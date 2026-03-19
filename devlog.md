@@ -1,5 +1,118 @@
 # OpenCodian 开发日志
 
+## 2026-03-19 Bug修复：消息显示与工具调用超时
+
+### 🔧 修复消息无法正常显示的问题
+
+**问题现象：**
+- AI 回复的消息在 UI 中无法正常显示
+- 日志显示消息已获取，但流提前退出
+- 控制台显示 `[OpenCodeService] Exiting - content stable`，但内容为空
+
+**根本原因：**
+```typescript
+// 原代码中的退出条件过于严格
+const hasSubstantialContent = lastContent.length > 100;  // 需要超过100字符
+const requiredStableCount = 8;  // 需要稳定8次轮询
+```
+- 如果 AI 回复短（少于100字符），`hasSubstantialContent` 永远为 false
+- 轮询会持续到 `maxAttempts`（300次），用户长时间看不到内容
+
+**解决方案：**
+1. 放宽退出条件：只要有任何内容（`> 0` 字符）即可退出
+2. 降低稳定计数要求：从 8 次降低到 5 次
+3. 添加兜底条件：50次轮询后无论是否有内容都退出
+
+```typescript
+const hasAnyContent = lastContent.length > 0 || lastThinkingContent.length > 0;
+const requiredStableCount = toolsPending ? 15 : 5;
+
+if (stableCount >= requiredStableCount && (hasAnyContent || attempts > 50) && !toolsPending) {
+  console.log('[OpenCodeService] Exiting - content stable');
+  break;
+}
+```
+
+**涉及文件：**
+- `src/core/opencode/OpenCodeService.ts`
+
+---
+
+### ⏱️ 添加工具调用超时机制
+
+**问题现象：**
+- 某些工具（如 `websearch_web_search_exa`）长时间处于 `running` 状态
+- 工具一直不返回结果，导致流永远无法退出
+- 用户界面显示转圈，但永远无法收到最终回复
+
+**根本原因：**
+- OpenCode 的工具调用是异步的
+- 某些工具可能因为网络问题或 API 错误永远卡住
+- 没有超时机制导致无限等待
+
+**解决方案：**
+添加工具调用超时检测（60秒）：
+
+```typescript
+// Track tool start times for timeout detection
+const toolStartTimes = new Map<string, number>();
+const TOOL_TIMEOUT_MS = 60000; // 60 seconds timeout
+
+// 记录工具开始时间
+if (!processedToolIds.has(toolId)) {
+  toolStartTimes.set(toolId, Date.now());
+  // ...
+}
+
+// 检测超时工具
+const timedOutTools: string[] = [];
+for (const toolId of pendingToolIds) {
+  const startTime = toolStartTimes.get(toolId);
+  if (startTime && (now - startTime) > TOOL_TIMEOUT_MS) {
+    console.log(`[OpenCodeService] Tool ${toolId} timed out`);
+    timedOutTools.push(toolId);
+  }
+}
+
+// 将超时工具标记为完成（带错误信息）
+for (const toolId of timedOutTools) {
+  yield {
+    type: 'tool_result',
+    toolUseId: toolId,
+    content: 'Error: Tool execution timed out after 60 seconds',
+  };
+}
+```
+
+**超时处理流程：**
+1. 新工具调用时记录开始时间
+2. 每次轮询检查是否有工具超过 60 秒
+3. 超时工具自动标记为完成，返回超时错误
+4. 流可以继续退出，显示已获取的内容
+
+**涉及文件：**
+- `src/core/opencode/OpenCodeService.ts`
+
+---
+
+### ✅ 修复验证
+
+**测试场景：**
+- 发送消息"搜索今日时事新闻"
+- AI 调用多个搜索工具
+- 其中一个工具卡住（websearch_web_search_exa）
+
+**修复前：**
+- 工具一直显示 running，无法退出
+- 用户看不到任何回复内容
+
+**修复后：**
+- 60秒后超时工具自动标记为错误
+- 流正常退出，显示 AI 的完整回复
+- 控制台显示：`Tool xxx timed out after 60000ms`
+
+---
+
 ## 2026-03-19 功能实现与改进
 
 本次会话完成了 OpenCodian 插件的核心功能实现和多项重要改进。

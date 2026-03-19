@@ -324,6 +324,10 @@ export class OpenCodeService {
       let lastMessageCount = 0;
       let lastAssistantMessageId: string | null = null;
       
+      // Track tool start times for timeout detection
+      const toolStartTimes = new Map<string, number>();
+      const TOOL_TIMEOUT_MS = 60000; // 60 seconds timeout for tools
+      
       while (attempts < maxAttempts) {
         await new Promise((resolve) => setTimeout(resolve, 600));
         
@@ -407,6 +411,8 @@ export class OpenCodeService {
               if (!processedToolIds.has(toolId)) {
                 console.log('[OpenCodeService] New tool use:', toolId, toolPart.tool);
                 processedToolIds.add(toolId);
+                // Record tool start time for timeout detection
+                toolStartTimes.set(toolId, Date.now());
                 yield { 
                   type: 'tool_use', 
                   id: toolId, 
@@ -441,16 +447,50 @@ export class OpenCodeService {
             stableCount++;
           }
           
-          // Exit logic: only exit if content is stable AND we have substantial content
-          // AND no tools are pending
-          const hasSubstantialContent = lastContent.length > 100;
-          const toolsPending = processedToolIds.size > 0 && 
-            Array.from(processedToolIds).some(id => !id.includes('_result'));
+          // Exit logic: exit if content is stable AND we have some content
+          // AND no tools are pending (or tools have timed out)
+          const hasAnyContent = lastContent.length > 0 || lastThinkingContent.length > 0;
           
-          // Wait longer if tools are pending
-          const requiredStableCount = toolsPending ? 15 : 8;
+          // Check for pending tools and detect timeouts
+          const pendingToolIds = Array.from(processedToolIds).filter(id => !id.includes('_result'));
+          const toolsPending = pendingToolIds.length > 0;
           
-          if (stableCount >= requiredStableCount && hasSubstantialContent && !toolsPending) {
+          // Check if any pending tools have timed out
+          const now = Date.now();
+          const timedOutTools: string[] = [];
+          for (const toolId of pendingToolIds) {
+            const startTime = toolStartTimes.get(toolId);
+            if (startTime && (now - startTime) > TOOL_TIMEOUT_MS) {
+              console.log(`[OpenCodeService] Tool ${toolId} timed out after ${TOOL_TIMEOUT_MS}ms`);
+              timedOutTools.push(toolId);
+            }
+          }
+          
+          // If tools have timed out, mark them as completed with timeout error
+          for (const toolId of timedOutTools) {
+            const resultKey = `${toolId}_result`;
+            if (!processedToolIds.has(resultKey)) {
+              processedToolIds.add(resultKey);
+              yield {
+                type: 'tool_result',
+                toolUseId: toolId,
+                content: 'Error: Tool execution timed out after 60 seconds',
+              };
+            }
+          }
+          
+          // Recalculate if tools are still pending after timeout handling
+          const hasTimedOutTools = timedOutTools.length > 0;
+          const stillPending = toolsPending && !hasTimedOutTools;
+          
+          // Wait longer if tools are pending (but not if they timed out)
+          const requiredStableCount = stillPending ? 15 : 5;
+          
+          // Exit conditions:
+          // 1. Content is stable for required count
+          // 2. We have some content OR we've waited long enough (50+ attempts)
+          // 3. No tools are pending (or all pending tools have timed out)
+          if (stableCount >= requiredStableCount && (hasAnyContent || attempts > 50) && !stillPending) {
             console.log('[OpenCodeService] Exiting - content stable. Text:', lastContent.length, 'Thinking:', lastThinkingContent.length);
             break;
           }
