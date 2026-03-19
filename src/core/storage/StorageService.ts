@@ -20,7 +20,7 @@ export class StorageService {
 
   constructor(plugin: OpenCodianPlugin) {
     this.app = plugin.app;
-    this.vaultPath = (this.app.vault.adapter as { basePath: string }).basePath;
+    this.vaultPath = (this.app.vault.adapter as unknown as { basePath: string }).basePath;
   }
 
   /** Initialize storage directories */
@@ -32,13 +32,14 @@ export class StorageService {
   /** Save conversation metadata */
   async saveConversation(conversation: Conversation): Promise<void> {
     const path = `${SESSIONS_DIR}/${conversation.id}.json`;
-    const data: ConversationMeta = {
+    const data: ConversationMeta & { openCodeSessionId?: string } = {
       id: conversation.id,
       title: conversation.title,
       createdAt: conversation.createdAt,
       updatedAt: conversation.updatedAt,
       lastResponseAt: conversation.lastResponseAt,
       messageCount: conversation.messages.length,
+      openCodeSessionId: conversation.openCodeSessionId,
     };
 
     await this.app.vault.adapter.write(

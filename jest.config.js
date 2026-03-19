@@ -13,6 +13,7 @@ module.exports = {
       moduleNameMapper: {
         '^@/(.*)$': '<rootDir>/src/$1',
         '^obsidian$': '<rootDir>/tests/__mocks__/obsidian.ts',
+        '^@opencode-ai/sdk$': '<rootDir>/tests/__mocks__/opencode-sdk.ts',
       },
       setupFilesAfterEnv: ['<rootDir>/tests/setup.ts'],
     },

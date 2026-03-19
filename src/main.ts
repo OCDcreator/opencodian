@@ -8,11 +8,14 @@
 import type { Editor, MarkdownView } from 'obsidian';
 import { Notice, Plugin } from 'obsidian';
 
+import { OpenCodianView } from './features/chat/OpenCodianView';
+
 import { OpenCodeService } from './core/opencode';
 import { StorageService } from './core/storage';
 import type { Conversation, OpenCodianSettings } from './core/types';
 import { DEFAULT_SETTINGS, VIEW_TYPE_OPENCODIAN } from './core/types';
 import { OpenCodianSettingTab } from './features/settings/OpenCodianSettings';
+import { setLocale } from './i18n';
 
 /** Main plugin class */
 export default class OpenCodianPlugin extends Plugin {
@@ -29,6 +32,9 @@ export default class OpenCodianPlugin extends Plugin {
 
     // Load settings
     await this.loadSettings();
+
+    // Initialize locale
+    setLocale(this.settings.locale);
 
     // Initialize OpenCode service
     this.openCodeService = new OpenCodeService(this.settings, {
@@ -53,11 +59,7 @@ export default class OpenCodianPlugin extends Plugin {
     // Register view
     this.registerView(
       VIEW_TYPE_OPENCODIAN,
-      (leaf) => {
-        // Lazy load view to reduce initial load time
-        const { OpenCodianView } = require('./features/chat/OpenCodianView');
-        return new OpenCodianView(leaf, this);
-      }
+      (leaf) => new OpenCodianView(leaf, this)
     );
 
     // Add ribbon icon
@@ -160,7 +162,8 @@ export default class OpenCodianPlugin extends Plugin {
       createdAt: meta.createdAt,
       updatedAt: meta.updatedAt,
       lastResponseAt: meta.lastResponseAt,
-      openCodeSessionId: meta.id, // Use conversation ID as session ID
+      // Use stored openCodeSessionId or fallback to conversation ID
+      openCodeSessionId: meta.openCodeSessionId ?? meta.id,
       messages: [],
     }));
   }

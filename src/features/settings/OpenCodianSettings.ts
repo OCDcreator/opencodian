@@ -7,6 +7,7 @@
 import { App, Notice, PluginSettingTab, Setting } from 'obsidian';
 
 import type { OpenCodianSettings } from '../../core/types';
+import { setLocale, t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 
 export class OpenCodianSettingTab extends PluginSettingTab {
@@ -22,7 +23,10 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     containerEl.empty();
     containerEl.addClass('opencodian-settings');
 
-    containerEl.createEl('h2', { text: 'OpenCodian Settings' });
+    containerEl.createEl('h2', { text: t('settings.title') });
+
+    // Language Settings (first so user can change language immediately)
+    this.addLanguageSettings(containerEl);
 
     // Server Settings
     this.addServerSettings(containerEl);
@@ -40,13 +44,35 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     this.addUserSettings(containerEl);
   }
 
-  /** Server settings section */
-  private addServerSettings(containerEl: HTMLElement) {
-    containerEl.createEl('h3', { text: 'Server' });
+  /** Language settings section */
+  private addLanguageSettings(containerEl: HTMLElement) {
+    containerEl.createEl('h3', { text: t('settings.language.title') });
 
     new Setting(containerEl)
-      .setName('Auto-start server')
-      .setDesc('Automatically start the OpenCode server when Obsidian loads')
+      .setName(t('settings.language.select.name'))
+      .setDesc(t('settings.language.select.desc'))
+      .addDropdown((dropdown) => {
+        dropdown.addOption('en', t('settings.language.en'));
+        dropdown.addOption('zh', t('settings.language.zh'));
+        dropdown
+          .setValue(this.plugin.settings.locale)
+          .onChange(async (value) => {
+            this.plugin.settings.locale = value as 'en' | 'zh';
+            setLocale(this.plugin.settings.locale);
+            await this.plugin.saveSettings();
+            // Refresh the settings UI to show new language
+            this.display();
+          });
+      });
+  }
+
+  /** Server settings section */
+  private addServerSettings(containerEl: HTMLElement) {
+    containerEl.createEl('h3', { text: t('settings.server.title') });
+
+    new Setting(containerEl)
+      .setName(t('settings.server.autoStart.name'))
+      .setDesc(t('settings.server.autoStart.desc'))
       .addToggle((toggle) =>
         toggle
           .setValue(this.plugin.settings.server.autoStart)
@@ -57,8 +83,8 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName('Server host')
-      .setDesc('Host address for the OpenCode server (default: 127.0.0.1)')
+      .setName(t('settings.server.host.name'))
+      .setDesc(t('settings.server.host.desc'))
       .addText((text) =>
         text
           .setPlaceholder('127.0.0.1')
@@ -70,8 +96,8 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName('Server port')
-      .setDesc('Port for the OpenCode server (default: 4096)')
+      .setName(t('settings.server.port.name'))
+      .setDesc(t('settings.server.port.desc'))
       .addText((text) =>
         text
           .setPlaceholder('4096')
@@ -85,105 +111,263 @@ export class OpenCodianSettingTab extends PluginSettingTab {
           })
       );
 
-    new Setting(containerEl)
-      .setName('Server status')
-      .setDesc('Current status of the OpenCode server')
+    // Server status display with refresh
+    const statusSetting = new Setting(containerEl)
+      .setName(t('settings.server.status.name'))
+      .setDesc(t('settings.server.status.desc'));
+    
+    let startBtn: import('obsidian').ButtonComponent;
+    let stopBtn: import('obsidian').ButtonComponent;
+    
+    // Track server state
+    let isActuallyRunning = false;
+    let isExternalServer = false;
+    
+    const updateStatus = async () => {
+      // Check actual server health
+      const isHealthy = await this.plugin.openCodeService.checkHealth();
+      isActuallyRunning = isHealthy;
+      
+      // Get internal status
+      const internalStatus = this.plugin.openCodeService.getServerStatus();
+      
+      // Check if server is external (running but plugin has no process)
+      isExternalServer = isHealthy && (internalStatus === 'stopped' || !this.plugin.openCodeService.isServerProcessRunning());
+      
+      // Determine display status
+      const displayStatus = isHealthy ? 'running' : 
+                           (internalStatus === 'starting' ? 'starting' : 'stopped');
+      
+      const statusKey = `settings.server.status.${displayStatus}` as const;
+      const statusText = t(statusKey) || displayStatus;
+      
+      // Update description with status and external warning if applicable
+      const healthIndicator = isHealthy ? '🟢' : '🔴';
+      let descText = `${t('settings.server.status.desc')} - ${healthIndicator} ${statusText}`;
+      if (isExternalServer) {
+        descText += ` (${t('settings.server.external.title')})`;
+      }
+      statusSetting.setDesc(descText);
+      
+      // Left button: always shows "Start", disabled when running or starting
+      if (startBtn) {
+        startBtn.setButtonText(t('settings.server.status.start'));
+        // Enable start button if server is not running OR if it's an external server
+        startBtn.setDisabled(isHealthy && !isExternalServer || internalStatus === 'starting');
+      }
+      
+      // Right button: always shows "Stop", disabled when not running or external
+      if (stopBtn) {
+        stopBtn.setButtonText(t('settings.server.status.stop'));
+        // Disable stop button for external servers (plugin can't stop them)
+        stopBtn.setDisabled(!isHealthy || isExternalServer);
+      }
+    };
+    
+    statusSetting
       .addButton((btn) => {
-        const updateStatus = () => {
-          const status = this.plugin.openCodeService.getServerStatus();
-          btn.setButtonText(status.charAt(0).toUpperCase() + status.slice(1));
-          btn.setDisabled(false);
-        };
-
-        updateStatus();
-
-        btn.setButtonText('Start')
+        startBtn = btn;
+        btn
+          .setButtonText(t('settings.server.status.start'))
           .setCta()
           .onClick(async () => {
             btn.setDisabled(true);
-            btn.setButtonText('Starting...');
             try {
               await this.plugin.openCodeService.start();
-              new Notice('OpenCode server started');
+              new Notice(t('settings.server.started'));
             } catch (error) {
-              const msg = error instanceof Error ? error.message : 'Failed to start';
+              const msg = error instanceof Error ? error.message : t('settings.server.startFailed');
               new Notice(msg);
             }
-            updateStatus();
+            await updateStatus();
           });
       })
       .addButton((btn) => {
-        btn.setButtonText('Stop')
+        stopBtn = btn;
+        btn
+          .setButtonText(t('settings.server.status.stop'))
           .onClick(async () => {
             btn.setDisabled(true);
             await this.plugin.openCodeService.stop();
-            new Notice('OpenCode server stopped');
+            new Notice(t('settings.server.stopped'));
+            await updateStatus();
+          });
+      })
+      .addButton((btn) => {
+        btn
+          .setButtonText(t('settings.server.status.refresh'))
+          .onClick(async () => {
+            btn.setDisabled(true);
+            const isHealthy = await this.plugin.openCodeService.checkHealth();
+            const internalStatus = this.plugin.openCodeService.getServerStatus();
+            
+            // Debug info
+            console.log('[Settings] Health check:', isHealthy, 'Internal status:', internalStatus);
+            console.log('[Settings] Start button disabled:', isHealthy || internalStatus === 'starting');
+            
+            await updateStatus();
+            
+            const statusKey = `settings.server.status.${internalStatus}` as const;
+            new Notice(`Health: ${isHealthy ? 'OK' : 'FAIL'} | Status: ${t(statusKey) || internalStatus}`);
             btn.setDisabled(false);
           });
       });
+    
+    // Initial status update
+    void updateStatus();
+    
+    // Set up interval to refresh status while settings tab is open
+    const statusInterval = window.setInterval(() => void updateStatus(), 2000);
+    
+    // Clean up interval when settings tab is closed
+    this.containerEl.addEventListener('unload', () => {
+      window.clearInterval(statusInterval);
+    }, { once: true });
   }
 
   /** Model settings section */
   private addModelSettings(containerEl: HTMLElement) {
-    containerEl.createEl('h3', { text: 'Model' });
+    containerEl.createEl('h3', { text: t('settings.model.title') });
+
+    // Provider dropdown - will be populated dynamically
+    let providerDropdown: import('obsidian').DropdownComponent;
+    let modelDropdown: import('obsidian').DropdownComponent;
+    
+    // Store available providers and models
+    let availableProviders: Array<{ id: string; name: string; models: Array<{ id: string; name: string }> }> = [];
+    
+    const loadAvailableModels = async () => {
+      try {
+        const result = await this.plugin.openCodeService.getAvailableModels();
+        availableProviders = result.providers;
+        
+        // Clear and repopulate provider dropdown
+        providerDropdown.selectEl.empty();
+        for (const provider of availableProviders) {
+          providerDropdown.addOption(provider.id, provider.name || provider.id);
+        }
+        
+        // Set current provider if available
+        if (availableProviders.find(p => p.id === this.plugin.settings.defaultProvider)) {
+          providerDropdown.setValue(this.plugin.settings.defaultProvider);
+        } else if (availableProviders.length > 0) {
+          // Default to first provider
+          providerDropdown.setValue(availableProviders[0].id);
+          this.plugin.settings.defaultProvider = availableProviders[0].id;
+          await this.plugin.saveSettings();
+        }
+        
+        // Update model dropdown for current provider
+        updateModelDropdown();
+        
+        return result;
+      } catch (error) {
+        console.error('Failed to load models:', error);
+        new Notice(t('settings.model.refresh.failed'));
+        return null;
+      }
+    };
+    
+    const updateModelDropdown = () => {
+      if (!modelDropdown) return;
+      
+      const currentProviderId = providerDropdown.getValue();
+      const provider = availableProviders.find(p => p.id === currentProviderId);
+      
+      // Clear and repopulate model dropdown
+      modelDropdown.selectEl.empty();
+      
+      if (provider && provider.models.length > 0) {
+        for (const model of provider.models) {
+          modelDropdown.addOption(model.id, model.name || model.id);
+        }
+        
+        // Set current model if available for this provider
+        const currentModel = this.plugin.settings.defaultModel;
+        console.log('[Settings] Current defaultModel:', currentModel, 'for provider:', currentProviderId);
+        
+        if (provider.models.find(m => m.id === currentModel)) {
+          modelDropdown.setValue(currentModel);
+          console.log('[Settings] Set model dropdown to:', currentModel);
+        } else {
+          // Default to first model and update settings
+          const firstModel = provider.models[0].id;
+          modelDropdown.setValue(firstModel);
+          this.plugin.settings.defaultModel = firstModel;
+          console.log('[Settings] Defaulted to first model:', firstModel);
+        }
+      } else {
+        modelDropdown.addOption('', 'No models available');
+      }
+    };
 
     new Setting(containerEl)
-      .setName('Default provider')
-      .setDesc('Default model provider to use')
+      .setName(t('settings.model.provider.name'))
+      .setDesc(t('settings.model.provider.desc'))
       .addDropdown((dropdown) => {
-        dropdown.addOption('anthropic', 'Anthropic');
-        dropdown.addOption('openai', 'OpenAI');
-        dropdown.addOption('local', 'Local');
-        dropdown
-          .setValue(this.plugin.settings.defaultProvider)
-          .onChange(async (value) => {
-            this.plugin.settings.defaultProvider = value;
-            await this.plugin.saveSettings();
-          });
+        providerDropdown = dropdown;
+        // Will be populated by loadAvailableModels()
+        dropdown.onChange(async (value) => {
+          this.plugin.settings.defaultProvider = value;
+          await this.plugin.saveSettings();
+          updateModelDropdown();
+        });
       });
 
     new Setting(containerEl)
-      .setName('Default model')
-      .setDesc('Default model ID to use (e.g., claude-3-5-sonnet-20241022)')
-      .addText((text) =>
-        text
-          .setPlaceholder('claude-3-5-sonnet-20241022')
-          .setValue(this.plugin.settings.defaultModel)
-          .onChange(async (value) => {
-            this.plugin.settings.defaultModel = value;
-            await this.plugin.saveSettings();
-          })
-      );
+      .setName(t('settings.model.model.name'))
+      .setDesc(t('settings.model.model.desc'))
+      .addDropdown((dropdown) => {
+        modelDropdown = dropdown;
+        dropdown.onChange(async (value) => {
+          console.log('[Settings] Model changed to:', value);
+          this.plugin.settings.defaultModel = value;
+          await this.plugin.saveSettings();
+          console.log('[Settings] Saved settings, defaultModel is now:', this.plugin.settings.defaultModel);
+        });
+      });
 
     new Setting(containerEl)
-      .setName('Refresh models')
-      .setDesc('Fetch available models from OpenCode server')
+      .setName(t('settings.model.refresh.name'))
+      .setDesc(t('settings.model.refresh.desc'))
       .addButton((btn) =>
         btn
-          .setButtonText('Refresh')
+          .setButtonText(t('settings.model.refresh.button'))
           .onClick(async () => {
-            try {
-              const models = await this.plugin.openCodeService.getAvailableModels();
-              console.log('Available models:', models);
-              new Notice(`Found ${models.providers.length} providers`);
-            } catch (error) {
-              new Notice('Failed to fetch models');
+            btn.setDisabled(true);
+            btn.setButtonText('Loading...');
+            
+            const result = await loadAvailableModels();
+            
+            btn.setDisabled(false);
+            btn.setButtonText(t('settings.model.refresh.button'));
+            
+            if (result) {
+              new Notice(t('settings.model.refresh.success', { count: result.providers.length }));
             }
           })
       );
+    
+    // Load models on initial display (if server is running)
+    void (async () => {
+      const isHealthy = await this.plugin.openCodeService.checkHealth();
+      if (isHealthy) {
+        await loadAvailableModels();
+      }
+    })();
   }
 
   /** Security settings section */
   private addSecuritySettings(containerEl: HTMLElement) {
-    containerEl.createEl('h3', { text: 'Security' });
+    containerEl.createEl('h3', { text: t('settings.security.title') });
 
     new Setting(containerEl)
-      .setName('Permission mode')
-      .setDesc('How to handle tool execution permissions')
+      .setName(t('settings.security.permissionMode.name'))
+      .setDesc(t('settings.security.permissionMode.desc'))
       .addDropdown((dropdown) => {
-        dropdown.addOption('yolo', 'YOLO - Auto-approve all');
-        dropdown.addOption('normal', 'Normal - Prompt for approval');
-        dropdown.addOption('plan', 'Plan - Plan mode');
+        dropdown.addOption('yolo', t('settings.security.permissionMode.yolo'));
+        dropdown.addOption('normal', t('settings.security.permissionMode.normal'));
+        dropdown.addOption('plan', t('settings.security.permissionMode.plan'));
         dropdown
           .setValue(this.plugin.settings.permissionMode)
           .onChange(async (value) => {
@@ -193,8 +377,8 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       });
 
     new Setting(containerEl)
-      .setName('Enable command blocklist')
-      .setDesc('Block dangerous bash commands')
+      .setName(t('settings.security.blocklist.name'))
+      .setDesc(t('settings.security.blocklist.desc'))
       .addToggle((toggle) =>
         toggle
           .setValue(this.plugin.settings.enableBlocklist)
@@ -205,8 +389,8 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName('Allow external access')
-      .setDesc('Allow AI to access files outside the vault')
+      .setName(t('settings.security.externalAccess.name'))
+      .setDesc(t('settings.security.externalAccess.desc'))
       .addToggle((toggle) =>
         toggle
           .setValue(this.plugin.settings.allowExternalAccess)
@@ -217,8 +401,8 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName('Allowed export paths')
-      .setDesc('Paths where AI can write files (one per line)')
+      .setName(t('settings.security.exportPaths.name'))
+      .setDesc(t('settings.security.exportPaths.desc'))
       .addTextArea((text) => {
         text
           .setValue(this.plugin.settings.allowedExportPaths.join('\n'))
@@ -235,11 +419,11 @@ export class OpenCodianSettingTab extends PluginSettingTab {
 
   /** UI settings section */
   private addUISettings(containerEl: HTMLElement) {
-    containerEl.createEl('h3', { text: 'User Interface' });
+    containerEl.createEl('h3', { text: t('settings.ui.title') });
 
     new Setting(containerEl)
-      .setName('Maximum tabs')
-      .setDesc('Maximum number of conversation tabs (3-10)')
+      .setName(t('settings.ui.maxTabs.name'))
+      .setDesc(t('settings.ui.maxTabs.desc'))
       .addSlider((slider) =>
         slider
           .setLimits(3, 10, 1)
@@ -252,11 +436,11 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName('Tab bar position')
-      .setDesc('Where to display the tab bar')
+      .setName(t('settings.ui.tabPosition.name'))
+      .setDesc(t('settings.ui.tabPosition.desc'))
       .addDropdown((dropdown) => {
-        dropdown.addOption('input', 'Near input');
-        dropdown.addOption('header', 'In header');
+        dropdown.addOption('input', t('settings.ui.tabPosition.input'));
+        dropdown.addOption('header', t('settings.ui.tabPosition.header'));
         dropdown
           .setValue(this.plugin.settings.tabBarPosition)
           .onChange(async (value) => {
@@ -266,8 +450,8 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       });
 
     new Setting(containerEl)
-      .setName('Auto-scroll')
-      .setDesc('Automatically scroll to new messages')
+      .setName(t('settings.ui.autoScroll.name'))
+      .setDesc(t('settings.ui.autoScroll.desc'))
       .addToggle((toggle) =>
         toggle
           .setValue(this.plugin.settings.enableAutoScroll)
@@ -278,8 +462,8 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName('Open in main tab')
-      .setDesc('Open chat in main editor area instead of sidebar')
+      .setName(t('settings.ui.openInMainTab.name'))
+      .setDesc(t('settings.ui.openInMainTab.desc'))
       .addToggle((toggle) =>
         toggle
           .setValue(this.plugin.settings.openInMainTab)
@@ -292,11 +476,11 @@ export class OpenCodianSettingTab extends PluginSettingTab {
 
   /** User settings section */
   private addUserSettings(containerEl: HTMLElement) {
-    containerEl.createEl('h3', { text: 'User' });
+    containerEl.createEl('h3', { text: t('settings.user.title') });
 
     new Setting(containerEl)
-      .setName('Your name')
-      .setDesc('How the AI should address you')
+      .setName(t('settings.user.name.name'))
+      .setDesc(t('settings.user.name.desc'))
       .addText((text) =>
         text
           .setPlaceholder('User')
@@ -308,8 +492,8 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName('System prompt')
-      .setDesc('Custom instructions for the AI')
+      .setName(t('settings.user.systemPrompt.name'))
+      .setDesc(t('settings.user.systemPrompt.desc'))
       .addTextArea((text) => {
         text
           .setPlaceholder('You are a helpful assistant...')
@@ -322,8 +506,8 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       });
 
     new Setting(containerEl)
-      .setName('Excluded tags')
-      .setDesc('Tags to exclude from context (one per line)')
+      .setName(t('settings.user.excludedTags.name'))
+      .setDesc(t('settings.user.excludedTags.desc'))
       .addTextArea((text) => {
         text
           .setPlaceholder('system\nprivate')

@@ -6,7 +6,7 @@
  */
 
 import { spawn, type ChildProcess } from 'child_process';
-import { Notice } from 'obsidian';
+import { Notice, requestUrl } from 'obsidian';
 import * as net from 'net';
 
 import type { OpenCodeServerConfig } from './types';
@@ -91,7 +91,7 @@ export class ServerManager {
       await this.spawnServer();
 
       // Wait for server to be healthy
-      await this.waitForHealthy(this.config.timeout);
+      await this.waitForHealthy(this.config.timeout ?? 30000);
 
       this.setStatus('running');
       new Notice('OpenCode server started');
@@ -105,26 +105,68 @@ export class ServerManager {
 
   /** Stop the OpenCode server */
   async stop(): Promise<void> {
-    if (!this.process || this.status === 'stopped') {
+    if (!this.process) {
+      console.log('[ServerManager] No process to stop');
+      this.setStatus('stopped');
       return;
     }
 
-    return new Promise((resolve) => {
-      const timeout = setTimeout(() => {
-        // Force kill if graceful shutdown fails
-        this.process?.kill('SIGKILL');
-        this.cleanup();
-        resolve();
-      }, 10000);
+    if (this.status === 'stopped') {
+      console.log('[ServerManager] Server already stopped');
+      return;
+    }
 
-      this.process?.once('exit', () => {
+    console.log('[ServerManager] Stopping server...');
+    this.setStatus('stopped');
+
+    return new Promise((resolve) => {
+      let resolved = false;
+      
+      const doResolve = () => {
+        if (!resolved) {
+          resolved = true;
+          this.cleanup();
+          resolve();
+        }
+      };
+
+      // Set a timeout to force kill
+      const timeout = setTimeout(() => {
+        console.log('[ServerManager] Force killing server process...');
+        try {
+          // Try SIGKILL on Unix, or terminate on Windows
+          const killed = this.process?.kill(process.platform === 'win32' ? undefined : 'SIGKILL');
+          if (!killed) {
+            console.warn('[ServerManager] Process kill returned false, process may have already exited');
+          }
+        } catch (e) {
+          console.error('[ServerManager] Error killing process:', e);
+        }
+        doResolve();
+      }, 5000);
+
+      // Listen for process exit
+      this.process?.once('exit', (code, signal) => {
+        console.log(`[ServerManager] Process exited with code ${code}, signal ${signal}`);
         clearTimeout(timeout);
-        this.cleanup();
-        resolve();
+        doResolve();
       });
 
       // Try graceful shutdown first
-      this.process?.kill('SIGTERM');
+      try {
+        const terminated = this.process?.kill(process.platform === 'win32' ? undefined : 'SIGTERM');
+        console.log(`[ServerManager] SIGTERM sent, result: ${terminated}`);
+        
+        // If kill returns false, the process might already be dead
+        if (terminated === false) {
+          clearTimeout(timeout);
+          doResolve();
+        }
+      } catch (e) {
+        console.error('[ServerManager] Error sending SIGTERM:', e);
+        clearTimeout(timeout);
+        doResolve();
+      }
     });
   }
 
@@ -135,17 +177,18 @@ export class ServerManager {
     await this.start();
   }
 
-  /** Check if server is healthy */
+  /** Check if server is healthy using Obsidian's requestUrl (bypasses CORS) */
   async checkHealth(timeout = 5000): Promise<boolean> {
     return new Promise((resolve) => {
       const timer = setTimeout(() => resolve(false), timeout);
 
-      const healthUrl = `http://${this.config.host}:${this.config.port}/health`;
+      // Note: OpenCode API uses /global/health endpoint
+      const healthUrl = `http://${this.config.host}:${this.config.port}/global/health`;
       
-      fetch(healthUrl)
+      requestUrl({ url: healthUrl, method: 'GET' })
         .then((res) => {
           clearTimeout(timer);
-          resolve(res.ok);
+          resolve(res.status === 200);
         })
         .catch(() => {
           clearTimeout(timer);
@@ -169,9 +212,9 @@ export class ServerManager {
 
         // Spawn server process
         this.process = spawn(opencodePath, [
-          'server',
+          'serve',
           '--port', String(this.config.port),
-          '--host', this.config.host,
+          '--hostname', this.config.host,
         ], {
           detached: false,
           stdio: ['ignore', 'pipe', 'pipe'],

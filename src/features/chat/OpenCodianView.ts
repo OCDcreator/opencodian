@@ -5,11 +5,13 @@
  */
 
 import type { EventRef, WorkspaceLeaf } from 'obsidian';
-import { ItemView, Notice, Scope, setIcon } from 'obsidian';
+import { Component, ItemView, Menu, Notice, Scope, setIcon } from 'obsidian';
 
 import { VIEW_TYPE_OPENCODIAN } from '../../core/types';
-import type { Conversation } from '../../core/types';
+import type { ChatMessage, Conversation } from '../../core/types';
+import { OpenCodeService } from '../../core/opencode';
 import type OpenCodianPlugin from '../../main';
+import { MarkdownRenderService } from '../../utils/markdown';
 
 /** Logo SVG */
 const LOGO_SVG = {
@@ -22,7 +24,7 @@ const LOGO_SVG = {
 
 export class OpenCodianView extends ItemView {
   private plugin: OpenCodianPlugin;
-  private containerEl: HTMLElement | null = null;
+  private chatContainerEl: HTMLElement | null = null;
   private messagesContainer: HTMLElement | null = null;
   private inputContainer: HTMLElement | null = null;
   private currentConversation: Conversation | null = null;
@@ -73,17 +75,17 @@ export class OpenCodianView extends ItemView {
 
   /** Build the UI structure */
   private buildUI() {
-    this.containerEl = this.contentEl.createDiv({ cls: 'opencodian-container' });
+    this.chatContainerEl = this.contentEl.createDiv({ cls: 'opencodian-container' });
 
     // Header
-    const header = this.containerEl.createDiv({ cls: 'opencodian-header' });
+    const header = this.chatContainerEl.createDiv({ cls: 'opencodian-header' });
     this.buildHeader(header);
 
     // Messages area
-    this.messagesContainer = this.containerEl.createDiv({ cls: 'opencodian-messages' });
+    this.messagesContainer = this.chatContainerEl.createDiv({ cls: 'opencodian-messages' });
 
     // Input area
-    this.inputContainer = this.containerEl.createDiv({ cls: 'opencodian-input-area' });
+    this.inputContainer = this.chatContainerEl.createDiv({ cls: 'opencodian-input-area' });
     this.buildInputArea(this.inputContainer);
   }
 
@@ -119,8 +121,8 @@ export class OpenCodianView extends ItemView {
     const historyBtn = actions.createDiv({ cls: 'opencodian-header-btn' });
     setIcon(historyBtn, 'history');
     historyBtn.setAttribute('aria-label', 'History');
-    historyBtn.addEventListener('click', () => {
-      this.showConversationHistory();
+    historyBtn.addEventListener('click', (event) => {
+      this.showConversationHistory(event);
     });
 
     // Settings button
@@ -238,7 +240,7 @@ export class OpenCodianView extends ItemView {
 
       // Render messages
       for (const { info, parts } of messages) {
-        const message = this.plugin.openCodeService.constructor['openCodeMessageToChatMessage'](
+        const message = OpenCodeService.openCodeMessageToChatMessage(
           info,
           parts
         );
@@ -253,10 +255,107 @@ export class OpenCodianView extends ItemView {
   }
 
   /** Show conversation history */
-  private showConversationHistory() {
-    // TODO: Implement conversation history dropdown/modal
+  private showConversationHistory(event: MouseEvent) {
     const conversations = this.plugin.getConversations();
-    console.log('Conversations:', conversations);
+    
+    if (conversations.length === 0) {
+      new Notice('No conversation history');
+      return;
+    }
+
+    const menu = new Menu();
+    
+    // Add each conversation to the menu
+    for (const conv of conversations) {
+      const isActive = this.currentConversation?.id === conv.id;
+      const title = conv.title || 'Untitled';
+      const date = new Date(conv.updatedAt).toLocaleDateString();
+      
+      menu.addItem((item) => {
+        item
+          .setTitle(`${title}${isActive ? ' (current)' : ''}`)
+          .setIcon(isActive ? 'check' : 'message-square')
+          .setSection('conversations')
+          .onClick(() => {
+            if (!isActive) {
+              void this.loadConversation(conv.id);
+            }
+          });
+        
+        // Add tooltip with creation date
+        const el = item.dom as HTMLElement;
+        el.setAttribute('title', `Created: ${date}`);
+      });
+    }
+    
+    // Add separator and delete options
+    if (conversations.length > 0) {
+      menu.addSeparator();
+      
+      menu.addItem((item) => {
+        item
+          .setTitle('Delete current conversation')
+          .setIcon('trash')
+          .setSection('actions')
+          .onClick(() => {
+            void this.deleteCurrentConversation();
+          });
+      });
+      
+      if (conversations.length > 1) {
+        menu.addItem((item) => {
+          item
+            .setTitle('Delete all conversations')
+            .setIcon('trash-2')
+            .setSection('actions')
+            .onClick(() => {
+              void this.deleteAllConversations();
+            });
+        });
+      }
+    }
+    
+    // Show the menu below the history button
+    menu.showAtMouseEvent(event);
+  }
+
+  /** Delete current conversation */
+  private async deleteCurrentConversation() {
+    if (!this.currentConversation) return;
+    
+    const confirmed = confirm(
+      `Are you sure you want to delete "${this.currentConversation.title}"?`
+    );
+    if (!confirmed) return;
+    
+    const deletedId = this.currentConversation.id;
+    await this.plugin.deleteConversation(deletedId);
+    
+    // Load another conversation or create new one
+    const remaining = this.plugin.getConversations();
+    if (remaining.length > 0) {
+      await this.loadConversation(remaining[0].id);
+    } else {
+      await this.createNewConversation();
+    }
+    
+    new Notice('Conversation deleted');
+  }
+
+  /** Delete all conversations */
+  private async deleteAllConversations() {
+    const confirmed = confirm(
+      'Are you sure you want to delete ALL conversations? This cannot be undone.'
+    );
+    if (!confirmed) return;
+    
+    const conversations = this.plugin.getConversations();
+    for (const conv of conversations) {
+      await this.plugin.deleteConversation(conv.id);
+    }
+    
+    await this.createNewConversation();
+    new Notice('All conversations deleted');
   }
 
   /** Send a message */
@@ -289,16 +388,26 @@ export class OpenCodianView extends ItemView {
     try {
       for await (const chunk of stream) {
         if (chunk.type === 'text') {
+          // Accumulate the message content
           assistantMessage += chunk.content;
+          // Update the display with full content
           this.updateMessageContent(messageEl, assistantMessage);
+          console.log('[OpenCodianView] Received chunk:', chunk.content.substring(0, 50) + '...');
         } else if (chunk.type === 'tool_use') {
           this.renderToolUse(chunk.name, chunk.input);
         } else if (chunk.type === 'error') {
+          console.error('[OpenCodianView] Stream error:', chunk.content);
           new Notice(chunk.content);
           break;
+        } else if (chunk.type === 'message_start') {
+          console.log('[OpenCodianView] Message stream started');
+        } else if (chunk.type === 'message_stop') {
+          console.log('[OpenCodianView] Message stream stopped');
         }
         this.scrollToBottom();
       }
+      
+      console.log('[OpenCodianView] Final message:', assistantMessage.substring(0, 100) + '...');
     } finally {
       this.isStreaming = false;
     }

@@ -82,6 +82,7 @@ export interface ConversationMeta {
   updatedAt: number;
   lastResponseAt?: number;
   messageCount: number;
+  openCodeSessionId?: string;
 }
 
 /** Conversation */
