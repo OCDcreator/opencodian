@@ -12,6 +12,8 @@ import type { ChatMessage, Conversation } from '../../core/types';
 import { OpenCodeService } from '../../core/opencode';
 import type OpenCodianPlugin from '../../main';
 import { MarkdownRenderService } from '../../utils/markdown';
+import { StreamController } from '../../utils/streaming';
+import type { ContentBlock } from '../../utils/streaming';
 
 /** Logo SVG */
 const LOGO_SVG = {
@@ -29,13 +31,28 @@ export class OpenCodianView extends ItemView {
   private inputContainer: HTMLElement | null = null;
   private currentConversation: Conversation | null = null;
   private isStreaming = false;
+  private markdownService: MarkdownRenderService | null = null;
+  private messageComponent: Component;
 
   // Event refs for cleanup
   private eventRefs: EventRef[] = [];
 
+  // Track rendered messages for streaming updates
+  private streamingMessageEl: HTMLElement | null = null;
+  private streamingContentEl: HTMLElement | null = null;
+
+  // Model selector state
+  private currentModelSelect: HTMLSelectElement | null = null;
+  private availableModels: Array<{ provider: string; model: string; label: string }> = [];
+  private sessionModelOverrides: Map<string, { provider: string; model: string }> = new Map();
+
+  // Streaming content state
+  private streamController: StreamController | null = null;
+
   constructor(leaf: WorkspaceLeaf, plugin: OpenCodianPlugin) {
     super(leaf);
     this.plugin = plugin;
+    this.messageComponent = new Component();
   }
 
   getViewType(): string {
@@ -54,6 +71,22 @@ export class OpenCodianView extends ItemView {
     // Build UI
     this.buildUI();
 
+    // Initialize markdown service
+    if (this.messagesContainer) {
+      this.markdownService = new MarkdownRenderService({
+        app: this.app,
+        component: this.messageComponent,
+        container: this.messagesContainer,
+      });
+
+      // Initialize streaming controller
+      this.streamController = new StreamController({
+        containerEl: this.messagesContainer,
+        markdownService: this.markdownService,
+        scrollToBottom: () => this.scrollToBottom(),
+      });
+    }
+
     // Wire events
     this.wireEventHandlers();
 
@@ -71,6 +104,10 @@ export class OpenCodianView extends ItemView {
       this.plugin.app.vault.offref(ref);
     }
     this.eventRefs = [];
+
+    // Cleanup markdown service
+    this.messageComponent.unload();
+    this.markdownService = null;
   }
 
   /** Build the UI structure */
@@ -177,13 +214,18 @@ export class OpenCodianView extends ItemView {
       }
     });
 
-    // Model selector
-    const modelSelector = container.createDiv({ cls: 'opencodian-model-selector' });
-    modelSelector.createEl('span', { text: 'Model: ' });
-    const modelSelect = modelSelector.createEl('select');
-    modelSelect.createEl('option', { value: 'default', text: 'Default' });
+    // Bottom toolbar for model selector and future buttons
+    const toolbar = container.createDiv({ cls: 'opencodian-input-toolbar' });
     
-    // TODO: Populate with available models from OpenCode
+    // Left side: Model selector
+    const modelSelector = toolbar.createDiv({ cls: 'opencodian-model-selector' });
+    const modelSelect = modelSelector.createEl('select');
+    
+    // Initialize model selector
+    void this.initializeModelSelector(modelSelect);
+    
+    // Right side: Reserved for future buttons (attach file, etc.)
+    // const toolbarRight = toolbar.createDiv({ cls: 'opencodian-toolbar-right' });
   }
 
   /** Wire event handlers */
@@ -244,7 +286,7 @@ export class OpenCodianView extends ItemView {
           info,
           parts
         );
-        this.renderMessage(message);
+        await this.renderMessage(message);
       }
     } catch (error) {
       console.error('Failed to load messages:', error);
@@ -252,6 +294,9 @@ export class OpenCodianView extends ItemView {
 
     // Scroll to bottom
     this.scrollToBottom();
+    
+    // Update model selector to reflect this session's model
+    this.updateModelSelectorDisplay();
   }
 
   /** Show conversation history */
@@ -367,7 +412,7 @@ export class OpenCodianView extends ItemView {
     if (!this.currentConversation) return;
 
     // Add user message to UI
-    this.renderMessage({
+    await this.renderMessage({
       id: `user-${Date.now()}`,
       role: 'user',
       content,
@@ -377,39 +422,51 @@ export class OpenCodianView extends ItemView {
     this.isStreaming = true;
     this.scrollToBottom();
 
-    // Stream response
+    // Stream response with current session model
+    const modelOptions = this.getSendMessageOptions();
     const stream = this.plugin.openCodeService.sendMessage(content, {
       sessionId: this.currentConversation.openCodeSessionId,
+      ...modelOptions,
     });
 
-    let assistantMessage = '';
-    const messageEl = this.createAssistantMessageElement();
+    // Create assistant message element and get content container
+    const { contentEl: messageContentEl } = this.createAssistantMessageElement();
+
+    // Initialize streaming controller
+    if (this.streamController) {
+      this.streamController.startStream(messageContentEl);
+    }
 
     try {
       for await (const chunk of stream) {
-        if (chunk.type === 'text') {
-          // Accumulate the message content
-          assistantMessage += chunk.content;
-          // Update the display with full content
-          this.updateMessageContent(messageEl, assistantMessage);
-          console.log('[OpenCodianView] Received chunk:', chunk.content.substring(0, 50) + '...');
-        } else if (chunk.type === 'tool_use') {
-          this.renderToolUse(chunk.name, chunk.input);
-        } else if (chunk.type === 'error') {
-          console.error('[OpenCodianView] Stream error:', chunk.content);
-          new Notice(chunk.content);
-          break;
-        } else if (chunk.type === 'message_start') {
-          console.log('[OpenCodianView] Message stream started');
-        } else if (chunk.type === 'message_stop') {
-          console.log('[OpenCodianView] Message stream stopped');
+        // Convert OpenCode chunks to streaming format
+        const streamingChunk = this.convertToStreamingChunk(chunk);
+        if (streamingChunk && this.streamController) {
+          await this.streamController.handleChunk(streamingChunk);
         }
-        this.scrollToBottom();
       }
       
-      console.log('[OpenCodianView] Final message:', assistantMessage.substring(0, 100) + '...');
+      // Signal completion
+      if (this.streamController) {
+        await this.streamController.handleChunk({ type: 'done' });
+      }
     } finally {
       this.isStreaming = false;
+      
+      // Add timestamp to the streamed message
+      if (this.streamingMessageEl) {
+        const timeEl = this.streamingMessageEl.querySelector('.opencodian-message-time');
+        if (timeEl) {
+          timeEl.textContent = new Date().toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit',
+          });
+        }
+      }
+      
+      // Clear streaming tracking
+      this.streamingMessageEl = null;
+      this.streamingContentEl = null;
     }
 
     // Update conversation
@@ -425,7 +482,7 @@ export class OpenCodianView extends ItemView {
   }
 
   /** Render a message */
-  private renderMessage(message: { id: string; role: string; content: string; timestamp: number }) {
+  private async renderMessage(message: { id: string; role: string; content: string; timestamp: number }) {
     const messageEl = this.messagesContainer?.createDiv({
       cls: `opencodian-message opencodian-message--${message.role}`,
     });
@@ -442,7 +499,16 @@ export class OpenCodianView extends ItemView {
 
     // Content
     const content = messageEl.createDiv({ cls: 'opencodian-message-content' });
-    content.createEl('div', { cls: 'opencodian-message-text', text: message.content });
+    const textEl = content.createDiv({ cls: 'opencodian-message-text' });
+
+    // Render content
+    if (message.role === 'assistant' && this.markdownService) {
+      // Use Markdown rendering for assistant messages
+      await this.markdownService.render(textEl, message.content);
+    } else {
+      // Use plain text for user messages
+      textEl.textContent = message.content;
+    }
 
     // Timestamp
     const time = new Date(message.timestamp).toLocaleTimeString([], {
@@ -455,25 +521,41 @@ export class OpenCodianView extends ItemView {
   }
 
   /** Create assistant message element for streaming */
-  private createAssistantMessageElement(): HTMLElement {
+  private createAssistantMessageElement(): { messageEl: HTMLElement; contentEl: HTMLElement } {
     const messageEl = this.messagesContainer?.createDiv({
       cls: 'opencodian-message opencodian-message--assistant',
     });
 
-    if (!messageEl) return document.createElement('div');
+    if (!messageEl) {
+      const fallback = document.createElement('div');
+      return { messageEl: fallback, contentEl: fallback };
+    }
 
     const avatar = messageEl.createDiv({ cls: 'opencodian-message-avatar' });
     setIcon(avatar, 'bot');
 
     const content = messageEl.createDiv({ cls: 'opencodian-message-content' });
-    content.createEl('div', { cls: 'opencodian-message-text' });
+    const textEl = content.createDiv({ cls: 'opencodian-message-text' });
 
-    return content.querySelector('.opencodian-message-text') as HTMLElement || messageEl;
+    // Add timestamp placeholder
+    content.createEl('div', { cls: 'opencodian-message-time', text: '' });
+
+    // Track for streaming updates
+    this.streamingMessageEl = messageEl;
+    this.streamingContentEl = textEl;
+
+    return { messageEl, contentEl: textEl };
   }
 
   /** Update message content during streaming */
-  private updateMessageContent(element: HTMLElement, content: string) {
-    element.textContent = content;
+  private async updateMessageContent(contentEl: HTMLElement, content: string) {
+    if (!this.markdownService) {
+      contentEl.textContent = content;
+      return;
+    }
+
+    // Use markdown rendering for streaming updates
+    await this.markdownService.render(contentEl, content);
   }
 
   /** Render tool use */
@@ -493,6 +575,185 @@ export class OpenCodianView extends ItemView {
   private scrollToBottom() {
     if (this.messagesContainer) {
       this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
+    }
+  }
+
+  /** Initialize model selector dropdown */
+  private async initializeModelSelector(selectEl: HTMLSelectElement): Promise<void> {
+    this.currentModelSelect = selectEl;
+    
+    // Load available models
+    await this.loadAvailableModels();
+    
+    // Set initial value
+    this.updateModelSelectorDisplay();
+    
+    // Setup hover tooltip
+    let hoverTimeout: number | null = null;
+    selectEl.addEventListener('mouseenter', () => {
+      hoverTimeout = window.setTimeout(() => {
+        const current = this.getCurrentSessionModel();
+        selectEl.setAttribute('title', `Using: ${current.provider}/${current.model}`);
+      }, 1000);
+    });
+    
+    selectEl.addEventListener('mouseleave', () => {
+      if (hoverTimeout) {
+        clearTimeout(hoverTimeout);
+        hoverTimeout = null;
+      }
+    });
+    
+    // Handle model change
+    selectEl.addEventListener('change', () => {
+      const selectedValue = selectEl.value;
+      if (selectedValue) {
+        const [provider, model] = selectedValue.split('::');
+        if (provider && model) {
+          this.switchModel(provider, model);
+        }
+      }
+    });
+  }
+
+  /** Load available models from OpenCode service */
+  private async loadAvailableModels(): Promise<void> {
+    try {
+      const { providers } = await this.plugin.openCodeService.getAvailableModels();
+      this.availableModels = [];
+      
+      for (const provider of providers) {
+        for (const model of provider.models) {
+          this.availableModels.push({
+            provider: provider.id,
+            model: model.id,
+            label: `${provider.name}/${model.name}`,
+          });
+        }
+      }
+      
+      // Populate dropdown
+      if (this.currentModelSelect) {
+        this.currentModelSelect.empty();
+        
+        for (const { provider, model, label } of this.availableModels) {
+          const option = this.currentModelSelect.createEl('option');
+          option.value = `${provider}::${model}`;
+          option.textContent = label;
+        }
+      }
+    } catch (error) {
+      console.error('[OpenCodianView] Failed to load models:', error);
+    }
+  }
+
+  /** Update model selector to show current model */
+  private updateModelSelectorDisplay(): void {
+    if (!this.currentModelSelect) return;
+    
+    const current = this.getCurrentSessionModel();
+    const value = `${current.provider}::${current.model}`;
+    
+    // Check if option exists
+    const option = this.currentModelSelect.querySelector(`option[value="${value}"]`);
+    if (option) {
+      this.currentModelSelect.value = value;
+    } else {
+      // Add temporary option if model not in list
+      const tempOption = this.currentModelSelect.createEl('option');
+      tempOption.value = value;
+      tempOption.textContent = `${current.provider}/${current.model}`;
+      this.currentModelSelect.value = value;
+    }
+  }
+
+  /** Get current model for this session */
+  private getCurrentSessionModel(): { provider: string; model: string } {
+    if (this.currentConversation) {
+      const override = this.sessionModelOverrides.get(this.currentConversation.id);
+      if (override) {
+        return override;
+      }
+    }
+    return {
+      provider: this.plugin.settings.defaultProvider,
+      model: this.plugin.settings.defaultModel,
+    };
+  }
+
+  /** Switch model for current session */
+  private switchModel(provider: string, model: string): void {
+    if (!this.currentConversation) return;
+    
+    // Store override for this session
+    this.sessionModelOverrides.set(this.currentConversation.id, { provider, model });
+    
+    // Update display
+    this.updateModelSelectorDisplay();
+    
+    // Show notification
+    new Notice(`Model switched to: ${provider}/${model}`);
+    
+    console.log('[OpenCodianView] Model switched:', { 
+      sessionId: this.currentConversation.id,
+      provider, 
+      model 
+    });
+  }
+
+  /** Get model options for sendMessage */
+  private getSendMessageOptions(): { provider?: string; model?: string } {
+    const current = this.getCurrentSessionModel();
+    return {
+      provider: current.provider,
+      model: current.model,
+    };
+  }
+
+  /** Convert OpenCode stream chunk to streaming module format */
+  private convertToStreamingChunk(
+    chunk: import('../../core/types').StreamChunk
+  ): import('../../utils/streaming').StreamChunk | null {
+    console.log('[OpenCodianView] Converting chunk:', chunk.type, chunk);
+    
+    switch (chunk.type) {
+      case 'text':
+        return { type: 'text', content: chunk.content };
+      
+      case 'thinking':
+        console.log('[OpenCodianView] Converting thinking chunk');
+        return { type: 'thinking', content: chunk.content };
+      
+      case 'tool_use':
+        console.log('[OpenCodianView] Converting tool_use chunk');
+        return {
+          type: 'tool_use',
+          id: chunk.id,
+          name: chunk.name,
+          input: chunk.input,
+        };
+      
+      case 'tool_result':
+        console.log('[OpenCodianView] Converting tool_result chunk');
+        return {
+          type: 'tool_result',
+          id: chunk.toolUseId,
+          content: chunk.content,
+        };
+      
+      case 'error':
+        return { type: 'error', content: chunk.content };
+      
+      case 'message_start':
+      case 'message_stop':
+      case 'usage':
+      case 'content_block_start':
+      case 'content_block_stop':
+        // These chunks don't need to be converted for rendering
+        return null;
+      
+      default:
+        return null;
     }
   }
 }

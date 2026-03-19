@@ -316,60 +316,152 @@ export class OpenCodeService {
 
       // Poll for response updates
       let attempts = 0;
-      const maxAttempts = 120; // 120 seconds timeout
+      const maxAttempts = 300;
       let lastContent = '';
-      let assistantMessageFound = false;
+      let lastThinkingContent = '';
+      let processedToolIds = new Set<string>();
+      let stableCount = 0;
+      let lastMessageCount = 0;
+      let lastAssistantMessageId: string | null = null;
       
       while (attempts < maxAttempts) {
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+        await new Promise((resolve) => setTimeout(resolve, 600));
         
         try {
           const messages = await this.getSessionMessages(sessionId);
-          const lastMessage = messages[messages.length - 1];
           
-          if (lastMessage && lastMessage.info.role === 'assistant') {
-            assistantMessageFound = true;
-            
-            // Assistant has responded - check for content
-            const textParts = lastMessage.parts.filter((p): p is Part & { text: string } =>
-              p.type === 'text' && typeof p.text === 'string'
-            );
-            const currentContent = textParts.map((p) => p.text).join('');
-            
-            // If we have new content, yield the delta
-            if (currentContent.length > lastContent.length) {
-              const delta = currentContent.slice(lastContent.length);
-              yield { type: 'text', content: delta };
-              lastContent = currentContent;
-            }
-            
-            // Check if message is complete (you may need to adjust this logic)
-            // For now, we continue polling for a bit to ensure we get all content
-            if (currentContent && attempts > 5) {
-              // Give it a few more seconds to ensure complete
-              await new Promise((resolve) => setTimeout(resolve, 2000));
-              
-              // Check one more time for any final updates
-              const finalMessages = await this.getSessionMessages(sessionId);
-              const finalMessage = finalMessages[finalMessages.length - 1];
-              if (finalMessage && finalMessage.info.role === 'assistant') {
-                const finalParts = finalMessage.parts.filter((p): p is Part & { text: string } =>
-                  p.type === 'text' && typeof p.text === 'string'
-                );
-                const finalContent = finalParts.map((p) => p.text).join('');
-                if (finalContent.length > lastContent.length) {
-                  yield { type: 'text', content: finalContent.slice(lastContent.length) };
-                }
-              }
+          // Detect if new messages were added (tool execution creates new messages)
+          if (messages.length !== lastMessageCount) {
+            console.log('[OpenCodeService] Message count changed:', lastMessageCount, '->', messages.length);
+            stableCount = 0;
+            lastMessageCount = messages.length;
+          }
+          
+          // Find the last assistant message
+          let lastAssistantMessage = null;
+          for (let i = messages.length - 1; i >= 0; i--) {
+            if (messages[i].info.role === 'assistant') {
+              lastAssistantMessage = messages[i];
               break;
             }
-          } else if (assistantMessageFound) {
-            // Assistant message was removed or changed - stop polling
+          }
+          
+          if (!lastAssistantMessage) {
+            attempts++;
+            continue;
+          }
+          
+          // Detect if we got a new assistant message
+          const currentMessageId = lastAssistantMessage.info.id;
+          if (lastAssistantMessageId && lastAssistantMessageId !== currentMessageId) {
+            console.log('[OpenCodeService] New assistant message detected:', currentMessageId);
+            // Don't reset content tracking - the new message continues the conversation
+          }
+          lastAssistantMessageId = currentMessageId;
+          
+          let hasNewContent = false;
+          
+          // Process all parts
+          for (const part of lastAssistantMessage.parts) {
+            console.log('[OpenCodeService] Processing part type:', part.type, 'part:', JSON.stringify(part).substring(0, 200));
+            
+            // Handle text parts
+            if (part.type === 'text' && typeof part.text === 'string') {
+              const currentText = part.text;
+              if (currentText.length > lastContent.length) {
+                const delta = currentText.slice(lastContent.length);
+                yield { type: 'text', content: delta };
+                lastContent = currentText;
+                hasNewContent = true;
+              }
+            }
+            
+            // Handle reasoning/thinking parts
+            if ((part.type === 'reasoning' || part.type === 'thinking') && typeof part.text === 'string') {
+              const currentThinking = part.text;
+              if (currentThinking.length > lastThinkingContent.length) {
+                const delta = currentThinking.slice(lastThinkingContent.length);
+                yield { type: 'thinking', content: delta };
+                lastThinkingContent = currentThinking;
+                hasNewContent = true;
+              }
+            }
+            
+            // Handle tool parts
+            if (part.type === 'tool') {
+              console.log('[OpenCodeService] Found tool part!');
+              const toolPart = part as Part & { 
+                callID?: string; 
+                tool?: string; 
+                state?: { 
+                  status: string; 
+                  input?: Record<string, unknown>;
+                  output?: string;
+                  error?: string;
+                };
+              };
+              
+              const toolId = toolPart.callID || (part as Part & { id: string }).id;
+              if (!toolId) continue;
+              
+              if (!processedToolIds.has(toolId)) {
+                console.log('[OpenCodeService] New tool use:', toolId, toolPart.tool);
+                processedToolIds.add(toolId);
+                yield { 
+                  type: 'tool_use', 
+                  id: toolId, 
+                  name: toolPart.tool || 'unknown', 
+                  input: toolPart.state?.input || {} 
+                };
+                hasNewContent = true;
+              }
+              
+              // Check for completed tool result
+              if (toolPart.state?.output || toolPart.state?.error) {
+                const resultKey = `${toolId}_result`;
+                if (!processedToolIds.has(resultKey)) {
+                  console.log('[OpenCodeService] Tool result:', toolId, toolPart.state?.status);
+                  processedToolIds.add(resultKey);
+                  yield {
+                    type: 'tool_result',
+                    toolUseId: toolId,
+                    content: toolPart.state.error 
+                      ? `Error: ${toolPart.state.error}` 
+                      : toolPart.state.output,
+                  };
+                  hasNewContent = true;
+                }
+              }
+            }
+          }
+          
+          if (hasNewContent) {
+            stableCount = 0;
+          } else {
+            stableCount++;
+          }
+          
+          // Exit logic: only exit if content is stable AND we have substantial content
+          // AND no tools are pending
+          const hasSubstantialContent = lastContent.length > 100;
+          const toolsPending = processedToolIds.size > 0 && 
+            Array.from(processedToolIds).some(id => !id.includes('_result'));
+          
+          // Wait longer if tools are pending
+          const requiredStableCount = toolsPending ? 15 : 8;
+          
+          if (stableCount >= requiredStableCount && hasSubstantialContent && !toolsPending) {
+            console.log('[OpenCodeService] Exiting - content stable. Text:', lastContent.length, 'Thinking:', lastThinkingContent.length);
             break;
           }
+          
+          // Safety exit after max attempts
+          if (attempts >= maxAttempts - 1) {
+            console.log('[OpenCodeService] Exiting - max attempts reached');
+          }
+          
         } catch (error) {
-          console.log('[OpenCodeService] Polling error:', error);
-          // Ignore polling errors but don't stop
+          // Ignore polling errors
         }
         
         attempts++;
@@ -572,6 +664,7 @@ export class OpenCodeService {
       parts,
     };
   }
+
 }
 
 // Extend QueryOptions to include sessionId and images
