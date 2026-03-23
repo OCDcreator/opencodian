@@ -25,3 +25,6 @@ coverage/
 
 # Obsidian
 data.json
+
+# Reference projects
+reference-projects/
