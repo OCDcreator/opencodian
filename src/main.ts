@@ -35,7 +35,7 @@ export default class OpenCodianPlugin extends Plugin {
     await this.loadSettings();
 
     // Initialize locale
-    setLocale(this.settings.locale);
+    setLocale(this.settings.locale as 'en' | 'zh');
 
     // Initialize OpenCode service
     this.openCodeService = new OpenCodeService(this.settings, {
@@ -202,9 +202,24 @@ export default class OpenCodianPlugin extends Plugin {
     return [...this.conversations];
   }
 
-  /** Get conversation by ID */
-  getConversationById(id: string): Conversation | undefined {
-    return this.conversations.find((c) => c.id === id);
+  /** Get conversation by ID (with messages loaded from storage) */
+  async getConversationById(id: string): Promise<Conversation | undefined> {
+    // First check in-memory cache
+    const cached = this.conversations.find((c) => c.id === id);
+    if (!cached) return undefined;
+    
+    // Load full conversation with messages from storage
+    const fullConversation = await this.storage.loadFullConversation(id);
+    if (fullConversation) {
+      // Update cache with full data
+      const index = this.conversations.findIndex((c) => c.id === id);
+      if (index !== -1) {
+        this.conversations[index] = fullConversation;
+      }
+      return fullConversation;
+    }
+    
+    return cached;
   }
 
   /** Delete a conversation */

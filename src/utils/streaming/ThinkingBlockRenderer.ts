@@ -5,7 +5,7 @@ const DEFAULT_OPTIONS: ThinkingRendererOptions = {
   collapsedByDefault: true,
   showTimer: true,
   collapsedLabel: 'Thinking...',
-  expandedLabel: 'Thinking',
+  expandedLabel: 'Thought',
 };
 
 export class ThinkingBlockRenderer {
@@ -128,9 +128,13 @@ export class ThinkingBlockRenderer {
     header.setAttribute('aria-label', 'Extended thinking - click to expand');
 
     const labelEl = header.createSpan({ cls: 'streaming-thinking-label' });
-    const labelText = durationSeconds !== undefined
-      ? `Thought for ${durationSeconds}s`
-      : (this.options.expandedLabel || 'Thought');
+    let labelText: string;
+    if (durationSeconds !== undefined && durationSeconds > 0) {
+      labelText = `Thought for ${durationSeconds}s`;
+    } else {
+      // No duration available - show as less than 1 second
+      labelText = 'Thought (<1s)';
+    }
     labelEl.setText(labelText);
 
     const contentEl = wrapperEl.createDiv({ cls: 'streaming-thinking-content' });
@@ -140,7 +144,11 @@ export class ThinkingBlockRenderer {
       contentEl.style.display = 'none';
     }
 
-    const toggleState = { isExpanded: !this.options.collapsedByDefault };
+    // Create minimal state for collapsible functionality (only used for wrapperEl reference)
+    const toggleState: Pick<ThinkingBlockState, 'isExpanded' | 'wrapperEl'> = {
+      isExpanded: !this.options.collapsedByDefault,
+      wrapperEl,
+    };
     this.setupCollapsible(toggleState as ThinkingBlockState, header, contentEl);
 
     return wrapperEl;

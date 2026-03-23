@@ -20,6 +20,45 @@ const LOGO_SVG_LIGHT = `<svg width="24" height="30" viewBox="0 0 240 300" fill="
 /** Logo SVG for dark theme (light logo on dark bg) - from opencode-logo-dark.svg */
 const LOGO_SVG_DARK = `<svg width="24" height="30" viewBox="0 0 240 300" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#clip0_dark)"><mask id="mask0_dark" style="mask-type:luminance" maskUnits="userSpaceOnUse" x="0" y="0" width="240" height="300"><path d="M240 0H0V300H240V0Z" fill="white"/></mask><g mask="url(#mask0_dark)"><path d="M180 240H60V120H180V240Z" fill="#4B4646"/><path d="M180 60H60V240H180V60ZM240 300H0V0H240V300Z" fill="#F1ECEC"/></g></g><defs><clipPath id="clip0_dark"><rect width="240" height="300" fill="white"/></clipPath></defs></svg>`;
 
+/** Pending indicator messages - randomly selected for variety */
+const PENDING_MESSAGES = [
+  // Technical
+  'Booting up...',
+  'Initializing...',
+  'Loading modules...',
+  'Processing...',
+  'Computing...',
+  'Analyzing...',
+  'Thinking...',
+  // Action
+  'Getting to work...',
+  'Diving in...',
+  'Rolling up sleeves...',
+  'Tackling this...',
+  'On the case...',
+  'Investigating...',
+  'Exploring...',
+  'Digging deeper...',
+  // Casual
+  'Bear with me...',
+  'Hang tight...',
+  'Just a sec...',
+  'Working my magic...',
+  'Almost there...',
+  'Give me a moment...',
+  // Whimsical
+  'Asking the stars...',
+  'Consulting ancient scrolls...',
+  'Decoding the matrix...',
+  'Channeling the cosmos...',
+  'Peering into the abyss...',
+];
+
+/** Get a random pending message */
+function getRandomPendingMessage(): string {
+  return PENDING_MESSAGES[Math.floor(Math.random() * PENDING_MESSAGES.length)];
+}
+
 export class OpenCodianView extends ItemView {
   private plugin: OpenCodianPlugin;
   private chatContainerEl: HTMLElement | null = null;
@@ -44,6 +83,10 @@ export class OpenCodianView extends ItemView {
 
   // Streaming content state
   private streamController: StreamController | null = null;
+
+  // Send/Stop button reference
+  private sendBtn: HTMLElement | null = null;
+  private inputTextarea: HTMLTextAreaElement | null = null;
 
   constructor(leaf: WorkspaceLeaf, plugin: OpenCodianPlugin) {
     super(leaf);
@@ -182,39 +225,48 @@ export class OpenCodianView extends ItemView {
   private buildInputArea(container: HTMLElement) {
     const inputWrapper = container.createDiv({ cls: 'opencodian-input-wrapper' });
     
-    const textarea = inputWrapper.createEl('textarea', {
+    this.inputTextarea = inputWrapper.createEl('textarea', {
       cls: 'opencodian-input',
       attr: { placeholder: 'Ask anything...', rows: '1' },
     });
 
     // Auto-resize textarea
-    textarea.addEventListener('input', () => {
-      textarea.style.height = 'auto';
-      textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`;
+    this.inputTextarea.addEventListener('input', () => {
+      if (this.inputTextarea) {
+        this.inputTextarea.style.height = 'auto';
+        this.inputTextarea.style.height = `${Math.min(this.inputTextarea.scrollHeight, 200)}px`;
+      }
     });
 
     // Send on Enter (Shift+Enter for new line)
-    textarea.addEventListener('keydown', (e) => {
+    this.inputTextarea.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
-        const message = textarea.value.trim();
-        if (message && !this.isStreaming) {
-          void this.sendMessage(message);
-          textarea.value = '';
-          textarea.style.height = 'auto';
+        if (this.inputTextarea && !this.isStreaming) {
+          const message = this.inputTextarea.value.trim();
+          if (message) {
+            void this.sendMessage(message);
+            this.inputTextarea.value = '';
+            this.inputTextarea.style.height = 'auto';
+          }
         }
       }
     });
 
-    // Send button
-    const sendBtn = inputWrapper.createDiv({ cls: 'opencodian-send-btn' });
-    setIcon(sendBtn, 'send');
-    sendBtn.addEventListener('click', () => {
-      const message = textarea.value.trim();
-      if (message && !this.isStreaming) {
-        void this.sendMessage(message);
-        textarea.value = '';
-        textarea.style.height = 'auto';
+    // Send/Stop button
+    this.sendBtn = inputWrapper.createDiv({ cls: 'opencodian-send-btn' });
+    setIcon(this.sendBtn, 'send');
+    this.sendBtn.addEventListener('click', () => {
+      if (this.isStreaming) {
+        // Stop streaming
+        this.cancelStreaming();
+      } else if (this.inputTextarea) {
+        const message = this.inputTextarea.value.trim();
+        if (message) {
+          void this.sendMessage(message);
+          this.inputTextarea.value = '';
+          this.inputTextarea.style.height = 'auto';
+        }
       }
     });
 
@@ -267,7 +319,7 @@ export class OpenCodianView extends ItemView {
 
   /** Load a conversation */
   private async loadConversation(id: string) {
-    const conversation = this.plugin.getConversationById(id);
+    const conversation = await this.plugin.getConversationById(id);
     if (!conversation) return;
 
     this.currentConversation = conversation;
@@ -278,22 +330,30 @@ export class OpenCodianView extends ItemView {
     // Set session in service
     this.plugin.openCodeService.setSessionId(conversation.openCodeSessionId);
 
-    // Load messages from OpenCode
-    try {
-      const messages = await this.plugin.openCodeService.getSessionMessages(
-        conversation.openCodeSessionId
-      );
-
-      // Render messages
-      for (const { info, parts } of messages) {
-        const message = OpenCodeService.openCodeMessageToChatMessage(
-          info,
-          parts
-        );
+    // Use locally saved messages if available (preserves durationSeconds and other metadata)
+    if (conversation.messages && conversation.messages.length > 0) {
+      // Render locally saved messages
+      for (const message of conversation.messages) {
         await this.renderMessage(message);
       }
-    } catch (error) {
-      console.error('Failed to load messages:', error);
+    } else {
+      // Fallback: Load messages from OpenCode
+      try {
+        const messages = await this.plugin.openCodeService.getSessionMessages(
+          conversation.openCodeSessionId
+        );
+
+        // Render messages
+        for (const { info, parts } of messages) {
+          const message = OpenCodeService.openCodeMessageToChatMessage(
+            info,
+            parts
+          );
+          await this.renderMessage(message);
+        }
+      } catch (error) {
+        console.error('Failed to load messages:', error);
+      }
     }
 
     // Scroll to bottom
@@ -331,9 +391,8 @@ export class OpenCodianView extends ItemView {
             }
           });
         
-        // Add tooltip with creation date
-        const el = item.dom as HTMLElement;
-        el.setAttribute('title', `Created: ${date}`);
+        // Add tooltip with creation date (set on the menu item via setTooltip if available)
+        // Note: Obsidian's MenuItem doesn't expose DOM directly, tooltip shows via title in item text
       });
     }
     
@@ -421,15 +480,18 @@ export class OpenCodianView extends ItemView {
       return;
     }
 
-    // Add user message to UI
-    await this.renderMessage({
+    // Add user message to conversation and UI
+    const userMessage: ChatMessage = {
       id: `user-${Date.now()}`,
       role: 'user',
       content,
       timestamp: Date.now(),
-    });
+    };
+    this.currentConversation.messages.push(userMessage);
+    await this.renderMessage(userMessage);
 
     this.isStreaming = true;
+    this.updateSendButtonState();
     this.scrollToBottom();
 
     // Set up timeout as safety net to reset isStreaming
@@ -441,11 +503,13 @@ export class OpenCodianView extends ItemView {
         timeoutId = null;
       }
       this.isStreaming = false;
-
+      this.updateSendButtonState();
     };
 
     timeoutId = window.setTimeout(() => {
       console.warn('[OpenCodianView] Stream timeout, forcing state reset');
+      // Mark running tool calls as error
+      this.streamController?.timeoutStream();
       resetStreamingState();
       // Add error message if still streaming
       if (this.streamController?.isStreaming()) {
@@ -466,22 +530,81 @@ export class OpenCodianView extends ItemView {
     // Create assistant message element and get content container
     const { contentEl: messageContentEl } = this.createAssistantMessageElement();
 
+    // Show pending indicator after a short delay
+    let pendingEl: HTMLElement | null = null;
+    let pendingStartTime = 0;
+    const pendingMessage = getRandomPendingMessage();
+    console.log('[OpenCodianView] Setting up pending indicator timeout');
+    const pendingTimeout = window.setTimeout(() => {
+      console.log('[OpenCodianView] Pending indicator timeout fired, isStreaming:', this.isStreaming);
+      if (!this.isStreaming || !messageContentEl) {
+        console.log('[OpenCodianView] Not showing pending indicator - not streaming or no element');
+        return;
+      }
+      
+      console.log('[OpenCodianView] Showing pending indicator:', pendingMessage);
+      pendingEl = messageContentEl.createDiv({ cls: 'opencodian-pending' });
+      pendingEl.createSpan({ 
+        text: pendingMessage,
+        cls: 'opencodian-pending-text' 
+      });
+      const hintEl = pendingEl.createSpan({ cls: 'opencodian-pending-hint' });
+      pendingStartTime = Date.now();
+      
+      // Update timer every second
+      const updateTimer = () => {
+        if (!pendingEl || !pendingEl.isConnected) return;
+        const elapsed = Math.floor((Date.now() - pendingStartTime) / 1000);
+        hintEl.setText(` (esc to interrupt · ${elapsed}s)`);
+      };
+      updateTimer();
+      pendingEl.dataset.timerInterval = String(window.setInterval(updateTimer, 1000));
+    }, 1000); // Show after 1s delay
+
     // Initialize streaming controller
     if (this.streamController) {
       this.streamController.startStream(messageContentEl);
     }
 
+    // Track if we've received first content
+    let receivedFirstChunk = false;
+
     try {
       for await (const chunk of stream) {
+        // Check if streaming was cancelled
+        if (!this.isStreaming) {
+          console.log('[OpenCodianView] Streaming cancelled, breaking loop');
+          break;
+        }
+
         // Convert OpenCode chunks to streaming format
         const streamingChunk = this.convertToStreamingChunk(chunk);
         if (streamingChunk && this.streamController) {
           await this.streamController.handleChunk(streamingChunk);
+          
+          // Clear pending indicator only when actual content is received (text or thinking with content)
+          const hasContent = (streamingChunk.type === 'text' && streamingChunk.content?.trim()) ||
+                            (streamingChunk.type === 'thinking' && streamingChunk.content?.trim());
+          
+          if (!receivedFirstChunk && hasContent) {
+            receivedFirstChunk = true;
+            console.log('[OpenCodianView] First content chunk received, clearing pending timeout/indicator');
+            window.clearTimeout(pendingTimeout);
+            if (pendingEl && pendingEl.parentNode) {
+              console.log('[OpenCodianView] Removing pending indicator');
+              // Clear timer interval
+              if (pendingEl.dataset.timerInterval) {
+                window.clearInterval(Number(pendingEl.dataset.timerInterval));
+              }
+              pendingEl.remove();
+              pendingEl = null;
+            }
+          }
         }
       }
       
-      // Signal completion
-      if (this.streamController) {
+      // Signal completion (only if not cancelled)
+      if (this.isStreaming && this.streamController) {
         await this.streamController.handleChunk({ type: 'done' });
       }
     } catch (error) {
@@ -493,6 +616,7 @@ export class OpenCodianView extends ItemView {
         });
       }
     } finally {
+      console.log('[OpenCodianView] Stream loop ended');
       resetStreamingState();
       
       // Add timestamp to the streamed message
@@ -506,21 +630,103 @@ export class OpenCodianView extends ItemView {
         }
       }
       
+      // Get content blocks from stream (includes thinking with duration)
+      const streamContentBlocks = this.streamController?.getContentBlocks();
+      
       // Clear streaming tracking
       this.streamingMessageEl = null;
       this.streamingContentEl = null;
+      
+      // Add the assistant message to conversation with content blocks
+      if (streamContentBlocks && streamContentBlocks.length > 0 && this.currentConversation) {
+        // Extract text content from text blocks
+        const textContent = streamContentBlocks
+          .filter((b): b is { type: 'text'; content: string } => b.type === 'text')
+          .map(b => b.content)
+          .join('');
+        
+        // Convert streaming content blocks to core ContentBlock format
+        const contentBlocks: ContentBlock[] = streamContentBlocks.map(b => {
+          if (b.type === 'text') {
+            return { type: 'text', text: b.content };
+          } else if (b.type === 'thinking') {
+            return { 
+              type: 'thinking', 
+              thinking: b.content,
+              durationSeconds: b.durationSeconds,
+            };
+          } else if (b.type === 'tool_call') {
+            return {
+              type: 'tool_use',
+              toolId: b.toolCall.id,
+              toolName: b.toolCall.name,
+              toolInput: b.toolCall.input,
+              toolResult: b.toolCall.result,
+            };
+          }
+          return { type: 'text', text: '' };
+        });
+        
+        // Create the assistant message
+        const assistantMessage: ChatMessage = {
+          id: `assistant-${Date.now()}`,
+          role: 'assistant',
+          content: textContent,
+          timestamp: Date.now(),
+          contentBlocks: contentBlocks,
+        };
+        
+        // Add to conversation
+        this.currentConversation.messages.push(assistantMessage);
+      }
     }
 
     // Update conversation
-    this.currentConversation.updatedAt = Date.now();
-    await this.plugin.storage.saveConversation(this.currentConversation);
+    if (this.currentConversation) {
+      this.currentConversation.updatedAt = Date.now();
+      await this.plugin.storage.saveConversation(this.currentConversation);
+    }
   }
 
   /** Cancel streaming */
   private cancelStreaming() {
-    // TODO: Implement cancel logic
+    console.log('[OpenCodianView] cancelStreaming called, isStreaming:', this.isStreaming);
+    
+    // Call service to abort the SSE connection
+    console.log('[OpenCodianView] Calling openCodeService.cancelStream()...');
+    this.plugin.openCodeService.cancelStream();
+    
+    // Update local state
     this.isStreaming = false;
+    console.log('[OpenCodianView] isStreaming set to false');
+    
+    // Update button state
+    this.updateSendButtonState();
+    console.log('[OpenCodianView] Send button state updated');
+    
     new Notice('Streaming cancelled');
+  }
+
+  /** Update send button icon based on streaming state */
+  private updateSendButtonState() {
+    if (!this.sendBtn) return;
+    
+    // Clear current icon
+    this.sendBtn.empty();
+    
+    if (this.isStreaming) {
+      // Show stop icon (square)
+      setIcon(this.sendBtn, 'square');
+      this.sendBtn.addClass('opencodian-stop-btn');
+      this.sendBtn.removeClass('opencodian-send-btn');
+      this.sendBtn.setAttribute('aria-label', 'Stop streaming');
+    } else {
+      // Show send icon
+      setIcon(this.sendBtn, 'send');
+      this.sendBtn.addClass('opencodian-send-btn');
+      this.sendBtn.removeClass('opencodian-stop-btn');
+      this.sendBtn.setAttribute('aria-label', 'Send message');
+    }
   }
 
   /** Render a message */
@@ -531,38 +737,36 @@ export class OpenCodianView extends ItemView {
 
     if (!messageEl) return;
 
-    // Avatar
-    const avatar = messageEl.createDiv({ cls: 'opencodian-message-avatar' });
-    if (message.role === 'assistant') {
-      setIcon(avatar, 'bot');
-    } else {
-      setIcon(avatar, 'user');
-    }
-
-    // Content
+    // Content container
     const content = messageEl.createDiv({ cls: 'opencodian-message-content' });
 
-    // Render content blocks if available (for rich content like thinking, tools)
-    if (message.contentBlocks && message.contentBlocks.length > 0) {
+    // For user messages, always use simple text rendering
+    if (message.role === 'user') {
+      if (message.content) {
+        const textEl = content.createDiv({ cls: 'opencodian-message-text' });
+        textEl.textContent = message.content;
+      }
+    } else if (message.contentBlocks && message.contentBlocks.length > 0) {
+      // For assistant messages, render content blocks (thinking, tools, etc.)
       for (const block of message.contentBlocks) {
         await this.renderContentBlock(content, block);
       }
     } else if (message.content) {
-      // Fallback to simple text rendering
+      // Fallback to simple text rendering for assistant
       const textEl = content.createDiv({ cls: 'opencodian-message-text' });
-      if (message.role === 'assistant' && this.markdownService) {
+      if (this.markdownService) {
         await this.markdownService.render(textEl, message.content);
       } else {
         textEl.textContent = message.content;
       }
     }
 
-    // Timestamp
+    // Timestamp (outside content bubble)
     const time = new Date(message.timestamp).toLocaleTimeString([], {
       hour: '2-digit',
       minute: '2-digit',
     });
-    content.createEl('div', { cls: 'opencodian-message-time', text: time });
+    messageEl.createEl('div', { cls: 'opencodian-message-time', text: time });
 
     return messageEl;
   }
@@ -578,7 +782,7 @@ export class OpenCodianView extends ItemView {
             collapsedByDefault: true,
             showTimer: false,
           });
-          thinkingRenderer.renderStored(container, block.thinking);
+          thinkingRenderer.renderStored(container, block.thinking, block.durationSeconds);
         }
         break;
 
@@ -622,14 +826,11 @@ export class OpenCodianView extends ItemView {
       return { messageEl: fallback, contentEl: fallback };
     }
 
-    const avatar = messageEl.createDiv({ cls: 'opencodian-message-avatar' });
-    setIcon(avatar, 'bot');
-
     const content = messageEl.createDiv({ cls: 'opencodian-message-content' });
     const textEl = content.createDiv({ cls: 'opencodian-message-text' });
 
-    // Add timestamp placeholder
-    content.createEl('div', { cls: 'opencodian-message-time', text: '' });
+    // Add timestamp placeholder (outside content bubble)
+    messageEl.createEl('div', { cls: 'opencodian-message-time', text: '' });
 
     // Track for streaming updates
     this.streamingMessageEl = messageEl;

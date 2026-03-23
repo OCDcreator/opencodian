@@ -21,6 +21,21 @@ const DEFAULT_TOOL_NAMES: Record<string, string> = {
   web_fetch: 'WebFetch',
 };
 
+// Claudian-style tool icons
+const TOOL_ICONS: Record<string, string> = {
+  read: 'file-text',
+  write: 'file-plus',
+  edit: 'file-edit',
+  bash: 'terminal',
+  grep: 'search',
+  glob: 'folder-search',
+  web_search: 'search',
+  web_fetch: 'download',
+  // MCP tools
+  mcp: 'layers',
+  get_repo_structure: 'folder-tree',
+};
+
 export class ToolCallRenderer {
   private options: ToolRendererOptions;
 
@@ -126,7 +141,9 @@ export class ToolCallRenderer {
       this.options.getToolSummary!(toolCall.name, toolCall.input)
     );
 
+    // Status icon (right side) - shows checkmark for success, X for error
     const statusEl = header.createSpan({ cls: 'streaming-tool-status' });
+    statusEl.addClass(`status-${toolCall.status}`);
     this.setStatus(statusEl, toolCall.status);
 
     const content = toolEl.createDiv({ cls: 'streaming-tool-content' });
@@ -147,12 +164,25 @@ export class ToolCallRenderer {
   }
 
   private setToolIcon(el: HTMLElement, name: string): void {
-    const icon = this.options.iconMap?.[name];
-    if (icon) {
-      setIcon(el, icon);
-    } else {
-      setIcon(el, 'wrench');
+    // Use custom icon map if provided
+    if (this.options.iconMap?.[name]) {
+      setIcon(el, this.options.iconMap[name]);
+      return;
     }
+    
+    // Check for MCP tool pattern (mcp__xxx__toolname)
+    if (name.startsWith('mcp__')) {
+      const parts = name.split('__');
+      if (parts.length >= 3) {
+        // Use MCP-specific icon
+        setIcon(el, 'layers');
+        return;
+      }
+    }
+    
+    // Use tool-specific icon or default
+    const icon = TOOL_ICONS[name] || 'wrench';
+    setIcon(el, icon);
   }
 
   private setStatus(statusEl: HTMLElement, status: ToolCallStatus): void {

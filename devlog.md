@@ -991,3 +991,348 @@ if (eventData.type === 'message.part.updated') {
 - `src/utils/streaming/StreamController.ts`
 
 **当前状态**: ✅ 工具调用显示功能完整，支持 task/glob/grep/ast_grep_search 等多种工具
+
+
+---
+
+## 2026-03-23 UI 优化与功能完善
+
+### 🧹 代码清理：移除不必要的控制台日志
+
+#### 清理范围
+移除了约 70 处调试日志，保留错误和警告日志：
+
+**保留的日志（有用信息）：**
+- `console.error` - 错误处理日志
+- `console.warn` - 警告日志
+
+**移除的日志文件：**
+- `src/main.ts` - 4 条
+- `src/features/settings/OpenCodianSettings.ts` - 6 条
+- `src/core/opencode/ServerManager.ts` - 7 条
+- `src/utils/streaming/StreamController.ts` - 5 条
+- `src/core/opencode/OpenCodeService.ts` - 38 条
+- `src/features/chat/OpenCodianView.ts` - 7 条
+
+### 🐛 修复历史会话显示问题
+
+#### 问题描述
+重新启动 Obsidian 后，以前会话的 thinking 和工具调用显示消失，只剩下一个空白框。
+
+#### 根本原因
+历史消息加载时只提取了 `type === 'text'` 的部分，没有处理 thinking 和 tool 部分。
+
+#### 解决方案
+
+**1. 更新 `openCodeMessageToChatMessage()` 方法**
+- 添加对 `type === 'reasoning'` 部分的提取（thinking 内容）
+- 构建 `contentBlocks` 数组，包含 thinking、tool_use、tool_result、text 块
+
+**2. 新增 `renderContentBlock()` 方法**
+使用与实时会话相同的渲染器：
+- `ThinkingBlockRenderer.renderStored()` - 渲染可折叠的 thinking 块
+- `ToolCallRenderer.render()` - 渲染工具调用卡片
+
+**3. 更新 `renderMessage()` 方法**
+- 支持完整的 `ChatMessage` 类型
+- 如果存在 `contentBlocks`，按顺序渲染每个块
+
+### 🎨 Header 样式更新
+
+#### 新增功能
+- 浅色主题显示深色 logo，深色主题显示浅色 logo
+- 根据 `.theme-dark` 类自动切换
+- 监听 `css-change` 事件，主题切换时自动更新
+
+#### 修改内容
+- 添加 `LOGO_SVG_LIGHT` 和 `LOGO_SVG_DARK` 常量
+- 添加 `getLogoSvg()` 方法检测当前主题
+- 更新 CSS 样式适配新的 logo 尺寸
+
+### 💬 消息界面优化
+
+#### 1. 移除头像
+用户和 AI 消息都不再显示头像图标，界面更简洁。
+
+#### 2. 融合背景样式
+- 用户消息：深色半透明气泡 (`rgba(0, 0, 0, 0.3)`)，右对齐
+- AI 消息：透明背景，与 Obsidian 背景融合
+
+#### 3. 文本选择支持
+- 添加 `user-select: text` 支持鼠标选择文本
+- 用户消息中选中文本有白色半透明高亮
+
+#### 4. 整体界面融合
+- 容器背景改为透明
+- Header 移除边框和背景色
+- 输入区域移除顶部边框
+
+### ⏹️ 停止按钮功能
+
+#### 功能描述
+发送消息后，按钮自动变为红色停止按钮，点击可中止流式响应。
+
+#### 实现细节
+
+**1. OpenCodeService 修改**
+- 添加 `currentAbortController` 跟踪当前流
+- 添加 `cancelStream()` 公共方法中止 SSE 连接
+- 在生成器循环中检查 `signal.aborted` 状态
+
+**2. OpenCodianView 修改**
+- 存储 `sendBtn` 和 `inputTextarea` 引用
+- 添加 `updateSendButtonState()` 方法切换按钮状态
+- `cancelStreaming()` 调用服务取消方法
+
+**3. 按钮状态切换**
+- 空闲时：蓝色背景 + 发送图标
+- 流式中：红色背景 + 方块图标（停止）
+
+#### 调试日志
+添加详细日志用于验证功能：
+```
+[OpenCodianView] cancelStreaming called, isStreaming: true
+[OpenCodeService] Cancelling stream...
+[OpenCodeService] Abort signal sent
+[OpenCodianView] Streaming cancelled, breaking loop
+```
+
+### 📊 测试结果
+- ✅ 历史会话 thinking 正确显示
+- ✅ 历史会话工具调用正确显示
+- ✅ Logo 随主题自动切换
+- ✅ 消息文本可选择复制
+- ✅ 停止按钮可中止流式响应
+
+### 📝 涉及文件
+- `src/core/opencode/OpenCodeService.ts`
+- `src/features/chat/OpenCodianView.ts`
+- `src/utils/streaming/ThinkingBlockRenderer.ts`
+- `src/utils/streaming/ToolCallRenderer.ts`
+- `styles.css`
+
+---
+
+**会话日期**: 2026-03-23
+**开发时间**: ~3 小时
+**主要贡献**: UI 优化、功能完善、代码清理
+**当前状态**: ✅ 所有功能正常工作
+
+---
+
+## 2026-03-24 UI 改进与功能完善
+
+本次会话完成了多项 UI 改进和 Bug 修复。
+
+---
+
+### ✅ 1. 时间戳移出消息气泡
+
+**问题现象：**
+- 用户消息的时间戳显示在深色气泡内部，影响美观
+- 与 Claudian 的样式不一致
+
+**解决方案：**
+- 将时间戳从 `content` 容器移到 `messageEl` 级别
+- 调整 CSS，让时间戳显示在气泡下方
+
+```typescript
+// 修改前：在 content 内部创建时间戳
+content.createEl('div', { cls: 'opencodian-message-time', text: time });
+
+// 修改后：在 messageEl 级别创建时间戳
+messageEl.createEl('div', { cls: 'opencodian-message-time', text: time });
+```
+
+**涉及文件：**
+- `src/features/chat/OpenCodianView.ts`
+- `styles.css`
+
+---
+
+### ✅ 2. Thinking 块与工具调用样式优化（Claudian 风格）
+
+**实现内容：**
+- Thinking 块显示 "Thought for Xs" 或 "Thought (<1s)"
+- 工具调用显示工具名和参数摘要
+- 工具状态图标：✓ 绿色（成功）、✕ 红色（失败）
+- 展开后显示左侧边框线
+
+**样式变更：**
+```css
+/* Thinking 块 */
+.streaming-thinking-label {
+  color: var(--text-accent);  /* 橙色/红色 */
+}
+
+/* 工具调用状态 */
+.streaming-tool-status.status-completed {
+  color: var(--color-green);
+}
+.streaming-tool-status.status-error {
+  color: var(--color-red);
+}
+```
+
+**涉及文件：**
+- `src/utils/streaming/ThinkingBlockRenderer.ts`
+- `src/utils/streaming/ToolCallRenderer.ts`
+- `styles.css`
+
+---
+
+### ✅ 3. 消息持久化存储
+
+**问题现象：**
+- 重新加载 Obsidian 后用户消息消失
+- 工具调用消息跑到最下面
+- Thinking duration 丢失
+
+**解决方案：**
+1. **保存完整消息**：`saveConversation` 现在保存 `messages` 数组
+2. **独立 thinking 块**：每个 reasoning part 创建独立的 thinking block
+3. **保持顺序**：工具调用在收到结果时立即保存到 contentBlocks
+
+```typescript
+// StorageService.ts
+async saveConversation(conversation: Conversation): Promise<void> {
+  const data = {
+    // ... 元数据
+    messages: conversation.messages,  // 保存完整消息
+  };
+}
+```
+
+**涉及文件：**
+- `src/core/storage/StorageService.ts`
+- `src/main.ts`
+- `src/utils/streaming/StreamController.ts`
+
+---
+
+### ✅ 4. 等待提示功能
+
+**实现内容：**
+- AI 响应超过 1 秒时显示 "Getting to work..."
+- 实时显示等待时间
+- 提示 "(esc to interrupt)"
+- 收到实际内容后自动消失
+
+```typescript
+const pendingTimeout = window.setTimeout(() => {
+  pendingEl = messageContentEl.createDiv({ cls: 'opencodian-pending' });
+  pendingEl.createSpan({ text: 'Getting to work...', cls: 'opencodian-pending-text' });
+  // ... 计时器更新
+}, 1000);
+```
+
+**CSS 样式：**
+```css
+.opencodian-pending {
+  font-size: 13px;
+  color: var(--text-accent);
+  font-style: italic;
+}
+```
+
+**涉及文件：**
+- `src/features/chat/OpenCodianView.ts`
+- `styles.css`
+
+---
+
+### ✅ 5. 流超时处理
+
+**问题现象：**
+- 某些工具调用长时间卡住
+- 流无法正常退出
+
+**解决方案：**
+- 添加 2 分钟超时机制
+- 超时后将运行中的工具标记为错误
+
+```typescript
+private timeoutStream(): void {
+  for (const [toolId, toolCall] of this.state.toolCalls) {
+    if (toolCall.status === 'running' || toolCall.status === 'pending') {
+      toolCall.status = 'error';
+      toolCall.result = 'Request timeout';
+      // ... 更新 UI
+    }
+  }
+}
+```
+
+**涉及文件：**
+- `src/utils/streaming/StreamController.ts`
+- `src/features/chat/OpenCodianView.ts`
+
+---
+
+### 🐛 遇到的问题与修复
+
+#### 问题 1：TypeScript 类型错误
+
+**现象：**
+编译时出现 9 处类型错误，涉及：
+- `ContentBlock` 未导入
+- `ToolCallInfo` 类型不匹配
+- `setLocale` 参数类型错误
+
+**修复：**
+```typescript
+// 统一 ToolCallStatus 类型
+export type ToolCallStatus = 'pending' | 'running' | 'completed' | 'error' | 'blocked';
+
+// 修复 setLocale 调用
+setLocale(this.settings.locale as 'en' | 'zh');
+```
+
+#### 问题 2：工具调用状态显示错误
+
+**现象：**
+- 工具调用失败仍显示绿色勾
+- CSS 中有重复定义覆盖了错误状态颜色
+
+**修复：**
+删除 CSS 中重复的状态颜色定义。
+
+#### 问题 3：等待提示不显示
+
+**现象：**
+- 等待提示逻辑存在但不显示
+- 原因是第一帧数据到达过快，清除了等待提示
+
+**修复：**
+```typescript
+// 只在有实际内容时才清除等待提示
+const hasContent = (streamingChunk.type === 'text' && streamingChunk.content?.trim()) ||
+                  (streamingChunk.type === 'thinking' && streamingChunk.content?.trim());
+```
+
+---
+
+### 📁 修改文件汇总
+
+| 文件 | 修改内容 |
+|------|----------|
+| `src/features/chat/OpenCodianView.ts` | 时间戳位置、等待提示、消息持久化 |
+| `src/utils/streaming/ThinkingBlockRenderer.ts` | Thinking 块渲染逻辑 |
+| `src/utils/streaming/ToolCallRenderer.ts` | 工具调用渲染、状态图标 |
+| `src/utils/streaming/StreamController.ts` | 工具调用保存顺序、超时处理 |
+| `src/core/storage/StorageService.ts` | 保存完整消息数组 |
+| `src/core/opencode/OpenCodeService.ts` | 独立 thinking 块处理 |
+| `src/core/types/chat.ts` | 添加 `durationSeconds` 字段 |
+| `src/core/types/tools.ts` | 统一 `ToolCallStatus` 类型 |
+| `src/main.ts` | 异步加载完整会话 |
+| `styles.css` | 样式优化、等待提示样式 |
+
+---
+
+### 📝 下一步计划
+
+1. **测试覆盖** - 添加单元测试覆盖新功能
+2. **性能优化** - 大型消息历史的加载优化
+3. **国际化** - 完善中英文切换
+
+---

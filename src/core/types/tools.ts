@@ -2,12 +2,14 @@
  * Tool-related type definitions
  */
 
+export type ToolCallStatus = 'pending' | 'running' | 'completed' | 'error' | 'blocked';
+
 /** Tool call information */
 export interface ToolCallInfo {
   id: string;
   name: string;
   input: Record<string, unknown>;
-  status?: 'pending' | 'running' | 'completed' | 'error';
+  status: ToolCallStatus;
   result?: string;
   isExpanded?: boolean;
 }

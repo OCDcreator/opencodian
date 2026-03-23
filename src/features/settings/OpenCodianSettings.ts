@@ -65,7 +65,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.locale)
           .onChange(async (value) => {
             this.plugin.settings.locale = value as 'en' | 'zh';
-            setLocale(this.plugin.settings.locale);
+            setLocale(value as 'en' | 'zh');
             await this.plugin.saveSettings();
             // Refresh the settings UI to show new language
             this.display();
@@ -213,8 +213,10 @@ export class OpenCodianSettingTab extends PluginSettingTab {
             
             await updateStatus();
             
-            const statusKey = `settings.server.status.${internalStatus}` as const;
-            new Notice(`Health: ${isHealthy ? 'OK' : 'FAIL'} | Status: ${t(statusKey) || internalStatus}`);
+            // Build status key and get translation
+            const statusKey = `settings.server.status.${internalStatus}`;
+            const statusText = (t as (key: string) => string)(statusKey) || internalStatus;
+            new Notice(`Health: ${isHealthy ? 'OK' : 'FAIL'} | Status: ${statusText}`);
             btn.setDisabled(false);
           });
       });

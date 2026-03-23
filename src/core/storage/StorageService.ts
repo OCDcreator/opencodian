@@ -7,7 +7,7 @@
 
 import { type App, normalizePath } from 'obsidian';
 
-import type { Conversation, ConversationMeta, OpenCodianSettings } from '../types';
+import type { ChatMessage, Conversation, ConversationMeta, OpenCodianSettings } from '../types';
 import type { OpenCodianPlugin } from '../../main';
 
 const STORAGE_DIR = '.opencodian';
@@ -29,10 +29,12 @@ export class StorageService {
     await this.ensureDir(SESSIONS_DIR);
   }
 
-  /** Save conversation metadata */
+  /** Save conversation with all messages */
   async saveConversation(conversation: Conversation): Promise<void> {
     const path = `${SESSIONS_DIR}/${conversation.id}.json`;
-    const data: ConversationMeta & { openCodeSessionId?: string } = {
+    
+    // Save full conversation data including messages
+    const data = {
       id: conversation.id,
       title: conversation.title,
       createdAt: conversation.createdAt,
@@ -40,6 +42,7 @@ export class StorageService {
       lastResponseAt: conversation.lastResponseAt,
       messageCount: conversation.messages.length,
       openCodeSessionId: conversation.openCodeSessionId,
+      messages: conversation.messages,  // Save full messages with contentBlocks
     };
 
     await this.app.vault.adapter.write(
@@ -48,13 +51,38 @@ export class StorageService {
     );
   }
 
-  /** Load conversation metadata */
+  /** Load full conversation with messages */
+  async loadFullConversation(id: string): Promise<Conversation | null> {
+    const path = `${SESSIONS_DIR}/${id}.json`;
+    
+    try {
+      const content = await this.app.vault.adapter.read(normalizePath(path));
+      const data = JSON.parse(content) as Conversation & { messageCount?: number };
+      // Ensure messages array exists
+      if (!data.messages) {
+        data.messages = [];
+      }
+      return data;
+    } catch {
+      return null;
+    }
+  }
+
+  /** Load conversation metadata only */
   async loadConversation(id: string): Promise<ConversationMeta | null> {
     const path = `${SESSIONS_DIR}/${id}.json`;
     
     try {
       const content = await this.app.vault.adapter.read(normalizePath(path));
-      return JSON.parse(content) as ConversationMeta;
+      const data = JSON.parse(content) as ConversationMeta & { messages?: ChatMessage[] };
+      return {
+        id: data.id,
+        title: data.title,
+        createdAt: data.createdAt,
+        updatedAt: data.updatedAt,
+        lastResponseAt: data.lastResponseAt,
+        messageCount: data.messages?.length ?? data.messageCount ?? 0,
+      };
     } catch {
       return null;
     }

@@ -172,6 +172,18 @@ export class StreamController {
       this.toolRenderer.updateResult(toolEl, toolCall);
     }
 
+    // Add tool call to content blocks immediately to preserve order
+    this.state.contentBlocks.push({
+      type: 'tool_call',
+      toolCall: {
+        id: toolCall.id,
+        name: toolCall.name,
+        input: toolCall.input,
+        status: toolCall.status,
+        result: toolCall.result,
+      },
+    });
+
     this.callbacks.onToolCallEnd?.(toolCall);
   }
 
@@ -190,6 +202,7 @@ export class StreamController {
   private handleDoneChunk(): void {
     this.finalizeThinkingBlock();
     this.finalizeTextBlock();
+    this.finalizeToolCalls();
     this.state.isStreaming = false;
     this.callbacks.onDone?.();
 
@@ -225,10 +238,49 @@ export class StreamController {
     this.state.currentTextContent = '';
   }
 
+  private finalizeToolCalls(): void {
+    // Clear tool calls after finalizing (they've already been added to contentBlocks)
+    this.state.toolCalls.clear();
+    this.state.toolCallElements.clear();
+  }
+
   cancelStream(): void {
     if (this.state.currentThinkingState) {
       this.thinkingRenderer.cleanup(this.state.currentThinkingState);
     }
+    this.state.isStreaming = false;
+  }
+
+  /**
+   * Handle stream timeout - mark all running tool calls as error
+   */
+  timeoutStream(): void {
+    // Mark all running/pending tool calls as error
+    for (const [toolId, toolCall] of this.state.toolCalls) {
+      if (toolCall.status === 'running' || toolCall.status === 'pending') {
+        toolCall.status = 'error';
+        toolCall.result = 'Request timeout';
+        
+        // Update UI
+        const toolEl = this.state.toolCallElements.get(toolId);
+        if (toolEl) {
+          this.toolRenderer.updateResult(toolEl, toolCall);
+        }
+        
+        // Add to content blocks
+        this.state.contentBlocks.push({
+          type: 'tool_call',
+          toolCall: {
+            id: toolCall.id,
+            name: toolCall.name,
+            input: toolCall.input,
+            status: 'error',
+            result: 'Request timeout',
+          },
+        });
+      }
+    }
+    
     this.state.isStreaming = false;
   }
 

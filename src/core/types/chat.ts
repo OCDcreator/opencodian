@@ -20,6 +20,7 @@ export interface ContentBlock {
   type: 'text' | 'thinking' | 'tool_use' | 'tool_result' | 'subagent';
   text?: string;
   thinking?: string;
+  durationSeconds?: number;
   toolId?: string;
   toolName?: string;
   toolInput?: Record<string, unknown>;

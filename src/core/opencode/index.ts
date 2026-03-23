@@ -2,8 +2,6 @@
  * OpenCode SDK wrapper module
  */
 
-export { OpenCodeService } from './OpenCodeService';
-export { ServerManager } from './ServerManager';
 export type {
   OpenCodeServerConfig,
   OpenCodeClientConfig,
@@ -12,3 +10,6 @@ export type {
   ServerStatus,
   ServerError,
 } from './types';
+
+export { OpenCodeService } from './OpenCodeService';
+export { ServerManager } from './ServerManager';

@@ -8,7 +8,7 @@
 
 import { Notice, requestUrl } from 'obsidian';
 
-import type { ChatMessage, ImageAttachment, StreamChunk } from '../types';
+import type { ChatMessage, ContentBlock, ImageAttachment, StreamChunk } from '../types';
 import type { OpenCodianSettings } from '../types/settings';
 import { ServerManager } from './ServerManager';
 import type { OpenCodeServerConfig, QueryOptions, ResponseHandler } from './types';
@@ -121,6 +121,7 @@ export class OpenCodeService {
   private responseHandlers: ResponseHandler[] = [];
   private baseUrl: string;
   private partTypeMap: Map<string, string> = new Map(); // Track part types by partID
+  private currentAbortController: AbortController | null = null; // For cancelling streams
 
   constructor(settings: OpenCodianSettings, events: OpenCodeServiceEvents = {}) {
     this.settings = settings;
@@ -322,6 +323,17 @@ export class OpenCodeService {
     return this.currentSessionId;
   }
 
+  /** Cancel the current streaming response */
+  cancelStream(): void {
+    if (this.currentAbortController) {
+      console.log('[OpenCodeService] Cancelling stream...');
+      this.currentAbortController.abort();
+      console.log('[OpenCodeService] Abort signal sent');
+    } else {
+      console.log('[OpenCodeService] No active stream to cancel');
+    }
+  }
+
   /** List all sessions */
   async listSessions(): Promise<Session[]> {
     try {
@@ -412,8 +424,8 @@ export class OpenCodeService {
 
 
       // Create SSE stream with abort controller
-      const abortController = new AbortController();
-      const eventStream = this.connectSSE(sseUrl, abortController.signal);
+      this.currentAbortController = new AbortController();
+      const eventStream = this.connectSSE(sseUrl, this.currentAbortController.signal);
       
       // Track state for content changes
       let lastContent = '';
@@ -433,6 +445,11 @@ export class OpenCodeService {
       try {
 
         for await (const event of eventStream) {
+          // Check if cancelled
+          if (this.currentAbortController?.signal.aborted) {
+            console.log('[OpenCodeService] Stream aborted, breaking loop');
+            break;
+          }
           // Parse the nested data structure
           let eventData: OpenCodeEvent;
           try {
@@ -557,7 +574,7 @@ export class OpenCodeService {
           // Handle session.idle - message streaming complete
           if (eventData.type === 'session.idle') {
 
-            abortController.abort(); // Abort the SSE connection
+            this.currentAbortController?.abort(); // Abort the SSE connection
             break; // Exit SSE loop
           }
 
@@ -570,6 +587,9 @@ export class OpenCodeService {
         if (checkInterval) {
           clearInterval(checkInterval);
         }
+        // Clear the abort controller
+        this.currentAbortController = null;
+        console.log('[OpenCodeService] Stream ended, abort controller cleared');
       }
 
       // Final check for any remaining content
@@ -924,11 +944,10 @@ export class OpenCodeService {
     );
     const content = textParts.map((p) => p.text).join('');
 
-    // Extract thinking content from reasoning parts
-    const thinkingParts = parts.filter((p): p is Part & { text: string } =>
+    // Extract thinking content from reasoning parts - each part becomes a separate block
+    const thinkingParts = parts.filter((p): p is Part & { text: string; duration?: number } =>
       p.type === 'reasoning' && typeof p.text === 'string'
     );
-    const thinking = thinkingParts.map((p) => p.text).join('');
 
     // Extract tool calls from tool parts
     const toolParts = parts.filter((p) => p.type === 'tool') as Array<Part & { callID?: string; tool?: string; state?: { status: string; input?: Record<string, unknown>; output?: string; error?: string } }>;
@@ -944,9 +963,15 @@ export class OpenCodeService {
     // Build content blocks for rich rendering
     const contentBlocks: ContentBlock[] = [];
     
-    // Add thinking block if present
-    if (thinking) {
-      contentBlocks.push({ type: 'thinking', thinking });
+    // Add each thinking part as a separate block to preserve individual durations
+    for (const part of thinkingParts) {
+      contentBlocks.push({
+        type: 'thinking',
+        thinking: part.text,
+        durationSeconds: typeof part.duration === 'number' && part.duration > 0 
+          ? part.duration 
+          : undefined,
+      });
     }
     
     // Process tool parts - combine tool_use and tool_result into single blocks
