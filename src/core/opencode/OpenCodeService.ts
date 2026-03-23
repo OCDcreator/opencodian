@@ -55,6 +55,8 @@ interface OpenCodeEvent {
       };
     };
     delta?: string;
+    field?: string;
+    partID?: string;
     toolID?: string;
     result?: string;
     error?: string;
@@ -484,15 +486,15 @@ export class OpenCodeService {
             }
             
             console.log('[OpenCodeService] Processing delta:', { field, delta: delta.substring(0, 50), partID });
-            
+
             // Track part types by partID
-            if (!this.partTypeMap.has(partID)) {
+            if (partID && !this.partTypeMap.has(partID)) {
               // First time seeing this part, determine type from field or part info
               const partType = eventData.properties?.part?.type;
               this.partTypeMap.set(partID, partType || 'text');
             }
-            
-            const partType = this.partTypeMap.get(partID) || 'text';
+
+            const partType = partID ? (this.partTypeMap.get(partID) || 'text') : 'text';
             
             // Handle based on field and tracked part type
             if (field === 'text') {
@@ -538,9 +540,9 @@ export class OpenCodeService {
                   yield {
                     type: 'tool_result',
                     toolUseId: toolId,
-                    content: part.state.error 
-                      ? `Error: ${part.state.error}` 
-                      : part.state.output,
+                    content: part.state.error
+                      ? `Error: ${part.state.error}`
+                      : (part.state.output ?? ''),
                   };
                 }
               }
