@@ -93,7 +93,20 @@ opencodian/
 │   │   └── locales/
 │   │       ├── en.ts
 │   │       └── zh.ts
+│   ├── shared/                      # Shared utilities
+│   │   └── index.ts
 │   └── utils/                       # Utility functions
+│       ├── markdown/                # Markdown rendering
+│       │   ├── MarkdownRenderer.ts  # Custom markdown renderer
+│       │   ├── fileLink.ts          # File link handling
+│       │   ├── imageEmbed.ts        # Image embed handling
+│       │   └── types.ts
+│       ├── streaming/               # SSE streaming utilities
+│       │   ├── StreamController.ts  # Stream state management
+│       │   ├── ThinkingBlockRenderer.ts
+│       │   ├── ToolCallRenderer.ts
+│       │   └── types.ts
+│       └── index.ts
 ├── tests/
 │   ├── __mocks__/obsidian.ts        # Obsidian API mock
 │   ├── setup.ts                     # Test setup
@@ -206,6 +219,25 @@ Settings UI with bilingual support (English/Chinese).
 - **Security**: Permission mode, command blocklist
 - **UI**: Max tabs, tab bar position, auto-scroll
 
+### 6. Streaming Utilities (`src/utils/streaming/`)
+
+SSE streaming components for real-time message display.
+
+**Key Components:**
+
+- `StreamController` - Manages stream state and callbacks
+- `ThinkingBlockRenderer` - Renders AI thinking blocks
+- `ToolCallRenderer` - Renders tool call progress and results
+
+**Stream Event Types:**
+
+- `text` - Text content chunks
+- `thinking` - AI reasoning blocks
+- `tool_use` - Tool call initiated
+- `tool_result` - Tool execution result
+- `done` - Stream completed
+- `error` - Error occurred
+
 ## Prerequisites for Users
 
 1. **Obsidian** v1.4.5 or later (desktop only)
@@ -223,10 +255,26 @@ Settings UI with bilingual support (English/Chinese).
 npm run build && cp dist/main.js dist/manifest.json dist/styles.css "/path/to/vault/.obsidian/plugins/opencodian/"
 ```
 
-### Current Deployment Path
+### Deployment Paths
 
+| Environment | Path Type | Path |
+|-------------|-----------|------|
+| **Production Vault** | Absolute | `/Volumes/SDD2T/obsidian-vault-write/技术学习/.obsidian/plugins/opencodian/` |
+| **Test Vault** | Absolute | `C:\Users\lt\Desktop\Write\testvault\.obsidian\plugins\opencodian\` |
+| **Test Vault** | Relative | `../../testvault/.obsidian/plugins/opencodian/` |
+
+> **Note**: Relative path is calculated from the project root (`opencodian/`) for cross-platform compatibility.
+
+### Test Vault Quick Deploy (Windows)
+
+```bash
+npm run build && copy dist\main.js dist\manifest.json dist\styles.css ..\..\testvault\.obsidian\plugins\opencodian\
 ```
-/Volumes/SDD2T/obsidian-vault-write/技术学习/.obsidian/plugins/opencodian/
+
+### Test Vault Quick Deploy (Unix/macOS)
+
+```bash
+npm run build && cp dist/main.js dist/manifest.json dist/styles.css ../../testvault/.obsidian/plugins/opencodian/
 ```
 
 ## Development Notes
@@ -268,5 +316,5 @@ This is the main development log maintained in the Obsidian vault for easy refer
 
 ---
 
-**Last Updated**: 2026-03-19  
+**Last Updated**: 2026-03-23
 **Plugin Version**: 0.1.0
