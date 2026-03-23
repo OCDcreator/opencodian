@@ -1,7 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(find /Volumes/SDD2T/obsidian-vault-write/custom-project/opencodian/src -name \"*.ts\" -exec wc -l {} +)"
-    ]
-  }
-}

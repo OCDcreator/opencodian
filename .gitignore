@@ -26,5 +26,8 @@ coverage/
 # Obsidian
 data.json
 
+# Local settings
+.claude/settings.local.json
+
 # Reference projects
 reference-projects/
