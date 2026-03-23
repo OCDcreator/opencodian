@@ -130,31 +130,52 @@ const abortHandler = () => {
 signal?.addEventListener('abort', abortHandler);
 ```
 
-### 🐛 已知问题
+### ✅ 已修复：流结束后无法发送新消息
 
-#### 问题：流结束后无法发送新消息
-**现象：**
+**问题现象：**
 - 第一条消息流式输出正常
 - 回复完成后，点击发送按钮无反应
 - 控制台无错误日志
 
-**可能原因排查：**
-1. ✅ `isStreaming` 状态未重置 - 已确认 `finally` 块正确执行
-2. ✅ SSE 连接未关闭 - 已实现 `reader.cancel()` 中断
-3. ✅ `session.idle` 事件处理 - 已添加检测并 break
-4. ❓ 可能需要检测 `message_stop` 事件而非 `session.idle`
-5. ❓ 可能存在未捕获的异常阻塞了流程
+**排查过程：**
+1. ✅ 确认 `isStreaming` 状态重置逻辑存在（`finally` 块）
+2. ✅ 确认 `session.idle` 事件正确处理并 break
+3. ✅ 确认 `abortController.abort()` 正确中断 SSE 连接
 
-**调试日志显示：**
+**根因分析：**
+- 通过添加详细调试日志，确认 `session.idle` 事件被正确接收和处理
+- SSE 循环正确 break，`finally` 块正确执行
+- `isStreaming` 状态正确重置
+
+**验证日志：**
 ```
-[OpenCodeService] SSE event: session.idle  <- 已检测到
-[OpenCodeService] SSE raw chunk: ...        <- 但仍在接收数据
+[OpenCodeService] SSE event: session.idle
+[OpenCodeService] session.idle event passed filter, properties: {"sessionID":"..."}
+[OpenCodeService] Session idle detected, breaking loop...
+[OpenCodeService] Session idle, message complete
+[OpenCodeService] Abort signal received, cancelling reader...
+[OpenCodeService] SSE reader released
+[OpenCodianView] Converting chunk: message_stop
+[StreamController] handleChunk: done
+[OpenCodianView] Streaming state reset  ← 状态正确重置
 ```
 
-**待验证：**
-- `session.idle` 后是否还有其他重要事件？
-- `reader.cancel()` 是否真正中断了连接？
-- `isStreaming` 是否在 UI 线程正确重置？
+**添加的调试日志：**
+```typescript
+// OpenCodeService.ts - session 过滤器
+if (eventData.properties?.sessionID && eventData.properties.sessionID !== sessionId) {
+  console.log('[OpenCodeService] Skipping event for different session...');
+  continue;
+}
+
+// session.idle 处理
+if (eventData.type === 'session.idle') {
+  console.log('[OpenCodeService] Session idle detected, breaking loop...');
+  console.log('[OpenCodeService] Session idle, message complete');
+  abortController.abort();
+  break;
+}
+```
 
 ### 📁 修改文件
 
@@ -166,18 +187,12 @@ signal?.addEventListener('abort', abortHandler);
 
 ### 📝 下一步计划
 
-1. **验证连接中断**
-   - 添加更多日志追踪 `finally` 块执行
-   - 确认 `reader.releaseLock()` 调用
-
-2. **备选方案**
-   - 如果 SSE 中断复杂，考虑使用超时机制强制重置状态
-   - 添加 "重置连接" 按钮作为临时解决方案
-
+1. ~~**验证连接中断**~~ ✅ 已验证，SSE 流正常工作
+2. **清理调试日志** - 移除不必要的详细日志（保留关键日志）
 3. **完善功能**
-   - 移除调试日志（大量 SSE 日志影响性能）
    - 添加连接状态指示器
    - 实现取消按钮（中断当前流）
+   - 消息历史持久化到本地
 
 ---
 
@@ -653,13 +668,78 @@ streamController.renderStoredContentBlocks(parentEl, savedBlocks);
 - 外部服务器无法通过插件停止（需要手动在终端停止）
 - 首次加载设置时需要手动刷新模型列表
 - 消息历史依赖 OpenCode 服务器存储
-- **SSE 流结束后无法发送新消息（开发中）**
+
+---
+
+## 2026-03-23 Bug修复：SSE流结束后无法发送新消息
+
+### 🔧 问题分析
+
+**现象：**
+- 第一条消息流式输出正常
+- 回复完成后，无法再发送新消息
+- `isStreaming` 状态保持为 `true`，阻止了新消息发送
+
+**根本原因：**
+1. `fetch` 请求没有使用 `signal` 参数，导致 `abortController.abort()` 无法真正取消连接
+2. `reader.read()` 在某些情况下可能挂起，导致 `for await...of` 循环无法退出
+3. `finally` 块无法执行，`isStreaming` 状态无法重置
+
+### ✅ 修复方案
+
+**1. OpenCodianView.ts - 添加超时保护机制**
+```typescript
+// Set up timeout as safety net to reset isStreaming
+const STREAM_TIMEOUT_MS = 120000; // 2 minutes timeout
+let timeoutId: number | null = null;
+const resetStreamingState = () => {
+  if (timeoutId) {
+    window.clearTimeout(timeoutId);
+    timeoutId = null;
+  }
+  this.isStreaming = false;
+};
+
+timeoutId = window.setTimeout(() => {
+  console.warn('[OpenCodianView] Stream timeout, forcing state reset');
+  resetStreamingState();
+  // ...
+}, STREAM_TIMEOUT_MS);
+```
+
+**2. OpenCodeService.ts - 修复 SSE 连接取消逻辑**
+```typescript
+// 将 signal 传递给 fetch
+const response = await fetch(url, {
+  method: 'GET',
+  headers: { 'Accept': 'text/event-stream' },
+  signal, // 允许通过 abortController 取消请求
+});
+
+// 改进错误处理
+try {
+  readResult = await reader.read();
+} catch (readError) {
+  if (signal?.aborted || aborted) {
+    break; // 优雅地处理取消
+  }
+  throw readError;
+}
+```
+
+### 📝 修改文件
+
+| 文件 | 修改内容 |
+|------|----------|
+| `src/features/chat/OpenCodianView.ts` | 添加超时机制，确保 `isStreaming` 总能被重置 |
+| `src/core/opencode/OpenCodeService.ts` | 修复 `fetch` 信号传递，改进 `reader.read()` 错误处理 |
 
 ---
 
 ## 🎯 下一步建议
 
-1. **修复 SSE 流状态问题** - 确保流结束后 `isStreaming` 正确重置
+1. ~~**修复 SSE 流状态问题**~~ ✅ 已完成
+2. **消息历史持久化** - 在插件端缓存消息历史，减少对服务器的依赖
 2. **消息历史持久化** - 在插件端缓存消息历史，减少对服务器的依赖
 3. **错误重试机制** - 网络错误时自动重试
 4. **消息编辑/删除** - 添加消息管理功能
@@ -668,8 +748,8 @@ streamController.renderStoredContentBlocks(parentEl, savedBlocks);
 
 ---
 
-**会话日期**: 2026-03-23  
-**开发时长**: ~3 小时  
-**主要贡献**: SSE 流式响应架构实现、CORS 配置、事件解析
+**会话日期**: 2026-03-23
+**开发时长**: ~4 小时
+**主要贡献**: SSE 流式响应架构实现、CORS 配置、事件解析、流状态管理修复
 
-**当前状态**: 🔧 SSE 流式传输开发中，存在连接结束后状态未重置问题
+**当前状态**: ✅ SSE 流式传输功能完整，支持连续发送多条消息

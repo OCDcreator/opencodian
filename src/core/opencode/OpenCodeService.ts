@@ -453,7 +453,13 @@ export class OpenCodeService {
           
           // Only process events for our session
           if (eventData.properties?.sessionID && eventData.properties.sessionID !== sessionId) {
+            console.log('[OpenCodeService] Skipping event for different session:', eventData.type, 'eventSession:', eventData.properties.sessionID, 'ourSession:', sessionId);
             continue;
+          }
+
+          // Debug: Log session.idle event details
+          if (eventData.type === 'session.idle') {
+            console.log('[OpenCodeService] session.idle event passed filter, properties:', JSON.stringify(eventData.properties));
           }
           
           // Handle message.part.updated - track part types
@@ -558,9 +564,15 @@ export class OpenCodeService {
           
           // Handle session.idle - message streaming complete
           if (eventData.type === 'session.idle') {
+            console.log('[OpenCodeService] Session idle detected, breaking loop...');
             console.log('[OpenCodeService] Session idle, message complete');
             abortController.abort(); // Abort the SSE connection
             break; // Exit SSE loop
+          }
+
+          // Debug: log if we reach here with session.idle
+          if (eventData.type?.includes?.('idle')) {
+            console.log('[OpenCodeService] DEBUG: idle-like event but not matched:', JSON.stringify(eventData.type));
           }
         }
       } finally {
@@ -600,6 +612,12 @@ export class OpenCodeService {
   private async *connectSSE(url: string, signal?: AbortSignal): AsyncGenerator<SSEEvent> {
     console.log('[OpenCodeService] connectSSE starting...');
     
+    // Check if already aborted
+    if (signal?.aborted) {
+      console.log('[OpenCodeService] Signal already aborted, exiting');
+      return;
+    }
+    
     // Use native fetch for streaming support
     console.log('[OpenCodeService] Fetching SSE stream...');
     const response = await fetch(url, {
@@ -607,6 +625,7 @@ export class OpenCodeService {
       headers: {
         'Accept': 'text/event-stream',
       },
+      signal, // Pass signal to fetch to allow cancellation
     });
 
     console.log('[OpenCodeService] SSE response received:', response.status, response.ok);
@@ -637,12 +656,25 @@ export class OpenCodeService {
     try {
       while (true) {
         // Check if aborted before reading
-        if (aborted) {
-          console.log('[OpenCodeService] Loop aborted');
+        if (aborted || signal?.aborted) {
+          console.log('[OpenCodeService] Loop aborted before read');
           break;
         }
 
-        const { done, value } = await reader.read();
+        let readResult: ReadableStreamReadResult<Uint8Array>;
+        try {
+          readResult = await reader.read();
+        } catch (readError) {
+          // Handle abort error gracefully
+          if (signal?.aborted || aborted) {
+            console.log('[OpenCodeService] Read aborted');
+            break;
+          }
+          // Re-throw other errors
+          throw readError;
+        }
+        
+        const { done, value } = readResult;
         
         if (done) {
           console.log('[OpenCodeService] SSE stream done');
@@ -650,7 +682,7 @@ export class OpenCodeService {
         }
 
         // Check abort again after read
-        if (aborted) {
+        if (aborted || signal?.aborted) {
           console.log('[OpenCodeService] Aborted after read');
           break;
         }
@@ -678,12 +710,19 @@ export class OpenCodeService {
       }
 
       // Process any remaining data
-      if (buffer.trim() && !aborted) {
+      if (buffer.trim() && !aborted && !signal?.aborted) {
         const events = this.parseSSEEvents(buffer + '\n\n');
         for (const event of events.events) {
           yield event;
         }
       }
+    } catch (error) {
+      // Handle abort errors gracefully - don't throw when aborted
+      if (signal?.aborted || (error instanceof Error && error.name === 'AbortError')) {
+        console.log('[OpenCodeService] SSE connection aborted gracefully');
+        return;
+      }
+      throw error;
     } finally {
       signal?.removeEventListener('abort', abortHandler);
       reader.releaseLock();

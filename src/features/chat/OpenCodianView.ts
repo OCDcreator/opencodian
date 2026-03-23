@@ -411,6 +411,12 @@ export class OpenCodianView extends ItemView {
 
     if (!this.currentConversation) return;
 
+    // Prevent sending if already streaming
+    if (this.isStreaming) {
+      console.log('[OpenCodianView] Already streaming, ignoring send request');
+      return;
+    }
+
     // Add user message to UI
     await this.renderMessage({
       id: `user-${Date.now()}`,
@@ -421,6 +427,30 @@ export class OpenCodianView extends ItemView {
 
     this.isStreaming = true;
     this.scrollToBottom();
+
+    // Set up timeout as safety net to reset isStreaming
+    const STREAM_TIMEOUT_MS = 120000; // 2 minutes timeout
+    let timeoutId: number | null = null;
+    const resetStreamingState = () => {
+      if (timeoutId) {
+        window.clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+      this.isStreaming = false;
+      console.log('[OpenCodianView] Streaming state reset');
+    };
+
+    timeoutId = window.setTimeout(() => {
+      console.warn('[OpenCodianView] Stream timeout, forcing state reset');
+      resetStreamingState();
+      // Add error message if still streaming
+      if (this.streamController?.isStreaming()) {
+        void this.streamController.handleChunk({ 
+          type: 'error', 
+          content: 'Response timeout' 
+        });
+      }
+    }, STREAM_TIMEOUT_MS);
 
     // Stream response with current session model
     const modelOptions = this.getSendMessageOptions();
@@ -459,7 +489,7 @@ export class OpenCodianView extends ItemView {
         });
       }
     } finally {
-      this.isStreaming = false;
+      resetStreamingState();
       
       // Add timestamp to the streamed message
       if (this.streamingMessageEl) {
