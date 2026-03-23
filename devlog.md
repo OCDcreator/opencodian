@@ -1,5 +1,107 @@
 # OpenCodian 开发日志
 
+## 2026-03-23 SDK 依赖评估与移除
+
+### 📋 背景
+项目中声明了 `@opencode-ai/sdk` 作为依赖，但实际代码完全没有使用它。项目自己实现了 HTTP 请求层和 SSE 流解析。本次评估决定是否使用官方 SDK 替代手动实现。
+
+### 🔍 调研过程
+
+#### 1. 对比参考项目与安装版本
+- **参考项目** (`reference-projects/opencode-sdk-js`): v0.1.0-alpha.21
+  - 使用 `Opencode` 类
+  - 方法返回直接的 Promise，如 `await client.session.create()` 返回 `Session`
+  - 支持流式事件 `client.event.list()`
+
+- **npm 安装版本**: v1.2.27
+  - 使用 `createOpencodeClient()` 或 `OpencodeClient`
+  - 所有方法返回 `{ data, error, request, response }` 包装对象
+  - API 结构完全不同
+
+#### 2. API 差异示例
+```typescript
+// 参考项目 (v0.1.0-alpha.21)
+const session = await client.session.create();
+// session 直接是 Session 对象
+
+// 安装版本 (v1.2.27)
+const result = await client.session.create();
+// result = { data: Session | undefined, error: APIError | undefined, request, response }
+// 需要检查 result.data 或 result.error
+```
+
+#### 3. 评估结论
+- 官方 SDK 版本差异过大，无法直接迁移
+- 当前手动实现已经稳定工作，没有迁移的必要
+- 移除未使用的依赖可以减少包体积
+
+### ✅ 执行操作
+
+#### 移除 SDK 依赖
+```bash
+npm uninstall @opencode-ai/sdk
+```
+
+#### 修复 TypeScript 类型错误
+在 `OpenCodeService.ts` 中补充缺失的类型定义：
+```typescript
+interface OpenCodeEvent {
+  type: string;
+  properties: {
+    // ... 已有属性
+    delta?: string;
+    field?: string;      // 新增
+    partID?: string;     // 新增
+    toolID?: string;
+    result?: string;
+    error?: string;
+  };
+}
+```
+
+#### 修复空值处理
+```typescript
+// partID 可能为 undefined 时的 Map 操作
+if (partID && !this.partTypeMap.has(partID)) {
+  const partType = eventData.properties?.part?.type;
+  this.partTypeMap.set(partID, partType || 'text');
+}
+const partType = partID ? (this.partTypeMap.get(partID) || 'text') : 'text';
+
+// tool output 可能为 undefined
+content: part.state.error
+  ? `Error: ${part.state.error}`
+  : (part.state.output ?? ''),
+```
+
+#### 更新 tsconfig.json
+排除 `reference-projects` 目录避免编译错误：
+```json
+{
+  "exclude": [
+    "node_modules",
+    "tests",
+    "reference-projects"
+  ]
+}
+```
+
+### 📁 修改文件
+
+| 文件 | 修改内容 |
+|------|----------|
+| `package.json` | 移除 `@opencode-ai/sdk` 依赖 |
+| `package-lock.json` | 更新锁定文件 |
+| `src/core/opencode/OpenCodeService.ts` | 修复类型定义和空值处理 |
+| `tsconfig.json` | 排除 reference-projects |
+
+### 🏁 结果
+- Git 分支 `refactor/use-sdk` 已合并到 `main`
+- 构建成功，已部署到测试环境
+- 项目继续使用自定义 HTTP 实现，代码更简洁
+
+---
+
 ## 2026-03-23 SSE 流式响应重构（进行中）
 
 ### 🚧 重构目标
