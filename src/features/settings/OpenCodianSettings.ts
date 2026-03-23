@@ -6,7 +6,6 @@
 
 import { App, Notice, PluginSettingTab, Setting } from 'obsidian';
 
-import type { OpenCodianSettings } from '../../core/types';
 import { setLocale, t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 
@@ -127,13 +126,11 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     let stopBtn: import('obsidian').ButtonComponent;
     
     // Track server state
-    let isActuallyRunning = false;
     let isExternalServer = false;
     
     const updateStatus = async () => {
       // Check actual server health
       const isHealthy = await this.plugin.openCodeService.checkHealth();
-      isActuallyRunning = isHealthy;
       
       // Get internal status
       const internalStatus = this.plugin.openCodeService.getServerStatus();
@@ -354,7 +351,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
             btn.setDisabled(true);
             btn.setButtonText('Loading...');
             
-            const result = await loadAvailableModels(true);
+            await loadAvailableModels(true);
             
             btn.setDisabled(false);
             btn.setButtonText(t('settings.model.refresh.button'));

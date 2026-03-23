@@ -432,6 +432,7 @@ export class OpenCodeService {
       let lastThinkingContent = '';
       const processedToolIds = new Set<string>();
       const toolStartTimes = new Map<string, number>();
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const TOOL_TIMEOUT_MS = 60000;
       
       // Track if we're done
@@ -447,6 +448,7 @@ export class OpenCodeService {
         for await (const event of eventStream) {
           // Check if cancelled
           if (this.currentAbortController?.signal.aborted) {
+            // eslint-disable-next-line no-console
             console.log('[OpenCodeService] Stream aborted, breaking loop');
             break;
           }
@@ -460,11 +462,11 @@ export class OpenCodeService {
           }
           
           // Print FULL event data for debugging (only for message.part.delta to avoid spam)
-          if (eventData.type === 'message.part.delta') {
+/*           if (eventData.type === 'message.part.delta') {
 
           } else {
 
-          }
+          } */
           
           // Only process events for our session
           if (eventData.properties?.sessionID && eventData.properties.sessionID !== sessionId) {
@@ -473,9 +475,9 @@ export class OpenCodeService {
           }
 
           // Debug: Log session.idle event details
-          if (eventData.type === 'session.idle') {
+/*           if (eventData.type === 'session.idle') {
 
-          }
+          } */
           
           // Handle message.part.updated - track part types and tool calls
           if (eventData.type === 'message.part.updated') {
@@ -579,9 +581,9 @@ export class OpenCodeService {
           }
 
           // Debug: log if we reach here with session.idle
-          if (eventData.type?.includes?.('idle')) {
+/*           if (eventData.type?.includes?.('idle')) {
 
-          }
+          } */
         }
       } finally {
         if (checkInterval) {
@@ -700,20 +702,20 @@ export class OpenCodeService {
 
         const chunk = decoder.decode(value, { stream: true });
         // Print full chunk if it contains message.part.delta
-        if (chunk.includes('message.part.delta')) {
+/*         if (chunk.includes('message.part.delta')) {
 
         } else {
 
-        }
+        } */
         buffer += chunk;
         
         // Process complete events in buffer
         const events = this.parseSSEEvents(buffer);
         buffer = events.remaining;
         
-        if (events.events.length > 0) {
+/*         if (events.events.length > 0) {
 
-        }
+        } */
         
         for (const event of events.events) {
           yield event;
