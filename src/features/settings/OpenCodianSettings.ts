@@ -209,8 +209,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
             const internalStatus = this.plugin.openCodeService.getServerStatus();
             
             // Debug info
-            console.log('[Settings] Health check:', isHealthy, 'Internal status:', internalStatus);
-            console.log('[Settings] Start button disabled:', isHealthy || internalStatus === 'starting');
+
             
             await updateStatus();
             
@@ -300,17 +299,17 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         
         // Set current model if available for this provider
         const currentModel = this.plugin.settings.defaultModel;
-        console.log('[Settings] Current defaultModel:', currentModel, 'for provider:', currentProviderId);
+
         
         if (provider.models.find(m => m.id === currentModel)) {
           modelDropdown.setValue(currentModel);
-          console.log('[Settings] Set model dropdown to:', currentModel);
+
         } else {
           // Default to first model and update settings
           const firstModel = provider.models[0].id;
           modelDropdown.setValue(firstModel);
           this.plugin.settings.defaultModel = firstModel;
-          console.log('[Settings] Defaulted to first model:', firstModel);
+
         }
       } else {
         modelDropdown.addOption('', 'No models available');
@@ -336,10 +335,10 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       .addDropdown((dropdown) => {
         modelDropdown = dropdown;
         dropdown.onChange(async (value) => {
-          console.log('[Settings] Model changed to:', value);
+
           this.plugin.settings.defaultModel = value;
           await this.plugin.saveSettings();
-          console.log('[Settings] Saved settings, defaultModel is now:', this.plugin.settings.defaultModel);
+
         });
       });
 

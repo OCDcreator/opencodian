@@ -47,7 +47,7 @@ export class StreamController {
   }
 
   startStream(contentEl: HTMLElement): void {
-    console.log('[StreamController] startStream called with element:', contentEl);
+
     this.state = createStreamState();
     this.state.isStreaming = true;
     this.state.currentContentEl = contentEl;
@@ -55,10 +55,10 @@ export class StreamController {
   }
 
   async handleChunk(chunk: StreamChunk): Promise<void> {
-    console.log('[StreamController] handleChunk:', chunk.type, chunk);
+
     
     if (!this.state.isStreaming || !this.state.currentContentEl) {
-      console.log('[StreamController] Skipping chunk - not streaming or no content element');
+
       return;
     }
 
@@ -147,13 +147,22 @@ export class StreamController {
     this.state.toolCalls.set(chunk.id, toolCall);
     this.callbacks.onToolCallStart?.(toolCall);
 
-    const toolEl = this.toolRenderer.render(this.state.currentContentEl!, toolCall);
+    if (!this.state.currentContentEl) {
+      console.error('[StreamController] currentContentEl is null, cannot render tool');
+      return;
+    }
+
+    const toolEl = this.toolRenderer.render(this.state.currentContentEl, toolCall);
     this.state.toolCallElements.set(chunk.id, toolEl);
   }
 
   private handleToolResultChunk(chunk: { id: string; content: string; isError?: boolean }): void {
+
     const toolCall = this.state.toolCalls.get(chunk.id);
-    if (!toolCall) return;
+    if (!toolCall) {
+
+      return;
+    }
 
     toolCall.result = chunk.content;
     toolCall.status = chunk.isError ? 'error' : 'completed';

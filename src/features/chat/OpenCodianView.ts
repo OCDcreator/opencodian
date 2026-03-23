@@ -8,21 +8,17 @@ import type { EventRef, WorkspaceLeaf } from 'obsidian';
 import { Component, ItemView, Menu, Notice, Scope, setIcon } from 'obsidian';
 
 import { VIEW_TYPE_OPENCODIAN } from '../../core/types';
-import type { ChatMessage, Conversation } from '../../core/types';
+import type { ChatMessage, ContentBlock, Conversation, ToolCallInfo } from '../../core/types';
 import { OpenCodeService } from '../../core/opencode';
 import type OpenCodianPlugin from '../../main';
 import { MarkdownRenderService } from '../../utils/markdown';
-import { StreamController } from '../../utils/streaming';
-import type { ContentBlock } from '../../utils/streaming';
+import { StreamController, ThinkingBlockRenderer, ToolCallRenderer } from '../../utils/streaming';
 
-/** Logo SVG */
-const LOGO_SVG = {
-  viewBox: '0 0 24 24',
-  width: '24',
-  height: '24',
-  path: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z',
-  fill: 'currentColor',
-};
+/** Logo SVG for light theme (dark logo on light bg) - from opencode-logo-light.svg */
+const LOGO_SVG_LIGHT = `<svg width="24" height="30" viewBox="0 0 240 300" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#clip0_light)"><mask id="mask0_light" style="mask-type:luminance" maskUnits="userSpaceOnUse" x="0" y="0" width="240" height="300"><path d="M240 0H0V300H240V0Z" fill="white"/></mask><g mask="url(#mask0_light)"><path d="M180 240H60V120H180V240Z" fill="#CFCECD"/><path d="M180 60H60V240H180V60ZM240 300H0V0H240V300Z" fill="#211E1E"/></g></g><defs><clipPath id="clip0_light"><rect width="240" height="300" fill="white"/></clipPath></defs></svg>`;
+
+/** Logo SVG for dark theme (light logo on dark bg) - from opencode-logo-dark.svg */
+const LOGO_SVG_DARK = `<svg width="24" height="30" viewBox="0 0 240 300" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#clip0_dark)"><mask id="mask0_dark" style="mask-type:luminance" maskUnits="userSpaceOnUse" x="0" y="0" width="240" height="300"><path d="M240 0H0V300H240V0Z" fill="white"/></mask><g mask="url(#mask0_dark)"><path d="M180 240H60V120H180V240Z" fill="#4B4646"/><path d="M180 60H60V240H180V60ZM240 300H0V0H240V300Z" fill="#F1ECEC"/></g></g><defs><clipPath id="clip0_dark"><rect width="240" height="300" fill="white"/></clipPath></defs></svg>`;
 
 export class OpenCodianView extends ItemView {
   private plugin: OpenCodianPlugin;
@@ -131,17 +127,18 @@ export class OpenCodianView extends ItemView {
     // Logo and title
     const titleEl = header.createDiv({ cls: 'opencodian-title' });
     
-    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.setAttribute('viewBox', LOGO_SVG.viewBox);
-    svg.setAttribute('width', LOGO_SVG.width);
-    svg.setAttribute('height', LOGO_SVG.height);
-    svg.setAttribute('fill', LOGO_SVG.fill);
-    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    path.setAttribute('d', LOGO_SVG.path);
-    svg.appendChild(path);
-    titleEl.appendChild(svg);
+    // Create logo container
+    const logoContainer = titleEl.createDiv({ cls: 'opencodian-logo' });
+    logoContainer.innerHTML = this.getLogoSvg();
 
-    titleEl.createEl('span', { text: 'OpenCodian' });
+    titleEl.createEl('span', { text: 'OpenCodian', cls: 'opencodian-title-text' });
+    
+    // Listen for theme changes
+    this.registerEvent(
+      this.app.workspace.on('css-change', () => {
+        logoContainer.innerHTML = this.getLogoSvg();
+      })
+    );
 
     // Actions
     const actions = header.createDiv({ cls: 'opencodian-header-actions' });
@@ -172,6 +169,13 @@ export class OpenCodianView extends ItemView {
       // @ts-ignore - Obsidian API
       this.app.setting.openTabById('opencodian');
     });
+  }
+
+  /** Get logo SVG based on current theme */
+  private getLogoSvg(): string {
+    // Check if we're in dark mode by looking for .theme-dark class
+    const isDark = document.body.classList.contains('theme-dark');
+    return isDark ? LOGO_SVG_DARK : LOGO_SVG_LIGHT;
   }
 
   /** Build input area */
@@ -413,7 +417,7 @@ export class OpenCodianView extends ItemView {
 
     // Prevent sending if already streaming
     if (this.isStreaming) {
-      console.log('[OpenCodianView] Already streaming, ignoring send request');
+
       return;
     }
 
@@ -437,7 +441,7 @@ export class OpenCodianView extends ItemView {
         timeoutId = null;
       }
       this.isStreaming = false;
-      console.log('[OpenCodianView] Streaming state reset');
+
     };
 
     timeoutId = window.setTimeout(() => {
@@ -520,7 +524,7 @@ export class OpenCodianView extends ItemView {
   }
 
   /** Render a message */
-  private async renderMessage(message: { id: string; role: string; content: string; timestamp: number }) {
+  private async renderMessage(message: ChatMessage) {
     const messageEl = this.messagesContainer?.createDiv({
       cls: `opencodian-message opencodian-message--${message.role}`,
     });
@@ -537,15 +541,20 @@ export class OpenCodianView extends ItemView {
 
     // Content
     const content = messageEl.createDiv({ cls: 'opencodian-message-content' });
-    const textEl = content.createDiv({ cls: 'opencodian-message-text' });
 
-    // Render content
-    if (message.role === 'assistant' && this.markdownService) {
-      // Use Markdown rendering for assistant messages
-      await this.markdownService.render(textEl, message.content);
-    } else {
-      // Use plain text for user messages
-      textEl.textContent = message.content;
+    // Render content blocks if available (for rich content like thinking, tools)
+    if (message.contentBlocks && message.contentBlocks.length > 0) {
+      for (const block of message.contentBlocks) {
+        await this.renderContentBlock(content, block);
+      }
+    } else if (message.content) {
+      // Fallback to simple text rendering
+      const textEl = content.createDiv({ cls: 'opencodian-message-text' });
+      if (message.role === 'assistant' && this.markdownService) {
+        await this.markdownService.render(textEl, message.content);
+      } else {
+        textEl.textContent = message.content;
+      }
     }
 
     // Timestamp
@@ -556,6 +565,50 @@ export class OpenCodianView extends ItemView {
     content.createEl('div', { cls: 'opencodian-message-time', text: time });
 
     return messageEl;
+  }
+
+  /** Render a content block using the same renderers as streaming */
+  private async renderContentBlock(container: HTMLElement, block: ContentBlock) {
+    if (!this.markdownService) return;
+
+    switch (block.type) {
+      case 'thinking':
+        if (block.thinking) {
+          const thinkingRenderer = new ThinkingBlockRenderer(this.markdownService, {
+            collapsedByDefault: true,
+            showTimer: false,
+          });
+          thinkingRenderer.renderStored(container, block.thinking);
+        }
+        break;
+
+      case 'tool_use':
+        if (block.toolName && block.toolId) {
+          const toolRenderer = new ToolCallRenderer();
+          const toolCall: ToolCallInfo = {
+            id: block.toolId,
+            name: block.toolName,
+            input: block.toolInput || {},
+            status: 'completed',
+            result: block.toolResult,
+          };
+          toolRenderer.render(container, toolCall);
+        }
+        break;
+
+      case 'tool_result':
+        // Tool results are rendered as part of tool_use or separately if needed
+        // For now, skip as they're typically shown within the tool call UI
+        break;
+
+      case 'text':
+      default:
+        if (block.text) {
+          const textEl = container.createDiv({ cls: 'opencodian-message-text' });
+          await this.markdownService.render(textEl, block.text);
+        }
+        break;
+    }
   }
 
   /** Create assistant message element for streaming */
@@ -732,11 +785,7 @@ export class OpenCodianView extends ItemView {
     // Show notification
     new Notice(`Model switched to: ${provider}/${model}`);
     
-    console.log('[OpenCodianView] Model switched:', { 
-      sessionId: this.currentConversation.id,
-      provider, 
-      model 
-    });
+
   }
 
   /** Get model options for sendMessage */
@@ -752,18 +801,18 @@ export class OpenCodianView extends ItemView {
   private convertToStreamingChunk(
     chunk: import('../../core/types').StreamChunk
   ): import('../../utils/streaming').StreamChunk | null {
-    console.log('[OpenCodianView] Converting chunk:', chunk.type, chunk);
+
     
     switch (chunk.type) {
       case 'text':
         return { type: 'text', content: chunk.content };
       
       case 'thinking':
-        console.log('[OpenCodianView] Converting thinking chunk');
+
         return { type: 'thinking', content: chunk.content };
       
       case 'tool_use':
-        console.log('[OpenCodianView] Converting tool_use chunk');
+
         return {
           type: 'tool_use',
           id: chunk.id,
@@ -772,7 +821,7 @@ export class OpenCodianView extends ItemView {
         };
       
       case 'tool_result':
-        console.log('[OpenCodianView] Converting tool_result chunk');
+
         return {
           type: 'tool_result',
           id: chunk.toolUseId,

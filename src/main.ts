@@ -40,7 +40,7 @@ export default class OpenCodianPlugin extends Plugin {
     // Initialize OpenCode service
     this.openCodeService = new OpenCodeService(this.settings, {
       onServerStatusChange: (status) => {
-        console.log('OpenCode server status:', status);
+
       },
       onError: (error) => {
         new Notice(`OpenCode error: ${error.message}`);
@@ -48,11 +48,7 @@ export default class OpenCodianPlugin extends Plugin {
       onModelsLoaded: (providers) => {
         // Auto-save settings when models are loaded and defaults are updated
         void this.saveSettings();
-        console.log('[OpenCodian] Models loaded, settings updated:', {
-          provider: this.settings.defaultProvider,
-          model: this.settings.defaultModel,
-          availableProviders: providers.map(p => p.id),
-        });
+
         // Notify settings tab to refresh dropdowns if it's open
         this.settingsTab?.onModelsLoaded();
       },
@@ -115,13 +111,13 @@ export default class OpenCodianPlugin extends Plugin {
     // Load conversations
     await this.loadConversations();
 
-    console.log('OpenCodian plugin loaded');
+
   }
 
   onunload() {
     // Stop OpenCode service
     void this.openCodeService.stop();
-    console.log('OpenCodian plugin unloaded');
+
   }
 
   /** Activate the chat view */

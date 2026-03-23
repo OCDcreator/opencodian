@@ -106,17 +106,17 @@ export class ServerManager {
   /** Stop the OpenCode server */
   async stop(): Promise<void> {
     if (!this.process) {
-      console.log('[ServerManager] No process to stop');
+
       this.setStatus('stopped');
       return;
     }
 
     if (this.status === 'stopped') {
-      console.log('[ServerManager] Server already stopped');
+
       return;
     }
 
-    console.log('[ServerManager] Stopping server...');
+
     this.setStatus('stopped');
 
     return new Promise((resolve) => {
@@ -132,7 +132,7 @@ export class ServerManager {
 
       // Set a timeout to force kill
       const timeout = setTimeout(() => {
-        console.log('[ServerManager] Force killing server process...');
+
         try {
           // Try SIGKILL on Unix, or terminate on Windows
           const killed = this.process?.kill(process.platform === 'win32' ? undefined : 'SIGKILL');
@@ -147,7 +147,7 @@ export class ServerManager {
 
       // Listen for process exit
       this.process?.once('exit', (code, signal) => {
-        console.log(`[ServerManager] Process exited with code ${code}, signal ${signal}`);
+
         clearTimeout(timeout);
         doResolve();
       });
@@ -155,7 +155,7 @@ export class ServerManager {
       // Try graceful shutdown first
       try {
         const terminated = this.process?.kill(process.platform === 'win32' ? undefined : 'SIGTERM');
-        console.log(`[ServerManager] SIGTERM sent, result: ${terminated}`);
+
         
         // If kill returns false, the process might already be dead
         if (terminated === false) {
@@ -236,7 +236,7 @@ export class ServerManager {
 
         // Log output for debugging
         this.process.stdout?.on('data', (data) => {
-          console.log('[OpenCode]', data.toString().trim());
+
         });
 
         this.process.stderr?.on('data', (data) => {

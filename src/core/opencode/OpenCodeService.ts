@@ -156,7 +156,7 @@ export class OpenCodeService {
   /** Auto-fetch models when server starts and update defaults if needed */
   private async autoFetchModels(): Promise<void> {
     try {
-      console.log('[OpenCodeService] Auto-fetching models after server start...');
+
       const result = await this.getAvailableModels();
       
       if (result.providers.length === 0) {
@@ -177,13 +177,13 @@ export class OpenCodeService {
           this.settings.defaultModel = firstProvider.models[0].id;
         }
         
-        console.log(`[OpenCodeService] Updated default provider to: ${this.settings.defaultProvider}, model: ${this.settings.defaultModel}`);
+
       } else {
         // Provider exists, check if model is valid
         const currentModel = currentProvider.models.find(m => m.id === this.settings.defaultModel);
         if (!currentModel && currentProvider.models.length > 0) {
           this.settings.defaultModel = currentProvider.models[0].id;
-          console.log(`[OpenCodeService] Updated default model to: ${this.settings.defaultModel}`);
+
         }
       }
 
@@ -291,13 +291,13 @@ export class OpenCodeService {
 
   /** Create a new session - returns Session object with id property */
   async createSession(title?: string): Promise<string> {
-    console.log('[OpenCodeService] Creating session:', title ?? 'New Conversation');
+
     
     const response = await this.post<unknown>('/session', {
       title: title ?? 'New Conversation',
     });
     
-    console.log('[OpenCodeService] Create session response:', response);
+
     
     // Handle different response formats
     let sessionId: string;
@@ -307,7 +307,7 @@ export class OpenCodeService {
       throw new Error('Invalid session response: ' + JSON.stringify(response));
     }
     
-    console.log('[OpenCodeService] Created session ID:', sessionId);
+
     this.currentSessionId = sessionId;
     return sessionId;
   }
@@ -338,15 +338,15 @@ export class OpenCodeService {
       return [];
     }
     
-    console.log(`[OpenCodeService] Getting messages for session: ${sessionId}`);
+
     
     try {
       // Note: The correct endpoint is /session/:id/message (singular, not plural)
       const path = `/session/${sessionId}/message`;
-      console.log(`[OpenCodeService] Requesting: ${this.baseUrl}${path}`);
+
       
       const response = await this.get<unknown>(path);
-      console.log(`[OpenCodeService] Messages response:`, response);
+
       
       return Array.isArray(response) ? response : [];
     } catch (error) {
@@ -400,20 +400,16 @@ export class OpenCodeService {
         },
       };
       
-      console.log('[OpenCodeService] Sending message:', { 
-        sessionId, 
-        providerID,
-        modelID,
-      });
+
       
       await this.post<void>(`/session/${sessionId}/prompt_async`, requestBody);
-      console.log('[OpenCodeService] Message sent, starting SSE stream...');
+
 
       yield { type: 'message_start' };
 
       // Use SSE for real-time streaming
       const sseUrl = `${this.baseUrl}/event`;
-      console.log('[OpenCodeService] Connecting to SSE:', sseUrl);
+
 
       // Create SSE stream with abort controller
       const abortController = new AbortController();
@@ -435,41 +431,74 @@ export class OpenCodeService {
       const MESSAGE_CHECK_INTERVAL = 2000; // Check every 2 seconds
       
       try {
-        console.log('[OpenCodeService] Starting SSE event loop...');
+
         for await (const event of eventStream) {
           // Parse the nested data structure
           let eventData: OpenCodeEvent;
           try {
             eventData = JSON.parse(event.data) as OpenCodeEvent;
           } catch {
-            console.log('[OpenCodeService] Failed to parse event data:', event.data.substring(0, 100));
+
             continue;
           }
           
           // Print FULL event data for debugging (only for message.part.delta to avoid spam)
           if (eventData.type === 'message.part.delta') {
-            console.log('[OpenCodeService] FULL message.part.delta:', JSON.stringify(eventData, null, 2));
+
           } else {
-            console.log('[OpenCodeService] SSE event:', eventData.type);
+
           }
           
           // Only process events for our session
           if (eventData.properties?.sessionID && eventData.properties.sessionID !== sessionId) {
-            console.log('[OpenCodeService] Skipping event for different session:', eventData.type, 'eventSession:', eventData.properties.sessionID, 'ourSession:', sessionId);
+
             continue;
           }
 
           // Debug: Log session.idle event details
           if (eventData.type === 'session.idle') {
-            console.log('[OpenCodeService] session.idle event passed filter, properties:', JSON.stringify(eventData.properties));
+
           }
           
-          // Handle message.part.updated - track part types
+          // Handle message.part.updated - track part types and tool calls
           if (eventData.type === 'message.part.updated') {
             const part = eventData.properties?.part;
             if (part?.id && part?.type) {
               this.partTypeMap.set(part.id, part.type);
-              console.log('[OpenCodeService] Tracked part type:', part.id, part.type);
+              
+              // Handle tool parts
+              if (part.type === 'tool') {
+                const toolId = part.callID || part.id;
+                const toolName = part.tool || 'unknown';
+                if (toolId) {
+                  // New tool use
+                  if (!processedToolIds.has(toolId)) {
+                    processedToolIds.add(toolId);
+                    toolStartTimes.set(toolId, Date.now());
+                    yield { 
+                      type: 'tool_use', 
+                      id: toolId, 
+                      name: toolName, 
+                      input: part.state?.input || {}
+                    };
+                  }
+                  
+                  // Tool result
+                  if (part.state?.output || part.state?.error) {
+                    const resultKey = `${toolId}_result`;
+                    if (!processedToolIds.has(resultKey)) {
+                      processedToolIds.add(resultKey);
+                      yield {
+                        type: 'tool_result',
+                        toolUseId: toolId,
+                        content: part.state.error
+                          ? `Error: ${part.state.error}`
+                          : (part.state.output ?? ''),
+                      };
+                    }
+                  }
+                }
+              }
             }
             continue;
           }
@@ -481,11 +510,11 @@ export class OpenCodeService {
             const partID = eventData.properties?.partID;
             
             if (!delta || !field) {
-              console.log('[OpenCodeService] Delta event missing delta or field:', { delta, field });
+
               continue;
             }
             
-            console.log('[OpenCodeService] Processing delta:', { field, delta: delta.substring(0, 50), partID });
+
 
             // Track part types by partID
             if (partID && !this.partTypeMap.has(partID)) {
@@ -510,45 +539,6 @@ export class OpenCodeService {
             }
           }
           
-          // Handle message.part.updated - part completion or tool updates
-          if (eventData.type === 'message.part.updated') {
-            const part = eventData.properties?.part;
-            if (!part) continue;
-            
-            // Handle tool parts
-            if (part.type === 'tool') {
-              const toolId = part.callID || part.id;
-              if (!toolId) continue;
-              
-              // New tool use
-              if (!processedToolIds.has(toolId)) {
-                processedToolIds.add(toolId);
-                toolStartTimes.set(toolId, Date.now());
-                yield { 
-                  type: 'tool_use', 
-                  id: toolId, 
-                  name: part.tool || 'unknown', 
-                  input: part.state?.input || {} 
-                };
-              }
-              
-              // Tool result
-              if (part.state?.output || part.state?.error) {
-                const resultKey = `${toolId}_result`;
-                if (!processedToolIds.has(resultKey)) {
-                  processedToolIds.add(resultKey);
-                  yield {
-                    type: 'tool_result',
-                    toolUseId: toolId,
-                    content: part.state.error
-                      ? `Error: ${part.state.error}`
-                      : (part.state.output ?? ''),
-                  };
-                }
-              }
-            }
-          }
-          
           // Handle session.diff - indicates changes, fetch latest messages
           if (eventData.type === 'session.diff') {
             // Session state changed, could check for completion
@@ -566,15 +556,14 @@ export class OpenCodeService {
           
           // Handle session.idle - message streaming complete
           if (eventData.type === 'session.idle') {
-            console.log('[OpenCodeService] Session idle detected, breaking loop...');
-            console.log('[OpenCodeService] Session idle, message complete');
+
             abortController.abort(); // Abort the SSE connection
             break; // Exit SSE loop
           }
 
           // Debug: log if we reach here with session.idle
           if (eventData.type?.includes?.('idle')) {
-            console.log('[OpenCodeService] DEBUG: idle-like event but not matched:', JSON.stringify(eventData.type));
+
           }
         }
       } finally {
@@ -612,16 +601,16 @@ export class OpenCodeService {
 
   /** Connect to SSE endpoint and yield events */
   private async *connectSSE(url: string, signal?: AbortSignal): AsyncGenerator<SSEEvent> {
-    console.log('[OpenCodeService] connectSSE starting...');
+
     
     // Check if already aborted
     if (signal?.aborted) {
-      console.log('[OpenCodeService] Signal already aborted, exiting');
+
       return;
     }
     
     // Use native fetch for streaming support
-    console.log('[OpenCodeService] Fetching SSE stream...');
+
     const response = await fetch(url, {
       method: 'GET',
       headers: {
@@ -630,7 +619,7 @@ export class OpenCodeService {
       signal, // Pass signal to fetch to allow cancellation
     });
 
-    console.log('[OpenCodeService] SSE response received:', response.status, response.ok);
+
     
     if (!response.ok) {
       throw new Error(`SSE connection failed: ${response.status} ${response.statusText}`);
@@ -640,7 +629,7 @@ export class OpenCodeService {
       throw new Error('SSE response has no body');
     }
 
-    console.log('[OpenCodeService] SSE stream connected, starting read loop...');
+
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
@@ -648,7 +637,7 @@ export class OpenCodeService {
 
     // Handle abort signal
     const abortHandler = () => {
-      console.log('[OpenCodeService] Abort signal received, cancelling reader...');
+
       aborted = true;
       void reader.cancel();
     };
@@ -659,7 +648,7 @@ export class OpenCodeService {
       while (true) {
         // Check if aborted before reading
         if (aborted || signal?.aborted) {
-          console.log('[OpenCodeService] Loop aborted before read');
+  
           break;
         }
 
@@ -669,7 +658,7 @@ export class OpenCodeService {
         } catch (readError) {
           // Handle abort error gracefully
           if (signal?.aborted || aborted) {
-            console.log('[OpenCodeService] Read aborted');
+
             break;
           }
           // Re-throw other errors
@@ -679,22 +668,22 @@ export class OpenCodeService {
         const { done, value } = readResult;
         
         if (done) {
-          console.log('[OpenCodeService] SSE stream done');
+
           break;
         }
 
         // Check abort again after read
         if (aborted || signal?.aborted) {
-          console.log('[OpenCodeService] Aborted after read');
+
           break;
         }
 
         const chunk = decoder.decode(value, { stream: true });
         // Print full chunk if it contains message.part.delta
         if (chunk.includes('message.part.delta')) {
-          console.log('[OpenCodeService] SSE FULL chunk:', chunk);
+
         } else {
-          console.log('[OpenCodeService] SSE raw chunk:', chunk.substring(0, 100));
+
         }
         buffer += chunk;
         
@@ -703,7 +692,7 @@ export class OpenCodeService {
         buffer = events.remaining;
         
         if (events.events.length > 0) {
-          console.log('[OpenCodeService] Parsed events:', events.events.length);
+
         }
         
         for (const event of events.events) {
@@ -721,14 +710,14 @@ export class OpenCodeService {
     } catch (error) {
       // Handle abort errors gracefully - don't throw when aborted
       if (signal?.aborted || (error instanceof Error && error.name === 'AbortError')) {
-        console.log('[OpenCodeService] SSE connection aborted gracefully');
+
         return;
       }
       throw error;
     } finally {
       signal?.removeEventListener('abort', abortHandler);
       reader.releaseLock();
-      console.log('[OpenCodeService] SSE reader released');
+
     }
   }
 
@@ -778,7 +767,7 @@ export class OpenCodeService {
     try {
       const data = await this.get<{ providers: Array<{ id: string; name: string; models: unknown }>; default: { provider?: string; model?: string } }>('/config/providers');
       
-      console.log('[OpenCodeService] Raw providers data:', data);
+
       
       return {
         providers: data.providers.map((p) => {
@@ -935,8 +924,14 @@ export class OpenCodeService {
     );
     const content = textParts.map((p) => p.text).join('');
 
+    // Extract thinking content from reasoning parts
+    const thinkingParts = parts.filter((p): p is Part & { text: string } =>
+      p.type === 'reasoning' && typeof p.text === 'string'
+    );
+    const thinking = thinkingParts.map((p) => p.text).join('');
+
     // Extract tool calls from tool parts
-    const toolParts = parts.filter((p) => p.type === 'tool') as Array<Part & { callID?: string; tool?: string; state?: { status: string; input?: Record<string, unknown> } }>;
+    const toolParts = parts.filter((p) => p.type === 'tool') as Array<Part & { callID?: string; tool?: string; state?: { status: string; input?: Record<string, unknown>; output?: string; error?: string } }>;
     const toolCalls = toolParts
       .filter((p) => p.state?.status === 'pending' || p.state?.status === 'running')
       .map((p) => ({
@@ -945,6 +940,44 @@ export class OpenCodeService {
         input: p.state?.input ?? {},
         status: 'pending' as const,
       }));
+
+    // Build content blocks for rich rendering
+    const contentBlocks: ContentBlock[] = [];
+    
+    // Add thinking block if present
+    if (thinking) {
+      contentBlocks.push({ type: 'thinking', thinking });
+    }
+    
+    // Process tool parts - combine tool_use and tool_result into single blocks
+    const processedToolIds = new Set<string>();
+    for (const part of toolParts) {
+      const toolId = part.callID || part.id;
+      if (!toolId || processedToolIds.has(toolId)) continue;
+      
+      processedToolIds.add(toolId);
+      
+      // Find the result for this tool (if any)
+      const resultPart = toolParts.find(
+        p => (p.callID || p.id) === toolId && (p.state?.output || p.state?.error)
+      );
+      
+      // Create combined tool_use block with result
+      contentBlocks.push({
+        type: 'tool_use',
+        toolId,
+        toolName: part.tool || 'unknown',
+        toolInput: part.state?.input || {},
+        toolResult: resultPart?.state?.error 
+          ? `Error: ${resultPart.state.error}`
+          : resultPart?.state?.output || undefined,
+      });
+    }
+    
+    // Add text content
+    if (content) {
+      contentBlocks.push({ type: 'text', text: content });
+    }
 
     // Determine timestamp
     let timestamp: number;
@@ -960,6 +993,7 @@ export class OpenCodeService {
       content,
       timestamp,
       toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+      contentBlocks: contentBlocks.length > 0 ? contentBlocks : undefined,
       parts,
     };
   }

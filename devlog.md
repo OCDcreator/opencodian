@@ -855,3 +855,139 @@ try {
 **主要贡献**: SSE 流式响应架构实现、CORS 配置、事件解析、流状态管理修复
 
 **当前状态**: ✅ SSE 流式传输功能完整，支持连续发送多条消息
+
+
+---
+
+## 2026-03-23 工具调用显示修复
+
+### 🐛 问题描述
+用户报告工具调用在会话中不显示。虽然 AI 实际调用了工具（如 web_search、bash、read 等），但前端界面中没有呈现工具调用的卡片。
+
+### 🔍 根因分析
+通过分析日志文件 `obsidian.md-1774267116377.log`，发现问题出在 `OpenCodeService.ts` 的 SSE 事件处理逻辑中：
+
+1. **代码逻辑错误**: `message.part.updated` 事件有两个处理块
+   - 第一个处理块（第 467 行）跟踪 part 类型后使用 `continue` 跳过循环
+   - 第二个处理块（原第 513 行）包含工具调用处理逻辑，但**永远不会被执行**
+
+```typescript
+// 第一个处理块 - 执行后会 continue 跳过
+if (eventData.type === 'message.part.updated') {
+  // ... 跟踪 part 类型
+  continue;  // ← 这里直接跳过了！
+}
+
+// 第二个处理块 - 永远不会执行
+if (eventData.type === 'message.part.updated') {
+  // 处理 tool 的逻辑在这里...
+}
+```
+
+2. **数据结构确认**: OpenCode Server 发送的工具调用事件格式如下：
+```json
+{
+  "type": "message.part.updated",
+  "properties": {
+    "part": {
+      "id": "prt_xxx",
+      "type": "tool",
+      "callID": "call_xxx",
+      "tool": "web_search",
+      "state": {
+        "status": "running",
+        "input": { "query": "today's date" }
+      }
+    }
+  }
+}
+```
+
+### ✅ 修复方案
+
+#### 1. 合并工具处理逻辑
+将工具调用处理逻辑合并到第一个 `message.part.updated` 处理块中：
+
+```typescript
+if (eventData.type === 'message.part.updated') {
+  const part = eventData.properties?.part;
+  if (part?.id && part?.type) {
+    this.partTypeMap.set(part.id, part.type);
+    
+    // 处理工具调用
+    if (part.type === 'tool') {
+      const toolId = part.callID || part.id;
+      const toolName = part.tool || 'unknown';
+      if (toolId) {
+        // 新工具调用
+        if (!processedToolIds.has(toolId)) {
+          processedToolIds.add(toolId);
+          yield { 
+            type: 'tool_use', 
+            id: toolId, 
+            name: toolName, 
+            input: part.state?.input || {}
+          };
+        }
+        
+        // 工具结果
+        if (part.state?.output || part.state?.error) {
+          // yield tool_result...
+        }
+      }
+    }
+  }
+  continue;
+}
+```
+
+#### 2. 删除冗余代码块
+移除永远不会执行的第二个 `message.part.updated` 处理块。
+
+### 🧪 调试过程
+为确认修复效果，添加了详细的调试日志：
+- `[OpenCodeService] message.part.updated - part:` - 显示 part 对象结构
+- `[OpenCodeService] Tool part detected!` - 确认检测到工具类型
+- `[StreamController] Rendering tool:` - 确认渲染执行
+
+通过日志验证，工具调用已正确 yield 并传递给 `StreamController`，`ToolCallRenderer` 成功渲染了工具卡片。
+
+### 📊 测试结果
+修复后，工具调用正常显示：
+- ✅ `task` 工具 - 显示任务进度
+- ✅ `glob` 工具 - 显示文件搜索
+- ✅ `grep` 工具 - 显示文本搜索
+- ✅ `ast_grep_search` 工具 - 显示代码搜索
+
+工具卡片显示为可折叠的 UI 组件：
+```
+┌─────────────────────────────────────┐
+│ 🔧 web_search │ "query" │ ⏳ │
+├─────────────────────────────────────┤
+│ Waiting for result...               │
+└─────────────────────────────────────┘
+```
+
+### 📝 代码清理
+修复验证完成后，清理了所有调试日志：
+- 删除了 `OpenCodeService.ts` 中的 5 处调试日志
+- 删除了 `StreamController.ts` 中的 3 处调试日志
+
+### 🎯 技术要点
+1. **SSE 事件处理**: OpenCode Server 使用 `message.part.updated` 事件通知工具状态变化
+2. **工具生命周期**: 工具调用经历 `pending` → `running` → `completed/error` 状态
+3. **渲染流程**: 
+   - `OpenCodeService` 解析 SSE 事件 → yield `tool_use` chunk
+   - `StreamController` 接收 chunk → 调用 `ToolCallRenderer.render()`
+   - `ToolCallRenderer` 创建 DOM 元素 → 显示工具卡片
+
+---
+
+**会话日期**: 2026-03-23
+**开发时间**: ~2 小时
+**主要贡献**: 修复工具调用显示问题，清理调试日志
+**涉及文件**: 
+- `src/core/opencode/OpenCodeService.ts`
+- `src/utils/streaming/StreamController.ts`
+
+**当前状态**: ✅ 工具调用显示功能完整，支持 task/glob/grep/ast_grep_search 等多种工具
