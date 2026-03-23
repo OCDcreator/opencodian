@@ -12,10 +12,17 @@ import type OpenCodianPlugin from '../../main';
 
 export class OpenCodianSettingTab extends PluginSettingTab {
   plugin: OpenCodianPlugin;
+  private refreshModelsCallback?: () => void;
 
   constructor(app: App, plugin: OpenCodianPlugin) {
     super(app, plugin);
     this.plugin = plugin;
+  }
+
+  /** Called when models are auto-loaded - refreshes the model dropdowns */
+  onModelsLoaded(): void {
+    // This will be set to the loadAvailableModels function in addModelSettings
+    this.refreshModelsCallback?.();
   }
 
   display(): void {
@@ -236,7 +243,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     // Store available providers and models
     let availableProviders: Array<{ id: string; name: string; models: Array<{ id: string; name: string }> }> = [];
     
-    const loadAvailableModels = async () => {
+    const loadAvailableModels = async (showNotice = false) => {
       try {
         const result = await this.plugin.openCodeService.getAvailableModels();
         availableProviders = result.providers;
@@ -253,19 +260,28 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         } else if (availableProviders.length > 0) {
           // Default to first provider
           providerDropdown.setValue(availableProviders[0].id);
-          this.plugin.settings.defaultProvider = availableProviders[0].id;
-          await this.plugin.saveSettings();
         }
         
         // Update model dropdown for current provider
         updateModelDropdown();
         
+        if (showNotice) {
+          new Notice(t('settings.model.refresh.success', { count: result.providers.length }));
+        }
+        
         return result;
       } catch (error) {
         console.error('Failed to load models:', error);
-        new Notice(t('settings.model.refresh.failed'));
+        if (showNotice) {
+          new Notice(t('settings.model.refresh.failed'));
+        }
         return null;
       }
+    };
+    
+    // Register this function so it can be called when models are auto-loaded
+    this.refreshModelsCallback = () => {
+      void loadAvailableModels(false);
     };
     
     const updateModelDropdown = () => {
@@ -337,14 +353,10 @@ export class OpenCodianSettingTab extends PluginSettingTab {
             btn.setDisabled(true);
             btn.setButtonText('Loading...');
             
-            const result = await loadAvailableModels();
+            const result = await loadAvailableModels(true);
             
             btn.setDisabled(false);
             btn.setButtonText(t('settings.model.refresh.button'));
-            
-            if (result) {
-              new Notice(t('settings.model.refresh.success', { count: result.providers.length }));
-            }
           })
       );
     
@@ -352,9 +364,14 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     void (async () => {
       const isHealthy = await this.plugin.openCodeService.checkHealth();
       if (isHealthy) {
-        await loadAvailableModels();
+        await loadAvailableModels(false);
       }
     })();
+  }
+
+  /** Clean up when settings tab is closed */
+  hide(): void {
+    this.refreshModelsCallback = undefined;
   }
 
   /** Security settings section */

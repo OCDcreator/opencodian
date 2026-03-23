@@ -1,5 +1,186 @@
 # OpenCodian 开发日志
 
+## 2026-03-23 SSE 流式响应重构（进行中）
+
+### 🚧 重构目标
+将原有的轮询式消息获取改为真正的 Server-Sent Events (SSE) 流式响应，实现逐字输出的真实流式效果。
+
+### ✅ 已完成工作
+
+#### 1. SSE 连接建立
+**实现内容：**
+- 使用原生 `fetch` + `ReadableStream` 实现 SSE 连接
+- 连接 OpenCode `/event` 端点获取实时事件流
+- 支持手动中断连接（`reader.cancel()`）
+
+**代码变更：**
+```typescript
+// src/core/opencode/OpenCodeService.ts
+private async *connectSSE(url: string, signal?: AbortSignal): AsyncGenerator<SSEEvent> {
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: { 'Accept': 'text/event-stream' },
+  });
+  
+  const reader = response.body!.getReader();
+  // ... 读取和处理 SSE 数据
+}
+```
+
+#### 2. SSE 数据解析
+**实现内容：**
+- 实现 `parseSSEEvents()` 方法解析 SSE 格式
+- 处理 OpenCode 的特殊格式（只有 `data:` 行，无 `event:` 行）
+- 从 JSON `type` 字段提取事件类型
+
+**关键发现：**
+```
+OpenCode SSE 格式：
+data: {"type":"message.part.delta","properties":{...}}
+
+标准 SSE 格式：
+event: message.part.delta
+data: {"properties":{...}}
+```
+
+**修复：**
+```typescript
+// 当没有 event 类型时，从 JSON 中提取
+if (!currentEvent.event && currentEvent.data) {
+  try {
+    const parsed = JSON.parse(currentEvent.data);
+    currentEvent.event = parsed.type || 'unknown';
+  } catch {
+    currentEvent.event = 'unknown';
+  }
+}
+```
+
+#### 3. 事件类型处理
+**支持的事件类型：**
+| 事件类型 | 处理方式 | 说明 |
+|---------|---------|------|
+| `message.part.updated` | 跟踪 part 类型 | 记录 partID → 类型的映射 |
+| `message.part.delta` | 流式输出 | 根据 part 类型输出 thinking/text |
+| `session.idle` | 终止连接 | 消息完成信号 |
+| `server.heartbeat` | 忽略 | 保持连接的心跳 |
+| `server.connected` | 忽略 | 初始连接确认 |
+
+**关键逻辑：**
+```typescript
+// 跟踪 part 类型
+if (eventData.type === 'message.part.updated') {
+  const part = eventData.properties?.part;
+  if (part?.id && part?.type) {
+    this.partTypeMap.set(part.id, part.type);
+  }
+}
+
+// 处理流式内容
+if (eventData.type === 'message.part.delta') {
+  const partType = this.partTypeMap.get(props.partID);
+  if (partType === 'reasoning') {
+    yield { type: 'thinking', content: props.delta };
+  } else {
+    yield { type: 'text', content: props.delta };
+  }
+}
+```
+
+#### 4. CORS 配置
+**问题：**
+- Obsidian 使用 `app://obsidian.md` 和 `app://obsidian` 协议
+- 浏览器拒绝跨域请求
+
+**解决方案：**
+```typescript
+// src/core/opencode/ServerManager.ts
+this.process = spawn(opencodePath, [
+  'serve',
+  '--port', String(this.config.port),
+  '--hostname', this.config.host,
+  '--cors', 'app://obsidian.md',
+  '--cors', 'app://obsidian',
+], {
+  detached: false,
+  stdio: ['ignore', 'pipe', 'pipe'],
+});
+```
+
+#### 5. 连接中断机制
+**实现内容：**
+- 使用 `AbortSignal` 传递中断信号
+- 检测到 `session.idle` 时主动中断连接
+- 使用 `reader.cancel()` 中断阻塞的 `read()` 调用
+
+**代码：**
+```typescript
+// 检测到消息完成
+if (eventData.type === 'session.idle') {
+  console.log('[OpenCodeService] Session idle, message complete');
+  abortController.abort();
+  break;
+}
+
+// 中断处理
+const abortHandler = () => {
+  aborted = true;
+  void reader.cancel();
+};
+signal?.addEventListener('abort', abortHandler);
+```
+
+### 🐛 已知问题
+
+#### 问题：流结束后无法发送新消息
+**现象：**
+- 第一条消息流式输出正常
+- 回复完成后，点击发送按钮无反应
+- 控制台无错误日志
+
+**可能原因排查：**
+1. ✅ `isStreaming` 状态未重置 - 已确认 `finally` 块正确执行
+2. ✅ SSE 连接未关闭 - 已实现 `reader.cancel()` 中断
+3. ✅ `session.idle` 事件处理 - 已添加检测并 break
+4. ❓ 可能需要检测 `message_stop` 事件而非 `session.idle`
+5. ❓ 可能存在未捕获的异常阻塞了流程
+
+**调试日志显示：**
+```
+[OpenCodeService] SSE event: session.idle  <- 已检测到
+[OpenCodeService] SSE raw chunk: ...        <- 但仍在接收数据
+```
+
+**待验证：**
+- `session.idle` 后是否还有其他重要事件？
+- `reader.cancel()` 是否真正中断了连接？
+- `isStreaming` 是否在 UI 线程正确重置？
+
+### 📁 修改文件
+
+| 文件 | 修改内容 |
+|------|----------|
+| `src/core/opencode/OpenCodeService.ts` | 实现 SSE 连接、数据解析、事件处理 |
+| `src/core/opencode/ServerManager.ts` | 添加 CORS 配置参数 |
+| `src/features/chat/OpenCodianView.ts` | 添加异常处理，确保流结束 |
+
+### 📝 下一步计划
+
+1. **验证连接中断**
+   - 添加更多日志追踪 `finally` 块执行
+   - 确认 `reader.releaseLock()` 调用
+
+2. **备选方案**
+   - 如果 SSE 中断复杂，考虑使用超时机制强制重置状态
+   - 添加 "重置连接" 按钮作为临时解决方案
+
+3. **完善功能**
+   - 移除调试日志（大量 SSE 日志影响性能）
+   - 添加连接状态指示器
+   - 实现取消按钮（中断当前流）
+
+---
+
 ## 2026-03-19 Bug修复：消息显示与工具调用超时
 
 ### 🔧 修复消息无法正常显示的问题
@@ -472,120 +653,23 @@ streamController.renderStoredContentBlocks(parentEl, savedBlocks);
 - 外部服务器无法通过插件停止（需要手动在终端停止）
 - 首次加载设置时需要手动刷新模型列表
 - 消息历史依赖 OpenCode 服务器存储
+- **SSE 流结束后无法发送新消息（开发中）**
 
 ---
 
 ## 🎯 下一步建议
 
-1. **消息历史持久化** - 在插件端缓存消息历史，减少对服务器的依赖
-2. **错误重试机制** - 网络错误时自动重试
-3. **消息编辑/删除** - 添加消息管理功能
-4. **文件附件** - 支持上传文件到对话
-5. **代码块高亮** - 优化消息中代码的显示
+1. **修复 SSE 流状态问题** - 确保流结束后 `isStreaming` 正确重置
+2. **消息历史持久化** - 在插件端缓存消息历史，减少对服务器的依赖
+3. **错误重试机制** - 网络错误时自动重试
+4. **消息编辑/删除** - 添加消息管理功能
+5. **文件附件** - 支持上传文件到对话
+6. **代码块高亮** - 优化消息中代码的显示
 
 ---
 
-## 📋 2026-03-19 开发进度更新
+**会话日期**: 2026-03-23  
+**开发时长**: ~3 小时  
+**主要贡献**: SSE 流式响应架构实现、CORS 配置、事件解析
 
-### 🚧 当前开发状态
-
-#### 已完成的基础功能
-1. **核心聊天功能** - 会话创建、消息发送、流式响应
-2. **国际化支持** - 中英双语界面
-3. **模型管理** - 动态加载供应商/模型，会话内切换
-4. **服务器管理** - 状态检测、外部服务器识别
-5. **历史会话** - 下拉菜单切换、删除管理
-6. **Markdown 渲染** - 代码块、图片、链接、表格
-7. **流式渲染模块** - 基础架构搭建完成
-
-#### 正在开发的功能
-**流式渲染模块集成**
-- ✅ 模块架构：`StreamController`, `ThinkingBlockRenderer`, `ToolCallRenderer`
-- ✅ TypeScript 类型定义
-- ✅ CSS 样式（thinking 块、tool call、error 块）
-- ✅ 基础渲染逻辑
-- 🔄 **进行中**：OpenCode API 数据解析与转换
-
-### 🐛 当前存在问题
-
-#### 问题 1：工具调用和 Thinking 块显示异常
-**现象**：
-- 能收到 `thinking` chunk 并渲染
-- 工具调用 chunk 能收到但没有正确显示
-- 第二轮对话时内容截断
-
-**根本原因**：
-```
-OpenCode API 返回的数据结构：
-- part.type = 'text' | 'reasoning' | 'thinking' | 'tool'
-- tool part 包含 callID, tool, state 字段
-- 但工具执行后消息数不变（3条），说明是异步后台执行
-```
-
-**已尝试的解决方案**：
-1. ✅ 扩展 chunk 类型支持（thinking, tool_use, tool_result）
-2. ✅ 添加轮询时消息数量变化检测
-3. ✅ 增加工具待完成时的等待逻辑
-4. 🔄 **待验证**：工具 part 的解析逻辑
-
-**调试状态**：
-- 添加了详细的 `Processing part` 日志
-- 需要验证工具 part 是否被正确识别
-
-#### 问题 2：流式效果不自然
-**现象**：
-- 内容不是逐字出现，而是段落式更新
-- OpenCode API 返回的是完整消息，不是 SSE 流
-
-**根本原因**：
-```
-OpenCode /session/:id/message 端点返回完整消息数组
-不是逐 token 的流式响应
-需要模拟流式效果（分词 + 延迟）
-```
-
-**计划方案**：
-1. 收到完整消息后，按字符/词组分割
-2. 使用 `setTimeout` 模拟逐字输出效果
-3. 保持 thinking 和 tool 的原子性（不拆分）
-
-### 📁 已修改文件
-
-| 文件 | 修改内容 |
-|------|----------|
-| `src/core/opencode/OpenCodeService.ts` | 添加 thinking/tool 检测，轮询逻辑优化 |
-| `src/features/chat/OpenCodianView.ts` | 集成 StreamController |
-| `src/utils/streaming/*.ts` | 流式渲染模块实现 |
-| `styles.css` | 添加流式内容样式 |
-
-### 🔍 待验证问题
-
-1. **工具 part 结构** - 通过添加的调试日志确认
-2. **消息数量变化** - 工具执行后是否真的创建新消息
-3. **异步执行流程** - AI 说"等待结果"后的实际行为
-
-### 📝 下一步计划
-
-1. **验证工具 part 解析**
-   - 查看 `Processing part type: tool` 日志
-   - 确认 callID、tool、state 字段存在
-
-2. **优化流式效果**
-   - 添加文本分割和延迟输出
-   - 保持 thinking/tool 的原子性
-
-3. **修复第二轮对话截断**
-   - 延长工具等待时间
-   - 检测最终回复消息
-
-4. **UI 优化**
-   - thinking 块折叠/展开动画
-   - tool 调用状态图标旋转动画
-
----
-
-**会话日期**: 2026-03-19  
-**开发时长**: ~4 小时（基础）+ ~2 小时（流式渲染）  
-**主要贡献**: 核心功能实现、Bug 修复、国际化支持、流式渲染模块架构
-
-**当前状态**: 🔧 流式渲染模块开发中，待解决工具调用显示问题
+**当前状态**: 🔧 SSE 流式传输开发中，存在连接结束后状态未重置问题

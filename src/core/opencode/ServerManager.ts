@@ -210,11 +210,13 @@ export class ServerManager {
           return;
         }
 
-        // Spawn server process
+        // Spawn server process with CORS enabled for Obsidian
         this.process = spawn(opencodePath, [
           'serve',
           '--port', String(this.config.port),
           '--hostname', this.config.host,
+          '--cors', 'app://obsidian.md',
+          '--cors', 'app://obsidian',
         ], {
           detached: false,
           stdio: ['ignore', 'pipe', 'pipe'],

@@ -450,6 +450,14 @@ export class OpenCodianView extends ItemView {
       if (this.streamController) {
         await this.streamController.handleChunk({ type: 'done' });
       }
+    } catch (error) {
+      console.error('[OpenCodianView] Streaming error:', error);
+      if (this.streamController) {
+        await this.streamController.handleChunk({ 
+          type: 'error', 
+          content: error instanceof Error ? error.message : 'Unknown error' 
+        });
+      }
     } finally {
       this.isStreaming = false;
       

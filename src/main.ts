@@ -22,6 +22,7 @@ export default class OpenCodianPlugin extends Plugin {
   settings: OpenCodianSettings;
   storage: StorageService;
   openCodeService: OpenCodeService;
+  settingsTab?: InstanceType<typeof OpenCodianSettingTab>;
   
   private conversations: Conversation[] = [];
 
@@ -43,6 +44,17 @@ export default class OpenCodianPlugin extends Plugin {
       },
       onError: (error) => {
         new Notice(`OpenCode error: ${error.message}`);
+      },
+      onModelsLoaded: (providers) => {
+        // Auto-save settings when models are loaded and defaults are updated
+        void this.saveSettings();
+        console.log('[OpenCodian] Models loaded, settings updated:', {
+          provider: this.settings.defaultProvider,
+          model: this.settings.defaultModel,
+          availableProviders: providers.map(p => p.id),
+        });
+        // Notify settings tab to refresh dropdowns if it's open
+        this.settingsTab?.onModelsLoaded();
       },
     });
 
@@ -97,7 +109,8 @@ export default class OpenCodianPlugin extends Plugin {
     });
 
     // Add settings tab
-    this.addSettingTab(new OpenCodianSettingTab(this.app, this));
+    this.settingsTab = new OpenCodianSettingTab(this.app, this);
+    this.addSettingTab(this.settingsTab);
 
     // Load conversations
     await this.loadConversations();
