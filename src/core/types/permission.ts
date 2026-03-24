@@ -16,6 +16,8 @@ export interface PermissionConfig {
   read?: ToolPermission;
   /** File edit permission (covers edit, write, patch, multiedit) */
   edit?: ToolPermission;
+  /** File write permission */
+  write?: ToolPermission;
   /** Shell command execution */
   bash?: ToolPermission;
   /** File glob patterns */

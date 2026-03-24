@@ -302,9 +302,6 @@ const PROVIDER_ICON_MAP: Record<string, string> = {
   // Tiangong
   'tiangong': 'tiangong',
   
-  // Xunfei Spark
-  'spark': 'spark',
-  
   // InternLM
   'internlm': 'internlm',
   
@@ -606,9 +603,6 @@ const PROVIDER_ICON_MAP: Record<string, string> = {
   // Command R
   'command-r': 'cohere',
   'command-r-plus': 'cohere',
-  
-  // Jamba
-  'jamba': 'ai21',
   
   // Claude models
   'claude-3-opus': 'claude',

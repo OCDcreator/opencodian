@@ -24,7 +24,7 @@ export interface ContentBlock {
   toolId?: string;
   toolName?: string;
   toolInput?: Record<string, unknown>;
-  toolStatus?: 'pending' | 'running' | 'completed' | 'error';
+  toolStatus?: 'pending' | 'running' | 'completed' | 'error' | 'blocked';
   toolResult?: string;
   subagentId?: string;
   subagentMode?: 'sync' | 'async';
@@ -48,7 +48,7 @@ export interface ToolCallInfo {
   id: string;
   name: string;
   input: Record<string, unknown>;
-  status?: 'pending' | 'running' | 'completed' | 'error';
+  status?: 'pending' | 'running' | 'completed' | 'error' | 'blocked';
   result?: string;
   isExpanded?: boolean;
 }
@@ -68,7 +68,7 @@ export type StreamChunk =
   | { type: 'text'; content: string }
   | { type: 'thinking'; content: string }
   | { type: 'tool_use'; id: string; name: string; input: Record<string, unknown> }
-  | { type: 'tool_result'; toolUseId: string; content: string }
+  | { type: 'tool_result'; toolUseId: string; content: string; isError?: boolean }
   | { type: 'usage'; inputTokens: number; outputTokens: number; sessionId?: string }
   | { type: 'error'; content: string }
   | { type: 'message_start' }

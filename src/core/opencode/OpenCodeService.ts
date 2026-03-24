@@ -28,6 +28,10 @@ interface OpenCodeEvent {
   properties: {
     sessionID?: string;
     messageID?: string;
+    id?: string;
+    permission?: string;
+    patterns?: string[];
+    metadata?: Record<string, unknown>;
     message?: {
       id: string;
       role: string;

@@ -16,7 +16,7 @@ import { DEFAULT_SETTINGS, VIEW_TYPE_OPENCODIAN } from './core/types';
 import { OpenCodianView } from './features/chat/OpenCodianView';
 import { OpenCodianSettingTab } from './features/settings/OpenCodianSettings';
 import { setLocale } from './i18n';
-import { createLogger, setDebugLoggingEnabled } from './shared';
+import { createLogger, getVaultBasePath, setDebugLoggingEnabled } from './shared';
 
 const logger = createLogger('OpenCodian');
 
@@ -63,7 +63,7 @@ export default class OpenCodianPlugin extends Plugin {
 
     // Set vault path so OpenCode reads project config from .opencode/
     // This automatically adapts to Windows (C:\path) and macOS (/Users/path)
-    const vaultPath = this.app.vault.adapter.getBasePath();
+    const vaultPath = getVaultBasePath(this.app);
     if (vaultPath) {
       this.openCodeService.setVaultPath(vaultPath);
       logger.debug(`Vault path set to: ${vaultPath}`);
@@ -168,7 +168,7 @@ export default class OpenCodianPlugin extends Plugin {
       ? {
           ...savedSettings,
           chatScrollMode:
-            savedSettings.chatScrollMode === 'sticky'
+            (savedSettings.chatScrollMode as OpenCodianSettings['chatScrollMode'] | 'sticky' | undefined) === 'sticky'
               ? 'sticky-mask'
               : savedSettings.chatScrollMode,
         }
@@ -206,7 +206,11 @@ export default class OpenCodianPlugin extends Plugin {
   /** Sync OpenCode config with current permission mode */
   private async syncOpencodeConfig(): Promise<void> {
     try {
-      const vaultPath = this.app.vault.adapter.getBasePath();
+      const vaultPath = getVaultBasePath(this.app);
+      if (!vaultPath) {
+        logger.warn('Could not get vault path, skipping OpenCode config sync');
+        return;
+      }
       const configManager = new OpencodeConfigManager(vaultPath);
       
       // Always update config to match current permission mode
@@ -229,7 +233,7 @@ export default class OpenCodianPlugin extends Plugin {
       logger.debug('Config permissions:', JSON.stringify(config.permission, null, 2));
       
       // Show notice if server is running (needs restart)
-      if (this.openCodeService?.checkHealth()) {
+      if (await this.openCodeService.checkHealth()) {
         logger.debug('OpenCode server is running. Config changes require restart to take effect.');
       }
     } catch (error) {
@@ -240,7 +244,11 @@ export default class OpenCodianPlugin extends Plugin {
   /** Initialize OpenCode config file based on current permission mode */
   private async initializeOpencodeConfig(): Promise<void> {
     try {
-      const vaultPath = this.app.vault.adapter.getBasePath();
+      const vaultPath = getVaultBasePath(this.app);
+      if (!vaultPath) {
+        logger.warn('Could not get vault path, skipping OpenCode config initialization');
+        return;
+      }
       const configManager = new OpencodeConfigManager(vaultPath);
       
       // Check if config already exists

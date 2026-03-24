@@ -2432,3 +2432,70 @@ if (this.isStreaming) {
 **开发时间**: ~1.5 小时
 **主要贡献**: 统一轻量 logger、调试日志设置开关、ESLint 全量清零
 **当前状态**: 功能完成，已通过 lint 与 build
+
+---
+
+## 2026-03-25 TypeScript 报错清零与配置兼容修复
+
+### 📋 功能描述
+在完成轻量 logger 与 ESLint 收敛后，继续清理仓库内剩余的 TypeScript 报错；重点修复聊天流式渲染、权限请求事件、OpenCode 配置权限类型、vault 路径访问兼容，以及 provider icon 映射中的重复 key 问题，最终将仓库恢复到 `tsc / lint / build` 全绿状态。
+
+### ✅ 实现细节
+
+#### 1. 修复 `OpenCodianView` 的 7 个 TypeScript 问题
+- 修正 `permission_request` 流式事件与权限弹窗参数类型不匹配
+- 使用包装状态对象替代直接闭包引用的 `pendingEl`，避免 TS 将其收窄为 `never`
+- 补齐流式工具结果的可选 `isError`
+- 补齐工具状态 `blocked` 的持久化类型
+
+#### 2. 补齐 OpenCode 权限配置类型
+- 在 `PermissionConfig` 中补充 `write` 字段
+- 清理 `src/core/types/index.ts` 中重复导出的 `PermissionMode`
+- 让计划模式 / 普通模式生成的 `.opencode` 权限配置与类型定义保持一致
+
+#### 3. 修复 vault 路径访问兼容性
+- 新增 `src/shared/vault.ts`
+- 统一通过 `getVaultBasePath()` 读取 Obsidian vault 根路径
+- 替换设置页和主插件中对旧 `adapter.getBasePath()` 的直接调用
+- 在路径不可用时增加安全降级，避免初始化或同步配置时报错
+
+#### 4. 清理其他编译问题
+- 修正 `OpenCodeService` 中 `permission.asked` 事件字段类型
+- 修正 `main.ts` 中旧版 `chatScrollMode: 'sticky'` 的兼容判断
+- 修正 `checkHealth()` 返回 Promise 后的判断逻辑
+- 移除 `ProviderIconService` 中重复的对象 key，消除 TS1117
+
+### 📁 本轮涉及文件
+
+| 文件 | 修改内容 |
+|------|----------|
+| `src/features/chat/OpenCodianView.ts` | 修复流式 UI 的 7 个 TS 报错 |
+| `src/core/types/chat.ts` | 补充 `blocked` 状态与 `tool_result.isError` |
+| `src/core/types/permission.ts` | 补充 `write` 权限类型 |
+| `src/core/types/index.ts` | 移除重复导出的 `PermissionMode` |
+| `src/core/opencode/OpenCodeService.ts` | 补齐权限事件字段类型 |
+| `src/shared/vault.ts` | 新增 vault 路径访问 helper |
+| `src/shared/index.ts` | 导出 vault helper |
+| `src/main.ts` | 替换旧路径访问并修复异步判断 |
+| `src/features/settings/OpenCodianSettings.ts` | 设置页改用兼容路径 helper |
+| `src/utils/icons/ProviderIconService.ts` | 清理重复 key |
+
+### 🎯 验证结果
+
+- ✅ `npx tsc --noEmit --pretty false`
+- ✅ `npm run lint`
+- ✅ `npm run build`
+
+### 当前状态
+
+- ✅ 仓库 TypeScript 报错清零
+- ✅ ESLint 继续保持 `0 errors / 0 warnings`
+- ✅ 生产构建通过
+- ✅ logger、debug 开关、类型系统与配置同步机制现已一致
+
+---
+
+**会话日期**: 2026-03-25
+**开发时间**: ~1 小时
+**主要贡献**: TypeScript 报错清零、vault 路径兼容、权限配置类型补齐
+**当前状态**: 已通过 tsc / lint / build，待提交

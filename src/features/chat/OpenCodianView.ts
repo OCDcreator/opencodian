@@ -631,7 +631,7 @@ export class OpenCodianView extends ItemView {
     const { messageEl } = this.createAssistantMessageElement();
 
     // Show pending indicator after a short delay
-    let pendingEl: HTMLElement | null = null;
+    const pendingState: { element: HTMLElement | null } = { element: null };
     let pendingStartTime = 0;
     const pendingMessage = getRandomPendingMessage();
     logger.debug('Setting up pending indicator timeout');
@@ -643,22 +643,22 @@ export class OpenCodianView extends ItemView {
       }
       
       logger.debug('Showing pending indicator:', pendingMessage);
-      pendingEl = messageEl.createDiv({ cls: 'opencodian-pending' });
-      pendingEl.createSpan({ 
+      pendingState.element = messageEl.createDiv({ cls: 'opencodian-pending' });
+      pendingState.element.createSpan({ 
         text: pendingMessage,
         cls: 'opencodian-pending-text' 
       });
-      const hintEl = pendingEl.createSpan({ cls: 'opencodian-pending-hint' });
+      const hintEl = pendingState.element.createSpan({ cls: 'opencodian-pending-hint' });
       pendingStartTime = Date.now();
       
       // Update timer every second
       const updateTimer = () => {
-        if (!pendingEl || !pendingEl.isConnected) return;
+        if (!pendingState.element || !pendingState.element.isConnected) return;
         const elapsed = Math.floor((Date.now() - pendingStartTime) / 1000);
         hintEl.setText(` (esc to interrupt · ${elapsed}s)`);
       };
       updateTimer();
-      pendingEl.dataset.timerInterval = String(window.setInterval(updateTimer, 1000));
+      pendingState.element.dataset.timerInterval = String(window.setInterval(updateTimer, 1000));
     }, 1000); // Show after 1s delay
 
     // Initialize streaming controller
@@ -717,14 +717,14 @@ export class OpenCodianView extends ItemView {
             receivedFirstChunk = true;
             logger.debug('First content chunk received, clearing pending timeout/indicator');
             window.clearTimeout(pendingTimeout);
-            if (pendingEl && pendingEl.parentNode) {
+            if (pendingState.element?.parentNode) {
               logger.debug('Removing pending indicator');
               // Clear timer interval
-              if (pendingEl.dataset.timerInterval) {
-                window.clearInterval(Number(pendingEl.dataset.timerInterval));
+              if (pendingState.element.dataset.timerInterval) {
+                window.clearInterval(Number(pendingState.element.dataset.timerInterval));
               }
-              pendingEl.remove();
-              pendingEl = null;
+              pendingState.element.remove();
+              pendingState.element = null;
             }
           }
         }
@@ -1740,7 +1740,7 @@ export class OpenCodianView extends ItemView {
 
   /** Show inline permission request card in the chat stream */
   private async showPermissionDialog(
-    request: import('../../core/types').PermissionRequest
+    request: Extract<import('../../core/types').StreamChunk, { type: 'permission_request' }>
   ): Promise<void> {
     const { t } = await import('../../i18n');
     const { id, permission, patterns, metadata } = request;

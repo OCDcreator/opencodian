@@ -9,7 +9,7 @@ import { App, Notice, PluginSettingTab, Setting } from 'obsidian';
 import { OpencodeConfigManager } from '../../core/config';
 import { setLocale, t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
-import { createLogger } from '../../shared';
+import { createLogger, getVaultBasePath } from '../../shared';
 import { OpencodeConfigModal } from './OpencodeConfigModal';
 
 const logger = createLogger('OpenCodianSettings');
@@ -382,7 +382,13 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     containerEl.createEl('h3', { text: t('settings.security.title') });
 
     // Initialize config manager
-    const vaultPath = this.plugin.app.vault.adapter.getBasePath();
+    const vaultPath = getVaultBasePath(this.plugin.app);
+    if (!vaultPath) {
+      new Setting(containerEl)
+        .setName(t('settings.security.configStatus.name'))
+        .setDesc('Vault path unavailable');
+      return;
+    }
     const configManager = new OpencodeConfigManager(vaultPath);
 
     // Config file status indicator (created first so we can update it)
