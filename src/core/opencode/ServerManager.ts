@@ -5,9 +5,9 @@
  * Handles startup, shutdown, health checks, and crash recovery.
  */
 
-import { spawn, type ChildProcess } from 'child_process';
-import { Notice, requestUrl } from 'obsidian';
+import { type ChildProcess,spawn } from 'child_process';
 import * as net from 'net';
+import { Notice, requestUrl } from 'obsidian';
 
 import type { OpenCodeServerConfig } from './types';
 
@@ -146,7 +146,7 @@ export class ServerManager {
       }, 5000);
 
       // Listen for process exit
-      this.process?.once('exit', (code, signal) => {
+      this.process?.once('exit', (_code, _signal) => {
 
         clearTimeout(timeout);
         doResolve();
@@ -227,7 +227,7 @@ export class ServerManager {
           this.events.onError?.(error);
         });
 
-        this.process.on('exit', (code, signal) => {
+        this.process.on('exit', (code, _signal) => {
           if (code !== 0 && code !== null) {
             this.events.onError?.(new Error(`Server exited with code ${code}`));
           }
@@ -235,7 +235,7 @@ export class ServerManager {
         });
 
         // Log output for debugging
-        this.process.stdout?.on('data', (data) => {
+        this.process.stdout?.on('data', (_data) => {
 
         });
 

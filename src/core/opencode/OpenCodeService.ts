@@ -6,7 +6,7 @@
  * Now supports SSE streaming for real-time message updates.
  */
 
-import { Notice, requestUrl } from 'obsidian';
+import { requestUrl } from 'obsidian';
 
 import type { ChatMessage, ContentBlock, ImageAttachment, StreamChunk } from '../types';
 import type { OpenCodianSettings } from '../types/settings';
@@ -100,18 +100,7 @@ interface Part {
   [key: string]: unknown;
 }
 
-/** Provider model */
-interface Model {
-  id: string;
-  name: string;
-}
 
-/** Provider */
-interface Provider {
-  id: string;
-  name: string;
-  models: Record<string, Model>;
-}
 
 export class OpenCodeService {
   private settings: OpenCodianSettings;
@@ -429,19 +418,15 @@ export class OpenCodeService {
       
       // Track state for content changes
       let lastContent = '';
-      let lastThinkingContent = '';
       const processedToolIds = new Set<string>();
       const toolStartTimes = new Map<string, number>();
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const TOOL_TIMEOUT_MS = 60000;
       
       // Track if we're done
-      let isDone = false;
-      let checkInterval: ReturnType<typeof setInterval> | null = null;
+      const checkInterval: ReturnType<typeof setInterval> | null = null;
       
       // Start periodic message check as fallback
-      let lastMessageCheckTime = Date.now();
-      const MESSAGE_CHECK_INTERVAL = 2000; // Check every 2 seconds
       
       try {
 
@@ -548,7 +533,6 @@ export class OpenCodeService {
             if (field === 'text') {
               if (partType === 'reasoning' || partType === 'thinking') {
                 yield { type: 'thinking', content: delta };
-                lastThinkingContent += delta;
               } else {
                 yield { type: 'text', content: delta };
                 lastContent += delta;
