@@ -2,4 +2,6 @@
  * Shared module
  */
 
-// Shared components will be exported here
+export type { Logger } from './logger';
+export { createLogger } from './logger';
+export { setDebugLoggingEnabled } from './logger';

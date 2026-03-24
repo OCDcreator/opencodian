@@ -5,6 +5,10 @@
  * CDN URL: https://unpkg.com/@lobehub/icons-static-svg@latest/icons/{id}.svg
  */
 
+import { createLogger } from '../../shared';
+
+const logger = createLogger('ProviderIconService');
+
 // Map provider IDs to Lobehub icon IDs
 const PROVIDER_ICON_MAP: Record<string, string> = {
   // OpenAI
@@ -635,11 +639,11 @@ export class ProviderIconService {
   static getIconUrl(providerId: string): string | null {
     const iconId = this.getIconId(providerId);
     if (!iconId) {
-      console.log(`[ProviderIconService] No icon found for: ${providerId}`);
+      logger.debug(`No icon found for: ${providerId}`);
       return null;
     }
     const url = `${LOBEHUB_CDN_BASE}/${iconId}.svg`;
-    console.log(`[ProviderIconService] Icon for ${providerId}: ${url}`);
+    logger.debug(`Icon for ${providerId}: ${url}`);
     return url;
   }
   
@@ -722,7 +726,7 @@ export class ProviderIconService {
     
     // Add error handler to fallback to default icon
     img.onerror = () => {
-      console.log(`[ProviderIconService] Failed to load icon for: ${providerId}`);
+      logger.debug(`Failed to load icon for: ${providerId}`);
       img.style.display = 'none';
     };
     

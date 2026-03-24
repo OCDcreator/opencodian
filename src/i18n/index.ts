@@ -2,8 +2,11 @@
  * Internationalization module
  */
 
+import { createLogger } from '../shared';
 import { enTranslations } from './locales/en';
 import { zhTranslations } from './locales/zh';
+
+const logger = createLogger('i18n');
 
 export type Locale = 'en' | 'zh';
 export type TranslationKey = keyof typeof enTranslations;
@@ -24,7 +27,7 @@ export function setLocale(locale: Locale): void {
   if (locale in translations) {
     currentLocale = locale;
   } else {
-    console.warn(`[i18n] Unsupported locale: ${locale}, falling back to 'en'`);
+    logger.warn(`Unsupported locale: ${locale}, falling back to 'en'`);
     currentLocale = 'en';
   }
 }

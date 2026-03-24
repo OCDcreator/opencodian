@@ -4,6 +4,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+
 import { OpencodeConfigManager } from '../../../../src/core/config/OpencodeConfigManager';
 
 // Mock Obsidian's Notice

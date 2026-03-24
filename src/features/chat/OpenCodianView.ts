@@ -7,13 +7,17 @@
 import type { EventRef, WorkspaceLeaf } from 'obsidian';
 import { Component, ItemView, Menu, Notice, Scope, setIcon } from 'obsidian';
 
-import { VIEW_TYPE_OPENCODIAN } from '../../core/types';
-import type { ChatMessage, ContentBlock, Conversation, ToolCallInfo } from '../../core/types';
 import { OpenCodeService } from '../../core/opencode';
+import type { ChatMessage, ContentBlock, Conversation, ToolCallInfo } from '../../core/types';
+import { VIEW_TYPE_OPENCODIAN } from '../../core/types';
+import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
-import { MarkdownRenderService } from '../../utils/markdown';
+import { createLogger } from '../../shared';
 import { ProviderIconService } from '../../utils/icons/ProviderIconService';
+import { MarkdownRenderService } from '../../utils/markdown';
 import { StreamController, ThinkingBlockRenderer, ToolCallRenderer } from '../../utils/streaming';
+
+const logger = createLogger('OpenCodianView');
 
 /** Logo SVG for light theme (dark logo on light bg) - from opencode-logo-light.svg */
 const LOGO_SVG_LIGHT = `<svg width="24" height="30" viewBox="0 0 240 300" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#clip0_light)"><mask id="mask0_light" style="mask-type:luminance" maskUnits="userSpaceOnUse" x="0" y="0" width="240" height="300"><path d="M240 0H0V300H240V0Z" fill="white"/></mask><g mask="url(#mask0_light)"><path d="M180 240H60V120H180V240Z" fill="#CFCECD"/><path d="M180 60H60V240H180V60ZM240 300H0V0H240V300Z" fill="#211E1E"/></g></g><defs><clipPath id="clip0_light"><rect width="240" height="300" fill="white"/></clipPath></defs></svg>`;
@@ -100,6 +104,12 @@ export class OpenCodianView extends ItemView {
   // Send/Stop button reference
   private sendBtn: HTMLElement | null = null;
   private inputTextarea: HTMLTextAreaElement | null = null;
+
+  private appSettings(): { open: () => void; openTabById: (id: string) => void } {
+    return (this.app as typeof this.app & {
+      setting: { open: () => void; openTabById: (id: string) => void };
+    }).setting;
+  }
 
   constructor(leaf: WorkspaceLeaf, plugin: OpenCodianPlugin) {
     super(leaf);
@@ -299,10 +309,9 @@ export class OpenCodianView extends ItemView {
     setIcon(settingsBtn, 'settings');
     settingsBtn.setAttribute('aria-label', 'Settings');
     settingsBtn.addEventListener('click', () => {
-      // @ts-ignore - Obsidian API
-      this.app.setting.open();
-      // @ts-ignore - Obsidian API
-      this.app.setting.openTabById('opencodian');
+      const settings = this.appSettings();
+      settings.open();
+      settings.openTabById('opencodian');
     });
   }
 
@@ -444,7 +453,7 @@ export class OpenCodianView extends ItemView {
           await this.renderMessage(message);
         }
       } catch (error) {
-        console.error('Failed to load messages:', error);
+        logger.error('Failed to load messages:', error);
       }
     }
 
@@ -470,7 +479,6 @@ export class OpenCodianView extends ItemView {
     for (const conv of conversations) {
       const isActive = this.currentConversation?.id === conv.id;
       const title = conv.title || 'Untitled';
-      const date = new Date(conv.updatedAt).toLocaleDateString();
       
       menu.addItem((item) => {
         item
@@ -599,7 +607,7 @@ export class OpenCodianView extends ItemView {
     };
 
     timeoutId = window.setTimeout(() => {
-      console.warn('[OpenCodianView] Stream timeout, forcing state reset');
+      logger.warn('Stream timeout, forcing state reset');
       // Mark running tool calls as error
       this.streamController?.timeoutStream();
       resetStreamingState();
@@ -620,21 +628,21 @@ export class OpenCodianView extends ItemView {
     });
 
     // Create assistant message element and get content container
-    const { messageEl, contentEl, textEl } = this.createAssistantMessageElement();
+    const { messageEl } = this.createAssistantMessageElement();
 
     // Show pending indicator after a short delay
     let pendingEl: HTMLElement | null = null;
     let pendingStartTime = 0;
     const pendingMessage = getRandomPendingMessage();
-    console.log('[OpenCodianView] Setting up pending indicator timeout');
+    logger.debug('Setting up pending indicator timeout');
     const pendingTimeout = window.setTimeout(() => {
-      console.log('[OpenCodianView] Pending indicator timeout fired, isStreaming:', this.isStreaming);
+      logger.debug('Pending indicator timeout fired, isStreaming:', this.isStreaming);
       if (!this.isStreaming || !messageEl) {
-        console.log('[OpenCodianView] Not showing pending indicator - not streaming or no element');
+        logger.debug('Not showing pending indicator - not streaming or no element');
         return;
       }
       
-      console.log('[OpenCodianView] Showing pending indicator:', pendingMessage);
+      logger.debug('Showing pending indicator:', pendingMessage);
       pendingEl = messageEl.createDiv({ cls: 'opencodian-pending' });
       pendingEl.createSpan({ 
         text: pendingMessage,
@@ -665,7 +673,7 @@ export class OpenCodianView extends ItemView {
       for await (const chunk of stream) {
         // Check if streaming was cancelled
         if (!this.isStreaming) {
-          console.log('[OpenCodianView] Streaming cancelled, breaking loop');
+          logger.debug('Streaming cancelled, breaking loop');
           break;
         }
 
@@ -682,7 +690,7 @@ export class OpenCodianView extends ItemView {
           // Resume the stream timeout after user response (reset to full timeout)
           if (this.isStreaming) {
             timeoutId = window.setTimeout(() => {
-              console.warn('[OpenCodianView] Stream timeout after permission, forcing state reset');
+              logger.warn('Stream timeout after permission, forcing state reset');
               this.streamController?.timeoutStream();
               resetStreamingState();
               if (this.streamController?.isStreaming()) {
@@ -707,10 +715,10 @@ export class OpenCodianView extends ItemView {
           
           if (!receivedFirstChunk && hasContent) {
             receivedFirstChunk = true;
-            console.log('[OpenCodianView] First content chunk received, clearing pending timeout/indicator');
+            logger.debug('First content chunk received, clearing pending timeout/indicator');
             window.clearTimeout(pendingTimeout);
             if (pendingEl && pendingEl.parentNode) {
-              console.log('[OpenCodianView] Removing pending indicator');
+              logger.debug('Removing pending indicator');
               // Clear timer interval
               if (pendingEl.dataset.timerInterval) {
                 window.clearInterval(Number(pendingEl.dataset.timerInterval));
@@ -727,7 +735,7 @@ export class OpenCodianView extends ItemView {
         await this.streamController.handleChunk({ type: 'done' });
       }
     } catch (error) {
-      console.error('[OpenCodianView] Streaming error:', error);
+      logger.error('Streaming error:', error);
       if (this.streamController) {
         await this.streamController.handleChunk({ 
           type: 'error', 
@@ -735,7 +743,7 @@ export class OpenCodianView extends ItemView {
         });
       }
     } finally {
-      console.log('[OpenCodianView] Stream loop ended');
+      logger.debug('Stream loop ended');
       resetStreamingState();
       
       // Add timestamp with copy button to the streamed message (after all content)
@@ -813,19 +821,19 @@ export class OpenCodianView extends ItemView {
 
   /** Cancel streaming */
   private cancelStreaming() {
-    console.log('[OpenCodianView] cancelStreaming called, isStreaming:', this.isStreaming);
+    logger.debug('cancelStreaming called, isStreaming:', this.isStreaming);
     
     // Call service to abort the SSE connection
-    console.log('[OpenCodianView] Calling openCodeService.cancelStream()...');
+    logger.debug('Calling openCodeService.cancelStream()...');
     this.plugin.openCodeService.cancelStream();
     
     // Update local state
     this.isStreaming = false;
-    console.log('[OpenCodianView] isStreaming set to false');
+    logger.debug('isStreaming set to false');
     
     // Update button state
     this.updateSendButtonState();
-    console.log('[OpenCodianView] Send button state updated');
+    logger.debug('Send button state updated');
     
     new Notice('Streaming cancelled');
   }
@@ -1497,7 +1505,7 @@ export class OpenCodianView extends ItemView {
       this.renderModelList();
       this.updateModelSelectorDisplay();
     } catch (error) {
-      console.error('[OpenCodianView] Failed to load models:', error);
+      logger.error('Failed to load models:', error);
     }
   }
 
@@ -1629,8 +1637,6 @@ export class OpenCodianView extends ItemView {
 
   /** Initialize permission mode selector */
   private initializePermissionSelector(containerEl: HTMLElement): void {
-    const { t } = require('../../i18n') as { t: (key: string) => string };
-    
     // Create trigger button
     const trigger = containerEl.createDiv({ cls: 'opencodian-permission-trigger' });
     
@@ -1708,8 +1714,6 @@ export class OpenCodianView extends ItemView {
 
   /** Switch permission mode and restart OpenCode service */
   private async switchPermissionMode(mode: 'yolo' | 'normal' | 'plan'): Promise<void> {
-    const { t } = require('../../i18n') as { t: (key: string) => string };
-    
     try {
       // Update setting
       this.plugin.settings.permissionMode = mode;
@@ -1729,7 +1733,7 @@ export class OpenCodianView extends ItemView {
       notice.hide();
       new Notice(t('settings.security.autoRestart.success'));
     } catch (error) {
-      console.error('[OpenCodianView] Failed to switch permission mode:', error);
+      logger.error('Failed to switch permission mode:', error);
       new Notice(t('settings.security.autoRestart.failed'));
     }
   }
@@ -1755,7 +1759,7 @@ export class OpenCodianView extends ItemView {
     // Note: Tool calls are rendered directly on messageEl, not in contentEl
     const messageEl = this.streamingMessageEl;
     if (!messageEl) {
-      console.error('[OpenCodianView] No streaming message element found for permission card');
+      logger.error('No streaming message element found for permission card');
       return;
     }
 
@@ -1853,7 +1857,7 @@ export class OpenCodianView extends ItemView {
     try {
       await this.plugin.openCodeService.respondToPermission(id, result);
     } catch (error) {
-      console.error('[OpenCodianView] Failed to respond to permission:', error);
+      logger.error('Failed to respond to permission:', error);
       new Notice(t('permissionDialog.notice.error'));
     }
   }

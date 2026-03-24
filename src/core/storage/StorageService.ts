@@ -7,8 +7,8 @@
 
 import { type App, normalizePath } from 'obsidian';
 
-import type { ChatMessage, Conversation, ConversationMeta, OpenCodianSettings } from '../types';
 import type { OpenCodianPlugin } from '../../main';
+import type { ChatMessage, Conversation, ConversationMeta, OpenCodianSettings } from '../types';
 
 const STORAGE_DIR = '.opencodian';
 const SESSIONS_DIR = `${STORAGE_DIR}/sessions`;

@@ -99,6 +99,8 @@ export const zhTranslations = {
   'settings.ui.chatScrollMode.natural': '自然滚动',
   'settings.ui.chatScrollMode.stickyBasic': '用户消息吸顶',
   'settings.ui.chatScrollMode.stickyMask': '吸顶 + 柔和遮盖',
+  'settings.ui.debugLogging.name': '调试日志',
+  'settings.ui.debugLogging.desc': '开启详细调试日志，便于排查问题',
   'settings.ui.openInMainTab.name': '在主标签页打开',
   'settings.ui.openInMainTab.desc': '在主编辑区而不是侧边栏打开聊天',
 

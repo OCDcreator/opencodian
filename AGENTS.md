@@ -222,7 +222,7 @@ Settings UI with bilingual support (English/Chinese).
 - **Server**: Auto-start, host, port
 - **Model**: Dynamic provider/model selection
 - **Security**: Permission mode, command blocklist
-- **UI**: Max tabs, tab bar position, auto-scroll, conversation scroll effect
+- **UI**: Max tabs, tab bar position, auto-scroll, conversation scroll effect, debug logging
 
 ### 6. Streaming Utilities (`src/utils/streaming/`)
 

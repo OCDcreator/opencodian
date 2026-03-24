@@ -5,14 +5,15 @@
  * Handles startup, shutdown, health checks, and crash recovery.
  */
 
-import { type ChildProcess,spawn } from 'child_process';
+import { type ChildProcess, spawn } from 'child_process';
+import * as fs from 'fs';
 import * as net from 'net';
 import { Notice, requestUrl } from 'obsidian';
 
+import { createLogger } from '../../shared';
 import type { OpenCodeServerConfig } from './types';
 
-// Vault path for OpenCode to read project config
-let vaultPath: string | undefined;
+const logger = createLogger('ServerManager');
 
 /** Server status type */
 export type ServerStatus = 
@@ -47,20 +48,19 @@ export class ServerManager {
   /** Set the working directory for the server (vault path) */
   setWorkingDirectory(path: string): void {
     this.workingDirectory = path;
-    console.log(`[ServerManager] Working directory set to: ${path}`);
+    logger.debug(`Working directory set to: ${path}`);
     
     // Check if config file exists in this directory
     const configPath = `${path}/.opencode/opencode.json`;
-    const fs = require('fs');
     if (fs.existsSync(configPath)) {
       try {
         const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-        console.log(`[ServerManager] Found OpenCode config:`, JSON.stringify(config.permission, null, 2));
+        logger.debug('Found OpenCode config:', JSON.stringify(config.permission, null, 2));
       } catch (e) {
-        console.error(`[ServerManager] Failed to read config:`, e);
+        logger.error('Failed to read config:', e);
       }
     } else {
-      console.warn(`[ServerManager] No OpenCode config found at: ${configPath}`);
+      logger.warn(`No OpenCode config found at: ${configPath}`);
     }
   }
 
@@ -105,8 +105,8 @@ export class ServerManager {
         // Check if it's an existing OpenCode server
         const healthy = await this.checkHealth(5000);
         if (healthy) {
-          console.warn('[ServerManager] OpenCode server already running on port', this.config.port);
-          console.warn('[ServerManager] This server may have been started with different working directory/config');
+          logger.warn('OpenCode server already running on port', this.config.port);
+          logger.warn('This server may have been started with different working directory/config');
           this.setStatus('running');
           return;
         }
@@ -163,10 +163,10 @@ export class ServerManager {
           // Try SIGKILL on Unix, or terminate on Windows
           const killed = this.process?.kill(process.platform === 'win32' ? undefined : 'SIGKILL');
           if (!killed) {
-            console.warn('[ServerManager] Process kill returned false, process may have already exited');
+            logger.warn('Process kill returned false, process may have already exited');
           }
         } catch (e) {
-          console.error('[ServerManager] Error killing process:', e);
+          logger.error('Error killing process:', e);
         }
         doResolve();
       }, 5000);
@@ -189,7 +189,7 @@ export class ServerManager {
           doResolve();
         }
       } catch (e) {
-        console.error('[ServerManager] Error sending SIGTERM:', e);
+        logger.error('Error sending SIGTERM:', e);
         clearTimeout(timeout);
         doResolve();
       }
@@ -238,10 +238,10 @@ export class ServerManager {
 
         // Spawn server process with CORS enabled for Obsidian
         // Use vault path as working directory so OpenCode reads project config
-        console.log(`[ServerManager] Starting OpenCode server:`);
-        console.log(`[ServerManager]   Binary: ${opencodePath}`);
-        console.log(`[ServerManager]   Working directory: ${this.workingDirectory || 'current directory'}`);
-        console.log(`[ServerManager]   Config path: ${this.workingDirectory ? `${this.workingDirectory}/.opencode/opencode.json` : 'N/A'}`);
+        logger.debug('Starting OpenCode server:');
+        logger.debug(`  Binary: ${opencodePath}`);
+        logger.debug(`  Working directory: ${this.workingDirectory || 'current directory'}`);
+        logger.debug(`  Config path: ${this.workingDirectory ? `${this.workingDirectory}/.opencode/opencode.json` : 'N/A'}`);
         
         this.process = spawn(opencodePath, [
           'serve',
@@ -273,7 +273,7 @@ export class ServerManager {
         });
 
         this.process.stderr?.on('data', (data) => {
-          console.error('[OpenCode]', data.toString().trim());
+          logger.error(data.toString().trim());
         });
 
         // Give it a moment to start

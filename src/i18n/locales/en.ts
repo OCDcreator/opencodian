@@ -99,6 +99,8 @@ export const enTranslations = {
   'settings.ui.chatScrollMode.natural': 'Natural scrolling',
   'settings.ui.chatScrollMode.stickyBasic': 'Sticky user headers',
   'settings.ui.chatScrollMode.stickyMask': 'Sticky + soft mask',
+  'settings.ui.debugLogging.name': 'Debug logging',
+  'settings.ui.debugLogging.desc': 'Enable verbose debug logs for troubleshooting',
   'settings.ui.openInMainTab.name': 'Open in main tab',
   'settings.ui.openInMainTab.desc': 'Open chat in main editor area instead of sidebar',
 

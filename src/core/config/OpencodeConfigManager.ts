@@ -6,11 +6,14 @@
  * modifying global user configuration.
  */
 
-import * as path from 'path';
 import * as fs from 'fs';
 import { Notice } from 'obsidian';
+import * as path from 'path';
 
-import type { OpencodeConfig, PermissionConfig, PermissionAction } from '../types/permission';
+import { createLogger } from '../../shared';
+import type { OpencodeConfig, PermissionAction,PermissionConfig } from '../types/permission';
+
+const logger = createLogger('OpencodeConfigManager');
 
 export class OpencodeConfigManager {
   private vaultPath: string;
@@ -43,7 +46,7 @@ export class OpencodeConfigManager {
       const content = await fs.promises.readFile(this.configPath, 'utf-8');
       return JSON.parse(content) as OpencodeConfig;
     } catch (error) {
-      console.error('[OpencodeConfigManager] Failed to read config:', error);
+      logger.error('Failed to read config:', error);
       return this.getDefaultConfig();
     }
   }
@@ -63,7 +66,7 @@ export class OpencodeConfigManager {
 
       await fs.promises.writeFile(this.configPath, content, 'utf-8');
     } catch (error) {
-      console.error('[OpencodeConfigManager] Failed to write config:', error);
+      logger.error('Failed to write config:', error);
       throw new Error('Failed to write OpenCode configuration');
     }
   }
@@ -151,7 +154,7 @@ export class OpencodeConfigManager {
         await fs.promises.unlink(this.configPath);
       }
     } catch (error) {
-      console.error('[OpencodeConfigManager] Failed to remove config:', error);
+      logger.error('Failed to remove config:', error);
     }
   }
 

@@ -1,3 +1,4 @@
+import { createLogger } from '../../shared';
 import type { MarkdownRenderService } from '../markdown';
 import { ThinkingBlockRenderer } from './ThinkingBlockRenderer';
 import { ToolCallRenderer } from './ToolCallRenderer';
@@ -12,6 +13,8 @@ import type {
   ToolRendererOptions,
 } from './types';
 import { createStreamState } from './types';
+
+const logger = createLogger('StreamController');
 
 export class StreamController {
   private containerEl: HTMLElement;
@@ -148,7 +151,7 @@ export class StreamController {
     this.callbacks.onToolCallStart?.(toolCall);
 
     if (!this.state.currentContentEl) {
-      console.error('[StreamController] currentContentEl is null, cannot render tool');
+      logger.error('currentContentEl is null, cannot render tool');
       return;
     }
 

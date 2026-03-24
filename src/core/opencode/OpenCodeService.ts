@@ -8,10 +8,13 @@
 
 import { requestUrl } from 'obsidian';
 
+import { createLogger } from '../../shared';
 import type { ChatMessage, ContentBlock, ImageAttachment, PermissionReply, PermissionRequest, StreamChunk } from '../types';
 import type { OpenCodianSettings } from '../types/settings';
 import { ServerManager } from './ServerManager';
 import type { OpenCodeServerConfig, QueryOptions, ResponseHandler } from './types';
+
+const logger = createLogger('OpenCodeService');
 
 /** SSE Event types from OpenCode server */
 interface SSEEvent {
@@ -155,7 +158,7 @@ export class OpenCodeService {
       const result = await this.getAvailableModels();
       
       if (result.providers.length === 0) {
-        console.warn('[OpenCodeService] No providers available from server');
+        logger.warn('No providers available from server');
         return;
       }
 
@@ -185,7 +188,7 @@ export class OpenCodeService {
       // Notify listeners that models are loaded
       this.events.onModelsLoaded?.(result.providers);
     } catch (error) {
-      console.error('[OpenCodeService] Failed to auto-fetch models:', error);
+      logger.error('Failed to auto-fetch models:', error);
     }
   }
 
@@ -320,11 +323,11 @@ export class OpenCodeService {
   /** Cancel the current streaming response */
   cancelStream(): void {
     if (this.currentAbortController) {
-      console.log('[OpenCodeService] Cancelling stream...');
+      logger.debug('Cancelling stream...');
       this.currentAbortController.abort();
-      console.log('[OpenCodeService] Abort signal sent');
+      logger.debug('Abort signal sent');
     } else {
-      console.log('[OpenCodeService] No active stream to cancel');
+      logger.debug('No active stream to cancel');
     }
   }
 
@@ -340,7 +343,7 @@ export class OpenCodeService {
   /** Get session messages - OpenCode API returns {info: Message, parts: Part[]}[] */
   async getSessionMessages(sessionId: string): Promise<{ info: Message; parts: Part[] }[]> {
     if (!sessionId) {
-      console.warn('[OpenCodeService] getSessionMessages called with empty sessionId');
+      logger.warn('getSessionMessages called with empty sessionId');
       return [];
     }
     
@@ -356,7 +359,7 @@ export class OpenCodeService {
       
       return Array.isArray(response) ? response : [];
     } catch (error) {
-      console.error(`[OpenCodeService] Failed to get messages for session ${sessionId}:`, error);
+      logger.error(`Failed to get messages for session ${sessionId}:`, error);
       // Return empty array instead of throwing to prevent UI crash
       return [];
     }
@@ -439,7 +442,7 @@ export class OpenCodeService {
           // Check if cancelled
           if (this.currentAbortController?.signal.aborted) {
             // eslint-disable-next-line no-console
-            console.log('[OpenCodeService] Stream aborted, breaking loop');
+            logger.debug('Stream aborted, breaking loop');
             break;
           }
           // Parse the nested data structure
@@ -595,7 +598,7 @@ export class OpenCodeService {
         }
         // Clear the abort controller
         this.currentAbortController = null;
-        console.log('[OpenCodeService] Stream ended, abort controller cleared');
+        logger.debug('Stream ended, abort controller cleared');
       }
 
       // Final check for any remaining content
@@ -615,7 +618,7 @@ export class OpenCodeService {
           }
         }
       } catch (error) {
-        console.error('[OpenCodeService] Final message check failed:', error);
+        logger.error('Final message check failed:', error);
       }
 
       yield { type: 'message_stop' };
@@ -825,7 +828,7 @@ export class OpenCodeService {
           : {},
       };
     } catch (error) {
-      console.error('[OpenCodeService] Failed to get models:', error);
+      logger.error('Failed to get models:', error);
       return { providers: [], defaults: {} };
     }
   }
@@ -1043,7 +1046,7 @@ export class OpenCodeService {
     try {
       return await this.get<PermissionRequest[]>('/permission');
     } catch (error) {
-      console.error('[OpenCodeService] Failed to get pending permissions:', error);
+      logger.error('Failed to get pending permissions:', error);
       return [];
     }
   }
@@ -1057,7 +1060,7 @@ export class OpenCodeService {
     try {
       await this.post(`/permission/${requestID}/reply`, { reply, message });
     } catch (error) {
-      console.error('[OpenCodeService] Failed to respond to permission:', error);
+      logger.error('Failed to respond to permission:', error);
       throw error;
     }
   }

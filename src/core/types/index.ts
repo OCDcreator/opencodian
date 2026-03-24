@@ -13,23 +13,23 @@ export {
 
 // Model types
 export {
+  getDefaultContextWindow,
   type ModelInfo,
   type ModelProvider,
-  getDefaultContextWindow,
 } from './models';
 
 // Settings types
 export {
-  type ChatScrollMode,
   type ApprovalDecision,
+  type ChatScrollMode,
+  DEFAULT_SETTINGS,
+  getCurrentPlatformBlockedCommands,
+  getDefaultBlockedCommands,
   type OpenCodianSettings,
-  type PlatformBlockedCommands,
   type PermissionMode,
+  type PlatformBlockedCommands,
   type ServerConfig,
   type TabBarPosition,
-  DEFAULT_SETTINGS,
-  getDefaultBlockedCommands,
-  getCurrentPlatformBlockedCommands,
 } from './settings';
 
 // Tool types
@@ -39,6 +39,7 @@ export {
 
 // Permission types
 export {
+  type OpencodeConfig,
   type PermissionAction,
   type PermissionConfig,
   type PermissionMode,
@@ -47,5 +48,4 @@ export {
   type PermissionRequest,
   type PermissionSettings,
   type ToolPermission,
-  type OpencodeConfig,
 } from './permission';

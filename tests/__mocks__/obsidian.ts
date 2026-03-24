@@ -67,9 +67,7 @@ export class Modal {
 }
 
 export class Notice {
-  constructor(message: string) {
-    console.log('Notice:', message);
-  }
+  constructor(_message: string) {}
 }
 
 export class TFile {

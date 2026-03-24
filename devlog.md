@@ -2356,3 +2356,79 @@ if (this.isStreaming) {
 **开发时间**: ~3 小时
 **主要贡献**: 会话滚动模式系统、吸顶交互优化、工具调用失败状态持久化修复
 **当前状态**: 功能完成，已部署测试
+
+---
+
+## 2026-03-25 轻量 Logger 与 ESLint 清零收敛
+
+### 📋 功能描述
+为项目引入统一的轻量 logger，并把原本分散在各模块中的 `console.*` 调用收敛到统一接口；同时通过忽略规则、自动修复和小规模代码清理，将仓库本体的 ESLint 结果收敛到 `0 errors / 0 warnings`。
+
+### ✅ 实现细节
+
+#### 1. 统一轻量 logger
+- 新增 `src/shared/logger.ts`
+- 提供统一接口：
+  - `logger.debug(...)`
+  - `logger.warn(...)`
+  - `logger.error(...)`
+- 日志会自动带上模块作用域前缀，避免不同模块日志混杂
+
+#### 2. Debug 日志开关
+- `debug` 日志默认关闭
+- 新增设置项 **调试日志 / Debug logging**
+- 支持在设置中实时切换，保存后立即影响当前会话中的日志输出
+- 运行时状态会同步到：
+  - 全局标记 `__OPENCODIAN_DEBUG__`
+  - `localStorage['opencodian:debug']`
+
+#### 3. 替换散落的 console 调用
+- 将 `src/main.ts`、`OpenCodeService`、`ServerManager`、`OpenCodianView` 等核心模块中的 `console.log / warn / error` 统一替换为 logger
+- 测试 mock 中的 `Notice` 输出也移除了直接 `console.log`
+
+#### 4. ESLint 收敛
+- 新增 `.eslintignore`，忽略：
+  - `reference-projects/**`
+  - `dist/**`
+  - `coverage/**`
+  - `node_modules/**`
+- 执行 `lint:fix` 自动清理 import/export 排序
+- 手动修复：
+  - 未使用变量
+  - `require()` 风格导入
+  - `@ts-ignore` / 类型访问问题
+
+### 📁 修改文件
+
+| 文件 | 修改内容 |
+|------|----------|
+| `src/shared/logger.ts` | 新增轻量 logger 与 debug 开关 |
+| `src/shared/index.ts` | 导出 logger 相关接口 |
+| `src/core/types/settings.ts` | 新增 `enableDebugLogging` 设置项 |
+| `src/features/settings/OpenCodianSettings.ts` | 增加调试日志开关 UI |
+| `src/i18n/locales/en.ts` | 新增 debug logging 英文文案 |
+| `src/i18n/locales/zh.ts` | 新增 debug logging 中文文案 |
+| `src/main.ts` | 加载/保存设置时同步 logger 开关 |
+| `.eslintignore` | 忽略参考项目与构建产物，减少 lint 噪音 |
+
+### 🐛 修复的问题
+
+1. **调试日志分散**：各模块直接使用 `console.*`，难以统一管理
+2. **无法按需开启调试日志**：排查问题时缺少运行时开关
+3. **ESLint 噪音过大**：既有错误与警告较多，且容易被参考项目目录干扰
+
+### 🎯 当前状态
+
+**logger 与 lint 当前为：**
+- ✅ 已接入统一轻量 logger
+- ✅ 设置页支持切换调试日志
+- ✅ 保存设置后 debug 开关立即生效
+- ✅ 项目本体 ESLint 结果收敛到 `0 errors / 0 warnings`
+- ✅ 构建通过，功能可继续迭代
+
+---
+
+**会话日期**: 2026-03-25
+**开发时间**: ~1.5 小时
+**主要贡献**: 统一轻量 logger、调试日志设置开关、ESLint 全量清零
+**当前状态**: 功能完成，已通过 lint 与 build

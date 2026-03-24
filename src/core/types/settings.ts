@@ -115,6 +115,7 @@ export interface OpenCodianSettings {
   tabBarPosition: TabBarPosition;
   enableAutoScroll: boolean;
   chatScrollMode: ChatScrollMode;
+  enableDebugLogging: boolean;
   openInMainTab: boolean;
 
   // Language
@@ -159,6 +160,7 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
   tabBarPosition: 'input',
   enableAutoScroll: true,
   chatScrollMode: 'sticky-mask',
+  enableDebugLogging: false,
   openInMainTab: false,
 
   locale: 'en',

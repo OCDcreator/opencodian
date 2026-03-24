@@ -2,7 +2,7 @@
  * Mock for @opencode-ai/sdk
  */
 
-import type { Message, Part, Session } from '@opencode-ai/sdk';
+import type { Message, Session } from '@opencode-ai/sdk';
 
 // Mock session data
 const mockSession: Session = {

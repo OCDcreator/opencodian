@@ -9,7 +9,10 @@ import { App, Notice, PluginSettingTab, Setting } from 'obsidian';
 import { OpencodeConfigManager } from '../../core/config';
 import { setLocale, t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
+import { createLogger } from '../../shared';
 import { OpencodeConfigModal } from './OpencodeConfigModal';
+
+const logger = createLogger('OpenCodianSettings');
 
 export class OpenCodianSettingTab extends PluginSettingTab {
   plugin: OpenCodianPlugin;
@@ -271,7 +274,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         
         return result;
       } catch (error) {
-        console.error('Failed to load models:', error);
+        logger.error('Failed to load models:', error);
         if (showNotice) {
           new Notice(t('settings.model.refresh.failed'));
         }
@@ -431,7 +434,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         
         configStatusSetting.setDesc(statusText);
         configStatusSetting.settingEl.addClass(statusClass);
-      } catch (error) {
+      } catch {
         configStatusSetting.setDesc(t('settings.security.configStatus.error'));
       }
     };
@@ -466,7 +469,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
                   new Notice(t('settings.security.autoRestart.success'));
                 }
               } catch (error) {
-                console.error('Auto restart failed:', error);
+                logger.error('Auto restart failed:', error);
                 new Notice(t('settings.security.autoRestart.failed'));
               }
             } else {
@@ -527,7 +530,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
                 new Notice('OpenCode service started with new permission settings.');
               }
             } catch (error) {
-              console.error('Failed to restart OpenCode:', error);
+              logger.error('Failed to restart OpenCode:', error);
               new Notice('Failed to restart OpenCode service. Please restart manually.');
             } finally {
               btn.setDisabled(false);
@@ -635,6 +638,18 @@ export class OpenCodianSettingTab extends PluginSettingTab {
             await this.plugin.saveSettings();
           });
       });
+
+    new Setting(containerEl)
+      .setName(t('settings.ui.debugLogging.name'))
+      .setDesc(t('settings.ui.debugLogging.desc'))
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.enableDebugLogging)
+          .onChange(async (value) => {
+            this.plugin.settings.enableDebugLogging = value;
+            await this.plugin.saveSettings();
+          })
+      );
 
     new Setting(containerEl)
       .setName(t('settings.ui.openInMainTab.name'))

@@ -8,15 +8,17 @@
 import type { Editor, MarkdownView } from 'obsidian';
 import { Notice, Plugin } from 'obsidian';
 
-import { OpenCodianView } from './features/chat/OpenCodianView';
-
 import { OpencodeConfigManager } from './core/config';
 import { OpenCodeService } from './core/opencode';
 import { StorageService } from './core/storage';
 import type { Conversation, OpenCodianSettings } from './core/types';
 import { DEFAULT_SETTINGS, VIEW_TYPE_OPENCODIAN } from './core/types';
+import { OpenCodianView } from './features/chat/OpenCodianView';
 import { OpenCodianSettingTab } from './features/settings/OpenCodianSettings';
 import { setLocale } from './i18n';
+import { createLogger, setDebugLoggingEnabled } from './shared';
+
+const logger = createLogger('OpenCodian');
 
 /** Main plugin class */
 export default class OpenCodianPlugin extends Plugin {
@@ -34,6 +36,7 @@ export default class OpenCodianPlugin extends Plugin {
 
     // Load settings
     await this.loadSettings();
+    this.applyLoggerSettings();
 
     // Initialize locale
     setLocale(this.settings.locale as 'en' | 'zh');
@@ -43,13 +46,13 @@ export default class OpenCodianPlugin extends Plugin {
 
     // Initialize OpenCode service
     this.openCodeService = new OpenCodeService(this.settings, {
-      onServerStatusChange: (status) => {
+      onServerStatusChange: (_status) => {
 
       },
       onError: (error) => {
         new Notice(`OpenCode error: ${error.message}`);
       },
-      onModelsLoaded: (providers) => {
+      onModelsLoaded: (_providers) => {
         // Auto-save settings when models are loaded and defaults are updated
         void this.saveSettings();
 
@@ -63,10 +66,10 @@ export default class OpenCodianPlugin extends Plugin {
     const vaultPath = this.app.vault.adapter.getBasePath();
     if (vaultPath) {
       this.openCodeService.setVaultPath(vaultPath);
-      console.log(`[OpenCodian] Vault path set to: ${vaultPath}`);
-      console.log(`[OpenCodian] Platform: ${process.platform}`);
+      logger.debug(`Vault path set to: ${vaultPath}`);
+      logger.debug(`Platform: ${process.platform}`);
     } else {
-      console.warn('[OpenCodian] Could not get vault path, OpenCode will use global config');
+      logger.warn('Could not get vault path, OpenCode will use global config');
     }
 
     // Start server if auto-start is enabled
@@ -179,6 +182,7 @@ export default class OpenCodianPlugin extends Plugin {
   /** Save settings to storage */
   async saveSettings() {
     await this.storage.saveSettings(this.settings);
+    this.applyLoggerSettings();
     
     // Update service with new settings
     this.openCodeService.updateSettings(this.settings);
@@ -193,6 +197,10 @@ export default class OpenCodianPlugin extends Plugin {
     
     // Sync OpenCode config with permission mode
     await this.syncOpencodeConfig();
+  }
+
+  private applyLoggerSettings(): void {
+    setDebugLoggingEnabled(this.settings.enableDebugLogging);
   }
 
   /** Sync OpenCode config with current permission mode */
@@ -216,16 +224,16 @@ export default class OpenCodianPlugin extends Plugin {
       
       // Verify the config was written correctly
       const config = await configManager.read();
-      console.log(`[OpenCodian] OpenCode config updated to mode: ${this.settings.permissionMode}`);
-      console.log(`[OpenCodian] Config file location: ${configManager.getConfigPath()}`);
-      console.log(`[OpenCodian] Config permissions:`, JSON.stringify(config.permission, null, 2));
+      logger.debug(`OpenCode config updated to mode: ${this.settings.permissionMode}`);
+      logger.debug(`Config file location: ${configManager.getConfigPath()}`);
+      logger.debug('Config permissions:', JSON.stringify(config.permission, null, 2));
       
       // Show notice if server is running (needs restart)
       if (this.openCodeService?.checkHealth()) {
-        console.log('[OpenCodian] OpenCode server is running. Config changes require restart to take effect.');
+        logger.debug('OpenCode server is running. Config changes require restart to take effect.');
       }
     } catch (error) {
-      console.error('[OpenCodian] Failed to sync OpenCode config:', error);
+      logger.error('Failed to sync OpenCode config:', error);
     }
   }
 
@@ -243,7 +251,7 @@ export default class OpenCodianPlugin extends Plugin {
       }
 
       // Create config based on current permission mode
-      console.log(`[OpenCodian] Creating OpenCode config with mode: ${this.settings.permissionMode}`);
+      logger.debug(`Creating OpenCode config with mode: ${this.settings.permissionMode}`);
       
       switch (this.settings.permissionMode) {
         case 'yolo':
@@ -259,9 +267,9 @@ export default class OpenCodianPlugin extends Plugin {
           await configManager.setNormalMode();
       }
       
-      console.log(`[OpenCodian] OpenCode config created at: ${configManager.getConfigPath()}`);
+      logger.debug(`OpenCode config created at: ${configManager.getConfigPath()}`);
     } catch (error) {
-      console.error('[OpenCodian] Failed to initialize OpenCode config:', error);
+      logger.error('Failed to initialize OpenCode config:', error);
       // Don't throw - plugin should still work even if config creation fails
     }
   }

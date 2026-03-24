@@ -5,9 +5,13 @@
  */
 
 import { App, Modal, Notice } from 'obsidian';
-import type { OpencodeConfig } from '../../core/types';
+
 import { OpencodeConfigManager } from '../../core/config';
+import type { OpencodeConfig } from '../../core/types';
 import { t } from '../../i18n';
+import { createLogger } from '../../shared';
+
+const logger = createLogger('OpencodeConfigModal');
 
 export class OpencodeConfigModal extends Modal {
   private configManager: OpencodeConfigManager;
@@ -27,7 +31,7 @@ export class OpencodeConfigModal extends Modal {
     try {
       this.config = await this.configManager.read();
     } catch (error) {
-      console.error('Failed to load config:', error);
+      logger.error('Failed to load config:', error);
       this.config = {};
     }
 
@@ -247,13 +251,13 @@ export class OpencodeConfigModal extends Modal {
           }
         }
       } catch (error) {
-        console.error('Failed to restart service:', error);
+        logger.error('Failed to restart service:', error);
         new Notice(t('configEditor.notice.saveError') + ': ' + (error as Error).message);
       }
 
       this.close();
     } catch (error) {
-      console.error('Failed to save config:', error);
+      logger.error('Failed to save config:', error);
       new Notice(t('configEditor.notice.saveError') + ': ' + (error as Error).message);
     }
   }
