@@ -1336,3 +1336,293 @@ const hasContent = (streamingChunk.type === 'text' && streamingChunk.content?.tr
 3. **国际化** - 完善中英文切换
 
 ---
+
+## 2026-03-24 模型选择器 UI 重构与图标集成
+
+本次会话完成了模型选择器的全面升级，从原生 `<select>` 元素迁移到自定义下拉组件，并集成了 200+ 个 AI 供应商品牌图标。
+
+---
+
+### ✅ 1. 模型选择器 UI 重构
+
+**问题背景：**
+- 原生 `<select>` 下拉框样式受限，无法分组显示
+- 无法显示供应商图标，视觉层次不清晰
+- 参考 opencode 的 UI 设计，需要更现代化的选择器
+
+**实现内容：**
+
+#### 自定义下拉组件架构
+```
+┌─────────────────────────────────────┐
+│ 🤖 anthropic/claude-3-5-sonnet   ▼ │  ← Trigger 按钮（显示当前选择）
+└─────────────────────────────────────┘
+                    │
+                    ▼
+┌─────────────────────────────────────┐
+│ 🔍 Search models...                 │  ← 搜索输入框
+├─────────────────────────────────────┤
+│ 🅰️  ANTHROPIC      ← sticky header   │
+│    claude-3-opus-20240229           │
+│  ✓ claude-3-5-sonnet-20241022       │  ← 当前选中
+│    claude-3-5-haiku-20241022        │
+├─────────────────────────────────────┤
+│ 🇨🇳 DEEPSEEK       ← sticky header   │
+│    deepseek-chat                    │
+│    deepseek-reasoner                │
+└─────────────────────────────────────┘
+```
+
+**关键实现：**
+
+1. **Trigger 按钮设计**
+   ```typescript
+   // Ghost 样式按钮，显示当前选择的模型
+   createEl('button', { cls: 'opencodian-model-trigger' }, (btn) => {
+     btn.createSpan({ cls: 'model-trigger-icon', text: '🤖' });
+     btn.createSpan({ cls: 'model-trigger-text', text: modelName });
+     btn.createSpan({ cls: 'model-trigger-chevron', text: '▼' });
+   });
+   ```
+
+2. **下拉面板结构**
+   ```typescript
+   createDiv({ cls: 'opencodian-model-dropdown' }, (dropdown) => {
+     // 搜索输入
+     dropdown.createDiv({ cls: 'opencodian-model-search' }, ...);
+     // 可滚动列表
+     dropdown.createDiv({ cls: 'opencodian-model-dropdown-scroll' }, ...);
+   });
+   ```
+
+3. **定位策略**
+   ```css
+   .opencodian-model-dropdown {
+     position: absolute;
+     bottom: calc(100% + 8px);  /* 位于输入框上方 */
+     left: 0;
+     z-index: 1000;
+   }
+   ```
+
+**涉及文件：**
+- `src/features/chat/OpenCodianView.ts`
+- `styles.css`
+
+---
+
+### ✅ 2. 粘性分组头部 (Sticky Headers)
+
+**设计目标：**
+- 提供商名称在滚动时固定在顶部
+- 清晰区分不同提供商的模型
+- 提供视觉反馈表示当前所在分组
+
+**技术实现：**
+
+1. **CSS 粘性定位**
+   ```css
+   .opencodian-model-provider-header {
+     position: sticky;
+     top: 0;
+     z-index: 10;
+     background: var(--background-secondary);
+   }
+   ```
+
+2. **IntersectionObserver 检测粘性状态**
+   ```typescript
+   private handleProviderHeaderScroll(): void {
+     const observer = new IntersectionObserver((entries) => {
+       entries.forEach(entry => {
+         const header = entry.target as HTMLElement;
+         const rect = header.getBoundingClientRect();
+         const containerRect = container.getBoundingClientRect();
+         // 检测是否被粘住
+         header.dataset.stuck = (rect.top <= containerRect.top + 1) ? 'true' : 'false';
+       });
+     }, { root: container, threshold: [0, 1] });
+   }
+   ```
+
+3. **粘性状态视觉反馈**
+   ```css
+   .opencodian-model-provider-header[data-stuck="true"] {
+     box-shadow: 0 8px 8px -4px rgba(0, 0, 0, 0.1);
+   }
+   ```
+
+---
+
+### ✅ 3. Lobehub 图标集成
+
+**图标来源：**
+- 使用 Lobehub Icons Static SVG 包
+- 1425+ 个 AI/LLM 品牌图标
+- CDN 加载：`https://unpkg.com/@lobehub/icons-static-svg@latest/icons/{name}.svg`
+
+**ProviderIconService 实现：**
+
+1. **图标映射表 (200+ 供应商)**
+   ```typescript
+   private static readonly PROVIDER_ICON_MAP: Record<string, string> = {
+     // 国际主流
+     'openai': 'openai',
+     'anthropic': 'anthropic',
+     'claude': 'claude',
+     'google': 'google',
+     'gemini': 'gemini',
+     // 中国厂商
+     'deepseek': 'deepseek',
+     'aihubmix': 'aihubmix',
+     'zhipu': 'zhipu',
+     'glm': 'chatglm',
+     'moonshot': 'moonshot',
+     'kimi': 'moonshot',  // kimi = moonshot
+     'qwen': 'qwen',
+     '通义千问': 'qwen',
+     // ... 200+ 更多映射
+   };
+   ```
+
+2. **模糊匹配算法**
+   ```typescript
+   private static normalizeProviderId(providerId: string): string {
+     return providerId
+       .toLowerCase()
+       .replace(/[\s\-_.]+/g, '')           // 移除分隔符
+       .replace(/[\(\（].*?[\)\）]/g, '');  // 移除括号内容
+   }
+   
+   static getIconUrl(providerId: string): string | undefined {
+     const normalized = this.normalizeProviderId(providerId);
+     
+     // 1. 直接匹配
+     if (this.PROVIDER_ICON_MAP[normalized]) {
+       return this.buildUrl(this.PROVIDER_ICON_MAP[normalized]);
+     }
+     
+     // 2. 包含匹配 (aihub-mix → aihubmix)
+     for (const [key, iconName] of Object.entries(this.PROVIDER_ICON_MAP)) {
+       if (normalized.includes(key) || key.includes(normalized)) {
+         return this.buildUrl(iconName);
+       }
+     }
+     
+     // 3. 尝试直接使用
+     return this.buildUrl(normalized);
+   }
+   ```
+
+3. **SVG 图标渲染**
+   ```typescript
+   static getProviderIconHTML(providerId: string, size: number = 16): string {
+     const iconUrl = this.getIconUrl(providerId);
+     return `<img src="${iconUrl}" 
+                  width="${size}" height="${size}" 
+                  class="opencodian-provider-icon"
+                  style="display: inline-block; vertical-align: middle;">`;
+   }
+   ```
+
+**匹配示例：**
+| 输入 | 归一化 | 匹配结果 |
+|------|--------|----------|
+| `AiHubMix (推理时代)` | `aihubmix` | ✅ `aihubmix` |
+| `aihub-mix` | `aihubmix` | ✅ `aihubmix` |
+| `zhipu-external` | `zhipexternal` | ✅ 包含 `zhipu` |
+| `通义千问` | `通义千问` | ✅ `qwen` |
+| `Kimi (Moonshot)` | `kimi` | ✅ `moonshot` |
+
+---
+
+### ✅ 4. 搜索与键盘导航
+
+**搜索功能：**
+```typescript
+private modelFilterQuery = '';
+
+// 过滤逻辑
+const filtered = providers.filter(({ provider, models }) => {
+  const providerMatch = provider.providerID.toLowerCase().includes(query);
+  const modelMatch = models.some(m => m.toLowerCase().includes(query));
+  return providerMatch || modelMatch;
+});
+```
+
+**键盘导航：**
+- `↑/↓` - 在选项间移动
+- `Enter` - 选择高亮项
+- `Escape` - 关闭下拉
+- `Home/End` - 跳到首/尾
+
+---
+
+### ✅ 5. Flexbox 滚动修复
+
+**问题：**
+flex 容器内的子元素使用 `overflow-y: auto` 时滚动条不显示。
+
+**解决方案：**
+```css
+/* 使用 max-height 而非 flex: 1 */
+.opencodian-model-dropdown-scroll {
+  max-height: 260px;        /* 固定最大高度 */
+  overflow-y: scroll !important;  /* 强制显示滚动条 */
+}
+
+/* 父容器 */
+.opencodian-model-dropdown {
+  display: flex;
+  flex-direction: column;
+  max-height: 320px;        /* 整体最大高度 */
+  overflow: hidden;         /* 防止整体溢出 */
+}
+```
+
+---
+
+### 📁 新增/修改文件
+
+| 文件 | 修改内容 |
+|------|----------|
+| `src/utils/icons/ProviderIconService.ts` | 新增：图标映射与加载服务 |
+| `src/features/chat/OpenCodianView.ts` | 重构：模型选择器 UI 实现 |
+| `styles.css` | 新增：下拉组件、粘性头部、图标样式 |
+
+---
+
+### 🎨 视觉层次设计
+
+```
+提供商头部 (14px, bold, accent color)
+  └── 模型选项 (12px, normal)
+  └── 模型选项 (12px, normal)
+
+颜色规范：
+- 提供商名：var(--text-accent) - 强调色
+- 模型名：var(--text-normal) - 正文色
+- 选中项：var(--background-modifier-hover) - 悬停背景
+- 图标：16x16px，flex-shrink: 0 防止压缩
+```
+
+---
+
+### 🔧 已知问题
+
+1. **重复 key 警告**
+   - `spark` 和 `jamba` 在映射表中重复定义（非致命）
+   - 不影响功能，可后续清理
+
+2. **图标加载延迟**
+   - CDN 图标首次加载有短暂延迟
+   - 浏览器缓存后快速加载
+
+---
+
+**会话日期**: 2026-03-24
+**开发时间**: ~3 小时
+**主要贡献**: 自定义模型选择器、Lobehub 图标集成、粘性分组头部、搜索功能
+**当前状态**: ✅ 模型选择器 UI 完整，支持 200+ 供应商图标
+
+---

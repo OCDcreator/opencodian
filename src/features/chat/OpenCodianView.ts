@@ -12,6 +12,7 @@ import type { ChatMessage, ContentBlock, Conversation, ToolCallInfo } from '../.
 import { OpenCodeService } from '../../core/opencode';
 import type OpenCodianPlugin from '../../main';
 import { MarkdownRenderService } from '../../utils/markdown';
+import { ProviderIconService } from '../../utils/icons/ProviderIconService';
 import { StreamController, ThinkingBlockRenderer, ToolCallRenderer } from '../../utils/streaming';
 
 /** Logo SVG for light theme (dark logo on light bg) - from opencode-logo-light.svg */
@@ -77,9 +78,17 @@ export class OpenCodianView extends ItemView {
   private streamingContentEl: HTMLElement | null = null;
 
   // Model selector state
-  private currentModelSelect: HTMLSelectElement | null = null;
-  private availableModels: Array<{ provider: string; model: string; label: string }> = [];
+  private modelSelectorContainer: HTMLElement | null = null;
+  private modelSelectorTrigger: HTMLElement | null = null;
+  private modelSelectorDropdown: HTMLElement | null = null;
+  private modelSelectorSearchInput: HTMLInputElement | null = null;
+  private modelSelectorScrollContainer: HTMLElement | null = null;
+  private availableModels: Array<{ provider: string; model: string; label: string; providerName: string; modelName: string }> = [];
+  private availableProviders: Array<{ id: string; name: string; models: Array<{ id: string; name: string }> }> = [];
   private sessionModelOverrides: Map<string, { provider: string; model: string }> = new Map();
+  private isModelDropdownOpen = false;
+  private modelFilterQuery = '';
+  private modelDropdownClickOutsideHandler: ((e: MouseEvent) => void) | null = null;
 
   // Streaming content state
   private streamController: StreamController | null = null;
@@ -273,12 +282,9 @@ export class OpenCodianView extends ItemView {
     // Bottom toolbar for model selector and future buttons
     const toolbar = container.createDiv({ cls: 'opencodian-input-toolbar' });
     
-    // Left side: Model selector
-    const modelSelector = toolbar.createDiv({ cls: 'opencodian-model-selector' });
-    const modelSelect = modelSelector.createEl('select');
-    
-    // Initialize model selector
-    void this.initializeModelSelector(modelSelect);
+    // Left side: Model selector (opencode-style)
+    this.modelSelectorContainer = toolbar.createDiv({ cls: 'opencodian-model-selector' });
+    this.initializeModelSelector(this.modelSelectorContainer);
     
     // Right side: Reserved for future buttons (attach file, etc.)
     // const toolbarRight = toolbar.createDiv({ cls: 'opencodian-toolbar-right' });
@@ -870,42 +876,357 @@ export class OpenCodianView extends ItemView {
     }
   }
 
-  /** Initialize model selector dropdown */
-  private async initializeModelSelector(selectEl: HTMLSelectElement): Promise<void> {
-    this.currentModelSelect = selectEl;
+  /** Initialize model selector (opencode-style) */
+  private initializeModelSelector(containerEl: HTMLElement): void {
+    this.modelSelectorContainer = containerEl;
     
-    // Load available models
-    await this.loadAvailableModels();
+    // Create trigger button - ghost style, shows provider icon + model name + chevron
+    this.modelSelectorTrigger = containerEl.createDiv({ cls: 'opencodian-model-trigger' });
+    const triggerContent = this.modelSelectorTrigger.createDiv({ cls: 'opencodian-model-trigger-content' });
     
-    // Set initial value
+    // Provider icon
+    const iconWrapper = triggerContent.createSpan({ cls: 'opencodian-model-trigger-icon' });
+    setIcon(iconWrapper, 'bot'); // Default icon, will be updated
+    
+    // Model name
+    triggerContent.createSpan({ cls: 'opencodian-model-trigger-text' });
+    
+    // Chevron
+    const chevron = triggerContent.createSpan({ cls: 'opencodian-model-trigger-chevron' });
+    setIcon(chevron, 'chevron-down');
+    
+    // Create dropdown (hidden by default)
+    this.modelSelectorDropdown = containerEl.createDiv({ cls: 'opencodian-model-dropdown' });
+    this.modelSelectorDropdown.style.display = 'none';
+    
+    // Build dropdown structure
+    this.buildModelDropdown();
+    
+    // Load models
+    void this.loadAvailableModels();
+    
+    // Update display
     this.updateModelSelectorDisplay();
     
-    // Setup hover tooltip
-    let hoverTimeout: number | null = null;
-    selectEl.addEventListener('mouseenter', () => {
-      hoverTimeout = window.setTimeout(() => {
-        const current = this.getCurrentSessionModel();
-        selectEl.setAttribute('title', `Using: ${current.provider}/${current.model}`);
-      }, 1000);
+    // Handle trigger click
+    this.modelSelectorTrigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.toggleModelDropdown();
     });
     
-    selectEl.addEventListener('mouseleave', () => {
-      if (hoverTimeout) {
-        clearTimeout(hoverTimeout);
-        hoverTimeout = null;
+    // Setup click outside handler
+    this.modelDropdownClickOutsideHandler = (e: MouseEvent) => {
+      if (!this.modelSelectorContainer?.contains(e.target as Node)) {
+        this.closeModelDropdown();
+      }
+    };
+  }
+  
+  /** Build model dropdown structure */
+  private buildModelDropdown(): void {
+    if (!this.modelSelectorDropdown) return;
+    
+    this.modelSelectorDropdown.empty();
+    
+    // Search section
+    const searchWrapper = this.modelSelectorDropdown.createDiv({ cls: 'opencodian-model-dropdown-search' });
+    const searchContainer = searchWrapper.createDiv({ cls: 'opencodian-model-dropdown-search-container' });
+    const searchIcon = searchContainer.createSpan({ cls: 'opencodian-model-dropdown-search-icon' });
+    setIcon(searchIcon, 'search');
+    
+    this.modelSelectorSearchInput = searchContainer.createEl('input', {
+      cls: 'opencodian-model-dropdown-search-input',
+      attr: { 
+        type: 'text', 
+        placeholder: 'Search models...'
       }
     });
     
-    // Handle model change
-    selectEl.addEventListener('change', () => {
-      const selectedValue = selectEl.value;
-      if (selectedValue) {
-        const [provider, model] = selectedValue.split('::');
-        if (provider && model) {
-          this.switchModel(provider, model);
+    // Handle search input
+    this.modelSelectorSearchInput.addEventListener('input', (e) => {
+      this.modelFilterQuery = (e.target as HTMLInputElement).value.toLowerCase();
+      this.renderModelList();
+    });
+    
+    // Handle keyboard navigation in search
+    this.modelSelectorSearchInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        this.closeModelDropdown();
+        e.preventDefault();
+      } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        this.navigateModelList(e.key === 'ArrowDown' ? 1 : -1);
+        e.preventDefault();
+      } else if (e.key === 'Enter') {
+        this.selectHighlightedModel();
+        e.preventDefault();
+      }
+    });
+    
+    // Scrollable list container
+    this.modelSelectorScrollContainer = this.modelSelectorDropdown.createDiv({ 
+      cls: 'opencodian-model-dropdown-scroll' 
+    });
+    
+    // Don't render list here - wait for models to load
+    // Initial render will show loading state
+    this.renderLoadingState();
+  }
+  
+  /** Render loading state */
+  private renderLoadingState(): void {
+    if (!this.modelSelectorScrollContainer) return;
+    
+    this.modelSelectorScrollContainer.empty();
+    
+    const loading = this.modelSelectorScrollContainer.createDiv({ 
+      cls: 'opencodian-model-dropdown-loading' 
+    });
+    loading.setText('Loading models...');
+  }
+  
+  /** Toggle dropdown visibility */
+  private toggleModelDropdown(): void {
+    if (this.isModelDropdownOpen) {
+      this.closeModelDropdown();
+    } else {
+      this.openModelDropdown();
+    }
+  }
+  
+  /** Open dropdown */
+  private openModelDropdown(): void {
+    if (!this.modelSelectorDropdown || !this.modelSelectorTrigger) return;
+    
+    this.isModelDropdownOpen = true;
+    this.modelSelectorDropdown.style.display = 'block';
+    this.modelSelectorTrigger.addClass('is-open');
+    
+    // Reset filter
+    this.modelFilterQuery = '';
+    if (this.modelSelectorSearchInput) {
+      this.modelSelectorSearchInput.value = '';
+    }
+    this.renderModelList();
+    
+    // Focus search input
+    setTimeout(() => {
+      this.modelSelectorSearchInput?.focus();
+      this.scrollToCurrentModel();
+    }, 0);
+    
+    // Add click outside listener
+    document.addEventListener('click', this.modelDropdownClickOutsideHandler!);
+    
+    // Register escape key handler
+    this.scope?.register([], 'Escape', () => {
+      if (this.isModelDropdownOpen) {
+        this.closeModelDropdown();
+        return true;
+      }
+      return false;
+    });
+  }
+  
+  /** Close dropdown */
+  private closeModelDropdown(): void {
+    if (!this.modelSelectorDropdown || !this.modelSelectorTrigger) return;
+    
+    this.isModelDropdownOpen = false;
+    this.modelSelectorDropdown.style.display = 'none';
+    this.modelSelectorTrigger.removeClass('is-open');
+    
+    // Remove click outside listener
+    if (this.modelDropdownClickOutsideHandler) {
+      document.removeEventListener('click', this.modelDropdownClickOutsideHandler);
+    }
+  }
+  
+  /** Render model list based on filter */
+  private renderModelList(): void {
+    if (!this.modelSelectorScrollContainer) return;
+    
+    this.modelSelectorScrollContainer.empty();
+    
+    // Check if models are still loading
+    if (this.availableProviders.length === 0) {
+      this.renderLoadingState();
+      return;
+    }
+    
+    // Filter models
+    const filteredProviders = this.availableProviders
+      .map(provider => ({
+        ...provider,
+        models: provider.models.filter(model => 
+          model.name.toLowerCase().includes(this.modelFilterQuery) ||
+          provider.name.toLowerCase().includes(this.modelFilterQuery)
+        )
+      }))
+      .filter(provider => provider.models.length > 0);
+    
+    if (filteredProviders.length === 0) {
+      const emptyState = this.modelSelectorScrollContainer.createDiv({ 
+        cls: 'opencodian-model-dropdown-empty' 
+      });
+      emptyState.setText(this.modelFilterQuery ? 'No models found' : 'No models available');
+      return;
+    }
+    
+    const current = this.getCurrentSessionModel();
+    
+    // Create all groups in a single container for proper scrolling
+    const groupsContainer = this.modelSelectorScrollContainer.createDiv({
+      cls: 'opencodian-model-groups'
+    });
+    
+    // Track headers for stuck effect
+    const headers: Array<{ el: HTMLElement; scrollHandler: () => void }> = [];
+    
+    // Create provider groups
+    for (const provider of filteredProviders) {
+      // Group container
+      const groupEl = groupsContainer.createDiv({
+        cls: 'opencodian-model-group'
+      });
+      
+      // Provider header (sticky)
+      const header = groupEl.createDiv({ 
+        cls: 'opencodian-model-provider-header' 
+      });
+      header.setText(provider.name);
+      
+      // Setup stuck detection for this header
+      const scrollHandler = () => {
+        if (!this.modelSelectorScrollContainer || !header) return;
+        const scrollRect = this.modelSelectorScrollContainer.getBoundingClientRect();
+        const headerRect = header.getBoundingClientRect();
+        const isStuck = headerRect.top <= scrollRect.top + 1 && 
+                        this.modelSelectorScrollContainer.scrollTop > 0;
+        header.setAttribute('data-stuck', String(isStuck));
+      };
+      
+      headers.push({ el: header, scrollHandler });
+      
+      // Models for this provider
+      for (const model of provider.models) {
+        const isSelected = current.provider === provider.id && current.model === model.id;
+        const modelValue = `${provider.id}::${model.id}`;
+        
+        const modelOption = groupEl.createDiv({ 
+          cls: 'opencodian-model-option',
+          attr: { 'data-value': modelValue }
+        });
+        
+        if (isSelected) {
+          modelOption.addClass('is-selected');
         }
+        
+        // Model name
+        const nameSpan = modelOption.createSpan({ cls: 'opencodian-model-option-name' });
+        nameSpan.setText(model.name);
+        
+        // Checkmark for selected model
+        const checkmark = modelOption.createSpan({ cls: 'opencodian-model-option-check' });
+        setIcon(checkmark, 'check');
+        
+        // Click handler
+        modelOption.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.switchModel(provider.id, model.id);
+          this.closeModelDropdown();
+        });
+        
+        // Hover handler for keyboard navigation
+        modelOption.addEventListener('mouseenter', () => {
+          this.highlightModelOption(modelValue);
+        });
       }
+    }
+    
+    // Add scroll listener to container
+    if (this.modelSelectorScrollContainer) {
+      // Remove old listener if exists
+      if ((this.modelSelectorScrollContainer as any)._stuckHandler) {
+        this.modelSelectorScrollContainer.removeEventListener(
+          'scroll', 
+          (this.modelSelectorScrollContainer as any)._stuckHandler
+        );
+      }
+      
+      const handler = () => {
+        headers.forEach(h => h.scrollHandler());
+      };
+      
+      (this.modelSelectorScrollContainer as any)._stuckHandler = handler;
+      this.modelSelectorScrollContainer.addEventListener('scroll', handler, { passive: true });
+      
+      // Initial check
+      handler();
+    }
+  }
+  
+  /** Navigate model list with keyboard */
+  private navigateModelList(direction: 1 | -1): void {
+    if (!this.modelSelectorScrollContainer) return;
+    
+    const options = Array.from(this.modelSelectorScrollContainer.querySelectorAll('.opencodian-model-option'));
+    if (options.length === 0) return;
+    
+    const currentIndex = options.findIndex(opt => opt.hasClass('is-highlighted'));
+    let nextIndex = currentIndex + direction;
+    
+    if (nextIndex < 0) nextIndex = 0;
+    if (nextIndex >= options.length) nextIndex = options.length - 1;
+    
+    if (currentIndex >= 0) {
+      options[currentIndex].removeClass('is-highlighted');
+    }
+    options[nextIndex].addClass('is-highlighted');
+    
+    // Scroll into view
+    options[nextIndex].scrollIntoView({ block: 'nearest' });
+  }
+  
+  /** Highlight a specific model option */
+  private highlightModelOption(value: string): void {
+    if (!this.modelSelectorScrollContainer) return;
+    
+    this.modelSelectorScrollContainer.querySelectorAll('.opencodian-model-option').forEach(opt => {
+      opt.removeClass('is-highlighted');
     });
+    
+    const option = this.modelSelectorScrollContainer.querySelector(`[data-value="${value}"]`);
+    if (option) {
+      option.addClass('is-highlighted');
+    }
+  }
+  
+  /** Select currently highlighted model */
+  private selectHighlightedModel(): void {
+    if (!this.modelSelectorScrollContainer) return;
+    
+    const highlighted = this.modelSelectorScrollContainer.querySelector('.opencodian-model-option.is-highlighted');
+    if (highlighted) {
+      const value = highlighted.getAttribute('data-value');
+      if (value) {
+        const [provider, model] = value.split('::');
+        this.switchModel(provider, model);
+        this.closeModelDropdown();
+      }
+    }
+  }
+  
+  /** Scroll to current model in dropdown */
+  private scrollToCurrentModel(): void {
+    if (!this.modelSelectorScrollContainer) return;
+    
+    const current = this.getCurrentSessionModel();
+    const currentValue = `${current.provider}::${current.model}`;
+    
+    const currentEl = this.modelSelectorScrollContainer.querySelector(`[data-value="${currentValue}"]`) as HTMLElement;
+    if (currentEl) {
+      currentEl.scrollIntoView({ block: 'center' });
+    }
   }
 
   /** Load available models from OpenCode service */
@@ -913,27 +1234,33 @@ export class OpenCodianView extends ItemView {
     try {
       const { providers } = await this.plugin.openCodeService.getAvailableModels();
       this.availableModels = [];
+      this.availableProviders = [];
       
       for (const provider of providers) {
+        const providerModels = [];
         for (const model of provider.models) {
           this.availableModels.push({
             provider: provider.id,
             model: model.id,
             label: `${provider.name}/${model.name}`,
+            providerName: provider.name,
+            modelName: model.name,
+          });
+          providerModels.push({
+            id: model.id,
+            name: model.name,
           });
         }
+        this.availableProviders.push({
+          id: provider.id,
+          name: provider.name,
+          models: providerModels,
+        });
       }
       
-      // Populate dropdown
-      if (this.currentModelSelect) {
-        this.currentModelSelect.empty();
-        
-        for (const { provider, model, label } of this.availableModels) {
-          const option = this.currentModelSelect.createEl('option');
-          option.value = `${provider}::${model}`;
-          option.textContent = label;
-        }
-      }
+      // Re-render dropdown with new data
+      this.renderModelList();
+      this.updateModelSelectorDisplay();
     } catch (error) {
       console.error('[OpenCodianView] Failed to load models:', error);
     }
@@ -941,21 +1268,38 @@ export class OpenCodianView extends ItemView {
 
   /** Update model selector to show current model */
   private updateModelSelectorDisplay(): void {
-    if (!this.currentModelSelect) return;
-    
     const current = this.getCurrentSessionModel();
-    const value = `${current.provider}::${current.model}`;
     
-    // Check if option exists
-    const option = this.currentModelSelect.querySelector(`option[value="${value}"]`);
-    if (option) {
-      this.currentModelSelect.value = value;
-    } else {
-      // Add temporary option if model not in list
-      const tempOption = this.currentModelSelect.createEl('option');
-      tempOption.value = value;
-      tempOption.textContent = `${current.provider}/${current.model}`;
-      this.currentModelSelect.value = value;
+    if (!this.modelSelectorTrigger) return;
+    
+    // Find model info from available models
+    const modelInfo = this.availableModels.find(
+      m => m.provider === current.provider && m.model === current.model
+    );
+    
+    // Update text
+    const textEl = this.modelSelectorTrigger.querySelector('.opencodian-model-trigger-text');
+    if (textEl) {
+      textEl.textContent = modelInfo?.modelName || current.model;
+    }
+    
+    // Update provider icon using Lobehub icons
+    const iconWrapper = this.modelSelectorTrigger.querySelector('.opencodian-model-trigger-icon');
+    if (iconWrapper) {
+      iconWrapper.empty();
+      
+      // Try to get Lobehub icon
+      const iconUrl = ProviderIconService.getIconUrl(current.provider);
+      if (iconUrl) {
+        const img = document.createElement('img');
+        img.src = iconUrl;
+        img.alt = modelInfo?.providerName || current.provider;
+        img.title = modelInfo?.providerName || current.provider;
+        iconWrapper.appendChild(img);
+      } else {
+        // Fallback to Obsidian icon
+        setIcon(iconWrapper as HTMLElement, 'bot');
+      }
     }
   }
 
@@ -983,10 +1327,12 @@ export class OpenCodianView extends ItemView {
     // Update display
     this.updateModelSelectorDisplay();
     
-    // Show notification
-    new Notice(`Model switched to: ${provider}/${model}`);
-    
-
+    // Show notification with model name only
+    const modelInfo = this.availableModels.find(
+      m => m.provider === provider && m.model === model
+    );
+    const modelName = modelInfo?.modelName || model;
+    new Notice(`Model switched to: ${modelName}`);
   }
 
   /** Get model options for sendMessage */
