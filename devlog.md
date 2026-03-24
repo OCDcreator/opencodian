@@ -1626,3 +1626,280 @@ flex 容器内的子元素使用 `overflow-y: auto` 时滚动条不显示。
 **当前状态**: ✅ 模型选择器 UI 完整，支持 200+ 供应商图标
 
 ---
+
+
+## 2026-03-24 权限系统完善与 UI 优化
+
+### 📋 背景
+OpenCode 的权限系统通过 `.opencode/opencode.json` 配置文件控制。本次开发将权限管理完全集成到插件中，实现从配置管理到权限请求处理的完整闭环。
+
+---
+
+### ✅ 1. OpenCode 配置管理器
+
+**实现内容：**
+- 创建 `OpencodeConfigManager` 类管理项目级配置
+- 支持自动创建、读取、更新配置文件
+- 三种权限模式：YOLO/Normal/Plan
+
+```typescript
+export class OpencodeConfigManager {
+  async setYoloMode(): Promise<void> {
+    await this.updatePermission('allow');
+  }
+  
+  async setNormalMode(): Promise<void> {
+    await this.updatePermission({ '*': 'ask' });
+  }
+  
+  async setPlanMode(): Promise<void> {
+    await this.updatePermission({
+      '*': 'ask',
+      edit: 'deny',
+      write: 'deny',
+      bash: 'deny',
+    });
+  }
+}
+```
+
+**文件位置：**
+- `src/core/config/OpencodeConfigManager.ts`
+
+---
+
+### ✅ 2. 跨平台工作目录支持
+
+**问题：**
+OpenCode 服务器需要在 vault 目录启动才能读取项目配置。
+
+**解决方案：**
+```typescript
+// Windows 支持
+if (process.platform === 'win32') {
+  candidates.push('opencode.cmd', `${process.env.APPDATA}\\npm\\opencode.cmd`);
+}
+
+// macOS 支持
+if (process.platform === 'darwin') {
+  candidates.push('/opt/homebrew/bin/opencode', '/usr/local/bin/opencode');
+}
+
+// 启动时设置工作目录
+this.process = spawn(opencodePath, ['serve', ...], {
+  cwd: this.workingDirectory,  // Vault 路径
+});
+```
+
+**调试输出：**
+```
+[ServerManager] Working directory set to: C:\Users\lt\Desktop\Write\testvault
+[ServerManager] Starting OpenCode in directory: C:\Users\lt\Desktop\Write\testvault
+```
+
+---
+
+### ✅ 3. 内联权限请求对话框
+
+**设计改进：**
+- 从全局弹窗改为消息流内嵌卡片
+- 不阻塞用户操作其他界面
+- 选择后自动消失，不占用空间
+
+**实现代码：**
+```typescript
+private async showPermissionDialog(request: PermissionRequest): Promise<void> {
+  // 在消息流中创建权限卡片
+  const permissionCard = permissionContainer.createDiv({ 
+    cls: 'opencodian-permission-inline' 
+  });
+  
+  // 显示工具信息和按钮
+  // ...
+  
+  // 用户选择后移除卡片
+  const result = await new Promise<...>((resolve) => { ... });
+  permissionCard.remove();  // 完全消失，不占用空间
+}
+```
+
+**UI 样式：**
+```css
+.opencodian-permission-inline {
+  background: var(--background-primary);
+  border: 2px solid var(--interactive-accent);
+  border-radius: 8px;
+  padding: 16px;
+  margin: 12px 0;
+}
+```
+
+**文件位置：**
+- `src/features/chat/OpenCodianView.ts`
+- `styles.css`
+
+---
+
+### ✅ 4. 输入栏权限模式切换
+
+**实现内容：**
+在输入框下方工具栏添加权限模式下拉框：
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  [🤖 模型选择器]              [🛡️ YOLO ▼]              │
+└─────────────────────────────────────────────────────────┘
+```
+
+**代码实现：**
+```typescript
+private initializePermissionSelector(containerEl: HTMLElement): void {
+  const trigger = containerEl.createDiv({ cls: 'opencodian-permission-trigger' });
+  
+  // 根据当前模式显示不同颜色
+  trigger.addClass(`mode-${mode}`);  // yolo=green, ask=blue, plan=red
+  
+  // 点击切换模式并自动重启服务
+  trigger.addEventListener('click', async () => {
+    await this.switchPermissionMode(newMode);
+  });
+}
+```
+
+**自动重启逻辑：**
+```typescript
+private async switchPermissionMode(mode: 'yolo' | 'normal' | 'plan'): Promise<void> {
+  // 1. 更新配置
+  this.plugin.settings.permissionMode = mode;
+  await this.plugin.saveSettings();
+  
+  // 2. 重启 OpenCode 服务
+  await this.plugin.openCodeService.stop();
+  await new Promise(resolve => setTimeout(resolve, 1000));
+  await this.plugin.openCodeService.start();
+}
+```
+
+**显示格式：**
+- YOLO 模式：`🛡️ YOLO`（绿色）
+- 询问模式：`🛡️ ASK`（蓝色）
+- 计划模式：`🛡️ PLAN`（红色）
+
+---
+
+### ✅ 5. 中文翻译完善
+
+**新增翻译键：**
+```typescript
+// 权限对话框
+'permissionDialog.title': '权限请求',
+'permissionDialog.description': 'AI 想要使用工具：',
+'permissionDialog.toolDescription': '此工具的作用：',
+'permissionDialog.allowOnce': '允许一次',
+'permissionDialog.allowAlways': '始终允许',
+'permissionDialog.reject': '拒绝',
+
+// 工具描述
+'permissionDialog.tools.websearch': '搜索网络获取最新信息',
+'permissionDialog.tools.bash': '执行终端命令（谨慎使用）',
+'permissionDialog.tools.read': '读取文件内容',
+'permissionDialog.tools.edit': '编辑/修改文件内容',
+
+// 设置按钮
+'settings.security.configFile.editBtn': '编辑配置',
+'settings.security.configFile.applyBtn': '应用并重启',
+```
+
+**文件位置：**
+- `src/i18n/locales/zh.ts`
+- `src/i18n/locales/en.ts`
+
+---
+
+### ✅ 6. 计划模式检测修复
+
+**问题：**
+计划模式（有 `deny` 权限）被错误显示为询问模式。
+
+**修复代码：**
+```typescript
+if (typeof permission === 'object' && permission?.['*'] === 'ask') {
+  // 检查是否有 deny - 那是计划模式
+  const hasDeny = Object.values(permission).some(v => v === 'deny');
+  if (hasDeny) {
+    statusText = t('settings.security.configStatus.plan');
+    statusClass = 'opencodian-status-plan';
+  } else {
+    statusText = t('settings.security.configStatus.normal');
+    statusClass = 'opencodian-status-normal';
+  }
+}
+```
+
+**状态显示：**
+- ✅ YOLO 模式（自动批准全部）- 绿色
+- ✅ 询问模式（提示批准）- 蓝色
+- ✅ 计划模式（禁止修改）- 红色
+- ✅ 自定义模式 - 灰色
+
+---
+
+### ✅ 7. 权限对话框超时修复
+
+**问题：**
+权限对话框显示时，流超时仍在计时，导致用户未响应就中断。
+
+**修复：**
+```typescript
+// 显示对话框前暂停超时
+if (timeoutId) {
+  window.clearTimeout(timeoutId);
+  timeoutId = null;
+}
+
+await this.showPermissionDialog(chunk);
+
+// 用户响应后重新开始超时
+if (this.isStreaming) {
+  timeoutId = window.setTimeout(() => { ... }, STREAM_TIMEOUT_MS);
+}
+```
+
+---
+
+### 📁 修改文件列表
+
+| 文件 | 修改内容 |
+|------|----------|
+| `src/core/config/OpencodeConfigManager.ts` | 新增配置管理器 |
+| `src/core/opencode/ServerManager.ts` | 跨平台工作目录支持 |
+| `src/core/opencode/OpenCodeService.ts` | 权限事件处理 |
+| `src/features/chat/OpenCodianView.ts` | 内联权限对话框、输入栏权限切换 |
+| `src/features/settings/OpenCodianSettings.ts` | 设置页面权限检测修复 |
+| `src/i18n/locales/zh.ts` | 中文翻译 |
+| `src/i18n/locales/en.ts` | 英文翻译 |
+| `styles.css` | 权限卡片样式、权限选择器样式 |
+
+---
+
+### 🎯 当前状态
+
+**权限系统功能完整：**
+- ✅ 三种权限模式（YOLO/ASK/PLAN）
+- ✅ 配置文件自动管理
+- ✅ 内联权限请求对话框
+- ✅ 输入栏快速切换权限模式
+- ✅ 切换后自动重启服务
+- ✅ 中英文双语支持
+
+**待优化：**
+- 设置页面 `display()` 改为 async 后需验证 Obsidian 兼容性
+
+---
+
+**会话日期**: 2026-03-24
+**开发时间**: ~4 小时
+**主要贡献**: 权限系统完整集成、跨平台支持、内联权限对话框、中文汉化
+**当前状态**: 权限系统功能完整，可正常使用
+
+---
