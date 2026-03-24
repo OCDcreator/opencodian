@@ -222,7 +222,7 @@ Settings UI with bilingual support (English/Chinese).
 - **Server**: Auto-start, host, port
 - **Model**: Dynamic provider/model selection
 - **Security**: Permission mode, command blocklist
-- **UI**: Max tabs, tab bar position, auto-scroll
+- **UI**: Max tabs, tab bar position, auto-scroll, conversation scroll effect
 
 ### 6. Streaming Utilities (`src/utils/streaming/`)
 
@@ -324,5 +324,5 @@ This is the main development log maintained in the Obsidian vault for easy refer
 
 ---
 
-**Last Updated**: 2026-03-23
+**Last Updated**: 2026-03-25
 **Plugin Version**: 0.1.0

@@ -79,6 +79,7 @@ export class OpenCodianView extends ItemView {
   // Track rendered messages for streaming updates
   private streamingMessageEl: HTMLElement | null = null;
   private streamingContentEl: HTMLElement | null = null;
+  private currentTurnBodyEl: HTMLElement | null = null;
 
   // Model selector state
   private modelSelectorContainer: HTMLElement | null = null;
@@ -99,11 +100,6 @@ export class OpenCodianView extends ItemView {
   // Send/Stop button reference
   private sendBtn: HTMLElement | null = null;
   private inputTextarea: HTMLTextAreaElement | null = null;
-
-  // Message sticky scroll observer
-  private messageStickyObserver: IntersectionObserver | null = null;
-  private stickyUserMessage: HTMLElement | null = null;
-  private stickyAssistantMessage: HTMLElement | null = null;
 
   constructor(leaf: WorkspaceLeaf, plugin: OpenCodianPlugin) {
     super(leaf);
@@ -146,9 +142,6 @@ export class OpenCodianView extends ItemView {
     // Wire events
     this.wireEventHandlers();
 
-    // Initialize message sticky scroll observer
-    this.initMessageStickyObserver();
-
     // Create or load conversation
     if (this.plugin.getConversations().length === 0) {
       await this.createNewConversation();
@@ -167,80 +160,6 @@ export class OpenCodianView extends ItemView {
     // Cleanup markdown service
     this.messageComponent.unload();
     this.markdownService = null;
-
-    // Cleanup sticky observer
-    this.messageStickyObserver?.disconnect();
-    this.messageStickyObserver = null;
-  }
-
-  /** Initialize IntersectionObserver for message sticky effect */
-  private initMessageStickyObserver(): void {
-    if (!this.messagesContainer) return;
-
-    this.messageStickyObserver = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          const messageEl = entry.target as HTMLElement;
-          const isUser = messageEl.hasClass('opencodian-message--user');
-          
-          if (entry.isIntersecting) {
-            // Message is visible, check if it should be the sticky one
-            if (isUser) {
-              this.updateStickyUserMessage(messageEl);
-            } else {
-              this.updateStickyAssistantMessage(messageEl);
-            }
-          }
-        });
-      },
-      {
-        root: this.messagesContainer,
-        threshold: [0, 0.5, 1],
-        rootMargin: '-10px 0px -10px 0px',
-      }
-    );
-
-    // Observe existing messages
-    this.observeAllMessages();
-  }
-
-  /** Update the sticky user message (bubble sticks to top) */
-  private updateStickyUserMessage(messageEl: HTMLElement): void {
-    // Remove sticky class from previous sticky message
-    if (this.stickyUserMessage && this.stickyUserMessage !== messageEl) {
-      this.stickyUserMessage.removeClass('is-sticky-top');
-    }
-    
-    // Add sticky class to new message
-    messageEl.addClass('is-sticky-top');
-    this.stickyUserMessage = messageEl;
-  }
-
-  /** Update the sticky assistant message (bubble sticks to bottom) */
-  private updateStickyAssistantMessage(messageEl: HTMLElement): void {
-    // Remove sticky class from previous sticky message
-    if (this.stickyAssistantMessage && this.stickyAssistantMessage !== messageEl) {
-      this.stickyAssistantMessage.removeClass('is-sticky-bottom');
-    }
-    
-    // Add sticky class to new message
-    messageEl.addClass('is-sticky-bottom');
-    this.stickyAssistantMessage = messageEl;
-  }
-
-  /** Observe all existing messages for sticky effect */
-  private observeAllMessages(): void {
-    if (!this.messagesContainer || !this.messageStickyObserver) return;
-    
-    const messages = this.messagesContainer.querySelectorAll('.opencodian-message');
-    messages.forEach((msg) => {
-      this.messageStickyObserver?.observe(msg);
-    });
-  }
-
-  /** Observe a single message element */
-  private observeMessage(messageEl: HTMLElement): void {
-    this.messageStickyObserver?.observe(messageEl);
   }
 
   /** Build the UI structure */
@@ -253,10 +172,89 @@ export class OpenCodianView extends ItemView {
 
     // Messages area
     this.messagesContainer = this.chatContainerEl.createDiv({ cls: 'opencodian-messages' });
+    this.applyChatScrollMode();
 
     // Input area
     this.inputContainer = this.chatContainerEl.createDiv({ cls: 'opencodian-input-area' });
     this.buildInputArea(this.inputContainer);
+  }
+
+  /** Apply configured chat scroll mode to the messages container */
+  public applyChatScrollMode(): void {
+    if (!this.messagesContainer) return;
+
+    this.syncChatSurfaceColor();
+    this.messagesContainer.removeClass('opencodian-messages--sticky-basic');
+    this.messagesContainer.removeClass('opencodian-messages--sticky-mask');
+    this.messagesContainer.removeClass('opencodian-messages--natural');
+
+    const scrollMode = this.plugin.settings.chatScrollMode;
+    if (scrollMode === 'natural') {
+      this.messagesContainer.addClass('opencodian-messages--natural');
+    } else if (scrollMode === 'sticky-basic') {
+      this.messagesContainer.addClass('opencodian-messages--sticky-basic');
+    } else {
+      this.messagesContainer.addClass('opencodian-messages--sticky-mask');
+    }
+  }
+
+  /** Sync sticky mask color to the actual pane background */
+  private syncChatSurfaceColor(): void {
+    if (!this.chatContainerEl) return;
+
+    let currentEl: HTMLElement | null = this.chatContainerEl;
+    let resolvedColor = '';
+
+    while (currentEl) {
+      const backgroundColor = window.getComputedStyle(currentEl).backgroundColor;
+      if (backgroundColor && backgroundColor !== 'transparent' && backgroundColor !== 'rgba(0, 0, 0, 0)') {
+        resolvedColor = backgroundColor;
+        break;
+      }
+      currentEl = currentEl.parentElement;
+    }
+
+    if (!resolvedColor) {
+      resolvedColor = 'var(--background-secondary)';
+    }
+
+    this.chatContainerEl.style.setProperty('--opencodian-chat-surface', resolvedColor);
+  }
+
+  /** Reset active turn references */
+  private resetTurnState(): void {
+    this.currentTurnBodyEl = null;
+  }
+
+  /** Create a new turn with sticky user header */
+  private createTurn(): { turnEl: HTMLElement; headerEl: HTMLElement; bodyEl: HTMLElement } | null {
+    if (!this.messagesContainer) return null;
+
+    const turnEl = this.messagesContainer.createDiv({ cls: 'opencodian-turn' });
+    const headerEl = turnEl.createDiv({ cls: 'opencodian-turn-header' });
+    const bodyEl = turnEl.createDiv({ cls: 'opencodian-turn-body' });
+
+    this.currentTurnBodyEl = bodyEl;
+
+    return { turnEl, headerEl, bodyEl };
+  }
+
+  /** Ensure there is a turn body available for assistant messages */
+  private ensureTurnBody(): HTMLElement | null {
+    if (this.currentTurnBodyEl?.isConnected) {
+      return this.currentTurnBodyEl;
+    }
+
+    if (!this.messagesContainer) return null;
+
+    const turnEl = this.messagesContainer.createDiv({
+      cls: 'opencodian-turn opencodian-turn--assistant-only',
+    });
+    const bodyEl = turnEl.createDiv({ cls: 'opencodian-turn-body' });
+
+    this.currentTurnBodyEl = bodyEl;
+
+    return bodyEl;
   }
 
   /** Build header */
@@ -419,6 +417,7 @@ export class OpenCodianView extends ItemView {
 
     // Clear messages display
     this.messagesContainer?.empty();
+    this.resetTurnState();
 
     // Set session in service
     this.plugin.openCodeService.setSessionId(conversation.openCodeSessionId);
@@ -784,6 +783,7 @@ export class OpenCodianView extends ItemView {
               toolId: b.toolCall.id,
               toolName: b.toolCall.name,
               toolInput: b.toolCall.input,
+              toolStatus: b.toolCall.status,
               toolResult: b.toolCall.result,
             };
           }
@@ -854,7 +854,11 @@ export class OpenCodianView extends ItemView {
 
   /** Render a message */
   private async renderMessage(message: ChatMessage) {
-    const messageEl = this.messagesContainer?.createDiv({
+    const parentEl =
+      message.role === 'user'
+        ? this.createTurn()?.headerEl
+        : this.ensureTurnBody();
+    const messageEl = parentEl?.createDiv({
       cls: `opencodian-message opencodian-message--${message.role}`,
     });
 
@@ -901,9 +905,6 @@ export class OpenCodianView extends ItemView {
       this.addTimestampWithCopyButton(messageEl, message.timestamp, message.content);
     }
 
-    // Observe this message for sticky scroll effect
-    this.observeMessage(messageEl);
-
     return messageEl;
   }
 
@@ -929,7 +930,7 @@ export class OpenCodianView extends ItemView {
             id: block.toolId,
             name: block.toolName,
             input: block.toolInput || {},
-            status: 'completed',
+            status: this.getStoredToolStatus(block),
             result: block.toolResult,
           };
           toolRenderer.render(container, toolCall);
@@ -951,9 +952,22 @@ export class OpenCodianView extends ItemView {
     }
   }
 
+  /** Resolve persisted tool status, with fallback for older stored messages */
+  private getStoredToolStatus(block: ContentBlock): ToolCallInfo['status'] {
+    if (block.toolStatus) {
+      return block.toolStatus;
+    }
+
+    if (block.toolResult?.startsWith('Error:')) {
+      return 'error';
+    }
+
+    return 'completed';
+  }
+
   /** Create assistant message element for streaming */
   private createAssistantMessageElement(): { messageEl: HTMLElement; contentEl: HTMLElement; textEl: HTMLElement } {
-    const messageEl = this.messagesContainer?.createDiv({
+    const messageEl = this.ensureTurnBody()?.createDiv({
       cls: 'opencodian-message opencodian-message--assistant',
     });
 

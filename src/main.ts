@@ -161,9 +161,18 @@ export default class OpenCodianPlugin extends Plugin {
   /** Load settings from storage */
   async loadSettings() {
     const savedSettings = await this.storage.loadSettings();
+    const normalizedSettings = savedSettings
+      ? {
+          ...savedSettings,
+          chatScrollMode:
+            savedSettings.chatScrollMode === 'sticky'
+              ? 'sticky-mask'
+              : savedSettings.chatScrollMode,
+        }
+      : null;
     this.settings = {
       ...DEFAULT_SETTINGS,
-      ...savedSettings,
+      ...normalizedSettings,
     };
   }
 
@@ -173,6 +182,14 @@ export default class OpenCodianPlugin extends Plugin {
     
     // Update service with new settings
     this.openCodeService.updateSettings(this.settings);
+
+    // Refresh any open chat views that depend on UI settings
+    for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_OPENCODIAN)) {
+      const view = leaf.view;
+      if (view instanceof OpenCodianView) {
+        view.applyChatScrollMode();
+      }
+    }
     
     // Sync OpenCode config with permission mode
     await this.syncOpencodeConfig();

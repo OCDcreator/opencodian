@@ -11,6 +11,9 @@ export type ApprovalDecision = 'allow' | 'allow-always' | 'deny' | 'cancel';
 /** Tab bar position setting */
 export type TabBarPosition = 'input' | 'header';
 
+/** Chat scroll effect */
+export type ChatScrollMode = 'natural' | 'sticky-basic' | 'sticky-mask';
+
 /** Server configuration */
 export interface ServerConfig {
   host: string;
@@ -111,6 +114,7 @@ export interface OpenCodianSettings {
   maxTabs: number;
   tabBarPosition: TabBarPosition;
   enableAutoScroll: boolean;
+  chatScrollMode: ChatScrollMode;
   openInMainTab: boolean;
 
   // Language
@@ -154,6 +158,7 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
   maxTabs: 3,
   tabBarPosition: 'input',
   enableAutoScroll: true,
+  chatScrollMode: 'sticky-mask',
   openInMainTab: false,
 
   locale: 'en',

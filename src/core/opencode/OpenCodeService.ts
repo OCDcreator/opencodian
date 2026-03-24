@@ -1001,6 +1001,11 @@ export class OpenCodeService {
         toolId,
         toolName: part.tool || 'unknown',
         toolInput: part.state?.input || {},
+        toolStatus: resultPart?.state?.error
+          ? 'error'
+          : resultPart?.state?.output
+            ? 'completed'
+            : 'running',
         toolResult: resultPart?.state?.error 
           ? `Error: ${resultPart.state.error}`
           : resultPart?.state?.output || undefined,

@@ -94,6 +94,11 @@ export const enTranslations = {
   'settings.ui.tabPosition.header': 'In header',
   'settings.ui.autoScroll.name': 'Auto-scroll',
   'settings.ui.autoScroll.desc': 'Automatically scroll to new messages',
+  'settings.ui.chatScrollMode.name': 'Conversation scroll effect',
+  'settings.ui.chatScrollMode.desc': 'Choose how user messages behave while scrolling',
+  'settings.ui.chatScrollMode.natural': 'Natural scrolling',
+  'settings.ui.chatScrollMode.stickyBasic': 'Sticky user headers',
+  'settings.ui.chatScrollMode.stickyMask': 'Sticky + soft mask',
   'settings.ui.openInMainTab.name': 'Open in main tab',
   'settings.ui.openInMainTab.desc': 'Open chat in main editor area instead of sidebar',
 

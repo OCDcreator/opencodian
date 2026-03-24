@@ -622,6 +622,21 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
+      .setName(t('settings.ui.chatScrollMode.name'))
+      .setDesc(t('settings.ui.chatScrollMode.desc'))
+      .addDropdown((dropdown) => {
+        dropdown.addOption('natural', t('settings.ui.chatScrollMode.natural'));
+        dropdown.addOption('sticky-basic', t('settings.ui.chatScrollMode.stickyBasic'));
+        dropdown.addOption('sticky-mask', t('settings.ui.chatScrollMode.stickyMask'));
+        dropdown
+          .setValue(this.plugin.settings.chatScrollMode)
+          .onChange(async (value) => {
+            this.plugin.settings.chatScrollMode = value as 'natural' | 'sticky-basic' | 'sticky-mask';
+            await this.plugin.saveSettings();
+          });
+      });
+
+    new Setting(containerEl)
       .setName(t('settings.ui.openInMainTab.name'))
       .setDesc(t('settings.ui.openInMainTab.desc'))
       .addToggle((toggle) =>

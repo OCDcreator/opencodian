@@ -20,6 +20,7 @@ export {
 
 // Settings types
 export {
+  type ChatScrollMode,
   type ApprovalDecision,
   type OpenCodianSettings,
   type PlatformBlockedCommands,

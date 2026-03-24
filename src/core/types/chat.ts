@@ -24,6 +24,7 @@ export interface ContentBlock {
   toolId?: string;
   toolName?: string;
   toolInput?: Record<string, unknown>;
+  toolStatus?: 'pending' | 'running' | 'completed' | 'error';
   toolResult?: string;
   subagentId?: string;
   subagentMode?: 'sync' | 'async';

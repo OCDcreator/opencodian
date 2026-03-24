@@ -94,6 +94,11 @@ export const zhTranslations = {
   'settings.ui.tabPosition.header': '在标题栏',
   'settings.ui.autoScroll.name': '自动滚动',
   'settings.ui.autoScroll.desc': '自动滚动到新消息',
+  'settings.ui.chatScrollMode.name': '会话滚动效果',
+  'settings.ui.chatScrollMode.desc': '选择用户消息在滚动时的呈现方式',
+  'settings.ui.chatScrollMode.natural': '自然滚动',
+  'settings.ui.chatScrollMode.stickyBasic': '用户消息吸顶',
+  'settings.ui.chatScrollMode.stickyMask': '吸顶 + 柔和遮盖',
   'settings.ui.openInMainTab.name': '在主标签页打开',
   'settings.ui.openInMainTab.desc': '在主编辑区而不是侧边栏打开聊天',
 
