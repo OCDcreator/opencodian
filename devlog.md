@@ -1,5 +1,197 @@
 # OpenCodian 开发日志
 
+## 2026-03-24 UI 布局优化与玻璃拟态设计
+
+### 📋 背景
+优化聊天界面布局，改进用户消息气泡视觉效果，添加流畅的动画交互。
+
+### ✅ 已完成功能
+
+#### 1. 发送按钮位置调整
+**改动前：**
+- 发送按钮位于输入框内部右侧
+
+**改动后：**
+- 发送按钮移到输入栏下方工具栏右侧
+- 布局结构：`[权限模式] [模型选择器]        [发送按钮]`
+
+**代码变更：**
+```typescript
+// OpenCodianView.ts - buildInputArea()
+// 将 sendBtn 从 inputWrapper 移到 toolbar
+this.sendBtn = toolbar.createDiv({ cls: 'opencodian-send-btn' });
+```
+
+---
+
+#### 2. 权限模式位置调整
+**改动：**
+- 权限模式从右侧移到左侧
+- 与模型选择器挨着，保持视觉连贯性
+- 统一字体大小为 `13px`（原来是 `12px`）
+
+**布局结构：**
+```
+┌─────────────────────────────────────────────────┐
+│  [PLAN] [GLM-4.5]                        [🚀]  │
+└─────────────────────────────────────────────────┘
+```
+
+---
+
+#### 3. 去掉下拉箭头
+**改动：**
+- 移除模型选择器的 chevron-down 图标
+- 移除权限模式的 chevron-down 图标
+
+**代码变更：**
+```typescript
+// OpenCodianView.ts - initializeModelSelector()
+// 删除：const chevron = triggerContent.createSpan(...)
+// 删除：setIcon(chevron, 'chevron-down');
+
+// OpenCodianView.ts - initializePermissionSelector()
+// 删除：const chevronEl = trigger.createSpan(...)
+// 删除：setIcon(chevronEl, 'chevron-down');
+```
+
+---
+
+#### 4. 用户消息玻璃拟态气泡
+**设计效果：**
+- 半透明渐变背景
+- backdrop-filter 毛玻璃模糊效果
+- 高光边框和多层阴影
+- 圆角气泡，右下尖角
+
+**CSS 实现：**
+```css
+.opencodian-message--user .opencodian-message-content {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 16px;
+  border-end-end-radius: 4px;
+  box-shadow: 
+    0 4px 24px rgba(0, 0, 0, 0.15),
+    0 1px 2px rgba(255, 255, 255, 0.1) inset;
+}
+```
+
+**悬停闪光效果：**
+```css
+.opencodian-message--user .opencodian-message-content::before {
+  content: '';
+  position: absolute;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+  transition: left 0.5s ease;
+}
+
+.opencodian-message--user:hover .opencodian-message-content::before {
+  left: 100%;  /* 悬停时闪光扫过 */
+}
+```
+
+---
+
+#### 5. 动画效果
+**消息滑入动画：**
+```css
+@keyframes messageSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.opencodian-message--user,
+.opencodian-message--assistant {
+  animation: messageSlideIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+```
+
+**发送按钮动画：**
+```css
+/* 悬停放大+旋转 */
+.opencodian-send-btn:hover {
+  transform: scale(1.1) rotate(-5deg);
+  box-shadow: 0 4px 16px rgba(var(--interactive-accent-rgb), 0.4);
+}
+
+/* 停止按钮脉冲动画 */
+.opencodian-stop-btn {
+  animation: pulseRed 2s ease-in-out infinite;
+}
+
+@keyframes pulseRed {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(var(--background-modifier-error-rgb), 0.4); }
+  50% { box-shadow: 0 0 0 8px rgba(var(--background-modifier-error-rgb), 0); }
+}
+
+/* 点击波纹效果 */
+.opencodian-send-btn::after {
+  content: '';
+  position: absolute;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  transition: width 0.4s ease, height 0.4s ease;
+}
+```
+
+**气泡悬停效果：**
+```css
+.opencodian-message--user:hover .opencodian-message-content {
+  transform: translateY(-2px) scale(1.01);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+```
+
+---
+
+### 📁 修改文件
+
+| 文件 | 修改内容 |
+|------|----------|
+| `src/features/chat/OpenCodianView.ts` | 发送按钮移到底部工具栏、移除下拉箭头、调整元素顺序 |
+| `styles.css` | 玻璃拟态气泡样式、动画效果、工具栏布局调整 |
+
+---
+
+### 🎯 当前状态
+
+**布局优化：**
+- ✅ 发送按钮在输入栏下方右侧
+- ✅ 权限模式在左侧与模型选择器挨着
+- ✅ 无下拉箭头，界面更简洁
+
+**视觉效果：**
+- ✅ 用户消息玻璃拟态气泡
+- ✅ 悬停闪光扫过效果
+- ✅ 悬停上浮放大效果
+
+**动画效果：**
+- ✅ 消息滑入动画（带弹性效果）
+- ✅ 发送按钮悬停旋转放大
+- ✅ 停止按钮红色脉冲呼吸
+- ✅ 点击波纹效果
+
+---
+
+**会话日期**: 2026-03-24
+**开发时间**: ~1 小时
+**主要贡献**: UI布局优化、玻璃拟态设计、动画效果增强
+**当前状态**: 已部署测试，效果良好
+
+---
+
+---
+
 ## 2026-03-23 SDK 依赖评估与移除
 
 ### 📋 背景

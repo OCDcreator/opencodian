@@ -235,6 +235,7 @@ export class OpenCodianView extends ItemView {
 
   /** Build input area */
   private buildInputArea(container: HTMLElement) {
+    // Input wrapper - textarea only (send button moved to toolbar)
     const inputWrapper = container.createDiv({ cls: 'opencodian-input-wrapper' });
     
     this.inputTextarea = inputWrapper.createEl('textarea', {
@@ -265,8 +266,19 @@ export class OpenCodianView extends ItemView {
       }
     });
 
-    // Send/Stop button
-    this.sendBtn = inputWrapper.createDiv({ cls: 'opencodian-send-btn' });
+    // Bottom toolbar: Permission mode (left) | Model selector (center) | Send button (right)
+    const toolbar = container.createDiv({ cls: 'opencodian-input-toolbar' });
+    
+    // Left side: Permission mode selector
+    const permissionContainer = toolbar.createDiv({ cls: 'opencodian-permission-selector' });
+    this.initializePermissionSelector(permissionContainer);
+    
+    // Center: Model selector (opencode-style)
+    this.modelSelectorContainer = toolbar.createDiv({ cls: 'opencodian-model-selector' });
+    this.initializeModelSelector(this.modelSelectorContainer);
+    
+    // Right side: Send/Stop button
+    this.sendBtn = toolbar.createDiv({ cls: 'opencodian-send-btn' });
     setIcon(this.sendBtn, 'send');
     this.sendBtn.addEventListener('click', () => {
       if (this.isStreaming) {
@@ -281,17 +293,6 @@ export class OpenCodianView extends ItemView {
         }
       }
     });
-
-    // Bottom toolbar for model selector and permission mode
-    const toolbar = container.createDiv({ cls: 'opencodian-input-toolbar' });
-    
-    // Left side: Model selector (opencode-style)
-    this.modelSelectorContainer = toolbar.createDiv({ cls: 'opencodian-model-selector' });
-    this.initializeModelSelector(this.modelSelectorContainer);
-    
-    // Right side: Permission mode selector
-    const permissionContainer = toolbar.createDiv({ cls: 'opencodian-permission-selector' });
-    this.initializePermissionSelector(permissionContainer);
   }
 
   /** Wire event handlers */
@@ -1030,10 +1031,6 @@ export class OpenCodianView extends ItemView {
     // Model name
     triggerContent.createSpan({ cls: 'opencodian-model-trigger-text' });
     
-    // Chevron
-    const chevron = triggerContent.createSpan({ cls: 'opencodian-model-trigger-chevron' });
-    setIcon(chevron, 'chevron-down');
-    
     // Create dropdown (hidden by default)
     this.modelSelectorDropdown = containerEl.createDiv({ cls: 'opencodian-model-dropdown' });
     this.modelSelectorDropdown.style.display = 'none';
@@ -1541,9 +1538,6 @@ export class OpenCodianView extends ItemView {
     setIcon(iconEl, 'shield');
     
     const textEl = trigger.createSpan({ cls: 'opencodian-permission-trigger-text' });
-    
-    const chevronEl = trigger.createSpan({ cls: 'opencodian-permission-trigger-chevron' });
-    setIcon(chevronEl, 'chevron-down');
     
     // Update display based on current mode
     const updateDisplay = () => {
