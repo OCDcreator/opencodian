@@ -13,7 +13,7 @@
 
 ## Architecture
 
-```
+```md
 ┌─────────────────────────────────────────────────────────────┐
 │                        Obsidian                              │
 │  ┌─────────────────────────────────────────────────────┐   │
@@ -48,18 +48,18 @@
 
 ## Technology Stack
 
-| Category | Technology |
-|----------|------------|
-| Language | TypeScript 5.0+ |
-| Target | ES2018, CommonJS |
-| Build Tool | esbuild 0.27+ |
-| Test Framework | Jest 30.2+ (jsdom environment) |
-| Linting | ESLint 8.57+ with TypeScript support |
-| Platform | Obsidian Plugin API |
+| Category       | Technology                           |
+| -------------- | ------------------------------------ |
+| Language       | TypeScript 5.0+                      |
+| Target         | ES2018, CommonJS                     |
+| Build Tool     | esbuild 0.27+                        |
+| Test Framework | Jest 30.2+ (jsdom environment)       |
+| Linting        | ESLint 8.57+ with TypeScript support |
+| Platform       | Obsidian Plugin API                  |
 
 ## Directory Structure
 
-```
+```md
 opencodian/
 ├── src/
 │   ├── main.ts                      # Plugin entry point
@@ -171,6 +171,7 @@ npm run lint:fix
 Main service for interacting with OpenCode Server via HTTP API.
 
 **Key Methods:**
+
 - `createSession(title?)` - Create a new chat session
 - `sendMessage(message, options)` - Send message and get streaming response
 - `getAvailableModels()` - Fetch available providers and models
@@ -181,6 +182,7 @@ Main service for interacting with OpenCode Server via HTTP API.
 Manages the OpenCode server process lifecycle.
 
 **Key Methods:**
+
 - `start()` - Start the OpenCode server process
 - `stop()` - Stop the server process
 - `checkHealth()` - Check if server is responding
@@ -190,7 +192,8 @@ Manages the OpenCode server process lifecycle.
 Persists conversations and settings.
 
 **Storage Layout:**
-```
+
+```md
 .obsidian/plugins/opencodian/
 └── .opencodian/
     ├── settings.json          # Plugin settings
@@ -203,6 +206,7 @@ Persists conversations and settings.
 Main chat UI view (extends Obsidian's `ItemView`).
 
 **Features:**
+
 - Sidebar chat interface
 - Message rendering
 - Input handling
@@ -213,6 +217,7 @@ Main chat UI view (extends Obsidian's `ItemView`).
 Settings UI with bilingual support (English/Chinese).
 
 **Settings Categories:**
+
 - **Language**: Interface language selection
 - **Server**: Auto-start, host, port
 - **Model**: Dynamic provider/model selection
@@ -242,9 +247,11 @@ SSE streaming components for real-time message display.
 
 1. **Obsidian** v1.4.5 or later (desktop only)
 2. **OpenCode** installed globally:
+
    ```bash
    npm install -g opencode-ai
    ```
+
 3. **AI Provider configured**: Run `opencode` and use `/connect` to set up API keys
 
 ## Deployment
@@ -257,11 +264,11 @@ npm run build && cp dist/main.js dist/manifest.json dist/styles.css "/path/to/va
 
 ### Deployment Paths
 
-| Environment | Path Type | Path |
-|-------------|-----------|------|
-| **Production Vault** | Absolute | `/Volumes/SDD2T/obsidian-vault-write/技术学习/.obsidian/plugins/opencodian/` |
-| **Test Vault** | Absolute | `C:\Users\lt\Desktop\Write\testvault\.obsidian\plugins\opencodian\` |
-| **Test Vault** | Relative | `../../testvault/.obsidian/plugins/opencodian/` |
+| Environment          | Path Type | Path                                                                         |
+| -------------------- | --------- | ---------------------------------------------------------------------------- |
+| **Production Vault** | Absolute  | `/Volumes/SDD2T/obsidian-vault-write/技术学习/.obsidian/plugins/opencodian/` |
+| **Test Vault**       | Absolute  | `C:\Users\lt\Desktop\Write\testvault\.obsidian\plugins\opencodian\`          |
+| **Test Vault**       | Relative  | `../../testvault/.obsidian/plugins/opencodian/`                              |
 
 > **Note**: Relative path is calculated from the project root (`opencodian/`) for cross-platform compatibility.
 
@@ -297,18 +304,19 @@ npm run build && cp dist/main.js dist/manifest.json dist/styles.css ../../testva
 
 ### Repository Documentation
 
-| File | Purpose |
-|------|---------|
-| `AGENTS.md` | Project overview and coding guidelines (this file) |
-| `devlog.md` | Development log with detailed feature implementation |
-| `ARCHITECTURE.md` | Detailed architecture documentation |
-| `SERVER_API.md` | OpenCode Server API reference |
-| `OPENCODE_SDK_USAGE.md` | SDK usage guide |
+| File                    | Purpose                                              |
+| ----------------------- | ---------------------------------------------------- |
+| `AGENTS.md`             | Project overview and coding guidelines (this file)   |
+| `devlog.md`             | Development log with detailed feature implementation |
+| `ARCHITECTURE.md`       | Detailed architecture documentation                  |
+| `SERVER_API.md`         | OpenCode Server API reference                        |
+| `OPENCODE_SDK_USAGE.md` | SDK usage guide                                      |
 
 ### Project Development Documentation
 
-**Primary devlog location**: 
-```
+**Primary devlog location**:
+
+```md
 /Volumes/SDD2T/obsidian-vault-write/技术学习/个人项目开发/opencodian插件项目/DEVLOG.md
 ```
 
