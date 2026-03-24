@@ -503,6 +503,7 @@ export class OpenCodeService {
                         content: part.state.error
                           ? `Error: ${part.state.error}`
                           : (part.state.output ?? ''),
+                        isError: !!part.state.error,
                       };
                     }
                   }
@@ -925,12 +926,14 @@ export class OpenCodeService {
               type: 'tool_result',
               toolUseId: toolPart.callID ?? '',
               content: state.output ?? '',
+              isError: false,
             });
           } else if (state.status === 'error') {
             chunks.push({
               type: 'tool_result',
               toolUseId: toolPart.callID ?? '',
               content: `Error: ${state.error}`,
+              isError: true,
             });
           }
         }

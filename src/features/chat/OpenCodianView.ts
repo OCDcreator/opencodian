@@ -100,6 +100,11 @@ export class OpenCodianView extends ItemView {
   private sendBtn: HTMLElement | null = null;
   private inputTextarea: HTMLTextAreaElement | null = null;
 
+  // Message sticky scroll observer
+  private messageStickyObserver: IntersectionObserver | null = null;
+  private stickyUserMessage: HTMLElement | null = null;
+  private stickyAssistantMessage: HTMLElement | null = null;
+
   constructor(leaf: WorkspaceLeaf, plugin: OpenCodianPlugin) {
     super(leaf);
     this.plugin = plugin;
@@ -141,6 +146,9 @@ export class OpenCodianView extends ItemView {
     // Wire events
     this.wireEventHandlers();
 
+    // Initialize message sticky scroll observer
+    this.initMessageStickyObserver();
+
     // Create or load conversation
     if (this.plugin.getConversations().length === 0) {
       await this.createNewConversation();
@@ -159,6 +167,80 @@ export class OpenCodianView extends ItemView {
     // Cleanup markdown service
     this.messageComponent.unload();
     this.markdownService = null;
+
+    // Cleanup sticky observer
+    this.messageStickyObserver?.disconnect();
+    this.messageStickyObserver = null;
+  }
+
+  /** Initialize IntersectionObserver for message sticky effect */
+  private initMessageStickyObserver(): void {
+    if (!this.messagesContainer) return;
+
+    this.messageStickyObserver = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          const messageEl = entry.target as HTMLElement;
+          const isUser = messageEl.hasClass('opencodian-message--user');
+          
+          if (entry.isIntersecting) {
+            // Message is visible, check if it should be the sticky one
+            if (isUser) {
+              this.updateStickyUserMessage(messageEl);
+            } else {
+              this.updateStickyAssistantMessage(messageEl);
+            }
+          }
+        });
+      },
+      {
+        root: this.messagesContainer,
+        threshold: [0, 0.5, 1],
+        rootMargin: '-10px 0px -10px 0px',
+      }
+    );
+
+    // Observe existing messages
+    this.observeAllMessages();
+  }
+
+  /** Update the sticky user message (bubble sticks to top) */
+  private updateStickyUserMessage(messageEl: HTMLElement): void {
+    // Remove sticky class from previous sticky message
+    if (this.stickyUserMessage && this.stickyUserMessage !== messageEl) {
+      this.stickyUserMessage.removeClass('is-sticky-top');
+    }
+    
+    // Add sticky class to new message
+    messageEl.addClass('is-sticky-top');
+    this.stickyUserMessage = messageEl;
+  }
+
+  /** Update the sticky assistant message (bubble sticks to bottom) */
+  private updateStickyAssistantMessage(messageEl: HTMLElement): void {
+    // Remove sticky class from previous sticky message
+    if (this.stickyAssistantMessage && this.stickyAssistantMessage !== messageEl) {
+      this.stickyAssistantMessage.removeClass('is-sticky-bottom');
+    }
+    
+    // Add sticky class to new message
+    messageEl.addClass('is-sticky-bottom');
+    this.stickyAssistantMessage = messageEl;
+  }
+
+  /** Observe all existing messages for sticky effect */
+  private observeAllMessages(): void {
+    if (!this.messagesContainer || !this.messageStickyObserver) return;
+    
+    const messages = this.messagesContainer.querySelectorAll('.opencodian-message');
+    messages.forEach((msg) => {
+      this.messageStickyObserver?.observe(msg);
+    });
+  }
+
+  /** Observe a single message element */
+  private observeMessage(messageEl: HTMLElement): void {
+    this.messageStickyObserver?.observe(messageEl);
   }
 
   /** Build the UI structure */
@@ -818,6 +900,9 @@ export class OpenCodianView extends ItemView {
       // Add timestamp with copy button
       this.addTimestampWithCopyButton(messageEl, message.timestamp, message.content);
     }
+
+    // Observe this message for sticky scroll effect
+    this.observeMessage(messageEl);
 
     return messageEl;
   }
@@ -1509,6 +1594,7 @@ export class OpenCodianView extends ItemView {
           type: 'tool_result',
           id: chunk.toolUseId,
           content: chunk.content,
+          isError: chunk.isError,
         };
       
       case 'error':
@@ -1651,25 +1737,33 @@ export class OpenCodianView extends ItemView {
       return description === toolKey ? t('permissionDialog.tools.default') : description;
     };
 
-    // Find or create the content element to insert the permission card
-    let permissionContainer: HTMLElement;
-    if (this.streamingContentEl) {
-      permissionContainer = this.streamingContentEl;
-    } else if (this.streamingMessageEl) {
-      const contentEl = this.streamingMessageEl.querySelector('.opencodian-message-content') as HTMLElement;
-      if (contentEl) {
-        permissionContainer = contentEl;
-      } else {
-        console.error('[OpenCodianView] No content element found for permission card');
-        return;
-      }
-    } else {
+    // Find the message element to insert the permission card
+    // Note: Tool calls are rendered directly on messageEl, not in contentEl
+    const messageEl = this.streamingMessageEl;
+    if (!messageEl) {
       console.error('[OpenCodianView] No streaming message element found for permission card');
       return;
     }
 
+    // Find the last tool call card to insert permission card after it
+    const lastToolCall = messageEl.querySelector('.streaming-tool-call:last-of-type');
+    
     // Create inline permission card
-    const permissionCard = permissionContainer.createDiv({ cls: 'opencodian-permission-inline' });
+    const permissionCard = document.createElement('div');
+    permissionCard.className = 'opencodian-permission-inline';
+    
+    if (lastToolCall && lastToolCall.parentNode) {
+      // Insert after the last tool call (so it appears right after the tool)
+      lastToolCall.parentNode.insertBefore(permissionCard, lastToolCall.nextSibling);
+    } else {
+      // Fallback: append to message content area if no tool call found
+      const contentEl = messageEl.querySelector('.opencodian-message-content');
+      if (contentEl) {
+        contentEl.appendChild(permissionCard);
+      } else {
+        messageEl.appendChild(permissionCard);
+      }
+    }
     
     // Header with tool name
     const headerEl = permissionCard.createDiv({ cls: 'opencodian-permission-inline-header' });

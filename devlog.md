@@ -192,6 +192,128 @@ this.sendBtn = toolbar.createDiv({ cls: 'opencodian-send-btn' });
 
 ---
 
+## 2026-03-24 Bug 修复：权限卡片位置与工具错误状态
+
+### 🐛 Bug 1：权限卡片位置错误
+
+**问题描述：**
+权限请求卡片显示在消息顶部，而不是对应的工具调用下方。
+
+**期望效果：**
+```
+[思考块]
+[文本内容]
+🔧 websearch_web_search_exa ⏳  ← 工具调用
+🔐 权限请求  ← 应该在工具卡片下方
+```
+
+**问题根源：**
+- `streamingContentEl` 指向 `textEl`（文本元素）
+- 工具调用直接渲染到 `messageEl`（消息元素）
+- 权限卡片被插入到 `textEl`，导致顺序错误
+
+**修复方案：**
+```typescript
+// 使用 messageEl 查找工具调用
+const messageEl = this.streamingMessageEl;
+const lastToolCall = messageEl.querySelector('.streaming-tool-call:last-of-type');
+
+// 将权限卡片插入到工具调用之后
+if (lastToolCall && lastToolCall.parentNode) {
+  lastToolCall.parentNode.insertBefore(permissionCard, lastToolCall.nextSibling);
+}
+```
+
+---
+
+### 🐛 Bug 2：工具错误状态不显示红色×
+
+**问题描述：**
+工具调用返回错误时（如 timeout、权限被拒绝），状态图标显示绿色勾而不是红色×。
+
+**问题根源：**
+1. OpenCodeService 发送 `tool_result` 时没有包含 `isError` 字段
+2. `convertToStreamingChunk` 转换时没有传递 `isError` 字段
+3. StreamController 默认将没有 `isError` 的结果视为 `completed`
+
+**修复方案：**
+
+**1. OpenCodeService.ts - SSE 流处理**
+```typescript
+yield {
+  type: 'tool_result',
+  toolUseId: toolId,
+  content: part.state.error ? `Error: ${part.state.error}` : (part.state.output ?? ''),
+  isError: !!part.state.error,  // ← 添加错误标记
+};
+```
+
+**2. OpenCodeService.ts - 历史消息加载**
+```typescript
+} else if (state.status === 'completed') {
+  chunks.push({
+    type: 'tool_result',
+    toolUseId: toolPart.callID ?? '',
+    content: state.output ?? '',
+    isError: false,  // ← 明确标记成功
+  });
+} else if (state.status === 'error') {
+  chunks.push({
+    type: 'tool_result',
+    toolUseId: toolPart.callID ?? '',
+    content: `Error: ${state.error}`,
+    isError: true,  // ← 明确标记错误
+  });
+}
+```
+
+**3. OpenCodianView.ts - 类型转换**
+```typescript
+case 'tool_result':
+  return {
+    type: 'tool_result',
+    id: chunk.toolUseId,
+    content: chunk.content,
+    isError: chunk.isError,  // ← 传递错误标记
+  };
+```
+
+**状态图标映射：**
+| 状态 | 图标 | 颜色 |
+|------|------|------|
+| `completed` | ✓ check | 绿色 |
+| `error` | ✗ x | 红色 |
+| `running` | ⟳ loader | 橙色（旋转） |
+
+---
+
+### 📁 修改文件
+
+| 文件 | 修改内容 |
+|------|----------|
+| `src/features/chat/OpenCodianView.ts` | 权限卡片插入位置修复、添加 `isError` 传递 |
+| `src/core/opencode/OpenCodeService.ts` | SSE 流和历史消息加载添加 `isError` 字段 |
+
+---
+
+### 🎯 当前状态
+
+**Bug 修复：**
+- ✅ 权限卡片显示在对应工具调用下方
+- ✅ 工具错误状态正确显示红色×图标
+- ✅ 工具成功状态显示绿色勾图标
+
+---
+
+**会话日期**: 2026-03-24
+**开发时间**: ~1 小时
+**主要贡献**: Bug 修复：权限卡片位置、工具错误状态图标
+**当前状态**: 已部署测试
+
+---
+
+---
+
 ## 2026-03-23 SDK 依赖评估与移除
 
 ### 📋 背景
