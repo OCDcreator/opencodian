@@ -1903,3 +1903,73 @@ if (this.isStreaming) {
 **当前状态**: 权限系统功能完整，可正常使用
 
 ---
+
+---
+
+## 2026-03-24 消息复制按钮功能
+
+### 📋 功能描述
+为聊天消息添加复制按钮，方便用户快速复制消息内容。
+
+### ✅ 实现细节
+
+#### 1. 用户消息复制按钮
+- **位置**：气泡外左下角，与气泡底部对齐
+- **触发方式**：鼠标悬浮在消息区域（包括气泡周围 28px 热区）
+- **交互**：
+  - 默认隐藏，悬浮显示
+  - 点击后显示 "copied!" 反馈
+  - 1.5 秒后恢复图标
+
+#### 2. 助手消息复制按钮
+- **位置**：时间戳旁边（同一行）
+- **触发方式**：鼠标悬浮在整个助手消息区域
+- **功能**：收集所有 text blocks 内容，点击后复制完整内容
+
+#### 3. DOM 结构调整
+```typescript
+// 助手消息时间戳行结构
+.opencodian-message-time-row
+├── .opencodian-message-time-text  // 时间文本
+└── .opencodian-copy-btn-inline     // 复制按钮
+```
+
+#### 4. 样式规格
+| 属性 | 值 |
+|------|-----|
+| 图标大小 | 18x18px |
+| 默认透明度 | 0（隐藏） |
+| 悬浮透明度 | 1（显示） |
+| 过渡动画 | 0.15s ease |
+| 反馈文字颜色 | var(--text-accent) |
+
+### 📁 修改文件
+
+| 文件 | 修改内容 |
+|------|----------|
+| `src/features/chat/OpenCodianView.ts` | 新增 `addTextCopyButton` 方法、新增 `addTimestampWithCopyButton` 方法、修改消息渲染逻辑 |
+| `styles.css` | 新增 `.opencodian-copy-btn`、`.opencodian-copy-btn--user`、`.opencodian-copy-btn-inline`、`.opencodian-message-time-row` 等样式 |
+
+### 🐛 修复的问题
+
+1. **变量名错误**：`OpenCodianView.COPY_ICON` → `COPY_ICON`
+2. **未定义变量**：`content` → `contentEl` in `createAssistantMessageElement`
+3. **时间戳位置错误**：流式消息时间戳在内容之前 → 改为流结束后添加到末尾
+4. **助手消息定位问题**：添加 `position: relative` 确保按钮正确相对定位
+5. **用户时间戳丢失**：恢复用户消息的时间戳显示
+
+### 🎯 当前状态
+
+**复制按钮功能完整：**
+- ✅ 用户消息：气泡外左下角复制按钮
+- ✅ 助手消息：时间戳旁内联复制按钮
+- ✅ 悬浮热区：消息周围 28px 范围可触发
+- ✅ 点击反馈：显示 "copied!" 1.5 秒
+- ✅ 大小一致：统一 18x18px 图标
+
+---
+
+**会话日期**: 2026-03-24
+**开发时间**: ~1 小时
+**主要贡献**: 消息复制按钮完整功能
+**当前状态**: 功能完整，已部署测试

@@ -60,6 +60,9 @@ function getRandomPendingMessage(): string {
   return PENDING_MESSAGES[Math.floor(Math.random() * PENDING_MESSAGES.length)];
 }
 
+/** Clipboard icon SVG for copy button */
+const COPY_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`;
+
 export class OpenCodianView extends ItemView {
   private plugin: OpenCodianPlugin;
   private chatContainerEl: HTMLElement | null = null;
@@ -535,7 +538,7 @@ export class OpenCodianView extends ItemView {
     });
 
     // Create assistant message element and get content container
-    const { contentEl: messageContentEl } = this.createAssistantMessageElement();
+    const { messageEl, contentEl, textEl } = this.createAssistantMessageElement();
 
     // Show pending indicator after a short delay
     let pendingEl: HTMLElement | null = null;
@@ -544,13 +547,13 @@ export class OpenCodianView extends ItemView {
     console.log('[OpenCodianView] Setting up pending indicator timeout');
     const pendingTimeout = window.setTimeout(() => {
       console.log('[OpenCodianView] Pending indicator timeout fired, isStreaming:', this.isStreaming);
-      if (!this.isStreaming || !messageContentEl) {
+      if (!this.isStreaming || !messageEl) {
         console.log('[OpenCodianView] Not showing pending indicator - not streaming or no element');
         return;
       }
       
       console.log('[OpenCodianView] Showing pending indicator:', pendingMessage);
-      pendingEl = messageContentEl.createDiv({ cls: 'opencodian-pending' });
+      pendingEl = messageEl.createDiv({ cls: 'opencodian-pending' });
       pendingEl.createSpan({ 
         text: pendingMessage,
         cls: 'opencodian-pending-text' 
@@ -570,7 +573,7 @@ export class OpenCodianView extends ItemView {
 
     // Initialize streaming controller
     if (this.streamController) {
-      this.streamController.startStream(messageContentEl);
+      this.streamController.startStream(messageEl);
     }
 
     // Track if we've received first content
@@ -653,15 +656,18 @@ export class OpenCodianView extends ItemView {
       console.log('[OpenCodianView] Stream loop ended');
       resetStreamingState();
       
-      // Add timestamp to the streamed message
+      // Add timestamp with copy button to the streamed message (after all content)
       if (this.streamingMessageEl) {
-        const timeEl = this.streamingMessageEl.querySelector('.opencodian-message-time');
-        if (timeEl) {
-          timeEl.textContent = new Date().toLocaleTimeString([], {
-            hour: '2-digit',
-            minute: '2-digit',
-          });
-        }
+        const streamContentBlocks = this.streamController?.getContentBlocks();
+        const textContent = streamContentBlocks
+          ?.filter((b): b is { type: 'text'; content: string } => b.type === 'text')
+          .map(b => b.content)
+          .join('') || '';
+        this.addTimestampWithCopyButton(
+          this.streamingMessageEl,
+          Date.now(),
+          textContent
+        );
       }
       
       // Get content blocks from stream (includes thinking with duration)
@@ -779,12 +785,27 @@ export class OpenCodianView extends ItemView {
       if (message.content) {
         const textEl = content.createDiv({ cls: 'opencodian-message-text' });
         textEl.textContent = message.content;
+        // Add copy button for user message (outside bubble)
+        this.addTextCopyButton(messageEl, message.content, true);
       }
+      // Add timestamp for user message
+      const time = new Date(message.timestamp).toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+      messageEl.createEl('div', { cls: 'opencodian-message-time', text: time });
     } else if (message.contentBlocks && message.contentBlocks.length > 0) {
       // For assistant messages, render content blocks (thinking, tools, etc.)
       for (const block of message.contentBlocks) {
         await this.renderContentBlock(content, block);
       }
+      // Collect all text content
+      const textContent = message.contentBlocks
+        .filter(b => b.type === 'text' && b.text)
+        .map(b => b.text)
+        .join('\n\n');
+      // Add timestamp with copy button
+      this.addTimestampWithCopyButton(messageEl, message.timestamp, textContent);
     } else if (message.content) {
       // Fallback to simple text rendering for assistant
       const textEl = content.createDiv({ cls: 'opencodian-message-text' });
@@ -793,14 +814,9 @@ export class OpenCodianView extends ItemView {
       } else {
         textEl.textContent = message.content;
       }
+      // Add timestamp with copy button
+      this.addTimestampWithCopyButton(messageEl, message.timestamp, message.content);
     }
-
-    // Timestamp (outside content bubble)
-    const time = new Date(message.timestamp).toLocaleTimeString([], {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-    messageEl.createEl('div', { cls: 'opencodian-message-time', text: time });
 
     return messageEl;
   }
@@ -850,27 +866,26 @@ export class OpenCodianView extends ItemView {
   }
 
   /** Create assistant message element for streaming */
-  private createAssistantMessageElement(): { messageEl: HTMLElement; contentEl: HTMLElement } {
+  private createAssistantMessageElement(): { messageEl: HTMLElement; contentEl: HTMLElement; textEl: HTMLElement } {
     const messageEl = this.messagesContainer?.createDiv({
       cls: 'opencodian-message opencodian-message--assistant',
     });
 
     if (!messageEl) {
       const fallback = document.createElement('div');
-      return { messageEl: fallback, contentEl: fallback };
+      return { messageEl: fallback, contentEl: fallback, textEl: fallback };
     }
 
-    const content = messageEl.createDiv({ cls: 'opencodian-message-content' });
-    const textEl = content.createDiv({ cls: 'opencodian-message-text' });
+    const contentEl = messageEl.createDiv({ cls: 'opencodian-message-content' });
+    const textEl = contentEl.createDiv({ cls: 'opencodian-message-text' });
 
-    // Add timestamp placeholder (outside content bubble)
-    messageEl.createEl('div', { cls: 'opencodian-message-time', text: '' });
+    // Note: Timestamp will be added after streaming completes to ensure correct DOM order
 
     // Track for streaming updates
     this.streamingMessageEl = messageEl;
     this.streamingContentEl = textEl;
 
-    return { messageEl, contentEl: textEl };
+    return { messageEl, contentEl, textEl };
   }
 
   /** Update message content during streaming */
@@ -895,6 +910,102 @@ export class OpenCodianView extends ItemView {
 
     const inputEl = toolEl.createEl('pre', { cls: 'opencodian-tool-input' });
     inputEl.textContent = JSON.stringify(input, null, 2);
+  }
+
+  /**
+   * Adds a copy button to a message element (outside the bubble).
+   * Button shows clipboard icon on hover, changes to "copied!" on click.
+   * @param messageEl The message element container
+   * @param content The original text content to copy
+   * @param isUser Whether this is a user message (affects positioning)
+   */
+  private addTextCopyButton(messageEl: HTMLElement, content: string, isUser: boolean): void {
+    const copyBtn = messageEl.createSpan({ 
+      cls: `opencodian-copy-btn ${isUser ? 'opencodian-copy-btn--user' : 'opencodian-copy-btn--assistant'}` 
+    });
+    copyBtn.innerHTML = COPY_ICON;
+
+    let feedbackTimeout: ReturnType<typeof setTimeout> | null = null;
+
+    copyBtn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+
+      try {
+        await navigator.clipboard.writeText(content);
+      } catch {
+        // Clipboard API may fail in non-secure contexts
+        return;
+      }
+
+      // Clear any pending timeout from rapid clicks
+      if (feedbackTimeout) {
+        clearTimeout(feedbackTimeout);
+      }
+
+      // Show "copied!" feedback
+      copyBtn.innerHTML = '';
+      copyBtn.setText('copied!');
+      copyBtn.classList.add('copied');
+
+      feedbackTimeout = setTimeout(() => {
+        copyBtn.innerHTML = COPY_ICON;
+        copyBtn.classList.remove('copied');
+        feedbackTimeout = null;
+      }, 1500);
+    });
+  }
+
+  /**
+   * Adds timestamp with copy button for assistant messages.
+   * Creates a row with timestamp and copy button side by side.
+   * @param messageEl The message element container
+   * @param timestamp The message timestamp
+   * @param content The text content to copy
+   */
+  private addTimestampWithCopyButton(
+    messageEl: HTMLElement,
+    timestamp: number,
+    content: string
+  ): void {
+    // Create a container for timestamp and copy button
+    const timeRow = messageEl.createDiv({ cls: 'opencodian-message-time-row' });
+
+    // Timestamp
+    const timeStr = new Date(timestamp).toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+    timeRow.createSpan({ cls: 'opencodian-message-time-text', text: timeStr });
+
+    // Copy button
+    const copyBtn = timeRow.createSpan({ cls: 'opencodian-copy-btn-inline' });
+    copyBtn.innerHTML = COPY_ICON;
+
+    let feedbackTimeout: ReturnType<typeof setTimeout> | null = null;
+
+    copyBtn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+
+      try {
+        await navigator.clipboard.writeText(content);
+      } catch {
+        return;
+      }
+
+      if (feedbackTimeout) {
+        clearTimeout(feedbackTimeout);
+      }
+
+      copyBtn.innerHTML = '';
+      copyBtn.setText('copied!');
+      copyBtn.classList.add('copied');
+
+      feedbackTimeout = setTimeout(() => {
+        copyBtn.innerHTML = COPY_ICON;
+        copyBtn.classList.remove('copied');
+        feedbackTimeout = null;
+      }, 1500);
+    });
   }
 
   /** Scroll to bottom of messages */
