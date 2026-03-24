@@ -4,7 +4,6 @@ node_modules/
 # Build output
 main.js
 *.js.map
-styles.css
 
 # Environment
 .env
