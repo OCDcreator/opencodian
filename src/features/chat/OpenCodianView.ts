@@ -279,15 +279,16 @@ export class OpenCodianView extends ItemView {
       }
     });
 
-    // Bottom toolbar for model selector and future buttons
+    // Bottom toolbar for model selector and permission mode
     const toolbar = container.createDiv({ cls: 'opencodian-input-toolbar' });
     
     // Left side: Model selector (opencode-style)
     this.modelSelectorContainer = toolbar.createDiv({ cls: 'opencodian-model-selector' });
     this.initializeModelSelector(this.modelSelectorContainer);
     
-    // Right side: Reserved for future buttons (attach file, etc.)
-    // const toolbarRight = toolbar.createDiv({ cls: 'opencodian-toolbar-right' });
+    // Right side: Permission mode selector
+    const permissionContainer = toolbar.createDiv({ cls: 'opencodian-permission-selector' });
+    this.initializePermissionSelector(permissionContainer);
   }
 
   /** Wire event handlers */
@@ -581,6 +582,33 @@ export class OpenCodianView extends ItemView {
         if (!this.isStreaming) {
           console.log('[OpenCodianView] Streaming cancelled, breaking loop');
           break;
+        }
+
+        // Handle permission request
+        if (chunk.type === 'permission_request') {
+          // Pause the stream timeout while waiting for user response
+          if (timeoutId) {
+            window.clearTimeout(timeoutId);
+            timeoutId = null;
+          }
+          
+          await this.showPermissionDialog(chunk);
+          
+          // Resume the stream timeout after user response (reset to full timeout)
+          if (this.isStreaming) {
+            timeoutId = window.setTimeout(() => {
+              console.warn('[OpenCodianView] Stream timeout after permission, forcing state reset');
+              this.streamController?.timeoutStream();
+              resetStreamingState();
+              if (this.streamController?.isStreaming()) {
+                void this.streamController.handleChunk({ 
+                  type: 'error', 
+                  content: 'Response timeout' 
+                });
+              }
+            }, STREAM_TIMEOUT_MS);
+          }
+          continue;
         }
 
         // Convert OpenCode chunks to streaming format
@@ -1388,6 +1416,232 @@ export class OpenCodianView extends ItemView {
       
       default:
         return null;
+    }
+  }
+
+  /** Initialize permission mode selector */
+  private initializePermissionSelector(containerEl: HTMLElement): void {
+    const { t } = require('../../i18n') as { t: (key: string) => string };
+    
+    // Create trigger button
+    const trigger = containerEl.createDiv({ cls: 'opencodian-permission-trigger' });
+    
+    const iconEl = trigger.createSpan({ cls: 'opencodian-permission-trigger-icon' });
+    setIcon(iconEl, 'shield');
+    
+    const textEl = trigger.createSpan({ cls: 'opencodian-permission-trigger-text' });
+    
+    const chevronEl = trigger.createSpan({ cls: 'opencodian-permission-trigger-chevron' });
+    setIcon(chevronEl, 'chevron-down');
+    
+    // Update display based on current mode
+    const updateDisplay = () => {
+      const mode = this.plugin.settings.permissionMode;
+      // Use uppercase mode names for consistency: YOLO / ASK / PLAN
+      const modeText: Record<string, string> = {
+        'yolo': 'YOLO',
+        'normal': 'ASK',
+        'plan': 'PLAN',
+      };
+      textEl.textContent = modeText[mode] || mode;
+      
+      // Update icon color based on mode
+      trigger.removeClass('mode-yolo', 'mode-normal', 'mode-plan');
+      trigger.addClass(`mode-${mode}`);
+    };
+    
+    updateDisplay();
+    
+    // Handle click
+    trigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      
+      const menu = new Menu();
+      
+      menu.addItem((item) => {
+        item
+          .setTitle(t('settings.security.permissionMode.yolo'))
+          .setIcon('shield-check')
+          .onClick(async () => {
+            await this.switchPermissionMode('yolo');
+            updateDisplay();
+          });
+        if (this.plugin.settings.permissionMode === 'yolo') {
+          item.setChecked(true);
+        }
+      });
+      
+      menu.addItem((item) => {
+        item
+          .setTitle(t('settings.security.permissionMode.normal'))
+          .setIcon('shield-question')
+          .onClick(async () => {
+            await this.switchPermissionMode('normal');
+            updateDisplay();
+          });
+        if (this.plugin.settings.permissionMode === 'normal') {
+          item.setChecked(true);
+        }
+      });
+      
+      menu.addItem((item) => {
+        item
+          .setTitle(t('settings.security.permissionMode.plan'))
+          .setIcon('shield-alert')
+          .onClick(async () => {
+            await this.switchPermissionMode('plan');
+            updateDisplay();
+          });
+        if (this.plugin.settings.permissionMode === 'plan') {
+          item.setChecked(true);
+        }
+      });
+      
+      menu.showAtPosition({ x: e.clientX, y: e.clientY });
+    });
+  }
+
+  /** Switch permission mode and restart OpenCode service */
+  private async switchPermissionMode(mode: 'yolo' | 'normal' | 'plan'): Promise<void> {
+    const { t } = require('../../i18n') as { t: (key: string) => string };
+    
+    try {
+      // Update setting
+      this.plugin.settings.permissionMode = mode;
+      await this.plugin.saveSettings();
+      
+      // Show restarting notice
+      const notice = new Notice(t('settings.security.autoRestart.manual'), 0);
+      
+      // Restart OpenCode service
+      const isRunning = await this.plugin.openCodeService.checkHealth();
+      if (isRunning) {
+        await this.plugin.openCodeService.stop();
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+      await this.plugin.openCodeService.start();
+      
+      notice.hide();
+      new Notice(t('settings.security.autoRestart.success'));
+    } catch (error) {
+      console.error('[OpenCodianView] Failed to switch permission mode:', error);
+      new Notice(t('settings.security.autoRestart.failed'));
+    }
+  }
+
+  /** Show inline permission request card in the chat stream */
+  private async showPermissionDialog(
+    request: import('../../core/types').PermissionRequest
+  ): Promise<void> {
+    const { t } = await import('../../i18n');
+    const { id, permission, patterns, metadata } = request;
+    
+    // Get tool description based on permission type
+    const getToolDescription = (perm: string): string => {
+      // Extract base tool name (e.g., 'websearch_web_search' -> 'websearch')
+      const baseTool = perm.split('_')[0].toLowerCase();
+      const toolKey = `permissionDialog.tools.${baseTool}`;
+      const description = t(toolKey as any);
+      // If translation not found, return default
+      return description === toolKey ? t('permissionDialog.tools.default') : description;
+    };
+
+    // Find or create the content element to insert the permission card
+    let permissionContainer: HTMLElement;
+    if (this.streamingContentEl) {
+      permissionContainer = this.streamingContentEl;
+    } else if (this.streamingMessageEl) {
+      const contentEl = this.streamingMessageEl.querySelector('.opencodian-message-content') as HTMLElement;
+      if (contentEl) {
+        permissionContainer = contentEl;
+      } else {
+        console.error('[OpenCodianView] No content element found for permission card');
+        return;
+      }
+    } else {
+      console.error('[OpenCodianView] No streaming message element found for permission card');
+      return;
+    }
+
+    // Create inline permission card
+    const permissionCard = permissionContainer.createDiv({ cls: 'opencodian-permission-inline' });
+    
+    // Header with tool name
+    const headerEl = permissionCard.createDiv({ cls: 'opencodian-permission-inline-header' });
+    headerEl.createSpan({ cls: 'opencodian-permission-inline-icon', text: '🔐' });
+    headerEl.createSpan({ 
+      cls: 'opencodian-permission-inline-title', 
+      text: t('permissionDialog.title') 
+    });
+    
+    // Tool info section
+    const infoEl = permissionCard.createDiv({ cls: 'opencodian-permission-inline-info' });
+    infoEl.createDiv({ 
+      cls: 'opencodian-permission-inline-tool',
+      text: `${t('permissionDialog.description')} ${permission}`
+    });
+    infoEl.createDiv({ 
+      cls: 'opencodian-permission-inline-desc',
+      text: `${getToolDescription(permission)}`
+    });
+
+    // Show patterns (only if meaningful)
+    if (patterns.length > 0 && !(patterns.length === 1 && patterns[0] === '*')) {
+      const patternsEl = permissionCard.createDiv({ cls: 'opencodian-permission-inline-patterns' });
+      patternsEl.createDiv({ 
+        cls: 'opencodian-permission-inline-label', 
+        text: t('permissionDialog.patterns') 
+      });
+      patterns.forEach(pattern => {
+        patternsEl.createDiv({ cls: 'opencodian-permission-inline-pattern-item', text: pattern });
+      });
+    }
+
+    // Show command if present
+    if (metadata.command) {
+      const commandEl = permissionCard.createDiv({ cls: 'opencodian-permission-inline-command' });
+      commandEl.createSpan({ 
+        cls: 'opencodian-permission-inline-label', 
+        text: `${t('permissionDialog.command')}: ` 
+      });
+      commandEl.createEl('code', { text: String(metadata.command) });
+    }
+
+    // Action buttons
+    const buttonsEl = permissionCard.createDiv({ cls: 'opencodian-permission-inline-buttons' });
+    
+    const onceBtn = buttonsEl.createEl('button', { 
+      cls: 'opencodian-permission-inline-btn opencodian-permission-inline-once',
+      text: t('permissionDialog.allowOnce')
+    });
+    
+    const alwaysBtn = buttonsEl.createEl('button', { 
+      cls: 'opencodian-permission-inline-btn opencodian-permission-inline-always',
+      text: t('permissionDialog.allowAlways')
+    });
+    
+    const rejectBtn = buttonsEl.createEl('button', { 
+      cls: 'opencodian-permission-inline-btn opencodian-permission-inline-reject',
+      text: t('permissionDialog.reject')
+    });
+
+    // Wait for user choice
+    const result = await new Promise<'once' | 'always' | 'reject'>((resolve) => {
+      onceBtn.addEventListener('click', () => resolve('once'));
+      alwaysBtn.addEventListener('click', () => resolve('always'));
+      rejectBtn.addEventListener('click', () => resolve('reject'));
+    });
+
+    // Remove the permission card entirely after selection
+    // The tool execution status will be shown by the tool call renderer
+    permissionCard.remove();
+
+    // Send response to server
+    try {
+      await this.plugin.openCodeService.respondToPermission(id, result);
+    } catch (error) {
+      console.error('[OpenCodianView] Failed to respond to permission:', error);
+      new Notice(t('permissionDialog.notice.error'));
     }
   }
 }

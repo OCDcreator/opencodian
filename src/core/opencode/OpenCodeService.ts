@@ -8,7 +8,7 @@
 
 import { requestUrl } from 'obsidian';
 
-import type { ChatMessage, ContentBlock, ImageAttachment, StreamChunk } from '../types';
+import type { ChatMessage, ContentBlock, ImageAttachment, PermissionReply, PermissionRequest, StreamChunk } from '../types';
 import type { OpenCodianSettings } from '../types/settings';
 import { ServerManager } from './ServerManager';
 import type { OpenCodeServerConfig, QueryOptions, ResponseHandler } from './types';
@@ -141,6 +141,11 @@ export class OpenCodeService {
     if (this.settings.server.autoStart) {
       await this.start();
     }
+  }
+
+  /** Set the vault path for OpenCode server to use project config */
+  setVaultPath(path: string): void {
+    this.serverManager.setWorkingDirectory(path);
   }
 
   /** Auto-fetch models when server starts and update defaults if needed */
@@ -555,6 +560,20 @@ export class OpenCodeService {
           // Handle server.connected - initial connection
           if (eventData.type === 'server.connected') {
             // Initial connection established
+          }
+
+          // Handle permission.asked - permission request from AI
+          if (eventData.type === 'permission.asked') {
+            const permission = eventData.properties;
+            if (permission?.id) {
+              yield {
+                type: 'permission_request',
+                id: permission.id,
+                permission: permission.permission || 'unknown',
+                patterns: permission.patterns || [],
+                metadata: permission.metadata || {},
+              };
+            }
           }
           
           // Handle session.idle - message streaming complete
@@ -1007,6 +1026,32 @@ export class OpenCodeService {
       contentBlocks: contentBlocks.length > 0 ? contentBlocks : undefined,
       parts,
     };
+  }
+
+  // ==================== Permission API Methods ====================
+
+  /** Get pending permission requests */
+  async getPendingPermissions(): Promise<PermissionRequest[]> {
+    try {
+      return await this.get<PermissionRequest[]>('/permission');
+    } catch (error) {
+      console.error('[OpenCodeService] Failed to get pending permissions:', error);
+      return [];
+    }
+  }
+
+  /** Respond to a permission request */
+  async respondToPermission(
+    requestID: string,
+    reply: PermissionReply,
+    message?: string
+  ): Promise<void> {
+    try {
+      await this.post(`/permission/${requestID}/reply`, { reply, message });
+    } catch (error) {
+      console.error('[OpenCodeService] Failed to respond to permission:', error);
+      throw error;
+    }
   }
 
 }

@@ -94,6 +94,7 @@ export interface OpenCodianSettings {
   allowExternalAccess: boolean;
   blockedCommands: PlatformBlockedCommands;
   permissionMode: PermissionMode;
+  autoRestartOnPermissionChange: boolean;
 
   // Model settings
   defaultProvider: string;
@@ -133,6 +134,7 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
   allowExternalAccess: false,
   blockedCommands: getDefaultBlockedCommands(),
   permissionMode: 'yolo',
+  autoRestartOnPermissionChange: false,
 
   defaultProvider: 'anthropic',
   defaultModel: 'claude-3-5-sonnet-20241022',

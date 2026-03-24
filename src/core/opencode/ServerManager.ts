@@ -11,6 +11,9 @@ import { Notice, requestUrl } from 'obsidian';
 
 import type { OpenCodeServerConfig } from './types';
 
+// Vault path for OpenCode to read project config
+let vaultPath: string | undefined;
+
 /** Server status type */
 export type ServerStatus = 
   | 'stopped'
@@ -31,6 +34,7 @@ export class ServerManager {
   private process: ChildProcess | null = null;
   private status: ServerStatus = 'stopped';
   private startPromise: Promise<void> | null = null;
+  private workingDirectory: string | undefined;
 
   constructor(
     config: OpenCodeServerConfig,
@@ -38,6 +42,26 @@ export class ServerManager {
   ) {
     this.config = { timeout: 30000, ...config };
     this.events = events;
+  }
+
+  /** Set the working directory for the server (vault path) */
+  setWorkingDirectory(path: string): void {
+    this.workingDirectory = path;
+    console.log(`[ServerManager] Working directory set to: ${path}`);
+    
+    // Check if config file exists in this directory
+    const configPath = `${path}/.opencode/opencode.json`;
+    const fs = require('fs');
+    if (fs.existsSync(configPath)) {
+      try {
+        const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+        console.log(`[ServerManager] Found OpenCode config:`, JSON.stringify(config.permission, null, 2));
+      } catch (e) {
+        console.error(`[ServerManager] Failed to read config:`, e);
+      }
+    } else {
+      console.warn(`[ServerManager] No OpenCode config found at: ${configPath}`);
+    }
   }
 
   /** Get current server status */
@@ -81,6 +105,8 @@ export class ServerManager {
         // Check if it's an existing OpenCode server
         const healthy = await this.checkHealth(5000);
         if (healthy) {
+          console.warn('[ServerManager] OpenCode server already running on port', this.config.port);
+          console.warn('[ServerManager] This server may have been started with different working directory/config');
           this.setStatus('running');
           return;
         }
@@ -211,6 +237,12 @@ export class ServerManager {
         }
 
         // Spawn server process with CORS enabled for Obsidian
+        // Use vault path as working directory so OpenCode reads project config
+        console.log(`[ServerManager] Starting OpenCode server:`);
+        console.log(`[ServerManager]   Binary: ${opencodePath}`);
+        console.log(`[ServerManager]   Working directory: ${this.workingDirectory || 'current directory'}`);
+        console.log(`[ServerManager]   Config path: ${this.workingDirectory ? `${this.workingDirectory}/.opencode/opencode.json` : 'N/A'}`);
+        
         this.process = spawn(opencodePath, [
           'serve',
           '--port', String(this.config.port),
@@ -220,6 +252,7 @@ export class ServerManager {
         ], {
           detached: false,
           stdio: ['ignore', 'pipe', 'pipe'],
+          cwd: this.workingDirectory,
         });
 
         // Handle process events
@@ -256,15 +289,31 @@ export class ServerManager {
     const candidates = [
       'opencode',
       'opencode-ai',
-      '/usr/local/bin/opencode',
-      '/usr/bin/opencode',
     ];
 
-    // On Windows, check for .cmd extension
+    // Platform-specific paths
     if (process.platform === 'win32') {
+      // Windows: check for .cmd extension
       candidates.push(
         'opencode.cmd',
-        `${process.env.APPDATA}\\npm\\opencode.cmd`
+        `${process.env.APPDATA}\\npm\\opencode.cmd`,
+        `${process.env.LOCALAPPDATA}\\npm\\opencode.cmd`
+      );
+    } else if (process.platform === 'darwin') {
+      // macOS: common Homebrew and npm locations
+      candidates.push(
+        '/usr/local/bin/opencode',
+        '/opt/homebrew/bin/opencode',
+        '/usr/bin/opencode',
+        `${process.env.HOME}/.npm-global/bin/opencode`,
+        `${process.env.HOME}/.nvm/current/bin/opencode`
+      );
+    } else {
+      // Linux
+      candidates.push(
+        '/usr/local/bin/opencode',
+        '/usr/bin/opencode',
+        '/opt/bin/opencode'
       );
     }
 

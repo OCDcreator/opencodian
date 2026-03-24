@@ -6,8 +6,10 @@
 
 import { App, Notice, PluginSettingTab, Setting } from 'obsidian';
 
+import { OpencodeConfigManager } from '../../core/config';
 import { setLocale, t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
+import { OpencodeConfigModal } from './OpencodeConfigModal';
 
 export class OpenCodianSettingTab extends PluginSettingTab {
   plugin: OpenCodianPlugin;
@@ -24,7 +26,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     this.refreshModelsCallback?.();
   }
 
-  display(): void {
+  async display(): Promise<void> {
     const { containerEl } = this;
     containerEl.empty();
     containerEl.addClass('opencodian-settings');
@@ -40,8 +42,8 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     // Model Settings
     this.addModelSettings(containerEl);
 
-    // Security Settings
-    this.addSecuritySettings(containerEl);
+    // Security Settings (async - must await to ensure correct order)
+    await this.addSecuritySettings(containerEl);
 
     // UI Settings
     this.addUISettings(containerEl);
@@ -373,8 +375,66 @@ export class OpenCodianSettingTab extends PluginSettingTab {
   }
 
   /** Security settings section */
-  private addSecuritySettings(containerEl: HTMLElement) {
+  private async addSecuritySettings(containerEl: HTMLElement) {
     containerEl.createEl('h3', { text: t('settings.security.title') });
+
+    // Initialize config manager
+    const vaultPath = this.plugin.app.vault.adapter.getBasePath();
+    const configManager = new OpencodeConfigManager(vaultPath);
+
+    // Config file status indicator (created first so we can update it)
+    const configStatusSetting = new Setting(containerEl)
+      .setName(t('settings.security.configStatus.name'))
+      .setDesc(t('settings.security.configStatus.checking'));
+    
+    // Update config status function
+    const updateConfigStatus = async () => {
+      try {
+        const exists = await configManager.exists();
+        const config = exists ? await configManager.read() : null;
+        const permission = config?.permission;
+        
+        // Remove old status classes
+        configStatusSetting.settingEl.removeClass(
+          'opencodian-status-warning',
+          'opencodian-status-yolo',
+          'opencodian-status-normal',
+          'opencodian-status-plan',
+          'opencodian-status-custom'
+        );
+        
+        let statusText: string;
+        let statusClass: string;
+        
+        if (!exists) {
+          statusText = t('settings.security.configStatus.notCreated');
+          statusClass = 'opencodian-status-warning';
+        } else if (typeof permission === 'string' && permission === 'allow') {
+          // YOLO mode: "allow" string
+          statusText = t('settings.security.configStatus.yolo');
+          statusClass = 'opencodian-status-yolo';
+        } else if (typeof permission === 'object' && permission?.['*'] === 'ask') {
+          // Check if any tool has 'deny' - that's plan mode
+          const hasDeny = Object.values(permission).some(v => v === 'deny');
+          if (hasDeny) {
+            statusText = t('settings.security.configStatus.plan');
+            statusClass = 'opencodian-status-plan';
+          } else {
+            // Normal mode: all 'ask'
+            statusText = t('settings.security.configStatus.normal');
+            statusClass = 'opencodian-status-normal';
+          }
+        } else {
+          statusText = t('settings.security.configStatus.custom');
+          statusClass = 'opencodian-status-custom';
+        }
+        
+        configStatusSetting.setDesc(statusText);
+        configStatusSetting.settingEl.addClass(statusClass);
+      } catch (error) {
+        configStatusSetting.setDesc(t('settings.security.configStatus.error'));
+      }
+    };
 
     new Setting(containerEl)
       .setName(t('settings.security.permissionMode.name'))
@@ -388,6 +448,91 @@ export class OpenCodianSettingTab extends PluginSettingTab {
           .onChange(async (value) => {
             this.plugin.settings.permissionMode = value as 'yolo' | 'normal' | 'plan';
             await this.plugin.saveSettings();
+            
+            // Config file is automatically updated in saveSettings()
+            new Notice(t('settings.security.permissionMode.updated', { mode: value }));
+            
+            // Refresh status display
+            await updateConfigStatus();
+            
+            // Auto restart if enabled
+            if (this.plugin.settings.autoRestartOnPermissionChange) {
+              try {
+                const isRunning = await this.plugin.openCodeService.checkHealth();
+                if (isRunning) {
+                  await this.plugin.openCodeService.stop();
+                  await new Promise(resolve => setTimeout(resolve, 1000));
+                  await this.plugin.openCodeService.start();
+                  new Notice(t('settings.security.autoRestart.success'));
+                }
+              } catch (error) {
+                console.error('Auto restart failed:', error);
+                new Notice(t('settings.security.autoRestart.failed'));
+              }
+            } else {
+              new Notice(t('settings.security.autoRestart.manual'));
+            }
+          });
+      });
+
+    // Initial status check
+    await updateConfigStatus();
+
+    // Auto restart option
+    new Setting(containerEl)
+      .setName(t('settings.security.autoRestart.name'))
+      .setDesc(t('settings.security.autoRestart.desc'))
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.autoRestartOnPermissionChange)
+          .onChange(async (value) => {
+            this.plugin.settings.autoRestartOnPermissionChange = value;
+            await this.plugin.saveSettings();
+          })
+      );
+
+    // Show current config file path and restart button
+    new Setting(containerEl)
+      .setName(t('settings.security.configFile.name'))
+      .setDesc(`${t('settings.security.configFile.desc')}${configManager.getConfigPath()}`)
+      .addButton((btn) => {
+        btn
+          .setButtonText(t('settings.security.configFile.editBtn'))
+          .setTooltip('Open configuration editor')
+          .onClick(() => {
+            new OpencodeConfigModal(this.app, configManager).open();
+          });
+      })
+      .addButton((btn) => {
+        btn
+          .setButtonText(t('settings.security.configFile.applyBtn'))
+          .setCta()
+          .onClick(async () => {
+            btn.setDisabled(true);
+            btn.setButtonText('Restarting...');
+            
+            try {
+              // Check if service is running
+              const isRunning = await this.plugin.openCodeService.checkHealth();
+              
+              if (isRunning) {
+                // Stop and restart
+                await this.plugin.openCodeService.stop();
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                await this.plugin.openCodeService.start();
+                new Notice('OpenCode service restarted. New permission settings are now active.');
+              } else {
+                // Just start
+                await this.plugin.openCodeService.start();
+                new Notice('OpenCode service started with new permission settings.');
+              }
+            } catch (error) {
+              console.error('Failed to restart OpenCode:', error);
+              new Notice('Failed to restart OpenCode service. Please restart manually.');
+            } finally {
+              btn.setDisabled(false);
+              btn.setButtonText('Apply & Restart');
+            }
           });
       });
 

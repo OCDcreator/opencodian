@@ -35,3 +35,16 @@ export {
 export {
   type ToolCallInfo,
 } from './tools';
+
+// Permission types
+export {
+  type PermissionAction,
+  type PermissionConfig,
+  type PermissionMode,
+  type PermissionReply,
+  type PermissionReplyInput,
+  type PermissionRequest,
+  type PermissionSettings,
+  type ToolPermission,
+  type OpencodeConfig,
+} from './permission';

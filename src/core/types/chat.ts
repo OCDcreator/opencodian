@@ -73,7 +73,8 @@ export type StreamChunk =
   | { type: 'message_start' }
   | { type: 'message_stop' }
   | { type: 'content_block_start'; index: number }
-  | { type: 'content_block_stop'; index: number };
+  | { type: 'content_block_stop'; index: number }
+  | { type: 'permission_request'; id: string; permission: string; patterns: string[]; metadata: Record<string, unknown> };
 
 /** Conversation metadata */
 export interface ConversationMeta {
