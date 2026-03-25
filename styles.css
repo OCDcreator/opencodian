@@ -212,7 +212,7 @@
   align-self: flex-end;
   
   /* Base styles */
-  padding: 4px 28px;
+  padding: 4px 28px 16px;
   max-width: 95%;
   animation: messageSlideIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
   z-index: 21;
@@ -342,30 +342,63 @@
 }
 
 /* Copy button - positioned outside the message bubble */
-.opencodian-copy-btn {
-  position: absolute;
-  border: none;
-  background: transparent;
-  color: var(--text-faint);
+.opencodian-copy-btn,
+.opencodian-copy-btn-inline {
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.3) 0%,
+      rgba(255, 255, 255, 0.14) 45%,
+      rgba(255, 255, 255, 0.06) 100%
+    ),
+    linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.12),
+      rgba(255, 255, 255, 0.03)
+    );
+  backdrop-filter: blur(20px) saturate(1.2);
+  -webkit-backdrop-filter: blur(20px) saturate(1.2);
+  box-shadow:
+    0 10px 26px rgba(15, 23, 42, 0.12),
+    0 1px 0 rgba(255, 255, 255, 0.32) inset,
+    0 -1px 0 rgba(255, 255, 255, 0.1) inset;
+  color: color-mix(in srgb, var(--text-normal) 82%, white);
   cursor: pointer;
   opacity: 0;
-  transition: opacity 0.15s ease, color 0.15s ease;
-  z-index: 2;
+  transition:
+    opacity 0.15s ease,
+    color 0.15s ease,
+    background 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 4px;
-  padding: 4px;
+  width: 30px;
+  height: 30px;
+  padding: 5px;
+  border-radius: 10px;
+  flex-shrink: 0;
 }
 
-.opencodian-copy-btn svg {
+.opencodian-copy-btn {
+  position: absolute;
+  z-index: 2;
+}
+
+.opencodian-copy-btn svg,
+.opencodian-copy-btn-inline svg {
   width: 18px;
   height: 18px;
 }
 
 /* User message: position at bottom-left outside bubble, aligned with bubble bottom */
 .opencodian-copy-btn--user {
-  left: 4px;
-  bottom: 0;
+  left: -4px;
+  bottom: 10px;
 }
 
 /* Show copy button on message hover (for user messages) */
@@ -373,8 +406,28 @@
   opacity: 1;
 }
 
-.opencodian-copy-btn:hover {
-  color: var(--text-normal);
+.opencodian-copy-btn:hover,
+.opencodian-copy-btn-inline:hover {
+  color: color-mix(in srgb, var(--text-normal) 88%, white);
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.38) 0%,
+      rgba(255, 255, 255, 0.18) 45%,
+      rgba(255, 255, 255, 0.08) 100%
+    ),
+    linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.16),
+      rgba(255, 255, 255, 0.05)
+    );
+  border-color: rgba(255, 255, 255, 0.34);
+  box-shadow:
+    0 14px 32px rgba(15, 23, 42, 0.15),
+    0 1px 0 rgba(255, 255, 255, 0.38) inset,
+    0 -1px 0 rgba(255, 255, 255, 0.12) inset;
+  opacity: 1;
+  transform: translateY(-1px) scale(1.01);
 }
 
 /* Copied state feedback */
@@ -403,6 +456,7 @@
   align-items: center;
   gap: 8px;
   margin-top: 4px;
+  padding-left: 0;
   font-size: 10px;
   color: var(--text-muted);
   opacity: 0.6;
@@ -416,33 +470,9 @@
   color: var(--text-muted);
 }
 
-/* Inline copy button next to timestamp */
-.opencodian-copy-btn-inline {
-  border: none;
-  background: transparent;
-  color: var(--text-faint);
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.15s ease, color 0.15s ease;
-  display: flex;
-  align-items: center;
-  padding: 2px;
-  border-radius: 4px;
-}
-
-.opencodian-copy-btn-inline svg {
-  width: 18px;
-  height: 18px;
-}
-
 /* Show copy button on assistant message hover */
 .opencodian-message--assistant:hover .opencodian-copy-btn-inline {
   opacity: 1;
-}
-
-.opencodian-copy-btn-inline:hover {
-  color: var(--text-normal);
-  background: var(--background-modifier-hover);
 }
 
 .opencodian-copy-btn-inline.copied {
