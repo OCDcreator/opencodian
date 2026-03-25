@@ -1072,7 +1072,8 @@ export class OpenCodianView extends ItemView {
         const streamContentBlocks = this.streamController?.getContentBlocks();
         const textContent = streamContentBlocks
           ?.filter((b): b is { type: 'text'; content: string } => b.type === 'text')
-          .map(b => b.content)
+          .map(b => b.content.trim())
+          .filter(Boolean)
           .join('') || '';
         this.addTimestampWithCopyButton(
           this.streamingMessageEl,
@@ -1215,10 +1216,11 @@ export class OpenCodianView extends ItemView {
       for (const block of message.contentBlocks) {
         await this.renderContentBlock(content, block);
       }
-      // Collect all text content
+      // Collect all text content (trim leading/trailing whitespace)
       const textContent = message.contentBlocks
         .filter(b => b.type === 'text' && b.text)
-        .map(b => b.text)
+        .map(b => b.text?.trim())
+        .filter(Boolean)
         .join('\n\n');
       // Add timestamp with copy button
       this.addTimestampWithCopyButton(messageEl, message.timestamp, textContent);
