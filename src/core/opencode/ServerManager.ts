@@ -9,8 +9,10 @@ import { type ChildProcess, spawn } from 'child_process';
 import * as fs from 'fs';
 import * as net from 'net';
 import { Notice, requestUrl } from 'obsidian';
+import * as path from 'path';
 
 import { createLogger } from '../../shared';
+import { parseOpencodeConfigText } from '../config/modelConfig';
 import type { OpenCodeServerConfig } from './types';
 
 const logger = createLogger('ServerManager');
@@ -410,6 +412,62 @@ export class ServerManager {
       delete env.OPENCODE_SERVER_PASSWORD;
     }
 
+    if (this.config.modelSourceMode === 'server') {
+      env.OPENCODE_DISABLE_PROJECT_CONFIG = 'true';
+      delete env.OPENCODE_CONFIG_DIR;
+      delete env.OPENCODE_CONFIG_CONTENT;
+      return env;
+    }
+
+    if (this.config.modelSourceMode === 'merge') {
+      delete env.OPENCODE_DISABLE_PROJECT_CONFIG;
+      delete env.OPENCODE_CONFIG_DIR;
+      delete env.OPENCODE_CONFIG_CONTENT;
+      return env;
+    }
+
+    env.OPENCODE_DISABLE_PROJECT_CONFIG = 'true';
+    if (this.workingDirectory) {
+      env.OPENCODE_CONFIG_DIR = path.join(this.workingDirectory, '.opencode');
+    }
+
+    const providerIds = this.getLocalProviderIds();
+    if (providerIds.length > 0) {
+      env.OPENCODE_CONFIG_CONTENT = JSON.stringify({
+        enabled_providers: providerIds,
+      });
+    } else {
+      delete env.OPENCODE_CONFIG_CONTENT;
+    }
+
     return env;
+  }
+
+  private getLocalProviderIds(): string[] {
+    if (!this.workingDirectory) {
+      return [];
+    }
+
+    for (const filename of ['opencode.json', 'opencode.jsonc']) {
+      const filepath = path.join(this.workingDirectory, '.opencode', filename);
+      if (!fs.existsSync(filepath)) {
+        continue;
+      }
+
+      try {
+        const config = parseOpencodeConfigText(fs.readFileSync(filepath, 'utf-8'));
+        if (config.provider && typeof config.provider === 'object') {
+          return Object.keys(config.provider);
+        }
+
+        if (typeof config.model === 'string' && config.model.includes('/')) {
+          return [config.model.slice(0, config.model.indexOf('/'))];
+        }
+      } catch (error) {
+        logger.error('Failed to parse local model config for source mode:', error);
+      }
+    }
+
+    return [];
   }
 }

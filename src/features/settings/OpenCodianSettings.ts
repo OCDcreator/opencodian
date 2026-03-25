@@ -5,17 +5,20 @@
  */
 
 import * as fs from 'fs';
+import { App, Notice, PluginSettingTab, Setting } from 'obsidian';
 import * as os from 'os';
 import * as path from 'path';
-import { App, Notice, PluginSettingTab, Setting } from 'obsidian';
 
 import { OpencodeConfigManager } from '../../core/config';
-import { getCurrentPlatformDebugLogPath, getCurrentPlatformKey } from '../../core/types';
+import type { ModelCatalog, ModelCatalogProvider } from '../../core/config/modelConfig';
+import { getCurrentPlatformDebugLogPath, getCurrentPlatformKey, type ModelSourceMode } from '../../core/types';
 import { setLocale, t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { createLogger, getVaultBasePath } from '../../shared';
+import { ModelConfigJsonModal } from './ModelConfigJsonModal';
+import { ModelConfigModal } from './ModelConfigModal';
 import { OpencodeConfigModal } from './OpencodeConfigModal';
-import { ServerSettingHelpModal, type ServerHelpTopic } from './ServerSettingHelpModal';
+import { type ServerHelpTopic,ServerSettingHelpModal } from './ServerSettingHelpModal';
 
 const logger = createLogger('OpenCodianSettings');
 
@@ -106,7 +109,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         tooltip: t('settings.quickNav.modelDesc'),
       },
       {
-        headingEl: await this.addSecuritySettings(containerEl),
+        headingEl: this.addSecuritySettings(containerEl),
         tooltip: t('settings.quickNav.securityDesc'),
       },
       {
@@ -460,41 +463,45 @@ export class OpenCodianSettingTab extends PluginSettingTab {
   /** Model settings section */
   private addModelSettings(containerEl: HTMLElement): HTMLHeadingElement {
     const headingEl = this.createSectionHeading(containerEl, t('settings.model.title'));
+    const modelConfigService = this.plugin.modelConfigService;
 
-    // Provider dropdown - will be populated dynamically
+    if (!modelConfigService) {
+      new Setting(containerEl)
+        .setName(t('settings.model.config.unavailableTitle'))
+        .setDesc(t('settings.model.config.unavailable'));
+      return headingEl;
+    }
+
     let providerDropdown: import('obsidian').DropdownComponent;
     let modelDropdown: import('obsidian').DropdownComponent;
-    
-    // Store available providers and models
-    let availableProviders: Array<{ id: string; name: string; models: Array<{ id: string; name: string }> }> = [];
-    
+    let catalogs: { local: ModelCatalog; server: ModelCatalog; effective: ModelCatalog } | null = null;
+    const sourceCardsEl = containerEl.createDiv({ cls: 'opencodian-model-source-cards' });
+
     const loadAvailableModels = async (showNotice = false) => {
       try {
-        const result = await this.plugin.openCodeService.getAvailableModels();
-        availableProviders = result.providers;
-        
-        // Clear and repopulate provider dropdown
+        catalogs = await modelConfigService.getCatalogs(this.plugin.settings.modelSourceMode);
+        const availableProviders = catalogs.effective.providers;
+
         providerDropdown.selectEl.empty();
         for (const provider of availableProviders) {
           providerDropdown.addOption(provider.id, provider.name || provider.id);
         }
-        
-        // Set current provider if available
-        if (availableProviders.find(p => p.id === this.plugin.settings.defaultProvider)) {
+
+        this.renderModelCatalogCards(sourceCardsEl, catalogs);
+
+        if (availableProviders.find((provider) => provider.id === this.plugin.settings.defaultProvider)) {
           providerDropdown.setValue(this.plugin.settings.defaultProvider);
         } else if (availableProviders.length > 0) {
-          // Default to first provider
           providerDropdown.setValue(availableProviders[0].id);
         }
-        
-        // Update model dropdown for current provider
-        updateModelDropdown();
-        
+
+        await updateModelDropdown();
+
         if (showNotice) {
-          new Notice(t('settings.model.refresh.success', { count: result.providers.length }));
+          new Notice(t('settings.model.refresh.success', { count: availableProviders.length }));
         }
-        
-        return result;
+
+        return catalogs;
       } catch (error) {
         logger.error('Failed to load models:', error);
         if (showNotice) {
@@ -504,54 +511,72 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       }
     };
     
-    // Register this function so it can be called when models are auto-loaded
     this.refreshModelsCallback = () => {
       void loadAvailableModels(false);
     };
-    
-    const updateModelDropdown = () => {
+
+    const updateModelDropdown = async () => {
       if (!modelDropdown) return;
-      
+      const availableProviders = catalogs?.effective.providers ?? [];
       const currentProviderId = providerDropdown.getValue();
-      const provider = availableProviders.find(p => p.id === currentProviderId);
-      
-      // Clear and repopulate model dropdown
+      const provider = availableProviders.find((item) => item.id === currentProviderId);
+
       modelDropdown.selectEl.empty();
-      
+
       if (provider && provider.models.length > 0) {
         for (const model of provider.models) {
           modelDropdown.addOption(model.id, model.name || model.id);
         }
-        
-        // Set current model if available for this provider
         const currentModel = this.plugin.settings.defaultModel;
-
-        
-        if (provider.models.find(m => m.id === currentModel)) {
+        if (provider.models.find((model) => model.id === currentModel)) {
           modelDropdown.setValue(currentModel);
-
         } else {
-          // Default to first model and update settings
           const firstModel = provider.models[0].id;
           modelDropdown.setValue(firstModel);
           this.plugin.settings.defaultModel = firstModel;
-
+          if (this.plugin.settings.defaultProvider !== currentProviderId) {
+            this.plugin.settings.defaultProvider = currentProviderId;
+          }
+          await this.plugin.saveSettings();
         }
       } else {
-        modelDropdown.addOption('', 'No models available');
+        modelDropdown.addOption('', t('settings.model.noModels'));
       }
     };
+
+    new Setting(containerEl)
+      .setName(t('settings.model.source.name'))
+      .setDesc(t('settings.model.source.desc'))
+      .addDropdown((dropdown) => {
+        dropdown
+          .addOption('merge', t('settings.model.source.merge'))
+          .addOption('local', t('settings.model.source.local'))
+          .addOption('server', t('settings.model.source.server'))
+          .setValue(this.plugin.settings.modelSourceMode)
+          .onChange(async (value) => {
+            this.plugin.settings.modelSourceMode = value as ModelSourceMode;
+            await this.plugin.saveSettings();
+            new Notice(t('settings.model.source.updated'));
+            window.setTimeout(() => {
+              void loadAvailableModels(false);
+            }, 1200);
+          });
+      });
+
+    containerEl.createDiv({
+      cls: 'opencodian-model-source-note',
+      text: t('settings.model.source.note'),
+    });
 
     new Setting(containerEl)
       .setName(t('settings.model.provider.name'))
       .setDesc(t('settings.model.provider.desc'))
       .addDropdown((dropdown) => {
         providerDropdown = dropdown;
-        // Will be populated by loadAvailableModels()
         dropdown.onChange(async (value) => {
           this.plugin.settings.defaultProvider = value;
           await this.plugin.saveSettings();
-          updateModelDropdown();
+          await updateModelDropdown();
         });
       });
 
@@ -561,10 +586,8 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       .addDropdown((dropdown) => {
         modelDropdown = dropdown;
         dropdown.onChange(async (value) => {
-
           this.plugin.settings.defaultModel = value;
           await this.plugin.saveSettings();
-
         });
       });
 
@@ -576,21 +599,34 @@ export class OpenCodianSettingTab extends PluginSettingTab {
           .setButtonText(t('settings.model.refresh.button'))
           .onClick(async () => {
             btn.setDisabled(true);
-            btn.setButtonText('Loading...');
-            
+            btn.setButtonText(t('settings.model.refresh.loading'));
             await loadAvailableModels(true);
-            
             btn.setDisabled(false);
             btn.setButtonText(t('settings.model.refresh.button'));
           })
       );
-    
-    // Load models on initial display (if server is running)
+
+    new Setting(containerEl)
+      .setName(t('settings.model.config.name'))
+      .setDesc(`${t('settings.model.config.desc')} ${modelConfigService.getConfigPath()}`)
+      .addButton((btn) => {
+        btn
+          .setButtonText(t('settings.model.config.visualButton'))
+          .setCta()
+          .onClick(() => {
+            new ModelConfigModal(this.app, this.plugin).open();
+          });
+      })
+      .addButton((btn) => {
+        btn
+          .setButtonText(t('settings.model.config.jsonButton'))
+          .onClick(() => {
+            new ModelConfigJsonModal(this.app, this.plugin).open();
+          });
+      });
+
     void (async () => {
-      const isHealthy = await this.plugin.openCodeService.checkHealth();
-      if (isHealthy) {
-        await loadAvailableModels(false);
-      }
+      await loadAvailableModels(false);
     })();
 
     return headingEl;
@@ -602,7 +638,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
   }
 
   /** Security settings section */
-  private async addSecuritySettings(containerEl: HTMLElement): Promise<HTMLHeadingElement> {
+  private addSecuritySettings(containerEl: HTMLElement): HTMLHeadingElement {
     const headingEl = this.createSectionHeading(containerEl, t('settings.security.title'));
 
     // Initialize config manager
@@ -620,7 +656,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       .setName(t('settings.security.configStatus.name'))
       .setDesc(t('settings.security.configStatus.checking'));
     
-    // Update config status function
+    // Update config status function - async but called independently
     const updateConfigStatus = async () => {
       try {
         const exists = await configManager.exists();
@@ -1258,6 +1294,76 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         });
       });
     }
+  }
+
+  private renderModelCatalogCards(
+    containerEl: HTMLElement,
+    catalogs: { local: ModelCatalog; server: ModelCatalog; effective: ModelCatalog },
+  ): void {
+    containerEl.empty();
+    this.renderModelCatalogCard(
+      containerEl,
+      t('settings.model.catalog.localTitle'),
+      t('settings.model.catalog.localDesc'),
+      catalogs.local,
+      'local',
+    );
+    this.renderModelCatalogCard(
+      containerEl,
+      t('settings.model.catalog.serverTitle'),
+      t('settings.model.catalog.serverDesc'),
+      catalogs.server,
+      'server',
+    );
+    this.renderModelCatalogCard(
+      containerEl,
+      t('settings.model.catalog.effectiveTitle'),
+      t('settings.model.catalog.effectiveDesc'),
+      catalogs.effective,
+      'effective',
+    );
+  }
+
+  private renderModelCatalogCard(
+    containerEl: HTMLElement,
+    title: string,
+    description: string,
+    catalog: ModelCatalog,
+    mode: 'local' | 'server' | 'effective',
+  ): void {
+    const cardEl = containerEl.createDiv({ cls: `opencodian-model-source-card is-${mode}` });
+    cardEl.createDiv({ cls: 'opencodian-model-source-card-title', text: title });
+    cardEl.createDiv({ cls: 'opencodian-model-source-card-desc', text: description });
+
+    if (catalog.providers.length === 0) {
+      cardEl.createDiv({
+        cls: 'opencodian-model-source-card-empty',
+        text: t('settings.model.catalog.empty'),
+      });
+      return;
+    }
+
+    for (const provider of catalog.providers) {
+      const providerEl = cardEl.createDiv({ cls: 'opencodian-model-source-provider' });
+      providerEl.createDiv({
+        cls: 'opencodian-model-source-provider-name',
+        text: `${provider.name} (${provider.models.length})`,
+      });
+      providerEl.createDiv({
+        cls: 'opencodian-model-source-provider-models',
+        text: this.describeProviderModels(provider),
+      });
+    }
+  }
+
+  private describeProviderModels(provider: ModelCatalogProvider): string {
+    const modelNames = provider.models.map((model) => model.name);
+    if (modelNames.length <= 4) {
+      return modelNames.join(' · ');
+    }
+
+    const preview = modelNames.slice(0, 4).join(' · ');
+    return `${preview} · +${modelNames.length - 4}`;
   }
 
   private addServerHelpButton(setting: Setting, topic: ServerHelpTopic): void {

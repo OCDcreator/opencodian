@@ -23,20 +23,21 @@ export {
   type ApprovalDecision,
   type ChatScrollMode,
   DEFAULT_SETTINGS,
-  getServerBaseUrl,
+  getBashToolBlockedCommands,
   getCurrentPlatformBlockedCommands,
   getCurrentPlatformDebugLogPath,
-  getBashToolBlockedCommands,
   getCurrentPlatformKey,
   getDefaultBlockedCommands,
   getDefaultDebugLogPaths,
+  getServerBaseUrl,
   isLocalServerMode,
+  type LocalServerConfig,
+  type ModelSourceMode,
   normalizeBaseUrl,
   type OpenCodianSettings,
   type PermissionMode,
   type PlatformBlockedCommands,
   type PlatformDebugLogPaths,
-  type LocalServerConfig,
   type RemoteServerConfig,
   type ServerAuthConfig,
   type ServerAuthType,
@@ -61,3 +62,11 @@ export {
   type PermissionSettings,
   type ToolPermission,
 } from './permission';
+
+// OpenCode config types
+export {
+  type OpencodeModelConfigSubset,
+  type OpencodeProviderConfig,
+  type OpencodeProviderModelConfig,
+  type OpencodeProviderModelLimit,
+} from './opencodeConfig';

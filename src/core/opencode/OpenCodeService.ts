@@ -10,8 +10,8 @@ import { requestUrl } from 'obsidian';
 
 import { createLogger } from '../../shared';
 import type { ChatMessage, ContentBlock, ImageAttachment, PermissionReply, PermissionRequest, StreamChunk } from '../types';
-import { getServerBaseUrl, isLocalServerMode } from '../types/settings';
 import type { OpenCodianSettings } from '../types/settings';
+import { getServerBaseUrl, isLocalServerMode } from '../types/settings';
 import { ServerManager } from './ServerManager';
 import type { OpenCodeServerConfig, QueryOptions, ResponseHandler } from './types';
 
@@ -866,7 +866,12 @@ export class OpenCodeService {
     const shouldRestartManagedServer =
       this.serverManager.isRunning() &&
       nextMode === 'local' &&
-      (previousMode !== nextMode || serverConfigChanged || authChanged);
+      (
+        previousMode !== nextMode
+        || serverConfigChanged
+        || authChanged
+        || previousSettings.modelSourceMode !== settings.modelSourceMode
+      );
     const shouldStopManagedServer =
       this.serverManager.isRunning() &&
       previousMode === 'local' &&
@@ -892,6 +897,7 @@ export class OpenCodeService {
       baseUrl: getServerBaseUrl(settings.server),
       local: settings.server.local,
       auth: settings.server.auth,
+      modelSourceMode: settings.modelSourceMode,
     };
   }
 

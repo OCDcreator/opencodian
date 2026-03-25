@@ -70,11 +70,12 @@ describe('Settings', () => {
       expect(DEFAULT_SETTINGS.server.local.host).toBe('127.0.0.1');
       expect(DEFAULT_SETTINGS.server.local.port).toBe(4096);
       expect(DEFAULT_SETTINGS.server.local.autoStart).toBe(true);
-      expect(DEFAULT_SETTINGS.server.remote.baseUrl).toBe('');
+      expect(DEFAULT_SETTINGS.server.remote.baseUrl).toBe('http://127.0.0.1:4096');
       expect(DEFAULT_SETTINGS.server.auth.type).toBe('none');
       expect(DEFAULT_SETTINGS.enableBlocklist).toBe(true);
       expect(DEFAULT_SETTINGS.allowExternalAccess).toBe(false);
       expect(DEFAULT_SETTINGS.permissionMode).toBe('yolo');
+      expect(DEFAULT_SETTINGS.modelSourceMode).toBe('merge');
       expect(DEFAULT_SETTINGS.defaultProvider).toBe('anthropic');
       expect(DEFAULT_SETTINGS.defaultModel).toBe('claude-3-5-sonnet-20241022');
       expect(DEFAULT_SETTINGS.maxTabs).toBe(3);

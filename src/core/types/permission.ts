@@ -2,6 +2,8 @@
  * Permission configuration types for OpenCode integration
  */
 
+import type { OpencodeConfig as BaseOpencodeConfig } from './opencodeConfig';
+
 /** Permission action types */
 export type PermissionAction = 'allow' | 'deny' | 'ask';
 
@@ -48,17 +50,7 @@ export interface PermissionConfig {
   todowrite?: ToolPermission;
 }
 
-/** OpenCode configuration file structure */
-export interface OpencodeConfig {
-  /** JSON schema reference */
-  $schema?: string;
-  /** Permission settings */
-  permission?: PermissionConfig | PermissionAction;
-  /** Agent configurations */
-  agent?: Record<string, unknown>;
-  /** Other config fields */
-  [key: string]: unknown;
-}
+export type OpencodeConfig = BaseOpencodeConfig;
 
 /** Permission request from OpenCode server */
 export interface PermissionRequest {

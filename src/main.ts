@@ -6,19 +6,19 @@
  */
 
 import * as fs from 'fs';
-import * as path from 'path';
 import type { Editor, MarkdownView } from 'obsidian';
 import { Notice, Plugin } from 'obsidian';
+import * as path from 'path';
 
-import { OpencodeConfigManager } from './core/config';
+import { ModelConfigService, OpencodeConfigManager } from './core/config';
 import { OpenCodeService } from './core/opencode';
 import { StorageService } from './core/storage';
 import type { Conversation, OpenCodianSettings, PlatformDebugLogPaths } from './core/types';
 import {
   DEFAULT_SETTINGS,
-  getServerBaseUrl,
   getCurrentPlatformDebugLogPath,
   getCurrentPlatformKey,
+  getServerBaseUrl,
   isLocalServerMode,
   VIEW_TYPE_OPENCODIAN,
 } from './core/types';
@@ -34,6 +34,8 @@ export default class OpenCodianPlugin extends Plugin {
   settings: OpenCodianSettings;
   storage: StorageService;
   openCodeService: OpenCodeService;
+  opencodeConfigManager: OpencodeConfigManager | null = null;
+  modelConfigService: ModelConfigService | null = null;
   settingsTab?: InstanceType<typeof OpenCodianSettingTab>;
   
   private conversations: Conversation[] = [];
@@ -75,10 +77,14 @@ export default class OpenCodianPlugin extends Plugin {
     // This automatically adapts to Windows (C:\path) and macOS (/Users/path)
     const vaultPath = getVaultBasePath(this.app);
     if (vaultPath) {
+      this.opencodeConfigManager = new OpencodeConfigManager(vaultPath);
+      this.modelConfigService = new ModelConfigService(this.opencodeConfigManager, this.openCodeService);
       this.openCodeService.setVaultPath(vaultPath);
       logger.debug(`Vault path set to: ${vaultPath}`);
       logger.debug(`Platform: ${process.platform}`);
     } else {
+      this.opencodeConfigManager = null;
+      this.modelConfigService = null;
       logger.warn('Could not get vault path, OpenCode will use global config');
     }
 
@@ -290,6 +296,7 @@ export default class OpenCodianPlugin extends Plugin {
       const view = leaf.view;
       if (view instanceof OpenCodianView) {
         view.applyChatScrollMode();
+        void view.reloadModelCatalog();
       }
     }
     

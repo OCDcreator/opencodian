@@ -5,11 +5,16 @@
  */
 
 import type { EventRef, WorkspaceLeaf } from 'obsidian';
-import { Component, ItemView, Menu, Notice, Scope, setIcon } from 'obsidian';
+import { Component, ItemView, Notice, Scope, setIcon } from 'obsidian';
 
 import { OpenCodeService } from '../../core/opencode';
-import type { ChatMessage, ContentBlock, Conversation, ToolCallInfo } from '../../core/types';
-import { VIEW_TYPE_OPENCODIAN } from '../../core/types';
+import {
+  type ChatMessage,
+  type ContentBlock,
+  type Conversation,
+  type ToolCallInfo,
+  VIEW_TYPE_OPENCODIAN,
+} from '../../core/types';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { createLogger } from '../../shared';
@@ -1027,6 +1032,17 @@ export class OpenCodianView extends ItemView {
       }
     }
 
+    const modelOptions = this.getSendMessageOptions();
+    if (!(await this.ensureSelectedModelAvailable(modelOptions.provider, modelOptions.model))) {
+      const { messageEl, contentEl } = this.createAssistantMessageElement();
+      await this.finalizeAssistantMessageWithError(
+        messageEl,
+        contentEl,
+        t('chat.error.modelUnavailable'),
+      );
+      return;
+    }
+
     this.isStreaming = true;
     this.updateSendButtonState();
     this.scrollToBottom();
@@ -1058,14 +1074,13 @@ export class OpenCodianView extends ItemView {
     }, STREAM_TIMEOUT_MS);
 
     // Stream response with current session model
-    const modelOptions = this.getSendMessageOptions();
     const stream = this.plugin.openCodeService.sendMessage(content, {
       sessionId: this.currentConversation.openCodeSessionId,
       ...modelOptions,
     });
 
     // Create assistant message element and get content container
-    const { messageEl, contentEl } = this.createAssistantMessageElement();
+    const { contentEl } = this.createAssistantMessageElement();
 
     // Show pending indicator after a short delay
     const pendingState: { element: HTMLElement | null } = { element: null };
@@ -1849,7 +1864,7 @@ export class OpenCodianView extends ItemView {
     this.buildModelDropdown();
     
     // Load models
-    void this.loadAvailableModels();
+    void this.reloadModelCatalog();
     
     // Update display
     this.updateModelSelectorDisplay();
@@ -2175,10 +2190,16 @@ export class OpenCodianView extends ItemView {
     }
   }
 
+  public async reloadModelCatalog(): Promise<void> {
+    await this.loadAvailableModels();
+  }
+
   /** Load available models from OpenCode service */
   private async loadAvailableModels(): Promise<void> {
     try {
-      const { providers } = await this.plugin.openCodeService.getAvailableModels();
+      const providers = this.plugin.modelConfigService
+        ? (await this.plugin.modelConfigService.getCatalogs(this.plugin.settings.modelSourceMode)).effective.providers
+        : (await this.plugin.openCodeService.getAvailableModels()).providers;
       this.availableModels = [];
       this.availableProviders = [];
       
@@ -2288,6 +2309,23 @@ export class OpenCodianView extends ItemView {
       provider: current.provider,
       model: current.model,
     };
+  }
+
+  private async ensureSelectedModelAvailable(
+    provider: string | undefined,
+    model: string | undefined,
+  ): Promise<boolean> {
+    if (!provider || !model || !this.plugin.modelConfigService) {
+      return true;
+    }
+
+    const available = await this.plugin.modelConfigService.isModelAvailableOnServer(provider, model);
+    if (available) {
+      return true;
+    }
+
+    new Notice(t('chat.error.modelUnavailable'));
+    return false;
   }
 
   /** Convert OpenCode stream chunk to streaming module format */

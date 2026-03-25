@@ -20,6 +20,9 @@ export type ServerMode = 'local' | 'remote';
 /** Server auth type */
 export type ServerAuthType = 'none' | 'basic' | 'bearer';
 
+/** Model source mode */
+export type ModelSourceMode = 'merge' | 'local' | 'server';
+
 /** Local server configuration */
 export interface LocalServerConfig {
   host: string;
@@ -162,6 +165,7 @@ export interface OpenCodianSettings {
   autoRestartOnPermissionChange: boolean;
 
   // Model settings
+  modelSourceMode: ModelSourceMode;
   defaultProvider: string;
   defaultModel: string;
   providers: ModelProviderConfig[];
@@ -216,6 +220,7 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
   permissionMode: 'yolo',
   autoRestartOnPermissionChange: false,
 
+  modelSourceMode: 'merge',
   defaultProvider: 'anthropic',
   defaultModel: 'claude-3-5-sonnet-20241022',
   providers: [

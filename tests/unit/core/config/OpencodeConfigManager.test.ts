@@ -112,7 +112,12 @@ describe('OpencodeConfigManager', () => {
       await manager.setNormalMode();
       
       const config = await manager.read();
-      expect(config.permission).toEqual({ '*': 'ask' });
+      expect(config.permission).toMatchObject({
+        '*': 'ask',
+        bash: 'ask',
+        edit: 'ask',
+        write: 'ask',
+      });
     });
 
     it('setPlanMode should deny write operations', async () => {
@@ -166,6 +171,53 @@ describe('OpencodeConfigManager', () => {
       
       const permission = await manager.getPermissionConfig();
       expect(permission).toEqual({ bash: 'allow' });
+    });
+  });
+
+  describe('model config compatibility', () => {
+    it('should preserve provider config when updating permissions', async () => {
+      await manager.write({
+        provider: {
+          myprovider: {
+            name: 'My Provider',
+            models: {
+              'my-model': {
+                name: 'My Model',
+              },
+            },
+          },
+        },
+      });
+
+      await manager.setPlanMode();
+
+      const config = await manager.read();
+      expect(config.provider?.myprovider?.name).toBe('My Provider');
+      expect(config.provider?.myprovider?.models?.['my-model']?.name).toBe('My Model');
+    });
+
+    it('should read JSONC config files with comments', async () => {
+      fs.mkdirSync(manager.getConfigDir(), { recursive: true });
+      fs.writeFileSync(
+        manager.getConfigPath(),
+        `{
+          // local provider
+          "provider": {
+            "demo": {
+              "name": "Demo",
+              "models": {
+                "demo-model": {
+                  "name": "Demo Model"
+                }
+              }
+            }
+          }
+        }`,
+        'utf-8',
+      );
+
+      const config = await manager.read();
+      expect(config.provider?.demo?.models?.['demo-model']?.name).toBe('Demo Model');
     });
   });
 

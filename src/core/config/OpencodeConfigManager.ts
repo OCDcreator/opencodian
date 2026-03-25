@@ -12,6 +12,7 @@ import * as path from 'path';
 
 import { createLogger } from '../../shared';
 import type { OpencodeConfig, PermissionAction,PermissionConfig } from '../types/permission';
+import { OPENCODE_SCHEMA_URL, parseOpencodeConfigText } from './modelConfig';
 
 const logger = createLogger('OpencodeConfigManager');
 
@@ -44,7 +45,7 @@ export class OpencodeConfigManager {
 
     try {
       const content = await fs.promises.readFile(this.configPath, 'utf-8');
-      return JSON.parse(content) as OpencodeConfig;
+      return parseOpencodeConfigText(content);
     } catch (error) {
       logger.error('Failed to read config:', error);
       return this.getDefaultConfig();
@@ -60,7 +61,7 @@ export class OpencodeConfigManager {
       }
 
       const content = JSON.stringify({
-        $schema: 'https://opencode.ai/config.json',
+        $schema: OPENCODE_SCHEMA_URL,
         ...config,
       }, null, 2);
 
@@ -161,6 +162,7 @@ export class OpencodeConfigManager {
   private getDefaultConfig(): OpencodeConfig {
     return {
       $schema: 'https://opencode.ai/config.json',
+      model: undefined,
       permission: {
         '*': 'ask',
       },
