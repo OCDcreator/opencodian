@@ -622,13 +622,12 @@ export class OpenCodianView extends ItemView {
     }
   }
 
-  /** Delete current conversation */
+  /** Delete current conversation with 3-second confirmation */
   private async deleteCurrentConversation() {
     if (!this.currentConversation) return;
     
-    const confirmed = confirm(
-      `Are you sure you want to delete "${this.currentConversation.title}"?`
-    );
+    // Create custom confirmation modal with 3-second countdown
+    const confirmed = await this.showDeleteCurrentConfirmDialog(this.currentConversation.title || 'Untitled');
     if (!confirmed) return;
     
     const deletedId = this.currentConversation.id;
@@ -642,23 +641,250 @@ export class OpenCodianView extends ItemView {
       await this.createNewConversation();
     }
     
-    new Notice('Conversation deleted');
+    new Notice(t('chat.deleteCurrentConfirm.success') || 'Conversation deleted');
   }
 
-  /** Delete all conversations */
+  /** Show delete current conversation confirmation dialog with 3-second countdown */
+  private async showDeleteCurrentConfirmDialog(title: string): Promise<boolean> {
+    return new Promise((resolve) => {
+      // Create overlay
+      const overlay = document.createElement('div');
+      overlay.addClass('opencodian-delete-confirm-overlay');
+      
+      // Create dialog
+      const dialog = document.createElement('div');
+      dialog.addClass('opencodian-delete-confirm-dialog');
+      
+      // Title with warning icon
+      const titleEl = dialog.createDiv({ cls: 'opencodian-delete-confirm-title' });
+      titleEl.setText(t('chat.deleteCurrentConfirm.title'));
+      
+      // Warning text
+      const warningEl = dialog.createDiv({ cls: 'opencodian-delete-confirm-warning' });
+      warningEl.setText(t('chat.deleteCurrentConfirm.warning'));
+      
+      // Description with conversation title
+      const descEl = dialog.createDiv({ cls: 'opencodian-delete-confirm-desc' });
+      descEl.setText(t('chat.deleteCurrentConfirm.description', { title }));
+      
+      // Emphasis text
+      const emphasisEl = dialog.createDiv({ cls: 'opencodian-delete-confirm-emphasis' });
+      emphasisEl.setText(t('chat.deleteCurrentConfirm.emphasis'));
+      
+      // Buttons container
+      const buttonsEl = dialog.createDiv({ cls: 'opencodian-delete-confirm-buttons' });
+      
+      // Confirm button (red, with countdown) - LEFT side
+      const confirmBtn = buttonsEl.createEl('button', { 
+        cls: 'opencodian-delete-confirm-btn opencodian-delete-confirm-confirm',
+        text: t('chat.deleteCurrentConfirm.confirm', { seconds: '3' })
+      });
+      confirmBtn.setAttribute('disabled', 'true');
+      
+      // Cancel button - RIGHT side, larger
+      const cancelBtn = buttonsEl.createEl('button', { 
+        cls: 'opencodian-delete-confirm-btn opencodian-delete-confirm-cancel',
+        text: t('chat.deleteCurrentConfirm.cancel')
+      });
+      
+      // Append to document
+      overlay.appendChild(dialog);
+      document.body.appendChild(overlay);
+      
+      let countdown = 3;
+      let timerId: number | null = null;
+      
+      // Countdown logic (3 seconds)
+      const startCountdown = () => {
+        timerId = window.setInterval(() => {
+          countdown--;
+          if (countdown > 0) {
+            confirmBtn.setText(t('chat.deleteCurrentConfirm.confirm', { seconds: String(countdown) }));
+          } else {
+            // Enable confirm button
+            if (timerId) {
+              window.clearInterval(timerId);
+              timerId = null;
+            }
+            confirmBtn.removeAttribute('disabled');
+            // Remove countdown text, show only confirm text
+            confirmBtn.setText(t('chat.deleteCurrentConfirm.confirmText'));
+          }
+        }, 1000);
+      };
+      
+      // Start countdown after a short delay
+      setTimeout(startCountdown, 100);
+      
+      // Cancel handler
+      const handleCancel = () => {
+        if (timerId) {
+          window.clearInterval(timerId);
+        }
+        overlay.remove();
+        resolve(false);
+      };
+      
+      // Confirm handler
+      const handleConfirm = () => {
+        if (countdown > 0) return; // Still counting down
+        if (timerId) {
+          window.clearInterval(timerId);
+        }
+        overlay.remove();
+        resolve(true);
+      };
+      
+      // Click outside to cancel
+      overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) {
+          handleCancel();
+        }
+      });
+      
+      // Button handlers
+      cancelBtn.addEventListener('click', handleCancel);
+      confirmBtn.addEventListener('click', handleConfirm);
+      
+      // Escape to cancel
+      const escapeHandler = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') {
+          handleCancel();
+          document.removeEventListener('keydown', escapeHandler);
+        }
+      };
+      document.addEventListener('keydown', escapeHandler);
+    });
+  }
+
+  /** Delete all conversations with 5-second confirmation */
   private async deleteAllConversations() {
-    const confirmed = confirm(
-      'Are you sure you want to delete ALL conversations? This cannot be undone.'
-    );
+    const conversations = this.plugin.getConversations();
+    if (conversations.length === 0) return;
+
+    // Create custom confirmation modal
+    const confirmed = await this.showDeleteAllConfirmDialog(conversations.length);
     if (!confirmed) return;
     
-    const conversations = this.plugin.getConversations();
     for (const conv of conversations) {
       await this.plugin.deleteConversation(conv.id);
     }
     
     await this.createNewConversation();
-    new Notice('All conversations deleted');
+    new Notice(t('chat.deleteAllConfirm.success') || 'All conversations deleted');
+  }
+
+  /** Show delete all confirmation dialog with 5-second countdown */
+  private async showDeleteAllConfirmDialog(count: number): Promise<boolean> {
+    return new Promise((resolve) => {
+      // Create overlay
+      const overlay = document.createElement('div');
+      overlay.addClass('opencodian-delete-confirm-overlay');
+      
+      // Create dialog
+      const dialog = document.createElement('div');
+      dialog.addClass('opencodian-delete-confirm-dialog');
+      
+      // Title with warning icon
+      const titleEl = dialog.createDiv({ cls: 'opencodian-delete-confirm-title' });
+      titleEl.setText(t('chat.deleteAllConfirm.title'));
+      
+      // Warning text
+      const warningEl = dialog.createDiv({ cls: 'opencodian-delete-confirm-warning' });
+      warningEl.setText(t('chat.deleteAllConfirm.warning'));
+      
+      // Description
+      const descEl = dialog.createDiv({ cls: 'opencodian-delete-confirm-desc' });
+      descEl.setText(t('chat.deleteAllConfirm.description', { count: String(count) }));
+      
+      // Emphasis text
+      const emphasisEl = dialog.createDiv({ cls: 'opencodian-delete-confirm-emphasis' });
+      emphasisEl.setText(t('chat.deleteAllConfirm.emphasis'));
+      
+      // Buttons container
+      const buttonsEl = dialog.createDiv({ cls: 'opencodian-delete-confirm-buttons' });
+      
+      // Confirm button (red, with countdown) - LEFT side
+      const confirmBtn = buttonsEl.createEl('button', { 
+        cls: 'opencodian-delete-confirm-btn opencodian-delete-confirm-confirm',
+        text: t('chat.deleteAllConfirm.confirm', { seconds: '6' })
+      });
+      confirmBtn.setAttribute('disabled', 'true');
+      
+      // Cancel button - RIGHT side, larger
+      const cancelBtn = buttonsEl.createEl('button', { 
+        cls: 'opencodian-delete-confirm-btn opencodian-delete-confirm-cancel',
+        text: t('chat.deleteAllConfirm.cancel')
+      });
+      
+      // Append to document
+      overlay.appendChild(dialog);
+      document.body.appendChild(overlay);
+      
+      let countdown = 6;
+      let timerId: number | null = null;
+      
+      // Countdown logic (6 seconds)
+      const startCountdown = () => {
+        timerId = window.setInterval(() => {
+          countdown--;
+          if (countdown > 0) {
+            confirmBtn.setText(t('chat.deleteAllConfirm.confirm', { seconds: String(countdown) }));
+          } else {
+            // Enable confirm button
+            if (timerId) {
+              window.clearInterval(timerId);
+              timerId = null;
+            }
+            confirmBtn.removeAttribute('disabled');
+            // Remove countdown text, show only confirm text
+            confirmBtn.setText(t('chat.deleteAllConfirm.confirmText'));
+          }
+        }, 1000);
+      };
+      
+      // Start countdown after a short delay
+      setTimeout(startCountdown, 100);
+      
+      // Cancel handler
+      const handleCancel = () => {
+        if (timerId) {
+          window.clearInterval(timerId);
+        }
+        overlay.remove();
+        resolve(false);
+      };
+      
+      // Confirm handler
+      const handleConfirm = () => {
+        if (countdown > 0) return; // Still counting down
+        if (timerId) {
+          window.clearInterval(timerId);
+        }
+        overlay.remove();
+        resolve(true);
+      };
+      
+      // Click outside to cancel
+      overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) {
+          handleCancel();
+        }
+      });
+      
+      // Button handlers
+      cancelBtn.addEventListener('click', handleCancel);
+      confirmBtn.addEventListener('click', handleConfirm);
+      
+      // Escape to cancel
+      const escapeHandler = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') {
+          handleCancel();
+          document.removeEventListener('keydown', escapeHandler);
+        }
+      };
+      document.addEventListener('keydown', escapeHandler);
+    });
   }
 
   /** Send a message */

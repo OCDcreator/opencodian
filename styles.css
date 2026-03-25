@@ -1321,6 +1321,120 @@
 }
 
 /* ============================================================
+   Delete All Confirmation Dialog Styles
+   ============================================================ */
+
+.opencodian-delete-confirm-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.opencodian-delete-confirm-dialog {
+  background: var(--background-primary);
+  border: 2px solid var(--background-modifier-error);
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 420px;
+  width: 90%;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.opencodian-delete-confirm-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--background-modifier-error);
+  margin-bottom: 16px;
+  text-align: center;
+}
+
+.opencodian-delete-confirm-warning {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--background-modifier-error);
+  text-align: center;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  background: rgba(var(--background-modifier-error-rgb), 0.1);
+  border-radius: 6px;
+}
+
+.opencodian-delete-confirm-desc {
+  font-size: 13px;
+  color: var(--text-normal);
+  line-height: 1.5;
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+.opencodian-delete-confirm-emphasis {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-accent);
+  text-align: center;
+  margin-bottom: 20px;
+  padding: 8px 12px;
+  background: var(--background-secondary);
+  border-radius: 6px;
+}
+
+.opencodian-delete-confirm-buttons {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  /* Confirm (red) on left, Cancel on right */
+}
+
+.opencodian-delete-confirm-btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.opencodian-delete-confirm-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Confirm button - red, on the LEFT */
+.opencodian-delete-confirm-confirm {
+  background: var(--background-modifier-error);
+  color: var(--text-on-accent);
+  min-width: 120px;
+}
+
+.opencodian-delete-confirm-confirm:not(:disabled):hover {
+  background: var(--background-modifier-error-hover);
+  transform: translateY(-1px);
+}
+
+/* Cancel button - larger overall but not too wide, on the RIGHT */
+.opencodian-delete-confirm-cancel {
+  background: var(--background-secondary);
+  color: var(--text-normal);
+  min-width: 100px;
+  padding: 14px 24px;
+  font-size: 16px;
+  transform: scale(1.1);
+}
+
+.opencodian-delete-confirm-cancel:hover {
+  background: var(--background-modifier-hover);
+  transform: scale(1.12);
+}
+
+/* ============================================================
    Markdown Rendering Styles
    ============================================================ */
 
