@@ -27,6 +27,12 @@ export interface PlatformBlockedCommands {
   windows: string[];
 }
 
+/** Platform-specific debug log export paths */
+export interface PlatformDebugLogPaths {
+  unix: string;
+  windows: string;
+}
+
 const UNIX_BLOCKED_COMMANDS = [
   'rm -rf',
   'chmod 777',
@@ -77,6 +83,17 @@ export function getCurrentPlatformKey(): 'unix' | 'windows' {
 
 export function getCurrentPlatformBlockedCommands(commands: PlatformBlockedCommands): string[] {
   return commands[getCurrentPlatformKey()];
+}
+
+export function getDefaultDebugLogPaths(): PlatformDebugLogPaths {
+  return {
+    unix: '',
+    windows: '',
+  };
+}
+
+export function getCurrentPlatformDebugLogPath(paths: PlatformDebugLogPaths): string {
+  return paths[getCurrentPlatformKey()];
 }
 
 /**
@@ -134,6 +151,7 @@ export interface OpenCodianSettings {
   enableAutoScroll: boolean;
   chatScrollMode: ChatScrollMode;
   enableDebugLogging: boolean;
+  debugLogPaths: PlatformDebugLogPaths;
   openInMainTab: boolean;
 
   // Language
@@ -179,6 +197,7 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
   enableAutoScroll: true,
   chatScrollMode: 'sticky-mask',
   enableDebugLogging: false,
+  debugLogPaths: getDefaultDebugLogPaths(),
   openInMainTab: false,
 
   locale: 'en',

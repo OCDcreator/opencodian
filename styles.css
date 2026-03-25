@@ -1208,6 +1208,42 @@
   letter-spacing: 0.5px;
 }
 
+.opencodian-debug-help {
+  margin: 12px 0 20px;
+  padding: 16px 18px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--background-secondary) 92%, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--background-modifier-border);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.opencodian-debug-help-intro,
+.opencodian-debug-help-footer,
+.opencodian-debug-help-detail {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+.opencodian-debug-help-title,
+.opencodian-debug-help-platform {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.opencodian-debug-help-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border-hover);
+}
+
 /* Scrollbar styling - apply to scroll container */
 .opencodian-messages-scroll::-webkit-scrollbar,
 .opencodian-messages::-webkit-scrollbar {

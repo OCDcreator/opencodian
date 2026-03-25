@@ -5,18 +5,25 @@
  * Manages conversation persistence and server lifecycle.
  */
 
+import * as fs from 'fs';
+import * as path from 'path';
 import type { Editor, MarkdownView } from 'obsidian';
 import { Notice, Plugin } from 'obsidian';
 
 import { OpencodeConfigManager } from './core/config';
 import { OpenCodeService } from './core/opencode';
 import { StorageService } from './core/storage';
-import type { Conversation, OpenCodianSettings } from './core/types';
-import { DEFAULT_SETTINGS, VIEW_TYPE_OPENCODIAN } from './core/types';
+import type { Conversation, OpenCodianSettings, PlatformDebugLogPaths } from './core/types';
+import {
+  DEFAULT_SETTINGS,
+  getCurrentPlatformDebugLogPath,
+  getCurrentPlatformKey,
+  VIEW_TYPE_OPENCODIAN,
+} from './core/types';
 import { OpenCodianView } from './features/chat/OpenCodianView';
 import { OpenCodianSettingTab } from './features/settings/OpenCodianSettings';
 import { setLocale } from './i18n';
-import { createLogger, getVaultBasePath, setDebugLoggingEnabled } from './shared';
+import { createLogger, getRecentLogText, getVaultBasePath, setDebugLoggingEnabled } from './shared';
 
 const logger = createLogger('OpenCodian');
 
@@ -167,6 +174,27 @@ export default class OpenCodianPlugin extends Plugin {
   /** Load settings from storage */
   async loadSettings() {
     const savedSettings = await this.storage.loadSettings();
+    const savedDebugLogPaths =
+      savedSettings && typeof savedSettings === 'object' && 'debugLogPaths' in savedSettings
+        ? (savedSettings as { debugLogPaths?: Partial<PlatformDebugLogPaths> }).debugLogPaths
+        : undefined;
+    const legacyDebugLogPath =
+      savedSettings && typeof savedSettings === 'object' && 'debugLogPath' in savedSettings
+        ? (savedSettings as { debugLogPath?: unknown }).debugLogPath
+        : undefined;
+    const normalizedDebugLogPaths: PlatformDebugLogPaths = {
+      ...DEFAULT_SETTINGS.debugLogPaths,
+      ...savedDebugLogPaths,
+    };
+
+    if (
+      typeof legacyDebugLogPath === 'string' &&
+      legacyDebugLogPath.trim().length > 0 &&
+      !normalizedDebugLogPaths[getCurrentPlatformKey()]
+    ) {
+      normalizedDebugLogPaths[getCurrentPlatformKey()] = legacyDebugLogPath.trim();
+    }
+
     const normalizedSettings = savedSettings
       ? {
           ...savedSettings,
@@ -174,11 +202,13 @@ export default class OpenCodianPlugin extends Plugin {
             (savedSettings.chatScrollMode as OpenCodianSettings['chatScrollMode'] | 'sticky' | undefined) === 'sticky'
               ? 'sticky-mask'
               : savedSettings.chatScrollMode,
+          debugLogPaths: normalizedDebugLogPaths,
         }
       : null;
     this.settings = {
       ...DEFAULT_SETTINGS,
       ...normalizedSettings,
+      debugLogPaths: normalizedDebugLogPaths,
     };
   }
 
@@ -213,6 +243,53 @@ export default class OpenCodianPlugin extends Plugin {
     logger.debug(
       `Server snapshot [${source}] -> health=${isHealthy ? 'ok' : 'fail'}, status=${internalStatus}, managedProcess=${hasManagedProcess}`
     );
+  }
+
+  async buildDiagnosticReport(source = 'manual'): Promise<string> {
+    const vaultPath = getVaultBasePath(this.app) ?? 'Unavailable';
+    const isHealthy = await this.openCodeService.checkHealth();
+    const internalStatus = this.openCodeService.getServerStatus();
+    const managedProcess = this.openCodeService.isServerProcessRunning();
+
+    return [
+      '# OpenCodian Diagnostic Report',
+      '',
+      `Generated: ${new Date().toISOString()}`,
+      `Source: ${source}`,
+      `Plugin version: ${this.manifest.version}`,
+      `Platform: ${process.platform}`,
+      `Vault path: ${vaultPath}`,
+      '',
+      '## Server',
+      `Health: ${isHealthy ? 'ok' : 'fail'}`,
+      `Status: ${internalStatus}`,
+      `Managed process: ${managedProcess}`,
+      `Host: ${this.settings.server.host}`,
+      `Port: ${this.settings.server.port}`,
+      '',
+      '## Settings',
+      `Locale: ${this.settings.locale}`,
+      `Permission mode: ${this.settings.permissionMode}`,
+      `Debug logging: ${this.settings.enableDebugLogging}`,
+      `Default provider: ${this.settings.defaultProvider}`,
+      `Default model: ${this.settings.defaultModel}`,
+      `Debug log path (${getCurrentPlatformKey()}): ${getCurrentPlatformDebugLogPath(this.settings.debugLogPaths) || '(not set)'}`,
+      `Debug log paths: ${JSON.stringify(this.settings.debugLogPaths)}`,
+      '',
+      '## Recent Logs',
+      getRecentLogText() || '(no logs captured yet)',
+      '',
+    ].join('\n');
+  }
+
+  async writeDiagnosticLogFile(targetDirectory: string, source = 'manual'): Promise<string> {
+    await fs.promises.mkdir(targetDirectory, { recursive: true });
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const filename = `opencodian-debug-${timestamp}.log`;
+    const targetPath = path.join(targetDirectory, filename);
+    const report = await this.buildDiagnosticReport(source);
+    await fs.promises.writeFile(targetPath, report, 'utf-8');
+    return targetPath;
   }
 
   /** Sync OpenCode config with current permission mode */

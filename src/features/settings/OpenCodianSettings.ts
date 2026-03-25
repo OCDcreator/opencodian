@@ -4,16 +4,58 @@
  * Settings UI for configuring the OpenCodian plugin.
  */
 
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 import { App, Notice, PluginSettingTab, Setting } from 'obsidian';
 
 import { OpencodeConfigManager } from '../../core/config';
-import { getCurrentPlatformKey } from '../../core/types';
+import { getCurrentPlatformDebugLogPath, getCurrentPlatformKey } from '../../core/types';
 import { setLocale, t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { createLogger, getVaultBasePath } from '../../shared';
 import { OpencodeConfigModal } from './OpencodeConfigModal';
 
 const logger = createLogger('OpenCodianSettings');
+
+interface ElectronDialogModule {
+  showOpenDialog: (options: {
+    properties: string[];
+    defaultPath?: string;
+    title?: string;
+    buttonLabel?: string;
+  }) => Promise<{ canceled: boolean; filePaths: string[] }>;
+}
+
+function getElectronDialog(): ElectronDialogModule | null {
+  const globalWithRequire = globalThis as typeof globalThis & {
+    require?: (module: string) => unknown;
+  };
+  const dynamicRequire = globalWithRequire.require;
+  if (!dynamicRequire) {
+    return null;
+  }
+
+  try {
+    const remote = dynamicRequire('@electron/remote') as { dialog?: ElectronDialogModule };
+    if (remote?.dialog) {
+      return remote.dialog;
+    }
+  } catch {
+    // ignore
+  }
+
+  try {
+    const electron = dynamicRequire('electron') as { remote?: { dialog?: ElectronDialogModule } };
+    if (electron?.remote?.dialog) {
+      return electron.remote.dialog;
+    }
+  } catch {
+    // ignore
+  }
+
+  return null;
+}
 
 export class OpenCodianSettingTab extends PluginSettingTab {
   plugin: OpenCodianPlugin;
@@ -69,6 +111,10 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       {
         headingEl: this.addUISettings(containerEl),
         tooltip: t('settings.quickNav.uiDesc'),
+      },
+      {
+        headingEl: this.addDebugSettings(containerEl),
+        tooltip: t('settings.quickNav.debugDesc'),
       },
       {
         headingEl: this.addUserSettings(containerEl),
@@ -731,8 +777,30 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       });
 
     new Setting(containerEl)
-      .setName(t('settings.ui.debugLogging.name'))
-      .setDesc(t('settings.ui.debugLogging.desc'))
+      .setName(t('settings.ui.openInMainTab.name'))
+      .setDesc(t('settings.ui.openInMainTab.desc'))
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.openInMainTab)
+          .onChange(async (value) => {
+            this.plugin.settings.openInMainTab = value;
+            await this.plugin.saveSettings();
+          })
+      );
+
+    return headingEl;
+  }
+
+  /** Debug settings section */
+  private addDebugSettings(containerEl: HTMLElement): HTMLHeadingElement {
+    const headingEl = this.createSectionHeading(containerEl, t('settings.debug.title'));
+    const platformKey = getCurrentPlatformKey();
+    const platformLabel = this.getDebugPathPlatformLabel(platformKey);
+    let logPathText: import('obsidian').TextComponent;
+
+    new Setting(containerEl)
+      .setName(t('settings.debug.logging.name'))
+      .setDesc(t('settings.debug.logging.desc'))
       .addToggle((toggle) =>
         toggle
           .setValue(this.plugin.settings.enableDebugLogging)
@@ -746,18 +814,202 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName(t('settings.ui.openInMainTab.name'))
-      .setDesc(t('settings.ui.openInMainTab.desc'))
-      .addToggle((toggle) =>
-        toggle
-          .setValue(this.plugin.settings.openInMainTab)
+      .setName(t('settings.debug.logPath.name'))
+      .setDesc(t('settings.debug.logPath.desc', { platform: platformLabel }))
+      .addText((text) => {
+        logPathText = text;
+        text
+          .setPlaceholder(this.getDebugPathPlaceholder(platformKey))
+          .setValue(getCurrentPlatformDebugLogPath(this.plugin.settings.debugLogPaths))
           .onChange(async (value) => {
-            this.plugin.settings.openInMainTab = value;
+            this.plugin.settings.debugLogPaths[platformKey] = value.trim();
             await this.plugin.saveSettings();
-          })
-      );
+          });
+      })
+      .addButton((btn) => {
+        btn
+          .setButtonText(t('settings.debug.logPath.choose'))
+          .onClick(async () => {
+            const pickedPath = await this.pickDirectory(getCurrentPlatformDebugLogPath(this.plugin.settings.debugLogPaths));
+            if (!pickedPath) {
+              return;
+            }
+            this.plugin.settings.debugLogPaths[platformKey] = pickedPath;
+            await this.plugin.saveSettings();
+            logPathText.setValue(pickedPath);
+          });
+      });
+
+    new Setting(containerEl)
+      .setName(t('settings.debug.actions.name'))
+      .setDesc(t('settings.debug.actions.desc'))
+      .addButton((btn) => {
+        btn
+          .setButtonText(t('settings.debug.actions.copy'))
+          .onClick(async () => {
+            try {
+              const report = await this.plugin.buildDiagnosticReport('copy-diagnostics');
+              await navigator.clipboard.writeText(report);
+              new Notice(t('settings.debug.actions.copySuccess'));
+            } catch (error) {
+              logger.error('Failed to copy diagnostics:', error);
+              new Notice(t('settings.debug.actions.copyFailed'));
+            }
+          });
+      })
+      .addButton((btn) => {
+        btn
+          .setButtonText(t('settings.debug.actions.generate'))
+          .setCta()
+          .onClick(async () => {
+            try {
+              const outputPath = await this.generateDiagnosticLogFile((savedPath) => {
+                logPathText.setValue(savedPath);
+              });
+              if (outputPath) {
+                new Notice(t('settings.debug.actions.generateSuccess', { path: outputPath }));
+              }
+            } catch (error) {
+              logger.error('Failed to generate diagnostics file:', error);
+              const message = error instanceof Error ? error.message : t('settings.debug.actions.generateFailed');
+              new Notice(message);
+            }
+          });
+      });
+
+    const helpEl = containerEl.createDiv({ cls: 'opencodian-debug-help' });
+    helpEl.createDiv({
+      cls: 'opencodian-debug-help-intro',
+      text: t('settings.debug.console.output'),
+    });
+    helpEl.createDiv({
+      cls: 'opencodian-debug-help-title',
+      text: t('settings.debug.console.howToOpen'),
+    });
+
+    const windowsEl = helpEl.createDiv({ cls: 'opencodian-debug-help-item' });
+    windowsEl.createDiv({
+      cls: 'opencodian-debug-help-platform',
+      text: t('settings.debug.console.windows.title'),
+    });
+    windowsEl.createDiv({
+      cls: 'opencodian-debug-help-detail',
+      text: t('settings.debug.console.windows.shortcut'),
+    });
+    windowsEl.createDiv({
+      cls: 'opencodian-debug-help-detail',
+      text: t('settings.debug.console.windows.menu'),
+    });
+
+    const macEl = helpEl.createDiv({ cls: 'opencodian-debug-help-item' });
+    macEl.createDiv({
+      cls: 'opencodian-debug-help-platform',
+      text: t('settings.debug.console.mac.title'),
+    });
+    macEl.createDiv({
+      cls: 'opencodian-debug-help-detail',
+      text: t('settings.debug.console.mac.shortcut'),
+    });
+    macEl.createDiv({
+      cls: 'opencodian-debug-help-detail',
+      text: t('settings.debug.console.mac.menu'),
+    });
+
+    helpEl.createDiv({
+      cls: 'opencodian-debug-help-footer',
+      text: t('settings.debug.console.consoleTab'),
+    });
 
     return headingEl;
+  }
+
+  private async pickDirectory(defaultPath?: string): Promise<string | null> {
+    const dialog = getElectronDialog();
+    if (!dialog) {
+      new Notice(t('settings.debug.logPath.dialogUnavailable'));
+      return null;
+    }
+
+    const result = await dialog.showOpenDialog({
+      title: t('settings.debug.logPath.dialogTitle'),
+      buttonLabel: t('settings.debug.logPath.dialogButton'),
+      properties: ['openDirectory', 'createDirectory'],
+      defaultPath: this.getDirectoryPickerDefaultPath(defaultPath),
+    });
+
+    if (result.canceled || result.filePaths.length === 0) {
+      return null;
+    }
+
+    return result.filePaths[0];
+  }
+
+  private async generateDiagnosticLogFile(onDefaultPathSaved?: (path: string) => void): Promise<string | null> {
+    const platformKey = getCurrentPlatformKey();
+    let targetDirectory = getCurrentPlatformDebugLogPath(this.plugin.settings.debugLogPaths).trim();
+
+    if (!targetDirectory || !fs.existsSync(targetDirectory)) {
+      const pickedPath = await this.pickDirectory(targetDirectory);
+      if (!pickedPath) {
+        return null;
+      }
+      targetDirectory = pickedPath;
+    }
+
+    const outputPath = await this.plugin.writeDiagnosticLogFile(targetDirectory, 'settings-export');
+
+    if (targetDirectory !== getCurrentPlatformDebugLogPath(this.plugin.settings.debugLogPaths)) {
+      const shouldPersist = window.confirm(t('settings.debug.logPath.confirmUseDefault', { path: targetDirectory }));
+      if (shouldPersist) {
+        this.plugin.settings.debugLogPaths[platformKey] = targetDirectory;
+        await this.plugin.saveSettings();
+        onDefaultPathSaved?.(targetDirectory);
+      }
+    }
+    return outputPath;
+  }
+
+  private getDebugPathPlatformLabel(platformKey: 'unix' | 'windows'): string {
+    return platformKey === 'windows'
+      ? t('settings.debug.logPath.platformWindows')
+      : t('settings.debug.logPath.platformUnix');
+  }
+
+  private getDebugPathPlaceholder(platformKey: 'unix' | 'windows'): string {
+    return platformKey === 'windows'
+      ? t('settings.debug.logPath.placeholderWindows')
+      : t('settings.debug.logPath.placeholderUnix');
+  }
+
+  private getDirectoryPickerDefaultPath(defaultPath?: string): string {
+    const normalizedDefaultPath = (defaultPath ?? '').trim();
+    if (normalizedDefaultPath) {
+      return normalizedDefaultPath;
+    }
+
+    for (const allowedPath of this.plugin.settings.allowedExportPaths) {
+      const expandedPath = this.expandHomePath(allowedPath);
+      if (expandedPath && fs.existsSync(expandedPath)) {
+        return expandedPath;
+      }
+    }
+
+    const desktopPath = path.join(os.homedir(), 'Desktop');
+    if (fs.existsSync(desktopPath)) {
+      return desktopPath;
+    }
+
+    return os.homedir();
+  }
+
+  private expandHomePath(candidatePath: string): string {
+    if (candidatePath === '~') {
+      return os.homedir();
+    }
+    if (candidatePath.startsWith('~/') || candidatePath.startsWith('~\\')) {
+      return path.join(os.homedir(), candidatePath.slice(2));
+    }
+    return candidatePath;
   }
 
   /** User settings section */

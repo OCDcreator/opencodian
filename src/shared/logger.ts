@@ -2,6 +2,16 @@ type LogMethod = 'log' | 'warn' | 'error';
 
 const DEBUG_STORAGE_KEY = 'opencodian:debug';
 const DEBUG_FLAG_KEY = '__OPENCODIAN_DEBUG__';
+const MAX_LOG_ENTRIES = 500;
+
+interface LogEntry {
+  timestamp: string;
+  method: LogMethod;
+  scope: string;
+  message: string;
+}
+
+const recentLogEntries: LogEntry[] = [];
 
 export interface Logger {
   debug: (...args: unknown[]) => void;
@@ -40,8 +50,39 @@ function formatArgs(scope: string, args: unknown[]): unknown[] {
   return [`[${scope}]`, ...args];
 }
 
+function stringifyArg(arg: unknown): string {
+  if (typeof arg === 'string') {
+    return arg;
+  }
+
+  if (arg instanceof Error) {
+    return arg.stack || arg.message;
+  }
+
+  try {
+    return JSON.stringify(arg);
+  } catch {
+    return String(arg);
+  }
+}
+
+function pushRecentLog(method: LogMethod, scope: string, args: unknown[]): void {
+  const parts = args.map((arg) => stringifyArg(arg)).filter(Boolean);
+  recentLogEntries.push({
+    timestamp: new Date().toISOString(),
+    method,
+    scope,
+    message: parts.join(' '),
+  });
+
+  if (recentLogEntries.length > MAX_LOG_ENTRIES) {
+    recentLogEntries.splice(0, recentLogEntries.length - MAX_LOG_ENTRIES);
+  }
+}
+
 function emit(method: LogMethod, scope: string, args: unknown[]): void {
   const consoleRef = globalThis.console;
+  pushRecentLog(method, scope, args);
   if (!consoleRef) {
     return;
   }
@@ -78,4 +119,14 @@ export function createLogger(scope: string): Logger {
       emit('error', scope, args);
     },
   };
+}
+
+export function getRecentLogEntries(): LogEntry[] {
+  return [...recentLogEntries];
+}
+
+export function getRecentLogText(): string {
+  return recentLogEntries
+    .map((entry) => `${entry.timestamp} [${entry.method.toUpperCase()}] [${entry.scope}] ${entry.message}`)
+    .join('\n');
 }

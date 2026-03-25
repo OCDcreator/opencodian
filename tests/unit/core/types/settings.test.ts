@@ -5,7 +5,9 @@
 import {
   DEFAULT_SETTINGS,
   getCurrentPlatformBlockedCommands,
+  getCurrentPlatformDebugLogPath,
   getDefaultBlockedCommands,
+  getDefaultDebugLogPaths,
 } from '../../../../src/core/types/settings';
 
 describe('Settings', () => {
@@ -75,6 +77,7 @@ describe('Settings', () => {
       expect(DEFAULT_SETTINGS.maxTabs).toBe(3);
       expect(DEFAULT_SETTINGS.tabBarPosition).toBe('input');
       expect(DEFAULT_SETTINGS.enableAutoScroll).toBe(true);
+      expect(DEFAULT_SETTINGS.debugLogPaths).toEqual({ unix: '', windows: '' });
       expect(DEFAULT_SETTINGS.openInMainTab).toBe(false);
       expect(DEFAULT_SETTINGS.locale).toBe('en');
     });
@@ -98,6 +101,51 @@ describe('Settings', () => {
     it('should have allowed export paths', () => {
       expect(DEFAULT_SETTINGS.allowedExportPaths).toContain('~/Desktop');
       expect(DEFAULT_SETTINGS.allowedExportPaths).toContain('~/Downloads');
+    });
+  });
+
+  describe('debug log paths', () => {
+    const originalPlatform = process.platform;
+
+    afterEach(() => {
+      Object.defineProperty(process, 'platform', {
+        value: originalPlatform,
+      });
+    });
+
+    it('should return a copy of default debug log paths', () => {
+      const paths1 = getDefaultDebugLogPaths();
+      const paths2 = getDefaultDebugLogPaths();
+
+      paths1.windows = 'C:\\Logs';
+
+      expect(paths2.windows).toBe('');
+    });
+
+    it('should return Windows debug path on Windows', () => {
+      Object.defineProperty(process, 'platform', {
+        value: 'win32',
+      });
+
+      expect(
+        getCurrentPlatformDebugLogPath({
+          unix: '/Users/test/OpenCodianLogs',
+          windows: 'C:\\OpenCodianLogs',
+        })
+      ).toBe('C:\\OpenCodianLogs');
+    });
+
+    it('should return Unix debug path on macOS/Linux', () => {
+      Object.defineProperty(process, 'platform', {
+        value: 'darwin',
+      });
+
+      expect(
+        getCurrentPlatformDebugLogPath({
+          unix: '/Users/test/OpenCodianLogs',
+          windows: 'C:\\OpenCodianLogs',
+        })
+      ).toBe('/Users/test/OpenCodianLogs');
     });
   });
 });
