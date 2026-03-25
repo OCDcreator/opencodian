@@ -22,6 +22,7 @@
 13. [SDK](#13-sdk)
 14. [服务器](#14-服务器)
 15. [插件 (Plugins)](#15-插件-plugins)
+- [附录：自定义提供商配置](#附录自定义提供商配置)
 
 ---
 
@@ -2146,83 +2147,6 @@ http://<hostname>:<port>/doc
 | ---- | ------ | ------------ |
 | GET  | `/doc` | OpenAPI 规范 |
 
----
-
-## 附录：自定义提供商配置
-
-**来源**: https://opencode.ai/docs/zh-cn/config/
-
-在项目目录中创建或更新 `opencode.json` 文件：
-
-```json
-{
-  "$schema": "https://opencode.ai/config.json",
-  "provider": {
-    "myprovider": {
-      "npm": "@ai-sdk/openai-compatible",
-      "name": "My AI Provider Display Name",
-      "options": {
-        "baseURL": "https://api.myprovider.com/v1"
-      },
-      "models": {
-        "my-model-name": {
-          "name": "My Model Display Name"
-        }
-      }
-    }
-  }
-}
-```
-
-### 配置选项说明
-
-| 字段              | 说明                                                                                                                       |
-| ----------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `npm`             | AI SDK 包，OpenAI 兼容使用 `@ai-sdk/openai-compatible`（适用于 /v1/chat/completions），/v1/responses 使用 `@ai-sdk/openai` |
-| `name`            | UI 中显示的名称                                                                                                            |
-| `models`          | 可用模型                                                                                                                   |
-| `options.baseURL` | API 端点 URL                                                                                                               |
-| `options.apiKey`  | API 密钥（可选，可使用 `{env:VAR_NAME}`）                                                                                  |
-| `options.headers` | 自定义请求头                                                                                                               |
-| `limit.context`   | 最大输入 Token 数                                                                                                          |
-| `limit.output`    | 最大输出 Token 数                                                                                                          |
-
-### 高级示例
-
-```json
-{
-  "$schema": "https://opencode.ai/config.json",
-  "provider": {
-    "myprovider": {
-      "npm": "@ai-sdk/openai-compatible",
-      "name": "My AI Provider",
-      "options": {
-        "baseURL": "https://api.myprovider.com/v1",
-        "apiKey": "{env:ANTHROPIC_API_KEY}",
-        "headers": {
-          "Authorization": "Bearer custom-token"
-        }
-      },
-      "models": {
-        "my-model-name": {
-          "name": "My Model",
-          "limit": {
-            "context": 200000,
-            "output": 65536
-          }
-        }
-      }
-    }
-  }
-}
-```
-
-执行 `/models` 命令，自定义的提供商和模型将出现在选择列表中。
-
----
-
-_文档结束_
-
 ## 15. 插件 (Plugins)
 
 **来源**: https://opencode.ai/docs/plugins/
@@ -2522,6 +2446,79 @@ Format as a structured prompt that a new agent can use to resume work.
 ```
 
 当设置 `output.prompt` 时，它会完全替换默认压缩提示词，此时 `output.context` 数组被忽略。
+
+---
+
+## 附录：自定义提供商配置
+
+**来源**: https://opencode.ai/docs/zh-cn/config/
+
+在项目目录中创建或更新 `opencode.json` 文件：
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "myprovider": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "My AI Provider Display Name",
+      "options": {
+        "baseURL": "https://api.myprovider.com/v1"
+      },
+      "models": {
+        "my-model-name": {
+          "name": "My Model Display Name"
+        }
+      }
+    }
+  }
+}
+```
+
+### 配置选项说明
+
+| 字段              | 说明                                                                                                                       |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `npm`             | AI SDK 包，OpenAI 兼容使用 `@ai-sdk/openai-compatible`（适用于 /v1/chat/completions），/v1/responses 使用 `@ai-sdk/openai` |
+| `name`            | UI 中显示的名称                                                                                                            |
+| `models`          | 可用模型                                                                                                                   |
+| `options.baseURL` | API 端点 URL                                                                                                               |
+| `options.apiKey`  | API 密钥（可选，可使用 `{env:VAR_NAME}`）                                                                                  |
+| `options.headers` | 自定义请求头                                                                                                               |
+| `limit.context`   | 最大输入 Token 数                                                                                                          |
+| `limit.output`    | 最大输出 Token 数                                                                                                          |
+
+### 高级示例
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "myprovider": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "My AI Provider",
+      "options": {
+        "baseURL": "https://api.myprovider.com/v1",
+        "apiKey": "{env:ANTHROPIC_API_KEY}",
+        "headers": {
+          "Authorization": "Bearer custom-token"
+        }
+      },
+      "models": {
+        "my-model-name": {
+          "name": "My Model",
+          "limit": {
+            "context": 200000,
+            "output": 65536
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+执行 `/models` 命令，自定义的提供商和模型将出现在选择列表中。
 
 ---
 
