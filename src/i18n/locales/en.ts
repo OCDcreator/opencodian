@@ -140,6 +140,8 @@ export const enTranslations = {
   'chat.action.copy': 'Copy',
   'chat.action.retry': 'Retry',
   'chat.action.delete': 'Delete',
+  'chat.history.deleteCurrent': 'Delete current conversation',
+  'chat.history.deleteAll': 'Delete all conversations',
 
   // Tool approval
   'toolApproval.title': 'Tool Execution Request',

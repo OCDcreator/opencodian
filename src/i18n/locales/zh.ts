@@ -140,6 +140,8 @@ export const zhTranslations = {
   'chat.action.copy': '复制',
   'chat.action.retry': '重试',
   'chat.action.delete': '删除',
+  'chat.history.deleteCurrent': '删除当前会话',
+  'chat.history.deleteAll': '删除所有会话',
 
   // Tool approval
   'toolApproval.title': '工具执行请求',

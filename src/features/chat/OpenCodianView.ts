@@ -464,6 +464,10 @@ export class OpenCodianView extends ItemView {
     this.updateModelSelectorDisplay();
   }
 
+  // History dropdown state
+  private historyDropdownEl: HTMLElement | null = null;
+  private historyDropdownClickOutsideHandler: ((e: MouseEvent) => void) | null = null;
+
   /** Show conversation history */
   private showConversationHistory(event: MouseEvent) {
     const conversations = this.plugin.getConversations();
@@ -473,58 +477,149 @@ export class OpenCodianView extends ItemView {
       return;
     }
 
-    const menu = new Menu();
+    // Close existing dropdown if open
+    this.closeHistoryDropdown();
+
+    // Create custom dropdown
+    this.historyDropdownEl = document.createElement('div');
+    this.historyDropdownEl.addClass('opencodian-history-dropdown');
     
-    // Add each conversation to the menu
+    // Create scrollable container for conversations only
+    const scrollContainer = this.historyDropdownEl.createDiv({ cls: 'opencodian-history-scroll' });
+    
+    // Add each conversation to the dropdown
     for (const conv of conversations) {
       const isActive = this.currentConversation?.id === conv.id;
       const title = conv.title || 'Untitled';
+      // Format: YYYY/M/D HH:MM:SS
+      const createdAt = new Date(conv.createdAt);
+      const dateStr = `${createdAt.getFullYear()}/${createdAt.getMonth() + 1}/${createdAt.getDate()} ${String(createdAt.getHours()).padStart(2, '0')}:${String(createdAt.getMinutes()).padStart(2, '0')}:${String(createdAt.getSeconds()).padStart(2, '0')}`;
       
-      menu.addItem((item) => {
-        item
-          .setTitle(`${title}${isActive ? ' (current)' : ''}`)
-          .setIcon(isActive ? 'check' : 'message-square')
-          .setSection('conversations')
-          .onClick(() => {
-            if (!isActive) {
-              void this.loadConversation(conv.id);
-            }
-          });
-        
-        // Add tooltip with creation date (set on the menu item via setTooltip if available)
-        // Note: Obsidian's MenuItem doesn't expose DOM directly, tooltip shows via title in item text
+      const itemEl = scrollContainer.createDiv({ 
+        cls: `opencodian-history-item${isActive ? ' is-active' : ''}` 
+      });
+      
+      // Icon
+      const iconEl = itemEl.createSpan({ cls: 'opencodian-history-item-icon' });
+      setIcon(iconEl, isActive ? 'check' : 'message-square');
+      
+      // Content container for title and date
+      const contentEl = itemEl.createDiv({ cls: 'opencodian-history-item-content' });
+      contentEl.createDiv({ cls: 'opencodian-history-item-title', text: title });
+      contentEl.createDiv({ cls: 'opencodian-history-item-date', text: dateStr });
+      
+      // Click handler
+      itemEl.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.closeHistoryDropdown();
+        if (!isActive) {
+          void this.loadConversation(conv.id);
+        }
       });
     }
     
-    // Add separator and delete options
-    if (conversations.length > 0) {
-      menu.addSeparator();
-      
-      menu.addItem((item) => {
-        item
-          .setTitle('Delete current conversation')
-          .setIcon('trash')
-          .setSection('actions')
-          .onClick(() => {
-            void this.deleteCurrentConversation();
-          });
+    // Fixed footer with delete actions (outside scroll container)
+    const footerEl = this.historyDropdownEl.createDiv({ cls: 'opencodian-history-footer' });
+    
+    // Add separator line
+    footerEl.createDiv({ cls: 'opencodian-history-separator' });
+    
+    // Delete actions section
+    const actionsEl = footerEl.createDiv({ cls: 'opencodian-history-actions' });
+    
+    // Delete current conversation
+    const deleteCurrentEl = actionsEl.createDiv({ cls: 'opencodian-history-action' });
+    const deleteCurrentIcon = deleteCurrentEl.createSpan({ cls: 'opencodian-history-action-icon' });
+    setIcon(deleteCurrentIcon, 'trash');
+    deleteCurrentEl.createSpan({ cls: 'opencodian-history-action-text', text: t('chat.history.deleteCurrent') });
+    deleteCurrentEl.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.closeHistoryDropdown();
+      void this.deleteCurrentConversation();
+    });
+    
+    // Delete all conversations (if more than 1)
+    if (conversations.length > 1) {
+      const deleteAllEl = actionsEl.createDiv({ cls: 'opencodian-history-action' });
+      const deleteAllIcon = deleteAllEl.createSpan({ cls: 'opencodian-history-action-icon' });
+      setIcon(deleteAllIcon, 'trash-2');
+      deleteAllEl.createSpan({ cls: 'opencodian-history-action-text', text: t('chat.history.deleteAll') });
+      deleteAllEl.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.closeHistoryDropdown();
+        void this.deleteAllConversations();
       });
-      
-      if (conversations.length > 1) {
-        menu.addItem((item) => {
-          item
-            .setTitle('Delete all conversations')
-            .setIcon('trash-2')
-            .setSection('actions')
-            .onClick(() => {
-              void this.deleteAllConversations();
-            });
-        });
+    }
+    
+    // Add to document first so we can measure its size
+    document.body.appendChild(this.historyDropdownEl);
+    
+    // Position the dropdown intelligently to stay within viewport
+    const targetEl = event.target as HTMLElement;
+    const rect = targetEl.getBoundingClientRect();
+    const dropdownRect = this.historyDropdownEl.getBoundingClientRect();
+    
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    
+    // Calculate available space
+    const spaceBelow = viewportHeight - rect.bottom - 8;
+    const spaceAbove = rect.top - 8;
+    
+    // Decide whether to show below or above
+    let top: number;
+    if (spaceBelow >= dropdownRect.height || spaceBelow >= spaceAbove) {
+      // Show below (preferred) or if there's more space below
+      top = rect.bottom + 4;
+      // But if it would overflow, adjust
+      if (top + dropdownRect.height > viewportHeight - 8) {
+        top = Math.max(8, viewportHeight - dropdownRect.height - 8);
+      }
+    } else {
+      // Show above
+      top = rect.top - dropdownRect.height - 4;
+      if (top < 8) {
+        top = 8;
       }
     }
     
-    // Show the menu below the history button
-    menu.showAtMouseEvent(event);
+    // Calculate left position to keep within viewport
+    let left = rect.left;
+    if (left + dropdownRect.width > viewportWidth - 8) {
+      left = Math.max(8, viewportWidth - dropdownRect.width - 8);
+    }
+    if (left < 8) {
+      left = 8;
+    }
+    
+    this.historyDropdownEl.style.position = 'fixed';
+    this.historyDropdownEl.style.top = `${top}px`;
+    this.historyDropdownEl.style.left = `${left}px`;
+    this.historyDropdownEl.style.zIndex = '1000';
+    
+    // Setup click outside handler
+    this.historyDropdownClickOutsideHandler = (e: MouseEvent) => {
+      if (!this.historyDropdownEl?.contains(e.target as Node)) {
+        this.closeHistoryDropdown();
+      }
+    };
+    
+    // Add click outside listener with small delay to avoid immediate close
+    setTimeout(() => {
+      document.addEventListener('click', this.historyDropdownClickOutsideHandler!);
+    }, 0);
+  }
+  
+  /** Close history dropdown */
+  private closeHistoryDropdown(): void {
+    if (this.historyDropdownEl) {
+      this.historyDropdownEl.remove();
+      this.historyDropdownEl = null;
+    }
+    if (this.historyDropdownClickOutsideHandler) {
+      document.removeEventListener('click', this.historyDropdownClickOutsideHandler);
+      this.historyDropdownClickOutsideHandler = null;
+    }
   }
 
   /** Delete current conversation */
