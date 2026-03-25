@@ -1635,15 +1635,31 @@ export class OpenCodianView extends ItemView {
     }
   }
 
+  // Permission selector state
+  private permissionSelectorContainer: HTMLElement | null = null;
+  private permissionSelectorTrigger: HTMLElement | null = null;
+  private permissionSelectorDropdown: HTMLElement | null = null;
+  private isPermissionDropdownOpen = false;
+  private permissionDropdownClickOutsideHandler: ((e: MouseEvent) => void) | null = null;
+
   /** Initialize permission mode selector */
   private initializePermissionSelector(containerEl: HTMLElement): void {
-    // Create trigger button
-    const trigger = containerEl.createDiv({ cls: 'opencodian-permission-trigger' });
+    this.permissionSelectorContainer = containerEl;
     
-    const iconEl = trigger.createSpan({ cls: 'opencodian-permission-trigger-icon' });
+    // Create trigger button
+    this.permissionSelectorTrigger = containerEl.createDiv({ cls: 'opencodian-permission-trigger' });
+    
+    const iconEl = this.permissionSelectorTrigger.createSpan({ cls: 'opencodian-permission-trigger-icon' });
     setIcon(iconEl, 'shield');
     
-    const textEl = trigger.createSpan({ cls: 'opencodian-permission-trigger-text' });
+    const textEl = this.permissionSelectorTrigger.createSpan({ cls: 'opencodian-permission-trigger-text' });
+    
+    // Create dropdown (hidden by default)
+    this.permissionSelectorDropdown = containerEl.createDiv({ cls: 'opencodian-permission-dropdown' });
+    this.permissionSelectorDropdown.style.display = 'none';
+    
+    // Build dropdown content
+    this.buildPermissionDropdown();
     
     // Update display based on current mode
     const updateDisplay = () => {
@@ -1657,59 +1673,169 @@ export class OpenCodianView extends ItemView {
       textEl.textContent = modeText[mode] || mode;
       
       // Update icon color based on mode
-      trigger.removeClass('mode-yolo', 'mode-normal', 'mode-plan');
-      trigger.addClass(`mode-${mode}`);
+      this.permissionSelectorTrigger?.removeClass('mode-yolo', 'mode-normal', 'mode-plan');
+      this.permissionSelectorTrigger?.addClass(`mode-${mode}`);
+      
+      // Update dropdown selection
+      this.updatePermissionDropdownSelection();
     };
     
     updateDisplay();
     
-    // Handle click
-    trigger.addEventListener('click', (e) => {
+    // Handle trigger click
+    this.permissionSelectorTrigger.addEventListener('click', (e) => {
       e.stopPropagation();
-      
-      const menu = new Menu();
-      
-      menu.addItem((item) => {
-        item
-          .setTitle(t('settings.security.permissionMode.yolo'))
-          .setIcon('shield-check')
-          .onClick(async () => {
-            await this.switchPermissionMode('yolo');
-            updateDisplay();
-          });
-        if (this.plugin.settings.permissionMode === 'yolo') {
-          item.setChecked(true);
-        }
-      });
-      
-      menu.addItem((item) => {
-        item
-          .setTitle(t('settings.security.permissionMode.normal'))
-          .setIcon('shield-question')
-          .onClick(async () => {
-            await this.switchPermissionMode('normal');
-            updateDisplay();
-          });
-        if (this.plugin.settings.permissionMode === 'normal') {
-          item.setChecked(true);
-        }
-      });
-      
-      menu.addItem((item) => {
-        item
-          .setTitle(t('settings.security.permissionMode.plan'))
-          .setIcon('shield-alert')
-          .onClick(async () => {
-            await this.switchPermissionMode('plan');
-            updateDisplay();
-          });
-        if (this.plugin.settings.permissionMode === 'plan') {
-          item.setChecked(true);
-        }
-      });
-      
-      menu.showAtPosition({ x: e.clientX, y: e.clientY });
+      this.togglePermissionDropdown();
     });
+    
+    // Setup click outside handler
+    this.permissionDropdownClickOutsideHandler = (e: MouseEvent) => {
+      if (!this.permissionSelectorContainer?.contains(e.target as Node)) {
+        this.closePermissionDropdown();
+      }
+    };
+  }
+  
+  /** Build permission dropdown content */
+  private buildPermissionDropdown(): void {
+    if (!this.permissionSelectorDropdown) return;
+    
+    this.permissionSelectorDropdown.empty();
+    
+    // Create option items
+    const modes: Array<{ id: string; label: string; description: string }> = [
+      { 
+        id: 'yolo', 
+        label: t('settings.security.permissionMode.yolo'),
+        description: t('settings.security.permissionMode.yoloDescription') || 'Allow all tools without asking'
+      },
+      { 
+        id: 'normal', 
+        label: t('settings.security.permissionMode.normal'),
+        description: t('settings.security.permissionMode.normalDescription') || 'Ask before executing tools'
+      },
+      { 
+        id: 'plan', 
+        label: t('settings.security.permissionMode.plan'),
+        description: t('settings.security.permissionMode.planDescription') || 'Review and approve all actions'
+      },
+    ];
+    
+    for (const mode of modes) {
+      const optionEl = this.permissionSelectorDropdown.createDiv({ 
+        cls: 'opencodian-permission-option',
+        attr: { 'data-mode': mode.id }
+      });
+      
+      // Icon - use consistent shield icon like the trigger
+      const iconWrapper = optionEl.createSpan({ cls: 'opencodian-permission-option-icon' });
+      setIcon(iconWrapper, 'shield');
+      
+      // Content container for label and description
+      const contentEl = optionEl.createDiv({ cls: 'opencodian-permission-option-content' });
+      contentEl.createDiv({ cls: 'opencodian-permission-option-label', text: mode.label });
+      contentEl.createDiv({ cls: 'opencodian-permission-option-desc', text: mode.description });
+      
+      // Checkmark for selected state
+      const checkmark = optionEl.createSpan({ cls: 'opencodian-permission-option-check' });
+      setIcon(checkmark, 'check');
+      
+      // Click handler
+      optionEl.addEventListener('click', (e) => {
+        e.stopPropagation();
+        void this.switchPermissionMode(mode.id as 'yolo' | 'normal' | 'plan').then(() => {
+          this.updatePermissionTriggerDisplay();
+          this.closePermissionDropdown();
+        });
+      });
+    }
+    
+    // Update selection state
+    this.updatePermissionDropdownSelection();
+  }
+  
+  /** Update permission dropdown selection state */
+  private updatePermissionDropdownSelection(): void {
+    if (!this.permissionSelectorDropdown) return;
+    
+    const currentMode = this.plugin.settings.permissionMode;
+    
+    this.permissionSelectorDropdown.querySelectorAll('.opencodian-permission-option').forEach(opt => {
+      const mode = opt.getAttribute('data-mode');
+      if (mode === currentMode) {
+        opt.addClass('is-selected');
+      } else {
+        opt.removeClass('is-selected');
+      }
+    });
+  }
+  
+  /** Update permission trigger display */
+  private updatePermissionTriggerDisplay(): void {
+    if (!this.permissionSelectorTrigger) return;
+    
+    const mode = this.plugin.settings.permissionMode;
+    const modeText: Record<string, string> = {
+      'yolo': 'YOLO',
+      'normal': 'ASK',
+      'plan': 'PLAN',
+    };
+    
+    const textEl = this.permissionSelectorTrigger.querySelector('.opencodian-permission-trigger-text');
+    if (textEl) {
+      textEl.textContent = modeText[mode] || mode;
+    }
+    
+    // Update icon color based on mode
+    this.permissionSelectorTrigger.removeClass('mode-yolo', 'mode-normal', 'mode-plan');
+    this.permissionSelectorTrigger.addClass(`mode-${mode}`);
+  }
+  
+  /** Toggle permission dropdown visibility */
+  private togglePermissionDropdown(): void {
+    if (this.isPermissionDropdownOpen) {
+      this.closePermissionDropdown();
+    } else {
+      this.openPermissionDropdown();
+    }
+  }
+  
+  /** Open permission dropdown */
+  private openPermissionDropdown(): void {
+    if (!this.permissionSelectorDropdown || !this.permissionSelectorTrigger) return;
+    
+    this.isPermissionDropdownOpen = true;
+    this.permissionSelectorDropdown.style.display = 'block';
+    this.permissionSelectorTrigger.addClass('is-open');
+    
+    // Update selection
+    this.updatePermissionDropdownSelection();
+    
+    // Add click outside listener
+    document.addEventListener('click', this.permissionDropdownClickOutsideHandler!);
+    
+    // Register escape key handler
+    this.scope?.register([], 'Escape', () => {
+      if (this.isPermissionDropdownOpen) {
+        this.closePermissionDropdown();
+        return true;
+      }
+      return false;
+    });
+  }
+  
+  /** Close permission dropdown */
+  private closePermissionDropdown(): void {
+    if (!this.permissionSelectorDropdown || !this.permissionSelectorTrigger) return;
+    
+    this.isPermissionDropdownOpen = false;
+    this.permissionSelectorDropdown.style.display = 'none';
+    this.permissionSelectorTrigger.removeClass('is-open');
+    
+    // Remove click outside listener
+    if (this.permissionDropdownClickOutsideHandler) {
+      document.removeEventListener('click', this.permissionDropdownClickOutsideHandler);
+    }
   }
 
   /** Switch permission mode and restart OpenCode service */
