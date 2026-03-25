@@ -64,6 +64,8 @@ function getRandomPendingMessage(): string {
   return PENDING_MESSAGES[Math.floor(Math.random() * PENDING_MESSAGES.length)];
 }
 
+type ChatServerAvailability = 'checking' | 'running' | 'starting' | 'offline' | 'external';
+
 /** Clipboard icon SVG for copy button */
 const COPY_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`;
 
@@ -104,6 +106,11 @@ export class OpenCodianView extends ItemView {
   // Send/Stop button reference
   private sendBtn: HTMLElement | null = null;
   private inputTextarea: HTMLTextAreaElement | null = null;
+  private serverStatusBadgeEl: HTMLElement | null = null;
+  private serverStatusTextEl: HTMLElement | null = null;
+  private serverStatusIntervalId: number | null = null;
+  private isRefreshingServerStatus = false;
+  private lastServerAvailability: ChatServerAvailability | null = null;
 
   private appSettings(): { open: () => void; openTabById: (id: string) => void } {
     return (this.app as typeof this.app & {
@@ -132,6 +139,7 @@ export class OpenCodianView extends ItemView {
   async onOpen() {
     // Build UI
     this.buildUI();
+    this.startServerStatusLoop();
 
     // Initialize markdown service
     if (this.messagesContainer) {
@@ -161,6 +169,8 @@ export class OpenCodianView extends ItemView {
   }
 
   async onClose() {
+    this.stopServerStatusLoop();
+
     // Cleanup event refs
     for (const ref of this.eventRefs) {
       this.plugin.app.vault.offref(ref);
@@ -288,6 +298,19 @@ export class OpenCodianView extends ItemView {
     // Actions
     const actions = header.createDiv({ cls: 'opencodian-header-actions' });
 
+    this.serverStatusBadgeEl = actions.createDiv({ cls: 'opencodian-server-status-badge is-checking' });
+    this.serverStatusBadgeEl.createSpan({ cls: 'opencodian-server-status-dot' });
+    this.serverStatusTextEl = this.serverStatusBadgeEl.createSpan({
+      cls: 'opencodian-server-status-text',
+      text: t('chat.serverStatus.checking'),
+    });
+    this.serverStatusBadgeEl.setAttribute('aria-label', t('chat.serverStatus.openSettings'));
+    this.serverStatusBadgeEl.addEventListener('click', () => {
+      const settings = this.appSettings();
+      settings.open();
+      settings.openTabById('opencodian');
+    });
+
     // New conversation button
     const newBtn = actions.createDiv({ cls: 'opencodian-header-btn' });
     setIcon(newBtn, 'plus');
@@ -313,6 +336,77 @@ export class OpenCodianView extends ItemView {
       settings.open();
       settings.openTabById('opencodian');
     });
+  }
+
+  private startServerStatusLoop(): void {
+    void this.refreshServerStatusBadge();
+    if (this.serverStatusIntervalId) {
+      window.clearInterval(this.serverStatusIntervalId);
+    }
+    this.serverStatusIntervalId = window.setInterval(() => {
+      void this.refreshServerStatusBadge();
+    }, 5000);
+  }
+
+  private stopServerStatusLoop(): void {
+    if (this.serverStatusIntervalId) {
+      window.clearInterval(this.serverStatusIntervalId);
+      this.serverStatusIntervalId = null;
+    }
+  }
+
+  private async refreshServerStatusBadge(): Promise<void> {
+    if (!this.serverStatusBadgeEl || !this.serverStatusTextEl || this.isRefreshingServerStatus) {
+      return;
+    }
+
+    this.isRefreshingServerStatus = true;
+    try {
+      const availability = await this.getServerAvailability();
+      if (availability !== this.lastServerAvailability) {
+        logger.debug(`Chat server availability -> ${availability}`);
+        this.lastServerAvailability = availability;
+      }
+      const statusKeyMap: Record<ChatServerAvailability, 'chat.serverStatus.checking' | 'chat.serverStatus.running' | 'chat.serverStatus.starting' | 'chat.serverStatus.offline' | 'chat.serverStatus.external'> = {
+        checking: 'chat.serverStatus.checking',
+        running: 'chat.serverStatus.running',
+        starting: 'chat.serverStatus.starting',
+        offline: 'chat.serverStatus.offline',
+        external: 'chat.serverStatus.external',
+      };
+      this.serverStatusBadgeEl.removeClass(
+        'is-checking',
+        'is-running',
+        'is-starting',
+        'is-offline',
+        'is-external'
+      );
+      this.serverStatusBadgeEl.addClass(`is-${availability}`);
+      this.serverStatusTextEl.setText(t(statusKeyMap[availability]));
+      this.serverStatusBadgeEl.setAttribute('title', t('chat.serverStatus.openSettings'));
+    } finally {
+      this.isRefreshingServerStatus = false;
+    }
+  }
+
+  private async getServerAvailability(): Promise<ChatServerAvailability> {
+    const isHealthy = await this.plugin.openCodeService.checkHealth();
+    const internalStatus = this.plugin.openCodeService.getServerStatus();
+    const hasManagedProcess = this.plugin.openCodeService.isServerProcessRunning();
+
+    if (isHealthy && !hasManagedProcess) {
+      return 'external';
+    }
+
+    if (isHealthy) {
+      return 'running';
+    }
+
+    if (internalStatus === 'starting' || internalStatus === 'restarting') {
+      return 'starting';
+    }
+
+    return 'offline';
   }
 
   /** Get logo SVG based on current theme */
@@ -911,6 +1005,15 @@ export class OpenCodianView extends ItemView {
     this.currentConversation.messages.push(userMessage);
     await this.renderMessage(userMessage);
 
+    const availability = await this.getServerAvailability();
+    await this.refreshServerStatusBadge();
+    if (availability !== 'running' && availability !== 'external') {
+      const ready = await this.ensureServerReadyForChat(availability);
+      if (!ready) {
+        return;
+      }
+    }
+
     this.isStreaming = true;
     this.updateSendButtonState();
     this.scrollToBottom();
@@ -949,22 +1052,24 @@ export class OpenCodianView extends ItemView {
     });
 
     // Create assistant message element and get content container
-    const { messageEl } = this.createAssistantMessageElement();
+    const { messageEl, contentEl } = this.createAssistantMessageElement();
 
     // Show pending indicator after a short delay
     const pendingState: { element: HTMLElement | null } = { element: null };
     let pendingStartTime = 0;
     const pendingMessage = getRandomPendingMessage();
+    let latestErrorMessage: string | null = null;
+    let receivedMeaningfulChunk = false;
     logger.debug('Setting up pending indicator timeout');
     const pendingTimeout = window.setTimeout(() => {
       logger.debug('Pending indicator timeout fired, isStreaming:', this.isStreaming);
-      if (!this.isStreaming || !messageEl) {
+      if (!this.isStreaming || !contentEl) {
         logger.debug('Not showing pending indicator - not streaming or no element');
         return;
       }
       
       logger.debug('Showing pending indicator:', pendingMessage);
-      pendingState.element = messageEl.createDiv({ cls: 'opencodian-pending' });
+      pendingState.element = contentEl.createDiv({ cls: 'opencodian-pending' });
       pendingState.element.createSpan({ 
         text: pendingMessage,
         cls: 'opencodian-pending-text' 
@@ -984,7 +1089,7 @@ export class OpenCodianView extends ItemView {
 
     // Initialize streaming controller
     if (this.streamController) {
-      this.streamController.startStream(messageEl);
+      this.streamController.startStream(contentEl);
     }
 
     // Track if we've received first content
@@ -1000,6 +1105,7 @@ export class OpenCodianView extends ItemView {
 
         // Handle permission request
         if (chunk.type === 'permission_request') {
+          receivedMeaningfulChunk = true;
           // Pause the stream timeout while waiting for user response
           if (timeoutId) {
             window.clearTimeout(timeoutId);
@@ -1028,6 +1134,12 @@ export class OpenCodianView extends ItemView {
         // Convert OpenCode chunks to streaming format
         const streamingChunk = this.convertToStreamingChunk(chunk);
         if (streamingChunk && this.streamController) {
+          if (streamingChunk.type === 'error') {
+            latestErrorMessage = this.getFriendlyStreamErrorMessage(streamingChunk.content);
+            streamingChunk.content = latestErrorMessage;
+          } else {
+            receivedMeaningfulChunk = true;
+          }
           await this.streamController.handleChunk(streamingChunk);
           
           // Clear pending indicator only when actual content is received (text or thinking with content)
@@ -1050,6 +1162,14 @@ export class OpenCodianView extends ItemView {
           }
         }
       }
+
+      if (this.isStreaming && !receivedMeaningfulChunk && !latestErrorMessage && this.streamController) {
+        latestErrorMessage = this.getFriendlyStreamErrorMessage('');
+        await this.streamController.handleChunk({
+          type: 'error',
+          content: latestErrorMessage,
+        });
+      }
       
       // Signal completion (only if not cancelled)
       if (this.isStreaming && this.streamController) {
@@ -1057,15 +1177,25 @@ export class OpenCodianView extends ItemView {
       }
     } catch (error) {
       logger.error('Streaming error:', error);
+      latestErrorMessage = this.getFriendlyStreamErrorMessage(
+        error instanceof Error ? error.message : 'Unknown error'
+      );
       if (this.streamController) {
         await this.streamController.handleChunk({ 
           type: 'error', 
-          content: error instanceof Error ? error.message : 'Unknown error' 
+          content: latestErrorMessage,
         });
       }
     } finally {
       logger.debug('Stream loop ended');
       resetStreamingState();
+      window.clearTimeout(pendingTimeout);
+      if (pendingState.element?.dataset.timerInterval) {
+        window.clearInterval(Number(pendingState.element.dataset.timerInterval));
+      }
+      pendingState.element?.remove();
+      pendingState.element = null;
+      await this.refreshServerStatusBadge();
       
       // Add timestamp with copy button to the streamed message (after all content)
       if (this.streamingMessageEl) {
@@ -1131,6 +1261,13 @@ export class OpenCodianView extends ItemView {
         
         // Add to conversation
         this.currentConversation.messages.push(assistantMessage);
+      } else if (latestErrorMessage && this.currentConversation) {
+        this.currentConversation.messages.push({
+          id: `assistant-${Date.now()}`,
+          role: 'assistant',
+          content: latestErrorMessage,
+          timestamp: Date.now(),
+        });
       }
     }
 
@@ -1139,6 +1276,229 @@ export class OpenCodianView extends ItemView {
       this.currentConversation.updatedAt = Date.now();
       await this.plugin.storage.saveConversation(this.currentConversation);
     }
+  }
+
+  private async ensureServerReadyForChat(availability: Exclude<ChatServerAvailability, 'running' | 'external'>): Promise<boolean> {
+    const { messageEl, contentEl } = this.createAssistantContainerElement();
+    const cardEl = contentEl.createDiv({ cls: 'opencodian-server-action-card' });
+    cardEl.createDiv({
+      cls: 'opencodian-server-action-title',
+      text: t('chat.serverPrompt.title'),
+    });
+    cardEl.createDiv({
+      cls: 'opencodian-server-action-desc',
+      text: this.getUnavailableServerMessage(availability),
+    });
+
+    const statusEl = cardEl.createDiv({
+      cls: 'opencodian-server-action-status',
+      text: `${t('chat.serverPrompt.currentStatus')} ${t(
+        availability === 'starting'
+          ? 'chat.serverStatus.starting'
+          : 'chat.serverStatus.offline'
+      )}`,
+    });
+
+    const buttonRow = cardEl.createDiv({ cls: 'opencodian-server-action-buttons' });
+    const startBtn = buttonRow.createEl('button', {
+      cls: 'opencodian-server-action-btn mod-cta',
+      text: t('chat.serverPrompt.start'),
+    });
+    const skipBtn = buttonRow.createEl('button', {
+      cls: 'opencodian-server-action-btn',
+      text: t('chat.serverPrompt.skip'),
+    });
+    const settingsBtn = buttonRow.createEl('button', {
+      cls: 'opencodian-server-action-btn',
+      text: t('chat.serverPrompt.settings'),
+    });
+
+    const choice = await new Promise<'start' | 'skip' | 'settings'>((resolve) => {
+      startBtn.addEventListener('click', () => resolve('start'));
+      skipBtn.addEventListener('click', () => resolve('skip'));
+      settingsBtn.addEventListener('click', () => resolve('settings'));
+    });
+
+    if (choice === 'settings') {
+      const settings = this.appSettings();
+      settings.open();
+      settings.openTabById('opencodian');
+      await this.refreshStatusSurfaces();
+      const latestAvailability = await this.getServerAvailability();
+      if (latestAvailability === 'running' || latestAvailability === 'external') {
+        messageEl.remove();
+        return true;
+      }
+      await this.finalizeAssistantMessageWithError(
+        messageEl,
+        contentEl,
+        this.getUnavailableServerMessage(latestAvailability)
+      );
+      return false;
+    }
+
+    if (choice === 'skip') {
+      await this.refreshStatusSurfaces();
+      const latestAvailability = await this.getServerAvailability();
+      if (latestAvailability === 'running' || latestAvailability === 'external') {
+        messageEl.remove();
+        return true;
+      }
+      await this.finalizeAssistantMessageWithError(
+        messageEl,
+        contentEl,
+        this.getUnavailableServerMessage(latestAvailability)
+      );
+      return false;
+    }
+
+    startBtn.disabled = true;
+    skipBtn.disabled = true;
+    settingsBtn.disabled = true;
+    cardEl.addClass('is-starting');
+    statusEl.setText(t('chat.serverPrompt.starting'));
+
+    try {
+      await this.plugin.openCodeService.start();
+      await this.refreshStatusSurfaces();
+      messageEl.remove();
+      this.scrollToBottom();
+      return true;
+    } catch (error) {
+      logger.error('Failed to start server from chat prompt:', error);
+      await this.refreshStatusSurfaces();
+      await this.finalizeAssistantMessageWithError(
+        messageEl,
+        contentEl,
+        this.getFriendlyServerStartErrorMessage(error)
+      );
+      return false;
+    }
+  }
+
+  private createAssistantContainerElement(): { messageEl: HTMLElement; contentEl: HTMLElement } {
+    const messageEl = this.ensureTurnBody()?.createDiv({
+      cls: 'opencodian-message opencodian-message--assistant',
+    });
+
+    if (!messageEl) {
+      const fallback = document.createElement('div');
+      return { messageEl: fallback, contentEl: fallback };
+    }
+
+    const contentEl = messageEl.createDiv({ cls: 'opencodian-message-content' });
+    return { messageEl, contentEl };
+  }
+
+  private async finalizeAssistantMessageWithError(
+    messageEl: HTMLElement,
+    contentEl: HTMLElement,
+    message: string
+  ): Promise<void> {
+    contentEl.empty();
+    const errorEl = contentEl.createDiv({ cls: 'streaming-error-block' });
+    errorEl.createSpan({ cls: 'streaming-error-icon', text: '❌' });
+    errorEl.createSpan({ cls: 'streaming-error-text', text: message });
+
+    this.addTimestampWithCopyButton(messageEl, Date.now(), message);
+
+    if (this.currentConversation) {
+      this.currentConversation.messages.push({
+        id: `assistant-${Date.now()}`,
+        role: 'assistant',
+        content: message,
+        timestamp: Date.now(),
+      });
+      this.currentConversation.updatedAt = Date.now();
+      await this.plugin.storage.saveConversation(this.currentConversation);
+    }
+
+    this.scrollToBottom();
+  }
+
+  private async refreshStatusSurfaces(): Promise<void> {
+    await this.refreshServerStatusBadge();
+    this.plugin.settingsTab?.refreshServerStatusDisplay();
+  }
+
+  private getFriendlyServerStartErrorMessage(error: unknown): string {
+    const rawMessage = error instanceof Error ? error.message : String(error);
+    const lowerMessage = rawMessage.toLowerCase();
+
+    if (lowerMessage.includes('opencode not found')) {
+      return t('chat.error.serverBinaryMissing');
+    }
+
+    if (lowerMessage.includes('already in use')) {
+      return t('chat.error.serverPortInUse');
+    }
+
+    return `${t('chat.error.serverStartFailed')}\n${rawMessage}`;
+  }
+
+  private getUnavailableServerMessage(availability: Exclude<ChatServerAvailability, 'running' | 'external'>): string {
+    if (availability === 'starting') {
+      return t('chat.error.serverStarting');
+    }
+
+    return t('chat.error.serverOffline');
+  }
+
+  private getFriendlyStreamErrorMessage(rawMessage: string): string {
+    const message = rawMessage.trim();
+    const lowerMessage = message.toLowerCase();
+
+    if (!message) {
+      return t('chat.error.serverNoResponse');
+    }
+
+    if (
+      lowerMessage.includes('failed to fetch')
+      || lowerMessage.includes('econnrefused')
+      || lowerMessage.includes('networkerror')
+      || lowerMessage.includes('sse connection failed')
+      || lowerMessage.includes('fetch failed')
+      || lowerMessage.includes('http 0')
+    ) {
+      return t('chat.error.serverConnection');
+    }
+
+    if (lowerMessage.includes('opencode not found')) {
+      return t('chat.error.serverBinaryMissing');
+    }
+
+    return `${t('chat.error.sendFailed')}\n${message}`;
+  }
+
+  private async appendAssistantErrorMessage(message: string): Promise<void> {
+    const { messageEl, contentEl } = this.createAssistantMessageElement();
+
+    if (this.streamController) {
+      this.streamController.startStream(contentEl);
+      await this.streamController.handleChunk({ type: 'error', content: message });
+      await this.streamController.handleChunk({ type: 'done' });
+    } else {
+      const errorEl = contentEl.createDiv({ cls: 'streaming-error-block' });
+      errorEl.createSpan({ cls: 'streaming-error-icon', text: '❌' });
+      errorEl.createSpan({ cls: 'streaming-error-text', text: message });
+    }
+
+    this.addTimestampWithCopyButton(messageEl, Date.now(), message);
+    this.streamingMessageEl = null;
+    this.streamingContentEl = null;
+
+    if (this.currentConversation) {
+      this.currentConversation.messages.push({
+        id: `assistant-${Date.now()}`,
+        role: 'assistant',
+        content: message,
+        timestamp: Date.now(),
+      });
+      this.currentConversation.updatedAt = Date.now();
+      await this.plugin.storage.saveConversation(this.currentConversation);
+    }
+
+    this.scrollToBottom();
   }
 
   /** Cancel streaming */

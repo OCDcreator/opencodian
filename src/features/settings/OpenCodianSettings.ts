@@ -18,6 +18,8 @@ const logger = createLogger('OpenCodianSettings');
 export class OpenCodianSettingTab extends PluginSettingTab {
   plugin: OpenCodianPlugin;
   private refreshModelsCallback?: () => void;
+  private refreshServerStatusCallback?: () => Promise<void>;
+  private serverStatusIntervalId: number | null = null;
 
   constructor(app: App, plugin: OpenCodianPlugin) {
     super(app, plugin);
@@ -30,8 +32,17 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     this.refreshModelsCallback?.();
   }
 
+  refreshServerStatusDisplay(): void {
+    void this.refreshServerStatusCallback?.();
+  }
+
   async display(): Promise<void> {
     const { containerEl } = this;
+    if (this.serverStatusIntervalId) {
+      window.clearInterval(this.serverStatusIntervalId);
+      this.serverStatusIntervalId = null;
+    }
+    this.refreshServerStatusCallback = undefined;
     containerEl.empty();
     containerEl.addClass('opencodian-settings');
 
@@ -187,6 +198,8 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         stopBtn.setDisabled(!isHealthy || isExternalServer);
       }
     };
+
+    this.refreshServerStatusCallback = updateStatus;
     
     statusSetting
       .addButton((btn) => {
@@ -242,11 +255,15 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     void updateStatus();
     
     // Set up interval to refresh status while settings tab is open
-    const statusInterval = window.setInterval(() => void updateStatus(), 2000);
+    this.serverStatusIntervalId = window.setInterval(() => void updateStatus(), 2000);
     
     // Clean up interval when settings tab is closed
     this.containerEl.addEventListener('unload', () => {
-      window.clearInterval(statusInterval);
+      if (this.serverStatusIntervalId) {
+        window.clearInterval(this.serverStatusIntervalId);
+        this.serverStatusIntervalId = null;
+      }
+      this.refreshServerStatusCallback = undefined;
     }, { once: true });
 
     return headingEl;
@@ -722,6 +739,9 @@ export class OpenCodianSettingTab extends PluginSettingTab {
           .onChange(async (value) => {
             this.plugin.settings.enableDebugLogging = value;
             await this.plugin.saveSettings();
+            if (value) {
+              await this.plugin.logServerStatusSnapshot('settings-toggle');
+            }
           })
       );
 

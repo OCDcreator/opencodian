@@ -46,8 +46,9 @@ export default class OpenCodianPlugin extends Plugin {
 
     // Initialize OpenCode service
     this.openCodeService = new OpenCodeService(this.settings, {
-      onServerStatusChange: (_status) => {
-
+      onServerStatusChange: (status) => {
+        logger.debug(`Server status changed: ${status}`);
+        this.settingsTab?.refreshServerStatusDisplay();
       },
       onError: (error) => {
         new Notice(`OpenCode error: ${error.message}`);
@@ -81,6 +82,8 @@ export default class OpenCodianPlugin extends Plugin {
         new Notice(`OpenCode: ${msg}`);
       }
     }
+
+    await this.logServerStatusSnapshot('onload');
 
     // Register view
     this.registerView(
@@ -201,6 +204,15 @@ export default class OpenCodianPlugin extends Plugin {
 
   private applyLoggerSettings(): void {
     setDebugLoggingEnabled(this.settings.enableDebugLogging);
+  }
+
+  async logServerStatusSnapshot(source = 'manual'): Promise<void> {
+    const isHealthy = await this.openCodeService.checkHealth();
+    const internalStatus = this.openCodeService.getServerStatus();
+    const hasManagedProcess = this.openCodeService.isServerProcessRunning();
+    logger.debug(
+      `Server snapshot [${source}] -> health=${isHealthy ? 'ok' : 'fail'}, status=${internalStatus}, managedProcess=${hasManagedProcess}`
+    );
   }
 
   /** Sync OpenCode config with current permission mode */

@@ -105,8 +105,8 @@ export class ServerManager {
         // Check if it's an existing OpenCode server
         const healthy = await this.checkHealth(5000);
         if (healthy) {
-          logger.warn('OpenCode server already running on port', this.config.port);
-          logger.warn('This server may have been started with different working directory/config');
+          logger.debug('OpenCode server already running on port', this.config.port);
+          logger.debug('This server may have been started with different working directory/config');
           this.setStatus('running');
           return;
         }
@@ -347,6 +347,9 @@ export class ServerManager {
   }
 
   private setStatus(status: ServerStatus): void {
+    if (this.status !== status) {
+      logger.debug(`Server status -> ${status}`);
+    }
     this.status = status;
     this.events.onStatusChange?.(status);
   }

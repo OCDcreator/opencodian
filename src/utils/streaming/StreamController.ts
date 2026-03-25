@@ -199,7 +199,10 @@ export class StreamController {
       cls: 'streaming-error-block',
     });
     errorEl.createSpan({ cls: 'streaming-error-icon', text: '❌' });
-    errorEl.createSpan({ cls: 'streaming-error-text', text: `Error: ${content}` });
+    errorEl.createSpan({
+      cls: 'streaming-error-text',
+      text: content.trim() || 'Unknown error',
+    });
   }
 
   private handleDoneChunk(): void {

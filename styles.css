@@ -69,6 +69,53 @@
   gap: 4px;
 }
 
+.opencodian-server-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  margin-right: 6px;
+  border-radius: 999px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.opencodian-server-status-badge:hover {
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
+}
+
+.opencodian-server-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.85;
+}
+
+.opencodian-server-status-text {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.opencodian-server-status-badge.is-checking,
+.opencodian-server-status-badge.is-starting {
+  color: var(--text-accent);
+}
+
+.opencodian-server-status-badge.is-running,
+.opencodian-server-status-badge.is-external {
+  color: var(--color-green);
+}
+
+.opencodian-server-status-badge.is-offline {
+  color: var(--text-error);
+}
+
 .opencodian-header-btn {
   display: flex;
   align-items: center;
@@ -2093,6 +2140,78 @@
 
 .streaming-error-text {
   font-size: 13px;
+  white-space: pre-wrap;
+  line-height: 1.5;
+}
+
+.opencodian-server-action-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 10px 0;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--background-modifier-border);
+  background: color-mix(in srgb, var(--background-primary) 88%, rgba(255, 255, 255, 0.04));
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.opencodian-server-action-card.is-starting {
+  border-color: rgba(var(--interactive-accent-rgb), 0.35);
+}
+
+.opencodian-server-action-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-normal);
+}
+
+.opencodian-server-action-desc,
+.opencodian-server-action-status {
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.opencodian-server-action-desc {
+  color: var(--text-normal);
+}
+
+.opencodian-server-action-status {
+  color: var(--text-muted);
+}
+
+.opencodian-server-action-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.opencodian-server-action-btn {
+  border: none;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-normal);
+  background: var(--background-secondary);
+  cursor: pointer;
+  transition: transform 0.15s ease, opacity 0.15s ease, background 0.15s ease;
+}
+
+.opencodian-server-action-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  background: var(--background-modifier-hover);
+}
+
+.opencodian-server-action-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.opencodian-server-action-btn.mod-cta {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
 }
 
 /* Expand/collapse animation helpers */
