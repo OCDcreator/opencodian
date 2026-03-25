@@ -15,6 +15,13 @@ export const zhTranslations = {
   'settings.ui.title': '界面',
   'settings.user.title': '用户',
   'settings.language.title': '语言',
+  'settings.quickNav.title': '快捷跳转',
+  'settings.quickNav.languageDesc': '切换插件界面语言与显示文案',
+  'settings.quickNav.serverDesc': '设置 OpenCode 服务地址、端口与运行状态',
+  'settings.quickNav.modelDesc': '选择默认提供商、模型并刷新模型列表',
+  'settings.quickNav.securityDesc': '调整权限模式、配置文件与导出安全策略',
+  'settings.quickNav.uiDesc': '控制标签、滚动、日志和界面打开方式',
+  'settings.quickNav.userDesc': '设置你的名字、系统提示词和排除标签',
 
   // Server settings
   'settings.server.autoStart.name': '自动启动服务器',

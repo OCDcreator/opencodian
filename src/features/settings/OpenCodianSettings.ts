@@ -34,30 +34,42 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     containerEl.empty();
     containerEl.addClass('opencodian-settings');
 
+    const quickNavEl = containerEl.createDiv({ cls: 'opencodian-settings-quick-nav' });
     containerEl.createEl('h2', { text: t('settings.title') });
 
-    // Language Settings (first so user can change language immediately)
-    this.addLanguageSettings(containerEl);
+    const sections = [
+      {
+        headingEl: this.addLanguageSettings(containerEl),
+        tooltip: t('settings.quickNav.languageDesc'),
+      },
+      {
+        headingEl: this.addServerSettings(containerEl),
+        tooltip: t('settings.quickNav.serverDesc'),
+      },
+      {
+        headingEl: this.addModelSettings(containerEl),
+        tooltip: t('settings.quickNav.modelDesc'),
+      },
+      {
+        headingEl: await this.addSecuritySettings(containerEl),
+        tooltip: t('settings.quickNav.securityDesc'),
+      },
+      {
+        headingEl: this.addUISettings(containerEl),
+        tooltip: t('settings.quickNav.uiDesc'),
+      },
+      {
+        headingEl: this.addUserSettings(containerEl),
+        tooltip: t('settings.quickNav.userDesc'),
+      },
+    ];
 
-    // Server Settings
-    this.addServerSettings(containerEl);
-
-    // Model Settings
-    this.addModelSettings(containerEl);
-
-    // Security Settings (async - must await to ensure correct order)
-    await this.addSecuritySettings(containerEl);
-
-    // UI Settings
-    this.addUISettings(containerEl);
-
-    // User Settings
-    this.addUserSettings(containerEl);
+    this.buildQuickNav(quickNavEl, sections);
   }
 
   /** Language settings section */
-  private addLanguageSettings(containerEl: HTMLElement) {
-    containerEl.createEl('h3', { text: t('settings.language.title') });
+  private addLanguageSettings(containerEl: HTMLElement): HTMLHeadingElement {
+    const headingEl = this.createSectionHeading(containerEl, t('settings.language.title'));
 
     new Setting(containerEl)
       .setName(t('settings.language.select.name'))
@@ -75,11 +87,13 @@ export class OpenCodianSettingTab extends PluginSettingTab {
             this.display();
           });
       });
+
+    return headingEl;
   }
 
   /** Server settings section */
-  private addServerSettings(containerEl: HTMLElement) {
-    containerEl.createEl('h3', { text: t('settings.server.title') });
+  private addServerSettings(containerEl: HTMLElement): HTMLHeadingElement {
+    const headingEl = this.createSectionHeading(containerEl, t('settings.server.title'));
 
     new Setting(containerEl)
       .setName(t('settings.server.autoStart.name'))
@@ -233,11 +247,13 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     this.containerEl.addEventListener('unload', () => {
       window.clearInterval(statusInterval);
     }, { once: true });
+
+    return headingEl;
   }
 
   /** Model settings section */
-  private addModelSettings(containerEl: HTMLElement) {
-    containerEl.createEl('h3', { text: t('settings.model.title') });
+  private addModelSettings(containerEl: HTMLElement): HTMLHeadingElement {
+    const headingEl = this.createSectionHeading(containerEl, t('settings.model.title'));
 
     // Provider dropdown - will be populated dynamically
     let providerDropdown: import('obsidian').DropdownComponent;
@@ -370,6 +386,8 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         await loadAvailableModels(false);
       }
     })();
+
+    return headingEl;
   }
 
   /** Clean up when settings tab is closed */
@@ -378,8 +396,8 @@ export class OpenCodianSettingTab extends PluginSettingTab {
   }
 
   /** Security settings section */
-  private async addSecuritySettings(containerEl: HTMLElement) {
-    containerEl.createEl('h3', { text: t('settings.security.title') });
+  private async addSecuritySettings(containerEl: HTMLElement): Promise<HTMLHeadingElement> {
+    const headingEl = this.createSectionHeading(containerEl, t('settings.security.title'));
 
     // Initialize config manager
     const vaultPath = getVaultBasePath(this.plugin.app);
@@ -387,7 +405,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       new Setting(containerEl)
         .setName(t('settings.security.configStatus.name'))
         .setDesc('Vault path unavailable');
-      return;
+      return headingEl;
     }
     const configManager = new OpencodeConfigManager(vaultPath);
 
@@ -584,11 +602,13 @@ export class OpenCodianSettingTab extends PluginSettingTab {
           });
         text.inputEl.rows = 3;
       });
+
+    return headingEl;
   }
 
   /** UI settings section */
-  private addUISettings(containerEl: HTMLElement) {
-    containerEl.createEl('h3', { text: t('settings.ui.title') });
+  private addUISettings(containerEl: HTMLElement): HTMLHeadingElement {
+    const headingEl = this.createSectionHeading(containerEl, t('settings.ui.title'));
 
     new Setting(containerEl)
       .setName(t('settings.ui.maxTabs.name'))
@@ -668,11 +688,13 @@ export class OpenCodianSettingTab extends PluginSettingTab {
             await this.plugin.saveSettings();
           })
       );
+
+    return headingEl;
   }
 
   /** User settings section */
-  private addUserSettings(containerEl: HTMLElement) {
-    containerEl.createEl('h3', { text: t('settings.user.title') });
+  private addUserSettings(containerEl: HTMLElement): HTMLHeadingElement {
+    const headingEl = this.createSectionHeading(containerEl, t('settings.user.title'));
 
     new Setting(containerEl)
       .setName(t('settings.user.name.name'))
@@ -717,5 +739,52 @@ export class OpenCodianSettingTab extends PluginSettingTab {
           });
         text.inputEl.rows = 4;
       });
+
+    return headingEl;
+  }
+
+  private createSectionHeading(containerEl: HTMLElement, title: string): HTMLHeadingElement {
+    const headingEl = containerEl.createEl('h3', {
+      text: title,
+      cls: 'opencodian-settings-section-heading',
+    });
+    headingEl.dataset.sectionTitle = title;
+    return headingEl;
+  }
+
+  private buildQuickNav(
+    quickNavEl: HTMLElement,
+    sections: Array<{ headingEl: HTMLHeadingElement; tooltip: string }>
+  ): void {
+    quickNavEl.empty();
+    quickNavEl.createDiv({
+      cls: 'opencodian-settings-quick-nav-label',
+      text: t('settings.quickNav.title'),
+    });
+
+    const chipsEl = quickNavEl.createDiv({ cls: 'opencodian-settings-quick-nav-chips' });
+
+    for (const [index, { headingEl: sectionEl, tooltip }] of sections.entries()) {
+      const title = sectionEl.dataset.sectionTitle ?? sectionEl.textContent ?? '';
+      const buttonEl = chipsEl.createEl('button', {
+        cls: 'opencodian-settings-quick-nav-btn',
+        text: title,
+      });
+      buttonEl.type = 'button';
+      buttonEl.dataset.tooltip = tooltip;
+      if (sections.length > 1) {
+        if (index <= 1) {
+          buttonEl.dataset.tooltipAlign = 'left';
+        } else if (index >= sections.length - 2) {
+          buttonEl.dataset.tooltipAlign = 'right';
+        }
+      }
+      buttonEl.addEventListener('click', () => {
+        sectionEl.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start',
+        });
+      });
+    }
   }
 }

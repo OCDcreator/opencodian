@@ -15,6 +15,13 @@ export const enTranslations = {
   'settings.ui.title': 'User Interface',
   'settings.user.title': 'User',
   'settings.language.title': 'Language',
+  'settings.quickNav.title': 'Quick Jump',
+  'settings.quickNav.languageDesc': 'Change the plugin language and visible interface text',
+  'settings.quickNav.serverDesc': 'Configure the OpenCode service host, port, and runtime status',
+  'settings.quickNav.modelDesc': 'Choose the default provider, model, and refresh available models',
+  'settings.quickNav.securityDesc': 'Adjust permission mode, config file, and export safety rules',
+  'settings.quickNav.uiDesc': 'Control tabs, scrolling, logs, and where the UI opens',
+  'settings.quickNav.userDesc': 'Set your name, system prompt, and excluded tags',
 
   // Server settings
   'settings.server.autoStart.name': 'Auto-start server',
