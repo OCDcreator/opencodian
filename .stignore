@@ -1,0 +1,10 @@
+# Syncthing ignore rules for cross-platform development
+# Keep native dependencies and local build artifacts machine-local.
+
+(?d)node_modules/
+(?d)dist/
+(?d)coverage/
+(?d).tmp-tsc-out/
+
+.DS_Store
+Thumbs.db

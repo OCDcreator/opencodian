@@ -8,6 +8,116 @@
 
 ---
 
+## 2026-03-26 全主题适配修复与双环境构建稳定性优化
+
+### 📋 本次开发目标
+本轮主要完成两类问题收敛：
+
+1. **聊天与设置界面全主题适配**
+   - 避免在 Minimal、Things、Catppuccin、AnuPpuccin 等第三方主题下出现“贴补丁感”
+   - 清除样式中的固定亮色/暗色假设
+   - 统一改为基于 Obsidian 语义变量与 `color-mix()` 的主题感知写法
+
+2. **Windows / macOS 双环境开发稳定性**
+   - 修复因 Syncthing 同步 `node_modules/` 导致的 `esbuild` 平台二进制错配
+   - 为仓库增加可重复执行的检测/修复命令
+   - 补充仓库内说明，降低后续切系统时的维护成本
+
+### ✅ 主题适配修复内容
+
+#### 1. 建立统一的 Theme-Aware 变量层
+- 在 `styles.css` 顶部新增一组 `--opencodian-*` 语义变量
+- 覆盖表面层级、玻璃背景、边框、阴影、悬浮态、强调色、成功/警告/错误状态
+- 所有变量都基于：
+  - `--background-primary`
+  - `--background-secondary`
+  - `--background-modifier-*`
+  - `--interactive-accent`
+  - `--text-normal`
+
+#### 2. 移除样式中的硬编码颜色
+- 清除了 `styles.css` 中所有：
+  - 十六进制颜色
+  - `rgba(255,255,255,...)`
+  - `rgba(0,0,0,...)`
+  - 其他固定色值混合写法
+- 改为统一使用 `color-mix(in srgb, var(--xxx), transparent)` 或 Obsidian 标准变量
+
+#### 3. 重点重做的界面组件
+- **用户消息气泡**：改为主题感知玻璃态背景、边框和阴影
+- **助手消息悬浮态**：改为基于 `--background-modifier-hover`
+- **notice 卡片**：warning / error / info 改为语义状态色
+- **复制按钮**：从固定亮面按钮改为主题融入式悬浮操作按钮
+- **模型下拉框**：重做弹层背景、搜索框、选中/悬浮态
+- **设置页快速导航**：重做 sticky 面板、chip、tooltip、箭头
+- **权限模式下拉 / 历史下拉 / 删除确认弹窗 / 权限弹窗**：统一改为主题感知玻璃层
+- **内联权限卡片与状态标记**：改为语义成功/错误状态色
+
+#### 4. 结果
+- `styles.css` 中已不再包含硬编码颜色
+- 插件界面在深色、浅色及第三方主题下都能更自然地融入宿主环境
+
+### ✅ 双环境构建问题修复
+
+#### 1. 发现的问题
+- 在 macOS 上执行 `npm run build` 时，`esbuild` 报错：
+  - 当前平台需要 `@esbuild/darwin-arm64`
+  - 但工作目录里实际存在的是 `@esbuild/win32-x64`
+- 根因是 **Syncthing 同步了 `node_modules/`**，导致 Windows 安装出的原生依赖覆盖了 macOS 本地依赖
+
+#### 2. 新增 `esbuild` 检查/修复脚本
+- 新增 `scripts/doctor-esbuild.mjs`
+- 功能：
+  - 检测当前平台与已安装 `@esbuild/*` 包是否匹配
+  - 直接验证 `esbuild` 是否可运行
+  - 在需要时自动触发 `npm ci` / `npm install` 修复当前平台依赖
+
+#### 3. 新增 npm 命令
+- `npm run doctor:esbuild`
+- `npm run doctor:esbuild:fix`
+
+#### 4. 构建脚本增强
+- `scripts/build.mjs` 中增加了更友好的错误提示
+- 当再次遇到平台错配时，会明确提示先运行 `npm run doctor:esbuild:fix`
+
+### ✅ Syncthing 同步策略调整
+
+#### 1. 新增 `.stignore`
+新增 Syncthing 忽略文件，避免继续同步跨平台或本地构建产物：
+
+- `node_modules/`
+- `dist/`
+- `coverage/`
+- `.tmp-tsc-out/`
+- `.DS_Store`
+- `Thumbs.db`
+
+#### 2. 后续工作流
+- 切换系统后通常**不需要**每次都跑 `doctor`
+- 只有在以下情况才需要执行：
+  - 依赖变更
+  - 手动重装/删除过依赖
+  - `build` / `dev` 再次出现 `esbuild` 平台不匹配报错
+
+### 📁 涉及文件
+
+| 文件 | 修改内容 |
+|------|----------|
+| `styles.css` | 全面清除硬编码颜色并重构为主题感知变量体系 |
+| `scripts/doctor-esbuild.mjs` | 新增 esbuild 平台检测与修复脚本 |
+| `scripts/build.mjs` | 构建脚本增加平台错配提示 |
+| `package.json` | 新增 `doctor:esbuild` / `doctor:esbuild:fix` 命令 |
+| `.stignore` | 新增 Syncthing 忽略规则，排除 `node_modules` 等本地目录 |
+| `README.md` | 补充双环境开发与 doctor 命令说明 |
+| `AGENTS.md` | 补充 Syncthing / esbuild 简短开发说明 |
+
+### 🧪 验证结果
+
+- ✅ 已确认 `styles.css` 中不再包含十六进制颜色或 `rgba(...)` 硬编码色值
+- ✅ `npm run doctor:esbuild`
+- ✅ `npm run doctor:esbuild:fix`
+- ✅ `npm run build`
+
 ## 2026-03-26 无模型提示卡片新增“前往模型设置”快捷按钮
 
 ### 📋 功能补充

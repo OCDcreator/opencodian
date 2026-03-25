@@ -125,6 +125,10 @@ opencodian/
 # Install dependencies
 npm install
 
+# Check/fix esbuild after dependency changes
+npm run doctor:esbuild
+npm run doctor:esbuild:fix
+
 # Development mode (watch and auto-rebuild)
 npm run dev
 
@@ -140,6 +144,8 @@ npm run test:coverage
 npm run lint
 npm run lint:fix
 ```
+
+> **Syncthing note**: This repo uses `.stignore` to exclude `node_modules/` and other local artifacts. After switching systems, you usually do **not** need to run `npm run doctor:esbuild`; only run it if dependencies changed or build/dev reports an esbuild platform mismatch.
 
 ## Code Style Guidelines
 
