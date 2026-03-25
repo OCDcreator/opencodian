@@ -66,9 +66,12 @@ describe('Settings', () => {
   describe('DEFAULT_SETTINGS', () => {
     it('should have correct default values', () => {
       expect(DEFAULT_SETTINGS.userName).toBe('');
-      expect(DEFAULT_SETTINGS.server.host).toBe('127.0.0.1');
-      expect(DEFAULT_SETTINGS.server.port).toBe(4096);
-      expect(DEFAULT_SETTINGS.server.autoStart).toBe(true);
+      expect(DEFAULT_SETTINGS.server.mode).toBe('local');
+      expect(DEFAULT_SETTINGS.server.local.host).toBe('127.0.0.1');
+      expect(DEFAULT_SETTINGS.server.local.port).toBe(4096);
+      expect(DEFAULT_SETTINGS.server.local.autoStart).toBe(true);
+      expect(DEFAULT_SETTINGS.server.remote.baseUrl).toBe('');
+      expect(DEFAULT_SETTINGS.server.auth.type).toBe('none');
       expect(DEFAULT_SETTINGS.enableBlocklist).toBe(true);
       expect(DEFAULT_SETTINGS.allowExternalAccess).toBe(false);
       expect(DEFAULT_SETTINGS.permissionMode).toBe('yolo');

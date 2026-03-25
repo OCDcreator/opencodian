@@ -74,6 +74,14 @@ export class ServerManager {
     return this.status === 'running' && this.process !== null && !this.process.killed;
   }
 
+  /** Update server configuration */
+  updateConfig(config: OpenCodeServerConfig): void {
+    this.config = {
+      timeout: this.config.timeout ?? 30000,
+      ...config,
+    };
+  }
+
   /** Start the OpenCode server */
   async start(): Promise<void> {
     // Return existing promise if already starting
@@ -99,18 +107,28 @@ export class ServerManager {
     this.setStatus('starting');
 
     try {
+      if (this.config.mode === 'remote') {
+        const healthy = await this.checkHealth(this.config.timeout ?? 30000);
+        if (!healthy) {
+          throw new Error(`Remote OpenCode server is unreachable: ${this.config.baseUrl}`);
+        }
+
+        this.setStatus('running');
+        return;
+      }
+
       // Check if port is already in use
-      const portAvailable = await this.isPortAvailable(this.config.port);
+      const portAvailable = await this.isPortAvailable(this.config.local.port);
       if (!portAvailable) {
         // Check if it's an existing OpenCode server
         const healthy = await this.checkHealth(5000);
         if (healthy) {
-          logger.debug('OpenCode server already running on port', this.config.port);
+          logger.debug('OpenCode server already running on port', this.config.local.port);
           logger.debug('This server may have been started with different working directory/config');
           this.setStatus('running');
           return;
         }
-        throw new Error(`Port ${this.config.port} is already in use by another process`);
+        throw new Error(`Port ${this.config.local.port} is already in use by another process`);
       }
 
       // Spawn OpenCode server process
@@ -208,10 +226,11 @@ export class ServerManager {
     return new Promise((resolve) => {
       const timer = setTimeout(() => resolve(false), timeout);
 
-      // Note: OpenCode API uses /global/health endpoint
-      const healthUrl = `http://${this.config.host}:${this.config.port}/global/health`;
-      
-      requestUrl({ url: healthUrl, method: 'GET' })
+      requestUrl({
+        url: `${this.config.baseUrl}/global/health`,
+        method: 'GET',
+        headers: this.getAuthHeaders(),
+      })
         .then((res) => {
           clearTimeout(timer);
           resolve(res.status === 200);
@@ -245,14 +264,15 @@ export class ServerManager {
         
         this.process = spawn(opencodePath, [
           'serve',
-          '--port', String(this.config.port),
-          '--hostname', this.config.host,
+          '--port', String(this.config.local.port),
+          '--hostname', this.config.local.host,
           '--cors', 'app://obsidian.md',
           '--cors', 'app://obsidian',
         ], {
           detached: false,
           stdio: ['ignore', 'pipe', 'pipe'],
           cwd: this.workingDirectory,
+          env: this.getSpawnEnv(),
         });
 
         // Handle process events
@@ -329,7 +349,7 @@ export class ServerManager {
           tester.close();
           resolve(true);
         })
-        .listen(port, this.config.host);
+        .listen(port, this.config.local.host);
     });
   }
 
@@ -357,5 +377,39 @@ export class ServerManager {
   private cleanup(): void {
     this.process = null;
     this.setStatus('stopped');
+  }
+
+  private getAuthHeaders(): Record<string, string> | undefined {
+    if (this.config.auth.type === 'basic') {
+      const credentials = Buffer.from(
+        `${this.config.auth.username}:${this.config.auth.password}`
+      ).toString('base64');
+
+      return {
+        Authorization: `Basic ${credentials}`,
+      };
+    }
+
+    if (this.config.auth.type === 'bearer' && this.config.auth.token.trim()) {
+      return {
+        Authorization: `Bearer ${this.config.auth.token.trim()}`,
+      };
+    }
+
+    return undefined;
+  }
+
+  private getSpawnEnv(): NodeJS.ProcessEnv {
+    const env = { ...process.env };
+
+    if (this.config.auth.type === 'basic' && this.config.auth.password.trim()) {
+      env.OPENCODE_SERVER_USERNAME = this.config.auth.username.trim() || 'opencode';
+      env.OPENCODE_SERVER_PASSWORD = this.config.auth.password;
+    } else {
+      delete env.OPENCODE_SERVER_USERNAME;
+      delete env.OPENCODE_SERVER_PASSWORD;
+    }
+
+    return env;
   }
 }

@@ -14,11 +14,38 @@ export type TabBarPosition = 'input' | 'header';
 /** Chat scroll effect */
 export type ChatScrollMode = 'natural' | 'sticky-basic' | 'sticky-mask';
 
-/** Server configuration */
-export interface ServerConfig {
+/** Server connection mode */
+export type ServerMode = 'local' | 'remote';
+
+/** Server auth type */
+export type ServerAuthType = 'none' | 'basic' | 'bearer';
+
+/** Local server configuration */
+export interface LocalServerConfig {
   host: string;
   port: number;
   autoStart: boolean;
+}
+
+/** Remote server configuration */
+export interface RemoteServerConfig {
+  baseUrl: string;
+}
+
+/** Server authentication configuration */
+export interface ServerAuthConfig {
+  type: ServerAuthType;
+  username: string;
+  password: string;
+  token: string;
+}
+
+/** Server configuration */
+export interface ServerConfig {
+  mode: ServerMode;
+  local: LocalServerConfig;
+  remote: RemoteServerConfig;
+  auth: ServerAuthConfig;
 }
 
 /** Platform-specific blocked commands */
@@ -166,9 +193,21 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
   userName: '',
 
   server: {
-    host: '127.0.0.1',
-    port: 4096,
-    autoStart: true,
+    mode: 'local',
+    local: {
+      host: '127.0.0.1',
+      port: 4096,
+      autoStart: true,
+    },
+    remote: {
+      baseUrl: 'http://127.0.0.1:4096',
+    },
+    auth: {
+      type: 'none',
+      username: 'opencode',
+      password: '',
+      token: '',
+    },
   },
 
   enableBlocklist: true,
@@ -204,3 +243,19 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
 
   hiddenSlashCommands: [],
 };
+
+export function isLocalServerMode(server: ServerConfig): boolean {
+  return server.mode === 'local';
+}
+
+export function getServerBaseUrl(server: ServerConfig): string {
+  if (server.mode === 'remote') {
+    return normalizeBaseUrl(server.remote.baseUrl);
+  }
+
+  return `http://${server.local.host}:${server.local.port}`;
+}
+
+export function normalizeBaseUrl(value: string): string {
+  return value.trim().replace(/\/+$/, '');
+}

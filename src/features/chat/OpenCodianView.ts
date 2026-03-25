@@ -382,11 +382,24 @@ export class OpenCodianView extends ItemView {
         'is-external'
       );
       this.serverStatusBadgeEl.addClass(`is-${availability}`);
-      this.serverStatusTextEl.setText(t(statusKeyMap[availability]));
+      this.serverStatusTextEl.setText(this.getServerStatusLabel(availability, statusKeyMap));
       this.serverStatusBadgeEl.setAttribute('title', t('chat.serverStatus.openSettings'));
     } finally {
       this.isRefreshingServerStatus = false;
     }
+  }
+
+  private getServerStatusLabel(
+    availability: ChatServerAvailability,
+    statusKeyMap: Record<ChatServerAvailability, 'chat.serverStatus.checking' | 'chat.serverStatus.running' | 'chat.serverStatus.starting' | 'chat.serverStatus.offline' | 'chat.serverStatus.external'>
+  ): string {
+    if (availability === 'running' || availability === 'external') {
+      return this.plugin.settings.server.mode === 'local'
+        ? t('chat.serverStatus.local')
+        : t('chat.serverStatus.remote');
+    }
+
+    return t(statusKeyMap[availability]);
   }
 
   private async getServerAvailability(): Promise<ChatServerAvailability> {
@@ -1300,9 +1313,12 @@ export class OpenCodianView extends ItemView {
     });
 
     const buttonRow = cardEl.createDiv({ cls: 'opencodian-server-action-buttons' });
+    const primaryButtonLabel = this.plugin.settings.server.mode === 'local'
+      ? t('chat.serverPrompt.start')
+      : t('chat.serverPrompt.retry');
     const startBtn = buttonRow.createEl('button', {
       cls: 'opencodian-server-action-btn mod-cta',
-      text: t('chat.serverPrompt.start'),
+      text: primaryButtonLabel,
     });
     const skipBtn = buttonRow.createEl('button', {
       cls: 'opencodian-server-action-btn',
@@ -1356,7 +1372,11 @@ export class OpenCodianView extends ItemView {
     skipBtn.disabled = true;
     settingsBtn.disabled = true;
     cardEl.addClass('is-starting');
-    statusEl.setText(t('chat.serverPrompt.starting'));
+    statusEl.setText(
+      this.plugin.settings.server.mode === 'local'
+        ? t('chat.serverPrompt.starting')
+        : t('chat.serverStatus.checking')
+    );
 
     try {
       await this.plugin.openCodeService.start();

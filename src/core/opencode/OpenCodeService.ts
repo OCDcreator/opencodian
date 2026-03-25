@@ -10,6 +10,7 @@ import { requestUrl } from 'obsidian';
 
 import { createLogger } from '../../shared';
 import type { ChatMessage, ContentBlock, ImageAttachment, PermissionReply, PermissionRequest, StreamChunk } from '../types';
+import { getServerBaseUrl, isLocalServerMode } from '../types/settings';
 import type { OpenCodianSettings } from '../types/settings';
 import { ServerManager } from './ServerManager';
 import type { OpenCodeServerConfig, QueryOptions, ResponseHandler } from './types';
@@ -122,14 +123,9 @@ export class OpenCodeService {
   constructor(settings: OpenCodianSettings, events: OpenCodeServiceEvents = {}) {
     this.settings = settings;
     this.events = events;
-    this.baseUrl = `http://${settings.server.host}:${settings.server.port}`;
+    this.baseUrl = getServerBaseUrl(settings.server);
 
-    const serverConfig: OpenCodeServerConfig = {
-      host: settings.server.host,
-      port: settings.server.port,
-    };
-
-    this.serverManager = new ServerManager(serverConfig, {
+    this.serverManager = new ServerManager(this.buildServerConfig(settings), {
       onStatusChange: (status) => {
         events.onServerStatusChange?.(status);
         // Auto-fetch models when server starts running
@@ -145,7 +141,7 @@ export class OpenCodeService {
 
   /** Initialize the service */
   async initialize(): Promise<void> {
-    if (this.settings.server.autoStart) {
+    if (isLocalServerMode(this.settings.server) && this.settings.server.local.autoStart) {
       await this.start();
     }
   }
@@ -198,6 +194,10 @@ export class OpenCodeService {
 
   /** Start the service and server */
   async start(): Promise<void> {
+    if (!this.baseUrl) {
+      throw new Error('OpenCode server URL is not configured');
+    }
+
     await this.serverManager.start();
   }
 
@@ -208,7 +208,7 @@ export class OpenCodeService {
 
   /** Check if service is ready */
   isReady(): boolean {
-    return this.serverManager.isRunning();
+    return this.serverManager.getStatus() === 'running';
   }
 
   /** Get server status */
@@ -218,6 +218,10 @@ export class OpenCodeService {
 
   /** Check server health directly */
   async checkHealth(): Promise<boolean> {
+    if (!this.baseUrl) {
+      return false;
+    }
+
     return this.serverManager.checkHealth(3000);
   }
 
@@ -228,9 +232,12 @@ export class OpenCodeService {
 
   /** HTTP GET helper using Obsidian's requestUrl */
   private async get<T>(path: string): Promise<T> {
+    this.ensureBaseUrl();
+
     const response = await requestUrl({
       url: `${this.baseUrl}${path}`,
       method: 'GET',
+      headers: this.getRequestHeaders(),
     });
     
     // Check for error status codes
@@ -253,10 +260,12 @@ export class OpenCodeService {
 
   /** HTTP POST helper using Obsidian's requestUrl */
   private async post<T>(path: string, body: unknown): Promise<T> {
+    this.ensureBaseUrl();
+
     const response = await requestUrl({
       url: `${this.baseUrl}${path}`,
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: this.getRequestHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(body),
     });
     
@@ -285,9 +294,12 @@ export class OpenCodeService {
 
   /** HTTP DELETE helper using Obsidian's requestUrl */
   private async delete(path: string): Promise<void> {
+    this.ensureBaseUrl();
+
     await requestUrl({
       url: `${this.baseUrl}${path}`,
       method: 'DELETE',
+      headers: this.getRequestHeaders(),
     });
   }
 
@@ -634,6 +646,7 @@ export class OpenCodeService {
 
   /** Connect to SSE endpoint and yield events */
   private async *connectSSE(url: string, signal?: AbortSignal): AsyncGenerator<SSEEvent> {
+    this.ensureBaseUrl();
 
     
     // Check if already aborted
@@ -646,9 +659,9 @@ export class OpenCodeService {
 
     const response = await fetch(url, {
       method: 'GET',
-      headers: {
+      headers: this.getRequestHeaders({
         'Accept': 'text/event-stream',
-      },
+      }),
       signal, // Pass signal to fetch to allow cancellation
     });
 
@@ -839,18 +852,80 @@ export class OpenCodeService {
 
   /** Update settings */
   updateSettings(settings: OpenCodianSettings): void {
-    this.settings = settings;
-    this.baseUrl = `http://${settings.server.host}:${settings.server.port}`;
-
-    // Check if server config changed
+    const previousSettings = this.settings;
+    const previousMode = previousSettings.server.mode;
+    const nextMode = settings.server.mode;
     const serverConfigChanged =
-      settings.server.host !== this.settings.server.host ||
-      settings.server.port !== this.settings.server.port;
+      previousSettings.server.local.host !== settings.server.local.host ||
+      previousSettings.server.local.port !== settings.server.local.port;
+    const authChanged =
+      previousSettings.server.auth.type !== settings.server.auth.type ||
+      previousSettings.server.auth.username !== settings.server.auth.username ||
+      previousSettings.server.auth.password !== settings.server.auth.password ||
+      previousSettings.server.auth.token !== settings.server.auth.token;
+    const shouldRestartManagedServer =
+      this.serverManager.isRunning() &&
+      nextMode === 'local' &&
+      (previousMode !== nextMode || serverConfigChanged || authChanged);
+    const shouldStopManagedServer =
+      this.serverManager.isRunning() &&
+      previousMode === 'local' &&
+      nextMode !== 'local';
 
-    if (serverConfigChanged && this.serverManager.isRunning()) {
-      // Restart server with new config
+    this.settings = settings;
+    this.baseUrl = getServerBaseUrl(settings.server);
+    this.serverManager.updateConfig(this.buildServerConfig(settings));
+
+    if (shouldStopManagedServer) {
+      void this.serverManager.stop();
+      return;
+    }
+
+    if (shouldRestartManagedServer) {
       void this.serverManager.restart();
     }
+  }
+
+  private buildServerConfig(settings: OpenCodianSettings): OpenCodeServerConfig {
+    return {
+      mode: settings.server.mode,
+      baseUrl: getServerBaseUrl(settings.server),
+      local: settings.server.local,
+      auth: settings.server.auth,
+    };
+  }
+
+  private ensureBaseUrl(): void {
+    if (!this.baseUrl) {
+      throw new Error('OpenCode server URL is not configured');
+    }
+  }
+
+  private getRequestHeaders(extraHeaders: Record<string, string> = {}): Record<string, string> {
+    const authHeaders = this.getAuthHeaders();
+    return {
+      ...authHeaders,
+      ...extraHeaders,
+    };
+  }
+
+  private getAuthHeaders(): Record<string, string> {
+    const { auth } = this.settings.server;
+
+    if (auth.type === 'basic') {
+      const credentials = Buffer.from(`${auth.username}:${auth.password}`).toString('base64');
+      return {
+        Authorization: `Basic ${credentials}`,
+      };
+    }
+
+    if (auth.type === 'bearer' && auth.token.trim()) {
+      return {
+        Authorization: `Bearer ${auth.token.trim()}`,
+      };
+    }
+
+    return {};
   }
 
   /** Transform SDK event to StreamChunks */

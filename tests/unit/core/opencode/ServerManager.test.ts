@@ -7,7 +7,12 @@ import { ServerManager } from '../../../../src/core/opencode/ServerManager';
 // Mock Obsidian
 jest.mock('obsidian', () => ({
   Notice: jest.fn(),
+  requestUrl: jest.fn(),
 }));
+
+const { requestUrl: mockRequestUrl } = jest.requireMock('obsidian') as {
+  requestUrl: jest.Mock;
+};
 
 // Mock child_process
 jest.mock('child_process', () => ({
@@ -30,15 +35,26 @@ jest.mock('net', () => ({
   }),
 }));
 
-// Mock global fetch
-const mockFetch = jest.fn();
-global.fetch = mockFetch;
-
 describe('ServerManager', () => {
   let manager: ServerManager;
+  const defaultConfig = {
+    mode: 'local' as const,
+    baseUrl: 'http://127.0.0.1:4096',
+    local: {
+      host: '127.0.0.1',
+      port: 4096,
+      autoStart: true,
+    },
+    auth: {
+      type: 'none' as const,
+      username: 'opencode',
+      password: '',
+      token: '',
+    },
+  };
 
   beforeEach(() => {
-    manager = new ServerManager({ host: '127.0.0.1', port: 4096 });
+    manager = new ServerManager(defaultConfig);
     jest.clearAllMocks();
   });
 
@@ -51,8 +67,13 @@ describe('ServerManager', () => {
 
     it('should create manager with custom config', () => {
       const customManager = new ServerManager({
-        host: '0.0.0.0',
-        port: 5000,
+        ...defaultConfig,
+        baseUrl: 'http://0.0.0.0:5000',
+        local: {
+          host: '0.0.0.0',
+          port: 5000,
+          autoStart: true,
+        },
         timeout: 60000,
       });
       expect(customManager).toBeDefined();
@@ -83,16 +104,19 @@ describe('ServerManager', () => {
 
   describe('checkHealth', () => {
     it('should return true for healthy server', async () => {
-      mockFetch.mockResolvedValueOnce({ ok: true });
+      mockRequestUrl.mockResolvedValueOnce({ status: 200 });
 
       const result = await manager.checkHealth();
 
       expect(result).toBe(true);
-      expect(mockFetch).toHaveBeenCalledWith('http://127.0.0.1:4096/health');
+      expect(mockRequestUrl).toHaveBeenCalledWith(expect.objectContaining({
+        url: 'http://127.0.0.1:4096/global/health',
+        method: 'GET',
+      }));
     });
 
     it('should return false for unhealthy server', async () => {
-      mockFetch.mockResolvedValueOnce({ ok: false });
+      mockRequestUrl.mockResolvedValueOnce({ status: 500 });
 
       const result = await manager.checkHealth();
 
@@ -100,7 +124,7 @@ describe('ServerManager', () => {
     });
 
     it('should return false on fetch error', async () => {
-      mockFetch.mockRejectedValueOnce(new Error('Connection refused'));
+      mockRequestUrl.mockRejectedValueOnce(new Error('Connection refused'));
 
       const result = await manager.checkHealth();
 
@@ -108,8 +132,7 @@ describe('ServerManager', () => {
     });
 
     it('should respect timeout', async () => {
-      // Mock fetch to never resolve
-      mockFetch.mockImplementation(() => new Promise(() => {}));
+      mockRequestUrl.mockImplementation(() => new Promise(() => {}));
 
       const startTime = Date.now();
       const result = await manager.checkHealth(100);
@@ -126,7 +149,7 @@ describe('ServerManager', () => {
       const onError = jest.fn();
 
       const managerWithEvents = new ServerManager(
-        { host: '127.0.0.1', port: 4096 },
+        defaultConfig,
         { onStatusChange, onError }
       );
 

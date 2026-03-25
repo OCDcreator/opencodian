@@ -167,3 +167,5 @@ export function debounce(fn: () => void, delay: number) {
     timeout = setTimeout(fn, delay);
   };
 }
+
+export const requestUrl = jest.fn();

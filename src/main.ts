@@ -16,8 +16,10 @@ import { StorageService } from './core/storage';
 import type { Conversation, OpenCodianSettings, PlatformDebugLogPaths } from './core/types';
 import {
   DEFAULT_SETTINGS,
+  getServerBaseUrl,
   getCurrentPlatformDebugLogPath,
   getCurrentPlatformKey,
+  isLocalServerMode,
   VIEW_TYPE_OPENCODIAN,
 } from './core/types';
 import { OpenCodianView } from './features/chat/OpenCodianView';
@@ -81,7 +83,7 @@ export default class OpenCodianPlugin extends Plugin {
     }
 
     // Start server if auto-start is enabled
-    if (this.settings.server.autoStart) {
+    if (isLocalServerMode(this.settings.server) && this.settings.server.local.autoStart) {
       try {
         await this.openCodeService.start();
       } catch (error) {
@@ -195,9 +197,71 @@ export default class OpenCodianPlugin extends Plugin {
       normalizedDebugLogPaths[getCurrentPlatformKey()] = legacyDebugLogPath.trim();
     }
 
+    const legacyServer =
+      savedSettings && typeof savedSettings === 'object' && 'server' in savedSettings
+        ? (savedSettings as {
+            server?:
+              | Partial<OpenCodianSettings['server']>
+              | { host?: string; port?: number; autoStart?: boolean };
+          }).server
+        : undefined;
+    const normalizedServer = (() => {
+      const defaultServer = DEFAULT_SETTINGS.server;
+
+      if (!legacyServer || typeof legacyServer !== 'object') {
+        return defaultServer;
+      }
+
+      const hasNestedServer =
+        'mode' in legacyServer || 'local' in legacyServer || 'remote' in legacyServer || 'auth' in legacyServer;
+
+      if (hasNestedServer) {
+        const nestedServer = legacyServer as Partial<OpenCodianSettings['server']>;
+        return {
+          ...defaultServer,
+          ...nestedServer,
+          local: {
+            ...defaultServer.local,
+            ...(nestedServer.local ?? {}),
+          },
+          remote: {
+            ...defaultServer.remote,
+            ...(nestedServer.remote ?? {}),
+          },
+          auth: {
+            ...defaultServer.auth,
+            ...(nestedServer.auth ?? {}),
+          },
+        };
+      }
+
+      const flatServer = legacyServer as { host?: string; port?: number; autoStart?: boolean };
+      const legacyHost = typeof flatServer.host === 'string' && flatServer.host.trim()
+        ? flatServer.host.trim()
+        : defaultServer.local.host;
+      const legacyPort = typeof flatServer.port === 'number' ? flatServer.port : defaultServer.local.port;
+      const legacyAutoStart = typeof flatServer.autoStart === 'boolean'
+        ? flatServer.autoStart
+        : defaultServer.local.autoStart;
+
+      return {
+        ...defaultServer,
+        mode: 'local' as const,
+        local: {
+          host: legacyHost,
+          port: legacyPort,
+          autoStart: legacyAutoStart,
+        },
+        remote: {
+          baseUrl: `http://${legacyHost}:${legacyPort}`,
+        },
+      };
+    })();
+
     const normalizedSettings = savedSettings
       ? {
           ...savedSettings,
+          server: normalizedServer,
           chatScrollMode:
             (savedSettings.chatScrollMode as OpenCodianSettings['chatScrollMode'] | 'sticky' | undefined) === 'sticky'
               ? 'sticky-mask'
@@ -208,6 +272,7 @@ export default class OpenCodianPlugin extends Plugin {
     this.settings = {
       ...DEFAULT_SETTINGS,
       ...normalizedSettings,
+      server: normalizedServer,
       debugLogPaths: normalizedDebugLogPaths,
     };
   }
@@ -264,8 +329,12 @@ export default class OpenCodianPlugin extends Plugin {
       `Health: ${isHealthy ? 'ok' : 'fail'}`,
       `Status: ${internalStatus}`,
       `Managed process: ${managedProcess}`,
-      `Host: ${this.settings.server.host}`,
-      `Port: ${this.settings.server.port}`,
+      `Mode: ${this.settings.server.mode}`,
+      `Base URL: ${getServerBaseUrl(this.settings.server) || '(not set)'}`,
+      `Local host: ${this.settings.server.local.host}`,
+      `Local port: ${this.settings.server.local.port}`,
+      `Local auto-start: ${this.settings.server.local.autoStart}`,
+      `Auth type: ${this.settings.server.auth.type}`,
       '',
       '## Settings',
       `Locale: ${this.settings.locale}`,

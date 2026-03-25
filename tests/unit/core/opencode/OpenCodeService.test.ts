@@ -2,11 +2,14 @@
  * OpenCodeService unit tests
  */
 
+import { TextDecoder } from 'util';
+
 import { OpenCodeService } from '../../../../src/core/opencode/OpenCodeService';
 import { DEFAULT_SETTINGS } from '../../../../src/core/types';
 
 // Mock global fetch
 global.fetch = jest.fn() as unknown as typeof fetch;
+global.TextDecoder = TextDecoder as unknown as typeof global.TextDecoder;
 
 // Mock EventSource
 class MockEventSource {
@@ -27,7 +30,12 @@ global.EventSource = MockEventSource as unknown as typeof EventSource;
 // Mock Obsidian
 jest.mock('obsidian', () => ({
   Notice: jest.fn(),
+  requestUrl: jest.fn(),
 }));
+
+const { requestUrl: mockRequestUrl } = jest.requireMock('obsidian') as {
+  requestUrl: jest.Mock;
+};
 
 // Mock child_process for ServerManager
 jest.mock('child_process', () => ({
@@ -71,7 +79,10 @@ describe('OpenCodeService', () => {
     it('should create service with custom settings', () => {
       const customSettings = {
         ...DEFAULT_SETTINGS,
-        server: { ...DEFAULT_SETTINGS.server, port: 5000 },
+        server: {
+          ...DEFAULT_SETTINGS.server,
+          local: { ...DEFAULT_SETTINGS.server.local, port: 5000 },
+        },
       };
       const customService = new OpenCodeService(customSettings);
       expect(customService).toBeDefined();
@@ -80,7 +91,13 @@ describe('OpenCodeService', () => {
 
   describe('initialize', () => {
     it('should not auto-start if disabled', async () => {
-      const settings = { ...DEFAULT_SETTINGS, server: { ...DEFAULT_SETTINGS.server, autoStart: false } };
+      const settings = {
+        ...DEFAULT_SETTINGS,
+        server: {
+          ...DEFAULT_SETTINGS.server,
+          local: { ...DEFAULT_SETTINGS.server.local, autoStart: false },
+        },
+      };
       service = new OpenCodeService(settings);
 
       await service.initialize();
@@ -91,25 +108,27 @@ describe('OpenCodeService', () => {
 
   describe('session management', () => {
     beforeEach(() => {
-      (global.fetch as jest.Mock).mockResolvedValue({
-        ok: true,
-        json: jest.fn().mockResolvedValue({ id: 'test-session' }),
+      mockRequestUrl.mockResolvedValue({
+        status: 200,
+        json: { id: 'test-session' },
+        text: '{"id":"test-session"}',
       });
     });
 
     it('should create session via HTTP API', async () => {
       const sessionId = await service.createSession('Test');
       expect(sessionId).toBe('test-session');
-      expect(global.fetch).toHaveBeenCalledWith(
-        'http://127.0.0.1:4096/session',
-        expect.objectContaining({ method: 'POST' })
-      );
+      expect(mockRequestUrl).toHaveBeenCalledWith(expect.objectContaining({
+        url: 'http://127.0.0.1:4096/session',
+        method: 'POST',
+      }));
     });
 
     it('should list sessions via HTTP API', async () => {
-      (global.fetch as jest.Mock).mockResolvedValue({
-        ok: true,
-        json: jest.fn().mockResolvedValue([{ id: '1', title: 'Test' }]),
+      mockRequestUrl.mockResolvedValue({
+        status: 200,
+        json: [{ id: '1', title: 'Test' }],
+        text: '[{"id":"1","title":"Test"}]',
       });
 
       const sessions = await service.listSessions();
@@ -117,9 +136,10 @@ describe('OpenCodeService', () => {
     });
 
     it('should get session messages via HTTP API', async () => {
-      (global.fetch as jest.Mock).mockResolvedValue({
-        ok: true,
-        json: jest.fn().mockResolvedValue([{ info: { id: 'm1', role: 'user' }, parts: [] }]),
+      mockRequestUrl.mockResolvedValue({
+        status: 200,
+        json: [{ info: { id: 'm1', role: 'user' }, parts: [] }],
+        text: '[{"info":{"id":"m1","role":"user"},"parts":[]}]',
       });
 
       const messages = await service.getSessionMessages('test-id');
@@ -127,13 +147,13 @@ describe('OpenCodeService', () => {
     });
 
     it('should delete session via HTTP API', async () => {
-      (global.fetch as jest.Mock).mockResolvedValue({ ok: true });
+      mockRequestUrl.mockResolvedValue({ status: 204, json: {}, text: '' });
 
       await service.deleteSession('test-id');
-      expect(global.fetch).toHaveBeenCalledWith(
-        'http://127.0.0.1:4096/session/test-id',
-        expect.objectContaining({ method: 'DELETE' })
-      );
+      expect(mockRequestUrl).toHaveBeenCalledWith(expect.objectContaining({
+        url: 'http://127.0.0.1:4096/session/test-id',
+        method: 'DELETE',
+      }));
     });
   });
 
@@ -160,9 +180,20 @@ describe('OpenCodeService', () => {
     it('should send message with active session', async () => {
       service.setSessionId('test-session');
       
+      mockRequestUrl.mockResolvedValue({
+        status: 204,
+        json: {},
+        text: '',
+      });
       (global.fetch as jest.Mock).mockResolvedValue({
         ok: true,
-        json: jest.fn().mockResolvedValue({ success: true }),
+        body: {
+          getReader: () => ({
+            read: jest.fn().mockResolvedValue({ done: true, value: undefined }),
+            cancel: jest.fn(),
+            releaseLock: jest.fn(),
+          }),
+        },
       });
 
       const chunks: unknown[] = [];
@@ -179,9 +210,9 @@ describe('OpenCodeService', () => {
 
   describe('getAvailableModels', () => {
     it('should fetch models via HTTP API', async () => {
-      (global.fetch as jest.Mock).mockResolvedValue({
-        ok: true,
-        json: jest.fn().mockResolvedValue({
+      mockRequestUrl.mockResolvedValue({
+        status: 200,
+        json: {
           providers: [{
             id: 'anthropic',
             name: 'Anthropic',
@@ -189,8 +220,9 @@ describe('OpenCodeService', () => {
               'claude-3': { id: 'claude-3', name: 'Claude 3' }
             }
           }],
-          default: { anthropic: 'claude-3' }
-        }),
+          default: { provider: 'anthropic', model: 'claude-3' }
+        },
+        text: '{}',
       });
 
       const result = await service.getAvailableModels();
@@ -211,7 +243,10 @@ describe('OpenCodeService', () => {
     it('should handle server config changes', () => {
       const newSettings = {
         ...DEFAULT_SETTINGS,
-        server: { ...DEFAULT_SETTINGS.server, port: 5000 },
+        server: {
+          ...DEFAULT_SETTINGS.server,
+          local: { ...DEFAULT_SETTINGS.server.local, port: 5000 },
+        },
       };
 
       expect(() => service.updateSettings(newSettings)).not.toThrow();

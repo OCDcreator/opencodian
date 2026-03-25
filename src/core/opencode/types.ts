@@ -3,6 +3,7 @@
  */
 
 import type { StreamChunk } from '../types';
+import type { LocalServerConfig, ServerAuthConfig, ServerMode } from '../types/settings';
 
 /** Response handler callbacks */
 export interface ResponseHandler {
@@ -37,8 +38,10 @@ export interface QueryOptions {
 
 /** Server configuration */
 export interface OpenCodeServerConfig {
-  host: string;
-  port: number;
+  mode: ServerMode;
+  baseUrl: string;
+  local: LocalServerConfig;
+  auth: ServerAuthConfig;
   timeout?: number;
 }
 

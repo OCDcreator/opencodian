@@ -240,6 +240,12 @@ export class OpencodeConfigModal extends Modal {
         // Access the plugin's OpenCode service
         const plugin = (this.app as any).plugins?.plugins?.['opencodian'];
         if (plugin?.openCodeService) {
+          if (plugin.settings?.server?.mode !== 'local') {
+            new Notice(t('settings.server.remoteManageUnavailable'));
+            this.close();
+            return;
+          }
+
           const isRunning = await plugin.openCodeService.checkHealth();
           if (isRunning) {
             await plugin.openCodeService.stop();

@@ -2767,6 +2767,11 @@
   max-width: 900px;
 }
 
+.modal:has(.opencodian-server-help) {
+  min-width: 620px;
+  max-width: 840px;
+}
+
 /* Editor textarea sizing */
 .opencodian-config-editor {
   width: 100%;
