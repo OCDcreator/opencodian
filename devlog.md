@@ -8,6 +8,311 @@
 
 ---
 
+## 2026-03-26 模型来源列表设置页布局优化
+
+### 📋 问题描述
+模型来源区此前采用 **本地配置 / 服务器配置 / 当前生效列表** 三张卡片并排展示：
+- provider / model 很多时，页面会被拉得很长
+- 三卡片布局在不同宽度下容易出现大块留白
+- “默认合并模式”说明单独占据一行，信息密度偏低
+
+### ✅ 优化内容
+
+#### 1. 三卡片改为单面板标签切换
+- 将三份模型目录改为单个面板展示
+- 通过标签切换查看：
+  - 本地配置
+  - 服务器配置
+  - 当前生效列表
+- 默认根据当前来源模式自动选中最相关视图：
+  - `仅本地` → 本地配置
+  - `仅服务器` → 服务器配置
+  - `合并模式` → 当前生效列表
+
+#### 2. 列表区域固定高度并支持滚动
+- 模型目录面板改为固定高度滚动区
+- provider 数量较多时不会继续无限拉长整个设置页
+- 去掉原先三列卡片造成的视觉割裂和底部空白
+
+#### 3. 合并模式说明并入来源选项
+- 删除来源模式下方单独说明文案
+- 将“默认使用合并模式，本地优先覆盖”直接并入 **合并模式** 选项文本
+- 让用户在切换来源时直接看到关键规则
+
+### 📁 涉及文件
+
+| 文件 | 修改内容 |
+|------|----------|
+| `src/features/settings/OpenCodianSettings.ts` | 将三卡片目录重构为单面板标签切换视图 |
+| `styles.css` | 新增模型目录标签页与滚动面板样式，移除旧三卡片布局样式 |
+| `src/i18n/locales/zh.ts` | 调整模型来源模式与目录摘要文案 |
+| `src/i18n/locales/en.ts` | 同步英文文案 |
+
+### 🧪 验证结果
+
+- ✅ `npm run typecheck`
+- ✅ `npm run lint`
+- ✅ `npm run build`
+
+## 2026-03-26 仅本地模式空模型仍可发送问题修复
+
+### 📋 问题描述
+在设置中把模型来源切换为 **仅本地** 后，如果本地 `.opencode/opencode.json` 里没有任何 provider / model：
+- 会话页模型选择器仍会显示之前残留的服务器模型名
+- 下拉展开后列表为空，显示与实际状态不一致
+- 用户继续发送消息时，OpenCode 仍可能沿用服务器侧可用模型完成回复
+
+### 🔍 原因分析
+- `src/features/chat/OpenCodianView.ts` 中，会话模型显示和发送逻辑此前没有在 **“模型目录已经加载，但当前模型已失效 / 不存在”** 的场景下彻底清空旧值
+- 设置页中的默认 provider / model 在有效模型列表为空时，也没有及时重置为空字符串
+- `src/core/opencode/ServerManager.ts` 在 **仅本地** 模式下，如果本地没有 provider，之前不会显式把 `enabled_providers` 约束为空集合，导致受管 OpenCode 进程仍可能继续使用服务端/全局配置
+
+### ✅ 修复内容
+
+#### 1. 聊天页模型选择器严格跟随当前有效目录
+- `getCurrentSessionModel()` 现在会在模型目录已加载后校验：
+  - 当前会话覆盖模型是否仍存在
+  - 默认 provider / model 是否仍存在
+- 若两者都无效，则回退到首个可用模型；如果根本没有模型，则返回 `null`
+- 模型选择器触发按钮在无模型时显示 **No models available**
+
+#### 2. 无模型时阻止发送
+- 发送消息前会再次校验当前 provider / model：
+  - 未选择模型时直接阻止发送
+  - 当前模型不在有效目录中时直接阻止发送
+  - 当前模型不在服务端实际可用模型中时直接阻止发送
+
+#### 3. 设置页同步清空失效默认值
+- 在 `src/features/settings/OpenCodianSettings.ts` 中：
+  - 若当前有效 provider 列表为空，则自动将 `defaultProvider` 置空
+  - 若当前 provider 下已无模型，则自动将 `defaultModel` 置空
+- provider / model 下拉框在空状态下明确显示无模型提示
+
+#### 4. 仅本地模式显式禁用非本地 provider
+- `src/core/opencode/ServerManager.ts` 在 `modelSourceMode === 'local'` 时：
+  - 强制设置 `OPENCODE_DISABLE_PROJECT_CONFIG=true`
+  - 指向 vault 内 `.opencode` 目录
+  - 无论本地 provider 是否为空，都写入：
+    - `OPENCODE_CONFIG_CONTENT={"enabled_providers":[]}`
+- 这样即使本地没有模型，也不会再隐式回退到服务器/全局 provider
+
+### 📁 涉及文件
+
+| 文件 | 修改内容 |
+|------|----------|
+| `src/features/chat/OpenCodianView.ts` | 修复会话模型选择器旧值残留，并在无模型时阻止发送 |
+| `src/features/settings/OpenCodianSettings.ts` | 有效模型为空时清空默认 provider / model |
+| `src/core/opencode/ServerManager.ts` | 仅本地模式下显式写入空 `enabled_providers` |
+| `tests/unit/core/opencode/ServerManager.test.ts` | 补充仅本地空 provider 场景测试 |
+
+### 🎯 修复效果
+- ✅ 仅本地模式且本地无模型时，聊天页不再显示旧服务器模型
+- ✅ 模型下拉框和实际可发送状态保持一致
+- ✅ 无模型时发送会被拦截，不会再意外走到服务器模型
+- ✅ 受管本地 OpenCode 服务严格遵循本地模型来源模式
+
+### 🧪 验证结果
+
+- ✅ `npm run typecheck`
+- ✅ `npm run test`
+- ✅ `npm run lint`
+- ✅ `npm run build`
+
+## 2026-03-26 设置页重复配置项渲染修复
+
+### 📋 问题描述
+设置界面在首次打开时通常正常，但在修改服务器相关配置并触发设置页重新渲染后，**用户 / 调试 / 界面** 等后半段配置区会重复追加到页面中，形成重复的设置项。
+
+### 🔍 原因分析
+- `src/features/settings/OpenCodianSettings.ts` 中的 `display()` 之前是异步方法
+- `display()` 在渲染过程中会等待异步的 `addSecuritySettings()`
+- 旧实现里 `addSecuritySettings()` 又会在中途 `await updateConfigStatus()`
+- 一旦服务器配置变化再次触发 `display()`，前一次渲染可能尚未完成，导致前一次渲染恢复后又把后续的 **UI / Debug / User** 分区再次插入 DOM
+
+本质上，这是一个由**设置页中途让出执行权**引发的重渲染竞态问题。
+
+### ✅ 修复内容
+
+#### 1. 将安全设置区恢复为同步渲染链路
+- `addSecuritySettings()` 保持为同步方法
+- 不再阻塞整个设置页主渲染流程
+
+#### 2. 配置状态检查改为非阻塞执行
+- 初始配置状态刷新从阻塞式等待改为：
+  - `void updateConfigStatus().catch(...)`
+- 这样配置状态仍会异步更新，但不会打断整页顺序渲染
+
+#### 3. 将设置页 `display()` 明确改为同步方法
+- 把 `display()` 从 `async display(): Promise<void>` 改为 `display(): void`
+- 使设置页的渲染语义与当前实现保持一致
+- 降低后续再次引入中途 `await` 导致竞态的风险
+
+### 📁 涉及文件
+
+| 文件 | 修改内容 |
+|------|----------|
+| `src/features/settings/OpenCodianSettings.ts` | 将设置页主渲染方法改为同步，并保持安全设置区状态检查为非阻塞调用 |
+
+### 🎯 修复效果
+- ✅ 修改服务器配置后，不再重复出现 **用户 / 调试 / 界面** 配置项
+- ✅ 配置状态仍可异步刷新显示
+- ✅ 设置页渲染顺序更加稳定，避免后半段分区被重复插入
+
+### 🧪 验证结果
+
+- ✅ `npm run build`
+
+## 2026-03-26 模型来源模式、可视化模型配置面板与模型 JSON 编辑器
+
+### 📋 功能描述
+本轮围绕 **“模型配置来源不清晰”**、**“手写 `.opencode/opencode.json` 门槛高”**、以及 **“高级用户仍需要可控的 JSON 编辑入口”** 三个问题，对 OpenCodian 的模型配置链路做了一次完整增强。
+
+目标包括：
+- 让用户明确选择模型列表来自 **本地配置 / 服务器配置 / 合并模式**
+- 在设置页直接看到 **本地模型列表、服务器模型列表、当前生效列表**
+- 提供 **可视化模型配置面板**，无需手改 JSON 即可添加提供商和模型
+- 提供 **只编辑 provider/model 相关字段** 的 JSON 编辑器，满足高级用户需求
+- 让本地受管 OpenCode 服务在不同来源模式下按预期加载配置
+
+### ✅ 实现细节
+
+#### 1. 新增模型来源模式
+- 在设置中新增 **模型来源模式**：
+  - **仅本地**
+  - **仅服务器**
+  - **合并模式**（默认）
+- 默认行为遵循 OpenCode 合并思路：
+  - 服务器模型作为基础
+  - 本地 `.opencode/opencode.json` 中的同名 provider / model 字段覆盖服务器同名字段
+- 来源模式会保存到插件设置中，并在设置页切换后自动刷新模型目录
+
+#### 2. 设置页显示三组模型目录
+- 模型设置区现在会展示三组卡片：
+  - **本地配置**
+  - **服务器配置**
+  - **当前生效列表**
+- 每张卡片按 provider 聚合展示模型列表，方便快速对比：
+  - 哪些模型只在本地
+  - 哪些模型只在服务器
+  - 合并后最终会在选择器里出现哪些模型
+
+#### 3. 新增模型配置解析与合并服务
+- 新增独立的模型配置处理模块，负责：
+  - 读取 `.opencode/opencode.json`
+  - 提取 provider / model / enabled_providers / disabled_providers 等相关字段
+  - 生成本地模型目录
+  - 拉取服务器模型目录
+  - 产出生效后的合并目录
+- 同时补充了对 **JSONC 注释** 的兼容解析，避免用户配置里带注释时直接读失败
+
+#### 4. 可视化模型配置面板
+- 新增 **Visual Model Configuration** 弹窗
+- 支持直接配置：
+  - 默认模型
+  - small model
+  - 提供商 ID / 名称
+  - SDK 包名
+  - API Base URL
+  - API Key
+  - 模型列表
+  - context / output limit
+- 支持：
+  - 添加提供商
+  - 删除提供商
+  - 添加模型
+  - 删除模型
+- 保存后自动写回当前 vault 的 `.opencode/opencode.json`
+
+#### 5. 模型 JSON 编辑器
+- 新增 **模型 JSON 编辑器** 弹窗
+- 该编辑器只显示与模型有关的子集字段，不暴露完整 OpenCode 配置
+- 支持：
+  - JSON 格式化
+  - 基本结构校验
+  - provider 对象校验
+  - enabled / disabled providers 数组校验
+- 保存时仅替换模型相关字段，保留原文件中其他配置（如 permission）不被覆盖
+
+#### 6. 本地受管 OpenCode 服务按来源模式加载配置
+- 对 `ServerManager` 增加来源模式感知：
+  - **server**：禁用项目配置加载
+  - **merge**：保持 OpenCode 默认行为
+  - **local**：禁用项目配置，再通过环境变量限制到本地 provider 范围
+- 这样在本地受管服务模式下，来源模式不再只是 UI 展示，而是真正影响服务启动时的配置来源
+
+#### 7. 聊天面板模型选择器同步升级
+- 聊天区模型下拉不再只依赖服务器原始列表
+- 现在会读取当前来源模式下的 **生效模型目录**
+- 发送消息前增加校验：
+  - 如果当前选中的 provider/model 并不在已连接的 OpenCode 服务可用列表里
+  - 直接提示用户切换来源模式、刷新模型或重启本地服务
+- 避免出现“设置里能选，但实际发送时报模型不存在”的迷惑体验
+
+#### 8. 中英文文案与样式同步补齐
+- 为模型来源模式、三组模型卡片、可视化配置、JSON 编辑器、模型不可用提示等新增中英文文案
+- 为模型来源卡片、provider/model 表单、配置弹窗补充样式
+- 保持与现有设置页视觉风格一致
+
+### 📁 本轮涉及文件
+
+| 文件 | 修改内容 |
+|------|----------|
+| `src/core/types/settings.ts` | 新增 `modelSourceMode` 设置及默认值 |
+| `src/core/types/opencodeConfig.ts` | 新增 OpenCode 模型配置相关类型 |
+| `src/core/types/permission.ts` | 复用统一的 `OpencodeConfig` 类型 |
+| `src/core/types/index.ts` | 导出新增模型配置类型 |
+| `src/core/config/modelConfig.ts` | 模型配置提取、合并、JSONC 注释解析 |
+| `src/core/config/ModelConfigService.ts` | 本地/服务器/生效模型目录服务 |
+| `src/core/config/OpencodeConfigManager.ts` | 配置读写兼容模型字段与 JSONC |
+| `src/core/config/index.ts` | 导出新配置服务 |
+| `src/core/opencode/types.ts` | 服务配置增加 `modelSourceMode` |
+| `src/core/opencode/OpenCodeService.ts` | 来源模式变化时支持重启受管服务 |
+| `src/core/opencode/ServerManager.ts` | 启动时按来源模式设置环境变量 |
+| `src/features/settings/OpenCodianSettings.ts` | 模型来源设置、目录卡片、配置入口 |
+| `src/features/settings/ModelConfigModal.ts` | 新增可视化模型配置面板 |
+| `src/features/settings/ModelConfigJsonModal.ts` | 新增模型 JSON 编辑器 |
+| `src/features/chat/OpenCodianView.ts` | 聊天页模型目录刷新与模型可用性校验 |
+| `src/main.ts` | 初始化并注入模型配置服务，刷新聊天页目录 |
+| `src/i18n/locales/zh.ts` | 新增模型来源/编辑器/错误提示文案 |
+| `src/i18n/locales/en.ts` | 新增模型来源/编辑器/错误提示文案 |
+| `styles.css` | 新增模型来源卡片与模型配置弹窗样式 |
+| `tests/unit/core/config/OpencodeConfigManager.test.ts` | 补充模型配置保留与 JSONC 解析测试 |
+| `tests/unit/core/types/settings.test.ts` | 补充 `modelSourceMode` 默认值测试 |
+
+### 🐛 本轮重点修复的问题
+
+1. **模型到底来自哪里不清楚**：用户无法区分本地配置、服务器配置和最终生效列表
+2. **本地自定义提供商配置门槛高**：必须手动编辑 JSON，不利于普通用户
+3. **高级用户只能编辑完整配置**：缺少只针对 provider/model 字段的安全编辑入口
+4. **来源模式只是概念，没有真正影响服务加载**：现在本地受管服务会按模式切换配置来源
+5. **聊天页可能选到不可用模型**：发送前新增可用性检查与明确提示
+
+### 🎯 验证结果
+
+- ✅ `npm run typecheck`
+- ✅ `npm run test`
+- ✅ `npm run lint`
+- ✅ `npm run build`
+- ✅ 已重新部署到测试库：`C:\Users\lt\Desktop\Write\testvault\.obsidian\plugins\opencodian\`
+
+### 当前状态
+
+- ✅ 模型来源模式已可在设置中切换
+- ✅ 设置页可同时查看本地、服务器和生效模型目录
+- ✅ 已具备可视化模型配置面板
+- ✅ 已具备模型 JSON 编辑器
+- ✅ 本地受管 OpenCode 服务会按来源模式调整配置加载方式
+- ✅ 聊天页已能拦截不可用模型并给出明确提示
+
+---
+
+**会话日期**: 2026-03-26
+**开发时间**: ~3-4 小时
+**主要贡献**: 模型来源模式、模型目录可视化、provider/model 配置面板、模型 JSON 编辑器、聊天页模型可用性校验
+**当前状态**: 已部署测试库，可继续在真实 vault 中验证本地 / 服务器 / 合并三种模型来源行为
+
+---
+
 ## 2026-03-26 远程服务器帮助文案完善与聊天面板状态显示修正
 
 ### 📋 功能描述

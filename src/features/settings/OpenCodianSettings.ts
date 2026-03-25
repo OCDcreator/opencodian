@@ -66,6 +66,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
   private refreshModelsCallback?: () => void;
   private refreshServerStatusCallback?: () => Promise<void>;
   private serverStatusIntervalId: number | null = null;
+  private activeModelCatalogTab: 'local' | 'server' | 'effective' = 'effective';
 
   constructor(app: App, plugin: OpenCodianPlugin) {
     super(app, plugin);
@@ -82,7 +83,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     void this.refreshServerStatusCallback?.();
   }
 
-  async display(): Promise<void> {
+  display(): void {
     const { containerEl } = this;
     if (this.serverStatusIntervalId) {
       window.clearInterval(this.serverStatusIntervalId);
@@ -472,30 +473,48 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       return headingEl;
     }
 
+    this.activeModelCatalogTab = this.getPreferredModelCatalogTab();
+
     let providerDropdown: import('obsidian').DropdownComponent;
     let modelDropdown: import('obsidian').DropdownComponent;
     let catalogs: { local: ModelCatalog; server: ModelCatalog; effective: ModelCatalog } | null = null;
-    const sourceCardsEl = containerEl.createDiv({ cls: 'opencodian-model-source-cards' });
+    const sourceCatalogEl = containerEl.createDiv({ cls: 'opencodian-model-catalog' });
 
     const loadAvailableModels = async (showNotice = false) => {
       try {
         catalogs = await modelConfigService.getCatalogs(this.plugin.settings.modelSourceMode);
         const availableProviders = catalogs.effective.providers;
+        let dirty = false;
 
         providerDropdown.selectEl.empty();
         for (const provider of availableProviders) {
           providerDropdown.addOption(provider.id, provider.name || provider.id);
         }
 
-        this.renderModelCatalogCards(sourceCardsEl, catalogs);
+        this.renderModelCatalogPanel(sourceCatalogEl, catalogs);
 
         if (availableProviders.find((provider) => provider.id === this.plugin.settings.defaultProvider)) {
           providerDropdown.setValue(this.plugin.settings.defaultProvider);
         } else if (availableProviders.length > 0) {
           providerDropdown.setValue(availableProviders[0].id);
+          if (this.plugin.settings.defaultProvider !== availableProviders[0].id) {
+            this.plugin.settings.defaultProvider = availableProviders[0].id;
+            dirty = true;
+          }
+        } else {
+          providerDropdown.addOption('', t('settings.model.noModels'));
+          providerDropdown.setValue('');
+          if (this.plugin.settings.defaultProvider !== '') {
+            this.plugin.settings.defaultProvider = '';
+            dirty = true;
+          }
         }
 
         await updateModelDropdown();
+
+        if (dirty) {
+          await this.plugin.saveSettings();
+        }
 
         if (showNotice) {
           new Notice(t('settings.model.refresh.success', { count: availableProviders.length }));
@@ -541,6 +560,11 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         }
       } else {
         modelDropdown.addOption('', t('settings.model.noModels'));
+        modelDropdown.setValue('');
+        if (this.plugin.settings.defaultModel !== '') {
+          this.plugin.settings.defaultModel = '';
+          await this.plugin.saveSettings();
+        }
       }
     };
 
@@ -555,6 +579,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.modelSourceMode)
           .onChange(async (value) => {
             this.plugin.settings.modelSourceMode = value as ModelSourceMode;
+            this.activeModelCatalogTab = this.getPreferredModelCatalogTab();
             await this.plugin.saveSettings();
             new Notice(t('settings.model.source.updated'));
             window.setTimeout(() => {
@@ -562,11 +587,6 @@ export class OpenCodianSettingTab extends PluginSettingTab {
             }, 1200);
           });
       });
-
-    containerEl.createDiv({
-      cls: 'opencodian-model-source-note',
-      text: t('settings.model.source.note'),
-    });
 
     new Setting(containerEl)
       .setName(t('settings.model.provider.name'))
@@ -749,8 +769,10 @@ export class OpenCodianSettingTab extends PluginSettingTab {
           });
       });
 
-    // Initial status check
-    await updateConfigStatus();
+    // Initial status check - run asynchronously without blocking
+    void updateConfigStatus().catch(() => {
+      // Ignore errors if settings tab was closed during update
+    });
 
     // Auto restart option
     new Setting(containerEl)
@@ -1296,74 +1318,125 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     }
   }
 
-  private renderModelCatalogCards(
+  private renderModelCatalogPanel(
     containerEl: HTMLElement,
     catalogs: { local: ModelCatalog; server: ModelCatalog; effective: ModelCatalog },
   ): void {
     containerEl.empty();
-    this.renderModelCatalogCard(
-      containerEl,
-      t('settings.model.catalog.localTitle'),
-      t('settings.model.catalog.localDesc'),
-      catalogs.local,
-      'local',
-    );
-    this.renderModelCatalogCard(
-      containerEl,
-      t('settings.model.catalog.serverTitle'),
-      t('settings.model.catalog.serverDesc'),
-      catalogs.server,
-      'server',
-    );
-    this.renderModelCatalogCard(
-      containerEl,
-      t('settings.model.catalog.effectiveTitle'),
-      t('settings.model.catalog.effectiveDesc'),
-      catalogs.effective,
-      'effective',
-    );
-  }
+    const tabs: Array<{
+      mode: 'local' | 'server' | 'effective';
+      title: string;
+      description: string;
+      catalog: ModelCatalog;
+    }> = [
+      {
+        mode: 'local',
+        title: t('settings.model.catalog.localTitle'),
+        description: t('settings.model.catalog.localDesc'),
+        catalog: catalogs.local,
+      },
+      {
+        mode: 'server',
+        title: t('settings.model.catalog.serverTitle'),
+        description: t('settings.model.catalog.serverDesc'),
+        catalog: catalogs.server,
+      },
+      {
+        mode: 'effective',
+        title: t('settings.model.catalog.effectiveTitle'),
+        description: t('settings.model.catalog.effectiveDesc'),
+        catalog: catalogs.effective,
+      },
+    ];
 
-  private renderModelCatalogCard(
-    containerEl: HTMLElement,
-    title: string,
-    description: string,
-    catalog: ModelCatalog,
-    mode: 'local' | 'server' | 'effective',
-  ): void {
-    const cardEl = containerEl.createDiv({ cls: `opencodian-model-source-card is-${mode}` });
-    cardEl.createDiv({ cls: 'opencodian-model-source-card-title', text: title });
-    cardEl.createDiv({ cls: 'opencodian-model-source-card-desc', text: description });
+    const activeTab = tabs.find((tab) => tab.mode === this.activeModelCatalogTab) ?? tabs[0];
+    const panelEl = containerEl.createDiv({ cls: 'opencodian-model-catalog-panel' });
+    const tabsEl = panelEl.createDiv({ cls: 'opencodian-model-catalog-tabs' });
 
-    if (catalog.providers.length === 0) {
-      cardEl.createDiv({
-        cls: 'opencodian-model-source-card-empty',
+    for (const tab of tabs) {
+      const buttonEl = tabsEl.createEl('button', {
+        cls: 'opencodian-model-catalog-tab',
+        text: tab.title,
+      });
+      buttonEl.type = 'button';
+      if (tab.mode === activeTab.mode) {
+        buttonEl.addClass('is-active');
+      }
+
+      const countEl = buttonEl.createSpan({ cls: 'opencodian-model-catalog-tab-count' });
+      countEl.setText(String(this.getCatalogModelCount(tab.catalog)));
+
+      buttonEl.addEventListener('click', () => {
+        if (this.activeModelCatalogTab === tab.mode) {
+          return;
+        }
+        this.activeModelCatalogTab = tab.mode;
+        this.renderModelCatalogPanel(containerEl, catalogs);
+      });
+    }
+
+    const headerEl = panelEl.createDiv({ cls: 'opencodian-model-catalog-header' });
+    headerEl.createDiv({ cls: 'opencodian-model-catalog-title', text: activeTab.title });
+    headerEl.createDiv({ cls: 'opencodian-model-catalog-desc', text: activeTab.description });
+    headerEl.createDiv({
+      cls: 'opencodian-model-catalog-summary',
+      text: t('settings.model.catalog.summary', {
+        providers: activeTab.catalog.providers.length,
+        models: this.getCatalogModelCount(activeTab.catalog),
+      }),
+    });
+
+    const bodyEl = panelEl.createDiv({ cls: 'opencodian-model-catalog-body' });
+
+    if (activeTab.catalog.providers.length === 0) {
+      bodyEl.createDiv({
+        cls: 'opencodian-model-catalog-empty',
         text: t('settings.model.catalog.empty'),
       });
       return;
     }
 
-    for (const provider of catalog.providers) {
-      const providerEl = cardEl.createDiv({ cls: 'opencodian-model-source-provider' });
-      providerEl.createDiv({
-        cls: 'opencodian-model-source-provider-name',
-        text: `${provider.name} (${provider.models.length})`,
+    for (const provider of activeTab.catalog.providers) {
+      const providerEl = bodyEl.createDiv({ cls: 'opencodian-model-catalog-provider' });
+      const providerHeaderEl = providerEl.createDiv({ cls: 'opencodian-model-catalog-provider-header' });
+      providerHeaderEl.createDiv({
+        cls: 'opencodian-model-catalog-provider-name',
+        text: provider.name,
+      });
+      providerHeaderEl.createDiv({
+        cls: 'opencodian-model-catalog-provider-count',
+        text: String(provider.models.length),
       });
       providerEl.createDiv({
-        cls: 'opencodian-model-source-provider-models',
+        cls: 'opencodian-model-catalog-provider-models',
         text: this.describeProviderModels(provider),
       });
     }
   }
 
+  private getPreferredModelCatalogTab(): 'local' | 'server' | 'effective' {
+    switch (this.plugin.settings.modelSourceMode) {
+      case 'local':
+        return 'local';
+      case 'server':
+        return 'server';
+      default:
+        return 'effective';
+    }
+  }
+
+  private getCatalogModelCount(catalog: ModelCatalog): number {
+    return catalog.providers.reduce((total, provider) => total + provider.models.length, 0);
+  }
+
   private describeProviderModels(provider: ModelCatalogProvider): string {
     const modelNames = provider.models.map((model) => model.name);
-    if (modelNames.length <= 4) {
+    if (modelNames.length <= 6) {
       return modelNames.join(' · ');
     }
 
-    const preview = modelNames.slice(0, 4).join(' · ');
-    return `${preview} · +${modelNames.length - 4}`;
+    const preview = modelNames.slice(0, 6).join(' · ');
+    return `${preview} · +${modelNames.length - 6}`;
   }
 
   private addServerHelpButton(setting: Setting, topic: ServerHelpTopic): void {

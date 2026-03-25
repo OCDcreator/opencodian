@@ -432,13 +432,9 @@ export class ServerManager {
     }
 
     const providerIds = this.getLocalProviderIds();
-    if (providerIds.length > 0) {
-      env.OPENCODE_CONFIG_CONTENT = JSON.stringify({
-        enabled_providers: providerIds,
-      });
-    } else {
-      delete env.OPENCODE_CONFIG_CONTENT;
-    }
+    env.OPENCODE_CONFIG_CONTENT = JSON.stringify({
+      enabled_providers: providerIds,
+    });
 
     return env;
   }

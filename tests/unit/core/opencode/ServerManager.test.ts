@@ -2,6 +2,9 @@
  * ServerManager unit tests
  */
 
+import * as fs from 'fs';
+import * as path from 'path';
+
 import { ServerManager } from '../../../../src/core/opencode/ServerManager';
 
 // Mock Obsidian
@@ -37,6 +40,7 @@ jest.mock('net', () => ({
 
 describe('ServerManager', () => {
   let manager: ServerManager;
+  const testVaultPath = path.join(__dirname, 'server-manager-vault');
   const defaultConfig = {
     mode: 'local' as const,
     baseUrl: 'http://127.0.0.1:4096',
@@ -51,11 +55,21 @@ describe('ServerManager', () => {
       password: '',
       token: '',
     },
+    modelSourceMode: 'merge' as const,
   };
 
   beforeEach(() => {
+    if (fs.existsSync(testVaultPath)) {
+      fs.rmSync(testVaultPath, { recursive: true, force: true });
+    }
     manager = new ServerManager(defaultConfig);
     jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    if (fs.existsSync(testVaultPath)) {
+      fs.rmSync(testVaultPath, { recursive: true, force: true });
+    }
   });
 
   describe('constructor', () => {
@@ -154,6 +168,28 @@ describe('ServerManager', () => {
       );
 
       expect(managerWithEvents).toBeDefined();
+    });
+  });
+
+  describe('local-only model source mode', () => {
+    it('should disable all providers when local config has no models', () => {
+      manager = new ServerManager({
+        ...defaultConfig,
+        modelSourceMode: 'local',
+      });
+      fs.mkdirSync(path.join(testVaultPath, '.opencode'), { recursive: true });
+      fs.writeFileSync(
+        path.join(testVaultPath, '.opencode', 'opencode.json'),
+        JSON.stringify({ $schema: 'https://opencode.ai/config.json' }),
+        'utf-8',
+      );
+
+      manager.setWorkingDirectory(testVaultPath);
+      const env = (manager as any).getSpawnEnv() as NodeJS.ProcessEnv;
+
+      expect(env.OPENCODE_DISABLE_PROJECT_CONFIG).toBe('true');
+      expect(env.OPENCODE_CONFIG_DIR).toBe(path.join(testVaultPath, '.opencode'));
+      expect(env.OPENCODE_CONFIG_CONTENT).toBe(JSON.stringify({ enabled_providers: [] }));
     });
   });
 });

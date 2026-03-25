@@ -101,6 +101,7 @@ export class OpenCodianView extends ItemView {
   private availableModels: Array<{ provider: string; model: string; label: string; providerName: string; modelName: string }> = [];
   private availableProviders: Array<{ id: string; name: string; models: Array<{ id: string; name: string }> }> = [];
   private sessionModelOverrides: Map<string, { provider: string; model: string }> = new Map();
+  private hasLoadedModelCatalog = false;
   private isModelDropdownOpen = false;
   private modelFilterQuery = '';
   private modelDropdownClickOutsideHandler: ((e: MouseEvent) => void) | null = null;
@@ -2010,7 +2011,14 @@ export class OpenCodianView extends ItemView {
     
     // Check if models are still loading
     if (this.availableProviders.length === 0) {
-      this.renderLoadingState();
+      if (!this.hasLoadedModelCatalog) {
+        this.renderLoadingState();
+      } else {
+        const emptyState = this.modelSelectorScrollContainer.createDiv({
+          cls: 'opencodian-model-dropdown-empty',
+        });
+        emptyState.setText(t('settings.model.noModels'));
+      }
       return;
     }
     
@@ -2070,7 +2078,7 @@ export class OpenCodianView extends ItemView {
       
       // Models for this provider
       for (const model of provider.models) {
-        const isSelected = current.provider === provider.id && current.model === model.id;
+        const isSelected = current?.provider === provider.id && current?.model === model.id;
         const modelValue = `${provider.id}::${model.id}`;
         
         const modelOption = groupEl.createDiv({ 
@@ -2182,6 +2190,9 @@ export class OpenCodianView extends ItemView {
     if (!this.modelSelectorScrollContainer) return;
     
     const current = this.getCurrentSessionModel();
+    if (!current) {
+      return;
+    }
     const currentValue = `${current.provider}::${current.model}`;
     
     const currentEl = this.modelSelectorScrollContainer.querySelector(`[data-value="${currentValue}"]`) as HTMLElement;
@@ -2200,6 +2211,7 @@ export class OpenCodianView extends ItemView {
       const providers = this.plugin.modelConfigService
         ? (await this.plugin.modelConfigService.getCatalogs(this.plugin.settings.modelSourceMode)).effective.providers
         : (await this.plugin.openCodeService.getAvailableModels()).providers;
+      this.hasLoadedModelCatalog = true;
       this.availableModels = [];
       this.availableProviders = [];
       
@@ -2240,14 +2252,18 @@ export class OpenCodianView extends ItemView {
     if (!this.modelSelectorTrigger) return;
     
     // Find model info from available models
-    const modelInfo = this.availableModels.find(
-      m => m.provider === current.provider && m.model === current.model
-    );
+    const modelInfo = current
+      ? this.availableModels.find(
+        m => m.provider === current.provider && m.model === current.model
+      )
+      : null;
     
     // Update text
     const textEl = this.modelSelectorTrigger.querySelector('.opencodian-model-trigger-text');
     if (textEl) {
-      textEl.textContent = modelInfo?.modelName || current.model;
+      textEl.textContent = current
+        ? (modelInfo?.modelName || current.model)
+        : t('settings.model.noModels');
     }
     
     // Update provider icon using Lobehub icons
@@ -2256,12 +2272,12 @@ export class OpenCodianView extends ItemView {
       iconWrapper.empty();
       
       // Try to get Lobehub icon
-      const iconUrl = ProviderIconService.getIconUrl(current.provider);
+      const iconUrl = current ? ProviderIconService.getIconUrl(current.provider) : null;
       if (iconUrl) {
         const img = document.createElement('img');
         img.src = iconUrl;
-        img.alt = modelInfo?.providerName || current.provider;
-        img.title = modelInfo?.providerName || current.provider;
+        img.alt = modelInfo?.providerName || current?.provider || 'model';
+        img.title = modelInfo?.providerName || current?.provider || 'model';
         iconWrapper.appendChild(img);
       } else {
         // Fallback to Obsidian icon
@@ -2271,17 +2287,35 @@ export class OpenCodianView extends ItemView {
   }
 
   /** Get current model for this session */
-  private getCurrentSessionModel(): { provider: string; model: string } {
+  private getCurrentSessionModel(): { provider: string; model: string } | null {
+    if (!this.hasLoadedModelCatalog) {
+      return {
+        provider: this.plugin.settings.defaultProvider,
+        model: this.plugin.settings.defaultModel,
+      };
+    }
+
     if (this.currentConversation) {
       const override = this.sessionModelOverrides.get(this.currentConversation.id);
-      if (override) {
+      if (override && this.isModelInAvailableProviders(override.provider, override.model)) {
         return override;
       }
+      if (override) {
+        this.sessionModelOverrides.delete(this.currentConversation.id);
+      }
     }
-    return {
-      provider: this.plugin.settings.defaultProvider,
-      model: this.plugin.settings.defaultModel,
-    };
+
+    if (this.isModelInAvailableProviders(
+      this.plugin.settings.defaultProvider,
+      this.plugin.settings.defaultModel,
+    )) {
+      return {
+        provider: this.plugin.settings.defaultProvider,
+        model: this.plugin.settings.defaultModel,
+      };
+    }
+
+    return this.getFirstAvailableModel();
   }
 
   /** Switch model for current session */
@@ -2305,6 +2339,9 @@ export class OpenCodianView extends ItemView {
   /** Get model options for sendMessage */
   private getSendMessageOptions(): { provider?: string; model?: string } {
     const current = this.getCurrentSessionModel();
+    if (!current) {
+      return {};
+    }
     return {
       provider: current.provider,
       model: current.model,
@@ -2315,7 +2352,17 @@ export class OpenCodianView extends ItemView {
     provider: string | undefined,
     model: string | undefined,
   ): Promise<boolean> {
-    if (!provider || !model || !this.plugin.modelConfigService) {
+    if (!provider || !model) {
+      new Notice(t('chat.error.modelUnavailable'));
+      return false;
+    }
+
+    if (!this.isModelInAvailableProviders(provider, model)) {
+      new Notice(t('chat.error.modelUnavailable'));
+      return false;
+    }
+
+    if (!this.plugin.modelConfigService) {
       return true;
     }
 
@@ -2326,6 +2373,26 @@ export class OpenCodianView extends ItemView {
 
     new Notice(t('chat.error.modelUnavailable'));
     return false;
+  }
+
+  private isModelInAvailableProviders(provider: string, model: string): boolean {
+    return this.availableProviders.some(
+      (item) => item.id === provider && item.models.some((entry) => entry.id === model),
+    );
+  }
+
+  private getFirstAvailableModel(): { provider: string; model: string } | null {
+    for (const provider of this.availableProviders) {
+      const firstModel = provider.models[0];
+      if (firstModel) {
+        return {
+          provider: provider.id,
+          model: firstModel.id,
+        };
+      }
+    }
+
+    return null;
   }
 
   /** Convert OpenCode stream chunk to streaming module format */
