@@ -1035,12 +1035,7 @@ export class OpenCodianView extends ItemView {
 
     const modelOptions = this.getSendMessageOptions();
     if (!(await this.ensureSelectedModelAvailable(modelOptions.provider, modelOptions.model))) {
-      const { messageEl, contentEl } = this.createAssistantMessageElement();
-      await this.finalizeAssistantMessageWithError(
-        messageEl,
-        contentEl,
-        t('chat.error.modelUnavailable'),
-      );
+      await this.appendModelUnavailableNoticeMessage();
       return;
     }
 
@@ -1607,6 +1602,10 @@ export class OpenCodianView extends ItemView {
         minute: '2-digit',
       });
       messageEl.createEl('div', { cls: 'opencodian-message-time', text: time });
+    } else if (message.displayStyle === 'notice') {
+      messageEl.addClass('opencodian-message--notice');
+      this.renderNoticeCard(content, message);
+      this.addTimestampWithCopyButton(messageEl, message.timestamp);
     } else if (message.contentBlocks && message.contentBlocks.length > 0) {
       // For assistant messages, render content blocks (thinking, tools, etc.)
       for (const block of message.contentBlocks) {
@@ -1792,7 +1791,7 @@ export class OpenCodianView extends ItemView {
   private addTimestampWithCopyButton(
     messageEl: HTMLElement,
     timestamp: number,
-    content: string
+    content?: string
   ): void {
     // Create a container for timestamp and copy button
     const timeRow = messageEl.createDiv({ cls: 'opencodian-message-time-row' });
@@ -1803,6 +1802,10 @@ export class OpenCodianView extends ItemView {
       minute: '2-digit',
     });
     timeRow.createSpan({ cls: 'opencodian-message-time-text', text: timeStr });
+
+    if (!content) {
+      return;
+    }
 
     // Copy button
     const copyBtn = timeRow.createSpan({ cls: 'opencodian-copy-btn-inline' });
@@ -2353,12 +2356,10 @@ export class OpenCodianView extends ItemView {
     model: string | undefined,
   ): Promise<boolean> {
     if (!provider || !model) {
-      new Notice(t('chat.error.modelUnavailable'));
       return false;
     }
 
     if (!this.isModelInAvailableProviders(provider, model)) {
-      new Notice(t('chat.error.modelUnavailable'));
       return false;
     }
 
@@ -2366,13 +2367,145 @@ export class OpenCodianView extends ItemView {
       return true;
     }
 
-    const available = await this.plugin.modelConfigService.isModelAvailableOnServer(provider, model);
-    if (available) {
-      return true;
+    try {
+      const available = await this.plugin.modelConfigService.isModelAvailableOnServer(provider, model);
+      if (available) {
+        return true;
+      }
+    } catch (error) {
+      logger.warn('Failed to verify model availability on server', error);
     }
 
-    new Notice(t('chat.error.modelUnavailable'));
     return false;
+  }
+
+  private renderNoticeCard(container: HTMLElement, message: ChatMessage): void {
+    const tone = message.noticeTone ?? 'info';
+    const cardEl = container.createDiv({ cls: `opencodian-chat-notice-card is-${tone}` });
+    const iconEl = cardEl.createDiv({ cls: 'opencodian-chat-notice-icon' });
+    setIcon(
+      iconEl,
+      tone === 'error' ? 'x-circle' : tone === 'warning' ? 'alert-triangle' : 'info',
+    );
+
+    const bodyEl = cardEl.createDiv({ cls: 'opencodian-chat-notice-body' });
+    if (message.noticeTitle) {
+      bodyEl.createDiv({
+        cls: 'opencodian-chat-notice-title',
+        text: message.noticeTitle,
+      });
+    }
+
+    bodyEl.createDiv({
+      cls: 'opencodian-chat-notice-text',
+      text: message.content,
+    });
+
+    if (message.noticeActions && message.noticeActions.length > 0) {
+      const actionsEl = bodyEl.createDiv({ cls: 'opencodian-chat-notice-actions' });
+      for (const action of message.noticeActions) {
+        const buttonEl = actionsEl.createEl('button', {
+          cls: 'opencodian-chat-notice-action-btn',
+          text: this.getNoticeActionLabel(action.type),
+        });
+        buttonEl.type = 'button';
+        buttonEl.addEventListener('click', () => {
+          void this.handleNoticeAction(action.type);
+        });
+      }
+    }
+  }
+
+  private async appendPersistentAssistantNoticeMessage(
+    title: string,
+    content: string,
+    tone: ChatMessage['noticeTone'] = 'warning',
+    noticeActions?: ChatMessage['noticeActions'],
+  ): Promise<void> {
+    const noticeMessage: ChatMessage = {
+      id: `assistant-notice-${Date.now()}`,
+      role: 'assistant',
+      content,
+      timestamp: Date.now(),
+      displayStyle: 'notice',
+      noticeTitle: title,
+      noticeTone: tone,
+      noticeActions,
+    };
+
+    await this.renderMessage(noticeMessage);
+
+    if (this.currentConversation) {
+      this.currentConversation.messages.push(noticeMessage);
+      this.currentConversation.updatedAt = Date.now();
+      await this.plugin.storage.saveConversation(this.currentConversation);
+    }
+
+    this.scrollToBottom();
+  }
+
+  private async appendModelUnavailableNoticeMessage(): Promise<void> {
+    const { title, message } = this.getModelUnavailableNoticeContent();
+    await this.appendPersistentAssistantNoticeMessage(
+      title,
+      message,
+      'warning',
+      [{ type: 'open_model_settings' }],
+    );
+  }
+
+  private getModelUnavailableNoticeContent(): { title: string; message: string } {
+    if (this.availableProviders.length === 0) {
+      switch (this.plugin.settings.modelSourceMode) {
+        case 'local':
+          return {
+            title: t('chat.notice.modelUnavailable.localTitle'),
+            message: t('chat.notice.modelUnavailable.localBody'),
+          };
+        case 'server':
+          return {
+            title: t('chat.notice.modelUnavailable.serverTitle'),
+            message: t('chat.notice.modelUnavailable.serverBody'),
+          };
+        default:
+          return {
+            title: t('chat.notice.modelUnavailable.mergeTitle'),
+            message: t('chat.notice.modelUnavailable.mergeBody'),
+          };
+      }
+    }
+
+    return {
+      title: t('chat.notice.modelUnavailable.selectedTitle'),
+      message: t('chat.notice.modelUnavailable.selectedBody'),
+    };
+  }
+
+  private getNoticeActionLabel(actionType: NonNullable<ChatMessage['noticeActions']>[number]['type']): string {
+    switch (actionType) {
+      case 'open_model_settings':
+        return t('chat.notice.action.openModelSettings');
+      default:
+        return t('chat.notice.action.openModelSettings');
+    }
+  }
+
+  private async handleNoticeAction(
+    actionType: NonNullable<ChatMessage['noticeActions']>[number]['type'],
+  ): Promise<void> {
+    switch (actionType) {
+      case 'open_model_settings': {
+        const settings = this.appSettings();
+        settings.open();
+        settings.openTabById('opencodian');
+        window.setTimeout(() => {
+          this.plugin.settingsTab?.scrollToModelSection();
+        }, 50);
+        return;
+      }
+      default:
+        return;
+    }
   }
 
   private isModelInAvailableProviders(provider: string, model: string): boolean {

@@ -8,6 +8,90 @@
 
 ---
 
+## 2026-03-26 无模型提示卡片新增“前往模型设置”快捷按钮
+
+### 📋 功能补充
+在“无模型可用”的会话内 notice 卡片基础上，继续补充一个更直接的操作入口：
+- 卡片内新增 **前往模型设置** 按钮
+- 点击后直接打开 OpenCodian 设置页
+- 自动滚动定位到 **模型** 设置区
+
+### ✅ 实现说明
+- notice 卡片的动作不是临时 DOM，而是作为会话消息元数据一起持久化保存
+- 因此即使：
+  - 切换会话
+  - 关闭后重新打开
+  - 重启 Obsidian
+- 这张卡片和它的按钮都会继续存在，并保持可点击
+
+### 📁 涉及文件
+
+| 文件 | 修改内容 |
+|------|----------|
+| `src/core/types/chat.ts` | 新增 notice action 持久化类型 |
+| `src/features/chat/OpenCodianView.ts` | 渲染 notice 按钮并处理“前往模型设置”动作 |
+| `src/features/settings/OpenCodianSettings.ts` | 新增滚动到模型设置区的方法 |
+| `styles.css` | 新增 notice 操作按钮样式 |
+| `src/i18n/locales/zh.ts` | 新增中文按钮文案 |
+| `src/i18n/locales/en.ts` | 新增英文按钮文案 |
+| `tests/unit/core/storage/StorageService.test.ts` | 校验 notice action 能随会话持久化保存 |
+
+### 🧪 验证结果
+
+- ✅ `npm run typecheck`
+- ✅ `npm run test`
+- ✅ `npm run lint`
+- ✅ `npm run build`
+
+## 2026-03-26 无模型发送失败提示改为会话内持久卡片
+
+### 📋 问题描述
+当当前来源模式下没有可用模型时，用户在聊天页发送消息会出现两个体验问题：
+- 会话区插入一整块非常突兀的红色错误块
+- 同时右上角还会弹出 `Notice` 提示，视觉上重复且打断感很强
+
+另外，这类提示如果只是临时浮层，也无法在重新打开会话或重启 Obsidian 后保留下来。
+
+### ✅ 修复内容
+
+#### 1. 无模型提示改为会话内 notice 卡片
+- 不再为该场景使用红色 `streaming-error-block`
+- 改为在聊天流中插入一张样式更温和的 **notice 卡片**
+- 卡片根据当前来源模式给出更具体的说明：
+  - 仅本地：提示本地 `.opencode/opencode.json` 尚无模型
+  - 仅服务器：提示服务器未暴露模型
+  - 合并模式：提示当前来源模式下没有可用模型
+  - 已选模型失效：提示当前会话模型已不可用
+
+#### 2. 去掉右上角重复弹窗
+- `modelUnavailable` 这条发送前校验链路不再调用右上角 `Notice`
+- 避免在会话中已经给出提示卡片时，界面顶部再重复提示一次
+
+#### 3. 提示卡片持久化到会话
+- 新增 assistant message 的 notice 展示元数据并直接保存进会话 JSON
+- 这样在以下情况下都能保持原位显示：
+  - 切换会话
+  - 关闭后重新打开会话
+  - 重启 Obsidian
+
+### 📁 涉及文件
+
+| 文件 | 修改内容 |
+|------|----------|
+| `src/core/types/chat.ts` | 为消息新增 notice 展示元数据字段 |
+| `src/features/chat/OpenCodianView.ts` | 将无模型错误改为会话内持久卡片，并移除右上角重复提示 |
+| `styles.css` | 新增聊天 notice 卡片样式 |
+| `src/i18n/locales/zh.ts` | 新增中文 notice 文案 |
+| `src/i18n/locales/en.ts` | 新增英文 notice 文案 |
+| `tests/unit/core/storage/StorageService.test.ts` | 补充 notice 消息持久化回归测试 |
+
+### 🧪 验证结果
+
+- ✅ `npm run typecheck`
+- ✅ `npm run test`
+- ✅ `npm run lint`
+- ✅ `npm run build`
+
 ## 2026-03-26 模型来源列表设置页布局优化
 
 ### 📋 问题描述

@@ -83,6 +83,17 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     void this.refreshServerStatusCallback?.();
   }
 
+  scrollToModelSection(): void {
+    const sectionTitle = t('settings.model.title');
+    const headingEl = this.containerEl.querySelector<HTMLHeadingElement>(
+      `.opencodian-settings-section-heading[data-section-title="${sectionTitle}"]`,
+    );
+    headingEl?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    });
+  }
+
   display(): void {
     const { containerEl } = this;
     if (this.serverStatusIntervalId) {

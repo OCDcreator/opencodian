@@ -31,11 +31,21 @@ export interface ContentBlock {
 }
 
 /** Chat message */
+export type ChatNoticeActionType = 'open_model_settings';
+
+export interface ChatNoticeAction {
+  type: ChatNoticeActionType;
+}
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   timestamp: number;
+  displayStyle?: 'default' | 'notice';
+  noticeTitle?: string;
+  noticeTone?: 'info' | 'warning' | 'error';
+  noticeActions?: ChatNoticeAction[];
   images?: ImageAttachment[];
   toolCalls?: ToolCallInfo[];
   contentBlocks?: ContentBlock[];

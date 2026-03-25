@@ -113,6 +113,41 @@ describe('StorageService', () => {
     });
   });
 
+  describe('loadFullConversation', () => {
+    it('should preserve persisted assistant notice messages', async () => {
+      mockAdapter.read.mockResolvedValue(JSON.stringify({
+        id: 'conv-123',
+        title: 'Test Conversation',
+        createdAt: 1234567890,
+        updatedAt: 1234567999,
+        openCodeSessionId: 'session-456',
+        messages: [
+          {
+            id: 'assistant-notice-1',
+            role: 'assistant',
+            content: 'No local models configured yet.',
+            timestamp: 1234567999,
+            displayStyle: 'notice',
+            noticeTitle: 'No local models available',
+            noticeTone: 'warning',
+            noticeActions: [{ type: 'open_model_settings' }],
+          },
+        ],
+      }));
+
+      const result = await storage.loadFullConversation('conv-123');
+
+      expect(result).not.toBeNull();
+      expect(result?.messages).toHaveLength(1);
+      expect(result?.messages[0]).toMatchObject({
+        displayStyle: 'notice',
+        noticeTitle: 'No local models available',
+        noticeTone: 'warning',
+        noticeActions: [{ type: 'open_model_settings' }],
+      });
+    });
+  });
+
   describe('listConversations', () => {
     it('should return sorted conversations', async () => {
       mockAdapter.list.mockResolvedValue({
