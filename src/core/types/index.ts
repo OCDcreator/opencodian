@@ -24,6 +24,8 @@ export {
   type ChatScrollMode,
   DEFAULT_SETTINGS,
   getCurrentPlatformBlockedCommands,
+  getBashToolBlockedCommands,
+  getCurrentPlatformKey,
   getDefaultBlockedCommands,
   type OpenCodianSettings,
   type PermissionMode,

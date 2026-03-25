@@ -4,7 +4,9 @@ node_modules/
 # Build output
 dist/
 main.js
+src/**/*.js
 *.js.map
+.tmp-tsc-out/
 
 # Environment
 .env

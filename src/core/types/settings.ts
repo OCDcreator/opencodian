@@ -71,8 +71,26 @@ export function getDefaultBlockedCommands(): PlatformBlockedCommands {
   };
 }
 
+export function getCurrentPlatformKey(): 'unix' | 'windows' {
+  return process.platform === 'win32' ? 'windows' : 'unix';
+}
+
 export function getCurrentPlatformBlockedCommands(commands: PlatformBlockedCommands): string[] {
-  return process.platform === 'win32' ? commands.windows : commands.unix;
+  return commands[getCurrentPlatformKey()];
+}
+
+/**
+ * Get blocked commands for the Bash tool.
+ *
+ * On Windows, the Bash tool runs in a Git Bash/MSYS2 environment but can still
+ * invoke Windows commands (e.g., via `cmd /c` or `powershell`), so both Unix
+ * and Windows blocklist patterns are merged.
+ */
+export function getBashToolBlockedCommands(commands: PlatformBlockedCommands): string[] {
+  if (process.platform === 'win32') {
+    return Array.from(new Set([...commands.unix, ...commands.windows]));
+  }
+  return getCurrentPlatformBlockedCommands(commands);
 }
 
 /** Model provider configuration */
