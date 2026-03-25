@@ -1,0 +1,3236 @@
+# OpenCodian 开发日志
+
+> **📋 日志记录原则**
+> 
+> 本日志采用**倒序排列**，最新的开发进度写在**最前面**。
+> 
+> 如需查看最新进展，请直接阅读最上方的条目。
+
+---
+
+## 2026-03-26 无模型提示卡片新增“前往模型设置”快捷按钮
+
+### 📋 功能补充
+在“无模型可用”的会话内 notice 卡片基础上，继续补充一个更直接的操作入口：
+- 卡片内新增 **前往模型设置** 按钮
+- 点击后直接打开 OpenCodian 设置页
+- 自动滚动定位到 **模型** 设置区
+
+### ✅ 实现说明
+- notice 卡片的动作不是临时 DOM，而是作为会话消息元数据一起持久化保存
+- 因此即使：
+  - 切换会话
+  - 关闭后重新打开
+  - 重启 Obsidian
+- 这张卡片和它的按钮都会继续存在，并保持可点击
+
+### 📁 涉及文件
+
+| 文件 | 修改内容 |
+|------|----------|
+| `src/core/types/chat.ts` | 新增 notice action 持久化类型 |
+| `src/features/chat/OpenCodianView.ts` | 渲染 notice 按钮并处理“前往模型设置”动作 |
+| `src/features/settings/OpenCodianSettings.ts` | 新增滚动到模型设置区的方法 |
+| `styles.css` | 新增 notice 操作按钮样式 |
+| `src/i18n/locales/zh.ts` | 新增中文按钮文案 |
+| `src/i18n/locales/en.ts` | 新增英文按钮文案 |
+| `tests/unit/core/storage/StorageService.test.ts` | 校验 notice action 能随会话持久化保存 |
+
+### 🧪 验证结果
+
+- ✅ `npm run typecheck`
+- ✅ `npm run test`
+- ✅ `npm run lint`
+- ✅ `npm run build`
+
+## 2026-03-26 无模型发送失败提示改为会话内持久卡片
+
+### 📋 问题描述
+当当前来源模式下没有可用模型时，用户在聊天页发送消息会出现两个体验问题：
+- 会话区插入一整块非常突兀的红色错误块
+- 同时右上角还会弹出 `Notice` 提示，视觉上重复且打断感很强
+
+另外，这类提示如果只是临时浮层，也无法在重新打开会话或重启 Obsidian 后保留下来。
+
+### ✅ 修复内容
+
+#### 1. 无模型提示改为会话内 notice 卡片
+- 不再为该场景使用红色 `streaming-error-block`
+- 改为在聊天流中插入一张样式更温和的 **notice 卡片**
+- 卡片根据当前来源模式给出更具体的说明：
+  - 仅本地：提示本地 `.opencode/opencode.json` 尚无模型
+  - 仅服务器：提示服务器未暴露模型
+  - 合并模式：提示当前来源模式下没有可用模型
+  - 已选模型失效：提示当前会话模型已不可用
+
+#### 2. 去掉右上角重复弹窗
+- `modelUnavailable` 这条发送前校验链路不再调用右上角 `Notice`
+- 避免在会话中已经给出提示卡片时，界面顶部再重复提示一次
+
+#### 3. 提示卡片持久化到会话
+- 新增 assistant message 的 notice 展示元数据并直接保存进会话 JSON
+- 这样在以下情况下都能保持原位显示：
+  - 切换会话
+  - 关闭后重新打开会话
+  - 重启 Obsidian
+
+### 📁 涉及文件
+
+| 文件 | 修改内容 |
+|------|----------|
+| `src/core/types/chat.ts` | 为消息新增 notice 展示元数据字段 |
+| `src/features/chat/OpenCodianView.ts` | 将无模型错误改为会话内持久卡片，并移除右上角重复提示 |
+| `styles.css` | 新增聊天 notice 卡片样式 |
+| `src/i18n/locales/zh.ts` | 新增中文 notice 文案 |
+| `src/i18n/locales/en.ts` | 新增英文 notice 文案 |
+| `tests/unit/core/storage/StorageService.test.ts` | 补充 notice 消息持久化回归测试 |
+
+### 🧪 验证结果
+
+- ✅ `npm run typecheck`
+- ✅ `npm run test`
+- ✅ `npm run lint`
+- ✅ `npm run build`
+
+## 2026-03-26 模型来源列表设置页布局优化
+
+### 📋 问题描述
+模型来源区此前采用 **本地配置 / 服务器配置 / 当前生效列表** 三张卡片并排展示：
+- provider / model 很多时，页面会被拉得很长
+- 三卡片布局在不同宽度下容易出现大块留白
+- “默认合并模式”说明单独占据一行，信息密度偏低
+
+### ✅ 优化内容
+
+#### 1. 三卡片改为单面板标签切换
+- 将三份模型目录改为单个面板展示
+- 通过标签切换查看：
+  - 本地配置
+  - 服务器配置
+  - 当前生效列表
+- 默认根据当前来源模式自动选中最相关视图：
+  - `仅本地` → 本地配置
+  - `仅服务器` → 服务器配置
+  - `合并模式` → 当前生效列表
+
+#### 2. 列表区域固定高度并支持滚动
+- 模型目录面板改为固定高度滚动区
+- provider 数量较多时不会继续无限拉长整个设置页
+- 去掉原先三列卡片造成的视觉割裂和底部空白
+
+#### 3. 合并模式说明并入来源选项
+- 删除来源模式下方单独说明文案
+- 将“默认使用合并模式，本地优先覆盖”直接并入 **合并模式** 选项文本
+- 让用户在切换来源时直接看到关键规则
+
+### 📁 涉及文件
+
+| 文件 | 修改内容 |
+|------|----------|
+| `src/features/settings/OpenCodianSettings.ts` | 将三卡片目录重构为单面板标签切换视图 |
+| `styles.css` | 新增模型目录标签页与滚动面板样式，移除旧三卡片布局样式 |
+| `src/i18n/locales/zh.ts` | 调整模型来源模式与目录摘要文案 |
+| `src/i18n/locales/en.ts` | 同步英文文案 |
+
+### 🧪 验证结果
+
+- ✅ `npm run typecheck`
+- ✅ `npm run lint`
+- ✅ `npm run build`
+
+## 2026-03-26 仅本地模式空模型仍可发送问题修复
+
+### 📋 问题描述
+在设置中把模型来源切换为 **仅本地** 后，如果本地 `.opencode/opencode.json` 里没有任何 provider / model：
+- 会话页模型选择器仍会显示之前残留的服务器模型名
+- 下拉展开后列表为空，显示与实际状态不一致
+- 用户继续发送消息时，OpenCode 仍可能沿用服务器侧可用模型完成回复
+
+### 🔍 原因分析
+- `src/features/chat/OpenCodianView.ts` 中，会话模型显示和发送逻辑此前没有在 **“模型目录已经加载，但当前模型已失效 / 不存在”** 的场景下彻底清空旧值
+- 设置页中的默认 provider / model 在有效模型列表为空时，也没有及时重置为空字符串
+- `src/core/opencode/ServerManager.ts` 在 **仅本地** 模式下，如果本地没有 provider，之前不会显式把 `enabled_providers` 约束为空集合，导致受管 OpenCode 进程仍可能继续使用服务端/全局配置
+
+### ✅ 修复内容
+
+#### 1. 聊天页模型选择器严格跟随当前有效目录
+- `getCurrentSessionModel()` 现在会在模型目录已加载后校验：
+  - 当前会话覆盖模型是否仍存在
+  - 默认 provider / model 是否仍存在
+- 若两者都无效，则回退到首个可用模型；如果根本没有模型，则返回 `null`
+- 模型选择器触发按钮在无模型时显示 **No models available**
+
+#### 2. 无模型时阻止发送
+- 发送消息前会再次校验当前 provider / model：
+  - 未选择模型时直接阻止发送
+  - 当前模型不在有效目录中时直接阻止发送
+  - 当前模型不在服务端实际可用模型中时直接阻止发送
+
+#### 3. 设置页同步清空失效默认值
+- 在 `src/features/settings/OpenCodianSettings.ts` 中：
+  - 若当前有效 provider 列表为空，则自动将 `defaultProvider` 置空
+  - 若当前 provider 下已无模型，则自动将 `defaultModel` 置空
+- provider / model 下拉框在空状态下明确显示无模型提示
+
+#### 4. 仅本地模式显式禁用非本地 provider
+- `src/core/opencode/ServerManager.ts` 在 `modelSourceMode === 'local'` 时：
+  - 强制设置 `OPENCODE_DISABLE_PROJECT_CONFIG=true`
+  - 指向 vault 内 `.opencode` 目录
+  - 无论本地 provider 是否为空，都写入：
+    - `OPENCODE_CONFIG_CONTENT={"enabled_providers":[]}`
+- 这样即使本地没有模型，也不会再隐式回退到服务器/全局 provider
+
+### 📁 涉及文件
+
+| 文件 | 修改内容 |
+|------|----------|
+| `src/features/chat/OpenCodianView.ts` | 修复会话模型选择器旧值残留，并在无模型时阻止发送 |
+| `src/features/settings/OpenCodianSettings.ts` | 有效模型为空时清空默认 provider / model |
+| `src/core/opencode/ServerManager.ts` | 仅本地模式下显式写入空 `enabled_providers` |
+| `tests/unit/core/opencode/ServerManager.test.ts` | 补充仅本地空 provider 场景测试 |
+
+### 🎯 修复效果
+- ✅ 仅本地模式且本地无模型时，聊天页不再显示旧服务器模型
+- ✅ 模型下拉框和实际可发送状态保持一致
+- ✅ 无模型时发送会被拦截，不会再意外走到服务器模型
+- ✅ 受管本地 OpenCode 服务严格遵循本地模型来源模式
+
+### 🧪 验证结果
+
+- ✅ `npm run typecheck`
+- ✅ `npm run test`
+- ✅ `npm run lint`
+- ✅ `npm run build`
+
+## 2026-03-26 设置页重复配置项渲染修复
+
+### 📋 问题描述
+设置界面在首次打开时通常正常，但在修改服务器相关配置并触发设置页重新渲染后，**用户 / 调试 / 界面** 等后半段配置区会重复追加到页面中，形成重复的设置项。
+
+### 🔍 原因分析
+- `src/features/settings/OpenCodianSettings.ts` 中的 `display()` 之前是异步方法
+- `display()` 在渲染过程中会等待异步的 `addSecuritySettings()`
+- 旧实现里 `addSecuritySettings()` 又会在中途 `await updateConfigStatus()`
+- 一旦服务器配置变化再次触发 `display()`，前一次渲染可能尚未完成，导致前一次渲染恢复后又把后续的 **UI / Debug / User** 分区再次插入 DOM
+
+本质上，这是一个由**设置页中途让出执行权**引发的重渲染竞态问题。
+
+### ✅ 修复内容
+
+#### 1. 将安全设置区恢复为同步渲染链路
+- `addSecuritySettings()` 保持为同步方法
+- 不再阻塞整个设置页主渲染流程
+
+#### 2. 配置状态检查改为非阻塞执行
+- 初始配置状态刷新从阻塞式等待改为：
+  - `void updateConfigStatus().catch(...)`
+- 这样配置状态仍会异步更新，但不会打断整页顺序渲染
+
+#### 3. 将设置页 `display()` 明确改为同步方法
+- 把 `display()` 从 `async display(): Promise<void>` 改为 `display(): void`
+- 使设置页的渲染语义与当前实现保持一致
+- 降低后续再次引入中途 `await` 导致竞态的风险
+
+### 📁 涉及文件
+
+| 文件 | 修改内容 |
+|------|----------|
+| `src/features/settings/OpenCodianSettings.ts` | 将设置页主渲染方法改为同步，并保持安全设置区状态检查为非阻塞调用 |
+
+### 🎯 修复效果
+- ✅ 修改服务器配置后，不再重复出现 **用户 / 调试 / 界面** 配置项
+- ✅ 配置状态仍可异步刷新显示
+- ✅ 设置页渲染顺序更加稳定，避免后半段分区被重复插入
+
+### 🧪 验证结果
+
+- ✅ `npm run build`
+
+## 2026-03-26 模型来源模式、可视化模型配置面板与模型 JSON 编辑器
+
+### 📋 功能描述
+本轮围绕 **“模型配置来源不清晰”**、**“手写 `.opencode/opencode.json` 门槛高”**、以及 **“高级用户仍需要可控的 JSON 编辑入口”** 三个问题，对 OpenCodian 的模型配置链路做了一次完整增强。
+
+目标包括：
+- 让用户明确选择模型列表来自 **本地配置 / 服务器配置 / 合并模式**
+- 在设置页直接看到 **本地模型列表、服务器模型列表、当前生效列表**
+- 提供 **可视化模型配置面板**，无需手改 JSON 即可添加提供商和模型
+- 提供 **只编辑 provider/model 相关字段** 的 JSON 编辑器，满足高级用户需求
+- 让本地受管 OpenCode 服务在不同来源模式下按预期加载配置
+
+### ✅ 实现细节
+
+#### 1. 新增模型来源模式
+- 在设置中新增 **模型来源模式**：
+  - **仅本地**
+  - **仅服务器**
+  - **合并模式**（默认）
+- 默认行为遵循 OpenCode 合并思路：
+  - 服务器模型作为基础
+  - 本地 `.opencode/opencode.json` 中的同名 provider / model 字段覆盖服务器同名字段
+- 来源模式会保存到插件设置中，并在设置页切换后自动刷新模型目录
+
+#### 2. 设置页显示三组模型目录
+- 模型设置区现在会展示三组卡片：
+  - **本地配置**
+  - **服务器配置**
+  - **当前生效列表**
+- 每张卡片按 provider 聚合展示模型列表，方便快速对比：
+  - 哪些模型只在本地
+  - 哪些模型只在服务器
+  - 合并后最终会在选择器里出现哪些模型
+
+#### 3. 新增模型配置解析与合并服务
+- 新增独立的模型配置处理模块，负责：
+  - 读取 `.opencode/opencode.json`
+  - 提取 provider / model / enabled_providers / disabled_providers 等相关字段
+  - 生成本地模型目录
+  - 拉取服务器模型目录
+  - 产出生效后的合并目录
+- 同时补充了对 **JSONC 注释** 的兼容解析，避免用户配置里带注释时直接读失败
+
+#### 4. 可视化模型配置面板
+- 新增 **Visual Model Configuration** 弹窗
+- 支持直接配置：
+  - 默认模型
+  - small model
+  - 提供商 ID / 名称
+  - SDK 包名
+  - API Base URL
+  - API Key
+  - 模型列表
+  - context / output limit
+- 支持：
+  - 添加提供商
+  - 删除提供商
+  - 添加模型
+  - 删除模型
+- 保存后自动写回当前 vault 的 `.opencode/opencode.json`
+
+#### 5. 模型 JSON 编辑器
+- 新增 **模型 JSON 编辑器** 弹窗
+- 该编辑器只显示与模型有关的子集字段，不暴露完整 OpenCode 配置
+- 支持：
+  - JSON 格式化
+  - 基本结构校验
+  - provider 对象校验
+  - enabled / disabled providers 数组校验
+- 保存时仅替换模型相关字段，保留原文件中其他配置（如 permission）不被覆盖
+
+#### 6. 本地受管 OpenCode 服务按来源模式加载配置
+- 对 `ServerManager` 增加来源模式感知：
+  - **server**：禁用项目配置加载
+  - **merge**：保持 OpenCode 默认行为
+  - **local**：禁用项目配置，再通过环境变量限制到本地 provider 范围
+- 这样在本地受管服务模式下，来源模式不再只是 UI 展示，而是真正影响服务启动时的配置来源
+
+#### 7. 聊天面板模型选择器同步升级
+- 聊天区模型下拉不再只依赖服务器原始列表
+- 现在会读取当前来源模式下的 **生效模型目录**
+- 发送消息前增加校验：
+  - 如果当前选中的 provider/model 并不在已连接的 OpenCode 服务可用列表里
+  - 直接提示用户切换来源模式、刷新模型或重启本地服务
+- 避免出现“设置里能选，但实际发送时报模型不存在”的迷惑体验
+
+#### 8. 中英文文案与样式同步补齐
+- 为模型来源模式、三组模型卡片、可视化配置、JSON 编辑器、模型不可用提示等新增中英文文案
+- 为模型来源卡片、provider/model 表单、配置弹窗补充样式
+- 保持与现有设置页视觉风格一致
+
+### 📁 本轮涉及文件
+
+| 文件 | 修改内容 |
+|------|----------|
+| `src/core/types/settings.ts` | 新增 `modelSourceMode` 设置及默认值 |
+| `src/core/types/opencodeConfig.ts` | 新增 OpenCode 模型配置相关类型 |
+| `src/core/types/permission.ts` | 复用统一的 `OpencodeConfig` 类型 |
+| `src/core/types/index.ts` | 导出新增模型配置类型 |
+| `src/core/config/modelConfig.ts` | 模型配置提取、合并、JSONC 注释解析 |
+| `src/core/config/ModelConfigService.ts` | 本地/服务器/生效模型目录服务 |
+| `src/core/config/OpencodeConfigManager.ts` | 配置读写兼容模型字段与 JSONC |
+| `src/core/config/index.ts` | 导出新配置服务 |
+| `src/core/opencode/types.ts` | 服务配置增加 `modelSourceMode` |
+| `src/core/opencode/OpenCodeService.ts` | 来源模式变化时支持重启受管服务 |
+| `src/core/opencode/ServerManager.ts` | 启动时按来源模式设置环境变量 |
+| `src/features/settings/OpenCodianSettings.ts` | 模型来源设置、目录卡片、配置入口 |
+| `src/features/settings/ModelConfigModal.ts` | 新增可视化模型配置面板 |
+| `src/features/settings/ModelConfigJsonModal.ts` | 新增模型 JSON 编辑器 |
+| `src/features/chat/OpenCodianView.ts` | 聊天页模型目录刷新与模型可用性校验 |
+| `src/main.ts` | 初始化并注入模型配置服务，刷新聊天页目录 |
+| `src/i18n/locales/zh.ts` | 新增模型来源/编辑器/错误提示文案 |
+| `src/i18n/locales/en.ts` | 新增模型来源/编辑器/错误提示文案 |
+| `styles.css` | 新增模型来源卡片与模型配置弹窗样式 |
+| `tests/unit/core/config/OpencodeConfigManager.test.ts` | 补充模型配置保留与 JSONC 解析测试 |
+| `tests/unit/core/types/settings.test.ts` | 补充 `modelSourceMode` 默认值测试 |
+
+### 🐛 本轮重点修复的问题
+
+1. **模型到底来自哪里不清楚**：用户无法区分本地配置、服务器配置和最终生效列表
+2. **本地自定义提供商配置门槛高**：必须手动编辑 JSON，不利于普通用户
+3. **高级用户只能编辑完整配置**：缺少只针对 provider/model 字段的安全编辑入口
+4. **来源模式只是概念，没有真正影响服务加载**：现在本地受管服务会按模式切换配置来源
+5. **聊天页可能选到不可用模型**：发送前新增可用性检查与明确提示
+
+### 🎯 验证结果
+
+- ✅ `npm run typecheck`
+- ✅ `npm run test`
+- ✅ `npm run lint`
+- ✅ `npm run build`
+- ✅ 已重新部署到测试库：`C:\Users\lt\Desktop\Write\testvault\.obsidian\plugins\opencodian\`
+
+### 当前状态
+
+- ✅ 模型来源模式已可在设置中切换
+- ✅ 设置页可同时查看本地、服务器和生效模型目录
+- ✅ 已具备可视化模型配置面板
+- ✅ 已具备模型 JSON 编辑器
+- ✅ 本地受管 OpenCode 服务会按来源模式调整配置加载方式
+- ✅ 聊天页已能拦截不可用模型并给出明确提示
+
+---
+
+**会话日期**: 2026-03-26
+**开发时间**: ~3-4 小时
+**主要贡献**: 模型来源模式、模型目录可视化、provider/model 配置面板、模型 JSON 编辑器、聊天页模型可用性校验
+**当前状态**: 已部署测试库，可继续在真实 vault 中验证本地 / 服务器 / 合并三种模型来源行为
+
+---
+
+## 2026-03-26 远程服务器帮助文案完善与聊天面板状态显示修正
+
+### 📋 功能描述
+本轮主要围绕 **“远程服务器模式对新手不够直观”** 和 **“聊天面板状态文案与用户选择不一致”** 两个问题做补充完善。
+
+目标包括：
+- 让“远程服务器 URL”帮助说明更贴近真实使用场景，明确说明它也可以填写本地地址
+- 将远程模式默认值设置为本地地址，降低第一次使用门槛
+- 明确告知用户这些设置是**自动保存**的，避免担心重启后丢失
+- 修复聊天面板中“外部服务”文案不合理的问题，使其跟随当前本地/远程模式显示
+
+### ✅ 实现细节
+
+#### 1. 远程服务器 URL 默认值改为本地地址
+- 将 `server.remote.baseUrl` 默认值改为：
+  - `http://127.0.0.1:4096`
+- 这样即使用户切换到“远程服务器”模式，也可以先直接复用本地 OpenCode 地址测试连接
+- 降低了“远程 URL 一定只能填公网地址”的认知门槛
+
+#### 2. 切换到远程模式时自动补本地 URL
+- 在用户从本地模式切换到远程模式时：
+  - 如果远程 URL 还是空值
+  - 自动填入当前本地配置拼出的地址
+- 行为示例：
+  - 本地 host = `127.0.0.1`
+  - 本地 port = `4096`
+  - 切到远程模式后，自动带出 `http://127.0.0.1:4096`
+
+#### 3. 远程 URL 帮助文案补充
+- 在帮助弹窗中新增更明确的说明：
+  - 这个字段虽然叫“远程服务器 URL”，**也可以填写本机地址**
+  - 适用于：
+    - 本地地址
+    - 局域网 IP
+    - 域名
+    - HTTPS
+    - 反向代理子路径
+- 示例更新为：
+  - `http://127.0.0.1:4096`
+  - `http://192.168.1.20:4096`
+  - `https://ai.example.com`
+  - `https://ai.example.com/opencode`
+
+#### 4. 明确说明“设置会自动保存”
+- 在远程 URL 帮助弹窗中增加提示：
+  - 用户填写后会**自动保存**
+  - 重启 Obsidian 后不会丢失
+- 同时确认设置项输入逻辑继续保持：
+  - 每次修改时立即调用 `saveSettings()`
+
+#### 5. 聊天面板状态文案按模式显示
+- 修复聊天面板中原来只显示“外部服务”的问题
+- 现在当服务可用时，状态会根据当前选择模式显示为：
+  - **本地服务**
+  - **远程服务**
+- 不再把用户已经主动选择的模式错误显示成“外部服务”
+
+#### 6. 中英文文案同步修正
+- 更新中文 `zh.ts` 和英文 `en.ts`
+- 保证设置页帮助弹窗、聊天状态文本、默认值说明在中英文下都一致
+
+### 📁 本轮涉及文件
+
+| 文件 | 修改内容 |
+|------|----------|
+| `src/core/types/settings.ts` | 将远程 URL 默认值改为本地地址 |
+| `src/features/settings/OpenCodianSettings.ts` | 切换远程模式时自动补全本地 URL；保持修改即保存 |
+| `src/features/chat/OpenCodianView.ts` | 聊天面板状态文案改为按本地/远程模式显示 |
+| `src/i18n/locales/zh.ts` | 补充远程 URL 可填写本地地址、自动保存说明与聊天状态文案 |
+| `src/i18n/locales/en.ts` | 补充远程 URL 可填写本地地址、自动保存说明与聊天状态文案 |
+
+### 🐛 本轮重点修复的问题
+
+1. **远程 URL 名称容易误导**：用户以为这里只能填写公网或别的机器地址
+2. **第一次切换远程模式时没有可参考值**：不利于本地快速测试
+3. **用户担心设置不持久**：不清楚输入后是否会自动保存
+4. **聊天面板状态文案不合理**：用户选择了本地/远程模式，却只看到“外部服务”
+
+### 🎯 验证结果
+
+- ✅ `npm run build`
+- ✅ 已重新部署到测试库：`C:\Users\lt\Desktop\Write\testvault\.obsidian\plugins\opencodian\`
+
+### 当前状态
+
+- ✅ 远程服务器 URL 帮助说明已明确支持填写本地地址
+- ✅ 远程模式默认值已改为本地地址，方便快速试用
+- ✅ 设置项保持自动保存，重启后不会丢失
+- ✅ 聊天面板服务状态已能根据本地 / 远程模式正确显示
+
+---
+
+**会话日期**: 2026-03-26
+**开发时间**: ~0.5 小时
+**主要贡献**: 远程 URL 帮助文案完善、默认值优化、自动保存说明补充、聊天状态文案修正
+**当前状态**: 已部署测试库，可继续观察实际使用反馈
+
+---
+
+## 2026-03-26 服务器可用性引导、调试诊断导出与跨平台日志路径完善
+
+### 📋 功能描述
+本轮主要围绕 **“服务未启动时用户不知道发生了什么”** 和 **“排障信息不够集中、导出不方便”** 两类问题做了一次完整收敛，同时继续打磨设置页交互体验。
+
+目标包括：
+- 在聊天窗口与设置面板中更明确地反映 OpenCode 服务真实状态
+- 当服务离线时，给用户可操作的启动/重试/打开设置入口，而不是只看到抽象报错块
+- 将调试日志、最近诊断信息、日志文件导出整合到独立调试分组
+- 让日志默认路径支持 Windows 与 macOS/Linux 分别保存，避免跨设备同步后互相污染
+- 修复选择日志路径后设置页闪烁并跳回顶部的问题
+
+### ✅ 实现细节
+
+#### 1. 服务器设置升级为本地 / 远程双模式
+- 重构 `server` 设置结构，区分：
+  - **local**：插件管理本机 OpenCode 进程
+  - **remote**：连接远程 OpenCode 服务
+- 新增远程地址与鉴权配置，支持：
+  - 无认证
+  - Basic Auth
+  - Bearer Token
+- 本地模式下保留 host / port / auto-start
+- 远程模式下改为连接测试，不再显示无意义的“启动本地服务”操作
+
+#### 2. 设置页新增服务器帮助弹窗
+- 新增 `ServerSettingHelpModal`
+- 为服务器模式、自动启动、地址、端口、远程 URL、认证方式、用户名、密码、Token、状态等字段增加帮助入口
+- 帮助弹窗统一说明：
+  - 这个字段是什么意思
+  - 应该怎么填写
+  - 示例值与注意事项
+
+#### 3. 聊天窗口增加服务离线引导卡片
+- 当 OpenCode 服务未就绪时，在会话区域直接显示状态卡片
+- 卡片提供以下操作：
+  - **启动服务**
+  - **重试连接**
+  - **打开设置**
+  - **暂不启动**
+- 会话顶部状态也补充了 `checking / running / starting / offline / external` 五种可视状态
+- 用户在卡片中执行操作后，设置页中的服务器状态会同步刷新，不再出现“会话与设置显示不一致”
+
+#### 4. 服务器状态检测与日志输出收敛
+- 插件加载时会主动记录一次服务器状态快照
+- 在设置里打开调试日志后，会额外输出当前服务器健康状态、内部状态、是否存在受管进程等信息
+- 清理了部分误导性常驻日志：
+  - 像“server already running on port 4096”这类信息改为 `debug` 级别
+  - 未开启调试日志时不再默认刷屏
+- 服务管理、健康检查、状态刷新与 UI 提示之间的联动更一致
+
+#### 5. 调试配置拆分为独立分组
+- 设置页将调试相关能力单独收纳到 **Debug / 调试** 分组
+- 顶部快捷跳转新增调试入口
+- 调试分组中明确说明：
+  - 调试日志输出在 Obsidian 开发者工具 **Console**
+  - Windows / Linux 如何打开控制台
+  - macOS 如何打开控制台
+  - 打开后应切换到 `Console` 标签查看与复制日志
+
+#### 6. 增加“一键复制最近诊断信息”
+- logger 新增最近日志缓冲区
+- 支持将最近捕获的关键信息与当前环境拼装成诊断文本
+- 点击设置页按钮后，可直接复制最近诊断结果到剪贴板，方便用户发给开发者排查
+
+#### 7. 增加“一键生成调试日志文件”
+- 新增诊断报告构建与写盘导出能力
+- 日志文件中包含：
+  - 插件版本
+  - 当前平台
+  - vault 路径
+  - 服务器模式、地址、认证方式、健康状态
+  - 调试开关状态
+  - 最近日志缓冲内容
+- 用户可直接生成 `.log` 文件发送给开发者
+
+#### 8. 日志默认路径改为按平台分别保存
+- 原先只有单一 `debugLogPath`
+- 现改为平台独立的 `debugLogPaths`：
+  - `windows`
+  - `unix`
+- Windows 与 macOS/Linux 使用各自默认路径，不会因设置同步互相覆盖
+- 兼容旧设置：如果用户原本只有旧版单路径，会自动迁移到当前平台对应槽位
+
+#### 9. 修复路径选择后的设置页闪烁与跳顶
+- 去掉选择路径、生成日志后对整个设置页的 `display()` 重绘
+- 改为只更新当前输入框值并保存设置
+- 修复选择路径后界面闪一下、滚动位置瞬间回到顶部的体验问题
+
+#### 10. 路径选择器补齐跨平台兜底
+- 文件夹选择器默认路径会优先使用：
+  1. 当前平台已保存的默认日志路径
+  2. `allowedExportPaths` 中存在的本地目录
+  3. 桌面目录
+  4. 用户主目录
+- 同时支持展开 `~`，兼容 Windows 与 macOS/Linux 常见写法
+
+### 📁 本轮涉及文件
+
+| 文件 | 修改内容 |
+|------|----------|
+| `src/core/types/settings.ts` | 重构 server 配置结构；新增平台化 debug 日志路径类型与默认值 |
+| `src/core/types/index.ts` | 导出新的 server / debug path helpers |
+| `src/core/opencode/types.ts` | 扩展 OpenCode server 配置类型，支持 mode / auth |
+| `src/core/opencode/ServerManager.ts` | 完善本地/远程模式、健康检查、认证头与日志级别 |
+| `src/core/opencode/OpenCodeService.ts` | 根据新 server 配置更新请求逻辑与设置变更处理 |
+| `src/features/chat/OpenCodianView.ts` | 新增服务离线提示卡片与更细的状态显示 |
+| `src/features/settings/OpenCodianSettings.ts` | 服务器设置重构、帮助按钮、调试分组、诊断导出、平台路径与无跳动更新 |
+| `src/features/settings/ServerSettingHelpModal.ts` | 新增服务器字段帮助弹窗 |
+| `src/features/settings/OpencodeConfigModal.ts` | 适配设置结构调整 |
+| `src/main.ts` | 设置迁移、服务器状态快照、诊断报告生成、日志文件写出 |
+| `src/i18n/locales/zh.ts` | 新增服务器帮助、调试、诊断、状态文案 |
+| `src/i18n/locales/en.ts` | 新增服务器帮助、调试、诊断、状态文案 |
+| `src/shared/logger.ts` | 增加最近日志缓冲与诊断辅助能力 |
+| `src/shared/index.ts` | 导出 logger 新接口 |
+| `styles.css` | 补充调试区、状态卡片与帮助弹窗相关样式 |
+| `tests/unit/core/opencode/OpenCodeService.test.ts` | 更新服务配置与状态相关测试 |
+| `tests/unit/core/opencode/ServerManager.test.ts` | 更新本地/远程与认证逻辑测试 |
+| `tests/unit/core/types/settings.test.ts` | 更新 debugLogPaths 与平台 helper 测试 |
+| `tests/__mocks__/obsidian.ts` | 补充测试环境 mock |
+
+### 🐛 本轮重点修复的问题
+
+1. **服务没启动时提示过于抽象**：用户只能看到错误块，不知道该启动服务还是检查设置
+2. **聊天窗口与设置状态不同步**：用户在会话里感知到离线，但设置页没有实时反映
+3. **调试日志开关开启后信息仍不完整**：缺少服务器健康状态与当前运行快照
+4. **未开启调试日志也会出现部分服务日志**：影响普通用户使用体验
+5. **日志导出能力不足**：用户难以快速提供可复现的诊断信息
+6. **日志默认路径不适合跨平台同步**：同一份设置在 Windows 与 macOS/Linux 下会互相覆盖
+7. **选择路径后设置页闪烁并回顶**：影响连续配置体验
+
+### 🎯 验证结果
+
+- ✅ `npm run typecheck`
+- ✅ `npm test -- --runTestsByPath tests/unit/core/types/settings.test.ts`
+- ✅ `npm run build`
+- ✅ 已构建并同步到测试库：`C:\Users\lt\Desktop\Write\testvault\.obsidian\plugins\opencodian\`
+
+### 当前状态
+
+- ✅ 服务器未启动时，聊天窗口已能给出明确可操作引导
+- ✅ 设置页已支持本地 / 远程 OpenCode 连接模式
+- ✅ 调试能力已形成独立分组，支持复制诊断与导出日志文件
+- ✅ 默认日志路径已支持 Windows 与 macOS/Linux 分别保存
+- ✅ 路径选择后的闪烁与跳顶体验问题已修复
+- ✅ 服务器状态日志、离线引导与设置页刷新链路已基本打通
+
+---
+
+**会话日期**: 2026-03-26
+**开发时间**: ~4-5 小时
+**主要贡献**: 服务器离线引导、调试诊断导出、服务器设置重构、跨平台日志路径与设置页体验修复
+**当前状态**: 已部署测试库，等待进一步联调与真实使用反馈
+
+---
+
+## 2026-03-25 聊天气泡复制按钮与设置页快捷导航体验优化
+
+### 📋 功能描述
+本轮主要围绕两块 UI 体验做连续打磨：
+- 聊天区复制按钮的玻璃质感、形状与相对气泡的位置关系
+- 设置页顶部快捷跳转条、毛玻璃提示、分类说明与弹层视觉统一
+
+目标是让聊天区复制按钮更贴合气泡角、更像系统悬浮控件，同时为设置页新增可快速定位分类的顶部导航，降低设置项增多后的查找成本。
+
+### ✅ 实现细节
+
+#### 1. 用户/助手复制按钮样式多轮收敛
+- 将复制按钮统一为更清晰的玻璃风格，补齐半透明底、边框高光、模糊与阴影
+- 从椭圆胶囊样式回退到更协调的圆角方形按钮
+- 多次微调用户消息复制按钮与气泡左下角的相对位置，使其视觉上对角呼应但不遮挡气泡
+- 为用户消息容器补足底部留白，避免按钮压住消息气泡
+
+#### 2. 聊天区相关弹出层改为透明毛玻璃面板
+- 将模型选择弹出框、权限控制弹出框、历史会话弹出框统一为 frosted glass 面板
+- 将历史会话中的删除确认弹窗与遮罩层也统一为透明玻璃风格
+- 后续又对模型选择面板单独降噪，减少内部多层渐变，避免看起来过于花哨
+
+#### 3. 设置页新增顶部快捷跳转条
+- 在设置页最顶部新增快捷跳转区，可快速滚动到语言、服务器、模型、安全、界面、用户等分类
+- 为每个分类标题补充锚点与平滑滚动逻辑
+- 将快捷跳转条调整到设置内容最上边，并修正容器顶部留白，确保真正贴顶显示
+
+#### 4. 快捷跳转条视觉与交互打磨
+- 顶部导航改为正文宽度内的圆角长方形玻璃条，而非整行全宽
+- 去掉背景渐变，改为更纯净、更透明的模糊玻璃底
+- 为快捷按钮新增玻璃提示框，并将提示内容从"跳转到某分类"改成"该分类主要设置什么"
+- 解决提示框与系统黑色 tooltip 重叠的问题，移除额外 tooltip 来源
+- 将提示框改到按钮下方显示，并处理左右边缘溢出与背景文字可读性问题
+
+### 📁 本轮涉及文件
+
+| 文件 | 修改内容 |
+|------|----------|
+| `styles.css` | 复制按钮样式与位置微调、模型/权限/历史/删除弹层毛玻璃化、设置页快捷导航与提示框样式 |
+| `src/features/settings/OpenCodianSettings.ts` | 新增设置页顶部快捷跳转、按钮提示文案与滚动逻辑 |
+| `src/i18n/locales/zh.ts` | 新增快捷跳转标题与分类说明文案 |
+| `src/i18n/locales/en.ts` | 新增快捷跳转标题与分类说明文案 |
+
+### 🎯 验证结果
+
+- ✅ 多轮执行 `npm run build`
+- ✅ 多轮部署到测试库：`C:\Users\lt\Desktop\Write\testvault\.obsidian\plugins\opencodian`
+- ✅ 聊天区复制按钮位置与质感已在测试库中反复微调验证
+- ✅ 设置页快捷跳转条、玻璃提示与弹层样式已在测试库中联调
+
+### 当前状态
+
+- ✅ 复制按钮已从早期"几乎无感"的样式收敛到更协调的玻璃悬浮按钮
+- ✅ 主要聊天弹出层已统一为透明毛玻璃面板
+- ✅ 设置页已具备顶部快捷跳转能力
+- ✅ 快捷按钮提示框已改为功能说明型文案，并处理了遮挡、越界与可读性问题
+
+---
+
+**会话日期**: 2026-03-25
+**开发时间**: ~2 小时
+**主要贡献**: 复制按钮玻璃样式迭代、聊天弹层毛玻璃统一、设置页快捷跳转与提示交互
+**当前状态**: 已部署测试库，UI 细节持续打磨中
+
+---
+
+---
+
+## 2026-03-25 TypeScript 报错清零与配置兼容修复
+
+### 📋 功能描述
+在完成轻量 logger 与 ESLint 收敛后，继续清理仓库内剩余的 TypeScript 报错；重点修复聊天流式渲染、权限请求事件、OpenCode 配置权限类型、vault 路径访问兼容，以及 provider icon 映射中的重复 key 问题，最终将仓库恢复到 `tsc / lint / build` 全绿状态。
+
+### ✅ 实现细节
+
+#### 1. 修复 `OpenCodianView` 的 7 个 TypeScript 问题
+- 修正 `permission_request` 流式事件与权限弹窗参数类型不匹配
+- 使用包装状态对象替代直接闭包引用的 `pendingEl`，避免 TS 将其收窄为 `never`
+- 补齐流式工具结果的可选 `isError`
+- 补齐工具状态 `blocked` 的持久化类型
+
+#### 2. 补齐 OpenCode 权限配置类型
+- 在 `PermissionConfig` 中补充 `write` 字段
+- 清理 `src/core/types/index.ts` 中重复导出的 `PermissionMode`
+- 让计划模式 / 普通模式生成的 `.opencode` 权限配置与类型定义保持一致
+
+#### 3. 修复 vault 路径访问兼容性
+- 新增 `src/shared/vault.ts`
+- 统一通过 `getVaultBasePath()` 读取 Obsidian vault 根路径
+- 替换设置页和主插件中对旧 `adapter.getBasePath()` 的直接调用
+- 在路径不可用时增加安全降级，避免初始化或同步配置时报错
+
+#### 4. 清理其他编译问题
+- 修正 `OpenCodeService` 中 `permission.asked` 事件字段类型
+- 修正 `main.ts` 中旧版 `chatScrollMode: 'sticky'` 的兼容判断
+- 修正 `checkHealth()` 返回 Promise 后的判断逻辑
+- 移除 `ProviderIconService` 中重复的对象 key，消除 TS1117
+
+### 📁 本轮涉及文件
+
+| 文件 | 修改内容 |
+|------|----------|
+| `src/features/chat/OpenCodianView.ts` | 修复流式 UI 的 7 个 TS 报错 |
+| `src/core/types/chat.ts` | 补充 `blocked` 状态与 `tool_result.isError` |
+| `src/core/types/permission.ts` | 补充 `write` 权限类型 |
+| `src/core/types/index.ts` | 移除重复导出的 `PermissionMode` |
+| `src/core/opencode/OpenCodeService.ts` | 补齐权限事件字段类型 |
+| `src/shared/vault.ts` | 新增 vault 路径访问 helper |
+| `src/shared/index.ts` | 导出 vault helper |
+| `src/main.ts` | 替换旧路径访问并修复异步判断 |
+| `src/features/settings/OpenCodianSettings.ts` | 设置页改用兼容路径 helper |
+| `src/utils/icons/ProviderIconService.ts` | 清理重复 key |
+
+### 🎯 验证结果
+
+- ✅ `npx tsc --noEmit --pretty false`
+- ✅ `npm run lint`
+- ✅ `npm run build`
+
+### 当前状态
+
+- ✅ 仓库 TypeScript 报错清零
+- ✅ ESLint 继续保持 `0 errors / 0 warnings`
+- ✅ 生产构建通过
+- ✅ logger、debug 开关、类型系统与配置同步机制现已一致
+
+---
+
+**会话日期**: 2026-03-25
+**开发时间**: ~1 小时
+**主要贡献**: TypeScript 报错清零、vault 路径兼容、权限配置类型补齐
+**当前状态**: 已通过 tsc / lint / build，待提交
+
+---
+
+---
+
+## 2026-03-25 轻量 Logger 与 ESLint 清零收敛
+
+### 📋 功能描述
+为项目引入统一的轻量 logger，并把原本分散在各模块中的 `console.*` 调用收敛到统一接口；同时通过忽略规则、自动修复和小规模代码清理，将仓库本体的 ESLint 结果收敛到 `0 errors / 0 warnings`。
+
+### ✅ 实现细节
+
+#### 1. 统一轻量 logger
+- 新增 `src/shared/logger.ts`
+- 提供统一接口：
+  - `logger.debug(...)`
+  - `logger.warn(...)`
+  - `logger.error(...)`
+- 日志会自动带上模块作用域前缀，避免不同模块日志混杂
+
+#### 2. Debug 日志开关
+- `debug` 日志默认关闭
+- 新增设置项 **调试日志 / Debug logging**
+- 支持在设置中实时切换，保存后立即影响当前会话中的日志输出
+- 运行时状态会同步到：
+  - 全局标记 `__OPENCODIAN_DEBUG__`
+  - `localStorage['opencodian:debug']`
+
+#### 3. 替换散落的 console 调用
+- 将 `src/main.ts`、`OpenCodeService`、`ServerManager`、`OpenCodianView` 等核心模块中的 `console.log / warn / error` 统一替换为 logger
+- 测试 mock 中的 `Notice` 输出也移除了直接 `console.log`
+
+#### 4. ESLint 收敛
+- 新增 `.eslintignore`，忽略：
+  - `reference-projects/**`
+  - `dist/**`
+  - `coverage/**`
+  - `node_modules/**`
+- 执行 `lint:fix` 自动清理 import/export 排序
+- 手动修复：
+  - 未使用变量
+  - `require()` 风格导入
+  - `@ts-ignore` / 类型访问问题
+
+### 📁 修改文件
+
+| 文件 | 修改内容 |
+|------|----------|
+| `src/shared/logger.ts` | 新增轻量 logger 与 debug 开关 |
+| `src/shared/index.ts` | 导出 logger 相关接口 |
+| `src/core/types/settings.ts` | 新增 `enableDebugLogging` 设置项 |
+| `src/features/settings/OpenCodianSettings.ts` | 增加调试日志开关 UI |
+| `src/i18n/locales/en.ts` | 新增 debug logging 英文文案 |
+| `src/i18n/locales/zh.ts` | 新增 debug logging 中文文案 |
+| `src/main.ts` | 加载/保存设置时同步 logger 开关 |
+| `.eslintignore` | 忽略参考项目与构建产物，减少 lint 噪音 |
+
+### 🐛 修复的问题
+
+1. **调试日志分散**：各模块直接使用 `console.*`，难以统一管理
+2. **无法按需开启调试日志**：排查问题时缺少运行时开关
+3. **ESLint 噪音过大**：既有错误与警告较多，且容易被参考项目目录干扰
+
+### 🎯 当前状态
+
+**logger 与 lint 当前为：**
+- ✅ 已接入统一轻量 logger
+- ✅ 设置页支持切换调试日志
+- ✅ 保存设置后 debug 开关立即生效
+- ✅ 项目本体 ESLint 结果收敛到 `0 errors / 0 warnings`
+- ✅ 构建通过，功能可继续迭代
+
+---
+
+**会话日期**: 2026-03-25
+**开发时间**: ~1.5 小时
+**主要贡献**: 统一轻量 logger、调试日志设置开关、ESLint 全量清零
+**当前状态**: 功能完成，已通过 lint 与 build
+
+---
+
+---
+
+## 2026-03-25 会话滚动模式与工具状态持久化修复
+
+### 📋 功能描述
+围绕聊天会话界面完成了一轮交互打磨，并修复历史会话中工具调用失败状态被错误显示为成功的问题。
+
+### ✅ 实现细节
+
+#### 1. 三档会话滚动模式
+- 新增聊天滚动模式设置，支持三种可切换效果：
+  - **自然滚动**：用户消息与助手消息正常随滚动移动
+  - **用户消息吸顶**：每轮对话的用户消息作为 section header 吸顶
+  - **吸顶 + 柔和遮盖**：在吸顶基础上增加边界遮盖与柔和过渡
+- 现有旧配置中的 `sticky` 自动迁移为新的 `sticky-mask`
+
+#### 2. 会话 DOM 结构重构
+- 将原来的平铺消息结构改为按 turn 分组
+- 每个 turn 拆分为：
+  - `opencodian-turn-header`：承载用户消息
+  - `opencodian-turn-body`：承载对应的助手内容
+- 这样可以稳定实现"用户消息吸顶、下一条用户消息将上一条顶走"的滚动行为
+
+#### 3. 吸顶模式视觉优化
+- 为吸顶模式增加可选遮盖层，避免助手消息穿透到上一条用户消息区域
+- 吸顶遮盖层跟随实际面板背景色，减少主题不一致带来的色块感
+- 助手消息悬浮底纹改为圆角，避免 hover 时出现生硬直角
+
+#### 4. 工具调用失败状态持久化修复
+- 新增 `toolStatus` 持久化字段，保存工具调用的真实状态
+- 流式渲染结束后，工具块会把 `completed / error` 状态一并写入消息内容块
+- 从 OpenCode 历史消息恢复为本地消息时，也会推导并保留工具状态
+- 历史渲染增加兼容逻辑：旧数据若没有 `toolStatus`，但结果文本以 `Error:` 开头，则仍显示为失败
+
+### 📁 修改文件
+
+| 文件 | 修改内容 |
+|------|----------|
+| `src/features/chat/OpenCodianView.ts` | 聊天视图改为 turn 分组结构；增加滚动模式类切换；渲染历史工具调用时恢复真实状态 |
+| `src/features/settings/OpenCodianSettings.ts` | 新增三档会话滚动模式设置项 |
+| `src/core/types/settings.ts` | 扩展 `ChatScrollMode` 类型与默认值 |
+| `src/main.ts` | 保存设置时刷新打开中的聊天视图；兼容旧 `sticky` 配置迁移 |
+| `src/core/types/chat.ts` | 为持久化消息块新增 `toolStatus` 字段 |
+| `src/core/opencode/OpenCodeService.ts` | 从历史工具结果构建本地内容块时补齐工具状态 |
+| `src/i18n/locales/en.ts` | 添加滚动模式英文文案 |
+| `src/i18n/locales/zh.ts` | 添加滚动模式中文文案 |
+
+### 🐛 修复的问题
+
+1. **历史失败工具调用显示错误**：重载 Obsidian 后，失败工具调用会错误显示为绿色勾
+2. **吸顶效果不可配置**：用户无法在自然滚动与吸顶滚动之间自由切换
+3. **旧配置兼容性**：旧版 `sticky` 配置需要迁移到新的三档滚动模式体系
+
+### 🎯 当前状态
+
+**聊天滚动与状态恢复功能当前为：**
+- ✅ 三档会话滚动模式可在设置中切换
+- ✅ 打开的聊天视图会在保存设置后立即刷新滚动模式
+- ✅ 失败工具调用状态会正确写入历史会话
+- ✅ 旧历史消息在可推断失败状态时能正确显示红色 `×`
+- ✅ 已构建并部署到测试库验证
+
+---
+
+**会话日期**: 2026-03-25
+**开发时间**: ~3 小时
+**主要贡献**: 会话滚动模式系统、吸顶交互优化、工具调用失败状态持久化修复
+**当前状态**: 功能完成，已部署测试
+
+---
+
+---
+
+## 2026-03-24 消息复制按钮功能
+
+### 📋 功能描述
+为聊天消息添加复制按钮，方便用户快速复制消息内容。
+
+### ✅ 实现细节
+
+#### 1. 用户消息复制按钮
+- **位置**：气泡外左下角，与气泡底部对齐
+- **触发方式**：鼠标悬浮在消息区域（包括气泡周围 28px 热区）
+- **交互**：
+  - 默认隐藏，悬浮显示
+  - 点击后显示 "copied!" 反馈
+  - 1.5 秒后恢复图标
+
+#### 2. 助手消息复制按钮
+- **位置**：时间戳旁边（同一行）
+- **触发方式**：鼠标悬浮在整个助手消息区域
+- **功能**：收集所有 text blocks 内容，点击后复制完整内容
+
+#### 3. DOM 结构调整
+```typescript
+// 助手消息时间戳行结构
+.opencodian-message-time-row
+├── .opencodian-message-time-text  // 时间文本
+└── .opencodian-copy-btn-inline     // 复制按钮
+```
+
+#### 4. 样式规格
+| 属性 | 值 |
+|------|-----|
+| 图标大小 | 18x18px |
+| 默认透明度 | 0（隐藏） |
+| 悬浮透明度 | 1（显示） |
+| 过渡动画 | 0.15s ease |
+| 反馈文字颜色 | var(--text-accent) |
+
+### 📁 修改文件
+
+| 文件 | 修改内容 |
+|------|----------|
+| `src/features/chat/OpenCodianView.ts` | 新增 `addTextCopyButton` 方法、新增 `addTimestampWithCopyButton` 方法、修改消息渲染逻辑 |
+| `styles.css` | 新增 `.opencodian-copy-btn`、`.opencodian-copy-btn--user`、`.opencodian-copy-btn-inline`、`.opencodian-message-time-row` 等样式 |
+
+### 🐛 修复的问题
+
+1. **变量名错误**：`OpenCodianView.COPY_ICON` → `COPY_ICON`
+2. **未定义变量**：`content` → `contentEl` in `createAssistantMessageElement`
+3. **时间戳位置错误**：流式消息时间戳在内容之前 → 改为流结束后添加到末尾
+4. **助手消息定位问题**：添加 `position: relative` 确保按钮正确相对定位
+5. **用户时间戳丢失**：恢复用户消息的时间戳显示
+
+### 🎯 当前状态
+
+**复制按钮功能完整：**
+- ✅ 用户消息：气泡外左下角复制按钮
+- ✅ 助手消息：时间戳旁内联复制按钮
+- ✅ 悬浮热区：消息周围 28px 范围可触发
+- ✅ 点击反馈：显示 "copied!" 1.5 秒
+- ✅ 大小一致：统一 18x18px 图标
+
+---
+
+**会话日期**: 2026-03-24
+**开发时间**: ~1 小时
+**主要贡献**: 消息复制按钮完整功能
+**当前状态**: 功能完整，已部署测试
+
+---
+
+---
+
+## 2026-03-24 权限系统完善与 UI 优化
+
+### 📋 背景
+OpenCode 的权限系统通过 `.opencode/opencode.json` 配置文件控制。本次开发将权限管理完全集成到插件中，实现从配置管理到权限请求处理的完整闭环。
+
+---
+
+### ✅ 1. OpenCode 配置管理器
+
+**实现内容：**
+- 创建 `OpencodeConfigManager` 类管理项目级配置
+- 支持自动创建、读取、更新配置文件
+- 三种权限模式：YOLO/Normal/Plan
+
+```typescript
+export class OpencodeConfigManager {
+  async setYoloMode(): Promise<void> {
+    await this.updatePermission('allow');
+  }
+  
+  async setNormalMode(): Promise<void> {
+    await this.updatePermission({ '*': 'ask' });
+  }
+  
+  async setPlanMode(): Promise<void> {
+    await this.updatePermission({
+      '*': 'ask',
+      edit: 'deny',
+      write: 'deny',
+      bash: 'deny',
+    });
+  }
+}
+```
+
+**文件位置：**
+- `src/core/config/OpencodeConfigManager.ts`
+
+---
+
+### ✅ 2. 跨平台工作目录支持
+
+**问题：**
+OpenCode 服务器需要在 vault 目录启动才能读取项目配置。
+
+**解决方案：**
+```typescript
+// Windows 支持
+if (process.platform === 'win32') {
+  candidates.push('opencode.cmd', `${process.env.APPDATA}\\npm\\opencode.cmd`);
+}
+
+// macOS 支持
+if (process.platform === 'darwin') {
+  candidates.push('/opt/homebrew/bin/opencode', '/usr/local/bin/opencode');
+}
+
+// 启动时设置工作目录
+this.process = spawn(opencodePath, ['serve', ...], {
+  cwd: this.workingDirectory,  // Vault 路径
+});
+```
+
+**调试输出：**
+```
+[ServerManager] Working directory set to: C:\Users\lt\Desktop\Write\testvault
+[ServerManager] Starting OpenCode in directory: C:\Users\lt\Desktop\Write\testvault
+```
+
+---
+
+### ✅ 3. 内联权限请求对话框
+
+**设计改进：**
+- 从全局弹窗改为消息流内嵌卡片
+- 不阻塞用户操作其他界面
+- 选择后自动消失，不占用空间
+
+**实现代码：**
+```typescript
+private async showPermissionDialog(request: PermissionRequest): Promise<void> {
+  // 在消息流中创建权限卡片
+  const permissionCard = permissionContainer.createDiv({ 
+    cls: 'opencodian-permission-inline' 
+  });
+  
+  // 显示工具信息和按钮
+  // ...
+  
+  // 用户选择后移除卡片
+  const result = await new Promise<...>((resolve) => { ... });
+  permissionCard.remove();  // 完全消失，不占用空间
+}
+```
+
+**UI 样式：**
+```css
+.opencodian-permission-inline {
+  background: var(--background-primary);
+  border: 2px solid var(--interactive-accent);
+  border-radius: 8px;
+  padding: 16px;
+  margin: 12px 0;
+}
+```
+
+**文件位置：**
+- `src/features/chat/OpenCodianView.ts`
+- `styles.css`
+
+---
+
+### ✅ 4. 输入栏权限模式切换
+
+**实现内容：**
+在输入框下方工具栏添加权限模式下拉框：
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  [🤖 模型选择器]              [🛡️ YOLO ▼]              │
+└─────────────────────────────────────────────────────────┘
+```
+
+**代码实现：**
+```typescript
+private initializePermissionSelector(containerEl: HTMLElement): void {
+  const trigger = containerEl.createDiv({ cls: 'opencodian-permission-trigger' });
+  
+  // 根据当前模式显示不同颜色
+  trigger.addClass(`mode-${mode}`);  // yolo=green, ask=blue, plan=red
+  
+  // 点击切换模式并自动重启服务
+  trigger.addEventListener('click', async () => {
+    await this.switchPermissionMode(newMode);
+  });
+}
+```
+
+**自动重启逻辑：**
+```typescript
+private async switchPermissionMode(mode: 'yolo' | 'normal' | 'plan'): Promise<void> {
+  // 1. 更新配置
+  this.plugin.settings.permissionMode = mode;
+  await this.plugin.saveSettings();
+  
+  // 2. 重启 OpenCode 服务
+  await this.plugin.openCodeService.stop();
+  await new Promise(resolve => setTimeout(resolve, 1000));
+  await this.plugin.openCodeService.start();
+}
+```
+
+**显示格式：**
+- YOLO 模式：`🛡️ YOLO`（绿色）
+- 询问模式：`🛡️ ASK`（蓝色）
+- 计划模式：`🛡️ PLAN`（红色）
+
+---
+
+### ✅ 5. 中文翻译完善
+
+**新增翻译键：**
+```typescript
+// 权限对话框
+'permissionDialog.title': '权限请求',
+'permissionDialog.description': 'AI 想要使用工具：',
+'permissionDialog.toolDescription': '此工具的作用：',
+'permissionDialog.allowOnce': '允许一次',
+'permissionDialog.allowAlways': '始终允许',
+'permissionDialog.reject': '拒绝',
+
+// 工具描述
+'permissionDialog.tools.websearch': '搜索网络获取最新信息',
+'permissionDialog.tools.bash': '执行终端命令（谨慎使用）',
+'permissionDialog.tools.read': '读取文件内容',
+'permissionDialog.tools.edit': '编辑/修改文件内容',
+
+// 设置按钮
+'settings.security.configFile.editBtn': '编辑配置',
+'settings.security.configFile.applyBtn': '应用并重启',
+```
+
+**文件位置：**
+- `src/i18n/locales/zh.ts`
+- `src/i18n/locales/en.ts`
+
+---
+
+### ✅ 6. 计划模式检测修复
+
+**问题：**
+计划模式（有 `deny` 权限）被错误显示为询问模式。
+
+**修复代码：**
+```typescript
+if (typeof permission === 'object' && permission?.['*'] === 'ask') {
+  // 检查是否有 deny - 那是计划模式
+  const hasDeny = Object.values(permission).some(v => v === 'deny');
+  if (hasDeny) {
+    statusText = t('settings.security.configStatus.plan');
+    statusClass = 'opencodian-status-plan';
+  } else {
+    statusText = t('settings.security.configStatus.normal');
+    statusClass = 'opencodian-status-normal';
+  }
+}
+```
+
+**状态显示：**
+- ✅ YOLO 模式（自动批准全部）- 绿色
+- ✅ 询问模式（提示批准）- 蓝色
+- ✅ 计划模式（禁止修改）- 红色
+- ✅ 自定义模式 - 灰色
+
+---
+
+### ✅ 7. 权限对话框超时修复
+
+**问题：**
+权限对话框显示时，流超时仍在计时，导致用户未响应就中断。
+
+**修复：**
+```typescript
+// 显示对话框前暂停超时
+if (timeoutId) {
+  window.clearTimeout(timeoutId);
+  timeoutId = null;
+}
+
+await this.showPermissionDialog(chunk);
+
+// 用户响应后重新开始超时
+if (this.isStreaming) {
+  timeoutId = window.setTimeout(() => { ... }, STREAM_TIMEOUT_MS);
+}
+```
+
+---
+
+### 📁 修改文件列表
+
+| 文件 | 修改内容 |
+|------|----------|
+| `src/core/config/OpencodeConfigManager.ts` | 新增配置管理器 |
+| `src/core/opencode/ServerManager.ts` | 跨平台工作目录支持 |
+| `src/core/opencode/OpenCodeService.ts` | 权限事件处理 |
+| `src/features/chat/OpenCodianView.ts` | 内联权限对话框、输入栏权限切换 |
+| `src/features/settings/OpenCodianSettings.ts` | 设置页面权限检测修复 |
+| `src/i18n/locales/zh.ts` | 中文翻译 |
+| `src/i18n/locales/en.ts` | 英文翻译 |
+| `styles.css` | 权限卡片样式、权限选择器样式 |
+
+---
+
+### 🎯 当前状态
+
+**权限系统功能完整：**
+- ✅ 三种权限模式（YOLO/ASK/PLAN）
+- ✅ 配置文件自动管理
+- ✅ 内联权限请求对话框
+- ✅ 输入栏快速切换权限模式
+- ✅ 切换后自动重启服务
+- ✅ 中英文双语支持
+
+**待优化：**
+- 设置页面 `display()` 改为 async 后需验证 Obsidian 兼容性
+
+---
+
+**会话日期**: 2026-03-24
+**开发时间**: ~4 小时
+**主要贡献**: 权限系统完整集成、跨平台支持、内联权限对话框、中文汉化
+**当前状态**: 权限系统功能完整，可正常使用
+
+---
+
+---
+
+## 2026-03-24 模型选择器 UI 重构与图标集成
+
+本次会话完成了模型选择器的全面升级，从原生 `<select>` 元素迁移到自定义下拉组件，并集成了 200+ 个 AI 供应商品牌图标。
+
+---
+
+### ✅ 1. 模型选择器 UI 重构
+
+**问题背景：**
+- 原生 `<select>` 下拉框样式受限，无法分组显示
+- 无法显示供应商图标，视觉层次不清晰
+- 参考 opencode 的 UI 设计，需要更现代化的选择器
+
+**实现内容：**
+
+#### 自定义下拉组件架构
+```
+┌─────────────────────────────────────┐
+│ 🤖 anthropic/claude-3-5-sonnet   ▼ │  ← Trigger 按钮（显示当前选择）
+└─────────────────────────────────────┘
+                    │
+                    ▼
+┌─────────────────────────────────────┐
+│ 🔍 Search models...                 │  ← 搜索输入框
+├─────────────────────────────────────┤
+│ 🅰️  ANTHROPIC      ← sticky header   │
+│    claude-3-opus-20240229           │
+│  ✓ claude-3-5-sonnet-20241022       │  ← 当前选中
+│    claude-3-5-haiku-20241022        │
+├─────────────────────────────────────┤
+│ 🇨🇳 DEEPSEEK       ← sticky header   │
+│    deepseek-chat                    │
+│    deepseek-reasoner                │
+└─────────────────────────────────────┘
+```
+
+**关键实现：**
+
+1. **Trigger 按钮设计**
+   ```typescript
+   // Ghost 样式按钮，显示当前选择的模型
+   createEl('button', { cls: 'opencodian-model-trigger' }, (btn) => {
+     btn.createSpan({ cls: 'model-trigger-icon', text: '🤖' });
+     btn.createSpan({ cls: 'model-trigger-text', text: modelName });
+     btn.createSpan({ cls: 'model-trigger-chevron', text: '▼' });
+   });
+   ```
+
+2. **下拉面板结构**
+   ```typescript
+   createDiv({ cls: 'opencodian-model-dropdown' }, (dropdown) => {
+     // 搜索输入
+     dropdown.createDiv({ cls: 'opencodian-model-search' }, ...);
+     // 可滚动列表
+     dropdown.createDiv({ cls: 'opencodian-model-dropdown-scroll' }, ...);
+   });
+   ```
+
+3. **定位策略**
+   ```css
+   .opencodian-model-dropdown {
+     position: absolute;
+     bottom: calc(100% + 8px);  /* 位于输入框上方 */
+     left: 0;
+     z-index: 1000;
+   }
+   ```
+
+**涉及文件：**
+- `src/features/chat/OpenCodianView.ts`
+- `styles.css`
+
+---
+
+### ✅ 2. 粘性分组头部 (Sticky Headers)
+
+**设计目标：**
+- 提供商名称在滚动时固定在顶部
+- 清晰区分不同提供商的模型
+- 提供视觉反馈表示当前所在分组
+
+**技术实现：**
+
+1. **CSS 粘性定位**
+   ```css
+   .opencodian-model-provider-header {
+     position: sticky;
+     top: 0;
+     z-index: 10;
+     background: var(--background-secondary);
+   }
+   ```
+
+2. **IntersectionObserver 检测粘性状态**
+   ```typescript
+   private handleProviderHeaderScroll(): void {
+     const observer = new IntersectionObserver((entries) => {
+       entries.forEach(entry => {
+         const header = entry.target as HTMLElement;
+         const rect = header.getBoundingClientRect();
+         const containerRect = container.getBoundingClientRect();
+         // 检测是否被粘住
+         header.dataset.stuck = (rect.top <= containerRect.top + 1) ? 'true' : 'false';
+       });
+     }, { root: container, threshold: [0, 1] });
+   }
+   ```
+
+3. **粘性状态视觉反馈**
+   ```css
+   .opencodian-model-provider-header[data-stuck="true"] {
+     box-shadow: 0 8px 8px -4px rgba(0, 0, 0, 0.1);
+   }
+   ```
+
+---
+
+### ✅ 3. Lobehub 图标集成
+
+**图标来源：**
+- 使用 Lobehub Icons Static SVG 包
+- 1425+ 个 AI/LLM 品牌图标
+- CDN 加载：`https://unpkg.com/@lobehub/icons-static-svg@latest/icons/{name}.svg`
+
+**ProviderIconService 实现：**
+
+1. **图标映射表 (200+ 供应商)**
+   ```typescript
+   private static readonly PROVIDER_ICON_MAP: Record<string, string> = {
+     // 国际主流
+     'openai': 'openai',
+     'anthropic': 'anthropic',
+     'claude': 'claude',
+     'google': 'google',
+     'gemini': 'gemini',
+     // 中国厂商
+     'deepseek': 'deepseek',
+     'aihubmix': 'aihubmix',
+     'zhipu': 'zhipu',
+     'glm': 'chatglm',
+     'moonshot': 'moonshot',
+     'kimi': 'moonshot',  // kimi = moonshot
+     'qwen': 'qwen',
+     '通义千问': 'qwen',
+     // ... 200+ 更多映射
+   };
+   ```
+
+2. **模糊匹配算法**
+   ```typescript
+   private static normalizeProviderId(providerId: string): string {
+     return providerId
+       .toLowerCase()
+       .replace(/[\s\-_.]+/g, '')           // 移除分隔符
+       .replace(/[\(\（].*?[\)\）]/g, '');  // 移除括号内容
+   }
+   
+   static getIconUrl(providerId: string): string | undefined {
+     const normalized = this.normalizeProviderId(providerId);
+     
+     // 1. 直接匹配
+     if (this.PROVIDER_ICON_MAP[normalized]) {
+       return this.buildUrl(this.PROVIDER_ICON_MAP[normalized]);
+     }
+     
+     // 2. 包含匹配 (aihub-mix → aihubmix)
+     for (const [key, iconName] of Object.entries(this.PROVIDER_ICON_MAP)) {
+       if (normalized.includes(key) || key.includes(normalized)) {
+         return this.buildUrl(iconName);
+       }
+     }
+     
+     // 3. 尝试直接使用
+     return this.buildUrl(normalized);
+   }
+   ```
+
+3. **SVG 图标渲染**
+   ```typescript
+   static getProviderIconHTML(providerId: string, size: number = 16): string {
+     const iconUrl = this.getIconUrl(providerId);
+     return `<img src="${iconUrl}" 
+                  width="${size}" height="${size}" 
+                  class="opencodian-provider-icon"
+                  style="display: inline-block; vertical-align: middle;">`;
+   }
+   ```
+
+**匹配示例：**
+| 输入 | 归一化 | 匹配结果 |
+|------|--------|----------|
+| `AiHubMix (推理时代)` | `aihubmix` | ✅ `aihubmix` |
+| `aihub-mix` | `aihubmix` | ✅ `aihubmix` |
+| `zhipu-external` | `zhipexternal` | ✅ 包含 `zhipu` |
+| `通义千问` | `通义千问` | ✅ `qwen` |
+| `Kimi (Moonshot)` | `kimi` | ✅ `moonshot` |
+
+---
+
+### ✅ 4. 搜索与键盘导航
+
+**搜索功能：**
+```typescript
+private modelFilterQuery = '';
+
+// 过滤逻辑
+const filtered = providers.filter(({ provider, models }) => {
+  const providerMatch = provider.providerID.toLowerCase().includes(query);
+  const modelMatch = models.some(m => m.toLowerCase().includes(query));
+  return providerMatch || modelMatch;
+});
+```
+
+**键盘导航：**
+- `↑/↓` - 在选项间移动
+- `Enter` - 选择高亮项
+- `Escape` - 关闭下拉
+- `Home/End` - 跳到首/尾
+
+---
+
+### ✅ 5. Flexbox 滚动修复
+
+**问题：**
+flex 容器内的子元素使用 `overflow-y: auto` 时滚动条不显示。
+
+**解决方案：**
+```css
+/* 使用 max-height 而非 flex: 1 */
+.opencodian-model-dropdown-scroll {
+  max-height: 260px;        /* 固定最大高度 */
+  overflow-y: scroll !important;  /* 强制显示滚动条 */
+}
+
+/* 父容器 */
+.opencodian-model-dropdown {
+  display: flex;
+  flex-direction: column;
+  max-height: 320px;        /* 整体最大高度 */
+  overflow: hidden;         /* 防止整体溢出 */
+}
+```
+
+---
+
+### 📁 新增/修改文件
+
+| 文件 | 修改内容 |
+|------|----------|
+| `src/utils/icons/ProviderIconService.ts` | 新增：图标映射与加载服务 |
+| `src/features/chat/OpenCodianView.ts` | 重构：模型选择器 UI 实现 |
+| `styles.css` | 新增：下拉组件、粘性头部、图标样式 |
+
+---
+
+### 🎨 视觉层次设计
+
+```
+提供商头部 (14px, bold, accent color)
+  └── 模型选项 (12px, normal)
+  └── 模型选项 (12px, normal)
+
+颜色规范：
+- 提供商名：var(--text-accent) - 强调色
+- 模型名：var(--text-normal) - 正文色
+- 选中项：var(--background-modifier-hover) - 悬停背景
+- 图标：16x16px，flex-shrink: 0 防止压缩
+```
+
+---
+
+### 🔧 已知问题
+
+1. **重复 key 警告**
+   - `spark` 和 `jamba` 在映射表中重复定义（非致命）
+   - 不影响功能，可后续清理
+
+2. **图标加载延迟**
+   - CDN 图标首次加载有短暂延迟
+   - 浏览器缓存后快速加载
+
+---
+
+**会话日期**: 2026-03-24
+**开发时间**: ~3 小时
+**主要贡献**: 自定义模型选择器、Lobehub 图标集成、粘性分组头部、搜索功能
+**当前状态**: ✅ 模型选择器 UI 完整，支持 200+ 供应商图标
+
+---
+
+---
+
+## 2026-03-24 UI 改进与功能完善
+
+本次会话完成了多项 UI 改进和 Bug 修复。
+
+---
+
+### ✅ 1. 时间戳移出消息气泡
+
+**问题现象：**
+- 用户消息的时间戳显示在深色气泡内部，影响美观
+- 与 Claudian 的样式不一致
+
+**解决方案：**
+- 将时间戳从 `content` 容器移到 `messageEl` 级别
+- 调整 CSS，让时间戳显示在气泡下方
+
+```typescript
+// 修改前：在 content 内部创建时间戳
+content.createEl('div', { cls: 'opencodian-message-time', text: time });
+
+// 修改后：在 messageEl 级别创建时间戳
+messageEl.createEl('div', { cls: 'opencodian-message-time', text: time });
+```
+
+**涉及文件：**
+- `src/features/chat/OpenCodianView.ts`
+- `styles.css`
+
+---
+
+### ✅ 2. Thinking 块与工具调用样式优化（Claudian 风格）
+
+**实现内容：**
+- Thinking 块显示 "Thought for Xs" 或 "Thought (<1s)"
+- 工具调用显示工具名和参数摘要
+- 工具状态图标：✓ 绿色（成功）、✕ 红色（失败）
+- 展开后显示左侧边框线
+
+**样式变更：**
+```css
+/* Thinking 块 */
+.streaming-thinking-label {
+  color: var(--text-accent);  /* 橙色/红色 */
+}
+
+/* 工具调用状态 */
+.streaming-tool-status.status-completed {
+  color: var(--color-green);
+}
+.streaming-tool-status.status-error {
+  color: var(--color-red);
+}
+```
+
+**涉及文件：**
+- `src/utils/streaming/ThinkingBlockRenderer.ts`
+- `src/utils/streaming/ToolCallRenderer.ts`
+- `styles.css`
+
+---
+
+### ✅ 3. 消息持久化存储
+
+**问题现象：**
+- 重新加载 Obsidian 后用户消息消失
+- 工具调用消息跑到最下面
+- Thinking duration 丢失
+
+**解决方案：**
+1. **保存完整消息**：`saveConversation` 现在保存 `messages` 数组
+2. **独立 thinking 块**：每个 reasoning part 创建独立的 thinking block
+3. **保持顺序**：工具调用在收到结果时立即保存到 contentBlocks
+
+```typescript
+// StorageService.ts
+async saveConversation(conversation: Conversation): Promise<void> {
+  const data = {
+    // ... 元数据
+    messages: conversation.messages,  // 保存完整消息
+  };
+}
+```
+
+**涉及文件：**
+- `src/core/storage/StorageService.ts`
+- `src/main.ts`
+- `src/utils/streaming/StreamController.ts`
+
+---
+
+### ✅ 4. 等待提示功能
+
+**实现内容：**
+- AI 响应超过 1 秒时显示 "Getting to work..."
+- 实时显示等待时间
+- 提示 "(esc to interrupt)"
+- 收到实际内容后自动消失
+
+```typescript
+const pendingTimeout = window.setTimeout(() => {
+  pendingEl = messageContentEl.createDiv({ cls: 'opencodian-pending' });
+  pendingEl.createSpan({ text: 'Getting to work...', cls: 'opencodian-pending-text' });
+  // ... 计时器更新
+}, 1000);
+```
+
+**CSS 样式：**
+```css
+.opencodian-pending {
+  font-size: 13px;
+  color: var(--text-accent);
+  font-style: italic;
+}
+```
+
+**涉及文件：**
+- `src/features/chat/OpenCodianView.ts`
+- `styles.css`
+
+---
+
+### ✅ 5. 流超时处理
+
+**问题现象：**
+- 某些工具调用长时间卡住
+- 流无法正常退出
+
+**解决方案：**
+- 添加 2 分钟超时机制
+- 超时后将运行中的工具标记为错误
+
+```typescript
+private timeoutStream(): void {
+  for (const [toolId, toolCall] of this.state.toolCalls) {
+    if (toolCall.status === 'running' || toolCall.status === 'pending') {
+      toolCall.status = 'error';
+      toolCall.result = 'Request timeout';
+      // ... 更新 UI
+    }
+  }
+}
+```
+
+**涉及文件：**
+- `src/utils/streaming/StreamController.ts`
+- `src/features/chat/OpenCodianView.ts`
+
+---
+
+### 🐛 遇到的问题与修复
+
+#### 问题 1：TypeScript 类型错误
+
+**现象：**
+编译时出现 9 处类型错误，涉及：
+- `ContentBlock` 未导入
+- `ToolCallInfo` 类型不匹配
+- `setLocale` 参数类型错误
+
+**修复：**
+```typescript
+// 统一 ToolCallStatus 类型
+export type ToolCallStatus = 'pending' | 'running' | 'completed' | 'error' | 'blocked';
+
+// 修复 setLocale 调用
+setLocale(this.settings.locale as 'en' | 'zh');
+```
+
+#### 问题 2：工具调用状态显示错误
+
+**现象：**
+- 工具调用失败仍显示绿色勾
+- CSS 中有重复定义覆盖了错误状态颜色
+
+**修复：**
+删除 CSS 中重复的状态颜色定义。
+
+#### 问题 3：等待提示不显示
+
+**现象：**
+- 等待提示逻辑存在但不显示
+- 原因是第一帧数据到达过快，清除了等待提示
+
+**修复：**
+```typescript
+// 只在有实际内容时才清除等待提示
+const hasContent = (streamingChunk.type === 'text' && streamingChunk.content?.trim()) ||
+                  (streamingChunk.type === 'thinking' && streamingChunk.content?.trim());
+```
+
+---
+
+### 📁 修改文件汇总
+
+| 文件 | 修改内容 |
+|------|----------|
+| `src/features/chat/OpenCodianView.ts` | 时间戳位置、等待提示、消息持久化 |
+| `src/utils/streaming/ThinkingBlockRenderer.ts` | Thinking 块渲染逻辑 |
+| `src/utils/streaming/ToolCallRenderer.ts` | 工具调用渲染、状态图标 |
+| `src/utils/streaming/StreamController.ts` | 工具调用保存顺序、超时处理 |
+| `src/core/storage/StorageService.ts` | 保存完整消息数组 |
+| `src/core/opencode/OpenCodeService.ts` | 独立 thinking 块处理 |
+| `src/core/types/chat.ts` | 添加 `durationSeconds` 字段 |
+| `src/core/types/tools.ts` | 统一 `ToolCallStatus` 类型 |
+| `src/main.ts` | 异步加载完整会话 |
+| `styles.css` | 样式优化、等待提示样式 |
+
+---
+
+### 📝 下一步计划
+
+1. **测试覆盖** - 添加单元测试覆盖新功能
+2. **性能优化** - 大型消息历史的加载优化
+3. **国际化** - 完善中英文切换
+
+---
+
+## 2026-03-24 UI 布局优化与玻璃拟态设计
+
+### 📋 背景
+优化聊天界面布局，改进用户消息气泡视觉效果，添加流畅的动画交互。
+
+### ✅ 已完成功能
+
+#### 1. 发送按钮位置调整
+**改动前：**
+- 发送按钮位于输入框内部右侧
+
+**改动后：**
+- 发送按钮移到输入栏下方工具栏右侧
+- 布局结构：`[权限模式] [模型选择器]        [发送按钮]`
+
+**代码变更：**
+```typescript
+// OpenCodianView.ts - buildInputArea()
+// 将 sendBtn 从 inputWrapper 移到 toolbar
+this.sendBtn = toolbar.createDiv({ cls: 'opencodian-send-btn' });
+```
+
+---
+
+#### 2. 权限模式位置调整
+**改动：**
+- 权限模式从右侧移到左侧
+- 与模型选择器挨着，保持视觉连贯性
+- 统一字体大小为 `13px`（原来是 `12px`）
+
+**布局结构：**
+```
+┌─────────────────────────────────────────────────┐
+│  [PLAN] [GLM-4.5]                        [🚀]  │
+└─────────────────────────────────────────────────┘
+```
+
+---
+
+#### 3. 去掉下拉箭头
+**改动：**
+- 移除模型选择器的 chevron-down 图标
+- 移除权限模式的 chevron-down 图标
+
+**代码变更：**
+```typescript
+// OpenCodianView.ts - initializeModelSelector()
+// 删除：const chevron = triggerContent.createSpan(...)
+// 删除：setIcon(chevron, 'chevron-down');
+
+// OpenCodianView.ts - initializePermissionSelector()
+// 删除：const chevronEl = trigger.createSpan(...)
+// 删除：setIcon(chevronEl, 'chevron-down');
+```
+
+---
+
+#### 4. 用户消息玻璃拟态气泡
+**设计效果：**
+- 半透明渐变背景
+- backdrop-filter 毛玻璃模糊效果
+- 高光边框和多层阴影
+- 圆角气泡，右下尖角
+
+**CSS 实现：**
+```css
+.opencodian-message--user .opencodian-message-content {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 16px;
+  border-end-end-radius: 4px;
+  box-shadow: 
+    0 4px 24px rgba(0, 0, 0, 0.15),
+    0 1px 2px rgba(255, 255, 255, 0.1) inset;
+}
+```
+
+**悬停闪光效果：**
+```css
+.opencodian-message--user .opencodian-message-content::before {
+  content: '';
+  position: absolute;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+  transition: left 0.5s ease;
+}
+
+.opencodian-message--user:hover .opencodian-message-content::before {
+  left: 100%;  /* 悬停时闪光扫过 */
+}
+```
+
+---
+
+#### 5. 动画效果
+**消息滑入动画：**
+```css
+@keyframes messageSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.opencodian-message--user,
+.opencodian-message--assistant {
+  animation: messageSlideIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+```
+
+**发送按钮动画：**
+```css
+/* 悬停放大+旋转 */
+.opencodian-send-btn:hover {
+  transform: scale(1.1) rotate(-5deg);
+  box-shadow: 0 4px 16px rgba(var(--interactive-accent-rgb), 0.4);
+}
+
+/* 停止按钮脉冲动画 */
+.opencodian-stop-btn {
+  animation: pulseRed 2s ease-in-out infinite;
+}
+
+@keyframes pulseRed {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(var(--background-modifier-error-rgb), 0.4); }
+  50% { box-shadow: 0 0 0 8px rgba(var(--background-modifier-error-rgb), 0); }
+}
+
+/* 点击波纹效果 */
+.opencodian-send-btn::after {
+  content: '';
+  position: absolute;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  transition: width 0.4s ease, height 0.4s ease;
+}
+```
+
+**气泡悬停效果：**
+```css
+.opencodian-message--user:hover .opencodian-message-content {
+  transform: translateY(-2px) scale(1.01);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+```
+
+---
+
+### 📁 修改文件
+
+| 文件 | 修改内容 |
+|------|----------|
+| `src/features/chat/OpenCodianView.ts` | 发送按钮移到底部工具栏、移除下拉箭头、调整元素顺序 |
+| `styles.css` | 玻璃拟态气泡样式、动画效果、工具栏布局调整 |
+
+---
+
+### 🎯 当前状态
+
+**布局优化：**
+- ✅ 发送按钮在输入栏下方右侧
+- ✅ 权限模式在左侧与模型选择器挨着
+- ✅ 无下拉箭头，界面更简洁
+
+**视觉效果：**
+- ✅ 用户消息玻璃拟态气泡
+- ✅ 悬停闪光扫过效果
+- ✅ 悬停上浮放大效果
+
+**动画效果：**
+- ✅ 消息滑入动画（带弹性效果）
+- ✅ 发送按钮悬停旋转放大
+- ✅ 停止按钮红色脉冲呼吸
+- ✅ 点击波纹效果
+
+---
+
+**会话日期**: 2026-03-24
+**开发时间**: ~1 小时
+**主要贡献**: UI布局优化、玻璃拟态设计、动画效果增强
+**当前状态**: 已部署测试，效果良好
+
+---
+
+---
+
+## 2026-03-24 Bug 修复：权限卡片位置与工具错误状态
+
+### 🐛 Bug 1：权限卡片位置错误
+
+**问题描述：**
+权限请求卡片显示在消息顶部，而不是对应的工具调用下方。
+
+**期望效果：**
+```
+[思考块]
+[文本内容]
+🔧 websearch_web_search_exa ⏳  ← 工具调用
+🔐 权限请求  ← 应该在工具卡片下方
+```
+
+**问题根源：**
+- `streamingContentEl` 指向 `textEl`（文本元素）
+- 工具调用直接渲染到 `messageEl`（消息元素）
+- 权限卡片被插入到 `textEl`，导致顺序错误
+
+**修复方案：**
+```typescript
+// 使用 messageEl 查找工具调用
+const messageEl = this.streamingMessageEl;
+const lastToolCall = messageEl.querySelector('.streaming-tool-call:last-of-type');
+
+// 将权限卡片插入到工具调用之后
+if (lastToolCall && lastToolCall.parentNode) {
+  lastToolCall.parentNode.insertBefore(permissionCard, lastToolCall.nextSibling);
+}
+```
+
+---
+
+### 🐛 Bug 2：工具错误状态不显示红色×
+
+**问题描述：**
+工具调用返回错误时（如 timeout、权限被拒绝），状态图标显示绿色勾而不是红色×。
+
+**问题根源：**
+1. OpenCodeService 发送 `tool_result` 时没有包含 `isError` 字段
+2. `convertToStreamingChunk` 转换时没有传递 `isError` 字段
+3. StreamController 默认将没有 `isError` 的结果视为 `completed`
+
+**修复方案：**
+
+**1. OpenCodeService.ts - SSE 流处理**
+```typescript
+yield {
+  type: 'tool_result',
+  toolUseId: toolId,
+  content: part.state.error ? `Error: ${part.state.error}` : (part.state.output ?? ''),
+  isError: !!part.state.error,  // ← 添加错误标记
+};
+```
+
+**2. OpenCodeService.ts - 历史消息加载**
+```typescript
+} else if (state.status === 'completed') {
+  chunks.push({
+    type: 'tool_result',
+    toolUseId: toolPart.callID ?? '',
+    content: state.output ?? '',
+    isError: false,  // ← 明确标记成功
+  });
+} else if (state.status === 'error') {
+  chunks.push({
+    type: 'tool_result',
+    toolUseId: toolPart.callID ?? '',
+    content: `Error: ${state.error}`,
+    isError: true,  // ← 明确标记错误
+  });
+}
+```
+
+**3. OpenCodianView.ts - 类型转换**
+```typescript
+case 'tool_result':
+  return {
+    type: 'tool_result',
+    id: chunk.toolUseId,
+    content: chunk.content,
+    isError: chunk.isError,  // ← 传递错误标记
+  };
+```
+
+**状态图标映射：**
+| 状态 | 图标 | 颜色 |
+|------|------|------|
+| `completed` | ✓ check | 绿色 |
+| `error` | ✗ x | 红色 |
+| `running` | ⟳ loader | 橙色（旋转） |
+
+---
+
+### 📁 修改文件
+
+| 文件 | 修改内容 |
+|------|----------|
+| `src/features/chat/OpenCodianView.ts` | 权限卡片插入位置修复、添加 `isError` 传递 |
+| `src/core/opencode/OpenCodeService.ts` | SSE 流和历史消息加载添加 `isError` 字段 |
+
+---
+
+### 🎯 当前状态
+
+**Bug 修复：**
+- ✅ 权限卡片显示在对应工具调用下方
+- ✅ 工具错误状态正确显示红色×图标
+- ✅ 工具成功状态显示绿色勾图标
+
+---
+
+**会话日期**: 2026-03-24
+**开发时间**: ~1 小时
+**主要贡献**: Bug 修复：权限卡片位置、工具错误状态图标
+**当前状态**: 已部署测试
+
+---
+
+---
+
+## 2026-03-23 UI 优化与功能完善
+
+### 🧹 代码清理：移除不必要的控制台日志
+
+#### 清理范围
+移除了约 70 处调试日志，保留错误和警告日志：
+
+**保留的日志（有用信息）：**
+- `console.error` - 错误处理日志
+- `console.warn` - 警告日志
+
+**移除的日志文件：**
+- `src/main.ts` - 4 条
+- `src/features/settings/OpenCodianSettings.ts` - 6 条
+- `src/core/opencode/ServerManager.ts` - 7 条
+- `src/utils/streaming/StreamController.ts` - 5 条
+- `src/core/opencode/OpenCodeService.ts` - 38 条
+- `src/features/chat/OpenCodianView.ts` - 7 条
+
+### 🐛 修复历史会话显示问题
+
+#### 问题描述
+重新启动 Obsidian 后，以前会话的 thinking 和工具调用显示消失，只剩下一个空白框。
+
+#### 根本原因
+历史消息加载时只提取了 `type === 'text'` 的部分，没有处理 thinking 和 tool 部分。
+
+#### 解决方案
+
+**1. 更新 `openCodeMessageToChatMessage()` 方法**
+- 添加对 `type === 'reasoning'` 部分的提取（thinking 内容）
+- 构建 `contentBlocks` 数组，包含 thinking、tool_use、tool_result、text 块
+
+**2. 新增 `renderContentBlock()` 方法**
+使用与实时会话相同的渲染器：
+- `ThinkingBlockRenderer.renderStored()` - 渲染可折叠的 thinking 块
+- `ToolCallRenderer.render()` - 渲染工具调用卡片
+
+**3. 更新 `renderMessage()` 方法**
+- 支持完整的 `ChatMessage` 类型
+- 如果存在 `contentBlocks`，按顺序渲染每个块
+
+### 🎨 Header 样式更新
+
+#### 新增功能
+- 浅色主题显示深色 logo，深色主题显示浅色 logo
+- 根据 `.theme-dark` 类自动切换
+- 监听 `css-change` 事件，主题切换时自动更新
+
+#### 修改内容
+- 添加 `LOGO_SVG_LIGHT` 和 `LOGO_SVG_DARK` 常量
+- 添加 `getLogoSvg()` 方法检测当前主题
+- 更新 CSS 样式适配新的 logo 尺寸
+
+### 💬 消息界面优化
+
+#### 1. 移除头像
+用户和 AI 消息都不再显示头像图标，界面更简洁。
+
+#### 2. 融合背景样式
+- 用户消息：深色半透明气泡 (`rgba(0, 0, 0, 0.3)`)，右对齐
+- AI 消息：透明背景，与 Obsidian 背景融合
+
+#### 3. 文本选择支持
+- 添加 `user-select: text` 支持鼠标选择文本
+- 用户消息中选中文本有白色半透明高亮
+
+#### 4. 整体界面融合
+- 容器背景改为透明
+- Header 移除边框和背景色
+- 输入区域移除顶部边框
+
+### ⏹️ 停止按钮功能
+
+#### 功能描述
+发送消息后，按钮自动变为红色停止按钮，点击可中止流式响应。
+
+#### 实现细节
+
+**1. OpenCodeService 修改**
+- 添加 `currentAbortController` 跟踪当前流
+- 添加 `cancelStream()` 公共方法中止 SSE 连接
+- 在生成器循环中检查 `signal.aborted` 状态
+
+**2. OpenCodianView 修改**
+- 存储 `sendBtn` 和 `inputTextarea` 引用
+- 添加 `updateSendButtonState()` 方法切换按钮状态
+- `cancelStreaming()` 调用服务取消方法
+
+**3. 按钮状态切换**
+- 空闲时：蓝色背景 + 发送图标
+- 流式中：红色背景 + 方块图标（停止）
+
+#### 调试日志
+添加详细日志用于验证功能：
+```
+[OpenCodianView] cancelStreaming called, isStreaming: true
+[OpenCodeService] Cancelling stream...
+[OpenCodeService] Abort signal sent
+[OpenCodianView] Streaming cancelled, breaking loop
+```
+
+### 📊 测试结果
+- ✅ 历史会话 thinking 正确显示
+- ✅ 历史会话工具调用正确显示
+- ✅ Logo 随主题自动切换
+- ✅ 消息文本可选择复制
+- ✅ 停止按钮可中止流式响应
+
+### 📝 涉及文件
+- `src/core/opencode/OpenCodeService.ts`
+- `src/features/chat/OpenCodianView.ts`
+- `src/utils/streaming/ThinkingBlockRenderer.ts`
+- `src/utils/streaming/ToolCallRenderer.ts`
+- `styles.css`
+
+---
+
+**会话日期**: 2026-03-23
+**开发时间**: ~3 小时
+**主要贡献**: UI 优化、功能完善、代码清理
+**当前状态**: ✅ 所有功能正常工作
+
+---
+
+---
+
+## 2026-03-23 工具调用显示修复
+
+### 🐛 问题描述
+用户报告工具调用在会话中不显示。虽然 AI 实际调用了工具（如 web_search、bash、read 等），但前端界面中没有呈现工具调用的卡片。
+
+### 🔍 根因分析
+通过分析日志文件 `obsidian.md-1774267116377.log`，发现问题出在 `OpenCodeService.ts` 的 SSE 事件处理逻辑中：
+
+1. **代码逻辑错误**: `message.part.updated` 事件有两个处理块
+   - 第一个处理块（第 467 行）跟踪 part 类型后使用 `continue` 跳过循环
+   - 第二个处理块（原第 513 行）包含工具调用处理逻辑，但**永远不会被执行**
+
+```typescript
+// 第一个处理块 - 执行后会 continue 跳过
+if (eventData.type === 'message.part.updated') {
+  // ... 跟踪 part 类型
+  continue;  // ← 这里直接跳过了！
+}
+
+// 第二个处理块 - 永远不会执行
+if (eventData.type === 'message.part.updated') {
+  // 处理 tool 的逻辑在这里...
+}
+```
+
+2. **数据结构确认**: OpenCode Server 发送的工具调用事件格式如下：
+```json
+{
+  "type": "message.part.updated",
+  "properties": {
+    "part": {
+      "id": "prt_xxx",
+      "type": "tool",
+      "callID": "call_xxx",
+      "tool": "web_search",
+      "state": {
+        "status": "running",
+        "input": { "query": "today's date" }
+      }
+    }
+  }
+}
+```
+
+### ✅ 修复方案
+
+#### 1. 合并工具处理逻辑
+将工具调用处理逻辑合并到第一个 `message.part.updated` 处理块中：
+
+```typescript
+if (eventData.type === 'message.part.updated') {
+  const part = eventData.properties?.part;
+  if (part?.id && part?.type) {
+    this.partTypeMap.set(part.id, part.type);
+    
+    // 处理工具调用
+    if (part.type === 'tool') {
+      const toolId = part.callID || part.id;
+      const toolName = part.tool || 'unknown';
+      if (toolId) {
+        // 新工具调用
+        if (!processedToolIds.has(toolId)) {
+          processedToolIds.add(toolId);
+          yield { 
+            type: 'tool_use', 
+            id: toolId, 
+            name: toolName, 
+            input: part.state?.input || {}
+          };
+        }
+        
+        // 工具结果
+        if (part.state?.output || part.state?.error) {
+          // yield tool_result...
+        }
+      }
+    }
+  }
+  continue;
+}
+```
+
+#### 2. 删除冗余代码块
+移除永远不会执行的第二个 `message.part.updated` 处理块。
+
+### 🧪 调试过程
+为确认修复效果，添加了详细的调试日志：
+- `[OpenCodeService] message.part.updated - part:` - 显示 part 对象结构
+- `[OpenCodeService] Tool part detected!` - 确认检测到工具类型
+- `[StreamController] Rendering tool:` - 确认渲染执行
+
+通过日志验证，工具调用已正确 yield 并传递给 `StreamController`，`ToolCallRenderer` 成功渲染了工具卡片。
+
+### 📊 测试结果
+修复后，工具调用正常显示：
+- ✅ `task` 工具 - 显示任务进度
+- ✅ `glob` 工具 - 显示文件搜索
+- ✅ `grep` 工具 - 显示文本搜索
+- ✅ `ast_grep_search` 工具 - 显示代码搜索
+
+工具卡片显示为可折叠的 UI 组件：
+```
+┌─────────────────────────────────────┐
+│ 🔧 web_search │ "query" │ ⏳ │
+├─────────────────────────────────────┤
+│ Waiting for result...               │
+└─────────────────────────────────────┘
+```
+
+### 📝 代码清理
+修复验证完成后，清理了所有调试日志：
+- 删除了 `OpenCodeService.ts` 中的 5 处调试日志
+- 删除了 `StreamController.ts` 中的 3 处调试日志
+
+### 🎯 技术要点
+1. **SSE 事件处理**: OpenCode Server 使用 `message.part.updated` 事件通知工具状态变化
+2. **工具生命周期**: 工具调用经历 `pending` → `running` → `completed/error` 状态
+3. **渲染流程**: 
+   - `OpenCodeService` 解析 SSE 事件 → yield `tool_use` chunk
+   - `StreamController` 接收 chunk → 调用 `ToolCallRenderer.render()`
+   - `ToolCallRenderer` 创建 DOM 元素 → 显示工具卡片
+
+---
+
+**会话日期**: 2026-03-23
+**开发时间**: ~2 小时
+**主要贡献**: 修复工具调用显示问题，清理调试日志
+**涉及文件**: 
+- `src/core/opencode/OpenCodeService.ts`
+- `src/utils/streaming/StreamController.ts`
+
+**当前状态**: ✅ 工具调用显示功能完整，支持 task/glob/grep/ast_grep_search 等多种工具
+
+---
+
+---
+
+## 2026-03-23 Bug修复：SSE流结束后无法发送新消息
+
+### 🔧 问题分析
+
+**现象：**
+- 第一条消息流式输出正常
+- 回复完成后，无法再发送新消息
+- `isStreaming` 状态保持为 `true`，阻止了新消息发送
+
+**根本原因：**
+1. `fetch` 请求没有使用 `signal` 参数，导致 `abortController.abort()` 无法真正取消连接
+2. `reader.read()` 在某些情况下可能挂起，导致 `for await...of` 循环无法退出
+3. `finally` 块无法执行，`isStreaming` 状态无法重置
+
+### ✅ 修复方案
+
+**1. OpenCodianView.ts - 添加超时保护机制**
+```typescript
+// Set up timeout as safety net to reset isStreaming
+const STREAM_TIMEOUT_MS = 120000; // 2 minutes timeout
+let timeoutId: number | null = null;
+const resetStreamingState = () => {
+  if (timeoutId) {
+    window.clearTimeout(timeoutId);
+    timeoutId = null;
+  }
+  this.isStreaming = false;
+};
+
+timeoutId = window.setTimeout(() => {
+  console.warn('[OpenCodianView] Stream timeout, forcing state reset');
+  resetStreamingState();
+  // ...
+}, STREAM_TIMEOUT_MS);
+```
+
+**2. OpenCodeService.ts - 修复 SSE 连接取消逻辑**
+```typescript
+// 将 signal 传递给 fetch
+const response = await fetch(url, {
+  method: 'GET',
+  headers: { 'Accept': 'text/event-stream' },
+  signal, // 允许通过 abortController 取消请求
+});
+
+// 改进错误处理
+try {
+  readResult = await reader.read();
+} catch (readError) {
+  if (signal?.aborted || aborted) {
+    break; // 优雅地处理取消
+  }
+  throw readError;
+}
+```
+
+### 📝 修改文件
+
+| 文件 | 修改内容 |
+|------|----------|
+| `src/features/chat/OpenCodianView.ts` | 添加超时机制，确保 `isStreaming` 总能被重置 |
+| `src/core/opencode/OpenCodeService.ts` | 修复 `fetch` 信号传递，改进 `reader.read()` 错误处理 |
+
+---
+
+## 🎯 下一步建议
+
+1. ~~**修复 SSE 流状态问题**~~ ✅ 已完成
+2. **消息历史持久化** - 在插件端缓存消息历史，减少对服务器的依赖
+2. **消息历史持久化** - 在插件端缓存消息历史，减少对服务器的依赖
+3. **错误重试机制** - 网络错误时自动重试
+4. **消息编辑/删除** - 添加消息管理功能
+5. **文件附件** - 支持上传文件到对话
+6. **代码块高亮** - 优化消息中代码的显示
+
+---
+
+**会话日期**: 2026-03-23
+**开发时长**: ~4 小时
+**主要贡献**: SSE 流式响应架构实现、CORS 配置、事件解析、流状态管理修复
+
+**当前状态**: ✅ SSE 流式传输功能完整，支持连续发送多条消息
+
+---
+
+---
+
+## 2026-03-23 SSE 流式响应重构（进行中）
+
+### 🚧 重构目标
+将原有的轮询式消息获取改为真正的 Server-Sent Events (SSE) 流式响应，实现逐字输出的真实流式效果。
+
+### ✅ 已完成工作
+
+#### 1. SSE 连接建立
+**实现内容：**
+- 使用原生 `fetch` + `ReadableStream` 实现 SSE 连接
+- 连接 OpenCode `/event` 端点获取实时事件流
+- 支持手动中断连接（`reader.cancel()`）
+
+**代码变更：**
+```typescript
+// src/core/opencode/OpenCodeService.ts
+private async *connectSSE(url: string, signal?: AbortSignal): AsyncGenerator<SSEEvent> {
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: { 'Accept': 'text/event-stream' },
+  });
+  
+  const reader = response.body!.getReader();
+  // ... 读取和处理 SSE 数据
+}
+```
+
+#### 2. SSE 数据解析
+**实现内容：**
+- 实现 `parseSSEEvents()` 方法解析 SSE 格式
+- 处理 OpenCode 的特殊格式（只有 `data:` 行，无 `event:` 行）
+- 从 JSON `type` 字段提取事件类型
+
+**关键发现：**
+```
+OpenCode SSE 格式：
+data: {"type":"message.part.delta","properties":{...}}
+
+标准 SSE 格式：
+event: message.part.delta
+data: {"properties":{...}}
+```
+
+**修复：**
+```typescript
+// 当没有 event 类型时，从 JSON 中提取
+if (!currentEvent.event && currentEvent.data) {
+  try {
+    const parsed = JSON.parse(currentEvent.data);
+    currentEvent.event = parsed.type || 'unknown';
+  } catch {
+    currentEvent.event = 'unknown';
+  }
+}
+```
+
+#### 3. 事件类型处理
+**支持的事件类型：**
+| 事件类型 | 处理方式 | 说明 |
+|---------|---------|------|
+| `message.part.updated` | 跟踪 part 类型 | 记录 partID → 类型的映射 |
+| `message.part.delta` | 流式输出 | 根据 part 类型输出 thinking/text |
+| `session.idle` | 终止连接 | 消息完成信号 |
+| `server.heartbeat` | 忽略 | 保持连接的心跳 |
+| `server.connected` | 忽略 | 初始连接确认 |
+
+**关键逻辑：**
+```typescript
+// 跟踪 part 类型
+if (eventData.type === 'message.part.updated') {
+  const part = eventData.properties?.part;
+  if (part?.id && part?.type) {
+    this.partTypeMap.set(part.id, part.type);
+  }
+}
+
+// 处理流式内容
+if (eventData.type === 'message.part.delta') {
+  const partType = this.partTypeMap.get(props.partID);
+  if (partType === 'reasoning') {
+    yield { type: 'thinking', content: props.delta };
+  } else {
+    yield { type: 'text', content: props.delta };
+  }
+}
+```
+
+#### 4. CORS 配置
+**问题：**
+- Obsidian 使用 `app://obsidian.md` 和 `app://obsidian` 协议
+- 浏览器拒绝跨域请求
+
+**解决方案：**
+```typescript
+// src/core/opencode/ServerManager.ts
+this.process = spawn(opencodePath, [
+  'serve',
+  '--port', String(this.config.port),
+  '--hostname', this.config.host,
+  '--cors', 'app://obsidian.md',
+  '--cors', 'app://obsidian',
+], {
+  detached: false,
+  stdio: ['ignore', 'pipe', 'pipe'],
+});
+```
+
+#### 5. 连接中断机制
+**实现内容：**
+- 使用 `AbortSignal` 传递中断信号
+- 检测到 `session.idle` 时主动中断连接
+- 使用 `reader.cancel()` 中断阻塞的 `read()` 调用
+
+**代码：**
+```typescript
+// 检测到消息完成
+if (eventData.type === 'session.idle') {
+  console.log('[OpenCodeService] Session idle, message complete');
+  abortController.abort();
+  break; // 退出 SSE 循环
+}
+
+// 中断处理
+const abortHandler = () => {
+  aborted = true;
+  void reader.cancel();
+};
+signal?.addEventListener('abort', abortHandler);
+```
+
+### ✅ 已修复：流结束后无法发送新消息
+
+**问题现象：**
+- 第一条消息流式输出正常
+- 回复完成后，点击发送按钮无反应
+- 控制台无错误日志
+
+**排查过程：**
+1. ✅ 确认 `isStreaming` 状态重置逻辑存在（`finally` 块）
+2. ✅ 确认 `session.idle` 事件正确处理并 break
+3. ✅ 确认 `abortController.abort()` 正确中断 SSE 连接
+
+**根因分析：**
+- 通过添加详细调试日志，确认 `session.idle` 事件被正确接收和处理
+- SSE 循环正确 break，`finally` 块正确执行
+- `isStreaming` 状态正确重置
+
+**验证日志：**
+```
+[OpenCodeService] SSE event: session.idle
+[OpenCodeService] session.idle event passed filter, properties: {"sessionID":"..."}
+[OpenCodeService] Session idle detected, breaking loop...
+[OpenCodeService] Session idle, message complete
+[OpenCodeService] Abort signal received, cancelling reader...
+[OpenCodeService] SSE reader released
+[OpenCodianView] Converting chunk: message_stop
+[StreamController] handleChunk: done
+[OpenCodianView] Streaming state reset  ← 状态正确重置
+```
+
+**添加的调试日志：**
+```typescript
+// OpenCodeService.ts - session 过滤器
+if (eventData.properties?.sessionID && eventData.properties.sessionID !== sessionId) {
+  console.log('[OpenCodeService] Skipping event for different session...');
+  continue;
+}
+
+// session.idle 处理
+if (eventData.type === 'session.idle') {
+  console.log('[OpenCodeService] Session idle detected, breaking loop...');
+  console.log('[OpenCodeService] Session idle, message complete');
+  abortController.abort();
+  break;
+}
+```
+
+### 📁 修改文件
+
+| 文件 | 修改内容 |
+|------|----------|
+| `src/core/opencode/OpenCodeService.ts` | 实现 SSE 连接、数据解析、事件处理 |
+| `src/core/opencode/ServerManager.ts` | 添加 CORS 配置参数 |
+| `src/features/chat/OpenCodianView.ts` | 添加异常处理，确保流结束 |
+
+### 📝 下一步计划
+
+1. ~~**验证连接中断**~~ ✅ 已验证，SSE 流正常工作
+2. **清理调试日志** - 移除不必要的详细日志（保留关键日志）
+3. **完善功能**
+   - 添加连接状态指示器
+   - 实现取消按钮（中断当前流）
+   - 消息历史持久化到本地
+
+---
+
+## 2026-03-23 SDK 依赖评估与移除
+
+### 📋 背景
+项目中声明了 `@opencode-ai/sdk` 作为依赖，但实际代码完全没有使用它。项目自己实现了 HTTP 请求层和 SSE 流解析。本次评估决定是否使用官方 SDK 替代手动实现。
+
+### 🔍 调研过程
+
+#### 1. 对比参考项目与安装版本
+- **参考项目** (`reference-projects/opencode-sdk-js`): v0.1.0-alpha.21
+  - 使用 `Opencode` 类
+  - 方法返回直接的 Promise，如 `await client.session.create()` 返回 `Session`
+  - 支持流式事件 `client.event.list()`
+
+- **npm 安装版本**: v1.2.27
+  - 使用 `createOpencodeClient()` 或 `OpencodeClient`
+  - 所有方法返回 `{ data, error, request, response }` 包装对象
+  - API 结构完全不同
+
+#### 2. API 差异示例
+```typescript
+// 参考项目 (v0.1.0-alpha.21)
+const session = await client.session.create();
+// session 直接是 Session 对象
+
+// 安装版本 (v1.2.27)
+const result = await client.session.create();
+// result = { data: Session | undefined, error: APIError | undefined, request, response }
+// 需要检查 result.data 或 result.error
+```
+
+#### 3. 评估结论
+- 官方 SDK 版本差异过大，无法直接迁移
+- 当前手动实现已经稳定工作，没有迁移的必要
+- 移除未使用的依赖可以减少包体积
+
+### ✅ 执行操作
+
+#### 移除 SDK 依赖
+```bash
+npm uninstall @opencode-ai/sdk
+```
+
+#### 修复 TypeScript 类型错误
+在 `OpenCodeService.ts` 中补充缺失的类型定义：
+```typescript
+interface OpenCodeEvent {
+  type: string;
+  properties: {
+    // ... 已有属性
+    delta?: string;
+    field?: string;      // 新增
+    partID?: string;     // 新增
+    toolID?: string;
+    result?: string;
+    error?: string;
+  };
+}
+```
+
+#### 修复空值处理
+```typescript
+// partID 可能为 undefined 时的 Map 操作
+if (partID && !this.partTypeMap.has(partID)) {
+  const partType = eventData.properties?.part?.type;
+  this.partTypeMap.set(partID, partType || 'text');
+}
+const partType = partID ? (this.partTypeMap.get(partID) || 'text') : 'text';
+
+// tool output 可能为 undefined
+content: part.state.error
+  ? `Error: ${part.state.error}`
+  : (part.state.output ?? ''),
+```
+
+#### 更新 tsconfig.json
+排除 `reference-projects` 目录避免编译错误：
+```json
+{
+  "exclude": [
+    "node_modules",
+    "tests",
+    "reference-projects"
+  ]
+}
+```
+
+### 📁 修改文件
+
+| 文件 | 修改内容 |
+|------|----------|
+| `package.json` | 移除 `@opencode-ai/sdk` 依赖 |
+| `package-lock.json` | 更新锁定文件 |
+| `src/core/opencode/OpenCodeService.ts` | 修复类型定义和空值处理 |
+| `tsconfig.json` | 排除 reference-projects |
+
+### 🏁 结果
+- Git 分支 `refactor/use-sdk` 已合并到 `main`
+- 构建成功，已部署到测试环境
+- 项目继续使用自定义 HTTP 实现，代码更简洁
+
+---
+
+## 2026-03-19 Bug修复：消息显示与工具调用超时
+
+### 🔧 修复消息无法正常显示的问题
+
+**问题现象：**
+- AI 回复的消息在 UI 中无法正常显示
+- 日志显示消息已获取，但流提前退出
+- 控制台显示 `[OpenCodeService] Exiting - content stable`，但内容为空
+
+**根本原因：**
+```typescript
+// 原代码中的退出条件过于严格
+const hasSubstantialContent = lastContent.length > 100;  // 需要超过100字符
+const requiredStableCount = 8;  // 需要稳定8次轮询
+```
+- 如果 AI 回复短（少于100字符），`hasSubstantialContent` 永远为 false
+- 轮询会持续到 `maxAttempts`（300次），用户长时间看不到内容
+
+**解决方案：**
+1. 放宽退出条件：只要有任何内容（`> 0` 字符）即可退出
+2. 降低稳定计数要求：从 8 次降低到 5 次
+3. 添加兜底条件：50次轮询后无论是否有内容都退出
+
+```typescript
+const hasAnyContent = lastContent.length > 0 || lastThinkingContent.length > 0;
+const requiredStableCount = toolsPending ? 15 : 5;
+
+if (stableCount >= requiredStableCount && (hasAnyContent || attempts > 50) && !toolsPending) {
+  console.log('[OpenCodeService] Exiting - content stable');
+  break;
+}
+```
+
+**涉及文件：**
+- `src/core/opencode/OpenCodeService.ts`
+
+---
+
+### ⏱️ 添加工具调用超时机制
+
+**问题现象：**
+- 某些工具（如 `websearch_web_search_exa`）长时间处于 `running` 状态
+- 工具一直不返回结果，导致流永远无法退出
+- 用户界面显示转圈，但永远无法收到最终回复
+
+**根本原因：**
+- OpenCode 的工具调用是异步的
+- 某些工具可能因为网络问题或 API 错误永远卡住
+- 没有超时机制导致无限等待
+
+**解决方案：**
+添加工具调用超时检测（60秒）：
+
+```typescript
+// Track tool start times for timeout detection
+const toolStartTimes = new Map<string, number>();
+const TOOL_TIMEOUT_MS = 60000; // 60 seconds timeout
+
+// 记录工具开始时间
+if (!processedToolIds.has(toolId)) {
+  toolStartTimes.set(toolId, Date.now());
+  // ...
+}
+
+// 检测超时工具
+const timedOutTools: string[] = [];
+for (const toolId of pendingToolIds) {
+  const startTime = toolStartTimes.get(toolId);
+  if (startTime && (now - startTime) > TOOL_TIMEOUT_MS) {
+    console.log(`[OpenCodeService] Tool ${toolId} timed out`);
+    timedOutTools.push(toolId);
+  }
+}
+
+// 将超时工具标记为完成（带错误信息）
+for (const toolId of timedOutTools) {
+  yield {
+    type: 'tool_result',
+    toolUseId: toolId,
+    content: 'Error: Tool execution timed out after 60 seconds',
+  };
+}
+```
+
+**超时处理流程：**
+1. 新工具调用时记录开始时间
+2. 每次轮询检查是否有工具超过 60 秒
+3. 超时工具自动标记为完成，返回超时错误
+4. 流可以继续退出，显示已获取的内容
+
+**涉及文件：**
+- `src/core/opencode/OpenCodeService.ts`
+
+---
+
+### ✅ 修复验证
+
+**测试场景：**
+- 发送消息"搜索今日时事新闻"
+- AI 调用多个搜索工具
+- 其中一个工具卡住（websearch_web_search_exa）
+
+**修复前：**
+- 工具一直显示 running，无法退出
+- 用户看不到任何回复内容
+
+**修复后：**
+- 60秒后超时工具自动标记为错误
+- 流正常退出，显示 AI 的完整回复
+- 控制台显示：`Tool xxx timed out after 60000ms`
+
+---
+
+## 2026-03-19 功能实现与改进
+
+本次会话完成了 OpenCodian 插件的核心功能实现和多项重要改进。
+
+---
+
+## ✅ 已完成的功能 (补充)
+
+### 7. 历史会话菜单功能
+
+**实现内容：**
+- 点击历史会话按钮（history icon）弹出下拉菜单
+- 显示所有历史会话列表，按更新时间排序
+- 当前会话标记为 `(current)` 并显示勾选图标
+- 点击任意会话即可切换到该会话
+- 支持删除当前会话或删除所有会话（带确认对话框）
+- 鼠标悬停显示会话创建日期
+
+**涉及文件：**
+- `src/features/chat/OpenCodianView.ts` - 菜单实现和会话切换逻辑
+
+**技术细节：**
+- 使用 Obsidian 的 `Menu` 组件创建下拉菜单
+- 菜单项包含：
+  - 会话列表（带图标和当前状态标记）
+  - 分隔线
+  - 删除当前会话
+  - 删除所有会话（当会话数 > 1 时显示）
+- 删除会话后自动加载剩余会话或创建新会话
+- 使用 `confirm()` 对话框防止误删除
+
+**示例交互：**
+```
+┌─────────────────────────┐
+│ 🗨️ 会话 1               │
+│ ✓ 会话 2 (current)      │
+│ 🗨️ 会话 3               │
+│ ─────────────────────── │
+│ 🗑️ Delete current       │
+│ 🗑️ Delete all           │
+└─────────────────────────┘
+```
+
+### 8. Markdown 渲染支持
+
+**实现内容：**
+- 集成 `MarkdownRenderService` 到聊天界面
+- AI 助手消息使用完整的 Markdown 渲染
+- 支持代码块高亮（含语言标签和复制按钮）
+- 支持图片嵌入 `![[image.png]]`
+- 支持文件链接 `[[note]]`
+- 支持表格、列表、引用等标准 Markdown 语法
+- 流式响应实时 Markdown 渲染
+
+**涉及文件：**
+- `src/features/chat/OpenCodianView.ts` - 集成 Markdown 渲染服务
+- `styles.css` - 添加 Markdown 渲染样式
+
+**技术细节：**
+- 使用 Obsidian 原生 `MarkdownRenderer` API
+- 三阶段渲染流程：
+  1. 预处理：`replaceImageEmbedsWithHtml` 处理图片嵌入
+  2. 核心渲染：`MarkdownRenderer.renderMarkdown()`
+  3. 后处理：`processFileLinks` 处理文件链接 + `enhanceCodeBlocks` 增强代码块
+- 用户消息保持纯文本显示
+- 创建独立的 `Component` 管理生命周期，避免内存泄漏
+
+**渲染功能：**
+| 功能 | 状态 |
+|------|------|
+| 代码块 + 语法高亮 | ✅ |
+| 行内代码 | ✅ |
+| 图片嵌入 `![[]]` | ✅ |
+| 文件链接 `[[ ]]` | ✅ |
+| 表格 | ✅ |
+| 列表（有序/无序） | ✅ |
+| 引用块 | ✅ |
+| 标题 H1-H6 | ✅ |
+| 水平分割线 | ✅ |
+| 链接 | ✅ |
+
+### 9. 流式内容渲染模块
+
+**实现内容：**
+- 创建通用流式渲染模块，支持思考块、文本、工具调用三种内容类型
+- 思考块（thinking）：可折叠 + 实时计时器，默认收起
+- 文本块（text）：支持 Markdown 实时渲染
+- 工具调用（tool_call）：状态图标 + 可展开结果
+- 支持流式数据块的增量处理和渲染
+- 支持历史消息的内容块恢复渲染
+
+**涉及文件：**
+- `src/utils/streaming/` - 流式渲染模块目录
+  - `types.ts` - 类型定义
+  - `StreamController.ts` - 核心流式控制器
+  - `ThinkingBlockRenderer.ts` - 思考块渲染器
+  - `ToolCallRenderer.ts` - 工具调用渲染器
+  - `index.ts` - 导出入口
+  - `README.md` - 使用文档
+- `styles.css` - 流式内容样式
+
+**技术细节：**
+- 三阶段内容块处理流程：
+  1. `startStream()` - 创建消息容器，初始化状态
+  2. `handleChunk()` - 处理各种类型的数据块
+     - `thinking` → 创建/更新思考块，实时计时
+     - `text` → Markdown 渲染
+     - `tool_use/tool_result` → 工具调用渲染和结果更新
+  3. `finalize()` - 保存 contentBlocks，触发回调
+- 使用 `ContentBlock[]` 数组持久化消息内容
+- 支持自定义工具图标、名称、摘要和结果渲染
+
+**API 示例：**
+```typescript
+import { StreamController } from '@/utils/streaming';
+
+const streamController = new StreamController({
+  containerEl: messagesContainer,
+  markdownService,
+  onStreamComplete: (blocks) => saveMessage(blocks),
+  scrollToBottom: () => scrollToBottom(),
+});
+
+// 开始流
+streamController.startStream(contentEl);
+
+// 处理数据块
+for await (const chunk of stream) {
+  await streamController.handleChunk(chunk);
+}
+
+// 恢复历史
+streamController.renderStoredContentBlocks(parentEl, savedBlocks);
+```
+
+**内容块类型：**
+| 类型 | 特性 |
+|------|------|
+| thinking | 可折叠，实时计时，默认收起 |
+| text | Markdown 渲染 |
+| tool_call | 状态图标（pending/running/completed/error），可展开结果 |
+
+### 10. 会话内模型切换
+
+**实现内容：**
+- 移除 "Model: " 文本标签，仅保留下拉框
+- 下拉框直接显示当前使用的模型名称（格式：Provider/Model）
+- 鼠标悬停1秒后显示完整模型信息提示
+- 支持下拉选择其他模型，仅影响当前会话
+- 切换模型后发送的消息使用新模型
+- 每个会话独立保存模型覆盖设置
+
+**涉及文件：**
+- `src/features/chat/OpenCodianView.ts` - 模型选择器实现
+- `styles.css` - 选择器样式优化
+
+**技术细节：**
+- 使用 `Map<string, {provider, model}>` 存储每个会话的模型覆盖
+- 模型选择优先级：会话覆盖 > 默认设置
+- 从 OpenCode 服务动态加载可用模型列表
+- 切换会话时自动更新选择器显示当前会话的模型
+
+**示例交互：**
+```
+┌────────────────────────────┐
+│ anthropic/claude-3-5-...  ▼│  <- 下拉框显示当前模型
+└────────────────────────────┘
+鼠标悬停1秒后显示：Using: anthropic/claude-3-5-sonnet-20241022
+```
+
+---
+
+## ✅ 已完成的功能
+
+### 1. 国际化支持 (i18n)
+
+**实现内容：**
+- 创建了完整的双语翻译系统
+- 支持英文 (`en`) 和简体中文 (`zh`)
+- 所有设置界面文本已翻译
+- 新增语言选择设置项
+
+**涉及文件：**
+- `src/i18n/index.ts` - 国际化核心模块
+- `src/i18n/locales/en.ts` - 英文翻译
+- `src/i18n/locales/zh.ts` - 中文翻译
+- `src/features/settings/OpenCodianSettings.ts` - 集成翻译
+- `src/main.ts` - 初始化语言设置
+
+### 2. 动态供应商/模型选择
+
+**实现内容：**
+- 从 OpenCode 服务器动态获取可用供应商列表
+- 根据选择的供应商动态加载可用模型
+- 修复模型数据格式兼容性（支持字符串数组和对象两种格式）
+- 模型选择后正确保存到设置
+
+**涉及文件：**
+- `src/core/opencode/OpenCodeService.ts` - `getAvailableModels()` 方法
+- `src/features/settings/OpenCodianSettings.ts` - 动态下拉菜单实现
+
+**技术细节：**
+- API 端点：`GET /config/providers`
+- 处理两种 models 格式：
+  - 格式1: `models: ["gpt-4", "gpt-3.5-turbo"]` (字符串数组)
+  - 格式2: `models: { "model-id": { name: "..." } }` (对象)
+
+### 3. 服务器状态检测与外部服务器识别
+
+**实现内容：**
+- 实时检测服务器运行状态（每2秒自动刷新）
+- 区分插件启动的服务器和外部独立运行的服务器
+- 添加 🟢/🔴 状态指示灯
+- 外部服务器显示特殊标记并禁用停止按钮
+
+**涉及文件：**
+- `src/features/settings/OpenCodianSettings.ts` - 状态显示逻辑
+- `src/core/opencode/ServerManager.ts` - 健康检查端点修复
+
+**技术细节：**
+- 修复健康检查端点：`/global/health`（原 `/health` 错误）
+- 状态检测逻辑：
+  - 健康检查通过 + 内部进程存在 = 运行中（可停止）
+  - 健康检查通过 + 无内部进程 = 外部服务器（不可停止）
+
+### 4. 会话功能修复
+
+**问题修复：**
+
+#### 问题1：会话ID错误导致500错误
+**原因：**
+- 保存会话时未存储 `openCodeSessionId`
+- 加载会话时错误地使用对话ID作为 session ID
+- 导致调用 `/session/{wrong-id}/message` 返回500
+
+**解决方案：**
+- 更新 `ConversationMeta` 类型，添加 `openCodeSessionId` 字段
+- 修复 `StorageService.saveConversation()` 保存正确的 session ID
+- 修复 `loadConversations()` 正确读取 `openCodeSessionId`
+
+**涉及文件：**
+- `src/core/types/chat.ts`
+- `src/core/storage/StorageService.ts`
+- `src/main.ts`
+
+#### 问题2：消息获取端点错误
+**修复内容：**
+- 端点从 `/session/:id/messages` 改为 `/session/:id/message`（单数形式）
+- 修复 `sendMessage()` 使用 `/prompt_async` 异步端点
+
+**涉及文件：**
+- `src/core/opencode/OpenCodeService.ts`
+
+### 5. 消息流式响应优化
+
+**实现内容：**
+- 修复轮询逻辑，持续轮询直到获取完整回复
+- 支持增量更新，实时显示AI回复
+- 改进超时处理（120秒超时）
+- 添加详细调试日志
+
+**涉及文件：**
+- `src/core/opencode/OpenCodeService.ts` - `sendMessage()` 方法
+- `src/features/chat/OpenCodianView.ts` - 消息渲染
+
+**技术细节：**
+- 轮询间隔：1秒
+- 最大尝试次数：120次（2分钟）
+- 检测到助手消息后，持续轮询直到内容不再变化
+
+### 6. 模型切换生效修复
+
+**问题：**
+- 设置中选择 glm-4.6，实际使用 glm-5
+- 请求体格式错误导致模型参数未生效
+
+**修复内容：**
+- 修正请求体格式为嵌套结构：
+```json
+{
+  "parts": [...],
+  "model": {
+    "providerID": "zhipu-external",
+    "modelID": "glm-4.6"
+  }
+}
+```
+
+**涉及文件：**
+- `src/core/opencode/OpenCodeService.ts`
+
+---
+
+## 🔧 API 端点修正记录
+
+| 功能 | 错误端点 | 正确端点 |
+|------|----------|----------|
+| 健康检查 | `/health` | `/global/health` |
+| 获取消息 | `/session/:id/messages` | `/session/:id/message` |
+| 发送消息 | `/session/:id/prompt` | `/session/:id/prompt_async` |
+| 获取模型 | `/config/providers` | `/config/providers` ✅ |
+
+---
+
+## 📝 调试日志添加
+
+为以下模块添加了详细控制台日志：
+
+1. **OpenCodeService**
+   - 会话创建：`[OpenCodeService] Creating session`, `Created session ID`
+   - 消息发送：`[OpenCodeService] Sending message`, `Message sent successfully`
+   - 消息获取：`[OpenCodeService] Getting messages`, `Messages response`
+   - 模型获取：`[OpenCodeService] Raw providers data`
+
+2. **OpenCodianView**
+   - 消息流：`[OpenCodianView] Message stream started/stopped`
+   - 内容接收：`[OpenCodianView] Received chunk`
+   - 最终消息：`[OpenCodianView] Final message`
+
+3. **Settings**
+   - 模型加载：`[Settings] Current defaultModel`
+   - 模型切换：`[Settings] Model changed to`, `Saved settings`
+
+---
+
+## 🐛 已知问题与解决方案
+
+### 已修复的问题
+
+| 问题 | 原因 | 解决方案 |
+|------|------|----------|
+| 消息加载 500 错误 | 使用了错误的会话ID | 正确存储和读取 `openCodeSessionId` |
+| 端点 404 错误 | 端点路径错误（复数形式） | 改为单数形式 `/message` |
+| 模型切换不生效 | 请求体格式错误 | 改为嵌套 `model` 对象格式 |
+| 服务器状态显示错误 | 未检测外部服务器 | 添加外部服务器识别逻辑 |
+| 模型列表为空 | 数据结构解析错误 | 支持两种 models 数据格式 |
+| 历史会话按钮无效 | `showConversationHistory()` 为空实现 | 使用 `Menu` 组件实现完整下拉菜单 |
+
+---
+
+## 📊 当前功能状态
+
+### ✅ 完全可用
+- [x] 中文界面
+- [x] 动态供应商/模型选择
+- [x] 模型切换生效
+- [x] 会话创建和管理
+- [x] 发送消息
+- [x] 实时流式响应
+- [x] 服务器状态检测
+- [x] 历史会话切换（点击 history 按钮弹出菜单）
+- [x] Markdown 渲染（代码块、图片、链接、表格等）
+- [x] 流式内容渲染（思考块、文本、工具调用）
+- [x] 会话内模型切换（下拉框选择，悬停提示）
+
+### 🚧 已知限制
+- 外部服务器无法通过插件停止（需要手动在终端停止）
+- 首次加载设置时需要手动刷新模型列表
+- 消息历史依赖 OpenCode 服务器存储
+
+---

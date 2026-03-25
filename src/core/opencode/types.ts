@@ -1,0 +1,53 @@
+/**
+ * OpenCode SDK wrapper types
+ */
+
+import type { StreamChunk } from '../types';
+import type { LocalServerConfig, ModelSourceMode, ServerAuthConfig, ServerMode } from '../types/settings';
+
+/** Response handler callbacks */
+export interface ResponseHandler {
+  id: string;
+  onChunk: (chunk: StreamChunk) => void;
+  onDone: () => void;
+  onError: (error: Error) => void;
+}
+
+/** Server status */
+export type ServerStatus = 
+  | 'stopped'
+  | 'starting'
+  | 'running'
+  | 'error'
+  | 'restarting';
+
+/** Server error */
+export interface ServerError {
+  code: string;
+  message: string;
+  recoverable: boolean;
+}
+
+/** Query options */
+export interface QueryOptions {
+  model?: string;
+  provider?: string;
+  allowedTools?: string[];
+  externalContextPaths?: string[];
+}
+
+/** Server configuration */
+export interface OpenCodeServerConfig {
+  mode: ServerMode;
+  baseUrl: string;
+  local: LocalServerConfig;
+  auth: ServerAuthConfig;
+  modelSourceMode: ModelSourceMode;
+  timeout?: number;
+}
+
+/** Client configuration */
+export interface OpenCodeClientConfig {
+  baseUrl: string;
+  fetch?: typeof fetch;
+}

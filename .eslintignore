@@ -1,0 +1,4 @@
+reference-projects/**
+dist/**
+coverage/**
+node_modules/**

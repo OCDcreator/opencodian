@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+main.js
+src/**/*.js
+*.js.map
+.tmp-tsc-out/
+
+# Environment
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+coverage/
+
+# Obsidian
+data.json
+
+# Local settings
+.claude/settings.local.json
+
+# Reference projects
+reference-projects/
