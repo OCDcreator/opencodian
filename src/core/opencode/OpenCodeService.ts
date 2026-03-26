@@ -913,6 +913,71 @@ export class OpenCodeService {
     }
   }
 
+  async forkSession(sessionId: string, messageID?: string): Promise<{ id: string; title: string }> {
+    const response = await this.post<unknown>(`/session/${sessionId}/fork`, messageID ? { messageID } : {});
+    if (typeof response === 'object' && response !== null && 'id' in response) {
+      const typedResponse = response as { id: unknown; title?: unknown };
+      return {
+        id: String(typedResponse.id),
+        title: typeof typedResponse.title === 'string'
+          ? typedResponse.title
+          : '',
+      };
+    }
+
+    throw new Error('Invalid fork session response');
+  }
+
+  async revertSession(sessionId: string, messageID: string, partID?: string): Promise<boolean> {
+    const payload: Record<string, string> = { messageID };
+    if (partID) {
+      payload.partID = partID;
+    }
+
+    logger.debug('Revert session request', {
+      sessionId,
+      messageID,
+      partID: partID ?? null,
+    });
+
+    const response = await this.post<unknown>(`/session/${sessionId}/revert`, payload);
+    logger.debug('Revert session raw response', {
+      sessionId,
+      messageID,
+      response,
+    });
+
+    if (response === false) {
+      logger.debug('Revert session normalized result=false', { sessionId, messageID });
+      return false;
+    }
+
+    if (typeof response === 'object' && response !== null && Object.keys(response).length === 0) {
+      logger.debug('Revert session normalized result=true (empty object/204)', { sessionId, messageID });
+      return true;
+    }
+
+    if (typeof response === 'object' && response !== null && 'id' in response) {
+      const responseId = String((response as { id: unknown }).id);
+      const normalized = responseId.length > 0;
+      logger.debug('Revert session normalized result from session object', {
+        sessionId,
+        messageID,
+        responseId,
+        normalized,
+      });
+      return normalized;
+    }
+
+    const normalized = response === true;
+    logger.debug('Revert session normalized boolean result', {
+      sessionId,
+      messageID,
+      normalized,
+    });
+    return normalized;
+  }
+
   private buildServerConfig(settings: OpenCodianSettings): OpenCodeServerConfig {
     return {
       mode: settings.server.mode,
@@ -1140,6 +1205,7 @@ export class OpenCodeService {
       role: info.role === 'assistant' ? 'assistant' : 'user',
       content,
       timestamp,
+      sourceMessageId: info.id,
       toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
       contentBlocks: contentBlocks.length > 0 ? contentBlocks : undefined,
       parts,

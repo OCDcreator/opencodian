@@ -19,10 +19,16 @@ import type { EffortLevel, ThinkingBudget } from '../../core/types/settings';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { createLogger } from '../../shared';
+import { chooseForkTarget } from '../../shared/modals';
 import { ProviderIconService } from '../../utils/icons/ProviderIconService';
 import { MarkdownRenderService } from '../../utils/markdown';
-import { StreamController, ThinkingBlockRenderer, ToolCallRenderer } from '../../utils/streaming';
+import {
+  StreamController,
+  ThinkingBlockRenderer,
+  ToolCallRenderer,
+} from '../../utils/streaming';
 import { buildChatAppearanceCustomCss, getChatAppearanceCssVariables } from './chatAppearance';
+import { type CollapsibleState,setupCollapsible } from './rendering/collapsible';
 import { TabBar, TabManager } from './tabs';
 import { EffortSelector } from './ui/EffortSelector';
 import { NavigationSidebar } from './ui/NavigationSidebar';
@@ -816,7 +822,7 @@ export class OpenCodianView extends ItemView {
   }
 
   /** Load a conversation */
-  private async loadConversation(id: string) {
+  private async loadConversation(id: string, options: { forceServerSync?: boolean } = {}) {
     const conversation = await this.plugin.getConversationById(id);
     if (!conversation) return;
 
@@ -830,30 +836,21 @@ export class OpenCodianView extends ItemView {
     // Set session in service
     this.plugin.openCodeService.setSessionId(conversation.openCodeSessionId);
 
-    // Use locally saved messages if available (preserves durationSeconds and other metadata)
-    if (conversation.messages && conversation.messages.length > 0) {
-      // Render locally saved messages
-      for (const message of conversation.messages) {
-        await this.renderMessage(message);
-      }
-    } else {
-      // Fallback: Load messages from OpenCode
-      try {
-        const messages = await this.plugin.openCodeService.getSessionMessages(
-          conversation.openCodeSessionId
-        );
+    const shouldSyncFromServer =
+      options.forceServerSync
+      || !conversation.messages
+      || conversation.messages.length === 0
+      || conversation.messages.some((message) =>
+        message.displayStyle !== 'notice'
+        && !message.sourceMessageId
+      );
 
-        // Render messages
-        for (const { info, parts } of messages) {
-          const message = OpenCodeService.openCodeMessageToChatMessage(
-            info,
-            parts
-          );
-          await this.renderMessage(message);
-        }
-      } catch (error) {
-        logger.error('Failed to load messages:', error);
-      }
+    const messages = shouldSyncFromServer
+      ? await this.syncConversationMessagesFromServer(conversation)
+      : conversation.messages;
+
+    for (const message of messages) {
+      await this.renderMessage(message);
     }
 
     // Scroll to bottom
@@ -1598,8 +1595,12 @@ export class OpenCodianView extends ItemView {
 
     // Update conversation
     if (this.currentConversation) {
+      if (!latestErrorMessage) {
+        await this.syncConversationMessagesFromServer(this.currentConversation);
+        await this.rerenderConversationMessages(this.currentConversation);
+      }
       this.currentConversation.updatedAt = Date.now();
-      await this.plugin.storage.saveConversation(this.currentConversation);
+      await this.plugin.saveConversation(this.currentConversation);
       this.tabManager?.setActiveTabConversation(this.currentConversation);
     }
   }
@@ -1894,15 +1895,19 @@ export class OpenCodianView extends ItemView {
       if (message.content) {
         const textEl = content.createDiv({ cls: 'opencodian-message-text' });
         textEl.textContent = message.content;
+        const collapseToggleEl = content.createEl('button');
+        const collapsibleState: CollapsibleState = {
+          isExpanded: false,
+          isCollapsible: false,
+        };
+        setupCollapsible(content, collapseToggleEl, textEl, collapsibleState, {
+          showMoreLabel: t('chat.action.showMore'),
+          showLessLabel: t('chat.action.showLess'),
+        });
         // Add copy button for user message (outside bubble)
         this.addTextCopyButton(messageEl, message.content, true);
       }
-      // Add timestamp for user message
-      const time = new Date(message.timestamp).toLocaleTimeString([], {
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-      messageEl.createEl('div', { cls: 'opencodian-message-time', text: time });
+      this.addUserMessageFooter(messageEl, message);
     } else if (message.displayStyle === 'notice') {
       messageEl.addClass('opencodian-message--notice');
       this.renderNoticeCard(content, message);
@@ -2137,6 +2142,243 @@ export class OpenCodianView extends ItemView {
         feedbackTimeout = null;
       }, 1500);
     });
+  }
+
+  private addUserMessageFooter(messageEl: HTMLElement, message: ChatMessage): void {
+    const footerEl = messageEl.createDiv({ cls: 'opencodian-message-time-row opencodian-message-time-row--user' });
+
+    const timeStr = new Date(message.timestamp).toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+    footerEl.createSpan({ cls: 'opencodian-message-time-text', text: timeStr });
+
+    if (!message.sourceMessageId) {
+      return;
+    }
+
+    const actionsEl = footerEl.createDiv({ cls: 'opencodian-user-message-actions' });
+
+    const rewindBtn = actionsEl.createEl('button', {
+      cls: 'opencodian-user-action-btn',
+      text: t('chat.rewind.button'),
+      attr: { type: 'button' },
+    });
+    rewindBtn.disabled = this.isStreaming;
+    rewindBtn.addEventListener('click', (event) => {
+      event.stopPropagation();
+      void this.handleRewindRequest(message);
+    });
+
+    const forkBtn = actionsEl.createEl('button', {
+      cls: 'opencodian-user-action-btn',
+      text: t('chat.fork.button'),
+      attr: { type: 'button' },
+    });
+    forkBtn.disabled = this.isStreaming;
+    forkBtn.addEventListener('click', (event) => {
+      event.stopPropagation();
+      void this.handleForkRequest(message);
+    });
+  }
+
+  private async handleRewindRequest(message: ChatMessage): Promise<void> {
+    if (this.isStreaming) {
+      new Notice(t('chat.rewind.streamingBlocked'));
+      return;
+    }
+
+    if (!this.currentConversation?.openCodeSessionId || !message.sourceMessageId) {
+      logger.debug('Rewind unavailable due to missing identifiers', {
+        conversationId: this.currentConversation?.id ?? null,
+        sessionId: this.currentConversation?.openCodeSessionId ?? null,
+        messageId: message.id,
+        sourceMessageId: message.sourceMessageId ?? null,
+      });
+      new Notice(t('chat.rewind.unavailable'));
+      return;
+    }
+
+    const confirmed = window.confirm(t('chat.rewind.confirm'));
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      logger.debug('Attempting rewind', {
+        conversationId: this.currentConversation.id,
+        sessionId: this.currentConversation.openCodeSessionId,
+        messageId: message.id,
+        sourceMessageId: message.sourceMessageId,
+        messagePreview: message.content.slice(0, 120),
+      });
+
+      const reverted = await this.plugin.openCodeService.revertSession(
+        this.currentConversation.openCodeSessionId,
+        message.sourceMessageId,
+      );
+
+      logger.debug('Rewind API result', {
+        conversationId: this.currentConversation.id,
+        sessionId: this.currentConversation.openCodeSessionId,
+        sourceMessageId: message.sourceMessageId,
+        reverted,
+      });
+
+      if (!reverted) {
+        logger.warn('Rewind API returned false', {
+          conversationId: this.currentConversation.id,
+          sessionId: this.currentConversation.openCodeSessionId,
+          sourceMessageId: message.sourceMessageId,
+        });
+        new Notice(t('chat.rewind.failed'));
+        return;
+      }
+
+      await this.loadConversation(this.currentConversation.id, { forceServerSync: true });
+      logger.debug('Rewind reload complete', {
+        conversationId: this.currentConversation.id,
+        sessionId: this.currentConversation.openCodeSessionId,
+        messagesAfterReload: this.currentConversation.messages.length,
+      });
+      new Notice(t('chat.rewind.success'));
+    } catch (error) {
+      logger.error('Failed to rewind conversation:', error);
+      new Notice(t('chat.rewind.failed'));
+    }
+  }
+
+  private async handleForkRequest(message: ChatMessage): Promise<void> {
+    if (this.isStreaming) {
+      new Notice(t('chat.fork.streamingBlocked'));
+      return;
+    }
+
+    if (!this.currentConversation?.openCodeSessionId || !message.sourceMessageId || !this.tabManager) {
+      new Notice(t('chat.fork.unavailable'));
+      return;
+    }
+
+    const target = await chooseForkTarget(this.app);
+    if (!target) {
+      return;
+    }
+
+    try {
+      const activeModelOverride = this.tabManager.getActiveTabModelOverride();
+      const forkedSession = await this.plugin.openCodeService.forkSession(
+        this.currentConversation.openCodeSessionId,
+        message.sourceMessageId,
+      );
+
+      const forkMessages = this.cloneMessagesUpTo(message.id);
+      const title = this.buildForkTitle(this.currentConversation.title);
+      const forkConversation = await this.plugin.createConversationFromSession(forkedSession.id, {
+        title,
+        messages: forkMessages,
+        currentNote: this.currentConversation.currentNote,
+        externalContextPaths: this.currentConversation.externalContextPaths,
+      });
+
+      if (target === 'new-tab') {
+        if (!this.tabManager.canCreateTab()) {
+          await this.plugin.deleteConversation(forkConversation.id);
+          new Notice(t('chat.fork.maxTabsReached', { count: String(this.plugin.settings.maxTabs) }));
+          return;
+        }
+
+        const tab = this.tabManager.createTab(forkConversation);
+        if (tab) {
+          await this.activateTab(tab.id);
+          if (activeModelOverride) {
+            this.tabManager.setActiveTabModelOverride(activeModelOverride);
+            this.updateModelSelectorDisplay();
+          }
+        }
+        new Notice(t('chat.fork.successNewTab'));
+        return;
+      }
+
+      this.tabManager.setActiveTabConversation(forkConversation);
+      await this.loadConversation(forkConversation.id, { forceServerSync: false });
+      new Notice(t('chat.fork.successCurrentTab'));
+    } catch (error) {
+      logger.error('Failed to fork conversation:', error);
+      new Notice(t('chat.fork.failed'));
+    }
+  }
+
+  private async syncConversationMessagesFromServer(conversation: Conversation): Promise<ChatMessage[]> {
+    try {
+      logger.debug('Syncing conversation messages from server', {
+        conversationId: conversation.id,
+        sessionId: conversation.openCodeSessionId,
+        localMessageCount: conversation.messages.length,
+      });
+      const serverMessages = await this.plugin.openCodeService.getSessionMessages(conversation.openCodeSessionId);
+      const converted = serverMessages.map(({ info, parts }) => OpenCodeService.openCodeMessageToChatMessage(info, parts));
+      const noticeMessages = conversation.messages.filter((message) => message.displayStyle === 'notice');
+      const merged = [...converted, ...noticeMessages].sort((left, right) => left.timestamp - right.timestamp);
+      conversation.messages = merged;
+      conversation.updatedAt = Date.now();
+      await this.plugin.saveConversation(conversation);
+      logger.debug('Conversation sync complete', {
+        conversationId: conversation.id,
+        sessionId: conversation.openCodeSessionId,
+        serverMessageCount: serverMessages.length,
+        mergedMessageCount: merged.length,
+      });
+      return merged;
+    } catch (error) {
+      logger.error('Failed to sync conversation messages from server:', error);
+      return conversation.messages;
+    }
+  }
+
+  private async rerenderConversationMessages(conversation: Conversation): Promise<void> {
+    if (!this.currentConversation || this.currentConversation.id !== conversation.id || !this.messagesContainer) {
+      return;
+    }
+
+    const shouldStickToBottom = this.isNearBottom();
+
+    this.messagesContainer.empty();
+    this.resetTurnState();
+
+    for (const message of conversation.messages) {
+      await this.renderMessage(message);
+    }
+
+    if (shouldStickToBottom) {
+      this.scrollToBottom();
+    }
+  }
+
+  private isNearBottom(threshold = 48): boolean {
+    if (!this.messagesContainer) {
+      return true;
+    }
+
+    const { scrollTop, scrollHeight, clientHeight } = this.messagesContainer;
+    return scrollHeight - (scrollTop + clientHeight) <= threshold;
+  }
+
+  private cloneMessagesUpTo(targetMessageId: string): ChatMessage[] {
+    if (!this.currentConversation) {
+      return [];
+    }
+
+    const index = this.currentConversation.messages.findIndex((message) => message.id === targetMessageId);
+    const messages = index >= 0
+      ? this.currentConversation.messages.slice(0, index + 1)
+      : this.currentConversation.messages;
+
+    return JSON.parse(JSON.stringify(messages)) as ChatMessage[];
+  }
+
+  private buildForkTitle(sourceTitle: string): string {
+    const baseTitle = sourceTitle?.trim() || t('chat.tab.new');
+    return `Fork: ${baseTitle}`;
   }
 
   /** Scroll to bottom of messages */

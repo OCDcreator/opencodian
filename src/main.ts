@@ -542,6 +542,38 @@ export default class OpenCodianPlugin extends Plugin {
     return conversation;
   }
 
+  async createConversationFromSession(
+    sessionId: string,
+    initial?: Partial<Omit<Conversation, 'id' | 'createdAt' | 'updatedAt' | 'openCodeSessionId'>>,
+  ): Promise<Conversation> {
+    const conversation: Conversation = {
+      id: `conv-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
+      title: initial?.title || this.generateDefaultTitle(),
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      openCodeSessionId: sessionId,
+      messages: initial?.messages ? JSON.parse(JSON.stringify(initial.messages)) as Conversation['messages'] : [],
+      currentNote: initial?.currentNote,
+      externalContextPaths: initial?.externalContextPaths ? [...initial.externalContextPaths] : undefined,
+      lastResponseAt: initial?.lastResponseAt,
+    };
+
+    this.conversations.unshift(conversation);
+    await this.storage.saveConversation(conversation);
+    return conversation;
+  }
+
+  async saveConversation(conversation: Conversation): Promise<void> {
+    const index = this.conversations.findIndex((item) => item.id === conversation.id);
+    if (index === -1) {
+      this.conversations.unshift(conversation);
+    } else {
+      this.conversations[index] = conversation;
+    }
+
+    await this.storage.saveConversation(conversation);
+  }
+
   /** Get all conversations */
   getConversations(): Conversation[] {
     return [...this.conversations];

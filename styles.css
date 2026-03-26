@@ -542,6 +542,65 @@
   overflow: hidden;
 }
 
+.opencodian-message--user .opencodian-message-content.opencodian-collapsible {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.opencodian-collapsible-content {
+  position: relative;
+}
+
+.opencodian-collapsible.is-collapsible.is-collapsed .opencodian-collapsible-content {
+  max-height: var(--opencodian-collapsible-max-height, 168px);
+  overflow: hidden;
+}
+
+.opencodian-collapsible.is-collapsible.is-collapsed .opencodian-collapsible-content::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 48px;
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--background-primary) 0%, transparent) 0%,
+    color-mix(in srgb, var(--opencodian-glass-base) 70%, transparent) 50%,
+    color-mix(in srgb, var(--opencodian-glass-base-strong) 96%, transparent) 100%
+  );
+  pointer-events: none;
+}
+
+.opencodian-collapsible-toggle {
+  display: none;
+  align-self: flex-start;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--interactive-accent);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.3;
+  cursor: pointer;
+}
+
+.opencodian-collapsible.is-collapsible .opencodian-collapsible-toggle {
+  display: inline-flex;
+}
+
+.opencodian-collapsible-toggle:hover {
+  color: var(--text-accent-hover);
+}
+
+.opencodian-collapsible-toggle:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
 /* Shimmer effect overlay */
 .opencodian-message--user .opencodian-message-content::before {
   content: '';
@@ -902,8 +961,42 @@
   opacity: 1;
 }
 
+.opencodian-message-time-row--user {
+  justify-content: space-between;
+  padding-left: 0;
+}
+
 .opencodian-message-time-text {
   color: var(--text-muted);
+}
+
+.opencodian-user-message-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.opencodian-user-action-btn {
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.opencodian-user-action-btn:hover:not(:disabled) {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+  border-color: var(--interactive-accent);
+}
+
+.opencodian-user-action-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 
 /* Show copy button on assistant message hover */
@@ -915,6 +1008,31 @@
   color: var(--text-accent);
   font-size: 10px;
   font-family: var(--font-monospace);
+}
+
+.opencodian-fork-target-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.opencodian-fork-target-option {
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  color: var(--text-normal);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+
+.opencodian-fork-target-option:hover {
+  background: var(--background-modifier-hover);
+  border-color: var(--interactive-accent);
+  transform: translateY(-1px);
 }
 
 /* Tool use */
