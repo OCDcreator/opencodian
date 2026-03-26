@@ -21,6 +21,7 @@ import { createLogger } from '../../shared';
 import { ProviderIconService } from '../../utils/icons/ProviderIconService';
 import { MarkdownRenderService } from '../../utils/markdown';
 import { StreamController, ThinkingBlockRenderer, ToolCallRenderer } from '../../utils/streaming';
+import { buildChatAppearanceCustomCss, getChatAppearanceCssVariables } from './chatAppearance';
 
 const logger = createLogger('OpenCodianView');
 
@@ -117,6 +118,9 @@ export class OpenCodianView extends ItemView {
   private serverStatusIntervalId: number | null = null;
   private isRefreshingServerStatus = false;
   private lastServerAvailability: ChatServerAvailability | null = null;
+  private chatSurfaceSyncFrameId: number | null = null;
+  private chatSurfaceSyncTimeoutId: number | null = null;
+  private chatAppearanceStyleEl: HTMLStyleElement | null = null;
 
   private appSettings(): { open: () => void; openTabById: (id: string) => void } {
     return (this.app as typeof this.app & {
@@ -176,6 +180,9 @@ export class OpenCodianView extends ItemView {
 
   async onClose() {
     this.stopServerStatusLoop();
+    this.clearChatSurfaceSyncTimers();
+    this.chatAppearanceStyleEl?.remove();
+    this.chatAppearanceStyleEl = null;
 
     // Cleanup event refs
     for (const ref of this.eventRefs) {
@@ -203,6 +210,36 @@ export class OpenCodianView extends ItemView {
     // Input area
     this.inputContainer = this.chatContainerEl.createDiv({ cls: 'opencodian-input-area' });
     this.buildInputArea(this.inputContainer);
+    this.applyChatAppearanceSettings();
+  }
+
+  public applyChatAppearanceSettings(): void {
+    if (!this.chatContainerEl) {
+      return;
+    }
+
+    const cssVariables = getChatAppearanceCssVariables(this.plugin.settings.chatAppearance);
+    for (const [cssVar, cssValue] of Object.entries(cssVariables)) {
+      this.chatContainerEl.style.setProperty(cssVar, cssValue);
+    }
+
+    const customCss = buildChatAppearanceCustomCss(
+      this.plugin.settings.chatAppearance.advanced.customCssDeclarations,
+    );
+
+    if (customCss) {
+      if (!this.chatAppearanceStyleEl) {
+        this.chatAppearanceStyleEl = document.createElement('style');
+        this.chatAppearanceStyleEl.className = 'opencodian-chat-appearance-style';
+        this.chatContainerEl.appendChild(this.chatAppearanceStyleEl);
+      }
+      this.chatAppearanceStyleEl.textContent = customCss;
+    } else if (this.chatAppearanceStyleEl) {
+      this.chatAppearanceStyleEl.remove();
+      this.chatAppearanceStyleEl = null;
+    }
+
+    this.scheduleChatSurfaceColorSync();
   }
 
   /** Apply configured chat scroll mode to the messages container */
@@ -221,6 +258,36 @@ export class OpenCodianView extends ItemView {
       this.messagesContainer.addClass('opencodian-messages--sticky-basic');
     } else {
       this.messagesContainer.addClass('opencodian-messages--sticky-mask');
+    }
+  }
+
+  /** Re-sync sticky mask color after theme/layout changes settle */
+  private scheduleChatSurfaceColorSync(): void {
+    this.clearChatSurfaceSyncTimers();
+
+    this.chatSurfaceSyncFrameId = window.requestAnimationFrame(() => {
+      this.chatSurfaceSyncFrameId = window.requestAnimationFrame(() => {
+        this.syncChatSurfaceColor();
+        this.chatSurfaceSyncFrameId = null;
+      });
+    });
+
+    this.chatSurfaceSyncTimeoutId = window.setTimeout(() => {
+      this.syncChatSurfaceColor();
+      this.chatSurfaceSyncTimeoutId = null;
+    }, 80);
+  }
+
+  /** Clear pending sticky mask sync timers */
+  private clearChatSurfaceSyncTimers(): void {
+    if (this.chatSurfaceSyncFrameId !== null) {
+      window.cancelAnimationFrame(this.chatSurfaceSyncFrameId);
+      this.chatSurfaceSyncFrameId = null;
+    }
+
+    if (this.chatSurfaceSyncTimeoutId !== null) {
+      window.clearTimeout(this.chatSurfaceSyncTimeoutId);
+      this.chatSurfaceSyncTimeoutId = null;
     }
   }
 
@@ -298,6 +365,7 @@ export class OpenCodianView extends ItemView {
     this.registerEvent(
       this.app.workspace.on('css-change', () => {
         logoContainer.innerHTML = this.getLogoSvg();
+        this.scheduleChatSurfaceColorSync();
       })
     );
 
@@ -312,9 +380,7 @@ export class OpenCodianView extends ItemView {
     });
     this.serverStatusBadgeEl.setAttribute('aria-label', t('chat.serverStatus.openSettings'));
     this.serverStatusBadgeEl.addEventListener('click', () => {
-      const settings = this.appSettings();
-      settings.open();
-      settings.openTabById('opencodian');
+      this.openPluginSettingsAtServerSection();
     });
 
     // New conversation button
@@ -338,10 +404,23 @@ export class OpenCodianView extends ItemView {
     setIcon(settingsBtn, 'settings');
     settingsBtn.setAttribute('aria-label', 'Settings');
     settingsBtn.addEventListener('click', () => {
-      const settings = this.appSettings();
-      settings.open();
-      settings.openTabById('opencodian');
+      this.openPluginSettingsPreservingScroll();
     });
+  }
+
+  private openPluginSettingsPreservingScroll(): void {
+    const savedScrollTop = this.plugin.settings.settingsPanelScrollTop;
+    this.plugin.settingsTab?.prepareRestoreScrollOnNextOpen(savedScrollTop);
+    const settings = this.appSettings();
+    settings.open();
+    settings.openTabById('opencodian');
+  }
+
+  private openPluginSettingsAtServerSection(): void {
+    this.plugin.settingsTab?.prepareScrollToServerOnNextOpen();
+    const settings = this.appSettings();
+    settings.open();
+    settings.openTabById('opencodian');
   }
 
   private startServerStatusLoop(): void {
@@ -1347,9 +1426,7 @@ export class OpenCodianView extends ItemView {
     });
 
     if (choice === 'settings') {
-      const settings = this.appSettings();
-      settings.open();
-      settings.openTabById('opencodian');
+      this.openPluginSettingsAtServerSection();
       await this.refreshStatusSurfaces();
       const latestAvailability = await this.getServerAvailability();
       if (latestAvailability === 'running' || latestAvailability === 'external') {
@@ -2495,9 +2572,7 @@ export class OpenCodianView extends ItemView {
   ): Promise<void> {
     switch (actionType) {
       case 'open_model_settings': {
-        const settings = this.appSettings();
-        settings.open();
-        settings.openTabById('opencodian');
+        this.openPluginSettingsPreservingScroll();
         window.setTimeout(() => {
           this.plugin.settingsTab?.scrollToModelSection();
         }, 50);

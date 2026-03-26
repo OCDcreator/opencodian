@@ -7,7 +7,10 @@ import {
   getCurrentPlatformBlockedCommands,
   getCurrentPlatformDebugLogPath,
   getDefaultBlockedCommands,
+  getDefaultChatAppearanceSettings,
   getDefaultDebugLogPaths,
+  isValidChatAppearanceCustomCssDeclarations,
+  normalizeChatAppearanceSettings,
 } from '../../../../src/core/types/settings';
 
 describe('Settings', () => {
@@ -81,6 +84,14 @@ describe('Settings', () => {
       expect(DEFAULT_SETTINGS.maxTabs).toBe(3);
       expect(DEFAULT_SETTINGS.tabBarPosition).toBe('input');
       expect(DEFAULT_SETTINGS.enableAutoScroll).toBe(true);
+      expect(DEFAULT_SETTINGS.chatAppearance.layout.messagesPaddingTop).toBe(12);
+      expect(DEFAULT_SETTINGS.chatAppearance.sticky.maskBlur).toBe(24);
+      expect(DEFAULT_SETTINGS.chatAppearance.user.radius).toBe(16);
+      expect(DEFAULT_SETTINGS.chatAppearance.assistant.backgroundOpacity).toBe(72);
+      expect(DEFAULT_SETTINGS.chatAppearance.input.shadowBlur).toBe(28);
+      expect(DEFAULT_SETTINGS.chatAppearance.scrollbar.width).toBe(8);
+      expect(DEFAULT_SETTINGS.chatAppearance.scrollbar.thumbHoverOpacity).toBe(82);
+      expect(DEFAULT_SETTINGS.settingsPanelScrollTop).toBe(0);
       expect(DEFAULT_SETTINGS.debugLogPaths).toEqual({ unix: '', windows: '' });
       expect(DEFAULT_SETTINGS.openInMainTab).toBe(false);
       expect(DEFAULT_SETTINGS.locale).toBe('en');
@@ -150,6 +161,42 @@ describe('Settings', () => {
           windows: 'C:\\OpenCodianLogs',
         })
       ).toBe('/Users/test/OpenCodianLogs');
+    });
+  });
+
+  describe('chat appearance settings', () => {
+    it('should return a copy of default chat appearance settings', () => {
+      const defaultsA = getDefaultChatAppearanceSettings();
+      const defaultsB = getDefaultChatAppearanceSettings();
+
+      defaultsA.layout.messagesPaddingTop = 30;
+      defaultsA.scrollbar.width = 12;
+
+      expect(defaultsB.layout.messagesPaddingTop).toBe(12);
+      expect(defaultsB.scrollbar.width).toBe(8);
+    });
+
+    it('should merge partial chat appearance settings with defaults', () => {
+      const normalized = normalizeChatAppearanceSettings({
+        layout: { messagesPaddingTop: 24 },
+        assistant: { blur: 4 },
+        scrollbar: { width: 10, thumbOpacity: 80 },
+      });
+
+      expect(normalized.layout.messagesPaddingTop).toBe(24);
+      expect(normalized.layout.messagesPaddingX).toBe(16);
+      expect(normalized.assistant.blur).toBe(4);
+      expect(normalized.assistant.radius).toBe(14);
+      expect(normalized.scrollbar.width).toBe(10);
+      expect(normalized.scrollbar.thumbOpacity).toBe(80);
+      expect(normalized.scrollbar.trackOpacity).toBe(22);
+      expect(normalized.advanced.customCssDeclarations).toBe('');
+    });
+
+    it('should validate custom CSS declarations', () => {
+      expect(isValidChatAppearanceCustomCssDeclarations('--foo: 1; backdrop-filter: blur(10px);')).toBe(true);
+      expect(isValidChatAppearanceCustomCssDeclarations('.opencodian-container { color: red; }')).toBe(false);
+      expect(isValidChatAppearanceCustomCssDeclarations('<style>color: red;</style>')).toBe(false);
     });
   });
 });

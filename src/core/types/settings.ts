@@ -149,6 +149,164 @@ export interface ModelProviderConfig {
   enabled: boolean;
 }
 
+export interface ChatAppearanceLayoutSettings {
+  messagesPaddingTop: number;
+  messagesPaddingX: number;
+}
+
+export interface ChatAppearanceStickySettings {
+  headerGap: number;
+  maskHeight: number;
+  maskBlur: number;
+}
+
+export interface ChatAppearanceUserSettings {
+  radius: number;
+  tailRadius: number;
+  blur: number;
+  shadowBlur: number;
+}
+
+export interface ChatAppearanceAssistantSettings {
+  radius: number;
+  backgroundOpacity: number;
+  blur: number;
+  shadowBlur: number;
+}
+
+export interface ChatAppearanceInputSettings {
+  radius: number;
+  blur: number;
+  shadowBlur: number;
+}
+
+export interface ChatAppearanceScrollbarSettings {
+  width: number;
+  radius: number;
+  trackOpacity: number;
+  thumbOpacity: number;
+  thumbHoverOpacity: number;
+  edgePadding: number;
+  shadowOpacity: number;
+}
+
+export interface ChatAppearanceAdvancedSettings {
+  customCssDeclarations: string;
+}
+
+export interface ChatAppearanceSettings {
+  layout: ChatAppearanceLayoutSettings;
+  sticky: ChatAppearanceStickySettings;
+  user: ChatAppearanceUserSettings;
+  assistant: ChatAppearanceAssistantSettings;
+  input: ChatAppearanceInputSettings;
+  scrollbar: ChatAppearanceScrollbarSettings;
+  advanced: ChatAppearanceAdvancedSettings;
+}
+
+export interface PartialChatAppearanceSettings {
+  layout?: Partial<ChatAppearanceLayoutSettings>;
+  sticky?: Partial<ChatAppearanceStickySettings>;
+  user?: Partial<ChatAppearanceUserSettings>;
+  assistant?: Partial<ChatAppearanceAssistantSettings>;
+  input?: Partial<ChatAppearanceInputSettings>;
+  scrollbar?: Partial<ChatAppearanceScrollbarSettings>;
+  advanced?: Partial<ChatAppearanceAdvancedSettings>;
+}
+
+export function getDefaultChatAppearanceSettings(): ChatAppearanceSettings {
+  return {
+    layout: {
+      messagesPaddingTop: 12,
+      messagesPaddingX: 16,
+    },
+    sticky: {
+      headerGap: 6,
+      maskHeight: 18,
+      maskBlur: 24,
+    },
+    user: {
+      radius: 16,
+      tailRadius: 4,
+      blur: 12,
+      shadowBlur: 28,
+    },
+    assistant: {
+      radius: 14,
+      backgroundOpacity: 72,
+      blur: 10,
+      shadowBlur: 24,
+    },
+    input: {
+      radius: 12,
+      blur: 18,
+      shadowBlur: 28,
+    },
+    scrollbar: {
+      width: 8,
+      radius: 999,
+      trackOpacity: 22,
+      thumbOpacity: 68,
+      thumbHoverOpacity: 82,
+      edgePadding: 2,
+      shadowOpacity: 46,
+    },
+    advanced: {
+      customCssDeclarations: '',
+    },
+  };
+}
+
+export function normalizeChatAppearanceSettings(
+  appearance?: PartialChatAppearanceSettings | null,
+): ChatAppearanceSettings {
+  const defaults = getDefaultChatAppearanceSettings();
+
+  return {
+    layout: {
+      ...defaults.layout,
+      ...(appearance?.layout ?? {}),
+    },
+    sticky: {
+      ...defaults.sticky,
+      ...(appearance?.sticky ?? {}),
+    },
+    user: {
+      ...defaults.user,
+      ...(appearance?.user ?? {}),
+    },
+    assistant: {
+      ...defaults.assistant,
+      ...(appearance?.assistant ?? {}),
+    },
+    input: {
+      ...defaults.input,
+      ...(appearance?.input ?? {}),
+    },
+    scrollbar: {
+      ...defaults.scrollbar,
+      ...(appearance?.scrollbar ?? {}),
+    },
+    advanced: {
+      ...defaults.advanced,
+      ...(appearance?.advanced ?? {}),
+    },
+  };
+}
+
+export function isValidChatAppearanceCustomCssDeclarations(value: string): boolean {
+  const trimmedValue = value.trim();
+  if (!trimmedValue) {
+    return true;
+  }
+
+  const loweredValue = trimmedValue.toLowerCase();
+  return !trimmedValue.includes('{')
+    && !trimmedValue.includes('}')
+    && !loweredValue.includes('<style')
+    && !loweredValue.includes('</style');
+}
+
 /** Main settings interface */
 export interface OpenCodianSettings {
   // User preferences
@@ -181,6 +339,8 @@ export interface OpenCodianSettings {
   tabBarPosition: TabBarPosition;
   enableAutoScroll: boolean;
   chatScrollMode: ChatScrollMode;
+  chatAppearance: ChatAppearanceSettings;
+  settingsPanelScrollTop: number;
   enableDebugLogging: boolean;
   debugLogPaths: PlatformDebugLogPaths;
   openInMainTab: boolean;
@@ -240,6 +400,8 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
   tabBarPosition: 'input',
   enableAutoScroll: true,
   chatScrollMode: 'sticky-mask',
+  chatAppearance: getDefaultChatAppearanceSettings(),
+  settingsPanelScrollTop: 0,
   enableDebugLogging: false,
   debugLogPaths: getDefaultDebugLogPaths(),
   openInMainTab: false,

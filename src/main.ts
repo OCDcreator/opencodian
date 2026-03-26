@@ -20,6 +20,7 @@ import {
   getCurrentPlatformKey,
   getServerBaseUrl,
   isLocalServerMode,
+  normalizeChatAppearanceSettings,
   VIEW_TYPE_OPENCODIAN,
 } from './core/types';
 import { OpenCodianView } from './features/chat/OpenCodianView';
@@ -39,6 +40,8 @@ export default class OpenCodianPlugin extends Plugin {
   settingsTab?: InstanceType<typeof OpenCodianSettingTab>;
   
   private conversations: Conversation[] = [];
+  private chatAppearanceSaveTimeoutId: number | null = null;
+  private settingsUiStateSaveTimeoutId: number | null = null;
 
   async onload() {
     // Initialize storage
@@ -153,6 +156,7 @@ export default class OpenCodianPlugin extends Plugin {
   onunload() {
     // Stop OpenCode service
     void this.openCodeService.stop();
+    this.clearChatAppearanceSaveTimer();
 
   }
 
@@ -263,6 +267,11 @@ export default class OpenCodianPlugin extends Plugin {
         },
       };
     })();
+    const savedChatAppearance =
+      savedSettings && typeof savedSettings === 'object' && 'chatAppearance' in savedSettings
+        ? (savedSettings as { chatAppearance?: Partial<OpenCodianSettings['chatAppearance']> }).chatAppearance
+        : undefined;
+    const normalizedChatAppearance = normalizeChatAppearanceSettings(savedChatAppearance);
 
     const normalizedSettings = savedSettings
       ? {
@@ -273,6 +282,7 @@ export default class OpenCodianPlugin extends Plugin {
               ? 'sticky-mask'
               : savedSettings.chatScrollMode,
           debugLogPaths: normalizedDebugLogPaths,
+          chatAppearance: normalizedChatAppearance,
         }
       : null;
     this.settings = {
@@ -280,11 +290,14 @@ export default class OpenCodianPlugin extends Plugin {
       ...normalizedSettings,
       server: normalizedServer,
       debugLogPaths: normalizedDebugLogPaths,
+      chatAppearance: normalizedChatAppearance,
     };
   }
 
   /** Save settings to storage */
   async saveSettings() {
+    this.clearChatAppearanceSaveTimer();
+    this.clearSettingsUiStateSaveTimer();
     await this.storage.saveSettings(this.settings);
     this.applyLoggerSettings();
     
@@ -295,6 +308,7 @@ export default class OpenCodianPlugin extends Plugin {
     for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_OPENCODIAN)) {
       const view = leaf.view;
       if (view instanceof OpenCodianView) {
+        view.applyChatAppearanceSettings();
         view.applyChatScrollMode();
         void view.reloadModelCatalog();
       }
@@ -306,6 +320,45 @@ export default class OpenCodianPlugin extends Plugin {
 
   private applyLoggerSettings(): void {
     setDebugLoggingEnabled(this.settings.enableDebugLogging);
+  }
+
+  applyChatAppearanceSettings(): void {
+    for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_OPENCODIAN)) {
+      const view = leaf.view;
+      if (view instanceof OpenCodianView) {
+        view.applyChatAppearanceSettings();
+      }
+    }
+  }
+
+  scheduleChatAppearanceSave(delay = 220): void {
+    this.clearChatAppearanceSaveTimer();
+    this.chatAppearanceSaveTimeoutId = window.setTimeout(() => {
+      this.chatAppearanceSaveTimeoutId = null;
+      void this.storage.saveSettings(this.settings);
+    }, delay);
+  }
+
+  scheduleSettingsUiStateSave(delay = 220): void {
+    this.clearSettingsUiStateSaveTimer();
+    this.settingsUiStateSaveTimeoutId = window.setTimeout(() => {
+      this.settingsUiStateSaveTimeoutId = null;
+      void this.storage.saveSettings(this.settings);
+    }, delay);
+  }
+
+  private clearChatAppearanceSaveTimer(): void {
+    if (this.chatAppearanceSaveTimeoutId !== null) {
+      window.clearTimeout(this.chatAppearanceSaveTimeoutId);
+      this.chatAppearanceSaveTimeoutId = null;
+    }
+  }
+
+  private clearSettingsUiStateSaveTimer(): void {
+    if (this.settingsUiStateSaveTimeoutId !== null) {
+      window.clearTimeout(this.settingsUiStateSaveTimeoutId);
+      this.settingsUiStateSaveTimeoutId = null;
+    }
   }
 
   async logServerStatusSnapshot(source = 'manual'): Promise<void> {

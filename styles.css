@@ -3,10 +3,32 @@
 /* Dark mode filter for Lobehub icons (most are black, need inversion on dark bg) */
 .theme-dark {
   --lobehub-icon-filter: invert(1);
+  --opencodian-glass-base: color-mix(in srgb, var(--background-primary) 68%, transparent);
+  --opencodian-glass-base-strong: color-mix(in srgb, var(--background-secondary) 62%, transparent);
+  --opencodian-glass-base-soft: color-mix(in srgb, var(--background-primary) 46%, transparent);
+  --opencodian-glass-specular: rgba(255, 255, 255, 0.14);
+  --opencodian-glass-specular-soft: rgba(255, 255, 255, 0.06);
+  --opencodian-glass-border: rgba(255, 255, 255, 0.16);
+  --opencodian-glass-border-strong: rgba(255, 255, 255, 0.24);
+  --opencodian-glass-shadow: rgba(15, 23, 42, 0.22);
+  --opencodian-glass-shadow-strong: rgba(15, 23, 42, 0.3);
+  --opencodian-glass-highlight: color-mix(in srgb, var(--interactive-accent) 10%, transparent);
+  --opencodian-glass-highlight-strong: color-mix(in srgb, var(--interactive-accent) 16%, transparent);
 }
 
 .theme-light {
   --lobehub-icon-filter: none;
+  --opencodian-glass-base: color-mix(in srgb, var(--background-primary) 42%, transparent);
+  --opencodian-glass-base-strong: color-mix(in srgb, var(--background-secondary) 36%, transparent);
+  --opencodian-glass-base-soft: color-mix(in srgb, var(--background-primary) 24%, transparent);
+  --opencodian-glass-specular: rgba(255, 255, 255, 0.72);
+  --opencodian-glass-specular-soft: rgba(255, 255, 255, 0.28);
+  --opencodian-glass-border: rgba(255, 255, 255, 0.46);
+  --opencodian-glass-border-strong: rgba(255, 255, 255, 0.7);
+  --opencodian-glass-shadow: rgba(15, 23, 42, 0.12);
+  --opencodian-glass-shadow-strong: rgba(15, 23, 42, 0.18);
+  --opencodian-glass-highlight: color-mix(in srgb, var(--interactive-accent) 12%, transparent);
+  --opencodian-glass-highlight-strong: color-mix(in srgb, var(--interactive-accent) 20%, transparent);
 }
 
 :root {
@@ -47,6 +69,17 @@
   --opencodian-status-error: var(--text-error, var(--background-modifier-error));
   --opencodian-status-error-subtle: color-mix(in srgb, var(--opencodian-status-error) 10%, transparent);
   --opencodian-status-error-border: color-mix(in srgb, var(--opencodian-status-error) 24%, transparent);
+  --opencodian-glass-base: color-mix(in srgb, var(--background-primary) 60%, transparent);
+  --opencodian-glass-base-strong: color-mix(in srgb, var(--background-secondary) 52%, transparent);
+  --opencodian-glass-base-soft: color-mix(in srgb, var(--background-primary) 34%, transparent);
+  --opencodian-glass-specular: rgba(255, 255, 255, 0.22);
+  --opencodian-glass-specular-soft: rgba(255, 255, 255, 0.1);
+  --opencodian-glass-border: rgba(255, 255, 255, 0.26);
+  --opencodian-glass-border-strong: rgba(255, 255, 255, 0.38);
+  --opencodian-glass-shadow: rgba(15, 23, 42, 0.14);
+  --opencodian-glass-shadow-strong: rgba(15, 23, 42, 0.22);
+  --opencodian-glass-highlight: color-mix(in srgb, var(--interactive-accent) 12%, transparent);
+  --opencodian-glass-highlight-strong: color-mix(in srgb, var(--interactive-accent) 18%, transparent);
 }
 
 /* Container - transparent to blend with Obsidian background */
@@ -57,6 +90,25 @@
   --opencodian-sticky-header-gap: 6px;
   --opencodian-sticky-push-gap: 0px;
   --opencodian-sticky-mask-height: 18px;
+  --opencodian-sticky-mask-blur: 24px;
+  --opencodian-user-radius: 16px;
+  --opencodian-user-tail-radius: 4px;
+  --opencodian-user-blur: 12px;
+  --opencodian-user-shadow-blur: 28px;
+  --opencodian-assistant-radius: 14px;
+  --opencodian-assistant-bg-opacity: 72%;
+  --opencodian-assistant-blur: 10px;
+  --opencodian-assistant-shadow-blur: 24px;
+  --opencodian-input-radius: 12px;
+  --opencodian-input-blur: 18px;
+  --opencodian-input-shadow-blur: 28px;
+  --opencodian-scrollbar-width: 8px;
+  --opencodian-scrollbar-radius: 999px;
+  --opencodian-scrollbar-track-opacity: 22%;
+  --opencodian-scrollbar-thumb-opacity: 68%;
+  --opencodian-scrollbar-thumb-hover-opacity: 82%;
+  --opencodian-scrollbar-edge-padding: 2px;
+  --opencodian-scrollbar-shadow-opacity: 46%;
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -116,8 +168,25 @@
   padding: 4px 10px;
   margin-right: 6px;
   border-radius: 999px;
-  border: 1px solid var(--background-modifier-border);
-  background: var(--background-secondary);
+  border: 1px solid var(--opencodian-glass-border);
+  background:
+    linear-gradient(
+      180deg,
+      var(--opencodian-glass-specular) 0%,
+      color-mix(in srgb, var(--opencodian-glass-specular-soft) 88%, transparent) 46%,
+      transparent 100%
+    ),
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--opencodian-glass-base-strong) 96%, transparent) 0%,
+      color-mix(in srgb, var(--opencodian-glass-base) 82%, transparent) 100%
+    );
+  backdrop-filter: blur(18px) saturate(1.15);
+  -webkit-backdrop-filter: blur(18px) saturate(1.15);
+  box-shadow:
+    0 5px 14px color-mix(in srgb, var(--opencodian-glass-shadow) 82%, transparent),
+    0 1px 0 color-mix(in srgb, var(--opencodian-glass-specular) 88%, transparent) inset,
+    0 -1px 0 color-mix(in srgb, var(--background-modifier-border) 48%, transparent) inset;
   color: var(--text-muted);
   cursor: pointer;
   transition: all 0.2s ease;
@@ -125,7 +194,12 @@
 
 .opencodian-server-status-badge:hover {
   color: var(--text-normal);
-  background: var(--background-modifier-hover);
+  border-color: var(--opencodian-glass-border-strong);
+  box-shadow:
+    0 7px 18px color-mix(in srgb, var(--opencodian-glass-shadow-strong) 84%, transparent),
+    0 1px 0 color-mix(in srgb, var(--opencodian-glass-specular) 95%, transparent) inset,
+    0 -1px 0 color-mix(in srgb, var(--background-modifier-border-hover) 64%, transparent) inset;
+  transform: translateY(-1px);
 }
 
 .opencodian-server-status-dot {
@@ -178,10 +252,12 @@
   flex: 1;
   overflow-y: auto;
   padding: var(--opencodian-messages-pad-top) var(--opencodian-messages-pad-x);
+  padding-right: calc(var(--opencodian-messages-pad-x) + var(--opencodian-scrollbar-edge-padding));
   display: flex;
   flex-direction: column;
   gap: 12px;
   background: transparent;
+  scrollbar-gutter: stable;
 }
 
 .opencodian-messages--sticky-basic,
@@ -240,8 +316,8 @@
   );
   pointer-events: none;
   z-index: -1;
-  backdrop-filter: blur(24px) saturate(1.25);
-  -webkit-backdrop-filter: blur(24px) saturate(1.25);
+  backdrop-filter: blur(var(--opencodian-sticky-mask-blur)) saturate(1.25);
+  -webkit-backdrop-filter: blur(var(--opencodian-sticky-mask-blur)) saturate(1.25);
   mask-image: linear-gradient(
     to bottom,
     color-mix(in srgb, var(--text-normal) 100%, transparent) 0%,
@@ -308,20 +384,31 @@
 /* User message content bubble - Glassmorphism effect */
 .opencodian-message--user .opencodian-message-content {
   background: linear-gradient(
+    180deg,
+    var(--opencodian-glass-specular) 0%,
+    color-mix(in srgb, var(--opencodian-glass-specular-soft) 88%, transparent) 38%,
+    transparent 100%
+  ),
+  linear-gradient(
     135deg,
-    color-mix(in srgb, var(--background-secondary) 82%, transparent),
-    color-mix(in srgb, var(--background-primary) 92%, transparent)
+    color-mix(in srgb, var(--opencodian-glass-base-strong) 96%, transparent) 0%,
+    color-mix(in srgb, var(--opencodian-glass-base) 84%, transparent) 100%
+  ),
+  radial-gradient(
+    circle at top left,
+    var(--opencodian-glass-highlight) 0%,
+    transparent 58%
   );
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--opencodian-border-soft);
-  border-radius: 16px;
-  border-end-end-radius: 4px;
+  backdrop-filter: blur(var(--opencodian-user-blur));
+  -webkit-backdrop-filter: blur(var(--opencodian-user-blur));
+  border: 1px solid var(--opencodian-glass-border);
+  border-radius: var(--opencodian-user-radius);
+  border-end-end-radius: var(--opencodian-user-tail-radius);
   padding: 12px 16px;
   box-shadow: 
-    var(--opencodian-shadow),
-    0 1px 2px var(--opencodian-inset-light) inset,
-    0 -1px 2px var(--opencodian-inset-shadow) inset;
+    0 10px var(--opencodian-user-shadow-blur) var(--opencodian-glass-shadow),
+    0 1px 0 color-mix(in srgb, var(--opencodian-glass-specular) 90%, transparent) inset,
+    0 -1px 0 color-mix(in srgb, var(--background-modifier-border) 52%, transparent) inset;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   overflow: hidden;
@@ -338,7 +425,7 @@
   background: linear-gradient(
     90deg,
     transparent,
-    color-mix(in srgb, var(--background-secondary) 70%, transparent),
+    color-mix(in srgb, var(--opencodian-glass-specular) 88%, transparent),
     transparent
   );
   transition: left 0.5s ease;
@@ -352,10 +439,10 @@
 .opencodian-message--user:hover .opencodian-message-content {
   transform: translateY(-2px) scale(1.01);
   box-shadow: 
-    0 8px 32px color-mix(in srgb, var(--text-normal) 15%, transparent),
-    0 1px 2px var(--opencodian-inset-light-strong) inset,
-    0 -1px 2px var(--opencodian-inset-shadow) inset;
-  border-color: var(--opencodian-border-strong);
+    0 14px calc(var(--opencodian-user-shadow-blur) + 6px) var(--opencodian-glass-shadow-strong),
+    0 1px 0 color-mix(in srgb, var(--opencodian-glass-specular) 96%, transparent) inset,
+    0 -1px 0 color-mix(in srgb, var(--background-modifier-border-hover) 64%, transparent) inset;
+  border-color: var(--opencodian-glass-border-strong);
 }
 
 /* Message slide-in animation */
@@ -407,8 +494,30 @@
 
 /* Assistant message hover effect */
 .opencodian-message--assistant:hover {
-  background: var(--opencodian-highlight-soft);
-  transition: background 0.3s ease;
+  background: transparent;
+}
+
+.opencodian-message--assistant .opencodian-message-content {
+  position: relative;
+  padding: 10px 14px;
+  border-radius: var(--opencodian-assistant-radius);
+  transition:
+    background 0.25s ease,
+    border-color 0.25s ease,
+    box-shadow 0.25s ease,
+    transform 0.25s ease,
+    backdrop-filter 0.25s ease;
+}
+
+.opencodian-message--assistant:hover .opencodian-message-content {
+  background: color-mix(in srgb, var(--opencodian-glass-base-soft) var(--opencodian-assistant-bg-opacity), transparent);
+  border-color: color-mix(in srgb, var(--background-modifier-border) 62%, transparent);
+  box-shadow:
+    0 10px var(--opencodian-assistant-shadow-blur) color-mix(in srgb, var(--opencodian-glass-shadow) 72%, transparent),
+    0 1px 0 color-mix(in srgb, var(--opencodian-glass-specular-soft) 68%, transparent) inset;
+  backdrop-filter: blur(var(--opencodian-assistant-blur)) saturate(1.04);
+  -webkit-backdrop-filter: blur(var(--opencodian-assistant-blur)) saturate(1.04);
+  transform: translateY(-1px);
 }
 
 .opencodian-message--notice:hover {
@@ -420,6 +529,7 @@
   user-select: text;
   -webkit-user-select: text;
   unicode-bidi: plaintext;
+  border: 1px solid transparent;
 }
 
 .opencodian-message-text {
@@ -532,25 +642,30 @@
 /* Copy button - positioned outside the message bubble */
 .opencodian-copy-btn,
 .opencodian-copy-btn-inline {
-  border: 1px solid var(--opencodian-border-soft);
+  border: 1px solid var(--opencodian-glass-border);
   background:
     linear-gradient(
       180deg,
-      color-mix(in srgb, var(--background-secondary) 78%, transparent) 0%,
-      color-mix(in srgb, var(--background-secondary) 52%, transparent) 45%,
-      color-mix(in srgb, var(--background-primary) 92%, transparent) 100%
+      var(--opencodian-glass-specular) 0%,
+      color-mix(in srgb, var(--opencodian-glass-specular-soft) 86%, transparent) 46%,
+      transparent 100%
     ),
     linear-gradient(
       135deg,
-      color-mix(in srgb, var(--background-modifier-hover) 58%, transparent),
-      color-mix(in srgb, var(--background-primary) 97%, transparent)
+      color-mix(in srgb, var(--opencodian-glass-base-strong) 96%, transparent),
+      color-mix(in srgb, var(--opencodian-glass-base) 82%, transparent)
+    ),
+    radial-gradient(
+      circle at top,
+      var(--opencodian-glass-highlight) 0%,
+      transparent 62%
     );
   backdrop-filter: blur(20px) saturate(1.2);
   -webkit-backdrop-filter: blur(20px) saturate(1.2);
   box-shadow:
-    var(--opencodian-shadow-md),
-    0 1px 0 var(--opencodian-inset-light-strong) inset,
-    0 -1px 0 var(--opencodian-inset-shadow) inset;
+    0 12px 28px var(--opencodian-glass-shadow),
+    0 1px 0 color-mix(in srgb, var(--opencodian-glass-specular) 94%, transparent) inset,
+    0 -1px 0 color-mix(in srgb, var(--background-modifier-border) 52%, transparent) inset;
   color: var(--opencodian-text-strong);
   cursor: pointer;
   opacity: 0;
@@ -600,20 +715,25 @@
   background:
     linear-gradient(
       180deg,
-      color-mix(in srgb, var(--background-secondary) 84%, transparent) 0%,
-      color-mix(in srgb, var(--background-secondary) 58%, transparent) 45%,
-      color-mix(in srgb, var(--background-primary) 90%, transparent) 100%
+      color-mix(in srgb, var(--opencodian-glass-specular) 100%, transparent) 0%,
+      color-mix(in srgb, var(--opencodian-glass-specular-soft) 94%, transparent) 42%,
+      transparent 100%
     ),
     linear-gradient(
       135deg,
-      color-mix(in srgb, var(--background-modifier-hover) 72%, transparent),
-      color-mix(in srgb, var(--background-primary) 95%, transparent)
+      color-mix(in srgb, var(--opencodian-glass-base-strong) 98%, transparent),
+      color-mix(in srgb, var(--opencodian-glass-base) 84%, transparent)
+    ),
+    radial-gradient(
+      circle at top,
+      var(--opencodian-glass-highlight-strong) 0%,
+      transparent 60%
     );
-  border-color: var(--opencodian-border-strong);
+  border-color: var(--opencodian-glass-border-strong);
   box-shadow:
-    0 14px 32px color-mix(in srgb, var(--text-normal) 15%, transparent),
-    0 1px 0 var(--opencodian-inset-light-strong) inset,
-    0 -1px 0 var(--opencodian-inset-shadow) inset;
+    0 16px 34px var(--opencodian-glass-shadow-strong),
+    0 1px 0 color-mix(in srgb, var(--opencodian-glass-specular) 98%, transparent) inset,
+    0 -1px 0 color-mix(in srgb, var(--background-modifier-border-hover) 64%, transparent) inset;
   opacity: 1;
   transform: translateY(-1px) scale(1.01);
 }
@@ -823,10 +943,36 @@
   display: flex;
   align-items: flex-end;
   gap: 8px;
-  background: var(--background-primary);
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 12px;
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--opencodian-glass-specular-soft) 92%, transparent) 0%,
+      transparent 100%
+    ),
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--opencodian-glass-base-strong) 94%, transparent) 0%,
+      color-mix(in srgb, var(--opencodian-glass-base) 82%, transparent) 100%
+    );
+  border: 1px solid var(--opencodian-glass-border);
+  border-radius: var(--opencodian-input-radius);
   padding: 8px 12px;
+  backdrop-filter: blur(var(--opencodian-input-blur)) saturate(1.12);
+  -webkit-backdrop-filter: blur(var(--opencodian-input-blur)) saturate(1.12);
+  box-shadow:
+    0 12px var(--opencodian-input-shadow-blur) var(--opencodian-glass-shadow),
+    0 1px 0 color-mix(in srgb, var(--opencodian-glass-specular) 84%, transparent) inset,
+    0 -1px 0 color-mix(in srgb, var(--background-modifier-border) 46%, transparent) inset;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.opencodian-input-wrapper:focus-within {
+  border-color: var(--opencodian-glass-border-strong);
+  box-shadow:
+    0 16px calc(var(--opencodian-input-shadow-blur) + 8px) var(--opencodian-glass-shadow-strong),
+    0 1px 0 color-mix(in srgb, var(--opencodian-glass-specular) 90%, transparent) inset,
+    0 -1px 0 color-mix(in srgb, var(--background-modifier-border-hover) 52%, transparent) inset;
+  transform: translateY(-1px);
 }
 
 /* Input wrapper without send button - full width textarea */
@@ -958,17 +1104,28 @@
   background:
     linear-gradient(
       180deg,
-      color-mix(in srgb, var(--background-secondary) 80%, transparent) 0%,
-      color-mix(in srgb, var(--background-primary) 90%, transparent) 100%
+      var(--opencodian-glass-specular) 0%,
+      color-mix(in srgb, var(--opencodian-glass-specular-soft) 88%, transparent) 42%,
+      transparent 100%
+    ),
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--opencodian-glass-base-strong) 98%, transparent) 0%,
+      color-mix(in srgb, var(--opencodian-glass-base) 84%, transparent) 100%
+    ),
+    radial-gradient(
+      circle at top,
+      var(--opencodian-glass-highlight) 0%,
+      transparent 68%
     );
-  border: 1px solid var(--opencodian-border-soft);
+  border: 1px solid var(--opencodian-glass-border);
   border-radius: 14px;
   backdrop-filter: blur(22px) saturate(1.2);
   -webkit-backdrop-filter: blur(22px) saturate(1.2);
   box-shadow:
-    var(--opencodian-shadow-lg),
-    0 1px 0 var(--opencodian-inset-light) inset,
-    0 -1px 0 var(--opencodian-inset-shadow) inset;
+    0 18px 42px var(--opencodian-glass-shadow-strong),
+    0 1px 0 color-mix(in srgb, var(--opencodian-glass-specular) 92%, transparent) inset,
+    0 -1px 0 color-mix(in srgb, var(--background-modifier-border) 52%, transparent) inset;
   z-index: 1000;
   overflow: hidden;
   animation: model-dropdown-open 0.15s ease-out;
@@ -998,9 +1155,15 @@
   gap: 8px;
   padding: 6px 10px;
   border-radius: 10px;
-  background: var(--opencodian-highlight-soft);
-  border: 1px solid var(--opencodian-border-soft);
-  box-shadow: 0 1px 0 color-mix(in srgb, var(--background-modifier-hover) 42%, transparent) inset;
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--opencodian-glass-specular-soft) 90%, transparent) 0%,
+      transparent 100%
+    ),
+    color-mix(in srgb, var(--opencodian-glass-base-soft) 88%, transparent);
+  border: 1px solid color-mix(in srgb, var(--opencodian-glass-border) 82%, transparent);
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--opencodian-glass-specular) 64%, transparent) inset;
 }
 
 .opencodian-model-dropdown-search-icon {
@@ -1081,7 +1244,13 @@
   display: flex;
   padding: 8px 12px 6px;
   align-items: center;
-  background: color-mix(in srgb, var(--background-primary) 82%, var(--background-secondary));
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--opencodian-glass-specular-soft) 84%, transparent) 0%,
+      transparent 100%
+    ),
+    color-mix(in srgb, var(--opencodian-glass-base) 94%, transparent);
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
   /* Use a distinct accent color that works in both themes */
@@ -1099,7 +1268,7 @@
   left: 0;
   right: 0;
   height: 8px;
-  background: linear-gradient(to bottom, color-mix(in srgb, var(--background-modifier-hover) 52%, transparent), transparent);
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--opencodian-glass-specular-soft) 92%, transparent), transparent);
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.15s ease;
@@ -1165,7 +1334,99 @@
 }
 
 .opencodian-settings {
+  --opencodian-settings-scrollbar-size: 8px;
+  --opencodian-settings-scrollbar-radius: 999px;
+  --opencodian-settings-scrollbar-track:
+    color-mix(in srgb, var(--background-secondary-alt, var(--background-secondary)) 22%, transparent);
+  --opencodian-settings-scrollbar-track-border:
+    color-mix(in srgb, var(--background-modifier-border) 28%, transparent);
+  --opencodian-settings-scrollbar-thumb:
+    color-mix(in srgb, var(--scrollbar-thumb-bg, rgba(var(--mono-rgb-100), 0.15)) 68%, transparent);
+  --opencodian-settings-scrollbar-thumb-soft:
+    color-mix(in srgb, var(--scrollbar-thumb-bg, rgba(var(--mono-rgb-100), 0.15)) 44%, transparent);
+  --opencodian-settings-scrollbar-thumb-hover:
+    color-mix(in srgb, var(--scrollbar-active-thumb-bg, rgba(var(--mono-rgb-100), 0.35)) 82%, transparent);
+  --opencodian-settings-scrollbar-specular:
+    color-mix(in srgb, var(--background-primary) 68%, transparent);
+  --opencodian-settings-scrollbar-shadow:
+    color-mix(in srgb, var(--background-modifier-border-hover) 46%, transparent);
+  overflow-y: auto;
+  max-height: 100%;
+  padding-right: 6px;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: var(--opencodian-settings-scrollbar-thumb) transparent;
   padding: 0 20px 20px;
+}
+
+.opencodian-settings:hover {
+  scrollbar-color: var(--opencodian-settings-scrollbar-thumb-hover) transparent;
+}
+
+.opencodian-settings::-webkit-scrollbar {
+  width: var(--opencodian-settings-scrollbar-size);
+  height: var(--opencodian-settings-scrollbar-size);
+}
+
+.opencodian-settings::-webkit-scrollbar-track {
+  background: var(--opencodian-settings-scrollbar-track);
+  border-radius: var(--opencodian-settings-scrollbar-radius);
+  box-shadow: inset 0 0 0 1px var(--opencodian-settings-scrollbar-track-border);
+}
+
+.opencodian-settings::-webkit-scrollbar-thumb {
+  background:
+    linear-gradient(
+      180deg,
+      var(--opencodian-settings-scrollbar-specular) 0%,
+      color-mix(in srgb, var(--opencodian-settings-scrollbar-specular) 42%, transparent) 22%,
+      transparent 100%
+    ),
+    linear-gradient(
+      180deg,
+      var(--opencodian-settings-scrollbar-thumb) 0%,
+      var(--opencodian-settings-scrollbar-thumb-soft) 100%
+    );
+  border-radius: var(--opencodian-settings-scrollbar-radius);
+  border: 1px solid transparent;
+  background-clip: padding-box;
+  min-height: 28px;
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--background-primary) 74%, transparent),
+    0 2px 8px var(--opencodian-settings-scrollbar-shadow);
+}
+
+.opencodian-settings:hover::-webkit-scrollbar-thumb {
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--opencodian-settings-scrollbar-specular) 92%, transparent) 0%,
+      color-mix(in srgb, var(--opencodian-settings-scrollbar-specular) 52%, transparent) 20%,
+      transparent 100%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--opencodian-settings-scrollbar-thumb) 88%, transparent) 0%,
+      color-mix(in srgb, var(--opencodian-settings-scrollbar-thumb-soft) 78%, transparent) 100%
+    );
+}
+
+.opencodian-settings::-webkit-scrollbar-thumb:hover {
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--opencodian-settings-scrollbar-specular) 100%, transparent) 0%,
+      color-mix(in srgb, var(--opencodian-settings-scrollbar-specular) 58%, transparent) 20%,
+      transparent 100%
+    ),
+    linear-gradient(
+      180deg,
+      var(--opencodian-settings-scrollbar-thumb-hover) 0%,
+      color-mix(in srgb, var(--opencodian-settings-scrollbar-thumb-hover) 76%, transparent) 100%
+    );
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--background-primary) 86%, transparent),
+    0 3px 10px color-mix(in srgb, var(--scrollbar-active-thumb-bg, rgba(var(--mono-rgb-100), 0.35)) 24%, transparent);
 }
 
 .opencodian-settings h2 {
@@ -1178,7 +1439,7 @@
 .opencodian-settings-quick-nav {
   position: sticky;
   top: 0;
-  z-index: 20;
+  z-index: 10;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -1193,6 +1454,13 @@
     0 1px 0 color-mix(in srgb, var(--background-modifier-hover) 40%, transparent) inset;
   backdrop-filter: blur(24px) saturate(1.01);
   -webkit-backdrop-filter: blur(24px) saturate(1.01);
+}
+
+.modal:has(.opencodian-settings) .modal-close-button {
+  position: absolute;
+  top: 12px;
+  right: 35px;
+  z-index: 60;
 }
 
 .opencodian-settings-quick-nav-label {
@@ -1390,26 +1658,441 @@
   border: 1px solid var(--background-modifier-border-hover);
 }
 
+.opencodian-style-section {
+  position: relative;
+  margin: 24px 0 16px;
+  padding: 16px;
+  border-radius: var(--radius-m, 8px);
+  border: 1px solid var(--background-modifier-border);
+  border-left: 3px solid var(--background-modifier-border-hover);
+  background: var(--background-secondary);
+}
+
+.opencodian-style-section .opencodian-style-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0 0 8px;
+  padding-left: 0;
+  align-items: flex-start;
+  width: 100%;
+  text-align: left;
+}
+
+.opencodian-style-group-body {
+  display: flex;
+  flex-direction: column;
+}
+
+.opencodian-style-section .opencodian-style-group > .opencodian-style-group-title {
+  display: block;
+  width: 100%;
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+  padding-left: 0;
+  text-indent: 0;
+  line-height: 1.35;
+  text-align: left;
+}
+
+.opencodian-style-section .opencodian-style-group > .opencodian-style-group-desc {
+  display: block;
+  width: 100%;
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--text-muted);
+  padding-left: 0;
+  text-indent: 0;
+  text-align: left;
+}
+
+.opencodian-style-setting {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  column-gap: 20px;
+  align-items: center;
+}
+
+.opencodian-style-setting .setting-item-control {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  width: 360px;
+  min-width: 360px;
+  max-width: 360px;
+}
+
+.opencodian-style-setting .setting-item-info,
+.opencodian-style-reset-setting .setting-item-info {
+  padding-left: 0;
+}
+
+.opencodian-style-setting .setting-item-info {
+  min-width: 0;
+  padding-right: 8px;
+}
+
+.opencodian-style-group-body .setting-item:first-child {
+  border-top: none;
+}
+
+.opencodian-style-setting-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+}
+
+.opencodian-style-step-btn,
+.opencodian-style-reset-btn {
+  display: inline-flex;
+  flex: 0 0 28px;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  min-width: 28px;
+  max-width: 28px;
+  height: 28px;
+  padding: 0;
+  box-sizing: border-box;
+  border-radius: 8px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--button-background);
+  color: var(--button-text-color);
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+  transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+
+.opencodian-style-step-btn:hover,
+.opencodian-style-reset-btn:hover {
+  background: var(--button-background-hover);
+  border-color: var(--background-modifier-border-hover);
+  transform: translateY(-1px);
+}
+
+.opencodian-style-slider {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: 0 0 160px;
+  width: 160px;
+  min-width: 160px;
+  max-width: 160px;
+  height: 28px;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+  accent-color: var(--interactive-accent);
+}
+
+.opencodian-style-slider:focus {
+  outline: none;
+}
+
+.opencodian-style-slider::-webkit-slider-runnable-track {
+  height: 8px;
+  border-radius: 999px;
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--background-modifier-border-hover) 72%, transparent) 0%,
+      color-mix(in srgb, var(--background-modifier-border) 88%, transparent) 100%
+    );
+  border: 1px solid color-mix(in srgb, var(--background-modifier-border) 88%, transparent);
+}
+
+.opencodian-style-slider::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  margin-top: -6px;
+  border-radius: 999px;
+  border: 2px solid var(--background-primary);
+  background:
+    radial-gradient(circle at 30% 30%, var(--background-primary) 0%, transparent 35%),
+    var(--interactive-accent);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--interactive-accent) 55%, var(--background-modifier-border)),
+    0 3px 10px color-mix(in srgb, var(--interactive-accent) 24%, transparent);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+
+.opencodian-style-slider:hover::-webkit-slider-thumb {
+  transform: scale(1.06);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--interactive-accent) 70%, var(--background-modifier-border-hover)),
+    0 4px 12px color-mix(in srgb, var(--interactive-accent) 28%, transparent);
+}
+
+.opencodian-style-slider:focus-visible::-webkit-slider-thumb {
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--interactive-accent) 24%, var(--background-primary)),
+    0 0 0 4px color-mix(in srgb, var(--interactive-accent) 16%, transparent),
+    0 4px 12px color-mix(in srgb, var(--interactive-accent) 28%, transparent);
+}
+
+.opencodian-style-slider::-moz-range-track {
+  height: 8px;
+  border-radius: 999px;
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--background-modifier-border-hover) 72%, transparent) 0%,
+      color-mix(in srgb, var(--background-modifier-border) 88%, transparent) 100%
+    );
+  border: 1px solid color-mix(in srgb, var(--background-modifier-border) 88%, transparent);
+}
+
+.opencodian-style-slider::-moz-range-progress {
+  height: 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--interactive-accent) 72%, var(--background-modifier-border-hover));
+}
+
+.opencodian-style-slider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  border: 2px solid var(--background-primary);
+  background:
+    radial-gradient(circle at 30% 30%, var(--background-primary) 0%, transparent 35%),
+    var(--interactive-accent);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--interactive-accent) 55%, var(--background-modifier-border)),
+    0 3px 10px color-mix(in srgb, var(--interactive-accent) 24%, transparent);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+
+.opencodian-style-slider:hover::-moz-range-thumb {
+  transform: scale(1.06);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--interactive-accent) 70%, var(--background-modifier-border-hover)),
+    0 4px 12px color-mix(in srgb, var(--interactive-accent) 28%, transparent);
+}
+
+.opencodian-style-slider:focus-visible::-moz-range-thumb {
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--interactive-accent) 24%, var(--background-primary)),
+    0 0 0 4px color-mix(in srgb, var(--interactive-accent) 16%, transparent),
+    0 4px 12px color-mix(in srgb, var(--interactive-accent) 28%, transparent);
+}
+
+.opencodian-style-number-wrap {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+  padding: 0 6px;
+  min-width: 78px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+  box-sizing: border-box;
+}
+
+.opencodian-style-number {
+  flex: 0 0 2.8em;
+  width: 2.8em;
+  min-width: 2.8em;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-normal);
+  font-size: 13px;
+  text-align: right;
+}
+
+.opencodian-style-number:focus {
+  outline: none;
+}
+
+.opencodian-style-unit {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .opencodian-style-setting {
+    grid-template-columns: 1fr;
+  }
+
+  .opencodian-style-setting .setting-item-control {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    justify-content: flex-start;
+  }
+
+  .opencodian-style-setting-control {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+}
+
+.opencodian-style-reset-setting .setting-item-info {
+  opacity: 0.82;
+}
+
+.opencodian-style-reset-setting {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.opencodian-style-reset-setting button {
+  background: var(--button-background);
+  color: var(--button-text-color);
+  border: 1px solid var(--background-modifier-border);
+}
+
+.opencodian-style-reset-setting button:hover {
+  background: var(--button-background-hover);
+  border-color: var(--background-modifier-border-hover);
+}
+
+.opencodian-style-textarea {
+  width: min(520px, 100%);
+  font-family: var(--font-monospace);
+}
+
+.opencodian-style-textarea.is-invalid {
+  border-color: var(--text-error);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--text-error) 24%, transparent);
+}
+
+.opencodian-style-validation {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-error);
+}
+
 /* Scrollbar styling - apply to scroll container */
+.opencodian-messages-scroll,
+.opencodian-messages,
+.opencodian-history-scroll {
+  scrollbar-width: thin;
+  scrollbar-color:
+    color-mix(
+      in srgb,
+      var(--scrollbar-thumb-bg, var(--background-modifier-border)) var(--opencodian-scrollbar-thumb-opacity),
+      transparent
+    )
+    color-mix(
+      in srgb,
+      var(--background-secondary-alt, var(--background-secondary)) var(--opencodian-scrollbar-track-opacity),
+      transparent
+    );
+}
+
+.opencodian-messages-scroll:hover,
+.opencodian-messages:hover,
+.opencodian-history-scroll:hover {
+  scrollbar-color:
+    color-mix(
+      in srgb,
+      var(--scrollbar-active-thumb-bg, var(--background-modifier-border-hover)) var(--opencodian-scrollbar-thumb-hover-opacity),
+      transparent
+    )
+    color-mix(
+      in srgb,
+      var(--background-secondary-alt, var(--background-secondary)) var(--opencodian-scrollbar-track-opacity),
+      transparent
+    );
+}
+
 .opencodian-messages-scroll::-webkit-scrollbar,
-.opencodian-messages::-webkit-scrollbar {
-  width: 8px;
+.opencodian-messages::-webkit-scrollbar,
+.opencodian-history-scroll::-webkit-scrollbar {
+  width: var(--opencodian-scrollbar-width);
+  height: var(--opencodian-scrollbar-width);
 }
 
 .opencodian-messages-scroll::-webkit-scrollbar-track,
-.opencodian-messages::-webkit-scrollbar-track {
-  background: transparent;
+.opencodian-messages::-webkit-scrollbar-track,
+.opencodian-history-scroll::-webkit-scrollbar-track {
+  background: color-mix(
+    in srgb,
+    var(--background-secondary-alt, var(--background-secondary)) var(--opencodian-scrollbar-track-opacity),
+    transparent
+  );
+  border-radius: var(--opencodian-scrollbar-radius);
 }
 
 .opencodian-messages-scroll::-webkit-scrollbar-thumb,
-.opencodian-messages::-webkit-scrollbar-thumb {
-  background: var(--background-modifier-border);
-  border-radius: 4px;
+.opencodian-messages::-webkit-scrollbar-thumb,
+.opencodian-history-scroll::-webkit-scrollbar-thumb {
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--background-primary) 72%, transparent) 0%,
+      color-mix(in srgb, var(--background-primary) 28%, transparent) 26%,
+      transparent 100%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(
+        in srgb,
+        var(--scrollbar-thumb-bg, var(--background-modifier-border)) var(--opencodian-scrollbar-thumb-opacity),
+        transparent
+      ) 0%,
+      color-mix(
+        in srgb,
+        var(--scrollbar-thumb-bg, var(--background-modifier-border)) 38%,
+        transparent
+      ) 100%
+    );
+  border-radius: var(--opencodian-scrollbar-radius);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--background-primary) 72%, transparent),
+    0 2px 8px color-mix(
+      in srgb,
+      var(--background-modifier-border-hover) var(--opencodian-scrollbar-shadow-opacity),
+      transparent
+    );
 }
 
 .opencodian-messages-scroll::-webkit-scrollbar-thumb:hover,
-.opencodian-messages::-webkit-scrollbar-thumb:hover {
-  background: var(--background-modifier-border-hover);
+.opencodian-messages::-webkit-scrollbar-thumb:hover,
+.opencodian-history-scroll::-webkit-scrollbar-thumb:hover {
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--background-primary) 88%, transparent) 0%,
+      color-mix(in srgb, var(--background-primary) 36%, transparent) 22%,
+      transparent 100%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(
+        in srgb,
+        var(--scrollbar-active-thumb-bg, var(--background-modifier-border-hover)) var(--opencodian-scrollbar-thumb-hover-opacity),
+        transparent
+      ) 0%,
+      color-mix(
+        in srgb,
+        var(--scrollbar-active-thumb-bg, var(--background-modifier-border-hover)) 46%,
+        transparent
+      ) 100%
+    );
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--background-primary) 84%, transparent),
+    0 3px 10px color-mix(
+      in srgb,
+      var(--background-modifier-border-hover) var(--opencodian-scrollbar-shadow-opacity),
+      transparent
+    );
 }
 
 /* ============================================================
@@ -1512,18 +2195,28 @@
   background:
     linear-gradient(
       180deg,
-      color-mix(in srgb, var(--background-secondary) 78%, transparent) 0%,
-      color-mix(in srgb, var(--background-primary) 90%, transparent) 100%
+      var(--opencodian-glass-specular) 0%,
+      color-mix(in srgb, var(--opencodian-glass-specular-soft) 88%, transparent) 42%,
+      transparent 100%
     ),
-    color-mix(in srgb, var(--background-primary) 68%, var(--background-secondary));
-  border: 1px solid var(--opencodian-border-soft);
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--opencodian-glass-base-strong) 98%, transparent) 0%,
+      color-mix(in srgb, var(--opencodian-glass-base) 84%, transparent) 100%
+    ),
+    radial-gradient(
+      circle at top,
+      var(--opencodian-glass-highlight) 0%,
+      transparent 68%
+    );
+  border: 1px solid var(--opencodian-glass-border);
   border-radius: 14px;
   backdrop-filter: blur(22px) saturate(1.2);
   -webkit-backdrop-filter: blur(22px) saturate(1.2);
   box-shadow:
-    var(--opencodian-shadow-lg),
-    0 1px 0 var(--opencodian-inset-light) inset,
-    0 -1px 0 var(--opencodian-inset-shadow) inset;
+    0 18px 42px var(--opencodian-glass-shadow-strong),
+    0 1px 0 color-mix(in srgb, var(--opencodian-glass-specular) 92%, transparent) inset,
+    0 -1px 0 color-mix(in srgb, var(--background-modifier-border) 52%, transparent) inset;
   z-index: 1000;
   overflow: hidden;
   padding: 4px 0;
@@ -1630,18 +2323,28 @@
   background:
     linear-gradient(
       180deg,
-      color-mix(in srgb, var(--background-secondary) 78%, transparent) 0%,
-      color-mix(in srgb, var(--background-primary) 90%, transparent) 100%
+      var(--opencodian-glass-specular) 0%,
+      color-mix(in srgb, var(--opencodian-glass-specular-soft) 88%, transparent) 42%,
+      transparent 100%
     ),
-    color-mix(in srgb, var(--background-primary) 68%, var(--background-secondary));
-  border: 1px solid var(--opencodian-border-soft);
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--opencodian-glass-base-strong) 98%, transparent) 0%,
+      color-mix(in srgb, var(--opencodian-glass-base) 84%, transparent) 100%
+    ),
+    radial-gradient(
+      circle at top,
+      var(--opencodian-glass-highlight) 0%,
+      transparent 68%
+    );
+  border: 1px solid var(--opencodian-glass-border);
   border-radius: 14px;
   backdrop-filter: blur(22px) saturate(1.2);
   -webkit-backdrop-filter: blur(22px) saturate(1.2);
   box-shadow:
-    var(--opencodian-shadow-lg),
-    0 1px 0 var(--opencodian-inset-light) inset,
-    0 -1px 0 var(--opencodian-inset-shadow) inset;
+    0 18px 42px var(--opencodian-glass-shadow-strong),
+    0 1px 0 color-mix(in srgb, var(--opencodian-glass-specular) 92%, transparent) inset,
+    0 -1px 0 color-mix(in srgb, var(--background-modifier-border) 52%, transparent) inset;
   min-width: 240px;
   max-width: 320px;
   max-height: 400px;
@@ -1654,25 +2357,9 @@
   flex: 1;
   overflow-y: auto;
   padding: 4px 0;
+  padding-right: var(--opencodian-scrollbar-edge-padding);
   min-height: 0;
-}
-
-/* Custom scrollbar for history dropdown */
-.opencodian-history-scroll::-webkit-scrollbar {
-  width: 6px;
-}
-
-.opencodian-history-scroll::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.opencodian-history-scroll::-webkit-scrollbar-thumb {
-  background: var(--background-modifier-border);
-  border-radius: 3px;
-}
-
-.opencodian-history-scroll::-webkit-scrollbar-thumb:hover {
-  background: var(--background-modifier-border-hover);
+  scrollbar-gutter: stable;
 }
 
 .opencodian-history-item {

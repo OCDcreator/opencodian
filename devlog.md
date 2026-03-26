@@ -8,6 +8,155 @@
 
 ---
 
+## 2026-03-26 会话样式系统落地与设置面板交互打磨
+
+### 📋 本次开发目标
+本轮围绕「会话界面可定制化」与「设置页使用体验」两条主线推进：
+
+1. **为聊天界面建立可持久化的样式系统**
+   - 在设置中新增独立 `样式 / Style` 大项
+   - 支持对消息区、吸顶遮盖、用户消息、助手消息、输入区进行结构化调节
+   - 保留高级 CSS 声明兜底，满足实验性微调需求
+
+2. **完善设置页的视觉层级与交互体验**
+   - 优化子分组层级、滑块控件排布、快速导航与关闭按钮关系
+   - 为聊天相关滚动条增加主题安全的美化配置
+   - 修复设置页从插件入口打开时的滚动记忆、定位跳转与初始焦点问题
+
+### ✅ 会话样式配置系统（V1）
+
+#### 1. 新增 `chatAppearance` 设置模型
+- 在 `src/core/types/settings.ts` 中新增 `chatAppearance` 结构
+- 拆分为：
+  - `layout`
+  - `sticky`
+  - `user`
+  - `assistant`
+  - `input`
+  - `scrollbar`
+  - `advanced`
+- 增加默认值工厂与 normalize 逻辑，确保老用户设置缺失时自动补齐
+
+#### 2. 建立“即时预览 + 延迟持久化”链路
+- 在 `src/main.ts` 中新增独立的样式应用与防抖保存流程
+- 样式修改后可立即推送到已打开聊天视图
+- 样式持久化不再触发模型刷新、服务重载、权限同步等无关副作用
+
+#### 3. 聊天视图接入样式变量映射
+- 新增 `src/features/chat/chatAppearance.ts`
+- 将 `chatAppearance` 映射为容器级 CSS 变量
+- 在 `src/features/chat/OpenCodianView.ts` 中统一应用变量，并注入高级声明模式的自定义样式：
+  - 结构化参数先应用
+  - `customCssDeclarations` 后应用，允许高级区覆盖前者
+
+### ✅ 设置页新增“样式 / Style”大项
+
+#### 1. 新增样式子分组
+- 在 `src/features/settings/OpenCodianSettings.ts` 中新增独立 `Style` section
+- 子分组包括：
+  - `布局与吸顶`
+  - `用户消息`
+  - `助手消息`
+  - `输入区`
+  - `滚动条`
+  - `高级样式`
+- 同步加入 quick nav 快捷导航
+
+#### 2. 抽象统一的数值调节控件
+- 所有数值项统一采用：
+  - 左减按钮
+  - 固定宽度滑块
+  - 数字输入框
+  - 右加按钮
+  - 单项重置按钮
+- 支持 clamp、步长控制、即时预览、失焦/停止操作后延迟保存
+- 补充子分组重置与整组“全部恢复默认”
+
+#### 3. 强化设置页层级与主题安全
+- 子分组标题改为更弱的视觉层级，明确低于主标题
+- 子分组描述、标题、具体设置项统一左对齐基准线
+- 为子分组增加更明确的容器包裹感
+- 所有容器背景、分割线、按钮、说明文本全面改用 Obsidian 主题变量，避免硬编码颜色
+
+### ✅ 滚动条样式配置（聊天界面）
+
+#### 1. 新增滚动条结构化配置
+- 在 `chatAppearance.scrollbar` 中新增：
+  - `width`
+  - `radius`
+  - `trackOpacity`
+  - `thumbOpacity`
+  - `thumbHoverOpacity`
+  - `edgePadding`
+  - `shadowOpacity`
+
+#### 2. 聊天区域滚动条主题化渲染
+- `styles.css` 中为以下区域接入统一滚动条变量：
+  - `.opencodian-messages-scroll`
+  - `.opencodian-messages`
+  - `.opencodian-history-scroll`
+- WebKit 侧使用 `::-webkit-scrollbar*`
+- Firefox 侧使用 `scrollbar-width` / `scrollbar-color` 做降级兼容
+- 颜色继续基于主题变量，通过透明度与阴影强度控制质感，不开放自由配色输入
+
+#### 3. 设置页滚动条额外美化
+- 同时对 `.opencodian-settings` 的滚动条做了独立主题适配优化
+- 让其在深浅主题下保持更柔和的可见度与悬停反馈
+- 该部分属于设置面板视觉优化，不纳入聊天 `chatAppearance.scrollbar` 持久化配置
+
+### ✅ 会话与设置界面样式细节收敛
+
+#### 1. 助手消息视觉回调
+- 收敛助手消息样式方向，弱化侵入文字区域的边缘高光
+- 改为以圆角、阴影与轻量玻璃质感为主，拒绝明显渐变边缘
+
+#### 2. 本地服务按钮与吸顶遮盖细节修复
+- 缩小本地服务按钮阴影范围，避免悬浮层过重
+- 修复主题切换时吸顶柔和遮盖未同步刷新背景的问题
+
+#### 3. 快捷导航与关闭按钮布局修复
+- 调整 `.opencodian-settings-quick-nav` 与 `.modal-close-button` 的相对关系
+- 最终收敛为：快捷跳转维持原有长度与吸顶位置，关闭按钮移动到其右上角附近，避免重叠与错位
+
+### ✅ 设置页滚动位置记忆与入口修复
+
+#### 1. 设置页滚动位置记忆
+- 在 `OpenCodianSettings` 中新增设置面板滚动容器绑定、恢复与捕获逻辑
+- 支持记忆用户上次离开 `OpenCodian` 设置页时的滚动位置
+- 原生 Obsidian 设置入口与插件内部入口均纳入兼容处理
+
+#### 2. 插件入口定向打开修复
+- 修复聊天界面右上角设置按钮打开后总是回到开头的问题
+- 修复“本地服务”入口应跳转到服务项却落回页首的问题
+- 对手动 restore 与定向滚动逻辑进行拆分，减少互相覆盖
+
+#### 3. 初始焦点与闪动细节修复
+- 清理 quick nav 初始焦点，避免从原生设置入口进入时出现语言说明 tooltip 被错误激活
+- 继续收敛由多阶段滚动恢复造成的闪动感
+
+### 📁 涉及文件
+
+| 文件 | 修改内容 |
+|------|----------|
+| `src/core/types/settings.ts` | 新增 `chatAppearance` 类型、默认值与 normalize 逻辑 |
+| `src/core/types/index.ts` | 导出新的样式设置相关类型 |
+| `src/features/chat/chatAppearance.ts` | 新增聊天样式变量映射与高级 CSS 声明构建工具 |
+| `src/features/chat/OpenCodianView.ts` | 聊天视图接入样式应用、设置入口与服务跳转修复 |
+| `src/features/settings/OpenCodianSettings.ts` | 新增样式大项、滑块控件、滚动记忆、quick nav 焦点修复 |
+| `src/main.ts` | 新增样式即时应用与防抖持久化链路 |
+| `src/i18n/locales/en.ts` | 补充样式与滚动条设置英文文案 |
+| `src/i18n/locales/zh.ts` | 补充样式与滚动条设置中文文案 |
+| `styles.css` | 新增聊天样式变量、滚动条样式、设置页层级与控件视觉优化 |
+| `tests/unit/core/types/settings.test.ts` | 补充 `chatAppearance` 默认值与 normalize 测试 |
+| `tests/unit/features/chat/chatAppearance.test.ts` | 新增聊天样式变量映射与高级声明测试 |
+
+### 🧪 验证结果
+
+- ✅ `npm run typecheck`
+- ✅ `npm run lint`
+- ✅ `npm run test`
+- ✅ `npm run build`
+
 ## 2026-03-26 全主题适配修复与双环境构建稳定性优化
 
 ### 📋 本次开发目标

@@ -11,7 +11,13 @@ import * as path from 'path';
 
 import { OpencodeConfigManager } from '../../core/config';
 import type { ModelCatalog, ModelCatalogProvider } from '../../core/config/modelConfig';
-import { getCurrentPlatformDebugLogPath, getCurrentPlatformKey, type ModelSourceMode } from '../../core/types';
+import {
+  getCurrentPlatformDebugLogPath,
+  getCurrentPlatformKey,
+  getDefaultChatAppearanceSettings,
+  isValidChatAppearanceCustomCssDeclarations,
+  type ModelSourceMode,
+} from '../../core/types';
 import { setLocale, t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { createLogger, getVaultBasePath } from '../../shared';
@@ -21,6 +27,18 @@ import { OpencodeConfigModal } from './OpencodeConfigModal';
 import { type ServerHelpTopic,ServerSettingHelpModal } from './ServerSettingHelpModal';
 
 const logger = createLogger('OpenCodianSettings');
+
+interface NumericStyleControlConfig {
+  name: string;
+  desc: string;
+  min: number;
+  max: number;
+  step: number;
+  unit: string;
+  defaultValue: number;
+  value: () => number;
+  setValue: (value: number) => void;
+}
 
 interface ElectronDialogModule {
   showOpenDialog: (options: {
@@ -67,6 +85,11 @@ export class OpenCodianSettingTab extends PluginSettingTab {
   private refreshServerStatusCallback?: () => Promise<void>;
   private serverStatusIntervalId: number | null = null;
   private activeModelCatalogTab: 'local' | 'server' | 'effective' = 'effective';
+  private settingsScrollHandler?: () => void;
+  private settingsScrollContainerEl: HTMLElement | null = null;
+  private lastObservedSettingsScrollTop = 0;
+  private pendingOpenScrollTop: number | null = null;
+  private pendingOpenSectionTitle: string | null = null;
 
   constructor(app: App, plugin: OpenCodianPlugin) {
     super(app, plugin);
@@ -83,8 +106,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     void this.refreshServerStatusCallback?.();
   }
 
-  scrollToModelSection(): void {
-    const sectionTitle = t('settings.model.title');
+  private scrollToSectionByTitle(sectionTitle: string): void {
     const headingEl = this.containerEl.querySelector<HTMLHeadingElement>(
       `.opencodian-settings-section-heading[data-section-title="${sectionTitle}"]`,
     );
@@ -94,8 +116,29 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     });
   }
 
+  scrollToServerSection(): void {
+    this.scrollToSectionByTitle(t('settings.server.title'));
+  }
+
+  scrollToModelSection(): void {
+    this.scrollToSectionByTitle(t('settings.model.title'));
+  }
+
+  prepareRestoreScrollOnNextOpen(scrollTop = this.plugin.settings.settingsPanelScrollTop): void {
+    this.pendingOpenScrollTop = scrollTop;
+    this.pendingOpenSectionTitle = null;
+  }
+
+  prepareScrollToServerOnNextOpen(): void {
+    this.pendingOpenSectionTitle = t('settings.server.title');
+    this.pendingOpenScrollTop = null;
+  }
+
   display(): void {
     const { containerEl } = this;
+    const pendingOpenScrollTop = this.pendingOpenScrollTop;
+    const pendingOpenSectionTitle = this.pendingOpenSectionTitle;
+
     if (this.serverStatusIntervalId) {
       window.clearInterval(this.serverStatusIntervalId);
       this.serverStatusIntervalId = null;
@@ -103,6 +146,11 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     this.refreshServerStatusCallback = undefined;
     containerEl.empty();
     containerEl.addClass('opencodian-settings');
+    if (pendingOpenScrollTop !== null || pendingOpenSectionTitle !== null) {
+      containerEl.style.visibility = 'hidden';
+    } else {
+      containerEl.style.removeProperty('visibility');
+    }
 
     const quickNavEl = containerEl.createDiv({ cls: 'opencodian-settings-quick-nav' });
     containerEl.createEl('h2', { text: t('settings.title') });
@@ -129,6 +177,10 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         tooltip: t('settings.quickNav.uiDesc'),
       },
       {
+        headingEl: this.addStyleSettings(containerEl),
+        tooltip: t('settings.quickNav.styleDesc'),
+      },
+      {
         headingEl: this.addDebugSettings(containerEl),
         tooltip: t('settings.quickNav.debugDesc'),
       },
@@ -139,6 +191,15 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     ];
 
     this.buildQuickNav(quickNavEl, sections);
+    this.bindSettingsPanelScrollPersistence();
+    if (pendingOpenSectionTitle) {
+      this.scrollToSectionByTitle(pendingOpenSectionTitle);
+      this.finishPendingOpenVisibility();
+    } else {
+      this.restoreSettingsPanelScrollPosition(pendingOpenScrollTop ?? this.plugin.settings.settingsPanelScrollTop);
+      this.finishPendingOpenVisibility();
+    }
+    this.clearInitialQuickNavFocus();
   }
 
   /** Language settings section */
@@ -665,7 +726,14 @@ export class OpenCodianSettingTab extends PluginSettingTab {
 
   /** Clean up when settings tab is closed */
   hide(): void {
+    this.captureSettingsPanelScrollPosition();
+    if (this.settingsScrollHandler) {
+      this.settingsScrollContainerEl?.removeEventListener('scroll', this.settingsScrollHandler);
+      this.settingsScrollHandler = undefined;
+    }
+    this.settingsScrollContainerEl = null;
     this.refreshModelsCallback = undefined;
+    super.hide();
   }
 
   /** Security settings section */
@@ -1010,6 +1078,648 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       );
 
     return headingEl;
+  }
+
+  /** Style settings section */
+  private addStyleSettings(containerEl: HTMLElement): HTMLHeadingElement {
+    const headingEl = this.createSectionHeading(containerEl, t('settings.style.title'));
+    const defaultAppearance = getDefaultChatAppearanceSettings();
+
+    new Setting(containerEl)
+      .setName(t('settings.style.resetAll.name'))
+      .setDesc(t('settings.style.resetAll.desc'))
+      .addButton((btn) => {
+        btn
+          .setButtonText(t('settings.style.resetAll.button'))
+          .onClick(() => {
+            this.plugin.settings.chatAppearance = getDefaultChatAppearanceSettings();
+            this.applyAndScheduleStyleUpdate();
+            this.display();
+          });
+      });
+
+    const layoutGroupEl = this.createStyleGroupSection(
+      containerEl,
+      t('settings.style.groups.layout.title'),
+      t('settings.style.groups.layout.desc'),
+    );
+    this.addNumericStyleControl(layoutGroupEl, {
+      name: t('settings.style.layout.messagesPaddingTop.name'),
+      desc: t('settings.style.layout.messagesPaddingTop.desc'),
+      min: 0,
+      max: 32,
+      step: 1,
+      unit: 'px',
+      defaultValue: defaultAppearance.layout.messagesPaddingTop,
+      value: () => this.plugin.settings.chatAppearance.layout.messagesPaddingTop,
+      setValue: (value) => {
+        this.plugin.settings.chatAppearance.layout.messagesPaddingTop = value;
+      },
+    });
+    this.addNumericStyleControl(layoutGroupEl, {
+      name: t('settings.style.layout.messagesPaddingX.name'),
+      desc: t('settings.style.layout.messagesPaddingX.desc'),
+      min: 0,
+      max: 32,
+      step: 1,
+      unit: 'px',
+      defaultValue: defaultAppearance.layout.messagesPaddingX,
+      value: () => this.plugin.settings.chatAppearance.layout.messagesPaddingX,
+      setValue: (value) => {
+        this.plugin.settings.chatAppearance.layout.messagesPaddingX = value;
+      },
+    });
+    this.addNumericStyleControl(layoutGroupEl, {
+      name: t('settings.style.sticky.headerGap.name'),
+      desc: t('settings.style.sticky.headerGap.desc'),
+      min: 0,
+      max: 16,
+      step: 1,
+      unit: 'px',
+      defaultValue: defaultAppearance.sticky.headerGap,
+      value: () => this.plugin.settings.chatAppearance.sticky.headerGap,
+      setValue: (value) => {
+        this.plugin.settings.chatAppearance.sticky.headerGap = value;
+      },
+    });
+    this.addNumericStyleControl(layoutGroupEl, {
+      name: t('settings.style.sticky.maskHeight.name'),
+      desc: t('settings.style.sticky.maskHeight.desc'),
+      min: 0,
+      max: 40,
+      step: 1,
+      unit: 'px',
+      defaultValue: defaultAppearance.sticky.maskHeight,
+      value: () => this.plugin.settings.chatAppearance.sticky.maskHeight,
+      setValue: (value) => {
+        this.plugin.settings.chatAppearance.sticky.maskHeight = value;
+      },
+    });
+    this.addNumericStyleControl(layoutGroupEl, {
+      name: t('settings.style.sticky.maskBlur.name'),
+      desc: t('settings.style.sticky.maskBlur.desc'),
+      min: 0,
+      max: 40,
+      step: 1,
+      unit: 'px',
+      defaultValue: defaultAppearance.sticky.maskBlur,
+      value: () => this.plugin.settings.chatAppearance.sticky.maskBlur,
+      setValue: (value) => {
+        this.plugin.settings.chatAppearance.sticky.maskBlur = value;
+      },
+    });
+    this.createStyleResetSetting(layoutGroupEl, 'layout');
+
+    const userGroupEl = this.createStyleGroupSection(
+      containerEl,
+      t('settings.style.groups.user.title'),
+      t('settings.style.groups.user.desc'),
+    );
+    this.addNumericStyleControl(userGroupEl, {
+      name: t('settings.style.user.radius.name'),
+      desc: t('settings.style.user.radius.desc'),
+      min: 8,
+      max: 28,
+      step: 1,
+      unit: 'px',
+      defaultValue: defaultAppearance.user.radius,
+      value: () => this.plugin.settings.chatAppearance.user.radius,
+      setValue: (value) => {
+        this.plugin.settings.chatAppearance.user.radius = value;
+      },
+    });
+    this.addNumericStyleControl(userGroupEl, {
+      name: t('settings.style.user.tailRadius.name'),
+      desc: t('settings.style.user.tailRadius.desc'),
+      min: 0,
+      max: 12,
+      step: 1,
+      unit: 'px',
+      defaultValue: defaultAppearance.user.tailRadius,
+      value: () => this.plugin.settings.chatAppearance.user.tailRadius,
+      setValue: (value) => {
+        this.plugin.settings.chatAppearance.user.tailRadius = value;
+      },
+    });
+    this.addNumericStyleControl(userGroupEl, {
+      name: t('settings.style.user.blur.name'),
+      desc: t('settings.style.user.blur.desc'),
+      min: 0,
+      max: 24,
+      step: 1,
+      unit: 'px',
+      defaultValue: defaultAppearance.user.blur,
+      value: () => this.plugin.settings.chatAppearance.user.blur,
+      setValue: (value) => {
+        this.plugin.settings.chatAppearance.user.blur = value;
+      },
+    });
+    this.addNumericStyleControl(userGroupEl, {
+      name: t('settings.style.user.shadowBlur.name'),
+      desc: t('settings.style.user.shadowBlur.desc'),
+      min: 0,
+      max: 40,
+      step: 1,
+      unit: 'px',
+      defaultValue: defaultAppearance.user.shadowBlur,
+      value: () => this.plugin.settings.chatAppearance.user.shadowBlur,
+      setValue: (value) => {
+        this.plugin.settings.chatAppearance.user.shadowBlur = value;
+      },
+    });
+    this.createStyleResetSetting(userGroupEl, 'user');
+
+    const assistantGroupEl = this.createStyleGroupSection(
+      containerEl,
+      t('settings.style.groups.assistant.title'),
+      t('settings.style.groups.assistant.desc'),
+    );
+    this.addNumericStyleControl(assistantGroupEl, {
+      name: t('settings.style.assistant.radius.name'),
+      desc: t('settings.style.assistant.radius.desc'),
+      min: 8,
+      max: 24,
+      step: 1,
+      unit: 'px',
+      defaultValue: defaultAppearance.assistant.radius,
+      value: () => this.plugin.settings.chatAppearance.assistant.radius,
+      setValue: (value) => {
+        this.plugin.settings.chatAppearance.assistant.radius = value;
+      },
+    });
+    this.addNumericStyleControl(assistantGroupEl, {
+      name: t('settings.style.assistant.backgroundOpacity.name'),
+      desc: t('settings.style.assistant.backgroundOpacity.desc'),
+      min: 0,
+      max: 100,
+      step: 1,
+      unit: '%',
+      defaultValue: defaultAppearance.assistant.backgroundOpacity,
+      value: () => this.plugin.settings.chatAppearance.assistant.backgroundOpacity,
+      setValue: (value) => {
+        this.plugin.settings.chatAppearance.assistant.backgroundOpacity = value;
+      },
+    });
+    this.addNumericStyleControl(assistantGroupEl, {
+      name: t('settings.style.assistant.blur.name'),
+      desc: t('settings.style.assistant.blur.desc'),
+      min: 0,
+      max: 20,
+      step: 1,
+      unit: 'px',
+      defaultValue: defaultAppearance.assistant.blur,
+      value: () => this.plugin.settings.chatAppearance.assistant.blur,
+      setValue: (value) => {
+        this.plugin.settings.chatAppearance.assistant.blur = value;
+      },
+    });
+    this.addNumericStyleControl(assistantGroupEl, {
+      name: t('settings.style.assistant.shadowBlur.name'),
+      desc: t('settings.style.assistant.shadowBlur.desc'),
+      min: 0,
+      max: 32,
+      step: 1,
+      unit: 'px',
+      defaultValue: defaultAppearance.assistant.shadowBlur,
+      value: () => this.plugin.settings.chatAppearance.assistant.shadowBlur,
+      setValue: (value) => {
+        this.plugin.settings.chatAppearance.assistant.shadowBlur = value;
+      },
+    });
+    this.createStyleResetSetting(assistantGroupEl, 'assistant');
+
+    const inputGroupEl = this.createStyleGroupSection(
+      containerEl,
+      t('settings.style.groups.input.title'),
+      t('settings.style.groups.input.desc'),
+    );
+    this.addNumericStyleControl(inputGroupEl, {
+      name: t('settings.style.input.radius.name'),
+      desc: t('settings.style.input.radius.desc'),
+      min: 8,
+      max: 24,
+      step: 1,
+      unit: 'px',
+      defaultValue: defaultAppearance.input.radius,
+      value: () => this.plugin.settings.chatAppearance.input.radius,
+      setValue: (value) => {
+        this.plugin.settings.chatAppearance.input.radius = value;
+      },
+    });
+    this.addNumericStyleControl(inputGroupEl, {
+      name: t('settings.style.input.blur.name'),
+      desc: t('settings.style.input.blur.desc'),
+      min: 0,
+      max: 24,
+      step: 1,
+      unit: 'px',
+      defaultValue: defaultAppearance.input.blur,
+      value: () => this.plugin.settings.chatAppearance.input.blur,
+      setValue: (value) => {
+        this.plugin.settings.chatAppearance.input.blur = value;
+      },
+    });
+    this.addNumericStyleControl(inputGroupEl, {
+      name: t('settings.style.input.shadowBlur.name'),
+      desc: t('settings.style.input.shadowBlur.desc'),
+      min: 0,
+      max: 36,
+      step: 1,
+      unit: 'px',
+      defaultValue: defaultAppearance.input.shadowBlur,
+      value: () => this.plugin.settings.chatAppearance.input.shadowBlur,
+      setValue: (value) => {
+        this.plugin.settings.chatAppearance.input.shadowBlur = value;
+      },
+    });
+    this.createStyleResetSetting(inputGroupEl, 'input');
+
+    const scrollbarGroupEl = this.createStyleGroupSection(
+      containerEl,
+      t('settings.style.groups.scrollbar.title'),
+      t('settings.style.groups.scrollbar.desc'),
+    );
+    this.addNumericStyleControl(scrollbarGroupEl, {
+      name: t('settings.style.scrollbar.width.name'),
+      desc: t('settings.style.scrollbar.width.desc'),
+      min: 6,
+      max: 12,
+      step: 1,
+      unit: 'px',
+      defaultValue: defaultAppearance.scrollbar.width,
+      value: () => this.plugin.settings.chatAppearance.scrollbar.width,
+      setValue: (value) => {
+        this.plugin.settings.chatAppearance.scrollbar.width = value;
+      },
+    });
+    this.addNumericStyleControl(scrollbarGroupEl, {
+      name: t('settings.style.scrollbar.radius.name'),
+      desc: t('settings.style.scrollbar.radius.desc'),
+      min: 2,
+      max: 999,
+      step: 1,
+      unit: 'px',
+      defaultValue: defaultAppearance.scrollbar.radius,
+      value: () => this.plugin.settings.chatAppearance.scrollbar.radius,
+      setValue: (value) => {
+        this.plugin.settings.chatAppearance.scrollbar.radius = value;
+      },
+    });
+    this.addNumericStyleControl(scrollbarGroupEl, {
+      name: t('settings.style.scrollbar.trackOpacity.name'),
+      desc: t('settings.style.scrollbar.trackOpacity.desc'),
+      min: 0,
+      max: 60,
+      step: 1,
+      unit: '%',
+      defaultValue: defaultAppearance.scrollbar.trackOpacity,
+      value: () => this.plugin.settings.chatAppearance.scrollbar.trackOpacity,
+      setValue: (value) => {
+        this.plugin.settings.chatAppearance.scrollbar.trackOpacity = value;
+      },
+    });
+    this.addNumericStyleControl(scrollbarGroupEl, {
+      name: t('settings.style.scrollbar.thumbOpacity.name'),
+      desc: t('settings.style.scrollbar.thumbOpacity.desc'),
+      min: 20,
+      max: 100,
+      step: 1,
+      unit: '%',
+      defaultValue: defaultAppearance.scrollbar.thumbOpacity,
+      value: () => this.plugin.settings.chatAppearance.scrollbar.thumbOpacity,
+      setValue: (value) => {
+        this.plugin.settings.chatAppearance.scrollbar.thumbOpacity = value;
+      },
+    });
+    this.addNumericStyleControl(scrollbarGroupEl, {
+      name: t('settings.style.scrollbar.thumbHoverOpacity.name'),
+      desc: t('settings.style.scrollbar.thumbHoverOpacity.desc'),
+      min: 30,
+      max: 100,
+      step: 1,
+      unit: '%',
+      defaultValue: defaultAppearance.scrollbar.thumbHoverOpacity,
+      value: () => this.plugin.settings.chatAppearance.scrollbar.thumbHoverOpacity,
+      setValue: (value) => {
+        this.plugin.settings.chatAppearance.scrollbar.thumbHoverOpacity = value;
+      },
+    });
+    this.addNumericStyleControl(scrollbarGroupEl, {
+      name: t('settings.style.scrollbar.edgePadding.name'),
+      desc: t('settings.style.scrollbar.edgePadding.desc'),
+      min: 0,
+      max: 4,
+      step: 1,
+      unit: 'px',
+      defaultValue: defaultAppearance.scrollbar.edgePadding,
+      value: () => this.plugin.settings.chatAppearance.scrollbar.edgePadding,
+      setValue: (value) => {
+        this.plugin.settings.chatAppearance.scrollbar.edgePadding = value;
+      },
+    });
+    this.addNumericStyleControl(scrollbarGroupEl, {
+      name: t('settings.style.scrollbar.shadowOpacity.name'),
+      desc: t('settings.style.scrollbar.shadowOpacity.desc'),
+      min: 0,
+      max: 100,
+      step: 1,
+      unit: '%',
+      defaultValue: defaultAppearance.scrollbar.shadowOpacity,
+      value: () => this.plugin.settings.chatAppearance.scrollbar.shadowOpacity,
+      setValue: (value) => {
+        this.plugin.settings.chatAppearance.scrollbar.shadowOpacity = value;
+      },
+    });
+    this.createStyleResetSetting(scrollbarGroupEl, 'scrollbar');
+
+    const advancedGroupEl = this.createStyleGroupSection(
+      containerEl,
+      t('settings.style.groups.advanced.title'),
+      t('settings.style.groups.advanced.desc'),
+    );
+
+    const advancedSetting = new Setting(advancedGroupEl)
+      .setName(t('settings.style.advanced.customCssDeclarations.name'))
+      .setDesc(t('settings.style.advanced.customCssDeclarations.desc'))
+      .setClass('opencodian-style-setting');
+
+    const validationEl = advancedSetting.settingEl.createDiv({
+      cls: 'opencodian-style-validation',
+    });
+
+    advancedSetting.addTextArea((text) => {
+      text
+        .setPlaceholder(t('settings.style.advanced.customCssDeclarations.placeholder'))
+        .setValue(this.plugin.settings.chatAppearance.advanced.customCssDeclarations)
+        .onChange((value) => {
+          if (!isValidChatAppearanceCustomCssDeclarations(value)) {
+            text.inputEl.addClass('is-invalid');
+            validationEl.setText(t('settings.style.advanced.customCssDeclarations.invalid'));
+            return;
+          }
+
+          text.inputEl.removeClass('is-invalid');
+          validationEl.empty();
+          this.plugin.settings.chatAppearance.advanced.customCssDeclarations = value;
+          this.applyAndScheduleStyleUpdate();
+        });
+
+      text.inputEl.rows = 6;
+      text.inputEl.cols = 44;
+      text.inputEl.addClass('opencodian-style-textarea');
+    });
+
+    this.createStyleResetSetting(advancedGroupEl, 'advanced');
+
+    return headingEl;
+  }
+
+  private createStyleGroupSection(containerEl: HTMLElement, title: string, desc: string): HTMLElement {
+    const sectionEl = containerEl.createDiv({ cls: 'opencodian-style-section' });
+    const headerEl = sectionEl.createDiv({ cls: 'opencodian-style-group' });
+    headerEl.createEl('h4', { cls: 'opencodian-style-group-title', text: title });
+    headerEl.createEl('p', { cls: 'opencodian-style-group-desc', text: desc });
+
+    return sectionEl.createDiv({ cls: 'opencodian-style-group-body' });
+  }
+
+  private addNumericStyleControl(containerEl: HTMLElement, config: NumericStyleControlConfig): void {
+    const setting = new Setting(containerEl)
+      .setName(config.name)
+      .setDesc(config.desc)
+      .setClass('opencodian-style-setting');
+
+    setting.controlEl.empty();
+    setting.controlEl.addClass('opencodian-style-setting-control');
+
+    const decrementBtn = setting.controlEl.createEl('button', {
+      cls: 'opencodian-style-step-btn',
+      text: '−',
+    });
+    decrementBtn.type = 'button';
+    decrementBtn.setAttribute('aria-label', `${config.name} -`);
+
+    const sliderEl = setting.controlEl.createEl('input', {
+      cls: 'opencodian-style-slider',
+      type: 'range',
+    });
+    sliderEl.min = String(config.min);
+    sliderEl.max = String(config.max);
+    sliderEl.step = String(config.step);
+
+    const numberWrapEl = setting.controlEl.createDiv({ cls: 'opencodian-style-number-wrap' });
+    const numberEl = numberWrapEl.createEl('input', {
+      cls: 'opencodian-style-number',
+      type: 'number',
+    });
+    numberEl.min = String(config.min);
+    numberEl.max = String(config.max);
+    numberEl.step = String(config.step);
+    const unitEl = numberWrapEl.createSpan({ cls: 'opencodian-style-unit', text: config.unit });
+
+    const incrementBtn = setting.controlEl.createEl('button', {
+      cls: 'opencodian-style-step-btn',
+      text: '+',
+    });
+    incrementBtn.type = 'button';
+    incrementBtn.setAttribute('aria-label', `${config.name} +`);
+
+    const resetBtn = setting.controlEl.createEl('button', {
+      cls: 'opencodian-style-reset-btn',
+      text: '⟲',
+    });
+    resetBtn.type = 'button';
+    resetBtn.setAttribute('aria-label', t('settings.style.resetSingle.tooltip'));
+    resetBtn.setAttribute('title', t('settings.style.resetSingle.tooltip'));
+
+    const renderValue = (value: number) => {
+      sliderEl.value = String(value);
+      numberEl.value = String(value);
+      unitEl.setText(config.unit);
+    };
+
+    const commitValue = (value: number) => {
+      const nextValue = this.clampStyleNumber(value, config.min, config.max, config.step);
+      config.setValue(nextValue);
+      renderValue(nextValue);
+      this.applyAndScheduleStyleUpdate();
+    };
+
+    decrementBtn.addEventListener('click', () => {
+      commitValue(config.value() - config.step);
+    });
+    incrementBtn.addEventListener('click', () => {
+      commitValue(config.value() + config.step);
+    });
+    resetBtn.addEventListener('click', () => {
+      commitValue(config.defaultValue);
+    });
+    sliderEl.addEventListener('input', () => {
+      commitValue(Number(sliderEl.value));
+    });
+    numberEl.addEventListener('input', () => {
+      const nextValue = Number(numberEl.value);
+      if (!Number.isNaN(nextValue)) {
+        commitValue(nextValue);
+      }
+    });
+    numberEl.addEventListener('blur', () => {
+      renderValue(config.value());
+    });
+
+    renderValue(config.value());
+  }
+
+  private createStyleResetSetting(
+    containerEl: HTMLElement,
+    group: 'layout' | 'user' | 'assistant' | 'input' | 'scrollbar' | 'advanced',
+  ): void {
+    new Setting(containerEl)
+      .setName(t('settings.style.groupReset.name'))
+      .setDesc(t('settings.style.groupReset.desc'))
+      .setClass('opencodian-style-reset-setting')
+      .addButton((btn) => {
+        btn
+          .setButtonText(t('settings.style.groupReset.button'))
+          .onClick(() => {
+            this.resetChatAppearanceGroup(group);
+            this.applyAndScheduleStyleUpdate();
+            this.display();
+          });
+      });
+  }
+
+  private resetChatAppearanceGroup(
+    group: 'layout' | 'user' | 'assistant' | 'input' | 'scrollbar' | 'advanced',
+  ): void {
+    const defaults = getDefaultChatAppearanceSettings();
+    if (group === 'layout') {
+      this.plugin.settings.chatAppearance.layout = { ...defaults.layout };
+      this.plugin.settings.chatAppearance.sticky = { ...defaults.sticky };
+      return;
+    }
+
+    if (group === 'user') {
+      this.plugin.settings.chatAppearance.user = { ...defaults.user };
+      return;
+    }
+
+    if (group === 'assistant') {
+      this.plugin.settings.chatAppearance.assistant = { ...defaults.assistant };
+      return;
+    }
+
+    if (group === 'input') {
+      this.plugin.settings.chatAppearance.input = { ...defaults.input };
+      return;
+    }
+
+    if (group === 'scrollbar') {
+      this.plugin.settings.chatAppearance.scrollbar = { ...defaults.scrollbar };
+      return;
+    }
+
+    this.plugin.settings.chatAppearance.advanced = { ...defaults.advanced };
+  }
+
+  private clampStyleNumber(value: number, min: number, max: number, step: number): number {
+    const clampedValue = Math.min(max, Math.max(min, value));
+    const steppedValue = Math.round(clampedValue / step) * step;
+    return Math.min(max, Math.max(min, steppedValue));
+  }
+
+  private applyAndScheduleStyleUpdate(): void {
+    this.plugin.applyChatAppearanceSettings();
+    this.plugin.scheduleChatAppearanceSave();
+  }
+
+  private bindSettingsPanelScrollPersistence(): void {
+    if (this.settingsScrollHandler) {
+      this.settingsScrollContainerEl?.removeEventListener('scroll', this.settingsScrollHandler);
+    }
+
+    const scrollContainer = this.getSettingsScrollContainer();
+    this.settingsScrollContainerEl = scrollContainer;
+    this.lastObservedSettingsScrollTop = scrollContainer.scrollTop;
+
+    this.settingsScrollHandler = () => {
+      this.plugin.settings.settingsPanelScrollTop = scrollContainer.scrollTop;
+      this.lastObservedSettingsScrollTop = scrollContainer.scrollTop;
+      this.plugin.scheduleSettingsUiStateSave();
+    };
+
+    scrollContainer.addEventListener('scroll', this.settingsScrollHandler, { passive: true });
+  }
+
+  private restoreSettingsPanelScrollPosition(scrollTop = this.plugin.settings.settingsPanelScrollTop): void {
+    const applyRestore = () => {
+      const scrollContainer = this.getSettingsScrollContainer();
+      scrollContainer.scrollTop = scrollTop;
+    };
+
+    window.requestAnimationFrame(() => {
+      applyRestore();
+      window.requestAnimationFrame(() => {
+        applyRestore();
+        window.setTimeout(applyRestore, 32);
+      });
+    });
+  }
+
+  private captureSettingsPanelScrollPosition(): void {
+    const scrollContainer = this.settingsScrollContainerEl ?? this.getSettingsScrollContainer();
+    const nextScrollTop =
+      scrollContainer.isConnected && scrollContainer.clientHeight > 0
+        ? scrollContainer.scrollTop
+        : this.lastObservedSettingsScrollTop;
+
+    this.plugin.settings.settingsPanelScrollTop = nextScrollTop;
+    this.plugin.scheduleSettingsUiStateSave();
+  }
+
+  private finishPendingOpenVisibility(): void {
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        this.pendingOpenScrollTop = null;
+        this.pendingOpenSectionTitle = null;
+        this.containerEl.style.removeProperty('visibility');
+      });
+    });
+  }
+
+  private clearInitialQuickNavFocus(): void {
+    window.requestAnimationFrame(() => {
+      const activeEl = document.activeElement;
+      if (!(activeEl instanceof HTMLElement)) {
+        return;
+      }
+
+      if (!activeEl.hasClass('opencodian-settings-quick-nav-btn')) {
+        return;
+      }
+
+      activeEl.blur();
+    });
+  }
+
+  private getSettingsScrollContainer(): HTMLElement {
+    const containerEl = this.containerEl;
+
+    let currentEl: HTMLElement | null = containerEl;
+    while (currentEl) {
+      const computedStyle = window.getComputedStyle(currentEl);
+      const overflowY = computedStyle.overflowY;
+      const canScrollY =
+        (overflowY === 'auto' || overflowY === 'scroll' || overflowY === 'overlay')
+        && currentEl.scrollHeight > currentEl.clientHeight + 1;
+
+      if (canScrollY) {
+        return currentEl;
+      }
+      currentEl = currentEl.parentElement;
+    }
+
+    return containerEl;
   }
 
   /** Debug settings section */
