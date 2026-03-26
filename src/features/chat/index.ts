@@ -3,3 +3,4 @@
  */
 
 export { OpenCodianView } from './OpenCodianView';
+export * from './tabs';

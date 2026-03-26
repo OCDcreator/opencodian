@@ -22,6 +22,7 @@ import { ProviderIconService } from '../../utils/icons/ProviderIconService';
 import { MarkdownRenderService } from '../../utils/markdown';
 import { StreamController, ThinkingBlockRenderer, ToolCallRenderer } from '../../utils/streaming';
 import { buildChatAppearanceCustomCss, getChatAppearanceCssVariables } from './chatAppearance';
+import { TabBar, TabManager } from './tabs';
 import { NavigationSidebar } from './ui/NavigationSidebar';
 
 const logger = createLogger('OpenCodianView');
@@ -94,6 +95,11 @@ export class OpenCodianView extends ItemView {
   private streamingMessageEl: HTMLElement | null = null;
   private streamingContentEl: HTMLElement | null = null;
   private currentTurnBodyEl: HTMLElement | null = null;
+  private headerTabBarSlotEl: HTMLElement | null = null;
+  private inputTabBarSlotEl: HTMLElement | null = null;
+  private tabBarMountEl: HTMLElement | null = null;
+  private tabBar: TabBar | null = null;
+  private tabManager: TabManager | null = null;
 
   // Model selector state
   private modelSelectorContainer: HTMLElement | null = null;
@@ -103,7 +109,6 @@ export class OpenCodianView extends ItemView {
   private modelSelectorScrollContainer: HTMLElement | null = null;
   private availableModels: Array<{ provider: string; model: string; label: string; providerName: string; modelName: string }> = [];
   private availableProviders: Array<{ id: string; name: string; models: Array<{ id: string; name: string }> }> = [];
-  private sessionModelOverrides: Map<string, { provider: string; model: string }> = new Map();
   private hasLoadedModelCatalog = false;
   private isModelDropdownOpen = false;
   private modelFilterQuery = '';
@@ -154,6 +159,7 @@ export class OpenCodianView extends ItemView {
   async onOpen() {
     // Build UI
     this.buildUI();
+    this.initializeTabSystem();
     this.startServerStatusLoop();
 
     // Initialize markdown service
@@ -175,12 +181,7 @@ export class OpenCodianView extends ItemView {
     // Wire events
     this.wireEventHandlers();
 
-    // Create or load conversation
-    if (this.plugin.getConversations().length === 0) {
-      await this.createNewConversation();
-    } else {
-      await this.loadConversation(this.plugin.getConversations()[0].id);
-    }
+    await this.initializeFirstTab();
   }
 
   async onClose() {
@@ -192,6 +193,12 @@ export class OpenCodianView extends ItemView {
     // Cleanup navigation sidebar
     this.navigationSidebar?.destroy();
     this.navigationSidebar = null;
+    this.tabBar?.destroy();
+    this.tabBar = null;
+    this.tabBarMountEl = null;
+    this.headerTabBarSlotEl = null;
+    this.inputTabBarSlotEl = null;
+    this.tabManager = null;
 
     // Cleanup event refs
     for (const ref of this.eventRefs) {
@@ -226,6 +233,143 @@ export class OpenCodianView extends ItemView {
     if (this.messagesShellEl && this.messagesContainer) {
       this.navigationSidebar = new NavigationSidebar(this.messagesShellEl, this.messagesContainer);
     }
+  }
+
+  private initializeTabSystem(): void {
+    if (!this.chatContainerEl) {
+      return;
+    }
+
+    this.tabBarMountEl = document.createElement('div');
+    this.tabBarMountEl.className = 'opencodian-tab-bar-mount';
+    this.tabBar = new TabBar(this.tabBarMountEl, {
+      onTabClick: (tabId) => {
+        void this.handleTabSwitch(tabId);
+      },
+      onTabClose: (tabId) => {
+        void this.handleTabClose(tabId);
+      },
+    });
+
+    this.tabManager = new TabManager(t('chat.tab.new'), {
+      getMaxTabs: () => this.plugin.settings.maxTabs,
+      onChanged: () => this.renderTabBar(),
+    });
+
+    this.applyTabBarLayout();
+  }
+
+  private async initializeFirstTab(): Promise<void> {
+    if (!this.tabManager) {
+      return;
+    }
+
+    let initialConversation = this.plugin.getConversations()[0];
+    if (!initialConversation) {
+      initialConversation = await this.plugin.createConversation();
+    }
+
+    const tab = this.tabManager.createTab(initialConversation);
+    if (tab) {
+      await this.activateTab(tab.id);
+    }
+  }
+
+  private renderTabBar(): void {
+    if (!this.tabBar || !this.tabManager) {
+      return;
+    }
+
+    this.tabBar.render(this.tabManager.getTabBarItems());
+  }
+
+  private async handleTabSwitch(tabId: string): Promise<void> {
+    if (!this.tabManager) {
+      return;
+    }
+
+    const activeTab = this.tabManager.getActiveTab();
+    if (this.isStreaming && activeTab?.id !== tabId) {
+      new Notice(t('chat.tab.streamingBlocked'));
+      return;
+    }
+
+    const switched = this.tabManager.switchToTab(tabId);
+    if (switched) {
+      await this.activateTab(tabId);
+    }
+  }
+
+  private async handleTabClose(tabId: string): Promise<void> {
+    if (!this.tabManager) {
+      return;
+    }
+
+    const tab = this.tabManager.getTab(tabId);
+    if (!tab) {
+      return;
+    }
+
+    if (tab.isStreaming) {
+      new Notice(t('chat.tab.streamingBlocked'));
+      return;
+    }
+
+    const result = this.tabManager.closeTab(tabId);
+    if (!result.closed) {
+      return;
+    }
+
+    if (result.nextActiveTabId) {
+      await this.activateTab(result.nextActiveTabId);
+      return;
+    }
+
+    const conversation = await this.plugin.createConversation();
+    const nextTab = this.tabManager.createTab(conversation);
+    if (nextTab) {
+      await this.activateTab(nextTab.id);
+    }
+  }
+
+  private async activateTab(tabId: string): Promise<void> {
+    if (!this.tabManager) {
+      return;
+    }
+
+    const tab = this.tabManager.getTab(tabId);
+    if (!tab) {
+      return;
+    }
+
+    if (tab.conversationId) {
+      await this.loadConversation(tab.conversationId);
+      return;
+    }
+
+    this.currentConversation = null;
+    this.messagesContainer?.empty();
+    this.resetTurnState();
+    this.updateModelSelectorDisplay();
+  }
+
+  public applyTabBarLayout(): void {
+    if (!this.tabBarMountEl || !this.headerTabBarSlotEl || !this.inputTabBarSlotEl) {
+      return;
+    }
+
+    const targetSlot = this.plugin.settings.tabBarPosition === 'header'
+      ? this.headerTabBarSlotEl
+      : this.inputTabBarSlotEl;
+
+    if (this.tabBarMountEl.parentElement !== targetSlot) {
+      this.tabBarMountEl.remove();
+      targetSlot.appendChild(this.tabBarMountEl);
+    }
+
+    this.headerTabBarSlotEl.classList.toggle('is-active-slot', targetSlot === this.headerTabBarSlotEl);
+    this.inputTabBarSlotEl.classList.toggle('is-active-slot', targetSlot === this.inputTabBarSlotEl);
+    this.renderTabBar();
   }
 
   public applyChatAppearanceSettings(): void {
@@ -375,6 +519,7 @@ export class OpenCodianView extends ItemView {
     logoContainer.innerHTML = this.getLogoSvg();
 
     titleEl.createEl('span', { text: 'OpenCodian', cls: 'opencodian-title-text' });
+    this.headerTabBarSlotEl = header.createDiv({ cls: 'opencodian-tab-bar-slot opencodian-tab-bar-slot--header' });
     
     // Listen for theme changes
     this.registerEvent(
@@ -401,7 +546,7 @@ export class OpenCodianView extends ItemView {
     // New conversation button
     const newBtn = actions.createDiv({ cls: 'opencodian-header-btn' });
     setIcon(newBtn, 'plus');
-    newBtn.setAttribute('aria-label', 'New conversation');
+    newBtn.setAttribute('aria-label', t('chat.tab.new'));
     newBtn.addEventListener('click', () => {
       void this.createNewConversation();
     });
@@ -531,6 +676,8 @@ export class OpenCodianView extends ItemView {
 
   /** Build input area */
   private buildInputArea(container: HTMLElement) {
+    this.inputTabBarSlotEl = container.createDiv({ cls: 'opencodian-tab-bar-slot opencodian-tab-bar-slot--input' });
+
     // Input wrapper - textarea only (send button moved to toolbar)
     const inputWrapper = container.createDiv({ cls: 'opencodian-input-wrapper' });
     
@@ -614,10 +761,22 @@ export class OpenCodianView extends ItemView {
 
   /** Create a new conversation */
   private async createNewConversation() {
+    if (!this.tabManager) {
+      return;
+    }
+
+    if (!this.tabManager.canCreateTab()) {
+      new Notice(t('chat.tab.maxReached', { count: String(this.plugin.settings.maxTabs) }));
+      return;
+    }
+
     try {
       const conversation = await this.plugin.createConversation();
-      await this.loadConversation(conversation.id);
-      new Notice('New conversation started');
+      const tab = this.tabManager.createTab(conversation);
+      if (tab) {
+        await this.activateTab(tab.id);
+      }
+      new Notice(t('chat.tab.created'));
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Failed to create conversation';
       new Notice(msg);
@@ -630,6 +789,7 @@ export class OpenCodianView extends ItemView {
     if (!conversation) return;
 
     this.currentConversation = conversation;
+    this.tabManager?.setActiveTabConversation(conversation);
 
     // Clear messages display
     this.messagesContainer?.empty();
@@ -719,6 +879,10 @@ export class OpenCodianView extends ItemView {
       itemEl.addEventListener('click', (e) => {
         e.stopPropagation();
         this.closeHistoryDropdown();
+        if (this.isStreaming) {
+          new Notice(t('chat.tab.streamingBlocked'));
+          return;
+        }
         if (!isActive) {
           void this.loadConversation(conv.id);
         }
@@ -839,11 +1003,15 @@ export class OpenCodianView extends ItemView {
     
     const deletedId = this.currentConversation.id;
     await this.plugin.deleteConversation(deletedId);
-    
-    // Load another conversation or create new one
-    const remaining = this.plugin.getConversations();
-    if (remaining.length > 0) {
-      await this.loadConversation(remaining[0].id);
+
+    const activeTabId = this.tabManager?.getActiveTab()?.id ?? null;
+    if (activeTabId && this.tabManager) {
+      const closeResult = this.tabManager.closeTab(activeTabId);
+      if (closeResult.nextActiveTabId) {
+        await this.activateTab(closeResult.nextActiveTabId);
+      } else {
+        await this.createNewConversation();
+      }
     } else {
       await this.createNewConversation();
     }
@@ -976,7 +1144,12 @@ export class OpenCodianView extends ItemView {
     for (const conv of conversations) {
       await this.plugin.deleteConversation(conv.id);
     }
-    
+
+    this.tabManager = new TabManager(t('chat.tab.new'), {
+      getMaxTabs: () => this.plugin.settings.maxTabs,
+      onChanged: () => this.renderTabBar(),
+    });
+    this.renderTabBar();
     await this.createNewConversation();
     new Notice(t('chat.deleteAllConfirm.success') || 'All conversations deleted');
   }
@@ -1134,6 +1307,7 @@ export class OpenCodianView extends ItemView {
     }
 
     this.isStreaming = true;
+    this.tabManager?.setActiveTabStreaming(true);
     this.updateSendButtonState();
     this.scrollToBottom();
 
@@ -1146,6 +1320,7 @@ export class OpenCodianView extends ItemView {
         timeoutId = null;
       }
       this.isStreaming = false;
+      this.tabManager?.setActiveTabStreaming(false);
       this.updateSendButtonState();
     };
 
@@ -1393,6 +1568,7 @@ export class OpenCodianView extends ItemView {
     if (this.currentConversation) {
       this.currentConversation.updatedAt = Date.now();
       await this.plugin.storage.saveConversation(this.currentConversation);
+      this.tabManager?.setActiveTabConversation(this.currentConversation);
     }
   }
 
@@ -1634,6 +1810,7 @@ export class OpenCodianView extends ItemView {
     
     // Update local state
     this.isStreaming = false;
+    this.tabManager?.setActiveTabStreaming(false);
     logger.debug('isStreaming set to false');
     
     // Update button state
@@ -2395,13 +2572,10 @@ export class OpenCodianView extends ItemView {
       };
     }
 
-    if (this.currentConversation) {
-      const override = this.sessionModelOverrides.get(this.currentConversation.id);
-      if (override && this.isModelInAvailableProviders(override.provider, override.model)) {
+    const override = this.tabManager?.getActiveTabModelOverride() ?? null;
+    if (override) {
+      if (this.isModelInAvailableProviders(override.provider, override.model)) {
         return override;
-      }
-      if (override) {
-        this.sessionModelOverrides.delete(this.currentConversation.id);
       }
     }
 
@@ -2424,10 +2598,9 @@ export class OpenCodianView extends ItemView {
 
   /** Switch model for current session */
   private switchModel(provider: string, model: string): void {
-    if (!this.currentConversation) return;
-    
-    // Store override for this session
-    this.sessionModelOverrides.set(this.currentConversation.id, { provider, model });
+    if (!this.tabManager?.getActiveTab()) return;
+
+    this.tabManager.setActiveTabModelOverride({ provider, model });
     
     // Update display
     this.updateModelSelectorDisplay();

@@ -310,6 +310,7 @@ export default class OpenCodianPlugin extends Plugin {
       if (view instanceof OpenCodianView) {
         view.applyChatAppearanceSettings();
         view.applyChatScrollMode();
+        view.applyTabBarLayout();
         void view.reloadModelCatalog();
       }
     }
