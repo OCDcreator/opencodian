@@ -419,6 +419,22 @@ export class OpenCodeService {
     // Build model config
     const providerID = options.provider ?? this.settings.defaultProvider;
     const modelID = options.model ?? this.settings.defaultModel;
+    const modelOptions: Record<string, unknown> = {};
+
+    if (options.reasoningEffort) {
+      modelOptions.reasoningEffort = options.reasoningEffort;
+    }
+
+    if (options.thinkingBudget !== undefined) {
+      modelOptions.thinking = options.thinkingBudget > 0
+        ? {
+            type: 'enabled',
+            budgetTokens: options.thinkingBudget,
+          }
+        : {
+            type: 'disabled',
+          };
+    }
 
     try {
       // Send the prompt using async endpoint
@@ -427,6 +443,7 @@ export class OpenCodeService {
         model: {
           providerID,
           modelID,
+          ...(Object.keys(modelOptions).length > 0 ? { options: modelOptions } : {}),
         },
       };
       

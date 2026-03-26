@@ -45,6 +45,8 @@ export {
   type ModelSourceMode,
   normalizeBaseUrl,
   normalizeChatAppearanceSettings,
+  normalizeEffortLevel,
+  normalizeThinkingBudget,
   type OpenCodianSettings,
   type PartialChatAppearanceSettings,
   type PermissionMode,

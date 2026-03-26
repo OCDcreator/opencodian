@@ -4040,3 +4040,96 @@
   width: 16px;
   height: 16px;
 }
+
+/* ==================== Effort Selector ==================== */
+.opencodian-effort-slot,
+.opencodian-effort-selector {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.opencodian-effort-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  font-size: 12px;
+}
+
+.opencodian-effort-label {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.opencodian-effort-gears {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.opencodian-effort-current {
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  min-width: 32px;
+  text-align: center;
+}
+
+.opencodian-effort-current:hover {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+.opencodian-effort-options {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  display: none;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 8px;
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  z-index: 100;
+  min-width: 60px;
+}
+
+.opencodian-effort-gears:hover .opencodian-effort-options,
+.opencodian-effort-options:has(:hover) {
+  display: flex;
+}
+
+.opencodian-effort-gear {
+  padding: 6px 12px;
+  border-radius: 4px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.opencodian-effort-gear:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.opencodian-effort-gear.selected {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  font-weight: 600;
+}
