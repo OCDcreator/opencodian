@@ -8,6 +8,84 @@
 
 ---
 
+## 2026-03-26 助手消息对齐修复与代码块复制入口收敛
+
+### 📋 本次开发目标
+本轮主要处理两个聊天界面细节问题，并补充代理默认交付流程：
+
+1. **统一助手消息内部内容的左对齐基线**
+   - 让思考块、正文、工具调用块与底部时间戳共享同一左边界
+   - 消除助手消息中由多层 padding 造成的视觉错位
+
+2. **移除代码块右下角冗余复制按钮**
+   - 保留现有右上角复制入口
+   - 去掉 Obsidian 默认注入、在当前界面里显得突兀的代码块复制按钮
+
+3. **补充默认测试库部署约定**
+   - 约定在本仓库中完成代码/样式修改后默认构建并同步到 Test Vault
+
+### ✅ 助手消息左对齐修复
+
+#### 1. 抽出助手消息共享间距变量
+- 在 `styles.css` 容器变量区新增：
+  - `--opencodian-assistant-pad-y`
+  - `--opencodian-assistant-pad-x`
+  - `--opencodian-assistant-content-pad-y`
+  - `--opencodian-assistant-content-pad-x`
+- 避免助手消息外层、内容层、时间行各自写死横向间距
+
+#### 2. 统一正文区与时间戳的左边界
+- `opencodian-message--assistant` 继续负责外层横向留白
+- `opencodian-message-content` 与 `opencodian-message-time-row` 统一使用相同的内容层横向内边距
+- 修复思考块、正文、工具调用块和时间戳左边界不一致的问题
+
+#### 3. 折叠/展开行为保持不变
+- 未改动：
+  - `.streaming-thinking-block.is-expanded`
+  - `.streaming-tool-call.is-expanded`
+  - 内容区现有的展开动画与内部缩进逻辑
+
+### ✅ 代码块复制入口收敛
+
+#### 1. 渲染阶段移除 Obsidian 默认复制按钮
+- 在 `src/utils/markdown/MarkdownRenderer.ts` 中检测到 `.copy-code-button` 后直接移除
+- 不再把默认复制按钮保留在代码块包装层中
+
+#### 2. 样式层增加兜底隐藏
+- 在 `styles.css` 中新增：
+  - `.markdown-code-wrapper .copy-code-button { display: none !important; }`
+- 避免在渲染时序变化或宿主行为调整时按钮重新显现
+
+#### 3. 保留现有顶部复制入口
+- 代码块右上角已有复制入口继续保留
+- 最终收敛为单一复制交互，减少视觉噪音
+
+### ✅ 代理默认部署流程补充
+
+#### 1. 仓库级默认规则
+- 在 `AGENTS.md` 中新增 `Agent Default Deploy Workflow`
+- 约定在本仓库中完成代码、样式、manifest 或构建相关修改后，默认执行：
+  - `npm run build`
+  - 同步 `dist/main.js`、`dist/manifest.json`、`dist/styles.css` 到 Test Vault
+
+#### 2. 本轮执行结果
+- 已完成 `npm run build`
+- 已同步到测试库：
+  - `C:\Users\lt\Desktop\Write\testvault\.obsidian\plugins\opencodian\`
+
+### 📁 涉及文件
+
+| 文件 | 修改内容 |
+|------|----------|
+| `styles.css` | 修复助手消息内容与时间戳左对齐，并隐藏代码块默认复制按钮 |
+| `src/utils/markdown/MarkdownRenderer.ts` | 移除 Obsidian 默认注入的代码块复制按钮 |
+| `AGENTS.md` | 新增默认构建并部署到 Test Vault 的仓库规则 |
+
+### 🧪 验证结果
+
+- ✅ `npm run build`
+- ✅ 已部署到 Test Vault
+
 ## 2026-03-26 会话样式系统落地与设置面板交互打磨
 
 ### 📋 本次开发目标

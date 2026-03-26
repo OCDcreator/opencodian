@@ -106,11 +106,9 @@ export class MarkdownRenderService {
         }
       }
 
-      if (addCopyButton) {
-        const obsidianCopyBtn = pre.querySelector('.copy-code-button');
-        if (obsidianCopyBtn) {
-          wrapper.appendChild(obsidianCopyBtn);
-        }
+      const obsidianCopyBtn = pre.querySelector('.copy-code-button');
+      if (obsidianCopyBtn) {
+        obsidianCopyBtn.remove();
       }
     });
   }

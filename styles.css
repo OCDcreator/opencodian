@@ -96,6 +96,10 @@
   --opencodian-user-blur: 12px;
   --opencodian-user-shadow-blur: 28px;
   --opencodian-assistant-radius: 14px;
+  --opencodian-assistant-pad-y: 10px;
+  --opencodian-assistant-pad-x: 28px;
+  --opencodian-assistant-content-pad-y: 10px;
+  --opencodian-assistant-content-pad-x: 14px;
   --opencodian-assistant-bg-opacity: 72%;
   --opencodian-assistant-blur: 10px;
   --opencodian-assistant-shadow-blur: 24px;
@@ -487,7 +491,7 @@
   border-radius: 12px;
   border-end-start-radius: 4px;
   text-align: start;
-  padding: 10px 28px;
+  padding: var(--opencodian-assistant-pad-y) var(--opencodian-assistant-pad-x);
   animation: messageSlideIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
   z-index: 1; /* Below sticky user messages (z-index: 100) */
 }
@@ -499,7 +503,7 @@
 
 .opencodian-message--assistant .opencodian-message-content {
   position: relative;
-  padding: 10px 14px;
+  padding: var(--opencodian-assistant-content-pad-y) var(--opencodian-assistant-content-pad-x);
   border-radius: var(--opencodian-assistant-radius);
   transition:
     background 0.25s ease,
@@ -755,7 +759,7 @@
 
 .opencodian-message--assistant .opencodian-message-time {
   text-align: left;
-  padding-left: 0;
+  padding-left: var(--opencodian-assistant-content-pad-x);
 }
 
 /* Timestamp row with copy button for assistant messages */
@@ -764,7 +768,7 @@
   align-items: center;
   gap: 8px;
   margin-top: 4px;
-  padding-left: 0;
+  padding-left: var(--opencodian-assistant-content-pad-x);
   font-size: 10px;
   color: var(--text-muted);
   opacity: 0.6;
@@ -2695,6 +2699,10 @@
 .markdown-code-lang-label:hover {
   background: var(--interactive-hover);
   color: var(--text-normal);
+}
+
+.markdown-code-wrapper .copy-code-button {
+  display: none !important;
 }
 
 /* Inline code */

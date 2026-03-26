@@ -290,6 +290,13 @@ npm run build && copy dist\main.js dist\manifest.json dist\styles.css ..\..\test
 npm run build && cp dist/main.js dist/manifest.json dist/styles.css ../../testvault/.obsidian/plugins/opencodian/
 ```
 
+### Agent Default Deploy Workflow
+
+- For any code, style, manifest, or build-related change, the default workflow is: `npm run build` and then deploy `dist/main.js`, `dist/manifest.json`, and `dist/styles.css` to the **Test Vault** plugin directory.
+- On Windows, deploy to `C:\Users\lt\Desktop\Write\testvault\.obsidian\plugins\opencodian\`.
+- Skip deployment only if the user explicitly says not to build/deploy, or if the task is analysis-only with no file changes.
+- After deployment, report whether build and copy succeeded or failed.
+
 ## Development Notes
 
 ### Adding New Features
