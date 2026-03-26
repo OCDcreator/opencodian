@@ -2343,7 +2343,7 @@ export class OpenCodianView extends ItemView {
     if (textEl) {
       textEl.textContent = current
         ? (modelInfo?.modelName || current.model)
-        : t('settings.model.noModels');
+        : t('settings.model.unconfigured');
     }
     
     // Update provider icon using Lobehub icons
@@ -2369,6 +2369,10 @@ export class OpenCodianView extends ItemView {
   /** Get current model for this session */
   private getCurrentSessionModel(): { provider: string; model: string } | null {
     if (!this.hasLoadedModelCatalog) {
+      if (!this.plugin.settings.defaultProvider || !this.plugin.settings.defaultModel) {
+        return null;
+      }
+
       return {
         provider: this.plugin.settings.defaultProvider,
         model: this.plugin.settings.defaultModel,
@@ -2393,6 +2397,10 @@ export class OpenCodianView extends ItemView {
         provider: this.plugin.settings.defaultProvider,
         model: this.plugin.settings.defaultModel,
       };
+    }
+
+    if (!this.plugin.settings.defaultProvider || !this.plugin.settings.defaultModel) {
+      return null;
     }
 
     return this.getFirstAvailableModel();
@@ -2532,6 +2540,13 @@ export class OpenCodianView extends ItemView {
   }
 
   private getModelUnavailableNoticeContent(): { title: string; message: string } {
+    if (!this.getCurrentSessionModel()) {
+      return {
+        title: t('chat.notice.modelUnavailable.unconfiguredTitle'),
+        message: t('chat.notice.modelUnavailable.unconfiguredBody'),
+      };
+    }
+
     if (this.availableProviders.length === 0) {
       switch (this.plugin.settings.modelSourceMode) {
         case 'local':

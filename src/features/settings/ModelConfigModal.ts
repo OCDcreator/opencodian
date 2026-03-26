@@ -16,6 +16,7 @@ interface ModelFormState {
   name: string;
   context: string;
   output: string;
+  enabled: boolean;
   raw: OpencodeProviderModelConfig;
 }
 
@@ -24,7 +25,9 @@ interface ProviderFormState {
   name: string;
   npm: string;
   baseURL: string;
+  anthropicBaseURL: string;
   apiKey: string;
+  enabled: boolean;
   models: ModelFormState[];
   raw: OpencodeProviderConfig;
 }
@@ -33,6 +36,8 @@ export class ModelConfigModal extends Modal {
   private modelValue = '';
   private smallModelValue = '';
   private providers: ProviderFormState[] = [];
+  private initialEnabledProviders: string[] = [];
+  private initialDisabledProviders: string[] = [];
   private restartToggleEl: HTMLInputElement | null = null;
   private providersEl: HTMLElement | null = null;
 
@@ -60,6 +65,10 @@ export class ModelConfigModal extends Modal {
     contentEl.createEl('p', {
       text: `${t('settings.model.config.path')}: ${service.getConfigPath()}`,
       cls: 'opencodian-config-path',
+    });
+    contentEl.createDiv({
+      cls: 'opencodian-model-config-warning',
+      text: t('settings.model.visualEditor.anthropicWarning'),
     });
 
     const defaultsEl = contentEl.createDiv({ cls: 'opencodian-model-config-defaults' });
@@ -102,17 +111,25 @@ export class ModelConfigModal extends Modal {
   private hydrate(config: OpencodeModelConfigSubset): void {
     this.modelValue = config.model ?? '';
     this.smallModelValue = config.small_model ?? '';
+    this.initialEnabledProviders = [...(config.enabled_providers ?? [])];
+    this.initialDisabledProviders = [...(config.disabled_providers ?? [])];
+    const enabledProviders = new Set(this.initialEnabledProviders);
+    const disabledProviders = new Set(this.initialDisabledProviders);
+
     this.providers = Object.entries(config.provider ?? {}).map(([providerId, provider]) => ({
       id: providerId,
       name: typeof provider.name === 'string' ? provider.name : '',
       npm: typeof provider.npm === 'string' ? provider.npm : '@ai-sdk/openai-compatible',
       baseURL: this.readString(provider.options, 'baseURL'),
+      anthropicBaseURL: this.readString(provider.options, 'anthropicBaseURL'),
       apiKey: this.readString(provider.options, 'apiKey'),
+      enabled: enabledProviders.size > 0 ? enabledProviders.has(providerId) : !disabledProviders.has(providerId),
       models: Object.entries(provider.models ?? {}).map(([modelId, model]) => ({
         id: modelId,
         name: typeof model.name === 'string' ? model.name : '',
         context: this.readNumber(model.limit, 'context'),
         output: this.readNumber(model.limit, 'output'),
+        enabled: this.isModelEnabled(provider, modelId),
         raw: model,
       })),
       raw: provider,
@@ -136,7 +153,21 @@ export class ModelConfigModal extends Modal {
       header.createEl('h3', {
         text: provider.name.trim() || provider.id.trim() || t('settings.model.visualEditor.providerUntitled'),
       });
-      header.createEl('button', {
+      const headerActions = header.createDiv({ cls: 'opencodian-model-provider-card-actions' });
+      const enabledLabel = headerActions.createEl('label', { cls: 'opencodian-model-config-inline-toggle' });
+      const enabledInput = enabledLabel.createEl('input', { attr: { type: 'checkbox' } });
+      enabledInput.checked = provider.enabled;
+      enabledInput.addEventListener('change', () => {
+        if (!enabledInput.checked && this.isDefaultProvider(provider.id)) {
+          enabledInput.checked = true;
+          new Notice(t('settings.model.toggle.defaultProviderLocked'));
+          return;
+        }
+        provider.enabled = enabledInput.checked;
+      });
+      enabledLabel.createSpan({ text: t('settings.model.toggle.enabled') });
+
+      headerActions.createEl('button', {
         text: t('settings.model.visualEditor.deleteProvider'),
       }).addEventListener('click', () => {
         this.providers.splice(providerIndex, 1);
@@ -156,6 +187,9 @@ export class ModelConfigModal extends Modal {
       this.createField(grid, `${t('settings.model.visualEditor.baseURL')} *`, provider.baseURL, (value) => {
         provider.baseURL = value;
       }, 'https://api.example.com/v1');
+      this.createField(grid, t('settings.model.visualEditor.anthropicBaseURL'), provider.anthropicBaseURL, (value) => {
+        provider.anthropicBaseURL = value;
+      }, 'https://api.anthropic.com');
       this.createField(grid, t('settings.model.visualEditor.apiKey'), provider.apiKey, (value) => {
         provider.apiKey = value;
       }, '{env:MY_API_KEY}', true);
@@ -169,6 +203,22 @@ export class ModelConfigModal extends Modal {
       const modelsEl = card.createDiv({ cls: 'opencodian-model-provider-models' });
       provider.models.forEach((model, modelIndex) => {
         const row = modelsEl.createDiv({ cls: 'opencodian-model-provider-model-row' });
+        const modelToggleField = row.createDiv({ cls: 'opencodian-model-config-field' });
+        modelToggleField.createEl('label', { text: t('settings.model.toggle.enabled') });
+        const modelToggleLabel = modelToggleField.createEl('label', { cls: 'opencodian-model-config-inline-toggle' });
+        const modelToggle = modelToggleLabel.createEl('input', { attr: { type: 'checkbox' } });
+        modelToggle.checked = model.enabled;
+        modelToggle.disabled = !provider.enabled;
+        modelToggle.addEventListener('change', () => {
+          model.enabled = modelToggle.checked;
+        });
+        modelToggleLabel.createSpan({ text: model.enabled ? t('settings.model.toggle.on') : t('settings.model.toggle.off') });
+        modelToggle.addEventListener('change', () => {
+          const stateEl = modelToggleLabel.querySelector('span');
+          if (stateEl instanceof HTMLElement) {
+            stateEl.textContent = modelToggle.checked ? t('settings.model.toggle.on') : t('settings.model.toggle.off');
+          }
+        });
         this.createField(row, `${t('settings.model.visualEditor.modelId')} *`, model.id, (value) => {
           model.id = value;
         }, 'my-model');
@@ -199,6 +249,7 @@ export class ModelConfigModal extends Modal {
           name: '',
           context: '',
           output: '',
+          enabled: true,
           raw: {},
         });
         this.renderProviders();
@@ -232,7 +283,9 @@ export class ModelConfigModal extends Modal {
       name: '',
       npm: '@ai-sdk/openai-compatible',
       baseURL: '',
+      anthropicBaseURL: '',
       apiKey: '',
+      enabled: true,
       models: [],
       raw: {},
     };
@@ -276,11 +329,18 @@ export class ModelConfigModal extends Modal {
 
   private toModelConfig(): OpencodeModelConfigSubset {
     const seenProviders = new Set<string>();
+    const knownProviderIds = this.providers
+      .map((provider) => provider.id.trim())
+      .filter((providerId) => providerId.length > 0);
+    const nextEnabledProviders = this.initialEnabledProviders.filter((providerId) => !knownProviderIds.includes(providerId));
+    const nextDisabledProviders = this.initialDisabledProviders.filter((providerId) => !knownProviderIds.includes(providerId));
+
     const providerEntries = this.providers.reduce<Record<string, OpencodeProviderConfig>>((result, provider) => {
       const isBlankProvider =
         !provider.id.trim()
         && !provider.name.trim()
         && !provider.baseURL.trim()
+        && !provider.anthropicBaseURL.trim()
         && !provider.apiKey.trim()
         && provider.models.length === 0;
       if (isBlankProvider) {
@@ -305,6 +365,14 @@ export class ModelConfigModal extends Modal {
       }
       seenProviders.add(providerId);
 
+      if (provider.enabled) {
+        if (this.initialEnabledProviders.length > 0 && !nextEnabledProviders.includes(providerId)) {
+          nextEnabledProviders.push(providerId);
+        }
+      } else if (!nextDisabledProviders.includes(providerId)) {
+        nextDisabledProviders.push(providerId);
+      }
+
       const nextProvider: OpencodeProviderConfig = { ...provider.raw };
       nextProvider.name = providerName;
       nextProvider.npm = provider.npm.trim() || '@ai-sdk/openai-compatible';
@@ -313,6 +381,11 @@ export class ModelConfigModal extends Modal {
         ? { ...nextProvider.options }
         : {};
       nextOptions.baseURL = baseURL;
+      if (provider.anthropicBaseURL.trim()) {
+        nextOptions.anthropicBaseURL = provider.anthropicBaseURL.trim();
+      } else {
+        delete nextOptions.anthropicBaseURL;
+      }
       if (provider.apiKey.trim()) {
         nextOptions.apiKey = provider.apiKey.trim();
       } else {
@@ -372,16 +445,70 @@ export class ModelConfigModal extends Modal {
         return models;
       }, {});
 
+      const originalWhitelist = this.uniqueStrings(nextProvider.whitelist ?? []);
+      const originalBlacklist = this.uniqueStrings(nextProvider.blacklist ?? []);
+      const knownModelIds = provider.models
+        .map((model) => model.id.trim())
+        .filter((modelId) => modelId.length > 0);
+
+      if (originalWhitelist.length > 0) {
+        const whitelist = originalWhitelist.filter((modelId) => !knownModelIds.includes(modelId));
+        for (const model of provider.models) {
+          const modelId = model.id.trim();
+          if (!modelId) {
+            continue;
+          }
+          if (model.enabled && !whitelist.includes(modelId)) {
+            whitelist.push(modelId);
+          }
+        }
+        if (whitelist.length > 0) {
+          nextProvider.whitelist = whitelist;
+        } else {
+          delete nextProvider.whitelist;
+        }
+        nextProvider.blacklist = originalBlacklist.filter((modelId) => !knownModelIds.includes(modelId));
+        if (nextProvider.blacklist.length === 0) {
+          delete nextProvider.blacklist;
+        }
+      } else {
+        const blacklist = originalBlacklist.filter((modelId) => !knownModelIds.includes(modelId));
+        for (const model of provider.models) {
+          const modelId = model.id.trim();
+          if (!modelId) {
+            continue;
+          }
+          if (!model.enabled && !blacklist.includes(modelId)) {
+            blacklist.push(modelId);
+          }
+        }
+        if (blacklist.length > 0) {
+          nextProvider.blacklist = blacklist;
+        } else {
+          delete nextProvider.blacklist;
+        }
+        delete nextProvider.whitelist;
+      }
+
       nextProvider.models = modelEntries;
       result[providerId] = nextProvider;
       return result;
     }, {});
 
-    return {
+    const nextConfig: OpencodeModelConfigSubset = {
       model: this.modelValue.trim() || undefined,
       small_model: this.smallModelValue.trim() || undefined,
       provider: providerEntries,
     };
+
+    if (this.initialEnabledProviders.length > 0 && nextEnabledProviders.length > 0) {
+      nextConfig.enabled_providers = this.uniqueStrings(nextEnabledProviders);
+    }
+    if (nextDisabledProviders.length > 0) {
+      nextConfig.disabled_providers = this.uniqueStrings(nextDisabledProviders);
+    }
+
+    return nextConfig;
   }
 
   private async maybeRestartServer(): Promise<void> {
@@ -403,5 +530,23 @@ export class ModelConfigModal extends Modal {
     await new Promise((resolve) => setTimeout(resolve, 1000));
     await this.plugin.openCodeService.start();
     new Notice(t('settings.model.config.restartSuccess'));
+  }
+
+  private isDefaultProvider(providerId: string): boolean {
+    return providerId.trim().length > 0 && this.plugin.settings.defaultProvider === providerId.trim();
+  }
+
+  private isModelEnabled(provider: OpencodeProviderConfig, modelId: string): boolean {
+    const whitelist = this.uniqueStrings(provider.whitelist ?? []);
+    const blacklist = this.uniqueStrings(provider.blacklist ?? []);
+    if (whitelist.length > 0) {
+      return whitelist.includes(modelId) && !blacklist.includes(modelId);
+    }
+
+    return !blacklist.includes(modelId);
+  }
+
+  private uniqueStrings(values: string[]): string[] {
+    return Array.from(new Set(values.map((value) => value.trim()).filter((value) => value.length > 0)));
   }
 }

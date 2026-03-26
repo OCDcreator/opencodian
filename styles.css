@@ -3740,6 +3740,11 @@
   border-top: 1px solid var(--background-modifier-border-hover);
 }
 
+.opencodian-model-catalog-provider.is-disabled,
+.opencodian-model-catalog-model-row.is-disabled {
+  opacity: 0.56;
+}
+
 .opencodian-model-catalog-provider:first-child {
   border-top: none;
   padding-top: 4px;
@@ -3758,6 +3763,12 @@
   color: var(--text-normal);
 }
 
+.opencodian-model-catalog-provider-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .opencodian-model-catalog-provider-count {
   padding: 2px 8px;
   border-radius: 999px;
@@ -3767,12 +3778,55 @@
   font-weight: 600;
 }
 
-.opencodian-model-catalog-provider-models {
-  margin-top: 6px;
+.opencodian-model-catalog-provider-model-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.opencodian-model-catalog-model-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+}
+
+.opencodian-model-catalog-model-info {
+  min-width: 0;
+}
+
+.opencodian-model-catalog-model-name {
   font-size: 12px;
-  color: var(--text-muted);
-  line-height: 1.6;
+  font-weight: 600;
+  color: var(--text-normal);
   word-break: break-word;
+}
+
+.opencodian-model-catalog-model-id {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--text-muted);
+  word-break: break-all;
+}
+
+.opencodian-model-catalog-toggle,
+.opencodian-model-config-inline-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.opencodian-model-catalog-toggle input,
+.opencodian-model-config-inline-toggle input {
+  margin: 0;
 }
 
 .opencodian-model-config-defaults,
@@ -3823,6 +3877,12 @@
   margin-bottom: 14px;
 }
 
+.opencodian-model-provider-card-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .opencodian-model-provider-card-header h3 {
   margin: 0;
   font-size: 15px;
@@ -3868,6 +3928,17 @@
   gap: 8px;
   font-size: 13px;
   color: var(--text-muted);
+}
+
+.opencodian-model-config-warning {
+  margin: 10px 0 16px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--text-warning) 30%, transparent);
+  background: color-mix(in srgb, var(--text-warning) 10%, transparent);
+  color: var(--text-warning);
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .opencodian-model-config-help pre {
