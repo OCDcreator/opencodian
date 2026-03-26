@@ -249,6 +249,7 @@ export const zhTranslations = {
   'settings.model.refresh.loading': '加载中...',
   'settings.model.refresh.success': '找到 {count} 个提供商',
   'settings.model.refresh.failed': '获取模型失败',
+  'settings.model.unconfigured': '未配置',
   'settings.model.noModels': '无可用模型',
   'settings.model.config.name': '本地模型配置',
   'settings.model.config.desc': '编辑当前 vault 的 `.opencode/opencode.json` 中的提供商 / 模型字段。',

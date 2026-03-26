@@ -249,6 +249,7 @@ export const enTranslations = {
   'settings.model.refresh.loading': 'Loading...',
   'settings.model.refresh.success': 'Found {count} providers',
   'settings.model.refresh.failed': 'Failed to fetch models',
+  'settings.model.unconfigured': 'Unconfigured',
   'settings.model.noModels': 'No models available',
   'settings.model.config.name': 'Local model configuration',
   'settings.model.config.desc': 'Edit the vault `.opencode/opencode.json` provider/model section.',
