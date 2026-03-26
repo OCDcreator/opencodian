@@ -21,6 +21,8 @@ import {
   getServerBaseUrl,
   isLocalServerMode,
   normalizeChatAppearanceSettings,
+  normalizeEffortLevel,
+  normalizeThinkingBudget,
   VIEW_TYPE_OPENCODIAN,
 } from './core/types';
 import { OpenCodianView } from './features/chat/OpenCodianView';
@@ -281,6 +283,8 @@ export default class OpenCodianPlugin extends Plugin {
             (savedSettings.chatScrollMode as OpenCodianSettings['chatScrollMode'] | 'sticky' | undefined) === 'sticky'
               ? 'sticky-mask'
               : savedSettings.chatScrollMode,
+          effortLevel: normalizeEffortLevel(savedSettings.effortLevel),
+          thinkingBudget: normalizeThinkingBudget(savedSettings.thinkingBudget),
           debugLogPaths: normalizedDebugLogPaths,
           chatAppearance: normalizedChatAppearance,
         }

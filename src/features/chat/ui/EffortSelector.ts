@@ -2,55 +2,58 @@
  * EffortSelector - Thinking budget and effort level selector.
  *
  * Shows either:
- * - Effort selector for adaptive thinking models (claude-sonnet-4, claude-opus-4)
+ * - Effort selector for adaptive reasoning models (GPT-5/o-series)
  * - Thinking budget selector for custom models
  */
 
+import type { EffortLevel, ThinkingBudget } from '../../../core/types/settings';
 import { t } from '../../../i18n';
-
-/** Effort levels for adaptive thinking models */
-export type EffortLevel = 'low' | 'medium' | 'high' | 'max';
-
-/** Thinking budget values for custom models */
-export type ThinkingBudget = 'off' | 'low' | 'medium' | 'high' | 'xhigh';
 
 /** Available effort levels */
 export const EFFORT_LEVELS: { value: EffortLevel; label: string }[] = [
+  { value: 'minimal', label: 'Minimal' },
   { value: 'low', label: 'Low' },
-  { value: 'medium', label: 'Med' },
+  { value: 'medium', label: 'Medium' },
   { value: 'high', label: 'High' },
-  { value: 'max', label: 'Max' },
+  { value: 'xhigh', label: 'XHigh' },
 ];
 
 /** Available thinking budgets with token counts */
 export const THINKING_BUDGETS: { value: ThinkingBudget; label: string; tokens: number }[] = [
-  { value: 'off', label: 'Off', tokens: 0 },
-  { value: 'low', label: '1K', tokens: 1024 },
-  { value: 'medium', label: '4K', tokens: 4096 },
-  { value: 'high', label: '8K', tokens: 8192 },
-  { value: 'xhigh', label: '16K', tokens: 16384 },
+  { value: 0, label: 'Off', tokens: 0 },
+  { value: 1024, label: '1K', tokens: 1024 },
+  { value: 4096, label: '4K', tokens: 4096 },
+  { value: 8192, label: '8K', tokens: 8192 },
+  { value: 16384, label: '16K', tokens: 16384 },
 ];
 
 /** Default effort level */
 export const DEFAULT_EFFORT_LEVEL: EffortLevel = 'high';
 
 /** Default thinking budget */
-export const DEFAULT_THINKING_BUDGET: ThinkingBudget = 'medium';
+export const DEFAULT_THINKING_BUDGET: ThinkingBudget = 4096;
 
 /**
- * Check if a model supports adaptive thinking (effort-based).
- * These are the newer Claude models that use effort levels.
+ * Check if a model supports effort-based reasoning control.
+ * This currently targets OpenAI reasoning models, which expose
+ * `reasoningEffort` values like minimal/low/medium/high/xhigh.
  */
 export function isAdaptiveThinkingModel(model: string): boolean {
-  const adaptiveModels = [
-    'claude-sonnet-4',
-    'claude-opus-4',
-    'claude-4-sonnet',
-    'claude-4-opus',
-    'claude-3-7-sonnet',
-    'claude-3.7-sonnet',
-  ];
-  return adaptiveModels.some(m => model.toLowerCase().includes(m));
+  const normalized = model.toLowerCase().trim();
+  if (!normalized) {
+    return false;
+  }
+
+  if (!normalized.startsWith('openai/')) {
+    return false;
+  }
+
+  return (
+    normalized.includes('/gpt-5') ||
+    normalized.includes('/o1') ||
+    normalized.includes('/o3') ||
+    normalized.includes('/o4')
+  );
 }
 
 export interface EffortSelectorCallbacks {
@@ -156,6 +159,16 @@ export class EffortSelector {
 
   updateDisplay(): void {
     const model = this.callbacks.getCurrentModel();
+    if (!model) {
+      if (this.effortEl) {
+        this.effortEl.style.display = 'none';
+      }
+      if (this.budgetEl) {
+        this.budgetEl.style.display = 'none';
+      }
+      return;
+    }
+
     const adaptive = isAdaptiveThinkingModel(model);
 
     // Show effort selector for adaptive models, budget selector for others
@@ -171,6 +184,10 @@ export class EffortSelector {
     } else {
       this.renderBudgetGears();
     }
+  }
+
+  isEffortModel(model: string): boolean {
+    return isAdaptiveThinkingModel(model);
   }
 
   /** Get the container element */

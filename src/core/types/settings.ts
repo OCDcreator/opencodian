@@ -5,6 +5,46 @@
 /** Permission mode for tool execution */
 export type PermissionMode = 'yolo' | 'plan' | 'normal';
 
+/** Effort level for adaptive thinking models */
+export type EffortLevel = 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
+
+/** Thinking budget for custom models */
+export type ThinkingBudget = 0 | 1024 | 4096 | 8192 | 16384;
+
+export function normalizeEffortLevel(value: unknown): EffortLevel {
+  switch (value) {
+    case 'minimal':
+    case 'low':
+    case 'medium':
+    case 'high':
+    case 'xhigh':
+      return value;
+    case 'max':
+      return 'xhigh';
+    default:
+      return 'high';
+  }
+}
+
+export function normalizeThinkingBudget(value: unknown): ThinkingBudget {
+  if (value === 'off') return 0;
+  if (value === 'low') return 1024;
+  if (value === 'medium') return 4096;
+  if (value === 'high') return 8192;
+  if (value === 'xhigh') return 16384;
+
+  switch (value) {
+    case 0:
+    case 1024:
+    case 4096:
+    case 8192:
+    case 16384:
+      return value;
+    default:
+      return 4096;
+  }
+}
+
 /** User decision from the approval modal */
 export type ApprovalDecision = 'allow' | 'allow-always' | 'deny' | 'cancel';
 
@@ -327,6 +367,8 @@ export interface OpenCodianSettings {
   defaultProvider: string;
   defaultModel: string;
   providers: ModelProviderConfig[];
+  effortLevel: EffortLevel;
+  thinkingBudget: ThinkingBudget;
 
   // Content settings
   excludedTags: string[];
@@ -390,6 +432,8 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
       enabled: true,
     },
   ],
+  effortLevel: 'high',
+  thinkingBudget: 4096,
 
   excludedTags: [],
   mediaFolder: '',

@@ -15,6 +15,7 @@ import {
   type ToolCallInfo,
   VIEW_TYPE_OPENCODIAN,
 } from '../../core/types';
+import type { EffortLevel, ThinkingBudget } from '../../core/types/settings';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { createLogger } from '../../shared';
@@ -23,6 +24,7 @@ import { MarkdownRenderService } from '../../utils/markdown';
 import { StreamController, ThinkingBlockRenderer, ToolCallRenderer } from '../../utils/streaming';
 import { buildChatAppearanceCustomCss, getChatAppearanceCssVariables } from './chatAppearance';
 import { TabBar, TabManager } from './tabs';
+import { EffortSelector } from './ui/EffortSelector';
 import { NavigationSidebar } from './ui/NavigationSidebar';
 
 const logger = createLogger('OpenCodianView');
@@ -120,6 +122,12 @@ export class OpenCodianView extends ItemView {
   // Navigation sidebar
   private navigationSidebar: NavigationSidebar | null = null;
 
+  // Effort selector
+  private effortSelector: EffortSelector | null = null;
+  private currentEffortLevel: EffortLevel;
+  private currentThinkingBudget: ThinkingBudget;
+  private effortContainerEl: HTMLElement | null = null;
+
   // Send/Stop button reference
   private sendBtn: HTMLElement | null = null;
   private inputTextarea: HTMLTextAreaElement | null = null;
@@ -142,6 +150,8 @@ export class OpenCodianView extends ItemView {
     super(leaf);
     this.plugin = plugin;
     this.messageComponent = new Component();
+    this.currentEffortLevel = this.plugin.settings.effortLevel;
+    this.currentThinkingBudget = this.plugin.settings.thinkingBudget;
   }
 
   getViewType(): string {
@@ -719,7 +729,29 @@ export class OpenCodianView extends ItemView {
     // Center: Model selector (opencode-style)
     this.modelSelectorContainer = toolbar.createDiv({ cls: 'opencodian-model-selector' });
     this.initializeModelSelector(this.modelSelectorContainer);
-    
+
+    // Effort selector (between model and send button)
+    this.effortContainerEl = toolbar.createDiv({ cls: 'opencodian-effort-slot' });
+    this.effortSelector = new EffortSelector(this.effortContainerEl, {
+      onEffortLevelChange: async (effort: EffortLevel) => {
+        this.currentEffortLevel = effort;
+        this.plugin.settings.effortLevel = effort;
+        await this.plugin.saveSettings();
+      },
+      onThinkingBudgetChange: async (budget: ThinkingBudget) => {
+        this.currentThinkingBudget = budget;
+        this.plugin.settings.thinkingBudget = budget;
+        await this.plugin.saveSettings();
+      },
+      getEffortLevel: () => this.currentEffortLevel,
+      getThinkingBudget: () => this.currentThinkingBudget,
+      getCurrentModel: () => {
+        const current = this.getCurrentSessionModel();
+        return current ? `${current.provider}/${current.model}` : '';
+      },
+    });
+    this.effortSelector.updateDisplay();
+
     // Right side: Send/Stop button
     this.sendBtn = toolbar.createDiv({ cls: 'opencodian-send-btn' });
     setIcon(this.sendBtn, 'send');
@@ -2557,6 +2589,8 @@ export class OpenCodianView extends ItemView {
         setIcon(iconWrapper as HTMLElement, 'bot');
       }
     }
+
+    this.effortSelector?.updateDisplay();
   }
 
   /** Get current model for this session */
@@ -2619,9 +2653,32 @@ export class OpenCodianView extends ItemView {
     if (!current) {
       return {};
     }
+
+    const modelRef = `${current.provider}/${current.model}`;
+    const reasoningOptions = this.getReasoningOptionsForModel(modelRef);
+
     return {
       provider: current.provider,
       model: current.model,
+      ...reasoningOptions,
+    };
+  }
+
+  private getReasoningOptionsForModel(
+    modelRef: string,
+  ): { reasoningEffort?: EffortLevel; thinkingBudget?: ThinkingBudget } {
+    if (!modelRef) {
+      return {};
+    }
+
+    if (this.effortSelector && this.effortSelector.isEffortModel(modelRef)) {
+      return {
+        reasoningEffort: this.currentEffortLevel,
+      };
+    }
+
+    return {
+      thinkingBudget: this.currentThinkingBudget,
     };
   }
 

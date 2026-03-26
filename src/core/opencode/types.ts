@@ -2,8 +2,15 @@
  * OpenCode SDK wrapper types
  */
 
-import type { StreamChunk } from '../types';
-import type { LocalServerConfig, ModelSourceMode, ServerAuthConfig, ServerMode } from '../types/settings';
+import type { ImageAttachment, StreamChunk } from '../types';
+import type {
+  EffortLevel,
+  LocalServerConfig,
+  ModelSourceMode,
+  ServerAuthConfig,
+  ServerMode,
+  ThinkingBudget,
+} from '../types/settings';
 
 /** Response handler callbacks */
 export interface ResponseHandler {
@@ -30,10 +37,14 @@ export interface ServerError {
 
 /** Query options */
 export interface QueryOptions {
+  sessionId?: string;
   model?: string;
   provider?: string;
+  images?: ImageAttachment[];
   allowedTools?: string[];
   externalContextPaths?: string[];
+  reasoningEffort?: EffortLevel;
+  thinkingBudget?: ThinkingBudget;
 }
 
 /** Server configuration */
