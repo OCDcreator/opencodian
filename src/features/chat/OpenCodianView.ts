@@ -22,6 +22,7 @@ import { ProviderIconService } from '../../utils/icons/ProviderIconService';
 import { MarkdownRenderService } from '../../utils/markdown';
 import { StreamController, ThinkingBlockRenderer, ToolCallRenderer } from '../../utils/streaming';
 import { buildChatAppearanceCustomCss, getChatAppearanceCssVariables } from './chatAppearance';
+import { NavigationSidebar } from './ui/NavigationSidebar';
 
 const logger = createLogger('OpenCodianView');
 
@@ -78,6 +79,7 @@ const COPY_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14
 export class OpenCodianView extends ItemView {
   private plugin: OpenCodianPlugin;
   private chatContainerEl: HTMLElement | null = null;
+  private messagesShellEl: HTMLElement | null = null;
   private messagesContainer: HTMLElement | null = null;
   private inputContainer: HTMLElement | null = null;
   private currentConversation: Conversation | null = null;
@@ -109,6 +111,9 @@ export class OpenCodianView extends ItemView {
 
   // Streaming content state
   private streamController: StreamController | null = null;
+
+  // Navigation sidebar
+  private navigationSidebar: NavigationSidebar | null = null;
 
   // Send/Stop button reference
   private sendBtn: HTMLElement | null = null;
@@ -184,6 +189,10 @@ export class OpenCodianView extends ItemView {
     this.chatAppearanceStyleEl?.remove();
     this.chatAppearanceStyleEl = null;
 
+    // Cleanup navigation sidebar
+    this.navigationSidebar?.destroy();
+    this.navigationSidebar = null;
+
     // Cleanup event refs
     for (const ref of this.eventRefs) {
       this.plugin.app.vault.offref(ref);
@@ -204,13 +213,19 @@ export class OpenCodianView extends ItemView {
     this.buildHeader(header);
 
     // Messages area
-    this.messagesContainer = this.chatContainerEl.createDiv({ cls: 'opencodian-messages' });
+    this.messagesShellEl = this.chatContainerEl.createDiv({ cls: 'opencodian-messages-shell' });
+    this.messagesContainer = this.messagesShellEl.createDiv({ cls: 'opencodian-messages' });
     this.applyChatScrollMode();
 
     // Input area
     this.inputContainer = this.chatContainerEl.createDiv({ cls: 'opencodian-input-area' });
     this.buildInputArea(this.inputContainer);
     this.applyChatAppearanceSettings();
+
+    // Navigation sidebar (left side of messages)
+    if (this.messagesShellEl && this.messagesContainer) {
+      this.navigationSidebar = new NavigationSidebar(this.messagesShellEl, this.messagesContainer);
+    }
   }
 
   public applyChatAppearanceSettings(): void {
@@ -1920,6 +1935,7 @@ export class OpenCodianView extends ItemView {
     if (this.messagesContainer) {
       this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
     }
+    this.navigationSidebar?.updateVisibility();
   }
 
   /** Initialize model selector (opencode-style) */
