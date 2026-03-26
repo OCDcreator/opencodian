@@ -64,29 +64,55 @@ opencodian/
 ├── src/
 │   ├── main.ts                      # Plugin entry point
 │   ├── core/
+│   │   ├── config/                  # OpenCode config + model catalog management
+│   │   │   ├── ModelConfigService.ts
+│   │   │   ├── OpencodeConfigManager.ts
+│   │   │   ├── modelConfig.ts
+│   │   │   └── index.ts
 │   │   ├── opencode/                # OpenCode SDK wrapper
 │   │   │   ├── OpenCodeService.ts   # Core service for SDK interaction
 │   │   │   ├── ServerManager.ts     # Server lifecycle management
 │   │   │   ├── types.ts             # Service types
 │   │   │   └── index.ts             # Module exports
+│   │   ├── security/                # Permission + blocklist helpers
+│   │   │   ├── BlocklistChecker.ts
+│   │   │   └── index.ts
 │   │   ├── storage/                 # Persistence layer
 │   │   │   ├── StorageService.ts    # Conversation & settings storage
 │   │   │   └── index.ts
 │   │   ├── types/                   # Type definitions
 │   │   │   ├── chat.ts              # Chat message types
 │   │   │   ├── models.ts            # Model types
+│   │   │   ├── opencodeConfig.ts    # OpenCode config schema types
+│   │   │   ├── permission.ts        # Permission UI / approval types
 │   │   │   ├── settings.ts          # Settings types & defaults
 │   │   │   ├── tools.ts             # Tool types
 │   │   │   └── index.ts
-│   │   └── tools/                   # Tool definitions
-│   │       ├── toolNames.ts         # Tool name constants
+│   │   └── tools/                   # Tool name constants
+│   │       ├── toolNames.ts
 │   │       └── index.ts
 │   ├── features/
 │   │   ├── chat/
+│   │   │   ├── rendering/           # Chat rendering helpers
+│   │   │   │   └── collapsible.ts
+│   │   │   ├── tabs/                # Multi-tab conversation system
+│   │   │   │   ├── Tab.ts
+│   │   │   │   ├── TabBar.ts
+│   │   │   │   ├── TabManager.ts
+│   │   │   │   ├── types.ts
+│   │   │   │   └── index.ts
+│   │   │   ├── ui/                  # Chat side utilities
+│   │   │   │   ├── EffortSelector.ts
+│   │   │   │   └── NavigationSidebar.ts
+│   │   │   ├── chatAppearance.ts    # Chat appearance CSS variable builder
 │   │   │   ├── OpenCodianView.ts    # Main chat view component
 │   │   │   └── index.ts
 │   │   └── settings/
+│   │       ├── ModelConfigJsonModal.ts
+│   │       ├── ModelConfigModal.ts
+│   │       ├── OpencodeConfigModal.ts
 │   │       ├── OpenCodianSettings.ts # Settings tab UI
+│   │       ├── ServerSettingHelpModal.ts
 │   │       └── index.ts
 │   ├── i18n/                        # Internationalization
 │   │   ├── index.ts
@@ -94,8 +120,16 @@ opencodian/
 │   │       ├── en.ts
 │   │       └── zh.ts
 │   ├── shared/                      # Shared utilities
-│   │   └── index.ts
+│   │   ├── modals/
+│   │   │   ├── ForkTargetModal.ts
+│   │   │   └── index.ts
+│   │   ├── index.ts
+│   │   ├── logger.ts
+│   │   └── vault.ts
 │   └── utils/                       # Utility functions
+│       ├── icons/
+│       │   ├── ProviderIconService.ts
+│       │   └── index.ts
 │       ├── markdown/                # Markdown rendering
 │       │   ├── MarkdownRenderer.ts  # Custom markdown renderer
 │       │   ├── fileLink.ts          # File link handling
@@ -182,6 +216,8 @@ Main service for interacting with OpenCode Server via HTTP API.
 - `sendMessage(message, options)` - Send message and get streaming response
 - `getAvailableModels()` - Fetch available providers and models
 - `getSessionMessages(sessionId)` - Get messages for a session
+- `forkSession(sessionId, messageID?)` - Fork a conversation from a selected message
+- `revertSession(sessionId, messageID, partID?)` - Rewind a conversation to a prior point
 
 ### 2. ServerManager (`src/core/opencode/ServerManager.ts`)
 
@@ -193,7 +229,18 @@ Manages the OpenCode server process lifecycle.
 - `stop()` - Stop the server process
 - `checkHealth()` - Check if server is responding
 
-### 3. StorageService (`src/core/storage/StorageService.ts`)
+### 3. ModelConfigService (`src/core/config/ModelConfigService.ts`)
+
+Resolves local OpenCode model config and server-provided model catalogs.
+
+**Key Methods:**
+
+- `getCatalogs(mode)` - Build local / server / effective model catalogs
+- `readLocalModelConfig()` - Read model-related OpenCode config subset
+- `writeLocalModelConfig(subset)` - Persist model config subset
+- `isModelAvailableOnServer(provider, model)` - Validate server-side availability
+
+### 4. StorageService (`src/core/storage/StorageService.ts`)
 
 Persists conversations and settings.
 
@@ -207,30 +254,38 @@ Persists conversations and settings.
         └── conv-xxx.json
 ```
 
-### 4. OpenCodianView (`src/features/chat/OpenCodianView.ts`)
+### 5. OpenCodianView (`src/features/chat/OpenCodianView.ts`)
 
 Main chat UI view (extends Obsidian's `ItemView`).
 
 **Features:**
 
-- Sidebar chat interface
-- Message rendering
-- Input handling
+- Sidebar or main-tab chat interface
+- Multi-tab conversation management
+- Per-session model switching dropdown
+- Effort / thinking budget selector
 - Real-time streaming display
+- Navigation sidebar for previous/next user messages
+- Fork / rewind conversation entry points
+- Collapsible long assistant content blocks
+- Inline permission cards and server status badge
 
-### 5. OpenCodianSettingTab (`src/features/settings/OpenCodianSettings.ts`)
+### 6. OpenCodianSettingTab (`src/features/settings/OpenCodianSettings.ts`)
 
 Settings UI with bilingual support (English/Chinese).
 
 **Settings Categories:**
 
 - **Language**: Interface language selection
-- **Server**: Auto-start, host, port
-- **Model**: Dynamic provider/model selection
-- **Security**: Permission mode, command blocklist
-- **UI**: Max tabs, tab bar position, auto-scroll, conversation scroll effect, debug logging
+- **Server**: Local / remote mode, auth, health status, help modal
+- **Model**: Source mode, default provider/model, visual editor, JSON editor
+- **Security**: Permission mode, config editor, command blocklist, export paths
+- **UI**: Max tabs, tab bar position, auto-scroll, chat scroll mode, open in main tab
+- **Style**: Chat appearance controls and custom CSS declarations
+- **Debug**: Debug logging, per-platform log paths, diagnostics export
+- **User**: User name, system prompt, excluded tags
 
-### 6. Streaming Utilities (`src/utils/streaming/`)
+### 7. Streaming Utilities (`src/utils/streaming/`)
 
 SSE streaming components for real-time message display.
 
@@ -304,11 +359,13 @@ npm run build && cp dist/main.js dist/manifest.json dist/styles.css ../../testva
 1. **New settings**: Add to `OpenCodianSettings` interface, add UI in `OpenCodianSettings.ts`
 2. **New commands**: Register in `main.ts` `onload()` method
 3. **New message types**: Extend `StreamChunk` type in `src/core/types/chat.ts`
+4. **Model config changes**: Keep `ModelConfigService`, settings UI, and `.opencode/config.json` writes in sync
+5. **Chat UI additions**: Check `features/chat/tabs/`, `features/chat/ui/`, and `styles.css` together
 
 ### Debugging
 
 - Check Obsidian's Developer Tools (Ctrl/Cmd+Shift+I)
-- Look for `[OpenCodeService]`, `[OpenCodianView]`, `[Settings]` prefix logs
+- Look for `[OpenCodian]`, `[ServerManager]`, `[OpenCodeService]`, `[OpenCodianView]`, `[OpenCodianSettings]` prefix logs
 - OpenCode server logs with `[OpenCode]` prefix
 
 ---
@@ -337,5 +394,5 @@ This is the main development log maintained in the Obsidian vault for easy refer
 
 ---
 
-**Last Updated**: 2026-03-25
+**Last Updated**: 2026-03-27
 **Plugin Version**: 0.1.0
