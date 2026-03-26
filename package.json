@@ -7,6 +7,8 @@
     "build:css": "node scripts/build-css.mjs",
     "dev": "npm run build:css && node esbuild.config.mjs",
     "build": "node scripts/build.mjs production",
+    "doctor:esbuild": "node scripts/doctor-esbuild.mjs",
+    "doctor:esbuild:fix": "node scripts/doctor-esbuild.mjs --fix",
     "typecheck": "tsc --noEmit",
     "lint": "eslint \"{src,tests}/**/*.ts\"",
     "lint:fix": "npm run lint -- --fix",

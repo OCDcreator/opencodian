@@ -96,6 +96,12 @@ src/
 # 安装依赖
 npm install
 
+# 检查 esbuild 是否匹配当前系统
+npm run doctor:esbuild
+
+# 切换 Windows/macOS 后，自动重装当前平台依赖
+npm run doctor:esbuild:fix
+
 # 开发模式（自动编译）
 npm run dev
 
@@ -111,6 +117,14 @@ npm run test
 # 代码检查
 npm run lint
 ```
+
+### 双环境开发说明
+
+如果你在同一个仓库目录里来回切换 Windows 和 macOS，`node_modules/` 里的原生依赖会互相覆盖，`esbuild` 最容易先报错。
+
+- **根因**：`package-lock.json` 可以跨平台共享，但 `node_modules/` 不能跨平台复用。
+- **推荐方案**：每个系统各用一个独立 clone / worktree，只同步源码和锁文件，不共享 `node_modules/`。
+- **单目录折中方案**：每次切换系统后先运行 `npm run doctor:esbuild:fix`，再继续 `npm run dev` 或 `npm run build`。
 
 ## 架构
 
@@ -143,6 +157,9 @@ A: 在 OpenCode 配置中添加本地提供商，指向你的 vLLM/Ollama 服务
 
 ### Q: 支持哪些文件操作？
 A: 支持读取、写入、编辑 Vault 中的文件，以及执行 bash 命令（受权限控制）。
+
+### Q: 为什么 `npm run build` 提示 esbuild 平台不匹配？
+A: 这是因为当前 `node_modules/` 是在另一个系统里安装的。先运行 `npm run doctor:esbuild:fix`。如果你长期双环境开发，建议每个系统使用独立工作目录。
 
 ## 许可证
 

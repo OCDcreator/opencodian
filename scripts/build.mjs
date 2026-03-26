@@ -1,4 +1,3 @@
-import esbuild from "esbuild";
 import fs from "fs";
 import path from "path";
 import process from "process";
@@ -19,26 +18,42 @@ if (!fs.existsSync(distDir)) {
   fs.mkdirSync(distDir, { recursive: true });
 }
 
-const context = await esbuild.context({
-  banner: {
-    js: banner,
-  },
-  entryPoints: ['src/main.ts'],
-  bundle: true,
-  external: [
-    'obsidian',
-    'electron',
-    '@codemirror/*',
-    'lezer',
-    '@lezer/*',
-    ...builtins],
-  format: 'cjs',
-  target: 'es2018',
-  logLevel: "info",
-  sourcemap: prod ? false : 'inline',
-  treeShaking: true,
-  outfile: prod ? 'dist/main.js' : 'main.js',
-});
+let context;
+
+try {
+  const esbuildModule = await import("esbuild");
+  const esbuild = esbuildModule.default ?? esbuildModule;
+
+  context = await esbuild.context({
+    banner: {
+      js: banner,
+    },
+    entryPoints: ['src/main.ts'],
+    bundle: true,
+    external: [
+      'obsidian',
+      'electron',
+      '@codemirror/*',
+      'lezer',
+      '@lezer/*',
+      ...builtins],
+    format: 'cjs',
+    target: 'es2018',
+    logLevel: "info",
+    sourcemap: prod ? false : 'inline',
+    treeShaking: true,
+    outfile: prod ? 'dist/main.js' : 'main.js',
+  });
+} catch (error) {
+  const errorMessage = error instanceof Error ? error.message : String(error);
+
+  if (errorMessage.includes("installed for another platform")) {
+    console.error("[build] esbuild binary does not match the current OS/CPU.");
+    console.error("[build] Run `npm run doctor:esbuild:fix` to reinstall dependencies for this platform.");
+  }
+
+  throw error;
+}
 
 if (prod) {
   await context.rebuild();
