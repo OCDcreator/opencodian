@@ -6,7 +6,6 @@
  * - Thinking budget selector for custom models
  */
 
-import { setIcon } from 'obsidian';
 import { t } from '../../../i18n';
 
 /** Effort levels for adaptive thinking models */
