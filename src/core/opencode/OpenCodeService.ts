@@ -162,11 +162,6 @@ export class OpenCodeService {
         return;
       }
 
-      if (!this.settings.defaultProvider || !this.settings.defaultModel) {
-        this.events.onModelsLoaded?.(result.providers);
-        return;
-      }
-
       // Check if current default provider is valid
       const currentProvider = result.providers.find(p => p.id === this.settings.defaultProvider);
       

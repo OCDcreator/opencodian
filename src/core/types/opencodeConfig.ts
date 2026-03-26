@@ -18,8 +18,6 @@ export interface OpencodeProviderModelConfig {
 export interface OpencodeProviderConfig {
   npm?: string;
   name?: string;
-  whitelist?: string[];
-  blacklist?: string[];
   options?: Record<string, unknown>;
   models?: Record<string, OpencodeProviderModelConfig>;
   [key: string]: unknown;
@@ -39,3 +37,4 @@ export interface OpencodeConfig extends OpencodeModelConfigSubset {
   agent?: Record<string, unknown>;
   [key: string]: unknown;
 }
+
