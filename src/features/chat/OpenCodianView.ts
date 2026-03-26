@@ -22,6 +22,7 @@ import { ProviderIconService } from '../../utils/icons/ProviderIconService';
 import { MarkdownRenderService } from '../../utils/markdown';
 import { StreamController, ThinkingBlockRenderer, ToolCallRenderer } from '../../utils/streaming';
 import { buildChatAppearanceCustomCss, getChatAppearanceCssVariables } from './chatAppearance';
+import { NavigationSidebar } from './ui/NavigationSidebar';
 
 const logger = createLogger('OpenCodianView');
 
@@ -78,6 +79,7 @@ const COPY_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14
 export class OpenCodianView extends ItemView {
   private plugin: OpenCodianPlugin;
   private chatContainerEl: HTMLElement | null = null;
+  private messagesShellEl: HTMLElement | null = null;
   private messagesContainer: HTMLElement | null = null;
   private inputContainer: HTMLElement | null = null;
   private currentConversation: Conversation | null = null;
@@ -109,6 +111,9 @@ export class OpenCodianView extends ItemView {
 
   // Streaming content state
   private streamController: StreamController | null = null;
+
+  // Navigation sidebar
+  private navigationSidebar: NavigationSidebar | null = null;
 
   // Send/Stop button reference
   private sendBtn: HTMLElement | null = null;
@@ -184,6 +189,10 @@ export class OpenCodianView extends ItemView {
     this.chatAppearanceStyleEl?.remove();
     this.chatAppearanceStyleEl = null;
 
+    // Cleanup navigation sidebar
+    this.navigationSidebar?.destroy();
+    this.navigationSidebar = null;
+
     // Cleanup event refs
     for (const ref of this.eventRefs) {
       this.plugin.app.vault.offref(ref);
@@ -204,13 +213,19 @@ export class OpenCodianView extends ItemView {
     this.buildHeader(header);
 
     // Messages area
-    this.messagesContainer = this.chatContainerEl.createDiv({ cls: 'opencodian-messages' });
+    this.messagesShellEl = this.chatContainerEl.createDiv({ cls: 'opencodian-messages-shell' });
+    this.messagesContainer = this.messagesShellEl.createDiv({ cls: 'opencodian-messages' });
     this.applyChatScrollMode();
 
     // Input area
     this.inputContainer = this.chatContainerEl.createDiv({ cls: 'opencodian-input-area' });
     this.buildInputArea(this.inputContainer);
     this.applyChatAppearanceSettings();
+
+    // Navigation sidebar (left side of messages)
+    if (this.messagesShellEl && this.messagesContainer) {
+      this.navigationSidebar = new NavigationSidebar(this.messagesShellEl, this.messagesContainer);
+    }
   }
 
   public applyChatAppearanceSettings(): void {
@@ -1920,6 +1935,7 @@ export class OpenCodianView extends ItemView {
     if (this.messagesContainer) {
       this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
     }
+    this.navigationSidebar?.updateVisibility();
   }
 
   /** Initialize model selector (opencode-style) */
@@ -2617,6 +2633,193 @@ export class OpenCodianView extends ItemView {
 
     return null;
   }
+=======
+  private getSendMessageOptions(): { provider?: string; model?: string } {
+    const current = this.getCurrentSessionModel();
+    if (!current) {
+      return {};
+    }
+    return {
+      provider: current.provider,
+      model: current.model,
+    };
+  }
+
+  private async ensureSelectedModelAvailable(
+    provider: string | undefined,
+    model: string | undefined,
+  ): Promise<boolean> {
+    if (!provider || !model) {
+      return false;
+    }
+
+    if (!this.isModelInAvailableProviders(provider, model)) {
+      return false;
+    }
+
+    if (!this.plugin.modelConfigService) {
+      return true;
+    }
+
+    try {
+      const available = await this.plugin.modelConfigService.isModelAvailableOnServer(provider, model);
+      if (available) {
+        return true;
+      }
+    } catch (error) {
+      logger.warn('Failed to verify model availability on server', error);
+    }
+
+    return false;
+  }
+
+  private renderNoticeCard(container: HTMLElement, message: ChatMessage): void {
+    const tone = message.noticeTone ?? 'info';
+    const cardEl = container.createDiv({ cls: `opencodian-chat-notice-card is-${tone}` });
+    const iconEl = cardEl.createDiv({ cls: 'opencodian-chat-notice-icon' });
+    setIcon(
+      iconEl,
+      tone === 'error' ? 'x-circle' : tone === 'warning' ? 'alert-triangle' : 'info',
+    );
+
+    const bodyEl = cardEl.createDiv({ cls: 'opencodian-chat-notice-body' });
+    if (message.noticeTitle) {
+      bodyEl.createDiv({
+        cls: 'opencodian-chat-notice-title',
+        text: message.noticeTitle,
+      });
+    }
+
+    bodyEl.createDiv({
+      cls: 'opencodian-chat-notice-text',
+      text: message.content,
+    });
+
+    if (message.noticeActions && message.noticeActions.length > 0) {
+      const actionsEl = bodyEl.createDiv({ cls: 'opencodian-chat-notice-actions' });
+      for (const action of message.noticeActions) {
+        const buttonEl = actionsEl.createEl('button', {
+          cls: 'opencodian-chat-notice-action-btn',
+          text: this.getNoticeActionLabel(action.type),
+        });
+        buttonEl.type = 'button';
+        buttonEl.addEventListener('click', () => {
+          void this.handleNoticeAction(action.type);
+        });
+      }
+    }
+  }
+
+  private async appendPersistentAssistantNoticeMessage(
+    title: string,
+    content: string,
+    tone: ChatMessage['noticeTone'] = 'warning',
+    noticeActions?: ChatMessage['noticeActions'],
+  ): Promise<void> {
+    const noticeMessage: ChatMessage = {
+      id: `assistant-notice-${Date.now()}`,
+      role: 'assistant',
+      content,
+      timestamp: Date.now(),
+      displayStyle: 'notice',
+      noticeTitle: title,
+      noticeTone: tone,
+      noticeActions,
+    };
+
+    await this.renderMessage(noticeMessage);
+
+    if (this.currentConversation) {
+      this.currentConversation.messages.push(noticeMessage);
+      this.currentConversation.updatedAt = Date.now();
+      await this.plugin.storage.saveConversation(this.currentConversation);
+    }
+
+    this.scrollToBottom();
+  }
+
+  private async appendModelUnavailableNoticeMessage(): Promise<void> {
+    const { title, message } = this.getModelUnavailableNoticeContent();
+    await this.appendPersistentAssistantNoticeMessage(
+      title,
+      message,
+      'warning',
+      [{ type: 'open_model_settings' }],
+    );
+  }
+
+  private getModelUnavailableNoticeContent(): { title: string; message: string } {
+    if (this.availableProviders.length === 0) {
+      switch (this.plugin.settings.modelSourceMode) {
+        case 'local':
+          return {
+            title: t('chat.notice.modelUnavailable.localTitle'),
+            message: t('chat.notice.modelUnavailable.localBody'),
+          };
+        case 'server':
+          return {
+            title: t('chat.notice.modelUnavailable.serverTitle'),
+            message: t('chat.notice.modelUnavailable.serverBody'),
+          };
+        default:
+          return {
+            title: t('chat.notice.modelUnavailable.mergeTitle'),
+            message: t('chat.notice.modelUnavailable.mergeBody'),
+          };
+      }
+    }
+
+    return {
+      title: t('chat.notice.modelUnavailable.selectedTitle'),
+      message: t('chat.notice.modelUnavailable.selectedBody'),
+    };
+  }
+
+  private getNoticeActionLabel(actionType: NonNullable<ChatMessage['noticeActions']>[number]['type']): string {
+    switch (actionType) {
+      case 'open_model_settings':
+        return t('chat.notice.action.openModelSettings');
+      default:
+        return t('chat.notice.action.openModelSettings');
+    }
+  }
+
+  private async handleNoticeAction(
+    actionType: NonNullable<ChatMessage['noticeActions']>[number]['type'],
+  ): Promise<void> {
+    switch (actionType) {
+      case 'open_model_settings': {
+        this.openPluginSettingsPreservingScroll();
+        window.setTimeout(() => {
+          this.plugin.settingsTab?.scrollToModelSection();
+        }, 50);
+        return;
+      }
+      default:
+        return;
+    }
+  }
+
+  private isModelInAvailableProviders(provider: string, model: string): boolean {
+    return this.availableProviders.some(
+      (item) => item.id === provider && item.models.some((entry) => entry.id === model),
+    );
+  }
+
+  private getFirstAvailableModel(): { provider: string; model: string } | null {
+    for (const provider of this.availableProviders) {
+      const firstModel = provider.models[0];
+      if (firstModel) {
+        return {
+          provider: provider.id,
+          model: firstModel.id,
+        };
+      }
+    }
+
+    return null;
+  }
+>>>>>>> mac/feature/navigation-sidebar
 
   /** Convert OpenCode stream chunk to streaming module format */
   private convertToStreamingChunk(
