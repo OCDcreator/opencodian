@@ -232,4 +232,37 @@ describe('StorageService', () => {
       expect(result).toBeNull();
     });
   });
+
+  describe('managed server state', () => {
+    it('should persist managed server state to runtime file', async () => {
+      await storage.saveManagedServerState({
+        pid: 12345,
+        host: '127.0.0.1',
+        port: 5090,
+      });
+
+      expect(mockAdapter.write).toHaveBeenCalledWith(
+        '.opencodian/runtime.json',
+        expect.stringContaining('"pid": 12345'),
+      );
+    });
+
+    it('should load managed server state from runtime file', async () => {
+      mockAdapter.read.mockResolvedValue(JSON.stringify({
+        managedServer: {
+          pid: 54321,
+          host: '127.0.0.1',
+          port: 4096,
+        },
+      }));
+
+      const result = await storage.loadManagedServerState();
+
+      expect(result).toEqual({
+        pid: 54321,
+        host: '127.0.0.1',
+        port: 4096,
+      });
+    });
+  });
 });

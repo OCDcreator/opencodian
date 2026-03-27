@@ -155,6 +155,61 @@ describe('OpenCodeService', () => {
         method: 'DELETE',
       }));
     });
+
+    it('should fork session via HTTP API', async () => {
+      mockRequestUrl.mockResolvedValue({
+        status: 200,
+        json: { id: 'fork-session', title: 'Fork Session' },
+        text: '{"id":"fork-session","title":"Fork Session"}',
+      });
+
+      const result = await service.forkSession('test-id', 'msg-1');
+      expect(result).toEqual({ id: 'fork-session', title: 'Fork Session' });
+      expect(mockRequestUrl).toHaveBeenCalledWith(expect.objectContaining({
+        url: 'http://127.0.0.1:4096/session/test-id/fork',
+        method: 'POST',
+      }));
+    });
+
+    it('should revert session via HTTP API', async () => {
+      mockRequestUrl.mockResolvedValue({
+        status: 200,
+        json: true,
+        text: 'true',
+      });
+
+      const reverted = await service.revertSession('test-id', 'msg-1');
+      expect(reverted).toBe(true);
+      expect(mockRequestUrl).toHaveBeenCalledWith(expect.objectContaining({
+        url: 'http://127.0.0.1:4096/session/test-id/revert',
+        method: 'POST',
+      }));
+    });
+
+    it('treats 204 revert response as success', async () => {
+      mockRequestUrl.mockResolvedValue({
+        status: 204,
+        json: null,
+        text: '',
+      });
+
+      const reverted = await service.revertSession('test-id', 'msg-1');
+      expect(reverted).toBe(true);
+    });
+
+    it('treats session object revert response as success', async () => {
+      mockRequestUrl.mockResolvedValue({
+        status: 200,
+        json: {
+          id: 'test-id',
+          title: 'New Conversation (fork #1)',
+        },
+        text: '{"id":"test-id","title":"New Conversation (fork #1)"}',
+      });
+
+      const reverted = await service.revertSession('test-id', 'msg-1');
+      expect(reverted).toBe(true);
+    });
   });
 
   describe('session ID management', () => {
@@ -286,6 +341,7 @@ describe('OpenCodeService.openCodeMessageToChatMessage', () => {
     expect(message.role).toBe('assistant');
     expect(message.content).toBe('Hello world');
     expect(message.timestamp).toBe(1234567890);
+    expect(message.sourceMessageId).toBe('msg-1');
   });
 
   it('should transform user message', () => {
@@ -307,6 +363,7 @@ describe('OpenCodeService.openCodeMessageToChatMessage', () => {
     expect(message.id).toBe('msg-2');
     expect(message.role).toBe('user');
     expect(message.content).toBe('User message');
+    expect(message.sourceMessageId).toBe('msg-2');
   });
 
   it('should extract tool calls from tool parts', () => {

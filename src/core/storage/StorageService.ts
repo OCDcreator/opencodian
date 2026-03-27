@@ -8,11 +8,17 @@
 import { type App, normalizePath } from 'obsidian';
 
 import type { OpenCodianPlugin } from '../../main';
+import type { ManagedServerState } from '../opencode/types';
 import type { ChatMessage, Conversation, ConversationMeta, OpenCodianSettings } from '../types';
 
 const STORAGE_DIR = '.opencodian';
 const SESSIONS_DIR = `${STORAGE_DIR}/sessions`;
 const SETTINGS_FILE = `${STORAGE_DIR}/settings.json`;
+const RUNTIME_FILE = `${STORAGE_DIR}/runtime.json`;
+
+interface RuntimeState {
+  managedServer: ManagedServerState | null;
+}
 
 export class StorageService {
   private app: App;
@@ -140,11 +146,39 @@ export class StorageService {
     }
   }
 
+  async saveManagedServerState(state: ManagedServerState | null): Promise<void> {
+    const runtime = await this.loadRuntimeState();
+    runtime.managedServer = state;
+    await this.app.vault.adapter.write(
+      normalizePath(RUNTIME_FILE),
+      JSON.stringify(runtime, null, 2),
+    );
+  }
+
+  async loadManagedServerState(): Promise<ManagedServerState | null> {
+    const runtime = await this.loadRuntimeState();
+    return runtime.managedServer ?? null;
+  }
+
   /** Ensure directory exists */
   private async ensureDir(dir: string): Promise<void> {
     const exists = await this.app.vault.adapter.exists(normalizePath(dir));
     if (!exists) {
       await this.app.vault.adapter.mkdir(normalizePath(dir));
+    }
+  }
+
+  private async loadRuntimeState(): Promise<RuntimeState> {
+    try {
+      const content = await this.app.vault.adapter.read(normalizePath(RUNTIME_FILE));
+      const parsed = JSON.parse(content) as Partial<RuntimeState>;
+      return {
+        managedServer: parsed.managedServer ?? null,
+      };
+    } catch {
+      return {
+        managedServer: null,
+      };
     }
   }
 }

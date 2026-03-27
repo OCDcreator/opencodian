@@ -15,7 +15,6 @@ export interface ModelCatalogModel {
   source: ModelCatalogSource;
   existsInLocal: boolean;
   existsInServer: boolean;
-  enabled: boolean;
 }
 
 export interface ModelCatalogProvider {
@@ -25,9 +24,6 @@ export interface ModelCatalogProvider {
   source: ModelCatalogSource;
   existsInLocal: boolean;
   existsInServer: boolean;
-  enabled: boolean;
-  whitelist: string[];
-  blacklist: string[];
 }
 
 export interface ModelCatalog {
@@ -198,15 +194,10 @@ export function buildCatalogFromConfig(
   subset: OpencodeModelConfigSubset,
   source: 'local' | 'server',
 ): ModelCatalog {
-  const enabledProviders = uniqueStrings(subset.enabled_providers ?? []);
-  const disabledProviders = new Set(uniqueStrings(subset.disabled_providers ?? []));
   const providers = isRecord(subset.provider)
     ? Object.entries(subset.provider)
       .filter((entry): entry is [string, OpencodeProviderConfig] => isRecord(entry[1]))
       .map(([providerId, providerConfig]) => {
-        const whitelist = uniqueStrings(providerConfig.whitelist ?? []);
-        const blacklist = uniqueStrings(providerConfig.blacklist ?? []);
-        const providerEnabled = isProviderEnabled(providerId, enabledProviders, disabledProviders);
         const models = isRecord(providerConfig.models)
           ? Object.entries(providerConfig.models)
             .filter((entry): entry is [string, OpencodeProviderModelConfig] => isRecord(entry[1]))
@@ -218,7 +209,6 @@ export function buildCatalogFromConfig(
               source,
               existsInLocal: source === 'local',
               existsInServer: source === 'server',
-              enabled: providerEnabled && isModelEnabled(modelId, whitelist, blacklist),
             }))
           : [];
 
@@ -231,9 +221,6 @@ export function buildCatalogFromConfig(
           source,
           existsInLocal: source === 'local',
           existsInServer: source === 'server',
-          enabled: providerEnabled,
-          whitelist,
-          blacklist,
         };
       })
     : [];
@@ -256,8 +243,6 @@ export function mergeCatalogs(server: ModelCatalog, local: ModelCatalog): ModelC
   for (const provider of server.providers) {
     providers.set(provider.id, {
       ...provider,
-      whitelist: [...provider.whitelist],
-      blacklist: [...provider.blacklist],
       models: provider.models.map((model) => ({ ...model })),
     });
   }
@@ -270,8 +255,6 @@ export function mergeCatalogs(server: ModelCatalog, local: ModelCatalog): ModelC
         source: 'local',
         existsInLocal: true,
         existsInServer: false,
-        whitelist: [...provider.whitelist],
-        blacklist: [...provider.blacklist],
         models: provider.models.map((model) => ({ ...model })),
       });
       continue;
@@ -279,10 +262,7 @@ export function mergeCatalogs(server: ModelCatalog, local: ModelCatalog): ModelC
 
     const models = new Map<string, ModelCatalogModel>();
     for (const model of existing.models) {
-      models.set(model.id, {
-        ...model,
-        enabled: provider.enabled && isModelEnabled(model.id, provider.whitelist, provider.blacklist),
-      });
+      models.set(model.id, { ...model });
     }
     for (const model of provider.models) {
       const existingModel = models.get(model.id);
@@ -292,7 +272,6 @@ export function mergeCatalogs(server: ModelCatalog, local: ModelCatalog): ModelC
           source: 'local',
           existsInLocal: true,
           existsInServer: false,
-          enabled: provider.enabled && isModelEnabled(model.id, provider.whitelist, provider.blacklist),
         });
         continue;
       }
@@ -303,7 +282,6 @@ export function mergeCatalogs(server: ModelCatalog, local: ModelCatalog): ModelC
         source: 'merge',
         existsInLocal: true,
         existsInServer: true,
-        enabled: provider.enabled && isModelEnabled(model.id, provider.whitelist, provider.blacklist),
       });
     }
 
@@ -313,9 +291,6 @@ export function mergeCatalogs(server: ModelCatalog, local: ModelCatalog): ModelC
       source: 'merge',
       existsInLocal: true,
       existsInServer: true,
-      enabled: provider.enabled,
-      whitelist: [...provider.whitelist],
-      blacklist: [...provider.blacklist],
       models: [...models.values()].sort((left, right) => left.name.localeCompare(right.name)),
     });
   }
@@ -343,130 +318,6 @@ export function parseModelReference(value: string | undefined): { provider: stri
     provider: value.slice(0, slash).trim(),
     model: value.slice(slash + 1).trim(),
   };
-}
-
-export function isProviderEnabledByConfig(
-  subset: OpencodeModelConfigSubset,
-  providerId: string,
-): boolean {
-  return isProviderEnabled(
-    providerId,
-    uniqueStrings(subset.enabled_providers ?? []),
-    new Set(uniqueStrings(subset.disabled_providers ?? [])),
-  );
-}
-
-export function isModelEnabledByConfig(
-  subset: OpencodeModelConfigSubset,
-  providerId: string,
-  modelId: string,
-): boolean {
-  if (!isProviderEnabledByConfig(subset, providerId)) {
-    return false;
-  }
-
-  const provider = subset.provider?.[providerId];
-  return isModelEnabled(
-    modelId,
-    uniqueStrings(provider?.whitelist ?? []),
-    uniqueStrings(provider?.blacklist ?? []),
-  );
-}
-
-export function setProviderEnabled(
-  subset: OpencodeModelConfigSubset,
-  providerId: string,
-  enabled: boolean,
-): OpencodeModelConfigSubset {
-  const next = cloneModelConfig(subset);
-  const enabledProviders = uniqueStrings(next.enabled_providers ?? []);
-  const disabledProviders = uniqueStrings(next.disabled_providers ?? []);
-
-  if (enabled) {
-    next.disabled_providers = disabledProviders.filter((item) => item !== providerId);
-    if (enabledProviders.length > 0 && !enabledProviders.includes(providerId)) {
-      next.enabled_providers = [...enabledProviders, providerId];
-    }
-  } else {
-    if (!disabledProviders.includes(providerId)) {
-      next.disabled_providers = [...disabledProviders, providerId];
-    }
-    if (enabledProviders.length > 0) {
-      next.enabled_providers = enabledProviders.filter((item) => item !== providerId);
-    }
-  }
-
-  if (next.enabled_providers?.length === 0) {
-    delete next.enabled_providers;
-  }
-  if (next.disabled_providers?.length === 0) {
-    delete next.disabled_providers;
-  }
-
-  return cleanupModelConfig(next);
-}
-
-export function setModelEnabled(
-  subset: OpencodeModelConfigSubset,
-  providerId: string,
-  modelId: string,
-  enabled: boolean,
-): OpencodeModelConfigSubset {
-  const next = cloneModelConfig(subset);
-  if (!next.provider) {
-    next.provider = {};
-  }
-
-  const provider = next.provider[providerId] ?? {};
-  const whitelist = uniqueStrings(provider.whitelist ?? []);
-  const blacklist = uniqueStrings(provider.blacklist ?? []);
-
-  if (enabled) {
-    provider.blacklist = blacklist.filter((item) => item !== modelId);
-    if (whitelist.length > 0 && !whitelist.includes(modelId)) {
-      provider.whitelist = [...whitelist, modelId];
-    } else if (whitelist.length === 0) {
-      delete provider.whitelist;
-    }
-  } else if (whitelist.length > 0) {
-    provider.whitelist = whitelist.filter((item) => item !== modelId);
-  } else if (!blacklist.includes(modelId)) {
-    provider.blacklist = [...blacklist, modelId];
-  }
-
-  if (provider.whitelist?.length === 0) {
-    delete provider.whitelist;
-  }
-  if (provider.blacklist?.length === 0) {
-    delete provider.blacklist;
-  }
-
-  next.provider[providerId] = provider;
-  return cleanupModelConfig(next);
-}
-
-function cloneModelConfig(subset: OpencodeModelConfigSubset): OpencodeModelConfigSubset {
-  return JSON.parse(JSON.stringify(subset)) as OpencodeModelConfigSubset;
-}
-
-function isProviderEnabled(
-  providerId: string,
-  enabledProviders: string[],
-  disabledProviders: Set<string>,
-): boolean {
-  if (enabledProviders.length > 0) {
-    return enabledProviders.includes(providerId);
-  }
-
-  return !disabledProviders.has(providerId);
-}
-
-function isModelEnabled(modelId: string, whitelist: string[], blacklist: string[]): boolean {
-  if (whitelist.length > 0) {
-    return whitelist.includes(modelId) && !blacklist.includes(modelId);
-  }
-
-  return !blacklist.includes(modelId);
 }
 
 function uniqueStrings(values: string[]): string[] {

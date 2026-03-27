@@ -10,12 +10,7 @@ import * as os from 'os';
 import * as path from 'path';
 
 import { OpencodeConfigManager } from '../../core/config';
-import {
-  type ModelCatalog,
-  type ModelCatalogProvider,
-  setModelEnabled,
-  setProviderEnabled,
-} from '../../core/config/modelConfig';
+import type { ModelCatalog, ModelCatalogProvider } from '../../core/config/modelConfig';
 import {
   getCurrentPlatformDebugLogPath,
   getCurrentPlatformKey,
@@ -34,6 +29,7 @@ import { type ServerHelpTopic,ServerSettingHelpModal } from './ServerSettingHelp
 const logger = createLogger('OpenCodianSettings');
 
 interface NumericStyleControlConfig {
+  group: ChatAppearanceStyleGroup;
   name: string;
   desc: string;
   min: number;
@@ -43,6 +39,13 @@ interface NumericStyleControlConfig {
   defaultValue: number;
   value: () => number;
   setValue: (value: number) => void;
+}
+
+type ChatAppearanceStyleGroup = 'layout' | 'user' | 'assistant' | 'input' | 'scrollbar' | 'advanced';
+
+interface StyleControlBinding {
+  group: ChatAppearanceStyleGroup;
+  syncFromSettings: () => void;
 }
 
 interface ElectronDialogModule {
@@ -89,12 +92,15 @@ export class OpenCodianSettingTab extends PluginSettingTab {
   private refreshModelsCallback?: () => void;
   private refreshServerStatusCallback?: () => Promise<void>;
   private serverStatusIntervalId: number | null = null;
+  private modelRefreshFrameId: number | null = null;
   private activeModelCatalogTab: 'local' | 'server' | 'effective' = 'effective';
   private settingsScrollHandler?: () => void;
   private settingsScrollContainerEl: HTMLElement | null = null;
   private lastObservedSettingsScrollTop = 0;
   private pendingOpenScrollTop: number | null = null;
   private pendingOpenSectionTitle: string | null = null;
+  private settingsPanelPostRenderFrameId: number | null = null;
+  private styleControlBindings: StyleControlBinding[] = [];
 
   constructor(app: App, plugin: OpenCodianPlugin) {
     super(app, plugin);
@@ -103,8 +109,14 @@ export class OpenCodianSettingTab extends PluginSettingTab {
 
   /** Called when models are auto-loaded - refreshes the model dropdowns */
   onModelsLoaded(): void {
-    // This will be set to the loadAvailableModels function in addModelSettings
-    this.refreshModelsCallback?.();
+    if (this.modelRefreshFrameId !== null) {
+      window.cancelAnimationFrame(this.modelRefreshFrameId);
+    }
+
+    this.modelRefreshFrameId = window.requestAnimationFrame(() => {
+      this.modelRefreshFrameId = null;
+      this.refreshModelsCallback?.();
+    });
   }
 
   refreshServerStatusDisplay(): void {
@@ -149,6 +161,11 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       this.serverStatusIntervalId = null;
     }
     this.refreshServerStatusCallback = undefined;
+    if (this.settingsPanelPostRenderFrameId !== null) {
+      window.cancelAnimationFrame(this.settingsPanelPostRenderFrameId);
+      this.settingsPanelPostRenderFrameId = null;
+    }
+    this.styleControlBindings = [];
     containerEl.empty();
     containerEl.addClass('opencodian-settings');
     if (pendingOpenScrollTop !== null || pendingOpenSectionTitle !== null) {
@@ -196,14 +213,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     ];
 
     this.buildQuickNav(quickNavEl, sections);
-    this.bindSettingsPanelScrollPersistence();
-    if (pendingOpenSectionTitle) {
-      this.scrollToSectionByTitle(pendingOpenSectionTitle);
-      this.finishPendingOpenVisibility();
-    } else {
-      this.restoreSettingsPanelScrollPosition(pendingOpenScrollTop ?? this.plugin.settings.settingsPanelScrollTop);
-      this.finishPendingOpenVisibility();
-    }
+    this.scheduleSettingsPanelPostRenderSetup(pendingOpenScrollTop, pendingOpenSectionTitle);
     this.clearInitialQuickNavFocus();
   }
 
@@ -279,32 +289,87 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       const hostSetting = new Setting(containerEl)
         .setName(t('settings.server.host.name'))
         .setDesc(t('settings.server.host.desc'))
-        .addText((text) =>
+        .addText((text) => {
+          const commitHostChange = async () => {
+            const nextHost = text.inputEl.value.trim() || '127.0.0.1';
+            if (nextHost === this.plugin.settings.server.local.host) {
+              text.setValue(nextHost);
+              return;
+            }
+
+            this.plugin.settings.server.local.host = nextHost;
+            try {
+              await this.plugin.saveSettings();
+              text.setValue(this.plugin.settings.server.local.host);
+            } catch (error) {
+              text.setValue(this.plugin.settings.server.local.host);
+              new Notice(error instanceof Error ? error.message : t('settings.server.startFailed'));
+            }
+          };
+
           text
             .setPlaceholder('127.0.0.1')
-            .setValue(this.plugin.settings.server.local.host)
-            .onChange(async (value) => {
-              this.plugin.settings.server.local.host = value || '127.0.0.1';
-              await this.plugin.saveSettings();
-            })
-        );
+            .setValue(this.plugin.settings.server.local.host);
+          text.inputEl.addEventListener('change', () => {
+            void commitHostChange();
+          });
+          text.inputEl.addEventListener('blur', () => {
+            void commitHostChange();
+          });
+          text.inputEl.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+              event.preventDefault();
+              text.inputEl.blur();
+            }
+          });
+        });
       this.addServerHelpButton(hostSetting, 'host');
 
       const portSetting = new Setting(containerEl)
         .setName(t('settings.server.port.name'))
         .setDesc(t('settings.server.port.desc'))
-        .addText((text) =>
+        .addText((text) => {
+          const commitPortChange = async () => {
+            const value = text.inputEl.value.trim();
+            const port = parseInt(value, 10);
+            if (Number.isNaN(port) || port <= 0 || port >= 65536) {
+              text.setValue(String(this.plugin.settings.server.local.port));
+              new Notice(t('settings.server.port.invalid'));
+              return;
+            }
+
+            if (port === this.plugin.settings.server.local.port) {
+              text.setValue(String(port));
+              return;
+            }
+
+            this.plugin.settings.server.local.port = port;
+            try {
+              await this.plugin.saveSettings();
+              text.setValue(String(this.plugin.settings.server.local.port));
+              new Notice(t('settings.server.port.updated', { port: String(port) }));
+            } catch (error) {
+              text.setValue(String(this.plugin.settings.server.local.port));
+              new Notice(error instanceof Error ? error.message : t('settings.server.startFailed'));
+            }
+          };
+
           text
             .setPlaceholder('4096')
-            .setValue(String(this.plugin.settings.server.local.port))
-            .onChange(async (value) => {
-              const port = parseInt(value, 10);
-              if (!isNaN(port) && port > 0 && port < 65536) {
-                this.plugin.settings.server.local.port = port;
-                await this.plugin.saveSettings();
-              }
-            })
-        );
+            .setValue(String(this.plugin.settings.server.local.port));
+          text.inputEl.addEventListener('change', () => {
+            void commitPortChange();
+          });
+          text.inputEl.addEventListener('blur', () => {
+            void commitPortChange();
+          });
+          text.inputEl.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+              event.preventDefault();
+              text.inputEl.blur();
+            }
+          });
+        });
       this.addServerHelpButton(portSetting, 'port');
     } else {
       const remoteUrlSetting = new Setting(containerEl)
@@ -417,19 +482,34 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       // Check if server is external (running but plugin has no process)
       isExternalServer = isHealthy && (internalStatus === 'stopped' || !this.plugin.openCodeService.isServerProcessRunning());
       
-      // Determine display status
-      const displayStatus = isHealthy ? 'running' : 
-                           (internalStatus === 'starting' ? 'starting' : 'stopped');
-      
-      const statusKey = `settings.server.status.${displayStatus}` as const;
-      const statusText = t(statusKey) || displayStatus;
-      const serverScopeText = isLocalMode
-        ? t('settings.server.status.scope.local')
-        : t('settings.server.status.scope.remote');
+      const statusText = (() => {
+        if (isLocalMode) {
+          if (isHealthy && isExternalServer) {
+            return t('settings.server.status.localExternal');
+          }
+          if (isHealthy) {
+            return t('settings.server.status.localManaged');
+          }
+          if (internalStatus === 'starting' || internalStatus === 'restarting') {
+            return t('settings.server.status.starting');
+          }
+          return t('settings.server.status.stopped');
+        }
+
+        if (isHealthy) {
+          return t('settings.server.status.remoteConnected');
+        }
+
+        if (internalStatus === 'starting' || internalStatus === 'restarting') {
+          return t('settings.server.status.starting');
+        }
+
+        return t('settings.server.status.stopped');
+      })();
       
       // Update description with status and external warning if applicable
       const healthIndicator = isHealthy ? '🟢' : '🔴';
-      let descText = `${t('settings.server.status.desc')} - ${healthIndicator} ${statusText} ${serverScopeText}`;
+      let descText = `${t('settings.server.status.desc')} - ${healthIndicator} ${statusText}`;
       if (isLocalMode && isExternalServer) {
         descText += ` (${t('settings.server.external.title')})`;
       }
@@ -503,18 +583,17 @@ export class OpenCodianSettingTab extends PluginSettingTab {
             btn.setDisabled(true);
             const isHealthy = await this.plugin.openCodeService.checkHealth();
             const internalStatus = this.plugin.openCodeService.getServerStatus();
-            const displayStatus = isHealthy
-              ? 'running'
-              : (internalStatus === 'starting' ? 'starting' : 'stopped');
-            
-            // Debug info
+            const isExternal = isHealthy && (internalStatus === 'stopped' || !this.plugin.openCodeService.isServerProcessRunning());
 
-            
             await updateStatus();
-            
-            // Build status key and get translation
-            const statusKey = `settings.server.status.${displayStatus}`;
-            const statusText = (t as (key: string) => string)(statusKey) || internalStatus;
+
+            const statusText = isLocalMode
+              ? (isHealthy
+                  ? (isExternal ? t('settings.server.status.localExternal') : t('settings.server.status.localManaged'))
+                  : (internalStatus === 'starting' || internalStatus === 'restarting'
+                      ? t('settings.server.status.starting')
+                      : t('settings.server.status.stopped')))
+              : (isHealthy ? t('settings.server.status.remoteConnected') : t('settings.server.status.stopped'));
             new Notice(`Health: ${isHealthy ? 'OK' : 'FAIL'} | Status: ${statusText}`);
             btn.setDisabled(false);
           });
@@ -560,26 +639,17 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     const loadAvailableModels = async (showNotice = false) => {
       try {
         catalogs = await modelConfigService.getCatalogs(this.plugin.settings.modelSourceMode);
-        const availableProviders = catalogs.effective.providers
-          .filter((provider) => provider.enabled)
-          .map((provider) => ({
-            ...provider,
-            models: provider.models.filter((model) => model.enabled),
-          }))
-          .filter((provider) => provider.models.length > 0);
+        const availableProviders = catalogs.effective.providers;
         let dirty = false;
 
         providerDropdown.selectEl.empty();
-        providerDropdown.addOption('', t('settings.model.unconfigured'));
         for (const provider of availableProviders) {
           providerDropdown.addOption(provider.id, provider.name || provider.id);
         }
 
         this.renderModelCatalogPanel(sourceCatalogEl, catalogs);
 
-        if (this.plugin.settings.defaultProvider === '') {
-          providerDropdown.setValue('');
-        } else if (availableProviders.find((provider) => provider.id === this.plugin.settings.defaultProvider)) {
+        if (availableProviders.find((provider) => provider.id === this.plugin.settings.defaultProvider)) {
           providerDropdown.setValue(this.plugin.settings.defaultProvider);
         } else if (availableProviders.length > 0) {
           providerDropdown.setValue(availableProviders[0].id);
@@ -588,13 +658,10 @@ export class OpenCodianSettingTab extends PluginSettingTab {
             dirty = true;
           }
         } else {
+          providerDropdown.addOption('', t('settings.model.noModels'));
           providerDropdown.setValue('');
           if (this.plugin.settings.defaultProvider !== '') {
             this.plugin.settings.defaultProvider = '';
-            dirty = true;
-          }
-          if (this.plugin.settings.defaultModel !== '') {
-            this.plugin.settings.defaultModel = '';
             dirty = true;
           }
         }
@@ -625,27 +692,11 @@ export class OpenCodianSettingTab extends PluginSettingTab {
 
     const updateModelDropdown = async () => {
       if (!modelDropdown) return;
-      const availableProviders = (catalogs?.effective.providers ?? [])
-        .filter((provider) => provider.enabled)
-        .map((provider) => ({
-          ...provider,
-          models: provider.models.filter((model) => model.enabled),
-        }))
-        .filter((provider) => provider.models.length > 0);
+      const availableProviders = catalogs?.effective.providers ?? [];
       const currentProviderId = providerDropdown.getValue();
       const provider = availableProviders.find((item) => item.id === currentProviderId);
 
       modelDropdown.selectEl.empty();
-
-      if (!currentProviderId) {
-        modelDropdown.addOption('', t('settings.model.unconfigured'));
-        modelDropdown.setValue('');
-        if (this.plugin.settings.defaultModel !== '') {
-          this.plugin.settings.defaultModel = '';
-          await this.plugin.saveSettings();
-        }
-        return;
-      }
 
       if (provider && provider.models.length > 0) {
         for (const model of provider.models) {
@@ -664,7 +715,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
           await this.plugin.saveSettings();
         }
       } else {
-        modelDropdown.addOption('', t('settings.model.unconfigured'));
+        modelDropdown.addOption('', t('settings.model.noModels'));
         modelDropdown.setValue('');
         if (this.plugin.settings.defaultModel !== '') {
           this.plugin.settings.defaultModel = '';
@@ -700,9 +751,6 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         providerDropdown = dropdown;
         dropdown.onChange(async (value) => {
           this.plugin.settings.defaultProvider = value;
-          if (!value) {
-            this.plugin.settings.defaultModel = '';
-          }
           await this.plugin.saveSettings();
           await updateModelDropdown();
         });
@@ -768,6 +816,15 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       this.settingsScrollHandler = undefined;
     }
     this.settingsScrollContainerEl = null;
+    if (this.modelRefreshFrameId !== null) {
+      window.cancelAnimationFrame(this.modelRefreshFrameId);
+      this.modelRefreshFrameId = null;
+    }
+    if (this.settingsPanelPostRenderFrameId !== null) {
+      window.cancelAnimationFrame(this.settingsPanelPostRenderFrameId);
+      this.settingsPanelPostRenderFrameId = null;
+    }
+    this.styleControlBindings = [];
     this.refreshModelsCallback = undefined;
     super.hide();
   }
@@ -1130,7 +1187,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
           .onClick(() => {
             this.plugin.settings.chatAppearance = getDefaultChatAppearanceSettings();
             this.applyAndScheduleStyleUpdate();
-            this.display();
+            this.refreshStyleControlValues();
           });
       });
 
@@ -1140,6 +1197,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       t('settings.style.groups.layout.desc'),
     );
     this.addNumericStyleControl(layoutGroupEl, {
+      group: 'layout',
       name: t('settings.style.layout.messagesPaddingTop.name'),
       desc: t('settings.style.layout.messagesPaddingTop.desc'),
       min: 0,
@@ -1153,6 +1211,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       },
     });
     this.addNumericStyleControl(layoutGroupEl, {
+      group: 'layout',
       name: t('settings.style.layout.messagesPaddingX.name'),
       desc: t('settings.style.layout.messagesPaddingX.desc'),
       min: 0,
@@ -1166,6 +1225,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       },
     });
     this.addNumericStyleControl(layoutGroupEl, {
+      group: 'layout',
       name: t('settings.style.sticky.headerGap.name'),
       desc: t('settings.style.sticky.headerGap.desc'),
       min: 0,
@@ -1179,6 +1239,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       },
     });
     this.addNumericStyleControl(layoutGroupEl, {
+      group: 'layout',
       name: t('settings.style.sticky.maskHeight.name'),
       desc: t('settings.style.sticky.maskHeight.desc'),
       min: 0,
@@ -1192,6 +1253,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       },
     });
     this.addNumericStyleControl(layoutGroupEl, {
+      group: 'layout',
       name: t('settings.style.sticky.maskBlur.name'),
       desc: t('settings.style.sticky.maskBlur.desc'),
       min: 0,
@@ -1212,6 +1274,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       t('settings.style.groups.user.desc'),
     );
     this.addNumericStyleControl(userGroupEl, {
+      group: 'user',
       name: t('settings.style.user.radius.name'),
       desc: t('settings.style.user.radius.desc'),
       min: 8,
@@ -1225,6 +1288,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       },
     });
     this.addNumericStyleControl(userGroupEl, {
+      group: 'user',
       name: t('settings.style.user.tailRadius.name'),
       desc: t('settings.style.user.tailRadius.desc'),
       min: 0,
@@ -1238,6 +1302,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       },
     });
     this.addNumericStyleControl(userGroupEl, {
+      group: 'user',
       name: t('settings.style.user.blur.name'),
       desc: t('settings.style.user.blur.desc'),
       min: 0,
@@ -1251,6 +1316,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       },
     });
     this.addNumericStyleControl(userGroupEl, {
+      group: 'user',
       name: t('settings.style.user.shadowBlur.name'),
       desc: t('settings.style.user.shadowBlur.desc'),
       min: 0,
@@ -1271,6 +1337,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       t('settings.style.groups.assistant.desc'),
     );
     this.addNumericStyleControl(assistantGroupEl, {
+      group: 'assistant',
       name: t('settings.style.assistant.radius.name'),
       desc: t('settings.style.assistant.radius.desc'),
       min: 8,
@@ -1284,6 +1351,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       },
     });
     this.addNumericStyleControl(assistantGroupEl, {
+      group: 'assistant',
       name: t('settings.style.assistant.backgroundOpacity.name'),
       desc: t('settings.style.assistant.backgroundOpacity.desc'),
       min: 0,
@@ -1297,6 +1365,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       },
     });
     this.addNumericStyleControl(assistantGroupEl, {
+      group: 'assistant',
       name: t('settings.style.assistant.blur.name'),
       desc: t('settings.style.assistant.blur.desc'),
       min: 0,
@@ -1310,6 +1379,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       },
     });
     this.addNumericStyleControl(assistantGroupEl, {
+      group: 'assistant',
       name: t('settings.style.assistant.shadowBlur.name'),
       desc: t('settings.style.assistant.shadowBlur.desc'),
       min: 0,
@@ -1330,6 +1400,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       t('settings.style.groups.input.desc'),
     );
     this.addNumericStyleControl(inputGroupEl, {
+      group: 'input',
       name: t('settings.style.input.radius.name'),
       desc: t('settings.style.input.radius.desc'),
       min: 8,
@@ -1343,6 +1414,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       },
     });
     this.addNumericStyleControl(inputGroupEl, {
+      group: 'input',
       name: t('settings.style.input.blur.name'),
       desc: t('settings.style.input.blur.desc'),
       min: 0,
@@ -1356,6 +1428,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       },
     });
     this.addNumericStyleControl(inputGroupEl, {
+      group: 'input',
       name: t('settings.style.input.shadowBlur.name'),
       desc: t('settings.style.input.shadowBlur.desc'),
       min: 0,
@@ -1376,6 +1449,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       t('settings.style.groups.scrollbar.desc'),
     );
     this.addNumericStyleControl(scrollbarGroupEl, {
+      group: 'scrollbar',
       name: t('settings.style.scrollbar.width.name'),
       desc: t('settings.style.scrollbar.width.desc'),
       min: 6,
@@ -1389,6 +1463,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       },
     });
     this.addNumericStyleControl(scrollbarGroupEl, {
+      group: 'scrollbar',
       name: t('settings.style.scrollbar.radius.name'),
       desc: t('settings.style.scrollbar.radius.desc'),
       min: 2,
@@ -1402,6 +1477,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       },
     });
     this.addNumericStyleControl(scrollbarGroupEl, {
+      group: 'scrollbar',
       name: t('settings.style.scrollbar.trackOpacity.name'),
       desc: t('settings.style.scrollbar.trackOpacity.desc'),
       min: 0,
@@ -1415,6 +1491,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       },
     });
     this.addNumericStyleControl(scrollbarGroupEl, {
+      group: 'scrollbar',
       name: t('settings.style.scrollbar.thumbOpacity.name'),
       desc: t('settings.style.scrollbar.thumbOpacity.desc'),
       min: 20,
@@ -1428,6 +1505,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       },
     });
     this.addNumericStyleControl(scrollbarGroupEl, {
+      group: 'scrollbar',
       name: t('settings.style.scrollbar.thumbHoverOpacity.name'),
       desc: t('settings.style.scrollbar.thumbHoverOpacity.desc'),
       min: 30,
@@ -1441,6 +1519,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       },
     });
     this.addNumericStyleControl(scrollbarGroupEl, {
+      group: 'scrollbar',
       name: t('settings.style.scrollbar.edgePadding.name'),
       desc: t('settings.style.scrollbar.edgePadding.desc'),
       min: 0,
@@ -1454,6 +1533,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       },
     });
     this.addNumericStyleControl(scrollbarGroupEl, {
+      group: 'scrollbar',
       name: t('settings.style.scrollbar.shadowOpacity.name'),
       desc: t('settings.style.scrollbar.shadowOpacity.desc'),
       min: 0,
@@ -1484,6 +1564,19 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     });
 
     advancedSetting.addTextArea((text) => {
+      const syncFromSettings = () => {
+        const currentValue = this.plugin.settings.chatAppearance.advanced.customCssDeclarations;
+        text.setValue(currentValue);
+        if (isValidChatAppearanceCustomCssDeclarations(currentValue)) {
+          text.inputEl.removeClass('is-invalid');
+          validationEl.empty();
+          return;
+        }
+
+        text.inputEl.addClass('is-invalid');
+        validationEl.setText(t('settings.style.advanced.customCssDeclarations.invalid'));
+      };
+
       text
         .setPlaceholder(t('settings.style.advanced.customCssDeclarations.placeholder'))
         .setValue(this.plugin.settings.chatAppearance.advanced.customCssDeclarations)
@@ -1503,6 +1596,8 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       text.inputEl.rows = 6;
       text.inputEl.cols = 44;
       text.inputEl.addClass('opencodian-style-textarea');
+
+      this.registerStyleControlBinding('advanced', syncFromSettings);
     });
 
     this.createStyleResetSetting(advancedGroupEl, 'advanced');
@@ -1604,11 +1699,14 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     });
 
     renderValue(config.value());
+    this.registerStyleControlBinding(config.group, () => {
+      renderValue(config.value());
+    });
   }
 
   private createStyleResetSetting(
     containerEl: HTMLElement,
-    group: 'layout' | 'user' | 'assistant' | 'input' | 'scrollbar' | 'advanced',
+    group: ChatAppearanceStyleGroup,
   ): void {
     new Setting(containerEl)
       .setName(t('settings.style.groupReset.name'))
@@ -1620,14 +1718,12 @@ export class OpenCodianSettingTab extends PluginSettingTab {
           .onClick(() => {
             this.resetChatAppearanceGroup(group);
             this.applyAndScheduleStyleUpdate();
-            this.display();
+            this.refreshStyleControlValues(group);
           });
       });
   }
 
-  private resetChatAppearanceGroup(
-    group: 'layout' | 'user' | 'assistant' | 'input' | 'scrollbar' | 'advanced',
-  ): void {
+  private resetChatAppearanceGroup(group: ChatAppearanceStyleGroup): void {
     const defaults = getDefaultChatAppearanceSettings();
     if (group === 'layout') {
       this.plugin.settings.chatAppearance.layout = { ...defaults.layout };
@@ -1658,6 +1754,25 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     this.plugin.settings.chatAppearance.advanced = { ...defaults.advanced };
   }
 
+  private registerStyleControlBinding(
+    group: ChatAppearanceStyleGroup,
+    syncFromSettings: () => void,
+  ): void {
+    this.styleControlBindings.push({
+      group,
+      syncFromSettings,
+    });
+  }
+
+  private refreshStyleControlValues(group?: ChatAppearanceStyleGroup): void {
+    for (const binding of this.styleControlBindings) {
+      if (group && binding.group !== group) {
+        continue;
+      }
+      binding.syncFromSettings();
+    }
+  }
+
   private clampStyleNumber(value: number, min: number, max: number, step: number): number {
     const clampedValue = Math.min(max, Math.max(min, value));
     const steppedValue = Math.round(clampedValue / step) * step;
@@ -1669,36 +1784,70 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     this.plugin.scheduleChatAppearanceSave();
   }
 
-  private bindSettingsPanelScrollPersistence(): void {
+  private scheduleSettingsPanelPostRenderSetup(
+    pendingOpenScrollTop: number | null,
+    pendingOpenSectionTitle: string | null,
+  ): void {
+    this.settingsPanelPostRenderFrameId = window.requestAnimationFrame(() => {
+      this.settingsPanelPostRenderFrameId = null;
+      const scrollContainer = this.getSettingsScrollContainer();
+      this.bindSettingsPanelScrollPersistence(scrollContainer);
+
+      if (pendingOpenSectionTitle) {
+        this.scrollToSectionByTitle(pendingOpenSectionTitle);
+        this.finishPendingOpenVisibility();
+        return;
+      }
+
+      this.restoreSettingsPanelScrollPosition(
+        pendingOpenScrollTop ?? this.plugin.settings.settingsPanelScrollTop,
+        scrollContainer,
+      );
+      this.finishPendingOpenVisibility();
+    });
+  }
+
+  private bindSettingsPanelScrollPersistence(scrollContainer?: HTMLElement): void {
     if (this.settingsScrollHandler) {
       this.settingsScrollContainerEl?.removeEventListener('scroll', this.settingsScrollHandler);
     }
 
-    const scrollContainer = this.getSettingsScrollContainer();
-    this.settingsScrollContainerEl = scrollContainer;
-    this.lastObservedSettingsScrollTop = scrollContainer.scrollTop;
+    const resolvedScrollContainer = scrollContainer ?? this.getSettingsScrollContainer();
+    this.settingsScrollContainerEl = resolvedScrollContainer;
+    this.lastObservedSettingsScrollTop = resolvedScrollContainer.scrollTop;
 
     this.settingsScrollHandler = () => {
-      this.plugin.settings.settingsPanelScrollTop = scrollContainer.scrollTop;
-      this.lastObservedSettingsScrollTop = scrollContainer.scrollTop;
+      this.plugin.settings.settingsPanelScrollTop = resolvedScrollContainer.scrollTop;
+      this.lastObservedSettingsScrollTop = resolvedScrollContainer.scrollTop;
       this.plugin.scheduleSettingsUiStateSave();
     };
 
-    scrollContainer.addEventListener('scroll', this.settingsScrollHandler, { passive: true });
+    resolvedScrollContainer.addEventListener('scroll', this.settingsScrollHandler, { passive: true });
   }
 
-  private restoreSettingsPanelScrollPosition(scrollTop = this.plugin.settings.settingsPanelScrollTop): void {
+  private restoreSettingsPanelScrollPosition(
+    scrollTop = this.plugin.settings.settingsPanelScrollTop,
+    scrollContainer?: HTMLElement,
+  ): void {
+    const resolvedScrollContainer = scrollContainer ?? this.settingsScrollContainerEl ?? this.getSettingsScrollContainer();
+    this.settingsScrollContainerEl = resolvedScrollContainer;
+
     const applyRestore = () => {
-      const scrollContainer = this.getSettingsScrollContainer();
-      scrollContainer.scrollTop = scrollTop;
+      if (!resolvedScrollContainer.isConnected) {
+        return;
+      }
+
+      if (Math.abs(resolvedScrollContainer.scrollTop - scrollTop) > 1) {
+        resolvedScrollContainer.scrollTop = scrollTop;
+      }
     };
 
     window.requestAnimationFrame(() => {
       applyRestore();
-      window.requestAnimationFrame(() => {
+
+      window.setTimeout(() => {
         applyRestore();
-        window.setTimeout(applyRestore, 32);
-      });
+      }, 24);
     });
   }
 
@@ -1739,6 +1888,14 @@ export class OpenCodianSettingTab extends PluginSettingTab {
   }
 
   private getSettingsScrollContainer(): HTMLElement {
+    if (
+      this.settingsScrollContainerEl
+      && this.settingsScrollContainerEl.isConnected
+      && this.settingsScrollContainerEl.contains(this.containerEl)
+    ) {
+      return this.settingsScrollContainerEl;
+    }
+
     const containerEl = this.containerEl;
 
     let currentEl: HTMLElement | null = containerEl;
@@ -1750,11 +1907,13 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         && currentEl.scrollHeight > currentEl.clientHeight + 1;
 
       if (canScrollY) {
+        this.settingsScrollContainerEl = currentEl;
         return currentEl;
       }
       currentEl = currentEl.parentElement;
     }
 
+    this.settingsScrollContainerEl = containerEl;
     return containerEl;
   }
 
@@ -2107,7 +2266,6 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     ];
 
     const activeTab = tabs.find((tab) => tab.mode === this.activeModelCatalogTab) ?? tabs[0];
-    const displayProviders = this.getDisplayCatalogProviders(activeTab.mode, activeTab.catalog);
     const panelEl = containerEl.createDiv({ cls: 'opencodian-model-catalog-panel' });
     const tabsEl = panelEl.createDiv({ cls: 'opencodian-model-catalog-tabs' });
 
@@ -2122,7 +2280,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       }
 
       const countEl = buttonEl.createSpan({ cls: 'opencodian-model-catalog-tab-count' });
-      countEl.setText(String(this.getCatalogModelCount(this.getDisplayCatalogProviders(tab.mode, tab.catalog))));
+      countEl.setText(String(this.getCatalogModelCount(tab.catalog)));
 
       buttonEl.addEventListener('click', () => {
         if (this.activeModelCatalogTab === tab.mode) {
@@ -2139,14 +2297,14 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     headerEl.createDiv({
       cls: 'opencodian-model-catalog-summary',
       text: t('settings.model.catalog.summary', {
-        providers: displayProviders.length,
-        models: this.getCatalogModelCount(displayProviders),
+        providers: activeTab.catalog.providers.length,
+        models: this.getCatalogModelCount(activeTab.catalog),
       }),
     });
 
     const bodyEl = panelEl.createDiv({ cls: 'opencodian-model-catalog-body' });
 
-    if (displayProviders.length === 0) {
+    if (activeTab.catalog.providers.length === 0) {
       bodyEl.createDiv({
         cls: 'opencodian-model-catalog-empty',
         text: t('settings.model.catalog.empty'),
@@ -2154,58 +2312,21 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       return;
     }
 
-    for (const provider of displayProviders) {
-      const providerToggleState = this.getProviderToggleState(catalogs.local, provider.id);
+    for (const provider of activeTab.catalog.providers) {
       const providerEl = bodyEl.createDiv({ cls: 'opencodian-model-catalog-provider' });
-      if (!providerToggleState) {
-        providerEl.addClass('is-disabled');
-      }
       const providerHeaderEl = providerEl.createDiv({ cls: 'opencodian-model-catalog-provider-header' });
       providerHeaderEl.createDiv({
         cls: 'opencodian-model-catalog-provider-name',
         text: provider.name,
       });
-      const providerActionsEl = providerHeaderEl.createDiv({ cls: 'opencodian-model-catalog-provider-actions' });
-      const providerCountEl = providerActionsEl.createDiv({
+      providerHeaderEl.createDiv({
         cls: 'opencodian-model-catalog-provider-count',
         text: String(provider.models.length),
       });
-      providerCountEl.title = t('settings.model.toggle.modelCount', { count: String(provider.models.length) });
-      const providerToggleLabel = providerActionsEl.createEl('label', { cls: 'opencodian-model-catalog-toggle' });
-      const providerToggleEl = providerToggleLabel.createEl('input', { attr: { type: 'checkbox' } });
-      providerToggleEl.checked = providerToggleState;
-      providerToggleEl.disabled = this.plugin.settings.defaultProvider === provider.id && this.plugin.settings.defaultProvider !== '';
-      providerToggleEl.addEventListener('change', () => {
-        void this.handleProviderToggle(provider.id, providerToggleEl.checked, providerToggleEl);
+      providerEl.createDiv({
+        cls: 'opencodian-model-catalog-provider-models',
+        text: this.describeProviderModels(provider),
       });
-      providerToggleLabel.createSpan({ text: providerToggleState ? t('settings.model.toggle.on') : t('settings.model.toggle.off') });
-
-      const modelsEl = providerEl.createDiv({ cls: 'opencodian-model-catalog-provider-model-list' });
-      for (const model of provider.models) {
-        const modelEnabled = this.getModelToggleState(catalogs.local, provider.id, model.id);
-        const modelRowEl = modelsEl.createDiv({ cls: 'opencodian-model-catalog-model-row' });
-        if (!modelEnabled) {
-          modelRowEl.addClass('is-disabled');
-        }
-        const modelInfoEl = modelRowEl.createDiv({ cls: 'opencodian-model-catalog-model-info' });
-        modelInfoEl.createDiv({
-          cls: 'opencodian-model-catalog-model-name',
-          text: model.name,
-        });
-        modelInfoEl.createDiv({
-          cls: 'opencodian-model-catalog-model-id',
-          text: model.id,
-        });
-
-        const modelToggleLabel = modelRowEl.createEl('label', { cls: 'opencodian-model-catalog-toggle' });
-        const modelToggleEl = modelToggleLabel.createEl('input', { attr: { type: 'checkbox' } });
-        modelToggleEl.checked = modelEnabled;
-        modelToggleEl.disabled = !providerToggleState;
-        modelToggleEl.addEventListener('change', () => {
-          void this.handleModelToggle(provider.id, model.id, modelToggleEl.checked, modelToggleEl);
-        });
-        modelToggleLabel.createSpan({ text: modelEnabled ? t('settings.model.toggle.on') : t('settings.model.toggle.off') });
-      }
     }
   }
 
@@ -2220,28 +2341,8 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     }
   }
 
-  private getDisplayCatalogProviders(
-    mode: 'local' | 'server' | 'effective',
-    catalog: ModelCatalog,
-  ): ModelCatalogProvider[] {
-    if (mode !== 'effective') {
-      return catalog.providers;
-    }
-
-    return catalog.providers
-      .filter((provider) => provider.enabled)
-      .map((provider) => ({
-        ...provider,
-        whitelist: [...provider.whitelist],
-        blacklist: [...provider.blacklist],
-        models: provider.models.filter((model) => model.enabled),
-      }))
-      .filter((provider) => provider.models.length > 0);
-  }
-
-  private getCatalogModelCount(catalog: ModelCatalog | ModelCatalogProvider[]): number {
-    const providers = Array.isArray(catalog) ? catalog : catalog.providers;
-    return providers.reduce((total, provider) => total + provider.models.length, 0);
+  private getCatalogModelCount(catalog: ModelCatalog): number {
+    return catalog.providers.reduce((total, provider) => total + provider.models.length, 0);
   }
 
   private describeProviderModels(provider: ModelCatalogProvider): string {
@@ -2252,100 +2353,6 @@ export class OpenCodianSettingTab extends PluginSettingTab {
 
     const preview = modelNames.slice(0, 6).join(' · ');
     return `${preview} · +${modelNames.length - 6}`;
-  }
-
-  private getProviderToggleState(localCatalog: ModelCatalog, providerId: string): boolean {
-    return localCatalog.providers.find((provider) => provider.id === providerId)?.enabled ?? true;
-  }
-
-  private getModelToggleState(localCatalog: ModelCatalog, providerId: string, modelId: string): boolean {
-    const provider = localCatalog.providers.find((item) => item.id === providerId);
-    if (!provider) {
-      return true;
-    }
-
-    if (!provider.enabled) {
-      return false;
-    }
-
-    const localModel = provider.models.find((model) => model.id === modelId);
-    if (localModel) {
-      return localModel.enabled;
-    }
-
-    if (provider.whitelist.length > 0) {
-      return provider.whitelist.includes(modelId) && !provider.blacklist.includes(modelId);
-    }
-
-    return !provider.blacklist.includes(modelId);
-  }
-
-  private async handleProviderToggle(
-    providerId: string,
-    enabled: boolean,
-    toggleEl: HTMLInputElement,
-  ): Promise<void> {
-    if (!this.plugin.modelConfigService) {
-      return;
-    }
-
-    if (!enabled && this.plugin.settings.defaultProvider === providerId && this.plugin.settings.defaultProvider !== '') {
-      toggleEl.checked = true;
-      new Notice(t('settings.model.toggle.defaultProviderLocked'));
-      return;
-    }
-
-    try {
-      const subset = await this.plugin.modelConfigService.readLocalModelConfig();
-      const next = setProviderEnabled(subset, providerId, enabled);
-      await this.plugin.modelConfigService.writeLocalModelConfig(next);
-      await this.restartLocalModelServerIfNeeded();
-      await this.plugin.saveSettings();
-      this.refreshModelsCallback?.();
-    } catch (error) {
-      logger.error('Failed to toggle provider availability:', error);
-      toggleEl.checked = !enabled;
-      new Notice(t('settings.model.toggle.updateFailed'));
-    }
-  }
-
-  private async handleModelToggle(
-    providerId: string,
-    modelId: string,
-    enabled: boolean,
-    toggleEl: HTMLInputElement,
-  ): Promise<void> {
-    if (!this.plugin.modelConfigService) {
-      return;
-    }
-
-    try {
-      const subset = await this.plugin.modelConfigService.readLocalModelConfig();
-      const next = setModelEnabled(subset, providerId, modelId, enabled);
-      await this.plugin.modelConfigService.writeLocalModelConfig(next);
-      await this.restartLocalModelServerIfNeeded();
-      await this.plugin.saveSettings();
-      this.refreshModelsCallback?.();
-    } catch (error) {
-      logger.error('Failed to toggle model availability:', error);
-      toggleEl.checked = !enabled;
-      new Notice(t('settings.model.toggle.updateFailed'));
-    }
-  }
-
-  private async restartLocalModelServerIfNeeded(): Promise<void> {
-    if (this.plugin.settings.server.mode !== 'local') {
-      return;
-    }
-
-    const running = await this.plugin.openCodeService.checkHealth();
-    if (!running) {
-      return;
-    }
-
-    await this.plugin.openCodeService.stop();
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    await this.plugin.openCodeService.start();
   }
 
   private addServerHelpButton(setting: Setting, topic: ServerHelpTopic): void {

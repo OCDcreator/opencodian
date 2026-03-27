@@ -13,9 +13,13 @@ import type { ChatMessage, ContentBlock, ImageAttachment, PermissionReply, Permi
 import type { OpenCodianSettings } from '../types/settings';
 import { getServerBaseUrl, isLocalServerMode } from '../types/settings';
 import { ServerManager } from './ServerManager';
-import type { OpenCodeServerConfig, QueryOptions, ResponseHandler } from './types';
+import type { ManagedServerState, OpenCodeServerConfig, QueryOptions, ResponseHandler } from './types';
 
 const logger = createLogger('OpenCodeService');
+
+function cloneSettings(settings: OpenCodianSettings): OpenCodianSettings {
+  return JSON.parse(JSON.stringify(settings)) as OpenCodianSettings;
+}
 
 /** SSE Event types from OpenCode server */
 interface SSEEvent {
@@ -78,6 +82,11 @@ interface OpenCodeServiceEvents {
   onModelsLoaded?: (providers: Array<{ id: string; name: string; models: Array<{ id: string; name: string }> }>) => void;
 }
 
+interface OpenCodeServiceRuntimeOptions {
+  initialManagedServerState?: ManagedServerState | null;
+  onManagedServerStateChange?: (state: ManagedServerState | null) => void;
+}
+
 /** Session data structure */
 interface Session {
   id: string;
@@ -120,23 +129,34 @@ export class OpenCodeService {
   private partTypeMap: Map<string, string> = new Map(); // Track part types by partID
   private currentAbortController: AbortController | null = null; // For cancelling streams
 
-  constructor(settings: OpenCodianSettings, events: OpenCodeServiceEvents = {}) {
-    this.settings = settings;
+  constructor(
+    settings: OpenCodianSettings,
+    events: OpenCodeServiceEvents = {},
+    runtimeOptions: OpenCodeServiceRuntimeOptions = {},
+  ) {
+    this.settings = cloneSettings(settings);
     this.events = events;
     this.baseUrl = getServerBaseUrl(settings.server);
 
-    this.serverManager = new ServerManager(this.buildServerConfig(settings), {
-      onStatusChange: (status) => {
-        events.onServerStatusChange?.(status);
-        // Auto-fetch models when server starts running
-        if (status === 'running') {
-          void this.autoFetchModels();
-        }
+    this.serverManager = new ServerManager(
+      this.buildServerConfig(settings),
+      {
+        onStatusChange: (status) => {
+          events.onServerStatusChange?.(status);
+          // Auto-fetch models when server starts running
+          if (status === 'running') {
+            void this.autoFetchModels();
+          }
+        },
+        onError: (error) => {
+          events.onError?.(error);
+        },
       },
-      onError: (error) => {
-        events.onError?.(error);
+      {
+        initialManagedServerState: runtimeOptions.initialManagedServerState,
+        onManagedServerStateChange: runtimeOptions.onManagedServerStateChange,
       },
-    });
+    );
   }
 
   /** Initialize the service */
@@ -151,6 +171,10 @@ export class OpenCodeService {
     this.serverManager.setWorkingDirectory(path);
   }
 
+  getSettingsSnapshot(): OpenCodianSettings {
+    return cloneSettings(this.settings);
+  }
+
   /** Auto-fetch models when server starts and update defaults if needed */
   private async autoFetchModels(): Promise<void> {
     try {
@@ -159,11 +183,6 @@ export class OpenCodeService {
       
       if (result.providers.length === 0) {
         logger.warn('No providers available from server');
-        return;
-      }
-
-      if (!this.settings.defaultProvider || !this.settings.defaultModel) {
-        this.events.onModelsLoaded?.(result.providers);
         return;
       }
 
@@ -873,7 +892,7 @@ export class OpenCodeService {
   }
 
   /** Update settings */
-  updateSettings(settings: OpenCodianSettings): void {
+  async updateSettings(settings: OpenCodianSettings): Promise<void> {
     const previousSettings = this.settings;
     const previousMode = previousSettings.server.mode;
     const nextMode = settings.server.mode;
@@ -899,18 +918,114 @@ export class OpenCodeService {
       previousMode === 'local' &&
       nextMode !== 'local';
 
-    this.settings = settings;
-    this.baseUrl = getServerBaseUrl(settings.server);
-    this.serverManager.updateConfig(this.buildServerConfig(settings));
-
-    if (shouldStopManagedServer) {
-      void this.serverManager.stop();
-      return;
+    if (
+      this.serverManager.isRunning() &&
+      previousMode === 'local' &&
+      nextMode === 'local' &&
+      serverConfigChanged
+    ) {
+      const endpointAvailable = await this.serverManager.canBindLocalEndpoint(
+        settings.server.local.host,
+        settings.server.local.port,
+      );
+      if (!endpointAvailable) {
+        throw new Error(`Cannot switch to ${settings.server.local.host}:${settings.server.local.port}. The target port is already in use.`);
+      }
     }
 
-    if (shouldRestartManagedServer) {
-      void this.serverManager.restart();
+    const nextSettings = cloneSettings(settings);
+    const previousBaseUrl = this.baseUrl;
+    this.settings = nextSettings;
+    this.baseUrl = getServerBaseUrl(nextSettings.server);
+    this.serverManager.updateConfig(this.buildServerConfig(nextSettings));
+
+    try {
+      if (shouldStopManagedServer) {
+        await this.serverManager.stop();
+        return;
+      }
+
+      if (shouldRestartManagedServer) {
+        await this.serverManager.restart();
+      }
+    } catch (error) {
+      this.settings = previousSettings;
+      this.baseUrl = previousBaseUrl;
+      this.serverManager.updateConfig(this.buildServerConfig(previousSettings));
+      if (previousMode === 'local' && (shouldRestartManagedServer || shouldStopManagedServer)) {
+        try {
+          await this.serverManager.start();
+        } catch (restoreError) {
+          logger.error('Failed to restore previous OpenCode server after settings update failure:', restoreError);
+        }
+      }
+      throw error;
     }
+  }
+
+  async forkSession(sessionId: string, messageID?: string): Promise<{ id: string; title: string }> {
+    const response = await this.post<unknown>(`/session/${sessionId}/fork`, messageID ? { messageID } : {});
+    if (typeof response === 'object' && response !== null && 'id' in response) {
+      const typedResponse = response as { id: unknown; title?: unknown };
+      return {
+        id: String(typedResponse.id),
+        title: typeof typedResponse.title === 'string'
+          ? typedResponse.title
+          : '',
+      };
+    }
+
+    throw new Error('Invalid fork session response');
+  }
+
+  async revertSession(sessionId: string, messageID: string, partID?: string): Promise<boolean> {
+    const payload: Record<string, string> = { messageID };
+    if (partID) {
+      payload.partID = partID;
+    }
+
+    logger.debug('Revert session request', {
+      sessionId,
+      messageID,
+      partID: partID ?? null,
+    });
+
+    const response = await this.post<unknown>(`/session/${sessionId}/revert`, payload);
+    logger.debug('Revert session raw response', {
+      sessionId,
+      messageID,
+      response,
+    });
+
+    if (response === false) {
+      logger.debug('Revert session normalized result=false', { sessionId, messageID });
+      return false;
+    }
+
+    if (typeof response === 'object' && response !== null && Object.keys(response).length === 0) {
+      logger.debug('Revert session normalized result=true (empty object/204)', { sessionId, messageID });
+      return true;
+    }
+
+    if (typeof response === 'object' && response !== null && 'id' in response) {
+      const responseId = String((response as { id: unknown }).id);
+      const normalized = responseId.length > 0;
+      logger.debug('Revert session normalized result from session object', {
+        sessionId,
+        messageID,
+        responseId,
+        normalized,
+      });
+      return normalized;
+    }
+
+    const normalized = response === true;
+    logger.debug('Revert session normalized boolean result', {
+      sessionId,
+      messageID,
+      normalized,
+    });
+    return normalized;
   }
 
   private buildServerConfig(settings: OpenCodianSettings): OpenCodeServerConfig {
@@ -1140,6 +1255,7 @@ export class OpenCodeService {
       role: info.role === 'assistant' ? 'assistant' : 'user',
       content,
       timestamp,
+      sourceMessageId: info.id,
       toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
       contentBlocks: contentBlocks.length > 0 ? contentBlocks : undefined,
       parts,

@@ -1,12 +1,15 @@
 {
   "name": "opencodian",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "OpenCodian - OpenCode AI embedded in Obsidian sidebar",
   "main": "main.js",
   "scripts": {
     "build:css": "node scripts/build-css.mjs",
     "dev": "npm run build:css && node esbuild.config.mjs",
     "build": "node scripts/build.mjs production",
+    "release:patch": "node scripts/release.mjs patch",
+    "release:minor": "node scripts/release.mjs minor",
+    "release:major": "node scripts/release.mjs major",
     "doctor:esbuild": "node scripts/doctor-esbuild.mjs",
     "doctor:esbuild:fix": "node scripts/doctor-esbuild.mjs --fix",
     "typecheck": "tsc --noEmit",

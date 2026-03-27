@@ -8,6 +8,558 @@
 
 ---
 
+## 2026-03-27 标签栏折叠、`+N` 溢出菜单、标签恢复与交互细节收尾
+
+### 📋 本次开发目标
+围绕会话标签栏与顶部交互做一轮可用性打磨，并把这批改动沉淀为首个正式大版本的发布基础：
+
+1. 标签默认折叠，仅在悬浮 / 聚焦 / 激活时展开标题
+2. 标签过多时引入 `+N` 溢出菜单，并根据标签栏位置智能决定弹出方向
+3. 修复重启 Obsidian 后只恢复当前标签、丢失其它标签的问题
+4. 统一顶部按钮、标签按钮、思考预算等区域的 tooltip 与下拉交互
+5. 调整新建标签图标与若干视觉细节，完成 1.0.0 前的交互收尾
+
+### ✅ 实现内容
+
+#### 1. 标签默认折叠，悬浮展开
+- 标签默认以紧凑胶囊展示，主要保留数字徽章
+- 在悬浮、键盘聚焦、当前激活时再平滑展开标题
+- 状态图标在无内容时不再占宽度，避免数字标签显得松散
+
+#### 2. 超过 5 个标签时使用 `+N` 溢出菜单
+- 标签数超过 5 个后，只保留可见槽位，剩余标签汇总进 `+N`
+- 当前激活标签始终优先留在可见区域
+- 最终将 `+N` 从 Obsidian 原生菜单改为插件自定义浮层，便于完全控制样式与方向
+- 当标签栏位于底部输入区时，`+N` 菜单优先向上弹出；位于顶部时则优先向下弹出
+
+#### 3. 持久化整组标签状态
+- 新增隐藏的 `tabState` 设置结构，记录：
+  - 标签顺序
+  - 当前激活标签索引
+  - 每个标签关联的会话 ID
+  - 每个标签的模型覆盖设置
+- 视图关闭时落盘，重新打开插件或重启 Obsidian 后按保存状态恢复
+- 若某些旧标签关联的会话已不存在，会自动跳过无效项，避免恢复失败
+
+#### 4. 统一 tooltip 体系
+- 标签、顶部状态按钮、历史按钮、设置按钮等统一改为项目内自定义 tooltip
+- 去掉会触发 Obsidian / 浏览器原生提示的重复属性，解决双提示问题
+- 顶部四个按钮的 tooltip 改为向下显示，避免在顶部区域被宿主裁切
+- `+N` 按钮悬浮时取消 tooltip，避免被裁切后出现不自然的深色横线阴影
+
+#### 5. 思考预算与 Effort 交互修复
+- 思考预算选项的 token 提示改为自定义 tooltip
+- 预算下拉改为点击展开，不再悬浮即弹出，降低误触和“悬浮后不知道怎么继续”的停滞感
+- 菜单支持点外部关闭与 `Esc` 关闭，鼠标离开触发按钮后仍可稳定点击 `4K / 8K / 16K`
+- 当预算栏位于输入区顶部时，菜单优先向上展开，避免被底部区域遮挡
+
+#### 6. 新建标签按钮文案与图标
+- “新对话”按钮提示改为“新建标签并在新标签中对话”
+- 为新建标签按钮接入自定义圆圈加号图标，并统一右上角按钮图标尺寸，修复图标显示过小问题
+
+#### 7. 部署流程约束写入 AGENTS
+- 在 `AGENTS.md` 中补充强约束：
+  - 必须先构建，再部署
+  - 禁止并行执行构建与部署
+  - 部署后必须校验测试库中的最终 `BUILD_ID`
+- 这样可以避免“测试库不是最新构建”的误部署情况再次发生
+
+### 📁 涉及文件
+
+| 文件 | 修改内容 |
+|------|----------|
+| `src/features/chat/tabs/TabBar.ts` | 标签折叠渲染、`+N` 溢出菜单、自定义浮层、弹出方向控制 |
+| `src/features/chat/tabs/TabManager.ts` | 新增整组标签恢复逻辑 |
+| `src/features/chat/tabs/types.ts` | 新增标签恢复数据结构 |
+| `src/features/chat/OpenCodianView.ts` | 顶部按钮 tooltip、标签状态持久化、新建标签按钮图标与提示 |
+| `src/features/chat/ui/EffortSelector.ts` | 预算菜单点击展开、关闭逻辑、自定义 tooltip |
+| `src/core/types/settings.ts` | 新增 `tabState` 持久化结构与归一化逻辑 |
+| `src/core/types/index.ts` | 导出新增的标签状态类型与工具函数 |
+| `src/main.ts` | 读取并归一化持久化标签状态 |
+| `src/i18n/locales/en.ts` | 新增标签 / 历史 / 设置 / 预算相关英文文案 |
+| `src/i18n/locales/zh.ts` | 新增标签 / 历史 / 设置 / 预算相关中文文案 |
+| `styles.css` | 标签栏、溢出菜单、tooltip、右上角按钮图标、思考预算菜单样式 |
+| `AGENTS.md` | 补充构建与部署的顺序性约束 |
+
+### 📌 当前收益
+
+- 标签栏在多会话场景下更紧凑，也更适合长期使用
+- 多标签状态终于能跨重启恢复，不再只剩最后一个标签
+- `+N` 的行为与标签栏位置保持一致，用户预期更稳定
+- tooltip 不再重复，不再出现顶部看不见、底部挡住、悬浮异常阴影等问题
+- 思考预算交互从“悬浮即弹”改为“点击展开”，更加明确、稳健
+- 构建与部署流程被正式写入仓库规范，为 1.0.0 发布提供了稳定基础
+
+---
+
+## 2026-03-27 助手消息模型 ID 持久化与外层导航浮层修复
+
+### 📋 本次开发目标
+围绕聊天界面补两项直接影响可用性的细节：
+
+1. 在助手消息底部时间戳与复制按钮之间直接显示生成该回复的模型 ID
+2. 彻底解决左侧导航按钮被宿主裁切、或为了防裁切而挤压消息正文宽度的问题
+
+### ✅ 实现内容
+
+#### 1. 助手消息新增 `modelId` 持久化字段
+- 在 `ChatMessage` 中新增 `modelId?: string`
+- 发送消息时根据当前会话模型写入 `provider/model`
+- 助手流式完成、错误消息、重新加载后的历史消息都统一走该字段显示模型 ID
+
+#### 2. 助手消息 footer 直接显示模型 ID
+- 助手消息底部改为：
+  - 时间戳
+  - `· provider/model`
+  - 复制按钮
+- 历史旧消息若没有 `modelId`，则保持兼容，不显示该字段
+- 模型 ID 文本支持单行省略，避免长模型名破坏底部布局
+
+#### 3. 服务端消息同步时保留本地 `modelId`
+- 现有会话重载 / 同步时会用服务端消息覆盖本地消息
+- 为避免本地新增的 `modelId` 被覆盖，新增了同步合并逻辑：
+  - 优先按 `sourceMessageId` 回填
+  - 对没有 `sourceMessageId` 的本地助手消息做末尾兜底匹配
+- 这样刷新会话、重新打开 Obsidian 后，模型 ID 仍可见
+
+#### 4. 导航按钮改为宿主外层独立浮层
+- 放弃“向左溢出消息容器”与“内部预留 gutter”的方案
+- 导航按钮现在不再挂在消息区内部，而是挂到 `workspace-leaf-content` 级别的独立 host 浮层
+- 浮层仅负责承载导航按钮：
+  - 不参与消息区布局
+  - 不压缩助手消息宽度
+  - 不依赖消息区 overflow 是否可见
+- 导航按钮位置改为根据消息区 anchor 动态计算纵向中心点，滚动、内容变更、窗口变化时都重新校正
+
+### 📁 涉及文件
+
+| 文件 | 修改内容 |
+|------|----------|
+| `src/core/types/chat.ts` | 为 `ChatMessage` 新增 `modelId?: string` |
+| `src/features/chat/OpenCodianView.ts` | 发送时记录模型 ID、渲染助手 footer、同步回填 `modelId`、导航栏挂载改到宿主外层 |
+| `src/features/chat/ui/NavigationSidebar.ts` | 新增外层 host 挂载、位置同步、宿主级浮层销毁逻辑 |
+| `styles.css` | 新增助手消息模型 ID 样式，导航浮层宿主样式改为外层 absolute host |
+
+### 🧪 验证结果
+
+- ✅ 多次 `npm run build`
+- ✅ 已多次部署到测试库：`C:\Users\lt\Desktop\Write\testvault\.obsidian\plugins\opencodian\`
+- ✅ 最终部署版本 BUILD_ID：`fix-revert-model-toggle.202603271716`
+
+### 📌 当前收益
+
+- 助手消息现在能直接看出是哪一个模型生成的
+- 模型信息会跟随会话持久化，不会因刷新 / 重载丢失
+- 左侧导航按钮不再压缩聊天正文
+- 导航按钮从消息区布局中完全抽离，后续只需要微调浮层定位和视觉样式，不必再和消息宽度互相牵连
+
+---
+
+## 2026-03-27 样式设置重置交互去抖与强制回流修复
+
+### 📋 本次开发目标
+修复设置页“样式”分组在点击“全部重置”或分组“重置”时的两个问题：
+
+1. 重置后调用 `display()` 重建整页设置面板，导致界面闪动、抖动和轻微滑动
+2. 设置页刚重建就同步读取滚动容器布局属性，控制台出现 `Forced reflow while executing JavaScript` 警告
+
+### ✅ 实现内容
+
+#### 1. 样式重置改为原地刷新控件，不再重建整页
+- 为样式数值控件建立分组绑定注册表
+- “全部重置”与分组“重置”只更新 `chatAppearance` 设置值
+- 随后直接把 slider / number input / 高级 CSS 文本框同步到最新值
+- 移除重置链路中的 `this.display()`，避免销毁并重建整个设置面板 DOM
+
+#### 2. 高级 CSS 文本框同步校验状态
+- 为 `advanced.customCssDeclarations` 单独补充绑定刷新逻辑
+- 重置时除文本值外，也同步清理或恢复非法输入提示状态
+- 避免出现设置值已经回到默认，但文本框红框或提示仍停留在旧状态
+
+#### 3. 设置页滚动绑定延后到渲染后执行
+- 将滚动容器探测、滚动监听绑定、滚动位置恢复收敛到渲染后的 `requestAnimationFrame`
+- 不再在 `display()` 刚重建 DOM 后立刻走 `scrollHeight / clientHeight` 判断
+- 继续保留设置页滚动记忆能力，同时降低重置后的布局抖动和强制回流概率
+
+### 📁 涉及文件
+
+| 文件 | 修改内容 |
+|------|----------|
+| `src/features/settings/OpenCodianSettings.ts` | 样式控件绑定注册、重置原地刷新、advanced 文本框同步、设置页滚动绑定延后 |
+
+### 🧪 验证结果
+
+- ✅ `npm run build`
+- ✅ 已部署到测试库：`C:\Users\lt\Desktop\Write\testvault\.obsidian\plugins\opencodian\`
+
+### 📌 当前收益
+
+- 点击“全部重置”或分组“重置”时，设置面板不再整页闪烁重建
+- 样式控件会原地回到默认值，滚动位置更稳定
+- `Forced reflow` 警告触发路径被拆开，设置页交互更顺滑
+
+---
+
+## 2026-03-27 用户消息操作区与导航按钮交互统一
+
+### 📋 本次开发目标
+围绕聊天界面的“用户消息操作区”和“左侧导航按钮”做一轮可用性与一致性整理，重点解决：
+
+1. 用户消息复制 / 回退 / 分叉的布局、图标化和 hover 行为不统一
+2. 自定义黑色提示与 Obsidian/浏览器原生提示重叠
+3. 左侧四个导航按钮默认过于显眼，且在某些消息边距配置下容易遮挡内容
+4. 导航提示文案未接入中文
+
+### ✅ 实现内容
+
+#### 1. 用户消息 footer 重构为单行操作区
+- 将用户消息原本独立定位的复制按钮收拢进 footer
+- 统一为“复制 / 回退 / 分叉 + 时间戳”同一行布局
+- 时间戳默认显示，操作按钮仅在 hover / focus 用户消息时显示
+- 用户消息气泡内容改为按文本自身宽度收缩，避免短消息被底部按钮区域视觉拉长
+
+#### 2. 回退 / 分叉改为图标按钮
+- 将“回退到此处”和“分叉对话”从文字按钮改为图标按钮
+- 复用当前玻璃拟态视觉语言，尺寸收敛到与复制按钮一致的 30x30 图标按钮
+- 保留对应操作语义，但通过 hover 提示解释含义，减少底部操作区宽度占用
+
+#### 3. Tooltip 统一为自定义黑色提示
+- 为用户消息操作区按钮和左侧四个导航按钮统一接入 `data-tooltip` 驱动的黑色 tooltip
+- 去掉这些按钮上的原生 tooltip 来源，不再依赖 `title`
+- 进一步移除会触发宿主额外提示的 `aria-label` 方案
+- 改为 `aria-labelledby + visually-hidden label`，既保留可访问性，又避免双 tooltip 叠加
+
+#### 4. 导航按钮中文化与样式弱化
+- 将 `Scroll to top / bottom`、`Previous / Next message` 接入 i18n
+- 新增中英文导航提示文案
+- 导航侧栏改为：
+  - 可滚动时默认半透明显示
+  - hover / focus 时恢复完全不透明
+- 将侧栏进一步贴近左边框，减少在助手消息靠左布局下的遮挡
+
+### 📁 涉及文件
+
+| 文件 | 修改内容 |
+|------|----------|
+| `src/features/chat/OpenCodianView.ts` | 用户消息 footer 重构、复制行为复用、图标按钮与可访问性标签整理 |
+| `src/features/chat/ui/NavigationSidebar.ts` | 四个导航按钮 tooltip 接入、自定义提示、中文化文案接入 |
+| `src/i18n/locales/zh.ts` | 新增导航按钮中文提示 |
+| `src/i18n/locales/en.ts` | 新增导航按钮英文提示 |
+| `styles.css` | 用户消息底部操作区布局、图标按钮、黑色 tooltip、导航侧栏透明度与左侧定位调整 |
+
+### 🧪 验证结果
+
+- ✅ 多轮 `npm run build`
+- ✅ 已部署到测试库：`C:\Users\lt\Desktop\Write\testvault\.obsidian\plugins\opencodian\`
+
+### 📌 当前收益
+
+- 用户消息底部操作区更紧凑，短消息不再被底部按钮区域拉宽
+- 回退 / 分叉 / 复制的视觉和交互语义统一
+- 自定义黑色 tooltip 不再与宿主原生提示叠加
+- 左侧导航按钮默认存在感更低，但悬停时仍然清晰可点击
+- 导航提示在中文界面下不再出现英文残留
+
+---
+
+## 2026-03-27 Sticky 滚动模式下 Previous Message 导航定位修复
+
+### 📋 本次开发目标
+修复聊天界面在以下两种滚动模式下的历史导航定位问题：
+
+1. `sticky-basic`
+2. `sticky-mask`
+
+具体是 `Previous Message` 按钮跳转到上一条用户消息时，只能看到吸顶后的用户消息本身，看不到该回合对应的助手回复；而 `Next Message` 的体感基本正常。
+
+### ✅ 实现内容
+
+#### 1. 导航判断与滚动目标拆分
+- 保留“用当前可见位置判断上一条/下一条消息”的逻辑
+- 但不再直接使用 `.opencodian-message--user` 的视觉 `top` 作为最终滚动目标
+- 避免在 sticky 模式下被 `position: sticky` 改写后的 `getBoundingClientRect()` 误导
+
+#### 2. Sticky 模式改为按 turn 锚点滚动
+- 为 `sticky-basic` / `sticky-mask` 新增滚动模式识别
+- 当命中 sticky 模式时：
+  - 导航选择仍参考用户消息当前视觉位置
+  - 实际滚动目标改为对应 `.opencodian-turn` 的文档流起点
+- 这样点击 `Previous Message` 时，会回到该回合的真实开头，而不是停在已经吸顶后的 header 位置
+
+#### 3. Natural 模式保持原行为
+- 非 sticky 模式仍然沿用用户消息锚点
+- 继续保留原有 `10px` 的滚动留白，避免改动自然滚动模式的观感
+
+#### 4. 补充针对性单元测试
+- 新增 `NavigationSidebar` 单元测试
+- 覆盖两个关键场景：
+  - sticky 模式下 `Previous` 应滚动到 turn 锚点
+  - natural 模式下仍保留现有 padding 行为
+
+### 📁 涉及文件
+
+| 文件 | 修改内容 |
+|------|----------|
+| `src/features/chat/ui/NavigationSidebar.ts` | 导航坐标计算改为“视觉定位 + turn 锚点滚动”双轨逻辑 |
+| `tests/unit/features/chat/NavigationSidebar.test.ts` | 新增 sticky / natural 导航定位测试 |
+
+### 🧪 验证结果
+
+- ✅ `npx eslint src/features/chat/ui/NavigationSidebar.ts tests/unit/features/chat/NavigationSidebar.test.ts`
+- ✅ `npm run test -- NavigationSidebar.test.ts`
+- ✅ `npm run build`
+- ✅ 已部署到测试库：`C:\Users\lt\Desktop\Write\testvault\.obsidian\plugins\opencodian\`
+
+### 📌 当前收益
+
+- `Previous Message` 在吸顶模式下不再只把用户消息顶到视口顶部
+- 上一回合对应的助手消息可以随着导航一起回到可见区域
+- `sticky-basic`、`sticky-mask` 与 `natural` 三种滚动模式的导航语义更一致
+
+---
+
+## 2026-03-27 本地 OpenCode 托管认领、端口切换与设置页性能优化
+
+### 📋 本次开发目标
+围绕本地 OpenCode 服务的实际使用问题做一轮稳定性与可观测性修复，重点解决：
+
+1. 本地服务在 Obsidian 重载后被误判为“外部服务”
+2. 切换模型来源、切换端口时的状态不清晰、失败提示不明确
+3. 设置页记忆滚动位置与模型刷新导致的 UI 抖动、强制回流和日志噪音
+
+### ✅ 实现内容
+
+#### 1. 本地服务状态语义重构
+- 将本地运行态明确区分为：
+  - `运行中（插件托管）`
+  - `运行中（外部接管）`
+- 聊天视图状态徽标同步细化为：
+  - `本地托管`
+  - `本地外部`
+  - `远程已连接`
+- 避免本地 `127.0.0.1` 上已有服务时仍然被笼统显示为普通“运行中”
+
+#### 2. 重载 Obsidian 后认领旧的本地托管进程
+- 新增运行态持久化文件 `.opencodian/runtime.json`
+- 记录插件托管 OpenCode 的 PID、host、port
+- 插件重载后如果检测到同一 PID 仍然存活，且命令行仍匹配当前 `opencode serve --port --hostname`，则自动认领为当前托管实例
+- 认领成功后，停止/重启按钮仍可继续管理该服务，而不是退化为“本地外部”
+
+#### 3. Windows 停服逻辑增强
+- 本地托管服务停止时，Windows 下改为使用 `taskkill /PID ... /T /F`
+- 终止完整 OpenCode 进程树，减少重载 Obsidian 后旧服务残留
+- 对已认领但当前实例没有 `ChildProcess` 句柄的 PID，也支持按 PID 停止
+
+#### 4. 端口切换行为收紧
+- 修复 `OpenCodeService` 与插件设置对象共享引用导致的“旧端口/新端口比较失效”问题
+- 切换本地主机或端口前，先检测目标端口是否可绑定
+- 如果目标端口已被占用：
+  - 明确抛错并提示
+  - 不再静默接管该端口上的健康 OpenCode 实例
+- 如果切换失败：
+  - 回滚内部设置快照
+  - 尝试恢复原本的本地服务
+- 设置页的 host/port 输入框改为“提交时生效”，不再每输入一个字符就触发保存与重启
+
+#### 5. 设置页服务状态与模型面板优化
+- 设置页服务状态文案按本地托管 / 本地外部 / 远程连接正常重新整理
+- 模型来源与服务状态切换时，提示信息更贴近真实状态
+- 模型面板刷新做单帧合并，减少短时间重复重建 DOM
+
+#### 6. 设置页记忆滚动位置的性能优化
+- 设置页打开时，滚动恢复逻辑由多次 `scrollTop` 重写收敛为“主恢复 + 轻量兜底”
+- 缓存设置页滚动容器，避免在打开设置按钮时沿父节点链反复 `getComputedStyle`
+- 保留“记忆上次滚动位置”的功能，同时降低 `Forced reflow` 出现概率
+
+#### 7. 模型刷新与图标日志去重
+- `onModelsLoaded` 不再直接走整套重型 `saveSettings() + syncOpencodeConfig() + 全视图重刷` 链路
+- 服务启动后，只在默认模型实际变化时做轻量持久化
+- 聊天视图模型按钮图标在 URL 未变化时不再重复重建 DOM
+- `ProviderIconService` 增加日志去重缓存：
+  - 同一个 provider 的 icon URL 不变时，不再重复输出 `Icon for xxx: ...`
+
+#### 8. 用户消息底部操作区样式整理
+- 调整用户消息底部的复制、回退、分叉按钮布局
+- 将复制按钮逻辑抽离为可复用的行为方法
+- 统一用户消息 footer 与时间戳样式，减少消息 hover 时的布局跳动
+
+### 📁 涉及文件
+
+| 文件 | 修改内容 |
+|------|----------|
+| `src/core/opencode/OpenCodeService.ts` | 设置快照隔离、端口切换预检查、失败回滚 |
+| `src/core/opencode/ServerManager.ts` | 托管 PID 认领、Windows 进程树终止、端口占用判断增强 |
+| `src/core/opencode/types.ts` | 新增 `ManagedServerState` |
+| `src/core/storage/StorageService.ts` | 新增运行态文件读写 |
+| `src/features/settings/OpenCodianSettings.ts` | 服务状态文案、host/port 提交流程、模型刷新合并、滚动恢复优化 |
+| `src/features/chat/OpenCodianView.ts` | 模型选择器图标去重更新、用户消息 footer 与复制逻辑整理 |
+| `src/main.ts` | `onModelsLoaded` 轻量化、视图刷新拆分、设置保存流程调整 |
+| `src/utils/icons/ProviderIconService.ts` | icon URL debug 日志去重 |
+| `src/i18n/locales/en.ts` | 新增服务状态与端口提示文案 |
+| `src/i18n/locales/zh.ts` | 新增服务状态与端口提示文案 |
+| `styles.css` | 用户消息底部操作区与复制按钮样式调整 |
+| `tests/unit/core/storage/StorageService.test.ts` | 运行态托管 PID 存储测试 |
+
+### 🧪 验证结果
+
+- ✅ `npm run build`
+- ✅ `npm run test -- OpenCodeService.test.ts StorageService.test.ts`
+- ✅ 已多次部署到测试库：`C:\Users\lt\Desktop\Write\testvault\.obsidian\plugins\opencodian\`
+
+### 📌 当前收益
+
+- 本地 OpenCode 服务在重载后更容易继续保持“托管”语义
+- 端口切换失败时不再悄悄失效，错误提示更明确
+- 设置页打开与模型刷新时的重复重绘和日志噪音明显减少
+- 控制台输出更容易区分“插件重复加载”与“同一 UI 重复请求图标”
+
+---
+
+## 2026-03-27 Logger 控制台输出增加时间戳
+
+### 📋 本次开发目标
+继续打磨日志可读性，让控制台输出在不打开诊断报告的情况下也能快速判断事件发生顺序。
+
+### ✅ 实现内容
+
+#### 1. 为 logger 控制台输出统一添加本地时间戳
+- 在 `src/shared/logger.ts` 中新增 `getTimestamp()`
+- `formatArgs()` 统一改为输出：
+  - `[HH:mm:ss] [scope] message`
+- 适用于：
+  - `logger.info()`
+  - `logger.debug()`
+  - `logger.warn()`
+  - `logger.error()`
+
+#### 2. 保持最近诊断日志结构不变
+- 本次仅调整控制台展示格式
+- `recentLogEntries` 仍保留原有 ISO 时间戳与消息结构
+- 避免影响现有诊断报告拼装逻辑
+
+### 📁 涉及文件
+
+| 文件 | 修改内容 |
+|------|----------|
+| `src/shared/logger.ts` | 为控制台日志前缀增加 `HH:mm:ss` 时间戳 |
+
+### 🧪 验证结果
+
+- ✅ `npm run lint -- src/shared/logger.ts`
+- ✅ `npm run build`
+- ✅ 已重新部署到测试库：`C:\Users\lt\Desktop\Write\testvault\.obsidian\plugins\opencodian\`
+
+---
+
+## 2026-03-27 BUILD_ID 系统与发布流程完善
+
+### 📋 本次开发目标
+本轮主要建立版本可追溯机制和标准化发布流程：
+
+1. **建立 BUILD_ID 生成机制**
+   - 每次构建自动生成包含分支信息和时间戳的唯一标识
+   - 格式：`{branch}.{YYYYMMDDHHmm}`，例如 `fix-revert-model-toggle.202603271430`
+
+2. **Logger 增强**
+   - 添加 `info` 方法用于无条件输出（不受调试开关控制）
+   - 用于在插件加载时输出 BUILD_ID
+
+3. **标准化版本发布流程**
+   - 添加 npm scripts 支持自动更新版本号
+   - 支持 patch / minor / major 三种升级类型
+
+### ✅ BUILD_ID 生成与注入系统
+
+#### 1. 构建工具模块 (`scripts/build-utils.mjs`)
+新增专用的构建工具模块，提供：
+- `getGitBranch()` - 获取当前 git 分支名称
+- `sanitizeBranchName(branch)` - 清洗分支名（将 `/` 替换为 `-`，移除非法字符）
+- `getLocalTimeStamp()` - 获取本地时间戳（格式 `YYYYMMDDHHmm`）
+- `generateBuildId()` - 组合分支和时间戳生成 BUILD_ID
+
+#### 2. 开发模式 BUILD_ID 注入 (`esbuild.config.mjs`)
+- 在开发监听模式下自动生成 BUILD_ID
+- 通过 esbuild 的 `define` 选项将 BUILD_ID 注入为全局变量
+- 构建时在控制台输出 `[dev] BUILD_ID: xxx`
+
+#### 3. 生产构建 BUILD_ID 注入 (`scripts/build.mjs`)
+- 生产模式下同样生成并注入 BUILD_ID
+- 构建时在控制台输出 `[build] BUILD_ID: xxx`
+- BUILD_ID 会被打包进最终的 `dist/main.js`
+
+### ✅ Logger info 方法添加 (`src/shared/logger.ts`)
+
+#### 方法特性
+- `logger.info()` - 无条件输出，不受调试开关控制
+- `logger.debug()` - 受调试开关控制（保持不变）
+- `logger.warn()` / `logger.error()` - 无条件输出（保持不变）
+
+#### 使用场景
+`info` 方法专门用于输出重要但非错误的信息，如：
+- 插件加载时输出 BUILD_ID
+- 服务器启动/停止通知
+- 其他需要总是可见的运行日志
+
+### ✅ 插件加载时输出 BUILD_ID (`src/main.ts`)
+
+在 `onload()` 方法中添加：
+```typescript
+logger.info(`OpenCodian BUILD_ID: ${BUILD_ID}`);
+```
+
+效果：
+- 每次插件加载时，在 Obsidian 开发者控制台输出 BUILD_ID
+- 方便调试时确认当前运行的是哪个版本
+- 不受调试开关影响，总是可见
+
+### ✅ 版本发布脚本 (`scripts/release.mjs`)
+
+#### 支持的命令
+```bash
+npm run release:patch  # 修复版：0.1.0 → 0.1.1
+npm run release:minor  # 次版本：0.1.0 → 0.2.0
+npm run release:major  # 主版本：0.1.0 → 1.0.0
+```
+
+#### 自动更新的文件
+- `package.json` - 更新 `version` 字段
+- `package-lock.json` - 同步版本号
+- `manifest.json` - 通过 `version` 生命周期钩子同步
+
+#### 实现细节
+- 使用 `npm version` 命令进行版本升级
+- `--no-git-tag-version` 避免自动创建 git 标签
+- 通过现有的 `sync-version.js` 保持 manifest.json 同步
+
+### ✅ 文档更新 (`AGENTS.md`)
+
+#### 新增内容
+- **Version Release Rules** 版本发布规则说明
+- **BUILD_ID** 格式和用途说明
+- **Typical Release Workflow** 典型发布流程示例
+
+### 📁 涉及文件
+
+| 文件 | 修改内容 |
+|------|----------|
+| `scripts/build-utils.mjs` | 新增 BUILD_ID 生成工具函数 |
+| `scripts/build.mjs` | 集成 BUILD_ID 生成与注入 |
+| `scripts/release.mjs` | 新增版本发布脚本 |
+| `esbuild.config.mjs` | 开发模式下注入 BUILD_ID |
+| `src/shared/logger.ts` | 添加 `info` 方法 |
+| `src/main.ts` | 插件加载时输出 BUILD_ID |
+| `package.json` | 添加 `release:*` scripts |
+| `AGENTS.md` | 更新发布流程和 BUILD_ID 文档 |
+
+### 🧪 验证结果
+
+- ✅ `npm run build` 正确输出 BUILD_ID
+- ✅ `npm run dev` 正确输出 BUILD_ID
+- ✅ 插件加载时控制台显示 BUILD_ID
+- ✅ `npm run release:patch` 正确更新版本号
+
+---
+
 ## 2026-03-26 助手消息对齐修复与代码块复制入口收敛
 
 ### 📋 本次开发目标
@@ -724,6 +1276,70 @@
 - ✅ 已具备模型 JSON 编辑器
 - ✅ 本地受管 OpenCode 服务会按来源模式调整配置加载方式
 - ✅ 聊天页已能拦截不可用模型并给出明确提示
+
+---
+
+## 2026-03-27 设置页模型开关回退与稳定支线切换
+
+### 📋 问题背景
+
+- 在后续加入“模型 / 提供商开关”后，Obsidian 设置页出现严重渲染回归：
+  - 切换开关后下半屏变黑 / 变空
+  - 有时整个设置页直接发黑
+- 多轮排查后确认：
+  - 设置内容本身没有丢失
+  - `scrollHeight` / `contentHeight` 等高度指标保持正常
+  - 问题更接近 Obsidian 设置弹窗内部滚动 / 重绘层回归
+
+### ✅ 今日处理结果
+
+#### 1. 识别问题引入点
+
+- 以 `27631b4` 为稳定参考点确认：
+  - 当时模型列表为只读展示，没有开关
+  - 设置页滚动与渲染正常
+- 继续排查后定位到引入开关的提交：
+  - `ca3274a` `feat: add model/provider toggle switches in settings`
+
+#### 2. 保护当前排查现场
+
+- 创建备份分支：
+  - `backup/settings-black-screen`
+- 将黑屏排查中的未提交改动保存到 stash：
+  - `stash@{0}` → `wip: settings black-screen debug`
+
+#### 3. 建立稳定工作支线
+
+- 基于当前工作线新建修复分支：
+  - `fix/revert-model-toggle`
+- 在该分支上回退模型开关功能提交：
+  - 新提交：`73ab805`
+  - 作用：撤回 `ca3274a`
+
+#### 4. 当前开发决策
+
+- 后续开发暂时以 **无模型开关** 的稳定支线继续
+- 保留：
+  - 模型来源模式
+  - 默认 provider / model 选择
+  - 模型可视化配置面板
+  - 模型 JSON 编辑器
+- 暂时不恢复：
+  - 设置页中的 provider / model enable/disable 开关
+
+### 🧭 当前分支状态
+
+- `feature/fork-conversation`
+  - 原主工作线，仍包含模型开关引入后的历史
+- `backup/settings-black-screen`
+  - 用于保留排查现场与 stash
+- `fix/revert-model-toggle`
+  - 当前继续开发的稳定支线
+
+### 📌 结论
+
+- 这次不是放弃后续提交，而是**只回退已确认导致设置页回归的那条功能线**
+- 其余已完成功能仍保留在当前稳定支线中继续使用
 
 ---
 

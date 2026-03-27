@@ -62,3 +62,9 @@ export interface OpenCodeClientConfig {
   baseUrl: string;
   fetch?: typeof fetch;
 }
+
+export interface ManagedServerState {
+  pid: number;
+  host: string;
+  port: number;
+}

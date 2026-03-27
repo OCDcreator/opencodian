@@ -5,13 +5,14 @@
  */
 
 import type { EventRef, WorkspaceLeaf } from 'obsidian';
-import { Component, ItemView, Notice, Scope, setIcon } from 'obsidian';
+import { addIcon, Component, ItemView, Notice, Scope, setIcon } from 'obsidian';
 
 import { OpenCodeService } from '../../core/opencode';
 import {
   type ChatMessage,
   type ContentBlock,
   type Conversation,
+  getDefaultPersistedTabState,
   type ToolCallInfo,
   VIEW_TYPE_OPENCODIAN,
 } from '../../core/types';
@@ -19,11 +20,17 @@ import type { EffortLevel, ThinkingBudget } from '../../core/types/settings';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { createLogger } from '../../shared';
+import { chooseForkTarget } from '../../shared/modals';
 import { ProviderIconService } from '../../utils/icons/ProviderIconService';
 import { MarkdownRenderService } from '../../utils/markdown';
-import { StreamController, ThinkingBlockRenderer, ToolCallRenderer } from '../../utils/streaming';
+import {
+  StreamController,
+  ThinkingBlockRenderer,
+  ToolCallRenderer,
+} from '../../utils/streaming';
 import { buildChatAppearanceCustomCss, getChatAppearanceCssVariables } from './chatAppearance';
-import { TabBar, TabManager } from './tabs';
+import { type CollapsibleState,setupCollapsible } from './rendering/collapsible';
+import { TabBar, TabManager, type RestoredTabState } from './tabs';
 import { EffortSelector } from './ui/EffortSelector';
 import { NavigationSidebar } from './ui/NavigationSidebar';
 
@@ -78,8 +85,14 @@ type ChatServerAvailability = 'checking' | 'running' | 'starting' | 'offline' | 
 
 /** Clipboard icon SVG for copy button */
 const COPY_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`;
+const FORK_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><circle cx="18" cy="6" r="3"/><path d="M6 9v3a3 3 0 0 0 3 3h6a3 3 0 0 0 3-3V9"/><path d="M12 12v3"/></svg>`;
+const REWIND_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5v0a5.5 5.5 0 0 1-5.5 5.5H11"/></svg>`;
+const NEW_TAB_ICON = `<g fill="none" stroke="currentColor" stroke-width="8.333" stroke-linecap="round" stroke-linejoin="round"><circle cx="50" cy="50" r="41.667"/><path d="M33.333 50h33.334"/><path d="M50 33.333v33.334"/></g>`;
+
+addIcon('opencodian-circle-plus', NEW_TAB_ICON);
 
 export class OpenCodianView extends ItemView {
+  private static tooltipLabelId = 0;
   private plugin: OpenCodianPlugin;
   private chatContainerEl: HTMLElement | null = null;
   private messagesShellEl: HTMLElement | null = null;
@@ -115,6 +128,7 @@ export class OpenCodianView extends ItemView {
   private isModelDropdownOpen = false;
   private modelFilterQuery = '';
   private modelDropdownClickOutsideHandler: ((e: MouseEvent) => void) | null = null;
+  private currentModelTriggerIconUrl: string | null = null;
 
   // Streaming content state
   private streamController: StreamController | null = null;
@@ -195,10 +209,14 @@ export class OpenCodianView extends ItemView {
   }
 
   async onClose() {
+    this.persistTabState({ flush: true });
     this.stopServerStatusLoop();
     this.clearChatSurfaceSyncTimers();
     this.chatAppearanceStyleEl?.remove();
     this.chatAppearanceStyleEl = null;
+    this.effortSelector?.destroy();
+    this.effortSelector = null;
+    this.effortContainerEl = null;
 
     // Cleanup navigation sidebar
     this.navigationSidebar?.destroy();
@@ -239,9 +257,15 @@ export class OpenCodianView extends ItemView {
     this.buildInputArea(this.inputContainer);
     this.applyChatAppearanceSettings();
 
-    // Navigation sidebar (left side of messages)
+    // Navigation sidebar (mounted on the outer host so it never compresses chat layout)
     if (this.messagesShellEl && this.messagesContainer) {
-      this.navigationSidebar = new NavigationSidebar(this.messagesShellEl, this.messagesContainer);
+      const navMountEl = this.contentEl.closest('.workspace-leaf-content[data-type="opencodian-view"]')
+        ?? this.contentEl;
+      this.navigationSidebar = new NavigationSidebar(
+        navMountEl as HTMLElement,
+        this.messagesShellEl,
+        this.messagesContainer,
+      );
     }
   }
 
@@ -263,7 +287,10 @@ export class OpenCodianView extends ItemView {
 
     this.tabManager = new TabManager(t('chat.tab.new'), {
       getMaxTabs: () => this.plugin.settings.maxTabs,
-      onChanged: () => this.renderTabBar(),
+      onChanged: () => {
+        this.renderTabBar();
+        this.persistTabState();
+      },
     });
 
     this.applyTabBarLayout();
@@ -271,6 +298,12 @@ export class OpenCodianView extends ItemView {
 
   private async initializeFirstTab(): Promise<void> {
     if (!this.tabManager) {
+      return;
+    }
+
+    const restoredTabId = this.restorePersistedTabs();
+    if (restoredTabId) {
+      await this.activateTab(restoredTabId);
       return;
     }
 
@@ -291,6 +324,60 @@ export class OpenCodianView extends ItemView {
     }
 
     this.tabBar.render(this.tabManager.getTabBarItems());
+  }
+
+  private restorePersistedTabs(): string | null {
+    if (!this.tabManager) {
+      return null;
+    }
+
+    const savedState = this.plugin.settings.tabState;
+    if (!savedState.tabs.length) {
+      return null;
+    }
+
+    const conversationMap = new Map(
+      this.plugin.getConversations().map((conversation) => [conversation.id, conversation] as const),
+    );
+    const restoredTab = this.tabManager.restoreTabs(
+      savedState.tabs as RestoredTabState[],
+      savedState.activeTabIndex,
+      conversationMap,
+    );
+
+    if (!restoredTab) {
+      this.plugin.settings.tabState = getDefaultPersistedTabState();
+      this.persistTabState({ flush: true });
+      return null;
+    }
+
+    return restoredTab.id;
+  }
+
+  private persistTabState(options: { flush?: boolean } = {}): void {
+    if (!this.tabManager) {
+      return;
+    }
+
+    const tabs = this.tabManager.getAllTabs();
+    const activeTabId = this.tabManager.getActiveTab()?.id ?? null;
+    const activeTabIndex = Math.max(0, tabs.findIndex((tab) => tab.id === activeTabId));
+
+    this.plugin.settings.tabState = {
+      tabs: tabs.map((tab) => ({
+        conversationId: tab.conversationId,
+        title: tab.title,
+        modelOverride: tab.modelOverride,
+      })),
+      activeTabIndex,
+    };
+
+    if (options.flush) {
+      void this.plugin.storage.saveSettings(this.plugin.settings);
+      return;
+    }
+
+    this.plugin.scheduleSettingsUiStateSave();
   }
 
   private async handleTabSwitch(tabId: string): Promise<void> {
@@ -543,36 +630,45 @@ export class OpenCodianView extends ItemView {
     const actions = header.createDiv({ cls: 'opencodian-header-actions' });
 
     this.serverStatusBadgeEl = actions.createDiv({ cls: 'opencodian-server-status-badge is-checking' });
+    this.serverStatusBadgeEl.addClass('opencodian-tooltip-trigger');
+    this.serverStatusBadgeEl.setAttribute('data-tooltip', t('chat.serverStatus.openSettings'));
+    this.serverStatusBadgeEl.setAttribute('data-tooltip-position', 'bottom');
+    this.attachTooltipLabel(this.serverStatusBadgeEl, t('chat.serverStatus.openSettings'));
     this.serverStatusBadgeEl.createSpan({ cls: 'opencodian-server-status-dot' });
     this.serverStatusTextEl = this.serverStatusBadgeEl.createSpan({
       cls: 'opencodian-server-status-text',
       text: t('chat.serverStatus.checking'),
     });
-    this.serverStatusBadgeEl.setAttribute('aria-label', t('chat.serverStatus.openSettings'));
     this.serverStatusBadgeEl.addEventListener('click', () => {
       this.openPluginSettingsAtServerSection();
     });
 
     // New conversation button
-    const newBtn = actions.createDiv({ cls: 'opencodian-header-btn' });
-    setIcon(newBtn, 'plus');
-    newBtn.setAttribute('aria-label', t('chat.tab.new'));
+    const newBtn = actions.createDiv({ cls: 'opencodian-header-btn opencodian-tooltip-trigger' });
+    setIcon(newBtn, 'opencodian-circle-plus');
+    newBtn.setAttribute('data-tooltip', t('chat.tab.newTooltip'));
+    newBtn.setAttribute('data-tooltip-position', 'bottom');
+    this.attachTooltipLabel(newBtn, t('chat.tab.newTooltip'));
     newBtn.addEventListener('click', () => {
       void this.createNewConversation();
     });
 
     // History button
-    const historyBtn = actions.createDiv({ cls: 'opencodian-header-btn' });
+    const historyBtn = actions.createDiv({ cls: 'opencodian-header-btn opencodian-tooltip-trigger' });
     setIcon(historyBtn, 'history');
-    historyBtn.setAttribute('aria-label', 'History');
+    historyBtn.setAttribute('data-tooltip', t('chat.history.open'));
+    historyBtn.setAttribute('data-tooltip-position', 'bottom');
+    this.attachTooltipLabel(historyBtn, t('chat.history.open'));
     historyBtn.addEventListener('click', (event) => {
       this.showConversationHistory(event);
     });
 
     // Settings button
-    const settingsBtn = actions.createDiv({ cls: 'opencodian-header-btn' });
+    const settingsBtn = actions.createDiv({ cls: 'opencodian-header-btn opencodian-tooltip-trigger' });
     setIcon(settingsBtn, 'settings');
-    settingsBtn.setAttribute('aria-label', 'Settings');
+    settingsBtn.setAttribute('data-tooltip', t('chat.settings.open'));
+    settingsBtn.setAttribute('data-tooltip-position', 'bottom');
+    this.attachTooltipLabel(settingsBtn, t('chat.settings.open'));
     settingsBtn.addEventListener('click', () => {
       this.openPluginSettingsPreservingScroll();
     });
@@ -638,7 +734,7 @@ export class OpenCodianView extends ItemView {
       );
       this.serverStatusBadgeEl.addClass(`is-${availability}`);
       this.serverStatusTextEl.setText(this.getServerStatusLabel(availability, statusKeyMap));
-      this.serverStatusBadgeEl.setAttribute('title', t('chat.serverStatus.openSettings'));
+      this.serverStatusBadgeEl.setAttribute('data-tooltip', t('chat.serverStatus.openSettings'));
     } finally {
       this.isRefreshingServerStatus = false;
     }
@@ -648,10 +744,17 @@ export class OpenCodianView extends ItemView {
     availability: ChatServerAvailability,
     statusKeyMap: Record<ChatServerAvailability, 'chat.serverStatus.checking' | 'chat.serverStatus.running' | 'chat.serverStatus.starting' | 'chat.serverStatus.offline' | 'chat.serverStatus.external'>
   ): string {
+    if (this.plugin.settings.server.mode === 'local') {
+      if (availability === 'running') {
+        return t('chat.serverStatus.localManaged');
+      }
+      if (availability === 'external') {
+        return t('chat.serverStatus.localExternal');
+      }
+    }
+
     if (availability === 'running' || availability === 'external') {
-      return this.plugin.settings.server.mode === 'local'
-        ? t('chat.serverStatus.local')
-        : t('chat.serverStatus.remote');
+      return t('chat.serverStatus.remoteConnected');
     }
 
     return t(statusKeyMap[availability]);
@@ -816,7 +919,7 @@ export class OpenCodianView extends ItemView {
   }
 
   /** Load a conversation */
-  private async loadConversation(id: string) {
+  private async loadConversation(id: string, options: { forceServerSync?: boolean } = {}) {
     const conversation = await this.plugin.getConversationById(id);
     if (!conversation) return;
 
@@ -830,30 +933,21 @@ export class OpenCodianView extends ItemView {
     // Set session in service
     this.plugin.openCodeService.setSessionId(conversation.openCodeSessionId);
 
-    // Use locally saved messages if available (preserves durationSeconds and other metadata)
-    if (conversation.messages && conversation.messages.length > 0) {
-      // Render locally saved messages
-      for (const message of conversation.messages) {
-        await this.renderMessage(message);
-      }
-    } else {
-      // Fallback: Load messages from OpenCode
-      try {
-        const messages = await this.plugin.openCodeService.getSessionMessages(
-          conversation.openCodeSessionId
-        );
+    const shouldSyncFromServer =
+      options.forceServerSync
+      || !conversation.messages
+      || conversation.messages.length === 0
+      || conversation.messages.some((message) =>
+        message.displayStyle !== 'notice'
+        && !message.sourceMessageId
+      );
 
-        // Render messages
-        for (const { info, parts } of messages) {
-          const message = OpenCodeService.openCodeMessageToChatMessage(
-            info,
-            parts
-          );
-          await this.renderMessage(message);
-        }
-      } catch (error) {
-        logger.error('Failed to load messages:', error);
-      }
+    const messages = shouldSyncFromServer
+      ? await this.syncConversationMessagesFromServer(conversation)
+      : conversation.messages;
+
+    for (const message of messages) {
+      await this.renderMessage(message);
     }
 
     // Scroll to bottom
@@ -1179,7 +1273,10 @@ export class OpenCodianView extends ItemView {
 
     this.tabManager = new TabManager(t('chat.tab.new'), {
       getMaxTabs: () => this.plugin.settings.maxTabs,
-      onChanged: () => this.renderTabBar(),
+      onChanged: () => {
+        this.renderTabBar();
+        this.persistTabState();
+      },
     });
     this.renderTabBar();
     await this.createNewConversation();
@@ -1333,6 +1430,7 @@ export class OpenCodianView extends ItemView {
     }
 
     const modelOptions = this.getSendMessageOptions();
+    const activeModelId = this.formatModelId(modelOptions);
     if (!(await this.ensureSelectedModelAvailable(modelOptions.provider, modelOptions.model))) {
       await this.appendModelUnavailableNoticeMessage();
       return;
@@ -1522,6 +1620,8 @@ export class OpenCodianView extends ItemView {
       pendingState.element = null;
       await this.refreshServerStatusBadge();
       
+      const finalizedTimestamp = Date.now();
+
       // Add timestamp with copy button to the streamed message (after all content)
       if (this.streamingMessageEl) {
         const streamContentBlocks = this.streamController?.getContentBlocks();
@@ -1532,8 +1632,9 @@ export class OpenCodianView extends ItemView {
           .join('') || '';
         this.addTimestampWithCopyButton(
           this.streamingMessageEl,
-          Date.now(),
-          textContent
+          finalizedTimestamp,
+          textContent,
+          activeModelId,
         );
       }
       
@@ -1577,10 +1678,11 @@ export class OpenCodianView extends ItemView {
         
         // Create the assistant message
         const assistantMessage: ChatMessage = {
-          id: `assistant-${Date.now()}`,
+          id: `assistant-${finalizedTimestamp}`,
           role: 'assistant',
           content: textContent,
-          timestamp: Date.now(),
+          timestamp: finalizedTimestamp,
+          modelId: activeModelId,
           contentBlocks: contentBlocks,
         };
         
@@ -1588,18 +1690,23 @@ export class OpenCodianView extends ItemView {
         this.currentConversation.messages.push(assistantMessage);
       } else if (latestErrorMessage && this.currentConversation) {
         this.currentConversation.messages.push({
-          id: `assistant-${Date.now()}`,
+          id: `assistant-${finalizedTimestamp}`,
           role: 'assistant',
           content: latestErrorMessage,
-          timestamp: Date.now(),
+          timestamp: finalizedTimestamp,
+          modelId: activeModelId,
         });
       }
     }
 
     // Update conversation
     if (this.currentConversation) {
+      if (!latestErrorMessage) {
+        await this.syncConversationMessagesFromServer(this.currentConversation);
+        await this.rerenderConversationMessages(this.currentConversation);
+      }
       this.currentConversation.updatedAt = Date.now();
-      await this.plugin.storage.saveConversation(this.currentConversation);
+      await this.plugin.saveConversation(this.currentConversation);
       this.tabManager?.setActiveTabConversation(this.currentConversation);
     }
   }
@@ -1731,14 +1838,17 @@ export class OpenCodianView extends ItemView {
     errorEl.createSpan({ cls: 'streaming-error-icon', text: '❌' });
     errorEl.createSpan({ cls: 'streaming-error-text', text: message });
 
-    this.addTimestampWithCopyButton(messageEl, Date.now(), message);
+    const timestamp = Date.now();
+    const modelId = this.formatModelId(this.getCurrentSessionModel());
+    this.addTimestampWithCopyButton(messageEl, timestamp, message, modelId);
 
     if (this.currentConversation) {
       this.currentConversation.messages.push({
-        id: `assistant-${Date.now()}`,
+        id: `assistant-${timestamp}`,
         role: 'assistant',
         content: message,
-        timestamp: Date.now(),
+        timestamp,
+        modelId,
       });
       this.currentConversation.updatedAt = Date.now();
       await this.plugin.storage.saveConversation(this.currentConversation);
@@ -1814,16 +1924,19 @@ export class OpenCodianView extends ItemView {
       errorEl.createSpan({ cls: 'streaming-error-text', text: message });
     }
 
-    this.addTimestampWithCopyButton(messageEl, Date.now(), message);
+    const timestamp = Date.now();
+    const modelId = this.formatModelId(this.getCurrentSessionModel());
+    this.addTimestampWithCopyButton(messageEl, timestamp, message, modelId);
     this.streamingMessageEl = null;
     this.streamingContentEl = null;
 
     if (this.currentConversation) {
       this.currentConversation.messages.push({
-        id: `assistant-${Date.now()}`,
+        id: `assistant-${timestamp}`,
         role: 'assistant',
         content: message,
-        timestamp: Date.now(),
+        timestamp,
+        modelId,
       });
       this.currentConversation.updatedAt = Date.now();
       await this.plugin.storage.saveConversation(this.currentConversation);
@@ -1894,19 +2007,21 @@ export class OpenCodianView extends ItemView {
       if (message.content) {
         const textEl = content.createDiv({ cls: 'opencodian-message-text' });
         textEl.textContent = message.content;
-        // Add copy button for user message (outside bubble)
-        this.addTextCopyButton(messageEl, message.content, true);
+        const collapseToggleEl = content.createEl('button');
+        const collapsibleState: CollapsibleState = {
+          isExpanded: false,
+          isCollapsible: false,
+        };
+        setupCollapsible(content, collapseToggleEl, textEl, collapsibleState, {
+          showMoreLabel: t('chat.action.showMore'),
+          showLessLabel: t('chat.action.showLess'),
+        });
       }
-      // Add timestamp for user message
-      const time = new Date(message.timestamp).toLocaleTimeString([], {
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-      messageEl.createEl('div', { cls: 'opencodian-message-time', text: time });
+      this.addUserMessageFooter(messageEl, message, message.content);
     } else if (message.displayStyle === 'notice') {
       messageEl.addClass('opencodian-message--notice');
       this.renderNoticeCard(content, message);
-      this.addTimestampWithCopyButton(messageEl, message.timestamp);
+      this.addTimestampWithCopyButton(messageEl, message.timestamp, undefined, message.modelId);
     } else if (message.contentBlocks && message.contentBlocks.length > 0) {
       // For assistant messages, render content blocks (thinking, tools, etc.)
       for (const block of message.contentBlocks) {
@@ -1919,7 +2034,7 @@ export class OpenCodianView extends ItemView {
         .filter(Boolean)
         .join('\n\n');
       // Add timestamp with copy button
-      this.addTimestampWithCopyButton(messageEl, message.timestamp, textContent);
+      this.addTimestampWithCopyButton(messageEl, message.timestamp, textContent, message.modelId);
     } else if (message.content) {
       // Fallback to simple text rendering for assistant
       const textEl = content.createDiv({ cls: 'opencodian-message-text' });
@@ -1929,7 +2044,7 @@ export class OpenCodianView extends ItemView {
         textEl.textContent = message.content;
       }
       // Add timestamp with copy button
-      this.addTimestampWithCopyButton(messageEl, message.timestamp, message.content);
+      this.addTimestampWithCopyButton(messageEl, message.timestamp, message.content, message.modelId);
     }
 
     return messageEl;
@@ -2039,20 +2154,29 @@ export class OpenCodianView extends ItemView {
     inputEl.textContent = JSON.stringify(input, null, 2);
   }
 
-  /**
-   * Adds a copy button to a message element (outside the bubble).
-   * Button shows clipboard icon on hover, changes to "copied!" on click.
-   * @param messageEl The message element container
-   * @param content The original text content to copy
-   * @param isUser Whether this is a user message (affects positioning)
-   */
-  private addTextCopyButton(messageEl: HTMLElement, content: string, isUser: boolean): void {
-    const copyBtn = messageEl.createSpan({ 
-      cls: `opencodian-copy-btn ${isUser ? 'opencodian-copy-btn--user' : 'opencodian-copy-btn--assistant'}` 
-    });
-    copyBtn.innerHTML = COPY_ICON;
-
+  private attachCopyButtonBehavior(copyBtn: HTMLElement, content: string): void {
     let feedbackTimeout: ReturnType<typeof setTimeout> | null = null;
+    const labelId = copyBtn.getAttribute('aria-labelledby');
+    const labelText = copyBtn.getAttribute('data-tooltip') ?? '';
+
+    const setButtonContent = (text?: string): void => {
+      copyBtn.empty();
+
+      if (text) {
+        copyBtn.setText(text);
+      } else {
+        copyBtn.innerHTML = COPY_ICON;
+      }
+
+      if (labelId && labelText) {
+        const labelEl = copyBtn.createSpan({
+          cls: 'opencodian-visually-hidden',
+          text: labelText,
+        });
+        labelEl.id = labelId;
+        copyBtn.setAttribute('aria-labelledby', labelId);
+      }
+    };
 
     copyBtn.addEventListener('click', async (e) => {
       e.stopPropagation();
@@ -2070,16 +2194,25 @@ export class OpenCodianView extends ItemView {
       }
 
       // Show "copied!" feedback
-      copyBtn.innerHTML = '';
-      copyBtn.setText('copied!');
+      setButtonContent('copied!');
       copyBtn.classList.add('copied');
 
       feedbackTimeout = setTimeout(() => {
-        copyBtn.innerHTML = COPY_ICON;
+        setButtonContent();
         copyBtn.classList.remove('copied');
         feedbackTimeout = null;
       }, 1500);
     });
+  }
+
+  private attachTooltipLabel(buttonEl: HTMLElement, label: string): void {
+    const labelId = `opencodian-tooltip-label-${OpenCodianView.tooltipLabelId++}`;
+    const labelEl = buttonEl.createSpan({
+      cls: 'opencodian-visually-hidden',
+      text: label,
+    });
+    labelEl.id = labelId;
+    buttonEl.setAttribute('aria-labelledby', labelId);
   }
 
   /**
@@ -2092,7 +2225,8 @@ export class OpenCodianView extends ItemView {
   private addTimestampWithCopyButton(
     messageEl: HTMLElement,
     timestamp: number,
-    content?: string
+    content?: string,
+    modelId?: string,
   ): void {
     // Create a container for timestamp and copy button
     const timeRow = messageEl.createDiv({ cls: 'opencodian-message-time-row' });
@@ -2104,6 +2238,10 @@ export class OpenCodianView extends ItemView {
     });
     timeRow.createSpan({ cls: 'opencodian-message-time-text', text: timeStr });
 
+    if (modelId) {
+      timeRow.createSpan({ cls: 'opencodian-message-model-id', text: `· ${modelId}` });
+    }
+
     if (!content) {
       return;
     }
@@ -2111,32 +2249,342 @@ export class OpenCodianView extends ItemView {
     // Copy button
     const copyBtn = timeRow.createSpan({ cls: 'opencodian-copy-btn-inline' });
     copyBtn.innerHTML = COPY_ICON;
+    this.attachCopyButtonBehavior(copyBtn, content);
+  }
 
-    let feedbackTimeout: ReturnType<typeof setTimeout> | null = null;
+  private mergeSyncedMessageModelIds(
+    existingMessages: ChatMessage[],
+    syncedMessages: ChatMessage[],
+  ): ChatMessage[] {
+    const modelIdBySourceMessageId = new Map<string, string>();
+    const fallbackAssistantMessages = existingMessages.filter(
+      (message) => message.role === 'assistant' && message.modelId && !message.sourceMessageId,
+    );
 
-    copyBtn.addEventListener('click', async (e) => {
-      e.stopPropagation();
+    for (const message of existingMessages) {
+      if (message.role !== 'assistant' || !message.modelId || !message.sourceMessageId) {
+        continue;
+      }
 
-      try {
-        await navigator.clipboard.writeText(content);
-      } catch {
+      modelIdBySourceMessageId.set(message.sourceMessageId, message.modelId);
+    }
+
+    const mergedMessages = syncedMessages.map((message) => {
+      if (message.role !== 'assistant') {
+        return message;
+      }
+
+      const persistedModelId = message.sourceMessageId
+        ? modelIdBySourceMessageId.get(message.sourceMessageId)
+        : undefined;
+
+      return persistedModelId
+        ? { ...message, modelId: persistedModelId }
+        : message;
+    });
+
+    const unmatchedSyncedIndexes = mergedMessages.reduce<number[]>((indexes, message, index) => {
+      if (message.role === 'assistant' && !message.modelId) {
+        indexes.push(index);
+      }
+
+      return indexes;
+    }, []);
+
+    for (let fallbackIndex = fallbackAssistantMessages.length - 1; fallbackIndex >= 0; fallbackIndex--) {
+      if (unmatchedSyncedIndexes.length === 0) {
+        break;
+      }
+
+      const fallbackMessage = fallbackAssistantMessages[fallbackIndex];
+      let preferredMatchPosition = -1;
+      if (fallbackMessage.content) {
+        for (let indexPosition = unmatchedSyncedIndexes.length - 1; indexPosition >= 0; indexPosition--) {
+          const unmatchedIndex = unmatchedSyncedIndexes[indexPosition];
+          if (mergedMessages[unmatchedIndex].content === fallbackMessage.content) {
+            preferredMatchPosition = indexPosition;
+            break;
+          }
+        }
+      }
+      const targetPosition = preferredMatchPosition >= 0
+        ? preferredMatchPosition
+        : unmatchedSyncedIndexes.length - 1;
+      const targetIndex = unmatchedSyncedIndexes.splice(targetPosition, 1)[0];
+
+      mergedMessages[targetIndex] = {
+        ...mergedMessages[targetIndex],
+        modelId: fallbackMessage.modelId,
+      };
+    }
+
+    return mergedMessages;
+  }
+
+  private addUserMessageFooter(messageEl: HTMLElement, message: ChatMessage, content?: string): void {
+    const footerEl = messageEl.createDiv({ cls: 'opencodian-user-message-footer' });
+    const hasActions = Boolean(content) || Boolean(message.sourceMessageId);
+
+    if (hasActions) {
+      const actionsEl = footerEl.createDiv({ cls: 'opencodian-user-message-actions' });
+
+      if (content) {
+        const copyLabel = t('chat.action.copy');
+        const copyBtn = actionsEl.createEl('button', {
+          cls: 'opencodian-copy-btn-inline opencodian-copy-btn-inline--user opencodian-tooltip-trigger',
+          attr: {
+            type: 'button',
+            'data-tooltip': copyLabel,
+          },
+        });
+        copyBtn.innerHTML = COPY_ICON;
+        this.attachTooltipLabel(copyBtn, copyLabel);
+        this.attachCopyButtonBehavior(copyBtn, content);
+      }
+
+      if (message.sourceMessageId) {
+        const rewindLabel = t('chat.rewind.button');
+        const rewindBtn = actionsEl.createEl('button', {
+          cls: 'opencodian-user-action-btn opencodian-user-action-btn--icon opencodian-tooltip-trigger',
+          attr: {
+            type: 'button',
+            'data-tooltip': rewindLabel,
+          },
+        });
+        rewindBtn.innerHTML = REWIND_ICON;
+        this.attachTooltipLabel(rewindBtn, rewindLabel);
+        rewindBtn.disabled = this.isStreaming;
+        rewindBtn.addEventListener('click', (event) => {
+          event.stopPropagation();
+          void this.handleRewindRequest(message);
+        });
+
+        const forkLabel = t('chat.fork.button');
+        const forkBtn = actionsEl.createEl('button', {
+          cls: 'opencodian-user-action-btn opencodian-user-action-btn--icon opencodian-tooltip-trigger',
+          attr: {
+            type: 'button',
+            'data-tooltip': forkLabel,
+          },
+        });
+        forkBtn.innerHTML = FORK_ICON;
+        this.attachTooltipLabel(forkBtn, forkLabel);
+        forkBtn.disabled = this.isStreaming;
+        forkBtn.addEventListener('click', (event) => {
+          event.stopPropagation();
+          void this.handleForkRequest(message);
+        });
+      }
+    }
+
+    const timeStr = new Date(message.timestamp).toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+    const timeEl = footerEl.createSpan({ cls: 'opencodian-message-time-text', text: timeStr });
+    timeEl.addClass('opencodian-user-message-time');
+  }
+
+  private async handleRewindRequest(message: ChatMessage): Promise<void> {
+    if (this.isStreaming) {
+      new Notice(t('chat.rewind.streamingBlocked'));
+      return;
+    }
+
+    if (!this.currentConversation?.openCodeSessionId || !message.sourceMessageId) {
+      logger.debug('Rewind unavailable due to missing identifiers', {
+        conversationId: this.currentConversation?.id ?? null,
+        sessionId: this.currentConversation?.openCodeSessionId ?? null,
+        messageId: message.id,
+        sourceMessageId: message.sourceMessageId ?? null,
+      });
+      new Notice(t('chat.rewind.unavailable'));
+      return;
+    }
+
+    const confirmed = window.confirm(t('chat.rewind.confirm'));
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      logger.debug('Attempting rewind', {
+        conversationId: this.currentConversation.id,
+        sessionId: this.currentConversation.openCodeSessionId,
+        messageId: message.id,
+        sourceMessageId: message.sourceMessageId,
+        messagePreview: message.content.slice(0, 120),
+      });
+
+      const reverted = await this.plugin.openCodeService.revertSession(
+        this.currentConversation.openCodeSessionId,
+        message.sourceMessageId,
+      );
+
+      logger.debug('Rewind API result', {
+        conversationId: this.currentConversation.id,
+        sessionId: this.currentConversation.openCodeSessionId,
+        sourceMessageId: message.sourceMessageId,
+        reverted,
+      });
+
+      if (!reverted) {
+        logger.warn('Rewind API returned false', {
+          conversationId: this.currentConversation.id,
+          sessionId: this.currentConversation.openCodeSessionId,
+          sourceMessageId: message.sourceMessageId,
+        });
+        new Notice(t('chat.rewind.failed'));
         return;
       }
 
-      if (feedbackTimeout) {
-        clearTimeout(feedbackTimeout);
+      await this.loadConversation(this.currentConversation.id, { forceServerSync: true });
+      logger.debug('Rewind reload complete', {
+        conversationId: this.currentConversation.id,
+        sessionId: this.currentConversation.openCodeSessionId,
+        messagesAfterReload: this.currentConversation.messages.length,
+      });
+      new Notice(t('chat.rewind.success'));
+    } catch (error) {
+      logger.error('Failed to rewind conversation:', error);
+      new Notice(t('chat.rewind.failed'));
+    }
+  }
+
+  private async handleForkRequest(message: ChatMessage): Promise<void> {
+    if (this.isStreaming) {
+      new Notice(t('chat.fork.streamingBlocked'));
+      return;
+    }
+
+    if (!this.currentConversation?.openCodeSessionId || !message.sourceMessageId || !this.tabManager) {
+      new Notice(t('chat.fork.unavailable'));
+      return;
+    }
+
+    const target = await chooseForkTarget(this.app);
+    if (!target) {
+      return;
+    }
+
+    try {
+      const activeModelOverride = this.tabManager.getActiveTabModelOverride();
+      const forkedSession = await this.plugin.openCodeService.forkSession(
+        this.currentConversation.openCodeSessionId,
+        message.sourceMessageId,
+      );
+
+      const forkMessages = this.cloneMessagesUpTo(message.id);
+      const title = this.buildForkTitle(this.currentConversation.title);
+      const forkConversation = await this.plugin.createConversationFromSession(forkedSession.id, {
+        title,
+        messages: forkMessages,
+        currentNote: this.currentConversation.currentNote,
+        externalContextPaths: this.currentConversation.externalContextPaths,
+      });
+
+      if (target === 'new-tab') {
+        if (!this.tabManager.canCreateTab()) {
+          await this.plugin.deleteConversation(forkConversation.id);
+          new Notice(t('chat.fork.maxTabsReached', { count: String(this.plugin.settings.maxTabs) }));
+          return;
+        }
+
+        const tab = this.tabManager.createTab(forkConversation);
+        if (tab) {
+          await this.activateTab(tab.id);
+          if (activeModelOverride) {
+            this.tabManager.setActiveTabModelOverride(activeModelOverride);
+            this.updateModelSelectorDisplay();
+          }
+        }
+        new Notice(t('chat.fork.successNewTab'));
+        return;
       }
 
-      copyBtn.innerHTML = '';
-      copyBtn.setText('copied!');
-      copyBtn.classList.add('copied');
+      this.tabManager.setActiveTabConversation(forkConversation);
+      await this.loadConversation(forkConversation.id, { forceServerSync: false });
+      new Notice(t('chat.fork.successCurrentTab'));
+    } catch (error) {
+      logger.error('Failed to fork conversation:', error);
+      new Notice(t('chat.fork.failed'));
+    }
+  }
 
-      feedbackTimeout = setTimeout(() => {
-        copyBtn.innerHTML = COPY_ICON;
-        copyBtn.classList.remove('copied');
-        feedbackTimeout = null;
-      }, 1500);
-    });
+  private async syncConversationMessagesFromServer(conversation: Conversation): Promise<ChatMessage[]> {
+    try {
+      logger.debug('Syncing conversation messages from server', {
+        conversationId: conversation.id,
+        sessionId: conversation.openCodeSessionId,
+        localMessageCount: conversation.messages.length,
+      });
+      const serverMessages = await this.plugin.openCodeService.getSessionMessages(conversation.openCodeSessionId);
+      const converted = this.mergeSyncedMessageModelIds(
+        conversation.messages,
+        serverMessages.map(({ info, parts }) => OpenCodeService.openCodeMessageToChatMessage(info, parts)),
+      );
+      const noticeMessages = conversation.messages.filter((message) => message.displayStyle === 'notice');
+      const merged = [...converted, ...noticeMessages].sort((left, right) => left.timestamp - right.timestamp);
+      conversation.messages = merged;
+      conversation.updatedAt = Date.now();
+      await this.plugin.saveConversation(conversation);
+      logger.debug('Conversation sync complete', {
+        conversationId: conversation.id,
+        sessionId: conversation.openCodeSessionId,
+        serverMessageCount: serverMessages.length,
+        mergedMessageCount: merged.length,
+      });
+      return merged;
+    } catch (error) {
+      logger.error('Failed to sync conversation messages from server:', error);
+      return conversation.messages;
+    }
+  }
+
+  private async rerenderConversationMessages(conversation: Conversation): Promise<void> {
+    if (!this.currentConversation || this.currentConversation.id !== conversation.id || !this.messagesContainer) {
+      return;
+    }
+
+    const shouldStickToBottom = this.isNearBottom();
+
+    this.messagesContainer.empty();
+    this.resetTurnState();
+
+    for (const message of conversation.messages) {
+      await this.renderMessage(message);
+    }
+
+    if (shouldStickToBottom) {
+      this.scrollToBottom();
+    }
+  }
+
+  private isNearBottom(threshold = 48): boolean {
+    if (!this.messagesContainer) {
+      return true;
+    }
+
+    const { scrollTop, scrollHeight, clientHeight } = this.messagesContainer;
+    return scrollHeight - (scrollTop + clientHeight) <= threshold;
+  }
+
+  private cloneMessagesUpTo(targetMessageId: string): ChatMessage[] {
+    if (!this.currentConversation) {
+      return [];
+    }
+
+    const index = this.currentConversation.messages.findIndex((message) => message.id === targetMessageId);
+    const messages = index >= 0
+      ? this.currentConversation.messages.slice(0, index + 1)
+      : this.currentConversation.messages;
+
+    return JSON.parse(JSON.stringify(messages)) as ChatMessage[];
+  }
+
+  private buildForkTitle(sourceTitle: string): string {
+    const baseTitle = sourceTitle?.trim() || t('chat.tab.new');
+    return `Fork: ${baseTitle}`;
   }
 
   /** Scroll to bottom of messages */
@@ -2574,19 +3022,30 @@ export class OpenCodianView extends ItemView {
     // Update provider icon using Lobehub icons
     const iconWrapper = this.modelSelectorTrigger.querySelector('.opencodian-model-trigger-icon');
     if (iconWrapper) {
-      iconWrapper.empty();
-      
-      // Try to get Lobehub icon
       const iconUrl = current ? ProviderIconService.getIconUrl(current.provider) : null;
-      if (iconUrl) {
-        const img = document.createElement('img');
-        img.src = iconUrl;
-        img.alt = modelInfo?.providerName || current?.provider || 'model';
-        img.title = modelInfo?.providerName || current?.provider || 'model';
-        iconWrapper.appendChild(img);
-      } else {
-        // Fallback to Obsidian icon
-        setIcon(iconWrapper as HTMLElement, 'bot');
+      const iconLabel = modelInfo?.providerName || current?.provider || 'model';
+
+      if (iconUrl !== this.currentModelTriggerIconUrl) {
+        iconWrapper.empty();
+
+        if (iconUrl) {
+          const img = document.createElement('img');
+          img.src = iconUrl;
+          img.alt = iconLabel;
+          img.title = iconLabel;
+          iconWrapper.appendChild(img);
+        } else {
+          // Fallback to Obsidian icon
+          setIcon(iconWrapper as HTMLElement, 'bot');
+        }
+
+        this.currentModelTriggerIconUrl = iconUrl;
+      } else if (iconUrl) {
+        const existingImg = iconWrapper.querySelector('img');
+        if (existingImg) {
+          existingImg.alt = iconLabel;
+          existingImg.title = iconLabel;
+        }
       }
     }
 
@@ -2628,6 +3087,16 @@ export class OpenCodianView extends ItemView {
     }
 
     return this.getFirstAvailableModel();
+  }
+
+  private formatModelId(
+    model: { provider?: string; model?: string } | null | undefined,
+  ): string | undefined {
+    if (!model?.provider || !model.model) {
+      return undefined;
+    }
+
+    return `${model.provider}/${model.model}`;
   }
 
   /** Switch model for current session */

@@ -18,10 +18,12 @@ import {
   DEFAULT_SETTINGS,
   getCurrentPlatformDebugLogPath,
   getCurrentPlatformKey,
+  getDefaultPersistedTabState,
   getServerBaseUrl,
   isLocalServerMode,
   normalizeChatAppearanceSettings,
   normalizeEffortLevel,
+  normalizePersistedTabState,
   normalizeThinkingBudget,
   VIEW_TYPE_OPENCODIAN,
 } from './core/types';
@@ -31,6 +33,9 @@ import { setLocale } from './i18n';
 import { createLogger, getRecentLogText, getVaultBasePath, setDebugLoggingEnabled } from './shared';
 
 const logger = createLogger('OpenCodian');
+
+// BUILD_ID is injected at build time via esbuild define
+declare const BUILD_ID: string;
 
 /** Main plugin class */
 export default class OpenCodianPlugin extends Plugin {
@@ -44,8 +49,12 @@ export default class OpenCodianPlugin extends Plugin {
   private conversations: Conversation[] = [];
   private chatAppearanceSaveTimeoutId: number | null = null;
   private settingsUiStateSaveTimeoutId: number | null = null;
+  private modelRefreshFrameId: number | null = null;
 
   async onload() {
+    // Output BUILD_ID for debugging (always visible)
+    logger.info(`OpenCodian BUILD_ID: ${BUILD_ID}`);
+
     // Initialize storage
     this.storage = new StorageService(this);
     await this.storage.initialize();
@@ -57,26 +66,33 @@ export default class OpenCodianPlugin extends Plugin {
     // Initialize locale
     setLocale(this.settings.locale as 'en' | 'zh');
 
+    const initialManagedServerState = await this.storage.loadManagedServerState();
+
     // Auto-create OpenCode config file based on permission mode
     await this.initializeOpencodeConfig();
 
     // Initialize OpenCode service
-    this.openCodeService = new OpenCodeService(this.settings, {
-      onServerStatusChange: (status) => {
-        logger.debug(`Server status changed: ${status}`);
-        this.settingsTab?.refreshServerStatusDisplay();
+    this.openCodeService = new OpenCodeService(
+      this.settings,
+      {
+        onServerStatusChange: (status) => {
+          logger.debug(`Server status changed: ${status}`);
+          this.settingsTab?.refreshServerStatusDisplay();
+        },
+        onError: (error) => {
+          new Notice(`OpenCode error: ${error.message}`);
+        },
+        onModelsLoaded: (_providers) => {
+          this.handleModelsLoaded();
+        },
       },
-      onError: (error) => {
-        new Notice(`OpenCode error: ${error.message}`);
+      {
+        initialManagedServerState,
+        onManagedServerStateChange: (state) => {
+          void this.storage.saveManagedServerState(state);
+        },
       },
-      onModelsLoaded: (_providers) => {
-        // Auto-save settings when models are loaded and defaults are updated
-        void this.saveSettings();
-
-        // Notify settings tab to refresh dropdowns if it's open
-        this.settingsTab?.onModelsLoaded();
-      },
-    });
+    );
 
     // Set vault path so OpenCode reads project config from .opencode/
     // This automatically adapts to Windows (C:\path) and macOS (/Users/path)
@@ -159,6 +175,7 @@ export default class OpenCodianPlugin extends Plugin {
     // Stop OpenCode service
     void this.openCodeService.stop();
     this.clearChatAppearanceSaveTimer();
+    this.clearQueuedModelRefresh();
 
   }
 
@@ -274,6 +291,11 @@ export default class OpenCodianPlugin extends Plugin {
         ? (savedSettings as { chatAppearance?: Partial<OpenCodianSettings['chatAppearance']> }).chatAppearance
         : undefined;
     const normalizedChatAppearance = normalizeChatAppearanceSettings(savedChatAppearance);
+    const savedTabState =
+      savedSettings && typeof savedSettings === 'object' && 'tabState' in savedSettings
+        ? (savedSettings as { tabState?: Partial<OpenCodianSettings['tabState']> }).tabState
+        : undefined;
+    const normalizedTabState = normalizePersistedTabState(savedTabState);
 
     const normalizedSettings = savedSettings
       ? {
@@ -287,6 +309,7 @@ export default class OpenCodianPlugin extends Plugin {
           thinkingBudget: normalizeThinkingBudget(savedSettings.thinkingBudget),
           debugLogPaths: normalizedDebugLogPaths,
           chatAppearance: normalizedChatAppearance,
+          tabState: normalizedTabState,
         }
       : null;
     this.settings = {
@@ -295,32 +318,42 @@ export default class OpenCodianPlugin extends Plugin {
       server: normalizedServer,
       debugLogPaths: normalizedDebugLogPaths,
       chatAppearance: normalizedChatAppearance,
+      tabState: normalizedTabState ?? getDefaultPersistedTabState(),
     };
   }
 
   /** Save settings to storage */
-  async saveSettings() {
+  async saveSettings(options: { syncService?: boolean; reloadModels?: boolean; syncConfig?: boolean; applyUi?: boolean } = {}) {
+    const {
+      syncService = true,
+      reloadModels = true,
+      syncConfig = true,
+      applyUi = true,
+    } = options;
     this.clearChatAppearanceSaveTimer();
     this.clearSettingsUiStateSaveTimer();
-    await this.storage.saveSettings(this.settings);
     this.applyLoggerSettings();
-    
-    // Update service with new settings
-    this.openCodeService.updateSettings(this.settings);
 
-    // Refresh any open chat views that depend on UI settings
-    for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_OPENCODIAN)) {
-      const view = leaf.view;
-      if (view instanceof OpenCodianView) {
-        view.applyChatAppearanceSettings();
-        view.applyChatScrollMode();
-        view.applyTabBarLayout();
-        void view.reloadModelCatalog();
+    if (syncService) {
+      const previousSettings = this.openCodeService.getSettingsSnapshot();
+
+      try {
+        await this.openCodeService.updateSettings(this.settings);
+      } catch (error) {
+        this.settings = previousSettings;
+        this.applyLoggerSettings();
+        throw error;
       }
     }
+
+    await this.storage.saveSettings(this.settings);
+
+    this.refreshOpenCodianViews({ reloadModels, applyUi });
     
     // Sync OpenCode config with permission mode
-    await this.syncOpencodeConfig();
+    if (syncConfig) {
+      await this.syncOpencodeConfig();
+    }
   }
 
   private applyLoggerSettings(): void {
@@ -363,6 +396,60 @@ export default class OpenCodianPlugin extends Plugin {
     if (this.settingsUiStateSaveTimeoutId !== null) {
       window.clearTimeout(this.settingsUiStateSaveTimeoutId);
       this.settingsUiStateSaveTimeoutId = null;
+    }
+  }
+
+  private handleModelsLoaded(): void {
+    const serviceSettings = this.openCodeService.getSettingsSnapshot();
+    const defaultsChanged =
+      this.settings.defaultProvider !== serviceSettings.defaultProvider
+      || this.settings.defaultModel !== serviceSettings.defaultModel;
+
+    if (defaultsChanged) {
+      this.settings.defaultProvider = serviceSettings.defaultProvider;
+      this.settings.defaultModel = serviceSettings.defaultModel;
+      void this.saveSettings({
+        syncService: false,
+        reloadModels: false,
+        syncConfig: false,
+        applyUi: false,
+      });
+    }
+
+    this.queueModelRefresh();
+  }
+
+  private refreshOpenCodianViews(options: { reloadModels?: boolean; applyUi?: boolean } = {}): void {
+    const { reloadModels = true, applyUi = true } = options;
+
+    for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_OPENCODIAN)) {
+      const view = leaf.view;
+      if (view instanceof OpenCodianView) {
+        if (applyUi) {
+          view.applyChatAppearanceSettings();
+          view.applyChatScrollMode();
+          view.applyTabBarLayout();
+        }
+        if (reloadModels) {
+          void view.reloadModelCatalog();
+        }
+      }
+    }
+  }
+
+  private queueModelRefresh(): void {
+    this.clearQueuedModelRefresh();
+    this.modelRefreshFrameId = window.requestAnimationFrame(() => {
+      this.modelRefreshFrameId = null;
+      this.refreshOpenCodianViews({ reloadModels: true, applyUi: false });
+      this.settingsTab?.onModelsLoaded();
+    });
+  }
+
+  private clearQueuedModelRefresh(): void {
+    if (this.modelRefreshFrameId !== null) {
+      window.cancelAnimationFrame(this.modelRefreshFrameId);
+      this.modelRefreshFrameId = null;
     }
   }
 
@@ -540,6 +627,38 @@ export default class OpenCodianPlugin extends Plugin {
     await this.storage.saveConversation(conversation);
 
     return conversation;
+  }
+
+  async createConversationFromSession(
+    sessionId: string,
+    initial?: Partial<Omit<Conversation, 'id' | 'createdAt' | 'updatedAt' | 'openCodeSessionId'>>,
+  ): Promise<Conversation> {
+    const conversation: Conversation = {
+      id: `conv-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
+      title: initial?.title || this.generateDefaultTitle(),
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      openCodeSessionId: sessionId,
+      messages: initial?.messages ? JSON.parse(JSON.stringify(initial.messages)) as Conversation['messages'] : [],
+      currentNote: initial?.currentNote,
+      externalContextPaths: initial?.externalContextPaths ? [...initial.externalContextPaths] : undefined,
+      lastResponseAt: initial?.lastResponseAt,
+    };
+
+    this.conversations.unshift(conversation);
+    await this.storage.saveConversation(conversation);
+    return conversation;
+  }
+
+  async saveConversation(conversation: Conversation): Promise<void> {
+    const index = this.conversations.findIndex((item) => item.id === conversation.id);
+    if (index === -1) {
+      this.conversations.unshift(conversation);
+    } else {
+      this.conversations[index] = conversation;
+    }
+
+    await this.storage.saveConversation(conversation);
   }
 
   /** Get all conversations */

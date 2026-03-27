@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import process from "process";
 import builtins from "builtin-modules";
+import { generateBuildId } from './build-utils.mjs';
 
 const banner =
 `/*
@@ -18,6 +19,9 @@ if (!fs.existsSync(distDir)) {
   fs.mkdirSync(distDir, { recursive: true });
 }
 
+const buildId = generateBuildId();
+console.log(`[build] BUILD_ID: ${buildId}`);
+
 let context;
 
 try {
@@ -27,6 +31,9 @@ try {
   context = await esbuild.context({
     banner: {
       js: banner,
+    },
+    define: {
+      BUILD_ID: JSON.stringify(buildId),
     },
     entryPoints: ['src/main.ts'],
     bundle: true,

@@ -14,6 +14,7 @@ interface LogEntry {
 const recentLogEntries: LogEntry[] = [];
 
 export interface Logger {
+  info: (...args: unknown[]) => void;
   debug: (...args: unknown[]) => void;
   warn: (...args: unknown[]) => void;
   error: (...args: unknown[]) => void;
@@ -42,12 +43,21 @@ export function setDebugLoggingEnabled(enabled: boolean): void {
   }
 }
 
+function getTimestamp(): string {
+  const now = new Date();
+  const hours = String(now.getHours()).padStart(2, '0');
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  const seconds = String(now.getSeconds()).padStart(2, '0');
+  return `${hours}:${minutes}:${seconds}`;
+}
+
 function formatArgs(scope: string, args: unknown[]): unknown[] {
+  const timestamp = getTimestamp();
   if (typeof args[0] === 'string') {
-    return [`[${scope}] ${args[0]}`, ...args.slice(1)];
+    return [`[${timestamp}] [${scope}] ${args[0]}`, ...args.slice(1)];
   }
 
-  return [`[${scope}]`, ...args];
+  return [`[${timestamp}] [${scope}]`, ...args];
 }
 
 function stringifyArg(arg: unknown): string {
@@ -105,6 +115,9 @@ function emit(method: LogMethod, scope: string, args: unknown[]): void {
 
 export function createLogger(scope: string): Logger {
   return {
+    info: (...args: unknown[]) => {
+      emit('log', scope, args);
+    },
     debug: (...args: unknown[]) => {
       if (!isDebugEnabled()) {
         return;
