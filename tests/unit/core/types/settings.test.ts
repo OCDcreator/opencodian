@@ -10,7 +10,9 @@ import {
   getDefaultChatAppearanceSettings,
   getDefaultDebugLogPaths,
   isValidChatAppearanceCustomCssDeclarations,
+  normalizeBelowHeaderTabBarLayout,
   normalizeChatAppearanceSettings,
+  normalizeTabBarPosition,
 } from '../../../../src/core/types/settings';
 
 describe('Settings', () => {
@@ -82,7 +84,8 @@ describe('Settings', () => {
       expect(DEFAULT_SETTINGS.defaultProvider).toBe('anthropic');
       expect(DEFAULT_SETTINGS.defaultModel).toBe('claude-3-5-sonnet-20241022');
       expect(DEFAULT_SETTINGS.maxTabs).toBe(3);
-      expect(DEFAULT_SETTINGS.tabBarPosition).toBe('input');
+      expect(DEFAULT_SETTINGS.tabBarPosition).toBe('below-header');
+      expect(DEFAULT_SETTINGS.belowHeaderTabBarLayout).toBe('grid');
       expect(DEFAULT_SETTINGS.enableAutoScroll).toBe(true);
       expect(DEFAULT_SETTINGS.chatAppearance.layout.messagesPaddingTop).toBe(12);
       expect(DEFAULT_SETTINGS.chatAppearance.sticky.maskBlur).toBe(24);
@@ -116,6 +119,21 @@ describe('Settings', () => {
     it('should have allowed export paths', () => {
       expect(DEFAULT_SETTINGS.allowedExportPaths).toContain('~/Desktop');
       expect(DEFAULT_SETTINGS.allowedExportPaths).toContain('~/Downloads');
+    });
+  });
+
+  describe('tab bar setting normalization', () => {
+    it('normalizes invalid tab bar positions to below-header', () => {
+      expect(normalizeTabBarPosition('header')).toBe('header');
+      expect(normalizeTabBarPosition('input')).toBe('input');
+      expect(normalizeTabBarPosition('below-header')).toBe('below-header');
+      expect(normalizeTabBarPosition('legacy')).toBe('below-header');
+    });
+
+    it('normalizes invalid below-header layouts to grid', () => {
+      expect(normalizeBelowHeaderTabBarLayout('grid')).toBe('grid');
+      expect(normalizeBelowHeaderTabBarLayout('vertical')).toBe('vertical');
+      expect(normalizeBelowHeaderTabBarLayout('stacked')).toBe('grid');
     });
   });
 

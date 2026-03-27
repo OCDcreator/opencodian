@@ -1,14 +1,16 @@
 import { setIcon } from 'obsidian';
 
 import { t } from '../../../i18n';
-import type { TabBarItem, TabId } from './types';
+import type { TabBarItem, TabBarLayoutMode, TabId } from './types';
 
 export interface TabBarCallbacks {
   onTabClick: (tabId: TabId) => void;
   onTabClose: (tabId: TabId) => void;
 }
 
-const MAX_VISIBLE_TABS = 5;
+const HEADER_MAX_VISIBLE_TABS = 4;
+const INPUT_MAX_VISIBLE_TABS = 5;
+const VERTICAL_MAX_VISIBLE_TABS = 5;
 
 export class TabBar {
   private static tooltipLabelId = 0;
@@ -22,18 +24,19 @@ export class TabBar {
     this.containerEl.addClass('opencodian-tab-bar');
   }
 
-  render(items: TabBarItem[]): void {
+  render(items: TabBarItem[], layout: TabBarLayoutMode): void {
     this.closeOverflowMenu();
     this.containerEl.empty();
+    this.containerEl.setAttribute('data-layout', layout);
 
-    const { visibleItems, overflowItems } = this.partitionItems(items);
+    const { visibleItems, overflowItems } = this.partitionItems(items, layout);
 
     for (const item of visibleItems) {
-      this.renderTabItem(item);
+      this.renderTabItem(item, layout);
     }
 
     if (overflowItems.length > 0) {
-      this.renderOverflowButton(overflowItems);
+      this.renderOverflowButton(overflowItems, layout);
     }
   }
 
@@ -43,11 +46,13 @@ export class TabBar {
     this.containerEl.removeClass('opencodian-tab-bar');
   }
 
-  private partitionItems(items: TabBarItem[]): {
+  private partitionItems(items: TabBarItem[], layout: TabBarLayoutMode): {
     visibleItems: TabBarItem[];
     overflowItems: TabBarItem[];
   } {
-    if (items.length <= MAX_VISIBLE_TABS) {
+    const maxVisibleTabs = this.getMaxVisibleTabs(layout);
+
+    if (items.length <= maxVisibleTabs) {
       return {
         visibleItems: items,
         overflowItems: [],
@@ -55,15 +60,15 @@ export class TabBar {
     }
 
     const activeIndex = items.findIndex((item) => item.isActive);
-    if (activeIndex === -1 || activeIndex < MAX_VISIBLE_TABS) {
+    if (activeIndex === -1 || activeIndex < maxVisibleTabs) {
       return {
-        visibleItems: items.slice(0, MAX_VISIBLE_TABS),
-        overflowItems: items.slice(MAX_VISIBLE_TABS),
+        visibleItems: items.slice(0, maxVisibleTabs),
+        overflowItems: items.slice(maxVisibleTabs),
       };
     }
 
-    const visibleItems = [...items.slice(0, MAX_VISIBLE_TABS - 1), items[activeIndex]];
-    const overflowItems = items.filter((item, index) => index >= MAX_VISIBLE_TABS - 1 && index !== activeIndex);
+    const visibleItems = [...items.slice(0, maxVisibleTabs - 1), items[activeIndex]];
+    const overflowItems = items.filter((item, index) => index >= maxVisibleTabs - 1 && index !== activeIndex);
 
     return {
       visibleItems,
@@ -71,14 +76,34 @@ export class TabBar {
     };
   }
 
-  private renderTabItem(item: TabBarItem): void {
+  private getMaxVisibleTabs(layout: TabBarLayoutMode): number {
+    switch (layout) {
+      case 'header':
+        return HEADER_MAX_VISIBLE_TABS;
+      case 'below-header-grid':
+      case 'below-header-vertical':
+        return VERTICAL_MAX_VISIBLE_TABS;
+      case 'input':
+      default:
+        return INPUT_MAX_VISIBLE_TABS;
+    }
+  }
+
+  private renderTabItem(item: TabBarItem, layout: TabBarLayoutMode): void {
     const tooltip = `${item.title}${item.canClose ? ` · ${t('chat.tab.close')}` : ''}`;
+    const useTooltip = layout !== 'below-header-vertical';
     const tabEl = this.containerEl.createEl('button', {
-      cls: 'opencodian-tab-bar-item opencodian-tooltip-trigger',
-      attr: {
-        type: 'button',
-        'data-tooltip': tooltip,
-      },
+      cls: useTooltip
+        ? 'opencodian-tab-bar-item opencodian-tooltip-trigger'
+        : 'opencodian-tab-bar-item',
+      attr: useTooltip
+        ? {
+            type: 'button',
+            'data-tooltip': tooltip,
+          }
+        : {
+            type: 'button',
+          },
     });
     this.attachTooltipLabel(tabEl, tooltip);
 
@@ -120,15 +145,24 @@ export class TabBar {
     }
   }
 
-  private renderOverflowButton(items: TabBarItem[]): void {
+  private renderOverflowButton(items: TabBarItem[], layout: TabBarLayoutMode): void {
     const tooltip = t('chat.tab.moreMenu', { count: items.length });
+    const useTooltip = layout !== 'below-header-vertical';
     const overflowEl = this.containerEl.createEl('button', {
-      cls: 'opencodian-tab-bar-overflow',
+      cls: useTooltip
+        ? 'opencodian-tab-bar-overflow opencodian-tooltip-trigger'
+        : 'opencodian-tab-bar-overflow',
       text: t('chat.tab.more', { count: items.length }),
-      attr: {
-        type: 'button',
-        'aria-haspopup': 'menu',
-      },
+      attr: useTooltip
+        ? {
+            type: 'button',
+            'aria-haspopup': 'menu',
+            'data-tooltip': tooltip,
+          }
+        : {
+            type: 'button',
+            'aria-haspopup': 'menu',
+          },
     });
     this.attachTooltipLabel(overflowEl, tooltip);
 

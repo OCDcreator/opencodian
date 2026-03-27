@@ -21,6 +21,7 @@ export {
 // Settings types
 export {
   type ApprovalDecision,
+  type BelowHeaderTabBarLayout,
   type ChatAppearanceAdvancedSettings,
   type ChatAppearanceAssistantSettings,
   type ChatAppearanceInputSettings,
@@ -45,9 +46,11 @@ export {
   type LocalServerConfig,
   type ModelSourceMode,
   normalizeBaseUrl,
+  normalizeBelowHeaderTabBarLayout,
   normalizeChatAppearanceSettings,
   normalizeEffortLevel,
   normalizePersistedTabState,
+  normalizeTabBarPosition,
   normalizeThinkingBudget,
   type OpenCodianSettings,
   type PartialChatAppearanceSettings,

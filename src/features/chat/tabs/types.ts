@@ -27,6 +27,8 @@ export interface TabBarItem {
   canClose: boolean;
 }
 
+export type TabBarLayoutMode = 'header' | 'input' | 'below-header-grid' | 'below-header-vertical';
+
 export interface RestoredTabState {
   conversationId: string | null;
   title: string;

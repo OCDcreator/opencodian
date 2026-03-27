@@ -258,6 +258,7 @@
 
 .opencodian-tab-bar-slot {
   display: none;
+  position: relative;
 }
 
 .opencodian-tab-bar-slot.is-active-slot {
@@ -270,8 +271,29 @@
   margin: 0 12px;
 }
 
+.opencodian-tab-bar-slot--below-header {
+  padding: 0 16px 10px;
+  z-index: 30;
+}
+
 .opencodian-tab-bar-slot--input {
   margin-bottom: 10px;
+}
+
+.opencodian-tab-bar-external-host {
+  position: absolute;
+  inset: 0;
+  z-index: 220;
+  pointer-events: none;
+}
+
+.opencodian-tab-bar-slot--outer-vertical {
+  position: absolute;
+  top: 56px;
+  left: 4px;
+  padding: 0;
+  width: max-content;
+  pointer-events: auto;
 }
 
 .opencodian-tab-bar {
@@ -280,28 +302,63 @@
   gap: 8px;
   min-width: 0;
   overflow-x: auto;
+  overflow-y: visible;
   scrollbar-width: none;
+  position: relative;
 }
 
 .opencodian-tab-bar::-webkit-scrollbar {
   display: none;
 }
 
+.opencodian-tab-bar-slot--outer-vertical.is-active-slot .opencodian-tab-bar {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  overflow: visible;
+}
+
+.opencodian-tab-bar[data-layout="below-header-grid"] {
+  flex-wrap: nowrap;
+  overflow: visible;
+}
+
 .opencodian-tab-bar-item,
-.opencodian-tab-bar-new {
+.opencodian-tab-bar-new,
+.opencodian-tab-bar-overflow {
+  position: relative;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 0;
   flex: 0 1 auto;
   min-width: 0;
   max-width: 44px;
   padding: 6px 8px;
-  border: 1px solid var(--background-modifier-border);
+  border: 1px solid color-mix(in srgb, var(--opencodian-glass-border) 88%, var(--background-modifier-border));
   border-radius: 999px;
-  background: var(--background-secondary);
+  background:
+    linear-gradient(
+      180deg,
+      var(--opencodian-glass-specular-soft) 0%,
+      color-mix(in srgb, var(--opencodian-glass-specular-soft) 55%, transparent) 42%,
+      transparent 100%
+    ),
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--opencodian-glass-base) 94%, transparent) 0%,
+      color-mix(in srgb, var(--background-secondary) 84%, transparent) 100%
+    );
+  backdrop-filter: blur(14px) saturate(1.04);
+  -webkit-backdrop-filter: blur(14px) saturate(1.04);
   color: var(--text-muted);
   cursor: pointer;
   overflow: hidden;
+  box-shadow:
+    0 3px 12px color-mix(in srgb, var(--opencodian-glass-shadow) 62%, transparent),
+    0 1px 0 color-mix(in srgb, var(--opencodian-glass-specular) 82%, transparent) inset;
+  opacity: 0.24;
+  filter: blur(0.5px) saturate(0.56);
   transition:
     max-width 0.2s ease,
     padding 0.2s ease,
@@ -309,25 +366,43 @@
     background 0.15s ease,
     border-color 0.15s ease,
     color 0.15s ease,
-    box-shadow 0.15s ease;
+    box-shadow 0.15s ease,
+    opacity 0.15s ease,
+    filter 0.15s ease,
+    transform 0.15s ease;
 }
 
 .opencodian-tab-bar-item:hover,
-.opencodian-tab-bar-new:hover:not(:disabled) {
-  background: var(--background-modifier-hover);
+.opencodian-tab-bar-new:hover:not(:disabled),
+.opencodian-tab-bar-overflow:hover,
+.opencodian-tab-bar-item:focus-visible,
+.opencodian-tab-bar-overflow:focus-visible,
+.opencodian-tab-bar-item.is-active {
+  overflow: visible;
+  z-index: 6;
+  background:
+    linear-gradient(
+      180deg,
+      var(--opencodian-glass-specular) 0%,
+      color-mix(in srgb, var(--opencodian-glass-specular-soft) 72%, transparent) 42%,
+      transparent 100%
+    ),
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--opencodian-glass-base-strong) 96%, transparent) 0%,
+      color-mix(in srgb, var(--background-modifier-hover) 86%, transparent) 100%
+    );
   color: var(--text-normal);
-}
-
-.opencodian-tab-bar-item:is(:hover, :focus-visible, :focus-within, .is-active) {
-  gap: 8px;
-  max-width: min(240px, 100%);
-  padding-right: 10px;
+  border-color: color-mix(in srgb, var(--opencodian-glass-border-strong) 72%, var(--interactive-accent));
+  box-shadow:
+    0 7px 20px color-mix(in srgb, var(--opencodian-glass-shadow-strong) 72%, transparent),
+    0 1px 0 color-mix(in srgb, var(--opencodian-glass-specular) 94%, transparent) inset;
+  opacity: 1;
+  filter: none;
 }
 
 .opencodian-tab-bar-item.is-active {
-  background: color-mix(in srgb, var(--interactive-accent) 18%, var(--background-secondary));
-  border-color: color-mix(in srgb, var(--interactive-accent) 45%, var(--background-modifier-border));
-  color: var(--text-normal);
+  border-color: color-mix(in srgb, var(--interactive-accent) 46%, var(--opencodian-glass-border-strong));
 }
 
 .opencodian-tab-bar-item.is-streaming .opencodian-tab-bar-state,
@@ -354,6 +429,8 @@
 }
 
 .opencodian-tab-bar-title {
+  min-width: 0;
+  flex: 0 1 auto;
   max-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -363,10 +440,47 @@
   font-weight: 600;
   transition:
     max-width 0.2s ease,
-    opacity 0.16s ease;
+    opacity 0.16s ease,
+    transform 0.16s ease;
 }
 
-.opencodian-tab-bar-item:is(:hover, :focus-visible, :focus-within, .is-active) .opencodian-tab-bar-title--collapsible {
+.opencodian-tab-bar[data-layout="input"] .opencodian-tab-bar-item:is(:hover, :focus-visible, :focus-within) {
+  gap: 8px;
+  max-width: min(240px, 100%);
+  padding-right: 10px;
+}
+
+.opencodian-tab-bar[data-layout="input"] .opencodian-tab-bar-item:is(:hover, :focus-visible, :focus-within) .opencodian-tab-bar-title--collapsible {
+  max-width: 180px;
+  opacity: 1;
+}
+
+.opencodian-tab-bar[data-layout="below-header-grid"] .opencodian-tab-bar-item,
+.opencodian-tab-bar[data-layout="below-header-grid"] .opencodian-tab-bar-overflow {
+  flex: 0 1 auto;
+  width: auto;
+  max-width: 44px;
+  min-width: 0;
+  justify-content: center;
+  gap: 0;
+  padding: 6px 8px;
+}
+
+.opencodian-tab-bar[data-layout="below-header-grid"] .opencodian-tab-bar-item.is-active {
+  gap: 8px;
+  max-width: min(240px, 100%);
+  padding-right: 10px;
+}
+
+.opencodian-tab-bar[data-layout="below-header-grid"] .opencodian-tab-bar-item.is-active .opencodian-tab-bar-title--collapsible,
+.opencodian-tab-bar[data-layout="below-header-grid"] .opencodian-tab-bar-item:not(.is-active):is(:hover, :focus-visible, :focus-within) {
+  gap: 8px;
+  max-width: min(240px, 100%);
+  padding-right: 10px;
+}
+
+.opencodian-tab-bar[data-layout="below-header-grid"] .opencodian-tab-bar-item.is-active .opencodian-tab-bar-title--collapsible,
+.opencodian-tab-bar[data-layout="below-header-grid"] .opencodian-tab-bar-item:not(.is-active):is(:hover, :focus-visible, :focus-within) .opencodian-tab-bar-title--collapsible {
   max-width: 180px;
   opacity: 1;
 }
@@ -404,28 +518,79 @@
 }
 
 .opencodian-tab-bar-overflow {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
   flex: 0 0 auto;
   min-width: 46px;
   padding: 6px 10px;
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 999px;
-  background: var(--background-secondary);
-  color: var(--text-muted);
-  cursor: pointer;
-  transition:
-    background 0.15s ease,
-    border-color 0.15s ease,
-    color 0.15s ease,
-    box-shadow 0.15s ease;
 }
 
-.opencodian-tab-bar-overflow:hover,
-.opencodian-tab-bar-overflow:focus-visible {
-  background: var(--background-modifier-hover);
+.opencodian-tab-bar[data-layout="below-header-vertical"] .opencodian-tab-bar-item,
+.opencodian-tab-bar[data-layout="below-header-vertical"] .opencodian-tab-bar-overflow {
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  padding: 0;
+  gap: 0;
+  border-radius: 6px;
+  overflow: visible;
+  box-shadow: 0 2px 8px var(--opencodian-glass-shadow);
+}
+
+.opencodian-tab-bar[data-layout="below-header-vertical"] .opencodian-tab-bar-item:hover,
+.opencodian-tab-bar[data-layout="below-header-vertical"] .opencodian-tab-bar-overflow:hover {
+  transform: scale(1.05);
+}
+
+.opencodian-tab-bar[data-layout="below-header-vertical"] .opencodian-tab-bar-badge {
+  width: 18px;
+  height: 18px;
+}
+
+.opencodian-tab-bar[data-layout="below-header-vertical"] .opencodian-tab-bar-title--collapsible {
+  position: absolute;
+  top: 50%;
+  left: calc(100% + 8px);
+  max-width: 0;
+  padding: 7px 11px;
+  border-radius: 10px;
+  border: 1px solid var(--opencodian-glass-border-strong);
+  background:
+    linear-gradient(
+      180deg,
+      var(--opencodian-glass-specular-soft) 0%,
+      color-mix(in srgb, var(--opencodian-glass-specular-soft) 68%, transparent) 44%,
+      transparent 100%
+    ),
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--opencodian-glass-base-strong) 97%, transparent) 0%,
+      color-mix(in srgb, var(--background-secondary) 92%, transparent) 100%
+    );
+  backdrop-filter: blur(18px) saturate(1.08);
+  -webkit-backdrop-filter: blur(18px) saturate(1.08);
+  box-shadow:
+    0 12px 28px color-mix(in srgb, var(--opencodian-glass-shadow-strong) 68%, transparent),
+    0 1px 0 color-mix(in srgb, var(--opencodian-glass-specular) 94%, transparent) inset;
   color: var(--text-normal);
+  transform: translateY(-50%) translateX(-4px);
+  z-index: 8;
+  pointer-events: none;
+}
+
+.opencodian-tab-bar[data-layout="below-header-vertical"] .opencodian-tab-bar-item:hover .opencodian-tab-bar-title--collapsible {
+  max-width: 220px;
+  opacity: 1;
+  transform: translateY(-50%) translateX(0);
+}
+
+.opencodian-tab-bar[data-layout="below-header-vertical"] .opencodian-tab-bar-state {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: var(--background-primary);
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--text-normal) 18%, transparent);
 }
 
 .opencodian-tab-overflow-menu {

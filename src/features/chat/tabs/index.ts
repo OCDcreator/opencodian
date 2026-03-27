@@ -4,6 +4,7 @@ export { TabManager } from './TabManager';
 export type {
   CloseTabResult,
   RestoredTabState,
+  TabBarLayoutMode,
   TabBarItem,
   TabData,
   TabId,

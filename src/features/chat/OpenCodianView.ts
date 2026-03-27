@@ -30,7 +30,7 @@ import {
 } from '../../utils/streaming';
 import { buildChatAppearanceCustomCss, getChatAppearanceCssVariables } from './chatAppearance';
 import { type CollapsibleState,setupCollapsible } from './rendering/collapsible';
-import { TabBar, TabManager, type RestoredTabState } from './tabs';
+import { TabBar, TabManager, type RestoredTabState, type TabBarLayoutMode } from './tabs';
 import { EffortSelector } from './ui/EffortSelector';
 import { NavigationSidebar } from './ui/NavigationSidebar';
 
@@ -111,6 +111,9 @@ export class OpenCodianView extends ItemView {
   private streamingContentEl: HTMLElement | null = null;
   private currentTurnBodyEl: HTMLElement | null = null;
   private headerTabBarSlotEl: HTMLElement | null = null;
+  private belowHeaderTabBarSlotEl: HTMLElement | null = null;
+  private outerVerticalTabBarHostEl: HTMLElement | null = null;
+  private outerVerticalTabBarSlotEl: HTMLElement | null = null;
   private inputTabBarSlotEl: HTMLElement | null = null;
   private tabBarMountEl: HTMLElement | null = null;
   private tabBar: TabBar | null = null;
@@ -225,6 +228,10 @@ export class OpenCodianView extends ItemView {
     this.tabBar = null;
     this.tabBarMountEl = null;
     this.headerTabBarSlotEl = null;
+    this.belowHeaderTabBarSlotEl = null;
+    this.outerVerticalTabBarSlotEl = null;
+    this.outerVerticalTabBarHostEl?.remove();
+    this.outerVerticalTabBarHostEl = null;
     this.inputTabBarSlotEl = null;
     this.tabManager = null;
 
@@ -246,6 +253,9 @@ export class OpenCodianView extends ItemView {
     // Header
     const header = this.chatContainerEl.createDiv({ cls: 'opencodian-header' });
     this.buildHeader(header);
+    this.belowHeaderTabBarSlotEl = this.chatContainerEl.createDiv({
+      cls: 'opencodian-tab-bar-slot opencodian-tab-bar-slot--below-header',
+    });
 
     // Messages area
     this.messagesShellEl = this.chatContainerEl.createDiv({ cls: 'opencodian-messages-shell' });
@@ -257,12 +267,19 @@ export class OpenCodianView extends ItemView {
     this.buildInputArea(this.inputContainer);
     this.applyChatAppearanceSettings();
 
+    const outerMountEl = this.contentEl.closest('.workspace-leaf-content[data-type="opencodian-view"]')
+      ?? this.contentEl;
+    this.outerVerticalTabBarHostEl = (outerMountEl as HTMLElement).createDiv({
+      cls: 'opencodian-tab-bar-external-host',
+    });
+    this.outerVerticalTabBarSlotEl = this.outerVerticalTabBarHostEl.createDiv({
+      cls: 'opencodian-tab-bar-slot opencodian-tab-bar-slot--outer-vertical',
+    });
+
     // Navigation sidebar (mounted on the outer host so it never compresses chat layout)
     if (this.messagesShellEl && this.messagesContainer) {
-      const navMountEl = this.contentEl.closest('.workspace-leaf-content[data-type="opencodian-view"]')
-        ?? this.contentEl;
       this.navigationSidebar = new NavigationSidebar(
-        navMountEl as HTMLElement,
+        outerMountEl as HTMLElement,
         this.messagesShellEl,
         this.messagesContainer,
       );
@@ -323,7 +340,7 @@ export class OpenCodianView extends ItemView {
       return;
     }
 
-    this.tabBar.render(this.tabManager.getTabBarItems());
+    this.tabBar.render(this.tabManager.getTabBarItems(), this.getTabBarLayoutMode());
   }
 
   private restorePersistedTabs(): string | null {
@@ -450,21 +467,63 @@ export class OpenCodianView extends ItemView {
     this.updateModelSelectorDisplay();
   }
 
+  private getTabBarLayoutMode(): TabBarLayoutMode {
+    if (this.plugin.settings.tabBarPosition === 'header') {
+      return 'header';
+    }
+
+    if (this.plugin.settings.tabBarPosition === 'below-header') {
+      return this.plugin.settings.belowHeaderTabBarLayout === 'vertical'
+        ? 'below-header-vertical'
+        : 'below-header-grid';
+    }
+
+    return 'input';
+  }
+
   public applyTabBarLayout(): void {
-    if (!this.tabBarMountEl || !this.headerTabBarSlotEl || !this.inputTabBarSlotEl) {
+    if (
+      !this.chatContainerEl
+      || !this.tabBarMountEl
+      || !this.headerTabBarSlotEl
+      || !this.belowHeaderTabBarSlotEl
+      || !this.outerVerticalTabBarSlotEl
+      || !this.inputTabBarSlotEl
+    ) {
       return;
     }
 
+    const isBelowHeader = this.plugin.settings.tabBarPosition === 'below-header';
+    const isVerticalBelowHeader =
+      isBelowHeader && this.plugin.settings.belowHeaderTabBarLayout === 'vertical';
+
     const targetSlot = this.plugin.settings.tabBarPosition === 'header'
       ? this.headerTabBarSlotEl
-      : this.inputTabBarSlotEl;
+      : isVerticalBelowHeader
+        ? this.outerVerticalTabBarSlotEl
+        : isBelowHeader
+          ? this.belowHeaderTabBarSlotEl
+          : this.inputTabBarSlotEl;
 
     if (this.tabBarMountEl.parentElement !== targetSlot) {
       this.tabBarMountEl.remove();
       targetSlot.appendChild(this.tabBarMountEl);
     }
 
+    this.chatContainerEl.toggleClass('opencodian-container--tab-pos-header', this.plugin.settings.tabBarPosition === 'header');
+    this.chatContainerEl.toggleClass('opencodian-container--tab-pos-below-header', isBelowHeader);
+    this.chatContainerEl.toggleClass('opencodian-container--tab-pos-input', this.plugin.settings.tabBarPosition === 'input');
+    this.chatContainerEl.toggleClass(
+      'opencodian-container--tab-layout-grid',
+      isBelowHeader && this.plugin.settings.belowHeaderTabBarLayout === 'grid',
+    );
+    this.chatContainerEl.toggleClass(
+      'opencodian-container--tab-layout-vertical',
+      isVerticalBelowHeader,
+    );
     this.headerTabBarSlotEl.classList.toggle('is-active-slot', targetSlot === this.headerTabBarSlotEl);
+    this.belowHeaderTabBarSlotEl.classList.toggle('is-active-slot', targetSlot === this.belowHeaderTabBarSlotEl);
+    this.outerVerticalTabBarSlotEl.classList.toggle('is-active-slot', targetSlot === this.outerVerticalTabBarSlotEl);
     this.inputTabBarSlotEl.classList.toggle('is-active-slot', targetSlot === this.inputTabBarSlotEl);
     this.renderTabBar();
   }

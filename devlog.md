@@ -4243,3 +4243,65 @@ streamController.renderStoredContentBlocks(parentEl, savedBlocks);
 - 消息历史依赖 OpenCode 服务器存储
 
 ---
+
+## 2026-03-27 标签栏位置与布局重构
+
+### ✅ 新增能力
+
+- 在设置中新增 `标题栏下方 (below-header)` 标签栏位置。
+- 为 `below-header` 新增两种布局：
+  - `grid`：横向单行紧凑布局，最多显示 5 个标签，超出折叠为 `+N`
+  - `vertical`：左侧悬浮竖排布局，最多显示 5 个按钮，超出折叠为 `+N`
+- 新增 `belowHeaderTabBarLayout` 设置项，并将默认标签栏位置切换为 `below-header`。
+
+### 🎨 交互与样式调整
+
+- `header` 位置的标签默认不展开标题，仅在悬浮时让非焦点标签恢复实体感。
+- `below-header/grid` 改为默认单行紧凑显示，非焦点标签默认虚化且不展开，只在悬浮时横向展开。
+- `below-header/vertical` 改为与导航按钮同尺寸的悬浮玻璃按钮，文字在悬浮时横向展开，不挤压正文内容。
+- 增强非焦点标签和 `+N` 的虚化程度。
+- 修复输入框附近首个标签在悬浮时出现明显长方形阴影棱角的问题，hover/focus/active 时允许阴影溢出显示。
+
+### 🏗️ 结构调整
+
+- `OpenCodianView` 增加第三个标签挂载点 `below-header`，并根据设置在 `header / below-header / input` 之间切换。
+- 竖排标签进一步移动到外层 `host`，与导航按钮使用同级的绝对定位覆盖层，而不是继续挂在聊天容器内部。
+- `TabBar` 渲染逻辑按布局模式区分可见标签数和 `+N` 溢出规则。
+
+### 🌐 国际化与设置
+
+- 中英文设置文案新增：
+  - `标题栏下方 / Below header`
+  - `下方标签布局 / Below-header tab layout`
+  - `横向多行 / Horizontal multi-row`
+  - `左侧竖排悬浮 / Floating vertical rail`
+
+### 🧪 验证
+
+- 补充 `TabBar` 单测，覆盖：
+  - `header` 布局最多 4 个可见标签
+  - `below-header/grid` 最多 5 个可见标签
+  - `below-header/vertical` 最多 5 个可见标签
+- 更新测试环境中的 DOM helper，补齐 `createEl / createDiv / createSpan / addClass / toggleClass / empty`。
+- 调整 `NavigationSidebar` 测试以匹配当前构造参数。
+- 本轮改动已通过多次 `npm run test` 与 `npm run build` 验证，并已同步部署到 Test Vault。
+
+### 📁 涉及文件
+
+- `src/core/types/settings.ts`
+- `src/core/types/index.ts`
+- `src/main.ts`
+- `src/features/chat/OpenCodianView.ts`
+- `src/features/chat/tabs/TabBar.ts`
+- `src/features/chat/tabs/types.ts`
+- `src/features/chat/tabs/index.ts`
+- `src/features/settings/OpenCodianSettings.ts`
+- `src/i18n/locales/en.ts`
+- `src/i18n/locales/zh.ts`
+- `styles.css`
+- `tests/setup.ts`
+- `tests/unit/core/types/settings.test.ts`
+- `tests/unit/features/chat/NavigationSidebar.test.ts`
+- `tests/unit/features/chat/tabs/TabBar.test.ts`
+
+---

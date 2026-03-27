@@ -118,9 +118,11 @@ describe('NavigationSidebar', () => {
 
   it('uses the turn anchor for previous navigation in sticky mode', () => {
     const parentEl = document.createElement('div') as ObsidianLikeElement;
+    const messagesShellEl = document.createElement('div');
     const messagesEl = document.createElement('div');
+    messagesShellEl.appendChild(messagesEl);
+    parentEl.appendChild(messagesShellEl);
     messagesEl.className = 'opencodian-messages opencodian-messages--sticky-mask';
-    parentEl.appendChild(messagesEl);
     document.body.appendChild(parentEl);
 
     const scrollTo = jest.fn();
@@ -131,6 +133,7 @@ describe('NavigationSidebar', () => {
     setNumericProperty(messagesEl, 'scrollHeight', 2400);
     setNumericProperty(messagesEl, 'clientHeight', 500);
     setNumericProperty(messagesEl, 'scrollTop', 920);
+    setRect(messagesShellEl, 0, 500);
     setRect(messagesEl, 0, 500);
 
     const firstTurn = createTurn(messagesEl, 'first');
@@ -144,7 +147,7 @@ describe('NavigationSidebar', () => {
     setRect(thirdTurn.turnEl, 220, 220);
     setRect(thirdTurn.userMessageEl, 220, 48);
 
-    const sidebar = new NavigationSidebar(parentEl, messagesEl);
+    const sidebar = new NavigationSidebar(parentEl, messagesShellEl, messagesEl);
     const prevBtn = parentEl.querySelector('.opencodian-nav-btn-prev') as HTMLButtonElement;
 
     prevBtn.click();
@@ -156,9 +159,11 @@ describe('NavigationSidebar', () => {
 
   it('keeps the existing message padding in natural mode', () => {
     const parentEl = document.createElement('div') as ObsidianLikeElement;
+    const messagesShellEl = document.createElement('div');
     const messagesEl = document.createElement('div');
+    messagesShellEl.appendChild(messagesEl);
+    parentEl.appendChild(messagesShellEl);
     messagesEl.className = 'opencodian-messages opencodian-messages--natural';
-    parentEl.appendChild(messagesEl);
     document.body.appendChild(parentEl);
 
     const scrollTo = jest.fn();
@@ -169,6 +174,7 @@ describe('NavigationSidebar', () => {
     setNumericProperty(messagesEl, 'scrollHeight', 1800);
     setNumericProperty(messagesEl, 'clientHeight', 500);
     setNumericProperty(messagesEl, 'scrollTop', 360);
+    setRect(messagesShellEl, 0, 500);
     setRect(messagesEl, 0, 500);
 
     const firstTurn = createTurn(messagesEl, 'first');
@@ -179,7 +185,7 @@ describe('NavigationSidebar', () => {
     setRect(secondTurn.turnEl, 80, 180);
     setRect(secondTurn.userMessageEl, 80, 48);
 
-    const sidebar = new NavigationSidebar(parentEl, messagesEl);
+    const sidebar = new NavigationSidebar(parentEl, messagesShellEl, messagesEl);
     const nextBtn = parentEl.querySelector('.opencodian-nav-btn-next') as HTMLButtonElement;
 
     nextBtn.click();

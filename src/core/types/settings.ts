@@ -45,11 +45,35 @@ export function normalizeThinkingBudget(value: unknown): ThinkingBudget {
   }
 }
 
+export function normalizeTabBarPosition(value: unknown): TabBarPosition {
+  switch (value) {
+    case 'input':
+    case 'header':
+    case 'below-header':
+      return value;
+    default:
+      return 'below-header';
+  }
+}
+
+export function normalizeBelowHeaderTabBarLayout(value: unknown): BelowHeaderTabBarLayout {
+  switch (value) {
+    case 'grid':
+    case 'vertical':
+      return value;
+    default:
+      return 'grid';
+  }
+}
+
 /** User decision from the approval modal */
 export type ApprovalDecision = 'allow' | 'allow-always' | 'deny' | 'cancel';
 
 /** Tab bar position setting */
-export type TabBarPosition = 'input' | 'header';
+export type TabBarPosition = 'input' | 'header' | 'below-header';
+
+/** Tab layout when mounted below the header */
+export type BelowHeaderTabBarLayout = 'grid' | 'vertical';
 
 /** Chat scroll effect */
 export type ChatScrollMode = 'natural' | 'sticky-basic' | 'sticky-mask';
@@ -442,6 +466,7 @@ export interface OpenCodianSettings {
   // UI settings
   maxTabs: number;
   tabBarPosition: TabBarPosition;
+  belowHeaderTabBarLayout: BelowHeaderTabBarLayout;
   enableAutoScroll: boolean;
   chatScrollMode: ChatScrollMode;
   chatAppearance: ChatAppearanceSettings;
@@ -505,7 +530,8 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
   allowedExportPaths: ['~/Desktop', '~/Downloads'],
 
   maxTabs: 3,
-  tabBarPosition: 'input',
+  tabBarPosition: 'below-header',
+  belowHeaderTabBarLayout: 'grid',
   enableAutoScroll: true,
   chatScrollMode: 'sticky-mask',
   chatAppearance: getDefaultChatAppearanceSettings(),

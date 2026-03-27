@@ -1137,10 +1137,25 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       .addDropdown((dropdown) => {
         dropdown.addOption('input', t('settings.ui.tabPosition.input'));
         dropdown.addOption('header', t('settings.ui.tabPosition.header'));
+        dropdown.addOption('below-header', t('settings.ui.tabPosition.belowHeader'));
         dropdown
           .setValue(this.plugin.settings.tabBarPosition)
           .onChange(async (value) => {
-            this.plugin.settings.tabBarPosition = value as 'input' | 'header';
+            this.plugin.settings.tabBarPosition = value as 'input' | 'header' | 'below-header';
+            await this.plugin.saveSettings();
+          });
+      });
+
+    new Setting(containerEl)
+      .setName(t('settings.ui.belowHeaderTabLayout.name'))
+      .setDesc(t('settings.ui.belowHeaderTabLayout.desc'))
+      .addDropdown((dropdown) => {
+        dropdown.addOption('grid', t('settings.ui.belowHeaderTabLayout.grid'));
+        dropdown.addOption('vertical', t('settings.ui.belowHeaderTabLayout.vertical'));
+        dropdown
+          .setValue(this.plugin.settings.belowHeaderTabBarLayout)
+          .onChange(async (value) => {
+            this.plugin.settings.belowHeaderTabBarLayout = value as 'grid' | 'vertical';
             await this.plugin.saveSettings();
           });
       });
