@@ -8,6 +8,56 @@
 
 ---
 
+## 2026-03-27 标签栏 Streaming 动画重构与多语言切换支持
+
+### 📋 本次开发目标
+
+1. 重构标签栏 streaming 状态动画，从 loader 图标改为 CSS conic-gradient 轨道光晕效果
+2. 支持语言切换时动态更新界面中的 tooltip 文本
+
+### ✅ 实现内容
+
+#### 1. Streaming 状态改为纯 CSS 轨道动画
+- 原实现：在 `.opencodian-tab-bar-state` 中放置 `loader-circle` 图标并旋转
+- 新实现：
+  - 新增 `.opencodian-tab-bar-badge-wrap` 包装器，包裹 badge 和 state
+  - streaming 时通过 `::before` 和 `::after` 伪元素渲染 `conic-gradient` 轨道
+  - 使用 `opencodian-tab-badge-orbit` 动画实现旋转光晕效果
+- 效果更柔和，与玻璃拟态风格更契合
+
+#### 2. 多语言切换时动态更新 Tooltip
+- `OpenCodianView` 新增成员变量引用：
+  - `newConversationBtnEl`
+  - `historyBtnEl`
+  - `settingsBtnEl`
+- 新增 `applyLocaleTexts()` 方法，在语言切换时更新所有按钮的 tooltip
+- 重构 `attachTooltipLabel` 为 `setTooltipLabel`，支持更新已有 tooltip 文本
+- `main.ts` 中 `onLocaleChange` 回调增加 `view.applyLocaleTexts()` 调用
+
+#### 3. 无障碍访问优化
+- 为 tooltip label span 添加 `data-tooltip-label="true"` 属性，便于查找和更新
+- 更新时复用已有 label 元素，避免重复创建
+
+#### 4. 样式微调
+- 调整 tab 阴影为内阴影风格，更符合当前玻璃拟态设计
+- 增加 tab bar 容器 padding，改善视觉边距
+- 优化 active tab 在 input 布局下的最大宽度限制
+- 移除 streaming 时的 loader 图标，改用纯 CSS 动画
+
+### 🧪 测试
+
+- 新增 `TabBar` 单测：验证 streaming 状态下 badge wrap 和 state 的渲染结构
+
+### 📁 涉及文件
+
+- `src/features/chat/OpenCodianView.ts`
+- `src/features/chat/tabs/TabBar.ts`
+- `src/main.ts`
+- `styles.css`
+- `tests/unit/features/chat/tabs/TabBar.test.ts`
+
+---
+
 ## 2026-03-27 设置面板滚动记忆修复与首次打开回流优化
 
 ### 📋 本次开发目标

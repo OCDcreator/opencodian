@@ -61,4 +61,17 @@ describe('TabBar', () => {
     expect(Array.from(tabButtons).every((button) => !button.classList.contains('opencodian-tooltip-trigger'))).toBe(true);
     expect(Array.from(tabButtons).some((button) => button.textContent?.includes('Tab 7'))).toBe(true);
   });
+
+  it('renders streaming state inside the badge wrap', () => {
+    const items = createItems(1, 0);
+    items[0].isStreaming = true;
+
+    const containerEl = renderTabBar(items, 'input');
+    const badgeWrap = containerEl.querySelector('.opencodian-tab-bar-badge-wrap');
+    const stateEl = badgeWrap?.querySelector('.opencodian-tab-bar-state');
+
+    expect(badgeWrap).not.toBeNull();
+    expect(stateEl).not.toBeNull();
+    expect(stateEl?.querySelector('svg')).toBeNull();
+  });
 });

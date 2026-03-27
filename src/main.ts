@@ -432,6 +432,7 @@ export default class OpenCodianPlugin extends Plugin {
       const view = leaf.view;
       if (view instanceof OpenCodianView) {
         if (applyUi) {
+          view.applyLocaleTexts();
           view.applyChatAppearanceSettings();
           view.applyChatScrollMode();
           view.applyTabBarLayout();

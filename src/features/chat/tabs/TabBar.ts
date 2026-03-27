@@ -117,7 +117,10 @@ export class TabBar {
       tabEl.addClass('needs-attention');
     }
 
-    const badgeEl = tabEl.createSpan({ cls: 'opencodian-tab-bar-badge', text: String(item.index) });
+    const badgeWrapEl = tabEl.createSpan({ cls: 'opencodian-tab-bar-badge-wrap' });
+    badgeWrapEl.setAttribute('aria-hidden', 'true');
+
+    const badgeEl = badgeWrapEl.createSpan({ cls: 'opencodian-tab-bar-badge', text: String(item.index) });
     badgeEl.setAttribute('aria-hidden', 'true');
 
     tabEl.createSpan({
@@ -125,11 +128,9 @@ export class TabBar {
       text: item.title,
     });
 
-    const stateEl = tabEl.createSpan({ cls: 'opencodian-tab-bar-state' });
+    const stateEl = badgeWrapEl.createSpan({ cls: 'opencodian-tab-bar-state' });
     stateEl.setAttribute('aria-hidden', 'true');
-    if (item.isStreaming) {
-      setIcon(stateEl, 'loader-circle');
-    } else if (item.needsAttention) {
+    if (item.needsAttention) {
       setIcon(stateEl, 'bell-ring');
     }
 

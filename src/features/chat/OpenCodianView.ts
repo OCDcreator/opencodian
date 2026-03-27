@@ -150,6 +150,9 @@ export class OpenCodianView extends ItemView {
   private inputTextarea: HTMLTextAreaElement | null = null;
   private serverStatusBadgeEl: HTMLElement | null = null;
   private serverStatusTextEl: HTMLElement | null = null;
+  private newConversationBtnEl: HTMLElement | null = null;
+  private historyBtnEl: HTMLElement | null = null;
+  private settingsBtnEl: HTMLElement | null = null;
   private serverStatusIntervalId: number | null = null;
   private isRefreshingServerStatus = false;
   private lastServerAvailability: ChatServerAvailability | null = null;
@@ -690,9 +693,7 @@ export class OpenCodianView extends ItemView {
 
     this.serverStatusBadgeEl = actions.createDiv({ cls: 'opencodian-server-status-badge is-checking' });
     this.serverStatusBadgeEl.addClass('opencodian-tooltip-trigger');
-    this.serverStatusBadgeEl.setAttribute('data-tooltip', t('chat.serverStatus.openSettings'));
-    this.serverStatusBadgeEl.setAttribute('data-tooltip-position', 'bottom');
-    this.attachTooltipLabel(this.serverStatusBadgeEl, t('chat.serverStatus.openSettings'));
+    this.setTooltipLabel(this.serverStatusBadgeEl, t('chat.serverStatus.openSettings'), 'bottom');
     this.serverStatusBadgeEl.createSpan({ cls: 'opencodian-server-status-dot' });
     this.serverStatusTextEl = this.serverStatusBadgeEl.createSpan({
       cls: 'opencodian-server-status-text',
@@ -703,34 +704,48 @@ export class OpenCodianView extends ItemView {
     });
 
     // New conversation button
-    const newBtn = actions.createDiv({ cls: 'opencodian-header-btn opencodian-tooltip-trigger' });
-    setIcon(newBtn, 'opencodian-circle-plus');
-    newBtn.setAttribute('data-tooltip', t('chat.tab.newTooltip'));
-    newBtn.setAttribute('data-tooltip-position', 'bottom');
-    this.attachTooltipLabel(newBtn, t('chat.tab.newTooltip'));
-    newBtn.addEventListener('click', () => {
+    this.newConversationBtnEl = actions.createDiv({ cls: 'opencodian-header-btn opencodian-tooltip-trigger' });
+    setIcon(this.newConversationBtnEl, 'opencodian-circle-plus');
+    this.setTooltipLabel(this.newConversationBtnEl, t('chat.tab.newTooltip'), 'bottom');
+    this.newConversationBtnEl.addEventListener('click', () => {
       void this.createNewConversation();
     });
 
     // History button
-    const historyBtn = actions.createDiv({ cls: 'opencodian-header-btn opencodian-tooltip-trigger' });
-    setIcon(historyBtn, 'history');
-    historyBtn.setAttribute('data-tooltip', t('chat.history.open'));
-    historyBtn.setAttribute('data-tooltip-position', 'bottom');
-    this.attachTooltipLabel(historyBtn, t('chat.history.open'));
-    historyBtn.addEventListener('click', (event) => {
+    this.historyBtnEl = actions.createDiv({ cls: 'opencodian-header-btn opencodian-tooltip-trigger' });
+    setIcon(this.historyBtnEl, 'history');
+    this.setTooltipLabel(this.historyBtnEl, t('chat.history.open'), 'bottom');
+    this.historyBtnEl.addEventListener('click', (event) => {
       this.showConversationHistory(event);
     });
 
     // Settings button
-    const settingsBtn = actions.createDiv({ cls: 'opencodian-header-btn opencodian-tooltip-trigger' });
-    setIcon(settingsBtn, 'settings');
-    settingsBtn.setAttribute('data-tooltip', t('chat.settings.open'));
-    settingsBtn.setAttribute('data-tooltip-position', 'bottom');
-    this.attachTooltipLabel(settingsBtn, t('chat.settings.open'));
-    settingsBtn.addEventListener('click', () => {
+    this.settingsBtnEl = actions.createDiv({ cls: 'opencodian-header-btn opencodian-tooltip-trigger' });
+    setIcon(this.settingsBtnEl, 'settings');
+    this.setTooltipLabel(this.settingsBtnEl, t('chat.settings.open'), 'bottom');
+    this.settingsBtnEl.addEventListener('click', () => {
       this.openPluginSettingsPreservingScroll();
     });
+  }
+
+  public applyLocaleTexts(): void {
+    if (this.serverStatusBadgeEl) {
+      this.setTooltipLabel(this.serverStatusBadgeEl, t('chat.serverStatus.openSettings'), 'bottom');
+    }
+
+    if (this.newConversationBtnEl) {
+      this.setTooltipLabel(this.newConversationBtnEl, t('chat.tab.newTooltip'), 'bottom');
+    }
+
+    if (this.historyBtnEl) {
+      this.setTooltipLabel(this.historyBtnEl, t('chat.history.open'), 'bottom');
+    }
+
+    if (this.settingsBtnEl) {
+      this.setTooltipLabel(this.settingsBtnEl, t('chat.settings.open'), 'bottom');
+    }
+
+    this.renderTabBar();
   }
 
   private openPluginSettingsPreservingScroll(): void {
@@ -793,7 +808,7 @@ export class OpenCodianView extends ItemView {
       );
       this.serverStatusBadgeEl.addClass(`is-${availability}`);
       this.serverStatusTextEl.setText(this.getServerStatusLabel(availability, statusKeyMap));
-      this.serverStatusBadgeEl.setAttribute('data-tooltip', t('chat.serverStatus.openSettings'));
+      this.setTooltipLabel(this.serverStatusBadgeEl, t('chat.serverStatus.openSettings'), 'bottom');
     } finally {
       this.isRefreshingServerStatus = false;
     }
@@ -2264,6 +2279,21 @@ export class OpenCodianView extends ItemView {
     });
   }
 
+  private setTooltipLabel(buttonEl: HTMLElement, label: string, position?: 'bottom' | 'top' | 'right'): void {
+    buttonEl.setAttribute('data-tooltip', label);
+    if (position) {
+      buttonEl.setAttribute('data-tooltip-position', position);
+    }
+
+    const existingLabelEl = buttonEl.querySelector('.opencodian-visually-hidden[data-tooltip-label="true"]');
+    if (existingLabelEl instanceof HTMLElement) {
+      existingLabelEl.textContent = label;
+      return;
+    }
+
+    this.attachTooltipLabel(buttonEl, label);
+  }
+
   private attachTooltipLabel(buttonEl: HTMLElement, label: string): void {
     const labelId = `opencodian-tooltip-label-${OpenCodianView.tooltipLabelId++}`;
     const labelEl = buttonEl.createSpan({
@@ -2271,6 +2301,7 @@ export class OpenCodianView extends ItemView {
       text: label,
     });
     labelEl.id = labelId;
+    labelEl.setAttribute('data-tooltip-label', 'true');
     buttonEl.setAttribute('aria-labelledby', labelId);
   }
 
