@@ -13,7 +13,7 @@ import * as path from 'path';
 
 import { createLogger } from '../../shared';
 import { parseOpencodeConfigText } from '../config/modelConfig';
-import type { OpenCodeServerConfig } from './types';
+import type { ManagedServerState, OpenCodeServerConfig } from './types';
 
 const logger = createLogger('ServerManager');
 
@@ -31,6 +31,11 @@ interface ServerManagerEvents {
   onError?: (error: Error) => void;
 }
 
+interface ServerManagerRuntimeOptions {
+  initialManagedServerState?: ManagedServerState | null;
+  onManagedServerStateChange?: (state: ManagedServerState | null) => void;
+}
+
 export class ServerManager {
   private config: OpenCodeServerConfig;
   private events: ServerManagerEvents;
@@ -38,13 +43,18 @@ export class ServerManager {
   private status: ServerStatus = 'stopped';
   private startPromise: Promise<void> | null = null;
   private workingDirectory: string | undefined;
+  private managedServerState: ManagedServerState | null;
+  private onManagedServerStateChange?: (state: ManagedServerState | null) => void;
 
   constructor(
     config: OpenCodeServerConfig,
-    events: ServerManagerEvents = {}
+    events: ServerManagerEvents = {},
+    runtimeOptions: ServerManagerRuntimeOptions = {},
   ) {
     this.config = { timeout: 30000, ...config };
     this.events = events;
+    this.managedServerState = runtimeOptions.initialManagedServerState ?? null;
+    this.onManagedServerStateChange = runtimeOptions.onManagedServerStateChange;
   }
 
   /** Set the working directory for the server (vault path) */
@@ -73,7 +83,7 @@ export class ServerManager {
 
   /** Check if server is running */
   isRunning(): boolean {
-    return this.status === 'running' && this.process !== null && !this.process.killed;
+    return this.status === 'running' && this.managedServerState !== null;
   }
 
   /** Update server configuration */
@@ -82,6 +92,10 @@ export class ServerManager {
       timeout: this.config.timeout ?? 30000,
       ...config,
     };
+  }
+
+  async canBindLocalEndpoint(host: string, port: number): Promise<boolean> {
+    return this.isPortAvailable(port, host);
   }
 
   /** Start the OpenCode server */
@@ -125,6 +139,13 @@ export class ServerManager {
         // Check if it's an existing OpenCode server
         const healthy = await this.checkHealth(5000);
         if (healthy) {
+          const adopted = await this.tryAdoptManagedServer();
+          if (adopted) {
+            logger.debug('Adopted previously managed OpenCode server on port', this.config.local.port);
+            this.setStatus('running');
+            return;
+          }
+
           logger.debug('OpenCode server already running on port', this.config.local.port);
           logger.debug('This server may have been started with different working directory/config');
           this.setStatus('running');
@@ -151,8 +172,7 @@ export class ServerManager {
 
   /** Stop the OpenCode server */
   async stop(): Promise<void> {
-    if (!this.process) {
-
+    if (!this.process && !this.managedServerState) {
       this.setStatus('stopped');
       return;
     }
@@ -165,12 +185,23 @@ export class ServerManager {
 
     this.setStatus('stopped');
 
+    const managedProcess = this.process;
+    const managedPid = this.managedServerState?.pid;
+
+    if (!managedProcess && managedPid) {
+      await this.terminateManagedPid(managedPid);
+      this.clearManagedServerState();
+      this.cleanup();
+      return;
+    }
+
     return new Promise((resolve) => {
       let resolved = false;
       
       const doResolve = () => {
         if (!resolved) {
           resolved = true;
+          this.clearManagedServerState();
           this.cleanup();
           resolve();
         }
@@ -180,29 +211,42 @@ export class ServerManager {
       const timeout = setTimeout(() => {
 
         try {
-          // Try SIGKILL on Unix, or terminate on Windows
-          const killed = this.process?.kill(process.platform === 'win32' ? undefined : 'SIGKILL');
+          if (process.platform === 'win32') {
+            void this.killWindowsProcessTree(managedProcess.pid).finally(doResolve);
+            return;
+          }
+
+          const killed = managedProcess.kill('SIGKILL');
           if (!killed) {
             logger.warn('Process kill returned false, process may have already exited');
           }
         } catch (e) {
           logger.error('Error killing process:', e);
+          doResolve();
         }
-        doResolve();
       }, 5000);
 
       // Listen for process exit
-      this.process?.once('exit', (_code, _signal) => {
+      managedProcess.once('exit', (_code, _signal) => {
 
         clearTimeout(timeout);
         doResolve();
       });
 
       // Try graceful shutdown first
-      try {
-        const terminated = this.process?.kill(process.platform === 'win32' ? undefined : 'SIGTERM');
+      if (process.platform === 'win32') {
+        void this.killWindowsProcessTree(managedProcess.pid).then((terminated) => {
+          if (!terminated) {
+            clearTimeout(timeout);
+            doResolve();
+          }
+        });
+        return;
+      }
 
-        
+      try {
+        const terminated = managedProcess.kill('SIGTERM');
+
         // If kill returns false, the process might already be dead
         if (terminated === false) {
           clearTimeout(timeout);
@@ -276,6 +320,7 @@ export class ServerManager {
           cwd: this.workingDirectory,
           env: this.getSpawnEnv(),
         });
+        this.setManagedServerState(this.process.pid);
 
         // Handle process events
         this.process.on('error', (error) => {
@@ -283,6 +328,7 @@ export class ServerManager {
         });
 
         this.process.on('exit', (code, _signal) => {
+          this.clearManagedServerState();
           if (code !== 0 && code !== null) {
             this.events.onError?.(new Error(`Server exited with code ${code}`));
           }
@@ -343,7 +389,7 @@ export class ServerManager {
     return candidates[0];
   }
 
-  private async isPortAvailable(port: number): Promise<boolean> {
+  private async isPortAvailable(port: number, host = this.config.local.host): Promise<boolean> {
     return new Promise((resolve) => {
       const tester = net.createServer()
         .once('error', () => resolve(false))
@@ -351,7 +397,7 @@ export class ServerManager {
           tester.close();
           resolve(true);
         })
-        .listen(port, this.config.local.host);
+        .listen(port, host);
     });
   }
 
@@ -379,6 +425,158 @@ export class ServerManager {
   private cleanup(): void {
     this.process = null;
     this.setStatus('stopped');
+  }
+
+  private setManagedServerState(pid: number | undefined): void {
+    if (!pid) {
+      this.clearManagedServerState();
+      return;
+    }
+
+    this.managedServerState = {
+      pid,
+      host: this.config.local.host,
+      port: this.config.local.port,
+    };
+    this.onManagedServerStateChange?.(this.managedServerState);
+  }
+
+  private clearManagedServerState(): void {
+    if (!this.managedServerState) {
+      return;
+    }
+
+    this.managedServerState = null;
+    this.onManagedServerStateChange?.(null);
+  }
+
+  private async tryAdoptManagedServer(): Promise<boolean> {
+    const state = this.managedServerState;
+    if (!state) {
+      return false;
+    }
+
+    if (state.port !== this.config.local.port || state.host !== this.config.local.host) {
+      return false;
+    }
+
+    const commandLine = await this.getProcessCommandLine(state.pid);
+    if (!commandLine) {
+      this.clearManagedServerState();
+      return false;
+    }
+
+    const normalizedCommand = commandLine.toLowerCase();
+    const host = this.config.local.host.toLowerCase();
+    const looksLikeOpenCodeServe =
+      normalizedCommand.includes('opencode')
+      && normalizedCommand.includes(' serve')
+      && (
+        normalizedCommand.includes(`--port ${this.config.local.port}`)
+        || normalizedCommand.includes(`--port=${this.config.local.port}`)
+      )
+      && (
+        normalizedCommand.includes(`--hostname ${host}`)
+        || normalizedCommand.includes(`--hostname=${host}`)
+      );
+
+    if (!looksLikeOpenCodeServe) {
+      this.clearManagedServerState();
+      return false;
+    }
+
+    this.onManagedServerStateChange?.(state);
+    return true;
+  }
+
+  private killWindowsProcessTree(pid: number | undefined): Promise<boolean> {
+    if (!pid) {
+      return Promise.resolve(false);
+    }
+
+    return new Promise((resolve) => {
+      const killer = spawn('taskkill', ['/PID', String(pid), '/T', '/F'], {
+        stdio: 'ignore',
+        windowsHide: true,
+      });
+
+      killer.once('error', (error) => {
+        logger.error('Failed to run taskkill for OpenCode process tree:', error);
+        resolve(false);
+      });
+
+      killer.once('exit', (code) => {
+        if (code !== 0) {
+          logger.warn(`taskkill exited with code ${code} while stopping OpenCode`);
+          resolve(false);
+          return;
+        }
+
+        resolve(true);
+      });
+    });
+  }
+
+  private async terminateManagedPid(pid: number): Promise<void> {
+    if (process.platform === 'win32') {
+      await this.killWindowsProcessTree(pid);
+      return;
+    }
+
+    try {
+      process.kill(pid, 'SIGTERM');
+    } catch (error) {
+      logger.error('Error sending SIGTERM to adopted OpenCode process:', error);
+      return;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
+    try {
+      process.kill(pid, 0);
+      process.kill(pid, 'SIGKILL');
+    } catch {
+      // Process already exited after SIGTERM.
+    }
+  }
+
+  private getProcessCommandLine(pid: number): Promise<string | null> {
+    if (process.platform === 'win32') {
+      return this.captureCommandOutput(
+        'powershell',
+        [
+          '-NoProfile',
+          '-Command',
+          `$p = Get-CimInstance Win32_Process -Filter "ProcessId = ${pid}" -ErrorAction SilentlyContinue; if ($p) { $p.CommandLine }`,
+        ],
+      );
+    }
+
+    return this.captureCommandOutput('ps', ['-p', String(pid), '-o', 'command=']);
+  }
+
+  private captureCommandOutput(command: string, args: string[]): Promise<string | null> {
+    return new Promise((resolve) => {
+      let stdout = '';
+      const child = spawn(command, args, {
+        stdio: ['ignore', 'pipe', 'ignore'],
+        windowsHide: true,
+      });
+
+      child.stdout?.on('data', (data) => {
+        stdout += data.toString();
+      });
+
+      child.once('error', () => resolve(null));
+      child.once('exit', (code) => {
+        if (code !== 0) {
+          resolve(null);
+          return;
+        }
+
+        resolve(stdout.trim() || null);
+      });
+    });
   }
 
   private getAuthHeaders(): Record<string, string> | undefined {

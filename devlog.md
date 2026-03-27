@@ -8,6 +8,103 @@
 
 ---
 
+## 2026-03-27 本地 OpenCode 托管认领、端口切换与设置页性能优化
+
+### 📋 本次开发目标
+围绕本地 OpenCode 服务的实际使用问题做一轮稳定性与可观测性修复，重点解决：
+
+1. 本地服务在 Obsidian 重载后被误判为“外部服务”
+2. 切换模型来源、切换端口时的状态不清晰、失败提示不明确
+3. 设置页记忆滚动位置与模型刷新导致的 UI 抖动、强制回流和日志噪音
+
+### ✅ 实现内容
+
+#### 1. 本地服务状态语义重构
+- 将本地运行态明确区分为：
+  - `运行中（插件托管）`
+  - `运行中（外部接管）`
+- 聊天视图状态徽标同步细化为：
+  - `本地托管`
+  - `本地外部`
+  - `远程已连接`
+- 避免本地 `127.0.0.1` 上已有服务时仍然被笼统显示为普通“运行中”
+
+#### 2. 重载 Obsidian 后认领旧的本地托管进程
+- 新增运行态持久化文件 `.opencodian/runtime.json`
+- 记录插件托管 OpenCode 的 PID、host、port
+- 插件重载后如果检测到同一 PID 仍然存活，且命令行仍匹配当前 `opencode serve --port --hostname`，则自动认领为当前托管实例
+- 认领成功后，停止/重启按钮仍可继续管理该服务，而不是退化为“本地外部”
+
+#### 3. Windows 停服逻辑增强
+- 本地托管服务停止时，Windows 下改为使用 `taskkill /PID ... /T /F`
+- 终止完整 OpenCode 进程树，减少重载 Obsidian 后旧服务残留
+- 对已认领但当前实例没有 `ChildProcess` 句柄的 PID，也支持按 PID 停止
+
+#### 4. 端口切换行为收紧
+- 修复 `OpenCodeService` 与插件设置对象共享引用导致的“旧端口/新端口比较失效”问题
+- 切换本地主机或端口前，先检测目标端口是否可绑定
+- 如果目标端口已被占用：
+  - 明确抛错并提示
+  - 不再静默接管该端口上的健康 OpenCode 实例
+- 如果切换失败：
+  - 回滚内部设置快照
+  - 尝试恢复原本的本地服务
+- 设置页的 host/port 输入框改为“提交时生效”，不再每输入一个字符就触发保存与重启
+
+#### 5. 设置页服务状态与模型面板优化
+- 设置页服务状态文案按本地托管 / 本地外部 / 远程连接正常重新整理
+- 模型来源与服务状态切换时，提示信息更贴近真实状态
+- 模型面板刷新做单帧合并，减少短时间重复重建 DOM
+
+#### 6. 设置页记忆滚动位置的性能优化
+- 设置页打开时，滚动恢复逻辑由多次 `scrollTop` 重写收敛为“主恢复 + 轻量兜底”
+- 缓存设置页滚动容器，避免在打开设置按钮时沿父节点链反复 `getComputedStyle`
+- 保留“记忆上次滚动位置”的功能，同时降低 `Forced reflow` 出现概率
+
+#### 7. 模型刷新与图标日志去重
+- `onModelsLoaded` 不再直接走整套重型 `saveSettings() + syncOpencodeConfig() + 全视图重刷` 链路
+- 服务启动后，只在默认模型实际变化时做轻量持久化
+- 聊天视图模型按钮图标在 URL 未变化时不再重复重建 DOM
+- `ProviderIconService` 增加日志去重缓存：
+  - 同一个 provider 的 icon URL 不变时，不再重复输出 `Icon for xxx: ...`
+
+#### 8. 用户消息底部操作区样式整理
+- 调整用户消息底部的复制、回退、分叉按钮布局
+- 将复制按钮逻辑抽离为可复用的行为方法
+- 统一用户消息 footer 与时间戳样式，减少消息 hover 时的布局跳动
+
+### 📁 涉及文件
+
+| 文件 | 修改内容 |
+|------|----------|
+| `src/core/opencode/OpenCodeService.ts` | 设置快照隔离、端口切换预检查、失败回滚 |
+| `src/core/opencode/ServerManager.ts` | 托管 PID 认领、Windows 进程树终止、端口占用判断增强 |
+| `src/core/opencode/types.ts` | 新增 `ManagedServerState` |
+| `src/core/storage/StorageService.ts` | 新增运行态文件读写 |
+| `src/features/settings/OpenCodianSettings.ts` | 服务状态文案、host/port 提交流程、模型刷新合并、滚动恢复优化 |
+| `src/features/chat/OpenCodianView.ts` | 模型选择器图标去重更新、用户消息 footer 与复制逻辑整理 |
+| `src/main.ts` | `onModelsLoaded` 轻量化、视图刷新拆分、设置保存流程调整 |
+| `src/utils/icons/ProviderIconService.ts` | icon URL debug 日志去重 |
+| `src/i18n/locales/en.ts` | 新增服务状态与端口提示文案 |
+| `src/i18n/locales/zh.ts` | 新增服务状态与端口提示文案 |
+| `styles.css` | 用户消息底部操作区与复制按钮样式调整 |
+| `tests/unit/core/storage/StorageService.test.ts` | 运行态托管 PID 存储测试 |
+
+### 🧪 验证结果
+
+- ✅ `npm run build`
+- ✅ `npm run test -- OpenCodeService.test.ts StorageService.test.ts`
+- ✅ 已多次部署到测试库：`C:\Users\lt\Desktop\Write\testvault\.obsidian\plugins\opencodian\`
+
+### 📌 当前收益
+
+- 本地 OpenCode 服务在重载后更容易继续保持“托管”语义
+- 端口切换失败时不再悄悄失效，错误提示更明确
+- 设置页打开与模型刷新时的重复重绘和日志噪音明显减少
+- 控制台输出更容易区分“插件重复加载”与“同一 UI 重复请求图标”
+
+---
+
 ## 2026-03-27 Logger 控制台输出增加时间戳
 
 ### 📋 本次开发目标

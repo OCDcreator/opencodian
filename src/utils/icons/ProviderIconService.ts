@@ -8,6 +8,7 @@
 import { createLogger } from '../../shared';
 
 const logger = createLogger('ProviderIconService');
+const loggedIconUrls = new Map<string, string | null>();
 
 // Map provider IDs to Lobehub icon IDs
 const PROVIDER_ICON_MAP: Record<string, string> = {
@@ -633,11 +634,17 @@ export class ProviderIconService {
   static getIconUrl(providerId: string): string | null {
     const iconId = this.getIconId(providerId);
     if (!iconId) {
-      logger.debug(`No icon found for: ${providerId}`);
+      if (loggedIconUrls.get(providerId) !== null) {
+        logger.debug(`No icon found for: ${providerId}`);
+        loggedIconUrls.set(providerId, null);
+      }
       return null;
     }
     const url = `${LOBEHUB_CDN_BASE}/${iconId}.svg`;
-    logger.debug(`Icon for ${providerId}: ${url}`);
+    if (loggedIconUrls.get(providerId) !== url) {
+      logger.debug(`Icon for ${providerId}: ${url}`);
+      loggedIconUrls.set(providerId, url);
+    }
     return url;
   }
   

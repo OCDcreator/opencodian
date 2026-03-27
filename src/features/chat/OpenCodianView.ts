@@ -121,6 +121,7 @@ export class OpenCodianView extends ItemView {
   private isModelDropdownOpen = false;
   private modelFilterQuery = '';
   private modelDropdownClickOutsideHandler: ((e: MouseEvent) => void) | null = null;
+  private currentModelTriggerIconUrl: string | null = null;
 
   // Streaming content state
   private streamController: StreamController | null = null;
@@ -654,10 +655,17 @@ export class OpenCodianView extends ItemView {
     availability: ChatServerAvailability,
     statusKeyMap: Record<ChatServerAvailability, 'chat.serverStatus.checking' | 'chat.serverStatus.running' | 'chat.serverStatus.starting' | 'chat.serverStatus.offline' | 'chat.serverStatus.external'>
   ): string {
+    if (this.plugin.settings.server.mode === 'local') {
+      if (availability === 'running') {
+        return t('chat.serverStatus.localManaged');
+      }
+      if (availability === 'external') {
+        return t('chat.serverStatus.localExternal');
+      }
+    }
+
     if (availability === 'running' || availability === 'external') {
-      return this.plugin.settings.server.mode === 'local'
-        ? t('chat.serverStatus.local')
-        : t('chat.serverStatus.remote');
+      return t('chat.serverStatus.remoteConnected');
     }
 
     return t(statusKeyMap[availability]);
@@ -1904,10 +1912,8 @@ export class OpenCodianView extends ItemView {
           showMoreLabel: t('chat.action.showMore'),
           showLessLabel: t('chat.action.showLess'),
         });
-        // Add copy button for user message (outside bubble)
-        this.addTextCopyButton(messageEl, message.content, true);
       }
-      this.addUserMessageFooter(messageEl, message);
+      this.addUserMessageFooter(messageEl, message, message.content);
     } else if (message.displayStyle === 'notice') {
       messageEl.addClass('opencodian-message--notice');
       this.renderNoticeCard(content, message);
@@ -2044,19 +2050,7 @@ export class OpenCodianView extends ItemView {
     inputEl.textContent = JSON.stringify(input, null, 2);
   }
 
-  /**
-   * Adds a copy button to a message element (outside the bubble).
-   * Button shows clipboard icon on hover, changes to "copied!" on click.
-   * @param messageEl The message element container
-   * @param content The original text content to copy
-   * @param isUser Whether this is a user message (affects positioning)
-   */
-  private addTextCopyButton(messageEl: HTMLElement, content: string, isUser: boolean): void {
-    const copyBtn = messageEl.createSpan({ 
-      cls: `opencodian-copy-btn ${isUser ? 'opencodian-copy-btn--user' : 'opencodian-copy-btn--assistant'}` 
-    });
-    copyBtn.innerHTML = COPY_ICON;
-
+  private attachCopyButtonBehavior(copyBtn: HTMLElement, content: string): void {
     let feedbackTimeout: ReturnType<typeof setTimeout> | null = null;
 
     copyBtn.addEventListener('click', async (e) => {
@@ -2116,70 +2110,59 @@ export class OpenCodianView extends ItemView {
     // Copy button
     const copyBtn = timeRow.createSpan({ cls: 'opencodian-copy-btn-inline' });
     copyBtn.innerHTML = COPY_ICON;
-
-    let feedbackTimeout: ReturnType<typeof setTimeout> | null = null;
-
-    copyBtn.addEventListener('click', async (e) => {
-      e.stopPropagation();
-
-      try {
-        await navigator.clipboard.writeText(content);
-      } catch {
-        return;
-      }
-
-      if (feedbackTimeout) {
-        clearTimeout(feedbackTimeout);
-      }
-
-      copyBtn.innerHTML = '';
-      copyBtn.setText('copied!');
-      copyBtn.classList.add('copied');
-
-      feedbackTimeout = setTimeout(() => {
-        copyBtn.innerHTML = COPY_ICON;
-        copyBtn.classList.remove('copied');
-        feedbackTimeout = null;
-      }, 1500);
-    });
+    this.attachCopyButtonBehavior(copyBtn, content);
   }
 
-  private addUserMessageFooter(messageEl: HTMLElement, message: ChatMessage): void {
-    const footerEl = messageEl.createDiv({ cls: 'opencodian-message-time-row opencodian-message-time-row--user' });
+  private addUserMessageFooter(messageEl: HTMLElement, message: ChatMessage, content?: string): void {
+    const footerEl = messageEl.createDiv({ cls: 'opencodian-user-message-footer' });
+    const hasActions = Boolean(content) || Boolean(message.sourceMessageId);
+
+    if (hasActions) {
+      const actionsEl = footerEl.createDiv({ cls: 'opencodian-user-message-actions' });
+
+      if (content) {
+        const copyBtn = actionsEl.createEl('button', {
+          cls: 'opencodian-copy-btn-inline opencodian-copy-btn-inline--user',
+          attr: {
+            type: 'button',
+            'aria-label': t('chat.action.copy'),
+          },
+        });
+        copyBtn.innerHTML = COPY_ICON;
+        this.attachCopyButtonBehavior(copyBtn, content);
+      }
+
+      if (message.sourceMessageId) {
+        const rewindBtn = actionsEl.createEl('button', {
+          cls: 'opencodian-user-action-btn',
+          text: t('chat.rewind.button'),
+          attr: { type: 'button' },
+        });
+        rewindBtn.disabled = this.isStreaming;
+        rewindBtn.addEventListener('click', (event) => {
+          event.stopPropagation();
+          void this.handleRewindRequest(message);
+        });
+
+        const forkBtn = actionsEl.createEl('button', {
+          cls: 'opencodian-user-action-btn',
+          text: t('chat.fork.button'),
+          attr: { type: 'button' },
+        });
+        forkBtn.disabled = this.isStreaming;
+        forkBtn.addEventListener('click', (event) => {
+          event.stopPropagation();
+          void this.handleForkRequest(message);
+        });
+      }
+    }
 
     const timeStr = new Date(message.timestamp).toLocaleTimeString([], {
       hour: '2-digit',
       minute: '2-digit',
     });
-    footerEl.createSpan({ cls: 'opencodian-message-time-text', text: timeStr });
-
-    if (!message.sourceMessageId) {
-      return;
-    }
-
-    const actionsEl = footerEl.createDiv({ cls: 'opencodian-user-message-actions' });
-
-    const rewindBtn = actionsEl.createEl('button', {
-      cls: 'opencodian-user-action-btn',
-      text: t('chat.rewind.button'),
-      attr: { type: 'button' },
-    });
-    rewindBtn.disabled = this.isStreaming;
-    rewindBtn.addEventListener('click', (event) => {
-      event.stopPropagation();
-      void this.handleRewindRequest(message);
-    });
-
-    const forkBtn = actionsEl.createEl('button', {
-      cls: 'opencodian-user-action-btn',
-      text: t('chat.fork.button'),
-      attr: { type: 'button' },
-    });
-    forkBtn.disabled = this.isStreaming;
-    forkBtn.addEventListener('click', (event) => {
-      event.stopPropagation();
-      void this.handleForkRequest(message);
-    });
+    const timeEl = footerEl.createSpan({ cls: 'opencodian-message-time-text', text: timeStr });
+    timeEl.addClass('opencodian-user-message-time');
   }
 
   private async handleRewindRequest(message: ChatMessage): Promise<void> {
@@ -2816,19 +2799,30 @@ export class OpenCodianView extends ItemView {
     // Update provider icon using Lobehub icons
     const iconWrapper = this.modelSelectorTrigger.querySelector('.opencodian-model-trigger-icon');
     if (iconWrapper) {
-      iconWrapper.empty();
-      
-      // Try to get Lobehub icon
       const iconUrl = current ? ProviderIconService.getIconUrl(current.provider) : null;
-      if (iconUrl) {
-        const img = document.createElement('img');
-        img.src = iconUrl;
-        img.alt = modelInfo?.providerName || current?.provider || 'model';
-        img.title = modelInfo?.providerName || current?.provider || 'model';
-        iconWrapper.appendChild(img);
-      } else {
-        // Fallback to Obsidian icon
-        setIcon(iconWrapper as HTMLElement, 'bot');
+      const iconLabel = modelInfo?.providerName || current?.provider || 'model';
+
+      if (iconUrl !== this.currentModelTriggerIconUrl) {
+        iconWrapper.empty();
+
+        if (iconUrl) {
+          const img = document.createElement('img');
+          img.src = iconUrl;
+          img.alt = iconLabel;
+          img.title = iconLabel;
+          iconWrapper.appendChild(img);
+        } else {
+          // Fallback to Obsidian icon
+          setIcon(iconWrapper as HTMLElement, 'bot');
+        }
+
+        this.currentModelTriggerIconUrl = iconUrl;
+      } else if (iconUrl) {
+        const existingImg = iconWrapper.querySelector('img');
+        if (existingImg) {
+          existingImg.alt = iconLabel;
+          existingImg.title = iconLabel;
+        }
       }
     }
 

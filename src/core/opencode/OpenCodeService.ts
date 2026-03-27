@@ -13,9 +13,13 @@ import type { ChatMessage, ContentBlock, ImageAttachment, PermissionReply, Permi
 import type { OpenCodianSettings } from '../types/settings';
 import { getServerBaseUrl, isLocalServerMode } from '../types/settings';
 import { ServerManager } from './ServerManager';
-import type { OpenCodeServerConfig, QueryOptions, ResponseHandler } from './types';
+import type { ManagedServerState, OpenCodeServerConfig, QueryOptions, ResponseHandler } from './types';
 
 const logger = createLogger('OpenCodeService');
+
+function cloneSettings(settings: OpenCodianSettings): OpenCodianSettings {
+  return JSON.parse(JSON.stringify(settings)) as OpenCodianSettings;
+}
 
 /** SSE Event types from OpenCode server */
 interface SSEEvent {
@@ -78,6 +82,11 @@ interface OpenCodeServiceEvents {
   onModelsLoaded?: (providers: Array<{ id: string; name: string; models: Array<{ id: string; name: string }> }>) => void;
 }
 
+interface OpenCodeServiceRuntimeOptions {
+  initialManagedServerState?: ManagedServerState | null;
+  onManagedServerStateChange?: (state: ManagedServerState | null) => void;
+}
+
 /** Session data structure */
 interface Session {
   id: string;
@@ -120,23 +129,34 @@ export class OpenCodeService {
   private partTypeMap: Map<string, string> = new Map(); // Track part types by partID
   private currentAbortController: AbortController | null = null; // For cancelling streams
 
-  constructor(settings: OpenCodianSettings, events: OpenCodeServiceEvents = {}) {
-    this.settings = settings;
+  constructor(
+    settings: OpenCodianSettings,
+    events: OpenCodeServiceEvents = {},
+    runtimeOptions: OpenCodeServiceRuntimeOptions = {},
+  ) {
+    this.settings = cloneSettings(settings);
     this.events = events;
     this.baseUrl = getServerBaseUrl(settings.server);
 
-    this.serverManager = new ServerManager(this.buildServerConfig(settings), {
-      onStatusChange: (status) => {
-        events.onServerStatusChange?.(status);
-        // Auto-fetch models when server starts running
-        if (status === 'running') {
-          void this.autoFetchModels();
-        }
+    this.serverManager = new ServerManager(
+      this.buildServerConfig(settings),
+      {
+        onStatusChange: (status) => {
+          events.onServerStatusChange?.(status);
+          // Auto-fetch models when server starts running
+          if (status === 'running') {
+            void this.autoFetchModels();
+          }
+        },
+        onError: (error) => {
+          events.onError?.(error);
+        },
       },
-      onError: (error) => {
-        events.onError?.(error);
+      {
+        initialManagedServerState: runtimeOptions.initialManagedServerState,
+        onManagedServerStateChange: runtimeOptions.onManagedServerStateChange,
       },
-    });
+    );
   }
 
   /** Initialize the service */
@@ -149,6 +169,10 @@ export class OpenCodeService {
   /** Set the vault path for OpenCode server to use project config */
   setVaultPath(path: string): void {
     this.serverManager.setWorkingDirectory(path);
+  }
+
+  getSettingsSnapshot(): OpenCodianSettings {
+    return cloneSettings(this.settings);
   }
 
   /** Auto-fetch models when server starts and update defaults if needed */
@@ -868,7 +892,7 @@ export class OpenCodeService {
   }
 
   /** Update settings */
-  updateSettings(settings: OpenCodianSettings): void {
+  async updateSettings(settings: OpenCodianSettings): Promise<void> {
     const previousSettings = this.settings;
     const previousMode = previousSettings.server.mode;
     const nextMode = settings.server.mode;
@@ -894,17 +918,48 @@ export class OpenCodeService {
       previousMode === 'local' &&
       nextMode !== 'local';
 
-    this.settings = settings;
-    this.baseUrl = getServerBaseUrl(settings.server);
-    this.serverManager.updateConfig(this.buildServerConfig(settings));
-
-    if (shouldStopManagedServer) {
-      void this.serverManager.stop();
-      return;
+    if (
+      this.serverManager.isRunning() &&
+      previousMode === 'local' &&
+      nextMode === 'local' &&
+      serverConfigChanged
+    ) {
+      const endpointAvailable = await this.serverManager.canBindLocalEndpoint(
+        settings.server.local.host,
+        settings.server.local.port,
+      );
+      if (!endpointAvailable) {
+        throw new Error(`Cannot switch to ${settings.server.local.host}:${settings.server.local.port}. The target port is already in use.`);
+      }
     }
 
-    if (shouldRestartManagedServer) {
-      void this.serverManager.restart();
+    const nextSettings = cloneSettings(settings);
+    const previousBaseUrl = this.baseUrl;
+    this.settings = nextSettings;
+    this.baseUrl = getServerBaseUrl(nextSettings.server);
+    this.serverManager.updateConfig(this.buildServerConfig(nextSettings));
+
+    try {
+      if (shouldStopManagedServer) {
+        await this.serverManager.stop();
+        return;
+      }
+
+      if (shouldRestartManagedServer) {
+        await this.serverManager.restart();
+      }
+    } catch (error) {
+      this.settings = previousSettings;
+      this.baseUrl = previousBaseUrl;
+      this.serverManager.updateConfig(this.buildServerConfig(previousSettings));
+      if (previousMode === 'local' && (shouldRestartManagedServer || shouldStopManagedServer)) {
+        try {
+          await this.serverManager.start();
+        } catch (restoreError) {
+          logger.error('Failed to restore previous OpenCode server after settings update failure:', restoreError);
+        }
+      }
+      throw error;
     }
   }
 

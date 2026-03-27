@@ -84,6 +84,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
   private refreshModelsCallback?: () => void;
   private refreshServerStatusCallback?: () => Promise<void>;
   private serverStatusIntervalId: number | null = null;
+  private modelRefreshFrameId: number | null = null;
   private activeModelCatalogTab: 'local' | 'server' | 'effective' = 'effective';
   private settingsScrollHandler?: () => void;
   private settingsScrollContainerEl: HTMLElement | null = null;
@@ -98,8 +99,14 @@ export class OpenCodianSettingTab extends PluginSettingTab {
 
   /** Called when models are auto-loaded - refreshes the model dropdowns */
   onModelsLoaded(): void {
-    // This will be set to the loadAvailableModels function in addModelSettings
-    this.refreshModelsCallback?.();
+    if (this.modelRefreshFrameId !== null) {
+      window.cancelAnimationFrame(this.modelRefreshFrameId);
+    }
+
+    this.modelRefreshFrameId = window.requestAnimationFrame(() => {
+      this.modelRefreshFrameId = null;
+      this.refreshModelsCallback?.();
+    });
   }
 
   refreshServerStatusDisplay(): void {
@@ -274,32 +281,87 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       const hostSetting = new Setting(containerEl)
         .setName(t('settings.server.host.name'))
         .setDesc(t('settings.server.host.desc'))
-        .addText((text) =>
+        .addText((text) => {
+          const commitHostChange = async () => {
+            const nextHost = text.inputEl.value.trim() || '127.0.0.1';
+            if (nextHost === this.plugin.settings.server.local.host) {
+              text.setValue(nextHost);
+              return;
+            }
+
+            this.plugin.settings.server.local.host = nextHost;
+            try {
+              await this.plugin.saveSettings();
+              text.setValue(this.plugin.settings.server.local.host);
+            } catch (error) {
+              text.setValue(this.plugin.settings.server.local.host);
+              new Notice(error instanceof Error ? error.message : t('settings.server.startFailed'));
+            }
+          };
+
           text
             .setPlaceholder('127.0.0.1')
-            .setValue(this.plugin.settings.server.local.host)
-            .onChange(async (value) => {
-              this.plugin.settings.server.local.host = value || '127.0.0.1';
-              await this.plugin.saveSettings();
-            })
-        );
+            .setValue(this.plugin.settings.server.local.host);
+          text.inputEl.addEventListener('change', () => {
+            void commitHostChange();
+          });
+          text.inputEl.addEventListener('blur', () => {
+            void commitHostChange();
+          });
+          text.inputEl.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+              event.preventDefault();
+              text.inputEl.blur();
+            }
+          });
+        });
       this.addServerHelpButton(hostSetting, 'host');
 
       const portSetting = new Setting(containerEl)
         .setName(t('settings.server.port.name'))
         .setDesc(t('settings.server.port.desc'))
-        .addText((text) =>
+        .addText((text) => {
+          const commitPortChange = async () => {
+            const value = text.inputEl.value.trim();
+            const port = parseInt(value, 10);
+            if (Number.isNaN(port) || port <= 0 || port >= 65536) {
+              text.setValue(String(this.plugin.settings.server.local.port));
+              new Notice(t('settings.server.port.invalid'));
+              return;
+            }
+
+            if (port === this.plugin.settings.server.local.port) {
+              text.setValue(String(port));
+              return;
+            }
+
+            this.plugin.settings.server.local.port = port;
+            try {
+              await this.plugin.saveSettings();
+              text.setValue(String(this.plugin.settings.server.local.port));
+              new Notice(t('settings.server.port.updated', { port: String(port) }));
+            } catch (error) {
+              text.setValue(String(this.plugin.settings.server.local.port));
+              new Notice(error instanceof Error ? error.message : t('settings.server.startFailed'));
+            }
+          };
+
           text
             .setPlaceholder('4096')
-            .setValue(String(this.plugin.settings.server.local.port))
-            .onChange(async (value) => {
-              const port = parseInt(value, 10);
-              if (!isNaN(port) && port > 0 && port < 65536) {
-                this.plugin.settings.server.local.port = port;
-                await this.plugin.saveSettings();
-              }
-            })
-        );
+            .setValue(String(this.plugin.settings.server.local.port));
+          text.inputEl.addEventListener('change', () => {
+            void commitPortChange();
+          });
+          text.inputEl.addEventListener('blur', () => {
+            void commitPortChange();
+          });
+          text.inputEl.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+              event.preventDefault();
+              text.inputEl.blur();
+            }
+          });
+        });
       this.addServerHelpButton(portSetting, 'port');
     } else {
       const remoteUrlSetting = new Setting(containerEl)
@@ -412,19 +474,34 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       // Check if server is external (running but plugin has no process)
       isExternalServer = isHealthy && (internalStatus === 'stopped' || !this.plugin.openCodeService.isServerProcessRunning());
       
-      // Determine display status
-      const displayStatus = isHealthy ? 'running' : 
-                           (internalStatus === 'starting' ? 'starting' : 'stopped');
-      
-      const statusKey = `settings.server.status.${displayStatus}` as const;
-      const statusText = t(statusKey) || displayStatus;
-      const serverScopeText = isLocalMode
-        ? t('settings.server.status.scope.local')
-        : t('settings.server.status.scope.remote');
+      const statusText = (() => {
+        if (isLocalMode) {
+          if (isHealthy && isExternalServer) {
+            return t('settings.server.status.localExternal');
+          }
+          if (isHealthy) {
+            return t('settings.server.status.localManaged');
+          }
+          if (internalStatus === 'starting' || internalStatus === 'restarting') {
+            return t('settings.server.status.starting');
+          }
+          return t('settings.server.status.stopped');
+        }
+
+        if (isHealthy) {
+          return t('settings.server.status.remoteConnected');
+        }
+
+        if (internalStatus === 'starting' || internalStatus === 'restarting') {
+          return t('settings.server.status.starting');
+        }
+
+        return t('settings.server.status.stopped');
+      })();
       
       // Update description with status and external warning if applicable
       const healthIndicator = isHealthy ? '🟢' : '🔴';
-      let descText = `${t('settings.server.status.desc')} - ${healthIndicator} ${statusText} ${serverScopeText}`;
+      let descText = `${t('settings.server.status.desc')} - ${healthIndicator} ${statusText}`;
       if (isLocalMode && isExternalServer) {
         descText += ` (${t('settings.server.external.title')})`;
       }
@@ -498,18 +575,17 @@ export class OpenCodianSettingTab extends PluginSettingTab {
             btn.setDisabled(true);
             const isHealthy = await this.plugin.openCodeService.checkHealth();
             const internalStatus = this.plugin.openCodeService.getServerStatus();
-            const displayStatus = isHealthy
-              ? 'running'
-              : (internalStatus === 'starting' ? 'starting' : 'stopped');
-            
-            // Debug info
+            const isExternal = isHealthy && (internalStatus === 'stopped' || !this.plugin.openCodeService.isServerProcessRunning());
 
-            
             await updateStatus();
-            
-            // Build status key and get translation
-            const statusKey = `settings.server.status.${displayStatus}`;
-            const statusText = (t as (key: string) => string)(statusKey) || internalStatus;
+
+            const statusText = isLocalMode
+              ? (isHealthy
+                  ? (isExternal ? t('settings.server.status.localExternal') : t('settings.server.status.localManaged'))
+                  : (internalStatus === 'starting' || internalStatus === 'restarting'
+                      ? t('settings.server.status.starting')
+                      : t('settings.server.status.stopped')))
+              : (isHealthy ? t('settings.server.status.remoteConnected') : t('settings.server.status.stopped'));
             new Notice(`Health: ${isHealthy ? 'OK' : 'FAIL'} | Status: ${statusText}`);
             btn.setDisabled(false);
           });
@@ -732,6 +808,10 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       this.settingsScrollHandler = undefined;
     }
     this.settingsScrollContainerEl = null;
+    if (this.modelRefreshFrameId !== null) {
+      window.cancelAnimationFrame(this.modelRefreshFrameId);
+      this.modelRefreshFrameId = null;
+    }
     this.refreshModelsCallback = undefined;
     super.hide();
   }
@@ -1652,17 +1732,25 @@ export class OpenCodianSettingTab extends PluginSettingTab {
   }
 
   private restoreSettingsPanelScrollPosition(scrollTop = this.plugin.settings.settingsPanelScrollTop): void {
+    const scrollContainer = this.settingsScrollContainerEl ?? this.getSettingsScrollContainer();
+    this.settingsScrollContainerEl = scrollContainer;
+
     const applyRestore = () => {
-      const scrollContainer = this.getSettingsScrollContainer();
-      scrollContainer.scrollTop = scrollTop;
+      if (!scrollContainer.isConnected) {
+        return;
+      }
+
+      if (Math.abs(scrollContainer.scrollTop - scrollTop) > 1) {
+        scrollContainer.scrollTop = scrollTop;
+      }
     };
 
     window.requestAnimationFrame(() => {
       applyRestore();
-      window.requestAnimationFrame(() => {
+
+      window.setTimeout(() => {
         applyRestore();
-        window.setTimeout(applyRestore, 32);
-      });
+      }, 24);
     });
   }
 
@@ -1703,6 +1791,14 @@ export class OpenCodianSettingTab extends PluginSettingTab {
   }
 
   private getSettingsScrollContainer(): HTMLElement {
+    if (
+      this.settingsScrollContainerEl
+      && this.settingsScrollContainerEl.isConnected
+      && this.settingsScrollContainerEl.contains(this.containerEl)
+    ) {
+      return this.settingsScrollContainerEl;
+    }
+
     const containerEl = this.containerEl;
 
     let currentEl: HTMLElement | null = containerEl;
@@ -1714,11 +1810,13 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         && currentEl.scrollHeight > currentEl.clientHeight + 1;
 
       if (canScrollY) {
+        this.settingsScrollContainerEl = currentEl;
         return currentEl;
       }
       currentEl = currentEl.parentElement;
     }
 
+    this.settingsScrollContainerEl = containerEl;
     return containerEl;
   }
 
