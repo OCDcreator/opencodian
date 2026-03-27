@@ -62,27 +62,64 @@ const timestamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, 
 
 ## 功能需求
 
-### 1. 构建时 BUILD_ID 注入
+### 1. Logger 新增 info 方法
 
-**位置**：`scripts/build.mjs`
+**位置**：`src/shared/logger.ts`
 
-**流程**：
-1. 获取当前 git 分支名（使用 `git rev-parse --abbrev-ref HEAD`）
-2. 规范化分支名（`/` → `-`）
-3. 生成本地时间戳（格式：`YYYYMMDDHHmm`）
-4. 组装 `BUILD_ID`：`{sanitizedBranch}.{timestamp}`
-5. 使用 esbuild 的 `define` 将 `BUILD_ID` 常量注入代码
-6. **不修改** `package.json` 或 `manifest.json`
+**原因**：
+- 现有 `logger` 只有 `debug`/`warn`/`error` 方法
+- ESLint 限制只能使用 `console.warn` 和 `console.error`
+- 启动日志应放进统一 logger 以符合仓库现有模式
 
-**构建脚本改动**：
+**改动**：
+
+```typescript
+// src/shared/logger.ts
+
+export interface Logger {
+  info: (...args: unknown[]) => void;  // 新增
+  debug: (...args: unknown[]) => void;
+  warn: (...args: unknown[]) => void;
+  error: (...args: unknown[]) => void;
+}
+
+// 在 emit 函数中添加 'info' 类型
+type LogMethod = 'log' | 'info' | 'warn' | 'error';  // 添加 'info'
+
+// createLogger 返回的对象中添加 info 方法
+export function createLogger(scope: string): Logger {
+  return {
+    info: (...args: unknown[]) => {
+      emit('log', scope, args);  // info 使用 console.log 输出，不受 debug 开关控制
+    },
+    debug: (...args: unknown[]) => {
+      if (!isDebugEnabled()) {
+        return;
+      }
+      emit('log', scope, args);
+    },
+    // ... warn, error 保持不变
+  };
+}
+```
+
+### 2. 构建时 BUILD_ID 注入
+
+**涉及文件**：`scripts/build.mjs` 和 `esbuild.config.mjs`
+
+**重要**：BUILD_ID 必须在**生产构建**和**开发模式**中都注入，否则 `src/main.ts` 引用 `BUILD_ID` 时会在 dev 模式报错。
+
+**方案**：抽取公共的 `scripts/build-utils.mjs`，供两个构建脚本复用。
+
+#### 2.1 公共工具模块
+
+**位置**：`scripts/build-utils.mjs`（新建）
 
 ```javascript
-// scripts/build.mjs 新增逻辑
-
 import { execSync } from 'child_process';
 
 // 获取 git 分支名
-function getGitBranch() {
+export function getGitBranch() {
   try {
     return execSync('git rev-parse --abbrev-ref HEAD', { encoding: 'utf-8' }).trim();
   } catch {
@@ -91,25 +128,32 @@ function getGitBranch() {
 }
 
 // 规范化分支名
-function sanitizeBranchName(branch) {
+export function sanitizeBranchName(branch) {
   return branch.replace(/\//g, '-').replace(/[^a-zA-Z0-9\-_.]/g, '');
 }
 
 // 生成本地时间戳
-function getLocalTimeStamp() {
+export function getLocalTimeStamp() {
   const now = new Date();
   const pad = (n) => String(n).padStart(2, '0');
   return `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}${pad(now.getHours())}${pad(now.getMinutes())}`;
 }
 
 // 生成 BUILD_ID
-function generateBuildId() {
+export function generateBuildId() {
   const branch = sanitizeBranchName(getGitBranch());
   const timestamp = getLocalTimeStamp();
   return `${branch}.${timestamp}`;
 }
+```
 
-// 在 esbuild.context() 中添加 define
+#### 2.2 生产构建改动
+
+**位置**：`scripts/build.mjs`
+
+```javascript
+import { generateBuildId } from './build-utils.mjs';
+
 const buildId = generateBuildId();
 console.log(`[build] BUILD_ID: ${buildId}`);
 
@@ -121,13 +165,40 @@ context = await esbuild.context({
 });
 ```
 
-### 2. 版本发布脚本
+#### 2.3 开发模式改动
+
+**位置**：`esbuild.config.mjs`
+
+```javascript
+import { generateBuildId } from './scripts/build-utils.mjs';
+
+const buildId = generateBuildId();
+console.log(`[dev] BUILD_ID: ${buildId}`);
+
+const context = await esbuild.context({
+  define: {
+    BUILD_ID: JSON.stringify(buildId),
+  },
+  // ... 其他现有配置
+});
+```
+
+**流程**：
+1. 获取当前 git 分支名（使用 `git rev-parse --abbrev-ref HEAD`）
+2. 规范化分支名（`/` → `-`）
+3. 生成本地时间戳（格式：`YYYYMMDDHHmm`）
+4. 组装 `BUILD_ID`：`{sanitizedBranch}.{timestamp}`
+5. 使用 esbuild 的 `define` 将 `BUILD_ID` 常量注入代码
+6. **不修改** `package.json` 或 `manifest.json`
+
+### 3. 版本发布脚本
 
 **位置**：`scripts/release.mjs`（新建）
 
-**功能**：递增语义化版本并同步更新 `package.json` 和 `manifest.json`
+**功能**：递增语义化版本并同步更新 `package.json`、`package-lock.json` 和 `manifest.json`
 
 **使用方式**：
+
 ```bash
 npm run release:patch  # 0.1.0 → 0.1.1
 npm run release:minor  # 0.1.0 → 0.2.0
@@ -135,6 +206,7 @@ npm run release:major  # 0.1.0 → 1.0.0
 ```
 
 **package.json scripts 添加**：
+
 ```json
 {
   "scripts": {
@@ -147,46 +219,36 @@ npm run release:major  # 0.1.0 → 1.0.0
 
 **release.mjs 实现**：
 
+使用 `npm version --no-git-tag-version` 来更新版本，这样可以自动处理 `package.json` 和 `package-lock.json`，避免版本漂移。
+
 ```javascript
+import { execSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 
 const bumpType = process.argv[2] || 'patch';
 
-// 读取当前版本
+// 使用 npm version 命令更新 package.json 和 package-lock.json
+// --no-git-tag-version 表示不创建 git tag
+execSync(`npm version ${bumpType} --no-git-tag-version`, { stdio: 'inherit' });
+
+// 读取更新后的版本号
 const pkgPath = path.join(process.cwd(), 'package.json');
 const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
-const [major, minor, patch] = pkg.version.split('.').map(Number);
+const newVersion = pkg.version;
 
-// 计算新版本
-let newVersion;
-switch (bumpType) {
-  case 'major':
-    newVersion = `${major + 1}.0.0`;
-    break;
-  case 'minor':
-    newVersion = `${major}.${minor + 1}.0`;
-    break;
-  case 'patch':
-  default:
-    newVersion = `${major}.${minor}.${patch + 1}`;
-    break;
-}
-
-// 更新 package.json
-pkg.version = newVersion;
-fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
-
-// 更新 manifest.json
+// 同步更新 manifest.json
 const manifestPath = path.join(process.cwd(), 'manifest.json');
 const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+const oldVersion = manifest.version;
 manifest.version = newVersion;
 fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
 
-console.log(`Version bumped: ${pkg.version} → ${newVersion}`);
+console.log(`Version bumped: ${oldVersion} → ${newVersion}`);
+console.log('Updated: package.json, package-lock.json, manifest.json');
 ```
 
-### 3. 运行时版本输出
+### 4. 运行时版本输出
 
 **位置**：`src/main.ts`
 
@@ -198,22 +260,19 @@ declare const BUILD_ID: string;
 
 // onload() 开头
 async onload() {
-  // 使用现有 logger 的 debug 方法（debug 模式下可见）
-  logger.debug(`OpenCodian BUILD_ID: ${BUILD_ID}`);
-
-  // 强制输出到控制台（不受 debug 开关影响）
-  console.log(`[OpenCodian] BUILD_ID: ${BUILD_ID}`);
+  // 使用 logger.info 输出（始终可见，不受 debug 开关影响）
+  logger.info(`OpenCodian BUILD_ID: ${BUILD_ID}`);
 
   // ... 其余代码
 }
 ```
 
 **说明**：
-- 现有 `logger` 只有 `debug`/`warn`/`error` 方法，没有 `info`
-- 使用 `console.log` 确保版本号始终输出到控制台最上方
-- 同时保留 `logger.debug` 用于调试日志记录
+- 使用 `logger.info` 而非 `console.log`，符合仓库现有模式
+- `logger.info` 始终输出，不受 debug 开关影响
+- 同时会被记录到 recent log，方便诊断
 
-### 4. 打包规则文档
+### 5. 打包规则文档
 
 **位置**：`AGENTS.md`（在 "Build and Development Commands" 章节后新增）
 
@@ -247,8 +306,11 @@ BUILD_ID 在插件加载时输出到 Obsidian 开发者控制台，用于问题�
 
 | 文件 | 变更类型 | 说明 |
 |------|---------|------|
-| `scripts/build.mjs` | 修改 | 添加 BUILD_ID 生成和注入逻辑 |
-| `scripts/release.mjs` | 新建 | 版本发布脚本 |
+| `src/shared/logger.ts` | 修改 | 新增 `info` 方法 |
+| `scripts/build-utils.mjs` | 新建 | 公共构建工具（BUILD_ID 生成） |
+| `scripts/build.mjs` | 修改 | 导入 build-utils，添加 BUILD_ID 注入 |
+| `esbuild.config.mjs` | 修改 | 导入 build-utils，添加 BUILD_ID 注入（dev 模式） |
+| `scripts/release.mjs` | 新建 | 版本发布脚本（使用 npm version） |
 | `src/main.ts` | 修改 | 添加 BUILD_ID 运行时输出 |
 | `package.json` | 修改 | 添加 `release:*` 脚本 |
 | `AGENTS.md` | 修改 | 添加版本发布规则文档 |
@@ -296,7 +358,9 @@ npm run build
 ## 测试计划
 
 1. 验证 `npm run build` 不修改 `package.json` 和 `manifest.json`
-2. 验证 BUILD_ID 格式正确（分支名规范化、本地时间戳）
-3. 验证 `npm run release:patch/minor/major` 正确递增版本号
-4. 验证 `release` 命令同步更新 `package.json` 和 `manifest.json`
-5. 验证运行时 BUILD_ID 正确输出到控制台
+2. 验证 `npm run dev` 正确注入 BUILD_ID（开发模式）
+3. 验证 BUILD_ID 格式正确（分支名规范化、本地时间戳）
+4. 验证 `npm run release:patch/minor/major` 正确递增版本号
+5. 验证 `release` 命令同步更新 `package.json`、`package-lock.json` 和 `manifest.json`
+6. 验证 `logger.info` 方法正常工作
+7. 验证运行时 BUILD_ID 正确输出到控制台
