@@ -1,6 +1,7 @@
 import esbuild from "esbuild";
 import process from "process";
 import builtins from "builtin-modules";
+import { generateBuildId } from './scripts/build-utils.mjs';
 
 const banner =
 `/*
@@ -11,9 +12,15 @@ if you want to view the source, please visit the github repository of this plugi
 
 const prod = (process.argv[2] === 'production');
 
+const buildId = generateBuildId();
+console.log(`[dev] BUILD_ID: ${buildId}`);
+
 const context = await esbuild.context({
 	banner: {
 		js: banner,
+	},
+	define: {
+		BUILD_ID: JSON.stringify(buildId),
 	},
 	entryPoints: ['src/main.ts'],
 	bundle: true,
