@@ -2,69 +2,79 @@
 
 ## 概述
 
-为 OpenCodian 插件添加自动版本号管理功能，每次打包时自动生成由 git 分支名、日期时间（精确到分钟）和语义化版本号构成的完整版本号。
+为 OpenCodian 插件添加构建标识功能，将"发布版本"与"构建标识"分离：
 
-## 版本号格式
+- **发布版本**：`package.json` 和 `manifest.json` 的 `version` 字段，保持纯语义化版本（semver）
+- **构建标识**：编译时注入的 `BUILD_ID`，包含分支名和时间戳，仅用于日志/诊断
+
+## 核心设计原则
+
+### 职责分离
+
+| 职责 | 触发方式 | 影响文件 |
+|------|---------|---------|
+| **版本发布 (release)** | `npm run release:patch/minor/major` | 修改 `package.json`、`manifest.json` |
+| **构建打包 (build)** | `npm run build` | 不修改版本号，仅注入 `BUILD_ID` |
+
+**重要**：`npm run build` **不会**自动递增版本号或修改仓库文件，避免日常本地构建制造无意义版本号和脏工作区。
+
+### 版本字段分离
+
+| 字段 | 存储位置 | 格式 | 示例 |
+|------|---------|------|------|
+| **version** | `package.json`, `manifest.json` | 纯 semver | `0.1.0` |
+| **BUILD_ID** | 编译时常量（内存） | 分支名.时间戳 | `fix-revert-model-toggle.202603271430` |
+
+## BUILD_ID 格式
 
 ```
-{分支名}.{YYYYMMDDHHmm}.{major}.{minor}.{patch}
+{sanitizedBranchName}.{YYYYMMDDHHmm}
 ```
 
-**示例**：`fix/revert-model-toggle.202603271430.0.1.0`
+**示例**：`fix-revert-model-toggle.202603271430`
 
-| 组成部分 | 说明 | 示例 |
-|---------|------|------|
-| 分支名 | 当前 git 分支名 | `fix/revert-model-toggle` |
-| 日期时间 | 精确到分钟 | `202603271430` |
-| 语义化版本 | major.minor.patch | `0.1.0` |
+| 组成部分 | 说明 | 规范化规则 |
+|---------|------|----------|
+| 分支名 | 当前 git 分支名 | `/` 替换为 `-`，移除非法字符 |
+| 时间戳 | 本地时间，精确到分钟 | `YYYYMMDDHHmm` 格式 |
+
+### 分支名规范化
+
+分支名中的 `/` 会导致版本字符串解析问题，需要规范化：
+
+| 原始分支名 | 规范化后 |
+|-----------|---------|
+| `fix/revert-model-toggle` | `fix-revert-model-toggle` |
+| `feature/new-thing` | `feature-new-thing` |
+| `main` | `main` |
+
+**实现**：`branchName.replace(/\//g, '-')`
+
+### 时间戳时区
+
+使用**本地时间**（非 UTC），方便人工排查：
+
+```javascript
+const now = new Date();
+const timestamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
+// 结果示例：202603271430（本地时间）
+```
 
 ## 功能需求
 
-### 1. 构建时版本号生成
+### 1. 构建时 BUILD_ID 注入
 
 **位置**：`scripts/build.mjs`
 
 **流程**：
 1. 获取当前 git 分支名（使用 `git rev-parse --abbrev-ref HEAD`）
-2. 读取当前语义化版本（从 `package.json` 的 `version` 字段）
-3. 解析命令行参数：
-   - `--patch`：递增 patch（0.1.0 → 0.1.1）
-   - `--minor`：递增 minor（0.1.0 → 0.2.0）
-   - `--major`：递增 major（0.1.0 → 1.0.0）
-   - 无参数：默认 `--patch`
-4. 生成日期时间戳（格式：YYYYMMDDHHmm）
-5. 组装完整版本号
-6. 更新 `package.json` 和 `manifest.json` 的 version 字段
-7. 使用 esbuild 的 `define` 将 `VERSION` 常量注入代码
+2. 规范化分支名（`/` → `-`）
+3. 生成本地时间戳（格式：`YYYYMMDDHHmm`）
+4. 组装 `BUILD_ID`：`{sanitizedBranch}.{timestamp}`
+5. 使用 esbuild 的 `define` 将 `BUILD_ID` 常量注入代码
+6. **不修改** `package.json` 或 `manifest.json`
 
-### 2. 运行时版本输出
-
-**位置**：`src/main.ts`
-
-**实现**：
-- 在插件 `onload()` 方法最开始，使用 logger 输出版本号
-- 版本号通过 esbuild `define` 在编译时内联
-
-```typescript
-// 编译时注入
-declare const VERSION: string;
-
-// onload() 开头
-logger.info(`OpenCodian v${VERSION} loaded`);
-```
-
-### 3. 打包规则文档
-
-**位置**：`CLAUDE.md`
-
-**规则**：
-- **patch（小改动）**：bugfix、文本修改、配置调整
-- **minor（中等改动）**：新功能、重构、API 扩展
-- **major（大幅改动）**：架构变更、breaking change、大版本发布
-
-## 技术实现
-
-### 构建脚本改动
+**构建脚本改动**：
 
 ```javascript
 // scripts/build.mjs 新增逻辑
@@ -73,116 +83,220 @@ import { execSync } from 'child_process';
 
 // 获取 git 分支名
 function getGitBranch() {
-  return execSync('git rev-parse --abbrev-ref HEAD', { encoding: 'utf-8' }).trim();
-}
-
-// 生成日期时间戳
-function getDateTimeStamp() {
-  const now = new Date();
-  return now.toISOString().replace(/[-:T]/g, '').slice(0, 12);
-}
-
-// 解析版本参数
-function parseVersionBump(args) {
-  if (args.includes('--major')) return 'major';
-  if (args.includes('--minor')) return 'minor';
-  return 'patch'; // 默认
-}
-
-// 递增版本号
-function bumpVersion(version, bumpType) {
-  const [major, minor, patch] = version.split('.').map(Number);
-  switch (bumpType) {
-    case 'major': return `${major + 1}.0.0`;
-    case 'minor': return `${major}.${minor + 1}.0`;
-    case 'patch': return `${major}.${minor}.${patch + 1}`;
+  try {
+    return execSync('git rev-parse --abbrev-ref HEAD', { encoding: 'utf-8' }).trim();
+  } catch {
+    return 'unknown';
   }
 }
 
-// 生成完整版本号
-function generateFullVersion(branch, dateTime, semver) {
-  return `${branch}.${dateTime}.${semver}`;
+// 规范化分支名
+function sanitizeBranchName(branch) {
+  return branch.replace(/\//g, '-').replace(/[^a-zA-Z0-9\-_.]/g, '');
 }
 
-// 更新 package.json 和 manifest.json
-function updateVersionFiles(fullVersion, semver) {
-  // 更新 package.json（语义化版本）
-  // 更新 manifest.json（完整版本号）
+// 生成本地时间戳
+function getLocalTimeStamp() {
+  const now = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}${pad(now.getHours())}${pad(now.getMinutes())}`;
+}
+
+// 生成 BUILD_ID
+function generateBuildId() {
+  const branch = sanitizeBranchName(getGitBranch());
+  const timestamp = getLocalTimeStamp();
+  return `${branch}.${timestamp}`;
+}
+
+// 在 esbuild.context() 中添加 define
+const buildId = generateBuildId();
+console.log(`[build] BUILD_ID: ${buildId}`);
+
+context = await esbuild.context({
+  define: {
+    BUILD_ID: JSON.stringify(buildId),
+  },
+  // ... 其他现有配置
+});
+```
+
+### 2. 版本发布脚本
+
+**位置**：`scripts/release.mjs`（新建）
+
+**功能**：递增语义化版本并同步更新 `package.json` 和 `manifest.json`
+
+**使用方式**：
+```bash
+npm run release:patch  # 0.1.0 → 0.1.1
+npm run release:minor  # 0.1.0 → 0.2.0
+npm run release:major  # 0.1.0 → 1.0.0
+```
+
+**package.json scripts 添加**：
+```json
+{
+  "scripts": {
+    "release:patch": "node scripts/release.mjs patch",
+    "release:minor": "node scripts/release.mjs minor",
+    "release:major": "node scripts/release.mjs major"
+  }
 }
 ```
 
-### esbuild 配置改动
+**release.mjs 实现**：
 
 ```javascript
-// esbuild.context() 添加 define
-{
-  define: {
-    VERSION: JSON.stringify(fullVersion),
-  },
-  // ... 其他配置
+import fs from 'fs';
+import path from 'path';
+
+const bumpType = process.argv[2] || 'patch';
+
+// 读取当前版本
+const pkgPath = path.join(process.cwd(), 'package.json');
+const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
+const [major, minor, patch] = pkg.version.split('.').map(Number);
+
+// 计算新版本
+let newVersion;
+switch (bumpType) {
+  case 'major':
+    newVersion = `${major + 1}.0.0`;
+    break;
+  case 'minor':
+    newVersion = `${major}.${minor + 1}.0`;
+    break;
+  case 'patch':
+  default:
+    newVersion = `${major}.${minor}.${patch + 1}`;
+    break;
+}
+
+// 更新 package.json
+pkg.version = newVersion;
+fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
+
+// 更新 manifest.json
+const manifestPath = path.join(process.cwd(), 'manifest.json');
+const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+manifest.version = newVersion;
+fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
+
+console.log(`Version bumped: ${pkg.version} → ${newVersion}`);
+```
+
+### 3. 运行时版本输出
+
+**位置**：`src/main.ts`
+
+**实现**：
+
+```typescript
+// 文件顶部添加声明
+declare const BUILD_ID: string;
+
+// onload() 开头
+async onload() {
+  // 使用现有 logger 的 debug 方法（debug 模式下可见）
+  logger.debug(`OpenCodian BUILD_ID: ${BUILD_ID}`);
+
+  // 强制输出到控制台（不受 debug 开关影响）
+  console.log(`[OpenCodian] BUILD_ID: ${BUILD_ID}`);
+
+  // ... 其余代码
 }
 ```
 
-### 运行时改动
+**说明**：
+- 现有 `logger` 只有 `debug`/`warn`/`error` 方法，没有 `info`
+- 使用 `console.log` 确保版本号始终输出到控制台最上方
+- 同时保留 `logger.debug` 用于调试日志记录
 
-```typescript
-// src/main.ts 顶部添加
-declare const VERSION: string;
+### 4. 打包规则文档
 
-// onload() 开头添加
-async onload() {
-  logger.info(`OpenCodian v${VERSION} loaded`);
-  // ... 其余代码
-}
+**位置**：`AGENTS.md`（在 "Build and Development Commands" 章节后新增）
+
+**内容**：
+
+```markdown
+## Release and Build ID
+
+### 版本发布规则
+
+发布新版本时使用以下命令递增语义化版本：
+
+| 命令 | 版本变化 | 适用场景 |
+|------|---------|---------|
+| `npm run release:patch` | 0.1.0 → 0.1.1 | bugfix、文本修改、配置调整 |
+| `npm run release:minor` | 0.1.0 → 0.2.0 | 新功能、重构、API 扩展 |
+| `npm run release:major` | 0.1.0 → 1.0.0 | 架构变更、breaking change |
+
+### BUILD_ID 说明
+
+每次 `npm run build` 会自动生成 `BUILD_ID`，格式为 `{分支名}.{时间戳}`。
+
+- **分支名**：当前 git 分支，`/` 替换为 `-`
+- **时间戳**：本地时间，格式 `YYYYMMDDHHmm`
+- **示例**：`fix-revert-model-toggle.202603271430`
+
+BUILD_ID 在插件加载时输出到 Obsidian 开发者控制台，用于问题排查。
 ```
 
 ## 文件变更清单
 
 | 文件 | 变更类型 | 说明 |
 |------|---------|------|
-| `scripts/build.mjs` | 修改 | 添加版本号生成逻辑 |
-| `src/main.ts` | 修改 | 添加运行时版本输出 |
-| `CLAUDE.md` | 修改 | 添加打包规则文档 |
-| `package.json` | 修改 | 添加 `VERSION` 类型声明（可选） |
+| `scripts/build.mjs` | 修改 | 添加 BUILD_ID 生成和注入逻辑 |
+| `scripts/release.mjs` | 新建 | 版本发布脚本 |
+| `src/main.ts` | 修改 | 添加 BUILD_ID 运行时输出 |
+| `package.json` | 修改 | 添加 `release:*` 脚本 |
+| `AGENTS.md` | 修改 | 添加版本发布规则文档 |
 
 ## 使用示例
 
+### 日常开发构建
+
 ```bash
-# 小改动（默认）
+# 构建不改变版本号
 npm run build
+# 输出：[build] BUILD_ID: fix-revert-model-toggle.202603271430
+```
 
-# 明确指定 patch
-npm run build -- --patch
+### 发布新版本
 
-# 中等改动
-npm run build -- --minor
+```bash
+# 递增版本号
+npm run release:patch
 
-# 大幅改动
-npm run build -- --major
+# 然后构建
+npm run build
 ```
 
 ## 日志输出示例
 
 **构建时（终端）**：
 ```
-[build] Version: fix/revert-model-toggle.202603271430.0.1.0
+[build] BUILD_ID: fix-revert-model-toggle.202603271430
 [build] Production build complete!
 ```
 
 **运行时（Obsidian 控制台）**：
 ```
-[OpenCodian] OpenCodian vfix/revert-model-toggle.202603271430.0.1.0 loaded
+[OpenCodian] BUILD_ID: fix-revert-model-toggle.202603271430
 ```
 
 ## 边界情况处理
 
 1. **非 git 仓库**：分支名使用 `unknown`
-2. **脏工作区**：日期时间戳确保唯一性，不影响版本号
-3. **CI/CD 环境**：支持通过参数直接指定，无需交互
+2. **git 命令失败**：分支名使用 `unknown`
+3. **脏工作区**：时间戳确保唯一性，不影响 BUILD_ID 生成
+4. **CI/CD 环境**：BUILD_ID 自动生成，无需额外配置
 
 ## 测试计划
 
-1. 验证 `--patch` / `--minor` / `--major` 参数正确递增版本号
-2. 验证无参数时默认 patch 递增
-3. 验证 package.json 和 manifest.json 同步更新
-4. 验证运行时版本号正确输出到控制台
+1. 验证 `npm run build` 不修改 `package.json` 和 `manifest.json`
+2. 验证 BUILD_ID 格式正确（分支名规范化、本地时间戳）
+3. 验证 `npm run release:patch/minor/major` 正确递增版本号
+4. 验证 `release` 命令同步更新 `package.json` 和 `manifest.json`
+5. 验证运行时 BUILD_ID 正确输出到控制台
