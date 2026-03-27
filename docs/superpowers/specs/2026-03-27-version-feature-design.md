@@ -197,7 +197,17 @@ const context = await esbuild.context({
 
 **功能**：递增语义化版本并同步更新 `package.json`、`package-lock.json` 和 `manifest.json`
 
-**使用方式**：
+#### 与现有脚本的关系
+
+仓库已有版本同步机制：
+
+- **package.json** 中的 `"version"` 脚本：`node scripts/sync-version.js && git add manifest.json`
+- 这是 npm 生命周期钩子，在 `npm version` 执行后自动运行
+- `sync-version.js` 负责将版本号从 `package.json` 同步到 `manifest.json`
+
+**设计决策**：复用现有机制，`release.mjs` 只需调用 `npm version`，manifest.json 同步由生命周期钩子自动处理。
+
+#### 使用方式
 
 ```bash
 npm run release:patch  # 0.1.0 → 0.1.1
@@ -205,7 +215,7 @@ npm run release:minor  # 0.1.0 → 0.2.0
 npm run release:major  # 0.1.0 → 1.0.0
 ```
 
-**package.json scripts 添加**：
+#### package.json scripts 添加
 
 ```json
 {
@@ -217,35 +227,21 @@ npm run release:major  # 0.1.0 → 1.0.0
 }
 ```
 
-**release.mjs 实现**：
+**注意**：保留现有的 `"version"` 脚本，不要删除。
 
-使用 `npm version --no-git-tag-version` 来更新版本，这样可以自动处理 `package.json` 和 `package-lock.json`，避免版本漂移。
+#### release.mjs 实现
 
 ```javascript
 import { execSync } from 'child_process';
-import fs from 'fs';
-import path from 'path';
 
 const bumpType = process.argv[2] || 'patch';
 
 // 使用 npm version 命令更新 package.json 和 package-lock.json
 // --no-git-tag-version 表示不创建 git tag
+// 现有的 "version" 生命周期钩子会自动同步 manifest.json
 execSync(`npm version ${bumpType} --no-git-tag-version`, { stdio: 'inherit' });
 
-// 读取更新后的版本号
-const pkgPath = path.join(process.cwd(), 'package.json');
-const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
-const newVersion = pkg.version;
-
-// 同步更新 manifest.json
-const manifestPath = path.join(process.cwd(), 'manifest.json');
-const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
-const oldVersion = manifest.version;
-manifest.version = newVersion;
-fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
-
-console.log(`Version bumped: ${oldVersion} → ${newVersion}`);
-console.log('Updated: package.json, package-lock.json, manifest.json');
+// 版本同步由 npm 生命周期钩子自动处理，无需手动更新 manifest.json
 ```
 
 ### 4. 运行时版本输出
@@ -310,9 +306,10 @@ BUILD_ID 在插件加载时输出到 Obsidian 开发者控制台，用于问题�
 | `scripts/build-utils.mjs` | 新建 | 公共构建工具（BUILD_ID 生成） |
 | `scripts/build.mjs` | 修改 | 导入 build-utils，添加 BUILD_ID 注入 |
 | `esbuild.config.mjs` | 修改 | 导入 build-utils，添加 BUILD_ID 注入（dev 模式） |
-| `scripts/release.mjs` | 新建 | 版本发布脚本（使用 npm version） |
+| `scripts/release.mjs` | 新建 | 版本发布脚本（包装 npm version） |
+| `scripts/sync-version.js` | 保留 | 无需修改，继续由 npm 生命周期调用 |
 | `src/main.ts` | 修改 | 添加 BUILD_ID 运行时输出 |
-| `package.json` | 修改 | 添加 `release:*` 脚本 |
+| `package.json` | 修改 | 添加 `release:*` 脚本（保留现有 `version` 脚本） |
 | `AGENTS.md` | 修改 | 添加版本发布规则文档 |
 
 ## 使用示例
