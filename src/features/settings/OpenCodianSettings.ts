@@ -57,6 +57,15 @@ interface ElectronDialogModule {
   }) => Promise<{ canceled: boolean; filePaths: string[] }>;
 }
 
+const SETTINGS_SCROLL_CONTAINER_SELECTORS = [
+  '.vertical-tab-content-container',
+  '.vertical-tab-content',
+  '.modal-content',
+] as const;
+const SETTINGS_SCROLL_CONTAINER_SELECTOR = SETTINGS_SCROLL_CONTAINER_SELECTORS.join(', ');
+const SETTINGS_SCROLL_RESTORE_RETRY_DELAYS = [24, 80, 160, 320] as const;
+const SETTINGS_SCROLL_RESTORE_OBSERVER_WINDOW_MS = 1200;
+
 function getElectronDialog(): ElectronDialogModule | null {
   const globalWithRequire = globalThis as typeof globalThis & {
     require?: (module: string) => unknown;
@@ -100,6 +109,9 @@ export class OpenCodianSettingTab extends PluginSettingTab {
   private pendingOpenScrollTop: number | null = null;
   private pendingOpenSectionTitle: string | null = null;
   private settingsPanelPostRenderFrameId: number | null = null;
+  private settingsPanelRestoreFrameId: number | null = null;
+  private settingsPanelRestoreTimeoutIds: number[] = [];
+  private settingsPanelRestoreObserver: MutationObserver | null = null;
   private styleControlBindings: StyleControlBinding[] = [];
 
   constructor(app: App, plugin: OpenCodianPlugin) {
@@ -156,6 +168,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     const pendingOpenScrollTop = this.pendingOpenScrollTop;
     const pendingOpenSectionTitle = this.pendingOpenSectionTitle;
 
+    this.clearSettingsPanelRestoreWork();
     if (this.serverStatusIntervalId) {
       window.clearInterval(this.serverStatusIntervalId);
       this.serverStatusIntervalId = null;
@@ -810,6 +823,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
 
   /** Clean up when settings tab is closed */
   hide(): void {
+    this.clearSettingsPanelRestoreWork();
     this.captureSettingsPanelScrollPosition();
     if (this.settingsScrollHandler) {
       this.settingsScrollContainerEl?.removeEventListener('scroll', this.settingsScrollHandler);
@@ -1814,7 +1828,6 @@ export class OpenCodianSettingTab extends PluginSettingTab {
 
     const resolvedScrollContainer = scrollContainer ?? this.getSettingsScrollContainer();
     this.settingsScrollContainerEl = resolvedScrollContainer;
-    this.lastObservedSettingsScrollTop = resolvedScrollContainer.scrollTop;
 
     this.settingsScrollHandler = () => {
       this.plugin.settings.settingsPanelScrollTop = resolvedScrollContainer.scrollTop;
@@ -1831,34 +1844,82 @@ export class OpenCodianSettingTab extends PluginSettingTab {
   ): void {
     const resolvedScrollContainer = scrollContainer ?? this.settingsScrollContainerEl ?? this.getSettingsScrollContainer();
     this.settingsScrollContainerEl = resolvedScrollContainer;
+    this.clearSettingsPanelRestoreWork();
 
-    const applyRestore = () => {
+    const normalizedScrollTop = Math.max(0, scrollTop);
+    const applyRestore = (reason: string): void => {
       if (!resolvedScrollContainer.isConnected) {
         return;
       }
 
-      if (Math.abs(resolvedScrollContainer.scrollTop - scrollTop) > 1) {
-        resolvedScrollContainer.scrollTop = scrollTop;
-      }
+      resolvedScrollContainer.scrollTop = normalizedScrollTop;
+      logger.debug('Settings scroll restore attempt', {
+        reason,
+        targetScrollTop: normalizedScrollTop,
+        containerClasses: resolvedScrollContainer.className,
+      });
     };
 
-    window.requestAnimationFrame(() => {
-      applyRestore();
-
-      window.setTimeout(() => {
-        applyRestore();
-      }, 24);
+    this.settingsPanelRestoreFrameId = window.requestAnimationFrame(() => {
+      this.settingsPanelRestoreFrameId = null;
+      applyRestore('animation-frame');
     });
+
+    for (const delay of SETTINGS_SCROLL_RESTORE_RETRY_DELAYS) {
+      const timeoutId = window.setTimeout(() => {
+        this.settingsPanelRestoreTimeoutIds = this.settingsPanelRestoreTimeoutIds.filter(
+          (id) => id !== timeoutId,
+        );
+        applyRestore(`timeout-${delay}`);
+      }, delay);
+      this.settingsPanelRestoreTimeoutIds.push(timeoutId);
+    }
+
+    if (typeof MutationObserver !== 'undefined') {
+      let mutationRestoreQueued = false;
+      this.settingsPanelRestoreObserver = new MutationObserver(() => {
+        if (mutationRestoreQueued) {
+          return;
+        }
+
+        mutationRestoreQueued = true;
+        const frameId = window.requestAnimationFrame(() => {
+          mutationRestoreQueued = false;
+          this.settingsPanelRestoreFrameId = null;
+          applyRestore('mutation');
+        });
+        this.settingsPanelRestoreFrameId = frameId;
+      });
+      this.settingsPanelRestoreObserver.observe(this.containerEl, {
+        childList: true,
+        subtree: true,
+        characterData: true,
+      });
+
+      const observerTimeoutId = window.setTimeout(() => {
+        this.settingsPanelRestoreTimeoutIds = this.settingsPanelRestoreTimeoutIds.filter(
+          (id) => id !== observerTimeoutId,
+        );
+        this.settingsPanelRestoreObserver?.disconnect();
+        this.settingsPanelRestoreObserver = null;
+      }, SETTINGS_SCROLL_RESTORE_OBSERVER_WINDOW_MS);
+      this.settingsPanelRestoreTimeoutIds.push(observerTimeoutId);
+    }
   }
 
   private captureSettingsPanelScrollPosition(): void {
     const scrollContainer = this.settingsScrollContainerEl ?? this.getSettingsScrollContainer();
     const nextScrollTop =
-      scrollContainer.isConnected && scrollContainer.clientHeight > 0
+      scrollContainer.isConnected
         ? scrollContainer.scrollTop
         : this.lastObservedSettingsScrollTop;
 
     this.plugin.settings.settingsPanelScrollTop = nextScrollTop;
+    logger.debug('Captured settings scroll position', {
+      nextScrollTop,
+      containerClasses: scrollContainer.className,
+      usedObservedFallback: !scrollContainer.isConnected,
+    });
     this.plugin.scheduleSettingsUiStateSave();
   }
 
@@ -1898,23 +1959,62 @@ export class OpenCodianSettingTab extends PluginSettingTab {
 
     const containerEl = this.containerEl;
 
-    let currentEl: HTMLElement | null = containerEl;
-    while (currentEl) {
-      const computedStyle = window.getComputedStyle(currentEl);
-      const overflowY = computedStyle.overflowY;
-      const canScrollY =
-        (overflowY === 'auto' || overflowY === 'scroll' || overflowY === 'overlay')
-        && currentEl.scrollHeight > currentEl.clientHeight + 1;
+    const matchedContainer = containerEl.closest<HTMLElement>(SETTINGS_SCROLL_CONTAINER_SELECTOR);
+    if (matchedContainer) {
+      this.settingsScrollContainerEl = matchedContainer;
+      logger.debug('Resolved settings scroll container via selector', {
+        selector: SETTINGS_SCROLL_CONTAINER_SELECTOR,
+        containerClasses: matchedContainer.className,
+      });
+      return matchedContainer;
+    }
 
-      if (canScrollY) {
+    let currentEl: HTMLElement | null = containerEl.parentElement;
+    while (currentEl) {
+      if (this.looksLikeSettingsScrollContainer(currentEl)) {
         this.settingsScrollContainerEl = currentEl;
+        logger.debug('Resolved settings scroll container via class fallback', {
+          containerClasses: currentEl.className,
+        });
         return currentEl;
       }
       currentEl = currentEl.parentElement;
     }
 
     this.settingsScrollContainerEl = containerEl;
+    logger.debug('Falling back to settings container as scroll container', {
+      containerClasses: containerEl.className,
+    });
     return containerEl;
+  }
+
+  private looksLikeSettingsScrollContainer(element: HTMLElement): boolean {
+    if (
+      SETTINGS_SCROLL_CONTAINER_SELECTORS.some((selector) => element.matches(selector))
+    ) {
+      return true;
+    }
+
+    const classNames = Array.from(element.classList);
+    return classNames.some((className) =>
+      className.includes('vertical-tab-content')
+      || className.includes('modal-content'),
+    );
+  }
+
+  private clearSettingsPanelRestoreWork(): void {
+    if (this.settingsPanelRestoreFrameId !== null) {
+      window.cancelAnimationFrame(this.settingsPanelRestoreFrameId);
+      this.settingsPanelRestoreFrameId = null;
+    }
+
+    for (const timeoutId of this.settingsPanelRestoreTimeoutIds) {
+      window.clearTimeout(timeoutId);
+    }
+    this.settingsPanelRestoreTimeoutIds = [];
+
+    this.settingsPanelRestoreObserver?.disconnect();
+    this.settingsPanelRestoreObserver = null;
   }
 
   /** Debug settings section */
