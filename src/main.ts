@@ -32,6 +32,9 @@ import { createLogger, getRecentLogText, getVaultBasePath, setDebugLoggingEnable
 
 const logger = createLogger('OpenCodian');
 
+// BUILD_ID is injected at build time via esbuild define
+declare const BUILD_ID: string;
+
 /** Main plugin class */
 export default class OpenCodianPlugin extends Plugin {
   settings: OpenCodianSettings;
@@ -46,6 +49,9 @@ export default class OpenCodianPlugin extends Plugin {
   private settingsUiStateSaveTimeoutId: number | null = null;
 
   async onload() {
+    // Output BUILD_ID for debugging (always visible)
+    logger.info(`OpenCodian BUILD_ID: ${BUILD_ID}`);
+
     // Initialize storage
     this.storage = new StorageService(this);
     await this.storage.initialize();
