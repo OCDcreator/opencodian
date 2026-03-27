@@ -14,6 +14,7 @@ interface LogEntry {
 const recentLogEntries: LogEntry[] = [];
 
 export interface Logger {
+  info: (...args: unknown[]) => void;
   debug: (...args: unknown[]) => void;
   warn: (...args: unknown[]) => void;
   error: (...args: unknown[]) => void;
@@ -105,6 +106,9 @@ function emit(method: LogMethod, scope: string, args: unknown[]): void {
 
 export function createLogger(scope: string): Logger {
   return {
+    info: (...args: unknown[]) => {
+      emit('log', scope, args);
+    },
     debug: (...args: unknown[]) => {
       if (!isDebugEnabled()) {
         return;
