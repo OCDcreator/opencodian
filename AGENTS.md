@@ -181,6 +181,43 @@ npm run lint:fix
 
 > **Syncthing note**: This repo uses `.stignore` to exclude `node_modules/` and other local artifacts. After switching systems, you usually do **not** need to run `npm run doctor:esbuild`; only run it if dependencies changed or build/dev reports an esbuild platform mismatch.
 
+## Release and Build ID
+
+### Version Release Rules
+
+Use these commands to bump the semantic version when releasing:
+
+| Command | Version Change | Use Case |
+|---------|---------------|----------|
+| `npm run release:patch` | 0.1.0 → 0.1.1 | Bugfix, text changes, config tweaks |
+| `npm run release:minor` | 0.1.0 → 0.2.0 | New features, refactoring, API extensions |
+| `npm run release:major` | 0.1.0 → 1.0.0 | Architecture changes, breaking changes |
+
+These commands update `package.json`, `package-lock.json`, and `manifest.json` automatically.
+
+### BUILD_ID
+
+Each `npm run build` generates a `BUILD_ID` with format `{branch}.{timestamp}`:
+
+- **Branch**: Current git branch, `/` replaced with `-`
+- **Timestamp**: Local time, format `YYYYMMDDHHmm`
+- **Example**: `fix-revert-model-toggle.202603271430`
+
+The BUILD_ID is output to the Obsidian developer console when the plugin loads, useful for debugging which build is running.
+
+### Typical Release Workflow
+
+```bash
+# 1. Bump version
+npm run release:patch
+
+# 2. Build
+npm run build
+
+# 3. Deploy to test vault
+cp dist/main.js dist/manifest.json dist/styles.css ../../testvault/.obsidian/plugins/opencodian/
+```
+
 ## Code Style Guidelines
 
 ### ESLint Configuration
