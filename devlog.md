@@ -8,6 +8,62 @@
 
 ---
 
+## 2026-03-27 Sticky 滚动模式下 Previous Message 导航定位修复
+
+### 📋 本次开发目标
+修复聊天界面在以下两种滚动模式下的历史导航定位问题：
+
+1. `sticky-basic`
+2. `sticky-mask`
+
+具体是 `Previous Message` 按钮跳转到上一条用户消息时，只能看到吸顶后的用户消息本身，看不到该回合对应的助手回复；而 `Next Message` 的体感基本正常。
+
+### ✅ 实现内容
+
+#### 1. 导航判断与滚动目标拆分
+- 保留“用当前可见位置判断上一条/下一条消息”的逻辑
+- 但不再直接使用 `.opencodian-message--user` 的视觉 `top` 作为最终滚动目标
+- 避免在 sticky 模式下被 `position: sticky` 改写后的 `getBoundingClientRect()` 误导
+
+#### 2. Sticky 模式改为按 turn 锚点滚动
+- 为 `sticky-basic` / `sticky-mask` 新增滚动模式识别
+- 当命中 sticky 模式时：
+  - 导航选择仍参考用户消息当前视觉位置
+  - 实际滚动目标改为对应 `.opencodian-turn` 的文档流起点
+- 这样点击 `Previous Message` 时，会回到该回合的真实开头，而不是停在已经吸顶后的 header 位置
+
+#### 3. Natural 模式保持原行为
+- 非 sticky 模式仍然沿用用户消息锚点
+- 继续保留原有 `10px` 的滚动留白，避免改动自然滚动模式的观感
+
+#### 4. 补充针对性单元测试
+- 新增 `NavigationSidebar` 单元测试
+- 覆盖两个关键场景：
+  - sticky 模式下 `Previous` 应滚动到 turn 锚点
+  - natural 模式下仍保留现有 padding 行为
+
+### 📁 涉及文件
+
+| 文件 | 修改内容 |
+|------|----------|
+| `src/features/chat/ui/NavigationSidebar.ts` | 导航坐标计算改为“视觉定位 + turn 锚点滚动”双轨逻辑 |
+| `tests/unit/features/chat/NavigationSidebar.test.ts` | 新增 sticky / natural 导航定位测试 |
+
+### 🧪 验证结果
+
+- ✅ `npx eslint src/features/chat/ui/NavigationSidebar.ts tests/unit/features/chat/NavigationSidebar.test.ts`
+- ✅ `npm run test -- NavigationSidebar.test.ts`
+- ✅ `npm run build`
+- ✅ 已部署到测试库：`C:\Users\lt\Desktop\Write\testvault\.obsidian\plugins\opencodian\`
+
+### 📌 当前收益
+
+- `Previous Message` 在吸顶模式下不再只把用户消息顶到视口顶部
+- 上一回合对应的助手消息可以随着导航一起回到可见区域
+- `sticky-basic`、`sticky-mask` 与 `natural` 三种滚动模式的导航语义更一致
+
+---
+
 ## 2026-03-27 本地 OpenCode 托管认领、端口切换与设置页性能优化
 
 ### 📋 本次开发目标

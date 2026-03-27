@@ -89,10 +89,34 @@ export class NavigationSidebar {
     this.container.classList.toggle('visible', isScrollable);
   }
 
-  private getMessageScrollTop(messageEl: HTMLElement): number {
-    const messageRect = messageEl.getBoundingClientRect();
+  private getElementScrollTop(element: HTMLElement): number {
+    const elementRect = element.getBoundingClientRect();
     const containerRect = this.messagesEl.getBoundingClientRect();
-    return messageRect.top - containerRect.top + this.messagesEl.scrollTop;
+    return elementRect.top - containerRect.top + this.messagesEl.scrollTop;
+  }
+
+  private isStickyScrollMode(): boolean {
+    return (
+      this.messagesEl.classList.contains('opencodian-messages--sticky-basic') ||
+      this.messagesEl.classList.contains('opencodian-messages--sticky-mask')
+    );
+  }
+
+  private getMessageTargetScrollTop(messageEl: HTMLElement): number {
+    if (!this.isStickyScrollMode()) {
+      return this.getElementScrollTop(messageEl);
+    }
+
+    const turnEl = messageEl.closest('.opencodian-turn');
+    if (!(turnEl instanceof HTMLElement)) {
+      return this.getElementScrollTop(messageEl);
+    }
+
+    return this.getElementScrollTop(turnEl);
+  }
+
+  private getMessageScrollPadding(): number {
+    return this.isStickyScrollMode() ? 0 : 10;
   }
 
   /**
@@ -106,22 +130,29 @@ export class NavigationSidebar {
     const scrollTop = this.messagesEl.scrollTop;
     const threshold = 30;
     const messagePositions = messages.map(messageEl => ({
-      element: messageEl,
-      top: this.getMessageScrollTop(messageEl),
+      visualTop: this.getElementScrollTop(messageEl),
+      targetTop: this.getMessageTargetScrollTop(messageEl),
     }));
+    const scrollPadding = this.getMessageScrollPadding();
 
     if (direction === 'prev') {
       for (let i = messagePositions.length - 1; i >= 0; i--) {
-        if (messagePositions[i].top < scrollTop - threshold) {
-          this.messagesEl.scrollTo({ top: Math.max(0, messagePositions[i].top - 10), behavior: 'smooth' });
+        if (messagePositions[i].visualTop < scrollTop - threshold) {
+          this.messagesEl.scrollTo({
+            top: Math.max(0, messagePositions[i].targetTop - scrollPadding),
+            behavior: 'smooth',
+          });
           return;
         }
       }
       this.messagesEl.scrollTo({ top: 0, behavior: 'smooth' });
     } else {
       for (let i = 0; i < messagePositions.length; i++) {
-        if (messagePositions[i].top > scrollTop + threshold) {
-          this.messagesEl.scrollTo({ top: Math.max(0, messagePositions[i].top - 10), behavior: 'smooth' });
+        if (messagePositions[i].visualTop > scrollTop + threshold) {
+          this.messagesEl.scrollTo({
+            top: Math.max(0, messagePositions[i].targetTop - scrollPadding),
+            behavior: 'smooth',
+          });
           return;
         }
       }
