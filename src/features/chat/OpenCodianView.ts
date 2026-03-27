@@ -84,8 +84,11 @@ type ChatServerAvailability = 'checking' | 'running' | 'starting' | 'offline' | 
 
 /** Clipboard icon SVG for copy button */
 const COPY_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`;
+const FORK_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><circle cx="18" cy="6" r="3"/><path d="M6 9v3a3 3 0 0 0 3 3h6a3 3 0 0 0 3-3V9"/><path d="M12 12v3"/></svg>`;
+const REWIND_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5v0a5.5 5.5 0 0 1-5.5 5.5H11"/></svg>`;
 
 export class OpenCodianView extends ItemView {
+  private static tooltipLabelId = 0;
   private plugin: OpenCodianPlugin;
   private chatContainerEl: HTMLElement | null = null;
   private messagesShellEl: HTMLElement | null = null;
@@ -2052,6 +2055,27 @@ export class OpenCodianView extends ItemView {
 
   private attachCopyButtonBehavior(copyBtn: HTMLElement, content: string): void {
     let feedbackTimeout: ReturnType<typeof setTimeout> | null = null;
+    const labelId = copyBtn.getAttribute('aria-labelledby');
+    const labelText = copyBtn.getAttribute('data-tooltip') ?? '';
+
+    const setButtonContent = (text?: string): void => {
+      copyBtn.empty();
+
+      if (text) {
+        copyBtn.setText(text);
+      } else {
+        copyBtn.innerHTML = COPY_ICON;
+      }
+
+      if (labelId && labelText) {
+        const labelEl = copyBtn.createSpan({
+          cls: 'opencodian-visually-hidden',
+          text: labelText,
+        });
+        labelEl.id = labelId;
+        copyBtn.setAttribute('aria-labelledby', labelId);
+      }
+    };
 
     copyBtn.addEventListener('click', async (e) => {
       e.stopPropagation();
@@ -2069,16 +2093,25 @@ export class OpenCodianView extends ItemView {
       }
 
       // Show "copied!" feedback
-      copyBtn.innerHTML = '';
-      copyBtn.setText('copied!');
+      setButtonContent('copied!');
       copyBtn.classList.add('copied');
 
       feedbackTimeout = setTimeout(() => {
-        copyBtn.innerHTML = COPY_ICON;
+        setButtonContent();
         copyBtn.classList.remove('copied');
         feedbackTimeout = null;
       }, 1500);
     });
+  }
+
+  private attachTooltipLabel(buttonEl: HTMLElement, label: string): void {
+    const labelId = `opencodian-tooltip-label-${OpenCodianView.tooltipLabelId++}`;
+    const labelEl = buttonEl.createSpan({
+      cls: 'opencodian-visually-hidden',
+      text: label,
+    });
+    labelEl.id = labelId;
+    buttonEl.setAttribute('aria-labelledby', labelId);
   }
 
   /**
@@ -2121,34 +2154,46 @@ export class OpenCodianView extends ItemView {
       const actionsEl = footerEl.createDiv({ cls: 'opencodian-user-message-actions' });
 
       if (content) {
+        const copyLabel = t('chat.action.copy');
         const copyBtn = actionsEl.createEl('button', {
-          cls: 'opencodian-copy-btn-inline opencodian-copy-btn-inline--user',
+          cls: 'opencodian-copy-btn-inline opencodian-copy-btn-inline--user opencodian-tooltip-trigger',
           attr: {
             type: 'button',
-            'aria-label': t('chat.action.copy'),
+            'data-tooltip': copyLabel,
           },
         });
         copyBtn.innerHTML = COPY_ICON;
+        this.attachTooltipLabel(copyBtn, copyLabel);
         this.attachCopyButtonBehavior(copyBtn, content);
       }
 
       if (message.sourceMessageId) {
+        const rewindLabel = t('chat.rewind.button');
         const rewindBtn = actionsEl.createEl('button', {
-          cls: 'opencodian-user-action-btn',
-          text: t('chat.rewind.button'),
-          attr: { type: 'button' },
+          cls: 'opencodian-user-action-btn opencodian-user-action-btn--icon opencodian-tooltip-trigger',
+          attr: {
+            type: 'button',
+            'data-tooltip': rewindLabel,
+          },
         });
+        rewindBtn.innerHTML = REWIND_ICON;
+        this.attachTooltipLabel(rewindBtn, rewindLabel);
         rewindBtn.disabled = this.isStreaming;
         rewindBtn.addEventListener('click', (event) => {
           event.stopPropagation();
           void this.handleRewindRequest(message);
         });
 
+        const forkLabel = t('chat.fork.button');
         const forkBtn = actionsEl.createEl('button', {
-          cls: 'opencodian-user-action-btn',
-          text: t('chat.fork.button'),
-          attr: { type: 'button' },
+          cls: 'opencodian-user-action-btn opencodian-user-action-btn--icon opencodian-tooltip-trigger',
+          attr: {
+            type: 'button',
+            'data-tooltip': forkLabel,
+          },
         });
+        forkBtn.innerHTML = FORK_ICON;
+        this.attachTooltipLabel(forkBtn, forkLabel);
         forkBtn.disabled = this.isStreaming;
         forkBtn.addEventListener('click', (event) => {
           event.stopPropagation();

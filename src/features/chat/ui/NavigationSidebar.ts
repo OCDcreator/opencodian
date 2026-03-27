@@ -7,11 +7,14 @@
 
 import { setIcon } from 'obsidian';
 
+import { t } from '../../../i18n';
+
 /**
  * Floating sidebar for navigating chat history.
  * Provides quick access to top/bottom and previous/next user messages.
  */
 export class NavigationSidebar {
+  private static tooltipLabelId = 0;
   private container: HTMLElement;
   private topBtn: HTMLButtonElement;
   private prevBtn: HTMLButtonElement;
@@ -28,10 +31,10 @@ export class NavigationSidebar {
     this.container = this.parentEl.createDiv({ cls: 'opencodian-nav-sidebar' });
 
     // Create buttons
-    this.topBtn = this.createButton('opencodian-nav-btn-top', 'chevrons-up', 'Scroll to top');
-    this.prevBtn = this.createButton('opencodian-nav-btn-prev', 'chevron-up', 'Previous message');
-    this.nextBtn = this.createButton('opencodian-nav-btn-next', 'chevron-down', 'Next message');
-    this.bottomBtn = this.createButton('opencodian-nav-btn-bottom', 'chevrons-down', 'Scroll to bottom');
+    this.topBtn = this.createButton('opencodian-nav-btn-top', 'chevrons-up', t('chat.navigation.top'));
+    this.prevBtn = this.createButton('opencodian-nav-btn-prev', 'chevron-up', t('chat.navigation.previous'));
+    this.nextBtn = this.createButton('opencodian-nav-btn-next', 'chevron-down', t('chat.navigation.next'));
+    this.bottomBtn = this.createButton('opencodian-nav-btn-bottom', 'chevrons-down', t('chat.navigation.bottom'));
 
     this.setupEventListeners();
     this.updateVisibility();
@@ -39,14 +42,17 @@ export class NavigationSidebar {
 
   private createButton(cls: string, icon: string, label: string): HTMLButtonElement {
     const btn = this.container.createEl('button', {
-      cls: `opencodian-nav-btn ${cls}`,
+      cls: `opencodian-nav-btn opencodian-tooltip-trigger ${cls}`,
       attr: {
         type: 'button',
-        'aria-label': label,
-        title: label,
+        'data-tooltip': label,
+        'data-tooltip-align': 'right',
       },
     });
     setIcon(btn, icon);
+    const labelEl = btn.createSpan({ cls: 'opencodian-visually-hidden', text: label });
+    labelEl.id = `opencodian-nav-tooltip-label-${NavigationSidebar.tooltipLabelId++}`;
+    btn.setAttribute('aria-labelledby', labelEl.id);
     return btn;
   }
 
