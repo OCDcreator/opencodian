@@ -1123,13 +1123,11 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       .addDropdown((dropdown) => {
         dropdown.addOption('input', t('settings.ui.tabPosition.input'));
         dropdown.addOption('header', t('settings.ui.tabPosition.header'));
-        dropdown.addOption('below-header', t('settings.ui.tabPosition.belowHeader'));
         dropdown
           .setValue(this.plugin.settings.tabBarPosition)
           .onChange(async (value) => {
-            this.plugin.settings.tabBarPosition = value as TabBarPosition;
+            this.plugin.settings.tabBarPosition = value as 'input' | 'header';
             await this.plugin.saveSettings();
-            this.plugin.applyTabBarLayoutToViews();
           });
       });
 
