@@ -42,6 +42,7 @@ export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   timestamp: number;
+  modelId?: string;
   sourceMessageId?: string;
   displayStyle?: 'default' | 'notice';
   noticeTitle?: string;

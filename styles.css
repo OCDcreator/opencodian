@@ -82,7 +82,6 @@
   --opencodian-glass-highlight-strong: color-mix(in srgb, var(--interactive-accent) 18%, transparent);
 }
 
-/* Container - transparent to blend with Obsidian background */
 .opencodian-container {
   --opencodian-chat-surface: var(--background-secondary);
   --opencodian-messages-pad-top: 12px;
@@ -945,6 +944,15 @@
 
 .opencodian-message-time-text {
   color: var(--text-muted);
+}
+
+.opencodian-message-model-id {
+  color: var(--text-faint, var(--text-muted));
+  flex: 1 1 auto;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 
 /* User message footer - actions and timestamp on the same row */
@@ -4325,9 +4333,20 @@
 
 /* ==================== Navigation Sidebar ==================== */
 
+.workspace-leaf-content[data-type="opencodian-view"] {
+  position: relative;
+}
+
+.opencodian-nav-sidebar-host {
+  position: absolute;
+  inset: 0;
+  z-index: 220;
+  pointer-events: none;
+}
+
 .opencodian-nav-sidebar {
   position: absolute;
-  left: 0px;
+  left: 4px;
   top: 50%;
   transform: translateY(-50%);
   display: flex;
@@ -4340,7 +4359,7 @@
 }
 
 .opencodian-nav-sidebar.visible {
-  opacity: 0.15;
+  opacity: 0.08;
   pointer-events: auto;
 }
 

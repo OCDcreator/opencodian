@@ -249,9 +249,15 @@ export class OpenCodianView extends ItemView {
     this.buildInputArea(this.inputContainer);
     this.applyChatAppearanceSettings();
 
-    // Navigation sidebar (left side of messages)
+    // Navigation sidebar (mounted on the outer host so it never compresses chat layout)
     if (this.messagesShellEl && this.messagesContainer) {
-      this.navigationSidebar = new NavigationSidebar(this.messagesShellEl, this.messagesContainer);
+      const navMountEl = this.contentEl.closest('.workspace-leaf-content[data-type="opencodian-view"]')
+        ?? this.contentEl;
+      this.navigationSidebar = new NavigationSidebar(
+        navMountEl as HTMLElement,
+        this.messagesShellEl,
+        this.messagesContainer,
+      );
     }
   }
 
@@ -1341,6 +1347,7 @@ export class OpenCodianView extends ItemView {
     }
 
     const modelOptions = this.getSendMessageOptions();
+    const activeModelId = this.formatModelId(modelOptions);
     if (!(await this.ensureSelectedModelAvailable(modelOptions.provider, modelOptions.model))) {
       await this.appendModelUnavailableNoticeMessage();
       return;
@@ -1530,6 +1537,8 @@ export class OpenCodianView extends ItemView {
       pendingState.element = null;
       await this.refreshServerStatusBadge();
       
+      const finalizedTimestamp = Date.now();
+
       // Add timestamp with copy button to the streamed message (after all content)
       if (this.streamingMessageEl) {
         const streamContentBlocks = this.streamController?.getContentBlocks();
@@ -1540,8 +1549,9 @@ export class OpenCodianView extends ItemView {
           .join('') || '';
         this.addTimestampWithCopyButton(
           this.streamingMessageEl,
-          Date.now(),
-          textContent
+          finalizedTimestamp,
+          textContent,
+          activeModelId,
         );
       }
       
@@ -1585,10 +1595,11 @@ export class OpenCodianView extends ItemView {
         
         // Create the assistant message
         const assistantMessage: ChatMessage = {
-          id: `assistant-${Date.now()}`,
+          id: `assistant-${finalizedTimestamp}`,
           role: 'assistant',
           content: textContent,
-          timestamp: Date.now(),
+          timestamp: finalizedTimestamp,
+          modelId: activeModelId,
           contentBlocks: contentBlocks,
         };
         
@@ -1596,10 +1607,11 @@ export class OpenCodianView extends ItemView {
         this.currentConversation.messages.push(assistantMessage);
       } else if (latestErrorMessage && this.currentConversation) {
         this.currentConversation.messages.push({
-          id: `assistant-${Date.now()}`,
+          id: `assistant-${finalizedTimestamp}`,
           role: 'assistant',
           content: latestErrorMessage,
-          timestamp: Date.now(),
+          timestamp: finalizedTimestamp,
+          modelId: activeModelId,
         });
       }
     }
@@ -1743,14 +1755,17 @@ export class OpenCodianView extends ItemView {
     errorEl.createSpan({ cls: 'streaming-error-icon', text: '❌' });
     errorEl.createSpan({ cls: 'streaming-error-text', text: message });
 
-    this.addTimestampWithCopyButton(messageEl, Date.now(), message);
+    const timestamp = Date.now();
+    const modelId = this.formatModelId(this.getCurrentSessionModel());
+    this.addTimestampWithCopyButton(messageEl, timestamp, message, modelId);
 
     if (this.currentConversation) {
       this.currentConversation.messages.push({
-        id: `assistant-${Date.now()}`,
+        id: `assistant-${timestamp}`,
         role: 'assistant',
         content: message,
-        timestamp: Date.now(),
+        timestamp,
+        modelId,
       });
       this.currentConversation.updatedAt = Date.now();
       await this.plugin.storage.saveConversation(this.currentConversation);
@@ -1826,16 +1841,19 @@ export class OpenCodianView extends ItemView {
       errorEl.createSpan({ cls: 'streaming-error-text', text: message });
     }
 
-    this.addTimestampWithCopyButton(messageEl, Date.now(), message);
+    const timestamp = Date.now();
+    const modelId = this.formatModelId(this.getCurrentSessionModel());
+    this.addTimestampWithCopyButton(messageEl, timestamp, message, modelId);
     this.streamingMessageEl = null;
     this.streamingContentEl = null;
 
     if (this.currentConversation) {
       this.currentConversation.messages.push({
-        id: `assistant-${Date.now()}`,
+        id: `assistant-${timestamp}`,
         role: 'assistant',
         content: message,
-        timestamp: Date.now(),
+        timestamp,
+        modelId,
       });
       this.currentConversation.updatedAt = Date.now();
       await this.plugin.storage.saveConversation(this.currentConversation);
@@ -1920,7 +1938,7 @@ export class OpenCodianView extends ItemView {
     } else if (message.displayStyle === 'notice') {
       messageEl.addClass('opencodian-message--notice');
       this.renderNoticeCard(content, message);
-      this.addTimestampWithCopyButton(messageEl, message.timestamp);
+      this.addTimestampWithCopyButton(messageEl, message.timestamp, undefined, message.modelId);
     } else if (message.contentBlocks && message.contentBlocks.length > 0) {
       // For assistant messages, render content blocks (thinking, tools, etc.)
       for (const block of message.contentBlocks) {
@@ -1933,7 +1951,7 @@ export class OpenCodianView extends ItemView {
         .filter(Boolean)
         .join('\n\n');
       // Add timestamp with copy button
-      this.addTimestampWithCopyButton(messageEl, message.timestamp, textContent);
+      this.addTimestampWithCopyButton(messageEl, message.timestamp, textContent, message.modelId);
     } else if (message.content) {
       // Fallback to simple text rendering for assistant
       const textEl = content.createDiv({ cls: 'opencodian-message-text' });
@@ -1943,7 +1961,7 @@ export class OpenCodianView extends ItemView {
         textEl.textContent = message.content;
       }
       // Add timestamp with copy button
-      this.addTimestampWithCopyButton(messageEl, message.timestamp, message.content);
+      this.addTimestampWithCopyButton(messageEl, message.timestamp, message.content, message.modelId);
     }
 
     return messageEl;
@@ -2124,7 +2142,8 @@ export class OpenCodianView extends ItemView {
   private addTimestampWithCopyButton(
     messageEl: HTMLElement,
     timestamp: number,
-    content?: string
+    content?: string,
+    modelId?: string,
   ): void {
     // Create a container for timestamp and copy button
     const timeRow = messageEl.createDiv({ cls: 'opencodian-message-time-row' });
@@ -2136,6 +2155,10 @@ export class OpenCodianView extends ItemView {
     });
     timeRow.createSpan({ cls: 'opencodian-message-time-text', text: timeStr });
 
+    if (modelId) {
+      timeRow.createSpan({ cls: 'opencodian-message-model-id', text: `· ${modelId}` });
+    }
+
     if (!content) {
       return;
     }
@@ -2144,6 +2167,75 @@ export class OpenCodianView extends ItemView {
     const copyBtn = timeRow.createSpan({ cls: 'opencodian-copy-btn-inline' });
     copyBtn.innerHTML = COPY_ICON;
     this.attachCopyButtonBehavior(copyBtn, content);
+  }
+
+  private mergeSyncedMessageModelIds(
+    existingMessages: ChatMessage[],
+    syncedMessages: ChatMessage[],
+  ): ChatMessage[] {
+    const modelIdBySourceMessageId = new Map<string, string>();
+    const fallbackAssistantMessages = existingMessages.filter(
+      (message) => message.role === 'assistant' && message.modelId && !message.sourceMessageId,
+    );
+
+    for (const message of existingMessages) {
+      if (message.role !== 'assistant' || !message.modelId || !message.sourceMessageId) {
+        continue;
+      }
+
+      modelIdBySourceMessageId.set(message.sourceMessageId, message.modelId);
+    }
+
+    const mergedMessages = syncedMessages.map((message) => {
+      if (message.role !== 'assistant') {
+        return message;
+      }
+
+      const persistedModelId = message.sourceMessageId
+        ? modelIdBySourceMessageId.get(message.sourceMessageId)
+        : undefined;
+
+      return persistedModelId
+        ? { ...message, modelId: persistedModelId }
+        : message;
+    });
+
+    const unmatchedSyncedIndexes = mergedMessages.reduce<number[]>((indexes, message, index) => {
+      if (message.role === 'assistant' && !message.modelId) {
+        indexes.push(index);
+      }
+
+      return indexes;
+    }, []);
+
+    for (let fallbackIndex = fallbackAssistantMessages.length - 1; fallbackIndex >= 0; fallbackIndex--) {
+      if (unmatchedSyncedIndexes.length === 0) {
+        break;
+      }
+
+      const fallbackMessage = fallbackAssistantMessages[fallbackIndex];
+      let preferredMatchPosition = -1;
+      if (fallbackMessage.content) {
+        for (let indexPosition = unmatchedSyncedIndexes.length - 1; indexPosition >= 0; indexPosition--) {
+          const unmatchedIndex = unmatchedSyncedIndexes[indexPosition];
+          if (mergedMessages[unmatchedIndex].content === fallbackMessage.content) {
+            preferredMatchPosition = indexPosition;
+            break;
+          }
+        }
+      }
+      const targetPosition = preferredMatchPosition >= 0
+        ? preferredMatchPosition
+        : unmatchedSyncedIndexes.length - 1;
+      const targetIndex = unmatchedSyncedIndexes.splice(targetPosition, 1)[0];
+
+      mergedMessages[targetIndex] = {
+        ...mergedMessages[targetIndex],
+        modelId: fallbackMessage.modelId,
+      };
+    }
+
+    return mergedMessages;
   }
 
   private addUserMessageFooter(messageEl: HTMLElement, message: ChatMessage, content?: string): void {
@@ -2344,7 +2436,10 @@ export class OpenCodianView extends ItemView {
         localMessageCount: conversation.messages.length,
       });
       const serverMessages = await this.plugin.openCodeService.getSessionMessages(conversation.openCodeSessionId);
-      const converted = serverMessages.map(({ info, parts }) => OpenCodeService.openCodeMessageToChatMessage(info, parts));
+      const converted = this.mergeSyncedMessageModelIds(
+        conversation.messages,
+        serverMessages.map(({ info, parts }) => OpenCodeService.openCodeMessageToChatMessage(info, parts)),
+      );
       const noticeMessages = conversation.messages.filter((message) => message.displayStyle === 'notice');
       const merged = [...converted, ...noticeMessages].sort((left, right) => left.timestamp - right.timestamp);
       conversation.messages = merged;
@@ -2909,6 +3004,16 @@ export class OpenCodianView extends ItemView {
     }
 
     return this.getFirstAvailableModel();
+  }
+
+  private formatModelId(
+    model: { provider?: string; model?: string } | null | undefined,
+  ): string | undefined {
+    if (!model?.provider || !model.model) {
+      return undefined;
+    }
+
+    return `${model.provider}/${model.model}`;
   }
 
   /** Switch model for current session */

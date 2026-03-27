@@ -15,6 +15,7 @@ import { t } from '../../../i18n';
  */
 export class NavigationSidebar {
   private static tooltipLabelId = 0;
+  private host: HTMLElement;
   private container: HTMLElement;
   private topBtn: HTMLButtonElement;
   private prevBtn: HTMLButtonElement;
@@ -25,10 +26,12 @@ export class NavigationSidebar {
   private mutationObserver: MutationObserver | null = null;
 
   constructor(
-    private parentEl: HTMLElement,
-    private messagesEl: HTMLElement
+    private mountEl: HTMLElement,
+    private anchorEl: HTMLElement,
+    private messagesEl: HTMLElement,
   ) {
-    this.container = this.parentEl.createDiv({ cls: 'opencodian-nav-sidebar' });
+    this.host = this.mountEl.createDiv({ cls: 'opencodian-nav-sidebar-host' });
+    this.container = this.host.createDiv({ cls: 'opencodian-nav-sidebar' });
 
     // Create buttons
     this.topBtn = this.createButton('opencodian-nav-btn-top', 'chevrons-up', t('chat.navigation.top'));
@@ -57,16 +60,26 @@ export class NavigationSidebar {
   }
 
   private setupEventListeners(): void {
-    this.scrollHandler = () => this.updateVisibility();
+    this.scrollHandler = () => {
+      this.updateVisibility();
+      this.updatePosition();
+    };
     this.messagesEl.addEventListener('scroll', this.scrollHandler, { passive: true });
 
     if (typeof ResizeObserver !== 'undefined') {
-      this.resizeObserver = new ResizeObserver(() => this.updateVisibility());
-      this.resizeObserver.observe(this.parentEl);
+      this.resizeObserver = new ResizeObserver(() => {
+        this.updateVisibility();
+        this.updatePosition();
+      });
+      this.resizeObserver.observe(this.mountEl);
+      this.resizeObserver.observe(this.anchorEl);
       this.resizeObserver.observe(this.messagesEl);
     }
 
-    this.mutationObserver = new MutationObserver(() => this.updateVisibility());
+    this.mutationObserver = new MutationObserver(() => {
+      this.updateVisibility();
+      this.updatePosition();
+    });
     this.mutationObserver.observe(this.messagesEl, {
       childList: true,
       subtree: true,
@@ -93,6 +106,19 @@ export class NavigationSidebar {
     const { scrollHeight, clientHeight } = this.messagesEl;
     const isScrollable = scrollHeight > clientHeight + 50; // Small buffer
     this.container.classList.toggle('visible', isScrollable);
+    this.updatePosition();
+  }
+
+  private updatePosition(): void {
+    const mountRect = this.mountEl.getBoundingClientRect();
+    const anchorRect = this.anchorEl.getBoundingClientRect();
+
+    if (mountRect.height === 0 || anchorRect.height === 0) {
+      return;
+    }
+
+    const top = anchorRect.top - mountRect.top + (anchorRect.height / 2);
+    this.container.style.top = `${Math.round(top)}px`;
   }
 
   private getElementScrollTop(element: HTMLElement): number {
@@ -172,6 +198,6 @@ export class NavigationSidebar {
     this.resizeObserver = null;
     this.mutationObserver?.disconnect();
     this.mutationObserver = null;
-    this.container.remove();
+    this.host.remove();
   }
 }
