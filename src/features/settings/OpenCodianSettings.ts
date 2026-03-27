@@ -29,6 +29,7 @@ import { type ServerHelpTopic,ServerSettingHelpModal } from './ServerSettingHelp
 const logger = createLogger('OpenCodianSettings');
 
 interface NumericStyleControlConfig {
+  group: ChatAppearanceStyleGroup;
   name: string;
   desc: string;
   min: number;
@@ -38,6 +39,13 @@ interface NumericStyleControlConfig {
   defaultValue: number;
   value: () => number;
   setValue: (value: number) => void;
+}
+
+type ChatAppearanceStyleGroup = 'layout' | 'user' | 'assistant' | 'input' | 'scrollbar' | 'advanced';
+
+interface StyleControlBinding {
+  group: ChatAppearanceStyleGroup;
+  syncFromSettings: () => void;
 }
 
 interface ElectronDialogModule {
@@ -91,6 +99,8 @@ export class OpenCodianSettingTab extends PluginSettingTab {
   private lastObservedSettingsScrollTop = 0;
   private pendingOpenScrollTop: number | null = null;
   private pendingOpenSectionTitle: string | null = null;
+  private settingsPanelPostRenderFrameId: number | null = null;
+  private styleControlBindings: StyleControlBinding[] = [];
 
   constructor(app: App, plugin: OpenCodianPlugin) {
     super(app, plugin);
@@ -151,6 +161,11 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       this.serverStatusIntervalId = null;
     }
     this.refreshServerStatusCallback = undefined;
+    if (this.settingsPanelPostRenderFrameId !== null) {
+      window.cancelAnimationFrame(this.settingsPanelPostRenderFrameId);
+      this.settingsPanelPostRenderFrameId = null;
+    }
+    this.styleControlBindings = [];
     containerEl.empty();
     containerEl.addClass('opencodian-settings');
     if (pendingOpenScrollTop !== null || pendingOpenSectionTitle !== null) {
@@ -198,14 +213,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     ];
 
     this.buildQuickNav(quickNavEl, sections);
-    this.bindSettingsPanelScrollPersistence();
-    if (pendingOpenSectionTitle) {
-      this.scrollToSectionByTitle(pendingOpenSectionTitle);
-      this.finishPendingOpenVisibility();
-    } else {
-      this.restoreSettingsPanelScrollPosition(pendingOpenScrollTop ?? this.plugin.settings.settingsPanelScrollTop);
-      this.finishPendingOpenVisibility();
-    }
+    this.scheduleSettingsPanelPostRenderSetup(pendingOpenScrollTop, pendingOpenSectionTitle);
     this.clearInitialQuickNavFocus();
   }
 
@@ -812,6 +820,11 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       window.cancelAnimationFrame(this.modelRefreshFrameId);
       this.modelRefreshFrameId = null;
     }
+    if (this.settingsPanelPostRenderFrameId !== null) {
+      window.cancelAnimationFrame(this.settingsPanelPostRenderFrameId);
+      this.settingsPanelPostRenderFrameId = null;
+    }
+    this.styleControlBindings = [];
     this.refreshModelsCallback = undefined;
     super.hide();
   }
@@ -1110,11 +1123,13 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       .addDropdown((dropdown) => {
         dropdown.addOption('input', t('settings.ui.tabPosition.input'));
         dropdown.addOption('header', t('settings.ui.tabPosition.header'));
+        dropdown.addOption('below-header', t('settings.ui.tabPosition.belowHeader'));
         dropdown
           .setValue(this.plugin.settings.tabBarPosition)
           .onChange(async (value) => {
-            this.plugin.settings.tabBarPosition = value as 'input' | 'header';
+            this.plugin.settings.tabBarPosition = value as TabBarPosition;
             await this.plugin.saveSettings();
+            this.plugin.applyTabBarLayoutToViews();
           });
       });
 
@@ -1174,7 +1189,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
           .onClick(() => {
             this.plugin.settings.chatAppearance = getDefaultChatAppearanceSettings();
             this.applyAndScheduleStyleUpdate();
-            this.display();
+            this.refreshStyleControlValues();
           });
       });
 
@@ -1184,6 +1199,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       t('settings.style.groups.layout.desc'),
     );
     this.addNumericStyleControl(layoutGroupEl, {
+      group: 'layout',
       name: t('settings.style.layout.messagesPaddingTop.name'),
       desc: t('settings.style.layout.messagesPaddingTop.desc'),
       min: 0,
@@ -1197,6 +1213,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       },
     });
     this.addNumericStyleControl(layoutGroupEl, {
+      group: 'layout',
       name: t('settings.style.layout.messagesPaddingX.name'),
       desc: t('settings.style.layout.messagesPaddingX.desc'),
       min: 0,
@@ -1210,6 +1227,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       },
     });
     this.addNumericStyleControl(layoutGroupEl, {
+      group: 'layout',
       name: t('settings.style.sticky.headerGap.name'),
       desc: t('settings.style.sticky.headerGap.desc'),
       min: 0,
@@ -1223,6 +1241,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       },
     });
     this.addNumericStyleControl(layoutGroupEl, {
+      group: 'layout',
       name: t('settings.style.sticky.maskHeight.name'),
       desc: t('settings.style.sticky.maskHeight.desc'),
       min: 0,
@@ -1236,6 +1255,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       },
     });
     this.addNumericStyleControl(layoutGroupEl, {
+      group: 'layout',
       name: t('settings.style.sticky.maskBlur.name'),
       desc: t('settings.style.sticky.maskBlur.desc'),
       min: 0,
@@ -1256,6 +1276,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       t('settings.style.groups.user.desc'),
     );
     this.addNumericStyleControl(userGroupEl, {
+      group: 'user',
       name: t('settings.style.user.radius.name'),
       desc: t('settings.style.user.radius.desc'),
       min: 8,
@@ -1269,6 +1290,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       },
     });
     this.addNumericStyleControl(userGroupEl, {
+      group: 'user',
       name: t('settings.style.user.tailRadius.name'),
       desc: t('settings.style.user.tailRadius.desc'),
       min: 0,
@@ -1282,6 +1304,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       },
     });
     this.addNumericStyleControl(userGroupEl, {
+      group: 'user',
       name: t('settings.style.user.blur.name'),
       desc: t('settings.style.user.blur.desc'),
       min: 0,
@@ -1295,6 +1318,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       },
     });
     this.addNumericStyleControl(userGroupEl, {
+      group: 'user',
       name: t('settings.style.user.shadowBlur.name'),
       desc: t('settings.style.user.shadowBlur.desc'),
       min: 0,
@@ -1315,6 +1339,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       t('settings.style.groups.assistant.desc'),
     );
     this.addNumericStyleControl(assistantGroupEl, {
+      group: 'assistant',
       name: t('settings.style.assistant.radius.name'),
       desc: t('settings.style.assistant.radius.desc'),
       min: 8,
@@ -1328,6 +1353,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       },
     });
     this.addNumericStyleControl(assistantGroupEl, {
+      group: 'assistant',
       name: t('settings.style.assistant.backgroundOpacity.name'),
       desc: t('settings.style.assistant.backgroundOpacity.desc'),
       min: 0,
@@ -1341,6 +1367,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       },
     });
     this.addNumericStyleControl(assistantGroupEl, {
+      group: 'assistant',
       name: t('settings.style.assistant.blur.name'),
       desc: t('settings.style.assistant.blur.desc'),
       min: 0,
@@ -1354,6 +1381,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       },
     });
     this.addNumericStyleControl(assistantGroupEl, {
+      group: 'assistant',
       name: t('settings.style.assistant.shadowBlur.name'),
       desc: t('settings.style.assistant.shadowBlur.desc'),
       min: 0,
@@ -1374,6 +1402,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       t('settings.style.groups.input.desc'),
     );
     this.addNumericStyleControl(inputGroupEl, {
+      group: 'input',
       name: t('settings.style.input.radius.name'),
       desc: t('settings.style.input.radius.desc'),
       min: 8,
@@ -1387,6 +1416,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       },
     });
     this.addNumericStyleControl(inputGroupEl, {
+      group: 'input',
       name: t('settings.style.input.blur.name'),
       desc: t('settings.style.input.blur.desc'),
       min: 0,
@@ -1400,6 +1430,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       },
     });
     this.addNumericStyleControl(inputGroupEl, {
+      group: 'input',
       name: t('settings.style.input.shadowBlur.name'),
       desc: t('settings.style.input.shadowBlur.desc'),
       min: 0,
@@ -1420,6 +1451,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       t('settings.style.groups.scrollbar.desc'),
     );
     this.addNumericStyleControl(scrollbarGroupEl, {
+      group: 'scrollbar',
       name: t('settings.style.scrollbar.width.name'),
       desc: t('settings.style.scrollbar.width.desc'),
       min: 6,
@@ -1433,6 +1465,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       },
     });
     this.addNumericStyleControl(scrollbarGroupEl, {
+      group: 'scrollbar',
       name: t('settings.style.scrollbar.radius.name'),
       desc: t('settings.style.scrollbar.radius.desc'),
       min: 2,
@@ -1446,6 +1479,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       },
     });
     this.addNumericStyleControl(scrollbarGroupEl, {
+      group: 'scrollbar',
       name: t('settings.style.scrollbar.trackOpacity.name'),
       desc: t('settings.style.scrollbar.trackOpacity.desc'),
       min: 0,
@@ -1459,6 +1493,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       },
     });
     this.addNumericStyleControl(scrollbarGroupEl, {
+      group: 'scrollbar',
       name: t('settings.style.scrollbar.thumbOpacity.name'),
       desc: t('settings.style.scrollbar.thumbOpacity.desc'),
       min: 20,
@@ -1472,6 +1507,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       },
     });
     this.addNumericStyleControl(scrollbarGroupEl, {
+      group: 'scrollbar',
       name: t('settings.style.scrollbar.thumbHoverOpacity.name'),
       desc: t('settings.style.scrollbar.thumbHoverOpacity.desc'),
       min: 30,
@@ -1485,6 +1521,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       },
     });
     this.addNumericStyleControl(scrollbarGroupEl, {
+      group: 'scrollbar',
       name: t('settings.style.scrollbar.edgePadding.name'),
       desc: t('settings.style.scrollbar.edgePadding.desc'),
       min: 0,
@@ -1498,6 +1535,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       },
     });
     this.addNumericStyleControl(scrollbarGroupEl, {
+      group: 'scrollbar',
       name: t('settings.style.scrollbar.shadowOpacity.name'),
       desc: t('settings.style.scrollbar.shadowOpacity.desc'),
       min: 0,
@@ -1528,6 +1566,19 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     });
 
     advancedSetting.addTextArea((text) => {
+      const syncFromSettings = () => {
+        const currentValue = this.plugin.settings.chatAppearance.advanced.customCssDeclarations;
+        text.setValue(currentValue);
+        if (isValidChatAppearanceCustomCssDeclarations(currentValue)) {
+          text.inputEl.removeClass('is-invalid');
+          validationEl.empty();
+          return;
+        }
+
+        text.inputEl.addClass('is-invalid');
+        validationEl.setText(t('settings.style.advanced.customCssDeclarations.invalid'));
+      };
+
       text
         .setPlaceholder(t('settings.style.advanced.customCssDeclarations.placeholder'))
         .setValue(this.plugin.settings.chatAppearance.advanced.customCssDeclarations)
@@ -1547,6 +1598,8 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       text.inputEl.rows = 6;
       text.inputEl.cols = 44;
       text.inputEl.addClass('opencodian-style-textarea');
+
+      this.registerStyleControlBinding('advanced', syncFromSettings);
     });
 
     this.createStyleResetSetting(advancedGroupEl, 'advanced');
@@ -1648,11 +1701,14 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     });
 
     renderValue(config.value());
+    this.registerStyleControlBinding(config.group, () => {
+      renderValue(config.value());
+    });
   }
 
   private createStyleResetSetting(
     containerEl: HTMLElement,
-    group: 'layout' | 'user' | 'assistant' | 'input' | 'scrollbar' | 'advanced',
+    group: ChatAppearanceStyleGroup,
   ): void {
     new Setting(containerEl)
       .setName(t('settings.style.groupReset.name'))
@@ -1664,14 +1720,12 @@ export class OpenCodianSettingTab extends PluginSettingTab {
           .onClick(() => {
             this.resetChatAppearanceGroup(group);
             this.applyAndScheduleStyleUpdate();
-            this.display();
+            this.refreshStyleControlValues(group);
           });
       });
   }
 
-  private resetChatAppearanceGroup(
-    group: 'layout' | 'user' | 'assistant' | 'input' | 'scrollbar' | 'advanced',
-  ): void {
+  private resetChatAppearanceGroup(group: ChatAppearanceStyleGroup): void {
     const defaults = getDefaultChatAppearanceSettings();
     if (group === 'layout') {
       this.plugin.settings.chatAppearance.layout = { ...defaults.layout };
@@ -1702,6 +1756,25 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     this.plugin.settings.chatAppearance.advanced = { ...defaults.advanced };
   }
 
+  private registerStyleControlBinding(
+    group: ChatAppearanceStyleGroup,
+    syncFromSettings: () => void,
+  ): void {
+    this.styleControlBindings.push({
+      group,
+      syncFromSettings,
+    });
+  }
+
+  private refreshStyleControlValues(group?: ChatAppearanceStyleGroup): void {
+    for (const binding of this.styleControlBindings) {
+      if (group && binding.group !== group) {
+        continue;
+      }
+      binding.syncFromSettings();
+    }
+  }
+
   private clampStyleNumber(value: number, min: number, max: number, step: number): number {
     const clampedValue = Math.min(max, Math.max(min, value));
     const steppedValue = Math.round(clampedValue / step) * step;
@@ -1713,35 +1786,61 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     this.plugin.scheduleChatAppearanceSave();
   }
 
-  private bindSettingsPanelScrollPersistence(): void {
+  private scheduleSettingsPanelPostRenderSetup(
+    pendingOpenScrollTop: number | null,
+    pendingOpenSectionTitle: string | null,
+  ): void {
+    this.settingsPanelPostRenderFrameId = window.requestAnimationFrame(() => {
+      this.settingsPanelPostRenderFrameId = null;
+      const scrollContainer = this.getSettingsScrollContainer();
+      this.bindSettingsPanelScrollPersistence(scrollContainer);
+
+      if (pendingOpenSectionTitle) {
+        this.scrollToSectionByTitle(pendingOpenSectionTitle);
+        this.finishPendingOpenVisibility();
+        return;
+      }
+
+      this.restoreSettingsPanelScrollPosition(
+        pendingOpenScrollTop ?? this.plugin.settings.settingsPanelScrollTop,
+        scrollContainer,
+      );
+      this.finishPendingOpenVisibility();
+    });
+  }
+
+  private bindSettingsPanelScrollPersistence(scrollContainer?: HTMLElement): void {
     if (this.settingsScrollHandler) {
       this.settingsScrollContainerEl?.removeEventListener('scroll', this.settingsScrollHandler);
     }
 
-    const scrollContainer = this.getSettingsScrollContainer();
-    this.settingsScrollContainerEl = scrollContainer;
-    this.lastObservedSettingsScrollTop = scrollContainer.scrollTop;
+    const resolvedScrollContainer = scrollContainer ?? this.getSettingsScrollContainer();
+    this.settingsScrollContainerEl = resolvedScrollContainer;
+    this.lastObservedSettingsScrollTop = resolvedScrollContainer.scrollTop;
 
     this.settingsScrollHandler = () => {
-      this.plugin.settings.settingsPanelScrollTop = scrollContainer.scrollTop;
-      this.lastObservedSettingsScrollTop = scrollContainer.scrollTop;
+      this.plugin.settings.settingsPanelScrollTop = resolvedScrollContainer.scrollTop;
+      this.lastObservedSettingsScrollTop = resolvedScrollContainer.scrollTop;
       this.plugin.scheduleSettingsUiStateSave();
     };
 
-    scrollContainer.addEventListener('scroll', this.settingsScrollHandler, { passive: true });
+    resolvedScrollContainer.addEventListener('scroll', this.settingsScrollHandler, { passive: true });
   }
 
-  private restoreSettingsPanelScrollPosition(scrollTop = this.plugin.settings.settingsPanelScrollTop): void {
-    const scrollContainer = this.settingsScrollContainerEl ?? this.getSettingsScrollContainer();
-    this.settingsScrollContainerEl = scrollContainer;
+  private restoreSettingsPanelScrollPosition(
+    scrollTop = this.plugin.settings.settingsPanelScrollTop,
+    scrollContainer?: HTMLElement,
+  ): void {
+    const resolvedScrollContainer = scrollContainer ?? this.settingsScrollContainerEl ?? this.getSettingsScrollContainer();
+    this.settingsScrollContainerEl = resolvedScrollContainer;
 
     const applyRestore = () => {
-      if (!scrollContainer.isConnected) {
+      if (!resolvedScrollContainer.isConnected) {
         return;
       }
 
-      if (Math.abs(scrollContainer.scrollTop - scrollTop) > 1) {
-        scrollContainer.scrollTop = scrollTop;
+      if (Math.abs(resolvedScrollContainer.scrollTop - scrollTop) > 1) {
+        resolvedScrollContainer.scrollTop = scrollTop;
       }
     };
 
