@@ -5,13 +5,14 @@
  */
 
 import type { EventRef, WorkspaceLeaf } from 'obsidian';
-import { Component, ItemView, Notice, Scope, setIcon } from 'obsidian';
+import { addIcon, Component, ItemView, Notice, Scope, setIcon } from 'obsidian';
 
 import { OpenCodeService } from '../../core/opencode';
 import {
   type ChatMessage,
   type ContentBlock,
   type Conversation,
+  getDefaultPersistedTabState,
   type ToolCallInfo,
   VIEW_TYPE_OPENCODIAN,
 } from '../../core/types';
@@ -29,7 +30,7 @@ import {
 } from '../../utils/streaming';
 import { buildChatAppearanceCustomCss, getChatAppearanceCssVariables } from './chatAppearance';
 import { type CollapsibleState,setupCollapsible } from './rendering/collapsible';
-import { TabBar, TabManager } from './tabs';
+import { TabBar, TabManager, type RestoredTabState } from './tabs';
 import { EffortSelector } from './ui/EffortSelector';
 import { NavigationSidebar } from './ui/NavigationSidebar';
 
@@ -86,6 +87,9 @@ type ChatServerAvailability = 'checking' | 'running' | 'starting' | 'offline' | 
 const COPY_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`;
 const FORK_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><circle cx="18" cy="6" r="3"/><path d="M6 9v3a3 3 0 0 0 3 3h6a3 3 0 0 0 3-3V9"/><path d="M12 12v3"/></svg>`;
 const REWIND_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5v0a5.5 5.5 0 0 1-5.5 5.5H11"/></svg>`;
+const NEW_TAB_ICON = `<g fill="none" stroke="currentColor" stroke-width="8.333" stroke-linecap="round" stroke-linejoin="round"><circle cx="50" cy="50" r="41.667"/><path d="M33.333 50h33.334"/><path d="M50 33.333v33.334"/></g>`;
+
+addIcon('opencodian-circle-plus', NEW_TAB_ICON);
 
 export class OpenCodianView extends ItemView {
   private static tooltipLabelId = 0;
@@ -205,10 +209,14 @@ export class OpenCodianView extends ItemView {
   }
 
   async onClose() {
+    this.persistTabState({ flush: true });
     this.stopServerStatusLoop();
     this.clearChatSurfaceSyncTimers();
     this.chatAppearanceStyleEl?.remove();
     this.chatAppearanceStyleEl = null;
+    this.effortSelector?.destroy();
+    this.effortSelector = null;
+    this.effortContainerEl = null;
 
     // Cleanup navigation sidebar
     this.navigationSidebar?.destroy();
@@ -279,7 +287,10 @@ export class OpenCodianView extends ItemView {
 
     this.tabManager = new TabManager(t('chat.tab.new'), {
       getMaxTabs: () => this.plugin.settings.maxTabs,
-      onChanged: () => this.renderTabBar(),
+      onChanged: () => {
+        this.renderTabBar();
+        this.persistTabState();
+      },
     });
 
     this.applyTabBarLayout();
@@ -287,6 +298,12 @@ export class OpenCodianView extends ItemView {
 
   private async initializeFirstTab(): Promise<void> {
     if (!this.tabManager) {
+      return;
+    }
+
+    const restoredTabId = this.restorePersistedTabs();
+    if (restoredTabId) {
+      await this.activateTab(restoredTabId);
       return;
     }
 
@@ -307,6 +324,60 @@ export class OpenCodianView extends ItemView {
     }
 
     this.tabBar.render(this.tabManager.getTabBarItems());
+  }
+
+  private restorePersistedTabs(): string | null {
+    if (!this.tabManager) {
+      return null;
+    }
+
+    const savedState = this.plugin.settings.tabState;
+    if (!savedState.tabs.length) {
+      return null;
+    }
+
+    const conversationMap = new Map(
+      this.plugin.getConversations().map((conversation) => [conversation.id, conversation] as const),
+    );
+    const restoredTab = this.tabManager.restoreTabs(
+      savedState.tabs as RestoredTabState[],
+      savedState.activeTabIndex,
+      conversationMap,
+    );
+
+    if (!restoredTab) {
+      this.plugin.settings.tabState = getDefaultPersistedTabState();
+      this.persistTabState({ flush: true });
+      return null;
+    }
+
+    return restoredTab.id;
+  }
+
+  private persistTabState(options: { flush?: boolean } = {}): void {
+    if (!this.tabManager) {
+      return;
+    }
+
+    const tabs = this.tabManager.getAllTabs();
+    const activeTabId = this.tabManager.getActiveTab()?.id ?? null;
+    const activeTabIndex = Math.max(0, tabs.findIndex((tab) => tab.id === activeTabId));
+
+    this.plugin.settings.tabState = {
+      tabs: tabs.map((tab) => ({
+        conversationId: tab.conversationId,
+        title: tab.title,
+        modelOverride: tab.modelOverride,
+      })),
+      activeTabIndex,
+    };
+
+    if (options.flush) {
+      void this.plugin.storage.saveSettings(this.plugin.settings);
+      return;
+    }
+
+    this.plugin.scheduleSettingsUiStateSave();
   }
 
   private async handleTabSwitch(tabId: string): Promise<void> {
@@ -559,36 +630,45 @@ export class OpenCodianView extends ItemView {
     const actions = header.createDiv({ cls: 'opencodian-header-actions' });
 
     this.serverStatusBadgeEl = actions.createDiv({ cls: 'opencodian-server-status-badge is-checking' });
+    this.serverStatusBadgeEl.addClass('opencodian-tooltip-trigger');
+    this.serverStatusBadgeEl.setAttribute('data-tooltip', t('chat.serverStatus.openSettings'));
+    this.serverStatusBadgeEl.setAttribute('data-tooltip-position', 'bottom');
+    this.attachTooltipLabel(this.serverStatusBadgeEl, t('chat.serverStatus.openSettings'));
     this.serverStatusBadgeEl.createSpan({ cls: 'opencodian-server-status-dot' });
     this.serverStatusTextEl = this.serverStatusBadgeEl.createSpan({
       cls: 'opencodian-server-status-text',
       text: t('chat.serverStatus.checking'),
     });
-    this.serverStatusBadgeEl.setAttribute('aria-label', t('chat.serverStatus.openSettings'));
     this.serverStatusBadgeEl.addEventListener('click', () => {
       this.openPluginSettingsAtServerSection();
     });
 
     // New conversation button
-    const newBtn = actions.createDiv({ cls: 'opencodian-header-btn' });
-    setIcon(newBtn, 'plus');
-    newBtn.setAttribute('aria-label', t('chat.tab.new'));
+    const newBtn = actions.createDiv({ cls: 'opencodian-header-btn opencodian-tooltip-trigger' });
+    setIcon(newBtn, 'opencodian-circle-plus');
+    newBtn.setAttribute('data-tooltip', t('chat.tab.newTooltip'));
+    newBtn.setAttribute('data-tooltip-position', 'bottom');
+    this.attachTooltipLabel(newBtn, t('chat.tab.newTooltip'));
     newBtn.addEventListener('click', () => {
       void this.createNewConversation();
     });
 
     // History button
-    const historyBtn = actions.createDiv({ cls: 'opencodian-header-btn' });
+    const historyBtn = actions.createDiv({ cls: 'opencodian-header-btn opencodian-tooltip-trigger' });
     setIcon(historyBtn, 'history');
-    historyBtn.setAttribute('aria-label', 'History');
+    historyBtn.setAttribute('data-tooltip', t('chat.history.open'));
+    historyBtn.setAttribute('data-tooltip-position', 'bottom');
+    this.attachTooltipLabel(historyBtn, t('chat.history.open'));
     historyBtn.addEventListener('click', (event) => {
       this.showConversationHistory(event);
     });
 
     // Settings button
-    const settingsBtn = actions.createDiv({ cls: 'opencodian-header-btn' });
+    const settingsBtn = actions.createDiv({ cls: 'opencodian-header-btn opencodian-tooltip-trigger' });
     setIcon(settingsBtn, 'settings');
-    settingsBtn.setAttribute('aria-label', 'Settings');
+    settingsBtn.setAttribute('data-tooltip', t('chat.settings.open'));
+    settingsBtn.setAttribute('data-tooltip-position', 'bottom');
+    this.attachTooltipLabel(settingsBtn, t('chat.settings.open'));
     settingsBtn.addEventListener('click', () => {
       this.openPluginSettingsPreservingScroll();
     });
@@ -654,7 +734,7 @@ export class OpenCodianView extends ItemView {
       );
       this.serverStatusBadgeEl.addClass(`is-${availability}`);
       this.serverStatusTextEl.setText(this.getServerStatusLabel(availability, statusKeyMap));
-      this.serverStatusBadgeEl.setAttribute('title', t('chat.serverStatus.openSettings'));
+      this.serverStatusBadgeEl.setAttribute('data-tooltip', t('chat.serverStatus.openSettings'));
     } finally {
       this.isRefreshingServerStatus = false;
     }
@@ -1193,7 +1273,10 @@ export class OpenCodianView extends ItemView {
 
     this.tabManager = new TabManager(t('chat.tab.new'), {
       getMaxTabs: () => this.plugin.settings.maxTabs,
-      onChanged: () => this.renderTabBar(),
+      onChanged: () => {
+        this.renderTabBar();
+        this.persistTabState();
+      },
     });
     this.renderTabBar();
     await this.createNewConversation();

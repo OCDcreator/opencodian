@@ -1,6 +1,7 @@
 import { Tab } from './Tab';
 import type {
   CloseTabResult,
+  RestoredTabState,
   TabBarItem,
   TabConversationLike,
   TabData,
@@ -92,6 +93,53 @@ export class TabManager {
 
   getAllTabs(): TabData[] {
     return this.tabs.map((tab) => tab.getData());
+  }
+
+  restoreTabs(
+    items: RestoredTabState[],
+    activeTabIndex: number,
+    conversations: ReadonlyMap<string, TabConversationLike>,
+  ): TabData | null {
+    this.tabs.length = 0;
+    this.activeTabId = null;
+
+    const maxTabs = this.options.getMaxTabs();
+    const limitedItems = items.slice(0, Math.max(1, maxTabs));
+    let restoredActiveIndex: number | null = null;
+
+    for (const [index, item] of limitedItems.entries()) {
+      if (item.conversationId && !conversations.has(item.conversationId)) {
+        continue;
+      }
+
+      const conversation = item.conversationId
+        ? (conversations.get(item.conversationId) ?? null)
+        : null;
+      const tab = new Tab(item.title || this.defaultTitle, conversation);
+
+      tab.setTitle(conversation?.title || item.title || this.defaultTitle);
+      tab.setModelOverride(item.modelOverride ?? null);
+      this.tabs.push(tab);
+
+      if (index === activeTabIndex) {
+        restoredActiveIndex = this.tabs.length - 1;
+      }
+    }
+
+    if (this.tabs.length === 0) {
+      this.notifyChanged();
+      return null;
+    }
+
+    const nextActiveIndex = restoredActiveIndex ?? Math.min(activeTabIndex, this.tabs.length - 1);
+    const nextActiveTab = this.tabs[Math.max(0, nextActiveIndex)];
+    for (const tab of this.tabs) {
+      tab.setActive(tab.getId() === nextActiveTab.getId());
+    }
+
+    this.activeTabId = nextActiveTab.getId();
+    this.notifyChanged();
+    return nextActiveTab.getData();
   }
 
   getTabBarItems(): TabBarItem[] {

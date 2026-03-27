@@ -18,10 +18,12 @@ import {
   DEFAULT_SETTINGS,
   getCurrentPlatformDebugLogPath,
   getCurrentPlatformKey,
+  getDefaultPersistedTabState,
   getServerBaseUrl,
   isLocalServerMode,
   normalizeChatAppearanceSettings,
   normalizeEffortLevel,
+  normalizePersistedTabState,
   normalizeThinkingBudget,
   VIEW_TYPE_OPENCODIAN,
 } from './core/types';
@@ -289,6 +291,11 @@ export default class OpenCodianPlugin extends Plugin {
         ? (savedSettings as { chatAppearance?: Partial<OpenCodianSettings['chatAppearance']> }).chatAppearance
         : undefined;
     const normalizedChatAppearance = normalizeChatAppearanceSettings(savedChatAppearance);
+    const savedTabState =
+      savedSettings && typeof savedSettings === 'object' && 'tabState' in savedSettings
+        ? (savedSettings as { tabState?: Partial<OpenCodianSettings['tabState']> }).tabState
+        : undefined;
+    const normalizedTabState = normalizePersistedTabState(savedTabState);
 
     const normalizedSettings = savedSettings
       ? {
@@ -302,6 +309,7 @@ export default class OpenCodianPlugin extends Plugin {
           thinkingBudget: normalizeThinkingBudget(savedSettings.thinkingBudget),
           debugLogPaths: normalizedDebugLogPaths,
           chatAppearance: normalizedChatAppearance,
+          tabState: normalizedTabState,
         }
       : null;
     this.settings = {
@@ -310,6 +318,7 @@ export default class OpenCodianPlugin extends Plugin {
       server: normalizedServer,
       debugLogPaths: normalizedDebugLogPaths,
       chatAppearance: normalizedChatAppearance,
+      tabState: normalizedTabState ?? getDefaultPersistedTabState(),
     };
   }
 

@@ -347,6 +347,69 @@ export function isValidChatAppearanceCustomCssDeclarations(value: string): boole
     && !loweredValue.includes('</style');
 }
 
+export interface PersistedTabModelOverride {
+  provider: string;
+  model: string;
+}
+
+export interface PersistedTabEntry {
+  conversationId: string | null;
+  title: string;
+  modelOverride: PersistedTabModelOverride | null;
+}
+
+export interface PersistedTabState {
+  tabs: PersistedTabEntry[];
+  activeTabIndex: number;
+}
+
+export function getDefaultPersistedTabState(): PersistedTabState {
+  return {
+    tabs: [],
+    activeTabIndex: 0,
+  };
+}
+
+export function normalizePersistedTabState(state?: Partial<PersistedTabState> | null): PersistedTabState {
+  const tabs = Array.isArray(state?.tabs)
+    ? state.tabs.flatMap((entry) => {
+        if (!entry || typeof entry !== 'object') {
+          return [];
+        }
+
+        const conversationId = typeof entry.conversationId === 'string'
+          ? entry.conversationId
+          : null;
+        const title = typeof entry.title === 'string' && entry.title.trim()
+          ? entry.title
+          : '';
+        const modelOverride =
+          entry.modelOverride
+          && typeof entry.modelOverride === 'object'
+          && typeof entry.modelOverride.provider === 'string'
+          && typeof entry.modelOverride.model === 'string'
+            ? {
+                provider: entry.modelOverride.provider,
+                model: entry.modelOverride.model,
+              }
+            : null;
+
+        return [{
+          conversationId,
+          title,
+          modelOverride,
+        }];
+      })
+    : [];
+
+  return {
+    tabs,
+    activeTabIndex: Number.isInteger(state?.activeTabIndex) && (state?.activeTabIndex ?? 0) >= 0
+      ? (state?.activeTabIndex as number)
+      : 0,
+  };
+}
+
 /** Main settings interface */
 export interface OpenCodianSettings {
   // User preferences
@@ -386,6 +449,7 @@ export interface OpenCodianSettings {
   enableDebugLogging: boolean;
   debugLogPaths: PlatformDebugLogPaths;
   openInMainTab: boolean;
+  tabState: PersistedTabState;
 
   // Language
   locale: string;
@@ -449,6 +513,7 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
   enableDebugLogging: false,
   debugLogPaths: getDefaultDebugLogPaths(),
   openInMainTab: false,
+  tabState: getDefaultPersistedTabState(),
 
   locale: 'en',
 

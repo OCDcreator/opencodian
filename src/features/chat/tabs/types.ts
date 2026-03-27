@@ -27,6 +27,12 @@ export interface TabBarItem {
   canClose: boolean;
 }
 
+export interface RestoredTabState {
+  conversationId: string | null;
+  title: string;
+  modelOverride: TabModelOverride | null;
+}
+
 export interface TabManagerOptions {
   getMaxTabs: () => number;
   onChanged?: () => void;

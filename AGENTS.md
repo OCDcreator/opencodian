@@ -388,6 +388,9 @@ npm run build && cp dist/main.js dist/manifest.json dist/styles.css ../../testva
 - On Windows, deploy to `C:\Users\lt\Desktop\Write\testvault\.obsidian\plugins\opencodian\`.
 - Skip deployment only if the user explicitly says not to build/deploy, or if the task is analysis-only with no file changes.
 - After deployment, report whether build and copy succeeded or failed.
+- Agents must run build and deploy as two separate sequential steps: first `npm run build`, wait for it to finish successfully, then copy the freshly built `dist/main.js`, `dist/manifest.json`, and `dist/styles.css` into the Test Vault plugin directory.
+- Agents must not use parallel commands, chained deploy shortcuts, or any workflow that can copy artifacts before the newest build has completed. In particular, do not use `npm run build && copy ...`, do not use parallel tool calls for build/deploy, and do not verify deployment until the copy step has finished.
+- After deployment, agents must verify that the Test Vault plugin `main.js` contains the latest `BUILD_ID` from the just-finished build and report that exact `BUILD_ID`.
 
 ## Development Notes
 
@@ -432,4 +435,4 @@ This is the main development log maintained in the Obsidian vault for easy refer
 ---
 
 **Last Updated**: 2026-03-27
-**Plugin Version**: 0.1.0
+**Plugin Version**: 1.0.0
