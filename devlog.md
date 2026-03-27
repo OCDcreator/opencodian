@@ -8,6 +8,151 @@
 
 ---
 
+## 2026-03-27 Logger 控制台输出增加时间戳
+
+### 📋 本次开发目标
+继续打磨日志可读性，让控制台输出在不打开诊断报告的情况下也能快速判断事件发生顺序。
+
+### ✅ 实现内容
+
+#### 1. 为 logger 控制台输出统一添加本地时间戳
+- 在 `src/shared/logger.ts` 中新增 `getTimestamp()`
+- `formatArgs()` 统一改为输出：
+  - `[HH:mm:ss] [scope] message`
+- 适用于：
+  - `logger.info()`
+  - `logger.debug()`
+  - `logger.warn()`
+  - `logger.error()`
+
+#### 2. 保持最近诊断日志结构不变
+- 本次仅调整控制台展示格式
+- `recentLogEntries` 仍保留原有 ISO 时间戳与消息结构
+- 避免影响现有诊断报告拼装逻辑
+
+### 📁 涉及文件
+
+| 文件 | 修改内容 |
+|------|----------|
+| `src/shared/logger.ts` | 为控制台日志前缀增加 `HH:mm:ss` 时间戳 |
+
+### 🧪 验证结果
+
+- ✅ `npm run lint -- src/shared/logger.ts`
+- ✅ `npm run build`
+- ✅ 已重新部署到测试库：`C:\Users\lt\Desktop\Write\testvault\.obsidian\plugins\opencodian\`
+
+---
+
+## 2026-03-27 BUILD_ID 系统与发布流程完善
+
+### 📋 本次开发目标
+本轮主要建立版本可追溯机制和标准化发布流程：
+
+1. **建立 BUILD_ID 生成机制**
+   - 每次构建自动生成包含分支信息和时间戳的唯一标识
+   - 格式：`{branch}.{YYYYMMDDHHmm}`，例如 `fix-revert-model-toggle.202603271430`
+
+2. **Logger 增强**
+   - 添加 `info` 方法用于无条件输出（不受调试开关控制）
+   - 用于在插件加载时输出 BUILD_ID
+
+3. **标准化版本发布流程**
+   - 添加 npm scripts 支持自动更新版本号
+   - 支持 patch / minor / major 三种升级类型
+
+### ✅ BUILD_ID 生成与注入系统
+
+#### 1. 构建工具模块 (`scripts/build-utils.mjs`)
+新增专用的构建工具模块，提供：
+- `getGitBranch()` - 获取当前 git 分支名称
+- `sanitizeBranchName(branch)` - 清洗分支名（将 `/` 替换为 `-`，移除非法字符）
+- `getLocalTimeStamp()` - 获取本地时间戳（格式 `YYYYMMDDHHmm`）
+- `generateBuildId()` - 组合分支和时间戳生成 BUILD_ID
+
+#### 2. 开发模式 BUILD_ID 注入 (`esbuild.config.mjs`)
+- 在开发监听模式下自动生成 BUILD_ID
+- 通过 esbuild 的 `define` 选项将 BUILD_ID 注入为全局变量
+- 构建时在控制台输出 `[dev] BUILD_ID: xxx`
+
+#### 3. 生产构建 BUILD_ID 注入 (`scripts/build.mjs`)
+- 生产模式下同样生成并注入 BUILD_ID
+- 构建时在控制台输出 `[build] BUILD_ID: xxx`
+- BUILD_ID 会被打包进最终的 `dist/main.js`
+
+### ✅ Logger info 方法添加 (`src/shared/logger.ts`)
+
+#### 方法特性
+- `logger.info()` - 无条件输出，不受调试开关控制
+- `logger.debug()` - 受调试开关控制（保持不变）
+- `logger.warn()` / `logger.error()` - 无条件输出（保持不变）
+
+#### 使用场景
+`info` 方法专门用于输出重要但非错误的信息，如：
+- 插件加载时输出 BUILD_ID
+- 服务器启动/停止通知
+- 其他需要总是可见的运行日志
+
+### ✅ 插件加载时输出 BUILD_ID (`src/main.ts`)
+
+在 `onload()` 方法中添加：
+```typescript
+logger.info(`OpenCodian BUILD_ID: ${BUILD_ID}`);
+```
+
+效果：
+- 每次插件加载时，在 Obsidian 开发者控制台输出 BUILD_ID
+- 方便调试时确认当前运行的是哪个版本
+- 不受调试开关影响，总是可见
+
+### ✅ 版本发布脚本 (`scripts/release.mjs`)
+
+#### 支持的命令
+```bash
+npm run release:patch  # 修复版：0.1.0 → 0.1.1
+npm run release:minor  # 次版本：0.1.0 → 0.2.0
+npm run release:major  # 主版本：0.1.0 → 1.0.0
+```
+
+#### 自动更新的文件
+- `package.json` - 更新 `version` 字段
+- `package-lock.json` - 同步版本号
+- `manifest.json` - 通过 `version` 生命周期钩子同步
+
+#### 实现细节
+- 使用 `npm version` 命令进行版本升级
+- `--no-git-tag-version` 避免自动创建 git 标签
+- 通过现有的 `sync-version.js` 保持 manifest.json 同步
+
+### ✅ 文档更新 (`AGENTS.md`)
+
+#### 新增内容
+- **Version Release Rules** 版本发布规则说明
+- **BUILD_ID** 格式和用途说明
+- **Typical Release Workflow** 典型发布流程示例
+
+### 📁 涉及文件
+
+| 文件 | 修改内容 |
+|------|----------|
+| `scripts/build-utils.mjs` | 新增 BUILD_ID 生成工具函数 |
+| `scripts/build.mjs` | 集成 BUILD_ID 生成与注入 |
+| `scripts/release.mjs` | 新增版本发布脚本 |
+| `esbuild.config.mjs` | 开发模式下注入 BUILD_ID |
+| `src/shared/logger.ts` | 添加 `info` 方法 |
+| `src/main.ts` | 插件加载时输出 BUILD_ID |
+| `package.json` | 添加 `release:*` scripts |
+| `AGENTS.md` | 更新发布流程和 BUILD_ID 文档 |
+
+### 🧪 验证结果
+
+- ✅ `npm run build` 正确输出 BUILD_ID
+- ✅ `npm run dev` 正确输出 BUILD_ID
+- ✅ 插件加载时控制台显示 BUILD_ID
+- ✅ `npm run release:patch` 正确更新版本号
+
+---
+
 ## 2026-03-26 助手消息对齐修复与代码块复制入口收敛
 
 ### 📋 本次开发目标
