@@ -1,12 +1,12 @@
 // Chat types
 export {
-  type ContextBreakdownKey,
-  type ContextBreakdownSegment,
-  createEmptyTabContextState,
   type ChatMessage,
   type ContentBlock,
+  type ContextBreakdownKey,
+  type ContextBreakdownSegment,
   type Conversation,
   type ConversationMeta,
+  createEmptyTabContextState,
   type ImageAttachment,
   type ImageMediaType,
   type StreamChunk,
@@ -54,6 +54,7 @@ export {
   normalizeChatAppearanceSettings,
   normalizeEffortLevel,
   normalizePersistedTabState,
+  normalizePluginIsolationMode,
   normalizeTabBarPosition,
   normalizeThinkingBudget,
   normalizeTitleMode,
@@ -65,6 +66,7 @@ export {
   type PersistedTabState,
   type PlatformBlockedCommands,
   type PlatformDebugLogPaths,
+  type PluginIsolationMode,
   type RemoteServerConfig,
   type ServerAuthConfig,
   type ServerAuthType,
@@ -94,6 +96,8 @@ export {
 // OpenCode config types
 export {
   type OpencodeModelConfigSubset,
+  type OpencodePluginOptions,
+  type OpencodePluginSpec,
   type OpencodeProviderConfig,
   type OpencodeProviderModelConfig,
   type OpencodeProviderModelLimit,

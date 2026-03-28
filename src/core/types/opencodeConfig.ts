@@ -23,6 +23,10 @@ export interface OpencodeProviderConfig {
   [key: string]: unknown;
 }
 
+export type OpencodePluginOptions = Record<string, unknown>;
+
+export type OpencodePluginSpec = string | [string, OpencodePluginOptions];
+
 export interface OpencodeModelConfigSubset {
   model?: string;
   small_model?: string;
@@ -34,7 +38,7 @@ export interface OpencodeModelConfigSubset {
 export interface OpencodeConfig extends OpencodeModelConfigSubset {
   $schema?: string;
   permission?: import('./permission').PermissionConfig | import('./permission').PermissionAction;
+  plugin?: OpencodePluginSpec[];
   agent?: Record<string, unknown>;
   [key: string]: unknown;
 }
-

@@ -1067,6 +1067,7 @@ export class OpenCodeService {
         || serverConfigChanged
         || authChanged
         || previousSettings.modelSourceMode !== settings.modelSourceMode
+        || previousSettings.pluginIsolationMode !== settings.pluginIsolationMode
       );
     const shouldStopManagedServer =
       this.serverManager.isRunning() &&
@@ -1242,6 +1243,7 @@ export class OpenCodeService {
       local: settings.server.local,
       auth: settings.server.auth,
       modelSourceMode: settings.modelSourceMode,
+      pluginIsolationMode: settings.pluginIsolationMode,
     };
   }
 

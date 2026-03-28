@@ -174,6 +174,29 @@ describe('OpencodeConfigManager', () => {
     });
   });
 
+  describe('plugin config', () => {
+    it('should update plugin config entries', async () => {
+      await manager.updatePluginConfig([
+        'opencode-plugin',
+        ['oh-my-opencode', { profile: 'vault' }],
+      ]);
+
+      const plugins = await manager.getPluginConfig();
+      expect(plugins).toEqual([
+        'opencode-plugin',
+        ['oh-my-opencode', { profile: 'vault' }],
+      ]);
+    });
+
+    it('should remove plugin field when the list is empty', async () => {
+      await manager.updatePluginConfig(['opencode-plugin']);
+      await manager.updatePluginConfig([]);
+
+      const config = await manager.read();
+      expect(config.plugin).toBeUndefined();
+    });
+  });
+
   describe('model config compatibility', () => {
     it('should preserve provider config when updating permissions', async () => {
       await manager.write({
@@ -230,6 +253,10 @@ describe('OpencodeConfigManager', () => {
     it('should return correct config file path', () => {
       const configPath = manager.getConfigPath();
       expect(configPath).toBe(path.join(testVaultPath, '.opencode', 'opencode.json'));
+    });
+
+    it('should return correct plugin directory path', () => {
+      expect(manager.getPluginDir()).toBe(path.join(testVaultPath, '.opencode', 'plugins'));
     });
   });
 });

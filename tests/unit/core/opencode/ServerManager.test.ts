@@ -56,6 +56,7 @@ describe('ServerManager', () => {
       token: '',
     },
     modelSourceMode: 'merge' as const,
+    pluginIsolationMode: 'default' as const,
   };
 
   beforeEach(() => {
@@ -190,6 +191,19 @@ describe('ServerManager', () => {
       expect(env.OPENCODE_DISABLE_PROJECT_CONFIG).toBe('true');
       expect(env.OPENCODE_CONFIG_DIR).toBe(path.join(testVaultPath, '.opencode'));
       expect(env.OPENCODE_CONFIG_CONTENT).toBe(JSON.stringify({ enabled_providers: [] }));
+    });
+  });
+
+  describe('plugin isolation mode', () => {
+    it('should enable OPENCODE_PURE in pure mode', () => {
+      manager = new ServerManager({
+        ...defaultConfig,
+        pluginIsolationMode: 'pure',
+      });
+
+      const env = (manager as any).getSpawnEnv() as NodeJS.ProcessEnv;
+
+      expect(env.OPENCODE_PURE).toBe('true');
     });
   });
 });

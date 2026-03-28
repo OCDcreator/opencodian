@@ -90,9 +90,22 @@ export type ModelSourceMode = 'merge' | 'local' | 'server';
 /** Conversation title generation mode */
 export type TitleMode = 'default' | 'ai';
 
+/** Plugin isolation mode for local OpenCode */
+export type PluginIsolationMode = 'default' | 'pure';
+
 export function normalizeTitleMode(value: unknown): TitleMode {
   switch (value) {
     case 'ai':
+    case 'default':
+      return value;
+    default:
+      return 'default';
+  }
+}
+
+export function normalizePluginIsolationMode(value: unknown): PluginIsolationMode {
+  switch (value) {
+    case 'pure':
     case 'default':
       return value;
     default:
@@ -468,6 +481,7 @@ export interface OpenCodianSettings {
   defaultModel: string;
   titleMode: TitleMode;
   aiTitleModel: string;
+  pluginIsolationMode: PluginIsolationMode;
   providers: ModelProviderConfig[];
   effortLevel: EffortLevel;
   thinkingBudget: ThinkingBudget;
@@ -531,6 +545,7 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
   defaultModel: 'claude-3-5-sonnet-20241022',
   titleMode: 'default',
   aiTitleModel: '',
+  pluginIsolationMode: 'default',
   providers: [
     {
       id: 'anthropic',

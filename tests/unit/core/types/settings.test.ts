@@ -83,6 +83,7 @@ describe('Settings', () => {
       expect(DEFAULT_SETTINGS.modelSourceMode).toBe('merge');
       expect(DEFAULT_SETTINGS.defaultProvider).toBe('anthropic');
       expect(DEFAULT_SETTINGS.defaultModel).toBe('claude-3-5-sonnet-20241022');
+      expect(DEFAULT_SETTINGS.pluginIsolationMode).toBe('default');
       expect(DEFAULT_SETTINGS.maxTabs).toBe(3);
       expect(DEFAULT_SETTINGS.tabBarPosition).toBe('below-header');
       expect(DEFAULT_SETTINGS.belowHeaderTabBarLayout).toBe('grid');

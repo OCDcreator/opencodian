@@ -80,9 +80,10 @@ opencodian/
 ├── src/
 │   ├── main.ts                      # Plugin entry point
 │   ├── core/
-│   │   ├── config/                  # OpenCode config + model catalog management
+│   │   ├── config/                  # OpenCode config + model catalog + plugin management
 │   │   │   ├── ModelConfigService.ts
 │   │   │   ├── OpencodeConfigManager.ts
+│   │   │   ├── PluginManagementService.ts
 │   │   │   ├── modelConfig.ts
 │   │   │   └── index.ts
 │   │   ├── opencode/                # OpenCode SDK wrapper
@@ -301,7 +302,18 @@ Resolves local OpenCode model config and server-provided model catalogs.
 - `writeLocalModelConfig(subset)` - Persist model config subset
 - `isModelAvailableOnServer(provider, model)` - Validate server-side availability
 
-### 4. StorageService (`src/core/storage/StorageService.ts`)
+### 4. PluginManagementService (`src/core/config/PluginManagementService.ts`)
+
+Inspects and manages OpenCode plugin sources for the current vault.
+
+**Key Methods:**
+
+- `inspect(serviceMode, isolationMode)` - Build a plugin environment snapshot for global/project sources
+- `updateProjectConfigPlugins(plugins)` - Persist the project-level `plugin` array
+- `ensureProjectPluginDirectory()` - Create `.opencode/plugins/` when needed
+- `ensureProjectOmoConfig()` - Create `.opencode/oh-my-opencode.jsonc` when needed
+
+### 5. StorageService (`src/core/storage/StorageService.ts`)
 
 Persists conversations and settings.
 
@@ -315,7 +327,7 @@ Persists conversations and settings.
         └── conv-xxx.json
 ```
 
-### 5. OpenCodianView (`src/features/chat/OpenCodianView.ts`)
+### 6. OpenCodianView (`src/features/chat/OpenCodianView.ts`)
 
 Main chat UI view (extends Obsidian's `ItemView`).
 
@@ -331,7 +343,7 @@ Main chat UI view (extends Obsidian's `ItemView`).
 - Collapsible long assistant content blocks
 - Inline permission cards and server status badge
 
-### 6. OpenCodianSettingTab (`src/features/settings/OpenCodianSettings.ts`)
+### 7. OpenCodianSettingTab (`src/features/settings/OpenCodianSettings.ts`)
 
 Settings UI with bilingual support (English/Chinese).
 
@@ -341,13 +353,14 @@ Settings UI with bilingual support (English/Chinese).
 - **Server**: Local / remote mode, auth, health status, help modal
 - **Model**: Source mode, default provider/model, visual editor, JSON editor
 - **Title Generation**: AI title mode (default/ai), override model for title generation
+- **Plugins**: Global/plugin visibility, project `plugin` config, project plugin directory, pure mode, OMO config entry
 - **Security**: Permission mode, config editor, command blocklist, export paths
 - **UI**: Max tabs, tab bar position, auto-scroll, chat scroll mode, open in main tab
 - **Style**: Chat appearance controls and custom CSS declarations
 - **Debug**: Debug logging, per-platform log paths, diagnostics export
 - **User**: User name, system prompt, excluded tags
 
-### 7. Streaming Utilities (`src/utils/streaming/`)
+### 8. Streaming Utilities (`src/utils/streaming/`)
 
 SSE streaming components for real-time message display.
 
@@ -366,7 +379,7 @@ SSE streaming components for real-time message display.
 - `done` - Stream completed
 - `error` - Error occurred
 
-### 8. TitleGenerationService (`src/features/chat/services/TitleGenerationService.ts`)
+### 9. TitleGenerationService (`src/features/chat/services/TitleGenerationService.ts`)
 
 AI-powered conversation title generation service. Creates concise titles by sending the user's first message to an AI model.
 
@@ -389,7 +402,7 @@ AI-powered conversation title generation service. Creates concise titles by send
 - `locale` setting - Drives the language of AI-generated titles (`zh` => Chinese, `en` => English)
 - `titleGenerationStatus` on conversations - Tracks state: `'pending'` | `'success'` | `'failed'`
 
-### 9. Markdown Rendering (`src/utils/markdown/`)
+### 10. Markdown Rendering (`src/utils/markdown/`)
 
 Custom markdown rendering pipeline for chat messages.
 
@@ -440,9 +453,10 @@ Custom markdown rendering pipeline for chat messages.
 2. **New commands**: Register in `main.ts` `onload()` method
 3. **New message types**: Extend `StreamChunk` type in `src/core/types/chat.ts`
 4. **Model config changes**: Keep `ModelConfigService`, settings UI, and `.opencode/config.json` writes in sync
-5. **Chat UI additions**: Check `features/chat/tabs/`, `features/chat/ui/`, and `styles.css` together
-6. **New AI features with prompts**: Add system prompts in `core/prompts/`, service logic in `features/chat/services/`, and wire into `OpenCodianView`
-7. **i18n additions**: Add keys to both `en.ts` and `zh.ts` locale files, export from `locales/index.ts`
+5. **Plugin management changes**: Keep `PluginManagementService`, `OpencodeConfigManager`, pure-mode server env, and plugin settings UI synchronized
+6. **Chat UI additions**: Check `features/chat/tabs/`, `features/chat/ui/`, and `styles.css` together
+7. **New AI features with prompts**: Add system prompts in `core/prompts/`, service logic in `features/chat/services/`, and wire into `OpenCodianView`
+8. **i18n additions**: Add keys to both `en.ts` and `zh.ts` locale files, export from `locales/index.ts`
 
 ### Agent Checklist
 
@@ -451,6 +465,7 @@ Before handing off work, agents should verify the following when relevant:
 - **Code changes**: Run the smallest meaningful test or validation command first, then broaden only if needed.
 - **Build/deploy changes**: Follow the required sequential `npm run build` -> copy -> deployed `BUILD_ID` verification flow.
 - **Prompt or title changes**: Keep `src/core/prompts/titleGeneration.ts`, `src/features/chat/services/TitleGenerationService.ts`, and locale-driven behavior aligned.
+- **Plugin changes**: Keep project config writes, plugin source visibility, `pluginIsolationMode`, and local-server restart expectations aligned.
 - **Settings or i18n changes**: Keep `DEFAULT_SETTINGS`, settings UI, and both locale files synchronized.
 - **Architecture/doc changes**: Update `devlog.md` and refresh this `AGENTS.md` when developer-facing workflow or component responsibilities materially change.
 

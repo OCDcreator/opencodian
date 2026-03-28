@@ -7,6 +7,7 @@ import type {
   EffortLevel,
   LocalServerConfig,
   ModelSourceMode,
+  PluginIsolationMode,
   ServerAuthConfig,
   ServerMode,
   ThinkingBudget,
@@ -54,6 +55,7 @@ export interface OpenCodeServerConfig {
   local: LocalServerConfig;
   auth: ServerAuthConfig;
   modelSourceMode: ModelSourceMode;
+  pluginIsolationMode: PluginIsolationMode;
   timeout?: number;
 }
 

@@ -11,6 +11,7 @@ import { Notice } from 'obsidian';
 import * as path from 'path';
 
 import { createLogger } from '../../shared';
+import type { OpencodePluginSpec } from '../types';
 import type { OpencodeConfig, PermissionAction,PermissionConfig } from '../types/permission';
 import { OPENCODE_SCHEMA_URL, parseOpencodeConfigText } from './modelConfig';
 
@@ -79,6 +80,21 @@ export class OpencodeConfigManager {
     await this.write(config);
   }
 
+  async getPluginConfig(): Promise<OpencodePluginSpec[]> {
+    const config = await this.read();
+    return Array.isArray(config.plugin) ? [...config.plugin] : [];
+  }
+
+  async updatePluginConfig(plugins: OpencodePluginSpec[]): Promise<void> {
+    const config = await this.read();
+    if (plugins.length > 0) {
+      config.plugin = [...plugins];
+    } else {
+      delete config.plugin;
+    }
+    await this.write(config);
+  }
+
   /** Get current permission configuration */
   async getPermissionConfig(): Promise<PermissionConfig | PermissionAction | undefined> {
     const config = await this.read();
@@ -141,6 +157,10 @@ export class OpencodeConfigManager {
   /** Get configuration directory path */
   getConfigDir(): string {
     return this.configDir;
+  }
+
+  getPluginDir(): string {
+    return path.join(this.configDir, 'plugins');
   }
 
   /** Get configuration file path */

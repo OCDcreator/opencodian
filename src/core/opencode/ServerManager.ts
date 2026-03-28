@@ -608,6 +608,12 @@ export class ServerManager {
   private getSpawnEnv(): NodeJS.ProcessEnv {
     const env = { ...process.env };
 
+    if (this.config.pluginIsolationMode === 'pure') {
+      env.OPENCODE_PURE = 'true';
+    } else {
+      delete env.OPENCODE_PURE;
+    }
+
     if (this.config.auth.type === 'basic' && this.config.auth.password.trim()) {
       env.OPENCODE_SERVER_USERNAME = this.config.auth.username.trim() || 'opencode';
       env.OPENCODE_SERVER_PASSWORD = this.config.auth.password;

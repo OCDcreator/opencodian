@@ -8,6 +8,104 @@
 
 ---
 
+## 2026-03-28 OpenCode 插件管理接入与设置页收尾
+
+### ✨ 改动目标
+
+- 为 OpenCodian 补齐 OpenCode 插件治理的一期能力，而不是继续把插件来源当成黑盒。
+- 让当前 vault 能看见“全局插件 + 项目插件”分别从哪里来。
+- 支持项目级 `plugin` 配置、项目 `.opencode/plugins/` 目录与 OMO 配置入口。
+- 为本地托管 OpenCode 提供“纯净模式”，用于一次性禁用所有外部插件排障。
+- 顺手修整插件设置区的界面结构、快捷跳转顺序，以及设置页中反引号文案的实际渲染效果。
+
+### 🏗️ 实现内容
+
+#### 1. 新增插件管理服务层
+- 新增 `PluginManagementService`，负责统一读取：
+  - 全局 `~/.config/opencode/opencode.json` 中的 `plugin`
+  - 全局 `~/.config/opencode/plugin(s)/`
+  - 项目 `.opencode/opencode.json` 中的 `plugin`
+  - 项目 `.opencode/plugin(s)/`
+- 能区分：
+  - `npm` 插件
+  - 本地路径插件
+  - 配置声明来源
+  - 目录扫描来源
+- 补充项目级 `oh-my-opencode.jsonc` 创建入口，作为后续 OMO 兼容基础设施。
+
+#### 2. 项目级插件配置写回能力
+- `OpencodeConfigManager` 新增项目 `plugin` 数组的读取与写入能力。
+- 保持现有 permission / model 配置逻辑不受影响，插件配置作为同一份 `.opencode/opencode.json` 的新管理维度。
+- 新增 `.opencode/plugins/` 目录辅助方法，便于设置页创建项目本地插件目录。
+
+#### 3. 插件隔离模式（纯净模式）
+- `OpenCodianSettings` / `ServerManager` / `OpenCodeService` 串起新的 `pluginIsolationMode` 设置。
+- 本地托管模式下可切换：
+  - `default`
+  - `pure`
+- `pure` 模式通过 `OPENCODE_PURE=true` 启动本地 OpenCode，禁用所有外部插件：
+  - 全局插件失效
+  - 项目插件也失效
+- 远程模式下仅做状态提示，不承诺强制控制远端插件环境。
+
+#### 4. 设置页新增插件分区
+- 设置页新增 `Plugins / 插件` 分区，并接入快捷跳转。
+- 首版包含：
+  - 插件环境概览
+  - 全局来源只读展示
+  - 项目 `plugin` 数组编辑
+  - 项目本地插件目录创建与文件列表
+  - OMO 项目配置入口
+  - 插件隔离模式切换
+- 快捷跳转顺序已修正为：会话标题在前，插件分区在后。
+
+#### 5. 设置页视觉与文案渲染收尾
+- 插件区改成更接近现有设置页的卡片化结构，避免裸文本堆叠。
+- 为设置页新增通用的 inline-code 渲染，把带反引号的描述转成真正的 `code` 元素。
+- 单独补了设置页 `code` 样式，使其更接近 Obsidian 原生行内代码，而不是仅仅“显示了反引号内容”。
+
+### 🧪 验证
+
+- 新增单测：
+  - `tests/unit/core/config/PluginManagementService.test.ts`
+- 更新单测：
+  - `tests/unit/core/config/OpencodeConfigManager.test.ts`
+  - `tests/unit/core/opencode/ServerManager.test.ts`
+  - `tests/unit/core/types/settings.test.ts`
+- 全量测试通过：`npm test`（129/129）
+- 构建成功并已部署到 Test Vault
+- 本轮最新验证使用的 `BUILD_ID`：`main.202603282250`
+
+### 📁 涉及文件
+
+- `src/core/config/PluginManagementService.ts`
+- `src/core/config/OpencodeConfigManager.ts`
+- `src/core/config/index.ts`
+- `src/core/opencode/OpenCodeService.ts`
+- `src/core/opencode/ServerManager.ts`
+- `src/core/opencode/types.ts`
+- `src/core/types/opencodeConfig.ts`
+- `src/core/types/settings.ts`
+- `src/core/types/index.ts`
+- `src/features/settings/OpenCodianSettings.ts`
+- `src/i18n/locales/en.ts`
+- `src/i18n/locales/zh.ts`
+- `src/main.ts`
+- `styles.css`
+- `tests/unit/core/config/PluginManagementService.test.ts`
+- `tests/unit/core/config/OpencodeConfigManager.test.ts`
+- `tests/unit/core/opencode/ServerManager.test.ts`
+- `tests/unit/core/types/settings.test.ts`
+
+### 📌 当前收益
+
+- 用户终于可以明确判断当前 vault 是否受全局插件影响。
+- 项目级插件能力开始成型，为 OMO 兼容准备好了配置治理入口。
+- 排查“是不是插件导致当前项目异常”时，有了明确的纯净模式。
+- 设置页插件区不再是原型状态，文案里的路径 / 配置项也能按真正的行内代码样式显示。
+
+---
+
 ## 2026-03-28 会话标题语言感知改造
 
 ### ✨ 改动目标
