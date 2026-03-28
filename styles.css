@@ -979,28 +979,35 @@
 .opencodian-collapsible-toggle {
   display: none;
   align-self: flex-start;
-  padding: 0;
-  border: none;
-  background: none;
+  padding: 4px 10px;
+  border: 1px solid color-mix(in srgb, var(--interactive-accent) 22%, var(--background-modifier-border));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--interactive-accent) 10%, var(--background-primary));
   color: var(--interactive-accent);
   font-size: 12px;
   font-weight: 600;
-  line-height: 1.3;
+  line-height: 1.4;
   cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease, color 0.15s ease;
 }
 
 .opencodian-collapsible.is-collapsible .opencodian-collapsible-toggle {
   display: inline-flex;
+  align-items: center;
+  min-height: 30px;
 }
 
 .opencodian-collapsible-toggle:hover {
+  background: color-mix(in srgb, var(--interactive-accent) 16%, var(--background-modifier-hover));
+  border-color: color-mix(in srgb, var(--interactive-accent) 44%, var(--background-modifier-border-hover));
   color: var(--text-accent-hover);
+  transform: translateY(-1px);
 }
 
 .opencodian-collapsible-toggle:focus-visible {
   outline: 2px solid var(--interactive-accent);
   outline-offset: 2px;
-  border-radius: 4px;
+  border-radius: 999px;
 }
 
 /* Shimmer effect overlay */
@@ -1135,6 +1142,86 @@
   color: var(--text-normal);
 }
 
+.opencodian-omo-injection {
+  margin-top: 10px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--interactive-accent) 24%, var(--background-modifier-border));
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--interactive-accent) 7%, transparent),
+      color-mix(in srgb, var(--background-secondary) 92%, transparent)
+    );
+}
+
+.opencodian-omo-injection-header {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.opencodian-omo-injection-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--interactive-accent) 14%, transparent);
+  color: var(--interactive-accent);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.opencodian-omo-injection-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-normal);
+}
+
+.opencodian-omo-injection-summary {
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+.opencodian-omo-raw-block {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.opencodian-omo-raw-block--notice {
+  margin-top: 12px;
+}
+
+.opencodian-omo-raw-label {
+  margin-bottom: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-faint, var(--text-muted));
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.opencodian-omo-raw-content {
+  margin: 0;
+  padding: 12px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--background-primary) 78%, black 2%);
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: var(--font-monospace);
+}
+
 .opencodian-chat-notice-card {
   display: flex;
   align-items: flex-start;
@@ -1161,6 +1248,16 @@
   background: color-mix(in srgb, var(--background-secondary) 90%, var(--opencodian-accent-subtle));
 }
 
+.opencodian-chat-notice-card.is-background-task {
+  border-color: color-mix(in srgb, var(--interactive-accent) 44%, var(--background-modifier-border));
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--interactive-accent) 10%, var(--background-secondary)) 0%,
+      color-mix(in srgb, var(--background-secondary) 92%, transparent) 100%
+    );
+}
+
 .opencodian-chat-notice-icon {
   display: flex;
   align-items: center;
@@ -1184,6 +1281,10 @@
   color: var(--interactive-accent);
 }
 
+.opencodian-chat-notice-icon--background-task svg {
+  animation: opencodian-spin 0.9s linear infinite;
+}
+
 .opencodian-chat-notice-body {
   min-width: 0;
   flex: 1;
@@ -1200,7 +1301,48 @@
   font-size: 13px;
   line-height: 1.6;
   color: var(--text-muted);
-  white-space: pre-wrap;
+  white-space: normal;
+}
+
+.opencodian-chat-notice-text > :first-child {
+  margin-top: 0;
+}
+
+.opencodian-chat-notice-text > :last-child {
+  margin-bottom: 0;
+}
+
+.opencodian-chat-notice-meta {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-faint);
+}
+
+.opencodian-chat-notice-text p,
+.opencodian-chat-notice-text ul,
+.opencodian-chat-notice-text ol,
+.opencodian-chat-notice-text pre,
+.opencodian-chat-notice-text blockquote {
+  margin: 0.4em 0 0;
+}
+
+.opencodian-chat-notice-text ul,
+.opencodian-chat-notice-text ol {
+  padding-left: 1.35em;
+}
+
+.opencodian-chat-notice-text li + li {
+  margin-top: 0.18em;
+}
+
+.opencodian-chat-notice-text code {
+  font-size: 0.94em;
+}
+
+.opencodian-omo-raw-block .opencodian-collapsible-toggle {
+  margin-top: 2px;
+  padding-inline: 12px;
+  font-size: 13px;
 }
 
 .opencodian-chat-notice-actions {

@@ -359,7 +359,7 @@ export class ContextUsageService {
   private static getUserCharsFromMessage(message: ChatMessage): number {
     const parts = this.getParts(message);
     if (parts.length > 0) {
-      return parts.reduce((sum, part) => sum + this.getUserCharsFromPart(part), 0);
+      return parts.reduce<number>((sum, part) => sum + this.getUserCharsFromPart(part), 0);
     }
 
     return message.content.length;
@@ -368,7 +368,7 @@ export class ContextUsageService {
   private static getAssistantCharsFromMessage(message: ChatMessage): { assistant: number; tool: number } {
     const parts = this.getParts(message);
     if (parts.length > 0) {
-      return parts.reduce(
+      return parts.reduce<{ assistant: number; tool: number }>(
         (sum, part) => {
           const next = this.getAssistantCharsFromPart(part);
           return {

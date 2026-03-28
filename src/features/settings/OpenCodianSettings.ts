@@ -1052,7 +1052,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         btn
           .setButtonText(t('settings.plugins.actions.openRaw'))
           .onClick(() => {
-            new OpencodeConfigModal(this.app, this.plugin).open();
+            new OpencodeConfigModal(this.app, new OpencodeConfigManager(vaultPath)).open();
           });
       });
     this.setSettingDescWithFormatting(pluginActionsSetting, t('settings.plugins.actions.desc'));

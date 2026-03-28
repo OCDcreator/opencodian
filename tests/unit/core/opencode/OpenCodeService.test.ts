@@ -647,6 +647,72 @@ describe('OpenCodeService.openCodeMessageToChatMessage', () => {
     expect(message.content).toBe('');
   });
 
+  it('extracts OMO-injected user prompts into structured metadata', () => {
+    const info = {
+      id: 'msg-omo-user',
+      sessionID: 'session-1',
+      role: 'user' as const,
+      time: { created: 1234567896 },
+    };
+
+    const parts: Part[] = [
+      {
+        type: 'text',
+        id: 'part-omo-user',
+        sessionID: 'session-1',
+        messageID: 'msg-omo-user',
+        text: '[search-mode]\nMAXIMIZE SEARCH EFFORT\n\n---\n使用工具搜索一下史料',
+      },
+    ];
+
+    const message = OpenCodeService.openCodeMessageToChatMessage(info, parts);
+
+    expect(message.content).toBe('使用工具搜索一下史料');
+    expect(message.omo).toMatchObject({
+      kind: 'user-injection',
+      modeTag: 'search-mode',
+      injectedPrompt: 'MAXIMIZE SEARCH EFFORT',
+      originalText: '使用工具搜索一下史料',
+    });
+  });
+
+  it('maps OMO system reminders to notice messages', () => {
+    const info = {
+      id: 'msg-omo-reminder',
+      sessionID: 'session-1',
+      role: 'assistant' as const,
+      time: { created: 1234567897 },
+      parentID: 'msg-omo-user',
+      modelID: 'claude-3-5-sonnet',
+      providerID: 'anthropic',
+      mode: 'default',
+      path: { cwd: '/test', root: '/test' },
+      cost: 0.001,
+      tokens: { input: 5, output: 10, reasoning: 0, cache: { read: 0, write: 0 } },
+    };
+
+    const parts: Part[] = [
+      {
+        type: 'text',
+        id: 'part-omo-reminder',
+        sessionID: 'session-1',
+        messageID: 'msg-omo-reminder',
+        text: '<system-reminder>\n[BACKGROUND TASK COMPLETED]\n整理完成：史料摘要已更新。\n</system-reminder>\n<!-- OMO_INTERNAL_INITIATOR -->',
+      },
+    ];
+
+    const message = OpenCodeService.openCodeMessageToChatMessage(info, parts);
+
+    expect(message.displayStyle).toBe('notice');
+    expect(message.noticeTone).toBe('info');
+    expect(message.content).toContain('[BACKGROUND TASK COMPLETED]');
+    expect(message.omo).toMatchObject({
+      kind: 'system-reminder',
+      reminderType: 'background-task-completed',
+      isInternalInitiator: true,
+    });
+  });
+
   it('should mark bash tool with non-zero exit metadata as error', () => {
     const info = {
       id: 'msg-6',

@@ -19,6 +19,7 @@ const DEFAULT_TOOL_NAMES: Record<string, string> = {
   glob: 'Glob',
   web_search: 'WebSearch',
   web_fetch: 'WebFetch',
+  task: 'Background Task',
 };
 
 // Claudian-style tool icons
@@ -31,6 +32,7 @@ const TOOL_ICONS: Record<string, string> = {
   glob: 'folder-search',
   web_search: 'search',
   web_fetch: 'download',
+  task: 'git-branch',
   // MCP tools
   mcp: 'layers',
   get_repo_structure: 'folder-tree',
@@ -71,6 +73,14 @@ export class ToolCallRenderer {
         return this.truncateText((input.query as string) || '', 60);
       case 'web_fetch':
         return this.truncateText((input.url as string) || '', 60);
+      case 'task':
+        return this.truncateText(
+          (input.description as string)
+          || (input.prompt as string)
+          || (input.title as string)
+          || '',
+          80,
+        );
       default:
         return '';
     }

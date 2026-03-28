@@ -88,6 +88,7 @@ opencodian/
 │   │   │   └── index.ts
 │   │   ├── opencode/                # OpenCode SDK wrapper
 │   │   │   ├── OpenCodeService.ts   # Core service for SDK interaction
+│   │   │   ├── omoCompat.ts         # OMO message detection helpers
 │   │   │   ├── ServerManager.ts     # Server lifecycle management
 │   │   │   ├── types.ts             # Service types
 │   │   │   └── index.ts             # Module exports
@@ -127,6 +128,7 @@ opencodian/
 │   │   │   │   └── NavigationSidebar.ts
 │   │   │   ├── chatAppearance.ts    # Chat appearance CSS variable builder
 │   │   │   ├── OpenCodianView.ts    # Main chat view component
+│   │   │   ├── renderGroups.ts      # Assistant render grouping helpers
 │   │   │   └── index.ts
 │   │   └── settings/
 │   │       ├── ModelConfigJsonModal.ts
@@ -280,6 +282,7 @@ Main service for interacting with OpenCode Server via HTTP API.
 - `deleteSession(sessionId)` - Delete a session by ID
 - `forkSession(sessionId, messageID?)` - Fork a conversation from a selected message
 - `revertSession(sessionId, messageID, partID?)` - Rewind a conversation to a prior point
+- `openCodeMessageToChatMessage(info, parts)` - Normalize persisted messages into chat UI data, including OMO metadata and notice hints
 
 ### 2. ServerManager (`src/core/opencode/ServerManager.ts`)
 
@@ -338,10 +341,15 @@ Main chat UI view (extends Obsidian's `ItemView`).
 - Per-session model switching dropdown
 - Effort / thinking budget selector
 - Real-time streaming display
+- Optimistic user message hydration from server-final content
 - Navigation sidebar for previous/next user messages
 - Fork / rewind conversation entry points
 - Collapsible long assistant content blocks
 - Inline permission cards and server status badge
+- OMO injected-prompt panels with expandable raw prompt view
+- OMO system-reminder notice cards with markdown rendering
+- Idle conversation sync loop for post-stream follow-up messages
+- Background-task in-progress indicator and follow-up pseudo-stream reveal
 
 ### 7. OpenCodianSettingTab (`src/features/settings/OpenCodianSettings.ts`)
 
@@ -369,6 +377,7 @@ SSE streaming components for real-time message display.
 - `StreamController` - Manages stream state and callbacks
 - `ThinkingBlockRenderer` - Renders AI thinking blocks
 - `ToolCallRenderer` - Renders tool call progress and results
+- Stream callbacks also feed chat-level background task progress UX
 
 **Stream Event Types:**
 
@@ -412,6 +421,18 @@ Custom markdown rendering pipeline for chat messages.
 - `processFileLinks()` / `registerFileLinkHandler()` - Handles internal file link rendering
 - `replaceImageEmbedsWithHtml()` - Converts image embeds to HTML elements
 
+### 11. OMO Compatibility (`src/core/opencode/omoCompat.ts` + chat UI)
+
+Compatibility layer for `oh-my-opencode` message mutations and reminders.
+
+**Current responsibilities:**
+
+1. Detect user-side injected prompts such as `[search-mode] ... --- 原始输入`
+2. Detect `<system-reminder>...</system-reminder>` plus `<!-- OMO_INTERNAL_INITIATOR -->`
+3. Preserve raw OMO text while exposing UI-friendly metadata
+4. Render injected prompt summaries and raw prompt collapsibles in chat
+5. Keep background-task reminders visible after the main stream ends
+
 ## Prerequisites for Users
 
 1. **Obsidian** v1.4.5 or later (desktop only)
@@ -454,9 +475,10 @@ Custom markdown rendering pipeline for chat messages.
 3. **New message types**: Extend `StreamChunk` type in `src/core/types/chat.ts`
 4. **Model config changes**: Keep `ModelConfigService`, settings UI, and `.opencode/config.json` writes in sync
 5. **Plugin management changes**: Keep `PluginManagementService`, `OpencodeConfigManager`, pure-mode server env, and plugin settings UI synchronized
-6. **Chat UI additions**: Check `features/chat/tabs/`, `features/chat/ui/`, and `styles.css` together
+6. **Chat UI additions**: Check `features/chat/tabs/`, `features/chat/ui/`, `renderGroups.ts`, `OpenCodianView.ts`, and `styles.css` together
 7. **New AI features with prompts**: Add system prompts in `core/prompts/`, service logic in `features/chat/services/`, and wire into `OpenCodianView`
 8. **i18n additions**: Add keys to both `en.ts` and `zh.ts` locale files, export from `locales/index.ts`
+9. **OMO changes**: Keep `src/core/opencode/omoCompat.ts`, `OpenCodeService.openCodeMessageToChatMessage()`, `OpenCodianView`, OMO settings entry points, and notice/injection styles aligned
 
 ### Agent Checklist
 
@@ -501,5 +523,5 @@ This is the main development log maintained in the Obsidian vault for easy refer
 
 ---
 
-**Last Updated**: 2026-03-28
+**Last Updated**: 2026-03-29
 **Plugin Version**: 1.0.0

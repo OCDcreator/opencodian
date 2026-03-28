@@ -37,6 +37,31 @@ export interface ChatNoticeAction {
   type: ChatNoticeActionType;
 }
 
+export type OmoReminderType =
+  | 'background-task-completed'
+  | 'all-background-tasks-complete'
+  | 'generic';
+
+export interface OmoUserInjectionMeta {
+  kind: 'user-injection';
+  modeTag: string;
+  injectedPrompt: string;
+  originalText: string;
+  rawText: string;
+  headline: string;
+}
+
+export interface OmoSystemReminderMeta {
+  kind: 'system-reminder';
+  reminderType: OmoReminderType;
+  reminderText: string;
+  rawText: string;
+  headline: string;
+  isInternalInitiator: boolean;
+}
+
+export type OmoMessageMeta = OmoUserInjectionMeta | OmoSystemReminderMeta;
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
@@ -51,6 +76,7 @@ export interface ChatMessage {
   images?: ImageAttachment[];
   toolCalls?: ToolCallInfo[];
   contentBlocks?: ContentBlock[];
+  omo?: OmoMessageMeta;
   // OpenCode-specific: store original parts for advanced features
   parts?: unknown[];
 }

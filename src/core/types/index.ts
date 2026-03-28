@@ -1,6 +1,10 @@
 // Chat types
 export {
   type ChatMessage,
+  type OmoMessageMeta,
+  type OmoReminderType,
+  type OmoSystemReminderMeta,
+  type OmoUserInjectionMeta,
   type ContentBlock,
   type ContextBreakdownKey,
   type ContextBreakdownSegment,

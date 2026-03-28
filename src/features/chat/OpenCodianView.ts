@@ -172,6 +172,15 @@ export class OpenCodianView extends ItemView {
   private scrollToBottomFrameId: number | null = null;
   private chatAppearanceStyleEl: HTMLStyleElement | null = null;
   private titleGenerationService: TitleGenerationService;
+  private conversationSyncIntervalId: number | null = null;
+  private isConversationSyncInFlight = false;
+  private lastConversationSyncFingerprint: string | null = null;
+  private backgroundTaskIndicatorEl: HTMLElement | null = null;
+  private backgroundTaskStartedAt: number | null = null;
+  private backgroundTaskModeTag: string | null = null;
+  private backgroundTaskToolIds = new Set<string>();
+  private backgroundTaskCompletedToolIds = new Set<string>();
+  private backgroundTaskWaitingForFollowUp = false;
 
   private appSettings(): { open: () => void; openTabById: (id: string) => void } {
     return (this.app as typeof this.app & {
@@ -220,6 +229,14 @@ export class OpenCodianView extends ItemView {
         markdownService: this.markdownService,
         scrollToBottom: () => this.scrollToBottomIfNeeded(),
       });
+      this.streamController.setCallbacks({
+        onToolCallStart: (toolCall) => {
+          void this.handleStreamingToolCallStart(toolCall);
+        },
+        onToolCallEnd: (toolCall) => {
+          void this.handleStreamingToolCallEnd(toolCall);
+        },
+      });
     }
 
     // Wire events
@@ -231,6 +248,7 @@ export class OpenCodianView extends ItemView {
   async onClose() {
     this.persistTabState({ flush: true });
     this.stopServerStatusLoop();
+    this.stopConversationSyncLoop();
     this.clearChatSurfaceSyncTimers();
     this.clearScheduledScrollToBottom();
     this.chatAppearanceStyleEl?.remove();
@@ -484,6 +502,7 @@ export class OpenCodianView extends ItemView {
     }
 
     this.currentConversation = null;
+    this.stopConversationSyncLoop();
     this.messagesContainer?.empty();
     this.resetTurnState();
     this.updateModelSelectorDisplay();
@@ -655,6 +674,7 @@ export class OpenCodianView extends ItemView {
   /** Reset active turn references */
   private resetTurnState(): void {
     this.currentTurnBodyEl = null;
+    this.backgroundTaskIndicatorEl = null;
   }
 
   /** Create a new turn with sticky user header */
@@ -1062,6 +1082,7 @@ export class OpenCodianView extends ItemView {
     if (this.currentConversation?.id && this.currentConversation.id !== id) {
       const previousConversationId = this.currentConversation.id;
       this.titleGenerationService.cancelConversation(previousConversationId);
+      this.resetBackgroundTaskIndicator();
       if (this.currentConversation.titleGenerationStatus === 'pending') {
         void this.updateConversationTitleState(previousConversationId, {
           titleGenerationStatus: undefined,
@@ -1095,10 +1116,13 @@ export class OpenCodianView extends ItemView {
       );
 
     const messages = shouldSyncFromServer
-      ? await this.syncConversationMessagesFromServer(conversation)
+      ? (await this.syncConversationMessagesFromServer(conversation)).messages
       : conversation.messages;
 
     await this.renderMessages(messages);
+    await this.renderBackgroundTaskIndicatorIfNeeded();
+    this.lastConversationSyncFingerprint = this.getConversationSyncFingerprint(messages);
+    this.startConversationSyncLoop();
 
     // Scroll to bottom
     this.scrollToBottom();
@@ -1110,15 +1134,88 @@ export class OpenCodianView extends ItemView {
   }
 
   private openConversationInCurrentTab(conversation: Conversation): void {
+    if (this.currentConversation?.id !== conversation.id) {
+      this.resetBackgroundTaskIndicator();
+    }
     this.tabManager?.setActiveTabConversation(conversation);
     this.currentConversation = conversation;
     this.plugin.openCodeService.setSessionId(conversation.openCodeSessionId);
     this.messagesContainer?.empty();
     this.resetTurnState();
+    this.lastConversationSyncFingerprint = this.getConversationSyncFingerprint(conversation.messages);
+    this.startConversationSyncLoop();
     this.updateModelSelectorDisplay();
     this.syncActiveTabContextUsageIdentity();
+    void this.renderBackgroundTaskIndicatorIfNeeded();
     void this.refreshActiveTabContextUsageFromServer();
     this.scrollToBottom();
+  }
+
+  private startConversationSyncLoop(): void {
+    this.stopConversationSyncLoop();
+
+    if (
+      !this.currentConversation?.openCodeSessionId
+      || this.currentConversation.messages.length === 0
+    ) {
+      return;
+    }
+
+    this.conversationSyncIntervalId = window.setInterval(() => {
+      void this.syncVisibleConversationInBackground();
+    }, 2000);
+  }
+
+  private stopConversationSyncLoop(): void {
+    if (this.conversationSyncIntervalId !== null) {
+      window.clearInterval(this.conversationSyncIntervalId);
+      this.conversationSyncIntervalId = null;
+    }
+    this.isConversationSyncInFlight = false;
+  }
+
+  private async syncVisibleConversationInBackground(): Promise<void> {
+    if (
+      this.isStreaming
+      || this.isConversationSyncInFlight
+      || !this.currentConversation?.openCodeSessionId
+    ) {
+      return;
+    }
+
+    const expectedConversationId = this.currentConversation.id;
+    this.isConversationSyncInFlight = true;
+    try {
+      const previousMessages = [...this.currentConversation.messages];
+      const syncResult = await this.syncConversationMessagesFromServer(this.currentConversation);
+      if (!syncResult.changed || this.currentConversation?.id !== expectedConversationId) {
+        await this.renderBackgroundTaskIndicatorIfNeeded();
+        return;
+      }
+
+      this.lastConversationSyncFingerprint = syncResult.fingerprint;
+      await this.applySyncedConversationUpdate(previousMessages, this.currentConversation.messages);
+    } finally {
+      this.isConversationSyncInFlight = false;
+    }
+  }
+
+  private getConversationSyncFingerprint(messages: ChatMessage[]): string {
+    return messages
+      .map((message) => JSON.stringify({
+        id: message.id,
+        role: message.role,
+        sourceMessageId: message.sourceMessageId ?? null,
+        displayStyle: message.displayStyle ?? null,
+        content: message.content,
+        timestamp: message.timestamp,
+        omo: message.omo ? {
+          kind: message.omo.kind,
+          headline: message.omo.headline,
+          rawText: message.omo.rawText,
+        } : null,
+      }))
+      .join('|');
   }
 
   // History dropdown state
@@ -1605,7 +1702,10 @@ export class OpenCodianView extends ItemView {
       content,
       timestamp: Date.now(),
     };
+    this.resetBackgroundTaskIndicator();
+    this.armBackgroundTaskIndicatorForUserMessage(userMessage);
     this.currentConversation.messages.push(userMessage);
+    this.startConversationSyncLoop();
     await this.renderMessage(userMessage);
     this.scrollToBottomIfNeeded(shouldAutoScrollOnSend);
 
@@ -1743,6 +1843,10 @@ export class OpenCodianView extends ItemView {
         scheduleStreamTimeout();
 
         if (chunk.type === 'message_start') {
+          void this.syncLatestUserMessageFromServer(
+            this.currentConversation?.openCodeSessionId ?? '',
+            userMessage.id,
+          );
           this.beginActiveTabContextUsageStream();
           continue;
         }
@@ -1788,7 +1892,8 @@ export class OpenCodianView extends ItemView {
           
           // Clear pending indicator only when actual content is received (text or thinking with content)
           const hasContent = (streamingChunk.type === 'text' && streamingChunk.content?.trim()) ||
-                            (streamingChunk.type === 'thinking' && streamingChunk.content?.trim());
+                            (streamingChunk.type === 'thinking' && streamingChunk.content?.trim()) ||
+                            streamingChunk.type === 'tool_use';
           
           if (!receivedFirstChunk && hasContent) {
             receivedFirstChunk = true;
@@ -1840,6 +1945,7 @@ export class OpenCodianView extends ItemView {
       }
       pendingState.element?.remove();
       pendingState.element = null;
+      await this.finalizeBackgroundTaskIndicatorAfterPrimaryStream();
       await this.refreshServerStatusBadge();
       
       const finalizedTimestamp = Date.now();
@@ -1926,11 +2032,13 @@ export class OpenCodianView extends ItemView {
     if (this.currentConversation) {
       const shouldSyncFromServer = streamCompleted && !streamTimedOut && !streamInterrupted && !latestErrorMessage;
       if (shouldSyncFromServer) {
-        await this.syncConversationMessagesFromServer(this.currentConversation);
+        const syncResult = await this.syncConversationMessagesFromServer(this.currentConversation);
+        this.lastConversationSyncFingerprint = syncResult.fingerprint;
         await this.rerenderConversationMessages(this.currentConversation);
       }
       this.currentConversation.updatedAt = Date.now();
       await this.plugin.saveConversation(this.currentConversation);
+      this.lastConversationSyncFingerprint = this.getConversationSyncFingerprint(this.currentConversation.messages);
       this.tabManager?.setActiveTabConversation(this.currentConversation);
       this.syncActiveTabContextUsageIdentity();
       if (shouldSyncFromServer) {
@@ -2080,6 +2188,7 @@ export class OpenCodianView extends ItemView {
       });
       this.currentConversation.updatedAt = Date.now();
       await this.plugin.storage.saveConversation(this.currentConversation);
+      this.lastConversationSyncFingerprint = this.getConversationSyncFingerprint(this.currentConversation.messages);
     }
 
     this.scrollToBottom();
@@ -2218,7 +2327,9 @@ export class OpenCodianView extends ItemView {
   /** Render a message */
   private async renderMessage(message: ChatMessage) {
     const parentEl =
-      message.role === 'user'
+      message.displayStyle === 'notice'
+        ? this.ensureTurnBody()
+        : message.role === 'user'
         ? this.createTurn()?.headerEl
         : this.ensureTurnBody();
     const messageEl = parentEl?.createDiv({
@@ -2226,30 +2337,25 @@ export class OpenCodianView extends ItemView {
     });
 
     if (!messageEl) return;
+    messageEl.dataset.messageId = message.id;
+    if (message.sourceMessageId) {
+      messageEl.dataset.sourceMessageId = message.sourceMessageId;
+    }
+    if (message.displayStyle === 'notice') {
+      messageEl.removeClass('opencodian-message--user');
+      messageEl.addClass('opencodian-message--assistant');
+    }
 
     // Content container
     const content = messageEl.createDiv({ cls: 'opencodian-message-content' });
 
-    // For user messages, always use simple text rendering
-    if (message.role === 'user') {
-      if (message.content) {
-        const textEl = content.createDiv({ cls: 'opencodian-message-text' });
-        textEl.textContent = message.content;
-        const collapseToggleEl = content.createEl('button');
-        const collapsibleState: CollapsibleState = {
-          isExpanded: false,
-          isCollapsible: false,
-        };
-        setupCollapsible(content, collapseToggleEl, textEl, collapsibleState, {
-          showMoreLabel: t('chat.action.showMore'),
-          showLessLabel: t('chat.action.showLess'),
-        });
-      }
-      this.addUserMessageFooter(messageEl, message, message.content);
-    } else if (message.displayStyle === 'notice') {
+    if (message.displayStyle === 'notice') {
       messageEl.addClass('opencodian-message--notice');
-      this.renderNoticeCard(content, message);
+      await this.renderNoticeCard(content, message);
       this.addTimestampWithCopyButton(messageEl, message.timestamp, undefined, message.modelId);
+    } else if (message.role === 'user') {
+      const copyContent = await this.renderUserMessageContent(content, message);
+      this.addUserMessageFooter(messageEl, message, copyContent);
     } else if (message.contentBlocks && message.contentBlocks.length > 0) {
       // For assistant messages, render content blocks (thinking, tools, etc.)
       for (const block of message.contentBlocks) {
@@ -2278,6 +2384,84 @@ export class OpenCodianView extends ItemView {
     return messageEl;
   }
 
+  private async renderUserMessageContent(container: HTMLElement, message: ChatMessage): Promise<string> {
+    const visibleText = this.getVisibleUserMessageText(message);
+    if (visibleText) {
+      const textEl = container.createDiv({ cls: 'opencodian-message-text' });
+      textEl.textContent = visibleText;
+      const collapseToggleEl = container.createEl('button');
+      const collapsibleState: CollapsibleState = {
+        isExpanded: false,
+        isCollapsible: false,
+      };
+      setupCollapsible(container, collapseToggleEl, textEl, collapsibleState, {
+        showMoreLabel: t('chat.action.showMore'),
+        showLessLabel: t('chat.action.showLess'),
+      });
+    }
+
+    if (message.omo?.kind === 'user-injection') {
+      await this.renderOmoUserInjection(container, message);
+    }
+
+    return visibleText;
+  }
+
+  private getVisibleUserMessageText(message: ChatMessage): string {
+    return message.omo?.kind === 'user-injection'
+      ? message.omo.originalText
+      : message.content;
+  }
+
+  private async renderMarkdownInto(container: HTMLElement, markdown: string): Promise<void> {
+    if (this.markdownService) {
+      await this.markdownService.render(container, markdown);
+      return;
+    }
+
+    container.setText(markdown);
+  }
+
+  private async renderOmoUserInjection(container: HTMLElement, message: ChatMessage): Promise<void> {
+    if (message.omo?.kind !== 'user-injection') {
+      return;
+    }
+
+    const panelEl = container.createDiv({ cls: 'opencodian-omo-injection' });
+    const headerEl = panelEl.createDiv({ cls: 'opencodian-omo-injection-header' });
+    headerEl.createSpan({
+      cls: 'opencodian-omo-injection-badge',
+      text: this.getOmoModeBadgeLabel(message.omo.modeTag),
+    });
+    headerEl.createSpan({
+      cls: 'opencodian-omo-injection-title',
+      text: t('chat.omo.injected.title'),
+    });
+
+    const summaryEl = panelEl.createDiv({ cls: 'opencodian-omo-injection-summary' });
+    await this.renderMarkdownInto(summaryEl, this.getOmoInjectionSummary(message));
+
+    const rawWrapperEl = panelEl.createDiv({ cls: 'opencodian-omo-raw-block' });
+    rawWrapperEl.createDiv({
+      cls: 'opencodian-omo-raw-label',
+      text: t('chat.omo.injected.rawLabel'),
+    });
+    const rawContentEl = rawWrapperEl.createEl('pre', {
+      cls: 'opencodian-omo-raw-content',
+      text: message.omo.injectedPrompt,
+    });
+    const rawToggleEl = rawWrapperEl.createEl('button');
+    const rawState: CollapsibleState = {
+      isExpanded: false,
+      isCollapsible: false,
+    };
+    setupCollapsible(rawWrapperEl, rawToggleEl, rawContentEl, rawState, {
+      collapsedHeight: 96,
+      showMoreLabel: t('chat.omo.injected.showRaw'),
+      showLessLabel: t('chat.omo.injected.hideRaw'),
+    });
+  }
+
   private async renderMessages(messages: ChatMessage[]): Promise<void> {
     const groups = buildMessageRenderGroups(messages);
 
@@ -2289,6 +2473,162 @@ export class OpenCodianView extends ItemView {
 
       await this.renderMessage(mergeAssistantMessagesForRender(group.messages));
     }
+  }
+
+  private armBackgroundTaskIndicatorForUserMessage(message: ChatMessage): void {
+    if (message.omo?.kind !== 'user-injection' || message.omo.modeTag !== 'search-mode') {
+      return;
+    }
+
+    this.backgroundTaskStartedAt = message.timestamp;
+    this.backgroundTaskModeTag = message.omo.modeTag;
+    this.backgroundTaskWaitingForFollowUp = false;
+  }
+
+  private hasActiveBackgroundTaskIndicator(): boolean {
+    return Boolean(this.backgroundTaskStartedAt) && (
+      this.backgroundTaskModeTag === 'search-mode'
+      || this.backgroundTaskToolIds.size > 0
+    );
+  }
+
+  private resetBackgroundTaskIndicator(): void {
+    this.backgroundTaskIndicatorEl?.remove();
+    this.backgroundTaskIndicatorEl = null;
+    this.backgroundTaskStartedAt = null;
+    this.backgroundTaskModeTag = null;
+    this.backgroundTaskWaitingForFollowUp = false;
+    this.backgroundTaskToolIds.clear();
+    this.backgroundTaskCompletedToolIds.clear();
+  }
+
+  private isBackgroundTaskTool(toolName: string): boolean {
+    return toolName === 'task';
+  }
+
+  private async handleStreamingToolCallStart(toolCall: { id: string; name: string }): Promise<void> {
+    if (!this.isBackgroundTaskTool(toolCall.name)) {
+      return;
+    }
+
+    if (!this.backgroundTaskStartedAt) {
+      this.backgroundTaskStartedAt = Date.now();
+    }
+    this.backgroundTaskToolIds.add(toolCall.id);
+    this.backgroundTaskWaitingForFollowUp = false;
+    await this.renderBackgroundTaskIndicatorIfNeeded();
+  }
+
+  private async handleStreamingToolCallEnd(toolCall: { id: string; name: string }): Promise<void> {
+    if (!this.isBackgroundTaskTool(toolCall.name)) {
+      return;
+    }
+
+    this.backgroundTaskToolIds.add(toolCall.id);
+    this.backgroundTaskCompletedToolIds.add(toolCall.id);
+    await this.renderBackgroundTaskIndicatorIfNeeded();
+  }
+
+  private async finalizeBackgroundTaskIndicatorAfterPrimaryStream(): Promise<void> {
+    if (!this.hasActiveBackgroundTaskIndicator()) {
+      return;
+    }
+
+    if (this.backgroundTaskToolIds.size === 0) {
+      this.resetBackgroundTaskIndicator();
+      return;
+    }
+
+    this.backgroundTaskWaitingForFollowUp = true;
+    await this.renderBackgroundTaskIndicatorIfNeeded();
+  }
+
+  private async renderBackgroundTaskIndicatorIfNeeded(): Promise<void> {
+    if (!this.hasActiveBackgroundTaskIndicator()) {
+      this.backgroundTaskIndicatorEl?.remove();
+      this.backgroundTaskIndicatorEl = null;
+      return;
+    }
+
+    const parentEl = this.ensureTurnBody();
+    if (!parentEl) {
+      return;
+    }
+
+    let messageEl = this.backgroundTaskIndicatorEl;
+    if (!messageEl || !messageEl.isConnected) {
+      messageEl = parentEl.createDiv({
+        cls: 'opencodian-message opencodian-message--assistant opencodian-message--notice opencodian-message--background-task',
+      });
+      messageEl.dataset.messageId = 'transient-background-task';
+      this.backgroundTaskIndicatorEl = messageEl;
+    }
+
+    let contentEl = messageEl.querySelector('.opencodian-message-content') as HTMLElement | null;
+    if (!contentEl) {
+      contentEl = messageEl.createDiv({ cls: 'opencodian-message-content' });
+    }
+
+    contentEl.empty();
+
+    const cardEl = contentEl.createDiv({ cls: 'opencodian-chat-notice-card is-info is-background-task' });
+    const iconEl = cardEl.createDiv({ cls: 'opencodian-chat-notice-icon opencodian-chat-notice-icon--background-task' });
+    setIcon(iconEl, 'loader');
+
+    const bodyEl = cardEl.createDiv({ cls: 'opencodian-chat-notice-body' });
+    const copy = this.getBackgroundTaskIndicatorCopy();
+    bodyEl.createDiv({
+      cls: 'opencodian-chat-notice-title',
+      text: copy.title,
+    });
+
+    const textEl = bodyEl.createDiv({ cls: 'opencodian-chat-notice-text' });
+    await this.renderMarkdownInto(textEl, copy.body);
+
+    if (copy.detail) {
+      bodyEl.createDiv({
+        cls: 'opencodian-chat-notice-meta',
+        text: copy.detail,
+      });
+    }
+  }
+
+  private getBackgroundTaskIndicatorCopy(): { title: string; body: string; detail?: string } {
+    const launched = this.backgroundTaskToolIds.size;
+    const completed = this.backgroundTaskCompletedToolIds.size;
+
+    if (launched === 0) {
+      return {
+        title: t('chat.backgroundTask.preparingTitle'),
+        body: t('chat.backgroundTask.preparingBody'),
+      };
+    }
+
+    if (this.backgroundTaskWaitingForFollowUp) {
+      return {
+        title: t('chat.backgroundTask.waitingTitle'),
+        body: t('chat.backgroundTask.waitingBody', {
+          total: String(launched),
+          completed: String(completed),
+        }),
+        detail: t('chat.backgroundTask.progressDetail', {
+          total: String(launched),
+          completed: String(completed),
+        }),
+      };
+    }
+
+    return {
+      title: t('chat.backgroundTask.runningTitle'),
+      body: t('chat.backgroundTask.runningBody', {
+        total: String(launched),
+        completed: String(completed),
+      }),
+      detail: t('chat.backgroundTask.progressDetail', {
+        total: String(launched),
+        completed: String(completed),
+      }),
+    };
   }
 
   /** Render a content block using the same renderers as streaming */
@@ -2595,6 +2935,141 @@ export class OpenCodianView extends ItemView {
     return mergedMessages;
   }
 
+  private async syncLatestUserMessageFromServer(
+    sessionId: string,
+    optimisticMessageId: string,
+  ): Promise<void> {
+    if (!sessionId || !this.currentConversation || this.currentConversation.openCodeSessionId !== sessionId) {
+      return;
+    }
+
+    try {
+      const serverMessages = await this.plugin.openCodeService.getSessionMessages(sessionId);
+      const latestServerUser = [...serverMessages]
+        .reverse()
+        .find(({ info }) => info.role === 'user');
+      if (!latestServerUser || !this.currentConversation || this.currentConversation.openCodeSessionId !== sessionId) {
+        return;
+      }
+
+      const hydratedMessage = OpenCodeService.openCodeMessageToChatMessage(
+        latestServerUser.info,
+        latestServerUser.parts,
+      );
+      const rawServerUserText = latestServerUser.parts
+        .filter((part) => typeof part.text === 'string')
+        .map((part) => part.text as string)
+        .join('');
+      logger.debug(`Hydrated latest server user message: ${this.stringifyLogPayload({
+        sessionId,
+        optimisticMessageId,
+        sourceMessageId: hydratedMessage.sourceMessageId ?? null,
+        rawTextPreview: this.getLogPreview(rawServerUserText),
+        visibleTextPreview: this.getLogPreview(this.getVisibleUserMessageText(hydratedMessage)),
+        omoDetected: Boolean(hydratedMessage.omo),
+        omoKind: hydratedMessage.omo?.kind ?? null,
+        omoModeTag: hydratedMessage.omo?.kind === 'user-injection' ? hydratedMessage.omo.modeTag : null,
+      })}`);
+      const optimisticIndex = this.currentConversation.messages.findIndex(
+        (message) => message.id === optimisticMessageId,
+      );
+      if (optimisticIndex < 0) {
+        return;
+      }
+
+      const optimisticMessage = this.currentConversation.messages[optimisticIndex];
+      const optimisticVisibleText = this.getVisibleUserMessageText(optimisticMessage).trim();
+      const hydratedVisibleText = this.getVisibleUserMessageText(hydratedMessage).trim();
+      if (
+        optimisticVisibleText
+        && hydratedVisibleText
+        && optimisticVisibleText !== hydratedVisibleText
+      ) {
+        logger.debug(`Skipped optimistic user message hydration due to visible text mismatch: ${this.stringifyLogPayload({
+          sessionId,
+          optimisticMessageId,
+          optimisticVisibleTextPreview: this.getLogPreview(optimisticVisibleText),
+          hydratedVisibleTextPreview: this.getLogPreview(hydratedVisibleText),
+          rawTextPreview: this.getLogPreview(rawServerUserText),
+          omoDetected: Boolean(hydratedMessage.omo),
+          omoKind: hydratedMessage.omo?.kind ?? null,
+        })}`);
+        return;
+      }
+
+      if (
+        optimisticMessage.sourceMessageId === hydratedMessage.sourceMessageId
+        && optimisticMessage.content === hydratedMessage.content
+        && JSON.stringify(optimisticMessage.omo ?? null) === JSON.stringify(hydratedMessage.omo ?? null)
+      ) {
+        logger.debug(`Skipped optimistic user message hydration because nothing changed: ${this.stringifyLogPayload({
+          sessionId,
+          optimisticMessageId,
+          sourceMessageId: hydratedMessage.sourceMessageId ?? null,
+          omoDetected: Boolean(hydratedMessage.omo),
+          omoKind: hydratedMessage.omo?.kind ?? null,
+        })}`);
+        return;
+      }
+
+      this.currentConversation.messages.splice(optimisticIndex, 1, hydratedMessage);
+      this.armBackgroundTaskIndicatorForUserMessage(hydratedMessage);
+      this.lastConversationSyncFingerprint = this.getConversationSyncFingerprint(this.currentConversation.messages);
+      await this.plugin.saveConversation(this.currentConversation);
+      await this.rerenderSingleUserMessage(optimisticMessageId, hydratedMessage);
+      await this.renderBackgroundTaskIndicatorIfNeeded();
+      logger.debug(`Applied hydrated server user message to optimistic bubble: ${this.stringifyLogPayload({
+        sessionId,
+        optimisticMessageId,
+        sourceMessageId: hydratedMessage.sourceMessageId ?? null,
+        omoDetected: Boolean(hydratedMessage.omo),
+        omoKind: hydratedMessage.omo?.kind ?? null,
+      })}`);
+    } catch (error) {
+      logger.debug('Failed to hydrate optimistic user message from server', error);
+    }
+  }
+
+  private getLogPreview(text: string, maxLength = 180): string {
+    const normalized = text.replace(/\s+/g, ' ').trim();
+    if (normalized.length <= maxLength) {
+      return normalized;
+    }
+
+    return `${normalized.slice(0, maxLength)}...`;
+  }
+
+  private stringifyLogPayload(payload: unknown): string {
+    try {
+      return JSON.stringify(payload);
+    } catch {
+      return '[unserializable]';
+    }
+  }
+
+  private async rerenderSingleUserMessage(
+    previousMessageId: string,
+    message: ChatMessage,
+  ): Promise<void> {
+    const messageEl = this.messagesContainer
+      ?.querySelector<HTMLElement>(`.opencodian-message[data-message-id="${previousMessageId}"]`);
+    if (!messageEl) {
+      return;
+    }
+
+    messageEl.dataset.messageId = message.id;
+    if (message.sourceMessageId) {
+      messageEl.dataset.sourceMessageId = message.sourceMessageId;
+    } else {
+      delete messageEl.dataset.sourceMessageId;
+    }
+
+    messageEl.empty();
+    const contentEl = messageEl.createDiv({ cls: 'opencodian-message-content' });
+    const copyContent = await this.renderUserMessageContent(contentEl, message);
+    this.addUserMessageFooter(messageEl, message, copyContent);
+  }
+
   private addUserMessageFooter(messageEl: HTMLElement, message: ChatMessage, content?: string): void {
     const footerEl = messageEl.createDiv({ cls: 'opencodian-user-message-footer' });
     const hasActions = Boolean(content) || Boolean(message.sourceMessageId);
@@ -2785,36 +3260,77 @@ export class OpenCodianView extends ItemView {
     }
   }
 
-  private async syncConversationMessagesFromServer(conversation: Conversation): Promise<ChatMessage[]> {
+  private async syncConversationMessagesFromServer(
+    conversation: Conversation,
+  ): Promise<{ messages: ChatMessage[]; changed: boolean; fingerprint: string }> {
     try {
-      logger.debug('Syncing conversation messages from server', {
-        conversationId: conversation.id,
-        sessionId: conversation.openCodeSessionId,
-        localMessageCount: conversation.messages.length,
-      });
       const serverMessages = await this.plugin.openCodeService.getSessionMessages(conversation.openCodeSessionId);
+      const serverUserDiagnostics = serverMessages
+        .filter(({ info }) => info.role === 'user')
+        .map(({ info, parts }) => {
+          const rawText = parts
+            .filter((part) => typeof part.text === 'string')
+            .map((part) => part.text as string)
+            .join('');
+          const converted = OpenCodeService.openCodeMessageToChatMessage(info, parts);
+          return {
+            sourceMessageId: converted.sourceMessageId ?? null,
+            rawTextPreview: this.getLogPreview(rawText),
+            visibleTextPreview: this.getLogPreview(this.getVisibleUserMessageText(converted)),
+            omoDetected: Boolean(converted.omo),
+            omoKind: converted.omo?.kind ?? null,
+            omoModeTag: converted.omo?.kind === 'user-injection' ? converted.omo.modeTag : null,
+          };
+        });
+      if (serverUserDiagnostics.some((entry) => entry.omoDetected)) {
+        logger.debug(`Server user message diagnostics: ${this.stringifyLogPayload({
+          conversationId: conversation.id,
+          sessionId: conversation.openCodeSessionId,
+          users: serverUserDiagnostics,
+        })}`);
+      }
       const converted = this.mergeSyncedMessageModelIds(
         conversation.messages,
         serverMessages.map(({ info, parts }) => OpenCodeService.openCodeMessageToChatMessage(info, parts)),
       );
-      const noticeMessages = conversation.messages.filter((message) => message.displayStyle === 'notice');
+      const noticeMessages = conversation.messages.filter(
+        (message) => message.displayStyle === 'notice' && !message.sourceMessageId,
+      );
       const merged = [...converted, ...noticeMessages].sort((left, right) => left.timestamp - right.timestamp);
-      conversation.messages = merged;
-      conversation.updatedAt = Date.now();
-      await this.plugin.saveConversation(conversation);
+      const fingerprint = this.getConversationSyncFingerprint(merged);
+      const previousFingerprint = this.lastConversationSyncFingerprint
+        ?? this.getConversationSyncFingerprint(conversation.messages);
+      const changed = fingerprint !== previousFingerprint;
+
+      if (changed) {
+        conversation.messages = merged;
+        conversation.updatedAt = Date.now();
+        await this.plugin.saveConversation(conversation);
+      } else {
+        conversation.messages = merged;
+      }
+
       if (this.currentConversation?.id === conversation.id) {
         await this.refreshActiveTabContextUsageFromServer();
       }
-      logger.debug('Conversation sync complete', {
-        conversationId: conversation.id,
-        sessionId: conversation.openCodeSessionId,
-        serverMessageCount: serverMessages.length,
-        mergedMessageCount: merged.length,
-      });
-      return merged;
+      if (changed) {
+        logger.debug('Conversation sync complete', {
+          conversationId: conversation.id,
+          sessionId: conversation.openCodeSessionId,
+          serverMessageCount: serverMessages.length,
+          mergedMessageCount: merged.length,
+          changed,
+        });
+      }
+      return { messages: merged, changed, fingerprint };
     } catch (error) {
       logger.error('Failed to sync conversation messages from server:', error);
-      return conversation.messages;
+      const fingerprint = this.getConversationSyncFingerprint(conversation.messages);
+      return {
+        messages: conversation.messages,
+        changed: false,
+        fingerprint,
+      };
     }
   }
 
@@ -2829,10 +3345,154 @@ export class OpenCodianView extends ItemView {
     this.resetTurnState();
 
     await this.renderMessages(conversation.messages);
+    await this.renderBackgroundTaskIndicatorIfNeeded();
 
     if (shouldStickToBottom) {
       this.scrollToBottom();
     }
+  }
+
+  private async applySyncedConversationUpdate(
+    previousMessages: ChatMessage[],
+    nextMessages: ChatMessage[],
+  ): Promise<void> {
+    if (!this.currentConversation) {
+      return;
+    }
+
+    const appendedMessages = this.getSimpleAppendedMessages(previousMessages, nextMessages);
+    if (!appendedMessages) {
+      await this.rerenderConversationMessages(this.currentConversation);
+      return;
+    }
+
+    const shouldStickToBottom = this.isNearBottom();
+    const hasBackgroundCompletionNotice = appendedMessages.some(
+      (message) => message.omo?.kind === 'system-reminder' && message.omo.reminderType === 'all-background-tasks-complete',
+    );
+    const hasBackgroundFollowUp = this.backgroundTaskWaitingForFollowUp && appendedMessages.some(
+      (message) => message.role === 'assistant' && message.displayStyle !== 'notice',
+    );
+    if (hasBackgroundCompletionNotice || hasBackgroundFollowUp) {
+      this.resetBackgroundTaskIndicator();
+    }
+
+    for (const message of appendedMessages) {
+      if (this.shouldPseudoStreamSyncedAssistantMessage(message)) {
+        await this.renderSyncedAssistantMessageWithReveal(message);
+      } else {
+        await this.renderMessage(message);
+      }
+    }
+
+    await this.renderBackgroundTaskIndicatorIfNeeded();
+
+    if (shouldStickToBottom) {
+      this.scrollToBottom();
+    }
+  }
+
+  private getSimpleAppendedMessages(
+    previousMessages: ChatMessage[],
+    nextMessages: ChatMessage[],
+  ): ChatMessage[] | null {
+    if (nextMessages.length < previousMessages.length) {
+      return null;
+    }
+
+    for (let index = 0; index < previousMessages.length; index += 1) {
+      if (this.getMessageRenderSignature(previousMessages[index]) !== this.getMessageRenderSignature(nextMessages[index])) {
+        return null;
+      }
+    }
+
+    return nextMessages.slice(previousMessages.length);
+  }
+
+  private getMessageRenderSignature(message: ChatMessage): string {
+    return JSON.stringify({
+      id: message.id,
+      role: message.role,
+      sourceMessageId: message.sourceMessageId ?? null,
+      displayStyle: message.displayStyle ?? null,
+      content: message.content,
+      timestamp: message.timestamp,
+      omo: message.omo ? {
+        kind: message.omo.kind,
+        headline: message.omo.headline,
+      } : null,
+    });
+  }
+
+  private shouldPseudoStreamSyncedAssistantMessage(message: ChatMessage): boolean {
+    if (message.role !== 'assistant' || message.displayStyle === 'notice') {
+      return false;
+    }
+
+    if (!message.content?.trim()) {
+      return false;
+    }
+
+    if (!message.contentBlocks || message.contentBlocks.length === 0) {
+      return true;
+    }
+
+    return message.contentBlocks.every((block) => block.type === 'text' && Boolean(block.text));
+  }
+
+  private async renderSyncedAssistantMessageWithReveal(message: ChatMessage): Promise<void> {
+    const { messageEl, contentEl } = this.createAssistantMessageElement();
+    const textEl = contentEl.createDiv({ cls: 'streaming-text-block' });
+    const chunks = this.splitPseudoStreamChunks(message.content);
+    const delayMs = this.getPseudoStreamDelay(chunks.length);
+
+    let rendered = '';
+    for (const chunk of chunks) {
+      rendered += chunk;
+      await this.renderMarkdownInto(textEl, rendered);
+      if (delayMs > 0) {
+        await this.sleep(delayMs);
+      }
+    }
+
+    this.addTimestampWithCopyButton(messageEl, message.timestamp, message.content, message.modelId);
+    this.streamingMessageEl = null;
+    this.streamingContentEl = null;
+  }
+
+  private splitPseudoStreamChunks(text: string): string[] {
+    const normalized = text.replace(/\r\n/g, '\n');
+    const chunks: string[] = [];
+    let buffer = '';
+
+    for (const char of normalized) {
+      buffer += char;
+      if (buffer.length >= 12 || /[\n，。！？；：,.!?;:]/u.test(char)) {
+        chunks.push(buffer);
+        buffer = '';
+      }
+    }
+
+    if (buffer) {
+      chunks.push(buffer);
+    }
+
+    return chunks.length > 0 ? chunks : [text];
+  }
+
+  private getPseudoStreamDelay(chunkCount: number): number {
+    if (chunkCount <= 1) {
+      return 0;
+    }
+
+    const targetDurationMs = 900;
+    return Math.max(12, Math.min(36, Math.round(targetDurationMs / chunkCount)));
+  }
+
+  private sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => {
+      window.setTimeout(resolve, ms);
+    });
   }
 
   private isNearBottom(threshold = 48): boolean {
@@ -3686,7 +4346,7 @@ export class OpenCodianView extends ItemView {
     return false;
   }
 
-  private renderNoticeCard(container: HTMLElement, message: ChatMessage): void {
+  private async renderNoticeCard(container: HTMLElement, message: ChatMessage): Promise<void> {
     const tone = message.noticeTone ?? 'info';
     const cardEl = container.createDiv({ cls: `opencodian-chat-notice-card is-${tone}` });
     const iconEl = cardEl.createDiv({ cls: 'opencodian-chat-notice-icon' });
@@ -3696,17 +4356,38 @@ export class OpenCodianView extends ItemView {
     );
 
     const bodyEl = cardEl.createDiv({ cls: 'opencodian-chat-notice-body' });
-    if (message.noticeTitle) {
+    const noticeTitle = message.noticeTitle ?? this.getOmoNoticeTitle(message);
+    if (noticeTitle) {
       bodyEl.createDiv({
         cls: 'opencodian-chat-notice-title',
-        text: message.noticeTitle,
+        text: noticeTitle,
       });
     }
 
-    bodyEl.createDiv({
-      cls: 'opencodian-chat-notice-text',
-      text: message.content,
-    });
+    const textEl = bodyEl.createDiv({ cls: 'opencodian-chat-notice-text' });
+    await this.renderMarkdownInto(textEl, this.getNoticeBodyText(message));
+
+    if (message.omo?.kind === 'system-reminder') {
+      const rawWrapperEl = bodyEl.createDiv({ cls: 'opencodian-omo-raw-block opencodian-omo-raw-block--notice' });
+      rawWrapperEl.createDiv({
+        cls: 'opencodian-omo-raw-label',
+        text: t('chat.omo.system.rawLabel'),
+      });
+      const rawContentEl = rawWrapperEl.createEl('pre', {
+        cls: 'opencodian-omo-raw-content',
+        text: message.omo.rawText,
+      });
+      const rawToggleEl = rawWrapperEl.createEl('button');
+      const rawState: CollapsibleState = {
+        isExpanded: false,
+        isCollapsible: false,
+      };
+      setupCollapsible(rawWrapperEl, rawToggleEl, rawContentEl, rawState, {
+        collapsedHeight: 88,
+        showMoreLabel: t('chat.omo.system.showRaw'),
+        showLessLabel: t('chat.omo.system.hideRaw'),
+      });
+    }
 
     if (message.noticeActions && message.noticeActions.length > 0) {
       const actionsEl = bodyEl.createDiv({ cls: 'opencodian-chat-notice-actions' });
@@ -3720,6 +4401,66 @@ export class OpenCodianView extends ItemView {
           void this.handleNoticeAction(action.type);
         });
       }
+    }
+  }
+
+  private getOmoModeBadgeLabel(modeTag: string): string {
+    switch (modeTag) {
+      case 'search-mode':
+        return t('chat.omo.mode.search');
+      case 'analyze-mode':
+        return t('chat.omo.mode.analyze');
+      default:
+        return t('chat.omo.mode.custom');
+    }
+  }
+
+  private getOmoInjectionSummary(message: ChatMessage): string {
+    if (message.omo?.kind !== 'user-injection') {
+      return '';
+    }
+
+    const headline = message.omo.headline || t('chat.omo.injected.defaultHeadline');
+    return t('chat.omo.injected.summary', { headline });
+  }
+
+  private getOmoNoticeTitle(message: ChatMessage): string | undefined {
+    if (message.omo?.kind !== 'system-reminder') {
+      return undefined;
+    }
+
+    switch (message.omo.reminderType) {
+      case 'background-task-completed':
+        return t('chat.omo.system.backgroundCompleted');
+      case 'all-background-tasks-complete':
+        return t('chat.omo.system.allCompleted');
+      default:
+        return t('chat.omo.system.generic');
+    }
+  }
+
+  private getNoticeBodyText(message: ChatMessage): string {
+    if (message.omo?.kind !== 'system-reminder') {
+      return message.content;
+    }
+
+    const lines = message.omo.reminderText
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0);
+    const headline = message.omo.headline;
+    const detailLines = lines.filter((line) => line !== headline).slice(0, 2);
+    if (detailLines.length > 0) {
+      return detailLines.join('\n\n');
+    }
+
+    switch (message.omo.reminderType) {
+      case 'background-task-completed':
+        return t('chat.omo.system.backgroundCompletedSummary');
+      case 'all-background-tasks-complete':
+        return t('chat.omo.system.allCompletedSummary');
+      default:
+        return message.content || headline;
     }
   }
 
@@ -3746,6 +4487,7 @@ export class OpenCodianView extends ItemView {
       this.currentConversation.messages.push(noticeMessage);
       this.currentConversation.updatedAt = Date.now();
       await this.plugin.storage.saveConversation(this.currentConversation);
+      this.lastConversationSyncFingerprint = this.getConversationSyncFingerprint(this.currentConversation.messages);
     }
 
     this.scrollToBottom();

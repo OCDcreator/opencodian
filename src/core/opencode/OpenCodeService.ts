@@ -13,6 +13,7 @@ import {
   resolveToolExecutionStatus,
   resolveToolResultText,
 } from '../../shared';
+import { detectOmoMessageMeta } from './omoCompat';
 import type { ChatMessage, ContentBlock, ImageAttachment, PermissionReply, PermissionRequest, StreamChunk } from '../types';
 import type { OpenCodianSettings } from '../types/settings';
 import { getServerBaseUrl, isLocalServerMode } from '../types/settings';
@@ -1500,14 +1501,25 @@ export class OpenCodeService {
       timestamp = Date.now();
     }
 
+    const role = info.role === 'assistant' ? 'assistant' : 'user';
+    const omo = detectOmoMessageMeta(role, content);
+    const normalizedContent = omo?.kind === 'user-injection'
+      ? omo.originalText
+      : omo?.kind === 'system-reminder'
+        ? omo.reminderText
+        : content;
+
     return {
       id: info.id,
-      role: info.role === 'assistant' ? 'assistant' : 'user',
-      content,
+      role,
+      content: normalizedContent,
       timestamp,
       sourceMessageId: info.id,
       toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
       contentBlocks: contentBlocks.length > 0 ? contentBlocks : undefined,
+      displayStyle: omo?.kind === 'system-reminder' ? 'notice' : undefined,
+      noticeTone: omo?.kind === 'system-reminder' ? 'info' : undefined,
+      omo: omo ?? undefined,
       parts,
     };
   }

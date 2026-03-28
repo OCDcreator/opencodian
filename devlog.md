@@ -8,6 +8,115 @@
 
 ---
 
+## 2026-03-29 OMO 兼容主链落地、后台任务可见性补强与文档同步
+
+### ✨ 改动目标
+
+- 为 `oh-my-opencode` 兼容补齐聊天侧主链，而不是只停留在“项目配置入口”阶段。
+- 让 OMO 注入提示词、系统提醒、后台任务进度在当前会话里可见、可理解、可区分。
+- 解决后台任务完成后消息整段跳出、提示卡片 markdown 未渲染、notice 样式留白不协调等体验问题。
+- 将当前已完成与未完成内容同步回需求文档和项目说明，方便新会话继续推进。
+
+### 🏗️ 实现内容
+
+#### 1. OMO 消息识别层
+
+- 新增 `src/core/opencode/omoCompat.ts`
+- 统一识别：
+  - `[search-mode] ... --- 原始输入`
+  - `<system-reminder>...</system-reminder>`
+  - `<!-- OMO_INTERNAL_INITIATOR -->`
+- `OpenCodeService.openCodeMessageToChatMessage()` 现在会产出 OMO 元数据，而不是把这类文本全当普通消息处理。
+
+#### 2. 当前 user bubble 及时回写
+
+- 发送后在 `message_start` 阶段立即拉取当前 session 的最新 user message
+- 用服务端最终文本回写本地乐观消息
+- 因此注入后的 `search-mode` 信息不再需要重新打开会话才能看到
+
+#### 3. OMO 专用 UI 与中文化
+
+- 用户消息支持：
+  - 原始用户输入正文
+  - 模式标签（如 `搜索模式`）
+  - 注入摘要
+  - 原始英文 prompt 折叠查看
+- 系统提醒支持：
+  - notice card 中文标题 / 摘要
+  - 原始 reminder 折叠查看
+- 相关 UI 已统一接入 markdown 渲染，而不是纯文本硬塞
+
+#### 4. 后台任务运行中状态可见
+
+- 聊天界面会根据 `search-mode` 与 `task` 工具调用显示“后台任务运行中”卡片
+- 主回复结束后，如果子任务仍在执行，卡片会继续保留
+- 用户不再只能盯着一个已结束的主回复发懵
+
+#### 5. 后台任务完成后的追加消息体验优化
+
+- 当前可见会话增加空闲期自动同步机制
+- 后台任务完成回写父会话后，界面会自动吸收新增消息
+- 新增的 assistant 纯文本消息会做轻量“伪流式”渐进显示，避免整段瞬间砸出
+
+#### 6. 工具展示与样式细节收尾
+
+- `task` 工具改成更易理解的命名与摘要
+- 修复：
+  - notice markdown 段落 / 列表大空白
+  - 原始提醒折叠按钮过小过挤
+  - 系统提醒摘要里 `ID / Description` 被挤成一行的问题
+
+#### 7. 文档同步
+
+- `docs/omo-compatibility-requirement.md`
+  - 新增“截至 2026-03-29 的当前实现进度”
+  - 明确区分已完成、未完成与建议优先级
+- `AGENTS.md`
+  - 补充 OMO 兼容层、renderGroups、聊天侧 OMO / 后台任务能力说明
+  - 更新开发注意事项与最后更新时间
+
+### 🧪 验证
+
+- `npm run typecheck` 通过
+- `npm test` 通过（131/131）
+- 多轮 `npm run build` 成功
+- 已部署到 Test Vault
+- 本轮最终验证与部署过程中使用过的 `BUILD_ID`：
+  - `main.202603290020`
+  - `main.202603290025`
+  - `main.202603290027`
+
+### 📁 涉及文件
+
+- `src/core/opencode/omoCompat.ts`
+- `src/core/opencode/OpenCodeService.ts`
+- `src/core/types/chat.ts`
+- `src/core/types/index.ts`
+- `src/features/chat/OpenCodianView.ts`
+- `src/features/chat/services/ContextUsageService.ts`
+- `src/features/settings/OpenCodianSettings.ts`
+- `src/utils/streaming/ToolCallRenderer.ts`
+- `src/i18n/locales/en.ts`
+- `src/i18n/locales/zh.ts`
+- `styles.css`
+- `tests/unit/core/opencode/OpenCodeService.test.ts`
+- `docs/omo-compatibility-requirement.md`
+- `AGENTS.md`
+
+### 📌 当前结论
+
+- 聊天侧 OMO 兼容主线已经基本闭环：
+  - 注入 prompt 可见
+  - 后台提醒自动出现
+  - 中文化 UI 已成型
+  - 后台任务“正在运行”对用户可见
+- 仍未完全做完的部分主要在“项目级 OMO 配置产品化”：
+  - OMO 配置目前还是创建 / 打开入口
+  - 远程模式提示还可以更直接
+  - 后续若追求更强实时性，可继续评估从轮询升级到常驻事件订阅
+
+---
+
 ## 2026-03-28 OpenCode 插件管理接入与设置页收尾
 
 ### ✨ 改动目标
