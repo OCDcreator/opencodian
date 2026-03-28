@@ -1,5 +1,5 @@
-import { TabBar } from '../../../../../src/features/chat/tabs';
 import type { TabBarItem, TabBarLayoutMode } from '../../../../../src/features/chat/tabs';
+import { TabBar } from '../../../../../src/features/chat/tabs';
 
 function createItems(count: number, activeIndex = 0): TabBarItem[] {
   return Array.from({ length: count }, (_, index) => ({
