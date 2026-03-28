@@ -27,11 +27,12 @@ import {
   normalizePersistedTabState,
   normalizeTabBarPosition,
   normalizeThinkingBudget,
+  normalizeTitleMode,
   VIEW_TYPE_OPENCODIAN,
 } from './core/types';
 import { OpenCodianView } from './features/chat/OpenCodianView';
 import { OpenCodianSettingTab } from './features/settings/OpenCodianSettings';
-import { setLocale } from './i18n';
+import { setLocale, t } from './i18n';
 import { createLogger, getRecentLogText, getVaultBasePath, setDebugLoggingEnabled } from './shared';
 
 const logger = createLogger('OpenCodian');
@@ -311,6 +312,8 @@ export default class OpenCodianPlugin extends Plugin {
           thinkingBudget: normalizeThinkingBudget(savedSettings.thinkingBudget),
           tabBarPosition: normalizeTabBarPosition(savedSettings.tabBarPosition),
           belowHeaderTabBarLayout: normalizeBelowHeaderTabBarLayout(savedSettings.belowHeaderTabBarLayout),
+          titleMode: normalizeTitleMode(savedSettings.titleMode),
+          aiTitleModel: typeof savedSettings.aiTitleModel === 'string' ? savedSettings.aiTitleModel.trim() : '',
           debugLogPaths: normalizedDebugLogPaths,
           chatAppearance: normalizedChatAppearance,
           tabState: normalizedTabState,
@@ -610,6 +613,7 @@ export default class OpenCodianPlugin extends Plugin {
       createdAt: meta.createdAt,
       updatedAt: meta.updatedAt,
       lastResponseAt: meta.lastResponseAt,
+      titleGenerationStatus: meta.titleGenerationStatus,
       // Use stored openCodeSessionId or fallback to conversation ID
       openCodeSessionId: meta.openCodeSessionId ?? meta.id,
       messages: [],
@@ -623,7 +627,7 @@ export default class OpenCodianPlugin extends Plugin {
     
     const conversation: Conversation = {
       id: `conv-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
-      title: this.generateDefaultTitle(),
+      title: this.getEmptyConversationTitle(),
       createdAt: Date.now(),
       updatedAt: Date.now(),
       openCodeSessionId: sessionId,
@@ -642,7 +646,7 @@ export default class OpenCodianPlugin extends Plugin {
   ): Promise<Conversation> {
     const conversation: Conversation = {
       id: `conv-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
-      title: initial?.title || this.generateDefaultTitle(),
+      title: initial?.title || this.getEmptyConversationTitle(),
       createdAt: Date.now(),
       updatedAt: Date.now(),
       openCodeSessionId: sessionId,
@@ -650,6 +654,7 @@ export default class OpenCodianPlugin extends Plugin {
       currentNote: initial?.currentNote,
       externalContextPaths: initial?.externalContextPaths ? [...initial.externalContextPaths] : undefined,
       lastResponseAt: initial?.lastResponseAt,
+      titleGenerationStatus: initial?.titleGenerationStatus,
     };
 
     this.conversations.unshift(conversation);
@@ -712,15 +717,32 @@ export default class OpenCodianPlugin extends Plugin {
     await this.storage.deleteConversation(id);
   }
 
-  /** Generate default conversation title */
-  private generateDefaultTitle(): string {
-    const now = new Date();
-    return now.toLocaleString(undefined, {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+  /** Get placeholder title for a new, empty conversation */
+  getEmptyConversationTitle(): string {
+    return t('chat.tab.new');
+  }
+
+  /** Generate fallback conversation title from the first user message */
+  generateDefaultTitle(firstMessage: string): string {
+    const normalizedMessage = firstMessage.replace(/\r/g, '').trim();
+    if (!normalizedMessage) {
+      return t('chat.history.untitled');
+    }
+
+    const firstSentence = normalizedMessage
+      .split(/[.!?\n]/)[0]
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (!firstSentence) {
+      return t('chat.history.untitled');
+    }
+
+    const title = firstSentence.substring(0, 50).trim();
+    if (!title) {
+      return t('chat.history.untitled');
+    }
+
+    return title + (firstSentence.length > 50 ? '...' : '');
   }
 }
 

@@ -4418,3 +4418,91 @@ streamController.renderStoredContentBlocks(parentEl, savedBlocks);
 - `styles.css`
 
 ---
+
+## 2026-03-28 会话标题机制改造与历史重命名修复
+
+### ✨ 新增能力
+
+- 新会话不再默认使用时间戳标题，改为在首条用户消息发送后，立即生成“消息截取回退标题”。
+- 新增标题生成模式设置：
+  - `default`：仅使用首条消息回退标题
+  - `ai`：先使用回退标题，再异步生成 AI 精炼标题
+- 新增 AI 标题模型设置 `aiTitleModel`，留空时自动跟随当前会话模型。
+- 历史会话列表新增重命名按钮，支持用户手动修改标题。
+
+### 🏗️ 数据与服务层改造
+
+- `OpenCodianSettings` 新增：
+  - `titleMode`
+  - `aiTitleModel`
+- `Conversation` / `ConversationMeta` 新增：
+  - `titleGenerationStatus?: 'pending' | 'success' | 'failed'`
+- `StorageService` 持久化并读取标题生成状态，保证重启后历史状态不丢失。
+- `OpenCodeService` 新增：
+  - `updateSessionTitle()`：封装 `PATCH /session/:id`
+  - `requestAssistantResponse()`：用于同步获取标题生成结果
+
+### 🤖 AI 标题生成流程
+
+- 新增 `src/core/prompts/titleGeneration.ts`，定义标题生成系统提示词。
+- 新增 `src/features/chat/services/TitleGenerationService.ts`：
+  - 使用临时 session 异步请求标题
+  - 支持取消
+  - 清洗 AI 返回内容（去引号、去尾标点、限制 50 字）
+- 在首条用户消息发送后：
+  1. 立即写入回退标题
+  2. 若设置为 `ai`，则异步生成精炼标题
+  3. 生成成功后同步更新本地会话、Tab 标题和服务端 session 标题
+- 若用户在 AI 生成期间手动改名，则取消生成并保留用户标题。
+
+### 🖊️ 历史会话重命名修复
+
+- 历史会话项右侧新增铅笔按钮。
+- 初版实现使用了 `window.prompt()`，但 Obsidian / Electron 渲染环境不支持原生 `prompt()`。
+- 后续改为插件内部自定义重命名弹窗，支持：
+  - 输入框自动聚焦
+  - Enter 保存
+  - Escape 取消
+  - 点击遮罩关闭
+
+### 🌐 设置、文案与样式
+
+- 设置面板新增 “Title Settings / 标题设置” 区块。
+- 中英文文案补充：
+  - 标题模式
+  - AI 标题模型
+  - 重命名按钮
+  - 标题生成状态
+  - 重命名弹窗按钮
+- 历史会话列表新增状态徽标与重命名按钮样式。
+- 新增重命名弹窗样式。
+
+### 🧪 验证
+
+- `npm run lint` 通过
+- `npm run typecheck` 通过
+- `node scripts/run-jest.js tests/unit/core/opencode/OpenCodeService.test.ts` 通过
+- `npm run build` 成功
+- 已部署到 Test Vault
+- 本轮最终验证使用的 `BUILD_ID`：`main.202603281012`
+
+### 📁 涉及文件
+
+- `src/main.ts`
+- `src/core/types/settings.ts`
+- `src/core/types/chat.ts`
+- `src/core/types/index.ts`
+- `src/core/storage/StorageService.ts`
+- `src/core/opencode/OpenCodeService.ts`
+- `src/core/opencode/ServerManager.ts`
+- `src/core/prompts/titleGeneration.ts`
+- `src/features/chat/OpenCodianView.ts`
+- `src/features/chat/services/TitleGenerationService.ts`
+- `src/features/chat/tabs/TabManager.ts`
+- `src/features/settings/OpenCodianSettings.ts`
+- `src/i18n/locales/en.ts`
+- `src/i18n/locales/zh.ts`
+- `styles.css`
+- `tests/unit/core/opencode/OpenCodeService.test.ts`
+
+---

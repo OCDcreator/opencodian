@@ -52,6 +52,7 @@ export {
   normalizePersistedTabState,
   normalizeTabBarPosition,
   normalizeThinkingBudget,
+  normalizeTitleMode,
   type OpenCodianSettings,
   type PartialChatAppearanceSettings,
   type PermissionMode,
@@ -66,6 +67,7 @@ export {
   type ServerConfig,
   type ServerMode,
   type TabBarPosition,
+  type TitleMode,
 } from './settings';
 
 // Tool types

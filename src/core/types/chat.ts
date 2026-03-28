@@ -96,6 +96,7 @@ export interface ConversationMeta {
   createdAt: number;
   updatedAt: number;
   lastResponseAt?: number;
+  titleGenerationStatus?: 'pending' | 'success' | 'failed';
   messageCount: number;
   openCodeSessionId?: string;
 }
@@ -107,6 +108,7 @@ export interface Conversation {
   createdAt: number;
   updatedAt: number;
   lastResponseAt?: number;
+  titleGenerationStatus?: 'pending' | 'success' | 'failed';
   openCodeSessionId: string;
   messages: ChatMessage[];
   currentNote?: string;

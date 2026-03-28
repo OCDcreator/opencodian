@@ -46,8 +46,11 @@ export class StorageService {
       createdAt: conversation.createdAt,
       updatedAt: conversation.updatedAt,
       lastResponseAt: conversation.lastResponseAt,
+      titleGenerationStatus: conversation.titleGenerationStatus,
       messageCount: conversation.messages.length,
       openCodeSessionId: conversation.openCodeSessionId,
+      currentNote: conversation.currentNote,
+      externalContextPaths: conversation.externalContextPaths,
       messages: conversation.messages,  // Save full messages with contentBlocks
     };
 
@@ -87,7 +90,9 @@ export class StorageService {
         createdAt: data.createdAt,
         updatedAt: data.updatedAt,
         lastResponseAt: data.lastResponseAt,
+        titleGenerationStatus: data.titleGenerationStatus,
         messageCount: data.messages?.length ?? data.messageCount ?? 0,
+        openCodeSessionId: data.openCodeSessionId,
       };
     } catch {
       return null;

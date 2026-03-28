@@ -177,6 +177,23 @@ export class TabManager {
     this.notifyChanged();
   }
 
+  syncConversationTitle(conversationId: string, title: string): void {
+    let changed = false;
+
+    for (const tab of this.tabs) {
+      if (tab.getData().conversationId !== conversationId) {
+        continue;
+      }
+
+      tab.setTitle(title || this.defaultTitle);
+      changed = true;
+    }
+
+    if (changed) {
+      this.notifyChanged();
+    }
+  }
+
   setActiveTabStreaming(isStreaming: boolean): void {
     const activeTab = this.tabs.find((tab) => tab.getId() === this.activeTabId);
     if (!activeTab) {

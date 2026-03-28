@@ -87,6 +87,19 @@ export type ServerAuthType = 'none' | 'basic' | 'bearer';
 /** Model source mode */
 export type ModelSourceMode = 'merge' | 'local' | 'server';
 
+/** Conversation title generation mode */
+export type TitleMode = 'default' | 'ai';
+
+export function normalizeTitleMode(value: unknown): TitleMode {
+  switch (value) {
+    case 'ai':
+    case 'default':
+      return value;
+    default:
+      return 'default';
+  }
+}
+
 /** Local server configuration */
 export interface LocalServerConfig {
   host: string;
@@ -453,6 +466,8 @@ export interface OpenCodianSettings {
   modelSourceMode: ModelSourceMode;
   defaultProvider: string;
   defaultModel: string;
+  titleMode: TitleMode;
+  aiTitleModel: string;
   providers: ModelProviderConfig[];
   effortLevel: EffortLevel;
   thinkingBudget: ThinkingBudget;
@@ -514,6 +529,8 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
   modelSourceMode: 'merge',
   defaultProvider: 'anthropic',
   defaultModel: 'claude-3-5-sonnet-20241022',
+  titleMode: 'default',
+  aiTitleModel: '',
   providers: [
     {
       id: 'anthropic',

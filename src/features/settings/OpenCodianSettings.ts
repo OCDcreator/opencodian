@@ -17,6 +17,7 @@ import {
   getDefaultChatAppearanceSettings,
   isValidChatAppearanceCustomCssDeclarations,
   type ModelSourceMode,
+  type TitleMode,
 } from '../../core/types';
 import { setLocale, t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
@@ -646,8 +647,47 @@ export class OpenCodianSettingTab extends PluginSettingTab {
 
     let providerDropdown: import('obsidian').DropdownComponent;
     let modelDropdown: import('obsidian').DropdownComponent;
+    let titleModelDropdown: import('obsidian').DropdownComponent;
+    let titleModelSetting: Setting | null = null;
     let catalogs: { local: ModelCatalog; server: ModelCatalog; effective: ModelCatalog } | null = null;
     const sourceCatalogEl = containerEl.createDiv({ cls: 'opencodian-model-catalog' });
+
+    const updateTitleModelSettingVisibility = () => {
+      if (!titleModelSetting) {
+        return;
+      }
+      titleModelSetting.settingEl.style.display = this.plugin.settings.titleMode === 'ai' ? '' : 'none';
+    };
+
+    const updateTitleModelDropdown = async () => {
+      if (!titleModelDropdown) return;
+
+      const selectedValue = this.plugin.settings.aiTitleModel;
+      const availableProviders = catalogs?.effective.providers ?? [];
+      let hasSelectedValue = !selectedValue;
+
+      titleModelDropdown.selectEl.empty();
+      titleModelDropdown.addOption('', t('settings.titleGeneration.model.followCurrent'));
+
+      for (const provider of availableProviders) {
+        for (const model of provider.models) {
+          const value = `${provider.id}/${model.id}`;
+          const label = `${provider.name || provider.id} / ${model.name || model.id}`;
+          titleModelDropdown.addOption(value, label);
+          if (value === selectedValue) {
+            hasSelectedValue = true;
+          }
+        }
+      }
+
+      if (!hasSelectedValue && selectedValue) {
+        this.plugin.settings.aiTitleModel = '';
+        await this.plugin.saveSettings();
+      }
+
+      titleModelDropdown.setValue(hasSelectedValue ? selectedValue : '');
+      updateTitleModelSettingVisibility();
+    };
 
     const loadAvailableModels = async (showNotice = false) => {
       try {
@@ -680,6 +720,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         }
 
         await updateModelDropdown();
+        await updateTitleModelDropdown();
 
         if (dirty) {
           await this.plugin.saveSettings();
@@ -779,6 +820,35 @@ export class OpenCodianSettingTab extends PluginSettingTab {
           await this.plugin.saveSettings();
         });
       });
+
+    containerEl.createEl('h4', { text: t('settings.titleGeneration.title') });
+
+    new Setting(containerEl)
+      .setName(t('settings.titleGeneration.mode.name'))
+      .setDesc(t('settings.titleGeneration.mode.desc'))
+      .addDropdown((dropdown) => {
+        dropdown
+          .addOption('default', t('settings.titleGeneration.mode.default'))
+          .addOption('ai', t('settings.titleGeneration.mode.ai'))
+          .setValue(this.plugin.settings.titleMode)
+          .onChange(async (value) => {
+            this.plugin.settings.titleMode = value as TitleMode;
+            await this.plugin.saveSettings();
+            updateTitleModelSettingVisibility();
+          });
+      });
+
+    titleModelSetting = new Setting(containerEl)
+      .setName(t('settings.titleGeneration.model.name'))
+      .setDesc(t('settings.titleGeneration.model.desc'))
+      .addDropdown((dropdown) => {
+        titleModelDropdown = dropdown;
+        dropdown.onChange(async (value) => {
+          this.plugin.settings.aiTitleModel = value;
+          await this.plugin.saveSettings();
+        });
+      });
+    updateTitleModelSettingVisibility();
 
     new Setting(containerEl)
       .setName(t('settings.model.refresh.name'))

@@ -195,6 +195,12 @@ export class ServerManager {
       return;
     }
 
+    if (!managedProcess) {
+      this.clearManagedServerState();
+      this.cleanup();
+      return;
+    }
+
     return new Promise((resolve) => {
       let resolved = false;
       

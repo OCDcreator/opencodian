@@ -30,6 +30,7 @@ import {
 } from '../../utils/streaming';
 import { buildChatAppearanceCustomCss, getChatAppearanceCssVariables } from './chatAppearance';
 import { type CollapsibleState,setupCollapsible } from './rendering/collapsible';
+import { TitleGenerationService } from './services/TitleGenerationService';
 import { type RestoredTabState, TabBar, type TabBarLayoutMode,TabManager } from './tabs';
 import { EffortSelector } from './ui/EffortSelector';
 import { NavigationSidebar } from './ui/NavigationSidebar';
@@ -163,6 +164,7 @@ export class OpenCodianView extends ItemView {
   private chatSurfaceSyncTimeoutId: number | null = null;
   private scrollToBottomFrameId: number | null = null;
   private chatAppearanceStyleEl: HTMLStyleElement | null = null;
+  private titleGenerationService: TitleGenerationService;
 
   private appSettings(): { open: () => void; openTabById: (id: string) => void } {
     return (this.app as typeof this.app & {
@@ -176,6 +178,7 @@ export class OpenCodianView extends ItemView {
     this.messageComponent = new Component();
     this.currentEffortLevel = this.plugin.settings.effortLevel;
     this.currentThinkingBudget = this.plugin.settings.thinkingBudget;
+    this.titleGenerationService = new TitleGenerationService(this.plugin);
   }
 
   getViewType(): string {
@@ -225,6 +228,7 @@ export class OpenCodianView extends ItemView {
     this.clearScheduledScrollToBottom();
     this.chatAppearanceStyleEl?.remove();
     this.chatAppearanceStyleEl = null;
+    this.titleGenerationService.cancelAll();
     this.effortSelector?.destroy();
     this.effortSelector = null;
     this.effortContainerEl = null;
@@ -1037,6 +1041,16 @@ export class OpenCodianView extends ItemView {
 
   /** Load a conversation */
   private async loadConversation(id: string, options: { forceServerSync?: boolean } = {}) {
+    if (this.currentConversation?.id && this.currentConversation.id !== id) {
+      const previousConversationId = this.currentConversation.id;
+      this.titleGenerationService.cancelConversation(previousConversationId);
+      if (this.currentConversation.titleGenerationStatus === 'pending') {
+        void this.updateConversationTitleState(previousConversationId, {
+          titleGenerationStatus: undefined,
+        });
+      }
+    }
+
     const conversation = await this.plugin.getConversationById(id);
     if (!conversation) return;
 
@@ -1093,7 +1107,7 @@ export class OpenCodianView extends ItemView {
     const conversations = this.plugin.getConversations();
     
     if (conversations.length === 0) {
-      new Notice('No conversation history');
+      new Notice(t('chat.history.empty'));
       return;
     }
 
@@ -1110,7 +1124,7 @@ export class OpenCodianView extends ItemView {
     // Add each conversation to the dropdown
     for (const conv of conversations) {
       const isActive = this.currentConversation?.id === conv.id;
-      const title = conv.title || 'Untitled';
+      const title = conv.title || t('chat.history.untitled');
       // Format: YYYY/M/D HH:MM:SS
       const createdAt = new Date(conv.createdAt);
       const dateStr = `${createdAt.getFullYear()}/${createdAt.getMonth() + 1}/${createdAt.getDate()} ${String(createdAt.getHours()).padStart(2, '0')}:${String(createdAt.getMinutes()).padStart(2, '0')}:${String(createdAt.getSeconds()).padStart(2, '0')}`;
@@ -1126,7 +1140,29 @@ export class OpenCodianView extends ItemView {
       // Content container for title and date
       const contentEl = itemEl.createDiv({ cls: 'opencodian-history-item-content' });
       contentEl.createDiv({ cls: 'opencodian-history-item-title', text: title });
-      contentEl.createDiv({ cls: 'opencodian-history-item-date', text: dateStr });
+      const metaEl = contentEl.createDiv({ cls: 'opencodian-history-item-meta' });
+      metaEl.createDiv({ cls: 'opencodian-history-item-date', text: dateStr });
+      if (conv.titleGenerationStatus === 'pending' || conv.titleGenerationStatus === 'failed') {
+        metaEl.createSpan({
+          cls: `opencodian-history-item-status is-${conv.titleGenerationStatus}`,
+          text: t(`chat.history.titleGeneration.${conv.titleGenerationStatus}`),
+        });
+      }
+
+      const controlsEl = itemEl.createDiv({ cls: 'opencodian-history-item-controls' });
+      const renameBtn = controlsEl.createEl('button', {
+        cls: 'opencodian-history-item-edit',
+        attr: {
+          type: 'button',
+          title: t('chat.history.rename'),
+          'aria-label': t('chat.history.rename'),
+        },
+      });
+      setIcon(renameBtn, 'pencil');
+      renameBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        void this.renameConversation(conv.id);
+      });
       
       // Click handler
       itemEl.addEventListener('click', (e) => {
@@ -1251,7 +1287,7 @@ export class OpenCodianView extends ItemView {
     if (!this.currentConversation) return;
     
     // Create custom confirmation modal with 3-second countdown
-    const confirmed = await this.showDeleteCurrentConfirmDialog(this.currentConversation.title || 'Untitled');
+    const confirmed = await this.showDeleteCurrentConfirmDialog(this.currentConversation.title || t('chat.history.untitled'));
     if (!confirmed) return;
     
     const deletedId = this.currentConversation.id;
@@ -1547,6 +1583,15 @@ export class OpenCodianView extends ItemView {
     this.currentConversation.messages.push(userMessage);
     await this.renderMessage(userMessage);
 
+    const isFirstUserMessage = this.currentConversation.messages.filter((message) => message.role === 'user').length === 1;
+    const modelOptions = this.getSendMessageOptions();
+    if (isFirstUserMessage) {
+      await this.applyFallbackConversationTitle(this.currentConversation.id, content);
+      if (this.plugin.settings.titleMode === 'ai') {
+        void this.startAiConversationTitleGeneration(this.currentConversation.id, content, modelOptions);
+      }
+    }
+
     const availability = await this.getServerAvailability();
     await this.refreshServerStatusBadge();
     if (availability !== 'running' && availability !== 'external') {
@@ -1556,7 +1601,6 @@ export class OpenCodianView extends ItemView {
       }
     }
 
-    const modelOptions = this.getSendMessageOptions();
     const activeModelId = this.formatModelId(modelOptions);
     if (!(await this.ensureSelectedModelAvailable(modelOptions.provider, modelOptions.model))) {
       await this.appendModelUnavailableNoticeMessage();
@@ -2738,6 +2782,197 @@ export class OpenCodianView extends ItemView {
   private buildForkTitle(sourceTitle: string): string {
     const baseTitle = sourceTitle?.trim() || t('chat.tab.new');
     return `Fork: ${baseTitle}`;
+  }
+
+  private async applyFallbackConversationTitle(conversationId: string, firstMessage: string): Promise<void> {
+    const fallbackTitle = this.plugin.generateDefaultTitle(firstMessage);
+    await this.updateConversationTitleState(conversationId, {
+      title: fallbackTitle,
+      titleGenerationStatus: this.plugin.settings.titleMode === 'ai' ? 'pending' : undefined,
+    });
+  }
+
+  private async startAiConversationTitleGeneration(
+    conversationId: string,
+    firstMessage: string,
+    modelOptions: { provider?: string; model?: string },
+  ): Promise<void> {
+    const expectedFallbackTitle = this.plugin.generateDefaultTitle(firstMessage);
+    await this.titleGenerationService.generateTitle(
+      conversationId,
+      firstMessage,
+      {
+        provider: modelOptions.provider ?? this.plugin.settings.defaultProvider,
+        model: modelOptions.model ?? this.plugin.settings.defaultModel,
+      },
+      async (generatedConversationId, result) => {
+        const conversation = await this.plugin.getConversationById(generatedConversationId);
+        if (!conversation) {
+          return;
+        }
+
+        if (conversation.title !== expectedFallbackTitle || conversation.titleGenerationStatus !== 'pending') {
+          return;
+        }
+
+        if (result.success) {
+          await this.updateConversationTitleState(generatedConversationId, {
+            title: result.title,
+            titleGenerationStatus: 'success',
+          });
+          return;
+        }
+
+        await this.updateConversationTitleState(generatedConversationId, {
+          titleGenerationStatus: 'failed',
+        });
+      },
+    );
+  }
+
+  private async updateConversationTitleState(
+    conversationId: string,
+    update: {
+      title?: string;
+      titleGenerationStatus?: 'pending' | 'success' | 'failed';
+    },
+  ): Promise<void> {
+    const conversation = await this.plugin.getConversationById(conversationId);
+    if (!conversation) {
+      return;
+    }
+
+    if (typeof update.title === 'string') {
+      conversation.title = update.title;
+    }
+    conversation.titleGenerationStatus = update.titleGenerationStatus;
+    conversation.updatedAt = Date.now();
+    await this.plugin.saveConversation(conversation);
+
+    if (this.currentConversation?.id === conversationId) {
+      this.currentConversation = conversation;
+    }
+
+    if (typeof update.title === 'string') {
+      this.tabManager?.syncConversationTitle(conversationId, conversation.title);
+      try {
+        await this.plugin.openCodeService.updateSessionTitle(conversation.openCodeSessionId, conversation.title);
+      } catch (error) {
+        logger.warn('Failed to sync conversation title to server:', error);
+      }
+    }
+  }
+
+  private async renameConversation(conversationId: string): Promise<void> {
+    const conversation = await this.plugin.getConversationById(conversationId);
+    if (!conversation) {
+      return;
+    }
+
+    this.titleGenerationService.cancelConversation(conversationId);
+    const initialValue = conversation.title || t('chat.history.untitled');
+    const nextTitle = await this.showRenameConversationDialog(initialValue);
+    if (nextTitle === null) {
+      return;
+    }
+
+    const trimmedTitle = nextTitle.trim();
+    if (!trimmedTitle) {
+      new Notice(t('chat.history.renameInvalid'));
+      return;
+    }
+
+    try {
+      await this.updateConversationTitleState(conversationId, {
+        title: trimmedTitle,
+        titleGenerationStatus: undefined,
+      });
+      new Notice(t('chat.history.renameSuccess'));
+      this.closeHistoryDropdown();
+    } catch (error) {
+      logger.error('Failed to rename conversation:', error);
+      new Notice(t('chat.history.renameFailed'));
+    }
+  }
+
+  private async showRenameConversationDialog(initialValue: string): Promise<string | null> {
+    return new Promise((resolve) => {
+      const overlay = document.createElement('div');
+      overlay.addClass('opencodian-rename-dialog-overlay');
+
+      const dialog = document.createElement('div');
+      dialog.addClass('opencodian-rename-dialog');
+
+      const titleEl = dialog.createDiv({ cls: 'opencodian-rename-dialog-title' });
+      titleEl.setText(t('chat.history.rename'));
+
+      const descEl = dialog.createDiv({ cls: 'opencodian-rename-dialog-desc' });
+      descEl.setText(t('chat.history.renamePrompt'));
+
+      const inputEl = dialog.createEl('input', {
+        cls: 'opencodian-rename-dialog-input',
+        attr: {
+          type: 'text',
+          value: initialValue,
+          maxlength: '120',
+          placeholder: t('chat.history.untitled'),
+        },
+      });
+
+      const buttonsEl = dialog.createDiv({ cls: 'opencodian-rename-dialog-buttons' });
+      const cancelBtn = buttonsEl.createEl('button', {
+        cls: 'opencodian-rename-dialog-btn',
+        text: t('chat.history.renameCancel'),
+      });
+      const saveBtn = buttonsEl.createEl('button', {
+        cls: 'opencodian-rename-dialog-btn mod-cta',
+        text: t('chat.history.renameSave'),
+      });
+
+      overlay.appendChild(dialog);
+      document.body.appendChild(overlay);
+
+      let settled = false;
+      const cleanup = () => {
+        overlay.remove();
+        document.removeEventListener('keydown', handleKeydown);
+      };
+      const finish = (value: string | null) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        cleanup();
+        resolve(value);
+      };
+
+      const handleKeydown = (event: KeyboardEvent) => {
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          finish(null);
+          return;
+        }
+
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          finish(inputEl.value);
+        }
+      };
+
+      document.addEventListener('keydown', handleKeydown);
+      overlay.addEventListener('click', (event) => {
+        if (event.target === overlay) {
+          finish(null);
+        }
+      });
+      cancelBtn.addEventListener('click', () => finish(null));
+      saveBtn.addEventListener('click', () => finish(inputEl.value));
+
+      window.setTimeout(() => {
+        inputEl.focus();
+        inputEl.select();
+      }, 0);
+    });
   }
 
   /** Scroll to bottom of messages */

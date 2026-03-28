@@ -156,6 +156,20 @@ describe('OpenCodeService', () => {
       }));
     });
 
+    it('should update session title via HTTP API', async () => {
+      mockRequestUrl.mockResolvedValue({
+        status: 200,
+        json: { id: 'test-id', title: 'Renamed' },
+        text: '{"id":"test-id","title":"Renamed"}',
+      });
+
+      await service.updateSessionTitle('test-id', 'Renamed');
+      expect(mockRequestUrl).toHaveBeenCalledWith(expect.objectContaining({
+        url: 'http://127.0.0.1:4096/session/test-id',
+        method: 'PATCH',
+      }));
+    });
+
     it('should fork session via HTTP API', async () => {
       mockRequestUrl.mockResolvedValue({
         status: 200,
@@ -260,6 +274,44 @@ describe('OpenCodeService', () => {
       expect(chunks.length).toBeGreaterThanOrEqual(2);
       expect(chunks[0]).toEqual({ type: 'message_start' });
       expect(chunks[chunks.length - 1]).toEqual({ type: 'message_stop' });
+    });
+
+    it('should request a full assistant response without SSE', async () => {
+      service.setSessionId('test-session');
+      mockRequestUrl.mockResolvedValue({
+        status: 200,
+        json: {
+          info: {
+            id: 'assistant-1',
+            sessionID: 'test-session',
+            role: 'assistant',
+            time: { created: 1234567890 },
+          },
+          parts: [
+            {
+              id: 'part-1',
+              sessionID: 'test-session',
+              messageID: 'assistant-1',
+              type: 'text',
+              text: 'Generated title',
+            },
+          ],
+        },
+        text: '{"info":{"id":"assistant-1","sessionID":"test-session","role":"assistant","time":{"created":1234567890}},"parts":[{"id":"part-1","sessionID":"test-session","messageID":"assistant-1","type":"text","text":"Generated title"}]}',
+      });
+
+      const response = await service.requestAssistantResponse('Create a title', {
+        sessionId: 'test-session',
+        provider: 'anthropic',
+        model: 'claude-3-5-sonnet-20241022',
+        system: 'Return only the title',
+      });
+
+      expect(response?.content).toBe('Generated title');
+      expect(mockRequestUrl).toHaveBeenCalledWith(expect.objectContaining({
+        url: 'http://127.0.0.1:4096/session/test-session/message',
+        method: 'POST',
+      }));
     });
   });
 

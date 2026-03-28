@@ -117,6 +117,11 @@ interface Part {
   [key: string]: unknown;
 }
 
+interface AssistantMessageResponse {
+  info: Message;
+  parts: Part[];
+}
+
 
 
 export class OpenCodeService {
@@ -316,6 +321,37 @@ export class OpenCodeService {
     }
   }
 
+  /** HTTP PATCH helper using Obsidian's requestUrl */
+  private async patch<T>(path: string, body: unknown): Promise<T> {
+    this.ensureBaseUrl();
+
+    const response = await requestUrl({
+      url: `${this.baseUrl}${path}`,
+      method: 'PATCH',
+      headers: this.getRequestHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(body),
+    });
+
+    if (response.status >= 400) {
+      const errorText = response.text?.substring(0, 200) ?? 'Unknown error';
+      throw new Error(`HTTP ${response.status} from ${path}: ${errorText}`);
+    }
+
+    if (response.status === 204) {
+      return {} as T;
+    }
+
+    if (typeof response.json === 'object' && response.json !== null) {
+      return response.json as T;
+    }
+
+    try {
+      return JSON.parse(response.text) as T;
+    } catch {
+      throw new Error(`Invalid JSON response from ${path}: ${response.text.substring(0, 100)}`);
+    }
+  }
+
   /** HTTP DELETE helper using Obsidian's requestUrl */
   private async delete(path: string): Promise<void> {
     this.ensureBaseUrl();
@@ -328,7 +364,7 @@ export class OpenCodeService {
   }
 
   /** Create a new session - returns Session object with id property */
-  async createSession(title?: string): Promise<string> {
+  async createSession(title?: string, options: { setCurrent?: boolean } = {}): Promise<string> {
 
     
     const response = await this.post<unknown>('/session', {
@@ -346,7 +382,9 @@ export class OpenCodeService {
     }
     
 
-    this.currentSessionId = sessionId;
+    if (options.setCurrent ?? true) {
+      this.currentSessionId = sessionId;
+    }
     return sessionId;
   }
 
@@ -412,6 +450,49 @@ export class OpenCodeService {
     if (this.currentSessionId === sessionId) {
       this.currentSessionId = null;
     }
+  }
+
+  /** Update a session title */
+  async updateSessionTitle(sessionId: string, title: string): Promise<void> {
+    await this.patch<Session>(`/session/${sessionId}`, { title });
+  }
+
+  /** Send a message and wait for the full assistant response */
+  async requestAssistantResponse(
+    message: string,
+    options: QueryOptions & { sessionId?: string; system?: string },
+  ): Promise<ChatMessage | null> {
+    const sessionId = options.sessionId ?? this.currentSessionId;
+    if (!sessionId) {
+      throw new Error('No active session');
+    }
+
+    const providerID = options.provider ?? this.settings.defaultProvider;
+    const modelID = options.model ?? this.settings.defaultModel;
+    const requestBody: Record<string, unknown> = {
+      parts: [{ type: 'text', text: message }],
+      model: {
+        providerID,
+        modelID,
+      },
+    };
+
+    if (options.system?.trim()) {
+      requestBody.system = options.system.trim();
+    }
+
+    const response = await this.post<unknown>(`/session/${sessionId}/message`, requestBody);
+    if (
+      typeof response === 'object'
+      && response !== null
+      && 'info' in response
+      && 'parts' in response
+    ) {
+      const typedResponse = response as AssistantMessageResponse;
+      return OpenCodeService.openCodeMessageToChatMessage(typedResponse.info, typedResponse.parts);
+    }
+
+    throw new Error('Invalid assistant response payload');
   }
 
   /** Send a message and get streaming response using SSE */
