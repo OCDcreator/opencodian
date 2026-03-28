@@ -338,6 +338,146 @@ describe('OpenCodeService', () => {
       expect(result.providers[0].id).toBe('anthropic');
       expect(result.defaults).toEqual({ anthropic: 'claude-3' });
     });
+
+    it('should parse context window limits from provider metadata', async () => {
+      mockRequestUrl.mockResolvedValue({
+        status: 200,
+        json: {
+          providers: [{
+            id: 'openai',
+            name: 'OpenAI',
+            models: {
+              'gpt-5': {
+                id: 'gpt-5',
+                name: 'GPT-5',
+                limit: { context: 400000 },
+              },
+            },
+          }],
+          default: { provider: 'openai', model: 'gpt-5' },
+        },
+        text: '{}',
+      });
+
+      const result = await service.getAvailableModels();
+
+      expect(result.providers[0].models[0]).toMatchObject({
+        id: 'gpt-5',
+        name: 'GPT-5',
+        contextWindow: 400000,
+      });
+    });
+  });
+
+  describe('getSessionContextUsageSnapshot', () => {
+    it('uses the latest assistant message with tokens for context metrics', async () => {
+      mockRequestUrl
+        .mockResolvedValueOnce({
+          status: 200,
+          json: {
+            id: 'session-1',
+            title: 'Planning session',
+            time: {
+              created: 1000,
+              updated: 9000,
+            },
+          },
+          text: '{}',
+        })
+        .mockResolvedValueOnce({
+          status: 200,
+          json: [
+            {
+              info: {
+                id: 'assistant-1',
+                role: 'assistant',
+                providerID: 'openai',
+                modelID: 'gpt-4.1',
+                cost: 0.1,
+                tokens: {
+                  input: 10,
+                  output: 5,
+                  reasoning: 0,
+                  cache: { read: 0, write: 0 },
+                },
+                time: { created: 2000 },
+              },
+              parts: [],
+            },
+            {
+              info: {
+                id: 'assistant-2',
+                role: 'assistant',
+                providerID: 'openai',
+                modelID: 'gpt-5',
+                cost: 0.2,
+                tokens: {
+                  input: 0,
+                  output: 0,
+                  reasoning: 0,
+                  cache: { read: 0, write: 0 },
+                },
+                time: { created: 3000 },
+              },
+              parts: [],
+            },
+            {
+              info: {
+                id: 'assistant-3',
+                role: 'assistant',
+                providerID: 'openai',
+                modelID: 'gpt-5',
+                cost: 0.3,
+                tokens: {
+                  input: 40,
+                  output: 20,
+                  reasoning: 10,
+                  cache: { read: 5, write: 5 },
+                },
+                time: { created: 4000 },
+              },
+              parts: [],
+            },
+          ],
+          text: '[]',
+        })
+        .mockResolvedValueOnce({
+          status: 200,
+          json: {
+            providers: [
+              {
+                id: 'openai',
+                name: 'OpenAI',
+                models: {
+                  'gpt-4.1': { name: 'GPT-4.1', limit: { context: 128000 } },
+                  'gpt-5': { name: 'GPT-5', limit: { context: 400000 } },
+                },
+              },
+            ],
+            default: { provider: 'openai', model: 'gpt-5' },
+          },
+          text: '{}',
+        });
+
+      const snapshot = await service.getSessionContextUsageSnapshot('session-1');
+
+      expect(snapshot).toMatchObject({
+        sessionId: 'session-1',
+        sessionTitle: 'Planning session',
+        providerId: 'openai',
+        providerName: 'OpenAI',
+        modelId: 'gpt-5',
+        modelName: 'GPT-5',
+        contextWindow: 400000,
+        inputTokens: 40,
+        outputTokens: 20,
+        reasoningTokens: 10,
+        cacheReadTokens: 5,
+        cacheWriteTokens: 5,
+        updatedAt: 4000,
+      });
+      expect(snapshot?.totalCost).toBeCloseTo(0.6, 6);
+    });
   });
 
   describe('updateSettings', () => {

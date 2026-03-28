@@ -12,6 +12,7 @@ export type ModelCatalogSource = 'local' | 'server' | 'merge';
 export interface ModelCatalogModel {
   id: string;
   name: string;
+  contextWindow?: number;
   source: ModelCatalogSource;
   existsInLocal: boolean;
   existsInServer: boolean;
@@ -206,6 +207,9 @@ export function buildCatalogFromConfig(
               name: typeof modelConfig.name === 'string' && modelConfig.name.trim()
                 ? modelConfig.name.trim()
                 : modelId,
+              contextWindow: typeof modelConfig.limit?.context === 'number'
+                ? modelConfig.limit.context
+                : undefined,
               source,
               existsInLocal: source === 'local',
               existsInServer: source === 'server',

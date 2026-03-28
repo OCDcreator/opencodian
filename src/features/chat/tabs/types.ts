@@ -1,4 +1,4 @@
-import type { Conversation } from '../../../core/types';
+import type { Conversation, TabContextState } from '../../../core/types';
 
 export type TabId = string;
 
@@ -15,6 +15,7 @@ export interface TabData {
   isStreaming: boolean;
   needsAttention: boolean;
   modelOverride: TabModelOverride | null;
+  contextUsage: TabContextState;
 }
 
 export interface TabBarItem {

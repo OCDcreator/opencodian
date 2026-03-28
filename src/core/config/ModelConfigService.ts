@@ -58,6 +58,7 @@ export class ModelConfigService {
         models: provider.models.map((model) => ({
           id: model.id,
           name: model.name || model.id,
+          contextWindow: model.contextWindow,
           source: 'server' as const,
           existsInLocal: false,
           existsInServer: true,

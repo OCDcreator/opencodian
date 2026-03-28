@@ -72,6 +72,10 @@ interface OpenCodeEvent {
     toolID?: string;
     result?: string;
     error?: string;
+    usage?: {
+      input?: number;
+      output?: number;
+    };
   };
 }
 
@@ -102,8 +106,22 @@ interface Message {
   id: string;
   sessionID: string;
   role: 'user' | 'assistant';
+  providerID?: string;
+  modelID?: string;
+  cost?: number;
+  tokens?: {
+    total?: number;
+    input: number;
+    output: number;
+    reasoning: number;
+    cache: {
+      read: number;
+      write: number;
+    };
+  };
   time: {
     created: number;
+    updated?: number;
   };
 }
 
@@ -120,6 +138,24 @@ interface Part {
 interface AssistantMessageResponse {
   info: Message;
   parts: Part[];
+}
+
+interface SessionContextUsageSnapshot {
+  sessionId: string;
+  sessionTitle: string;
+  createdAt: number;
+  updatedAt: number;
+  providerId: string | null;
+  providerName: string | null;
+  modelId: string | null;
+  modelName: string | null;
+  contextWindow: number;
+  inputTokens: number;
+  outputTokens: number;
+  reasoningTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  totalCost: number;
 }
 
 
@@ -605,6 +641,15 @@ export class OpenCodeService {
             continue;
           }
 
+          if (eventData.properties?.usage) {
+            yield {
+              type: 'usage',
+              inputTokens: eventData.properties.usage.input ?? 0,
+              outputTokens: eventData.properties.usage.output ?? 0,
+              sessionId,
+            };
+          }
+
           // Debug: Log session.idle event details
 /*           if (eventData.type === 'session.idle') {
 
@@ -931,7 +976,7 @@ export class OpenCodeService {
   }
 
   /** Get available models - Handles both string array and object formats */
-  async getAvailableModels(): Promise<{ providers: Array<{ id: string; name: string; models: Array<{ id: string; name: string }> }>; defaults: Record<string, string> }> {
+  async getAvailableModels(): Promise<{ providers: Array<{ id: string; name: string; models: Array<{ id: string; name: string; contextWindow?: number }> }>; defaults: Record<string, string> }> {
     try {
       const data = await this.get<{ providers: Array<{ id: string; name: string; models: unknown }>; default: { provider?: string; model?: string } }>('/config/providers');
       
@@ -939,7 +984,7 @@ export class OpenCodeService {
       
       return {
         providers: data.providers.map((p) => {
-          let models: Array<{ id: string; name: string }> = [];
+          let models: Array<{ id: string; name: string; contextWindow?: number }> = [];
           
           // Handle different models formats
           if (Array.isArray(p.models)) {
@@ -950,9 +995,12 @@ export class OpenCodeService {
             }));
           } else if (typeof p.models === 'object' && p.models !== null) {
             // Format 2: models is object { "model-id": { name: "..." }, ... }
-            models = Object.entries(p.models as Record<string, { name?: string }>).map(([id, info]) => ({
+            models = Object.entries(
+              p.models as Record<string, { name?: string; limit?: { context?: number } }>,
+            ).map(([id, info]) => ({
               id,
               name: info.name ?? id,
+              contextWindow: typeof info.limit?.context === 'number' ? info.limit.context : undefined,
             }));
           }
           
@@ -1041,6 +1089,58 @@ export class OpenCodeService {
         }
       }
       throw error;
+    }
+  }
+
+  async getSessionContextUsageSnapshot(sessionId: string): Promise<SessionContextUsageSnapshot | null> {
+    if (!sessionId) {
+      return null;
+    }
+
+    try {
+      const [session, messages, providersResult] = await Promise.all([
+        this.get<Session>(`/session/${sessionId}`),
+        this.getSessionMessages(sessionId),
+        this.getAvailableModels(),
+      ]);
+
+      const totalCost = messages.reduce(
+        (sum, message) => sum + (message.info.role === 'assistant' ? (message.info.cost ?? 0) : 0),
+        0,
+      );
+
+      const latestAssistantWithTokens = OpenCodeService.findLatestAssistantWithTokens(messages);
+
+      const providerId = latestAssistantWithTokens?.info.providerID ?? null;
+      const modelId = latestAssistantWithTokens?.info.modelID ?? null;
+      const provider = providerId
+        ? providersResult.providers.find((item) => item.id === providerId)
+        : undefined;
+      const model = provider && modelId
+        ? provider.models.find((item) => item.id === modelId)
+        : undefined;
+      const tokens = latestAssistantWithTokens?.info.tokens;
+
+      return {
+        sessionId,
+        sessionTitle: session.title,
+        createdAt: session.time.created,
+        updatedAt: latestAssistantWithTokens?.info.time.created ?? session.time.updated,
+        providerId,
+        providerName: provider?.name ?? providerId,
+        modelId,
+        modelName: model?.name ?? modelId,
+        contextWindow: model?.contextWindow ?? 0,
+        inputTokens: tokens?.input ?? 0,
+        outputTokens: tokens?.output ?? 0,
+        reasoningTokens: tokens?.reasoning ?? 0,
+        cacheReadTokens: tokens?.cache?.read ?? 0,
+        cacheWriteTokens: tokens?.cache?.write ?? 0,
+        totalCost,
+      };
+    } catch (error) {
+      logger.error(`Failed to get session context usage snapshot for ${sessionId}:`, error);
+      return null;
     }
   }
 
@@ -1150,6 +1250,35 @@ export class OpenCodeService {
     }
 
     return {};
+  }
+
+  private static findLatestAssistantWithTokens(
+    messages: Array<{ info: Message; parts: Part[] }>,
+  ): { info: Message; parts: Part[] } | null {
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      const message = messages[index];
+      if (message.info.role !== 'assistant') {
+        continue;
+      }
+
+      const tokens = message.info.tokens;
+      if (!tokens) {
+        continue;
+      }
+
+      const total = (tokens.input ?? 0)
+        + (tokens.output ?? 0)
+        + (tokens.reasoning ?? 0)
+        + (tokens.cache?.read ?? 0)
+        + (tokens.cache?.write ?? 0);
+      if (total <= 0) {
+        continue;
+      }
+
+      return message;
+    }
+
+    return null;
   }
 
   /** Transform SDK event to StreamChunks */

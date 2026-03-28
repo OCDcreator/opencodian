@@ -1,5 +1,8 @@
 // Chat types
 export {
+  type ContextBreakdownKey,
+  type ContextBreakdownSegment,
+  createEmptyTabContextState,
   type ChatMessage,
   type ContentBlock,
   type Conversation,
@@ -7,6 +10,7 @@ export {
   type ImageAttachment,
   type ImageMediaType,
   type StreamChunk,
+  type TabContextState,
   type UsageInfo,
   VIEW_TYPE_OPENCODIAN,
 } from './chat';

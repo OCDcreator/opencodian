@@ -1,4 +1,5 @@
 import { Tab } from './Tab';
+import type { TabContextState } from '../../../core/types';
 import type {
   CloseTabResult,
   RestoredTabState,
@@ -229,6 +230,19 @@ export class TabManager {
 
     activeTab.setModelOverride(modelOverride);
     this.notifyChanged();
+  }
+
+  getActiveTabContextUsage(): TabContextState | null {
+    return this.tabs.find((tab) => tab.getId() === this.activeTabId)?.getData().contextUsage ?? null;
+  }
+
+  setActiveTabContextUsage(contextUsage: TabContextState): void {
+    const activeTab = this.tabs.find((tab) => tab.getId() === this.activeTabId);
+    if (!activeTab) {
+      return;
+    }
+
+    activeTab.setContextUsage(contextUsage);
   }
 
   private notifyChanged(): void {

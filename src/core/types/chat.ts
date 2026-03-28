@@ -75,6 +75,63 @@ export interface UsageInfo {
   sessionId?: string;
 }
 
+export type ContextBreakdownKey = 'system' | 'user' | 'assistant' | 'tool' | 'other';
+
+export interface ContextBreakdownSegment {
+  key: ContextBreakdownKey;
+  tokens: number;
+  width: number;
+  percent: number;
+}
+
+/** Per-tab context usage state */
+export interface TabContextState {
+  estimatedInputTokens: number;
+  estimatedOutputTokens: number;
+  streamInputTokens: number;
+  streamOutputTokens: number;
+  preciseTokens: {
+    total: number;
+    input: number;
+    output: number;
+    reasoning: number;
+    cacheRead: number;
+    cacheWrite: number;
+  } | null;
+  totalCost: number | null;
+  contextWindow: number;
+  percentage: number;
+  provider: string | null;
+  providerName: string | null;
+  model: string | null;
+  modelName: string | null;
+  sessionId: string | null;
+  sessionTitle: string | null;
+  createdAt: number | null;
+  updatedAt: number | null;
+}
+
+export function createEmptyTabContextState(): TabContextState {
+  return {
+    estimatedInputTokens: 0,
+    estimatedOutputTokens: 0,
+    streamInputTokens: 0,
+    streamOutputTokens: 0,
+    preciseTokens: null,
+    totalCost: null,
+    contextWindow: 0,
+    percentage: 0,
+    provider: null,
+    providerName: null,
+    model: null,
+    modelName: null,
+    sessionId: null,
+    sessionTitle: null,
+    createdAt: null,
+    updatedAt: null,
+  };
+}
+
 /** Stream chunk types */
 export type StreamChunk =
   | { type: 'text'; content: string }

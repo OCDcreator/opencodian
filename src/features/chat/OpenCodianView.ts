@@ -9,6 +9,7 @@ import { addIcon, Component, ItemView, Notice, Scope, setIcon } from 'obsidian';
 
 import { OpenCodeService } from '../../core/opencode';
 import {
+  createEmptyTabContextState,
   type ChatMessage,
   type ContentBlock,
   type Conversation,
@@ -30,9 +31,12 @@ import {
 } from '../../utils/streaming';
 import { buildChatAppearanceCustomCss, getChatAppearanceCssVariables } from './chatAppearance';
 import { buildMessageRenderGroups, mergeAssistantMessagesForRender } from './renderGroups';
-import { type CollapsibleState,setupCollapsible } from './rendering/collapsible';
+import { type CollapsibleState, setupCollapsible } from './rendering/collapsible';
+import { ContextUsageService } from './services/ContextUsageService';
 import { TitleGenerationService } from './services/TitleGenerationService';
-import { type RestoredTabState, TabBar, type TabBarLayoutMode,TabManager } from './tabs';
+import { type RestoredTabState, TabBar, type TabBarLayoutMode, TabManager } from './tabs';
+import { ContextDetailModal } from './ui/ContextDetailModal';
+import { ContextRing } from './ui/ContextRing';
 import { EffortSelector } from './ui/EffortSelector';
 import { NavigationSidebar } from './ui/NavigationSidebar';
 
@@ -129,8 +133,8 @@ export class OpenCodianView extends ItemView {
   private modelSelectorDropdown: HTMLElement | null = null;
   private modelSelectorSearchInput: HTMLInputElement | null = null;
   private modelSelectorScrollContainer: HTMLElement | null = null;
-  private availableModels: Array<{ provider: string; model: string; label: string; providerName: string; modelName: string }> = [];
-  private availableProviders: Array<{ id: string; name: string; models: Array<{ id: string; name: string }> }> = [];
+  private availableModels: Array<{ provider: string; model: string; label: string; providerName: string; modelName: string; contextWindow?: number }> = [];
+  private availableProviders: Array<{ id: string; name: string; models: Array<{ id: string; name: string; contextWindow?: number }> }> = [];
   private hasLoadedModelCatalog = false;
   private isModelDropdownOpen = false;
   private modelFilterQuery = '';
@@ -148,6 +152,8 @@ export class OpenCodianView extends ItemView {
   private currentEffortLevel: EffortLevel;
   private currentThinkingBudget: ThinkingBudget;
   private effortContainerEl: HTMLElement | null = null;
+  private contextRing: ContextRing | null = null;
+  private contextRingContainerEl: HTMLElement | null = null;
 
   // Send/Stop button reference
   private sendBtn: HTMLElement | null = null;
@@ -212,7 +218,7 @@ export class OpenCodianView extends ItemView {
       this.streamController = new StreamController({
         containerEl: this.messagesContainer,
         markdownService: this.markdownService,
-        scrollToBottom: () => this.scrollToBottom(),
+        scrollToBottom: () => this.scrollToBottomIfNeeded(),
       });
     }
 
@@ -233,6 +239,9 @@ export class OpenCodianView extends ItemView {
     this.effortSelector?.destroy();
     this.effortSelector = null;
     this.effortContainerEl = null;
+    this.contextRing?.destroy();
+    this.contextRing = null;
+    this.contextRingContainerEl = null;
 
     // Cleanup navigation sidebar
     this.navigationSidebar?.destroy();
@@ -478,6 +487,7 @@ export class OpenCodianView extends ItemView {
     this.messagesContainer?.empty();
     this.resetTurnState();
     this.updateModelSelectorDisplay();
+    this.syncActiveTabContextUsageIdentity();
   }
 
   private getTabBarLayoutMode(): TabBarLayoutMode {
@@ -831,6 +841,7 @@ export class OpenCodianView extends ItemView {
       this.serverStatusBadgeEl.addClass(`is-${availability}`);
       this.serverStatusTextEl.setText(this.getServerStatusLabel(availability, statusKeyMap));
       this.setTooltipLabel(this.serverStatusBadgeEl, t('chat.serverStatus.openSettings'), 'bottom');
+      this.refreshContextUsageIndicator();
     } finally {
       this.isRefreshingServerStatus = false;
     }
@@ -950,6 +961,12 @@ export class OpenCodianView extends ItemView {
       },
     });
     this.effortSelector.updateDisplay();
+
+    this.contextRingContainerEl = toolbar.createDiv({ cls: 'opencodian-context-usage-slot' });
+    this.contextRing = new ContextRing(this.contextRingContainerEl, () => {
+      this.openContextUsageDetails();
+    });
+    this.refreshContextUsageIndicator();
 
     // Right side: Send/Stop button
     this.sendBtn = toolbar.createDiv({ cls: 'opencodian-send-btn' });
@@ -1085,6 +1102,8 @@ export class OpenCodianView extends ItemView {
     
     // Update model selector to reflect this session's model
     this.updateModelSelectorDisplay();
+    this.syncActiveTabContextUsageIdentity();
+    await this.refreshActiveTabContextUsageFromServer();
   }
 
   private openConversationInCurrentTab(conversation: Conversation): void {
@@ -1094,6 +1113,8 @@ export class OpenCodianView extends ItemView {
     this.messagesContainer?.empty();
     this.resetTurnState();
     this.updateModelSelectorDisplay();
+    this.syncActiveTabContextUsageIdentity();
+    void this.refreshActiveTabContextUsageFromServer();
     this.scrollToBottom();
   }
 
@@ -1572,6 +1593,8 @@ export class OpenCodianView extends ItemView {
       return;
     }
 
+    const shouldAutoScrollOnSend = this.shouldAutoScroll();
+
     // Add user message to conversation and UI
     const userMessage: ChatMessage = {
       id: `user-${Date.now()}`,
@@ -1581,6 +1604,7 @@ export class OpenCodianView extends ItemView {
     };
     this.currentConversation.messages.push(userMessage);
     await this.renderMessage(userMessage);
+    this.scrollToBottomIfNeeded(shouldAutoScrollOnSend);
 
     const isFirstUserMessage = this.currentConversation.messages.filter((message) => message.role === 'user').length === 1;
     const modelOptions = this.getSendMessageOptions();
@@ -1609,11 +1633,12 @@ export class OpenCodianView extends ItemView {
     this.isStreaming = true;
     this.tabManager?.setActiveTabStreaming(true);
     this.updateSendButtonState();
-    this.scrollToBottom();
+    this.beginActiveTabContextUsageStream();
 
     // Set up timeout as safety net to reset isStreaming
     const STREAM_TIMEOUT_MS = 120000; // 2 minutes timeout
     let timeoutId: number | null = null;
+    let streamCompleted = false;
     const resetStreamingState = () => {
       if (timeoutId) {
         window.clearTimeout(timeoutId);
@@ -1646,6 +1671,7 @@ export class OpenCodianView extends ItemView {
 
     // Create assistant message element and get content container
     const { contentEl } = this.createAssistantMessageElement();
+    this.scheduleSettledScrollToBottomIfNeeded(shouldAutoScrollOnSend);
 
     // Show pending indicator after a short delay
     const pendingState: { element: HTMLElement | null } = { element: null };
@@ -1660,7 +1686,8 @@ export class OpenCodianView extends ItemView {
         logger.debug('Not showing pending indicator - not streaming or no element');
         return;
       }
-      
+
+      const shouldAutoScrollPending = this.shouldAutoScroll();
       logger.debug('Showing pending indicator:', pendingMessage);
       pendingState.element = contentEl.createDiv({ cls: 'opencodian-pending' });
       pendingState.element.createSpan({ 
@@ -1678,6 +1705,7 @@ export class OpenCodianView extends ItemView {
       };
       updateTimer();
       pendingState.element.dataset.timerInterval = String(window.setInterval(updateTimer, 1000));
+      this.scheduleSettledScrollToBottomIfNeeded(shouldAutoScrollPending);
     }, 1000); // Show after 1s delay
 
     // Initialize streaming controller
@@ -1694,6 +1722,21 @@ export class OpenCodianView extends ItemView {
         if (!this.isStreaming) {
           logger.debug('Streaming cancelled, breaking loop');
           break;
+        }
+
+        if (chunk.type === 'message_start') {
+          this.beginActiveTabContextUsageStream();
+          continue;
+        }
+
+        if (chunk.type === 'usage') {
+          this.applyUsageChunkToActiveTab(chunk);
+          continue;
+        }
+
+        if (chunk.type === 'message_stop') {
+          streamCompleted = true;
+          this.completeActiveTabContextUsageStream();
         }
 
         // Handle permission request
@@ -1782,6 +1825,7 @@ export class OpenCodianView extends ItemView {
     } finally {
       logger.debug('Stream loop ended');
       resetStreamingState();
+      this.completeActiveTabContextUsageStream();
       window.clearTimeout(pendingTimeout);
       if (pendingState.element?.dataset.timerInterval) {
         window.clearInterval(Number(pendingState.element.dataset.timerInterval));
@@ -1806,7 +1850,7 @@ export class OpenCodianView extends ItemView {
           textContent,
           activeModelId,
         );
-        this.scheduleSettledScrollToBottom();
+        this.scheduleSettledScrollToBottomIfNeeded();
       }
       
       // Get content blocks from stream (includes thinking with duration)
@@ -1879,6 +1923,10 @@ export class OpenCodianView extends ItemView {
       this.currentConversation.updatedAt = Date.now();
       await this.plugin.saveConversation(this.currentConversation);
       this.tabManager?.setActiveTabConversation(this.currentConversation);
+      this.syncActiveTabContextUsageIdentity();
+      if (!latestErrorMessage) {
+        await this.refreshActiveTabContextUsageFromServer();
+      }
     }
   }
 
@@ -2737,6 +2785,9 @@ export class OpenCodianView extends ItemView {
       conversation.messages = merged;
       conversation.updatedAt = Date.now();
       await this.plugin.saveConversation(conversation);
+      if (this.currentConversation?.id === conversation.id) {
+        await this.refreshActiveTabContextUsageFromServer();
+      }
       logger.debug('Conversation sync complete', {
         conversationId: conversation.id,
         sessionId: conversation.openCodeSessionId,
@@ -2991,6 +3042,26 @@ export class OpenCodianView extends ItemView {
       this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
     }
     this.navigationSidebar?.updateVisibility();
+  }
+
+  private shouldAutoScroll(threshold = 48): boolean {
+    return this.plugin.settings.enableAutoScroll && this.isNearBottom(threshold);
+  }
+
+  private scrollToBottomIfNeeded(shouldScroll = this.shouldAutoScroll()): void {
+    if (!shouldScroll) {
+      return;
+    }
+
+    this.scrollToBottom();
+  }
+
+  private scheduleSettledScrollToBottomIfNeeded(shouldScroll = this.shouldAutoScroll()): void {
+    if (!shouldScroll) {
+      return;
+    }
+
+    this.scheduleSettledScrollToBottom();
   }
 
   private scheduleSettledScrollToBottom(): void {
@@ -3392,10 +3463,12 @@ export class OpenCodianView extends ItemView {
             label: `${provider.name}/${model.name}`,
             providerName: provider.name,
             modelName: model.name,
+            contextWindow: 'contextWindow' in model ? model.contextWindow : undefined,
           });
           providerModels.push({
             id: model.id,
             name: model.name,
+            contextWindow: 'contextWindow' in model ? model.contextWindow : undefined,
           });
         }
         this.availableProviders.push({
@@ -3408,6 +3481,7 @@ export class OpenCodianView extends ItemView {
       // Re-render dropdown with new data
       this.renderModelList();
       this.updateModelSelectorDisplay();
+      this.syncActiveTabContextUsageIdentity();
     } catch (error) {
       logger.error('Failed to load models:', error);
     }
@@ -3522,6 +3596,7 @@ export class OpenCodianView extends ItemView {
     
     // Update display
     this.updateModelSelectorDisplay();
+    this.syncActiveTabContextUsageIdentity();
     
     // Show notification with model name only
     const modelInfo = this.availableModels.find(
@@ -3794,6 +3869,147 @@ export class OpenCodianView extends ItemView {
       default:
         return null;
     }
+  }
+
+  private openContextUsageDetails(): void {
+    const contextState = this.tabManager?.getActiveTabContextUsage() ?? null;
+    new ContextDetailModal(
+      this.app,
+      this.currentConversation,
+      contextState,
+      this.plugin.settings.systemPrompt,
+    ).open();
+  }
+
+  private refreshContextUsageIndicator(): void {
+    if (!this.contextRing) {
+      return;
+    }
+
+    this.contextRing.update(this.tabManager?.getActiveTabContextUsage() ?? null);
+  }
+
+  private syncActiveTabContextUsageIdentity(): void {
+    if (!this.tabManager?.getActiveTab()) {
+      this.contextRing?.update(null);
+      return;
+    }
+
+    const currentModel = this.getCurrentSessionModel();
+    const modelInfo = currentModel
+      ? this.availableModels.find(
+        (item) => item.provider === currentModel.provider && item.model === currentModel.model,
+      )
+      : null;
+    const currentState = this.tabManager.getActiveTabContextUsage() ?? createEmptyTabContextState();
+    const nextState = ContextUsageService.syncStateIdentity(
+      currentState,
+      {
+        provider: currentModel?.provider ?? null,
+        providerName: modelInfo?.providerName ?? currentModel?.provider ?? null,
+        model: currentModel?.model ?? null,
+        modelName: modelInfo?.modelName ?? currentModel?.model ?? null,
+        contextWindow: modelInfo?.contextWindow,
+      },
+      {
+        sessionId: this.currentConversation?.openCodeSessionId ?? null,
+        sessionTitle: this.currentConversation?.title ?? null,
+        createdAt: this.currentConversation?.createdAt ?? null,
+        updatedAt: this.currentConversation?.updatedAt ?? null,
+      },
+    );
+
+    this.tabManager.setActiveTabContextUsage(nextState);
+    this.refreshContextUsageIndicator();
+  }
+
+  private async refreshActiveTabContextUsageFromServer(): Promise<void> {
+    if (!this.currentConversation?.openCodeSessionId || !this.tabManager?.getActiveTab()) {
+      return;
+    }
+
+    const expectedConversationId = this.currentConversation.id;
+    const expectedSessionId = this.currentConversation.openCodeSessionId;
+    const snapshot = await this.plugin.openCodeService.getSessionContextUsageSnapshot(
+      expectedSessionId,
+    );
+    if (
+      !snapshot
+      || this.currentConversation?.id !== expectedConversationId
+      || this.currentConversation?.openCodeSessionId !== expectedSessionId
+      || !this.tabManager?.getActiveTab()
+    ) {
+      return;
+    }
+
+    const currentState = this.tabManager.getActiveTabContextUsage() ?? createEmptyTabContextState();
+    const nextState = ContextUsageService.syncStateIdentity(
+      currentState,
+      {
+        provider: snapshot.providerId,
+        providerName: snapshot.providerName,
+        model: snapshot.modelId,
+        modelName: snapshot.modelName,
+        contextWindow: snapshot.contextWindow,
+      },
+      {
+        sessionId: snapshot.sessionId,
+        sessionTitle: snapshot.sessionTitle,
+        createdAt: snapshot.createdAt,
+        updatedAt: snapshot.updatedAt,
+      },
+    );
+
+    const calibratedState = ContextUsageService.applyPreciseUsage(nextState, {
+      input: snapshot.inputTokens,
+      output: snapshot.outputTokens,
+      reasoning: snapshot.reasoningTokens,
+      cacheRead: snapshot.cacheReadTokens,
+      cacheWrite: snapshot.cacheWriteTokens,
+      totalCost: snapshot.totalCost,
+    });
+
+    this.tabManager.setActiveTabContextUsage(calibratedState);
+    this.refreshContextUsageIndicator();
+  }
+
+  private beginActiveTabContextUsageStream(): void {
+    if (!this.tabManager?.getActiveTab()) {
+      return;
+    }
+
+    const nextState = ContextUsageService.beginStream(
+      this.tabManager.getActiveTabContextUsage() ?? createEmptyTabContextState(),
+    );
+    this.tabManager.setActiveTabContextUsage(nextState);
+    this.refreshContextUsageIndicator();
+  }
+
+  private completeActiveTabContextUsageStream(): void {
+    if (!this.tabManager?.getActiveTab()) {
+      return;
+    }
+
+    const nextState = ContextUsageService.completeStream(
+      this.tabManager.getActiveTabContextUsage() ?? createEmptyTabContextState(),
+    );
+    this.tabManager.setActiveTabContextUsage(nextState);
+    this.refreshContextUsageIndicator();
+  }
+
+  private applyUsageChunkToActiveTab(
+    chunk: Extract<import('../../core/types').StreamChunk, { type: 'usage' }>,
+  ): void {
+    if (!this.tabManager?.getActiveTab()) {
+      return;
+    }
+
+    const nextState = ContextUsageService.applyUsageChunk(
+      this.tabManager.getActiveTabContextUsage() ?? createEmptyTabContextState(),
+      chunk,
+    );
+    this.tabManager.setActiveTabContextUsage(nextState);
+    this.refreshContextUsageIndicator();
   }
 
   // Permission selector state

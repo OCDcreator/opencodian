@@ -1,3 +1,4 @@
+import { createEmptyTabContextState, type TabContextState } from '../../../core/types';
 import type { TabConversationLike, TabData, TabId, TabModelOverride } from './types';
 import { generateTabId } from './types';
 
@@ -13,6 +14,7 @@ export class Tab {
       isStreaming: false,
       needsAttention: false,
       modelOverride: null,
+      contextUsage: createEmptyTabContextState(),
     };
   }
 
@@ -21,7 +23,11 @@ export class Tab {
   }
 
   getData(): TabData {
-    return { ...this.data, modelOverride: this.data.modelOverride ? { ...this.data.modelOverride } : null };
+    return {
+      ...this.data,
+      modelOverride: this.data.modelOverride ? { ...this.data.modelOverride } : null,
+      contextUsage: { ...this.data.contextUsage },
+    };
   }
 
   setActive(active: boolean): void {
@@ -37,15 +43,26 @@ export class Tab {
   }
 
   setConversation(conversation: TabConversationLike | null, fallbackTitle: string): void {
+    const nextConversationId = conversation?.id ?? null;
+    if (this.data.conversationId !== nextConversationId) {
+      this.data.contextUsage = createEmptyTabContextState();
+    }
+
     this.data.conversationId = conversation?.id ?? null;
     this.data.title = conversation?.title || fallbackTitle;
+    this.data.contextUsage.sessionTitle = conversation?.title || fallbackTitle;
   }
 
   setTitle(title: string): void {
     this.data.title = title;
+    this.data.contextUsage.sessionTitle = title;
   }
 
   setModelOverride(modelOverride: TabModelOverride | null): void {
     this.data.modelOverride = modelOverride ? { ...modelOverride } : null;
+  }
+
+  setContextUsage(contextUsage: TabContextState): void {
+    this.data.contextUsage = { ...contextUsage };
   }
 }
