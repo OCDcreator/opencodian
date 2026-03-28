@@ -30,7 +30,7 @@ import {
 } from '../../utils/streaming';
 import { buildChatAppearanceCustomCss, getChatAppearanceCssVariables } from './chatAppearance';
 import { type CollapsibleState,setupCollapsible } from './rendering/collapsible';
-import { TabBar, TabManager, type RestoredTabState, type TabBarLayoutMode } from './tabs';
+import { type RestoredTabState, TabBar, type TabBarLayoutMode,TabManager } from './tabs';
 import { EffortSelector } from './ui/EffortSelector';
 import { NavigationSidebar } from './ui/NavigationSidebar';
 
@@ -88,8 +88,10 @@ const COPY_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14
 const FORK_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><circle cx="18" cy="6" r="3"/><path d="M6 9v3a3 3 0 0 0 3 3h6a3 3 0 0 0 3-3V9"/><path d="M12 12v3"/></svg>`;
 const REWIND_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5v0a5.5 5.5 0 0 1-5.5 5.5H11"/></svg>`;
 const NEW_TAB_ICON = `<g fill="none" stroke="currentColor" stroke-width="8.333" stroke-linecap="round" stroke-linejoin="round"><circle cx="50" cy="50" r="41.667"/><path d="M33.333 50h33.334"/><path d="M50 33.333v33.334"/></g>`;
+const CURRENT_TAB_NEW_CONVERSATION_ICON = `<g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" transform="scale(4.166667)"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/><path d="M12 8v6"/><path d="M9 11h6"/></g>`;
 
 addIcon('opencodian-circle-plus', NEW_TAB_ICON);
+addIcon('opencodian-message-square-plus', CURRENT_TAB_NEW_CONVERSATION_ICON);
 
 export class OpenCodianView extends ItemView {
   private static tooltipLabelId = 0;
@@ -151,6 +153,7 @@ export class OpenCodianView extends ItemView {
   private serverStatusBadgeEl: HTMLElement | null = null;
   private serverStatusTextEl: HTMLElement | null = null;
   private newConversationBtnEl: HTMLElement | null = null;
+  private newConversationCurrentTabBtnEl: HTMLElement | null = null;
   private historyBtnEl: HTMLElement | null = null;
   private settingsBtnEl: HTMLElement | null = null;
   private serverStatusIntervalId: number | null = null;
@@ -711,6 +714,14 @@ export class OpenCodianView extends ItemView {
       void this.createNewConversation();
     });
 
+    // New conversation in current tab button
+    this.newConversationCurrentTabBtnEl = actions.createDiv({ cls: 'opencodian-header-btn opencodian-tooltip-trigger' });
+    setIcon(this.newConversationCurrentTabBtnEl, 'opencodian-message-square-plus');
+    this.setTooltipLabel(this.newConversationCurrentTabBtnEl, t('chat.tab.newCurrentTooltip'), 'bottom');
+    this.newConversationCurrentTabBtnEl.addEventListener('click', () => {
+      void this.createNewConversationInCurrentTab();
+    });
+
     // History button
     this.historyBtnEl = actions.createDiv({ cls: 'opencodian-header-btn opencodian-tooltip-trigger' });
     setIcon(this.historyBtnEl, 'history');
@@ -735,6 +746,10 @@ export class OpenCodianView extends ItemView {
 
     if (this.newConversationBtnEl) {
       this.setTooltipLabel(this.newConversationBtnEl, t('chat.tab.newTooltip'), 'bottom');
+    }
+
+    if (this.newConversationCurrentTabBtnEl) {
+      this.setTooltipLabel(this.newConversationCurrentTabBtnEl, t('chat.tab.newCurrentTooltip'), 'bottom');
     }
 
     if (this.historyBtnEl) {
@@ -974,6 +989,11 @@ export class OpenCodianView extends ItemView {
       return;
     }
 
+    if (this.isStreaming) {
+      new Notice(t('chat.tab.newBlockedWhileStreaming'));
+      return;
+    }
+
     if (!this.tabManager.canCreateTab()) {
       new Notice(t('chat.tab.maxReached', { count: String(this.plugin.settings.maxTabs) }));
       return;
@@ -986,6 +1006,27 @@ export class OpenCodianView extends ItemView {
         await this.activateTab(tab.id);
       }
       new Notice(t('chat.tab.created'));
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Failed to create conversation';
+      new Notice(msg);
+    }
+  }
+
+  /** Create a new conversation in the current tab */
+  private async createNewConversationInCurrentTab(): Promise<void> {
+    if (!this.tabManager) {
+      return;
+    }
+
+    if (this.isStreaming) {
+      new Notice(t('chat.tab.newBlockedWhileStreaming'));
+      return;
+    }
+
+    try {
+      const conversation = await this.plugin.createConversation();
+      this.openConversationInCurrentTab(conversation);
+      new Notice(t('chat.tab.newCurrentCreated'));
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Failed to create conversation';
       new Notice(msg);
@@ -1029,6 +1070,16 @@ export class OpenCodianView extends ItemView {
     
     // Update model selector to reflect this session's model
     this.updateModelSelectorDisplay();
+  }
+
+  private openConversationInCurrentTab(conversation: Conversation): void {
+    this.tabManager?.setActiveTabConversation(conversation);
+    this.currentConversation = conversation;
+    this.plugin.openCodeService.setSessionId(conversation.openCodeSessionId);
+    this.messagesContainer?.empty();
+    this.resetTurnState();
+    this.updateModelSelectorDisplay();
+    this.scrollToBottom();
   }
 
   // History dropdown state
