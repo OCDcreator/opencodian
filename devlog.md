@@ -8,6 +8,27 @@
 
 ---
 
+## 2026-03-28 标签栏数字徽标底色调整
+
+### 📋 本次开发目标
+
+将标签栏数字徽标的底色从纯背景色改为主题色，使其更有层次感但不至于过于耀眼。
+
+### ✅ 实现内容
+
+#### 数字徽标底色改为 `--background-modifier-hover`
+- `.opencodian-tab-bar-badge`：底色从 `--background-primary` 改为 `--background-modifier-hover`，文字色保持 `--text-normal`
+- `.opencodian-tab-overflow-menu-badge`：底色从 `--background-secondary` 改为 `--background-modifier-hover`，文字色保持 `--text-normal`
+- 效果：低调但有区分度，不会像强调色（`--interactive-accent`）那样抢眼
+
+### 🔄 变更过程
+
+1. 最初尝试使用 `--interactive-accent` 作为底色，文字用 `--text-on-accent`
+2. 用户反馈强调色过于耀眼，与整体界面不协调
+3. 改用 `--background-modifier-hover`，既有层次感又不喧宾夺主
+
+---
+
 ## 2026-03-27 标签栏 Streaming 动画重构与多语言切换支持
 
 ### 📋 本次开发目标
