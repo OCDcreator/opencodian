@@ -29,6 +29,7 @@ import {
   ToolCallRenderer,
 } from '../../utils/streaming';
 import { buildChatAppearanceCustomCss, getChatAppearanceCssVariables } from './chatAppearance';
+import { buildMessageRenderGroups, mergeAssistantMessagesForRender } from './renderGroups';
 import { type CollapsibleState,setupCollapsible } from './rendering/collapsible';
 import { TitleGenerationService } from './services/TitleGenerationService';
 import { type RestoredTabState, TabBar, type TabBarLayoutMode,TabManager } from './tabs';
@@ -1077,9 +1078,7 @@ export class OpenCodianView extends ItemView {
       ? await this.syncConversationMessagesFromServer(conversation)
       : conversation.messages;
 
-    for (const message of messages) {
-      await this.renderMessage(message);
-    }
+    await this.renderMessages(messages);
 
     // Scroll to bottom
     this.scrollToBottom();
@@ -2222,6 +2221,19 @@ export class OpenCodianView extends ItemView {
     return messageEl;
   }
 
+  private async renderMessages(messages: ChatMessage[]): Promise<void> {
+    const groups = buildMessageRenderGroups(messages);
+
+    for (const group of groups) {
+      if (!group.mergedAssistant || group.messages.length === 1) {
+        await this.renderMessage(group.messages[0]);
+        continue;
+      }
+
+      await this.renderMessage(mergeAssistantMessagesForRender(group.messages));
+    }
+  }
+
   /** Render a content block using the same renderers as streaming */
   private async renderContentBlock(container: HTMLElement, block: ContentBlock) {
     if (!this.markdownService) return;
@@ -2748,9 +2760,7 @@ export class OpenCodianView extends ItemView {
     this.messagesContainer.empty();
     this.resetTurnState();
 
-    for (const message of conversation.messages) {
-      await this.renderMessage(message);
-    }
+    await this.renderMessages(conversation.messages);
 
     if (shouldStickToBottom) {
       this.scrollToBottom();
