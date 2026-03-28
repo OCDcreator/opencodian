@@ -6,6 +6,7 @@ import { TextDecoder } from 'util';
 
 import { OpenCodeService } from '../../../../src/core/opencode/OpenCodeService';
 import { DEFAULT_SETTINGS } from '../../../../src/core/types';
+import { resolveToolExecutionStatus } from '../../../../src/shared';
 
 // Mock global fetch
 global.fetch = jest.fn() as unknown as typeof fetch;
@@ -644,6 +645,67 @@ describe('OpenCodeService.openCodeMessageToChatMessage', () => {
     const message = OpenCodeService.openCodeMessageToChatMessage(info, parts);
 
     expect(message.content).toBe('');
+  });
+
+  it('should mark bash tool with non-zero exit metadata as error', () => {
+    const info = {
+      id: 'msg-6',
+      sessionID: 'session-1',
+      role: 'assistant' as const,
+      time: { created: 1234567895 },
+      parentID: 'msg-5',
+      modelID: 'claude-3-5-sonnet',
+      providerID: 'anthropic',
+      mode: 'default',
+      path: { cwd: '/test', root: '/test' },
+      cost: 0.001,
+      tokens: { input: 5, output: 10, reasoning: 0, cache: { read: 0, write: 0 } },
+    };
+
+    const parts = [
+      {
+        type: 'tool',
+        id: 'part-7',
+        sessionID: 'session-1',
+        messageID: 'msg-6',
+        callID: 'call-2',
+        tool: 'bash',
+        state: {
+          status: 'completed' as const,
+          input: { command: 'git status' },
+          output: 'fatal: not a git repository (or any of the parent directories): .git',
+          metadata: { exit: 128 },
+        },
+      },
+    ] as unknown as Part[];
+
+    const message = OpenCodeService.openCodeMessageToChatMessage(info, parts);
+
+    expect(message.contentBlocks?.[0]).toMatchObject({
+      type: 'tool_use',
+      toolId: 'call-2',
+      toolName: 'bash',
+      toolStatus: 'error',
+      toolResult: 'fatal: not a git repository (or any of the parent directories): .git',
+    });
+  });
+});
+
+describe('tool execution status helpers', () => {
+  it('treats older completed bash results with fatal output as errors', () => {
+    expect(resolveToolExecutionStatus({
+      toolName: 'bash',
+      storedStatus: 'completed',
+      result: 'fatal: not a git repository (or any of the parent directories): .git',
+    })).toBe('error');
+  });
+
+  it('keeps successful bash results completed when exit code is zero', () => {
+    expect(resolveToolExecutionStatus({
+      toolName: 'bash',
+      storedStatus: 'completed',
+      result: 'On branch main\nnothing to commit, working tree clean',
+    })).toBe('completed');
   });
 });
 

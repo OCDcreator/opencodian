@@ -8,7 +8,11 @@
 
 import { requestUrl } from 'obsidian';
 
-import { createLogger } from '../../shared';
+import {
+  createLogger,
+  resolveToolExecutionStatus,
+  resolveToolResultText,
+} from '../../shared';
 import type { ChatMessage, ContentBlock, ImageAttachment, PermissionReply, PermissionRequest, StreamChunk } from '../types';
 import type { OpenCodianSettings } from '../types/settings';
 import { getServerBaseUrl, isLocalServerMode } from '../types/settings';
@@ -50,6 +54,7 @@ interface OpenCodeEvent {
           input?: Record<string, unknown>;
           output?: string;
           error?: string;
+          metadata?: Record<string, unknown>;
         };
       }>;
     };
@@ -64,6 +69,7 @@ interface OpenCodeEvent {
         input?: Record<string, unknown>;
         output?: string;
         error?: string;
+        metadata?: Record<string, unknown>;
       };
     };
     delta?: string;
@@ -133,6 +139,20 @@ interface Part {
   type: string;
   text?: string;
   [key: string]: unknown;
+}
+
+interface ToolStateData {
+  status: string;
+  input?: Record<string, unknown>;
+  output?: string;
+  error?: string;
+  metadata?: Record<string, unknown>;
+}
+
+interface ToolPartData extends Part {
+  callID?: string;
+  tool?: string;
+  state?: ToolStateData;
 }
 
 interface AssistantMessageResponse {
@@ -657,7 +677,7 @@ export class OpenCodeService {
           
           // Handle message.part.updated - track part types and tool calls
           if (eventData.type === 'message.part.updated') {
-            const part = eventData.properties?.part;
+            const part = eventData.properties?.part as ToolPartData | undefined;
             if (part?.id && part?.type) {
               this.partTypeMap.set(part.id, part.type);
               
@@ -679,17 +699,23 @@ export class OpenCodeService {
                   }
                   
                   // Tool result
-                  if (part.state?.output || part.state?.error) {
+                  const toolStatus = resolveToolExecutionStatus({
+                    toolName,
+                    state: part.state,
+                  });
+                  const toolResult = resolveToolResultText(part.state);
+                  if (
+                    (toolStatus === 'completed' || toolStatus === 'error')
+                    && toolResult !== undefined
+                  ) {
                     const resultKey = `${toolId}_result`;
                     if (!processedToolIds.has(resultKey)) {
                       processedToolIds.add(resultKey);
                       yield {
                         type: 'tool_result',
                         toolUseId: toolId,
-                        content: part.state.error
-                          ? `Error: ${part.state.error}`
-                          : (part.state.output ?? ''),
-                        isError: !!part.state.error,
+                        content: toolResult,
+                        isError: toolStatus === 'error',
                       };
                     }
                   }
@@ -1346,29 +1372,27 @@ export class OpenCodeService {
         break;
       }
       case 'tool': {
-        const toolPart = part as Part & { callID?: string; tool?: string; state?: { status: string; input?: Record<string, unknown>; output?: string; error?: string } };
+        const toolPart = part as ToolPartData;
         if (toolPart.state) {
-          const state = toolPart.state;
-          if (state.status === 'pending' || state.status === 'running') {
+          const toolStatus = resolveToolExecutionStatus({
+            toolName: toolPart.tool,
+            state: toolPart.state,
+          });
+          if (toolStatus === 'pending' || toolStatus === 'running') {
             chunks.push({
               type: 'tool_use',
               id: toolPart.callID ?? '',
               name: toolPart.tool ?? '',
-              input: state.input ?? {},
+              input: toolPart.state.input ?? {},
             });
-          } else if (state.status === 'completed') {
+          } else if (toolStatus === 'completed' || toolStatus === 'error') {
+            const result = resolveToolResultText(toolPart.state)
+              ?? (toolStatus === 'error' ? 'Error: Tool execution failed' : '');
             chunks.push({
               type: 'tool_result',
               toolUseId: toolPart.callID ?? '',
-              content: state.output ?? '',
-              isError: false,
-            });
-          } else if (state.status === 'error') {
-            chunks.push({
-              type: 'tool_result',
-              toolUseId: toolPart.callID ?? '',
-              content: `Error: ${state.error}`,
-              isError: true,
+              content: result,
+              isError: toolStatus === 'error',
             });
           }
         }
@@ -1393,9 +1417,15 @@ export class OpenCodeService {
     );
 
     // Extract tool calls from tool parts
-    const toolParts = parts.filter((p) => p.type === 'tool') as Array<Part & { callID?: string; tool?: string; state?: { status: string; input?: Record<string, unknown>; output?: string; error?: string } }>;
+    const toolParts = parts.filter((p) => p.type === 'tool') as ToolPartData[];
     const toolCalls = toolParts
-      .filter((p) => p.state?.status === 'pending' || p.state?.status === 'running')
+      .filter((p) => {
+        const toolStatus = resolveToolExecutionStatus({
+          toolName: p.tool,
+          state: p.state,
+        });
+        return toolStatus === 'pending' || toolStatus === 'running';
+      })
       .map((p) => ({
         id: p.callID ?? '',
         name: p.tool ?? '',
@@ -1427,8 +1457,22 @@ export class OpenCodeService {
       
       // Find the result for this tool (if any)
       const resultPart = toolParts.find(
-        p => (p.callID || p.id) === toolId && (p.state?.output || p.state?.error)
+        (p) => {
+          if ((p.callID || p.id) !== toolId) {
+            return false;
+          }
+
+          const toolStatus = resolveToolExecutionStatus({
+            toolName: p.tool,
+            state: p.state,
+          });
+          return toolStatus === 'completed' || toolStatus === 'error';
+        }
       );
+      const toolStatus = resolveToolExecutionStatus({
+        toolName: part.tool,
+        state: resultPart?.state ?? part.state,
+      });
       
       // Create combined tool_use block with result
       contentBlocks.push({
@@ -1436,14 +1480,8 @@ export class OpenCodeService {
         toolId,
         toolName: part.tool || 'unknown',
         toolInput: part.state?.input || {},
-        toolStatus: resultPart?.state?.error
-          ? 'error'
-          : resultPart?.state?.output
-            ? 'completed'
-            : 'running',
-        toolResult: resultPart?.state?.error 
-          ? `Error: ${resultPart.state.error}`
-          : resultPart?.state?.output || undefined,
+        toolStatus,
+        toolResult: resolveToolResultText(resultPart?.state),
       });
     }
     

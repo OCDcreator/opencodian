@@ -20,7 +20,7 @@ import {
 import type { EffortLevel, ThinkingBudget } from '../../core/types/settings';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
-import { createLogger } from '../../shared';
+import { createLogger, resolveToolExecutionStatus } from '../../shared';
 import { chooseForkTarget } from '../../shared/modals';
 import { ProviderIconService } from '../../utils/icons/ProviderIconService';
 import { MarkdownRenderService } from '../../utils/markdown';
@@ -1086,9 +1086,12 @@ export class OpenCodianView extends ItemView {
       options.forceServerSync
       || !conversation.messages
       || conversation.messages.length === 0
-      || conversation.messages.some((message) =>
-        message.displayStyle !== 'notice'
-        && !message.sourceMessageId
+      || (
+        !this.hasInterruptedLocalAssistantTail(conversation.messages)
+        && conversation.messages.some((message) =>
+          message.displayStyle !== 'notice'
+          && !message.sourceMessageId
+        )
       );
 
     const messages = shouldSyncFromServer
@@ -1636,9 +1639,11 @@ export class OpenCodianView extends ItemView {
     this.beginActiveTabContextUsageStream();
 
     // Set up timeout as safety net to reset isStreaming
-    const STREAM_TIMEOUT_MS = 120000; // 2 minutes timeout
+    const STREAM_IDLE_TIMEOUT_MS = 300000; // 5 minutes of no new stream chunks
     let timeoutId: number | null = null;
     let streamCompleted = false;
+    let streamInterrupted = false;
+    let streamTimedOut = false;
     const resetStreamingState = () => {
       if (timeoutId) {
         window.clearTimeout(timeoutId);
@@ -1649,19 +1654,29 @@ export class OpenCodianView extends ItemView {
       this.updateSendButtonState();
     };
 
-    timeoutId = window.setTimeout(() => {
-      logger.warn('Stream timeout, forcing state reset');
-      // Mark running tool calls as error
-      this.streamController?.timeoutStream();
-      resetStreamingState();
-      // Add error message if still streaming
-      if (this.streamController?.isStreaming()) {
-        void this.streamController.handleChunk({ 
-          type: 'error', 
-          content: 'Response timeout' 
-        });
+    const scheduleStreamTimeout = () => {
+      if (timeoutId) {
+        window.clearTimeout(timeoutId);
       }
-    }, STREAM_TIMEOUT_MS);
+
+      timeoutId = window.setTimeout(() => {
+        if (!this.isStreaming) {
+          return;
+        }
+
+        streamTimedOut = true;
+        streamInterrupted = true;
+        latestErrorMessage = this.getFriendlyStreamErrorMessage('Response timeout');
+        logger.warn('Stream idle timeout, forcing state reset');
+
+        // Mark any unfinished tool calls as failed and stop the SSE locally.
+        this.streamController?.timeoutStream();
+        this.plugin.openCodeService.cancelStream();
+        resetStreamingState();
+      }, STREAM_IDLE_TIMEOUT_MS);
+    };
+
+    scheduleStreamTimeout();
 
     // Stream response with current session model
     const stream = this.plugin.openCodeService.sendMessage(content, {
@@ -1721,8 +1736,11 @@ export class OpenCodianView extends ItemView {
         // Check if streaming was cancelled
         if (!this.isStreaming) {
           logger.debug('Streaming cancelled, breaking loop');
+          streamInterrupted = true;
           break;
         }
+
+        scheduleStreamTimeout();
 
         if (chunk.type === 'message_start') {
           this.beginActiveTabContextUsageStream();
@@ -1752,17 +1770,7 @@ export class OpenCodianView extends ItemView {
           
           // Resume the stream timeout after user response (reset to full timeout)
           if (this.isStreaming) {
-            timeoutId = window.setTimeout(() => {
-              logger.warn('Stream timeout after permission, forcing state reset');
-              this.streamController?.timeoutStream();
-              resetStreamingState();
-              if (this.streamController?.isStreaming()) {
-                void this.streamController.handleChunk({ 
-                  type: 'error', 
-                  content: 'Response timeout' 
-                });
-              }
-            }, STREAM_TIMEOUT_MS);
+            scheduleStreamTimeout();
           }
           continue;
         }
@@ -1916,7 +1924,8 @@ export class OpenCodianView extends ItemView {
 
     // Update conversation
     if (this.currentConversation) {
-      if (!latestErrorMessage) {
+      const shouldSyncFromServer = streamCompleted && !streamTimedOut && !streamInterrupted && !latestErrorMessage;
+      if (shouldSyncFromServer) {
         await this.syncConversationMessagesFromServer(this.currentConversation);
         await this.rerenderConversationMessages(this.currentConversation);
       }
@@ -1924,7 +1933,7 @@ export class OpenCodianView extends ItemView {
       await this.plugin.saveConversation(this.currentConversation);
       this.tabManager?.setActiveTabConversation(this.currentConversation);
       this.syncActiveTabContextUsageIdentity();
-      if (!latestErrorMessage) {
+      if (shouldSyncFromServer) {
         await this.refreshActiveTabContextUsageFromServer();
       }
     }
@@ -2328,15 +2337,23 @@ export class OpenCodianView extends ItemView {
 
   /** Resolve persisted tool status, with fallback for older stored messages */
   private getStoredToolStatus(block: ContentBlock): ToolCallInfo['status'] {
-    if (block.toolStatus) {
-      return block.toolStatus;
-    }
+    return resolveToolExecutionStatus({
+      toolName: block.toolName,
+      storedStatus: block.toolStatus,
+      result: block.toolResult,
+    });
+  }
 
-    if (block.toolResult?.startsWith('Error:')) {
-      return 'error';
-    }
-
-    return 'completed';
+  private hasInterruptedLocalAssistantTail(messages: ChatMessage[]): boolean {
+    return messages.some((message) =>
+      message.role === 'assistant'
+      && !message.sourceMessageId
+      && message.displayStyle !== 'notice'
+      && (
+        (message.contentBlocks?.length ?? 0) > 0
+        || Boolean(message.content)
+      ),
+    );
   }
 
   /** Create assistant message element for streaming */

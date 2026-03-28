@@ -1,0 +1,145 @@
+export type ToolExecutionStatus = 'pending' | 'running' | 'completed' | 'error' | 'blocked';
+
+export interface ToolExecutionStateLike {
+  status?: string;
+  output?: string;
+  error?: string;
+  metadata?: Record<string, unknown>;
+}
+
+interface ResolveToolExecutionStatusOptions {
+  toolName?: string;
+  state?: ToolExecutionStateLike | null;
+  storedStatus?: ToolExecutionStatus | null;
+  result?: string | null;
+}
+
+const BASH_METADATA_FAILURE_PATTERNS = [
+  /bash tool terminated command after exceeding timeout/i,
+  /user aborted the command/i,
+];
+
+const BASH_OUTPUT_FAILURE_PATTERNS = [
+  /^\s*fatal:/im,
+  /command not found/i,
+  /is not recognized as an internal or external command/i,
+  /permission denied/i,
+];
+
+function getNumericMetadataValue(metadata: Record<string, unknown> | undefined, key: string): number | null {
+  if (!metadata) {
+    return null;
+  }
+
+  const value = metadata[key];
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === 'string' && /^-?\d+$/.test(value.trim())) {
+    return Number(value);
+  }
+
+  return null;
+}
+
+function hasExplicitFailureMetadata(metadata: Record<string, unknown> | undefined): boolean {
+  if (!metadata) {
+    return false;
+  }
+
+  if (metadata.success === false || metadata.ok === false || metadata.failed === true) {
+    return true;
+  }
+
+  const exitCode = getNumericMetadataValue(metadata, 'exit') ?? getNumericMetadataValue(metadata, 'exitCode');
+  return exitCode !== null && exitCode !== 0;
+}
+
+function stripBashMetadata(result: string): string {
+  return result.replace(/<bash_metadata>[\s\S]*?<\/bash_metadata>/gi, '').trim();
+}
+
+function hasBashFailureMarkers(result: string): boolean {
+  if (!result) {
+    return false;
+  }
+
+  if (BASH_METADATA_FAILURE_PATTERNS.some((pattern) => pattern.test(result))) {
+    return true;
+  }
+
+  const visibleOutput = stripBashMetadata(result);
+  return BASH_OUTPUT_FAILURE_PATTERNS.some((pattern) => pattern.test(visibleOutput));
+}
+
+export function resolveToolResultText(
+  state?: ToolExecutionStateLike | null,
+  result?: string | null,
+): string | undefined {
+  if (typeof state?.error === 'string' && state.error.trim()) {
+    return `Error: ${state.error}`;
+  }
+
+  if (typeof state?.output === 'string') {
+    return state.output;
+  }
+
+  if (typeof result === 'string') {
+    return result;
+  }
+
+  return undefined;
+}
+
+export function isToolExecutionError(options: ResolveToolExecutionStatusOptions): boolean {
+  const { toolName, state } = options;
+  const result = resolveToolResultText(state, options.result) ?? '';
+
+  if (state?.status === 'error') {
+    return true;
+  }
+
+  if (typeof state?.error === 'string' && state.error.trim()) {
+    return true;
+  }
+
+  if (result.trimStart().startsWith('Error:')) {
+    return true;
+  }
+
+  if (hasExplicitFailureMetadata(state?.metadata)) {
+    return true;
+  }
+
+  return toolName === 'bash' && hasBashFailureMarkers(result);
+}
+
+export function resolveToolExecutionStatus(
+  options: ResolveToolExecutionStatusOptions,
+): ToolExecutionStatus {
+  const { state, storedStatus } = options;
+
+  if (storedStatus === 'blocked') {
+    return 'blocked';
+  }
+
+  if (state?.status === 'pending' || state?.status === 'running') {
+    return state.status;
+  }
+
+  if (storedStatus === 'pending' || storedStatus === 'running') {
+    return storedStatus;
+  }
+
+  if (isToolExecutionError(options)) {
+    return 'error';
+  }
+
+  const hasResult = resolveToolResultText(state, options.result) !== undefined;
+  if (storedStatus === 'completed' || state?.status === 'completed' || hasResult) {
+    return 'completed';
+  }
+
+  return 'running';
+}
