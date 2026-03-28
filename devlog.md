@@ -8,6 +8,48 @@
 
 ---
 
+## 2026-03-28 会话标题语言感知改造
+
+### ✨ 改动目标
+
+- AI 自动生成会话标题时，不再固定输出英文。
+- 改为根据插件当前界面语言决定标题输出语言：
+  - `zh`：输出中文标题
+  - `en`：输出英文标题
+
+### 🏗️ 实现方式
+
+- 将 `src/core/prompts/titleGeneration.ts` 从静态提示词常量改为可按语言构建的提示词工具：
+  - `normalizeTitleGenerationLocale()`
+  - `buildTitleGenerationSystemPrompt()`
+  - `buildTitleGenerationPrompt()`
+- 在 `TitleGenerationService` 内读取 `plugin.settings.locale`，并在请求标题生成时同时注入：
+  - 与语言匹配的 system prompt
+  - 与语言匹配的 user prompt
+- 保持现有标题清洗逻辑不变，只调整模型输出语言约束。
+
+### 🌐 行为结果
+
+- 用户界面语言为中文时，新会话 AI 标题会明确要求模型输出简体中文。
+- 用户界面语言为英文时，新会话 AI 标题会明确要求模型输出英文。
+- 不支持的语言值会安全回退到英文。
+
+### 🧪 验证
+
+- 新增定向单测：`tests/unit/features/chat/TitleGenerationPrompt.test.ts`
+- 测试通过：`npm test -- tests/unit/features/chat/TitleGenerationPrompt.test.ts`
+- 构建成功：`npm run build`
+- 已部署到 Test Vault
+- 本轮验证使用的 `BUILD_ID`：`main.202603281319`
+
+### 📁 涉及文件
+
+- `src/core/prompts/titleGeneration.ts`
+- `src/features/chat/services/TitleGenerationService.ts`
+- `tests/unit/features/chat/TitleGenerationPrompt.test.ts`
+
+---
+
 ## 2026-03-28 同一轮 Assistant 消息自动合并渲染
 
 ### 📋 本次开发目标

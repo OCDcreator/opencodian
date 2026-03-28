@@ -4,6 +4,15 @@
 
 **OpenCodian** is an Obsidian plugin that embeds OpenCode AI (an open-source AI coding assistant) into the Obsidian sidebar. It is inspired by [Claudian](https://github.com/YishenTu/claudian) but uses the open-source OpenCode as the backend, supporting multiple AI model providers including Claude, GPT, and local models (vLLM/Ollama).
 
+## Agent Working Profile
+
+Use this repo's default agent profile for focused Obsidian plugin work:
+
+- **Role**: Make surgical TypeScript, UI, config, and documentation updates for the OpenCodian plugin.
+- **Best fit**: Plugin feature work, bugfixes, settings wiring, OpenCode integration, documentation upkeep, and test-vault deployment.
+- **Prefer**: `rg` for search, small targeted edits, targeted tests first, and the sequential build-then-deploy workflow below.
+- **Avoid**: Unrelated refactors, edits under `reference-projects/` unless explicitly requested, and chained build/deploy commands that can copy stale artifacts.
+
 ### Key Characteristics
 
 - **Multi-model support**: Works with Claude, GPT, local models, and any OpenAI-compatible API
@@ -29,6 +38,13 @@
 │  │         │(Lifecycle Mgr)  │                         │   │
 │  │         └────────┬────────┘                         │   │
 │  └──────────────────┼──────────────────────────────────┘   │
+│  ┌──────────────────┼──────────────────────────────────┐   │
+│  │  Supporting Services                                │   │
+│  │  ┌──────────────────┐ ┌────────────┐ ┌───────────┐ │   │
+│  │  │TitleGenerationSvc│ │  Markdown  │ │   i18n    │ │   │
+│  │  │  (AI Titles)     │ │ Rendering  │ │ (en/zh)   │ │   │
+│  │  └──────────────────┘ └────────────┘ └───────────┘ │   │
+│  └─────────────────────────────────────────────────────┘   │
 └─────────────────────┼──────────────────────────────────────┘
                       │ HTTP API
                       ▼ 
@@ -74,6 +90,8 @@ opencodian/
 │   │   │   ├── ServerManager.ts     # Server lifecycle management
 │   │   │   ├── types.ts             # Service types
 │   │   │   └── index.ts             # Module exports
+│   │   ├── prompts/                 # System prompts for AI features
+│   │   │   └── titleGeneration.ts   # Title generation system prompt
 │   │   ├── security/                # Permission + blocklist helpers
 │   │   │   ├── BlocklistChecker.ts
 │   │   │   └── index.ts
@@ -95,6 +113,8 @@ opencodian/
 │   │   ├── chat/
 │   │   │   ├── rendering/           # Chat rendering helpers
 │   │   │   │   └── collapsible.ts
+│   │   │   ├── services/            # Chat-level business services
+│   │   │   │   └── TitleGenerationService.ts  # AI-powered title generation
 │   │   │   ├── tabs/                # Multi-tab conversation system
 │   │   │   │   ├── Tab.ts
 │   │   │   │   ├── TabBar.ts
@@ -118,6 +138,7 @@ opencodian/
 │   │   ├── index.ts
 │   │   └── locales/
 │   │       ├── en.ts
+│   │       ├── index.ts             # Locale barrel export
 │   │       └── zh.ts
 │   ├── shared/                      # Shared utilities
 │   │   ├── modals/
@@ -251,8 +272,11 @@ Main service for interacting with OpenCode Server via HTTP API.
 
 - `createSession(title?)` - Create a new chat session
 - `sendMessage(message, options)` - Send message and get streaming response
+- `requestAssistantResponse(message, options)` - Send a message and wait for the full (non-streaming) assistant response
 - `getAvailableModels()` - Fetch available providers and models
 - `getSessionMessages(sessionId)` - Get messages for a session
+- `updateSessionTitle(sessionId, title)` - Update a session's title
+- `deleteSession(sessionId)` - Delete a session by ID
 - `forkSession(sessionId, messageID?)` - Fork a conversation from a selected message
 - `revertSession(sessionId, messageID, partID?)` - Rewind a conversation to a prior point
 
@@ -316,6 +340,7 @@ Settings UI with bilingual support (English/Chinese).
 - **Language**: Interface language selection
 - **Server**: Local / remote mode, auth, health status, help modal
 - **Model**: Source mode, default provider/model, visual editor, JSON editor
+- **Title Generation**: AI title mode (default/ai), override model for title generation
 - **Security**: Permission mode, config editor, command blocklist, export paths
 - **UI**: Max tabs, tab bar position, auto-scroll, chat scroll mode, open in main tab
 - **Style**: Chat appearance controls and custom CSS declarations
@@ -341,6 +366,39 @@ SSE streaming components for real-time message display.
 - `done` - Stream completed
 - `error` - Error occurred
 
+### 8. TitleGenerationService (`src/features/chat/services/TitleGenerationService.ts`)
+
+AI-powered conversation title generation service. Creates concise titles by sending the user's first message to an AI model.
+
+**How it works:**
+
+1. Creates a temporary OpenCode session for title generation
+2. Sends the first user message with the system prompt from `src/core/prompts/titleGeneration.ts`
+3. Parses the AI response into a clean title (≤50 chars)
+4. Deletes the temporary session after use
+
+**Key Methods:**
+
+- `generateTitle(conversationId, userMessage, currentModel, callback)` - Generate a title for a conversation
+- `cancelConversation(conversationId)` - Cancel an in-progress title generation
+- `cancelAll()` - Cancel all active title generations
+
+**Configuration:**
+
+- `aiTitleModel` setting - Override the model used for title generation (format: `provider/model`), or leave empty to follow the current session model
+- `locale` setting - Drives the language of AI-generated titles (`zh` => Chinese, `en` => English)
+- `titleGenerationStatus` on conversations - Tracks state: `'pending'` | `'success'` | `'failed'`
+
+### 9. Markdown Rendering (`src/utils/markdown/`)
+
+Custom markdown rendering pipeline for chat messages.
+
+**Key Components:**
+
+- `MarkdownRenderService` / `renderMarkdown()` - Renders markdown to HTML with Obsidian integration
+- `processFileLinks()` / `registerFileLinkHandler()` - Handles internal file link rendering
+- `replaceImageEmbedsWithHtml()` - Converts image embeds to HTML elements
+
 ## Prerequisites for Users
 
 1. **Obsidian** v1.4.5 or later (desktop only)
@@ -354,12 +412,6 @@ SSE streaming components for real-time message display.
 
 ## Deployment
 
-### Quick Deploy Script
-
-```bash
-npm run build && cp dist/main.js dist/manifest.json dist/styles.css "/path/to/vault/.obsidian/plugins/opencodian/"
-```
-
 ### Deployment Paths
 
 | Environment          | Path Type | Path                                                                         |
@@ -369,18 +421,6 @@ npm run build && cp dist/main.js dist/manifest.json dist/styles.css "/path/to/va
 | **Test Vault**       | Relative  | `../../testvault/.obsidian/plugins/opencodian/`                              |
 
 > **Note**: Relative path is calculated from the project root (`opencodian/`) for cross-platform compatibility.
-
-### Test Vault Quick Deploy (Windows)
-
-```bash
-npm run build && copy dist\main.js dist\manifest.json dist\styles.css ..\..\testvault\.obsidian\plugins\opencodian\
-```
-
-### Test Vault Quick Deploy (Unix/macOS)
-
-```bash
-npm run build && cp dist/main.js dist/manifest.json dist/styles.css ../../testvault/.obsidian/plugins/opencodian/
-```
 
 ### Agent Default Deploy Workflow
 
@@ -401,6 +441,18 @@ npm run build && cp dist/main.js dist/manifest.json dist/styles.css ../../testva
 3. **New message types**: Extend `StreamChunk` type in `src/core/types/chat.ts`
 4. **Model config changes**: Keep `ModelConfigService`, settings UI, and `.opencode/config.json` writes in sync
 5. **Chat UI additions**: Check `features/chat/tabs/`, `features/chat/ui/`, and `styles.css` together
+6. **New AI features with prompts**: Add system prompts in `core/prompts/`, service logic in `features/chat/services/`, and wire into `OpenCodianView`
+7. **i18n additions**: Add keys to both `en.ts` and `zh.ts` locale files, export from `locales/index.ts`
+
+### Agent Checklist
+
+Before handing off work, agents should verify the following when relevant:
+
+- **Code changes**: Run the smallest meaningful test or validation command first, then broaden only if needed.
+- **Build/deploy changes**: Follow the required sequential `npm run build` -> copy -> deployed `BUILD_ID` verification flow.
+- **Prompt or title changes**: Keep `src/core/prompts/titleGeneration.ts`, `src/features/chat/services/TitleGenerationService.ts`, and locale-driven behavior aligned.
+- **Settings or i18n changes**: Keep `DEFAULT_SETTINGS`, settings UI, and both locale files synchronized.
+- **Architecture/doc changes**: Update `devlog.md` and refresh this `AGENTS.md` when developer-facing workflow or component responsibilities materially change.
 
 ### Debugging
 
@@ -434,5 +486,5 @@ This is the main development log maintained in the Obsidian vault for easy refer
 
 ---
 
-**Last Updated**: 2026-03-27
+**Last Updated**: 2026-03-28
 **Plugin Version**: 1.0.0

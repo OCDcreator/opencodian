@@ -1,4 +1,8 @@
-import { TITLE_GENERATION_SYSTEM_PROMPT } from '../../../core/prompts/titleGeneration';
+import {
+  buildTitleGenerationPrompt,
+  buildTitleGenerationSystemPrompt,
+  normalizeTitleGenerationLocale,
+} from '../../../core/prompts/titleGeneration';
 import type OpenCodianPlugin from '../../../main';
 
 export type TitleGenerationResult =
@@ -27,12 +31,8 @@ export class TitleGenerationService {
     this.activeGenerations.set(conversationId, controller);
 
     const { provider, model } = this.resolveModel(currentModel);
-    const prompt = `First user message:
-"""
-${this.truncateText(userMessage, 600)}
-"""
-
-Generate the best short conversation title.`;
+    const locale = normalizeTitleGenerationLocale(this.plugin.settings.locale);
+    const prompt = buildTitleGenerationPrompt(this.truncateText(userMessage, 600), locale);
 
     let tempSessionId: string | null = null;
 
@@ -42,7 +42,7 @@ Generate the best short conversation title.`;
         sessionId: tempSessionId,
         provider,
         model,
-        system: TITLE_GENERATION_SYSTEM_PROMPT,
+        system: buildTitleGenerationSystemPrompt(locale),
       });
 
       if (controller.signal.aborted) {
