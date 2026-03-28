@@ -4376,3 +4376,45 @@ streamController.renderStoredContentBlocks(parentEl, savedBlocks);
 - `tests/unit/features/chat/tabs/TabBar.test.ts`
 
 ---
+
+## 2026-03-28 助手消息流结束抖动修复
+
+### 🐛 问题现象
+
+- 助手消息在流式输出完成后，会出现一次明显的“向下跳”或“闪一下”的视觉抖动。
+- 开启自动滚动时，滚动位置也会在结束瞬间被再次推到底部，放大这种不稳定感。
+
+### 🔍 原因定位
+
+- 时间戳行原本在流结束后才插入，导致消息高度在最后一刻突然增加。
+- `done` 阶段仍会触发一次额外的 `scrollToBottom()`，与时间戳插入叠加，形成末尾跳动。
+- 流式助手消息结构中还存在一层多余的预创建文本容器，不必要地增加了收尾阶段 DOM 调整的复杂度。
+
+### ✅ 本轮修复
+
+- 助手流式消息创建时就预留 `.opencodian-message-time-row` 占位，结束时只填充时间、模型和复制按钮，不再新增一整行 DOM。
+- 为时间戳行增加稳定高度与隐藏占位态，避免结束瞬间撑高消息。
+- `StreamController` 在处理 `done` chunk 时不再立即触发额外滚动。
+- `OpenCodianView` 改为在流结束后的双 `requestAnimationFrame` 中补一次稳定滚动，等待布局完成后再校正位置。
+- 清理流式助手消息里多余的空文本节点，保持实时 Markdown 渲染路径不变。
+
+### 🎯 结果
+
+- 保留实时 Markdown 渲染效果，不牺牲流式过程中的格式反馈。
+- 显著减轻消息结束瞬间的“蹦一下”感，尤其是在自动滚动开启时更稳定。
+
+### 🧪 验证
+
+- 定向 ESLint 校验通过：
+  - `src/features/chat/OpenCodianView.ts`
+  - `src/utils/streaming/StreamController.ts`
+- 构建成功并部署到 Test Vault。
+- 本轮验证使用的 `BUILD_ID`：`main.202603280851`
+
+### 📁 涉及文件
+
+- `src/features/chat/OpenCodianView.ts`
+- `src/utils/streaming/StreamController.ts`
+- `styles.css`
+
+---

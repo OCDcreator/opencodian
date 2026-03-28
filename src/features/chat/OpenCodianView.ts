@@ -161,6 +161,7 @@ export class OpenCodianView extends ItemView {
   private lastServerAvailability: ChatServerAvailability | null = null;
   private chatSurfaceSyncFrameId: number | null = null;
   private chatSurfaceSyncTimeoutId: number | null = null;
+  private scrollToBottomFrameId: number | null = null;
   private chatAppearanceStyleEl: HTMLStyleElement | null = null;
 
   private appSettings(): { open: () => void; openTabById: (id: string) => void } {
@@ -221,6 +222,7 @@ export class OpenCodianView extends ItemView {
     this.persistTabState({ flush: true });
     this.stopServerStatusLoop();
     this.clearChatSurfaceSyncTimers();
+    this.clearScheduledScrollToBottom();
     this.chatAppearanceStyleEl?.remove();
     this.chatAppearanceStyleEl = null;
     this.effortSelector?.destroy();
@@ -1761,6 +1763,7 @@ export class OpenCodianView extends ItemView {
           textContent,
           activeModelId,
         );
+        this.scheduleSettledScrollToBottom();
       }
       
       // Get content blocks from stream (includes thinking with duration)
@@ -2233,26 +2236,24 @@ export class OpenCodianView extends ItemView {
   }
 
   /** Create assistant message element for streaming */
-  private createAssistantMessageElement(): { messageEl: HTMLElement; contentEl: HTMLElement; textEl: HTMLElement } {
+  private createAssistantMessageElement(): { messageEl: HTMLElement; contentEl: HTMLElement } {
     const messageEl = this.ensureTurnBody()?.createDiv({
       cls: 'opencodian-message opencodian-message--assistant',
     });
 
     if (!messageEl) {
       const fallback = document.createElement('div');
-      return { messageEl: fallback, contentEl: fallback, textEl: fallback };
+      return { messageEl: fallback, contentEl: fallback };
     }
 
     const contentEl = messageEl.createDiv({ cls: 'opencodian-message-content' });
-    const textEl = contentEl.createDiv({ cls: 'opencodian-message-text' });
-
-    // Note: Timestamp will be added after streaming completes to ensure correct DOM order
+    this.ensureAssistantTimestampRow(messageEl, true);
 
     // Track for streaming updates
     this.streamingMessageEl = messageEl;
-    this.streamingContentEl = textEl;
+    this.streamingContentEl = contentEl;
 
-    return { messageEl, contentEl, textEl };
+    return { messageEl, contentEl };
   }
 
   /** Update message content during streaming */
@@ -2369,8 +2370,9 @@ export class OpenCodianView extends ItemView {
     content?: string,
     modelId?: string,
   ): void {
-    // Create a container for timestamp and copy button
-    const timeRow = messageEl.createDiv({ cls: 'opencodian-message-time-row' });
+    const timeRow = this.ensureAssistantTimestampRow(messageEl);
+    timeRow.empty();
+    timeRow.classList.remove('is-pending');
 
     // Timestamp
     const timeStr = new Date(timestamp).toLocaleTimeString([], {
@@ -2391,6 +2393,16 @@ export class OpenCodianView extends ItemView {
     const copyBtn = timeRow.createSpan({ cls: 'opencodian-copy-btn-inline' });
     copyBtn.innerHTML = COPY_ICON;
     this.attachCopyButtonBehavior(copyBtn, content);
+  }
+
+  private ensureAssistantTimestampRow(messageEl: HTMLElement, reserveSpace = false): HTMLElement {
+    const existingRow = messageEl.querySelector('.opencodian-message-time-row');
+    const timeRow = existingRow instanceof HTMLElement
+      ? existingRow
+      : messageEl.createDiv({ cls: 'opencodian-message-time-row' });
+
+    timeRow.classList.toggle('is-pending', reserveSpace);
+    return timeRow;
   }
 
   private mergeSyncedMessageModelIds(
@@ -2734,6 +2746,23 @@ export class OpenCodianView extends ItemView {
       this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
     }
     this.navigationSidebar?.updateVisibility();
+  }
+
+  private scheduleSettledScrollToBottom(): void {
+    this.clearScheduledScrollToBottom();
+    this.scrollToBottomFrameId = window.requestAnimationFrame(() => {
+      this.scrollToBottomFrameId = window.requestAnimationFrame(() => {
+        this.scrollToBottomFrameId = null;
+        this.scrollToBottom();
+      });
+    });
+  }
+
+  private clearScheduledScrollToBottom(): void {
+    if (this.scrollToBottomFrameId !== null) {
+      window.cancelAnimationFrame(this.scrollToBottomFrameId);
+      this.scrollToBottomFrameId = null;
+    }
   }
 
   /** Initialize model selector (opencode-style) */

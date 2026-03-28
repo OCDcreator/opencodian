@@ -1329,9 +1329,16 @@
   gap: 8px;
   margin-top: 4px;
   padding-left: var(--opencodian-assistant-content-pad-x);
+  min-height: 14px;
   font-size: 10px;
+  line-height: 1.4;
   color: var(--text-muted);
   opacity: 0.6;
+}
+
+.opencodian-message-time-row.is-pending {
+  visibility: hidden;
+  pointer-events: none;
 }
 
 .opencodian-message-time-row:hover {

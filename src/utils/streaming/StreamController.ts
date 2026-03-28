@@ -91,7 +91,9 @@ export class StreamController {
         break;
     }
 
-    this.scrollToBottom?.();
+    if (chunk.type !== 'done') {
+      this.scrollToBottom?.();
+    }
   }
 
   private async handleThinkingChunk(content: string): Promise<void> {
