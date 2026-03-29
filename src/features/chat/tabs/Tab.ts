@@ -12,6 +12,7 @@ export class Tab {
       title: conversation?.title || title,
       isActive: false,
       isStreaming: false,
+      hasBackgroundTask: false,
       needsAttention: false,
       modelOverride: null,
       contextUsage: createEmptyTabContextState(),
@@ -36,6 +37,10 @@ export class Tab {
 
   setStreaming(streaming: boolean): void {
     this.data.isStreaming = streaming;
+  }
+
+  setBackgroundTaskRunning(hasBackgroundTask: boolean): void {
+    this.data.hasBackgroundTask = hasBackgroundTask;
   }
 
   setNeedsAttention(needsAttention: boolean): void {

@@ -113,6 +113,9 @@ export class TabBar {
     if (item.isStreaming) {
       tabEl.addClass('is-streaming');
     }
+    if (item.hasBackgroundTask) {
+      tabEl.addClass('has-background-task');
+    }
     if (item.needsAttention) {
       tabEl.addClass('needs-attention');
     }
@@ -130,7 +133,9 @@ export class TabBar {
 
     const stateEl = badgeWrapEl.createSpan({ cls: 'opencodian-tab-bar-state' });
     stateEl.setAttribute('aria-hidden', 'true');
-    if (item.needsAttention) {
+    if (item.hasBackgroundTask) {
+      this.renderBackgroundTaskState(stateEl);
+    } else if (item.needsAttention) {
       setIcon(stateEl, 'bell-ring');
     }
 
@@ -195,6 +200,9 @@ export class TabBar {
       if (item.isActive) {
         itemEl.classList.add('is-active');
       }
+      if (item.hasBackgroundTask) {
+        itemEl.classList.add('has-background-task');
+      }
       if (item.needsAttention) {
         itemEl.classList.add('needs-attention');
       }
@@ -216,6 +224,9 @@ export class TabBar {
       if (item.isStreaming) {
         setIcon(stateEl, 'loader-circle');
         stateEl.classList.add('is-streaming');
+      } else if (item.hasBackgroundTask) {
+        stateEl.classList.add('is-background-task');
+        this.renderBackgroundTaskState(stateEl);
       } else if (item.needsAttention) {
         setIcon(stateEl, 'bell-ring');
       }
@@ -303,6 +314,16 @@ export class TabBar {
     this.overflowMenuCleanup?.();
     this.overflowMenuCleanup = null;
     this.overflowMenuEl = null;
+  }
+
+  private renderBackgroundTaskState(containerEl: HTMLElement): void {
+    containerEl.empty();
+    containerEl.addClass('is-background-task');
+    const dotsEl = containerEl.createSpan({ cls: 'opencodian-tab-activity-dots' });
+    dotsEl.setAttribute('aria-hidden', 'true');
+    for (let index = 0; index < 3; index += 1) {
+      dotsEl.createSpan({ cls: 'opencodian-tab-activity-dot' });
+    }
   }
 
   private attachTooltipLabel(element: HTMLElement, label: string): void {

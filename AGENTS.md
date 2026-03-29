@@ -17,7 +17,7 @@ Use this repo's default agent profile for focused Obsidian plugin work:
 
 - **Multi-model support**: Works with Claude, GPT, local models, and any OpenAI-compatible API
 - **Local-first**: Can be configured to use local models, keeping data on the local machine
-- **Client/Server architecture**: The plugin communicates with an OpenCode server via HTTP/SSE
+- **Client/Server architecture**: The plugin communicates with an OpenCode server via a hybrid HTTP/SSE + SDK v2 client layer
 - **Desktop only**: Requires Obsidian desktop app (v1.4.5+)
 
 ## Architecture
@@ -88,8 +88,12 @@ opencodian/
 │   │   │   └── index.ts
 │   │   ├── opencode/                # OpenCode SDK wrapper
 │   │   │   ├── OpenCodeService.ts   # Core service for SDK interaction
+│   │   │   ├── createSdkClient.ts   # SDK v2 client factory
 │   │   │   ├── omoCompat.ts         # OMO message detection helpers
 │   │   │   ├── ServerManager.ts     # Server lifecycle management
+│   │   │   ├── sdkFeatureFlags.ts   # Internal SDK rollout switches
+│   │   │   ├── sdkFetch.ts          # requestUrl/fetch hybrid transport
+│   │   │   ├── sdkTypes.ts          # SDK v2 type bridge
 │   │   │   ├── types.ts             # Service types
 │   │   │   └── index.ts             # Module exports
 │   │   ├── prompts/                 # System prompts for AI features
@@ -269,11 +273,18 @@ cp dist/main.js dist/manifest.json dist/styles.css ../../testvault/.obsidian/plu
 
 ### 1. OpenCodeService (`src/core/opencode/OpenCodeService.ts`)
 
-Main service for interacting with OpenCode Server via HTTP API.
+Main service for interacting with OpenCode Server. Current state is a hybrid facade:
+
+- UI-facing API remains local to `OpenCodian`
+- `ServerManager` still owns process lifecycle
+- SDK v2 now backs most CRUD, non-stream prompt, streaming main path, and cancel abort behavior
+- Legacy HTTP/SSE paths are intentionally retained as fallback during rollout
 
 **Key Methods:**
 
+- `checkHealth()` - Health check with SDK-first / local probe fallback
 - `createSession(title?)` - Create a new chat session
+- `cancelStream(sessionId?)` - Stop the targeted local session stream and best-effort abort server execution
 - `sendMessage(message, options)` - Send message and get streaming response
 - `requestAssistantResponse(message, options)` - Send a message and wait for the full (non-streaming) assistant response
 - `getAvailableModels()` - Fetch available providers and models
@@ -282,7 +293,23 @@ Main service for interacting with OpenCode Server via HTTP API.
 - `deleteSession(sessionId)` - Delete a session by ID
 - `forkSession(sessionId, messageID?)` - Fork a conversation from a selected message
 - `revertSession(sessionId, messageID, partID?)` - Rewind a conversation to a prior point
+- `getPendingPermissions()` - Fetch pending permission requests
+- `respondToPermission(requestID, reply, message?)` - Reply to a permission request
 - `openCodeMessageToChatMessage(info, parts)` - Normalize persisted messages into chat UI data, including OMO metadata and notice hints
+
+**SDK v2 migration notes:**
+
+- **Reference source path**: `reference-projects/opencode/packages/sdk/js/src/v2`
+- **Feature flags**: `sdkCrud`, `sdkPrompt`, `sdkStream`, `sdkAbort`, `sdkQuestions`, `sdkSync`
+- **Runtime rollout**: `src/main.ts` currently injects `SDK_FEATURE_FLAG_ROLLOUT_DEFAULTS`
+- **Testing default**: constructing `OpenCodeService` without runtime overrides keeps all SDK flags off
+- **Do not remove yet**: legacy `connectSSE()`, `parseSSEEvents()`, and legacy HTTP helpers remain the rollback path
+
+**Current module status:**
+
+- **Implemented**: SDK type bridge, client factory, hybrid transport, CRUD migration, non-stream prompt migration, streaming main chain, dual-path cancel/abort
+- **Still pending**: `format` / `agent` / `noReply`, real file/image parts, `externalContextPaths`, `question.*`, `global.syncEvent.subscribe()`, `session.summarize()`, `session.diff()`
+- **Concurrency note**: streaming state is now maintained per session in `OpenCodeService`, so different tabs/sessions can stream concurrently without sharing one global abort/controller state
 
 ### 2. ServerManager (`src/core/opencode/ServerManager.ts`)
 
@@ -338,6 +365,7 @@ Main chat UI view (extends Obsidian's `ItemView`).
 
 - Sidebar or main-tab chat interface
 - Multi-tab conversation management
+- Per-tab runtime state for true concurrent tab sends
 - Per-session model switching dropdown
 - Effort / thinking budget selector
 - Real-time streaming display
@@ -350,6 +378,7 @@ Main chat UI view (extends Obsidian's `ItemView`).
 - OMO system-reminder notice cards with markdown rendering
 - Idle conversation sync loop for post-stream follow-up messages
 - Background-task in-progress indicator and follow-up pseudo-stream reveal
+- Hidden background-task tab sync and per-tab permission card routing
 
 ### 7. OpenCodianSettingTab (`src/features/settings/OpenCodianSettings.ts`)
 
@@ -479,6 +508,8 @@ Compatibility layer for `oh-my-opencode` message mutations and reminders.
 7. **New AI features with prompts**: Add system prompts in `core/prompts/`, service logic in `features/chat/services/`, and wire into `OpenCodianView`
 8. **i18n additions**: Add keys to both `en.ts` and `zh.ts` locale files, export from `locales/index.ts`
 9. **OMO changes**: Keep `src/core/opencode/omoCompat.ts`, `OpenCodeService.openCodeMessageToChatMessage()`, `OpenCodianView`, OMO settings entry points, and notice/injection styles aligned
+10. **SDK v2 migration changes**: Keep `OpenCodeService`, `createSdkClient.ts`, `sdkFetch.ts`, `sdkFeatureFlags.ts`, `sdkTypes.ts`, related tests, and `docs/opencode-service-sdk-v2-mapping.md` synchronized
+11. **Concurrent tab changes**: When editing `OpenCodianView.ts`, `TabManager.ts`, or streaming/cancel logic, preserve the per-tab runtime model; do not reintroduce single global streaming state unless explicitly redesigning multi-tab concurrency
 
 ### Agent Checklist
 
@@ -489,6 +520,7 @@ Before handing off work, agents should verify the following when relevant:
 - **Prompt or title changes**: Keep `src/core/prompts/titleGeneration.ts`, `src/features/chat/services/TitleGenerationService.ts`, and locale-driven behavior aligned.
 - **Plugin changes**: Keep project config writes, plugin source visibility, `pluginIsolationMode`, and local-server restart expectations aligned.
 - **Settings or i18n changes**: Keep `DEFAULT_SETTINGS`, settings UI, and both locale files synchronized.
+- **SDK migration changes**: Preserve rollback paths, keep rollout flags explicit, and update the mapping/checklist docs when module status changes.
 - **Architecture/doc changes**: Update `devlog.md` and refresh this `AGENTS.md` when developer-facing workflow or component responsibilities materially change.
 
 ### Debugging
@@ -510,6 +542,8 @@ Before handing off work, agents should verify the following when relevant:
 | `ARCHITECTURE.md`       | Detailed architecture documentation                  |
 | `SERVER_API.md`         | OpenCode Server API reference                        |
 | `OPENCODE_SDK_USAGE.md` | SDK usage guide                                      |
+| `docs/opencode-service-sdk-v2-mapping.md` | SDK v2 migration mapping, progress, and handoff status |
+| `docs/opencode-sdk-v2-manual-checklist.md` | Manual verification checklist for SDK v2 migration |
 
 ### Project Development Documentation
 

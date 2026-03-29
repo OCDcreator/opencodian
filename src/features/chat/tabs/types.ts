@@ -13,6 +13,7 @@ export interface TabData {
   title: string;
   isActive: boolean;
   isStreaming: boolean;
+  hasBackgroundTask: boolean;
   needsAttention: boolean;
   modelOverride: TabModelOverride | null;
   contextUsage: TabContextState;
@@ -24,6 +25,7 @@ export interface TabBarItem {
   title: string;
   isActive: boolean;
   isStreaming: boolean;
+  hasBackgroundTask: boolean;
   needsAttention: boolean;
   canClose: boolean;
 }

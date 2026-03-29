@@ -2,15 +2,17 @@
  * OpenCodeService unit tests
  */
 
-import { TextDecoder } from 'util';
+import { TextDecoder, TextEncoder } from 'util';
 
 import { OpenCodeService } from '../../../../src/core/opencode/OpenCodeService';
+import { SDK_FEATURE_FLAG_ROLLOUT_DEFAULTS } from '../../../../src/core/opencode/sdkFeatureFlags';
 import { DEFAULT_SETTINGS } from '../../../../src/core/types';
 import { resolveToolExecutionStatus } from '../../../../src/shared';
 
 // Mock global fetch
 global.fetch = jest.fn() as unknown as typeof fetch;
 global.TextDecoder = TextDecoder as unknown as typeof global.TextDecoder;
+global.TextEncoder = TextEncoder as unknown as typeof global.TextEncoder;
 
 // Mock EventSource
 class MockEventSource {
@@ -38,6 +40,14 @@ const { requestUrl: mockRequestUrl } = jest.requireMock('obsidian') as {
   requestUrl: jest.Mock;
 };
 
+jest.mock('../../../../src/core/opencode/createSdkClient', () => ({
+  createSdkClient: jest.fn(),
+}));
+
+const { createSdkClient: mockCreateSdkClient } = jest.requireMock('../../../../src/core/opencode/createSdkClient') as {
+  createSdkClient: jest.Mock;
+};
+
 // Mock child_process for ServerManager
 jest.mock('child_process', () => ({
   spawn: jest.fn().mockReturnValue({
@@ -61,9 +71,48 @@ jest.mock('net', () => ({
 
 describe('OpenCodeService', () => {
   let service: OpenCodeService;
+  let mockSdkClient: {
+    global: { health: jest.Mock };
+    session: {
+      create: jest.Mock;
+      list: jest.Mock;
+      messages: jest.Mock;
+      delete: jest.Mock;
+      update: jest.Mock;
+      prompt: jest.Mock;
+      promptAsync: jest.Mock;
+      abort: jest.Mock;
+      get: jest.Mock;
+      fork: jest.Mock;
+      revert: jest.Mock;
+    };
+    config: { providers: jest.Mock };
+    permission: { list: jest.Mock; reply: jest.Mock };
+    event: { subscribe: jest.Mock };
+  };
 
   beforeEach(() => {
     service = new OpenCodeService(DEFAULT_SETTINGS);
+    mockSdkClient = {
+      global: { health: jest.fn() },
+      session: {
+        create: jest.fn(),
+        list: jest.fn(),
+        messages: jest.fn(),
+        delete: jest.fn(),
+        update: jest.fn(),
+        prompt: jest.fn(),
+        promptAsync: jest.fn(),
+        abort: jest.fn(),
+        get: jest.fn(),
+        fork: jest.fn(),
+        revert: jest.fn(),
+      },
+      config: { providers: jest.fn() },
+      permission: { list: jest.fn(), reply: jest.fn() },
+      event: { subscribe: jest.fn() },
+    };
+    mockCreateSdkClient.mockReturnValue(mockSdkClient);
     jest.clearAllMocks();
   });
 
@@ -313,6 +362,190 @@ describe('OpenCodeService', () => {
         url: 'http://127.0.0.1:4096/session/test-session/message',
         method: 'POST',
       }));
+    });
+  });
+
+  describe('sdk migration paths', () => {
+    const createServiceWithSdkFlags = () => new OpenCodeService(
+      DEFAULT_SETTINGS,
+      {},
+      { sdkFeatureFlags: SDK_FEATURE_FLAG_ROLLOUT_DEFAULTS },
+    );
+
+    it('uses SDK createSession when rollout flags are enabled', async () => {
+      service = createServiceWithSdkFlags();
+      mockSdkClient.session.create.mockResolvedValue({
+        id: 'sdk-session',
+        title: 'Test',
+        time: { created: 1, updated: 1 },
+      });
+
+      const sessionId = await service.createSession('Test');
+
+      expect(sessionId).toBe('sdk-session');
+      expect(mockCreateSdkClient).toHaveBeenCalled();
+      expect(mockSdkClient.session.create).toHaveBeenCalledWith({
+        title: 'Test',
+      });
+      expect(mockRequestUrl).not.toHaveBeenCalled();
+    });
+
+    it('falls back to legacy HTTP for read-only listSessions failures', async () => {
+      service = createServiceWithSdkFlags();
+      mockSdkClient.session.list.mockRejectedValue(new Error('sdk read failed'));
+      mockRequestUrl.mockResolvedValue({
+        status: 200,
+        json: [{ id: 'legacy-session', title: 'Legacy' }],
+        text: '[{"id":"legacy-session","title":"Legacy"}]',
+      });
+
+      const sessions = await service.listSessions();
+
+      expect(sessions).toHaveLength(1);
+      expect(sessions[0].id).toBe('legacy-session');
+      expect(mockSdkClient.session.list).toHaveBeenCalled();
+      expect(mockRequestUrl).toHaveBeenCalledWith(expect.objectContaining({
+        url: 'http://127.0.0.1:4096/session',
+        method: 'GET',
+      }));
+    });
+
+    it('maps requestAssistantResponse through SDK prompt with tools and variant', async () => {
+      service = createServiceWithSdkFlags();
+      service.setSessionId('sdk-session');
+      mockSdkClient.session.prompt.mockResolvedValue({
+        info: {
+          id: 'assistant-1',
+          sessionID: 'sdk-session',
+          role: 'assistant',
+          time: { created: 1234567890 },
+        },
+        parts: [
+          {
+            id: 'part-1',
+            sessionID: 'sdk-session',
+            messageID: 'assistant-1',
+            type: 'text',
+            text: 'Generated title',
+          },
+        ],
+      });
+
+      const response = await service.requestAssistantResponse('Create a title', {
+        sessionId: 'sdk-session',
+        provider: 'openai',
+        model: 'gpt-5',
+        system: 'Return only the title',
+        allowedTools: ['read', 'grep'],
+        reasoningEffort: 'high',
+      });
+
+      expect(response?.content).toBe('Generated title');
+      expect(mockSdkClient.session.prompt).toHaveBeenCalledWith(expect.objectContaining({
+        sessionID: 'sdk-session',
+        system: 'Return only the title',
+        tools: {
+          read: true,
+          grep: true,
+        },
+        variant: 'high',
+      }));
+    });
+
+    it('falls back to legacy SSE when the SDK event stream fails before the first event', async () => {
+      service = createServiceWithSdkFlags();
+      service.setSessionId('test-session');
+
+      mockSdkClient.session.promptAsync.mockResolvedValue({});
+      mockSdkClient.event.subscribe.mockResolvedValue({
+        stream: (async function* () {
+          throw new Error('sdk stream failed');
+          yield undefined as never;
+        })(),
+      });
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        body: {
+          getReader: () => {
+            const chunks = [
+              {
+                done: false,
+                value: new TextEncoder().encode('data: {"type":"session.idle","properties":{"sessionID":"test-session"}}\n\n'),
+              },
+              {
+                done: true,
+                value: undefined,
+              },
+            ];
+            return {
+              read: jest.fn().mockImplementation(() => Promise.resolve(chunks.shift() ?? { done: true, value: undefined })),
+              cancel: jest.fn(),
+              releaseLock: jest.fn(),
+            };
+          },
+        },
+      });
+
+      const chunks: unknown[] = [];
+      for await (const chunk of service.sendMessage('Hello', { sessionId: 'test-session' })) {
+        chunks.push(chunk);
+      }
+
+      expect(chunks[0]).toEqual({ type: 'message_start' });
+      expect(chunks[chunks.length - 1]).toEqual({ type: 'message_stop' });
+      expect(mockSdkClient.session.promptAsync).toHaveBeenCalled();
+      expect(global.fetch).toHaveBeenCalledWith(
+        'http://127.0.0.1:4096/event',
+        expect.objectContaining({
+          method: 'GET',
+        }),
+      );
+    });
+
+    it('calls session.abort when cancelStream is invoked during an SDK stream', async () => {
+      service = createServiceWithSdkFlags();
+      service.setSessionId('test-session');
+
+      mockSdkClient.session.promptAsync.mockResolvedValue({});
+      mockSdkClient.event.subscribe.mockResolvedValue({
+        stream: (async function* () {
+          yield {
+            type: 'message.part.updated',
+            properties: {
+              sessionID: 'test-session',
+              part: {
+                id: 'part-1',
+                type: 'text',
+              },
+            },
+          };
+          yield {
+            type: 'message.part.delta',
+            properties: {
+              sessionID: 'test-session',
+              partID: 'part-1',
+              field: 'text',
+              delta: 'Hello',
+            },
+          };
+          await new Promise(() => {});
+        })(),
+      });
+
+      const iterator = service.sendMessage('Hello', { sessionId: 'test-session' });
+      await iterator.next();
+      await iterator.next();
+
+      service.cancelStream();
+      await Promise.resolve();
+
+      expect(mockSdkClient.session.abort).toHaveBeenCalledWith({
+        sessionID: 'test-session',
+      });
+
+      if (iterator.return) {
+        await iterator.return(undefined);
+      }
     });
   });
 
@@ -697,7 +930,7 @@ describe('OpenCodeService.openCodeMessageToChatMessage', () => {
         id: 'part-omo-reminder',
         sessionID: 'session-1',
         messageID: 'msg-omo-reminder',
-        text: '<system-reminder>\n[BACKGROUND TASK COMPLETED]\n整理完成：史料摘要已更新。\n</system-reminder>\n<!-- OMO_INTERNAL_INITIATOR -->',
+        text: '<system-reminder>\n[BACKGROUND TASK COMPLETED]\n**ID:** `bg_8f454ac6`\n**Description:** 探索系统进程和文件管理\n</system-reminder>\n<!-- OMO_INTERNAL_INITIATOR -->',
       },
     ];
 
@@ -710,6 +943,55 @@ describe('OpenCodeService.openCodeMessageToChatMessage', () => {
       kind: 'system-reminder',
       reminderType: 'background-task-completed',
       isInternalInitiator: true,
+      tasks: [
+        {
+          id: 'bg_8f454ac6',
+          description: '探索系统进程和文件管理',
+        },
+      ],
+    });
+  });
+
+  it('parses all background task completion reminders into structured task metadata', () => {
+    const info = {
+      id: 'msg-omo-reminder-all',
+      sessionID: 'session-1',
+      role: 'assistant' as const,
+      time: { created: 1234567898 },
+      parentID: 'msg-omo-user',
+      modelID: 'claude-3-5-sonnet',
+      providerID: 'anthropic',
+      mode: 'default',
+      path: { cwd: '/test', root: '/test' },
+      cost: 0.001,
+      tokens: { input: 5, output: 10, reasoning: 0, cache: { read: 0, write: 0 } },
+    };
+
+    const parts: Part[] = [
+      {
+        type: 'text',
+        id: 'part-omo-reminder-all',
+        sessionID: 'session-1',
+        messageID: 'msg-omo-reminder-all',
+        text: '<system-reminder>\n[ALL BACKGROUND TASKS COMPLETE]\n\n**Completed:**\n- `bg_8f454ac6`: 探索系统进程和文件管理\n- `bg_32c8a726`: 搜索文件管理最佳实践\n\nUse `background_output(task_id="<id>")` to retrieve each result.\n</system-reminder>\n<!-- OMO_INTERNAL_INITIATOR -->',
+      },
+    ];
+
+    const message = OpenCodeService.openCodeMessageToChatMessage(info, parts);
+
+    expect(message.omo).toMatchObject({
+      kind: 'system-reminder',
+      reminderType: 'all-background-tasks-complete',
+      tasks: [
+        {
+          id: 'bg_8f454ac6',
+          description: '探索系统进程和文件管理',
+        },
+        {
+          id: 'bg_32c8a726',
+          description: '搜索文件管理最佳实践',
+        },
+      ],
     });
   });
 

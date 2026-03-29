@@ -1,10 +1,6 @@
 // Chat types
 export {
   type ChatMessage,
-  type OmoMessageMeta,
-  type OmoReminderType,
-  type OmoSystemReminderMeta,
-  type OmoUserInjectionMeta,
   type ContentBlock,
   type ContextBreakdownKey,
   type ContextBreakdownSegment,
@@ -13,6 +9,11 @@ export {
   createEmptyTabContextState,
   type ImageAttachment,
   type ImageMediaType,
+  type OmoBackgroundTaskInfo,
+  type OmoMessageMeta,
+  type OmoReminderType,
+  type OmoSystemReminderMeta,
+  type OmoUserInjectionMeta,
   type StreamChunk,
   type TabContextState,
   type UsageInfo,

@@ -1,5 +1,5 @@
-import { Tab } from './Tab';
 import type { TabContextState } from '../../../core/types';
+import { Tab } from './Tab';
 import type {
   CloseTabResult,
   RestoredTabState,
@@ -152,6 +152,7 @@ export class TabManager {
         title: data.title,
         isActive: data.isActive,
         isStreaming: data.isStreaming,
+        hasBackgroundTask: data.hasBackgroundTask,
         needsAttention: data.needsAttention,
         canClose: this.tabs.length > 1,
       };
@@ -196,16 +197,11 @@ export class TabManager {
   }
 
   setActiveTabStreaming(isStreaming: boolean): void {
-    const activeTab = this.tabs.find((tab) => tab.getId() === this.activeTabId);
-    if (!activeTab) {
-      return;
-    }
+    this.setTabStreaming(this.activeTabId, isStreaming);
+  }
 
-    activeTab.setStreaming(isStreaming);
-    if (!isStreaming) {
-      activeTab.setNeedsAttention(false);
-    }
-    this.notifyChanged();
+  setActiveTabBackgroundTaskRunning(hasBackgroundTask: boolean): void {
+    this.setTabBackgroundTaskRunning(this.activeTabId, hasBackgroundTask);
   }
 
   setTabNeedsAttention(tabId: TabId, needsAttention: boolean): void {
@@ -215,6 +211,40 @@ export class TabManager {
     }
 
     tab.setNeedsAttention(needsAttention);
+    this.notifyChanged();
+  }
+
+  setTabStreaming(tabId: TabId | null, isStreaming: boolean): void {
+    if (!tabId) {
+      return;
+    }
+
+    const tab = this.tabs.find((item) => item.getId() === tabId);
+    if (!tab) {
+      return;
+    }
+
+    tab.setStreaming(isStreaming);
+    if (!isStreaming) {
+      tab.setNeedsAttention(false);
+    }
+    this.notifyChanged();
+  }
+
+  setTabBackgroundTaskRunning(tabId: TabId | null, hasBackgroundTask: boolean): void {
+    if (!tabId) {
+      return;
+    }
+
+    const tab = this.tabs.find((item) => item.getId() === tabId);
+    if (!tab) {
+      return;
+    }
+
+    tab.setBackgroundTaskRunning(hasBackgroundTask);
+    if (hasBackgroundTask) {
+      tab.setNeedsAttention(false);
+    }
     this.notifyChanged();
   }
 
@@ -236,13 +266,29 @@ export class TabManager {
     return this.tabs.find((tab) => tab.getId() === this.activeTabId)?.getData().contextUsage ?? null;
   }
 
+  getTabContextUsage(tabId: TabId | null): TabContextState | null {
+    if (!tabId) {
+      return null;
+    }
+
+    return this.tabs.find((tab) => tab.getId() === tabId)?.getData().contextUsage ?? null;
+  }
+
   setActiveTabContextUsage(contextUsage: TabContextState): void {
-    const activeTab = this.tabs.find((tab) => tab.getId() === this.activeTabId);
-    if (!activeTab) {
+    this.setTabContextUsage(this.activeTabId, contextUsage);
+  }
+
+  setTabContextUsage(tabId: TabId | null, contextUsage: TabContextState): void {
+    if (!tabId) {
       return;
     }
 
-    activeTab.setContextUsage(contextUsage);
+    const tab = this.tabs.find((item) => item.getId() === tabId);
+    if (!tab) {
+      return;
+    }
+
+    tab.setContextUsage(contextUsage);
   }
 
   private notifyChanged(): void {

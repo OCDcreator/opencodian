@@ -8,6 +8,7 @@ function createItems(count: number, activeIndex = 0): TabBarItem[] {
     title: `Tab ${index + 1}`,
     isActive: index === activeIndex,
     isStreaming: false,
+    hasBackgroundTask: false,
     needsAttention: false,
     canClose: true,
   }));
@@ -73,5 +74,19 @@ describe('TabBar', () => {
     expect(badgeWrap).not.toBeNull();
     expect(stateEl).not.toBeNull();
     expect(stateEl?.querySelector('svg')).toBeNull();
+  });
+
+  it('renders a dedicated background-task state inside the badge wrap', () => {
+    const items = createItems(1, 0);
+    items[0].hasBackgroundTask = true;
+
+    const containerEl = renderTabBar(items, 'input');
+    const tabEl = containerEl.querySelector('.opencodian-tab-bar-item');
+    const stateEl = containerEl.querySelector('.opencodian-tab-bar-state.is-background-task');
+    const dots = containerEl.querySelectorAll('.opencodian-tab-activity-dot');
+
+    expect(tabEl?.classList.contains('has-background-task')).toBe(true);
+    expect(stateEl).not.toBeNull();
+    expect(dots).toHaveLength(3);
   });
 });

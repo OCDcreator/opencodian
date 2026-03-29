@@ -9,10 +9,10 @@ import { addIcon, Component, ItemView, Notice, Scope, setIcon } from 'obsidian';
 
 import { OpenCodeService } from '../../core/opencode';
 import {
-  createEmptyTabContextState,
   type ChatMessage,
   type ContentBlock,
   type Conversation,
+  createEmptyTabContextState,
   getDefaultPersistedTabState,
   type ToolCallInfo,
   VIEW_TYPE_OPENCODIAN,
@@ -34,7 +34,7 @@ import { buildMessageRenderGroups, mergeAssistantMessagesForRender } from './ren
 import { type CollapsibleState, setupCollapsible } from './rendering/collapsible';
 import { ContextUsageService } from './services/ContextUsageService';
 import { TitleGenerationService } from './services/TitleGenerationService';
-import { type RestoredTabState, TabBar, type TabBarLayoutMode, TabManager } from './tabs';
+import { type RestoredTabState, TabBar, type TabBarLayoutMode, type TabId,TabManager } from './tabs';
 import { ContextDetailModal } from './ui/ContextDetailModal';
 import { ContextRing } from './ui/ContextRing';
 import { EffortSelector } from './ui/EffortSelector';
@@ -89,6 +89,45 @@ function getRandomPendingMessage(): string {
 
 type ChatServerAvailability = 'checking' | 'running' | 'starting' | 'offline' | 'external';
 
+interface BackgroundTaskLaunchInfo {
+  launchId: string;
+  taskId: string | null;
+  description: string;
+}
+
+interface BackgroundTaskCompletionInfo {
+  taskId: string;
+  description: string;
+}
+
+interface OmoBackgroundTaskLogState {
+  anchorKey: string;
+  loggedPendingTaskIds: Set<string>;
+  completionLogged: boolean;
+}
+
+interface TabRuntimeState {
+  isStreaming: boolean;
+  streamController: StreamController | null;
+  streamingMessageEl: HTMLElement | null;
+  streamingContentEl: HTMLElement | null;
+  currentTurnBodyEl: HTMLElement | null;
+  isConversationSyncInFlight: boolean;
+  lastConversationSyncFingerprint: string | null;
+  backgroundTaskIndicatorEl: HTMLElement | null;
+  backgroundTaskStartedAt: number | null;
+  backgroundTaskModeTag: string | null;
+  backgroundTaskLaunches: Map<string, BackgroundTaskLaunchInfo>;
+  backgroundTaskCompletedTasks: Map<string, BackgroundTaskCompletionInfo>;
+  backgroundTaskWaitingForFollowUp: boolean;
+}
+
+interface TabPaneState {
+  tabId: TabId;
+  messagesEl: HTMLElement;
+  runtime: TabRuntimeState;
+}
+
 /** Clipboard icon SVG for copy button */
 const COPY_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`;
 const FORK_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><circle cx="18" cy="6" r="3"/><path d="M6 9v3a3 3 0 0 0 3 3h6a3 3 0 0 0 3-3V9"/><path d="M12 12v3"/></svg>`;
@@ -107,17 +146,12 @@ export class OpenCodianView extends ItemView {
   private messagesContainer: HTMLElement | null = null;
   private inputContainer: HTMLElement | null = null;
   private currentConversation: Conversation | null = null;
-  private isStreaming = false;
   private markdownService: MarkdownRenderService | null = null;
   private messageComponent: Component;
 
   // Event refs for cleanup
   private eventRefs: EventRef[] = [];
 
-  // Track rendered messages for streaming updates
-  private streamingMessageEl: HTMLElement | null = null;
-  private streamingContentEl: HTMLElement | null = null;
-  private currentTurnBodyEl: HTMLElement | null = null;
   private headerTabBarSlotEl: HTMLElement | null = null;
   private belowHeaderTabBarSlotEl: HTMLElement | null = null;
   private outerVerticalTabBarHostEl: HTMLElement | null = null;
@@ -126,6 +160,7 @@ export class OpenCodianView extends ItemView {
   private tabBarMountEl: HTMLElement | null = null;
   private tabBar: TabBar | null = null;
   private tabManager: TabManager | null = null;
+  private tabPaneStates = new Map<TabId, TabPaneState>();
 
   // Model selector state
   private modelSelectorContainer: HTMLElement | null = null;
@@ -140,9 +175,6 @@ export class OpenCodianView extends ItemView {
   private modelFilterQuery = '';
   private modelDropdownClickOutsideHandler: ((e: MouseEvent) => void) | null = null;
   private currentModelTriggerIconUrl: string | null = null;
-
-  // Streaming content state
-  private streamController: StreamController | null = null;
 
   // Navigation sidebar
   private navigationSidebar: NavigationSidebar | null = null;
@@ -173,19 +205,209 @@ export class OpenCodianView extends ItemView {
   private chatAppearanceStyleEl: HTMLStyleElement | null = null;
   private titleGenerationService: TitleGenerationService;
   private conversationSyncIntervalId: number | null = null;
-  private isConversationSyncInFlight = false;
-  private lastConversationSyncFingerprint: string | null = null;
-  private backgroundTaskIndicatorEl: HTMLElement | null = null;
-  private backgroundTaskStartedAt: number | null = null;
-  private backgroundTaskModeTag: string | null = null;
-  private backgroundTaskToolIds = new Set<string>();
-  private backgroundTaskCompletedToolIds = new Set<string>();
-  private backgroundTaskWaitingForFollowUp = false;
+  private omoBackgroundTaskLogStates = new Map<string, OmoBackgroundTaskLogState>();
 
   private appSettings(): { open: () => void; openTabById: (id: string) => void } {
     return (this.app as typeof this.app & {
       setting: { open: () => void; openTabById: (id: string) => void };
     }).setting;
+  }
+
+  private createTabRuntimeState(): TabRuntimeState {
+    return {
+      isStreaming: false,
+      streamController: null,
+      streamingMessageEl: null,
+      streamingContentEl: null,
+      currentTurnBodyEl: null,
+      isConversationSyncInFlight: false,
+      lastConversationSyncFingerprint: null,
+      backgroundTaskIndicatorEl: null,
+      backgroundTaskStartedAt: null,
+      backgroundTaskModeTag: null,
+      backgroundTaskLaunches: new Map(),
+      backgroundTaskCompletedTasks: new Map(),
+      backgroundTaskWaitingForFollowUp: false,
+    };
+  }
+
+  private getTabPaneState(tabId: TabId | null): TabPaneState | null {
+    if (!tabId) {
+      return null;
+    }
+
+    return this.tabPaneStates.get(tabId) ?? null;
+  }
+
+  private getTabRuntimeState(tabId: TabId | null = this.getActiveTabId()): TabRuntimeState | null {
+    return this.getTabPaneState(tabId)?.runtime ?? null;
+  }
+
+  private ensureTabRuntimeState(tabId: TabId | null = this.getActiveTabId()): TabRuntimeState | null {
+    if (!tabId) {
+      return null;
+    }
+
+    return this.ensureTabMessagesPane(tabId)?.runtime ?? null;
+  }
+
+  private getActiveTabRuntimeState(): TabRuntimeState | null {
+    return this.getTabRuntimeState(this.getActiveTabId());
+  }
+
+  private getOrCreateTabStreamController(tabId: TabId | null): StreamController | null {
+    if (!tabId || !this.markdownService) {
+      return null;
+    }
+
+    const paneState = this.ensureTabMessagesPane(tabId);
+    if (!paneState) {
+      return null;
+    }
+
+    if (!paneState.runtime.streamController) {
+      paneState.runtime.streamController = new StreamController({
+        containerEl: paneState.messagesEl,
+        markdownService: this.markdownService,
+        scrollToBottom: () => {
+          if (this.getActiveTabId() === tabId) {
+            this.scrollToBottomIfNeeded();
+          }
+        },
+      });
+      paneState.runtime.streamController.setCallbacks({
+        onToolCallStart: (toolCall) => {
+          void this.handleStreamingToolCallStart(toolCall, tabId);
+        },
+        onToolCallEnd: (toolCall) => {
+          void this.handleStreamingToolCallEnd(toolCall, tabId);
+        },
+      });
+    }
+
+    return paneState.runtime.streamController;
+  }
+
+  private get isStreaming(): boolean {
+    return this.getActiveTabRuntimeState()?.isStreaming ?? false;
+  }
+
+  private set isStreaming(value: boolean) {
+    const runtime = this.ensureTabRuntimeState();
+    if (runtime) {
+      runtime.isStreaming = value;
+    }
+  }
+
+  private get streamController(): StreamController | null {
+    return this.getActiveTabRuntimeState()?.streamController ?? null;
+  }
+
+  private get streamingMessageEl(): HTMLElement | null {
+    return this.getActiveTabRuntimeState()?.streamingMessageEl ?? null;
+  }
+
+  private set streamingMessageEl(value: HTMLElement | null) {
+    const runtime = this.ensureTabRuntimeState();
+    if (runtime) {
+      runtime.streamingMessageEl = value;
+    }
+  }
+
+  private get streamingContentEl(): HTMLElement | null {
+    return this.getActiveTabRuntimeState()?.streamingContentEl ?? null;
+  }
+
+  private set streamingContentEl(value: HTMLElement | null) {
+    const runtime = this.ensureTabRuntimeState();
+    if (runtime) {
+      runtime.streamingContentEl = value;
+    }
+  }
+
+  private get currentTurnBodyEl(): HTMLElement | null {
+    return this.getActiveTabRuntimeState()?.currentTurnBodyEl ?? null;
+  }
+
+  private set currentTurnBodyEl(value: HTMLElement | null) {
+    const runtime = this.ensureTabRuntimeState();
+    if (runtime) {
+      runtime.currentTurnBodyEl = value;
+    }
+  }
+
+  private get isConversationSyncInFlight(): boolean {
+    return this.getActiveTabRuntimeState()?.isConversationSyncInFlight ?? false;
+  }
+
+  private set isConversationSyncInFlight(value: boolean) {
+    const runtime = this.ensureTabRuntimeState();
+    if (runtime) {
+      runtime.isConversationSyncInFlight = value;
+    }
+  }
+
+  private get lastConversationSyncFingerprint(): string | null {
+    return this.getActiveTabRuntimeState()?.lastConversationSyncFingerprint ?? null;
+  }
+
+  private set lastConversationSyncFingerprint(value: string | null) {
+    const runtime = this.ensureTabRuntimeState();
+    if (runtime) {
+      runtime.lastConversationSyncFingerprint = value;
+    }
+  }
+
+  private get backgroundTaskIndicatorEl(): HTMLElement | null {
+    return this.getActiveTabRuntimeState()?.backgroundTaskIndicatorEl ?? null;
+  }
+
+  private set backgroundTaskIndicatorEl(value: HTMLElement | null) {
+    const runtime = this.ensureTabRuntimeState();
+    if (runtime) {
+      runtime.backgroundTaskIndicatorEl = value;
+    }
+  }
+
+  private get backgroundTaskStartedAt(): number | null {
+    return this.getActiveTabRuntimeState()?.backgroundTaskStartedAt ?? null;
+  }
+
+  private set backgroundTaskStartedAt(value: number | null) {
+    const runtime = this.ensureTabRuntimeState();
+    if (runtime) {
+      runtime.backgroundTaskStartedAt = value;
+    }
+  }
+
+  private get backgroundTaskModeTag(): string | null {
+    return this.getActiveTabRuntimeState()?.backgroundTaskModeTag ?? null;
+  }
+
+  private set backgroundTaskModeTag(value: string | null) {
+    const runtime = this.ensureTabRuntimeState();
+    if (runtime) {
+      runtime.backgroundTaskModeTag = value;
+    }
+  }
+
+  private get backgroundTaskLaunches(): Map<string, BackgroundTaskLaunchInfo> {
+    return this.getActiveTabRuntimeState()?.backgroundTaskLaunches ?? new Map();
+  }
+
+  private get backgroundTaskCompletedTasks(): Map<string, BackgroundTaskCompletionInfo> {
+    return this.getActiveTabRuntimeState()?.backgroundTaskCompletedTasks ?? new Map();
+  }
+
+  private get backgroundTaskWaitingForFollowUp(): boolean {
+    return this.getActiveTabRuntimeState()?.backgroundTaskWaitingForFollowUp ?? false;
+  }
+
+  private set backgroundTaskWaitingForFollowUp(value: boolean) {
+    const runtime = this.ensureTabRuntimeState();
+    if (runtime) {
+      runtime.backgroundTaskWaitingForFollowUp = value;
+    }
   }
 
   constructor(leaf: WorkspaceLeaf, plugin: OpenCodianPlugin) {
@@ -216,26 +438,11 @@ export class OpenCodianView extends ItemView {
     this.startServerStatusLoop();
 
     // Initialize markdown service
-    if (this.messagesContainer) {
+    if (this.messagesShellEl) {
       this.markdownService = new MarkdownRenderService({
         app: this.app,
         component: this.messageComponent,
-        container: this.messagesContainer,
-      });
-
-      // Initialize streaming controller
-      this.streamController = new StreamController({
-        containerEl: this.messagesContainer,
-        markdownService: this.markdownService,
-        scrollToBottom: () => this.scrollToBottomIfNeeded(),
-      });
-      this.streamController.setCallbacks({
-        onToolCallStart: (toolCall) => {
-          void this.handleStreamingToolCallStart(toolCall);
-        },
-        onToolCallEnd: (toolCall) => {
-          void this.handleStreamingToolCallEnd(toolCall);
-        },
+        container: this.messagesShellEl,
       });
     }
 
@@ -262,8 +469,7 @@ export class OpenCodianView extends ItemView {
     this.contextRingContainerEl = null;
 
     // Cleanup navigation sidebar
-    this.navigationSidebar?.destroy();
-    this.navigationSidebar = null;
+    this.clearTabMessagesPanes();
     this.tabBar?.destroy();
     this.tabBar = null;
     this.tabBarMountEl = null;
@@ -299,8 +505,7 @@ export class OpenCodianView extends ItemView {
 
     // Messages area
     this.messagesShellEl = this.chatContainerEl.createDiv({ cls: 'opencodian-messages-shell' });
-    this.messagesContainer = this.messagesShellEl.createDiv({ cls: 'opencodian-messages' });
-    this.applyChatScrollMode();
+    this.messagesContainer = null;
 
     // Input area
     this.inputContainer = this.chatContainerEl.createDiv({ cls: 'opencodian-input-area' });
@@ -316,14 +521,108 @@ export class OpenCodianView extends ItemView {
       cls: 'opencodian-tab-bar-slot opencodian-tab-bar-slot--outer-vertical',
     });
 
-    // Navigation sidebar (mounted on the outer host so it never compresses chat layout)
-    if (this.messagesShellEl && this.messagesContainer) {
-      this.navigationSidebar = new NavigationSidebar(
-        outerMountEl as HTMLElement,
-        this.messagesShellEl,
-        this.messagesContainer,
-      );
+    // Navigation sidebar is attached after the active tab pane is created.
+  }
+
+  private ensureTabMessagesPane(tabId: TabId): TabPaneState | null {
+    const existing = this.tabPaneStates.get(tabId);
+    if (existing?.messagesEl?.isConnected) {
+      return existing;
     }
+
+    if (!this.messagesShellEl) {
+      return null;
+    }
+
+    const messagesEl = this.messagesShellEl.createDiv({ cls: 'opencodian-messages opencodian-messages-pane' });
+    messagesEl.dataset.tabId = tabId;
+    this.applyChatScrollModeToMessagesEl(messagesEl);
+    const paneState: TabPaneState = {
+      tabId,
+      messagesEl,
+      runtime: this.createTabRuntimeState(),
+    };
+    this.tabPaneStates.set(tabId, paneState);
+    return paneState;
+  }
+
+  private setActiveMessagesPane(tabId: TabId): void {
+    const activePaneState = this.ensureTabMessagesPane(tabId);
+    if (!activePaneState) {
+      this.messagesContainer = null;
+      this.resetTurnState();
+      this.navigationSidebar?.destroy();
+      this.navigationSidebar = null;
+      return;
+    }
+
+    for (const [paneTabId, paneState] of this.tabPaneStates) {
+      paneState.messagesEl.classList.toggle('is-active', paneTabId === tabId);
+    }
+
+    this.messagesContainer = activePaneState.messagesEl;
+    this.restoreTurnStateFromActivePane();
+    this.rebuildNavigationSidebar();
+  }
+
+  private removeTabMessagesPane(tabId: TabId): void {
+    const paneState = this.tabPaneStates.get(tabId);
+    if (!paneState) {
+      return;
+    }
+
+    if (this.messagesContainer === paneState.messagesEl) {
+      this.messagesContainer = null;
+      this.resetTurnState();
+      this.navigationSidebar?.destroy();
+      this.navigationSidebar = null;
+    }
+
+    paneState.runtime.streamController?.cancelStream();
+    paneState.messagesEl.remove();
+    this.tabPaneStates.delete(tabId);
+  }
+
+  private clearTabMessagesPanes(): void {
+    for (const paneState of this.tabPaneStates.values()) {
+      paneState.runtime.streamController?.cancelStream();
+      paneState.messagesEl.remove();
+    }
+    this.tabPaneStates.clear();
+    this.messagesContainer = null;
+    this.resetTurnState();
+    this.navigationSidebar?.destroy();
+    this.navigationSidebar = null;
+  }
+
+  private rebuildNavigationSidebar(): void {
+    this.navigationSidebar?.destroy();
+    this.navigationSidebar = null;
+
+    if (!this.messagesShellEl || !this.messagesContainer) {
+      return;
+    }
+
+    const outerMountEl = this.contentEl.closest('.workspace-leaf-content[data-type="opencodian-view"]')
+      ?? this.contentEl;
+    this.navigationSidebar = new NavigationSidebar(
+      outerMountEl as HTMLElement,
+      this.messagesShellEl,
+      this.messagesContainer,
+    );
+  }
+
+  private restoreTurnStateFromActivePane(): void {
+    if (!this.messagesContainer) {
+      this.resetTurnState();
+      return;
+    }
+
+    const turnBodies = Array.from(this.messagesContainer.querySelectorAll('.opencodian-turn-body'));
+    this.currentTurnBodyEl = (turnBodies[turnBodies.length - 1] as HTMLElement | undefined) ?? null;
+    this.backgroundTaskIndicatorEl = this.messagesContainer.querySelector<HTMLElement>(
+      '.opencodian-message--background-task[data-message-id="transient-background-task"]',
+    );
   }
 
   private initializeTabSystem(): void {
@@ -437,14 +736,46 @@ export class OpenCodianView extends ItemView {
     this.plugin.scheduleSettingsUiStateSave();
   }
 
-  private async handleTabSwitch(tabId: string): Promise<void> {
-    if (!this.tabManager) {
+  private getActiveTabId(): TabId | null {
+    return this.tabManager?.getActiveTab()?.id ?? null;
+  }
+
+  private isActiveTabStreaming(): boolean {
+    return Boolean(this.getActiveTabRuntimeState()?.isStreaming);
+  }
+
+  private hasTabBackgroundTaskIndicator(tabId: TabId | null): boolean {
+    const runtime = this.getTabRuntimeState(tabId);
+    return Boolean(runtime?.backgroundTaskStartedAt) && (
+      runtime?.backgroundTaskModeTag === 'search-mode'
+      || (runtime?.backgroundTaskLaunches.size ?? 0) > 0
+    );
+  }
+
+  private syncTabStreamLikeState(tabId: TabId | null): void {
+    if (!tabId) {
+      this.updateSendButtonState();
       return;
     }
 
-    const activeTab = this.tabManager.getActiveTab();
-    if (this.isStreaming && activeTab?.id !== tabId) {
-      new Notice(t('chat.tab.streamingBlocked'));
+    const runtime = this.getTabRuntimeState(tabId);
+    this.tabManager?.setTabStreaming(tabId, runtime?.isStreaming ?? false);
+    this.tabManager?.setTabBackgroundTaskRunning(
+      tabId,
+      Boolean(runtime && this.hasTabBackgroundTaskIndicator(tabId) && !runtime.isStreaming),
+    );
+
+    if (tabId === this.getActiveTabId()) {
+      this.updateSendButtonState();
+    }
+  }
+
+  private syncActiveTabStreamLikeState(): void {
+    this.syncTabStreamLikeState(this.getActiveTabId());
+  }
+
+  private async handleTabSwitch(tabId: string): Promise<void> {
+    if (!this.tabManager) {
       return;
     }
 
@@ -464,7 +795,7 @@ export class OpenCodianView extends ItemView {
       return;
     }
 
-    if (tab.isStreaming) {
+    if (tab.isStreaming || tab.hasBackgroundTask) {
       new Notice(t('chat.tab.streamingBlocked'));
       return;
     }
@@ -473,6 +804,8 @@ export class OpenCodianView extends ItemView {
     if (!result.closed) {
       return;
     }
+
+    this.removeTabMessagesPane(tabId);
 
     if (result.nextActiveTabId) {
       await this.activateTab(result.nextActiveTabId);
@@ -496,7 +829,26 @@ export class OpenCodianView extends ItemView {
       return;
     }
 
+    this.setActiveMessagesPane(tabId);
+
     if (tab.conversationId) {
+      if (tab.isStreaming) {
+        const conversation = await this.plugin.getConversationById(tab.conversationId);
+        if (!conversation) {
+          return;
+        }
+
+        this.currentConversation = conversation;
+        this.tabManager.setActiveTabConversation(conversation);
+        this.plugin.openCodeService.setSessionId(conversation.openCodeSessionId);
+        this.lastConversationSyncFingerprint = this.getConversationSyncFingerprint(conversation.messages);
+        this.startConversationSyncLoop();
+        this.updateModelSelectorDisplay();
+        this.syncActiveTabContextUsageIdentity();
+        this.updateSendButtonState();
+        return;
+      }
+
       await this.loadConversation(tab.conversationId);
       return;
     }
@@ -507,6 +859,7 @@ export class OpenCodianView extends ItemView {
     this.resetTurnState();
     this.updateModelSelectorDisplay();
     this.syncActiveTabContextUsageIdentity();
+    this.updateSendButtonState();
   }
 
   private getTabBarLayoutMode(): TabBarLayoutMode {
@@ -601,20 +954,32 @@ export class OpenCodianView extends ItemView {
 
   /** Apply configured chat scroll mode to the messages container */
   public applyChatScrollMode(): void {
-    if (!this.messagesContainer) return;
-
     this.syncChatSurfaceColor();
-    this.messagesContainer.removeClass('opencodian-messages--sticky-basic');
-    this.messagesContainer.removeClass('opencodian-messages--sticky-mask');
-    this.messagesContainer.removeClass('opencodian-messages--natural');
+
+    if (this.tabPaneStates.size > 0) {
+      for (const paneState of this.tabPaneStates.values()) {
+        this.applyChatScrollModeToMessagesEl(paneState.messagesEl);
+      }
+      return;
+    }
+
+    if (this.messagesContainer) {
+      this.applyChatScrollModeToMessagesEl(this.messagesContainer);
+    }
+  }
+
+  private applyChatScrollModeToMessagesEl(messagesEl: HTMLElement): void {
+    messagesEl.removeClass('opencodian-messages--sticky-basic');
+    messagesEl.removeClass('opencodian-messages--sticky-mask');
+    messagesEl.removeClass('opencodian-messages--natural');
 
     const scrollMode = this.plugin.settings.chatScrollMode;
     if (scrollMode === 'natural') {
-      this.messagesContainer.addClass('opencodian-messages--natural');
+      messagesEl.addClass('opencodian-messages--natural');
     } else if (scrollMode === 'sticky-basic') {
-      this.messagesContainer.addClass('opencodian-messages--sticky-basic');
+      messagesEl.addClass('opencodian-messages--sticky-basic');
     } else {
-      this.messagesContainer.addClass('opencodian-messages--sticky-mask');
+      messagesEl.addClass('opencodian-messages--sticky-mask');
     }
   }
 
@@ -672,38 +1037,45 @@ export class OpenCodianView extends ItemView {
   }
 
   /** Reset active turn references */
-  private resetTurnState(): void {
-    this.currentTurnBodyEl = null;
-    this.backgroundTaskIndicatorEl = null;
+  private resetTurnState(tabId: TabId | null = this.getActiveTabId()): void {
+    const runtime = this.getTabRuntimeState(tabId);
+    if (!runtime) {
+      return;
+    }
+
+    runtime.currentTurnBodyEl = null;
+    runtime.backgroundTaskIndicatorEl = null;
   }
 
   /** Create a new turn with sticky user header */
-  private createTurn(): { turnEl: HTMLElement; headerEl: HTMLElement; bodyEl: HTMLElement } | null {
-    if (!this.messagesContainer) return null;
+  private createTurn(tabId: TabId | null = this.getActiveTabId()): { turnEl: HTMLElement; headerEl: HTMLElement; bodyEl: HTMLElement } | null {
+    const paneState = this.getTabPaneState(tabId);
+    if (!paneState) return null;
 
-    const turnEl = this.messagesContainer.createDiv({ cls: 'opencodian-turn' });
+    const turnEl = paneState.messagesEl.createDiv({ cls: 'opencodian-turn' });
     const headerEl = turnEl.createDiv({ cls: 'opencodian-turn-header' });
     const bodyEl = turnEl.createDiv({ cls: 'opencodian-turn-body' });
 
-    this.currentTurnBodyEl = bodyEl;
+    paneState.runtime.currentTurnBodyEl = bodyEl;
 
     return { turnEl, headerEl, bodyEl };
   }
 
   /** Ensure there is a turn body available for assistant messages */
-  private ensureTurnBody(): HTMLElement | null {
-    if (this.currentTurnBodyEl?.isConnected) {
-      return this.currentTurnBodyEl;
+  private ensureTurnBody(tabId: TabId | null = this.getActiveTabId()): HTMLElement | null {
+    const paneState = this.getTabPaneState(tabId);
+    if (!paneState) return null;
+
+    if (paneState.runtime.currentTurnBodyEl?.isConnected) {
+      return paneState.runtime.currentTurnBodyEl;
     }
 
-    if (!this.messagesContainer) return null;
-
-    const turnEl = this.messagesContainer.createDiv({
+    const turnEl = paneState.messagesEl.createDiv({
       cls: 'opencodian-turn opencodian-turn--assistant-only',
     });
     const bodyEl = turnEl.createDiv({ cls: 'opencodian-turn-body' });
 
-    this.currentTurnBodyEl = bodyEl;
+    paneState.runtime.currentTurnBodyEl = bodyEl;
 
     return bodyEl;
   }
@@ -938,14 +1310,7 @@ export class OpenCodianView extends ItemView {
     this.inputTextarea.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
-        if (this.inputTextarea && !this.isStreaming) {
-          const message = this.inputTextarea.value.trim();
-          if (message) {
-            void this.sendMessage(message);
-            this.inputTextarea.value = '';
-            this.inputTextarea.style.height = 'auto';
-          }
-        }
+        this.trySubmitCurrentInput();
       }
     });
 
@@ -992,18 +1357,33 @@ export class OpenCodianView extends ItemView {
     this.sendBtn = toolbar.createDiv({ cls: 'opencodian-send-btn' });
     setIcon(this.sendBtn, 'send');
     this.sendBtn.addEventListener('click', () => {
-      if (this.isStreaming) {
+      if (this.isActiveTabStreaming()) {
         // Stop streaming
         this.cancelStreaming();
-      } else if (this.inputTextarea) {
-        const message = this.inputTextarea.value.trim();
-        if (message) {
-          void this.sendMessage(message);
-          this.inputTextarea.value = '';
-          this.inputTextarea.style.height = 'auto';
-        }
+      } else {
+        this.trySubmitCurrentInput();
       }
     });
+  }
+
+  private trySubmitCurrentInput(): void {
+    if (!this.inputTextarea) {
+      return;
+    }
+
+    if (this.isStreaming || this.hasActiveBackgroundTaskIndicator()) {
+      new Notice(t('chat.tab.processingBlocked'));
+      return;
+    }
+
+    const message = this.inputTextarea.value.trim();
+    if (!message) {
+      return;
+    }
+
+    void this.sendMessage(message);
+    this.inputTextarea.value = '';
+    this.inputTextarea.style.height = 'auto';
   }
 
   /** Wire event handlers */
@@ -1011,7 +1391,7 @@ export class OpenCodianView extends ItemView {
     // Escape to cancel streaming
     this.scope = new Scope(this.app.scope);
     this.scope.register([], 'Escape', () => {
-      if (this.isStreaming) {
+      if (this.isActiveTabStreaming()) {
         this.cancelStreaming();
       }
       return false;
@@ -1030,11 +1410,6 @@ export class OpenCodianView extends ItemView {
   /** Create a new conversation */
   private async createNewConversation() {
     if (!this.tabManager) {
-      return;
-    }
-
-    if (this.isStreaming) {
-      new Notice(t('chat.tab.newBlockedWhileStreaming'));
       return;
     }
 
@@ -1062,7 +1437,7 @@ export class OpenCodianView extends ItemView {
       return;
     }
 
-    if (this.isStreaming) {
+    if (this.isActiveTabStreaming()) {
       new Notice(t('chat.tab.newBlockedWhileStreaming'));
       return;
     }
@@ -1119,6 +1494,7 @@ export class OpenCodianView extends ItemView {
       ? (await this.syncConversationMessagesFromServer(conversation)).messages
       : conversation.messages;
 
+    this.syncBackgroundTaskStateFromConversation(conversation);
     await this.renderMessages(messages);
     await this.renderBackgroundTaskIndicatorIfNeeded();
     this.lastConversationSyncFingerprint = this.getConversationSyncFingerprint(messages);
@@ -1146,6 +1522,7 @@ export class OpenCodianView extends ItemView {
     this.startConversationSyncLoop();
     this.updateModelSelectorDisplay();
     this.syncActiveTabContextUsageIdentity();
+    this.syncBackgroundTaskStateFromConversation(conversation);
     void this.renderBackgroundTaskIndicatorIfNeeded();
     void this.refreshActiveTabContextUsageFromServer();
     this.scrollToBottom();
@@ -1154,15 +1531,23 @@ export class OpenCodianView extends ItemView {
   private startConversationSyncLoop(): void {
     this.stopConversationSyncLoop();
 
-    if (
-      !this.currentConversation?.openCodeSessionId
-      || this.currentConversation.messages.length === 0
-    ) {
+    const shouldSyncVisibleConversation = Boolean(
+      this.currentConversation?.openCodeSessionId
+      && this.currentConversation.messages.length > 0,
+    );
+    const shouldSyncBackgroundTabs = Boolean(
+      this.tabManager?.getAllTabs().some((tab) =>
+        Boolean(tab.conversationId) && tab.hasBackgroundTask,
+      ),
+    );
+
+    if (!shouldSyncVisibleConversation && !shouldSyncBackgroundTabs) {
       return;
     }
 
     this.conversationSyncIntervalId = window.setInterval(() => {
       void this.syncVisibleConversationInBackground();
+      void this.syncBackgroundTaskTabsInBackground();
     }, 2000);
   }
 
@@ -1171,32 +1556,73 @@ export class OpenCodianView extends ItemView {
       window.clearInterval(this.conversationSyncIntervalId);
       this.conversationSyncIntervalId = null;
     }
-    this.isConversationSyncInFlight = false;
   }
 
   private async syncVisibleConversationInBackground(): Promise<void> {
+    const activeTabId = this.getActiveTabId();
+    const runtime = this.getTabRuntimeState(activeTabId);
     if (
-      this.isStreaming
-      || this.isConversationSyncInFlight
+      !activeTabId
+      || !runtime
+      || runtime.isStreaming
+      || runtime.isConversationSyncInFlight
       || !this.currentConversation?.openCodeSessionId
     ) {
       return;
     }
 
     const expectedConversationId = this.currentConversation.id;
-    this.isConversationSyncInFlight = true;
+    runtime.isConversationSyncInFlight = true;
     try {
       const previousMessages = [...this.currentConversation.messages];
-      const syncResult = await this.syncConversationMessagesFromServer(this.currentConversation);
+      const syncResult = await this.syncConversationMessagesFromServer(this.currentConversation, activeTabId);
       if (!syncResult.changed || this.currentConversation?.id !== expectedConversationId) {
-        await this.renderBackgroundTaskIndicatorIfNeeded();
+        await this.renderBackgroundTaskIndicatorIfNeeded(activeTabId);
         return;
       }
 
-      this.lastConversationSyncFingerprint = syncResult.fingerprint;
+      runtime.lastConversationSyncFingerprint = syncResult.fingerprint;
       await this.applySyncedConversationUpdate(previousMessages, this.currentConversation.messages);
     } finally {
-      this.isConversationSyncInFlight = false;
+      runtime.isConversationSyncInFlight = false;
+    }
+  }
+
+  private async syncBackgroundTaskTabsInBackground(): Promise<void> {
+    if (!this.tabManager) {
+      return;
+    }
+
+    const activeConversationId = this.currentConversation?.id ?? null;
+    for (const tab of this.tabManager.getAllTabs()) {
+      if (!tab.conversationId || tab.conversationId === activeConversationId) {
+        continue;
+      }
+
+      const runtime = this.getTabRuntimeState(tab.id);
+      if (!runtime || runtime.isStreaming || runtime.isConversationSyncInFlight || !tab.hasBackgroundTask) {
+        continue;
+      }
+
+      const conversation = await this.plugin.getConversationById(tab.conversationId);
+      if (!conversation?.openCodeSessionId) {
+        continue;
+      }
+
+      runtime.isConversationSyncInFlight = true;
+      try {
+        const previousFingerprint = runtime.lastConversationSyncFingerprint
+          ?? this.getConversationSyncFingerprint(conversation.messages);
+        const syncResult = await this.syncConversationMessagesFromServer(conversation, tab.id);
+        this.syncBackgroundTaskStateFromConversation(conversation, tab.id);
+        this.syncTabStreamLikeState(tab.id);
+
+        if (syncResult.changed || syncResult.fingerprint !== previousFingerprint) {
+          this.tabManager?.setTabNeedsAttention(tab.id, true);
+        }
+      } finally {
+        runtime.isConversationSyncInFlight = false;
+      }
     }
   }
 
@@ -1288,7 +1714,7 @@ export class OpenCodianView extends ItemView {
       itemEl.addEventListener('click', (e) => {
         e.stopPropagation();
         this.closeHistoryDropdown();
-        if (this.isStreaming) {
+        if (this.isActiveTabStreaming()) {
           new Notice(t('chat.tab.streamingBlocked'));
           return;
         }
@@ -1554,6 +1980,8 @@ export class OpenCodianView extends ItemView {
       await this.plugin.deleteConversation(conv.id);
     }
 
+    this.clearTabMessagesPanes();
+
     this.tabManager = new TabManager(t('chat.tab.new'), {
       getMaxTabs: () => this.plugin.settings.maxTabs,
       onChanged: () => {
@@ -1686,10 +2114,18 @@ export class OpenCodianView extends ItemView {
     }
 
     if (!this.currentConversation) return;
+    const sendingConversation = this.currentConversation;
+    const sendingTabId = this.getActiveTabId();
+    if (!sendingTabId) {
+      return;
+    }
+    const sendingRuntime = this.ensureTabRuntimeState(sendingTabId);
+    if (!sendingRuntime) {
+      return;
+    }
 
-    // Prevent sending if already streaming
-    if (this.isStreaming) {
-
+    if (sendingRuntime.isStreaming || this.hasTabBackgroundTaskIndicator(sendingTabId)) {
+      new Notice(t('chat.tab.processingBlocked'));
       return;
     }
 
@@ -1704,17 +2140,17 @@ export class OpenCodianView extends ItemView {
     };
     this.resetBackgroundTaskIndicator();
     this.armBackgroundTaskIndicatorForUserMessage(userMessage);
-    this.currentConversation.messages.push(userMessage);
+    sendingConversation.messages.push(userMessage);
     this.startConversationSyncLoop();
     await this.renderMessage(userMessage);
     this.scrollToBottomIfNeeded(shouldAutoScrollOnSend);
 
-    const isFirstUserMessage = this.currentConversation.messages.filter((message) => message.role === 'user').length === 1;
+    const isFirstUserMessage = sendingConversation.messages.filter((message) => message.role === 'user').length === 1;
     const modelOptions = this.getSendMessageOptions();
     if (isFirstUserMessage) {
-      await this.applyFallbackConversationTitle(this.currentConversation.id, content);
+      await this.applyFallbackConversationTitle(sendingConversation.id, content);
       if (this.plugin.settings.titleMode === 'ai') {
-        void this.startAiConversationTitleGeneration(this.currentConversation.id, content, modelOptions);
+        void this.startAiConversationTitleGeneration(sendingConversation.id, content, modelOptions);
       }
     }
 
@@ -1733,12 +2169,10 @@ export class OpenCodianView extends ItemView {
       return;
     }
 
-    this.isStreaming = true;
-    this.tabManager?.setActiveTabStreaming(true);
-    this.updateSendButtonState();
-    this.beginActiveTabContextUsageStream();
+    sendingRuntime.isStreaming = true;
+    this.syncTabStreamLikeState(sendingTabId);
+    this.beginTabContextUsageStream(sendingTabId);
 
-    // Set up timeout as safety net to reset isStreaming
     const STREAM_IDLE_TIMEOUT_MS = 300000; // 5 minutes of no new stream chunks
     let timeoutId: number | null = null;
     let streamCompleted = false;
@@ -1749,9 +2183,8 @@ export class OpenCodianView extends ItemView {
         window.clearTimeout(timeoutId);
         timeoutId = null;
       }
-      this.isStreaming = false;
-      this.tabManager?.setActiveTabStreaming(false);
-      this.updateSendButtonState();
+      sendingRuntime.isStreaming = false;
+      this.syncTabStreamLikeState(sendingTabId);
     };
 
     const scheduleStreamTimeout = () => {
@@ -1760,7 +2193,7 @@ export class OpenCodianView extends ItemView {
       }
 
       timeoutId = window.setTimeout(() => {
-        if (!this.isStreaming) {
+        if (!sendingRuntime.isStreaming) {
           return;
         }
 
@@ -1769,9 +2202,8 @@ export class OpenCodianView extends ItemView {
         latestErrorMessage = this.getFriendlyStreamErrorMessage('Response timeout');
         logger.warn('Stream idle timeout, forcing state reset');
 
-        // Mark any unfinished tool calls as failed and stop the SSE locally.
-        this.streamController?.timeoutStream();
-        this.plugin.openCodeService.cancelStream();
+        sendingRuntime.streamController?.timeoutStream();
+        this.plugin.openCodeService.cancelStream(sendingConversation.openCodeSessionId);
         resetStreamingState();
       }, STREAM_IDLE_TIMEOUT_MS);
     };
@@ -1780,13 +2212,15 @@ export class OpenCodianView extends ItemView {
 
     // Stream response with current session model
     const stream = this.plugin.openCodeService.sendMessage(content, {
-      sessionId: this.currentConversation.openCodeSessionId,
+      sessionId: sendingConversation.openCodeSessionId,
       ...modelOptions,
     });
 
-    // Create assistant message element and get content container
-    const { contentEl } = this.createAssistantMessageElement();
-    this.scheduleSettledScrollToBottomIfNeeded(shouldAutoScrollOnSend);
+    const { contentEl } = this.createAssistantMessageElement(sendingTabId);
+    const streamController = this.getOrCreateTabStreamController(sendingTabId);
+    if (this.getActiveTabId() === sendingTabId) {
+      this.scheduleSettledScrollToBottomIfNeeded(shouldAutoScrollOnSend);
+    }
 
     // Show pending indicator after a short delay
     const pendingState: { element: HTMLElement | null } = { element: null };
@@ -1796,13 +2230,13 @@ export class OpenCodianView extends ItemView {
     let receivedMeaningfulChunk = false;
     logger.debug('Setting up pending indicator timeout');
     const pendingTimeout = window.setTimeout(() => {
-      logger.debug('Pending indicator timeout fired, isStreaming:', this.isStreaming);
-      if (!this.isStreaming || !contentEl) {
+      logger.debug('Pending indicator timeout fired, isStreaming:', sendingRuntime.isStreaming);
+      if (!sendingRuntime.isStreaming || !contentEl) {
         logger.debug('Not showing pending indicator - not streaming or no element');
         return;
       }
 
-      const shouldAutoScrollPending = this.shouldAutoScroll();
+      const shouldAutoScrollPending = this.getActiveTabId() === sendingTabId && this.shouldAutoScroll();
       logger.debug('Showing pending indicator:', pendingMessage);
       pendingState.element = contentEl.createDiv({ cls: 'opencodian-pending' });
       pendingState.element.createSpan({ 
@@ -1820,21 +2254,20 @@ export class OpenCodianView extends ItemView {
       };
       updateTimer();
       pendingState.element.dataset.timerInterval = String(window.setInterval(updateTimer, 1000));
-      this.scheduleSettledScrollToBottomIfNeeded(shouldAutoScrollPending);
+      if (this.getActiveTabId() === sendingTabId) {
+        this.scheduleSettledScrollToBottomIfNeeded(shouldAutoScrollPending);
+      }
     }, 1000); // Show after 1s delay
 
-    // Initialize streaming controller
-    if (this.streamController) {
-      this.streamController.startStream(contentEl);
+    if (streamController) {
+      streamController.startStream(contentEl);
     }
 
-    // Track if we've received first content
     let receivedFirstChunk = false;
 
     try {
       for await (const chunk of stream) {
-        // Check if streaming was cancelled
-        if (!this.isStreaming) {
+        if (!sendingRuntime.isStreaming) {
           logger.debug('Streaming cancelled, breaking loop');
           streamInterrupted = true;
           break;
@@ -1844,53 +2277,50 @@ export class OpenCodianView extends ItemView {
 
         if (chunk.type === 'message_start') {
           void this.syncLatestUserMessageFromServer(
-            this.currentConversation?.openCodeSessionId ?? '',
+            sendingConversation,
             userMessage.id,
+            sendingTabId,
           );
-          this.beginActiveTabContextUsageStream();
+          this.beginTabContextUsageStream(sendingTabId);
           continue;
         }
 
         if (chunk.type === 'usage') {
-          this.applyUsageChunkToActiveTab(chunk);
+          this.applyUsageChunkToTab(sendingTabId, chunk);
           continue;
         }
 
         if (chunk.type === 'message_stop') {
           streamCompleted = true;
-          this.completeActiveTabContextUsageStream();
+          this.completeTabContextUsageStream(sendingTabId);
         }
 
         // Handle permission request
         if (chunk.type === 'permission_request') {
           receivedMeaningfulChunk = true;
-          // Pause the stream timeout while waiting for user response
           if (timeoutId) {
             window.clearTimeout(timeoutId);
             timeoutId = null;
           }
           
-          await this.showPermissionDialog(chunk);
+          await this.showPermissionDialog(chunk, sendingTabId);
           
-          // Resume the stream timeout after user response (reset to full timeout)
-          if (this.isStreaming) {
+          if (sendingRuntime.isStreaming) {
             scheduleStreamTimeout();
           }
           continue;
         }
 
-        // Convert OpenCode chunks to streaming format
         const streamingChunk = this.convertToStreamingChunk(chunk);
-        if (streamingChunk && this.streamController) {
+        if (streamingChunk && streamController) {
           if (streamingChunk.type === 'error') {
             latestErrorMessage = this.getFriendlyStreamErrorMessage(streamingChunk.content);
             streamingChunk.content = latestErrorMessage;
           } else {
             receivedMeaningfulChunk = true;
           }
-          await this.streamController.handleChunk(streamingChunk);
+          await streamController.handleChunk(streamingChunk);
           
-          // Clear pending indicator only when actual content is received (text or thinking with content)
           const hasContent = (streamingChunk.type === 'text' && streamingChunk.content?.trim()) ||
                             (streamingChunk.type === 'thinking' && streamingChunk.content?.trim()) ||
                             streamingChunk.type === 'tool_use';
@@ -1912,25 +2342,24 @@ export class OpenCodianView extends ItemView {
         }
       }
 
-      if (this.isStreaming && !receivedMeaningfulChunk && !latestErrorMessage && this.streamController) {
+      if (sendingRuntime.isStreaming && !receivedMeaningfulChunk && !latestErrorMessage && streamController) {
         latestErrorMessage = this.getFriendlyStreamErrorMessage('');
-        await this.streamController.handleChunk({
+        await streamController.handleChunk({
           type: 'error',
           content: latestErrorMessage,
         });
       }
       
-      // Signal completion (only if not cancelled)
-      if (this.isStreaming && this.streamController) {
-        await this.streamController.handleChunk({ type: 'done' });
+      if (sendingRuntime.isStreaming && streamController) {
+        await streamController.handleChunk({ type: 'done' });
       }
     } catch (error) {
       logger.error('Streaming error:', error);
       latestErrorMessage = this.getFriendlyStreamErrorMessage(
         error instanceof Error ? error.message : 'Unknown error'
       );
-      if (this.streamController) {
-        await this.streamController.handleChunk({ 
+      if (streamController) {
+        await streamController.handleChunk({ 
           type: 'error', 
           content: latestErrorMessage,
         });
@@ -1938,51 +2367,47 @@ export class OpenCodianView extends ItemView {
     } finally {
       logger.debug('Stream loop ended');
       resetStreamingState();
-      this.completeActiveTabContextUsageStream();
+      this.completeTabContextUsageStream(sendingTabId);
       window.clearTimeout(pendingTimeout);
       if (pendingState.element?.dataset.timerInterval) {
         window.clearInterval(Number(pendingState.element.dataset.timerInterval));
       }
       pendingState.element?.remove();
       pendingState.element = null;
-      await this.finalizeBackgroundTaskIndicatorAfterPrimaryStream();
+      await this.finalizeBackgroundTaskIndicatorAfterPrimaryStream(sendingTabId);
+      this.syncTabStreamLikeState(sendingTabId);
       await this.refreshServerStatusBadge();
       
       const finalizedTimestamp = Date.now();
 
-      // Add timestamp with copy button to the streamed message (after all content)
-      if (this.streamingMessageEl) {
-        const streamContentBlocks = this.streamController?.getContentBlocks();
+      if (sendingRuntime.streamingMessageEl) {
+        const streamContentBlocks = streamController?.getContentBlocks();
         const textContent = streamContentBlocks
           ?.filter((b): b is { type: 'text'; content: string } => b.type === 'text')
           .map(b => b.content.trim())
           .filter(Boolean)
           .join('') || '';
         this.addTimestampWithCopyButton(
-          this.streamingMessageEl,
+          sendingRuntime.streamingMessageEl,
           finalizedTimestamp,
           textContent,
           activeModelId,
         );
-        this.scheduleSettledScrollToBottomIfNeeded();
+        if (this.getActiveTabId() === sendingTabId) {
+          this.scheduleSettledScrollToBottomIfNeeded();
+        }
       }
       
-      // Get content blocks from stream (includes thinking with duration)
-      const streamContentBlocks = this.streamController?.getContentBlocks();
+      const streamContentBlocks = streamController?.getContentBlocks();
+      sendingRuntime.streamingMessageEl = null;
+      sendingRuntime.streamingContentEl = null;
       
-      // Clear streaming tracking
-      this.streamingMessageEl = null;
-      this.streamingContentEl = null;
-      
-      // Add the assistant message to conversation with content blocks
-      if (streamContentBlocks && streamContentBlocks.length > 0 && this.currentConversation) {
-        // Extract text content from text blocks
+      if (streamContentBlocks && streamContentBlocks.length > 0) {
         const textContent = streamContentBlocks
           .filter((b): b is { type: 'text'; content: string } => b.type === 'text')
           .map(b => b.content)
           .join('');
         
-        // Convert streaming content blocks to core ContentBlock format
         const contentBlocks: ContentBlock[] = streamContentBlocks.map(b => {
           if (b.type === 'text') {
             return { type: 'text', text: b.content };
@@ -2005,7 +2430,6 @@ export class OpenCodianView extends ItemView {
           return { type: 'text', text: '' };
         });
         
-        // Create the assistant message
         const assistantMessage: ChatMessage = {
           id: `assistant-${finalizedTimestamp}`,
           role: 'assistant',
@@ -2015,10 +2439,9 @@ export class OpenCodianView extends ItemView {
           contentBlocks: contentBlocks,
         };
         
-        // Add to conversation
-        this.currentConversation.messages.push(assistantMessage);
-      } else if (latestErrorMessage && this.currentConversation) {
-        this.currentConversation.messages.push({
+        sendingConversation.messages.push(assistantMessage);
+      } else if (latestErrorMessage) {
+        sendingConversation.messages.push({
           id: `assistant-${finalizedTimestamp}`,
           role: 'assistant',
           content: latestErrorMessage,
@@ -2028,21 +2451,31 @@ export class OpenCodianView extends ItemView {
       }
     }
 
-    // Update conversation
-    if (this.currentConversation) {
+    if (sendingConversation) {
       const shouldSyncFromServer = streamCompleted && !streamTimedOut && !streamInterrupted && !latestErrorMessage;
       if (shouldSyncFromServer) {
-        const syncResult = await this.syncConversationMessagesFromServer(this.currentConversation);
-        this.lastConversationSyncFingerprint = syncResult.fingerprint;
-        await this.rerenderConversationMessages(this.currentConversation);
+        const syncResult = await this.syncConversationMessagesFromServer(sendingConversation, sendingTabId);
+        if (this.currentConversation?.id === sendingConversation.id && this.getActiveTabId() === sendingTabId) {
+          const activeRuntime = this.getTabRuntimeState(sendingTabId);
+          if (activeRuntime) {
+            activeRuntime.lastConversationSyncFingerprint = syncResult.fingerprint;
+          }
+          await this.rerenderConversationMessages(sendingConversation);
+        }
       }
-      this.currentConversation.updatedAt = Date.now();
-      await this.plugin.saveConversation(this.currentConversation);
-      this.lastConversationSyncFingerprint = this.getConversationSyncFingerprint(this.currentConversation.messages);
-      this.tabManager?.setActiveTabConversation(this.currentConversation);
-      this.syncActiveTabContextUsageIdentity();
-      if (shouldSyncFromServer) {
+      sendingConversation.updatedAt = Date.now();
+      await this.plugin.saveConversation(sendingConversation);
+      if (this.currentConversation?.id === sendingConversation.id && this.getActiveTabId() === sendingTabId) {
+        const activeRuntime = this.getTabRuntimeState(sendingTabId);
+        if (activeRuntime) {
+          activeRuntime.lastConversationSyncFingerprint = this.getConversationSyncFingerprint(sendingConversation.messages);
+        }
+        this.tabManager?.setTabNeedsAttention(sendingTabId, false);
+        this.tabManager?.setActiveTabConversation(sendingConversation);
+        this.syncActiveTabContextUsageIdentity();
         await this.refreshActiveTabContextUsageFromServer();
+      } else {
+        this.tabManager?.setTabNeedsAttention(sendingTabId, true);
       }
     }
   }
@@ -2249,12 +2682,15 @@ export class OpenCodianView extends ItemView {
   }
 
   private async appendAssistantErrorMessage(message: string): Promise<void> {
-    const { messageEl, contentEl } = this.createAssistantMessageElement();
+    const activeTabId = this.getActiveTabId();
+    const activeRuntime = this.getTabRuntimeState(activeTabId);
+    const { messageEl, contentEl } = this.createAssistantMessageElement(activeTabId);
+    const streamController = this.getOrCreateTabStreamController(activeTabId);
 
-    if (this.streamController) {
-      this.streamController.startStream(contentEl);
-      await this.streamController.handleChunk({ type: 'error', content: message });
-      await this.streamController.handleChunk({ type: 'done' });
+    if (streamController) {
+      streamController.startStream(contentEl);
+      await streamController.handleChunk({ type: 'error', content: message });
+      await streamController.handleChunk({ type: 'done' });
     } else {
       const errorEl = contentEl.createDiv({ cls: 'streaming-error-block' });
       errorEl.createSpan({ cls: 'streaming-error-icon', text: '❌' });
@@ -2264,8 +2700,10 @@ export class OpenCodianView extends ItemView {
     const timestamp = Date.now();
     const modelId = this.formatModelId(this.getCurrentSessionModel());
     this.addTimestampWithCopyButton(messageEl, timestamp, message, modelId);
-    this.streamingMessageEl = null;
-    this.streamingContentEl = null;
+    if (activeRuntime) {
+      activeRuntime.streamingMessageEl = null;
+      activeRuntime.streamingContentEl = null;
+    }
 
     if (this.currentConversation) {
       this.currentConversation.messages.push({
@@ -2285,19 +2723,21 @@ export class OpenCodianView extends ItemView {
   /** Cancel streaming */
   private cancelStreaming() {
     logger.debug('cancelStreaming called, isStreaming:', this.isStreaming);
+    if (!this.isActiveTabStreaming()) {
+      return;
+    }
     
     // Call service to abort the SSE connection
     logger.debug('Calling openCodeService.cancelStream()...');
-    this.plugin.openCodeService.cancelStream();
+    if (this.currentConversation?.openCodeSessionId) {
+      this.plugin.openCodeService.cancelStream(this.currentConversation.openCodeSessionId);
+    }
     
     // Update local state
     this.isStreaming = false;
-    this.tabManager?.setActiveTabStreaming(false);
+    this.streamController?.cancelStream();
+    this.syncActiveTabStreamLikeState();
     logger.debug('isStreaming set to false');
-    
-    // Update button state
-    this.updateSendButtonState();
-    logger.debug('Send button state updated');
     
     new Notice('Streaming cancelled');
   }
@@ -2309,7 +2749,7 @@ export class OpenCodianView extends ItemView {
     // Clear current icon
     this.sendBtn.empty();
     
-    if (this.isStreaming) {
+    if (this.isActiveTabStreaming()) {
       // Show stop icon (square)
       setIcon(this.sendBtn, 'square');
       this.sendBtn.addClass('opencodian-stop-btn');
@@ -2475,93 +2915,507 @@ export class OpenCodianView extends ItemView {
     }
   }
 
-  private armBackgroundTaskIndicatorForUserMessage(message: ChatMessage): void {
+  private armBackgroundTaskIndicatorForUserMessage(
+    message: ChatMessage,
+    tabId: TabId | null = this.getActiveTabId(),
+  ): void {
+    const runtime = this.getTabRuntimeState(tabId);
+    if (!runtime) {
+      return;
+    }
+
     if (message.omo?.kind !== 'user-injection' || message.omo.modeTag !== 'search-mode') {
       return;
     }
 
-    this.backgroundTaskStartedAt = message.timestamp;
-    this.backgroundTaskModeTag = message.omo.modeTag;
-    this.backgroundTaskWaitingForFollowUp = false;
+    runtime.backgroundTaskStartedAt = message.timestamp;
+    runtime.backgroundTaskModeTag = message.omo.modeTag;
+    runtime.backgroundTaskWaitingForFollowUp = false;
   }
 
   private hasActiveBackgroundTaskIndicator(): boolean {
-    return Boolean(this.backgroundTaskStartedAt) && (
-      this.backgroundTaskModeTag === 'search-mode'
-      || this.backgroundTaskToolIds.size > 0
-    );
+    return this.hasTabBackgroundTaskIndicator(this.getActiveTabId());
   }
 
-  private resetBackgroundTaskIndicator(): void {
-    this.backgroundTaskIndicatorEl?.remove();
-    this.backgroundTaskIndicatorEl = null;
-    this.backgroundTaskStartedAt = null;
-    this.backgroundTaskModeTag = null;
-    this.backgroundTaskWaitingForFollowUp = false;
-    this.backgroundTaskToolIds.clear();
-    this.backgroundTaskCompletedToolIds.clear();
+  private resetBackgroundTaskIndicator(tabId: TabId | null = this.getActiveTabId()): void {
+    const runtime = this.getTabRuntimeState(tabId);
+    if (!runtime) {
+      return;
+    }
+
+    runtime.backgroundTaskIndicatorEl?.remove();
+    runtime.backgroundTaskIndicatorEl = null;
+    runtime.backgroundTaskStartedAt = null;
+    runtime.backgroundTaskModeTag = null;
+    runtime.backgroundTaskWaitingForFollowUp = false;
+    runtime.backgroundTaskLaunches.clear();
+    runtime.backgroundTaskCompletedTasks.clear();
+    this.syncTabStreamLikeState(tabId);
   }
 
   private isBackgroundTaskTool(toolName: string): boolean {
     return toolName === 'task';
   }
 
-  private async handleStreamingToolCallStart(toolCall: { id: string; name: string }): Promise<void> {
+  private getBackgroundTaskDescription(
+    input: Record<string, unknown>,
+    fallbackResult?: string,
+  ): string {
+    const description = [
+      input.description,
+      input.prompt,
+      input.title,
+      input.summary,
+      input.query,
+      input.command,
+    ].find((value): value is string => typeof value === 'string' && value.trim().length > 0);
+
+    if (description) {
+      return description.trim();
+    }
+
+    if (fallbackResult) {
+      const trimmed = fallbackResult.trim();
+      if (trimmed.length > 0) {
+        return trimmed.split(/\r?\n/)[0].trim();
+      }
+    }
+
+    return t('chat.backgroundTask.noDescription');
+  }
+
+  private extractBackgroundTaskId(...sources: unknown[]): string | null {
+    const pattern = /\b(bg_[a-z0-9]+)\b/i;
+
+    for (const source of sources) {
+      if (typeof source === 'string') {
+        const match = source.match(pattern);
+        if (match?.[1]) {
+          return match[1];
+        }
+        continue;
+      }
+
+      if (source && typeof source === 'object') {
+        const nested = [
+          (source as Record<string, unknown>).task_id,
+          (source as Record<string, unknown>).taskId,
+          (source as Record<string, unknown>).id,
+        ];
+        const directMatch = this.extractBackgroundTaskId(...nested);
+        if (directMatch) {
+          return directMatch;
+        }
+
+        try {
+          const match = JSON.stringify(source).match(pattern);
+          if (match?.[1]) {
+            return match[1];
+          }
+        } catch {
+          continue;
+        }
+      }
+    }
+
+    return null;
+  }
+
+  private upsertBackgroundTaskLaunch(toolCall: {
+    id: string;
+    input: Record<string, unknown>;
+    result?: string;
+  }, target: Map<string, BackgroundTaskLaunchInfo> = this.backgroundTaskLaunches): void {
+    const existing = target.get(toolCall.id);
+    const description = this.getBackgroundTaskDescription(toolCall.input, toolCall.result ?? existing?.description);
+    const taskId = this.extractBackgroundTaskId(toolCall.input, toolCall.result, existing?.taskId) ?? null;
+
+    target.set(toolCall.id, {
+      launchId: toolCall.id,
+      taskId,
+      description,
+    });
+  }
+
+  private addCompletedBackgroundTasksFromMessage(
+    message: ChatMessage,
+    target: Map<string, BackgroundTaskCompletionInfo> = this.backgroundTaskCompletedTasks,
+  ): void {
+    if (message.omo?.kind !== 'system-reminder' || !message.omo.tasks || message.omo.tasks.length === 0) {
+      return;
+    }
+
+    for (const task of message.omo.tasks) {
+      if (!task.id && !task.description) {
+        continue;
+      }
+
+      const completionId = task.id || task.description;
+      target.set(completionId, {
+        taskId: task.id || completionId,
+        description: task.description || t('chat.backgroundTask.noDescription'),
+      });
+    }
+  }
+
+  private findBackgroundTaskAnchorIndex(messages: ChatMessage[]): number {
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      if (messages[index].role === 'user') {
+        return index;
+      }
+    }
+
+    return -1;
+  }
+
+  private syncBackgroundTaskStateFromConversation(
+    conversation: Conversation | null = this.currentConversation,
+    tabId: TabId | null = this.getActiveTabId(),
+  ): void {
+    const runtime = this.getTabRuntimeState(tabId);
+    if (!runtime) {
+      return;
+    }
+
+    runtime.backgroundTaskStartedAt = null;
+    runtime.backgroundTaskModeTag = null;
+    runtime.backgroundTaskWaitingForFollowUp = false;
+    runtime.backgroundTaskLaunches.clear();
+    runtime.backgroundTaskCompletedTasks.clear();
+
+    if (!conversation || conversation.messages.length === 0) {
+      runtime.backgroundTaskIndicatorEl?.remove();
+      runtime.backgroundTaskIndicatorEl = null;
+      this.syncTabStreamLikeState(tabId);
+      return;
+    }
+
+    const anchorIndex = this.findBackgroundTaskAnchorIndex(conversation.messages);
+    if (anchorIndex < 0) {
+      return;
+    }
+
+    const anchorMessage = conversation.messages[anchorIndex];
+    runtime.backgroundTaskStartedAt = anchorMessage.timestamp;
+    runtime.backgroundTaskModeTag = anchorMessage.omo?.kind === 'user-injection'
+      ? anchorMessage.omo.modeTag
+      : null;
+
+    let sawAllTasksComplete = false;
+    for (const message of conversation.messages.slice(anchorIndex + 1)) {
+      if (message.omo?.kind === 'system-reminder') {
+        this.addCompletedBackgroundTasksFromMessage(message, runtime.backgroundTaskCompletedTasks);
+        if (message.omo.reminderType === 'all-background-tasks-complete') {
+          sawAllTasksComplete = true;
+        }
+      }
+
+      for (const block of message.contentBlocks ?? []) {
+        if (block.type !== 'tool_use' || block.toolName !== 'task' || !block.toolId) {
+          continue;
+        }
+
+        this.upsertBackgroundTaskLaunch({
+          id: block.toolId,
+          input: block.toolInput ?? {},
+          result: block.toolResult,
+        }, runtime.backgroundTaskLaunches);
+      }
+    }
+
+    if (sawAllTasksComplete) {
+      runtime.backgroundTaskStartedAt = null;
+      runtime.backgroundTaskModeTag = null;
+      runtime.backgroundTaskLaunches.clear();
+      runtime.backgroundTaskCompletedTasks.clear();
+      runtime.backgroundTaskIndicatorEl?.remove();
+      runtime.backgroundTaskIndicatorEl = null;
+      this.syncTabStreamLikeState(tabId);
+      return;
+    }
+
+    if (runtime.backgroundTaskLaunches.size === 0 && runtime.backgroundTaskModeTag !== 'search-mode') {
+      runtime.backgroundTaskStartedAt = null;
+      runtime.backgroundTaskModeTag = null;
+      runtime.backgroundTaskIndicatorEl?.remove();
+      runtime.backgroundTaskIndicatorEl = null;
+      this.syncTabStreamLikeState(tabId);
+      return;
+    }
+
+    runtime.backgroundTaskWaitingForFollowUp = runtime.backgroundTaskLaunches.size > 0 && !runtime.isStreaming;
+    this.syncTabStreamLikeState(tabId);
+  }
+
+  private getCompletedBackgroundTasks(tabId: TabId | null = this.getActiveTabId()): BackgroundTaskCompletionInfo[] {
+    return Array.from(this.getTabRuntimeState(tabId)?.backgroundTaskCompletedTasks.values() ?? []);
+  }
+
+  private isLaunchMatchedByCompletion(
+    launch: BackgroundTaskLaunchInfo,
+    completion: BackgroundTaskCompletionInfo,
+  ): boolean {
+    if (launch.taskId && launch.taskId === completion.taskId) {
+      return true;
+    }
+
+    return launch.description.trim().toLowerCase() === completion.description.trim().toLowerCase();
+  }
+
+  private getPendingBackgroundTaskLaunches(tabId: TabId | null = this.getActiveTabId()): BackgroundTaskLaunchInfo[] {
+    const runtime = this.getTabRuntimeState(tabId);
+    return this.filterPendingBackgroundTaskLaunches(
+      Array.from(runtime?.backgroundTaskLaunches.values() ?? []),
+      this.getCompletedBackgroundTasks(tabId),
+    );
+  }
+
+  private filterPendingBackgroundTaskLaunches(
+    launches: BackgroundTaskLaunchInfo[],
+    completed: BackgroundTaskCompletionInfo[],
+  ): BackgroundTaskLaunchInfo[] {
+    return launches.filter((launch) =>
+      !completed.some((completion) => this.isLaunchMatchedByCompletion(launch, completion)),
+    );
+  }
+
+  private collectBackgroundTaskDiagnostics(messages: ChatMessage[]): {
+    anchorKey: string;
+    completed: BackgroundTaskCompletionInfo[];
+    pending: BackgroundTaskLaunchInfo[];
+    sawAllTasksComplete: boolean;
+  } | null {
+    if (messages.length === 0) {
+      return null;
+    }
+
+    const anchorIndex = this.findBackgroundTaskAnchorIndex(messages);
+    if (anchorIndex < 0) {
+      return null;
+    }
+
+    const anchorMessage = messages[anchorIndex];
+    const launches = new Map<string, BackgroundTaskLaunchInfo>();
+    const completed = new Map<string, BackgroundTaskCompletionInfo>();
+    let sawAllTasksComplete = false;
+
+    for (const message of messages.slice(anchorIndex + 1)) {
+      if (message.omo?.kind === 'system-reminder') {
+        this.addCompletedBackgroundTasksFromMessage(message, completed);
+        if (message.omo.reminderType === 'all-background-tasks-complete') {
+          sawAllTasksComplete = true;
+        }
+      }
+
+      for (const block of message.contentBlocks ?? []) {
+        if (block.type !== 'tool_use' || block.toolName !== 'task' || !block.toolId) {
+          continue;
+        }
+
+        this.upsertBackgroundTaskLaunch({
+          id: block.toolId,
+          input: block.toolInput ?? {},
+          result: block.toolResult,
+        }, launches);
+      }
+    }
+
+    const isSearchModeAnchor = anchorMessage.omo?.kind === 'user-injection' && anchorMessage.omo.modeTag === 'search-mode';
+    if (!isSearchModeAnchor && launches.size === 0 && completed.size === 0 && !sawAllTasksComplete) {
+      return null;
+    }
+
+    return {
+      anchorKey: anchorMessage.sourceMessageId ?? anchorMessage.id,
+      completed: Array.from(completed.values()),
+      pending: this.filterPendingBackgroundTaskLaunches(Array.from(launches.values()), Array.from(completed.values())),
+      sawAllTasksComplete,
+    };
+  }
+
+  private logOmoBackgroundTaskDiagnostics(
+    conversation: Conversation,
+    previousMessages: ChatMessage[],
+    nextMessages: ChatMessage[],
+  ): void {
+    const diagnostics = this.collectBackgroundTaskDiagnostics(nextMessages);
+    if (!diagnostics) {
+      this.omoBackgroundTaskLogStates.delete(conversation.id);
+      return;
+    }
+
+    const previousDiagnostics = this.collectBackgroundTaskDiagnostics(previousMessages);
+    const previousHasSameAnchor = previousDiagnostics?.anchorKey === diagnostics.anchorKey;
+    const previousPendingTaskIds = new Set(
+      previousHasSameAnchor
+        ? previousDiagnostics.pending
+          .map((task) => task.taskId)
+          .filter((taskId): taskId is string => Boolean(taskId))
+        : [],
+    );
+    const previousCompletionLogged = previousHasSameAnchor && (
+      previousDiagnostics.sawAllTasksComplete
+      || (previousDiagnostics.pending.length === 0 && previousDiagnostics.completed.length > 0)
+    );
+
+    let state = this.omoBackgroundTaskLogStates.get(conversation.id);
+    if (!state || state.anchorKey !== diagnostics.anchorKey) {
+      state = {
+        anchorKey: diagnostics.anchorKey,
+        loggedPendingTaskIds: new Set(previousPendingTaskIds),
+        completionLogged: previousCompletionLogged,
+      };
+    } else if (previousCompletionLogged) {
+      state.completionLogged = true;
+    }
+
+    for (const task of diagnostics.pending) {
+      if (!task.taskId || previousPendingTaskIds.has(task.taskId) || state.loggedPendingTaskIds.has(task.taskId)) {
+        continue;
+      }
+
+      logger.debug(`OMO background task running: ${task.taskId} - ${this.getLogPreview(task.description, 140)}`);
+      state.loggedPendingTaskIds.add(task.taskId);
+    }
+
+    if (!state.completionLogged && (diagnostics.sawAllTasksComplete || (diagnostics.pending.length === 0 && diagnostics.completed.length > 0))) {
+      logger.debug(`OMO background tasks completed: ${this.stringifyLogPayload({
+        conversationId: conversation.id,
+        sessionId: conversation.openCodeSessionId,
+        completedTasks: diagnostics.completed.map((task) => ({
+          id: task.taskId,
+          description: task.description,
+        })),
+      })}`);
+      state.completionLogged = true;
+    }
+
+    this.omoBackgroundTaskLogStates.set(conversation.id, state);
+  }
+
+  private getBackgroundTaskLaunchDisplayId(launch: BackgroundTaskLaunchInfo): string {
+    if (launch.taskId) {
+      return launch.taskId;
+    }
+
+    return `launch_${launch.launchId.slice(-8)}`;
+  }
+
+  private buildBackgroundTaskIndicatorTasksMarkdown(tabId: TabId | null = this.getActiveTabId()): string | undefined {
+    const lines: string[] = [];
+    const completed = this.getCompletedBackgroundTasks(tabId);
+    const pending = this.getPendingBackgroundTaskLaunches(tabId);
+
+    if (completed.length === 0 && pending.length === 0) {
+      return undefined;
+    }
+
+    lines.push(`**${t('chat.backgroundTask.taskListLabel')}**`);
+
+    for (const task of completed) {
+      lines.push(`- ${t('chat.backgroundTask.taskStatusCompleted')} · \`${task.taskId}\`: ${task.description}`);
+    }
+
+    for (const task of pending) {
+      lines.push(`- ${t('chat.backgroundTask.taskStatusRunning')} · \`${this.getBackgroundTaskLaunchDisplayId(task)}\`: ${task.description}`);
+    }
+
+    return lines.join('\n');
+  }
+
+  private async handleStreamingToolCallStart(
+    toolCall: ToolCallInfo,
+    tabId: TabId | null = this.getActiveTabId(),
+  ): Promise<void> {
+    const runtime = this.getTabRuntimeState(tabId);
+    if (!runtime) {
+      return;
+    }
+
     if (!this.isBackgroundTaskTool(toolCall.name)) {
       return;
     }
 
-    if (!this.backgroundTaskStartedAt) {
-      this.backgroundTaskStartedAt = Date.now();
+    if (!runtime.backgroundTaskStartedAt) {
+      runtime.backgroundTaskStartedAt = Date.now();
     }
-    this.backgroundTaskToolIds.add(toolCall.id);
-    this.backgroundTaskWaitingForFollowUp = false;
-    await this.renderBackgroundTaskIndicatorIfNeeded();
+    this.upsertBackgroundTaskLaunch({
+      id: toolCall.id,
+      input: toolCall.input ?? {},
+    }, runtime.backgroundTaskLaunches);
+    runtime.backgroundTaskWaitingForFollowUp = false;
+    await this.renderBackgroundTaskIndicatorIfNeeded(tabId);
   }
 
-  private async handleStreamingToolCallEnd(toolCall: { id: string; name: string }): Promise<void> {
+  private async handleStreamingToolCallEnd(
+    toolCall: ToolCallInfo,
+    tabId: TabId | null = this.getActiveTabId(),
+  ): Promise<void> {
+    const runtime = this.getTabRuntimeState(tabId);
+    if (!runtime) {
+      return;
+    }
+
     if (!this.isBackgroundTaskTool(toolCall.name)) {
       return;
     }
 
-    this.backgroundTaskToolIds.add(toolCall.id);
-    this.backgroundTaskCompletedToolIds.add(toolCall.id);
-    await this.renderBackgroundTaskIndicatorIfNeeded();
+    this.upsertBackgroundTaskLaunch({
+      id: toolCall.id,
+      input: toolCall.input ?? {},
+      result: toolCall.result,
+    }, runtime.backgroundTaskLaunches);
+    await this.renderBackgroundTaskIndicatorIfNeeded(tabId);
   }
 
-  private async finalizeBackgroundTaskIndicatorAfterPrimaryStream(): Promise<void> {
-    if (!this.hasActiveBackgroundTaskIndicator()) {
+  private async finalizeBackgroundTaskIndicatorAfterPrimaryStream(
+    tabId: TabId | null = this.getActiveTabId(),
+  ): Promise<void> {
+    const runtime = this.getTabRuntimeState(tabId);
+    if (!runtime || !this.hasTabBackgroundTaskIndicator(tabId)) {
       return;
     }
 
-    if (this.backgroundTaskToolIds.size === 0) {
-      this.resetBackgroundTaskIndicator();
+    if (runtime.backgroundTaskLaunches.size === 0) {
+      this.resetBackgroundTaskIndicator(tabId);
       return;
     }
 
-    this.backgroundTaskWaitingForFollowUp = true;
-    await this.renderBackgroundTaskIndicatorIfNeeded();
+    runtime.backgroundTaskWaitingForFollowUp = true;
+    await this.renderBackgroundTaskIndicatorIfNeeded(tabId);
   }
 
-  private async renderBackgroundTaskIndicatorIfNeeded(): Promise<void> {
-    if (!this.hasActiveBackgroundTaskIndicator()) {
-      this.backgroundTaskIndicatorEl?.remove();
-      this.backgroundTaskIndicatorEl = null;
+  private async renderBackgroundTaskIndicatorIfNeeded(
+    tabId: TabId | null = this.getActiveTabId(),
+  ): Promise<void> {
+    const runtime = this.getTabRuntimeState(tabId);
+    if (!runtime) {
       return;
     }
 
-    const parentEl = this.ensureTurnBody();
+    if (!this.hasTabBackgroundTaskIndicator(tabId)) {
+      runtime.backgroundTaskIndicatorEl?.remove();
+      runtime.backgroundTaskIndicatorEl = null;
+      this.syncTabStreamLikeState(tabId);
+      return;
+    }
+
+    const parentEl = this.ensureTurnBody(tabId);
     if (!parentEl) {
       return;
     }
 
-    let messageEl = this.backgroundTaskIndicatorEl;
+    let messageEl = runtime.backgroundTaskIndicatorEl;
     if (!messageEl || !messageEl.isConnected) {
       messageEl = parentEl.createDiv({
         cls: 'opencodian-message opencodian-message--assistant opencodian-message--notice opencodian-message--background-task',
       });
       messageEl.dataset.messageId = 'transient-background-task';
-      this.backgroundTaskIndicatorEl = messageEl;
+      runtime.backgroundTaskIndicatorEl = messageEl;
+    }
+
+    if (messageEl.parentElement !== parentEl || messageEl !== parentEl.lastElementChild) {
+      parentEl.appendChild(messageEl);
     }
 
     let contentEl = messageEl.querySelector('.opencodian-message-content') as HTMLElement | null;
@@ -2576,7 +3430,7 @@ export class OpenCodianView extends ItemView {
     setIcon(iconEl, 'loader');
 
     const bodyEl = cardEl.createDiv({ cls: 'opencodian-chat-notice-body' });
-    const copy = this.getBackgroundTaskIndicatorCopy();
+    const copy = this.getBackgroundTaskIndicatorCopy(tabId);
     bodyEl.createDiv({
       cls: 'opencodian-chat-notice-title',
       text: copy.title,
@@ -2591,20 +3445,32 @@ export class OpenCodianView extends ItemView {
         text: copy.detail,
       });
     }
+
+    if (copy.tasksMarkdown) {
+      const tasksEl = bodyEl.createDiv({ cls: 'opencodian-chat-notice-task-list' });
+      await this.renderMarkdownInto(tasksEl, copy.tasksMarkdown);
+    }
+
+    this.syncTabStreamLikeState(tabId);
   }
 
-  private getBackgroundTaskIndicatorCopy(): { title: string; body: string; detail?: string } {
-    const launched = this.backgroundTaskToolIds.size;
-    const completed = this.backgroundTaskCompletedToolIds.size;
+  private getBackgroundTaskIndicatorCopy(
+    tabId: TabId | null = this.getActiveTabId(),
+  ): { title: string; body: string; detail?: string; tasksMarkdown?: string } {
+    const runtime = this.getTabRuntimeState(tabId);
+    const launched = runtime?.backgroundTaskLaunches.size ?? 0;
+    const completed = Math.min(launched, this.getCompletedBackgroundTasks(tabId).length);
+    const tasksMarkdown = this.buildBackgroundTaskIndicatorTasksMarkdown(tabId);
 
     if (launched === 0) {
       return {
         title: t('chat.backgroundTask.preparingTitle'),
         body: t('chat.backgroundTask.preparingBody'),
+        tasksMarkdown,
       };
     }
 
-    if (this.backgroundTaskWaitingForFollowUp) {
+    if (runtime?.backgroundTaskWaitingForFollowUp) {
       return {
         title: t('chat.backgroundTask.waitingTitle'),
         body: t('chat.backgroundTask.waitingBody', {
@@ -2615,6 +3481,7 @@ export class OpenCodianView extends ItemView {
           total: String(launched),
           completed: String(completed),
         }),
+        tasksMarkdown,
       };
     }
 
@@ -2628,6 +3495,7 @@ export class OpenCodianView extends ItemView {
         total: String(launched),
         completed: String(completed),
       }),
+      tasksMarkdown,
     };
   }
 
@@ -2697,8 +3565,9 @@ export class OpenCodianView extends ItemView {
   }
 
   /** Create assistant message element for streaming */
-  private createAssistantMessageElement(): { messageEl: HTMLElement; contentEl: HTMLElement } {
-    const messageEl = this.ensureTurnBody()?.createDiv({
+  private createAssistantMessageElement(tabId: TabId | null = this.getActiveTabId()): { messageEl: HTMLElement; contentEl: HTMLElement } {
+    const paneState = this.getTabPaneState(tabId);
+    const messageEl = this.ensureTurnBody(tabId)?.createDiv({
       cls: 'opencodian-message opencodian-message--assistant',
     });
 
@@ -2710,9 +3579,10 @@ export class OpenCodianView extends ItemView {
     const contentEl = messageEl.createDiv({ cls: 'opencodian-message-content' });
     this.ensureAssistantTimestampRow(messageEl, true);
 
-    // Track for streaming updates
-    this.streamingMessageEl = messageEl;
-    this.streamingContentEl = contentEl;
+    if (paneState) {
+      paneState.runtime.streamingMessageEl = messageEl;
+      paneState.runtime.streamingContentEl = contentEl;
+    }
 
     return { messageEl, contentEl };
   }
@@ -2936,10 +3806,12 @@ export class OpenCodianView extends ItemView {
   }
 
   private async syncLatestUserMessageFromServer(
-    sessionId: string,
+    conversation: Conversation,
     optimisticMessageId: string,
+    tabId: TabId | null = this.getActiveTabId(),
   ): Promise<void> {
-    if (!sessionId || !this.currentConversation || this.currentConversation.openCodeSessionId !== sessionId) {
+    const sessionId = conversation.openCodeSessionId;
+    if (!sessionId) {
       return;
     }
 
@@ -2948,7 +3820,7 @@ export class OpenCodianView extends ItemView {
       const latestServerUser = [...serverMessages]
         .reverse()
         .find(({ info }) => info.role === 'user');
-      if (!latestServerUser || !this.currentConversation || this.currentConversation.openCodeSessionId !== sessionId) {
+      if (!latestServerUser) {
         return;
       }
 
@@ -2970,14 +3842,14 @@ export class OpenCodianView extends ItemView {
         omoKind: hydratedMessage.omo?.kind ?? null,
         omoModeTag: hydratedMessage.omo?.kind === 'user-injection' ? hydratedMessage.omo.modeTag : null,
       })}`);
-      const optimisticIndex = this.currentConversation.messages.findIndex(
+      const optimisticIndex = conversation.messages.findIndex(
         (message) => message.id === optimisticMessageId,
       );
       if (optimisticIndex < 0) {
         return;
       }
 
-      const optimisticMessage = this.currentConversation.messages[optimisticIndex];
+      const optimisticMessage = conversation.messages[optimisticIndex];
       const optimisticVisibleText = this.getVisibleUserMessageText(optimisticMessage).trim();
       const hydratedVisibleText = this.getVisibleUserMessageText(hydratedMessage).trim();
       if (
@@ -3012,12 +3884,17 @@ export class OpenCodianView extends ItemView {
         return;
       }
 
-      this.currentConversation.messages.splice(optimisticIndex, 1, hydratedMessage);
-      this.armBackgroundTaskIndicatorForUserMessage(hydratedMessage);
-      this.lastConversationSyncFingerprint = this.getConversationSyncFingerprint(this.currentConversation.messages);
-      await this.plugin.saveConversation(this.currentConversation);
-      await this.rerenderSingleUserMessage(optimisticMessageId, hydratedMessage);
-      await this.renderBackgroundTaskIndicatorIfNeeded();
+      conversation.messages.splice(optimisticIndex, 1, hydratedMessage);
+      this.armBackgroundTaskIndicatorForUserMessage(hydratedMessage, tabId);
+      const runtime = this.getTabRuntimeState(tabId);
+      if (runtime) {
+        runtime.lastConversationSyncFingerprint = this.getConversationSyncFingerprint(conversation.messages);
+      }
+      await this.plugin.saveConversation(conversation);
+      if (this.currentConversation?.id === conversation.id && this.getActiveTabId() === tabId) {
+        await this.rerenderSingleUserMessage(optimisticMessageId, hydratedMessage);
+        await this.renderBackgroundTaskIndicatorIfNeeded(tabId);
+      }
       logger.debug(`Applied hydrated server user message to optimistic bubble: ${this.stringifyLogPayload({
         sessionId,
         optimisticMessageId,
@@ -3102,7 +3979,7 @@ export class OpenCodianView extends ItemView {
         });
         rewindBtn.innerHTML = REWIND_ICON;
         this.attachTooltipLabel(rewindBtn, rewindLabel);
-        rewindBtn.disabled = this.isStreaming;
+        rewindBtn.disabled = this.isActiveTabStreaming();
         rewindBtn.addEventListener('click', (event) => {
           event.stopPropagation();
           void this.handleRewindRequest(message);
@@ -3118,7 +3995,7 @@ export class OpenCodianView extends ItemView {
         });
         forkBtn.innerHTML = FORK_ICON;
         this.attachTooltipLabel(forkBtn, forkLabel);
-        forkBtn.disabled = this.isStreaming;
+        forkBtn.disabled = this.isActiveTabStreaming();
         forkBtn.addEventListener('click', (event) => {
           event.stopPropagation();
           void this.handleForkRequest(message);
@@ -3135,7 +4012,7 @@ export class OpenCodianView extends ItemView {
   }
 
   private async handleRewindRequest(message: ChatMessage): Promise<void> {
-    if (this.isStreaming) {
+    if (this.isActiveTabStreaming()) {
       new Notice(t('chat.rewind.streamingBlocked'));
       return;
     }
@@ -3201,7 +4078,7 @@ export class OpenCodianView extends ItemView {
   }
 
   private async handleForkRequest(message: ChatMessage): Promise<void> {
-    if (this.isStreaming) {
+    if (this.isActiveTabStreaming()) {
       new Notice(t('chat.fork.streamingBlocked'));
       return;
     }
@@ -3262,43 +4139,24 @@ export class OpenCodianView extends ItemView {
 
   private async syncConversationMessagesFromServer(
     conversation: Conversation,
+    tabId: TabId | null = this.getActiveTabId(),
   ): Promise<{ messages: ChatMessage[]; changed: boolean; fingerprint: string }> {
     try {
       const serverMessages = await this.plugin.openCodeService.getSessionMessages(conversation.openCodeSessionId);
-      const serverUserDiagnostics = serverMessages
-        .filter(({ info }) => info.role === 'user')
-        .map(({ info, parts }) => {
-          const rawText = parts
-            .filter((part) => typeof part.text === 'string')
-            .map((part) => part.text as string)
-            .join('');
-          const converted = OpenCodeService.openCodeMessageToChatMessage(info, parts);
-          return {
-            sourceMessageId: converted.sourceMessageId ?? null,
-            rawTextPreview: this.getLogPreview(rawText),
-            visibleTextPreview: this.getLogPreview(this.getVisibleUserMessageText(converted)),
-            omoDetected: Boolean(converted.omo),
-            omoKind: converted.omo?.kind ?? null,
-            omoModeTag: converted.omo?.kind === 'user-injection' ? converted.omo.modeTag : null,
-          };
-        });
-      if (serverUserDiagnostics.some((entry) => entry.omoDetected)) {
-        logger.debug(`Server user message diagnostics: ${this.stringifyLogPayload({
-          conversationId: conversation.id,
-          sessionId: conversation.openCodeSessionId,
-          users: serverUserDiagnostics,
-        })}`);
-      }
+      const convertedServerMessages = serverMessages.map(({ info, parts }) =>
+        OpenCodeService.openCodeMessageToChatMessage(info, parts),
+      );
+      this.logOmoBackgroundTaskDiagnostics(conversation, conversation.messages, convertedServerMessages);
       const converted = this.mergeSyncedMessageModelIds(
         conversation.messages,
-        serverMessages.map(({ info, parts }) => OpenCodeService.openCodeMessageToChatMessage(info, parts)),
+        convertedServerMessages,
       );
       const noticeMessages = conversation.messages.filter(
         (message) => message.displayStyle === 'notice' && !message.sourceMessageId,
       );
       const merged = [...converted, ...noticeMessages].sort((left, right) => left.timestamp - right.timestamp);
       const fingerprint = this.getConversationSyncFingerprint(merged);
-      const previousFingerprint = this.lastConversationSyncFingerprint
+      const previousFingerprint = this.getTabRuntimeState(tabId)?.lastConversationSyncFingerprint
         ?? this.getConversationSyncFingerprint(conversation.messages);
       const changed = fingerprint !== previousFingerprint;
 
@@ -3310,7 +4168,7 @@ export class OpenCodianView extends ItemView {
         conversation.messages = merged;
       }
 
-      if (this.currentConversation?.id === conversation.id) {
+      if (this.currentConversation?.id === conversation.id && this.getActiveTabId() === tabId) {
         await this.refreshActiveTabContextUsageFromServer();
       }
       if (changed) {
@@ -3367,21 +4225,18 @@ export class OpenCodianView extends ItemView {
     }
 
     const shouldStickToBottom = this.isNearBottom();
-    const hasBackgroundCompletionNotice = appendedMessages.some(
-      (message) => message.omo?.kind === 'system-reminder' && message.omo.reminderType === 'all-background-tasks-complete',
-    );
-    const hasBackgroundFollowUp = this.backgroundTaskWaitingForFollowUp && appendedMessages.some(
-      (message) => message.role === 'assistant' && message.displayStyle !== 'notice',
-    );
-    if (hasBackgroundCompletionNotice || hasBackgroundFollowUp) {
-      this.resetBackgroundTaskIndicator();
-    }
+    this.syncBackgroundTaskStateFromConversation(this.currentConversation);
 
-    for (const message of appendedMessages) {
-      if (this.shouldPseudoStreamSyncedAssistantMessage(message)) {
-        await this.renderSyncedAssistantMessageWithReveal(message);
+    const groups = buildMessageRenderGroups(appendedMessages);
+    for (const group of groups) {
+      const messageToRender = group.mergedAssistant && group.messages.length > 1
+        ? mergeAssistantMessagesForRender(group.messages)
+        : group.messages[0];
+
+      if (this.shouldPseudoStreamSyncedAssistantMessage(messageToRender)) {
+        await this.renderSyncedAssistantMessageWithReveal(messageToRender);
       } else {
-        await this.renderMessage(message);
+        await this.renderMessage(messageToRender);
       }
     }
 
@@ -3446,15 +4301,23 @@ export class OpenCodianView extends ItemView {
     const chunks = this.splitPseudoStreamChunks(message.content);
     const delayMs = this.getPseudoStreamDelay(chunks.length);
 
+    messageEl.style.visibility = 'hidden';
+
     let rendered = '';
     for (const chunk of chunks) {
       rendered += chunk;
       await this.renderMarkdownInto(textEl, rendered);
+      if (messageEl.style.visibility === 'hidden') {
+        messageEl.style.visibility = '';
+      }
       if (delayMs > 0) {
         await this.sleep(delayMs);
       }
     }
 
+    if (messageEl.style.visibility === 'hidden') {
+      messageEl.style.visibility = '';
+    }
     this.addTimestampWithCopyButton(messageEl, message.timestamp, message.content, message.modelId);
     this.streamingMessageEl = null;
     this.streamingContentEl = null;
@@ -4449,7 +5312,7 @@ export class OpenCodianView extends ItemView {
       .map((line) => line.trim())
       .filter((line) => line.length > 0);
     const headline = message.omo.headline;
-    const detailLines = lines.filter((line) => line !== headline).slice(0, 2);
+    const detailLines = lines.filter((line) => line !== headline);
     if (detailLines.length > 0) {
       return detailLines.join('\n\n');
     }
@@ -4733,42 +5596,63 @@ export class OpenCodianView extends ItemView {
   }
 
   private beginActiveTabContextUsageStream(): void {
-    if (!this.tabManager?.getActiveTab()) {
-      return;
-    }
-
-    const nextState = ContextUsageService.beginStream(
-      this.tabManager.getActiveTabContextUsage() ?? createEmptyTabContextState(),
-    );
-    this.tabManager.setActiveTabContextUsage(nextState);
-    this.refreshContextUsageIndicator();
+    this.beginTabContextUsageStream(this.getActiveTabId());
   }
 
   private completeActiveTabContextUsageStream(): void {
-    if (!this.tabManager?.getActiveTab()) {
-      return;
-    }
-
-    const nextState = ContextUsageService.completeStream(
-      this.tabManager.getActiveTabContextUsage() ?? createEmptyTabContextState(),
-    );
-    this.tabManager.setActiveTabContextUsage(nextState);
-    this.refreshContextUsageIndicator();
+    this.completeTabContextUsageStream(this.getActiveTabId());
   }
 
   private applyUsageChunkToActiveTab(
     chunk: Extract<import('../../core/types').StreamChunk, { type: 'usage' }>,
   ): void {
-    if (!this.tabManager?.getActiveTab()) {
+    this.applyUsageChunkToTab(this.getActiveTabId(), chunk);
+  }
+
+  private beginTabContextUsageStream(tabId: TabId | null): void {
+    if (!this.tabManager?.getTab(tabId ?? '')) {
+      return;
+    }
+
+    const nextState = ContextUsageService.beginStream(
+      this.tabManager.getTabContextUsage(tabId) ?? createEmptyTabContextState(),
+    );
+    this.tabManager.setTabContextUsage(tabId, nextState);
+    if (tabId === this.getActiveTabId()) {
+      this.refreshContextUsageIndicator();
+    }
+  }
+
+  private completeTabContextUsageStream(tabId: TabId | null): void {
+    if (!this.tabManager?.getTab(tabId ?? '')) {
+      return;
+    }
+
+    const nextState = ContextUsageService.completeStream(
+      this.tabManager.getTabContextUsage(tabId) ?? createEmptyTabContextState(),
+    );
+    this.tabManager.setTabContextUsage(tabId, nextState);
+    if (tabId === this.getActiveTabId()) {
+      this.refreshContextUsageIndicator();
+    }
+  }
+
+  private applyUsageChunkToTab(
+    tabId: TabId | null,
+    chunk: Extract<import('../../core/types').StreamChunk, { type: 'usage' }>,
+  ): void {
+    if (!this.tabManager?.getTab(tabId ?? '')) {
       return;
     }
 
     const nextState = ContextUsageService.applyUsageChunk(
-      this.tabManager.getActiveTabContextUsage() ?? createEmptyTabContextState(),
+      this.tabManager.getTabContextUsage(tabId) ?? createEmptyTabContextState(),
       chunk,
     );
-    this.tabManager.setActiveTabContextUsage(nextState);
-    this.refreshContextUsageIndicator();
+    this.tabManager.setTabContextUsage(tabId, nextState);
+    if (tabId === this.getActiveTabId()) {
+      this.refreshContextUsageIndicator();
+    }
   }
 
   // Permission selector state
@@ -5002,7 +5886,8 @@ export class OpenCodianView extends ItemView {
 
   /** Show inline permission request card in the chat stream */
   private async showPermissionDialog(
-    request: Extract<import('../../core/types').StreamChunk, { type: 'permission_request' }>
+    request: Extract<import('../../core/types').StreamChunk, { type: 'permission_request' }>,
+    tabId: TabId | null = this.getActiveTabId(),
   ): Promise<void> {
     const { t } = await import('../../i18n');
     const { id, permission, patterns, metadata } = request;
@@ -5019,7 +5904,7 @@ export class OpenCodianView extends ItemView {
 
     // Find the message element to insert the permission card
     // Note: Tool calls are rendered directly on messageEl, not in contentEl
-    const messageEl = this.streamingMessageEl;
+    const messageEl = this.getTabRuntimeState(tabId)?.streamingMessageEl ?? null;
     if (!messageEl) {
       logger.error('No streaming message element found for permission card');
       return;

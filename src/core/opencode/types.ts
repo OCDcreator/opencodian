@@ -12,6 +12,7 @@ import type {
   ServerMode,
   ThinkingBudget,
 } from '../types/settings';
+import type { SdkFeatureFlags } from './sdkFeatureFlags';
 
 /** Response handler callbacks */
 export interface ResponseHandler {
@@ -70,3 +71,5 @@ export interface ManagedServerState {
   host: string;
   port: number;
 }
+
+export type { SdkFeatureFlags };

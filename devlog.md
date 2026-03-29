@@ -8,6 +8,231 @@
 
 ---
 
+## 2026-03-29 多 Tab 真并发发送落地、流状态去全局化与接力文档补强
+
+### ✨ 改动目标
+
+- 解决“一个 tab 在跑时，另一个 tab 仍不能真正发送”的问题。
+- 让 tab 不只是“可切换”，而是“会话状态、流状态、后台任务状态都真正独立”。
+- 将这轮并发能力落地同步回 `devlog.md`、`AGENTS.md` 与 SDK v2 mapping，方便后续会话继续接力。
+
+### 🏗️ 实现内容
+
+#### 1. OpenCodeService 流状态改为按 session 独立
+
+- `OpenCodeService` 不再使用单一全局：
+  - `currentAbortController`
+  - `currentAbortSessionId`
+  - `partTypeMap`
+- 新增按 `sessionId` 维护的 `activeStreams`：
+  - 每个会话各自拥有 `AbortController`
+  - 每个会话各自拥有 `partTypeMap`
+- `cancelStream()` 升级为按 session 定位取消；UI 现在会取消当前 tab 对应 session，而不会误伤别的 tab 流。
+
+#### 2. OpenCodianView 改为每个 tab 一份 runtime
+
+- 新增 `TabRuntimeState`，把以下状态从“全局单份”拆到“每个 tab 一份”：
+  - `isStreaming`
+  - `streamController`
+  - `streamingMessageEl`
+  - `streamingContentEl`
+  - `currentTurnBodyEl`
+  - `lastConversationSyncFingerprint`
+  - `isConversationSyncInFlight`
+  - 后台任务 indicator / 启动时间 / task 列表 / waiting 状态
+- 每个 tab 现在都有自己的消息 pane 与自己的 `StreamController`，因此：
+  - Tab A 可继续流式输出
+  - Tab B 可同时发起新请求
+  - 两边不会再争抢同一套 UI streaming 引用
+
+#### 3. 后台任务与隐藏 tab 同步也改为按 tab 处理
+
+- 后台任务卡片、完成任务列表、waiting 状态全部绑定到对应 tab runtime。
+- 新增后台同步扫描逻辑：
+  - 当前可见 tab 继续做普通同步
+  - 非当前 tab 但仍有后台任务的会话，也会单独同步
+- 因此后台任务不再依赖“唯一 stream owner tab”的旧假设。
+
+#### 4. 交互细节修正
+
+- 权限卡片现在会插入到发起请求的那个 tab 的流消息中。
+- `processingBlocked` 文案改为“当前标签仍在处理”，不再误导成“另一个标签阻塞了你”。
+- 关闭 tab 时，如果该 tab 仍在 streaming 或仍有后台任务，仍会阻止关闭，避免丢失跟踪状态。
+
+#### 5. 文档同步
+
+- `AGENTS.md`
+  - 补充多 tab 真并发与 per-tab runtime 说明
+  - 补充 `OpenCodeService` 的 per-session active stream 现状
+- `docs/opencode-service-sdk-v2-mapping.md`
+  - 同步“流式主链 / 取消模块”当前已落地的并发能力
+  - 标明多 tab 并发依赖于 service per-session stream context + view per-tab runtime
+
+### 🧪 验证
+
+- `npm run typecheck` 通过
+- 定向测试通过：
+  - `tests/unit/core/opencode/OpenCodeService.test.ts`
+  - `tests/unit/features/chat/tabs/TabManager.test.ts`
+  - `tests/unit/features/chat/tabs/TabBar.test.ts`
+- 全量测试通过：`npm run test`（145/145）
+- `npm run build` 成功
+- 已部署到 Test Vault
+- 本轮最终验证使用的 `BUILD_ID`：`main.202603291519`
+
+### 📁 涉及文件
+
+- `src/core/opencode/OpenCodeService.ts`
+- `src/features/chat/OpenCodianView.ts`
+- `src/features/chat/tabs/Tab.ts`
+- `src/features/chat/tabs/TabManager.ts`
+- `src/features/chat/tabs/TabBar.ts`
+- `src/i18n/locales/en.ts`
+- `src/i18n/locales/zh.ts`
+- `tests/unit/core/opencode/OpenCodeService.test.ts`
+- `tests/unit/features/chat/tabs/TabManager.test.ts`
+- `tests/unit/features/chat/tabs/TabBar.test.ts`
+- `devlog.md`
+- `AGENTS.md`
+- `docs/opencode-service-sdk-v2-mapping.md`
+
+### 📌 当前结论
+
+- OpenCodian 现在已支持“多 tab 多任务并发发送”，前提是它们属于不同 session/tab。
+- SDK v2 主链的流式接入不再被单全局流状态卡死，这为后续 `question.*`、`syncEvent` 与更完整事件消费打下了更稳的底座。
+- 后续如果继续迭代，应优先补自动化测试覆盖“多 tab 同时 streaming + 后台任务回写”的组合场景。
+
+---
+
+## 2026-03-29 OpenCodeService → SDK v2 渐进迁移主链落地与接力文档同步
+
+### ✨ 改动目标
+
+- 将 `OpenCodeService` 的核心 API / prompt / streaming 主链逐步切到 OpenCode JS SDK v2。
+- 保持 `ServerManager`、`OpenCodeService` facade、`ChatMessage` / `StreamChunk` / OMO 兼容层不变。
+- 补齐新会话接力所需的迁移状态文档、手工验收清单与 AGENTS 说明。
+
+### 🏗️ 实现内容
+
+#### 1. SDK v2 依赖、类型桥接与开关护栏
+
+- 精确锁定 `@opencode-ai/sdk@1.3.3`
+- 新增：
+  - `src/core/opencode/sdkFeatureFlags.ts`
+  - `src/core/opencode/sdkTypes.ts`
+- 引入内部 feature flags：
+  - `sdkCrud`
+  - `sdkPrompt`
+  - `sdkStream`
+  - `sdkAbort`
+  - `sdkQuestions`
+  - `sdkSync`
+- 默认全关；插件组合根在 `src/main.ts` 里显式启用 rollout defaults，单元测试仍可保守使用 legacy 默认值
+
+#### 2. SDK client factory 与 hybrid transport
+
+- 新增：
+  - `src/core/opencode/createSdkClient.ts`
+  - `src/core/opencode/sdkFetch.ts`
+- 统一注入：
+  - `baseUrl`
+  - 认证头
+  - `directory`
+- JSON 请求继续复用 Obsidian `requestUrl()` 并包装成标准 `Response`
+- SSE 请求继续使用原生 `fetch()`
+- SDK client 固定：
+  - `responseStyle: "data"`
+  - `throwOnError: true`
+
+#### 3. OpenCodeService 主链迁移
+
+- 已切 SDK 的能力：
+  - `checkHealth()`
+  - `createSession()`
+  - `listSessions()`
+  - `getSessionMessages()`
+  - `deleteSession()`
+  - `updateSessionTitle()`
+  - `forkSession()`
+  - `revertSession()`
+  - `getAvailableModels()`
+  - `getPendingPermissions()`
+  - `respondToPermission()`
+  - `requestAssistantResponse()`
+  - `sendMessage()`
+  - `cancelStream()` 的服务端 abort 补全
+- 读链路保留 fallback：
+  - SDK 失败时回退 legacy HTTP / legacy SSE
+- 写链路不做自动重试，只保留模块级回滚能力
+
+#### 4. 当前已完成与未完成边界
+
+- 已完成：
+  - CRUD 迁移
+  - 非流式 prompt 迁移
+  - 流式主链迁移
+  - 双通道取消（本地 abort + 服务端 abort）
+  - 路径说明与 handoff 文档同步
+- 仍待补齐：
+  - `format` / `agent` / `noReply`
+  - `thinkingBudget` 真正映射
+  - `externalContextPaths` / 真实 file parts
+  - 图片 file part
+  - `question.*`
+  - `global.syncEvent.subscribe()`
+  - `session.summarize()` / `session.diff()`
+  - 旧链路收敛
+
+#### 5. 文档同步
+
+- `docs/opencode-service-sdk-v2-mapping.md`
+  - 补齐精确 SDK 参考路径
+  - 同步当前模块进度
+  - 标明已实现 / 未实现 / 接力注意事项
+- 新增 `docs/opencode-sdk-v2-manual-checklist.md`
+  - 供 Test Vault 手工回归 SDK v2 主链
+- `AGENTS.md`
+  - 补充 SDK v2 混合架构、关键文件、当前模块状态与接力规则
+
+### 🧪 验证
+
+- `npm run typecheck` 通过
+- `npm run lint` 通过
+- `npm run test` 通过（140/140）
+- `npm run build` 成功
+- 已部署到 Test Vault
+- 本轮最终验证使用的 `BUILD_ID`：`main.202603291252`
+
+### 📁 涉及文件
+
+- `package.json`
+- `package-lock.json`
+- `src/core/opencode/OpenCodeService.ts`
+- `src/core/opencode/createSdkClient.ts`
+- `src/core/opencode/sdkFeatureFlags.ts`
+- `src/core/opencode/sdkFetch.ts`
+- `src/core/opencode/sdkTypes.ts`
+- `src/core/opencode/index.ts`
+- `src/core/opencode/types.ts`
+- `src/main.ts`
+- `tests/unit/core/opencode/OpenCodeService.test.ts`
+- `tests/unit/core/opencode/createSdkClient.test.ts`
+- `tests/unit/core/opencode/sdkFetch.test.ts`
+- `docs/opencode-service-sdk-v2-mapping.md`
+- `docs/opencode-sdk-v2-manual-checklist.md`
+- `AGENTS.md`
+
+### 📌 当前结论
+
+- `OpenCodeService` 已进入“SDK v2 主链 + legacy 回滚链路并存”的稳定过渡态。
+- 新会话继续开发时，应优先补齐 prompt/file/question/sync 的剩余缺口，而不是提前删除 legacy fallback。
+- 当前最重要的文档入口是：
+  - `docs/opencode-service-sdk-v2-mapping.md`
+  - `docs/opencode-sdk-v2-manual-checklist.md`
+  - `AGENTS.md`
+
+---
+
 ## 2026-03-29 OMO 兼容主链落地、后台任务可见性补强与文档同步
 
 ### ✨ 改动目标

@@ -51,6 +51,11 @@ export interface OmoUserInjectionMeta {
   headline: string;
 }
 
+export interface OmoBackgroundTaskInfo {
+  id: string;
+  description: string;
+}
+
 export interface OmoSystemReminderMeta {
   kind: 'system-reminder';
   reminderType: OmoReminderType;
@@ -58,6 +63,7 @@ export interface OmoSystemReminderMeta {
   rawText: string;
   headline: string;
   isInternalInitiator: boolean;
+  tasks?: OmoBackgroundTaskInfo[];
 }
 
 export type OmoMessageMeta = OmoUserInjectionMeta | OmoSystemReminderMeta;

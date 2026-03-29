@@ -11,7 +11,7 @@ import { Notice, Plugin } from 'obsidian';
 import * as path from 'path';
 
 import { ModelConfigService, OpencodeConfigManager } from './core/config';
-import { OpenCodeService } from './core/opencode';
+import { OpenCodeService, SDK_FEATURE_FLAG_ROLLOUT_DEFAULTS } from './core/opencode';
 import { StorageService } from './core/storage';
 import type { Conversation, OpenCodianSettings, PlatformDebugLogPaths } from './core/types';
 import {
@@ -92,6 +92,7 @@ export default class OpenCodianPlugin extends Plugin {
       },
       {
         initialManagedServerState,
+        sdkFeatureFlags: SDK_FEATURE_FLAG_ROLLOUT_DEFAULTS,
         onManagedServerStateChange: (state) => {
           void this.storage.saveManagedServerState(state);
         },

@@ -408,8 +408,30 @@
 }
 
 .opencodian-tab-bar-item.is-streaming .opencodian-tab-bar-state,
+.opencodian-tab-bar-item.has-background-task .opencodian-tab-bar-state,
 .opencodian-tab-bar-item.needs-attention .opencodian-tab-bar-state {
   color: var(--interactive-accent);
+}
+
+.opencodian-tab-bar-item.has-background-task {
+  border-color: color-mix(in srgb, var(--text-warning) 60%, var(--opencodian-glass-border-strong));
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--opencodian-glass-specular) 94%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, var(--text-warning) 16%, transparent),
+    inset 0 8px 14px color-mix(in srgb, var(--text-warning) 8%, transparent),
+    0 6px 18px color-mix(in srgb, var(--text-warning) 12%, transparent);
+  opacity: 0.92;
+  filter: saturate(0.96);
+}
+
+.opencodian-tab-bar-item.is-active.has-background-task {
+  border-color: color-mix(in srgb, var(--text-warning) 72%, var(--interactive-accent));
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--opencodian-glass-specular) 96%, transparent),
+    inset 0 -1px 0 color-mix(in srgb, var(--background-modifier-border-hover) 42%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, var(--text-warning) 24%, transparent),
+    inset 0 10px 20px color-mix(in srgb, var(--text-warning) 10%, transparent),
+    0 8px 24px color-mix(in srgb, var(--text-warning) 16%, transparent);
 }
 
 .opencodian-tab-bar-item.needs-attention:not(.is-active) {
@@ -479,6 +501,36 @@
 .opencodian-tab-bar-item.is-streaming .opencodian-tab-bar-badge {
   position: relative;
   z-index: 1;
+}
+
+.opencodian-tab-bar-item.has-background-task .opencodian-tab-bar-badge-wrap::before,
+.opencodian-tab-bar-item.has-background-task .opencodian-tab-bar-badge-wrap::after {
+  opacity: 1;
+}
+
+.opencodian-tab-bar-item.has-background-task .opencodian-tab-bar-badge-wrap::before {
+  inset: -5px;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--text-warning) 34%, transparent) 0%,
+    color-mix(in srgb, var(--text-warning) 18%, transparent) 55%,
+    transparent 78%
+  );
+  animation: opencodian-tab-background-pulse 1.5s ease-in-out infinite;
+}
+
+.opencodian-tab-bar-item.has-background-task .opencodian-tab-bar-badge-wrap::after {
+  inset: -4px;
+  border: 1px solid color-mix(in srgb, var(--text-warning) 52%, transparent);
+  background: transparent;
+  animation: opencodian-tab-background-ring 1.8s ease-out infinite;
+}
+
+.opencodian-tab-bar-item.has-background-task .opencodian-tab-bar-badge {
+  position: relative;
+  z-index: 1;
+  background: color-mix(in srgb, var(--text-warning) 18%, var(--background-modifier-hover));
+  color: color-mix(in srgb, var(--text-warning) 84%, var(--text-normal));
 }
 
 .opencodian-tab-bar-title {
@@ -573,6 +625,37 @@
   height: 12px;
 }
 
+.opencodian-tab-bar-state.is-background-task {
+  width: 16px;
+  height: 12px;
+  color: var(--text-warning);
+}
+
+.opencodian-tab-activity-dots {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 100%;
+}
+
+.opencodian-tab-activity-dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.4;
+  animation: opencodian-tab-background-dots 1.15s ease-in-out infinite;
+}
+
+.opencodian-tab-activity-dot:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.opencodian-tab-activity-dot:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
 .opencodian-tab-bar-item.is-streaming .opencodian-tab-bar-state {
   display: none;
 }
@@ -658,6 +741,11 @@
   box-shadow: 0 1px 4px color-mix(in srgb, var(--text-normal) 18%, transparent);
 }
 
+.opencodian-tab-bar[data-layout="below-header-vertical"] .opencodian-tab-bar-item.has-background-task .opencodian-tab-bar-state {
+  background: color-mix(in srgb, var(--text-warning) 12%, var(--background-primary));
+  box-shadow: 0 1px 6px color-mix(in srgb, var(--text-warning) 28%, transparent);
+}
+
 .opencodian-tab-overflow-menu {
   position: fixed;
   display: flex;
@@ -701,6 +789,10 @@
   color: var(--text-warning);
 }
 
+.opencodian-tab-overflow-menu-item.has-background-task:not(.is-active) {
+  background: color-mix(in srgb, var(--text-warning) 8%, transparent);
+}
+
 .opencodian-tab-overflow-menu-badge {
   display: inline-flex;
   align-items: center;
@@ -740,6 +832,11 @@
   height: 14px;
 }
 
+.opencodian-tab-overflow-menu-state.is-background-task {
+  width: 18px;
+  color: var(--text-warning);
+}
+
 .opencodian-tab-overflow-menu-state.is-streaming svg {
   animation: opencodian-spin 0.9s linear infinite;
 }
@@ -757,6 +854,39 @@
 @keyframes opencodian-spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
+}
+
+@keyframes opencodian-tab-background-pulse {
+  0%, 100% {
+    opacity: 0.35;
+    transform: scale(0.92);
+  }
+  50% {
+    opacity: 0.88;
+    transform: scale(1.08);
+  }
+}
+
+@keyframes opencodian-tab-background-ring {
+  0% {
+    opacity: 0.78;
+    transform: scale(0.8);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.25);
+  }
+}
+
+@keyframes opencodian-tab-background-dots {
+  0%, 80%, 100% {
+    opacity: 0.34;
+    transform: translateY(0) scale(0.9);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-1px) scale(1.18);
+  }
 }
 
 @keyframes opencodian-tab-badge-orbit {
@@ -781,6 +911,14 @@
   gap: 12px;
   background: transparent;
   scrollbar-gutter: stable;
+}
+
+.opencodian-messages-pane {
+  display: none;
+}
+
+.opencodian-messages-pane.is-active {
+  display: flex;
 }
 
 .opencodian-messages--sticky-basic,
@@ -1283,6 +1421,28 @@
 
 .opencodian-chat-notice-icon--background-task svg {
   animation: opencodian-spin 0.9s linear infinite;
+}
+
+.opencodian-chat-notice-task-list {
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.opencodian-chat-notice-task-list ul,
+.opencodian-chat-notice-task-list ol {
+  margin: 0.45em 0 0;
+  padding-left: 1.35em;
+}
+
+.opencodian-chat-notice-task-list li {
+  margin: 0.3em 0;
+}
+
+.opencodian-chat-notice-task-list code {
+  white-space: break-spaces;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .opencodian-chat-notice-body {
@@ -3927,11 +4087,17 @@
   padding: 0.2em 0.4em;
   border-radius: 3px;
   color: var(--code-normal);
+  white-space: break-spaces;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .opencodian-message-text pre code {
   padding: 0;
   background: transparent;
+  white-space: pre;
+  overflow-wrap: normal;
+  word-break: normal;
 }
 
 /* Images */
@@ -4004,6 +4170,9 @@
   width: 100%;
   border-collapse: collapse;
   margin: 0.5em 0;
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
 }
 
 .opencodian-message-text th,
@@ -4011,6 +4180,9 @@
   padding: 0.5em;
   border: 1px solid var(--background-modifier-border);
   text-align: left;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .opencodian-message-text th {

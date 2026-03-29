@@ -52,4 +52,39 @@ describe('TabManager', () => {
       model: 'claude-sonnet',
     });
   });
+
+  it('tracks background-task state separately from streaming', () => {
+    const manager = createManager();
+    manager.createTab({ id: 'conv-1', title: 'Chat 1' });
+
+    manager.setActiveTabStreaming(false);
+    manager.setActiveTabBackgroundTaskRunning(true);
+
+    expect(manager.getActiveTab()?.isStreaming).toBe(false);
+    expect(manager.getActiveTab()?.hasBackgroundTask).toBe(true);
+    expect(manager.getTabBarItems()[0].hasBackgroundTask).toBe(true);
+  });
+
+  it('updates tab streaming state by tab id', () => {
+    const manager = createManager();
+    const first = manager.createTab({ id: 'conv-1', title: 'Chat 1' })!;
+    const second = manager.createTab({ id: 'conv-2', title: 'Chat 2' })!;
+
+    manager.setTabStreaming(first.id, true);
+
+    expect(manager.getTab(first.id)?.isStreaming).toBe(true);
+    expect(manager.getTab(second.id)?.isStreaming).toBe(false);
+  });
+
+  it('updates tab context usage by tab id', () => {
+    const manager = createManager();
+    const first = manager.createTab({ id: 'conv-1', title: 'Chat 1' })!;
+
+    manager.setTabContextUsage(first.id, {
+      ...manager.getTabContextUsage(first.id)!,
+      estimatedInputTokens: 42,
+    });
+
+    expect(manager.getTabContextUsage(first.id)?.estimatedInputTokens).toBe(42);
+  });
 });

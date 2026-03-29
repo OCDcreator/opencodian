@@ -13,10 +13,14 @@ import {
   resolveToolExecutionStatus,
   resolveToolResultText,
 } from '../../shared';
-import { detectOmoMessageMeta } from './omoCompat';
 import type { ChatMessage, ContentBlock, ImageAttachment, PermissionReply, PermissionRequest, StreamChunk } from '../types';
 import type { OpenCodianSettings } from '../types/settings';
 import { getServerBaseUrl, isLocalServerMode } from '../types/settings';
+import { createSdkClient } from './createSdkClient';
+import { detectOmoMessageMeta } from './omoCompat';
+import type { SdkFeatureFlags } from './sdkFeatureFlags';
+import { resolveSdkFeatureFlags } from './sdkFeatureFlags';
+import type { SdkEvent, SdkOpencodeClient } from './sdkTypes';
 import { ServerManager } from './ServerManager';
 import type { ManagedServerState, OpenCodeServerConfig, QueryOptions, ResponseHandler } from './types';
 
@@ -96,6 +100,7 @@ interface OpenCodeServiceEvents {
 interface OpenCodeServiceRuntimeOptions {
   initialManagedServerState?: ManagedServerState | null;
   onManagedServerStateChange?: (state: ManagedServerState | null) => void;
+  sdkFeatureFlags?: Partial<SdkFeatureFlags>;
 }
 
 /** Session data structure */
@@ -179,7 +184,16 @@ interface SessionContextUsageSnapshot {
   totalCost: number;
 }
 
+interface StreamingState {
+  lastContent: string;
+  processedToolIds: Set<string>;
+}
 
+interface ActiveStreamContext {
+  sessionId: string;
+  abortController: AbortController;
+  partTypeMap: Map<string, string>;
+}
 
 export class OpenCodeService {
   private settings: OpenCodianSettings;
@@ -188,8 +202,9 @@ export class OpenCodeService {
   private currentSessionId: string | null = null;
   private responseHandlers: ResponseHandler[] = [];
   private baseUrl: string;
-  private partTypeMap: Map<string, string> = new Map(); // Track part types by partID
-  private currentAbortController: AbortController | null = null; // For cancelling streams
+  private activeStreams = new Map<string, ActiveStreamContext>();
+  private sdkFeatureFlags: SdkFeatureFlags;
+  private vaultPath?: string;
 
   constructor(
     settings: OpenCodianSettings,
@@ -199,6 +214,7 @@ export class OpenCodeService {
     this.settings = cloneSettings(settings);
     this.events = events;
     this.baseUrl = getServerBaseUrl(settings.server);
+    this.sdkFeatureFlags = resolveSdkFeatureFlags(runtimeOptions.sdkFeatureFlags);
 
     this.serverManager = new ServerManager(
       this.buildServerConfig(settings),
@@ -230,6 +246,7 @@ export class OpenCodeService {
 
   /** Set the vault path for OpenCode server to use project config */
   setVaultPath(path: string): void {
+    this.vaultPath = path;
     this.serverManager.setWorkingDirectory(path);
   }
 
@@ -306,6 +323,15 @@ export class OpenCodeService {
   async checkHealth(): Promise<boolean> {
     if (!this.baseUrl) {
       return false;
+    }
+
+    if (this.shouldUseSdk('sdkCrud')) {
+      try {
+        const response = await this.getSdkClient().global.health();
+        return this.normalizeHealthResponse(response);
+      } catch (error) {
+        logger.warn('SDK health check failed, falling back to ServerManager health probe', error);
+      }
     }
 
     return this.serverManager.checkHealth(3000);
@@ -422,6 +448,17 @@ export class OpenCodeService {
 
   /** Create a new session - returns Session object with id property */
   async createSession(title?: string, options: { setCurrent?: boolean } = {}): Promise<string> {
+    if (this.shouldUseSdk('sdkCrud')) {
+      const response = await this.getSdkClient().session.create({
+        title: title ?? 'New Conversation',
+      });
+      const sessionId = this.normalizeSessionId(response);
+
+      if (options.setCurrent ?? true) {
+        this.currentSessionId = sessionId;
+      }
+      return sessionId;
+    }
 
     
     const response = await this.post<unknown>('/session', {
@@ -456,18 +493,36 @@ export class OpenCodeService {
   }
 
   /** Cancel the current streaming response */
-  cancelStream(): void {
-    if (this.currentAbortController) {
-      logger.debug('Cancelling stream...');
-      this.currentAbortController.abort();
-      logger.debug('Abort signal sent');
-    } else {
-      logger.debug('No active stream to cancel');
+  cancelStream(sessionId?: string): void {
+    const targetSessionId = sessionId ?? this.currentSessionId;
+    if (!targetSessionId) {
+      logger.debug('No session specified for stream cancellation');
+      return;
     }
+
+    const streamContext = this.activeStreams.get(targetSessionId);
+    if (!streamContext) {
+      logger.debug(`No active stream to cancel for session ${targetSessionId}`);
+      return;
+    }
+
+    logger.debug(`Cancelling stream for session ${targetSessionId}...`);
+    streamContext.abortController.abort();
+    logger.debug('Abort signal sent');
+    void this.abortSessionOnServer(targetSessionId);
   }
 
   /** List all sessions */
   async listSessions(): Promise<Session[]> {
+    if (this.shouldUseSdk('sdkCrud')) {
+      try {
+        const response = await this.getSdkClient().session.list();
+        return Array.isArray(response) ? response as Session[] : [];
+      } catch (error) {
+        logger.warn('SDK session.list failed, falling back to legacy HTTP', error);
+      }
+    }
+
     try {
       return await this.get<Session[]>('/session');
     } catch {
@@ -481,7 +536,15 @@ export class OpenCodeService {
       logger.warn('getSessionMessages called with empty sessionId');
       return [];
     }
-    
+
+    if (this.shouldUseSdk('sdkCrud')) {
+      try {
+        const response = await this.getSdkClient().session.messages({ sessionID: sessionId });
+        return this.normalizeSessionMessages(response);
+      } catch (error) {
+        logger.warn(`SDK session.messages failed for ${sessionId}, falling back to legacy HTTP`, error);
+      }
+    }
 
     
     try {
@@ -502,7 +565,11 @@ export class OpenCodeService {
 
   /** Delete a session */
   async deleteSession(sessionId: string): Promise<void> {
-    await this.delete(`/session/${sessionId}`);
+    if (this.shouldUseSdk('sdkCrud')) {
+      await this.getSdkClient().session.delete({ sessionID: sessionId });
+    } else {
+      await this.delete(`/session/${sessionId}`);
+    }
 
     if (this.currentSessionId === sessionId) {
       this.currentSessionId = null;
@@ -511,6 +578,14 @@ export class OpenCodeService {
 
   /** Update a session title */
   async updateSessionTitle(sessionId: string, title: string): Promise<void> {
+    if (this.shouldUseSdk('sdkCrud')) {
+      await this.getSdkClient().session.update({
+        sessionID: sessionId,
+        title,
+      });
+      return;
+    }
+
     await this.patch<Session>(`/session/${sessionId}`, { title });
   }
 
@@ -522,6 +597,18 @@ export class OpenCodeService {
     const sessionId = options.sessionId ?? this.currentSessionId;
     if (!sessionId) {
       throw new Error('No active session');
+    }
+
+    if (this.shouldUseSdk('sdkPrompt')) {
+      const response = await this.getSdkClient().session.prompt(
+        this.buildSdkPromptParameters(sessionId, message, options),
+      );
+      if (response && typeof response === 'object' && 'info' in response && 'parts' in response) {
+        const typedResponse = response as AssistantMessageResponse;
+        return OpenCodeService.openCodeMessageToChatMessage(typedResponse.info, typedResponse.parts);
+      }
+
+      throw new Error('Invalid assistant response payload');
     }
 
     const providerID = options.provider ?? this.settings.defaultProvider;
@@ -557,6 +644,11 @@ export class OpenCodeService {
     const sessionId = options.sessionId ?? this.currentSessionId;
     if (!sessionId) {
       yield { type: 'error', content: 'No active session' };
+      return;
+    }
+
+    if (this.shouldUseSdk('sdkStream')) {
+      yield* this.sendMessageWithSdk(message, options, sessionId);
       return;
     }
 
@@ -605,236 +697,543 @@ export class OpenCodeService {
       };
       
 
-      
+
       await this.post<void>(`/session/${sessionId}/prompt_async`, requestBody);
 
 
+      const streamContext = this.createActiveStreamContext(sessionId);
       yield { type: 'message_start' };
-
-      // Use SSE for real-time streaming
-      const sseUrl = `${this.baseUrl}/event`;
-
-
-      // Create SSE stream with abort controller
-      this.currentAbortController = new AbortController();
-      const eventStream = this.connectSSE(sseUrl, this.currentAbortController.signal);
-      
-      // Track state for content changes
-      let lastContent = '';
-      const processedToolIds = new Set<string>();
-      const toolStartTimes = new Map<string, number>();
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const TOOL_TIMEOUT_MS = 60000;
-      
-      // Track if we're done
-      const checkInterval: ReturnType<typeof setInterval> | null = null;
-      
-      // Start periodic message check as fallback
-      
       try {
-
-        for await (const event of eventStream) {
-          // Check if cancelled
-          if (this.currentAbortController?.signal.aborted) {
-            // eslint-disable-next-line no-console
-            logger.debug('Stream aborted, breaking loop');
-            break;
-          }
-          // Parse the nested data structure
-          let eventData: OpenCodeEvent;
-          try {
-            eventData = JSON.parse(event.data) as OpenCodeEvent;
-          } catch {
-
-            continue;
-          }
-          
-          // Print FULL event data for debugging (only for message.part.delta to avoid spam)
-/*           if (eventData.type === 'message.part.delta') {
-
-          } else {
-
-          } */
-          
-          // Only process events for our session
-          if (eventData.properties?.sessionID && eventData.properties.sessionID !== sessionId) {
-
-            continue;
-          }
-
-          if (eventData.properties?.usage) {
-            yield {
-              type: 'usage',
-              inputTokens: eventData.properties.usage.input ?? 0,
-              outputTokens: eventData.properties.usage.output ?? 0,
-              sessionId,
-            };
-          }
-
-          // Debug: Log session.idle event details
-/*           if (eventData.type === 'session.idle') {
-
-          } */
-          
-          // Handle message.part.updated - track part types and tool calls
-          if (eventData.type === 'message.part.updated') {
-            const part = eventData.properties?.part as ToolPartData | undefined;
-            if (part?.id && part?.type) {
-              this.partTypeMap.set(part.id, part.type);
-              
-              // Handle tool parts
-              if (part.type === 'tool') {
-                const toolId = part.callID || part.id;
-                const toolName = part.tool || 'unknown';
-                if (toolId) {
-                  // New tool use
-                  if (!processedToolIds.has(toolId)) {
-                    processedToolIds.add(toolId);
-                    toolStartTimes.set(toolId, Date.now());
-                    yield { 
-                      type: 'tool_use', 
-                      id: toolId, 
-                      name: toolName, 
-                      input: part.state?.input || {}
-                    };
-                  }
-                  
-                  // Tool result
-                  const toolStatus = resolveToolExecutionStatus({
-                    toolName,
-                    state: part.state,
-                  });
-                  const toolResult = resolveToolResultText(part.state);
-                  if (
-                    (toolStatus === 'completed' || toolStatus === 'error')
-                    && toolResult !== undefined
-                  ) {
-                    const resultKey = `${toolId}_result`;
-                    if (!processedToolIds.has(resultKey)) {
-                      processedToolIds.add(resultKey);
-                      yield {
-                        type: 'tool_result',
-                        toolUseId: toolId,
-                        content: toolResult,
-                        isError: toolStatus === 'error',
-                      };
-                    }
-                  }
-                }
-              }
-            }
-            continue;
-          }
-          
-          // Handle message.part.delta - streaming text/thinking chunks
-          if (eventData.type === 'message.part.delta') {
-            const delta = eventData.properties?.delta;
-            const field = eventData.properties?.field;
-            const partID = eventData.properties?.partID;
-            
-            if (!delta || !field) {
-
-              continue;
-            }
-            
-
-
-            // Track part types by partID
-            if (partID && !this.partTypeMap.has(partID)) {
-              // First time seeing this part, determine type from field or part info
-              const partType = eventData.properties?.part?.type;
-              this.partTypeMap.set(partID, partType || 'text');
-            }
-
-            const partType = partID ? (this.partTypeMap.get(partID) || 'text') : 'text';
-            
-            // Handle based on field and tracked part type
-            if (field === 'text') {
-              if (partType === 'reasoning' || partType === 'thinking') {
-                yield { type: 'thinking', content: delta };
-              } else {
-                yield { type: 'text', content: delta };
-                lastContent += delta;
-              }
-            } else if (field === 'tool') {
-              // Tool call updates handled separately
-            }
-          }
-          
-          // Handle session.diff - indicates changes, fetch latest messages
-          if (eventData.type === 'session.diff') {
-            // Session state changed, could check for completion
-          }
-          
-          // Handle server.heartbeat - keepalive
-          if (eventData.type === 'server.heartbeat') {
-            // Just a keepalive, ignore
-          }
-          
-          // Handle server.connected - initial connection
-          if (eventData.type === 'server.connected') {
-            // Initial connection established
-          }
-
-          // Handle permission.asked - permission request from AI
-          if (eventData.type === 'permission.asked') {
-            const permission = eventData.properties;
-            if (permission?.id) {
-              yield {
-                type: 'permission_request',
-                id: permission.id,
-                permission: permission.permission || 'unknown',
-                patterns: permission.patterns || [],
-                metadata: permission.metadata || {},
-              };
-            }
-          }
-          
-          // Handle session.idle - message streaming complete
-          if (eventData.type === 'session.idle') {
-
-            this.currentAbortController?.abort(); // Abort the SSE connection
-            break; // Exit SSE loop
-          }
-
-          // Debug: log if we reach here with session.idle
-/*           if (eventData.type?.includes?.('idle')) {
-
-          } */
-        }
+        yield* this.consumeLegacyEventStream(sessionId, streamContext);
       } finally {
-        if (checkInterval) {
-          clearInterval(checkInterval);
-        }
-        // Clear the abort controller
-        this.currentAbortController = null;
-        logger.debug('Stream ended, abort controller cleared');
+        this.releaseActiveStreamContext(streamContext);
+        logger.debug(`Legacy stream ended for session ${sessionId}`);
       }
-
-      // Final check for any remaining content
-      try {
-        const messages = await this.getSessionMessages(sessionId);
-        const assistantMsg = messages.reverse().find(m => m.info.role === 'assistant');
-        if (assistantMsg) {
-          for (const part of assistantMsg.parts) {
-            if (part.type === 'text' && typeof part.text === 'string') {
-              const currentText = part.text;
-              if (currentText.length > lastContent.length) {
-                const delta = currentText.slice(lastContent.length);
-                yield { type: 'text', content: delta };
-                lastContent = currentText;
-              }
-            }
-          }
-        }
-      } catch (error) {
-        logger.error('Final message check failed:', error);
-      }
-
-      yield { type: 'message_stop' };
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Unknown error';
       yield { type: 'error', content: msg };
+    }
+  }
+
+  private shouldUseSdk(flag: keyof SdkFeatureFlags): boolean {
+    return this.sdkFeatureFlags[flag];
+  }
+
+  private getSdkClient(): SdkOpencodeClient {
+    this.ensureBaseUrl();
+    return createSdkClient({
+      baseUrl: this.baseUrl,
+      authHeaders: this.getAuthHeaders(),
+      directory: this.vaultPath,
+    });
+  }
+
+  private createStreamingState(): StreamingState {
+    return {
+      lastContent: '',
+      processedToolIds: new Set<string>(),
+    };
+  }
+
+  private createActiveStreamContext(sessionId: string): ActiveStreamContext {
+    const existing = this.activeStreams.get(sessionId);
+    if (existing) {
+      logger.warn(`Replacing existing active stream context for session ${sessionId}`);
+      existing.abortController.abort();
+    }
+
+    const context: ActiveStreamContext = {
+      sessionId,
+      abortController: new AbortController(),
+      partTypeMap: new Map(),
+    };
+    this.activeStreams.set(sessionId, context);
+    return context;
+  }
+
+  private releaseActiveStreamContext(streamContext: ActiveStreamContext): void {
+    const current = this.activeStreams.get(streamContext.sessionId);
+    if (current === streamContext) {
+      this.activeStreams.delete(streamContext.sessionId);
+    }
+  }
+
+  private normalizeHealthResponse(response: unknown): boolean {
+    if (typeof response === 'boolean') {
+      return response;
+    }
+
+    if (response && typeof response === 'object' && 'healthy' in response) {
+      return Boolean((response as { healthy?: unknown }).healthy);
+    }
+
+    return false;
+  }
+
+  private normalizeSessionId(response: unknown): string {
+    if (typeof response === 'object' && response !== null && 'id' in response) {
+      return String((response as { id: unknown }).id);
+    }
+
+    throw new Error(`Invalid session response: ${JSON.stringify(response)}`);
+  }
+
+  private normalizeSessionMessages(response: unknown): Array<{ info: Message; parts: Part[] }> {
+    return Array.isArray(response) ? response as Array<{ info: Message; parts: Part[] }> : [];
+  }
+
+  private normalizeForkResponse(response: unknown): { id: string; title: string } {
+    if (typeof response === 'object' && response !== null && 'id' in response) {
+      const typedResponse = response as { id: unknown; title?: unknown };
+      return {
+        id: String(typedResponse.id),
+        title: typeof typedResponse.title === 'string'
+          ? typedResponse.title
+          : '',
+      };
+    }
+
+    throw new Error('Invalid fork session response');
+  }
+
+  private normalizeRevertResponse(response: unknown): boolean {
+    if (response === false) {
+      return false;
+    }
+
+    if (typeof response === 'object' && response !== null && Object.keys(response).length === 0) {
+      return true;
+    }
+
+    if (typeof response === 'object' && response !== null && 'id' in response) {
+      const responseId = String((response as { id: unknown }).id);
+      return responseId.length > 0;
+    }
+
+    return response === true;
+  }
+
+  private normalizeAvailableModels(
+    data: unknown,
+  ): {
+    providers: Array<{ id: string; name: string; models: Array<{ id: string; name: string; contextWindow?: number }> }>;
+    defaults: Record<string, string>;
+  } {
+    const source = data as {
+      providers?: Array<{ id: string; name?: string; models: unknown }>;
+      all?: Array<{ id: string; name?: string; models: unknown }>;
+      default?: Record<string, string>;
+    };
+    const providers = Array.isArray(source.providers)
+      ? source.providers
+      : Array.isArray(source.all)
+        ? source.all
+        : [];
+
+    return {
+      providers: providers.map((provider) => {
+        let models: Array<{ id: string; name: string; contextWindow?: number }> = [];
+
+        if (Array.isArray(provider.models)) {
+          models = provider.models.map((modelId) => ({
+            id: String(modelId),
+            name: String(modelId),
+          }));
+        } else if (provider.models && typeof provider.models === 'object') {
+          models = Object.entries(
+            provider.models as Record<string, { name?: string; limit?: { context?: number } }>,
+          ).map(([id, info]) => ({
+            id,
+            name: info.name ?? id,
+            contextWindow: typeof info.limit?.context === 'number' ? info.limit.context : undefined,
+          }));
+        }
+
+        return {
+          id: provider.id,
+          name: provider.name ?? provider.id,
+          models,
+        };
+      }),
+      defaults: source.default && typeof source.default === 'object'
+        ? source.default
+        : {},
+    };
+  }
+
+  private buildSdkPromptParameters(
+    sessionId: string,
+    message: string,
+    options: QueryOptions & { system?: string },
+  ): {
+    sessionID: string;
+    model: {
+      providerID: string;
+      modelID: string;
+    };
+    parts: Array<{ type: 'text'; text: string }>;
+    system?: string;
+    tools?: Record<string, boolean>;
+    variant?: string;
+  } {
+    if (options.externalContextPaths?.length) {
+      logger.debug('externalContextPaths are not yet mapped to SDK file parts and are being omitted', {
+        count: options.externalContextPaths.length,
+      });
+    }
+
+    if (options.thinkingBudget !== undefined) {
+      logger.debug('thinkingBudget is not currently mapped to the SDK v2 prompt payload and is being omitted', {
+        thinkingBudget: options.thinkingBudget,
+      });
+    }
+
+    const parameters: {
+      sessionID: string;
+      model: {
+        providerID: string;
+        modelID: string;
+      };
+      parts: Array<{ type: 'text'; text: string }>;
+      system?: string;
+      tools?: Record<string, boolean>;
+      variant?: string;
+    } = {
+      sessionID: sessionId,
+      model: {
+        providerID: options.provider ?? this.settings.defaultProvider,
+        modelID: options.model ?? this.settings.defaultModel,
+      },
+      parts: this.buildPromptTextParts(message, options.images),
+    };
+
+    const tools = this.buildAllowedToolsRecord(options.allowedTools);
+    if (tools) {
+      parameters.tools = tools;
+    }
+
+    const variant = this.resolveSdkVariant(options);
+    if (variant) {
+      parameters.variant = variant;
+    }
+
+    if (options.system?.trim()) {
+      parameters.system = options.system.trim();
+    }
+
+    return parameters;
+  }
+
+  private buildPromptTextParts(
+    message: string,
+    images?: ImageAttachment[],
+  ): Array<{ type: 'text'; text: string }> {
+    const parts: Array<{ type: 'text'; text: string }> = [{ type: 'text', text: message }];
+
+    if (images && images.length > 0) {
+      for (const image of images) {
+        parts.push({
+          type: 'text',
+          text: `[Image: ${image.filename ?? 'attachment'}]`,
+        });
+      }
+    }
+
+    return parts;
+  }
+
+  private buildAllowedToolsRecord(allowedTools?: string[]): Record<string, boolean> | undefined {
+    if (!allowedTools || allowedTools.length === 0) {
+      return undefined;
+    }
+
+    return Object.fromEntries(allowedTools.map((toolName) => [toolName, true]));
+  }
+
+  private resolveSdkVariant(options: QueryOptions): string | undefined {
+    return options.reasoningEffort;
+  }
+
+  private handleStreamingEvent(
+    eventData: OpenCodeEvent,
+    sessionId: string,
+    state: StreamingState,
+    streamContext: ActiveStreamContext,
+  ): { chunks: StreamChunk[]; stop: boolean } {
+    if (eventData.properties?.sessionID && eventData.properties.sessionID !== sessionId) {
+      return { chunks: [], stop: false };
+    }
+
+    const chunks: StreamChunk[] = [];
+
+    if (eventData.properties?.usage) {
+      chunks.push({
+        type: 'usage',
+        inputTokens: eventData.properties.usage.input ?? 0,
+        outputTokens: eventData.properties.usage.output ?? 0,
+        sessionId,
+      });
+    }
+
+    if (eventData.type === 'message.part.updated') {
+      const part = eventData.properties?.part as ToolPartData | undefined;
+      if (part?.id && part?.type) {
+        streamContext.partTypeMap.set(part.id, part.type);
+
+        if (part.type === 'tool') {
+          const toolId = part.callID || part.id;
+          const toolName = part.tool || 'unknown';
+          if (toolId) {
+            if (!state.processedToolIds.has(toolId)) {
+              state.processedToolIds.add(toolId);
+              chunks.push({
+                type: 'tool_use',
+                id: toolId,
+                name: toolName,
+                input: part.state?.input || {},
+              });
+            }
+
+            const toolStatus = resolveToolExecutionStatus({
+              toolName,
+              state: part.state,
+            });
+            const toolResult = resolveToolResultText(part.state);
+            if ((toolStatus === 'completed' || toolStatus === 'error') && toolResult !== undefined) {
+              const resultKey = `${toolId}_result`;
+              if (!state.processedToolIds.has(resultKey)) {
+                state.processedToolIds.add(resultKey);
+                chunks.push({
+                  type: 'tool_result',
+                  toolUseId: toolId,
+                  content: toolResult,
+                  isError: toolStatus === 'error',
+                });
+              }
+            }
+          }
+        }
+      }
+
+      return { chunks, stop: false };
+    }
+
+    if (eventData.type === 'message.part.delta') {
+      const delta = eventData.properties?.delta;
+      const field = eventData.properties?.field;
+      const partID = eventData.properties?.partID;
+
+      if (!delta || !field) {
+        return { chunks, stop: false };
+      }
+
+      if (partID && !streamContext.partTypeMap.has(partID)) {
+        const partType = eventData.properties?.part?.type;
+        streamContext.partTypeMap.set(partID, partType || 'text');
+      }
+
+      const partType = partID ? (streamContext.partTypeMap.get(partID) || 'text') : 'text';
+
+      if (field === 'text') {
+        if (partType === 'reasoning' || partType === 'thinking') {
+          chunks.push({ type: 'thinking', content: delta });
+        } else {
+          chunks.push({ type: 'text', content: delta });
+          state.lastContent += delta;
+        }
+      }
+
+      return { chunks, stop: false };
+    }
+
+    if (eventData.type === 'permission.asked') {
+      const permission = eventData.properties;
+      if (permission?.id) {
+        chunks.push({
+          type: 'permission_request',
+          id: permission.id,
+          permission: permission.permission || 'unknown',
+          patterns: permission.patterns || [],
+          metadata: permission.metadata || {},
+        });
+      }
+
+      return { chunks, stop: false };
+    }
+
+    if (eventData.type === 'session.idle') {
+      return { chunks, stop: true };
+    }
+
+    if (eventData.type === 'question.asked') {
+      logger.debug('Ignoring unsupported SDK question event until question UI is implemented', {
+        sessionId,
+      });
+    }
+
+    return { chunks, stop: false };
+  }
+
+  private async *consumeLegacyEventStream(
+    sessionId: string,
+    streamContext: ActiveStreamContext,
+  ): AsyncGenerator<StreamChunk> {
+    const signal = streamContext.abortController.signal;
+    const eventStream = this.connectSSE(`${this.baseUrl}/event`, signal);
+    const state = this.createStreamingState();
+
+    for await (const event of eventStream) {
+      if (signal?.aborted) {
+        logger.debug('Stream aborted, breaking loop');
+        break;
+      }
+
+      let eventData: OpenCodeEvent;
+      try {
+        eventData = JSON.parse(event.data) as OpenCodeEvent;
+      } catch {
+        continue;
+      }
+
+      const outcome = this.handleStreamingEvent(eventData, sessionId, state, streamContext);
+      for (const chunk of outcome.chunks) {
+        yield chunk;
+      }
+
+      if (outcome.stop) {
+        streamContext.abortController.abort();
+        break;
+      }
+    }
+
+    yield* this.finishStreamingResponse(sessionId, state.lastContent);
+  }
+
+  private async *sendMessageWithSdk(
+    message: string,
+    options: QueryOptions,
+    sessionId: string,
+  ): AsyncGenerator<StreamChunk> {
+    const client = this.getSdkClient();
+
+    try {
+      await client.session.promptAsync(this.buildSdkPromptParameters(sessionId, message, options));
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Unknown error';
+      yield { type: 'error', content: msg };
+      return;
+    }
+
+    const streamContext = this.createActiveStreamContext(sessionId);
+    const state = this.createStreamingState();
+    let yieldedMessageStart = false;
+
+    try {
+      const subscription = await client.event.subscribe(undefined, {
+        signal: streamContext.abortController.signal,
+      });
+      const iterator = subscription.stream[Symbol.asyncIterator]();
+
+      while (true) {
+        let result: IteratorResult<SdkEvent>;
+        try {
+          result = await iterator.next() as IteratorResult<SdkEvent>;
+        } catch (error) {
+          if (!yieldedMessageStart) {
+            logger.warn('SDK event stream failed before first event, falling back to legacy SSE', error);
+            yield { type: 'message_start' };
+            yieldedMessageStart = true;
+            yield* this.consumeLegacyEventStream(sessionId, streamContext);
+            return;
+          }
+
+          throw error;
+        }
+
+        if (result.done) {
+          break;
+        }
+
+        if (!yieldedMessageStart) {
+          yield { type: 'message_start' };
+          yieldedMessageStart = true;
+        }
+
+        const outcome = this.handleStreamingEvent(
+          result.value as unknown as OpenCodeEvent,
+          sessionId,
+          state,
+          streamContext,
+        );
+        for (const chunk of outcome.chunks) {
+          yield chunk;
+        }
+
+        if (outcome.stop) {
+          streamContext.abortController.abort();
+          break;
+        }
+      }
+
+      if (!yieldedMessageStart) {
+        yield { type: 'message_start' };
+      }
+
+      yield* this.finishStreamingResponse(sessionId, state.lastContent);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Unknown error';
+      yield { type: 'error', content: msg };
+    } finally {
+      this.releaseActiveStreamContext(streamContext);
+      logger.debug(`SDK stream ended for session ${sessionId}`);
+    }
+  }
+
+  private async *finishStreamingResponse(sessionId: string, lastContent: string): AsyncGenerator<StreamChunk> {
+    try {
+      const messages = await this.getSessionMessages(sessionId);
+      const assistantMsg = messages.reverse().find((item) => item.info.role === 'assistant');
+      if (assistantMsg) {
+        for (const part of assistantMsg.parts) {
+          if (part.type !== 'text' || typeof part.text !== 'string') {
+            continue;
+          }
+
+          const currentText = part.text;
+          if (currentText.length <= lastContent.length) {
+            continue;
+          }
+
+          const delta = currentText.slice(lastContent.length);
+          yield { type: 'text', content: delta };
+          lastContent = currentText;
+        }
+      }
+    } catch (error) {
+      logger.error('Final message check failed:', error);
+    }
+
+    yield { type: 'message_stop' };
+  }
+
+  private async abortSessionOnServer(sessionId: string): Promise<void> {
+    if (!sessionId) {
+      return;
+    }
+
+    if (this.shouldUseSdk('sdkAbort')) {
+      try {
+        await this.getSdkClient().session.abort({ sessionID: sessionId });
+        return;
+      } catch (error) {
+        logger.warn(`SDK session.abort failed for ${sessionId}, falling back to legacy HTTP`, error);
+      }
+    }
+
+    try {
+      await this.post(`/session/${sessionId}/abort`, {});
+    } catch (error) {
+      logger.warn(`Failed to abort session ${sessionId} via legacy HTTP`, error);
     }
   }
 
@@ -1004,43 +1403,26 @@ export class OpenCodeService {
 
   /** Get available models - Handles both string array and object formats */
   async getAvailableModels(): Promise<{ providers: Array<{ id: string; name: string; models: Array<{ id: string; name: string; contextWindow?: number }> }>; defaults: Record<string, string> }> {
+    if (this.shouldUseSdk('sdkCrud')) {
+      try {
+        const data = await this.getSdkClient().config.providers();
+        return this.normalizeAvailableModels(data);
+      } catch (error) {
+        logger.warn('SDK config.providers failed, falling back to legacy HTTP', error);
+      }
+    }
+
     try {
       const data = await this.get<{ providers: Array<{ id: string; name: string; models: unknown }>; default: { provider?: string; model?: string } }>('/config/providers');
       
 
       
-      return {
-        providers: data.providers.map((p) => {
-          let models: Array<{ id: string; name: string; contextWindow?: number }> = [];
-          
-          // Handle different models formats
-          if (Array.isArray(p.models)) {
-            // Format 1: models is string array ["gpt-4", "gpt-3.5-turbo"]
-            models = p.models.map((modelId: string) => ({
-              id: modelId,
-              name: modelId,
-            }));
-          } else if (typeof p.models === 'object' && p.models !== null) {
-            // Format 2: models is object { "model-id": { name: "..." }, ... }
-            models = Object.entries(
-              p.models as Record<string, { name?: string; limit?: { context?: number } }>,
-            ).map(([id, info]) => ({
-              id,
-              name: info.name ?? id,
-              contextWindow: typeof info.limit?.context === 'number' ? info.limit.context : undefined,
-            }));
-          }
-          
-          return {
-            id: p.id,
-            name: p.name ?? p.id,
-            models,
-          };
-        }),
-        defaults: data.default?.provider && data.default?.model 
+      return this.normalizeAvailableModels({
+        providers: data.providers,
+        default: data.default?.provider && data.default?.model
           ? { [data.default.provider]: data.default.model }
           : {},
-      };
+      });
     } catch (error) {
       logger.error('Failed to get models:', error);
       return { providers: [], defaults: {} };
@@ -1127,7 +1509,7 @@ export class OpenCodeService {
 
     try {
       const [session, messages, providersResult] = await Promise.all([
-        this.get<Session>(`/session/${sessionId}`),
+        this.getSessionInfo(sessionId),
         this.getSessionMessages(sessionId),
         this.getAvailableModels(),
       ]);
@@ -1173,18 +1555,16 @@ export class OpenCodeService {
   }
 
   async forkSession(sessionId: string, messageID?: string): Promise<{ id: string; title: string }> {
-    const response = await this.post<unknown>(`/session/${sessionId}/fork`, messageID ? { messageID } : {});
-    if (typeof response === 'object' && response !== null && 'id' in response) {
-      const typedResponse = response as { id: unknown; title?: unknown };
-      return {
-        id: String(typedResponse.id),
-        title: typeof typedResponse.title === 'string'
-          ? typedResponse.title
-          : '',
-      };
+    if (this.shouldUseSdk('sdkCrud')) {
+      const response = await this.getSdkClient().session.fork({
+        sessionID: sessionId,
+        messageID,
+      });
+      return this.normalizeForkResponse(response);
     }
 
-    throw new Error('Invalid fork session response');
+    const response = await this.post<unknown>(`/session/${sessionId}/fork`, messageID ? { messageID } : {});
+    return this.normalizeForkResponse(response);
   }
 
   async revertSession(sessionId: string, messageID: string, partID?: string): Promise<boolean> {
@@ -1199,42 +1579,38 @@ export class OpenCodeService {
       partID: partID ?? null,
     });
 
-    const response = await this.post<unknown>(`/session/${sessionId}/revert`, payload);
+    const response = this.shouldUseSdk('sdkCrud')
+      ? await this.getSdkClient().session.revert({
+          sessionID: sessionId,
+          messageID,
+          partID,
+        })
+      : await this.post<unknown>(`/session/${sessionId}/revert`, payload);
     logger.debug('Revert session raw response', {
       sessionId,
       messageID,
       response,
     });
 
-    if (response === false) {
-      logger.debug('Revert session normalized result=false', { sessionId, messageID });
-      return false;
-    }
-
-    if (typeof response === 'object' && response !== null && Object.keys(response).length === 0) {
-      logger.debug('Revert session normalized result=true (empty object/204)', { sessionId, messageID });
-      return true;
-    }
-
-    if (typeof response === 'object' && response !== null && 'id' in response) {
-      const responseId = String((response as { id: unknown }).id);
-      const normalized = responseId.length > 0;
-      logger.debug('Revert session normalized result from session object', {
-        sessionId,
-        messageID,
-        responseId,
-        normalized,
-      });
-      return normalized;
-    }
-
-    const normalized = response === true;
+    const normalized = this.normalizeRevertResponse(response);
     logger.debug('Revert session normalized boolean result', {
       sessionId,
       messageID,
       normalized,
     });
     return normalized;
+  }
+
+  private async getSessionInfo(sessionId: string): Promise<Session> {
+    if (this.shouldUseSdk('sdkCrud')) {
+      try {
+        return await this.getSdkClient().session.get({ sessionID: sessionId }) as unknown as Session;
+      } catch (error) {
+        logger.warn(`SDK session.get failed for ${sessionId}, falling back to legacy HTTP`, error);
+      }
+    }
+
+    return this.get<Session>(`/session/${sessionId}`);
   }
 
   private buildServerConfig(settings: OpenCodianSettings): OpenCodeServerConfig {
@@ -1528,6 +1904,15 @@ export class OpenCodeService {
 
   /** Get pending permission requests */
   async getPendingPermissions(): Promise<PermissionRequest[]> {
+    if (this.shouldUseSdk('sdkCrud')) {
+      try {
+        const response = await this.getSdkClient().permission.list();
+        return Array.isArray(response) ? response as PermissionRequest[] : [];
+      } catch (error) {
+        logger.warn('SDK permission.list failed, falling back to legacy HTTP', error);
+      }
+    }
+
     try {
       return await this.get<PermissionRequest[]>('/permission');
     } catch (error) {
@@ -1543,6 +1928,15 @@ export class OpenCodeService {
     message?: string
   ): Promise<void> {
     try {
+      if (this.shouldUseSdk('sdkCrud')) {
+        await this.getSdkClient().permission.reply({
+          requestID,
+          reply,
+          message,
+        });
+        return;
+      }
+
       await this.post(`/permission/${requestID}/reply`, { reply, message });
     } catch (error) {
       logger.error('Failed to respond to permission:', error);
