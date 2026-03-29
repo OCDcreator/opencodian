@@ -40,6 +40,10 @@ export const createMockClient = () => ({
       data: { success: true },
       error: null,
     }),
+    unrevert: jest.fn().mockResolvedValue({
+      data: mockSession,
+      error: null,
+    }),
   },
   config: {
     providers: jest.fn().mockResolvedValue({

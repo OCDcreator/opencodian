@@ -31,7 +31,7 @@ export interface ContentBlock {
 }
 
 /** Chat message */
-export type ChatNoticeActionType = 'open_model_settings';
+export type ChatNoticeActionType = 'open_model_settings' | 'restore_rewind';
 
 export interface ChatNoticeAction {
   type: ChatNoticeActionType;

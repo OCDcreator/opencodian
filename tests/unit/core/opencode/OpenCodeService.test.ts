@@ -85,6 +85,7 @@ describe('OpenCodeService', () => {
       get: jest.Mock;
       fork: jest.Mock;
       revert: jest.Mock;
+      unrevert: jest.Mock;
     };
     config: { providers: jest.Mock };
     permission: { list: jest.Mock; reply: jest.Mock };
@@ -107,6 +108,7 @@ describe('OpenCodeService', () => {
         get: jest.fn(),
         fork: jest.fn(),
         revert: jest.fn(),
+        unrevert: jest.fn(),
       },
       config: { providers: jest.fn() },
       permission: { list: jest.fn(), reply: jest.fn() },
@@ -186,14 +188,68 @@ describe('OpenCodeService', () => {
     });
 
     it('should get session messages via HTTP API', async () => {
-      mockRequestUrl.mockResolvedValue({
-        status: 200,
-        json: [{ info: { id: 'm1', role: 'user' }, parts: [] }],
-        text: '[{"info":{"id":"m1","role":"user"},"parts":[]}]',
-      });
+      mockRequestUrl
+        .mockResolvedValueOnce({
+          status: 200,
+          json: [{ info: { id: 'm1', role: 'user' }, parts: [] }],
+          text: '[{"info":{"id":"m1","role":"user"},"parts":[]}]',
+        })
+        .mockResolvedValueOnce({
+          status: 200,
+          json: {
+            id: 'test-id',
+            title: 'Test',
+            time: { created: 1, updated: 1 },
+          },
+          text: '{"id":"test-id","title":"Test","time":{"created":1,"updated":1}}',
+        });
 
       const messages = await service.getSessionMessages('test-id');
       expect(messages).toHaveLength(1);
+    });
+
+    it('applies session revert state when loading messages via HTTP API', async () => {
+      mockRequestUrl
+        .mockResolvedValueOnce({
+          status: 200,
+          json: [
+            { info: { id: 'msg-1', role: 'user' }, parts: [] },
+            { info: { id: 'msg-2', role: 'assistant' }, parts: [] },
+            { info: { id: 'msg-3', role: 'user' }, parts: [] },
+            { info: { id: 'msg-4', role: 'assistant' }, parts: [] },
+          ],
+          text: '[]',
+        })
+        .mockResolvedValueOnce({
+          status: 200,
+          json: {
+            id: 'test-id',
+            title: 'Test',
+            revert: {
+              messageID: 'msg-3',
+            },
+            time: { created: 1, updated: 1 },
+          },
+          text: '{"id":"test-id","title":"Test","revert":{"messageID":"msg-3"},"time":{"created":1,"updated":1}}',
+        });
+
+      const messages = await service.getSessionMessages('test-id');
+      expect(messages.map((message) => message.info.id)).toEqual(['msg-1', 'msg-2']);
+    });
+
+    it('returns session revert state via HTTP API', async () => {
+      mockRequestUrl.mockResolvedValue({
+        status: 200,
+        json: {
+          id: 'test-id',
+          title: 'Test',
+          revert: { messageID: 'msg-1' },
+          time: { created: 1, updated: 1 },
+        },
+        text: '{"id":"test-id","title":"Test","revert":{"messageID":"msg-1"},"time":{"created":1,"updated":1}}',
+      });
+
+      await expect(service.getSessionRevertState('test-id')).resolves.toEqual({ messageID: 'msg-1' });
     });
 
     it('should delete session via HTTP API', async () => {
@@ -246,6 +302,20 @@ describe('OpenCodeService', () => {
       expect(reverted).toBe(true);
       expect(mockRequestUrl).toHaveBeenCalledWith(expect.objectContaining({
         url: 'http://127.0.0.1:4096/session/test-id/revert',
+        method: 'POST',
+      }));
+    });
+
+    it('restores reverted session via HTTP API', async () => {
+      mockRequestUrl.mockResolvedValue({
+        status: 200,
+        json: { id: 'test-id', title: 'Test', time: { created: 1, updated: 1 } },
+        text: '{"id":"test-id","title":"Test","time":{"created":1,"updated":1}}',
+      });
+
+      await expect(service.unrevertSession('test-id')).resolves.toBe(true);
+      expect(mockRequestUrl).toHaveBeenCalledWith(expect.objectContaining({
+        url: 'http://127.0.0.1:4096/session/test-id/unrevert',
         method: 'POST',
       }));
     });
@@ -408,6 +478,56 @@ describe('OpenCodeService', () => {
         url: 'http://127.0.0.1:4096/session',
         method: 'GET',
       }));
+    });
+
+    it('applies session revert state when loading messages via SDK', async () => {
+      service = createServiceWithSdkFlags();
+      mockSdkClient.session.messages.mockResolvedValue([
+        { info: { id: 'msg-1', role: 'user' }, parts: [] },
+        { info: { id: 'msg-2', role: 'assistant' }, parts: [] },
+        { info: { id: 'msg-3', role: 'user' }, parts: [] },
+        { info: { id: 'msg-4', role: 'assistant' }, parts: [] },
+      ]);
+      mockSdkClient.session.get.mockResolvedValue({
+        id: 'sdk-session',
+        title: 'SDK',
+        revert: { messageID: 'msg-3' },
+        time: { created: 1, updated: 1 },
+      });
+
+      const messages = await service.getSessionMessages('sdk-session');
+
+      expect(messages.map((message) => message.info.id)).toEqual(['msg-1', 'msg-2']);
+      expect(mockSdkClient.session.messages).toHaveBeenCalledWith({ sessionID: 'sdk-session' });
+      expect(mockSdkClient.session.get).toHaveBeenCalledWith({ sessionID: 'sdk-session' });
+    });
+
+    it('returns session revert state via SDK', async () => {
+      service = createServiceWithSdkFlags();
+      mockSdkClient.session.get.mockResolvedValue({
+        id: 'sdk-session',
+        title: 'SDK',
+        revert: { messageID: 'msg-1', partID: 'part-1' },
+        time: { created: 1, updated: 1 },
+      });
+
+      await expect(service.getSessionRevertState('sdk-session')).resolves.toEqual({
+        messageID: 'msg-1',
+        partID: 'part-1',
+      });
+      expect(mockSdkClient.session.get).toHaveBeenCalledWith({ sessionID: 'sdk-session' });
+    });
+
+    it('restores reverted session via SDK', async () => {
+      service = createServiceWithSdkFlags();
+      mockSdkClient.session.unrevert.mockResolvedValue({
+        id: 'sdk-session',
+        title: 'SDK',
+        time: { created: 1, updated: 1 },
+      });
+
+      await expect(service.unrevertSession('sdk-session')).resolves.toBe(true);
+      expect(mockSdkClient.session.unrevert).toHaveBeenCalledWith({ sessionID: 'sdk-session' });
     });
 
     it('maps requestAssistantResponse through SDK prompt with tools and variant', async () => {

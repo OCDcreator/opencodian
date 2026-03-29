@@ -106,6 +106,11 @@ interface OmoBackgroundTaskLogState {
   completionLogged: boolean;
 }
 
+interface ConversationRevertState {
+  messageID: string;
+  partID?: string;
+}
+
 interface TabRuntimeState {
   isStreaming: boolean;
   streamController: StreamController | null;
@@ -146,6 +151,7 @@ export class OpenCodianView extends ItemView {
   private messagesContainer: HTMLElement | null = null;
   private inputContainer: HTMLElement | null = null;
   private currentConversation: Conversation | null = null;
+  private currentConversationRevertState: ConversationRevertState | null = null;
   private markdownService: MarkdownRenderService | null = null;
   private messageComponent: Component;
 
@@ -1469,6 +1475,7 @@ export class OpenCodianView extends ItemView {
     if (!conversation) return;
 
     this.currentConversation = conversation;
+    this.currentConversationRevertState = null;
     this.tabManager?.setActiveTabConversation(conversation);
 
     // Clear messages display
@@ -1490,9 +1497,12 @@ export class OpenCodianView extends ItemView {
         )
       );
 
-    const messages = shouldSyncFromServer
-      ? (await this.syncConversationMessagesFromServer(conversation)).messages
-      : conversation.messages;
+    let messages = conversation.messages;
+    if (shouldSyncFromServer) {
+      const syncResult = await this.syncConversationMessagesFromServer(conversation);
+      messages = syncResult.messages;
+      this.currentConversationRevertState = syncResult.revertState;
+    }
 
     this.syncBackgroundTaskStateFromConversation(conversation);
     await this.renderMessages(messages);
@@ -1515,6 +1525,7 @@ export class OpenCodianView extends ItemView {
     }
     this.tabManager?.setActiveTabConversation(conversation);
     this.currentConversation = conversation;
+    this.currentConversationRevertState = null;
     this.plugin.openCodeService.setSessionId(conversation.openCodeSessionId);
     this.messagesContainer?.empty();
     this.resetTurnState();
@@ -1577,10 +1588,14 @@ export class OpenCodianView extends ItemView {
       const previousMessages = [...this.currentConversation.messages];
       const syncResult = await this.syncConversationMessagesFromServer(this.currentConversation, activeTabId);
       if (!syncResult.changed || this.currentConversation?.id !== expectedConversationId) {
+        if (this.currentConversation?.id === expectedConversationId) {
+          this.currentConversationRevertState = syncResult.revertState;
+        }
         await this.renderBackgroundTaskIndicatorIfNeeded(activeTabId);
         return;
       }
 
+      this.currentConversationRevertState = syncResult.revertState;
       runtime.lastConversationSyncFingerprint = syncResult.fingerprint;
       await this.applySyncedConversationUpdate(previousMessages, this.currentConversation.messages);
     } finally {
@@ -2903,6 +2918,11 @@ export class OpenCodianView extends ItemView {
   }
 
   private async renderMessages(messages: ChatMessage[]): Promise<void> {
+    if (messages.length === 0) {
+      await this.renderMessage(this.createEmptyConversationNoticeMessage());
+      return;
+    }
+
     const groups = buildMessageRenderGroups(messages);
 
     for (const group of groups) {
@@ -4077,6 +4097,53 @@ export class OpenCodianView extends ItemView {
     }
   }
 
+  private createEmptyConversationNoticeMessage(): ChatMessage {
+    const rewound = Boolean(this.currentConversationRevertState?.messageID);
+
+    return {
+      id: rewound ? 'opencodian-empty-rewind' : 'opencodian-empty-state',
+      role: 'assistant',
+      content: rewound
+        ? t('chat.rewind.empty.description')
+        : t('chat.empty.description'),
+      timestamp: Date.now(),
+      displayStyle: 'notice',
+      noticeTitle: rewound
+        ? t('chat.rewind.empty.title')
+        : t('chat.empty.title'),
+      noticeTone: rewound ? 'warning' : 'info',
+      noticeActions: rewound ? [{ type: 'restore_rewind' }] : undefined,
+    };
+  }
+
+  private async handleRestoreRewindRequest(): Promise<void> {
+    if (this.isActiveTabStreaming()) {
+      new Notice(t('chat.rewind.streamingBlocked'));
+      return;
+    }
+
+    if (!this.currentConversation?.openCodeSessionId) {
+      new Notice(t('chat.rewind.restoreFailed'));
+      return;
+    }
+
+    try {
+      const restored = await this.plugin.openCodeService.unrevertSession(
+        this.currentConversation.openCodeSessionId,
+      );
+      if (!restored) {
+        new Notice(t('chat.rewind.restoreFailed'));
+        return;
+      }
+
+      await this.loadConversation(this.currentConversation.id, { forceServerSync: true });
+      new Notice(t('chat.rewind.restoreSuccess'));
+    } catch (error) {
+      logger.error('Failed to restore rewound conversation:', error);
+      new Notice(t('chat.rewind.restoreFailed'));
+    }
+  }
+
   private async handleForkRequest(message: ChatMessage): Promise<void> {
     if (this.isActiveTabStreaming()) {
       new Notice(t('chat.fork.streamingBlocked'));
@@ -4140,9 +4207,17 @@ export class OpenCodianView extends ItemView {
   private async syncConversationMessagesFromServer(
     conversation: Conversation,
     tabId: TabId | null = this.getActiveTabId(),
-  ): Promise<{ messages: ChatMessage[]; changed: boolean; fingerprint: string }> {
+  ): Promise<{
+    messages: ChatMessage[];
+    changed: boolean;
+    fingerprint: string;
+    revertState: ConversationRevertState | null;
+  }> {
     try {
       const serverMessages = await this.plugin.openCodeService.getSessionMessages(conversation.openCodeSessionId);
+      const revertState = serverMessages.length === 0
+        ? await this.plugin.openCodeService.getSessionRevertState(conversation.openCodeSessionId)
+        : null;
       const convertedServerMessages = serverMessages.map(({ info, parts }) =>
         OpenCodeService.openCodeMessageToChatMessage(info, parts),
       );
@@ -4177,10 +4252,12 @@ export class OpenCodianView extends ItemView {
           sessionId: conversation.openCodeSessionId,
           serverMessageCount: serverMessages.length,
           mergedMessageCount: merged.length,
+          revertApplied: Boolean(revertState),
+          revertMessageId: revertState?.messageID ?? null,
           changed,
         });
       }
-      return { messages: merged, changed, fingerprint };
+      return { messages: merged, changed, fingerprint, revertState };
     } catch (error) {
       logger.error('Failed to sync conversation messages from server:', error);
       const fingerprint = this.getConversationSyncFingerprint(conversation.messages);
@@ -4188,6 +4265,9 @@ export class OpenCodianView extends ItemView {
         messages: conversation.messages,
         changed: false,
         fingerprint,
+        revertState: this.currentConversation?.id === conversation.id
+          ? this.currentConversationRevertState
+          : null,
       };
     }
   }
@@ -5404,6 +5484,8 @@ export class OpenCodianView extends ItemView {
     switch (actionType) {
       case 'open_model_settings':
         return t('chat.notice.action.openModelSettings');
+      case 'restore_rewind':
+        return t('chat.rewind.empty.restore');
       default:
         return t('chat.notice.action.openModelSettings');
     }
@@ -5420,6 +5502,9 @@ export class OpenCodianView extends ItemView {
         }, 50);
         return;
       }
+      case 'restore_rewind':
+        await this.handleRestoreRewindRequest();
+        return;
       default:
         return;
     }

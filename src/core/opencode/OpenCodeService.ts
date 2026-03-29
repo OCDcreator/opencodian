@@ -107,6 +107,10 @@ interface OpenCodeServiceRuntimeOptions {
 interface Session {
   id: string;
   title: string;
+  revert?: {
+    messageID: string;
+    partID?: string;
+  } | null;
   time: {
     created: number;
     updated: number;
@@ -540,7 +544,10 @@ export class OpenCodeService {
     if (this.shouldUseSdk('sdkCrud')) {
       try {
         const response = await this.getSdkClient().session.messages({ sessionID: sessionId });
-        return this.normalizeSessionMessages(response);
+        return await this.applySessionRevertState(
+          sessionId,
+          this.normalizeSessionMessages(response),
+        );
       } catch (error) {
         logger.warn(`SDK session.messages failed for ${sessionId}, falling back to legacy HTTP`, error);
       }
@@ -554,8 +561,10 @@ export class OpenCodeService {
       
       const response = await this.get<unknown>(path);
 
-      
-      return Array.isArray(response) ? response : [];
+      return await this.applySessionRevertState(
+        sessionId,
+        Array.isArray(response) ? response : [],
+      );
     } catch (error) {
       logger.error(`Failed to get messages for session ${sessionId}:`, error);
       // Return empty array instead of throwing to prevent UI crash
@@ -780,6 +789,71 @@ export class OpenCodeService {
 
   private normalizeSessionMessages(response: unknown): Array<{ info: Message; parts: Part[] }> {
     return Array.isArray(response) ? response as Array<{ info: Message; parts: Part[] }> : [];
+  }
+
+  private async applySessionRevertState(
+    sessionId: string,
+    messages: Array<{ info: Message; parts: Part[] }>,
+  ): Promise<Array<{ info: Message; parts: Part[] }>> {
+    if (messages.length === 0) {
+      return messages;
+    }
+
+    try {
+      const session = await this.getSessionInfo(sessionId);
+      const filtered = this.filterMessagesByRevertState(messages, session.revert);
+      if (filtered.length !== messages.length && session.revert?.messageID) {
+        logger.debug('Applied session revert state while loading messages', {
+          sessionId,
+          originalCount: messages.length,
+          filteredCount: filtered.length,
+          revertMessageId: session.revert.messageID,
+          revertPartId: session.revert.partID ?? null,
+        });
+      }
+      return filtered;
+    } catch (error) {
+      logger.warn(`Failed to load session info for ${sessionId} while applying revert state`, error);
+      return messages;
+    }
+  }
+
+  private filterMessagesByRevertState(
+    messages: Array<{ info: Message; parts: Part[] }>,
+    revert: Session['revert'],
+  ): Array<{ info: Message; parts: Part[] }> {
+    if (!revert?.messageID) {
+      return messages;
+    }
+
+    const filteredMessages: Array<{ info: Message; parts: Part[] }> = [];
+    for (const message of messages) {
+      if (message.info.id < revert.messageID) {
+        filteredMessages.push(message);
+        continue;
+      }
+
+      if (message.info.id > revert.messageID) {
+        continue;
+      }
+
+      if (!revert.partID) {
+        continue;
+      }
+
+      const removeStart = message.parts.findIndex((part) => part.id === revert.partID);
+      if (removeStart < 0) {
+        filteredMessages.push(message);
+        continue;
+      }
+
+      filteredMessages.push({
+        ...message,
+        parts: message.parts.slice(0, removeStart),
+      });
+    }
+
+    return filteredMessages;
   }
 
   private normalizeForkResponse(response: unknown): { id: string; title: string } {
@@ -1599,6 +1673,23 @@ export class OpenCodeService {
       normalized,
     });
     return normalized;
+  }
+
+  async unrevertSession(sessionId: string): Promise<boolean> {
+    const response = this.shouldUseSdk('sdkCrud')
+      ? await this.getSdkClient().session.unrevert({
+          sessionID: sessionId,
+        })
+      : await this.post<unknown>(`/session/${sessionId}/unrevert`, {});
+
+    return this.normalizeRevertResponse(response);
+  }
+
+  async getSessionRevertState(
+    sessionId: string,
+  ): Promise<{ messageID: string; partID?: string } | null> {
+    const session = await this.getSessionInfo(sessionId);
+    return session.revert?.messageID ? session.revert : null;
   }
 
   private async getSessionInfo(sessionId: string): Promise<Session> {
