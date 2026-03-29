@@ -4,7 +4,112 @@
 > 
 > 本日志采用**倒序排列**，最新的开发进度写在**最前面**。
 > 
+> 新的日期型日志必须插入到最上方第一个 `## YYYY-MM-DD ...` 条目前，禁止追加到文件末尾。
+> 
+> 每次更新后必须运行：`npm run check:devlog-order`
+> 
 > 如需查看最新进展，请直接阅读最上方的条目。
+
+---
+
+## 2026-03-29 历史记录下拉布局抖动修复与滚动优化
+
+### 🎯 改动目标
+
+- 解决点击历史记录按钮后下拉菜单位置计算导致的布局抖动（layout thrash）问题。
+- 避免强制同步布局（forced synchronous layout），提升渲染性能。
+- 优化加载会话后的滚动时机，减少视觉跳动。
+
+### ✅ 本轮调整
+
+- `src/features/chat/OpenCodianView.ts`
+  - 新增 `scheduleHistoryDropdownPosition()`，使用 `requestAnimationFrame` 将菜单位置计算推迟到下一帧
+  - 下拉菜单初始状态设为 `visibility: hidden`，位置计算完成后再显示，避免用户看到位置调整过程
+  - 提取 `clearScheduledHistoryDropdownPosition()` 用于清理待执行的动画帧
+  - 点击历史项加载会话时，使用 `requestAnimationFrame` 延迟加载，避免与菜单关闭动画冲突
+  - 将 `loadConversation()` 和 `switchToTabById()` 中的同步滚动改为 `scheduleSettledScrollToBottom()`，确保内容稳定后再滚动
+
+### 🧪 验证
+
+- `npm run lint` 通过
+- `npm run typecheck` 通过
+- `npm run build` 成功
+- 已部署到 Test Vault
+- 本轮最终验证使用的 `BUILD_ID`：`main.202603291740`
+
+### 📁 涉及文件
+
+- `src/features/chat/OpenCodianView.ts`
+- `devlog.md`
+
+---
+
+## 2026-03-29 回退会话空状态修复与恢复功能
+
+### 🎯 改动目标
+
+- 解决会话被回退（rewind）到起点后，界面显示空白且无明确提示的问题。
+- 让用户能够理解当前会话处于回退状态，并提供恢复之前内容的操作入口。
+- 在服务端支持获取回退状态和取消回退（unrevert）操作。
+
+### ✅ 本轮调整
+
+- `src/core/opencode/OpenCodeService.ts`
+  - 新增 `Session.revert` 类型定义，包含 `messageID` 和可选的 `partID`
+  - 新增 `applySessionRevertState()`，在加载消息时根据会话回退状态过滤消息
+  - 新增 `filterMessagesByRevertState()`，按消息 ID 和 part ID 精确过滤应显示的消息范围
+  - 新增 `unrevertSession()`，支持调用 SDK 或 HTTP API 取消回退状态
+  - 新增 `getSessionRevertState()`，获取当前会话的回退状态
+  - `getSessionMessages()` 现在会自动应用回退状态过滤
+
+- `src/core/types/chat.ts`
+  - 新增 `restore_rewind` 到 `ChatNoticeActionType`
+
+- `src/features/chat/OpenCodianView.ts`
+  - 新增 `currentConversationRevertState` 记录当前会话的回退状态
+  - 新增 `createEmptyConversationNoticeMessage()`，根据是否处于回退状态显示不同的空会话提示
+  - 新增 `handleRestoreRewindRequest()`，处理用户点击"恢复回退前内容"的操作
+  - `renderMessages()` 在消息为空时显示提示消息而非空白
+  - `syncConversationMessagesFromServer()` 现在返回 `revertState`，用于 UI 状态同步
+  - `getNoticeActionLabel()` 和 `handleNoticeAction()` 支持 `restore_rewind` 操作类型
+
+- `src/i18n/locales/en.ts` / `src/i18n/locales/zh.ts`
+  - 新增回退相关文案：
+    - `chat.rewind.empty.title` / `chat.rewind.empty.description`
+    - `chat.rewind.empty.restore`
+    - `chat.rewind.restoreSuccess` / `chat.rewind.restoreFailed`
+
+- `tests/__mocks__/opencode-sdk.ts`
+  - SDK mock 新增 `session.unrevert` 方法
+
+- `tests/unit/core/opencode/OpenCodeService.test.ts`
+  - 新增测试用例覆盖：
+    - HTTP API 加载消息时应用回退状态
+    - HTTP API 获取会话回退状态
+    - HTTP API 恢复回退会话
+    - SDK 加载消息时应用回退状态
+    - SDK 获取会话回退状态
+    - SDK 恢复回退会话
+
+### 🧪 验证
+
+- `npm run test -- OpenCodeService.test.ts` 通过（新增 6 个测试用例）
+- `npm run typecheck` 通过
+- `npm run lint` 通过
+- `npm run build` 成功
+- 已部署到 Test Vault
+- 本轮最终验证使用的 `BUILD_ID`：`main.202603291737`
+
+### 📁 涉及文件
+
+- `src/core/opencode/OpenCodeService.ts`
+- `src/core/types/chat.ts`
+- `src/features/chat/OpenCodianView.ts`
+- `src/i18n/locales/en.ts`
+- `src/i18n/locales/zh.ts`
+- `tests/__mocks__/opencode-sdk.ts`
+- `tests/unit/core/opencode/OpenCodeService.test.ts`
+- `devlog.md`
 
 ---
 
@@ -60,6 +165,94 @@
 - `devlog.md`
 
 ---
+
+## 2026-03-29 devlog 顺序约束与自动检查落地
+
+### 🎯 改动目标
+
+- 防止后续开发日志再次被追加到文件末尾，破坏“最新在前”的倒序结构。
+- 把这件事从“靠记忆”改成“文档明确要求 + 脚本自动拦截”。
+
+### ✅ 本轮调整
+
+- `AGENTS.md`
+  - 新增 `devlog.md` 更新约束
+  - 明确要求新日志必须插入到首个日期型二级标题之前
+  - 明确要求交付前运行 `npm run check:devlog-order`
+- `devlog.md`
+  - 在文件开头的“日志记录原则”中补充插入位置与校验命令
+- `package.json`
+  - 新增脚本：`npm run check:devlog-order`
+- `scripts/check-devlog-order.mjs`
+  - 扫描 `devlog.md` 中所有日期型二级标题
+  - 如果顺序不是倒序，直接报错并输出错位行号
+
+### 🧪 验证
+
+- `npm run check:devlog-order`
+- `npm run build`
+- 已部署到 Test Vault
+- 本轮最终验证使用的 `BUILD_ID`：`main.202603291833`
+
+### 📁 涉及文件
+
+- `AGENTS.md`
+- `devlog.md`
+- `package.json`
+- `scripts/check-devlog-order.mjs`
+
+---
+
+## 2026-03-29 Settings 滚动恢复日志优化
+
+### 🔇 问题现象
+
+- 每次打开 Settings 页面时，滚动恢复逻辑会因为 `animation-frame`、`mutation` 和多轮递增 `timeout` 连续输出多条几乎相同的调试日志。
+- `Settings scroll restore attempt`、`Captured settings scroll position`、`Resolved settings scroll container` 叠加后，单次打开设置页可产生 10+ 条日志，影响问题排查。
+
+### 🎯 优化目标
+
+- 在首次成功恢复滚动位置后，静默后续重复触发。
+- 保留一条足够详细的成功日志，继续支持线上排查。
+
+### ✅ 本轮调整
+
+- 为设置页滚动恢复流程增加“已成功恢复”标记，成功后后续触发直接返回。
+- 只有在 `scrollTop` 实际到达目标值后才判定恢复成功，避免内容尚未撑开时过早结束恢复流程。
+- 首次恢复成功后立即：
+  - 清理剩余的重试 `timeout`
+  - 断开 `MutationObserver`
+  - 停止后续重复日志输出
+- 将原先多条 `Settings scroll restore attempt` 调试日志收敛为单条 `Settings scroll restored`，包含：
+  - `reason`
+  - `attempts`
+  - `elapsedMs`
+  - `targetScrollTop`
+  - `restoredScrollTop`
+- 移除常态下噪声较高的 `Captured settings scroll position` 与滚动容器解析调试日志。
+
+### 🧪 验证
+
+- 新增定向单测，覆盖：
+  - 首轮恢复未成功时不应提前记录成功日志
+  - 内容高度变化后由 `mutation` 触发二次恢复成功
+  - 成功后 observer 和 timeout 均被清理
+  - 最终只输出 1 条恢复成功日志
+- 已通过：
+  - `npm run test -- OpenCodianSettings.test.ts`
+  - `npm run lint -- src/features/settings/OpenCodianSettings.ts tests/unit/features/settings/OpenCodianSettings.test.ts`
+  - `npm run build`
+- 已部署到 Test Vault。
+- 本轮最终验证使用的 `BUILD_ID`：`main.202603291806`
+
+### 📁 涉及文件
+
+- `src/features/settings/OpenCodianSettings.ts`
+- `tests/unit/features/settings/OpenCodianSettings.test.ts`
+- `devlog.md`
+
+---
+
 ## 2026-03-29 流式表格样式补齐、滚动稳定性修复与 Fork 快照 helper 抽离
 
 ### ✨ 改动目标
@@ -672,6 +865,136 @@
 1. 最初尝试使用 `--interactive-accent` 作为底色，文字用 `--text-on-accent`
 2. 用户反馈强调色过于耀眼，与整体界面不协调
 3. 改用 `--background-modifier-hover`，既有层次感又不喧宾夺主
+
+---
+
+## 2026-03-28 助手消息流结束抖动修复
+
+### 🐛 问题现象
+
+- 助手消息在流式输出完成后，会出现一次明显的“向下跳”或“闪一下”的视觉抖动。
+- 开启自动滚动时，滚动位置也会在结束瞬间被再次推到底部，放大这种不稳定感。
+
+### 🔍 原因定位
+
+- 时间戳行原本在流结束后才插入，导致消息高度在最后一刻突然增加。
+- `done` 阶段仍会触发一次额外的 `scrollToBottom()`，与时间戳插入叠加，形成末尾跳动。
+- 流式助手消息结构中还存在一层多余的预创建文本容器，不必要地增加了收尾阶段 DOM 调整的复杂度。
+
+### ✅ 本轮修复
+
+- 助手流式消息创建时就预留 `.opencodian-message-time-row` 占位，结束时只填充时间、模型和复制按钮，不再新增一整行 DOM。
+- 为时间戳行增加稳定高度与隐藏占位态，避免结束瞬间撑高消息。
+- `StreamController` 在处理 `done` chunk 时不再立即触发额外滚动。
+- `OpenCodianView` 改为在流结束后的双 `requestAnimationFrame` 中补一次稳定滚动，等待布局完成后再校正位置。
+- 清理流式助手消息里多余的空文本节点，保持实时 Markdown 渲染路径不变。
+
+### 🎯 结果
+
+- 保留实时 Markdown 渲染效果，不牺牲流式过程中的格式反馈。
+- 显著减轻消息结束瞬间的“蹦一下”感，尤其是在自动滚动开启时更稳定。
+
+### 🧪 验证
+
+- 定向 ESLint 校验通过：
+  - `src/features/chat/OpenCodianView.ts`
+  - `src/utils/streaming/StreamController.ts`
+- 构建成功并部署到 Test Vault。
+- 本轮验证使用的 `BUILD_ID`：`main.202603280851`
+
+### 📁 涉及文件
+
+- `src/features/chat/OpenCodianView.ts`
+- `src/utils/streaming/StreamController.ts`
+- `styles.css`
+
+---
+
+## 2026-03-28 会话标题机制改造与历史重命名修复
+
+### ✨ 新增能力
+
+- 新会话不再默认使用时间戳标题，改为在首条用户消息发送后，立即生成“消息截取回退标题”。
+- 新增标题生成模式设置：
+  - `default`：仅使用首条消息回退标题
+  - `ai`：先使用回退标题，再异步生成 AI 精炼标题
+- 新增 AI 标题模型设置 `aiTitleModel`，留空时自动跟随当前会话模型。
+- 历史会话列表新增重命名按钮，支持用户手动修改标题。
+
+### 🏗️ 数据与服务层改造
+
+- `OpenCodianSettings` 新增：
+  - `titleMode`
+  - `aiTitleModel`
+- `Conversation` / `ConversationMeta` 新增：
+  - `titleGenerationStatus?: 'pending' | 'success' | 'failed'`
+- `StorageService` 持久化并读取标题生成状态，保证重启后历史状态不丢失。
+- `OpenCodeService` 新增：
+  - `updateSessionTitle()`：封装 `PATCH /session/:id`
+  - `requestAssistantResponse()`：用于同步获取标题生成结果
+
+### 🤖 AI 标题生成流程
+
+- 新增 `src/core/prompts/titleGeneration.ts`，定义标题生成系统提示词。
+- 新增 `src/features/chat/services/TitleGenerationService.ts`：
+  - 使用临时 session 异步请求标题
+  - 支持取消
+  - 清洗 AI 返回内容（去引号、去尾标点、限制 50 字）
+- 在首条用户消息发送后：
+  1. 立即写入回退标题
+  2. 若设置为 `ai`，则异步生成精炼标题
+  3. 生成成功后同步更新本地会话、Tab 标题和服务端 session 标题
+- 若用户在 AI 生成期间手动改名，则取消生成并保留用户标题。
+
+### 🖊️ 历史会话重命名修复
+
+- 历史会话项右侧新增铅笔按钮。
+- 初版实现使用了 `window.prompt()`，但 Obsidian / Electron 渲染环境不支持原生 `prompt()`。
+- 后续改为插件内部自定义重命名弹窗，支持：
+  - 输入框自动聚焦
+  - Enter 保存
+  - Escape 取消
+  - 点击遮罩关闭
+
+### 🌐 设置、文案与样式
+
+- 设置面板新增 “Title Settings / 标题设置” 区块。
+- 中英文文案补充：
+  - 标题模式
+  - AI 标题模型
+  - 重命名按钮
+  - 标题生成状态
+  - 重命名弹窗按钮
+- 历史会话列表新增状态徽标与重命名按钮样式。
+- 新增重命名弹窗样式。
+
+### 🧪 验证
+
+- `npm run lint` 通过
+- `npm run typecheck` 通过
+- `node scripts/run-jest.js tests/unit/core/opencode/OpenCodeService.test.ts` 通过
+- `npm run build` 成功
+- 已部署到 Test Vault
+- 本轮最终验证使用的 `BUILD_ID`：`main.202603281012`
+
+### 📁 涉及文件
+
+- `src/main.ts`
+- `src/core/types/settings.ts`
+- `src/core/types/chat.ts`
+- `src/core/types/index.ts`
+- `src/core/storage/StorageService.ts`
+- `src/core/opencode/OpenCodeService.ts`
+- `src/core/opencode/ServerManager.ts`
+- `src/core/prompts/titleGeneration.ts`
+- `src/features/chat/OpenCodianView.ts`
+- `src/features/chat/services/TitleGenerationService.ts`
+- `src/features/chat/tabs/TabManager.ts`
+- `src/features/settings/OpenCodianSettings.ts`
+- `src/i18n/locales/en.ts`
+- `src/i18n/locales/zh.ts`
+- `styles.css`
+- `tests/unit/core/opencode/OpenCodeService.test.ts`
 
 ---
 
@@ -1330,6 +1653,139 @@ npm run release:major  # 主版本：0.1.0 → 1.0.0
 - ✅ `npm run dev` 正确输出 BUILD_ID
 - ✅ 插件加载时控制台显示 BUILD_ID
 - ✅ `npm run release:patch` 正确更新版本号
+
+---
+
+## 2026-03-27 设置页模型开关回退与稳定支线切换
+
+### 📋 问题背景
+
+- 在后续加入“模型 / 提供商开关”后，Obsidian 设置页出现严重渲染回归：
+  - 切换开关后下半屏变黑 / 变空
+  - 有时整个设置页直接发黑
+- 多轮排查后确认：
+  - 设置内容本身没有丢失
+  - `scrollHeight` / `contentHeight` 等高度指标保持正常
+  - 问题更接近 Obsidian 设置弹窗内部滚动 / 重绘层回归
+
+### ✅ 今日处理结果
+
+#### 1. 识别问题引入点
+
+- 以 `27631b4` 为稳定参考点确认：
+  - 当时模型列表为只读展示，没有开关
+  - 设置页滚动与渲染正常
+- 继续排查后定位到引入开关的提交：
+  - `ca3274a` `feat: add model/provider toggle switches in settings`
+
+#### 2. 保护当前排查现场
+
+- 创建备份分支：
+  - `backup/settings-black-screen`
+- 将黑屏排查中的未提交改动保存到 stash：
+  - `stash@{0}` → `wip: settings black-screen debug`
+
+#### 3. 建立稳定工作支线
+
+- 基于当前工作线新建修复分支：
+  - `fix/revert-model-toggle`
+- 在该分支上回退模型开关功能提交：
+  - 新提交：`73ab805`
+  - 作用：撤回 `ca3274a`
+
+#### 4. 当前开发决策
+
+- 后续开发暂时以 **无模型开关** 的稳定支线继续
+- 保留：
+  - 模型来源模式
+  - 默认 provider / model 选择
+  - 模型可视化配置面板
+  - 模型 JSON 编辑器
+- 暂时不恢复：
+  - 设置页中的 provider / model enable/disable 开关
+
+### 🧭 当前分支状态
+
+- `feature/fork-conversation`
+  - 原主工作线，仍包含模型开关引入后的历史
+- `backup/settings-black-screen`
+  - 用于保留排查现场与 stash
+- `fix/revert-model-toggle`
+  - 当前继续开发的稳定支线
+
+### 📌 结论
+
+- 这次不是放弃后续提交，而是**只回退已确认导致设置页回归的那条功能线**
+- 其余已完成功能仍保留在当前稳定支线中继续使用
+
+---
+
+**会话日期**: 2026-03-26
+**开发时间**: ~3-4 小时
+**主要贡献**: 模型来源模式、模型目录可视化、provider/model 配置面板、模型 JSON 编辑器、聊天页模型可用性校验
+**当前状态**: 已部署测试库，可继续在真实 vault 中验证本地 / 服务器 / 合并三种模型来源行为
+
+---
+
+## 2026-03-27 标签栏位置与布局重构
+
+### ✅ 新增能力
+
+- 在设置中新增 `标题栏下方 (below-header)` 标签栏位置。
+- 为 `below-header` 新增两种布局：
+  - `grid`：横向单行紧凑布局，最多显示 5 个标签，超出折叠为 `+N`
+  - `vertical`：左侧悬浮竖排布局，最多显示 5 个按钮，超出折叠为 `+N`
+- 新增 `belowHeaderTabBarLayout` 设置项，并将默认标签栏位置切换为 `below-header`。
+
+### 🎨 交互与样式调整
+
+- `header` 位置的标签默认不展开标题，仅在悬浮时让非焦点标签恢复实体感。
+- `below-header/grid` 改为默认单行紧凑显示，非焦点标签默认虚化且不展开，只在悬浮时横向展开。
+- `below-header/vertical` 改为与导航按钮同尺寸的悬浮玻璃按钮，文字在悬浮时横向展开，不挤压正文内容。
+- 增强非焦点标签和 `+N` 的虚化程度。
+- 修复输入框附近首个标签在悬浮时出现明显长方形阴影棱角的问题，hover/focus/active 时允许阴影溢出显示。
+
+### 🏗️ 结构调整
+
+- `OpenCodianView` 增加第三个标签挂载点 `below-header`，并根据设置在 `header / below-header / input` 之间切换。
+- 竖排标签进一步移动到外层 `host`，与导航按钮使用同级的绝对定位覆盖层，而不是继续挂在聊天容器内部。
+- `TabBar` 渲染逻辑按布局模式区分可见标签数和 `+N` 溢出规则。
+
+### 🌐 国际化与设置
+
+- 中英文设置文案新增：
+  - `标题栏下方 / Below header`
+  - `下方标签布局 / Below-header tab layout`
+  - `横向多行 / Horizontal multi-row`
+  - `左侧竖排悬浮 / Floating vertical rail`
+
+### 🧪 验证
+
+- 补充 `TabBar` 单测，覆盖：
+  - `header` 布局最多 4 个可见标签
+  - `below-header/grid` 最多 5 个可见标签
+  - `below-header/vertical` 最多 5 个可见标签
+- 更新测试环境中的 DOM helper，补齐 `createEl / createDiv / createSpan / addClass / toggleClass / empty`。
+- 调整 `NavigationSidebar` 测试以匹配当前构造参数。
+- 本轮改动已通过多次 `npm run test` 与 `npm run build` 验证，并已同步部署到 Test Vault。
+
+### 📁 涉及文件
+
+- `src/core/types/settings.ts`
+- `src/core/types/index.ts`
+- `src/main.ts`
+- `src/features/chat/OpenCodianView.ts`
+- `src/features/chat/tabs/TabBar.ts`
+- `src/features/chat/tabs/types.ts`
+- `src/features/chat/tabs/index.ts`
+- `src/features/settings/OpenCodianSettings.ts`
+- `src/i18n/locales/en.ts`
+- `src/i18n/locales/zh.ts`
+- `styles.css`
+- `tests/setup.ts`
+- `tests/unit/core/types/settings.test.ts`
+- `tests/unit/features/chat/NavigationSidebar.test.ts`
+- `tests/unit/features/chat/tabs/TabBar.test.ts`
 
 ---
 
@@ -2049,77 +2505,6 @@ npm run release:major  # 主版本：0.1.0 → 1.0.0
 - ✅ 已具备模型 JSON 编辑器
 - ✅ 本地受管 OpenCode 服务会按来源模式调整配置加载方式
 - ✅ 聊天页已能拦截不可用模型并给出明确提示
-
----
-
-## 2026-03-27 设置页模型开关回退与稳定支线切换
-
-### 📋 问题背景
-
-- 在后续加入“模型 / 提供商开关”后，Obsidian 设置页出现严重渲染回归：
-  - 切换开关后下半屏变黑 / 变空
-  - 有时整个设置页直接发黑
-- 多轮排查后确认：
-  - 设置内容本身没有丢失
-  - `scrollHeight` / `contentHeight` 等高度指标保持正常
-  - 问题更接近 Obsidian 设置弹窗内部滚动 / 重绘层回归
-
-### ✅ 今日处理结果
-
-#### 1. 识别问题引入点
-
-- 以 `27631b4` 为稳定参考点确认：
-  - 当时模型列表为只读展示，没有开关
-  - 设置页滚动与渲染正常
-- 继续排查后定位到引入开关的提交：
-  - `ca3274a` `feat: add model/provider toggle switches in settings`
-
-#### 2. 保护当前排查现场
-
-- 创建备份分支：
-  - `backup/settings-black-screen`
-- 将黑屏排查中的未提交改动保存到 stash：
-  - `stash@{0}` → `wip: settings black-screen debug`
-
-#### 3. 建立稳定工作支线
-
-- 基于当前工作线新建修复分支：
-  - `fix/revert-model-toggle`
-- 在该分支上回退模型开关功能提交：
-  - 新提交：`73ab805`
-  - 作用：撤回 `ca3274a`
-
-#### 4. 当前开发决策
-
-- 后续开发暂时以 **无模型开关** 的稳定支线继续
-- 保留：
-  - 模型来源模式
-  - 默认 provider / model 选择
-  - 模型可视化配置面板
-  - 模型 JSON 编辑器
-- 暂时不恢复：
-  - 设置页中的 provider / model enable/disable 开关
-
-### 🧭 当前分支状态
-
-- `feature/fork-conversation`
-  - 原主工作线，仍包含模型开关引入后的历史
-- `backup/settings-black-screen`
-  - 用于保留排查现场与 stash
-- `fix/revert-model-toggle`
-  - 当前继续开发的稳定支线
-
-### 📌 结论
-
-- 这次不是放弃后续提交，而是**只回退已确认导致设置页回归的那条功能线**
-- 其余已完成功能仍保留在当前稳定支线中继续使用
-
----
-
-**会话日期**: 2026-03-26
-**开发时间**: ~3-4 小时
-**主要贡献**: 模型来源模式、模型目录可视化、provider/model 配置面板、模型 JSON 编辑器、聊天页模型可用性校验
-**当前状态**: 已部署测试库，可继续在真实 vault 中验证本地 / 服务器 / 合并三种模型来源行为
 
 ---
 
@@ -4958,247 +5343,5 @@ streamController.renderStoredContentBlocks(parentEl, savedBlocks);
 - 外部服务器无法通过插件停止（需要手动在终端停止）
 - 首次加载设置时需要手动刷新模型列表
 - 消息历史依赖 OpenCode 服务器存储
-
----
-
-## 2026-03-29 Settings 滚动恢复日志优化
-
-### 🔇 问题现象
-
-- 每次打开 Settings 页面时，滚动恢复逻辑会因为 `animation-frame`、`mutation` 和多轮递增 `timeout` 连续输出多条几乎相同的调试日志。
-- `Settings scroll restore attempt`、`Captured settings scroll position`、`Resolved settings scroll container` 叠加后，单次打开设置页可产生 10+ 条日志，影响问题排查。
-
-### 🎯 优化目标
-
-- 在首次成功恢复滚动位置后，静默后续重复触发。
-- 保留一条足够详细的成功日志，继续支持线上排查。
-
-### ✅ 本轮调整
-
-- 为设置页滚动恢复流程增加“已成功恢复”标记，成功后后续触发直接返回。
-- 只有在 `scrollTop` 实际到达目标值后才判定恢复成功，避免内容尚未撑开时过早结束恢复流程。
-- 首次恢复成功后立即：
-  - 清理剩余的重试 `timeout`
-  - 断开 `MutationObserver`
-  - 停止后续重复日志输出
-- 将原先多条 `Settings scroll restore attempt` 调试日志收敛为单条 `Settings scroll restored`，包含：
-  - `reason`
-  - `attempts`
-  - `elapsedMs`
-  - `targetScrollTop`
-  - `restoredScrollTop`
-- 移除常态下噪声较高的 `Captured settings scroll position` 与滚动容器解析调试日志。
-
-### 🧪 验证
-
-- 新增定向单测，覆盖：
-  - 首轮恢复未成功时不应提前记录成功日志
-  - 内容高度变化后由 `mutation` 触发二次恢复成功
-  - 成功后 observer 和 timeout 均被清理
-  - 最终只输出 1 条恢复成功日志
-- 已通过：
-  - `npm run test -- OpenCodianSettings.test.ts`
-  - `npm run lint -- src/features/settings/OpenCodianSettings.ts tests/unit/features/settings/OpenCodianSettings.test.ts`
-  - `npm run build`
-- 已部署到 Test Vault。
-- 本轮最终验证使用的 `BUILD_ID`：`main.202603291806`
-
-### 📁 涉及文件
-
-- `src/features/settings/OpenCodianSettings.ts`
-- `tests/unit/features/settings/OpenCodianSettings.test.ts`
-- `devlog.md`
-
----
-
-## 2026-03-27 标签栏位置与布局重构
-
-### ✅ 新增能力
-
-- 在设置中新增 `标题栏下方 (below-header)` 标签栏位置。
-- 为 `below-header` 新增两种布局：
-  - `grid`：横向单行紧凑布局，最多显示 5 个标签，超出折叠为 `+N`
-  - `vertical`：左侧悬浮竖排布局，最多显示 5 个按钮，超出折叠为 `+N`
-- 新增 `belowHeaderTabBarLayout` 设置项，并将默认标签栏位置切换为 `below-header`。
-
-### 🎨 交互与样式调整
-
-- `header` 位置的标签默认不展开标题，仅在悬浮时让非焦点标签恢复实体感。
-- `below-header/grid` 改为默认单行紧凑显示，非焦点标签默认虚化且不展开，只在悬浮时横向展开。
-- `below-header/vertical` 改为与导航按钮同尺寸的悬浮玻璃按钮，文字在悬浮时横向展开，不挤压正文内容。
-- 增强非焦点标签和 `+N` 的虚化程度。
-- 修复输入框附近首个标签在悬浮时出现明显长方形阴影棱角的问题，hover/focus/active 时允许阴影溢出显示。
-
-### 🏗️ 结构调整
-
-- `OpenCodianView` 增加第三个标签挂载点 `below-header`，并根据设置在 `header / below-header / input` 之间切换。
-- 竖排标签进一步移动到外层 `host`，与导航按钮使用同级的绝对定位覆盖层，而不是继续挂在聊天容器内部。
-- `TabBar` 渲染逻辑按布局模式区分可见标签数和 `+N` 溢出规则。
-
-### 🌐 国际化与设置
-
-- 中英文设置文案新增：
-  - `标题栏下方 / Below header`
-  - `下方标签布局 / Below-header tab layout`
-  - `横向多行 / Horizontal multi-row`
-  - `左侧竖排悬浮 / Floating vertical rail`
-
-### 🧪 验证
-
-- 补充 `TabBar` 单测，覆盖：
-  - `header` 布局最多 4 个可见标签
-  - `below-header/grid` 最多 5 个可见标签
-  - `below-header/vertical` 最多 5 个可见标签
-- 更新测试环境中的 DOM helper，补齐 `createEl / createDiv / createSpan / addClass / toggleClass / empty`。
-- 调整 `NavigationSidebar` 测试以匹配当前构造参数。
-- 本轮改动已通过多次 `npm run test` 与 `npm run build` 验证，并已同步部署到 Test Vault。
-
-### 📁 涉及文件
-
-- `src/core/types/settings.ts`
-- `src/core/types/index.ts`
-- `src/main.ts`
-- `src/features/chat/OpenCodianView.ts`
-- `src/features/chat/tabs/TabBar.ts`
-- `src/features/chat/tabs/types.ts`
-- `src/features/chat/tabs/index.ts`
-- `src/features/settings/OpenCodianSettings.ts`
-- `src/i18n/locales/en.ts`
-- `src/i18n/locales/zh.ts`
-- `styles.css`
-- `tests/setup.ts`
-- `tests/unit/core/types/settings.test.ts`
-- `tests/unit/features/chat/NavigationSidebar.test.ts`
-- `tests/unit/features/chat/tabs/TabBar.test.ts`
-
----
-
-## 2026-03-28 助手消息流结束抖动修复
-
-### 🐛 问题现象
-
-- 助手消息在流式输出完成后，会出现一次明显的“向下跳”或“闪一下”的视觉抖动。
-- 开启自动滚动时，滚动位置也会在结束瞬间被再次推到底部，放大这种不稳定感。
-
-### 🔍 原因定位
-
-- 时间戳行原本在流结束后才插入，导致消息高度在最后一刻突然增加。
-- `done` 阶段仍会触发一次额外的 `scrollToBottom()`，与时间戳插入叠加，形成末尾跳动。
-- 流式助手消息结构中还存在一层多余的预创建文本容器，不必要地增加了收尾阶段 DOM 调整的复杂度。
-
-### ✅ 本轮修复
-
-- 助手流式消息创建时就预留 `.opencodian-message-time-row` 占位，结束时只填充时间、模型和复制按钮，不再新增一整行 DOM。
-- 为时间戳行增加稳定高度与隐藏占位态，避免结束瞬间撑高消息。
-- `StreamController` 在处理 `done` chunk 时不再立即触发额外滚动。
-- `OpenCodianView` 改为在流结束后的双 `requestAnimationFrame` 中补一次稳定滚动，等待布局完成后再校正位置。
-- 清理流式助手消息里多余的空文本节点，保持实时 Markdown 渲染路径不变。
-
-### 🎯 结果
-
-- 保留实时 Markdown 渲染效果，不牺牲流式过程中的格式反馈。
-- 显著减轻消息结束瞬间的“蹦一下”感，尤其是在自动滚动开启时更稳定。
-
-### 🧪 验证
-
-- 定向 ESLint 校验通过：
-  - `src/features/chat/OpenCodianView.ts`
-  - `src/utils/streaming/StreamController.ts`
-- 构建成功并部署到 Test Vault。
-- 本轮验证使用的 `BUILD_ID`：`main.202603280851`
-
-### 📁 涉及文件
-
-- `src/features/chat/OpenCodianView.ts`
-- `src/utils/streaming/StreamController.ts`
-- `styles.css`
-
----
-
-## 2026-03-28 会话标题机制改造与历史重命名修复
-
-### ✨ 新增能力
-
-- 新会话不再默认使用时间戳标题，改为在首条用户消息发送后，立即生成“消息截取回退标题”。
-- 新增标题生成模式设置：
-  - `default`：仅使用首条消息回退标题
-  - `ai`：先使用回退标题，再异步生成 AI 精炼标题
-- 新增 AI 标题模型设置 `aiTitleModel`，留空时自动跟随当前会话模型。
-- 历史会话列表新增重命名按钮，支持用户手动修改标题。
-
-### 🏗️ 数据与服务层改造
-
-- `OpenCodianSettings` 新增：
-  - `titleMode`
-  - `aiTitleModel`
-- `Conversation` / `ConversationMeta` 新增：
-  - `titleGenerationStatus?: 'pending' | 'success' | 'failed'`
-- `StorageService` 持久化并读取标题生成状态，保证重启后历史状态不丢失。
-- `OpenCodeService` 新增：
-  - `updateSessionTitle()`：封装 `PATCH /session/:id`
-  - `requestAssistantResponse()`：用于同步获取标题生成结果
-
-### 🤖 AI 标题生成流程
-
-- 新增 `src/core/prompts/titleGeneration.ts`，定义标题生成系统提示词。
-- 新增 `src/features/chat/services/TitleGenerationService.ts`：
-  - 使用临时 session 异步请求标题
-  - 支持取消
-  - 清洗 AI 返回内容（去引号、去尾标点、限制 50 字）
-- 在首条用户消息发送后：
-  1. 立即写入回退标题
-  2. 若设置为 `ai`，则异步生成精炼标题
-  3. 生成成功后同步更新本地会话、Tab 标题和服务端 session 标题
-- 若用户在 AI 生成期间手动改名，则取消生成并保留用户标题。
-
-### 🖊️ 历史会话重命名修复
-
-- 历史会话项右侧新增铅笔按钮。
-- 初版实现使用了 `window.prompt()`，但 Obsidian / Electron 渲染环境不支持原生 `prompt()`。
-- 后续改为插件内部自定义重命名弹窗，支持：
-  - 输入框自动聚焦
-  - Enter 保存
-  - Escape 取消
-  - 点击遮罩关闭
-
-### 🌐 设置、文案与样式
-
-- 设置面板新增 “Title Settings / 标题设置” 区块。
-- 中英文文案补充：
-  - 标题模式
-  - AI 标题模型
-  - 重命名按钮
-  - 标题生成状态
-  - 重命名弹窗按钮
-- 历史会话列表新增状态徽标与重命名按钮样式。
-- 新增重命名弹窗样式。
-
-### 🧪 验证
-
-- `npm run lint` 通过
-- `npm run typecheck` 通过
-- `node scripts/run-jest.js tests/unit/core/opencode/OpenCodeService.test.ts` 通过
-- `npm run build` 成功
-- 已部署到 Test Vault
-- 本轮最终验证使用的 `BUILD_ID`：`main.202603281012`
-
-### 📁 涉及文件
-
-- `src/main.ts`
-- `src/core/types/settings.ts`
-- `src/core/types/chat.ts`
-- `src/core/types/index.ts`
-- `src/core/storage/StorageService.ts`
-- `src/core/opencode/OpenCodeService.ts`
-- `src/core/opencode/ServerManager.ts`
-- `src/core/prompts/titleGeneration.ts`
-- `src/features/chat/OpenCodianView.ts`
-- `src/features/chat/services/TitleGenerationService.ts`
-- `src/features/chat/tabs/TabManager.ts`
-- `src/features/settings/OpenCodianSettings.ts`
-- `src/i18n/locales/en.ts`
-- `src/i18n/locales/zh.ts`
-- `styles.css`
-- `tests/unit/core/opencode/OpenCodeService.test.ts`
 
 ---
