@@ -1,6 +1,6 @@
 /**
  * OpenCodian View
- * 
+ *
  * Main sidebar view for the OpenCodian chat interface.
  */
 
@@ -18,7 +18,7 @@ import {
   VIEW_TYPE_OPENCODIAN,
 } from '../../core/types';
 import type { EffortLevel, ThinkingBudget } from '../../core/types/settings';
-import { t } from '../../i18n';
+import { t, type TranslationKey } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { createLogger, resolveToolExecutionStatus } from '../../shared';
 import { chooseForkTarget } from '../../shared/modals';
@@ -1093,14 +1093,14 @@ export class OpenCodianView extends ItemView {
   private buildHeader(header: HTMLElement) {
     // Logo and title
     const titleEl = header.createDiv({ cls: 'opencodian-title' });
-    
+
     // Create logo container
     const logoContainer = titleEl.createDiv({ cls: 'opencodian-logo' });
     logoContainer.innerHTML = this.getLogoSvg();
 
     titleEl.createEl('span', { text: 'OpenCodian', cls: 'opencodian-title-text' });
     this.headerTabBarSlotEl = header.createDiv({ cls: 'opencodian-tab-bar-slot opencodian-tab-bar-slot--header' });
-    
+
     // Listen for theme changes
     this.registerEvent(
       this.app.workspace.on('css-change', () => {
@@ -1301,7 +1301,7 @@ export class OpenCodianView extends ItemView {
 
     // Input wrapper - textarea only (send button moved to toolbar)
     const inputWrapper = container.createDiv({ cls: 'opencodian-input-wrapper' });
-    
+
     this.inputTextarea = inputWrapper.createEl('textarea', {
       cls: 'opencodian-input',
       attr: { placeholder: 'Ask anything...', rows: '1' },
@@ -1325,11 +1325,11 @@ export class OpenCodianView extends ItemView {
 
     // Bottom toolbar: Permission mode (left) | Model selector (center) | Send button (right)
     const toolbar = container.createDiv({ cls: 'opencodian-input-toolbar' });
-    
+
     // Left side: Permission mode selector
     const permissionContainer = toolbar.createDiv({ cls: 'opencodian-permission-selector' });
     this.initializePermissionSelector(permissionContainer);
-    
+
     // Center: Model selector (opencode-style)
     this.modelSelectorContainer = toolbar.createDiv({ cls: 'opencodian-model-selector' });
     this.initializeModelSelector(this.modelSelectorContainer);
@@ -1537,7 +1537,7 @@ export class OpenCodianView extends ItemView {
         messagesEl.removeClass('is-rehydrating');
       });
     }
-    
+
     // Update model selector to reflect this session's model
     this.updateModelSelectorDisplay();
     this.syncActiveTabContextUsageIdentity();
@@ -1726,7 +1726,8 @@ export class OpenCodianView extends ItemView {
   /** Show conversation history */
   private showConversationHistory(event: MouseEvent) {
     const conversations = this.plugin.getConversations();
-    
+    const selectedConversationIds = new Set<string>();
+
     if (conversations.length === 0) {
       new Notice(t('chat.history.empty'));
       return;
@@ -1738,10 +1739,10 @@ export class OpenCodianView extends ItemView {
     // Create custom dropdown
     this.historyDropdownEl = document.createElement('div');
     this.historyDropdownEl.addClass('opencodian-history-dropdown');
-    
+
     // Create scrollable container for conversations only
     const scrollContainer = this.historyDropdownEl.createDiv({ cls: 'opencodian-history-scroll' });
-    
+
     // Add each conversation to the dropdown
     for (const conv of conversations) {
       const isActive = this.currentConversation?.id === conv.id;
@@ -1749,15 +1750,29 @@ export class OpenCodianView extends ItemView {
       // Format: YYYY/M/D HH:MM:SS
       const createdAt = new Date(conv.createdAt);
       const dateStr = `${createdAt.getFullYear()}/${createdAt.getMonth() + 1}/${createdAt.getDate()} ${String(createdAt.getHours()).padStart(2, '0')}:${String(createdAt.getMinutes()).padStart(2, '0')}:${String(createdAt.getSeconds()).padStart(2, '0')}`;
-      
-      const itemEl = scrollContainer.createDiv({ 
-        cls: `opencodian-history-item${isActive ? ' is-active' : ''}` 
+
+      const itemEl = scrollContainer.createDiv({
+        cls: `opencodian-history-item${isActive ? ' is-active' : ''}`
       });
-      
+
+      const checkboxWrapperEl = itemEl.createDiv({ cls: 'opencodian-history-item-checkbox' });
+      checkboxWrapperEl.addEventListener('click', (e) => {
+        e.stopPropagation();
+      });
+      const checkboxEl = checkboxWrapperEl.createEl('input', {
+        attr: {
+          type: 'checkbox',
+          'aria-label': `${t('chat.history.selectConversation')}: ${title}`,
+        },
+      });
+      checkboxEl.addEventListener('click', (e) => {
+        e.stopPropagation();
+      });
+
       // Icon
       const iconEl = itemEl.createSpan({ cls: 'opencodian-history-item-icon' });
       setIcon(iconEl, isActive ? 'check' : 'message-square');
-      
+
       // Content container for title and date
       const contentEl = itemEl.createDiv({ cls: 'opencodian-history-item-content' });
       contentEl.createDiv({ cls: 'opencodian-history-item-title', text: title });
@@ -1784,7 +1799,19 @@ export class OpenCodianView extends ItemView {
         e.stopPropagation();
         void this.renameConversation(conv.id);
       });
-      
+
+      checkboxEl.addEventListener('change', (e) => {
+        e.stopPropagation();
+        const isSelected = checkboxEl.checked;
+        itemEl.toggleClass('is-selected', isSelected);
+        if (isSelected) {
+          selectedConversationIds.add(conv.id);
+        } else {
+          selectedConversationIds.delete(conv.id);
+        }
+        updateDeleteActionText();
+      });
+
       // Click handler
       itemEl.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -1800,27 +1827,40 @@ export class OpenCodianView extends ItemView {
         }
       });
     }
-    
+
     // Fixed footer with delete actions (outside scroll container)
     const footerEl = this.historyDropdownEl.createDiv({ cls: 'opencodian-history-footer' });
-    
+
     // Add separator line
     footerEl.createDiv({ cls: 'opencodian-history-separator' });
-    
+
     // Delete actions section
     const actionsEl = footerEl.createDiv({ cls: 'opencodian-history-actions' });
-    
-    // Delete current conversation
-    const deleteCurrentEl = actionsEl.createDiv({ cls: 'opencodian-history-action' });
-    const deleteCurrentIcon = deleteCurrentEl.createSpan({ cls: 'opencodian-history-action-icon' });
-    setIcon(deleteCurrentIcon, 'trash');
-    deleteCurrentEl.createSpan({ cls: 'opencodian-history-action-text', text: t('chat.history.deleteCurrent') });
-    deleteCurrentEl.addEventListener('click', (e) => {
+
+    // Delete current or selected conversations
+    const deleteTargetEl = actionsEl.createDiv({ cls: 'opencodian-history-action' });
+    const deleteTargetIcon = deleteTargetEl.createSpan({ cls: 'opencodian-history-action-icon' });
+    setIcon(deleteTargetIcon, 'trash');
+    const deleteTargetTextEl = deleteTargetEl.createSpan({ cls: 'opencodian-history-action-text' });
+    const updateDeleteActionText = () => {
+      deleteTargetTextEl.setText(
+        selectedConversationIds.size > 0
+          ? t('chat.history.deleteSelected')
+          : t('chat.history.deleteCurrent'),
+      );
+    };
+    updateDeleteActionText();
+    deleteTargetEl.addEventListener('click', (e) => {
       e.stopPropagation();
+      const selectedIds = Array.from(selectedConversationIds);
       this.closeHistoryDropdown();
+      if (selectedIds.length > 0) {
+        void this.deleteSelectedConversations(selectedIds);
+        return;
+      }
       void this.deleteCurrentConversation();
     });
-    
+
     // Delete all conversations (if more than 1)
     if (conversations.length > 1) {
       const deleteAllEl = actionsEl.createDiv({ cls: 'opencodian-history-action' });
@@ -1833,7 +1873,7 @@ export class OpenCodianView extends ItemView {
         void this.deleteAllConversations();
       });
     }
-    
+
     const targetEl = (event.currentTarget as HTMLElement | null) ?? (event.target as HTMLElement);
     const rect = targetEl.getBoundingClientRect();
 
@@ -1844,20 +1884,20 @@ export class OpenCodianView extends ItemView {
     this.historyDropdownEl.style.zIndex = '1000';
     this.historyDropdownEl.style.visibility = 'hidden';
     this.scheduleHistoryDropdownPosition(rect);
-    
+
     // Setup click outside handler
     this.historyDropdownClickOutsideHandler = (e: MouseEvent) => {
       if (!this.historyDropdownEl?.contains(e.target as Node)) {
         this.closeHistoryDropdown();
       }
     };
-    
+
     // Add click outside listener with small delay to avoid immediate close
     setTimeout(() => {
       document.addEventListener('click', this.historyDropdownClickOutsideHandler!);
     }, 0);
   }
-  
+
   /** Close history dropdown */
   private closeHistoryDropdown(): void {
     this.clearScheduledHistoryDropdownPosition();
@@ -1874,139 +1914,98 @@ export class OpenCodianView extends ItemView {
   /** Delete current conversation with 3-second confirmation */
   private async deleteCurrentConversation() {
     if (!this.currentConversation) return;
-    
+
     // Create custom confirmation modal with 3-second countdown
     const confirmed = await this.showDeleteCurrentConfirmDialog(this.currentConversation.title || t('chat.history.untitled'));
     if (!confirmed) return;
-    
-    const deletedId = this.currentConversation.id;
-    await this.plugin.deleteConversation(deletedId);
 
-    const activeTabId = this.tabManager?.getActiveTab()?.id ?? null;
-    if (activeTabId && this.tabManager) {
-      const closeResult = this.tabManager.closeTab(activeTabId);
-      if (closeResult.nextActiveTabId) {
-        await this.activateTab(closeResult.nextActiveTabId);
-      } else {
+    const deletedId = this.currentConversation.id;
+    await this.deleteConversationsAndCleanupTabs([deletedId]);
+
+    new Notice(t('chat.deleteCurrentConfirm.success') || 'Conversation deleted');
+  }
+
+  /** Delete selected conversations with the same 3-second confirmation countdown */
+  private async deleteSelectedConversations(conversationIds: string[]) {
+    const uniqueConversationIds = Array.from(new Set(conversationIds));
+    if (uniqueConversationIds.length === 0) {
+      return;
+    }
+
+    const confirmed = await this.showDeleteSelectedConfirmDialog(uniqueConversationIds.length);
+    if (!confirmed) {
+      return;
+    }
+
+    await this.deleteConversationsAndCleanupTabs(uniqueConversationIds);
+    new Notice(t('chat.deleteSelectedConfirm.success') || 'Selected conversations deleted');
+  }
+
+  private async deleteConversationsAndCleanupTabs(conversationIds: string[]): Promise<void> {
+    const uniqueConversationIds = Array.from(new Set(conversationIds));
+    if (uniqueConversationIds.length === 0) {
+      return;
+    }
+
+    const conversationIdSet = new Set(uniqueConversationIds);
+    for (const conversationId of uniqueConversationIds) {
+      await this.plugin.deleteConversation(conversationId);
+    }
+
+    if (!this.tabManager) {
+      if (this.currentConversation && conversationIdSet.has(this.currentConversation.id)) {
         await this.createNewConversation();
       }
-    } else {
-      await this.createNewConversation();
+      return;
     }
-    
-    new Notice(t('chat.deleteCurrentConfirm.success') || 'Conversation deleted');
+
+    const tabsToClose = this.tabManager.getAllTabs()
+      .filter((tab) => tab.conversationId && conversationIdSet.has(tab.conversationId));
+    const activeTabId = this.tabManager.getActiveTab()?.id ?? null;
+    const activeTabWillBeClosed = activeTabId
+      ? tabsToClose.some((tab) => tab.id === activeTabId)
+      : false;
+    const closeResult = this.tabManager.closeTabs(tabsToClose.map((tab) => tab.id));
+
+    for (const tabId of closeResult.closedTabIds) {
+      this.removeTabMessagesPane(tabId);
+    }
+
+    if (this.tabManager.getTabCount() === 0) {
+      await this.createNewConversation();
+      return;
+    }
+
+    if (activeTabWillBeClosed && closeResult.nextActiveTabId) {
+      await this.activateTab(closeResult.nextActiveTabId);
+    }
   }
 
   /** Show delete current conversation confirmation dialog with 3-second countdown */
   private async showDeleteCurrentConfirmDialog(title: string): Promise<boolean> {
-    return new Promise((resolve) => {
-      // Create overlay
-      const overlay = document.createElement('div');
-      overlay.addClass('opencodian-delete-confirm-overlay');
-      
-      // Create dialog
-      const dialog = document.createElement('div');
-      dialog.addClass('opencodian-delete-confirm-dialog');
-      
-      // Title with warning icon
-      const titleEl = dialog.createDiv({ cls: 'opencodian-delete-confirm-title' });
-      titleEl.setText(t('chat.deleteCurrentConfirm.title'));
-      
-      // Warning text
-      const warningEl = dialog.createDiv({ cls: 'opencodian-delete-confirm-warning' });
-      warningEl.setText(t('chat.deleteCurrentConfirm.warning'));
-      
-      // Description with conversation title
-      const descEl = dialog.createDiv({ cls: 'opencodian-delete-confirm-desc' });
-      descEl.setText(t('chat.deleteCurrentConfirm.description', { title }));
-      
-      // Emphasis text
-      const emphasisEl = dialog.createDiv({ cls: 'opencodian-delete-confirm-emphasis' });
-      emphasisEl.setText(t('chat.deleteCurrentConfirm.emphasis'));
-      
-      // Buttons container
-      const buttonsEl = dialog.createDiv({ cls: 'opencodian-delete-confirm-buttons' });
-      
-      // Confirm button (red, with countdown) - LEFT side
-      const confirmBtn = buttonsEl.createEl('button', { 
-        cls: 'opencodian-delete-confirm-btn opencodian-delete-confirm-confirm',
-        text: t('chat.deleteCurrentConfirm.confirm', { seconds: '3' })
-      });
-      confirmBtn.setAttribute('disabled', 'true');
-      
-      // Cancel button - RIGHT side, larger
-      const cancelBtn = buttonsEl.createEl('button', { 
-        cls: 'opencodian-delete-confirm-btn opencodian-delete-confirm-cancel',
-        text: t('chat.deleteCurrentConfirm.cancel')
-      });
-      
-      // Append to document
-      overlay.appendChild(dialog);
-      document.body.appendChild(overlay);
-      
-      let countdown = 3;
-      let timerId: number | null = null;
-      
-      // Countdown logic (3 seconds)
-      const startCountdown = () => {
-        timerId = window.setInterval(() => {
-          countdown--;
-          if (countdown > 0) {
-            confirmBtn.setText(t('chat.deleteCurrentConfirm.confirm', { seconds: String(countdown) }));
-          } else {
-            // Enable confirm button
-            if (timerId) {
-              window.clearInterval(timerId);
-              timerId = null;
-            }
-            confirmBtn.removeAttribute('disabled');
-            // Remove countdown text, show only confirm text
-            confirmBtn.setText(t('chat.deleteCurrentConfirm.confirmText'));
-          }
-        }, 1000);
-      };
-      
-      // Start countdown after a short delay
-      setTimeout(startCountdown, 100);
-      
-      // Cancel handler
-      const handleCancel = () => {
-        if (timerId) {
-          window.clearInterval(timerId);
-        }
-        overlay.remove();
-        resolve(false);
-      };
-      
-      // Confirm handler
-      const handleConfirm = () => {
-        if (countdown > 0) return; // Still counting down
-        if (timerId) {
-          window.clearInterval(timerId);
-        }
-        overlay.remove();
-        resolve(true);
-      };
-      
-      // Click outside to cancel
-      overlay.addEventListener('click', (e) => {
-        if (e.target === overlay) {
-          handleCancel();
-        }
-      });
-      
-      // Button handlers
-      cancelBtn.addEventListener('click', handleCancel);
-      confirmBtn.addEventListener('click', handleConfirm);
-      
-      // Escape to cancel
-      const escapeHandler = (e: KeyboardEvent) => {
-        if (e.key === 'Escape') {
-          handleCancel();
-          document.removeEventListener('keydown', escapeHandler);
-        }
-      };
-      document.addEventListener('keydown', escapeHandler);
+    return this.showDeleteConfirmDialog({
+      titleKey: 'chat.deleteCurrentConfirm.title',
+      warningKey: 'chat.deleteCurrentConfirm.warning',
+      description: t('chat.deleteCurrentConfirm.description', { title }),
+      emphasisKey: 'chat.deleteCurrentConfirm.emphasis',
+      cancelKey: 'chat.deleteCurrentConfirm.cancel',
+      confirmKey: 'chat.deleteCurrentConfirm.confirm',
+      confirmTextKey: 'chat.deleteCurrentConfirm.confirmText',
+      countdown: 3,
+    });
+  }
+
+  /** Show delete selected conversations confirmation dialog with 3-second countdown */
+  private async showDeleteSelectedConfirmDialog(count: number): Promise<boolean> {
+    return this.showDeleteConfirmDialog({
+      titleKey: 'chat.deleteSelectedConfirm.title',
+      warningKey: 'chat.deleteSelectedConfirm.warning',
+      description: t('chat.deleteSelectedConfirm.description', { count: String(count) }),
+      emphasisKey: 'chat.deleteSelectedConfirm.emphasis',
+      cancelKey: 'chat.deleteSelectedConfirm.cancel',
+      confirmKey: 'chat.deleteSelectedConfirm.confirm',
+      confirmTextKey: 'chat.deleteSelectedConfirm.confirmText',
+      countdown: 3,
     });
   }
 
@@ -2018,7 +2017,7 @@ export class OpenCodianView extends ItemView {
     // Create custom confirmation modal
     const confirmed = await this.showDeleteAllConfirmDialog(conversations.length);
     if (!confirmed) return;
-    
+
     for (const conv of conversations) {
       await this.plugin.deleteConversation(conv.id);
     }
@@ -2039,60 +2038,109 @@ export class OpenCodianView extends ItemView {
 
   /** Show delete all confirmation dialog with 5-second countdown */
   private async showDeleteAllConfirmDialog(count: number): Promise<boolean> {
+    return this.showDeleteConfirmDialog({
+      titleKey: 'chat.deleteAllConfirm.title',
+      warningKey: 'chat.deleteAllConfirm.warning',
+      description: t('chat.deleteAllConfirm.description', { count: String(count) }),
+      emphasisKey: 'chat.deleteAllConfirm.emphasis',
+      cancelKey: 'chat.deleteAllConfirm.cancel',
+      confirmKey: 'chat.deleteAllConfirm.confirm',
+      confirmTextKey: 'chat.deleteAllConfirm.confirmText',
+      countdown: 6,
+    });
+  }
+
+  private async showDeleteConfirmDialog(options: {
+    titleKey: TranslationKey;
+    warningKey: TranslationKey;
+    description: string;
+    emphasisKey: TranslationKey;
+    cancelKey: TranslationKey;
+    confirmKey: TranslationKey;
+    confirmTextKey: TranslationKey;
+    countdown: number;
+  }): Promise<boolean> {
     return new Promise((resolve) => {
       // Create overlay
       const overlay = document.createElement('div');
       overlay.addClass('opencodian-delete-confirm-overlay');
-      
+
       // Create dialog
       const dialog = document.createElement('div');
       dialog.addClass('opencodian-delete-confirm-dialog');
-      
+
       // Title with warning icon
       const titleEl = dialog.createDiv({ cls: 'opencodian-delete-confirm-title' });
-      titleEl.setText(t('chat.deleteAllConfirm.title'));
-      
+      titleEl.setText(t(options.titleKey));
+
       // Warning text
       const warningEl = dialog.createDiv({ cls: 'opencodian-delete-confirm-warning' });
-      warningEl.setText(t('chat.deleteAllConfirm.warning'));
-      
+      warningEl.setText(t(options.warningKey));
+
       // Description
       const descEl = dialog.createDiv({ cls: 'opencodian-delete-confirm-desc' });
-      descEl.setText(t('chat.deleteAllConfirm.description', { count: String(count) }));
-      
+      descEl.setText(options.description);
+
       // Emphasis text
       const emphasisEl = dialog.createDiv({ cls: 'opencodian-delete-confirm-emphasis' });
-      emphasisEl.setText(t('chat.deleteAllConfirm.emphasis'));
-      
+      emphasisEl.setText(t(options.emphasisKey));
+
       // Buttons container
       const buttonsEl = dialog.createDiv({ cls: 'opencodian-delete-confirm-buttons' });
-      
+
       // Confirm button (red, with countdown) - LEFT side
-      const confirmBtn = buttonsEl.createEl('button', { 
+      const confirmBtn = buttonsEl.createEl('button', {
         cls: 'opencodian-delete-confirm-btn opencodian-delete-confirm-confirm',
-        text: t('chat.deleteAllConfirm.confirm', { seconds: '6' })
+        text: t(options.confirmKey, { seconds: String(options.countdown) })
       });
       confirmBtn.setAttribute('disabled', 'true');
-      
+
       // Cancel button - RIGHT side, larger
-      const cancelBtn = buttonsEl.createEl('button', { 
+      const cancelBtn = buttonsEl.createEl('button', {
         cls: 'opencodian-delete-confirm-btn opencodian-delete-confirm-cancel',
-        text: t('chat.deleteAllConfirm.cancel')
+        text: t(options.cancelKey)
       });
-      
+
       // Append to document
       overlay.appendChild(dialog);
       document.body.appendChild(overlay);
-      
-      let countdown = 6;
+
+      let countdown = options.countdown;
       let timerId: number | null = null;
-      
-      // Countdown logic (6 seconds)
+      let countdownStartTimeoutId: number | null = null;
+      let settled = false;
+
+      const cleanup = () => {
+        if (timerId) {
+          window.clearInterval(timerId);
+          timerId = null;
+        }
+        if (countdownStartTimeoutId) {
+          window.clearTimeout(countdownStartTimeoutId);
+          countdownStartTimeoutId = null;
+        }
+        document.removeEventListener('keydown', escapeHandler);
+        overlay.remove();
+      };
+
+      const finish = (value: boolean) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        cleanup();
+        resolve(value);
+      };
+
+      // Countdown logic
       const startCountdown = () => {
+        if (settled) {
+          return;
+        }
         timerId = window.setInterval(() => {
           countdown--;
           if (countdown > 0) {
-            confirmBtn.setText(t('chat.deleteAllConfirm.confirm', { seconds: String(countdown) }));
+            confirmBtn.setText(t(options.confirmKey, { seconds: String(countdown) }));
           } else {
             // Enable confirm button
             if (timerId) {
@@ -2101,49 +2149,40 @@ export class OpenCodianView extends ItemView {
             }
             confirmBtn.removeAttribute('disabled');
             // Remove countdown text, show only confirm text
-            confirmBtn.setText(t('chat.deleteAllConfirm.confirmText'));
+            confirmBtn.setText(t(options.confirmTextKey));
           }
         }, 1000);
       };
-      
+
       // Start countdown after a short delay
-      setTimeout(startCountdown, 100);
-      
+      countdownStartTimeoutId = window.setTimeout(startCountdown, 100);
+
       // Cancel handler
       const handleCancel = () => {
-        if (timerId) {
-          window.clearInterval(timerId);
-        }
-        overlay.remove();
-        resolve(false);
+        finish(false);
       };
-      
+
       // Confirm handler
       const handleConfirm = () => {
         if (countdown > 0) return; // Still counting down
-        if (timerId) {
-          window.clearInterval(timerId);
-        }
-        overlay.remove();
-        resolve(true);
+        finish(true);
       };
-      
+
       // Click outside to cancel
       overlay.addEventListener('click', (e) => {
         if (e.target === overlay) {
           handleCancel();
         }
       });
-      
+
       // Button handlers
       cancelBtn.addEventListener('click', handleCancel);
       confirmBtn.addEventListener('click', handleConfirm);
-      
+
       // Escape to cancel
       const escapeHandler = (e: KeyboardEvent) => {
         if (e.key === 'Escape') {
           handleCancel();
-          document.removeEventListener('keydown', escapeHandler);
         }
       };
       document.addEventListener('keydown', escapeHandler);
@@ -2282,13 +2321,13 @@ export class OpenCodianView extends ItemView {
       const shouldAutoScrollPending = this.getActiveTabId() === sendingTabId && this.shouldAutoScroll();
       logger.debug('Showing pending indicator:', pendingMessage);
       pendingState.element = contentEl.createDiv({ cls: 'opencodian-pending' });
-      pendingState.element.createSpan({ 
+      pendingState.element.createSpan({
         text: pendingMessage,
-        cls: 'opencodian-pending-text' 
+        cls: 'opencodian-pending-text'
       });
       const hintEl = pendingState.element.createSpan({ cls: 'opencodian-pending-hint' });
       pendingStartTime = Date.now();
-      
+
       // Update timer every second
       const updateTimer = () => {
         if (!pendingState.element || !pendingState.element.isConnected) return;
@@ -2345,9 +2384,9 @@ export class OpenCodianView extends ItemView {
             window.clearTimeout(timeoutId);
             timeoutId = null;
           }
-          
+
           await this.showPermissionDialog(chunk, sendingTabId);
-          
+
           if (sendingRuntime.isStreaming) {
             scheduleStreamTimeout();
           }
@@ -2363,11 +2402,11 @@ export class OpenCodianView extends ItemView {
             receivedMeaningfulChunk = true;
           }
           await streamController.handleChunk(streamingChunk);
-          
+
           const hasContent = (streamingChunk.type === 'text' && streamingChunk.content?.trim()) ||
                             (streamingChunk.type === 'thinking' && streamingChunk.content?.trim()) ||
                             streamingChunk.type === 'tool_use';
-          
+
           if (!receivedFirstChunk && hasContent) {
             receivedFirstChunk = true;
             logger.debug('First content chunk received, clearing pending timeout/indicator');
@@ -2392,7 +2431,7 @@ export class OpenCodianView extends ItemView {
           content: latestErrorMessage,
         });
       }
-      
+
       if (sendingRuntime.isStreaming && streamController) {
         await streamController.handleChunk({ type: 'done' });
       }
@@ -2402,8 +2441,8 @@ export class OpenCodianView extends ItemView {
         error instanceof Error ? error.message : 'Unknown error'
       );
       if (streamController) {
-        await streamController.handleChunk({ 
-          type: 'error', 
+        await streamController.handleChunk({
+          type: 'error',
           content: latestErrorMessage,
         });
       }
@@ -2420,7 +2459,7 @@ export class OpenCodianView extends ItemView {
       await this.finalizeBackgroundTaskIndicatorAfterPrimaryStream(sendingTabId);
       this.syncTabStreamLikeState(sendingTabId);
       await this.refreshServerStatusBadge();
-      
+
       const finalizedTimestamp = Date.now();
 
       if (sendingRuntime.streamingMessageEl) {
@@ -2440,23 +2479,23 @@ export class OpenCodianView extends ItemView {
           this.scheduleSettledScrollToBottomIfNeeded();
         }
       }
-      
+
       const streamContentBlocks = streamController?.getContentBlocks();
       sendingRuntime.streamingMessageEl = null;
       sendingRuntime.streamingContentEl = null;
-      
+
       if (streamContentBlocks && streamContentBlocks.length > 0) {
         const textContent = streamContentBlocks
           .filter((b): b is { type: 'text'; content: string } => b.type === 'text')
           .map(b => b.content)
           .join('');
-        
+
         const contentBlocks: ContentBlock[] = streamContentBlocks.map(b => {
           if (b.type === 'text') {
             return { type: 'text', text: b.content };
           } else if (b.type === 'thinking') {
-            return { 
-              type: 'thinking', 
+            return {
+              type: 'thinking',
               thinking: b.content,
               durationSeconds: b.durationSeconds,
             };
@@ -2472,7 +2511,7 @@ export class OpenCodianView extends ItemView {
           }
           return { type: 'text', text: '' };
         });
-        
+
         const assistantMessage: ChatMessage = {
           id: `assistant-${finalizedTimestamp}`,
           role: 'assistant',
@@ -2481,7 +2520,7 @@ export class OpenCodianView extends ItemView {
           modelId: activeModelId,
           contentBlocks: contentBlocks,
         };
-        
+
         sendingConversation.messages.push(assistantMessage);
       } else if (latestErrorMessage) {
         sendingConversation.messages.push({
@@ -2821,29 +2860,29 @@ export class OpenCodianView extends ItemView {
     if (!this.isActiveTabStreaming()) {
       return;
     }
-    
+
     // Call service to abort the SSE connection
     logger.debug('Calling openCodeService.cancelStream()...');
     if (this.currentConversation?.openCodeSessionId) {
       this.plugin.openCodeService.cancelStream(this.currentConversation.openCodeSessionId);
     }
-    
+
     // Update local state
     this.isStreaming = false;
     this.streamController?.cancelStream();
     this.syncActiveTabStreamLikeState();
     logger.debug('isStreaming set to false');
-    
+
     new Notice('Streaming cancelled');
   }
 
   /** Update send button icon based on streaming state */
   private updateSendButtonState() {
     if (!this.sendBtn) return;
-    
+
     // Clear current icon
     this.sendBtn.empty();
-    
+
     if (this.isActiveTabStreaming()) {
       // Show stop icon (square)
       setIcon(this.sendBtn, 'square');
@@ -4818,37 +4857,37 @@ export class OpenCodianView extends ItemView {
   /** Initialize model selector (opencode-style) */
   private initializeModelSelector(containerEl: HTMLElement): void {
     this.modelSelectorContainer = containerEl;
-    
+
     // Create trigger button - ghost style, shows provider icon + model name + chevron
     this.modelSelectorTrigger = containerEl.createDiv({ cls: 'opencodian-model-trigger' });
     const triggerContent = this.modelSelectorTrigger.createDiv({ cls: 'opencodian-model-trigger-content' });
-    
+
     // Provider icon
     const iconWrapper = triggerContent.createSpan({ cls: 'opencodian-model-trigger-icon' });
     setIcon(iconWrapper, 'bot'); // Default icon, will be updated
-    
+
     // Model name
     triggerContent.createSpan({ cls: 'opencodian-model-trigger-text' });
-    
+
     // Create dropdown (hidden by default)
     this.modelSelectorDropdown = containerEl.createDiv({ cls: 'opencodian-model-dropdown' });
     this.modelSelectorDropdown.style.display = 'none';
-    
+
     // Build dropdown structure
     this.buildModelDropdown();
-    
+
     // Load models
     void this.reloadModelCatalog();
-    
+
     // Update display
     this.updateModelSelectorDisplay();
-    
+
     // Handle trigger click
     this.modelSelectorTrigger.addEventListener('click', (e) => {
       e.stopPropagation();
       this.toggleModelDropdown();
     });
-    
+
     // Setup click outside handler
     this.modelDropdownClickOutsideHandler = (e: MouseEvent) => {
       if (!this.modelSelectorContainer?.contains(e.target as Node)) {
@@ -4856,33 +4895,33 @@ export class OpenCodianView extends ItemView {
       }
     };
   }
-  
+
   /** Build model dropdown structure */
   private buildModelDropdown(): void {
     if (!this.modelSelectorDropdown) return;
-    
+
     this.modelSelectorDropdown.empty();
-    
+
     // Search section
     const searchWrapper = this.modelSelectorDropdown.createDiv({ cls: 'opencodian-model-dropdown-search' });
     const searchContainer = searchWrapper.createDiv({ cls: 'opencodian-model-dropdown-search-container' });
     const searchIcon = searchContainer.createSpan({ cls: 'opencodian-model-dropdown-search-icon' });
     setIcon(searchIcon, 'search');
-    
+
     this.modelSelectorSearchInput = searchContainer.createEl('input', {
       cls: 'opencodian-model-dropdown-search-input',
-      attr: { 
-        type: 'text', 
+      attr: {
+        type: 'text',
         placeholder: 'Search models...'
       }
     });
-    
+
     // Handle search input
     this.modelSelectorSearchInput.addEventListener('input', (e) => {
       this.modelFilterQuery = (e.target as HTMLInputElement).value.toLowerCase();
       this.renderModelList();
     });
-    
+
     // Handle keyboard navigation in search
     this.modelSelectorSearchInput.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
@@ -4896,29 +4935,29 @@ export class OpenCodianView extends ItemView {
         e.preventDefault();
       }
     });
-    
+
     // Scrollable list container
-    this.modelSelectorScrollContainer = this.modelSelectorDropdown.createDiv({ 
-      cls: 'opencodian-model-dropdown-scroll' 
+    this.modelSelectorScrollContainer = this.modelSelectorDropdown.createDiv({
+      cls: 'opencodian-model-dropdown-scroll'
     });
-    
+
     // Don't render list here - wait for models to load
     // Initial render will show loading state
     this.renderLoadingState();
   }
-  
+
   /** Render loading state */
   private renderLoadingState(): void {
     if (!this.modelSelectorScrollContainer) return;
-    
+
     this.modelSelectorScrollContainer.empty();
-    
-    const loading = this.modelSelectorScrollContainer.createDiv({ 
-      cls: 'opencodian-model-dropdown-loading' 
+
+    const loading = this.modelSelectorScrollContainer.createDiv({
+      cls: 'opencodian-model-dropdown-loading'
     });
     loading.setText('Loading models...');
   }
-  
+
   /** Toggle dropdown visibility */
   private toggleModelDropdown(): void {
     if (this.isModelDropdownOpen) {
@@ -4927,31 +4966,31 @@ export class OpenCodianView extends ItemView {
       this.openModelDropdown();
     }
   }
-  
+
   /** Open dropdown */
   private openModelDropdown(): void {
     if (!this.modelSelectorDropdown || !this.modelSelectorTrigger) return;
-    
+
     this.isModelDropdownOpen = true;
     this.modelSelectorDropdown.style.display = 'block';
     this.modelSelectorTrigger.addClass('is-open');
-    
+
     // Reset filter
     this.modelFilterQuery = '';
     if (this.modelSelectorSearchInput) {
       this.modelSelectorSearchInput.value = '';
     }
     this.renderModelList();
-    
+
     // Focus search input
     setTimeout(() => {
       this.modelSelectorSearchInput?.focus();
       this.scrollToCurrentModel();
     }, 0);
-    
+
     // Add click outside listener
     document.addEventListener('click', this.modelDropdownClickOutsideHandler!);
-    
+
     // Register escape key handler
     this.scope?.register([], 'Escape', () => {
       if (this.isModelDropdownOpen) {
@@ -4961,27 +5000,27 @@ export class OpenCodianView extends ItemView {
       return false;
     });
   }
-  
+
   /** Close dropdown */
   private closeModelDropdown(): void {
     if (!this.modelSelectorDropdown || !this.modelSelectorTrigger) return;
-    
+
     this.isModelDropdownOpen = false;
     this.modelSelectorDropdown.style.display = 'none';
     this.modelSelectorTrigger.removeClass('is-open');
-    
+
     // Remove click outside listener
     if (this.modelDropdownClickOutsideHandler) {
       document.removeEventListener('click', this.modelDropdownClickOutsideHandler);
     }
   }
-  
+
   /** Render model list based on filter */
   private renderModelList(): void {
     if (!this.modelSelectorScrollContainer) return;
-    
+
     this.modelSelectorScrollContainer.empty();
-    
+
     // Check if models are still loading
     if (this.availableProviders.length === 0) {
       if (!this.hasLoadedModelCatalog) {
@@ -4994,159 +5033,159 @@ export class OpenCodianView extends ItemView {
       }
       return;
     }
-    
+
     // Filter models
     const filteredProviders = this.availableProviders
       .map(provider => ({
         ...provider,
-        models: provider.models.filter(model => 
+        models: provider.models.filter(model =>
           model.name.toLowerCase().includes(this.modelFilterQuery) ||
           provider.name.toLowerCase().includes(this.modelFilterQuery)
         )
       }))
       .filter(provider => provider.models.length > 0);
-    
+
     if (filteredProviders.length === 0) {
-      const emptyState = this.modelSelectorScrollContainer.createDiv({ 
-        cls: 'opencodian-model-dropdown-empty' 
+      const emptyState = this.modelSelectorScrollContainer.createDiv({
+        cls: 'opencodian-model-dropdown-empty'
       });
       emptyState.setText(this.modelFilterQuery ? 'No models found' : 'No models available');
       return;
     }
-    
+
     const current = this.getCurrentSessionModel();
-    
+
     // Create all groups in a single container for proper scrolling
     const groupsContainer = this.modelSelectorScrollContainer.createDiv({
       cls: 'opencodian-model-groups'
     });
-    
+
     // Track headers for stuck effect
     const headers: Array<{ el: HTMLElement; scrollHandler: () => void }> = [];
-    
+
     // Create provider groups
     for (const provider of filteredProviders) {
       // Group container
       const groupEl = groupsContainer.createDiv({
         cls: 'opencodian-model-group'
       });
-      
+
       // Provider header (sticky)
-      const header = groupEl.createDiv({ 
-        cls: 'opencodian-model-provider-header' 
+      const header = groupEl.createDiv({
+        cls: 'opencodian-model-provider-header'
       });
       header.setText(provider.name);
-      
+
       // Setup stuck detection for this header
       const scrollHandler = () => {
         if (!this.modelSelectorScrollContainer || !header) return;
         const scrollRect = this.modelSelectorScrollContainer.getBoundingClientRect();
         const headerRect = header.getBoundingClientRect();
-        const isStuck = headerRect.top <= scrollRect.top + 1 && 
+        const isStuck = headerRect.top <= scrollRect.top + 1 &&
                         this.modelSelectorScrollContainer.scrollTop > 0;
         header.setAttribute('data-stuck', String(isStuck));
       };
-      
+
       headers.push({ el: header, scrollHandler });
-      
+
       // Models for this provider
       for (const model of provider.models) {
         const isSelected = current?.provider === provider.id && current?.model === model.id;
         const modelValue = `${provider.id}::${model.id}`;
-        
-        const modelOption = groupEl.createDiv({ 
+
+        const modelOption = groupEl.createDiv({
           cls: 'opencodian-model-option',
           attr: { 'data-value': modelValue }
         });
-        
+
         if (isSelected) {
           modelOption.addClass('is-selected');
         }
-        
+
         // Model name
         const nameSpan = modelOption.createSpan({ cls: 'opencodian-model-option-name' });
         nameSpan.setText(model.name);
-        
+
         // Checkmark for selected model
         const checkmark = modelOption.createSpan({ cls: 'opencodian-model-option-check' });
         setIcon(checkmark, 'check');
-        
+
         // Click handler
         modelOption.addEventListener('click', (e) => {
           e.stopPropagation();
           this.switchModel(provider.id, model.id);
           this.closeModelDropdown();
         });
-        
+
         // Hover handler for keyboard navigation
         modelOption.addEventListener('mouseenter', () => {
           this.highlightModelOption(modelValue);
         });
       }
     }
-    
+
     // Add scroll listener to container
     if (this.modelSelectorScrollContainer) {
       // Remove old listener if exists
       if ((this.modelSelectorScrollContainer as any)._stuckHandler) {
         this.modelSelectorScrollContainer.removeEventListener(
-          'scroll', 
+          'scroll',
           (this.modelSelectorScrollContainer as any)._stuckHandler
         );
       }
-      
+
       const handler = () => {
         headers.forEach(h => h.scrollHandler());
       };
-      
+
       (this.modelSelectorScrollContainer as any)._stuckHandler = handler;
       this.modelSelectorScrollContainer.addEventListener('scroll', handler, { passive: true });
-      
+
       // Initial check
       handler();
     }
   }
-  
+
   /** Navigate model list with keyboard */
   private navigateModelList(direction: 1 | -1): void {
     if (!this.modelSelectorScrollContainer) return;
-    
+
     const options = Array.from(this.modelSelectorScrollContainer.querySelectorAll('.opencodian-model-option'));
     if (options.length === 0) return;
-    
+
     const currentIndex = options.findIndex(opt => opt.hasClass('is-highlighted'));
     let nextIndex = currentIndex + direction;
-    
+
     if (nextIndex < 0) nextIndex = 0;
     if (nextIndex >= options.length) nextIndex = options.length - 1;
-    
+
     if (currentIndex >= 0) {
       options[currentIndex].removeClass('is-highlighted');
     }
     options[nextIndex].addClass('is-highlighted');
-    
+
     // Scroll into view
     options[nextIndex].scrollIntoView({ block: 'nearest' });
   }
-  
+
   /** Highlight a specific model option */
   private highlightModelOption(value: string): void {
     if (!this.modelSelectorScrollContainer) return;
-    
+
     this.modelSelectorScrollContainer.querySelectorAll('.opencodian-model-option').forEach(opt => {
       opt.removeClass('is-highlighted');
     });
-    
+
     const option = this.modelSelectorScrollContainer.querySelector(`[data-value="${value}"]`);
     if (option) {
       option.addClass('is-highlighted');
     }
   }
-  
+
   /** Select currently highlighted model */
   private selectHighlightedModel(): void {
     if (!this.modelSelectorScrollContainer) return;
-    
+
     const highlighted = this.modelSelectorScrollContainer.querySelector('.opencodian-model-option.is-highlighted');
     if (highlighted) {
       const value = highlighted.getAttribute('data-value');
@@ -5157,17 +5196,17 @@ export class OpenCodianView extends ItemView {
       }
     }
   }
-  
+
   /** Scroll to current model in dropdown */
   private scrollToCurrentModel(): void {
     if (!this.modelSelectorScrollContainer) return;
-    
+
     const current = this.getCurrentSessionModel();
     if (!current) {
       return;
     }
     const currentValue = `${current.provider}::${current.model}`;
-    
+
     const currentEl = this.modelSelectorScrollContainer.querySelector(`[data-value="${currentValue}"]`) as HTMLElement;
     if (currentEl) {
       currentEl.scrollIntoView({ block: 'center' });
@@ -5187,7 +5226,7 @@ export class OpenCodianView extends ItemView {
       this.hasLoadedModelCatalog = true;
       this.availableModels = [];
       this.availableProviders = [];
-      
+
       for (const provider of providers) {
         const providerModels = [];
         for (const model of provider.models) {
@@ -5211,7 +5250,7 @@ export class OpenCodianView extends ItemView {
           models: providerModels,
         });
       }
-      
+
       // Re-render dropdown with new data
       this.renderModelList();
       this.updateModelSelectorDisplay();
@@ -5224,16 +5263,16 @@ export class OpenCodianView extends ItemView {
   /** Update model selector to show current model */
   private updateModelSelectorDisplay(): void {
     const current = this.getCurrentSessionModel();
-    
+
     if (!this.modelSelectorTrigger) return;
-    
+
     // Find model info from available models
     const modelInfo = current
       ? this.availableModels.find(
         m => m.provider === current.provider && m.model === current.model
       )
       : null;
-    
+
     // Update text
     const textEl = this.modelSelectorTrigger.querySelector('.opencodian-model-trigger-text');
     if (textEl) {
@@ -5241,7 +5280,7 @@ export class OpenCodianView extends ItemView {
         ? (modelInfo?.modelName || current.model)
         : t('settings.model.unconfigured');
     }
-    
+
     // Update provider icon using Lobehub icons
     const iconWrapper = this.modelSelectorTrigger.querySelector('.opencodian-model-trigger-icon');
     if (iconWrapper) {
@@ -5327,11 +5366,11 @@ export class OpenCodianView extends ItemView {
     if (!this.tabManager?.getActiveTab()) return;
 
     this.tabManager.setActiveTabModelOverride({ provider, model });
-    
+
     // Update display
     this.updateModelSelectorDisplay();
     this.syncActiveTabContextUsageIdentity();
-    
+
     // Show notification with model name only
     const modelInfo = this.availableModels.find(
       m => m.provider === provider && m.model === model
@@ -5649,15 +5688,19 @@ export class OpenCodianView extends ItemView {
     chunk: import('../../core/types').StreamChunk
   ): import('../../utils/streaming').StreamChunk | null {
 
-    
+
     switch (chunk.type) {
       case 'text':
         return { type: 'text', content: chunk.content };
-      
-      case 'thinking':
 
-        return { type: 'thinking', content: chunk.content };
-      
+      case 'thinking':
+        return {
+          type: 'thinking',
+          content: chunk.content,
+          partId: chunk.partId,
+          durationSeconds: chunk.durationSeconds,
+        };
+
       case 'tool_use':
 
         return {
@@ -5666,7 +5709,7 @@ export class OpenCodianView extends ItemView {
           name: chunk.name,
           input: chunk.input,
         };
-      
+
       case 'tool_result':
 
         return {
@@ -5675,10 +5718,10 @@ export class OpenCodianView extends ItemView {
           content: chunk.content,
           isError: chunk.isError,
         };
-      
+
       case 'error':
         return { type: 'error', content: chunk.content };
-      
+
       case 'message_start':
       case 'message_stop':
       case 'usage':
@@ -5686,7 +5729,7 @@ export class OpenCodianView extends ItemView {
       case 'content_block_stop':
         // These chunks don't need to be converted for rendering
         return null;
-      
+
       default:
         return null;
     }
@@ -5864,22 +5907,22 @@ export class OpenCodianView extends ItemView {
   /** Initialize permission mode selector */
   private initializePermissionSelector(containerEl: HTMLElement): void {
     this.permissionSelectorContainer = containerEl;
-    
+
     // Create trigger button
     this.permissionSelectorTrigger = containerEl.createDiv({ cls: 'opencodian-permission-trigger' });
-    
+
     const iconEl = this.permissionSelectorTrigger.createSpan({ cls: 'opencodian-permission-trigger-icon' });
     setIcon(iconEl, 'shield');
-    
+
     const textEl = this.permissionSelectorTrigger.createSpan({ cls: 'opencodian-permission-trigger-text' });
-    
+
     // Create dropdown (hidden by default)
     this.permissionSelectorDropdown = containerEl.createDiv({ cls: 'opencodian-permission-dropdown' });
     this.permissionSelectorDropdown.style.display = 'none';
-    
+
     // Build dropdown content
     this.buildPermissionDropdown();
-    
+
     // Update display based on current mode
     const updateDisplay = () => {
       const mode = this.plugin.settings.permissionMode;
@@ -5890,23 +5933,23 @@ export class OpenCodianView extends ItemView {
         'plan': 'PLAN',
       };
       textEl.textContent = modeText[mode] || mode;
-      
+
       // Update icon color based on mode
       this.permissionSelectorTrigger?.removeClass('mode-yolo', 'mode-normal', 'mode-plan');
       this.permissionSelectorTrigger?.addClass(`mode-${mode}`);
-      
+
       // Update dropdown selection
       this.updatePermissionDropdownSelection();
     };
-    
+
     updateDisplay();
-    
+
     // Handle trigger click
     this.permissionSelectorTrigger.addEventListener('click', (e) => {
       e.stopPropagation();
       this.togglePermissionDropdown();
     });
-    
+
     // Setup click outside handler
     this.permissionDropdownClickOutsideHandler = (e: MouseEvent) => {
       if (!this.permissionSelectorContainer?.contains(e.target as Node)) {
@@ -5914,51 +5957,51 @@ export class OpenCodianView extends ItemView {
       }
     };
   }
-  
+
   /** Build permission dropdown content */
   private buildPermissionDropdown(): void {
     if (!this.permissionSelectorDropdown) return;
-    
+
     this.permissionSelectorDropdown.empty();
-    
+
     // Create option items
     const modes: Array<{ id: string; label: string; description: string }> = [
-      { 
-        id: 'yolo', 
+      {
+        id: 'yolo',
         label: t('settings.security.permissionMode.yolo'),
         description: t('settings.security.permissionMode.yoloDescription') || 'Allow all tools without asking'
       },
-      { 
-        id: 'normal', 
+      {
+        id: 'normal',
         label: t('settings.security.permissionMode.normal'),
         description: t('settings.security.permissionMode.normalDescription') || 'Ask before executing tools'
       },
-      { 
-        id: 'plan', 
+      {
+        id: 'plan',
         label: t('settings.security.permissionMode.plan'),
         description: t('settings.security.permissionMode.planDescription') || 'Review and approve all actions'
       },
     ];
-    
+
     for (const mode of modes) {
-      const optionEl = this.permissionSelectorDropdown.createDiv({ 
+      const optionEl = this.permissionSelectorDropdown.createDiv({
         cls: 'opencodian-permission-option',
         attr: { 'data-mode': mode.id }
       });
-      
+
       // Icon - use consistent shield icon like the trigger
       const iconWrapper = optionEl.createSpan({ cls: 'opencodian-permission-option-icon' });
       setIcon(iconWrapper, 'shield');
-      
+
       // Content container for label and description
       const contentEl = optionEl.createDiv({ cls: 'opencodian-permission-option-content' });
       contentEl.createDiv({ cls: 'opencodian-permission-option-label', text: mode.label });
       contentEl.createDiv({ cls: 'opencodian-permission-option-desc', text: mode.description });
-      
+
       // Checkmark for selected state
       const checkmark = optionEl.createSpan({ cls: 'opencodian-permission-option-check' });
       setIcon(checkmark, 'check');
-      
+
       // Click handler
       optionEl.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -5968,17 +6011,17 @@ export class OpenCodianView extends ItemView {
         });
       });
     }
-    
+
     // Update selection state
     this.updatePermissionDropdownSelection();
   }
-  
+
   /** Update permission dropdown selection state */
   private updatePermissionDropdownSelection(): void {
     if (!this.permissionSelectorDropdown) return;
-    
+
     const currentMode = this.plugin.settings.permissionMode;
-    
+
     this.permissionSelectorDropdown.querySelectorAll('.opencodian-permission-option').forEach(opt => {
       const mode = opt.getAttribute('data-mode');
       if (mode === currentMode) {
@@ -5988,28 +6031,28 @@ export class OpenCodianView extends ItemView {
       }
     });
   }
-  
+
   /** Update permission trigger display */
   private updatePermissionTriggerDisplay(): void {
     if (!this.permissionSelectorTrigger) return;
-    
+
     const mode = this.plugin.settings.permissionMode;
     const modeText: Record<string, string> = {
       'yolo': 'YOLO',
       'normal': 'ASK',
       'plan': 'PLAN',
     };
-    
+
     const textEl = this.permissionSelectorTrigger.querySelector('.opencodian-permission-trigger-text');
     if (textEl) {
       textEl.textContent = modeText[mode] || mode;
     }
-    
+
     // Update icon color based on mode
     this.permissionSelectorTrigger.removeClass('mode-yolo', 'mode-normal', 'mode-plan');
     this.permissionSelectorTrigger.addClass(`mode-${mode}`);
   }
-  
+
   /** Toggle permission dropdown visibility */
   private togglePermissionDropdown(): void {
     if (this.isPermissionDropdownOpen) {
@@ -6018,21 +6061,21 @@ export class OpenCodianView extends ItemView {
       this.openPermissionDropdown();
     }
   }
-  
+
   /** Open permission dropdown */
   private openPermissionDropdown(): void {
     if (!this.permissionSelectorDropdown || !this.permissionSelectorTrigger) return;
-    
+
     this.isPermissionDropdownOpen = true;
     this.permissionSelectorDropdown.style.display = 'block';
     this.permissionSelectorTrigger.addClass('is-open');
-    
+
     // Update selection
     this.updatePermissionDropdownSelection();
-    
+
     // Add click outside listener
     document.addEventListener('click', this.permissionDropdownClickOutsideHandler!);
-    
+
     // Register escape key handler
     this.scope?.register([], 'Escape', () => {
       if (this.isPermissionDropdownOpen) {
@@ -6042,15 +6085,15 @@ export class OpenCodianView extends ItemView {
       return false;
     });
   }
-  
+
   /** Close permission dropdown */
   private closePermissionDropdown(): void {
     if (!this.permissionSelectorDropdown || !this.permissionSelectorTrigger) return;
-    
+
     this.isPermissionDropdownOpen = false;
     this.permissionSelectorDropdown.style.display = 'none';
     this.permissionSelectorTrigger.removeClass('is-open');
-    
+
     // Remove click outside listener
     if (this.permissionDropdownClickOutsideHandler) {
       document.removeEventListener('click', this.permissionDropdownClickOutsideHandler);
@@ -6063,10 +6106,10 @@ export class OpenCodianView extends ItemView {
       // Update setting
       this.plugin.settings.permissionMode = mode;
       await this.plugin.saveSettings();
-      
+
       // Show restarting notice
       const notice = new Notice(t('settings.security.autoRestart.manual'), 0);
-      
+
       // Restart OpenCode service
       const isRunning = await this.plugin.openCodeService.checkHealth();
       if (isRunning) {
@@ -6074,7 +6117,7 @@ export class OpenCodianView extends ItemView {
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
       await this.plugin.openCodeService.start();
-      
+
       notice.hide();
       new Notice(t('settings.security.autoRestart.success'));
     } catch (error) {
@@ -6090,7 +6133,7 @@ export class OpenCodianView extends ItemView {
   ): Promise<void> {
     const { t } = await import('../../i18n');
     const { id, permission, patterns, metadata } = request;
-    
+
     // Get tool description based on permission type
     const getToolDescription = (perm: string): string => {
       // Extract base tool name (e.g., 'websearch_web_search' -> 'websearch')
@@ -6111,11 +6154,11 @@ export class OpenCodianView extends ItemView {
 
     // Find the last tool call card to insert permission card after it
     const lastToolCall = messageEl.querySelector('.streaming-tool-call:last-of-type');
-    
+
     // Create inline permission card
     const permissionCard = document.createElement('div');
     permissionCard.className = 'opencodian-permission-inline';
-    
+
     if (lastToolCall && lastToolCall.parentNode) {
       // Insert after the last tool call (so it appears right after the tool)
       lastToolCall.parentNode.insertBefore(permissionCard, lastToolCall.nextSibling);
@@ -6128,22 +6171,22 @@ export class OpenCodianView extends ItemView {
         messageEl.appendChild(permissionCard);
       }
     }
-    
+
     // Header with tool name
     const headerEl = permissionCard.createDiv({ cls: 'opencodian-permission-inline-header' });
     headerEl.createSpan({ cls: 'opencodian-permission-inline-icon', text: '🔐' });
-    headerEl.createSpan({ 
-      cls: 'opencodian-permission-inline-title', 
-      text: t('permissionDialog.title') 
+    headerEl.createSpan({
+      cls: 'opencodian-permission-inline-title',
+      text: t('permissionDialog.title')
     });
-    
+
     // Tool info section
     const infoEl = permissionCard.createDiv({ cls: 'opencodian-permission-inline-info' });
-    infoEl.createDiv({ 
+    infoEl.createDiv({
       cls: 'opencodian-permission-inline-tool',
       text: `${t('permissionDialog.description')} ${permission}`
     });
-    infoEl.createDiv({ 
+    infoEl.createDiv({
       cls: 'opencodian-permission-inline-desc',
       text: `${getToolDescription(permission)}`
     });
@@ -6151,9 +6194,9 @@ export class OpenCodianView extends ItemView {
     // Show patterns (only if meaningful)
     if (patterns.length > 0 && !(patterns.length === 1 && patterns[0] === '*')) {
       const patternsEl = permissionCard.createDiv({ cls: 'opencodian-permission-inline-patterns' });
-      patternsEl.createDiv({ 
-        cls: 'opencodian-permission-inline-label', 
-        text: t('permissionDialog.patterns') 
+      patternsEl.createDiv({
+        cls: 'opencodian-permission-inline-label',
+        text: t('permissionDialog.patterns')
       });
       patterns.forEach(pattern => {
         patternsEl.createDiv({ cls: 'opencodian-permission-inline-pattern-item', text: pattern });
@@ -6163,27 +6206,27 @@ export class OpenCodianView extends ItemView {
     // Show command if present
     if (metadata.command) {
       const commandEl = permissionCard.createDiv({ cls: 'opencodian-permission-inline-command' });
-      commandEl.createSpan({ 
-        cls: 'opencodian-permission-inline-label', 
-        text: `${t('permissionDialog.command')}: ` 
+      commandEl.createSpan({
+        cls: 'opencodian-permission-inline-label',
+        text: `${t('permissionDialog.command')}: `
       });
       commandEl.createEl('code', { text: String(metadata.command) });
     }
 
     // Action buttons
     const buttonsEl = permissionCard.createDiv({ cls: 'opencodian-permission-inline-buttons' });
-    
-    const onceBtn = buttonsEl.createEl('button', { 
+
+    const onceBtn = buttonsEl.createEl('button', {
       cls: 'opencodian-permission-inline-btn opencodian-permission-inline-once',
       text: t('permissionDialog.allowOnce')
     });
-    
-    const alwaysBtn = buttonsEl.createEl('button', { 
+
+    const alwaysBtn = buttonsEl.createEl('button', {
       cls: 'opencodian-permission-inline-btn opencodian-permission-inline-always',
       text: t('permissionDialog.allowAlways')
     });
-    
-    const rejectBtn = buttonsEl.createEl('button', { 
+
+    const rejectBtn = buttonsEl.createEl('button', {
       cls: 'opencodian-permission-inline-btn opencodian-permission-inline-reject',
       text: t('permissionDialog.reject')
     });

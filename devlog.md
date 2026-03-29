@@ -8,6 +8,58 @@
 
 ---
 
+## 2026-03-29 历史会话多选删除与批量清理
+
+### 🎯 改动目标
+
+- 让历史会话支持复选框多选，避免必须一条条删除。
+- 保持现有删除确认弹框、倒计时和“删除所有会话”行为不变，只在有选中项时把“删除当前会话”切换为“删除选中会话”。
+- 确保批量删除后，多 Tab 关联状态和会话面板不会残留脏数据。
+
+### ✅ 本轮调整
+
+- `src/features/chat/OpenCodianView.ts`
+  - 在历史会话下拉列表中为每条会话增加复选框与选中态
+  - 底部删除动作改为根据选中状态动态显示“删除当前会话”或“删除选中会话”
+  - 新增批量删除选中会话逻辑
+  - 抽出通用删除确认弹框 helper，复用现有样式与倒计时体验
+  - 删除后同步清理关联 tab，并在需要时激活下一个可用 tab 或创建新会话
+- `src/features/chat/tabs/TabManager.ts`
+  - 新增 `closeTabs()`，支持按 tab 顺序批量关闭并返回后续激活目标
+- `src/features/chat/tabs/types.ts`
+  - 新增 `CloseTabsResult` 类型
+- `src/i18n/locales/en.ts`
+  - 补充历史多选与“删除选中会话”确认文案
+- `src/i18n/locales/zh.ts`
+  - 补充历史多选与“删除选中会话”确认文案
+- `styles.css`
+  - 增加历史会话复选框与选中态样式
+- `tests/unit/features/chat/tabs/TabManager.test.ts`
+  - 新增批量关闭 tab 的定向单测
+
+### 🧪 验证
+
+- 已通过：
+  - `npm run test -- TabManager.test.ts`
+  - `npm run typecheck`
+  - `npx eslint src/features/chat/OpenCodianView.ts src/features/chat/tabs/TabManager.ts tests/unit/features/chat/tabs/TabManager.test.ts src/i18n/locales/en.ts src/i18n/locales/zh.ts`
+  - `npm run build`
+  - `npm run check:devlog-order`
+- 已部署到 Test Vault。
+- 本轮最终验证使用的 `BUILD_ID`：`main.202603291852`
+
+### 📁 涉及文件
+
+- `src/features/chat/OpenCodianView.ts`
+- `src/features/chat/tabs/TabManager.ts`
+- `src/features/chat/tabs/types.ts`
+- `src/i18n/locales/en.ts`
+- `src/i18n/locales/zh.ts`
+- `styles.css`
+- `tests/unit/features/chat/tabs/TabManager.test.ts`
+- `devlog.md`
+
+---
 ## 2026-03-29 流式表格样式补齐、滚动稳定性修复与 Fork 快照 helper 抽离
 
 ### ✨ 改动目标

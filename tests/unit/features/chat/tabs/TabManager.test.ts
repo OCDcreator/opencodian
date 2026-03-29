@@ -41,6 +41,22 @@ describe('TabManager', () => {
     expect(manager.getActiveTab()?.id).toBe(second.id);
   });
 
+  it('closes multiple tabs in tab order and preserves a valid next active tab', () => {
+    const manager = createManager(4);
+    const first = manager.createTab({ id: 'conv-1', title: 'Chat 1' })!;
+    const second = manager.createTab({ id: 'conv-2', title: 'Chat 2' })!;
+    const third = manager.createTab({ id: 'conv-3', title: 'Chat 3' })!;
+
+    manager.switchToTab(second.id);
+
+    const result = manager.closeTabs([first.id, second.id]);
+
+    expect(result.closedTabIds).toEqual([first.id, second.id]);
+    expect(result.nextActiveTabId).toBe(third.id);
+    expect(manager.getTabCount()).toBe(1);
+    expect(manager.getActiveTab()?.id).toBe(third.id);
+  });
+
   it('stores model override per active tab', () => {
     const manager = createManager();
     manager.createTab({ id: 'conv-1', title: 'Chat 1' });

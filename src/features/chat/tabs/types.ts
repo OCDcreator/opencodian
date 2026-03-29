@@ -50,6 +50,11 @@ export interface CloseTabResult {
   nextActiveTabId: TabId | null;
 }
 
+export interface CloseTabsResult {
+  closedTabIds: TabId[];
+  nextActiveTabId: TabId | null;
+}
+
 export function generateTabId(): TabId {
   return `tab-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }

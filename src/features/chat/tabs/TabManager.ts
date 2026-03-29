@@ -2,6 +2,7 @@ import type { TabContextState } from '../../../core/types';
 import { Tab } from './Tab';
 import type {
   CloseTabResult,
+  CloseTabsResult,
   RestoredTabState,
   TabBarItem,
   TabConversationLike,
@@ -78,6 +79,31 @@ export class TabManager {
     this.activeTabId = nextTab.getId();
     this.notifyChanged();
     return { closed: true, nextActiveTabId: this.activeTabId };
+  }
+
+  closeTabs(tabIds: readonly TabId[]): CloseTabsResult {
+    const requestedIds = new Set(tabIds);
+    const orderedTabIds = this.tabs
+      .map((tab) => tab.getId())
+      .filter((tabId) => requestedIds.has(tabId));
+
+    const closedTabIds: TabId[] = [];
+    let nextActiveTabId = this.activeTabId;
+
+    for (const tabId of orderedTabIds) {
+      const result = this.closeTab(tabId);
+      if (!result.closed) {
+        continue;
+      }
+
+      closedTabIds.push(tabId);
+      nextActiveTabId = result.nextActiveTabId;
+    }
+
+    return {
+      closedTabIds,
+      nextActiveTabId,
+    };
   }
 
   getActiveTab(): TabData | null {
