@@ -8,6 +8,76 @@
 
 ---
 
+## 2026-03-29 流式表格样式补齐、滚动稳定性修复与 Fork 快照 helper 抽离
+
+### ✨ 改动目标
+
+- 让 Markdown 表格在流式渲染阶段就显示完整边框与更清晰的层次。
+- 修复消息完成、会话重渲染、标签切换时打断阅读位置的问题。
+- 消除流结束和会话重绘瞬间的跳动感。
+- 顺手整理 fork 快照逻辑，确保 fork 时不把被点击的目标消息一并带进新会话。
+
+### 🏗️ 实现内容
+
+#### 1. 流式 Markdown 与最终态样式统一
+
+- 将 `.streaming-text-block` 纳入与 `.opencodian-message-text` 相同的 Markdown 样式作用域：
+  - 标题
+  - 列表
+  - 引用
+  - 链接
+  - 行内代码
+  - 表格
+- 这样表格在流式过程中就能直接使用最终边框样式，不再等消息结束后才“突然补全”。
+
+#### 2. 表格视觉增强
+
+- 为表格新增更明显的边框色。
+- 增强表头背景与字重。
+- 增加隔行底色，提升行阅读辨识度。
+- 补充表格容器背景与圆角，让表格块在消息中更容易被识别。
+
+#### 3. 切换标签时保留原滚动位置
+
+- `loadConversation()` 新增 `preserveScrollPosition` 选项。
+- tab 切换回已有会话时，不再默认跳到底部，而是恢复离开该 tab 时的阅读位置。
+- 仅当用户原本就在底部附近时，才继续贴底显示最新消息。
+
+#### 4. 减少流结束后的无意义重绘与布局抖动
+
+- 新增 `getConversationVisualFingerprint()`：
+  - 若流结束后服务端同步回来的内容在视觉上没有变化，则跳过整段消息重渲染。
+- 对必须重渲的场景：
+  - 在 pane 上增加 `is-rehydrating` 标记
+  - 临时关闭消息进入动画
+  - 渲染后恢复原滚动位置或底部贴齐
+- 从而减少“结束瞬间跳到顶部 / 抖一下 / 闪一下”的问题。
+
+#### 5. Fork 快照 helper 抽离与行为修正
+
+- 新增 `src/features/chat/forkMessages.ts`，抽离 fork 前的消息切片逻辑。
+- `cloneMessagesBeforeForkTarget()` 会：
+  - 默认排除被点击的目标消息本身
+  - 在本地 `id` 不一致时回退用 `sourceMessageId` 定位
+- 新增定向单测覆盖上述两种行为，便于后续继续维护 fork/rewind 相关逻辑。
+
+### 🧪 验证
+
+- `npx eslint src/features/chat/OpenCodianView.ts src/features/chat/forkMessages.ts tests/unit/features/chat/forkMessages.test.ts --max-warnings=0`
+- `node scripts/run-jest.js tests/unit/features/chat/forkMessages.test.ts`
+- `npm run build`
+- 已部署到 Test Vault
+- 本轮最终验证使用的 `BUILD_ID`：`main.202603291755`
+
+### 📁 涉及文件
+
+- `src/features/chat/OpenCodianView.ts`
+- `src/features/chat/forkMessages.ts`
+- `styles.css`
+- `tests/unit/features/chat/forkMessages.test.ts`
+
+---
+
 ## 2026-03-29 多 Tab 真并发发送落地、流状态去全局化与接力文档补强
 
 ### ✨ 改动目标

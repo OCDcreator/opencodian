@@ -30,6 +30,7 @@ import {
   ToolCallRenderer,
 } from '../../utils/streaming';
 import { buildChatAppearanceCustomCss, getChatAppearanceCssVariables } from './chatAppearance';
+import { cloneMessagesBeforeForkTarget } from './forkMessages';
 import { buildMessageRenderGroups, mergeAssistantMessagesForRender } from './renderGroups';
 import { type CollapsibleState, setupCollapsible } from './rendering/collapsible';
 import { ContextUsageService } from './services/ContextUsageService';
@@ -855,7 +856,9 @@ export class OpenCodianView extends ItemView {
         return;
       }
 
-      await this.loadConversation(tab.conversationId);
+      await this.loadConversation(tab.conversationId, {
+        preserveScrollPosition: true,
+      });
       return;
     }
 
@@ -1459,7 +1462,10 @@ export class OpenCodianView extends ItemView {
   }
 
   /** Load a conversation */
-  private async loadConversation(id: string, options: { forceServerSync?: boolean } = {}) {
+  private async loadConversation(
+    id: string,
+    options: { forceServerSync?: boolean; preserveScrollPosition?: boolean } = {},
+  ) {
     if (this.currentConversation?.id && this.currentConversation.id !== id) {
       const previousConversationId = this.currentConversation.id;
       this.titleGenerationService.cancelConversation(previousConversationId);
@@ -1474,11 +1480,22 @@ export class OpenCodianView extends ItemView {
     const conversation = await this.plugin.getConversationById(id);
     if (!conversation) return;
 
+    const messagesEl = this.messagesContainer;
+    const preserveScrollPosition = Boolean(options.preserveScrollPosition && messagesEl);
+    const previousScrollTop = preserveScrollPosition && messagesEl
+      ? messagesEl.scrollTop
+      : 0;
+    const shouldStickToBottom = preserveScrollPosition && messagesEl
+      ? this.isNearBottomForElement(messagesEl)
+      : true;
+
     this.currentConversation = conversation;
     this.currentConversationRevertState = null;
     this.tabManager?.setActiveTabConversation(conversation);
 
     // Clear messages display
+    this.clearScheduledScrollToBottom();
+    messagesEl?.addClass('is-rehydrating');
     this.messagesContainer?.empty();
     this.resetTurnState();
 
@@ -1510,7 +1527,16 @@ export class OpenCodianView extends ItemView {
     this.lastConversationSyncFingerprint = this.getConversationSyncFingerprint(messages);
     this.startConversationSyncLoop();
 
-    this.scheduleSettledScrollToBottom();
+    if (messagesEl) {
+      if (preserveScrollPosition && !shouldStickToBottom) {
+        this.restoreElementScrollTopAfterRender(messagesEl, previousScrollTop);
+      } else {
+        this.scrollElementToBottomAfterRender(messagesEl);
+      }
+      window.requestAnimationFrame(() => {
+        messagesEl.removeClass('is-rehydrating');
+      });
+    }
     
     // Update model selector to reflect this session's model
     this.updateModelSelectorDisplay();
@@ -1656,6 +1682,40 @@ export class OpenCodianView extends ItemView {
         } : null,
       }))
       .join('|');
+  }
+
+  private getConversationVisualFingerprint(messages: ChatMessage[]): string {
+    return messages
+      .map((message) => this.getMessageVisualSignature(message))
+      .join('|');
+  }
+
+  private getMessageVisualSignature(message: ChatMessage): string {
+    return JSON.stringify({
+      role: message.role,
+      displayStyle: message.displayStyle ?? null,
+      content: message.content,
+      timestamp: message.timestamp,
+      modelId: message.modelId ?? null,
+      noticeTitle: message.noticeTitle ?? null,
+      noticeTone: message.noticeTone ?? null,
+      noticeActions: message.noticeActions ?? null,
+      images: message.images ?? null,
+      omo: message.omo ?? null,
+      contentBlocks: (message.contentBlocks ?? []).map((block) => ({
+        type: block.type,
+        text: block.text ?? null,
+        thinking: block.thinking ?? null,
+        durationSeconds: block.durationSeconds ?? null,
+        toolId: block.toolId ?? null,
+        toolName: block.toolName ?? null,
+        toolInput: block.toolInput ?? null,
+        toolStatus: block.toolStatus ?? null,
+        toolResult: block.toolResult ?? null,
+        subagentId: block.subagentId ?? null,
+        subagentMode: block.subagentMode ?? null,
+      })),
+    });
   }
 
   // History dropdown state
@@ -2437,13 +2497,16 @@ export class OpenCodianView extends ItemView {
     if (sendingConversation) {
       const shouldSyncFromServer = streamCompleted && !streamTimedOut && !streamInterrupted && !latestErrorMessage;
       if (shouldSyncFromServer) {
+        const previousVisualFingerprint = this.getConversationVisualFingerprint(sendingConversation.messages);
         const syncResult = await this.syncConversationMessagesFromServer(sendingConversation, sendingTabId);
         if (this.currentConversation?.id === sendingConversation.id && this.getActiveTabId() === sendingTabId) {
           const activeRuntime = this.getTabRuntimeState(sendingTabId);
           if (activeRuntime) {
             activeRuntime.lastConversationSyncFingerprint = syncResult.fingerprint;
           }
-          await this.rerenderConversationMessages(sendingConversation);
+          if (previousVisualFingerprint !== this.getConversationVisualFingerprint(syncResult.messages)) {
+            await this.rerenderConversationMessages(sendingConversation);
+          }
         }
       }
       sendingConversation.updatedAt = Date.now();
@@ -4184,7 +4247,7 @@ export class OpenCodianView extends ItemView {
         message.sourceMessageId,
       );
 
-      const forkMessages = this.cloneMessagesUpTo(message.id);
+      const forkMessages = this.cloneMessagesBefore(message);
       const title = this.buildForkTitle(this.currentConversation.title);
       const forkConversation = await this.plugin.createConversationFromSession(forkedSession.id, {
         title,
@@ -4294,8 +4357,12 @@ export class OpenCodianView extends ItemView {
       return;
     }
 
-    const shouldStickToBottom = this.isNearBottom();
+    const messagesEl = this.messagesContainer;
+    const shouldStickToBottom = this.isNearBottomForElement(messagesEl);
+    const previousScrollTop = messagesEl.scrollTop;
 
+    this.clearScheduledScrollToBottom();
+    messagesEl.addClass('is-rehydrating');
     this.messagesContainer.empty();
     this.resetTurnState();
 
@@ -4303,8 +4370,14 @@ export class OpenCodianView extends ItemView {
     await this.renderBackgroundTaskIndicatorIfNeeded();
 
     if (shouldStickToBottom) {
-      this.scrollToBottom();
+      this.scrollElementToBottomAfterRender(messagesEl);
+    } else {
+      this.restoreElementScrollTopAfterRender(messagesEl, previousScrollTop);
     }
+
+    window.requestAnimationFrame(() => {
+      messagesEl.removeClass('is-rehydrating');
+    });
   }
 
   private async applySyncedConversationUpdate(
@@ -4455,26 +4528,25 @@ export class OpenCodianView extends ItemView {
     });
   }
 
+  private isNearBottomForElement(messagesEl: HTMLElement, threshold = 48): boolean {
+    const { scrollTop, scrollHeight, clientHeight } = messagesEl;
+    return scrollHeight - (scrollTop + clientHeight) <= threshold;
+  }
+
   private isNearBottom(threshold = 48): boolean {
     if (!this.messagesContainer) {
       return true;
     }
 
-    const { scrollTop, scrollHeight, clientHeight } = this.messagesContainer;
-    return scrollHeight - (scrollTop + clientHeight) <= threshold;
+    return this.isNearBottomForElement(this.messagesContainer, threshold);
   }
 
-  private cloneMessagesUpTo(targetMessageId: string): ChatMessage[] {
+  private cloneMessagesBefore(targetMessage: ChatMessage): ChatMessage[] {
     if (!this.currentConversation) {
       return [];
     }
 
-    const index = this.currentConversation.messages.findIndex((message) => message.id === targetMessageId);
-    const messages = index >= 0
-      ? this.currentConversation.messages.slice(0, index + 1)
-      : this.currentConversation.messages;
-
-    return JSON.parse(JSON.stringify(messages)) as ChatMessage[];
+    return cloneMessagesBeforeForkTarget(this.currentConversation.messages, targetMessage);
   }
 
   private buildForkTitle(sourceTitle: string): string {
@@ -4679,6 +4751,31 @@ export class OpenCodianView extends ItemView {
       this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
     }
     this.navigationSidebar?.updateVisibility();
+  }
+
+  private restoreElementScrollTopAfterRender(messagesEl: HTMLElement, scrollTop: number): void {
+    const apply = () => {
+      const maxScrollTop = Math.max(0, messagesEl.scrollHeight - messagesEl.clientHeight);
+      messagesEl.scrollTop = Math.min(Math.max(0, scrollTop), maxScrollTop);
+      if (this.messagesContainer === messagesEl) {
+        this.navigationSidebar?.updateVisibility();
+      }
+    };
+
+    apply();
+    window.requestAnimationFrame(apply);
+  }
+
+  private scrollElementToBottomAfterRender(messagesEl: HTMLElement): void {
+    const apply = () => {
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+      if (this.messagesContainer === messagesEl) {
+        this.navigationSidebar?.updateVisibility();
+      }
+    };
+
+    apply();
+    window.requestAnimationFrame(apply);
   }
 
   private shouldAutoScroll(threshold = 48): boolean {
