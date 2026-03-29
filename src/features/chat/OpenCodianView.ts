@@ -1510,8 +1510,7 @@ export class OpenCodianView extends ItemView {
     this.lastConversationSyncFingerprint = this.getConversationSyncFingerprint(messages);
     this.startConversationSyncLoop();
 
-    // Scroll to bottom
-    this.scrollToBottom();
+    this.scheduleSettledScrollToBottom();
     
     // Update model selector to reflect this session's model
     this.updateModelSelectorDisplay();
@@ -1536,7 +1535,7 @@ export class OpenCodianView extends ItemView {
     this.syncBackgroundTaskStateFromConversation(conversation);
     void this.renderBackgroundTaskIndicatorIfNeeded();
     void this.refreshActiveTabContextUsageFromServer();
-    this.scrollToBottom();
+    this.scheduleSettledScrollToBottom();
   }
 
   private startConversationSyncLoop(): void {
@@ -1662,6 +1661,7 @@ export class OpenCodianView extends ItemView {
   // History dropdown state
   private historyDropdownEl: HTMLElement | null = null;
   private historyDropdownClickOutsideHandler: ((e: MouseEvent) => void) | null = null;
+  private historyDropdownPositionFrameId: number | null = null;
 
   /** Show conversation history */
   private showConversationHistory(event: MouseEvent) {
@@ -1734,7 +1734,9 @@ export class OpenCodianView extends ItemView {
           return;
         }
         if (!isActive) {
-          void this.loadConversation(conv.id);
+          window.requestAnimationFrame(() => {
+            void this.loadConversation(conv.id);
+          });
         }
       });
     }
@@ -1772,51 +1774,16 @@ export class OpenCodianView extends ItemView {
       });
     }
     
-    // Add to document first so we can measure its size
-    document.body.appendChild(this.historyDropdownEl);
-    
-    // Position the dropdown intelligently to stay within viewport
-    const targetEl = event.target as HTMLElement;
+    const targetEl = (event.currentTarget as HTMLElement | null) ?? (event.target as HTMLElement);
     const rect = targetEl.getBoundingClientRect();
-    const dropdownRect = this.historyDropdownEl.getBoundingClientRect();
-    
-    const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
-    
-    // Calculate available space
-    const spaceBelow = viewportHeight - rect.bottom - 8;
-    const spaceAbove = rect.top - 8;
-    
-    // Decide whether to show below or above
-    let top: number;
-    if (spaceBelow >= dropdownRect.height || spaceBelow >= spaceAbove) {
-      // Show below (preferred) or if there's more space below
-      top = rect.bottom + 4;
-      // But if it would overflow, adjust
-      if (top + dropdownRect.height > viewportHeight - 8) {
-        top = Math.max(8, viewportHeight - dropdownRect.height - 8);
-      }
-    } else {
-      // Show above
-      top = rect.top - dropdownRect.height - 4;
-      if (top < 8) {
-        top = 8;
-      }
-    }
-    
-    // Calculate left position to keep within viewport
-    let left = rect.left;
-    if (left + dropdownRect.width > viewportWidth - 8) {
-      left = Math.max(8, viewportWidth - dropdownRect.width - 8);
-    }
-    if (left < 8) {
-      left = 8;
-    }
-    
+
+    document.body.appendChild(this.historyDropdownEl);
     this.historyDropdownEl.style.position = 'fixed';
-    this.historyDropdownEl.style.top = `${top}px`;
-    this.historyDropdownEl.style.left = `${left}px`;
+    this.historyDropdownEl.style.top = '0';
+    this.historyDropdownEl.style.left = '0';
     this.historyDropdownEl.style.zIndex = '1000';
+    this.historyDropdownEl.style.visibility = 'hidden';
+    this.scheduleHistoryDropdownPosition(rect);
     
     // Setup click outside handler
     this.historyDropdownClickOutsideHandler = (e: MouseEvent) => {
@@ -1833,6 +1800,7 @@ export class OpenCodianView extends ItemView {
   
   /** Close history dropdown */
   private closeHistoryDropdown(): void {
+    this.clearScheduledHistoryDropdownPosition();
     if (this.historyDropdownEl) {
       this.historyDropdownEl.remove();
       this.historyDropdownEl = null;
@@ -2492,6 +2460,55 @@ export class OpenCodianView extends ItemView {
       } else {
         this.tabManager?.setTabNeedsAttention(sendingTabId, true);
       }
+    }
+  }
+
+  private scheduleHistoryDropdownPosition(anchorRect: DOMRect): void {
+    this.clearScheduledHistoryDropdownPosition();
+    this.historyDropdownPositionFrameId = window.requestAnimationFrame(() => {
+      this.historyDropdownPositionFrameId = null;
+      const dropdownEl = this.historyDropdownEl;
+      if (!dropdownEl?.isConnected) {
+        return;
+      }
+
+      const dropdownRect = dropdownEl.getBoundingClientRect();
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      const spaceBelow = viewportHeight - anchorRect.bottom - 8;
+      const spaceAbove = anchorRect.top - 8;
+
+      let top: number;
+      if (spaceBelow >= dropdownRect.height || spaceBelow >= spaceAbove) {
+        top = anchorRect.bottom + 4;
+        if (top + dropdownRect.height > viewportHeight - 8) {
+          top = Math.max(8, viewportHeight - dropdownRect.height - 8);
+        }
+      } else {
+        top = anchorRect.top - dropdownRect.height - 4;
+        if (top < 8) {
+          top = 8;
+        }
+      }
+
+      let left = anchorRect.left;
+      if (left + dropdownRect.width > viewportWidth - 8) {
+        left = Math.max(8, viewportWidth - dropdownRect.width - 8);
+      }
+      if (left < 8) {
+        left = 8;
+      }
+
+      dropdownEl.style.top = `${top}px`;
+      dropdownEl.style.left = `${left}px`;
+      dropdownEl.style.visibility = 'visible';
+    });
+  }
+
+  private clearScheduledHistoryDropdownPosition(): void {
+    if (this.historyDropdownPositionFrameId !== null) {
+      window.cancelAnimationFrame(this.historyDropdownPositionFrameId);
+      this.historyDropdownPositionFrameId = null;
     }
   }
 
