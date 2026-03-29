@@ -68,6 +68,7 @@ const SETTINGS_SCROLL_CONTAINER_SELECTORS = [
 const SETTINGS_SCROLL_CONTAINER_SELECTOR = SETTINGS_SCROLL_CONTAINER_SELECTORS.join(', ');
 const SETTINGS_SCROLL_RESTORE_RETRY_DELAYS = [24, 80, 160, 320] as const;
 const SETTINGS_SCROLL_RESTORE_OBSERVER_WINDOW_MS = 1200;
+const SETTINGS_SCROLL_RESTORE_SUCCESS_TOLERANCE_PX = 1;
 
 function getElectronDialog(): ElectronDialogModule | null {
   const globalWithRequire = globalThis as typeof globalThis & {
@@ -2195,17 +2196,38 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     this.clearSettingsPanelRestoreWork();
 
     const normalizedScrollTop = Math.max(0, scrollTop);
-    const applyRestore = (reason: string): void => {
-      if (!resolvedScrollContainer.isConnected) {
+    const restoreStartedAt = Date.now();
+    let restoreAttempts = 0;
+    let restored = false;
+
+    const finishRestore = (reason: string, restoredScrollTop: number): void => {
+      if (restored) {
         return;
       }
 
-      resolvedScrollContainer.scrollTop = normalizedScrollTop;
-      logger.debug('Settings scroll restore attempt', {
+      restored = true;
+      this.lastObservedSettingsScrollTop = restoredScrollTop;
+      this.clearSettingsPanelRestoreWork();
+      logger.debug('Settings scroll restored', {
         reason,
+        attempts: restoreAttempts,
+        elapsedMs: Date.now() - restoreStartedAt,
         targetScrollTop: normalizedScrollTop,
-        containerClasses: resolvedScrollContainer.className,
+        restoredScrollTop,
       });
+    };
+
+    const applyRestore = (reason: string): void => {
+      if (restored || !resolvedScrollContainer.isConnected) {
+        return;
+      }
+
+      restoreAttempts += 1;
+      resolvedScrollContainer.scrollTop = normalizedScrollTop;
+      const restoredScrollTop = resolvedScrollContainer.scrollTop;
+      if (Math.abs(restoredScrollTop - normalizedScrollTop) <= SETTINGS_SCROLL_RESTORE_SUCCESS_TOLERANCE_PX) {
+        finishRestore(reason, restoredScrollTop);
+      }
     };
 
     this.settingsPanelRestoreFrameId = window.requestAnimationFrame(() => {
@@ -2226,14 +2248,16 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     if (typeof MutationObserver !== 'undefined') {
       let mutationRestoreQueued = false;
       this.settingsPanelRestoreObserver = new MutationObserver(() => {
-        if (mutationRestoreQueued) {
+        if (restored || mutationRestoreQueued) {
           return;
         }
 
         mutationRestoreQueued = true;
         const frameId = window.requestAnimationFrame(() => {
           mutationRestoreQueued = false;
-          this.settingsPanelRestoreFrameId = null;
+          if (this.settingsPanelRestoreFrameId === frameId) {
+            this.settingsPanelRestoreFrameId = null;
+          }
           applyRestore('mutation');
         });
         this.settingsPanelRestoreFrameId = frameId;
@@ -2248,6 +2272,9 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         this.settingsPanelRestoreTimeoutIds = this.settingsPanelRestoreTimeoutIds.filter(
           (id) => id !== observerTimeoutId,
         );
+        if (restored) {
+          return;
+        }
         this.settingsPanelRestoreObserver?.disconnect();
         this.settingsPanelRestoreObserver = null;
       }, SETTINGS_SCROLL_RESTORE_OBSERVER_WINDOW_MS);
@@ -2263,11 +2290,6 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         : this.lastObservedSettingsScrollTop;
 
     this.plugin.settings.settingsPanelScrollTop = nextScrollTop;
-    logger.debug('Captured settings scroll position', {
-      nextScrollTop,
-      containerClasses: scrollContainer.className,
-      usedObservedFallback: !scrollContainer.isConnected,
-    });
     this.plugin.scheduleSettingsUiStateSave();
   }
 
@@ -2310,10 +2332,6 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     const matchedContainer = containerEl.closest<HTMLElement>(SETTINGS_SCROLL_CONTAINER_SELECTOR);
     if (matchedContainer) {
       this.settingsScrollContainerEl = matchedContainer;
-      logger.debug('Resolved settings scroll container via selector', {
-        selector: SETTINGS_SCROLL_CONTAINER_SELECTOR,
-        containerClasses: matchedContainer.className,
-      });
       return matchedContainer;
     }
 
@@ -2321,18 +2339,12 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     while (currentEl) {
       if (this.looksLikeSettingsScrollContainer(currentEl)) {
         this.settingsScrollContainerEl = currentEl;
-        logger.debug('Resolved settings scroll container via class fallback', {
-          containerClasses: currentEl.className,
-        });
         return currentEl;
       }
       currentEl = currentEl.parentElement;
     }
 
     this.settingsScrollContainerEl = containerEl;
-    logger.debug('Falling back to settings container as scroll container', {
-      containerClasses: containerEl.className,
-    });
     return containerEl;
   }
 

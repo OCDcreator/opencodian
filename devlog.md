@@ -4909,6 +4909,56 @@ streamController.renderStoredContentBlocks(parentEl, savedBlocks);
 
 ---
 
+## 2026-03-29 Settings 滚动恢复日志优化
+
+### 🔇 问题现象
+
+- 每次打开 Settings 页面时，滚动恢复逻辑会因为 `animation-frame`、`mutation` 和多轮递增 `timeout` 连续输出多条几乎相同的调试日志。
+- `Settings scroll restore attempt`、`Captured settings scroll position`、`Resolved settings scroll container` 叠加后，单次打开设置页可产生 10+ 条日志，影响问题排查。
+
+### 🎯 优化目标
+
+- 在首次成功恢复滚动位置后，静默后续重复触发。
+- 保留一条足够详细的成功日志，继续支持线上排查。
+
+### ✅ 本轮调整
+
+- 为设置页滚动恢复流程增加“已成功恢复”标记，成功后后续触发直接返回。
+- 只有在 `scrollTop` 实际到达目标值后才判定恢复成功，避免内容尚未撑开时过早结束恢复流程。
+- 首次恢复成功后立即：
+  - 清理剩余的重试 `timeout`
+  - 断开 `MutationObserver`
+  - 停止后续重复日志输出
+- 将原先多条 `Settings scroll restore attempt` 调试日志收敛为单条 `Settings scroll restored`，包含：
+  - `reason`
+  - `attempts`
+  - `elapsedMs`
+  - `targetScrollTop`
+  - `restoredScrollTop`
+- 移除常态下噪声较高的 `Captured settings scroll position` 与滚动容器解析调试日志。
+
+### 🧪 验证
+
+- 新增定向单测，覆盖：
+  - 首轮恢复未成功时不应提前记录成功日志
+  - 内容高度变化后由 `mutation` 触发二次恢复成功
+  - 成功后 observer 和 timeout 均被清理
+  - 最终只输出 1 条恢复成功日志
+- 已通过：
+  - `npm run test -- OpenCodianSettings.test.ts`
+  - `npm run lint -- src/features/settings/OpenCodianSettings.ts tests/unit/features/settings/OpenCodianSettings.test.ts`
+  - `npm run build`
+- 已部署到 Test Vault。
+- 本轮最终验证使用的 `BUILD_ID`：`main.202603291806`
+
+### 📁 涉及文件
+
+- `src/features/settings/OpenCodianSettings.ts`
+- `tests/unit/features/settings/OpenCodianSettings.test.ts`
+- `devlog.md`
+
+---
+
 ## 2026-03-27 标签栏位置与布局重构
 
 ### ✅ 新增能力
