@@ -156,6 +156,8 @@ export function setIcon(el: HTMLElement, icon: string) {
   el.innerHTML = `<svg data-icon="${icon}"></svg>`;
 }
 
+export function addIcon(_iconId: string, _svgContent: string) {}
+
 export function normalizePath(path: string) {
   return path.replace(/\\/g, '/');
 }

@@ -2309,6 +2309,7 @@ export class OpenCodianView extends ItemView {
     let pendingStartTime = 0;
     const pendingMessage = getRandomPendingMessage();
     let latestErrorMessage: string | null = null;
+    let finalizedAssistantMetadata: Extract<import('../../core/types').StreamChunk, { type: 'message_metadata' }> | null = null;
     let receivedMeaningfulChunk = false;
     logger.debug('Setting up pending indicator timeout');
     const pendingTimeout = window.setTimeout(() => {
@@ -2369,6 +2370,11 @@ export class OpenCodianView extends ItemView {
 
         if (chunk.type === 'usage') {
           this.applyUsageChunkToTab(sendingTabId, chunk);
+          continue;
+        }
+
+        if (chunk.type === 'message_metadata') {
+          finalizedAssistantMetadata = chunk;
           continue;
         }
 
@@ -2447,6 +2453,15 @@ export class OpenCodianView extends ItemView {
         });
       }
     } finally {
+      const finalizedTimestamp = finalizedAssistantMetadata?.timestamp ?? Date.now();
+      const finalizedModelId = finalizedAssistantMetadata?.modelId ?? activeModelId;
+      const finalizedAssistantMessageId = finalizedAssistantMetadata?.messageId;
+      const streamContentBlocks = streamController?.getContentBlocks();
+      const streamedTextContent = streamContentBlocks
+        ?.filter((b): b is { type: 'text'; content: string } => b.type === 'text')
+        .map(b => b.content)
+        .join('') ?? '';
+
       logger.debug('Stream loop ended');
       resetStreamingState();
       this.completeTabContextUsageStream(sendingTabId);
@@ -2456,40 +2471,27 @@ export class OpenCodianView extends ItemView {
       }
       pendingState.element?.remove();
       pendingState.element = null;
-      await this.finalizeBackgroundTaskIndicatorAfterPrimaryStream(sendingTabId);
-      this.syncTabStreamLikeState(sendingTabId);
-      await this.refreshServerStatusBadge();
-
-      const finalizedTimestamp = Date.now();
 
       if (sendingRuntime.streamingMessageEl) {
-        const streamContentBlocks = streamController?.getContentBlocks();
-        const textContent = streamContentBlocks
-          ?.filter((b): b is { type: 'text'; content: string } => b.type === 'text')
-          .map(b => b.content.trim())
-          .filter(Boolean)
-          .join('') || '';
         this.addTimestampWithCopyButton(
           sendingRuntime.streamingMessageEl,
           finalizedTimestamp,
-          textContent,
-          activeModelId,
+          streamedTextContent.trim() || undefined,
+          finalizedModelId,
         );
         if (this.getActiveTabId() === sendingTabId) {
           this.scheduleSettledScrollToBottomIfNeeded();
         }
       }
 
-      const streamContentBlocks = streamController?.getContentBlocks();
+      await this.finalizeBackgroundTaskIndicatorAfterPrimaryStream(sendingTabId);
+      this.syncTabStreamLikeState(sendingTabId);
+      await this.refreshServerStatusBadge();
+
       sendingRuntime.streamingMessageEl = null;
       sendingRuntime.streamingContentEl = null;
 
       if (streamContentBlocks && streamContentBlocks.length > 0) {
-        const textContent = streamContentBlocks
-          .filter((b): b is { type: 'text'; content: string } => b.type === 'text')
-          .map(b => b.content)
-          .join('');
-
         const contentBlocks: ContentBlock[] = streamContentBlocks.map(b => {
           if (b.type === 'text') {
             return { type: 'text', text: b.content };
@@ -2513,22 +2515,24 @@ export class OpenCodianView extends ItemView {
         });
 
         const assistantMessage: ChatMessage = {
-          id: `assistant-${finalizedTimestamp}`,
+          id: finalizedAssistantMessageId ?? `assistant-${finalizedTimestamp}`,
           role: 'assistant',
-          content: textContent,
+          content: streamedTextContent,
           timestamp: finalizedTimestamp,
-          modelId: activeModelId,
+          modelId: finalizedModelId,
+          sourceMessageId: finalizedAssistantMessageId,
           contentBlocks: contentBlocks,
         };
 
         sendingConversation.messages.push(assistantMessage);
       } else if (latestErrorMessage) {
         sendingConversation.messages.push({
-          id: `assistant-${finalizedTimestamp}`,
+          id: finalizedAssistantMessageId ?? `assistant-${finalizedTimestamp}`,
           role: 'assistant',
           content: latestErrorMessage,
           timestamp: finalizedTimestamp,
-          modelId: activeModelId,
+          modelId: finalizedModelId,
+          sourceMessageId: finalizedAssistantMessageId,
         });
       }
     }
@@ -2536,6 +2540,7 @@ export class OpenCodianView extends ItemView {
     if (sendingConversation) {
       const shouldSyncFromServer = streamCompleted && !streamTimedOut && !streamInterrupted && !latestErrorMessage;
       if (shouldSyncFromServer) {
+        const previousMessagesBeforeSync = [...sendingConversation.messages];
         const previousVisualFingerprint = this.getConversationVisualFingerprint(sendingConversation.messages);
         const syncResult = await this.syncConversationMessagesFromServer(sendingConversation, sendingTabId);
         if (this.currentConversation?.id === sendingConversation.id && this.getActiveTabId() === sendingTabId) {
@@ -2544,7 +2549,14 @@ export class OpenCodianView extends ItemView {
             activeRuntime.lastConversationSyncFingerprint = syncResult.fingerprint;
           }
           if (previousVisualFingerprint !== this.getConversationVisualFingerprint(syncResult.messages)) {
-            await this.rerenderConversationMessages(sendingConversation);
+            const patchedTail = await this.patchTrailingAssistantRender(
+              previousMessagesBeforeSync,
+              syncResult.messages,
+              sendingTabId,
+            );
+            if (!patchedTail) {
+              await this.rerenderConversationMessages(sendingConversation);
+            }
           }
         }
       }
@@ -2962,7 +2974,7 @@ export class OpenCodianView extends ItemView {
     const visibleText = this.getVisibleUserMessageText(message);
     if (visibleText) {
       const textEl = container.createDiv({ cls: 'opencodian-message-text' });
-      textEl.textContent = visibleText;
+      await this.renderMarkdownInto(textEl, visibleText);
       const collapseToggleEl = container.createEl('button');
       const collapsibleState: CollapsibleState = {
         isExpanded: false,
@@ -3042,15 +3054,8 @@ export class OpenCodianView extends ItemView {
       return;
     }
 
-    const groups = buildMessageRenderGroups(messages);
-
-    for (const group of groups) {
-      if (!group.mergedAssistant || group.messages.length === 1) {
-        await this.renderMessage(group.messages[0]);
-        continue;
-      }
-
-      await this.renderMessage(mergeAssistantMessagesForRender(group.messages));
+    for (const message of this.getMessagesForRender(messages)) {
+      await this.renderMessage(message);
     }
   }
 
@@ -4419,6 +4424,91 @@ export class OpenCodianView extends ItemView {
     });
   }
 
+  private getMessagesForRender(messages: ChatMessage[]): ChatMessage[] {
+    return buildMessageRenderGroups(messages).map((group) =>
+      group.mergedAssistant && group.messages.length > 1
+        ? mergeAssistantMessagesForRender(group.messages)
+        : group.messages[0],
+    );
+  }
+
+  private async patchTrailingAssistantRender(
+    previousMessages: ChatMessage[],
+    nextMessages: ChatMessage[],
+    tabId: TabId | null = this.getActiveTabId(),
+  ): Promise<boolean> {
+    if (!this.messagesContainer || this.getActiveTabId() !== tabId) {
+      return false;
+    }
+
+    const previousRenderedMessages = this.getMessagesForRender(previousMessages);
+    const nextRenderedMessages = this.getMessagesForRender(nextMessages);
+    if (
+      previousRenderedMessages.length === 0
+      || previousRenderedMessages.length !== nextRenderedMessages.length
+    ) {
+      return false;
+    }
+
+    const lastIndex = previousRenderedMessages.length - 1;
+    for (let index = 0; index < lastIndex; index += 1) {
+      if (
+        this.getMessageVisualSignature(previousRenderedMessages[index])
+        !== this.getMessageVisualSignature(nextRenderedMessages[index])
+      ) {
+        return false;
+      }
+    }
+
+    const previousTailMessage = previousRenderedMessages[lastIndex];
+    const nextTailMessage = nextRenderedMessages[lastIndex];
+    if (
+      previousTailMessage.role !== 'assistant'
+      || nextTailMessage.role !== 'assistant'
+      || previousTailMessage.displayStyle === 'notice'
+      || nextTailMessage.displayStyle === 'notice'
+    ) {
+      return false;
+    }
+
+    const existingTailMessageEl = Array.from(
+      this.messagesContainer.querySelectorAll<HTMLElement>('.opencodian-message--assistant'),
+    )
+      .filter((element) => !element.classList.contains('opencodian-message--notice'))
+      .pop();
+    if (!existingTailMessageEl || !(existingTailMessageEl.parentElement instanceof HTMLElement)) {
+      return false;
+    }
+
+    const parentEl = existingTailMessageEl.parentElement;
+    const runtime = this.getTabRuntimeState(tabId);
+    const previousTurnBodyEl = runtime?.currentTurnBodyEl ?? null;
+    const shouldStickToBottom = this.isNearBottomForElement(this.messagesContainer);
+
+    existingTailMessageEl.remove();
+
+    if (runtime) {
+      runtime.currentTurnBodyEl = parentEl;
+    }
+
+    try {
+      const replacementEl = await this.renderMessage(nextTailMessage);
+      if (!replacementEl) {
+        return false;
+      }
+
+      replacementEl.style.animation = 'none';
+      if (shouldStickToBottom) {
+        this.scrollToBottom();
+      }
+      return true;
+    } finally {
+      if (runtime) {
+        runtime.currentTurnBodyEl = previousTurnBodyEl ?? parentEl;
+      }
+    }
+  }
+
   private async applySyncedConversationUpdate(
     previousMessages: ChatMessage[],
     nextMessages: ChatMessage[],
@@ -4436,12 +4526,7 @@ export class OpenCodianView extends ItemView {
     const shouldStickToBottom = this.isNearBottom();
     this.syncBackgroundTaskStateFromConversation(this.currentConversation);
 
-    const groups = buildMessageRenderGroups(appendedMessages);
-    for (const group of groups) {
-      const messageToRender = group.mergedAssistant && group.messages.length > 1
-        ? mergeAssistantMessagesForRender(group.messages)
-        : group.messages[0];
-
+    for (const messageToRender of this.getMessagesForRender(appendedMessages)) {
       if (this.shouldPseudoStreamSyncedAssistantMessage(messageToRender)) {
         await this.renderSyncedAssistantMessageWithReveal(messageToRender);
       } else {
@@ -4615,7 +4700,10 @@ export class OpenCodianView extends ItemView {
         model: modelOptions.model ?? this.plugin.settings.defaultModel,
       },
       async (generatedConversationId, result) => {
-        const conversation = await this.plugin.getConversationById(generatedConversationId);
+        const conversation = await this.plugin.getConversationById(
+          generatedConversationId,
+          { preferCache: true },
+        );
         if (!conversation) {
           return;
         }
@@ -4646,7 +4734,9 @@ export class OpenCodianView extends ItemView {
       titleGenerationStatus?: 'pending' | 'success' | 'failed';
     },
   ): Promise<void> {
-    const conversation = await this.plugin.getConversationById(conversationId);
+    const conversation = await this.plugin.getConversationById(conversationId, {
+      preferCache: true,
+    });
     if (!conversation) {
       return;
     }
@@ -4673,7 +4763,9 @@ export class OpenCodianView extends ItemView {
   }
 
   private async renameConversation(conversationId: string): Promise<void> {
-    const conversation = await this.plugin.getConversationById(conversationId);
+    const conversation = await this.plugin.getConversationById(conversationId, {
+      preferCache: true,
+    });
     if (!conversation) {
       return;
     }
@@ -5724,6 +5816,7 @@ export class OpenCodianView extends ItemView {
 
       case 'message_start':
       case 'message_stop':
+      case 'message_metadata':
       case 'usage':
       case 'content_block_start':
       case 'content_block_stop':

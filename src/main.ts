@@ -682,11 +682,18 @@ export default class OpenCodianPlugin extends Plugin {
     return [...this.conversations];
   }
 
-  /** Get conversation by ID (with messages loaded from storage) */
-  async getConversationById(id: string): Promise<Conversation | undefined> {
+  /** Get conversation by ID (with optional cache-first behavior) */
+  async getConversationById(
+    id: string,
+    options: { preferCache?: boolean } = {},
+  ): Promise<Conversation | undefined> {
     // First check in-memory cache
     const cached = this.conversations.find((c) => c.id === id);
     if (!cached) return undefined;
+
+    if (options.preferCache) {
+      return cached;
+    }
     
     // Load full conversation with messages from storage
     const fullConversation = await this.storage.loadFullConversation(id);

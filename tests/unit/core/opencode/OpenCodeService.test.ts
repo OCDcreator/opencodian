@@ -667,6 +667,62 @@ describe('OpenCodeService', () => {
         await iterator.return(undefined);
       }
     });
+
+    it('emits final assistant metadata from SDK stream completion', async () => {
+      service = createServiceWithSdkFlags();
+      service.setSessionId('test-session');
+
+      mockSdkClient.session.promptAsync.mockResolvedValue({});
+      mockSdkClient.event.subscribe.mockResolvedValue({
+        stream: (async function* () {
+          yield {
+            type: 'session.idle',
+            properties: {
+              sessionID: 'test-session',
+            },
+          };
+        })(),
+      });
+      mockSdkClient.session.messages.mockResolvedValue([
+        {
+          info: {
+            id: 'assistant-42',
+            sessionID: 'test-session',
+            role: 'assistant',
+            providerID: 'openai',
+            modelID: 'gpt-5',
+            time: { created: 1234567890 },
+          },
+          parts: [
+            {
+              id: 'part-1',
+              sessionID: 'test-session',
+              messageID: 'assistant-42',
+              type: 'text',
+              text: 'Hello',
+            },
+          ],
+        },
+      ]);
+      mockSdkClient.session.get.mockResolvedValue({
+        id: 'test-session',
+        title: 'SDK',
+        time: { created: 1, updated: 1 },
+      });
+
+      const chunks: unknown[] = [];
+      for await (const chunk of service.sendMessage('Hello', { sessionId: 'test-session' })) {
+        chunks.push(chunk);
+      }
+
+      expect(chunks).toContainEqual({
+        type: 'message_metadata',
+        messageId: 'assistant-42',
+        timestamp: 1234567890,
+        modelId: 'openai/gpt-5',
+      });
+      expect(chunks[chunks.length - 1]).toEqual({ type: 'message_stop' });
+    });
   });
 
   describe('getAvailableModels', () => {
@@ -998,6 +1054,44 @@ describe('OpenCodeService.openCodeMessageToChatMessage', () => {
     const message = OpenCodeService.openCodeMessageToChatMessage(info, parts);
 
     expect(message.content).toBe('');
+  });
+
+  it('prefers SDK reasoning time windows for thinking duration', () => {
+    const info = {
+      id: 'msg-thinking-duration',
+      sessionID: 'session-1',
+      role: 'assistant' as const,
+      time: { created: 1234567895 },
+      parentID: 'msg-5',
+      modelID: 'claude-3-5-sonnet',
+      providerID: 'anthropic',
+      mode: 'default',
+      path: { cwd: '/test', root: '/test' },
+      cost: 0.001,
+      tokens: { input: 5, output: 10, reasoning: 0, cache: { read: 0, write: 0 } },
+    };
+
+    const parts = [
+      {
+        type: 'reasoning',
+        id: 'part-thinking-duration',
+        sessionID: 'session-1',
+        messageID: 'msg-thinking-duration',
+        text: 'Let me think...',
+        time: {
+          start: 1_000,
+          end: 3_450,
+        },
+      },
+    ] as unknown as Part[];
+
+    const message = OpenCodeService.openCodeMessageToChatMessage(info, parts);
+
+    expect(message.contentBlocks?.[0]).toMatchObject({
+      type: 'thinking',
+      thinking: 'Let me think...',
+      durationSeconds: 2.45,
+    });
   });
 
   it('extracts OMO-injected user prompts into structured metadata', () => {

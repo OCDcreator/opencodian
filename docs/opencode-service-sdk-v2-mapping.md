@@ -50,7 +50,7 @@
 | 模块 2：client factory 与 transport | 已完成 | 新增 `createSdkClient()` 与 `createSdkFetch()`；统一注入 `baseUrl` / 认证头 / `directory`；JSON 走 `requestUrl()` 包装 `Response`，SSE 走原生 `fetch()`；固定 `responseStyle: "data"` 与 `throwOnError: true` | `src/core/opencode/createSdkClient.ts`、`src/core/opencode/sdkFetch.ts` |
 | 模块 3：低风险非流式 CRUD | 已完成 | `checkHealth`、`createSession`、`listSessions`、`getSessionMessages`、`deleteSession`、`updateSessionTitle`、`forkSession`、`revertSession`、`getAvailableModels`、`getPendingPermissions`、`respondToPermission` 已切 SDK；读操作保留 legacy fallback，写操作无自动重试 | `src/core/opencode/OpenCodeService.ts` |
 | 模块 4：非流式 prompt | 大部分完成 | `requestAssistantResponse()` 已切到 `session.prompt()`；已映射 `text part`、`system`、`provider/model`、`reasoningEffort -> variant`、`allowedTools -> tools`；输出继续归一化为 `ChatMessage` | `src/core/opencode/OpenCodeService.ts` |
-| 模块 5：流式消息主链 | 大部分完成 | `sendMessage()` 已切到 `session.promptAsync()` + `event.subscribe()` + 本地 event adapter；已消费 `message.part.delta`、`message.part.updated`、`permission.asked`、`session.idle`、`usage`；首事件前失败会整次回退到 legacy SSE；旧 `connectSSE()` / `parseSSEEvents()` 仍保留；服务层流状态已改成按 `sessionId` 独立，支持多 tab / 多 session 并发流式发送 | `src/core/opencode/OpenCodeService.ts`、`src/features/chat/OpenCodianView.ts` |
+| 模块 5：流式消息主链 | 大部分完成 | `sendMessage()` 已切到 `session.promptAsync()` + `event.subscribe()` + 本地 event adapter；已消费 `message.part.delta`、`message.part.updated`、`permission.asked`、`session.idle`、`usage`；reasoning/thinking block 的最终耗时现在优先采用 SDK `reasoning.time.start/end` 计算，前端本地计时仅作流中展示与兜底；首事件前失败会整次回退到 legacy SSE；旧 `connectSSE()` / `parseSSEEvents()` 仍保留；服务层流状态已改成按 `sessionId` 独立，支持多 tab / 多 session 并发流式发送 | `src/core/opencode/OpenCodeService.ts`、`src/features/chat/OpenCodianView.ts` |
 | 模块 6：取消与高可用补全 | 大部分完成 | `cancelStream()` 已升级为本地 `AbortController.abort()` + best-effort `session.abort()`；首事件后失败不会中途换链路；SDK abort 失败时会降级到 legacy `/session/:id/abort`；视图层已拆成 per-tab runtime，取消只作用于当前 tab 对应 session | `src/core/opencode/OpenCodeService.ts`、`src/features/chat/OpenCodianView.ts` |
 
 ### 1.1.2 未实现或仅部分实现的模块
@@ -147,7 +147,7 @@
 
 | 当前能力 | 当前实现 | SDK v2 对应 | 状态 | 主要差异 |
 | --- | --- | --- | --- | --- |
-| `sendMessage(message, options)` | 当前优先走 `client.session.promptAsync()` + `client.event.subscribe()` + 本地 adapter；仅在首事件前 SDK stream 失败时回退到 legacy `/prompt_async` + `/event` | `client.session.promptAsync()` + `client.event.subscribe()` | 部分覆盖 | 当前白名单只覆盖 `message.part.delta`、`message.part.updated`、`permission.asked`、`session.idle`、`usage`，未完整消费 SDK 事件模型 |
+| `sendMessage(message, options)` | 当前优先走 `client.session.promptAsync()` + `client.event.subscribe()` + 本地 adapter；仅在首事件前 SDK stream 失败时回退到 legacy `/prompt_async` + `/event` | `client.session.promptAsync()` + `client.event.subscribe()` | 部分覆盖 | 当前白名单只覆盖 `message.part.delta`、`message.part.updated`、`permission.asked`、`session.idle`、`usage`，未完整消费 SDK 事件模型；但已额外利用 reasoning `part.time.start/end` 修正 thinking block 最终耗时 |
 | 流取消 `cancelStream()` | 当前会先中断本地流，再 best-effort 调 `session.abort()` 停止服务端 | 本地 `AbortController` + `client.session.abort()` | 部分覆盖 | 服务端 abort 已接入，但 UI 还没有单独展示“已中止 finish reason” |
 | `connectSSE()` | 已降级为 legacy fallback transport，只在 SDK 流首事件前失败时使用 | `client.event.subscribe()` | 部分覆盖 | 仍需保留一个版本周期作为回滚链路 |
 | `parseSSEEvents()` | 已降级为 legacy fallback parser，只服务于旧 `/event` 回滚链路 | SDK 内部 SSE parser | 部分覆盖 | 仍需保留一个版本周期作为回滚链路 |

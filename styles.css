@@ -1073,7 +1073,7 @@
   border: 1px solid var(--opencodian-glass-border);
   border-radius: var(--opencodian-user-radius);
   border-end-end-radius: var(--opencodian-user-tail-radius);
-  padding: 12px 16px;
+  padding: 1px 16px;
   box-shadow: 
     0 10px var(--opencodian-user-shadow-blur) var(--opencodian-glass-shadow),
     0 1px 0 color-mix(in srgb, var(--opencodian-glass-specular) 90%, transparent) inset,
@@ -4059,6 +4059,16 @@
   padding: 0;
 }
 
+.opencodian-message--user .opencodian-message-text.markdown-rendered {
+  display: inline-block;
+  width: fit-content;
+  max-width: 100%;
+}
+
+.opencodian-message--user .opencodian-message-text.markdown-rendered > :first-child:last-child {
+  margin-block: 0;
+}
+
 .opencodian-message--assistant :is(.opencodian-message-text, .streaming-text-block) {
   /* Ensure markdown content is readable */
   overflow-wrap: break-word;
@@ -4110,23 +4120,37 @@
 
 /* Inline code */
 :is(.opencodian-message-text, .streaming-text-block) code {
+  display: inline-block;
   font-family: var(--font-monospace);
   font-size: 0.9em;
-  background: var(--code-background);
-  padding: 0.2em 0.4em;
-  border-radius: 3px;
-  color: var(--code-normal);
+  background: color-mix(
+    in srgb,
+    var(--code-background, var(--background-secondary-alt, var(--background-secondary))) 88%,
+    var(--interactive-accent) 12%
+  );
+  padding: 0.18em 0.45em;
+  border-radius: 5px;
+  border: 1px solid color-mix(
+    in srgb,
+    var(--background-modifier-border-hover, var(--background-modifier-border)) 78%,
+    var(--interactive-accent) 22%
+  );
+  box-shadow:
+    0 1px 0 color-mix(in srgb, var(--background-modifier-border-hover) 22%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--opencodian-glass-specular-soft, var(--text-muted)) 28%, transparent);
+  color: var(--code-normal, var(--text-normal));
   white-space: break-spaces;
   overflow-wrap: anywhere;
   word-break: break-word;
+  vertical-align: baseline;
 }
 
 :is(.opencodian-message-text, .streaming-text-block) pre code {
   padding: 0;
   background: transparent;
-  white-space: pre;
-  overflow-wrap: normal;
-  word-break: normal;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 /* Images */
@@ -4205,9 +4229,8 @@
   width: 100%;
   border-collapse: collapse;
   margin: 0.75em 0;
-  display: block;
+  display: table;
   max-width: 100%;
-  overflow-x: auto;
   background: color-mix(in srgb, var(--background-primary) 82%, var(--background-secondary) 18%);
   box-shadow: inset 0 0 0 1px var(--opencodian-table-border-color);
   border-radius: 10px;

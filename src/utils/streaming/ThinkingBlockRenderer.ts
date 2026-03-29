@@ -8,6 +8,30 @@ const DEFAULT_OPTIONS: ThinkingRendererOptions = {
   expandedLabel: 'Thought',
 };
 
+function normalizeDurationSeconds(durationSeconds: number): number {
+  if (!Number.isFinite(durationSeconds) || durationSeconds <= 0) {
+    return 0;
+  }
+
+  if (durationSeconds < 10) {
+    return Math.round(durationSeconds * 10) / 10;
+  }
+
+  return Math.round(durationSeconds);
+}
+
+function formatDurationSeconds(durationSeconds: number): string {
+  const normalizedDuration = normalizeDurationSeconds(durationSeconds);
+  if (normalizedDuration <= 0) {
+    return 'Thought (<1s)';
+  }
+
+  const text = normalizedDuration % 1 === 0
+    ? String(normalizedDuration)
+    : normalizedDuration.toFixed(1);
+  return `Thought for ${text}s`;
+}
+
 export class ThinkingBlockRenderer {
   private options: ThinkingRendererOptions;
   private markdownService: MarkdownRenderService;
@@ -50,6 +74,8 @@ export class ThinkingBlockRenderer {
       contentEl,
       labelEl,
       content: '',
+      partId: null,
+      resolvedDurationSeconds: null,
       startTime,
       timerInterval,
       isExpanded: !this.options.collapsedByDefault,
@@ -86,14 +112,31 @@ export class ThinkingBlockRenderer {
     await this.markdownService.render(state.contentEl, state.content);
   }
 
+  updateDuration(state: ThinkingBlockState, durationSeconds: number): void {
+    state.resolvedDurationSeconds = normalizeDurationSeconds(durationSeconds);
+    if (!state.timerInterval) {
+      state.labelEl.setText(formatDurationSeconds(state.resolvedDurationSeconds));
+    }
+  }
+
+  updateStoredDuration(wrapperEl: HTMLElement, durationSeconds: number): void {
+    const labelEl = wrapperEl.querySelector('.streaming-thinking-label');
+    if (!(labelEl instanceof HTMLElement)) {
+      return;
+    }
+
+    labelEl.setText(formatDurationSeconds(durationSeconds));
+  }
+
   finalize(state: ThinkingBlockState): number {
     if (state.timerInterval) {
       clearInterval(state.timerInterval);
       state.timerInterval = null;
     }
 
-    const durationSeconds = Math.floor((Date.now() - state.startTime) / 1000);
-    state.labelEl.setText(`Thought for ${durationSeconds}s`);
+    const durationSeconds = state.resolvedDurationSeconds
+      ?? normalizeDurationSeconds((Date.now() - state.startTime) / 1000);
+    state.labelEl.setText(formatDurationSeconds(durationSeconds));
 
     if (this.options.collapsedByDefault && state.isExpanded) {
       const header = state.wrapperEl.querySelector('.streaming-thinking-header') as HTMLElement;
@@ -128,14 +171,11 @@ export class ThinkingBlockRenderer {
     header.setAttribute('aria-label', 'Extended thinking - click to expand');
 
     const labelEl = header.createSpan({ cls: 'streaming-thinking-label' });
-    let labelText: string;
-    if (durationSeconds !== undefined && durationSeconds > 0) {
-      labelText = `Thought for ${durationSeconds}s`;
-    } else {
-      // No duration available - show as less than 1 second
-      labelText = 'Thought (<1s)';
-    }
-    labelEl.setText(labelText);
+    labelEl.setText(
+      durationSeconds !== undefined
+        ? formatDurationSeconds(durationSeconds)
+        : 'Thought (<1s)'
+    );
 
     const contentEl = wrapperEl.createDiv({ cls: 'streaming-thinking-content' });
     this.markdownService.render(contentEl, content);

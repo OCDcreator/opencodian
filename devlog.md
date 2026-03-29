@@ -12,6 +12,135 @@
 
 ---
 
+## 2026-03-29 Reasoning 时长精确化、消息元数据同步与尾部渲染优化
+
+### 🎯 改动目标
+
+- 让 Thinking Block 的显示时长优先采用服务端计算值（SDK `part.time.start/end`），而非前端本地粗略计时。
+- 支持服务端在流结束时推送准确的 message metadata（messageId、timestamp、modelId），替代本地生成的临时值。
+- 优化服务端同步后的重渲染策略，仅替换变化的尾部消息而非全量重渲，减少视觉闪烁。
+- 补充相关测试与文档同步。
+
+### ✅ 本轮调整
+
+#### 1. Reasoning/Thinking Block 时长计算优化
+
+- `src/core/opencode/OpenCodeService.ts`
+  - 新增 `resolveReasoningDurationSeconds()`，优先从 `part.time.start/end` 计算耗时，其次回退到 `part.duration`
+  - 新增 `formatModelIdentifier()`，统一格式化 provider/model 标识
+  - `openCodeMessageToChatMessage()` 现在返回 `modelId`（从 `providerID/modelID` 构造）
+  - SDK 流事件处理：
+    - `message.part.updated` 新增处理 `reasoning`/`thinking` 类型 part，推送 `durationSeconds` 到 UI
+    - `message.part.delta` 的 thinking chunk 新增 `partId` 字段
+  - `requestAssistantResponse()` 结束时推送 `message_metadata` chunk 包含准确的 messageId、timestamp、modelId
+
+- `src/utils/streaming/types.ts`
+  - `ThinkingChunk` 新增 `partId` 和 `durationSeconds` 字段
+  - `ThinkingContentBlock` 新增 `partId` 字段
+  - `ThinkingBlockState` 新增 `partId` 和 `resolvedDurationSeconds` 字段
+  - `StreamState` 新增 `thinkingBlocksByPartId` 和 `thinkingBlockElements` Map，用于按 partId 索引和更新已完成的 thinking block
+
+- `src/utils/streaming/StreamController.ts`
+  - `handleThinkingChunk()` 重构：
+    - 支持按 `partId` 区分不同的 thinking block
+    - 如果收到带 `durationSeconds` 的 chunk 但还没有对应 thinking state，尝试更新已完成的 block
+    - 空内容但有 `partId` 的 chunk 用于更新时长而不触发新 block 创建
+  - `finalizeThinkingBlock()` 将完成的 thinking block 存入 `thinkingBlocksByPartId` 和 `thinkingBlockElements`
+  - 新增 `updateStoredThinkingDuration()`，用于服务端推送最终时长时更新已渲染的 thinking block 标签
+
+- `src/utils/streaming/ThinkingBlockRenderer.ts`
+  - 新增 `normalizeDurationSeconds()` 和 `formatDurationSeconds()`，优化时长显示格式：
+    - 小于 10 秒显示 1 位小数（如 "Thought for 5.2s"）
+    - 大于等于 10 秒显示整数（如 "Thought for 15s"）
+    - 小于 1 秒显示 "Thought (<1s)"
+  - 新增 `updateDuration()` 方法，更新进行中的 thinking block 时长
+  - 新增 `updateStoredDuration()` 方法，更新已完成的 thinking block 时长标签
+  - `finalize()` 优先使用 `resolvedDurationSeconds` 而非本地计时
+  - `createStoredBlock()` 使用新的格式化函数
+
+#### 2. 消息元数据同步
+
+- `src/core/types/chat.ts`
+  - `StreamChunk` 新增 `message_metadata` 类型
+
+- `src/features/chat/OpenCodianView.ts`
+  - 流处理循环中捕获 `message_metadata` chunk，用于最终确定 assistant 消息的准确元数据
+  - 使用服务端的 `messageId`、`timestamp`、`modelId` 替代本地生成的值
+  - 最终化的消息包含准确的 `sourceMessageId`，便于后续追踪
+
+#### 3. 尾部消息增量渲染优化
+
+- `src/features/chat/OpenCodianView.ts`
+  - 新增 `getMessagesForRender()`，统一处理消息分组合并逻辑
+  - 新增 `patchTrailingAssistantRender()`，实现尾部 assistant 消息的增量替换：
+    - 比较前后两次消息列表，检查是否只有最后一条 assistant 消息变化
+    - 如果是，仅移除并重新渲染该消息元素，而非清空整个容器
+    - 保留原有的滚动位置（如果在底部则保持贴底）
+    - 新渲染的消息禁用进入动画（`animation: none`）
+  - 服务端同步后优先尝试 `patchTrailingAssistantRender()`，失败才回退到全量 `rerenderConversationMessages()`
+  - `applySyncedConversationUpdate()` 使用 `getMessagesForRender()` 简化循环逻辑
+
+#### 4. 折叠用户消息 Markdown 渲染
+
+- `src/features/chat/OpenCodianView.ts`
+  - 长用户消息的可见文本现在使用 `renderMarkdownInto()` 渲染，支持 Markdown 格式显示
+
+#### 5. 缓存优化
+
+- `src/features/chat/OpenCodianView.ts`
+  - 标题生成、会话重命名等场景的 `getConversationById()` 调用添加 `{ preferCache: true }` 选项，避免不必要的网络同步
+
+#### 6. 测试与文档
+
+- `tests/unit/core/opencode/OpenCodeService.test.ts`
+  - 新增测试用例覆盖 `resolveReasoningDurationSeconds` 和 `formatModelIdentifier` 逻辑
+- `tests/__mocks__/obsidian.ts`
+  - 补充 mock 数据支持
+- `tests/setup.ts`
+  - 测试环境初始化调整
+- `AGENTS.md`
+  - 补充 `devlog.md` 更新约束说明
+- `docs/opencode-service-sdk-v2-mapping.md`
+  - 更新流式主链文档，说明 reasoning 时长计算优化
+
+#### 7. 配置与样式
+
+- `package.json`
+  - 添加 `check:devlog-order` 脚本
+- `styles.css`
+  - 优化 thinking block 和消息样式
+- `src/main.ts`
+  - 调整初始化逻辑
+
+### 🧪 验证
+
+- `npm run test` 通过（新增测试用例）
+- `npm run typecheck` 通过
+- `npm run lint` 通过
+- `npm run build` 成功
+- `npm run check:devlog-order` 通过
+- 已部署到 Test Vault
+
+### 📁 涉及文件
+
+- `src/core/opencode/OpenCodeService.ts`
+- `src/core/types/chat.ts`
+- `src/features/chat/OpenCodianView.ts`
+- `src/utils/streaming/StreamController.ts`
+- `src/utils/streaming/ThinkingBlockRenderer.ts`
+- `src/utils/streaming/types.ts`
+- `src/main.ts`
+- `styles.css`
+- `tests/unit/core/opencode/OpenCodeService.test.ts`
+- `tests/__mocks__/obsidian.ts`
+- `tests/setup.ts`
+- `AGENTS.md`
+- `docs/opencode-service-sdk-v2-mapping.md`
+- `package.json`
+- `devlog.md`
+
+---
+
 ## 2026-03-29 历史记录下拉布局抖动修复与滚动优化
 
 ### 🎯 改动目标

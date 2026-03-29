@@ -7,6 +7,8 @@ import type { MarkdownRenderService } from '../markdown';
 export interface ThinkingChunk {
   type: 'thinking';
   content: string;
+  partId?: string;
+  durationSeconds?: number;
 }
 
 export interface TextChunk {
@@ -71,6 +73,7 @@ export interface TextContentBlock {
 export interface ThinkingContentBlock {
   type: 'thinking';
   content: string;
+  partId?: string;
   durationSeconds?: number;
 }
 
@@ -93,6 +96,8 @@ export interface ThinkingBlockState {
   contentEl: HTMLElement;
   labelEl: HTMLElement;
   content: string;
+  partId: string | null;
+  resolvedDurationSeconds: number | null;
   startTime: number;
   timerInterval: ReturnType<typeof setInterval> | null;
   isExpanded: boolean;
@@ -108,6 +113,8 @@ export interface StreamState {
   currentTextEl: HTMLElement | null;
   currentTextContent: string;
   currentThinkingState: ThinkingBlockState | null;
+  thinkingBlocksByPartId: Map<string, ThinkingContentBlock>;
+  thinkingBlockElements: Map<string, HTMLElement>;
   toolCalls: Map<string, ToolCallInfo>;
   toolCallElements: Map<string, HTMLElement>;
   contentBlocks: ContentBlock[];
@@ -120,6 +127,8 @@ export function createStreamState(): StreamState {
     currentTextEl: null,
     currentTextContent: '',
     currentThinkingState: null,
+    thinkingBlocksByPartId: new Map(),
+    thinkingBlockElements: new Map(),
     toolCalls: new Map(),
     toolCallElements: new Map(),
     contentBlocks: [],

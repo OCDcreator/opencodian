@@ -205,6 +205,9 @@ npm run test:coverage
 # Linting
 npm run lint
 npm run lint:fix
+
+# Documentation guardrail
+npm run check:devlog-order
 ```
 
 > **Syncthing note**: This repo uses `.stignore` to exclude `node_modules/` and other local artifacts. After switching systems, you usually do **not** need to run `npm run doctor:esbuild`; only run it if dependencies changed or build/dev reports an esbuild platform mismatch.
@@ -522,6 +525,7 @@ Before handing off work, agents should verify the following when relevant:
 - **Settings or i18n changes**: Keep `DEFAULT_SETTINGS`, settings UI, and both locale files synchronized.
 - **SDK migration changes**: Preserve rollback paths, keep rollout flags explicit, and update the mapping/checklist docs when module status changes.
 - **Architecture/doc changes**: Update `devlog.md` and refresh this `AGENTS.md` when developer-facing workflow or component responsibilities materially change.
+- **`devlog.md` updates**: Insert new dated entries before the first dated `## YYYY-MM-DD ...` section, never append them to the file end, and run `npm run check:devlog-order` before handoff.
 
 ### Debugging
 

@@ -148,6 +148,11 @@ interface Part {
   messageID: string;
   type: string;
   text?: string;
+  duration?: number;
+  time?: {
+    start?: number;
+    end?: number;
+  };
   [key: string]: unknown;
 }
 
@@ -163,6 +168,32 @@ interface ToolPartData extends Part {
   callID?: string;
   tool?: string;
   state?: ToolStateData;
+}
+
+function resolveReasoningDurationSeconds(part: Pick<Part, 'duration' | 'time'>): number | undefined {
+  const start = part.time?.start;
+  const end = part.time?.end;
+  if (typeof start === 'number' && typeof end === 'number' && end >= start) {
+    return Math.max(0, end - start) / 1000;
+  }
+
+  if (typeof part.duration === 'number' && part.duration > 0) {
+    return part.duration;
+  }
+
+  return undefined;
+}
+
+function formatModelIdentifier(providerID?: string, modelID?: string): string | undefined {
+  if (providerID && modelID) {
+    return `${providerID}/${modelID}`;
+  }
+
+  if (typeof modelID === 'string' && modelID.trim()) {
+    return modelID.trim();
+  }
+
+  return undefined;
 }
 
 interface AssistantMessageResponse {
@@ -1050,13 +1081,14 @@ export class OpenCodeService {
     }
 
     if (eventData.type === 'message.part.updated') {
-      const part = eventData.properties?.part as ToolPartData | undefined;
+      const part = eventData.properties?.part as Part | undefined;
       if (part?.id && part?.type) {
         streamContext.partTypeMap.set(part.id, part.type);
 
         if (part.type === 'tool') {
-          const toolId = part.callID || part.id;
-          const toolName = part.tool || 'unknown';
+          const toolPart = part as ToolPartData;
+          const toolId = toolPart.callID || toolPart.id;
+          const toolName = toolPart.tool || 'unknown';
           if (toolId) {
             if (!state.processedToolIds.has(toolId)) {
               state.processedToolIds.add(toolId);
@@ -1064,15 +1096,15 @@ export class OpenCodeService {
                 type: 'tool_use',
                 id: toolId,
                 name: toolName,
-                input: part.state?.input || {},
+                input: toolPart.state?.input || {},
               });
             }
 
             const toolStatus = resolveToolExecutionStatus({
               toolName,
-              state: part.state,
+              state: toolPart.state,
             });
-            const toolResult = resolveToolResultText(part.state);
+            const toolResult = resolveToolResultText(toolPart.state);
             if ((toolStatus === 'completed' || toolStatus === 'error') && toolResult !== undefined) {
               const resultKey = `${toolId}_result`;
               if (!state.processedToolIds.has(resultKey)) {
@@ -1085,6 +1117,18 @@ export class OpenCodeService {
                 });
               }
             }
+          }
+        }
+
+        if (part.type === 'reasoning' || part.type === 'thinking') {
+          const durationSeconds = resolveReasoningDurationSeconds(part);
+          if (durationSeconds !== undefined) {
+            chunks.push({
+              type: 'thinking',
+              content: '',
+              partId: part.id,
+              durationSeconds,
+            });
           }
         }
       }
@@ -1110,7 +1154,7 @@ export class OpenCodeService {
 
       if (field === 'text') {
         if (partType === 'reasoning' || partType === 'thinking') {
-          chunks.push({ type: 'thinking', content: delta });
+          chunks.push({ type: 'thinking', content: delta, partId: partID });
         } else {
           chunks.push({ type: 'text', content: delta });
           state.lastContent += delta;
@@ -1282,6 +1326,13 @@ export class OpenCodeService {
           yield { type: 'text', content: delta };
           lastContent = currentText;
         }
+
+        yield {
+          type: 'message_metadata',
+          messageId: assistantMsg.info.id,
+          timestamp: assistantMsg.info.time.created,
+          modelId: formatModelIdentifier(assistantMsg.info.providerID, assistantMsg.info.modelID),
+        };
       }
     } catch (error) {
       logger.error('Final message check failed:', error);
@@ -1837,7 +1888,12 @@ export class OpenCodeService {
       }
       case 'reasoning': {
         if (part.text) {
-          chunks.push({ type: 'thinking', content: part.text });
+          chunks.push({
+            type: 'thinking',
+            content: part.text,
+            partId: part.id,
+            durationSeconds: resolveReasoningDurationSeconds(part),
+          });
         }
         break;
       }
@@ -1882,7 +1938,7 @@ export class OpenCodeService {
     const content = textParts.map((p) => p.text).join('');
 
     // Extract thinking content from reasoning parts - each part becomes a separate block
-    const thinkingParts = parts.filter((p): p is Part & { text: string; duration?: number } =>
+    const thinkingParts = parts.filter((p): p is Part & { text: string } =>
       p.type === 'reasoning' && typeof p.text === 'string'
     );
 
@@ -1911,9 +1967,7 @@ export class OpenCodeService {
       contentBlocks.push({
         type: 'thinking',
         thinking: part.text,
-        durationSeconds: typeof part.duration === 'number' && part.duration > 0 
-          ? part.duration 
-          : undefined,
+        durationSeconds: resolveReasoningDurationSeconds(part),
       });
     }
     
@@ -1981,6 +2035,9 @@ export class OpenCodeService {
       role,
       content: normalizedContent,
       timestamp,
+      modelId: role === 'assistant'
+        ? formatModelIdentifier(info.providerID, info.modelID)
+        : undefined,
       sourceMessageId: info.id,
       toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
       contentBlocks: contentBlocks.length > 0 ? contentBlocks : undefined,

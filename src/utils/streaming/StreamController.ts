@@ -8,6 +8,8 @@ import type {
   StreamControllerOptions,
   StreamEventCallbacks,
   StreamState,
+  ThinkingChunk,
+  ThinkingContentBlock,
   ThinkingRendererOptions,
   ToolCallInfo,
   ToolRendererOptions,
@@ -67,7 +69,7 @@ export class StreamController {
 
     switch (chunk.type) {
       case 'thinking':
-        await this.handleThinkingChunk(chunk.content);
+        await this.handleThinkingChunk(chunk);
         break;
 
       case 'text':
@@ -96,17 +98,45 @@ export class StreamController {
     }
   }
 
-  private async handleThinkingChunk(content: string): Promise<void> {
+  private async handleThinkingChunk(chunk: ThinkingChunk): Promise<void> {
     this.finalizeTextBlock();
-    this.callbacks.onThinkingStart?.();
+
+    if (chunk.partId
+      && this.state.currentThinkingState?.partId
+      && this.state.currentThinkingState.partId !== chunk.partId) {
+      this.finalizeThinkingBlock();
+    }
+
+    if (!this.state.currentThinkingState && chunk.partId && chunk.durationSeconds !== undefined) {
+      if (this.updateStoredThinkingDuration(chunk.partId, chunk.durationSeconds)) {
+        return;
+      }
+    }
 
     if (!this.state.currentThinkingState) {
+      if (!chunk.content) {
+        return;
+      }
+
       this.state.currentThinkingState = this.thinkingRenderer.create(
         this.state.currentContentEl!
       );
+      this.callbacks.onThinkingStart?.();
     }
 
-    await this.thinkingRenderer.appendContent(this.state.currentThinkingState, content);
+    if (chunk.partId && !this.state.currentThinkingState.partId) {
+      this.state.currentThinkingState.partId = chunk.partId;
+    }
+
+    if (chunk.durationSeconds !== undefined) {
+      this.thinkingRenderer.updateDuration(this.state.currentThinkingState, chunk.durationSeconds);
+    }
+
+    if (!chunk.content) {
+      return;
+    }
+
+    await this.thinkingRenderer.appendContent(this.state.currentThinkingState, chunk.content);
   }
 
   private async handleTextChunk(content: string): Promise<void> {
@@ -224,14 +254,40 @@ export class StreamController {
 
     const durationSeconds = this.thinkingRenderer.finalize(this.state.currentThinkingState);
 
-    this.state.contentBlocks.push({
+    const thinkingBlock: ThinkingContentBlock = {
       type: 'thinking',
       content: this.state.currentThinkingState.content,
+      partId: this.state.currentThinkingState.partId ?? undefined,
       durationSeconds,
-    });
+    };
+    this.state.contentBlocks.push(thinkingBlock);
+
+    if (this.state.currentThinkingState.partId) {
+      this.state.thinkingBlocksByPartId.set(this.state.currentThinkingState.partId, thinkingBlock);
+      this.state.thinkingBlockElements.set(
+        this.state.currentThinkingState.partId,
+        this.state.currentThinkingState.wrapperEl,
+      );
+    }
 
     this.callbacks.onThinkingEnd?.(durationSeconds);
     this.state.currentThinkingState = null;
+  }
+
+  private updateStoredThinkingDuration(partId: string, durationSeconds: number): boolean {
+    const block = this.state.thinkingBlocksByPartId.get(partId);
+    if (!block) {
+      return false;
+    }
+
+    block.durationSeconds = durationSeconds;
+
+    const wrapperEl = this.state.thinkingBlockElements.get(partId);
+    if (wrapperEl) {
+      this.thinkingRenderer.updateStoredDuration(wrapperEl, durationSeconds);
+    }
+
+    return true;
   }
 
   private finalizeTextBlock(): void {

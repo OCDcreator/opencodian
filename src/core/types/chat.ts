@@ -167,9 +167,10 @@ export function createEmptyTabContextState(): TabContextState {
 /** Stream chunk types */
 export type StreamChunk =
   | { type: 'text'; content: string }
-  | { type: 'thinking'; content: string }
+  | { type: 'thinking'; content: string; partId?: string; durationSeconds?: number }
   | { type: 'tool_use'; id: string; name: string; input: Record<string, unknown> }
   | { type: 'tool_result'; toolUseId: string; content: string; isError?: boolean }
+  | { type: 'message_metadata'; messageId: string; timestamp: number; modelId?: string }
   | { type: 'usage'; inputTokens: number; outputTokens: number; sessionId?: string }
   | { type: 'error'; content: string }
   | { type: 'message_start' }

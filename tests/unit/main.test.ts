@@ -1,0 +1,65 @@
+import type { StorageService } from '../../src/core/storage';
+import type { Conversation } from '../../src/core/types';
+import OpenCodianPlugin from '../../src/main';
+
+jest.mock('@opencode-ai/sdk/v2/client', () => ({
+  createOpencodeClient: jest.fn(() => ({ client: 'mock-sdk-client' })),
+}), { virtual: true });
+
+describe('OpenCodianPlugin.getConversationById', () => {
+  it('returns the in-memory conversation when preferCache is enabled', async () => {
+    const plugin = new OpenCodianPlugin() as OpenCodianPlugin & {
+      conversations: Conversation[];
+      storage: Pick<StorageService, 'loadFullConversation'>;
+    };
+    const conversation: Conversation = {
+      id: 'conv-1',
+      title: '缓存标题',
+      createdAt: 1,
+      updatedAt: 1,
+      openCodeSessionId: 'session-1',
+      messages: [{ id: 'user-1', role: 'user', content: 'hello', timestamp: 1 }],
+    };
+
+    plugin.conversations = [conversation];
+    plugin.storage = {
+      loadFullConversation: jest.fn(),
+    } as Pick<StorageService, 'loadFullConversation'>;
+
+    const result = await plugin.getConversationById('conv-1', { preferCache: true });
+
+    expect(result).toBe(conversation);
+    expect(plugin.storage.loadFullConversation).not.toHaveBeenCalled();
+  });
+
+  it('hydrates the cached conversation from storage by default', async () => {
+    const plugin = new OpenCodianPlugin() as OpenCodianPlugin & {
+      conversations: Conversation[];
+      storage: Pick<StorageService, 'loadFullConversation'>;
+    };
+    const cachedConversation: Conversation = {
+      id: 'conv-1',
+      title: '旧标题',
+      createdAt: 1,
+      updatedAt: 1,
+      openCodeSessionId: 'session-1',
+      messages: [],
+    };
+    const storedConversation: Conversation = {
+      ...cachedConversation,
+      title: '存储标题',
+      messages: [{ id: 'user-1', role: 'user', content: 'hello', timestamp: 1 }],
+    };
+
+    plugin.conversations = [cachedConversation];
+    plugin.storage = {
+      loadFullConversation: jest.fn().mockResolvedValue(storedConversation),
+    } as Pick<StorageService, 'loadFullConversation'>;
+
+    const result = await plugin.getConversationById('conv-1');
+
+    expect(result).toEqual(storedConversation);
+    expect(plugin.storage.loadFullConversation).toHaveBeenCalledWith('conv-1');
+    expect(plugin.conversations[0]).toEqual(storedConversation);
+  });
+});

@@ -88,6 +88,14 @@ if (!('toggleClass' in HTMLElement.prototype)) {
   });
 }
 
+if (!('setText' in HTMLElement.prototype)) {
+  Object.defineProperty(HTMLElement.prototype, 'setText', {
+    value(text: string) {
+      this.textContent = text;
+    },
+  });
+}
+
 if (!('empty' in HTMLElement.prototype)) {
   Object.defineProperty(HTMLElement.prototype, 'empty', {
     value() {

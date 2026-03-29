@@ -12,6 +12,7 @@
     "release:major": "node scripts/release.mjs major",
     "doctor:esbuild": "node scripts/doctor-esbuild.mjs",
     "doctor:esbuild:fix": "node scripts/doctor-esbuild.mjs --fix",
+    "check:devlog-order": "node scripts/check-devlog-order.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "eslint \"{src,tests}/**/*.ts\"",
     "lint:fix": "npm run lint -- --fix",
