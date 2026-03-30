@@ -550,7 +550,7 @@ export const zhTranslations = {
   'settings.language.zh': '简体中文',
 
   // Chat UI
-  'chat.input.placeholder': '输入消息...',
+  'chat.input.placeholder': '输入消息，开始与 AI 对话…',
   'chat.input.send': '发送',
   'chat.input.attach': '附加文件',
   'chat.tab.new': '新对话',

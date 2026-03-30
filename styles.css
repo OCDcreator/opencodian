@@ -1882,6 +1882,10 @@
   outline: none;
 }
 
+.opencodian-input::placeholder {
+  color: var(--text-muted);
+}
+
 .opencodian-send-btn,
 .opencodian-stop-btn {
   display: flex;

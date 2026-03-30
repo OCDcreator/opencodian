@@ -485,10 +485,115 @@ export class OpenCodianView extends ItemView {
     }
 
     runtime.sessionTodoSessionId = sessionId;
-    runtime.sessionTodos = [...todos];
+    runtime.sessionTodos = this.normalizeSessionTodosForView(todos);
     if (tabId === this.getActiveTabId()) {
       this.renderSessionTodoDock(tabId);
     }
+  }
+
+  private normalizeSessionTodosForView(todos: readonly SessionTodo[] | unknown[]): SessionTodo[] {
+    const normalized: SessionTodo[] = [];
+    const seen = new Set<string>();
+
+    for (const rawTodo of todos) {
+      const todo = this.normalizeSessionTodoForView(rawTodo);
+      if (!todo) {
+        continue;
+      }
+
+      const dedupeKey = todo.id
+        ? `id:${todo.id}`
+        : `${todo.status}:${todo.content.trim().toLowerCase()}`;
+      if (seen.has(dedupeKey)) {
+        continue;
+      }
+
+      seen.add(dedupeKey);
+      normalized.push(todo);
+    }
+
+    return normalized;
+  }
+
+  private normalizeSessionTodoForView(todo: unknown): SessionTodo | null {
+    if (!todo || typeof todo !== 'object') {
+      return null;
+    }
+
+    const raw = todo as Record<string, unknown>;
+    const content = typeof raw.content === 'string' ? raw.content.trim() : '';
+    const status = raw.status;
+
+    if (!content) {
+      return null;
+    }
+
+    if (
+      status !== 'pending'
+      && status !== 'in_progress'
+      && status !== 'completed'
+      && status !== 'cancelled'
+    ) {
+      return null;
+    }
+
+    const priority = raw.priority;
+    const id = typeof raw.id === 'string' && raw.id.trim() ? raw.id.trim() : undefined;
+
+    return {
+      id,
+      content,
+      status,
+      priority: priority === 'low' || priority === 'medium' || priority === 'high'
+        ? priority
+        : undefined,
+    };
+  }
+
+  private getSessionIdForTab(tabId: TabId | null = this.getActiveTabId()): string | null {
+    if (!tabId) {
+      return null;
+    }
+
+    if (tabId === this.getActiveTabId()) {
+      return this.currentConversation?.openCodeSessionId ?? null;
+    }
+
+    const tab = this.tabManager?.getTab(tabId);
+    if (!tab?.conversationId) {
+      return this.getTabRuntimeState(tabId)?.sessionTodoSessionId ?? null;
+    }
+
+    const conversation = this.plugin.getConversations().find((item) => item.id === tab.conversationId);
+    return conversation?.openCodeSessionId
+      ?? this.getTabRuntimeState(tabId)?.sessionTodoSessionId
+      ?? null;
+  }
+
+  private extractSessionTodosFromToolInput(input: Record<string, unknown>): SessionTodo[] {
+    const rawTodos = Array.isArray(input.todos) ? input.todos : [];
+    return this.normalizeSessionTodosForView(rawTodos);
+  }
+
+  private applyStreamingTodoSnapshotFromTool(
+    toolCall: ToolCallInfo,
+    tabId: TabId | null = this.getActiveTabId(),
+  ): void {
+    if (toolCall.name !== 'todowrite') {
+      return;
+    }
+
+    const todos = this.extractSessionTodosFromToolInput(toolCall.input ?? {});
+    if (todos.length === 0) {
+      return;
+    }
+
+    const sessionId = this.getSessionIdForTab(tabId);
+    if (!sessionId) {
+      return;
+    }
+
+    this.setTabSessionTodos(tabId, todos, sessionId);
   }
 
   private renderSessionTodoDock(tabId: TabId | null = this.getActiveTabId()): void {
@@ -1310,7 +1415,7 @@ export class OpenCodianView extends ItemView {
       this.setTooltipLabel(this.settingsBtnEl, t('chat.settings.open'), 'bottom');
     }
 
-    this.inputTextarea?.setAttribute('placeholder', t('chat.input.placeholder'));
+    this.inputTextarea?.setAttribute('placeholder', this.getInputPlaceholder());
     this.renderSessionTodoDock();
     this.renderTabBar();
   }
@@ -1440,7 +1545,7 @@ export class OpenCodianView extends ItemView {
 
     this.inputTextarea = inputWrapper.createEl('textarea', {
       cls: 'opencodian-input',
-      attr: { placeholder: t('chat.input.placeholder'), rows: '1' },
+      attr: { placeholder: this.getInputPlaceholder(), rows: '1' },
     });
 
     // Auto-resize textarea
@@ -3214,7 +3319,9 @@ export class OpenCodianView extends ItemView {
 
   private async renderMessages(messages: ChatMessage[]): Promise<void> {
     if (messages.length === 0) {
-      await this.renderMessage(this.createEmptyConversationNoticeMessage());
+      if (this.currentConversationRevertState?.messageID) {
+        await this.renderMessage(this.createEmptyConversationNoticeMessage());
+      }
       return;
     }
 
@@ -3404,13 +3511,14 @@ export class OpenCodianView extends ItemView {
     }
 
     const anchorMessage = conversation.messages[anchorIndex];
+    const trailingMessages = conversation.messages.slice(anchorIndex + 1);
     runtime.backgroundTaskStartedAt = anchorMessage.timestamp;
     runtime.backgroundTaskModeTag = anchorMessage.omo?.kind === 'user-injection'
       ? anchorMessage.omo.modeTag
       : null;
 
     let sawAllTasksComplete = false;
-    for (const message of conversation.messages.slice(anchorIndex + 1)) {
+    for (const message of trailingMessages) {
       if (message.omo?.kind === 'system-reminder') {
         this.addCompletedBackgroundTasksFromMessage(message, runtime.backgroundTaskCompletedTasks);
         if (message.omo.reminderType === 'all-background-tasks-complete') {
@@ -3442,7 +3550,15 @@ export class OpenCodianView extends ItemView {
       return;
     }
 
-    if (runtime.backgroundTaskLaunches.size === 0 && runtime.backgroundTaskModeTag !== 'search-mode') {
+    if (runtime.backgroundTaskLaunches.size === 0) {
+      const shouldKeepPreparingIndicator = runtime.backgroundTaskModeTag === 'search-mode'
+        && trailingMessages.length === 0;
+
+      if (shouldKeepPreparingIndicator) {
+        this.syncTabStreamLikeState(tabId);
+        return;
+      }
+
       runtime.backgroundTaskStartedAt = null;
       runtime.backgroundTaskModeTag = null;
       runtime.backgroundTaskIndicatorEl?.remove();
@@ -3640,6 +3756,8 @@ export class OpenCodianView extends ItemView {
       return;
     }
 
+    this.applyStreamingTodoSnapshotFromTool(toolCall, tabId);
+
     if (!this.isBackgroundTaskTool(toolCall.name)) {
       return;
     }
@@ -3662,6 +3780,15 @@ export class OpenCodianView extends ItemView {
     const runtime = this.getTabRuntimeState(tabId);
     if (!runtime) {
       return;
+    }
+
+    this.applyStreamingTodoSnapshotFromTool(toolCall, tabId);
+
+    if (toolCall.name === 'todowrite' || toolCall.name === 'todoread') {
+      const sessionId = this.getSessionIdForTab(tabId);
+      if (sessionId) {
+        await this.refreshTabSessionTodos(tabId, sessionId, { suppressErrors: true });
+      }
     }
 
     if (!this.isBackgroundTaskTool(toolCall.name)) {
@@ -4402,6 +4529,10 @@ export class OpenCodianView extends ItemView {
       noticeTone: rewound ? 'warning' : 'info',
       noticeActions: rewound ? [{ type: 'restore_rewind' }] : undefined,
     };
+  }
+
+  private getInputPlaceholder(): string {
+    return t('chat.input.placeholder');
   }
 
   private async handleRestoreRewindRequest(): Promise<void> {

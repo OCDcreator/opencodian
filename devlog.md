@@ -12,6 +12,44 @@
 
 ---
 
+## 2026-03-30 聊天待办面板与工具摘要显示修复
+
+### 🎯 改动目标
+
+- 解决聊天底部待办面板偶发需要“切换标签再切回来”才出现的问题，尽量让 `todowrite` 一到达就驱动 UI 更新。
+- 修复重载 Obsidian 后，明明没有后台任务却仍然出现“后台任务准备中”提示的误判。
+- 优化工具块摘要显示，让 `read` / `write` / `edit` 直接显示文件名，`todo` 工具直接显示任务进度和任务名预览。
+
+### ✅ 本轮调整
+
+- `src/features/chat/OpenCodianView.ts`
+  - 为会话 todo 增加视图层归一化与去重，避免同内容/同状态的重复 todo 在 dock 中重复显示
+  - 新增流式 `todowrite` 快照应用逻辑，在工具流过程中就把最新待办写入对应标签页的 todo dock
+  - 在 `todowrite` / `todoread` 结束后立即补拉一次服务端 session todo，减少 UI 只在切标签后才同步的概率
+  - 调整后台任务恢复判断：若只是历史 `search-mode` 注入、后续已存在消息且没有真实 task launch，则不再显示“后台任务准备中”
+  - 顺手收敛输入框 placeholder 获取逻辑，并避免在无消息且无 rewind 恢复场景下额外渲染空对话提示
+
+- `src/utils/streaming/ToolCallRenderer.ts`
+  - `read` / `write` / `edit` 支持从 `file_path`、`filePath`、`path`、`notebook_path` 等字段提取文件名摘要
+  - `todowrite` / `todoread` 摘要改为显示“完成数/总数 + 任务名预览”，减少必须点开工具块才能知道内容的情况
+  - 为工具摘要补上 `title`，鼠标悬停时可查看完整文本
+
+- `src/i18n/locales/en.ts` / `src/i18n/locales/zh.ts` / `styles.css`
+  - 调整聊天输入框占位文案，并为 placeholder 补充更稳定的弱化样式
+
+- `tests/unit/utils/streaming/ToolCallRenderer.test.ts`
+  - 新增工具摘要单测，覆盖文件名提取与 todo 任务名预览显示
+
+### 🧪 验证结果
+
+- 通过：`node scripts/run-jest.js tests/unit/utils/streaming/ToolCallRenderer.test.ts --runInBand`
+- 通过：`npm run build`
+- 已部署到测试库并确认 `BUILD_ID`：`main.202603301433`
+
+### 📝 结论
+
+- 这轮改动把 todo dock 的可见性更新从“主要依赖后续刷新/切标签触发”前移到了工具流本身，同时收紧了后台任务恢复条件，减少重载后残留提示和重复 todo 的概率。
+
 ## 2026-03-30 设置面板滚动记忆防漂移修复
 
 ### 🎯 改动目标

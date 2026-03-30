@@ -550,7 +550,7 @@ export const enTranslations = {
   'settings.language.zh': '简体中文',
 
   // Chat UI
-  'chat.input.placeholder': 'Type a message...',
+  'chat.input.placeholder': 'Type a message to start chatting with AI…',
   'chat.input.send': 'Send',
   'chat.input.attach': 'Attach file',
   'chat.tab.new': 'New chat',

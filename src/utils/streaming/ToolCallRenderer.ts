@@ -65,7 +65,7 @@ export class ToolCallRenderer {
       case 'read':
       case 'write':
       case 'edit':
-        return this.fileNameOnly((input.file_path as string) || '');
+        return this.fileNameOnly(this.getToolFilePath(input));
       case 'bash':
         return this.truncateText((input.command as string) || '', 60);
       case 'glob':
@@ -83,10 +83,9 @@ export class ToolCallRenderer {
           || '',
           80,
         );
+      case 'todoread':
       case 'todowrite': {
-        const todos = Array.isArray(input.todos) ? input.todos as Array<{ status?: string }> : [];
-        const done = todos.filter((todo) => todo.status === 'completed').length;
-        return `${done}/${todos.length}`;
+        return this.getTodoSummary(input);
       }
       default:
         return '';
@@ -128,6 +127,57 @@ export class ToolCallRenderer {
     return normalized.split('/').pop() ?? normalized;
   }
 
+  private getToolFilePath(input: Record<string, unknown>): string {
+    const candidate = [
+      input.file_path,
+      input.filePath,
+      input.path,
+      input.notebook_path,
+      input.notebookPath,
+      input.target_file,
+      input.targetFile,
+    ].find((value): value is string => typeof value === 'string' && value.trim().length > 0);
+
+    return candidate?.trim() ?? '';
+  }
+
+  private getTodoSummary(input: Record<string, unknown>): string {
+    const todos = this.extractTodoNames(input);
+    if (todos.length === 0) {
+      return '';
+    }
+
+    const rawTodos = Array.isArray(input.todos) ? input.todos as Array<{ status?: string }> : [];
+    const done = rawTodos.filter((todo) => todo.status === 'completed').length;
+    const preview = todos.slice(0, 2).join(' · ');
+    const extraCount = todos.length - Math.min(todos.length, 2);
+    const extraSuffix = extraCount > 0 ? ` · +${extraCount}` : '';
+
+    return `${done}/${todos.length} · ${this.truncateText(`${preview}${extraSuffix}`, 80)}`;
+  }
+
+  private extractTodoNames(input: Record<string, unknown>): string[] {
+    if (!Array.isArray(input.todos)) {
+      return [];
+    }
+
+    return input.todos.reduce<string[]>((names, todo) => {
+      if (!todo || typeof todo !== 'object') {
+        return names;
+      }
+
+      const content = typeof (todo as { content?: unknown }).content === 'string'
+        ? (todo as { content: string }).content.trim()
+        : '';
+      if (!content) {
+        return names;
+      }
+
+      names.push(content);
+      return names;
+    }, []);
+  }
+
   private truncateText(text: string, maxLength: number): string {
     if (text.length <= maxLength) return text;
     return text.substring(0, maxLength) + '...';
@@ -154,9 +204,9 @@ export class ToolCallRenderer {
     );
 
     const summaryEl = header.createSpan({ cls: 'streaming-tool-summary' });
-    summaryEl.setText(
-      this.options.getToolSummary!(toolCall.name, toolCall.input)
-    );
+    const summaryText = this.options.getToolSummary!(toolCall.name, toolCall.input);
+    summaryEl.setText(summaryText);
+    summaryEl.title = summaryText;
 
     // Status icon (right side) - shows checkmark for success, X for error
     const statusEl = header.createSpan({ cls: 'streaming-tool-status' });
@@ -270,7 +320,9 @@ export class ToolCallRenderer {
       nameEl.setText(this.options.getToolName!(toolCall.name, toolCall.input));
     }
     if (summaryEl) {
-      summaryEl.setText(this.options.getToolSummary!(toolCall.name, toolCall.input));
+      const summaryText = this.options.getToolSummary!(toolCall.name, toolCall.input);
+      summaryEl.setText(summaryText);
+      summaryEl.title = summaryText;
     }
   }
 }
