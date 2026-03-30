@@ -949,7 +949,7 @@
 .opencodian-messages--sticky-mask .opencodian-turn-header {
   position: sticky;
   top: 0;
-  z-index: 20;
+  z-index: 22;
   isolation: isolate;
   margin-bottom: var(--opencodian-sticky-push-gap);
 }
