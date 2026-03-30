@@ -12,6 +12,114 @@
 
 ---
 
+## 2026-03-30 Question 卡片改为就地定稿，避免 assistant 尾部重绘
+
+### 🎯 改动目标
+
+- 避免 question 完成态依赖“流结束后重绘整条 assistant 消息”来保留卡片。
+- 修复 question card 出现/下一题/完成态时滚动不贴底、点击后视图上跳的问题。
+- 让“已回答 / 已拒绝”卡片先保留在原位，并支持折叠查看。
+
+### ✅ 本轮调整
+
+- `src/features/chat/OpenCodianView.ts`
+  - assistant 最终态改成“流式 DOM 就地定稿 + 本地消息数据补全”，不再为了 question 结果去重绘整条消息
+  - 把 assistant 内容渲染抽成 `renderAssistantMessageContent()`，尾部同步改为复用现有 DOM、只更新内容区和时间行
+  - `questionResolution` 纳入 message render/visual signature，避免本地已回答卡片在后续 sync 中被当成异常差异
+  - 带 `questionResolution` 的 assistant message 不再走 pseudo-stream reveal，避免完成态卡片被吞掉或顺序错乱
+  - question inline card 改为复用同一个 DOM 容器，减少“下一题”时 remove/recreate 导致的跳动
+  - question 交互按钮点击后会先 `blur()`，减少浏览器焦点回滚造成的视图上跳
+  - 新增 `keepQuestionCardPinnedToBottom()`，question 出现、切题、完成态时都主动保持贴底
+
+- `styles.css`
+  - 为已回答卡片补充 `details/summary` 折叠样式
+  - 增加折叠提示文案区域，完成态卡片现在可以收起/展开
+
+### 🧪 验证结果
+
+- 通过：`npm run typecheck`
+- 通过：`npm run lint`
+
+### 📝 结论
+
+- 这轮后，question 结果不再依赖 assistant 结束时整条重绘来保留；当前方向改成更轻量的“原地更新”，同时把完成态卡片留在会话里，交互也更稳定。
+
+## 2026-03-30 Question 卡片回答结果改为同条 assistant 内联呈现
+
+### 🎯 改动目标
+
+- 修复 OpenCode question 交互完成后，聊天渲染被拆成“tool summary + 已回答 notice + assistant 正文”三段的问题。
+- 避免 question 流程结束时再额外插入一条持久 assistant notice，导致布局抖动和会话视觉割裂。
+
+### ✅ 本轮调整
+
+- `src/features/chat/OpenCodianView.ts`
+  - `showQuestionDialog()` 不再在回答/拒绝后调用 `appendPersistentAssistantNoticeMessage()`
+  - 改为在当前 streaming assistant 消息内部追加 resolved question inline card
+  - 已回答 / 已拒绝状态现在与当前 assistant turn 保持同一消息流内呈现
+
+- `styles.css`
+  - 为 resolved question card 新增样式
+  - 增加回答摘要列表样式，避免完成态只剩一块突兀的临时容器
+
+### 🧪 验证结果
+
+- 通过：`npm run typecheck`
+- 通过：`npm run lint`
+- 通过：`npm test -- tests/unit/core/types/settings.test.ts tests/unit/core/opencode/OpenCodeService.test.ts`
+
+### 📝 结论
+
+- 这轮之后，question 流程完成时不再平白多出一条独立 assistant notice；回答结果会留在当前 assistant turn 内，整体对话结构更连贯，也更接近“一段完整会话”的预期。
+
+## 2026-03-30 OpenCode 提问支持逐题展示模式
+
+### 🎯 改动目标
+
+- 让用户可以决定 OpenCode 的一组问题是“一次全部展示”，还是“逐题展示、一题答完再问下一题”。
+- 把该能力做成会话设置中的显式选项，而不是写死在 question card UI 里。
+
+### ✅ 本轮调整
+
+- `src/core/types/settings.ts`
+  - 新增 `questionDisplayMode`
+  - 支持 `all` / `single`
+  - 默认保持当前行为：`all`
+
+- `src/features/settings/OpenCodianSettings.ts`
+  - 在“会话”设置区新增“提问展示方式”下拉项
+  - 用户可以切换为“全部一起显示”或“逐题显示”
+
+- `src/features/chat/OpenCodianView.ts`
+  - question card 渲染拆成两条路径：
+    - `all`：保留当前整组问题一次性展示
+    - `single`：逐题展示，当前题回答后才进入下一题
+  - 逐题模式下，所有问题答完后仍一次性回传完整 answers 数组给 OpenCode
+
+- `src/i18n/locales/en.ts`
+- `src/i18n/locales/zh.ts`
+  - 新增 question display mode 设置文案
+  - 新增逐题模式的进度与“下一题”文案
+
+- `styles.css`
+  - 新增逐题模式进度 badge 样式
+
+- `tests/unit/core/types/settings.test.ts`
+  - 新增 `questionDisplayMode` 默认值与归一化回归测试
+
+- `AGENTS.md`
+  - 同步更新聊天 question card 能力说明与会话设置分类说明
+
+### 🧪 验证结果
+
+- 通过：`npm run typecheck`
+- 通过：`npm run lint`
+- 通过：`npm test -- tests/unit/core/types/settings.test.ts tests/unit/core/opencode/OpenCodeService.test.ts`
+
+### 📝 结论
+
+- 到这一轮为止，OpenCodian 的 question card 已经不再只能“一次把所有问题砸出来”，而是可以按用户偏好切换成更平滑的逐题提问流程。
+
 ## 2026-03-30 文件选择器改为隐藏目录排除并扩展附件后缀支持
 
 ### 🎯 改动目标

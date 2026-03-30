@@ -27,6 +27,7 @@ import {
   normalizePersistedTabState,
   normalizePluginIsolationMode,
   normalizeProviderIconLibrary,
+  normalizeQuestionDisplayMode,
   normalizeTabBarPosition,
   normalizeThinkingBudget,
   normalizeTitleMode,
@@ -347,6 +348,7 @@ export default class OpenCodianPlugin extends Plugin {
           tabBarPosition: normalizeTabBarPosition(savedSettings.tabBarPosition),
           belowHeaderTabBarLayout: normalizeBelowHeaderTabBarLayout(savedSettings.belowHeaderTabBarLayout),
           titleMode: normalizeTitleMode(savedSettings.titleMode),
+          questionDisplayMode: normalizeQuestionDisplayMode(savedSettings.questionDisplayMode),
           aiTitleModel: typeof savedSettings.aiTitleModel === 'string' ? savedSettings.aiTitleModel.trim() : '',
           renderUserMarkupAsCodeBlocks:
             typeof savedSettings.renderUserMarkupAsCodeBlocks === 'boolean'

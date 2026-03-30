@@ -68,6 +68,12 @@ export interface QuestionRequest {
   questions: QuestionPrompt[];
 }
 
+export interface QuestionResolution {
+  request: QuestionRequest;
+  status: 'answered' | 'rejected';
+  answers?: string[][];
+}
+
 export interface SessionDiffEntry {
   file: string;
   before?: string;
@@ -145,6 +151,7 @@ export interface ChatMessage {
   toolCalls?: ToolCallInfo[];
   contentBlocks?: ContentBlock[];
   contextAttachments?: MessageContextAttachment[];
+  questionResolution?: QuestionResolution;
   omo?: OmoMessageMeta;
   // OpenCode-specific: store original parts for advanced features
   parts?: unknown[];

@@ -90,6 +90,9 @@ export type ModelSourceMode = 'merge' | 'local' | 'server';
 /** Conversation title generation mode */
 export type TitleMode = 'default' | 'ai';
 
+/** OpenCode question card display mode */
+export type QuestionDisplayMode = 'all' | 'single';
+
 /** Plugin isolation mode for local OpenCode */
 export type PluginIsolationMode = 'default' | 'pure';
 
@@ -100,6 +103,16 @@ export function normalizeTitleMode(value: unknown): TitleMode {
       return value;
     default:
       return 'default';
+  }
+}
+
+export function normalizeQuestionDisplayMode(value: unknown): QuestionDisplayMode {
+  switch (value) {
+    case 'all':
+    case 'single':
+      return value;
+    default:
+      return 'all';
   }
 }
 
@@ -554,6 +567,7 @@ export interface OpenCodianSettings {
   defaultProvider: string;
   defaultModel: string;
   titleMode: TitleMode;
+  questionDisplayMode: QuestionDisplayMode;
   aiTitleModel: string;
   renderUserMarkupAsCodeBlocks: boolean;
   pluginIsolationMode: PluginIsolationMode;
@@ -620,6 +634,7 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
   defaultProvider: 'anthropic',
   defaultModel: 'claude-3-5-sonnet-20241022',
   titleMode: 'default',
+  questionDisplayMode: 'all',
   aiTitleModel: '',
   renderUserMarkupAsCodeBlocks: true,
   pluginIsolationMode: 'default',

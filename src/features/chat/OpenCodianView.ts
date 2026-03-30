@@ -16,6 +16,7 @@ import {
   getDefaultPersistedTabState,
   type PromptContextItem,
   type QuestionRequest,
+  type QuestionResolution,
   type SessionDiffEntry,
   type SessionTodo,
   type ToolCallInfo,
@@ -158,6 +159,8 @@ interface TabRuntimeState {
   backgroundTaskWaitingForFollowUp: boolean;
   draftContextItems: PromptContextItem[];
   pendingEditedFiles: Set<string>;
+  questionInlineCardEl: HTMLElement | null;
+  pendingQuestionResolution: QuestionResolution | null;
 }
 
 interface TabPaneState {
@@ -285,6 +288,8 @@ export class OpenCodianView extends ItemView {
       backgroundTaskWaitingForFollowUp: false,
       draftContextItems: [],
       pendingEditedFiles: new Set(),
+      questionInlineCardEl: null,
+      pendingQuestionResolution: null,
     };
   }
 
@@ -2766,6 +2771,11 @@ export class OpenCodianView extends ItemView {
       noticeActions: message.noticeActions ?? null,
       images: message.images ?? null,
       omo: message.omo ?? null,
+      questionResolution: message.questionResolution ? {
+        requestId: message.questionResolution.request.id,
+        status: message.questionResolution.status,
+        answers: message.questionResolution.answers ?? null,
+      } : null,
       contentBlocks: (message.contentBlocks ?? []).map((block) => ({
         type: block.type,
         text: block.text ?? null,
@@ -3614,6 +3624,7 @@ export class OpenCodianView extends ItemView {
           modelId: finalizedModelId,
           sourceMessageId: finalizedAssistantMessageId,
           contentBlocks: contentBlocks,
+          questionResolution: sendingRuntime.pendingQuestionResolution ?? undefined,
         };
 
         sendingConversation.messages.push(assistantMessage);
@@ -3633,6 +3644,8 @@ export class OpenCodianView extends ItemView {
         sendingConversation.lastResponseAt = finalizedTimestamp;
         await this.plugin.saveConversation(sendingConversation);
       }
+
+      sendingRuntime.pendingQuestionResolution = null;
     }
 
     if (sendingConversation) {
@@ -4048,32 +4061,61 @@ export class OpenCodianView extends ItemView {
     } else if (message.role === 'user') {
       const copyContent = await this.renderUserMessageContent(content, message);
       this.addUserMessageFooter(messageEl, message, copyContent);
-    } else if (message.contentBlocks && message.contentBlocks.length > 0) {
-      // For assistant messages, render content blocks (thinking, tools, etc.)
-      for (const block of message.contentBlocks) {
+    } else {
+      await this.renderAssistantMessageContent(messageEl, content, message);
+    }
+
+    return messageEl;
+  }
+
+  private async renderAssistantMessageContent(
+    messageEl: HTMLElement,
+    content: HTMLElement,
+    message: ChatMessage,
+  ): Promise<void> {
+    if (message.contentBlocks && message.contentBlocks.length > 0) {
+      const nonTextBlocks = message.contentBlocks.filter((block) => block.type !== 'text');
+      const textBlocks = message.contentBlocks.filter((block) => block.type === 'text');
+
+      for (const block of nonTextBlocks) {
         await this.renderContentBlock(content, block);
       }
-      // Collect all text content (trim leading/trailing whitespace)
+      if (message.questionResolution) {
+        const questionCardEl = content.createDiv({
+          cls: 'opencodian-question-inline opencodian-question-inline--resolved',
+        });
+        this.populateQuestionResolutionCard(questionCardEl, message.questionResolution);
+      }
+      for (const block of textBlocks) {
+        await this.renderContentBlock(content, block);
+      }
+
       const textContent = message.contentBlocks
-        .filter(b => b.type === 'text' && b.text)
-        .map(b => b.text?.trim())
+        .filter((block) => block.type === 'text' && block.text)
+        .map((block) => block.text?.trim())
         .filter(Boolean)
         .join('\n\n');
-      // Add timestamp with copy button
       this.addTimestampWithCopyButton(messageEl, message.timestamp, textContent, message.modelId);
-    } else if (message.content) {
-      // Fallback to simple text rendering for assistant
+      return;
+    }
+
+    if (message.questionResolution) {
+      const questionCardEl = content.createDiv({
+        cls: 'opencodian-question-inline opencodian-question-inline--resolved',
+      });
+      this.populateQuestionResolutionCard(questionCardEl, message.questionResolution);
+    }
+
+    if (message.content) {
       const textEl = content.createDiv({ cls: 'opencodian-message-text' });
       if (this.markdownService) {
         await this.markdownService.render(textEl, message.content);
       } else {
         textEl.textContent = message.content;
       }
-      // Add timestamp with copy button
-      this.addTimestampWithCopyButton(messageEl, message.timestamp, message.content, message.modelId);
     }
 
-    return messageEl;
+    this.addTimestampWithCopyButton(messageEl, message.timestamp, message.content, message.modelId);
   }
 
   private async renderUserMessageContent(container: HTMLElement, message: ChatMessage): Promise<string> {
@@ -5146,6 +5188,7 @@ export class OpenCodianView extends ItemView {
     return {
       ...syncedMessage,
       contextAttachments,
+      questionResolution: syncedMessage.questionResolution ?? existingMessage.questionResolution,
     };
   }
 
@@ -5692,20 +5735,25 @@ export class OpenCodianView extends ItemView {
     const runtime = this.getTabRuntimeState(tabId);
     const previousTurnBodyEl = runtime?.currentTurnBodyEl ?? null;
     const shouldStickToBottom = this.isNearBottomForElement(this.messagesContainer);
-
-    existingTailMessageEl.remove();
+    const existingContentEl = existingTailMessageEl.querySelector('.opencodian-message-content');
+    if (!(existingContentEl instanceof HTMLElement)) {
+      return false;
+    }
 
     if (runtime) {
       runtime.currentTurnBodyEl = parentEl;
     }
 
     try {
-      const replacementEl = await this.renderMessage(nextTailMessage);
-      if (!replacementEl) {
-        return false;
+      existingTailMessageEl.dataset.messageId = nextTailMessage.id;
+      if (nextTailMessage.sourceMessageId) {
+        existingTailMessageEl.dataset.sourceMessageId = nextTailMessage.sourceMessageId;
+      } else {
+        delete existingTailMessageEl.dataset.sourceMessageId;
       }
-
-      replacementEl.style.animation = 'none';
+      existingContentEl.empty();
+      await this.renderAssistantMessageContent(existingTailMessageEl, existingContentEl, nextTailMessage);
+      existingTailMessageEl.style.animation = 'none';
       if (shouldStickToBottom) {
         this.scrollToBottom();
       }
@@ -5774,6 +5822,11 @@ export class OpenCodianView extends ItemView {
       displayStyle: message.displayStyle ?? null,
       content: message.content,
       timestamp: message.timestamp,
+      questionResolution: message.questionResolution ? {
+        requestId: message.questionResolution.request.id,
+        status: message.questionResolution.status,
+        answers: message.questionResolution.answers ?? null,
+      } : null,
       omo: message.omo ? {
         kind: message.omo.kind,
         headline: message.omo.headline,
@@ -5783,6 +5836,10 @@ export class OpenCodianView extends ItemView {
 
   private shouldPseudoStreamSyncedAssistantMessage(message: ChatMessage): boolean {
     if (message.role !== 'assistant' || message.displayStyle === 'notice') {
+      return false;
+    }
+
+    if (message.questionResolution) {
       return false;
     }
 
@@ -7536,14 +7593,173 @@ export class OpenCodianView extends ItemView {
     return cardEl;
   }
 
+  private getOrCreateQuestionInlineCard(
+    className: string,
+    tabId: TabId | null = this.getActiveTabId(),
+  ): HTMLElement | null {
+    const runtime = this.getTabRuntimeState(tabId);
+    const existing = runtime?.questionInlineCardEl ?? null;
+
+    if (existing?.isConnected) {
+      existing.className = className;
+      existing.empty();
+      this.keepQuestionCardPinnedToBottom(tabId);
+      return existing;
+    }
+
+    const cardEl = this.createStreamingInlineCard(className, tabId);
+    if (!cardEl) {
+      return null;
+    }
+
+    if (runtime) {
+      runtime.questionInlineCardEl = cardEl;
+    }
+    this.keepQuestionCardPinnedToBottom(tabId);
+    return cardEl;
+  }
+
+  private clearQuestionInlineCard(tabId: TabId | null = this.getActiveTabId()): void {
+    const runtime = this.getTabRuntimeState(tabId);
+    runtime?.questionInlineCardEl?.remove();
+    if (runtime) {
+      runtime.questionInlineCardEl = null;
+    }
+  }
+
   private async showQuestionDialog(
     request: QuestionRequest,
     tabId: TabId | null = this.getActiveTabId(),
   ): Promise<void> {
-    const questionCard = this.createStreamingInlineCard('opencodian-question-inline', tabId);
+    const action = this.plugin.settings.questionDisplayMode === 'single'
+      ? await this.collectSequentialQuestionAction(request, tabId)
+      : await this.collectGroupedQuestionAction(request, tabId);
+
+    if (!action) {
+      return;
+    }
+
+    try {
+      if (action.type === 'reject') {
+        await this.plugin.openCodeService.rejectQuestion(request.id);
+        this.applyResolvedQuestionState({
+          request,
+          status: 'rejected',
+        }, tabId);
+        return;
+      }
+
+      await this.plugin.openCodeService.replyToQuestion(request.id, action.answers);
+      this.applyResolvedQuestionState({
+        request,
+        status: 'answered',
+        answers: action.answers,
+      }, tabId);
+    } catch (error) {
+      logger.error('Failed to resolve question request:', error);
+      new Notice(t('chat.question.notice.error'));
+    }
+  }
+
+  private applyResolvedQuestionState(
+    resolution: QuestionResolution,
+    tabId: TabId | null,
+  ): void {
+    const runtime = this.getTabRuntimeState(tabId);
+    if (runtime) {
+      runtime.pendingQuestionResolution = resolution;
+    }
+
+    this.renderQuestionResolutionCard(resolution, tabId);
+  }
+
+  private renderQuestionResolutionCard(
+    resolution: QuestionResolution,
+    tabId: TabId | null,
+  ): void {
+    const cardEl = this.getOrCreateQuestionInlineCard(
+      'opencodian-question-inline opencodian-question-inline--resolved',
+      tabId,
+    );
+    if (!cardEl) {
+      return;
+    }
+
+    this.populateQuestionResolutionCard(cardEl, resolution);
+    this.keepQuestionCardPinnedToBottom(tabId);
+  }
+
+  private populateQuestionResolutionCard(cardEl: HTMLElement, resolution: QuestionResolution): void {
+    const detailsEl = cardEl.createEl('details', {
+      cls: 'opencodian-question-inline-details',
+    });
+    detailsEl.open = true;
+
+    const summaryEl = detailsEl.createEl('summary', {
+      cls: 'opencodian-question-inline-summary-toggle',
+    });
+    const headerEl = summaryEl.createDiv({ cls: 'opencodian-question-inline-header' });
+    headerEl.createSpan({
+      cls: 'opencodian-question-inline-icon',
+      text: resolution.status === 'answered' ? 'i' : '!',
+    });
+    headerEl.createSpan({
+      cls: 'opencodian-question-inline-title',
+      text: resolution.status === 'answered'
+        ? t('chat.question.notice.answeredTitle')
+        : t('chat.question.notice.rejectedTitle'),
+    });
+    headerEl.createSpan({
+      cls: 'opencodian-question-inline-collapse-hint',
+      text: '',
+    });
+    const updateCollapseHint = () => {
+      const hintEl = headerEl.querySelector('.opencodian-question-inline-collapse-hint');
+      if (hintEl instanceof HTMLElement) {
+        hintEl.setText(detailsEl.open ? t('chat.action.showLess') : t('chat.action.showMore'));
+      }
+    };
+    updateCollapseHint();
+    detailsEl.addEventListener('toggle', updateCollapseHint);
+
+    const bodyEl = detailsEl.createDiv({ cls: 'opencodian-question-inline-details-body' });
+    bodyEl.createDiv({
+      cls: 'opencodian-question-inline-body-text',
+      text: resolution.status === 'answered'
+        ? t('chat.question.notice.answeredBody')
+        : t('chat.question.notice.rejectedBody'),
+    });
+
+    const listEl = bodyEl.createEl('ul', { cls: 'opencodian-question-inline-summary-list' });
+    resolution.request.questions.forEach((question, index) => {
+      const itemEl = listEl.createEl('li', { cls: 'opencodian-question-inline-summary-item' });
+      const labelEl = itemEl.createSpan({ cls: 'opencodian-question-inline-summary-label' });
+      labelEl.setText(`${question.header}: `);
+      itemEl.createSpan({
+        cls: 'opencodian-question-inline-summary-value',
+        text: resolution.status === 'answered'
+          ? (resolution.answers?.[index]?.join(', ') ?? '')
+          : t('chat.question.reject'),
+      });
+    });
+  }
+
+  private keepQuestionCardPinnedToBottom(tabId: TabId | null): void {
+    if (this.getActiveTabId() !== tabId || !this.plugin.settings.enableAutoScroll) {
+      return;
+    }
+
+    this.scheduleSettledScrollToBottomIfNeeded(true);
+  }
+
+  private async collectGroupedQuestionAction(
+    request: QuestionRequest,
+    tabId: TabId | null,
+  ): Promise<{ type: 'reply'; answers: string[][] } | { type: 'reject' } | null> {
+    const questionCard = this.getOrCreateQuestionInlineCard('opencodian-question-inline', tabId);
     if (!questionCard) {
       logger.error('No streaming message element found for question card');
-      return;
+      return null;
     }
 
     const headerEl = questionCard.createDiv({ cls: 'opencodian-question-inline-header' });
@@ -7626,6 +7842,7 @@ export class OpenCodianView extends ItemView {
 
     const action = await new Promise<{ type: 'reply'; answers: string[][] } | { type: 'reject' }>((resolve) => {
       submitBtn.addEventListener('click', () => {
+        submitBtn.blur();
         const answers = request.questions.map((question, index) => {
           const selectedValues = state[index].optionInputs
             .filter((input) => input.checked)
@@ -7654,33 +7871,173 @@ export class OpenCodianView extends ItemView {
       });
 
       rejectBtn.addEventListener('click', () => {
+        rejectBtn.blur();
         resolve({ type: 'reject' });
       });
     });
 
-    questionCard.remove();
+    this.keepQuestionCardPinnedToBottom(tabId);
+    return action;
+  }
 
-    try {
-      if (action.type === 'reject') {
-        await this.plugin.openCodeService.rejectQuestion(request.id);
-        await this.appendPersistentAssistantNoticeMessage(
-          t('chat.question.notice.rejectedTitle'),
-          this.buildQuestionRejectedMarkdown(request),
-          'warning',
-        );
-        return;
+  private async collectSequentialQuestionAction(
+    request: QuestionRequest,
+    tabId: TabId | null,
+  ): Promise<{ type: 'reply'; answers: string[][] } | { type: 'reject' } | null> {
+    const answers: string[][] = [];
+
+    for (let index = 0; index < request.questions.length; index += 1) {
+      const action = await this.promptForSingleQuestion(
+        request,
+        request.questions[index],
+        index,
+        request.questions.length,
+        tabId,
+      );
+
+      if (!action) {
+        return null;
       }
 
-      await this.plugin.openCodeService.replyToQuestion(request.id, action.answers);
-      await this.appendPersistentAssistantNoticeMessage(
-        t('chat.question.notice.answeredTitle'),
-        this.buildQuestionAnswerMarkdown(request, action.answers),
-        'info',
-      );
-    } catch (error) {
-      logger.error('Failed to resolve question request:', error);
-      new Notice(t('chat.question.notice.error'));
+      if (action.type === 'reject') {
+        return action;
+      }
+
+      answers.push(action.answer);
     }
+
+    return {
+      type: 'reply',
+      answers,
+    };
+  }
+
+  private async promptForSingleQuestion(
+    request: QuestionRequest,
+    question: QuestionRequest['questions'][number],
+    index: number,
+    total: number,
+    tabId: TabId | null,
+  ): Promise<{ type: 'reply'; answer: string[] } | { type: 'reject' } | null> {
+    const questionCard = this.getOrCreateQuestionInlineCard('opencodian-question-inline', tabId);
+    if (!questionCard) {
+      logger.error('No streaming message element found for question card');
+      return null;
+    }
+
+    const headerEl = questionCard.createDiv({ cls: 'opencodian-question-inline-header' });
+    headerEl.createSpan({ cls: 'opencodian-question-inline-icon', text: '?' });
+    headerEl.createSpan({
+      cls: 'opencodian-question-inline-title',
+      text: t('chat.question.title'),
+    });
+    if (total > 1) {
+      headerEl.createSpan({
+        cls: 'opencodian-question-inline-progress',
+        text: t('chat.question.progress', {
+          current: String(index + 1),
+          total: String(total),
+        }),
+      });
+    }
+
+    const sectionEl = questionCard.createDiv({ cls: 'opencodian-question-inline-section' });
+    sectionEl.createDiv({
+      cls: 'opencodian-question-inline-header-text',
+      text: question.header,
+    });
+    sectionEl.createDiv({
+      cls: 'opencodian-question-inline-body-text',
+      text: question.question,
+    });
+
+    const optionInputs: HTMLInputElement[] = [];
+    let customInput: HTMLInputElement | null = null;
+
+    if (question.options.length > 0) {
+      const optionsEl = sectionEl.createDiv({ cls: 'opencodian-question-inline-options' });
+      const inputType = question.multiple ? 'checkbox' : 'radio';
+
+      for (const option of question.options) {
+        const labelEl = optionsEl.createEl('label', {
+          cls: 'opencodian-question-inline-option',
+        });
+        const inputEl = labelEl.createEl('input', {
+          attr: {
+            type: inputType,
+            name: `opencodian-question-${request.id}-${index}`,
+            value: option.label,
+          },
+        });
+        optionInputs.push(inputEl);
+
+        const textWrap = labelEl.createDiv({ cls: 'opencodian-question-inline-option-copy' });
+        textWrap.createDiv({
+          cls: 'opencodian-question-inline-option-label',
+          text: option.label,
+        });
+        if (option.description) {
+          textWrap.createDiv({
+            cls: 'opencodian-question-inline-option-description',
+            text: option.description,
+          });
+        }
+      }
+    }
+
+    if (question.custom !== false) {
+      customInput = sectionEl.createEl('input', {
+        cls: 'opencodian-question-inline-custom',
+        attr: {
+          type: 'text',
+          placeholder: t('chat.question.customPlaceholder'),
+        },
+      });
+    }
+
+    const buttonsEl = questionCard.createDiv({ cls: 'opencodian-question-inline-buttons' });
+    const submitBtn = buttonsEl.createEl('button', {
+      cls: 'opencodian-question-inline-btn is-submit',
+      text: index === total - 1 ? t('chat.question.submit') : t('chat.question.next'),
+      attr: { type: 'button' },
+    });
+    const rejectBtn = buttonsEl.createEl('button', {
+      cls: 'opencodian-question-inline-btn is-reject',
+      text: t('chat.question.reject'),
+      attr: { type: 'button' },
+    });
+
+    const action = await new Promise<{ type: 'reply'; answer: string[] } | { type: 'reject' }>((resolve) => {
+      submitBtn.addEventListener('click', () => {
+        submitBtn.blur();
+        const selectedValues = optionInputs
+          .filter((input) => input.checked)
+          .map((input) => input.value);
+        const customValue = customInput?.value.trim() ?? '';
+
+        const answer = question.multiple
+          ? [...new Set(customValue ? [...selectedValues, customValue] : selectedValues)]
+          : customValue
+            ? [customValue]
+            : selectedValues.length > 0
+              ? [selectedValues[0]]
+              : [];
+
+        if (answer.length === 0) {
+          new Notice(t('chat.question.answerRequired'));
+          return;
+        }
+
+        resolve({ type: 'reply', answer });
+      });
+
+      rejectBtn.addEventListener('click', () => {
+        rejectBtn.blur();
+        resolve({ type: 'reject' });
+      });
+    });
+    this.keepQuestionCardPinnedToBottom(tabId);
+    return action;
   }
 
   private buildQuestionAnswerMarkdown(request: QuestionRequest, answers: string[][]): string {

@@ -19,6 +19,7 @@ import {
   isValidChatAppearanceCustomCssDeclarations,
   type ModelSourceMode,
   type PluginIsolationMode,
+  type QuestionDisplayMode,
   type TitleMode,
 } from '../../core/types';
 import { setLocale, t } from '../../i18n';
@@ -1112,6 +1113,20 @@ export class OpenCodianSettingTab extends PluginSettingTab {
             this.plugin.settings.titleMode = value as TitleMode;
             await this.plugin.saveSettings();
             updateTitleModelSettingVisibility();
+          });
+      });
+
+    new Setting(containerEl)
+      .setName(t('settings.conversation.questionDisplayMode.name'))
+      .setDesc(t('settings.conversation.questionDisplayMode.desc'))
+      .addDropdown((dropdown) => {
+        dropdown
+          .addOption('all', t('settings.conversation.questionDisplayMode.all'))
+          .addOption('single', t('settings.conversation.questionDisplayMode.single'))
+          .setValue(this.plugin.settings.questionDisplayMode)
+          .onChange(async (value) => {
+            this.plugin.settings.questionDisplayMode = value as QuestionDisplayMode;
+            await this.plugin.saveSettings();
           });
       });
 
