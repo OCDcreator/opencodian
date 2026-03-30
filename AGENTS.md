@@ -129,7 +129,8 @@ opencodian/
 │   │   │   │   └── index.ts
 │   │   │   ├── ui/                  # Chat side utilities
 │   │   │   │   ├── EffortSelector.ts
-│   │   │   │   └── NavigationSidebar.ts
+│   │   │   │   ├── NavigationSidebar.ts
+│   │   │   │   └── SessionTodoDock.ts
 │   │   │   ├── chatAppearance.ts    # Chat appearance CSS variable builder
 │   │   │   ├── OpenCodianView.ts    # Main chat view component
 │   │   │   ├── renderGroups.ts      # Assistant render grouping helpers
@@ -139,6 +140,7 @@ opencodian/
 │   │       ├── ModelConfigModal.ts
 │   │       ├── OpencodeConfigModal.ts
 │   │       ├── OpenCodianSettings.ts # Settings tab UI
+│   │       ├── ProviderIconCacheModal.ts # Provider icon cache / custom icon manager
 │   │       ├── ServerSettingHelpModal.ts
 │   │       └── index.ts
 │   ├── i18n/                        # Internationalization
@@ -310,8 +312,8 @@ Main service for interacting with OpenCode Server. Current state is a hybrid fac
 
 **Current module status:**
 
-- **Implemented**: SDK type bridge, client factory, hybrid transport, CRUD migration, non-stream prompt migration, streaming main chain, dual-path cancel/abort
-- **Still pending**: `format` / `agent` / `noReply`, real file/image parts, `externalContextPaths`, `question.*`, `global.syncEvent.subscribe()`, `session.summarize()`, `session.diff()`
+- **Implemented**: SDK type bridge, client factory, hybrid transport, CRUD migration, non-stream prompt migration, streaming main chain, dual-path cancel/abort, `global.syncEvent.subscribe()` for session todo updates
+- **Still pending**: `format` / `agent` / `noReply`, real file/image parts, `externalContextPaths`, `question.*`, `session.summarize()`, `session.diff()`
 - **Concurrency note**: streaming state is now maintained per session in `OpenCodeService`, so different tabs/sessions can stream concurrently without sharing one global abort/controller state
 
 ### 2. ServerManager (`src/core/opencode/ServerManager.ts`)
@@ -356,6 +358,8 @@ Persists conversations and settings.
 .obsidian/plugins/opencodian/
 └── .opencodian/
     ├── settings.json          # Plugin settings
+    ├── provider-icons/        # Cached provider icons (mapped + custom)
+    │   └── *.svg|png|jpg...
     └── sessions/              # Conversation metadata
         └── conv-xxx.json
 ```
@@ -369,6 +373,7 @@ Main chat UI view (extends Obsidian's `ItemView`).
 - Sidebar or main-tab chat interface
 - Multi-tab conversation management
 - Per-tab runtime state for true concurrent tab sends
+- Reload-safe conversation restore path that waits for preloaded conversation metadata
 - Per-session model switching dropdown
 - Effort / thinking budget selector
 - Real-time streaming display
@@ -379,6 +384,7 @@ Main chat UI view (extends Obsidian's `ItemView`).
 - Inline permission cards and server status badge
 - OMO injected-prompt panels with expandable raw prompt view
 - OMO system-reminder notice cards with markdown rendering
+- Session todo dock powered by `session.todo()` snapshots and `todo.updated` sync events
 - Idle conversation sync loop for post-stream follow-up messages
 - Background-task in-progress indicator and follow-up pseudo-stream reveal
 - Hidden background-task tab sync and per-tab permission card routing
@@ -391,8 +397,8 @@ Settings UI with bilingual support (English/Chinese).
 
 - **Language**: Interface language selection
 - **Server**: Local / remote mode, auth, health status, help modal
-- **Model**: Source mode, default provider/model, visual editor, JSON editor
-- **Title Generation**: AI title mode (default/ai), override model for title generation
+- **Model**: Source mode, default provider/model, model refresh, local visual/JSON config editors, provider icon cache, and custom provider icon library management
+- **Conversation**: Conversation title mode (default/ai) and override model for AI title generation
 - **Plugins**: Global/plugin visibility, project `plugin` config, project plugin directory, pure mode, OMO config entry
 - **Security**: Permission mode, config editor, command blocklist, export paths
 - **UI**: Max tabs, tab bar position, auto-scroll, chat scroll mode, open in main tab
@@ -513,6 +519,7 @@ Compatibility layer for `oh-my-opencode` message mutations and reminders.
 9. **OMO changes**: Keep `src/core/opencode/omoCompat.ts`, `OpenCodeService.openCodeMessageToChatMessage()`, `OpenCodianView`, OMO settings entry points, and notice/injection styles aligned
 10. **SDK v2 migration changes**: Keep `OpenCodeService`, `createSdkClient.ts`, `sdkFetch.ts`, `sdkFeatureFlags.ts`, `sdkTypes.ts`, related tests, and `docs/opencode-service-sdk-v2-mapping.md` synchronized
 11. **Concurrent tab changes**: When editing `OpenCodianView.ts`, `TabManager.ts`, or streaming/cancel logic, preserve the per-tab runtime model; do not reintroduce single global streaming state unless explicitly redesigning multi-tab concurrency
+12. **Conversation restore / hot-reload changes**: Keep `main.ts` conversation preloading and `OpenCodianView` restore logic aligned; do not register/restore chat views before `loadConversations()` has completed
 
 ### Agent Checklist
 

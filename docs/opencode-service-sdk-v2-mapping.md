@@ -60,7 +60,7 @@
 | 模块 4：非流式 prompt | `thinkingBudget` 仍未映射到 SDK prompt payload；`externalContextPaths` 尚未转 `file part`；图片仍是文本占位；`format` / `agent` / `noReply` 尚未开放 |
 | 模块 5：流式消息主链 | 事件白名单仍偏保守；`message.part.removed`、`session.status`、`session.diff` 等未接；通用未知事件目前是“安全忽略”为主，尚未补统一日志采样；问题事件仅记录 debug，不进入 UI；多 tab 并发已支持，但“并发 + question/event 扩展”的组合场景自动化覆盖仍不足 |
 | 模块 6：取消与高可用补全 | 还没有专门的“服务端已 abort” UI 状态；尚未补充针对异常 finish reason 的细粒度展示 |
-| 模块 7：后续增强 | `question.*`、`global.syncEvent.subscribe()`、`session.summarize()`、`session.diff()`、`session.unrevert()`、`find.*`、`file.status()`、`vcs.get()` 仍未开始 |
+| 模块 7：后续增强 | `global.syncEvent.subscribe()` 已接入 `todo.updated` 增量同步；`question.*`、`session.summarize()`、`session.diff()`、`session.unrevert()`、`find.*`、`file.status()`、`vcs.get()` 仍未开始 |
 | 模块 8：旧链路收敛 | `connectSSE()`、`parseSSEEvents()`、旧 HTTP helpers 仍保留，计划在至少一个版本周期后再评估收敛 |
 
 ### 1.1.3 新会话接力注意事项
@@ -69,7 +69,7 @@
 - 不要迁移 `ServerManager` 到 SDK server helper；本轮只迁 client / types / event 使用方式
 - 不要删除 legacy `connectSSE()` / `parseSSEEvents()` / legacy HTTP fallback，至少保留一个版本周期
 - `src/main.ts` 当前显式注入 `SDK_FEATURE_FLAG_ROLLOUT_DEFAULTS`，而 `OpenCodeService` 默认构造仍使用全关默认值，便于测试精确控制
-- 若新会话继续开发，优先顺序建议为：`format/noReply/agent` → `file part / externalContextPaths` → `question.*` → `syncEvent`
+- 若新会话继续开发，优先顺序建议为：`format/noReply/agent` → `file part / externalContextPaths` → `question.*` → 扩展更多 `syncEvent`
 - 手工回归清单见 `docs/opencode-sdk-v2-manual-checklist.md`
 
 ## 2. 对比范围
@@ -130,6 +130,7 @@
 | `getSessionId()` | 获取本地当前会话 | 无 | 本地实现 | 本地 UI 状态 |
 | `listSessions()` | `GET /session`，失败时吞错并返回空数组 | `client.session.list()` | 部分覆盖 | SDK 支持 `roots/start/search/limit`；当前无过滤与分页 |
 | `getSessionMessages(sessionId)` | `GET /session/{id}/message`，失败时返回空数组 | `client.session.messages()` | 部分覆盖 | SDK 支持 `limit/before`；当前无分页参数、无 typed response |
+| `getSessionTodos(sessionId)` | 优先走 `client.session.todo()`，失败时回退 `GET /session/{id}/todo` | `client.session.todo()` | 部分覆盖 | 当前已提供 UI 需要的 todo 归一化，但未公开更多原始字段 |
 | `deleteSession(sessionId)` | `DELETE /session/{id}`，如果正是当前会话则清空本地状态 | `client.session.delete()` | 部分覆盖 | SDK 返回响应；当前隐藏细节并带本地清理 |
 | `updateSessionTitle(sessionId, title)` | `PATCH /session/{id}` 只改标题 | `client.session.update()` | 部分覆盖 | SDK 还支持更新时间字段等 |
 | `forkSession(sessionId, messageID?)` | `POST /session/{id}/fork`，返回 `{ id, title }` | `client.session.fork()` | 部分覆盖 | SDK 返回完整 `Session`；当前只保留最小字段 |
@@ -194,7 +195,7 @@
 | 结构化输出 | 未实现 | SDK `format: { type: "json_schema" }` | 无法直接拿到 schema 校验后的结果 |
 | 事件类型覆盖 | 主要处理 `message.part.delta`、`message.part.updated`、`permission.asked`、`session.idle` | SDK 类型还覆盖 `question`、`message.updated`、`message.part.removed`、`session.status`、`session.diff`、`worktree`、`pty` 等 | 当前流式 UI 对上游能力覆盖不全 |
 | Part 类型覆盖 | 实际只消费 `text` / `reasoning` / `tool` | SDK `Part` 还包括 `step-start`、`step-finish`、`snapshot`、`patch`、`agent`、`retry`、`compaction`、`subtask` | 会丢掉更丰富的 agent 时间线信息 |
-| Sync event 能力 | 完全未使用 | SDK v2 还提供 `global.syncEvent.subscribe()` 增量同步流 | 当前 tab 切换、后台刷新、多会话同步仍主要靠手动拉取与局部事件 |
+| Sync event 能力 | 已接入 `global.syncEvent.subscribe()`，当前消费 `todo.updated` 并驱动会话待办面板；其余增量事件仍未覆盖 | SDK v2 还提供更丰富的全局增量同步流 | Todo 渲染已不再依赖工具卡文本，但更多会话级增量同步仍主要靠手动拉取与局部事件 |
 
 ### 4.2 `requestAssistantResponse()` 的关键差异
 
@@ -261,7 +262,7 @@ SDK v2 的大多数 API 都支持 `directory` + `workspace` 双上下文，而�
 | `global.event()` | 未覆盖 | 无公开方法 | 当前只用 `/event`，未用 `/global/event` |
 | `global.dispose()` | 未覆盖 | 无 | 可作为“重置当前实例”能力 |
 | `global.upgrade()` | 未覆盖 | 无 | 插件里通常不应直接开放 |
-| `global.syncEvent.subscribe()` | 未覆盖 | 无 | 可用于更低粒度同步流 |
+| `global.syncEvent.subscribe()` | 部分覆盖 | 已订阅 `todo.updated` 并同步到会话待办 UI | 其他 sync 事件仍未消费 |
 | `global.config.get()` | 未覆盖 | 无 | 当前 `OpenCodeService` 不公开全局 config |
 | `global.config.update()` | 未覆盖 | 无 | 同上 |
 | `auth.remove()` | 未覆盖 | 无 | provider auth 管理尚未接入 |
@@ -288,7 +289,7 @@ SDK v2 的大多数 API 都支持 `directory` + `workspace` 双上下文，而�
 | `session.get()` | 未覆盖为公开能力 | `getSessionContextUsageSnapshot()` 内部组合调用了私有 GET | 建议补一个公开 `getSession()` |
 | `session.update()` | 部分覆盖 | `updateSessionTitle()` | 当前只覆盖标题更新 |
 | `session.children()` | 未覆盖 | 无 | 对 fork 树导航有价值 |
-| `session.todo()` | 未覆盖 | 无 | 可用于 TODO 面板或任务视图 |
+| `session.todo()` | 部分覆盖 | `getSessionTodos()` + 会话 todo dock | 已用于会话待办面板，当前仍以 UI 归一化结构为主 |
 | `session.init()` | 未覆盖 | 无 | 可用于生成 `AGENTS.md`，但当前插件不一定需要 |
 | `session.fork()` | 部分覆盖 | `forkSession()` | 当前丢弃完整 Session 信息 |
 | `session.abort()` | 部分覆盖 | `cancelStream()` 内部 best-effort 调用 | 当前没有公开 `abortSession()` facade，但流取消已接入服务端 abort |
@@ -693,8 +694,8 @@ return result.data ?? []
    - 价值：补齐真正的“人在回路”交互
 2. `session.abort()` 公开 facade / richer abort UI
    - 价值：当前内部 best-effort abort 已落地，下一步应补公开能力与更明确的中止态展示
-3. `global.syncEvent.subscribe()`
-   - 价值：为多 tab、后台同步、会话状态刷新提供增量同步基础
+3. 扩展 `global.syncEvent.subscribe()`
+   - 价值：当前已用于 `todo.updated`，下一步可继续承接更多多 tab、后台同步、会话状态刷新事件
 4. `session.summarize()`
    - 价值：长对话压缩
 5. `session.diff()`

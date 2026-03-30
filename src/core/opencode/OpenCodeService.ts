@@ -13,7 +13,15 @@ import {
   resolveToolExecutionStatus,
   resolveToolResultText,
 } from '../../shared';
-import type { ChatMessage, ContentBlock, ImageAttachment, PermissionReply, PermissionRequest, StreamChunk } from '../types';
+import type {
+  ChatMessage,
+  ContentBlock,
+  ImageAttachment,
+  PermissionReply,
+  PermissionRequest,
+  SessionTodo,
+  StreamChunk,
+} from '../types';
 import type { OpenCodianSettings } from '../types/settings';
 import { getServerBaseUrl, isLocalServerMode } from '../types/settings';
 import { createSdkClient } from './createSdkClient';
@@ -230,6 +238,13 @@ interface ActiveStreamContext {
   partTypeMap: Map<string, string>;
 }
 
+type SessionTodoUpdate = {
+  sessionId: string;
+  todos: SessionTodo[];
+};
+
+type SessionTodoListener = (update: SessionTodoUpdate) => void;
+
 export class OpenCodeService {
   private settings: OpenCodianSettings;
   private events: OpenCodeServiceEvents;
@@ -239,6 +254,10 @@ export class OpenCodeService {
   private baseUrl: string;
   private activeStreams = new Map<string, ActiveStreamContext>();
   private sdkFeatureFlags: SdkFeatureFlags;
+  private sessionTodoListeners = new Set<SessionTodoListener>();
+  private syncEventAbortController: AbortController | null = null;
+  private syncEventPromise: Promise<void> | null = null;
+  private syncEventWanted = false;
   private vaultPath?: string;
 
   constructor(
@@ -283,6 +302,7 @@ export class OpenCodeService {
   setVaultPath(path: string): void {
     this.vaultPath = path;
     this.serverManager.setWorkingDirectory(path);
+    this.restartSyncEventSubscription();
   }
 
   getSettingsSnapshot(): OpenCodianSettings {
@@ -337,10 +357,12 @@ export class OpenCodeService {
     }
 
     await this.serverManager.start();
+    this.ensureSyncEventSubscription();
   }
 
   /** Stop the service */
   async stop(): Promise<void> {
+    this.stopSyncEventSubscription();
     await this.serverManager.stop();
   }
 
@@ -603,6 +625,43 @@ export class OpenCodeService {
     }
   }
 
+  async getSessionTodos(sessionId: string): Promise<SessionTodo[]> {
+    if (!sessionId) {
+      logger.warn('getSessionTodos called with empty sessionId');
+      return [];
+    }
+
+    if (this.shouldUseSdk('sdkCrud')) {
+      try {
+        const response = await this.getSdkClient().session.todo({ sessionID: sessionId });
+        return this.normalizeSessionTodos(response);
+      } catch (error) {
+        logger.warn(`SDK session.todo failed for ${sessionId}, falling back to legacy HTTP`, error);
+      }
+    }
+
+    try {
+      const response = await this.get<unknown>(`/session/${sessionId}/todo`);
+      return this.normalizeSessionTodos(response);
+    } catch (error) {
+      logger.error(`Failed to get todos for session ${sessionId}:`, error);
+      return [];
+    }
+  }
+
+  subscribeToSessionTodoUpdates(listener: SessionTodoListener): () => void {
+    this.sessionTodoListeners.add(listener);
+    this.syncEventWanted = true;
+    this.ensureSyncEventSubscription();
+
+    return () => {
+      this.sessionTodoListeners.delete(listener);
+      if (this.sessionTodoListeners.size === 0) {
+        this.stopSyncEventSubscription();
+      }
+    };
+  }
+
   /** Delete a session */
   async deleteSession(sessionId: string): Promise<void> {
     if (this.shouldUseSdk('sdkCrud')) {
@@ -820,6 +879,183 @@ export class OpenCodeService {
 
   private normalizeSessionMessages(response: unknown): Array<{ info: Message; parts: Part[] }> {
     return Array.isArray(response) ? response as Array<{ info: Message; parts: Part[] }> : [];
+  }
+
+  private normalizeSessionTodos(response: unknown): SessionTodo[] {
+    const rawTodos = Array.isArray(response)
+      ? response
+      : response && typeof response === 'object' && 'data' in response && Array.isArray((response as { data?: unknown }).data)
+        ? (response as { data: unknown[] }).data
+        : [];
+
+    return rawTodos.reduce<SessionTodo[]>((todos, rawTodo) => {
+      const todo = this.normalizeSessionTodo(rawTodo);
+      if (todo) {
+        todos.push(todo);
+      }
+      return todos;
+    }, []);
+  }
+
+  private normalizeSessionTodo(todo: unknown): SessionTodo | null {
+    if (!todo || typeof todo !== 'object') {
+      return null;
+    }
+
+    const raw = todo as Record<string, unknown>;
+    const content = typeof raw.content === 'string' ? raw.content.trim() : '';
+    const status = raw.status;
+    if (!content) {
+      return null;
+    }
+
+    if (
+      status !== 'pending'
+      && status !== 'in_progress'
+      && status !== 'completed'
+      && status !== 'cancelled'
+    ) {
+      return null;
+    }
+
+    const priority = raw.priority;
+    const id = typeof raw.id === 'string' && raw.id.trim() ? raw.id.trim() : undefined;
+
+    return {
+      id,
+      content,
+      status,
+      priority: priority === 'low' || priority === 'medium' || priority === 'high'
+        ? priority
+        : undefined,
+    };
+  }
+
+  private ensureSyncEventSubscription(): void {
+    if (!this.shouldUseSdk('sdkSync')) {
+      return;
+    }
+
+    if (!this.syncEventWanted || this.sessionTodoListeners.size === 0 || this.syncEventPromise) {
+      return;
+    }
+
+    const abortController = new AbortController();
+    this.syncEventAbortController = abortController;
+    this.syncEventPromise = this.runSyncEventLoop(abortController).finally(() => {
+      if (this.syncEventAbortController === abortController) {
+        this.syncEventAbortController = null;
+      }
+      this.syncEventPromise = null;
+      if (this.syncEventWanted && this.sessionTodoListeners.size > 0 && this.shouldUseSdk('sdkSync')) {
+        this.ensureSyncEventSubscription();
+      }
+    });
+  }
+
+  private stopSyncEventSubscription(keepWanted = false): void {
+    this.syncEventWanted = keepWanted;
+    this.syncEventAbortController?.abort();
+    this.syncEventAbortController = null;
+  }
+
+  private restartSyncEventSubscription(): void {
+    if (!this.shouldUseSdk('sdkSync') || this.sessionTodoListeners.size === 0) {
+      return;
+    }
+
+    this.stopSyncEventSubscription(true);
+    if (!this.syncEventPromise) {
+      this.ensureSyncEventSubscription();
+    }
+  }
+
+  private async runSyncEventLoop(abortController: AbortController): Promise<void> {
+    while (!abortController.signal.aborted && this.sessionTodoListeners.size > 0) {
+      try {
+        const events = await this.getSdkClient().global.syncEvent.subscribe({
+          signal: abortController.signal,
+        });
+
+        for await (const event of events.stream as AsyncIterable<unknown>) {
+          if (abortController.signal.aborted) {
+            break;
+          }
+          this.handleSyncEvent(event);
+        }
+      } catch (error) {
+        if (abortController.signal.aborted) {
+          break;
+        }
+        logger.warn('SDK sync event stream failed', error);
+      }
+
+      if (abortController.signal.aborted) {
+        break;
+      }
+
+      await this.delay(1000, abortController.signal).catch(() => {});
+    }
+  }
+
+  private handleSyncEvent(event: unknown): void {
+    if (!event || typeof event !== 'object') {
+      return;
+    }
+
+    const value = event as {
+      type?: string;
+      properties?: {
+        sessionID?: unknown;
+        todos?: unknown;
+      };
+    };
+
+    if (value.type !== 'todo.updated') {
+      return;
+    }
+
+    const sessionId = typeof value.properties?.sessionID === 'string'
+      ? value.properties.sessionID
+      : '';
+    if (!sessionId) {
+      return;
+    }
+
+    const todos = this.normalizeSessionTodos(value.properties?.todos);
+    this.emitSessionTodoUpdate({ sessionId, todos });
+  }
+
+  private emitSessionTodoUpdate(update: SessionTodoUpdate): void {
+    for (const listener of this.sessionTodoListeners) {
+      try {
+        listener(update);
+      } catch (error) {
+        logger.error('Session todo listener failed', error);
+      }
+    }
+  }
+
+  private async delay(ms: number, signal?: AbortSignal): Promise<void> {
+    if (!signal) {
+      await new Promise((resolve) => setTimeout(resolve, ms));
+      return;
+    }
+
+    await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        signal.removeEventListener('abort', onAbort);
+        resolve();
+      }, ms);
+
+      const onAbort = () => {
+        clearTimeout(timer);
+        signal.removeEventListener('abort', onAbort);
+        reject(new DOMException('Aborted', 'AbortError'));
+      };
+
+      signal.addEventListener('abort', onAbort, { once: true });
+    });
   }
 
   private async applySessionRevertState(
@@ -1599,23 +1835,29 @@ export class OpenCodeService {
 
     const nextSettings = cloneSettings(settings);
     const previousBaseUrl = this.baseUrl;
+    const shouldResumeSyncEvents = this.sessionTodoListeners.size > 0;
     this.settings = nextSettings;
     this.baseUrl = getServerBaseUrl(nextSettings.server);
     this.serverManager.updateConfig(this.buildServerConfig(nextSettings));
+    this.stopSyncEventSubscription(shouldResumeSyncEvents);
 
     try {
       if (shouldStopManagedServer) {
         await this.serverManager.stop();
+        this.ensureSyncEventSubscription();
         return;
       }
 
       if (shouldRestartManagedServer) {
         await this.serverManager.restart();
       }
+
+      this.ensureSyncEventSubscription();
     } catch (error) {
       this.settings = previousSettings;
       this.baseUrl = previousBaseUrl;
       this.serverManager.updateConfig(this.buildServerConfig(previousSettings));
+      this.stopSyncEventSubscription(shouldResumeSyncEvents);
       if (previousMode === 'local' && (shouldRestartManagedServer || shouldStopManagedServer)) {
         try {
           await this.serverManager.start();
@@ -1623,6 +1865,7 @@ export class OpenCodeService {
           logger.error('Failed to restore previous OpenCode server after settings update failure:', restoreError);
         }
       }
+      this.ensureSyncEventSubscription();
       throw error;
     }
   }

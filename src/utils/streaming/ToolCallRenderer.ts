@@ -20,6 +20,8 @@ const DEFAULT_TOOL_NAMES: Record<string, string> = {
   web_search: 'WebSearch',
   web_fetch: 'WebFetch',
   task: 'Background Task',
+  todowrite: 'Todos',
+  todoread: 'Todo Read',
 };
 
 // Claudian-style tool icons
@@ -81,6 +83,11 @@ export class ToolCallRenderer {
           || '',
           80,
         );
+      case 'todowrite': {
+        const todos = Array.isArray(input.todos) ? input.todos as Array<{ status?: string }> : [];
+        const done = todos.filter((todo) => todo.status === 'completed').length;
+        return `${done}/${todos.length}`;
+      }
       default:
         return '';
     }

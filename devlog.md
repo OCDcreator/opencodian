@@ -12,6 +12,62 @@
 
 ---
 
+## 2026-03-30 会话 Todo Dock（正统方案接入）
+
+### 🎯 改动目标
+
+- 按 OpenCode 官方数据流接入会话级 Todo，而不是只把 `todowrite` 当普通工具卡渲染。
+- 让 OpenCodian 能通过 SDK 获取 `session.todo()` 快照，并通过 `global.syncEvent.subscribe()` 持续接收 `todo.updated` 增量事件。
+
+### ✅ 本轮调整
+
+- `src/core/opencode/OpenCodeService.ts`
+  - 新增 `getSessionTodos(sessionId)`，优先走 SDK `session.todo()`，失败时回退 `/session/:id/todo`
+  - 新增 `subscribeToSessionTodoUpdates()`，通过 `global.syncEvent.subscribe()` 消费 `todo.updated`
+  - 增加 todo 数据归一化与 sync loop 生命周期管理
+
+- `src/features/chat/OpenCodianView.ts`
+  - 为每个 tab 增加独立的 todo 运行时状态，避免多会话串数据
+  - 会话切换、加载、流结束、后台同步后都会刷新当前会话 todo
+  - 将 todo 面板挂载到输入区上方，作为会话级 UI，而非工具消息的一部分
+
+- `src/features/chat/ui/SessionTodoDock.ts`（新增）
+  - 新增会话 todo dock，显示进度、当前进行项、折叠/展开列表
+
+- `src/utils/streaming/ToolCallRenderer.ts`
+  - 仍保留 `todowrite` / `todoread` 的工具卡摘要，但不再承担主 todo 展示职责
+
+- `styles.css` / `src/i18n/locales/*.ts`
+  - 补齐 dock 样式与中英文文案
+
+### 🧪 验证结果
+
+- 通过：`npm run typecheck`
+- 通过：`node scripts/run-jest.js tests/unit/core/opencode/OpenCodeService.test.ts`
+
+### 📝 结论
+
+- 之前“只出现 Todo 卡片、不出现真正待办列表”的根因并不在前端渲染本身，而在于未按 OpenCode 官方方案接 `session.todo()` + `global.syncEvent.subscribe()` 这条会话级数据链路。
+
+## 2026-03-30 AGENTS.md 文档同步（设置分组 / 图标缓存 / 重载约束）
+
+### 🎯 改动目标
+
+- 让 `AGENTS.md` 与当前代码实现保持一致，避免后续开发或代理工作继续参考过期文档。
+
+### ✅ 本轮调整
+
+- 更新 `src/features/settings/` 目录说明，补充 `ProviderIconCacheModal.ts`
+- 更新存储结构说明，补充 `.opencodian/provider-icons/` 本地图标缓存目录
+- 更新设置分类说明：
+  - 将原来的 **Title Generation** 改为一级分组 **Conversation**
+  - 将 provider 图标缓存 / 自定义图标库管理归入 **Model**
+- 补充热重载恢复约束，说明 `main.ts` 必须先完成 `loadConversations()` 再注册/恢复视图
+
+### 📝 备注
+
+- 本次仅同步开发文档，不涉及运行时逻辑改动
+
 ## 2026-03-30 Provider Icon Cache（提供商图标缓存）功能
 
 ### 🎯 改动目标

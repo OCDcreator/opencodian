@@ -30,6 +30,7 @@ export const SDK_FEATURE_FLAG_ROLLOUT_DEFAULTS: Readonly<SdkFeatureFlags> = Obje
   sdkPrompt: true,
   sdkStream: true,
   sdkAbort: true,
+  sdkSync: true,
 });
 
 export function resolveSdkFeatureFlags(

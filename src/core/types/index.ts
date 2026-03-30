@@ -14,6 +14,7 @@ export {
   type OmoReminderType,
   type OmoSystemReminderMeta,
   type OmoUserInjectionMeta,
+  type SessionTodo,
   type StreamChunk,
   type TabContextState,
   type UsageInfo,

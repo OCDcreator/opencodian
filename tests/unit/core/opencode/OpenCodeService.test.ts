@@ -72,11 +72,12 @@ jest.mock('net', () => ({
 describe('OpenCodeService', () => {
   let service: OpenCodeService;
   let mockSdkClient: {
-    global: { health: jest.Mock };
+    global: { health: jest.Mock; syncEvent: { subscribe: jest.Mock } };
     session: {
       create: jest.Mock;
       list: jest.Mock;
       messages: jest.Mock;
+      todo: jest.Mock;
       delete: jest.Mock;
       update: jest.Mock;
       prompt: jest.Mock;
@@ -95,11 +96,12 @@ describe('OpenCodeService', () => {
   beforeEach(() => {
     service = new OpenCodeService(DEFAULT_SETTINGS);
     mockSdkClient = {
-      global: { health: jest.fn() },
+      global: { health: jest.fn(), syncEvent: { subscribe: jest.fn() } },
       session: {
         create: jest.fn(),
         list: jest.fn(),
         messages: jest.fn(),
+        todo: jest.fn(),
         delete: jest.fn(),
         update: jest.fn(),
         prompt: jest.fn(),
@@ -500,6 +502,58 @@ describe('OpenCodeService', () => {
       expect(messages.map((message) => message.info.id)).toEqual(['msg-1', 'msg-2']);
       expect(mockSdkClient.session.messages).toHaveBeenCalledWith({ sessionID: 'sdk-session' });
       expect(mockSdkClient.session.get).toHaveBeenCalledWith({ sessionID: 'sdk-session' });
+    });
+
+    it('loads session todos via SDK and normalizes entries', async () => {
+      service = createServiceWithSdkFlags();
+      mockSdkClient.session.todo = jest.fn().mockResolvedValue([
+        { id: 'todo-1', content: 'Inspect docs', status: 'in_progress', priority: 'high' },
+        { content: 'Draft spec', status: 'pending', priority: 'medium' },
+        { content: '', status: 'pending' },
+      ]);
+
+      await expect(service.getSessionTodos('sdk-session')).resolves.toEqual([
+        { id: 'todo-1', content: 'Inspect docs', status: 'in_progress', priority: 'high' },
+        { content: 'Draft spec', status: 'pending', priority: 'medium' },
+      ]);
+      expect(mockSdkClient.session.todo).toHaveBeenCalledWith({ sessionID: 'sdk-session' });
+    });
+
+    it('emits todo.updated payloads from SDK sync events', async () => {
+      service = createServiceWithSdkFlags();
+      const updates: Array<{ sessionId: string; todos: unknown[] }> = [];
+      mockSdkClient.global.syncEvent.subscribe.mockResolvedValue({
+        stream: (async function* () {
+          yield {
+            type: 'todo.updated',
+            properties: {
+              sessionID: 'sdk-session',
+              todos: [
+                { content: 'Inspect docs', status: 'in_progress', priority: 'high' },
+                { content: 'Draft spec', status: 'pending', priority: 'medium' },
+              ],
+            },
+          };
+        })(),
+      });
+
+      const dispose = service.subscribeToSessionTodoUpdates((update) => {
+        updates.push(update as unknown as { sessionId: string; todos: unknown[] });
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      dispose();
+
+      expect(mockSdkClient.global.syncEvent.subscribe).toHaveBeenCalled();
+      expect(updates).toEqual([
+        {
+          sessionId: 'sdk-session',
+          todos: [
+            { content: 'Inspect docs', status: 'in_progress', priority: 'high' },
+            { content: 'Draft spec', status: 'pending', priority: 'medium' },
+          ],
+        },
+      ]);
     });
 
     it('returns session revert state via SDK', async () => {

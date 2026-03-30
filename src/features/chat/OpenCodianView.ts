@@ -14,6 +14,7 @@ import {
   type Conversation,
   createEmptyTabContextState,
   getDefaultPersistedTabState,
+  type SessionTodo,
   type ToolCallInfo,
   VIEW_TYPE_OPENCODIAN,
 } from '../../core/types';
@@ -40,6 +41,7 @@ import { ContextDetailModal } from './ui/ContextDetailModal';
 import { ContextRing } from './ui/ContextRing';
 import { EffortSelector } from './ui/EffortSelector';
 import { NavigationSidebar } from './ui/NavigationSidebar';
+import { SessionTodoDock } from './ui/SessionTodoDock';
 
 const logger = createLogger('OpenCodianView');
 
@@ -120,6 +122,9 @@ interface TabRuntimeState {
   currentTurnBodyEl: HTMLElement | null;
   isConversationSyncInFlight: boolean;
   lastConversationSyncFingerprint: string | null;
+  sessionTodoSessionId: string | null;
+  sessionTodos: SessionTodo[];
+  todoRequestId: number;
   backgroundTaskIndicatorEl: HTMLElement | null;
   backgroundTaskStartedAt: number | null;
   backgroundTaskModeTag: string | null;
@@ -151,6 +156,8 @@ export class OpenCodianView extends ItemView {
   private messagesShellEl: HTMLElement | null = null;
   private messagesContainer: HTMLElement | null = null;
   private inputContainer: HTMLElement | null = null;
+  private todoDockMountEl: HTMLElement | null = null;
+  private sessionTodoDock: SessionTodoDock | null = null;
   private currentConversation: Conversation | null = null;
   private currentConversationRevertState: ConversationRevertState | null = null;
   private markdownService: MarkdownRenderService | null = null;
@@ -214,6 +221,7 @@ export class OpenCodianView extends ItemView {
   private titleGenerationService: TitleGenerationService;
   private conversationSyncIntervalId: number | null = null;
   private omoBackgroundTaskLogStates = new Map<string, OmoBackgroundTaskLogState>();
+  private disposeSessionTodoSubscription: (() => void) | null = null;
 
   private appSettings(): { open: () => void; openTabById: (id: string) => void } {
     return (this.app as typeof this.app & {
@@ -230,6 +238,9 @@ export class OpenCodianView extends ItemView {
       currentTurnBodyEl: null,
       isConversationSyncInFlight: false,
       lastConversationSyncFingerprint: null,
+      sessionTodoSessionId: null,
+      sessionTodos: [],
+      todoRequestId: 0,
       backgroundTaskIndicatorEl: null,
       backgroundTaskStartedAt: null,
       backgroundTaskModeTag: null,
@@ -418,6 +429,111 @@ export class OpenCodianView extends ItemView {
     }
   }
 
+  private subscribeToSessionTodoUpdates(): void {
+    this.disposeSessionTodoSubscription?.();
+    this.disposeSessionTodoSubscription = this.plugin.openCodeService.subscribeToSessionTodoUpdates(
+      ({ sessionId, todos }) => {
+        this.applySessionTodoUpdate(sessionId, todos);
+      },
+    );
+  }
+
+  private applySessionTodoUpdate(sessionId: string, todos: SessionTodo[]): void {
+    const tabs = this.tabManager?.getAllTabs() ?? [];
+    const conversations = new Map(this.plugin.getConversations().map((conversation) => [conversation.id, conversation]));
+    let matched = false;
+
+    for (const tab of tabs) {
+      const conversation = tab.conversationId ? conversations.get(tab.conversationId) : null;
+      if (conversation?.openCodeSessionId !== sessionId) {
+        continue;
+      }
+
+      this.setTabSessionTodos(tab.id, todos, sessionId);
+      matched = true;
+    }
+
+    if (!matched && this.currentConversation?.openCodeSessionId === sessionId) {
+      this.setTabSessionTodos(this.getActiveTabId(), todos, sessionId);
+    }
+  }
+
+  private getTabSessionTodos(
+    tabId: TabId | null = this.getActiveTabId(),
+    sessionId = this.currentConversation?.openCodeSessionId ?? null,
+  ): SessionTodo[] {
+    const runtime = this.getTabRuntimeState(tabId);
+    if (!runtime) {
+      return [];
+    }
+
+    if (sessionId && runtime.sessionTodoSessionId && runtime.sessionTodoSessionId !== sessionId) {
+      return [];
+    }
+
+    return [...runtime.sessionTodos];
+  }
+
+  private setTabSessionTodos(
+    tabId: TabId | null,
+    todos: SessionTodo[],
+    sessionId: string | null = this.currentConversation?.openCodeSessionId ?? null,
+  ): void {
+    const runtime = this.getTabRuntimeState(tabId);
+    if (!runtime) {
+      return;
+    }
+
+    runtime.sessionTodoSessionId = sessionId;
+    runtime.sessionTodos = [...todos];
+    if (tabId === this.getActiveTabId()) {
+      this.renderSessionTodoDock(tabId);
+    }
+  }
+
+  private renderSessionTodoDock(tabId: TabId | null = this.getActiveTabId()): void {
+    const activeSessionId = tabId === this.getActiveTabId()
+      ? (this.currentConversation?.openCodeSessionId ?? null)
+      : this.getTabRuntimeState(tabId)?.sessionTodoSessionId ?? null;
+    this.sessionTodoDock?.update(this.getTabSessionTodos(tabId, activeSessionId));
+  }
+
+  private async refreshActiveSessionTodos(options: { suppressErrors?: boolean } = {}): Promise<SessionTodo[]> {
+    return this.refreshTabSessionTodos(this.getActiveTabId(), this.currentConversation?.openCodeSessionId, options);
+  }
+
+  private async refreshTabSessionTodos(
+    tabId: TabId | null,
+    sessionId: string | undefined,
+    options: { suppressErrors?: boolean } = {},
+  ): Promise<SessionTodo[]> {
+    const runtime = this.getTabRuntimeState(tabId);
+    if (!runtime || !sessionId) {
+      this.renderSessionTodoDock(tabId);
+      return [];
+    }
+
+    const requestId = runtime.todoRequestId + 1;
+    runtime.todoRequestId = requestId;
+
+    try {
+      const todos = await this.plugin.openCodeService.getSessionTodos(sessionId);
+      const latestRuntime = this.getTabRuntimeState(tabId);
+      if (!latestRuntime || latestRuntime.todoRequestId !== requestId) {
+        return this.getTabSessionTodos(tabId);
+      }
+
+      this.setTabSessionTodos(tabId, todos, sessionId);
+      return todos;
+    } catch (error) {
+      logger.debug('Failed to refresh session todos', error);
+      if (!options.suppressErrors) {
+        new Notice(t('chat.todo.loadFailed'));
+      }
+      return this.getTabSessionTodos(tabId);
+    }
+  }
+
   constructor(leaf: WorkspaceLeaf, plugin: OpenCodianPlugin) {
     super(leaf);
     this.plugin = plugin;
@@ -456,6 +572,7 @@ export class OpenCodianView extends ItemView {
 
     // Wire events
     this.wireEventHandlers();
+    this.subscribeToSessionTodoUpdates();
 
     await this.initializeFirstTab();
   }
@@ -487,6 +604,11 @@ export class OpenCodianView extends ItemView {
     this.outerVerticalTabBarHostEl?.remove();
     this.outerVerticalTabBarHostEl = null;
     this.inputTabBarSlotEl = null;
+    this.sessionTodoDock?.destroy();
+    this.sessionTodoDock = null;
+    this.todoDockMountEl = null;
+    this.disposeSessionTodoSubscription?.();
+    this.disposeSessionTodoSubscription = null;
     this.tabManager = null;
 
     // Cleanup event refs
@@ -840,6 +962,9 @@ export class OpenCodianView extends ItemView {
     }
 
     this.setActiveMessagesPane(tabId);
+    this.sessionTodoDock?.update(
+      this.getTabSessionTodos(tabId, this.getTabRuntimeState(tabId)?.sessionTodoSessionId ?? null),
+    );
 
     if (tab.conversationId) {
       if (tab.isStreaming) {
@@ -855,6 +980,8 @@ export class OpenCodianView extends ItemView {
         this.startConversationSyncLoop();
         this.updateModelSelectorDisplay();
         this.syncActiveTabContextUsageIdentity();
+        this.renderSessionTodoDock(tabId);
+        void this.refreshTabSessionTodos(tabId, conversation.openCodeSessionId, { suppressErrors: true });
         this.updateSendButtonState();
         return;
       }
@@ -869,6 +996,8 @@ export class OpenCodianView extends ItemView {
     this.stopConversationSyncLoop();
     this.messagesContainer?.empty();
     this.resetTurnState();
+    this.setTabSessionTodos(tabId, [], null);
+    this.renderSessionTodoDock(tabId);
     this.updateModelSelectorDisplay();
     this.syncActiveTabContextUsageIdentity();
     this.updateSendButtonState();
@@ -1181,6 +1310,8 @@ export class OpenCodianView extends ItemView {
       this.setTooltipLabel(this.settingsBtnEl, t('chat.settings.open'), 'bottom');
     }
 
+    this.inputTextarea?.setAttribute('placeholder', t('chat.input.placeholder'));
+    this.renderSessionTodoDock();
     this.renderTabBar();
   }
 
@@ -1301,13 +1432,15 @@ export class OpenCodianView extends ItemView {
   /** Build input area */
   private buildInputArea(container: HTMLElement) {
     this.inputTabBarSlotEl = container.createDiv({ cls: 'opencodian-tab-bar-slot opencodian-tab-bar-slot--input' });
+    this.todoDockMountEl = container.createDiv({ cls: 'opencodian-session-todo-slot' });
+    this.sessionTodoDock = new SessionTodoDock(this.todoDockMountEl);
 
     // Input wrapper - textarea only (send button moved to toolbar)
     const inputWrapper = container.createDiv({ cls: 'opencodian-input-wrapper' });
 
     this.inputTextarea = inputWrapper.createEl('textarea', {
       cls: 'opencodian-input',
-      attr: { placeholder: 'Ask anything...', rows: '1' },
+      attr: { placeholder: t('chat.input.placeholder'), rows: '1' },
     });
 
     // Auto-resize textarea
@@ -1508,6 +1641,7 @@ export class OpenCodianView extends ItemView {
 
     // Set session in service
     this.plugin.openCodeService.setSessionId(conversation.openCodeSessionId);
+    this.setTabSessionTodos(this.getActiveTabId(), [], conversation.openCodeSessionId);
 
     const shouldSyncFromServer =
       options.forceServerSync
@@ -1531,6 +1665,8 @@ export class OpenCodianView extends ItemView {
     this.syncBackgroundTaskStateFromConversation(conversation);
     await this.renderMessages(messages);
     await this.renderBackgroundTaskIndicatorIfNeeded();
+    this.renderSessionTodoDock();
+    void this.refreshActiveSessionTodos({ suppressErrors: true });
     this.lastConversationSyncFingerprint = this.getConversationSyncFingerprint(messages);
     this.startConversationSyncLoop();
 
@@ -1559,6 +1695,7 @@ export class OpenCodianView extends ItemView {
     this.currentConversation = conversation;
     this.currentConversationRevertState = null;
     this.plugin.openCodeService.setSessionId(conversation.openCodeSessionId);
+    this.setTabSessionTodos(this.getActiveTabId(), [], conversation.openCodeSessionId);
     this.messagesContainer?.empty();
     this.resetTurnState();
     this.lastConversationSyncFingerprint = this.getConversationSyncFingerprint(conversation.messages);
@@ -1566,6 +1703,8 @@ export class OpenCodianView extends ItemView {
     this.updateModelSelectorDisplay();
     this.syncActiveTabContextUsageIdentity();
     this.syncBackgroundTaskStateFromConversation(conversation);
+    this.renderSessionTodoDock();
+    void this.refreshActiveSessionTodos({ suppressErrors: true });
     void this.renderBackgroundTaskIndicatorIfNeeded();
     void this.refreshActiveTabContextUsageFromServer();
     this.scheduleSettledScrollToBottom();
@@ -1623,12 +1762,26 @@ export class OpenCodianView extends ItemView {
         if (this.currentConversation?.id === expectedConversationId) {
           this.currentConversationRevertState = syncResult.revertState;
         }
+        if (
+          runtime.sessionTodos.length > 0
+          || runtime.backgroundTaskLaunches.size > 0
+          || runtime.backgroundTaskWaitingForFollowUp
+        ) {
+          await this.refreshTabSessionTodos(activeTabId, this.currentConversation?.openCodeSessionId, { suppressErrors: true });
+        }
         await this.renderBackgroundTaskIndicatorIfNeeded(activeTabId);
         return;
       }
 
       this.currentConversationRevertState = syncResult.revertState;
       runtime.lastConversationSyncFingerprint = syncResult.fingerprint;
+      if (
+        runtime.sessionTodos.length > 0
+        || runtime.backgroundTaskLaunches.size > 0
+        || runtime.backgroundTaskWaitingForFollowUp
+      ) {
+        await this.refreshTabSessionTodos(activeTabId, this.currentConversation.openCodeSessionId, { suppressErrors: true });
+      }
       await this.applySyncedConversationUpdate(previousMessages, this.currentConversation.messages);
     } finally {
       runtime.isConversationSyncInFlight = false;
@@ -1662,6 +1815,9 @@ export class OpenCodianView extends ItemView {
           ?? this.getConversationSyncFingerprint(conversation.messages);
         const syncResult = await this.syncConversationMessagesFromServer(conversation, tab.id);
         this.syncBackgroundTaskStateFromConversation(conversation, tab.id);
+        if (runtime.sessionTodos.length > 0 || tab.hasBackgroundTask) {
+          await this.refreshTabSessionTodos(tab.id, conversation.openCodeSessionId, { suppressErrors: true });
+        }
         this.syncTabStreamLikeState(tab.id);
 
         if (syncResult.changed || syncResult.fingerprint !== previousFingerprint) {
@@ -2567,6 +2723,7 @@ export class OpenCodianView extends ItemView {
           }
         }
       }
+      await this.refreshTabSessionTodos(sendingTabId, sendingConversation.openCodeSessionId, { suppressErrors: true });
       sendingConversation.updatedAt = Date.now();
       await this.plugin.saveConversation(sendingConversation);
       if (this.currentConversation?.id === sendingConversation.id && this.getActiveTabId() === sendingTabId) {

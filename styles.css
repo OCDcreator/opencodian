@@ -1980,6 +1980,176 @@
   gap: 8px;
 }
 
+.opencodian-session-todo-slot {
+  display: flex;
+  flex-direction: column;
+}
+
+.opencodian-session-todo-dock {
+  border: 1px solid var(--opencodian-glass-border);
+  border-radius: 14px;
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--opencodian-glass-specular-soft) 88%, transparent) 0%,
+      transparent 100%
+    ),
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--opencodian-glass-base-strong) 94%, transparent) 0%,
+      color-mix(in srgb, var(--opencodian-glass-base) 82%, transparent) 100%
+    );
+  backdrop-filter: blur(18px) saturate(1.08);
+  -webkit-backdrop-filter: blur(18px) saturate(1.08);
+  box-shadow:
+    0 10px 26px color-mix(in srgb, var(--opencodian-glass-shadow) 78%, transparent),
+    0 1px 0 color-mix(in srgb, var(--opencodian-glass-specular) 86%, transparent) inset;
+  overflow: hidden;
+}
+
+.opencodian-session-todo-dock.is-hidden {
+  display: none;
+}
+
+.opencodian-session-todo-dock.is-complete {
+  border-color: color-mix(in srgb, var(--opencodian-status-success-border) 72%, var(--opencodian-glass-border));
+}
+
+.opencodian-session-todo-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.opencodian-session-todo-header:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: -2px;
+}
+
+.opencodian-session-todo-label {
+  flex: 0 0 auto;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-normal);
+  white-space: nowrap;
+}
+
+.opencodian-session-todo-preview {
+  min-width: 0;
+  flex: 1 1 auto;
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.opencodian-session-todo-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease;
+}
+
+.opencodian-session-todo-toggle:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.opencodian-session-todo-dock.is-collapsed .opencodian-session-todo-toggle {
+  transform: rotate(-180deg);
+}
+
+.opencodian-session-todo-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 240px;
+  padding: 0 12px 12px;
+  overflow-y: auto;
+}
+
+.opencodian-session-todo-dock.is-collapsed .opencodian-session-todo-list {
+  display: none;
+}
+
+.opencodian-session-todo-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--background-primary) 66%, transparent);
+  border: 1px solid color-mix(in srgb, var(--background-modifier-border) 76%, transparent);
+}
+
+.opencodian-session-todo-item[data-state="pending"] {
+  opacity: 0.92;
+}
+
+.opencodian-session-todo-marker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  border-radius: 999px;
+  border: 1.5px solid color-mix(in srgb, var(--text-faint) 72%, transparent);
+  color: var(--text-faint);
+  flex: 0 0 auto;
+}
+
+.opencodian-session-todo-marker[data-state="completed"] {
+  border-color: color-mix(in srgb, var(--opencodian-status-success) 52%, transparent);
+  background: color-mix(in srgb, var(--opencodian-status-success) 14%, transparent);
+  color: var(--opencodian-status-success);
+}
+
+.opencodian-session-todo-marker[data-state="in_progress"] {
+  border-color: color-mix(in srgb, var(--interactive-accent) 52%, transparent);
+  color: var(--interactive-accent);
+}
+
+.opencodian-session-todo-pulse {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: currentColor;
+  animation: opencodian-todo-pulse 1.4s ease-in-out infinite;
+}
+
+.opencodian-session-todo-text {
+  min-width: 0;
+  flex: 1 1 auto;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-normal);
+  word-break: break-word;
+}
+
+.opencodian-session-todo-item[data-state="completed"] .opencodian-session-todo-text,
+.opencodian-session-todo-item[data-state="cancelled"] .opencodian-session-todo-text {
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+
+@keyframes opencodian-todo-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.45; transform: scale(0.82); }
+}
+
 .opencodian-input-wrapper {
   display: flex;
   align-items: flex-end;

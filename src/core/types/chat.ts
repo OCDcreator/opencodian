@@ -15,6 +15,14 @@ export interface ImageAttachment {
   filename?: string;
 }
 
+/** Session todo item */
+export interface SessionTodo {
+  id?: string;
+  content: string;
+  status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
+  priority?: 'low' | 'medium' | 'high';
+}
+
 /** Content block in a message */
 export interface ContentBlock {
   type: 'text' | 'thinking' | 'tool_use' | 'tool_result' | 'subagent';

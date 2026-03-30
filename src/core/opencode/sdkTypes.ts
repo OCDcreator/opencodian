@@ -5,12 +5,26 @@
  * - `reference-projects/opencode/packages/sdk/js/src/v2`
  */
 
+import type {
+  AgentPartInput,
+  Event,
+  FilePartInput,
+  Message,
+  OpencodeClient,
+  OpencodeClientConfig,
+  OutputFormat,
+  Part,
+  PermissionRequest,
+  Session,
+  SubtaskPartInput,
+  TextPartInput,
+} from '@opencode-ai/sdk/v2/client';
+
 export type {
   AgentPartInput as SdkAgentPartInput,
   Event as SdkEvent,
   FilePartInput as SdkFilePartInput,
   Message as SdkMessage,
-  OpencodeClient as SdkOpencodeClient,
   OpencodeClientConfig as SdkOpencodeClientConfig,
   OutputFormat as SdkOutputFormat,
   Part as SdkPart,
@@ -18,4 +32,10 @@ export type {
   Session as SdkSession,
   SubtaskPartInput as SdkSubtaskPartInput,
   TextPartInput as SdkTextPartInput,
-} from '@opencode-ai/sdk/v2/client';
+};
+
+export type SdkSyncEventStream = {
+  stream: AsyncIterable<unknown>;
+};
+
+export type SdkOpencodeClient = OpencodeClient;

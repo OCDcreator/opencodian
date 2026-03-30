@@ -158,7 +158,7 @@
 - `externalContextPaths` 尚未转成真实 `file part`
 - 图片输入仍是文本占位，不是真实多模态 file part
 - `question.*` 流程尚未接入 UI
-- `global.syncEvent.subscribe()` 尚未接入
+- `global.syncEvent.subscribe()` 已接入 `todo.updated`；其余增量事件仍待覆盖
 - `session.summarize()` / `session.diff()` / `find.*` / `file.status()` 尚未接入
 
 ## 6. 失败时建议立即记录的信息
