@@ -1437,12 +1437,55 @@ describe('OpenCodeService.openCodeMessageToChatMessage', () => {
 });
 
 describe('tool execution status helpers', () => {
+  it('treats batch tool results with failed count metadata as errors', () => {
+    expect(resolveToolExecutionStatus({
+      toolName: 'batch',
+      state: {
+        status: 'completed',
+        output: 'Executed 3/5 tools successfully. 2 failed.',
+        metadata: { failed: 2, successful: 3 },
+      },
+    })).toBe('error');
+  });
+
+  it('treats invalid tool calls as errors', () => {
+    expect(resolveToolExecutionStatus({
+      toolName: 'invalid',
+      storedStatus: 'completed',
+      result: "The arguments provided to the tool are invalid: Model tried to call unavailable tool 'ls'.",
+    })).toBe('error');
+  });
+
   it('treats older completed bash results with fatal output as errors', () => {
     expect(resolveToolExecutionStatus({
       toolName: 'bash',
       storedStatus: 'completed',
       result: 'fatal: not a git repository (or any of the parent directories): .git',
     })).toBe('error');
+  });
+
+  it('treats dismissed question tool calls as blocked', () => {
+    expect(resolveToolExecutionStatus({
+      toolName: 'question',
+      storedStatus: 'error',
+      result: 'The user dismissed this question',
+    })).toBe('blocked');
+  });
+
+  it('treats rejected permission tool calls as blocked', () => {
+    expect(resolveToolExecutionStatus({
+      toolName: 'bash',
+      storedStatus: 'error',
+      result: 'The user rejected permission to use this specific tool call.',
+    })).toBe('blocked');
+  });
+
+  it('treats permission rule denials as blocked', () => {
+    expect(resolveToolExecutionStatus({
+      toolName: 'edit',
+      storedStatus: 'error',
+      result: 'The user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules []',
+    })).toBe('blocked');
   });
 
   it('treats rm missing-file output as a bash error', () => {

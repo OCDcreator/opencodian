@@ -14,6 +14,12 @@ interface ResolveToolExecutionStatusOptions {
   result?: string | null;
 }
 
+const BLOCKED_RESULT_PATTERNS = [
+  /the user dismissed this question/i,
+  /the user rejected permission to use this specific tool call/i,
+  /the user has specified a rule which prevents you from using this specific tool call/i,
+];
+
 const BASH_METADATA_FAILURE_PATTERNS = [
   /bash tool terminated command after exceeding timeout/i,
   /user aborted the command/i,
@@ -54,6 +60,11 @@ function hasExplicitFailureMetadata(metadata: Record<string, unknown> | undefine
   }
 
   if (metadata.success === false || metadata.ok === false || metadata.failed === true) {
+    return true;
+  }
+
+  const failedCount = getNumericMetadataValue(metadata, 'failed');
+  if (failedCount !== null && failedCount > 0) {
     return true;
   }
 
@@ -101,6 +112,10 @@ export function isToolExecutionError(options: ResolveToolExecutionStatusOptions)
   const { toolName, state } = options;
   const result = resolveToolResultText(state, options.result) ?? '';
 
+  if (toolName === 'invalid') {
+    return true;
+  }
+
   if (state?.status === 'error') {
     return true;
   }
@@ -120,12 +135,27 @@ export function isToolExecutionError(options: ResolveToolExecutionStatusOptions)
   return toolName === 'bash' && hasBashFailureMarkers(result);
 }
 
+export function isToolExecutionBlocked(options: ResolveToolExecutionStatusOptions): boolean {
+  const { state, storedStatus } = options;
+  const result = resolveToolResultText(state, options.result) ?? '';
+
+  if (storedStatus === 'blocked') {
+    return true;
+  }
+
+  if (state?.status === 'blocked') {
+    return true;
+  }
+
+  return BLOCKED_RESULT_PATTERNS.some((pattern) => pattern.test(result));
+}
+
 export function resolveToolExecutionStatus(
   options: ResolveToolExecutionStatusOptions,
 ): ToolExecutionStatus {
   const { state, storedStatus } = options;
 
-  if (storedStatus === 'blocked') {
+  if (isToolExecutionBlocked(options)) {
     return 'blocked';
   }
 

@@ -12,6 +12,42 @@
 
 ---
 
+## 2026-03-30 Batch 失败态与用户拒绝工具态映射修正
+
+### 🎯 改动目标
+
+- 修复 `batch` 工具在部分子工具失败时，虽然输出里已经明确写出失败数量，但工具卡片仍显示绿 `√` 的问题。
+- 修复用户主动关闭问题、拒绝权限、或命中显式权限规则时，工具卡片统一被当成红色错误，而不是更贴近语义的阻塞/拒绝状态的问题。
+- 补齐这类“上游返回 completed / error，但 UI 需要按语义再映射”的状态判定规则。
+
+### ✅ 本轮调整
+
+- `src/shared/toolExecution.ts`
+  - 新增阻塞态结果文本匹配规则 `BLOCKED_RESULT_PATTERNS`
+  - 将以下结果统一映射为 `blocked`：
+    - `The user dismissed this question`
+    - `The user rejected permission to use this specific tool call`
+    - `The user has specified a rule which prevents you from using this specific tool call`
+  - 扩展显式失败元数据判断：当 `metadata.failed` 为数值且大于 `0` 时，也判定为失败
+  - 保持现有 `invalid`、`bash` 非零退出 / 典型失败输出等错误识别逻辑不变
+
+- `tests/unit/core/opencode/OpenCodeService.test.ts`
+  - 新增 `batch` 局部失败时应映射为 `error` 的断言
+  - 新增问题关闭应映射为 `blocked` 的断言
+  - 新增权限拒绝应映射为 `blocked` 的断言
+  - 新增权限规则阻止应映射为 `blocked` 的断言
+
+### 🧪 验证结果
+
+- 通过：`npm test -- tests/unit/core/opencode/OpenCodeService.test.ts tests/unit/utils/streaming/ToolCallRenderer.test.ts`
+- 通过：`npm run build`
+- 通过：`npm run check:devlog-order`
+- 已部署到测试库并确认 `BUILD_ID`：`main.202603301719`
+
+### 📝 结论
+
+- 这轮改动把“部分失败却显示成功”和“用户拒绝却显示普通错误”这两类状态语义问题补齐了：`batch` 的失败数量现在能稳定转成红错，而用户主动拒绝/关闭导致的上游 error 则会更准确地显示为阻塞态。
+
 ## 2026-03-30 工具摘要全量补齐与 Bash 失败状态修正
 
 ### 🎯 改动目标
