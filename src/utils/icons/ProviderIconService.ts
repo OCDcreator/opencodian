@@ -898,6 +898,20 @@ export class ProviderIconService {
     };
   }
 
+  static splitCustomIconSourcesInput(sourceInput: string): string[] {
+    const input = sourceInput.trim();
+    if (!input) {
+      return [];
+    }
+
+    const lineParts = input
+      .split(/\r?\n/)
+      .map((part) => part.trim().replace(/,\s*$/, '').trim())
+      .filter(Boolean);
+
+    return lineParts.flatMap((part) => this.splitCustomIconSourceChunk(part));
+  }
+
   static updateProviderEntries(
     providerId: string,
     entries: ProviderIconEntry[],
@@ -1330,6 +1344,49 @@ export class ProviderIconService {
     }
 
     return { type: 'file', source, localPath: source };
+  }
+
+  private static splitCustomIconSourceChunk(chunk: string): string[] {
+    const normalizedChunk = chunk.trim();
+    if (!normalizedChunk) {
+      return [];
+    }
+
+    const commaParts = normalizedChunk
+      .split(/\s*,\s*(?=(?:https?:\/\/|file:\/\/|[A-Za-z]:[\\/]|\/))/)
+      .map((part) => part.trim())
+      .filter(Boolean);
+
+    return commaParts.flatMap((part) => this.splitWhitespaceSeparatedUrls(part));
+  }
+
+  private static splitWhitespaceSeparatedUrls(chunk: string): string[] {
+    const tokens = chunk
+      .split(/\s+/)
+      .map((part) => part.trim().replace(/,\s*$/, ''))
+      .filter(Boolean);
+
+    if (tokens.length > 1 && tokens.every((token) => this.isUrlLikeCustomSource(token))) {
+      return tokens;
+    }
+
+    return [chunk.replace(/,\s*$/, '').trim()];
+  }
+
+  private static isUrlLikeCustomSource(sourceInput: string): boolean {
+    const source = this.stripEnclosingQuotes(sourceInput.trim());
+    if (!source) {
+      return false;
+    }
+
+    const maybeUrl = this.tryParseUrl(source);
+    return Boolean(
+      maybeUrl && (
+        maybeUrl.protocol === 'http:'
+        || maybeUrl.protocol === 'https:'
+        || maybeUrl.protocol === 'file:'
+      ),
+    );
   }
 
   private static tryParseUrl(source: string): URL | null {

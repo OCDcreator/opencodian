@@ -12,6 +12,47 @@
 
 ---
 
+## 2026-03-30 Provider Icon Cache Modal 批量添加与滚动位置优化
+
+### 🎯 改动目标
+
+- 解决提供商图标缓存窗口在每次添加一个图标来源后自动滚回顶部的问题，减少连续维护多个 provider 时的操作打断。
+- 支持一次粘贴多个图标链接批量导入，兼容空格、逗号、换行分隔，降低手动重复添加成本。
+
+### ✅ 本轮调整
+
+- `src/features/settings/ProviderIconCacheModal.ts`
+  - 将单行输入改为多行输入，支持批量粘贴多个图标来源
+  - 回车逻辑调整为 `Ctrl/Cmd + Enter` 提交，避免换行输入时误触发
+  - 添加后保留弹窗滚动位置；删除、自定义图标置顶、拖拽排序后也保持当前位置
+  - 批量导入时支持部分成功，成功后刷新列表并提示首个失败原因
+
+- `src/utils/icons/ProviderIconService.ts`
+  - 新增批量来源拆分逻辑
+  - 支持按空格、逗号、换行拆分多个 URL
+  - 保留包含空格的本地绝对路径，避免误拆
+  - 避免把单个包含逗号的 URL 错误拆成多个来源
+
+- `styles.css`
+  - 调整图标来源输入区布局，适配多行文本框与批量导入提示
+
+- `src/i18n/locales/en.ts` / `src/i18n/locales/zh.ts`
+  - 更新占位文案与帮助提示，明确支持批量粘贴
+
+- `tests/unit/utils/icons/ProviderIconService.test.ts`
+  - 新增批量拆分规则测试，覆盖空格、逗号、换行、本地路径空格、URL 含逗号等场景
+
+### 🧪 验证结果
+
+- 通过：`npx jest tests/unit/utils/icons/ProviderIconService.test.ts --runInBand`
+- 通过：`npm run typecheck`
+- 通过：`npm run build`
+- 已部署到测试库并确认 `BUILD_ID`：`main.202603301345`
+
+### 📝 结论
+
+- 这次改动把“连续添加图标来源时的滚动打断”和“多个来源必须逐条粘贴”的两个高频操作痛点一起解决了，图标缓存弹窗现在更适合批量维护。
+
 ## 2026-03-30 会话 Todo Dock（正统方案接入）
 
 ### 🎯 改动目标

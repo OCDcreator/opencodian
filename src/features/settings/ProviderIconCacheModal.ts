@@ -29,7 +29,7 @@ export class ProviderIconCacheModal extends Modal {
     this.contentEl.empty();
   }
 
-  private async render(): Promise<void> {
+  private async render(restoreScrollTop?: number): Promise<void> {
     this.contentEl.empty();
     this.providerSections.clear();
 
@@ -53,6 +53,7 @@ export class ProviderIconCacheModal extends Modal {
         cls: 'opencodian-icon-cache-modal-empty',
         text: t('settings.model.iconCache.noProviders'),
       });
+      this.restoreScrollPosition(restoreScrollTop);
       return;
     }
 
@@ -78,6 +79,8 @@ export class ProviderIconCacheModal extends Modal {
     for (const provider of providers) {
       this.renderProviderSection(provider);
     }
+
+    this.restoreScrollPosition(restoreScrollTop);
   }
 
   private renderProviderSection(provider: ProviderIconProviderState): void {
@@ -202,58 +205,90 @@ export class ProviderIconCacheModal extends Modal {
     }
 
     const addRowEl = sectionEl.createDiv({ cls: 'opencodian-icon-cache-add-row' });
-    const inputEl = addRowEl.createEl('input', {
+    const controlsEl = addRowEl.createDiv({ cls: 'opencodian-icon-cache-add-controls' });
+    const inputEl = controlsEl.createEl('textarea', {
       cls: 'opencodian-icon-cache-add-input',
       attr: {
-        type: 'text',
         placeholder: t('settings.model.iconCache.modal.addPlaceholder'),
+        rows: '3',
       },
     });
-    const addBtn = addRowEl.createEl('button', {
+    const addBtn = controlsEl.createEl('button', {
       cls: 'mod-cta',
       text: t('settings.model.iconCache.modal.addButton'),
+    });
+    addRowEl.createDiv({
+      cls: 'opencodian-icon-cache-add-hint',
+      text: t('settings.model.iconCache.modal.addHint'),
     });
     addBtn.addEventListener('click', () => {
       void this.addCustomSource(provider.providerId, inputEl);
     });
     inputEl.addEventListener('keydown', (event) => {
-      if (event.key === 'Enter') {
+      if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
         event.preventDefault();
         void this.addCustomSource(provider.providerId, inputEl);
       }
     });
   }
 
-  private async addCustomSource(providerId: string, inputEl: HTMLInputElement): Promise<void> {
-    const source = inputEl.value.trim();
-    if (!source) {
+  private async addCustomSource(providerId: string, inputEl: HTMLTextAreaElement): Promise<void> {
+    const sources = ProviderIconService.splitCustomIconSourcesInput(inputEl.value);
+    if (sources.length === 0) {
       new Notice(t('settings.model.iconCache.modal.addEmpty'));
       return;
     }
 
+    const restoreScrollTop = this.contentEl.scrollTop;
+    let nextLibrary = this.plugin.settings.providerIconLibrary;
+    const errors: string[] = [];
+    let addedCount = 0;
+
     try {
-      this.plugin.settings.providerIconLibrary = await ProviderIconService.addCustomIconSource(
-        this.app,
-        providerId,
-        source,
-        this.plugin.settings.providerIconLibrary,
-      );
+      for (const source of sources) {
+        try {
+          nextLibrary = await ProviderIconService.addCustomIconSource(
+            this.app,
+            providerId,
+            source,
+            nextLibrary,
+          );
+          addedCount += 1;
+        } catch (error) {
+          errors.push(error instanceof Error ? error.message : t('settings.model.iconCache.modal.addFailed'));
+        }
+      }
+
+      if (addedCount === 0) {
+        throw new Error(errors[0] ?? t('settings.model.iconCache.modal.addFailed'));
+      }
+
+      this.plugin.settings.providerIconLibrary = nextLibrary;
       await this.persistLibrary();
       inputEl.value = '';
-      await this.render();
+      await this.render(restoreScrollTop);
+
+      if (errors.length > 0) {
+        new Notice(t('settings.model.iconCache.modal.addPartial', {
+          successCount: String(addedCount),
+          failedCount: String(errors.length),
+          message: errors[0],
+        }));
+      }
     } catch (error) {
       new Notice(error instanceof Error ? error.message : t('settings.model.iconCache.modal.addFailed'));
     }
   }
 
   private async removeCustomEntry(providerId: string, entryId: string): Promise<void> {
+    const restoreScrollTop = this.contentEl.scrollTop;
     this.plugin.settings.providerIconLibrary = ProviderIconService.removeProviderEntry(
       providerId,
       entryId,
       this.plugin.settings.providerIconLibrary,
     );
     await this.persistLibrary();
-    await this.render();
+    await this.render(restoreScrollTop);
   }
 
   private async moveEntryToFront(providerId: string, entryId: string): Promise<void> {
@@ -270,8 +305,9 @@ export class ProviderIconCacheModal extends Modal {
       entries,
       this.plugin.settings.providerIconLibrary,
     );
+    const restoreScrollTop = this.contentEl.scrollTop;
     await this.persistLibrary();
-    await this.render();
+    await this.render(restoreScrollTop);
   }
 
   private async reorderProviderEntries(providerId: string, draggedId: string, targetId: string): Promise<void> {
@@ -289,8 +325,9 @@ export class ProviderIconCacheModal extends Modal {
       entries,
       this.plugin.settings.providerIconLibrary,
     );
+    const restoreScrollTop = this.contentEl.scrollTop;
     await this.persistLibrary();
-    await this.render();
+    await this.render(restoreScrollTop);
   }
 
   private getEditableEntries(providerId: string): ProviderIconEntry[] {
@@ -314,5 +351,16 @@ export class ProviderIconCacheModal extends Modal {
       applyUi: true,
     });
     this.onLibraryChanged?.();
+  }
+
+  private restoreScrollPosition(restoreScrollTop?: number): void {
+    if (restoreScrollTop === undefined) {
+      return;
+    }
+
+    this.contentEl.scrollTop = restoreScrollTop;
+    window.requestAnimationFrame(() => {
+      this.contentEl.scrollTop = restoreScrollTop;
+    });
   }
 }

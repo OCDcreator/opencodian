@@ -215,6 +215,43 @@ describe('ProviderIconService', () => {
     });
   });
 
+  it('splits batch custom icon input across spaces commas and new lines', async () => {
+    const { ProviderIconService } = await import('../../../../src/utils/icons/ProviderIconService');
+
+    const sources = ProviderIconService.splitCustomIconSourcesInput(
+      'https://example.com/a.png https://example.com/b.png,\nhttps://example.com/c.png',
+    );
+
+    expect(sources).toEqual([
+      'https://example.com/a.png',
+      'https://example.com/b.png',
+      'https://example.com/c.png',
+    ]);
+  });
+
+  it('keeps local paths with spaces intact when splitting batch input', async () => {
+    const { ProviderIconService } = await import('../../../../src/utils/icons/ProviderIconService');
+
+    const sources = ProviderIconService.splitCustomIconSourcesInput(
+      'C:\\Users\\lt\\My Icons\\codex.svg, C:\\Users\\lt\\More Icons\\openai.svg',
+    );
+
+    expect(sources).toEqual([
+      'C:\\Users\\lt\\My Icons\\codex.svg',
+      'C:\\Users\\lt\\More Icons\\openai.svg',
+    ]);
+  });
+
+  it('does not split a single URL just because it contains commas', async () => {
+    const { ProviderIconService } = await import('../../../../src/utils/icons/ProviderIconService');
+
+    const sources = ProviderIconService.splitCustomIconSourcesInput(
+      'https://example.com/icons/a,b.svg',
+    );
+
+    expect(sources).toEqual(['https://example.com/icons/a,b.svg']);
+  });
+
   it('reads local cache state for current and saved-only providers', async () => {
     const adapter = createMockAdapter();
     adapter.exists.mockImplementation(async (targetPath: string) =>
