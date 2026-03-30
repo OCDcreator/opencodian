@@ -23,6 +23,60 @@ export interface SessionTodo {
   priority?: 'low' | 'medium' | 'high';
 }
 
+export type PromptContextKind = 'current_note' | 'selection' | 'file';
+
+export interface PromptContextLineRange {
+  startLine: number;
+  endLine: number;
+}
+
+export interface PromptContextItem {
+  id: string;
+  kind: PromptContextKind;
+  path: string;
+  label: string;
+  mime: string;
+  lineRange?: PromptContextLineRange;
+  textSnapshot?: string;
+}
+
+export interface MessageContextAttachment {
+  kind: PromptContextKind;
+  path: string;
+  label: string;
+  mime: string;
+  lineRange?: PromptContextLineRange;
+  textSnapshot?: string;
+}
+
+export interface QuestionOption {
+  label: string;
+  description: string;
+}
+
+export interface QuestionPrompt {
+  question: string;
+  header: string;
+  options: QuestionOption[];
+  multiple?: boolean;
+  custom?: boolean;
+}
+
+export interface QuestionRequest {
+  id: string;
+  sessionId: string;
+  questions: QuestionPrompt[];
+}
+
+export interface SessionDiffEntry {
+  file: string;
+  before?: string;
+  after?: string;
+  additions: number;
+  deletions: number;
+  status?: 'added' | 'deleted' | 'modified';
+}
+
 /** Content block in a message */
 export interface ContentBlock {
   type: 'text' | 'thinking' | 'tool_use' | 'tool_result' | 'subagent';
@@ -90,6 +144,7 @@ export interface ChatMessage {
   images?: ImageAttachment[];
   toolCalls?: ToolCallInfo[];
   contentBlocks?: ContentBlock[];
+  contextAttachments?: MessageContextAttachment[];
   omo?: OmoMessageMeta;
   // OpenCode-specific: store original parts for advanced features
   parts?: unknown[];
@@ -178,6 +233,7 @@ export type StreamChunk =
   | { type: 'thinking'; content: string; partId?: string; durationSeconds?: number }
   | { type: 'tool_use'; id: string; name: string; input: Record<string, unknown> }
   | { type: 'tool_result'; toolUseId: string; content: string; isError?: boolean }
+  | { type: 'file_edited'; file: string }
   | { type: 'message_metadata'; messageId: string; timestamp: number; modelId?: string }
   | { type: 'usage'; inputTokens: number; outputTokens: number; sessionId?: string }
   | { type: 'error'; content: string }
@@ -185,7 +241,8 @@ export type StreamChunk =
   | { type: 'message_stop' }
   | { type: 'content_block_start'; index: number }
   | { type: 'content_block_stop'; index: number }
-  | { type: 'permission_request'; id: string; permission: string; patterns: string[]; metadata: Record<string, unknown> };
+  | { type: 'permission_request'; id: string; permission: string; patterns: string[]; metadata: Record<string, unknown> }
+  | { type: 'question_request'; request: QuestionRequest };
 
 /** Conversation metadata */
 export interface ConversationMeta {

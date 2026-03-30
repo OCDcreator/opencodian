@@ -120,6 +120,7 @@ export class MarkdownRenderService {
 
   private enhanceTableLinks(container: HTMLElement): void {
     container.querySelectorAll('table a[href]').forEach((linkEl) => {
+      const link = linkEl as HTMLAnchorElement;
       const href = linkEl.getAttribute('href');
       const linkText = linkEl.textContent?.trim();
 
@@ -134,9 +135,9 @@ export class MarkdownRenderService {
       const truncatedHref =
         `${href.slice(0, TABLE_URL_TRUNCATION_HEAD_LENGTH)}...${href.slice(-TABLE_URL_TRUNCATION_TAIL_LENGTH)}`;
 
-      linkEl.textContent = truncatedHref;
-      linkEl.title = href;
-      linkEl.setAttribute('aria-label', href);
+      link.textContent = truncatedHref;
+      link.title = href;
+      link.setAttribute('aria-label', href);
     });
   }
 

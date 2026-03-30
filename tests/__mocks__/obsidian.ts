@@ -78,6 +78,14 @@ export class TFile {
   extension = '';
 }
 
+export class MarkdownView {
+  file: TFile | null = null;
+  editor = {
+    getSelection: () => '',
+    getCursor: () => ({ line: 0, ch: 0 }),
+  };
+}
+
 export class TFolder {
   vault = {};
   path = '';
@@ -91,6 +99,7 @@ export class Vault {
   };
   
   getAbstractFileByPath() { return null; }
+  getFiles() { return []; }
   getRoot() { return {}; }
   create() { return Promise.resolve({}); }
   createFolder() { return Promise.resolve({}); }
@@ -122,6 +131,8 @@ export class Workspace {
   getLeavesOfType() { return []; }
   getLeaf() { return null; }
   getRightLeaf() { return null; }
+  getActiveViewOfType() { return null; }
+  openLinkText() { return Promise.resolve(); }
   revealLeaf() {}
   on() { return {} as { off: () => void }; }
 }

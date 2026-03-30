@@ -128,6 +128,9 @@ opencodian/
 │   │   │   │   ├── types.ts
 │   │   │   │   └── index.ts
 │   │   │   ├── ui/                  # Chat side utilities
+│   │   │   │   ├── ContextDetailModal.ts
+│   │   │   │   ├── ContextFilePickerModal.ts
+│   │   │   │   ├── ContextRing.ts
 │   │   │   │   ├── EffortSelector.ts
 │   │   │   │   ├── NavigationSidebar.ts
 │   │   │   │   └── SessionTodoDock.ts
@@ -155,6 +158,7 @@ opencodian/
 │   │   │   └── index.ts
 │   │   ├── index.ts
 │   │   ├── logger.ts
+│   │   ├── obsidianContext.ts       # Obsidian explicit-context helpers
 │   │   └── vault.ts
 │   └── utils/                       # Utility functions
 │       ├── icons/
@@ -299,7 +303,11 @@ Main service for interacting with OpenCode Server. Current state is a hybrid fac
 - `forkSession(sessionId, messageID?)` - Fork a conversation from a selected message
 - `revertSession(sessionId, messageID, partID?)` - Rewind a conversation to a prior point
 - `getPendingPermissions()` - Fetch pending permission requests
+- `getPendingQuestions()` - Fetch pending question requests
 - `respondToPermission(requestID, reply, message?)` - Reply to a permission request
+- `replyToQuestion(requestID, answers)` - Reply to an OpenCode question request
+- `rejectQuestion(requestID)` - Reject an OpenCode question request
+- `getSessionDiff(sessionId, messageID?)` - Fetch current-turn/session diff metadata
 - `openCodeMessageToChatMessage(info, parts)` - Normalize persisted messages into chat UI data, including OMO metadata and notice hints
 
 **SDK v2 migration notes:**
@@ -312,8 +320,8 @@ Main service for interacting with OpenCode Server. Current state is a hybrid fac
 
 **Current module status:**
 
-- **Implemented**: SDK type bridge, client factory, hybrid transport, CRUD migration, non-stream prompt migration, streaming main chain, dual-path cancel/abort, `global.syncEvent.subscribe()` for session todo updates
-- **Still pending**: `format` / `agent` / `noReply`, real file/image parts, `externalContextPaths`, `question.*`, `session.summarize()`, `session.diff()`
+- **Implemented**: SDK type bridge, client factory, hybrid transport, CRUD migration, non-stream prompt migration, streaming main chain, dual-path cancel/abort, explicit Obsidian `contextItems` file/text parts, `question.*`, `session.diff()`, and `global.syncEvent.subscribe()` for session todo/status updates
+- **Still pending**: `format` / `agent` / `noReply`, `session.summarize()`, and any future replacement for deprecated `externalContextPaths`
 - **Concurrency note**: streaming state is now maintained per session in `OpenCodeService`, so different tabs/sessions can stream concurrently without sharing one global abort/controller state
 
 ### 2. ServerManager (`src/core/opencode/ServerManager.ts`)
@@ -360,9 +368,11 @@ Persists conversations and settings.
     ├── settings.json          # Plugin settings
     ├── provider-icons/        # Cached provider icons (mapped + custom)
     │   └── *.svg|png|jpg...
-    └── sessions/              # Conversation metadata
+    └── sessions/              # Full local conversation storage
         └── conv-xxx.json
 ```
+
+`StorageService` remains local-first: complete conversations, `messages[]`, local notice messages, context attachments, and related chat metadata are persisted in the vault-side plugin storage instead of being reduced to metadata-only records.
 
 ### 6. OpenCodianView (`src/features/chat/OpenCodianView.ts`)
 
@@ -374,14 +384,19 @@ Main chat UI view (extends Obsidian's `ItemView`).
 - Multi-tab conversation management
 - Per-tab runtime state for true concurrent tab sends
 - Reload-safe conversation restore path that waits for preloaded conversation metadata
+- Explicit Obsidian context tray with current note / selection / file actions
+- Cached vault file picker with suffix filters, search, and hidden-path exclusion
 - Per-session model switching dropdown
 - Effort / thinking budget selector
 - Real-time streaming display
 - Optimistic user message hydration from server-final content
+- User message context attachment rendering and detail modal
 - Navigation sidebar for previous/next user messages
 - Fork / rewind conversation entry points
 - Collapsible long assistant content blocks
 - Inline permission cards and server status badge
+- Inline OpenCode question cards with reply / reject handling
+- Post-turn diff notices sourced from `file.edited` + `session.diff()`
 - OMO injected-prompt panels with expandable raw prompt view
 - OMO system-reminder notice cards with markdown rendering
 - Session todo dock powered by `session.todo()` snapshots and `todo.updated` sync events
@@ -555,6 +570,7 @@ Before handing off work, agents should verify the following when relevant:
 | `OPENCODE_SDK_USAGE.md` | SDK usage guide                                      |
 | `docs/opencode-service-sdk-v2-mapping.md` | SDK v2 migration mapping, progress, and handoff status |
 | `docs/opencode-sdk-v2-manual-checklist.md` | Manual verification checklist for SDK v2 migration |
+| `docs/obsidian-linkage-mvp-status.md` | Obsidian linkage MVP scope, status, and next steps |
 
 ### Project Development Documentation
 
@@ -568,5 +584,5 @@ This is the main development log maintained in the Obsidian vault for easy refer
 
 ---
 
-**Last Updated**: 2026-03-29
+**Last Updated**: 2026-03-30
 **Plugin Version**: 1.0.0

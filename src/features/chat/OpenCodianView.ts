@@ -4,8 +4,8 @@
  * Main sidebar view for the OpenCodian chat interface.
  */
 
-import type { EventRef, WorkspaceLeaf } from 'obsidian';
-import { addIcon, Component, ItemView, Notice, Scope, setIcon } from 'obsidian';
+import type { Editor, EventRef, TAbstractFile, WorkspaceLeaf } from 'obsidian';
+import { addIcon, Component, ItemView, MarkdownView, Notice, Scope, setIcon, TFile } from 'obsidian';
 
 import { OpenCodeService, type SessionActivityStatus } from '../../core/opencode';
 import {
@@ -14,6 +14,9 @@ import {
   type Conversation,
   createEmptyTabContextState,
   getDefaultPersistedTabState,
+  type PromptContextItem,
+  type QuestionRequest,
+  type SessionDiffEntry,
   type SessionTodo,
   type ToolCallInfo,
   VIEW_TYPE_OPENCODIAN,
@@ -21,7 +24,18 @@ import {
 import type { EffortLevel, ThinkingBudget } from '../../core/types/settings';
 import { t, type TranslationKey } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
-import { createLogger, resolveToolExecutionStatus } from '../../shared';
+import {
+  buildContextAttachment,
+  createLogger,
+  formatContextLabel,
+  getContextPathExtension,
+  getVaultBasePath,
+  isEligibleContextFilePath,
+  isTextLikeMime,
+  resolveContextMimeFromPath,
+  resolveTextMimeFromPath,
+  resolveToolExecutionStatus,
+} from '../../shared';
 import { chooseForkTarget } from '../../shared/modals';
 import { ProviderIconService } from '../../utils/icons/ProviderIconService';
 import { MarkdownRenderService } from '../../utils/markdown';
@@ -38,6 +52,11 @@ import { ContextUsageService } from './services/ContextUsageService';
 import { TitleGenerationService } from './services/TitleGenerationService';
 import { type RestoredTabState, TabBar, type TabBarLayoutMode, type TabId,TabManager } from './tabs';
 import { ContextDetailModal } from './ui/ContextDetailModal';
+import {
+  chooseContextFile,
+  type ContextFileCatalog,
+  type ContextFileEntry,
+} from './ui/ContextFilePickerModal';
 import { ContextRing } from './ui/ContextRing';
 import { EffortSelector } from './ui/EffortSelector';
 import { NavigationSidebar } from './ui/NavigationSidebar';
@@ -91,6 +110,8 @@ function getRandomPendingMessage(): string {
   return PENDING_MESSAGES[Math.floor(Math.random() * PENDING_MESSAGES.length)];
 }
 
+const REMOTE_CONTEXT_TEXT_LIMIT_BYTES = 64 * 1024;
+
 type ChatServerAvailability = 'checking' | 'running' | 'starting' | 'offline' | 'external';
 
 interface BackgroundTaskLaunchInfo {
@@ -135,6 +156,8 @@ interface TabRuntimeState {
   backgroundTaskLaunches: Map<string, BackgroundTaskLaunchInfo>;
   backgroundTaskCompletedTasks: Map<string, BackgroundTaskCompletionInfo>;
   backgroundTaskWaitingForFollowUp: boolean;
+  draftContextItems: PromptContextItem[];
+  pendingEditedFiles: Set<string>;
 }
 
 interface TabPaneState {
@@ -160,6 +183,8 @@ export class OpenCodianView extends ItemView {
   private messagesShellEl: HTMLElement | null = null;
   private messagesContainer: HTMLElement | null = null;
   private inputContainer: HTMLElement | null = null;
+  private contextTrayEl: HTMLElement | null = null;
+  private contextTrayChipsEl: HTMLElement | null = null;
   private todoDockMountEl: HTMLElement | null = null;
   private sessionTodoDock: SessionTodoDock | null = null;
   private currentConversation: Conversation | null = null;
@@ -227,6 +252,9 @@ export class OpenCodianView extends ItemView {
   private omoBackgroundTaskLogStates = new Map<string, OmoBackgroundTaskLogState>();
   private disposeSessionTodoSubscription: (() => void) | null = null;
   private disposeSessionStatusSubscription: (() => void) | null = null;
+  private lastKnownMarkdownFilePath: string | null = null;
+  private contextFileCatalogCache: ContextFileCatalog | null = null;
+  private contextFileCatalogBuildPromise: Promise<ContextFileCatalog> | null = null;
 
   private appSettings(): { open: () => void; openTabById: (id: string) => void } {
     return (this.app as typeof this.app & {
@@ -255,6 +283,8 @@ export class OpenCodianView extends ItemView {
       backgroundTaskLaunches: new Map(),
       backgroundTaskCompletedTasks: new Map(),
       backgroundTaskWaitingForFollowUp: false,
+      draftContextItems: [],
+      pendingEditedFiles: new Set(),
     };
   }
 
@@ -435,6 +465,53 @@ export class OpenCodianView extends ItemView {
     if (runtime) {
       runtime.backgroundTaskWaitingForFollowUp = value;
     }
+  }
+
+  private getDraftContextItems(tabId: TabId | null = this.getActiveTabId()): PromptContextItem[] {
+    const runtime = this.getTabRuntimeState(tabId);
+    return runtime ? [...runtime.draftContextItems] : [];
+  }
+
+  private setDraftContextItems(
+    items: PromptContextItem[],
+    tabId: TabId | null = this.getActiveTabId(),
+  ): void {
+    const runtime = this.getTabRuntimeState(tabId);
+    if (!runtime) {
+      return;
+    }
+
+    runtime.draftContextItems = [...items];
+    if (tabId === this.getActiveTabId()) {
+      this.renderDraftContextTray();
+    }
+  }
+
+  private addDraftContextItem(
+    item: PromptContextItem,
+    tabId: TabId | null = this.getActiveTabId(),
+  ): void {
+    const existingItems = this.getDraftContextItems(tabId);
+    const nextItems = existingItems.filter((entry) => this.getDraftContextItemKey(entry) !== this.getDraftContextItemKey(item));
+    nextItems.push(item);
+    this.setDraftContextItems(nextItems, tabId);
+  }
+
+  private removeDraftContextItem(
+    itemId: string,
+    tabId: TabId | null = this.getActiveTabId(),
+  ): void {
+    const nextItems = this.getDraftContextItems(tabId).filter((item) => item.id !== itemId);
+    this.setDraftContextItems(nextItems, tabId);
+  }
+
+  private clearDraftContextItems(tabId: TabId | null = this.getActiveTabId()): void {
+    this.setDraftContextItems([], tabId);
+  }
+
+  private getDraftContextItemKey(item: PromptContextItem): string {
+    const lines = item.lineRange ? `${item.lineRange.startLine}-${item.lineRange.endLine}` : '';
+    return `${item.kind}:${item.path}:${lines}`;
   }
 
   private subscribeToSessionTodoUpdates(): void {
@@ -1290,6 +1367,7 @@ export class OpenCodianView extends ItemView {
     }
 
     this.setActiveMessagesPane(tabId);
+    this.renderDraftContextTray();
     this.sessionTodoDock?.update(
       this.getTabSessionTodos(tabId, this.getTabRuntimeState(tabId)?.sessionTodoSessionId ?? null),
     );
@@ -1773,6 +1851,43 @@ export class OpenCodianView extends ItemView {
     this.todoDockMountEl = container.createDiv({ cls: 'opencodian-session-todo-slot' });
     this.sessionTodoDock = new SessionTodoDock(this.todoDockMountEl);
 
+    this.contextTrayEl = container.createDiv({ cls: 'opencodian-context-tray' });
+    const contextActionsEl = this.contextTrayEl.createDiv({ cls: 'opencodian-context-tray-actions' });
+    contextActionsEl.createSpan({
+      cls: 'opencodian-context-tray-title',
+      text: t('chat.context.title'),
+    });
+
+    const currentNoteBtn = contextActionsEl.createEl('button', {
+      cls: 'opencodian-context-tray-btn',
+      text: t('chat.context.addCurrentNote'),
+      attr: { type: 'button' },
+    });
+    currentNoteBtn.addEventListener('click', () => {
+      void this.addCurrentNoteContextFromActiveEditor();
+    });
+
+    const selectionBtn = contextActionsEl.createEl('button', {
+      cls: 'opencodian-context-tray-btn',
+      text: t('chat.context.addSelection'),
+      attr: { type: 'button' },
+    });
+    selectionBtn.addEventListener('click', () => {
+      void this.addSelectionContextFromActiveEditor();
+    });
+
+    const chooseFileBtn = contextActionsEl.createEl('button', {
+      cls: 'opencodian-context-tray-btn',
+      text: t('chat.context.addFile'),
+      attr: { type: 'button' },
+    });
+    chooseFileBtn.addEventListener('click', () => {
+      void this.addChosenFileContextToActiveTab();
+    });
+
+    this.contextTrayChipsEl = this.contextTrayEl.createDiv({ cls: 'opencodian-context-tray-chips' });
+    this.renderDraftContextTray();
+
     // Input wrapper - textarea only (send button moved to toolbar)
     const inputWrapper = container.createDiv({ cls: 'opencodian-input-wrapper' });
 
@@ -1849,6 +1964,436 @@ export class OpenCodianView extends ItemView {
     });
   }
 
+  private renderDraftContextTray(): void {
+    if (!this.contextTrayEl || !this.contextTrayChipsEl) {
+      return;
+    }
+
+    const items = this.getDraftContextItems();
+    this.contextTrayEl.toggleClass('is-empty', items.length === 0);
+    this.contextTrayChipsEl.empty();
+
+    if (items.length === 0) {
+      this.contextTrayChipsEl.createSpan({
+        cls: 'opencodian-context-tray-empty',
+        text: t('chat.context.empty'),
+      });
+      return;
+    }
+
+    for (const item of items) {
+      const chipEl = this.contextTrayChipsEl.createDiv({ cls: 'opencodian-context-chip' });
+      chipEl.createSpan({
+        cls: 'opencodian-context-chip-kind',
+        text: this.getContextKindLabel(item.kind),
+      });
+
+      const openBtn = chipEl.createEl('button', {
+        cls: 'opencodian-context-chip-label',
+        text: item.label,
+        attr: {
+          type: 'button',
+          title: item.path,
+        },
+      });
+      openBtn.addEventListener('click', () => {
+        void this.app.workspace.openLinkText(item.path, '', 'tab');
+      });
+
+      const removeBtn = chipEl.createEl('button', {
+        cls: 'opencodian-context-chip-remove',
+        text: 'x',
+        attr: {
+          type: 'button',
+          'aria-label': t('chat.context.remove'),
+        },
+      });
+      removeBtn.addEventListener('click', () => {
+        this.removeDraftContextItem(item.id);
+      });
+    }
+  }
+
+  private getContextKindLabel(kind: PromptContextItem['kind']): string {
+    switch (kind) {
+      case 'current_note':
+        return t('chat.context.kind.currentNote');
+      case 'selection':
+        return t('chat.context.kind.selection');
+      default:
+        return t('chat.context.kind.file');
+    }
+  }
+
+  private getActiveMarkdownView(): MarkdownView | null {
+    const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+    if (activeView?.file) {
+      this.lastKnownMarkdownFilePath = activeView.file.path;
+      return activeView;
+    }
+
+    const preferredPaths = [
+      this.lastKnownMarkdownFilePath,
+      this.currentConversation?.currentNote ?? null,
+    ].filter((value): value is string => Boolean(value));
+    const markdownViews = this.app.workspace.getLeavesOfType('markdown')
+      .map((leaf) => leaf.view)
+      .filter((view): view is MarkdownView => view instanceof MarkdownView && Boolean(view.file));
+
+    for (const preferredPath of preferredPaths) {
+      const matchedView = markdownViews.find((view) => view.file?.path === preferredPath);
+      if (matchedView?.file) {
+        this.lastKnownMarkdownFilePath = matchedView.file.path;
+        return matchedView;
+      }
+    }
+
+    const fallbackView = markdownViews[0] ?? null;
+    if (fallbackView?.file) {
+      this.lastKnownMarkdownFilePath = fallbackView.file.path;
+    }
+
+    return fallbackView;
+  }
+
+  public async addCurrentNoteContextFromActiveEditor(view?: MarkdownView | null): Promise<boolean> {
+    const contextItem = await this.buildCurrentNoteContextItem(view ?? this.getActiveMarkdownView());
+    if (!contextItem) {
+      return false;
+    }
+
+    this.addDraftContextItem(contextItem);
+    return true;
+  }
+
+  public async addSelectionContextFromActiveEditor(
+    editor?: Editor | null,
+    view?: MarkdownView | null,
+  ): Promise<boolean> {
+    const contextItem = await this.buildSelectionContextItem(
+      editor ?? (view ?? this.getActiveMarkdownView())?.editor ?? null,
+      view ?? this.getActiveMarkdownView(),
+    );
+    if (!contextItem) {
+      return false;
+    }
+
+    this.addDraftContextItem(contextItem);
+    return true;
+  }
+
+  private async addChosenFileContextToActiveTab(): Promise<boolean> {
+    const file = await chooseContextFile(this.app, async () => this.getContextFileCatalog());
+    if (!file) {
+      return false;
+    }
+
+    const contextItem = await this.buildFileContextItem(file, 'file');
+    if (!contextItem) {
+      return false;
+    }
+
+    this.addDraftContextItem(contextItem);
+    return true;
+  }
+
+  private async getContextFileCatalog(): Promise<ContextFileCatalog> {
+    if (this.contextFileCatalogCache) {
+      return this.contextFileCatalogCache;
+    }
+
+    if (this.contextFileCatalogBuildPromise) {
+      return this.contextFileCatalogBuildPromise;
+    }
+
+    this.contextFileCatalogBuildPromise = this.buildContextFileCatalog();
+    try {
+      const catalog = await this.contextFileCatalogBuildPromise;
+      this.contextFileCatalogCache = catalog;
+      return catalog;
+    } finally {
+      this.contextFileCatalogBuildPromise = null;
+    }
+  }
+
+  private async buildContextFileCatalog(): Promise<ContextFileCatalog> {
+    const files = this.app.vault.getFiles();
+    const entries: ContextFileEntry[] = [];
+    const extensionCounts = new Map<string, number>();
+    const batchSize = 400;
+
+    for (let index = 0; index < files.length; index += batchSize) {
+      const batch = files.slice(index, index + batchSize);
+      for (const file of batch) {
+        const entry = this.createContextFileEntry(file);
+        if (!entry) {
+          continue;
+        }
+
+        entries.push(entry);
+        extensionCounts.set(entry.extension, (extensionCounts.get(entry.extension) ?? 0) + 1);
+      }
+
+      if (index + batchSize < files.length) {
+        await this.yieldContextCatalogBuild();
+      }
+    }
+
+    entries.sort((left, right) => this.compareContextFileEntries(left, right));
+
+    return {
+      entries,
+      extensions: this.buildContextFileExtensionBuckets(extensionCounts),
+    };
+  }
+
+  private createContextFileEntry(file: TFile): ContextFileEntry | null {
+    if (!isEligibleContextFilePath(file.path)) {
+      return null;
+    }
+
+    const extension = getContextPathExtension(file.path);
+    if (!extension) {
+      return null;
+    }
+
+    return {
+      file,
+      lowerPath: file.path.toLowerCase(),
+      lowerBasename: file.basename.toLowerCase(),
+      lowerExtension: extension.toLowerCase(),
+      extension,
+    };
+  }
+
+  private buildContextFileExtensionBuckets(extensionCounts: Map<string, number>) {
+    return [...extensionCounts.entries()]
+      .sort((left, right) => {
+        return left[0].localeCompare(right[0]);
+      })
+      .map(([value, count]) => ({ value, count }));
+  }
+
+  private async yieldContextCatalogBuild(): Promise<void> {
+    await new Promise<void>((resolve) => {
+      window.setTimeout(resolve, 0);
+    });
+  }
+
+  private invalidateContextFileCatalogCache(): void {
+    this.contextFileCatalogCache = null;
+    this.contextFileCatalogBuildPromise = null;
+  }
+
+  private updateContextFileCatalogForCreate(file: TAbstractFile): void {
+    if (!(file instanceof TFile)) {
+      this.invalidateContextFileCatalogCache();
+      return;
+    }
+
+    if (!this.contextFileCatalogCache) {
+      return;
+    }
+
+    this.upsertContextFileCatalogEntry(file);
+  }
+
+  private updateContextFileCatalogForDelete(file: TAbstractFile): void {
+    if (!(file instanceof TFile)) {
+      this.invalidateContextFileCatalogCache();
+      return;
+    }
+
+    if (!this.contextFileCatalogCache) {
+      return;
+    }
+
+    this.removeContextFileCatalogEntry(file.path);
+  }
+
+  private updateContextFileCatalogForRename(file: TAbstractFile, oldPath: string): void {
+    if (!(file instanceof TFile)) {
+      this.invalidateContextFileCatalogCache();
+      return;
+    }
+
+    if (!this.contextFileCatalogCache) {
+      return;
+    }
+
+    this.removeContextFileCatalogEntry(oldPath);
+    this.upsertContextFileCatalogEntry(file);
+  }
+
+  private upsertContextFileCatalogEntry(file: TFile): void {
+    if (!this.contextFileCatalogCache) {
+      return;
+    }
+
+    const existingIndex = this.contextFileCatalogCache.entries.findIndex((entry) => entry.file.path === file.path);
+    if (existingIndex >= 0) {
+      this.contextFileCatalogCache.entries.splice(existingIndex, 1);
+    }
+
+    const nextEntry = this.createContextFileEntry(file);
+    if (!nextEntry) {
+      this.recomputeContextFileCatalogBuckets();
+      return;
+    }
+
+    this.contextFileCatalogCache.entries.push(nextEntry);
+    this.contextFileCatalogCache.entries.sort((left, right) => this.compareContextFileEntries(left, right));
+    this.recomputeContextFileCatalogBuckets();
+  }
+
+  private removeContextFileCatalogEntry(targetPath: string): void {
+    if (!this.contextFileCatalogCache) {
+      return;
+    }
+
+    const nextEntries = this.contextFileCatalogCache.entries.filter((entry) => entry.file.path !== targetPath);
+    if (nextEntries.length === this.contextFileCatalogCache.entries.length) {
+      return;
+    }
+
+    this.contextFileCatalogCache.entries = nextEntries;
+    this.recomputeContextFileCatalogBuckets();
+  }
+
+  private recomputeContextFileCatalogBuckets(): void {
+    if (!this.contextFileCatalogCache) {
+      return;
+    }
+
+    const extensionCounts = new Map<string, number>();
+    for (const entry of this.contextFileCatalogCache.entries) {
+      extensionCounts.set(entry.extension, (extensionCounts.get(entry.extension) ?? 0) + 1);
+    }
+
+    this.contextFileCatalogCache.extensions = this.buildContextFileExtensionBuckets(extensionCounts);
+  }
+
+  private compareContextFileEntries(left: ContextFileEntry, right: ContextFileEntry): number {
+    const extensionCompare = left.extension.localeCompare(right.extension);
+    if (extensionCompare !== 0) {
+      return extensionCompare;
+    }
+
+    const basenameCompare = left.file.basename.localeCompare(right.file.basename);
+    if (basenameCompare !== 0) {
+      return basenameCompare;
+    }
+
+    return left.file.path.localeCompare(right.file.path);
+  }
+
+  private async buildCurrentNoteContextItem(view: MarkdownView | null): Promise<PromptContextItem | null> {
+    const file = view?.file ?? null;
+    if (!file) {
+      new Notice(t('chat.context.notice.noActiveNote'));
+      return null;
+    }
+
+    return this.buildFileContextItem(file, 'current_note');
+  }
+
+  private async buildSelectionContextItem(
+    editor: Editor | null,
+    view: MarkdownView | null,
+  ): Promise<PromptContextItem | null> {
+    const file = view?.file ?? null;
+    if (!editor || !file) {
+      new Notice(t('chat.context.notice.noActiveNote'));
+      return null;
+    }
+
+    const selectedText = editor.getSelection();
+    if (!selectedText.trim()) {
+      new Notice(t('chat.context.notice.noSelection'));
+      return null;
+    }
+
+    const mime = resolveTextMimeFromPath(file.path);
+    if (!isTextLikeMime(mime)) {
+      new Notice(t('chat.context.notice.binaryUnsupported'));
+      return null;
+    }
+
+    const textSnapshot = this.validateRemoteContextText(selectedText, file.path);
+    if (this.isRemoteContextMode() && textSnapshot === null) {
+      return null;
+    }
+
+    const from = editor.getCursor('from');
+    const to = editor.getCursor('to');
+    const lineRange = {
+      startLine: from.line + 1,
+      endLine: to.line + 1,
+    };
+
+    return {
+      id: this.createPromptContextId(),
+      kind: 'selection',
+      path: file.path,
+      label: formatContextLabel(file.path, lineRange),
+      mime,
+      lineRange,
+      textSnapshot: textSnapshot ?? undefined,
+    };
+  }
+
+  private async buildFileContextItem(
+    file: TFile,
+    kind: 'current_note' | 'file',
+  ): Promise<PromptContextItem | null> {
+    const mime = resolveContextMimeFromPath(file.path);
+    if (this.isRemoteContextMode() && !isTextLikeMime(mime)) {
+      new Notice(t('chat.context.notice.binaryUnsupportedRemote'));
+      return null;
+    }
+
+    let textSnapshot: string | undefined;
+    if (this.isRemoteContextMode()) {
+      const fileText = await this.app.vault.read(file);
+      const validatedText = this.validateRemoteContextText(fileText, file.path);
+      if (validatedText === null) {
+        return null;
+      }
+      textSnapshot = validatedText;
+    }
+
+    return {
+      id: this.createPromptContextId(),
+      kind,
+      path: file.path,
+      label: formatContextLabel(file.path),
+      mime,
+      textSnapshot,
+    };
+  }
+
+  private isRemoteContextMode(): boolean {
+    return this.plugin.settings.server.mode === 'remote';
+  }
+
+  private validateRemoteContextText(text: string, label: string): string | null {
+    if (!this.isRemoteContextMode()) {
+      return text;
+    }
+
+    const byteLength = new TextEncoder().encode(text).length;
+    if (byteLength > REMOTE_CONTEXT_TEXT_LIMIT_BYTES) {
+      new Notice(t('chat.context.notice.tooLarge', { label }));
+      return null;
+    }
+
+    return text;
+  }
+
+  private createPromptContextId(): string {
+    return `context-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  }
+
   private trySubmitCurrentInput(): void {
     if (!this.inputTextarea) {
       return;
@@ -1883,11 +2428,22 @@ export class OpenCodianView extends ItemView {
     // File open event
     this.registerEvent(
       this.plugin.app.workspace.on('file-open', (file) => {
+        this.lastKnownMarkdownFilePath = file?.path ?? null;
         if (file && this.currentConversation) {
           this.currentConversation.currentNote = file.path;
         }
       })
     );
+
+    this.registerEvent(this.plugin.app.vault.on('create', (file) => {
+      this.updateContextFileCatalogForCreate(file);
+    }));
+    this.registerEvent(this.plugin.app.vault.on('delete', (file) => {
+      this.updateContextFileCatalogForDelete(file);
+    }));
+    this.registerEvent(this.plugin.app.vault.on('rename', (file, oldPath) => {
+      this.updateContextFileCatalogForRename(file, oldPath);
+    }));
   }
 
   /** Create a new conversation */
@@ -2720,6 +3276,8 @@ export class OpenCodianView extends ItemView {
     }
 
     const shouldAutoScrollOnSend = this.shouldAutoScroll();
+    const draftContextItems = [...sendingRuntime.draftContextItems];
+    const contextAttachments = draftContextItems.map((item) => buildContextAttachment(item));
 
     // Add user message to conversation and UI
     const userMessage: ChatMessage = {
@@ -2727,11 +3285,14 @@ export class OpenCodianView extends ItemView {
       role: 'user',
       content,
       timestamp: Date.now(),
+      contextAttachments: contextAttachments.length > 0 ? contextAttachments : undefined,
     };
     this.resetBackgroundTaskIndicator();
     this.armBackgroundTaskIndicatorForUserMessage(userMessage);
     sendingConversation.messages.push(userMessage);
+    sendingConversation.updatedAt = userMessage.timestamp;
     this.startConversationSyncLoop();
+    await this.plugin.saveConversation(sendingConversation);
     await this.renderMessage(userMessage);
     this.scrollToBottomIfNeeded(shouldAutoScrollOnSend);
 
@@ -2804,7 +3365,10 @@ export class OpenCodianView extends ItemView {
     const stream = this.plugin.openCodeService.sendMessage(content, {
       sessionId: sendingConversation.openCodeSessionId,
       ...modelOptions,
+      contextItems: draftContextItems,
     });
+    sendingRuntime.pendingEditedFiles.clear();
+    this.clearDraftContextItems(sendingTabId);
 
     const { contentEl } = this.createAssistantMessageElement(sendingTabId);
     const streamController = this.getOrCreateTabStreamController(sendingTabId);
@@ -2891,6 +3455,11 @@ export class OpenCodianView extends ItemView {
           this.completeTabContextUsageStream(sendingTabId);
         }
 
+        if (chunk.type === 'file_edited') {
+          sendingRuntime.pendingEditedFiles.add(chunk.file);
+          continue;
+        }
+
         // Handle permission request
         if (chunk.type === 'permission_request') {
           receivedMeaningfulChunk = true;
@@ -2900,6 +3469,21 @@ export class OpenCodianView extends ItemView {
           }
 
           await this.showPermissionDialog(chunk, sendingTabId);
+
+          if (sendingRuntime.isStreaming) {
+            scheduleStreamTimeout();
+          }
+          continue;
+        }
+
+        if (chunk.type === 'question_request') {
+          receivedMeaningfulChunk = true;
+          if (timeoutId) {
+            window.clearTimeout(timeoutId);
+            timeoutId = null;
+          }
+
+          await this.showQuestionDialog(chunk.request, sendingTabId);
 
           if (sendingRuntime.isStreaming) {
             scheduleStreamTimeout();
@@ -3043,6 +3627,12 @@ export class OpenCodianView extends ItemView {
           sourceMessageId: finalizedAssistantMessageId,
         });
       }
+
+      if (streamContentBlocks?.length || latestErrorMessage) {
+        sendingConversation.updatedAt = finalizedTimestamp;
+        sendingConversation.lastResponseAt = finalizedTimestamp;
+        await this.plugin.saveConversation(sendingConversation);
+      }
     }
 
     if (sendingConversation) {
@@ -3067,10 +3657,17 @@ export class OpenCodianView extends ItemView {
             }
           }
         }
+
+        await this.appendTurnDiffNoticeIfNeeded(
+          sendingConversation,
+          [...sendingRuntime.pendingEditedFiles],
+          sendingTabId,
+        );
       }
       await this.refreshTabSessionTodos(sendingTabId, sendingConversation.openCodeSessionId, { suppressErrors: true });
       sendingConversation.updatedAt = Date.now();
       await this.plugin.saveConversation(sendingConversation);
+      sendingRuntime.pendingEditedFiles.clear();
       if (this.currentConversation?.id === sendingConversation.id && this.getActiveTabId() === sendingTabId) {
         const activeRuntime = this.getTabRuntimeState(sendingTabId);
         if (activeRuntime) {
@@ -3498,11 +4095,42 @@ export class OpenCodianView extends ItemView {
       });
     }
 
+    if (message.contextAttachments && message.contextAttachments.length > 0) {
+      this.renderUserContextAttachments(container, message.contextAttachments);
+    }
+
     if (message.omo?.kind === 'user-injection') {
       await this.renderOmoUserInjection(container, message);
     }
 
     return visibleText;
+  }
+
+  private renderUserContextAttachments(
+    container: HTMLElement,
+    attachments: NonNullable<ChatMessage['contextAttachments']>,
+  ): void {
+    const listEl = container.createDiv({ cls: 'opencodian-user-context-list' });
+
+    for (const attachment of attachments) {
+      const chipEl = listEl.createDiv({ cls: 'opencodian-user-context-chip' });
+      chipEl.createSpan({
+        cls: 'opencodian-user-context-kind',
+        text: this.getContextKindLabel(attachment.kind),
+      });
+
+      const openBtn = chipEl.createEl('button', {
+        cls: 'opencodian-user-context-label',
+        text: attachment.label,
+        attr: {
+          type: 'button',
+          title: attachment.path,
+        },
+      });
+      openBtn.addEventListener('click', () => {
+        void this.app.workspace.openLinkText(attachment.path, '', 'tab');
+      });
+    }
   }
 
   private getVisibleUserMessageText(message: ChatMessage): string {
@@ -4421,30 +5049,42 @@ export class OpenCodianView extends ItemView {
     syncedMessages: ChatMessage[],
   ): ChatMessage[] {
     const modelIdBySourceMessageId = new Map<string, string>();
+    const messageBySourceMessageId = new Map<string, ChatMessage>();
     const fallbackAssistantMessages = existingMessages.filter(
       (message) => message.role === 'assistant' && message.modelId && !message.sourceMessageId,
     );
 
     for (const message of existingMessages) {
       if (message.role !== 'assistant' || !message.modelId || !message.sourceMessageId) {
+        if (message.sourceMessageId) {
+          messageBySourceMessageId.set(message.sourceMessageId, message);
+        }
         continue;
       }
 
       modelIdBySourceMessageId.set(message.sourceMessageId, message.modelId);
+      messageBySourceMessageId.set(message.sourceMessageId, message);
     }
 
     const mergedMessages = syncedMessages.map((message) => {
-      if (message.role !== 'assistant') {
-        return message;
+      const existingMessage = message.sourceMessageId
+        ? messageBySourceMessageId.get(message.sourceMessageId)
+        : undefined;
+      const mergedMessage = existingMessage
+        ? this.mergeClientOnlyMessageFields(existingMessage, message)
+        : message;
+
+      if (mergedMessage.role !== 'assistant') {
+        return mergedMessage;
       }
 
-      const persistedModelId = message.sourceMessageId
-        ? modelIdBySourceMessageId.get(message.sourceMessageId)
+      const persistedModelId = mergedMessage.sourceMessageId
+        ? modelIdBySourceMessageId.get(mergedMessage.sourceMessageId)
         : undefined;
 
       return persistedModelId
-        ? { ...message, modelId: persistedModelId }
-        : message;
+        ? { ...mergedMessage, modelId: persistedModelId }
+        : mergedMessage;
     });
 
     const unmatchedSyncedIndexes = mergedMessages.reduce<number[]>((indexes, message, index) => {
@@ -4485,6 +5125,30 @@ export class OpenCodianView extends ItemView {
     return mergedMessages;
   }
 
+  private mergeClientOnlyMessageFields(existingMessage: ChatMessage, syncedMessage: ChatMessage): ChatMessage {
+    let contextAttachments = syncedMessage.contextAttachments;
+    if (existingMessage.contextAttachments && existingMessage.contextAttachments.length > 0) {
+      if (!contextAttachments || contextAttachments.length === 0) {
+        contextAttachments = existingMessage.contextAttachments;
+      } else {
+        contextAttachments = contextAttachments.map((attachment) => {
+          const existingAttachment = existingMessage.contextAttachments?.find((candidate) =>
+            candidate.path === attachment.path
+            && candidate.lineRange?.startLine === attachment.lineRange?.startLine
+            && candidate.lineRange?.endLine === attachment.lineRange?.endLine,
+          );
+
+          return existingAttachment ?? attachment;
+        });
+      }
+    }
+
+    return {
+      ...syncedMessage,
+      contextAttachments,
+    };
+  }
+
   private async syncLatestUserMessageFromServer(
     conversation: Conversation,
     optimisticMessageId: string,
@@ -4507,6 +5171,7 @@ export class OpenCodianView extends ItemView {
       const hydratedMessage = OpenCodeService.openCodeMessageToChatMessage(
         latestServerUser.info,
         latestServerUser.parts,
+        getVaultBasePath(this.app) ?? undefined,
       );
       const rawServerUserText = latestServerUser.parts
         .filter((part) => typeof part.text === 'string')
@@ -4549,10 +5214,13 @@ export class OpenCodianView extends ItemView {
         return;
       }
 
+      const mergedHydratedMessage = this.mergeClientOnlyMessageFields(optimisticMessage, hydratedMessage);
+
       if (
-        optimisticMessage.sourceMessageId === hydratedMessage.sourceMessageId
-        && optimisticMessage.content === hydratedMessage.content
-        && JSON.stringify(optimisticMessage.omo ?? null) === JSON.stringify(hydratedMessage.omo ?? null)
+        optimisticMessage.sourceMessageId === mergedHydratedMessage.sourceMessageId
+        && optimisticMessage.content === mergedHydratedMessage.content
+        && JSON.stringify(optimisticMessage.omo ?? null) === JSON.stringify(mergedHydratedMessage.omo ?? null)
+        && JSON.stringify(optimisticMessage.contextAttachments ?? null) === JSON.stringify(mergedHydratedMessage.contextAttachments ?? null)
       ) {
         logger.debug(`Skipped optimistic user message hydration because nothing changed: ${this.stringifyLogPayload({
           sessionId,
@@ -4564,23 +5232,23 @@ export class OpenCodianView extends ItemView {
         return;
       }
 
-      conversation.messages.splice(optimisticIndex, 1, hydratedMessage);
-      this.armBackgroundTaskIndicatorForUserMessage(hydratedMessage, tabId);
+      conversation.messages.splice(optimisticIndex, 1, mergedHydratedMessage);
+      this.armBackgroundTaskIndicatorForUserMessage(mergedHydratedMessage, tabId);
       const runtime = this.getTabRuntimeState(tabId);
       if (runtime) {
         runtime.lastConversationSyncFingerprint = this.getConversationSyncFingerprint(conversation.messages);
       }
       await this.plugin.saveConversation(conversation);
       if (this.currentConversation?.id === conversation.id && this.getActiveTabId() === tabId) {
-        await this.rerenderSingleUserMessage(optimisticMessageId, hydratedMessage);
+        await this.rerenderSingleUserMessage(optimisticMessageId, mergedHydratedMessage);
         await this.renderBackgroundTaskIndicatorIfNeeded(tabId);
       }
       logger.debug(`Applied hydrated server user message to optimistic bubble: ${this.stringifyLogPayload({
         sessionId,
         optimisticMessageId,
-        sourceMessageId: hydratedMessage.sourceMessageId ?? null,
-        omoDetected: Boolean(hydratedMessage.omo),
-        omoKind: hydratedMessage.omo?.kind ?? null,
+        sourceMessageId: mergedHydratedMessage.sourceMessageId ?? null,
+        omoDetected: Boolean(mergedHydratedMessage.omo),
+        omoKind: mergedHydratedMessage.omo?.kind ?? null,
       })}`);
     } catch (error) {
       logger.debug('Failed to hydrate optimistic user message from server', error);
@@ -4883,7 +5551,7 @@ export class OpenCodianView extends ItemView {
         ? await this.plugin.openCodeService.getSessionRevertState(conversation.openCodeSessionId)
         : null;
       const convertedServerMessages = serverMessages.map(({ info, parts }) =>
-        OpenCodeService.openCodeMessageToChatMessage(info, parts),
+        OpenCodeService.openCodeMessageToChatMessage(info, parts, getVaultBasePath(this.app) ?? undefined),
       );
       this.logOmoBackgroundTaskDiagnostics(conversation, conversation.messages, convertedServerMessages);
       const converted = this.mergeSyncedMessageModelIds(
@@ -6244,6 +6912,64 @@ export class OpenCodianView extends ItemView {
     this.scrollToBottom();
   }
 
+  private async appendTurnDiffNoticeIfNeeded(
+    conversation: Conversation,
+    editedFiles: string[],
+    tabId: TabId | null = this.getActiveTabId(),
+  ): Promise<void> {
+    if (!conversation.openCodeSessionId || editedFiles.length === 0) {
+      return;
+    }
+
+    const latestUserMessage = [...conversation.messages]
+      .reverse()
+      .find((message) => message.role === 'user' && message.sourceMessageId);
+    if (!latestUserMessage?.sourceMessageId) {
+      return;
+    }
+
+    const diffEntries = await this.plugin.openCodeService.getSessionDiff(
+      conversation.openCodeSessionId,
+      latestUserMessage.sourceMessageId,
+    );
+    const fallbackEntries: SessionDiffEntry[] = [...new Set(editedFiles)].map((file) => ({
+      file,
+      additions: 0,
+      deletions: 0,
+    }));
+    const entries = diffEntries.length > 0 ? diffEntries : fallbackEntries;
+    if (entries.length === 0) {
+      return;
+    }
+
+    await this.appendPersistentAssistantNoticeMessage(
+      t('chat.diffNotice.title'),
+      this.buildDiffNoticeMarkdown(entries),
+      'info',
+    );
+
+    if (tabId === this.getActiveTabId()) {
+      await this.renderBackgroundTaskIndicatorIfNeeded(tabId);
+    }
+  }
+
+  private buildDiffNoticeMarkdown(entries: SessionDiffEntry[]): string {
+    const lines = entries.map((entry) => {
+      const link = `[[${entry.file}]]`;
+      const stats = entry.additions > 0 || entry.deletions > 0
+        ? ` (+${entry.additions} / -${entry.deletions})`
+        : '';
+      const status = entry.status ? ` ${entry.status}` : '';
+      return `- ${link}${status}${stats}`;
+    });
+
+    return [
+      t('chat.diffNotice.description'),
+      '',
+      ...lines,
+    ].join('\n');
+  }
+
   private async appendModelUnavailableNoticeMessage(): Promise<void> {
     const { title, message } = this.getModelUnavailableNoticeContent();
     await this.appendPersistentAssistantNoticeMessage(
@@ -6780,6 +7506,203 @@ export class OpenCodianView extends ItemView {
       logger.error('Failed to switch permission mode:', error);
       new Notice(t('settings.security.autoRestart.failed'));
     }
+  }
+
+  private createStreamingInlineCard(
+    className: string,
+    tabId: TabId | null = this.getActiveTabId(),
+  ): HTMLElement | null {
+    const messageEl = this.getTabRuntimeState(tabId)?.streamingMessageEl ?? null;
+    if (!messageEl) {
+      return null;
+    }
+
+    const cardEl = document.createElement('div');
+    cardEl.className = className;
+
+    const lastToolCall = messageEl.querySelector('.streaming-tool-call:last-of-type');
+    if (lastToolCall?.parentNode) {
+      lastToolCall.parentNode.insertBefore(cardEl, lastToolCall.nextSibling);
+      return cardEl;
+    }
+
+    const contentEl = messageEl.querySelector('.opencodian-message-content');
+    if (contentEl) {
+      contentEl.appendChild(cardEl);
+      return cardEl;
+    }
+
+    messageEl.appendChild(cardEl);
+    return cardEl;
+  }
+
+  private async showQuestionDialog(
+    request: QuestionRequest,
+    tabId: TabId | null = this.getActiveTabId(),
+  ): Promise<void> {
+    const questionCard = this.createStreamingInlineCard('opencodian-question-inline', tabId);
+    if (!questionCard) {
+      logger.error('No streaming message element found for question card');
+      return;
+    }
+
+    const headerEl = questionCard.createDiv({ cls: 'opencodian-question-inline-header' });
+    headerEl.createSpan({ cls: 'opencodian-question-inline-icon', text: '?' });
+    headerEl.createSpan({
+      cls: 'opencodian-question-inline-title',
+      text: t('chat.question.title'),
+    });
+
+    const state = request.questions.map(() => ({
+      optionInputs: [] as HTMLInputElement[],
+      customInput: null as HTMLInputElement | null,
+    }));
+
+    request.questions.forEach((question, index) => {
+      const sectionEl = questionCard.createDiv({ cls: 'opencodian-question-inline-section' });
+      sectionEl.createDiv({
+        cls: 'opencodian-question-inline-header-text',
+        text: question.header,
+      });
+      sectionEl.createDiv({
+        cls: 'opencodian-question-inline-body-text',
+        text: question.question,
+      });
+
+      if (question.options.length > 0) {
+        const optionsEl = sectionEl.createDiv({ cls: 'opencodian-question-inline-options' });
+        const inputType = question.multiple ? 'checkbox' : 'radio';
+
+        for (const option of question.options) {
+          const labelEl = optionsEl.createEl('label', {
+            cls: 'opencodian-question-inline-option',
+          });
+          const inputEl = labelEl.createEl('input', {
+            attr: {
+              type: inputType,
+              name: `opencodian-question-${request.id}-${index}`,
+              value: option.label,
+            },
+          });
+          state[index].optionInputs.push(inputEl);
+
+          const textWrap = labelEl.createDiv({ cls: 'opencodian-question-inline-option-copy' });
+          textWrap.createDiv({
+            cls: 'opencodian-question-inline-option-label',
+            text: option.label,
+          });
+          if (option.description) {
+            textWrap.createDiv({
+              cls: 'opencodian-question-inline-option-description',
+              text: option.description,
+            });
+          }
+        }
+      }
+
+      if (question.custom !== false) {
+        const customInput = sectionEl.createEl('input', {
+          cls: 'opencodian-question-inline-custom',
+          attr: {
+            type: 'text',
+            placeholder: t('chat.question.customPlaceholder'),
+          },
+        });
+        state[index].customInput = customInput;
+      }
+    });
+
+    const buttonsEl = questionCard.createDiv({ cls: 'opencodian-question-inline-buttons' });
+    const submitBtn = buttonsEl.createEl('button', {
+      cls: 'opencodian-question-inline-btn is-submit',
+      text: t('chat.question.submit'),
+      attr: { type: 'button' },
+    });
+    const rejectBtn = buttonsEl.createEl('button', {
+      cls: 'opencodian-question-inline-btn is-reject',
+      text: t('chat.question.reject'),
+      attr: { type: 'button' },
+    });
+
+    const action = await new Promise<{ type: 'reply'; answers: string[][] } | { type: 'reject' }>((resolve) => {
+      submitBtn.addEventListener('click', () => {
+        const answers = request.questions.map((question, index) => {
+          const selectedValues = state[index].optionInputs
+            .filter((input) => input.checked)
+            .map((input) => input.value);
+          const customValue = state[index].customInput?.value.trim() ?? '';
+
+          if (question.multiple) {
+            const combined = customValue ? [...selectedValues, customValue] : selectedValues;
+            return [...new Set(combined)];
+          }
+
+          if (customValue) {
+            return [customValue];
+          }
+
+          return selectedValues.length > 0 ? [selectedValues[0]] : [];
+        });
+
+        const hasEmptyAnswer = answers.some((answer) => answer.length === 0);
+        if (hasEmptyAnswer) {
+          new Notice(t('chat.question.answerRequired'));
+          return;
+        }
+
+        resolve({ type: 'reply', answers });
+      });
+
+      rejectBtn.addEventListener('click', () => {
+        resolve({ type: 'reject' });
+      });
+    });
+
+    questionCard.remove();
+
+    try {
+      if (action.type === 'reject') {
+        await this.plugin.openCodeService.rejectQuestion(request.id);
+        await this.appendPersistentAssistantNoticeMessage(
+          t('chat.question.notice.rejectedTitle'),
+          this.buildQuestionRejectedMarkdown(request),
+          'warning',
+        );
+        return;
+      }
+
+      await this.plugin.openCodeService.replyToQuestion(request.id, action.answers);
+      await this.appendPersistentAssistantNoticeMessage(
+        t('chat.question.notice.answeredTitle'),
+        this.buildQuestionAnswerMarkdown(request, action.answers),
+        'info',
+      );
+    } catch (error) {
+      logger.error('Failed to resolve question request:', error);
+      new Notice(t('chat.question.notice.error'));
+    }
+  }
+
+  private buildQuestionAnswerMarkdown(request: QuestionRequest, answers: string[][]): string {
+    const lines = request.questions.map((question, index) => {
+      const answer = answers[index]?.join(', ') ?? '';
+      return `- **${question.header}**: ${answer}`;
+    });
+
+    return [
+      t('chat.question.notice.answeredBody'),
+      '',
+      ...lines,
+    ].join('\n');
+  }
+
+  private buildQuestionRejectedMarkdown(request: QuestionRequest): string {
+    const lines = request.questions.map((question) => `- ${question.header}`);
+    return [
+      t('chat.question.notice.rejectedBody'),
+      '',
+      ...lines,
+    ].join('\n');
   }
 
   /** Show inline permission request card in the chat stream */

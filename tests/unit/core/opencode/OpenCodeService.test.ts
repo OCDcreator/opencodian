@@ -48,6 +48,8 @@ const { createSdkClient: mockCreateSdkClient } = jest.requireMock('../../../../s
   createSdkClient: jest.Mock;
 };
 
+const REMOTE_CONTEXT_LIMIT_BYTES = 64 * 1024;
+
 // Mock child_process for ServerManager
 jest.mock('child_process', () => ({
   spawn: jest.fn().mockReturnValue({
@@ -75,6 +77,7 @@ describe('OpenCodeService', () => {
     global: { health: jest.Mock; syncEvent: { subscribe: jest.Mock } };
     session: {
       create: jest.Mock;
+      diff: jest.Mock;
       list: jest.Mock;
       status: jest.Mock;
       messages: jest.Mock;
@@ -91,6 +94,7 @@ describe('OpenCodeService', () => {
     };
     config: { providers: jest.Mock };
     permission: { list: jest.Mock; reply: jest.Mock };
+    question: { list: jest.Mock; reply: jest.Mock; reject: jest.Mock };
     event: { subscribe: jest.Mock };
   };
 
@@ -100,6 +104,7 @@ describe('OpenCodeService', () => {
       global: { health: jest.fn(), syncEvent: { subscribe: jest.fn() } },
       session: {
         create: jest.fn(),
+        diff: jest.fn(),
         list: jest.fn(),
         status: jest.fn(),
         messages: jest.fn(),
@@ -116,6 +121,7 @@ describe('OpenCodeService', () => {
       },
       config: { providers: jest.fn() },
       permission: { list: jest.fn(), reply: jest.fn() },
+      question: { list: jest.fn(), reply: jest.fn(), reject: jest.fn() },
       event: { subscribe: jest.fn() },
     };
     mockCreateSdkClient.mockReturnValue(mockSdkClient);
@@ -435,6 +441,351 @@ describe('OpenCodeService', () => {
       expect(mockRequestUrl).toHaveBeenCalledWith(expect.objectContaining({
         url: 'http://127.0.0.1:4096/session/test-session/message',
         method: 'POST',
+      }));
+    });
+
+    it('maps local Obsidian context items to file:// parts', async () => {
+      service.setSessionId('test-session');
+      service.setVaultPath('C:\\vault');
+      mockRequestUrl.mockResolvedValue({
+        status: 200,
+        json: {
+          info: {
+            id: 'assistant-1',
+            sessionID: 'test-session',
+            role: 'assistant',
+            time: { created: 1234567890 },
+          },
+          parts: [],
+        },
+        text: '{"info":{"id":"assistant-1","sessionID":"test-session","role":"assistant","time":{"created":1234567890}},"parts":[]}',
+      });
+
+      await service.requestAssistantResponse('Use context', {
+        sessionId: 'test-session',
+        contextItems: [
+          {
+            id: 'ctx-1',
+            kind: 'file',
+            path: 'docs/spec.md',
+            label: 'spec.md',
+            mime: 'text/markdown',
+          },
+          {
+            id: 'ctx-2',
+            kind: 'selection',
+            path: 'docs/spec.md',
+            label: 'spec.md:3-5',
+            mime: 'text/markdown',
+            lineRange: { startLine: 3, endLine: 5 },
+            textSnapshot: 'selected lines',
+          },
+        ],
+      });
+
+      const requestBody = JSON.parse(mockRequestUrl.mock.calls[0][0].body);
+      expect(requestBody.parts[1]).toMatchObject({
+        type: 'file',
+        mime: 'text/plain',
+      });
+      expect(requestBody.parts[1].url).toContain('file:///C:/vault/docs/spec.md');
+      expect(requestBody.parts[2]).toMatchObject({
+        type: 'file',
+        mime: 'text/plain',
+        source: {
+          type: 'file',
+          path: 'docs/spec.md',
+          text: {
+            value: 'selected lines',
+            start: 0,
+            end: 'selected lines'.length,
+          },
+        },
+      });
+      expect(requestBody.parts[2].url).toContain('start=3');
+      expect(requestBody.parts[2].url).toContain('end=5');
+    });
+
+    it('falls back to synthetic text parts for remote Obsidian context', async () => {
+      service = new OpenCodeService({
+        ...DEFAULT_SETTINGS,
+        server: {
+          ...DEFAULT_SETTINGS.server,
+          mode: 'remote',
+        },
+      });
+      service.setSessionId('test-session');
+      mockRequestUrl.mockResolvedValue({
+        status: 200,
+        json: {
+          info: {
+            id: 'assistant-1',
+            sessionID: 'test-session',
+            role: 'assistant',
+            time: { created: 1234567890 },
+          },
+          parts: [],
+        },
+        text: '{"info":{"id":"assistant-1","sessionID":"test-session","role":"assistant","time":{"created":1234567890}},"parts":[]}',
+      });
+
+      await service.requestAssistantResponse('Use remote context', {
+        sessionId: 'test-session',
+        contextItems: [
+          {
+            id: 'ctx-1',
+            kind: 'current_note',
+            path: 'notes/today.md',
+            label: 'today.md',
+            mime: 'text/markdown',
+            textSnapshot: 'Remote note body',
+          },
+        ],
+      });
+
+      const requestBody = JSON.parse(mockRequestUrl.mock.calls[0][0].body);
+      expect(requestBody.parts[1]).toEqual({
+        type: 'text',
+        text: '<obsidian_context kind="current_note" path="notes/today.md">Remote note body</obsidian_context>',
+        synthetic: true,
+        metadata: {
+          kind: 'current_note',
+          path: 'notes/today.md',
+          lines: undefined,
+        },
+      });
+    });
+
+    it('rejects remote binary or oversized Obsidian context before sending', async () => {
+      service = new OpenCodeService({
+        ...DEFAULT_SETTINGS,
+        server: {
+          ...DEFAULT_SETTINGS.server,
+          mode: 'remote',
+        },
+      });
+      service.setSessionId('test-session');
+
+      await expect(service.requestAssistantResponse('Use remote context', {
+        sessionId: 'test-session',
+        contextItems: [
+          {
+            id: 'ctx-1',
+            kind: 'file',
+            path: 'assets/image.png',
+            label: 'image.png',
+            mime: 'image/png',
+            textSnapshot: 'ignored',
+          },
+        ],
+      })).rejects.toThrow('Only text context is supported in remote mode');
+
+      await expect(service.requestAssistantResponse('Use remote context', {
+        sessionId: 'test-session',
+        contextItems: [
+          {
+            id: 'ctx-2',
+            kind: 'file',
+            path: 'notes/huge.md',
+            label: 'huge.md',
+            mime: 'text/markdown',
+            textSnapshot: 'a'.repeat(REMOTE_CONTEXT_LIMIT_BYTES + 1),
+          },
+        ],
+      })).rejects.toThrow('Context exceeds remote size limit');
+
+      expect(mockRequestUrl).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Obsidian linkage helpers', () => {
+    it('parses synthetic context tags and file parts into context attachments', () => {
+      const message = OpenCodeService.openCodeMessageToChatMessage(
+        {
+          id: 'user-1',
+          sessionID: 'test-session',
+          role: 'user',
+          time: { created: 123 },
+        } as unknown as Parameters<typeof OpenCodeService.openCodeMessageToChatMessage>[0],
+        [
+          {
+            id: 'text-1',
+            sessionID: 'test-session',
+            messageID: 'user-1',
+            type: 'text',
+            text: 'Summarize this',
+          },
+          {
+            id: 'text-2',
+            sessionID: 'test-session',
+            messageID: 'user-1',
+            type: 'text',
+            text: '<obsidian_context kind="current_note" path="notes/today.md">Body</obsidian_context>',
+          },
+          {
+            id: 'file-1',
+            sessionID: 'test-session',
+            messageID: 'user-1',
+            type: 'file',
+            mime: 'text/markdown',
+            url: 'file:///C:/vault/notes/today.md?start=2&end=4',
+            source: {
+              type: 'file',
+              path: 'notes/today.md',
+              text: {
+                value: 'Selected text',
+              },
+            },
+          },
+        ] as unknown as Parameters<typeof OpenCodeService.openCodeMessageToChatMessage>[1],
+        'C:\\vault',
+      );
+
+      expect(message.content).toBe('Summarize this');
+      expect(message.contextAttachments).toEqual([
+        {
+          kind: 'current_note',
+          path: 'notes/today.md',
+          label: 'today.md',
+          mime: 'text/markdown',
+          textSnapshot: 'Body',
+        },
+        {
+          kind: 'selection',
+          path: 'notes/today.md',
+          label: 'today.md:2-4',
+          mime: 'text/markdown',
+          lineRange: { startLine: 2, endLine: 4 },
+          textSnapshot: 'Selected text',
+        },
+      ]);
+    });
+
+    it('turns question.asked events into question_request chunks', () => {
+      const outcome = (service as unknown as {
+        handleStreamingEvent: (
+          eventData: unknown,
+          sessionId: string,
+          state: unknown,
+          streamContext: unknown,
+        ) => { chunks: unknown[]; stop: boolean };
+      }).handleStreamingEvent(
+        {
+          type: 'question.asked',
+          properties: {
+            id: 'question-1',
+            sessionID: 'test-session',
+            questions: [
+              {
+                header: 'Mode',
+                question: 'Pick a mode',
+                options: [{ label: 'Fast', description: 'Quick answer' }],
+                multiple: false,
+                custom: true,
+              },
+            ],
+          },
+        },
+        'test-session',
+        { lastContent: '', processedToolIds: new Set(), toolInputSnapshots: new Map() },
+        { partTypeMap: new Map() },
+      );
+
+      expect(outcome.chunks).toEqual([
+        {
+          type: 'question_request',
+          request: {
+            id: 'question-1',
+            sessionId: 'test-session',
+            questions: [
+              {
+                header: 'Mode',
+                question: 'Pick a mode',
+                options: [{ label: 'Fast', description: 'Quick answer' }],
+                multiple: false,
+                custom: true,
+              },
+            ],
+          },
+        },
+      ]);
+    });
+
+    it('turns file.edited events into file_edited chunks', () => {
+      const outcome = (service as unknown as {
+        handleStreamingEvent: (
+          eventData: unknown,
+          sessionId: string,
+          state: unknown,
+          streamContext: unknown,
+        ) => { chunks: unknown[]; stop: boolean };
+      }).handleStreamingEvent(
+        {
+          type: 'file.edited',
+          properties: {
+            file: 'notes/today.md',
+          },
+        },
+        'test-session',
+        { lastContent: '', processedToolIds: new Set(), toolInputSnapshots: new Map() },
+        { partTypeMap: new Map() },
+      );
+
+      expect(outcome.chunks).toEqual([
+        {
+          type: 'file_edited',
+          file: 'notes/today.md',
+        },
+      ]);
+    });
+
+    it('replies to and rejects question requests via HTTP', async () => {
+      mockRequestUrl.mockResolvedValue({ status: 200, json: true, text: 'true' });
+
+      await service.replyToQuestion('question-1', [['Fast']]);
+      await service.rejectQuestion('question-2');
+
+      expect(mockRequestUrl).toHaveBeenNthCalledWith(1, expect.objectContaining({
+        url: 'http://127.0.0.1:4096/question/question-1/reply',
+        method: 'POST',
+        body: JSON.stringify({ answers: [['Fast']] }),
+      }));
+      expect(mockRequestUrl).toHaveBeenNthCalledWith(2, expect.objectContaining({
+        url: 'http://127.0.0.1:4096/question/question-2/reject',
+        method: 'POST',
+        body: JSON.stringify({}),
+      }));
+    });
+
+    it('loads session diffs via HTTP', async () => {
+      mockRequestUrl.mockResolvedValue({
+        status: 200,
+        json: [
+          {
+            file: 'notes/today.md',
+            before: 'old',
+            after: 'new',
+            additions: 3,
+            deletions: 1,
+            status: 'modified',
+          },
+        ],
+        text: '[{"file":"notes/today.md","before":"old","after":"new","additions":3,"deletions":1,"status":"modified"}]',
+      });
+
+      await expect(service.getSessionDiff('test-session', 'message-1')).resolves.toEqual([
+        {
+          file: 'notes/today.md',
+          before: 'old',
+          after: 'new',
+          additions: 3,
+          deletions: 1,
+          status: 'modified',
+        },
+      ]);
+      expect(mockRequestUrl).toHaveBeenCalledWith(expect.objectContaining({
+        url: 'http://127.0.0.1:4096/session/test-session/diff?messageID=message-1',
+        method: 'GET',
       }));
     });
   });
@@ -1149,6 +1500,100 @@ describe('OpenCodeService.openCodeMessageToChatMessage', () => {
     expect(message.role).toBe('user');
     expect(message.content).toBe('User message');
     expect(message.sourceMessageId).toBe('msg-2');
+  });
+
+  it('strips inline read-tool hydration text from user messages and restores it as a context attachment', () => {
+    const info = {
+      id: 'msg-2b',
+      sessionID: 'session-1',
+      role: 'user' as const,
+      time: { created: 1234567891 },
+    };
+
+    const parts: Part[] = [
+      {
+        type: 'text',
+        id: 'part-2b',
+        sessionID: 'session-1',
+        messageID: 'msg-2b',
+        text: '你能看到动画集成需求文档吗？Called the Read tool with the following input:\n{"filePath":"C:\\\\vault\\\\动画集成需求文档.md"}',
+      },
+    ];
+
+    const message = OpenCodeService.openCodeMessageToChatMessage(info, parts, 'C:\\vault');
+
+    expect(message.content).toBe('你能看到动画集成需求文档吗？');
+    expect(message.contextAttachments).toEqual([
+      {
+        kind: 'file',
+        path: '动画集成需求文档.md',
+        label: '动画集成需求文档.md',
+        mime: 'text/markdown',
+      },
+    ]);
+  });
+
+  it('ignores synthetic read-tool text in hydrated user content while restoring context attachments', () => {
+    const info = {
+      id: 'msg-user-synthetic',
+      sessionID: 'session-1',
+      role: 'user' as const,
+      time: { created: 1234567899 },
+    };
+
+    const parts: Part[] = [
+      {
+        type: 'text',
+        id: 'part-user-text',
+        sessionID: 'session-1',
+        messageID: 'msg-user-synthetic',
+        text: '能看到选中文字吗？',
+      },
+      {
+        type: 'text',
+        id: 'part-user-synth',
+        sessionID: 'session-1',
+        messageID: 'msg-user-synthetic',
+        synthetic: true,
+        text: 'Called the Read tool with the following input: {"filePath":"C:\\\\vault\\\\obsidian 联动设置.md","offset":6,"limit":1}',
+      } as unknown as Part,
+      {
+        type: 'text',
+        id: 'part-user-synth-output',
+        sessionID: 'session-1',
+        messageID: 'msg-user-synthetic',
+        synthetic: true,
+        text: '6| 这是被读取的选中文本',
+      } as unknown as Part,
+      {
+        type: 'file',
+        id: 'part-user-file',
+        sessionID: 'session-1',
+        messageID: 'msg-user-synthetic',
+        mime: 'text/plain',
+        url: 'file:///C:/vault/obsidian%20%E8%81%94%E5%8A%A8%E8%AE%BE%E7%BD%AE.md?start=6&end=6',
+        source: {
+          type: 'file',
+          path: 'obsidian 联动设置.md',
+          text: {
+            value: '这是被读取的选中文本',
+          },
+        },
+      } as unknown as Part,
+    ];
+
+    const message = OpenCodeService.openCodeMessageToChatMessage(info, parts, 'C:\\vault');
+
+    expect(message.content).toBe('能看到选中文字吗？');
+    expect(message.contextAttachments?.[0]).toMatchObject({
+      kind: 'file',
+      path: 'obsidian 联动设置.md',
+    });
+    expect(message.contextAttachments?.[1]).toMatchObject({
+      kind: 'selection',
+      path: 'obsidian 联动设置.md',
+      lineRange: { startLine: 6, endLine: 6 },
+    });
   });
 
   it('should extract tool calls from tool parts', () => {

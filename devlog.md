@@ -12,6 +12,263 @@
 
 ---
 
+## 2026-03-30 文件选择器改为隐藏目录排除并扩展附件后缀支持
+
+### 🎯 改动目标
+
+- 按最新联动需求，把文件选择器的过滤规则收敛为“只排除隐藏目录/隐藏文件”，不再主观屏蔽可见工程目录。
+- 让 picker 不只面向 `.md`，而是能展示更多常见附件，并按后缀排序、按后缀筛选与搜索。
+- 修复 picker 行高和排版过挤的问题，让文件名、路径、后缀 badge 的视觉层次稳定下来。
+
+### ✅ 本轮调整
+
+- `src/shared/obsidianContext.ts`
+  - 移除 `node_modules`、`dist` 等“噪音目录”硬编码排除
+  - `isEligibleContextFilePath()` 现在只根据“是否位于隐藏路径中”与“是否有后缀”决定是否进入 picker
+  - 新增更完整的上下文 MIME 映射，覆盖图片、PDF、Office、压缩包、音视频和常见代码文件
+
+- `src/features/chat/OpenCodianView.ts`
+  - picker catalog 继续沿用缓存与增量更新，不退回到每次点击都全量重扫
+  - 候选文件排序调整为“后缀 -> 文件名 -> 路径”
+  - 本地模式下允许把非文本附件作为 file context 加入；远程模式仍只允许文本文件，并给出明确提示
+
+- `src/features/chat/ui/ContextFilePickerModal.ts`
+  - 搜索框改为同时匹配文件名、路径和后缀
+  - 后缀筛选条增加区块标题和结果统计
+  - picker 首屏默认显示全部后缀，不再强制跳到 `.md`
+
+- `styles.css`
+  - 后缀筛选 chips 改成接近设置面板快捷跳转的交互风格
+  - 文件卡片增加高度、留白和 badge 对齐空间，避免文字挤压和错位
+
+- `tests/unit/shared/obsidianContext.test.ts`
+  - 回归测试更新为“隐藏路径排除 + 可见附件允许”
+  - 新增附件 MIME 解析断言
+
+- `AGENTS.md`
+  - 同步刷新目录结构、OpenCodeService / OpenCodianView 现状、完整本地存储说明与 Obsidian 联动文档索引
+
+### 🧪 验证结果
+
+- 通过：`npm run typecheck`
+- 通过：`npm run lint`
+- 通过：`npm test -- tests/unit/shared/obsidianContext.test.ts tests/unit/core/opencode/OpenCodeService.test.ts`
+
+### 📝 结论
+
+- 这轮之后，picker 的行为更接近 Obsidian 用户预期：只避开隐藏区域，不擅自替你决定哪些可见目录算“噪音”；同时附件浏览、后缀筛选和实际发送能力也终于对齐了。
+
+## 2026-03-30 文件选择器噪音目录排除补强与列表项错位修正
+
+### 🎯 改动目标
+
+- 修复 picker 仍然把测试库里的工程噪音目录算进候选文件，导致文件数量明显异常的问题。
+- 修复文件项标题、路径和后缀 badge 挤在一起、错位重叠的问题。
+
+### ✅ 本轮调整
+
+- `src/shared/obsidianContext.ts`
+  - 在隐藏目录过滤之外，新增噪音目录段排除
+  - 现在会额外排除：`node_modules`、`dist`、`build`、`coverage`、`.obsidian`、`.opencode`、`.opencodian`、`.git` 等常见工程噪音目录
+
+- `src/features/chat/ui/ContextFilePickerModal.ts`
+  - catalog 加载完成后，如果存在 `.md` bucket，默认优先切到 `.md`
+  - picker 首屏更贴近“选笔记”而不是“扫整个工程”
+
+- `styles.css`
+  - 文件项改为显式 `justify-content: flex-start`
+  - 增加 `min-height`
+  - 头部改为 `align-items: flex-start`
+  - 文件名、路径、后缀 badge 的 margin / padding / 对齐方式重新收束，避免视觉重叠
+
+- `tests/unit/shared/obsidianContext.test.ts`
+  - 新增 `node_modules` 与 `dist` 排除断言
+
+### 🧪 验证结果
+
+- 通过：`npm run typecheck`
+- 通过：`npm run lint`
+- 通过：`npm test -- tests/unit/shared/obsidianContext.test.ts`
+
+### 📝 结论
+
+- 这轮之后，picker 不再只是“过滤点号目录”，而是会主动绕开常见工程噪音；同时列表项本身也从容易重叠的状态修到了更稳定的块级排版。
+
+## 2026-03-30 选区上下文会话失响应定位与本地 text/plain 归一化
+
+### 🎯 改动目标
+
+- 排查“发送选中文本后，当前会话后续普通消息也只出现红色错误条/空白条”的问题。
+- 给出能直接在测试库控制台里观察到的关键调试信号，而不是只靠 UI 现象猜测。
+
+### ✅ 本轮调整
+
+- `src/core/opencode/OpenCodeService.ts`
+  - 本地模式下，Obsidian 文本上下文的 `file part` 统一按 `text/plain` 发送
+  - 这样 OpenCode 会走更稳定的“Read tool 文本展开”路径，而不是把 Markdown/文本笔记作为数据附件继续向下传
+  - hydration 阶段不再把 user message 里的 synthetic `Called the Read tool...` 文本混进可见正文
+  - 新增 debug / warn 日志：
+    - 发送本地 Obsidian context part 时，打印 `kind/path/requestedMime/normalizedMime`
+    - 流结束时若没有 assistant message，打印 `sessionId/messageCount/roles/lastUserId`
+
+- `tests/unit/core/opencode/OpenCodeService.test.ts`
+  - 本地上下文 part 映射测试改为断言 `text/plain`
+  - 新增 synthetic Read tool 文本不会污染 user 正文的回归测试
+
+### 🧪 验证结果
+
+- 通过：`npm test -- tests/unit/core/opencode/OpenCodeService.test.ts`
+- 通过：`npm run typecheck`
+- 通过：`npm run lint`
+
+### 📝 结论
+
+- 这轮不是只加日志，而是先根据 OpenCode 参考实现把一个高概率根因修掉了：本地文本上下文如果按 `text/markdown` 等 MIME 走下去，可能会进入更不稳定的附件链路；现在先统一收敛到 `text/plain`，同时把关键调试日志补齐，便于继续验证会话是否恢复正常。
+
+## 2026-03-30 文件选择器隐藏目录过滤、后缀筛选与缓存 catalog
+
+### 🎯 改动目标
+
+- 让 `选择文件` 弹窗不再加载 `.obsidian`、`.git` 这类隐藏目录中的内容。
+- 修复基于 `resolveTextMimeFromPath()` 默认值的误判，避免 `.png` 等二进制附件继续混进“文本上下文文件”列表。
+- 避免每次打开 picker 都重新从头扫描和整理整份 vault 文件列表。
+- 为 picker 增加按文件后缀筛选的入口，并把列表项高度和信息层级拉开，减少拥挤感。
+
+### ✅ 本轮调整
+
+- `src/shared/obsidianContext.ts`
+  - 新增 `getContextPathExtension()`
+  - 新增 `isHiddenContextPath()`
+  - 新增 `isEligibleContextFilePath()`
+  - picker 现在只接受“非隐藏路径 + 已知文本后缀”的文件
+
+- `src/features/chat/OpenCodianView.ts`
+  - 将文件上下文候选集从“临时数组”升级为可复用的 `ContextFileCatalog` 缓存
+  - 首次构建 catalog 时按批次处理，避免长时间阻塞
+  - `create` / `delete` / `rename` 事件尽量增量更新缓存，而不是每次重新全量扫描
+
+- `src/features/chat/ui/ContextFilePickerModal.ts`
+  - picker 改为消费 catalog，而不是每次打开时自己重新整理文件列表
+  - 新增后缀筛选条：`全部` + 各扩展名 bucket
+  - 每个列表项新增后缀 badge
+  - 保留首屏最多 `200` 条结果的策略，但现在可以先按后缀再搜，缩小范围更直接
+
+- `styles.css`
+  - 新增后缀筛选条样式
+  - 提升列表项高度、内边距、行高和头部布局
+  - 文件名与路径的呼吸感更大，减少“上下挤在一起”的观感
+
+- `tests/unit/shared/obsidianContext.test.ts`
+  - 新增回归测试，覆盖隐藏目录过滤、已知文本后缀提取、二进制文件排除
+
+### 🧪 验证结果
+
+- 通过：`npm run typecheck`
+- 通过：`npm run lint`
+- 通过：`npm test -- tests/unit/shared/obsidianContext.test.ts tests/unit/core/opencode/OpenCodeService.test.ts`
+
+### 📝 结论
+
+- 到这一轮为止，文件上下文 picker 已经从“全量堆列表的临时实现”进化成了更接近正式组件的形态：候选文件来源更干净、打开代价更低、筛选路径更明确、视觉也不再那么挤。
+
+## 2026-03-30 文件上下文选择器异步化与样式收束
+
+### 🎯 改动目标
+
+- 修复点击 `选择文件` 时把 vault 文件筛选、排序、全量 DOM 渲染都塞进同一个 click handler，导致控制台出现长时间 `Violation` 警告的问题。
+- 收拾文件选择器与上下文 chip 的视觉层级，让它们不再像临时拼装出来的调试控件。
+
+### ✅ 本轮调整
+
+- `src/features/chat/ui/ContextFilePickerModal.ts`
+  - `chooseContextFile()` 改为接收 loader，而不是在点击前就把全量文件数组准备好
+  - modal 打开后先显示 loading 状态，再异步加载文件列表
+  - 文件索引按批次构建，避免一次性长任务
+  - 搜索结果首屏限制为前 `200` 项，超出时显示摘要提示，减少首屏 DOM 数量与回流开销
+
+- `src/features/chat/OpenCodianView.ts`
+  - 可选文本文件列表增加简单缓存
+  - 在 vault `create` / `delete` / `rename` 时失效缓存
+  - `选择文件` 点击时直接打开 picker，不再同步预先扫完整个 vault
+
+- `styles.css`
+  - 重做文件选择器标题、搜索框、列表项、空状态与摘要提示样式
+  - 重做 context chip：弱化“外层大胶囊 + 内层默认按钮”的割裂感，提升信息层级和可读性
+
+- `src/i18n/locales/en.ts`
+- `src/i18n/locales/zh.ts`
+  - 新增加载态与“仅显示前 N 条匹配结果”文案
+
+### 🧪 验证结果
+
+- 通过：`npm run typecheck`
+- 通过：`npm run lint`
+
+### 📝 结论
+
+- 这轮之后，文件选择器会更快地先把 modal 打开，再逐步准备可选文件列表；同时 UI 也从“能用但很糙”的状态收束成了更接近插件整体风格的正式控件。
+
+## 2026-03-30 Obsidian 上下文按钮焦点修复与本地文件回填清洗
+
+### 🎯 改动目标
+
+- 修复在 OpenCodian 聊天面板内点击 `当前笔记` / `当前选区` 时，经常提示“请先打开一个笔记”的问题。
+- 修复本地模式下发送 vault 文件上下文后，服务端把 user message 回填成 `原始问题 + Called the Read tool with the following input...`，导致用户气泡正文被污染、上下文附件丢失的问题。
+
+### ✅ 本轮调整
+
+- `src/features/chat/OpenCodianView.ts`
+  - `getActiveMarkdownView()` 不再只依赖当前活动视图
+  - 新增对最近 Markdown 文件路径和已打开 markdown leaf 的回退查找
+  - 即使当前焦点已经切到 OpenCodian 视图，仍然能回找到最近的笔记与选区来源
+
+- `src/core/opencode/OpenCodeService.ts`
+  - 为 user message hydration 新增本地文件上下文清洗逻辑
+  - 识别 `Called the Read tool with the following input: {...}` 这种服务端回填文本
+  - 从中提取 `filePath` / `file_path` / `path` / `notebook_path`
+  - 把该段文本从用户正文剥离，恢复成 `contextAttachments`
+  - 增加上下文附件去重，避免 file part 与清洗逻辑重复添加
+
+- `tests/unit/core/opencode/OpenCodeService.test.ts`
+  - 新增回归测试，覆盖“本地文件上下文被回填成 Read tool 文本”场景
+
+### 🧪 验证结果
+
+- 通过：`npm test -- --runTestsByPath tests/unit/core/opencode/OpenCodeService.test.ts`
+- 通过：`npm run typecheck`
+- 通过：`npm run lint`
+
+### 📝 结论
+
+- 这轮修复后，聊天面板内的上下文按钮不再过度依赖当前焦点；同时本地文件上下文在会话同步后，也会尽量恢复成“正常用户文本 + 上下文附件”的展示，而不是把底层 Read tool 回填内容直接暴露给用户。
+
+## 2026-03-30 Obsidian 联动 MVP 状态文档补齐
+
+### 🎯 改动目标
+
+- 为已经落地的 Obsidian 联动 MVP 补一份可接力的开发状态文档，避免后续继续开发时只能先读代码倒推设计。
+- 把这期的范围、已实现能力、未实现项、存储同步原则和关键文件职责统一整理到 `docs/`。
+
+### ✅ 本轮调整
+
+- 新增文档：`docs/obsidian-linkage-mvp-status.md`
+- 文档内容覆盖：
+  - 本期目标与非目标
+  - 聊天侧 Obsidian 联动的方案总览
+  - context tray / 命令 / 本地与远程上下文映射
+  - `question.asked` / `file.edited + session.diff()` 联动
+  - 本地完整存储原则
+  - 已实现 / 未实现 / 下一步建议
+  - 关键文件与职责、当前验证状态
+
+### 🧪 验证结果
+
+- 通过：`npm run check:devlog-order`
+
+### 📝 结论
+
+- 现在这轮 Obsidian 联动 MVP 已经有了单独的开发状态文档，后续继续做上下文增强、diff 展示或 `inline edit` 时，可以先看文档再进代码，接力成本会低很多。
+
 ## 2026-03-30 表格长链接换行与显示增强
 
 ### 🎯 改动目标

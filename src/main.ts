@@ -172,6 +172,24 @@ export default class OpenCodianPlugin extends Plugin {
       },
     });
 
+    this.addCommand({
+      id: 'add-current-note-to-context',
+      name: 'Add current note to OpenCodian context',
+      callback: async () => {
+        await this.activateView();
+        await this.getOpenCodianView()?.addCurrentNoteContextFromActiveEditor();
+      },
+    });
+
+    this.addCommand({
+      id: 'add-selection-to-context',
+      name: 'Add selection to OpenCodian context',
+      editorCallback: async (editor: Editor, view: MarkdownView) => {
+        await this.activateView();
+        await this.getOpenCodianView()?.addSelectionContextFromActiveEditor(editor, view);
+      },
+    });
+
     // Add settings tab
     this.settingsTab = new OpenCodianSettingTab(this.app, this);
     this.addSettingTab(this.settingsTab);
@@ -207,6 +225,13 @@ export default class OpenCodianPlugin extends Plugin {
     if (leaf) {
       workspace.revealLeaf(leaf);
     }
+  }
+
+  private getOpenCodianView(): OpenCodianView | null {
+    const leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE_OPENCODIAN)[0];
+    return leaf?.view instanceof OpenCodianView
+      ? leaf.view
+      : null;
   }
 
   /** Load settings from storage */

@@ -2,7 +2,7 @@
  * OpenCode SDK wrapper types
  */
 
-import type { ImageAttachment, StreamChunk } from '../types';
+import type { ImageAttachment, PromptContextItem, StreamChunk } from '../types';
 import type {
   EffortLevel,
   LocalServerConfig,
@@ -43,6 +43,7 @@ export interface QueryOptions {
   model?: string;
   provider?: string;
   images?: ImageAttachment[];
+  contextItems?: PromptContextItem[];
   allowedTools?: string[];
   externalContextPaths?: string[];
   reasoningEffort?: EffortLevel;

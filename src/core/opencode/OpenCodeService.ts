@@ -7,18 +7,33 @@
  */
 
 import { requestUrl } from 'obsidian';
+import * as path from 'path';
+import { fileURLToPath } from 'url';
 
 import {
+  buildObsidianContextTag,
   createLogger,
+  formatContextLabel,
+  isTextLikeMime,
+  parseLineRangeFromFileUrl,
+  parseObsidianContextTag,
+  resolveContextMimeFromPath,
   resolveToolExecutionStatus,
   resolveToolResultText,
+  toFileContextUrl,
 } from '../../shared';
 import type {
   ChatMessage,
   ContentBlock,
   ImageAttachment,
+  MessageContextAttachment,
   PermissionReply,
   PermissionRequest,
+  PromptContextItem,
+  QuestionOption,
+  QuestionPrompt,
+  QuestionRequest as ChatQuestionRequest,
+  SessionDiffEntry,
   SessionTodo,
   StreamChunk,
 } from '../types';
@@ -33,6 +48,7 @@ import { ServerManager } from './ServerManager';
 import type { ManagedServerState, OpenCodeServerConfig, QueryOptions, ResponseHandler } from './types';
 
 const logger = createLogger('OpenCodeService');
+const INLINE_READ_TOOL_PREFIX = 'Called the Read tool with the following input:';
 
 function cloneSettings(settings: OpenCodianSettings): OpenCodianSettings {
   return JSON.parse(JSON.stringify(settings)) as OpenCodianSettings;
@@ -95,6 +111,14 @@ interface OpenCodeEvent {
       input?: number;
       output?: number;
     };
+    file?: string;
+    questions?: Array<{
+      question?: string;
+      header?: string;
+      options?: Array<{ label?: string; description?: string }>;
+      multiple?: boolean;
+      custom?: boolean;
+    }>;
   };
 }
 
@@ -239,6 +263,30 @@ interface ActiveStreamContext {
   partTypeMap: Map<string, string>;
 }
 
+type PromptRequestPart =
+  | {
+      type: 'text';
+      text: string;
+      synthetic?: boolean;
+      ignored?: boolean;
+      metadata?: Record<string, unknown>;
+    }
+  | {
+      type: 'file';
+      mime: string;
+      filename?: string;
+      url: string;
+      source?: {
+        type: 'file';
+        path: string;
+        text: {
+          value: string;
+          start: number;
+          end: number;
+        };
+      };
+    };
+
 type SessionTodoUpdate = {
   sessionId: string;
   todos: SessionTodo[];
@@ -266,6 +314,8 @@ type SessionStatusUpdate = {
 };
 
 type SessionStatusListener = (update: SessionStatusUpdate) => void;
+
+const REMOTE_CONTEXT_TEXT_LIMIT_BYTES = 64 * 1024;
 
 export class OpenCodeService {
   private settings: OpenCodianSettings;
@@ -753,13 +803,15 @@ export class OpenCodeService {
       throw new Error('No active session');
     }
 
+    const parts = this.buildPromptRequestParts(message, options);
+
     if (this.shouldUseSdk('sdkPrompt')) {
       const response = await this.getSdkClient().session.prompt(
-        this.buildSdkPromptParameters(sessionId, message, options),
+        this.buildSdkPromptParameters(sessionId, parts, options),
       );
       if (response && typeof response === 'object' && 'info' in response && 'parts' in response) {
         const typedResponse = response as AssistantMessageResponse;
-        return OpenCodeService.openCodeMessageToChatMessage(typedResponse.info, typedResponse.parts);
+        return OpenCodeService.openCodeMessageToChatMessage(typedResponse.info, typedResponse.parts, this.vaultPath);
       }
 
       throw new Error('Invalid assistant response payload');
@@ -768,7 +820,7 @@ export class OpenCodeService {
     const providerID = options.provider ?? this.settings.defaultProvider;
     const modelID = options.model ?? this.settings.defaultModel;
     const requestBody: Record<string, unknown> = {
-      parts: [{ type: 'text', text: message }],
+      parts,
       model: {
         providerID,
         modelID,
@@ -787,7 +839,7 @@ export class OpenCodeService {
       && 'parts' in response
     ) {
       const typedResponse = response as AssistantMessageResponse;
-      return OpenCodeService.openCodeMessageToChatMessage(typedResponse.info, typedResponse.parts);
+      return OpenCodeService.openCodeMessageToChatMessage(typedResponse.info, typedResponse.parts, this.vaultPath);
     }
 
     throw new Error('Invalid assistant response payload');
@@ -806,18 +858,7 @@ export class OpenCodeService {
       return;
     }
 
-    // Build parts array
-    const parts = [{ type: 'text', text: message }];
-
-    // Add images if present
-    if (options.images && options.images.length > 0) {
-      for (const img of options.images) {
-        parts.push({
-          type: 'text',
-          text: `[Image: ${img.filename ?? 'attachment'}]`,
-        });
-      }
-    }
+    const parts = this.buildPromptRequestParts(message, options);
 
     // Build model config
     const providerID = options.provider ?? this.settings.defaultProvider;
@@ -1341,7 +1382,7 @@ export class OpenCodeService {
 
   private buildSdkPromptParameters(
     sessionId: string,
-    message: string,
+    parts: PromptRequestPart[],
     options: QueryOptions & { system?: string },
   ): {
     sessionID: string;
@@ -1349,17 +1390,11 @@ export class OpenCodeService {
       providerID: string;
       modelID: string;
     };
-    parts: Array<{ type: 'text'; text: string }>;
+    parts: PromptRequestPart[];
     system?: string;
     tools?: Record<string, boolean>;
     variant?: string;
   } {
-    if (options.externalContextPaths?.length) {
-      logger.debug('externalContextPaths are not yet mapped to SDK file parts and are being omitted', {
-        count: options.externalContextPaths.length,
-      });
-    }
-
     if (options.thinkingBudget !== undefined) {
       logger.debug('thinkingBudget is not currently mapped to the SDK v2 prompt payload and is being omitted', {
         thinkingBudget: options.thinkingBudget,
@@ -1372,7 +1407,7 @@ export class OpenCodeService {
         providerID: string;
         modelID: string;
       };
-      parts: Array<{ type: 'text'; text: string }>;
+      parts: PromptRequestPart[];
       system?: string;
       tools?: Record<string, boolean>;
       variant?: string;
@@ -1382,7 +1417,7 @@ export class OpenCodeService {
         providerID: options.provider ?? this.settings.defaultProvider,
         modelID: options.model ?? this.settings.defaultModel,
       },
-      parts: this.buildPromptTextParts(message, options.images),
+      parts,
     };
 
     const tools = this.buildAllowedToolsRecord(options.allowedTools);
@@ -1402,22 +1437,192 @@ export class OpenCodeService {
     return parameters;
   }
 
-  private buildPromptTextParts(
+  private buildPromptRequestParts(
     message: string,
-    images?: ImageAttachment[],
-  ): Array<{ type: 'text'; text: string }> {
-    const parts: Array<{ type: 'text'; text: string }> = [{ type: 'text', text: message }];
+    options: QueryOptions,
+  ): PromptRequestPart[] {
+    const parts: PromptRequestPart[] = [{ type: 'text', text: message }];
 
-    if (images && images.length > 0) {
-      for (const image of images) {
-        parts.push({
-          type: 'text',
-          text: `[Image: ${image.filename ?? 'attachment'}]`,
-        });
-      }
+    for (const item of options.contextItems ?? []) {
+      parts.push(this.createPromptContextPart(item));
+    }
+
+    for (const image of options.images ?? []) {
+      parts.push({
+        type: 'file',
+        mime: image.mediaType,
+        filename: image.filename,
+        url: `data:${image.mediaType};base64,${image.data}`,
+      });
+    }
+
+    if (options.externalContextPaths?.length) {
+      logger.debug('externalContextPaths are deprecated for sendMessage/requestAssistantResponse and are being omitted', {
+        count: options.externalContextPaths.length,
+      });
     }
 
     return parts;
+  }
+
+  private createPromptContextPart(item: PromptContextItem): PromptRequestPart {
+    if (this.settings.server.mode === 'local') {
+      const absolutePath = this.resolveContextAbsolutePath(item.path);
+      const normalizedMime = isTextLikeMime(item.mime) ? 'text/plain' : item.mime;
+      const part: Extract<PromptRequestPart, { type: 'file' }> = {
+        type: 'file',
+        mime: normalizedMime,
+        filename: path.basename(item.path.replace(/\\/g, '/')),
+        url: toFileContextUrl(absolutePath, item.lineRange),
+      };
+
+      logger.debug('Preparing local Obsidian context part', {
+        kind: item.kind,
+        path: item.path,
+        requestedMime: item.mime,
+        normalizedMime,
+        hasLineRange: Boolean(item.lineRange),
+        hasTextSnapshot: Boolean(item.textSnapshot),
+      });
+
+      if (item.kind === 'selection' && item.textSnapshot) {
+        part.source = {
+          type: 'file',
+          path: item.path,
+          text: {
+            value: item.textSnapshot,
+            start: 0,
+            end: item.textSnapshot.length,
+          },
+        };
+      }
+
+      return part;
+    }
+
+    if (!isTextLikeMime(item.mime)) {
+      throw new Error(`Only text context is supported in remote mode: ${item.label}`);
+    }
+
+    if (!item.textSnapshot) {
+      throw new Error(`Missing text snapshot for remote context: ${item.label}`);
+    }
+
+    const byteLength = new TextEncoder().encode(item.textSnapshot).length;
+    if (byteLength > REMOTE_CONTEXT_TEXT_LIMIT_BYTES) {
+      throw new Error(`Context exceeds remote size limit: ${item.label}`);
+    }
+
+    return {
+      type: 'text',
+      text: buildObsidianContextTag(item),
+      synthetic: true,
+      metadata: {
+        kind: item.kind,
+        path: item.path,
+        lines: item.lineRange ? `${item.lineRange.startLine}-${item.lineRange.endLine}` : undefined,
+      },
+    };
+  }
+
+  private resolveContextAbsolutePath(contextPath: string): string {
+    if (path.isAbsolute(contextPath)) {
+      return contextPath;
+    }
+
+    if (!this.vaultPath) {
+      return contextPath;
+    }
+
+    return path.resolve(this.vaultPath, contextPath);
+  }
+
+  private normalizeQuestionRequest(raw: unknown): ChatQuestionRequest | null {
+    if (!raw || typeof raw !== 'object') {
+      return null;
+    }
+
+    const request = raw as {
+      id?: unknown;
+      sessionID?: unknown;
+      questions?: unknown;
+    };
+
+    if (typeof request.id !== 'string' || typeof request.sessionID !== 'string') {
+      return null;
+    }
+
+    const questions = Array.isArray(request.questions)
+      ? request.questions.reduce<QuestionPrompt[]>((items, question) => {
+          const normalized = this.normalizeQuestionPrompt(question);
+          if (normalized) {
+            items.push(normalized);
+          }
+          return items;
+        }, [])
+      : [];
+
+    if (questions.length === 0) {
+      return null;
+    }
+
+    return {
+      id: request.id,
+      sessionId: request.sessionID,
+      questions,
+    };
+  }
+
+  private normalizeQuestionPrompt(raw: unknown): QuestionPrompt | null {
+    if (!raw || typeof raw !== 'object') {
+      return null;
+    }
+
+    const prompt = raw as {
+      question?: unknown;
+      header?: unknown;
+      options?: unknown;
+      multiple?: unknown;
+      custom?: unknown;
+    };
+
+    const questionText = typeof prompt.question === 'string' ? prompt.question.trim() : '';
+    const header = typeof prompt.header === 'string' && prompt.header.trim()
+      ? prompt.header.trim()
+      : questionText;
+    if (!questionText || !header) {
+      return null;
+    }
+
+    const options = Array.isArray(prompt.options)
+      ? prompt.options.reduce<QuestionOption[]>((items, option) => {
+          if (!option || typeof option !== 'object') {
+            return items;
+          }
+
+          const normalizedOption = option as { label?: unknown; description?: unknown };
+          const label = typeof normalizedOption.label === 'string' ? normalizedOption.label.trim() : '';
+          if (!label) {
+            return items;
+          }
+
+          items.push({
+            label,
+            description: typeof normalizedOption.description === 'string'
+              ? normalizedOption.description.trim()
+              : '',
+          });
+          return items;
+        }, [])
+      : [];
+
+    return {
+      question: questionText,
+      header,
+      options,
+      multiple: prompt.multiple === true,
+      custom: prompt.custom !== false,
+    };
   }
 
   private buildAllowedToolsRecord(allowedTools?: string[]): Record<string, boolean> | undefined {
@@ -1560,14 +1765,29 @@ export class OpenCodeService {
       return { chunks, stop: false };
     }
 
+    if (eventData.type === 'file.edited') {
+      const file = eventData.properties?.file;
+      if (typeof file === 'string' && file.trim()) {
+        chunks.push({ type: 'file_edited', file: file.trim() });
+      }
+
+      return { chunks, stop: false };
+    }
+
     if (eventData.type === 'session.idle') {
       return { chunks, stop: true };
     }
 
     if (eventData.type === 'question.asked') {
-      logger.debug('Ignoring unsupported SDK question event until question UI is implemented', {
-        sessionId,
-      });
+      const request = this.normalizeQuestionRequest(eventData.properties);
+      if (request) {
+        chunks.push({
+          type: 'question_request',
+          request,
+        });
+      }
+
+      return { chunks, stop: false };
     }
 
     return { chunks, stop: false };
@@ -1614,9 +1834,10 @@ export class OpenCodeService {
     sessionId: string,
   ): AsyncGenerator<StreamChunk> {
     const client = this.getSdkClient();
+    const parts = this.buildPromptRequestParts(message, options);
 
     try {
-      await client.session.promptAsync(this.buildSdkPromptParameters(sessionId, message, options));
+      await client.session.promptAsync(this.buildSdkPromptParameters(sessionId, parts, options));
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Unknown error';
       yield { type: 'error', content: msg };
@@ -1714,6 +1935,13 @@ export class OpenCodeService {
           timestamp: assistantMsg.info.time.created,
           modelId: formatModelIdentifier(assistantMsg.info.providerID, assistantMsg.info.modelID),
         };
+      } else {
+        logger.warn('No assistant message found when finalizing stream response', {
+          sessionId,
+          messageCount: messages.length,
+          roles: messages.map((item) => item.info.role),
+          lastUserId: messages.filter((item) => item.info.role === 'user').at(-1)?.info.id ?? null,
+        });
       }
     } catch (error) {
       logger.error('Final message check failed:', error);
@@ -2131,6 +2359,133 @@ export class OpenCodeService {
     return session.revert?.messageID ? session.revert : null;
   }
 
+  async getPendingQuestions(): Promise<ChatQuestionRequest[]> {
+    const normalizeResponse = (response: unknown): ChatQuestionRequest[] => {
+      const rawRequests = Array.isArray(response)
+        ? response
+        : response && typeof response === 'object' && 'data' in response && Array.isArray((response as { data?: unknown }).data)
+          ? (response as { data: unknown[] }).data
+          : [];
+
+      return rawRequests.reduce<ChatQuestionRequest[]>((requests, rawRequest) => {
+        const normalized = this.normalizeQuestionRequest(rawRequest);
+        if (normalized) {
+          requests.push(normalized);
+        }
+        return requests;
+      }, []);
+    };
+
+    if (this.shouldUseSdk('sdkQuestions')) {
+      try {
+        const response = await this.getSdkClient().question.list();
+        return normalizeResponse(response);
+      } catch (error) {
+        logger.warn('SDK question.list failed, falling back to legacy HTTP', error);
+      }
+    }
+
+    try {
+      const response = await this.get<unknown>('/question');
+      return normalizeResponse(response);
+    } catch (error) {
+      logger.error('Failed to get pending questions:', error);
+      return [];
+    }
+  }
+
+  async replyToQuestion(requestID: string, answers: string[][]): Promise<void> {
+    if (this.shouldUseSdk('sdkQuestions')) {
+      try {
+        await this.getSdkClient().question.reply({
+          requestID,
+          answers,
+        });
+        return;
+      } catch (error) {
+        logger.warn('SDK question.reply failed, falling back to legacy HTTP', error);
+      }
+    }
+
+    await this.post(`/question/${requestID}/reply`, { answers });
+  }
+
+  async rejectQuestion(requestID: string): Promise<void> {
+    if (this.shouldUseSdk('sdkQuestions')) {
+      try {
+        await this.getSdkClient().question.reject({
+          requestID,
+        });
+        return;
+      } catch (error) {
+        logger.warn('SDK question.reject failed, falling back to legacy HTTP', error);
+      }
+    }
+
+    await this.post(`/question/${requestID}/reject`, {});
+  }
+
+  async getSessionDiff(sessionId: string, messageID?: string): Promise<SessionDiffEntry[]> {
+    const normalizeResponse = (response: unknown): SessionDiffEntry[] => {
+      const rawEntries = Array.isArray(response)
+        ? response
+        : response && typeof response === 'object' && 'data' in response && Array.isArray((response as { data?: unknown }).data)
+          ? (response as { data: unknown[] }).data
+          : [];
+
+      return rawEntries.reduce<SessionDiffEntry[]>((entries, rawEntry) => {
+        if (!rawEntry || typeof rawEntry !== 'object') {
+          return entries;
+        }
+
+        const entry = rawEntry as {
+          file?: unknown;
+          before?: unknown;
+          after?: unknown;
+          additions?: unknown;
+          deletions?: unknown;
+          status?: unknown;
+        };
+        if (typeof entry.file !== 'string' || !entry.file.trim()) {
+          return entries;
+        }
+
+        entries.push({
+          file: entry.file,
+          before: typeof entry.before === 'string' ? entry.before : undefined,
+          after: typeof entry.after === 'string' ? entry.after : undefined,
+          additions: typeof entry.additions === 'number' ? entry.additions : 0,
+          deletions: typeof entry.deletions === 'number' ? entry.deletions : 0,
+          status: entry.status === 'added' || entry.status === 'deleted' || entry.status === 'modified'
+            ? entry.status
+            : undefined,
+        });
+        return entries;
+      }, []);
+    };
+
+    if (this.shouldUseSdk('sdkCrud')) {
+      try {
+        const response = await this.getSdkClient().session.diff({
+          sessionID: sessionId,
+          messageID,
+        });
+        return normalizeResponse(response);
+      } catch (error) {
+        logger.warn(`SDK session.diff failed for ${sessionId}, falling back to legacy HTTP`, error);
+      }
+    }
+
+    const query = messageID ? `?messageID=${encodeURIComponent(messageID)}` : '';
+    try {
+      const response = await this.get<unknown>(`/session/${sessionId}/diff${query}`);
+      return normalizeResponse(response);
+    } catch (error) {
+      logger.error(`Failed to get session diff for ${sessionId}:`, error);
+      return [];
+    }
+  }
+
   private async getSessionInfo(sessionId: string): Promise<Session> {
     if (this.shouldUseSdk('sdkCrud')) {
       try {
@@ -2318,19 +2673,58 @@ export class OpenCodeService {
   }
 
   /** Convert OpenCode message to ChatMessage */
-  static openCodeMessageToChatMessage(info: Message, parts: Part[]): ChatMessage {
-    // Build content from text parts
+  static openCodeMessageToChatMessage(
+    info: Message,
+    parts: Part[],
+    vaultPath?: string,
+  ): ChatMessage {
+    const role = info.role === 'assistant' ? 'assistant' : 'user';
+
     const textParts = parts.filter((p): p is Part & { text: string } =>
       p.type === 'text' && typeof p.text === 'string'
     );
-    const content = textParts.map((p) => p.text).join('');
+    const visibleTextParts: string[] = [];
+    const contextAttachments: MessageContextAttachment[] = [];
 
-    // Extract thinking content from reasoning parts - each part becomes a separate block
+    for (const part of textParts) {
+      if (role === 'user') {
+        const contextAttachment = parseObsidianContextTag(part.text);
+        if (contextAttachment) {
+          contextAttachments.push(contextAttachment);
+          continue;
+        }
+
+        if ((part as Part & { synthetic?: boolean }).synthetic === true) {
+          const inlineReadContext = OpenCodeService.extractInlineReadToolContext(part.text, vaultPath);
+          if (inlineReadContext.attachments.length > 0) {
+            contextAttachments.push(...inlineReadContext.attachments);
+          }
+          continue;
+        }
+      }
+
+      visibleTextParts.push(part.text);
+    }
+
+    let content = visibleTextParts.join('');
+
+    if (role === 'user') {
+      for (const part of parts) {
+        const contextAttachment = OpenCodeService.parseFileContextAttachment(part, vaultPath);
+        if (contextAttachment) {
+          contextAttachments.push(contextAttachment);
+        }
+      }
+
+      const inlineReadContext = OpenCodeService.extractInlineReadToolContext(content, vaultPath);
+      content = inlineReadContext.content;
+      contextAttachments.push(...inlineReadContext.attachments);
+    }
+
     const thinkingParts = parts.filter((p): p is Part & { text: string } =>
       p.type === 'reasoning' && typeof p.text === 'string'
     );
 
-    // Extract tool calls from tool parts
     const toolParts = parts.filter((p) => p.type === 'tool') as ToolPartData[];
     const toolCalls = toolParts
       .filter((p) => {
@@ -2347,10 +2741,8 @@ export class OpenCodeService {
         status: 'pending' as const,
       }));
 
-    // Build content blocks for rich rendering
     const contentBlocks: ContentBlock[] = [];
-    
-    // Add each thinking part as a separate block to preserve individual durations
+
     for (const part of thinkingParts) {
       contentBlocks.push({
         type: 'thinking',
@@ -2358,35 +2750,32 @@ export class OpenCodeService {
         durationSeconds: resolveReasoningDurationSeconds(part),
       });
     }
-    
-    // Process tool parts - combine tool_use and tool_result into single blocks
+
     const processedToolIds = new Set<string>();
     for (const part of toolParts) {
       const toolId = part.callID || part.id;
-      if (!toolId || processedToolIds.has(toolId)) continue;
-      
-      processedToolIds.add(toolId);
-      
-      // Find the result for this tool (if any)
-      const resultPart = toolParts.find(
-        (p) => {
-          if ((p.callID || p.id) !== toolId) {
-            return false;
-          }
+      if (!toolId || processedToolIds.has(toolId)) {
+        continue;
+      }
 
-          const toolStatus = resolveToolExecutionStatus({
-            toolName: p.tool,
-            state: p.state,
-          });
-          return toolStatus === 'completed' || toolStatus === 'error';
+      processedToolIds.add(toolId);
+
+      const resultPart = toolParts.find((candidate) => {
+        if ((candidate.callID || candidate.id) !== toolId) {
+          return false;
         }
-      );
+
+        const toolStatus = resolveToolExecutionStatus({
+          toolName: candidate.tool,
+          state: candidate.state,
+        });
+        return toolStatus === 'completed' || toolStatus === 'error';
+      });
       const toolStatus = resolveToolExecutionStatus({
         toolName: part.tool,
         state: resultPart?.state ?? part.state,
       });
-      
-      // Create combined tool_use block with result
+
       contentBlocks.push({
         type: 'tool_use',
         toolId,
@@ -2396,21 +2785,15 @@ export class OpenCodeService {
         toolResult: resolveToolResultText(resultPart?.state),
       });
     }
-    
-    // Add text content
+
     if (content) {
       contentBlocks.push({ type: 'text', text: content });
     }
 
-    // Determine timestamp
-    let timestamp: number;
-    if ('time' in info && info.time) {
-      timestamp = info.time.created;
-    } else {
-      timestamp = Date.now();
-    }
+    const timestamp = 'time' in info && info.time
+      ? info.time.created
+      : Date.now();
 
-    const role = info.role === 'assistant' ? 'assistant' : 'user';
     const omo = detectOmoMessageMeta(role, content);
     const normalizedContent = omo?.kind === 'user-injection'
       ? omo.originalText
@@ -2429,11 +2812,266 @@ export class OpenCodeService {
       sourceMessageId: info.id,
       toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
       contentBlocks: contentBlocks.length > 0 ? contentBlocks : undefined,
+      contextAttachments: contextAttachments.length > 0
+        ? OpenCodeService.dedupeContextAttachments(contextAttachments)
+        : undefined,
       displayStyle: omo?.kind === 'system-reminder' ? 'notice' : undefined,
       noticeTone: omo?.kind === 'system-reminder' ? 'info' : undefined,
       omo: omo ?? undefined,
       parts,
     };
+  }
+
+  private static parseFileContextAttachment(
+    part: Part,
+    vaultPath?: string,
+  ): MessageContextAttachment | null {
+    if (part.type !== 'file') {
+      return null;
+    }
+
+    const filePart = part as Part & {
+      mime?: string;
+      url?: string;
+      source?: {
+        type?: string;
+        path?: string;
+        text?: {
+          value?: string;
+        };
+      };
+    };
+
+    const sourcePath = typeof filePart.source?.path === 'string'
+      ? OpenCodeService.normalizeContextAttachmentPath(filePart.source.path, vaultPath)
+      : undefined;
+    const urlPath = typeof filePart.url === 'string'
+      ? OpenCodeService.contextPathFromFileUrl(filePart.url, vaultPath)
+      : null;
+    const contextPath = sourcePath ?? urlPath;
+    if (!contextPath) {
+      return null;
+    }
+
+    const lineRange = typeof filePart.url === 'string'
+      ? parseLineRangeFromFileUrl(filePart.url) ?? undefined
+      : undefined;
+    const textSnapshot = typeof filePart.source?.text?.value === 'string'
+      ? filePart.source.text.value
+      : undefined;
+
+    return {
+      kind: lineRange || textSnapshot ? 'selection' : 'file',
+      path: contextPath,
+      label: formatContextLabel(contextPath, lineRange),
+      mime: typeof filePart.mime === 'string' && filePart.mime.trim()
+        ? filePart.mime
+        : resolveContextMimeFromPath(contextPath),
+      lineRange,
+      textSnapshot,
+    };
+  }
+
+  private static extractInlineReadToolContext(
+    text: string,
+    vaultPath?: string,
+  ): { content: string; attachments: MessageContextAttachment[] } {
+    if (!text.includes(INLINE_READ_TOOL_PREFIX)) {
+      return {
+        content: text,
+        attachments: [],
+      };
+    }
+
+    const attachments: MessageContextAttachment[] = [];
+    const visibleSegments: string[] = [];
+    let cursor = 0;
+
+    while (cursor < text.length) {
+      const markerIndex = text.indexOf(INLINE_READ_TOOL_PREFIX, cursor);
+      if (markerIndex < 0) {
+        visibleSegments.push(text.slice(cursor));
+        break;
+      }
+
+      const parsedInvocation = OpenCodeService.parseInlineReadToolInvocation(text, markerIndex, vaultPath);
+      if (!parsedInvocation) {
+        visibleSegments.push(text.slice(cursor, markerIndex + INLINE_READ_TOOL_PREFIX.length));
+        cursor = markerIndex + INLINE_READ_TOOL_PREFIX.length;
+        continue;
+      }
+
+      visibleSegments.push(text.slice(cursor, markerIndex));
+      attachments.push(parsedInvocation.attachment);
+      cursor = parsedInvocation.nextIndex;
+    }
+
+    return {
+      content: visibleSegments.join('').trim(),
+      attachments,
+    };
+  }
+
+  private static parseInlineReadToolInvocation(
+    text: string,
+    markerIndex: number,
+    vaultPath?: string,
+  ): { attachment: MessageContextAttachment; nextIndex: number } | null {
+    let cursor = markerIndex + INLINE_READ_TOOL_PREFIX.length;
+    while (cursor < text.length && /\s/.test(text[cursor])) {
+      cursor += 1;
+    }
+
+    if (text[cursor] !== '{') {
+      return null;
+    }
+
+    const jsonEnd = OpenCodeService.findBalancedJsonObjectEnd(text, cursor);
+    if (jsonEnd < 0) {
+      return null;
+    }
+
+    const parsedInput = OpenCodeService.safeParseJsonRecord(text.slice(cursor, jsonEnd + 1));
+    const inputPath = OpenCodeService.extractPathFromToolInput(parsedInput);
+    if (!inputPath) {
+      return null;
+    }
+
+    const contextPath = OpenCodeService.normalizeContextAttachmentPath(inputPath, vaultPath);
+
+    return {
+      attachment: {
+        kind: 'file',
+        path: contextPath,
+        label: formatContextLabel(contextPath),
+        mime: resolveContextMimeFromPath(contextPath),
+      },
+      nextIndex: jsonEnd + 1,
+    };
+  }
+
+  private static findBalancedJsonObjectEnd(text: string, startIndex: number): number {
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+
+    for (let index = startIndex; index < text.length; index++) {
+      const char = text[index];
+
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+
+      if (char === '\\') {
+        escaped = true;
+        continue;
+      }
+
+      if (char === '"') {
+        inString = !inString;
+        continue;
+      }
+
+      if (inString) {
+        continue;
+      }
+
+      if (char === '{') {
+        depth += 1;
+      } else if (char === '}') {
+        depth -= 1;
+        if (depth === 0) {
+          return index;
+        }
+      }
+    }
+
+    return -1;
+  }
+
+  private static safeParseJsonRecord(value: string): Record<string, unknown> | null {
+    try {
+      const parsed = JSON.parse(value);
+      return parsed && typeof parsed === 'object'
+        ? parsed as Record<string, unknown>
+        : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private static extractPathFromToolInput(input: Record<string, unknown> | null): string | null {
+    if (!input) {
+      return null;
+    }
+
+    const candidates = [
+      input.filePath,
+      input.file_path,
+      input.path,
+      input.notebook_path,
+    ];
+
+    for (const candidate of candidates) {
+      if (typeof candidate === 'string' && candidate.trim()) {
+        return candidate.trim();
+      }
+    }
+
+    return null;
+  }
+
+  private static contextPathFromFileUrl(fileUrl: string, vaultPath?: string): string | null {
+    try {
+      return OpenCodeService.normalizeContextAttachmentPath(fileURLToPath(fileUrl), vaultPath);
+    } catch {
+      return null;
+    }
+  }
+
+  private static normalizeContextAttachmentPath(filePath: string, vaultPath?: string): string {
+    const normalizedPath = path.normalize(filePath);
+    if (!vaultPath) {
+      return normalizedPath.replace(/\\/g, '/');
+    }
+
+    const normalizedVaultPath = path.normalize(vaultPath);
+    const relativePath = path.relative(normalizedVaultPath, normalizedPath);
+    if (
+      relativePath
+      && !relativePath.startsWith('..')
+      && !path.isAbsolute(relativePath)
+    ) {
+      return relativePath.replace(/\\/g, '/');
+    }
+
+    return normalizedPath.replace(/\\/g, '/');
+  }
+
+  private static dedupeContextAttachments(
+    attachments: MessageContextAttachment[],
+  ): MessageContextAttachment[] {
+    const seen = new Set<string>();
+    const deduped: MessageContextAttachment[] = [];
+
+    for (const attachment of attachments) {
+      const key = [
+        attachment.kind,
+        attachment.path,
+        attachment.lineRange?.startLine ?? '',
+        attachment.lineRange?.endLine ?? '',
+      ].join(':');
+
+      if (seen.has(key)) {
+        continue;
+      }
+
+      seen.add(key);
+      deduped.push(attachment);
+    }
+
+    return deduped;
   }
 
   // ==================== Permission API Methods ====================

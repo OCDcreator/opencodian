@@ -1280,6 +1280,49 @@
   font-size: 15px;
 }
 
+.opencodian-user-context-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.opencodian-user-context-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--interactive-accent) 24%, var(--opencodian-glass-border));
+  background: color-mix(in srgb, var(--interactive-accent) 10%, var(--background-primary));
+  max-width: 100%;
+}
+
+.opencodian-user-context-kind {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--interactive-accent);
+  text-transform: uppercase;
+}
+
+.opencodian-user-context-label {
+  border: none;
+  background: transparent;
+  color: var(--text-normal);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 260px;
+}
+
+.opencodian-user-context-label:hover {
+  color: var(--text-accent);
+}
+
 .opencodian-message--assistant .opencodian-message-text {
   color: var(--text-normal);
 }
@@ -1982,6 +2025,139 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.opencodian-context-tray {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid var(--opencodian-glass-border);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--opencodian-glass-specular-soft) 86%, transparent) 0%,
+      transparent 100%
+    ),
+    color-mix(in srgb, var(--opencodian-glass-base-soft) 92%, transparent);
+  backdrop-filter: blur(16px) saturate(1.08);
+  -webkit-backdrop-filter: blur(16px) saturate(1.08);
+}
+
+.opencodian-context-tray-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.opencodian-context-tray-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+  margin-right: 4px;
+}
+
+.opencodian-context-tray-btn {
+  border: 1px solid color-mix(in srgb, var(--opencodian-glass-border) 82%, transparent);
+  background: color-mix(in srgb, var(--background-primary) 78%, transparent);
+  color: var(--text-normal);
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.opencodian-context-tray-btn:hover {
+  transform: translateY(-1px);
+  border-color: var(--opencodian-glass-border-strong);
+  background: color-mix(in srgb, var(--interactive-accent) 12%, var(--background-primary));
+}
+
+.opencodian-context-tray-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.opencodian-context-tray-empty {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.opencodian-context-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 18px;
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--interactive-accent) 10%, transparent) 0%,
+      color-mix(in srgb, var(--background-primary) 86%, transparent) 100%
+    );
+  border: 1px solid color-mix(in srgb, var(--interactive-accent) 18%, var(--opencodian-glass-border));
+  box-shadow:
+    0 8px 18px color-mix(in srgb, var(--opencodian-glass-shadow) 22%, transparent),
+    0 1px 0 color-mix(in srgb, var(--background-primary) 70%, transparent) inset;
+  max-width: 100%;
+}
+
+.opencodian-context-chip-kind {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 8px;
+  min-height: 28px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--interactive-accent);
+}
+
+.opencodian-context-chip-label {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 12px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--opencodian-glass-border) 75%, transparent);
+  background: color-mix(in srgb, var(--background-primary) 94%, transparent);
+  color: var(--text-normal);
+  cursor: pointer;
+  font-size: 12px;
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--background-primary) 72%, transparent) inset;
+}
+
+.opencodian-context-chip-label:hover {
+  color: var(--text-accent);
+  border-color: color-mix(in srgb, var(--interactive-accent) 30%, var(--opencodian-glass-border));
+}
+
+.opencodian-context-chip-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.opencodian-context-chip-remove:hover {
+  color: var(--text-error);
+  background: color-mix(in srgb, var(--background-modifier-error) 18%, transparent);
 }
 
 .opencodian-session-todo-slot {
@@ -5052,6 +5228,381 @@
 .opencodian-permission-inline-reject {
   background: var(--background-modifier-error);
   color: var(--text-on-accent);
+}
+
+.opencodian-question-inline {
+  margin-top: 12px;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--interactive-accent) 24%, var(--opencodian-glass-border));
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--interactive-accent) 8%, transparent) 0%,
+      transparent 100%
+    ),
+    color-mix(in srgb, var(--opencodian-glass-base) 92%, transparent);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.opencodian-question-inline-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.opencodian-question-inline-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--interactive-accent) 16%, transparent);
+  color: var(--interactive-accent);
+  font-weight: 700;
+}
+
+.opencodian-question-inline-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-normal);
+}
+
+.opencodian-question-inline-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.opencodian-question-inline-header-text {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-normal);
+}
+
+.opencodian-question-inline-body-text {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.opencodian-question-inline-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.opencodian-question-inline-option {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--background-primary) 74%, transparent);
+  border: 1px solid color-mix(in srgb, var(--opencodian-glass-border) 76%, transparent);
+}
+
+.opencodian-question-inline-option-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.opencodian-question-inline-option-label {
+  font-size: 13px;
+  color: var(--text-normal);
+}
+
+.opencodian-question-inline-option-description {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.opencodian-question-inline-custom {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--opencodian-border-soft);
+  background: color-mix(in srgb, var(--background-primary) 82%, transparent);
+  color: var(--text-normal);
+}
+
+.opencodian-question-inline-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.opencodian-question-inline-btn {
+  border: none;
+  border-radius: 10px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.opencodian-question-inline-btn.is-submit {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+.opencodian-question-inline-btn.is-reject {
+  background: var(--background-modifier-error);
+  color: var(--text-on-accent);
+}
+
+.opencodian-context-file-modal .modal-content {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-top: 6px;
+}
+
+.opencodian-context-file-modal .modal-title {
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.opencodian-context-file-modal .modal-close-button {
+  border-radius: 12px;
+}
+
+.opencodian-context-file-search-section,
+.opencodian-context-file-filter-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.opencodian-context-file-search {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--opencodian-glass-border) 82%, transparent);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--background-primary) 98%, transparent) 0%,
+      color-mix(in srgb, var(--background-secondary) 94%, transparent) 100%
+    );
+  color: var(--text-normal);
+  box-shadow:
+    0 10px 24px color-mix(in srgb, var(--opencodian-glass-shadow) 14%, transparent),
+    0 1px 0 color-mix(in srgb, var(--background-primary) 80%, transparent) inset;
+}
+
+.opencodian-context-file-search:focus {
+  border-color: color-mix(in srgb, var(--interactive-accent) 36%, var(--opencodian-glass-border));
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--interactive-accent) 12%, transparent),
+    0 10px 24px color-mix(in srgb, var(--opencodian-glass-shadow) 14%, transparent),
+    0 1px 0 color-mix(in srgb, var(--background-primary) 80%, transparent) inset;
+}
+
+.opencodian-context-file-search:disabled {
+  opacity: 0.7;
+}
+
+.opencodian-context-file-filter-heading {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.opencodian-context-file-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-height: 132px;
+  overflow-y: auto;
+  padding: 2px 4px 2px 0;
+}
+
+.opencodian-context-file-filter {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 6px 12px;
+  line-height: 1.2;
+  border-radius: 999px;
+  border: 1px solid var(--opencodian-border-soft);
+  background: color-mix(in srgb, var(--background-secondary) 96%, transparent);
+  color: var(--text-normal);
+  cursor: pointer;
+  transition:
+    border-color 0.16s ease,
+    background 0.16s ease,
+    color 0.16s ease,
+    transform 0.16s ease,
+    box-shadow 0.16s ease;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.opencodian-context-file-filter:hover {
+  transform: translateY(-1px);
+  background: var(--opencodian-highlight);
+  border-color: var(--opencodian-border-strong);
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--text-normal) 10%, transparent);
+}
+
+.opencodian-context-file-filter.is-active {
+  border-color: color-mix(in srgb, var(--interactive-accent) 34%, var(--opencodian-border-soft));
+  background: color-mix(in srgb, var(--interactive-accent) 14%, var(--background-secondary));
+  color: var(--text-normal);
+}
+
+.opencodian-context-file-filter-label {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.opencodian-context-file-filter-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 21px;
+  height: 21px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--background-primary) 86%, transparent);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.opencodian-context-file-filter.is-active .opencodian-context-file-filter-count {
+  background: color-mix(in srgb, var(--interactive-accent) 18%, var(--background-secondary));
+  color: var(--interactive-accent);
+}
+
+.opencodian-context-file-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 440px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.opencodian-context-file-item {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: stretch;
+  gap: 10px;
+  padding: 16px 18px;
+  min-height: 104px;
+  border-radius: 18px;
+  border: 1px solid color-mix(in srgb, var(--opencodian-glass-border) 78%, transparent);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--background-primary) 100%, transparent) 0%,
+      color-mix(in srgb, var(--background-secondary) 95%, transparent) 100%
+    );
+  cursor: pointer;
+  text-align: left;
+  box-shadow:
+    0 8px 18px color-mix(in srgb, var(--opencodian-glass-shadow) 12%, transparent),
+    0 1px 0 color-mix(in srgb, var(--background-primary) 80%, transparent) inset;
+  transition:
+    transform 0.16s ease,
+    border-color 0.16s ease,
+    box-shadow 0.16s ease,
+    background 0.16s ease;
+}
+
+.opencodian-context-file-item-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.opencodian-context-file-item:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--interactive-accent) 28%, var(--opencodian-glass-border));
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--interactive-accent) 8%, var(--background-primary)) 0%,
+      color-mix(in srgb, var(--interactive-accent) 4%, var(--background-secondary)) 100%
+    );
+  box-shadow:
+    0 12px 24px color-mix(in srgb, var(--opencodian-glass-shadow) 16%, transparent),
+    0 1px 0 color-mix(in srgb, var(--background-primary) 84%, transparent) inset;
+}
+
+.opencodian-context-file-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 15px;
+  line-height: 1.5;
+  font-weight: 700;
+  color: var(--text-normal);
+  word-break: break-word;
+  white-space: normal;
+  margin: 0;
+}
+
+.opencodian-context-file-ext {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  min-height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--interactive-accent) 10%, var(--background-secondary));
+  color: var(--interactive-accent);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1;
+}
+
+.opencodian-context-file-path,
+.opencodian-context-file-empty {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+
+.opencodian-context-file-path {
+  display: block;
+  word-break: break-word;
+  margin: 0;
+  padding-right: 4px;
+  opacity: 0.92;
+}
+
+.opencodian-context-file-empty {
+  padding: 18px 14px;
+  border-radius: 16px;
+  border: 1px dashed color-mix(in srgb, var(--opencodian-glass-border) 72%, transparent);
+  background: color-mix(in srgb, var(--background-secondary) 82%, transparent);
+  text-align: center;
+}
+
+.opencodian-context-file-empty.is-loading {
+  color: var(--text-accent);
+}
+
+.opencodian-context-file-summary {
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 0 4px 2px;
+  line-height: 1.5;
 }
 
 .opencodian-permission-inline-status {

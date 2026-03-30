@@ -84,6 +84,55 @@ describe('StorageService', () => {
       const savedData = JSON.parse(mockAdapter.write.mock.calls[0][1]);
       expect(savedData.messageCount).toBe(2);
     });
+
+    it('persists user context attachments inside full messages', async () => {
+      const conversation = {
+        id: 'conv-ctx',
+        title: 'Context conversation',
+        createdAt: 1234567890,
+        updatedAt: 1234567890,
+        openCodeSessionId: 'session-ctx',
+        messages: [
+          {
+            id: 'user-1',
+            role: 'user',
+            content: 'Summarize this',
+            timestamp: 1234567890,
+            contextAttachments: [
+              {
+                kind: 'selection',
+                path: 'notes/today.md',
+                label: 'today.md:3-4',
+                mime: 'text/markdown',
+                lineRange: { startLine: 3, endLine: 4 },
+                textSnapshot: 'Selected text',
+              },
+            ],
+          },
+        ],
+      };
+
+      await storage.saveConversation(conversation as unknown as {
+        id: string;
+        title: string;
+        createdAt: number;
+        updatedAt: number;
+        openCodeSessionId: string;
+        messages: unknown[];
+      });
+
+      const savedData = JSON.parse(mockAdapter.write.mock.calls[0][1]);
+      expect(savedData.messages[0].contextAttachments).toEqual([
+        {
+          kind: 'selection',
+          path: 'notes/today.md',
+          label: 'today.md:3-4',
+          mime: 'text/markdown',
+          lineRange: { startLine: 3, endLine: 4 },
+          textSnapshot: 'Selected text',
+        },
+      ]);
+    });
   });
 
   describe('loadConversation', () => {
@@ -145,6 +194,43 @@ describe('StorageService', () => {
         noticeTone: 'warning',
         noticeActions: [{ type: 'open_model_settings' }],
       });
+    });
+
+    it('restores persisted context attachments after reload', async () => {
+      mockAdapter.read.mockResolvedValue(JSON.stringify({
+        id: 'conv-ctx',
+        title: 'Context Conversation',
+        createdAt: 1234567890,
+        updatedAt: 1234567999,
+        openCodeSessionId: 'session-ctx',
+        messages: [
+          {
+            id: 'user-1',
+            role: 'user',
+            content: 'Summarize this',
+            timestamp: 1234567890,
+            contextAttachments: [
+              {
+                kind: 'file',
+                path: 'notes/today.md',
+                label: 'today.md',
+                mime: 'text/markdown',
+              },
+            ],
+          },
+        ],
+      }));
+
+      const result = await storage.loadFullConversation('conv-ctx');
+
+      expect(result?.messages[0].contextAttachments).toEqual([
+        {
+          kind: 'file',
+          path: 'notes/today.md',
+          label: 'today.md',
+          mime: 'text/markdown',
+        },
+      ]);
     });
   });
 
