@@ -62,4 +62,40 @@ describe('OpenCodianPlugin.getConversationById', () => {
     expect(plugin.storage.loadFullConversation).toHaveBeenCalledWith('conv-1');
     expect(plugin.conversations[0]).toEqual(storedConversation);
   });
+
+  it('loads conversation metadata only once across concurrent calls', async () => {
+    const plugin = new OpenCodianPlugin() as OpenCodianPlugin & {
+      conversations: Conversation[];
+      storage: Pick<StorageService, 'listConversations'>;
+    };
+    const listConversations = jest.fn().mockResolvedValue([
+      {
+        id: 'conv-1',
+        title: '标题',
+        createdAt: 1,
+        updatedAt: 2,
+        lastResponseAt: 3,
+        titleGenerationStatus: 'success',
+        openCodeSessionId: 'session-1',
+      },
+    ]);
+
+    plugin.storage = {
+      listConversations,
+    } as Pick<StorageService, 'listConversations'>;
+
+    await Promise.all([
+      plugin.loadConversations(),
+      plugin.loadConversations(),
+    ]);
+
+    expect(listConversations).toHaveBeenCalledTimes(1);
+    expect(plugin.getConversations()).toEqual([
+      expect.objectContaining({
+        id: 'conv-1',
+        title: '标题',
+        openCodeSessionId: 'session-1',
+      }),
+    ]);
+  });
 });

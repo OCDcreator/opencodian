@@ -153,6 +153,20 @@ export interface PlatformDebugLogPaths {
   windows: string;
 }
 
+export type ProviderIconEntryType = 'mapped' | 'url' | 'file';
+
+export interface ProviderIconEntry {
+  id: string;
+  type: ProviderIconEntryType;
+  source: string;
+  mimeType?: string;
+  cacheFileName?: string;
+  addedAt: number;
+  updatedAt?: number;
+}
+
+export type ProviderIconLibrary = Record<string, ProviderIconEntry[]>;
+
 const UNIX_BLOCKED_COMMANDS = [
   'rm -rf',
   'chmod 777',
@@ -214,6 +228,66 @@ export function getDefaultDebugLogPaths(): PlatformDebugLogPaths {
 
 export function getCurrentPlatformDebugLogPath(paths: PlatformDebugLogPaths): string {
   return paths[getCurrentPlatformKey()];
+}
+
+export function normalizeProviderIconLibrary(value: unknown): ProviderIconLibrary {
+  if (!value || typeof value !== 'object') {
+    return {};
+  }
+
+  const normalizedLibrary: ProviderIconLibrary = {};
+
+  for (const [providerId, entries] of Object.entries(value as Record<string, unknown>)) {
+    if (!providerId.trim() || !Array.isArray(entries)) {
+      continue;
+    }
+
+    const normalizedEntries = entries.flatMap((entry) => {
+      if (!entry || typeof entry !== 'object') {
+        return [];
+      }
+
+      const candidate = entry as Partial<ProviderIconEntry>;
+      const id = typeof candidate.id === 'string' && candidate.id.trim()
+        ? candidate.id.trim()
+        : '';
+      const source = typeof candidate.source === 'string' && candidate.source.trim()
+        ? candidate.source.trim()
+        : '';
+
+      if (!id || !source) {
+        return [];
+      }
+
+      if (candidate.type !== 'mapped' && candidate.type !== 'url' && candidate.type !== 'file') {
+        return [];
+      }
+
+      return [{
+        id,
+        type: candidate.type,
+        source,
+        mimeType: typeof candidate.mimeType === 'string' && candidate.mimeType.trim()
+          ? candidate.mimeType.trim()
+          : undefined,
+        cacheFileName: typeof candidate.cacheFileName === 'string' && candidate.cacheFileName.trim()
+          ? candidate.cacheFileName.trim()
+          : undefined,
+        addedAt: typeof candidate.addedAt === 'number' && Number.isFinite(candidate.addedAt)
+          ? candidate.addedAt
+          : Date.now(),
+        updatedAt: typeof candidate.updatedAt === 'number' && Number.isFinite(candidate.updatedAt)
+          ? candidate.updatedAt
+          : undefined,
+      } satisfies ProviderIconEntry];
+    });
+
+    if (normalizedEntries.length > 0) {
+      normalizedLibrary[providerId.trim()] = normalizedEntries;
+    }
+  }
+
+  return normalizedLibrary;
 }
 
 /**
@@ -483,6 +557,7 @@ export interface OpenCodianSettings {
   aiTitleModel: string;
   pluginIsolationMode: PluginIsolationMode;
   providers: ModelProviderConfig[];
+  providerIconLibrary: ProviderIconLibrary;
   effortLevel: EffortLevel;
   thinkingBudget: ThinkingBudget;
 
@@ -553,6 +628,7 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
       enabled: true,
     },
   ],
+  providerIconLibrary: {},
   effortLevel: 'high',
   thinkingBudget: 4096,
 

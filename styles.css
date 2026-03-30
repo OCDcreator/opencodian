@@ -5778,3 +5778,228 @@
   color: var(--text-on-accent);
   font-weight: 600;
 }
+
+.opencodian-icon-cache-modal-summary {
+    margin-bottom: 16px;
+    color: var(--text-muted);
+  }
+
+  .opencodian-icon-cache-quick-jump {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    margin-bottom: 16px;
+    padding: 12px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 12px;
+    background: var(--background-secondary);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+  }
+
+  .opencodian-icon-cache-quick-jump-label {
+    margin-bottom: 8px;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  .opencodian-icon-cache-quick-jump-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .opencodian-icon-cache-quick-jump-button {
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .opencodian-icon-cache-quick-jump-button.is-current {
+    border-color: var(--interactive-accent);
+  }
+
+  .opencodian-icon-cache-modal-section + .opencodian-icon-cache-modal-section {
+    margin-top: 20px;
+  }
+
+.opencodian-icon-cache-modal-section-title {
+  margin-bottom: 10px;
+  font-weight: 600;
+}
+
+.opencodian-icon-cache-modal-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.opencodian-icon-cache-card {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 12px;
+  padding: 12px;
+  background: var(--background-secondary);
+}
+
+.opencodian-icon-cache-card-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 56px;
+  margin-bottom: 10px;
+  border-radius: 10px;
+  background: var(--background-primary);
+}
+
+.opencodian-icon-cache-card-preview img {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+}
+
+.opencodian-icon-cache-card-placeholder {
+  color: var(--text-muted);
+  font-size: 20px;
+  line-height: 1;
+}
+
+.opencodian-icon-cache-card-provider {
+  margin-bottom: 6px;
+  font-weight: 600;
+  word-break: break-word;
+}
+
+.opencodian-icon-cache-card-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.opencodian-icon-cache-card-icon-id,
+.opencodian-icon-cache-card-path {
+  word-break: break-word;
+}
+
+.opencodian-icon-cache-modal-empty {
+  color: var(--text-muted);
+}
+
+.opencodian-icon-cache-provider-section {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.opencodian-icon-cache-provider-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.opencodian-icon-cache-provider-title {
+  font-weight: 600;
+  word-break: break-word;
+}
+
+.opencodian-icon-cache-provider-badges {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.opencodian-icon-cache-provider-badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  color: var(--text-muted);
+  background: var(--background-primary-alt);
+}
+
+.opencodian-icon-cache-provider-badge.is-current {
+  color: var(--text-on-accent);
+  background: var(--interactive-accent);
+}
+
+.opencodian-icon-cache-entry-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.opencodian-icon-cache-entry-item {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 12px;
+  padding: 12px;
+  background: var(--background-secondary);
+}
+
+.opencodian-icon-cache-entry-item.is-dragging {
+  opacity: 0.6;
+}
+
+.opencodian-icon-cache-entry-item.is-drag-over {
+  border-color: var(--interactive-accent);
+  box-shadow: 0 0 0 1px var(--interactive-accent);
+}
+
+.opencodian-icon-cache-entry-body {
+  min-width: 0;
+}
+
+.opencodian-icon-cache-entry-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
+.opencodian-icon-cache-entry-title {
+  font-weight: 600;
+}
+
+.opencodian-icon-cache-entry-badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  background: var(--background-primary);
+  color: var(--text-muted);
+}
+
+.opencodian-icon-cache-entry-badge.is-selected {
+  color: var(--text-on-accent);
+  background: var(--interactive-accent);
+}
+
+.opencodian-icon-cache-entry-source,
+.opencodian-icon-cache-entry-path,
+.opencodian-icon-cache-provider-empty {
+  color: var(--text-muted);
+  font-size: 12px;
+  word-break: break-word;
+}
+
+.opencodian-icon-cache-entry-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.opencodian-icon-cache-add-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.opencodian-icon-cache-add-input {
+  flex: 1;
+  min-width: 0;
+}

@@ -5,10 +5,60 @@
  * CDN URL: https://unpkg.com/@lobehub/icons-static-svg@latest/icons/{id}.svg
  */
 
+import * as fs from 'fs';
+import type { App } from 'obsidian';
+import { normalizePath, requestUrl } from 'obsidian';
+import * as path from 'path';
+
+import type { ProviderIconEntry, ProviderIconLibrary } from '../../core/types';
 import { createLogger } from '../../shared';
 
 const logger = createLogger('ProviderIconService');
 const loggedIconUrls = new Map<string, string | null>();
+const resolvedIconUrls = new Map<string, string | null>();
+const inFlightIconLoads = new Map<string, Promise<string | null>>();
+const failedIconIds = new Set<string>();
+
+export interface ProviderIconCacheEntry {
+  providerId: string;
+  entry: ProviderIconEntry;
+  iconId: string | null;
+  cached: boolean;
+  cachePath: string | null;
+  iconUrl: string | null;
+  isCurrentProvider: boolean;
+  isSelected: boolean;
+  sourceLabel: string;
+}
+
+export interface ProviderIconProviderState {
+  providerId: string;
+  isCurrentProvider: boolean;
+  entries: ProviderIconCacheEntry[];
+}
+
+export interface ProviderIconCacheSummary {
+  currentProviders: number;
+  totalProviders: number;
+  cachedProviders: number;
+  totalIcons: number;
+  cachedIcons: number;
+}
+
+interface ResolveIconUrlOptions {
+  retryFailed?: boolean;
+}
+
+interface LoadedIconAsset {
+  data: ArrayBuffer;
+  mimeType: string;
+}
+
+interface NormalizedCustomSource {
+  type: 'url' | 'file';
+  source: string;
+  localPath?: string;
+}
 
 // Map provider IDs to Lobehub icon IDs
 const PROVIDER_ICON_MAP: Record<string, string> = {
@@ -626,6 +676,22 @@ const PROVIDER_ICON_MAP: Record<string, string> = {
 
 // CDN base URL for Lobehub icons
 const LOBEHUB_CDN_BASE = 'https://unpkg.com/@lobehub/icons-static-svg@latest/icons';
+const ICON_CACHE_DIR = '.opencodian/provider-icons';
+const MAX_ICON_BYTES = 1024 * 1024;
+const ALLOWED_IMAGE_MIME_TYPES = new Set([
+  'image/svg+xml',
+  'image/png',
+  'image/jpeg',
+  'image/webp',
+  'image/gif',
+]);
+const MIME_TYPE_TO_EXTENSION: Record<string, string> = {
+  'image/svg+xml': 'svg',
+  'image/png': 'png',
+  'image/jpeg': 'jpg',
+  'image/webp': 'webp',
+  'image/gif': 'gif',
+};
 
 export class ProviderIconService {
   /**
@@ -634,18 +700,28 @@ export class ProviderIconService {
   static getIconUrl(providerId: string): string | null {
     const iconId = this.getIconId(providerId);
     if (!iconId) {
+      return null;
+    }
+
+    return `${LOBEHUB_CDN_BASE}/${iconId}.svg`;
+  }
+
+  static async resolveIconUrl(
+    app: App,
+    providerId: string,
+    library: ProviderIconLibrary = {},
+    options: ResolveIconUrlOptions = {},
+  ): Promise<string | null> {
+    const entry = this.getEffectiveEntries(providerId, library)[0] ?? null;
+    if (!entry) {
       if (loggedIconUrls.get(providerId) !== null) {
         logger.debug(`No icon found for: ${providerId}`);
         loggedIconUrls.set(providerId, null);
       }
       return null;
     }
-    const url = `${LOBEHUB_CDN_BASE}/${iconId}.svg`;
-    if (loggedIconUrls.get(providerId) !== url) {
-      logger.debug(`Icon for ${providerId}: ${url}`);
-      loggedIconUrls.set(providerId, url);
-    }
-    return url;
+
+    return this.resolveEntryUrl(app, providerId, entry, options);
   }
   
   /**
@@ -708,6 +784,234 @@ export class ProviderIconService {
   static hasIcon(providerId: string): boolean {
     return this.getIconId(providerId) !== null;
   }
+
+  /**
+   * Build state for current and persisted provider icon entries using local cache only.
+   */
+  static async getProviderCacheState(
+    app: App,
+    currentProviderIds: string[],
+    library: ProviderIconLibrary = {},
+  ): Promise<{ providers: ProviderIconProviderState[]; summary: ProviderIconCacheSummary }> {
+    const currentProviders = this.uniqueProviderIds(currentProviderIds);
+    const allProviders = this.mergeProviderIds(currentProviders, Object.keys(library));
+
+    const providers = await Promise.all(allProviders.map(async (providerId) => {
+      const entries = await this.getProviderCacheEntries(app, providerId, library, currentProviders.includes(providerId));
+      return {
+        providerId,
+        isCurrentProvider: currentProviders.includes(providerId),
+        entries,
+      } satisfies ProviderIconProviderState;
+    }));
+
+    providers.sort((left, right) => {
+      if (left.isCurrentProvider !== right.isCurrentProvider) {
+        return left.isCurrentProvider ? -1 : 1;
+      }
+      return left.providerId.localeCompare(right.providerId);
+    });
+
+    const totalIcons = providers.reduce((sum, provider) => sum + provider.entries.length, 0);
+    const cachedIcons = providers.reduce(
+      (sum, provider) => sum + provider.entries.filter((entry) => entry.cached).length,
+      0,
+    );
+    const cachedProviders = providers.filter((provider) => provider.entries.some((entry) => entry.cached)).length;
+
+    return {
+      providers,
+      summary: {
+        currentProviders: currentProviders.length,
+        totalProviders: providers.length,
+        cachedProviders,
+        totalIcons,
+        cachedIcons,
+      },
+    };
+  }
+
+  /**
+   * Ensure the default mapped entry is persisted for providers that should survive provider-list changes.
+   */
+  static persistDefaultEntries(
+    providerIds: string[],
+    library: ProviderIconLibrary,
+  ): ProviderIconLibrary {
+    let nextLibrary = { ...library };
+
+    for (const providerId of this.uniqueProviderIds(providerIds)) {
+      if (this.resolveLibraryProviderId(providerId, nextLibrary)) {
+        continue;
+      }
+
+      const defaultEntry = this.getDefaultEntry(providerId);
+      if (!defaultEntry) {
+        continue;
+      }
+
+      nextLibrary = {
+        ...nextLibrary,
+        [providerId]: [defaultEntry],
+      };
+    }
+
+    return nextLibrary;
+  }
+
+  static async addCustomIconSource(
+    app: App,
+    providerId: string,
+    sourceInput: string,
+    library: ProviderIconLibrary,
+  ): Promise<ProviderIconLibrary> {
+    const normalizedProviderId = providerId.trim();
+    if (!normalizedProviderId) {
+      throw new Error('Provider ID is required.');
+    }
+
+    const storedProviderId = this.resolveLibraryProviderId(normalizedProviderId, library) ?? normalizedProviderId;
+    const normalizedSource = this.normalizeCustomSource(sourceInput);
+    const existingEntries = this.getEffectiveEntries(storedProviderId, library);
+    if (existingEntries.some((entry) => entry.type !== 'mapped' && entry.source === normalizedSource.source)) {
+      throw new Error('This icon source has already been added for the provider.');
+    }
+
+    const asset = await this.loadCustomSourceAsset(normalizedSource);
+    const cacheFileName = this.buildCustomCacheFileName(normalizedProviderId, asset.mimeType);
+    const entry: ProviderIconEntry = {
+      id: this.createEntryId(),
+      type: normalizedSource.type,
+      source: normalizedSource.source,
+      mimeType: asset.mimeType,
+      cacheFileName,
+      addedAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+
+    await this.writeCachedAsset(app, normalizePath(`${ICON_CACHE_DIR}/${cacheFileName}`), asset.data);
+    failedIconIds.delete(this.getEntryRuntimeKey(normalizedProviderId, entry));
+
+    return {
+      ...library,
+      [storedProviderId]: [...existingEntries, entry],
+    };
+  }
+
+  static updateProviderEntries(
+    providerId: string,
+    entries: ProviderIconEntry[],
+    library: ProviderIconLibrary,
+  ): ProviderIconLibrary {
+    const requestedProviderId = providerId.trim();
+    if (!requestedProviderId) {
+      return library;
+    }
+    const normalizedProviderId = this.resolveLibraryProviderId(requestedProviderId, library) ?? requestedProviderId;
+
+    const sanitizedEntries = entries.filter((entry, index, collection) =>
+      Boolean(entry.id)
+      && Boolean(entry.source)
+      && collection.findIndex((candidate) => candidate.id === entry.id) === index,
+    );
+
+    if (sanitizedEntries.length === 0) {
+      const nextLibrary = { ...library };
+      delete nextLibrary[normalizedProviderId];
+      return nextLibrary;
+    }
+
+    return {
+      ...library,
+      [normalizedProviderId]: sanitizedEntries,
+    };
+  }
+
+  static removeProviderEntry(
+    providerId: string,
+    entryId: string,
+    library: ProviderIconLibrary,
+  ): ProviderIconLibrary {
+    const resolvedProviderId = this.resolveLibraryProviderId(providerId, library) ?? providerId;
+    const nextEntries = (library[resolvedProviderId] ?? []).filter((entry) => entry.id !== entryId);
+    return this.updateProviderEntries(providerId, nextEntries, library);
+  }
+
+  static async clearCache(app: App): Promise<number> {
+    resolvedIconUrls.clear();
+    inFlightIconLoads.clear();
+    loggedIconUrls.clear();
+    failedIconIds.clear();
+
+    const adapter = app.vault.adapter;
+    const cacheDir = normalizePath(ICON_CACHE_DIR);
+
+    try {
+      const exists = await adapter.exists(cacheDir);
+      if (!exists) {
+        return 0;
+      }
+
+      const listing = await adapter.list(cacheDir);
+      let removedCount = 0;
+
+      for (const file of listing.files) {
+        try {
+          await adapter.remove(file);
+          removedCount += 1;
+        } catch (error) {
+          logger.debug(`Failed to remove cached icon: ${file}`, error);
+        }
+      }
+
+      logger.debug(`Cleared provider icon cache: removed ${removedCount} file(s)`);
+      return removedCount;
+    } catch (error) {
+      logger.warn('Failed to clear provider icon cache', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Preload icons for a set of providers into the local cache.
+   */
+  static async warmProviderIcons(
+    app: App,
+    providerIds: string[],
+    library: ProviderIconLibrary = {},
+  ): Promise<{ total: number; supported: number; cached: number; failed: number }> {
+    const uniqueProviderIds = this.uniqueProviderIds(providerIds);
+
+    let supported = 0;
+    let cached = 0;
+    let failed = 0;
+
+    for (const providerId of uniqueProviderIds) {
+      const entries = this.getEffectiveEntries(providerId, library);
+      if (entries.length === 0) {
+        continue;
+      }
+
+      supported += 1;
+      const iconUrl = await this.resolveIconUrl(app, providerId, library, { retryFailed: true });
+      if (iconUrl) {
+        cached += 1;
+      } else {
+        failed += 1;
+      }
+    }
+
+    logger.debug(
+      `Warm provider icons complete: total=${uniqueProviderIds.length}, supported=${supported}, cached=${cached}, failed=${failed}`,
+    );
+
+    return {
+      total: uniqueProviderIds.length,
+      supported,
+      cached,
+      failed,
+    };
+  }
   
   /**
    * Create an img element with the provider icon
@@ -732,5 +1036,494 @@ export class ProviderIconService {
     };
     
     return img;
+  }
+
+  private static async getProviderCacheEntries(
+    app: App,
+    providerId: string,
+    library: ProviderIconLibrary,
+    isCurrentProvider: boolean,
+  ): Promise<ProviderIconCacheEntry[]> {
+    const entries = this.getEffectiveEntries(providerId, library);
+    return Promise.all(entries.map(async (entry, index) => {
+      const cachedAsset = await this.readCachedAsset(app, entry);
+      return {
+        providerId,
+        entry,
+        iconId: entry.type === 'mapped' ? entry.source : null,
+        cached: cachedAsset !== null,
+        cachePath: this.getCachePathForEntry(entry),
+        iconUrl: cachedAsset ? this.assetToDataUrl(cachedAsset) : null,
+        isCurrentProvider,
+        isSelected: index === 0,
+        sourceLabel: this.getEntrySourceLabel(entry),
+      } satisfies ProviderIconCacheEntry;
+    }));
+  }
+
+  private static getEffectiveEntries(
+    providerId: string,
+    library: ProviderIconLibrary,
+  ): ProviderIconEntry[] {
+    const resolvedProviderId = this.resolveLibraryProviderId(providerId, library);
+    const savedEntries = resolvedProviderId ? (library[resolvedProviderId] ?? []) : [];
+    if (savedEntries.length === 0) {
+      const defaultEntry = this.getDefaultEntry(providerId);
+      return defaultEntry ? [defaultEntry] : [];
+    }
+
+    const defaultEntry = this.getDefaultEntry(providerId);
+    const hasMappedEntry = savedEntries.some((entry) => entry.type === 'mapped');
+    if (!defaultEntry || hasMappedEntry) {
+      return [...savedEntries];
+    }
+
+    return [...savedEntries, defaultEntry];
+  }
+
+  private static getDefaultEntry(providerId: string): ProviderIconEntry | null {
+    const iconId = this.getIconId(providerId);
+    if (!iconId) {
+      return null;
+    }
+
+    return {
+      id: `mapped:${iconId}`,
+      type: 'mapped',
+      source: iconId,
+      mimeType: 'image/svg+xml',
+      addedAt: 0,
+    };
+  }
+
+  private static async resolveEntryUrl(
+    app: App,
+    providerId: string,
+    entry: ProviderIconEntry,
+    options: ResolveIconUrlOptions,
+  ): Promise<string | null> {
+    const runtimeKey = this.getEntryRuntimeKey(providerId, entry);
+    if (resolvedIconUrls.has(runtimeKey)) {
+      return resolvedIconUrls.get(runtimeKey) ?? null;
+    }
+
+    if (options.retryFailed) {
+      failedIconIds.delete(runtimeKey);
+    } else if (failedIconIds.has(runtimeKey)) {
+      return null;
+    }
+
+    const inFlight = inFlightIconLoads.get(runtimeKey);
+    if (inFlight) {
+      return inFlight;
+    }
+
+    const loadPromise = this.loadEntryUrl(app, providerId, entry);
+    inFlightIconLoads.set(runtimeKey, loadPromise);
+
+    try {
+      const resolvedUrl = await loadPromise;
+      if (resolvedUrl) {
+        resolvedIconUrls.set(runtimeKey, resolvedUrl);
+      } else {
+        resolvedIconUrls.delete(runtimeKey);
+      }
+      return resolvedUrl;
+    } finally {
+      inFlightIconLoads.delete(runtimeKey);
+    }
+  }
+
+  private static async loadEntryUrl(
+    app: App,
+    providerId: string,
+    entry: ProviderIconEntry,
+  ): Promise<string | null> {
+    const runtimeKey = this.getEntryRuntimeKey(providerId, entry);
+    const cachedAsset = await this.readCachedAsset(app, entry);
+    if (cachedAsset) {
+      failedIconIds.delete(runtimeKey);
+      const localUrl = this.assetToDataUrl(cachedAsset);
+      loggedIconUrls.set(providerId, localUrl);
+      return localUrl;
+    }
+
+    try {
+      const asset = entry.type === 'mapped'
+        ? await this.loadMappedAsset(entry.source, providerId)
+        : await this.loadCustomSourceAsset(this.normalizeCustomSource(entry.source, entry.type));
+      await this.writeCachedAsset(app, this.getCachePathForEntry(entry), asset.data);
+      failedIconIds.delete(runtimeKey);
+      const localUrl = this.assetToDataUrl(asset);
+      loggedIconUrls.set(providerId, localUrl);
+      return localUrl;
+    } catch (error) {
+      failedIconIds.add(runtimeKey);
+      logger.warn(`Failed to fetch icon for ${providerId}`, error);
+      return null;
+    }
+  }
+
+  private static async loadMappedAsset(iconId: string, providerId: string): Promise<LoadedIconAsset> {
+    const remoteUrl = `${LOBEHUB_CDN_BASE}/${iconId}.svg`;
+    const response = await requestUrl({
+      url: remoteUrl,
+      method: 'GET',
+      throw: false,
+    });
+
+    if (response.status >= 400) {
+      throw new Error(`HTTP ${response.status} while fetching ${providerId}`);
+    }
+
+    const mimeType = this.detectMimeType(response.arrayBuffer, response.headers['content-type'], remoteUrl);
+    if (mimeType !== 'image/svg+xml') {
+      throw new Error('Default mapped icon did not return valid SVG content.');
+    }
+
+    return {
+      data: response.arrayBuffer,
+      mimeType,
+    };
+  }
+
+  private static async loadCustomSourceAsset(source: NormalizedCustomSource): Promise<LoadedIconAsset> {
+    return source.type === 'url'
+      ? this.loadRemoteCustomAsset(source.source)
+      : this.loadLocalCustomAsset(source.localPath ?? source.source);
+  }
+
+  private static async loadRemoteCustomAsset(source: string): Promise<LoadedIconAsset> {
+    const response = await requestUrl({
+      url: source,
+      method: 'GET',
+      throw: false,
+    });
+
+    if (response.status >= 400) {
+      throw new Error(`HTTP ${response.status} while fetching custom icon.`);
+    }
+
+    this.assertByteLength(response.arrayBuffer.byteLength);
+    const mimeType = this.detectMimeType(response.arrayBuffer, response.headers['content-type'], source);
+    return {
+      data: response.arrayBuffer,
+      mimeType,
+    };
+  }
+
+  private static async loadLocalCustomAsset(localPath: string): Promise<LoadedIconAsset> {
+    const stats = await fs.promises.stat(localPath);
+    if (!stats.isFile()) {
+      throw new Error('The provided local icon path is not a file.');
+    }
+
+    this.assertByteLength(stats.size);
+    const buffer = await fs.promises.readFile(localPath);
+    const arrayBuffer = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
+    const mimeType = this.detectMimeType(arrayBuffer, undefined, localPath);
+    return {
+      data: arrayBuffer,
+      mimeType,
+    };
+  }
+
+  private static async readCachedAsset(app: App, entry: ProviderIconEntry): Promise<LoadedIconAsset | null> {
+    const cachePath = this.getCachePathForEntry(entry);
+    if (!cachePath) {
+      return null;
+    }
+
+    try {
+      const adapter = app.vault.adapter;
+      const exists = await adapter.exists(cachePath);
+      if (!exists) {
+        return null;
+      }
+
+      const readBinary = adapter.readBinary?.bind(adapter) as undefined | ((path: string) => Promise<ArrayBuffer>);
+      if (!readBinary) {
+        return null;
+      }
+
+      const data = await readBinary(cachePath);
+      return {
+        data,
+        mimeType: entry.mimeType ?? this.getMimeTypeFromPath(cachePath) ?? 'image/svg+xml',
+      };
+    } catch (error) {
+      logger.debug(`Failed to read cached icon: ${cachePath}`, error);
+      return null;
+    }
+  }
+
+  private static async writeCachedAsset(app: App, cachePath: string | null, data: ArrayBuffer): Promise<void> {
+    if (!cachePath) {
+      return;
+    }
+
+    try {
+      const adapter = app.vault.adapter;
+      const dirExists = await adapter.exists(normalizePath(ICON_CACHE_DIR));
+      if (!dirExists) {
+        await adapter.mkdir(normalizePath(ICON_CACHE_DIR));
+      }
+
+      const writeBinary = adapter.writeBinary?.bind(adapter) as undefined | ((path: string, data: ArrayBuffer) => Promise<void>);
+      if (!writeBinary) {
+        throw new Error('Vault adapter does not support binary icon cache writes.');
+      }
+
+      await writeBinary(cachePath, data);
+    } catch (error) {
+      logger.debug(`Failed to write cached icon: ${cachePath}`, error);
+      throw error;
+    }
+  }
+
+  private static normalizeCustomSource(
+    sourceInput: string,
+    expectedType?: 'url' | 'file',
+  ): NormalizedCustomSource {
+    const source = this.stripEnclosingQuotes(sourceInput.trim());
+    if (!source) {
+      throw new Error('Please paste a non-empty local path or URL.');
+    }
+
+    if (source.length > 2048) {
+      throw new Error('The icon source is too long.');
+    }
+
+    if (this.isAbsoluteLocalPath(source)) {
+      if (expectedType && expectedType !== 'file') {
+        throw new Error('Expected a URL, but received a local file path.');
+      }
+
+      return { type: 'file', source, localPath: source };
+    }
+
+    const maybeUrl = this.tryParseUrl(source);
+    if (maybeUrl) {
+      if (maybeUrl.protocol === 'http:' || maybeUrl.protocol === 'https:') {
+        if (expectedType && expectedType !== 'url') {
+          throw new Error('Expected a local file path, but received a URL.');
+        }
+        return { type: 'url', source: maybeUrl.toString() };
+      }
+
+      if (maybeUrl.protocol === 'file:') {
+        if (expectedType && expectedType !== 'file') {
+          throw new Error('Expected a URL, but received a local file path.');
+        }
+        return { type: 'file', source: maybeUrl.toString(), localPath: decodeURIComponent(maybeUrl.pathname.replace(/^\/([A-Za-z]:)/, '$1')) };
+      }
+
+      throw new Error('Only http(s) URLs and local file paths are allowed.');
+    }
+
+    if (!this.isAbsoluteLocalPath(source)) {
+      throw new Error('Please use an absolute local file path or a full URL.');
+    }
+
+    if (expectedType && expectedType !== 'file') {
+      throw new Error('Expected a URL, but received a local file path.');
+    }
+
+    return { type: 'file', source, localPath: source };
+  }
+
+  private static tryParseUrl(source: string): URL | null {
+    try {
+      return new URL(source);
+    } catch {
+      return null;
+    }
+  }
+
+  private static isAbsoluteLocalPath(source: string): boolean {
+    return path.isAbsolute(source) || /^[A-Za-z]:[\\/]/.test(source);
+  }
+
+  private static detectMimeType(buffer: ArrayBuffer, headerValue?: string, sourceHint?: string): string {
+    const normalizedHeader = headerValue?.split(';')[0]?.trim().toLowerCase();
+    if (normalizedHeader && ALLOWED_IMAGE_MIME_TYPES.has(normalizedHeader)) {
+      return normalizedHeader;
+    }
+
+    const bytes = new Uint8Array(buffer);
+    const prefix = Buffer.from(bytes.slice(0, Math.min(bytes.length, 2048)))
+      .toString('utf-8')
+      .replace(/^\uFEFF/, '')
+      .trimStart();
+    if (/<svg[\s>]/i.test(prefix) || (/^<\?xml/i.test(prefix) && /\.svg$/i.test(sourceHint ?? ''))) {
+      return 'image/svg+xml';
+    }
+
+    if (bytes.length >= 4 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) {
+      return 'image/png';
+    }
+
+    if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
+      return 'image/jpeg';
+    }
+
+    if (bytes.length >= 6) {
+      const signature = Buffer.from(bytes.slice(0, 6)).toString('ascii');
+      if (signature === 'GIF87a' || signature === 'GIF89a') {
+        return 'image/gif';
+      }
+    }
+
+    if (bytes.length >= 12) {
+      const riff = Buffer.from(bytes.slice(0, 4)).toString('ascii');
+      const webp = Buffer.from(bytes.slice(8, 12)).toString('ascii');
+      if (riff === 'RIFF' && webp === 'WEBP') {
+        return 'image/webp';
+      }
+    }
+
+    const fromPath = this.getMimeTypeFromPath(sourceHint);
+    if (fromPath) {
+      return fromPath;
+    }
+
+    throw new Error('Only SVG, PNG, JPEG, WEBP, and GIF icon files are supported.');
+  }
+
+  private static getMimeTypeFromPath(sourceHint?: string): string | null {
+    if (!sourceHint) {
+      return null;
+    }
+
+    const extension = path.extname(sourceHint).toLowerCase();
+    switch (extension) {
+      case '.svg':
+        return 'image/svg+xml';
+      case '.png':
+        return 'image/png';
+      case '.jpg':
+      case '.jpeg':
+        return 'image/jpeg';
+      case '.webp':
+        return 'image/webp';
+      case '.gif':
+        return 'image/gif';
+      default:
+        return null;
+    }
+  }
+
+  private static buildCustomCacheFileName(providerId: string, mimeType: string): string {
+    const extension = MIME_TYPE_TO_EXTENSION[mimeType];
+    const safeProvider = providerId.replace(/[^a-z0-9_-]/gi, '-').slice(0, 48) || 'provider';
+    return `${safeProvider}-${this.createEntryId()}.${extension}`;
+  }
+
+  private static createEntryId(): string {
+    return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  }
+
+  private static getCachePathForEntry(entry: ProviderIconEntry): string | null {
+    if (entry.type === 'mapped') {
+      return normalizePath(`${ICON_CACHE_DIR}/${entry.source}.svg`);
+    }
+
+    if (!entry.cacheFileName) {
+      return null;
+    }
+
+    return normalizePath(`${ICON_CACHE_DIR}/${entry.cacheFileName}`);
+  }
+
+  private static getEntryRuntimeKey(providerId: string, entry: ProviderIconEntry): string {
+    return `${providerId}::${entry.id}`;
+  }
+
+  private static assetToDataUrl(asset: LoadedIconAsset): string {
+    const base64 = Buffer.from(asset.data).toString('base64');
+    return `data:${asset.mimeType};base64,${base64}`;
+  }
+
+  private static getEntrySourceLabel(entry: ProviderIconEntry): string {
+    if (entry.type === 'mapped') {
+      return `LobeHub / ${entry.source}`;
+    }
+
+    return entry.source;
+  }
+
+  private static uniqueProviderIds(providerIds: string[]): string[] {
+    return Array.from(new Set(
+      providerIds
+        .map((providerId) => providerId.trim())
+        .filter(Boolean),
+    ));
+  }
+
+  private static mergeProviderIds(currentProviderIds: string[], savedProviderIds: string[]): string[] {
+    const merged: string[] = [];
+    const seen = new Set<string>();
+
+    for (const providerId of [...currentProviderIds, ...savedProviderIds]) {
+      const trimmedProviderId = providerId.trim();
+      if (!trimmedProviderId) {
+        continue;
+      }
+
+      const canonicalKey = this.getCanonicalProviderKey(trimmedProviderId);
+      if (seen.has(canonicalKey)) {
+        continue;
+      }
+
+      seen.add(canonicalKey);
+      merged.push(trimmedProviderId);
+    }
+
+    return merged;
+  }
+
+  private static resolveLibraryProviderId(
+    providerId: string,
+    library: ProviderIconLibrary,
+  ): string | null {
+    const trimmedProviderId = providerId.trim();
+    if (!trimmedProviderId) {
+      return null;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(library, trimmedProviderId)) {
+      return trimmedProviderId;
+    }
+
+    const canonicalKey = this.getCanonicalProviderKey(trimmedProviderId);
+    for (const savedProviderId of Object.keys(library)) {
+      if (this.getCanonicalProviderKey(savedProviderId) === canonicalKey) {
+        return savedProviderId;
+      }
+    }
+
+    return null;
+  }
+
+  private static getCanonicalProviderKey(providerId: string): string {
+    return providerId.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+  }
+
+  private static stripEnclosingQuotes(source: string): string {
+    if (source.length >= 2) {
+      const firstChar = source[0];
+      const lastChar = source[source.length - 1];
+      if ((firstChar === '"' && lastChar === '"') || (firstChar === '\'' && lastChar === '\'')) {
+        return source.slice(1, -1).trim();
+      }
+    }
+
+    return source;
+  }
+
+  private static assertByteLength(byteLength: number): void {
+    if (byteLength > MAX_ICON_BYTES) {
+      throw new Error('The icon file is too large. Maximum size is 1 MB.');
+    }
   }
 }

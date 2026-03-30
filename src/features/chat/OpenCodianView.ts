@@ -182,6 +182,7 @@ export class OpenCodianView extends ItemView {
   private modelFilterQuery = '';
   private modelDropdownClickOutsideHandler: ((e: MouseEvent) => void) | null = null;
   private currentModelTriggerIconUrl: string | null = null;
+  private modelSelectorIconRequestId = 0;
 
   // Navigation sidebar
   private navigationSidebar: NavigationSidebar | null = null;
@@ -663,6 +664,8 @@ export class OpenCodianView extends ItemView {
     if (!this.tabManager) {
       return;
     }
+
+    await this.plugin.loadConversations();
 
     const restoredTabId = this.restorePersistedTabs();
     if (restoredTabId) {
@@ -1477,7 +1480,11 @@ export class OpenCodianView extends ItemView {
       }
     }
 
-    const conversation = await this.plugin.getConversationById(id);
+    let conversation = await this.plugin.getConversationById(id);
+    if (!conversation) {
+      await this.plugin.loadConversations();
+      conversation = await this.plugin.getConversationById(id);
+    }
     if (!conversation) return;
 
     const messagesEl = this.messagesContainer;
@@ -5373,37 +5380,60 @@ export class OpenCodianView extends ItemView {
         : t('settings.model.unconfigured');
     }
 
-    // Update provider icon using Lobehub icons
-    const iconWrapper = this.modelSelectorTrigger.querySelector('.opencodian-model-trigger-icon');
-    if (iconWrapper) {
-      const iconUrl = current ? ProviderIconService.getIconUrl(current.provider) : null;
-      const iconLabel = modelInfo?.providerName || current?.provider || 'model';
-
-      if (iconUrl !== this.currentModelTriggerIconUrl) {
-        iconWrapper.empty();
-
-        if (iconUrl) {
-          const img = document.createElement('img');
-          img.src = iconUrl;
-          img.alt = iconLabel;
-          img.title = iconLabel;
-          iconWrapper.appendChild(img);
-        } else {
-          // Fallback to Obsidian icon
-          setIcon(iconWrapper as HTMLElement, 'bot');
-        }
-
-        this.currentModelTriggerIconUrl = iconUrl;
-      } else if (iconUrl) {
-        const existingImg = iconWrapper.querySelector('img');
-        if (existingImg) {
-          existingImg.alt = iconLabel;
-          existingImg.title = iconLabel;
-        }
-      }
-    }
+    const iconLabel = modelInfo?.providerName || current?.provider || 'model';
+    void this.updateModelSelectorIcon(current?.provider ?? null, iconLabel);
 
     this.effortSelector?.updateDisplay();
+  }
+
+  private async updateModelSelectorIcon(providerId: string | null, iconLabel: string): Promise<void> {
+    if (!this.modelSelectorTrigger) return;
+
+    const iconWrapper = this.modelSelectorTrigger.querySelector('.opencodian-model-trigger-icon');
+    if (!iconWrapper) return;
+
+    const requestId = ++this.modelSelectorIconRequestId;
+
+    if (!providerId) {
+      iconWrapper.empty();
+      setIcon(iconWrapper as HTMLElement, 'bot');
+      this.currentModelTriggerIconUrl = null;
+      return;
+    }
+
+    const iconUrl = await ProviderIconService.resolveIconUrl(
+      this.app,
+      providerId,
+      this.plugin.settings.providerIconLibrary,
+    );
+    if (requestId !== this.modelSelectorIconRequestId) {
+      return;
+    }
+
+    if (iconUrl !== this.currentModelTriggerIconUrl) {
+      iconWrapper.empty();
+
+      if (iconUrl) {
+        const img = document.createElement('img');
+        img.src = iconUrl;
+        img.alt = iconLabel;
+        img.title = iconLabel;
+        iconWrapper.appendChild(img);
+      } else {
+        setIcon(iconWrapper as HTMLElement, 'bot');
+      }
+
+      this.currentModelTriggerIconUrl = iconUrl;
+      return;
+    }
+
+    if (iconUrl) {
+      const existingImg = iconWrapper.querySelector('img');
+      if (existingImg) {
+        existingImg.alt = iconLabel;
+        existingImg.title = iconLabel;
+      }
+    }
   }
 
   /** Get current model for this session */

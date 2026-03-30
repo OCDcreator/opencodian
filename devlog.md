@@ -12,6 +12,159 @@
 
 ---
 
+## 2026-03-30 Provider Icon Cache（提供商图标缓存）功能
+
+### 🎯 改动目标
+
+- 为模型选择器添加可扩展的提供商图标系统，支持从 Lobehub CDN、本地文件和自定义 URL 加载图标。
+- 提供图标缓存机制，避免重复下载，支持离线使用已缓存图标。
+- 允许用户管理每个提供商的图标源（映射图标、自定义 URL、本地文件），并可设置默认图标。
+- 保持向后兼容，现有行为不受影响。
+
+### ✅ 本轮调整
+
+#### 1. 核心类型定义
+
+- `src/core/types/settings.ts`
+  - 新增 `ProviderIconEntryType` 类型：`'mapped' | 'url' | 'file'`
+  - 新增 `ProviderIconEntry` 接口：定义图标条目结构（id, type, source, mimeType, cacheFileName, addedAt, updatedAt）
+  - 新增 `ProviderIconLibrary` 类型：`Record<string, ProviderIconEntry[]>`
+  - 新增 `normalizeProviderIconLibrary()` 函数：安全地规范化用户配置的图标库数据
+  - `OpenCodianSettings` 接口新增 `providerIconLibrary` 字段
+  - `DEFAULT_SETTINGS` 添加 `providerIconLibrary: {}`
+
+- `src/core/types/index.ts`
+  - 导出新增的类型定义
+
+#### 2. Provider Icon Service 重构与扩展
+
+- `src/utils/icons/ProviderIconService.ts`
+  - 新增缓存目录常量 `ICON_CACHE_DIR = '.opencodian/provider-icons'`
+  - 新增缓存限制：最大 1MB 文件大小，支持 SVG/PNG/JPEG/WebP/GIF 格式
+  - 新增状态管理 Map：resolvedIconUrls, inFlightIconLoads, failedIconIds
+  - 新增接口定义：ProviderIconCacheEntry, ProviderIconProviderState, ProviderIconCacheSummary 等
+  - 新增 `resolveIconUrl()` 方法：异步解析图标 URL，优先从缓存读取，支持重试失败项
+  - 新增 `loadIconAsset()` 方法：从 URL 或本地路径加载图标数据
+  - 新增 `saveIconToCache()` / `readIconFromCache()`：缓存管理
+  - 新增 `addIconToLibrary()` / `removeIconFromLibrary()`：图标库增删
+  - 新增 `setDefaultIconForProvider()`：设置提供商的默认图标
+  - 新增 `getProviderCacheState()`：获取完整的缓存状态概览
+  - 新增 `refreshIconCache()` / `warmIconCache()`：缓存刷新与预热
+  - 新增 `getCacheDirectory()` / `ensureCacheDirectory()`：缓存目录管理
+  - 新增 `parseCustomSource()`：解析用户输入的图标源（本地路径、file:// URL、https:// URL）
+
+#### 3. 图标缓存管理弹窗
+
+- `src/features/settings/ProviderIconCacheModal.ts`（新增文件）
+  - 实现 `ProviderIconCacheModal` 类，继承 Obsidian 的 Modal
+  - 功能：
+    - 显示所有提供商的图标缓存状态概览（缓存数/总数/当前提供商数）
+    - 快速跳转栏：点击提供商名称滚动到对应区域
+    - 每个提供商独立区域：显示当前/仅保存状态徽章
+    - 图标条目列表：显示映射图标和自定义图标
+    - 支持设置默认图标、删除图标、添加新图标源
+    - 支持从 URL 或本地文件路径添加图标
+
+#### 4. 设置界面集成
+
+- `src/features/settings/OpenCodianSettings.ts`
+  - 在"模型"设置标签页新增"Provider icon cache"设置项
+    - 显示当前缓存状态（加载中/状态概览/加载失败）
+    - "Manage cached icons"按钮：打开 ProviderIconCacheModal
+    - "Clear / refresh icon cache"按钮：刷新缓存
+    - "Cache current provider icons"按钮：预热当前可用提供商图标
+  - 新增 `renderProviderIconCacheSetting()` 方法渲染图标缓存设置
+  - 新增 `refreshIconCacheWithNotice()` / `warmIconCacheWithNotice()` 方法
+  - 调整"快速跳转"描述文案，反映模型设置的新职责
+
+- `src/features/chat/OpenCodianView.ts`
+  - 重构 `updateModelSelectorIcon()` 方法：
+    - 使用 `ProviderIconService.resolveIconUrl()` 异步解析图标
+    - 添加请求 ID 机制防止竞态条件
+    - 加载完成后更新模型选择器触发按钮的图标
+  - 新增 `modelSelectorIconRequestId` 字段追踪图标请求
+  - `onOpen()` 中加载会话前确保已加载对话列表
+  - `loadConversation()` 中增加重试逻辑：如果找不到会话则刷新列表再试一次
+
+#### 5. 主程序扩展
+
+- `src/main.ts`
+  - 新增 `saveProviderIconLibrary()` 方法：保存图标库配置到 settings
+  - 新增 `getProviderIconLibrary()` 方法：获取当前图标库配置
+  - 新增 `deleteProviderIconCache()` 方法：删除所有图标缓存文件
+
+#### 6. 国际化
+
+- `src/i18n/locales/en.ts` / `src/i18n/locales/zh.ts`
+  - 新增大量图标缓存相关翻译键：
+    - `settings.conversation.title` - 设置分类标题（从 titleGeneration 重命名）
+    - `settings.quickNav.conversationDesc` - 快速跳转描述更新
+    - `settings.model.iconCache.*` - 图标缓存设置文案（20+ 个键）
+    - `settings.debug.iconCache.*` - 调试区域图标缓存文案
+
+#### 7. 样式
+
+- `styles.css`
+  - 新增 Provider Icon Cache Modal 完整样式（200+ 行）：
+    - `.opencodian-icon-cache-modal-summary` - 概览文本
+    - `.opencodian-icon-cache-quick-jump` - 快速跳转栏（sticky 定位）
+    - `.opencodian-icon-cache-quick-jump-buttons` - 跳转按钮容器
+    - `.opencodian-icon-cache-quick-jump-button` - 跳转按钮（支持 `.is-current` 高亮）
+    - `.opencodian-icon-cache-provider-section` - 提供商区域
+    - `.opencodian-icon-cache-provider-header` - 区域头部
+    - `.opencodian-icon-cache-provider-badges` - 状态徽章容器
+    - `.opencodian-icon-cache-provider-badge` - 徽章（`.is-current`/`.is-saved`）
+    - `.opencodian-icon-cache-entry-list` - 图标条目列表
+    - `.opencodian-icon-cache-entry` - 单个图标条目
+    - `.opencodian-icon-cache-entry-preview` - 图标预览区域
+    - `.opencodian-icon-cache-entry-actions` - 操作按钮区域
+    - `.opencodian-icon-cache-entry-action` - 操作按钮
+    - `.opencodian-icon-cache-entry-default-badge` - 默认图标徽章
+    - `.opencodian-icon-cache-add-section` - 添加新图标区域
+    - `.opencodian-icon-cache-add-input` - 图标源输入框
+    - `.opencodian-icon-cache-add-button` - 添加按钮
+    - `.opencodian-icon-cache-add-error` - 错误提示
+
+#### 8. 测试
+
+- `tests/unit/main.test.ts`
+  - 新增测试用例覆盖 `saveProviderIconLibrary`、`getProviderIconLibrary`、`deleteProviderIconCache` 方法
+- `tests/unit/utils/icons/`（新增目录）
+  - `ProviderIconService.test.ts`：ProviderIconService 的单元测试
+
+#### 9. 其他
+
+- `.gitignore`
+  - 新增 `.claude/` 目录忽略
+
+### 🧪 验证
+
+- `npm run test` 通过
+- `npm run typecheck` 通过
+- `npm run lint` 通过
+- `npm run build` 成功
+- `npm run check:devlog-order` 通过
+
+### 📁 涉及文件
+
+- 新增：
+  - `src/features/settings/ProviderIconCacheModal.ts`
+  - `tests/unit/utils/icons/ProviderIconService.test.ts`
+- 修改：
+  - `src/core/types/settings.ts`
+  - `src/core/types/index.ts`
+  - `src/utils/icons/ProviderIconService.ts`
+  - `src/features/settings/OpenCodianSettings.ts`
+  - `src/features/chat/OpenCodianView.ts`
+  - `src/main.ts`
+  - `src/i18n/locales/en.ts`
+  - `src/i18n/locales/zh.ts`
+  - `styles.css`
+  - `tests/unit/main.test.ts`
+  - `.gitignore`
+
+---
+
 ## 2026-03-29 Reasoning 时长精确化、消息元数据同步与尾部渲染优化
 
 ### 🎯 改动目标

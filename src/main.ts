@@ -26,6 +26,7 @@ import {
   normalizeEffortLevel,
   normalizePersistedTabState,
   normalizePluginIsolationMode,
+  normalizeProviderIconLibrary,
   normalizeTabBarPosition,
   normalizeThinkingBudget,
   normalizeTitleMode,
@@ -51,6 +52,8 @@ export default class OpenCodianPlugin extends Plugin {
   settingsTab?: InstanceType<typeof OpenCodianSettingTab>;
   
   private conversations: Conversation[] = [];
+  private conversationsLoaded = false;
+  private conversationsLoadPromise: Promise<void> | null = null;
   private chatAppearanceSaveTimeoutId: number | null = null;
   private settingsUiStateSaveTimeoutId: number | null = null;
   private modelRefreshFrameId: number | null = null;
@@ -126,6 +129,9 @@ export default class OpenCodianPlugin extends Plugin {
 
     await this.logServerStatusSnapshot('onload');
 
+    // Load conversations before restoring any existing OpenCodian view.
+    await this.loadConversations();
+
     // Register view
     this.registerView(
       VIEW_TYPE_OPENCODIAN,
@@ -169,10 +175,6 @@ export default class OpenCodianPlugin extends Plugin {
     // Add settings tab
     this.settingsTab = new OpenCodianSettingTab(this.app, this);
     this.addSettingTab(this.settingsTab);
-
-    // Load conversations
-    await this.loadConversations();
-
 
   }
 
@@ -301,6 +303,11 @@ export default class OpenCodianPlugin extends Plugin {
         ? (savedSettings as { tabState?: Partial<OpenCodianSettings['tabState']> }).tabState
         : undefined;
     const normalizedTabState = normalizePersistedTabState(savedTabState);
+    const savedProviderIconLibrary =
+      savedSettings && typeof savedSettings === 'object' && 'providerIconLibrary' in savedSettings
+        ? (savedSettings as { providerIconLibrary?: OpenCodianSettings['providerIconLibrary'] }).providerIconLibrary
+        : undefined;
+    const normalizedProviderIconLibrary = normalizeProviderIconLibrary(savedProviderIconLibrary);
 
     const normalizedSettings = savedSettings
       ? {
@@ -320,6 +327,7 @@ export default class OpenCodianPlugin extends Plugin {
           debugLogPaths: normalizedDebugLogPaths,
           chatAppearance: normalizedChatAppearance,
           tabState: normalizedTabState,
+          providerIconLibrary: normalizedProviderIconLibrary,
         }
       : null;
     this.settings = {
@@ -331,6 +339,7 @@ export default class OpenCodianPlugin extends Plugin {
       debugLogPaths: normalizedDebugLogPaths,
       chatAppearance: normalizedChatAppearance,
       tabState: normalizedTabState ?? getDefaultPersistedTabState(),
+      providerIconLibrary: normalizedProviderIconLibrary,
     };
   }
 
@@ -607,21 +616,39 @@ export default class OpenCodianPlugin extends Plugin {
   }
 
   /** Load conversations from storage */
-  async loadConversations() {
-    const metas = await this.storage.listConversations();
-    
-    // Convert metadata to conversations (without messages)
-    this.conversations = metas.map((meta) => ({
-      id: meta.id,
-      title: meta.title,
-      createdAt: meta.createdAt,
-      updatedAt: meta.updatedAt,
-      lastResponseAt: meta.lastResponseAt,
-      titleGenerationStatus: meta.titleGenerationStatus,
-      // Use stored openCodeSessionId or fallback to conversation ID
-      openCodeSessionId: meta.openCodeSessionId ?? meta.id,
-      messages: [],
-    }));
+  async loadConversations(options: { force?: boolean } = {}): Promise<void> {
+    const { force = false } = options;
+
+    if (this.conversationsLoaded && !force) {
+      return;
+    }
+
+    if (this.conversationsLoadPromise) {
+      await this.conversationsLoadPromise;
+      return;
+    }
+
+    this.conversationsLoadPromise = (async () => {
+      const metas = await this.storage.listConversations();
+
+      this.conversations = metas.map((meta) => ({
+        id: meta.id,
+        title: meta.title,
+        createdAt: meta.createdAt,
+        updatedAt: meta.updatedAt,
+        lastResponseAt: meta.lastResponseAt,
+        titleGenerationStatus: meta.titleGenerationStatus,
+        openCodeSessionId: meta.openCodeSessionId ?? meta.id,
+        messages: [],
+      }));
+      this.conversationsLoaded = true;
+    })();
+
+    try {
+      await this.conversationsLoadPromise;
+    } finally {
+      this.conversationsLoadPromise = null;
+    }
   }
 
   /** Create a new conversation */

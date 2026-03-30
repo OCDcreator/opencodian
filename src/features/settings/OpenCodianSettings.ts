@@ -24,9 +24,11 @@ import {
 import { setLocale, t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { createLogger, getVaultBasePath } from '../../shared';
+import { ProviderIconService } from '../../utils/icons';
 import { ModelConfigJsonModal } from './ModelConfigJsonModal';
 import { ModelConfigModal } from './ModelConfigModal';
 import { OpencodeConfigModal } from './OpencodeConfigModal';
+import { ProviderIconCacheModal } from './ProviderIconCacheModal';
 import { type ServerHelpTopic,ServerSettingHelpModal } from './ServerSettingHelpModal';
 
 const logger = createLogger('OpenCodianSettings');
@@ -117,7 +119,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
   private settingsPanelRestoreTimeoutIds: number[] = [];
   private settingsPanelRestoreObserver: MutationObserver | null = null;
   private styleControlBindings: StyleControlBinding[] = [];
-  private titleGenerationHeadingEl: HTMLHeadingElement | null = null;
+  private conversationHeadingEl: HTMLHeadingElement | null = null;
 
   constructor(app: App, plugin: OpenCodianPlugin) {
     super(app, plugin);
@@ -235,7 +237,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       this.settingsPanelPostRenderFrameId = null;
     }
     this.styleControlBindings = [];
-    this.titleGenerationHeadingEl = null;
+    this.conversationHeadingEl = null;
     containerEl.empty();
     containerEl.addClass('opencodian-settings');
     if (pendingOpenScrollTop !== null || pendingOpenSectionTitle !== null) {
@@ -250,6 +252,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     const languageHeadingEl = this.addLanguageSettings(containerEl);
     const serverHeadingEl = this.addServerSettings(containerEl);
     const modelHeadingEl = this.addModelSettings(containerEl);
+    const conversationHeadingEl = this.addConversationSettings(containerEl);
     const pluginHeadingEl = this.addPluginSettings(containerEl);
     const securityHeadingEl = this.addSecuritySettings(containerEl);
     const uiHeadingEl = this.addUISettings(containerEl);
@@ -270,12 +273,10 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         headingEl: modelHeadingEl,
         tooltip: t('settings.quickNav.modelDesc'),
       },
-      ...(this.titleGenerationHeadingEl
-        ? [{
-          headingEl: this.titleGenerationHeadingEl,
-          tooltip: t('settings.quickNav.titleGenerationDesc'),
-        }]
-        : []),
+      {
+        headingEl: conversationHeadingEl,
+        tooltip: t('settings.quickNav.conversationDesc'),
+      },
       {
         headingEl: pluginHeadingEl,
         tooltip: t('settings.quickNav.pluginsDesc'),
@@ -723,47 +724,8 @@ export class OpenCodianSettingTab extends PluginSettingTab {
 
     let providerDropdown: import('obsidian').DropdownComponent;
     let modelDropdown: import('obsidian').DropdownComponent;
-    let titleModelDropdown: import('obsidian').DropdownComponent;
-    let titleModelSetting: Setting | null = null;
     let catalogs: { local: ModelCatalog; server: ModelCatalog; effective: ModelCatalog } | null = null;
     const sourceCatalogEl = containerEl.createDiv({ cls: 'opencodian-model-catalog' });
-
-    const updateTitleModelSettingVisibility = () => {
-      if (!titleModelSetting) {
-        return;
-      }
-      titleModelSetting.settingEl.style.display = this.plugin.settings.titleMode === 'ai' ? '' : 'none';
-    };
-
-    const updateTitleModelDropdown = async () => {
-      if (!titleModelDropdown) return;
-
-      const selectedValue = this.plugin.settings.aiTitleModel;
-      const availableProviders = catalogs?.effective.providers ?? [];
-      let hasSelectedValue = !selectedValue;
-
-      titleModelDropdown.selectEl.empty();
-      titleModelDropdown.addOption('', t('settings.titleGeneration.model.followCurrent'));
-
-      for (const provider of availableProviders) {
-        for (const model of provider.models) {
-          const value = `${provider.id}/${model.id}`;
-          const label = `${provider.name || provider.id} / ${model.name || model.id}`;
-          titleModelDropdown.addOption(value, label);
-          if (value === selectedValue) {
-            hasSelectedValue = true;
-          }
-        }
-      }
-
-      if (!hasSelectedValue && selectedValue) {
-        this.plugin.settings.aiTitleModel = '';
-        await this.plugin.saveSettings();
-      }
-
-      titleModelDropdown.setValue(hasSelectedValue ? selectedValue : '');
-      updateTitleModelSettingVisibility();
-    };
 
     const loadAvailableModels = async (showNotice = false) => {
       try {
@@ -796,8 +758,6 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         }
 
         await updateModelDropdown();
-        await updateTitleModelDropdown();
-
         if (dirty) {
           await this.plugin.saveSettings();
         }
@@ -897,39 +857,6 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         });
       });
 
-    this.titleGenerationHeadingEl = containerEl.createEl('h4', {
-      text: t('settings.titleGeneration.title'),
-      cls: 'opencodian-settings-subsection-heading',
-    });
-    this.titleGenerationHeadingEl.dataset.sectionTitle = t('settings.titleGeneration.title');
-
-    new Setting(containerEl)
-      .setName(t('settings.titleGeneration.mode.name'))
-      .setDesc(t('settings.titleGeneration.mode.desc'))
-      .addDropdown((dropdown) => {
-        dropdown
-          .addOption('default', t('settings.titleGeneration.mode.default'))
-          .addOption('ai', t('settings.titleGeneration.mode.ai'))
-          .setValue(this.plugin.settings.titleMode)
-          .onChange(async (value) => {
-            this.plugin.settings.titleMode = value as TitleMode;
-            await this.plugin.saveSettings();
-            updateTitleModelSettingVisibility();
-          });
-      });
-
-    titleModelSetting = new Setting(containerEl)
-      .setName(t('settings.titleGeneration.model.name'))
-      .setDesc(t('settings.titleGeneration.model.desc'))
-      .addDropdown((dropdown) => {
-        titleModelDropdown = dropdown;
-        dropdown.onChange(async (value) => {
-          this.plugin.settings.aiTitleModel = value;
-          await this.plugin.saveSettings();
-        });
-      });
-    updateTitleModelSettingVisibility();
-
     new Setting(containerEl)
       .setName(t('settings.model.refresh.name'))
       .setDesc(t('settings.model.refresh.desc'))
@@ -967,9 +894,233 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       `${t('settings.model.config.desc')}\n${modelConfigService.getConfigPath()}`,
     );
 
+    let refreshIconCacheButton: import('obsidian').ButtonComponent;
+    let warmIconCacheButton: import('obsidian').ButtonComponent;
+    let viewIconCacheButton: import('obsidian').ButtonComponent;
+    const iconCacheOverviewSetting = new Setting(containerEl)
+      .setName(t('settings.model.iconCache.currentName'))
+      .setDesc(t('settings.model.iconCache.currentLoading'))
+      .addButton((btn) => {
+        viewIconCacheButton = btn;
+        btn
+          .setButtonText(t('settings.model.iconCache.view'))
+          .onClick(async () => {
+            const providerIds = await this.getCurrentProviderIdsForIconCache();
+            new ProviderIconCacheModal(this.app, this.plugin, providerIds, () => {
+              void refreshIconCacheOverview();
+            }).open();
+          });
+      });
+
+    const setIconCacheButtonsDisabled = (disabled: boolean) => {
+      refreshIconCacheButton?.setDisabled(disabled);
+      warmIconCacheButton?.setDisabled(disabled);
+      viewIconCacheButton?.setDisabled(disabled);
+    };
+
+    const refreshIconCacheOverview = async () => {
+      try {
+        const providerIds = await this.getCurrentProviderIdsForIconCache();
+        const { summary } = await ProviderIconService.getProviderCacheState(
+          this.app,
+          providerIds,
+          this.plugin.settings.providerIconLibrary,
+        );
+        iconCacheOverviewSetting.setDesc(t('settings.model.iconCache.currentStatus', {
+          cachedProviders: String(summary.cachedProviders),
+          totalProviders: String(summary.totalProviders),
+          cachedIcons: String(summary.cachedIcons),
+          totalIcons: String(summary.totalIcons),
+          currentProviders: String(summary.currentProviders),
+        }));
+        viewIconCacheButton?.setDisabled(summary.totalProviders === 0);
+      } catch (error) {
+        logger.error('Failed to load provider icon cache overview:', error);
+        iconCacheOverviewSetting.setDesc(t('settings.model.iconCache.currentFailed'));
+        viewIconCacheButton?.setDisabled(true);
+      }
+    };
+
+    new Setting(containerEl)
+      .setName(t('settings.model.iconCache.name'))
+      .setDesc(t('settings.model.iconCache.desc'))
+      .addButton((btn) => {
+        refreshIconCacheButton = btn;
+        btn
+          .setButtonText(t('settings.model.iconCache.refresh'))
+          .onClick(async () => {
+            setIconCacheButtonsDisabled(true);
+            try {
+              const providerIds = await this.getCurrentProviderIdsForIconCache();
+              this.plugin.settings.providerIconLibrary = ProviderIconService.persistDefaultEntries(
+                providerIds,
+                this.plugin.settings.providerIconLibrary,
+              );
+              const removed = await ProviderIconService.clearCache(this.app);
+              const summary = await ProviderIconService.warmProviderIcons(
+                this.app,
+                providerIds,
+                this.plugin.settings.providerIconLibrary,
+              );
+              await this.plugin.saveSettings({
+                syncService: false,
+                reloadModels: true,
+                syncConfig: false,
+                applyUi: true,
+              });
+              new Notice(t('settings.model.iconCache.refreshSuccess', {
+                cached: String(summary.cached),
+                supported: String(summary.supported),
+                removed: String(removed),
+              }));
+              await refreshIconCacheOverview();
+            } catch (error) {
+              logger.error('Failed to refresh provider icon cache:', error);
+              new Notice(t('settings.model.iconCache.refreshFailed'));
+            } finally {
+              setIconCacheButtonsDisabled(false);
+            }
+          });
+      })
+      .addButton((btn) => {
+        warmIconCacheButton = btn;
+        btn
+          .setButtonText(t('settings.model.iconCache.warm'))
+          .setCta()
+          .onClick(async () => {
+            setIconCacheButtonsDisabled(true);
+            try {
+              const providerIds = await this.getCurrentProviderIdsForIconCache();
+              this.plugin.settings.providerIconLibrary = ProviderIconService.persistDefaultEntries(
+                providerIds,
+                this.plugin.settings.providerIconLibrary,
+              );
+              const summary = await ProviderIconService.warmProviderIcons(
+                this.app,
+                providerIds,
+                this.plugin.settings.providerIconLibrary,
+              );
+              await this.plugin.saveSettings({
+                syncService: false,
+                reloadModels: true,
+                syncConfig: false,
+                applyUi: true,
+              });
+              if (summary.total === 0) {
+                new Notice(t('settings.model.iconCache.noProviders'));
+                return;
+              }
+              new Notice(t('settings.model.iconCache.warmSuccess', {
+                cached: String(summary.cached),
+                supported: String(summary.supported),
+              }));
+              await refreshIconCacheOverview();
+            } catch (error) {
+              logger.error('Failed to warm provider icon cache:', error);
+              new Notice(t('settings.model.iconCache.warmFailed'));
+            } finally {
+              setIconCacheButtonsDisabled(false);
+            }
+          });
+      });
+
+    void refreshIconCacheOverview();
+
     void (async () => {
       await loadAvailableModels(false);
+      await refreshIconCacheOverview();
     })();
+
+    return headingEl;
+  }
+
+  private addConversationSettings(containerEl: HTMLElement): HTMLHeadingElement {
+    const headingEl = this.createSectionHeading(containerEl, t('settings.conversation.title'));
+    this.conversationHeadingEl = headingEl;
+
+    let titleModelDropdown: import('obsidian').DropdownComponent;
+    let titleModelSetting: Setting | null = null;
+
+    const updateTitleModelSettingVisibility = () => {
+      if (!titleModelSetting) {
+        return;
+      }
+      titleModelSetting.settingEl.style.display = this.plugin.settings.titleMode === 'ai' ? '' : 'none';
+    };
+
+    const loadTitleModels = async () => {
+      const selectedValue = this.plugin.settings.aiTitleModel;
+      let hasSelectedValue = !selectedValue;
+      const options: Array<{ value: string; label: string }> = [];
+
+      try {
+        if (this.plugin.modelConfigService) {
+          const catalogs = await this.plugin.modelConfigService.getCatalogs(this.plugin.settings.modelSourceMode);
+          for (const provider of catalogs.effective.providers) {
+            for (const model of provider.models) {
+              const value = `${provider.id}/${model.id}`;
+              options.push({
+                value,
+                label: `${provider.name || provider.id} / ${model.name || model.id}`,
+              });
+              if (value === selectedValue) {
+                hasSelectedValue = true;
+              }
+            }
+          }
+        }
+
+        titleModelDropdown.selectEl.empty();
+        titleModelDropdown.addOption('', t('settings.titleGeneration.model.followCurrent'));
+
+        for (const option of options) {
+          titleModelDropdown.addOption(option.value, option.label);
+        }
+
+        if (!hasSelectedValue && selectedValue) {
+          this.plugin.settings.aiTitleModel = '';
+          await this.plugin.saveSettings();
+        }
+
+        titleModelDropdown.setValue(hasSelectedValue ? selectedValue : '');
+      } catch (error) {
+        logger.error('Failed to load AI title models:', error);
+        titleModelDropdown.selectEl.empty();
+        titleModelDropdown.addOption('', t('settings.titleGeneration.model.followCurrent'));
+        titleModelDropdown.setValue('');
+      }
+
+      updateTitleModelSettingVisibility();
+    };
+
+    new Setting(containerEl)
+      .setName(t('settings.titleGeneration.mode.name'))
+      .setDesc(t('settings.titleGeneration.mode.desc'))
+      .addDropdown((dropdown) => {
+        dropdown
+          .addOption('default', t('settings.titleGeneration.mode.default'))
+          .addOption('ai', t('settings.titleGeneration.mode.ai'))
+          .setValue(this.plugin.settings.titleMode)
+          .onChange(async (value) => {
+            this.plugin.settings.titleMode = value as TitleMode;
+            await this.plugin.saveSettings();
+            updateTitleModelSettingVisibility();
+          });
+      });
+
+    titleModelSetting = new Setting(containerEl)
+      .setName(t('settings.titleGeneration.model.name'))
+      .setDesc(t('settings.titleGeneration.model.desc'))
+      .addDropdown((dropdown) => {
+        titleModelDropdown = dropdown;
+        dropdown.onChange(async (value) => {
+          this.plugin.settings.aiTitleModel = value;
+          await this.plugin.saveSettings();
+        });
+      });
+
+    updateTitleModelSettingVisibility();
+    void loadTitleModels();
 
     return headingEl;
   }
@@ -2553,6 +2704,16 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       }
     }
     return outputPath;
+  }
+
+  private async getCurrentProviderIdsForIconCache(): Promise<string[]> {
+    if (this.plugin.modelConfigService) {
+      const catalogs = await this.plugin.modelConfigService.getCatalogs(this.plugin.settings.modelSourceMode);
+      return catalogs.effective.providers.map((provider) => provider.id);
+    }
+
+    const availableModels = await this.plugin.openCodeService.getAvailableModels();
+    return availableModels.providers.map((provider) => provider.id);
   }
 
   private getDebugPathPlatformLabel(platformKey: 'unix' | 'windows'): string {
