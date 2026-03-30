@@ -4402,6 +4402,7 @@
     color-mix(in srgb, var(--background-secondary-alt, var(--background-secondary)) 78%, transparent);
   width: 100%;
   border-collapse: collapse;
+  table-layout: fixed;
   margin: 0.75em 0;
   display: table;
   max-width: 100%;
@@ -4427,6 +4428,11 @@
 
 :is(.opencodian-message-text, .streaming-text-block) tbody tr:nth-child(even) td {
   background: var(--opencodian-table-row-alt-bg);
+}
+
+:is(.opencodian-message-text, .streaming-text-block) :is(th, td) a {
+  overflow-wrap: anywhere;
+  word-break: break-all;
 }
 
 /* Horizontal rule */

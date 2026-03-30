@@ -11,6 +11,10 @@ const DEFAULT_CODE_BLOCK_OPTIONS: CodeBlockOptions = {
   languageLabelClass: 'markdown-code-lang-label',
 };
 
+const TABLE_URL_TRUNCATION_THRESHOLD = 80;
+const TABLE_URL_TRUNCATION_HEAD_LENGTH = 36;
+const TABLE_URL_TRUNCATION_TAIL_LENGTH = 18;
+
 export class MarkdownRenderService {
   private app: MarkdownRendererOptions['app'];
   private component: MarkdownRendererOptions['component'];
@@ -55,6 +59,7 @@ export class MarkdownRenderService {
         this.component
       );
 
+      this.enhanceTableLinks(el);
       this.enhanceCodeBlocks(el);
       processFileLinks(this.app, el);
 
@@ -110,6 +115,28 @@ export class MarkdownRenderService {
       if (obsidianCopyBtn) {
         obsidianCopyBtn.remove();
       }
+    });
+  }
+
+  private enhanceTableLinks(container: HTMLElement): void {
+    container.querySelectorAll('table a[href]').forEach((linkEl) => {
+      const href = linkEl.getAttribute('href');
+      const linkText = linkEl.textContent?.trim();
+
+      if (!href || !linkText || linkText !== href) {
+        return;
+      }
+
+      if (href.length <= TABLE_URL_TRUNCATION_THRESHOLD) {
+        return;
+      }
+
+      const truncatedHref =
+        `${href.slice(0, TABLE_URL_TRUNCATION_HEAD_LENGTH)}...${href.slice(-TABLE_URL_TRUNCATION_TAIL_LENGTH)}`;
+
+      linkEl.textContent = truncatedHref;
+      linkEl.title = href;
+      linkEl.setAttribute('aria-label', href);
     });
   }
 

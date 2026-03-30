@@ -12,6 +12,44 @@
 
 ---
 
+## 2026-03-30 表格长链接换行与显示增强
+
+### 🎯 改动目标
+
+- 修复 assistant 消息里的 Markdown 表格在包含超长 URL 时，会把聊天面板横向撑破的问题。
+- 让表格内链接在保持可点击的前提下，不影响其它普通段落、代码块和 Obsidian 原生 Markdown 渲染行为。
+- 在 CSS 兜底之外，为“表格内直接显示原始超长 URL”的场景补一个更易读的显示增强。
+
+### ✅ 本轮调整
+
+- `styles.css`
+  - 为聊天消息与流式消息作用域下的表格增加 `table-layout: fixed`
+  - 保留现有表格单元格换行能力，并为 `th` / `td` 内的链接补上 `overflow-wrap: anywhere` 与 `word-break: break-all`
+  - 修复范围严格限制在 `.opencodian-message-text` / `.streaming-text-block` 内，不影响其它渲染区域
+
+- `src/utils/markdown/MarkdownRenderer.ts`
+  - 在 Markdown 渲染完成后新增表格链接增强步骤
+  - 仅当命中 `table a[href]`、链接显示文本与 `href` 完全相同、且 URL 长度超过阈值时，才对可见文本做截断
+  - 截断格式为“前段 + ... + 后段”，同时保留原始 `href`
+  - 将完整 URL 写入 `title` 与 `aria-label`，保证 hover 与可访问性场景下仍可拿到完整地址
+  - 自定义链接文本与非表格链接保持不变
+
+- `tests/unit/utils/markdown/MarkdownRenderer.test.ts`
+  - 新增表格长 URL 截断测试
+  - 验证表格内原始超长 URL 会被缩短显示，但 `href` 保持原值
+  - 验证表格内自定义链接文本不受影响
+  - 验证普通段落中的链接文本不受影响
+
+### 🧪 验证结果
+
+- 通过：`npm test -- --runTestsByPath tests/unit/utils/markdown/MarkdownRenderer.test.ts`
+- 通过：`npm run build`
+- 已部署到测试库并确认 `BUILD_ID`：`main.202603301733`
+
+### 📝 结论
+
+- 这轮改动把“超长 URL 撑破表格布局”的问题拆成了两层处理：CSS 负责让表格宽度服从聊天容器，渲染后处理负责改善原始长链接的可读性。最终效果是表格不会再横向失控，链接仍可点击，且改动范围限定在聊天消息表格内。
+
 ## 2026-03-30 Batch 失败态与用户拒绝工具态映射修正
 
 ### 🎯 改动目标
