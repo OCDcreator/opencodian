@@ -1445,6 +1445,22 @@ describe('tool execution status helpers', () => {
     })).toBe('error');
   });
 
+  it('treats rm missing-file output as a bash error', () => {
+    expect(resolveToolExecutionStatus({
+      toolName: 'bash',
+      storedStatus: 'completed',
+      result: "rm: cannot remove '/c/Users/lt/Desktop/Write/testvault/message.txt': No such file or directory",
+    })).toBe('error');
+  });
+
+  it('treats curl TLS handshake failures as bash errors', () => {
+    expect(resolveToolExecutionStatus({
+      toolName: 'bash',
+      storedStatus: 'completed',
+      result: 'curl: (35) schannel: failed to receive handshake, SSL/TLS connection failed',
+    })).toBe('error');
+  });
+
   it('keeps successful bash results completed when exit code is zero', () => {
     expect(resolveToolExecutionStatus({
       toolName: 'bash',

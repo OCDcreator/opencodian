@@ -21,9 +21,14 @@ const BASH_METADATA_FAILURE_PATTERNS = [
 
 const BASH_OUTPUT_FAILURE_PATTERNS = [
   /^\s*fatal:/im,
+  /^\s*curl:\s*\(\d+\)/im,
+  /^\s*rm:\s+cannot\b/im,
+  /^\s*(?:bash|sh|zsh|ls|cat|cp|mv|rm|find|sed|grep): .*no such file or directory/im,
   /command not found/i,
   /is not recognized as an internal or external command/i,
+  /failed to receive handshake/i,
   /permission denied/i,
+  /ssl\/tls connection failed/i,
 ];
 
 function getNumericMetadataValue(metadata: Record<string, unknown> | undefined, key: string): number | null {

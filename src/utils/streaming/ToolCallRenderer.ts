@@ -14,12 +14,26 @@ const DEFAULT_TOOL_NAMES: Record<string, string> = {
   read: 'Read',
   write: 'Write',
   edit: 'Edit',
+  multiedit: 'MultiEdit',
+  apply_patch: 'Patch',
+  patch: 'Patch',
   bash: 'Bash',
   grep: 'Grep',
   glob: 'Glob',
+  list: 'List',
+  lsp: 'LSP',
   web_search: 'WebSearch',
   web_fetch: 'WebFetch',
+  websearch: 'WebSearch',
+  webfetch: 'WebFetch',
+  codesearch: 'CodeSearch',
   task: 'Background Task',
+  question: 'Questions',
+  skill: 'Skill',
+  plan_enter: 'EnterPlanMode',
+  plan_exit: 'ExitPlanMode',
+  enter_plan_mode: 'EnterPlanMode',
+  exit_plan_mode: 'ExitPlanMode',
   todowrite: 'Todos',
   todoread: 'Todo Read',
 };
@@ -29,12 +43,23 @@ const TOOL_ICONS: Record<string, string> = {
   read: 'file-text',
   write: 'file-plus',
   edit: 'file-edit',
+  multiedit: 'file-edit',
+  apply_patch: 'file-edit',
   bash: 'terminal',
   grep: 'search',
   glob: 'folder-search',
+  list: 'folder-tree',
+  lsp: 'search',
   web_search: 'search',
   web_fetch: 'download',
+  websearch: 'search',
+  webfetch: 'download',
+  codesearch: 'code',
   task: 'git-branch',
+  skill: 'brain',
+  question: 'message-square',
+  plan_enter: 'list',
+  plan_exit: 'check',
   // MCP tools
   mcp: 'layers',
   get_repo_structure: 'folder-tree',
@@ -63,27 +88,52 @@ export class ToolCallRenderer {
   ): string => {
     switch (name) {
       case 'read':
+        return this.getReadSummary(input);
       case 'write':
       case 'edit':
         return this.fileNameOnly(this.getToolFilePath(input));
+      case 'multiedit':
+        return this.getMultiEditSummary(input);
+      case 'apply_patch':
+      case 'patch':
+        return this.getApplyPatchSummary(input);
       case 'bash':
         return this.truncateText((input.command as string) || '', 60);
+      case 'list':
+        return this.directoryNameOnly((input.path as string) || '');
       case 'glob':
+        return this.getGlobSummary(input);
       case 'grep':
-        return (input.pattern as string) || '';
+        return this.getGrepSummary(input);
+      case 'lsp':
+        return this.getLspSummary(input);
       case 'web_search':
+      case 'websearch':
+      case 'codesearch':
         return this.truncateText((input.query as string) || '', 60);
       case 'web_fetch':
+      case 'webfetch':
         return this.truncateText((input.url as string) || '', 60);
       case 'task':
+        return this.getTaskSummary(input);
+      case 'question':
+        return this.getQuestionSummary(input);
+      case 'skill':
         return this.truncateText(
-          (input.description as string)
-          || (input.prompt as string)
-          || (input.title as string)
+          (input.name as string)
+          || (input.skill as string)
           || '',
           80,
         );
-      case 'todoread':
+      case 'plan_enter':
+      case 'enter_plan_mode':
+        return 'Switch to plan mode';
+      case 'plan_exit':
+      case 'exit_plan_mode':
+        return 'Switch to build mode';
+      case 'todoread': {
+        return this.getTodoSummary(input) || 'Current tasks';
+      }
       case 'todowrite': {
         return this.getTodoSummary(input);
       }
@@ -125,6 +175,17 @@ export class ToolCallRenderer {
     if (!filePath) return '';
     const normalized = filePath.replace(/\\/g, '/');
     return normalized.split('/').pop() ?? normalized;
+  }
+
+  private directoryNameOnly(filePath: string): string {
+    if (!filePath) return '';
+    const normalized = filePath.replace(/\\/g, '/').replace(/\/+$/, '');
+    if (!normalized) {
+      return '';
+    }
+
+    const parts = normalized.split('/');
+    return parts[parts.length - 1] || normalized;
   }
 
   private getToolFilePath(input: Record<string, unknown>): string {
@@ -176,6 +237,161 @@ export class ToolCallRenderer {
       names.push(content);
       return names;
     }, []);
+  }
+
+  private getReadSummary(input: Record<string, unknown>): string {
+    const file = this.fileNameOnly(this.getToolFilePath(input));
+    const offset = this.getPositiveInteger(input.offset);
+    const limit = this.getPositiveInteger(input.limit);
+
+    if (!file) {
+      return this.formatReadRange(offset, limit);
+    }
+
+    const range = this.formatReadRange(offset, limit);
+    return range ? `${file} · ${range}` : file;
+  }
+
+  private getMultiEditSummary(input: Record<string, unknown>): string {
+    const file = this.fileNameOnly(this.getToolFilePath(input));
+    const edits = Array.isArray(input.edits) ? input.edits.length : 0;
+    if (!file) {
+      return edits > 0 ? `${edits} edits` : '';
+    }
+    return edits > 0 ? `${file} · ${edits} edits` : file;
+  }
+
+  private getApplyPatchSummary(input: Record<string, unknown>): string {
+    const patchText = typeof input.patchText === 'string'
+      ? input.patchText
+      : typeof input.patch === 'string'
+        ? input.patch
+        : '';
+
+    if (!patchText) {
+      return '';
+    }
+
+    const matches = [...patchText.matchAll(/^\*\*\* (?:Add|Update|Delete) File: (.+)$/gm)];
+    const files = matches
+      .map((match) => this.fileNameOnly(match[1]?.trim() ?? ''))
+      .filter((value) => value.length > 0);
+
+    if (files.length === 0) {
+      return 'Patch';
+    }
+
+    if (files.length === 1) {
+      return files[0];
+    }
+
+    const preview = files.slice(0, 2).join(' · ');
+    const extra = files.length - 2;
+    return extra > 0 ? `${files.length} files · ${preview} · +${extra}` : `${files.length} files · ${preview}`;
+  }
+
+  private getGlobSummary(input: Record<string, unknown>): string {
+    const pattern = typeof input.pattern === 'string' ? input.pattern.trim() : '';
+    const dir = this.directoryNameOnly(typeof input.path === 'string' ? input.path : '');
+
+    if (pattern && dir) {
+      return this.truncateText(`${pattern} · ${dir}`, 80);
+    }
+
+    return pattern || dir;
+  }
+
+  private getGrepSummary(input: Record<string, unknown>): string {
+    const parts: string[] = [];
+    const pattern = typeof input.pattern === 'string' ? input.pattern.trim() : '';
+    const include = typeof input.include === 'string' ? input.include.trim() : '';
+    const dir = this.directoryNameOnly(typeof input.path === 'string' ? input.path : '');
+
+    if (pattern) {
+      parts.push(pattern);
+    }
+    if (include) {
+      parts.push(include);
+    } else if (dir) {
+      parts.push(dir);
+    }
+
+    return this.truncateText(parts.join(' · '), 80);
+  }
+
+  private getLspSummary(input: Record<string, unknown>): string {
+    const operation = typeof input.operation === 'string' ? input.operation.trim() : '';
+    const file = this.fileNameOnly(this.getToolFilePath(input));
+    const line = this.getPositiveInteger(input.line);
+    const character = this.getPositiveInteger(input.character);
+
+    const location = [file, line, character].filter((value) => value !== null && value !== '').join(':');
+    if (operation && location) {
+      return `${operation} · ${location}`;
+    }
+
+    return operation || location;
+  }
+
+  private getTaskSummary(input: Record<string, unknown>): string {
+    const type = typeof input.subagent_type === 'string' ? input.subagent_type.trim() : '';
+    const description = typeof input.description === 'string'
+      ? input.description.trim()
+      : typeof input.prompt === 'string'
+        ? input.prompt.trim()
+        : typeof input.title === 'string'
+          ? input.title.trim()
+          : '';
+
+    if (type && description) {
+      return this.truncateText(`${type} · ${description}`, 80);
+    }
+
+    return this.truncateText(type || description, 80);
+  }
+
+  private getQuestionSummary(input: Record<string, unknown>): string {
+    const questions = Array.isArray(input.questions) ? input.questions : [];
+    if (questions.length === 0) {
+      return '';
+    }
+
+    if (questions.length === 1 && questions[0] && typeof questions[0] === 'object') {
+      const question = questions[0] as { header?: unknown; question?: unknown };
+      const label = typeof question.header === 'string' && question.header.trim()
+        ? question.header.trim()
+        : typeof question.question === 'string'
+          ? question.question.trim()
+          : '';
+      return this.truncateText(label, 80);
+    }
+
+    return `${questions.length} questions`;
+  }
+
+  private getPositiveInteger(value: unknown): number | null {
+    if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
+      return Math.floor(value);
+    }
+
+    if (typeof value === 'string' && /^\d+$/.test(value.trim())) {
+      return Number(value.trim());
+    }
+
+    return null;
+  }
+
+  private formatReadRange(offset: number | null, limit: number | null): string {
+    if (offset === null && limit === null) {
+      return '';
+    }
+
+    const start = offset ?? 1;
+    if (limit !== null) {
+      return `${start}-${start + limit - 1}`;
+    }
+
+    return `${start}+`;
   }
 
   private truncateText(text: string, maxLength: number): string {

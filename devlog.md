@@ -12,6 +12,57 @@
 
 ---
 
+## 2026-03-30 工具摘要全量补齐与 Bash 失败状态修正
+
+### 🎯 改动目标
+
+- 修复 `bash` 工具在命令实际失败、输出明确错误时，工具卡片先显示红 `×`、消息结束后又错误翻成绿 `√` 的状态误判。
+- 让 `skill` 工具在调用一开始就直接显示所加载的 skill 名称，不再只出现一个空白或信息不足的工具项。
+- 将工具栏摘要补齐到更多 OpenCode 常见工具，按工具类型展示更直观的关键信息，减少只看到原始工具名却不知道它在做什么的情况。
+
+### ✅ 本轮调整
+
+- `src/shared/toolExecution.ts`
+  - 扩充 `bash` 失败输出识别规则
+  - 新增对 `rm: cannot remove ... No such file or directory`、`curl: (35) ... SSL/TLS connection failed`、握手失败等典型失败输出的识别
+  - 让这类已完成但实际失败的 `bash` 结果稳定归类为 `error`，不再被后续状态收敛逻辑误判成 `completed`
+
+- `src/utils/streaming/ToolCallRenderer.ts`
+  - 补全更多工具的显示名与图标映射
+  - 将工具摘要逻辑扩展为按类型生成：
+    - `read`：文件名 + 读取范围
+    - `write` / `edit`：文件名
+    - `multiedit`：文件名 + 编辑次数
+    - `apply_patch` / `patch`：补丁涉及文件数或文件名
+    - `list`：目录名
+    - `glob` / `grep`：模式、包含规则、目录摘要
+    - `lsp`：操作名 + 文件位置
+    - `websearch` / `webfetch` / `codesearch`：查询或 URL
+    - `task`：子代理类型 + 描述
+    - `question`：问题标题或问题数
+    - `skill`：skill 名称，生成时立即可见
+    - `todoread` / `todowrite`：当前任务或任务进度摘要
+    - `plan_enter` / `plan_exit`：模式切换提示
+
+- `tests/unit/core/opencode/OpenCodeService.test.ts`
+  - 新增 `rm` 缺失文件报错输出识别测试
+  - 新增 `curl` TLS 握手失败输出识别测试
+
+- `tests/unit/utils/streaming/ToolCallRenderer.test.ts`
+  - 新增 `skill` 工具即时显示 skill 名称测试
+  - 新增多类工具摘要渲染测试，覆盖 `read`、`multiedit`、`apply_patch`、`list`、`glob`、`grep`、`lsp`、`websearch`、`webfetch`、`task`、`question`、`todoread`
+
+### 🧪 验证结果
+
+- 通过：`npm test -- tests/unit/utils/streaming/ToolCallRenderer.test.ts tests/unit/core/opencode/OpenCodeService.test.ts`
+- 通过：`npm run check:devlog-order`
+- 通过：`npm run build`
+- 已部署到测试库并确认 `BUILD_ID`：`main.202603301655`
+
+### 📝 结论
+
+- 这轮改动把工具卡片的可读性从“只显示工具名”提升为“按工具类型直接显示关键上下文”，同时修正了 `bash` 工具在明显失败场景下的状态反转问题；像 `skill` 这类工具也能在生成时立刻看出它具体调用了什么。
+
 ## 2026-03-30 用户消息原始标记代码化显示与会话开关
 
 ### 🎯 改动目标
