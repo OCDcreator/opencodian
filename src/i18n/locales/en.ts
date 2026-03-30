@@ -569,6 +569,7 @@ export const enTranslations = {
   'chat.context.addCurrentNote': 'Current note',
   'chat.context.addSelection': 'Selection',
   'chat.context.addFile': 'Choose file',
+  'chat.context.addContext': 'Add context',
   'chat.context.empty': 'No extra Obsidian context selected for this message.',
   'chat.context.remove': 'Remove context',
   'chat.context.kind.currentNote': 'Note',

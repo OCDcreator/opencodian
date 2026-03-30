@@ -569,6 +569,7 @@ export const zhTranslations = {
   'chat.context.addCurrentNote': '当前笔记',
   'chat.context.addSelection': '当前选区',
   'chat.context.addFile': '选择文件',
+  'chat.context.addContext': '添加上下文',
   'chat.context.empty': '这条消息当前还没有额外的 Obsidian 上下文。',
   'chat.context.remove': '移除上下文',
   'chat.context.kind.currentNote': '笔记',

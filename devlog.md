@@ -12,6 +12,55 @@
 
 ---
 
+## 2026-03-31 输入框内联上下文 Composer 重构
+
+### 🎯 改动目标
+
+- 移除输入框上方独立的上下文 tray，把上下文状态、文本输入、添加上下文按钮、发送按钮整合进同一个 composer 容器。
+- 为当前焦点文档/选区提供 VS Code 风格的顶部内联提示：未附加时显示虚线预览 chip，附加后切成实线 chip。
+- 优化 composer 的视觉与布局细节，包括去除内层 textarea 边框、补足默认留白、限制最大输入高度，以及微调 toolbar 中模型/圆环/思考预算的相对位置。
+
+### ✅ 本轮调整
+
+- `src/features/chat/OpenCodianView.ts`
+- `src/features/chat/composerContext.ts`
+  - 新增 per-tab `focusContextPreview` 运行时状态，把“当前焦点预览”和“已附加上下文”分离
+  - 输入区重建为一体化 composer：顶部 context chips、中部 textarea、底部 `+`/发送按钮，删除旧的独立 context tray
+  - 新增 `composerContext.ts` 纯逻辑辅助函数，统一处理目标去重、preview/attached chip 排序、焦点目标 key 计算
+  - 当前焦点文档/选区改为事件驱动刷新：结合 `file-open`、`active-leaf-change`、`editor-change` 与 `selectionchange` 等信号更新预览 chip
+  - 点击 preview chip 会即时附加当前文档/选区；点击 attached chip 会按目标维度取消附加
+  - textarea 改为随输入内容增高，并在达到最大高度后切换到内部滚动
+  - toolbar 顺序微调为“权限 -> 模型 -> 上下文使用圆环 -> 思考预算”，并将圆环固定到模型这一侧
+
+- `styles.css`
+  - 删除旧 context tray 样式，新增 composer 内联 chip、footer、添加上下文按钮样式
+  - 当前焦点未附加 chip 使用明确的虚线边框和斜体样式；已附加 chip 使用实线样式
+  - 清除 textarea 的内层边框/阴影，让输入区完全融入外层 composer 卡片
+  - 调整空输入时的默认最小高度与留白，并将输入最大高度与代码限制对齐
+
+- `src/i18n/locales/en.ts`
+- `src/i18n/locales/zh.ts`
+  - 补充 composer 内 `+` 按钮“添加上下文”文案
+
+- `tests/unit/features/chat/composerContext.test.ts`
+  - 新增 preview/attached 去重、排序、选区冻结与 detach 后回退为 preview 的回归测试
+
+- `AGENTS.md`
+  - 更新目录与 `OpenCodianView` 职责说明，反映新引入的 `composerContext.ts` 和输入框内联上下文 composer
+
+### 🧪 验证结果
+
+- 通过：`npm test`
+- 通过：`npm run typecheck`
+- 通过：`npm run lint`
+- 通过：`npm run build`（`BUILD_ID: main.202603310022`）
+- 已部署到 Test Vault：`C:\Users\lt\Desktop\Write\testvault\.obsidian\plugins\opencodian\`
+- 已验证部署后的 `main.js` 包含 `BUILD_ID: main.202603310022`
+
+### 📝 结论
+
+- 这轮之后，OpenCodian 的输入区已经从“上方独立上下文区 + 下方输入框”切换成了更接近 VS Code/Copilot 的一体化 composer；上下文提示、附加行为和输入区视觉被收拢到同一个容器中，交互更紧凑，也更容易继续打磨。
+
 ## 2026-03-30 提问卡片位置设置、输入框上方 Dock 与回顾卡片开关
 
 ### 🎯 改动目标

@@ -137,6 +137,7 @@ opencodian/
 │   │   │   │   ├── questionDockState.ts
 │   │   │   │   └── SessionTodoDock.ts
 │   │   │   ├── chatAppearance.ts    # Chat appearance CSS variable builder
+│   │   │   ├── composerContext.ts   # Inline composer context preview + dedupe helpers
 │   │   │   ├── OpenCodianView.ts    # Main chat view component
 │   │   │   ├── renderGroups.ts      # Assistant render grouping helpers
 │   │   │   └── index.ts
@@ -386,10 +387,11 @@ Main chat UI view (extends Obsidian's `ItemView`).
 - Multi-tab conversation management
 - Per-tab runtime state for true concurrent tab sends
 - Reload-safe conversation restore path that waits for preloaded conversation metadata
-- Explicit Obsidian context tray with current note / selection / file actions
+- Inline composer context chips with per-tab focus preview, attach/detach toggles, and a built-in `+` file picker entry point
 - Cached vault file picker with suffix filters, search, and hidden-path exclusion
 - Per-session model switching dropdown
-- Effort / thinking budget selector
+- Composer textarea that auto-grows with a capped max height and internal scrolling once capped
+- Toolbar controls for model selection, context usage ring, and effort / thinking budget
 - Real-time streaming display
 - Optimistic user message hydration from server-final content
 - User message context attachment rendering and detail modal
@@ -587,5 +589,5 @@ This is the main development log maintained in the Obsidian vault for easy refer
 
 ---
 
-**Last Updated**: 2026-03-30
+**Last Updated**: 2026-03-31
 **Plugin Version**: 1.0.0

@@ -46,6 +46,14 @@ import {
   ToolCallRenderer,
 } from '../../utils/streaming';
 import { buildChatAppearanceCustomCss, getChatAppearanceCssVariables } from './chatAppearance';
+import {
+  buildComposerContextChipStates,
+  createFocusContextPreview,
+  type FocusContextPreview,
+  getContextTargetKey,
+  removeDraftContextItemsByTarget,
+  upsertDraftContextItem,
+} from './composerContext';
 import { cloneMessagesBeforeForkTarget } from './forkMessages';
 import { buildMessageRenderGroups, mergeAssistantMessagesForRender } from './renderGroups';
 import { type CollapsibleState, setupCollapsible } from './rendering/collapsible';
@@ -114,6 +122,8 @@ const PENDING_MESSAGES = [
   'Peering into the abyss...',
 ];
 
+const COMPOSER_TEXTAREA_MAX_HEIGHT = 240;
+
 /** Get a random pending message */
 function getRandomPendingMessage(): string {
   return PENDING_MESSAGES[Math.floor(Math.random() * PENDING_MESSAGES.length)];
@@ -170,6 +180,7 @@ interface TabRuntimeState {
   backgroundTaskLaunches: Map<string, BackgroundTaskLaunchInfo>;
   backgroundTaskCompletedTasks: Map<string, BackgroundTaskCompletionInfo>;
   backgroundTaskWaitingForFollowUp: boolean;
+  focusContextPreview: FocusContextPreview | null;
   draftContextItems: PromptContextItem[];
   pendingEditedFiles: Set<string>;
   questionInlineCardEl: HTMLElement | null;
@@ -205,8 +216,7 @@ export class OpenCodianView extends ItemView {
   private messagesShellEl: HTMLElement | null = null;
   private messagesContainer: HTMLElement | null = null;
   private inputContainer: HTMLElement | null = null;
-  private contextTrayEl: HTMLElement | null = null;
-  private contextTrayChipsEl: HTMLElement | null = null;
+  private composerContextRowEl: HTMLElement | null = null;
   private questionDockMountEl: HTMLElement | null = null;
   private questionDock: QuestionDock | null = null;
   private todoDockMountEl: HTMLElement | null = null;
@@ -279,6 +289,7 @@ export class OpenCodianView extends ItemView {
   private lastKnownMarkdownFilePath: string | null = null;
   private contextFileCatalogCache: ContextFileCatalog | null = null;
   private contextFileCatalogBuildPromise: Promise<ContextFileCatalog> | null = null;
+  private focusContextRefreshTimeoutId: number | null = null;
 
   private appSettings(): { open: () => void; openTabById: (id: string) => void } {
     return (this.app as typeof this.app & {
@@ -307,6 +318,7 @@ export class OpenCodianView extends ItemView {
       backgroundTaskLaunches: new Map(),
       backgroundTaskCompletedTasks: new Map(),
       backgroundTaskWaitingForFollowUp: false,
+      focusContextPreview: null,
       draftContextItems: [],
       pendingEditedFiles: new Set(),
       questionInlineCardEl: null,
@@ -504,6 +516,10 @@ export class OpenCodianView extends ItemView {
     return runtime ? [...runtime.draftContextItems] : [];
   }
 
+  private getFocusContextPreview(tabId: TabId | null = this.getActiveTabId()): FocusContextPreview | null {
+    return this.getTabRuntimeState(tabId)?.focusContextPreview ?? null;
+  }
+
   private setDraftContextItems(
     items: PromptContextItem[],
     tabId: TabId | null = this.getActiveTabId(),
@@ -515,7 +531,7 @@ export class OpenCodianView extends ItemView {
 
     runtime.draftContextItems = [...items];
     if (tabId === this.getActiveTabId()) {
-      this.renderDraftContextTray();
+      this.renderComposerContextChips();
     }
   }
 
@@ -524,16 +540,35 @@ export class OpenCodianView extends ItemView {
     tabId: TabId | null = this.getActiveTabId(),
   ): void {
     const existingItems = this.getDraftContextItems(tabId);
-    const nextItems = existingItems.filter((entry) => this.getDraftContextItemKey(entry) !== this.getDraftContextItemKey(item));
-    nextItems.push(item);
+    const nextItems = upsertDraftContextItem(existingItems, item);
     this.setDraftContextItems(nextItems, tabId);
   }
 
-  private removeDraftContextItem(
-    itemId: string,
+  private setFocusContextPreview(
+    preview: FocusContextPreview | null,
     tabId: TabId | null = this.getActiveTabId(),
   ): void {
-    const nextItems = this.getDraftContextItems(tabId).filter((item) => item.id !== itemId);
+    const runtime = this.getTabRuntimeState(tabId);
+    if (!runtime) {
+      return;
+    }
+
+    const previous = runtime.focusContextPreview;
+    if (this.areFocusContextPreviewsEqual(previous, preview)) {
+      return;
+    }
+
+    runtime.focusContextPreview = preview;
+    if (tabId === this.getActiveTabId()) {
+      this.renderComposerContextChips();
+    }
+  }
+
+  private removeDraftContextItemsForTarget(
+    target: Pick<PromptContextItem, 'path' | 'lineRange'>,
+    tabId: TabId | null = this.getActiveTabId(),
+  ): void {
+    const nextItems = removeDraftContextItemsByTarget(this.getDraftContextItems(tabId), target);
     this.setDraftContextItems(nextItems, tabId);
   }
 
@@ -541,9 +576,16 @@ export class OpenCodianView extends ItemView {
     this.setDraftContextItems([], tabId);
   }
 
-  private getDraftContextItemKey(item: PromptContextItem): string {
-    const lines = item.lineRange ? `${item.lineRange.startLine}-${item.lineRange.endLine}` : '';
-    return `${item.kind}:${item.path}:${lines}`;
+  private areFocusContextPreviewsEqual(
+    left: FocusContextPreview | null,
+    right: FocusContextPreview | null,
+  ): boolean {
+    if (!left || !right) {
+      return left === right;
+    }
+
+    return left.kind === right.kind
+      && getContextTargetKey(left.path, left.lineRange) === getContextTargetKey(right.path, right.lineRange);
   }
 
   private subscribeToSessionTodoUpdates(): void {
@@ -1001,6 +1043,7 @@ export class OpenCodianView extends ItemView {
     this.persistTabState({ flush: true });
     this.stopServerStatusLoop();
     this.stopConversationSyncLoop();
+    this.clearScheduledFocusContextPreviewRefresh();
     this.clearChatSurfaceSyncTimers();
     this.clearScheduledScrollToBottom();
     this.chatAppearanceStyleEl?.remove();
@@ -1024,6 +1067,7 @@ export class OpenCodianView extends ItemView {
     this.outerVerticalTabBarHostEl?.remove();
     this.outerVerticalTabBarHostEl = null;
     this.inputTabBarSlotEl = null;
+    this.composerContextRowEl = null;
     this.questionDock?.destroy();
     this.questionDock = null;
     this.questionDockMountEl = null;
@@ -1415,7 +1459,7 @@ export class OpenCodianView extends ItemView {
     }
 
     this.setActiveMessagesPane(tabId);
-    this.renderDraftContextTray();
+    this.refreshActiveFocusContextPreview();
     this.renderQuestionDock();
     this.sessionTodoDock?.update(
       this.getTabSessionTodos(tabId, this.getTabRuntimeState(tabId)?.sessionTodoSessionId ?? null),
@@ -1912,49 +1956,13 @@ export class OpenCodianView extends ItemView {
     this.todoDockMountEl = container.createDiv({ cls: 'opencodian-session-todo-slot' });
     this.sessionTodoDock = new SessionTodoDock(this.todoDockMountEl);
 
-    this.contextTrayEl = container.createDiv({ cls: 'opencodian-context-tray' });
-    const contextActionsEl = this.contextTrayEl.createDiv({ cls: 'opencodian-context-tray-actions' });
-    contextActionsEl.createSpan({
-      cls: 'opencodian-context-tray-title',
-      text: t('chat.context.title'),
-    });
-
-    const currentNoteBtn = contextActionsEl.createEl('button', {
-      cls: 'opencodian-context-tray-btn',
-      text: t('chat.context.addCurrentNote'),
-      attr: { type: 'button' },
-    });
-    currentNoteBtn.addEventListener('click', () => {
-      void this.addCurrentNoteContextFromActiveEditor();
-    });
-
-    const selectionBtn = contextActionsEl.createEl('button', {
-      cls: 'opencodian-context-tray-btn',
-      text: t('chat.context.addSelection'),
-      attr: { type: 'button' },
-    });
-    selectionBtn.addEventListener('click', () => {
-      void this.addSelectionContextFromActiveEditor();
-    });
-
-    const chooseFileBtn = contextActionsEl.createEl('button', {
-      cls: 'opencodian-context-tray-btn',
-      text: t('chat.context.addFile'),
-      attr: { type: 'button' },
-    });
-    chooseFileBtn.addEventListener('click', () => {
-      void this.addChosenFileContextToActiveTab();
-    });
-
-    this.contextTrayChipsEl = this.contextTrayEl.createDiv({ cls: 'opencodian-context-tray-chips' });
-    this.renderDraftContextTray();
-
     this.questionDockMountEl = container.createDiv({ cls: 'opencodian-question-dock-slot' });
     this.questionDock = new QuestionDock(this.questionDockMountEl);
     this.renderQuestionDock();
 
-    // Input wrapper - textarea only (send button moved to toolbar)
     const inputWrapper = container.createDiv({ cls: 'opencodian-input-wrapper' });
+    this.composerContextRowEl = inputWrapper.createDiv({ cls: 'opencodian-composer-context-row is-empty' });
+    this.renderComposerContextChips();
 
     this.inputTextarea = inputWrapper.createEl('textarea', {
       cls: 'opencodian-input',
@@ -1963,11 +1971,9 @@ export class OpenCodianView extends ItemView {
 
     // Auto-resize textarea
     this.inputTextarea.addEventListener('input', () => {
-      if (this.inputTextarea) {
-        this.inputTextarea.style.height = 'auto';
-        this.inputTextarea.style.height = `${Math.min(this.inputTextarea.scrollHeight, 200)}px`;
-      }
+      this.syncInputTextareaHeight();
     });
+    this.syncInputTextareaHeight();
 
     // Send on Enter (Shift+Enter for new line)
     this.inputTextarea.addEventListener('keydown', (e) => {
@@ -1977,18 +1983,50 @@ export class OpenCodianView extends ItemView {
       }
     });
 
-    // Bottom toolbar: Permission mode (left) | Model selector (center) | Send button (right)
+    const composerFooterEl = inputWrapper.createDiv({ cls: 'opencodian-composer-footer' });
+    const addContextBtn = composerFooterEl.createEl('button', {
+      cls: 'opencodian-composer-add-btn opencodian-tooltip-trigger',
+      attr: {
+        type: 'button',
+        'aria-label': t('chat.context.addContext'),
+      },
+    });
+    setIcon(addContextBtn, 'plus');
+    this.setTooltipLabel(addContextBtn, t('chat.context.addContext'), 'top');
+    addContextBtn.addEventListener('click', () => {
+      void this.addChosenFileContextToActiveTab();
+    });
+
+    this.sendBtn = composerFooterEl.createEl('button', {
+      cls: 'opencodian-send-btn',
+      attr: {
+        type: 'button',
+      },
+    });
+    setIcon(this.sendBtn, 'send');
+    this.sendBtn.addEventListener('click', () => {
+      if (this.isActiveTabStreaming()) {
+        this.cancelStreaming();
+      } else {
+        this.trySubmitCurrentInput();
+      }
+    });
+
+    // Bottom toolbar: Permission mode | Model selector | Effort selector | Context usage
     const toolbar = container.createDiv({ cls: 'opencodian-input-toolbar' });
 
-    // Left side: Permission mode selector
     const permissionContainer = toolbar.createDiv({ cls: 'opencodian-permission-selector' });
     this.initializePermissionSelector(permissionContainer);
 
-    // Center: Model selector (opencode-style)
     this.modelSelectorContainer = toolbar.createDiv({ cls: 'opencodian-model-selector' });
     this.initializeModelSelector(this.modelSelectorContainer);
 
-    // Effort selector (between model and send button)
+    this.contextRingContainerEl = toolbar.createDiv({ cls: 'opencodian-context-usage-slot' });
+    this.contextRing = new ContextRing(this.contextRingContainerEl, () => {
+      this.openContextUsageDetails();
+    });
+    this.refreshContextUsageIndicator();
+
     this.effortContainerEl = toolbar.createDiv({ cls: 'opencodian-effort-slot' });
     this.effortSelector = new EffortSelector(this.effortContainerEl, {
       onEffortLevelChange: async (effort: EffortLevel) => {
@@ -2009,73 +2047,91 @@ export class OpenCodianView extends ItemView {
       },
     });
     this.effortSelector.updateDisplay();
-
-    this.contextRingContainerEl = toolbar.createDiv({ cls: 'opencodian-context-usage-slot' });
-    this.contextRing = new ContextRing(this.contextRingContainerEl, () => {
-      this.openContextUsageDetails();
-    });
-    this.refreshContextUsageIndicator();
-
-    // Right side: Send/Stop button
-    this.sendBtn = toolbar.createDiv({ cls: 'opencodian-send-btn' });
-    setIcon(this.sendBtn, 'send');
-    this.sendBtn.addEventListener('click', () => {
-      if (this.isActiveTabStreaming()) {
-        // Stop streaming
-        this.cancelStreaming();
-      } else {
-        this.trySubmitCurrentInput();
-      }
-    });
   }
 
-  private renderDraftContextTray(): void {
-    if (!this.contextTrayEl || !this.contextTrayChipsEl) {
+  private renderComposerContextChips(): void {
+    if (!this.composerContextRowEl) {
       return;
     }
 
-    const items = this.getDraftContextItems();
-    this.contextTrayEl.toggleClass('is-empty', items.length === 0);
-    this.contextTrayChipsEl.empty();
+    const chipStates = buildComposerContextChipStates(
+      this.getDraftContextItems(),
+      this.getFocusContextPreview(),
+    );
 
-    if (items.length === 0) {
-      this.contextTrayChipsEl.createSpan({
-        cls: 'opencodian-context-tray-empty',
-        text: t('chat.context.empty'),
-      });
+    this.composerContextRowEl.empty();
+    this.composerContextRowEl.toggleClass('is-empty', chipStates.length === 0);
+    if (chipStates.length === 0) {
       return;
     }
 
-    for (const item of items) {
-      const chipEl = this.contextTrayChipsEl.createDiv({ cls: 'opencodian-context-chip' });
-      chipEl.createSpan({
-        cls: 'opencodian-context-chip-kind',
-        text: this.getContextKindLabel(item.kind),
-      });
-
-      const openBtn = chipEl.createEl('button', {
-        cls: 'opencodian-context-chip-label',
-        text: item.label,
+    for (const chipState of chipStates) {
+      const chipEl = this.composerContextRowEl.createEl('button', {
+        cls: 'opencodian-composer-context-chip',
+        text: chipState.label,
         attr: {
           type: 'button',
-          title: item.path,
+          title: chipState.path,
+          'aria-pressed': String(chipState.attached),
         },
-      });
-      openBtn.addEventListener('click', () => {
-        void this.app.workspace.openLinkText(item.path, '', 'tab');
       });
 
-      const removeBtn = chipEl.createEl('button', {
-        cls: 'opencodian-context-chip-remove',
-        text: 'x',
-        attr: {
-          type: 'button',
-          'aria-label': t('chat.context.remove'),
-        },
+      if (chipState.preview) {
+        chipEl.addClass('is-preview');
+      } else {
+        chipEl.addClass('is-attached');
+      }
+      if (chipState.lineRange) {
+        chipEl.addClass('is-selection');
+      }
+
+      chipEl.addEventListener('click', () => {
+        void this.handleComposerContextChipClick(chipState);
       });
-      removeBtn.addEventListener('click', () => {
-        this.removeDraftContextItem(item.id);
-      });
+    }
+  }
+
+  private async handleComposerContextChipClick(
+    chipState: ReturnType<typeof buildComposerContextChipStates>[number],
+  ): Promise<void> {
+    if (chipState.attached) {
+      this.removeDraftContextItemsForTarget(chipState);
+      return;
+    }
+
+    const focusPreview = this.getFocusContextPreview();
+    if (!focusPreview) {
+      return;
+    }
+
+    if (getContextTargetKey(focusPreview.path, focusPreview.lineRange) !== chipState.key) {
+      this.refreshActiveFocusContextPreview();
+      return;
+    }
+
+    await this.attachFocusContextPreview(focusPreview);
+  }
+
+  private async attachFocusContextPreview(preview: FocusContextPreview): Promise<void> {
+    if (preview.kind === 'selection') {
+      const previewView = this.getMarkdownViewByPath(preview.path);
+      const contextItem = await this.buildSelectionContextItem(previewView?.editor ?? null, previewView);
+      if (contextItem) {
+        this.addDraftContextItem(contextItem);
+      }
+      return;
+    }
+
+    const targetFile = this.app.vault.getAbstractFileByPath(preview.path);
+    if (!(targetFile instanceof TFile)) {
+      new Notice(t('chat.context.notice.noActiveNote'));
+      this.refreshActiveFocusContextPreview();
+      return;
+    }
+
+    const contextItem = await this.buildFileContextItem(targetFile, 'current_note');
+    if (contextItem) {
+      this.addDraftContextItem(contextItem);
     }
   }
 
@@ -2202,11 +2258,15 @@ export class OpenCodianView extends ItemView {
     }
 
     if (tabId !== this.getActiveTabId()) {
-      this.tabManager?.setTabNeedsAttention(tabId, true);
+      if (tabId) {
+        this.tabManager?.setTabNeedsAttention(tabId, true);
+      }
       return;
     }
 
-    this.tabManager?.setTabNeedsAttention(tabId, false);
+    if (tabId) {
+      this.tabManager?.setTabNeedsAttention(tabId, false);
+    }
     this.renderQuestionDock();
   }
 
@@ -2226,12 +2286,16 @@ export class OpenCodianView extends ItemView {
     this.resolveQuestionWaiter(requestId, tabId);
 
     if (tabId === this.getActiveTabId()) {
-      this.tabManager?.setTabNeedsAttention(tabId, false);
+      if (tabId) {
+        this.tabManager?.setTabNeedsAttention(tabId, false);
+      }
       this.renderQuestionDock();
       return;
     }
 
-    this.tabManager?.setTabNeedsAttention(tabId, runtime.pendingQuestionRequests.length > 0);
+    if (tabId) {
+      this.tabManager?.setTabNeedsAttention(tabId, runtime.pendingQuestionRequests.length > 0);
+    }
   }
 
   private suppressResolvedQuestionRequest(
@@ -2255,7 +2319,9 @@ export class OpenCodianView extends ItemView {
     runtime.questionActiveIndexes.clear();
     runtime.questionRequestWaiters.clear();
 
-    this.tabManager?.setTabNeedsAttention(tabId, false);
+    if (tabId) {
+      this.tabManager?.setTabNeedsAttention(tabId, false);
+    }
 
     if (tabId === this.getActiveTabId()) {
       this.renderQuestionDock();
@@ -2318,10 +2384,14 @@ export class OpenCodianView extends ItemView {
       }
 
       if (tabId === this.getActiveTabId()) {
-        this.tabManager?.setTabNeedsAttention(tabId, false);
+        if (tabId) {
+          this.tabManager?.setTabNeedsAttention(tabId, false);
+        }
         this.renderQuestionDock();
       } else {
-        this.tabManager?.setTabNeedsAttention(tabId, mergedRequests.length > 0);
+        if (tabId) {
+          this.tabManager?.setTabNeedsAttention(tabId, mergedRequests.length > 0);
+        }
       }
 
       return mergedRequests;
@@ -2496,7 +2566,7 @@ export class OpenCodianView extends ItemView {
     this.startConversationSyncLoop();
 
     if (tabId === this.getActiveTabId() && !this.getTabRuntimeState(tabId)?.isStreaming) {
-      await this.syncVisibleConversationIfNeeded();
+      await this.syncVisibleConversationInBackground();
     }
   }
 
@@ -2540,6 +2610,71 @@ export class OpenCodianView extends ItemView {
     }
 
     return fallbackView;
+  }
+
+  private getMarkdownViews(): MarkdownView[] {
+    return this.app.workspace.getLeavesOfType('markdown')
+      .map((leaf) => leaf.view)
+      .filter((view): view is MarkdownView => view instanceof MarkdownView && Boolean(view.file));
+  }
+
+  private getMarkdownViewByPath(path: string | null): MarkdownView | null {
+    if (!path) {
+      return null;
+    }
+
+    const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+    if (activeView?.file?.path === path) {
+      return activeView;
+    }
+
+    return this.getMarkdownViews().find((view) => view.file?.path === path) ?? null;
+  }
+
+  private computeFocusContextPreview(
+    view?: MarkdownView | null,
+    editor?: Editor | null,
+  ): FocusContextPreview | null {
+    const activeView = view?.file ? view : this.getActiveMarkdownView();
+    const file = activeView?.file ?? null;
+    if (!file) {
+      return null;
+    }
+
+    const activeEditor = editor ?? activeView?.editor ?? null;
+    const selectedText = activeEditor?.getSelection?.() ?? '';
+    if (activeEditor && selectedText.trim()) {
+      const from = activeEditor.getCursor('from');
+      const to = activeEditor.getCursor('to');
+      return createFocusContextPreview(file.path, {
+        startLine: from.line + 1,
+        endLine: to.line + 1,
+      });
+    }
+
+    return createFocusContextPreview(file.path);
+  }
+
+  private refreshActiveFocusContextPreview(
+    view?: MarkdownView | null,
+    editor?: Editor | null,
+  ): void {
+    this.setFocusContextPreview(this.computeFocusContextPreview(view, editor));
+  }
+
+  private scheduleFocusContextPreviewRefresh(): void {
+    this.clearScheduledFocusContextPreviewRefresh();
+    this.focusContextRefreshTimeoutId = window.setTimeout(() => {
+      this.focusContextRefreshTimeoutId = null;
+      this.refreshActiveFocusContextPreview();
+    }, 40);
+  }
+
+  private clearScheduledFocusContextPreviewRefresh(): void {
+    if (this.focusContextRefreshTimeoutId !== null) {
+      window.clearTimeout(this.focusContextRefreshTimeoutId);
+      this.focusContextRefreshTimeoutId = null;
+    }
   }
 
   public async addCurrentNoteContextFromActiveEditor(view?: MarkdownView | null): Promise<boolean> {
@@ -2897,7 +3032,20 @@ export class OpenCodianView extends ItemView {
 
     void this.sendMessage(message);
     this.inputTextarea.value = '';
+    this.syncInputTextareaHeight();
+  }
+
+  private syncInputTextareaHeight(): void {
+    if (!this.inputTextarea) {
+      return;
+    }
+
     this.inputTextarea.style.height = 'auto';
+    const nextHeight = Math.min(this.inputTextarea.scrollHeight, COMPOSER_TEXTAREA_MAX_HEIGHT);
+    this.inputTextarea.style.height = `${nextHeight}px`;
+    this.inputTextarea.style.overflowY = this.inputTextarea.scrollHeight > COMPOSER_TEXTAREA_MAX_HEIGHT
+      ? 'auto'
+      : 'hidden';
   }
 
   /** Wire event handlers */
@@ -2911,15 +3059,32 @@ export class OpenCodianView extends ItemView {
       return false;
     });
 
-    // File open event
+    const scheduleFocusPreviewRefresh = () => {
+      this.scheduleFocusContextPreviewRefresh();
+    };
+
     this.registerEvent(
       this.plugin.app.workspace.on('file-open', (file) => {
         this.lastKnownMarkdownFilePath = file?.path ?? null;
         if (file && this.currentConversation) {
           this.currentConversation.currentNote = file.path;
         }
+        scheduleFocusPreviewRefresh();
       })
     );
+    this.registerEvent(
+      this.plugin.app.workspace.on('active-leaf-change', () => {
+        scheduleFocusPreviewRefresh();
+      })
+    );
+    this.registerEvent(
+      this.plugin.app.workspace.on('editor-change', (editor, info) => {
+        this.refreshActiveFocusContextPreview(info instanceof MarkdownView ? info : undefined, editor);
+      })
+    );
+    this.registerDomEvent(document, 'selectionchange', scheduleFocusPreviewRefresh);
+    this.registerDomEvent(document, 'mouseup', scheduleFocusPreviewRefresh);
+    this.registerDomEvent(document, 'keyup', scheduleFocusPreviewRefresh);
 
     this.registerEvent(this.plugin.app.vault.on('create', (file) => {
       this.updateContextFileCatalogForCreate(file);
