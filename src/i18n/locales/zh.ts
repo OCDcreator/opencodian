@@ -252,6 +252,8 @@ export const zhTranslations = {
   'settings.titleGeneration.model.name': 'AI 标题模型',
   'settings.titleGeneration.model.desc': '仅用于 AI 生成标题的可选模型',
   'settings.titleGeneration.model.followCurrent': '跟随当前会话模型',
+  'settings.conversation.userMarkupAsCodeBlocks.name': '将用户原始标记显示为代码',
+  'settings.conversation.userMarkupAsCodeBlocks.desc': '把用户消息中的 HTML / CSS / JS / XML / SVG 等原始标记以代码块显示，而不是直接渲染',
   'settings.model.source.name': '模型来源模式',
   'settings.model.source.desc': '选择模型列表来自哪里',
   'settings.model.source.merge': '合并本地 + 服务器（默认，本地优先）',

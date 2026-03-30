@@ -42,6 +42,7 @@ import { ContextRing } from './ui/ContextRing';
 import { EffortSelector } from './ui/EffortSelector';
 import { NavigationSidebar } from './ui/NavigationSidebar';
 import { SessionTodoDock } from './ui/SessionTodoDock';
+import { prepareUserMessageMarkdownForDisplay } from './userMessageDisplay';
 
 const logger = createLogger('OpenCodianView');
 
@@ -1420,6 +1421,14 @@ export class OpenCodianView extends ItemView {
     }
 
     this.scheduleChatSurfaceColorSync();
+  }
+
+  public refreshCurrentConversationRendering(): void {
+    if (!this.currentConversation) {
+      return;
+    }
+
+    void this.rerenderConversationMessages(this.currentConversation);
   }
 
   /** Apply configured chat scroll mode to the messages container */
@@ -3474,7 +3483,10 @@ export class OpenCodianView extends ItemView {
     const visibleText = this.getVisibleUserMessageText(message);
     if (visibleText) {
       const textEl = container.createDiv({ cls: 'opencodian-message-text' });
-      await this.renderMarkdownInto(textEl, visibleText);
+      const displayText = this.plugin.settings.renderUserMarkupAsCodeBlocks
+        ? prepareUserMessageMarkdownForDisplay(visibleText)
+        : visibleText;
+      await this.renderMarkdownInto(textEl, displayText);
       const collapseToggleEl = container.createEl('button');
       const collapsibleState: CollapsibleState = {
         isExpanded: false,

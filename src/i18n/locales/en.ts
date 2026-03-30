@@ -252,6 +252,8 @@ export const enTranslations = {
   'settings.titleGeneration.model.name': 'AI title model',
   'settings.titleGeneration.model.desc': 'Optional model used only for AI title generation',
   'settings.titleGeneration.model.followCurrent': 'Follow active conversation model',
+  'settings.conversation.userMarkupAsCodeBlocks.name': 'Render raw user markup as code',
+  'settings.conversation.userMarkupAsCodeBlocks.desc': 'Show raw HTML / CSS / JS / XML / SVG and similar markup in user messages as code blocks instead of rendering them',
   'settings.model.source.name': 'Model source mode',
   'settings.model.source.desc': 'Choose where the model list comes from',
   'settings.model.source.merge': 'Merge local + server (default, local wins)',

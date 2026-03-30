@@ -323,6 +323,10 @@ export default class OpenCodianPlugin extends Plugin {
           belowHeaderTabBarLayout: normalizeBelowHeaderTabBarLayout(savedSettings.belowHeaderTabBarLayout),
           titleMode: normalizeTitleMode(savedSettings.titleMode),
           aiTitleModel: typeof savedSettings.aiTitleModel === 'string' ? savedSettings.aiTitleModel.trim() : '',
+          renderUserMarkupAsCodeBlocks:
+            typeof savedSettings.renderUserMarkupAsCodeBlocks === 'boolean'
+              ? savedSettings.renderUserMarkupAsCodeBlocks
+              : DEFAULT_SETTINGS.renderUserMarkupAsCodeBlocks,
           pluginIsolationMode: normalizePluginIsolationMode(savedSettings.pluginIsolationMode),
           debugLogPaths: normalizedDebugLogPaths,
           chatAppearance: normalizedChatAppearance,
@@ -386,6 +390,15 @@ export default class OpenCodianPlugin extends Plugin {
       const view = leaf.view;
       if (view instanceof OpenCodianView) {
         view.applyChatAppearanceSettings();
+      }
+    }
+  }
+
+  refreshConversationRendering(): void {
+    for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_OPENCODIAN)) {
+      const view = leaf.view;
+      if (view instanceof OpenCodianView) {
+        view.refreshCurrentConversationRendering();
       }
     }
   }

@@ -12,6 +12,60 @@
 
 ---
 
+## 2026-03-30 用户消息原始标记代码化显示与会话开关
+
+### 🎯 改动目标
+
+- 解决用户消息中直接包含 `CSS` / `HTML` / `JS` / `XML` / `SVG` 等原始标记时，被 Obsidian Markdown 渲染链当作真实内容参与渲染的问题。
+- 在不破坏现有用户消息 Markdown 展示能力的前提下，让这类原始标记优先以代码格式安全显示。
+- 增加一个会话设置开关，允许在“原始标记代码化显示”和“沿用原始 Markdown 渲染”之间切换。
+
+### ✅ 本轮调整
+
+- `src/features/chat/userMessageDisplay.ts`
+  - 新增用户消息显示预处理层，专门处理原始标记内容
+  - 将 `<style>...</style>` 转成 `css` fenced code block
+  - 将 `<script>...</script>` 转成 `javascript` fenced code block
+  - 将独立的 `HTML` / `SVG` / `XML` 声明 / `MathML` / `DOCTYPE` / `comment` / `CDATA` 等统一归入 `html` fenced code block
+  - 对未成块、残缺或 inline 的原始标记片段做转义，避免被 Markdown 渲染链继续解析
+
+- `src/features/chat/OpenCodianView.ts`
+  - 用户消息显示改为先走 `prepareUserMessageMarkdownForDisplay()`，再进入现有 Markdown 渲染流程
+  - 新增当前会话重渲染入口，供设置开关切换后立即刷新聊天区
+  - 保持 assistant 消息与其它现有渲染逻辑不变，只对用户消息显示链路做最小改动
+
+- `src/core/types/settings.ts` / `src/main.ts`
+  - 新增设置项 `renderUserMarkupAsCodeBlocks`
+  - 默认值设为 `true`，保持当前安全显示行为
+  - 加入设置加载与兼容归一化逻辑，旧配置缺失该字段时自动回退到默认值
+  - 新增插件级 `refreshConversationRendering()`，用于统一刷新已打开的聊天视图
+
+- `src/features/settings/OpenCodianSettings.ts`
+  - 在“会话”设置分区新增开关
+  - 切换后保存设置，并立即触发当前聊天视图重渲染，无需手动关闭重开
+
+- `src/i18n/locales/en.ts` / `src/i18n/locales/zh.ts`
+  - 补充会话设置开关的中英文文案
+
+- `tests/unit/features/chat/userMessageDisplay.test.ts`
+  - 新增并扩展用户消息预处理单测
+  - 覆盖 `CSS`、`JS`、`HTML`、`SVG`、`XML`、`MathML`、`DOCTYPE`、`comment`、`CDATA`、inline / dangling 标记等场景
+
+- `tests/unit/core/types/settings.test.ts`
+  - 新增默认设置断言，确保 `renderUserMarkupAsCodeBlocks` 默认开启
+
+### 🧪 验证结果
+
+- 通过：`npm run test -- tests/unit/core/types/settings.test.ts tests/unit/features/chat/userMessageDisplay.test.ts tests/unit/features/settings/OpenCodianSettings.test.ts`
+- 通过：`npx eslint src/core/types/settings.ts src/main.ts src/features/chat/OpenCodianView.ts src/features/settings/OpenCodianSettings.ts src/i18n/locales/en.ts src/i18n/locales/zh.ts tests/unit/core/types/settings.test.ts tests/unit/features/chat/userMessageDisplay.test.ts tests/unit/features/settings/OpenCodianSettings.test.ts`
+- 通过：`npm run check:devlog-order`
+- 通过：`npm run build`
+- 已部署到测试库并确认 `BUILD_ID`：`main.202603301613`
+
+### 📝 结论
+
+- 这轮改动把“用户消息里的原始标记被直接渲染”的问题收敛到了一个专门的显示预处理层里，默认以安全、可读的代码格式呈现，同时又保留了会话级设置开关，便于后续在安全性与原始渲染体验之间切换。
+
 ## 2026-03-30 后台任务陈旧运行态判定与失联提示卡补强
 
 ### 🎯 改动目标

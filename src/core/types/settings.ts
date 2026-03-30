@@ -555,6 +555,7 @@ export interface OpenCodianSettings {
   defaultModel: string;
   titleMode: TitleMode;
   aiTitleModel: string;
+  renderUserMarkupAsCodeBlocks: boolean;
   pluginIsolationMode: PluginIsolationMode;
   providers: ModelProviderConfig[];
   providerIconLibrary: ProviderIconLibrary;
@@ -620,6 +621,7 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
   defaultModel: 'claude-3-5-sonnet-20241022',
   titleMode: 'default',
   aiTitleModel: '',
+  renderUserMarkupAsCodeBlocks: true,
   pluginIsolationMode: 'default',
   providers: [
     {

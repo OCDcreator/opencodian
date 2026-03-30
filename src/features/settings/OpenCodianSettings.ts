@@ -1129,6 +1129,19 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     updateTitleModelSettingVisibility();
     void loadTitleModels();
 
+    new Setting(containerEl)
+      .setName(t('settings.conversation.userMarkupAsCodeBlocks.name'))
+      .setDesc(t('settings.conversation.userMarkupAsCodeBlocks.desc'))
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.renderUserMarkupAsCodeBlocks)
+          .onChange(async (value) => {
+            this.plugin.settings.renderUserMarkupAsCodeBlocks = value;
+            await this.plugin.saveSettings();
+            this.plugin.refreshConversationRendering();
+          })
+      );
+
     return headingEl;
   }
 
