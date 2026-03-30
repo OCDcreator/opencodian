@@ -12,6 +12,36 @@
 
 ---
 
+## 2026-03-30 设置面板滚动记忆防漂移修复
+
+### 🎯 改动目标
+
+- 解决 OpenCodian 设置页在反复切换 Obsidian 原生设置入口与插件设置入口时，滚动位置有时能记住、有时又会自动向下滑动的问题。
+- 尽量避免依赖 reflow 方案，优先从滚动锚点与错误状态写回的根因上修复。
+
+### ✅ 本轮调整
+
+- `src/features/settings/OpenCodianSettings.ts`
+  - 为设置面板根节点增加 `overflow-anchor: none`，降低内容异步变化导致的自动滚动锚定漂移
+  - 将滚动恢复改为“短暂稳态恢复”流程：恢复命中目标后不会立刻结束，而是等待一个很短的稳定窗口
+  - 在恢复窗口内暂停 `settingsPanelScrollTop` 的持久化写回，避免切页或面板内部补渲染时把错误位置保存成新的记忆位置
+  - 新增恢复期滚动监听；如果打开后又被外部布局变化带偏，会自动拉回目标位置后再完成恢复
+  - 保留现有 `animation-frame` / `timeout` / `mutation` 多通道恢复机制，但减少无意义重复确认，避免把“稳定完成”不断向后推迟
+
+- `tests/unit/features/settings/OpenCodianSettings.test.ts`
+  - 更新原有恢复日志测试，适配新的稳态完成时序
+  - 新增“恢复后发生滚动漂移时会重新拉回目标位置”的单测，覆盖本次问题的核心场景
+
+### 🧪 验证结果
+
+- 通过：`npm run test -- OpenCodianSettings.test.ts`
+- 通过：`npm run build`
+- 已部署到测试库并确认 `BUILD_ID`：`main.202603301408`
+
+### 📝 结论
+
+- 这次修复的重点不再是“多做几次 reflow”，而是阻止设置页在打开初期被滚动锚点或异步布局变化带偏，同时避免错误滚动值反写进持久化状态。
+
 ## 2026-03-30 Provider Icon Cache Modal 批量添加与滚动位置优化
 
 ### 🎯 改动目标

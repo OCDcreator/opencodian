@@ -71,6 +71,8 @@ const SETTINGS_SCROLL_CONTAINER_SELECTOR = SETTINGS_SCROLL_CONTAINER_SELECTORS.j
 const SETTINGS_SCROLL_RESTORE_RETRY_DELAYS = [24, 80, 160, 320] as const;
 const SETTINGS_SCROLL_RESTORE_OBSERVER_WINDOW_MS = 1200;
 const SETTINGS_SCROLL_RESTORE_SUCCESS_TOLERANCE_PX = 1;
+const SETTINGS_SCROLL_RESTORE_IDLE_SETTLE_MS = 96;
+const SETTINGS_SCROLL_RESTORE_MIN_STABLE_MS = 180;
 
 function getElectronDialog(): ElectronDialogModule | null {
   const globalWithRequire = globalThis as typeof globalThis & {
@@ -118,6 +120,10 @@ export class OpenCodianSettingTab extends PluginSettingTab {
   private settingsPanelRestoreFrameId: number | null = null;
   private settingsPanelRestoreTimeoutIds: number[] = [];
   private settingsPanelRestoreObserver: MutationObserver | null = null;
+  private settingsPanelRestoreScrollContainerEl: HTMLElement | null = null;
+  private settingsPanelRestoreScrollListener?: () => void;
+  private settingsPanelRestoreSettleTimeoutId: number | null = null;
+  private settingsScrollPersistenceSuspended = false;
   private styleControlBindings: StyleControlBinding[] = [];
   private conversationHeadingEl: HTMLHeadingElement | null = null;
 
@@ -240,6 +246,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     this.conversationHeadingEl = null;
     containerEl.empty();
     containerEl.addClass('opencodian-settings');
+    containerEl.style.setProperty('overflow-anchor', 'none');
     if (pendingOpenScrollTop !== null || pendingOpenSectionTitle !== null) {
       containerEl.style.visibility = 'hidden';
     } else {
@@ -2316,8 +2323,8 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       this.restoreSettingsPanelScrollPosition(
         pendingOpenScrollTop ?? this.plugin.settings.settingsPanelScrollTop,
         scrollContainer,
+        pendingOpenScrollTop !== null ? () => this.finishPendingOpenVisibility() : undefined,
       );
-      this.finishPendingOpenVisibility();
     });
   }
 
@@ -2330,6 +2337,14 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     this.settingsScrollContainerEl = resolvedScrollContainer;
 
     this.settingsScrollHandler = () => {
+      if (this.settingsScrollPersistenceSuspended) {
+        return;
+      }
+
+      if (!this.containerEl.isConnected || !resolvedScrollContainer.contains(this.containerEl)) {
+        return;
+      }
+
       this.plugin.settings.settingsPanelScrollTop = resolvedScrollContainer.scrollTop;
       this.lastObservedSettingsScrollTop = resolvedScrollContainer.scrollTop;
       this.plugin.scheduleSettingsUiStateSave();
@@ -2341,22 +2356,28 @@ export class OpenCodianSettingTab extends PluginSettingTab {
   private restoreSettingsPanelScrollPosition(
     scrollTop = this.plugin.settings.settingsPanelScrollTop,
     scrollContainer?: HTMLElement,
+    onSettled?: () => void,
   ): void {
     const resolvedScrollContainer = scrollContainer ?? this.settingsScrollContainerEl ?? this.getSettingsScrollContainer();
     this.settingsScrollContainerEl = resolvedScrollContainer;
     this.clearSettingsPanelRestoreWork();
+    this.settingsScrollPersistenceSuspended = true;
+    this.settingsPanelRestoreScrollContainerEl = resolvedScrollContainer;
 
     const normalizedScrollTop = Math.max(0, scrollTop);
     const restoreStartedAt = Date.now();
+    const minimumSettleAt = restoreStartedAt + SETTINGS_SCROLL_RESTORE_MIN_STABLE_MS;
     let restoreAttempts = 0;
-    let restored = false;
+    let restoreSettled = false;
+    let restoreQueued = false;
 
     const finishRestore = (reason: string, restoredScrollTop: number): void => {
-      if (restored) {
+      if (restoreSettled) {
         return;
       }
 
-      restored = true;
+      restoreSettled = true;
+      this.plugin.settings.settingsPanelScrollTop = restoredScrollTop;
       this.lastObservedSettingsScrollTop = restoredScrollTop;
       this.clearSettingsPanelRestoreWork();
       logger.debug('Settings scroll restored', {
@@ -2366,10 +2387,43 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         targetScrollTop: normalizedScrollTop,
         restoredScrollTop,
       });
+      onSettled?.();
+    };
+
+    const scheduleRestoreSettle = (reason: string): void => {
+      if (restoreSettled) {
+        return;
+      }
+
+      if (this.settingsPanelRestoreSettleTimeoutId !== null) {
+        window.clearTimeout(this.settingsPanelRestoreSettleTimeoutId);
+      }
+
+      const settleDelay = Math.max(
+        SETTINGS_SCROLL_RESTORE_IDLE_SETTLE_MS,
+        minimumSettleAt - Date.now(),
+        0,
+      );
+      this.settingsPanelRestoreSettleTimeoutId = window.setTimeout(() => {
+        this.settingsPanelRestoreSettleTimeoutId = null;
+        finishRestore(reason, resolvedScrollContainer.scrollTop);
+      }, settleDelay);
     };
 
     const applyRestore = (reason: string): void => {
-      if (restored || !resolvedScrollContainer.isConnected) {
+      if (restoreSettled) {
+        return;
+      }
+
+      if (!resolvedScrollContainer.isConnected) {
+        finishRestore('disconnected', this.lastObservedSettingsScrollTop || normalizedScrollTop);
+        return;
+      }
+
+      const currentScrollTop = resolvedScrollContainer.scrollTop;
+      const alreadyAtTarget =
+        Math.abs(currentScrollTop - normalizedScrollTop) <= SETTINGS_SCROLL_RESTORE_SUCCESS_TOLERANCE_PX;
+      if (alreadyAtTarget && reason.startsWith('timeout-')) {
         return;
       }
 
@@ -2377,9 +2431,40 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       resolvedScrollContainer.scrollTop = normalizedScrollTop;
       const restoredScrollTop = resolvedScrollContainer.scrollTop;
       if (Math.abs(restoredScrollTop - normalizedScrollTop) <= SETTINGS_SCROLL_RESTORE_SUCCESS_TOLERANCE_PX) {
-        finishRestore(reason, restoredScrollTop);
+        scheduleRestoreSettle(reason);
       }
     };
+
+    const queueRestore = (reason: string): void => {
+      if (restoreSettled || restoreQueued || !resolvedScrollContainer.isConnected) {
+        return;
+      }
+
+      restoreQueued = true;
+      const frameId = window.requestAnimationFrame(() => {
+        restoreQueued = false;
+        if (this.settingsPanelRestoreFrameId === frameId) {
+          this.settingsPanelRestoreFrameId = null;
+        }
+        applyRestore(reason);
+      });
+      this.settingsPanelRestoreFrameId = frameId;
+    };
+
+    this.settingsPanelRestoreScrollListener = () => {
+      if (restoreSettled) {
+        return;
+      }
+
+      const currentScrollTop = resolvedScrollContainer.scrollTop;
+      if (Math.abs(currentScrollTop - normalizedScrollTop) <= SETTINGS_SCROLL_RESTORE_SUCCESS_TOLERANCE_PX) {
+        scheduleRestoreSettle('scroll');
+        return;
+      }
+
+      queueRestore('scroll');
+    };
+    resolvedScrollContainer.addEventListener('scroll', this.settingsPanelRestoreScrollListener, { passive: true });
 
     this.settingsPanelRestoreFrameId = window.requestAnimationFrame(() => {
       this.settingsPanelRestoreFrameId = null;
@@ -2397,21 +2482,8 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     }
 
     if (typeof MutationObserver !== 'undefined') {
-      let mutationRestoreQueued = false;
       this.settingsPanelRestoreObserver = new MutationObserver(() => {
-        if (restored || mutationRestoreQueued) {
-          return;
-        }
-
-        mutationRestoreQueued = true;
-        const frameId = window.requestAnimationFrame(() => {
-          mutationRestoreQueued = false;
-          if (this.settingsPanelRestoreFrameId === frameId) {
-            this.settingsPanelRestoreFrameId = null;
-          }
-          applyRestore('mutation');
-        });
-        this.settingsPanelRestoreFrameId = frameId;
+        queueRestore('mutation');
       });
       this.settingsPanelRestoreObserver.observe(this.containerEl, {
         childList: true,
@@ -2423,11 +2495,13 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         this.settingsPanelRestoreTimeoutIds = this.settingsPanelRestoreTimeoutIds.filter(
           (id) => id !== observerTimeoutId,
         );
-        if (restored) {
+        if (restoreSettled) {
           return;
         }
         this.settingsPanelRestoreObserver?.disconnect();
         this.settingsPanelRestoreObserver = null;
+        applyRestore('observer-timeout');
+        scheduleRestoreSettle('observer-timeout');
       }, SETTINGS_SCROLL_RESTORE_OBSERVER_WINDOW_MS);
       this.settingsPanelRestoreTimeoutIds.push(observerTimeoutId);
     }
@@ -2524,8 +2598,20 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     }
     this.settingsPanelRestoreTimeoutIds = [];
 
+    if (this.settingsPanelRestoreSettleTimeoutId !== null) {
+      window.clearTimeout(this.settingsPanelRestoreSettleTimeoutId);
+      this.settingsPanelRestoreSettleTimeoutId = null;
+    }
+
     this.settingsPanelRestoreObserver?.disconnect();
     this.settingsPanelRestoreObserver = null;
+
+    if (this.settingsPanelRestoreScrollListener && this.settingsPanelRestoreScrollContainerEl) {
+      this.settingsPanelRestoreScrollContainerEl.removeEventListener('scroll', this.settingsPanelRestoreScrollListener);
+    }
+    this.settingsPanelRestoreScrollListener = undefined;
+    this.settingsPanelRestoreScrollContainerEl = null;
+    this.settingsScrollPersistenceSuspended = false;
   }
 
   /** Debug settings section */

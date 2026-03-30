@@ -135,6 +135,10 @@ describe('OpenCodianSettingTab scroll restore logging', () => {
     jest.advanceTimersByTime(1);
 
     expect(scrollContainer.scrollTop).toBe(400);
+    expect(logSpy).not.toHaveBeenCalled();
+
+    jest.advanceTimersByTime(200);
+
     expect(logSpy).toHaveBeenCalledTimes(1);
     expect(logSpy.mock.calls[0]?.[0]).toContain('[OpenCodianSettings] Settings scroll restored');
     expect(logSpy.mock.calls[0]?.[1]).toMatchObject({
@@ -160,5 +164,50 @@ describe('OpenCodianSettingTab scroll restore logging', () => {
 
     jest.advanceTimersByTime(1500);
     expect(logSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('reapplies the target scroll position when the panel drifts before settling', () => {
+    const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const plugin = {
+      settings: {
+        settingsPanelScrollTop: 0,
+      },
+      scheduleSettingsUiStateSave: jest.fn(),
+    } as unknown as ConstructorParameters<typeof OpenCodianSettingTab>[1];
+    const tab = new OpenCodianSettingTab({} as App, plugin);
+    const scrollContainer = document.createElement('div');
+
+    installClampedScrollState(scrollContainer, {
+      clientHeight: 200,
+      scrollHeight: 800,
+    });
+
+    document.body.appendChild(scrollContainer);
+    scrollContainer.appendChild(tab.containerEl);
+
+    (tab as unknown as {
+      restoreSettingsPanelScrollPosition: (scrollTop: number, scrollContainer: HTMLElement) => void;
+    }).restoreSettingsPanelScrollPosition(400, scrollContainer);
+
+    jest.advanceTimersByTime(1);
+    expect(scrollContainer.scrollTop).toBe(400);
+    expect(logSpy).not.toHaveBeenCalled();
+
+    scrollContainer.scrollTop = 520;
+    scrollContainer.dispatchEvent(new Event('scroll'));
+    jest.advanceTimersByTime(1);
+
+    expect(scrollContainer.scrollTop).toBe(400);
+    expect(logSpy).not.toHaveBeenCalled();
+
+    jest.advanceTimersByTime(220);
+
+    expect(logSpy).toHaveBeenCalledTimes(1);
+    expect(logSpy.mock.calls[0]?.[1]).toMatchObject({
+      reason: 'scroll',
+      attempts: 2,
+      targetScrollTop: 400,
+      restoredScrollTop: 400,
+    });
   });
 });
