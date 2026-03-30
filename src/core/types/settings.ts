@@ -93,6 +93,9 @@ export type TitleMode = 'default' | 'ai';
 /** OpenCode question card display mode */
 export type QuestionDisplayMode = 'all' | 'single';
 
+/** Where pending OpenCode question cards should be shown */
+export type QuestionCardPosition = 'inline' | 'above_input';
+
 /** Plugin isolation mode for local OpenCode */
 export type PluginIsolationMode = 'default' | 'pure';
 
@@ -113,6 +116,16 @@ export function normalizeQuestionDisplayMode(value: unknown): QuestionDisplayMod
       return value;
     default:
       return 'all';
+  }
+}
+
+export function normalizeQuestionCardPosition(value: unknown): QuestionCardPosition {
+  switch (value) {
+    case 'inline':
+    case 'above_input':
+      return value;
+    default:
+      return 'inline';
   }
 }
 
@@ -568,6 +581,8 @@ export interface OpenCodianSettings {
   defaultModel: string;
   titleMode: TitleMode;
   questionDisplayMode: QuestionDisplayMode;
+  questionCardPosition: QuestionCardPosition;
+  showAnsweredQuestionCards: boolean;
   aiTitleModel: string;
   renderUserMarkupAsCodeBlocks: boolean;
   pluginIsolationMode: PluginIsolationMode;
@@ -635,6 +650,8 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
   defaultModel: 'claude-3-5-sonnet-20241022',
   titleMode: 'default',
   questionDisplayMode: 'all',
+  questionCardPosition: 'inline',
+  showAnsweredQuestionCards: true,
   aiTitleModel: '',
   renderUserMarkupAsCodeBlocks: true,
   pluginIsolationMode: 'default',

@@ -12,6 +12,62 @@
 
 ---
 
+## 2026-03-30 提问卡片位置设置、输入框上方 Dock 与回顾卡片开关
+
+### 🎯 改动目标
+
+- 为 OpenCode question card 新增“助手消息内联 / 输入框上方 dock”两种位置模式，并保持 `inline` 为完全兼容的默认行为。
+- 新增“显示已回答问题卡片”开关，让 answered / rejected recap card 可以按需显示或静默隐藏，同时继续保留持久化的 `questionResolution`。
+- 让 pending question 在 reload、切 tab、会话同步后仍能按当前 session 恢复，并在 background tab 上只打 attention、不串到前台 tab。
+
+### ✅ 本轮调整
+
+- `src/core/types/settings.ts`
+- `src/core/types/index.ts`
+- `src/main.ts`
+  - 新增 `questionCardPosition`（`inline | above_input`）和 `showAnsweredQuestionCards`（`boolean`）设置字段、默认值与归一化逻辑
+  - 新增插件级 `refreshQuestionUi()`，供设置改动后立即刷新当前 question dock 与历史渲染
+
+- `src/features/settings/OpenCodianSettings.ts`
+- `src/i18n/locales/en.ts`
+- `src/i18n/locales/zh.ts`
+  - 在 Conversation 分组新增“提问框位置”下拉和“显示已回答问题卡片”开关
+  - 设置切换后会立即刷新聊天历史和 question UI，而不是只写入配置
+  - 补充 above-input dock 所需的中英文文案
+
+- `src/features/chat/ui/QuestionDock.ts`
+- `src/features/chat/ui/questionDockState.ts`
+- `src/features/chat/OpenCodianView.ts`
+  - 新增输入框上方 question dock：按 `question.header` 分组 tabs，支持 `single` / `all` 两种展示模式、分页/汇总进度、关闭/拒绝、草稿答案保留
+  - pending question 改为按 tab 维护队列、草稿答案、当前分组和当前题索引；background tab 收到问题时只标 `needsAttention`
+  - `showQuestionDialog()` 现在会按设置分流：`inline` 继续走原始内联表单，`above_input` 改为挂起到 dock 里等待用户处理
+  - 会话加载、后台同步、切 tab 后都会按 `sessionId` 刷新 pending questions，保证 dock 可恢复
+  - answered / rejected recap card 现在受 `showAnsweredQuestionCards` 控制；关闭时立即隐藏 UI，但仍保留 `questionResolution` 以便未来重新开启后恢复显示
+
+- `styles.css`
+  - 新增 question dock 容器、tabs、summary/progress、close 按钮、hidden 状态和 answered section 样式
+  - 复用现有 inline question card 的选项与按钮视觉，避免两套分叉样式
+
+- `tests/unit/core/types/settings.test.ts`
+- `tests/unit/features/chat/questionDockState.test.ts`
+- `tests/unit/features/settings/OpenCodianConversationSettings.test.ts`
+  - 补充新设置默认值 / 归一化、dock 分组/提交流程、设置控件保存与即时刷新回归测试
+
+- `AGENTS.md`
+  - 同步记录 `QuestionDock` / `questionDockState` 的 UI 结构，以及 Conversation 设置分类与 chat question 能力说明
+
+### 🧪 验证结果
+
+- 通过：`npm run test -- tests/unit/core/types/settings.test.ts tests/unit/features/chat/questionDockState.test.ts tests/unit/features/settings/OpenCodianConversationSettings.test.ts`
+- 通过：`npm run lint`
+- 通过：`npm run build`（`BUILD_ID: main.202603302343`）
+- 已部署到 Test Vault：`C:\Users\lt\Desktop\Write\testvault\.obsidian\plugins\opencodian\`
+- 已验证部署后的 `main.js` 包含 `BUILD_ID: main.202603302343`
+
+### 📝 结论
+
+- 这轮之后，question card 已经不再只能埋在 assistant 消息流里；用户可以按偏好切到输入框上方的固定 dock，并且 answered/rejected 回顾卡片也可以按需显隐，同时不会牺牲会话恢复、多 tab 隔离和历史上下文追溯能力。
+
 ## 2026-03-30 Question 卡片改为就地定稿，避免 assistant 尾部重绘
 
 ### 🎯 改动目标

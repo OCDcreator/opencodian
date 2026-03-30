@@ -27,6 +27,7 @@ import {
   normalizePersistedTabState,
   normalizePluginIsolationMode,
   normalizeProviderIconLibrary,
+  normalizeQuestionCardPosition,
   normalizeQuestionDisplayMode,
   normalizeTabBarPosition,
   normalizeThinkingBudget,
@@ -349,6 +350,11 @@ export default class OpenCodianPlugin extends Plugin {
           belowHeaderTabBarLayout: normalizeBelowHeaderTabBarLayout(savedSettings.belowHeaderTabBarLayout),
           titleMode: normalizeTitleMode(savedSettings.titleMode),
           questionDisplayMode: normalizeQuestionDisplayMode(savedSettings.questionDisplayMode),
+          questionCardPosition: normalizeQuestionCardPosition(savedSettings.questionCardPosition),
+          showAnsweredQuestionCards:
+            typeof savedSettings.showAnsweredQuestionCards === 'boolean'
+              ? savedSettings.showAnsweredQuestionCards
+              : DEFAULT_SETTINGS.showAnsweredQuestionCards,
           aiTitleModel: typeof savedSettings.aiTitleModel === 'string' ? savedSettings.aiTitleModel.trim() : '',
           renderUserMarkupAsCodeBlocks:
             typeof savedSettings.renderUserMarkupAsCodeBlocks === 'boolean'
@@ -426,6 +432,15 @@ export default class OpenCodianPlugin extends Plugin {
       const view = leaf.view;
       if (view instanceof OpenCodianView) {
         view.refreshCurrentConversationRendering();
+      }
+    }
+  }
+
+  refreshQuestionUi(): void {
+    for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_OPENCODIAN)) {
+      const view = leaf.view;
+      if (view instanceof OpenCodianView) {
+        view.refreshQuestionUi();
       }
     }
   }

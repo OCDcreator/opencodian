@@ -12,6 +12,7 @@ import {
   isValidChatAppearanceCustomCssDeclarations,
   normalizeBelowHeaderTabBarLayout,
   normalizeChatAppearanceSettings,
+  normalizeQuestionCardPosition,
   normalizeQuestionDisplayMode,
   normalizeTabBarPosition,
 } from '../../../../src/core/types/settings';
@@ -85,6 +86,8 @@ describe('Settings', () => {
       expect(DEFAULT_SETTINGS.defaultProvider).toBe('anthropic');
       expect(DEFAULT_SETTINGS.defaultModel).toBe('claude-3-5-sonnet-20241022');
       expect(DEFAULT_SETTINGS.questionDisplayMode).toBe('all');
+      expect(DEFAULT_SETTINGS.questionCardPosition).toBe('inline');
+      expect(DEFAULT_SETTINGS.showAnsweredQuestionCards).toBe(true);
       expect(DEFAULT_SETTINGS.renderUserMarkupAsCodeBlocks).toBe(true);
       expect(DEFAULT_SETTINGS.pluginIsolationMode).toBe('default');
       expect(DEFAULT_SETTINGS.maxTabs).toBe(3);
@@ -147,6 +150,15 @@ describe('Settings', () => {
       expect(normalizeQuestionDisplayMode('single')).toBe('single');
       expect(normalizeQuestionDisplayMode('grouped')).toBe('all');
       expect(normalizeQuestionDisplayMode(undefined)).toBe('all');
+    });
+  });
+
+  describe('question card position normalization', () => {
+    it('normalizes invalid question card positions to inline', () => {
+      expect(normalizeQuestionCardPosition('inline')).toBe('inline');
+      expect(normalizeQuestionCardPosition('above_input')).toBe('above_input');
+      expect(normalizeQuestionCardPosition('floating')).toBe('inline');
+      expect(normalizeQuestionCardPosition(undefined)).toBe('inline');
     });
   });
 

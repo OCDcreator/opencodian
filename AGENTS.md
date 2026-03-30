@@ -133,6 +133,8 @@ opencodian/
 │   │   │   │   ├── ContextRing.ts
 │   │   │   │   ├── EffortSelector.ts
 │   │   │   │   ├── NavigationSidebar.ts
+│   │   │   │   ├── QuestionDock.ts
+│   │   │   │   ├── questionDockState.ts
 │   │   │   │   └── SessionTodoDock.ts
 │   │   │   ├── chatAppearance.ts    # Chat appearance CSS variable builder
 │   │   │   ├── OpenCodianView.ts    # Main chat view component
@@ -395,7 +397,8 @@ Main chat UI view (extends Obsidian's `ItemView`).
 - Fork / rewind conversation entry points
 - Collapsible long assistant content blocks
 - Inline permission cards and server status badge
-- Inline OpenCode question cards with reply / reject handling and configurable single/all-at-once display
+- OpenCode question cards that can stay inline or dock above the input, with tab-scoped pending queues, grouped header tabs, and configurable single/all-at-once display
+- Optional answered / rejected question recap cards controlled by a conversation setting while preserving `questionResolution` in persisted assistant messages
 - Post-turn diff notices sourced from `file.edited` + `session.diff()`
 - OMO injected-prompt panels with expandable raw prompt view
 - OMO system-reminder notice cards with markdown rendering
@@ -413,7 +416,7 @@ Settings UI with bilingual support (English/Chinese).
 - **Language**: Interface language selection
 - **Server**: Local / remote mode, auth, health status, help modal
 - **Model**: Source mode, default provider/model, model refresh, local visual/JSON config editors, provider icon cache, and custom provider icon library management
-- **Conversation**: Conversation title mode (default/ai), AI title model override, question display mode, and user-markup rendering preferences
+- **Conversation**: Conversation title mode (default/ai), AI title model override, question display mode, question card position, answered-question recap visibility, and user-markup rendering preferences
 - **Plugins**: Global/plugin visibility, project `plugin` config, project plugin directory, pure mode, OMO config entry
 - **Security**: Permission mode, config editor, command blocklist, export paths
 - **UI**: Max tabs, tab bar position, auto-scroll, chat scroll mode, open in main tab

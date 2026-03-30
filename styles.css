@@ -2165,6 +2165,183 @@
   flex-direction: column;
 }
 
+.opencodian-question-dock-slot {
+  display: flex;
+  flex-direction: column;
+}
+
+.opencodian-question-dock {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--interactive-accent) 24%, var(--opencodian-glass-border));
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--interactive-accent) 8%, transparent) 0%,
+      transparent 100%
+    ),
+    color-mix(in srgb, var(--opencodian-glass-base) 92%, transparent);
+  box-shadow:
+    0 12px 24px color-mix(in srgb, var(--opencodian-glass-shadow) 12%, transparent),
+    0 1px 0 color-mix(in srgb, var(--background-primary) 68%, transparent) inset;
+}
+
+.opencodian-question-dock.is-hidden {
+  display: none;
+}
+
+.opencodian-question-dock-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.opencodian-question-dock-title-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.opencodian-question-dock-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--interactive-accent) 16%, transparent);
+  color: var(--interactive-accent);
+  flex: 0 0 auto;
+}
+
+.opencodian-question-dock-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-normal);
+}
+
+.opencodian-question-dock-meta {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.opencodian-question-dock-progress,
+.opencodian-question-dock-summary {
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.opencodian-question-dock-progress {
+  background: color-mix(in srgb, var(--interactive-accent) 14%, transparent);
+  color: var(--interactive-accent);
+}
+
+.opencodian-question-dock-summary {
+  background: color-mix(in srgb, var(--background-primary) 78%, transparent);
+  color: var(--text-muted);
+  border: 1px solid color-mix(in srgb, var(--opencodian-glass-border) 72%, transparent);
+}
+
+.opencodian-question-dock-close {
+  margin-left: 4px;
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid color-mix(in srgb, var(--opencodian-glass-border) 76%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--background-primary) 76%, transparent);
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0;
+}
+
+.opencodian-question-dock-close:hover {
+  color: var(--text-normal);
+  border-color: color-mix(in srgb, var(--interactive-accent) 26%, var(--opencodian-glass-border));
+  background: color-mix(in srgb, var(--interactive-accent) 10%, var(--background-primary));
+}
+
+.opencodian-question-dock-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.opencodian-question-dock-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--opencodian-glass-border) 78%, transparent);
+  background: color-mix(in srgb, var(--background-primary) 78%, transparent);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.opencodian-question-dock-tab:hover {
+  color: var(--text-normal);
+  border-color: color-mix(in srgb, var(--interactive-accent) 24%, var(--opencodian-glass-border));
+}
+
+.opencodian-question-dock-tab.is-active {
+  color: var(--interactive-accent);
+  border-color: color-mix(in srgb, var(--interactive-accent) 32%, var(--opencodian-glass-border));
+  background: color-mix(in srgb, var(--interactive-accent) 12%, var(--background-primary));
+}
+
+.opencodian-question-dock-tab-badge {
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--background-primary) 86%, transparent);
+  color: inherit;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.opencodian-question-dock-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.opencodian-question-dock-section {
+  padding: 12px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--background-primary) 62%, transparent);
+  border: 1px solid color-mix(in srgb, var(--opencodian-glass-border) 76%, transparent);
+}
+
+.opencodian-question-dock-section.is-answered {
+  border-color: color-mix(in srgb, var(--interactive-accent) 24%, var(--opencodian-glass-border));
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--interactive-accent) 8%, transparent) 0%,
+      transparent 100%
+    ),
+    color-mix(in srgb, var(--background-primary) 72%, transparent);
+}
+
+.opencodian-question-dock-footer {
+  align-items: center;
+}
+
 .opencodian-session-todo-dock {
   border: 1px solid var(--opencodian-glass-border);
   border-radius: 14px;

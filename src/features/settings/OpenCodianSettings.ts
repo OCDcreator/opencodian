@@ -19,6 +19,7 @@ import {
   isValidChatAppearanceCustomCssDeclarations,
   type ModelSourceMode,
   type PluginIsolationMode,
+  type QuestionCardPosition,
   type QuestionDisplayMode,
   type TitleMode,
 } from '../../core/types';
@@ -30,7 +31,7 @@ import { ModelConfigJsonModal } from './ModelConfigJsonModal';
 import { ModelConfigModal } from './ModelConfigModal';
 import { OpencodeConfigModal } from './OpencodeConfigModal';
 import { ProviderIconCacheModal } from './ProviderIconCacheModal';
-import { type ServerHelpTopic,ServerSettingHelpModal } from './ServerSettingHelpModal';
+import { type ServerHelpTopic, ServerSettingHelpModal } from './ServerSettingHelpModal';
 
 const logger = createLogger('OpenCodianSettings');
 
@@ -1127,6 +1128,37 @@ export class OpenCodianSettingTab extends PluginSettingTab {
           .onChange(async (value) => {
             this.plugin.settings.questionDisplayMode = value as QuestionDisplayMode;
             await this.plugin.saveSettings();
+            this.plugin.refreshQuestionUi();
+          });
+      });
+
+    new Setting(containerEl)
+      .setName(t('settings.conversation.questionCardPosition.name'))
+      .setDesc(t('settings.conversation.questionCardPosition.desc'))
+      .addDropdown((dropdown) => {
+        dropdown
+          .addOption('inline', t('settings.conversation.questionCardPosition.inline'))
+          .addOption('above_input', t('settings.conversation.questionCardPosition.aboveInput'))
+          .setValue(this.plugin.settings.questionCardPosition)
+          .onChange(async (value) => {
+            this.plugin.settings.questionCardPosition = value as QuestionCardPosition;
+            await this.plugin.saveSettings();
+            this.plugin.refreshConversationRendering();
+            this.plugin.refreshQuestionUi();
+          });
+      });
+
+    new Setting(containerEl)
+      .setName(t('settings.conversation.showAnsweredQuestionCards.name'))
+      .setDesc(t('settings.conversation.showAnsweredQuestionCards.desc'))
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.plugin.settings.showAnsweredQuestionCards)
+          .onChange(async (value) => {
+            this.plugin.settings.showAnsweredQuestionCards = value;
+            await this.plugin.saveSettings();
+            this.plugin.refreshConversationRendering();
+            this.plugin.refreshQuestionUi();
           });
       });
 
