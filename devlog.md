@@ -12,6 +12,48 @@
 
 ---
 
+## 2026-03-30 后台任务陈旧运行态判定与失联提示卡补强
+
+### 🎯 改动目标
+
+- 解决 OpenCodian 在本地 OpenCode 服务被终止、停止后重启，或后台任务未再回写时，聊天区仍长期显示“后台任务仍在运行”的误判。
+- 让后台任务面板不再只依赖历史 `task` launch / OMO completion reminder，而是结合 OpenCode 当前会话 live 状态判断是否真的还在运行。
+- 当面板被判定为陈旧并移除时，补一个明确的 warning 提示卡，向用户解释为什么“运行中”面板消失了。
+
+### ✅ 本轮调整
+
+- `src/core/opencode/OpenCodeService.ts` / `src/core/opencode/index.ts`
+  - 新增 `getSessionStatuses()`，接入 SDK `session.status()` 与 legacy `/session/status` fallback
+  - 新增 `session.status` 全局 sync event 订阅与归一化，和原有 `todo.updated` 共用同一条 sync 订阅链路
+  - 对外导出 `SessionActivityStatus`，供聊天视图按 `idle` / `busy` / `retry` 区分当前会话是否仍然 live
+
+- `src/features/chat/OpenCodianView.ts`
+  - 为每个 tab runtime 增加会话状态缓存与请求序号，避免异步刷新串台
+  - 在打开会话、切换标签、后台同步轮询时，同时刷新 session todo 和 session status
+  - 将后台任务面板显示条件改为“历史 launch 记录 + 当前会话 live 状态 + 未完成 todo + 短暂宽限期”联合判定
+  - 当会话已经 `idle`、没有未完成 todo、也没有新的 live 信号时，自动清理陈旧的“后台任务仍在运行”面板
+  - 清理时追加 warning notice，解释当前无法再确认这些后台任务仍在运行，并列出被停止跟踪的任务
+
+- `src/i18n/locales/en.ts` / `src/i18n/locales/zh.ts`
+  - 新增后台任务陈旧状态提示卡标题、正文与“已停止跟踪”任务状态文案
+
+- `tests/unit/core/opencode/OpenCodeService.test.ts`
+  - 新增 `session.status()` 归一化测试
+  - 新增 `session.status` sync event 分发测试
+
+- `docs/opencode-service-sdk-v2-mapping.md`
+  - 同步记录 `session.status` 与 `todo.updated` 已纳入当前 sync/live 判断链路
+
+### 🧪 验证结果
+
+- 通过：`npm test -- OpenCodeService.test.ts`
+- 通过：`npm run build`
+- 已部署到测试库并确认 `BUILD_ID`：`main.202603301519`
+
+### 📝 结论
+
+- 这轮修复把后台任务面板从“历史消息推断”升级为“历史 launch + 当前 live 状态”联合判断，能更稳地处理服务停止、重启、掉线、未回写等场景，避免把已经失联的后台任务继续误显示为运行中。
+
 ## 2026-03-30 聊天待办面板与工具摘要显示修复
 
 ### 🎯 改动目标

@@ -3,6 +3,7 @@
  */
 
 export { OpenCodeService } from './OpenCodeService';
+export type { SessionActivityStatus } from './OpenCodeService';
 export {
   resolveSdkFeatureFlags,
   SDK_FEATURE_FLAG_DISABLED_DEFAULTS,

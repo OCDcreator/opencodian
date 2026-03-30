@@ -7,7 +7,7 @@
 import type { EventRef, WorkspaceLeaf } from 'obsidian';
 import { addIcon, Component, ItemView, Notice, Scope, setIcon } from 'obsidian';
 
-import { OpenCodeService } from '../../core/opencode';
+import { OpenCodeService, type SessionActivityStatus } from '../../core/opencode';
 import {
   type ChatMessage,
   type ContentBlock,
@@ -125,6 +125,9 @@ interface TabRuntimeState {
   sessionTodoSessionId: string | null;
   sessionTodos: SessionTodo[];
   todoRequestId: number;
+  sessionStatusSessionId: string | null;
+  sessionStatus: SessionActivityStatus | null;
+  statusRequestId: number;
   backgroundTaskIndicatorEl: HTMLElement | null;
   backgroundTaskStartedAt: number | null;
   backgroundTaskModeTag: string | null;
@@ -222,6 +225,7 @@ export class OpenCodianView extends ItemView {
   private conversationSyncIntervalId: number | null = null;
   private omoBackgroundTaskLogStates = new Map<string, OmoBackgroundTaskLogState>();
   private disposeSessionTodoSubscription: (() => void) | null = null;
+  private disposeSessionStatusSubscription: (() => void) | null = null;
 
   private appSettings(): { open: () => void; openTabById: (id: string) => void } {
     return (this.app as typeof this.app & {
@@ -241,6 +245,9 @@ export class OpenCodianView extends ItemView {
       sessionTodoSessionId: null,
       sessionTodos: [],
       todoRequestId: 0,
+      sessionStatusSessionId: null,
+      sessionStatus: null,
+      statusRequestId: 0,
       backgroundTaskIndicatorEl: null,
       backgroundTaskStartedAt: null,
       backgroundTaskModeTag: null,
@@ -438,6 +445,15 @@ export class OpenCodianView extends ItemView {
     );
   }
 
+  private subscribeToSessionStatusUpdates(): void {
+    this.disposeSessionStatusSubscription?.();
+    this.disposeSessionStatusSubscription = this.plugin.openCodeService.subscribeToSessionStatusUpdates(
+      ({ sessionId, status }) => {
+        this.applySessionStatusUpdate(sessionId, status);
+      },
+    );
+  }
+
   private applySessionTodoUpdate(sessionId: string, todos: SessionTodo[]): void {
     const tabs = this.tabManager?.getAllTabs() ?? [];
     const conversations = new Map(this.plugin.getConversations().map((conversation) => [conversation.id, conversation]));
@@ -450,11 +466,35 @@ export class OpenCodianView extends ItemView {
       }
 
       this.setTabSessionTodos(tab.id, todos, sessionId);
+      this.reconcileBackgroundTaskStateFromLiveSignals(tab.id);
       matched = true;
     }
 
     if (!matched && this.currentConversation?.openCodeSessionId === sessionId) {
       this.setTabSessionTodos(this.getActiveTabId(), todos, sessionId);
+      this.reconcileBackgroundTaskStateFromLiveSignals(this.getActiveTabId());
+    }
+  }
+
+  private applySessionStatusUpdate(sessionId: string, status: SessionActivityStatus): void {
+    const tabs = this.tabManager?.getAllTabs() ?? [];
+    const conversations = new Map(this.plugin.getConversations().map((conversation) => [conversation.id, conversation]));
+    let matched = false;
+
+    for (const tab of tabs) {
+      const conversation = tab.conversationId ? conversations.get(tab.conversationId) : null;
+      if (conversation?.openCodeSessionId !== sessionId) {
+        continue;
+      }
+
+      this.setTabSessionStatus(tab.id, status, sessionId);
+      this.reconcileBackgroundTaskStateFromLiveSignals(tab.id);
+      matched = true;
+    }
+
+    if (!matched && this.currentConversation?.openCodeSessionId === sessionId) {
+      this.setTabSessionStatus(this.getActiveTabId(), status, sessionId);
+      this.reconcileBackgroundTaskStateFromLiveSignals(this.getActiveTabId());
     }
   }
 
@@ -489,6 +529,36 @@ export class OpenCodianView extends ItemView {
     if (tabId === this.getActiveTabId()) {
       this.renderSessionTodoDock(tabId);
     }
+  }
+
+  private getTabSessionStatus(
+    tabId: TabId | null = this.getActiveTabId(),
+    sessionId = this.currentConversation?.openCodeSessionId ?? null,
+  ): SessionActivityStatus | null {
+    const runtime = this.getTabRuntimeState(tabId);
+    if (!runtime) {
+      return null;
+    }
+
+    if (sessionId && runtime.sessionStatusSessionId && runtime.sessionStatusSessionId !== sessionId) {
+      return null;
+    }
+
+    return runtime.sessionStatus;
+  }
+
+  private setTabSessionStatus(
+    tabId: TabId | null,
+    status: SessionActivityStatus | null,
+    sessionId: string | null = this.currentConversation?.openCodeSessionId ?? null,
+  ): void {
+    const runtime = this.getTabRuntimeState(tabId);
+    if (!runtime) {
+      return;
+    }
+
+    runtime.sessionStatusSessionId = sessionId;
+    runtime.sessionStatus = status;
   }
 
   private normalizeSessionTodosForView(todos: readonly SessionTodo[] | unknown[]): SessionTodo[] {
@@ -629,6 +699,7 @@ export class OpenCodianView extends ItemView {
       }
 
       this.setTabSessionTodos(tabId, todos, sessionId);
+      this.reconcileBackgroundTaskStateFromLiveSignals(tabId);
       return todos;
     } catch (error) {
       logger.debug('Failed to refresh session todos', error);
@@ -637,6 +708,139 @@ export class OpenCodianView extends ItemView {
       }
       return this.getTabSessionTodos(tabId);
     }
+  }
+
+  private async refreshTabSessionStatus(
+    tabId: TabId | null,
+    sessionId: string | undefined,
+    options: { suppressErrors?: boolean } = {},
+  ): Promise<SessionActivityStatus | null> {
+    const runtime = this.getTabRuntimeState(tabId);
+    if (!runtime || !sessionId) {
+      this.setTabSessionStatus(tabId, null, sessionId ?? null);
+      return null;
+    }
+
+    const requestId = runtime.statusRequestId + 1;
+    runtime.statusRequestId = requestId;
+
+    try {
+      const statuses = await this.plugin.openCodeService.getSessionStatuses();
+      const latestRuntime = this.getTabRuntimeState(tabId);
+      if (!latestRuntime || latestRuntime.statusRequestId !== requestId) {
+        return this.getTabSessionStatus(tabId, sessionId);
+      }
+
+      const status = statuses[sessionId] ?? { type: 'idle' as const };
+      this.setTabSessionStatus(tabId, status, sessionId);
+      this.reconcileBackgroundTaskStateFromLiveSignals(tabId);
+      return status;
+    } catch (error) {
+      logger.debug('Failed to refresh session status', error);
+      if (!options.suppressErrors) {
+        new Notice(t('chat.todo.loadFailed'));
+      }
+      return this.getTabSessionStatus(tabId, sessionId);
+    }
+  }
+
+  private hasIncompleteTodos(todos: readonly SessionTodo[]): boolean {
+    return todos.some((todo) => todo.status !== 'completed' && todo.status !== 'cancelled');
+  }
+
+  private hasIncompleteTabSessionTodos(tabId: TabId | null = this.getActiveTabId()): boolean {
+    return this.hasIncompleteTodos(this.getTabSessionTodos(tabId, this.getSessionIdForTab(tabId)));
+  }
+
+  private isTabSessionLive(tabId: TabId | null = this.getActiveTabId()): boolean {
+    const runtime = this.getTabRuntimeState(tabId);
+    if (!runtime) {
+      return false;
+    }
+
+    if (runtime.isStreaming) {
+      return true;
+    }
+
+    const status = this.getTabSessionStatus(tabId, this.getSessionIdForTab(tabId));
+    return status?.type === 'busy' || status?.type === 'retry';
+  }
+
+  private isBackgroundTaskGracePeriodActive(tabId: TabId | null = this.getActiveTabId()): boolean {
+    const startedAt = this.getTabRuntimeState(tabId)?.backgroundTaskStartedAt;
+    return typeof startedAt === 'number' && Date.now() - startedAt < 15000;
+  }
+
+  private reconcileBackgroundTaskStateFromLiveSignals(tabId: TabId | null = this.getActiveTabId()): void {
+    const runtime = this.getTabRuntimeState(tabId);
+    if (!runtime || runtime.isStreaming || !runtime.backgroundTaskStartedAt) {
+      return;
+    }
+
+    const status = this.getTabSessionStatus(tabId, this.getSessionIdForTab(tabId));
+    if (status?.type === 'busy' || status?.type === 'retry') {
+      runtime.backgroundTaskWaitingForFollowUp = runtime.backgroundTaskLaunches.size > 0;
+      this.syncTabStreamLikeState(tabId);
+      return;
+    }
+
+    if (status?.type !== 'idle' && this.hasIncompleteTabSessionTodos(tabId)) {
+      runtime.backgroundTaskWaitingForFollowUp = runtime.backgroundTaskLaunches.size > 0;
+      this.syncTabStreamLikeState(tabId);
+      return;
+    }
+
+    if (this.isBackgroundTaskGracePeriodActive(tabId)) {
+      this.syncTabStreamLikeState(tabId);
+      return;
+    }
+
+    if (runtime.backgroundTaskLaunches.size === 0) {
+      if (runtime.backgroundTaskModeTag === 'search-mode') {
+        this.resetBackgroundTaskIndicator(tabId);
+      }
+      return;
+    }
+
+    const stalePending = this.getPendingBackgroundTaskLaunches(tabId);
+    if (stalePending.length > 0) {
+      void this.appendBackgroundTaskStoppedNotice(tabId, stalePending);
+    }
+    logger.debug('Clearing stale background task indicator after session became idle without incomplete todos', {
+      tabId,
+      sessionId: this.getSessionIdForTab(tabId),
+      launchCount: runtime.backgroundTaskLaunches.size,
+    });
+    this.resetBackgroundTaskIndicator(tabId);
+  }
+
+  private async appendBackgroundTaskStoppedNotice(
+    tabId: TabId | null,
+    pending: BackgroundTaskLaunchInfo[],
+  ): Promise<void> {
+    if (!tabId || tabId !== this.getActiveTabId() || !this.currentConversation) {
+      return;
+    }
+
+    const sessionId = this.getSessionIdForTab(tabId);
+    if (!sessionId || sessionId !== this.currentConversation.openCodeSessionId) {
+      return;
+    }
+
+    const lines = [
+      t('chat.backgroundTask.staleBody'),
+      '',
+      `**${t('chat.backgroundTask.taskListLabel')}**`,
+      ...pending.map((task) =>
+        `- ${t('chat.backgroundTask.taskStatusStopped')} · \`${this.getBackgroundTaskLaunchDisplayId(task)}\`: ${task.description}`,
+      ),
+    ];
+
+    await this.appendPersistentAssistantNoticeMessage(
+      t('chat.backgroundTask.staleTitle'),
+      lines.join('\n'),
+      'warning',
+    );
   }
 
   constructor(leaf: WorkspaceLeaf, plugin: OpenCodianPlugin) {
@@ -678,6 +882,7 @@ export class OpenCodianView extends ItemView {
     // Wire events
     this.wireEventHandlers();
     this.subscribeToSessionTodoUpdates();
+    this.subscribeToSessionStatusUpdates();
 
     await this.initializeFirstTab();
   }
@@ -714,6 +919,8 @@ export class OpenCodianView extends ItemView {
     this.todoDockMountEl = null;
     this.disposeSessionTodoSubscription?.();
     this.disposeSessionTodoSubscription = null;
+    this.disposeSessionStatusSubscription?.();
+    this.disposeSessionStatusSubscription = null;
     this.tabManager = null;
 
     // Cleanup event refs
@@ -983,9 +1190,24 @@ export class OpenCodianView extends ItemView {
 
   private hasTabBackgroundTaskIndicator(tabId: TabId | null): boolean {
     const runtime = this.getTabRuntimeState(tabId);
-    return Boolean(runtime?.backgroundTaskStartedAt) && (
-      runtime?.backgroundTaskModeTag === 'search-mode'
-      || (runtime?.backgroundTaskLaunches.size ?? 0) > 0
+    if (!runtime?.backgroundTaskStartedAt) {
+      return false;
+    }
+
+    const status = this.getTabSessionStatus(tabId, this.getSessionIdForTab(tabId));
+    const pending = this.getPendingBackgroundTaskLaunches(tabId);
+    if (pending.length > 0) {
+      if (status?.type === 'idle') {
+        return this.isBackgroundTaskGracePeriodActive(tabId);
+      }
+
+      return this.isTabSessionLive(tabId)
+        || this.hasIncompleteTabSessionTodos(tabId)
+        || this.isBackgroundTaskGracePeriodActive(tabId);
+    }
+
+    return runtime.backgroundTaskModeTag === 'search-mode' && (
+      runtime.isStreaming || this.isBackgroundTaskGracePeriodActive(tabId)
     );
   }
 
@@ -1086,6 +1308,7 @@ export class OpenCodianView extends ItemView {
         this.updateModelSelectorDisplay();
         this.syncActiveTabContextUsageIdentity();
         this.renderSessionTodoDock(tabId);
+        void this.refreshTabSessionStatus(tabId, conversation.openCodeSessionId, { suppressErrors: true });
         void this.refreshTabSessionTodos(tabId, conversation.openCodeSessionId, { suppressErrors: true });
         this.updateSendButtonState();
         return;
@@ -1102,6 +1325,7 @@ export class OpenCodianView extends ItemView {
     this.messagesContainer?.empty();
     this.resetTurnState();
     this.setTabSessionTodos(tabId, [], null);
+    this.setTabSessionStatus(tabId, null, null);
     this.renderSessionTodoDock(tabId);
     this.updateModelSelectorDisplay();
     this.syncActiveTabContextUsageIdentity();
@@ -1747,6 +1971,7 @@ export class OpenCodianView extends ItemView {
     // Set session in service
     this.plugin.openCodeService.setSessionId(conversation.openCodeSessionId);
     this.setTabSessionTodos(this.getActiveTabId(), [], conversation.openCodeSessionId);
+    this.setTabSessionStatus(this.getActiveTabId(), null, conversation.openCodeSessionId);
 
     const shouldSyncFromServer =
       options.forceServerSync
@@ -1771,6 +1996,7 @@ export class OpenCodianView extends ItemView {
     await this.renderMessages(messages);
     await this.renderBackgroundTaskIndicatorIfNeeded();
     this.renderSessionTodoDock();
+    void this.refreshTabSessionStatus(this.getActiveTabId(), conversation.openCodeSessionId, { suppressErrors: true });
     void this.refreshActiveSessionTodos({ suppressErrors: true });
     this.lastConversationSyncFingerprint = this.getConversationSyncFingerprint(messages);
     this.startConversationSyncLoop();
@@ -1801,6 +2027,7 @@ export class OpenCodianView extends ItemView {
     this.currentConversationRevertState = null;
     this.plugin.openCodeService.setSessionId(conversation.openCodeSessionId);
     this.setTabSessionTodos(this.getActiveTabId(), [], conversation.openCodeSessionId);
+    this.setTabSessionStatus(this.getActiveTabId(), null, conversation.openCodeSessionId);
     this.messagesContainer?.empty();
     this.resetTurnState();
     this.lastConversationSyncFingerprint = this.getConversationSyncFingerprint(conversation.messages);
@@ -1809,6 +2036,7 @@ export class OpenCodianView extends ItemView {
     this.syncActiveTabContextUsageIdentity();
     this.syncBackgroundTaskStateFromConversation(conversation);
     this.renderSessionTodoDock();
+    void this.refreshTabSessionStatus(this.getActiveTabId(), conversation.openCodeSessionId, { suppressErrors: true });
     void this.refreshActiveSessionTodos({ suppressErrors: true });
     void this.renderBackgroundTaskIndicatorIfNeeded();
     void this.refreshActiveTabContextUsageFromServer();
@@ -1872,6 +2100,7 @@ export class OpenCodianView extends ItemView {
           || runtime.backgroundTaskLaunches.size > 0
           || runtime.backgroundTaskWaitingForFollowUp
         ) {
+          await this.refreshTabSessionStatus(activeTabId, this.currentConversation?.openCodeSessionId, { suppressErrors: true });
           await this.refreshTabSessionTodos(activeTabId, this.currentConversation?.openCodeSessionId, { suppressErrors: true });
         }
         await this.renderBackgroundTaskIndicatorIfNeeded(activeTabId);
@@ -1885,6 +2114,7 @@ export class OpenCodianView extends ItemView {
         || runtime.backgroundTaskLaunches.size > 0
         || runtime.backgroundTaskWaitingForFollowUp
       ) {
+        await this.refreshTabSessionStatus(activeTabId, this.currentConversation.openCodeSessionId, { suppressErrors: true });
         await this.refreshTabSessionTodos(activeTabId, this.currentConversation.openCodeSessionId, { suppressErrors: true });
       }
       await this.applySyncedConversationUpdate(previousMessages, this.currentConversation.messages);
@@ -1921,6 +2151,7 @@ export class OpenCodianView extends ItemView {
         const syncResult = await this.syncConversationMessagesFromServer(conversation, tab.id);
         this.syncBackgroundTaskStateFromConversation(conversation, tab.id);
         if (runtime.sessionTodos.length > 0 || tab.hasBackgroundTask) {
+          await this.refreshTabSessionStatus(tab.id, conversation.openCodeSessionId, { suppressErrors: true });
           await this.refreshTabSessionTodos(tab.id, conversation.openCodeSessionId, { suppressErrors: true });
         }
         this.syncTabStreamLikeState(tab.id);
@@ -3827,6 +4058,8 @@ export class OpenCodianView extends ItemView {
     if (!runtime) {
       return;
     }
+
+    this.reconcileBackgroundTaskStateFromLiveSignals(tabId);
 
     if (!this.hasTabBackgroundTaskIndicator(tabId)) {
       runtime.backgroundTaskIndicatorEl?.remove();

@@ -58,9 +58,9 @@
 | 模块 | 当前缺口 |
 | --- | --- |
 | 模块 4：非流式 prompt | `thinkingBudget` 仍未映射到 SDK prompt payload；`externalContextPaths` 尚未转 `file part`；图片仍是文本占位；`format` / `agent` / `noReply` 尚未开放 |
-| 模块 5：流式消息主链 | 事件白名单仍偏保守；`message.part.removed`、`session.status`、`session.diff` 等未接；通用未知事件目前是“安全忽略”为主，尚未补统一日志采样；问题事件仅记录 debug，不进入 UI；多 tab 并发已支持，但“并发 + question/event 扩展”的组合场景自动化覆盖仍不足 |
+| 模块 5：流式消息主链 | 事件白名单仍偏保守；`message.part.removed`、`session.diff` 等未接；通用未知事件目前是“安全忽略”为主，尚未补统一日志采样；问题事件仅记录 debug，不进入 UI；多 tab 并发已支持，但“并发 + question/event 扩展”的组合场景自动化覆盖仍不足 |
 | 模块 6：取消与高可用补全 | 还没有专门的“服务端已 abort” UI 状态；尚未补充针对异常 finish reason 的细粒度展示 |
-| 模块 7：后续增强 | `global.syncEvent.subscribe()` 已接入 `todo.updated` 增量同步；`question.*`、`session.summarize()`、`session.diff()`、`session.unrevert()`、`find.*`、`file.status()`、`vcs.get()` 仍未开始 |
+| 模块 7：后续增强 | `global.syncEvent.subscribe()` 已接入 `todo.updated` 与 `session.status` 增量同步；`question.*`、`session.summarize()`、`session.diff()`、`session.unrevert()`、`find.*`、`file.status()`、`vcs.get()` 仍未开始 |
 | 模块 8：旧链路收敛 | `connectSSE()`、`parseSSEEvents()`、旧 HTTP helpers 仍保留，计划在至少一个版本周期后再评估收敛 |
 
 ### 1.1.3 新会话接力注意事项
@@ -193,9 +193,9 @@
 | `allowedTools` | 已映射到 SDK `tools` | SDK `prompt()` / `promptAsync()` 支持 `tools` | 当前真实生效，但仍只支持布尔白名单，不含更细粒度配置 |
 | `externalContextPaths` | `QueryOptions` 有字段，但未写入请求 | SDK 可通过 `parts:file` 等方式传上下文 | 当前外部上下文路径只是 UI/状态字段，未真正参与 prompt |
 | 结构化输出 | 未实现 | SDK `format: { type: "json_schema" }` | 无法直接拿到 schema 校验后的结果 |
-| 事件类型覆盖 | 主要处理 `message.part.delta`、`message.part.updated`、`permission.asked`、`session.idle` | SDK 类型还覆盖 `question`、`message.updated`、`message.part.removed`、`session.status`、`session.diff`、`worktree`、`pty` 等 | 当前流式 UI 对上游能力覆盖不全 |
+| 事件类型覆盖 | 主要处理 `message.part.delta`、`message.part.updated`、`permission.asked`、`session.idle`；全局 sync 已补 `session.status` | SDK 类型还覆盖 `question`、`message.updated`、`message.part.removed`、`session.diff`、`worktree`、`pty` 等 | 当前流式 UI 对上游能力仍不全，但后台任务 live 判定已开始利用会话状态 |
 | Part 类型覆盖 | 实际只消费 `text` / `reasoning` / `tool` | SDK `Part` 还包括 `step-start`、`step-finish`、`snapshot`、`patch`、`agent`、`retry`、`compaction`、`subtask` | 会丢掉更丰富的 agent 时间线信息 |
-| Sync event 能力 | 已接入 `global.syncEvent.subscribe()`，当前消费 `todo.updated` 并驱动会话待办面板；其余增量事件仍未覆盖 | SDK v2 还提供更丰富的全局增量同步流 | Todo 渲染已不再依赖工具卡文本，但更多会话级增量同步仍主要靠手动拉取与局部事件 |
+| Sync event 能力 | 已接入 `global.syncEvent.subscribe()`，当前消费 `todo.updated` 与 `session.status`，驱动会话待办与后台任务 live 判定；其余增量事件仍未覆盖 | SDK v2 还提供更丰富的全局增量同步流 | Todo 渲染已不再依赖工具卡文本，后台任务面板也开始结合 live 状态去除陈旧运行态 |
 
 ### 4.2 `requestAssistantResponse()` 的关键差异
 
@@ -262,7 +262,7 @@ SDK v2 的大多数 API 都支持 `directory` + `workspace` 双上下文，而�
 | `global.event()` | 未覆盖 | 无公开方法 | 当前只用 `/event`，未用 `/global/event` |
 | `global.dispose()` | 未覆盖 | 无 | 可作为“重置当前实例”能力 |
 | `global.upgrade()` | 未覆盖 | 无 | 插件里通常不应直接开放 |
-| `global.syncEvent.subscribe()` | 部分覆盖 | 已订阅 `todo.updated` 并同步到会话待办 UI | 其他 sync 事件仍未消费 |
+| `global.syncEvent.subscribe()` | 部分覆盖 | 已订阅 `todo.updated`、`session.status` 并同步到会话待办 / 后台任务 live UI | 其他 sync 事件仍未消费 |
 | `global.config.get()` | 未覆盖 | 无 | 当前 `OpenCodeService` 不公开全局 config |
 | `global.config.update()` | 未覆盖 | 无 | 同上 |
 | `auth.remove()` | 未覆盖 | 无 | provider auth 管理尚未接入 |
@@ -284,7 +284,7 @@ SDK v2 的大多数 API 都支持 `directory` + `workspace` 双上下文，而�
 | --- | --- | --- | --- |
 | `session.list()` | 部分覆盖 | `listSessions()` | 当前无筛选 / 分页 |
 | `session.create()` | 部分覆盖 | `createSession()` | 当前只返回 `id` |
-| `session.status()` | 未覆盖 | 无 | 可用于更准确的 busy / idle 管理 |
+| `session.status()` | 部分覆盖 | `getSessionStatuses()` + 后台任务 live 判定 | 当前已用于 busy / idle 管理与陈旧后台任务清理，但尚未开放更完整的会话状态 UI |
 | `session.delete()` | 部分覆盖 | `deleteSession()` | 当前语义已够用 |
 | `session.get()` | 未覆盖为公开能力 | `getSessionContextUsageSnapshot()` 内部组合调用了私有 GET | 建议补一个公开 `getSession()` |
 | `session.update()` | 部分覆盖 | `updateSessionTitle()` | 当前只覆盖标题更新 |
@@ -695,7 +695,7 @@ return result.data ?? []
 2. `session.abort()` 公开 facade / richer abort UI
    - 价值：当前内部 best-effort abort 已落地，下一步应补公开能力与更明确的中止态展示
 3. 扩展 `global.syncEvent.subscribe()`
-   - 价值：当前已用于 `todo.updated`，下一步可继续承接更多多 tab、后台同步、会话状态刷新事件
+   - 价值：当前已用于 `todo.updated`、`session.status`，下一步可继续承接更多多 tab、后台同步、会话状态刷新事件
 4. `session.summarize()`
    - 价值：长对话压缩
 5. `session.diff()`

@@ -230,6 +230,7 @@ interface SessionContextUsageSnapshot {
 interface StreamingState {
   lastContent: string;
   processedToolIds: Set<string>;
+  toolInputSnapshots: Map<string, string>;
 }
 
 interface ActiveStreamContext {
@@ -245,6 +246,27 @@ type SessionTodoUpdate = {
 
 type SessionTodoListener = (update: SessionTodoUpdate) => void;
 
+export type SessionActivityStatus =
+  | {
+      type: 'idle';
+    }
+  | {
+      type: 'busy';
+    }
+  | {
+      type: 'retry';
+      attempt: number;
+      message: string;
+      next: number;
+    };
+
+type SessionStatusUpdate = {
+  sessionId: string;
+  status: SessionActivityStatus;
+};
+
+type SessionStatusListener = (update: SessionStatusUpdate) => void;
+
 export class OpenCodeService {
   private settings: OpenCodianSettings;
   private events: OpenCodeServiceEvents;
@@ -255,6 +277,7 @@ export class OpenCodeService {
   private activeStreams = new Map<string, ActiveStreamContext>();
   private sdkFeatureFlags: SdkFeatureFlags;
   private sessionTodoListeners = new Set<SessionTodoListener>();
+  private sessionStatusListeners = new Set<SessionStatusListener>();
   private syncEventAbortController: AbortController | null = null;
   private syncEventPromise: Promise<void> | null = null;
   private syncEventWanted = false;
@@ -649,6 +672,25 @@ export class OpenCodeService {
     }
   }
 
+  async getSessionStatuses(): Promise<Record<string, SessionActivityStatus>> {
+    if (this.shouldUseSdk('sdkCrud')) {
+      try {
+        const response = await this.getSdkClient().session.status();
+        return this.normalizeSessionStatuses(response);
+      } catch (error) {
+        logger.warn('SDK session.status failed, falling back to legacy HTTP', error);
+      }
+    }
+
+    try {
+      const response = await this.get<unknown>('/session/status');
+      return this.normalizeSessionStatuses(response);
+    } catch (error) {
+      logger.error('Failed to get session statuses:', error);
+      return {};
+    }
+  }
+
   subscribeToSessionTodoUpdates(listener: SessionTodoListener): () => void {
     this.sessionTodoListeners.add(listener);
     this.syncEventWanted = true;
@@ -656,7 +698,20 @@ export class OpenCodeService {
 
     return () => {
       this.sessionTodoListeners.delete(listener);
-      if (this.sessionTodoListeners.size === 0) {
+      if (!this.hasSyncEventListeners()) {
+        this.stopSyncEventSubscription();
+      }
+    };
+  }
+
+  subscribeToSessionStatusUpdates(listener: SessionStatusListener): () => void {
+    this.sessionStatusListeners.add(listener);
+    this.syncEventWanted = true;
+    this.ensureSyncEventSubscription();
+
+    return () => {
+      this.sessionStatusListeners.delete(listener);
+      if (!this.hasSyncEventListeners()) {
         this.stopSyncEventSubscription();
       }
     };
@@ -831,7 +886,20 @@ export class OpenCodeService {
     return {
       lastContent: '',
       processedToolIds: new Set<string>(),
+      toolInputSnapshots: new Map(),
     };
+  }
+
+  private getToolInputSnapshot(input: Record<string, unknown> | undefined): string {
+    if (!input || Object.keys(input).length === 0) {
+      return '';
+    }
+
+    try {
+      return JSON.stringify(input);
+    } catch {
+      return '[unserializable-tool-input]';
+    }
   }
 
   private createActiveStreamContext(sessionId: string): ActiveStreamContext {
@@ -897,6 +965,23 @@ export class OpenCodeService {
     }, []);
   }
 
+  private normalizeSessionStatuses(response: unknown): Record<string, SessionActivityStatus> {
+    const rawStatuses = response && typeof response === 'object' && 'data' in response
+      ? (response as { data?: unknown }).data
+      : response;
+    if (!rawStatuses || typeof rawStatuses !== 'object' || Array.isArray(rawStatuses)) {
+      return {};
+    }
+
+    return Object.entries(rawStatuses).reduce<Record<string, SessionActivityStatus>>((statuses, [sessionId, rawStatus]) => {
+      const status = this.normalizeSessionStatus(rawStatus);
+      if (status) {
+        statuses[sessionId] = status;
+      }
+      return statuses;
+    }, {});
+  }
+
   private normalizeSessionTodo(todo: unknown): SessionTodo | null {
     if (!todo || typeof todo !== 'object') {
       return null;
@@ -931,12 +1016,43 @@ export class OpenCodeService {
     };
   }
 
+  private normalizeSessionStatus(status: unknown): SessionActivityStatus | null {
+    if (!status || typeof status !== 'object') {
+      return null;
+    }
+
+    const raw = status as Record<string, unknown>;
+    if (raw.type === 'idle' || raw.type === 'busy') {
+      return { type: raw.type };
+    }
+
+    if (
+      raw.type === 'retry'
+      && typeof raw.attempt === 'number'
+      && typeof raw.message === 'string'
+      && typeof raw.next === 'number'
+    ) {
+      return {
+        type: 'retry',
+        attempt: raw.attempt,
+        message: raw.message,
+        next: raw.next,
+      };
+    }
+
+    return null;
+  }
+
+  private hasSyncEventListeners(): boolean {
+    return this.sessionTodoListeners.size > 0 || this.sessionStatusListeners.size > 0;
+  }
+
   private ensureSyncEventSubscription(): void {
     if (!this.shouldUseSdk('sdkSync')) {
       return;
     }
 
-    if (!this.syncEventWanted || this.sessionTodoListeners.size === 0 || this.syncEventPromise) {
+    if (!this.syncEventWanted || !this.hasSyncEventListeners() || this.syncEventPromise) {
       return;
     }
 
@@ -947,7 +1063,7 @@ export class OpenCodeService {
         this.syncEventAbortController = null;
       }
       this.syncEventPromise = null;
-      if (this.syncEventWanted && this.sessionTodoListeners.size > 0 && this.shouldUseSdk('sdkSync')) {
+      if (this.syncEventWanted && this.hasSyncEventListeners() && this.shouldUseSdk('sdkSync')) {
         this.ensureSyncEventSubscription();
       }
     });
@@ -960,7 +1076,7 @@ export class OpenCodeService {
   }
 
   private restartSyncEventSubscription(): void {
-    if (!this.shouldUseSdk('sdkSync') || this.sessionTodoListeners.size === 0) {
+    if (!this.shouldUseSdk('sdkSync') || !this.hasSyncEventListeners()) {
       return;
     }
 
@@ -971,7 +1087,7 @@ export class OpenCodeService {
   }
 
   private async runSyncEventLoop(abortController: AbortController): Promise<void> {
-    while (!abortController.signal.aborted && this.sessionTodoListeners.size > 0) {
+    while (!abortController.signal.aborted && this.hasSyncEventListeners()) {
       try {
         const events = await this.getSdkClient().global.syncEvent.subscribe({
           signal: abortController.signal,
@@ -1008,12 +1124,9 @@ export class OpenCodeService {
       properties?: {
         sessionID?: unknown;
         todos?: unknown;
+        status?: unknown;
       };
     };
-
-    if (value.type !== 'todo.updated') {
-      return;
-    }
 
     const sessionId = typeof value.properties?.sessionID === 'string'
       ? value.properties.sessionID
@@ -1022,8 +1135,22 @@ export class OpenCodeService {
       return;
     }
 
-    const todos = this.normalizeSessionTodos(value.properties?.todos);
-    this.emitSessionTodoUpdate({ sessionId, todos });
+    if (value.type === 'todo.updated') {
+      const todos = this.normalizeSessionTodos(value.properties?.todos);
+      this.emitSessionTodoUpdate({ sessionId, todos });
+      return;
+    }
+
+    if (value.type !== 'session.status') {
+      return;
+    }
+
+    const status = this.normalizeSessionStatus(value.properties?.status);
+    if (!status) {
+      return;
+    }
+
+    this.emitSessionStatusUpdate({ sessionId, status });
   }
 
   private emitSessionTodoUpdate(update: SessionTodoUpdate): void {
@@ -1032,6 +1159,16 @@ export class OpenCodeService {
         listener(update);
       } catch (error) {
         logger.error('Session todo listener failed', error);
+      }
+    }
+  }
+
+  private emitSessionStatusUpdate(update: SessionStatusUpdate): void {
+    for (const listener of this.sessionStatusListeners) {
+      try {
+        listener(update);
+      } catch (error) {
+        logger.error('Session status listener failed', error);
       }
     }
   }
@@ -1326,13 +1463,21 @@ export class OpenCodeService {
           const toolId = toolPart.callID || toolPart.id;
           const toolName = toolPart.tool || 'unknown';
           if (toolId) {
-            if (!state.processedToolIds.has(toolId)) {
+            const toolInput = toolPart.state?.input || {};
+            const nextSnapshot = this.getToolInputSnapshot(toolInput);
+            const previousSnapshot = state.toolInputSnapshots.get(toolId);
+            const shouldEmitToolUse =
+              !state.processedToolIds.has(toolId)
+              || nextSnapshot !== previousSnapshot;
+
+            if (shouldEmitToolUse) {
               state.processedToolIds.add(toolId);
+              state.toolInputSnapshots.set(toolId, nextSnapshot);
               chunks.push({
                 type: 'tool_use',
                 id: toolId,
                 name: toolName,
-                input: toolPart.state?.input || {},
+                input: toolInput,
               });
             }
 

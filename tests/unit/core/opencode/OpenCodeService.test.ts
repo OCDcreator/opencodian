@@ -76,6 +76,7 @@ describe('OpenCodeService', () => {
     session: {
       create: jest.Mock;
       list: jest.Mock;
+      status: jest.Mock;
       messages: jest.Mock;
       todo: jest.Mock;
       delete: jest.Mock;
@@ -100,6 +101,7 @@ describe('OpenCodeService', () => {
       session: {
         create: jest.fn(),
         list: jest.fn(),
+        status: jest.fn(),
         messages: jest.fn(),
         todo: jest.fn(),
         delete: jest.fn(),
@@ -519,6 +521,23 @@ describe('OpenCodeService', () => {
       expect(mockSdkClient.session.todo).toHaveBeenCalledWith({ sessionID: 'sdk-session' });
     });
 
+    it('loads session statuses via SDK and normalizes entries', async () => {
+      service = createServiceWithSdkFlags();
+      mockSdkClient.session.status = jest.fn().mockResolvedValue({
+        data: {
+          'sdk-session': { type: 'busy' },
+          'retry-session': { type: 'retry', attempt: 2, message: 'Retrying', next: 123 },
+          'invalid-session': { type: 'unknown' },
+        },
+      });
+
+      await expect(service.getSessionStatuses()).resolves.toEqual({
+        'sdk-session': { type: 'busy' },
+        'retry-session': { type: 'retry', attempt: 2, message: 'Retrying', next: 123 },
+      });
+      expect(mockSdkClient.session.status).toHaveBeenCalledWith();
+    });
+
     it('emits todo.updated payloads from SDK sync events', async () => {
       service = createServiceWithSdkFlags();
       const updates: Array<{ sessionId: string; todos: unknown[] }> = [];
@@ -552,6 +571,37 @@ describe('OpenCodeService', () => {
             { content: 'Inspect docs', status: 'in_progress', priority: 'high' },
             { content: 'Draft spec', status: 'pending', priority: 'medium' },
           ],
+        },
+      ]);
+    });
+
+    it('emits session.status payloads from SDK sync events', async () => {
+      service = createServiceWithSdkFlags();
+      const updates: Array<{ sessionId: string; status: unknown }> = [];
+      mockSdkClient.global.syncEvent.subscribe.mockResolvedValue({
+        stream: (async function* () {
+          yield {
+            type: 'session.status',
+            properties: {
+              sessionID: 'sdk-session',
+              status: { type: 'idle' },
+            },
+          };
+        })(),
+      });
+
+      const dispose = service.subscribeToSessionStatusUpdates((update) => {
+        updates.push(update as unknown as { sessionId: string; status: unknown });
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      dispose();
+
+      expect(mockSdkClient.global.syncEvent.subscribe).toHaveBeenCalled();
+      expect(updates).toEqual([
+        {
+          sessionId: 'sdk-session',
+          status: { type: 'idle' },
         },
       ]);
     });
@@ -776,6 +826,85 @@ describe('OpenCodeService', () => {
         modelId: 'openai/gpt-5',
       });
       expect(chunks[chunks.length - 1]).toEqual({ type: 'message_stop' });
+    });
+
+    it('re-emits tool_use when later stream updates provide richer tool input', async () => {
+      service = createServiceWithSdkFlags();
+      service.setSessionId('test-session');
+
+      mockSdkClient.session.promptAsync.mockResolvedValue({});
+      mockSdkClient.event.subscribe.mockResolvedValue({
+        stream: (async function* () {
+          yield {
+            type: 'message.part.updated',
+            properties: {
+              sessionID: 'test-session',
+              part: {
+                id: 'part-tool-1',
+                type: 'tool',
+                callID: 'call-tool-1',
+                tool: 'read',
+                state: {
+                  status: 'running',
+                  input: {},
+                },
+              },
+            },
+          };
+          yield {
+            type: 'message.part.updated',
+            properties: {
+              sessionID: 'test-session',
+              part: {
+                id: 'part-tool-1',
+                type: 'tool',
+                callID: 'call-tool-1',
+                tool: 'read',
+                state: {
+                  status: 'running',
+                  input: {
+                    file_path: 'docs/architecture/README.md',
+                  },
+                },
+              },
+            },
+          };
+          yield {
+            type: 'session.idle',
+            properties: {
+              sessionID: 'test-session',
+            },
+          };
+        })(),
+      });
+      mockSdkClient.session.messages.mockResolvedValue([]);
+      mockSdkClient.session.get.mockResolvedValue({
+        id: 'test-session',
+        title: 'SDK',
+        time: { created: 1, updated: 1 },
+      });
+
+      const chunks: unknown[] = [];
+      for await (const chunk of service.sendMessage('Hello', { sessionId: 'test-session' })) {
+        chunks.push(chunk);
+      }
+
+      expect(chunks).toEqual(expect.arrayContaining([
+        {
+          type: 'tool_use',
+          id: 'call-tool-1',
+          name: 'read',
+          input: {},
+        },
+        {
+          type: 'tool_use',
+          id: 'call-tool-1',
+          name: 'read',
+          input: {
+            file_path: 'docs/architecture/README.md',
+          },
+        },
+      ]));
     });
   });
 
