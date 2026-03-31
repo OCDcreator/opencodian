@@ -216,6 +216,7 @@ export class OpenCodianView extends ItemView {
   private messagesShellEl: HTMLElement | null = null;
   private messagesContainer: HTMLElement | null = null;
   private inputContainer: HTMLElement | null = null;
+  private inputWrapperEl: HTMLElement | null = null;
   private composerContextRowEl: HTMLElement | null = null;
   private questionDockMountEl: HTMLElement | null = null;
   private questionDock: QuestionDock | null = null;
@@ -279,6 +280,8 @@ export class OpenCodianView extends ItemView {
   private lastServerAvailability: ChatServerAvailability | null = null;
   private chatSurfaceSyncFrameId: number | null = null;
   private chatSurfaceSyncTimeoutId: number | null = null;
+  private composerLayoutSyncFrameId: number | null = null;
+  private inputContainerResizeObserver: ResizeObserver | null = null;
   private scrollToBottomFrameId: number | null = null;
   private chatAppearanceStyleEl: HTMLStyleElement | null = null;
   private titleGenerationService: TitleGenerationService;
@@ -1045,6 +1048,7 @@ export class OpenCodianView extends ItemView {
     this.stopConversationSyncLoop();
     this.clearScheduledFocusContextPreviewRefresh();
     this.clearChatSurfaceSyncTimers();
+    this.clearScheduledComposerLayoutSync();
     this.clearScheduledScrollToBottom();
     this.chatAppearanceStyleEl?.remove();
     this.chatAppearanceStyleEl = null;
@@ -1055,6 +1059,8 @@ export class OpenCodianView extends ItemView {
     this.contextRing?.destroy();
     this.contextRing = null;
     this.contextRingContainerEl = null;
+    this.inputContainerResizeObserver?.disconnect();
+    this.inputContainerResizeObserver = null;
 
     // Cleanup navigation sidebar
     this.clearTabMessagesPanes();
@@ -1067,6 +1073,7 @@ export class OpenCodianView extends ItemView {
     this.outerVerticalTabBarHostEl?.remove();
     this.outerVerticalTabBarHostEl = null;
     this.inputTabBarSlotEl = null;
+    this.inputWrapperEl = null;
     this.composerContextRowEl = null;
     this.questionDock?.destroy();
     this.questionDock = null;
@@ -1596,6 +1603,7 @@ export class OpenCodianView extends ItemView {
     }
 
     this.scheduleChatSurfaceColorSync();
+    this.scheduleComposerLayoutSync();
   }
 
   public refreshCurrentConversationRendering(): void {
@@ -1751,6 +1759,7 @@ export class OpenCodianView extends ItemView {
       this.app.workspace.on('css-change', () => {
         logoContainer.innerHTML = this.getLogoSvg();
         this.scheduleChatSurfaceColorSync();
+        this.scheduleComposerLayoutSync();
       })
     );
 
@@ -1960,11 +1969,15 @@ export class OpenCodianView extends ItemView {
     this.questionDock = new QuestionDock(this.questionDockMountEl);
     this.renderQuestionDock();
 
-    const inputWrapper = container.createDiv({ cls: 'opencodian-input-wrapper' });
-    this.composerContextRowEl = inputWrapper.createDiv({ cls: 'opencodian-composer-context-row is-empty' });
+    const composerShellEl = container.createDiv({ cls: 'opencodian-composer-shell' });
+
+    const inputWrapper = composerShellEl.createDiv({ cls: 'opencodian-input-wrapper' });
+    this.inputWrapperEl = inputWrapper;
+    const composerContentEl = inputWrapper.createDiv({ cls: 'opencodian-composer-content' });
+    this.composerContextRowEl = composerContentEl.createDiv({ cls: 'opencodian-composer-context-row is-empty' });
     this.renderComposerContextChips();
 
-    this.inputTextarea = inputWrapper.createEl('textarea', {
+    this.inputTextarea = composerContentEl.createEl('textarea', {
       cls: 'opencodian-input',
       attr: { placeholder: this.getInputPlaceholder(), rows: '1' },
     });
@@ -1983,7 +1996,7 @@ export class OpenCodianView extends ItemView {
       }
     });
 
-    const composerFooterEl = inputWrapper.createDiv({ cls: 'opencodian-composer-footer' });
+    const composerFooterEl = composerContentEl.createDiv({ cls: 'opencodian-composer-footer' });
     const addContextBtn = composerFooterEl.createEl('button', {
       cls: 'opencodian-composer-add-btn opencodian-tooltip-trigger',
       attr: {
@@ -2013,7 +2026,7 @@ export class OpenCodianView extends ItemView {
     });
 
     // Bottom toolbar: Permission mode | Model selector | Effort selector | Context usage
-    const toolbar = container.createDiv({ cls: 'opencodian-input-toolbar' });
+    const toolbar = composerShellEl.createDiv({ cls: 'opencodian-input-toolbar' });
 
     const permissionContainer = toolbar.createDiv({ cls: 'opencodian-permission-selector' });
     this.initializePermissionSelector(permissionContainer);
@@ -2047,6 +2060,53 @@ export class OpenCodianView extends ItemView {
       },
     });
     this.effortSelector.updateDisplay();
+
+    this.initializeComposerLayoutMetrics();
+  }
+
+  private initializeComposerLayoutMetrics(): void {
+    if (!this.chatContainerEl || !this.inputContainer) {
+      return;
+    }
+
+    this.inputContainerResizeObserver?.disconnect();
+    this.inputContainerResizeObserver = null;
+
+    if (typeof ResizeObserver !== 'undefined') {
+      this.inputContainerResizeObserver = new ResizeObserver(() => {
+        this.scheduleComposerLayoutSync();
+      });
+      this.inputContainerResizeObserver.observe(this.inputContainer);
+    }
+
+    this.scheduleComposerLayoutSync();
+  }
+
+  private scheduleComposerLayoutSync(): void {
+    if (this.composerLayoutSyncFrameId !== null) {
+      return;
+    }
+
+    this.composerLayoutSyncFrameId = window.requestAnimationFrame(() => {
+      this.composerLayoutSyncFrameId = null;
+      this.syncComposerLayoutMetrics();
+    });
+  }
+
+  private clearScheduledComposerLayoutSync(): void {
+    if (this.composerLayoutSyncFrameId !== null) {
+      window.cancelAnimationFrame(this.composerLayoutSyncFrameId);
+      this.composerLayoutSyncFrameId = null;
+    }
+  }
+
+  private syncComposerLayoutMetrics(): void {
+    if (!this.chatContainerEl || !this.inputContainer) {
+      return;
+    }
+
+    const stackHeight = Math.ceil(this.inputContainer.offsetHeight);
+    this.chatContainerEl.style.setProperty('--opencodian-composer-stack-height', `${Math.max(0, stackHeight)}px`);
   }
 
   private renderComposerContextChips(): void {
@@ -3234,6 +3294,7 @@ export class OpenCodianView extends ItemView {
         messagesEl.removeClass('is-rehydrating');
       });
     }
+    this.scheduleComposerLayoutSync();
 
     // Update model selector to reflect this session's model
     this.updateModelSelectorDisplay();
@@ -5678,6 +5739,8 @@ export class OpenCodianView extends ItemView {
 
   private setTooltipLabel(buttonEl: HTMLElement, label: string, position?: 'bottom' | 'top' | 'right'): void {
     buttonEl.setAttribute('data-tooltip', label);
+    buttonEl.removeAttribute('title');
+    buttonEl.removeAttribute('aria-label');
     if (position) {
       buttonEl.setAttribute('data-tooltip-position', position);
     }
@@ -6333,6 +6396,7 @@ export class OpenCodianView extends ItemView {
     } else {
       this.restoreElementScrollTopAfterRender(messagesEl, previousScrollTop);
     }
+    this.scheduleComposerLayoutSync();
 
     window.requestAnimationFrame(() => {
       messagesEl.removeClass('is-rehydrating');
