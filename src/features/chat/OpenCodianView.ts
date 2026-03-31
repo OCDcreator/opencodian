@@ -4921,20 +4921,19 @@ export class OpenCodianView extends ItemView {
     const listEl = container.createDiv({ cls: 'opencodian-user-context-list' });
 
     for (const attachment of attachments) {
-      const chipEl = listEl.createDiv({ cls: 'opencodian-user-context-chip' });
-      chipEl.createSpan({
-        cls: 'opencodian-user-context-kind',
-        text: this.getContextKindLabel(attachment.kind),
-      });
-
-      const openBtn = chipEl.createEl('button', {
-        cls: 'opencodian-user-context-label',
+      const openBtn = listEl.createEl('button', {
+        cls: 'opencodian-user-context-chip opencodian-composer-context-chip is-attached',
         text: attachment.label,
         attr: {
           type: 'button',
           title: attachment.path,
+          'aria-label': `${this.getContextKindLabel(attachment.kind)}: ${attachment.label}`,
         },
       });
+      openBtn.dataset.contextKind = attachment.kind;
+      if (attachment.kind === 'selection') {
+        openBtn.addClass('is-selection');
+      }
       openBtn.addEventListener('click', () => {
         void this.app.workspace.openLinkText(attachment.path, '', 'tab');
       });

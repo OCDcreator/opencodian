@@ -2861,7 +2861,7 @@ export class OpenCodeService {
       : undefined;
 
     return {
-      kind: lineRange || textSnapshot ? 'selection' : 'file',
+      kind: lineRange ? 'selection' : 'file',
       path: contextPath,
       label: formatContextLabel(contextPath, lineRange),
       mime: typeof filePart.mime === 'string' && filePart.mime.trim()

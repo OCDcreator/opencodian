@@ -1147,7 +1147,7 @@
   border: 1px solid var(--opencodian-glass-border);
   border-radius: var(--opencodian-user-radius);
   border-end-end-radius: var(--opencodian-user-tail-radius);
-  padding: 1px 16px;
+  padding: 6px 14px 7px;
   box-shadow: 
     0 10px var(--opencodian-user-shadow-blur) var(--opencodian-glass-shadow),
     0 1px 0 color-mix(in srgb, var(--opencodian-glass-specular) 90%, transparent) inset,
@@ -1165,7 +1165,7 @@
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 8px;
+  gap: 2px;
 }
 
 .opencodian-collapsible-content {
@@ -1351,47 +1351,38 @@
   font-size: 15px;
 }
 
+.opencodian-message--user .opencodian-message-text > p {
+  margin: 4px 0;
+}
+
 .opencodian-user-context-list {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 10px;
+  gap: 6px;
+  margin-top: 0;
 }
 
 .opencodian-user-context-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
-  border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--interactive-accent) 24%, var(--opencodian-glass-border));
-  background: color-mix(in srgb, var(--interactive-accent) 10%, var(--background-primary));
-  max-width: 100%;
-}
-
-.opencodian-user-context-kind {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  color: var(--interactive-accent);
-  text-transform: uppercase;
-}
-
-.opencodian-user-context-label {
-  border: none;
-  background: transparent;
+  min-height: 24px;
+  max-width: min(100%, 300px);
+  justify-content: flex-start;
+  padding-inline: 9px;
+  border-radius: 9px;
+  border-color: color-mix(in srgb, var(--opencodian-composer-embedded-border-strong) 72%, transparent) !important;
+  background: color-mix(in srgb, var(--opencodian-composer-embedded-fill) 18%, transparent);
   color: var(--text-normal);
   font-size: 12px;
-  cursor: pointer;
-  padding: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 260px;
 }
 
-.opencodian-user-context-label:hover {
-  color: var(--text-accent);
+.opencodian-user-context-chip.is-selection {
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--text-muted) 56%, var(--opencodian-composer-embedded-border)) !important;
+  background: color-mix(in srgb, var(--opencodian-composer-embedded-fill) 12%, transparent);
+  color: var(--text-muted);
+}
+
+.opencodian-user-context-chip:hover {
+  color: var(--text-normal);
 }
 
 .opencodian-message--assistant .opencodian-message-text {

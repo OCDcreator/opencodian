@@ -235,7 +235,13 @@ export function parseLineRangeFromFileUrl(url: string): PromptContextLineRange |
     const parsed = new URL(url);
     const startLine = Number(parsed.searchParams.get('start'));
     const endLine = Number(parsed.searchParams.get('end'));
-    if (!Number.isFinite(startLine) || !Number.isFinite(endLine)) {
+    if (
+      !Number.isFinite(startLine)
+      || !Number.isFinite(endLine)
+      || startLine < 1
+      || endLine < 1
+      || endLine < startLine
+    ) {
       return null;
     }
 
@@ -260,7 +266,12 @@ function parseLineRange(lines: string): PromptContextLineRange | null {
 
   const startLine = Number(match[1]);
   const endLine = Number(match[2] ?? match[1]);
-  if (!Number.isFinite(startLine) || !Number.isFinite(endLine)) {
+  if (
+    !Number.isFinite(startLine)
+    || !Number.isFinite(endLine)
+    || startLine < 1
+    || endLine < startLine
+  ) {
     return null;
   }
 
