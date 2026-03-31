@@ -12,6 +12,46 @@
 
 ---
 
+## 2026-03-31 用户消息折叠遮罩、中断提示与空助手壳过滤修复
+
+### 🎯 改动目标
+
+- 修复长用户消息折叠时尾部出现黑色长方形阴影的问题。
+- 修复用户中断回复后出现多个无文字 assistant 消息块、或先出现中断提示后又插入空助手壳的问题。
+- 收敛用户消息 hover / 展开时对 assistant 消息的遮挡感，保持单次回复的视觉统一性。
+
+### ✅ 本轮调整
+
+- `styles.css`
+  - 将用户长消息折叠尾部从额外的深色渐变遮罩改为 `mask-image` 渐隐，避免最后一行出现突兀的黑色覆盖块
+  - 下调用户消息容器与 footer 的层级，并收敛用户气泡与操作按钮 hover 时的放大幅度，减少展开和悬浮时遮住下方 assistant 内容的情况
+  - 为 assistant 时间行补充可换行布局与中断状态 badge 样式，确保中断状态能在同一条回复块里被清晰表达
+
+- `src/core/types/chat.ts`
+  - 为 `ChatMessage` 增加 `streamState` 字段，用于持久化记录本地流式消息是否处于 `interrupted` 状态
+
+- `src/features/chat/OpenCodianView.ts`
+  - 中断流式回复时，如果本轮已经产生可见内容，则保留同一条 assistant 消息并标记“已中断”
+  - 如果中断发生在可见正文输出前，则把预创建的流式占位直接转换成明确的中断 notice，而不是留下空 assistant 壳
+  - 新增空 assistant shell 清理逻辑，流式收尾后会移除仅剩时间行、没有正文/工具/卡片内容的本地占位
+  - 新增 `shouldRenderConversationMessage()`，在服务端同步合并与最终渲染前统一过滤空 assistant message，避免中断后后台 sync 又把空助手块重新插回 UI
+  - 将“Streaming cancelled” 也接入中英文 i18n，统一中断提示文本来源
+
+- `src/i18n/locales/en.ts`
+- `src/i18n/locales/zh.ts`
+  - 新增流式中断 toast、badge 与 notice 文案
+
+### 🧪 验证结果
+
+- 通过：`npm run build`（`BUILD_ID: main.202603311625`）
+- 已部署到 Test Vault：`C:\Users\lt\Desktop\Write\testvault\.obsidian\plugins\opencodian\`
+- 已验证部署后的 `main.js` 包含 `BUILD_ID: main.202603311625`
+- 待继续关注：若服务端后续仍返回异常空 assistant message，需要再补充更细的诊断日志定位具体 message payload
+
+### 📝 结论
+
+- 这轮之后，用户长消息折叠的尾部遮罩会更自然；中断回复时，界面会优先保持“一个回复块”的表达，不再把空助手壳插回聊天流里。
+
 ## 2026-03-31 输入框面板自动增高与最大高度统一修复
 
 ### 🎯 改动目标

@@ -143,6 +143,7 @@ export interface ChatMessage {
   timestamp: number;
   modelId?: string;
   sourceMessageId?: string;
+  streamState?: 'interrupted';
   displayStyle?: 'default' | 'notice';
   noticeTitle?: string;
   noticeTone?: 'info' | 'warning' | 'error';

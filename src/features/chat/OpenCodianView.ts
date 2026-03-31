@@ -3467,6 +3467,7 @@ export class OpenCodianView extends ItemView {
         id: message.id,
         role: message.role,
         sourceMessageId: message.sourceMessageId ?? null,
+        streamState: message.streamState ?? null,
         displayStyle: message.displayStyle ?? null,
         content: message.content,
         timestamp: message.timestamp,
@@ -3488,6 +3489,7 @@ export class OpenCodianView extends ItemView {
   private getMessageVisualSignature(message: ChatMessage): string {
     return JSON.stringify({
       role: message.role,
+      streamState: message.streamState ?? null,
       displayStyle: message.displayStyle ?? null,
       content: message.content,
       timestamp: message.timestamp,
@@ -4289,6 +4291,8 @@ export class OpenCodianView extends ItemView {
         ?.filter((b): b is { type: 'text'; content: string } => b.type === 'text')
         .map(b => b.content)
         .join('') ?? '';
+      const shouldPersistInterruptedState = streamInterrupted && !streamCompleted && !latestErrorMessage;
+      let interruptedNoticeMessage: ChatMessage | null = null;
 
       logger.debug('Stream loop ended');
       resetStreamingState();
@@ -4301,18 +4305,28 @@ export class OpenCodianView extends ItemView {
       pendingState.element = null;
 
       if (sendingRuntime.streamingMessageEl) {
-        this.addTimestampWithCopyButton(
-          sendingRuntime.streamingMessageEl,
-          finalizedTimestamp,
-          streamedTextContent.trim() || undefined,
-          finalizedModelId,
-        );
+        if (streamContentBlocks?.length || latestErrorMessage) {
+          this.addTimestampWithCopyButton(
+            sendingRuntime.streamingMessageEl,
+            finalizedTimestamp,
+            streamedTextContent.trim() || undefined,
+            finalizedModelId,
+            shouldPersistInterruptedState ? t('chat.stream.interruptedBadge') : undefined,
+          );
+        } else if (shouldPersistInterruptedState) {
+          interruptedNoticeMessage = this.buildInterruptedAssistantNotice(finalizedTimestamp, finalizedModelId);
+          await this.renderAssistantPlaceholderAsNotice(sendingRuntime.streamingMessageEl, interruptedNoticeMessage);
+        } else {
+          sendingRuntime.streamingMessageEl.remove();
+        }
+
         if (this.getActiveTabId() === sendingTabId) {
           this.scheduleSettledScrollToBottomIfNeeded();
         }
       }
 
       await this.finalizeBackgroundTaskIndicatorAfterPrimaryStream(sendingTabId);
+      this.removeEmptyAssistantShells();
       this.syncTabStreamLikeState(sendingTabId);
       await this.refreshServerStatusBadge();
 
@@ -4349,9 +4363,19 @@ export class OpenCodianView extends ItemView {
           timestamp: finalizedTimestamp,
           modelId: finalizedModelId,
           sourceMessageId: finalizedAssistantMessageId,
+          streamState: shouldPersistInterruptedState ? 'interrupted' : undefined,
           contentBlocks: contentBlocks,
           questionResolution: sendingRuntime.pendingQuestionResolution ?? undefined,
         };
+
+        if (sendingRuntime.streamingMessageEl) {
+          sendingRuntime.streamingMessageEl.dataset.messageId = assistantMessage.id;
+          if (assistantMessage.sourceMessageId) {
+            sendingRuntime.streamingMessageEl.dataset.sourceMessageId = assistantMessage.sourceMessageId;
+          } else {
+            delete sendingRuntime.streamingMessageEl.dataset.sourceMessageId;
+          }
+        }
 
         sendingConversation.messages.push(assistantMessage);
       } else if (latestErrorMessage) {
@@ -4363,9 +4387,11 @@ export class OpenCodianView extends ItemView {
           modelId: finalizedModelId,
           sourceMessageId: finalizedAssistantMessageId,
         });
+      } else if (interruptedNoticeMessage) {
+        sendingConversation.messages.push(interruptedNoticeMessage);
       }
 
-      if (streamContentBlocks?.length || latestErrorMessage) {
+      if (streamContentBlocks?.length || latestErrorMessage || interruptedNoticeMessage) {
         sendingConversation.updatedAt = finalizedTimestamp;
         sendingConversation.lastResponseAt = finalizedTimestamp;
         await this.plugin.saveConversation(sendingConversation);
@@ -4730,7 +4756,7 @@ export class OpenCodianView extends ItemView {
     this.syncActiveTabStreamLikeState();
     logger.debug('isStreaming set to false');
 
-    new Notice('Streaming cancelled');
+    new Notice(t('chat.stream.cancelledToast'));
   }
 
   /** Update send button icon based on streaming state */
@@ -4799,6 +4825,8 @@ export class OpenCodianView extends ItemView {
     content: HTMLElement,
     message: ChatMessage,
   ): Promise<void> {
+    const streamStatusLabel = this.getAssistantStreamStatusLabel(message);
+
     if (message.contentBlocks && message.contentBlocks.length > 0) {
       const nonTextBlocks = message.contentBlocks.filter((block) => block.type !== 'text');
       const textBlocks = message.contentBlocks.filter((block) => block.type === 'text');
@@ -4821,7 +4849,13 @@ export class OpenCodianView extends ItemView {
         .map((block) => block.text?.trim())
         .filter(Boolean)
         .join('\n\n');
-      this.addTimestampWithCopyButton(messageEl, message.timestamp, textContent, message.modelId);
+      this.addTimestampWithCopyButton(
+        messageEl,
+        message.timestamp,
+        textContent,
+        message.modelId,
+        streamStatusLabel,
+      );
       return;
     }
 
@@ -4841,7 +4875,13 @@ export class OpenCodianView extends ItemView {
       }
     }
 
-    this.addTimestampWithCopyButton(messageEl, message.timestamp, message.content, message.modelId);
+    this.addTimestampWithCopyButton(
+      messageEl,
+      message.timestamp,
+      message.content,
+      message.modelId,
+      streamStatusLabel,
+    );
   }
 
   private async renderUserMessageContent(container: HTMLElement, message: ChatMessage): Promise<string> {
@@ -5640,6 +5680,20 @@ export class OpenCodianView extends ItemView {
     );
   }
 
+  private shouldRenderConversationMessage(message: ChatMessage): boolean {
+    if (message.role !== 'assistant' || message.displayStyle === 'notice') {
+      return true;
+    }
+
+    return Boolean(
+      message.content?.trim()
+      || (message.contentBlocks?.length ?? 0) > 0
+      || (message.toolCalls?.length ?? 0) > 0
+      || message.questionResolution
+      || message.omo,
+    );
+  }
+
   /** Create assistant message element for streaming */
   private createAssistantMessageElement(tabId: TabId | null = this.getActiveTabId()): { messageEl: HTMLElement; contentEl: HTMLElement } {
     const paneState = this.getTabPaneState(tabId);
@@ -5778,6 +5832,7 @@ export class OpenCodianView extends ItemView {
     timestamp: number,
     content?: string,
     modelId?: string,
+    statusLabel?: string,
   ): void {
     const timeRow = this.ensureAssistantTimestampRow(messageEl);
     timeRow.empty();
@@ -5792,6 +5847,13 @@ export class OpenCodianView extends ItemView {
 
     if (modelId) {
       timeRow.createSpan({ cls: 'opencodian-message-model-id', text: `· ${modelId}` });
+    }
+
+    if (statusLabel) {
+      timeRow.createSpan({
+        cls: 'opencodian-message-time-status is-warning',
+        text: statusLabel,
+      });
     }
 
     if (!content) {
@@ -5812,6 +5874,71 @@ export class OpenCodianView extends ItemView {
 
     timeRow.classList.toggle('is-pending', reserveSpace);
     return timeRow;
+  }
+
+  private getAssistantStreamStatusLabel(message: ChatMessage): string | undefined {
+    if (message.streamState === 'interrupted') {
+      return t('chat.stream.interruptedBadge');
+    }
+
+    return undefined;
+  }
+
+  private buildInterruptedAssistantNotice(timestamp: number, modelId?: string): ChatMessage {
+    return {
+      id: `assistant-interrupted-${timestamp}`,
+      role: 'assistant',
+      content: t('chat.stream.interruptedNoticeBody'),
+      timestamp,
+      modelId,
+      displayStyle: 'notice',
+      noticeTitle: t('chat.stream.interruptedNoticeTitle'),
+      noticeTone: 'warning',
+    };
+  }
+
+  private async renderAssistantPlaceholderAsNotice(
+    messageEl: HTMLElement,
+    noticeMessage: ChatMessage,
+  ): Promise<void> {
+    messageEl.dataset.messageId = noticeMessage.id;
+    delete messageEl.dataset.sourceMessageId;
+    messageEl.addClass('opencodian-message--assistant');
+    messageEl.addClass('opencodian-message--notice');
+    messageEl.removeClass('opencodian-message--background-task');
+    messageEl.empty();
+
+    const contentEl = messageEl.createDiv({ cls: 'opencodian-message-content' });
+    await this.renderNoticeCard(contentEl, noticeMessage);
+    this.addTimestampWithCopyButton(messageEl, noticeMessage.timestamp, undefined, noticeMessage.modelId);
+  }
+
+  private removeEmptyAssistantShells(): void {
+    if (!this.messagesContainer) {
+      return;
+    }
+
+    const assistantMessages = this.messagesContainer.querySelectorAll<HTMLElement>(
+      '.opencodian-message--assistant:not(.opencodian-message--notice):not(.opencodian-message--background-task)',
+    );
+
+    for (const messageEl of assistantMessages) {
+      const contentEl = messageEl.querySelector(':scope > .opencodian-message-content');
+      if (!(contentEl instanceof HTMLElement)) {
+        continue;
+      }
+
+      const hasStructuredContent = Boolean(
+        contentEl.querySelector(
+          '.streaming-text-block, .opencodian-message-text, .streaming-error-block, .streaming-tool-call, .streaming-thinking-block, .opencodian-permission-inline, .opencodian-question-inline, .opencodian-chat-notice-card, .opencodian-pending',
+        ),
+      );
+      const hasVisibleText = Boolean(contentEl.textContent?.trim());
+
+      if (!hasStructuredContent && !hasVisibleText) {
+        messageEl.remove();
+      }
+    }
   }
 
   private mergeSyncedMessageModelIds(
@@ -5917,6 +6044,7 @@ export class OpenCodianView extends ItemView {
       ...syncedMessage,
       contextAttachments,
       questionResolution: syncedMessage.questionResolution ?? existingMessage.questionResolution,
+      streamState: syncedMessage.streamState ?? existingMessage.streamState,
     };
   }
 
@@ -6321,9 +6449,11 @@ export class OpenCodianView extends ItemView {
       const revertState = serverMessages.length === 0
         ? await this.plugin.openCodeService.getSessionRevertState(conversation.openCodeSessionId)
         : null;
-      const convertedServerMessages = serverMessages.map(({ info, parts }) =>
-        OpenCodeService.openCodeMessageToChatMessage(info, parts, getVaultBasePath(this.app) ?? undefined),
-      );
+      const convertedServerMessages = serverMessages
+        .map(({ info, parts }) =>
+          OpenCodeService.openCodeMessageToChatMessage(info, parts, getVaultBasePath(this.app) ?? undefined),
+        )
+        .filter((message) => this.shouldRenderConversationMessage(message));
       this.logOmoBackgroundTaskDiagnostics(conversation, conversation.messages, convertedServerMessages);
       const converted = this.mergeSyncedMessageModelIds(
         conversation.messages,
@@ -6405,7 +6535,7 @@ export class OpenCodianView extends ItemView {
   }
 
   private getMessagesForRender(messages: ChatMessage[]): ChatMessage[] {
-    return buildMessageRenderGroups(messages).map((group) =>
+    return buildMessageRenderGroups(messages.filter((message) => this.shouldRenderConversationMessage(message))).map((group) =>
       group.mergedAssistant && group.messages.length > 1
         ? mergeAssistantMessagesForRender(group.messages)
         : group.messages[0],
