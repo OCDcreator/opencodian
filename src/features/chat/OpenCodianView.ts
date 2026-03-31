@@ -9,6 +9,11 @@ import { addIcon, Component, ItemView, MarkdownView, Notice, Scope, setIcon, TFi
 
 import { OpenCodeService, type SessionActivityStatus } from '../../core/opencode';
 import {
+  THEME_PRESET_CSS_VARIABLE_NAMES,
+  THEME_STYLE_CONTAINER_CLASSES,
+  getThemePresetDefinition,
+} from '../../core/theme';
+import {
   type ChatMessage,
   type ContentBlock,
   type Conversation,
@@ -1579,6 +1584,20 @@ export class OpenCodianView extends ItemView {
   public applyChatAppearanceSettings(): void {
     if (!this.chatContainerEl) {
       return;
+    }
+
+    const activePreset = getThemePresetDefinition(this.plugin.settings.theme.activePresetId);
+    for (const containerClass of THEME_STYLE_CONTAINER_CLASSES) {
+      this.chatContainerEl.removeClass(containerClass);
+    }
+    for (const cssVar of THEME_PRESET_CSS_VARIABLE_NAMES) {
+      this.chatContainerEl.style.removeProperty(cssVar);
+    }
+    if (activePreset) {
+      this.chatContainerEl.addClass(activePreset.containerClass);
+      for (const [cssVar, cssValue] of Object.entries(activePreset.cssVariables)) {
+        this.chatContainerEl.style.setProperty(cssVar, cssValue);
+      }
     }
 
     const cssVariables = getChatAppearanceCssVariables(this.plugin.settings.chatAppearance);

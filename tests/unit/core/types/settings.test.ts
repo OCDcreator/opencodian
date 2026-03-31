@@ -9,12 +9,15 @@ import {
   getDefaultBlockedCommands,
   getDefaultChatAppearanceSettings,
   getDefaultDebugLogPaths,
+  getDefaultThemeSettings,
   isValidChatAppearanceCustomCssDeclarations,
+  normalizePartialChatAppearanceSettings,
   normalizeBelowHeaderTabBarLayout,
   normalizeChatAppearanceSettings,
   normalizeQuestionCardPosition,
   normalizeQuestionDisplayMode,
   normalizeTabBarPosition,
+  normalizeThemeSettings,
 } from '../../../../src/core/types/settings';
 
 describe('Settings', () => {
@@ -104,6 +107,7 @@ describe('Settings', () => {
       expect(DEFAULT_SETTINGS.settingsPanelScrollTop).toBe(0);
       expect(DEFAULT_SETTINGS.debugLogPaths).toEqual({ unix: '', windows: '' });
       expect(DEFAULT_SETTINGS.openInMainTab).toBe(false);
+      expect(DEFAULT_SETTINGS.theme).toEqual(getDefaultThemeSettings());
       expect(DEFAULT_SETTINGS.locale).toBe('en');
     });
 
@@ -240,6 +244,40 @@ describe('Settings', () => {
       expect(isValidChatAppearanceCustomCssDeclarations('--foo: 1; backdrop-filter: blur(10px);')).toBe(true);
       expect(isValidChatAppearanceCustomCssDeclarations('.opencodian-container { color: red; }')).toBe(false);
       expect(isValidChatAppearanceCustomCssDeclarations('<style>color: red;</style>')).toBe(false);
+    });
+
+    it('normalizes partial chat appearance overrides without filling defaults', () => {
+      expect(normalizePartialChatAppearanceSettings({
+        user: { blur: 8 },
+        advanced: { customCssDeclarations: '--foo: 1;' },
+      })).toEqual({
+        user: { blur: 8 },
+        advanced: { customCssDeclarations: '--foo: 1;' },
+      });
+      expect(normalizePartialChatAppearanceSettings(null)).toEqual({});
+    });
+  });
+
+  describe('theme settings', () => {
+    it('returns the built-in current style preset as default theme settings', () => {
+      expect(getDefaultThemeSettings()).toEqual({
+        activePresetId: 'glass-classic',
+        customAppearanceOverrides: {},
+      });
+    });
+
+    it('normalizes a null active preset without forcing a preset back in', () => {
+      expect(normalizeThemeSettings({
+        activePresetId: null,
+        customAppearanceOverrides: {
+          user: { blur: 4 },
+        },
+      })).toEqual({
+        activePresetId: null,
+        customAppearanceOverrides: {
+          user: { blur: 4 },
+        },
+      });
     });
   });
 });

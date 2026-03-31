@@ -404,6 +404,37 @@ export interface PartialChatAppearanceSettings {
   advanced?: Partial<ChatAppearanceAdvancedSettings>;
 }
 
+export type ThemeStyleId = 'glass' | 'flat' | 'soft' | 'sharp';
+
+export type ThemePresetId =
+  | 'glass-classic'
+  | 'glass-warm'
+  | 'glass-mint'
+  | 'flat-slate'
+  | 'flat-ocean'
+  | 'flat-rose'
+  | 'soft-neutral'
+  | 'soft-lavender'
+  | 'soft-latte'
+  | 'sharp-graphite'
+  | 'sharp-neon'
+  | 'sharp-amber';
+
+export interface ThemePresetDefinition {
+  id: ThemePresetId;
+  name: string;
+  styleId: ThemeStyleId;
+  schemeName: string;
+  containerClass: string;
+  cssVariables: Record<string, string>;
+  appearance: ChatAppearanceSettings;
+}
+
+export interface ThemeSettings {
+  activePresetId: ThemePresetId | null;
+  customAppearanceOverrides: PartialChatAppearanceSettings;
+}
+
 export function getDefaultChatAppearanceSettings(): ChatAppearanceSettings {
   return {
     layout: {
@@ -447,6 +478,61 @@ export function getDefaultChatAppearanceSettings(): ChatAppearanceSettings {
   };
 }
 
+function normalizePartialNestedObject<T extends object>(value: unknown): Partial<T> | undefined {
+  if (!value || typeof value !== 'object') {
+    return undefined;
+  }
+
+  return { ...(value as Partial<T>) };
+}
+
+export function normalizePartialChatAppearanceSettings(
+  appearance?: PartialChatAppearanceSettings | null,
+): PartialChatAppearanceSettings {
+  if (!appearance || typeof appearance !== 'object') {
+    return {};
+  }
+
+  const normalized: PartialChatAppearanceSettings = {};
+
+  const layout = normalizePartialNestedObject<ChatAppearanceLayoutSettings>(appearance.layout);
+  if (layout) {
+    normalized.layout = layout;
+  }
+
+  const sticky = normalizePartialNestedObject<ChatAppearanceStickySettings>(appearance.sticky);
+  if (sticky) {
+    normalized.sticky = sticky;
+  }
+
+  const user = normalizePartialNestedObject<ChatAppearanceUserSettings>(appearance.user);
+  if (user) {
+    normalized.user = user;
+  }
+
+  const assistant = normalizePartialNestedObject<ChatAppearanceAssistantSettings>(appearance.assistant);
+  if (assistant) {
+    normalized.assistant = assistant;
+  }
+
+  const input = normalizePartialNestedObject<ChatAppearanceInputSettings>(appearance.input);
+  if (input) {
+    normalized.input = input;
+  }
+
+  const scrollbar = normalizePartialNestedObject<ChatAppearanceScrollbarSettings>(appearance.scrollbar);
+  if (scrollbar) {
+    normalized.scrollbar = scrollbar;
+  }
+
+  const advanced = normalizePartialNestedObject<ChatAppearanceAdvancedSettings>(appearance.advanced);
+  if (advanced) {
+    normalized.advanced = advanced;
+  }
+
+  return normalized;
+}
+
 export function normalizeChatAppearanceSettings(
   appearance?: PartialChatAppearanceSettings | null,
 ): ChatAppearanceSettings {
@@ -481,6 +567,47 @@ export function normalizeChatAppearanceSettings(
       ...defaults.advanced,
       ...(appearance?.advanced ?? {}),
     },
+  };
+}
+
+export function isThemePresetId(value: unknown): value is ThemePresetId {
+  switch (value) {
+    case 'glass-classic':
+    case 'glass-warm':
+    case 'glass-mint':
+    case 'flat-slate':
+    case 'flat-ocean':
+    case 'flat-rose':
+    case 'soft-neutral':
+    case 'soft-lavender':
+    case 'soft-latte':
+    case 'sharp-graphite':
+    case 'sharp-neon':
+    case 'sharp-amber':
+      return true;
+    default:
+      return false;
+  }
+}
+
+export function getDefaultThemeSettings(): ThemeSettings {
+  return {
+    activePresetId: 'glass-classic',
+    customAppearanceOverrides: {},
+  };
+}
+
+export function normalizeThemeSettings(value?: Partial<ThemeSettings> | null): ThemeSettings {
+  const defaults = getDefaultThemeSettings();
+
+  return {
+    activePresetId:
+      value?.activePresetId === null
+        ? null
+        : isThemePresetId(value?.activePresetId)
+          ? value.activePresetId
+          : defaults.activePresetId,
+    customAppearanceOverrides: normalizePartialChatAppearanceSettings(value?.customAppearanceOverrides),
   };
 }
 
@@ -609,6 +736,7 @@ export interface OpenCodianSettings {
   debugLogPaths: PlatformDebugLogPaths;
   openInMainTab: boolean;
   tabState: PersistedTabState;
+  theme: ThemeSettings;
 
   // Language
   locale: string;
@@ -682,6 +810,7 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
   debugLogPaths: getDefaultDebugLogPaths(),
   openInMainTab: false,
   tabState: getDefaultPersistedTabState(),
+  theme: getDefaultThemeSettings(),
 
   locale: 'en',
 

@@ -12,18 +12,21 @@ import * as path from 'path';
 import { OpencodeConfigManager, PluginManagementService } from '../../core/config';
 import type { ModelCatalog, ModelCatalogProvider } from '../../core/config/modelConfig';
 import type { PluginEntry, PluginEnvironmentSnapshot } from '../../core/config/PluginManagementService';
+import { getBuiltinThemePresets, hasThemeAppearanceOverrides } from '../../core/theme';
 import {
   getCurrentPlatformDebugLogPath,
   getCurrentPlatformKey,
-  getDefaultChatAppearanceSettings,
   isValidChatAppearanceCustomCssDeclarations,
+  type ChatAppearanceSettings,
   type ModelSourceMode,
   type PluginIsolationMode,
   type QuestionCardPosition,
   type QuestionDisplayMode,
+  type ThemePresetDefinition,
+  type ThemeStyleId,
   type TitleMode,
 } from '../../core/types';
-import { setLocale, t } from '../../i18n';
+import { setLocale, t, type TranslationKey } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { createLogger, getVaultBasePath } from '../../shared';
 import { ProviderIconService } from '../../utils/icons';
@@ -43,9 +46,9 @@ interface NumericStyleControlConfig {
   max: number;
   step: number;
   unit: string;
-  defaultValue: number;
   value: () => number;
-  setValue: (value: number) => void;
+  resetValue: () => number;
+  setValue: (appearance: ChatAppearanceSettings, value: number) => void;
 }
 
 type ChatAppearanceStyleGroup = 'layout' | 'user' | 'assistant' | 'input' | 'scrollbar' | 'advanced';
@@ -1754,7 +1757,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
   /** Style settings section */
   private addStyleSettings(containerEl: HTMLElement): HTMLHeadingElement {
     const headingEl = this.createSectionHeading(containerEl, t('settings.style.title'));
-    const defaultAppearance = getDefaultChatAppearanceSettings();
+    this.addThemePresetSection(containerEl);
 
     new Setting(containerEl)
       .setName(t('settings.style.resetAll.name'))
@@ -1763,7 +1766,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         btn
           .setButtonText(t('settings.style.resetAll.button'))
           .onClick(() => {
-            this.plugin.settings.chatAppearance = getDefaultChatAppearanceSettings();
+            this.plugin.resetChatAppearanceToBaseline();
             this.applyAndScheduleStyleUpdate();
             this.refreshStyleControlValues();
           });
@@ -1782,10 +1785,10 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       max: 32,
       step: 1,
       unit: 'px',
-      defaultValue: defaultAppearance.layout.messagesPaddingTop,
       value: () => this.plugin.settings.chatAppearance.layout.messagesPaddingTop,
-      setValue: (value) => {
-        this.plugin.settings.chatAppearance.layout.messagesPaddingTop = value;
+      resetValue: () => this.plugin.getChatAppearanceBaseline().layout.messagesPaddingTop,
+      setValue: (appearance, value) => {
+        appearance.layout.messagesPaddingTop = value;
       },
     });
     this.addNumericStyleControl(layoutGroupEl, {
@@ -1796,10 +1799,10 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       max: 32,
       step: 1,
       unit: 'px',
-      defaultValue: defaultAppearance.layout.messagesPaddingX,
       value: () => this.plugin.settings.chatAppearance.layout.messagesPaddingX,
-      setValue: (value) => {
-        this.plugin.settings.chatAppearance.layout.messagesPaddingX = value;
+      resetValue: () => this.plugin.getChatAppearanceBaseline().layout.messagesPaddingX,
+      setValue: (appearance, value) => {
+        appearance.layout.messagesPaddingX = value;
       },
     });
     this.addNumericStyleControl(layoutGroupEl, {
@@ -1810,10 +1813,10 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       max: 16,
       step: 1,
       unit: 'px',
-      defaultValue: defaultAppearance.sticky.headerGap,
       value: () => this.plugin.settings.chatAppearance.sticky.headerGap,
-      setValue: (value) => {
-        this.plugin.settings.chatAppearance.sticky.headerGap = value;
+      resetValue: () => this.plugin.getChatAppearanceBaseline().sticky.headerGap,
+      setValue: (appearance, value) => {
+        appearance.sticky.headerGap = value;
       },
     });
     this.addNumericStyleControl(layoutGroupEl, {
@@ -1824,10 +1827,10 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       max: 40,
       step: 1,
       unit: 'px',
-      defaultValue: defaultAppearance.sticky.maskHeight,
       value: () => this.plugin.settings.chatAppearance.sticky.maskHeight,
-      setValue: (value) => {
-        this.plugin.settings.chatAppearance.sticky.maskHeight = value;
+      resetValue: () => this.plugin.getChatAppearanceBaseline().sticky.maskHeight,
+      setValue: (appearance, value) => {
+        appearance.sticky.maskHeight = value;
       },
     });
     this.addNumericStyleControl(layoutGroupEl, {
@@ -1838,10 +1841,10 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       max: 40,
       step: 1,
       unit: 'px',
-      defaultValue: defaultAppearance.sticky.maskBlur,
       value: () => this.plugin.settings.chatAppearance.sticky.maskBlur,
-      setValue: (value) => {
-        this.plugin.settings.chatAppearance.sticky.maskBlur = value;
+      resetValue: () => this.plugin.getChatAppearanceBaseline().sticky.maskBlur,
+      setValue: (appearance, value) => {
+        appearance.sticky.maskBlur = value;
       },
     });
     this.createStyleResetSetting(layoutGroupEl, 'layout');
@@ -1859,10 +1862,10 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       max: 28,
       step: 1,
       unit: 'px',
-      defaultValue: defaultAppearance.user.radius,
       value: () => this.plugin.settings.chatAppearance.user.radius,
-      setValue: (value) => {
-        this.plugin.settings.chatAppearance.user.radius = value;
+      resetValue: () => this.plugin.getChatAppearanceBaseline().user.radius,
+      setValue: (appearance, value) => {
+        appearance.user.radius = value;
       },
     });
     this.addNumericStyleControl(userGroupEl, {
@@ -1873,10 +1876,10 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       max: 12,
       step: 1,
       unit: 'px',
-      defaultValue: defaultAppearance.user.tailRadius,
       value: () => this.plugin.settings.chatAppearance.user.tailRadius,
-      setValue: (value) => {
-        this.plugin.settings.chatAppearance.user.tailRadius = value;
+      resetValue: () => this.plugin.getChatAppearanceBaseline().user.tailRadius,
+      setValue: (appearance, value) => {
+        appearance.user.tailRadius = value;
       },
     });
     this.addNumericStyleControl(userGroupEl, {
@@ -1887,10 +1890,10 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       max: 24,
       step: 1,
       unit: 'px',
-      defaultValue: defaultAppearance.user.blur,
       value: () => this.plugin.settings.chatAppearance.user.blur,
-      setValue: (value) => {
-        this.plugin.settings.chatAppearance.user.blur = value;
+      resetValue: () => this.plugin.getChatAppearanceBaseline().user.blur,
+      setValue: (appearance, value) => {
+        appearance.user.blur = value;
       },
     });
     this.addNumericStyleControl(userGroupEl, {
@@ -1901,10 +1904,10 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       max: 40,
       step: 1,
       unit: 'px',
-      defaultValue: defaultAppearance.user.shadowBlur,
       value: () => this.plugin.settings.chatAppearance.user.shadowBlur,
-      setValue: (value) => {
-        this.plugin.settings.chatAppearance.user.shadowBlur = value;
+      resetValue: () => this.plugin.getChatAppearanceBaseline().user.shadowBlur,
+      setValue: (appearance, value) => {
+        appearance.user.shadowBlur = value;
       },
     });
     this.createStyleResetSetting(userGroupEl, 'user');
@@ -1922,10 +1925,10 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       max: 24,
       step: 1,
       unit: 'px',
-      defaultValue: defaultAppearance.assistant.radius,
       value: () => this.plugin.settings.chatAppearance.assistant.radius,
-      setValue: (value) => {
-        this.plugin.settings.chatAppearance.assistant.radius = value;
+      resetValue: () => this.plugin.getChatAppearanceBaseline().assistant.radius,
+      setValue: (appearance, value) => {
+        appearance.assistant.radius = value;
       },
     });
     this.addNumericStyleControl(assistantGroupEl, {
@@ -1936,10 +1939,10 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       max: 100,
       step: 1,
       unit: '%',
-      defaultValue: defaultAppearance.assistant.backgroundOpacity,
       value: () => this.plugin.settings.chatAppearance.assistant.backgroundOpacity,
-      setValue: (value) => {
-        this.plugin.settings.chatAppearance.assistant.backgroundOpacity = value;
+      resetValue: () => this.plugin.getChatAppearanceBaseline().assistant.backgroundOpacity,
+      setValue: (appearance, value) => {
+        appearance.assistant.backgroundOpacity = value;
       },
     });
     this.addNumericStyleControl(assistantGroupEl, {
@@ -1950,10 +1953,10 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       max: 20,
       step: 1,
       unit: 'px',
-      defaultValue: defaultAppearance.assistant.blur,
       value: () => this.plugin.settings.chatAppearance.assistant.blur,
-      setValue: (value) => {
-        this.plugin.settings.chatAppearance.assistant.blur = value;
+      resetValue: () => this.plugin.getChatAppearanceBaseline().assistant.blur,
+      setValue: (appearance, value) => {
+        appearance.assistant.blur = value;
       },
     });
     this.addNumericStyleControl(assistantGroupEl, {
@@ -1964,10 +1967,10 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       max: 32,
       step: 1,
       unit: 'px',
-      defaultValue: defaultAppearance.assistant.shadowBlur,
       value: () => this.plugin.settings.chatAppearance.assistant.shadowBlur,
-      setValue: (value) => {
-        this.plugin.settings.chatAppearance.assistant.shadowBlur = value;
+      resetValue: () => this.plugin.getChatAppearanceBaseline().assistant.shadowBlur,
+      setValue: (appearance, value) => {
+        appearance.assistant.shadowBlur = value;
       },
     });
     this.createStyleResetSetting(assistantGroupEl, 'assistant');
@@ -1985,10 +1988,10 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       max: 24,
       step: 1,
       unit: 'px',
-      defaultValue: defaultAppearance.input.radius,
       value: () => this.plugin.settings.chatAppearance.input.radius,
-      setValue: (value) => {
-        this.plugin.settings.chatAppearance.input.radius = value;
+      resetValue: () => this.plugin.getChatAppearanceBaseline().input.radius,
+      setValue: (appearance, value) => {
+        appearance.input.radius = value;
       },
     });
     this.addNumericStyleControl(inputGroupEl, {
@@ -1999,10 +2002,10 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       max: 24,
       step: 1,
       unit: 'px',
-      defaultValue: defaultAppearance.input.blur,
       value: () => this.plugin.settings.chatAppearance.input.blur,
-      setValue: (value) => {
-        this.plugin.settings.chatAppearance.input.blur = value;
+      resetValue: () => this.plugin.getChatAppearanceBaseline().input.blur,
+      setValue: (appearance, value) => {
+        appearance.input.blur = value;
       },
     });
     this.addNumericStyleControl(inputGroupEl, {
@@ -2013,10 +2016,10 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       max: 36,
       step: 1,
       unit: 'px',
-      defaultValue: defaultAppearance.input.shadowBlur,
       value: () => this.plugin.settings.chatAppearance.input.shadowBlur,
-      setValue: (value) => {
-        this.plugin.settings.chatAppearance.input.shadowBlur = value;
+      resetValue: () => this.plugin.getChatAppearanceBaseline().input.shadowBlur,
+      setValue: (appearance, value) => {
+        appearance.input.shadowBlur = value;
       },
     });
     this.createStyleResetSetting(inputGroupEl, 'input');
@@ -2034,10 +2037,10 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       max: 12,
       step: 1,
       unit: 'px',
-      defaultValue: defaultAppearance.scrollbar.width,
       value: () => this.plugin.settings.chatAppearance.scrollbar.width,
-      setValue: (value) => {
-        this.plugin.settings.chatAppearance.scrollbar.width = value;
+      resetValue: () => this.plugin.getChatAppearanceBaseline().scrollbar.width,
+      setValue: (appearance, value) => {
+        appearance.scrollbar.width = value;
       },
     });
     this.addNumericStyleControl(scrollbarGroupEl, {
@@ -2048,10 +2051,10 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       max: 999,
       step: 1,
       unit: 'px',
-      defaultValue: defaultAppearance.scrollbar.radius,
       value: () => this.plugin.settings.chatAppearance.scrollbar.radius,
-      setValue: (value) => {
-        this.plugin.settings.chatAppearance.scrollbar.radius = value;
+      resetValue: () => this.plugin.getChatAppearanceBaseline().scrollbar.radius,
+      setValue: (appearance, value) => {
+        appearance.scrollbar.radius = value;
       },
     });
     this.addNumericStyleControl(scrollbarGroupEl, {
@@ -2062,10 +2065,10 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       max: 60,
       step: 1,
       unit: '%',
-      defaultValue: defaultAppearance.scrollbar.trackOpacity,
       value: () => this.plugin.settings.chatAppearance.scrollbar.trackOpacity,
-      setValue: (value) => {
-        this.plugin.settings.chatAppearance.scrollbar.trackOpacity = value;
+      resetValue: () => this.plugin.getChatAppearanceBaseline().scrollbar.trackOpacity,
+      setValue: (appearance, value) => {
+        appearance.scrollbar.trackOpacity = value;
       },
     });
     this.addNumericStyleControl(scrollbarGroupEl, {
@@ -2076,10 +2079,10 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       max: 100,
       step: 1,
       unit: '%',
-      defaultValue: defaultAppearance.scrollbar.thumbOpacity,
       value: () => this.plugin.settings.chatAppearance.scrollbar.thumbOpacity,
-      setValue: (value) => {
-        this.plugin.settings.chatAppearance.scrollbar.thumbOpacity = value;
+      resetValue: () => this.plugin.getChatAppearanceBaseline().scrollbar.thumbOpacity,
+      setValue: (appearance, value) => {
+        appearance.scrollbar.thumbOpacity = value;
       },
     });
     this.addNumericStyleControl(scrollbarGroupEl, {
@@ -2090,10 +2093,10 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       max: 100,
       step: 1,
       unit: '%',
-      defaultValue: defaultAppearance.scrollbar.thumbHoverOpacity,
       value: () => this.plugin.settings.chatAppearance.scrollbar.thumbHoverOpacity,
-      setValue: (value) => {
-        this.plugin.settings.chatAppearance.scrollbar.thumbHoverOpacity = value;
+      resetValue: () => this.plugin.getChatAppearanceBaseline().scrollbar.thumbHoverOpacity,
+      setValue: (appearance, value) => {
+        appearance.scrollbar.thumbHoverOpacity = value;
       },
     });
     this.addNumericStyleControl(scrollbarGroupEl, {
@@ -2104,10 +2107,10 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       max: 4,
       step: 1,
       unit: 'px',
-      defaultValue: defaultAppearance.scrollbar.edgePadding,
       value: () => this.plugin.settings.chatAppearance.scrollbar.edgePadding,
-      setValue: (value) => {
-        this.plugin.settings.chatAppearance.scrollbar.edgePadding = value;
+      resetValue: () => this.plugin.getChatAppearanceBaseline().scrollbar.edgePadding,
+      setValue: (appearance, value) => {
+        appearance.scrollbar.edgePadding = value;
       },
     });
     this.addNumericStyleControl(scrollbarGroupEl, {
@@ -2118,10 +2121,10 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       max: 100,
       step: 1,
       unit: '%',
-      defaultValue: defaultAppearance.scrollbar.shadowOpacity,
       value: () => this.plugin.settings.chatAppearance.scrollbar.shadowOpacity,
-      setValue: (value) => {
-        this.plugin.settings.chatAppearance.scrollbar.shadowOpacity = value;
+      resetValue: () => this.plugin.getChatAppearanceBaseline().scrollbar.shadowOpacity,
+      setValue: (appearance, value) => {
+        appearance.scrollbar.shadowOpacity = value;
       },
     });
     this.createStyleResetSetting(scrollbarGroupEl, 'scrollbar');
@@ -2170,7 +2173,9 @@ export class OpenCodianSettingTab extends PluginSettingTab {
 
           text.inputEl.removeClass('is-invalid');
           validationEl.empty();
-          this.plugin.settings.chatAppearance.advanced.customCssDeclarations = value;
+          this.plugin.updateChatAppearance((appearance) => {
+            appearance.advanced.customCssDeclarations = value;
+          });
           this.applyAndScheduleStyleUpdate();
         });
 
@@ -2184,6 +2189,134 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     this.createStyleResetSetting(advancedGroupEl, 'advanced');
 
     return headingEl;
+  }
+
+  private addThemePresetSection(containerEl: HTMLElement): void {
+    const presetGroupEl = this.createStyleGroupSection(
+      containerEl,
+      t('settings.style.presets.title'),
+      t('settings.style.presets.desc'),
+    );
+    presetGroupEl.addClass('opencodian-theme-presets');
+
+    const presets = getBuiltinThemePresets();
+    const styleOrder: ThemeStyleId[] = ['glass', 'flat', 'soft', 'sharp'];
+    const presetsByStyle = new Map<ThemeStyleId, ThemePresetDefinition[]>(
+      styleOrder.map((styleId) => [styleId, presets.filter((preset) => preset.styleId === styleId)]),
+    );
+    const styleGridEl = presetGroupEl.createDiv({ cls: 'opencodian-theme-style-grid' });
+    const statusRowEl = presetGroupEl.createDiv({ cls: 'opencodian-theme-status-row' });
+    const statusEl = statusRowEl.createDiv({ cls: 'opencodian-theme-status-copy' });
+    const schemeSectionEl = presetGroupEl.createDiv({ cls: 'opencodian-theme-scheme-section' });
+    const schemeLabelEl = schemeSectionEl.createDiv({
+      cls: 'opencodian-theme-scheme-label',
+      text: t('settings.style.presets.schemes.label'),
+    });
+    const schemeChipsEl = schemeSectionEl.createDiv({ cls: 'opencodian-theme-scheme-chips' });
+    const actionsEl = presetGroupEl.createDiv({ cls: 'opencodian-theme-actions' });
+    const styleButtons = new Map<ThemeStyleId, HTMLButtonElement>();
+
+    let selectedStyleId: ThemeStyleId = this.plugin.getActiveThemePresetDefinition()?.styleId ?? 'glass';
+
+    const renderPresetUi = () => {
+      const activePreset = this.plugin.getActiveThemePresetDefinition();
+      if (activePreset) {
+        selectedStyleId = activePreset.styleId;
+      }
+
+      const hasOverrides = activePreset ? hasThemeAppearanceOverrides(this.plugin.settings.theme) : false;
+      statusEl.setText(
+        activePreset
+          ? (
+            hasOverrides
+              ? t('settings.style.presets.statusCustomized', { preset: activePreset.name })
+              : t('settings.style.presets.statusPreset', { preset: activePreset.name })
+          )
+          : t('settings.style.presets.statusCustom'),
+      );
+      statusRowEl.toggleClass('is-customized', hasOverrides);
+
+      for (const [styleId, buttonEl] of styleButtons) {
+        buttonEl.toggleClass('is-active', activePreset?.styleId === styleId);
+      }
+
+      schemeChipsEl.empty();
+      for (const preset of presetsByStyle.get(selectedStyleId) ?? []) {
+        const schemeButtonEl = schemeChipsEl.createEl('button', {
+          cls: 'opencodian-theme-scheme-chip',
+          text: this.getThemeSchemeLabel(preset.id),
+        });
+        schemeButtonEl.type = 'button';
+        schemeButtonEl.toggleClass('is-active', activePreset?.id === preset.id);
+        schemeButtonEl.addEventListener('click', () => {
+          this.plugin.selectThemePreset(preset.id);
+          this.applyAndScheduleStyleUpdate();
+          this.refreshStyleControlValues();
+          renderPresetUi();
+        });
+      }
+      schemeSectionEl.toggleClass('is-empty', schemeChipsEl.childElementCount === 0);
+      schemeLabelEl.setText(t('settings.style.presets.schemes.label'));
+
+      actionsEl.empty();
+      if (activePreset) {
+        const resetBtn = actionsEl.createEl('button', {
+          cls: 'mod-cta opencodian-theme-reset-btn',
+          text: t('settings.style.presets.reset.button'),
+        });
+        resetBtn.type = 'button';
+        resetBtn.disabled = !hasOverrides;
+        resetBtn.addEventListener('click', () => {
+          this.plugin.resetChatAppearanceToBaseline();
+          this.applyAndScheduleStyleUpdate();
+          this.refreshStyleControlValues();
+          renderPresetUi();
+        });
+      }
+    };
+
+    for (const styleId of styleOrder) {
+      const buttonEl = styleGridEl.createEl('button', {
+        cls: 'opencodian-theme-style-card',
+      });
+      buttonEl.type = 'button';
+      buttonEl.createDiv({
+        cls: 'opencodian-theme-style-card-title',
+        text: this.getThemeStyleTitle(styleId),
+      });
+      buttonEl.createDiv({
+        cls: 'opencodian-theme-style-card-desc',
+        text: this.getThemeStyleDescription(styleId),
+      });
+      buttonEl.addEventListener('click', () => {
+        selectedStyleId = styleId;
+        const nextPreset = presetsByStyle.get(styleId)?.[0];
+        if (!nextPreset) {
+          renderPresetUi();
+          return;
+        }
+
+        this.plugin.selectThemePreset(nextPreset.id);
+        this.applyAndScheduleStyleUpdate();
+        this.refreshStyleControlValues();
+        renderPresetUi();
+      });
+      styleButtons.set(styleId, buttonEl);
+    }
+
+    renderPresetUi();
+  }
+
+  private getThemeStyleTitle(styleId: ThemeStyleId): string {
+    return t(`settings.style.presets.styles.${styleId}.title` as TranslationKey);
+  }
+
+  private getThemeStyleDescription(styleId: ThemeStyleId): string {
+    return t(`settings.style.presets.styles.${styleId}.desc` as TranslationKey);
+  }
+
+  private getThemeSchemeLabel(presetId: ThemePresetDefinition['id']): string {
+    return t(`settings.style.presets.scheme.${presetId}` as TranslationKey);
   }
 
   private createStyleGroupSection(containerEl: HTMLElement, title: string, desc: string): HTMLElement {
@@ -2252,7 +2385,9 @@ export class OpenCodianSettingTab extends PluginSettingTab {
 
     const commitValue = (value: number) => {
       const nextValue = this.clampStyleNumber(value, config.min, config.max, config.step);
-      config.setValue(nextValue);
+      this.plugin.updateChatAppearance((appearance) => {
+        config.setValue(appearance, nextValue);
+      });
       renderValue(nextValue);
       this.applyAndScheduleStyleUpdate();
     };
@@ -2264,7 +2399,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       commitValue(config.value() + config.step);
     });
     resetBtn.addEventListener('click', () => {
-      commitValue(config.defaultValue);
+      commitValue(config.resetValue());
     });
     sliderEl.addEventListener('input', () => {
       commitValue(Number(sliderEl.value));
@@ -2297,42 +2432,11 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         btn
           .setButtonText(t('settings.style.groupReset.button'))
           .onClick(() => {
-            this.resetChatAppearanceGroup(group);
+            this.plugin.resetChatAppearanceGroup(group);
             this.applyAndScheduleStyleUpdate();
             this.refreshStyleControlValues(group);
           });
       });
-  }
-
-  private resetChatAppearanceGroup(group: ChatAppearanceStyleGroup): void {
-    const defaults = getDefaultChatAppearanceSettings();
-    if (group === 'layout') {
-      this.plugin.settings.chatAppearance.layout = { ...defaults.layout };
-      this.plugin.settings.chatAppearance.sticky = { ...defaults.sticky };
-      return;
-    }
-
-    if (group === 'user') {
-      this.plugin.settings.chatAppearance.user = { ...defaults.user };
-      return;
-    }
-
-    if (group === 'assistant') {
-      this.plugin.settings.chatAppearance.assistant = { ...defaults.assistant };
-      return;
-    }
-
-    if (group === 'input') {
-      this.plugin.settings.chatAppearance.input = { ...defaults.input };
-      return;
-    }
-
-    if (group === 'scrollbar') {
-      this.plugin.settings.chatAppearance.scrollbar = { ...defaults.scrollbar };
-      return;
-    }
-
-    this.plugin.settings.chatAppearance.advanced = { ...defaults.advanced };
   }
 
   private registerStyleControlBinding(

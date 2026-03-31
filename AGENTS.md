@@ -96,6 +96,8 @@ opencodian/
 │   │   │   ├── sdkTypes.ts          # SDK v2 type bridge
 │   │   │   ├── types.ts             # Service types
 │   │   │   └── index.ts             # Module exports
+│   │   ├── theme/                   # Built-in chat theme presets + resolver helpers
+│   │   │   └── index.ts
 │   │   ├── prompts/                 # System prompts for AI features
 │   │   │   └── titleGeneration.ts   # Title generation system prompt
 │   │   ├── security/                # Permission + blocklist helpers
@@ -423,6 +425,7 @@ Settings UI with bilingual support (English/Chinese).
 - **Security**: Permission mode, config editor, command blocklist, export paths
 - **UI**: Max tabs, tab bar position, auto-scroll, chat scroll mode, open in main tab
 - **Style**: Chat appearance controls and custom CSS declarations
+- **Theme presets**: Built-in theme style/scheme switching, preset reset, and post-preset appearance fine-tuning
 - **Debug**: Debug logging, per-platform log paths, diagnostics export
 - **User**: User name, system prompt, excluded tags
 
@@ -534,12 +537,13 @@ Compatibility layer for `oh-my-opencode` message mutations and reminders.
 4. **Model config changes**: Keep `ModelConfigService`, settings UI, and `.opencode/config.json` writes in sync
 5. **Plugin management changes**: Keep `PluginManagementService`, `OpencodeConfigManager`, pure-mode server env, and plugin settings UI synchronized
 6. **Chat UI additions**: Check `features/chat/tabs/`, `features/chat/ui/`, `renderGroups.ts`, `OpenCodianView.ts`, and `styles.css` together
-7. **New AI features with prompts**: Add system prompts in `core/prompts/`, service logic in `features/chat/services/`, and wire into `OpenCodianView`
-8. **i18n additions**: Add keys to both `en.ts` and `zh.ts` locale files, export from `locales/index.ts`
-9. **OMO changes**: Keep `src/core/opencode/omoCompat.ts`, `OpenCodeService.openCodeMessageToChatMessage()`, `OpenCodianView`, OMO settings entry points, and notice/injection styles aligned
-10. **SDK v2 migration changes**: Keep `OpenCodeService`, `createSdkClient.ts`, `sdkFetch.ts`, `sdkFeatureFlags.ts`, `sdkTypes.ts`, related tests, and `docs/opencode-service-sdk-v2-mapping.md` synchronized
-11. **Concurrent tab changes**: When editing `OpenCodianView.ts`, `TabManager.ts`, or streaming/cancel logic, preserve the per-tab runtime model; do not reintroduce single global streaming state unless explicitly redesigning multi-tab concurrency
-12. **Conversation restore / hot-reload changes**: Keep `main.ts` conversation preloading and `OpenCodianView` restore logic aligned; do not register/restore chat views before `loadConversations()` has completed
+7. **Theme preset changes**: Keep `src/core/theme/`, `src/core/types/settings.ts`, `src/main.ts`, `OpenCodianView.ts`, `OpenCodianSettings.ts`, and `styles.css` synchronized so preset base values, runtime application, migration, and UI reset behavior stay aligned
+8. **New AI features with prompts**: Add system prompts in `core/prompts/`, service logic in `features/chat/services/`, and wire into `OpenCodianView`
+9. **i18n additions**: Add keys to both `en.ts` and `zh.ts` locale files, export from `locales/index.ts`
+10. **OMO changes**: Keep `src/core/opencode/omoCompat.ts`, `OpenCodeService.openCodeMessageToChatMessage()`, `OpenCodianView`, OMO settings entry points, and notice/injection styles aligned
+11. **SDK v2 migration changes**: Keep `OpenCodeService`, `createSdkClient.ts`, `sdkFetch.ts`, `sdkFeatureFlags.ts`, `sdkTypes.ts`, related tests, and `docs/opencode-service-sdk-v2-mapping.md` synchronized
+12. **Concurrent tab changes**: When editing `OpenCodianView.ts`, `TabManager.ts`, or streaming/cancel logic, preserve the per-tab runtime model; do not reintroduce single global streaming state unless explicitly redesigning multi-tab concurrency
+13. **Conversation restore / hot-reload changes**: Keep `main.ts` conversation preloading and `OpenCodianView` restore logic aligned; do not register/restore chat views before `loadConversations()` has completed
 
 ### Agent Checklist
 
@@ -550,6 +554,7 @@ Before handing off work, agents should verify the following when relevant:
 - **Prompt or title changes**: Keep `src/core/prompts/titleGeneration.ts`, `src/features/chat/services/TitleGenerationService.ts`, and locale-driven behavior aligned.
 - **Plugin changes**: Keep project config writes, plugin source visibility, `pluginIsolationMode`, and local-server restart expectations aligned.
 - **Settings or i18n changes**: Keep `DEFAULT_SETTINGS`, settings UI, and both locale files synchronized.
+- **Theme preset changes**: Keep preset definitions, theme migration, effective `chatAppearance`, and reset semantics synchronized across `core/theme`, `settings.ts`, `main.ts`, settings UI, and `styles.css`.
 - **SDK migration changes**: Preserve rollback paths, keep rollout flags explicit, and update the mapping/checklist docs when module status changes.
 - **Architecture/doc changes**: Update `devlog.md` and refresh this `AGENTS.md` when developer-facing workflow or component responsibilities materially change.
 - **`devlog.md` updates**: Insert new dated entries before the first dated `## YYYY-MM-DD ...` section, never append them to the file end, and run `npm run check:devlog-order` before handoff.

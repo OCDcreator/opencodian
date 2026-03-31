@@ -13,12 +13,27 @@ import * as path from 'path';
 import { ModelConfigService, OpencodeConfigManager } from './core/config';
 import { OpenCodeService, SDK_FEATURE_FLAG_ROLLOUT_DEFAULTS } from './core/opencode';
 import { StorageService } from './core/storage';
-import type { Conversation, OpenCodianSettings, PlatformDebugLogPaths } from './core/types';
+import {
+  areChatAppearanceSettingsEqual,
+  getThemeAppearanceOverridesFromBase,
+  getThemePresetDefinition,
+  resolveThemeChatAppearance,
+} from './core/theme';
+import type {
+  ChatAppearanceSettings,
+  Conversation,
+  OpenCodianSettings,
+  PlatformDebugLogPaths,
+  ThemePresetDefinition,
+  ThemePresetId,
+} from './core/types';
 import {
   DEFAULT_SETTINGS,
   getCurrentPlatformDebugLogPath,
   getCurrentPlatformKey,
+  getDefaultChatAppearanceSettings,
   getDefaultPersistedTabState,
+  getDefaultThemeSettings,
   getServerBaseUrl,
   isLocalServerMode,
   normalizeBelowHeaderTabBarLayout,
@@ -30,6 +45,7 @@ import {
   normalizeQuestionCardPosition,
   normalizeQuestionDisplayMode,
   normalizeTabBarPosition,
+  normalizeThemeSettings,
   normalizeThinkingBudget,
   normalizeTitleMode,
   VIEW_TYPE_OPENCODIAN,
@@ -320,11 +336,66 @@ export default class OpenCodianPlugin extends Plugin {
         },
       };
     })();
+    const hasSavedChatAppearance =
+      Boolean(savedSettings && typeof savedSettings === 'object' && 'chatAppearance' in savedSettings);
     const savedChatAppearance =
-      savedSettings && typeof savedSettings === 'object' && 'chatAppearance' in savedSettings
+      hasSavedChatAppearance
         ? (savedSettings as { chatAppearance?: Partial<OpenCodianSettings['chatAppearance']> }).chatAppearance
         : undefined;
-    const normalizedChatAppearance = normalizeChatAppearanceSettings(savedChatAppearance);
+    const normalizedSavedChatAppearance = normalizeChatAppearanceSettings(savedChatAppearance);
+    const hasSavedTheme =
+      Boolean(savedSettings && typeof savedSettings === 'object' && 'theme' in savedSettings);
+    const savedTheme =
+      hasSavedTheme
+        ? (savedSettings as { theme?: Partial<OpenCodianSettings['theme']> }).theme
+        : undefined;
+    const normalizedTheme = (() => {
+      if (!savedSettings) {
+        return getDefaultThemeSettings();
+      }
+
+      if (!hasSavedTheme) {
+        if (
+          hasSavedChatAppearance
+          && !areChatAppearanceSettingsEqual(normalizedSavedChatAppearance, getDefaultChatAppearanceSettings())
+        ) {
+          return {
+            activePresetId: null,
+            customAppearanceOverrides: {},
+          } satisfies OpenCodianSettings['theme'];
+        }
+
+        return getDefaultThemeSettings();
+      }
+
+      const baseTheme = normalizeThemeSettings(savedTheme);
+      if (!baseTheme.activePresetId) {
+        return {
+          activePresetId: null,
+          customAppearanceOverrides: {},
+        } satisfies OpenCodianSettings['theme'];
+      }
+
+      const preset = getThemePresetDefinition(baseTheme.activePresetId);
+      if (!preset) {
+        return {
+          activePresetId: null,
+          customAppearanceOverrides: {},
+        } satisfies OpenCodianSettings['theme'];
+      }
+
+      const effectiveAppearance = hasSavedChatAppearance
+        ? normalizedSavedChatAppearance
+        : resolveThemeChatAppearance(baseTheme);
+
+      return {
+        activePresetId: preset.id,
+        customAppearanceOverrides: getThemeAppearanceOverridesFromBase(preset.appearance, effectiveAppearance),
+      } satisfies OpenCodianSettings['theme'];
+    })();
+    const normalizedChatAppearance = normalizedTheme.activePresetId
+      ? resolveThemeChatAppearance(normalizedTheme)
+      : normalizedSavedChatAppearance;
     const savedTabState =
       savedSettings && typeof savedSettings === 'object' && 'tabState' in savedSettings
         ? (savedSettings as { tabState?: Partial<OpenCodianSettings['tabState']> }).tabState
@@ -363,6 +434,7 @@ export default class OpenCodianPlugin extends Plugin {
           pluginIsolationMode: normalizePluginIsolationMode(savedSettings.pluginIsolationMode),
           debugLogPaths: normalizedDebugLogPaths,
           chatAppearance: normalizedChatAppearance,
+          theme: normalizedTheme,
           tabState: normalizedTabState,
           providerIconLibrary: normalizedProviderIconLibrary,
         }
@@ -375,6 +447,7 @@ export default class OpenCodianPlugin extends Plugin {
       belowHeaderTabBarLayout: normalizeBelowHeaderTabBarLayout(normalizedSettings?.belowHeaderTabBarLayout),
       debugLogPaths: normalizedDebugLogPaths,
       chatAppearance: normalizedChatAppearance,
+      theme: normalizedTheme,
       tabState: normalizedTabState ?? getDefaultPersistedTabState(),
       providerIconLibrary: normalizedProviderIconLibrary,
     };
@@ -427,6 +500,62 @@ export default class OpenCodianPlugin extends Plugin {
     }
   }
 
+  getActiveThemePresetDefinition(): ThemePresetDefinition | null {
+    return getThemePresetDefinition(this.settings.theme.activePresetId);
+  }
+
+  getChatAppearanceBaseline(): ChatAppearanceSettings {
+    const activePreset = this.getActiveThemePresetDefinition();
+    return activePreset
+      ? normalizeChatAppearanceSettings(activePreset.appearance)
+      : getDefaultChatAppearanceSettings();
+  }
+
+  selectThemePreset(presetId: ThemePresetId): void {
+    const preset = getThemePresetDefinition(presetId);
+    if (!preset) {
+      return;
+    }
+
+    this.settings.theme.activePresetId = preset.id;
+    this.settings.theme.customAppearanceOverrides = {};
+    this.settings.chatAppearance = normalizeChatAppearanceSettings(preset.appearance);
+  }
+
+  updateChatAppearance(mutator: (appearance: ChatAppearanceSettings) => void): void {
+    const nextAppearance = normalizeChatAppearanceSettings(this.settings.chatAppearance);
+    mutator(nextAppearance);
+    this.setEffectiveChatAppearance(nextAppearance);
+  }
+
+  resetChatAppearanceToBaseline(): void {
+    this.setEffectiveChatAppearance(this.getChatAppearanceBaseline());
+  }
+
+  resetChatAppearanceGroup(
+    group: 'layout' | 'user' | 'assistant' | 'input' | 'scrollbar' | 'advanced',
+  ): void {
+    const baseline = this.getChatAppearanceBaseline();
+    const nextAppearance = normalizeChatAppearanceSettings(this.settings.chatAppearance);
+
+    if (group === 'layout') {
+      nextAppearance.layout = { ...baseline.layout };
+      nextAppearance.sticky = { ...baseline.sticky };
+    } else if (group === 'user') {
+      nextAppearance.user = { ...baseline.user };
+    } else if (group === 'assistant') {
+      nextAppearance.assistant = { ...baseline.assistant };
+    } else if (group === 'input') {
+      nextAppearance.input = { ...baseline.input };
+    } else if (group === 'scrollbar') {
+      nextAppearance.scrollbar = { ...baseline.scrollbar };
+    } else {
+      nextAppearance.advanced = { ...baseline.advanced };
+    }
+
+    this.setEffectiveChatAppearance(nextAppearance);
+  }
+
   refreshConversationRendering(): void {
     for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_OPENCODIAN)) {
       const view = leaf.view;
@@ -443,6 +572,14 @@ export default class OpenCodianPlugin extends Plugin {
         view.refreshQuestionUi();
       }
     }
+  }
+
+  private setEffectiveChatAppearance(nextAppearance: ChatAppearanceSettings): void {
+    this.settings.chatAppearance = normalizeChatAppearanceSettings(nextAppearance);
+    const activePreset = this.getActiveThemePresetDefinition();
+    this.settings.theme.customAppearanceOverrides = activePreset
+      ? getThemeAppearanceOverridesFromBase(activePreset.appearance, this.settings.chatAppearance)
+      : {};
   }
 
   scheduleChatAppearanceSave(delay = 220): void {

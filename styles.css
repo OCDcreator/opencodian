@@ -80,6 +80,10 @@
 }
 
 :root {
+  --opencodian-accent: var(--interactive-accent);
+  --opencodian-accent-hover: var(--interactive-accent-hover);
+  --opencodian-accent-contrast: var(--text-on-accent);
+  --opencodian-accent-text: var(--text-accent);
   --opencodian-surface: var(--background-primary);
   --opencodian-surface-elevated: var(--background-secondary);
   --opencodian-surface-mix: color-mix(in srgb, var(--background-primary) 88%, var(--background-secondary));
@@ -155,6 +159,10 @@
 }
 
 .opencodian-container {
+  --interactive-accent: var(--opencodian-accent);
+  --interactive-accent-hover: var(--opencodian-accent-hover);
+  --text-on-accent: var(--opencodian-accent-contrast);
+  --text-accent: var(--opencodian-accent-text);
   --opencodian-chat-surface: var(--background-secondary);
   --opencodian-composer-stack-height: 0px;
   --opencodian-messages-pad-top: 12px;
@@ -191,6 +199,112 @@
   max-height: 100vh; /* Ensure container doesn't exceed viewport */
   overflow: hidden;
   position: relative; /* Create positioning context */
+}
+
+.theme-dark .opencodian-container.opencodian-theme-flat {
+  --opencodian-glass-base: color-mix(in srgb, var(--background-secondary) 96%, var(--background-primary));
+  --opencodian-glass-base-strong: color-mix(in srgb, var(--background-secondary) 92%, var(--background-primary));
+  --opencodian-glass-base-soft: color-mix(in srgb, var(--background-secondary) 88%, var(--background-primary));
+  --opencodian-glass-specular: rgba(255, 255, 255, 0.02);
+  --opencodian-glass-specular-soft: rgba(255, 255, 255, 0.01);
+  --opencodian-glass-border: rgba(148, 163, 184, 0.16);
+  --opencodian-glass-border-strong: rgba(148, 163, 184, 0.24);
+  --opencodian-glass-shadow: rgba(15, 23, 42, 0);
+  --opencodian-glass-shadow-strong: rgba(15, 23, 42, 0);
+  --opencodian-glass-highlight: color-mix(in srgb, var(--interactive-accent) 8%, transparent);
+  --opencodian-glass-highlight-strong: color-mix(in srgb, var(--interactive-accent) 12%, transparent);
+  --opencodian-shadow-xs: none;
+  --opencodian-shadow-sm: none;
+  --opencodian-shadow: none;
+  --opencodian-shadow-md: none;
+  --opencodian-shadow-lg: none;
+  --opencodian-shadow-xl: none;
+}
+
+.theme-light .opencodian-container.opencodian-theme-flat {
+  --opencodian-glass-base: color-mix(in srgb, white 98%, var(--background-secondary));
+  --opencodian-glass-base-strong: color-mix(in srgb, white 94%, var(--background-secondary));
+  --opencodian-glass-base-soft: color-mix(in srgb, white 90%, var(--background-secondary));
+  --opencodian-glass-specular: rgba(255, 255, 255, 0.04);
+  --opencodian-glass-specular-soft: rgba(255, 255, 255, 0.02);
+  --opencodian-glass-border: rgba(148, 163, 184, 0.22);
+  --opencodian-glass-border-strong: rgba(148, 163, 184, 0.3);
+  --opencodian-glass-shadow: rgba(15, 23, 42, 0);
+  --opencodian-glass-shadow-strong: rgba(15, 23, 42, 0);
+  --opencodian-glass-highlight: color-mix(in srgb, var(--interactive-accent) 6%, transparent);
+  --opencodian-glass-highlight-strong: color-mix(in srgb, var(--interactive-accent) 10%, transparent);
+  --opencodian-shadow-xs: none;
+  --opencodian-shadow-sm: none;
+  --opencodian-shadow: none;
+  --opencodian-shadow-md: none;
+  --opencodian-shadow-lg: none;
+  --opencodian-shadow-xl: none;
+}
+
+.theme-dark .opencodian-container.opencodian-theme-soft {
+  --opencodian-glass-base: color-mix(in srgb, var(--background-primary) 78%, transparent);
+  --opencodian-glass-base-strong: color-mix(in srgb, var(--background-secondary) 72%, transparent);
+  --opencodian-glass-base-soft: color-mix(in srgb, var(--background-primary) 62%, transparent);
+  --opencodian-glass-specular: rgba(255, 255, 255, 0.18);
+  --opencodian-glass-specular-soft: rgba(255, 255, 255, 0.08);
+  --opencodian-glass-border: rgba(255, 255, 255, 0.22);
+  --opencodian-glass-border-strong: rgba(255, 255, 255, 0.32);
+  --opencodian-glass-shadow: rgba(15, 23, 42, 0.14);
+  --opencodian-glass-shadow-strong: rgba(15, 23, 42, 0.2);
+  --opencodian-shadow-xs: 0 1px 6px color-mix(in srgb, var(--text-normal) 8%, transparent);
+  --opencodian-shadow-sm: 0 6px 18px color-mix(in srgb, var(--text-normal) 10%, transparent);
+  --opencodian-shadow: 0 10px 28px color-mix(in srgb, var(--text-normal) 12%, transparent);
+  --opencodian-shadow-md: 0 14px 32px color-mix(in srgb, var(--text-normal) 14%, transparent);
+}
+
+.theme-light .opencodian-container.opencodian-theme-soft {
+  --opencodian-glass-base: color-mix(in srgb, white 86%, transparent);
+  --opencodian-glass-base-strong: color-mix(in srgb, white 80%, var(--background-secondary));
+  --opencodian-glass-base-soft: color-mix(in srgb, white 94%, transparent);
+  --opencodian-glass-specular: rgba(255, 255, 255, 0.82);
+  --opencodian-glass-specular-soft: rgba(255, 255, 255, 0.38);
+  --opencodian-glass-border: rgba(255, 255, 255, 0.56);
+  --opencodian-glass-border-strong: rgba(255, 255, 255, 0.7);
+  --opencodian-glass-shadow: rgba(15, 23, 42, 0.08);
+  --opencodian-glass-shadow-strong: rgba(15, 23, 42, 0.12);
+  --opencodian-shadow-xs: 0 2px 8px color-mix(in srgb, var(--text-normal) 8%, transparent);
+  --opencodian-shadow-sm: 0 8px 18px color-mix(in srgb, var(--text-normal) 10%, transparent);
+  --opencodian-shadow: 0 12px 30px color-mix(in srgb, var(--text-normal) 12%, transparent);
+  --opencodian-shadow-md: 0 16px 34px color-mix(in srgb, var(--text-normal) 13%, transparent);
+}
+
+.theme-dark .opencodian-container.opencodian-theme-sharp {
+  --opencodian-glass-base: color-mix(in srgb, var(--background-secondary) 84%, transparent);
+  --opencodian-glass-base-strong: color-mix(in srgb, var(--background-secondary) 78%, transparent);
+  --opencodian-glass-base-soft: color-mix(in srgb, var(--background-primary) 72%, transparent);
+  --opencodian-glass-specular: rgba(255, 255, 255, 0.08);
+  --opencodian-glass-specular-soft: rgba(255, 255, 255, 0.03);
+  --opencodian-glass-border: rgba(148, 163, 184, 0.2);
+  --opencodian-glass-border-strong: rgba(148, 163, 184, 0.34);
+  --opencodian-glass-shadow: rgba(2, 6, 23, 0.22);
+  --opencodian-glass-shadow-strong: rgba(2, 6, 23, 0.3);
+  --opencodian-shadow-xs: 0 1px 4px color-mix(in srgb, var(--text-normal) 16%, transparent);
+  --opencodian-shadow-sm: 0 3px 10px color-mix(in srgb, var(--text-normal) 18%, transparent);
+  --opencodian-shadow: 0 8px 18px color-mix(in srgb, var(--text-normal) 22%, transparent);
+  --opencodian-shadow-md: 0 10px 22px color-mix(in srgb, var(--text-normal) 24%, transparent);
+  --opencodian-shadow-lg: 0 14px 28px color-mix(in srgb, var(--text-normal) 26%, transparent);
+}
+
+.theme-light .opencodian-container.opencodian-theme-sharp {
+  --opencodian-glass-base: color-mix(in srgb, white 92%, var(--background-secondary));
+  --opencodian-glass-base-strong: color-mix(in srgb, white 86%, var(--background-secondary));
+  --opencodian-glass-base-soft: color-mix(in srgb, white 94%, var(--background-primary));
+  --opencodian-glass-specular: rgba(255, 255, 255, 0.46);
+  --opencodian-glass-specular-soft: rgba(255, 255, 255, 0.18);
+  --opencodian-glass-border: rgba(100, 116, 139, 0.24);
+  --opencodian-glass-border-strong: rgba(71, 85, 105, 0.38);
+  --opencodian-glass-shadow: rgba(15, 23, 42, 0.14);
+  --opencodian-glass-shadow-strong: rgba(15, 23, 42, 0.18);
+  --opencodian-shadow-xs: 0 1px 4px color-mix(in srgb, var(--text-normal) 14%, transparent);
+  --opencodian-shadow-sm: 0 4px 12px color-mix(in srgb, var(--text-normal) 16%, transparent);
+  --opencodian-shadow: 0 8px 18px color-mix(in srgb, var(--text-normal) 18%, transparent);
+  --opencodian-shadow-md: 0 10px 22px color-mix(in srgb, var(--text-normal) 20%, transparent);
+  --opencodian-shadow-lg: 0 14px 28px color-mix(in srgb, var(--text-normal) 22%, transparent);
 }
 
 /* Header - transparent, no border */
@@ -3589,6 +3703,156 @@
   flex-direction: column;
 }
 
+.opencodian-theme-presets {
+  gap: 14px;
+}
+
+.opencodian-theme-style-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.opencodian-theme-style-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  min-height: 108px;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--background-modifier-border-hover) 72%, transparent);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--interactive-accent) 6%, transparent) 0%,
+      transparent 100%
+    ),
+    var(--background-primary);
+  text-align: left;
+  white-space: normal;
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+
+.opencodian-theme-style-card:hover,
+.opencodian-theme-style-card.is-active {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--interactive-accent) 42%, var(--background-modifier-border-hover));
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--interactive-accent) 10%, transparent);
+}
+
+.opencodian-theme-style-card.is-active {
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--interactive-accent) 14%, transparent) 0%,
+      transparent 100%
+    ),
+    var(--background-primary);
+}
+
+.opencodian-theme-style-card-title {
+  width: 100%;
+  max-width: 100%;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-normal);
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.opencodian-theme-style-card-desc {
+  width: 100%;
+  max-width: 100%;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-muted);
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.opencodian-theme-status-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--background-primary) 78%, transparent);
+  border: 1px solid color-mix(in srgb, var(--background-modifier-border) 88%, transparent);
+}
+
+.opencodian-theme-status-row.is-customized {
+  border-color: color-mix(in srgb, var(--interactive-accent) 26%, var(--background-modifier-border-hover));
+}
+
+.opencodian-theme-status-copy {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.opencodian-theme-scheme-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.opencodian-theme-scheme-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.opencodian-theme-scheme-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.opencodian-theme-scheme-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--background-modifier-border-hover) 76%, transparent);
+  background: var(--background-primary);
+  color: var(--text-normal);
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
+}
+
+.opencodian-theme-scheme-chip:hover,
+.opencodian-theme-scheme-chip.is-active {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--interactive-accent) 44%, var(--background-modifier-border-hover));
+}
+
+.opencodian-theme-scheme-chip.is-active {
+  background: color-mix(in srgb, var(--interactive-accent) 14%, var(--background-primary));
+  color: var(--interactive-accent);
+}
+
+.opencodian-theme-actions {
+  display: flex;
+  justify-content: flex-start;
+  margin-top: 16px;
+}
+
+.opencodian-theme-reset-btn[disabled] {
+  opacity: 0.5;
+  cursor: default;
+}
+
 .opencodian-style-section .opencodian-style-group > .opencodian-style-group-title {
   display: block;
   width: 100%;
@@ -3828,6 +4092,10 @@
 }
 
 @media (max-width: 900px) {
+  .opencodian-theme-style-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .opencodian-style-setting {
     grid-template-columns: 1fr;
   }
@@ -3842,6 +4110,12 @@
   .opencodian-style-setting-control {
     justify-content: flex-start;
     flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 560px) {
+  .opencodian-theme-style-grid {
+    grid-template-columns: 1fr;
   }
 }
 

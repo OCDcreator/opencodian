@@ -12,6 +12,70 @@
 
 ---
 
+## 2026-03-31 主题预设系统与当前样式内置预设接入
+
+### 🎯 改动目标
+
+- 为聊天界面新增一套可快速切换的主题预设系统，支持在不同视觉风格与配色方案之间切换。
+- 将当前 shipped 样式固化为内置预设 `glass-classic` / `OpenCodian Classic`，作为新安装用户的默认主题。
+- 保留现有细粒度样式滑块与高级 CSS 作为“预设之后的微调层”，并确保老用户样式设置无损迁移。
+
+### ✅ 本轮调整
+
+- `src/core/theme/index.ts`
+  - 新增内置主题预设注册表，覆盖 `glass / flat / soft / sharp` 四类风格与对应配色方案
+  - 新增主题解析、预设基线合成、override 计算、外观比较等 helper，统一管理 preset 与最终 `chatAppearance` 的关系
+
+- `src/core/types/settings.ts`
+- `src/core/types/index.ts`
+  - 为设置系统新增 `ThemePresetId`、`ThemePresetDefinition`、`ThemeSettings`
+  - `OpenCodianSettings` 新增 `theme` 字段，结构为 `activePresetId + customAppearanceOverrides`
+  - 保留 `chatAppearance` 作为最终生效快照，用于兼容现有渲染与存储链路
+
+- `src/main.ts`
+  - 新增主题设置迁移逻辑
+  - 老用户若 `chatAppearance` 仍等于历史默认值，则自动绑定到 `glass-classic`
+  - 老用户若已自定义样式，则保留原样并标记为 `Custom`
+  - 新增插件级 helper，用于选择预设、按预设基线重置、按分组重置，以及在编辑样式时自动回写 `theme.customAppearanceOverrides`
+
+- `src/features/chat/OpenCodianView.ts`
+  - 在现有 `chatAppearance` CSS 变量应用前，先对聊天容器应用主题 class 与 preset-level CSS variables
+  - 切换预设时可即时反映风格差异，同时继续叠加用户微调
+
+- `src/features/settings/OpenCodianSettings.ts`
+  - 在样式设置顶部新增“主题预设”区域
+  - 支持风格卡片与配色方案切换，并显示“当前预设 / 已微调 / 自定义”状态
+  - “全部重置”“分组重置”“单项重置”改为回到当前预设基线，而不再一律回到历史默认值
+  - 修复主题卡片长文案在窄宽度下不换行、横向溢出的问题
+
+- `src/i18n/locales/en.ts`
+- `src/i18n/locales/zh.ts`
+  - 新增主题预设文案与状态提示
+  - 更新样式重置相关提示文案，使其准确反映“恢复预设/默认值”的行为
+
+- `styles.css`
+  - 新增 plugin-scoped 主题 accent token，并将其桥接到聊天容器内的 `interactive-accent` / `text-accent` / `text-on-accent`
+  - 为 `flat / soft / sharp` 主题增加 dark/light 自适应基础 token
+  - 为设置页新增主题卡片、配色 chip、状态行等样式
+  - 修复主题卡片标题与描述文本的换行与断词表现
+
+- `tests/unit/core/theme/themePresets.test.ts`
+- `tests/unit/main/themeSettingsMigration.test.ts`
+- `tests/unit/core/types/settings.test.ts`
+  - 新增主题预设解析、override 计算、主题默认值与老设置迁移测试
+
+### 🧪 验证结果
+
+- 通过：`npm test`
+- 通过：`npm run build`（`BUILD_ID: main.202603311902`）
+- 已部署到 Test Vault：`C:\Users\lt\Desktop\Write\testvault\.obsidian\plugins\opencodian\`
+- 已验证部署后的 `main.js` 包含 `BUILD_ID: main.202603311902`
+- 待继续观察：不同 Obsidian 第三方主题下，`flat / soft / sharp` 的 token 混色是否还需要进一步微调
+
+### 📝 结论
+
+- 这轮之后，OpenCodian 已具备内置主题预设能力，当前默认视觉也被沉淀为可回切的系统预设；同时原有样式微调能力仍完整保留，并以“预设基线 + 用户 override”的方式工作。
+
 ## 2026-03-31 用户消息折叠遮罩、中断提示与空助手壳过滤修复
 
 ### 🎯 改动目标
