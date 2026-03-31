@@ -6501,8 +6501,8 @@ export class OpenCodianView extends ItemView {
       return;
     }
 
-    const appendedMessages = this.getSimpleAppendedMessages(previousMessages, nextMessages);
-    if (!appendedMessages) {
+    const incrementalUpdate = this.getIncrementalRenderedMessageUpdate(previousMessages, nextMessages);
+    if (!incrementalUpdate) {
       await this.rerenderConversationMessages(this.currentConversation);
       return;
     }
@@ -6510,7 +6510,15 @@ export class OpenCodianView extends ItemView {
     const shouldStickToBottom = this.isNearBottom();
     this.syncBackgroundTaskStateFromConversation(this.currentConversation);
 
-    for (const messageToRender of this.getMessagesForRender(appendedMessages)) {
+    if (incrementalUpdate.patchTrailingAssistant) {
+      const patchedTail = await this.patchTrailingAssistantRender(previousMessages, nextMessages);
+      if (!patchedTail) {
+        await this.rerenderConversationMessages(this.currentConversation);
+        return;
+      }
+    }
+
+    for (const messageToRender of incrementalUpdate.appendedRenderedMessages) {
       if (this.shouldPseudoStreamSyncedAssistantMessage(messageToRender)) {
         await this.renderSyncedAssistantMessageWithReveal(messageToRender);
       } else {
@@ -6525,41 +6533,44 @@ export class OpenCodianView extends ItemView {
     }
   }
 
-  private getSimpleAppendedMessages(
+  private getIncrementalRenderedMessageUpdate(
     previousMessages: ChatMessage[],
     nextMessages: ChatMessage[],
-  ): ChatMessage[] | null {
-    if (nextMessages.length < previousMessages.length) {
+  ): {
+    appendedRenderedMessages: ChatMessage[];
+    patchTrailingAssistant: boolean;
+  } | null {
+    const previousRenderedMessages = this.getMessagesForRender(previousMessages);
+    const nextRenderedMessages = this.getMessagesForRender(nextMessages);
+
+    if (nextRenderedMessages.length < previousRenderedMessages.length) {
       return null;
     }
 
-    for (let index = 0; index < previousMessages.length; index += 1) {
-      if (this.getMessageRenderSignature(previousMessages[index]) !== this.getMessageRenderSignature(nextMessages[index])) {
+    if (previousRenderedMessages.length === 0) {
+      return {
+        appendedRenderedMessages: nextRenderedMessages,
+        patchTrailingAssistant: false,
+      };
+    }
+
+    for (let index = 0; index < previousRenderedMessages.length - 1; index += 1) {
+      if (
+        this.getMessageVisualSignature(previousRenderedMessages[index])
+        !== this.getMessageVisualSignature(nextRenderedMessages[index])
+      ) {
         return null;
       }
     }
 
-    return nextMessages.slice(previousMessages.length);
-  }
+    const lastSharedIndex = previousRenderedMessages.length - 1;
+    const patchTrailingAssistant = this.getMessageVisualSignature(previousRenderedMessages[lastSharedIndex])
+      !== this.getMessageVisualSignature(nextRenderedMessages[lastSharedIndex]);
 
-  private getMessageRenderSignature(message: ChatMessage): string {
-    return JSON.stringify({
-      id: message.id,
-      role: message.role,
-      sourceMessageId: message.sourceMessageId ?? null,
-      displayStyle: message.displayStyle ?? null,
-      content: message.content,
-      timestamp: message.timestamp,
-      questionResolution: message.questionResolution ? {
-        requestId: message.questionResolution.request.id,
-        status: message.questionResolution.status,
-        answers: message.questionResolution.answers ?? null,
-      } : null,
-      omo: message.omo ? {
-        kind: message.omo.kind,
-        headline: message.omo.headline,
-      } : null,
-    });
+    return {
+      appendedRenderedMessages: nextRenderedMessages.slice(previousRenderedMessages.length),
+      patchTrailingAssistant,
+    };
   }
 
   private shouldPseudoStreamSyncedAssistantMessage(message: ChatMessage): boolean {

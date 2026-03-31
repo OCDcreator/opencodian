@@ -12,6 +12,33 @@
 
 ---
 
+## 2026-03-31 Assistant 同步尾部改为按合并后结果补丁更新
+
+### 🎯 改动目标
+
+- 修复 assistant 在一次回复完成后出现“中间消息先出现、随后又消失”的观感问题。
+- 保留“一个问题对应一个 assistant 回复块”的直觉，不把一次回复最终拆成多个独立气泡。
+
+### ✅ 本轮调整
+
+- `src/features/chat/OpenCodianView.ts`
+  - 将会话同步后的增量更新逻辑从“按原始消息数组判断 append”改为“按合并后的渲染结果判断增量”
+  - 新增 `getIncrementalRenderedMessageUpdate()`，先比较 `getMessagesForRender()` 的前缀与尾部变化，再决定是 patch 尾部 assistant，还是追加新的渲染消息
+  - `applySyncedConversationUpdate()` 现在会优先复用 `patchTrailingAssistantRender()` 更新当前尾部 assistant，而不是先把新同步到的 assistant 片段单独渲染出来
+  - 删除旧的 `getSimpleAppendedMessages()` / `getMessageRenderSignature()` 路径，避免“先拆开显示、后合并回去”造成的闪动和消失感
+
+### 🧪 验证结果
+
+- 通过：`npm test -- tests/unit/features/chat/renderGroups.test.ts`
+- 通过：`npx tsc -p tsconfig.json --noEmit`
+- 通过：`npm run build`（`BUILD_ID: feat-liquid-composer-reactive-refraction.202603311506`）
+- 已部署到 Test Vault：`C:\Users\lt\Desktop\Write\testvault\.obsidian\plugins\opencodian\`
+- 已验证部署后的 `main.js` 包含 `BUILD_ID: feat-liquid-composer-reactive-refraction.202603311506`
+
+### 📝 结论
+
+- 这轮之后，assistant 回复在同步服务端最终消息时，会继续保持“一个回复块”的最终形态；如果尾部内容发生变化，界面会直接补丁更新当前回复块，而不是临时渲染成多段再合并回去。
+
 ## 2026-03-31 输入框内联上下文 Composer 重构
 
 ### 🎯 改动目标
