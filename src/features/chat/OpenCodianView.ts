@@ -3106,6 +3106,7 @@ export class OpenCodianView extends ItemView {
     this.inputTextarea.style.overflowY = this.inputTextarea.scrollHeight > COMPOSER_TEXTAREA_MAX_HEIGHT
       ? 'auto'
       : 'hidden';
+    this.scheduleComposerLayoutSync();
   }
 
   /** Wire event handlers */

@@ -12,6 +12,33 @@
 
 ---
 
+## 2026-03-31 输入框面板自动增高与最大高度统一修复
+
+### 🎯 改动目标
+
+- 修复用户在 composer 中输入较长消息时，输入框外层面板没有随着内容自动变高的问题。
+- 保留输入区的最大高度上限，避免长文本把底部输入面板无限撑高。
+
+### ✅ 本轮调整
+
+- `src/features/chat/OpenCodianView.ts`
+  - 在 `syncInputTextareaHeight()` 完成 textarea 高度重算后，追加调用 `scheduleComposerLayoutSync()`
+  - 让每次输入后的 textarea 高度变化都能同步传递到 composer 外层布局与消息区底部留白计算
+
+- `styles.css`
+  - 将 `.opencodian-input` 从 `flex: 1` 改为 `flex: 0 0 auto`，避免 textarea 被 flex 布局固定成不随内容自然增高的状态
+  - 将 `.opencodian-input` 的 CSS `max-height` 从 `200px` 统一调整为 `240px`，与 `OpenCodianView.ts` 中的 `COMPOSER_TEXTAREA_MAX_HEIGHT` 对齐
+
+### 🧪 验证结果
+
+- 通过：`npm run build`（`BUILD_ID: main.202603311550`）
+- 已部署到 Test Vault：`C:\Users\lt\Desktop\Write\testvault\.obsidian\plugins\opencodian\`
+- 已验证部署后的 `main.js` 包含 `BUILD_ID: main.202603311550`
+
+### 📝 结论
+
+- 这轮之后，用户在输入长消息时，composer 面板会先跟随内容自然长高；达到上限后再切换为输入框内部滚动，既保留了展开反馈，也控制住了最大高度。
+
 ## 2026-03-31 消息间距收束与用户消息 Hover 操作区遮挡修复
 
 ### 🎯 改动目标

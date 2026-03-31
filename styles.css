@@ -1986,7 +1986,7 @@
 
 /* Input area */
 .opencodian-input {
-  flex: 1;
+  flex: 0 0 auto;
   display: block;
   margin: 0;
   padding: 8px 0 4px;
@@ -1998,7 +1998,7 @@
   box-shadow: none !important;
   resize: none;
   min-height: 44px;
-  max-height: 200px;
+  max-height: 240px;
   font-family: inherit;
   font-size: 14px;
   line-height: 1.5;
