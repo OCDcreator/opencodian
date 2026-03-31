@@ -12,6 +12,32 @@
 
 ---
 
+## 2026-03-31 消息间距收束与用户消息 Hover 操作区遮挡修复
+
+### 🎯 改动目标
+
+- 修复长用户消息展开后在 hover 态放大时遮住复制 / 回退 / 分叉按钮的问题。
+- 收紧用户消息与助手消息外层留白，让聊天列表纵向密度更紧凑，贴近最新视觉预期。
+
+### ✅ 本轮调整
+
+- `styles.css`
+  - 为 `.opencodian-message--user .opencodian-message-content` 增加 `transform-origin: right bottom`，让 hover 放大从右下角展开，避免长卡片继续向下压住 footer 操作区
+  - 为 `.opencodian-user-message-footer` 增加 `position: relative` 与 `z-index: 1`，确保复制 / 回退 / 分叉按钮层级稳定高于 hover 后的用户气泡
+  - 将通用消息容器 `.opencodian-message` 的横向 padding 从 `14px` 收窄到 `4px`
+  - 将用户消息外层 `.opencodian-message--user` 的底部 padding 从 `16px` 收窄到 `4px`
+  - 将助手消息外层纵向间距变量 `--opencodian-assistant-pad-y` 从 `10px` 调整为 `0px`，使 `.opencodian-message--assistant` 变为 `0px 28px`
+
+### 🧪 验证结果
+
+- 通过：`npm run build`（`BUILD_ID: main.202603311530`）
+- 已部署到 Test Vault：`C:\Users\lt\Desktop\Write\testvault\.obsidian\plugins\opencodian\`
+- 已验证部署后的 `main.js` 包含 `BUILD_ID: main.202603311530`
+
+### 📝 结论
+
+- 这轮之后，长用户消息在展开并 hover 时不会再把底部操作按钮压住，同时用户与助手消息的外层留白都更紧凑，整体消息列表密度更高。
+
 ## 2026-03-31 Assistant 同步尾部改为按合并后结果补丁更新
 
 ### 🎯 改动目标

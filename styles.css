@@ -168,7 +168,7 @@
   --opencodian-user-blur: 12px;
   --opencodian-user-shadow-blur: 28px;
   --opencodian-assistant-radius: 14px;
-  --opencodian-assistant-pad-y: 10px;
+  --opencodian-assistant-pad-y: 0px;
   --opencodian-assistant-pad-x: 28px;
   --opencodian-assistant-content-pad-y: 10px;
   --opencodian-assistant-content-pad-x: 14px;
@@ -1091,7 +1091,7 @@
 
 .opencodian-message {
   position: relative;
-  padding: 10px 14px;
+  padding: 10px 4px;
   border-radius: 8px;
   max-width: 95%;
   word-wrap: break-word;
@@ -1117,7 +1117,7 @@
   align-items: flex-end;
   
   /* Base styles */
-  padding: 4px 28px 16px;
+  padding: 4px 28px 4px;
   max-width: 95%;
   animation: messageSlideIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
   z-index: 21;
@@ -1155,6 +1155,7 @@
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   overflow: hidden;
+  transform-origin: right bottom;
   width: fit-content;
   max-width: 100%;
   align-self: flex-end;
@@ -1791,6 +1792,8 @@
   margin-bottom: 4px;
   gap: 8px;
   min-height: 30px;
+  position: relative;
+  z-index: 1;
 }
 
 .opencodian-user-message-time {
