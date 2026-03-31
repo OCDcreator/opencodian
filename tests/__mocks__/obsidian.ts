@@ -66,6 +66,12 @@ export class Modal {
   onClose() {}
 }
 
+export class Component {
+  load() {}
+  unload() {}
+  register() {}
+}
+
 export class Notice {
   constructor(_message: string) {}
 }

@@ -1,8 +1,9 @@
 import type { App } from 'obsidian';
 import { Setting } from 'obsidian';
 
+import { DEFAULT_SETTINGS, getDefaultChatAppearanceSettings } from '../../../../src/core/types';
 import { OpenCodianSettingTab } from '../../../../src/features/settings/OpenCodianSettings';
-import { setLocale, t } from '../../../../src/i18n';
+import { setLocale } from '../../../../src/i18n';
 
 interface MockDropdownControl {
   addOption: jest.MockedFunction<(value: string, label: string) => MockDropdownControl>;
@@ -65,26 +66,43 @@ describe('OpenCodian style settings', () => {
     jest.restoreAllMocks();
   });
 
-  it('adds a disabled preset-only theme control for the input panel', () => {
-    const plugin = {} as ConstructorParameters<typeof OpenCodianSettingTab>[1];
+  it('does not add a separate input theme dropdown anymore', () => {
+    const plugin = {
+      settings: {
+        ...DEFAULT_SETTINGS,
+        chatAppearance: getDefaultChatAppearanceSettings(),
+      },
+      saveSettings: jest.fn(),
+    } as unknown as ConstructorParameters<typeof OpenCodianSettingTab>[1];
     const tab = new OpenCodianSettingTab({} as App, plugin);
     const containerEl = document.createElement('div');
+    const privateTab = tab as unknown as {
+      addStyleSettings: (containerEl: HTMLElement) => void;
+      addThemePresetSection: (containerEl: HTMLElement) => void;
+      addNumericStyleControl: (containerEl: HTMLElement, config: unknown) => void;
+      createStyleResetSetting: (containerEl: HTMLElement, group: unknown) => void;
+      createSectionHeading: (containerEl: HTMLElement, title: string) => HTMLHeadingElement;
+      createStyleGroupSection: (containerEl: HTMLElement, title: string, desc: string) => HTMLElement;
+      setSettingDescWithFormatting: (setting: Setting, desc: string) => void;
+      registerStyleControlBinding: (group: unknown, callback: () => void) => void;
+    };
 
-    (tab as unknown as {
-      addInputPanelThemeSetting: (containerEl: HTMLElement) => void;
-    }).addInputPanelThemeSetting(containerEl);
-
-    const themeSetting = dropdownRecords.find(
-      (record) => record.name === t('settings.style.input.theme.name'),
+    jest.spyOn(privateTab, 'addThemePresetSection').mockImplementation(() => {});
+    jest.spyOn(privateTab, 'addNumericStyleControl').mockImplementation(() => {});
+    jest.spyOn(privateTab, 'createStyleResetSetting').mockImplementation(() => {});
+    jest.spyOn(privateTab, 'createSectionHeading').mockImplementation((parent, title) =>
+      parent.createEl('h3', { text: title }),
     );
-
-    expect(themeSetting).toBeDefined();
-    expect(themeSetting?.control.addOption).toHaveBeenCalledWith(
-      'preset',
-      t('settings.style.input.theme.options.preset'),
+    jest.spyOn(privateTab, 'createStyleGroupSection').mockImplementation((parent) =>
+      parent.createDiv(),
     );
-    expect(themeSetting?.control.setValue).toHaveBeenCalledWith('preset');
-    expect(themeSetting?.control.selectEl.disabled).toBe(true);
-    expect(themeSetting?.control.selectEl.getAttribute('aria-disabled')).toBe('true');
+    jest.spyOn(privateTab, 'setSettingDescWithFormatting').mockImplementation(() => {});
+    jest.spyOn(privateTab, 'registerStyleControlBinding').mockImplementation(() => {});
+
+    privateTab.addStyleSettings(containerEl);
+
+    expect(
+      dropdownRecords.some((record) => record.name === 'Panel style theme' || record.name === '面板样式主题'),
+    ).toBe(false);
   });
 });

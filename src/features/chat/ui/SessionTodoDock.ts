@@ -81,7 +81,8 @@ export class SessionTodoDock {
     const previous = this.todos;
     this.todos = [...todos];
 
-    if (this.todos.length === 0) {
+    const hasIncompleteTodos = this.hasIncompleteTodos(this.todos);
+    if (this.todos.length === 0 || !hasIncompleteTodos) {
       this.rootEl.addClass('is-hidden');
       this.labelEl.setText('');
       this.previewEl.setText('');
@@ -90,12 +91,12 @@ export class SessionTodoDock {
       return;
     }
 
-    if (previous.length === 0 && this.hasIncompleteTodos(this.todos)) {
+    if (previous.length === 0 && hasIncompleteTodos) {
       this.collapsed = false;
     }
 
     this.rootEl.removeClass('is-hidden');
-    this.rootEl.toggleClass('is-complete', !this.hasIncompleteTodos(this.todos));
+    this.rootEl.toggleClass('is-complete', !hasIncompleteTodos);
 
     const done = this.todos.filter((todo) => todo.status === 'completed').length;
     this.labelEl.setText(t('chat.todo.progress', {

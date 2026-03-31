@@ -11,9 +11,10 @@ import {
   getDefaultDebugLogPaths,
   getDefaultThemeSettings,
   isValidChatAppearanceCustomCssDeclarations,
-  normalizePartialChatAppearanceSettings,
   normalizeBelowHeaderTabBarLayout,
   normalizeChatAppearanceSettings,
+  normalizeInputPanelThemeId,
+  normalizePartialChatAppearanceSettings,
   normalizeQuestionCardPosition,
   normalizeQuestionDisplayMode,
   normalizeTabBarPosition,
@@ -98,6 +99,7 @@ describe('Settings', () => {
       expect(DEFAULT_SETTINGS.belowHeaderTabBarLayout).toBe('grid');
       expect(DEFAULT_SETTINGS.enableAutoScroll).toBe(true);
       expect(DEFAULT_SETTINGS.chatAppearance.layout.messagesPaddingTop).toBe(12);
+      expect(DEFAULT_SETTINGS.inputPanelTheme).toBe('preset');
       expect(DEFAULT_SETTINGS.chatAppearance.sticky.maskBlur).toBe(24);
       expect(DEFAULT_SETTINGS.chatAppearance.user.radius).toBe(16);
       expect(DEFAULT_SETTINGS.chatAppearance.assistant.backgroundOpacity).toBe(72);
@@ -163,6 +165,15 @@ describe('Settings', () => {
       expect(normalizeQuestionCardPosition('above_input')).toBe('above_input');
       expect(normalizeQuestionCardPosition('floating')).toBe('inline');
       expect(normalizeQuestionCardPosition(undefined)).toBe('inline');
+    });
+  });
+
+  describe('input panel theme normalization', () => {
+    it('normalizes invalid input panel themes to preset', () => {
+      expect(normalizeInputPanelThemeId('preset')).toBe('preset');
+      expect(normalizeInputPanelThemeId('liquid-glass')).toBe('preset');
+      expect(normalizeInputPanelThemeId('glass')).toBe('preset');
+      expect(normalizeInputPanelThemeId(undefined)).toBe('preset');
     });
   });
 

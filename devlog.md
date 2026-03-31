@@ -12,6 +12,146 @@
 
 ---
 
+## 2026-04-01 输入区回归预设、通知路由修正与文档仓收口
+
+### 🎯 改动目标
+
+- 收回输入区 `Liquid Glass` 实验链路，回归“只保留主题预设、输入区只走 preset 样式”的稳定方案。
+- 修正多标签场景下后台任务 stale notice 与 turn diff notice 的路由、去重与持久化行为。
+- 清理仓库内已过时的设计/迁移/spec 文档，并将临时文档工作区从版本控制中排除。
+
+### ✅ 本轮调整
+
+- `src/core/types/settings.ts`
+- `src/core/types/index.ts`
+- `src/main.ts`
+- `src/features/settings/OpenCodianSettings.ts`
+- `src/i18n/locales/en.ts`
+- `src/i18n/locales/zh.ts`
+  - 将输入区主题重新收口为 `preset`
+  - 旧配置中的 `inputPanelTheme = 'liquid-glass'` 会在加载时自动归一化回 `preset`
+  - 移除输入区 Liquid Glass 相关设置项、模式选项与对应文案
+
+- `src/features/chat/OpenCodianView.ts`
+- `styles.css`
+  - 删除输入区 Liquid Glass 运行时接线、专用 lens DOM、刷新调度与专用样式层
+  - 输入区重新回到普通预设 composer 外壳
+  - 为 stale background task notice 增加 fingerprint 去重，避免同一批挂起任务重复插入 notice
+  - turn diff notice 现在会写回原始发送会话，并在用户已切换 tab 时正确给原 tab 标记 attention
+
+- `src/features/chat/ui/SessionTodoDock.ts`
+  - 当 todo 全部完成时自动隐藏 dock，不再继续保留空的已完成状态条
+
+- `tests/unit/core/types/settings.test.ts`
+- `tests/unit/main/themeSettingsMigration.test.ts`
+- `tests/unit/features/settings/OpenCodianStyleSettings.test.ts`
+- `tests/unit/features/chat/SessionTodoDock.test.ts`
+- `tests/unit/features/chat/backgroundTaskNoticeDedup.test.ts`
+- `tests/unit/features/chat/turnDiffNoticeRouting.test.ts`
+- `tests/__mocks__/obsidian.ts`
+  - 更新输入区 preset-only 迁移与设置测试
+  - 新增 todo dock 完成态隐藏测试
+  - 新增后台任务 stale notice 去重测试
+  - 新增跨 tab turn diff notice 路由测试
+
+- `.gitignore`
+- `docs/`
+  - 将 `docs/` 目录作为临时文档工作区忽略
+  - 移除仓库内一批已失效的迁移说明、架构镜像、superpowers 计划/spec 文档快照，减少噪音
+
+### 🧪 当前验证
+
+- 通过：`npm run test -- tests/unit/core/types/settings.test.ts tests/unit/main/themeSettingsMigration.test.ts tests/unit/features/settings/OpenCodianStyleSettings.test.ts`
+- 通过：`npm run lint`
+- 待本条日志写入后继续执行：`npm run check:devlog-order`
+
+### 📝 结论
+
+- 输入区现已明确回到“预设优先”的稳定策略，不再保留 Liquid Glass 主题入口或运行时残留。
+- 多 tab 下的后台任务 notice / diff notice 行为更稳定，todo dock 在任务完成后也更干净。
+- 仓库内保留的开发文档范围进一步收紧，`devlog.md` 成为当前开发过程的主要持续记录入口。
+
+## 2026-03-31 输入区 Liquid Glass 主题接入
+
+### 🎯 改动目标
+
+- 为输入区新增一套可选的 `Liquid Glass` 主题，保留现有输入区作为默认 `preset` 样式。
+- 在不改动整体聊天主题预设体系的前提下，让输入区可以单独切换到一套 Liquid Glass 风格外观，并保留后续恢复实时折射能力的接线位。
+- 保留现有输入区半径、模糊和阴影滑块作为 Liquid Glass 主题的后置微调层。
+
+### ✅ 本轮调整
+
+- `src/core/types/settings.ts`
+- `src/core/types/index.ts`
+  - 新增 `InputPanelThemeId = 'preset' | 'liquid-glass'`
+  - 新增 `InputPanelLiquidGlassMode = 'css' | 'webgl-experimental'`
+  - `OpenCodianSettings` 新增 `inputPanelTheme` 字段，默认值为 `preset`
+  - `OpenCodianSettings` 新增 `inputPanelLiquidGlassMode` 字段，默认值为 `css`
+  - 新增 `normalizeInputPanelThemeId()` 与 `normalizeInputPanelLiquidGlassMode()`，用于旧配置和非法值回退
+
+- `src/main.ts`
+  - 将 `inputPanelTheme` 与 `inputPanelLiquidGlassMode` 纳入设置加载与归一化流程
+  - 保证旧用户未配置该字段时自动回退到 `preset`
+
+- `src/features/settings/OpenCodianSettings.ts`
+- `src/i18n/locales/en.ts`
+- `src/i18n/locales/zh.ts`
+  - 将输入区“面板样式主题”从禁用占位改为可用下拉框
+  - 提供 `Preset` 与 `Liquid Glass` 两个选项
+  - 在 `Liquid Glass` 主题下新增 `Stable CSS shell / True Refraction (Experimental)` 渲染器选项
+  - 切换时走纯 UI 保存路径：不触发服务设置同步、不刷新模型列表、不重写 OpenCode 配置
+
+- `src/features/chat/liquidGlass/liquidGlassGeometry.ts`
+- `src/features/chat/liquidGlass/MessageBandSampler.ts`
+- `src/features/chat/liquidGlass/WebGLLiquidGlassRenderer.ts`
+- `src/features/chat/liquidGlass/InputLiquidGlassController.ts`
+  - 新增“消息区带状采样 + WebGL 镜片渲染”链路，只对输入框背后的活动消息区域取样
+  - 采样器只重建 composer 后方的一条窄带，覆盖常见文本/代码/notice/card，并对复杂内容降级为占位块
+  - WebGL renderer 使用原生 `Canvas2D + WebGL`，实现折射位移、边缘色散、高光与阴影叠加
+  - 本地 controller 统一管理 `css` / `webgl-experimental` 两种模式，以及失败时回退到稳定 CSS 壳
+  - 旧 `html2canvas / liquidGL` 运行时接线已停用，仅保留陈旧全局残留清理逻辑，避免 `document.write`、快照解析失败和关闭视图后残留 renderer
+
+- `src/features/chat/OpenCodianView.ts`
+  - 新增输入区 Liquid Glass controller 生命周期管理
+  - 在 `applyChatAppearanceSettings()` 中同步输入区主题状态
+  - 新增统一的 `scheduleLiquidGlassRefresh()` 节流入口，更新为“最大 24fps + 120ms 尾刷新”
+  - 将以下事件汇总到同一刷新路径：
+    - Obsidian `css-change`
+    - 消息区 DOM MutationObserver
+    - 活动消息面板内部滚动
+    - tab pane 切换
+    - 输入区 ResizeObserver
+
+- `styles.css`
+  - 为 composer 新增 `opencodian-composer-shell--liquid-glass` 主题样式
+  - 使用 `::before / ::after` 叠加 tint、specular、边缘色散和雾化层
+  - 让现有 input radius / blur / shadowBlur 继续作用于 Liquid Glass 外壳
+
+- `package.json`
+- `package-lock.json`
+  - 新增 `html2canvas` 依赖，用于本地打包页面快照采样能力
+
+- `tests/unit/core/types/settings.test.ts`
+- `tests/unit/features/settings/OpenCodianStyleSettings.test.ts`
+- `tests/unit/features/chat/liquidGlassGeometry.test.ts`
+- `tests/unit/features/chat/MessageBandSampler.test.ts`
+- `tests/unit/features/chat/InputLiquidGlassController.test.ts`
+  - 补充输入区主题默认值与归一化测试
+  - 补充设置页选项与纯 UI 持久化测试
+  - 补充消息区带状采样几何测试与复杂内容降级不抛错测试
+  - 补充 Liquid Glass controller 在 `css / webgl-experimental` 下的初始化、重建、销毁与 fallback 测试
+
+### 🧪 当前验证
+
+- 通过：`npm run test -- tests/unit/core/types/settings.test.ts tests/unit/features/settings/OpenCodianStyleSettings.test.ts tests/unit/main/themeSettingsMigration.test.ts tests/unit/features/chat/liquidGlassGeometry.test.ts tests/unit/features/chat/MessageBandSampler.test.ts tests/unit/features/chat/InputLiquidGlassController.test.ts`
+- 待继续执行：更宽范围相关测试、`npm run check:devlog-order`、完整 build、Test Vault 部署与 `BUILD_ID` 校验
+
+### 📝 结论
+
+- 输入区现在提供稳定可切换的 `Liquid Glass` 主题外观，并在其下新增可选的 `True Refraction (Experimental)` 模式。
+
+- 实验模式已经摆脱 `html2canvas / liquidGL` 的页面级快照方案，改为只采样输入框背后的活动消息条带，从而避免 `document.write`、`foreignObject` 与颜色函数解析失败等旧问题。
+
 ## 2026-03-31 主题预设系统与当前样式内置预设接入
 
 ### 🎯 改动目标

@@ -9,9 +9,9 @@ import { addIcon, Component, ItemView, MarkdownView, Notice, Scope, setIcon, TFi
 
 import { OpenCodeService, type SessionActivityStatus } from '../../core/opencode';
 import {
+  getThemePresetDefinition,
   THEME_PRESET_CSS_VARIABLE_NAMES,
   THEME_STYLE_CONTAINER_CLASSES,
-  getThemePresetDefinition,
 } from '../../core/theme';
 import {
   type ChatMessage,
@@ -185,6 +185,7 @@ interface TabRuntimeState {
   backgroundTaskLaunches: Map<string, BackgroundTaskLaunchInfo>;
   backgroundTaskCompletedTasks: Map<string, BackgroundTaskCompletionInfo>;
   backgroundTaskWaitingForFollowUp: boolean;
+  backgroundTaskStaleNoticeFingerprint: string | null;
   focusContextPreview: FocusContextPreview | null;
   draftContextItems: PromptContextItem[];
   pendingEditedFiles: Set<string>;
@@ -222,6 +223,7 @@ export class OpenCodianView extends ItemView {
   private messagesContainer: HTMLElement | null = null;
   private inputContainer: HTMLElement | null = null;
   private inputWrapperEl: HTMLElement | null = null;
+  private composerShellEl: HTMLElement | null = null;
   private composerContextRowEl: HTMLElement | null = null;
   private questionDockMountEl: HTMLElement | null = null;
   private questionDock: QuestionDock | null = null;
@@ -326,6 +328,7 @@ export class OpenCodianView extends ItemView {
       backgroundTaskLaunches: new Map(),
       backgroundTaskCompletedTasks: new Map(),
       backgroundTaskWaitingForFollowUp: false,
+      backgroundTaskStaleNoticeFingerprint: null,
       focusContextPreview: null,
       draftContextItems: [],
       pendingEditedFiles: new Set(),
@@ -978,7 +981,8 @@ export class OpenCodianView extends ItemView {
     tabId: TabId | null,
     pending: BackgroundTaskLaunchInfo[],
   ): Promise<void> {
-    if (!tabId || tabId !== this.getActiveTabId() || !this.currentConversation) {
+    const runtime = this.getTabRuntimeState(tabId);
+    if (!runtime || !tabId || tabId !== this.getActiveTabId() || !this.currentConversation) {
       return;
     }
 
@@ -987,20 +991,57 @@ export class OpenCodianView extends ItemView {
       return;
     }
 
-    const lines = [
+    const title = t('chat.backgroundTask.staleTitle');
+    const content = this.buildBackgroundTaskStoppedNoticeContent(pending);
+    if (runtime.backgroundTaskStaleNoticeFingerprint === content) {
+      return;
+    }
+
+    if (this.hasMatchingPersistentAssistantNoticeMessage(title, content, 'warning')) {
+      runtime.backgroundTaskStaleNoticeFingerprint = content;
+      return;
+    }
+
+    runtime.backgroundTaskStaleNoticeFingerprint = content;
+    try {
+      await this.appendPersistentAssistantNoticeMessage(title, content, 'warning');
+    } catch (error) {
+      if (runtime.backgroundTaskStaleNoticeFingerprint === content) {
+        runtime.backgroundTaskStaleNoticeFingerprint = null;
+      }
+      logger.warn('Failed to append stale background task notice', error);
+    }
+  }
+
+  private buildBackgroundTaskStoppedNoticeContent(pending: BackgroundTaskLaunchInfo[]): string {
+    const sortedPending = [...pending].sort((left, right) => {
+      const leftId = this.getBackgroundTaskLaunchDisplayId(left);
+      const rightId = this.getBackgroundTaskLaunchDisplayId(right);
+      return leftId.localeCompare(rightId) || left.description.localeCompare(right.description);
+    });
+
+    return [
       t('chat.backgroundTask.staleBody'),
       '',
       `**${t('chat.backgroundTask.taskListLabel')}**`,
-      ...pending.map((task) =>
+      ...sortedPending.map((task) =>
         `- ${t('chat.backgroundTask.taskStatusStopped')} · \`${this.getBackgroundTaskLaunchDisplayId(task)}\`: ${task.description}`,
       ),
-    ];
+    ].join('\n');
+  }
 
-    await this.appendPersistentAssistantNoticeMessage(
-      t('chat.backgroundTask.staleTitle'),
-      lines.join('\n'),
-      'warning',
-    );
+  private hasMatchingPersistentAssistantNoticeMessage(
+    title: string,
+    content: string,
+    tone: ChatMessage['noticeTone'],
+  ): boolean {
+    return this.currentConversation?.messages.some((message) =>
+      message.role === 'assistant'
+      && message.displayStyle === 'notice'
+      && message.noticeTitle === title
+      && message.noticeTone === tone
+      && message.content === content,
+    ) ?? false;
   }
 
   constructor(leaf: WorkspaceLeaf, plugin: OpenCodianPlugin) {
@@ -1079,6 +1120,7 @@ export class OpenCodianView extends ItemView {
     this.outerVerticalTabBarHostEl = null;
     this.inputTabBarSlotEl = null;
     this.inputWrapperEl = null;
+    this.composerShellEl = null;
     this.composerContextRowEl = null;
     this.questionDock?.destroy();
     this.questionDock = null;
@@ -1989,6 +2031,7 @@ export class OpenCodianView extends ItemView {
     this.renderQuestionDock();
 
     const composerShellEl = container.createDiv({ cls: 'opencodian-composer-shell' });
+    this.composerShellEl = composerShellEl;
 
     const inputWrapper = composerShellEl.createDiv({ cls: 'opencodian-input-wrapper' });
     this.inputWrapperEl = inputWrapper;
@@ -3410,7 +3453,7 @@ export class OpenCodianView extends ItemView {
           this.currentConversationRevertState = syncResult.revertState;
         }
         if (
-          runtime.sessionTodos.length > 0
+          this.hasIncompleteTodos(runtime.sessionTodos)
           || runtime.backgroundTaskLaunches.size > 0
           || runtime.backgroundTaskWaitingForFollowUp
         ) {
@@ -3424,7 +3467,7 @@ export class OpenCodianView extends ItemView {
       this.currentConversationRevertState = syncResult.revertState;
       runtime.lastConversationSyncFingerprint = syncResult.fingerprint;
       if (
-        runtime.sessionTodos.length > 0
+        this.hasIncompleteTodos(runtime.sessionTodos)
         || runtime.backgroundTaskLaunches.size > 0
         || runtime.backgroundTaskWaitingForFollowUp
       ) {
@@ -3465,7 +3508,7 @@ export class OpenCodianView extends ItemView {
         const syncResult = await this.syncConversationMessagesFromServer(conversation, tab.id);
         await this.refreshPendingQuestionsForTab(tab.id, conversation.openCodeSessionId);
         this.syncBackgroundTaskStateFromConversation(conversation, tab.id);
-        if (runtime.sessionTodos.length > 0 || tab.hasBackgroundTask) {
+        if (this.hasIncompleteTodos(runtime.sessionTodos) || tab.hasBackgroundTask) {
           await this.refreshTabSessionStatus(tab.id, conversation.openCodeSessionId, { suppressErrors: true });
           await this.refreshTabSessionTodos(tab.id, conversation.openCodeSessionId, { suppressErrors: true });
         }
@@ -5043,6 +5086,7 @@ export class OpenCodianView extends ItemView {
     runtime.backgroundTaskStartedAt = message.timestamp;
     runtime.backgroundTaskModeTag = message.omo.modeTag;
     runtime.backgroundTaskWaitingForFollowUp = false;
+    runtime.backgroundTaskStaleNoticeFingerprint = null;
   }
 
   private hasActiveBackgroundTaskIndicator(): boolean {
@@ -5062,6 +5106,7 @@ export class OpenCodianView extends ItemView {
     runtime.backgroundTaskWaitingForFollowUp = false;
     runtime.backgroundTaskLaunches.clear();
     runtime.backgroundTaskCompletedTasks.clear();
+    runtime.backgroundTaskStaleNoticeFingerprint = null;
     this.syncTabStreamLikeState(tabId);
   }
 
@@ -5194,6 +5239,7 @@ export class OpenCodianView extends ItemView {
     runtime.backgroundTaskWaitingForFollowUp = false;
     runtime.backgroundTaskLaunches.clear();
     runtime.backgroundTaskCompletedTasks.clear();
+    runtime.backgroundTaskStaleNoticeFingerprint = null;
 
     if (!conversation || conversation.messages.length === 0) {
       runtime.backgroundTaskIndicatorEl?.remove();
@@ -5462,6 +5508,7 @@ export class OpenCodianView extends ItemView {
     if (!runtime.backgroundTaskStartedAt) {
       runtime.backgroundTaskStartedAt = Date.now();
     }
+    runtime.backgroundTaskStaleNoticeFingerprint = null;
     this.upsertBackgroundTaskLaunch({
       id: toolCall.id,
       input: toolCall.input ?? {},
@@ -5497,6 +5544,7 @@ export class OpenCodianView extends ItemView {
       input: toolCall.input ?? {},
       result: toolCall.result,
     }, runtime.backgroundTaskLaunches);
+    runtime.backgroundTaskStaleNoticeFingerprint = null;
     await this.renderBackgroundTaskIndicatorIfNeeded(tabId);
   }
 
@@ -7833,28 +7881,53 @@ export class OpenCodianView extends ItemView {
     content: string,
     tone: ChatMessage['noticeTone'] = 'warning',
     noticeActions?: ChatMessage['noticeActions'],
+    options: {
+      conversation?: Conversation | null;
+      tabId?: TabId | null;
+    } = {},
   ): Promise<void> {
+    const timestamp = Date.now();
     const noticeMessage: ChatMessage = {
-      id: `assistant-notice-${Date.now()}`,
+      id: `assistant-notice-${timestamp}`,
       role: 'assistant',
       content,
-      timestamp: Date.now(),
+      timestamp,
       displayStyle: 'notice',
       noticeTitle: title,
       noticeTone: tone,
       noticeActions,
     };
 
-    await this.renderMessage(noticeMessage);
-
-    if (this.currentConversation) {
-      this.currentConversation.messages.push(noticeMessage);
-      this.currentConversation.updatedAt = Date.now();
-      await this.plugin.storage.saveConversation(this.currentConversation);
-      this.lastConversationSyncFingerprint = this.getConversationSyncFingerprint(this.currentConversation.messages);
+    const targetConversation = options.conversation ?? this.currentConversation;
+    if (!targetConversation) {
+      return;
     }
 
-    this.scrollToBottom();
+    const targetTabId = options.tabId ?? this.getActiveTabId();
+    const fingerprint = this.getConversationSyncFingerprint([...targetConversation.messages, noticeMessage]);
+    const targetConversationIsVisible = this.currentConversation?.id === targetConversation.id;
+
+    if (targetConversationIsVisible) {
+      await this.renderMessage(noticeMessage);
+    }
+
+    targetConversation.messages.push(noticeMessage);
+    targetConversation.updatedAt = timestamp;
+    await this.plugin.saveConversation(targetConversation);
+
+    if (targetConversationIsVisible) {
+      this.lastConversationSyncFingerprint = fingerprint;
+      this.scrollToBottom();
+      return;
+    }
+
+    if (targetTabId) {
+      const runtime = this.getTabRuntimeState(targetTabId);
+      if (runtime) {
+        runtime.lastConversationSyncFingerprint = fingerprint;
+      }
+      this.tabManager?.setTabNeedsAttention(targetTabId, true);
+    }
   }
 
   private async appendTurnDiffNoticeIfNeeded(
@@ -7891,6 +7964,8 @@ export class OpenCodianView extends ItemView {
       t('chat.diffNotice.title'),
       this.buildDiffNoticeMarkdown(entries),
       'info',
+      undefined,
+      { conversation, tabId },
     );
 
     if (tabId === this.getActiveTabId()) {

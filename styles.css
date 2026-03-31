@@ -26,6 +26,9 @@
   --opencodian-composer-liquid-frost-opacity: 0.52;
   --opencodian-composer-liquid-refract-opacity: 0.34;
   --opencodian-composer-liquid-dispersion-opacity: 0.08;
+  --opencodian-composer-liquid-highlight: rgba(173, 216, 255, 0.1);
+  --opencodian-composer-liquid-highlight-strong: rgba(196, 230, 255, 0.16);
+  --opencodian-composer-liquid-spectrum-end: rgba(151, 211, 255, 0.12);
   --opencodian-composer-embedded-fill: color-mix(in srgb, var(--background-primary) 8%, transparent);
   --opencodian-composer-embedded-fill-strong: color-mix(in srgb, var(--background-primary) 12%, transparent);
   --opencodian-composer-embedded-border: rgba(255, 255, 255, 0.06);
@@ -65,6 +68,9 @@
   --opencodian-composer-liquid-frost-opacity: 0.42;
   --opencodian-composer-liquid-refract-opacity: 0.24;
   --opencodian-composer-liquid-dispersion-opacity: 0.04;
+  --opencodian-composer-liquid-highlight: rgba(154, 201, 255, 0.14);
+  --opencodian-composer-liquid-highlight-strong: rgba(194, 225, 255, 0.2);
+  --opencodian-composer-liquid-spectrum-end: rgba(131, 197, 255, 0.1);
   --opencodian-composer-embedded-fill: color-mix(in srgb, var(--background-primary) 72%, transparent);
   --opencodian-composer-embedded-fill-strong: color-mix(in srgb, var(--background-primary) 82%, transparent);
   --opencodian-composer-embedded-border: rgba(255, 255, 255, 0.44);
@@ -144,6 +150,9 @@
   --opencodian-composer-liquid-frost-opacity: 0.48;
   --opencodian-composer-liquid-refract-opacity: 0.3;
   --opencodian-composer-liquid-dispersion-opacity: 0.06;
+  --opencodian-composer-liquid-highlight: rgba(173, 216, 255, 0.12);
+  --opencodian-composer-liquid-highlight-strong: rgba(196, 230, 255, 0.18);
+  --opencodian-composer-liquid-spectrum-end: rgba(151, 211, 255, 0.12);
   --opencodian-composer-embedded-fill: color-mix(in srgb, var(--background-primary) 8%, transparent);
   --opencodian-composer-embedded-fill-strong: color-mix(in srgb, var(--background-primary) 12%, transparent);
   --opencodian-composer-embedded-border: rgba(255, 255, 255, 0.07);
@@ -2745,6 +2754,7 @@
   align-items: stretch;
   gap: 0;
   position: relative;
+  z-index: 1;
   overflow: visible;
   isolation: auto;
   background: transparent;

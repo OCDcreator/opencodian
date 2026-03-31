@@ -78,6 +78,9 @@ export type BelowHeaderTabBarLayout = 'grid' | 'vertical';
 /** Chat scroll effect */
 export type ChatScrollMode = 'natural' | 'sticky-basic' | 'sticky-mask';
 
+/** Input panel visual theme */
+export type InputPanelThemeId = 'preset';
+
 /** Server connection mode */
 export type ServerMode = 'local' | 'remote';
 
@@ -126,6 +129,15 @@ export function normalizeQuestionCardPosition(value: unknown): QuestionCardPosit
       return value;
     default:
       return 'inline';
+  }
+}
+
+export function normalizeInputPanelThemeId(value: unknown): InputPanelThemeId {
+  switch (value) {
+    case 'preset':
+      return value;
+    default:
+      return 'preset';
   }
 }
 
@@ -730,6 +742,7 @@ export interface OpenCodianSettings {
   belowHeaderTabBarLayout: BelowHeaderTabBarLayout;
   enableAutoScroll: boolean;
   chatScrollMode: ChatScrollMode;
+  inputPanelTheme: InputPanelThemeId;
   chatAppearance: ChatAppearanceSettings;
   settingsPanelScrollTop: number;
   enableDebugLogging: boolean;
@@ -804,6 +817,7 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
   belowHeaderTabBarLayout: 'grid',
   enableAutoScroll: true,
   chatScrollMode: 'sticky-mask',
+  inputPanelTheme: 'preset',
   chatAppearance: getDefaultChatAppearanceSettings(),
   settingsPanelScrollTop: 0,
   enableDebugLogging: false,

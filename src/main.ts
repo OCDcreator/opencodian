@@ -39,6 +39,7 @@ import {
   normalizeBelowHeaderTabBarLayout,
   normalizeChatAppearanceSettings,
   normalizeEffortLevel,
+  normalizeInputPanelThemeId,
   normalizePersistedTabState,
   normalizePluginIsolationMode,
   normalizeProviderIconLibrary,
@@ -432,6 +433,7 @@ export default class OpenCodianPlugin extends Plugin {
               ? savedSettings.renderUserMarkupAsCodeBlocks
               : DEFAULT_SETTINGS.renderUserMarkupAsCodeBlocks,
           pluginIsolationMode: normalizePluginIsolationMode(savedSettings.pluginIsolationMode),
+          inputPanelTheme: normalizeInputPanelThemeId(savedSettings.inputPanelTheme),
           debugLogPaths: normalizedDebugLogPaths,
           chatAppearance: normalizedChatAppearance,
           theme: normalizedTheme,
@@ -445,6 +447,7 @@ export default class OpenCodianPlugin extends Plugin {
       server: normalizedServer,
       tabBarPosition: normalizeTabBarPosition(normalizedSettings?.tabBarPosition),
       belowHeaderTabBarLayout: normalizeBelowHeaderTabBarLayout(normalizedSettings?.belowHeaderTabBarLayout),
+      inputPanelTheme: normalizeInputPanelThemeId(normalizedSettings?.inputPanelTheme),
       debugLogPaths: normalizedDebugLogPaths,
       chatAppearance: normalizedChatAppearance,
       theme: normalizedTheme,

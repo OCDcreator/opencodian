@@ -3,8 +3,8 @@ jest.mock('../../../src/core/opencode', () => ({
   SDK_FEATURE_FLAG_ROLLOUT_DEFAULTS: {},
 }));
 
-import OpenCodianPlugin from '../../../src/main';
 import { getDefaultChatAppearanceSettings } from '../../../src/core/types';
+import OpenCodianPlugin from '../../../src/main';
 
 describe('OpenCodianPlugin.loadSettings theme migration', () => {
   it('binds legacy default chat appearance to the built-in current style preset', async () => {
@@ -71,5 +71,19 @@ describe('OpenCodianPlugin.loadSettings theme migration', () => {
       },
     });
     expect(plugin.settings.chatAppearance.assistant.blur).toBe(4);
+  });
+
+  it('migrates legacy liquid glass input theme values back to preset on load', async () => {
+    const plugin = {
+      storage: {
+        loadSettings: jest.fn().mockResolvedValue({
+          inputPanelTheme: 'liquid-glass',
+        }),
+      },
+    } as unknown as OpenCodianPlugin;
+
+    await OpenCodianPlugin.prototype.loadSettings.call(plugin);
+
+    expect(plugin.settings.inputPanelTheme).toBe('preset');
   });
 });

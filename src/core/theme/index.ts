@@ -1,8 +1,8 @@
 import {
+  type ChatAppearanceSettings,
   getDefaultChatAppearanceSettings,
   normalizeChatAppearanceSettings,
   normalizePartialChatAppearanceSettings,
-  type ChatAppearanceSettings,
   type PartialChatAppearanceSettings,
   type ThemePresetDefinition,
   type ThemePresetId,

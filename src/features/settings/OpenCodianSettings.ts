@@ -14,10 +14,10 @@ import type { ModelCatalog, ModelCatalogProvider } from '../../core/config/model
 import type { PluginEntry, PluginEnvironmentSnapshot } from '../../core/config/PluginManagementService';
 import { getBuiltinThemePresets, hasThemeAppearanceOverrides } from '../../core/theme';
 import {
+  type ChatAppearanceSettings,
   getCurrentPlatformDebugLogPath,
   getCurrentPlatformKey,
   isValidChatAppearanceCustomCssDeclarations,
-  type ChatAppearanceSettings,
   type ModelSourceMode,
   type PluginIsolationMode,
   type QuestionCardPosition,
@@ -1980,7 +1980,6 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       t('settings.style.groups.input.title'),
       t('settings.style.groups.input.desc'),
     );
-    this.addInputPanelThemeSetting(inputGroupEl);
     this.addNumericStyleControl(inputGroupEl, {
       group: 'input',
       name: t('settings.style.input.radius.name'),
@@ -2306,18 +2305,6 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     }
 
     renderPresetUi();
-  }
-
-  private addInputPanelThemeSetting(containerEl: HTMLElement): void {
-    new Setting(containerEl)
-      .setName(t('settings.style.input.theme.name'))
-      .setDesc(t('settings.style.input.theme.desc'))
-      .addDropdown((dropdown) => {
-        dropdown.addOption('preset', t('settings.style.input.theme.options.preset'));
-        dropdown.setValue('preset');
-        dropdown.selectEl.disabled = true;
-        dropdown.selectEl.setAttribute('aria-disabled', 'true');
-      });
   }
 
   private getThemeStyleTitle(styleId: ThemeStyleId): string {
