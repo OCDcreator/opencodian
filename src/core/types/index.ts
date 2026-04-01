@@ -71,6 +71,7 @@ export {
   normalizeBelowHeaderTabBarLayout,
   normalizeChatAppearanceSettings,
   normalizeEffortLevel,
+  normalizeExperimentalComposerGlassRefractionEnabled,
   normalizeInputPanelThemeId,
   normalizePartialChatAppearanceSettings,
   normalizePersistedTabState,

@@ -29,6 +29,13 @@
   --opencodian-composer-liquid-highlight: rgba(173, 216, 255, 0.1);
   --opencodian-composer-liquid-highlight-strong: rgba(196, 230, 255, 0.16);
   --opencodian-composer-liquid-spectrum-end: rgba(151, 211, 255, 0.12);
+  --opencodian-glass-refraction-blur: 24px;
+  --opencodian-glass-refraction-saturation: 1.18;
+  --opencodian-glass-refraction-brightness: 1.05;
+  --opencodian-glass-refraction-blue: rgba(0, 180, 255, 0.08);
+  --opencodian-glass-refraction-violet: rgba(120, 80, 255, 0.07);
+  --opencodian-glass-refraction-pink: rgba(255, 100, 200, 0.07);
+  --opencodian-glass-refraction-green: rgba(100, 255, 180, 0.05);
   --opencodian-composer-embedded-fill: color-mix(in srgb, var(--background-primary) 8%, transparent);
   --opencodian-composer-embedded-fill-strong: color-mix(in srgb, var(--background-primary) 12%, transparent);
   --opencodian-composer-embedded-border: rgba(255, 255, 255, 0.06);
@@ -71,6 +78,13 @@
   --opencodian-composer-liquid-highlight: rgba(154, 201, 255, 0.14);
   --opencodian-composer-liquid-highlight-strong: rgba(194, 225, 255, 0.2);
   --opencodian-composer-liquid-spectrum-end: rgba(131, 197, 255, 0.1);
+  --opencodian-glass-refraction-blur: 20px;
+  --opencodian-glass-refraction-saturation: 1.12;
+  --opencodian-glass-refraction-brightness: 1.03;
+  --opencodian-glass-refraction-blue: rgba(0, 140, 220, 0.05);
+  --opencodian-glass-refraction-violet: rgba(100, 60, 220, 0.045);
+  --opencodian-glass-refraction-pink: rgba(220, 80, 170, 0.04);
+  --opencodian-glass-refraction-green: rgba(80, 200, 140, 0.032);
   --opencodian-composer-embedded-fill: color-mix(in srgb, var(--background-primary) 72%, transparent);
   --opencodian-composer-embedded-fill-strong: color-mix(in srgb, var(--background-primary) 82%, transparent);
   --opencodian-composer-embedded-border: rgba(255, 255, 255, 0.44);
@@ -153,6 +167,13 @@
   --opencodian-composer-liquid-highlight: rgba(173, 216, 255, 0.12);
   --opencodian-composer-liquid-highlight-strong: rgba(196, 230, 255, 0.18);
   --opencodian-composer-liquid-spectrum-end: rgba(151, 211, 255, 0.12);
+  --opencodian-glass-refraction-blur: 24px;
+  --opencodian-glass-refraction-saturation: 1.18;
+  --opencodian-glass-refraction-brightness: 1.04;
+  --opencodian-glass-refraction-blue: rgba(0, 180, 255, 0.06);
+  --opencodian-glass-refraction-violet: rgba(120, 80, 255, 0.055);
+  --opencodian-glass-refraction-pink: rgba(255, 100, 200, 0.05);
+  --opencodian-glass-refraction-green: rgba(100, 255, 180, 0.04);
   --opencodian-composer-embedded-fill: color-mix(in srgb, var(--background-primary) 8%, transparent);
   --opencodian-composer-embedded-fill-strong: color-mix(in srgb, var(--background-primary) 12%, transparent);
   --opencodian-composer-embedded-border: rgba(255, 255, 255, 0.07);
@@ -2287,6 +2308,86 @@
   box-shadow: 0 12px 28px color-mix(in srgb, var(--opencodian-composer-lens-shadow) 18%, transparent);
 }
 
+.opencodian-composer-shell--glass-refract {
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--opencodian-glass-specular-soft) 90%, transparent) 0%,
+      transparent 44%
+    ),
+    color-mix(in srgb, var(--opencodian-composer-lens-bg-strong) 70%, transparent);
+  box-shadow:
+    0 16px 34px color-mix(in srgb, var(--opencodian-composer-lens-shadow-strong) 22%, transparent),
+    0 1px 0 color-mix(in srgb, var(--opencodian-composer-lens-border-strong) 72%, transparent) inset;
+}
+
+.opencodian-composer-glass-fx {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+
+.opencodian-composer-glass-fx.is-enabled {
+  opacity: 1;
+}
+
+.opencodian-composer-glass-fx-refract {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--opencodian-composer-lens-bg) 82%, transparent) 0%,
+      color-mix(in srgb, var(--opencodian-composer-lens-bg-strong) 68%, transparent) 100%
+    );
+  opacity: var(--opencodian-composer-liquid-refract-opacity);
+  filter: url(#opencodian-glass-refract);
+  backdrop-filter:
+    blur(var(--opencodian-glass-refraction-blur))
+    saturate(var(--opencodian-glass-refraction-saturation))
+    brightness(var(--opencodian-glass-refraction-brightness));
+  -webkit-backdrop-filter:
+    blur(var(--opencodian-glass-refraction-blur))
+    saturate(var(--opencodian-glass-refraction-saturation))
+    brightness(var(--opencodian-glass-refraction-brightness));
+}
+
+.opencodian-composer-glass-fx::before,
+.opencodian-composer-glass-fx::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.opencodian-composer-glass-fx::before {
+  background:
+    radial-gradient(ellipse 58% 50% at 12% 50%, var(--opencodian-glass-refraction-blue) 0%, transparent 72%),
+    radial-gradient(ellipse 50% 56% at 50% 12%, var(--opencodian-glass-refraction-violet) 0%, transparent 72%),
+    radial-gradient(ellipse 58% 50% at 88% 50%, var(--opencodian-glass-refraction-pink) 0%, transparent 72%),
+    radial-gradient(ellipse 50% 56% at 50% 88%, var(--opencodian-glass-refraction-green) 0%, transparent 72%);
+  box-shadow:
+    inset 1px 0 0 color-mix(in srgb, var(--opencodian-glass-refraction-blue) 88%, transparent),
+    inset -1px 0 0 color-mix(in srgb, var(--opencodian-glass-refraction-pink) 88%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--opencodian-glass-refraction-violet) 78%, transparent),
+    inset 0 -1px 0 color-mix(in srgb, var(--opencodian-glass-refraction-green) 78%, transparent);
+  opacity: var(--opencodian-composer-liquid-dispersion-opacity);
+}
+
+.opencodian-composer-glass-fx::after {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, white 10%, transparent) 0%, transparent 42%),
+    radial-gradient(circle at 18% 0%, color-mix(in srgb, white 18%, transparent) 0%, transparent 42%);
+  opacity: var(--opencodian-composer-liquid-frost-opacity);
+}
+
 .opencodian-composer-content {
   position: relative;
   z-index: 1;
@@ -2798,6 +2899,12 @@
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
   box-shadow: none;
+}
+
+.opencodian-composer-shell--glass-refract .opencodian-input-wrapper,
+.opencodian-composer-shell--glass-refract .opencodian-input-toolbar {
+  position: relative;
+  z-index: 1;
 }
 
 .opencodian-input-toolbar .opencodian-permission-selector,

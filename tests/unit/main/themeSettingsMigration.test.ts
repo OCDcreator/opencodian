@@ -86,4 +86,44 @@ describe('OpenCodianPlugin.loadSettings theme migration', () => {
 
     expect(plugin.settings.inputPanelTheme).toBe('preset');
   });
+
+  it('defaults the experimental composer glass refraction toggle to false', async () => {
+    const plugin = {
+      storage: {
+        loadSettings: jest.fn().mockResolvedValue({}),
+      },
+    } as unknown as OpenCodianPlugin;
+
+    await OpenCodianPlugin.prototype.loadSettings.call(plugin);
+
+    expect(plugin.settings.experimentalComposerGlassRefractionEnabled).toBe(false);
+  });
+
+  it('preserves an explicit enabled experimental composer glass refraction toggle', async () => {
+    const plugin = {
+      storage: {
+        loadSettings: jest.fn().mockResolvedValue({
+          experimentalComposerGlassRefractionEnabled: true,
+        }),
+      },
+    } as unknown as OpenCodianPlugin;
+
+    await OpenCodianPlugin.prototype.loadSettings.call(plugin);
+
+    expect(plugin.settings.experimentalComposerGlassRefractionEnabled).toBe(true);
+  });
+
+  it('preserves an explicit disabled experimental composer glass refraction toggle', async () => {
+    const plugin = {
+      storage: {
+        loadSettings: jest.fn().mockResolvedValue({
+          experimentalComposerGlassRefractionEnabled: false,
+        }),
+      },
+    } as unknown as OpenCodianPlugin;
+
+    await OpenCodianPlugin.prototype.loadSettings.call(plugin);
+
+    expect(plugin.settings.experimentalComposerGlassRefractionEnabled).toBe(false);
+  });
 });

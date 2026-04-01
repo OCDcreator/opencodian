@@ -13,6 +13,7 @@ import {
   isValidChatAppearanceCustomCssDeclarations,
   normalizeBelowHeaderTabBarLayout,
   normalizeChatAppearanceSettings,
+  normalizeExperimentalComposerGlassRefractionEnabled,
   normalizeInputPanelThemeId,
   normalizePartialChatAppearanceSettings,
   normalizeQuestionCardPosition,
@@ -100,6 +101,7 @@ describe('Settings', () => {
       expect(DEFAULT_SETTINGS.enableAutoScroll).toBe(true);
       expect(DEFAULT_SETTINGS.chatAppearance.layout.messagesPaddingTop).toBe(12);
       expect(DEFAULT_SETTINGS.inputPanelTheme).toBe('preset');
+      expect(DEFAULT_SETTINGS.experimentalComposerGlassRefractionEnabled).toBe(false);
       expect(DEFAULT_SETTINGS.chatAppearance.sticky.maskBlur).toBe(24);
       expect(DEFAULT_SETTINGS.chatAppearance.user.radius).toBe(16);
       expect(DEFAULT_SETTINGS.chatAppearance.assistant.backgroundOpacity).toBe(72);
@@ -174,6 +176,15 @@ describe('Settings', () => {
       expect(normalizeInputPanelThemeId('liquid-glass')).toBe('preset');
       expect(normalizeInputPanelThemeId('glass')).toBe('preset');
       expect(normalizeInputPanelThemeId(undefined)).toBe('preset');
+    });
+  });
+
+  describe('experimental composer glass refraction normalization', () => {
+    it('normalizes invalid values to false', () => {
+      expect(normalizeExperimentalComposerGlassRefractionEnabled(true)).toBe(true);
+      expect(normalizeExperimentalComposerGlassRefractionEnabled(false)).toBe(false);
+      expect(normalizeExperimentalComposerGlassRefractionEnabled('true')).toBe(false);
+      expect(normalizeExperimentalComposerGlassRefractionEnabled(undefined)).toBe(false);
     });
   });
 

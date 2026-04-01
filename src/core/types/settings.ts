@@ -141,6 +141,10 @@ export function normalizeInputPanelThemeId(value: unknown): InputPanelThemeId {
   }
 }
 
+export function normalizeExperimentalComposerGlassRefractionEnabled(value: unknown): boolean {
+  return typeof value === 'boolean' ? value : false;
+}
+
 export function normalizePluginIsolationMode(value: unknown): PluginIsolationMode {
   switch (value) {
     case 'pure':
@@ -743,6 +747,7 @@ export interface OpenCodianSettings {
   enableAutoScroll: boolean;
   chatScrollMode: ChatScrollMode;
   inputPanelTheme: InputPanelThemeId;
+  experimentalComposerGlassRefractionEnabled: boolean;
   chatAppearance: ChatAppearanceSettings;
   settingsPanelScrollTop: number;
   enableDebugLogging: boolean;
@@ -818,6 +823,7 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
   enableAutoScroll: true,
   chatScrollMode: 'sticky-mask',
   inputPanelTheme: 'preset',
+  experimentalComposerGlassRefractionEnabled: false,
   chatAppearance: getDefaultChatAppearanceSettings(),
   settingsPanelScrollTop: 0,
   enableDebugLogging: false,

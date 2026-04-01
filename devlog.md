@@ -12,6 +12,49 @@
 
 ---
 
+## 2026-04-01 Composer Glass Refraction 方案 A 实验接入
+
+### 🎯 改动目标
+
+- 按研究文档 `docs/liquid-glass-research/plan-a-glass-refraction.md`，重新为输入区 composer 接入一层低风险的 CSS/SVG 玻璃折射实验壳层。
+- 不恢复已移除的 `src/features/chat/liquidGlass/*` controller / sampler / renderer 架构，只走 `OpenCodianView + styles.css` 的最小接入线。
+- 为测试期提供命令面板级的开关，并将开关状态持久化到隐藏设置字段，方便在不污染正式设置页的前提下快速验证。
+
+### ✅ 本轮调整
+
+- `src/core/types/settings.ts`
+- `src/core/types/index.ts`
+- `src/main.ts`
+  - 新增隐藏字段 `experimentalComposerGlassRefractionEnabled`，默认值为 `false`
+  - 设置加载时对该字段做布尔回退
+  - 新增命令面板开关 `Toggle composer glass refraction (experimental)`，切换后仅刷新 UI，不触发服务/模型/配置同步
+
+- `src/features/chat/OpenCodianView.ts`
+- `styles.css`
+  - 在 composer shell 中新增独立的 `opencodian-composer-glass-fx` 背景层
+  - 文档级一次性注入 `#opencodian-glass-refract` SVG filter，避免多 view 重复 defs
+  - 通过激活类 `opencodian-composer-shell--glass-refract` 控制 refraction 壳层显示
+  - 玻璃 FX 仅作用于背景层，textarea、footer、toolbar 继续保持在前景，不吃 filter
+
+- `tests/unit/core/types/settings.test.ts`
+- `tests/unit/main/themeSettingsMigration.test.ts`
+- `tests/unit/features/chat/composerGlassRefraction.test.ts`
+  - 覆盖隐藏开关默认值与归一化
+  - 覆盖设置加载对缺省 / 显式 true / 显式 false 的处理
+  - 覆盖 composer glass 壳层的 DOM 激活类、FX 层注入与 SVG defs 去重
+
+### 🧪 当前验证
+
+- 待执行：相关单测
+- 待执行：`npm run build`
+- 待执行：Test Vault 部署与 `BUILD_ID` 校验
+- 待执行：`npm run check:devlog-order`
+
+### 📝 结论
+
+- 输入区这次恢复的是“方案 A：CSS/SVG 实验壳层”，不是旧版 Liquid Glass WebGL 运行时链路。
+- 正式设置页仍保持收口状态；实验验证阶段改用命令面板开关来降低回退和对比成本。
+
 ## 2026-04-01 输入区回归预设、通知路由修正与文档仓收口
 
 ### 🎯 改动目标

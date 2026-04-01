@@ -39,6 +39,7 @@ import {
   normalizeBelowHeaderTabBarLayout,
   normalizeChatAppearanceSettings,
   normalizeEffortLevel,
+  normalizeExperimentalComposerGlassRefractionEnabled,
   normalizeInputPanelThemeId,
   normalizePersistedTabState,
   normalizePluginIsolationMode,
@@ -206,6 +207,15 @@ export default class OpenCodianPlugin extends Plugin {
       editorCallback: async (editor: Editor, view: MarkdownView) => {
         await this.activateView();
         await this.getOpenCodianView()?.addSelectionContextFromActiveEditor(editor, view);
+      },
+    });
+
+    this.addCommand({
+      id: 'toggle-composer-glass-refraction-experimental',
+      name: 'Toggle composer glass refraction (experimental)',
+      callback: async () => {
+        const enabled = await this.toggleExperimentalComposerGlassRefraction();
+        new Notice(`Composer glass refraction ${enabled ? 'enabled' : 'disabled'}.`);
       },
     });
 
@@ -434,6 +444,9 @@ export default class OpenCodianPlugin extends Plugin {
               : DEFAULT_SETTINGS.renderUserMarkupAsCodeBlocks,
           pluginIsolationMode: normalizePluginIsolationMode(savedSettings.pluginIsolationMode),
           inputPanelTheme: normalizeInputPanelThemeId(savedSettings.inputPanelTheme),
+          experimentalComposerGlassRefractionEnabled: normalizeExperimentalComposerGlassRefractionEnabled(
+            savedSettings.experimentalComposerGlassRefractionEnabled,
+          ),
           debugLogPaths: normalizedDebugLogPaths,
           chatAppearance: normalizedChatAppearance,
           theme: normalizedTheme,
@@ -448,6 +461,9 @@ export default class OpenCodianPlugin extends Plugin {
       tabBarPosition: normalizeTabBarPosition(normalizedSettings?.tabBarPosition),
       belowHeaderTabBarLayout: normalizeBelowHeaderTabBarLayout(normalizedSettings?.belowHeaderTabBarLayout),
       inputPanelTheme: normalizeInputPanelThemeId(normalizedSettings?.inputPanelTheme),
+      experimentalComposerGlassRefractionEnabled: normalizeExperimentalComposerGlassRefractionEnabled(
+        normalizedSettings?.experimentalComposerGlassRefractionEnabled,
+      ),
       debugLogPaths: normalizedDebugLogPaths,
       chatAppearance: normalizedChatAppearance,
       theme: normalizedTheme,
@@ -488,6 +504,18 @@ export default class OpenCodianPlugin extends Plugin {
     if (syncConfig) {
       await this.syncOpencodeConfig();
     }
+  }
+
+  async toggleExperimentalComposerGlassRefraction(): Promise<boolean> {
+    this.settings.experimentalComposerGlassRefractionEnabled = !this.settings.experimentalComposerGlassRefractionEnabled;
+    await this.saveSettings({
+      syncService: false,
+      reloadModels: false,
+      syncConfig: false,
+      applyUi: true,
+    });
+
+    return this.settings.experimentalComposerGlassRefractionEnabled;
   }
 
   private applyLoggerSettings(): void {
