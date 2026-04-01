@@ -2458,7 +2458,7 @@
 }
 
 .opencodian-composer-shell--gr-pill {
-  border-radius: 9999px;
+  border-radius: 16px;
   -webkit-backdrop-filter: blur(var(--opencodian-gr-pill-blur)) saturate(var(--opencodian-gr-pill-saturation)) brightness(var(--opencodian-gr-pill-brightness));
   backdrop-filter: blur(var(--opencodian-gr-pill-blur)) saturate(var(--opencodian-gr-pill-saturation)) brightness(var(--opencodian-gr-pill-brightness));
   background: rgba(255, 255, 255, var(--opencodian-gr-pill-bg-alpha));
