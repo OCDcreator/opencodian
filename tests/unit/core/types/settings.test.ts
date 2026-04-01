@@ -9,11 +9,12 @@ import {
   getDefaultBlockedCommands,
   getDefaultChatAppearanceSettings,
   getDefaultDebugLogPaths,
+  getDefaultInputPanelGlassRefractionSettings,
   getDefaultThemeSettings,
   isValidChatAppearanceCustomCssDeclarations,
   normalizeBelowHeaderTabBarLayout,
   normalizeChatAppearanceSettings,
-  normalizeExperimentalComposerGlassRefractionEnabled,
+  normalizeInputPanelGlassRefractionSettings,
   normalizeInputPanelThemeId,
   normalizePartialChatAppearanceSettings,
   normalizeQuestionCardPosition,
@@ -101,11 +102,12 @@ describe('Settings', () => {
       expect(DEFAULT_SETTINGS.enableAutoScroll).toBe(true);
       expect(DEFAULT_SETTINGS.chatAppearance.layout.messagesPaddingTop).toBe(12);
       expect(DEFAULT_SETTINGS.inputPanelTheme).toBe('preset');
-      expect(DEFAULT_SETTINGS.experimentalComposerGlassRefractionEnabled).toBe(false);
       expect(DEFAULT_SETTINGS.chatAppearance.sticky.maskBlur).toBe(24);
       expect(DEFAULT_SETTINGS.chatAppearance.user.radius).toBe(16);
       expect(DEFAULT_SETTINGS.chatAppearance.assistant.backgroundOpacity).toBe(72);
+      expect(DEFAULT_SETTINGS.chatAppearance.input.backgroundOpacity).toBe(72);
       expect(DEFAULT_SETTINGS.chatAppearance.input.shadowBlur).toBe(28);
+      expect(DEFAULT_SETTINGS.inputPanelGlassRefraction).toEqual(getDefaultInputPanelGlassRefractionSettings());
       expect(DEFAULT_SETTINGS.chatAppearance.scrollbar.width).toBe(8);
       expect(DEFAULT_SETTINGS.chatAppearance.scrollbar.thumbHoverOpacity).toBe(82);
       expect(DEFAULT_SETTINGS.settingsPanelScrollTop).toBe(0);
@@ -171,20 +173,14 @@ describe('Settings', () => {
   });
 
   describe('input panel theme normalization', () => {
-    it('normalizes invalid input panel themes to preset', () => {
+    it('accepts supported input panel themes and normalizes invalid values to preset', () => {
       expect(normalizeInputPanelThemeId('preset')).toBe('preset');
+      expect(normalizeInputPanelThemeId('glass-refraction-glass')).toBe('glass-refraction-glass');
+      expect(normalizeInputPanelThemeId('glass-refraction-card')).toBe('glass-refraction-card');
+      expect(normalizeInputPanelThemeId('glass-refraction-pill')).toBe('glass-refraction-pill');
       expect(normalizeInputPanelThemeId('liquid-glass')).toBe('preset');
       expect(normalizeInputPanelThemeId('glass')).toBe('preset');
       expect(normalizeInputPanelThemeId(undefined)).toBe('preset');
-    });
-  });
-
-  describe('experimental composer glass refraction normalization', () => {
-    it('normalizes invalid values to false', () => {
-      expect(normalizeExperimentalComposerGlassRefractionEnabled(true)).toBe(true);
-      expect(normalizeExperimentalComposerGlassRefractionEnabled(false)).toBe(false);
-      expect(normalizeExperimentalComposerGlassRefractionEnabled('true')).toBe(false);
-      expect(normalizeExperimentalComposerGlassRefractionEnabled(undefined)).toBe(false);
     });
   });
 
@@ -249,6 +245,7 @@ describe('Settings', () => {
       const normalized = normalizeChatAppearanceSettings({
         layout: { messagesPaddingTop: 24 },
         assistant: { blur: 4 },
+        input: { backgroundOpacity: 64 },
         scrollbar: { width: 10, thumbOpacity: 80 },
       });
 
@@ -256,6 +253,8 @@ describe('Settings', () => {
       expect(normalized.layout.messagesPaddingX).toBe(16);
       expect(normalized.assistant.blur).toBe(4);
       expect(normalized.assistant.radius).toBe(14);
+      expect(normalized.input.backgroundOpacity).toBe(64);
+      expect(normalized.input.blur).toBe(18);
       expect(normalized.scrollbar.width).toBe(10);
       expect(normalized.scrollbar.thumbOpacity).toBe(80);
       expect(normalized.scrollbar.trackOpacity).toBe(22);
@@ -298,6 +297,65 @@ describe('Settings', () => {
         activePresetId: null,
         customAppearanceOverrides: {
           user: { blur: 4 },
+        },
+      });
+    });
+  });
+
+  describe('input panel glass refraction settings', () => {
+    it('returns the expected defaults', () => {
+      expect(getDefaultInputPanelGlassRefractionSettings()).toEqual({
+        glass: {
+          backgroundOpacity: 48,
+          blur: 26,
+          saturation: 170,
+          brightness: 108,
+        },
+        card: {
+          backgroundOpacity: 52,
+          blur: 20,
+          saturation: 150,
+          brightness: 100,
+        },
+        pill: {
+          backgroundOpacity: 5,
+          blur: 8,
+          saturation: 130,
+          brightness: 100,
+        },
+      });
+    });
+
+    it('normalizes invalid glass refraction values back to defaults and clamps ranges', () => {
+      expect(normalizeInputPanelGlassRefractionSettings({
+        glass: {
+          backgroundOpacity: 140,
+          blur: -1,
+          saturation: 999,
+          brightness: 10,
+        },
+        card: {
+          blur: 24,
+        },
+        pill: {} as never,
+      })).toEqual({
+        glass: {
+          backgroundOpacity: 100,
+          blur: 0,
+          saturation: 250,
+          brightness: 50,
+        },
+        card: {
+          backgroundOpacity: 52,
+          blur: 24,
+          saturation: 150,
+          brightness: 100,
+        },
+        pill: {
+          backgroundOpacity: 5,
+          blur: 8,
+          saturation: 130,
+          brightness: 100,
         },
       });
     });

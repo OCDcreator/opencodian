@@ -3,7 +3,10 @@ jest.mock('../../../src/core/opencode', () => ({
   SDK_FEATURE_FLAG_ROLLOUT_DEFAULTS: {},
 }));
 
-import { getDefaultChatAppearanceSettings } from '../../../src/core/types';
+import {
+  getDefaultChatAppearanceSettings,
+  getDefaultInputPanelGlassRefractionSettings,
+} from '../../../src/core/types';
 import OpenCodianPlugin from '../../../src/main';
 
 describe('OpenCodianPlugin.loadSettings theme migration', () => {
@@ -87,19 +90,73 @@ describe('OpenCodianPlugin.loadSettings theme migration', () => {
     expect(plugin.settings.inputPanelTheme).toBe('preset');
   });
 
-  it('defaults the experimental composer glass refraction toggle to false', async () => {
+  it.each([
+    'preset',
+    'glass-refraction-glass',
+    'glass-refraction-card',
+    'glass-refraction-pill',
+  ] as const)('preserves explicit input panel theme value %s', async (inputPanelTheme) => {
     const plugin = {
       storage: {
-        loadSettings: jest.fn().mockResolvedValue({}),
+        loadSettings: jest.fn().mockResolvedValue({
+          inputPanelTheme,
+        }),
       },
     } as unknown as OpenCodianPlugin;
 
     await OpenCodianPlugin.prototype.loadSettings.call(plugin);
 
-    expect(plugin.settings.experimentalComposerGlassRefractionEnabled).toBe(false);
+    expect(plugin.settings.inputPanelTheme).toBe(inputPanelTheme);
   });
 
-  it('preserves an explicit enabled experimental composer glass refraction toggle', async () => {
+  it('preserves preset input transparency and per-tier glass refraction tuning on load', async () => {
+    const plugin = {
+      storage: {
+        loadSettings: jest.fn().mockResolvedValue({
+          chatAppearance: {
+            input: {
+              backgroundOpacity: 61,
+            },
+          },
+          inputPanelGlassRefraction: {
+            glass: {
+              backgroundOpacity: 56,
+              blur: 28,
+              saturation: 180,
+              brightness: 110,
+            },
+            card: {
+              backgroundOpacity: 44,
+              blur: 18,
+              saturation: 145,
+              brightness: 96,
+            },
+          },
+        }),
+      },
+    } as unknown as OpenCodianPlugin;
+
+    await OpenCodianPlugin.prototype.loadSettings.call(plugin);
+
+    expect(plugin.settings.chatAppearance.input.backgroundOpacity).toBe(61);
+    expect(plugin.settings.inputPanelGlassRefraction).toEqual({
+      glass: {
+        backgroundOpacity: 56,
+        blur: 28,
+        saturation: 180,
+        brightness: 110,
+      },
+      card: {
+        backgroundOpacity: 44,
+        blur: 18,
+        saturation: 145,
+        brightness: 96,
+      },
+      pill: getDefaultInputPanelGlassRefractionSettings().pill,
+    });
+  });
+
+  it('ignores the removed experimental composer glass refraction toggle field', async () => {
     const plugin = {
       storage: {
         loadSettings: jest.fn().mockResolvedValue({
@@ -110,20 +167,9 @@ describe('OpenCodianPlugin.loadSettings theme migration', () => {
 
     await OpenCodianPlugin.prototype.loadSettings.call(plugin);
 
-    expect(plugin.settings.experimentalComposerGlassRefractionEnabled).toBe(true);
-  });
-
-  it('preserves an explicit disabled experimental composer glass refraction toggle', async () => {
-    const plugin = {
-      storage: {
-        loadSettings: jest.fn().mockResolvedValue({
-          experimentalComposerGlassRefractionEnabled: false,
-        }),
-      },
-    } as unknown as OpenCodianPlugin;
-
-    await OpenCodianPlugin.prototype.loadSettings.call(plugin);
-
-    expect(plugin.settings.experimentalComposerGlassRefractionEnabled).toBe(false);
+    expect(plugin.settings.inputPanelTheme).toBe('preset');
+    expect(
+      (plugin.settings as unknown as Record<string, unknown>).experimentalComposerGlassRefractionEnabled,
+    ).toBeUndefined();
   });
 });

@@ -12,6 +12,186 @@
 
 ---
 
+## 2026-04-01 输入区预设透明度与 Glass Refraction 自定义
+
+### 🎯 改动目标
+
+- 为 `preset` 输入区补上真正可用的背景透明度调节，并让现有 blur / shadow 滑块直接驱动 composer 壳层。
+- 为正式接入的 `glass-refraction` 三档输入区预设补上可持久化的参数自定义，不再只有固定原版公式。
+
+### ✅ 本轮调整
+
+- `src/core/types/settings.ts`
+- `src/core/theme/index.ts`
+- `src/main.ts`
+  - 为 `chatAppearance.input` 新增 `backgroundOpacity`
+  - 新增 `inputPanelGlassRefraction` 持久化设置，分别保存 `glass / card / pill` 的背景强度、blur、saturation、brightness
+  - 设置加载时补齐默认值并归一化范围
+
+- `src/features/chat/chatAppearance.ts`
+- `src/features/chat/OpenCodianView.ts`
+- `styles.css`
+  - 为 preset 输入区输出并消费 `--opencodian-input-bg-opacity`
+  - 让 preset 输入区的 blur / shadow 变量真正作用到 composer shell
+  - 为三档 `glass-refraction` 输出独立 CSS 变量，并在样式层按 tier 应用对应的 blur / opacity / saturation / brightness
+
+- `src/features/settings/OpenCodianSettings.ts`
+- `src/i18n/locales/en.ts`
+- `src/i18n/locales/zh.ts`
+  - 在“样式 > 输入区”中为 `preset` 新增“输入框背景强度”滑块
+  - 当选择 `glass-refraction` 时，改为显示当前 tier 的玻璃背景强度、blur、saturation、brightness 控件与独立 reset
+
+- `tests/unit/core/types/settings.test.ts`
+- `tests/unit/main/themeSettingsMigration.test.ts`
+- `tests/unit/features/chat/chatAppearance.test.ts`
+  - 覆盖新增默认值、归一化、加载行为与 CSS 变量映射
+
+### 🧪 当前验证
+
+- 已通过：相关单测
+- 待执行：`npm run check:devlog-order`
+- 待执行：`npm run lint`
+- 待执行：`npm run build`
+- 待执行：Test Vault 部署与 `BUILD_ID` 校验
+
+## 2026-04-01 输入区原版 glass-refraction 三档预设接入
+
+### 🎯 改动目标
+
+- 不再继续维护 composer 的实验 FX 壳层，而是将输入区正式接入 `glass-refraction` reference 的三档原版 tier。
+- 在设置页中提供正式的输入区样式选择：保留原本 `preset`，并新增 `glass`、`glass-card`、`glass-pill` 3 个原版子选项。
+
+### ✅ 本轮调整
+
+- `src/core/types/settings.ts`
+- `src/main.ts`
+  - 将 `InputPanelThemeId` 扩展为 `preset + 3` 个原版 `glass-refraction` 选项
+  - 删除隐藏实验字段 `experimentalComposerGlassRefractionEnabled` 及命令面板实验 toggle
+  - 设置加载时忽略旧实验字段与旧 `inputPanelLiquidGlassMode` 残留
+
+- `src/features/chat/OpenCodianView.ts`
+- `styles.css`
+  - 删除实验态 SVG defs 注入、FX 子层 DOM 与相关运行时 helper
+  - 改为在 composer shell 上直接切换正式类：
+    - `opencodian-composer-shell--gr-glass`
+    - `opencodian-composer-shell--gr-card`
+    - `opencodian-composer-shell--gr-pill`
+  - 将 reference `glass-refraction` 三档视觉公式 vendoring 到主仓样式，仅做选择器作用域改写
+
+- `src/features/settings/OpenCodianSettings.ts`
+- `src/i18n/locales/en.ts`
+- `src/i18n/locales/zh.ts`
+  - 在“样式 > 输入区”新增正式输入区样式入口
+  - 采用两级选择：`Preset / Glass Refraction` + `Glass / Glass Card / Glass Pill`
+  - 当选择原版三档时禁用输入区圆角 / blur / shadow 控制，并提示这些控制只对 `Preset` 生效
+
+- `tests/unit/core/types/settings.test.ts`
+- `tests/unit/main/themeSettingsMigration.test.ts`
+- `tests/unit/features/chat/inputPanelTheme.test.ts`
+  - 删除实验开关相关断言
+  - 新增输入区 4 档主题的归一化、加载与运行时 class 切换测试
+
+### 🧪 当前验证
+
+- 待执行：相关单测
+- 待执行：`npm run check:devlog-order`
+- 待执行：`npm run lint`
+- 待执行：`npm run build`
+- 待执行：Test Vault 部署与 `BUILD_ID` 校验
+
+### 📝 结论
+
+- 输入区的 glass-refraction 现在转为正式可选预设，而不是继续停留在实验 FX 方案上。
+- `preset` 保留原有 OpenCodian 输入区调节能力；原版三档则按 reference 的 tier 公式直接接入。
+
+## 2026-04-01 Composer Glass Refraction 去雾化对齐
+
+### 🎯 改动目标
+
+- 针对当前实验态“后面只是模糊的一大团”的观感，继续把 composer glass 从单纯毛玻璃块拉回到更像参考 `.glass` 的折射体。
+- 保持“实验态只有 `refract` 单层 blur”不变，优先通过底色密度、边缘色散和高光层次来减弱雾块感。
+
+### ✅ 本轮调整
+
+- `styles.css`
+  - 适度下调实验态 refraction blur，并降低深浅主题下主玻璃底色的不透明度，避免输入区背后直接结成整块雾面
+  - 提高 chromatic dispersion 和 specular 的可见度，让四边色散与顶部细亮线比纯 blur 更先被读到
+  - 为 `refract` 增加顶部软高光和底部轻微内收阴影，让玻璃面更有壳体体积感，而不是平铺的糊面
+  - 将 specular 呼吸动画改为基于变量强度呼吸，避免动画把主题/模式下的高光强度配置覆盖掉
+
+### 🧪 当前验证
+
+- 待执行：相关单测
+- 待执行：`npm run check:devlog-order`
+- 待执行：`npm run lint`
+- 待执行：`npm run build`
+- 待执行：Test Vault 部署与 `BUILD_ID` 校验
+
+### 📝 结论
+
+- 这一轮仍然是单层模糊结构，但视觉重心不再主要落在 blur 上，而是开始更多依赖壳体高光、边缘色散和更轻的玻璃底色去建立“液态玻璃”感。
+
+## 2026-04-01 Composer Glass Refraction 单层主层再对齐
+
+### 🎯 改动目标
+
+- 在已经纠正为“实验态单层 blur”之后，继续把主玻璃面的职责分布对齐到 `glass-refraction` 参考项目。
+- 避免继续出现“shell 提供一半玻璃面、refract 再提供另一半玻璃面”的拆分式实现，让 `refract` 层更像参考 `.glass` 的主视觉承载层。
+
+### ✅ 本轮调整
+
+- `styles.css`
+  - 将 shimmer sweep 和主玻璃底色从 `opencodian-composer-shell--glass-refract` 移到 `opencodian-composer-glass-fx-refract`
+  - `opencodian-composer-shell--glass-refract` 只保留 ring border / inset highlight / depth shadow，不再承担主玻璃面背景
+  - 让 `refract` 层同时承担：主玻璃底色、单层 blur、SVG refraction、shimmer 动画
+  - 将暗色 `saturate` 和色散整体强度继续拉近参考 `.glass`
+  - 为 `refract / dispersion / specular` 三层补显式 z-index，减少多层壳体下的层叠歧义
+
+### 🧪 当前验证
+
+- 待执行：相关单测
+- 待执行：`npm run build`
+- 待执行：Test Vault 部署与 `BUILD_ID` 校验
+
+### 📝 结论
+
+- 实验态现在不仅是“单层 blur”，而且主玻璃面的职责也更接近参考 `.glass`：`refract` 层成为真正的主玻璃面，shell 退回到承载边框和投影的容器角色。
+
+## 2026-04-01 Composer Glass Refraction 参考样式对齐
+
+### 🎯 改动目标
+
+- 不再停留在“方案 A 已接通”的静态壳层阶段，而是把 composer 的实验实现重新对齐到 `reference-projects/liquid-glass-research/glass-refraction` 的 `.glass` 视觉语言。
+- 修正当前实现里最影响观感的几个偏差：暗色主题 blur 被手动压成 `0px`、只有单层 FX、缺少 shimmer / specular breathing、色散过弱、SVG filter 缺少饱和增强步骤。
+
+### ✅ 本轮调整
+
+- `src/features/chat/OpenCodianView.ts`
+  - 将 composer glass 层改为三层显式 DOM：`refract`、`dispersion`、`specular`
+  - 在 SVG filter 中补上 `feColorMatrix` 饱和增强步骤，与参考 `GlassFilters.tsx` 对齐
+
+- `styles.css`
+  - 将暗色主题 `--opencodian-glass-refraction-blur` 从临时调试值 `0px` 恢复到 dense glass 基线
+  - 新增并对齐 shimmer / specular 动画、四边 chromatic edge、ring border、inset highlight、depth shadow
+  - 让 composer glass 的基础配色和透明度更接近参考 `.glass`
+  - 明确收口为“实验态只有单层 blur”：普通 composer shell 保持默认 blur，`opencodian-composer-shell--glass-refract` 激活后由 `refract` 子层独占 blur，对齐参考项目的单层模糊结构
+
+- `tests/unit/features/chat/composerGlassRefraction.test.ts`
+  - 更新断言，要求三层显式 FX DOM 都存在，同时仍保持 SVG defs 只注入一次
+
+### 🧪 当前验证
+
+- 待执行：相关单测
+- 待执行：`npm run build`
+- 待执行：Test Vault 部署与 `BUILD_ID` 校验
+- 待执行：`npm run check:devlog-order`
+
+### 📝 结论
+
+- 这一轮的目标是把当前实验外壳从“静态磨砂面板”推进到更接近 `glass-refraction` 参考项目的 dense `.glass` 效果。
+- 模糊结构上也已从“双层 blur”纠正为“实验态单层 blur”，避免 shell 本体和 `refract` 子层重复发雾。
+- 仍不恢复旧 `liquidGlass` WebGL/controller 架构，继续使用现有隐藏实验开关进行验证。
+
 ## 2026-04-01 Composer Glass Refraction 方案 A 实验接入
 
 ### 🎯 改动目标

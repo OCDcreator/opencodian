@@ -1,4 +1,4 @@
-import type { ChatAppearanceSettings } from '../../core/types';
+import type { ChatAppearanceSettings, InputPanelGlassRefractionSettings } from '../../core/types';
 import { isValidChatAppearanceCustomCssDeclarations } from '../../core/types';
 
 export function getChatAppearanceCssVariables(
@@ -19,6 +19,7 @@ export function getChatAppearanceCssVariables(
     '--opencodian-assistant-blur': `${appearance.assistant.blur}px`,
     '--opencodian-assistant-shadow-blur': `${appearance.assistant.shadowBlur}px`,
     '--opencodian-input-radius': `${appearance.input.radius}px`,
+    '--opencodian-input-bg-opacity': `${appearance.input.backgroundOpacity}%`,
     '--opencodian-input-blur': `${appearance.input.blur}px`,
     '--opencodian-input-shadow-blur': `${appearance.input.shadowBlur}px`,
     '--opencodian-scrollbar-width': `${appearance.scrollbar.width}px`,
@@ -28,6 +29,25 @@ export function getChatAppearanceCssVariables(
     '--opencodian-scrollbar-thumb-hover-opacity': `${appearance.scrollbar.thumbHoverOpacity}%`,
     '--opencodian-scrollbar-edge-padding': `${appearance.scrollbar.edgePadding}px`,
     '--opencodian-scrollbar-shadow-opacity': `${appearance.scrollbar.shadowOpacity}%`,
+  };
+}
+
+export function getInputPanelGlassRefractionCssVariables(
+  settings: InputPanelGlassRefractionSettings,
+): Record<string, string> {
+  return {
+    '--opencodian-gr-glass-bg-alpha': `${settings.glass.backgroundOpacity / 100}`,
+    '--opencodian-gr-glass-blur': `${settings.glass.blur}px`,
+    '--opencodian-gr-glass-saturation': `${settings.glass.saturation}%`,
+    '--opencodian-gr-glass-brightness': `${settings.glass.brightness}%`,
+    '--opencodian-gr-card-bg-alpha': `${settings.card.backgroundOpacity / 100}`,
+    '--opencodian-gr-card-blur': `${settings.card.blur}px`,
+    '--opencodian-gr-card-saturation': `${settings.card.saturation}%`,
+    '--opencodian-gr-card-brightness': `${settings.card.brightness}%`,
+    '--opencodian-gr-pill-bg-alpha': `${settings.pill.backgroundOpacity / 100}`,
+    '--opencodian-gr-pill-blur': `${settings.pill.blur}px`,
+    '--opencodian-gr-pill-saturation': `${settings.pill.saturation}%`,
+    '--opencodian-gr-pill-brightness': `${settings.pill.brightness}%`,
   };
 }
 

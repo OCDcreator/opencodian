@@ -29,13 +29,6 @@
   --opencodian-composer-liquid-highlight: rgba(173, 216, 255, 0.1);
   --opencodian-composer-liquid-highlight-strong: rgba(196, 230, 255, 0.16);
   --opencodian-composer-liquid-spectrum-end: rgba(151, 211, 255, 0.12);
-  --opencodian-glass-refraction-blur: 24px;
-  --opencodian-glass-refraction-saturation: 1.18;
-  --opencodian-glass-refraction-brightness: 1.05;
-  --opencodian-glass-refraction-blue: rgba(0, 180, 255, 0.08);
-  --opencodian-glass-refraction-violet: rgba(120, 80, 255, 0.07);
-  --opencodian-glass-refraction-pink: rgba(255, 100, 200, 0.07);
-  --opencodian-glass-refraction-green: rgba(100, 255, 180, 0.05);
   --opencodian-composer-embedded-fill: color-mix(in srgb, var(--background-primary) 8%, transparent);
   --opencodian-composer-embedded-fill-strong: color-mix(in srgb, var(--background-primary) 12%, transparent);
   --opencodian-composer-embedded-border: rgba(255, 255, 255, 0.06);
@@ -78,13 +71,6 @@
   --opencodian-composer-liquid-highlight: rgba(154, 201, 255, 0.14);
   --opencodian-composer-liquid-highlight-strong: rgba(194, 225, 255, 0.2);
   --opencodian-composer-liquid-spectrum-end: rgba(131, 197, 255, 0.1);
-  --opencodian-glass-refraction-blur: 20px;
-  --opencodian-glass-refraction-saturation: 1.12;
-  --opencodian-glass-refraction-brightness: 1.03;
-  --opencodian-glass-refraction-blue: rgba(0, 140, 220, 0.05);
-  --opencodian-glass-refraction-violet: rgba(100, 60, 220, 0.045);
-  --opencodian-glass-refraction-pink: rgba(220, 80, 170, 0.04);
-  --opencodian-glass-refraction-green: rgba(80, 200, 140, 0.032);
   --opencodian-composer-embedded-fill: color-mix(in srgb, var(--background-primary) 72%, transparent);
   --opencodian-composer-embedded-fill-strong: color-mix(in srgb, var(--background-primary) 82%, transparent);
   --opencodian-composer-embedded-border: rgba(255, 255, 255, 0.44);
@@ -167,13 +153,6 @@
   --opencodian-composer-liquid-highlight: rgba(173, 216, 255, 0.12);
   --opencodian-composer-liquid-highlight-strong: rgba(196, 230, 255, 0.18);
   --opencodian-composer-liquid-spectrum-end: rgba(151, 211, 255, 0.12);
-  --opencodian-glass-refraction-blur: 24px;
-  --opencodian-glass-refraction-saturation: 1.18;
-  --opencodian-glass-refraction-brightness: 1.04;
-  --opencodian-glass-refraction-blue: rgba(0, 180, 255, 0.06);
-  --opencodian-glass-refraction-violet: rgba(120, 80, 255, 0.055);
-  --opencodian-glass-refraction-pink: rgba(255, 100, 200, 0.05);
-  --opencodian-glass-refraction-green: rgba(100, 255, 180, 0.04);
   --opencodian-composer-embedded-fill: color-mix(in srgb, var(--background-primary) 8%, transparent);
   --opencodian-composer-embedded-fill-strong: color-mix(in srgb, var(--background-primary) 12%, transparent);
   --opencodian-composer-embedded-border: rgba(255, 255, 255, 0.07);
@@ -214,8 +193,21 @@
   --opencodian-assistant-blur: 10px;
   --opencodian-assistant-shadow-blur: 24px;
   --opencodian-input-radius: 12px;
+  --opencodian-input-bg-opacity: 72%;
   --opencodian-input-blur: 18px;
   --opencodian-input-shadow-blur: 28px;
+  --opencodian-gr-glass-bg-alpha: 0.48;
+  --opencodian-gr-glass-blur: 26px;
+  --opencodian-gr-glass-saturation: 170%;
+  --opencodian-gr-glass-brightness: 108%;
+  --opencodian-gr-card-bg-alpha: 0.52;
+  --opencodian-gr-card-blur: 20px;
+  --opencodian-gr-card-saturation: 150%;
+  --opencodian-gr-card-brightness: 100%;
+  --opencodian-gr-pill-bg-alpha: 0.05;
+  --opencodian-gr-pill-blur: 8px;
+  --opencodian-gr-pill-saturation: 130%;
+  --opencodian-gr-pill-brightness: 100%;
   --opencodian-scrollbar-width: 8px;
   --opencodian-scrollbar-radius: 999px;
   --opencodian-scrollbar-track-opacity: 22%;
@@ -2302,95 +2294,190 @@
   overflow: visible;
   isolation: isolate;
   border-radius: calc(var(--opencodian-input-radius) + 2px);
-  background: color-mix(in srgb, var(--opencodian-composer-lens-bg-strong) 72%, transparent);
-  backdrop-filter: blur(22px) saturate(1.18) contrast(1.02);
-  -webkit-backdrop-filter: blur(22px) saturate(1.18) contrast(1.02);
-  box-shadow: 0 12px 28px color-mix(in srgb, var(--opencodian-composer-lens-shadow) 18%, transparent);
+  background: color-mix(in srgb, var(--opencodian-composer-lens-bg-strong) var(--opencodian-input-bg-opacity), transparent);
+  backdrop-filter: blur(var(--opencodian-input-blur)) saturate(118%) contrast(102%);
+  -webkit-backdrop-filter: blur(var(--opencodian-input-blur)) saturate(118%) contrast(102%);
+  box-shadow: 0 12px var(--opencodian-input-shadow-blur) color-mix(in srgb, var(--opencodian-composer-lens-shadow) 18%, transparent);
 }
 
-.opencodian-composer-shell--glass-refract {
+@keyframes opencodian-glass-shimmer {
+  0% {
+    background-position: -200% 0, 0 0;
+  }
+
+  100% {
+    background-position: 200% 0, 0 0;
+  }
+}
+
+@keyframes opencodian-specular-breathe {
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
+.opencodian-composer-shell--gr-glass,
+.opencodian-composer-shell--gr-card,
+.opencodian-composer-shell--gr-pill {
+  --opencodian-gr-chromatic-blue: rgba(0, 180, 255, 0.045);
+  --opencodian-gr-chromatic-violet: rgba(120, 80, 255, 0.04);
+  --opencodian-gr-chromatic-pink: rgba(255, 100, 200, 0.035);
+  --opencodian-gr-chromatic-green: rgba(100, 255, 180, 0.025);
+  --opencodian-gr-shimmer-duration: 7s;
+  --opencodian-gr-specular-duration: 5s;
+  background: transparent;
+  transform: none;
+}
+
+.opencodian-composer-shell--gr-glass .opencodian-input-wrapper,
+.opencodian-composer-shell--gr-glass .opencodian-input-toolbar,
+.opencodian-composer-shell--gr-card .opencodian-input-wrapper,
+.opencodian-composer-shell--gr-card .opencodian-input-toolbar,
+.opencodian-composer-shell--gr-pill .opencodian-input-wrapper,
+.opencodian-composer-shell--gr-pill .opencodian-input-toolbar {
+  position: relative;
+  z-index: 4;
+}
+
+.opencodian-composer-shell--gr-glass {
+  border-radius: 20px;
   background:
+    linear-gradient(105deg, transparent 40%, rgba(255, 255, 255, 0.06) 50%, transparent 60%),
     linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--opencodian-glass-specular-soft) 90%, transparent) 0%,
-      transparent 44%
-    ),
-    color-mix(in srgb, var(--opencodian-composer-lens-bg-strong) 70%, transparent);
-  box-shadow:
-    0 16px 34px color-mix(in srgb, var(--opencodian-composer-lens-shadow-strong) 22%, transparent),
-    0 1px 0 color-mix(in srgb, var(--opencodian-composer-lens-border-strong) 72%, transparent) inset;
-}
-
-.opencodian-composer-glass-fx {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  overflow: hidden;
-  border-radius: inherit;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.18s ease;
-}
-
-.opencodian-composer-glass-fx.is-enabled {
-  opacity: 1;
-}
-
-.opencodian-composer-glass-fx-refract {
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--opencodian-composer-lens-bg) 82%, transparent) 0%,
-      color-mix(in srgb, var(--opencodian-composer-lens-bg-strong) 68%, transparent) 100%
+      135deg,
+      rgba(18, 22, 35, var(--opencodian-gr-glass-bg-alpha)),
+      rgba(12, 16, 28, calc(var(--opencodian-gr-glass-bg-alpha) * 0.88))
     );
-  opacity: var(--opencodian-composer-liquid-refract-opacity);
-  filter: url(#opencodian-glass-refract);
-  backdrop-filter:
-    blur(var(--opencodian-glass-refraction-blur))
-    saturate(var(--opencodian-glass-refraction-saturation))
-    brightness(var(--opencodian-glass-refraction-brightness));
-  -webkit-backdrop-filter:
-    blur(var(--opencodian-glass-refraction-blur))
-    saturate(var(--opencodian-glass-refraction-saturation))
-    brightness(var(--opencodian-glass-refraction-brightness));
+  background-size: 200% 100%, 100% 100%;
+  animation: opencodian-glass-shimmer var(--opencodian-gr-shimmer-duration) ease-in-out infinite;
+  -webkit-backdrop-filter: blur(var(--opencodian-gr-glass-blur)) saturate(var(--opencodian-gr-glass-saturation)) brightness(var(--opencodian-gr-glass-brightness));
+  backdrop-filter: blur(var(--opencodian-gr-glass-blur)) saturate(var(--opencodian-gr-glass-saturation)) brightness(var(--opencodian-gr-glass-brightness));
+  box-shadow:
+    0 0 0 0.5px rgba(255, 255, 255, 0.10),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 4px 24px -4px rgba(0, 0, 0, 0.30);
 }
 
-.opencodian-composer-glass-fx::before,
-.opencodian-composer-glass-fx::after {
+.opencodian-composer-shell--gr-glass::before {
   content: '';
   position: absolute;
   inset: 0;
   border-radius: inherit;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.07) 0%, transparent 45%),
+    linear-gradient(90deg, transparent 8%, rgba(255, 255, 255, 0.55) 50%, transparent 92%);
+  background-size: 100% 100%, 100% 1px;
+  background-position: 0 0, 0 0;
+  background-repeat: no-repeat;
+  animation: opencodian-specular-breathe var(--opencodian-gr-specular-duration) ease-in-out infinite;
   pointer-events: none;
+  z-index: 3;
 }
 
-.opencodian-composer-glass-fx::before {
+.opencodian-composer-shell--gr-glass::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
   background:
-    radial-gradient(ellipse 58% 50% at 12% 50%, var(--opencodian-glass-refraction-blue) 0%, transparent 72%),
-    radial-gradient(ellipse 50% 56% at 50% 12%, var(--opencodian-glass-refraction-violet) 0%, transparent 72%),
-    radial-gradient(ellipse 58% 50% at 88% 50%, var(--opencodian-glass-refraction-pink) 0%, transparent 72%),
-    radial-gradient(ellipse 50% 56% at 50% 88%, var(--opencodian-glass-refraction-green) 0%, transparent 72%);
+    radial-gradient(ellipse 55% 50% at 12% 50%, var(--opencodian-gr-chromatic-blue) 0%, transparent 70%),
+    radial-gradient(ellipse 50% 55% at 50% 12%, var(--opencodian-gr-chromatic-violet) 0%, transparent 70%),
+    radial-gradient(ellipse 55% 50% at 88% 50%, var(--opencodian-gr-chromatic-pink) 0%, transparent 70%),
+    radial-gradient(ellipse 50% 55% at 50% 88%, var(--opencodian-gr-chromatic-green) 0%, transparent 70%);
   box-shadow:
-    inset 1px 0 0 color-mix(in srgb, var(--opencodian-glass-refraction-blue) 88%, transparent),
-    inset -1px 0 0 color-mix(in srgb, var(--opencodian-glass-refraction-pink) 88%, transparent),
-    inset 0 1px 0 color-mix(in srgb, var(--opencodian-glass-refraction-violet) 78%, transparent),
-    inset 0 -1px 0 color-mix(in srgb, var(--opencodian-glass-refraction-green) 78%, transparent);
-  opacity: var(--opencodian-composer-liquid-dispersion-opacity);
+    inset 1px 0 0 0 rgba(0, 180, 255, 0.07),
+    inset -1px 0 0 0 rgba(255, 100, 200, 0.07),
+    inset 0 1px 0 0 rgba(100, 255, 180, 0.05),
+    inset 0 -1px 0 0 rgba(255, 200, 50, 0.05);
+  opacity: 0.8;
+  pointer-events: none;
+  z-index: 2;
 }
 
-.opencodian-composer-glass-fx::after {
-  background:
-    linear-gradient(180deg, color-mix(in srgb, white 10%, transparent) 0%, transparent 42%),
-    radial-gradient(circle at 18% 0%, color-mix(in srgb, white 18%, transparent) 0%, transparent 42%);
-  opacity: var(--opencodian-composer-liquid-frost-opacity);
+.opencodian-composer-shell--gr-card {
+  border-radius: 16px;
+  background: linear-gradient(
+    160deg,
+    rgba(255, 255, 255, calc(var(--opencodian-gr-card-bg-alpha) * 0.12)) 0%,
+    rgba(15, 18, 30, var(--opencodian-gr-card-bg-alpha)) 100%
+  );
+  -webkit-backdrop-filter: blur(var(--opencodian-gr-card-blur)) saturate(var(--opencodian-gr-card-saturation)) brightness(var(--opencodian-gr-card-brightness));
+  backdrop-filter: blur(var(--opencodian-gr-card-blur)) saturate(var(--opencodian-gr-card-saturation)) brightness(var(--opencodian-gr-card-brightness));
+  box-shadow:
+    0 0 0 0.5px rgba(255, 255, 255, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 2px 12px -4px rgba(0, 0, 0, 0.3);
+  transition:
+    transform 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.opencodian-composer-shell--gr-card:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 0 0 0.5px rgba(255, 255, 255, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 8px 32px -8px rgba(0, 0, 0, 0.45);
+}
+
+.opencodian-composer-shell--gr-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 14%;
+  right: 14%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.30) 50%, transparent);
+  pointer-events: none;
+  z-index: 3;
+}
+
+.opencodian-composer-shell--gr-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow:
+    inset 1px 0 0 0 rgba(0, 180, 255, 0.05),
+    inset -1px 0 0 0 rgba(255, 100, 200, 0.05),
+    inset 0 1px 0 0 rgba(100, 255, 180, 0.03),
+    inset 0 -1px 0 0 rgba(255, 200, 50, 0.03);
+  opacity: 0;
+  transition: opacity 0.35s ease;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.opencodian-composer-shell--gr-card:hover::after {
+  opacity: 1;
+}
+
+.opencodian-composer-shell--gr-pill {
+  border-radius: 9999px;
+  -webkit-backdrop-filter: blur(var(--opencodian-gr-pill-blur)) saturate(var(--opencodian-gr-pill-saturation)) brightness(var(--opencodian-gr-pill-brightness));
+  backdrop-filter: blur(var(--opencodian-gr-pill-blur)) saturate(var(--opencodian-gr-pill-saturation)) brightness(var(--opencodian-gr-pill-brightness));
+  background: rgba(255, 255, 255, var(--opencodian-gr-pill-bg-alpha));
+  box-shadow:
+    0 0 0 0.5px rgba(255, 255, 255, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  transition: all 0.25s ease;
+}
+
+.opencodian-composer-shell--gr-pill:hover {
+  background: rgba(255, 255, 255, calc(var(--opencodian-gr-pill-bg-alpha) + 0.04));
+  box-shadow:
+    0 0 0 0.5px rgba(255, 255, 255, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
 .opencodian-composer-content {
   position: relative;
-  z-index: 1;
+  z-index: 4;
   display: flex;
   flex-direction: column;
   gap: 0;
@@ -2855,7 +2942,7 @@
   align-items: stretch;
   gap: 0;
   position: relative;
-  z-index: 1;
+  z-index: 4;
   overflow: visible;
   isolation: auto;
   background: transparent;
@@ -2890,7 +2977,7 @@
   gap: 8px;
   align-self: stretch;
   position: relative;
-  z-index: 1;
+  z-index: 4;
   margin-top: 0;
   padding: 0 12px 10px;
   border-radius: 0;
@@ -2899,12 +2986,6 @@
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
   box-shadow: none;
-}
-
-.opencodian-composer-shell--glass-refract .opencodian-input-wrapper,
-.opencodian-composer-shell--glass-refract .opencodian-input-toolbar {
-  position: relative;
-  z-index: 1;
 }
 
 .opencodian-input-toolbar .opencodian-permission-selector,
@@ -3818,6 +3899,26 @@
 .opencodian-style-group-body {
   display: flex;
   flex-direction: column;
+}
+
+.opencodian-style-input-controls {
+  display: flex;
+  flex-direction: column;
+}
+
+.opencodian-style-input-controls.is-disabled {
+  opacity: 0.72;
+}
+
+.opencodian-style-input-lock-note {
+  margin: 4px 0 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--background-modifier-border) 88%, transparent);
+  background: color-mix(in srgb, var(--background-primary) 78%, transparent);
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .opencodian-theme-presets {

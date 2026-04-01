@@ -79,7 +79,11 @@ export type BelowHeaderTabBarLayout = 'grid' | 'vertical';
 export type ChatScrollMode = 'natural' | 'sticky-basic' | 'sticky-mask';
 
 /** Input panel visual theme */
-export type InputPanelThemeId = 'preset';
+export type InputPanelThemeId =
+  | 'preset'
+  | 'glass-refraction-glass'
+  | 'glass-refraction-card'
+  | 'glass-refraction-pill';
 
 /** Server connection mode */
 export type ServerMode = 'local' | 'remote';
@@ -135,14 +139,13 @@ export function normalizeQuestionCardPosition(value: unknown): QuestionCardPosit
 export function normalizeInputPanelThemeId(value: unknown): InputPanelThemeId {
   switch (value) {
     case 'preset':
+    case 'glass-refraction-glass':
+    case 'glass-refraction-card':
+    case 'glass-refraction-pill':
       return value;
     default:
       return 'preset';
   }
-}
-
-export function normalizeExperimentalComposerGlassRefractionEnabled(value: unknown): boolean {
-  return typeof value === 'boolean' ? value : false;
 }
 
 export function normalizePluginIsolationMode(value: unknown): PluginIsolationMode {
@@ -382,9 +385,29 @@ export interface ChatAppearanceAssistantSettings {
 
 export interface ChatAppearanceInputSettings {
   radius: number;
+  backgroundOpacity: number;
   blur: number;
   shadowBlur: number;
 }
+
+export type InputPanelGlassRefractionVariantId = 'glass' | 'card' | 'pill';
+
+export interface InputPanelGlassRefractionVariantSettings {
+  backgroundOpacity: number;
+  blur: number;
+  saturation: number;
+  brightness: number;
+}
+
+export interface InputPanelGlassRefractionSettings {
+  glass: InputPanelGlassRefractionVariantSettings;
+  card: InputPanelGlassRefractionVariantSettings;
+  pill: InputPanelGlassRefractionVariantSettings;
+}
+
+type PartialInputPanelGlassRefractionSettings = Partial<
+  Record<InputPanelGlassRefractionVariantId, Partial<InputPanelGlassRefractionVariantSettings>>
+>;
 
 export interface ChatAppearanceScrollbarSettings {
   width: number;
@@ -476,6 +499,7 @@ export function getDefaultChatAppearanceSettings(): ChatAppearanceSettings {
     },
     input: {
       radius: 12,
+      backgroundOpacity: 72,
       blur: 18,
       shadowBlur: 28,
     },
@@ -491,6 +515,71 @@ export function getDefaultChatAppearanceSettings(): ChatAppearanceSettings {
     advanced: {
       customCssDeclarations: '',
     },
+  };
+}
+
+function normalizeFiniteNumberInRange(value: unknown, fallback: number, min: number, max: number): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return fallback;
+  }
+
+  return Math.min(max, Math.max(min, value));
+}
+
+export function getDefaultInputPanelGlassRefractionSettings(): InputPanelGlassRefractionSettings {
+  return {
+    glass: {
+      backgroundOpacity: 48,
+      blur: 26,
+      saturation: 170,
+      brightness: 108,
+    },
+    card: {
+      backgroundOpacity: 52,
+      blur: 20,
+      saturation: 150,
+      brightness: 100,
+    },
+    pill: {
+      backgroundOpacity: 5,
+      blur: 8,
+      saturation: 130,
+      brightness: 100,
+    },
+  };
+}
+
+function normalizeInputPanelGlassRefractionVariantSettings(
+  value: unknown,
+  defaults: InputPanelGlassRefractionVariantSettings,
+): InputPanelGlassRefractionVariantSettings {
+  const candidate =
+    value && typeof value === 'object'
+      ? (value as Partial<InputPanelGlassRefractionVariantSettings>)
+      : undefined;
+
+  return {
+    backgroundOpacity: normalizeFiniteNumberInRange(
+      candidate?.backgroundOpacity,
+      defaults.backgroundOpacity,
+      0,
+      100,
+    ),
+    blur: normalizeFiniteNumberInRange(candidate?.blur, defaults.blur, 0, 40),
+    saturation: normalizeFiniteNumberInRange(candidate?.saturation, defaults.saturation, 50, 250),
+    brightness: normalizeFiniteNumberInRange(candidate?.brightness, defaults.brightness, 50, 150),
+  };
+}
+
+export function normalizeInputPanelGlassRefractionSettings(
+  value?: PartialInputPanelGlassRefractionSettings | null,
+): InputPanelGlassRefractionSettings {
+  const defaults = getDefaultInputPanelGlassRefractionSettings();
+
+  return {
+    glass: normalizeInputPanelGlassRefractionVariantSettings(value?.glass, defaults.glass),
+    card: normalizeInputPanelGlassRefractionVariantSettings(value?.card, defaults.card),
+    pill: normalizeInputPanelGlassRefractionVariantSettings(value?.pill, defaults.pill),
   };
 }
 
@@ -747,7 +836,7 @@ export interface OpenCodianSettings {
   enableAutoScroll: boolean;
   chatScrollMode: ChatScrollMode;
   inputPanelTheme: InputPanelThemeId;
-  experimentalComposerGlassRefractionEnabled: boolean;
+  inputPanelGlassRefraction: InputPanelGlassRefractionSettings;
   chatAppearance: ChatAppearanceSettings;
   settingsPanelScrollTop: number;
   enableDebugLogging: boolean;
@@ -823,7 +912,7 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
   enableAutoScroll: true,
   chatScrollMode: 'sticky-mask',
   inputPanelTheme: 'preset',
-  experimentalComposerGlassRefractionEnabled: false,
+  inputPanelGlassRefraction: getDefaultInputPanelGlassRefractionSettings(),
   chatAppearance: getDefaultChatAppearanceSettings(),
   settingsPanelScrollTop: 0,
   enableDebugLogging: false,

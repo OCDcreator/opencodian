@@ -25,6 +25,7 @@ const GLASS_APPEARANCE = normalizeChatAppearanceSettings({
   },
   input: {
     radius: 14,
+    backgroundOpacity: 72,
     blur: 20,
     shadowBlur: 30,
   },
@@ -48,6 +49,7 @@ const FLAT_APPEARANCE = normalizeChatAppearanceSettings({
   },
   input: {
     radius: 10,
+    backgroundOpacity: 92,
     blur: 0,
     shadowBlur: 0,
   },
@@ -86,6 +88,7 @@ const SOFT_APPEARANCE = normalizeChatAppearanceSettings({
   },
   input: {
     radius: 20,
+    backgroundOpacity: 78,
     blur: 14,
     shadowBlur: 18,
   },
@@ -124,6 +127,7 @@ const SHARP_APPEARANCE = normalizeChatAppearanceSettings({
   },
   input: {
     radius: 8,
+    backgroundOpacity: 88,
     blur: 4,
     shadowBlur: 14,
   },

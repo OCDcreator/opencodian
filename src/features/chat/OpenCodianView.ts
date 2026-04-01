@@ -19,6 +19,7 @@ import {
   type Conversation,
   createEmptyTabContextState,
   getDefaultPersistedTabState,
+  type InputPanelThemeId,
   type PromptContextItem,
   type QuestionRequest,
   type QuestionResolution,
@@ -50,7 +51,11 @@ import {
   ThinkingBlockRenderer,
   ToolCallRenderer,
 } from '../../utils/streaming';
-import { buildChatAppearanceCustomCss, getChatAppearanceCssVariables } from './chatAppearance';
+import {
+  buildChatAppearanceCustomCss,
+  getChatAppearanceCssVariables,
+  getInputPanelGlassRefractionCssVariables,
+} from './chatAppearance';
 import {
   buildComposerContextChipStates,
   createFocusContextPreview,
@@ -135,8 +140,12 @@ function getRandomPendingMessage(): string {
 }
 
 const REMOTE_CONTEXT_TEXT_LIMIT_BYTES = 64 * 1024;
-const COMPOSER_GLASS_SVG_DEFS_ID = 'opencodian-glass-svg-defs';
-const COMPOSER_GLASS_FILTER_ID = 'opencodian-glass-refract';
+const INPUT_PANEL_THEME_CLASS_BY_ID: Record<Exclude<InputPanelThemeId, 'preset'>, string> = {
+  'glass-refraction-glass': 'opencodian-composer-shell--gr-glass',
+  'glass-refraction-card': 'opencodian-composer-shell--gr-card',
+  'glass-refraction-pill': 'opencodian-composer-shell--gr-pill',
+};
+const INPUT_PANEL_THEME_CLASS_NAMES = Object.values(INPUT_PANEL_THEME_CLASS_BY_ID);
 
 type ChatServerAvailability = 'checking' | 'running' | 'starting' | 'offline' | 'external';
 
@@ -207,75 +216,6 @@ interface TabPaneState {
   runtime: TabRuntimeState;
 }
 
-function createSvgElement<K extends keyof SVGElementTagNameMap>(
-  tagName: K,
-  attributes: Record<string, string>,
-): SVGElementTagNameMap[K] {
-  const element = document.createElementNS('http://www.w3.org/2000/svg', tagName);
-  for (const [name, value] of Object.entries(attributes)) {
-    element.setAttribute(name, value);
-  }
-
-  return element;
-}
-
-function ensureComposerGlassSvgDefs(): void {
-  if (document.getElementById(COMPOSER_GLASS_SVG_DEFS_ID)) {
-    return;
-  }
-
-  const svg = createSvgElement('svg', {
-    id: COMPOSER_GLASS_SVG_DEFS_ID,
-    width: '0',
-    height: '0',
-    'aria-hidden': 'true',
-    focusable: 'false',
-  });
-  svg.style.position = 'absolute';
-  svg.style.width = '0';
-  svg.style.height = '0';
-  svg.style.pointerEvents = 'none';
-
-  const defs = createSvgElement('defs', {});
-  const filter = createSvgElement('filter', {
-    id: COMPOSER_GLASS_FILTER_ID,
-    x: '-5%',
-    y: '-5%',
-    width: '110%',
-    height: '110%',
-    colorInterpolationFilters: 'sRGB',
-  });
-  filter.append(
-    createSvgElement('feGaussianBlur', {
-      in: 'SourceGraphic',
-      stdDeviation: '0.3',
-      result: 'preblur',
-    }),
-    createSvgElement('feTurbulence', {
-      type: 'fractalNoise',
-      baseFrequency: '0.015 0.012',
-      numOctaves: '2',
-      seed: '42',
-      result: 'noise',
-    }),
-    createSvgElement('feGaussianBlur', {
-      in: 'noise',
-      stdDeviation: '3',
-      result: 'smooth',
-    }),
-    createSvgElement('feDisplacementMap', {
-      in: 'preblur',
-      in2: 'smooth',
-      scale: '8',
-      xChannelSelector: 'R',
-      yChannelSelector: 'G',
-    }),
-  );
-  defs.appendChild(filter);
-  svg.appendChild(defs);
-  (document.body ?? document.documentElement).appendChild(svg);
-}
-
 /** Clipboard icon SVG for copy button */
 const COPY_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`;
 const FORK_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><circle cx="18" cy="6" r="3"/><path d="M6 9v3a3 3 0 0 0 3 3h6a3 3 0 0 0 3-3V9"/><path d="M12 12v3"/></svg>`;
@@ -295,7 +235,6 @@ export class OpenCodianView extends ItemView {
   private inputContainer: HTMLElement | null = null;
   private inputWrapperEl: HTMLElement | null = null;
   private composerShellEl: HTMLElement | null = null;
-  private composerGlassFxEl: HTMLElement | null = null;
   private composerContextRowEl: HTMLElement | null = null;
   private questionDockMountEl: HTMLElement | null = null;
   private questionDock: QuestionDock | null = null;
@@ -1193,7 +1132,6 @@ export class OpenCodianView extends ItemView {
     this.inputTabBarSlotEl = null;
     this.inputWrapperEl = null;
     this.composerShellEl = null;
-    this.composerGlassFxEl = null;
     this.composerContextRowEl = null;
     this.questionDock?.destroy();
     this.questionDock = null;
@@ -1720,6 +1658,13 @@ export class OpenCodianView extends ItemView {
       this.chatContainerEl.style.setProperty(cssVar, cssValue);
     }
 
+    const glassRefractionCssVariables = getInputPanelGlassRefractionCssVariables(
+      this.plugin.settings.inputPanelGlassRefraction,
+    );
+    for (const [cssVar, cssValue] of Object.entries(glassRefractionCssVariables)) {
+      this.chatContainerEl.style.setProperty(cssVar, cssValue);
+    }
+
     const customCss = buildChatAppearanceCustomCss(
       this.plugin.settings.chatAppearance.advanced.customCssDeclarations,
     );
@@ -1736,7 +1681,7 @@ export class OpenCodianView extends ItemView {
       this.chatAppearanceStyleEl = null;
     }
 
-    this.applyComposerGlassRefractionState();
+    this.applyInputPanelThemeState();
     this.scheduleChatSurfaceColorSync();
     this.scheduleComposerLayoutSync();
   }
@@ -2106,7 +2051,6 @@ export class OpenCodianView extends ItemView {
 
     const composerShellEl = container.createDiv({ cls: 'opencodian-composer-shell' });
     this.composerShellEl = composerShellEl;
-    this.initializeComposerGlassRefraction(composerShellEl);
 
     const inputWrapper = composerShellEl.createDiv({ cls: 'opencodian-input-wrapper' });
     this.inputWrapperEl = inputWrapper;
@@ -2198,29 +2142,24 @@ export class OpenCodianView extends ItemView {
     });
     this.effortSelector.updateDisplay();
 
+    this.applyInputPanelThemeState();
     this.initializeComposerLayoutMetrics();
   }
 
-  private initializeComposerGlassRefraction(composerShellEl: HTMLElement): void {
-    this.composerGlassFxEl?.remove();
-    const glassFxEl = composerShellEl.createDiv({ cls: 'opencodian-composer-glass-fx' });
-    glassFxEl.createDiv({ cls: 'opencodian-composer-glass-fx-refract' });
-    this.composerGlassFxEl = glassFxEl;
-    this.applyComposerGlassRefractionState();
-  }
-
-  private applyComposerGlassRefractionState(): void {
-    if (!this.composerShellEl || !this.composerGlassFxEl) {
+  private applyInputPanelThemeState(): void {
+    if (!this.composerShellEl) {
       return;
     }
 
-    const isEnabled = this.plugin.settings.experimentalComposerGlassRefractionEnabled;
-    this.composerShellEl.toggleClass('opencodian-composer-shell--glass-refract', isEnabled);
-    this.composerGlassFxEl.toggleClass('is-enabled', isEnabled);
-
-    if (isEnabled) {
-      ensureComposerGlassSvgDefs();
+    for (const className of INPUT_PANEL_THEME_CLASS_NAMES) {
+      this.composerShellEl.removeClass(className);
     }
+
+    if (this.plugin.settings.inputPanelTheme === 'preset') {
+      return;
+    }
+
+    this.composerShellEl.addClass(INPUT_PANEL_THEME_CLASS_BY_ID[this.plugin.settings.inputPanelTheme]);
   }
 
   private initializeComposerLayoutMetrics(): void {
