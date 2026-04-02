@@ -4288,14 +4288,15 @@
 }
 
 .opencodian-style-number {
-  flex: 0 0 2.8em;
-  width: 2.8em;
-  min-width: 2.8em;
+  flex: 0 0 var(--opencodian-style-number-width, calc(4ch + 1.8em));
+  width: var(--opencodian-style-number-width, calc(4ch + 1.8em));
+  min-width: var(--opencodian-style-number-width, calc(4ch + 1.8em));
   padding: 0;
   border: none;
   background: transparent;
   color: var(--text-normal);
   font-size: 13px;
+  font-variant-numeric: tabular-nums;
   text-align: right;
 }
 

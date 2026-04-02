@@ -2424,11 +2424,17 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     sliderEl.max = String(config.max);
     sliderEl.step = String(config.step);
 
+    const numberInputChars = this.getNumericControlInputChars(config);
     const numberWrapEl = setting.controlEl.createDiv({ cls: 'opencodian-style-number-wrap' });
+    numberWrapEl.style.setProperty(
+      '--opencodian-style-number-width',
+      `calc(${numberInputChars}ch + 1.8em)`,
+    );
     const numberEl = numberWrapEl.createEl('input', {
       cls: 'opencodian-style-number',
       type: 'number',
     });
+    numberEl.size = numberInputChars;
     numberEl.min = String(config.min);
     numberEl.max = String(config.max);
     numberEl.step = String(config.step);
@@ -2487,6 +2493,29 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     config.registerSync?.(() => {
       renderValue(config.value());
     });
+  }
+
+  private getNumericControlInputChars(config: Pick<NumericControlConfig, 'min' | 'max' | 'step'>): number {
+    const precision = this.getNumericControlPrecision(config.step);
+    const minChars = this.formatNumericControlValue(config.min, precision).length;
+    const maxChars = this.formatNumericControlValue(config.max, precision).length;
+
+    return Math.max(4, minChars, maxChars);
+  }
+
+  private getNumericControlPrecision(step: number): number {
+    const stepText = String(step);
+    const decimalIndex = stepText.indexOf('.');
+
+    return decimalIndex >= 0 ? stepText.length - decimalIndex - 1 : 0;
+  }
+
+  private formatNumericControlValue(value: number, precision: number): string {
+    if (precision <= 0) {
+      return String(value);
+    }
+
+    return value.toFixed(precision).replace(/\.?0+$/, '');
   }
 
   private addNumericStyleControl(containerEl: HTMLElement, config: NumericStyleControlConfig): void {

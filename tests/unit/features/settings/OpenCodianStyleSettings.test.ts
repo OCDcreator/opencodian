@@ -105,4 +105,25 @@ describe('OpenCodian style settings', () => {
       dropdownRecords.some((record) => record.name === 'Panel style theme' || record.name === '面板样式主题'),
     ).toBe(false);
   });
+
+  it('sizes numeric inputs to fit the configured value range', () => {
+    const plugin = {
+      settings: {
+        ...DEFAULT_SETTINGS,
+        chatAppearance: getDefaultChatAppearanceSettings(),
+      },
+    } as unknown as ConstructorParameters<typeof OpenCodianSettingTab>[1];
+    const tab = new OpenCodianSettingTab({} as App, plugin);
+    const privateTab = tab as unknown as {
+      getNumericControlInputChars: (config: { min: number; max: number; step: number }) => number;
+    };
+
+    const inputChars = privateTab.getNumericControlInputChars({
+      min: 0.01,
+      max: 0.211,
+      step: 0.001,
+    });
+
+    expect(inputChars).toBe(5);
+  });
 });
