@@ -6,6 +6,7 @@ export interface FocusContextPreview {
   path: string;
   label: string;
   lineRange?: PromptContextLineRange;
+  textSnapshot?: string;
 }
 
 export interface ComposerContextChipState {
@@ -53,13 +54,41 @@ export function removeDraftContextItemsByTarget(
 export function createFocusContextPreview(
   path: string,
   lineRange?: PromptContextLineRange,
+  textSnapshot?: string,
 ): FocusContextPreview {
   return {
     kind: lineRange ? 'selection' : 'current_note',
     path,
     label: formatContextLabel(path, lineRange),
     lineRange,
+    textSnapshot: lineRange ? textSnapshot : undefined,
   };
+}
+
+export function resolveFocusContextPreview(
+  nextPreview: FocusContextPreview | null,
+  previousPreview: FocusContextPreview | null,
+  options: {
+    retainSelectionPreview?: boolean;
+  } = {},
+): FocusContextPreview | null {
+  if (!options.retainSelectionPreview) {
+    return nextPreview;
+  }
+
+  if (!nextPreview || nextPreview.kind !== 'current_note') {
+    return nextPreview;
+  }
+
+  if (!previousPreview || previousPreview.kind !== 'selection') {
+    return nextPreview;
+  }
+
+  if (previousPreview.path !== nextPreview.path) {
+    return nextPreview;
+  }
+
+  return previousPreview;
 }
 
 export function buildComposerContextChipStates(

@@ -3,6 +3,7 @@ import {
   buildComposerContextChipStates,
   createFocusContextPreview,
   removeDraftContextItemsByTarget,
+  resolveFocusContextPreview,
   upsertDraftContextItem,
 } from '../../../../src/features/chat/composerContext';
 
@@ -36,7 +37,7 @@ describe('composerContext helpers', () => {
     const preview = createFocusContextPreview('notes/A.md', {
       startLine: 155,
       endLine: 155,
-    });
+    }, 'line 155');
     const chips = buildComposerContextChipStates([], preview);
 
     expect(chips).toEqual([
@@ -46,6 +47,7 @@ describe('composerContext helpers', () => {
         preview: true,
       }),
     ]);
+    expect(preview.textSnapshot).toBe('line 155');
   });
 
   it('dedupes same-target file and current-note attachments into one chip', () => {
@@ -129,5 +131,29 @@ describe('composerContext helpers', () => {
         preview: true,
       }),
     ]);
+  });
+
+  it('retains the previous selection preview while the composer holds focus', () => {
+    const previous = createFocusContextPreview('notes/A.md', {
+      startLine: 12,
+      endLine: 18,
+    }, 'Selected paragraph');
+    const next = createFocusContextPreview('notes/A.md');
+
+    expect(resolveFocusContextPreview(next, previous, {
+      retainSelectionPreview: true,
+    })).toEqual(previous);
+  });
+
+  it('does not retain a stale selection preview when the note changed', () => {
+    const previous = createFocusContextPreview('notes/A.md', {
+      startLine: 12,
+      endLine: 18,
+    }, 'Selected paragraph');
+    const next = createFocusContextPreview('notes/B.md');
+
+    expect(resolveFocusContextPreview(next, previous, {
+      retainSelectionPreview: true,
+    })).toEqual(next);
   });
 });

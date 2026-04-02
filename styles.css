@@ -1415,6 +1415,18 @@
   color: inherit;
 }
 
+.cm-line .opencodian-selection-highlight,
+.opencodian-selection-highlight {
+  background: var(--text-selection) !important;
+  border-radius: 2px;
+  padding: 2px 0;
+  margin: -2px 0;
+}
+
+::highlight(opencodian-selection) {
+  background: var(--text-selection);
+}
+
 /* ============================================================
    Assistant Message - Normal Flow (Not Sticky)
    ============================================================ */

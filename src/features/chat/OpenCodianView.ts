@@ -4,6 +4,7 @@
  * Main sidebar view for the OpenCodian chat interface.
  */
 
+import type { EditorView } from '@codemirror/view';
 import type { Editor, EventRef, TAbstractFile, WorkspaceLeaf } from 'obsidian';
 import { addIcon, Component, ItemView, MarkdownView, Notice, Scope, setIcon, TFile } from 'obsidian';
 
@@ -23,6 +24,7 @@ import {
   type InputPanelGlassRefractionSvgFilterSettings,
   type InputPanelThemeId,
   type PromptContextItem,
+  type PromptContextLineRange,
   type QuestionRequest,
   type QuestionResolution,
   type SessionDiffEntry,
@@ -46,6 +48,7 @@ import {
   resolveToolExecutionStatus,
 } from '../../shared';
 import { chooseForkTarget } from '../../shared/modals';
+import { hideSelectionHighlight, showSelectionHighlight } from '../../utils/editorSelectionHighlight';
 import { ProviderIconService } from '../../utils/icons/ProviderIconService';
 import { MarkdownRenderService } from '../../utils/markdown';
 import {
@@ -64,6 +67,7 @@ import {
   type FocusContextPreview,
   getContextTargetKey,
   removeDraftContextItemsByTarget,
+  resolveFocusContextPreview,
   upsertDraftContextItem,
 } from './composerContext';
 import { cloneMessagesBeforeForkTarget } from './forkMessages';
@@ -142,6 +146,9 @@ function getRandomPendingMessage(): string {
 }
 
 const REMOTE_CONTEXT_TEXT_LIMIT_BYTES = 64 * 1024;
+const RETAINED_SELECTION_DOM_HIGHLIGHT_KEY = 'opencodian-selection';
+const RETAINED_SELECTION_INPUT_HANDOFF_GRACE_MS = 1500;
+const RETAINED_SELECTION_POLL_INTERVAL_MS = 250;
 const INPUT_PANEL_THEME_CLASS_BY_ID: Record<Exclude<InputPanelThemeId, 'preset'>, string> = {
   'glass-refraction-glass': 'opencodian-composer-shell--gr-glass',
   'glass-refraction-card': 'opencodian-composer-shell--gr-card',
@@ -293,6 +300,15 @@ interface DeferredQuestionRequest {
   resolve: () => void;
 }
 
+interface RetainedSelectionHighlight {
+  path: string;
+  editorView: EditorView | null;
+  from: number | null;
+  to: number | null;
+  domRanges: Range[];
+  captureSource: 'offsets' | 'dom' | 'mixed';
+}
+
 interface TabRuntimeState {
   isStreaming: boolean;
   streamController: StreamController | null;
@@ -429,6 +445,9 @@ export class OpenCodianView extends ItemView {
   private contextFileCatalogCache: ContextFileCatalog | null = null;
   private contextFileCatalogBuildPromise: Promise<ContextFileCatalog> | null = null;
   private focusContextRefreshTimeoutId: number | null = null;
+  private retainedSelectionHighlight: RetainedSelectionHighlight | null = null;
+  private retainedSelectionInputHandoffGraceUntil: number | null = null;
+  private retainedSelectionPollIntervalId: number | null = null;
 
   private appSettings(): { open: () => void; openTabById: (id: string) => void } {
     return (this.app as typeof this.app & {
@@ -725,7 +744,278 @@ export class OpenCodianView extends ItemView {
     }
 
     return left.kind === right.kind
+      && left.textSnapshot === right.textSnapshot
       && getContextTargetKey(left.path, left.lineRange) === getContextTargetKey(right.path, right.lineRange);
+  }
+
+  private isComposerInteractionFocused(): boolean {
+    const activeElement = document.activeElement;
+    return Boolean(activeElement && this.inputContainer?.contains(activeElement));
+  }
+
+  private markRetainedSelectionInputHandoff(): void {
+    this.retainedSelectionInputHandoffGraceUntil = Date.now() + RETAINED_SELECTION_INPUT_HANDOFF_GRACE_MS;
+  }
+
+  private clearRetainedSelectionInputHandoff(): void {
+    this.retainedSelectionInputHandoffGraceUntil = null;
+  }
+
+  private isRetainedSelectionInputHandoffActive(): boolean {
+    return this.retainedSelectionInputHandoffGraceUntil !== null
+      && Date.now() <= this.retainedSelectionInputHandoffGraceUntil;
+  }
+
+  private shouldRetainSelectionPreviewDuringTransition(): boolean {
+    return this.isComposerInteractionFocused() || this.isRetainedSelectionInputHandoffActive();
+  }
+
+  private getRetainedSelectionCaptureQuality(retained: RetainedSelectionHighlight | null): number {
+    if (!retained) {
+      return 0;
+    }
+
+    if (retained.editorView && retained.from !== null && retained.to !== null) {
+      return 2;
+    }
+
+    if (retained.domRanges.length > 0) {
+      return 1;
+    }
+
+    return 0;
+  }
+
+  private shouldPreserveExistingRetainedSelection(
+    existing: RetainedSelectionHighlight | null,
+    next: RetainedSelectionHighlight,
+  ): boolean {
+    if (!this.isComposerInteractionFocused()) {
+      return false;
+    }
+
+    if (!existing || existing.path !== next.path) {
+      return false;
+    }
+
+    return this.getRetainedSelectionCaptureQuality(existing) > this.getRetainedSelectionCaptureQuality(next);
+  }
+
+  private getCssHighlightRegistry():
+    | { set: (name: string, highlight: unknown) => void; delete: (name: string) => void }
+    | null {
+    if (typeof CSS === 'undefined') {
+      return null;
+    }
+
+    const cssWithHighlights = CSS as typeof CSS & {
+      highlights?: { set: (name: string, highlight: unknown) => void; delete: (name: string) => void };
+    };
+    return cssWithHighlights.highlights ?? null;
+  }
+
+  private createDomHighlight(ranges: Range[]): unknown | null {
+    const HighlightCtor = (window as Window & {
+      Highlight?: new (...ranges: Range[]) => unknown;
+    }).Highlight;
+    if (!HighlightCtor) {
+      return null;
+    }
+
+    return new HighlightCtor(...ranges);
+  }
+
+  private cloneDocumentSelectionRanges(): Range[] {
+    const selection = document.getSelection();
+    if (!selection) {
+      return [];
+    }
+
+    const ranges: Range[] = [];
+    for (let index = 0; index < selection.rangeCount; index += 1) {
+      ranges.push(selection.getRangeAt(index).cloneRange());
+    }
+
+    return ranges;
+  }
+
+  private clearRetainedDomSelectionHighlight(): void {
+    this.getCssHighlightRegistry()?.delete(RETAINED_SELECTION_DOM_HIGHLIGHT_KEY);
+  }
+
+  private startRetainedSelectionPolling(): void {
+    if (this.retainedSelectionPollIntervalId !== null) {
+      return;
+    }
+
+    this.pollRetainedSelectionState();
+    this.retainedSelectionPollIntervalId = window.setInterval(() => {
+      this.pollRetainedSelectionState();
+    }, RETAINED_SELECTION_POLL_INTERVAL_MS);
+  }
+
+  private stopRetainedSelectionPolling(): void {
+    if (this.retainedSelectionPollIntervalId === null) {
+      return;
+    }
+
+    window.clearInterval(this.retainedSelectionPollIntervalId);
+    this.retainedSelectionPollIntervalId = null;
+  }
+
+  private pollRetainedSelectionState(): void {
+    const view = this.getActiveMarkdownView();
+    this.refreshActiveFocusContextPreview(view, view?.editor ?? null);
+    this.refreshRetainedSelectionHighlight();
+  }
+
+  private primeRetainedSelectionHighlightFromActiveEditor(): void {
+    const view = this.getActiveMarkdownView();
+    this.refreshActiveFocusContextPreview(view, view?.editor ?? null);
+  }
+
+  private getEditorView(editor: Editor | null): EditorView | null {
+    return (editor as unknown as { cm?: EditorView | null })?.cm ?? null;
+  }
+
+  private getEditorSelectionOffsets(
+    editor: Editor | null,
+    editorView: EditorView | null,
+  ): { from: number; to: number } | null {
+    if (editor) {
+      const editorWithOffsets = editor as Editor & {
+        posToOffset?: (position: { line: number; ch: number }) => number;
+      };
+      if (typeof editorWithOffsets.posToOffset === 'function') {
+        try {
+          return {
+            from: editorWithOffsets.posToOffset(editor.getCursor('from')),
+            to: editorWithOffsets.posToOffset(editor.getCursor('to')),
+          };
+        } catch (error) {
+          logger.debug('Failed to resolve editor offsets for retained selection highlight', error);
+        }
+      }
+    }
+
+    const selection = editorView?.state.selection.main;
+    if (!selection || selection.empty) {
+      return null;
+    }
+
+    return {
+      from: selection.from,
+      to: selection.to,
+    };
+  }
+
+  private setRetainedSelectionHighlight(next: RetainedSelectionHighlight | null): void {
+    const current = this.retainedSelectionHighlight;
+    if (next && this.shouldPreserveExistingRetainedSelection(current, next)) {
+      return;
+    }
+
+    if (current && (!next
+      || current.editorView !== next.editorView
+      || current.from !== next.from
+      || current.to !== next.to)) {
+      if (current.editorView) {
+        hideSelectionHighlight(current.editorView);
+      }
+    }
+
+    this.retainedSelectionHighlight = next;
+  }
+
+  private clearRetainedSelectionHighlight(): void {
+    if (!this.retainedSelectionHighlight) {
+      return;
+    }
+
+    if (this.retainedSelectionHighlight.editorView) {
+      hideSelectionHighlight(this.retainedSelectionHighlight.editorView);
+    }
+    this.clearRetainedDomSelectionHighlight();
+    this.retainedSelectionHighlight = null;
+  }
+
+  private refreshRetainedSelectionHighlight(): void {
+    const retained = this.retainedSelectionHighlight;
+    if (!retained) {
+      return;
+    }
+
+    const focusPreview = this.getFocusContextPreview();
+    const shouldShow = this.isComposerInteractionFocused()
+      && focusPreview?.kind === 'selection'
+      && focusPreview.path === retained.path;
+
+    if (shouldShow) {
+      if (
+        retained.editorView
+        && retained.from !== null
+        && retained.to !== null
+      ) {
+        this.clearRetainedDomSelectionHighlight();
+        showSelectionHighlight(retained.editorView, retained.from, retained.to);
+        return;
+      }
+
+      const validDomRanges = retained.domRanges.filter((range) => range.startContainer.isConnected && range.endContainer.isConnected);
+      const domHighlight = validDomRanges.length > 0
+        ? this.createDomHighlight(validDomRanges)
+        : null;
+      if (domHighlight) {
+        this.getCssHighlightRegistry()?.set(RETAINED_SELECTION_DOM_HIGHLIGHT_KEY, domHighlight);
+      } else {
+        this.clearRetainedDomSelectionHighlight();
+      }
+      return;
+    }
+
+    if (retained.editorView) {
+      hideSelectionHighlight(retained.editorView);
+    }
+    this.clearRetainedDomSelectionHighlight();
+  }
+
+  private syncRetainedSelectionHighlight(
+    actualPreview: FocusContextPreview | null,
+    view?: MarkdownView | null,
+    editor?: Editor | null,
+  ): void {
+    const composerFocused = this.isComposerInteractionFocused();
+    if (actualPreview?.kind === 'selection') {
+      const activeEditor = editor ?? view?.editor ?? null;
+      const editorView = this.getEditorView(activeEditor);
+      const offsets = this.getEditorSelectionOffsets(activeEditor, editorView);
+      const domRanges = this.cloneDocumentSelectionRanges();
+      if (offsets || domRanges.length > 0) {
+        const captureSource: RetainedSelectionHighlight['captureSource'] = offsets && domRanges.length > 0
+          ? 'mixed'
+          : offsets
+            ? 'offsets'
+            : 'dom';
+        this.setRetainedSelectionHighlight({
+          path: actualPreview.path,
+          editorView: editorView ?? null,
+          from: offsets?.from ?? null,
+          to: offsets?.to ?? null,
+          domRanges,
+          captureSource,
+        });
+      } else if (!composerFocused) {
+        this.clearRetainedSelectionHighlight();
+      }
+    } else if (
+      !this.shouldRetainSelectionPreviewDuringTransition()
+      || !actualPreview
+      || actualPreview.path !== this.retainedSelectionHighlight?.path
+    ) {
+      this.clearRetainedSelectionHighlight();
+    }
+
+    this.refreshRetainedSelectionHighlight();
   }
 
   private subscribeToSessionTodoUpdates(): void {
@@ -1211,6 +1501,7 @@ export class OpenCodianView extends ItemView {
 
     // Wire events
     this.wireEventHandlers();
+    this.startRetainedSelectionPolling();
     this.subscribeToSessionTodoUpdates();
     this.subscribeToSessionStatusUpdates();
 
@@ -1221,7 +1512,10 @@ export class OpenCodianView extends ItemView {
     this.persistTabState({ flush: true });
     this.stopServerStatusLoop();
     this.stopConversationSyncLoop();
+    this.stopRetainedSelectionPolling();
     this.clearScheduledFocusContextPreviewRefresh();
+    this.clearRetainedSelectionInputHandoff();
+    this.clearRetainedSelectionHighlight();
     this.clearChatSurfaceSyncTimers();
     this.clearScheduledComposerLayoutSync();
     this.clearScheduledScrollToBottom();
@@ -2438,8 +2732,7 @@ export class OpenCodianView extends ItemView {
 
   private async attachFocusContextPreview(preview: FocusContextPreview): Promise<void> {
     if (preview.kind === 'selection') {
-      const previewView = this.getMarkdownViewByPath(preview.path);
-      const contextItem = await this.buildSelectionContextItem(previewView?.editor ?? null, previewView);
+      const contextItem = this.buildSelectionContextItemFromPreview(preview);
       if (contextItem) {
         this.addDraftContextItem(contextItem);
       }
@@ -2973,7 +3266,7 @@ export class OpenCodianView extends ItemView {
       return createFocusContextPreview(file.path, {
         startLine: from.line + 1,
         endLine: to.line + 1,
-      });
+      }, selectedText);
     }
 
     return createFocusContextPreview(file.path);
@@ -2983,7 +3276,16 @@ export class OpenCodianView extends ItemView {
     view?: MarkdownView | null,
     editor?: Editor | null,
   ): void {
-    this.setFocusContextPreview(this.computeFocusContextPreview(view, editor));
+    const actualPreview = this.computeFocusContextPreview(view, editor);
+    const nextPreview = resolveFocusContextPreview(
+      actualPreview,
+      this.getFocusContextPreview(),
+      {
+        retainSelectionPreview: this.shouldRetainSelectionPreviewDuringTransition(),
+      },
+    );
+    this.setFocusContextPreview(nextPreview);
+    this.syncRetainedSelectionHighlight(actualPreview, view, editor);
   }
 
   private scheduleFocusContextPreviewRefresh(): void {
@@ -3258,29 +3560,54 @@ export class OpenCodianView extends ItemView {
       return null;
     }
 
-    const mime = resolveTextMimeFromPath(file.path);
+    const from = editor.getCursor('from');
+    const to = editor.getCursor('to');
+    return this.createSelectionContextItem(file.path, {
+      startLine: from.line + 1,
+      endLine: to.line + 1,
+    }, selectedText);
+  }
+
+  private buildSelectionContextItemFromPreview(preview: FocusContextPreview): PromptContextItem | null {
+    if (
+      preview.kind !== 'selection'
+      || !preview.lineRange
+      || !preview.textSnapshot?.trim()
+    ) {
+      new Notice(t('chat.context.notice.noSelection'));
+      return null;
+    }
+
+    const targetFile = this.app.vault.getAbstractFileByPath(preview.path);
+    if (!(targetFile instanceof TFile)) {
+      new Notice(t('chat.context.notice.noActiveNote'));
+      return null;
+    }
+
+    return this.createSelectionContextItem(targetFile.path, preview.lineRange, preview.textSnapshot);
+  }
+
+  private createSelectionContextItem(
+    path: string,
+    lineRange: PromptContextLineRange,
+    selectedText: string,
+  ): PromptContextItem | null {
+    const mime = resolveTextMimeFromPath(path);
     if (!isTextLikeMime(mime)) {
       new Notice(t('chat.context.notice.binaryUnsupported'));
       return null;
     }
 
-    const textSnapshot = this.validateRemoteContextText(selectedText, file.path);
+    const textSnapshot = this.validateRemoteContextText(selectedText, path);
     if (this.isRemoteContextMode() && textSnapshot === null) {
       return null;
     }
 
-    const from = editor.getCursor('from');
-    const to = editor.getCursor('to');
-    const lineRange = {
-      startLine: from.line + 1,
-      endLine: to.line + 1,
-    };
-
     return {
       id: this.createPromptContextId(),
       kind: 'selection',
-      path: file.path,
-      label: formatContextLabel(file.path, lineRange),
+      path,
+      label: formatContextLabel(path, lineRange),
       mime,
       lineRange,
       textSnapshot: textSnapshot ?? undefined,
@@ -3407,6 +3734,25 @@ export class OpenCodianView extends ItemView {
         this.refreshActiveFocusContextPreview(info instanceof MarkdownView ? info : undefined, editor);
       })
     );
+    if (this.inputContainer) {
+      const handleComposerFocusIn = () => {
+        this.clearRetainedSelectionInputHandoff();
+        this.refreshActiveFocusContextPreview();
+        this.refreshRetainedSelectionHighlight();
+      };
+      const handleComposerFocusOut = () => {
+        window.setTimeout(() => {
+          this.refreshActiveFocusContextPreview();
+          this.refreshRetainedSelectionHighlight();
+        }, 0);
+      };
+      this.registerDomEvent(this.inputContainer, 'pointerdown', () => {
+        this.markRetainedSelectionInputHandoff();
+        this.primeRetainedSelectionHighlightFromActiveEditor();
+      });
+      this.registerDomEvent(this.inputContainer, 'focusin', handleComposerFocusIn);
+      this.registerDomEvent(this.inputContainer, 'focusout', handleComposerFocusOut);
+    }
     this.registerDomEvent(document, 'selectionchange', scheduleFocusPreviewRefresh);
     this.registerDomEvent(document, 'mouseup', scheduleFocusPreviewRefresh);
     this.registerDomEvent(document, 'keyup', scheduleFocusPreviewRefresh);
