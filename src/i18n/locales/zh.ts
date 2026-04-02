@@ -776,6 +776,8 @@ export const zhTranslations = {
   'chat.todo.collapse': '收起待办',
   'chat.todo.expand': '展开待办',
   'chat.todo.loadFailed': '加载会话待办失败',
+  'chat.todo.staleTitle': '待办状态已降级为过期',
+  'chat.todo.staleBody': '这些待办已经长时间没有变化，而且会话也不再报告活跃工作。OpenCodian 已暂时隐藏待办面板，直到服务端返回新的待办更新。',
   'chat.message.user': '你',
   'chat.message.assistant': 'AI',
   'chat.message.thinking': '思考中...',

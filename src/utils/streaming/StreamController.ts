@@ -238,8 +238,7 @@ export class StreamController {
   }
 
   private handleDoneChunk(): void {
-    this.finalizeThinkingBlock();
-    this.finalizeTextBlock();
+    this.flushOpenContentBlocks();
     this.finalizeToolCalls();
     this.state.isStreaming = false;
     this.callbacks.onDone?.();
@@ -308,10 +307,13 @@ export class StreamController {
     this.state.toolCallElements.clear();
   }
 
+  private flushOpenContentBlocks(): void {
+    this.finalizeThinkingBlock();
+    this.finalizeTextBlock();
+  }
+
   cancelStream(): void {
-    if (this.state.currentThinkingState) {
-      this.thinkingRenderer.cleanup(this.state.currentThinkingState);
-    }
+    this.flushOpenContentBlocks();
     this.state.isStreaming = false;
   }
 
@@ -319,6 +321,8 @@ export class StreamController {
    * Handle stream timeout - mark all running tool calls as error
    */
   timeoutStream(): void {
+    this.flushOpenContentBlocks();
+
     // Mark all running/pending tool calls as error
     for (const [toolId, toolCall] of this.state.toolCalls) {
       if (toolCall.status === 'running' || toolCall.status === 'pending') {

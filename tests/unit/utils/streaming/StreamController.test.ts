@@ -44,4 +44,36 @@ describe('StreamController', () => {
     ]);
     expect(contentEl.querySelector('.streaming-thinking-label')?.textContent).toBe('Thought for 1.6s');
   });
+
+  it('preserves partial text content when streaming is cancelled', async () => {
+    const containerEl = document.createElement('div');
+    const contentEl = document.createElement('div');
+    containerEl.appendChild(contentEl);
+
+    const markdownService = {
+      render: jest.fn().mockImplementation(async (el: HTMLElement, content: string) => {
+        el.textContent = content;
+      }),
+    };
+
+    const controller = new StreamController({
+      containerEl,
+      markdownService: markdownService as never,
+    });
+
+    controller.startStream(contentEl);
+
+    await controller.handleChunk({ type: 'text', content: 'Interrupted ' });
+    await controller.handleChunk({ type: 'text', content: 'reply' });
+
+    controller.cancelStream();
+
+    expect(controller.isStreaming()).toBe(false);
+    expect(controller.getContentBlocks()).toEqual([
+      {
+        type: 'text',
+        content: 'Interrupted reply',
+      },
+    ]);
+  });
 });

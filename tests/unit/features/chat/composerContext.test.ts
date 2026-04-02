@@ -111,6 +111,32 @@ describe('composerContext helpers', () => {
     ]);
   });
 
+  it('hides the current-note preview when an attached selection already covers the same file', () => {
+    const attachedSelection = createContextItem({
+      id: 'context-selection-155',
+      kind: 'selection',
+      label: 'A.md:155',
+      lineRange: {
+        startLine: 155,
+        endLine: 155,
+      },
+      textSnapshot: 'line 155',
+    });
+
+    const chips = buildComposerContextChipStates(
+      [attachedSelection],
+      createFocusContextPreview('notes/A.md'),
+    );
+
+    expect(chips).toEqual([
+      expect.objectContaining({
+        label: 'A.md:155',
+        attached: true,
+        preview: false,
+      }),
+    ]);
+  });
+
   it('falls back to a preview chip after detaching the currently focused attachment', () => {
     const attachedFile = createContextItem({
       id: 'context-file',

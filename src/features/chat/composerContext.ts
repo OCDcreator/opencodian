@@ -97,12 +97,19 @@ export function buildComposerContextChipStates(
 ): ComposerContextChipState[] {
   const chips: ComposerContextChipState[] = [];
   const attachedByKey = new Map<string, PromptContextItem>();
+  const selectionPaths = new Set<string>();
 
   for (const item of attachedItems) {
     attachedByKey.set(getPromptContextTargetKey(item), item);
+    if (item.kind === 'selection') {
+      selectionPaths.add(item.path);
+    }
   }
 
-  if (focusPreview) {
+  const shouldHideFocusPreview = focusPreview?.kind === 'current_note'
+    && selectionPaths.has(focusPreview.path);
+
+  if (focusPreview && !shouldHideFocusPreview) {
     const focusKey = getContextTargetKey(focusPreview.path, focusPreview.lineRange);
     const matchedAttached = attachedByKey.get(focusKey);
     if (matchedAttached) {

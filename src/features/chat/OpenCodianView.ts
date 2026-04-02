@@ -319,9 +319,14 @@ interface TabRuntimeState {
   lastConversationSyncFingerprint: string | null;
   sessionTodoSessionId: string | null;
   sessionTodos: SessionTodo[];
+  sessionTodoFingerprint: string | null;
+  sessionTodoLastChangedAt: number | null;
+  sessionTodoSuppressedFingerprint: string | null;
+  sessionTodoStaleNoticeFingerprint: string | null;
   todoRequestId: number;
   sessionStatusSessionId: string | null;
   sessionStatus: SessionActivityStatus | null;
+  sessionStatusLastChangedAt: number | null;
   statusRequestId: number;
   backgroundTaskIndicatorEl: HTMLElement | null;
   backgroundTaskStartedAt: number | null;
@@ -355,6 +360,8 @@ const FORK_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24
 const REWIND_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5v0a5.5 5.5 0 0 1-5.5 5.5H11"/></svg>`;
 const NEW_TAB_ICON = `<g fill="none" stroke="currentColor" stroke-width="8.333" stroke-linecap="round" stroke-linejoin="round"><circle cx="50" cy="50" r="41.667"/><path d="M33.333 50h33.334"/><path d="M50 33.333v33.334"/></g>`;
 const CURRENT_TAB_NEW_CONVERSATION_ICON = `<g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" transform="scale(4.166667)"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/><path d="M12 8v6"/><path d="M9 11h6"/></g>`;
+const BACKGROUND_TASK_GRACE_PERIOD_MS = 15_000;
+const STALE_SESSION_TODO_TIMEOUT_MS = 120_000;
 
 addIcon('opencodian-circle-plus', NEW_TAB_ICON);
 addIcon('opencodian-message-square-plus', CURRENT_TAB_NEW_CONVERSATION_ICON);
@@ -466,9 +473,14 @@ export class OpenCodianView extends ItemView {
       lastConversationSyncFingerprint: null,
       sessionTodoSessionId: null,
       sessionTodos: [],
+      sessionTodoFingerprint: null,
+      sessionTodoLastChangedAt: null,
+      sessionTodoSuppressedFingerprint: null,
+      sessionTodoStaleNoticeFingerprint: null,
       todoRequestId: 0,
       sessionStatusSessionId: null,
       sessionStatus: null,
+      sessionStatusLastChangedAt: null,
       statusRequestId: 0,
       backgroundTaskIndicatorEl: null,
       backgroundTaskStartedAt: null,
@@ -1107,10 +1119,38 @@ export class OpenCodianView extends ItemView {
     }
 
     runtime.sessionTodoSessionId = sessionId;
-    runtime.sessionTodos = this.normalizeSessionTodosForView(todos);
+    const normalizedTodos = this.normalizeSessionTodosForView(todos);
+    const fingerprint = this.getSessionTodoFingerprint(normalizedTodos);
+    if (runtime.sessionTodoFingerprint !== fingerprint) {
+      runtime.sessionTodoFingerprint = fingerprint;
+      runtime.sessionTodoLastChangedAt = Date.now();
+
+      if (
+        runtime.sessionTodoSuppressedFingerprint
+        && runtime.sessionTodoSuppressedFingerprint !== fingerprint
+      ) {
+        logger.debug(`Clearing stale session todo suppression after snapshot changed: ${this.stringifyLogPayload({
+          tabId,
+          sessionId,
+          fingerprint,
+        })}`);
+        runtime.sessionTodoSuppressedFingerprint = null;
+        runtime.sessionTodoStaleNoticeFingerprint = null;
+      }
+    }
+
+    if (!this.hasIncompleteTodos(normalizedTodos)) {
+      runtime.sessionTodoSuppressedFingerprint = null;
+      runtime.sessionTodoStaleNoticeFingerprint = null;
+    }
+
+    runtime.sessionTodos = this.shouldHideSuppressedTodoSnapshot(tabId, sessionId, fingerprint)
+      ? []
+      : normalizedTodos;
     if (tabId === this.getActiveTabId()) {
       this.renderSessionTodoDock(tabId);
     }
+    this.reconcileStaleSessionTodoState(tabId);
   }
 
   private getTabSessionStatus(
@@ -1139,8 +1179,136 @@ export class OpenCodianView extends ItemView {
       return;
     }
 
+    const previousFingerprint = this.getSessionStatusFingerprint(runtime.sessionStatus);
+    const nextFingerprint = this.getSessionStatusFingerprint(status);
+
     runtime.sessionStatusSessionId = sessionId;
     runtime.sessionStatus = status;
+    if (previousFingerprint !== nextFingerprint) {
+      runtime.sessionStatusLastChangedAt = Date.now();
+    }
+
+    if (this.isSessionStatusLive(status) && runtime.sessionTodoSuppressedFingerprint) {
+      logger.debug(`Clearing stale session todo suppression because session became live again: ${this.stringifyLogPayload({
+        tabId,
+        sessionId,
+        status,
+      })}`);
+      runtime.sessionTodoSuppressedFingerprint = null;
+      runtime.sessionTodoStaleNoticeFingerprint = null;
+      if (tabId === this.getActiveTabId()) {
+        this.renderSessionTodoDock(tabId);
+      }
+    }
+
+    this.reconcileStaleSessionTodoState(tabId);
+  }
+
+  private getSessionTodoFingerprint(todos: readonly SessionTodo[]): string {
+    return JSON.stringify(todos.map((todo) => ({
+      id: todo.id ?? null,
+      content: todo.content,
+      status: todo.status,
+      priority: todo.priority ?? null,
+    })));
+  }
+
+  private getSessionStatusFingerprint(status: SessionActivityStatus | null): string {
+    return JSON.stringify(status ?? null);
+  }
+
+  private isSessionStatusLive(status: SessionActivityStatus | null | undefined): boolean {
+    return status?.type === 'busy' || status?.type === 'retry';
+  }
+
+  private shouldHideSuppressedTodoSnapshot(
+    tabId: TabId | null,
+    sessionId: string | null,
+    fingerprint: string,
+  ): boolean {
+    const runtime = this.getTabRuntimeState(tabId);
+    if (!runtime || runtime.sessionTodoSuppressedFingerprint !== fingerprint) {
+      return false;
+    }
+
+    const status = this.getTabSessionStatus(tabId, sessionId);
+    return !runtime.isStreaming && !this.isSessionStatusLive(status);
+  }
+
+  private getTabSessionTodoStaleAgeMs(tabId: TabId | null = this.getActiveTabId()): number | null {
+    const runtime = this.getTabRuntimeState(tabId);
+    if (!runtime) {
+      return null;
+    }
+
+    const lastActivity = Math.max(
+      runtime.sessionTodoLastChangedAt ?? 0,
+      runtime.sessionStatusLastChangedAt ?? 0,
+      runtime.backgroundTaskStartedAt ?? 0,
+    );
+    if (lastActivity <= 0) {
+      return null;
+    }
+
+    return Date.now() - lastActivity;
+  }
+
+  private suppressStaleSessionTodosIfNeeded(
+    tabId: TabId | null = this.getActiveTabId(),
+  ): SessionTodo[] | null {
+    const runtime = this.getTabRuntimeState(tabId);
+    const sessionId = this.getSessionIdForTab(tabId);
+    if (!runtime || !sessionId || runtime.isStreaming) {
+      return null;
+    }
+
+    const status = this.getTabSessionStatus(tabId, sessionId);
+    if (this.isSessionStatusLive(status)) {
+      return null;
+    }
+
+    const staleAgeMs = this.getTabSessionTodoStaleAgeMs(tabId);
+    if (staleAgeMs === null || staleAgeMs < STALE_SESSION_TODO_TIMEOUT_MS) {
+      return null;
+    }
+
+    const visibleTodos = this.getTabSessionTodos(tabId, sessionId);
+    if (!this.hasIncompleteTodos(visibleTodos)) {
+      return null;
+    }
+
+    const fingerprint = runtime.sessionTodoFingerprint ?? this.getSessionTodoFingerprint(visibleTodos);
+    if (runtime.sessionTodoSuppressedFingerprint === fingerprint) {
+      return null;
+    }
+
+    runtime.sessionTodoSuppressedFingerprint = fingerprint;
+    runtime.sessionTodos = [];
+    if (tabId === this.getActiveTabId()) {
+      this.renderSessionTodoDock(tabId);
+    }
+
+    logger.debug(`Suppressing stale session todos after prolonged inactivity: ${this.stringifyLogPayload({
+      tabId,
+      sessionId,
+      staleAgeMs,
+      todoCount: visibleTodos.length,
+      status,
+      todos: visibleTodos.map((todo) => ({
+        id: todo.id ?? null,
+        status: todo.status,
+        content: this.getLogPreview(todo.content, 120),
+      })),
+    })}`);
+
+    return visibleTodos;
+  }
+
+  private reconcileStaleSessionTodoState(tabId: TabId | null = this.getActiveTabId()): void {
+    const staleTodos = this.suppressStaleSessionTodosIfNeeded(tabId);
+    if (staleTodos && staleTodos.length > 0) {
+      void this.appendStaleSessionTodoNotice(tabId, staleTodos);
+    }
   }
 
   private normalizeSessionTodosForView(todos: readonly SessionTodo[] | unknown[]): SessionTodo[] {
@@ -1350,7 +1518,7 @@ export class OpenCodianView extends ItemView {
 
   private isBackgroundTaskGracePeriodActive(tabId: TabId | null = this.getActiveTabId()): boolean {
     const startedAt = this.getTabRuntimeState(tabId)?.backgroundTaskStartedAt;
-    return typeof startedAt === 'number' && Date.now() - startedAt < 15000;
+    return typeof startedAt === 'number' && Date.now() - startedAt < BACKGROUND_TASK_GRACE_PERIOD_MS;
   }
 
   private reconcileBackgroundTaskStateFromLiveSignals(tabId: TabId | null = this.getActiveTabId()): void {
@@ -1358,6 +1526,8 @@ export class OpenCodianView extends ItemView {
     if (!runtime || runtime.isStreaming || !runtime.backgroundTaskStartedAt) {
       return;
     }
+
+    this.reconcileStaleSessionTodoState(tabId);
 
     const status = this.getTabSessionStatus(tabId, this.getSessionIdForTab(tabId));
     if (status?.type === 'busy' || status?.type === 'retry') {
@@ -1446,6 +1616,58 @@ export class OpenCodianView extends ItemView {
       ...sortedPending.map((task) =>
         `- ${t('chat.backgroundTask.taskStatusStopped')} · \`${this.getBackgroundTaskLaunchDisplayId(task)}\`: ${task.description}`,
       ),
+    ].join('\n');
+  }
+
+  private async appendStaleSessionTodoNotice(
+    tabId: TabId | null,
+    todos: SessionTodo[],
+  ): Promise<void> {
+    const runtime = this.getTabRuntimeState(tabId);
+    if (!runtime || !tabId || tabId !== this.getActiveTabId() || !this.currentConversation) {
+      return;
+    }
+
+    const sessionId = this.getSessionIdForTab(tabId);
+    if (!sessionId || sessionId !== this.currentConversation.openCodeSessionId) {
+      return;
+    }
+
+    const title = t('chat.todo.staleTitle');
+    const content = this.buildStaleSessionTodoNoticeContent(todos);
+    if (runtime.sessionTodoStaleNoticeFingerprint === content) {
+      return;
+    }
+
+    if (this.hasMatchingPersistentAssistantNoticeMessage(title, content, 'warning')) {
+      runtime.sessionTodoStaleNoticeFingerprint = content;
+      return;
+    }
+
+    runtime.sessionTodoStaleNoticeFingerprint = content;
+    try {
+      await this.appendPersistentAssistantNoticeMessage(title, content, 'warning');
+    } catch (error) {
+      if (runtime.sessionTodoStaleNoticeFingerprint === content) {
+        runtime.sessionTodoStaleNoticeFingerprint = null;
+      }
+      logger.warn('Failed to append stale session todo notice', error);
+    }
+  }
+
+  private buildStaleSessionTodoNoticeContent(todos: SessionTodo[]): string {
+    const incompleteTodos = todos.filter((todo) =>
+      todo.status !== 'completed' && todo.status !== 'cancelled',
+    );
+    if (incompleteTodos.length === 0) {
+      return t('chat.todo.staleBody');
+    }
+
+    return [
+      t('chat.todo.staleBody'),
+      '',
+      `**${t('chat.backgroundTask.taskListLabel')}**`,
+      ...incompleteTodos.map((todo) => `- ${todo.content}`),
     ].join('\n');
   }
 
@@ -4896,6 +5118,7 @@ export class OpenCodianView extends ItemView {
       const finalizedTimestamp = finalizedAssistantMetadata?.timestamp ?? Date.now();
       const finalizedModelId = finalizedAssistantMetadata?.modelId ?? activeModelId;
       const finalizedAssistantMessageId = finalizedAssistantMetadata?.messageId;
+      const finalizedStreamingMessageEl = sendingRuntime.streamingMessageEl;
       const streamContentBlocks = streamController?.getContentBlocks();
       const streamedTextContent = streamContentBlocks
         ?.filter((b): b is { type: 'text'; content: string } => b.type === 'text')
@@ -4914,10 +5137,10 @@ export class OpenCodianView extends ItemView {
       pendingState.element?.remove();
       pendingState.element = null;
 
-      if (sendingRuntime.streamingMessageEl) {
+      if (finalizedStreamingMessageEl) {
         if (streamContentBlocks?.length || latestErrorMessage) {
           this.addTimestampWithCopyButton(
-            sendingRuntime.streamingMessageEl,
+            finalizedStreamingMessageEl,
             finalizedTimestamp,
             streamedTextContent.trim() || undefined,
             finalizedModelId,
@@ -4925,9 +5148,9 @@ export class OpenCodianView extends ItemView {
           );
         } else if (shouldPersistInterruptedState) {
           interruptedNoticeMessage = this.buildInterruptedAssistantNotice(finalizedTimestamp, finalizedModelId);
-          await this.renderAssistantPlaceholderAsNotice(sendingRuntime.streamingMessageEl, interruptedNoticeMessage);
+          await this.renderAssistantPlaceholderAsNotice(finalizedStreamingMessageEl, interruptedNoticeMessage);
         } else {
-          sendingRuntime.streamingMessageEl.remove();
+          finalizedStreamingMessageEl.remove();
         }
 
         if (this.getActiveTabId() === sendingTabId) {
@@ -4940,11 +5163,8 @@ export class OpenCodianView extends ItemView {
       this.syncTabStreamLikeState(sendingTabId);
       await this.refreshServerStatusBadge();
 
-      sendingRuntime.streamingMessageEl = null;
-      sendingRuntime.streamingContentEl = null;
-
       if (streamContentBlocks && streamContentBlocks.length > 0) {
-        const contentBlocks: ContentBlock[] = streamContentBlocks.map(b => {
+        const contentBlocks: ContentBlock[] = streamContentBlocks.map((b) => {
           if (b.type === 'text') {
             return { type: 'text', text: b.content };
           } else if (b.type === 'thinking') {
@@ -4974,16 +5194,28 @@ export class OpenCodianView extends ItemView {
           modelId: finalizedModelId,
           sourceMessageId: finalizedAssistantMessageId,
           streamState: shouldPersistInterruptedState ? 'interrupted' : undefined,
-          contentBlocks: contentBlocks,
+          contentBlocks,
           questionResolution: sendingRuntime.pendingQuestionResolution ?? undefined,
         };
 
-        if (sendingRuntime.streamingMessageEl) {
-          sendingRuntime.streamingMessageEl.dataset.messageId = assistantMessage.id;
+        if (shouldPersistInterruptedState) {
+          logger.debug(`Persisting interrupted assistant message after stream cancellation: ${this.stringifyLogPayload({
+            tabId: sendingTabId,
+            conversationId: sendingConversation.id,
+            sessionId: sendingConversation.openCodeSessionId,
+            messageId: assistantMessage.id,
+            sourceMessageId: assistantMessage.sourceMessageId ?? null,
+            contentPreview: this.getLogPreview(assistantMessage.content, 160),
+            contentBlockCount: assistantMessage.contentBlocks?.length ?? 0,
+          })}`);
+        }
+
+        if (finalizedStreamingMessageEl) {
+          finalizedStreamingMessageEl.dataset.messageId = assistantMessage.id;
           if (assistantMessage.sourceMessageId) {
-            sendingRuntime.streamingMessageEl.dataset.sourceMessageId = assistantMessage.sourceMessageId;
+            finalizedStreamingMessageEl.dataset.sourceMessageId = assistantMessage.sourceMessageId;
           } else {
-            delete sendingRuntime.streamingMessageEl.dataset.sourceMessageId;
+            delete finalizedStreamingMessageEl.dataset.sourceMessageId;
           }
         }
 
@@ -4998,6 +5230,12 @@ export class OpenCodianView extends ItemView {
           sourceMessageId: finalizedAssistantMessageId,
         });
       } else if (interruptedNoticeMessage) {
+        logger.debug(`Persisting interrupted assistant notice because no visible assistant content survived cancellation: ${this.stringifyLogPayload({
+          tabId: sendingTabId,
+          conversationId: sendingConversation.id,
+          sessionId: sendingConversation.openCodeSessionId,
+          noticeId: interruptedNoticeMessage.id,
+        })}`);
         sendingConversation.messages.push(interruptedNoticeMessage);
       }
 
@@ -5007,6 +5245,8 @@ export class OpenCodianView extends ItemView {
         await this.plugin.saveConversation(sendingConversation);
       }
 
+      sendingRuntime.streamingMessageEl = null;
+      sendingRuntime.streamingContentEl = null;
       sendingRuntime.pendingQuestionResolution = null;
     }
 
@@ -6294,6 +6534,39 @@ export class OpenCodianView extends ItemView {
     );
   }
 
+  private getClientOnlyMessagesToPreserveOnSync(
+    existingMessages: ChatMessage[],
+    syncedMessages: ChatMessage[],
+  ): ChatMessage[] {
+    return existingMessages.filter((message) => {
+      if (message.displayStyle === 'notice' && !message.sourceMessageId) {
+        return true;
+      }
+
+      if (
+        message.role !== 'assistant'
+        || message.displayStyle === 'notice'
+        || message.streamState !== 'interrupted'
+      ) {
+        return false;
+      }
+
+      const hasVisibleContent = Boolean(
+        message.content?.trim()
+        || (message.contentBlocks?.length ?? 0) > 0,
+      );
+      if (!hasVisibleContent) {
+        return false;
+      }
+
+      if (message.sourceMessageId) {
+        return !syncedMessages.some((candidate) => candidate.sourceMessageId === message.sourceMessageId);
+      }
+
+      return true;
+    });
+  }
+
   private shouldRenderConversationMessage(message: ChatMessage): boolean {
     if (message.role !== 'assistant' || message.displayStyle === 'notice') {
       return true;
@@ -7073,10 +7346,28 @@ export class OpenCodianView extends ItemView {
         conversation.messages,
         convertedServerMessages,
       );
-      const noticeMessages = conversation.messages.filter(
-        (message) => message.displayStyle === 'notice' && !message.sourceMessageId,
+      const preservedClientOnlyMessages = this.getClientOnlyMessagesToPreserveOnSync(
+        conversation.messages,
+        converted,
       );
-      const merged = [...converted, ...noticeMessages].sort((left, right) => left.timestamp - right.timestamp);
+      const preservedInterruptedMessages = preservedClientOnlyMessages.filter(
+        (message) => message.streamState === 'interrupted',
+      );
+      if (preservedInterruptedMessages.length > 0) {
+        logger.debug(`Preserving local interrupted assistant message(s) during conversation sync: ${this.stringifyLogPayload({
+          conversationId: conversation.id,
+          sessionId: conversation.openCodeSessionId,
+          count: preservedInterruptedMessages.length,
+          messages: preservedInterruptedMessages.map((message) => ({
+            id: message.id,
+            sourceMessageId: message.sourceMessageId ?? null,
+            contentPreview: this.getLogPreview(message.content, 120),
+            contentBlockCount: message.contentBlocks?.length ?? 0,
+          })),
+        })}`);
+      }
+      const merged = [...converted, ...preservedClientOnlyMessages]
+        .sort((left, right) => left.timestamp - right.timestamp);
       const fingerprint = this.getConversationSyncFingerprint(merged);
       const previousFingerprint = this.getTabRuntimeState(tabId)?.lastConversationSyncFingerprint
         ?? this.getConversationSyncFingerprint(conversation.messages);
@@ -7099,6 +7390,7 @@ export class OpenCodianView extends ItemView {
           sessionId: conversation.openCodeSessionId,
           serverMessageCount: serverMessages.length,
           mergedMessageCount: merged.length,
+          preservedClientOnlyMessageCount: preservedClientOnlyMessages.length,
           revertApplied: Boolean(revertState),
           revertMessageId: revertState?.messageID ?? null,
           changed,

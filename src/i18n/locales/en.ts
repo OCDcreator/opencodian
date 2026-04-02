@@ -776,6 +776,8 @@ export const enTranslations = {
   'chat.todo.collapse': 'Collapse todos',
   'chat.todo.expand': 'Expand todos',
   'chat.todo.loadFailed': 'Failed to load session todos',
+  'chat.todo.staleTitle': 'Todo state downgraded as stale',
+  'chat.todo.staleBody': 'These todos have not changed for a while, and the session is no longer reporting active work. OpenCodian has hidden the todo dock until the server sends a new todo update.',
   'chat.message.user': 'You',
   'chat.message.assistant': 'AI',
   'chat.message.thinking': 'Thinking...',
