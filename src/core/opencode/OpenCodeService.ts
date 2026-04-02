@@ -30,6 +30,7 @@ import type {
   PermissionReply,
   PermissionRequest,
   PromptContextItem,
+  PromptContextLineRange,
   QuestionOption,
   QuestionPrompt,
   QuestionRequest as ChatQuestionRequest,
@@ -2938,13 +2939,15 @@ export class OpenCodeService {
     }
 
     const contextPath = OpenCodeService.normalizeContextAttachmentPath(inputPath, vaultPath);
+    const lineRange = OpenCodeService.extractLineRangeFromToolInput(parsedInput);
 
     return {
       attachment: {
-        kind: 'file',
+        kind: lineRange ? 'selection' : 'file',
         path: contextPath,
-        label: formatContextLabel(contextPath),
+        label: formatContextLabel(contextPath, lineRange),
         mime: resolveContextMimeFromPath(contextPath),
+        lineRange,
       },
       nextIndex: jsonEnd + 1,
     };
@@ -3017,6 +3020,38 @@ export class OpenCodeService {
       if (typeof candidate === 'string' && candidate.trim()) {
         return candidate.trim();
       }
+    }
+
+    return null;
+  }
+
+  private static extractLineRangeFromToolInput(
+    input: Record<string, unknown> | null,
+  ): PromptContextLineRange | undefined {
+    if (!input) {
+      return undefined;
+    }
+
+    const offset = OpenCodeService.parsePositiveInteger(input.offset);
+    const limit = OpenCodeService.parsePositiveInteger(input.limit);
+    if (offset === null || limit === null) {
+      return undefined;
+    }
+
+    return {
+      startLine: offset,
+      endLine: offset + limit - 1,
+    };
+  }
+
+  private static parsePositiveInteger(value: unknown): number | null {
+    if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
+      return Math.floor(value);
+    }
+
+    if (typeof value === 'string' && /^\d+$/.test(value.trim())) {
+      const parsed = Number(value.trim());
+      return parsed > 0 ? parsed : null;
     }
 
     return null;

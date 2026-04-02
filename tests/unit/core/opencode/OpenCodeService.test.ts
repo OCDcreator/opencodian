@@ -1585,15 +1585,43 @@ describe('OpenCodeService.openCodeMessageToChatMessage', () => {
     const message = OpenCodeService.openCodeMessageToChatMessage(info, parts, 'C:\\vault');
 
     expect(message.content).toBe('能看到选中文字吗？');
-    expect(message.contextAttachments?.[0]).toMatchObject({
-      kind: 'file',
-      path: 'obsidian 联动设置.md',
-    });
-    expect(message.contextAttachments?.[1]).toMatchObject({
-      kind: 'selection',
-      path: 'obsidian 联动设置.md',
-      lineRange: { startLine: 6, endLine: 6 },
-    });
+    expect(message.contextAttachments).toEqual([
+      expect.objectContaining({
+        kind: 'selection',
+        path: 'obsidian 联动设置.md',
+        lineRange: { startLine: 6, endLine: 6 },
+      }),
+    ]);
+  });
+
+  it('restores a selection attachment from inline read-tool metadata when no file part is present', () => {
+    const info = {
+      id: 'msg-user-inline-selection',
+      sessionID: 'session-1',
+      role: 'user' as const,
+      time: { created: 1234567900 },
+    };
+
+    const parts: Part[] = [
+      {
+        type: 'text',
+        id: 'part-user-inline-selection',
+        sessionID: 'session-1',
+        messageID: 'msg-user-inline-selection',
+        text: '请看这里 Called the Read tool with the following input: {"filePath":"C:\\\\vault\\\\obsidian 联动设置.md","offset":6,"limit":1}',
+      },
+    ];
+
+    const message = OpenCodeService.openCodeMessageToChatMessage(info, parts, 'C:\\vault');
+
+    expect(message.content).toBe('请看这里');
+    expect(message.contextAttachments).toEqual([
+      expect.objectContaining({
+        kind: 'selection',
+        path: 'obsidian 联动设置.md',
+        lineRange: { startLine: 6, endLine: 6 },
+      }),
+    ]);
   });
 
   it('should extract tool calls from tool parts', () => {
