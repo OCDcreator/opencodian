@@ -10,11 +10,14 @@ import {
   getDefaultChatAppearanceSettings,
   getDefaultDebugLogPaths,
   getDefaultInputPanelGlassRefractionSettings,
+  getDefaultInputPanelGlassRefractionSvgFilterSettings,
   getDefaultThemeSettings,
   isValidChatAppearanceCustomCssDeclarations,
   normalizeBelowHeaderTabBarLayout,
   normalizeChatAppearanceSettings,
   normalizeInputPanelGlassRefractionSettings,
+  normalizeInputPanelGlassRefractionSvgFilterPresetId,
+  normalizeInputPanelGlassRefractionSvgFilterSettings,
   normalizeInputPanelThemeId,
   normalizePartialChatAppearanceSettings,
   normalizeQuestionCardPosition,
@@ -108,6 +111,9 @@ describe('Settings', () => {
       expect(DEFAULT_SETTINGS.chatAppearance.input.backgroundOpacity).toBe(72);
       expect(DEFAULT_SETTINGS.chatAppearance.input.shadowBlur).toBe(28);
       expect(DEFAULT_SETTINGS.inputPanelGlassRefraction).toEqual(getDefaultInputPanelGlassRefractionSettings());
+      expect(DEFAULT_SETTINGS.inputPanelGlassRefractionSvgFilter).toEqual(
+        getDefaultInputPanelGlassRefractionSvgFilterSettings(),
+      );
       expect(DEFAULT_SETTINGS.chatAppearance.scrollbar.width).toBe(8);
       expect(DEFAULT_SETTINGS.chatAppearance.scrollbar.thumbHoverOpacity).toBe(82);
       expect(DEFAULT_SETTINGS.settingsPanelScrollTop).toBe(0);
@@ -357,6 +363,44 @@ describe('Settings', () => {
           saturation: 130,
           brightness: 100,
         },
+      });
+    });
+  });
+
+  describe('input panel glass refraction svg filters', () => {
+    it('returns the expected defaults', () => {
+      expect(getDefaultInputPanelGlassRefractionSvgFilterSettings()).toEqual({
+        preset: 'none',
+        subtleScale: 8,
+        strongScale: 16,
+      });
+    });
+
+    it('normalizes svg filter preset values', () => {
+      expect(normalizeInputPanelGlassRefractionSvgFilterPresetId('none')).toBe('none');
+      expect(normalizeInputPanelGlassRefractionSvgFilterPresetId('subtle')).toBe('subtle');
+      expect(normalizeInputPanelGlassRefractionSvgFilterPresetId('strong')).toBe('strong');
+      expect(normalizeInputPanelGlassRefractionSvgFilterPresetId('hero')).toBe('none');
+      expect(normalizeInputPanelGlassRefractionSvgFilterPresetId(undefined)).toBe('none');
+    });
+
+    it('normalizes svg filter settings back to defaults and clamps scales', () => {
+      expect(normalizeInputPanelGlassRefractionSvgFilterSettings({
+        preset: 'strong',
+        subtleScale: -5,
+        strongScale: 99,
+      })).toEqual({
+        preset: 'strong',
+        subtleScale: 0,
+        strongScale: 32,
+      });
+
+      expect(normalizeInputPanelGlassRefractionSvgFilterSettings({
+        preset: 'legacy' as never,
+      })).toEqual({
+        preset: 'none',
+        subtleScale: 8,
+        strongScale: 16,
       });
     });
   });

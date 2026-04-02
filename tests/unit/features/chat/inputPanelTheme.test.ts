@@ -7,7 +7,9 @@ jest.mock('../../../../src/core/opencode', () => ({
 import {
   getDefaultChatAppearanceSettings,
   getDefaultInputPanelGlassRefractionSettings,
+  getDefaultInputPanelGlassRefractionSvgFilterSettings,
   getDefaultThemeSettings,
+  type InputPanelGlassRefractionSvgFilterSettings,
   type InputPanelThemeId,
 } from '../../../../src/core/types';
 import { OpenCodianView } from '../../../../src/features/chat/OpenCodianView';
@@ -18,6 +20,7 @@ type InputPanelThemeViewHarness = {
     settings: {
       inputPanelTheme: InputPanelThemeId;
       inputPanelGlassRefraction: ReturnType<typeof getDefaultInputPanelGlassRefractionSettings>;
+      inputPanelGlassRefractionSvgFilter: InputPanelGlassRefractionSvgFilterSettings;
     };
   };
   applyInputPanelThemeState: () => void;
@@ -42,6 +45,7 @@ describe('OpenCodianView input panel theme', () => {
         chatAppearance: getDefaultChatAppearanceSettings(),
         inputPanelTheme,
         inputPanelGlassRefraction: getDefaultInputPanelGlassRefractionSettings(),
+        inputPanelGlassRefractionSvgFilter: getDefaultInputPanelGlassRefractionSvgFilterSettings(),
       },
       openCodeService: {},
       storage: {},
@@ -59,6 +63,7 @@ describe('OpenCodianView input panel theme', () => {
     expect(shellEl.classList.contains('opencodian-composer-shell--gr-card')).toBe(false);
     expect(shellEl.classList.contains('opencodian-composer-shell--gr-pill')).toBe(false);
     expect(document.body.querySelector('.opencodian-composer-glass-fx')).toBeNull();
+    expect(shellEl.querySelector('.opencodian-composer-svg-filter-layer')).toBeNull();
     expect(shellEl.querySelector('.opencodian-composer-glass-surface')).toBeNull();
   });
 
@@ -85,8 +90,60 @@ describe('OpenCodianView input panel theme', () => {
 
     expect(shellEl.classList.contains('opencodian-composer-shell--gr-glass')).toBe(true);
     expect(document.body.querySelector('.opencodian-composer-glass-fx')).toBeNull();
+    expect(shellEl.querySelector('.opencodian-composer-svg-filter-layer')).toBeNull();
     expect(shellEl.querySelector('.opencodian-composer-glass-surface')).toBeNull();
     expect(shellEl.dataset.opencodianGlassFilter).toBeUndefined();
+  });
+
+  it('mounts the subtle svg refraction filter layer and syncs project-default scales', () => {
+    const view = createView('glass-refraction-glass');
+    const shellEl = document.body.createDiv({ cls: 'opencodian-composer-shell' });
+    view.composerShellEl = shellEl;
+    view.plugin.settings.inputPanelGlassRefractionSvgFilter = {
+      preset: 'subtle',
+      subtleScale: 8,
+      strongScale: 16,
+    };
+
+    view.applyInputPanelThemeState();
+
+    expect(shellEl.classList.contains('opencodian-composer-shell--gr-glass')).toBe(true);
+    expect(shellEl.classList.contains('opencodian-composer-shell--gr-svg-filter-subtle')).toBe(true);
+    expect(shellEl.querySelector('.opencodian-composer-svg-filter-layer')).not.toBeNull();
+    expect(
+      document.querySelector('#opencodian-glass-refract feDisplacementMap')?.getAttribute('scale'),
+    ).toBe('8');
+    expect(
+      document.querySelector('#opencodian-glass-refract-strong feDisplacementMap')?.getAttribute('scale'),
+    ).toBe('16');
+  });
+
+  it('updates the strong svg refraction scale and removes the layer when disabled', () => {
+    const view = createView('glass-refraction-card');
+    const shellEl = document.body.createDiv({ cls: 'opencodian-composer-shell' });
+    view.composerShellEl = shellEl;
+    view.plugin.settings.inputPanelGlassRefractionSvgFilter = {
+      preset: 'strong',
+      subtleScale: 8,
+      strongScale: 21,
+    };
+
+    view.applyInputPanelThemeState();
+    expect(shellEl.classList.contains('opencodian-composer-shell--gr-svg-filter-strong')).toBe(true);
+    expect(
+      document.querySelector('#opencodian-glass-refract-strong feDisplacementMap')?.getAttribute('scale'),
+    ).toBe('21');
+    expect(shellEl.querySelector('.opencodian-composer-svg-filter-layer')).not.toBeNull();
+
+    view.plugin.settings.inputPanelGlassRefractionSvgFilter = {
+      preset: 'none',
+      subtleScale: 8,
+      strongScale: 21,
+    };
+    view.applyInputPanelThemeState();
+
+    expect(shellEl.classList.contains('opencodian-composer-shell--gr-svg-filter-strong')).toBe(false);
+    expect(shellEl.querySelector('.opencodian-composer-svg-filter-layer')).toBeNull();
   });
 
   it('replaces existing glass-refraction classes when switching themes', () => {

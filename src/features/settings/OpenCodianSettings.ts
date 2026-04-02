@@ -18,6 +18,8 @@ import {
   getCurrentPlatformDebugLogPath,
   getCurrentPlatformKey,
   getDefaultInputPanelGlassRefractionSettings,
+  getDefaultInputPanelGlassRefractionSvgFilterSettings,
+  type InputPanelGlassRefractionSvgFilterPresetId,
   type InputPanelGlassRefractionVariantId,
   type InputPanelThemeId,
   isValidChatAppearanceCustomCssDeclarations,
@@ -2443,6 +2445,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
   private addGlassRefractionInputControls(containerEl: HTMLElement): void {
     const variantId = this.getCurrentGlassRefractionVariantId(this.plugin.settings.inputPanelTheme);
     const defaults = getDefaultInputPanelGlassRefractionSettings()[variantId];
+    const svgFilterDefaults = getDefaultInputPanelGlassRefractionSvgFilterSettings();
     const syncHandlers: Array<() => void> = [];
     const registerSync = (syncFromSettings: () => void) => {
       syncHandlers.push(syncFromSettings);
@@ -2516,6 +2519,67 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       },
       registerSync,
     });
+
+    new Setting(containerEl)
+      .setName(t('settings.style.input.glassRefraction.svgFilter.name'))
+      .setDesc(t('settings.style.input.glassRefraction.svgFilter.desc'))
+      .addDropdown((dropdown) => {
+        dropdown
+          .addOption('none', t('settings.style.input.glassRefraction.svgFilter.option.none'))
+          .addOption('subtle', t('settings.style.input.glassRefraction.svgFilter.option.subtle'))
+          .addOption('strong', t('settings.style.input.glassRefraction.svgFilter.option.strong'))
+          .setValue(this.plugin.settings.inputPanelGlassRefractionSvgFilter.preset)
+          .onChange((value) => {
+            this.plugin.settings.inputPanelGlassRefractionSvgFilter = {
+              ...this.plugin.settings.inputPanelGlassRefractionSvgFilter,
+              preset: value as InputPanelGlassRefractionSvgFilterPresetId,
+            };
+            this.applyAndScheduleStyleUpdate();
+            this.renderInputStyleGroup();
+          });
+      });
+
+    const activeSvgFilterPreset = this.plugin.settings.inputPanelGlassRefractionSvgFilter.preset;
+    if (activeSvgFilterPreset !== 'none') {
+      const scaleKey = this.getInputPanelGlassRefractionSvgFilterScaleKey(activeSvgFilterPreset);
+      const scaleDefault = svgFilterDefaults[scaleKey];
+
+      this.addNumericControl(containerEl, {
+        name: t('settings.style.input.glassRefraction.svgFilter.scale.name'),
+        desc: t('settings.style.input.glassRefraction.svgFilter.scale.desc'),
+        min: 0,
+        max: 32,
+        step: 1,
+        unit: '',
+        value: () => this.plugin.settings.inputPanelGlassRefractionSvgFilter[scaleKey],
+        resetValue: () => scaleDefault,
+        commitValue: (value) => {
+          this.plugin.settings.inputPanelGlassRefractionSvgFilter = {
+            ...this.plugin.settings.inputPanelGlassRefractionSvgFilter,
+            [scaleKey]: value,
+          };
+          this.applyAndScheduleStyleUpdate();
+        },
+        registerSync,
+      });
+
+      new Setting(containerEl)
+        .setName(t('settings.style.input.glassRefraction.svgFilter.reset.name'))
+        .setDesc(t('settings.style.input.glassRefraction.svgFilter.reset.desc'))
+        .setClass('opencodian-style-reset-setting')
+        .addButton((btn) => {
+          btn
+            .setButtonText(t('settings.style.input.glassRefraction.svgFilter.reset.button'))
+            .onClick(() => {
+              this.plugin.settings.inputPanelGlassRefractionSvgFilter = {
+                ...this.plugin.settings.inputPanelGlassRefractionSvgFilter,
+                [scaleKey]: scaleDefault,
+              };
+              this.applyAndScheduleStyleUpdate();
+              syncHandlers.forEach((syncFromSettings) => syncFromSettings());
+            });
+        });
+    }
 
     new Setting(containerEl)
       .setName(t('settings.style.input.glassRefraction.reset.name'))
@@ -2597,6 +2661,12 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       default:
         return 'glass-refraction-glass';
     }
+  }
+
+  private getInputPanelGlassRefractionSvgFilterScaleKey(
+    preset: Exclude<InputPanelGlassRefractionSvgFilterPresetId, 'none'>,
+  ): 'subtleScale' | 'strongScale' {
+    return preset === 'subtle' ? 'subtleScale' : 'strongScale';
   }
 
   private getCurrentGlassRefractionVariantId(themeId: InputPanelThemeId): InputPanelGlassRefractionVariantId {

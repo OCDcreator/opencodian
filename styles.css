@@ -2344,6 +2344,32 @@
   z-index: 4;
 }
 
+.opencodian-composer-svg-filter-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateZ(0);
+  transition: opacity 0.22s ease;
+  will-change: filter, opacity;
+}
+
+.opencodian-composer-shell--gr-svg-filter-subtle .opencodian-composer-svg-filter-layer,
+.opencodian-composer-shell--gr-svg-filter-strong .opencodian-composer-svg-filter-layer {
+  opacity: 1;
+}
+
+.opencodian-composer-shell--gr-svg-filter-subtle .opencodian-composer-svg-filter-layer {
+  filter: url(#opencodian-glass-refract);
+}
+
+.opencodian-composer-shell--gr-svg-filter-strong .opencodian-composer-svg-filter-layer {
+  filter: url(#opencodian-glass-refract-strong);
+}
+
 .opencodian-composer-shell--gr-glass {
   border-radius: calc(var(--opencodian-input-radius) + 2px);
   background:
@@ -2361,6 +2387,27 @@
     0 0 0 0.5px rgba(255, 255, 255, 0.10),
     inset 0 1px 0 rgba(255, 255, 255, 0.12),
     0 4px 24px -4px rgba(0, 0, 0, 0.30);
+}
+
+.opencodian-composer-shell--gr-glass.opencodian-composer-shell--gr-svg-filter-subtle,
+.opencodian-composer-shell--gr-glass.opencodian-composer-shell--gr-svg-filter-strong {
+  background: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.opencodian-composer-shell--gr-glass .opencodian-composer-svg-filter-layer {
+  background:
+    linear-gradient(105deg, transparent 40%, rgba(255, 255, 255, 0.06) 50%, transparent 60%),
+    linear-gradient(
+      135deg,
+      rgba(18, 22, 35, var(--opencodian-gr-glass-bg-alpha)),
+      rgba(12, 16, 28, calc(var(--opencodian-gr-glass-bg-alpha) * 0.875))
+    );
+  background-size: 200% 100%, 100% 100%;
+  animation: opencodian-glass-shimmer var(--opencodian-gr-shimmer-duration) ease-in-out infinite;
+  -webkit-backdrop-filter: blur(var(--opencodian-gr-glass-blur)) saturate(var(--opencodian-gr-glass-saturation)) brightness(var(--opencodian-gr-glass-brightness));
+  backdrop-filter: blur(var(--opencodian-gr-glass-blur)) saturate(var(--opencodian-gr-glass-saturation)) brightness(var(--opencodian-gr-glass-brightness));
 }
 
 .opencodian-composer-shell--gr-glass::before {
@@ -2403,7 +2450,7 @@
   border-radius: 16px;
   background: linear-gradient(
     160deg,
-    rgba(255, 255, 255, calc(var(--opencodian-gr-card-bg-alpha) * 0.12)) 0%,
+    rgba(255, 255, 255, calc(var(--opencodian-gr-card-bg-alpha) * 0.1153846154)) 0%,
     rgba(15, 18, 30, var(--opencodian-gr-card-bg-alpha)) 100%
   );
   -webkit-backdrop-filter: blur(var(--opencodian-gr-card-blur)) saturate(var(--opencodian-gr-card-saturation)) brightness(var(--opencodian-gr-card-brightness));
@@ -2415,6 +2462,23 @@
   transition:
     transform 0.35s cubic-bezier(0.4, 0, 0.2, 1),
     box-shadow 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.opencodian-composer-shell--gr-card.opencodian-composer-shell--gr-svg-filter-subtle,
+.opencodian-composer-shell--gr-card.opencodian-composer-shell--gr-svg-filter-strong {
+  background: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.opencodian-composer-shell--gr-card .opencodian-composer-svg-filter-layer {
+  background: linear-gradient(
+    160deg,
+    rgba(255, 255, 255, calc(var(--opencodian-gr-card-bg-alpha) * 0.1153846154)) 0%,
+    rgba(15, 18, 30, var(--opencodian-gr-card-bg-alpha)) 100%
+  );
+  -webkit-backdrop-filter: blur(var(--opencodian-gr-card-blur)) saturate(var(--opencodian-gr-card-saturation)) brightness(var(--opencodian-gr-card-brightness));
+  backdrop-filter: blur(var(--opencodian-gr-card-blur)) saturate(var(--opencodian-gr-card-saturation)) brightness(var(--opencodian-gr-card-brightness));
 }
 
 .opencodian-composer-shell--gr-card:hover {
@@ -2466,6 +2530,19 @@
     0 0 0 0.5px rgba(255, 255, 255, 0.08),
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
   transition: all 0.25s ease;
+}
+
+.opencodian-composer-shell--gr-pill.opencodian-composer-shell--gr-svg-filter-subtle,
+.opencodian-composer-shell--gr-pill.opencodian-composer-shell--gr-svg-filter-strong {
+  background: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.opencodian-composer-shell--gr-pill .opencodian-composer-svg-filter-layer {
+  background: rgba(255, 255, 255, var(--opencodian-gr-pill-bg-alpha));
+  -webkit-backdrop-filter: blur(var(--opencodian-gr-pill-blur)) saturate(var(--opencodian-gr-pill-saturation)) brightness(var(--opencodian-gr-pill-brightness));
+  backdrop-filter: blur(var(--opencodian-gr-pill-blur)) saturate(var(--opencodian-gr-pill-saturation)) brightness(var(--opencodian-gr-pill-brightness));
 }
 
 .opencodian-composer-shell--gr-pill:hover {

@@ -114,7 +114,7 @@ describe('OpenCodianPlugin.loadSettings theme migration', () => {
     expect(plugin.settings.inputPanelTheme).toBe(inputPanelTheme);
   });
 
-  it('resets legacy glass tuning to reference defaults while preserving other tiers', async () => {
+  it('resets legacy glass-refraction tier tuning to reference defaults', async () => {
     const plugin = {
       storage: {
         loadSettings: jest.fn().mockResolvedValue({
@@ -136,6 +136,12 @@ describe('OpenCodianPlugin.loadSettings theme migration', () => {
               saturation: 145,
               brightness: 96,
             },
+            pill: {
+              backgroundOpacity: 12,
+              blur: 10,
+              saturation: 138,
+              brightness: 104,
+            },
           },
         }),
         saveSettings: jest.fn(),
@@ -147,18 +153,13 @@ describe('OpenCodianPlugin.loadSettings theme migration', () => {
     expect(plugin.settings.chatAppearance.input.backgroundOpacity).toBe(61);
     expect(plugin.settings.inputPanelGlassRefraction).toEqual({
       glass: getDefaultInputPanelGlassRefractionSettings().glass,
-      card: {
-        backgroundOpacity: 44,
-        blur: 18,
-        saturation: 145,
-        brightness: 96,
-      },
+      card: getDefaultInputPanelGlassRefractionSettings().card,
       pill: getDefaultInputPanelGlassRefractionSettings().pill,
     });
-    expect(plugin.settings.inputPanelGlassRefractionGlassDefaultsVersion).toBe(1);
+    expect(plugin.settings.inputPanelGlassRefractionGlassDefaultsVersion).toBe(2);
   });
 
-  it('preserves user-adjusted glass tuning after the one-time reset has run', async () => {
+  it('preserves glass tuning from v1 while resetting card and pill to reference defaults', async () => {
     const plugin = {
       storage: {
         loadSettings: jest.fn().mockResolvedValue({
@@ -175,6 +176,57 @@ describe('OpenCodianPlugin.loadSettings theme migration', () => {
               blur: 18,
               saturation: 145,
               brightness: 96,
+            },
+            pill: {
+              backgroundOpacity: 12,
+              blur: 10,
+              saturation: 138,
+              brightness: 104,
+            },
+          },
+        }),
+        saveSettings: jest.fn(),
+      },
+    } as unknown as OpenCodianPlugin;
+
+    await OpenCodianPlugin.prototype.loadSettings.call(plugin);
+
+    expect(plugin.settings.inputPanelGlassRefraction).toEqual({
+      glass: {
+        backgroundOpacity: 56,
+        blur: 28,
+        saturation: 180,
+        brightness: 110,
+      },
+      card: getDefaultInputPanelGlassRefractionSettings().card,
+      pill: getDefaultInputPanelGlassRefractionSettings().pill,
+    });
+    expect(plugin.settings.inputPanelGlassRefractionGlassDefaultsVersion).toBe(2);
+  });
+
+  it('preserves user-adjusted glass-refraction tuning after the v2 reset has run', async () => {
+    const plugin = {
+      storage: {
+        loadSettings: jest.fn().mockResolvedValue({
+          inputPanelGlassRefractionGlassDefaultsVersion: 2,
+          inputPanelGlassRefraction: {
+            glass: {
+              backgroundOpacity: 56,
+              blur: 28,
+              saturation: 180,
+              brightness: 110,
+            },
+            card: {
+              backgroundOpacity: 44,
+              blur: 18,
+              saturation: 145,
+              brightness: 96,
+            },
+            pill: {
+              backgroundOpacity: 12,
+              blur: 10,
+              saturation: 138,
+              brightness: 104,
             },
           },
         }),
@@ -197,9 +249,47 @@ describe('OpenCodianPlugin.loadSettings theme migration', () => {
         saturation: 145,
         brightness: 96,
       },
+      pill: {
+        backgroundOpacity: 12,
+        blur: 10,
+        saturation: 138,
+        brightness: 104,
+      },
+    });
+    expect(plugin.settings.inputPanelGlassRefractionGlassDefaultsVersion).toBe(2);
+  });
+
+  it('fills missing card and pill tiers with reference defaults after the v2 reset has run', async () => {
+    const plugin = {
+      storage: {
+        loadSettings: jest.fn().mockResolvedValue({
+          inputPanelGlassRefractionGlassDefaultsVersion: 2,
+          inputPanelGlassRefraction: {
+            glass: {
+              backgroundOpacity: 56,
+              blur: 28,
+              saturation: 180,
+              brightness: 110,
+            },
+          },
+        }),
+        saveSettings: jest.fn(),
+      },
+    } as unknown as OpenCodianPlugin;
+
+    await OpenCodianPlugin.prototype.loadSettings.call(plugin);
+
+    expect(plugin.settings.inputPanelGlassRefraction).toEqual({
+      glass: {
+        backgroundOpacity: 56,
+        blur: 28,
+        saturation: 180,
+        brightness: 110,
+      },
+      card: getDefaultInputPanelGlassRefractionSettings().card,
       pill: getDefaultInputPanelGlassRefractionSettings().pill,
     });
-    expect(plugin.settings.inputPanelGlassRefractionGlassDefaultsVersion).toBe(1);
+    expect(plugin.settings.inputPanelGlassRefractionGlassDefaultsVersion).toBe(2);
   });
 
   it('ignores the removed experimental composer glass refraction toggle field', async () => {

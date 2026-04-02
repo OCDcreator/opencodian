@@ -409,6 +409,14 @@ type PartialInputPanelGlassRefractionSettings = Partial<
   Record<InputPanelGlassRefractionVariantId, Partial<InputPanelGlassRefractionVariantSettings>>
 >;
 
+export type InputPanelGlassRefractionSvgFilterPresetId = 'none' | 'subtle' | 'strong';
+
+export interface InputPanelGlassRefractionSvgFilterSettings {
+  preset: InputPanelGlassRefractionSvgFilterPresetId;
+  subtleScale: number;
+  strongScale: number;
+}
+
 export interface ChatAppearanceScrollbarSettings {
   width: number;
   radius: number;
@@ -549,6 +557,14 @@ export function getDefaultInputPanelGlassRefractionSettings(): InputPanelGlassRe
   };
 }
 
+export function getDefaultInputPanelGlassRefractionSvgFilterSettings(): InputPanelGlassRefractionSvgFilterSettings {
+  return {
+    preset: 'none',
+    subtleScale: 8,
+    strongScale: 16,
+  };
+}
+
 function normalizeInputPanelGlassRefractionVariantSettings(
   value: unknown,
   defaults: InputPanelGlassRefractionVariantSettings,
@@ -580,6 +596,31 @@ export function normalizeInputPanelGlassRefractionSettings(
     glass: normalizeInputPanelGlassRefractionVariantSettings(value?.glass, defaults.glass),
     card: normalizeInputPanelGlassRefractionVariantSettings(value?.card, defaults.card),
     pill: normalizeInputPanelGlassRefractionVariantSettings(value?.pill, defaults.pill),
+  };
+}
+
+export function normalizeInputPanelGlassRefractionSvgFilterPresetId(
+  value: unknown,
+): InputPanelGlassRefractionSvgFilterPresetId {
+  switch (value) {
+    case 'none':
+    case 'subtle':
+    case 'strong':
+      return value;
+    default:
+      return 'none';
+  }
+}
+
+export function normalizeInputPanelGlassRefractionSvgFilterSettings(
+  value?: Partial<InputPanelGlassRefractionSvgFilterSettings> | null,
+): InputPanelGlassRefractionSvgFilterSettings {
+  const defaults = getDefaultInputPanelGlassRefractionSvgFilterSettings();
+
+  return {
+    preset: normalizeInputPanelGlassRefractionSvgFilterPresetId(value?.preset),
+    subtleScale: normalizeFiniteNumberInRange(value?.subtleScale, defaults.subtleScale, 0, 32),
+    strongScale: normalizeFiniteNumberInRange(value?.strongScale, defaults.strongScale, 0, 32),
   };
 }
 
@@ -837,6 +878,7 @@ export interface OpenCodianSettings {
   chatScrollMode: ChatScrollMode;
   inputPanelTheme: InputPanelThemeId;
   inputPanelGlassRefraction: InputPanelGlassRefractionSettings;
+  inputPanelGlassRefractionSvgFilter: InputPanelGlassRefractionSvgFilterSettings;
   inputPanelGlassRefractionGlassDefaultsVersion: number;
   chatAppearance: ChatAppearanceSettings;
   settingsPanelScrollTop: number;
@@ -914,7 +956,8 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
   chatScrollMode: 'sticky-mask',
   inputPanelTheme: 'preset',
   inputPanelGlassRefraction: getDefaultInputPanelGlassRefractionSettings(),
-  inputPanelGlassRefractionGlassDefaultsVersion: 1,
+  inputPanelGlassRefractionSvgFilter: getDefaultInputPanelGlassRefractionSvgFilterSettings(),
+  inputPanelGlassRefractionGlassDefaultsVersion: 2,
   chatAppearance: getDefaultChatAppearanceSettings(),
   settingsPanelScrollTop: 0,
   enableDebugLogging: false,

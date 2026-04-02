@@ -33,6 +33,7 @@ import {
   getCurrentPlatformKey,
   getDefaultChatAppearanceSettings,
   getDefaultInputPanelGlassRefractionSettings,
+  getDefaultInputPanelGlassRefractionSvgFilterSettings,
   getDefaultPersistedTabState,
   getDefaultThemeSettings,
   getServerBaseUrl,
@@ -41,6 +42,7 @@ import {
   normalizeChatAppearanceSettings,
   normalizeEffortLevel,
   normalizeInputPanelGlassRefractionSettings,
+  normalizeInputPanelGlassRefractionSvgFilterSettings,
   normalizeInputPanelThemeId,
   normalizePersistedTabState,
   normalizePluginIsolationMode,
@@ -59,7 +61,7 @@ import { setLocale, t } from './i18n';
 import { createLogger, getRecentLogText, getVaultBasePath, setDebugLoggingEnabled } from './shared';
 
 const logger = createLogger('OpenCodian');
-const INPUT_PANEL_GLASS_REFRACTION_GLASS_DEFAULTS_VERSION = 1;
+const INPUT_PANEL_GLASS_REFRACTION_GLASS_DEFAULTS_VERSION = 2;
 
 // BUILD_ID is injected at build time via esbuild define
 declare const BUILD_ID: string;
@@ -417,8 +419,11 @@ export default class OpenCodianPlugin extends Plugin {
       && Number.isFinite(savedSettings.inputPanelGlassRefractionGlassDefaultsVersion)
         ? Number(savedSettings.inputPanelGlassRefractionGlassDefaultsVersion)
         : 0;
-    const shouldResetGlassRefractionGlassDefaults =
+    const shouldResetGlassTierDefaults = savedGlassDefaultsVersion < 1;
+    const shouldResetCardAndPillTierDefaults =
       savedGlassDefaultsVersion < INPUT_PANEL_GLASS_REFRACTION_GLASS_DEFAULTS_VERSION;
+    const shouldResetGlassRefractionGlassDefaults =
+      shouldResetGlassTierDefaults || shouldResetCardAndPillTierDefaults;
     const defaultInputPanelGlassRefraction = getDefaultInputPanelGlassRefractionSettings();
     const normalizedInputPanelGlassRefractionBase = normalizeInputPanelGlassRefractionSettings(
       savedSettings?.inputPanelGlassRefraction,
@@ -426,9 +431,22 @@ export default class OpenCodianPlugin extends Plugin {
     const normalizedInputPanelGlassRefraction = shouldResetGlassRefractionGlassDefaults
       ? {
           ...normalizedInputPanelGlassRefractionBase,
-          glass: { ...defaultInputPanelGlassRefraction.glass },
+          ...(shouldResetGlassTierDefaults
+            ? {
+                glass: { ...defaultInputPanelGlassRefraction.glass },
+              }
+            : {}),
+          ...(shouldResetCardAndPillTierDefaults
+            ? {
+                card: { ...defaultInputPanelGlassRefraction.card },
+                pill: { ...defaultInputPanelGlassRefraction.pill },
+              }
+            : {}),
         }
       : normalizedInputPanelGlassRefractionBase;
+    const normalizedInputPanelGlassRefractionSvgFilter = normalizeInputPanelGlassRefractionSvgFilterSettings(
+      savedSettings?.inputPanelGlassRefractionSvgFilter,
+    );
 
     const normalizedSettings = savedSettings
       ? (() => {
@@ -467,6 +485,7 @@ export default class OpenCodianPlugin extends Plugin {
             pluginIsolationMode: normalizePluginIsolationMode(savedSettings.pluginIsolationMode),
             inputPanelTheme: normalizeInputPanelThemeId(savedSettings.inputPanelTheme),
             inputPanelGlassRefraction: normalizedInputPanelGlassRefraction,
+            inputPanelGlassRefractionSvgFilter: normalizedInputPanelGlassRefractionSvgFilter,
             inputPanelGlassRefractionGlassDefaultsVersion: INPUT_PANEL_GLASS_REFRACTION_GLASS_DEFAULTS_VERSION,
             debugLogPaths: normalizedDebugLogPaths,
             chatAppearance: normalizedChatAppearance,
@@ -485,6 +504,8 @@ export default class OpenCodianPlugin extends Plugin {
       inputPanelTheme: normalizeInputPanelThemeId(normalizedSettings?.inputPanelTheme),
       inputPanelGlassRefraction: normalizedSettings?.inputPanelGlassRefraction
         ?? getDefaultInputPanelGlassRefractionSettings(),
+      inputPanelGlassRefractionSvgFilter: normalizedSettings?.inputPanelGlassRefractionSvgFilter
+        ?? getDefaultInputPanelGlassRefractionSvgFilterSettings(),
       inputPanelGlassRefractionGlassDefaultsVersion:
         normalizedSettings?.inputPanelGlassRefractionGlassDefaultsVersion
         ?? INPUT_PANEL_GLASS_REFRACTION_GLASS_DEFAULTS_VERSION,

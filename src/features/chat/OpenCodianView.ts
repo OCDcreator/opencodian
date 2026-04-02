@@ -19,6 +19,8 @@ import {
   type Conversation,
   createEmptyTabContextState,
   getDefaultPersistedTabState,
+  type InputPanelGlassRefractionSvgFilterPresetId,
+  type InputPanelGlassRefractionSvgFilterSettings,
   type InputPanelThemeId,
   type PromptContextItem,
   type QuestionRequest,
@@ -146,6 +148,121 @@ const INPUT_PANEL_THEME_CLASS_BY_ID: Record<Exclude<InputPanelThemeId, 'preset'>
   'glass-refraction-pill': 'opencodian-composer-shell--gr-pill',
 };
 const INPUT_PANEL_THEME_CLASS_NAMES = Object.values(INPUT_PANEL_THEME_CLASS_BY_ID);
+const INPUT_PANEL_SVG_FILTER_CLASS_BY_ID: Record<Exclude<InputPanelGlassRefractionSvgFilterPresetId, 'none'>, string> = {
+  subtle: 'opencodian-composer-shell--gr-svg-filter-subtle',
+  strong: 'opencodian-composer-shell--gr-svg-filter-strong',
+};
+const INPUT_PANEL_SVG_FILTER_CLASS_NAMES = Object.values(INPUT_PANEL_SVG_FILTER_CLASS_BY_ID);
+const COMPOSER_GLASS_SVG_DEFS_ID = 'opencodian-glass-svg-defs';
+const COMPOSER_GLASS_SVG_FILTER_ID = 'opencodian-glass-refract';
+const COMPOSER_GLASS_SVG_FILTER_STRONG_ID = 'opencodian-glass-refract-strong';
+
+function createSvgElement<K extends keyof SVGElementTagNameMap>(
+  tagName: K,
+  attributes: Record<string, string>,
+): SVGElementTagNameMap[K] {
+  const element = document.createElementNS('http://www.w3.org/2000/svg', tagName);
+  for (const [name, value] of Object.entries(attributes)) {
+    element.setAttribute(name, value);
+  }
+
+  return element;
+}
+
+function createComposerGlassFilterElement(
+  filterId: string,
+  config: {
+    initialBlur: number;
+    baseFrequency: string;
+    numOctaves: number;
+    noiseBlur: number;
+    scale: number;
+    saturation: number;
+  },
+): SVGFilterElement {
+  const filter = createSvgElement('filter', {
+    id: filterId,
+    x: '-5%',
+    y: '-5%',
+    width: '110%',
+    height: '110%',
+    'color-interpolation-filters': 'sRGB',
+  });
+
+  filter.append(
+    createSvgElement('feGaussianBlur', {
+      in: 'SourceGraphic',
+      stdDeviation: `${config.initialBlur}`,
+      result: 'preblur',
+    }),
+    createSvgElement('feTurbulence', {
+      type: 'fractalNoise',
+      baseFrequency: config.baseFrequency,
+      numOctaves: `${config.numOctaves}`,
+      seed: '42',
+      result: 'noise',
+    }),
+    createSvgElement('feGaussianBlur', {
+      in: 'noise',
+      stdDeviation: `${config.noiseBlur}`,
+      result: 'smooth',
+    }),
+    createSvgElement('feDisplacementMap', {
+      in: 'preblur',
+      in2: 'smooth',
+      scale: `${config.scale}`,
+      xChannelSelector: 'R',
+      yChannelSelector: 'G',
+      result: 'displaced',
+    }),
+    createSvgElement('feColorMatrix', {
+      in: 'displaced',
+      type: 'saturate',
+      values: `${config.saturation}`,
+    }),
+  );
+
+  return filter;
+}
+
+function ensureComposerGlassSvgDefs(settings: InputPanelGlassRefractionSvgFilterSettings): void {
+  let svg = document.getElementById(COMPOSER_GLASS_SVG_DEFS_ID) as SVGSVGElement | null;
+  if (!svg) {
+    svg = createSvgElement('svg', {
+      id: COMPOSER_GLASS_SVG_DEFS_ID,
+      width: '0',
+      height: '0',
+      'aria-hidden': 'true',
+      focusable: 'false',
+    });
+    svg.style.position = 'absolute';
+    svg.style.width = '0';
+    svg.style.height = '0';
+    svg.style.pointerEvents = 'none';
+    (document.body ?? document.documentElement).appendChild(svg);
+  }
+
+  const defs = createSvgElement('defs', {});
+  defs.append(
+    createComposerGlassFilterElement(COMPOSER_GLASS_SVG_FILTER_ID, {
+      initialBlur: 0.3,
+      baseFrequency: '0.015 0.012',
+      numOctaves: 2,
+      noiseBlur: 3,
+      scale: settings.subtleScale,
+      saturation: 1.3,
+    }),
+    createComposerGlassFilterElement(COMPOSER_GLASS_SVG_FILTER_STRONG_ID, {
+      initialBlur: 0.4,
+      baseFrequency: '0.012 0.010',
+      numOctaves: 3,
+      noiseBlur: 4,
+      scale: settings.strongScale,
+      saturation: 1.5,
+    }),
+  );
+  svg.replaceChildren(defs);
+}
 
 type ChatServerAvailability = 'checking' | 'running' | 'starting' | 'offline' | 'external';
 
@@ -235,6 +352,7 @@ export class OpenCodianView extends ItemView {
   private inputContainer: HTMLElement | null = null;
   private inputWrapperEl: HTMLElement | null = null;
   private composerShellEl: HTMLElement | null = null;
+  private composerSvgFilterLayerEl: HTMLElement | null = null;
   private composerContextRowEl: HTMLElement | null = null;
   private questionDockMountEl: HTMLElement | null = null;
   private questionDock: QuestionDock | null = null;
@@ -2154,12 +2272,60 @@ export class OpenCodianView extends ItemView {
     for (const className of INPUT_PANEL_THEME_CLASS_NAMES) {
       this.composerShellEl.removeClass(className);
     }
+    for (const className of INPUT_PANEL_SVG_FILTER_CLASS_NAMES) {
+      this.composerShellEl.removeClass(className);
+    }
 
     if (this.plugin.settings.inputPanelTheme === 'preset') {
+      this.removeComposerSvgFilterLayer();
       return;
     }
 
     this.composerShellEl.addClass(INPUT_PANEL_THEME_CLASS_BY_ID[this.plugin.settings.inputPanelTheme]);
+
+    const svgFilterSettings = this.plugin.settings.inputPanelGlassRefractionSvgFilter;
+    const activeSvgFilterPreset = svgFilterSettings.preset;
+    const activeSvgFilterScale = this.getActiveInputPanelGlassRefractionSvgFilterScale();
+    if (activeSvgFilterPreset === 'none' || activeSvgFilterScale <= 0) {
+      this.removeComposerSvgFilterLayer();
+      return;
+    }
+
+    ensureComposerGlassSvgDefs(svgFilterSettings);
+    this.ensureComposerSvgFilterLayer();
+    this.composerShellEl.addClass(INPUT_PANEL_SVG_FILTER_CLASS_BY_ID[activeSvgFilterPreset]);
+  }
+
+  private getActiveInputPanelGlassRefractionSvgFilterScale(): number {
+    switch (this.plugin.settings.inputPanelGlassRefractionSvgFilter.preset) {
+      case 'subtle':
+        return this.plugin.settings.inputPanelGlassRefractionSvgFilter.subtleScale;
+      case 'strong':
+        return this.plugin.settings.inputPanelGlassRefractionSvgFilter.strongScale;
+      default:
+        return 0;
+    }
+  }
+
+  private ensureComposerSvgFilterLayer(): HTMLElement | null {
+    if (!this.composerShellEl) {
+      return null;
+    }
+
+    if (this.composerSvgFilterLayerEl?.isConnected) {
+      return this.composerSvgFilterLayerEl;
+    }
+
+    const layerEl = document.createElement('div');
+    layerEl.className = 'opencodian-composer-svg-filter-layer';
+    this.composerShellEl.insertBefore(layerEl, this.composerShellEl.firstChild);
+    this.composerSvgFilterLayerEl = layerEl;
+    return layerEl;
+  }
+
+  private removeComposerSvgFilterLayer(): void {
+    this.composerSvgFilterLayerEl?.remove();
+    this.composerSvgFilterLayerEl = null;
   }
 
   private initializeComposerLayoutMetrics(): void {
