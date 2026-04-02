@@ -6,6 +6,7 @@ jest.mock('../../../../src/core/opencode', () => ({
 
 import {
   getDefaultChatAppearanceSettings,
+  getDefaultInputPanelGlassRefractionSettings,
   getDefaultThemeSettings,
   type InputPanelThemeId,
 } from '../../../../src/core/types';
@@ -16,6 +17,7 @@ type InputPanelThemeViewHarness = {
   plugin: {
     settings: {
       inputPanelTheme: InputPanelThemeId;
+      inputPanelGlassRefraction: ReturnType<typeof getDefaultInputPanelGlassRefractionSettings>;
     };
   };
   applyInputPanelThemeState: () => void;
@@ -24,6 +26,10 @@ type InputPanelThemeViewHarness = {
 describe('OpenCodianView input panel theme', () => {
   beforeEach(() => {
     document.body.innerHTML = '';
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   function createView(inputPanelTheme: InputPanelThemeId): InputPanelThemeViewHarness {
@@ -35,13 +41,14 @@ describe('OpenCodianView input panel theme', () => {
         theme: getDefaultThemeSettings(),
         chatAppearance: getDefaultChatAppearanceSettings(),
         inputPanelTheme,
+        inputPanelGlassRefraction: getDefaultInputPanelGlassRefractionSettings(),
       },
       openCodeService: {},
       storage: {},
     } as never) as unknown as InputPanelThemeViewHarness;
   }
 
-  it('keeps preset mode free of glass-refraction classes and experimental fx dom', () => {
+  it('keeps preset mode free of glass-refraction classes and extra glass nodes', () => {
     const view = createView('preset');
     const shellEl = document.body.createDiv({ cls: 'opencodian-composer-shell' });
     view.composerShellEl = shellEl;
@@ -51,7 +58,8 @@ describe('OpenCodianView input panel theme', () => {
     expect(shellEl.classList.contains('opencodian-composer-shell--gr-glass')).toBe(false);
     expect(shellEl.classList.contains('opencodian-composer-shell--gr-card')).toBe(false);
     expect(shellEl.classList.contains('opencodian-composer-shell--gr-pill')).toBe(false);
-    expect(shellEl.querySelector('.opencodian-composer-glass-fx')).toBeNull();
+    expect(document.body.querySelector('.opencodian-composer-glass-fx')).toBeNull();
+    expect(shellEl.querySelector('.opencodian-composer-glass-surface')).toBeNull();
   });
 
   it.each([
@@ -68,6 +76,19 @@ describe('OpenCodianView input panel theme', () => {
     expect(shellEl.classList.contains(className)).toBe(true);
   });
 
+  it('applies the glass class without mounting extra runtime nodes', () => {
+    const view = createView('glass-refraction-glass');
+    const shellEl = document.body.createDiv({ cls: 'opencodian-composer-shell' });
+    view.composerShellEl = shellEl;
+
+    view.applyInputPanelThemeState();
+
+    expect(shellEl.classList.contains('opencodian-composer-shell--gr-glass')).toBe(true);
+    expect(document.body.querySelector('.opencodian-composer-glass-fx')).toBeNull();
+    expect(shellEl.querySelector('.opencodian-composer-glass-surface')).toBeNull();
+    expect(shellEl.dataset.opencodianGlassFilter).toBeUndefined();
+  });
+
   it('replaces existing glass-refraction classes when switching themes', () => {
     const view = createView('glass-refraction-glass');
     const shellEl = document.body.createDiv({ cls: 'opencodian-composer-shell' });
@@ -80,6 +101,9 @@ describe('OpenCodianView input panel theme', () => {
     view.applyInputPanelThemeState();
     expect(shellEl.classList.contains('opencodian-composer-shell--gr-glass')).toBe(false);
     expect(shellEl.classList.contains('opencodian-composer-shell--gr-card')).toBe(true);
+    expect(document.body.querySelector('.opencodian-composer-glass-fx')).toBeNull();
+    expect(shellEl.querySelector('.opencodian-composer-glass-surface')).toBeNull();
+    expect(shellEl.dataset.opencodianGlassFilter).toBeUndefined();
 
     view.plugin.settings.inputPanelTheme = 'preset';
     view.applyInputPanelThemeState();

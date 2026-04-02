@@ -16,6 +16,7 @@ describe('OpenCodianPlugin.loadSettings theme migration', () => {
         loadSettings: jest.fn().mockResolvedValue({
           chatAppearance: getDefaultChatAppearanceSettings(),
         }),
+        saveSettings: jest.fn(),
       },
     } as unknown as OpenCodianPlugin;
 
@@ -37,6 +38,7 @@ describe('OpenCodianPlugin.loadSettings theme migration', () => {
         loadSettings: jest.fn().mockResolvedValue({
           chatAppearance: customizedAppearance,
         }),
+        saveSettings: jest.fn(),
       },
     } as unknown as OpenCodianPlugin;
 
@@ -62,6 +64,7 @@ describe('OpenCodianPlugin.loadSettings theme migration', () => {
             customAppearanceOverrides: {},
           },
         }),
+        saveSettings: jest.fn(),
       },
     } as unknown as OpenCodianPlugin;
 
@@ -82,6 +85,7 @@ describe('OpenCodianPlugin.loadSettings theme migration', () => {
         loadSettings: jest.fn().mockResolvedValue({
           inputPanelTheme: 'liquid-glass',
         }),
+        saveSettings: jest.fn(),
       },
     } as unknown as OpenCodianPlugin;
 
@@ -101,6 +105,7 @@ describe('OpenCodianPlugin.loadSettings theme migration', () => {
         loadSettings: jest.fn().mockResolvedValue({
           inputPanelTheme,
         }),
+        saveSettings: jest.fn(),
       },
     } as unknown as OpenCodianPlugin;
 
@@ -109,7 +114,7 @@ describe('OpenCodianPlugin.loadSettings theme migration', () => {
     expect(plugin.settings.inputPanelTheme).toBe(inputPanelTheme);
   });
 
-  it('preserves preset input transparency and per-tier glass refraction tuning on load', async () => {
+  it('resets legacy glass tuning to reference defaults while preserving other tiers', async () => {
     const plugin = {
       storage: {
         loadSettings: jest.fn().mockResolvedValue({
@@ -133,12 +138,52 @@ describe('OpenCodianPlugin.loadSettings theme migration', () => {
             },
           },
         }),
+        saveSettings: jest.fn(),
       },
     } as unknown as OpenCodianPlugin;
 
     await OpenCodianPlugin.prototype.loadSettings.call(plugin);
 
     expect(plugin.settings.chatAppearance.input.backgroundOpacity).toBe(61);
+    expect(plugin.settings.inputPanelGlassRefraction).toEqual({
+      glass: getDefaultInputPanelGlassRefractionSettings().glass,
+      card: {
+        backgroundOpacity: 44,
+        blur: 18,
+        saturation: 145,
+        brightness: 96,
+      },
+      pill: getDefaultInputPanelGlassRefractionSettings().pill,
+    });
+    expect(plugin.settings.inputPanelGlassRefractionGlassDefaultsVersion).toBe(1);
+  });
+
+  it('preserves user-adjusted glass tuning after the one-time reset has run', async () => {
+    const plugin = {
+      storage: {
+        loadSettings: jest.fn().mockResolvedValue({
+          inputPanelGlassRefractionGlassDefaultsVersion: 1,
+          inputPanelGlassRefraction: {
+            glass: {
+              backgroundOpacity: 56,
+              blur: 28,
+              saturation: 180,
+              brightness: 110,
+            },
+            card: {
+              backgroundOpacity: 44,
+              blur: 18,
+              saturation: 145,
+              brightness: 96,
+            },
+          },
+        }),
+        saveSettings: jest.fn(),
+      },
+    } as unknown as OpenCodianPlugin;
+
+    await OpenCodianPlugin.prototype.loadSettings.call(plugin);
+
     expect(plugin.settings.inputPanelGlassRefraction).toEqual({
       glass: {
         backgroundOpacity: 56,
@@ -154,6 +199,7 @@ describe('OpenCodianPlugin.loadSettings theme migration', () => {
       },
       pill: getDefaultInputPanelGlassRefractionSettings().pill,
     });
+    expect(plugin.settings.inputPanelGlassRefractionGlassDefaultsVersion).toBe(1);
   });
 
   it('ignores the removed experimental composer glass refraction toggle field', async () => {
@@ -162,6 +208,7 @@ describe('OpenCodianPlugin.loadSettings theme migration', () => {
         loadSettings: jest.fn().mockResolvedValue({
           experimentalComposerGlassRefractionEnabled: true,
         }),
+        saveSettings: jest.fn(),
       },
     } as unknown as OpenCodianPlugin;
 

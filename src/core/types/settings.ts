@@ -837,6 +837,7 @@ export interface OpenCodianSettings {
   chatScrollMode: ChatScrollMode;
   inputPanelTheme: InputPanelThemeId;
   inputPanelGlassRefraction: InputPanelGlassRefractionSettings;
+  inputPanelGlassRefractionGlassDefaultsVersion: number;
   chatAppearance: ChatAppearanceSettings;
   settingsPanelScrollTop: number;
   enableDebugLogging: boolean;
@@ -913,6 +914,7 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
   chatScrollMode: 'sticky-mask',
   inputPanelTheme: 'preset',
   inputPanelGlassRefraction: getDefaultInputPanelGlassRefractionSettings(),
+  inputPanelGlassRefractionGlassDefaultsVersion: 1,
   chatAppearance: getDefaultChatAppearanceSettings(),
   settingsPanelScrollTop: 0,
   enableDebugLogging: false,

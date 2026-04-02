@@ -2345,13 +2345,13 @@
 }
 
 .opencodian-composer-shell--gr-glass {
-  border-radius: 20px;
+  border-radius: calc(var(--opencodian-input-radius) + 2px);
   background:
     linear-gradient(105deg, transparent 40%, rgba(255, 255, 255, 0.06) 50%, transparent 60%),
     linear-gradient(
       135deg,
       rgba(18, 22, 35, var(--opencodian-gr-glass-bg-alpha)),
-      rgba(12, 16, 28, calc(var(--opencodian-gr-glass-bg-alpha) * 0.88))
+      rgba(12, 16, 28, calc(var(--opencodian-gr-glass-bg-alpha) * 0.875))
     );
   background-size: 200% 100%, 100% 100%;
   animation: opencodian-glass-shimmer var(--opencodian-gr-shimmer-duration) ease-in-out infinite;

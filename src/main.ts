@@ -59,6 +59,7 @@ import { setLocale, t } from './i18n';
 import { createLogger, getRecentLogText, getVaultBasePath, setDebugLoggingEnabled } from './shared';
 
 const logger = createLogger('OpenCodian');
+const INPUT_PANEL_GLASS_REFRACTION_GLASS_DEFAULTS_VERSION = 1;
 
 // BUILD_ID is injected at build time via esbuild define
 declare const BUILD_ID: string;
@@ -409,9 +410,25 @@ export default class OpenCodianPlugin extends Plugin {
         ? (savedSettings as { providerIconLibrary?: OpenCodianSettings['providerIconLibrary'] }).providerIconLibrary
         : undefined;
     const normalizedProviderIconLibrary = normalizeProviderIconLibrary(savedProviderIconLibrary);
-    const normalizedInputPanelGlassRefraction = normalizeInputPanelGlassRefractionSettings(
+    const savedGlassDefaultsVersion =
+      savedSettings
+      && typeof savedSettings === 'object'
+      && 'inputPanelGlassRefractionGlassDefaultsVersion' in savedSettings
+      && Number.isFinite(savedSettings.inputPanelGlassRefractionGlassDefaultsVersion)
+        ? Number(savedSettings.inputPanelGlassRefractionGlassDefaultsVersion)
+        : 0;
+    const shouldResetGlassRefractionGlassDefaults =
+      savedGlassDefaultsVersion < INPUT_PANEL_GLASS_REFRACTION_GLASS_DEFAULTS_VERSION;
+    const defaultInputPanelGlassRefraction = getDefaultInputPanelGlassRefractionSettings();
+    const normalizedInputPanelGlassRefractionBase = normalizeInputPanelGlassRefractionSettings(
       savedSettings?.inputPanelGlassRefraction,
     );
+    const normalizedInputPanelGlassRefraction = shouldResetGlassRefractionGlassDefaults
+      ? {
+          ...normalizedInputPanelGlassRefractionBase,
+          glass: { ...defaultInputPanelGlassRefraction.glass },
+        }
+      : normalizedInputPanelGlassRefractionBase;
 
     const normalizedSettings = savedSettings
       ? (() => {
@@ -450,6 +467,7 @@ export default class OpenCodianPlugin extends Plugin {
             pluginIsolationMode: normalizePluginIsolationMode(savedSettings.pluginIsolationMode),
             inputPanelTheme: normalizeInputPanelThemeId(savedSettings.inputPanelTheme),
             inputPanelGlassRefraction: normalizedInputPanelGlassRefraction,
+            inputPanelGlassRefractionGlassDefaultsVersion: INPUT_PANEL_GLASS_REFRACTION_GLASS_DEFAULTS_VERSION,
             debugLogPaths: normalizedDebugLogPaths,
             chatAppearance: normalizedChatAppearance,
             theme: normalizedTheme,
@@ -467,12 +485,23 @@ export default class OpenCodianPlugin extends Plugin {
       inputPanelTheme: normalizeInputPanelThemeId(normalizedSettings?.inputPanelTheme),
       inputPanelGlassRefraction: normalizedSettings?.inputPanelGlassRefraction
         ?? getDefaultInputPanelGlassRefractionSettings(),
+      inputPanelGlassRefractionGlassDefaultsVersion:
+        normalizedSettings?.inputPanelGlassRefractionGlassDefaultsVersion
+        ?? INPUT_PANEL_GLASS_REFRACTION_GLASS_DEFAULTS_VERSION,
       debugLogPaths: normalizedDebugLogPaths,
       chatAppearance: normalizedChatAppearance,
       theme: normalizedTheme,
       tabState: normalizedTabState ?? getDefaultPersistedTabState(),
       providerIconLibrary: normalizedProviderIconLibrary,
     };
+
+    if (
+      shouldResetGlassRefractionGlassDefaults
+      && this.storage
+      && typeof this.storage.saveSettings === 'function'
+    ) {
+      await this.storage.saveSettings(this.settings);
+    }
   }
 
   /** Save settings to storage */
