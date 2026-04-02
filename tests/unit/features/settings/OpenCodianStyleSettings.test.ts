@@ -126,4 +126,33 @@ describe('OpenCodian style settings', () => {
 
     expect(inputChars).toBe(5);
   });
+
+  it('switches input panel theme without rebuilding the whole settings page', async () => {
+    const plugin = {
+      settings: {
+        ...DEFAULT_SETTINGS,
+        chatAppearance: getDefaultChatAppearanceSettings(),
+      },
+      saveSettings: jest.fn().mockResolvedValue(undefined),
+      getChatAppearanceBaseline: jest.fn(() => getDefaultChatAppearanceSettings()),
+    } as unknown as ConstructorParameters<typeof OpenCodianSettingTab>[1];
+    const tab = new OpenCodianSettingTab({} as App, plugin);
+    const privateTab = tab as unknown as {
+      display: () => void;
+      renderInputStyleGroup: (containerEl?: HTMLElement) => void;
+      applyInputPanelThemeChange: (themeId: 'preset' | 'glass-refraction-card') => Promise<void>;
+    };
+
+    const displaySpy = jest.spyOn(privateTab, 'display');
+    const renderInputStyleGroupSpy = jest
+      .spyOn(privateTab, 'renderInputStyleGroup')
+      .mockImplementation(() => {});
+
+    await privateTab.applyInputPanelThemeChange('glass-refraction-card');
+
+    expect(plugin.saveSettings).toHaveBeenCalledTimes(1);
+    expect(displaySpy).not.toHaveBeenCalled();
+    expect(renderInputStyleGroupSpy).toHaveBeenCalledWith();
+    expect(plugin.settings.inputPanelTheme).toBe('glass-refraction-card');
+  });
 });

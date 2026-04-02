@@ -147,6 +147,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
   private settingsScrollPersistenceSuspended = false;
   private styleControlBindings: StyleControlBinding[] = [];
   private conversationHeadingEl: HTMLHeadingElement | null = null;
+  private inputStyleGroupHostEl: HTMLElement | null = null;
 
   constructor(app: App, plugin: OpenCodianPlugin) {
     super(app, plugin);
@@ -265,6 +266,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     }
     this.styleControlBindings = [];
     this.conversationHeadingEl = null;
+    this.inputStyleGroupHostEl = null;
     containerEl.empty();
     containerEl.addClass('opencodian-settings');
     containerEl.style.setProperty('overflow-anchor', 'none');
@@ -1991,110 +1993,8 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     });
     this.createStyleResetSetting(assistantGroupEl, 'assistant');
 
-    const inputGroupEl = this.createStyleGroupSection(
-      containerEl,
-      t('settings.style.groups.input.title'),
-      t('settings.style.groups.input.desc'),
-    );
-    const isPresetInputPanelTheme = this.plugin.settings.inputPanelTheme === 'preset';
-    new Setting(inputGroupEl)
-      .setName(t('settings.style.input.theme.name'))
-      .setDesc(t('settings.style.input.theme.desc'))
-      .addDropdown((dropdown) => {
-        dropdown
-          .addOption('preset', t('settings.style.input.theme.option.preset'))
-          .addOption('glass-refraction', t('settings.style.input.theme.option.glassRefraction'))
-          .setValue(this.getInputPanelThemeFamily(this.plugin.settings.inputPanelTheme))
-          .onChange(async (value) => {
-            const nextTheme: InputPanelThemeId = value === 'preset'
-              ? 'preset'
-              : this.getGlassRefractionInputPanelTheme(this.plugin.settings.inputPanelTheme);
-            await this.applyInputPanelThemeChange(nextTheme);
-          });
-      });
-
-    if (!isPresetInputPanelTheme) {
-      new Setting(inputGroupEl)
-        .setName(t('settings.style.input.variant.name'))
-        .setDesc(t('settings.style.input.variant.desc'))
-        .addDropdown((dropdown) => {
-          dropdown
-            .addOption('glass-refraction-glass', t('settings.style.input.variant.option.glass'))
-            .addOption('glass-refraction-card', t('settings.style.input.variant.option.card'))
-            .addOption('glass-refraction-pill', t('settings.style.input.variant.option.pill'))
-            .setValue(this.getGlassRefractionInputPanelTheme(this.plugin.settings.inputPanelTheme))
-            .onChange(async (value) => {
-              await this.applyInputPanelThemeChange(value as InputPanelThemeId);
-            });
-        });
-    }
-
-    const inputControlsEl = inputGroupEl.createDiv({ cls: 'opencodian-style-input-controls' });
-    if (isPresetInputPanelTheme) {
-      this.addNumericStyleControl(inputControlsEl, {
-        group: 'input',
-        name: t('settings.style.input.radius.name'),
-        desc: t('settings.style.input.radius.desc'),
-        min: 8,
-        max: 24,
-        step: 1,
-        unit: 'px',
-        value: () => this.plugin.settings.chatAppearance.input.radius,
-        resetValue: () => this.plugin.getChatAppearanceBaseline().input.radius,
-        setValue: (appearance, value) => {
-          appearance.input.radius = value;
-        },
-      });
-      this.addNumericStyleControl(inputControlsEl, {
-        group: 'input',
-        name: t('settings.style.input.backgroundOpacity.name'),
-        desc: t('settings.style.input.backgroundOpacity.desc'),
-        min: 0,
-        max: 100,
-        step: 1,
-        unit: '%',
-        value: () => this.plugin.settings.chatAppearance.input.backgroundOpacity,
-        resetValue: () => this.plugin.getChatAppearanceBaseline().input.backgroundOpacity,
-        setValue: (appearance, value) => {
-          appearance.input.backgroundOpacity = value;
-        },
-      });
-      this.addNumericStyleControl(inputControlsEl, {
-        group: 'input',
-        name: t('settings.style.input.blur.name'),
-        desc: t('settings.style.input.blur.desc'),
-        min: 0,
-        max: 24,
-        step: 1,
-        unit: 'px',
-        value: () => this.plugin.settings.chatAppearance.input.blur,
-        resetValue: () => this.plugin.getChatAppearanceBaseline().input.blur,
-        setValue: (appearance, value) => {
-          appearance.input.blur = value;
-        },
-      });
-      this.addNumericStyleControl(inputControlsEl, {
-        group: 'input',
-        name: t('settings.style.input.shadowBlur.name'),
-        desc: t('settings.style.input.shadowBlur.desc'),
-        min: 0,
-        max: 36,
-        step: 1,
-        unit: 'px',
-        value: () => this.plugin.settings.chatAppearance.input.shadowBlur,
-        resetValue: () => this.plugin.getChatAppearanceBaseline().input.shadowBlur,
-        setValue: (appearance, value) => {
-          appearance.input.shadowBlur = value;
-        },
-      });
-      this.createStyleResetSetting(inputControlsEl, 'input');
-    } else {
-      inputControlsEl.createDiv({
-        cls: 'opencodian-style-input-lock-note',
-        text: t('settings.style.input.glassRefractionNotice'),
-      });
-      this.addGlassRefractionInputControls(inputControlsEl);
-    }
+    const inputGroupHostEl = containerEl.createDiv({ cls: 'opencodian-style-input-group-host' });
+    this.renderInputStyleGroup(inputGroupHostEl);
 
     const scrollbarGroupEl = this.createStyleGroupSection(
       containerEl,
@@ -2724,6 +2624,123 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     };
   }
 
+  private renderInputStyleGroup(containerEl?: HTMLElement): void {
+    const hostEl = containerEl ?? this.inputStyleGroupHostEl;
+    if (!hostEl) {
+      return;
+    }
+
+    this.inputStyleGroupHostEl = hostEl;
+    this.styleControlBindings = this.styleControlBindings.filter((binding) => binding.group !== 'input');
+    hostEl.empty();
+
+    const inputGroupEl = this.createStyleGroupSection(
+      hostEl,
+      t('settings.style.groups.input.title'),
+      t('settings.style.groups.input.desc'),
+    );
+    const isPresetInputPanelTheme = this.plugin.settings.inputPanelTheme === 'preset';
+    new Setting(inputGroupEl)
+      .setName(t('settings.style.input.theme.name'))
+      .setDesc(t('settings.style.input.theme.desc'))
+      .addDropdown((dropdown) => {
+        dropdown
+          .addOption('preset', t('settings.style.input.theme.option.preset'))
+          .addOption('glass-refraction', t('settings.style.input.theme.option.glassRefraction'))
+          .setValue(this.getInputPanelThemeFamily(this.plugin.settings.inputPanelTheme))
+          .onChange(async (value) => {
+            const nextTheme: InputPanelThemeId = value === 'preset'
+              ? 'preset'
+              : this.getGlassRefractionInputPanelTheme(this.plugin.settings.inputPanelTheme);
+            await this.applyInputPanelThemeChange(nextTheme);
+          });
+      });
+
+    if (!isPresetInputPanelTheme) {
+      new Setting(inputGroupEl)
+        .setName(t('settings.style.input.variant.name'))
+        .setDesc(t('settings.style.input.variant.desc'))
+        .addDropdown((dropdown) => {
+          dropdown
+            .addOption('glass-refraction-glass', t('settings.style.input.variant.option.glass'))
+            .addOption('glass-refraction-card', t('settings.style.input.variant.option.card'))
+            .addOption('glass-refraction-pill', t('settings.style.input.variant.option.pill'))
+            .setValue(this.getGlassRefractionInputPanelTheme(this.plugin.settings.inputPanelTheme))
+            .onChange(async (value) => {
+              await this.applyInputPanelThemeChange(value as InputPanelThemeId);
+            });
+        });
+    }
+
+    const inputControlsEl = inputGroupEl.createDiv({ cls: 'opencodian-style-input-controls' });
+    if (isPresetInputPanelTheme) {
+      this.addNumericStyleControl(inputControlsEl, {
+        group: 'input',
+        name: t('settings.style.input.radius.name'),
+        desc: t('settings.style.input.radius.desc'),
+        min: 8,
+        max: 24,
+        step: 1,
+        unit: 'px',
+        value: () => this.plugin.settings.chatAppearance.input.radius,
+        resetValue: () => this.plugin.getChatAppearanceBaseline().input.radius,
+        setValue: (appearance, value) => {
+          appearance.input.radius = value;
+        },
+      });
+      this.addNumericStyleControl(inputControlsEl, {
+        group: 'input',
+        name: t('settings.style.input.backgroundOpacity.name'),
+        desc: t('settings.style.input.backgroundOpacity.desc'),
+        min: 0,
+        max: 100,
+        step: 1,
+        unit: '%',
+        value: () => this.plugin.settings.chatAppearance.input.backgroundOpacity,
+        resetValue: () => this.plugin.getChatAppearanceBaseline().input.backgroundOpacity,
+        setValue: (appearance, value) => {
+          appearance.input.backgroundOpacity = value;
+        },
+      });
+      this.addNumericStyleControl(inputControlsEl, {
+        group: 'input',
+        name: t('settings.style.input.blur.name'),
+        desc: t('settings.style.input.blur.desc'),
+        min: 0,
+        max: 24,
+        step: 1,
+        unit: 'px',
+        value: () => this.plugin.settings.chatAppearance.input.blur,
+        resetValue: () => this.plugin.getChatAppearanceBaseline().input.blur,
+        setValue: (appearance, value) => {
+          appearance.input.blur = value;
+        },
+      });
+      this.addNumericStyleControl(inputControlsEl, {
+        group: 'input',
+        name: t('settings.style.input.shadowBlur.name'),
+        desc: t('settings.style.input.shadowBlur.desc'),
+        min: 0,
+        max: 36,
+        step: 1,
+        unit: 'px',
+        value: () => this.plugin.settings.chatAppearance.input.shadowBlur,
+        resetValue: () => this.plugin.getChatAppearanceBaseline().input.shadowBlur,
+        setValue: (appearance, value) => {
+          appearance.input.shadowBlur = value;
+        },
+      });
+      this.createStyleResetSetting(inputControlsEl, 'input');
+      return;
+    }
+
+    inputControlsEl.createDiv({
+      cls: 'opencodian-style-input-lock-note',
+      text: t('settings.style.input.glassRefractionNotice'),
+    });
+    this.addGlassRefractionInputControls(inputControlsEl);
+  }
+
   private async applyInputPanelThemeChange(themeId: InputPanelThemeId): Promise<void> {
     if (this.plugin.settings.inputPanelTheme === themeId) {
       return;
@@ -2736,7 +2753,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       syncConfig: false,
       applyUi: true,
     });
-    this.display();
+    this.renderInputStyleGroup();
   }
 
   private setStyleControlsDisabled(containerEl: HTMLElement, disabled: boolean): void {
