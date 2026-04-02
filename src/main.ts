@@ -34,6 +34,7 @@ import {
   getDefaultChatAppearanceSettings,
   getDefaultInputPanelGlassRefractionSettings,
   getDefaultInputPanelGlassRefractionSvgFilterSettings,
+  getDefaultInputPanelLiquidGlassSettings,
   getDefaultPersistedTabState,
   getDefaultThemeSettings,
   getServerBaseUrl,
@@ -43,6 +44,7 @@ import {
   normalizeEffortLevel,
   normalizeInputPanelGlassRefractionSettings,
   normalizeInputPanelGlassRefractionSvgFilterSettings,
+  normalizeInputPanelLiquidGlassSettings,
   normalizeInputPanelThemeId,
   normalizePersistedTabState,
   normalizePluginIsolationMode,
@@ -59,6 +61,7 @@ import { OpenCodianView } from './features/chat/OpenCodianView';
 import { OpenCodianSettingTab } from './features/settings/OpenCodianSettings';
 import { setLocale, t } from './i18n';
 import { createLogger, getRecentLogText, getVaultBasePath, setDebugLoggingEnabled } from './shared';
+import { registerBuiltinGlassAdapters } from './utils/glass';
 
 const logger = createLogger('OpenCodian');
 const INPUT_PANEL_GLASS_REFRACTION_GLASS_DEFAULTS_VERSION = 2;
@@ -92,6 +95,7 @@ export default class OpenCodianPlugin extends Plugin {
 
     // Load settings
     await this.loadSettings();
+    registerBuiltinGlassAdapters();
     this.applyLoggerSettings();
 
     // Initialize locale
@@ -447,6 +451,9 @@ export default class OpenCodianPlugin extends Plugin {
     const normalizedInputPanelGlassRefractionSvgFilter = normalizeInputPanelGlassRefractionSvgFilterSettings(
       savedSettings?.inputPanelGlassRefractionSvgFilter,
     );
+    const normalizedInputPanelLiquidGlass = normalizeInputPanelLiquidGlassSettings(
+      savedSettings?.inputPanelLiquidGlass,
+    );
 
     const normalizedSettings = savedSettings
       ? (() => {
@@ -487,6 +494,7 @@ export default class OpenCodianPlugin extends Plugin {
             inputPanelGlassRefraction: normalizedInputPanelGlassRefraction,
             inputPanelGlassRefractionSvgFilter: normalizedInputPanelGlassRefractionSvgFilter,
             inputPanelGlassRefractionGlassDefaultsVersion: INPUT_PANEL_GLASS_REFRACTION_GLASS_DEFAULTS_VERSION,
+            inputPanelLiquidGlass: normalizedInputPanelLiquidGlass,
             debugLogPaths: normalizedDebugLogPaths,
             chatAppearance: normalizedChatAppearance,
             theme: normalizedTheme,
@@ -509,6 +517,8 @@ export default class OpenCodianPlugin extends Plugin {
       inputPanelGlassRefractionGlassDefaultsVersion:
         normalizedSettings?.inputPanelGlassRefractionGlassDefaultsVersion
         ?? INPUT_PANEL_GLASS_REFRACTION_GLASS_DEFAULTS_VERSION,
+      inputPanelLiquidGlass: normalizedSettings?.inputPanelLiquidGlass
+        ?? getDefaultInputPanelLiquidGlassSettings(),
       debugLogPaths: normalizedDebugLogPaths,
       chatAppearance: normalizedChatAppearance,
       theme: normalizedTheme,

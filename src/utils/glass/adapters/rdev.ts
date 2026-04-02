@@ -1,0 +1,63 @@
+import type { GlassEffectAdapter } from '../types';
+
+export const adapter: GlassEffectAdapter = {
+  id: 'rdev',
+  displayName: 'Rdev Liquid Glass',
+  description: 'A flexible liquid-glass adapter with multiple render modes and expressive motion tuning.',
+  paramDefs: [
+    {
+      key: 'mode',
+      labelKey: 'settings.style.input.liquidGlass.rdev.mode',
+      type: 'select',
+      options: [
+        { value: 'standard', label: 'Standard' },
+        { value: 'polar', label: 'Polar' },
+        { value: 'prominent', label: 'Prominent' },
+        { value: 'shader', label: 'Shader' },
+      ],
+      defaultValue: 'standard',
+    },
+    {
+      key: 'displacementScale',
+      labelKey: 'settings.style.input.liquidGlass.rdev.displacementScale',
+      type: 'number',
+      min: 0,
+      max: 140,
+      step: 1,
+      unit: '',
+      defaultValue: 70,
+    },
+    {
+      key: 'aberrationIntensity',
+      labelKey: 'settings.style.input.liquidGlass.rdev.aberrationIntensity',
+      type: 'number',
+      min: 0,
+      max: 10,
+      step: 0.1,
+      unit: '',
+      defaultValue: 2,
+    },
+    {
+      key: 'blurAmount',
+      labelKey: 'settings.style.input.liquidGlass.rdev.blurAmount',
+      type: 'number',
+      min: 0,
+      max: 10,
+      step: 0.1,
+      unit: '',
+      defaultValue: 1,
+    },
+    {
+      key: 'elasticity',
+      labelKey: 'settings.style.input.liquidGlass.rdev.elasticity',
+      type: 'number',
+      min: 0,
+      max: 1,
+      step: 0.01,
+      unit: '',
+      defaultValue: 0.15,
+    },
+  ],
+  mount(): void {},
+  unmount(): void {},
+};

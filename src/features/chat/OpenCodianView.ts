@@ -23,6 +23,7 @@ import {
   type InputPanelGlassRefractionSvgFilterPresetId,
   type InputPanelGlassRefractionSvgFilterSettings,
   type InputPanelThemeId,
+  type LiquidGlassAdapterId,
   type PromptContextItem,
   type PromptContextLineRange,
   type QuestionRequest,
@@ -49,6 +50,7 @@ import {
 } from '../../shared';
 import { chooseForkTarget } from '../../shared/modals';
 import { hideSelectionHighlight, showSelectionHighlight } from '../../utils/editorSelectionHighlight';
+import { getGlassAdapter, type GlassEffectAdapter, type GlassMountContext } from '../../utils/glass';
 import { ProviderIconService } from '../../utils/icons/ProviderIconService';
 import { MarkdownRenderService } from '../../utils/markdown';
 import {
@@ -149,12 +151,18 @@ const REMOTE_CONTEXT_TEXT_LIMIT_BYTES = 64 * 1024;
 const RETAINED_SELECTION_DOM_HIGHLIGHT_KEY = 'opencodian-selection';
 const RETAINED_SELECTION_INPUT_HANDOFF_GRACE_MS = 1500;
 const RETAINED_SELECTION_POLL_INTERVAL_MS = 250;
-const INPUT_PANEL_THEME_CLASS_BY_ID: Record<Exclude<InputPanelThemeId, 'preset'>, string> = {
+const INPUT_PANEL_THEME_CLASS_BY_ID: Record<
+  Exclude<InputPanelThemeId, 'preset' | 'liquid-glass-shuding' | 'liquid-glass-nikdelvin' | 'liquid-glass-rdev'>,
+  string
+> = {
   'glass-refraction-glass': 'opencodian-composer-shell--gr-glass',
   'glass-refraction-card': 'opencodian-composer-shell--gr-card',
   'glass-refraction-pill': 'opencodian-composer-shell--gr-pill',
 };
-const INPUT_PANEL_THEME_CLASS_NAMES = Object.values(INPUT_PANEL_THEME_CLASS_BY_ID);
+const INPUT_PANEL_THEME_CLASS_NAMES = [
+  ...Object.values(INPUT_PANEL_THEME_CLASS_BY_ID),
+  'opencodian-composer-shell--liquid-glass',
+];
 const INPUT_PANEL_SVG_FILTER_CLASS_BY_ID: Record<Exclude<InputPanelGlassRefractionSvgFilterPresetId, 'none'>, string> = {
   subtle: 'opencodian-composer-shell--gr-svg-filter-subtle',
   strong: 'opencodian-composer-shell--gr-svg-filter-strong',
@@ -232,7 +240,7 @@ function createComposerGlassFilterElement(
   return filter;
 }
 
-function ensureComposerGlassSvgDefs(settings: InputPanelGlassRefractionSvgFilterSettings): void {
+function ensureComposerGlassSvgRootElement(): SVGSVGElement {
   let svg = document.getElementById(COMPOSER_GLASS_SVG_DEFS_ID) as SVGSVGElement | null;
   if (!svg) {
     svg = createSvgElement('svg', {
@@ -249,6 +257,11 @@ function ensureComposerGlassSvgDefs(settings: InputPanelGlassRefractionSvgFilter
     (document.body ?? document.documentElement).appendChild(svg);
   }
 
+  return svg;
+}
+
+function ensureComposerGlassSvgDefs(settings: InputPanelGlassRefractionSvgFilterSettings): void {
+  const svg = ensureComposerGlassSvgRootElement();
   const defs = createSvgElement('defs', {});
   defs.append(
     createComposerGlassFilterElement(COMPOSER_GLASS_SVG_FILTER_ID, {
@@ -376,6 +389,7 @@ export class OpenCodianView extends ItemView {
   private inputWrapperEl: HTMLElement | null = null;
   private composerShellEl: HTMLElement | null = null;
   private composerSvgFilterLayerEl: HTMLElement | null = null;
+  private activeLiquidGlassAdapter: GlassEffectAdapter | null = null;
   private composerContextRowEl: HTMLElement | null = null;
   private questionDockMountEl: HTMLElement | null = null;
   private questionDock: QuestionDock | null = null;
@@ -1752,6 +1766,8 @@ export class OpenCodianView extends ItemView {
     this.contextRingContainerEl = null;
     this.inputContainerResizeObserver?.disconnect();
     this.inputContainerResizeObserver = null;
+    this.unmountLiquidGlassAdapter();
+    this.removeComposerSvgFilterLayer();
 
     // Cleanup navigation sidebar
     this.clearTabMessagesPanes();
@@ -2780,6 +2796,41 @@ export class OpenCodianView extends ItemView {
     this.initializeComposerLayoutMetrics();
   }
 
+  private getLiquidGlassAdapterId(themeId: InputPanelThemeId): LiquidGlassAdapterId | null {
+    switch (themeId) {
+      case 'liquid-glass-shuding':
+        return 'shuding';
+      case 'liquid-glass-nikdelvin':
+        return 'nikdelvin';
+      case 'liquid-glass-rdev':
+        return 'rdev';
+      default:
+        return null;
+    }
+  }
+
+  private ensureComposerGlassSvgRoot(): SVGSVGElement {
+    return ensureComposerGlassSvgRootElement();
+  }
+
+  private buildLiquidGlassMountContext(): GlassMountContext | null {
+    if (!this.composerShellEl || !this.inputWrapperEl) {
+      return null;
+    }
+
+    const filterLayerEl = this.ensureComposerSvgFilterLayer();
+    if (!filterLayerEl) {
+      return null;
+    }
+
+    return {
+      shellEl: this.composerShellEl,
+      contentEl: this.inputWrapperEl,
+      svgRootEl: this.ensureComposerGlassSvgRoot(),
+      filterLayerEl,
+    };
+  }
+
   private applyInputPanelThemeState(): void {
     if (!this.composerShellEl) {
       return;
@@ -2793,11 +2844,39 @@ export class OpenCodianView extends ItemView {
     }
 
     if (this.plugin.settings.inputPanelTheme === 'preset') {
+      this.unmountLiquidGlassAdapter();
       this.removeComposerSvgFilterLayer();
       return;
     }
 
-    this.composerShellEl.addClass(INPUT_PANEL_THEME_CLASS_BY_ID[this.plugin.settings.inputPanelTheme]);
+    const liquidGlassAdapterId = this.getLiquidGlassAdapterId(this.plugin.settings.inputPanelTheme);
+    if (liquidGlassAdapterId) {
+      this.composerShellEl.addClass('opencodian-composer-shell--liquid-glass');
+
+      const adapter = getGlassAdapter(liquidGlassAdapterId);
+      const ctx = this.buildLiquidGlassMountContext();
+      if (!adapter || !ctx) {
+        this.unmountLiquidGlassAdapter();
+        return;
+      }
+
+      const adapterSettings = this.plugin.settings.inputPanelLiquidGlass[liquidGlassAdapterId];
+      if (this.activeLiquidGlassAdapter !== adapter) {
+        this.unmountLiquidGlassAdapter();
+        adapter.mount(ctx, adapterSettings);
+        this.activeLiquidGlassAdapter = adapter;
+      } else {
+        adapter.updateSettings?.(ctx, adapterSettings);
+      }
+      return;
+    }
+
+    this.unmountLiquidGlassAdapter();
+    this.composerShellEl.addClass(
+      INPUT_PANEL_THEME_CLASS_BY_ID[
+        this.plugin.settings.inputPanelTheme as keyof typeof INPUT_PANEL_THEME_CLASS_BY_ID
+      ],
+    );
 
     const svgFilterSettings = this.plugin.settings.inputPanelGlassRefractionSvgFilter;
     const activeSvgFilterPreset = svgFilterSettings.preset;
@@ -2842,6 +2921,19 @@ export class OpenCodianView extends ItemView {
   private removeComposerSvgFilterLayer(): void {
     this.composerSvgFilterLayerEl?.remove();
     this.composerSvgFilterLayerEl = null;
+  }
+
+  private unmountLiquidGlassAdapter(): void {
+    if (!this.activeLiquidGlassAdapter) {
+      return;
+    }
+
+    const ctx = this.buildLiquidGlassMountContext();
+    if (ctx) {
+      this.activeLiquidGlassAdapter.unmount(ctx);
+    }
+
+    this.activeLiquidGlassAdapter = null;
   }
 
   private initializeComposerLayoutMetrics(): void {

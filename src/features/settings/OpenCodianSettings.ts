@@ -23,6 +23,7 @@ import {
   type InputPanelGlassRefractionVariantId,
   type InputPanelThemeId,
   isValidChatAppearanceCustomCssDeclarations,
+  type LiquidGlassAdapterId,
   type ModelSourceMode,
   type PluginIsolationMode,
   type QuestionCardPosition,
@@ -34,6 +35,7 @@ import {
 import { setLocale, t, type TranslationKey } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { createLogger, getVaultBasePath } from '../../shared';
+import { getAllGlassAdapters } from '../../utils/glass';
 import { ProviderIconService } from '../../utils/icons';
 import { ModelConfigJsonModal } from './ModelConfigJsonModal';
 import { ModelConfigModal } from './ModelConfigModal';
@@ -2648,11 +2650,25 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     this.plugin.scheduleChatAppearanceSave();
   }
 
-  private getInputPanelThemeFamily(themeId: InputPanelThemeId): 'preset' | 'glass-refraction' {
-    return themeId === 'preset' ? 'preset' : 'glass-refraction';
+  private getInputPanelThemeFamily(themeId: InputPanelThemeId): 'preset' | 'glass-refraction' | 'liquid-glass' {
+    if (themeId === 'preset') {
+      return 'preset';
+    }
+
+    if (
+      themeId === 'liquid-glass-shuding'
+      || themeId === 'liquid-glass-nikdelvin'
+      || themeId === 'liquid-glass-rdev'
+    ) {
+      return 'liquid-glass';
+    }
+
+    return 'glass-refraction';
   }
 
-  private getGlassRefractionInputPanelTheme(themeId: InputPanelThemeId): Exclude<InputPanelThemeId, 'preset'> {
+  private getGlassRefractionInputPanelTheme(
+    themeId: InputPanelThemeId,
+  ): 'glass-refraction-glass' | 'glass-refraction-card' | 'glass-refraction-pill' {
     switch (themeId) {
       case 'glass-refraction-card':
       case 'glass-refraction-pill':
@@ -2660,6 +2676,44 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         return themeId;
       default:
         return 'glass-refraction-glass';
+    }
+  }
+
+  private getLiquidGlassInputPanelTheme(
+    themeId: InputPanelThemeId,
+  ): 'liquid-glass-shuding' | 'liquid-glass-nikdelvin' | 'liquid-glass-rdev' {
+    switch (themeId) {
+      case 'liquid-glass-shuding':
+      case 'liquid-glass-nikdelvin':
+      case 'liquid-glass-rdev':
+        return themeId;
+      default:
+        return 'liquid-glass-rdev';
+    }
+  }
+
+  private getLiquidGlassAdapterId(themeId: InputPanelThemeId): LiquidGlassAdapterId | null {
+    switch (themeId) {
+      case 'liquid-glass-shuding':
+        return 'shuding';
+      case 'liquid-glass-nikdelvin':
+        return 'nikdelvin';
+      case 'liquid-glass-rdev':
+        return 'rdev';
+      default:
+        return null;
+    }
+  }
+
+  private getLiquidGlassThemeId(adapterId: LiquidGlassAdapterId): InputPanelThemeId {
+    switch (adapterId) {
+      case 'shuding':
+        return 'liquid-glass-shuding';
+      case 'nikdelvin':
+        return 'liquid-glass-nikdelvin';
+      case 'rdev':
+      default:
+        return 'liquid-glass-rdev';
     }
   }
 
@@ -2709,7 +2763,8 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       t('settings.style.groups.input.title'),
       t('settings.style.groups.input.desc'),
     );
-    const isPresetInputPanelTheme = this.plugin.settings.inputPanelTheme === 'preset';
+    const themeFamily = this.getInputPanelThemeFamily(this.plugin.settings.inputPanelTheme);
+    const isPresetInputPanelTheme = themeFamily === 'preset';
     new Setting(inputGroupEl)
       .setName(t('settings.style.input.theme.name'))
       .setDesc(t('settings.style.input.theme.desc'))
@@ -2717,16 +2772,28 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         dropdown
           .addOption('preset', t('settings.style.input.theme.option.preset'))
           .addOption('glass-refraction', t('settings.style.input.theme.option.glassRefraction'))
-          .setValue(this.getInputPanelThemeFamily(this.plugin.settings.inputPanelTheme))
+          .addOption('liquid-glass', t('settings.style.input.theme.option.liquidGlass'))
+          .setValue(themeFamily)
           .onChange(async (value) => {
-            const nextTheme: InputPanelThemeId = value === 'preset'
-              ? 'preset'
-              : this.getGlassRefractionInputPanelTheme(this.plugin.settings.inputPanelTheme);
+            const nextTheme: InputPanelThemeId =
+              value === 'preset'
+                ? 'preset'
+                : value === 'glass-refraction'
+                  ? (
+                    themeFamily === 'glass-refraction'
+                      ? this.getGlassRefractionInputPanelTheme(this.plugin.settings.inputPanelTheme)
+                      : 'glass-refraction-glass'
+                  )
+                  : (
+                    themeFamily === 'liquid-glass'
+                      ? this.getLiquidGlassInputPanelTheme(this.plugin.settings.inputPanelTheme)
+                      : 'liquid-glass-rdev'
+                  );
             await this.applyInputPanelThemeChange(nextTheme);
           });
       });
 
-    if (!isPresetInputPanelTheme) {
+    if (themeFamily === 'glass-refraction') {
       new Setting(inputGroupEl)
         .setName(t('settings.style.input.variant.name'))
         .setDesc(t('settings.style.input.variant.desc'))
@@ -2736,6 +2803,23 @@ export class OpenCodianSettingTab extends PluginSettingTab {
             .addOption('glass-refraction-card', t('settings.style.input.variant.option.card'))
             .addOption('glass-refraction-pill', t('settings.style.input.variant.option.pill'))
             .setValue(this.getGlassRefractionInputPanelTheme(this.plugin.settings.inputPanelTheme))
+            .onChange(async (value) => {
+              await this.applyInputPanelThemeChange(value as InputPanelThemeId);
+            });
+        });
+    }
+
+    if (themeFamily === 'liquid-glass') {
+      new Setting(inputGroupEl)
+        .setName(t('settings.style.input.liquidGlass.variant.name'))
+        .setDesc(t('settings.style.input.liquidGlass.variant.desc'))
+        .addDropdown((dropdown) => {
+          for (const adapter of getAllGlassAdapters()) {
+            dropdown.addOption(this.getLiquidGlassThemeId(adapter.id), adapter.displayName);
+          }
+
+          dropdown
+            .setValue(this.getLiquidGlassInputPanelTheme(this.plugin.settings.inputPanelTheme))
             .onChange(async (value) => {
               await this.applyInputPanelThemeChange(value as InputPanelThemeId);
             });
@@ -2804,11 +2888,88 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       return;
     }
 
+    if (themeFamily === 'liquid-glass') {
+      this.addLiquidGlassInputControls(inputControlsEl);
+      return;
+    }
+
     inputControlsEl.createDiv({
       cls: 'opencodian-style-input-lock-note',
       text: t('settings.style.input.glassRefractionNotice'),
     });
     this.addGlassRefractionInputControls(inputControlsEl);
+  }
+
+  private addLiquidGlassInputControls(containerEl: HTMLElement): void {
+    const adapterId = this.getLiquidGlassAdapterId(this.plugin.settings.inputPanelTheme);
+    if (!adapterId) {
+      return;
+    }
+
+    const adapter = getAllGlassAdapters().find((item) => item.id === adapterId);
+    if (!adapter) {
+      return;
+    }
+
+    const adapterSettings = this.plugin.settings.inputPanelLiquidGlass[adapterId];
+    for (const paramDef of adapter.paramDefs) {
+      if (paramDef.type === 'select') {
+        new Setting(containerEl)
+          .setName(t(paramDef.labelKey as TranslationKey))
+          .addDropdown((dropdown) => {
+            for (const option of paramDef.options ?? []) {
+              dropdown.addOption(option.value, option.label);
+            }
+
+            dropdown
+              .setValue(String(adapterSettings[paramDef.key] ?? paramDef.defaultValue))
+              .onChange((value) => {
+                this.updateLiquidGlassAdapterSetting(adapterId, paramDef.key, value);
+                void this.plugin.saveSettings({
+                  syncService: false,
+                  reloadModels: false,
+                  syncConfig: false,
+                  applyUi: true,
+                });
+              });
+          });
+        continue;
+      }
+
+      this.addNumericControl(containerEl, {
+        name: t(paramDef.labelKey as TranslationKey),
+        desc: '',
+        min: paramDef.min ?? 0,
+        max: paramDef.max ?? 100,
+        step: paramDef.step ?? 1,
+        unit: paramDef.unit ?? '',
+        value: () => Number(this.plugin.settings.inputPanelLiquidGlass[adapterId][paramDef.key] ?? paramDef.defaultValue),
+        resetValue: () => Number(paramDef.defaultValue),
+        commitValue: (value) => {
+          this.updateLiquidGlassAdapterSetting(adapterId, paramDef.key, value);
+          void this.plugin.saveSettings({
+            syncService: false,
+            reloadModels: false,
+            syncConfig: false,
+            applyUi: true,
+          });
+        },
+      });
+    }
+  }
+
+  private updateLiquidGlassAdapterSetting(
+    adapterId: LiquidGlassAdapterId,
+    key: string,
+    value: number | string,
+  ): void {
+    this.plugin.settings.inputPanelLiquidGlass = {
+      ...this.plugin.settings.inputPanelLiquidGlass,
+      [adapterId]: {
+        ...this.plugin.settings.inputPanelLiquidGlass[adapterId],
+        [key]: value,
+      },
+    };
   }
 
   private async applyInputPanelThemeChange(themeId: InputPanelThemeId): Promise<void> {

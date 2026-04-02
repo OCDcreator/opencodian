@@ -2335,7 +2335,8 @@
 
 .opencodian-composer-shell--gr-glass,
 .opencodian-composer-shell--gr-card,
-.opencodian-composer-shell--gr-pill {
+.opencodian-composer-shell--gr-pill,
+.opencodian-composer-shell--liquid-glass {
   --opencodian-gr-chromatic-blue: rgba(0, 180, 255, 0.045);
   --opencodian-gr-chromatic-violet: rgba(120, 80, 255, 0.04);
   --opencodian-gr-chromatic-pink: rgba(255, 100, 200, 0.035);
@@ -2351,7 +2352,9 @@
 .opencodian-composer-shell--gr-card .opencodian-input-wrapper,
 .opencodian-composer-shell--gr-card .opencodian-input-toolbar,
 .opencodian-composer-shell--gr-pill .opencodian-input-wrapper,
-.opencodian-composer-shell--gr-pill .opencodian-input-toolbar {
+.opencodian-composer-shell--gr-pill .opencodian-input-toolbar,
+.opencodian-composer-shell--liquid-glass .opencodian-input-wrapper,
+.opencodian-composer-shell--liquid-glass .opencodian-input-toolbar {
   position: relative;
   z-index: 4;
 }

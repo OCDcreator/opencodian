@@ -83,7 +83,12 @@ export type InputPanelThemeId =
   | 'preset'
   | 'glass-refraction-glass'
   | 'glass-refraction-card'
-  | 'glass-refraction-pill';
+  | 'glass-refraction-pill'
+  | 'liquid-glass-shuding'
+  | 'liquid-glass-nikdelvin'
+  | 'liquid-glass-rdev';
+
+export type LiquidGlassAdapterId = 'shuding' | 'nikdelvin' | 'rdev';
 
 /** Server connection mode */
 export type ServerMode = 'local' | 'remote';
@@ -142,6 +147,9 @@ export function normalizeInputPanelThemeId(value: unknown): InputPanelThemeId {
     case 'glass-refraction-glass':
     case 'glass-refraction-card':
     case 'glass-refraction-pill':
+    case 'liquid-glass-shuding':
+    case 'liquid-glass-nikdelvin':
+    case 'liquid-glass-rdev':
       return value;
     default:
       return 'preset';
@@ -417,6 +425,12 @@ export interface InputPanelGlassRefractionSvgFilterSettings {
   strongScale: number;
 }
 
+export interface InputPanelLiquidGlassSettings {
+  shuding: Record<string, number | string>;
+  nikdelvin: Record<string, number | string>;
+  rdev: Record<string, number | string>;
+}
+
 export interface ChatAppearanceScrollbarSettings {
   width: number;
   radius: number;
@@ -534,6 +548,10 @@ function normalizeFiniteNumberInRange(value: unknown, fallback: number, min: num
   return Math.min(max, Math.max(min, value));
 }
 
+function normalizeFiniteNumber(value: unknown, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+}
+
 export function getDefaultInputPanelGlassRefractionSettings(): InputPanelGlassRefractionSettings {
   return {
     glass: {
@@ -562,6 +580,28 @@ export function getDefaultInputPanelGlassRefractionSvgFilterSettings(): InputPan
     preset: 'none',
     subtleScale: 8,
     strongScale: 16,
+  };
+}
+
+export function getDefaultInputPanelLiquidGlassSettings(): InputPanelLiquidGlassSettings {
+  return {
+    shuding: {
+      displacementScale: 10,
+      blurAmount: 0.25,
+    },
+    nikdelvin: {
+      depth: 10,
+      strength: 100,
+      chromaticAberration: 2,
+      blur: 0,
+    },
+    rdev: {
+      mode: 'standard',
+      displacementScale: 70,
+      aberrationIntensity: 2,
+      blurAmount: 1,
+      elasticity: 0.15,
+    },
   };
 }
 
@@ -621,6 +661,71 @@ export function normalizeInputPanelGlassRefractionSvgFilterSettings(
     preset: normalizeInputPanelGlassRefractionSvgFilterPresetId(value?.preset),
     subtleScale: normalizeFiniteNumberInRange(value?.subtleScale, defaults.subtleScale, 0, 32),
     strongScale: normalizeFiniteNumberInRange(value?.strongScale, defaults.strongScale, 0, 32),
+  };
+}
+
+export function normalizeInputPanelLiquidGlassSettings(
+  value?: Partial<InputPanelLiquidGlassSettings> | null,
+): InputPanelLiquidGlassSettings {
+  const defaults = getDefaultInputPanelLiquidGlassSettings();
+  const shuding = value?.shuding ?? {};
+  const nikdelvin = value?.nikdelvin ?? {};
+  const rdev = value?.rdev ?? {};
+
+  return {
+    shuding: {
+      displacementScale: normalizeFiniteNumber(
+        shuding.displacementScale,
+        defaults.shuding.displacementScale as number,
+      ),
+      blurAmount: normalizeFiniteNumber(
+        shuding.blurAmount,
+        defaults.shuding.blurAmount as number,
+      ),
+    },
+    nikdelvin: {
+      depth: normalizeFiniteNumber(
+        nikdelvin.depth,
+        defaults.nikdelvin.depth as number,
+      ),
+      strength: normalizeFiniteNumber(
+        nikdelvin.strength,
+        defaults.nikdelvin.strength as number,
+      ),
+      chromaticAberration: normalizeFiniteNumber(
+        nikdelvin.chromaticAberration,
+        defaults.nikdelvin.chromaticAberration as number,
+      ),
+      blur: normalizeFiniteNumber(
+        nikdelvin.blur,
+        defaults.nikdelvin.blur as number,
+      ),
+    },
+    rdev: {
+      mode:
+        rdev.mode === 'standard'
+        || rdev.mode === 'polar'
+        || rdev.mode === 'prominent'
+        || rdev.mode === 'shader'
+          ? rdev.mode
+          : defaults.rdev.mode,
+      displacementScale: normalizeFiniteNumber(
+        rdev.displacementScale,
+        defaults.rdev.displacementScale as number,
+      ),
+      aberrationIntensity: normalizeFiniteNumber(
+        rdev.aberrationIntensity,
+        defaults.rdev.aberrationIntensity as number,
+      ),
+      blurAmount: normalizeFiniteNumber(
+        rdev.blurAmount,
+        defaults.rdev.blurAmount as number,
+      ),
+      elasticity: normalizeFiniteNumber(
+        rdev.elasticity,
+        defaults.rdev.elasticity as number,
+      ),
+    },
   };
 }
 
@@ -880,6 +985,7 @@ export interface OpenCodianSettings {
   inputPanelGlassRefraction: InputPanelGlassRefractionSettings;
   inputPanelGlassRefractionSvgFilter: InputPanelGlassRefractionSvgFilterSettings;
   inputPanelGlassRefractionGlassDefaultsVersion: number;
+  inputPanelLiquidGlass: InputPanelLiquidGlassSettings;
   chatAppearance: ChatAppearanceSettings;
   settingsPanelScrollTop: number;
   enableDebugLogging: boolean;
@@ -958,6 +1064,7 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
   inputPanelGlassRefraction: getDefaultInputPanelGlassRefractionSettings(),
   inputPanelGlassRefractionSvgFilter: getDefaultInputPanelGlassRefractionSvgFilterSettings(),
   inputPanelGlassRefractionGlassDefaultsVersion: 2,
+  inputPanelLiquidGlass: getDefaultInputPanelLiquidGlassSettings(),
   chatAppearance: getDefaultChatAppearanceSettings(),
   settingsPanelScrollTop: 0,
   enableDebugLogging: false,

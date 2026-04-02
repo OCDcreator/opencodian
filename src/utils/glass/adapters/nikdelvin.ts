@@ -1,0 +1,51 @@
+import type { GlassEffectAdapter } from '../types';
+
+export const adapter: GlassEffectAdapter = {
+  id: 'nikdelvin',
+  displayName: 'Nikdelvin Liquid Glass',
+  description: 'A deeper liquid-glass variant with stronger depth and chromatic separation.',
+  paramDefs: [
+    {
+      key: 'depth',
+      labelKey: 'settings.style.input.liquidGlass.nikdelvin.depth',
+      type: 'number',
+      min: 0,
+      max: 40,
+      step: 0.5,
+      unit: '',
+      defaultValue: 10,
+    },
+    {
+      key: 'strength',
+      labelKey: 'settings.style.input.liquidGlass.nikdelvin.strength',
+      type: 'number',
+      min: 0,
+      max: 200,
+      step: 1,
+      unit: '',
+      defaultValue: 100,
+    },
+    {
+      key: 'chromaticAberration',
+      labelKey: 'settings.style.input.liquidGlass.nikdelvin.chromaticAberration',
+      type: 'number',
+      min: 0,
+      max: 10,
+      step: 0.1,
+      unit: '',
+      defaultValue: 2,
+    },
+    {
+      key: 'blur',
+      labelKey: 'settings.style.input.liquidGlass.nikdelvin.blur',
+      type: 'number',
+      min: 0,
+      max: 10,
+      step: 0.1,
+      unit: '',
+      defaultValue: 0,
+    },
+  ],
+  mount(): void {},
+  unmount(): void {},
+};
