@@ -19,6 +19,15 @@ if (!fs.existsSync(distDir)) {
   fs.mkdirSync(distDir, { recursive: true });
 }
 
+function copyDirectoryIfExists(sourcePath, destinationPath) {
+  if (!fs.existsSync(sourcePath)) {
+    return;
+  }
+
+  fs.rmSync(destinationPath, { recursive: true, force: true });
+  fs.cpSync(sourcePath, destinationPath, { recursive: true });
+}
+
 const buildId = generateBuildId();
 console.log(`[build] BUILD_ID: ${buildId}`);
 
@@ -72,6 +81,8 @@ if (prod) {
   if (fs.existsSync('styles.css')) {
     fs.copyFileSync('styles.css', 'dist/styles.css');
   }
+
+  copyDirectoryIfExists('assets', 'dist/assets');
   
   console.log('Production build complete!');
   process.exit(0);

@@ -3,19 +3,20 @@ export interface GlassMountContext {
   contentEl: HTMLElement;
   svgRootEl: SVGSVGElement;
   filterLayerEl: HTMLElement;
+  resolveAssetUrl?: (relativePath: string) => string | null;
 }
 
 export interface GlassParamDef {
   key: string;
   labelKey: string;
   descKey?: string;
-  type: 'number' | 'select' | 'toggle';
+  type: 'number' | 'select' | 'text' | 'toggle';
   sectionLabelKey?: string;
   min?: number;
   max?: number;
   step?: number;
   unit?: string;
-  options?: { value: string; label: string }[];
+  options?: { value: string; label?: string; labelKey?: string }[];
   defaultValue: number | string | boolean;
 }
 

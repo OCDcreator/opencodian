@@ -12,14 +12,36 @@ const INSTANCE_ATTR = 'data-opencodian-lg-nikdelvin-instance';
 const OWNER_ATTR = 'data-opencodian-lg-nikdelvin-owner';
 const ROLE_ATTR = 'data-opencodian-lg-nikdelvin-role';
 const MODE_ATTR = 'data-opencodian-lg-nikdelvin-mode';
+const SPIN_DEGREES_PER_MS = 360 / 20000;
 
 type RenderMode = 'svg' | 'glass' | 'overlay';
+type NikdelvinColor = 'transparent' | 'black' | 'white';
+type NikdelvinBackgroundPresetId = 'none' | 'background' | 'lines' | 'rocks' | 'chrome' | 'silk';
+
+const NIKDELVIN_BACKGROUND_PRESET_ASSET_PATH: Record<
+  Exclude<NikdelvinBackgroundPresetId, 'none'>,
+  string
+> = {
+  background: 'assets/liquid-glass/nikdelvin/background.webp',
+  lines: 'assets/liquid-glass/nikdelvin/lines1.svg',
+  rocks: 'assets/liquid-glass/nikdelvin/rocks1.png',
+  chrome: 'assets/liquid-glass/nikdelvin/chrome1.png',
+  silk: 'assets/liquid-glass/nikdelvin/silk1.png',
+};
 
 interface NikdelvinSettings {
   depth: number;
   strength: number;
   chromaticAberration: number;
   blur: number;
+  backgroundPreset: NikdelvinBackgroundPresetId;
+  color: NikdelvinColor;
+  background: string;
+  freeze: boolean;
+  noMorph: boolean;
+  button: boolean;
+  inline: boolean;
+  customEffects: boolean;
 }
 
 interface ShellMetrics {
@@ -38,6 +60,10 @@ interface NikdelvinState {
   svgRootEl: SVGSVGElement;
   filterLayerEl: HTMLElement;
   svgDefsEl: SVGDefsElement;
+  bgContainerEl: HTMLDivElement;
+  bgImageEl: HTMLImageElement;
+  overlayEl: HTMLDivElement;
+  glassBoxEl: HTMLDivElement;
   surfaceEl: HTMLDivElement;
   highlightEl: HTMLDivElement;
   spectrumEl: HTMLDivElement;
@@ -47,6 +73,13 @@ interface NikdelvinState {
   settings: NikdelvinSettings;
   currentFilterSignature: string | null;
   currentMode: RenderMode | null;
+  resolveAssetUrl: ((relativePath: string) => string | null) | null;
+  spinFrameId: number | null;
+  spinLastTimestamp: number | null;
+  spinRotation: number;
+  isHovered: boolean;
+  mouseEnterHandler: () => void;
+  mouseLeaveHandler: () => void;
 }
 
 type DisplacementOptions = {
@@ -62,6 +95,8 @@ const paramDefs: readonly GlassParamDef[] = [
   {
     key: 'depth',
     labelKey: 'settings.style.input.liquidGlass.nikdelvin.depth',
+    descKey: 'settings.style.input.liquidGlass.nikdelvin.depth.desc',
+    sectionLabelKey: 'settings.style.input.liquidGlass.section.refraction',
     type: 'number',
     min: 0,
     max: 40,
@@ -72,6 +107,8 @@ const paramDefs: readonly GlassParamDef[] = [
   {
     key: 'strength',
     labelKey: 'settings.style.input.liquidGlass.nikdelvin.strength',
+    descKey: 'settings.style.input.liquidGlass.nikdelvin.strength.desc',
+    sectionLabelKey: 'settings.style.input.liquidGlass.section.refraction',
     type: 'number',
     min: 0,
     max: 200,
@@ -82,22 +119,130 @@ const paramDefs: readonly GlassParamDef[] = [
   {
     key: 'chromaticAberration',
     labelKey: 'settings.style.input.liquidGlass.nikdelvin.chromaticAberration',
-    type: 'number',
-    min: 0,
-    max: 10,
-    step: 0.1,
-    unit: '',
-    defaultValue: 2,
-  },
-  {
-    key: 'blur',
-    labelKey: 'settings.style.input.liquidGlass.nikdelvin.blur',
+    descKey: 'settings.style.input.liquidGlass.nikdelvin.chromaticAberration.desc',
+    sectionLabelKey: 'settings.style.input.liquidGlass.section.refraction',
     type: 'number',
     min: 0,
     max: 10,
     step: 0.1,
     unit: '',
     defaultValue: 0,
+  },
+  {
+    key: 'blur',
+    labelKey: 'settings.style.input.liquidGlass.nikdelvin.blur',
+    descKey: 'settings.style.input.liquidGlass.nikdelvin.blur.desc',
+    sectionLabelKey: 'settings.style.input.liquidGlass.section.refraction',
+    type: 'number',
+    min: 0,
+    max: 10,
+    step: 0.1,
+    unit: '',
+    defaultValue: 0,
+  },
+  {
+    key: 'backgroundPreset',
+    labelKey: 'settings.style.input.liquidGlass.nikdelvin.backgroundPreset',
+    descKey: 'settings.style.input.liquidGlass.nikdelvin.backgroundPreset.desc',
+    sectionLabelKey: 'settings.style.input.liquidGlass.section.appearance',
+    type: 'select',
+    options: [
+      {
+        value: 'none',
+        labelKey: 'settings.style.input.liquidGlass.nikdelvin.backgroundPreset.option.none',
+      },
+      {
+        value: 'background',
+        labelKey: 'settings.style.input.liquidGlass.nikdelvin.backgroundPreset.option.background',
+      },
+      {
+        value: 'lines',
+        labelKey: 'settings.style.input.liquidGlass.nikdelvin.backgroundPreset.option.lines',
+      },
+      {
+        value: 'rocks',
+        labelKey: 'settings.style.input.liquidGlass.nikdelvin.backgroundPreset.option.rocks',
+      },
+      {
+        value: 'chrome',
+        labelKey: 'settings.style.input.liquidGlass.nikdelvin.backgroundPreset.option.chrome',
+      },
+      {
+        value: 'silk',
+        labelKey: 'settings.style.input.liquidGlass.nikdelvin.backgroundPreset.option.silk',
+      },
+    ],
+    defaultValue: 'background',
+  },
+  {
+    key: 'color',
+    labelKey: 'settings.style.input.liquidGlass.nikdelvin.color',
+    descKey: 'settings.style.input.liquidGlass.nikdelvin.color.desc',
+    sectionLabelKey: 'settings.style.input.liquidGlass.section.appearance',
+    type: 'select',
+    options: [
+      {
+        value: 'transparent',
+        labelKey: 'settings.style.input.liquidGlass.nikdelvin.color.option.transparent',
+      },
+      {
+        value: 'black',
+        labelKey: 'settings.style.input.liquidGlass.nikdelvin.color.option.black',
+      },
+      {
+        value: 'white',
+        labelKey: 'settings.style.input.liquidGlass.nikdelvin.color.option.white',
+      },
+    ],
+    defaultValue: 'transparent',
+  },
+  {
+    key: 'background',
+    labelKey: 'settings.style.input.liquidGlass.nikdelvin.background',
+    descKey: 'settings.style.input.liquidGlass.nikdelvin.background.desc',
+    sectionLabelKey: 'settings.style.input.liquidGlass.section.appearance',
+    type: 'text',
+    defaultValue: '',
+  },
+  {
+    key: 'freeze',
+    labelKey: 'settings.style.input.liquidGlass.nikdelvin.freeze',
+    descKey: 'settings.style.input.liquidGlass.nikdelvin.freeze.desc',
+    sectionLabelKey: 'settings.style.input.liquidGlass.section.behavior',
+    type: 'toggle',
+    defaultValue: false,
+  },
+  {
+    key: 'noMorph',
+    labelKey: 'settings.style.input.liquidGlass.nikdelvin.noMorph',
+    descKey: 'settings.style.input.liquidGlass.nikdelvin.noMorph.desc',
+    sectionLabelKey: 'settings.style.input.liquidGlass.section.behavior',
+    type: 'toggle',
+    defaultValue: false,
+  },
+  {
+    key: 'button',
+    labelKey: 'settings.style.input.liquidGlass.nikdelvin.button',
+    descKey: 'settings.style.input.liquidGlass.nikdelvin.button.desc',
+    sectionLabelKey: 'settings.style.input.liquidGlass.section.behavior',
+    type: 'toggle',
+    defaultValue: false,
+  },
+  {
+    key: 'inline',
+    labelKey: 'settings.style.input.liquidGlass.nikdelvin.inline',
+    descKey: 'settings.style.input.liquidGlass.nikdelvin.inline.desc',
+    sectionLabelKey: 'settings.style.input.liquidGlass.section.behavior',
+    type: 'toggle',
+    defaultValue: false,
+  },
+  {
+    key: 'customEffects',
+    labelKey: 'settings.style.input.liquidGlass.nikdelvin.customEffects',
+    descKey: 'settings.style.input.liquidGlass.nikdelvin.customEffects.desc',
+    sectionLabelKey: 'settings.style.input.liquidGlass.section.extras',
+    type: 'toggle',
+    defaultValue: false,
   },
 ] as const;
 
@@ -132,7 +277,7 @@ function createSvgElement<K extends keyof SVGElementTagNameMap>(
   return element;
 }
 
-function createOverlayElement(instanceId: string, role: string): HTMLDivElement {
+function createLayerElement(instanceId: string, role: string): HTMLDivElement {
   const element = document.createElement('div');
   element.setAttribute(OWNER_ATTR, instanceId);
   element.setAttribute(ROLE_ATTR, role);
@@ -141,6 +286,19 @@ function createOverlayElement(instanceId: string, role: string): HTMLDivElement 
   element.style.borderRadius = 'inherit';
   element.style.pointerEvents = 'none';
   element.style.transform = 'translateZ(0)';
+  return element;
+}
+
+function createBackgroundImageElement(instanceId: string): HTMLImageElement {
+  const element = document.createElement('img');
+  element.setAttribute(OWNER_ATTR, instanceId);
+  element.setAttribute(ROLE_ATTR, 'background-image');
+  element.style.position = 'absolute';
+  element.style.top = '50%';
+  element.style.left = '50%';
+  element.style.transform = 'translate(-50%, -50%)';
+  element.style.pointerEvents = 'none';
+  element.style.willChange = 'filter, transform';
   return element;
 }
 
@@ -216,9 +374,9 @@ function supportsBackdropFilterUrl(): boolean {
   return cachedBackdropFilterUrlSupport;
 }
 
-function getDefaultNumber(key: keyof NikdelvinSettings): number {
+function getDefaultSetting<K extends keyof NikdelvinSettings>(key: K): NikdelvinSettings[K] {
   const def = paramDefs.find((item) => item.key === key);
-  return typeof def?.defaultValue === 'number' ? def.defaultValue : 0;
+  return (def?.defaultValue ?? null) as NikdelvinSettings[K];
 }
 
 function readNumberSetting(
@@ -230,10 +388,59 @@ function readNumberSetting(
   const rawValue = settings[key];
   const parsedValue = typeof rawValue === 'number' ? rawValue : Number(rawValue);
   if (!Number.isFinite(parsedValue)) {
-    return getDefaultNumber(key);
+    return getDefaultSetting(key) as number;
   }
 
   return clamp(parsedValue, min, max);
+}
+
+function readStringSetting(
+  settings: Record<string, GlassAdapterSettingsValue>,
+  key: keyof NikdelvinSettings,
+): string {
+  const rawValue = settings[key];
+  return typeof rawValue === 'string'
+    ? rawValue.trim()
+    : String(getDefaultSetting(key) ?? '');
+}
+
+function readBooleanSetting(
+  settings: Record<string, GlassAdapterSettingsValue>,
+  key: keyof NikdelvinSettings,
+): boolean {
+  const rawValue = settings[key];
+  return typeof rawValue === 'boolean'
+    ? rawValue
+    : Boolean(getDefaultSetting(key));
+}
+
+function readColorSetting(settings: Record<string, GlassAdapterSettingsValue>): NikdelvinColor {
+  const rawValue = settings.color;
+  switch (rawValue) {
+    case 'black':
+    case 'white':
+    case 'transparent':
+      return rawValue;
+    default:
+      return getDefaultSetting('color');
+  }
+}
+
+function readBackgroundPresetSetting(
+  settings: Record<string, GlassAdapterSettingsValue>,
+): NikdelvinBackgroundPresetId {
+  const rawValue = settings.backgroundPreset;
+  switch (rawValue) {
+    case 'background':
+    case 'lines':
+    case 'rocks':
+    case 'chrome':
+    case 'silk':
+    case 'none':
+      return rawValue;
+    default:
+      return getDefaultSetting('backgroundPreset');
+  }
 }
 
 function normalizeSettings(settings: Record<string, GlassAdapterSettingsValue>): NikdelvinSettings {
@@ -242,6 +449,14 @@ function normalizeSettings(settings: Record<string, GlassAdapterSettingsValue>):
     strength: readNumberSetting(settings, 'strength', 0, 200),
     chromaticAberration: readNumberSetting(settings, 'chromaticAberration', 0, 10),
     blur: readNumberSetting(settings, 'blur', 0, 10),
+    backgroundPreset: readBackgroundPresetSetting(settings),
+    color: readColorSetting(settings),
+    background: readStringSetting(settings, 'background'),
+    freeze: readBooleanSetting(settings, 'freeze'),
+    noMorph: readBooleanSetting(settings, 'noMorph'),
+    button: readBooleanSetting(settings, 'button'),
+    inline: readBooleanSetting(settings, 'inline'),
+    customEffects: readBooleanSetting(settings, 'customEffects'),
   };
 }
 
@@ -454,47 +669,40 @@ function getDisplacementFilter({
   return filter;
 }
 
-function applyBackdropFilterValue(filterLayerEl: HTMLElement, value: string | null): void {
+function applyBackdropFilterValue(element: HTMLElement, value: string | null): void {
   if (!value) {
-    filterLayerEl.style.backdropFilter = '';
-    filterLayerEl.style.removeProperty('-webkit-backdrop-filter');
+    element.style.backdropFilter = '';
+    element.style.removeProperty('-webkit-backdrop-filter');
     return;
   }
 
-  filterLayerEl.style.backdropFilter = value;
-  filterLayerEl.style.setProperty('-webkit-backdrop-filter', value);
+  element.style.backdropFilter = value;
+  element.style.setProperty('-webkit-backdrop-filter', value);
 }
 
-function buildBackdropFilterValue(
-  state: NikdelvinState,
-  mode: Extract<RenderMode, 'svg' | 'glass'>,
-): string {
-  const brightness = clamp(1.04 + state.settings.depth * 0.006 + state.settings.blur * 0.012, 1, 1.26);
-  const saturation = clamp(
-    1.18 + state.settings.strength * 0.003 + state.settings.chromaticAberration * 0.03,
-    1,
-    1.95,
-  );
+function buildSvgBackdropFilterValue(state: NikdelvinState): string {
+  const brightness = state.settings.button ? 1.6 : 1.1;
+  const saturation = state.settings.button ? 1.2 : 1.5;
   const parts: string[] = [];
 
-  if (mode === 'svg' && state.settings.blur > 0) {
+  if (state.settings.blur > 0) {
     parts.push(`blur(${formatNumber(state.settings.blur / 2)}px)`);
   }
 
-  if (mode === 'svg') {
-    parts.push(`url("#${state.filterId}")`);
-    if (state.settings.blur > 0) {
-      parts.push(`blur(${formatNumber(state.settings.blur)}px)`);
-    }
-  } else {
-    const fallbackBlur = Math.max(4, state.settings.blur + state.settings.depth * 0.45);
-    parts.push(`blur(${formatNumber(fallbackBlur)}px)`);
+  parts.push(`url("#${state.filterId}")`);
+
+  if (state.settings.blur > 0) {
+    parts.push(`blur(${formatNumber(state.settings.blur)}px)`);
   }
 
   parts.push(`brightness(${formatNumber(brightness)})`);
   parts.push(`saturate(${formatNumber(saturation)})`);
 
   return parts.join(' ');
+}
+
+function buildFallbackBackdropFilterValue(metrics: ShellMetrics): string {
+  return `blur(${formatNumber(metrics.width / 10)}px) saturate(180%)`;
 }
 
 function clearFilterDefinition(state: NikdelvinState): void {
@@ -521,7 +729,170 @@ function syncFilterDefinition(state: NikdelvinState, metrics: ShellMetrics): voi
   state.currentFilterSignature = metrics.filterSignature;
 }
 
-function updateVisualLayers(state: NikdelvinState, mode: RenderMode): void {
+function resolveOverlayBackground(settings: NikdelvinSettings): string {
+  if (settings.noMorph) {
+    return 'rgba(255, 255, 255, 0.1)';
+  }
+
+  return settings.button ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.3)';
+}
+
+function applyGlassTint(state: NikdelvinState): void {
+  state.glassBoxEl.style.boxShadow = 'inset 0 0 4px 0 #fafafa80';
+
+  switch (state.settings.color) {
+    case 'black':
+      state.glassBoxEl.style.background = '#09090b80';
+      state.glassBoxEl.style.filter = 'brightness(0.6)';
+      break;
+    case 'white':
+      state.glassBoxEl.style.background = '#fafafa80';
+      state.glassBoxEl.style.filter = '';
+      break;
+    case 'transparent':
+    default:
+      state.glassBoxEl.style.background = '#09090b00';
+      state.glassBoxEl.style.filter = '';
+      break;
+  }
+}
+
+function updateBackgroundTransform(state: NikdelvinState): void {
+  state.bgImageEl.style.transform =
+    `translate(-50%, -50%) rotate(${formatNumber(state.spinRotation)}deg)`;
+}
+
+function stopBackgroundSpin(state: NikdelvinState): void {
+  if (state.spinFrameId !== null) {
+    window.cancelAnimationFrame(state.spinFrameId);
+    state.spinFrameId = null;
+  }
+  state.spinLastTimestamp = null;
+}
+
+function shouldSpinBackground(state: NikdelvinState): boolean {
+  return resolveBackgroundSource(state).length > 0 && !state.settings.freeze && state.isHovered;
+}
+
+function stepBackgroundSpin(state: NikdelvinState, timestamp: number): void {
+  if (!shouldSpinBackground(state)) {
+    stopBackgroundSpin(state);
+    return;
+  }
+
+  if (state.spinLastTimestamp !== null) {
+    const elapsed = timestamp - state.spinLastTimestamp;
+    state.spinRotation = (state.spinRotation + elapsed * SPIN_DEGREES_PER_MS) % 360;
+    updateBackgroundTransform(state);
+  }
+
+  state.spinLastTimestamp = timestamp;
+  state.spinFrameId = window.requestAnimationFrame((nextTimestamp) => {
+    stepBackgroundSpin(state, nextTimestamp);
+  });
+}
+
+function syncBackgroundSpin(state: NikdelvinState): void {
+  if (!shouldSpinBackground(state)) {
+    stopBackgroundSpin(state);
+    return;
+  }
+
+  if (state.spinFrameId !== null) {
+    return;
+  }
+
+  state.spinFrameId = window.requestAnimationFrame((timestamp) => {
+    stepBackgroundSpin(state, timestamp);
+  });
+}
+
+function applyShellInteractiveStyles(state: NikdelvinState): void {
+  const hasBackground = resolveBackgroundSource(state).length > 0;
+  state.shellEl.style.transition = state.settings.button ? 'all 0.3s ease-out' : '';
+  state.shellEl.style.transformOrigin = state.settings.button ? 'top center' : '';
+  state.shellEl.style.cursor = state.settings.button ? 'pointer' : '';
+  state.shellEl.style.transform =
+    state.settings.button && state.isHovered ? 'scale(1.05) rotate(-1deg)' : '';
+  state.shellEl.style.display = state.settings.inline ? 'inline-flex' : '';
+  state.shellEl.style.alignSelf = state.settings.inline ? 'flex-start' : '';
+  state.shellEl.style.width = state.settings.inline ? 'max-content' : '';
+  state.shellEl.style.maxWidth = state.settings.inline ? '100%' : '';
+  state.shellEl.style.verticalAlign = state.settings.inline ? 'middle' : '';
+  state.shellEl.style.boxShadow =
+    !state.supportsBackdropFilterUrl && hasBackground
+      ? (state.settings.button ? '0px 0px 2px white' : '0px 0px 1px white')
+      : '';
+}
+
+function resolveBackgroundSource(state: NikdelvinState): string {
+  if (state.settings.backgroundPreset !== 'none') {
+    const relativePath = NIKDELVIN_BACKGROUND_PRESET_ASSET_PATH[state.settings.backgroundPreset];
+    const resolvedUrl = state.resolveAssetUrl?.(relativePath) ?? null;
+    if (resolvedUrl) {
+      return resolvedUrl;
+    }
+  }
+
+  return state.settings.background;
+}
+
+function updateBaseLayers(state: NikdelvinState, metrics: ShellMetrics, mode: RenderMode): void {
+  const backgroundSource = resolveBackgroundSource(state);
+  const hasBackground = backgroundSource.length > 0;
+
+  state.overlayEl.style.display = 'block';
+  state.overlayEl.style.background = resolveOverlayBackground(state.settings);
+
+  state.glassBoxEl.style.display = 'block';
+  state.glassBoxEl.style.width = `${metrics.width}px`;
+  state.glassBoxEl.style.height = `${metrics.height}px`;
+  applyGlassTint(state);
+
+  if (mode === 'svg') {
+    applyBackdropFilterValue(state.glassBoxEl, buildSvgBackdropFilterValue(state));
+  } else if (mode === 'glass' && !hasBackground) {
+    applyBackdropFilterValue(state.glassBoxEl, buildFallbackBackdropFilterValue(metrics));
+  } else {
+    applyBackdropFilterValue(state.glassBoxEl, null);
+  }
+
+  state.bgContainerEl.style.display = hasBackground ? 'block' : 'none';
+  if (!hasBackground) {
+    state.bgImageEl.removeAttribute('src');
+    state.bgImageEl.style.filter = '';
+    state.spinRotation = 0;
+    updateBackgroundTransform(state);
+    stopBackgroundSpin(state);
+    applyShellInteractiveStyles(state);
+    return;
+  }
+
+  if (state.bgImageEl.getAttribute('src') !== backgroundSource) {
+    state.bgImageEl.src = backgroundSource;
+  }
+
+  state.bgImageEl.style.width = `${metrics.width}px`;
+  state.bgImageEl.style.height = `${metrics.width}px`;
+  state.bgImageEl.style.filter =
+    mode === 'svg' ? '' : `blur(${formatNumber(metrics.width / 50)}px) saturate(180%)`;
+  updateBackgroundTransform(state);
+  syncBackgroundSpin(state);
+  applyShellInteractiveStyles(state);
+}
+
+function updateCustomEffectLayers(state: NikdelvinState, mode: RenderMode): void {
+  if (!state.settings.customEffects) {
+    for (const element of [state.surfaceEl, state.highlightEl, state.spectrumEl]) {
+      element.style.display = 'none';
+      element.style.opacity = '0';
+      element.style.background = '';
+      element.style.boxShadow = '';
+      element.style.mixBlendMode = '';
+    }
+    return;
+  }
+
   const fallbackBoost = mode === 'svg' ? 0 : mode === 'glass' ? 0.06 : 0.12;
   const surfaceOpacity = clamp(
     0.82 + state.settings.depth * 0.004 + state.settings.blur * 0.01 + fallbackBoost,
@@ -540,6 +911,10 @@ function updateVisualLayers(state: NikdelvinState, mode: RenderMode): void {
   );
   const borderAlpha = clamp(0.16 + state.settings.depth * 0.008, 0.14, 0.46);
   const bottomEdgeAlpha = clamp(0.06 + state.settings.strength * 0.0005, 0.05, 0.2);
+
+  for (const element of [state.surfaceEl, state.highlightEl, state.spectrumEl]) {
+    element.style.display = 'block';
+  }
 
   state.surfaceEl.style.opacity = formatNumber(surfaceOpacity);
   state.surfaceEl.style.background = [
@@ -569,10 +944,21 @@ function updateVisualLayers(state: NikdelvinState, mode: RenderMode): void {
 
 function clearFilterLayerDecorations(filterLayerEl: HTMLElement): void {
   filterLayerEl.style.opacity = '';
-  filterLayerEl.style.backdropFilter = '';
-  filterLayerEl.style.removeProperty('-webkit-backdrop-filter');
   filterLayerEl.removeAttribute(INSTANCE_ATTR);
   filterLayerEl.removeAttribute(MODE_ATTR);
+}
+
+function resetShellStyles(shellEl: HTMLElement): void {
+  shellEl.style.transition = '';
+  shellEl.style.transformOrigin = '';
+  shellEl.style.cursor = '';
+  shellEl.style.transform = '';
+  shellEl.style.display = '';
+  shellEl.style.alignSelf = '';
+  shellEl.style.width = '';
+  shellEl.style.maxWidth = '';
+  shellEl.style.verticalAlign = '';
+  shellEl.style.boxShadow = '';
 }
 
 function cleanupInstanceArtifacts(
@@ -589,6 +975,7 @@ function cleanupInstanceArtifacts(
     .forEach((element) => element.remove());
 
   clearFilterLayerDecorations(filterLayerEl);
+  resetShellStyles(shellEl);
   shellEl.removeAttribute(INSTANCE_ATTR);
   shellEl.removeAttribute(MODE_ATTR);
 }
@@ -606,12 +993,24 @@ function syncStateContext(state: NikdelvinState, ctx: GlassMountContext): void {
 
   state.contentEl = ctx.contentEl;
   state.svgRootEl = ctx.svgRootEl;
+  state.resolveAssetUrl = ctx.resolveAssetUrl ?? null;
 
   if (state.svgDefsEl.parentNode !== ctx.svgRootEl) {
     ctx.svgRootEl.appendChild(state.svgDefsEl);
   }
 
-  for (const element of [state.surfaceEl, state.highlightEl, state.spectrumEl]) {
+  if (state.bgImageEl.parentElement !== state.bgContainerEl) {
+    state.bgContainerEl.appendChild(state.bgImageEl);
+  }
+
+  for (const element of [
+    state.bgContainerEl,
+    state.overlayEl,
+    state.glassBoxEl,
+    state.surfaceEl,
+    state.highlightEl,
+    state.spectrumEl,
+  ]) {
     if (element.parentElement !== ctx.filterLayerEl) {
       ctx.filterLayerEl.appendChild(element);
     }
@@ -634,16 +1033,13 @@ function renderState(state: NikdelvinState): void {
 
   if (mode === 'svg') {
     syncFilterDefinition(state, metrics);
-    applyBackdropFilterValue(state.filterLayerEl, buildBackdropFilterValue(state, 'svg'));
   } else {
     clearFilterDefinition(state);
-    applyBackdropFilterValue(
-      state.filterLayerEl,
-      mode === 'glass' ? buildBackdropFilterValue(state, 'glass') : null,
-    );
   }
 
-  updateVisualLayers(state, mode);
+  updateBaseLayers(state, metrics, mode);
+  updateCustomEffectLayers(state, mode);
+  applyShellInteractiveStyles(state);
   state.currentMode = mode;
 }
 
@@ -656,6 +1052,28 @@ function createState(
   const svgDefsEl = createSvgElement('defs');
   applyInstanceMarker(svgDefsEl, instanceId, 'defs');
 
+  const bgContainerEl = createLayerElement(instanceId, 'background');
+  bgContainerEl.style.overflow = 'hidden';
+  bgContainerEl.style.zIndex = '0';
+
+  const bgImageEl = createBackgroundImageElement(instanceId);
+  bgContainerEl.appendChild(bgImageEl);
+
+  const overlayEl = createLayerElement(instanceId, 'overlay');
+  overlayEl.style.zIndex = '1';
+
+  const glassBoxEl = createLayerElement(instanceId, 'glass-box');
+  glassBoxEl.style.zIndex = '2';
+
+  const surfaceEl = createLayerElement(instanceId, 'surface');
+  surfaceEl.style.zIndex = '3';
+
+  const highlightEl = createLayerElement(instanceId, 'highlight');
+  highlightEl.style.zIndex = '4';
+
+  const spectrumEl = createLayerElement(instanceId, 'spectrum');
+  spectrumEl.style.zIndex = '5';
+
   const state: NikdelvinState = {
     instanceId,
     filterId: `${instanceId}-filter`,
@@ -664,16 +1082,38 @@ function createState(
     svgRootEl: ctx.svgRootEl,
     filterLayerEl: ctx.filterLayerEl,
     svgDefsEl,
-    surfaceEl: createOverlayElement(instanceId, 'surface'),
-    highlightEl: createOverlayElement(instanceId, 'highlight'),
-    spectrumEl: createOverlayElement(instanceId, 'spectrum'),
+    bgContainerEl,
+    bgImageEl,
+    overlayEl,
+    glassBoxEl,
+    surfaceEl,
+    highlightEl,
+    spectrumEl,
     resizeObserver: null,
     supportsBackdropFilter: supportsBackdropFilter(),
     supportsBackdropFilterUrl: supportsBackdropFilterUrl(),
     settings: normalizeSettings(settings),
     currentFilterSignature: null,
     currentMode: null,
+    resolveAssetUrl: ctx.resolveAssetUrl ?? null,
+    spinFrameId: null,
+    spinLastTimestamp: null,
+    spinRotation: 0,
+    isHovered: false,
+    mouseEnterHandler: () => {
+      state.isHovered = true;
+      applyShellInteractiveStyles(state);
+      syncBackgroundSpin(state);
+    },
+    mouseLeaveHandler: () => {
+      state.isHovered = false;
+      applyShellInteractiveStyles(state);
+      syncBackgroundSpin(state);
+    },
   };
+
+  state.shellEl.addEventListener('mouseenter', state.mouseEnterHandler);
+  state.shellEl.addEventListener('mouseleave', state.mouseLeaveHandler);
 
   if (typeof ResizeObserver !== 'undefined') {
     state.resizeObserver = new ResizeObserver(() => {
@@ -738,11 +1178,15 @@ function unmount(ctx: GlassMountContext): void {
         .querySelectorAll<HTMLElement>(`[${OWNER_ATTR}]`)
         .forEach((element) => element.remove());
       clearFilterLayerDecorations(ctx.filterLayerEl);
+      resetShellStyles(ctx.shellEl);
     }
     return;
   }
 
+  stopBackgroundSpin(state);
   state.resizeObserver?.disconnect();
+  state.shellEl.removeEventListener('mouseenter', state.mouseEnterHandler);
+  state.shellEl.removeEventListener('mouseleave', state.mouseLeaveHandler);
   cleanupInstanceArtifacts(state.shellEl, state.filterLayerEl, state.svgRootEl, state.instanceId);
   stateByShellEl.delete(ctx.shellEl);
 }
@@ -750,7 +1194,7 @@ function unmount(ctx: GlassMountContext): void {
 export const adapter: GlassEffectAdapter = {
   id: 'nikdelvin',
   displayName: 'Nikdelvin Liquid Glass',
-  description: 'A deeper liquid-glass variant with stronger depth and chromatic separation.',
+  description: 'A liquid-glass adapter that keeps the upstream overlay and tint defaults while allowing OpenCodian extras to be toggled back on.',
   paramDefs,
   mount,
   updateSettings,

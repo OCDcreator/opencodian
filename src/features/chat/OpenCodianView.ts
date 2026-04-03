@@ -6,7 +6,7 @@
 
 import type { EditorView } from '@codemirror/view';
 import type { Editor, EventRef, TAbstractFile, WorkspaceLeaf } from 'obsidian';
-import { addIcon, Component, ItemView, MarkdownView, Notice, Scope, setIcon, TFile } from 'obsidian';
+import { addIcon, Component, ItemView, MarkdownView, normalizePath, Notice, Scope, setIcon, TFile } from 'obsidian';
 
 import { OpenCodeService, type SessionActivityStatus } from '../../core/opencode';
 import {
@@ -2854,7 +2854,22 @@ export class OpenCodianView extends ItemView {
       contentEl: this.inputWrapperEl,
       svgRootEl: this.ensureComposerGlassSvgRoot(),
       filterLayerEl,
+      resolveAssetUrl: (relativePath: string) => this.resolvePluginAssetUrl(relativePath),
     };
+  }
+
+  private resolvePluginAssetUrl(relativePath: string): string | null {
+    const adapter = this.app.vault.adapter;
+    const pluginDir = this.plugin.manifest.dir?.trim()
+      ? normalizePath(this.plugin.manifest.dir)
+      : normalizePath(`${this.app.vault.configDir}/plugins/${this.plugin.manifest.id}`);
+    const assetPath = normalizePath(`${pluginDir}/${relativePath}`);
+
+    if (typeof adapter.getResourcePath !== 'function') {
+      return null;
+    }
+
+    return adapter.getResourcePath(assetPath);
   }
 
   private applyInputPanelThemeState(): void {

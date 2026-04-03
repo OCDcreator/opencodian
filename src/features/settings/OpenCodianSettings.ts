@@ -2848,21 +2848,22 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     }
 
     const inputControlsEl = inputGroupEl.createDiv({ cls: 'opencodian-style-input-controls' });
+    this.addNumericStyleControl(inputControlsEl, {
+      group: 'input',
+      name: t('settings.style.input.radius.name'),
+      desc: t('settings.style.input.radius.desc'),
+      min: 8,
+      max: 24,
+      step: 1,
+      unit: 'px',
+      value: () => this.plugin.settings.chatAppearance.input.radius,
+      resetValue: () => this.plugin.getChatAppearanceBaseline().input.radius,
+      setValue: (appearance, value) => {
+        appearance.input.radius = value;
+      },
+    });
+
     if (isPresetInputPanelTheme) {
-      this.addNumericStyleControl(inputControlsEl, {
-        group: 'input',
-        name: t('settings.style.input.radius.name'),
-        desc: t('settings.style.input.radius.desc'),
-        min: 8,
-        max: 24,
-        step: 1,
-        unit: 'px',
-        value: () => this.plugin.settings.chatAppearance.input.radius,
-        resetValue: () => this.plugin.getChatAppearanceBaseline().input.radius,
-        setValue: (appearance, value) => {
-          appearance.input.radius = value;
-        },
-      });
       this.addNumericStyleControl(inputControlsEl, {
         group: 'input',
         name: t('settings.style.input.backgroundOpacity.name'),
@@ -2970,13 +2971,36 @@ export class OpenCodianSettingTab extends PluginSettingTab {
           .setDesc(paramDef.descKey ? t(paramDef.descKey as TranslationKey) : '')
           .addDropdown((dropdown) => {
             for (const option of paramDef.options ?? []) {
-              dropdown.addOption(option.value, option.label);
+              dropdown.addOption(
+                option.value,
+                option.labelKey ? t(option.labelKey as TranslationKey) : (option.label ?? option.value),
+              );
             }
 
             dropdown
               .setValue(String(adapterSettings[paramDef.key] ?? paramDef.defaultValue))
               .onChange((value) => {
                 this.updateLiquidGlassAdapterSetting(adapterId, paramDef.key, value);
+                void this.plugin.saveSettings({
+                  syncService: false,
+                  reloadModels: false,
+                  syncConfig: false,
+                  applyUi: true,
+                });
+              });
+          });
+        continue;
+      }
+
+      if (paramDef.type === 'text') {
+        new Setting(containerEl)
+          .setName(t(paramDef.labelKey as TranslationKey))
+          .setDesc(paramDef.descKey ? t(paramDef.descKey as TranslationKey) : '')
+          .addText((text) => {
+            text
+              .setValue(String(adapterSettings[paramDef.key] ?? paramDef.defaultValue ?? ''))
+              .onChange((value) => {
+                this.updateLiquidGlassAdapterSetting(adapterId, paramDef.key, value.trim());
                 void this.plugin.saveSettings({
                   syncService: false,
                   reloadModels: false,

@@ -12,6 +12,50 @@
 
 ---
 
+## 2026-04-03 Nikdelvin Liquid Glass Demo 纹理预设、资源路径修复与 hover 稳定性
+
+### 🎯 改动目标
+
+- 让 `Nikdelvin Liquid Glass` 输入区默认更接近参考 demo，而不是首次启用时只剩纯黑 overlay。
+- 在设置里补齐 demo 的 `Background / Lines / Rocks / Chrome / Silk` 纹理预设，并确保这些资源在 Obsidian 插件环境中真的能加载。
+- 修复输入区玻璃在底部覆盖层空白区域发生 hover 穿透时，把下方助手卡片 hover 高光折射进输入区顶部的闪烁问题。
+
+### ✅ 本轮调整
+
+- `src/core/types/settings.ts`
+- `src/main.ts`
+- `src/utils/glass/adapters/nikdelvin.ts`
+  - 将 `Nikdelvin` 默认参数改为更接近原版组件：保留原版 overlay / tint / box-shadow 路径，默认关闭 OpenCodian 自定义光效
+  - 将默认 demo 纹理预设从 `none` 调整为 `background`
+  - 为旧的 `Nikdelvin` 默认配置补一层迁移判断，让刚好还停留在旧默认值的本地设置也能自动切到新的默认背景预设
+  - 暴露并接通原版可调项与可开关项，包括背景 URL、freeze、button、inline、noMorph、color 与 demo 纹理预设
+
+- `src/features/settings/OpenCodianSettings.ts`
+- `src/i18n/locales/en.ts`
+- `src/i18n/locales/zh.ts`
+- `src/utils/glass/types.ts`
+  - 让 Liquid Glass 设置面板支持 `select / text / toggle / slider` 混合渲染
+  - 在 `Nikdelvin` 分支中补齐预设纹理、原版背景 URL 和其它原版选项的设置项
+  - 让输入区继承圆角这类真实生效项继续在所有输入区样式分支中可见
+
+- `src/features/chat/OpenCodianView.ts`
+- `scripts/build.mjs`
+- `assets/liquid-glass/nikdelvin/*`
+  - 将 Nikdelvin demo 纹理资源打包进插件构建产物
+  - 修复插件内置纹理资源路径，改为通过 Obsidian 资源路径加载，而不是错误的重复插件目录 / `file://` 路径
+  - 让 `Background / Lines / Rocks / Chrome / Silk` 在 Obsidian 里实际可见，而不再只剩黑色玻璃层
+
+- `styles.css`
+  - 在启用 liquid-glass 输入区时，让底部输入区 overlay 自己接住鼠标，避免 hover 穿透到底下助手消息卡片
+  - 修复因为助手消息 hover 态被输入区实时折射而导致的顶部高光忽隐忽现问题
+
+### 🧪 当前验证
+
+- 已通过：`npm run check:devlog-order`
+- 已通过：`npm run build`
+- 已完成：部署 `dist/main.js`、`dist/manifest.json`、`dist/styles.css` 与 `dist/assets/` 到 Test Vault
+- 已验证：Test Vault `BUILD_ID = main.202604031649`
+
 ## 2026-04-03 会话输入区操作按钮样式与发送提示中文化
 
 ### 🎯 改动目标

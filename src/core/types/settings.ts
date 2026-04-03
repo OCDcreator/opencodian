@@ -632,8 +632,16 @@ export function getDefaultInputPanelLiquidGlassSettings(): InputPanelLiquidGlass
     nikdelvin: {
       depth: 10,
       strength: 100,
-      chromaticAberration: 2,
+      chromaticAberration: 0,
       blur: 0,
+      backgroundPreset: 'background',
+      color: 'transparent',
+      background: '',
+      freeze: false,
+      noMorph: false,
+      button: false,
+      inline: false,
+      customEffects: false,
     },
     rdev: {
       mode: 'standard',
@@ -834,21 +842,68 @@ export function normalizeInputPanelLiquidGlassSettings(
       ),
     },
     nikdelvin: {
-      depth: normalizeFiniteNumber(
+      depth: normalizeFiniteNumberInRange(
         nikdelvin.depth,
         defaults.nikdelvin.depth as number,
+        0,
+        40,
       ),
-      strength: normalizeFiniteNumber(
+      strength: normalizeFiniteNumberInRange(
         nikdelvin.strength,
         defaults.nikdelvin.strength as number,
+        0,
+        200,
       ),
-      chromaticAberration: normalizeFiniteNumber(
+      chromaticAberration: normalizeFiniteNumberInRange(
         nikdelvin.chromaticAberration,
         defaults.nikdelvin.chromaticAberration as number,
+        0,
+        10,
       ),
-      blur: normalizeFiniteNumber(
+      blur: normalizeFiniteNumberInRange(
         nikdelvin.blur,
         defaults.nikdelvin.blur as number,
+        0,
+        10,
+      ),
+      backgroundPreset:
+        nikdelvin.backgroundPreset === 'background'
+        || nikdelvin.backgroundPreset === 'lines'
+        || nikdelvin.backgroundPreset === 'rocks'
+        || nikdelvin.backgroundPreset === 'chrome'
+        || nikdelvin.backgroundPreset === 'silk'
+        || nikdelvin.backgroundPreset === 'none'
+          ? nikdelvin.backgroundPreset
+          : defaults.nikdelvin.backgroundPreset,
+      color:
+        nikdelvin.color === 'black'
+        || nikdelvin.color === 'white'
+        || nikdelvin.color === 'transparent'
+          ? nikdelvin.color
+          : defaults.nikdelvin.color,
+      background:
+        typeof nikdelvin.background === 'string'
+          ? nikdelvin.background.trim()
+          : defaults.nikdelvin.background,
+      freeze: normalizeBoolean(
+        nikdelvin.freeze,
+        defaults.nikdelvin.freeze as boolean,
+      ),
+      noMorph: normalizeBoolean(
+        nikdelvin.noMorph,
+        defaults.nikdelvin.noMorph as boolean,
+      ),
+      button: normalizeBoolean(
+        nikdelvin.button,
+        defaults.nikdelvin.button as boolean,
+      ),
+      inline: normalizeBoolean(
+        nikdelvin.inline,
+        defaults.nikdelvin.inline as boolean,
+      ),
+      customEffects: normalizeBoolean(
+        nikdelvin.customEffects,
+        defaults.nikdelvin.customEffects as boolean,
       ),
     },
     rdev: {

@@ -66,6 +66,54 @@ import { registerBuiltinGlassAdapters } from './utils/glass';
 const logger = createLogger('OpenCodian');
 const INPUT_PANEL_GLASS_REFRACTION_GLASS_DEFAULTS_VERSION = 2;
 
+function isLegacyNikdelvinDefaultProfile(value: unknown): boolean {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  const candidate = value as Record<string, unknown>;
+  const keys = Object.keys(candidate);
+  const legacyKeys = ['depth', 'strength', 'chromaticAberration', 'blur'];
+  const hasOnlyLegacyKeys = keys.every((key) => legacyKeys.includes(key));
+  const transitionalKeys = [
+    'depth',
+    'strength',
+    'chromaticAberration',
+    'blur',
+    'backgroundPreset',
+    'color',
+    'background',
+    'freeze',
+    'noMorph',
+    'button',
+    'inline',
+    'customEffects',
+  ];
+  const hasOnlyTransitionalKeys = keys.every((key) => transitionalKeys.includes(key));
+
+  const matchesLegacyProfile = hasOnlyLegacyKeys
+    && candidate.depth === 10
+    && candidate.strength === 100
+    && candidate.chromaticAberration === 2
+    && candidate.blur === 0;
+
+  const matchesTransitionalProfile = hasOnlyTransitionalKeys
+    && candidate.depth === 10
+    && candidate.strength === 100
+    && candidate.chromaticAberration === 0
+    && candidate.blur === 0
+    && candidate.backgroundPreset === 'none'
+    && candidate.color === 'transparent'
+    && candidate.background === ''
+    && candidate.freeze === false
+    && candidate.noMorph === false
+    && candidate.button === false
+    && candidate.inline === false
+    && candidate.customEffects === false;
+
+  return matchesLegacyProfile || matchesTransitionalProfile;
+}
+
 // BUILD_ID is injected at build time via esbuild define
 declare const BUILD_ID: string;
 
@@ -451,9 +499,19 @@ export default class OpenCodianPlugin extends Plugin {
     const normalizedInputPanelGlassRefractionSvgFilter = normalizeInputPanelGlassRefractionSvgFilterSettings(
       savedSettings?.inputPanelGlassRefractionSvgFilter,
     );
-    const normalizedInputPanelLiquidGlass = normalizeInputPanelLiquidGlassSettings(
+    const normalizedInputPanelLiquidGlassBase = normalizeInputPanelLiquidGlassSettings(
       savedSettings?.inputPanelLiquidGlass,
     );
+    const defaultInputPanelLiquidGlass = getDefaultInputPanelLiquidGlassSettings();
+    const shouldResetNikdelvinDefaults = isLegacyNikdelvinDefaultProfile(
+      savedSettings?.inputPanelLiquidGlass?.nikdelvin,
+    );
+    const normalizedInputPanelLiquidGlass = shouldResetNikdelvinDefaults
+      ? {
+          ...normalizedInputPanelLiquidGlassBase,
+          nikdelvin: { ...defaultInputPanelLiquidGlass.nikdelvin },
+        }
+      : normalizedInputPanelLiquidGlassBase;
 
     const normalizedSettings = savedSettings
       ? (() => {

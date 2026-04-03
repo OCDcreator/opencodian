@@ -2297,6 +2297,11 @@
   pointer-events: auto;
 }
 
+/* Keep liquid-glass backdrop stable instead of letting hover leak through to messages beneath it. */
+.opencodian-input-area:has(.opencodian-composer-shell--liquid-glass) {
+  pointer-events: auto;
+}
+
 .opencodian-composer-shell {
   position: relative;
   display: flex;
@@ -2345,6 +2350,12 @@
   --opencodian-gr-specular-duration: 5s;
   background: transparent;
   transform: none;
+}
+
+.opencodian-composer-shell--liquid-glass {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: none;
 }
 
 .opencodian-composer-shell--gr-glass .opencodian-input-wrapper,
