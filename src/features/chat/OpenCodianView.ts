@@ -5032,11 +5032,15 @@ export class OpenCodianView extends ItemView {
 
         streamTimedOut = true;
         streamInterrupted = true;
-        latestErrorMessage = this.getFriendlyStreamErrorMessage('Response timeout');
-        logger.warn('Stream idle timeout, forcing state reset');
+        logger.warn('Stream idle timeout reached, detaching local stream and continuing background sync', {
+          conversationId: sendingConversation.id,
+          sessionId: sendingConversation.openCodeSessionId,
+          timeoutMs: STREAM_IDLE_TIMEOUT_MS,
+          hasVisibleAssistantContent: Boolean(streamController?.getContentBlocks().length),
+        });
 
-        sendingRuntime.streamController?.timeoutStream();
-        this.plugin.openCodeService.cancelStream(sendingConversation.openCodeSessionId);
+        sendingRuntime.streamController?.cancelStream();
+        this.plugin.openCodeService.detachStream(sendingConversation.openCodeSessionId);
         resetStreamingState();
       }, STREAM_IDLE_TIMEOUT_MS);
     };

@@ -1123,6 +1123,50 @@ describe('OpenCodeService', () => {
       }
     });
 
+    it('does not call session.abort when detachStream is invoked during an SDK stream', async () => {
+      service = createServiceWithSdkFlags();
+      service.setSessionId('test-session');
+
+      mockSdkClient.session.promptAsync.mockResolvedValue({});
+      mockSdkClient.event.subscribe.mockResolvedValue({
+        stream: (async function* () {
+          yield {
+            type: 'message.part.updated',
+            properties: {
+              sessionID: 'test-session',
+              part: {
+                id: 'part-1',
+                type: 'text',
+              },
+            },
+          };
+          yield {
+            type: 'message.part.delta',
+            properties: {
+              sessionID: 'test-session',
+              partID: 'part-1',
+              field: 'text',
+              delta: 'Hello',
+            },
+          };
+          await new Promise(() => {});
+        })(),
+      });
+
+      const iterator = service.sendMessage('Hello', { sessionId: 'test-session' });
+      await iterator.next();
+      await iterator.next();
+
+      service.detachStream();
+      await Promise.resolve();
+
+      expect(mockSdkClient.session.abort).not.toHaveBeenCalled();
+
+      if (iterator.return) {
+        await iterator.return(undefined);
+      }
+    });
+
     it('emits final assistant metadata from SDK stream completion', async () => {
       service = createServiceWithSdkFlags();
       service.setSessionId('test-session');

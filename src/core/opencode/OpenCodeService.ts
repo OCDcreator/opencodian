@@ -643,6 +643,25 @@ export class OpenCodeService {
     void this.abortSessionOnServer(targetSessionId);
   }
 
+  /** Stop watching the current stream locally without aborting the server-side session */
+  detachStream(sessionId?: string): void {
+    const targetSessionId = sessionId ?? this.currentSessionId;
+    if (!targetSessionId) {
+      logger.debug('No session specified for local stream detach');
+      return;
+    }
+
+    const streamContext = this.activeStreams.get(targetSessionId);
+    if (!streamContext) {
+      logger.debug(`No active stream to detach for session ${targetSessionId}`);
+      return;
+    }
+
+    logger.debug(`Detaching local stream listener for session ${targetSessionId}...`);
+    streamContext.abortController.abort();
+    logger.debug('Local stream detach signal sent');
+  }
+
   /** List all sessions */
   async listSessions(): Promise<Session[]> {
     if (this.shouldUseSdk('sdkCrud')) {
