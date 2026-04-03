@@ -330,6 +330,7 @@ interface TabRuntimeState {
   currentTurnBodyEl: HTMLElement | null;
   isConversationSyncInFlight: boolean;
   lastConversationSyncFingerprint: string | null;
+  lastInterruptedSyncPreservationLogFingerprint: string | null;
   sessionTodoSessionId: string | null;
   sessionTodos: SessionTodo[];
   sessionTodoFingerprint: string | null;
@@ -485,6 +486,7 @@ export class OpenCodianView extends ItemView {
       currentTurnBodyEl: null,
       isConversationSyncInFlight: false,
       lastConversationSyncFingerprint: null,
+      lastInterruptedSyncPreservationLogFingerprint: null,
       sessionTodoSessionId: null,
       sessionTodos: [],
       sessionTodoFingerprint: null,
@@ -4404,6 +4406,24 @@ export class OpenCodianView extends ItemView {
       .join('|');
   }
 
+  private getInterruptedSyncPreservationLogFingerprint(
+    conversation: Conversation,
+    messages: ChatMessage[],
+  ): string {
+    return JSON.stringify({
+      conversationId: conversation.id,
+      sessionId: conversation.openCodeSessionId,
+      messages: messages.map((message) => ({
+        id: message.id,
+        sourceMessageId: message.sourceMessageId ?? null,
+        streamState: message.streamState ?? null,
+        timestamp: message.timestamp,
+        content: message.content,
+        contentBlocks: message.contentBlocks ?? [],
+      })),
+    });
+  }
+
   private getConversationVisualFingerprint(messages: ChatMessage[]): string {
     return messages
       .map((message) => this.getMessageVisualSignature(message))
@@ -7445,7 +7465,14 @@ export class OpenCodianView extends ItemView {
       const preservedInterruptedMessages = preservedClientOnlyMessages.filter(
         (message) => message.streamState === 'interrupted',
       );
-      if (preservedInterruptedMessages.length > 0) {
+      const runtime = this.getTabRuntimeState(tabId);
+      const preservedInterruptedLogFingerprint = preservedInterruptedMessages.length > 0
+        ? this.getInterruptedSyncPreservationLogFingerprint(conversation, preservedInterruptedMessages)
+        : null;
+      if (
+        preservedInterruptedMessages.length > 0
+        && (!runtime || runtime.lastInterruptedSyncPreservationLogFingerprint !== preservedInterruptedLogFingerprint)
+      ) {
         logger.debug(`Preserving local interrupted assistant message(s) during conversation sync: ${this.stringifyLogPayload({
           conversationId: conversation.id,
           sessionId: conversation.openCodeSessionId,
@@ -7457,6 +7484,9 @@ export class OpenCodianView extends ItemView {
             contentBlockCount: message.contentBlocks?.length ?? 0,
           })),
         })}`);
+      }
+      if (runtime) {
+        runtime.lastInterruptedSyncPreservationLogFingerprint = preservedInterruptedLogFingerprint;
       }
       const merged = [...converted, ...preservedClientOnlyMessages]
         .sort((left, right) => left.timestamp - right.timestamp);
