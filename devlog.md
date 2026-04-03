@@ -12,6 +12,54 @@
 
 ---
 
+## 2026-04-03 `shuding` 矩形玻璃面板参数化与独立调试
+
+### 🎯 改动目标
+
+- 让 `shuding` Liquid Glass 不再被固定成一套“胶囊感”效果，而是按矩形玻璃面板思路单独调校。
+- 在设置页把折射、角落、光照、滤镜这些效果拆成独立项目，方便逐项开关和判断。
+- 保证这些调整只影响 `shuding` adapter，不串到 `nikdelvin`、`rdev` 或共享输入区样式。
+
+### ✅ 本轮调整
+
+- `src/utils/glass/adapters/shuding.ts`
+- `src/utils/glass/types.ts`
+- `src/core/types/settings.ts`
+  - 为 `shuding` 新增矩形面板相关参数与默认值，包括：
+    - 自适应 SDF / 自适应混合
+    - 矩形边缘折射 / 折射强度
+    - 角落增强 / 角落强度
+    - 边缘带宽
+    - 桶形畸变 / 桶形强度
+    - 顶部高光、内框线、底部暗线、内凹阴影及对应强度
+    - blur / contrast / brightness / saturate / displacement
+  - 扩展 Liquid Glass 参数类型，允许保存 boolean 配置与说明字段
+  - 为新增参数补齐默认值与归一化范围
+
+- `src/features/settings/OpenCodianSettings.ts`
+- `styles.css`
+  - 为 Liquid Glass 输入区设置面板补上分组标题
+  - 为每个 `shuding` 项目显示更易懂的说明文字
+  - 让之前只有开关的效果继续保留 toggle，同时补对应强度滑块，便于“先开关再细调”
+
+- `src/i18n/locales/en.ts`
+- `src/i18n/locales/zh.ts`
+  - 补齐 `shuding` 新参数的中英文标题与浅显说明
+
+- `src/utils/glass/adapters/shuding.ts`
+  - 将矩形玻璃逻辑改为以真实宽高比和圆角驱动的自适应 SDF
+  - 折射改为以边缘窄带为主、四角可加强，中心保持更清晰
+  - 光照改为顶部高光线、内框线、底部暗线和可选内凹阴影的组合
+  - backdrop filter 改为可单独调整 blur / contrast / brightness / saturate
+  - 修复切换折射相关参数时位移贴图不立即重算的问题，避免设置看起来“没反应”
+
+### 🧪 当前验证
+
+- 已通过：`npm run build`
+- 已通过：`npm run check:devlog-order`
+- 已完成：部署 `dist/main.js`、`dist/manifest.json`、`dist/styles.css` 到 Test Vault
+- 已验证：Test Vault `BUILD_ID = main.202604031428`
+
 ## 2026-04-01 输入区预设透明度与 Glass Refraction 自定义
 
 ### 🎯 改动目标

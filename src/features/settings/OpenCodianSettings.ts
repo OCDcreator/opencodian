@@ -2912,10 +2912,41 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     }
 
     const adapterSettings = this.plugin.settings.inputPanelLiquidGlass[adapterId];
+    let activeSectionLabelKey: TranslationKey | null = null;
     for (const paramDef of adapter.paramDefs) {
+      if (paramDef.sectionLabelKey && paramDef.sectionLabelKey !== activeSectionLabelKey) {
+        activeSectionLabelKey = paramDef.sectionLabelKey as TranslationKey;
+        containerEl.createEl('h5', {
+          cls: 'opencodian-style-subgroup-title',
+          text: t(activeSectionLabelKey),
+        });
+      }
+
+      if (paramDef.type === 'toggle') {
+        new Setting(containerEl)
+          .setName(t(paramDef.labelKey as TranslationKey))
+          .setDesc(paramDef.descKey ? t(paramDef.descKey as TranslationKey) : '')
+          .setClass('opencodian-style-setting')
+          .addToggle((toggle) => {
+            toggle
+              .setValue(Boolean(adapterSettings[paramDef.key] ?? paramDef.defaultValue))
+              .onChange((value) => {
+                this.updateLiquidGlassAdapterSetting(adapterId, paramDef.key, value);
+                void this.plugin.saveSettings({
+                  syncService: false,
+                  reloadModels: false,
+                  syncConfig: false,
+                  applyUi: true,
+                });
+              });
+          });
+        continue;
+      }
+
       if (paramDef.type === 'select') {
         new Setting(containerEl)
           .setName(t(paramDef.labelKey as TranslationKey))
+          .setDesc(paramDef.descKey ? t(paramDef.descKey as TranslationKey) : '')
           .addDropdown((dropdown) => {
             for (const option of paramDef.options ?? []) {
               dropdown.addOption(option.value, option.label);
@@ -2938,7 +2969,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
 
       this.addNumericControl(containerEl, {
         name: t(paramDef.labelKey as TranslationKey),
-        desc: '',
+        desc: paramDef.descKey ? t(paramDef.descKey as TranslationKey) : '',
         min: paramDef.min ?? 0,
         max: paramDef.max ?? 100,
         step: paramDef.step ?? 1,
@@ -2961,7 +2992,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
   private updateLiquidGlassAdapterSetting(
     adapterId: LiquidGlassAdapterId,
     key: string,
-    value: number | string,
+    value: number | string | boolean,
   ): void {
     this.plugin.settings.inputPanelLiquidGlass = {
       ...this.plugin.settings.inputPanelLiquidGlass,

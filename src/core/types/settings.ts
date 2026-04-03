@@ -426,9 +426,9 @@ export interface InputPanelGlassRefractionSvgFilterSettings {
 }
 
 export interface InputPanelLiquidGlassSettings {
-  shuding: Record<string, number | string>;
-  nikdelvin: Record<string, number | string>;
-  rdev: Record<string, number | string>;
+  shuding: Record<string, number | string | boolean>;
+  nikdelvin: Record<string, number | string | boolean>;
+  rdev: Record<string, number | string | boolean>;
 }
 
 export interface ChatAppearanceScrollbarSettings {
@@ -552,6 +552,10 @@ function normalizeFiniteNumber(value: unknown, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
 }
 
+function normalizeBoolean(value: unknown, fallback: boolean): boolean {
+  return typeof value === 'boolean' ? value : fallback;
+}
+
 export function getDefaultInputPanelGlassRefractionSettings(): InputPanelGlassRefractionSettings {
   return {
     glass: {
@@ -587,7 +591,28 @@ export function getDefaultInputPanelLiquidGlassSettings(): InputPanelLiquidGlass
   return {
     shuding: {
       displacementScale: 10,
-      blurAmount: 0.25,
+      blurAmount: 0.3,
+      adaptiveSdf: true,
+      adaptiveSdfMix: 1,
+      rectEdgeRefraction: true,
+      rectEdgeRefractionStrength: 1,
+      cornerEnhancement: true,
+      cornerEnhancementStrength: 1,
+      edgeBandWidth: 0.08,
+      barrelDistortion: false,
+      barrelStrength: 0.03,
+      topHighlight: true,
+      topHighlightOpacity: 0.6,
+      innerBorder: true,
+      innerBorderOpacity: 0.2,
+      bottomShadow: true,
+      bottomShadowOpacity: 0.08,
+      insetDepthShadow: false,
+      insetDepthShadowOpacity: 0.12,
+      insetShadowBlur: 10,
+      contrastBoost: 1.25,
+      brightnessBoost: 1.05,
+      saturateBoost: 1.1,
     },
     nikdelvin: {
       depth: 10,
@@ -681,6 +706,116 @@ export function normalizeInputPanelLiquidGlassSettings(
       blurAmount: normalizeFiniteNumber(
         shuding.blurAmount,
         defaults.shuding.blurAmount as number,
+      ),
+      adaptiveSdf: normalizeBoolean(
+        shuding.adaptiveSdf,
+        defaults.shuding.adaptiveSdf as boolean,
+      ),
+      adaptiveSdfMix: normalizeFiniteNumberInRange(
+        shuding.adaptiveSdfMix,
+        defaults.shuding.adaptiveSdfMix as number,
+        0,
+        1,
+      ),
+      rectEdgeRefraction: normalizeBoolean(
+        shuding.rectEdgeRefraction,
+        defaults.shuding.rectEdgeRefraction as boolean,
+      ),
+      rectEdgeRefractionStrength: normalizeFiniteNumberInRange(
+        shuding.rectEdgeRefractionStrength,
+        defaults.shuding.rectEdgeRefractionStrength as number,
+        0,
+        2,
+      ),
+      cornerEnhancement: normalizeBoolean(
+        shuding.cornerEnhancement,
+        defaults.shuding.cornerEnhancement as boolean,
+      ),
+      cornerEnhancementStrength: normalizeFiniteNumberInRange(
+        shuding.cornerEnhancementStrength,
+        defaults.shuding.cornerEnhancementStrength as number,
+        0,
+        2,
+      ),
+      edgeBandWidth: normalizeFiniteNumberInRange(
+        shuding.edgeBandWidth,
+        defaults.shuding.edgeBandWidth as number,
+        0.02,
+        0.2,
+      ),
+      barrelDistortion: normalizeBoolean(
+        shuding.barrelDistortion,
+        defaults.shuding.barrelDistortion as boolean,
+      ),
+      barrelStrength: normalizeFiniteNumberInRange(
+        shuding.barrelStrength,
+        defaults.shuding.barrelStrength as number,
+        0,
+        0.1,
+      ),
+      topHighlight: normalizeBoolean(
+        shuding.topHighlight,
+        defaults.shuding.topHighlight as boolean,
+      ),
+      topHighlightOpacity: normalizeFiniteNumberInRange(
+        shuding.topHighlightOpacity,
+        defaults.shuding.topHighlightOpacity as number,
+        0,
+        1,
+      ),
+      innerBorder: normalizeBoolean(
+        shuding.innerBorder,
+        defaults.shuding.innerBorder as boolean,
+      ),
+      innerBorderOpacity: normalizeFiniteNumberInRange(
+        shuding.innerBorderOpacity,
+        defaults.shuding.innerBorderOpacity as number,
+        0,
+        1,
+      ),
+      bottomShadow: normalizeBoolean(
+        shuding.bottomShadow,
+        defaults.shuding.bottomShadow as boolean,
+      ),
+      bottomShadowOpacity: normalizeFiniteNumberInRange(
+        shuding.bottomShadowOpacity,
+        defaults.shuding.bottomShadowOpacity as number,
+        0,
+        1,
+      ),
+      insetDepthShadow: normalizeBoolean(
+        shuding.insetDepthShadow,
+        defaults.shuding.insetDepthShadow as boolean,
+      ),
+      insetDepthShadowOpacity: normalizeFiniteNumberInRange(
+        shuding.insetDepthShadowOpacity,
+        defaults.shuding.insetDepthShadowOpacity as number,
+        0,
+        1,
+      ),
+      insetShadowBlur: normalizeFiniteNumberInRange(
+        shuding.insetShadowBlur,
+        defaults.shuding.insetShadowBlur as number,
+        5,
+        30,
+      ),
+      contrastBoost: normalizeFiniteNumberInRange(
+        shuding.contrastBoost,
+        defaults.shuding.contrastBoost as number,
+        1,
+        1.5,
+      ),
+      brightnessBoost: normalizeFiniteNumberInRange(
+        shuding.brightnessBoost,
+        defaults.shuding.brightnessBoost as number,
+        1,
+        1.2,
+      ),
+      saturateBoost: normalizeFiniteNumberInRange(
+        shuding.saturateBoost,
+        defaults.shuding.saturateBoost as number,
+        1,
+        1.3,
       ),
     },
     nikdelvin: {

@@ -4013,6 +4013,20 @@
   line-height: 1.45;
 }
 
+.opencodian-style-subgroup-title {
+  margin: 16px 0 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.opencodian-style-group-body > .opencodian-style-subgroup-title:first-child,
+.opencodian-style-input-controls > .opencodian-style-subgroup-title:first-child {
+  margin-top: 0;
+}
+
 .opencodian-theme-presets {
   gap: 14px;
 }

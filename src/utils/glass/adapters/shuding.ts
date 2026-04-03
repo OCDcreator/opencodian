@@ -9,13 +9,57 @@ const XLINK_NS = 'http://www.w3.org/1999/xlink';
 const FILTER_ID_PREFIX = 'opencodian-lg-shuding-';
 const FILTER_OWNER_DATASET_KEY = 'opencodianLgShudingOwner';
 const DEFAULT_DISPLACEMENT_SCALE = 10;
-const DEFAULT_BLUR_AMOUNT = 0.25;
+const DEFAULT_BLUR_AMOUNT = 0.3;
+const DISPLACEMENT_SCALE_BASELINE = 10;
+const DISPLACEMENT_SCALE_FACTOR = 0.45;
 const DISPLACEMENT_MAP_RESULT = 'shuding-displacement-map';
 const EPSILON = 1e-3;
+const SHELL_DATASET_KEYS = ['opencodianLgShuding'] as const;
+const FILTER_LAYER_DATASET_KEYS = [
+  FILTER_OWNER_DATASET_KEY,
+  'opencodianLgShudingUrlSupported',
+] as const;
+const SHELL_STYLE_PROPERTIES = [
+  'background',
+  'backdrop-filter',
+  '-webkit-backdrop-filter',
+  'transform-origin',
+  'will-change',
+] as const;
+const FILTER_LAYER_STYLE_PROPERTIES = [
+  'opacity',
+  'background',
+  'backdrop-filter',
+  '-webkit-backdrop-filter',
+  'box-shadow',
+  'transform-origin',
+  'will-change',
+] as const;
 
 interface ShudingSettings {
+  adaptiveSdf: boolean;
+  adaptiveSdfMix: number;
+  rectEdgeRefraction: boolean;
+  rectEdgeRefractionStrength: number;
+  cornerEnhancement: boolean;
+  cornerEnhancementStrength: number;
+  edgeBandWidth: number;
+  barrelDistortion: boolean;
+  barrelStrength: number;
+  topHighlight: boolean;
+  topHighlightOpacity: number;
+  innerBorder: boolean;
+  innerBorderOpacity: number;
+  bottomShadow: boolean;
+  bottomShadowOpacity: number;
+  insetDepthShadow: boolean;
+  insetDepthShadowOpacity: number;
+  insetShadowBlur: number;
   displacementScale: number;
   blurAmount: number;
+  contrastBoost: number;
+  brightnessBoost: number;
+  saturateBoost: number;
 }
 
 interface ShudingSize {
@@ -27,6 +71,10 @@ interface ShudingSize {
 }
 
 interface ShudingState {
+  ctx: GlassMountContext;
+  shellEl: HTMLElement;
+  filterLayerEl: HTMLElement;
+  svgRootEl: SVGSVGElement;
   filterId: string;
   defsEl: SVGDefsElement;
   filterEl: SVGFilterElement;
@@ -38,12 +86,29 @@ interface ShudingState {
   resizeFrame: number | null;
   settings: ShudingSettings;
   size: ShudingSize;
+  baseDisplacementScale: number;
+  shellDatasetSnapshot: Record<string, string | undefined>;
+  filterLayerDatasetSnapshot: Record<string, string | undefined>;
+  shellStyleSnapshot: Record<string, string>;
+  filterLayerStyleSnapshot: Record<string, string>;
+  supportsBackdropFilterUrl: boolean;
+}
+
+interface ShudingPanelGeometry {
+  halfWidth: number;
+  halfHeight: number;
+  radius: number;
 }
 
 const states = new WeakMap<HTMLElement, ShudingState>();
+let cachedBackdropFilterUrlSupport: boolean | null = null;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
+}
+
+function lerp(start: number, end: number, amount: number): number {
+  return start + (end - start) * amount;
 }
 
 function smoothStep(edge0: number, edge1: number, value: number): number {
@@ -80,10 +145,38 @@ function readNumberSetting(
   return Number.isFinite(numericValue) ? clamp(numericValue, min, max) : fallback;
 }
 
+function readBooleanSetting(
+  value: GlassAdapterSettingsValue | undefined,
+  fallback: boolean,
+): boolean {
+  return typeof value === 'boolean' ? value : fallback;
+}
+
 function resolveSettings(settings: Record<string, GlassAdapterSettingsValue>): ShudingSettings {
   return {
+    adaptiveSdf: readBooleanSetting(settings.adaptiveSdf, true),
+    adaptiveSdfMix: readNumberSetting(settings.adaptiveSdfMix, 1, 0, 1),
+    rectEdgeRefraction: readBooleanSetting(settings.rectEdgeRefraction, true),
+    rectEdgeRefractionStrength: readNumberSetting(settings.rectEdgeRefractionStrength, 1, 0, 2),
+    cornerEnhancement: readBooleanSetting(settings.cornerEnhancement, true),
+    cornerEnhancementStrength: readNumberSetting(settings.cornerEnhancementStrength, 1, 0, 2),
+    edgeBandWidth: readNumberSetting(settings.edgeBandWidth, 0.08, 0.02, 0.2),
+    barrelDistortion: readBooleanSetting(settings.barrelDistortion, false),
+    barrelStrength: readNumberSetting(settings.barrelStrength, 0.03, 0, 0.1),
+    topHighlight: readBooleanSetting(settings.topHighlight, true),
+    topHighlightOpacity: readNumberSetting(settings.topHighlightOpacity, 0.6, 0, 1),
+    innerBorder: readBooleanSetting(settings.innerBorder, true),
+    innerBorderOpacity: readNumberSetting(settings.innerBorderOpacity, 0.2, 0, 1),
+    bottomShadow: readBooleanSetting(settings.bottomShadow, true),
+    bottomShadowOpacity: readNumberSetting(settings.bottomShadowOpacity, 0.08, 0, 1),
+    insetDepthShadow: readBooleanSetting(settings.insetDepthShadow, false),
+    insetDepthShadowOpacity: readNumberSetting(settings.insetDepthShadowOpacity, 0.12, 0, 1),
+    insetShadowBlur: readNumberSetting(settings.insetShadowBlur, 10, 5, 30),
     displacementScale: readNumberSetting(settings.displacementScale, DEFAULT_DISPLACEMENT_SCALE, 0, 40),
     blurAmount: readNumberSetting(settings.blurAmount, DEFAULT_BLUR_AMOUNT, 0, 4),
+    contrastBoost: readNumberSetting(settings.contrastBoost, 1.25, 1, 1.5),
+    brightnessBoost: readNumberSetting(settings.brightnessBoost, 1.05, 1, 1.2),
+    saturateBoost: readNumberSetting(settings.saturateBoost, 1.1, 1, 1.3),
   };
 }
 
@@ -120,29 +213,153 @@ function generateFilterId(): string {
   return `${FILTER_ID_PREFIX}${entropy}`;
 }
 
-function buildBackdropFilterValue(filterId: string, blurAmount: number): string {
-  const blurValue = blurAmount.toFixed(2).replace(/\.?0+$/, '');
-  return `url(#${filterId}) blur(${blurValue}px) saturate(1.08) brightness(1.03)`;
+function captureDatasetSnapshot(
+  el: HTMLElement,
+  keys: readonly string[],
+): Record<string, string | undefined> {
+  return Object.fromEntries(keys.map((key) => [key, el.dataset[key]]));
 }
 
-function applyFilterLayerStyles(filterLayerEl: HTMLElement, filterId: string, blurAmount: number): void {
-  const style = filterLayerEl.style as CSSStyleDeclaration & { webkitBackdropFilter: string };
-  const filterValue = buildBackdropFilterValue(filterId, blurAmount);
+function restoreDatasetSnapshot(
+  el: HTMLElement,
+  snapshot: Record<string, string | undefined>,
+): void {
+  Object.entries(snapshot).forEach(([key, value]) => {
+    if (value === undefined) {
+      delete el.dataset[key];
+      return;
+    }
 
-  style.backdropFilter = filterValue;
-  style.webkitBackdropFilter = filterValue;
-  filterLayerEl.dataset[FILTER_OWNER_DATASET_KEY] = filterId;
+    el.dataset[key] = value;
+  });
 }
 
-function clearFilterLayerStyles(filterLayerEl: HTMLElement, filterId: string): void {
-  if (filterLayerEl.dataset[FILTER_OWNER_DATASET_KEY] !== filterId) {
-    return;
+function captureStyleSnapshot(
+  el: HTMLElement,
+  properties: readonly string[],
+): Record<string, string> {
+  return Object.fromEntries(properties.map((property) => [property, el.style.getPropertyValue(property)]));
+}
+
+function restoreStyleSnapshot(el: HTMLElement, snapshot: Record<string, string>): void {
+  Object.entries(snapshot).forEach(([property, value]) => {
+    if (value) {
+      el.style.setProperty(property, value);
+      return;
+    }
+
+    el.style.removeProperty(property);
+  });
+}
+
+function detectCssSupport(property: string, value: string): boolean {
+  return typeof CSS !== 'undefined' && typeof CSS.supports === 'function'
+    ? CSS.supports(property, value)
+    : false;
+}
+
+function normalizeFilterValue(value: string): string {
+  return value.replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
+function formatNumber(value: number): string {
+  return Number(value.toFixed(3)).toString();
+}
+
+function parseCssLength(value: string): number {
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function styleAcceptsBackdropValue(value: string, prefixed: boolean): boolean {
+  const probe = document.createElement('div');
+  if (prefixed) {
+    probe.style.setProperty('-webkit-backdrop-filter', value);
+    return normalizeFilterValue(probe.style.getPropertyValue('-webkit-backdrop-filter')).includes('url(');
   }
 
-  const style = filterLayerEl.style as CSSStyleDeclaration & { webkitBackdropFilter: string };
-  style.backdropFilter = '';
-  style.webkitBackdropFilter = '';
-  delete filterLayerEl.dataset[FILTER_OWNER_DATASET_KEY];
+  probe.style.setProperty('backdrop-filter', value);
+  return normalizeFilterValue(probe.style.getPropertyValue('backdrop-filter')).includes('url(');
+}
+
+function supportsBackdropFilterUrl(): boolean {
+  if (cachedBackdropFilterUrlSupport !== null) {
+    return cachedBackdropFilterUrlSupport;
+  }
+
+  const quotedValue = 'url("#opencodian-lg-shuding-support")';
+  const plainValue = 'url(#opencodian-lg-shuding-support)';
+  cachedBackdropFilterUrlSupport =
+    detectCssSupport('backdrop-filter', quotedValue)
+    || detectCssSupport('-webkit-backdrop-filter', quotedValue)
+    || detectCssSupport('backdrop-filter', plainValue)
+    || detectCssSupport('-webkit-backdrop-filter', plainValue)
+    || styleAcceptsBackdropValue(quotedValue, false)
+    || styleAcceptsBackdropValue(quotedValue, true)
+    || styleAcceptsBackdropValue(plainValue, false)
+    || styleAcceptsBackdropValue(plainValue, true);
+
+  return cachedBackdropFilterUrlSupport;
+}
+
+function buildBackdropFilterValue(filterId: string, settings: ShudingSettings): string {
+  const blurValue = settings.blurAmount.toFixed(2).replace(/\.?0+$/, '');
+  return `url(#${filterId}) blur(${blurValue}px) contrast(${formatNumber(settings.contrastBoost)}) brightness(${formatNumber(settings.brightnessBoost)}) saturate(${formatNumber(settings.saturateBoost)})`;
+}
+
+function applyShellStyles(shellEl: HTMLElement): void {
+  shellEl.dataset.opencodianLgShuding = 'mounted';
+  shellEl.style.setProperty('background', 'transparent');
+  shellEl.style.setProperty('backdrop-filter', 'none');
+  shellEl.style.setProperty('-webkit-backdrop-filter', 'none');
+  shellEl.style.setProperty('transform-origin', 'center center');
+  shellEl.style.setProperty('will-change', 'transform');
+}
+
+function applyFilterLayerStyles(
+  filterLayerEl: HTMLElement,
+  filterId: string,
+  settings: ShudingSettings,
+  supportsUrlFilter: boolean,
+): void {
+  filterLayerEl.dataset[FILTER_OWNER_DATASET_KEY] = filterId;
+  filterLayerEl.dataset.opencodianLgShudingUrlSupported = supportsUrlFilter ? 'true' : 'false';
+  filterLayerEl.style.setProperty('opacity', '1');
+  filterLayerEl.style.setProperty('background', 'transparent');
+
+  const boxShadowParts: string[] = [];
+  if (settings.topHighlight && settings.topHighlightOpacity > EPSILON) {
+    boxShadowParts.push(`inset 0 1px 0 rgba(255, 255, 255, ${formatNumber(settings.topHighlightOpacity)})`);
+  }
+  if (settings.bottomShadow && settings.bottomShadowOpacity > EPSILON) {
+    boxShadowParts.push(`inset 0 -1px 0 rgba(0, 0, 0, ${formatNumber(settings.bottomShadowOpacity)})`);
+  }
+  if (settings.innerBorder && settings.innerBorderOpacity > EPSILON) {
+    boxShadowParts.push(`inset 0 0 0 1px rgba(255, 255, 255, ${formatNumber(settings.innerBorderOpacity)})`);
+  }
+  if (settings.insetDepthShadow && settings.insetDepthShadowOpacity > EPSILON) {
+    boxShadowParts.push(`inset 0 -8px ${formatNumber(settings.insetShadowBlur)}px rgba(0, 0, 0, ${formatNumber(settings.insetDepthShadowOpacity)})`);
+  }
+
+  if (boxShadowParts.length > 0) {
+    filterLayerEl.style.setProperty('box-shadow', boxShadowParts.join(', '));
+  } else {
+    filterLayerEl.style.removeProperty('box-shadow');
+  }
+  filterLayerEl.style.setProperty('transform-origin', 'center center');
+  filterLayerEl.style.setProperty('will-change', 'backdrop-filter, opacity');
+
+  const filterValue = supportsUrlFilter
+    ? buildBackdropFilterValue(filterId, settings)
+    : `blur(${settings.blurAmount.toFixed(2).replace(/\.?0+$/, '')}px) contrast(${formatNumber(settings.contrastBoost)}) brightness(${formatNumber(settings.brightnessBoost)}) saturate(${formatNumber(settings.saturateBoost)})`;
+
+  if (!supportsUrlFilter) {
+    filterLayerEl.style.setProperty('backdrop-filter', filterValue);
+    filterLayerEl.style.setProperty('-webkit-backdrop-filter', filterValue);
+  } else {
+    filterLayerEl.style.setProperty('backdrop-filter', filterValue);
+    filterLayerEl.style.setProperty('-webkit-backdrop-filter', filterValue);
+  }
 }
 
 function updateSvgGeometry(state: ShudingState): void {
@@ -159,75 +376,130 @@ function updateSvgGeometry(state: ShudingState): void {
   state.feImageEl.setAttribute('height', `${cssHeight}`);
 }
 
-function writeNeutralPixel(data: Uint8ClampedArray, index: number): void {
-  data[index] = 128;
-  data[index + 1] = 128;
-  data[index + 2] = 0;
-  data[index + 3] = 255;
+function resolvePanelGeometry(state: ShudingState): ShudingPanelGeometry {
+  const legacyGeometry: ShudingPanelGeometry = {
+    halfWidth: 0.3,
+    halfHeight: 0.2,
+    radius: 0.6,
+  };
+
+  if (!state.settings.adaptiveSdf) {
+    return legacyGeometry;
+  }
+
+  const aspect = state.size.cssWidth / Math.max(state.size.cssHeight, 1);
+  const normalizedAspect = Math.max(aspect, 1);
+  const halfWidth = clamp(0.5 * (aspect / normalizedAspect), EPSILON, 0.5);
+  const halfHeight = clamp(0.5 * (1 / normalizedAspect), EPSILON, 0.5);
+
+  const computedStyle = window.getComputedStyle(state.shellEl);
+  const borderRadiusPx =
+    (
+      parseCssLength(computedStyle.getPropertyValue('border-top-left-radius')) +
+      parseCssLength(computedStyle.getPropertyValue('border-top-right-radius')) +
+      parseCssLength(computedStyle.getPropertyValue('border-bottom-right-radius')) +
+      parseCssLength(computedStyle.getPropertyValue('border-bottom-left-radius'))
+    ) / 4;
+  const sdfRadius = clamp(
+    (borderRadiusPx / Math.max(1, Math.min(state.size.cssWidth, state.size.cssHeight))) * 0.5,
+    EPSILON,
+    Math.min(halfWidth, halfHeight),
+  );
+
+  const adaptiveGeometry: ShudingPanelGeometry = {
+    halfWidth,
+    halfHeight,
+    radius: sdfRadius,
+  };
+  const mixAmount = state.settings.adaptiveSdfMix;
+
+  return {
+    halfWidth: lerp(legacyGeometry.halfWidth, adaptiveGeometry.halfWidth, mixAmount),
+    halfHeight: lerp(legacyGeometry.halfHeight, adaptiveGeometry.halfHeight, mixAmount),
+    radius: lerp(legacyGeometry.radius, adaptiveGeometry.radius, mixAmount),
+  };
 }
 
-function renderDisplacementMap(state: ShudingState): void {
+function buildEdgeBandWeight(distanceToEdge: number, edgeBandWidth: number): number {
+  const outerMask = smoothStep(0, -edgeBandWidth, distanceToEdge);
+  const innerMask = smoothStep(-edgeBandWidth, -(edgeBandWidth * 2), distanceToEdge);
+  return clamp(outerMask - innerMask, 0, 1);
+}
+
+function renderDisplacementMap(state: ShudingState): number {
   const { pixelWidth, pixelHeight, dpi } = state.size;
   const { canvasEl, canvasCtx } = state;
+  const geometry = resolvePanelGeometry(state);
 
   canvasEl.width = pixelWidth;
   canvasEl.height = pixelHeight;
 
   const imageData = canvasCtx.createImageData(pixelWidth, pixelHeight);
   const data = imageData.data;
-  const halfWidth = pixelWidth / 2;
-  const halfHeight = pixelHeight / 2;
-  const minDimension = Math.min(pixelWidth, pixelHeight);
-  const inset = Math.max(dpi * 1.5, minDimension * 0.045);
-  const radius = Math.max(dpi * 8, minDimension * 0.28);
-  const shapeHalfWidth = Math.max(dpi, halfWidth - inset);
-  const shapeHalfHeight = Math.max(dpi, halfHeight - inset);
-  const edgeBand = clamp(minDimension * 0.17, 10 * dpi, 30 * dpi);
-  const outsideFade = edgeBand * 0.6;
-  const maxVectorStrength = 0.62;
+  const rawValues: number[] = [];
+  let maxScale = 0;
 
   for (let y = 0; y < pixelHeight; y += 1) {
     for (let x = 0; x < pixelWidth; x += 1) {
-      const index = (y * pixelWidth + x) * 4;
-      const localX = x + 0.5 - halfWidth;
-      const localY = y + 0.5 - halfHeight;
-      const distance = roundedRectSDF(localX, localY, shapeHalfWidth, shapeHalfHeight, radius);
-      const edgeWeight = smoothStep(-edgeBand, 0, distance);
+      const uvX = x / pixelWidth;
+      const uvY = y / pixelHeight;
+      const ix = uvX - 0.5;
+      const iy = uvY - 0.5;
+      const distanceToEdge = roundedRectSDF(
+        ix,
+        iy,
+        geometry.halfWidth,
+        geometry.halfHeight,
+        geometry.radius,
+      );
 
-      if (edgeWeight <= EPSILON) {
-        writeNeutralPixel(data, index);
-        continue;
+      let push = 0;
+      if (state.settings.rectEdgeRefraction) {
+        const edgeBand = buildEdgeBandWeight(distanceToEdge, state.settings.edgeBandWidth);
+        let edgePush = edgeBand * state.settings.rectEdgeRefractionStrength;
+
+        if (state.settings.cornerEnhancement && geometry.radius > EPSILON) {
+          const cornerX = Math.max(Math.abs(ix) - geometry.halfWidth + geometry.radius, 0);
+          const cornerY = Math.max(Math.abs(iy) - geometry.halfHeight + geometry.radius, 0);
+          const cornerFactor = clamp((Math.hypot(cornerX, cornerY) / geometry.radius) * 2, 0, 1);
+          edgePush *= 1 + (cornerFactor * state.settings.cornerEnhancementStrength * 0.35);
+        }
+
+        push += edgePush;
+      } else {
+        const displacement = smoothStep(0.8, 0, distanceToEdge - 0.15);
+        push += smoothStep(0, 1, displacement);
       }
 
-      const gradientX =
-        roundedRectSDF(localX + 1, localY, shapeHalfWidth, shapeHalfHeight, radius) -
-        roundedRectSDF(localX - 1, localY, shapeHalfWidth, shapeHalfHeight, radius);
-      const gradientY =
-        roundedRectSDF(localX, localY + 1, shapeHalfWidth, shapeHalfHeight, radius) -
-        roundedRectSDF(localX, localY - 1, shapeHalfWidth, shapeHalfHeight, radius);
-      const gradientLength = Math.hypot(gradientX, gradientY);
-
-      if (gradientLength <= EPSILON) {
-        writeNeutralPixel(data, index);
-        continue;
+      if (state.settings.barrelDistortion) {
+        const radialDistance = Math.hypot(
+          ix / Math.max(geometry.halfWidth, EPSILON),
+          iy / Math.max(geometry.halfHeight, EPSILON),
+        );
+        const barrelFactor = clamp(1 - radialDistance, 0, 1);
+        push += barrelFactor * state.settings.barrelStrength;
       }
 
-      const inwardX = -gradientX / gradientLength;
-      const inwardY = -gradientY / gradientLength;
-      const outsideAttenuation = distance > 0 ? 1 - smoothStep(0, outsideFade, distance) : 1;
-      const strength =
-        maxVectorStrength *
-        edgeWeight *
-        (0.45 + edgeWeight * 0.55) *
-        outsideAttenuation;
-      const displacedX = clamp(inwardX * strength, -1, 1);
-      const displacedY = clamp(inwardY * strength, -1, 1);
+      const sampleX = ix * (1 + push) + 0.5;
+      const sampleY = iy * (1 + push) + 0.5;
+      const dx = sampleX * pixelWidth - x;
+      const dy = sampleY * pixelHeight - y;
 
-      data[index] = Math.round((displacedX * 0.5 + 0.5) * 255);
-      data[index + 1] = Math.round((displacedY * 0.5 + 0.5) * 255);
-      data[index + 2] = 0;
-      data[index + 3] = 255;
+      maxScale = Math.max(maxScale, Math.abs(dx), Math.abs(dy));
+      rawValues.push(dx, dy);
     }
+  }
+
+  maxScale = Math.max(maxScale * 0.5, EPSILON);
+
+  let rawIndex = 0;
+  for (let index = 0; index < data.length; index += 4) {
+    const r = rawValues[rawIndex++] / maxScale + 0.5;
+    const g = rawValues[rawIndex++] / maxScale + 0.5;
+    data[index] = Math.round(clamp(r, 0, 1) * 255);
+    data[index + 1] = Math.round(clamp(g, 0, 1) * 255);
+    data[index + 2] = 0;
+    data[index + 3] = 255;
   }
 
   canvasCtx.putImageData(imageData, 0, 0);
@@ -235,10 +507,66 @@ function renderDisplacementMap(state: ShudingState): void {
   const dataUrl = canvasEl.toDataURL();
   state.feImageEl.setAttribute('href', dataUrl);
   state.feImageEl.setAttributeNS(XLINK_NS, 'href', dataUrl);
+
+  return maxScale / dpi;
+}
+
+function shouldRegenerateDisplacementMap(
+  current: ShudingSettings,
+  next: ShudingSettings,
+): boolean {
+  return current.adaptiveSdf !== next.adaptiveSdf
+    || current.adaptiveSdfMix !== next.adaptiveSdfMix
+    || current.rectEdgeRefraction !== next.rectEdgeRefraction
+    || current.rectEdgeRefractionStrength !== next.rectEdgeRefractionStrength
+    || current.cornerEnhancement !== next.cornerEnhancement
+    || current.cornerEnhancementStrength !== next.cornerEnhancementStrength
+    || current.edgeBandWidth !== next.edgeBandWidth
+    || current.barrelDistortion !== next.barrelDistortion
+    || current.barrelStrength !== next.barrelStrength;
 }
 
 function updateDisplacementScale(state: ShudingState): void {
-  state.feDisplacementMapEl.setAttribute('scale', `${state.settings.displacementScale}`);
+  const normalizedStrength = state.settings.displacementScale / DISPLACEMENT_SCALE_BASELINE;
+  const appliedScale = state.baseDisplacementScale * normalizedStrength * DISPLACEMENT_SCALE_FACTOR;
+  state.feDisplacementMapEl.setAttribute('scale', `${appliedScale}`);
+}
+
+function syncStateContext(
+  ctx: GlassMountContext,
+  state: ShudingState,
+): void {
+  state.ctx = ctx;
+
+  if (state.shellEl !== ctx.shellEl) {
+    const previousShellEl = state.shellEl;
+    state.resizeObserver.unobserve(previousShellEl);
+    restoreStyleSnapshot(previousShellEl, state.shellStyleSnapshot);
+    restoreDatasetSnapshot(previousShellEl, state.shellDatasetSnapshot);
+    states.delete(previousShellEl);
+
+    state.shellEl = ctx.shellEl;
+    state.shellStyleSnapshot = captureStyleSnapshot(ctx.shellEl, SHELL_STYLE_PROPERTIES);
+    state.shellDatasetSnapshot = captureDatasetSnapshot(ctx.shellEl, SHELL_DATASET_KEYS);
+    state.resizeObserver.observe(ctx.shellEl);
+    states.set(ctx.shellEl, state);
+  }
+
+  if (state.filterLayerEl !== ctx.filterLayerEl) {
+    restoreStyleSnapshot(state.filterLayerEl, state.filterLayerStyleSnapshot);
+    restoreDatasetSnapshot(state.filterLayerEl, state.filterLayerDatasetSnapshot);
+
+    state.filterLayerEl = ctx.filterLayerEl;
+    state.filterLayerStyleSnapshot = captureStyleSnapshot(ctx.filterLayerEl, FILTER_LAYER_STYLE_PROPERTIES);
+    state.filterLayerDatasetSnapshot = captureDatasetSnapshot(ctx.filterLayerEl, FILTER_LAYER_DATASET_KEYS);
+  }
+
+  if (state.svgRootEl !== ctx.svgRootEl) {
+    state.svgRootEl = ctx.svgRootEl;
+    if (state.defsEl.parentNode !== ctx.svgRootEl) {
+      ctx.svgRootEl.appendChild(state.defsEl);
+    }
+  }
 }
 
 function syncState(
@@ -247,22 +575,33 @@ function syncState(
   nextSettings: ShudingSettings,
   options?: { forceMapRegeneration?: boolean },
 ): void {
-  const nextSize = measureShell(ctx.shellEl);
-  const shouldRegenerateMap = options?.forceMapRegeneration || !sizesMatch(state.size, nextSize);
+  syncStateContext(ctx, state);
+
+  const nextSize = measureShell(state.shellEl);
+  const shouldRegenerateMap =
+    options?.forceMapRegeneration
+    || !sizesMatch(state.size, nextSize)
+    || shouldRegenerateDisplacementMap(state.settings, nextSettings);
 
   state.settings = nextSettings;
 
   if (shouldRegenerateMap) {
     state.size = nextSize;
     updateSvgGeometry(state);
-    renderDisplacementMap(state);
+    state.baseDisplacementScale = renderDisplacementMap(state);
   }
 
   updateDisplacementScale(state);
-  applyFilterLayerStyles(ctx.filterLayerEl, state.filterId, state.settings.blurAmount);
+  applyShellStyles(state.shellEl);
+  applyFilterLayerStyles(
+    state.filterLayerEl,
+    state.filterId,
+    state.settings,
+    state.supportsBackdropFilterUrl,
+  );
 }
 
-function scheduleResizeSync(ctx: GlassMountContext, state: ShudingState): void {
+function scheduleResizeSync(state: ShudingState): void {
   if (state.resizeFrame !== null) {
     return;
   }
@@ -270,11 +609,11 @@ function scheduleResizeSync(ctx: GlassMountContext, state: ShudingState): void {
   state.resizeFrame = window.requestAnimationFrame(() => {
     state.resizeFrame = null;
 
-    if (states.get(ctx.shellEl) !== state) {
+    if (states.get(state.shellEl) !== state) {
       return;
     }
 
-    syncState(ctx, state, state.settings);
+    syncState(state.ctx, state, state.settings);
   });
 }
 
@@ -316,6 +655,10 @@ function createState(
   ctx.svgRootEl.appendChild(defsEl);
 
   const state: ShudingState = {
+    ctx,
+    shellEl: ctx.shellEl,
+    filterLayerEl: ctx.filterLayerEl,
+    svgRootEl: ctx.svgRootEl,
     filterId,
     defsEl,
     filterEl,
@@ -324,11 +667,17 @@ function createState(
     canvasEl,
     canvasCtx,
     resizeObserver: new ResizeObserver(() => {
-      scheduleResizeSync(ctx, state);
+      scheduleResizeSync(state);
     }),
     resizeFrame: null,
     settings,
     size: measureShell(ctx.shellEl),
+    baseDisplacementScale: 0,
+    shellDatasetSnapshot: captureDatasetSnapshot(ctx.shellEl, SHELL_DATASET_KEYS),
+    filterLayerDatasetSnapshot: captureDatasetSnapshot(ctx.filterLayerEl, FILTER_LAYER_DATASET_KEYS),
+    shellStyleSnapshot: captureStyleSnapshot(ctx.shellEl, SHELL_STYLE_PROPERTIES),
+    filterLayerStyleSnapshot: captureStyleSnapshot(ctx.filterLayerEl, FILTER_LAYER_STYLE_PROPERTIES),
+    supportsBackdropFilterUrl: supportsBackdropFilterUrl(),
   };
 
   state.resizeObserver.observe(ctx.shellEl);
@@ -374,10 +723,15 @@ function unmount(ctx: GlassMountContext): void {
     window.cancelAnimationFrame(state.resizeFrame);
   }
 
-  clearFilterLayerStyles(ctx.filterLayerEl, state.filterId);
+  syncStateContext(ctx, state);
+
   state.defsEl.remove();
   state.canvasEl.width = 0;
   state.canvasEl.height = 0;
+  restoreStyleSnapshot(state.filterLayerEl, state.filterLayerStyleSnapshot);
+  restoreDatasetSnapshot(state.filterLayerEl, state.filterLayerDatasetSnapshot);
+  restoreStyleSnapshot(state.shellEl, state.shellStyleSnapshot);
+  restoreDatasetSnapshot(state.shellEl, state.shellDatasetSnapshot);
   states.delete(ctx.shellEl);
 }
 
@@ -387,8 +741,194 @@ export const adapter: GlassEffectAdapter = {
   description: 'A restrained liquid-glass variant with compact displacement and soft blur.',
   paramDefs: [
     {
+      key: 'adaptiveSdf',
+      labelKey: 'settings.style.input.liquidGlass.shuding.adaptiveSdf',
+      descKey: 'settings.style.input.liquidGlass.shuding.adaptiveSdf.desc',
+      sectionLabelKey: 'settings.style.input.liquidGlass.section.refraction',
+      type: 'toggle',
+      defaultValue: true,
+    },
+    {
+      key: 'adaptiveSdfMix',
+      labelKey: 'settings.style.input.liquidGlass.shuding.adaptiveSdfMix',
+      descKey: 'settings.style.input.liquidGlass.shuding.adaptiveSdfMix.desc',
+      sectionLabelKey: 'settings.style.input.liquidGlass.section.refraction',
+      type: 'number',
+      min: 0,
+      max: 1,
+      step: 0.01,
+      unit: '',
+      defaultValue: 1,
+    },
+    {
+      key: 'rectEdgeRefraction',
+      labelKey: 'settings.style.input.liquidGlass.shuding.rectEdgeRefraction',
+      descKey: 'settings.style.input.liquidGlass.shuding.rectEdgeRefraction.desc',
+      sectionLabelKey: 'settings.style.input.liquidGlass.section.refraction',
+      type: 'toggle',
+      defaultValue: true,
+    },
+    {
+      key: 'rectEdgeRefractionStrength',
+      labelKey: 'settings.style.input.liquidGlass.shuding.rectEdgeRefractionStrength',
+      descKey: 'settings.style.input.liquidGlass.shuding.rectEdgeRefractionStrength.desc',
+      sectionLabelKey: 'settings.style.input.liquidGlass.section.refraction',
+      type: 'number',
+      min: 0,
+      max: 2,
+      step: 0.05,
+      unit: '',
+      defaultValue: 1,
+    },
+    {
+      key: 'cornerEnhancement',
+      labelKey: 'settings.style.input.liquidGlass.shuding.cornerEnhancement',
+      descKey: 'settings.style.input.liquidGlass.shuding.cornerEnhancement.desc',
+      sectionLabelKey: 'settings.style.input.liquidGlass.section.refraction',
+      type: 'toggle',
+      defaultValue: true,
+    },
+    {
+      key: 'cornerEnhancementStrength',
+      labelKey: 'settings.style.input.liquidGlass.shuding.cornerEnhancementStrength',
+      descKey: 'settings.style.input.liquidGlass.shuding.cornerEnhancementStrength.desc',
+      sectionLabelKey: 'settings.style.input.liquidGlass.section.refraction',
+      type: 'number',
+      min: 0,
+      max: 2,
+      step: 0.05,
+      unit: '',
+      defaultValue: 1,
+    },
+    {
+      key: 'edgeBandWidth',
+      labelKey: 'settings.style.input.liquidGlass.shuding.edgeBandWidth',
+      descKey: 'settings.style.input.liquidGlass.shuding.edgeBandWidth.desc',
+      sectionLabelKey: 'settings.style.input.liquidGlass.section.refraction',
+      type: 'number',
+      min: 0.02,
+      max: 0.2,
+      step: 0.01,
+      unit: '',
+      defaultValue: 0.08,
+    },
+    {
+      key: 'barrelDistortion',
+      labelKey: 'settings.style.input.liquidGlass.shuding.barrelDistortion',
+      descKey: 'settings.style.input.liquidGlass.shuding.barrelDistortion.desc',
+      sectionLabelKey: 'settings.style.input.liquidGlass.section.global',
+      type: 'toggle',
+      defaultValue: false,
+    },
+    {
+      key: 'barrelStrength',
+      labelKey: 'settings.style.input.liquidGlass.shuding.barrelStrength',
+      descKey: 'settings.style.input.liquidGlass.shuding.barrelStrength.desc',
+      sectionLabelKey: 'settings.style.input.liquidGlass.section.global',
+      type: 'number',
+      min: 0,
+      max: 0.1,
+      step: 0.005,
+      unit: '',
+      defaultValue: 0.03,
+    },
+    {
+      key: 'topHighlight',
+      labelKey: 'settings.style.input.liquidGlass.shuding.topHighlight',
+      descKey: 'settings.style.input.liquidGlass.shuding.topHighlight.desc',
+      sectionLabelKey: 'settings.style.input.liquidGlass.section.lighting',
+      type: 'toggle',
+      defaultValue: true,
+    },
+    {
+      key: 'topHighlightOpacity',
+      labelKey: 'settings.style.input.liquidGlass.shuding.topHighlightOpacity',
+      descKey: 'settings.style.input.liquidGlass.shuding.topHighlightOpacity.desc',
+      sectionLabelKey: 'settings.style.input.liquidGlass.section.lighting',
+      type: 'number',
+      min: 0,
+      max: 1,
+      step: 0.01,
+      unit: '',
+      defaultValue: 0.6,
+    },
+    {
+      key: 'innerBorder',
+      labelKey: 'settings.style.input.liquidGlass.shuding.innerBorder',
+      descKey: 'settings.style.input.liquidGlass.shuding.innerBorder.desc',
+      sectionLabelKey: 'settings.style.input.liquidGlass.section.lighting',
+      type: 'toggle',
+      defaultValue: true,
+    },
+    {
+      key: 'innerBorderOpacity',
+      labelKey: 'settings.style.input.liquidGlass.shuding.innerBorderOpacity',
+      descKey: 'settings.style.input.liquidGlass.shuding.innerBorderOpacity.desc',
+      sectionLabelKey: 'settings.style.input.liquidGlass.section.lighting',
+      type: 'number',
+      min: 0,
+      max: 1,
+      step: 0.01,
+      unit: '',
+      defaultValue: 0.2,
+    },
+    {
+      key: 'bottomShadow',
+      labelKey: 'settings.style.input.liquidGlass.shuding.bottomShadow',
+      descKey: 'settings.style.input.liquidGlass.shuding.bottomShadow.desc',
+      sectionLabelKey: 'settings.style.input.liquidGlass.section.lighting',
+      type: 'toggle',
+      defaultValue: true,
+    },
+    {
+      key: 'bottomShadowOpacity',
+      labelKey: 'settings.style.input.liquidGlass.shuding.bottomShadowOpacity',
+      descKey: 'settings.style.input.liquidGlass.shuding.bottomShadowOpacity.desc',
+      sectionLabelKey: 'settings.style.input.liquidGlass.section.lighting',
+      type: 'number',
+      min: 0,
+      max: 1,
+      step: 0.01,
+      unit: '',
+      defaultValue: 0.08,
+    },
+    {
+      key: 'insetDepthShadow',
+      labelKey: 'settings.style.input.liquidGlass.shuding.insetDepthShadow',
+      descKey: 'settings.style.input.liquidGlass.shuding.insetDepthShadow.desc',
+      sectionLabelKey: 'settings.style.input.liquidGlass.section.lighting',
+      type: 'toggle',
+      defaultValue: false,
+    },
+    {
+      key: 'insetDepthShadowOpacity',
+      labelKey: 'settings.style.input.liquidGlass.shuding.insetDepthShadowOpacity',
+      descKey: 'settings.style.input.liquidGlass.shuding.insetDepthShadowOpacity.desc',
+      sectionLabelKey: 'settings.style.input.liquidGlass.section.lighting',
+      type: 'number',
+      min: 0,
+      max: 1,
+      step: 0.01,
+      unit: '',
+      defaultValue: 0.12,
+    },
+    {
+      key: 'insetShadowBlur',
+      labelKey: 'settings.style.input.liquidGlass.shuding.insetShadowBlur',
+      descKey: 'settings.style.input.liquidGlass.shuding.insetShadowBlur.desc',
+      sectionLabelKey: 'settings.style.input.liquidGlass.section.lighting',
+      type: 'number',
+      min: 5,
+      max: 30,
+      step: 1,
+      unit: '',
+      defaultValue: 10,
+    },
+    {
       key: 'displacementScale',
       labelKey: 'settings.style.input.liquidGlass.shuding.displacementScale',
+      descKey: 'settings.style.input.liquidGlass.shuding.displacementScale.desc',
+      sectionLabelKey: 'settings.style.input.liquidGlass.section.filter',
       type: 'number',
       min: 0,
       max: 40,
@@ -399,12 +939,50 @@ export const adapter: GlassEffectAdapter = {
     {
       key: 'blurAmount',
       labelKey: 'settings.style.input.liquidGlass.shuding.blurAmount',
+      descKey: 'settings.style.input.liquidGlass.shuding.blurAmount.desc',
+      sectionLabelKey: 'settings.style.input.liquidGlass.section.filter',
       type: 'number',
       min: 0,
       max: 4,
       step: 0.05,
       unit: '',
       defaultValue: DEFAULT_BLUR_AMOUNT,
+    },
+    {
+      key: 'contrastBoost',
+      labelKey: 'settings.style.input.liquidGlass.shuding.contrastBoost',
+      descKey: 'settings.style.input.liquidGlass.shuding.contrastBoost.desc',
+      sectionLabelKey: 'settings.style.input.liquidGlass.section.filter',
+      type: 'number',
+      min: 1,
+      max: 1.5,
+      step: 0.01,
+      unit: '',
+      defaultValue: 1.25,
+    },
+    {
+      key: 'brightnessBoost',
+      labelKey: 'settings.style.input.liquidGlass.shuding.brightnessBoost',
+      descKey: 'settings.style.input.liquidGlass.shuding.brightnessBoost.desc',
+      sectionLabelKey: 'settings.style.input.liquidGlass.section.filter',
+      type: 'number',
+      min: 1,
+      max: 1.2,
+      step: 0.01,
+      unit: '',
+      defaultValue: 1.05,
+    },
+    {
+      key: 'saturateBoost',
+      labelKey: 'settings.style.input.liquidGlass.shuding.saturateBoost',
+      descKey: 'settings.style.input.liquidGlass.shuding.saturateBoost.desc',
+      sectionLabelKey: 'settings.style.input.liquidGlass.section.filter',
+      type: 'number',
+      min: 1,
+      max: 1.3,
+      step: 0.01,
+      unit: '',
+      defaultValue: 1.1,
     },
   ],
   mount,

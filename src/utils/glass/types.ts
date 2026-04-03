@@ -8,16 +8,18 @@ export interface GlassMountContext {
 export interface GlassParamDef {
   key: string;
   labelKey: string;
-  type: 'number' | 'select';
+  descKey?: string;
+  type: 'number' | 'select' | 'toggle';
+  sectionLabelKey?: string;
   min?: number;
   max?: number;
   step?: number;
   unit?: string;
   options?: { value: string; label: string }[];
-  defaultValue: number | string;
+  defaultValue: number | string | boolean;
 }
 
-export type GlassAdapterSettingsValue = number | string;
+export type GlassAdapterSettingsValue = number | string | boolean;
 
 export interface GlassEffectAdapter {
   readonly id: 'shuding' | 'nikdelvin' | 'rdev';
