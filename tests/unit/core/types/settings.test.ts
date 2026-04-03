@@ -15,6 +15,7 @@ import {
   isValidChatAppearanceCustomCssDeclarations,
   normalizeBelowHeaderTabBarLayout,
   normalizeChatAppearanceSettings,
+  normalizeInputPanelActionButtonStyleId,
   normalizeInputPanelGlassRefractionSettings,
   normalizeInputPanelGlassRefractionSvgFilterPresetId,
   normalizeInputPanelGlassRefractionSvgFilterSettings,
@@ -110,6 +111,7 @@ describe('Settings', () => {
       expect(DEFAULT_SETTINGS.chatAppearance.assistant.backgroundOpacity).toBe(72);
       expect(DEFAULT_SETTINGS.chatAppearance.input.backgroundOpacity).toBe(72);
       expect(DEFAULT_SETTINGS.chatAppearance.input.shadowBlur).toBe(28);
+      expect(DEFAULT_SETTINGS.chatAppearance.input.actionButtonStyle).toBe('default');
       expect(DEFAULT_SETTINGS.inputPanelGlassRefraction).toEqual(getDefaultInputPanelGlassRefractionSettings());
       expect(DEFAULT_SETTINGS.inputPanelGlassRefractionSvgFilter).toEqual(
         getDefaultInputPanelGlassRefractionSvgFilterSettings(),
@@ -190,6 +192,15 @@ describe('Settings', () => {
     });
   });
 
+  describe('input action button style normalization', () => {
+    it('accepts supported styles and normalizes invalid values to default', () => {
+      expect(normalizeInputPanelActionButtonStyleId('default')).toBe('default');
+      expect(normalizeInputPanelActionButtonStyleId('etched')).toBe('etched');
+      expect(normalizeInputPanelActionButtonStyleId('embedded')).toBe('default');
+      expect(normalizeInputPanelActionButtonStyleId(undefined)).toBe('default');
+    });
+  });
+
   describe('debug log paths', () => {
     const originalPlatform = process.platform;
 
@@ -261,10 +272,21 @@ describe('Settings', () => {
       expect(normalized.assistant.radius).toBe(14);
       expect(normalized.input.backgroundOpacity).toBe(64);
       expect(normalized.input.blur).toBe(18);
+      expect(normalized.input.actionButtonStyle).toBe('default');
       expect(normalized.scrollbar.width).toBe(10);
       expect(normalized.scrollbar.thumbOpacity).toBe(80);
       expect(normalized.scrollbar.trackOpacity).toBe(22);
       expect(normalized.advanced.customCssDeclarations).toBe('');
+    });
+
+    it('normalizes an invalid input action button style back to default', () => {
+      const normalized = normalizeChatAppearanceSettings({
+        input: {
+          actionButtonStyle: 'embedded' as never,
+        },
+      });
+
+      expect(normalized.input.actionButtonStyle).toBe('default');
     });
 
     it('should validate custom CSS declarations', () => {

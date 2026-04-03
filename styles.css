@@ -2681,6 +2681,55 @@
   height: 16px;
 }
 
+.opencodian-composer-shell--action-buttons-etched .opencodian-composer-add-btn,
+.opencodian-composer-shell--action-buttons-etched .opencodian-send-btn,
+.opencodian-composer-shell--action-buttons-etched .opencodian-stop-btn {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  color: color-mix(in srgb, var(--text-normal) 78%, var(--text-muted));
+  filter: none;
+}
+
+.opencodian-composer-shell--action-buttons-etched .opencodian-send-btn::after,
+.opencodian-composer-shell--action-buttons-etched .opencodian-stop-btn::after {
+  display: none;
+}
+
+.opencodian-composer-shell--action-buttons-etched .opencodian-composer-add-btn:hover,
+.opencodian-composer-shell--action-buttons-etched .opencodian-send-btn:hover,
+.opencodian-composer-shell--action-buttons-etched .opencodian-stop-btn:hover {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  color: color-mix(in srgb, var(--text-normal) 92%, white);
+  filter: brightness(1.04) saturate(1.02);
+}
+
+.opencodian-composer-shell--action-buttons-etched .opencodian-composer-add-btn:focus-visible,
+.opencodian-composer-shell--action-buttons-etched .opencodian-send-btn:focus-visible,
+.opencodian-composer-shell--action-buttons-etched .opencodian-stop-btn:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--interactive-accent) 58%, transparent);
+  outline-offset: 3px;
+}
+
+.opencodian-composer-shell--action-buttons-etched .opencodian-composer-add-btn svg,
+.opencodian-composer-shell--action-buttons-etched .opencodian-send-btn svg,
+.opencodian-composer-shell--action-buttons-etched .opencodian-stop-btn svg {
+  opacity: 0.96;
+  filter:
+    drop-shadow(0 1px 0 color-mix(in srgb, var(--opencodian-glass-specular) 84%, transparent))
+    drop-shadow(0 -1px 0 color-mix(in srgb, var(--opencodian-glass-shadow-strong) 48%, transparent));
+}
+
+.opencodian-composer-shell--action-buttons-etched .opencodian-stop-btn {
+  color: color-mix(in srgb, var(--background-modifier-error) 72%, var(--text-normal));
+}
+
+.opencodian-composer-shell--action-buttons-etched .opencodian-stop-btn:hover {
+  color: color-mix(in srgb, var(--background-modifier-error) 82%, var(--text-normal));
+}
+
 .opencodian-session-todo-slot {
   display: flex;
   flex-direction: column;

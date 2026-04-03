@@ -20,6 +20,7 @@ import {
   type Conversation,
   createEmptyTabContextState,
   getDefaultPersistedTabState,
+  type InputPanelActionButtonStyleId,
   type InputPanelGlassRefractionSvgFilterPresetId,
   type InputPanelGlassRefractionSvgFilterSettings,
   type InputPanelThemeId,
@@ -168,6 +169,15 @@ const INPUT_PANEL_SVG_FILTER_CLASS_BY_ID: Record<Exclude<InputPanelGlassRefracti
   strong: 'opencodian-composer-shell--gr-svg-filter-strong',
 };
 const INPUT_PANEL_SVG_FILTER_CLASS_NAMES = Object.values(INPUT_PANEL_SVG_FILTER_CLASS_BY_ID);
+const INPUT_PANEL_ACTION_BUTTON_STYLE_CLASS_BY_ID: Record<
+  Exclude<InputPanelActionButtonStyleId, 'default'>,
+  string
+> = {
+  etched: 'opencodian-composer-shell--action-buttons-etched',
+};
+const INPUT_PANEL_ACTION_BUTTON_STYLE_CLASS_NAMES = Object.values(
+  INPUT_PANEL_ACTION_BUTTON_STYLE_CLASS_BY_ID,
+);
 const COMPOSER_GLASS_SVG_DEFS_ID = 'opencodian-glass-svg-defs';
 const COMPOSER_GLASS_SVG_FILTER_ID = 'opencodian-glass-refract';
 const COMPOSER_GLASS_SVG_FILTER_STRONG_ID = 'opencodian-glass-refract-strong';
@@ -442,6 +452,7 @@ export class OpenCodianView extends ItemView {
 
   // Send/Stop button reference
   private sendBtn: HTMLElement | null = null;
+  private addContextBtn: HTMLElement | null = null;
   private inputTextarea: HTMLTextAreaElement | null = null;
   private serverStatusBadgeEl: HTMLElement | null = null;
   private serverStatusTextEl: HTMLElement | null = null;
@@ -1785,6 +1796,9 @@ export class OpenCodianView extends ItemView {
     this.inputWrapperEl = null;
     this.composerShellEl = null;
     this.composerContextRowEl = null;
+    this.addContextBtn = null;
+    this.sendBtn = null;
+    this.inputTextarea = null;
     this.questionDock?.destroy();
     this.questionDock = null;
     this.questionDockMountEl = null;
@@ -2333,6 +2347,7 @@ export class OpenCodianView extends ItemView {
       this.chatAppearanceStyleEl = null;
     }
 
+    this.applyInputActionButtonStyleState();
     this.applyInputPanelThemeState();
     this.scheduleChatSurfaceColorSync();
     this.scheduleComposerLayoutSync();
@@ -2564,6 +2579,14 @@ export class OpenCodianView extends ItemView {
       this.setTooltipLabel(this.settingsBtnEl, t('chat.settings.open'), 'bottom');
     }
 
+    if (this.addContextBtn) {
+      this.setTooltipLabel(this.addContextBtn, t('chat.context.addContext'), 'top');
+    }
+
+    if (this.sendBtn) {
+      this.updateSendButtonState();
+    }
+
     this.inputTextarea?.setAttribute('placeholder', this.getInputPlaceholder());
     this.renderSessionTodoDock();
     this.renderQuestionDock();
@@ -2737,6 +2760,7 @@ export class OpenCodianView extends ItemView {
         'aria-label': t('chat.context.addContext'),
       },
     });
+    this.addContextBtn = addContextBtn;
     setIcon(addContextBtn, 'plus');
     this.setTooltipLabel(addContextBtn, t('chat.context.addContext'), 'top');
     addContextBtn.addEventListener('click', () => {
@@ -2744,12 +2768,11 @@ export class OpenCodianView extends ItemView {
     });
 
     this.sendBtn = composerFooterEl.createEl('button', {
-      cls: 'opencodian-send-btn',
+      cls: 'opencodian-send-btn opencodian-tooltip-trigger',
       attr: {
         type: 'button',
       },
     });
-    setIcon(this.sendBtn, 'send');
     this.sendBtn.addEventListener('click', () => {
       if (this.isActiveTabStreaming()) {
         this.cancelStreaming();
@@ -2757,6 +2780,7 @@ export class OpenCodianView extends ItemView {
         this.trySubmitCurrentInput();
       }
     });
+    this.updateSendButtonState();
 
     // Bottom toolbar: Permission mode | Model selector | Effort selector | Context usage
     const toolbar = composerShellEl.createDiv({ cls: 'opencodian-input-toolbar' });
@@ -2891,6 +2915,23 @@ export class OpenCodianView extends ItemView {
     ensureComposerGlassSvgDefs(svgFilterSettings);
     this.ensureComposerSvgFilterLayer();
     this.composerShellEl.addClass(INPUT_PANEL_SVG_FILTER_CLASS_BY_ID[activeSvgFilterPreset]);
+  }
+
+  private applyInputActionButtonStyleState(): void {
+    if (!this.composerShellEl) {
+      return;
+    }
+
+    for (const className of INPUT_PANEL_ACTION_BUTTON_STYLE_CLASS_NAMES) {
+      this.composerShellEl.removeClass(className);
+    }
+
+    const actionButtonStyle = this.plugin.settings.chatAppearance.input.actionButtonStyle;
+    if (actionButtonStyle === 'default') {
+      return;
+    }
+
+    this.composerShellEl.addClass(INPUT_PANEL_ACTION_BUTTON_STYLE_CLASS_BY_ID[actionButtonStyle]);
   }
 
   private getActiveInputPanelGlassRefractionSvgFilterScale(): number {
@@ -5737,13 +5778,13 @@ export class OpenCodianView extends ItemView {
       setIcon(this.sendBtn, 'square');
       this.sendBtn.addClass('opencodian-stop-btn');
       this.sendBtn.removeClass('opencodian-send-btn');
-      this.sendBtn.setAttribute('aria-label', 'Stop streaming');
+      this.setTooltipLabel(this.sendBtn, t('chat.input.stopStreaming'), 'top');
     } else {
       // Show send icon
       setIcon(this.sendBtn, 'send');
       this.sendBtn.addClass('opencodian-send-btn');
       this.sendBtn.removeClass('opencodian-stop-btn');
-      this.sendBtn.setAttribute('aria-label', 'Send message');
+      this.setTooltipLabel(this.sendBtn, t('chat.input.sendMessage'), 'top');
     }
   }
 

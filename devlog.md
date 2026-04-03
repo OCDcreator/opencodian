@@ -12,6 +12,49 @@
 
 ---
 
+## 2026-04-03 会话输入区操作按钮样式与发送提示中文化
+
+### 🎯 改动目标
+
+- 在“样式 > 输入区”里新增一个可控的会话输入区操作按钮样式选项，覆盖“添加上下文”和“发送消息”两个按钮。
+- 保留当前独立按钮外观作为默认样式。
+- 新增一种“图标直接刻在玻璃里”的无背景样式，并补齐发送按钮缺失的中文提示。
+
+### ✅ 本轮调整
+
+- `src/core/types/settings.ts`
+- `src/core/types/index.ts`
+  - 为 `chatAppearance.input` 新增 `actionButtonStyle` 持久化设置
+  - 新增 `default / etched` 两种按钮样式枚举、默认值与归一化逻辑
+
+- `src/features/settings/OpenCodianSettings.ts`
+- `src/i18n/locales/en.ts`
+- `src/i18n/locales/zh.ts`
+  - 在“样式 > 输入区”中新增“操作按钮样式”下拉选项
+  - 补齐新设置项的中英文文案
+  - 为发送按钮补上 `发送消息 / 停止生成` 的中英文 tooltip 文案
+
+- `src/features/chat/OpenCodianView.ts`
+- `styles.css`
+  - 让 composer 按设置切换独立按钮样式与 etched 玻璃刻印样式
+  - etched 样式下移除 `+` 与发送/停止按钮的独立背景，仅保留玻璃内部图标质感
+  - 发送按钮状态切换时统一改走 tooltip/i18n，而不再写死英文 `Send message / Stop streaming`
+  - 切换界面语言时同步刷新输入框按钮提示
+
+- `tests/unit/core/types/settings.test.ts`
+- `tests/unit/features/chat/inputPanelTheme.test.ts`
+- `tests/unit/features/settings/OpenCodianStyleSettings.test.ts`
+  - 覆盖新增设置的默认值与归一化
+  - 覆盖 etched 样式 class 切换
+  - 覆盖发送按钮 tooltip 的中文化与设置页下拉项
+
+### 🧪 当前验证
+
+- 已通过：相关单测
+- 已通过：`npm run build`
+- 已完成：部署 `dist/main.js`、`dist/manifest.json`、`dist/styles.css` 到 Test Vault
+- 已验证：Test Vault `BUILD_ID = main.202604031501`
+
 ## 2026-04-03 `shuding` 矩形玻璃面板参数化与独立调试
 
 ### 🎯 改动目标

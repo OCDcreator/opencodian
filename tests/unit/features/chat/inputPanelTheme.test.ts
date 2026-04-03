@@ -13,17 +13,22 @@ import {
   type InputPanelThemeId,
 } from '../../../../src/core/types';
 import { OpenCodianView } from '../../../../src/features/chat/OpenCodianView';
+import { setLocale } from '../../../../src/i18n';
 
 type InputPanelThemeViewHarness = {
   composerShellEl: HTMLElement | null;
+  sendBtn: HTMLElement | null;
   plugin: {
     settings: {
+      chatAppearance: ReturnType<typeof getDefaultChatAppearanceSettings>;
       inputPanelTheme: InputPanelThemeId;
       inputPanelGlassRefraction: ReturnType<typeof getDefaultInputPanelGlassRefractionSettings>;
       inputPanelGlassRefractionSvgFilter: InputPanelGlassRefractionSvgFilterSettings;
     };
   };
   applyInputPanelThemeState: () => void;
+  applyInputActionButtonStyleState: () => void;
+  updateSendButtonState: () => void;
 };
 
 describe('OpenCodianView input panel theme', () => {
@@ -32,6 +37,7 @@ describe('OpenCodianView input panel theme', () => {
   });
 
   afterEach(() => {
+    setLocale('en');
     jest.restoreAllMocks();
   });
 
@@ -166,5 +172,40 @@ describe('OpenCodianView input panel theme', () => {
     view.applyInputPanelThemeState();
     expect(shellEl.classList.contains('opencodian-composer-shell--gr-card')).toBe(false);
     expect(shellEl.classList.contains('opencodian-composer-shell--gr-pill')).toBe(false);
+  });
+
+  it('toggles the etched action button class from chat appearance settings', () => {
+    const view = createView('preset');
+    const shellEl = document.body.createDiv({ cls: 'opencodian-composer-shell' });
+    view.composerShellEl = shellEl;
+
+    view.applyInputActionButtonStyleState();
+    expect(shellEl.classList.contains('opencodian-composer-shell--action-buttons-etched')).toBe(false);
+
+    view.plugin.settings.chatAppearance.input.actionButtonStyle = 'etched';
+    view.applyInputActionButtonStyleState();
+    expect(shellEl.classList.contains('opencodian-composer-shell--action-buttons-etched')).toBe(true);
+
+    view.plugin.settings.chatAppearance.input.actionButtonStyle = 'default';
+    view.applyInputActionButtonStyleState();
+    expect(shellEl.classList.contains('opencodian-composer-shell--action-buttons-etched')).toBe(false);
+  });
+
+  it('localizes the send button tooltip label for both idle and streaming states', () => {
+    setLocale('zh');
+    const view = createView('preset');
+    view.sendBtn = document.body.createEl('button', { cls: 'opencodian-tooltip-trigger' });
+    const streamingSpy = jest.spyOn(
+      view as unknown as { isActiveTabStreaming: () => boolean },
+      'isActiveTabStreaming',
+    );
+
+    streamingSpy.mockReturnValue(false);
+    view.updateSendButtonState();
+    expect(view.sendBtn?.getAttribute('data-tooltip')).toBe('发送消息');
+
+    streamingSpy.mockReturnValue(true);
+    view.updateSendButtonState();
+    expect(view.sendBtn?.getAttribute('data-tooltip')).toBe('停止生成');
   });
 });

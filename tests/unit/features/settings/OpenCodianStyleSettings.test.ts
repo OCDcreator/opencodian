@@ -106,6 +106,47 @@ describe('OpenCodian style settings', () => {
     ).toBe(false);
   });
 
+  it('adds the input action button style dropdown to the style settings', () => {
+    const plugin = {
+      settings: {
+        ...DEFAULT_SETTINGS,
+        chatAppearance: getDefaultChatAppearanceSettings(),
+      },
+      saveSettings: jest.fn(),
+    } as unknown as ConstructorParameters<typeof OpenCodianSettingTab>[1];
+    const tab = new OpenCodianSettingTab({} as App, plugin);
+    const containerEl = document.createElement('div');
+    const privateTab = tab as unknown as {
+      addStyleSettings: (containerEl: HTMLElement) => void;
+      addThemePresetSection: (containerEl: HTMLElement) => void;
+      addNumericStyleControl: (containerEl: HTMLElement, config: unknown) => void;
+      createStyleResetSetting: (containerEl: HTMLElement, group: unknown) => void;
+      createSectionHeading: (containerEl: HTMLElement, title: string) => HTMLHeadingElement;
+      createStyleGroupSection: (containerEl: HTMLElement, title: string, desc: string) => HTMLElement;
+      setSettingDescWithFormatting: (setting: Setting, desc: string) => void;
+      registerStyleControlBinding: (group: unknown, callback: () => void) => void;
+    };
+
+    jest.spyOn(privateTab, 'addThemePresetSection').mockImplementation(() => {});
+    jest.spyOn(privateTab, 'addNumericStyleControl').mockImplementation(() => {});
+    jest.spyOn(privateTab, 'createStyleResetSetting').mockImplementation(() => {});
+    jest.spyOn(privateTab, 'createSectionHeading').mockImplementation((parent, title) =>
+      parent.createEl('h3', { text: title }),
+    );
+    jest.spyOn(privateTab, 'createStyleGroupSection').mockImplementation((parent) =>
+      parent.createDiv(),
+    );
+    jest.spyOn(privateTab, 'setSettingDescWithFormatting').mockImplementation(() => {});
+    jest.spyOn(privateTab, 'registerStyleControlBinding').mockImplementation(() => {});
+
+    privateTab.addStyleSettings(containerEl);
+
+    const actionButtonsDropdown = dropdownRecords.find((record) => record.name === '操作按钮样式');
+    expect(actionButtonsDropdown).toBeDefined();
+    expect(actionButtonsDropdown?.control.addOption).toHaveBeenCalledWith('default', '独立按钮');
+    expect(actionButtonsDropdown?.control.addOption).toHaveBeenCalledWith('etched', '刻入玻璃');
+  });
+
   it('sizes numeric inputs to fit the configured value range', () => {
     const plugin = {
       settings: {

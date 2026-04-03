@@ -19,6 +19,7 @@ import {
   getCurrentPlatformKey,
   getDefaultInputPanelGlassRefractionSettings,
   getDefaultInputPanelGlassRefractionSvgFilterSettings,
+  type InputPanelActionButtonStyleId,
   type InputPanelGlassRefractionSvgFilterPresetId,
   type InputPanelGlassRefractionVariantId,
   type InputPanelThemeId,
@@ -2790,6 +2791,26 @@ export class OpenCodianSettingTab extends PluginSettingTab {
                       : 'liquid-glass-rdev'
                   );
             await this.applyInputPanelThemeChange(nextTheme);
+          });
+      });
+
+    new Setting(inputGroupEl)
+      .setName(t('settings.style.input.actionButtons.name'))
+      .setDesc(t('settings.style.input.actionButtons.desc'))
+      .addDropdown((dropdown) => {
+        const syncFromSettings = () => {
+          dropdown.setValue(this.plugin.settings.chatAppearance.input.actionButtonStyle);
+        };
+        this.registerStyleControlBinding('input', syncFromSettings);
+        dropdown
+          .addOption('default', t('settings.style.input.actionButtons.option.default'))
+          .addOption('etched', t('settings.style.input.actionButtons.option.etched'))
+          .setValue(this.plugin.settings.chatAppearance.input.actionButtonStyle)
+          .onChange((value) => {
+            this.plugin.updateChatAppearance((appearance) => {
+              appearance.input.actionButtonStyle = value as InputPanelActionButtonStyleId;
+            });
+            this.applyAndScheduleStyleUpdate();
           });
       });
 

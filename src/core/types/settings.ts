@@ -88,6 +88,9 @@ export type InputPanelThemeId =
   | 'liquid-glass-nikdelvin'
   | 'liquid-glass-rdev';
 
+/** Composer action button style */
+export type InputPanelActionButtonStyleId = 'default' | 'etched';
+
 export type LiquidGlassAdapterId = 'shuding' | 'nikdelvin' | 'rdev';
 
 /** Server connection mode */
@@ -153,6 +156,16 @@ export function normalizeInputPanelThemeId(value: unknown): InputPanelThemeId {
       return value;
     default:
       return 'preset';
+  }
+}
+
+export function normalizeInputPanelActionButtonStyleId(value: unknown): InputPanelActionButtonStyleId {
+  switch (value) {
+    case 'default':
+    case 'etched':
+      return value;
+    default:
+      return 'default';
   }
 }
 
@@ -396,6 +409,7 @@ export interface ChatAppearanceInputSettings {
   backgroundOpacity: number;
   blur: number;
   shadowBlur: number;
+  actionButtonStyle: InputPanelActionButtonStyleId;
 }
 
 export type InputPanelGlassRefractionVariantId = 'glass' | 'card' | 'pill';
@@ -524,6 +538,7 @@ export function getDefaultChatAppearanceSettings(): ChatAppearanceSettings {
       backgroundOpacity: 72,
       blur: 18,
       shadowBlur: 28,
+      actionButtonStyle: 'default',
     },
     scrollbar: {
       width: 8,
@@ -944,6 +959,7 @@ export function normalizeChatAppearanceSettings(
     input: {
       ...defaults.input,
       ...(appearance?.input ?? {}),
+      actionButtonStyle: normalizeInputPanelActionButtonStyleId(appearance?.input?.actionButtonStyle),
     },
     scrollbar: {
       ...defaults.scrollbar,
