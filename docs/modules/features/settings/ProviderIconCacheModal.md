@@ -1,7 +1,7 @@
 # ProviderIconCacheModal
 
 > **源码**: `src/features/settings/ProviderIconCacheModal.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
@@ -87,6 +87,7 @@ render(restoreScrollTop) 重新渲染
 - mapped 类型条目不可删除
 - 拖拽仅在条目数 > 1 时启用
 
-## 待补充
-- [ ] ProviderIconService 的完整 API 说明
-- [ ] 自定义图标源支持的格式（URL、SVG、文件路径）
+## 补充说明
+
+- `ProviderIconService` 核心方法：`getProviderCacheState()` 返回 `{ providers, summary }`，`addCustomIconSource(app, providerId, source, library)` 返回更新后的 library，`splitCustomIconSourcesInput(input)` 按行分割并去空行
+- 自定义图标源支持格式：URL（`https://...`）、SVG 文本（`<svg>...</svg>`）、Obsidian vault 内文件路径（相对路径，如 `assets/icon.svg`），由 `ProviderIconService.addCustomIconSource()` 自动检测类型

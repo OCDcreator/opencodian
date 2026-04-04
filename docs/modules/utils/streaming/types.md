@@ -1,7 +1,7 @@
 # Streaming 类型定义
 
 > **源码**: `src/utils/streaming/types.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
@@ -142,6 +142,4 @@ SSE event → StreamChunk (输入类型)
 - `ThinkingBlockState` 包含 DOM 引用和 `setInterval` ID，不能序列化
 - `createStreamState()` 是唯一的状态创建入口
 
-## 待补充
-- [ ] StreamChunk 与 OpenCode SDK 事件类型的映射关系
-- [ ] ContentBlock 版本迁移策略
+

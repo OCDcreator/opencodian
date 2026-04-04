@@ -1,7 +1,7 @@
 # ContextRing
 
 > **源码**: `src/features/chat/ui/ContextRing.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
@@ -63,6 +63,7 @@ TabContextState → ContextUsageService.summarize() → ContextRing.update()
 - `tooltipLabelId` 是静态递增计数器，确保同一页面多个实例的 `aria-labelledby` 不冲突
 - `destroy()` 仅移除 DOM，不清理上游数据源
 
-## 待补充
-- [ ] 与 ContextUsageService.summarize() 返回值字段的完整映射表
-- [ ] CSS 色调阈值说明（success / warning / danger 的百分比区间）
+## 补充说明
+
+- `ContextUsageService.summarize()` 返回字段映射：`percentage` → strokeDashoffset 计算，`tone` → CSS 类 `is-{tone}`，`ringLabel` → labelEl 文本，`tooltip` → data-tooltip 属性，`isUnavailable` → 额外 `is-unavailable` 类
+- CSS 色调阈值由 `ContextUsageService.summarize()` 内部逻辑决定，具体阈值参见 Worker 5 负责的 `ContextUsageService.md`

@@ -1,7 +1,7 @@
 # Fork Target Modal
 
 > **源码**: `src/shared/modals/ForkTargetModal.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
@@ -30,7 +30,7 @@ type ForkTarget = 'new-tab' | 'current-tab';
 
 模态框内容：
 1. 标题：`t('chat.fork.chooseTarget')`
-2. 两个选项卡片：
+2. 两个选项卡片（包裹在 `.opencodian-fork-target-list` 容器中，每个选项使用 `.opencodian-fork-target-option` CSS class）：
    - `current-tab`: `t('chat.fork.targetCurrentTab')`
    - `new-tab`: `t('chat.fork.targetNewTab')`
 
@@ -72,6 +72,4 @@ OpenCodianView (用户触发分叉)
 - `onClose` 清空内容并处理未 resolve 的情况
 - 模态框内部类 `ForkTargetModal` 不导出，仅通过 `chooseForkTarget()` 函数使用
 
-## 待补充
-- [ ] 模态框样式截图
-- [ ] 键盘导航支持（↑↓ 选择，Enter 确认）
+

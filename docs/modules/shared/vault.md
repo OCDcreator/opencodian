@@ -1,7 +1,7 @@
 # Vault 工具函数
 
 > **源码**: `src/shared/vault.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
@@ -57,6 +57,4 @@ function getVaultBasePath(app: App): string | null {
 - 移动端 Obsidian 不支持文件系统路径，返回 `null`
 - 仅适用于桌面端 Obsidian（与 AGENTS.md 中 "Desktop only" 要求一致）
 
-## 待补充
-- [ ] 移动端替代方案
-- [ ] Obsidian API 变更监控策略
+

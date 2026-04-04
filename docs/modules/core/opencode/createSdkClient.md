@@ -1,88 +1,104 @@
 # SDK v2 Client Factory
 
 > **源码**: `src/core/opencode/createSdkClient.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
-OpenCode SDK v2 客户端工厂函数，负责创建类型化的 SDK 客户端实例。配置传输层（通过 `sdkFetch` 桥接 Obsidian 的 `requestUrl`），设置服务器地址和认证信息，返回供 `OpenCodeService` 使用的完整 SDK 客户端对象。
+`createSdkClient.ts` 只有一个职责：按 OpenCodian 运行时环境创建 `@opencode-ai/sdk/v2/client` 客户端。
+
+它把三件事固定下来：
+
+- 使用 OpenCodian 提供的 `baseUrl`
+- 注入适配 Obsidian 环境的 `fetch`
+- 打开 SDK 的 `responseStyle: 'data'` 与 `throwOnError: true`
+
+这个模块本身不缓存客户端；当前 `OpenCodeService.getSdkClient()` 会按需重复创建。
 
 ## 导入关系
 
 ```text
-上游: @opencode/sdk (SDK v2 包), src/core/opencode/sdkFetch, src/core/opencode/sdkTypes
-下游: src/core/opencode/OpenCodeService
+上游:
+- `@opencode-ai/sdk/v2/client`
+- `./sdkFetch`
+- `./sdkTypes`
+
+下游:
+- `src/core/opencode/OpenCodeService`
 ```
 
 ## 核心类型 / 接口
 
-```typescript
-// SDK v2 客户端类型（从 SDK 包导入）
-import type { OpenCodeClient } from "@opencode/sdk/v2";
+`CreateSdkClientOptions` 的字段是源码里真实定义的全部输入：
 
-// 工厂配置
-interface SdkClientConfig {
-  baseUrl: string;
-  authToken?: string;
-  // ...
-}
+| 字段 | 说明 |
+|------|------|
+| `baseUrl` | OpenCode 服务地址 |
+| `authHeaders?` | 要透传给 SDK 的请求头 |
+| `directory?` | SDK 工作目录，当前通常传 vault 路径 |
+| `experimentalWorkspaceId?` | 会被重命名成 SDK 需要的 `experimental_workspaceID` |
+| `fetchImpl?` | 可选的 fetch 实现；不传时使用 `createSdkFetch()` |
 
-// 工厂函数签名
-function createSdkClient(config: SdkClientConfig): OpenCodeClient;
-```
+返回值类型是 `SdkOpencodeClient`，本质上是 SDK 的 `OpencodeClient` 别名。
 
 ## 核心逻辑
 
-### 客户端创建
+### 配置组装
 
-1. 从配置中获取服务器 base URL 和认证信息
-2. 创建自定义 fetch 传输层（使用 `sdkFetch` 的混合 requestUrl/fetch 实现）
-3. 初始化 SDK v2 客户端，注入自定义传输层
-4. 返回类型化的客户端实例
+工厂内部会构造一个 SDK config 对象，并固定这些字段：
+
+- `baseUrl`
+- `directory`
+- `experimental_workspaceID`
+- `fetch`
+- `headers`
+- `responseStyle: 'data'`
+- `throwOnError: true`
+
+其中：
+
+- `baseUrl` 被断言成模板字面量类型 `` `${string}://${string}` ``
+- `experimentalWorkspaceId` 会重命名为 `experimental_workspaceID`
+- `fetch` 默认来自 `createSdkFetch()`
 
 ### 传输层注入
 
-SDK v2 默认使用标准 `fetch` API，但 Obsidian 环境中需要通过 `requestUrl` 绕过 CORS 和安全限制。`createSdkClient` 将 `sdkFetch` 作为自定义传输注入到 SDK 客户端。
+SDK 默认期望标准 `fetch`，但 OpenCodian 需要兼顾：
+
+- Obsidian 的 `requestUrl`
+- SSE 流式事件
+- 可选的测试替身 fetch
+
+所以这里不直接依赖全局 `fetch`，而是把 fetch 选择逻辑收口到一个工厂里。
 
 ## 关键方法
 
 | 方法 | 说明 |
 |------|------|
-| `createSdkClient(config)` | 创建并返回配置完成的 SDK v2 客户端实例 |
+| `createSdkClient(options)` | 组装 SDK config 并返回 `createOpencodeClient(config)` |
 
 ## 数据流
 
 ```mermaid
 graph LR
-    A[SdkClientConfig] --> B[createSdkClient]
-    B --> C[sdkFetch 传输层]
-    B --> D[SDK v2 Client]
-    D --> E[OpenCodeService]
-    D -->|HTTP 请求| C
-    C -->|requestUrl/fetch| F[OpenCode Server]
+    A[CreateSdkClientOptions] --> B[createSdkClient]
+    B --> C[createSdkFetch 或外部 fetchImpl]
+    B --> D[createOpencodeClient]
+    D --> E[SdkOpencodeClient]
 ```
 
 ## 与其他模块的交互
 
-- **sdkFetch**: 提供混合传输层实现
-- **sdkTypes**: 提供 SDK v2 与插件内部类型的桥接定义
-- **OpenCodeService**: 唯一消费者，通过此工厂获取 SDK 客户端实例
-- **SDK v2 参考实现**: `reference-projects/opencode/packages/sdk/js/src/v2`
+- `sdkFetch`: 提供 Obsidian 环境可用的 fetch 适配器。
+- `sdkTypes`: 为输入/输出类型提供 `Sdk*` 别名，避免在调用方重复依赖 SDK 路径。
+- `OpenCodeService`: 当前唯一直接消费者，每次 SDK 调用前通过这里创建客户端。
 
 ## 配置项
 
-- **baseUrl**: OpenCode 服务器地址
-- **authToken**: 远程模式下的认证令牌
+本模块没有自己的持久化配置；所有输入都来自调用方传入的 `CreateSdkClientOptions`。
 
 ## 注意事项
 
-- SDK v2 包的实际导入路径需要与 `reference-projects/opencode/packages/sdk/js/src/v2` 中的类型保持一致
-- 自定义传输层必须兼容 SDK 的 fetch 接口契约
-- 客户端实例应考虑缓存/复用，避免重复创建
-
-## 待补充
-
-- [ ] SDK v2 包的确切导入路径和版本
-- [ ] 完整的 `SdkClientConfig` 字段列表
-- [ ] SDK 客户端的生命周期管理（是否需要显式销毁）
-- [ ] 错误处理：连接失败、认证失败等
+- `directory` 会直接透传给 SDK，因此 `OpenCodeService.setVaultPath()` 之后创建的客户端才能感知 vault 级 `.opencode` 配置。
+- `experimentalWorkspaceId` 在这里仅做字段改名，当前 Worker 1 范围内没有其他模块直接消费它。
+- 模块本身不做客户端缓存或复用；是否复用由上层决定。

@@ -1,58 +1,33 @@
 # userMessageActions
 
 > **源码**: `src/features/chat/userMessageActions.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
-用户消息操作按钮的流式状态同步工具。提供单一函数 `syncUserMessageStreamingActionState()`，在流式传输开始/结束时批量启用或禁用所有用户消息上的操作按钮（如编辑、分叉、复制、删除），防止用户在助手响应期间执行破坏性操作。
+这个模块只有一个 DOM 辅助函数，用来同步用户消息底部“rewind / fork”按钮的禁用态。
 
-## 导入关系
+## 导出
 
-**上游**: 无外部导入。
-
-**下游**: `OpenCodianView` — 在流式传输状态变更时调用。
-
-## 核心类型 / 接口
-
-无。
-
-## 核心逻辑
-
-### 按钮状态同步
-遍历容器内所有 `.opencodian-user-action-btn` 按钮，设置 `disabled` 属性。流式传输中（`isStreaming === true`）禁用所有按钮，传输结束后重新启用。
-
-## 关键方法
-
-| 方法 | 说明 |
-|------|------|
-| `syncUserMessageStreamingActionState(container, isStreaming)` | 根据流式状态启用/禁用用户消息操作按钮 |
-
-## 数据流
-
-```
-流式传输开始 → syncUserMessageStreamingActionState(container, true)
-  → 所有 .opencodian-user-action-btn 设置 disabled = true
-
-流式传输结束 → syncUserMessageStreamingActionState(container, false)
-  → 所有 .opencodian-user-action-btn 设置 disabled = false
+```typescript
+syncUserMessageStreamingActionState(
+  container: ParentNode,
+  isStreaming: boolean,
+): void
 ```
 
-## 与其他模块的交互
+## 实现事实
 
-- **OpenCodianView**: 在 `syncTabStreamLikeState()` / `syncTabUserMessageActionButtons()` 中调用
-- **styles.css**: `.opencodian-user-action-btn` 样式定义
+- 目标选择器固定为 `.opencodian-user-action-btn`
+- 函数会遍历 `container` 下所有匹配按钮
+- 对每个按钮直接写入 `button.disabled = isStreaming`
 
-## 配置项
+## 模块关系
 
-无。
+- 无上游依赖
+- 下游消费者：`OpenCodianView.syncTabUserMessageActionButtons()`
 
 ## 注意事项
 
-- CSS 选择器 `.opencodian-user-action-btn` 需与渲染用户消息时的 class 保持一致
-- 这是纯 DOM 操作，无状态管理
-
-## 待补充
-
-- [ ] 各操作按钮（编辑/重发/分叉/复制/删除）的具体 handler 分布
-- [ ] 按钮禁用状态的视觉反馈样式
+- 这个函数不会处理用户消息里的复制按钮，因为复制按钮使用的是另一套 class：`opencodian-copy-btn-inline--user`。
+- 它也不判断“是否允许 fork / rewind”；业务判断由 `OpenCodianView` 完成，这里只负责同步当前 tab 的 streaming 禁用态。

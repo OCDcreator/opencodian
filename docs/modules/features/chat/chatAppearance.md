@@ -1,81 +1,64 @@
 # chatAppearance
 
 > **源码**: `src/features/chat/chatAppearance.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
-聊天外观 CSS 变量构建器。将 `ChatAppearanceSettings` 对象转换为一组 CSS 自定义属性（`--opencodian-*`），供 `styles.css` 中的规则消费。涵盖布局间距、消息气泡样式、输入面板、滚动条、主题背景图片和输入面板玻璃折射效果。
+这个模块是聊天外观的纯函数工具集，不直接操作 DOM。它把设置对象转换成 `OpenCodianView.applyChatAppearanceSettings()` 可以批量写入容器元素的 CSS 变量和样式文本。
 
-## 导入关系
+## 导出
 
-**上游**:
-- `../../core/types` — `ChatAppearanceSettings`, `ChatAppearanceBackgroundFitMode`, `InputPanelGlassRefractionSettings`, `isValidChatAppearanceCustomCssDeclarations`
-
-**下游**: `OpenCodianView` — `applyChatAppearanceSettings()` 调用此模块将设置应用到 DOM。
-
-## 核心类型 / 接口
-
-无自定义类型，消费 `core/types` 中的 `ChatAppearanceSettings` 和 `InputPanelGlassRefractionSettings`。
-
-## 核心逻辑
-
-### CSS 变量生成
-`getChatAppearanceCssVariables()` 接收完整外观设置，计算派生值（如 `backgroundScale`、`backgroundBleed`、`backgroundOverlayOpacity`），输出约 30 个 CSS 自定义属性。
-
-### 背景图片适配模式
-`getChatAppearanceBackgroundSizeValue()` 将 `ChatAppearanceBackgroundFitMode`（`cover`/`contain`/`fit-width`/`fit-height`）转换为 CSS `background-size` 值。
-
-### 玻璃折射变量
-`getInputPanelGlassRefractionCssVariables()` 为输入面板的 glass/card/pill 三层各生成 4 个 CSS 变量（`bg-alpha`、`blur`、`saturation`、`brightness`）。
-
-### 自定义 CSS 注入
-`buildChatAppearanceCustomCss()` 验证用户自定义 CSS 声明（通过 `isValidChatAppearanceCustomCssDeclarations` 安全校验），安全地包装在 `.opencodian-container` 选择器中。
-
-## 关键方法
-
-| 方法 | 说明 |
-|------|------|
-| `getChatAppearanceCssVariables(appearance)` | 从外观设置生成全部 CSS 自定义属性映射 |
-| `getChatAppearanceBackgroundSizeValue(fitMode)` | 将 fitMode 枚举转为 CSS background-size 值 |
-| `getInputPanelGlassRefractionCssVariables(settings)` | 生成输入面板玻璃折射 CSS 变量 |
-| `buildChatAppearanceCustomCss(declarations)` | 构建安全的自定义 CSS 字符串 |
-
-## 数据流
-
-```
-ChatAppearanceSettings (plugin.settings)
-  → getChatAppearanceCssVariables()
-    → Record<string, string> (30+ CSS 变量)
-    → OpenCodianView.applyChatAppearanceSettings()
-      → element.style.setProperty() 批量应用到容器
+```typescript
+getChatAppearanceBackgroundSizeValue(fitMode): string
+getChatAppearanceCssVariables(appearance): Record<string, string>
+getInputPanelGlassRefractionCssVariables(settings): Record<string, string>
+buildChatAppearanceCustomCss(declarations): string
 ```
 
-## 与其他模块的交互
+## 关键行为
 
-- **OpenCodianView**: 唯一消费者，在 `applyChatAppearanceSettings()` 中调用
-- **core/types**: 类型定义来源
-- **styles.css**: 消费这些 CSS 变量的样式规则
+### 背景尺寸映射
 
-## 配置项
+`getChatAppearanceBackgroundSizeValue()` 只负责把 `fitMode` 枚举转换成 CSS `background-size` 值：
 
-由 `ChatAppearanceSettings` 控制，包含：
-- `layout` — `messagesPaddingTop`, `messagesPaddingX`
-- `sticky` — `headerGap`, `maskHeight`, `maskBlur`
-- `background` — `opacity`, `blur`, `depth`, `dim`, `edgeFade`, `saturation`, `brightness`, `fitMode`, `focusX`, `focusY`
-- `user` — `radius`, `tailRadius`, `blur`, `shadowBlur`
-- `assistant` — `radius`, `backgroundOpacity`, `blur`, `shadowBlur`
-- `input` — `radius`, `backgroundOpacity`, `blur`, `shadowBlur`
-- `scrollbar` — `width`, `radius`, `trackOpacity`, `thumbOpacity` 等
+- `contain` -> `contain`
+- `fit-width` -> `100% auto`
+- `fit-height` -> `auto 100%`
+- `cover` 或未知值 -> `cover`
+
+### 聊天外观变量生成
+
+`getChatAppearanceCssVariables()` 读取 `ChatAppearanceSettings`，生成消息区、背景、用户气泡、助手气泡、输入区、滚动条相关的 `--opencodian-*` 变量。
+
+其中有几组变量是运行时计算值，不是直接照抄设置：
+
+- `backgroundScale = 1 + depth / 100`
+- `backgroundBleed` 由 `blur`、`edgeFade`、`depth` 组合计算，并有 `28px` 下限
+- 背景遮罩和高光透明度会做上限裁剪，避免数值失控
+
+### 输入面板玻璃折射变量
+
+`getInputPanelGlassRefractionCssVariables()` 为 `glass`、`card`、`pill` 三层分别生成透明度、模糊、饱和度、亮度变量，供输入面板的 glass-refraction 主题使用。
+
+### 自定义 CSS 包装
+
+`buildChatAppearanceCustomCss()` 会先裁剪字符串，再调用 `isValidChatAppearanceCustomCssDeclarations()` 做校验。只有在声明非空且通过校验时，才返回：
+
+```css
+.opencodian-container {
+  ...
+}
+```
+
+否则返回空字符串。
+
+## 模块关系
+
+- 上游依赖：`../../core/types`
+- 下游消费者：`OpenCodianView.applyChatAppearanceSettings()`
 
 ## 注意事项
 
-- `backgroundBleed` 由 `blur`、`edgeFade`、`depth` 三者联合计算，调整外观时需注意联动效果
-- `backgroundOverlayOpacity` 系列值有硬上限（68%/78%/84%/18%），防止背景完全遮盖内容
-- 自定义 CSS 通过验证函数确保不注入危险选择器
-
-## 待补充
-
-- [ ] 每个 CSS 变量在 styles.css 中的具体消费位置
-- [ ] 派生值（bleed/overlay）的视觉效果说明
-- [ ] 主题预设与此模块的关系
+- 这个模块不保存任何状态，也不附带默认值回填逻辑；输入必须是已经完成初始化的设置对象。
+- 自定义 CSS 只能以“声明集合”的形式注入，作用域固定为 `.opencodian-container`，不会在这里生成更外层或更复杂的选择器。

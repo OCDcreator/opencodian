@@ -1,7 +1,7 @@
 # Nikdelvin Liquid Glass 适配器
 
 > **源码**: `src/utils/glass/adapters/nikdelvin.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
@@ -131,8 +131,3 @@ unmount → stopBackgroundSpin → disconnect observer → cleanupInstanceArtifa
 - 背景旋转仅在鼠标悬停时启动，离开时停止
 - `cleanupInstanceArtifacts()` 使用 `querySelectorAll` 按自定义 data attribute 清理
 - 实例 ID 通过递增计数器生成，不使用 UUID
-
-## 待补充
-- [ ] 内置背景资源文件列表和尺寸
-- [ ] CSS 变量 `--opencodian-composer-liquid-*` 的完整定义
-- [ ] `inline` 模式的布局行为详细说明

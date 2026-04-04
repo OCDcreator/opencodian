@@ -1,7 +1,7 @@
 # Obsidian Context Helpers
 
 > **源码**: `src/shared/obsidianContext.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
@@ -42,7 +42,7 @@ Obsidian 显式上下文（explicit context）工具函数。处理 `<obsidian_c
 ### MIME 类型解析
 
 两层 MIME 映射表：
-- `TEXT_MIME_BY_EXTENSION` — 文本文件（ts, js, py, md 等 18 种）
+- `TEXT_MIME_BY_EXTENSION` — 文本文件（css, html, java, js, json, jsonc, jsx, md, mjs, py, sh, sql, text, toml, ts, tsx, txt, xml, yaml, yml 等 20 种）
 - `CONTEXT_MIME_BY_EXTENSION` — 全类型（含图片、文档、压缩包等 80+ 种）
 
 `resolveContextMimeFromPath(path)` → 扩展名 → MIME 类型，默认 `application/octet-stream`
@@ -74,6 +74,7 @@ Obsidian 显式上下文（explicit context）工具函数。处理 `<obsidian_c
 | `formatContextLabel(path, range?)` | `basename:lines` 格式标签 |
 | `toFileContextUrl(path, range?)` | 构建 `file:///` URL（含 start/end 参数） |
 | `parseLineRangeFromFileUrl(url)` | 从 file URL 解析行范围 |
+| `getContextPathExtension(path)` | 从路径中提取文件扩展名 |
 | `isHiddenContextPath(path)` | 检查隐藏路径 |
 | `isEligibleContextFilePath(path)` | 检查可用的上下文文件路径 |
 
@@ -112,6 +113,4 @@ Obsidian 显式上下文（explicit context）工具函数。处理 `<obsidian_c
 - MIME 检测仅基于扩展名，不检查文件内容
 - `toFileContextUrl()` 使用 Node.js `pathToFileURL`，在浏览器环境可能需要 polyfill
 
-## 待补充
-- [ ] 上下文标签嵌套和转义的边界情况
-- [ ] 大文件上下文的截断策略
+

@@ -1,21 +1,13 @@
 # composerContext
 
 > **源码**: `src/features/chat/composerContext.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
-Composer 区域的上下文附件状态管理。管理用户在发送消息前可附加的文件/文本上下文，包括焦点预览（当前笔记/选区）、上下文 chip 的去重与合并、附加/移除操作。为 OpenCodianView 的 composer 底部 chip 行提供状态计算逻辑。
+这个模块封装了 composer 上下文 chip 的纯状态计算，不负责读取文件、操作编辑器或更新 DOM。`OpenCodianView` 持有实际的 tab 级状态，然后调用这里的函数做去重、预览保留和渲染顺序计算。
 
-## 导入关系
-
-**上游**:
-- `../../core/types` — `PromptContextItem`, `PromptContextLineRange`
-- `../../shared` — `formatContextLabel`
-
-**下游**: `OpenCodianView` — composer 区域的上下文 chip 渲染与交互。
-
-## 核心类型 / 接口
+## 核心类型
 
 ```typescript
 interface FocusContextPreview {
@@ -37,64 +29,41 @@ interface ComposerContextChipState {
 }
 ```
 
-## 核心逻辑
+## 关键行为
 
-### 上下文项去重
-`upsertDraftContextItem()` 基于 `path:lineRange` 组合键去重，替换已存在的同目标项。`removeDraftContextItemsByTarget()` 按目标键移除。
+### 目标键
 
-### 焦点预览解析
-`createFocusContextPreview()` 从活动编辑器路径和可选行范围创建预览。`resolveFocusContextPreview()` 处理焦点切换时的保留逻辑——当选区预览与当前笔记同路径时可选择保留选区预览，避免切回时丢失。
+`getContextTargetKey()` 用 `path:startLine-endLine` 生成目标键；没有行范围时，结果会是 `path:`。  
+`getPromptContextTargetKey()` 只是把 `PromptContextItem` 适配到同一套键规则。
 
-### Chip 状态构建
-`buildComposerContextChipStates()` 合并已附加项和焦点预览，生成有序的 chip 列表。焦点预览 chip 始终排在首位；若当前笔记已有同路径的 selection 附件，则隐藏 `current_note` 类型的预览。
+### 草稿上下文去重
 
-### 键生成
-`getContextTargetKey()` 和 `getPromptContextTargetKey()` 生成 `path:startLine-endLine` 格式的唯一键用于去重。
+`upsertDraftContextItem()` 会删除同目标键的旧项，再把新项追加到数组末尾。  
+`removeDraftContextItemsByTarget()` 则按目标键过滤移除。
 
-## 关键方法
+### 焦点预览创建与保留
 
-| 方法 | 说明 |
-|------|------|
-| `getContextTargetKey(path, lineRange?)` | 生成上下文目标唯一键 |
-| `getPromptContextTargetKey(item)` | 从 PromptContextItem 生成唯一键 |
-| `upsertDraftContextItem(items, item)` | 插入或替换上下文项（去重） |
-| `removeDraftContextItemsByTarget(items, target)` | 按目标移除上下文项 |
-| `createFocusContextPreview(path, lineRange?, textSnapshot?)` | 创建焦点预览对象 |
-| `resolveFocusContextPreview(next, previous, options?)` | 解析焦点切换时的预览保留逻辑 |
-| `buildComposerContextChipStates(attachedItems, focusPreview)` | 构建有序 chip 状态列表 |
+`createFocusContextPreview()` 根据路径、可选行范围和可选文本快照构造预览对象：
 
-## 数据流
+- 有 `lineRange` 时，`kind` 为 `selection`
+- 没有 `lineRange` 时，`kind` 为 `current_note`
 
-```
-活动编辑器 → createFocusContextPreview()
-  → 存入 tabRuntimeState.focusContextPreview
+`resolveFocusContextPreview()` 只有在 `retainSelectionPreview` 为真，并且“新预览是同一路径的当前笔记、旧预览是选区”时，才继续保留旧的选区预览。
 
-用户附加文件 → upsertDraftContextItem()
-  → 存入 tabRuntimeState.draftContextItems
+### chip 列表构建
 
-渲染时:
-  buildComposerContextChipStates(draftContextItems, focusContextPreview)
-    → ComposerContextChipState[] → chip DOM 渲染
-```
+`buildComposerContextChipStates()` 会把“焦点预览 + 已附加项”合并成最终渲染序列：
 
-## 与其他模块的交互
+- 预览 chip 始终优先出现在前面
+- 如果预览目标已经在已附加项里，返回的是一个 `attached: true, preview: false` 的真实附件 chip
+- 如果当前笔记预览所在文件已经有某个 `selection` 附件，则该 `current_note` 预览会被隐藏，避免和更具体的选区信息重复
 
-- **OpenCodianView**: 持有 `draftContextItems` 和 `focusContextPreview` 状态（按标签存储），调用此模块进行状态计算
-- **core/types**: `PromptContextItem` 类型定义
-- **shared/formatContextLabel**: 生成 chip 显示标签
+## 模块关系
 
-## 配置项
-
-无直接配置，由 OpenCodianView 的 composer UI 驱动。
+- 上游依赖：`../../core/types`、`../../shared`
+- 下游消费者：`OpenCodianView`
 
 ## 注意事项
 
-- 键格式 `path:startLine-endLine` 中的行号为空时仅用 `path:`，确保唯一性
-- 焦点预览的 `retainSelectionPreview` 选项用于编辑器→composer 切换时保留选区上下文
-- `buildComposerContextChipStates()` 中 `current_note` 预览在已有同路径 `selection` 附件时自动隐藏
-
-## 待补充
-
-- [ ] chip 的 attach/detach 交互完整流程
-- [ ] 与 ContextFilePickerModal 的集成
-- [ ] 发送时 contextItems 到 SDK parts 的编码过程
+- 这个模块只处理数组和轻量对象，不负责持久化。
+- `textSnapshot` 只有选区预览会自动保留；当前笔记预览不会填充 `textSnapshot`。

@@ -1,7 +1,7 @@
 # questionDockState
 
 > **源码**: `src/features/chat/ui/questionDockState.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
@@ -113,6 +113,7 @@ QuestionDockViewModel
 - `activeGroupKey` 推导优先级：`options.activeGroupKey` → 从 `activeQuestionIndex` 反推 → `groups[0].key`
 - `activeQuestionIndex` 在 `all` 模式下强制使用组内首选索引
 
-## 待补充
-- [ ] `QuestionPrompt` 的完整类型字段（header、question、options、multiple、custom）
-- [ ] single 模式下步骤导航的边界情况处理
+## 补充说明
+
+- `QuestionPrompt` 完整字段：`header: string`（分组标签）、`question: string`（问题文本）、`options: { label: string; description?: string }[]`（预设选项列表）、`multiple: boolean`（是否多选）、`custom: boolean`（是否允许自定义输入）
+- single 模式下步骤导航边界：当最后一个问题未回答时提交按钮文本为 "提交"，中间步骤为 "下一步"；在 `renderFooter` 中通过 `viewModel.currentStep.current < viewModel.totalCount` 判断

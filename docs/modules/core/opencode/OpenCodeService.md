@@ -1,176 +1,310 @@
 # OpenCodeService
 
 > **源码**: `src/core/opencode/OpenCodeService.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
-OpenCodian 与 OpenCode Server 交互的核心服务层。当前为混合架构外观（hybrid facade）：UI 层 API 保持本地化，`ServerManager` 拥有进程生命周期，SDK v2 承载大部分 CRUD、流式响应和取消中断逻辑。维护 per-session 的流式状态以支持多 Tab 并发流式。通过特性开关控制 SDK v2 与 legacy HTTP/SSE 路径之间的切换。
+`OpenCodeService` 是 OpenCodian 与 OpenCode Server 之间的核心门面。它把几类能力收在同一个服务里：
+
+- 通过 `ServerManager` 管理本地或远程 OpenCode 服务状态
+- 在 SDK v2 与 legacy HTTP/SSE 两条链路之间按 feature flag 路由
+- 维护按 session 隔离的流式状态，支持多标签并发流式响应
+- 归一化 session、message、todo、question、diff、permission 等返回值
+- 把 OpenCode 持久化消息转换成 UI 可直接消费的 `ChatMessage`
+
+当前实现是“混合外观层”：SDK v2 已覆盖大部分 CRUD、非流式 prompt、流式主链路、abort 与 sync 事件；legacy HTTP/SSE 仍完整保留作为回滚路径。
 
 ## 导入关系
 
 ```text
-上游: src/core/opencode/ServerManager, src/core/opencode/createSdkClient, src/core/opencode/sdkFetch, src/core/opencode/sdkFeatureFlags, src/core/opencode/sdkTypes, src/core/opencode/omoCompat, src/core/opencode/types, src/shared/logger
-下游: src/features/chat/OpenCodianView, src/features/chat/services/TitleGenerationService, src/core/config/ModelConfigService
+上游:
+- Obsidian `requestUrl`
+- Node `path` / `url`
+- `../../shared/*`
+- `../types/*`
+- `../types/settings`
+- `./createSdkClient`
+- `./omoCompat`
+- `./sdkFeatureFlags`
+- `./sdkTypes`
+- `./ServerManager`
+- `./types`
+
+下游:
+- `src/main.ts`
+- `src/features/chat/OpenCodianView`
+- `src/features/chat/services/TitleGenerationService`
+- `src/core/config/ModelConfigService`
+- 单元测试
 ```
 
-## 核心类型 / 接口
+## 核心类型 / 状态
 
-```typescript
-// SDK 特性开关
-interface SdkFeatureFlags {
-  sdkCrud: boolean;
-  sdkPrompt: boolean;
-  sdkStream: boolean;
-  sdkAbort: boolean;
-  sdkQuestions: boolean;
-  sdkSync: boolean;
-}
+- `OpenCodeServiceEvents`: server status、错误、模型加载事件回调。
+- `OpenCodeServiceRuntimeOptions`: 初始 managed pid、state 持久化回调、SDK feature flag 覆盖。
+- `SessionActivityStatus`: session 的 `idle` / `busy` / `retry` 状态。
+- `activeStreams: Map<string, ActiveStreamContext>`: 以 `sessionId` 为键保存当前流的 `AbortController` 和 part 类型映射。
+- `sdkFeatureFlags`: 由 `resolveSdkFeatureFlags()` 合并后的运行时 SDK 开关。
+- `sessionTodoListeners` / `sessionStatusListeners`: 订阅 `global.syncEvent.subscribe()` 的本地监听集合。
+- `syncEventAbortController` / `syncEventPromise` / `syncEventWanted`: 同步事件循环的生命周期状态。
+- `vaultPath`: 用于 SDK `directory` 注入、上下文文件绝对路径解析，以及 `ServerManager` 工作目录设置。
 
-// Per-session 流式状态
-interface SessionStreamState {
-  controller: AbortController | null;
-  // ...
-}
-
-// 发送消息选项
-interface SendMessageOptions {
-  sessionId: string;
-  model?: string;
-  provider?: string;
-  contextItems?: ContextItem[];
-  effort?: string;
-  thinkingBudget?: string;
-  // ...
-}
-```
+`responseHandlers` 字段虽然仍然存在，但当前公开的主流式接口已经是 `AsyncGenerator<StreamChunk>`。
 
 ## 核心逻辑
 
-### 健康检查 (checkHealth)
+### 服务初始化、设置同步与服务状态
 
-SDK 优先的健康检查，失败时回退到本地探针。检测 OpenCode 服务器是否可达并正常响应。
+构造函数会先：
 
-### 会话 CRUD
+1. 深拷贝 `OpenCodianSettings`
+2. 由 `getServerBaseUrl()` 生成 `baseUrl`
+3. 以“全关闭”为基线解析 `sdkFeatureFlags`
+4. 创建 `ServerManager`
 
-- `createSession(title?)`: 创建新的聊天会话
-- `getSessionMessages(sessionId)`: 获取会话消息列表
-- `updateSessionTitle(sessionId, title)`: 更新会话标题
-- `deleteSession(sessionId)`: 删除会话
-- `forkSession(sessionId, messageID?)`: 从指定消息分叉会话
-- `revertSession(sessionId, messageID, partID?)`: 回滚会话到指定消息
+`ServerManager` 的回调被接上后，服务层会在 server 进入 `running` 时自动执行 `autoFetchModels()`，并把错误与状态变化向上传递。
 
-### 消息发送与流式响应
+运行时还有三条重要的配置通道：
 
-`sendMessage(message, options)` 发送用户消息并返回流式响应。per-session 维护 `AbortController`，支持多 Tab 并发流式。`requestAssistantResponse()` 发送消息并等待完整（非流式）响应。
+- `setVaultPath(path)`: 更新 vault 路径、把工作目录传给 `ServerManager`，并重启 sync event 订阅。
+- `checkHealth()`: 优先走 SDK `global.health()`，失败时回退到 `ServerManager.checkHealth()`。
+- `updateSettings(settings)`: 根据新旧设置差异决定是否需要重启/停止 managed server；失败时会回滚内存设置、`baseUrl`、`ServerManager` 配置，并尽力恢复原服务。
 
-### 流式取消 (cancelStream)
+特别点：
 
-`cancelStream(sessionId?)` 停止指定会话的本地流，并尽力通知服务器中止执行。双路径取消：本地 AbortController + 服务器端 abort API。
+- 如果本地 managed server 正在运行，切换到新的 host/port 前会先调用 `canBindLocalEndpoint()` 做端口占用预检。
+- `isServerProcessRunning()` 代理的是 `ServerManager.isRunning()`，语义是“插件是否持有一个 managed pid”，不是“远端服务是否可达”。
 
-### 权限与问答
+### 会话 CRUD 与回退态过滤
 
-- `getPendingPermissions()`: 获取待处理的权限请求
-- `respondToPermission(requestID, reply, message?)`: 回复权限请求
-- `getPendingQuestions()`: 获取待处理的问答请求
-- `replyToQuestion(requestID, answers)`: 回复问答请求
-- `rejectQuestion(requestID)`: 拒绝问答请求
+会话读写接口几乎都支持 SDK / legacy 双路径：
 
-### 消息标准化
+- `createSession()`
+- `listSessions()`
+- `getSessionMessages()`
+- `getSessionTodos()`
+- `getSessionStatuses()`
+- `deleteSession()`
+- `updateSessionTitle()`
+- `forkSession()`
+- `revertSession()`
+- `unrevertSession()`
+- `getSessionRevertState()`
+- `getSessionDiff()`
 
-`openCodeMessageToChatMessage(info, parts)` 将持久化消息转换为聊天 UI 数据，包括 OMO 元数据和通知提示。
+其中 `getSessionMessages()` 有两个实现细节需要注意：
 
-### Diff 与同步
+- legacy 路径使用的是 `/session/:id/message`，不是 `messages`。
+- 无论 SDK 还是 legacy，读到消息后都会调用 `applySessionRevertState()`，按 session 的 `revert.messageID` / `revert.partID` 过滤被回滚掉的消息或消息尾部 parts。
 
-- `getSessionDiff(sessionId, messageID?)`: 获取当前轮次/会话的 diff 元数据
-- 通过 `global.syncEvent.subscribe()` 接收 session todo/status 更新
+`currentSessionId` 是默认会话指针；调用方如果不显式传 `options.sessionId`，多数接口会落回它。
 
-### SDK v2 / Legacy 双路径
+### Prompt 组装与 SDK/legacy 分流
 
-通过 `sdkFeatureFlags` 控制运行时路径选择：
-- **sdkCrud**: 会话 CRUD 操作
-- **sdkPrompt**: 非流式消息发送
-- **sdkStream**: 流式消息主路径
-- **sdkAbort**: 取消/中断操作
-- **sdkQuestions**: 问答请求处理
-- **sdkSync**: 同步事件订阅
+#### `buildPromptRequestParts()`
 
-Legacy 的 `connectSSE()`, `parseSSEEvents()` 和 HTTP 辅助方法保留作为回滚路径。
+请求 parts 的组装顺序固定为：
+
+1. 当前输入文本
+2. `contextItems`
+3. `images`
+
+`externalContextPaths` 仍保留在 `QueryOptions` 里，但这里会直接记一条 debug log 后忽略，不再序列化。
+
+#### 上下文 item 的序列化
+
+- 本地模式：
+  - 序列化为 `file` part
+  - `url` 使用 `toFileContextUrl()`
+  - 如果是 `selection` 且带 `textSnapshot`，会把选中文本放进 `source.text`
+- 远程模式：
+  - 只允许 text-like MIME
+  - 必须有 `textSnapshot`
+  - 文本大小上限是 `64 * 1024` 字节
+  - 序列化为带 `synthetic: true` 的 `text` part，内容由 `buildObsidianContextTag()` 生成
+
+图片会被追加成 data URL `file` part。
+
+#### 非流式请求
+
+`requestAssistantResponse()`：
+
+- `sdkPrompt` 开启时调用 `client.session.prompt(...)`
+- 否则 POST 到 `/session/:id/message`
+
+返回值不是原始 OpenCode message，而是已经过 `openCodeMessageToChatMessage()` 归一化后的 `ChatMessage`。
+
+#### 流式请求
+
+`sendMessage()`：
+
+- `sdkStream` 开启时调用 `sendMessageWithSdk()`
+- 否则先 POST `/session/:id/prompt_async`，再连接 legacy SSE `/event`
+
+`buildSdkPromptParameters()` 只在 SDK 路径上生效，并且：
+
+- `allowedTools` 会被转换成 `{ [toolName]: true }`
+- `reasoningEffort` 会映射到 SDK `variant`
+- `system` 会透传
+- `thinkingBudget` 当前不会写进 SDK v2 payload，只会记录 debug log
+
+legacy 流式路径则会把：
+
+- `reasoningEffort` 写进 `model.options.reasoningEffort`
+- `thinkingBudget` 写进 `model.options.thinking`
+
+### 流式事件处理与取消
+
+服务层的并发模型是“每个 session 一条活动流”：
+
+- `createActiveStreamContext()` 会为 `sessionId` 分配独立 `AbortController`
+- 如果同一 session 已有旧流，会先中断旧流再替换
+- `handleStreamingEvent()` 负责把 OpenCode event 归一化成 `StreamChunk`
+
+当前会产出的 chunk 类型包括：
+
+- `usage`
+- `text`
+- `thinking`
+- `tool_use`
+- `tool_result`
+- `permission_request`
+- `file_edited`
+- `question_request`
+- `message_start`
+- `message_stop`
+- `message_metadata`
+- `error`
+
+`sendMessageWithSdk()` 有一个很具体的降级策略：
+
+- 如果 SDK `event.subscribe()` 在第一条事件之前就失败，会回退到 legacy SSE
+- 一旦已经开始收到 SDK 事件，后续异常不会再切回 legacy，而是直接产出 `error` chunk
+
+流结束后，`finishStreamingResponse()` 还会重新拉一次 session messages，补发任何未在流里出现的尾部文本，并补一条 `message_metadata`，最后统一输出 `message_stop`。
+
+取消分两种：
+
+- `cancelStream(sessionId?)`: 先中断本地流，再 best-effort 调用 `abortSessionOnServer()`
+- `detachStream(sessionId?)`: 只中断本地观察，不请求服务端 abort
+
+### Todo / status 的 sync 事件循环
+
+只有在 `sdkSync` 开启且存在本地监听器时，才会启动 `global.syncEvent.subscribe()` 循环。
+
+链路如下：
+
+1. `subscribeToSessionTodoUpdates()` / `subscribeToSessionStatusUpdates()` 注册监听器
+2. `ensureSyncEventSubscription()` 启动循环
+3. `runSyncEventLoop()` 订阅 SDK sync stream
+4. `handleSyncEvent()` 只处理两类事件：
+   - `todo.updated`
+   - `session.status`
+5. 订阅失败后等待 1 秒并重试；停止时通过 `AbortController` 中断
+
+修改 vault 路径或设置时，服务会先停掉旧订阅，再按需要恢复。
+
+### 消息标准化、上下文附件与 OMO
+
+`openCodeMessageToChatMessage()` 是服务层和 UI 之间的重要桥：
+
+- 把 `text` / `reasoning` / `tool` parts 组装成 `contentBlocks`
+- 为 assistant message 生成 `modelId`
+- 为用户消息提取 `contextAttachments`
+- 识别 OMO 注入与 system reminder
+
+上下文提取有三条来源：
+
+1. 用户消息中的 synthetic text tag（`parseObsidianContextTag`）
+2. `file` parts（`parseFileContextAttachment`）
+3. 夹在文本里的 inline Read tool 记录（`Called the Read tool with the following input:`）
+
+inline Read tool 解析成功后：
+
+- 会把对应的文件/行号转成 `MessageContextAttachment`
+- 同时把这段工具调用 JSON 从可见正文里剥离出去
+
+OMO 处理则基于 `detectOmoMessageMeta()`：
+
+- 用户注入消息最终显示 `originalText`
+- system reminder 最终显示 `reminderText`
+- system reminder 会把 `displayStyle` 设为 `notice`，`noticeTone` 设为 `info`
+
+### 模型、权限、问题与上下文使用快照
+
+除了聊天主链路，服务层还负责一组周边接口：
+
+- `getAvailableModels()`: 读取 SDK `config.providers()` 或 legacy `/config/providers`，并把 string-array/object 两种 provider model 结构统一成同一个返回形状。
+- `getSessionContextUsageSnapshot()`: 并发读取 session、messages、providers，计算 provider/model 名称、上下文窗口、token 统计和总 cost。
+- `getPendingPermissions()` / `respondToPermission()`: 当前跟随 `sdkCrud` 开关走 SDK `permission.*` 或 legacy `/permission/*`。
+- `getPendingQuestions()` / `replyToQuestion()` / `rejectQuestion()`: 由 `sdkQuestions` 单独控制。
 
 ## 关键方法
 
 | 方法 | 说明 |
 |------|------|
-| `checkHealth()` | SDK 优先健康检查，回退到本地探针 |
-| `createSession(title?)` | 创建新聊天会话 |
-| `cancelStream(sessionId?)` | 停止指定会话流 + 尽力 abort 服务器执行 |
-| `sendMessage(message, options)` | 发送消息并获取流式响应 |
-| `requestAssistantResponse(message, options)` | 发送消息并等待完整非流式响应 |
-| `getAvailableModels()` | 获取可用的 provider 和 model 列表 |
-| `getSessionMessages(sessionId)` | 获取会话消息 |
-| `updateSessionTitle(sessionId, title)` | 更新会话标题 |
-| `deleteSession(sessionId)` | 删除会话 |
-| `forkSession(sessionId, messageID?)` | 从指定消息分叉会话 |
-| `revertSession(sessionId, messageID, partID?)` | 回滚会话 |
-| `getPendingPermissions()` | 获取待处理权限请求 |
-| `getPendingQuestions()` | 获取待处理问答请求 |
-| `respondToPermission(requestID, reply, message?)` | 回复权限请求 |
-| `replyToQuestion(requestID, answers)` | 回复问答请求 |
-| `rejectQuestion(requestID)` | 拒绝问答请求 |
-| `getSessionDiff(sessionId, messageID?)` | 获取 diff 元数据 |
-| `openCodeMessageToChatMessage(info, parts)` | 标准化消息为 UI 数据 |
+| `start()` / `stop()` | 启停底层 `ServerManager` 并管理 sync 事件订阅 |
+| `checkHealth()` | SDK 优先健康检查，失败时回退到 `ServerManager` |
+| `updateSettings()` | 根据新旧设置差异更新 `baseUrl`、`ServerManager` 和订阅状态 |
+| `createSession()` | 创建 session，并可同时写入 `currentSessionId` |
+| `getSessionMessages()` | 读取消息并应用 revert 过滤 |
+| `requestAssistantResponse()` | 非流式请求，返回归一化后的 `ChatMessage` |
+| `sendMessage()` | 流式请求入口，按 flag 选择 SDK 或 legacy SSE |
+| `cancelStream()` | 本地 abort + 服务端 abort |
+| `detachStream()` | 只停止本地流观察 |
+| `subscribeToSessionTodoUpdates()` | 订阅 todo.updated sync 事件 |
+| `subscribeToSessionStatusUpdates()` | 订阅 session.status sync 事件 |
+| `getAvailableModels()` | 读取并统一 provider/model 目录 |
+| `getSessionContextUsageSnapshot()` | 计算 token/cost/context window 快照 |
+| `getPendingPermissions()` / `respondToPermission()` | 处理权限请求 |
+| `getPendingQuestions()` / `replyToQuestion()` / `rejectQuestion()` | 处理 OpenCode question 请求 |
+| `getSessionDiff()` | 拉取 session diff 元数据 |
+| `openCodeMessageToChatMessage()` | 把 OpenCode persisted message 归一化为 UI message |
 
 ## 数据流
 
 ```mermaid
 graph TD
-    subgraph "OpenCodeService"
-        A[SDK v2 Client] --> B[Feature Flag 路由]
-        B -->|flag on| C[SDK 路径]
-        B -->|flag off| D[Legacy HTTP/SSE 路径]
-        E[Per-Session Stream State]
-    end
-    
-    F[OpenCodianView] -->|发送消息| A
-    F -->|取消流| E
-    G[TitleGenerationService] -->|非流式请求| A
-    H[ModelConfigService] -->|获取模型| A
-    
-    C --> I[OpenCode Server]
-    D --> I
+    A[OpenCodianView / TitleGenerationService] --> B[OpenCodeService]
+    B --> C{feature flag 路由}
+    C -->|SDK| D[createSdkClient]
+    C -->|legacy| E[requestUrl + fetch/SSE]
+    D --> F[OpenCode Server]
+    E --> F
+    F --> G[OpenCode message / event]
+    G --> H[handleStreamingEvent / normalize*]
+    H --> I[StreamChunk / ChatMessage]
+    I --> A
 ```
 
 ## 与其他模块的交互
 
-- **ServerManager**: 间接使用，服务器进程生命周期由 ServerManager 管理
-- **createSdkClient**: 创建 SDK v2 客户端实例
-- **sdkFetch**: 为 SDK 提供混合 requestUrl/fetch 传输层
-- **sdkFeatureFlags**: 读取运行时特性开关
-- **sdkTypes**: SDK v2 与内部类型的桥接
-- **omoCompat**: 在消息标准化中检测 OMO 元数据
-- **OpenCodianView**: 主要消费者，通过此服务完成所有聊天交互
-- **TitleGenerationService**: 调用 `requestAssistantResponse` 生成标题
-- **ModelConfigService**: 调用 `getAvailableModels()` 获取模型目录
+- `ServerManager`: 负责本地/远程服务生命周期与健康检查。
+- `createSdkClient`: 为每次 SDK 调用创建客户端实例。
+- `sdkFeatureFlags`: 定义 SDK 与 legacy 的路由开关。
+- `omoCompat`: 负责 OMO 文本检测与元数据提取。
+- `shared/*`: 提供上下文标签、路径解析、tool 状态和结果文本等辅助能力。
+- `OpenCodianView`: 是最主要消费者，聊天发送、流式渲染、取消、diff、todo、question 都通过本服务完成。
+- `TitleGenerationService`: 调用 `requestAssistantResponse()` 走非流式链路。
+- `ModelConfigService`: 调用 `getAvailableModels()` 读取服务端目录。
 
 ## 配置项
 
-- **SDK Feature Flags**: 通过 `main.ts` 注入的运行时开关
-- **服务器模式**: 本地 / 远程，影响 ServerManager 行为
-- **端口 / URL**: OpenCode 服务器连接配置
+| 项目 | 来源 | 当前行为 |
+|------|------|---------|
+| `sdkFeatureFlags` | 运行时注入 | 不传时全部关闭；`main.ts` 当前启用 `sdkCrud` / `sdkPrompt` / `sdkStream` / `sdkAbort` / `sdkSync`，保留 `sdkQuestions` 为关闭 |
+| `server.*` | `OpenCodianSettings` | 决定 `baseUrl`、认证方式和 `ServerManager` 行为 |
+| `defaultProvider` / `defaultModel` | `OpenCodianSettings` | 调用方未显式传 `provider` / `model` 时作为默认模型 |
+| `allowedTools` | `QueryOptions` | 只在 SDK prompt 路径里映射为 `tools` 记录 |
+| `reasoningEffort` | `QueryOptions` | SDK 路径映射到 `variant`；legacy 路径映射到 `model.options.reasoningEffort` |
+| `thinkingBudget` | `QueryOptions` | legacy 路径会下发；SDK prompt 路径当前仅记录日志，不写入 payload |
+| `REMOTE_CONTEXT_TEXT_LIMIT_BYTES` | 常量 | 远程模式上下文文本上限 64 KiB |
 
 ## 注意事项
 
-- **并发安全**: 流状态按 session 维护，不同 Tab/session 可以并发流式，不会共享全局 abort/controller
-- **Rollback 路径**: Legacy `connectSSE()`, `parseSSEEvents()` 等 **不要删除**，作为 SDK v2 回滚路径保留
-- **测试安全**: 构造 `OpenCodeService` 不传运行时覆盖时，所有 SDK 标志默认关闭
-- **Pending 模块**: `format`, `agent`, `noReply`, `session.summarize()` 等尚未迁移
-- **已废弃**: `externalContextPaths` 已废弃，未来可能被替换
-
-## 待补充
-
-- [ ] `sendMessage` 的完整事件流（text / thinking / tool_use / tool_result / done / error）
-- [ ] Per-session stream state 的完整字段
-- [ ] SDK v2 与 legacy 路径的具体 API 对照表
-- [ ] `contextItems` (显式 Obsidian 文件/文本 parts) 的序列化细节
-- [ ] 后台任务流式进度和 follow-up 伪流式展开机制
-- [ ] 空闲会话同步循环 (idle sync loop) 的触发条件和行为
+- `OpenCodeService.initialize()` 仍然存在，但运行时入口 `main.ts` 并不调用它；主要使用方是测试。
+- `getPendingPermissions()` / `respondToPermission()` 当前跟随的是 `sdkCrud`，不是单独的 permission flag。
+- `checkHealth()` 和 `getAvailableModels()` 也跟随 `sdkCrud`，而不是独立的 health/models flag。
+- legacy `connectSSE()` / `parseSSEEvents()` 仍然是有效回滚路径，不能在 SDK rollout 未完全收口前删除。
+- 文件里的 `transformEventToChunks()` / `transformPartToChunks()` 仍保留，但当前主流式路径实际走的是 `handleStreamingEvent()`。

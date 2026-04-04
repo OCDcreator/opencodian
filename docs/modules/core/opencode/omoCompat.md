@@ -1,113 +1,132 @@
 # OMO Compatibility
 
 > **源码**: `src/core/opencode/omoCompat.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
-oh-my-opencode (OMO) 兼容层，处理 OMO 插件对用户消息的注入和变异。负责检测 OMO 添加的特殊标记（如 `[search-mode]` 前缀、`<system-reminder>` 标签、`<!-- OMO_INTERNAL_INITIATOR -->` 注释等），保留原始 OMO 文本的同时提取 UI 友好的元数据，供聊天界面渲染注入提示摘要和原始提示折叠面板。
+`omoCompat.ts` 是一个纯文本解析模块，唯一对外导出 `detectOmoMessageMeta(role, text)`。它负责识别两类 OMO 变异内容：
+
+- 用户消息里的注入提示（`[xxx-mode] ... --- ...`）
+- system reminder（`<system-reminder>...</system-reminder>` 或 `<!-- OMO_INTERNAL_INITIATOR -->`）
+
+返回值不是 UI 组件，而是 `OmoMessageMeta`，随后由 `OpenCodeService.openCodeMessageToChatMessage()` 写进 `ChatMessage.omo`。
 
 ## 导入关系
 
 ```text
-上游: (无外部依赖，纯文本解析逻辑)
-下游: src/core/opencode/OpenCodeService (openCodeMessageToChatMessage), src/features/chat/OpenCodianView (OMO UI 渲染)
+上游:
+- `src/core/types/chat.ts` 中的 `OmoMessageMeta` / `OmoReminderType` / `OmoBackgroundTaskInfo`
+
+下游:
+- `src/core/opencode/OpenCodeService`
 ```
 
-## 核心类型 / 接口
+## 核心类型 / 输出形状
 
-```typescript
-// OMO 检测结果
-interface OmoDetectionResult {
-  isOmoMessage: boolean;
-  injectedPrompt?: string;
-  rawOriginalInput?: string;
-  systemReminder?: string;
-  isInternalInitiator?: boolean;
-  // ...
-}
+模块只返回两种元数据：
 
-// OMO 消息模式
-type OmoPattern = "search-mode" | "system-reminder" | "internal-initiator" | ...;
-```
+- `OmoUserInjectionMeta`
+  - `kind: 'user-injection'`
+  - `modeTag`
+  - `injectedPrompt`
+  - `originalText`
+  - `rawText`
+  - `headline`
+- `OmoSystemReminderMeta`
+  - `kind: 'system-reminder'`
+  - `reminderType`
+  - `reminderText`
+  - `rawText`
+  - `headline`
+  - `isInternalInitiator`
+  - `tasks?`
 
 ## 核心逻辑
 
-### 注入提示检测
+### system reminder 检测优先
 
-检测用户消息中的 OMO 注入模式：
-1. **`[search-mode]` 前缀 + `--- 原始输入`**: OMO 的搜索模式注入，分隔线前为 OMO 注入内容，分隔线后为用户原始输入
-2. **`<system-reminder>...</system-reminder>`**: OMO 的系统提醒注入，包含 markdown 格式的提醒内容
-3. **`<!-- OMO_INTERNAL_INITIATOR -->`**: OMO 内部发起者标记，标识该消息由 OMO 内部触发
+`detectOmoMessageMeta()` 会先调用 `detectSystemReminder(text)`，不区分角色。
 
-### 元数据提取
+system reminder 的识别条件是：
 
-从检测到的 OMO 模式中提取：
-- 注入的提示内容（用于摘要显示）
-- 用户原始输入（用于显示真实用户消息）
-- 系统提醒内容（用于通知卡片渲染）
-- 原始完整文本（用于原始提示折叠面板）
+- 文本里出现 `<!-- OMO_INTERNAL_INITIATOR -->`
+- 或匹配 `<system-reminder>...</system-reminder>`
 
-### UI 元数据构建
+解析后会做这些规范化处理：
 
-将解析结果转换为 UI 层可直接消费的元数据结构，包含：
-- 注入提示的摘要文本
-- 是否显示原始提示展开面板
-- 系统提醒的 markdown 内容
-- 后台任务提醒标记
+- 把 `\r\n` 统一成 `\n`
+- 折叠连续 3 个及以上空行为 2 个空行
+- 去掉 marker / tag 包装并 `trim()`
+
+`reminderType` 的分类规则只有三种：
+
+- 包含 `[ALL BACKGROUND TASKS COMPLETE]` -> `all-background-tasks-complete`
+- 包含 `[BACKGROUND TASK COMPLETED]` -> `background-task-completed`
+- 其他 -> `generic`
+
+### 后台任务信息解析
+
+源码当前只支持两种 task 文本结构：
+
+- 单个完成任务：
+  - `ID: \`...\``
+  - `Description: ...`
+- 全部完成任务列表：
+  - `- \`task-id\`: description`
+
+如果文本不符合这两种格式，`tasks` 就保持 `undefined`。
+
+### 用户注入提示检测
+
+只有当 `role === 'user'` 且前面没有匹配到 system reminder 时，才会尝试 `detectUserInjection(text)`。
+
+判定条件是：
+
+1. 第一行匹配 `^\[([a-z0-9-]+-mode)\]$`
+2. 从底部向上找到最后一个 `---` 分隔线
+3. 分隔线前有注入提示正文，分隔线后有原始输入正文
+
+这里没有解析固定的“原始输入”字样；真正依赖的是：
+
+- 第一行的 `[...-mode]`
+- 最后一个 `---`
+
+### headline 生成
+
+两类元数据都会通过 `getFirstMeaningfulLine()` 取第一条非空行作为 `headline`，供 UI 做摘要标题。
 
 ## 关键方法
 
 | 方法 | 说明 |
 |------|------|
-| `detectOmoMessage(text)` | 检测文本是否包含 OMO 注入模式，返回解析结果 |
-| `extractInjectedPrompt(text)` | 提取注入的提示内容 |
-| `extractOriginalInput(text)` | 提取用户的原始输入文本 |
-| `extractSystemReminder(text)` | 提取 system-reminder 标签内容 |
-| `buildOmoMetadata(text)` | 构建完整的 OMO UI 元数据 |
+| `detectOmoMessageMeta(role, text)` | 先检查 system reminder，再按用户角色检查 injection，返回 `OmoMessageMeta | null` |
 
 ## 数据流
 
 ```mermaid
 graph TD
-    A[用户消息文本] --> B[detectOmoMessage]
-    B -->|是 OMO| C[提取注入提示]
-    B -->|是 OMO| D[提取原始输入]
-    B -->|是 OMO| E[提取系统提醒]
-    C --> F[buildOmoMetadata]
-    D --> F
-    E --> F
-    F --> G[OpenCodeService.openCodeMessageToChatMessage]
-    G --> H[OpenCodianView OMO UI 渲染]
+    A[role + text] --> B[detectOmoMessageMeta]
+    B --> C{system reminder?}
+    C -->|yes| D[OmoSystemReminderMeta]
+    C -->|no 且 user| E[user injection parser]
+    E --> F[OmoUserInjectionMeta]
+    D --> G[OpenCodeService.openCodeMessageToChatMessage]
+    F --> G
 ```
 
 ## 与其他模块的交互
 
-- **OpenCodeService**: 在 `openCodeMessageToChatMessage()` 中调用 OMO 检测，将结果附加到消息元数据
-- **OpenCodianView**: 根据 OMO 元数据渲染：
-  - 注入提示摘要面板
-  - 原始提示可折叠面板
-  - 系统提醒通知卡片（支持 markdown 渲染）
-  - 后台任务提醒（主流结束后保持可见）
-- **styles.css**: OMO 相关的 UI 样式
+- `OpenCodeService` 在 `openCodeMessageToChatMessage()` 内调用这里的检测函数。
+- 解析出的 `rawText`、`headline`、`tasks` 等字段会跟随 `ChatMessage.omo` 一起流向 UI。
 
 ## 配置项
 
-- **OMO 设置入口**: 在 OpenCodianSettings 中有 OMO 相关的配置项（如显示/隐藏注入提示）
-- **OMO 配置文件**: `.opencode/oh-my-opencode.jsonc`（由 PluginManagementService 管理）
+无。该模块不读取设置，也不读取 `.opencode` 配置文件。
 
 ## 注意事项
 
-- OMO 注入模式可能随 OMO 版本变化，需要保持兼容性
-- 检测逻辑应基于模式匹配而非硬编码偏移量
-- 必须保留原始 OMO 文本，不丢失任何信息
-- 系统提醒中的 markdown 需要正确渲染
-- 后台任务提醒在主流结束后仍需保持可见
-
-## 待补充
-
-- [ ] 所有支持的 OMO 注入模式的完整列表和正则表达式
-- [ ] OMO 元数据在 ChatMessage 类型中的存储结构
-- [ ] 多层 OMO 注入（同一消息中多种模式）的处理策略
-- [ ] OMO 版本兼容性矩阵
-- [ ] 与 `OpenCodeService.openCodeMessageToChatMessage()` 的具体集成点
+- 检测顺序固定是“先 system reminder，后 user injection”；同一段文本不会同时返回两种元数据。
+- 当前解析是基于非常具体的字符串模式，不会做通用 markdown/HTML AST 解析。
+- assistant 角色不会尝试 user injection 解析。
+- 如果 reminder 或 injection 的结构不完整，函数会直接返回 `null`，不会返回半成品元数据。

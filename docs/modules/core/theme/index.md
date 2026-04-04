@@ -1,98 +1,169 @@
 # Theme Presets and Resolver
 
 > **源码**: `src/core/theme/index.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
-定义内置聊天主题预设（12 种）并提供外观设置解析、比较和合并工具函数。主题系统采用 "预设 + 覆盖" 模型：选择预设提供基础外观值，用户可在预设基础上微调，差异部分存储为 `customAppearanceOverrides`。4 种风格（glass / flat / soft / sharp）× 多种配色方案。
+`src/core/theme/index.ts` 定义了内置聊天主题 preset，并提供一组围绕 preset 的解析、比较和差异提取函数。它服务的不是完整设置系统，而是“preset 作为基础，局部样式覆盖作为增量”的那一层逻辑。
+
+源码当前内置 12 个 preset，分成 4 种 style：
+
+- `glass`
+- `flat`
+- `soft`
+- `sharp`
 
 ## 导入关系
 
-上游: `src/core/types/settings.ts`（`ChatAppearanceSettings`, `ThemePresetDefinition`, `ThemePresetId`, `ThemeSettings`, 归一化函数）
-下游: `src/main.ts`（主题迁移）、`src/features/chat/OpenCodianView.ts`（运行时外观应用）、`src/features/settings/OpenCodianSettings.ts`（预设选择 UI）
+```text
+上游: src/core/types/index.ts
+下游: src/main.ts, src/features/settings/OpenCodianSettings.ts, src/features/chat/OpenCodianView.ts
+```
 
 ## 核心类型 / 接口
 
-使用 `src/core/types/settings.ts` 中定义的类型：
+```typescript
+export const THEME_STYLE_CONTAINER_CLASSES: string[];
+export const THEME_PRESET_CSS_VARIABLE_NAMES: string[];
 
-| 类型 | 说明 |
-|------|------|
-| `ThemePresetId` | 预设 ID 联合类型（12 个值） |
-| `ThemePresetDefinition` | 预设完整定义（id, name, styleId, schemeName, containerClass, cssVariables, appearance） |
-| `ThemeSettings` | `{ activePresetId, customAppearanceOverrides }` |
-| `ChatAppearanceSettings` | 完整外观设置（layout, sticky, background, user, assistant, input, scrollbar, advanced） |
+export function getBuiltinThemePresets(): ThemePresetDefinition[];
+export function getThemePresetDefinition(presetId: ThemePresetId | null | undefined): ThemePresetDefinition | null;
+export function resolveThemeChatAppearance(theme: ThemeSettings): ChatAppearanceSettings;
+export function mergePartialChatAppearanceSettings(
+  base: ChatAppearanceSettings,
+  overrides?: PartialChatAppearanceSettings | null,
+): ChatAppearanceSettings;
+export function getThemeAppearanceOverridesFromBase(
+  base: ChatAppearanceSettings,
+  current: ChatAppearanceSettings,
+): PartialChatAppearanceSettings;
+export function areChatAppearanceSettingsEqual(
+  left: ChatAppearanceSettings,
+  right: ChatAppearanceSettings,
+): boolean;
+export function hasThemeAppearanceOverrides(theme: ThemeSettings): boolean;
+```
 
 ## 核心逻辑
 
-### 内置预设
+### 内置 preset 列表
 
-| 预设 ID | 风格 | 配色 | 容器 CSS 类 |
-|---------|------|------|-------------|
-| `glass-classic` | glass | Classic | `opencodian-theme-glass` |
-| `glass-warm` | glass | Warm | `opencodian-theme-glass` |
-| `glass-mint` | glass | Mint | `opencodian-theme-glass` |
-| `flat-slate` | flat | Slate | `opencodian-theme-flat` |
-| `flat-ocean` | flat | Ocean | `opencodian-theme-flat` |
-| `flat-rose` | flat | Rose | `opencodian-theme-flat` |
-| `soft-neutral` | soft | Neutral | `opencodian-theme-soft` |
-| `soft-lavender` | soft | Lavender | `opencodian-theme-soft` |
-| `soft-latte` | soft | Latte | `opencodian-theme-soft` |
-| `sharp-graphite` | sharp | Graphite | `opencodian-theme-sharp` |
-| `sharp-neon` | sharp | Neon | `opencodian-theme-sharp` |
-| `sharp-amber` | sharp | Amber | `opencodian-theme-sharp` |
+源码里的 12 个 preset 如下：
 
-### 预设 + 覆盖解析模型
-1. 用户选择预设 → 获取预设的基础 `appearance`
-2. 将 `customAppearanceOverrides` 合并到基础值上
-3. 通过 `normalizeChatAppearanceSettings()` 确保值完整且合法
-4. `background` 部分不参与覆盖 diff 计算
-
-### 差异计算
-`getThemeAppearanceOverridesFromBase()` 对比基础外观与当前外观，提取仅包含差异数据的 `PartialChatAppearanceSettings`，用于持久化用户微调。
-
-## 关键方法
-
-| 方法 | 说明 |
+| Style | Preset |
 |------|------|
-| `getBuiltinThemePresets()` | 返回所有内置预设定义（深拷贝） |
-| `getThemePresetDefinition(presetId)` | 按 ID 获取单个预设定义 |
-| `resolveThemeChatAppearance(theme)` | 解析最终外观 = 预设基础 + 用户覆盖 |
-| `mergePartialChatAppearanceSettings(base, overrides)` | 将部分覆盖合并到完整基础值上 |
-| `getThemeAppearanceOverridesFromBase(base, current)` | 计算当前值相对于基础值的差异 |
-| `areChatAppearanceSettingsEqual(left, right)` | JSON 序列化比较两个外观设置 |
-| `hasThemeAppearanceOverrides(theme)` | 检查是否存在非 background 的用户覆盖 |
-| `diffObject(base, current)` | （内部）对比两个对象的属性差异 |
+| `glass` | `glass-classic`, `glass-warm`, `glass-mint` |
+| `flat` | `flat-slate`, `flat-ocean`, `flat-rose` |
+| `soft` | `soft-neutral`, `soft-lavender`, `soft-latte` |
+| `sharp` | `sharp-graphite`, `sharp-neon`, `sharp-amber` |
+
+每个 preset 都包含：
+
+- `id`
+- `name`
+- `styleId`
+- `schemeName`
+- `containerClass`
+- `cssVariables`
+- `appearance`
+
+其中 `appearance` 来自 4 组基础外观对象之一：
+
+- `GLASS_CLASSIC_APPEARANCE`
+- `GLASS_APPEARANCE`
+- `FLAT_APPEARANCE`
+- `SOFT_APPEARANCE`
+- `SHARP_APPEARANCE`
+
+### 运行时查找表与样式清单
+
+模块额外构建了两份派生常量：
+
+- `THEME_STYLE_CONTAINER_CLASSES`
+  - 来自所有 preset 的 `containerClass` 去重结果
+  - 当前值对应 `opencodian-theme-glass/flat/soft/sharp`
+- `THEME_PRESET_CSS_VARIABLE_NAMES`
+  - 来自所有 preset 的 `cssVariables` key 去重结果
+
+以及一份内部 `THEME_PRESET_MAP`，用于按 `ThemePresetId` 查找 preset。
+
+### 读取 preset 时的拷贝策略
+
+`getBuiltinThemePresets()` 和 `getThemePresetDefinition()` 都不会把内部对象直接返回给调用方，而是返回拷贝版本：
+
+- `cssVariables` 会被浅拷贝
+- `appearance` 会重新走一次 `normalizeChatAppearanceSettings()`
+
+这样可以避免外部修改内部常量对象。
+
+### preset + overrides 解析
+
+`resolveThemeChatAppearance(theme)` 的行为是：
+
+1. 先按 `activePresetId` 找到 preset
+2. 找不到时直接返回 `getDefaultChatAppearanceSettings()`
+3. 找到时用 `mergePartialChatAppearanceSettings(preset.appearance, theme.customAppearanceOverrides)` 叠加覆盖值
+4. 最终再做一次 `normalizeChatAppearanceSettings()`
+
+### 主题覆盖值的边界
+
+这里有一个很重要的源码事实：主题覆盖值并不覆盖 `background`。
+
+`mergePartialChatAppearanceSettings()` 明确只对以下分组应用 overrides：
+
+- `layout`
+- `sticky`
+- `user`
+- `assistant`
+- `input`
+- `scrollbar`
+- `advanced`
+
+`background` 只复制 `base.background`，不会读取 `overrides?.background`。
+
+与此对应：
+
+- `getThemeAppearanceOverridesFromBase()` 不会比较 `background`
+- `hasThemeAppearanceOverrides()` 也显式忽略 `background`
+
+这说明主题 preset 系统当前只负责消息壳与输入区等外观，不把背景图相关设置视为主题覆盖的一部分。
+
+### 差异提取与比较
+
+`getThemeAppearanceOverridesFromBase(base, current)` 会逐组做浅层字段 diff，把“和 base 不同”的字段收集成 `PartialChatAppearanceSettings`。
+
+`areChatAppearanceSettingsEqual(left, right)` 则把两边都先标准化，再用 `JSON.stringify()` 比较。
+
+`hasThemeAppearanceOverrides(theme)` 会把 `theme.customAppearanceOverrides` 归一化后，判断除 `background` 以外的分组是否有非空字段。
 
 ## 数据流
 
-1. 用户在设置面板选择预设 → `theme.activePresetId` 更新
-2. 用户微调外观 → `getThemeAppearanceOverridesFromBase()` 计算差异 → `theme.customAppearanceOverrides` 更新
-3. 运行时 → `resolveThemeChatAppearance(theme)` 解析最终外观 → `chatAppearance.ts` 生成 CSS 变量 → 应用到 DOM
+```text
+src/main.ts
+  -> getThemePresetDefinition()
+  -> resolveThemeChatAppearance()
+  -> 主题迁移 / 设置归一化
+
+src/features/settings/OpenCodianSettings.ts
+  -> getBuiltinThemePresets()
+  -> hasThemeAppearanceOverrides()
+  -> preset 选择与“是否有覆盖”提示
+
+src/features/chat/OpenCodianView.ts
+  -> getThemePresetDefinition()
+  -> THEME_STYLE_CONTAINER_CLASSES / THEME_PRESET_CSS_VARIABLE_NAMES
+  -> 应用 CSS class 与 preset CSS 变量
+```
 
 ## 与其他模块的交互
 
-- **settings.ts**: 类型定义和归一化函数
-- **main.ts**: 主题迁移（版本升级时重置无效预设）
-- **OpenCodianView.ts**: 运行时解析和应用外观
-- **OpenCodianSettings.ts**: 预设选择器 UI、外观微调滑块
-- **chatAppearance.ts**: 将解析后的外观设置转为 CSS 自定义属性
-
-## 配置项
-
-| 设置 | 说明 |
-|------|------|
-| `settings.theme.activePresetId` | 当前激活的预设 ID |
-| `settings.theme.customAppearanceOverrides` | 相对于预设的用户微调 |
+- `src/main.ts` 使用 `getThemePresetDefinition()`、`resolveThemeChatAppearance()`、`getThemeAppearanceOverridesFromBase()` 和 `areChatAppearanceSettingsEqual()` 做主题迁移与设置同步。
+- `src/features/settings/OpenCodianSettings.ts` 用 `getBuiltinThemePresets()` 列出可选 preset，并用 `hasThemeAppearanceOverrides()` 提示用户是否做过样式微调。
+- `src/features/chat/OpenCodianView.ts` 用 `THEME_STYLE_CONTAINER_CLASSES` 和 `THEME_PRESET_CSS_VARIABLE_NAMES` 清理旧主题痕迹，再按当前 preset 应用 class 与 CSS 变量。
 
 ## 注意事项
 
-- `background` 不参与 `hasThemeAppearanceOverrides()` 判断和 diff 计算（背景有独立的上传/存储路径）
-- `THEME_STYLE_CONTAINER_CLASSES` 和 `THEME_PRESET_CSS_VARIABLE_NAMES` 为去重后的常量列表，供外部使用
-- `getBuiltinThemePresets()` 返回深拷贝，防止外部修改预设定义
-- glass 风格有两套外观：`GLASS_CLASSIC_APPEARANCE`（默认值）和 `GLASS_APPEARANCE`（warm/mint 使用）
-
-## 待补充
-- [ ] 记录每个风格类型的视觉特征差异
-- [ ] 补充预设重置时的行为说明
-- [ ] 记录 CSS 变量映射表
+- 如果 `activePresetId` 为空或无效，`resolveThemeChatAppearance()` 会直接回到默认聊天外观，而不是“继续套用 overrides”。
+- `background` 不属于主题 override 的差异范围；修改这部分逻辑时，必须同步检查 `main.ts`、`OpenCodianView.ts`、设置页和相关文档。
+- 新增 preset 时，`ThemePresetId`、`ThemePresetDefinition`、设置页选项和本模块文档需要一起同步。

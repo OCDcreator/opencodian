@@ -1,11 +1,13 @@
 # Settings Types and Defaults
 
 > **源码**: `src/core/types/settings.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
 OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings` 接口、`DEFAULT_SETTINGS` 常量、以及约 30 个归一化/验证/默认值辅助函数。涵盖服务器连接、模型配置、安全策略、UI/UX、主题、输入面板玻璃效果、标签页状态等全部可配置维度。所有设置变更都需要经过对应的 `normalize*()` 函数验证后才能持久化。
+
+源码约 1396 行，是项目最大的类型定义文件。
 
 ## 导入关系
 
@@ -32,12 +34,12 @@ OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings` 接口、`D
 |------|------|
 | `ServerMode` | `'local' \| 'remote'` |
 | `ServerAuthType` | `'none' \| 'basic' \| 'bearer'` |
-| `ServerConfig` | 服务器配置（mode, local, remote, auth） |
-| `LocalServerConfig` | 本地服务器（host, port, autoStart） |
-| `RemoteServerConfig` | 远程服务器（baseUrl） |
-| `ServerAuthConfig` | 认证配置（type, username, password, token） |
+| `ServerConfig` | 服务器配置（`mode`, `local`, `remote`, `auth`） |
+| `LocalServerConfig` | 本地服务器（`host`, `port`, `autoStart`） |
+| `RemoteServerConfig` | 远程服务器（`baseUrl`） |
+| `ServerAuthConfig` | 认证配置（`type`, `username`, `password`, `token`） |
 | `PermissionMode` | `'yolo' \| 'plan' \| 'normal'` |
-| `PlatformBlockedCommands` | 平台分组黑名单（unix/windows） |
+| `PlatformBlockedCommands` | 平台分组黑名单（`unix`, `windows`） |
 | `ApprovalDecision` | `'allow' \| 'allow-always' \| 'deny' \| 'cancel'` |
 
 ### 模型与对话
@@ -45,7 +47,7 @@ OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings` 接口、`D
 | 类型 | 说明 |
 |------|------|
 | `ModelSourceMode` | `'merge' \| 'local' \| 'server'` |
-| `ModelProviderConfig` | 提供商配置（id, name, apiKey?, baseUrl?, enabled） |
+| `ModelProviderConfig` | 提供商配置（`id`, `name`, `apiKey?`, `baseUrl?`, `enabled`） |
 | `TitleMode` | `'default' \| 'ai'` |
 | `EffortLevel` | `'minimal' \| 'low' \| 'medium' \| 'high' \| 'xhigh'` |
 | `ThinkingBudget` | `0 \| 1024 \| 4096 \| 8192 \| 16384` |
@@ -60,8 +62,9 @@ OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings` 接口、`D
 | `TabBarPosition` | `'input' \| 'header' \| 'below-header'` |
 | `BelowHeaderTabBarLayout` | `'grid' \| 'vertical'` |
 | `ChatScrollMode` | `'natural' \| 'sticky-basic' \| 'sticky-mask'` |
-| `InputPanelThemeId` | 输入面板主题 ID（preset, glass-refraction-*, liquid-glass-*） |
+| `InputPanelThemeId` | 输入面板主题 ID（`preset`, `glass-refraction-*`, `liquid-glass-*`） |
 | `LiquidGlassAdapterId` | `'shuding' \| 'nikdelvin' \| 'shudingDiamond'` |
+| `InputPanelActionButtonStyleId` | `'default' \| 'etched'` |
 | `ChatAppearanceSettings` | 完整外观设置（8 个子对象） |
 | `PartialChatAppearanceSettings` | 外观设置的部分覆盖类型 |
 | `ThemeSettings` | `{ activePresetId, customAppearanceOverrides }` |
@@ -73,23 +76,25 @@ OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings` 接口、`D
 
 | 类型 | 说明 |
 |------|------|
-| `ChatAppearanceLayoutSettings` | 布局（messagesPaddingTop, messagesPaddingX） |
-| `ChatAppearanceStickySettings` | 吸顶区（headerGap, maskHeight, maskBlur） |
-| `ChatAppearanceBackgroundSettings` | 背景图（path, fitMode, opacity, blur, depth, dim, edgeFade, saturation, brightness, focusX, focusY） |
-| `ChatAppearanceUserSettings` | 用户消息气泡（radius, tailRadius, blur, shadowBlur） |
-| `ChatAppearanceAssistantSettings` | 助手消息气泡（radius, backgroundOpacity, blur, shadowBlur） |
-| `ChatAppearanceInputSettings` | 输入面板（radius, backgroundOpacity, blur, shadowBlur, actionButtonStyle） |
-| `ChatAppearanceScrollbarSettings` | 滚动条（width, radius, trackOpacity, thumbOpacity, thumbHoverOpacity, edgePadding, shadowOpacity） |
-| `ChatAppearanceAdvancedSettings` | 高级（customCssDeclarations） |
+| `ChatAppearanceLayoutSettings` | 布局（`messagesPaddingTop`, `messagesPaddingX`） |
+| `ChatAppearanceStickySettings` | 吸顶区（`headerGap`, `maskHeight`, `maskBlur`） |
+| `ChatAppearanceBackgroundSettings` | 背景图（`imagePath`, `fitMode`, `opacity`, `blur`, `depth`, `dim`, `edgeFade`, `saturation`, `brightness`, `focusX`, `focusY`） |
+| `ChatAppearanceUserSettings` | 用户消息气泡（`radius`, `tailRadius`, `blur`, `shadowBlur`） |
+| `ChatAppearanceAssistantSettings` | 助手消息气泡（`radius`, `backgroundOpacity`, `blur`, `shadowBlur`） |
+| `ChatAppearanceInputSettings` | 输入面板（`radius`, `backgroundOpacity`, `blur`, `shadowBlur`, `actionButtonStyle`） |
+| `ChatAppearanceScrollbarSettings` | 滚动条（`width`, `radius`, `trackOpacity`, `thumbOpacity`, `thumbHoverOpacity`, `edgePadding`, `shadowOpacity`） |
+| `ChatAppearanceAdvancedSettings` | 高级（`customCssDeclarations`） |
 
 ### 玻璃效果
 
 | 类型 | 说明 |
 |------|------|
-| `InputPanelGlassRefractionSettings` | 玻璃折射效果（glass/card/pill 三种变体） |
-| `InputPanelGlassRefractionVariantSettings` | 单变体（backgroundOpacity, blur, saturation, brightness） |
-| `InputPanelGlassRefractionSvgFilterSettings` | SVG 滤镜预设（none/subtle/strong + scale 参数） |
-| `InputPanelLiquidGlassSettings` | 液态玻璃效果（shuding/nikdelvin/shudingDiamond 三套参数） |
+| `InputPanelGlassRefractionVariantId` | `'glass' \| 'card' \| 'pill'` |
+| `InputPanelGlassRefractionVariantSettings` | 单变体（`backgroundOpacity`, `blur`, `saturation`, `brightness`） |
+| `InputPanelGlassRefractionSettings` | 玻璃折射效果（`glass`/`card`/`pill` 三种变体） |
+| `InputPanelGlassRefractionSvgFilterPresetId` | `'none' \| 'subtle' \| 'strong'` |
+| `InputPanelGlassRefractionSvgFilterSettings` | SVG 滤镜预设（`preset`, `subtleScale`, `strongScale`） |
+| `InputPanelLiquidGlassSettings` | 液态玻璃效果（`shuding`/`nikdelvin`/`shudingDiamond` 三套参数） |
 
 ### 标签页持久化
 
@@ -103,8 +108,9 @@ OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings` 接口、`D
 
 | 类型 | 说明 |
 |------|------|
-| `ProviderIconEntry` | 图标条目（id, type, source, mimeType, cacheFileName, timestamps） |
-| `ProviderIconLibrary` | `Record<providerId, ProviderIconEntry[]>` |
+| `ProviderIconEntryType` | `'mapped' \| 'url' \| 'file'` |
+| `ProviderIconEntry` | 图标条目（`id`, `type`, `source`, `mimeType?`, `cacheFileName?`, `addedAt`, `updatedAt?`） |
+| `ProviderIconLibrary` | `Record<string, ProviderIconEntry[]>` |
 
 ## 关键方法
 
@@ -115,16 +121,22 @@ OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings` 接口、`D
 | `normalizeEffortLevel(value)` | 归一化努力级别，`'max'` → `'xhigh'`，默认 `'high'` |
 | `normalizeThinkingBudget(value)` | 归一化思考预算，支持字符串/数字输入 |
 | `normalizeTabBarPosition(value)` | 归一化标签栏位置 |
+| `normalizeBelowHeaderTabBarLayout(value)` | 归一化下方标签布局 |
 | `normalizeTitleMode(value)` | 归一化标题模式 |
 | `normalizeQuestionDisplayMode(value)` | 归一化问题显示模式 |
 | `normalizeQuestionCardPosition(value)` | 归一化问题卡片位置 |
 | `normalizeInputPanelThemeId(value)` | 归一化输入面板主题（含废弃 ID 迁移） |
+| `normalizeInputPanelActionButtonStyleId(value)` | 归一化按钮样式 |
+| `normalizeChatAppearanceBackgroundFitMode(value)` | 归一化背景填充模式 |
 | `normalizePluginIsolationMode(value)` | 归一化插件隔离模式 |
 | `normalizeChatAppearanceSettings(appearance?)` | 归一化完整外观设置 |
 | `normalizePartialChatAppearanceSettings(appearance?)` | 归一化部分外观覆盖 |
 | `normalizeThemeSettings(value?)` | 归一化主题设置 |
 | `normalizePersistedTabState(state?)` | 归一化标签页持久化状态 |
 | `normalizeProviderIconLibrary(value)` | 归一化图标库 |
+| `normalizeInputPanelGlassRefractionSettings(value?)` | 归一化玻璃折射设置 |
+| `normalizeInputPanelGlassRefractionSvgFilterSettings(value?)` | 归一化 SVG 滤镜设置 |
+| `normalizeInputPanelLiquidGlassSettings(value?)` | 归一化液态玻璃设置 |
 
 ### 默认值函数
 
@@ -133,6 +145,7 @@ OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings` 接口、`D
 | `getDefaultChatAppearanceSettings()` | 默认外观设置 |
 | `getDefaultThemeSettings()` | 默认主题设置（`glass-classic`） |
 | `getDefaultInputPanelGlassRefractionSettings()` | 默认玻璃折射参数 |
+| `getDefaultInputPanelGlassRefractionSvgFilterSettings()` | 默认 SVG 滤镜参数 |
 | `getDefaultInputPanelLiquidGlassSettings()` | 默认液态玻璃参数 |
 | `getDefaultBlockedCommands()` | 默认黑名单命令 |
 | `getDefaultDebugLogPaths()` | 默认调试日志路径 |
@@ -146,10 +159,59 @@ OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings` 接口、`D
 | `isLocalServerMode(server)` | 判断是否为本地服务器模式 |
 | `isThemePresetId(value)` | 类型守卫：是否为有效预设 ID |
 | `isValidChatAppearanceCustomCssDeclarations(value)` | 验证自定义 CSS 声明安全性 |
-| `getCurrentPlatformKey()` | 返回当前平台 key |
+| `getCurrentPlatformKey()` | 返回当前平台 key（`'unix' \| 'windows'`） |
 | `getCurrentPlatformBlockedCommands(commands)` | 获取当前平台黑名单 |
 | `getBashToolBlockedCommands(commands)` | 获取 Bash 工具黑名单（Windows 合并两套） |
-| `normalizeBaseUrl(value)` | 去除尾部斜杠 |
+| `normalizeBaseUrl(value)` | 去除 URL 尾部斜杠 |
+
+## OpenCodianSettings 字段参考
+
+| 字段 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `userName` | `string` | `''` | 用户名称 |
+| `server` | `ServerConfig` | 本地模式 | 服务器配置 |
+| `enableBlocklist` | `boolean` | `true` | 启用命令黑名单 |
+| `allowExternalAccess` | `boolean` | `false` | 允许外部文件访问 |
+| `blockedCommands` | `PlatformBlockedCommands` | 预定义 | 平台黑名单 |
+| `permissionMode` | `PermissionMode` | `'yolo'` | 权限模式 |
+| `autoRestartOnPermissionChange` | `boolean` | `false` | 权限变更自动重启 |
+| `modelSourceMode` | `ModelSourceMode` | `'merge'` | 模型来源模式 |
+| `defaultProvider` | `string` | `'anthropic'` | 默认提供商 |
+| `defaultModel` | `string` | `'claude-3-5-sonnet-20241022'` | 默认模型 |
+| `titleMode` | `TitleMode` | `'default'` | 标题生成模式 |
+| `questionDisplayMode` | `QuestionDisplayMode` | `'all'` | 问题显示模式 |
+| `questionCardPosition` | `QuestionCardPosition` | `'inline'` | 问题卡片位置 |
+| `showAnsweredQuestionCards` | `boolean` | `true` | 显示已回答问题卡片 |
+| `aiTitleModel` | `string` | `''` | AI 标题专用模型 |
+| `renderUserMarkupAsCodeBlocks` | `boolean` | `true` | 用户标记渲染为代码块 |
+| `pluginIsolationMode` | `PluginIsolationMode` | `'default'` | 插件隔离模式 |
+| `providers` | `ModelProviderConfig[]` | Anthropic | 提供商列表 |
+| `providerIconLibrary` | `ProviderIconLibrary` | `{}` | 图标库 |
+| `effortLevel` | `EffortLevel` | `'high'` | 努力级别 |
+| `thinkingBudget` | `ThinkingBudget` | `4096` | 思考预算 |
+| `excludedTags` | `string[]` | `[]` | 排除标签 |
+| `mediaFolder` | `string` | `''` | 媒体文件夹 |
+| `systemPrompt` | `string` | `''` | 系统提示词 |
+| `allowedExportPaths` | `string[]` | `['~/Desktop', '~/Downloads']` | 允许导出路径 |
+| `maxTabs` | `number` | `3` | 最大标签数 |
+| `tabBarPosition` | `TabBarPosition` | `'below-header'` | 标签栏位置 |
+| `belowHeaderTabBarLayout` | `BelowHeaderTabBarLayout` | `'grid'` | 下方标签布局 |
+| `enableAutoScroll` | `boolean` | `true` | 启用自动滚动 |
+| `chatScrollMode` | `ChatScrollMode` | `'sticky-mask'` | 滚动模式 |
+| `inputPanelTheme` | `InputPanelThemeId` | `'preset'` | 输入面板主题 |
+| `inputPanelGlassRefraction` | `InputPanelGlassRefractionSettings` | 默认 | 玻璃折射设置 |
+| `inputPanelGlassRefractionSvgFilter` | `InputPanelGlassRefractionSvgFilterSettings` | 默认 | SVG 滤镜设置 |
+| `inputPanelGlassRefractionGlassDefaultsVersion` | `number` | `2` | 玻璃默认值版本 |
+| `inputPanelLiquidGlass` | `InputPanelLiquidGlassSettings` | 默认 | 液态玻璃设置 |
+| `chatAppearance` | `ChatAppearanceSettings` | 默认 | 聊天外观 |
+| `settingsPanelScrollTop` | `number` | `0` | 设置面板滚动位置 |
+| `enableDebugLogging` | `boolean` | `false` | 启用调试日志 |
+| `debugLogPaths` | `PlatformDebugLogPaths` | 默认 | 调试日志路径 |
+| `openInMainTab` | `boolean` | `false` | 在主标签页打开 |
+| `tabState` | `PersistedTabState` | 默认 | 标签页状态 |
+| `theme` | `ThemeSettings` | 默认 | 主题设置 |
+| `locale` | `string` | `'en'` | 界面语言 |
+| `hiddenSlashCommands` | `string[]` | `[]` | 隐藏的斜杠命令 |
 
 ## 数据流
 
@@ -171,14 +233,17 @@ OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings` 接口、`D
 
 ## 注意事项
 
-- `normalizeInputPanelThemeId()` 包含废弃 ID 迁移逻辑（`'liquid-glass-rdev'` → `'liquid-glass-shuding'`，`'liquid-diamond-shuding'` → `'preset'`）
+- `normalizeInputPanelThemeId()` 包含废弃 ID 迁移逻辑：
+  - `'liquid-glass-rdev'` → `'liquid-glass-shuding'`
+  - `'liquid-diamond-shuding'` → `'preset'`
 - `isValidChatAppearanceCustomCssDeclarations()` 禁止花括号和 `<style>` 标签，防止 CSS 注入
 - `normalizeFiniteNumberInRange()` 用于将数值夹紧到合法范围
 - `inputPanelGlassRefractionGlassDefaultsVersion` 用于版本化默认值迁移
 - Windows 上 `getBashToolBlockedCommands()` 合并 unix + windows 两套黑名单
+- `hiddenSlashCommands` 存储用户隐藏的斜杠命令 ID
+- 归一化函数设计原则：未知值回退到默认值，而非报错
 
-## 待补充
-- [ ] 补充 `DEFAULT_SETTINGS` 中每个字段的含义和推荐值范围
-- [ ] 记录设置版本迁移策略
-- [ ] 补充 `allowedExportPaths` 的安全模型说明
-- [ ] 记录 `inputPanelGlassRefractionGlassDefaultsVersion` 的迁移历史
+## 版本迁移
+
+- `inputPanelGlassRefractionGlassDefaultsVersion: 2` 表示当前玻璃默认值版本
+- 未来版本升级时可通过比较版本号触发默认值迁移

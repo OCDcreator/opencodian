@@ -1,7 +1,7 @@
 # File Link 处理器
 
 > **源码**: `src/utils/markdown/fileLink.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
@@ -51,7 +51,6 @@
 |------|------|
 | `processFileLinks(app, container, linkClass?)` | 后处理：扫描 DOM 替换 wikilinks |
 | `registerFileLinkHandler(options)` | 注册委托点击处理器 |
-| `extractLinkTarget(fullMatch)` | 提取链接目标路径（去除别名） |
 
 ## 数据流
 
@@ -88,6 +87,4 @@ MarkdownRenderService.render()
 - TreeWalker 过滤 `PRE`, `CODE`, `A` 和已处理元素的子节点
 - `extractLinkTarget()` 是公共函数，处理 `[[target#heading^block|alias]]` 提取 `target`
 
-## 待补充
-- [ ] Markdown 链接格式 `[text](path)` 的处理
-- [ ] 性能优化：大量链接时的批量 DOM 操作
+

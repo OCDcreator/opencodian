@@ -1,7 +1,7 @@
 # ServerSettingHelpModal
 
 > **源码**: `src/features/settings/ServerSettingHelpModal.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
@@ -74,6 +74,7 @@ i18n keys: settings.server.help.{topic}.{intro|meaning|fill|extra|example|tip1|t
 - `tr()` 使用 `t(key as never)` 绕过类型检查（因为 key 是动态拼接的）
 - tip 过滤逻辑：当 i18n 返回的值包含原始 key 文本时视为未翻译
 
-## 待补充
-- [ ] 各 topic 的帮助内容完整文本
-- [ ] `addServerHelpButton()` 的实现位置和调用模式
+## 补充说明
+
+- 各 topic 的帮助内容由 i18n key 提供，具体文本见 `src/i18n/locales/en.ts` 和 `src/i18n/locales/zh.ts` 中 `settings.server.help.{topic}.*` 命名空间
+- `addServerHelpButton()` 定义在 `OpenCodianSettings.ts` 中，为每个服务器设置项创建 `?` 按钮，点击时 `new ServerSettingHelpModal(this.app, topic).open()`

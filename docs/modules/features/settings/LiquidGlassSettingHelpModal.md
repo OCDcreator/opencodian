@@ -1,7 +1,7 @@
 # LiquidGlassSettingHelpModal
 
 > **源码**: `src/features/settings/LiquidGlassSettingHelpModal.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
@@ -64,6 +64,7 @@ onOpen() → h2(titleText) + h5(i18n heading) + p[] (分段 bodyText)
 - 使用 `createEl('p', { text })` 而非 innerHTML，自动安全
 - 正文的分段格式要求使用双换行 `\n\n` 分隔
 
-## 待补充
-- [ ] 调用方传入的典型 titleText 和 bodyText 内容示例
-- [ ] 与 glass adapter 参数的对应关系说明
+## 补充说明
+
+- 典型 titleText 示例：glass adapter 名称（如 "Shuding" / "Nikdelvin"），bodyText 由 `buildPlainLanguageHelpForAdapter()` 生成，包含该 adapter 的折射参数含义和调优建议
+- 与 glass adapter 参数的对应：bodyText 描述的参数（如 blur radius、displacement scale、opacity）对应 `InputPanelGlassRefractionSettings` 中的 `refractionBlur`、`displacementScale`、`glassOpacity` 等字段

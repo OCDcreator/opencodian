@@ -1,7 +1,7 @@
 # Shuding Diamond Liquid Crystal 适配器
 
 > **源码**: `src/utils/glass/adapters/shudingDiamond.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
@@ -125,8 +125,3 @@ unmount → cleanupState → disconnect observer + cancel animation + remove DOM
 - 指针追踪使用 `requestAnimationFrame` 动画循环，在活跃时持续消耗帧
 - 金字塔缩放因子 `SHAPE_SCALE = 0.9`，顶点坐标硬编码
 - `__testing` 导出用于单元测试，包含所有核心算法函数
-
-## 待补充
-- [ ] 性能基准测试数据
-- [ ] 参数对视觉效果的影响图谱
-- [ ] 重新启用的注册步骤

@@ -1,7 +1,7 @@
 # Stream Controller
 
 > **源码**: `src/utils/streaming/StreamController.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
@@ -40,7 +40,7 @@ SSE 流式渲染的核心控制器。管理流状态，协调 `ThinkingBlockRend
 | `tool_use` | `handleToolUseChunk()` | 创建 tool call 卡片，支持增量 input 合并 |
 | `tool_result` | `handleToolResultChunk()` | 更新 tool call 状态和结果 |
 | `error` | `handleErrorChunk()` | 渲染错误提示 |
-| `done` | `handleDoneChunk()` | 刷新所有未完成块，触发 onStreamComplete |
+| `done` | `handleDoneChunk()` | 刷新所有未完成块，终结化残留 tool calls，触发 onStreamComplete |
 
 ### 内容块最终化
 
@@ -113,7 +113,4 @@ OpenCodianView → sendMessage()
 - `cancelStream()` 和 `timeoutStream()` 不触发 `onStreamComplete`
 - `currentContentEl` 为 null 时 `handleChunk()` 静默返回
 
-## 待补充
-- [ ] 流式文本增量渲染优化（diff-based）
-- [ ] 多路并发流的隔离策略
-- [ ] Tool call 增量 input 合并的边界情况
+

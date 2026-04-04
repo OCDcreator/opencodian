@@ -1,61 +1,95 @@
 # Title Generation System Prompt
 
 > **源码**: `src/core/prompts/titleGeneration.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
-定义 AI 生成会话标题所使用的 system prompt 模板和 user prompt 构建函数。标题上限 50 字符，输出语言由插件 locale 设置驱动（`en` / `zh`）。`TitleGenerationService` 在创建临时会话时调用此模块生成 prompt，获取到 AI 响应后删除临时会话。
+`titleGeneration.ts` 是一个纯函数模块，专门给会话标题生成链路构造 prompt。它不直接和 OpenCode 服务交互，也不做响应解析；这些工作在 `TitleGenerationService` 中完成。
+
+模块负责 3 件事：
+
+- 归一化标题生成语言
+- 构造 system prompt
+- 构造 user prompt
 
 ## 导入关系
 
-上游: 无外部依赖（纯函数模块）
-下游: `src/features/chat/services/TitleGenerationService.ts`
+```text
+上游: 无
+下游: src/features/chat/services/TitleGenerationService.ts
+```
 
 ## 核心类型 / 接口
 
-| 类型 | 说明 |
-|------|------|
-| `TitleGenerationLocale` | `'en' \| 'zh'` — 标题输出语言 |
+```typescript
+export type TitleGenerationLocale = 'en' | 'zh';
+
+export function normalizeTitleGenerationLocale(locale: string): TitleGenerationLocale;
+export function buildTitleGenerationSystemPrompt(locale: string): string;
+export function buildTitleGenerationPrompt(userMessage: string, locale: string): string;
+export const TITLE_GENERATION_SYSTEM_PROMPT: string;
+```
 
 ## 核心逻辑
 
-### Prompt 规则
-System prompt 要求 AI 遵循 7 条规则：仅返回纯文本标题、句首强动词、≤50 字符、包含技术上下文、无引号/markdown/前缀/尾部标点、避免 "Help with" 等泛化短语、以指定语言输出。
+### 语言归一化
 
-### Locale 归一化
-`normalizeTitleGenerationLocale()` 将任意字符串归一为 `'zh'` 或 `'en'`（默认）。
+`normalizeTitleGenerationLocale(locale)` 的规则非常简单：
 
-## 关键方法
+- 输入 `zh` -> 返回 `zh`
+- 其他任意值 -> 返回 `en`
 
-| 方法 | 说明 |
-|------|------|
-| `buildTitleGenerationSystemPrompt(locale)` | 根据 locale 构建包含 7 条规则的 system prompt |
-| `buildTitleGenerationPrompt(userMessage, locale)` | 将用户首条消息包装为 user prompt，要求生成短标题 |
-| `normalizeTitleGenerationLocale(locale)` | 将 locale 归一化为 `'en'` 或 `'zh'` |
+也就是说，源码只显式支持英文和简体中文两种输出语言。
 
-## 数据流
+### system prompt 规则
 
-1. `TitleGenerationService` 读取当前 `settings.locale`
-2. 调用 `buildTitleGenerationSystemPrompt(locale)` → system prompt
-3. 调用 `buildTitleGenerationPrompt(userMessage, locale)` → user prompt
-4. 发送到 AI 模型获取标题文本
+`buildTitleGenerationSystemPrompt(locale)` 会把语言标签映射成：
+
+- `en` -> `English`
+- `zh` -> `Simplified Chinese`
+
+再生成一段固定规则文本，要求模型：
+
+1. 只返回原始标题文本
+2. 尽量使用 sentence case，并在自然时以动词开头
+3. 长度不超过 50 个字符
+4. 尽量包含主要技术上下文
+5. 不要引号、markdown、前缀或结尾标点
+6. 避免通用短语，例如 “Help with”
+7. 以指定语言输出
+
+### user prompt 模板
+
+`buildTitleGenerationPrompt(userMessage, locale)` 只负责把调用方提供的首条用户消息放进模板：
+
+```text
+First user message:
+"""
+{userMessage}
+"""
+
+Generate the best short conversation title in {Language}.
+```
+
+它不会自己裁剪消息长度，截断是在 `TitleGenerationService.truncateText()` 里完成的。
+
+### 预构建常量
+
+`TITLE_GENERATION_SYSTEM_PROMPT` 等价于：
+
+```typescript
+buildTitleGenerationSystemPrompt('en')
+```
+
+当前仓库内没有检索到这个常量的实际消费方；`TitleGenerationService` 会动态按 locale 调用构造函数。
 
 ## 与其他模块的交互
 
-- **TitleGenerationService**: 唯一消费者，负责调用 prompt 构建函数和处理 AI 响应
-- **Settings**: 通过 `settings.locale` 控制标题输出语言
-
-## 配置项
-
-- `settings.locale` — 驱动标题语言（`'zh'` → 中文，`'en'` → 英文）
-- `settings.aiTitleModel` — 可覆盖标题生成使用的模型（格式 `provider/model`），为空时跟随当前会话模型
+- `src/features/chat/services/TitleGenerationService.ts` 在每次生成标题前调用 `normalizeTitleGenerationLocale()`、`buildTitleGenerationPrompt()` 和 `buildTitleGenerationSystemPrompt()`。
+- 响应解析、长度二次裁剪和临时 session 生命周期都不在这个模块里。
 
 ## 注意事项
 
-- `TITLE_GENERATION_SYSTEM_PROMPT` 常量是默认英文 system prompt 的缓存副本，用于不需要动态 locale 的场景
-- 标题长度硬编码为 ≤50 字符，无外部配置
-
-## 待补充
-- [ ] 补充实际 AI 生成标题的质量示例和边界情况处理
-- [ ] 记录 `aiTitleModel` 设置如何影响此模块的选择逻辑
+- 这是纯 prompt 模块，改动规则文字会直接影响 AI 标题风格，但不会自动更新任何解析逻辑。
+- 由于 locale 只有 `zh` 特判，新增更多语言时必须同时扩展 `TitleGenerationLocale` 和 `TITLE_LANGUAGE_LABELS`。

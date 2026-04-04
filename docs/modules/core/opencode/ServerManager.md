@@ -1,94 +1,205 @@
 # ServerManager
 
 > **源码**: `src/core/opencode/ServerManager.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
-OpenCode 服务器进程生命周期管理器。负责在本地模式下启动和停止 OpenCode Node.js 子进程，监控进程健康状态，并提供服务器可达性检查接口。在远程模式下不启动本地进程，仅提供健康检查。
+`ServerManager` 负责 OpenCode 服务端进程生命周期，但它管理的并不只有“本地 spawn 出来的子进程”。
+
+它同时处理三种场景：
+
+- 本地模式下启动和停止 OpenCode 子进程
+- 远程模式下只做可达性校验并把状态标成 `running`
+- 端口已被占用时，尝试重新接管之前由插件自己启动过的 OpenCode 进程
+
+因此，它既是进程管理器，也是“当前运行模式下服务是否可用”的状态机。
 
 ## 导入关系
 
 ```text
-上游: obsidian (Notice API), src/shared/logger, child_process (Node.js)
-下游: src/core/opencode/OpenCodeService
+上游:
+- Node `child_process`, `fs`, `net`, `path`
+- Obsidian `Notice`, `requestUrl`
+- `../../shared/logger`
+- `../config/modelConfig`
+- `./types`
+
+下游:
+- `src/core/opencode/OpenCodeService`
 ```
 
-## 核心类型 / 接口
+## 核心类型 / 状态
 
-```typescript
-// 服务器运行状态
-interface ServerStatus {
-  running: boolean;
-  port?: number;
-  pid?: number;
-}
-```
+- `ServerStatus`: `'stopped' | 'starting' | 'running' | 'error' | 'restarting'`
+- `ServerManagerEvents`: `onStatusChange` / `onError`
+- `ServerManagerRuntimeOptions`:
+  - `initialManagedServerState`
+  - `onManagedServerStateChange`
+- `process`: 当前 spawn 出来的 `ChildProcess`，只有本地 managed 进程才会有
+- `managedServerState`: 插件持久化的 `{ pid, host, port }`
+- `startPromise`: 避免并发重复启动
+- `workingDirectory`: 通常是 vault 根目录，用来让 OpenCode 读取 `.opencode/`
+
+`getStatus()` 和 `isRunning()` 的语义不同：
+
+- `getStatus()` 反映状态机值
+- `isRunning()` 只有在状态是 `running` 且 `managedServerState !== null` 时才返回 `true`
+
+所以远程模式或“外部已有但未被插件接管”的服务，可能是 `status === 'running'`，但 `isRunning() === false`。
 
 ## 核心逻辑
 
-### 服务器启动 (start)
+### 工作目录与 managed pid 追踪
 
-在本地模式下：
-1. 确定 OpenCode 二进制路径（全局安装的 `opencode-ai`）
-2. 使用 `child_process.spawn` 启动 OpenCode 服务器进程
-3. 传递 vault 路径和相关环境变量
-4. 监听 stdout/stderr 输出，重定向到日志
-5. 等待服务器就绪（端口监听）
-6. 可选：支持 pure 模式等特殊环境变量
+`setWorkingDirectory(path)` 会：
 
-在远程模式下跳过启动。
+- 记录 vault 根路径
+- 把它作为后续 spawn 的 `cwd`
+- 额外尝试读取 `${path}/.opencode/opencode.json` 里的权限配置并写 debug log
 
-### 服务器停止 (stop)
+managed pid 的持久化/恢复通过 `managedServerState` 与 `onManagedServerStateChange` 完成。它只记录：
 
-优雅停止子进程：发送终止信号，等待进程退出，超时后强制终止。清理所有引用。
+- `pid`
+- `host`
+- `port`
 
-### 健康检查 (checkHealth)
+### 启动流程 (`start` / `doStart`)
 
-向 OpenCode 服务器发送 HTTP 健康检查请求（通常是 `GET /health`），判断服务器是否可达且正常响应。
+`start()` 先做两层短路：
+
+1. 已经有 `startPromise` 时直接复用
+2. `isRunning()` 为真时直接返回
+
+真正逻辑在 `doStart()`：
+
+#### 远程模式
+
+不会 spawn 任何本地进程，但仍会：
+
+- 对 `config.baseUrl` 执行健康检查
+- 不可达时抛错
+- 可达时把状态设成 `running`
+
+#### 本地模式
+
+会先检查目标端口：
+
+- 端口空闲：进入 spawn 流程
+- 端口占用但健康检查通过：
+  - 先尝试 `tryAdoptManagedServer()`
+  - 如果能确认这个 pid 就是之前插件管理的 `opencode serve --port ... --hostname ...`，则恢复接管
+  - 否则把它当成“外部已有 OpenCode 服务”直接标成 `running`
+- 端口占用但健康检查失败：抛出“端口被其他进程占用”的错误
+
+真正 spawn 时会：
+
+- 调用 `findOpenCodeBinary()`
+- 用 `spawn(opencodePath, ['serve', '--port', ..., '--hostname', ..., '--cors', ...])`
+- 把 `cwd` 设为 `workingDirectory`
+- 注入由 `getSpawnEnv()` 生成的环境变量
+- 记录 managed pid
+- 监听 `error` / `exit`
+- 延迟 1 秒后进入 `waitForHealthy()` 轮询
+
+本地成功启动后会弹出 `new Notice('OpenCode server started')`。
+
+### 停止与重启 (`stop` / `restart`)
+
+`stop()` 分三种情况：
+
+- 没有 `process`、也没有 `managedServerState`：直接进入 `stopped`
+- 没有 `process` 但有 `managedServerState`：说明是“接管到的 pid”，调用 `terminateManagedPid(pid)`
+- 有 `process`：走正常终止流程
+
+正常终止流程的策略是：
+
+- 非 Windows：先发 `SIGTERM`，5 秒后仍未退出再发 `SIGKILL`
+- Windows：通过 `taskkill /PID ... /T /F` 终止整棵进程树
+
+`restart()` 只是按顺序执行：
+
+1. `setStatus('restarting')`
+2. `stop()`
+3. `start()`
+
+### 健康检查与端口探测
+
+- `checkHealth(timeout)` 通过 `requestUrl(GET ${baseUrl}/global/health)` 判断服务是否健康，只有 HTTP 200 才返回 `true`
+- `canBindLocalEndpoint(host, port)` 和内部 `isPortAvailable()` 通过真实 bind 一个临时 `net.Server` 来判断端口是否可用
+- `waitForHealthy(timeout)` 每 500 ms 轮询一次健康检查，直到成功或超时
+
+### Spawn 环境变量与模型来源模式
+
+`getSpawnEnv()` 会根据配置生成不同的 OpenCode 运行环境：
+
+- `pluginIsolationMode === 'pure'`: 设置 `OPENCODE_PURE=true`
+- basic auth: 设置 `OPENCODE_SERVER_USERNAME` / `OPENCODE_SERVER_PASSWORD`
+- `modelSourceMode === 'server'`:
+  - `OPENCODE_DISABLE_PROJECT_CONFIG=true`
+  - 清掉 `OPENCODE_CONFIG_DIR` / `OPENCODE_CONFIG_CONTENT`
+- `modelSourceMode === 'merge'`:
+  - 不禁用 project config
+  - 清掉 `OPENCODE_CONFIG_DIR` / `OPENCODE_CONFIG_CONTENT`
+- 其他情况（本地 project config 模式）:
+  - `OPENCODE_DISABLE_PROJECT_CONFIG=true`
+  - `OPENCODE_CONFIG_DIR=<vault>/.opencode`
+  - `OPENCODE_CONFIG_CONTENT={"enabled_providers":[...]}`
+
+provider 列表来自 `getLocalProviderIds()`，它会读取 `.opencode/opencode.json` 或 `.opencode/opencode.jsonc`，优先拿 `provider` 对象的键，否则从 `model` 的 `provider/model` 字符串里截 provider 前缀。
 
 ## 关键方法
 
 | 方法 | 说明 |
 |------|------|
-| `start()` | 启动 OpenCode 服务器进程（本地模式） |
-| `stop()` | 停止服务器进程并清理资源 |
-| `checkHealth()` | 检查服务器是否响应健康检查 |
+| `setWorkingDirectory(path)` | 记录 vault 根目录，并作为本地 spawn 的 `cwd` |
+| `getStatus()` | 返回状态机值 |
+| `isRunning()` | 判断插件当前是否持有一个 managed pid |
+| `updateConfig(config)` | 更新运行配置 |
+| `canBindLocalEndpoint(host, port)` | 预检目标 host/port 是否可绑定 |
+| `start()` | 启动或接管服务 |
+| `stop()` | 停止本地 managed 进程或终止被接管的 pid |
+| `restart()` | 顺序执行 stop + start |
+| `checkHealth(timeout?)` | 请求 `/global/health` |
 
 ## 数据流
 
 ```mermaid
-graph LR
-    A[OpenCodeService] -->|启动请求| B[ServerManager]
-    B -->|spawn| C[OpenCode Server Process]
-    B -->|health check| C
-    C -->|stdout/stderr| B
-    B -->|状态回调| A
+graph TD
+    A[OpenCodeService] --> B[start / stop / restart]
+    B --> C{mode}
+    C -->|remote| D[requestUrl health probe]
+    C -->|local| E[端口检查]
+    E -->|空闲| F[spawn opencode serve]
+    E -->|已占用| G[health probe + tryAdoptManagedServer]
+    F --> H[waitForHealthy]
+    G --> I[设为 running 或报错]
+    H --> I
+    I --> J[onStatusChange / onManagedServerStateChange]
 ```
 
 ## 与其他模块的交互
 
-- **OpenCodeService**: 唯一的直接消费者，在需要时调用 start/stop/checkHealth
-- **Settings**: 服务器模式（本地/远程）和端口配置影响启动行为
-- **PluginManagementService**: pure 模式等插件隔离设置影响服务器环境变量
+- `OpenCodeService` 是唯一直接消费者，负责决定何时 start/stop/restart。
+- `modelConfig.parseOpencodeConfigText()` 被用于解析本地 `.opencode` 配置，从中提取 provider id。
+- `shared/logger` 负责启动参数、状态变化和错误日志。
 
 ## 配置项
 
-- **服务器模式**: `local`（启动子进程）或 `remote`（连接远程地址）
-- **端口**: 本地服务器监听端口
-- **认证**: 远程模式下的认证凭据
+`ServerManager` 直接消费 `OpenCodeServerConfig` 中这些字段：
+
+- `mode`
+- `baseUrl`
+- `local.host`
+- `local.port`
+- `auth`
+- `modelSourceMode`
+- `pluginIsolationMode`
+- `timeout`
 
 ## 注意事项
 
-- 服务器启动是异步操作，需要等待端口就绪后才能发送 API 请求
-- 进程清理应在插件卸载时执行，避免孤立进程
-- Windows 和 macOS/Linux 的进程管理存在差异（信号处理、路径分隔符等）
-- 远程模式下 start() 不执行任何操作
-
-## 待补充
-
-- [ ] 进程启动参数的完整列表
-- [ ] 健康检查的具体 HTTP 端点和超时设置
-- [ ] 进程崩溃时的自动重启策略（如有）
-- [ ] pure 模式下的环境变量列表
-- [ ] 服务器就绪检测的轮询机制细节
+- 远程模式下 `start()` 不是空操作；它会做健康检查并把状态置为 `running`。
+- `findOpenCodeBinary()` 虽然构造了多组候选路径，但当前实现直接返回候选数组的第一个值，实际依赖的是系统 `PATH`/spawn 解析，而不是显式文件探测。
+- `setWorkingDirectory()` 只会额外检查 `.opencode/opencode.json` 的存在并写日志，不会在这里解析 `.jsonc`。
+- 对“外部已有但未接管”的健康 OpenCode 服务，状态会是 `running`，但 `isRunning()` 仍可能是 `false`。

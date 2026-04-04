@@ -1,7 +1,7 @@
 # Markdown 渲染器
 
 > **源码**: `src/utils/markdown/MarkdownRenderer.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
@@ -113,7 +113,4 @@ async function renderMarkdown(el, markdown, options): Promise<RenderResult>
 - `render()` 会 `el.empty()` 清空目标元素
 - Obsidian 渲染后可能产生 `.copy-code-button`，被增强逻辑移除
 
-## 待补充
-- [ ] Mermaid 图表渲染支持
-- [ ] LaTeX 数学公式渲染支持
-- [ ] 代码块语法高亮主题配置
+

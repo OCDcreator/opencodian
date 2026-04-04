@@ -1,7 +1,7 @@
 # Logger
 
 > **源码**: `src/shared/logger.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
@@ -113,7 +113,4 @@ getRecentLogText()
 - `getRecentLogText()` 返回完整日志文本，可能较大
 - 环形缓冲区在插件重载后清空（模块级状态）
 
-## 待补充
-- [ ] 日志级别过滤策略
-- [ ] 日志持久化方案（写入文件）
-- [ ] 结构化日志格式（JSON Lines）
+

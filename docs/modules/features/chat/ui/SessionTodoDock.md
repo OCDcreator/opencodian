@@ -1,7 +1,7 @@
 # SessionTodoDock
 
 > **源码**: `src/features/chat/ui/SessionTodoDock.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
@@ -85,7 +85,8 @@ OpenCodeService → OpenCodianView → SessionTodoDock.update(todos)
 - `syncCollapsedState()` 同时处理隐藏和折叠两种情况的 CSS 类
 - `aria-expanded` 属性跟随折叠状态
 
-## 待补充
-- [ ] `session.todo()` SDK 调用的频率和缓存策略
-- [ ] `todo.updated` 事件的数据格式
-- [ ] 取消任务（cancelled）的视觉处理
+## 补充说明
+
+- `session.todo()` SDK 调用：由 `OpenCodeService` 在 stream 完成后主动调用获取快照，不进行定时轮询
+- `todo.updated` 同步事件：通过 `global.syncEvent.subscribe('todo.updated', ...)` 订阅，事件数据为最新的 `SessionTodo[]` 数组，由 `OpenCodianView` 接收后调用 `SessionTodoDock.update(todos)`
+- `cancelled` 状态的视觉处理：marker 区域不显示任何图标（与 `pending` 相同），通过 `itemEl.dataset.state = 'cancelled'` 传递给 CSS 控制透明度/灰度样式

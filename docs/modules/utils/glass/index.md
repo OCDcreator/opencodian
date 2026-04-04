@@ -1,7 +1,7 @@
 # Liquid Glass 效果系统
 
 > **源码**: `src/utils/glass/index.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
@@ -60,10 +60,5 @@ OpenCodianView (渲染时)
 
 ## 注意事项
 
-- 适配器 ID 目前限定为 `'shuding' | 'nikdelvin' | 'shudingDiamond'` 联合类型
-- `shudingDiamond` 已在 `builtin-adapters.ts` 中移除注册（仅保留 shuding + nikdelvin）
+- 当前已注册的适配器 ID 为 `'shuding'` 和 `'nikdelvin'`。`shudingDiamond` 代码保留但未注册
 - 外部消费者应通过 registry 函数访问适配器，不直接 import 适配器模块
-
-## 待补充
-- [ ] 适配器生命周期时序图
-- [ ] 与 chatAppearance CSS 变量的集成细节

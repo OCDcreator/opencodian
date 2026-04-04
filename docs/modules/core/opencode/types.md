@@ -1,120 +1,142 @@
 # OpenCode Service Types
 
 > **源码**: `src/core/opencode/types.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
-OpenCode 服务层的类型定义文件，定义与会话（Session）、消息（Message）和流式事件（Streaming Events）相关的核心类型。这些类型构成 OpenCodeService 与上层 UI 之间的契约，独立于 SDK v2 的类型体系。
+`types.ts` 定义的是 `core/opencode` 这一层的服务契约类型。它不描述 OpenCode 持久化 message 的内部结构，也不承担 SDK v2 类型别名工作；它关注的是：
+
+- `OpenCodeService` 对上暴露的方法参数/返回值
+- server 连接与运行配置
+- 与聊天上下文、权限、流式输出有关的输入类型
 
 ## 导入关系
 
 ```text
-上游: src/core/types/chat.ts, src/core/types/models.ts, src/core/types/tools.ts
-下游: src/core/opencode/OpenCodeService, src/core/opencode/sdkTypes, src/features/chat/OpenCodianView
+上游:
+- `src/core/types/chat.ts`
+- `src/core/types/settings.ts`
+- `./sdkFeatureFlags`
+
+下游:
+- `src/core/opencode/OpenCodeService`
+- `src/core/opencode/index`
 ```
 
-## 核心类型 / 接口
+## 公开类型
 
-```typescript
-// 会话信息
-interface SessionInfo {
+### `ResponseHandler`
+
+```ts
+interface ResponseHandler {
   id: string;
-  title?: string;
-  createdAt: string;
-  updatedAt: string;
-  // ...
-}
-
-// 消息信息（服务层视图）
-interface MessageInfo {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  parts?: MessagePart[];
-  timestamp: string;
-  // ...
-}
-
-// 消息部件
-type MessagePart =
-  | TextPart
-  | ThinkingPart
-  | ToolUsePart
-  | ToolResultPart
-  | ContextPart
-  | ...;
-
-// 流式事件块
-interface StreamChunk {
-  type: "text" | "thinking" | "tool_use" | "tool_result" | "done" | "error";
-  sessionId: string;
-  content?: string;
-  // ...
-}
-
-// 权限请求
-interface PermissionRequest {
-  id: string;
-  toolName: string;
-  description: string;
-  // ...
-}
-
-// 问答请求
-interface QuestionRequest {
-  id: string;
-  question: string;
-  answers?: string[];
-  // ...
-}
-
-// Diff 结果
-interface SessionDiff {
-  files: FileDiff[];
-  summary?: string;
-  // ...
+  onChunk: (chunk: StreamChunk) => void;
+  onDone: () => void;
+  onError: (error: Error) => void;
 }
 ```
+
+这是 callback 风格的流式处理接口定义。当前 `OpenCodeService` 仍保留了 `responseHandlers` 私有字段，但主公开流式 API 实际上已经转向 `AsyncGenerator<StreamChunk>`。
+
+### `ServerStatus`
+
+```ts
+'stopped' | 'starting' | 'running' | 'error' | 'restarting'
+```
+
+这是服务层对外可见的 server 状态联合类型。`ServerManager.ts` 里还有一个同形的本地 `ServerStatus`，两者语义一致，但定义位置不同。
+
+### `ServerError`
+
+```ts
+interface ServerError {
+  code: string;
+  message: string;
+  recoverable: boolean;
+}
+```
+
+当前 Worker 1 范围里，这个类型主要是对外暴露的服务层错误形状定义，本文件本身不提供构造逻辑。
+
+### `QueryOptions`
+
+`QueryOptions` 是发送 prompt 时最关键的输入类型，字段包括：
+
+| 字段 | 说明 |
+|------|------|
+| `sessionId?` | 目标 session；不传时服务层会回退到 `currentSessionId` |
+| `model?` / `provider?` | 显式指定模型 |
+| `images?` | 图片附件 |
+| `contextItems?` | 显式 Obsidian 上下文条目 |
+| `allowedTools?` | 允许的工具列表 |
+| `externalContextPaths?` | 旧字段，服务层目前会忽略 |
+| `reasoningEffort?` | 推理强度 |
+| `thinkingBudget?` | thinking token 预算 |
+
+### `OpenCodeServerConfig`
+
+这是 `ServerManager` 的运行配置：
+
+| 字段 | 说明 |
+|------|------|
+| `mode` | 本地 / 远程 |
+| `baseUrl` | 目标服务地址 |
+| `local` | 本地 host / port / autoStart |
+| `auth` | basic / bearer / none |
+| `modelSourceMode` | server / merge / 本地 project config 相关模式 |
+| `pluginIsolationMode` | 是否 pure |
+| `timeout?` | 启动或健康检查超时 |
+
+### `OpenCodeClientConfig`
+
+```ts
+interface OpenCodeClientConfig {
+  baseUrl: string;
+  fetch?: typeof fetch;
+}
+```
+
+这是 SDK/HTTP 客户端最小连接配置，不包含更高层的 server 模式或模型来源设置。
+
+### `ManagedServerState`
+
+```ts
+interface ManagedServerState {
+  pid: number;
+  host: string;
+  port: number;
+}
+```
+
+用于记录并恢复插件曾经启动过的 OpenCode 进程。
+
+### `SdkFeatureFlags`
+
+本文件最后重新导出了 `SdkFeatureFlags`，方便调用方从 `core/opencode/types` 或 barrel 间接拿到 SDK rollout 类型。
 
 ## 核心逻辑
 
-此模块为纯类型定义文件，不包含运行时逻辑。定义的类型用于：
-1. OpenCodeService 的方法签名（参数和返回值）
-2. SDK v2 类型到内部类型的映射目标
-3. UI 层的数据契约
-
-## 关键方法
-
-无（纯类型定义文件）。
+无运行时逻辑。该文件只提供类型。
 
 ## 数据流
 
-```
-SDK v2 Types → sdkTypes (桥接) → types.ts (服务层类型) → ChatMessage/UI Types
+```text
+settings/chat types -> core/opencode/types.ts -> OpenCodeService / ServerManager / barrel
 ```
 
 ## 与其他模块的交互
 
-- **OpenCodeService**: 所有方法签名使用此模块的类型
-- **sdkTypes**: 将 SDK v2 类型映射到此模块定义的类型
-- **features/chat/**: 消费这些类型进行 UI 渲染
-- **core/types/**: 引用底层的 chat、models、tools 类型定义
+- `OpenCodeService` 用这里的 `QueryOptions`、`ResponseHandler`、`OpenCodeServerConfig`、`ManagedServerState` 做方法签名和内部协作。
+- `ServerManager` 直接消费 `OpenCodeServerConfig` 和 `ManagedServerState`。
+- `index.ts` 通过这里向上层重导出服务层类型。
 
 ## 配置项
 
-无。
+无独立配置项；这里定义的是配置类型，而不是配置值。
 
 ## 注意事项
 
-- 此文件定义的是服务层（service-level）类型，与 SDK v2 类型和 UI 层类型都可能有差异
-- 新增消息类型（如 StreamChunk 的 type 扩展）应在此文件中定义
-- 类型变更需要同步更新 sdkTypes 的映射和 UI 层的消费逻辑
-
-## 待补充
-
-- [ ] 完整的类型定义列表（所有 interface / type）
-- [ ] MessagePart 的所有变体定义
-- [ ] StreamChunk 的完整字段
-- [ ] 与 `src/core/types/chat.ts` 中 ChatMessage 的关系和区别
-- [ ] 与 SDK v2 类型的对照表
+- `QueryOptions.externalContextPaths` 仍在类型里，但 `OpenCodeService.buildPromptRequestParts()` 当前会忽略它。
+- `reasoningEffort` / `thinkingBudget` 的实际下发方式由 `OpenCodeService` 决定，不由此文件约束。
+- `ServerStatus` 在 `ServerManager.ts` 里也定义了一份同形联合类型；修改状态集合时需要同步。

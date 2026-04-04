@@ -1,7 +1,7 @@
 # QuestionDock
 
 > **源码**: `src/features/chat/ui/QuestionDock.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
@@ -103,6 +103,7 @@ render() → Header + Tabs + Body + Footer
 - `collectAnswerFromSection()` 直接操作 DOM，与 render 紧耦合
 - `is-hidden` CSS 类控制可见性，非 display:none
 
-## 待补充
-- [ ] QuestionRequest 的完整类型定义（来自 core/types）
-- [ ] single 模式下的步骤导航与 onAnswerChange 时序
+## 补充说明
+
+- `QuestionRequest` 类型定义在 `src/core/types/chat.ts`，包含 `id`、`questions: QuestionPrompt[]` 等字段；`QuestionPrompt` 包含 `header`、`question`、`options: { label, description? }[]`、`multiple: boolean`、`custom: boolean`
+- single 模式下 `onAnswerChange` 时序：用户选择选项 → `collectAnswerFromSection()` 收集 DOM 状态 → `callbacks.onAnswerChange(index, answer)` → 上层更新 `answers[index]` → 下次 `render()` 传入更新后的 answers

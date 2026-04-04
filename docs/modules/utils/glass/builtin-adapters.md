@@ -1,11 +1,11 @@
 # 内置 Glass 适配器注册
 
 > **源码**: `src/utils/glass/builtin-adapters.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
-提供 `registerBuiltinGlassAdapters()` 函数，负责将所有内置玻璃效果适配器注册到全局注册表。当前注册的适配器为 `shuding` 和 `nikdelvin`。`shudingDiamond` 适配器的 import 保留但未注册。
+提供 `registerBuiltinGlassAdapters()` 函数，负责将所有内置玻璃效果适配器注册到全局注册表。当前注册的适配器为 `shuding` 和 `nikdelvin`。`shudingDiamond` 适配器代码保留在 `adapters/shudingDiamond.ts` 但本文件未 import 且不参与注册。
 
 ## 导入关系
 上游: `./adapters/shuding` (adapter), `./adapters/nikdelvin` (adapter), `./registry` (registerGlassAdapter)
@@ -22,7 +22,7 @@
 1. `registerGlassAdapter(shudingAdapter)` — 注册 Shuding 适配器
 2. `registerGlassAdapter(nikdelvinAdapter)` — 注册 Nikdelvin 适配器
 
-`shudingDiamond` 已 import 但不参与注册。
+`shudingDiamond` 不参与注册。
 
 ## 关键方法
 
@@ -52,10 +52,6 @@ main.ts → onload()
 
 ## 注意事项
 
-- `shudingDiamond` 的 import 存在但被注释掉（未注册），适配器代码本身仍保留在仓库中
+- `shudingDiamond` 适配器代码仍保留在仓库中但未在此处 import
 - 调用时机必须在任何 `getGlassAdapter()` 查询之前
 - 此函数是幂等的——重复调用会覆盖相同 ID 的适配器
-
-## 待补充
-- [ ] `shudingDiamond` 适配器的启用/禁用策略文档
-- [ ] 未来新增适配器的注册步骤

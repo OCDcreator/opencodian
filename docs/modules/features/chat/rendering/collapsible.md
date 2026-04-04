@@ -1,19 +1,13 @@
 # collapsible
 
 > **源码**: `src/features/chat/rendering/collapsible.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
-可折叠长内容块的设置工具。为助手消息中超出高度阈值的内容添加自动折叠/展开功能。使用 `ResizeObserver` 监听内容尺寸变化，动态计算是否需要折叠。提供键盘和鼠标交互支持，以及 ARIA 辅助功能属性。
+`setupCollapsible()` 是一个一次性装配函数，用来给现有 DOM 节点加上“超高内容可折叠”的行为。它既被普通长文本复用，也被 OMO 原始提示块复用。
 
-## 导入关系
-
-**上游**: 无外部导入。
-
-**下游**: `OpenCodianView` — 在渲染助手消息后调用 `setupCollapsible()` 设置折叠行为。
-
-## 核心类型 / 接口
+## 核心类型
 
 ```typescript
 interface CollapsibleState {
@@ -29,64 +23,63 @@ interface CollapsibleOptions {
 }
 ```
 
-## 核心逻辑
+## 函数行为
 
-### 折叠判断
-`setupCollapsible()` 在初始化和每次内容尺寸变化时（通过 `ResizeObserver`）检查 `contentEl.scrollHeight` 是否超过 `collapsedHeight + minOverflow`。仅当内容溢出足够量（默认 24px）时才启用折叠，避免小量溢出导致无意义的折叠按钮。
+```typescript
+setupCollapsible(
+  wrapperEl: HTMLElement,
+  headerEl: HTMLElement,
+  contentEl: HTMLElement,
+  state: CollapsibleState,
+  options?: CollapsibleOptions,
+): void
+```
 
-### 状态应用
-`applyState()` 根据 `isCollapsible` 和 `isExpanded` 组合切换 CSS class：
-- `is-collapsible` — 内容可折叠
-- `is-expanded` — 已展开
-- `is-collapsed` — 已折叠
+初始化时会：
 
-通过 CSS `--opencodian-collapsible-max-height` 自定义属性控制折叠高度。
+- 给 wrapper / content / header 加固定 class
+- 设置 `aria-expanded`、`aria-hidden`、`hidden`、`tabIndex`
+- 写入 `--opencodian-collapsible-max-height`
+- 用 `contentEl.scrollHeight > collapsedHeight + minOverflow` 判定是否真的需要折叠
+
+默认值：
+
+- `collapsedHeight = 168`
+- `minOverflow = 24`
+- `showMoreLabel = 'Show more'`
+- `showLessLabel = 'Show less'`
+
+## 运行机制
+
+### 状态同步
+
+内部 `applyState()` 会同步：
+
+- `state.isCollapsible`
+- `state.isExpanded`
+- `wrapperEl` 上的 `is-collapsible` / `is-expanded` / `is-collapsed`
+- `headerEl` 的可见性、可聚焦性和标签文本
 
 ### 交互
-- 点击 `headerEl`（toggle 按钮）切换展开/折叠
-- Enter / Space 键盘操作同样触发切换
-- ARIA 属性（`aria-expanded`, `aria-hidden`）随状态更新
 
-### ResizeObserver
-若浏览器支持 `ResizeObserver`，自动监听 `contentEl` 尺寸变化并重新计算折叠状态。支持流式传输期间内容逐步增长时的实时折叠判断。
+`headerEl` 同时监听：
 
-## 关键方法
+- `click`
+- `keydown` 中的 `Enter`
+- `keydown` 中的空格
 
-| 方法 | 说明 |
-|------|------|
-| `setupCollapsible(wrapperEl, headerEl, contentEl, state, options?)` | 初始化折叠行为 |
+点击或按键后都会切换 `state.isExpanded`，再重新执行 `applyState()`。
 
-## 数据流
+### 尺寸变化
 
-```
-助手消息渲染完成
-  → setupCollapsible(wrapper, toggle, content, state)
-    → ResizeObserver 监听 content 尺寸
-    → 内容超高 → 显示 toggle 按钮
-    → 用户点击 toggle → 切换 isExpanded → CSS class 变更 → 过渡动画
-```
+当运行环境支持 `ResizeObserver` 时，函数会观察 `contentEl`，让流式追加内容或异步渲染完成后重新计算是否需要折叠。
 
-## 与其他模块的交互
+## 模块关系
 
-- **OpenCodianView**: 在 `renderAssistantMessage()` 中创建 DOM 结构后调用
-- **styles.css**: 消费 `.opencodian-collapsible`, `.is-collapsible`, `.is-expanded`, `.is-collapsed` 等 class
-
-## 配置项
-
-通过 `CollapsibleOptions` 可配置：
-- `collapsedHeight` — 折叠高度（默认 168px）
-- `minOverflow` — 最小溢出量才启用折叠（默认 24px）
-- `showMoreLabel` / `showLessLabel` — 按钮文本（默认 "Show more"/"Show less"）
+- 无上游依赖
+- 下游消费者：`OpenCodianView.renderUserMessageContent()`、`OpenCodianView.renderOmoUserInjection()`
 
 ## 注意事项
 
-- `state` 对象由调用方持有并传入，折叠状态通过引用修改
-- 当 `isCollapsible` 为 false 时，toggle 按钮隐藏（`hidden` 属性 + `aria-hidden`）
-- 无 `ResizeObserver` 的环境（理论上 Obsidian 桌面均支持）不会实时响应尺寸变化
-- 折叠高度通过 CSS 变量设置，可在主题 CSS 中覆盖
-
-## 待补充
-
-- [ ] 过渡动画的 CSS 实现位置
-- [ ] 流式传输期间的折叠行为（内容逐步增长时的实时判断）
-- [ ] 多语言标签（showMoreLabel/showLessLabel）的实际传入值
+- 这个函数不返回 disposer；观察器生命周期完全依赖 DOM 节点后续一起被释放。
+- `headerEl` 类型写成 `HTMLElement`，但实现会给它写 `type="button"` 和键盘交互属性，所以调用方实际传入的是按钮元素。

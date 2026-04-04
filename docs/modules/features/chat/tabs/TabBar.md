@@ -1,7 +1,7 @@
 # TabBar
 
 > **源码**: `src/features/chat/tabs/TabBar.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
@@ -43,9 +43,9 @@ interface TabBarCallbacks {
 每个按钮附带 `aria-labelledby` 指向隐藏的文本标签。溢出菜单使用 `role="menu"` / `role="menuitem"`。可展开按钮支持 Enter/Space 键盘操作。
 
 ### 状态指示
-- streaming: 无特殊图标（通过 CSS 动画）
-- background task: 三点动画（`opencodian-tab-activity-dots`）
-- needs attention: bell-ring 图标
+- streaming: 主标签栏中无图标（通过 CSS 动画 `is-streaming`），溢出菜单中显示 `loader-circle` 图标 + `is-streaming` 类
+- background task: 三点动画（`opencodian-tab-activity-dots` → 3 个 `opencodian-tab-activity-dot` span）
+- needs attention: `bell-ring` 图标
 
 ## 关键方法
 
@@ -84,8 +84,8 @@ TabManager.getTabBarItems()
 - `below-header-vertical` 布局不显示 tooltip（空间不足）
 - `shouldOpenOverflowAbove()` 判断是否在 input 布局下向上打开菜单
 
-## 待补充
+## 补充说明
 
-- [ ] 四种布局模式的视觉差异说明
-- [ ] 溢出菜单定位算法的边界情况
-- [ ] CSS 动画类名与实际效果的对应
+- 四种布局模式差异：`header` = 标签栏在消息区上方（max 4），`input` = 标签栏在输入框区域（max 5，溢出菜单向上弹出），`below-header-grid` = header 下方的网格布局（max 5），`below-header-vertical` = 垂直排列且禁用 tooltip（空间受限）
+- 溢出菜单定位：水平方向 `left = min(max(margin, rect.right - menuWidth), viewportWidth - menuWidth - margin)`，宽度至少 220px；垂直方向根据 `shouldOpenOverflowAbove()` 判断优先向上（input 模式）或向下，`maxHeight` 至少 120px
+- CSS 动画类名：`is-streaming` 由 CSS 驱动旋转/脉冲效果，`has-background-task` 配合 `opencodian-tab-activity-dot` 的逐帧动画，`needs-attention` 使用 `bell-ring` SVG 图标

@@ -1,20 +1,26 @@
 # Core Config Barrel
 
 > **源码**: `src/core/config/index.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
-`core/config` 目录的 barrel 模块，为配置相关服务提供统一导出入口。它把模型配置、OpenCode 配置管理和插件配置管理聚合到一个稳定 import 路径下，减少上层模块直接依赖深层文件路径。
+`src/core/config/index.ts` 是 `core/config` 目录的 barrel。它只聚合 3 个服务类导出：
+
+- `ModelConfigService`
+- `OpencodeConfigManager`
+- `PluginManagementService`
+
+这个入口不暴露 `modelConfig.ts` 里的辅助函数或类型，因此需要这些细粒度工具的调用方仍然要走深路径导入。
 
 ## 导入关系
 
 ```text
 上游: ./ModelConfigService, ./OpencodeConfigManager, ./PluginManagementService
-下游: main.ts、设置面板、测试或其他需要批量引入配置服务的模块
+下游: src/main.ts, src/features/settings/OpenCodianSettings.ts, src/features/settings/OpencodeConfigModal.ts
 ```
 
-## 核心类型 / 接口
+## 公开导出
 
 ```typescript
 export { ModelConfigService } from './ModelConfigService';
@@ -22,43 +28,24 @@ export { OpencodeConfigManager } from './OpencodeConfigManager';
 export { PluginManagementService } from './PluginManagementService';
 ```
 
-## 核心逻辑
+## 聚合规则
 
-### 配置服务聚合
+### 只暴露服务类
 
-该文件没有运行时业务逻辑，职责是把 `core/config` 下的三个主要服务收口为同一个导出面。
+barrel 没有转发 `modelConfig.ts` 中的 `ModelCatalog`、`parseOpencodeConfigText()`、`mergeCatalogs()` 等辅助导出。仓库中需要这些内容的模块会直接引用：
 
-### 降低上层耦合
+- `src/core/config/modelConfig.ts`
+- `src/core/config/PluginManagementService.ts`
 
-调用方可以从 `core/config` 一次性获得配置相关入口，而不必了解具体实现文件名。
+### 作为配置层稳定入口
 
-## 关键方法
+运行时装配主要通过这个 barrel 完成：
 
-| 方法 / 导出 | 说明 |
-|-------------|------|
-| `ModelConfigService` | 模型目录与本地模型配置服务 |
-| `OpencodeConfigManager` | OpenCode 配置文件读写与管理 |
-| `PluginManagementService` | 项目级插件来源与 `.opencode/plugins` 管理 |
-
-## 数据流
-
-不适用。该模块只做静态 re-export，典型消费链路为“上层模块 import barrel -> 再调用具体服务类”。
-
-## 与其他模块的交互
-
-- 与 [ModelConfigService.md](C:/Users/lt/Desktop/Write/custom-project/opencodian/docs/modules/core/config/ModelConfigService.md)、[OpencodeConfigManager.md](C:/Users/lt/Desktop/Write/custom-project/opencodian/docs/modules/core/config/OpencodeConfigManager.md)、[PluginManagementService.md](C:/Users/lt/Desktop/Write/custom-project/opencodian/docs/modules/core/config/PluginManagementService.md) 组成同一组公开 API
-- 上层若只需单个服务，也可以绕过 barrel 直接导入具体文件
-
-## 配置项
-
-无。配置项由下游具体服务负责。
+- `src/main.ts` 通过它创建 `OpencodeConfigManager` 和 `ModelConfigService`
+- `src/features/settings/OpenCodianSettings.ts` 通过它创建 `OpencodeConfigManager` 与 `PluginManagementService`
+- `src/features/settings/OpencodeConfigModal.ts` 通过它接收 `OpencodeConfigManager`
 
 ## 注意事项
 
-- 新增配置服务时，如果希望成为公开入口，应同步更新本文件和 [README.md](C:/Users/lt/Desktop/Write/custom-project/opencodian/docs/modules/README.md)
-- 删除或重命名导出会影响所有通过 barrel 导入的调用方
-
-## 待补充
-
-- [ ] 记录当前有哪些模块实际通过该 barrel 导入
-
+- 新增配置服务时，如果希望上层继续使用统一导入路径，需要同步更新这个 barrel。
+- 只改 barrel 不改文档会导致 `docs/modules/core/config/index.md` 与叶子模块脱节，后续汇总时需要一起检查。

@@ -1,68 +1,79 @@
 # SDK Type Bridge
 
 > **源码**: `src/core/opencode/sdkTypes.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
-SDK v2 类型桥接层，定义 SDK v2 的类型与插件内部类型之间的映射和转换。当 SDK v2 包的类型定义与 OpenCodian 内部的类型系统不完全匹配时，此模块提供适配层，确保类型安全的交互。
+`sdkTypes.ts` 不是“类型转换器”，而是一个很薄的 SDK 类型别名层。它的作用是把 `@opencode-ai/sdk/v2/client` 里的常用类型统一改名为 `Sdk*` 前缀，再集中导出给 OpenCodian 其他模块使用。
+
+这个文件没有运行时逻辑，也没有字段级映射函数。
 
 ## 导入关系
 
 ```text
-上游: @opencode/sdk (SDK v2 类型), src/core/types/* (内部类型)
-下游: src/core/opencode/OpenCodeService, src/core/opencode/createSdkClient
+上游:
+- `@opencode-ai/sdk/v2/client`
+
+下游:
+- `src/core/opencode/OpenCodeService`
+- `src/core/opencode/createSdkClient`
 ```
 
-## 核心类型 / 接口
+## 公开类型
 
-```typescript
-// SDK v2 消息类型 → 插件内部 ChatMessage 的映射
-// SDK v2 会话类型 → 插件内部 Session 类型的映射
-// SDK v2 流事件类型 → 插件内部 StreamChunk 类型的映射
+源码当前导出的类型别名如下：
 
-// 类型转换函数
-function sdkMessageToChatMessage(sdkMsg: SdkMessage): ChatMessage;
-function sdkSessionToSession(sdkSession: SdkSession): Session;
-// ... 具体映射待补充
-```
+| 本地别名 | 对应 SDK 类型 |
+|---------|---------------|
+| `SdkAgentPartInput` | `AgentPartInput` |
+| `SdkEvent` | `Event` |
+| `SdkFilePartInput` | `FilePartInput` |
+| `SdkMessage` | `Message` |
+| `SdkOpencodeClientConfig` | `OpencodeClientConfig` |
+| `SdkOutputFormat` | `OutputFormat` |
+| `SdkPart` | `Part` |
+| `SdkPermissionRequest` | `PermissionRequest` |
+| `SdkSession` | `Session` |
+| `SdkSubtaskPartInput` | `SubtaskPartInput` |
+| `SdkTextPartInput` | `TextPartInput` |
+
+另外还有两个本地辅助类型：
+
+- `SdkSyncEventStream = { stream: AsyncIterable<unknown> }`
+- `SdkOpencodeClient = OpencodeClient`
 
 ## 核心逻辑
 
-### 双向类型映射
+### SDK import path 收口
 
-在 SDK v2 的请求/响应类型与 OpenCodian 内部类型之间建立双向转换：
-1. **请求方向**: 内部类型 → SDK 类型（发送请求前）
-2. **响应方向**: SDK 类型 → 内部类型（接收响应后）
+当前 `OpenCodeService` 和 `createSdkClient` 都不直接从 SDK 包到处散落地导入类型，而是优先从这个文件取 `Sdk*` 别名。这样做的直接效果是：
 
-### 流事件类型映射
+- SDK 类型命名在插件内统一
+- SDK 包路径集中在一个文件里
+- 如果未来 SDK 类型路径变化，改动面更小
 
-SDK v2 的流事件类型（如 text delta, thinking, tool_use 等）映射到 `StreamChunk` 类型。
+### 本地辅助类型补位
+
+`SdkSyncEventStream` 不是 SDK 原生导出，而是当前代码为了表达 `global.syncEvent.subscribe()` 返回值形状额外定义的轻量类型。
 
 ## 关键方法
 
-| 方法 | 说明 |
-|------|------|
-| 待补充 | SDK 消息 → 内部消息转换 |
-| 待补充 | SDK 会话 → 内部会话转换 |
-| 待补充 | SDK 流事件 → 内部 StreamChunk 转换 |
+无。该文件只导出类型。
 
 ## 数据流
 
 ```mermaid
 graph LR
-    A[SDK v2 Types] -->|映射| B[sdkTypes Bridge]
-    B -->|转换| C[Internal Types]
-    C -->|转换| B
-    B -->|映射| A
+    A[@opencode-ai/sdk/v2/client] --> B[sdkTypes.ts]
+    B --> C[OpenCodeService]
+    B --> D[createSdkClient]
 ```
 
 ## 与其他模块的交互
 
-- **OpenCodeService**: 在 SDK 路径中大量使用类型转换
-- **createSdkClient**: 使用类型映射确保 SDK 客户端的类型安全
-- **types/**: 引用内部类型定义
-- **SDK v2 包**: 引用 SDK 的类型定义
+- `OpenCodeService` 使用这里的 `SdkEvent`、`SdkOpencodeClient` 等类型约束 SDK 调用结果。
+- `createSdkClient` 使用 `SdkOpencodeClientConfig` / `SdkOpencodeClient` 做工厂函数签名。
 
 ## 配置项
 
@@ -70,13 +81,5 @@ graph LR
 
 ## 注意事项
 
-- 类型映射应保持纯函数，不引入运行时副作用
-- 当 SDK v2 类型发生变更时，此桥接层需要同步更新
-- 确保映射的完整性：所有 SDK 类型字段都应有对应的内部类型字段
-
-## 待补充
-
-- [ ] 完整的类型映射对照表
-- [ ] 字段缺失或类型不匹配时的处理策略
-- [ ] 是否使用 namespace 或 type branding 增强类型安全
-- [ ] 与 `src/core/types/` 中各类型文件的对应关系
+- 该文件不负责把 SDK message/session/event 转成插件内部 `ChatMessage` / `StreamChunk`；真正的归一化逻辑在 `OpenCodeService.ts`。
+- 如果 SDK v2 升级导致类型名或 import path 变化，应优先更新这里，再处理调用方编译错误。

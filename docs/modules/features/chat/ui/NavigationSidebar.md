@@ -1,7 +1,7 @@
 # NavigationSidebar
 
 > **源码**: `src/features/chat/ui/NavigationSidebar.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
@@ -88,6 +88,7 @@ messagesEl.scrollTo({ top, behavior: 'smooth' })
 - `isStickyScrollMode()` 检查 `opencodian-messages--sticky-basic` 和 `opencodian-messages--sticky-mask` 两个类
 - `threshold=30` 用于避免在当前位置附近反复跳动
 
-## 待补充
-- [ ] anchor 元素的具体含义（toolbar area?）
-- [ ] 与 chatScrollMode 的完整交互说明
+## 补充说明
+
+- `anchorEl` 是 OpenCodianView 中的 toolbar/input 区域元素，侧栏通过 `anchorRect.top - mountRect.top + anchorHeight/2` 与其垂直居中对齐
+- `chatScrollMode` 设置影响 `isStickyScrollMode()`：当 messagesEl 含 `opencodian-messages--sticky-basic` 或 `opencodian-messages--sticky-mask` 类时启用 sticky 模式，此时导航目标为 `.opencodian-turn` 容器而非单条消息，scrollPadding 为 0

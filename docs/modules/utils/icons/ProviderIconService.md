@@ -1,7 +1,7 @@
 # Provider Icon Service
 
 > **源码**: `src/utils/icons/ProviderIconService.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
@@ -69,6 +69,7 @@ AI 模型提供商图标管理服务。使用 LobeHub Icons CDN（`@lobehub/icon
 | `addCustomIconSource(app, providerId, source, library)` | 添加自定义图标 |
 | `updateProviderEntries(providerId, entries, library)` | 更新 provider 的图标条目 |
 | `removeProviderEntry(providerId, entryId, library)` | 删除单个图标条目 |
+| `splitCustomIconSourcesInput(sourceInput)` | 解析多行/多来源图标输入为独立来源字符串 |
 | `clearCache(app)` | 清空所有缓存 |
 | `warmProviderIcons(app, providerIds, library)` | 批量预热图标缓存 |
 | `persistDefaultEntries(providerIds, library)` | 将默认映射持久化到 library |
@@ -114,7 +115,4 @@ resolveIconUrl(app, providerId, library)
 - MIME 检测优先级：Content-Type header → 文件头魔数 → 扩展名
 - `PROVIDER_ICON_MAP` 包含 200+ 条映射，涵盖国内外主流 AI 服务商
 
-## 待补充
-- [ ] PROVIDER_ICON_MAP 完整映射表
-- [ ] 图标加载失败的 UI 降级策略
-- [ ] CDN 不可用时的离线模式
+

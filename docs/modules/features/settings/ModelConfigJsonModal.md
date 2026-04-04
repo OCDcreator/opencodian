@@ -1,11 +1,11 @@
 # ModelConfigJsonModal
 
 > **源码**: `src/features/settings/ModelConfigJsonModal.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
-JSON 格式的模型配置编辑器 Modal。提供原始 JSON 文本编辑器，用于直接编辑 `.opencode/config.json` 的模型部分。支持格式化、保存、可选服务器重启。包含示例配置帮助文本。
+JSON 格式的模型配置编辑器 Modal。提供原始 JSON 文本编辑器，用于直接编辑 `.opencode/opencode.json` 里的模型相关字段子集。支持格式化、保存、可选服务器重启。包含示例配置帮助文本。
 
 ## 导入关系
 上游: `obsidian`（App、Modal、Notice）、`OpencodeModelConfigSubset`（core/types）、`i18n`、`main`（OpenCodianPlugin）、`shared`（logger）
@@ -75,6 +75,7 @@ maybeRestartServer() → saveSettings()
 - 与 `ModelConfigModal`（可视化）互为补充
 - `validate()` 不检查 provider 内部结构
 
-## 待补充
-- [ ] 更完善的 JSON schema 验证
-- [ ] 与 ModelConfigModal 的数据同步说明
+## 补充说明
+
+- `validate()` 仅检查 `provider` 为 object 且 `enabled_providers`/`disabled_providers` 为 string[]，不检查 provider 内部的 name/npm/options/models 结构
+- 与 `ModelConfigModal` 的关系：两者都通过 `ModelConfigService` 读写同一份 `.opencode/opencode.json` 的模型相关字段。JSON 编辑器适合批量/高级编辑，可视化编辑器适合单条增删改。两者无互锁机制，同时打开时后保存者覆盖先保存者

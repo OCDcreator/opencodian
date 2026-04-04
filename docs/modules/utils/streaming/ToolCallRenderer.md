@@ -1,7 +1,7 @@
 # Tool Call Renderer
 
 > **源码**: `src/utils/streaming/ToolCallRenderer.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
@@ -42,6 +42,13 @@
 | `task` | `type · description` |
 | `question` | 第一个问题的 header |
 | `todowrite` | `done/total · preview` |
+| `skill` | 技能名称文本（截断 80 字符） |
+| `lsp` | `operation · file:line:char` |
+| `plan_enter` / `enter_plan_mode` | 'Switch to plan mode' |
+| `plan_exit` / `exit_plan_mode` | 'Switch to build mode' |
+| `todoread` | 任务进度摘要或 'Current tasks' |
+| `web_search` / `websearch` / `codesearch` | 查询文本（截断 60 字符） |
+| `web_fetch` / `webfetch` | URL 文本（截断 60 字符） |
 
 ### 工具图标映射
 
@@ -109,9 +116,6 @@ StreamController.handleToolResultChunk(chunk)
 - 同一 tool call ID 的重复 `tool_use` chunk 会合并 input（`Object.assign`）
 - 结果渲染截断为 20 行，大输出可能丢失信息
 - Obsidian 内置的 `.copy-code-button` 不在此处处理（由 MarkdownRenderer 处理）
-- 工具名称映射 `DEFAULT_TOOL_NAMES` 包含约 30 个常用工具的显示名
+- 工具名称映射 `DEFAULT_TOOL_NAMES` 包含约 26 个常用工具的显示名
 
-## 待补充
-- [ ] 工具调用结果中的 diff 高亮
-- [ ] 可配置的截断行数
-- [ ] MCP 工具的自定义摘要策略注册机制
+

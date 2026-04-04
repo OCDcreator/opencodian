@@ -12,6 +12,57 @@
 
 ---
 
+## 2026-04-04 模块文档 review 收口：统一配置路径、修正事实偏差、提交并行工作流
+
+### 🎯 改动目标
+
+- 汇总 6 个文档 worker 的产出，把 `docs/modules/` 从“批量填充完成”推进到“可进入 reviewer 完成态检查”
+- 修正 reviewer spot-check 中确认的事实偏差，尤其是 OpenCode 配置文件路径、schema 示例、以及 settings 文档里的配置写入边界
+- 让 `[REVIEW]` 状态与文档内容保持一致，不再保留明显未完成的“待补充”章节或 checklist 口吻
+
+### ✅ 本轮调整
+
+- `docs/modules/_WORKFLOW.md`
+  - 新增文档并行填充与增量更新 workflow
+  - 记录 6 worker 拆分、5 worker 合并方案、reviewer 波次职责，以及按 git diff 反推文档更新目标的流程
+
+- `docs/modules/README.md`
+  - 把 `_WORKFLOW.md` 纳入文档元信息
+  - 依据当前源码树修正模块文档总数
+  - 移除已不存在的 `liquidDiamondDemoWebgl.md` 目录项，并补充 workflow 入口说明
+
+- `docs/modules/core/**/*.md`、`docs/modules/entry-point/main.md`
+  - 六个 worker 负责范围内的模块文档批量从 `[DRAFT]` 收口到 `[REVIEW]`
+  - 补全文档职责、导出面、关键类型、模块交互与实现约束
+
+- `docs/modules/core/types/permission.md`
+  - 把配置文件路径从旧的 `.opencode/config.json` 更正为源码实际使用的 `.opencode/opencode.json`
+
+- `docs/modules/core/types/opencodeConfig.md`
+  - 把配置文件路径统一更正为 `.opencode/opencode.json`
+  - 修正“所有接口都有索引签名”的错误描述，明确 `OpencodeModelConfigSubset` 仍是固定字段集合
+  - 将示例 `$schema` 修正为当前代码实际写入的 `https://opencode.ai/config.json`
+
+- `docs/modules/features/settings/ModelConfigJsonModal.md`
+  - 明确该 modal 编辑的是同一份 `.opencode/opencode.json` 中的模型相关字段子集
+  - 补充它与 `ModelConfigModal` 的覆盖关系和“后保存覆盖先保存”的风险
+
+- `docs/modules/features/settings/OpencodeConfigModal.md`
+  - 明确它与 `ModelConfigJsonModal` 操作的是同一个配置文件，而不是两个不同配置文件
+  - 改为用“完整配置 / 模型子集”区分职责边界
+
+- `docs/modules/features/chat/tabs/*.md`
+- `docs/modules/features/chat/ui/*.md`
+- `docs/modules/features/settings/*.md`
+  - 把 `[REVIEW]` 文档里残留的 `## 待补充` 统一改成 `## 补充说明`
+  - 去掉未完成 checklist 语气，改成完成态的事实补充，避免状态和内容自相矛盾
+
+### 🧪 当前验证
+
+- 已通过：`npm run check:devlog-order`
+- 未运行：`npm run build`、`npm run test`
+- 未部署：本轮为纯文档 / devlog 收口，无代码、样式、manifest 变更
+
 ## 2026-04-04 独立 Liquid Diamond Demo、旧主题迁移回 `preset`，并保留 `shudingDiamond` 为实验核心
 
 ### 🎯 改动目标
@@ -91,11 +142,15 @@
   - 明确类型文件、barrel 文件、locale 文件可以把“关键方法 / 数据流”改写为更贴切的内容
   - 统一状态值写法为 `[DRAFT]` / `[REVIEW]` / `[FINAL]`
 
-- 新增 22 篇缺失模块文档，覆盖此前未纳入框架的真实源码文件：
+- `docs/modules/_WORKFLOW.md`
+  - 新增可直接分发给大模型的并行任务拆分方案
+  - 记录 6 worker 推荐分组、5 worker 合并方案、统一提示词模板，以及按 git diff 做增量文档同步的流程
+
+- 新增 21 篇缺失模块文档，覆盖此前未纳入框架的真实源码文件：
   - `core/*/index.ts` 系列 barrel 文档
   - `features/chat/index.ts`、`features/chat/tabs/index.ts`、`features/settings/index.ts`
   - `features/settings/ModelConfigModal.ts`
-  - `features/chat/liquidDiamondDemo.ts`、`features/chat/liquidDiamondDemoWebgl.ts`
+  - `features/chat/liquidDiamondDemo.ts`
   - `utils/index.ts`、`utils/icons/index.ts`、`utils/markdown/index.ts`、`utils/markdown/types.ts`、`utils/streaming/index.ts`
   - `i18n/locales/index.ts`、`i18n/locales/en.ts`、`i18n/locales/zh.ts`
   - `shared/index.ts`、`shared/modals/index.ts`
@@ -106,6 +161,9 @@
 - `.gitignore`
   - 不再整段忽略 `docs/`
   - 改为只忽略 `docs/` 下非 `docs/modules/` 的内容，确保模块文档框架可以进入版本控制
+
+- 校验收口
+  - 按当前工作区再次核对时，`src/features/chat/liquidDiamondDemoWebgl.ts` 已不存在，因此未继续保留对应的一对一文档映射
 
 ### 🧪 当前验证
 

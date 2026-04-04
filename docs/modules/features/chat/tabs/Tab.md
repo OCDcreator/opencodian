@@ -1,7 +1,7 @@
 # Tab
 
 > **源码**: `src/features/chat/tabs/Tab.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
@@ -73,7 +73,7 @@ TabManager 操作
 - `setConversation()` 在对话 ID 不变时不重置上下文用量，仅更新标题
 - `generateTabId()` 格式为 `tab-{timestamp}-{random}`
 
-## 待补充
+## 补充说明
 
-- [ ] `getData()` 的拷贝深度是否足够（`preciseTokens` 嵌套问题）
-- [ ] 标签 ID 的唯一性保证
+- `getData()` 拷贝深度说明：`contextUsage` 使用 `{ ...this.data.contextUsage }` 展开，仅拷贝一级属性。若 `TabContextState` 中存在嵌套对象（如 `preciseTokens` 对象），这些嵌套引用仍与内部状态共享。当前使用场景下风险可控，因为 `setContextUsage()` 每次都整体替换。
+- 标签 ID 唯一性由 `generateTabId()` 保证：`tab-{Date.now()}-{Math.random().toString(36).slice(2, 9)}`，时间戳 + 7 位 base-36 随机串，冲突概率极低但不绝对。

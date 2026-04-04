@@ -1,7 +1,7 @@
 # Tab Types
 
 > **源码**: `src/features/chat/tabs/types.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
@@ -121,8 +121,7 @@ interface CloseTabsResult {
 - `RestoredTabState` 不包含运行时状态（streaming/attention 等），仅持久化必要的对话引用和标题
 - `TabBarLayoutMode` 的 `below-header-grid` 和 `below-header-vertical` 在 TabBar 中使用相同的最大可见数（5）
 
-## 待补充
+## 补充说明
 
-- [ ] `TabContextState` 在 core/types 中的完整定义
-- [ ] 四种布局模式的截图对比
-- [ ] `RestoredTabState` 与 StorageService 的序列化格式
+- `TabContextState` 定义在 `src/core/types/chat.ts`，包含 `sessionTitle`、`provider`、`model`、`preciseTokens`、`totalCost`、`createdAt`、`updatedAt` 等字段，由 `createEmptyTabContextState()` 创建初始值
+- `RestoredTabState` 序列化格式：`{ conversationId: string | null, title: string, modelOverride: { provider: string, model: string } | null }`，以 JSON 数组形式存储在 StorageService 的 tab state 中

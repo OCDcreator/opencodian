@@ -1,77 +1,64 @@
 # userMessageDisplay
 
 > **源码**: `src/features/chat/userMessageDisplay.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
-用户消息 Markdown 预处理工具。在用户消息内容交给 Markdown 渲染器之前，将原始 HTML/CSS/Script 标签安全转换为 Markdown 代码围栏，并对剩余 HTML 标签进行转义。确保用户输入中的 HTML 片段被安全地显示为代码块而非被浏览器解析执行。
+这个模块只有一个职责：把用户消息里的 HTML 片段改写成“适合展示的 Markdown 文本”。它不是通用 sanitizer，而是专门服务于 `OpenCodianView.renderUserMessageContent()` 在 `renderUserMarkupAsCodeBlocks` 打开时的显示转换。
 
-## 导入关系
+## 导出
 
-**上游**: 无外部导入。
-
-**下游**: `OpenCodianView` — 在渲染用户消息前调用 `prepareUserMessageMarkdownForDisplay()`。
-
-## 核心类型 / 接口
-
-无自定义类型。
-
-## 核心逻辑
-
-### 安全转换管线
-`prepareUserMessageMarkdownForDisplay()` 对输入 Markdown 执行以下转换管线：
-
-1. **保护代码区**: 识别行内代码（`` ` ``）、围栏代码块（` ``` ` / `~~~`）并保护其内容不被后续转换影响
-2. **`<style>` → CSS 代码围栏**: 将 HTML style 块转为 ` ```css ` 围栏
-3. **`<script>` → JS 代码围栏**: 将 HTML script 块转为 ` ```javascript ` 围栏
-4. **HTML 块 → HTML 代码围栏**: 将独立 HTML 标签块转为 ` ```html ` 围栏
-5. **HTML 标签转义**: 对剩余的 HTML 标签（`<div>`, `<span>` 等）进行 `&lt;`/`&gt;` 转义
-
-### HTML 块检测
-使用复杂正则 `HTML_BLOCK_REGEX` 匹配多行 HTML 结构，支持配对标签、自闭合标签、处理指令、CDATA、注释等。排除 `<style>` 和 `<script>`（已在前序步骤处理）。
-
-### 代码区外操作
-`replaceOutsideMarkdownCode()` 工具函数将 Markdown 文本按代码区分割，只对非代码区部分执行替换操作。
-
-## 关键方法
-
-| 方法 | 说明 |
-|------|------|
-| `prepareUserMessageMarkdownForDisplay(markdown)` | 预处理用户消息 Markdown（HTML→代码围栏 + 标签转义） |
-
-## 数据流
-
-```
-用户输入 Markdown（可能含 HTML）
-  → prepareUserMessageMarkdownForDisplay()
-    1. 保护代码围栏内容
-    2. <style> → ```css```
-    3. <script> → ```javascript```
-    4. HTML 块 → ```html```
-    5. 残余标签 → &lt; &gt; 转义
-  → 安全的 Markdown 字符串
-  → MarkdownRenderService.renderMarkdown()
+```typescript
+prepareUserMessageMarkdownForDisplay(markdown: string): string
 ```
 
-## 与其他模块的交互
+## 转换顺序
 
-- **OpenCodianView**: 在 `renderUserMessage()` 中调用，是用户消息渲染管线的前置步骤
-- **MarkdownRenderService**: 接收此模块处理后的安全 Markdown
+`prepareUserMessageMarkdownForDisplay()` 的处理顺序是固定的：
 
-## 配置项
+1. 如果输入为空，直接返回
+2. 用 `replaceOutsideMarkdownCode()` 保护已有的行内代码和 fenced code block
+3. 把 `<style>...</style>` 转成 `css` fenced code block
+4. 把 `<script>...</script>` 转成 `javascript` fenced code block
+5. 把整段 HTML 块转成 `html` fenced code block
+6. 对剩余 HTML 标签做 `<` / `>` 转义
 
-由 `plugin.settings.userMarkup` 控制是否启用此预处理（在 OpenCodianView 中判断）。
+## 关键实现点
+
+### 代码区保护
+
+`replaceOutsideMarkdownCode()` 会先找出：
+
+- 三反引号 fenced code block
+- `~~~` fenced code block
+- 行内反引号代码
+
+只有代码区外的文本会继续做 HTML 相关替换。
+
+### HTML 块识别
+
+`HTML_BLOCK_REGEX` 支持这些结构：
+
+- 成对标签
+- 自闭合标签
+- `<!DOCTYPE ...>`
+- 注释
+- CDATA
+- 处理指令
+
+但会排除 `style` 和 `script`，因为它们前面已经单独处理。
+
+### 标签转义
+
+最后一步的 `escapeHtmlTags()` 只对剩余标签 token 转义，所以最终 Markdown 里保留的是“按代码/文本显示的 HTML”，而不是可被浏览器继续解释的标签。
+
+## 模块关系
+
+- 无上游依赖
+- 下游消费者：`OpenCodianView`
 
 ## 注意事项
 
-- 正则处理顺序关键：必须先保护代码区，再处理 HTML 转换，最后转义残余标签
-- `<style>` 和 `<script>` 必须在通用 HTML 块检测之前处理，避免被错误归类
-- `MARKUP_BODY_PATTERN` 使用具名捕获组 `pairedTag` 和 `selfClosingTag`，需支持 ES2018 命名捕获组
-- 内容首尾空白通过 `trimFenceContent()` 清理
-
-## 待补充
-
-- [ ] `userMarkup` 设置的完整取值与行为映射
-- [ ] 边界情况测试（嵌套代码围栏、HTML 内嵌 Markdown 等）
-- [ ] 性能考量（正则复杂度对大消息的影响）
+- 实际启用开关是 `OpenCodianView` 读取的 `plugin.settings.renderUserMarkupAsCodeBlocks`，不是模块内部配置。
+- `buildCodeFence()` 会去掉被包裹内容首尾多余空行，再生成带语言标识的 fenced block。

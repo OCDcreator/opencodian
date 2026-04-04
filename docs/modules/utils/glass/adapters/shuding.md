@@ -1,7 +1,7 @@
 # Shuding Liquid Glass 适配器
 
 > **源码**: `src/utils/glass/adapters/shuding.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
@@ -125,8 +125,3 @@ unmount → restoreStyleSnapshot → restoreDatasetSnapshot → disconnect Resiz
 - `supportsBackdropFilterUrl()` 结果在模块生命周期内缓存
 - 位移贴图每像素计算复杂度较高，大尺寸面板可能影响性能
 - 卸载时通过快照机制精确恢复原始 DOM 状态
-
-## 待补充
-- [ ] 高 DPI 支持方案
-- [ ] 性能优化：WebWorker 或 OffscreenCanvas 离屏渲染
-- [ ] 菲涅尔效应和环境反射的实现计划（参见 docs/glass-improvement-guide.md）

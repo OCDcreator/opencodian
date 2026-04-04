@@ -1,7 +1,7 @@
 # Chat Tabs Barrel
 
 > **源码**: `src/features/chat/tabs/index.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
@@ -59,7 +59,8 @@ export type { CloseTabResult, RestoredTabState, TabBarItem, TabBarLayoutMode, Ta
 
 - 该 barrel 使用较多类型 re-export，改动时要同步检查主视图 import 是否受影响
 
-## 待补充
+## 补充说明
 
-- [ ] 补充当前 tabs 子系统在视图恢复流程中的实际导入链
+- 当前 tabs 子系统在视图恢复流程中的实际导入链如下
 
+> **验证结果**: `OpenCodianView` 直接从 `./tabs` 导入 `TabManager`，在视图初始化时调用 `restoreTabs(items, activeTabIndex, conversations)`，其中 `items` 来自 `StorageService` 持久化的 `RestoredTabState[]`，`conversations` 来自预加载的 `Map<string, TabConversationLike>`。恢复后 `TabManager.onChanged` 回调触发 TabBar 重新渲染。

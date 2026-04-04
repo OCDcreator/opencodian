@@ -1,7 +1,7 @@
 # Thinking Block Renderer
 
 > **源码**: `src/utils/streaming/ThinkingBlockRenderer.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
@@ -82,7 +82,7 @@
 | `cleanup(state)` | 清理计时器 |
 | `updateDuration(state, durationSeconds)` | 设置服务端提供的持续时间 |
 | `updateStoredDuration(wrapperEl, durationSeconds)` | 更新已持久化块的标签 |
-| `renderStored(parentEl, content, durationSeconds?)` | 从持久化数据重建 |
+| `renderStored(parentEl, content, durationSeconds?)` | 从持久化数据重建，返回 wrapper `HTMLElement` |
 
 ## 数据流
 
@@ -119,6 +119,4 @@
 - 折叠/展开通过 `display: none/block` 切换，不使用 CSS animation
 - 键盘支持：Enter 和 Space 键切换展开/折叠
 
-## 待补充
-- [ ] 思考内容折叠动画
-- [ ] 大量思考内容时的虚拟滚动
+

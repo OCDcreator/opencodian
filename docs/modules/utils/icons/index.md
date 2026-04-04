@@ -1,7 +1,7 @@
 # Utils Icons Barrel
 
 > **源码**: `src/utils/icons/index.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
@@ -48,7 +48,4 @@ export { ProviderIconService } from './ProviderIconService';
 
 - 如果 icons 目录未来新增其他公开工具，应同步扩充此 barrel
 
-## 待补充
-
-- [ ] 记录当前图标服务的主要消费方
 

@@ -1,7 +1,7 @@
 # Markdown Utils Barrel
 
 > **源码**: `src/utils/markdown/index.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
@@ -58,7 +58,4 @@ export type { CodeBlockOptions, FileLinkOptions, ImageEmbedOptions, MarkdownRend
 
 - 若某个下游只需要局部能力，也可直接导入子模块以减少认知负担
 
-## 待补充
-
-- [ ] 记录当前哪些调用方使用 barrel，哪些直接用子文件
 

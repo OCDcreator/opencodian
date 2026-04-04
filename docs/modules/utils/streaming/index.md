@@ -1,7 +1,7 @@
 # Streaming Barrel
 
 > **源码**: `src/utils/streaming/index.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
@@ -20,7 +20,12 @@
 export { StreamController } from './StreamController';
 export { ThinkingBlockRenderer } from './ThinkingBlockRenderer';
 export { ToolCallRenderer } from './ToolCallRenderer';
-export type { StreamChunk, StreamState, StreamEventCallbacks, ... } from './types';
+export type {
+  ContentBlock, DoneChunk, ErrorChunk, StreamChunk, StreamControllerOptions,
+  StreamEventCallbacks, StreamState, TextChunk, TextContentBlock, ThinkingBlockState,
+  ThinkingChunk, ThinkingContentBlock, ThinkingRendererOptions, ToolCallContentBlock,
+  ToolCallInfo, ToolCallStatus, ToolRendererOptions, ToolResultChunk, ToolUseChunk,
+} from './types';
 export { createStreamState } from './types';
 ```
 
@@ -59,7 +64,4 @@ export { createStreamState } from './types';
 
 - 如果未来新增更多流式渲染器，应评估是否一起纳入此 barrel，避免公开 API 面失衡
 
-## 待补充
-
-- [ ] 补充当前主视图是如何使用该 barrel 的 import 形态
 

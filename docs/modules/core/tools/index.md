@@ -1,57 +1,52 @@
 # Core Tools Barrel
 
 > **源码**: `src/core/tools/index.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
-工具相关的聚合入口。它把运行时工具名常量 `TOOL_NAMES` 与类型层的 `ToolCallInfo` 组合到同一导入面，方便工具渲染、权限判断和消息标准化代码统一取用。
+`src/core/tools/index.ts` 聚合了两类导出：
+
+- 运行时工具名常量 `TOOL_NAMES`
+- 工具调用信息类型 `ToolCallInfo`
+
+其中 `ToolCallInfo` 来自 `src/core/types/tools.ts`，而 `TOOL_NAMES` 来自当前目录下的 `toolNames.ts`。
 
 ## 导入关系
 
 ```text
 上游: ./toolNames, ../types/tools
-下游: 流式渲染、聊天视图、权限相关模块
+下游: 当前仓库内未检索到通过该 barrel 的直接导入
 ```
 
-## 核心类型 / 接口
+## 公开导出
 
 ```typescript
 export type { ToolCallInfo } from '../types/tools';
 export { TOOL_NAMES } from './toolNames';
 ```
 
-## 核心逻辑
+## 聚合规则
 
-### 运行时常量与类型桥接
+### 混合导出类型与常量
 
-该 barrel 不定义新逻辑，而是把“工具名字面量集合”和“工具调用结构类型”放到一个更顺手的入口里。
+这个 barrel 把“类型定义”和“常量表”放到同一导入面，但没有导出：
 
-## 关键方法
+- `ToolCallStatus`
+- `ToolName`
 
-| 方法 / 导出 | 说明 |
-|-------------|------|
-| `TOOL_NAMES` | 工具名常量表 |
-| `ToolCallInfo` | 工具调用展示与状态跟踪所用类型 |
+需要这两个类型时，仍然要直接从各自定义文件导入。
 
-## 数据流
+### 与 `src/core/types/tools.ts` 保持同步
 
-典型链路为：SSE / SDK 事件产生工具调用信息 -> 上层模块从本 barrel 获取常量和类型 -> 根据工具名决定渲染和权限行为。
+当前仓库里存在两份工具常量定义：
 
-## 与其他模块的交互
+- `src/core/tools/toolNames.ts`
+- `src/core/types/tools.ts`
 
-- 运行时工具名定义位于 [toolNames.md](C:/Users/lt/Desktop/Write/custom-project/opencodian/docs/modules/core/tools/toolNames.md)
-- `ToolCallInfo` 的结构来源于 `core/types/tools.ts`
-
-## 配置项
-
-无。
+barrel 只选择了前者作为常量来源，因此维护时需要留意两份定义是否继续一致。
 
 ## 注意事项
 
-- 当前这个 barrel 同时横跨 `core/tools` 和 `core/types`，变更导出时要关注潜在循环依赖
-
-## 待补充
-
-- [ ] 说明是否需要把 `ToolName` 类型也一并从此处导出
-
+- 如果后续要把工具相关 API 收拢到统一入口，当前 barrel 的导出面可能需要扩展 `ToolName` 等类型。
+- 现有仓库里工具渲染主链更多直接使用 `src/utils/streaming/types.ts` 与 `src/core/types/chat.ts` 中的工具结构，而不是这里的 barrel。

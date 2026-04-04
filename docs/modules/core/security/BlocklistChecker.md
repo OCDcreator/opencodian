@@ -1,66 +1,65 @@
 # BlocklistChecker
 
 > **源码**: `src/core/security/BlocklistChecker.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
-提供命令黑名单检查能力。将 bash 命令与用户配置的黑名单模式列表进行匹配，模式支持大小写不敏感的正则表达式，当正则无效或模式超过 500 字符时回退到子字符串匹配。用于在权限审批流程中拦截危险命令。
+`BlocklistChecker.ts` 目前只导出一个纯函数 `isCommandBlocked()`，用于把待执行命令与用户配置的黑名单模式逐条匹配，并返回布尔结果。它不负责读取设置，也不返回命中的具体模式。
 
 ## 导入关系
 
-上游: `src/core/types/settings.ts`（`PlatformBlockedCommands`、`enableBlocklist` 设置）
-下游: `OpenCodianView`（权限卡片处理）、`OpenCodeService`（工具调用前检查）
+```text
+上游: 无模块级依赖
+下游: 当前仓库内未检索到函数调用点
+```
 
 ## 核心类型 / 接口
 
-无独立类型导出，使用原始 `string[]` 作为模式列表。
+```typescript
+export function isCommandBlocked(
+  command: string,
+  patterns: string[],
+  enableBlocklist: boolean
+): boolean;
+```
 
 ## 核心逻辑
 
-### 命令匹配算法
-1. 若 `enableBlocklist` 为 `false`，直接返回 `false`（不拦截）
-2. 遍历所有 pattern：
-   - 模式长度 > 500 → 强制使用子字符串匹配（安全降级）
-   - 尝试构造 `RegExp(pattern, 'i')` 进行正则匹配
-   - 正则构造失败 → 回退到 `toLowerCase().includes()` 子字符串匹配
+### 总开关短路
 
-### 常量
-- `MAX_PATTERN_LENGTH = 500` — 超过此长度的模式跳过正则编译
+当 `enableBlocklist` 为 `false` 时，函数立即返回 `false`，不会检查任何模式。
 
-## 关键方法
+### 匹配顺序
 
-| 方法 | 说明 |
+当开关开启后，函数对 `patterns` 使用 `Array.prototype.some()`，任意一条命中就返回 `true`。
+
+每条 pattern 的处理规则是：
+
+1. 长度大于 `500` 时，不尝试构建正则，直接做大小写不敏感的子串匹配
+2. 否则尝试 `new RegExp(pattern, 'i')`
+3. 如果正则构造失败，再回退到大小写不敏感的子串匹配
+
+### 大小写处理
+
+正则路径始终使用 `i` 标志。
+
+子串回退路径则把 `command` 和 `pattern` 都转成小写后做 `includes()`。
+
+## 关键常量 / 方法
+
+| 项目 | 说明 |
 |------|------|
-| `isCommandBlocked(command, patterns, enableBlocklist)` | 检查命令是否被任何黑名单模式匹配 |
-
-## 数据流
-
-1. OpenCode server 发送 `permission_request` 事件（含 bash 命令）
-2. 插件 UI 展示权限卡片
-3. `isCommandBlocked()` 检查命令是否命中黑名单
-4. 若命中 → 自动拒绝或标记为危险；若未命中 → 展示给用户审批
+| `MAX_PATTERN_LENGTH` | 500，超过时一律走子串匹配 |
+| `isCommandBlocked()` | 返回命令是否应被阻止 |
 
 ## 与其他模块的交互
 
-- **Settings**: 读取 `settings.enableBlocklist` 和 `settings.blockedCommands`
-- **OpenCodianView**: 在渲染权限卡片时调用检查
-- **Permission types**: 配合 `PermissionMode`（`yolo`/`normal`/`plan`）决定是否自动拦截
-
-## 配置项
-
-| 设置 | 默认值 | 说明 |
-|------|--------|------|
-| `enableBlocklist` | `true` | 是否启用黑名单检查 |
-| `blockedCommands.unix` | `['rm -rf', 'chmod 777', ...]` | Unix 平台黑名单 |
-| `blockedCommands.windows` | `['del /s /q', 'rd /s /q', 'Remove-Item -Recurse -Force', ...]` | Windows 平台黑名单 |
+- 平台默认黑名单模式并不在这里定义，而是在 `src/core/types/settings.ts` 的 `getDefaultBlockedCommands()` / `getBashToolBlockedCommands()`。
+- 这个模块只消费调用方传入的 `patterns` 和布尔开关，不知道这些模式是来自用户设置、权限卡片还是其他来源。
 
 ## 注意事项
 
-- Windows 上 Bash 工具运行在 Git Bash/MSYS2 中但可调用 Windows 命令，因此 `getBashToolBlockedCommands()` 在 Windows 上合并两套黑名单
-- 黑名单检查不区分大小写
-- 正则失败时静默降级为子字符串匹配，不抛异常
-
-## 待补充
-- [ ] 记录黑名单匹配在 YOLO 模式下的行为（是否自动拒绝）
-- [ ] 补充典型黑名单模式的配置示例
+- 函数不会过滤空字符串 pattern；如果调用方传入 `''`，正则分支会把所有命令都判定为命中。
+- 函数不会返回“哪一条规则命中”，因此如果 UI 需要展示命中原因，必须在调用侧再做一遍解释。
+- 长模式回退到子串匹配是出于安全和稳定性考虑，不是严格的正则语义。

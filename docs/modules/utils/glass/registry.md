@@ -1,7 +1,7 @@
 # Glass 适配器注册表
 
 > **源码**: `src/utils/glass/registry.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
@@ -13,7 +13,7 @@ Glass 效果适配器的全局注册表。使用 `Map<GlassEffectAdapter['id'], 
 
 ## 核心类型 / 接口
 
-适配器 ID 类型为 `GlassEffectAdapter['id']`，即 `'shuding' | 'nikdelvin' | 'shudingDiamond'` 联合类型。
+适配器 ID 类型为 `GlassEffectAdapter['id']`（即 `string`），当前已注册的值有 `'shuding'` 和 `'nikdelvin'`。
 
 ## 核心逻辑
 
@@ -60,7 +60,3 @@ getGlassAdapter('shuding')
 - 重复注册同一 ID 会静默覆盖之前的适配器
 - 注册表是模块级状态，不随 Obsidian 工作区重置
 - 返回的适配器对象是引用，外部不应修改
-
-## 待补充
-- [ ] 第三方适配器注册的扩展点文档
-- [ ] 适配器热插拔场景下的状态清理

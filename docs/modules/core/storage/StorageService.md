@@ -1,110 +1,190 @@
 # StorageService
 
 > **源码**: `src/core/storage/StorageService.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
-OpenCodian 的持久化层，负责会话数据、插件设置、运行时状态和主题背景图片的读写。使用 Obsidian 的 `FileSystemAdapter` 进行文件操作。采用 local-first 策略：完整会话（含全部消息、上下文附件、本地通知）保存在 vault 侧插件存储中，而非仅保留元数据。
+`StorageService` 是 OpenCodian 的本地持久化层。它直接通过 `app.vault.adapter` 在当前 vault 根目录下维护一个 `.opencodian/` 目录，用来保存：
+
+- 会话 JSON
+- 插件设置 JSON
+- 运行时状态 JSON
+- 主题背景图片资产
+
+源码里没有把这些数据写到 `.obsidian/plugins/opencodian/`；实际相对路径都是以 vault 根目录为基准。
 
 ## 导入关系
 
-上游:
-- `obsidian`（`App`, `normalizePath`）
-- `src/main.ts`（`OpenCodianPlugin`）
-- `src/core/opencode/types.ts`（`ManagedServerState`）
-- `src/core/types/index.ts`（`ChatMessage`, `Conversation`, `ConversationMeta`, `OpenCodianSettings`）
+```text
+上游: obsidian App/normalizePath, path, src/main.ts, src/core/opencode/types.ts, src/core/types/index.ts
+下游: src/main.ts, src/features/chat/OpenCodianView.ts
+```
 
-下游:
-- `src/main.ts`（插件初始化时创建实例）
-- `src/features/chat/OpenCodianView.ts`（读写会话）
-- `src/features/settings/OpenCodianSettings.ts`（读写设置）
-- `src/features/settings/ProviderIconCacheModal.ts`（图标缓存）
+## 对外 API
 
-## 核心类型 / 接口
-
-| 类型 | 说明 |
-|------|------|
-| `StoredThemeBackgroundAsset` | 已存储的主题背景图片元数据（path, mimeType, displayName） |
-| `RuntimeState` | 运行时持久状态（managedServer 进程信息） |
+```typescript
+class StorageService {
+  initialize(): Promise<void>;
+  saveConversation(conversation: Conversation): Promise<void>;
+  loadFullConversation(id: string): Promise<Conversation | null>;
+  loadConversation(id: string): Promise<ConversationMeta | null>;
+  listConversations(): Promise<ConversationMeta[]>;
+  deleteConversation(id: string): Promise<void>;
+  saveSettings(settings: OpenCodianSettings): Promise<void>;
+  loadSettings(): Promise<Partial<OpenCodianSettings> | null>;
+  saveManagedServerState(state: ManagedServerState | null): Promise<void>;
+  loadManagedServerState(): Promise<ManagedServerState | null>;
+  saveThemeBackgroundAsset(data: ArrayBuffer, sourceName: string, hintedMimeType?: string): Promise<{
+    path: string;
+    mimeType: string;
+    displayName: string;
+  }>;
+  removeThemeBackground(storedPath: string | null | undefined): Promise<void>;
+  readThemeBackgroundDataUrl(storedPath: string, hintedMimeType?: string): Promise<string | null>;
+}
+```
 
 ## 核心逻辑
 
 ### 存储目录布局
 
+源码定义的路径常量如下：
+
+```text
+.opencodian/
+  settings.json
+  runtime.json
+  sessions/
+    {conversationId}.json
+  theme-backgrounds/
+    theme-bg-{timestamp}-{random}.{ext}
 ```
-.obsidian/plugins/opencodian/.opencodian/
-├── settings.json              # 插件设置
-├── runtime.json               # 运行时状态（托管服务器 PID 等）
-├── provider-icons/            # 缓存的 provider 图标（mapped / custom）
-├── theme-backgrounds/         # 上传的聊天主题背景图片
-│   └── theme-bg-{timestamp}-{random}.{ext}
-└── sessions/                  # 完整本地会话存储
-    └── {conversationId}.json
-```
+
+`initialize()` 只会确保 3 个目录存在：
+
+- `.opencodian`
+- `.opencodian/sessions`
+- `.opencodian/theme-backgrounds`
+
+`settings.json` 和 `runtime.json` 都是按需首次写入时创建。
 
 ### 会话持久化
-- `saveConversation()` 保存完整 `Conversation` 对象，含 `messages[]`、`contentBlocks`、上下文附件等
-- `loadFullConversation()` 加载含消息的完整会话
-- `loadConversation()` 仅加载元数据（`ConversationMeta`）
-- `listConversations()` 列出所有会话，按 `lastResponseAt` 降序排列
 
-### 主题背景图片管理
-- `saveThemeBackgroundAsset()` — 二进制写入 + MIME 检测 + 大小校验（≤64 MB）
-- `removeThemeBackground()` — 删除已存储的背景文件
-- `readThemeBackgroundDataUrl()` — 读取为 base64 data URL
-- 支持格式：SVG, PNG, JPEG, WEBP, GIF
+`saveConversation()` 会把完整 `Conversation` 序列化到单独文件，写入字段包括：
 
-### MIME 检测策略
-1. 优先使用 `hintedMimeType`
-2. 检查文件头部魔术字节（SVG `<svg`, PNG `89 50 4E 47`, JPEG `FF D8 FF`, GIF `GIF87a/GIF89a`, WEBP `RIFF...WEBP`）
-3. 回退到文件扩展名匹配
+- 基本元数据：`id/title/createdAt/updatedAt/lastResponseAt`
+- `titleGenerationStatus`
+- `messageCount`
+- `openCodeSessionId`
+- `currentNote`
+- `externalContextPaths`
+- `messages`
 
-## 关键方法
+也就是说，保存时不是只存摘要，而是把完整消息数组一起落盘。
 
-| 方法 | 说明 |
-|------|------|
-| `initialize()` | 创建 `.opencodian/`, `sessions/`, `theme-backgrounds/` 目录 |
-| `saveConversation(conversation)` | 保存完整会话（含消息数组） |
-| `loadFullConversation(id)` | 加载完整会话（含消息） |
-| `loadConversation(id)` | 仅加载会话元数据 |
-| `listConversations()` | 列出所有会话元数据，按最新响应时间排序 |
-| `deleteConversation(id)` | 删除会话文件 |
-| `saveSettings(settings)` | 持久化插件设置到 `settings.json` |
-| `loadSettings()` | 加载插件设置 |
-| `saveManagedServerState(state)` | 保存托管服务器进程状态 |
-| `loadManagedServerState()` | 加载托管服务器进程状态 |
-| `saveThemeBackgroundAsset(data, name, mime?)` | 存储主题背景图片（≤64MB） |
-| `removeThemeBackground(path)` | 删除主题背景文件 |
-| `readThemeBackgroundDataUrl(path, mime?)` | 读取背景图片为 data URL |
+读取分成两条路径：
+
+- `loadFullConversation(id)` 返回完整 `Conversation`
+- `loadConversation(id)` 只返回 `ConversationMeta`
+
+`loadFullConversation()` 在旧文件缺少 `messages` 时会自动补成空数组；`loadConversation()` 的 `messageCount` 则优先取 `messages.length`，没有时才回退到文件里的 `messageCount`。
+
+### 会话列表与删除
+
+`listConversations()` 会遍历 `sessions/` 下的所有 `.json` 文件，逐个调用 `loadConversation()`，最后按以下键排序：
+
+- 优先 `lastResponseAt`
+- 否则 `updatedAt`
+
+排序方向是从新到旧。
+
+`deleteConversation()` 会尝试删除单个文件；文件不存在时静默忽略。
+
+### 设置与运行时状态
+
+`saveSettings()` / `loadSettings()` 直接读写 `.opencodian/settings.json`。
+
+`saveManagedServerState()` / `loadManagedServerState()` 则读写 `.opencodian/runtime.json` 中的：
+
+```json
+{
+  "managedServer": {
+    "pid": 1234,
+    "host": "127.0.0.1",
+    "port": 4096
+  }
+}
+```
+
+运行时文件内部通过 `loadRuntimeState()` 做兜底，缺失或解析失败时会回到 `{ managedServer: null }`。
+
+### 主题背景资产
+
+`saveThemeBackgroundAsset()` 负责把用户上传的背景图写入 `theme-backgrounds/`：
+
+1. 先校验大小不能超过 64 MB
+2. 检测 MIME 类型
+3. 映射扩展名
+4. 调用 adapter 的 `writeBinary()` 写文件
+5. 返回 `{ path, mimeType, displayName }`
+
+支持的格式只有：
+
+- SVG
+- PNG
+- JPEG
+- WEBP
+- GIF
+
+`removeThemeBackground()` 删除已存储的背景图文件。
+
+`readThemeBackgroundDataUrl()` 会：
+
+1. 先检查文件是否存在
+2. 调用 adapter 的 `readBinary()`
+3. 重新判断 MIME
+4. 转成 `data:${mimeType};base64,...`
+
+如果文件不存在，或者 adapter 不支持 `readBinary()`，返回 `null`。
+
+### MIME 检测顺序
+
+`detectThemeBackgroundMimeType()` 的顺序是：
+
+1. 优先接受合法的 `hintedMimeType`
+2. 检测二进制或文本签名
+3. 最后按源文件扩展名判断
+
+其中 SVG 既支持直接 `<svg ...>` 文本，也支持 XML 头配合 `.svg` 后缀的判断。
 
 ## 数据流
 
-1. 插件 `onload()` → `storage.initialize()` 创建目录结构
-2. 用户发送消息 → `OpenCodianView` → `storage.saveConversation()` 持久化
-3. 插件重载 → `loadConversations()` → `storage.listConversations()` 恢复会话列表
-4. 用户切换会话 → `storage.loadFullConversation()` 加载消息
-5. 设置变更 → `storage.saveSettings()` 持久化
+```text
+src/main.ts onload
+  -> storage.initialize()
+  -> storage.loadSettings()
+  -> storage.loadManagedServerState()
+  -> storage.listConversations()
+
+OpenCodianView 会话变更
+  -> plugin.saveConversation()
+  -> storage.saveConversation()
+
+主题背景上传 / 删除
+  -> src/main.ts
+  -> storage.saveThemeBackgroundAsset() / removeThemeBackground()
+```
 
 ## 与其他模块的交互
 
-- **OpenCodianView**: 读写会话、保存/删除会话
-- **OpenCodianSettings**: 读写设置
-- **ServerManager**: 通过 `saveManagedServerState()` / `loadManagedServerState()` 持久化进程 PID
-- **chatAppearance**: 主题背景图片的上传/删除/读取
-
-## 配置项
-
-无直接配置，受 `OpenCodianSettings` 中的路径和存储相关设置影响。
+- `src/main.ts` 是 `StorageService` 的创建者，也是设置、运行时状态、背景图资源读写的协调者。
+- `src/features/chat/OpenCodianView.ts` 通过 `plugin.saveConversation()` 和部分直接调用 `plugin.storage.saveConversation()` 持久化会话。
+- 主题背景图的写入、移除和读取都由 `src/main.ts` 调用这个服务，再把结果回填到设置项中。
 
 ## 注意事项
 
-- 会话文件使用 JSON 格式（带缩进），文件名格式为 `{conversationId}.json`
-- `readBinary` 和 `writeBinary` 为可选 API，通过 `?.` 安全访问
-- `vaultPath` 通过 `(adapter as any).basePath` 获取，非 Obsidian 官方 API
-- 删除操作静默忽略文件不存在的错误
-
-## 待补充
-- [ ] 补充 provider-icons 目录的使用文档
-- [ ] 记录会话数据迁移/兼容性策略
-- [ ] 补充存储空间占用的监控建议
+- 存储根目录是 vault 根下的 `.opencodian/`，不是插件安装目录。
+- `writeBinary` / `readBinary` 都是可选 adapter API；缺失时分别表现为抛错或返回 `null`。
+- `initialize()` 不会创建 `runtime.json` 与 `settings.json`，因此依赖它们存在的逻辑必须允许首次为空。
+- 模块里声明了 `vaultPath`，但当前公开 API 并不直接使用这个字段。

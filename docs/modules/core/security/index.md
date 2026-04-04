@@ -1,55 +1,38 @@
 # Core Security Barrel
 
 > **源码**: `src/core/security/index.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
-安全辅助模块的最小公开入口。目前它只重新导出 `BlocklistChecker` 中的 `isCommandBlocked()`，让调用方可以通过更短路径使用命令黑名单检查能力。
+`src/core/security/index.ts` 是一个单导出 barrel，目前只转发命令黑名单检查函数 `isCommandBlocked()`。它没有附带类型、常量或额外安全策略。
 
 ## 导入关系
 
 ```text
 上游: ./BlocklistChecker
-下游: OpenCodeService、权限相关逻辑、测试
+下游: 当前仓库内未检索到通过该 barrel 的直接导入
 ```
 
-## 核心类型 / 接口
+## 公开导出
 
 ```typescript
 export { isCommandBlocked } from './BlocklistChecker';
 ```
 
-## 核心逻辑
+## 聚合规则
 
-### 单一公开能力
+### 只转发函数本身
 
-当前 barrel 只暴露“判断命令是否命中黑名单”这一项能力，没有额外封装。
+barrel 不转发：
 
-## 关键方法
+- `MAX_PATTERN_LENGTH`
+- 任何 settings 类型
+- 任何平台默认黑名单
 
-| 方法 / 导出 | 说明 |
-|-------------|------|
-| `isCommandBlocked()` | 检查命令是否被安全黑名单阻止 |
-
-## 数据流
-
-典型消费链路为：工具调用准备执行 -> 调用 `isCommandBlocked()` -> 命中时拦截并返回风险信息。
-
-## 与其他模块的交互
-
-- 真实实现位于 [BlocklistChecker.md](C:/Users/lt/Desktop/Write/custom-project/opencodian/docs/modules/core/security/BlocklistChecker.md)
-- 上层通过该 barrel 可以避免深路径 import
-
-## 配置项
-
-无。黑名单来源和配置解释由 `BlocklistChecker` 负责。
+这些内容分别仍然定义在 `BlocklistChecker.ts` 或 `src/core/types/settings.ts`。
 
 ## 注意事项
 
-- 如果未来安全模块暴露更多 API，需要重新审视是否继续保持“单函数 barrel”
-
-## 待补充
-
-- [ ] 记录当前有哪些调用方走的是 barrel 而不是直接导入实现文件
-
+- 如果后续新增更多安全辅助函数，这个 barrel 需要和 `docs/modules/core/security/index.md` 一起同步。
+- 当前仓库没有通过 `core/security` 入口消费该函数，因此它更像是对外 API 面，而不是现有主链路的一部分。

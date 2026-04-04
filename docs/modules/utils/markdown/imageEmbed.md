@@ -1,7 +1,7 @@
 # Image Embed 处理器
 
 > **源码**: `src/utils/markdown/imageEmbed.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
@@ -84,6 +84,4 @@ MarkdownRenderService.render()
 - `<img>` 标签设置 `loading="lazy"` 延迟加载
 - 非 Obsidian vault 内的图片路径无法解析
 
-## 待补充
-- [ ] 外部 URL 图片（`![](https://...)`）的处理
-- [ ] 图片大小自适应与聊天消息宽度的配合
+

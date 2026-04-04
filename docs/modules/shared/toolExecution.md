@@ -1,7 +1,7 @@
 # Tool Execution 工具函数
 
 > **源码**: `src/shared/toolExecution.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
@@ -116,6 +116,4 @@ OpenCodianView (显示 tool call)
 - `resolveToolResultText()` 优先返回 `state.error`（带 "Error:" 前缀），其次 `state.output`，最后原始 `result`
 - 元数据中的数字支持 string 和 number 两种类型
 
-## 待补充
-- [ ] 更多工具类型的特定失败模式
-- [ ] 自定义失败模式注册机制
+

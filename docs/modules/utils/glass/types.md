@@ -1,7 +1,7 @@
 # Glass 效果系统类型定义
 
 > **源码**: `src/utils/glass/types.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
@@ -53,7 +53,7 @@ type GlassAdapterSettingsValue = number | string | boolean;
 
 | 属性/方法 | 类型 | 说明 |
 |-----------|------|------|
-| `id` | `'shuding' \| 'nikdelvin' \| 'shudingDiamond'` | 唯一标识 |
+| `id` | `string` | 唯一标识（当前已注册的 ID 有 `'shuding'`、`'nikdelvin'`。`'shudingDiamond'` 代码保留但未注册） |
 | `displayName` | `string` | 显示名称 |
 | `description` | `string` | 适配器描述 |
 | `paramDefs` | `readonly GlassParamDef[]` | 参数定义列表 |
@@ -101,10 +101,6 @@ OpenCodianSettings (UI 控件)
 
 ## 注意事项
 
-- `id` 字段是联合类型，新增适配器需扩展此类型
+- `id` 字段为 string 类型，新增适配器时选择唯一 ID 即可
 - `updateSettings` 是可选方法——不实现时消费者应 fallback 到 `unmount` + `mount`
 - `resolveAssetUrl` 用于 nikdelvin 适配器解析内置背景图片资源路径
-
-## 待补充
-- [ ] 新增适配器 ID 的扩展指南
-- [ ] `resolveAssetUrl` 的具体调用链

@@ -1,7 +1,7 @@
 # Shared Modals Barrel
 
 > **源码**: `src/shared/modals/index.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
@@ -49,7 +49,5 @@ export { chooseForkTarget, type ForkTarget } from './ForkTargetModal';
 
 - 如果未来新增更多共享弹窗，建议持续通过本 barrel 暴露，而不是让调用方依赖深层文件
 
-## 待补充
 
-- [ ] 记录共享弹窗的命名与导出约定
 

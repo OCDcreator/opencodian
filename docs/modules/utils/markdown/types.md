@@ -1,7 +1,7 @@
 # Markdown Types
 
 > **源码**: `src/utils/markdown/types.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
@@ -63,7 +63,4 @@ interface RenderResult { success: boolean; error?: string; }
 - 这些类型依赖 Obsidian 的 `App` / `Component`，不适合脱离插件上下文单独使用
 - `RenderResult.error` 仅是可选字符串，不承载完整异常对象
 
-## 待补充
-
-- [ ] 记录代码块增强选项目前由谁消费
 

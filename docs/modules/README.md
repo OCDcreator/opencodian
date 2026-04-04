@@ -18,14 +18,15 @@
 
 - `docs/modules/README.md`
 - `docs/modules/_TEMPLATE.md`
+- `docs/modules/_WORKFLOW.md`
 - `docs/modules/infrastructure/build-pipeline.md`
 - `docs/modules/infrastructure/test-framework.md`
 - `docs/modules/infrastructure/scripts.md`
 
 ### 当前基线
 
-- `src/**/*.ts`: 96 篇源码模块文档
-- 文档元信息与基础设施: 5 篇
+- `src/**/*.ts`: 95 篇源码模块文档
+- 文档元信息与基础设施: 6 篇
 - `docs/modules/**/*.md` 合计: 101 篇
 
 ## 文档结构
@@ -34,6 +35,7 @@
 docs/modules/
 ├── README.md                          ← 总索引与覆盖规则
 ├── _TEMPLATE.md                       ← 统一文档模板
+├── _WORKFLOW.md                       ← 并行填充与增量更新工作流
 ├── entry-point/
 │   └── main.md
 ├── core/
@@ -82,7 +84,6 @@ docs/modules/
 │   │   ├── composerContext.md
 │   │   ├── forkMessages.md
 │   │   ├── liquidDiamondDemo.md
-│   │   ├── liquidDiamondDemoWebgl.md
 │   │   ├── renderGroups.md
 │   │   ├── userMessageActions.md
 │   │   ├── userMessageDisplay.md
@@ -166,6 +167,7 @@ docs/modules/
 ## 编写约定
 
 每篇文档遵循统一模板，详见 [`_TEMPLATE.md`](_TEMPLATE.md)。
+并行分工与后续增量维护流程，详见 [`_WORKFLOW.md`](_WORKFLOW.md)。
 
 ### 状态标记
 

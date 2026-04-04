@@ -1,7 +1,7 @@
 # OpenCodianSettings
 
 > **源码**: `src/features/settings/OpenCodianSettings.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
@@ -95,7 +95,8 @@ plugin.saveSettings() → StorageService 持久化
 - Electron dialog 通过 `@electron/remote` 或 `electron.remote` 动态获取
 - `visibility: hidden` 用于滚动恢复前的闪烁预防
 
-## 待补充
-- [ ] `addStyleSettings()` 内各样式分组的完整字段列表
-- [ ] 滚动恢复的 retry 机制详细说明
-- [ ] `renderBackgroundStyleGroup()` 和 `renderInputStyleGroup()` 的完整逻辑
+## 补充说明
+
+- `addStyleSettings()` 内样式分组字段：layout（maxWidth, messageSpacing, borderRadius）、background（相关背景图片设置）、user（userBubbleColor, userTextColor, userFont, userCodeFont, userMessageMaxWidth）、assistant（assistantBubbleColor, assistantTextColor, assistantFont, assistantCodeFont, assistantMessageMaxWidth）、input（inputBackgroundColor, inputTextColor, inputFont, inputCodeFont, inputMaxHeight, inputPlaceholderColor, glass refraction 参数）、scrollbar（scrollbarWidth, scrollbarTrackColor, scrollbarThumbColor, scrollbarThumbHoverColor）、advanced（customCssDeclarations）
+- 滚动恢复机制：`SETTINGS_SCROLL_RESTORE_RETRY_DELAYS = [24, 80, 160, 320]` 定义重试延迟，`SETTINGS_SCROLL_RESTORE_OBSERVER_WINDOW_MS = 1200` 为观察窗口，`SETTINGS_SCROLL_RESTORE_MIN_STABLE_MS = 180` 为最小稳定时间，使用 `MutationObserver` 监听 DOM 变化后逐帧检查 scrollTop 是否到达目标位置
+- `renderBackgroundStyleGroup()` 处理背景图片上传/预览/移除（通过 Electron `showOpenDialog`）、blur/depth/edge blending 参数调节；`renderInputStyleGroup()` 处理 glass refraction variant 选择、SVG filter preset、折射参数（blur/offset/scale/opacity）的数值控件

@@ -1,7 +1,7 @@
 # Editor Selection Highlight
 
 > **源码**: `src/utils/editorSelectionHighlight.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
@@ -82,7 +82,4 @@ OpenCodianView (用户引用编辑器选区)
 - 每次 `showHighlightEffect` 只创建单个范围，之前的范围被替换
 - 不支持多个同时高亮区域
 
-## 待补充
-- [ ] 多范围高亮支持
-- [ ] 高亮样式自定义配置
-- [ ] 与 Obsidian 原生搜索高亮的协调
+

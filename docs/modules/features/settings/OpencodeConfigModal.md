@@ -1,7 +1,7 @@
 # OpencodeConfigModal
 
 > **源码**: `src/features/settings/OpencodeConfigModal.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
@@ -76,6 +76,7 @@ JSON.parse() → configManager.write() → 重启服务
 - 保存时仅 warn 缺少 permission 字段，不阻止保存
 - `confirm()` 使用浏览器原生确认框
 
-## 待补充
-- [ ] OpencodeConfig 的完整类型定义
-- [ ] 与 ModelConfigJsonModal 的职责边界说明
+## 补充说明
+
+- `OpencodeConfig` 类型定义在 `src/core/types/opencodeConfig.ts`，包含 `$schema`、`permission`、`mcp`、`provider`、`model` 等顶层字段
+- 与 `ModelConfigJsonModal` 的职责边界：本 modal 编辑完整的 `.opencode/opencode.json`（含 permission/mcp/plugin 等），`ModelConfigJsonModal` 只读写其中的模型相关子集（model/provider/limits 等）。两者操作的是同一个配置文件，只是写入范围不同，因此并行打开时也存在后保存覆盖先保存的风险

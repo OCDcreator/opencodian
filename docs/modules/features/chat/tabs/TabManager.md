@@ -1,7 +1,7 @@
 # TabManager
 
 > **源码**: `src/features/chat/tabs/TabManager.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
@@ -68,6 +68,10 @@
 | `setActiveTabModelOverride(modelOverride)` | 设置激活标签的模型覆盖 |
 | `getTabContextUsage(tabId)` | 获取指定标签的上下文用量 |
 | `setTabContextUsage(tabId, contextUsage)` | 设置指定标签的上下文用量 |
+| `setActiveTabStreaming(isStreaming)` | 设置激活标签的流式状态 |
+| `setActiveTabBackgroundTaskRunning(hasBackgroundTask)` | 设置激活标签的背景任务状态 |
+| `getActiveTabContextUsage()` | 获取激活标签的上下文用量 |
+| `setActiveTabContextUsage(contextUsage)` | 设置激活标签的上下文用量 |
 
 ## 数据流
 
@@ -103,9 +107,10 @@
 - 恢复时跳过对话 ID 不在 `conversations` Map 中的条目
 - `onChanged` 回调在大多数修改操作后触发，调用方需注意避免无限循环
 - `TabData` 通过 `getData()` 返回的是浅拷贝（`modelOverride` 和 `contextUsage` 为一级拷贝）
+- `setTabContextUsage()` 和 `setActiveTabContextUsage()` **不触发** `notifyChanged()`，调用方需自行决定是否刷新 UI
 
-## 待补充
+## 补充说明
 
-- [ ] 标签持久化格式与 StorageService 的交互
-- [ ] `activeTabId` 为 null 时的 UI 表现
-- [ ] 标签数达到上限时的用户反馈
+- 标签持久化格式：`RestoredTabState[]` 由 `StorageService` 以 JSON 数组存储在 tab state 字段中，每个条目包含 `conversationId`、`title`、`modelOverride`
+- `activeTabId` 为 null 时：表示无标签存在（`tabs.length === 0`），`getActiveTab()` 返回 null，OpenCodianView 应展示空状态
+- 标签数达到上限时：`canCreateTab()` 返回 false，`createTab()` 返回 null，OpenCodianView 应在 UI 层给出提示

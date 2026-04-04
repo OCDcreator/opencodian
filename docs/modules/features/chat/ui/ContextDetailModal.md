@@ -1,7 +1,7 @@
 # ContextDetailModal
 
 > **源码**: `src/features/chat/ui/ContextDetailModal.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
@@ -75,6 +75,7 @@ Modal grid + breakdown bar + legend
 - 当 `contextState` 为 null 或 `summary.isUnavailable` 时，显示空状态提示
 - `formatTimestamp` 有 fallback：先尝试 `dateStyle + timeStyle`，失败后使用 `year/month/day/hour/minute` 各组件
 
-## 待补充
-- [ ] ContextBreakdownSegment 的 key 枚举（system / history / context / ...）
-- [ ] 与 ContextUsageService 各方法返回类型的精确映射
+## 补充说明
+
+- `ContextBreakdownSegment` 的 `key` 值由 `ContextUsageService.getContextBreakdown()` 返回，包含 system / history / context 等 key，每个 key 对应 i18n 翻译 `context.breakdown.{key}`
+- 与 `ContextUsageService` 各方法返回类型的精确映射：`summarize()` → `{ percentage, tone, ringLabel, tooltip, isUnavailable, contextWindow }`，`getDisplayTokenBreakdown()` → `{ total, input, output, reasoning, cacheRead, cacheWrite }`，`getContextBreakdown()` → `ContextBreakdownSegment[]`（每个含 `key`, `tokens`, `percent`, `width`）

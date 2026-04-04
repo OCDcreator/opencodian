@@ -1,7 +1,7 @@
 # Settings Feature Barrel
 
 > **源码**: `src/features/settings/index.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
@@ -49,7 +49,6 @@ export { OpenCodianSettingTab } from './OpenCodianSettings';
 
 - 若后续需要从设置目录公开更多组件，应先确认是否应该继续保持“单主入口”设计
 
-## 待补充
+## 补充说明
 
-- [ ] 记录设置页之外是否存在其他 `OpenCodianSettingTab` 消费方
-
+- `OpenCodianSettingTab` 的唯一消费方是 `main.ts` 中的 `this.addSettingTab(new OpenCodianSettingTab(...))` 调用，无其他外部消费方

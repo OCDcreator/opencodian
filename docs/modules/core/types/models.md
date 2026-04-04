@@ -1,7 +1,7 @@
 # Model Types
 
 > **源码**: `src/core/types/models.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
@@ -20,12 +20,13 @@
 
 | 类型 | 说明 |
 |------|------|
-| `ModelInfo` | 模型信息（id, name, provider, contextWindow, supportsThinking?, supportsVision?） |
-| `ModelProvider` | 模型提供商（id, name, models[], defaultModelId?） |
+| `ModelInfo` | 模型信息（`id`, `name`, `provider`, `contextWindow`, `supportsThinking?`, `supportsVision?`） |
+| `ModelProvider` | 模型提供商（`id`, `name`, `models[]`, `defaultModelId?`） |
 
 ## 核心逻辑
 
 ### 上下文窗口解析
+
 `getDefaultContextWindow(modelId)` 按以下优先级查找：
 1. 精确匹配 `DEFAULT_CONTEXT_WINDOWS` 映射表
 2. 部分匹配（`includes` 检查），覆盖 claude-3 系列（200k）、gpt-4 系列（128k）、gpt-3.5（16k）
@@ -35,19 +36,30 @@
 
 | 模型模式 | 上下文窗口 |
 |----------|-----------|
-| claude-3-opus | 200,000 |
-| claude-3.5-sonnet | 200,000 |
-| claude-3.5-haiku | 200,000 |
-| claude-3（其他） | 200,000 |
-| gpt-4 / gpt-4-turbo / gpt-4o | 128,000 |
+| claude-3-opus-20240229 | 200,000 |
+| claude-3-5-sonnet-20241022 | 200,000 |
+| claude-3-5-haiku-20241022 | 200,000 |
+| gpt-4 / gpt-4-turbo / gpt-4o / gpt-4o-mini | 128,000 |
 | gpt-3.5 | 16,000 |
-| 未知模型 | 128,000 |
+| claude-3（其他变体） | 200,000 |
+| 未知模型 | 128,000（回退） |
+
+### 部分匹配规则
+
+```typescript
+if (modelId.includes('claude-3-opus')) return 200000;
+if (modelId.includes('claude-3-5-sonnet')) return 200000;
+if (modelId.includes('claude-3-5-haiku')) return 200000;
+if (modelId.includes('claude-3')) return 200000;
+if (modelId.includes('gpt-4')) return 128000;
+if (modelId.includes('gpt-3.5')) return 16000;
+```
 
 ## 关键方法
 
 | 方法 | 说明 |
 |------|------|
-| `getDefaultContextWindow(modelId)` | 根据模型 ID 返回默认上下文窗口大小 |
+| `getDefaultContextWindow(modelId: string): number` | 根据模型 ID 返回默认上下文窗口大小 |
 
 ## 数据流
 
@@ -60,6 +72,7 @@
 - **ModelConfigService**: 使用 `ModelProvider` 和 `ModelInfo` 构建本地/服务端模型目录
 - **OpenCodianView**: 模型选择下拉框、上下文用量环形图
 - **TabContextState**: 使用 `contextWindow` 计算 token 百分比
+- **ModelConfigModal**: 展示模型信息和能力标记
 
 ## 配置项
 
@@ -67,11 +80,12 @@
 
 ## 注意事项
 
-- 部分匹配使用 `includes()`，可能误匹配（如 `gpt-4o-mini` 会命中 `gpt-4` 分支，得到 128000 而非实际值）
+- 部分匹配使用 `includes()`，可能误匹配（如 `gpt-4o-mini` 会命中 `gpt-4` 分支，得到 128000）
 - 服务端返回的模型信息中如果包含 `contextWindow` 字段，应优先使用而非此函数的估算值
 - `supportsThinking` 和 `supportsVision` 为可选字段，缺失时 UI 应做降级处理
+- 源码约 51 行
 
-## 待补充
-- [ ] 补充更多模型的上下文窗口映射
-- [ ] 记录服务端 contextWindow 与本地估算的优先级策略
-- [ ] 补充 supportsThinking / supportsVision 的判断来源
+## 未来扩展
+
+- 可考虑从服务端动态获取模型能力信息，而非硬编码
+- 可添加更多模型家族的上下文窗口映射（如 Gemini、Llama 等）

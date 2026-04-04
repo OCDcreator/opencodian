@@ -1,87 +1,77 @@
 # Liquid Diamond Demo
 
 > **源码**: `src/features/chat/liquidDiamondDemo.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
-聊天界面里的 DOM/SVG/Canvas 版 Liquid Diamond 演示控制器。它使用 `shudingDiamond` 适配器提供的几何投影与折射辅助函数，在消息壳层上挂载一个可拖拽、带惯性和弹性边界的视觉 demo，用于调试或展示 Liquid Glass / diamond 效果。
+这是一个挂载在聊天消息壳层上的实验性视觉控制器。它不是聊天主流程的一部分，但确实由 `OpenCodianView.toggleLiquidDiamondDemo()` 直接创建和销毁。
 
-## 导入关系
+实现方式是：
 
-```text
-上游: ../../utils/glass/adapters/shudingDiamond
-下游: OpenCodianView
-```
+- 用 `shudingDiamond` 提供的几何和折射计算函数生成 diamond 上下文
+- 用 `canvas` 生成位移贴图
+- 用 SVG `feDisplacementMap` 和 CSS `backdrop-filter` 组合出“液态折射”效果
+- 用 DOM 指针事件实现拖拽、惯性和边界回弹
 
-## 核心类型 / 接口
+## 公开导出
 
 ```typescript
 export const LIQUID_DIAMOND_DEMO_STAGE_SIZE = 220;
 
 export class LiquidDiamondDemoController {
-  isVisible(): boolean;
-  show(): void;
-  hide(): void;
-  toggle(): void;
-  destroy(): void;
+  constructor(parentEl: HTMLElement)
+  isVisible(): boolean
+  show(): void
+  hide(): void
+  toggle(): void
+  destroy(): void
 }
 ```
 
-## 核心逻辑
+## 关键行为
 
-### Overlay 与场景搭建
+### 场景创建
 
-`createState()` 会创建 overlay、interaction layer、host、SVG filter、canvas、crystal/rim/bloom 等 DOM 结构，并把 demo 挂到传入的 `parentEl` 下。
+`show()` 首次调用时会通过内部 `createState(parentEl)` 生成完整场景：
 
-### 几何投影与折射
+- overlay / interaction layer / host DOM
+- SVG `filter`、`feImage`、`feDisplacementMap`
+- `canvas` 和 2D 上下文
+- `bloom`、`rim`、`crystal`、`face overlay` 等视觉层
 
-渲染时通过 `createDiamondContext()`、`traceDiamondRay()`、`applyEdgeBulge()` 计算 diamond 外形、面片与折射视觉，再同步更新 SVG filter、canvas 位移图和表层装饰。
+### 渲染分级
 
-### 交互惯性
+模块维护两种渲染质量：
 
-pointer 事件驱动拖拽，释放后进入惯性动画；边界通过 `elasticPosition()` 和 spring/damping 参数回弹，保持视觉上可拖动但不会永久跑出容器。
+- `interactive`：拖动时使用较低 DPI，加快重绘
+- `settled`：静止后回到较高 DPI，提高细节
 
-### 渲染质量分级
+### 指针交互
 
-拖动中使用较低 DPI 的 `interactive` 渲染，静止后回到 `settled` 渲染，以平衡流畅度与清晰度。
+拖动逻辑保存在内部 `DemoState`：
 
-## 关键方法
+- `pointerdown` 开始拖动并尝试 `setPointerCapture`
+- `pointermove` 更新 `x/y` 和速度
+- `pointerup` 结束拖动，若有速度则进入惯性动画
+- `tickInertia()` 会叠加阻尼、弹簧回弹和边界限制
 
-| 方法 / 导出 | 说明 |
-|-------------|------|
-| `LIQUID_DIAMOND_DEMO_STAGE_SIZE` | demo 固定舞台尺寸常量 |
-| `show()` | 创建场景并挂载 demo |
-| `hide()` | 销毁场景、解绑事件、移除 DOM |
-| `toggle()` | 在显示与隐藏之间切换 |
-| `destroy()` | 对外销毁入口，内部复用 `hide()` |
+### 位移贴图与外观层
 
-## 数据流
+`renderScene()` 会：
 
-1. `OpenCodianView` 创建 `LiquidDiamondDemoController`
-2. `show()` 调用 `createState(parentEl)`
-3. pointer / resize 事件更新 `x/y/vx/vy`
-4. `renderScene()` 基于 `shudingDiamond` 几何上下文更新 SVG 与 canvas
-5. `hide()` / `destroy()` 取消动画帧、解绑事件并移除 overlay
+- 由 `createDiamondContext()` 构建当前视角下的 diamond 几何
+- 通过 `traceDiamondRay()` 和 `applyEdgeBulge()` 生成位移数据
+- 把位移数据写入 canvas，再转成 data URL 提供给 `feImage`
+- 用 `renderVisualLayers()` 同步 bloom、rim、crystal、face overlay 的样式
 
-## 与其他模块的交互
+## 模块关系
 
-- 依赖 `shudingDiamond` 提供的 diamond 几何与折射辅助能力
-- 被 [OpenCodianView.md](C:/Users/lt/Desktop/Write/custom-project/opencodian/docs/modules/features/chat/OpenCodianView.md) 用于 demo 开关逻辑
-- 与 [liquidDiamondDemoWebgl.md](C:/Users/lt/Desktop/Write/custom-project/opencodian/docs/modules/features/chat/liquidDiamondDemoWebgl.md) 形成两套同主题 demo 实现
-
-## 配置项
-
-无直接设置项，主要由内部常量控制物理与渲染参数。
+- 上游依赖：`../../utils/glass/adapters/shudingDiamond`
+- 下游消费者：`OpenCodianView`
 
 ## 注意事项
 
-- 这是 feature 目录下的辅助 demo，不是普通聊天主流程，但它真实接入 `OpenCodianView`，修改时不能当作完全独立脚本
-- 该实现创建了较多 DOM / pointer / animation frame 资源，销毁路径必须完整
-- `LIQUID_DIAMOND_DEMO_STAGE_SIZE` 还会被 WebGL 版本复用
-
-## 待补充
-
-- [ ] 记录当前 view 里有哪些命令或调试入口能触发该 demo
-- [ ] 补充 SVG filter 与 canvas 位移图的更新关系
-
+- `destroy()` 只是对外销毁入口，内部直接复用 `hide()`。
+- `hide()` 会取消动画帧、移除事件监听、释放指针捕获并删除 overlay；这个清理路径是真正的资源回收点。
+- 控制器本身没有配置持久化，也没有和插件设置联动。

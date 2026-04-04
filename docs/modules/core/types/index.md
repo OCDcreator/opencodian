@@ -1,7 +1,7 @@
 # Core Types Barrel
 
 > **源码**: `src/core/types/index.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
@@ -14,16 +14,85 @@ OpenCodian 全局类型的主聚合入口。它把聊天、模型、设置、权
 下游: 几乎所有业务模块，尤其是 main.ts、OpenCodianView、OpenCodeService、设置 UI
 ```
 
-## 核心类型 / 接口
+## 核心导出
 
-```typescript
-export { ... } from './chat';
-export { ... } from './models';
-export { ... } from './settings';
-export { ... } from './tools';
-export { ... } from './permission';
-export { ... } from './opencodeConfig';
-```
+### 来自 `./chat`
+
+| 导出 | 类型 | 说明 |
+|------|------|------|
+| `ChatMessage` | type | 聊天消息结构 |
+| `ContentBlock` | type | 内容块（text/thinking/tool_use/tool_result/subagent） |
+| `Conversation` | type | 完整会话（含消息数组） |
+| `ConversationMeta` | type | 会话元数据 |
+| `StreamChunk` | type | 流式事件联合类型（13 种事件） |
+| `TabContextState` | type | 标签页上下文状态 |
+| `createEmptyTabContextState` | function | 创建空白上下文状态 |
+| `UsageInfo` | type | Token 使用信息 |
+| `ImageAttachment` | type | 图片附件 |
+| `ToolCallInfo` | type | 工具调用信息 |
+| `QuestionRequest` | type | OpenCode 问题请求 |
+| `QuestionResolution` | type | 问题解决状态 |
+| `SessionTodo` | type | 会话待办项 |
+| `SessionDiffEntry` | type | 会话差异条目 |
+| `OmoMessageMeta` | type | OMO 消息元数据 |
+| `VIEW_TYPE_OPENCODIAN` | const | 视图类型常量 `'opencodian-view'` |
+
+### 来自 `./models`
+
+| 导出 | 类型 | 说明 |
+|------|------|------|
+| `ModelInfo` | type | 模型信息 |
+| `ModelProvider` | type | 模型提供商 |
+| `getDefaultContextWindow` | function | 获取模型默认上下文窗口 |
+
+### 来自 `./settings`
+
+| 导出 | 类型 | 说明 |
+|------|------|------|
+| `OpenCodianSettings` | type | 完整设置接口 |
+| `DEFAULT_SETTINGS` | const | 默认设置常量 |
+| `ServerMode` / `ServerAuthType` | type | 服务器模式/认证类型 |
+| `ServerConfig` / `LocalServerConfig` / `RemoteServerConfig` | type | 服务器配置 |
+| `PermissionMode` / `ApprovalDecision` | type | 权限模式/审批决策 |
+| `ModelSourceMode` | type | 模型来源模式 |
+| `TitleMode` | type | 标题生成模式 |
+| `QuestionDisplayMode` / `QuestionCardPosition` | type | 问题显示配置 |
+| `TabBarPosition` / `BelowHeaderTabBarLayout` | type | 标签栏配置 |
+| `ChatScrollMode` | type | 滚动模式 |
+| `InputPanelThemeId` / `LiquidGlassAdapterId` | type | 输入面板主题 |
+| `ChatAppearanceSettings` | type | 聊天外观设置 |
+| `ThemeSettings` / `ThemePresetId` / `ThemeStyleId` | type | 主题设置 |
+| `PersistedTabState` / `PersistedTabEntry` | type | 标签页持久化 |
+| `ProviderIconEntry` / `ProviderIconLibrary` | type | 提供商图标 |
+| `normalize*` 系列 | function | 归一化函数（约 20+ 个） |
+| `getDefault*` 系列 | function | 默认值函数 |
+| `isLocalServerMode` / `getServerBaseUrl` | function | 服务器工具函数 |
+
+### 来自 `./tools`
+
+| 导出 | 类型 | 说明 |
+|------|------|------|
+| `ToolCallInfo` | type | 工具调用信息 |
+
+### 来自 `./permission`
+
+| 导出 | 类型 | 说明 |
+|------|------|------|
+| `PermissionAction` / `ToolPermission` | type | 权限动作 |
+| `PermissionConfig` | type | 权限配置 |
+| `PermissionRequest` / `PermissionReplyInput` | type | 权限请求/响应 |
+| `PermissionSettings` | type | 权限设置 |
+| `PermissionMode` | type | 权限模式 |
+| `OpencodeConfig` | type | OpenCode 配置（交叉引用） |
+
+### 来自 `./opencodeConfig`
+
+| 导出 | 类型 | 说明 |
+|------|------|------|
+| `OpencodeProviderConfig` | type | 提供商配置 |
+| `OpencodeProviderModelConfig` | type | 模型配置 |
+| `OpencodePluginSpec` | type | 插件声明格式 |
+| `OpencodeModelConfigSubset` | type | 模型配置子集 |
 
 ## 核心逻辑
 
@@ -31,24 +100,25 @@ export { ... } from './opencodeConfig';
 
 该文件按主题分组 re-export：
 
-- chat: 消息、会话、流式事件、上下文附件
-- models: 模型提供商与上下文窗口信息
-- settings: 默认设置、normalize 工具、主题与服务器配置
-- tools: 工具调用数据结构
-- permission: 权限请求与审批结构
-- opencodeConfig: 本地 OpenCode 配置文件 schema
+- **chat**: 消息、会话、流式事件、上下文附件、OMO 元数据、待办、差异
+- **models**: 模型提供商与上下文窗口信息
+- **settings**: 默认设置、normalize 工具、主题与服务器配置（约 40+ 个字段）
+- **tools**: 工具调用数据结构
+- **permission**: 权限请求与审批结构
+- **opencodeConfig**: 本地 OpenCode 配置文件 schema
 
 ### 为上层提供稳定类型入口
 
-调用方通常只需 import `../../core/types`，而不用深入每个子文件。
+调用方通常只需 `import { ... } from '../../core/types'`，而不用深入每个子文件。
 
 ## 关键方法
 
 | 方法 / 导出 | 说明 |
 |-------------|------|
-| `createEmptyTabContextState` | 从 chat 类型模块暴露的上下文状态初始化函数 |
-| `DEFAULT_SETTINGS` | 从 settings 模块暴露的默认配置 |
-| `getDefaultThemeSettings()` 等 | 多组默认值与 normalize 工具 |
+| `createEmptyTabContextState()` | 从 chat 类型模块暴露的上下文状态初始化函数 |
+| `DEFAULT_SETTINGS` | 从 settings 模块暴露的默认配置常量 |
+| `getDefaultChatAppearanceSettings()` 等 | 多组默认值与 normalize 工具 |
+| `normalizeEffortLevel()` 等 | 设置值归一化函数 |
 | 各类 `type` 导出 | 项目核心类型契约 |
 
 ## 数据流
@@ -57,8 +127,9 @@ export { ... } from './opencodeConfig';
 
 ## 与其他模块的交互
 
-- 是 [chat.md](C:/Users/lt/Desktop/Write/custom-project/opencodian/docs/modules/core/types/chat.md)、[models.md](C:/Users/lt/Desktop/Write/custom-project/opencodian/docs/modules/core/types/models.md)、[settings.md](C:/Users/lt/Desktop/Write/custom-project/opencodian/docs/modules/core/types/settings.md) 等子文档的聚合入口
-- 与 `core/tools/index.ts` 共同提供“类型 + 常量”层的公开 API
+- 是 [chat.md](./chat.md)、[models.md](./models.md)、[settings.md](./settings.md) 等子文档的聚合入口
+- 与 `core/tools/index.ts` 共同提供"类型 + 常量"层的公开 API
+- 被 `main.ts`、`OpenCodianView`、`OpenCodeService`、`OpenCodianSettings` 等几乎所有模块导入
 
 ## 配置项
 
@@ -67,10 +138,12 @@ export { ... } from './opencodeConfig';
 ## 注意事项
 
 - 这是高耦合入口，新增导出时要警惕循环依赖和 import 体积膨胀
-- 这里既导出类型也导出少量函数/常量，文档中应明确哪些是纯类型、哪些有运行时值
+- 这里既导出类型也导出函数/常量，消费方需区分使用场景
+- 源码约 156 行，但聚合了数千行的类型定义
 
-## 待补充
+## 消费统计
 
-- [ ] 统计当前最常被消费的导出分组
-- [ ] 评估是否需要拆分更细的公共入口，降低单文件认知负担
-
+最常被消费的导出分组（按出现频率估计）：
+1. `chat` 相关（`ChatMessage`, `StreamChunk`, `Conversation`）— 聊天核心
+2. `settings` 相关（`OpenCodianSettings`, `DEFAULT_SETTINGS`, `normalize*`）— 设置系统
+3. `permission` 相关（`PermissionRequest`, `PermissionMode`）— 权限交互

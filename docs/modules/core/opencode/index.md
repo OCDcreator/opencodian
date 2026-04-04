@@ -1,71 +1,85 @@
 # Core OpenCode Barrel
 
 > **源码**: `src/core/opencode/index.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
-`core/opencode` 目录的公开入口，聚合 OpenCode 服务门面、服务器生命周期管理、SDK rollout flag 以及对外暴露的类型。它定义了“插件侧愿意向上层公开的 OpenCode API 面”，而不是把目录内所有辅助实现都一并暴露出去。
+`src/core/opencode/index.ts` 是 `core/opencode` 目录的公开 barrel。它只暴露上层真正需要直接依赖的类、常量和类型：
+
+- `OpenCodeService`
+- `ServerManager`
+- SDK v2 rollout 常量与解析函数
+- 供调用方使用的服务层类型
+
+像 `createSdkClient.ts`、`sdkFetch.ts`、`sdkTypes.ts`、`omoCompat.ts` 这类实现细节并不会通过本文件转发。
 
 ## 导入关系
 
 ```text
-上游: ./OpenCodeService, ./sdkFeatureFlags, ./ServerManager, ./types
-下游: main.ts、设置面板、主视图、测试代码
+上游:
+- `./OpenCodeService`
+- `./sdkFeatureFlags`
+- `./ServerManager`
+- `./types`
+
+下游:
+- `src/main.ts`
+- 依赖 OpenCode 服务层类型的设置页 / 视图 / 测试
 ```
 
-## 核心类型 / 接口
+## 公开导出
 
-```typescript
-export type { SessionActivityStatus } from './OpenCodeService';
-export { OpenCodeService } from './OpenCodeService';
-export { resolveSdkFeatureFlags, SDK_FEATURE_FLAG_DISABLED_DEFAULTS, SDK_FEATURE_FLAG_ROLLOUT_DEFAULTS } from './sdkFeatureFlags';
-export { ServerManager } from './ServerManager';
-export type { OpenCodeClientConfig, OpenCodeServerConfig, QueryOptions, ResponseHandler, SdkFeatureFlags, ServerError, ServerStatus } from './types';
-```
+| 导出 | 来源 | 用途 |
+|------|------|------|
+| `OpenCodeService` | `./OpenCodeService` | OpenCode 运行时门面 |
+| `SessionActivityStatus` | `./OpenCodeService` | session 忙闲/重试状态的类型 |
+| `ServerManager` | `./ServerManager` | 本地/远程服务生命周期管理 |
+| `resolveSdkFeatureFlags` | `./sdkFeatureFlags` | 合并 SDK rollout 开关 |
+| `SDK_FEATURE_FLAG_DISABLED_DEFAULTS` | `./sdkFeatureFlags` | 全关闭默认值 |
+| `SDK_FEATURE_FLAG_ROLLOUT_DEFAULTS` | `./sdkFeatureFlags` | 当前运行时 rollout 默认值 |
+| `OpenCodeClientConfig` 等类型 | `./types` | 调用方使用的服务层配置与状态类型 |
 
 ## 核心逻辑
 
 ### 公开 API 收口
 
-该 barrel 把上层需要的服务类、flag 和类型集中导出，隐藏 `sdkFetch`、`createSdkClient` 等更偏内部实现细节的模块。
+barrel 的作用是给上层提供稳定入口，而不是把整个目录平铺导出。当前公开面聚焦在两类东西：
 
-### rollout 配置透传
+- 运行时类：`OpenCodeService`、`ServerManager`
+- 调用方会直接引用的类型/常量：`SdkFeatureFlags`、`QueryOptions`、`ServerStatus` 等
 
-`SDK_FEATURE_FLAG_DISABLED_DEFAULTS` 与 `SDK_FEATURE_FLAG_ROLLOUT_DEFAULTS` 通过此文件向 `main.ts` 和测试暴露，用于控制 SDK v2 的启用范围。
+### rollout 常量透传
 
-## 关键方法
+`SDK_FEATURE_FLAG_DISABLED_DEFAULTS` 与 `SDK_FEATURE_FLAG_ROLLOUT_DEFAULTS` 通过本文件暴露给 `main.ts` 和测试代码。当前 `main.ts` 会把 rollout 默认值传给 `OpenCodeService`，而测试如果直接构造服务且不传运行时覆盖，则仍然落回“全关闭”基线。
 
-| 方法 / 导出 | 说明 |
-|-------------|------|
-| `OpenCodeService` | OpenCode 能力门面 |
-| `ServerManager` | 本地 OpenCode 进程生命周期管理 |
-| `resolveSdkFeatureFlags()` | 组合运行时 SDK feature flags |
-| `SdkFeatureFlags` 等类型 | 上层配置与状态类型约束 |
+### 类型重导出
+
+这里重导出的类型都来自 `types.ts`，因此调用方不需要知道 `OpenCodeService` 内部实际如何使用 SDK v2、legacy HTTP 或 `ServerManager`。
 
 ## 数据流
 
-典型消费链路：
-
-1. `main.ts` 或设置模块从本 barrel 导入 `OpenCodeService` / `ServerManager`
-2. 上层根据设置构造服务实例
-3. 服务内部再调用 `sdkFetch`、`createSdkClient`、`types` 等更细分实现
+```mermaid
+graph LR
+    A[main.ts / 视图 / 测试] --> B[index.ts barrel]
+    B --> C[OpenCodeService]
+    B --> D[ServerManager]
+    B --> E[sdkFeatureFlags 常量]
+    B --> F[types.ts 类型]
+```
 
 ## 与其他模块的交互
 
-- 与 [OpenCodeService.md](C:/Users/lt/Desktop/Write/custom-project/opencodian/docs/modules/core/opencode/OpenCodeService.md) 和 [ServerManager.md](C:/Users/lt/Desktop/Write/custom-project/opencodian/docs/modules/core/opencode/ServerManager.md) 共同构成 OpenCode 集成层
-- 与 [sdkFeatureFlags.md](C:/Users/lt/Desktop/Write/custom-project/opencodian/docs/modules/core/opencode/sdkFeatureFlags.md) 共享 rollout 语义
+- `main.ts` 通过本 barrel 导入 `OpenCodeService` 和 `SDK_FEATURE_FLAG_ROLLOUT_DEFAULTS`。
+- 其他模块如果只需要服务层类型，也可以停留在 barrel 这一层，不必直接依赖实现文件。
+- `createSdkClient.ts`、`sdkFetch.ts`、`sdkTypes.ts`、`omoCompat.ts` 仍然是内部实现文件，需要时应直接导入源码文件，而不是期待 barrel 暴露它们。
 
 ## 配置项
 
-无直接配置，但导出的 `SdkFeatureFlags` 和 rollout 默认值会被运行时配置消费。
+本文件没有自己的运行时配置；它只转发会被运行时消费的 `SdkFeatureFlags` 及其默认常量。
 
 ## 注意事项
 
-- 该 barrel 当前只暴露“稳定入口”；内部辅助文件是否导出应保持克制
-- 新增公开类型或服务时，需要考虑它是否真的属于稳定 API 面
-
-## 待补充
-
-- [ ] 补充哪些内部模块被有意保留为“非公开实现细节”
-
+- 新增导出会扩大 `core/opencode` 的公开 API 面，应该只在确实需要对上层公开时才加入。
+- `SessionActivityStatus` 是从 `OpenCodeService.ts` 转发的类型，而不是来自 `types.ts`。
+- 本 barrel 没有导出 SDK v2 客户端工厂或 fetch 适配器；这些仍属于内部实现细节。

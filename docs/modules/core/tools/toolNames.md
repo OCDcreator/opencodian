@@ -1,77 +1,85 @@
 # Tool Name Constants
 
 > **源码**: `src/core/tools/toolNames.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
-定义 OpenCode 工具名称的常量映射表。这些常量在流式渲染、工具调用 UI、权限检查等模块中用于标识和匹配具体的工具类型。使用 `as const` 确保类型窄化。
+`toolNames.ts` 定义了 OpenCodian 侧维护的一份工具名常量表，并导出基于该常量表推导出来的 `ToolName` 联合类型。这里的字符串值看起来对应 OpenCode 事件里的工具名显示值。
 
 ## 导入关系
 
-上游: 无依赖
-下游:
-- `src/core/types/tools.ts`（重复定义，待合并）
-- `src/utils/streaming/ToolCallRenderer.ts`
-- `src/features/chat/OpenCodianView.ts`
-- `src/core/security/BlocklistChecker.ts`（间接，通过工具名判断是否需要命令检查）
+```text
+上游: 无
+下游: src/core/tools/index.ts
+```
 
 ## 核心类型 / 接口
 
-| 类型 | 说明 |
+```typescript
+export const TOOL_NAMES = {
+  READ: 'Read',
+  WRITE: 'Write',
+  EDIT: 'Edit',
+  BASH: 'Bash',
+  GLOB: 'Glob',
+  GREP: 'Grep',
+  VIEW: 'View',
+  LS: 'LS',
+  ASK_USER: 'AskUser',
+  ENTER_PLAN_MODE: 'EnterPlanMode',
+  EXIT_PLAN_MODE: 'ExitPlanMode',
+  TASK: 'Task',
+  WEB_SEARCH: 'WebSearch',
+  WEB_FETCH: 'WebFetch',
+} as const;
+
+export type ToolName = typeof TOOL_NAMES[keyof typeof TOOL_NAMES];
+```
+
+## 常量内容
+
+| 键 | 值 |
 |------|------|
-| `TOOL_NAMES` | `as const` 对象，包含 14 个工具名常量 |
-| `ToolName` | 所有工具名字符串的联合类型 |
+| `READ` | `Read` |
+| `WRITE` | `Write` |
+| `EDIT` | `Edit` |
+| `BASH` | `Bash` |
+| `GLOB` | `Glob` |
+| `GREP` | `Grep` |
+| `VIEW` | `View` |
+| `LS` | `LS` |
+| `ASK_USER` | `AskUser` |
+| `ENTER_PLAN_MODE` | `EnterPlanMode` |
+| `EXIT_PLAN_MODE` | `ExitPlanMode` |
+| `TASK` | `Task` |
+| `WEB_SEARCH` | `WebSearch` |
+| `WEB_FETCH` | `WebFetch` |
 
-## 核心逻辑
+## 导出语义
 
-### 工具名称映射
+### `TOOL_NAMES`
 
-| 常量 | 值 | 说明 |
-|------|----|------|
-| `READ` | `'Read'` | 文件读取 |
-| `WRITE` | `'Write'` | 文件写入 |
-| `EDIT` | `'Edit'` | 文件编辑 |
-| `BASH` | `'Bash'` | Shell 命令执行 |
-| `GLOB` | `'Glob'` | 文件模式匹配搜索 |
-| `GREP` | `'Grep'` | 内容搜索 |
-| `VIEW` | `'View'` | 文件查看 |
-| `LS` | `'LS'` | 目录列表 |
-| `ASK_USER` | `'AskUser'` | 向用户提问 |
-| `ENTER_PLAN_MODE` | `'EnterPlanMode'` | 进入计划模式 |
-| `EXIT_PLAN_MODE` | `'ExitPlanMode'` | 退出计划模式 |
-| `TASK` | `'Task'` | 子任务派发 |
-| `WEB_SEARCH` | `'WebSearch'` | 网络搜索 |
-| `WEB_FETCH` | `'WebFetch'` | 网页抓取 |
+提供一组 `as const` 常量，方便调用方：
 
-## 关键方法
+- 避免硬编码字符串
+- 让 TypeScript 推导出字面量值
 
-无运行时方法，仅导出常量和类型。
+### `ToolName`
 
-## 数据流
+`ToolName` 是 `TOOL_NAMES` 值的联合类型，即：
 
-1. OpenCode server 发送 `tool_use` SSE 事件（含 `name` 字段）
-2. 客户端将 `name` 与 `TOOL_NAMES` 常量比较
-3. 匹配到 `BASH` → 触发黑名单检查和权限审批
-4. `ToolCallRenderer` 根据工具名选择渲染模板
+```typescript
+'Read' | 'Write' | 'Edit' | 'Bash' | 'Glob' | 'Grep' | 'View' | 'LS'
+| 'AskUser' | 'EnterPlanMode' | 'ExitPlanMode' | 'Task' | 'WebSearch' | 'WebFetch'
+```
 
 ## 与其他模块的交互
 
-- **ToolCallRenderer**: 使用工具名决定工具调用的 UI 展示样式
-- **BlocklistChecker**: 对 `BASH` 工具执行命令黑名单检查
-- **PermissionTypes**: 工具名与权限配置中的 key 对应（如 `bash`, `edit`, `read`）
-- **StreamChunk**: `tool_use` 类型的 `name` 字段携带工具名
-
-## 配置项
-
-无，工具名称由 OpenCode server 定义。
+- `src/core/tools/index.ts` 重新导出了这份常量表。
+- `src/core/types/tools.ts` 里存在一份字段完全相同的 `TOOL_NAMES` 和 `ToolName` 定义，当前需要人工保持同步。
 
 ## 注意事项
 
-- `src/core/types/tools.ts` 中有重复定义的 `TOOL_NAMES` 和 `ToolName`，两个模块都导出了相同的常量。消费方应统一从一处导入，后续考虑合并去重。
-- 工具名大小写敏感（如 `'LS'` 全大写，其余首字母大写）
-
-## 待补充
-- [ ] 合并 `src/core/tools/toolNames.ts` 和 `src/core/types/tools.ts` 中的重复定义
-- [ ] 记录 OpenCode server 端工具注册机制
-- [ ] 补充新增工具时的更新清单
+- 这份常量表目前在仓库内的直接消费面很窄；修改字符串值前，应同时检查 `src/core/types/tools.ts` 以及任何依赖工具名字面量的渲染逻辑。
+- 如果未来改为只保留单一定义源，`docs/modules/core/tools/index.md` 也需要同步更新聚合关系描述。

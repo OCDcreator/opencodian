@@ -1,7 +1,7 @@
 # Model Config Modal
 
 > **源码**: `src/features/settings/ModelConfigModal.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
@@ -101,8 +101,7 @@ export class ModelConfigModal extends Modal { ... }
 - `apiKey` 为空时会从 `options` 中删除而不是写空串
 - 本地重启只在 server 已运行时执行，远程模式会直接提示不可管理
 
-## 待补充
+## 补充说明
 
-- [ ] 补充该弹窗对应的设置入口与用户操作截图
-- [ ] 记录目前是否已有专门测试覆盖 `toModelConfig()` 校验分支
-
+- 设置入口：OpenCodianSettings 的 `addModelSettings()` 中 "可视化模型配置" 按钮，点击后 `new ModelConfigModal(app, plugin).open()`
+- `toModelConfig()` 校验分支目前无专门测试覆盖，校验逻辑在用户点击保存时内联执行，抛出的 `Error` 由 `save()` 的 try-catch 捕获并通过 `Notice` 显示

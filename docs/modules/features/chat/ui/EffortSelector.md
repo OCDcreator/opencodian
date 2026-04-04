@@ -1,7 +1,7 @@
 # EffortSelector
 
 > **源码**: `src/features/chat/ui/EffortSelector.ts`
-> **状态**: [DRAFT]
+> **状态**: [REVIEW]
 
 ## 概述
 
@@ -94,6 +94,8 @@ getCurrentModel() → isAdaptiveThinkingModel()
 - document mousedown/keydown 使用捕获阶段（`true`）确保在其他元素之前处理
 - 两个菜单互斥，`activeMenu` 追踪当前打开的菜单
 
-## 待补充
-- [ ] EffortLevel 和 ThinkingBudget 如何传递到 SDK / OpenCode API 调用
-- [ ] 更多模型厂商的自适应推理模型支持（如 Claude extended thinking）
+## 补充说明
+
+- EffortLevel 通过 `OpenCodianView` 保存到 `plugin.settings.effortLevel`，在发送消息时通过 SDK `reasoningEffort` 参数传递给 OpenCode API
+- ThinkingBudget 通过 `plugin.settings.thinkingBudget` 保存，在发送消息时通过 SDK `thinkingBudget` 参数传递
+- 当前 `isAdaptiveThinkingModel()` 仅检测 `openai/` 前缀的模型，其他厂商的自适应推理模型需扩展此函数
