@@ -195,6 +195,7 @@ describe('Settings', () => {
       expect(normalizeInputPanelThemeId('glass-refraction-pill')).toBe('glass-refraction-pill');
       expect(normalizeInputPanelThemeId('liquid-glass-shuding')).toBe('liquid-glass-shuding');
       expect(normalizeInputPanelThemeId('liquid-glass-nikdelvin')).toBe('liquid-glass-nikdelvin');
+      expect(normalizeInputPanelThemeId('liquid-diamond-shuding')).toBe('preset');
       expect(normalizeInputPanelThemeId('liquid-glass-rdev')).toBe('liquid-glass-shuding');
       expect(normalizeInputPanelThemeId('liquid-glass')).toBe('preset');
       expect(normalizeInputPanelThemeId('glass')).toBe('preset');
@@ -235,12 +236,13 @@ describe('Settings', () => {
       });
     });
 
-    it('restores only the supported shuding and nikdelvin defaults', () => {
+    it('restores only the supported liquid adapter defaults', () => {
       const normalized = normalizeInputPanelLiquidGlassSettings({});
 
       expect(normalized).toEqual({
         shuding: getDefaultInputPanelLiquidGlassSettings().shuding,
         nikdelvin: getDefaultInputPanelLiquidGlassSettings().nikdelvin,
+        shudingDiamond: getDefaultInputPanelLiquidGlassSettings().shudingDiamond,
       });
     });
 

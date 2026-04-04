@@ -23,7 +23,7 @@ export interface GlassParamDef {
 export type GlassAdapterSettingsValue = number | string | boolean;
 
 export interface GlassEffectAdapter {
-  readonly id: 'shuding' | 'nikdelvin';
+  readonly id: 'shuding' | 'nikdelvin' | 'shudingDiamond';
   readonly displayName: string;
   readonly description: string;
   readonly paramDefs: readonly GlassParamDef[];

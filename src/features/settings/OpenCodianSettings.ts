@@ -2776,7 +2776,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       case 'nikdelvin':
         return 'liquid-glass-nikdelvin';
       default:
-        return 'liquid-glass-nikdelvin';
+        return 'preset';
     }
   }
 

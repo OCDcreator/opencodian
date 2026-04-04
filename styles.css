@@ -1126,6 +1126,69 @@
   isolation: isolate;
 }
 
+.opencodian-liquid-diamond-demo-overlay {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.opencodian-liquid-diamond-demo-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.opencodian-liquid-diamond-demo-host {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  pointer-events: auto;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  will-change: transform;
+}
+
+.opencodian-liquid-diamond-demo-host.is-dragging {
+  cursor: grabbing;
+}
+
+.opencodian-liquid-diamond-demo-filter-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.opencodian-liquid-diamond-demo-stage {
+  position: relative;
+  width: 220px;
+  height: 220px;
+  overflow: visible;
+}
+
+.opencodian-liquid-diamond-demo-bloom,
+.opencodian-liquid-diamond-demo-rim,
+.opencodian-liquid-diamond-demo-face-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.opencodian-liquid-diamond-demo-canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 220px;
+  height: 220px;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  opacity: 0.96;
+}
+
 .opencodian-theme-background-layer {
   position: absolute;
   inset: 0;

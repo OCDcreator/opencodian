@@ -3,7 +3,6 @@ import { Setting } from 'obsidian';
 
 import { DEFAULT_SETTINGS, getDefaultChatAppearanceSettings } from '../../../../src/core/types';
 import { LiquidGlassSettingHelpModal } from '../../../../src/features/settings/LiquidGlassSettingHelpModal';
-import { registerBuiltinGlassAdapters } from '../../../../src/utils/glass/builtin-adapters';
 import { OpenCodianSettingTab } from '../../../../src/features/settings/OpenCodianSettings';
 import { setLocale } from '../../../../src/i18n';
 import { registerBuiltinGlassAdapters } from '../../../../src/utils/glass/builtin-adapters';
@@ -148,6 +147,44 @@ describe('OpenCodian style settings', () => {
     expect(actionButtonsDropdown).toBeDefined();
     expect(actionButtonsDropdown?.control.addOption).toHaveBeenCalledWith('default', '独立按钮');
     expect(actionButtonsDropdown?.control.addOption).toHaveBeenCalledWith('etched', '刻入玻璃');
+  });
+
+  it('does not expose the standalone diamond input theme in the liquid glass adapter dropdown', () => {
+    registerBuiltinGlassAdapters();
+
+    const plugin = {
+      settings: {
+        ...DEFAULT_SETTINGS,
+        inputPanelTheme: 'liquid-glass-shuding',
+        chatAppearance: getDefaultChatAppearanceSettings(),
+      },
+      saveSettings: jest.fn(),
+      getChatAppearanceBaseline: jest.fn(() => getDefaultChatAppearanceSettings()),
+    } as unknown as ConstructorParameters<typeof OpenCodianSettingTab>[1];
+    const tab = new OpenCodianSettingTab({} as App, plugin);
+    const containerEl = document.createElement('div');
+    const privateTab = tab as unknown as {
+      renderInputStyleGroup: (containerEl?: HTMLElement) => void;
+      createStyleGroupSection: (containerEl: HTMLElement, title: string, desc: string) => HTMLElement;
+      addNumericStyleControl: (containerEl: HTMLElement, config: unknown) => void;
+      addLiquidGlassInputControls: (containerEl: HTMLElement) => void;
+      createStyleResetSetting: (containerEl: HTMLElement, group: unknown) => void;
+      registerStyleControlBinding: (group: unknown, callback: () => void) => void;
+    };
+
+    jest.spyOn(privateTab, 'createStyleGroupSection').mockImplementation((parent) => parent.createDiv());
+    jest.spyOn(privateTab, 'addNumericStyleControl').mockImplementation(() => {});
+    jest.spyOn(privateTab, 'addLiquidGlassInputControls').mockImplementation(() => {});
+    jest.spyOn(privateTab, 'createStyleResetSetting').mockImplementation(() => {});
+    jest.spyOn(privateTab, 'registerStyleControlBinding').mockImplementation(() => {});
+
+    privateTab.renderInputStyleGroup(containerEl);
+
+    const liquidAdapterDropdown = dropdownRecords.find((record) => record.name === 'Liquid Glass 适配器');
+    expect(liquidAdapterDropdown).toBeDefined();
+    expect(liquidAdapterDropdown?.control.addOption).not.toHaveBeenCalledWith('liquid-diamond-shuding', 'Shuding Diamond');
+    expect(liquidAdapterDropdown?.control.addOption).toHaveBeenCalledWith('liquid-glass-shuding', 'Shuding Liquid Glass');
+    expect(liquidAdapterDropdown?.control.addOption).toHaveBeenCalledWith('liquid-glass-nikdelvin', 'Nikdelvin Liquid Glass');
   });
 
   it('sizes numeric inputs to fit the configured value range', () => {

@@ -172,6 +172,21 @@ describe('OpenCodianPlugin.loadSettings theme migration', () => {
     expect(plugin.settings.inputPanelTheme).toBe(inputPanelTheme);
   });
 
+  it('migrates the removed diamond input panel theme back to preset on load', async () => {
+    const plugin = {
+      storage: {
+        loadSettings: jest.fn().mockResolvedValue({
+          inputPanelTheme: 'liquid-diamond-shuding',
+        }),
+        saveSettings: jest.fn(),
+      },
+    } as unknown as OpenCodianPlugin;
+
+    await OpenCodianPlugin.prototype.loadSettings.call(plugin);
+
+    expect(plugin.settings.inputPanelTheme).toBe('preset');
+  });
+
   it('resets legacy glass-refraction tier tuning to reference defaults', async () => {
     const plugin = {
       storage: {

@@ -140,10 +140,12 @@ opencodian/
 │   │   │   │   └── SessionTodoDock.ts
 │   │   │   ├── chatAppearance.ts    # Chat appearance CSS variable builder
 │   │   │   ├── composerContext.ts   # Inline composer context preview + dedupe helpers
+│   │   │   ├── liquidDiamondDemo.ts # Floating diamond refraction demo controller
 │   │   │   ├── OpenCodianView.ts    # Main chat view component
 │   │   │   ├── renderGroups.ts      # Assistant render grouping helpers
 │   │   │   └── index.ts
 │   │   └── settings/
+│   │       ├── LiquidGlassSettingHelpModal.ts # Plain-language liquid glass help modal
 │   │       ├── ModelConfigJsonModal.ts
 │   │       ├── ModelConfigModal.ts
 │   │       ├── OpencodeConfigModal.ts
@@ -166,6 +168,15 @@ opencodian/
 │   │   ├── obsidianContext.ts       # Obsidian explicit-context helpers
 │   │   └── vault.ts
 │   └── utils/                       # Utility functions
+│       ├── glass/                   # Glass adapter registry + implementations
+│       │   ├── adapters/
+│       │   │   ├── nikdelvin.ts
+│       │   │   ├── shuding.ts
+│       │   │   └── shudingDiamond.ts
+│       │   ├── builtin-adapters.ts
+│       │   ├── index.ts
+│       │   ├── registry.ts
+│       │   └── types.ts
 │       ├── icons/
 │       │   ├── ProviderIconService.ts
 │       │   └── index.ts
@@ -409,6 +420,7 @@ Main chat UI view (extends Obsidian's `ItemView`).
 - OMO injected-prompt panels with expandable raw prompt view
 - OMO system-reminder notice cards with markdown rendering
 - Optional message-shell theme background image with upload-backed local storage, blur/depth tuning, edge blending, and theme-colored veil controls
+- Optional floating liquid diamond demo overlay mounted in `messagesShellEl` and toggled via command for visual prototyping without mutating composer geometry
 - Session todo dock powered by `session.todo()` snapshots and `todo.updated` sync events
 - Idle conversation sync loop for post-stream follow-up messages
 - Background-task in-progress indicator and follow-up pseudo-stream reveal
@@ -497,6 +509,18 @@ Compatibility layer for `oh-my-opencode` message mutations and reminders.
 4. Render injected prompt summaries and raw prompt collapsibles in chat
 5. Keep background-task reminders visible after the main stream ends
 
+### 12. Glass Utilities (`src/utils/glass/`)
+
+Shared registry and adapter layer for input-panel glass effects plus experimental diamond rendering helpers.
+
+**Current responsibilities:**
+
+- Register built-in input-panel adapters through `builtin-adapters.ts`
+- Provide the `GlassEffectAdapter` contract, mount context, and parameter metadata in `types.ts`
+- Keep adapter lookup / lifecycle centralized in `registry.ts`
+- Host production adapters such as `shuding` and `nikdelvin`
+- Host experimental-but-reusable implementations such as `adapters/shudingDiamond.ts`, which currently powers testing and the floating demo core without being registered into the public composer adapter list
+
 ## Prerequisites for Users
 
 1. **Obsidian** v1.4.5 or later (desktop only)
@@ -547,6 +571,7 @@ Compatibility layer for `oh-my-opencode` message mutations and reminders.
 11. **SDK v2 migration changes**: Keep `OpenCodeService`, `createSdkClient.ts`, `sdkFetch.ts`, `sdkFeatureFlags.ts`, `sdkTypes.ts`, related tests, and `docs/opencode-service-sdk-v2-mapping.md` synchronized
 12. **Concurrent tab changes**: When editing `OpenCodianView.ts`, `TabManager.ts`, or streaming/cancel logic, preserve the per-tab runtime model; do not reintroduce single global streaming state unless explicitly redesigning multi-tab concurrency
 13. **Conversation restore / hot-reload changes**: Keep `main.ts` conversation preloading and `OpenCodianView` restore logic aligned; do not register/restore chat views before `loadConversations()` has completed
+14. **Glass / diamond changes**: Keep `src/utils/glass/`, `src/core/types/settings.ts`, `OpenCodianSettings.ts`, `OpenCodianView.ts`, `main.ts`, and `styles.css` aligned; if an adapter is intentionally experimental-only, do not add it to `builtin-adapters.ts` or expose it in the settings dropdown by accident
 
 ### Agent Checklist
 
@@ -558,6 +583,7 @@ Before handing off work, agents should verify the following when relevant:
 - **Plugin changes**: Keep project config writes, plugin source visibility, `pluginIsolationMode`, and local-server restart expectations aligned.
 - **Settings or i18n changes**: Keep `DEFAULT_SETTINGS`, settings UI, and both locale files synchronized.
 - **Theme preset changes**: Keep preset definitions, theme migration, effective `chatAppearance`, and reset semantics synchronized across `core/theme`, `settings.ts`, `main.ts`, settings UI, and `styles.css`.
+- **Glass / diamond changes**: Keep runtime adapter registration, stored defaults/migrations, settings exposure, demo commands, and CSS layers synchronized so experimental adapters do not leak into public UI unintentionally.
 - **SDK migration changes**: Preserve rollback paths, keep rollout flags explicit, and update the mapping/checklist docs when module status changes.
 - **Architecture/doc changes**: Update `devlog.md` and refresh this `AGENTS.md` when developer-facing workflow or component responsibilities materially change.
 - **`devlog.md` updates**: Insert new dated entries before the first dated `## YYYY-MM-DD ...` section, never append them to the file end, and run `npm run check:devlog-order` before handoff.
@@ -581,6 +607,7 @@ Before handing off work, agents should verify the following when relevant:
 | `ARCHITECTURE.md`       | Detailed architecture documentation                  |
 | `SERVER_API.md`         | OpenCode Server API reference                        |
 | `OPENCODE_SDK_USAGE.md` | SDK usage guide                                      |
+| `docs/modules/README.md` | Source-to-doc coverage rules and module doc map     |
 | `docs/opencode-service-sdk-v2-mapping.md` | SDK v2 migration mapping, progress, and handoff status |
 | `docs/opencode-sdk-v2-manual-checklist.md` | Manual verification checklist for SDK v2 migration |
 | `docs/obsidian-linkage-mvp-status.md` | Obsidian linkage MVP scope, status, and next steps |
@@ -597,5 +624,5 @@ This is the main development log maintained in the Obsidian vault for easy refer
 
 ---
 
-**Last Updated**: 2026-03-31
+**Last Updated**: 2026-04-04
 **Plugin Version**: 1.0.0

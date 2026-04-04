@@ -99,3 +99,25 @@ describe('OpenCodianPlugin.getConversationById', () => {
     ]);
   });
 });
+
+describe('OpenCodianPlugin.toggleLiquidDiamondDemoForCurrentView', () => {
+  it('activates the view and forwards the toggle to the current OpenCodian view', async () => {
+    const plugin = new OpenCodianPlugin() as OpenCodianPlugin & {
+      activateView: jest.Mock<Promise<void>, []>;
+      getOpenCodianView: () => { toggleLiquidDiamondDemo: jest.Mock } | null;
+    };
+    const view = {
+      toggleLiquidDiamondDemo: jest.fn(),
+    };
+
+    plugin.activateView = jest.fn().mockResolvedValue(undefined);
+    jest
+      .spyOn(plugin as unknown as { getOpenCodianView: () => typeof view | null }, 'getOpenCodianView')
+      .mockReturnValue(view);
+
+    await plugin.toggleLiquidDiamondDemoForCurrentView();
+
+    expect(plugin.activateView).toHaveBeenCalledTimes(1);
+    expect(view.toggleLiquidDiamondDemo).toHaveBeenCalledTimes(1);
+  });
+});

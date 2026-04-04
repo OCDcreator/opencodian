@@ -12,6 +12,107 @@
 
 ---
 
+## 2026-04-04 独立 Liquid Diamond Demo、旧主题迁移回 `preset`，并保留 `shudingDiamond` 为实验核心
+
+### 🎯 改动目标
+
+- 不再把 `liquid-diamond-shuding` 继续作为输入区正式主题保留，避免旧 vault 值落到已移除的主题路径后产生错误挂载或设置歧义
+- 把钻石折射效果从“输入区主题”改成独立 demo：挂到 `messages shell` 上，可通过命令单独开关，不改写 composer 既有宽高、圆角和输入控件几何
+- 预留 `shudingDiamond` 折射/几何计算核心与设置桶，便于后续实验复用，但暂时不注册进内置 liquid-glass adapter 下拉，避免未成熟实现提前暴露给普通用户
+
+### ✅ 本轮调整
+
+- `src/features/chat/liquidDiamondDemo.ts`
+  - 新增独立 `LiquidDiamondDemoController`
+  - 使用 CPU 侧钻石折射 tracing、位移图、bloom / rim / facet overlay 组合出可拖拽的浮动 demo
+  - 支持 pointer capture、拖拽惯性回弹、resize 后重新约束位置，以及 `backdrop-filter: url(...)` 不可用时的 blur fallback
+
+- `src/features/chat/OpenCodianView.ts`
+  - 新增 `toggleLiquidDiamondDemo()` 与控制器生命周期清理
+  - 将 demo 明确挂载到 `messagesShellEl`，不再侵入 composer shell
+  - 输入区主题应用逻辑增加未知主题保护，遇到已删除的主题值时直接回落而不是继续尝试套 class
+
+- `src/main.ts`
+  - 注册 `Toggle diamond demo` 命令
+  - 新增 `toggleLiquidDiamondDemoForCurrentView()`，在激活当前视图后把命令转发到 `OpenCodianView`
+
+- `src/core/types/settings.ts`
+  - 为 `inputPanelLiquidGlass` 新增 `shudingDiamond` 设置桶与默认值/归一化逻辑
+  - 把历史 `inputPanelTheme = 'liquid-diamond-shuding'` 统一迁移回 `preset`
+
+- `src/features/settings/OpenCodianSettings.ts`
+  - liquid-glass adapter 映射的默认回落改为 `preset`
+  - 保持设置页下拉只暴露正式支持的 `shuding` / `nikdelvin`，不把实验中的 diamond adapter 误显示成可选输入区主题
+
+- `src/utils/glass/types.ts`
+  - 扩展 `GlassEffectAdapter['id']` 联合类型，允许 `shudingDiamond` 作为独立实验 adapter / demo 核心复用
+
+- `src/utils/glass/adapters/shudingDiamond.ts`
+  - 新增独立的钻石折射核心实现，封装凸包、折射/反射、facet 投影、位移图生成和视觉层渲染
+  - 继续保持其“可测试、可复用，但不进 builtin 注册表”的实验定位
+
+- `styles.css`
+  - 为 demo overlay / host / bloom / rim / canvas / stage 增加专用样式
+
+- `tests/unit/features/chat/liquidDiamondDemo.test.ts`
+- `tests/unit/utils/glass/shudingDiamond.test.ts`
+- `tests/unit/main.test.ts`
+- `tests/unit/main/themeSettingsMigration.test.ts`
+- `tests/unit/core/types/settings.test.ts`
+- `tests/unit/features/settings/OpenCodianStyleSettings.test.ts`
+  - 补齐 demo 挂载位置、拖拽状态、命令转发、旧主题迁移、diamond 设置默认值，以及“实验 adapter 不进入设置 dropdown”的回归保护
+
+### 🧪 当前验证
+
+- 已通过：`npm run check:devlog-order`
+- 已通过：`npm run test -- tests/unit/features/chat/liquidDiamondDemo.test.ts tests/unit/utils/glass/shudingDiamond.test.ts tests/unit/main.test.ts tests/unit/main/themeSettingsMigration.test.ts tests/unit/core/types/settings.test.ts tests/unit/features/settings/OpenCodianStyleSettings.test.ts`
+- 已通过：`npm run build`（`BUILD_ID: main.202604041634`）
+- 已完成：部署 `dist/main.js`、`dist/manifest.json`、`dist/styles.css` 到 Test Vault
+- 已验证部署后的 `main.js` 包含 `BUILD_ID: main.202604041634`
+
+## 2026-04-04 模块文档框架收口：补齐源码映射、统一状态标记、修正文档约定
+
+### 🎯 改动目标
+
+- 把 `docs/modules/` 从“基本骨架已建”推进到“与当前仓库真实结构一致”的状态
+- 修复总索引、模板约定和实际文档树之间的偏差，避免后续继续出现 README 可见但文件不存在，或源码存在但文档缺失的问题
+- 明确 `index.ts`、locale、types、demo 这类模块也属于文档覆盖范围，而不是只覆盖服务类文件
+
+### ✅ 本轮调整
+
+- `docs/modules/README.md`
+  - 重写覆盖规则，明确 `src/**/*.ts` 原则上一一对应文档
+  - 把 `index.ts`、`i18n/locales/*.ts`、demo/experimental 模块纳入正式覆盖策略
+  - 更新完整目录树，使其与当前实际文档文件对齐
+  - 补充状态标记规范与不同模块类型的写法建议
+
+- `docs/modules/_TEMPLATE.md`
+  - 保留统一骨架，但补充“按模块类型灵活填写”的说明
+  - 明确类型文件、barrel 文件、locale 文件可以把“关键方法 / 数据流”改写为更贴切的内容
+  - 统一状态值写法为 `[DRAFT]` / `[REVIEW]` / `[FINAL]`
+
+- 新增 22 篇缺失模块文档，覆盖此前未纳入框架的真实源码文件：
+  - `core/*/index.ts` 系列 barrel 文档
+  - `features/chat/index.ts`、`features/chat/tabs/index.ts`、`features/settings/index.ts`
+  - `features/settings/ModelConfigModal.ts`
+  - `features/chat/liquidDiamondDemo.ts`、`features/chat/liquidDiamondDemoWebgl.ts`
+  - `utils/index.ts`、`utils/icons/index.ts`、`utils/markdown/index.ts`、`utils/markdown/types.ts`、`utils/streaming/index.ts`
+  - `i18n/locales/index.ts`、`i18n/locales/en.ts`、`i18n/locales/zh.ts`
+  - `shared/index.ts`、`shared/modals/index.ts`
+
+- `docs/modules/**/*.md`
+  - 将已有文档中的裸 `DRAFT` 状态统一收口为 `[DRAFT]`
+
+- `.gitignore`
+  - 不再整段忽略 `docs/`
+  - 改为只忽略 `docs/` 下非 `docs/modules/` 的内容，确保模块文档框架可以进入版本控制
+
+### 🧪 当前验证
+
+- 已通过：脚本比对 `src/**/*.ts` 与 `docs/modules/**/*.md` 后，缺失源码文档数为 `0`
+- 已通过：`docs/modules` 状态标记统一为 `[DRAFT]`
+- 已通过：`README` 当前基线与目录树和实际文件结构一致
+
 ## 2026-04-04 `Liquid Glass -> Shuding` 设置增加问号大白话帮助
 
 ### 🎯 改动目标

@@ -239,6 +239,14 @@ export default class OpenCodianPlugin extends Plugin {
     });
 
     this.addCommand({
+      id: 'toggle-liquid-diamond-demo',
+      name: 'Toggle diamond demo',
+      callback: async () => {
+        await this.toggleLiquidDiamondDemoForCurrentView();
+      },
+    });
+
+    this.addCommand({
       id: 'inline-edit',
       name: 'Inline edit',
       editorCallback: async (editor: Editor, view: MarkdownView) => {
@@ -310,6 +318,11 @@ export default class OpenCodianPlugin extends Plugin {
     return leaf?.view instanceof OpenCodianView
       ? leaf.view
       : null;
+  }
+
+  async toggleLiquidDiamondDemoForCurrentView(): Promise<void> {
+    await this.activateView();
+    this.getOpenCodianView()?.toggleLiquidDiamondDemo();
   }
 
   /** Load settings from storage */

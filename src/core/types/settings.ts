@@ -90,7 +90,7 @@ export type InputPanelThemeId =
 /** Composer action button style */
 export type InputPanelActionButtonStyleId = 'default' | 'etched';
 
-export type LiquidGlassAdapterId = 'shuding' | 'nikdelvin';
+export type LiquidGlassAdapterId = 'shuding' | 'nikdelvin' | 'shudingDiamond';
 
 export type ChatAppearanceBackgroundFitMode = 'cover' | 'contain' | 'fit-width' | 'fit-height';
 
@@ -156,6 +156,8 @@ export function normalizeInputPanelThemeId(value: unknown): InputPanelThemeId {
       return value;
     case 'liquid-glass-rdev':
       return 'liquid-glass-shuding';
+    case 'liquid-diamond-shuding':
+      return 'preset';
     default:
       return 'preset';
   }
@@ -472,6 +474,7 @@ export interface InputPanelGlassRefractionSvgFilterSettings {
 export interface InputPanelLiquidGlassSettings {
   shuding: Record<string, number | string | boolean>;
   nikdelvin: Record<string, number | string | boolean>;
+  shudingDiamond: Record<string, number | string | boolean>;
 }
 
 export interface ChatAppearanceScrollbarSettings {
@@ -689,6 +692,15 @@ export function getDefaultInputPanelLiquidGlassSettings(): InputPanelLiquidGlass
       inline: false,
       customEffects: false,
     },
+    shudingDiamond: {
+      displacementScale: 10,
+      bloomOpacity: 1,
+      rimOpacity: 0.45,
+      faceOverlayOpacity: 1,
+      supportOpacity: 0.88,
+      pointerTracking: true,
+      pointerTilt: 1,
+    },
   };
 }
 
@@ -757,6 +769,7 @@ export function normalizeInputPanelLiquidGlassSettings(
   const defaults = getDefaultInputPanelLiquidGlassSettings();
   const shuding = value?.shuding ?? {};
   const nikdelvin = value?.nikdelvin ?? {};
+  const shudingDiamond = value?.shudingDiamond ?? {};
 
   return {
     shuding: {
@@ -942,6 +955,46 @@ export function normalizeInputPanelLiquidGlassSettings(
       customEffects: normalizeBoolean(
         nikdelvin.customEffects,
         defaults.nikdelvin.customEffects as boolean,
+      ),
+    },
+    shudingDiamond: {
+      displacementScale: normalizeFiniteNumber(
+        shudingDiamond.displacementScale,
+        defaults.shudingDiamond.displacementScale as number,
+      ),
+      bloomOpacity: normalizeFiniteNumberInRange(
+        shudingDiamond.bloomOpacity,
+        defaults.shudingDiamond.bloomOpacity as number,
+        0,
+        1,
+      ),
+      rimOpacity: normalizeFiniteNumberInRange(
+        shudingDiamond.rimOpacity,
+        defaults.shudingDiamond.rimOpacity as number,
+        0,
+        1,
+      ),
+      faceOverlayOpacity: normalizeFiniteNumberInRange(
+        shudingDiamond.faceOverlayOpacity,
+        defaults.shudingDiamond.faceOverlayOpacity as number,
+        0,
+        1,
+      ),
+      supportOpacity: normalizeFiniteNumberInRange(
+        shudingDiamond.supportOpacity,
+        defaults.shudingDiamond.supportOpacity as number,
+        0,
+        1,
+      ),
+      pointerTracking: normalizeBoolean(
+        shudingDiamond.pointerTracking,
+        defaults.shudingDiamond.pointerTracking as boolean,
+      ),
+      pointerTilt: normalizeFiniteNumberInRange(
+        shudingDiamond.pointerTilt,
+        defaults.shudingDiamond.pointerTilt as number,
+        0,
+        2,
       ),
     },
   };

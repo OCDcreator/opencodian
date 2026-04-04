@@ -1,0 +1,80 @@
+# ModelConfigJsonModal
+
+> **源码**: `src/features/settings/ModelConfigJsonModal.ts`
+> **状态**: [DRAFT]
+
+## 概述
+
+JSON 格式的模型配置编辑器 Modal。提供原始 JSON 文本编辑器，用于直接编辑 `.opencode/config.json` 的模型部分。支持格式化、保存、可选服务器重启。包含示例配置帮助文本。
+
+## 导入关系
+上游: `obsidian`（App、Modal、Notice）、`OpencodeModelConfigSubset`（core/types）、`i18n`、`main`（OpenCodianPlugin）、`shared`（logger）
+下游: 被 `OpenCodianSettings` 的 JSON 编辑器按钮打开
+
+## 核心类型 / 接口
+
+无独立导出类型。
+
+## 核心逻辑
+
+### 编辑器
+
+`textarea` 显示 `JSON.stringify(config, null, 2)` 格式化的 JSON。`spellcheck="false"`。
+
+### 格式化
+
+`formatJson()`: 解析 → 验证 → 重新格式化。失败时显示 Notice。
+
+### 保存
+
+`save()`: 解析 → `validate()` → `writeLocalModelConfig()` → `maybeRestartServer()` → `saveSettings()`。
+
+### 验证
+
+`validate(value)`:
+- `provider` 必须是 object（非 null/数组）
+- `enabled_providers` / `disabled_providers` 必须是 string 数组
+
+### 帮助文本
+
+嵌入示例 JSON 配置，展示 provider 结构（name、npm、options.baseURL、options.apiKey、models）。
+
+## 关键方法
+
+| 方法 | 说明 |
+|------|------|
+| `onOpen()` | 加载配置、渲染编辑器、帮助文本、按钮 |
+| `formatJson()` | 解析 + 验证 + 重新格式化 |
+| `save()` | 解析 + 验证 + 写入 + 重启 |
+| `validate(value)` | 检查 provider 对象类型和数组类型 |
+| `maybeRestartServer()` | local 模式下 stop → 1s → start |
+
+## 数据流
+
+```
+modelConfigService.readLocalModelConfig() → JSON
+        ↓ 用户编辑
+JSON.parse() → validate() → modelConfigService.writeLocalModelConfig()
+        ↓
+maybeRestartServer() → saveSettings()
+```
+
+## 与其他模块的交互
+
+- **ModelConfigService**: 读写配置
+- **OpenCodeService**: 可选重启
+- **OpenCodianSettings**: 打开入口
+
+## 配置项
+
+- "保存后重启服务器" checkbox
+
+## 注意事项
+
+- 无 JSON schema 验证，仅检查基本结构
+- 与 `ModelConfigModal`（可视化）互为补充
+- `validate()` 不检查 provider 内部结构
+
+## 待补充
+- [ ] 更完善的 JSON schema 验证
+- [ ] 与 ModelConfigModal 的数据同步说明

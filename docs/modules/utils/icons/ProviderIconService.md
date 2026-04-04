@@ -1,0 +1,120 @@
+# Provider Icon Service
+
+> **源码**: `src/utils/icons/ProviderIconService.ts`
+> **状态**: [DRAFT]
+
+## 概述
+
+AI 模型提供商图标管理服务。使用 LobeHub Icons CDN（`@lobehub/icons-static-svg`）作为图标来源，支持 200+ 个 provider ID 到 LobeHub icon ID 的映射。提供图标 URL 解析、本地缓存、自定义图标上传和批量预热功能。所有静态方法设计为无状态工具类。
+
+## 导入关系
+上游: `fs`, `path`, `obsidian` (App, normalizePath, requestUrl), `../../core/types` (ProviderIconEntry, ProviderIconLibrary), `../../shared` (createLogger)
+下游: `OpenCodianView` (图标显示), `OpenCodianSettings` / `ProviderIconCacheModal` (缓存管理)
+
+## 核心类型 / 接口
+
+### ProviderIconCacheEntry
+单个图标缓存条目的视图模型：`providerId`, `entry`, `iconId`, `cached`, `cachePath`, `iconUrl`, `isCurrentProvider`, `isSelected`, `sourceLabel`。
+
+### ProviderIconProviderState
+按 provider 分组的缓存状态：`providerId`, `isCurrentProvider`, `entries[]`。
+
+### ProviderIconCacheSummary
+缓存摘要统计：`currentProviders`, `totalProviders`, `cachedProviders`, `totalIcons`, `cachedIcons`。
+
+## 核心逻辑
+
+### 图标 ID 解析
+
+`getIconId()` 使用 5 级策略解析 provider ID 到 LobeHub icon ID：
+1. 直接小写匹配
+2. 移除特殊字符后匹配
+3. 提取英文部分逐个/组合匹配
+4. 部分包含匹配（providerId 包含 key）
+5. 反向部分包含匹配（key 包含 providerId）
+
+### 图标加载管线
+
+1. **resolveIconUrl()** — 入口，委托给 `resolveEntryUrl()`
+2. **resolveEntryUrl()** — 检查内存缓存 → 检查失败记录 → 去重 in-flight 请求 → 发起加载
+3. **loadEntryUrl()** — 先尝试本地缓存文件 → 不存在则从远程下载 → 写入缓存 → 返回 data URL
+
+### 自定义图标
+
+`addCustomIconSource()` 支持 URL 和本地文件路径，流程：
+1. 归一化输入（`normalizeCustomSource`）
+2. 加载资源（远程通过 `requestUrl`，本地通过 `fs.readFile`）
+3. 检测 MIME 类型（文件头魔数 + Content-Type + 扩展名）
+4. 写入缓存目录（`.opencodian/provider-icons/`）
+5. 添加到 library
+
+### 缓存管理
+
+- 缓存目录：`.opencodian/provider-icons/`
+- 文件名格式：`{provider}-{timestamp}-{random}.{ext}`
+- 最大文件大小：1 MB
+- 支持格式：SVG, PNG, JPEG, WEBP, GIF
+- `clearCache()` 清空缓存目录和内存映射
+
+## 关键方法
+
+| 方法 | 说明 |
+|------|------|
+| `getIconUrl(providerId)` | 获取 CDN URL（仅 mapped 类型） |
+| `resolveIconUrl(app, providerId, library, options)` | 解析图标 URL（含缓存和远程加载） |
+| `getIconId(providerId)` | 5 级策略匹配 provider ID |
+| `hasIcon(providerId)` | 检查是否有图标映射 |
+| `createIconElement(providerId, size)` | 创建 `<img>` 元素 |
+| `getProviderCacheState(app, providerIds, library)` | 构建完整缓存状态 |
+| `addCustomIconSource(app, providerId, source, library)` | 添加自定义图标 |
+| `updateProviderEntries(providerId, entries, library)` | 更新 provider 的图标条目 |
+| `removeProviderEntry(providerId, entryId, library)` | 删除单个图标条目 |
+| `clearCache(app)` | 清空所有缓存 |
+| `warmProviderIcons(app, providerIds, library)` | 批量预热图标缓存 |
+| `persistDefaultEntries(providerIds, library)` | 将默认映射持久化到 library |
+
+## 数据流
+
+```
+getProviderCacheState(app, currentProviderIds, library)
+  → mergeProviderIds() → 合并当前和历史 provider
+  → 对每个 provider:
+    → getEffectiveEntries() → library entries + default entry
+    → readCachedAsset() → 检查本地缓存
+    → 构建 ProviderIconCacheEntry[]
+
+resolveIconUrl(app, providerId, library)
+  → getEffectiveEntries() → 取第一个 entry
+  → resolveEntryUrl()
+    → 内存缓存命中? → 返回
+    → readCachedAsset() → 本地文件缓存命中? → 返回 data URL
+    → loadMappedAsset() → 从 CDN 下载 → writeCachedAsset() → 返回 data URL
+```
+
+## 与其他模块的交互
+
+- **OpenCodianView**: 调用 `resolveIconUrl()` 在模型选择器和消息头部显示 provider 图标
+- **OpenCodianSettings**: 调用 `getProviderCacheState()` 在图标缓存设置面板显示状态
+- **ProviderIconCacheModal**: 调用 `addCustomIconSource()`, `removeProviderEntry()`, `clearCache()` 管理图标
+- **StorageService**: 持久化 `ProviderIconLibrary` 到 settings
+
+## 配置项
+
+| 常量 | 值 | 说明 |
+|------|-----|------|
+| `LOBEHUB_CDN_BASE` | `https://unpkg.com/@lobehub/icons-static-svg@latest/icons` | CDN 基础 URL |
+| `ICON_CACHE_DIR` | `.opencodian/provider-icons` | 缓存目录（vault 相对路径） |
+| `MAX_ICON_BYTES` | 1048576 | 最大图标文件大小 |
+
+## 注意事项
+
+- 所有方法为静态方法，不需要实例化
+- 内存缓存（`resolvedIconUrls`, `inFlightIconLoads`, `failedIconIds`）为模块级状态
+- `requestUrl` 使用 Obsidian API，不走系统代理
+- MIME 检测优先级：Content-Type header → 文件头魔数 → 扩展名
+- `PROVIDER_ICON_MAP` 包含 200+ 条映射，涵盖国内外主流 AI 服务商
+
+## 待补充
+- [ ] PROVIDER_ICON_MAP 完整映射表
+- [ ] 图标加载失败的 UI 降级策略
+- [ ] CDN 不可用时的离线模式

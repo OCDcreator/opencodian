@@ -74,6 +74,7 @@ import {
   upsertDraftContextItem,
 } from './composerContext';
 import { cloneMessagesBeforeForkTarget } from './forkMessages';
+import { LiquidDiamondDemoController } from './liquidDiamondDemo';
 import { buildMessageRenderGroups, mergeAssistantMessagesForRender } from './renderGroups';
 import { type CollapsibleState, setupCollapsible } from './rendering/collapsible';
 import { ContextUsageService } from './services/ContextUsageService';
@@ -153,7 +154,10 @@ const RETAINED_SELECTION_DOM_HIGHLIGHT_KEY = 'opencodian-selection';
 const RETAINED_SELECTION_INPUT_HANDOFF_GRACE_MS = 1500;
 const RETAINED_SELECTION_POLL_INTERVAL_MS = 250;
 const INPUT_PANEL_THEME_CLASS_BY_ID: Record<
-  Exclude<InputPanelThemeId, 'preset' | 'liquid-glass-shuding' | 'liquid-glass-nikdelvin'>,
+  Exclude<
+    InputPanelThemeId,
+    'preset' | 'liquid-glass-shuding' | 'liquid-glass-nikdelvin'
+  >,
   string
 > = {
   'glass-refraction-glass': 'opencodian-composer-shell--gr-glass',
@@ -449,6 +453,7 @@ export class OpenCodianView extends ItemView {
   private composerShellEl: HTMLElement | null = null;
   private composerSvgFilterLayerEl: HTMLElement | null = null;
   private activeLiquidGlassAdapter: GlassEffectAdapter | null = null;
+  private liquidDiamondDemoController: LiquidDiamondDemoController | null = null;
   private composerContextRowEl: HTMLElement | null = null;
   private questionDockMountEl: HTMLElement | null = null;
   private questionDock: QuestionDock | null = null;
@@ -1828,6 +1833,7 @@ export class OpenCodianView extends ItemView {
     this.contextRingContainerEl = null;
     this.inputContainerResizeObserver?.disconnect();
     this.inputContainerResizeObserver = null;
+    this.destroyLiquidDiamondDemo();
     this.unmountLiquidGlassAdapter();
     this.removeComposerSvgFilterLayer();
 
@@ -2898,6 +2904,36 @@ export class OpenCodianView extends ItemView {
     this.initializeComposerLayoutMetrics();
   }
 
+  public toggleLiquidDiamondDemo(): void {
+    if (!this.messagesShellEl) {
+      return;
+    }
+
+    if (!this.liquidDiamondDemoController) {
+      this.liquidDiamondDemoController = new LiquidDiamondDemoController(this.messagesShellEl);
+    }
+
+    if (this.liquidDiamondDemoController.isVisible()) {
+      this.liquidDiamondDemoController.destroy();
+      this.liquidDiamondDemoController = null;
+      return;
+    }
+
+    try {
+      this.liquidDiamondDemoController.show();
+    } catch (error) {
+      logger.warn('Failed to initialize CPU liquid diamond demo', error);
+      new Notice('Diamond demo is not available in this environment.');
+      this.destroyLiquidDiamondDemo();
+      return;
+    }
+  }
+
+  private destroyLiquidDiamondDemo(): void {
+    this.liquidDiamondDemoController?.destroy();
+    this.liquidDiamondDemoController = null;
+  }
+
   private getLiquidGlassAdapterId(themeId: InputPanelThemeId): LiquidGlassAdapterId | null {
     switch (themeId) {
       case 'liquid-glass-shuding':
@@ -2988,11 +3024,15 @@ export class OpenCodianView extends ItemView {
     }
 
     this.unmountLiquidGlassAdapter();
-    this.composerShellEl.addClass(
-      INPUT_PANEL_THEME_CLASS_BY_ID[
-        this.plugin.settings.inputPanelTheme as keyof typeof INPUT_PANEL_THEME_CLASS_BY_ID
-      ],
-    );
+    const themeClassName = INPUT_PANEL_THEME_CLASS_BY_ID[
+      this.plugin.settings.inputPanelTheme as keyof typeof INPUT_PANEL_THEME_CLASS_BY_ID
+    ];
+    if (!themeClassName) {
+      this.removeComposerSvgFilterLayer();
+      return;
+    }
+
+    this.composerShellEl.addClass(themeClassName);
 
     const svgFilterSettings = this.plugin.settings.inputPanelGlassRefractionSvgFilter;
     const activeSvgFilterPreset = svgFilterSettings.preset;

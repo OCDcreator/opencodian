@@ -37,4 +37,6 @@ settings_scroll_memory_requirement.md
 settings_scroll_performance_optimization.md
 providers_output.json
 # Documentation
-docs/
+docs/*
+!docs/modules/
+!docs/modules/**
