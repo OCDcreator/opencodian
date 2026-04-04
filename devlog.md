@@ -12,6 +12,45 @@
 
 ---
 
+## 2026-04-04 `Liquid Glass -> Shuding` 设置增加问号大白话帮助
+
+### 🎯 改动目标
+
+- 让普通用户在调整 `Liquid Glass -> Shuding` 参数时，不必先理解 `SDF`、`barrel distortion`、`contrast boost` 这类技术词
+- 在不改动 `nikdelvin` 和其他设置分组的前提下，为 `shuding` 参数补一个可点击的问号帮助入口
+- 保持这次改动只影响设置可理解性，不改变既有默认值、输入区尺寸语义和主题挂载逻辑
+
+### ✅ 本轮调整
+
+- `src/features/settings/OpenCodianSettings.ts`
+  - 给 `shuding` 的 toggle / dropdown / text / numeric 控件统一接入 `help-circle` 按钮
+  - 帮助按钮只在 `adapterId === 'shuding'` 时出现，避免把 `nikdelvin` 和其他设置一并扩散成同一套说明
+  - 点击问号后打开独立帮助弹窗，标题直接复用当前设置项名称
+
+- `src/features/settings/LiquidGlassSettingHelpModal.ts`
+  - 新增轻量帮助弹窗
+  - 用分段文本渲染“大白话说明”，便于把“这项会让哪里变”讲清楚
+
+- `src/i18n/locales/en.ts`
+- `src/i18n/locales/zh.ts`
+  - 新增问号按钮 tooltip 文案
+  - 为 `shuding` 现有参数补全 plain-language help 文案，重点解释“看起来会怎么变”“一般什么时候该调它”
+
+- `tests/unit/features/settings/OpenCodianStyleSettings.test.ts`
+  - 新增断言：`shuding` 会生成问号帮助配置，`nikdelvin` 不会
+  - 新增断言：点击帮助配置会打开帮助弹窗
+
+- `tests/unit/features/settings/LiquidGlassSettingHelpModal.test.ts`
+  - 新增帮助弹窗渲染测试
+  - 锁定标题、分段文案和 plain-language heading，防止后续改回技术黑话但没有回归保护
+
+### 🧪 当前验证
+
+- 已通过：`npm run test -- tests/unit/features/settings/OpenCodianStyleSettings.test.ts tests/unit/features/settings/LiquidGlassSettingHelpModal.test.ts`
+- 已通过：`npm run build`（`BUILD_ID: main.202604041022`）
+- 已完成：部署 `dist/main.js`、`dist/manifest.json`、`dist/styles.css` 到 Test Vault
+- 已验证部署后的 `main.js` 包含 `BUILD_ID: main.202604041022`
+
 ## 2026-04-04 `shuding` 默认路径对齐 upstream liquid-glass.js，并补 mount / unmount 回归保护
 
 ### 🎯 改动目标

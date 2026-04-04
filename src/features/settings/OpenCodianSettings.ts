@@ -40,6 +40,7 @@ import type OpenCodianPlugin from '../../main';
 import { createLogger, getVaultBasePath } from '../../shared';
 import { getAllGlassAdapters } from '../../utils/glass';
 import { ProviderIconService } from '../../utils/icons';
+import { LiquidGlassSettingHelpModal } from './LiquidGlassSettingHelpModal';
 import { ModelConfigJsonModal } from './ModelConfigJsonModal';
 import { ModelConfigModal } from './ModelConfigModal';
 import { OpencodeConfigModal } from './OpencodeConfigModal';
@@ -71,7 +72,13 @@ interface NumericControlConfig {
   value: () => number;
   resetValue: () => number;
   commitValue: (value: number) => void;
+  helpButton?: SettingHelpButtonConfig;
   registerSync?: (syncFromSettings: () => void) => void;
+}
+
+interface SettingHelpButtonConfig {
+  tooltip: string;
+  onClick: () => void;
 }
 
 type ChatAppearanceStyleGroup = 'layout' | 'background' | 'user' | 'assistant' | 'input' | 'scrollbar' | 'advanced';
@@ -2437,6 +2444,10 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     config.registerSync?.(() => {
       renderValue(config.value());
     });
+
+    if (config.helpButton) {
+      this.addSettingHelpButton(setting, config.helpButton);
+    }
   }
 
   private getNumericControlInputChars(config: Pick<NumericControlConfig, 'min' | 'max' | 'step'>): number {
@@ -3394,77 +3405,90 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         });
       }
 
+      const label = t(paramDef.labelKey as TranslationKey);
+      const desc = paramDef.descKey ? t(paramDef.descKey as TranslationKey) : '';
+      const helpButton = this.getLiquidGlassSettingHelpButtonConfig(adapterId, paramDef.key, label);
+
       if (paramDef.type === 'toggle') {
-        new Setting(containerEl)
-          .setName(t(paramDef.labelKey as TranslationKey))
-          .setDesc(paramDef.descKey ? t(paramDef.descKey as TranslationKey) : '')
-          .setClass('opencodian-style-setting')
-          .addToggle((toggle) => {
-            toggle
-              .setValue(Boolean(adapterSettings[paramDef.key] ?? paramDef.defaultValue))
-              .onChange((value) => {
-                this.updateLiquidGlassAdapterSetting(adapterId, paramDef.key, value);
-                void this.plugin.saveSettings({
-                  syncService: false,
-                  reloadModels: false,
-                  syncConfig: false,
-                  applyUi: true,
-                });
+        const setting = new Setting(containerEl)
+          .setName(label)
+          .setDesc(desc)
+          .setClass('opencodian-style-setting');
+        setting.addToggle((toggle) => {
+          toggle
+            .setValue(Boolean(adapterSettings[paramDef.key] ?? paramDef.defaultValue))
+            .onChange((value) => {
+              this.updateLiquidGlassAdapterSetting(adapterId, paramDef.key, value);
+              void this.plugin.saveSettings({
+                syncService: false,
+                reloadModels: false,
+                syncConfig: false,
+                applyUi: true,
               });
-          });
+            });
+        });
+        if (helpButton) {
+          this.addSettingHelpButton(setting, helpButton);
+        }
         continue;
       }
 
       if (paramDef.type === 'select') {
-        new Setting(containerEl)
-          .setName(t(paramDef.labelKey as TranslationKey))
-          .setDesc(paramDef.descKey ? t(paramDef.descKey as TranslationKey) : '')
-          .addDropdown((dropdown) => {
-            for (const option of paramDef.options ?? []) {
-              dropdown.addOption(
-                option.value,
-                option.labelKey ? t(option.labelKey as TranslationKey) : (option.label ?? option.value),
-              );
-            }
+        const setting = new Setting(containerEl)
+          .setName(label)
+          .setDesc(desc);
+        setting.addDropdown((dropdown) => {
+          for (const option of paramDef.options ?? []) {
+            dropdown.addOption(
+              option.value,
+              option.labelKey ? t(option.labelKey as TranslationKey) : (option.label ?? option.value),
+            );
+          }
 
-            dropdown
-              .setValue(String(adapterSettings[paramDef.key] ?? paramDef.defaultValue))
-              .onChange((value) => {
-                this.updateLiquidGlassAdapterSetting(adapterId, paramDef.key, value);
-                void this.plugin.saveSettings({
-                  syncService: false,
-                  reloadModels: false,
-                  syncConfig: false,
-                  applyUi: true,
-                });
+          dropdown
+            .setValue(String(adapterSettings[paramDef.key] ?? paramDef.defaultValue))
+            .onChange((value) => {
+              this.updateLiquidGlassAdapterSetting(adapterId, paramDef.key, value);
+              void this.plugin.saveSettings({
+                syncService: false,
+                reloadModels: false,
+                syncConfig: false,
+                applyUi: true,
               });
-          });
+            });
+        });
+        if (helpButton) {
+          this.addSettingHelpButton(setting, helpButton);
+        }
         continue;
       }
 
       if (paramDef.type === 'text') {
-        new Setting(containerEl)
-          .setName(t(paramDef.labelKey as TranslationKey))
-          .setDesc(paramDef.descKey ? t(paramDef.descKey as TranslationKey) : '')
-          .addText((text) => {
-            text
-              .setValue(String(adapterSettings[paramDef.key] ?? paramDef.defaultValue ?? ''))
-              .onChange((value) => {
-                this.updateLiquidGlassAdapterSetting(adapterId, paramDef.key, value.trim());
-                void this.plugin.saveSettings({
-                  syncService: false,
-                  reloadModels: false,
-                  syncConfig: false,
-                  applyUi: true,
-                });
+        const setting = new Setting(containerEl)
+          .setName(label)
+          .setDesc(desc);
+        setting.addText((text) => {
+          text
+            .setValue(String(adapterSettings[paramDef.key] ?? paramDef.defaultValue ?? ''))
+            .onChange((value) => {
+              this.updateLiquidGlassAdapterSetting(adapterId, paramDef.key, value.trim());
+              void this.plugin.saveSettings({
+                syncService: false,
+                reloadModels: false,
+                syncConfig: false,
+                applyUi: true,
               });
-          });
+            });
+        });
+        if (helpButton) {
+          this.addSettingHelpButton(setting, helpButton);
+        }
         continue;
       }
 
       this.addNumericControl(containerEl, {
-        name: t(paramDef.labelKey as TranslationKey),
-        desc: paramDef.descKey ? t(paramDef.descKey as TranslationKey) : '',
+        name: label,
+        desc,
         min: paramDef.min ?? 0,
         max: paramDef.max ?? 100,
         step: paramDef.step ?? 1,
@@ -3480,8 +3504,41 @@ export class OpenCodianSettingTab extends PluginSettingTab {
             applyUi: true,
           });
         },
+        helpButton,
       });
     }
+  }
+
+  private getLiquidGlassSettingHelpButtonConfig(
+    adapterId: LiquidGlassAdapterId,
+    paramKey: string,
+    title: string,
+  ): SettingHelpButtonConfig | undefined {
+    const helpText = this.getLiquidGlassSettingHelpText(adapterId, paramKey);
+    if (!helpText) {
+      return undefined;
+    }
+
+    return {
+      tooltip: t('settings.style.input.help.buttonTooltip'),
+      onClick: () => {
+        new LiquidGlassSettingHelpModal(this.app, title, helpText).open();
+      },
+    };
+  }
+
+  private getLiquidGlassSettingHelpText(
+    adapterId: LiquidGlassAdapterId,
+    paramKey: string,
+  ): string | null {
+    if (adapterId !== 'shuding') {
+      return null;
+    }
+
+    const helpKey = `settings.style.input.liquidGlass.shuding.help.${paramKey}` as TranslationKey;
+    const helpText = t(helpKey);
+
+    return helpText === helpKey ? null : helpText;
   }
 
   private updateLiquidGlassAdapterSetting(
@@ -4497,6 +4554,15 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         .onClick(() => {
           new ServerSettingHelpModal(this.app, topic).open();
         });
+    });
+  }
+
+  private addSettingHelpButton(setting: Setting, helpButton: SettingHelpButtonConfig): void {
+    setting.addExtraButton((button) => {
+      button
+        .setIcon('help-circle')
+        .setTooltip(helpButton.tooltip)
+        .onClick(helpButton.onClick);
     });
   }
 }

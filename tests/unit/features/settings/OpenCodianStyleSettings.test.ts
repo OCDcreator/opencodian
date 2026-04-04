@@ -2,8 +2,11 @@ import type { App } from 'obsidian';
 import { Setting } from 'obsidian';
 
 import { DEFAULT_SETTINGS, getDefaultChatAppearanceSettings } from '../../../../src/core/types';
+import { LiquidGlassSettingHelpModal } from '../../../../src/features/settings/LiquidGlassSettingHelpModal';
+import { registerBuiltinGlassAdapters } from '../../../../src/utils/glass/builtin-adapters';
 import { OpenCodianSettingTab } from '../../../../src/features/settings/OpenCodianSettings';
 import { setLocale } from '../../../../src/i18n';
+import { registerBuiltinGlassAdapters } from '../../../../src/utils/glass/builtin-adapters';
 
 interface MockDropdownControl {
   addOption: jest.MockedFunction<(value: string, label: string) => MockDropdownControl>;
@@ -195,5 +198,33 @@ describe('OpenCodian style settings', () => {
     expect(displaySpy).not.toHaveBeenCalled();
     expect(renderInputStyleGroupSpy).toHaveBeenCalledWith();
     expect(plugin.settings.inputPanelTheme).toBe('glass-refraction-card');
+  });
+
+  it('creates a plain-language help button config for shuding settings only', () => {
+    const plugin = {
+      settings: {
+        ...DEFAULT_SETTINGS,
+        inputPanelTheme: 'liquid-glass-shuding',
+        chatAppearance: getDefaultChatAppearanceSettings(),
+      },
+    } as unknown as ConstructorParameters<typeof OpenCodianSettingTab>[1];
+    const tab = new OpenCodianSettingTab({} as App, plugin);
+    const privateTab = tab as unknown as {
+      getLiquidGlassSettingHelpButtonConfig: (
+        adapterId: 'shuding' | 'nikdelvin',
+        paramKey: string,
+        title: string,
+      ) => { tooltip: string; onClick: () => void } | undefined;
+    };
+    const openSpy = jest.spyOn(LiquidGlassSettingHelpModal.prototype, 'open').mockImplementation(() => {});
+
+    const shudingHelp = privateTab.getLiquidGlassSettingHelpButtonConfig('shuding', 'displacementScale', '位移强度');
+    const nikdelvinHelp = privateTab.getLiquidGlassSettingHelpButtonConfig('nikdelvin', 'depth', '景深');
+
+    expect(shudingHelp?.tooltip).toBe('用大白话解释这项');
+    expect(nikdelvinHelp).toBeUndefined();
+
+    shudingHelp?.onClick();
+    expect(openSpy).toHaveBeenCalledTimes(1);
   });
 });
