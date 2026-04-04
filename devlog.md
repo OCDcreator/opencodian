@@ -12,6 +12,54 @@
 
 ---
 
+## 2026-04-04 待办 stale 状态跨重载保持抑制，避免旧快照短暂复活
+
+### 🎯 改动目标
+
+- 查清输入框上方 session todo dock 为什么会在“已降级为过期”后，刷新页面又短暂重新出现，过几分钟再消失
+- 结合最新参考项目 `reference-projects/opencode`，确认 `session.todo()`、`todo.updated`、`session.status()` 和前端 live 判定的真实语义
+- 在不改成“直接清空 todo 缓存”的前提下，让 OpenCodian 现有的 stale notice + suppress 方案跨重载保持一致，不再让同一份旧待办反复复活
+
+### ✅ 本轮调整
+
+- `reference-projects/opencode/packages/app/src/pages/session/composer/session-composer-state.ts`
+- `reference-projects/opencode/packages/app/src/context/sync.tsx`
+- `reference-projects/opencode/packages/app/src/context/global-sync/event-reducer.ts`
+- `reference-projects/opencode/packages/sdk/js/src/v2/gen/types.gen.ts`
+  - 对照参考项目确认：SDK 侧 `session.todo()` / `todo.updated` 只提供待办快照，真正决定“待办是否还该继续显示”的是前端基于 `session.status()` 和 blocked 状态计算出来的 `live`
+  - 参考项目在 `count > 0 && !live` 时直接 `clear()` todo，本质上是不允许非活跃会话长期挂着旧待办
+
+- `src/features/chat/OpenCodianView.ts`
+  - 新增“从已持久化 stale notice 恢复 session todo suppression”的逻辑
+  - 当会话里已经存在同一份 `chat.todo.staleTitle` notice，而且当前收到的 todo 指纹与该 notice 内容匹配时，重载后不再把这份旧 snapshot 当成新更新重新显示
+  - 把 notice 匹配 helper 扩展为可指定 conversation，方便 active tab / 非 active tab 共用同一套持久 notice 复用逻辑
+  - 保持现有语义不变：只有 session 重新 live，或 todo snapshot 真正变化，才清除 suppression
+
+- `tests/unit/features/chat/staleSessionTodoState.test.ts`
+  - 保留原有“长时间无活动后 suppress stale incomplete todos”的回归测试
+  - 新增“reload 后如果同一份 stale notice 已持久化，则旧 todo snapshot 继续隐藏”的回归测试
+
+### 🧠 问题根因
+
+- OpenCodian 之前的逻辑是：
+  - 先把 stale 未完成待办隐藏，并写入一条持久 notice
+  - 但 reload 时 runtime 会先清空，再重新拉 `session.status()` / `session.todo()`
+  - 如果服务端仍返回同一份旧 todo snapshot，插件会把它当成“新鲜数据”重新渲染，因为 `sessionTodoLastChangedAt` 被刷新了
+  - 结果就是待办面板短暂复活，直到下一轮 stale timeout 再被隐藏一次
+
+- 这次修复后：
+  - 持久 notice 本身就作为“这份 todo 已经判 stale”的跨重载证据
+  - 所以 reload 收到同一份旧 snapshot 时，会直接恢复 suppression，不再出现“先回来、再消失”的抖动
+
+### 🧪 当前验证
+
+- 已通过：`npm test -- staleSessionTodoState`
+- 已通过：`npm test -- backgroundTaskNoticeDedup`
+- 已通过：`npm test -- SessionTodoDock`
+- 已通过：`npm run check:devlog-order`
+- 已通过：`npm run build`（`BUILD_ID: main.202604042241`）
+- 已部署：`dist/main.js`、`dist/manifest.json`、`dist/styles.css` 已复制到 Test Vault，并确认插件端 `main.js` 含 `BUILD_ID: main.202604042241`
+
 ## 2026-04-04 钻石 WebGL 命令分流、补充控制台诊断，并将命令名称统一汉化
 
 ### 🎯 改动目标

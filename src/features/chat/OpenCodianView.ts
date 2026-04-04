@@ -1224,6 +1224,13 @@ export class OpenCodianView extends ItemView {
     if (!this.hasIncompleteTodos(normalizedTodos)) {
       runtime.sessionTodoSuppressedFingerprint = null;
       runtime.sessionTodoStaleNoticeFingerprint = null;
+    } else {
+      this.restorePersistedStaleSessionTodoSuppressionIfNeeded(
+        tabId,
+        sessionId,
+        normalizedTodos,
+        fingerprint,
+      );
     }
 
     runtime.sessionTodos = this.shouldHideSuppressedTodoSnapshot(tabId, sessionId, fingerprint)
@@ -1301,6 +1308,48 @@ export class OpenCodianView extends ItemView {
 
   private isSessionStatusLive(status: SessionActivityStatus | null | undefined): boolean {
     return status?.type === 'busy' || status?.type === 'retry';
+  }
+
+  private restorePersistedStaleSessionTodoSuppressionIfNeeded(
+    tabId: TabId | null,
+    sessionId: string | null,
+    todos: SessionTodo[],
+    fingerprint: string,
+  ): void {
+    const runtime = this.getTabRuntimeState(tabId);
+    if (
+      !runtime
+      || !sessionId
+      || runtime.isStreaming
+      || runtime.sessionTodoSuppressedFingerprint
+      || !this.hasIncompleteTodos(todos)
+      || this.isSessionStatusLive(this.getTabSessionStatus(tabId, sessionId))
+    ) {
+      return;
+    }
+
+    const conversation = this.getConversationForTab(tabId);
+    if (!conversation || conversation.openCodeSessionId !== sessionId) {
+      return;
+    }
+
+    const content = this.buildStaleSessionTodoNoticeContent(todos);
+    if (!this.hasMatchingPersistentAssistantNoticeMessage(
+      t('chat.todo.staleTitle'),
+      content,
+      'warning',
+      conversation,
+    )) {
+      return;
+    }
+
+    runtime.sessionTodoSuppressedFingerprint = fingerprint;
+    runtime.sessionTodoStaleNoticeFingerprint = content;
+    logger.debug(`Restored stale session todo suppression from persisted notice: ${this.stringifyLogPayload({
+      tabId,
+      sessionId,
+      fingerprint,
+    })}`);
   }
 
   private shouldHideSuppressedTodoSnapshot(
@@ -1470,6 +1519,23 @@ export class OpenCodianView extends ItemView {
     return conversation?.openCodeSessionId
       ?? this.getTabRuntimeState(tabId)?.sessionTodoSessionId
       ?? null;
+  }
+
+  private getConversationForTab(tabId: TabId | null = this.getActiveTabId()): Conversation | null {
+    if (!tabId) {
+      return null;
+    }
+
+    if (tabId === this.getActiveTabId()) {
+      return this.currentConversation;
+    }
+
+    const tab = this.tabManager?.getTab(tabId);
+    if (!tab?.conversationId) {
+      return null;
+    }
+
+    return this.plugin.getConversations().find((item) => item.id === tab.conversationId) ?? null;
   }
 
   private extractSessionTodosFromToolInput(input: Record<string, unknown>): SessionTodo[] {
@@ -1757,8 +1823,9 @@ export class OpenCodianView extends ItemView {
     title: string,
     content: string,
     tone: ChatMessage['noticeTone'],
+    conversation: Conversation | null = this.currentConversation,
   ): boolean {
-    return this.currentConversation?.messages.some((message) =>
+    return conversation?.messages.some((message) =>
       message.role === 'assistant'
       && message.displayStyle === 'notice'
       && message.noticeTitle === title
