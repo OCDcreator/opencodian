@@ -12,6 +12,61 @@
 
 ---
 
+## 2026-04-04 `shuding` 默认路径对齐 upstream liquid-glass.js，并补 mount / unmount 回归保护
+
+### 🎯 改动目标
+
+- 在不改变当前 composer 外部宽高、布局占位和圆角来源的前提下，把 `liquid-glass-shuding` 的默认折射路径收紧到参考 `reference-projects/liquid-glass-research/liquid-glass/liquid-glass.js`
+- 明确把此前的 `adaptive / rect-edge / corner / barrel` 等增强逻辑降级为非默认高级参数，避免默认视觉继续偏离 upstream
+- 用精确断言补齐回归测试，重点锁住默认滤镜串、SVG 挂载、最终 style 值，以及 `unmount()` 后恢复原样
+
+### ✅ 本轮调整
+
+- `src/utils/glass/adapters/shuding.ts`
+  - 将默认位移公式收紧为 upstream 路径：
+    - `roundedRectSDF(ix, iy, 0.3, 0.2, 0.6)`
+    - `smoothStep(0.8, 0, distanceToEdge - 0.15)`
+    - `smoothStep(0, 1, displacement)`
+    - `sampleX = ix * scaled + 0.5`
+    - `sampleY = iy * scaled + 0.5`
+  - 默认关闭 `adaptiveSdf`、`adaptiveSdfMix`、`rectEdgeRefraction`、`rectEdgeRefractionStrength`、`cornerEnhancement`、`cornerEnhancementStrength`、`edgeBandWidth`、`barrelDistortion`、`barrelStrength`
+  - 将默认滤镜改为 upstream 组合：
+    - `url(#filterId) blur(0.25px) contrast(1.2) brightness(1.05) saturate(1.1)`
+  - 将默认位移图生成改为固定 `canvasDPI = 1`，不再跟随 `devicePixelRatio`
+  - 保留 `feImage + feDisplacementMap` 管线，并保留 `maxScale *= 0.5` 的归一化思路
+  - 将默认视觉阴影改为更接近 upstream：
+    - `0 4px 8px rgba(0,0,0,0.25), 0 -10px 25px inset rgba(0,0,0,0.15)`
+  - 不再默认启用顶部高光、内边框、底部暗线、内凹阴影
+  - 整个适配器继续只消费当前 shell 的现有宽高与圆角，不向 shell 写入 demo 的 `300px / 200px / 150px`
+
+- `src/core/types/settings.ts`
+  - 同步 `shuding` 的持久化默认值与归一化范围，确保默认保存/恢复结果和新的 upstream 默认语义一致
+  - 允许 `edgeBandWidth = 0` 这类“默认关闭增强项”的值稳定持久化，不再被归一化逻辑重新抬起
+
+- `tests/unit/core/types/settings.test.ts`
+  - 新增 `shuding` 默认值断言，锁定 upstream 对齐后的 filter 参数与增强项默认关闭状态
+  - 新增归一化断言，锁定零值增强参数不会被回夹成旧默认
+
+- `tests/unit/features/chat/inputPanelTheme.test.ts`
+  - 补充 `liquid-glass-shuding` 在输入区主题切换时的挂载/清理回归测试
+  - 锁定运行时不会破坏输入区既有宽高与圆角
+
+- `tests/unit/utils/glass/shuding.test.ts`
+  - 新增 `shuding` adapter 定向测试
+  - 覆盖默认 strict upstream displacement 分支
+  - 覆盖 URL-backed filter 串、`feImage` / `feDisplacementMap` 挂载与 `scale`
+  - 覆盖 mount 后 shell / filter-layer 的最终 style 值
+  - 覆盖 `unmount()` 后 dataset、style 与 SVG defs 恢复原样
+
+### 🧪 当前验证
+
+- 已通过：`npm run test -- tests/unit/utils/glass/shuding.test.ts tests/unit/features/chat/inputPanelTheme.test.ts tests/unit/core/types/settings.test.ts`
+- 已通过：`npm run test -- tests/unit/utils/glass/shuding.test.ts`
+- 已通过：`npm run check:devlog-order`
+- 已通过：`npm run build`（`BUILD_ID: main.202604040948`）
+- 已完成：部署 `dist/main.js`、`dist/manifest.json`、`dist/styles.css` 到 Test Vault
+- 已验证部署后的 `main.js` 包含 `BUILD_ID: main.202604040948`
+
 ## 2026-04-04 Nikdelvin 模式语义澄清：有背景走 Demo 背景模式，无背景走实时折射
 
 ### 🎯 改动目标

@@ -212,12 +212,53 @@ describe('Settings', () => {
   });
 
   describe('liquid glass settings normalization', () => {
+    it('uses upstream-aligned shuding defaults while keeping enhancements off by default', () => {
+      expect(getDefaultInputPanelLiquidGlassSettings().shuding).toMatchObject({
+        displacementScale: 10,
+        blurAmount: 0.25,
+        contrastBoost: 1.2,
+        brightnessBoost: 1.05,
+        saturateBoost: 1.1,
+        adaptiveSdf: false,
+        adaptiveSdfMix: 0,
+        rectEdgeRefraction: false,
+        rectEdgeRefractionStrength: 0,
+        cornerEnhancement: false,
+        cornerEnhancementStrength: 0,
+        edgeBandWidth: 0,
+        barrelDistortion: false,
+        barrelStrength: 0,
+        topHighlight: false,
+        innerBorder: false,
+        bottomShadow: false,
+        insetDepthShadow: false,
+      });
+    });
+
     it('restores only the supported shuding and nikdelvin defaults', () => {
       const normalized = normalizeInputPanelLiquidGlassSettings({});
 
       expect(normalized).toEqual({
         shuding: getDefaultInputPanelLiquidGlassSettings().shuding,
         nikdelvin: getDefaultInputPanelLiquidGlassSettings().nikdelvin,
+      });
+    });
+
+    it('preserves zero-valued shuding enhancement settings instead of clamping them back on', () => {
+      expect(normalizeInputPanelLiquidGlassSettings({
+        shuding: {
+          adaptiveSdfMix: 0,
+          rectEdgeRefractionStrength: 0,
+          cornerEnhancementStrength: 0,
+          edgeBandWidth: 0,
+          barrelStrength: 0,
+        },
+      }).shuding).toMatchObject({
+        adaptiveSdfMix: 0,
+        rectEdgeRefractionStrength: 0,
+        cornerEnhancementStrength: 0,
+        edgeBandWidth: 0,
+        barrelStrength: 0,
       });
     });
   });

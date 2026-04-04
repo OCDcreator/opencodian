@@ -9,11 +9,21 @@ const XLINK_NS = 'http://www.w3.org/1999/xlink';
 const FILTER_ID_PREFIX = 'opencodian-lg-shuding-';
 const FILTER_OWNER_DATASET_KEY = 'opencodianLgShudingOwner';
 const DEFAULT_DISPLACEMENT_SCALE = 10;
-const DEFAULT_BLUR_AMOUNT = 0.3;
+const DEFAULT_BLUR_AMOUNT = 0.25;
+const DEFAULT_CONTRAST_BOOST = 1.2;
+const DEFAULT_BRIGHTNESS_BOOST = 1.05;
+const DEFAULT_SATURATE_BOOST = 1.1;
+const CANVAS_DPI = 1;
 const DISPLACEMENT_SCALE_BASELINE = 10;
-const DISPLACEMENT_SCALE_FACTOR = 0.45;
 const DISPLACEMENT_MAP_RESULT = 'shuding-displacement-map';
 const EPSILON = 1e-3;
+const UPSTREAM_PANEL_GEOMETRY = Object.freeze({
+  halfWidth: 0.3,
+  halfHeight: 0.2,
+  radius: 0.6,
+});
+const UPSTREAM_BOX_SHADOW =
+  '0 4px 8px rgba(0, 0, 0, 0.25), 0 -10px 25px inset rgba(0, 0, 0, 0.15)';
 const SHELL_DATASET_KEYS = ['opencodianLgShuding'] as const;
 const FILTER_LAYER_DATASET_KEYS = [
   FILTER_OWNER_DATASET_KEY,
@@ -100,6 +110,14 @@ interface ShudingPanelGeometry {
   radius: number;
 }
 
+type ShudingDisplacementPath = 'strict-upstream' | 'adaptive-upstream' | 'enhanced';
+
+interface ShudingTextureSample {
+  path: ShudingDisplacementPath;
+  sampleX: number;
+  sampleY: number;
+}
+
 const states = new WeakMap<HTMLElement, ShudingState>();
 let cachedBackdropFilterUrlSupport: boolean | null = null;
 
@@ -154,29 +172,29 @@ function readBooleanSetting(
 
 function resolveSettings(settings: Record<string, GlassAdapterSettingsValue>): ShudingSettings {
   return {
-    adaptiveSdf: readBooleanSetting(settings.adaptiveSdf, true),
-    adaptiveSdfMix: readNumberSetting(settings.adaptiveSdfMix, 1, 0, 1),
-    rectEdgeRefraction: readBooleanSetting(settings.rectEdgeRefraction, true),
-    rectEdgeRefractionStrength: readNumberSetting(settings.rectEdgeRefractionStrength, 1, 0, 2),
-    cornerEnhancement: readBooleanSetting(settings.cornerEnhancement, true),
-    cornerEnhancementStrength: readNumberSetting(settings.cornerEnhancementStrength, 1, 0, 2),
-    edgeBandWidth: readNumberSetting(settings.edgeBandWidth, 0.08, 0.02, 0.2),
+    adaptiveSdf: readBooleanSetting(settings.adaptiveSdf, false),
+    adaptiveSdfMix: readNumberSetting(settings.adaptiveSdfMix, 0, 0, 1),
+    rectEdgeRefraction: readBooleanSetting(settings.rectEdgeRefraction, false),
+    rectEdgeRefractionStrength: readNumberSetting(settings.rectEdgeRefractionStrength, 0, 0, 2),
+    cornerEnhancement: readBooleanSetting(settings.cornerEnhancement, false),
+    cornerEnhancementStrength: readNumberSetting(settings.cornerEnhancementStrength, 0, 0, 2),
+    edgeBandWidth: readNumberSetting(settings.edgeBandWidth, 0, 0, 0.2),
     barrelDistortion: readBooleanSetting(settings.barrelDistortion, false),
-    barrelStrength: readNumberSetting(settings.barrelStrength, 0.03, 0, 0.1),
-    topHighlight: readBooleanSetting(settings.topHighlight, true),
+    barrelStrength: readNumberSetting(settings.barrelStrength, 0, 0, 0.1),
+    topHighlight: readBooleanSetting(settings.topHighlight, false),
     topHighlightOpacity: readNumberSetting(settings.topHighlightOpacity, 0.6, 0, 1),
-    innerBorder: readBooleanSetting(settings.innerBorder, true),
+    innerBorder: readBooleanSetting(settings.innerBorder, false),
     innerBorderOpacity: readNumberSetting(settings.innerBorderOpacity, 0.2, 0, 1),
-    bottomShadow: readBooleanSetting(settings.bottomShadow, true),
+    bottomShadow: readBooleanSetting(settings.bottomShadow, false),
     bottomShadowOpacity: readNumberSetting(settings.bottomShadowOpacity, 0.08, 0, 1),
     insetDepthShadow: readBooleanSetting(settings.insetDepthShadow, false),
     insetDepthShadowOpacity: readNumberSetting(settings.insetDepthShadowOpacity, 0.12, 0, 1),
     insetShadowBlur: readNumberSetting(settings.insetShadowBlur, 10, 5, 30),
     displacementScale: readNumberSetting(settings.displacementScale, DEFAULT_DISPLACEMENT_SCALE, 0, 40),
     blurAmount: readNumberSetting(settings.blurAmount, DEFAULT_BLUR_AMOUNT, 0, 4),
-    contrastBoost: readNumberSetting(settings.contrastBoost, 1.25, 1, 1.5),
-    brightnessBoost: readNumberSetting(settings.brightnessBoost, 1.05, 1, 1.2),
-    saturateBoost: readNumberSetting(settings.saturateBoost, 1.1, 1, 1.3),
+    contrastBoost: readNumberSetting(settings.contrastBoost, DEFAULT_CONTRAST_BOOST, 1, 1.5),
+    brightnessBoost: readNumberSetting(settings.brightnessBoost, DEFAULT_BRIGHTNESS_BOOST, 1, 1.2),
+    saturateBoost: readNumberSetting(settings.saturateBoost, DEFAULT_SATURATE_BOOST, 1, 1.3),
   };
 }
 
@@ -184,7 +202,7 @@ function measureShell(shellEl: HTMLElement): ShudingSize {
   const rect = shellEl.getBoundingClientRect();
   const cssWidth = Math.max(1, Math.round(rect.width));
   const cssHeight = Math.max(1, Math.round(rect.height));
-  const dpi = clamp(window.devicePixelRatio || 1, 1, 2);
+  const dpi = CANVAS_DPI;
 
   return {
     cssWidth,
@@ -307,6 +325,11 @@ function buildBackdropFilterValue(filterId: string, settings: ShudingSettings): 
   return `url(#${filterId}) blur(${blurValue}px) contrast(${formatNumber(settings.contrastBoost)}) brightness(${formatNumber(settings.brightnessBoost)}) saturate(${formatNumber(settings.saturateBoost)})`;
 }
 
+function buildFallbackBackdropFilterValue(settings: ShudingSettings): string {
+  const blurValue = settings.blurAmount.toFixed(2).replace(/\.?0+$/, '');
+  return `blur(${blurValue}px) contrast(${formatNumber(settings.contrastBoost)}) brightness(${formatNumber(settings.brightnessBoost)}) saturate(${formatNumber(settings.saturateBoost)})`;
+}
+
 function applyShellStyles(shellEl: HTMLElement): void {
   shellEl.dataset.opencodianLgShuding = 'mounted';
   shellEl.style.setProperty('background', 'transparent');
@@ -316,18 +339,9 @@ function applyShellStyles(shellEl: HTMLElement): void {
   shellEl.style.setProperty('will-change', 'transform');
 }
 
-function applyFilterLayerStyles(
-  filterLayerEl: HTMLElement,
-  filterId: string,
-  settings: ShudingSettings,
-  supportsUrlFilter: boolean,
-): void {
-  filterLayerEl.dataset[FILTER_OWNER_DATASET_KEY] = filterId;
-  filterLayerEl.dataset.opencodianLgShudingUrlSupported = supportsUrlFilter ? 'true' : 'false';
-  filterLayerEl.style.setProperty('opacity', '1');
-  filterLayerEl.style.setProperty('background', 'transparent');
+function buildFilterLayerBoxShadow(settings: ShudingSettings): string {
+  const boxShadowParts = [UPSTREAM_BOX_SHADOW];
 
-  const boxShadowParts: string[] = [];
   if (settings.topHighlight && settings.topHighlightOpacity > EPSILON) {
     boxShadowParts.push(`inset 0 1px 0 rgba(255, 255, 255, ${formatNumber(settings.topHighlightOpacity)})`);
   }
@@ -341,25 +355,29 @@ function applyFilterLayerStyles(
     boxShadowParts.push(`inset 0 -8px ${formatNumber(settings.insetShadowBlur)}px rgba(0, 0, 0, ${formatNumber(settings.insetDepthShadowOpacity)})`);
   }
 
-  if (boxShadowParts.length > 0) {
-    filterLayerEl.style.setProperty('box-shadow', boxShadowParts.join(', '));
-  } else {
-    filterLayerEl.style.removeProperty('box-shadow');
-  }
+  return boxShadowParts.join(', ');
+}
+
+function applyFilterLayerStyles(
+  filterLayerEl: HTMLElement,
+  filterId: string,
+  settings: ShudingSettings,
+  supportsUrlFilter: boolean,
+): void {
+  filterLayerEl.dataset[FILTER_OWNER_DATASET_KEY] = filterId;
+  filterLayerEl.dataset.opencodianLgShudingUrlSupported = supportsUrlFilter ? 'true' : 'false';
+  filterLayerEl.style.setProperty('opacity', '1');
+  filterLayerEl.style.setProperty('background', 'transparent');
+  filterLayerEl.style.setProperty('box-shadow', buildFilterLayerBoxShadow(settings));
   filterLayerEl.style.setProperty('transform-origin', 'center center');
   filterLayerEl.style.setProperty('will-change', 'backdrop-filter, opacity');
 
   const filterValue = supportsUrlFilter
     ? buildBackdropFilterValue(filterId, settings)
-    : `blur(${settings.blurAmount.toFixed(2).replace(/\.?0+$/, '')}px) contrast(${formatNumber(settings.contrastBoost)}) brightness(${formatNumber(settings.brightnessBoost)}) saturate(${formatNumber(settings.saturateBoost)})`;
+    : buildFallbackBackdropFilterValue(settings);
 
-  if (!supportsUrlFilter) {
-    filterLayerEl.style.setProperty('backdrop-filter', filterValue);
-    filterLayerEl.style.setProperty('-webkit-backdrop-filter', filterValue);
-  } else {
-    filterLayerEl.style.setProperty('backdrop-filter', filterValue);
-    filterLayerEl.style.setProperty('-webkit-backdrop-filter', filterValue);
-  }
+  filterLayerEl.style.setProperty('backdrop-filter', filterValue);
+  filterLayerEl.style.setProperty('-webkit-backdrop-filter', filterValue);
 }
 
 function updateSvgGeometry(state: ShudingState): void {
@@ -377,11 +395,7 @@ function updateSvgGeometry(state: ShudingState): void {
 }
 
 function resolvePanelGeometry(state: ShudingState): ShudingPanelGeometry {
-  const legacyGeometry: ShudingPanelGeometry = {
-    halfWidth: 0.3,
-    halfHeight: 0.2,
-    radius: 0.6,
-  };
+  const legacyGeometry: ShudingPanelGeometry = { ...UPSTREAM_PANEL_GEOMETRY };
 
   if (!state.settings.adaptiveSdf) {
     return legacyGeometry;
@@ -426,6 +440,87 @@ function buildEdgeBandWeight(distanceToEdge: number, edgeBandWidth: number): num
   return clamp(outerMask - innerMask, 0, 1);
 }
 
+function resolveUpstreamTextureSample(
+  ix: number,
+  iy: number,
+  geometry: ShudingPanelGeometry,
+  path: ShudingDisplacementPath,
+): ShudingTextureSample {
+  const distanceToEdge = roundedRectSDF(
+    ix,
+    iy,
+    geometry.halfWidth,
+    geometry.halfHeight,
+    geometry.radius,
+  );
+  const displacement = smoothStep(0.8, 0, distanceToEdge - 0.15);
+  const scaled = smoothStep(0, 1, displacement);
+
+  return {
+    path,
+    sampleX: ix * scaled + 0.5,
+    sampleY: iy * scaled + 0.5,
+  };
+}
+
+function resolveDisplacementTextureSample(
+  ix: number,
+  iy: number,
+  geometry: ShudingPanelGeometry,
+  settings: ShudingSettings,
+): ShudingTextureSample {
+  const usesEnhancedRefraction = settings.rectEdgeRefraction || settings.barrelDistortion;
+
+  if (!settings.adaptiveSdf && !usesEnhancedRefraction) {
+    return resolveUpstreamTextureSample(ix, iy, UPSTREAM_PANEL_GEOMETRY, 'strict-upstream');
+  }
+
+  if (!usesEnhancedRefraction) {
+    return resolveUpstreamTextureSample(ix, iy, geometry, 'adaptive-upstream');
+  }
+
+  const distanceToEdge = roundedRectSDF(
+    ix,
+    iy,
+    geometry.halfWidth,
+    geometry.halfHeight,
+    geometry.radius,
+  );
+
+  let push = 0;
+  if (settings.rectEdgeRefraction) {
+    const edgeBand = buildEdgeBandWeight(distanceToEdge, settings.edgeBandWidth);
+    let edgePush = edgeBand * settings.rectEdgeRefractionStrength;
+
+    if (settings.cornerEnhancement && geometry.radius > EPSILON) {
+      const cornerX = Math.max(Math.abs(ix) - geometry.halfWidth + geometry.radius, 0);
+      const cornerY = Math.max(Math.abs(iy) - geometry.halfHeight + geometry.radius, 0);
+      const cornerFactor = clamp((Math.hypot(cornerX, cornerY) / geometry.radius) * 2, 0, 1);
+      edgePush *= 1 + (cornerFactor * settings.cornerEnhancementStrength * 0.35);
+    }
+
+    push += edgePush;
+  } else {
+    const displacement = smoothStep(0.8, 0, distanceToEdge - 0.15);
+    push += smoothStep(0, 1, displacement);
+  }
+
+  if (settings.barrelDistortion) {
+    const radialDistance = Math.hypot(
+      ix / Math.max(geometry.halfWidth, EPSILON),
+      iy / Math.max(geometry.halfHeight, EPSILON),
+    );
+    const barrelFactor = clamp(1 - radialDistance, 0, 1);
+    push += barrelFactor * settings.barrelStrength;
+  }
+
+  return {
+    path: 'enhanced',
+    sampleX: ix * (1 + push) + 0.5,
+    sampleY: iy * (1 + push) + 0.5,
+  };
+}
+
 function renderDisplacementMap(state: ShudingState): number {
   const { pixelWidth, pixelHeight, dpi } = state.size;
   const { canvasEl, canvasCtx } = state;
@@ -445,43 +540,9 @@ function renderDisplacementMap(state: ShudingState): number {
       const uvY = y / pixelHeight;
       const ix = uvX - 0.5;
       const iy = uvY - 0.5;
-      const distanceToEdge = roundedRectSDF(
-        ix,
-        iy,
-        geometry.halfWidth,
-        geometry.halfHeight,
-        geometry.radius,
-      );
-
-      let push = 0;
-      if (state.settings.rectEdgeRefraction) {
-        const edgeBand = buildEdgeBandWeight(distanceToEdge, state.settings.edgeBandWidth);
-        let edgePush = edgeBand * state.settings.rectEdgeRefractionStrength;
-
-        if (state.settings.cornerEnhancement && geometry.radius > EPSILON) {
-          const cornerX = Math.max(Math.abs(ix) - geometry.halfWidth + geometry.radius, 0);
-          const cornerY = Math.max(Math.abs(iy) - geometry.halfHeight + geometry.radius, 0);
-          const cornerFactor = clamp((Math.hypot(cornerX, cornerY) / geometry.radius) * 2, 0, 1);
-          edgePush *= 1 + (cornerFactor * state.settings.cornerEnhancementStrength * 0.35);
-        }
-
-        push += edgePush;
-      } else {
-        const displacement = smoothStep(0.8, 0, distanceToEdge - 0.15);
-        push += smoothStep(0, 1, displacement);
-      }
-
-      if (state.settings.barrelDistortion) {
-        const radialDistance = Math.hypot(
-          ix / Math.max(geometry.halfWidth, EPSILON),
-          iy / Math.max(geometry.halfHeight, EPSILON),
-        );
-        const barrelFactor = clamp(1 - radialDistance, 0, 1);
-        push += barrelFactor * state.settings.barrelStrength;
-      }
-
-      const sampleX = ix * (1 + push) + 0.5;
-      const sampleY = iy * (1 + push) + 0.5;
+      const textureSample = resolveDisplacementTextureSample(ix, iy, geometry, state.settings);
+      const sampleX = textureSample.sampleX;
+      const sampleY = textureSample.sampleY;
       const dx = sampleX * pixelWidth - x;
       const dy = sampleY * pixelHeight - y;
 
@@ -528,7 +589,7 @@ function shouldRegenerateDisplacementMap(
 
 function updateDisplacementScale(state: ShudingState): void {
   const normalizedStrength = state.settings.displacementScale / DISPLACEMENT_SCALE_BASELINE;
-  const appliedScale = state.baseDisplacementScale * normalizedStrength * DISPLACEMENT_SCALE_FACTOR;
+  const appliedScale = state.baseDisplacementScale * normalizedStrength;
   state.feDisplacementMapEl.setAttribute('scale', `${appliedScale}`);
 }
 
@@ -746,7 +807,7 @@ export const adapter: GlassEffectAdapter = {
       descKey: 'settings.style.input.liquidGlass.shuding.adaptiveSdf.desc',
       sectionLabelKey: 'settings.style.input.liquidGlass.section.refraction',
       type: 'toggle',
-      defaultValue: true,
+      defaultValue: false,
     },
     {
       key: 'adaptiveSdfMix',
@@ -758,7 +819,7 @@ export const adapter: GlassEffectAdapter = {
       max: 1,
       step: 0.01,
       unit: '',
-      defaultValue: 1,
+      defaultValue: 0,
     },
     {
       key: 'rectEdgeRefraction',
@@ -766,7 +827,7 @@ export const adapter: GlassEffectAdapter = {
       descKey: 'settings.style.input.liquidGlass.shuding.rectEdgeRefraction.desc',
       sectionLabelKey: 'settings.style.input.liquidGlass.section.refraction',
       type: 'toggle',
-      defaultValue: true,
+      defaultValue: false,
     },
     {
       key: 'rectEdgeRefractionStrength',
@@ -778,7 +839,7 @@ export const adapter: GlassEffectAdapter = {
       max: 2,
       step: 0.05,
       unit: '',
-      defaultValue: 1,
+      defaultValue: 0,
     },
     {
       key: 'cornerEnhancement',
@@ -786,7 +847,7 @@ export const adapter: GlassEffectAdapter = {
       descKey: 'settings.style.input.liquidGlass.shuding.cornerEnhancement.desc',
       sectionLabelKey: 'settings.style.input.liquidGlass.section.refraction',
       type: 'toggle',
-      defaultValue: true,
+      defaultValue: false,
     },
     {
       key: 'cornerEnhancementStrength',
@@ -798,7 +859,7 @@ export const adapter: GlassEffectAdapter = {
       max: 2,
       step: 0.05,
       unit: '',
-      defaultValue: 1,
+      defaultValue: 0,
     },
     {
       key: 'edgeBandWidth',
@@ -806,11 +867,11 @@ export const adapter: GlassEffectAdapter = {
       descKey: 'settings.style.input.liquidGlass.shuding.edgeBandWidth.desc',
       sectionLabelKey: 'settings.style.input.liquidGlass.section.refraction',
       type: 'number',
-      min: 0.02,
+      min: 0,
       max: 0.2,
       step: 0.01,
       unit: '',
-      defaultValue: 0.08,
+      defaultValue: 0,
     },
     {
       key: 'barrelDistortion',
@@ -830,7 +891,7 @@ export const adapter: GlassEffectAdapter = {
       max: 0.1,
       step: 0.005,
       unit: '',
-      defaultValue: 0.03,
+      defaultValue: 0,
     },
     {
       key: 'topHighlight',
@@ -838,7 +899,7 @@ export const adapter: GlassEffectAdapter = {
       descKey: 'settings.style.input.liquidGlass.shuding.topHighlight.desc',
       sectionLabelKey: 'settings.style.input.liquidGlass.section.lighting',
       type: 'toggle',
-      defaultValue: true,
+      defaultValue: false,
     },
     {
       key: 'topHighlightOpacity',
@@ -858,7 +919,7 @@ export const adapter: GlassEffectAdapter = {
       descKey: 'settings.style.input.liquidGlass.shuding.innerBorder.desc',
       sectionLabelKey: 'settings.style.input.liquidGlass.section.lighting',
       type: 'toggle',
-      defaultValue: true,
+      defaultValue: false,
     },
     {
       key: 'innerBorderOpacity',
@@ -878,7 +939,7 @@ export const adapter: GlassEffectAdapter = {
       descKey: 'settings.style.input.liquidGlass.shuding.bottomShadow.desc',
       sectionLabelKey: 'settings.style.input.liquidGlass.section.lighting',
       type: 'toggle',
-      defaultValue: true,
+      defaultValue: false,
     },
     {
       key: 'bottomShadowOpacity',
@@ -958,7 +1019,7 @@ export const adapter: GlassEffectAdapter = {
       max: 1.5,
       step: 0.01,
       unit: '',
-      defaultValue: 1.25,
+      defaultValue: DEFAULT_CONTRAST_BOOST,
     },
     {
       key: 'brightnessBoost',
@@ -988,4 +1049,18 @@ export const adapter: GlassEffectAdapter = {
   mount,
   unmount,
   updateSettings,
+};
+
+export const __testing = {
+  buildBackdropFilterValue,
+  buildFilterLayerBoxShadow,
+  measureShell,
+  resetCachedBackdropFilterUrlSupport(): void {
+    cachedBackdropFilterUrlSupport = null;
+  },
+  resolveDisplacementTextureSample,
+  resolvePanelGeometry,
+  resolveSettings,
+  upstreamBoxShadow: UPSTREAM_BOX_SHADOW,
+  upstreamPanelGeometry: UPSTREAM_PANEL_GEOMETRY,
 };

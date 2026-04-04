@@ -37,6 +37,25 @@ type InputPanelThemeViewHarness = {
   updateSendButtonState: () => void;
 };
 
+class ResizeObserverMock {
+  observe = jest.fn();
+  unobserve = jest.fn();
+  disconnect = jest.fn();
+
+  constructor(_callback: ResizeObserverCallback) {}
+}
+
+function createCanvasContextMock(): CanvasRenderingContext2D {
+  return {
+    createImageData: (width: number, height: number) => ({
+      data: new Uint8ClampedArray(width * height * 4),
+      width,
+      height,
+    } as ImageData),
+    putImageData: jest.fn(),
+  } as unknown as CanvasRenderingContext2D;
+}
+
 describe('OpenCodianView input panel theme', () => {
   beforeEach(() => {
     document.body.innerHTML = '';
@@ -215,6 +234,85 @@ describe('OpenCodianView input panel theme', () => {
     streamingSpy.mockReturnValue(true);
     view.updateSendButtonState();
     expect(view.sendBtn?.getAttribute('data-tooltip')).toBe('停止生成');
+  });
+
+  it('mounts shuding liquid glass with upstream defaults and cleans it up on theme switch', () => {
+    const originalCss = globalThis.CSS;
+    const originalResizeObserver = globalThis.ResizeObserver;
+    const originalDevicePixelRatio = window.devicePixelRatio;
+    Object.defineProperty(globalThis, 'CSS', {
+      configurable: true,
+      value: {
+        supports: jest.fn().mockReturnValue(true),
+      },
+    });
+    Object.defineProperty(globalThis, 'ResizeObserver', {
+      configurable: true,
+      value: ResizeObserverMock,
+    });
+    Object.defineProperty(window, 'devicePixelRatio', {
+      configurable: true,
+      value: 2,
+    });
+    jest.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(createCanvasContextMock());
+    jest.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue('data:image/png;base64,input-panel');
+
+    try {
+      const view = createView('liquid-glass-shuding');
+      const shellEl = document.body.createDiv({ cls: 'opencodian-composer-shell' });
+      shellEl.style.width = '432px';
+      shellEl.style.height = '74px';
+      shellEl.style.borderRadius = '20px';
+      Object.defineProperty(shellEl, 'getBoundingClientRect', {
+        configurable: true,
+        value: () => ({
+          x: 0,
+          y: 0,
+          top: 0,
+          left: 0,
+          right: 432,
+          bottom: 74,
+          width: 432,
+          height: 74,
+          toJSON: () => ({}),
+        } as DOMRect),
+      });
+      const inputWrapperEl = shellEl.createDiv({ cls: 'opencodian-input-wrapper' });
+      view.composerShellEl = shellEl;
+      view.inputWrapperEl = inputWrapperEl;
+
+      view.applyInputPanelThemeState();
+
+      const filterLayerEl = shellEl.querySelector<HTMLElement>('.opencodian-composer-svg-filter-layer');
+      expect(shellEl.classList.contains('opencodian-composer-shell--liquid-glass')).toBe(true);
+      expect(shellEl.dataset.opencodianLgShuding).toBe('mounted');
+      expect(filterLayerEl).not.toBeNull();
+      expect(filterLayerEl?.dataset.opencodianLgShudingUrlSupported).toBe('true');
+      expect(filterLayerEl?.dataset.opencodianLgShudingOwner).toBeTruthy();
+      expect(shellEl.style.width).toBe('432px');
+      expect(shellEl.style.height).toBe('74px');
+      expect(shellEl.style.borderRadius).toBe('20px');
+
+      view.plugin.settings.inputPanelTheme = 'glass-refraction-card';
+      view.applyInputPanelThemeState();
+
+      expect(shellEl.classList.contains('opencodian-composer-shell--liquid-glass')).toBe(false);
+      expect(shellEl.dataset.opencodianLgShuding).toBeUndefined();
+      expect(shellEl.querySelector('.opencodian-composer-svg-filter-layer')).toBeNull();
+    } finally {
+      Object.defineProperty(globalThis, 'CSS', {
+        configurable: true,
+        value: originalCss,
+      });
+      Object.defineProperty(globalThis, 'ResizeObserver', {
+        configurable: true,
+        value: originalResizeObserver,
+      });
+      Object.defineProperty(window, 'devicePixelRatio', {
+        configurable: true,
+        value: originalDevicePixelRatio,
+      });
+    }
   });
 
 });
