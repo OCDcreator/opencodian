@@ -9,6 +9,10 @@ import { setIcon } from 'obsidian';
 
 import { t } from '../../../i18n';
 
+interface NavigationSidebarOptions {
+  onScrollToBottom?: () => void;
+}
+
 /**
  * Floating sidebar for navigating chat history.
  * Provides quick access to top/bottom and previous/next user messages.
@@ -29,6 +33,7 @@ export class NavigationSidebar {
     private mountEl: HTMLElement,
     private anchorEl: HTMLElement,
     private messagesEl: HTMLElement,
+    private options: NavigationSidebarOptions = {},
   ) {
     this.host = this.mountEl.createDiv({ cls: 'opencodian-nav-sidebar-host' });
     this.container = this.host.createDiv({ cls: 'opencodian-nav-sidebar' });
@@ -91,6 +96,10 @@ export class NavigationSidebar {
     });
 
     this.bottomBtn.addEventListener('click', () => {
+      if (this.options.onScrollToBottom) {
+        this.options.onScrollToBottom();
+        return;
+      }
       this.messagesEl.scrollTo({ top: this.messagesEl.scrollHeight, behavior: 'smooth' });
     });
 

@@ -12,6 +12,47 @@
 
 ---
 
+## 2026-04-04 聊天自动滚动状态机收口到现有导航按钮，并修复主题预设类型检查
+
+### 🎯 改动目标
+
+- 按“在底部时自动跟随、向上浏览时不打断”的规则，收敛聊天区现有自然滚动逻辑
+- 不新增重复 UI，直接复用现有导航栏“跳到底部”按钮来恢复自动滚动
+- 修复 `src/core/theme/index.ts` 在 `npm run typecheck` 下的预设与 diff helper 类型报错
+
+### ✅ 本轮调整
+
+- `src/features/chat/autoScrollState.ts`
+  - 新增独立的滚动状态 helper，集中管理 near-bottom 阈值、用户滚动意图、programmatic scroll guard 和 smooth/instant guard 时长
+
+- `src/features/chat/OpenCodianView.ts`
+  - 将聊天自动滚动状态提升为 tab 级 runtime 字段，分别记录 `autoScrollEnabled`、`isNearBottom` 与 `programmaticScrollGuardUntil`
+  - 为每个消息 pane 接入 `scroll`、`MutationObserver` 和 `ResizeObserver`，让流式输出、增量渲染、重载恢复、composer 高度变化和内容尺寸变化都走同一套自动滚动判断
+  - 用户发送新消息时强制回到底部并恢复自动滚动；用户手动上滑时停用自动滚动；用户重新回到底部时恢复
+  - 删除额外新增的浮动“回到底部”按钮，改为复用现有导航栏底部按钮来触发“恢复自动滚动 + smooth 滚到底部”
+
+- `src/features/chat/ui/NavigationSidebar.ts`
+  - 为底部按钮新增可选 `onScrollToBottom` 回调，优先让宿主视图决定“滚到底部”的真实行为
+
+- `src/core/theme/index.ts`
+  - 将 `BUILTIN_THEME_PRESETS` 显式声明为 `ThemePresetDefinition[]`，避免空 `cssVariables` 触发联合类型推断并把值错误收窄为 `string | undefined`
+  - 将 `diffObject` 的泛型约束从 `Record<string, unknown>` 放宽为 `object`，使 chat appearance 子配置接口可以直接参与差异提取
+
+- `tests/unit/features/chat/autoScrollState.test.ts`
+  - 补充 near-bottom 阈值、用户上滑关闭自动滚动、回到底部恢复自动滚动、被动布局测量不改写用户意图、programmatic guard 判定的回归测试
+
+- `tests/unit/features/chat/NavigationSidebar.test.ts`
+  - 新增“存在 `onScrollToBottom` 时优先调用宿主回调而不是直接 `scrollTo`”的回归测试
+
+### 🧪 当前验证
+
+- 已通过：`npm test -- tests/unit/features/chat/NavigationSidebar.test.ts tests/unit/features/chat/autoScrollState.test.ts`
+- 已通过：`npx eslint src/features/chat/OpenCodianView.ts src/features/chat/ui/NavigationSidebar.ts tests/unit/features/chat/NavigationSidebar.test.ts`
+- 已通过：`npm run typecheck`
+- 已通过：`npm run check:devlog-order`
+- 已通过：`npm run build`（`BUILD_ID: main.202604042313`）
+- 已部署：`dist/main.js`、`dist/manifest.json`、`dist/styles.css` 已复制到 Test Vault，并确认插件端 `main.js` 含 `BUILD_ID: main.202604042313`
+
 ## 2026-04-04 待办 stale 状态跨重载保持抑制，避免旧快照短暂复活
 
 ### 🎯 改动目标

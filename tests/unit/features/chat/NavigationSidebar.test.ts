@@ -194,4 +194,38 @@ describe('NavigationSidebar', () => {
 
     sidebar.destroy();
   });
+
+  it('uses the provided bottom callback when available', () => {
+    const parentEl = document.createElement('div') as ObsidianLikeElement;
+    const messagesShellEl = document.createElement('div');
+    const messagesEl = document.createElement('div');
+    messagesShellEl.appendChild(messagesEl);
+    parentEl.appendChild(messagesShellEl);
+    messagesEl.className = 'opencodian-messages opencodian-messages--natural';
+    document.body.appendChild(parentEl);
+
+    const scrollTo = jest.fn();
+    const onScrollToBottom = jest.fn();
+    Object.defineProperty(messagesEl, 'scrollTo', {
+      configurable: true,
+      value: scrollTo,
+    });
+    setNumericProperty(messagesEl, 'scrollHeight', 1800);
+    setNumericProperty(messagesEl, 'clientHeight', 500);
+    setNumericProperty(messagesEl, 'scrollTop', 360);
+    setRect(messagesShellEl, 0, 500);
+    setRect(messagesEl, 0, 500);
+
+    const sidebar = new NavigationSidebar(parentEl, messagesShellEl, messagesEl, {
+      onScrollToBottom,
+    });
+    const bottomBtn = parentEl.querySelector('.opencodian-nav-btn-bottom') as HTMLButtonElement;
+
+    bottomBtn.click();
+
+    expect(onScrollToBottom).toHaveBeenCalledTimes(1);
+    expect(scrollTo).not.toHaveBeenCalled();
+
+    sidebar.destroy();
+  });
 });

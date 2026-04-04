@@ -60,6 +60,13 @@ import {
   ToolCallRenderer,
 } from '../../utils/streaming';
 import {
+  applyPassiveScrollMeasurement,
+  applyUserScrollIntent,
+  getProgrammaticScrollGuardDelayMs,
+  hasProgrammaticScrollGuard,
+  isNearBottom as isNearBottomByMetrics,
+} from './autoScrollState';
+import {
   buildChatAppearanceCustomCss,
   getChatAppearanceCssVariables,
   getInputPanelGlassRefractionCssVariables,
@@ -389,6 +396,9 @@ interface TabRuntimeState {
   streamingMessageEl: HTMLElement | null;
   streamingContentEl: HTMLElement | null;
   currentTurnBodyEl: HTMLElement | null;
+  autoScrollEnabled: boolean;
+  isNearBottom: boolean;
+  programmaticScrollGuardUntil: number;
   isConversationSyncInFlight: boolean;
   lastConversationSyncFingerprint: string | null;
   lastInterruptedSyncPreservationLogFingerprint: string | null;
@@ -427,6 +437,9 @@ interface TabPaneState {
   tabId: TabId;
   messagesEl: HTMLElement;
   runtime: TabRuntimeState;
+  scrollHandler: () => void;
+  mutationObserver: MutationObserver | null;
+  resizeObserver: ResizeObserver | null;
 }
 
 /** Clipboard icon SVG for copy button */
@@ -550,6 +563,9 @@ export class OpenCodianView extends ItemView {
       streamingMessageEl: null,
       streamingContentEl: null,
       currentTurnBodyEl: null,
+      autoScrollEnabled: true,
+      isNearBottom: true,
+      programmaticScrollGuardUntil: 0,
       isConversationSyncInFlight: false,
       lastConversationSyncFingerprint: null,
       lastInterruptedSyncPreservationLogFingerprint: null,
@@ -625,7 +641,7 @@ export class OpenCodianView extends ItemView {
         markdownService: this.markdownService,
         scrollToBottom: () => {
           if (this.getActiveTabId() === tabId) {
-            this.scrollToBottomIfNeeded();
+            this.scheduleSettledScrollToBottomIfNeeded(this.shouldAutoScroll(tabId), tabId);
           }
         },
       });
@@ -1980,6 +1996,72 @@ export class OpenCodianView extends ItemView {
     // Navigation sidebar is attached after the active tab pane is created.
   }
 
+  private observeMessagesPaneChildren(paneState: TabPaneState): void {
+    paneState.resizeObserver?.observe(paneState.messagesEl);
+    for (const child of Array.from(paneState.messagesEl.children)) {
+      if (child instanceof HTMLElement) {
+        paneState.resizeObserver?.observe(child);
+      }
+    }
+  }
+
+  private syncPaneScrollMetrics(
+    tabId: TabId | null,
+    messagesEl: HTMLElement | null = this.getTabPaneState(tabId)?.messagesEl ?? null,
+  ): boolean {
+    if (!tabId || !messagesEl) {
+      return true;
+    }
+
+    const runtime = this.getTabRuntimeState(tabId);
+    if (!runtime) {
+      return true;
+    }
+
+    const nearBottom = this.isNearBottomForElement(messagesEl);
+    const nextState = applyPassiveScrollMeasurement(runtime, nearBottom);
+    runtime.isNearBottom = nextState.isNearBottom;
+    if (this.getActiveTabId() === tabId) {
+      this.navigationSidebar?.updateVisibility();
+    }
+    return nearBottom;
+  }
+
+  private handleMessagesPaneScroll(tabId: TabId): void {
+    const paneState = this.getTabPaneState(tabId);
+    if (!paneState) {
+      return;
+    }
+
+    const nearBottom = this.syncPaneScrollMetrics(tabId, paneState.messagesEl);
+    if (hasProgrammaticScrollGuard(paneState.runtime)) {
+      if (nearBottom) {
+        paneState.runtime.programmaticScrollGuardUntil = 0;
+      }
+      return;
+    }
+
+    const nextState = applyUserScrollIntent(paneState.runtime, nearBottom);
+    paneState.runtime.autoScrollEnabled = nextState.autoScrollEnabled;
+    paneState.runtime.isNearBottom = nextState.isNearBottom;
+  }
+
+  private handleMessagesPaneLayoutChange(tabId: TabId): void {
+    const paneState = this.getTabPaneState(tabId);
+    if (!paneState) {
+      return;
+    }
+
+    const nearBottom = this.syncPaneScrollMetrics(tabId, paneState.messagesEl);
+    if (hasProgrammaticScrollGuard(paneState.runtime) && nearBottom) {
+      paneState.runtime.programmaticScrollGuardUntil = 0;
+    }
+
+    if (this.getActiveTabId() === tabId) {
+      this.scheduleSettledScrollToBottomIfNeeded(this.shouldAutoScroll(tabId), tabId);
+    }
+  }
+
   private ensureTabMessagesPane(tabId: TabId): TabPaneState | null {
     const existing = this.tabPaneStates.get(tabId);
     if (existing?.messagesEl?.isConnected) {
@@ -1993,11 +2075,41 @@ export class OpenCodianView extends ItemView {
     const messagesEl = this.messagesShellEl.createDiv({ cls: 'opencodian-messages opencodian-messages-pane' });
     messagesEl.dataset.tabId = tabId;
     this.applyChatScrollModeToMessagesEl(messagesEl);
+    const scrollHandler = () => {
+      this.handleMessagesPaneScroll(tabId);
+    };
+    messagesEl.addEventListener('scroll', scrollHandler, { passive: true });
+
+    const resizeObserver = typeof ResizeObserver !== 'undefined'
+      ? new ResizeObserver(() => {
+        this.handleMessagesPaneLayoutChange(tabId);
+      })
+      : null;
+    const mutationObserver = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        mutation.addedNodes.forEach((node) => {
+          if (node instanceof HTMLElement) {
+            resizeObserver?.observe(node);
+          }
+        });
+        mutation.removedNodes.forEach((node) => {
+          if (node instanceof HTMLElement) {
+            resizeObserver?.unobserve(node);
+          }
+        });
+      }
+      this.handleMessagesPaneLayoutChange(tabId);
+    });
+    mutationObserver.observe(messagesEl, { childList: true });
     const paneState: TabPaneState = {
       tabId,
       messagesEl,
       runtime: this.createTabRuntimeState(),
+      scrollHandler,
+      mutationObserver,
+      resizeObserver,
     };
+    this.observeMessagesPaneChildren(paneState);
     this.tabPaneStates.set(tabId, paneState);
     return paneState;
   }
@@ -2019,6 +2131,10 @@ export class OpenCodianView extends ItemView {
     this.messagesContainer = activePaneState.messagesEl;
     this.restoreTurnStateFromActivePane();
     this.rebuildNavigationSidebar();
+    this.syncPaneScrollMetrics(tabId, activePaneState.messagesEl);
+    if (activePaneState.runtime.autoScrollEnabled) {
+      this.scheduleSettledScrollToBottomIfNeeded(this.shouldAutoScroll(tabId), tabId);
+    }
   }
 
   private removeTabMessagesPane(tabId: TabId): void {
@@ -2035,6 +2151,9 @@ export class OpenCodianView extends ItemView {
     }
 
     paneState.runtime.streamController?.cancelStream();
+    paneState.messagesEl.removeEventListener('scroll', paneState.scrollHandler);
+    paneState.mutationObserver?.disconnect();
+    paneState.resizeObserver?.disconnect();
     paneState.messagesEl.remove();
     this.tabPaneStates.delete(tabId);
   }
@@ -2042,6 +2161,9 @@ export class OpenCodianView extends ItemView {
   private clearTabMessagesPanes(): void {
     for (const paneState of this.tabPaneStates.values()) {
       paneState.runtime.streamController?.cancelStream();
+      paneState.messagesEl.removeEventListener('scroll', paneState.scrollHandler);
+      paneState.mutationObserver?.disconnect();
+      paneState.resizeObserver?.disconnect();
       paneState.messagesEl.remove();
     }
     this.tabPaneStates.clear();
@@ -2065,6 +2187,20 @@ export class OpenCodianView extends ItemView {
       outerMountEl as HTMLElement,
       this.messagesShellEl,
       this.messagesContainer,
+      {
+        onScrollToBottom: () => {
+          const tabId = this.getActiveTabId();
+          if (!tabId) {
+            return;
+          }
+
+          const runtime = this.getTabRuntimeState(tabId);
+          if (runtime) {
+            runtime.autoScrollEnabled = true;
+          }
+          this.scrollToBottom({ tabId, behavior: 'smooth', enableAutoScroll: true });
+        },
+      },
     );
   }
 
@@ -3516,6 +3652,7 @@ export class OpenCodianView extends ItemView {
 
     const stackHeight = Math.ceil(this.inputContainer.offsetHeight);
     this.chatContainerEl.style.setProperty('--opencodian-composer-stack-height', `${Math.max(0, stackHeight)}px`);
+    this.scheduleSettledScrollToBottomIfNeeded();
   }
 
   private renderComposerContextChips(): void {
@@ -4693,7 +4830,7 @@ export class OpenCodianView extends ItemView {
       ? messagesEl.scrollTop
       : 0;
     const shouldStickToBottom = preserveScrollPosition && messagesEl
-      ? this.isNearBottomForElement(messagesEl)
+      ? this.getTabRuntimeState(this.getActiveTabId())?.autoScrollEnabled ?? this.isNearBottomForElement(messagesEl)
       : true;
     const activeTabId = this.getActiveTabId();
     const previousSessionId = this.getSessionIdForTab(activeTabId);
@@ -4747,6 +4884,10 @@ export class OpenCodianView extends ItemView {
     this.startConversationSyncLoop();
 
     if (messagesEl) {
+      const runtime = this.getTabRuntimeState(activeTabId);
+      if (runtime) {
+        runtime.autoScrollEnabled = shouldStickToBottom;
+      }
       if (preserveScrollPosition && !shouldStickToBottom) {
         this.restoreElementScrollTopAfterRender(messagesEl, previousScrollTop);
       } else {
@@ -5492,7 +5633,6 @@ export class OpenCodianView extends ItemView {
       return;
     }
 
-    const shouldAutoScrollOnSend = this.shouldAutoScroll();
     const draftContextItems = [...sendingRuntime.draftContextItems];
     const contextAttachments = draftContextItems.map((item) => buildContextAttachment(item));
 
@@ -5510,8 +5650,9 @@ export class OpenCodianView extends ItemView {
     sendingConversation.updatedAt = userMessage.timestamp;
     this.startConversationSyncLoop();
     await this.plugin.saveConversation(sendingConversation);
+    sendingRuntime.autoScrollEnabled = true;
     await this.renderMessage(userMessage);
-    this.scrollToBottomIfNeeded(shouldAutoScrollOnSend);
+    this.scrollToBottom({ tabId: sendingTabId, enableAutoScroll: true });
 
     const isFirstUserMessage = sendingConversation.messages.filter((message) => message.role === 'user').length === 1;
     const modelOptions = this.getSendMessageOptions();
@@ -5594,7 +5735,7 @@ export class OpenCodianView extends ItemView {
     const { contentEl } = this.createAssistantMessageElement(sendingTabId);
     const streamController = this.getOrCreateTabStreamController(sendingTabId);
     if (this.getActiveTabId() === sendingTabId) {
-      this.scheduleSettledScrollToBottomIfNeeded(shouldAutoScrollOnSend);
+      this.scheduleSettledScrollToBottomIfNeeded(this.shouldAutoScroll(sendingTabId), sendingTabId);
     }
 
     // Show pending indicator after a short delay
@@ -5612,7 +5753,6 @@ export class OpenCodianView extends ItemView {
         return;
       }
 
-      const shouldAutoScrollPending = this.getActiveTabId() === sendingTabId && this.shouldAutoScroll();
       logger.debug('Showing pending indicator:', pendingMessage);
       pendingState.element = contentEl.createDiv({ cls: 'opencodian-pending' });
       pendingState.element.createSpan({
@@ -5631,7 +5771,7 @@ export class OpenCodianView extends ItemView {
       updateTimer();
       pendingState.element.dataset.timerInterval = String(window.setInterval(updateTimer, 1000));
       if (this.getActiveTabId() === sendingTabId) {
-        this.scheduleSettledScrollToBottomIfNeeded(shouldAutoScrollPending);
+        this.scheduleSettledScrollToBottomIfNeeded(this.shouldAutoScroll(sendingTabId), sendingTabId);
       }
     }, 1000); // Show after 1s delay
 
@@ -6087,7 +6227,7 @@ export class OpenCodianView extends ItemView {
       await this.plugin.openCodeService.start();
       await this.refreshStatusSurfaces();
       messageEl.remove();
-      this.scrollToBottom();
+      this.scrollToBottom({ enableAutoScroll: true });
       return true;
     } catch (error) {
       logger.error('Failed to start server from chat prompt:', error);
@@ -6142,7 +6282,7 @@ export class OpenCodianView extends ItemView {
       this.lastConversationSyncFingerprint = this.getConversationSyncFingerprint(this.currentConversation.messages);
     }
 
-    this.scrollToBottom();
+    this.scrollToBottom({ enableAutoScroll: true });
   }
 
   private async refreshStatusSurfaces(): Promise<void> {
@@ -6235,7 +6375,7 @@ export class OpenCodianView extends ItemView {
       await this.plugin.storage.saveConversation(this.currentConversation);
     }
 
-    this.scrollToBottom();
+    this.scrollToBottom({ enableAutoScroll: true });
   }
 
   /** Cancel streaming */
@@ -8078,7 +8218,7 @@ export class OpenCodianView extends ItemView {
     }
 
     const messagesEl = this.messagesContainer;
-    const shouldStickToBottom = this.isNearBottomForElement(messagesEl);
+    const shouldStickToBottom = this.getActiveTabRuntimeState()?.autoScrollEnabled ?? this.isNearBottomForElement(messagesEl);
     const previousScrollTop = messagesEl.scrollTop;
 
     this.clearScheduledScrollToBottom();
@@ -8160,7 +8300,7 @@ export class OpenCodianView extends ItemView {
     const parentEl = existingTailMessageEl.parentElement;
     const runtime = this.getTabRuntimeState(tabId);
     const previousTurnBodyEl = runtime?.currentTurnBodyEl ?? null;
-    const shouldStickToBottom = this.isNearBottomForElement(this.messagesContainer);
+    const shouldStickToBottom = this.shouldAutoScroll(tabId);
     const existingContentEl = existingTailMessageEl.querySelector('.opencodian-message-content');
     if (!(existingContentEl instanceof HTMLElement)) {
       return false;
@@ -8181,7 +8321,7 @@ export class OpenCodianView extends ItemView {
       await this.renderAssistantMessageContent(existingTailMessageEl, existingContentEl, nextTailMessage);
       existingTailMessageEl.style.animation = 'none';
       if (shouldStickToBottom) {
-        this.scrollToBottom();
+        this.scrollToBottom({ tabId });
       }
       return true;
     } finally {
@@ -8205,7 +8345,7 @@ export class OpenCodianView extends ItemView {
       return;
     }
 
-    const shouldStickToBottom = this.isNearBottom();
+    const shouldStickToBottom = this.shouldAutoScroll();
     this.syncBackgroundTaskStateFromConversation(this.currentConversation);
 
     if (incrementalUpdate.patchTrailingAssistant) {
@@ -8354,12 +8494,15 @@ export class OpenCodianView extends ItemView {
     });
   }
 
-  private isNearBottomForElement(messagesEl: HTMLElement, threshold = 48): boolean {
-    const { scrollTop, scrollHeight, clientHeight } = messagesEl;
-    return scrollHeight - (scrollTop + clientHeight) <= threshold;
+  private isNearBottomForElement(messagesEl: HTMLElement, threshold?: number): boolean {
+    return isNearBottomByMetrics({
+      scrollTop: messagesEl.scrollTop,
+      scrollHeight: messagesEl.scrollHeight,
+      clientHeight: messagesEl.clientHeight,
+    }, threshold);
   }
 
-  private isNearBottom(threshold = 48): boolean {
+  private isNearBottom(threshold?: number): boolean {
     if (!this.messagesContainer) {
       return true;
     }
@@ -8579,20 +8722,52 @@ export class OpenCodianView extends ItemView {
   }
 
   /** Scroll to bottom of messages */
-  private scrollToBottom() {
-    if (this.messagesContainer) {
-      this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
+  private scrollToBottom(options: {
+    tabId?: TabId | null;
+    behavior?: ScrollBehavior;
+    enableAutoScroll?: boolean;
+  } = {}): void {
+    const tabId = options.tabId ?? this.getActiveTabId();
+    if (!tabId) {
+      return;
     }
-    this.navigationSidebar?.updateVisibility();
+
+    const paneState = this.getTabPaneState(tabId);
+    if (!paneState) {
+      return;
+    }
+
+    if (options.enableAutoScroll) {
+      paneState.runtime.autoScrollEnabled = true;
+    }
+    paneState.runtime.programmaticScrollGuardUntil = Date.now()
+      + getProgrammaticScrollGuardDelayMs(options.behavior);
+
+    if (options.behavior === 'smooth') {
+      paneState.messagesEl.scrollTo({
+        top: paneState.messagesEl.scrollHeight,
+        behavior: 'smooth',
+      });
+    } else {
+      paneState.messagesEl.scrollTop = paneState.messagesEl.scrollHeight;
+    }
+
+    this.syncPaneScrollMetrics(tabId, paneState.messagesEl);
   }
 
   private restoreElementScrollTopAfterRender(messagesEl: HTMLElement, scrollTop: number): void {
+    const tabId = messagesEl.dataset.tabId ?? null;
     const apply = () => {
       const maxScrollTop = Math.max(0, messagesEl.scrollHeight - messagesEl.clientHeight);
-      messagesEl.scrollTop = Math.min(Math.max(0, scrollTop), maxScrollTop);
-      if (this.messagesContainer === messagesEl) {
-        this.navigationSidebar?.updateVisibility();
+      if (tabId) {
+        const runtime = this.getTabRuntimeState(tabId);
+        if (runtime) {
+          runtime.programmaticScrollGuardUntil = Date.now()
+            + getProgrammaticScrollGuardDelayMs();
+        }
       }
+      messagesEl.scrollTop = Math.min(Math.max(0, scrollTop), maxScrollTop);
+      this.syncPaneScrollMetrics(tabId, messagesEl);
     };
 
     apply();
@@ -8600,43 +8775,48 @@ export class OpenCodianView extends ItemView {
   }
 
   private scrollElementToBottomAfterRender(messagesEl: HTMLElement): void {
+    const tabId = messagesEl.dataset.tabId ?? null;
     const apply = () => {
-      messagesEl.scrollTop = messagesEl.scrollHeight;
-      if (this.messagesContainer === messagesEl) {
-        this.navigationSidebar?.updateVisibility();
-      }
+      this.scrollToBottom({ tabId });
     };
 
     apply();
     window.requestAnimationFrame(apply);
   }
 
-  private shouldAutoScroll(threshold = 48): boolean {
-    return this.plugin.settings.enableAutoScroll && this.isNearBottom(threshold);
+  private shouldAutoScroll(tabId: TabId | null = this.getActiveTabId()): boolean {
+    return this.plugin.settings.enableAutoScroll
+      && (this.getTabRuntimeState(tabId)?.autoScrollEnabled ?? true);
   }
 
-  private scrollToBottomIfNeeded(shouldScroll = this.shouldAutoScroll()): void {
+  private scrollToBottomIfNeeded(
+    shouldScroll = this.shouldAutoScroll(),
+    tabId: TabId | null = this.getActiveTabId(),
+  ): void {
     if (!shouldScroll) {
       return;
     }
 
-    this.scrollToBottom();
+    this.scrollToBottom({ tabId });
   }
 
-  private scheduleSettledScrollToBottomIfNeeded(shouldScroll = this.shouldAutoScroll()): void {
+  private scheduleSettledScrollToBottomIfNeeded(
+    shouldScroll = this.shouldAutoScroll(),
+    tabId: TabId | null = this.getActiveTabId(),
+  ): void {
     if (!shouldScroll) {
       return;
     }
 
-    this.scheduleSettledScrollToBottom();
+    this.scheduleSettledScrollToBottom(tabId);
   }
 
-  private scheduleSettledScrollToBottom(): void {
+  private scheduleSettledScrollToBottom(tabId: TabId | null = this.getActiveTabId()): void {
     this.clearScheduledScrollToBottom();
     this.scrollToBottomFrameId = window.requestAnimationFrame(() => {
       this.scrollToBottomFrameId = window.requestAnimationFrame(() => {
         this.scrollToBottomFrameId = null;
-        this.scrollToBottom();
+        this.scrollToBottom({ tabId });
       });
     });
   }
@@ -9418,7 +9598,7 @@ export class OpenCodianView extends ItemView {
 
     if (targetConversationIsVisible) {
       this.lastConversationSyncFingerprint = fingerprint;
-      this.scrollToBottom();
+      this.scheduleSettledScrollToBottomIfNeeded();
       return;
     }
 
@@ -10225,11 +10405,11 @@ export class OpenCodianView extends ItemView {
   }
 
   private keepQuestionCardPinnedToBottom(tabId: TabId | null): void {
-    if (this.getActiveTabId() !== tabId || !this.plugin.settings.enableAutoScroll) {
+    if (this.getActiveTabId() !== tabId) {
       return;
     }
 
-    this.scheduleSettledScrollToBottomIfNeeded(true);
+    this.scheduleSettledScrollToBottomIfNeeded(this.shouldAutoScroll(tabId), tabId);
   }
 
   private async collectGroupedQuestionAction(

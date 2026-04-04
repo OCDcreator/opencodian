@@ -142,7 +142,7 @@ const SHARP_APPEARANCE = normalizeChatAppearanceSettings({
   },
 });
 
-const BUILTIN_THEME_PRESETS = [
+const BUILTIN_THEME_PRESETS: ThemePresetDefinition[] = [
   {
     id: 'glass-classic',
     name: 'OpenCodian Classic',
@@ -306,7 +306,7 @@ const BUILTIN_THEME_PRESETS = [
     },
     appearance: SHARP_APPEARANCE,
   },
-] satisfies ThemePresetDefinition[];
+];
 
 export const THEME_STYLE_CONTAINER_CLASSES = Array.from(new Set(
   BUILTIN_THEME_PRESETS.map((preset) => preset.containerClass),
@@ -454,7 +454,7 @@ export function hasThemeAppearanceOverrides(theme: ThemeSettings): boolean {
   return Object.entries(normalized).some(([key, value]) => key !== 'background' && value && Object.keys(value).length > 0);
 }
 
-function diffObject<T extends Record<string, unknown>>(base: T, current: T): Partial<T> | undefined {
+function diffObject<T extends object>(base: T, current: T): Partial<T> | undefined {
   const next: Partial<T> = {};
 
   for (const key of Object.keys(base) as Array<keyof T>) {
