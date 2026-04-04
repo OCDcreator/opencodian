@@ -8,15 +8,20 @@ import {
   getDefaultChatAppearanceSettings,
   getDefaultInputPanelGlassRefractionSettings,
   getDefaultInputPanelGlassRefractionSvgFilterSettings,
+  getDefaultInputPanelLiquidGlassSettings,
   getDefaultThemeSettings,
   type InputPanelGlassRefractionSvgFilterSettings,
   type InputPanelThemeId,
 } from '../../../../src/core/types';
 import { OpenCodianView } from '../../../../src/features/chat/OpenCodianView';
 import { setLocale } from '../../../../src/i18n';
+import { registerBuiltinGlassAdapters } from '../../../../src/utils/glass/builtin-adapters';
 
 type InputPanelThemeViewHarness = {
+  chatContainerEl: HTMLElement | null;
   composerShellEl: HTMLElement | null;
+  inputContainer: HTMLElement | null;
+  inputWrapperEl: HTMLElement | null;
   sendBtn: HTMLElement | null;
   plugin: {
     settings: {
@@ -24,6 +29,7 @@ type InputPanelThemeViewHarness = {
       inputPanelTheme: InputPanelThemeId;
       inputPanelGlassRefraction: ReturnType<typeof getDefaultInputPanelGlassRefractionSettings>;
       inputPanelGlassRefractionSvgFilter: InputPanelGlassRefractionSvgFilterSettings;
+      inputPanelLiquidGlass: ReturnType<typeof getDefaultInputPanelLiquidGlassSettings>;
     };
   };
   applyInputPanelThemeState: () => void;
@@ -34,6 +40,7 @@ type InputPanelThemeViewHarness = {
 describe('OpenCodianView input panel theme', () => {
   beforeEach(() => {
     document.body.innerHTML = '';
+    registerBuiltinGlassAdapters();
   });
 
   afterEach(() => {
@@ -52,6 +59,7 @@ describe('OpenCodianView input panel theme', () => {
         inputPanelTheme,
         inputPanelGlassRefraction: getDefaultInputPanelGlassRefractionSettings(),
         inputPanelGlassRefractionSvgFilter: getDefaultInputPanelGlassRefractionSvgFilterSettings(),
+        inputPanelLiquidGlass: getDefaultInputPanelLiquidGlassSettings(),
       },
       openCodeService: {},
       storage: {},
@@ -208,4 +216,5 @@ describe('OpenCodianView input panel theme', () => {
     view.updateSendButtonState();
     expect(view.sendBtn?.getAttribute('data-tooltip')).toBe('停止生成');
   });
+
 });

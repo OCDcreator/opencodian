@@ -10,7 +10,9 @@ const mockAdapter = {
   exists: jest.fn().mockResolvedValue(false),
   mkdir: jest.fn().mockResolvedValue(undefined),
   write: jest.fn().mockResolvedValue(undefined),
+  writeBinary: jest.fn().mockResolvedValue(undefined),
   read: jest.fn().mockResolvedValue('{}'),
+  readBinary: jest.fn().mockResolvedValue(new ArrayBuffer(0)),
   remove: jest.fn().mockResolvedValue(undefined),
   list: jest.fn().mockResolvedValue({ files: [], folders: [] }),
 };
@@ -39,6 +41,7 @@ describe('StorageService', () => {
 
       expect(mockAdapter.mkdir).toHaveBeenCalledWith('.opencodian');
       expect(mockAdapter.mkdir).toHaveBeenCalledWith('.opencodian/sessions');
+      expect(mockAdapter.mkdir).toHaveBeenCalledWith('.opencodian/theme-backgrounds');
     });
 
     it('should handle existing directories', async () => {
@@ -349,6 +352,42 @@ describe('StorageService', () => {
         host: '127.0.0.1',
         port: 4096,
       });
+    });
+  });
+
+  describe('theme background assets', () => {
+    it('writes uploaded background images to the dedicated cache directory', async () => {
+      const pngData = Uint8Array.from([0x89, 0x50, 0x4e, 0x47]).buffer;
+
+      const asset = await storage.saveThemeBackgroundAsset(pngData, 'sunset.png', 'image/png');
+
+      expect(asset.mimeType).toBe('image/png');
+      expect(asset.displayName).toBe('sunset.png');
+      expect(asset.path).toMatch(/^\.opencodian\/theme-backgrounds\/theme-bg-/);
+      expect(mockAdapter.writeBinary).toHaveBeenCalledWith(asset.path, pngData);
+    });
+
+    it('reads a stored background image back as a data URL', async () => {
+      const pngBytes = Uint8Array.from([0x89, 0x50, 0x4e, 0x47]).buffer;
+      mockAdapter.exists.mockResolvedValue(true);
+      mockAdapter.readBinary.mockResolvedValue(pngBytes);
+
+      const dataUrl = await storage.readThemeBackgroundDataUrl(
+        '.opencodian/theme-backgrounds/theme-bg-test.png',
+        'image/png',
+      );
+
+      expect(dataUrl).toBe('data:image/png;base64,iVBORw==');
+    });
+
+    it('rejects uploaded background images larger than 64 MB', async () => {
+      const oversizedBuffer = {
+        byteLength: (64 * 1024 * 1024) + 1,
+      } as ArrayBuffer;
+
+      await expect(
+        storage.saveThemeBackgroundAsset(oversizedBuffer, 'too-large.jpg', 'image/jpeg'),
+      ).rejects.toThrow('The background image is too large. Maximum size is 64 MB.');
     });
   });
 });

@@ -12,6 +12,192 @@
 
 ---
 
+## 2026-04-04 Nikdelvin 模式语义澄清：有背景走 Demo 背景模式，无背景走实时折射
+
+### 🎯 改动目标
+
+- 把 `Nikdelvin Liquid Glass` 在 OpenCodian 里的实际运行语义说清楚，避免继续把“参考原版实时折射”和“参考 demo 自带背景图视觉”混成一套模糊描述。
+- 保持当前实现与参考项目的两条主路径一致：有背景时优先走内部 demo 背景图视觉，无背景时才使用实时聊天背景折射。
+- 顺手修正“`Demo 纹理预设 = 无` 看起来发黑”的观感，让无背景模式更接近透明玻璃而不是深色遮罩。
+
+### ✅ 本轮调整
+
+- `src/utils/glass/adapters/nikdelvin.ts`
+  - 明确以 `hasBackground` 区分两条模式：
+    - 有 demo 纹理预设或自定义背景图时，使用内部背景图 + overlay 的 demo 背景模式
+    - 没有背景图时，使用实时聊天背景折射模式
+  - 在无背景模式下，将默认 overlay 从深色改成更轻的白色玻璃层，避免 `backgroundPreset = none` 时看起来像黑底
+
+- `styles.css`
+  - 将 `opencodian-composer-shell--liquid-glass` 恢复为 `isolation: isolate`，减小无背景实时折射模式下被外层 hover 重绘串进顶部边缘的概率
+
+- `src/i18n/locales/en.ts`
+- `src/i18n/locales/zh.ts`
+  - 重新描述 `backgroundPreset`、`background`、`freeze` 相关设置文案
+  - 在设置页里直接说明“有背景 = demo 背景模式”“无背景且背景图为空 = 实时折射模式”
+
+- `tests/unit/utils/glass/nikdelvin.test.ts`
+  - 补充针对 `Nikdelvin` 模式语义的定向测试
+  - 覆盖“无背景时使用浅色 overlay”“有背景时保留原版深色 overlay”两条断言
+
+### 🧪 当前验证
+
+- 已通过：`npm run check:devlog-order`
+- 已通过：`npm run test -- tests/unit/core/storage/StorageService.test.ts tests/unit/core/theme/themePresets.test.ts tests/unit/core/types/settings.test.ts tests/unit/features/chat/chatAppearance.test.ts tests/unit/features/chat/inputPanelTheme.test.ts tests/unit/main/themeSettingsMigration.test.ts tests/unit/utils/glass/nikdelvin.test.ts tests/unit/features/settings/OpenCodianStyleSettings.test.ts tests/unit/features/settings/OpenCodianSettings.test.ts`
+- 已通过：`npm run build`（`BUILD_ID: main.202604040827`）
+- 已完成：部署 `dist/main.js`、`dist/manifest.json`、`dist/styles.css` 到 Test Vault
+- 已验证部署后的 `main.js` 包含 `BUILD_ID: main.202604040827`
+
+## 2026-04-04 Nikdelvin 背景模式禁用实时折射，修复助手消息 hover 顶部横线
+
+### 🎯 改动目标
+
+- 修复 `liquid-glass-nikdelvin` 输入区在启用 demo 背景预设或自定义背景时，只要鼠标悬浮到助手消息，输入区顶部就会出现一条横线的问题。
+- 保留“无背景”场景下的实时折射质感，但避免“有背景”场景继续去采样聊天区 hover 态，导致输入区顶部出现 seam / 折射伪影。
+
+### ✅ 本轮调整
+
+- `src/utils/glass/adapters/nikdelvin.ts`
+  - 在 `Nikdelvin` 的基础层渲染逻辑中增加 `shouldUseBackdropRefraction = !hasBackground`
+  - 当存在 demo 背景预设或自定义背景时，关闭 `glassBoxEl` 的 live backdrop refraction，只保留背景图、overlay 与 tint 路径
+  - 当没有背景时，继续保留原来的 `svg` / `glass` 折射分支，不影响纯折射玻璃模式
+
+### 🧪 当前验证
+
+- 已通过：`npm run build`（`BUILD_ID: main.202604040210`）
+- 已完成：部署 `dist/main.js`、`dist/manifest.json`、`dist/styles.css` 到 Test Vault
+- 已验证部署后的 `main.js` 包含 `BUILD_ID: main.202604040210`
+- 已由用户确认：启用背景的 `Nikdelvin Liquid Glass` 输入区在助手消息 hover 时不再出现顶部横线
+
+## 2026-04-04 聊天主题背景上传、边缘融合与消息外壳背景层
+
+### 🎯 改动目标
+
+- 在设置页的 `样式 / Style` 中新增一套真正可用的“主题背景”能力，让用户可以上传自己的图片并将其作为 `opencodian-messages-shell` 的背景层。
+- 让背景图不是生硬贴进去，而是能通过模糊、景深、主题遮罩和边缘融合自然地融入当前 Obsidian / OpenCodian 主题。
+- 保持本地存储友好：图片不塞进 `settings.json`，而是单独存到插件本地目录，并在切换/清空时回收旧资源。
+
+### ✅ 本轮调整
+
+- `src/core/types/settings.ts`
+- `src/core/theme/index.ts`
+- `src/features/chat/chatAppearance.ts`
+- `src/main.ts`
+  - 为 `chatAppearance` 新增 `background` 分组，包含图片路径/类型/显示名，以及透明度、模糊、景深、主题遮罩、边缘融合、饱和度、亮度、横向焦点、纵向焦点等参数
+  - 将背景图从主题预设 override 体系中独立出来：切换聊天主题预设时保留用户上传的背景图，但“重置全部样式”或“重置背景分组”仍会清空背景
+  - 在主插件层新增背景图即时持久化、资源清理和 data URL 缓存解析逻辑，避免每次样式刷新都重复读盘
+
+- `src/core/storage/StorageService.ts`
+  - 新增 `.opencodian/theme-backgrounds/` 本地素材目录
+  - 支持把上传图片以二进制写入插件本地存储，并在需要时读取为 data URL
+  - 接通背景图 MIME 检测、扩展名推断、64 MB 大小限制以及旧素材删除
+
+- `src/features/settings/OpenCodianSettings.ts`
+- `src/i18n/locales/en.ts`
+- `src/i18n/locales/zh.ts`
+  - 在样式设置中新增“主题背景”分组
+  - 支持图片上传、替换、移除、预览，以及背景相关滑杆调节
+  - 让主题预设切换、预设重置、背景分组重置、全部重置这些操作和背景素材生命周期保持一致
+
+- `src/features/chat/OpenCodianView.ts`
+- `styles.css`
+  - 给 `opencodian-messages-shell` 新增独立背景图层、主题遮罩层和边缘融合过渡层
+  - 让背景图支持 blur / depth / focus 定位等视觉调节，并把这些变量作用到聊天视图
+  - 当启用主题背景时，为助手消息卡片补上默认玻璃底色，避免文本直接压在照片上影响可读性
+
+- `tests/unit/core/types/settings.test.ts`
+- `tests/unit/features/chat/chatAppearance.test.ts`
+- `tests/unit/core/theme/themePresets.test.ts`
+- `tests/unit/main/themeSettingsMigration.test.ts`
+- `tests/unit/core/storage/StorageService.test.ts`
+  - 覆盖背景设置默认值、归一化与 CSS 变量映射
+  - 覆盖主题预设恢复时保留背景图的迁移行为
+  - 覆盖背景素材读写与 data URL 回读
+
+- `AGENTS.md`
+  - 更新本地存储结构说明，补充 `.opencodian/theme-backgrounds/`
+  - 更新聊天视图与设置页职责描述，记录消息外壳背景图能力
+
+### 🧪 当前验证
+
+- 已通过：`npm run test -- tests/unit/core/types/settings.test.ts tests/unit/features/chat/chatAppearance.test.ts tests/unit/core/theme/themePresets.test.ts tests/unit/main/themeSettingsMigration.test.ts tests/unit/core/storage/StorageService.test.ts`
+- 已通过：`npm run test -- tests/unit/features/settings/OpenCodianStyleSettings.test.ts tests/unit/features/settings/OpenCodianSettings.test.ts`
+
+## 2026-04-04 移除 Rdev Liquid Glass 输入区主题
+
+### 🎯 改动目标
+
+- 当前 `rdev` 输入区主题效果不理想，先把这套主题样式和接线完整移除，为后续重做留出干净基线。
+- 避免旧 vault 继续指向已经删除的主题值，保证升级后设置页和运行时都能稳定工作。
+
+### ✅ 本轮调整
+
+- `src/core/types/settings.ts`
+- `src/features/settings/OpenCodianSettings.ts`
+- `src/features/chat/OpenCodianView.ts`
+- `src/utils/glass/types.ts`
+- `src/utils/glass/builtin-adapters.ts`
+  - 从输入区主题类型、liquid-glass adapter 枚举、设置页映射和运行时挂载逻辑中移除 `rdev`
+  - 把旧的 `inputPanelTheme = 'liquid-glass-rdev'` 归一化迁移到 `liquid-glass-shuding`
+  - 把 liquid-glass 家族的默认落点从 `rdev` 改为 `shuding`
+  - 删除只为 `rdev` 服务的滚动重绘 nudge 和诊断分支
+
+- `src/utils/glass/adapters/rdev.ts`
+- `src/utils/glass/adapters/rdev/*`
+  - 删除整套 `rdev` adapter 实现与相关辅助模块
+
+- `src/i18n/locales/en.ts`
+- `src/i18n/locales/zh.ts`
+- `tests/unit/core/types/settings.test.ts`
+- `tests/unit/features/chat/inputPanelTheme.test.ts`
+- `tests/unit/main/themeSettingsMigration.test.ts`
+  - 移除 `rdev` 专属设置文案和测试
+  - 补充已删除主题值的迁移断言，并保留其余 liquid-glass 主题覆盖
+
+### 🧪 当前验证
+
+- 已通过：`npm run test -- tests/unit/core/types/settings.test.ts tests/unit/features/chat/inputPanelTheme.test.ts tests/unit/main/themeSettingsMigration.test.ts`
+- 已通过：`npm run check:devlog-order`
+- 已通过：`npm run build`（`BUILD_ID: main.202604040143`）
+- 已验证部署后的 `main.js` 包含 `BUILD_ID: main.202604040143`
+
+## 2026-04-03 Rdev Liquid Glass 一比一语义回归与完整参数暴露
+
+### 🎯 改动目标
+
+- 让输入区 `liquid-glass-rdev` 不再只是“借用了 rdev 思路的 OpenCodian 变体”，而是尽量回到参考项目 `rdev-liquid-glass-react` 的层结构、位移图来源和交互语义。
+- 把参考组件可调的核心参数，以及本地实现里所有布尔开关都直接暴露到设置页，方便用户自行微调。
+
+### ✅ 本轮调整
+
+- `src/utils/glass/adapters/rdev.ts`
+- `src/utils/glass/adapters/rdev/interaction.ts`
+- `src/utils/glass/adapters/rdev/displacementMaps.ts`
+- `src/utils/glass/adapters/rdev/shaderUtils.ts`
+- `src/utils/glass/adapters/rdev/presets.ts`
+  - 将 `rdev` adapter 重写为更贴近参考组件的层结构：保留单独 warp/filter 层，补回 over-light 黑色辅助层、双层边框高光、hover glow、press glow 与 hover overlay
+  - 把交互逻辑改回参考组件语义：使用方向性缩放、弹性平移、按下缩放和基于鼠标偏移的边框高光角度
+  - 让 `standard / polar / prominent` 直接使用参考项目预生成 displacement map，`shader` 模式回到原版 liquid-glass shader 生成路径
+  - 补齐并接通原版可调项：`saturation`、`cornerRadius`、`padding`、`overLight`
+  - 另外把本地实现里的布尔开关也暴露出来：`enableInteraction`、`borderEffects`、`interactiveEffects`
+
+- `src/core/types/settings.ts`
+- `src/i18n/locales/en.ts`
+- `src/i18n/locales/zh.ts`
+  - 扩展 `rdev` 默认配置与归一化逻辑，确保新增参数和开关能被持久化、夹取和恢复
+  - 为新增设置项补齐中英文文案、描述和模式选项标签
+  - 新增“跟随输入区外形”开关，并将其设为默认开启，让 `rdev` 默认继承原 composer card 的长宽和圆角，而不是强制切成原版胶囊几何
+
+- `tests/unit/core/types/settings.test.ts`
+- `tests/unit/features/chat/inputPanelTheme.test.ts`
+  - 覆盖 `rdev` 新默认值与归一化边界
+  - 覆盖输入区挂载 `liquid-glass-rdev` 后会生成参考风格的运行时层节点
+  - 覆盖默认跟随输入区几何时，不再向 shell 强写 `padding / border-radius`
+
+### 🧪 当前验证
+
+- 已通过：`npm run test -- tests/unit/core/types/settings.test.ts tests/unit/features/chat/inputPanelTheme.test.ts`
+
 ## 2026-04-03 Nikdelvin Liquid Glass Demo 纹理预设、资源路径修复与 hover 稳定性
 
 ### 🎯 改动目标

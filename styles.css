@@ -180,6 +180,21 @@
   --opencodian-sticky-push-gap: 0px;
   --opencodian-sticky-mask-height: 18px;
   --opencodian-sticky-mask-blur: 24px;
+  --opencodian-theme-bg-opacity: 0.92;
+  --opencodian-theme-bg-blur: 2px;
+  --opencodian-theme-bg-scale: 1.08;
+  --opencodian-theme-bg-bleed: 28px;
+  --opencodian-theme-bg-dim: 28%;
+  --opencodian-theme-bg-edge-fade: 28px;
+  --opencodian-theme-bg-overlay-opacity: 32%;
+  --opencodian-theme-bg-overlay-opacity-strong: 42%;
+  --opencodian-theme-bg-mask-opacity: 48%;
+  --opencodian-theme-bg-highlight-opacity: 14%;
+  --opencodian-theme-bg-saturation: 108%;
+  --opencodian-theme-bg-brightness: 94%;
+  --opencodian-theme-bg-size: cover;
+  --opencodian-theme-bg-focus-x: 50%;
+  --opencodian-theme-bg-focus-y: 50%;
   --opencodian-user-radius: 16px;
   --opencodian-user-tail-radius: 4px;
   --opencodian-user-blur: 12px;
@@ -1107,6 +1122,87 @@
   position: relative;
   flex: 1;
   min-height: 0;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.opencodian-theme-background-layer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+  background: var(--opencodian-chat-surface);
+  opacity: 0;
+  transition: opacity 0.28s ease;
+}
+
+.opencodian-theme-background-image {
+  position: absolute;
+  top: calc(-1 * var(--opencodian-theme-bg-bleed));
+  left: calc(-1 * var(--opencodian-theme-bg-bleed));
+  width: calc(100% + (var(--opencodian-theme-bg-bleed) * 2));
+  height: calc(100% + (var(--opencodian-theme-bg-bleed) * 2));
+  background-repeat: no-repeat;
+  background-size: var(--opencodian-theme-bg-size);
+  background-position: var(--opencodian-theme-bg-focus-x) var(--opencodian-theme-bg-focus-y);
+  transform: translateZ(0) scale(var(--opencodian-theme-bg-scale));
+  transform-origin: center;
+  filter:
+    blur(var(--opencodian-theme-bg-blur))
+    saturate(var(--opencodian-theme-bg-saturation))
+    brightness(var(--opencodian-theme-bg-brightness));
+  opacity: var(--opencodian-theme-bg-opacity);
+  -webkit-mask-image: radial-gradient(
+    140% 122% at 50% 50%,
+    rgba(0, 0, 0, 1) calc(100% - var(--opencodian-theme-bg-edge-fade)),
+    rgba(0, 0, 0, 0.82) calc(100% - (var(--opencodian-theme-bg-edge-fade) * 0.52)),
+    rgba(0, 0, 0, 0.2) calc(100% - (var(--opencodian-theme-bg-edge-fade) * 0.12)),
+    transparent 100%
+  );
+  -webkit-mask-repeat: no-repeat;
+  mask-image: radial-gradient(
+    140% 122% at 50% 50%,
+    rgba(0, 0, 0, 1) calc(100% - var(--opencodian-theme-bg-edge-fade)),
+    rgba(0, 0, 0, 0.82) calc(100% - (var(--opencodian-theme-bg-edge-fade) * 0.52)),
+    rgba(0, 0, 0, 0.2) calc(100% - (var(--opencodian-theme-bg-edge-fade) * 0.12)),
+    transparent 100%
+  );
+  mask-repeat: no-repeat;
+  transition: opacity 0.28s ease, transform 0.32s ease, filter 0.28s ease;
+}
+
+.opencodian-messages-shell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0;
+  transition: opacity 0.28s ease;
+  background:
+    radial-gradient(
+      120% 84% at 50% 0%,
+      color-mix(in srgb, white var(--opencodian-theme-bg-highlight-opacity), transparent) 0%,
+      transparent 58%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--opencodian-chat-surface) var(--opencodian-theme-bg-overlay-opacity-strong), transparent) 0%,
+      color-mix(in srgb, var(--opencodian-chat-surface) var(--opencodian-theme-bg-overlay-opacity), transparent) 26%,
+      color-mix(in srgb, var(--opencodian-chat-surface) calc(var(--opencodian-theme-bg-overlay-opacity) - 6%), transparent) 100%
+    );
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--background-modifier-border) 34%, transparent),
+    inset 0 18px 36px color-mix(in srgb, var(--opencodian-chat-surface) 12%, transparent);
+}
+
+.opencodian-container--theme-background .opencodian-theme-background-layer {
+  opacity: 1;
+}
+
+.opencodian-container--theme-background .opencodian-messages-shell::after {
+  opacity: 1;
 }
 
 /* Messages */
@@ -1121,6 +1217,8 @@
   gap: 12px;
   background: transparent;
   scrollbar-gutter: stable;
+  position: relative;
+  z-index: 2;
 }
 
 .opencodian-messages-pane {
@@ -1203,6 +1301,19 @@
     to bottom,
     color-mix(in srgb, var(--text-normal) 100%, transparent) 0%,
     color-mix(in srgb, var(--text-normal) 78%, transparent) 28%,
+    transparent 100%
+  );
+}
+
+.opencodian-container--theme-background .opencodian-messages--sticky-mask .opencodian-turn-header::before {
+  background: color-mix(in srgb, var(--opencodian-chat-surface) var(--opencodian-theme-bg-mask-opacity), transparent);
+}
+
+.opencodian-container--theme-background .opencodian-messages--sticky-mask .opencodian-turn-header::after {
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--opencodian-chat-surface) var(--opencodian-theme-bg-mask-opacity), transparent) 0%,
+    color-mix(in srgb, var(--opencodian-chat-surface) var(--opencodian-theme-bg-overlay-opacity), transparent) 35%,
     transparent 100%
   );
 }
@@ -1464,6 +1575,16 @@
     box-shadow 0.25s ease,
     transform 0.25s ease,
     backdrop-filter 0.25s ease;
+}
+
+.opencodian-container--theme-background .opencodian-message--assistant .opencodian-message-content {
+  background: color-mix(in srgb, var(--opencodian-glass-base-soft) calc(var(--opencodian-assistant-bg-opacity) - 14%), transparent);
+  border-color: color-mix(in srgb, var(--background-modifier-border) 44%, transparent);
+  box-shadow:
+    0 8px calc(var(--opencodian-assistant-shadow-blur) * 0.72) color-mix(in srgb, var(--opencodian-glass-shadow) 54%, transparent),
+    0 1px 0 color-mix(in srgb, var(--opencodian-glass-specular-soft) 56%, transparent) inset;
+  backdrop-filter: blur(var(--opencodian-assistant-blur)) saturate(1.04);
+  -webkit-backdrop-filter: blur(var(--opencodian-assistant-blur)) saturate(1.04);
 }
 
 .opencodian-message--assistant:hover .opencodian-message-content {
@@ -2356,6 +2477,7 @@
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
   box-shadow: none;
+  isolation: isolate;
 }
 
 .opencodian-composer-shell--gr-glass .opencodian-input-wrapper,
@@ -4232,9 +4354,158 @@
   margin-top: 16px;
 }
 
+.opencodian-theme-background-card {
+  display: grid;
+  grid-template-columns: minmax(132px, 168px) minmax(0, 1fr);
+  gap: 14px;
+  margin: 4px 0 14px;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--background-modifier-border) 86%, transparent);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--interactive-accent) 5%, transparent) 0%,
+      transparent 100%
+    ),
+    color-mix(in srgb, var(--background-primary) 82%, transparent);
+}
+
+.opencodian-theme-background-preview {
+  --opencodian-theme-background-preview-edge-fade: 28px;
+  position: relative;
+  min-height: 136px;
+  border-radius: 12px;
+  overflow: hidden;
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--background-modifier-border-hover) 46%, transparent),
+      color-mix(in srgb, var(--background-primary) 86%, transparent)
+    );
+  border: 1px solid color-mix(in srgb, var(--background-modifier-border-hover) 72%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, white 18%, transparent);
+}
+
+.opencodian-theme-background-preview.is-draggable {
+  cursor: grab;
+}
+
+.opencodian-theme-background-preview.is-dragging {
+  cursor: grabbing;
+}
+
+.opencodian-theme-background-preview.is-loading::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(
+      90deg,
+      transparent 0%,
+      color-mix(in srgb, white 24%, transparent) 50%,
+      transparent 100%
+    );
+  transform: translateX(-100%);
+  animation: opencodian-theme-background-shimmer 1.3s ease-in-out infinite;
+}
+
+.opencodian-theme-background-preview-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  text-align: center;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.opencodian-theme-background-preview-image,
+.opencodian-theme-background-preview-overlay {
+  position: absolute;
+  inset: 0;
+}
+
+.opencodian-theme-background-preview-image {
+  width: 100%;
+  height: 100%;
+  background-repeat: no-repeat;
+  transform-origin: center;
+  -webkit-mask-image: radial-gradient(
+    140% 122% at 50% 50%,
+    rgba(0, 0, 0, 1) calc(100% - var(--opencodian-theme-background-preview-edge-fade)),
+    rgba(0, 0, 0, 0.82) calc(100% - (var(--opencodian-theme-background-preview-edge-fade) * 0.52)),
+    rgba(0, 0, 0, 0.2) calc(100% - (var(--opencodian-theme-background-preview-edge-fade) * 0.12)),
+    transparent 100%
+  );
+  -webkit-mask-repeat: no-repeat;
+  mask-image: radial-gradient(
+    140% 122% at 50% 50%,
+    rgba(0, 0, 0, 1) calc(100% - var(--opencodian-theme-background-preview-edge-fade)),
+    rgba(0, 0, 0, 0.82) calc(100% - (var(--opencodian-theme-background-preview-edge-fade) * 0.52)),
+    rgba(0, 0, 0, 0.2) calc(100% - (var(--opencodian-theme-background-preview-edge-fade) * 0.12)),
+    transparent 100%
+  );
+  mask-repeat: no-repeat;
+}
+
+.opencodian-theme-background-preview-overlay {
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--background-secondary) 26%, transparent) 0%,
+      color-mix(in srgb, var(--background-secondary) 10%, transparent) 100%
+    );
+  pointer-events: none;
+}
+
+.opencodian-theme-background-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.opencodian-theme-background-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-normal);
+}
+
+.opencodian-theme-background-copy {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.opencodian-theme-background-note {
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--text-faint, var(--text-muted));
+}
+
+.opencodian-theme-background-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: auto;
+}
+
 .opencodian-theme-reset-btn[disabled] {
   opacity: 0.5;
   cursor: default;
+}
+
+@keyframes opencodian-theme-background-shimmer {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
 }
 
 .opencodian-style-section .opencodian-style-group > .opencodian-style-group-title {
@@ -4479,6 +4750,14 @@
 @media (max-width: 900px) {
   .opencodian-theme-style-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .opencodian-theme-background-card {
+    grid-template-columns: 1fr;
+  }
+
+  .opencodian-theme-background-preview {
+    min-height: 168px;
   }
 
   .opencodian-style-setting {

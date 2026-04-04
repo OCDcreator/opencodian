@@ -370,6 +370,9 @@ export function mergePartialChatAppearanceSettings(
       ...base.sticky,
       ...(overrides?.sticky ?? {}),
     },
+    background: {
+      ...base.background,
+    },
     user: {
       ...base.user,
       ...(overrides?.user ?? {}),
@@ -448,7 +451,7 @@ export function areChatAppearanceSettingsEqual(
 
 export function hasThemeAppearanceOverrides(theme: ThemeSettings): boolean {
   const normalized = normalizePartialChatAppearanceSettings(theme.customAppearanceOverrides);
-  return Object.values(normalized).some((value) => value && Object.keys(value).length > 0);
+  return Object.entries(normalized).some(([key, value]) => key !== 'background' && value && Object.keys(value).length > 0);
 }
 
 function diffObject<T extends Record<string, unknown>>(base: T, current: T): Partial<T> | undefined {

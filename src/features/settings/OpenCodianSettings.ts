@@ -14,6 +14,7 @@ import type { ModelCatalog, ModelCatalogProvider } from '../../core/config/model
 import type { PluginEntry, PluginEnvironmentSnapshot } from '../../core/config/PluginManagementService';
 import { getBuiltinThemePresets, hasThemeAppearanceOverrides } from '../../core/theme';
 import {
+  type ChatAppearanceBackgroundFitMode,
   type ChatAppearanceSettings,
   getCurrentPlatformDebugLogPath,
   getCurrentPlatformKey,
@@ -33,6 +34,7 @@ import {
   type ThemeStyleId,
   type TitleMode,
 } from '../../core/types';
+import { getChatAppearanceBackgroundSizeValue } from '../chat/chatAppearance';
 import { setLocale, t, type TranslationKey } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { createLogger, getVaultBasePath } from '../../shared';
@@ -72,7 +74,7 @@ interface NumericControlConfig {
   registerSync?: (syncFromSettings: () => void) => void;
 }
 
-type ChatAppearanceStyleGroup = 'layout' | 'user' | 'assistant' | 'input' | 'scrollbar' | 'advanced';
+type ChatAppearanceStyleGroup = 'layout' | 'background' | 'user' | 'assistant' | 'input' | 'scrollbar' | 'advanced';
 
 interface StyleControlBinding {
   group: ChatAppearanceStyleGroup;
@@ -151,7 +153,10 @@ export class OpenCodianSettingTab extends PluginSettingTab {
   private settingsPanelRestoreSettleTimeoutId: number | null = null;
   private settingsScrollPersistenceSuspended = false;
   private styleControlBindings: StyleControlBinding[] = [];
+  private stylePresetUiRefresh?: () => void;
   private conversationHeadingEl: HTMLHeadingElement | null = null;
+  private backgroundStyleGroupHostEl: HTMLElement | null = null;
+  private backgroundPreviewRequestId = 0;
   private inputStyleGroupHostEl: HTMLElement | null = null;
 
   constructor(app: App, plugin: OpenCodianPlugin) {
@@ -270,7 +275,10 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       this.settingsPanelPostRenderFrameId = null;
     }
     this.styleControlBindings = [];
+    this.stylePresetUiRefresh = undefined;
     this.conversationHeadingEl = null;
+    this.backgroundStyleGroupHostEl = null;
+    this.backgroundPreviewRequestId = 0;
     this.inputStyleGroupHostEl = null;
     containerEl.empty();
     containerEl.addClass('opencodian-settings');
@@ -1789,11 +1797,12 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         btn
           .setButtonText(t('settings.style.resetAll.button'))
           .onClick(() => {
-            this.plugin.resetChatAppearanceToBaseline();
-            this.applyAndScheduleStyleUpdate();
-            this.refreshStyleControlValues();
+            void this.resetAllChatStyles();
           });
       });
+
+    const backgroundGroupHostEl = containerEl.createDiv({ cls: 'opencodian-style-background-group-host' });
+    this.renderBackgroundStyleGroup(backgroundGroupHostEl);
 
     const layoutGroupEl = this.createStyleGroupSection(
       containerEl,
@@ -2226,10 +2235,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         schemeButtonEl.type = 'button';
         schemeButtonEl.toggleClass('is-active', activePreset?.id === preset.id);
         schemeButtonEl.addEventListener('click', () => {
-          this.plugin.selectThemePreset(preset.id);
-          this.applyAndScheduleStyleUpdate();
-          this.refreshStyleControlValues();
-          renderPresetUi();
+          void this.applyThemePresetSelection(preset.id, renderPresetUi);
         });
       }
       schemeSectionEl.toggleClass('is-empty', schemeChipsEl.childElementCount === 0);
@@ -2244,10 +2250,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         resetBtn.type = 'button';
         resetBtn.disabled = !hasOverrides;
         resetBtn.addEventListener('click', () => {
-          this.plugin.resetChatAppearanceToBaseline();
-          this.applyAndScheduleStyleUpdate();
-          this.refreshStyleControlValues();
-          renderPresetUi();
+          void this.resetThemePresetAppearance(renderPresetUi);
         });
       }
     };
@@ -2266,22 +2269,58 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         text: this.getThemeStyleDescription(styleId),
       });
       buttonEl.addEventListener('click', () => {
-        selectedStyleId = styleId;
-        const nextPreset = presetsByStyle.get(styleId)?.[0];
-        if (!nextPreset) {
-          renderPresetUi();
-          return;
-        }
-
-        this.plugin.selectThemePreset(nextPreset.id);
-        this.applyAndScheduleStyleUpdate();
-        this.refreshStyleControlValues();
-        renderPresetUi();
+        void this.applyThemeStyleSelection(styleId, presetsByStyle, renderPresetUi, (nextStyleId) => {
+          selectedStyleId = nextStyleId;
+        });
       });
       styleButtons.set(styleId, buttonEl);
     }
 
+    this.stylePresetUiRefresh = renderPresetUi;
     renderPresetUi();
+  }
+
+  private async applyThemePresetSelection(
+    presetId: ThemePresetDefinition['id'],
+    renderPresetUi: () => void,
+  ): Promise<void> {
+    try {
+      await this.plugin.selectThemePresetAndSave(presetId);
+      this.refreshStyleControlValues();
+      this.renderBackgroundStyleGroup();
+      renderPresetUi();
+    } catch (error) {
+      logger.warn('Failed to apply theme preset selection', error);
+      new Notice(t('settings.style.presets.applyFailed'));
+    }
+  }
+
+  private async resetThemePresetAppearance(renderPresetUi: () => void): Promise<void> {
+    try {
+      await this.plugin.resetThemePresetAppearanceAndSave();
+      this.refreshStyleControlValues();
+      this.renderBackgroundStyleGroup();
+      renderPresetUi();
+    } catch (error) {
+      logger.warn('Failed to reset preset appearance', error);
+      new Notice(t('settings.style.presets.reset.failed'));
+    }
+  }
+
+  private async applyThemeStyleSelection(
+    styleId: ThemeStyleId,
+    presetsByStyle: Map<ThemeStyleId, ThemePresetDefinition[]>,
+    renderPresetUi: () => void,
+    updateSelectedStyleId: (styleId: ThemeStyleId) => void,
+  ): Promise<void> {
+    updateSelectedStyleId(styleId);
+    const nextPreset = presetsByStyle.get(styleId)?.[0];
+    if (!nextPreset) {
+      renderPresetUi();
+      return;
+    }
+
+    await this.applyThemePresetSelection(nextPreset.id, renderPresetUi);
   }
 
   private getThemeStyleTitle(styleId: ThemeStyleId): string {
@@ -2614,11 +2653,28 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         btn
           .setButtonText(t('settings.style.groupReset.button'))
           .onClick(() => {
+            if (group === 'background') {
+              void this.resetBackgroundStyleGroup();
+              return;
+            }
+
             this.plugin.resetChatAppearanceGroup(group);
             this.applyAndScheduleStyleUpdate();
             this.refreshStyleControlValues(group);
           });
       });
+  }
+
+  private async resetBackgroundStyleGroup(): Promise<void> {
+    try {
+      await this.plugin.resetChatAppearanceGroupAndSave('background');
+      this.refreshStyleControlValues('background');
+      this.renderBackgroundStyleGroup();
+      new Notice(t('settings.style.groupReset.success'));
+    } catch (error) {
+      logger.warn('Failed to reset background style group', error);
+      new Notice(t('settings.style.groupReset.failed'));
+    }
   }
 
   private registerStyleControlBinding(
@@ -2659,7 +2715,6 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     if (
       themeId === 'liquid-glass-shuding'
       || themeId === 'liquid-glass-nikdelvin'
-      || themeId === 'liquid-glass-rdev'
     ) {
       return 'liquid-glass';
     }
@@ -2682,14 +2737,13 @@ export class OpenCodianSettingTab extends PluginSettingTab {
 
   private getLiquidGlassInputPanelTheme(
     themeId: InputPanelThemeId,
-  ): 'liquid-glass-shuding' | 'liquid-glass-nikdelvin' | 'liquid-glass-rdev' {
+  ): 'liquid-glass-shuding' | 'liquid-glass-nikdelvin' {
     switch (themeId) {
       case 'liquid-glass-shuding':
       case 'liquid-glass-nikdelvin':
-      case 'liquid-glass-rdev':
         return themeId;
       default:
-        return 'liquid-glass-rdev';
+        return 'liquid-glass-shuding';
     }
   }
 
@@ -2699,8 +2753,6 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         return 'shuding';
       case 'liquid-glass-nikdelvin':
         return 'nikdelvin';
-      case 'liquid-glass-rdev':
-        return 'rdev';
       default:
         return null;
     }
@@ -2712,9 +2764,8 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         return 'liquid-glass-shuding';
       case 'nikdelvin':
         return 'liquid-glass-nikdelvin';
-      case 'rdev':
       default:
-        return 'liquid-glass-rdev';
+        return 'liquid-glass-nikdelvin';
     }
   }
 
@@ -2747,6 +2798,405 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       ...this.plugin.settings.inputPanelGlassRefraction,
       [variantId]: nextVariantSettings,
     };
+  }
+
+  private renderBackgroundStyleGroup(containerEl?: HTMLElement): void {
+    const hostEl = containerEl ?? this.backgroundStyleGroupHostEl;
+    if (!hostEl) {
+      return;
+    }
+
+    this.backgroundStyleGroupHostEl = hostEl;
+    this.styleControlBindings = this.styleControlBindings.filter((binding) => binding.group !== 'background');
+    hostEl.empty();
+
+    const backgroundGroupEl = this.createStyleGroupSection(
+      hostEl,
+      t('settings.style.groups.background.title'),
+      t('settings.style.groups.background.desc'),
+    );
+    const backgroundSettings = this.plugin.settings.chatAppearance.background;
+    const hasBackgroundImage = Boolean(backgroundSettings.imagePath);
+    const displayName = backgroundSettings.imageDisplayName
+      || (backgroundSettings.imagePath ? path.basename(backgroundSettings.imagePath) : '');
+
+    const cardEl = backgroundGroupEl.createDiv({ cls: 'opencodian-theme-background-card' });
+    const previewEl = cardEl.createDiv({
+      cls: `opencodian-theme-background-preview ${hasBackgroundImage ? 'is-loading' : 'is-empty'}`,
+    });
+    previewEl.createDiv({
+      cls: 'opencodian-theme-background-preview-placeholder',
+      text: hasBackgroundImage
+        ? t('settings.style.background.preview.loading')
+        : t('settings.style.background.preview.empty'),
+    });
+
+    const metaEl = cardEl.createDiv({ cls: 'opencodian-theme-background-meta' });
+    metaEl.createDiv({
+      cls: 'opencodian-theme-background-label',
+      text: t('settings.style.background.card.title'),
+    });
+    metaEl.createDiv({
+      cls: 'opencodian-theme-background-copy',
+      text: hasBackgroundImage
+        ? t('settings.style.background.card.descLoaded', { name: displayName || t('settings.style.background.card.defaultName') })
+        : t('settings.style.background.card.descEmpty'),
+    });
+    const detailEl = metaEl.createDiv({
+      cls: 'opencodian-theme-background-note',
+      text: t('settings.style.background.card.scope'),
+    });
+
+    const actionsEl = metaEl.createDiv({ cls: 'opencodian-theme-background-actions' });
+    const fileInputEl = document.createElement('input');
+    fileInputEl.type = 'file';
+    fileInputEl.accept = '.svg,.png,.jpg,.jpeg,.webp,.gif,image/*';
+    fileInputEl.style.display = 'none';
+    fileInputEl.addEventListener('change', () => {
+      const selectedFile = fileInputEl.files?.[0];
+      if (!selectedFile) {
+        return;
+      }
+
+      fileInputEl.value = '';
+      void this.handleThemeBackgroundFileSelected(selectedFile);
+    });
+    actionsEl.appendChild(fileInputEl);
+
+    const uploadBtn = actionsEl.createEl('button', {
+      cls: 'mod-cta',
+      text: hasBackgroundImage
+        ? t('settings.style.background.actions.replace')
+        : t('settings.style.background.actions.upload'),
+    });
+    uploadBtn.type = 'button';
+    uploadBtn.addEventListener('click', () => {
+      fileInputEl.click();
+    });
+
+    const clearBtn = actionsEl.createEl('button', {
+      text: t('settings.style.background.actions.remove'),
+    });
+    clearBtn.type = 'button';
+    clearBtn.disabled = !hasBackgroundImage;
+    clearBtn.addEventListener('click', () => {
+      void this.clearThemeBackgroundSelection();
+    });
+
+    if (hasBackgroundImage) {
+      const requestId = ++this.backgroundPreviewRequestId;
+      void this.populateThemeBackgroundPreview(previewEl, detailEl, requestId);
+    } else {
+      this.backgroundPreviewRequestId += 1;
+    }
+
+    new Setting(backgroundGroupEl)
+      .setName(t('settings.style.background.fitMode.name'))
+      .setDesc(t('settings.style.background.fitMode.desc'))
+      .setClass('opencodian-style-setting')
+      .addDropdown((dropdown) => {
+        dropdown
+          .addOption('cover', t('settings.style.background.fitMode.option.cover'))
+          .addOption('contain', t('settings.style.background.fitMode.option.contain'))
+          .addOption('fit-width', t('settings.style.background.fitMode.option.fitWidth'))
+          .addOption('fit-height', t('settings.style.background.fitMode.option.fitHeight'))
+          .setValue(this.plugin.settings.chatAppearance.background.fitMode)
+          .onChange((value) => {
+            this.plugin.updateChatAppearance((appearance) => {
+              appearance.background.fitMode = value as ChatAppearanceBackgroundFitMode;
+            });
+            this.applyAndScheduleStyleUpdate();
+            this.renderBackgroundStyleGroup();
+          });
+      });
+
+    this.addNumericStyleControl(backgroundGroupEl, {
+      group: 'background',
+      name: t('settings.style.background.opacity.name'),
+      desc: t('settings.style.background.opacity.desc'),
+      min: 0,
+      max: 100,
+      step: 1,
+      unit: '%',
+      value: () => this.plugin.settings.chatAppearance.background.opacity,
+      resetValue: () => this.plugin.getChatAppearanceBaseline().background.opacity,
+      setValue: (appearance, value) => {
+        appearance.background.opacity = value;
+      },
+    });
+    this.addNumericStyleControl(backgroundGroupEl, {
+      group: 'background',
+      name: t('settings.style.background.blur.name'),
+      desc: t('settings.style.background.blur.desc'),
+      min: 0,
+      max: 48,
+      step: 1,
+      unit: 'px',
+      value: () => this.plugin.settings.chatAppearance.background.blur,
+      resetValue: () => this.plugin.getChatAppearanceBaseline().background.blur,
+      setValue: (appearance, value) => {
+        appearance.background.blur = value;
+      },
+    });
+    this.addNumericStyleControl(backgroundGroupEl, {
+      group: 'background',
+      name: t('settings.style.background.depth.name'),
+      desc: t('settings.style.background.depth.desc'),
+      min: 0,
+      max: 36,
+      step: 1,
+      unit: '%',
+      value: () => this.plugin.settings.chatAppearance.background.depth,
+      resetValue: () => this.plugin.getChatAppearanceBaseline().background.depth,
+      setValue: (appearance, value) => {
+        appearance.background.depth = value;
+      },
+    });
+    this.addNumericStyleControl(backgroundGroupEl, {
+      group: 'background',
+      name: t('settings.style.background.dim.name'),
+      desc: t('settings.style.background.dim.desc'),
+      min: 0,
+      max: 88,
+      step: 1,
+      unit: '%',
+      value: () => this.plugin.settings.chatAppearance.background.dim,
+      resetValue: () => this.plugin.getChatAppearanceBaseline().background.dim,
+      setValue: (appearance, value) => {
+        appearance.background.dim = value;
+      },
+    });
+    this.addNumericStyleControl(backgroundGroupEl, {
+      group: 'background',
+      name: t('settings.style.background.edgeFade.name'),
+      desc: t('settings.style.background.edgeFade.desc'),
+      min: 0,
+      max: 80,
+      step: 1,
+      unit: 'px',
+      value: () => this.plugin.settings.chatAppearance.background.edgeFade,
+      resetValue: () => this.plugin.getChatAppearanceBaseline().background.edgeFade,
+      setValue: (appearance, value) => {
+        appearance.background.edgeFade = value;
+      },
+    });
+    this.addNumericStyleControl(backgroundGroupEl, {
+      group: 'background',
+      name: t('settings.style.background.saturation.name'),
+      desc: t('settings.style.background.saturation.desc'),
+      min: 50,
+      max: 200,
+      step: 1,
+      unit: '%',
+      value: () => this.plugin.settings.chatAppearance.background.saturation,
+      resetValue: () => this.plugin.getChatAppearanceBaseline().background.saturation,
+      setValue: (appearance, value) => {
+        appearance.background.saturation = value;
+      },
+    });
+    this.addNumericStyleControl(backgroundGroupEl, {
+      group: 'background',
+      name: t('settings.style.background.brightness.name'),
+      desc: t('settings.style.background.brightness.desc'),
+      min: 40,
+      max: 140,
+      step: 1,
+      unit: '%',
+      value: () => this.plugin.settings.chatAppearance.background.brightness,
+      resetValue: () => this.plugin.getChatAppearanceBaseline().background.brightness,
+      setValue: (appearance, value) => {
+        appearance.background.brightness = value;
+      },
+    });
+    this.addNumericStyleControl(backgroundGroupEl, {
+      group: 'background',
+      name: t('settings.style.background.focusX.name'),
+      desc: t('settings.style.background.focusX.desc'),
+      min: 0,
+      max: 100,
+      step: 1,
+      unit: '%',
+      value: () => this.plugin.settings.chatAppearance.background.focusX,
+      resetValue: () => this.plugin.getChatAppearanceBaseline().background.focusX,
+      setValue: (appearance, value) => {
+        appearance.background.focusX = value;
+      },
+    });
+    this.addNumericStyleControl(backgroundGroupEl, {
+      group: 'background',
+      name: t('settings.style.background.focusY.name'),
+      desc: t('settings.style.background.focusY.desc'),
+      min: 0,
+      max: 100,
+      step: 1,
+      unit: '%',
+      value: () => this.plugin.settings.chatAppearance.background.focusY,
+      resetValue: () => this.plugin.getChatAppearanceBaseline().background.focusY,
+      setValue: (appearance, value) => {
+        appearance.background.focusY = value;
+      },
+    });
+    this.createStyleResetSetting(backgroundGroupEl, 'background');
+  }
+
+  private updateThemeBackgroundPreviewPresentation(
+    previewEl: HTMLElement,
+    imageEl: HTMLElement,
+    overlayEl: HTMLElement,
+  ): void {
+    const backgroundSettings = this.plugin.settings.chatAppearance.background;
+    previewEl.style.setProperty('--opencodian-theme-background-preview-edge-fade', `${backgroundSettings.edgeFade}px`);
+    imageEl.style.opacity = String(backgroundSettings.opacity / 100);
+    imageEl.style.backgroundSize = getChatAppearanceBackgroundSizeValue(backgroundSettings.fitMode);
+    imageEl.style.backgroundPosition = `${backgroundSettings.focusX}% ${backgroundSettings.focusY}%`;
+    imageEl.style.transform = `scale(${(100 + backgroundSettings.depth) / 100})`;
+    imageEl.style.filter = `blur(${backgroundSettings.blur}px) saturate(${backgroundSettings.saturation}%) brightness(${backgroundSettings.brightness}%)`;
+    overlayEl.style.opacity = String(Math.min(0.88, backgroundSettings.dim / 100));
+  }
+
+  private bindThemeBackgroundPreviewFocusDrag(
+    previewEl: HTMLElement,
+    applyPreviewPresentation: () => void,
+  ): void {
+    let activePointerId: number | null = null;
+
+    const updateFocusFromPointer = (clientX: number, clientY: number) => {
+      const rect = previewEl.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) {
+        return;
+      }
+
+      const nextFocusX = this.clampStyleNumber(((clientX - rect.left) / rect.width) * 100, 0, 100, 1);
+      const nextFocusY = this.clampStyleNumber(((clientY - rect.top) / rect.height) * 100, 0, 100, 1);
+
+      this.plugin.updateChatAppearance((appearance) => {
+        appearance.background.focusX = nextFocusX;
+        appearance.background.focusY = nextFocusY;
+      });
+      applyPreviewPresentation();
+      this.refreshStyleControlValues('background');
+      this.plugin.applyChatAppearanceSettings();
+      this.plugin.scheduleChatAppearanceSave();
+    };
+
+    previewEl.addClass('is-draggable');
+    previewEl.setAttribute('title', t('settings.style.background.preview.dragHint'));
+    previewEl.style.touchAction = 'none';
+
+    previewEl.addEventListener('pointerdown', (event) => {
+      if (event.button !== 0) {
+        return;
+      }
+
+      activePointerId = event.pointerId;
+      previewEl.addClass('is-dragging');
+      previewEl.setPointerCapture(event.pointerId);
+      updateFocusFromPointer(event.clientX, event.clientY);
+      event.preventDefault();
+    });
+
+    previewEl.addEventListener('pointermove', (event) => {
+      if (activePointerId !== event.pointerId) {
+        return;
+      }
+
+      updateFocusFromPointer(event.clientX, event.clientY);
+    });
+
+    const releasePointer = (event: PointerEvent) => {
+      if (activePointerId !== event.pointerId) {
+        return;
+      }
+
+      activePointerId = null;
+      previewEl.removeClass('is-dragging');
+      if (previewEl.hasPointerCapture(event.pointerId)) {
+        previewEl.releasePointerCapture(event.pointerId);
+      }
+    };
+
+    previewEl.addEventListener('pointerup', releasePointer);
+    previewEl.addEventListener('pointercancel', releasePointer);
+  }
+
+  private async populateThemeBackgroundPreview(
+    previewEl: HTMLElement,
+    detailEl: HTMLElement,
+    requestId: number,
+  ): Promise<void> {
+    const backgroundSettings = this.plugin.settings.chatAppearance.background;
+    const displayName = backgroundSettings.imageDisplayName
+      || (backgroundSettings.imagePath ? path.basename(backgroundSettings.imagePath) : t('settings.style.background.card.defaultName'));
+    const dataUrl = await this.plugin.resolveChatThemeBackgroundDataUrl();
+
+    if (requestId !== this.backgroundPreviewRequestId || !previewEl.isConnected) {
+      return;
+    }
+
+    previewEl.empty();
+    previewEl.removeClass('is-loading');
+    if (!dataUrl) {
+      previewEl.addClass('is-empty');
+      previewEl.createDiv({
+        cls: 'opencodian-theme-background-preview-placeholder',
+        text: t('settings.style.background.preview.missing'),
+      });
+      detailEl.setText(t('settings.style.background.card.descMissing'));
+      return;
+    }
+
+    previewEl.removeClass('is-empty');
+    const imageEl = previewEl.createDiv({ cls: 'opencodian-theme-background-preview-image' });
+    imageEl.setAttribute('aria-label', displayName);
+    imageEl.style.backgroundImage = `url(${JSON.stringify(dataUrl)})`;
+    const overlayEl = previewEl.createDiv({ cls: 'opencodian-theme-background-preview-overlay' });
+    const applyPreviewPresentation = () => {
+      this.updateThemeBackgroundPreviewPresentation(previewEl, imageEl, overlayEl);
+    };
+    applyPreviewPresentation();
+    this.bindThemeBackgroundPreviewFocusDrag(previewEl, applyPreviewPresentation);
+    detailEl.setText(
+      `${t('settings.style.background.card.scopeWithName', { name: displayName })} ${t('settings.style.background.preview.dragHint')}`,
+    );
+  }
+
+  private async handleThemeBackgroundFileSelected(file: File): Promise<void> {
+    try {
+      await this.plugin.importChatThemeBackgroundFile(file);
+      this.renderBackgroundStyleGroup();
+      new Notice(t('settings.style.background.upload.success', { name: file.name }));
+    } catch (error) {
+      logger.warn('Failed to import theme background image', error);
+      new Notice(
+        error instanceof Error
+          ? error.message
+          : t('settings.style.background.upload.failed'),
+      );
+    }
+  }
+
+  private async clearThemeBackgroundSelection(): Promise<void> {
+    try {
+      await this.plugin.clearChatThemeBackground();
+      this.renderBackgroundStyleGroup();
+      new Notice(t('settings.style.background.remove.success'));
+    } catch (error) {
+      logger.warn('Failed to clear theme background image', error);
+      new Notice(t('settings.style.background.remove.failed'));
+    }
+  }
+
+  private async resetAllChatStyles(): Promise<void> {
+    try {
+      await this.plugin.resetChatAppearanceToBaselineAndSave();
+      this.refreshStyleControlValues();
+      this.renderBackgroundStyleGroup();
+      this.stylePresetUiRefresh?.();
+      new Notice(t('settings.style.resetAll.success'));
+    } catch (error) {
+      logger.warn('Failed to reset chat styles', error);
+      new Notice(t('settings.style.resetAll.failed'));
+    }
   }
 
   private renderInputStyleGroup(containerEl?: HTMLElement): void {
@@ -2788,7 +3238,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
                   : (
                     themeFamily === 'liquid-glass'
                       ? this.getLiquidGlassInputPanelTheme(this.plugin.settings.inputPanelTheme)
-                      : 'liquid-glass-rdev'
+                      : 'liquid-glass-shuding'
                   );
             await this.applyInputPanelThemeChange(nextTheme);
           });

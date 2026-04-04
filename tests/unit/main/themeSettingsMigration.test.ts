@@ -79,6 +79,47 @@ describe('OpenCodianPlugin.loadSettings theme migration', () => {
     expect(plugin.settings.chatAppearance.assistant.blur).toBe(4);
   });
 
+  it('preserves the saved background image when a preset-backed theme is restored', async () => {
+    const storedAppearance = getDefaultChatAppearanceSettings();
+    storedAppearance.background.imagePath = '.opencodian/theme-backgrounds/theme-bg-test.png';
+    storedAppearance.background.imageMimeType = 'image/png';
+    storedAppearance.background.imageDisplayName = 'theme-bg-test.png';
+    storedAppearance.background.edgeFade = 36;
+
+    const plugin = {
+      storage: {
+        loadSettings: jest.fn().mockResolvedValue({
+          chatAppearance: storedAppearance,
+          theme: {
+            activePresetId: 'glass-classic',
+            customAppearanceOverrides: {},
+          },
+        }),
+        saveSettings: jest.fn(),
+      },
+    } as unknown as OpenCodianPlugin;
+
+    await OpenCodianPlugin.prototype.loadSettings.call(plugin);
+
+    expect(plugin.settings.theme.activePresetId).toBe('glass-classic');
+    expect(plugin.settings.theme.customAppearanceOverrides).toEqual({});
+    expect(plugin.settings.chatAppearance.background).toEqual({
+      imagePath: '.opencodian/theme-backgrounds/theme-bg-test.png',
+      imageMimeType: 'image/png',
+      imageDisplayName: 'theme-bg-test.png',
+      fitMode: 'cover',
+      opacity: 92,
+      blur: 2,
+      depth: 8,
+      dim: 28,
+      edgeFade: 36,
+      saturation: 108,
+      brightness: 94,
+      focusX: 50,
+      focusY: 50,
+    });
+  });
+
   it('migrates legacy liquid glass input theme values back to preset on load', async () => {
     const plugin = {
       storage: {
@@ -94,11 +135,28 @@ describe('OpenCodianPlugin.loadSettings theme migration', () => {
     expect(plugin.settings.inputPanelTheme).toBe('preset');
   });
 
+  it('migrates the removed rdev liquid glass input theme to shuding on load', async () => {
+    const plugin = {
+      storage: {
+        loadSettings: jest.fn().mockResolvedValue({
+          inputPanelTheme: 'liquid-glass-rdev',
+        }),
+        saveSettings: jest.fn(),
+      },
+    } as unknown as OpenCodianPlugin;
+
+    await OpenCodianPlugin.prototype.loadSettings.call(plugin);
+
+    expect(plugin.settings.inputPanelTheme).toBe('liquid-glass-shuding');
+  });
+
   it.each([
     'preset',
     'glass-refraction-glass',
     'glass-refraction-card',
     'glass-refraction-pill',
+    'liquid-glass-shuding',
+    'liquid-glass-nikdelvin',
   ] as const)('preserves explicit input panel theme value %s', async (inputPanelTheme) => {
     const plugin = {
       storage: {

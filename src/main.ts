@@ -132,6 +132,8 @@ export default class OpenCodianPlugin extends Plugin {
   private chatAppearanceSaveTimeoutId: number | null = null;
   private settingsUiStateSaveTimeoutId: number | null = null;
   private modelRefreshFrameId: number | null = null;
+  private themeBackgroundDataUrlCache = new Map<string, string | null>();
+  private themeBackgroundDataUrlRequests = new Map<string, Promise<string | null>>();
 
   async onload() {
     // Output BUILD_ID for debugging (always visible)
@@ -451,9 +453,20 @@ export default class OpenCodianPlugin extends Plugin {
         customAppearanceOverrides: getThemeAppearanceOverridesFromBase(preset.appearance, effectiveAppearance),
       } satisfies OpenCodianSettings['theme'];
     })();
-    const normalizedChatAppearance = normalizedTheme.activePresetId
-      ? resolveThemeChatAppearance(normalizedTheme)
-      : normalizedSavedChatAppearance;
+    const normalizedChatAppearance = (() => {
+      const themeResolvedAppearance = normalizedTheme.activePresetId
+        ? resolveThemeChatAppearance(normalizedTheme)
+        : normalizedSavedChatAppearance;
+
+      if (!hasSavedChatAppearance) {
+        return themeResolvedAppearance;
+      }
+
+      return normalizeChatAppearanceSettings({
+        ...themeResolvedAppearance,
+        background: normalizedSavedChatAppearance.background,
+      });
+    })();
     const savedTabState =
       savedSettings && typeof savedSettings === 'object' && 'tabState' in savedSettings
         ? (savedSettings as { tabState?: Partial<OpenCodianSettings['tabState']> }).tabState
@@ -657,9 +670,13 @@ export default class OpenCodianPlugin extends Plugin {
       return;
     }
 
+    const preservedBackground = normalizeChatAppearanceSettings(this.settings.chatAppearance).background;
     this.settings.theme.activePresetId = preset.id;
     this.settings.theme.customAppearanceOverrides = {};
-    this.settings.chatAppearance = normalizeChatAppearanceSettings(preset.appearance);
+    this.settings.chatAppearance = normalizeChatAppearanceSettings({
+      ...preset.appearance,
+      background: preservedBackground,
+    });
   }
 
   updateChatAppearance(mutator: (appearance: ChatAppearanceSettings) => void): void {
@@ -673,7 +690,7 @@ export default class OpenCodianPlugin extends Plugin {
   }
 
   resetChatAppearanceGroup(
-    group: 'layout' | 'user' | 'assistant' | 'input' | 'scrollbar' | 'advanced',
+    group: 'layout' | 'background' | 'user' | 'assistant' | 'input' | 'scrollbar' | 'advanced',
   ): void {
     const baseline = this.getChatAppearanceBaseline();
     const nextAppearance = normalizeChatAppearanceSettings(this.settings.chatAppearance);
@@ -681,6 +698,8 @@ export default class OpenCodianPlugin extends Plugin {
     if (group === 'layout') {
       nextAppearance.layout = { ...baseline.layout };
       nextAppearance.sticky = { ...baseline.sticky };
+    } else if (group === 'background') {
+      nextAppearance.background = { ...baseline.background };
     } else if (group === 'user') {
       nextAppearance.user = { ...baseline.user };
     } else if (group === 'assistant') {
@@ -694,6 +713,113 @@ export default class OpenCodianPlugin extends Plugin {
     }
 
     this.setEffectiveChatAppearance(nextAppearance);
+  }
+
+  async selectThemePresetAndSave(presetId: ThemePresetId): Promise<void> {
+    const previousAppearance = normalizeChatAppearanceSettings(this.settings.chatAppearance);
+    this.selectThemePreset(presetId);
+    await this.saveChatAppearanceImmediately(previousAppearance);
+  }
+
+  async resetChatAppearanceToBaselineAndSave(): Promise<void> {
+    const previousAppearance = normalizeChatAppearanceSettings(this.settings.chatAppearance);
+    this.resetChatAppearanceToBaseline();
+    await this.saveChatAppearanceImmediately(previousAppearance);
+  }
+
+  async resetThemePresetAppearanceAndSave(): Promise<void> {
+    const previousAppearance = normalizeChatAppearanceSettings(this.settings.chatAppearance);
+    const preservedBackground = previousAppearance.background;
+    this.resetChatAppearanceToBaseline();
+    this.updateChatAppearance((appearance) => {
+      appearance.background = { ...preservedBackground };
+    });
+    await this.saveChatAppearanceImmediately(previousAppearance);
+  }
+
+  async resetChatAppearanceGroupAndSave(
+    group: 'layout' | 'background' | 'user' | 'assistant' | 'input' | 'scrollbar' | 'advanced',
+  ): Promise<void> {
+    const previousAppearance = normalizeChatAppearanceSettings(this.settings.chatAppearance);
+    this.resetChatAppearanceGroup(group);
+    await this.saveChatAppearanceImmediately(previousAppearance);
+  }
+
+  async importChatThemeBackgroundFile(file: File): Promise<void> {
+    const previousAppearance = normalizeChatAppearanceSettings(this.settings.chatAppearance);
+    const asset = await this.storage.saveThemeBackgroundAsset(
+      await file.arrayBuffer(),
+      file.name,
+      file.type,
+    );
+
+    this.updateChatAppearance((appearance) => {
+      appearance.background.imagePath = asset.path;
+      appearance.background.imageMimeType = asset.mimeType;
+      appearance.background.imageDisplayName = asset.displayName;
+    });
+
+    try {
+      await this.saveChatAppearanceImmediately(previousAppearance);
+    } catch (error) {
+      this.clearThemeBackgroundDataUrlCache(asset.path);
+      await this.storage.removeThemeBackground(asset.path);
+      throw error;
+    }
+  }
+
+  async clearChatThemeBackground(): Promise<void> {
+    const previousAppearance = normalizeChatAppearanceSettings(this.settings.chatAppearance);
+    const hadBackground = Boolean(
+      previousAppearance.background.imagePath
+      || previousAppearance.background.imageMimeType
+      || previousAppearance.background.imageDisplayName,
+    );
+    if (!hadBackground) {
+      return;
+    }
+
+    this.updateChatAppearance((appearance) => {
+      appearance.background.imagePath = '';
+      appearance.background.imageMimeType = '';
+      appearance.background.imageDisplayName = '';
+    });
+
+    await this.saveChatAppearanceImmediately(previousAppearance);
+  }
+
+  async resolveChatThemeBackgroundDataUrl(): Promise<string | null> {
+    const { imagePath, imageMimeType } = this.settings.chatAppearance.background;
+    if (!imagePath) {
+      return null;
+    }
+
+    const cacheKey = `${imagePath}::${imageMimeType}`;
+    if (this.themeBackgroundDataUrlCache.has(cacheKey)) {
+      return this.themeBackgroundDataUrlCache.get(cacheKey) ?? null;
+    }
+
+    const inFlightRequest = this.themeBackgroundDataUrlRequests.get(cacheKey);
+    if (inFlightRequest) {
+      return inFlightRequest;
+    }
+
+    const request = this.storage.readThemeBackgroundDataUrl(imagePath, imageMimeType)
+      .then((dataUrl) => {
+        this.themeBackgroundDataUrlCache.set(cacheKey, dataUrl);
+        return dataUrl;
+      })
+      .catch((error) => {
+        logger.warn('Failed to resolve chat theme background asset', error);
+        this.themeBackgroundDataUrlCache.set(cacheKey, null);
+        return null;
+      })
+      .finally(() => {
+        this.themeBackgroundDataUrlRequests.delete(cacheKey);
+      });
+
+    this.themeBackgroundDataUrlRequests.set(cacheKey, request);
+    return request;
   }
 
   refreshConversationRendering(): void {
@@ -720,6 +846,53 @@ export default class OpenCodianPlugin extends Plugin {
     this.settings.theme.customAppearanceOverrides = activePreset
       ? getThemeAppearanceOverridesFromBase(activePreset.appearance, this.settings.chatAppearance)
       : {};
+  }
+
+  private clearThemeBackgroundDataUrlCache(path?: string | null): void {
+    if (!path) {
+      this.themeBackgroundDataUrlCache.clear();
+      this.themeBackgroundDataUrlRequests.clear();
+      return;
+    }
+
+    const pathPrefix = `${path}::`;
+    for (const cacheKey of Array.from(this.themeBackgroundDataUrlCache.keys())) {
+      if (cacheKey.startsWith(pathPrefix)) {
+        this.themeBackgroundDataUrlCache.delete(cacheKey);
+      }
+    }
+    for (const cacheKey of Array.from(this.themeBackgroundDataUrlRequests.keys())) {
+      if (cacheKey.startsWith(pathPrefix)) {
+        this.themeBackgroundDataUrlRequests.delete(cacheKey);
+      }
+    }
+  }
+
+  private async saveChatAppearanceImmediately(previousAppearance: ChatAppearanceSettings): Promise<void> {
+    const previousBackgroundPath = previousAppearance.background.imagePath;
+    const nextBackgroundPath = this.settings.chatAppearance.background.imagePath;
+
+    try {
+      await this.saveSettings({
+        syncService: false,
+        reloadModels: false,
+        syncConfig: false,
+        applyUi: true,
+      });
+    } catch (error) {
+      this.setEffectiveChatAppearance(previousAppearance);
+      this.refreshOpenCodianViews({ reloadModels: false, applyUi: true });
+      throw error;
+    }
+
+    if (previousBackgroundPath && previousBackgroundPath !== nextBackgroundPath) {
+      this.clearThemeBackgroundDataUrlCache(previousBackgroundPath);
+      try {
+        await this.storage.removeThemeBackground(previousBackgroundPath);
+      } catch (error) {
+        logger.warn('Failed to delete old chat theme background asset', error);
+      }
+    }
   }
 
   scheduleChatAppearanceSave(delay = 220): void {

@@ -373,11 +373,13 @@ Persists conversations and settings.
     ├── settings.json          # Plugin settings
     ├── provider-icons/        # Cached provider icons (mapped + custom)
     │   └── *.svg|png|jpg...
+    ├── theme-backgrounds/     # Uploaded chat theme backgrounds for message shell
+    │   └── theme-bg-*.png|jpg|webp|gif|svg
     └── sessions/              # Full local conversation storage
         └── conv-xxx.json
 ```
 
-`StorageService` remains local-first: complete conversations, `messages[]`, local notice messages, context attachments, and related chat metadata are persisted in the vault-side plugin storage instead of being reduced to metadata-only records.
+`StorageService` remains local-first: complete conversations, `messages[]`, local notice messages, context attachments, uploaded theme background assets, and related chat metadata are persisted in the vault-side plugin storage instead of being reduced to metadata-only records.
 
 ### 6. OpenCodianView (`src/features/chat/OpenCodianView.ts`)
 
@@ -406,6 +408,7 @@ Main chat UI view (extends Obsidian's `ItemView`).
 - Post-turn diff notices sourced from `file.edited` + `session.diff()`
 - OMO injected-prompt panels with expandable raw prompt view
 - OMO system-reminder notice cards with markdown rendering
+- Optional message-shell theme background image with upload-backed local storage, blur/depth tuning, edge blending, and theme-colored veil controls
 - Session todo dock powered by `session.todo()` snapshots and `todo.updated` sync events
 - Idle conversation sync loop for post-stream follow-up messages
 - Background-task in-progress indicator and follow-up pseudo-stream reveal
@@ -424,7 +427,7 @@ Settings UI with bilingual support (English/Chinese).
 - **Plugins**: Global/plugin visibility, project `plugin` config, project plugin directory, pure mode, OMO config entry
 - **Security**: Permission mode, config editor, command blocklist, export paths
 - **UI**: Max tabs, tab bar position, auto-scroll, chat scroll mode, open in main tab
-- **Style**: Chat appearance controls and custom CSS declarations
+- **Style**: Chat appearance controls, theme background upload/tuning, edge blending, and custom CSS declarations
 - **Theme presets**: Built-in theme style/scheme switching, preset reset, and post-preset appearance fine-tuning
 - **Debug**: Debug logging, per-platform log paths, diagnostics export
 - **User**: User name, system prompt, excluded tags

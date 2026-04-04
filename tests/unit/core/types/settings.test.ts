@@ -11,6 +11,7 @@ import {
   getDefaultDebugLogPaths,
   getDefaultInputPanelGlassRefractionSettings,
   getDefaultInputPanelGlassRefractionSvgFilterSettings,
+  getDefaultInputPanelLiquidGlassSettings,
   getDefaultThemeSettings,
   isValidChatAppearanceCustomCssDeclarations,
   normalizeBelowHeaderTabBarLayout,
@@ -19,6 +20,7 @@ import {
   normalizeInputPanelGlassRefractionSettings,
   normalizeInputPanelGlassRefractionSvgFilterPresetId,
   normalizeInputPanelGlassRefractionSvgFilterSettings,
+  normalizeInputPanelLiquidGlassSettings,
   normalizeInputPanelThemeId,
   normalizePartialChatAppearanceSettings,
   normalizeQuestionCardPosition,
@@ -107,6 +109,10 @@ describe('Settings', () => {
       expect(DEFAULT_SETTINGS.chatAppearance.layout.messagesPaddingTop).toBe(12);
       expect(DEFAULT_SETTINGS.inputPanelTheme).toBe('preset');
       expect(DEFAULT_SETTINGS.chatAppearance.sticky.maskBlur).toBe(24);
+      expect(DEFAULT_SETTINGS.chatAppearance.background.imagePath).toBe('');
+      expect(DEFAULT_SETTINGS.chatAppearance.background.fitMode).toBe('cover');
+      expect(DEFAULT_SETTINGS.chatAppearance.background.opacity).toBe(92);
+      expect(DEFAULT_SETTINGS.chatAppearance.background.edgeFade).toBe(28);
       expect(DEFAULT_SETTINGS.chatAppearance.user.radius).toBe(16);
       expect(DEFAULT_SETTINGS.chatAppearance.assistant.backgroundOpacity).toBe(72);
       expect(DEFAULT_SETTINGS.chatAppearance.input.backgroundOpacity).toBe(72);
@@ -116,6 +122,7 @@ describe('Settings', () => {
       expect(DEFAULT_SETTINGS.inputPanelGlassRefractionSvgFilter).toEqual(
         getDefaultInputPanelGlassRefractionSvgFilterSettings(),
       );
+      expect(DEFAULT_SETTINGS.inputPanelLiquidGlass).toEqual(getDefaultInputPanelLiquidGlassSettings());
       expect(DEFAULT_SETTINGS.chatAppearance.scrollbar.width).toBe(8);
       expect(DEFAULT_SETTINGS.chatAppearance.scrollbar.thumbHoverOpacity).toBe(82);
       expect(DEFAULT_SETTINGS.settingsPanelScrollTop).toBe(0);
@@ -186,6 +193,9 @@ describe('Settings', () => {
       expect(normalizeInputPanelThemeId('glass-refraction-glass')).toBe('glass-refraction-glass');
       expect(normalizeInputPanelThemeId('glass-refraction-card')).toBe('glass-refraction-card');
       expect(normalizeInputPanelThemeId('glass-refraction-pill')).toBe('glass-refraction-pill');
+      expect(normalizeInputPanelThemeId('liquid-glass-shuding')).toBe('liquid-glass-shuding');
+      expect(normalizeInputPanelThemeId('liquid-glass-nikdelvin')).toBe('liquid-glass-nikdelvin');
+      expect(normalizeInputPanelThemeId('liquid-glass-rdev')).toBe('liquid-glass-shuding');
       expect(normalizeInputPanelThemeId('liquid-glass')).toBe('preset');
       expect(normalizeInputPanelThemeId('glass')).toBe('preset');
       expect(normalizeInputPanelThemeId(undefined)).toBe('preset');
@@ -198,6 +208,17 @@ describe('Settings', () => {
       expect(normalizeInputPanelActionButtonStyleId('etched')).toBe('etched');
       expect(normalizeInputPanelActionButtonStyleId('embedded')).toBe('default');
       expect(normalizeInputPanelActionButtonStyleId(undefined)).toBe('default');
+    });
+  });
+
+  describe('liquid glass settings normalization', () => {
+    it('restores only the supported shuding and nikdelvin defaults', () => {
+      const normalized = normalizeInputPanelLiquidGlassSettings({});
+
+      expect(normalized).toEqual({
+        shuding: getDefaultInputPanelLiquidGlassSettings().shuding,
+        nikdelvin: getDefaultInputPanelLiquidGlassSettings().nikdelvin,
+      });
     });
   });
 
@@ -252,15 +273,31 @@ describe('Settings', () => {
       const defaultsB = getDefaultChatAppearanceSettings();
 
       defaultsA.layout.messagesPaddingTop = 30;
+      defaultsA.background.edgeFade = 44;
       defaultsA.scrollbar.width = 12;
 
       expect(defaultsB.layout.messagesPaddingTop).toBe(12);
+      expect(defaultsB.background.edgeFade).toBe(28);
       expect(defaultsB.scrollbar.width).toBe(8);
     });
 
     it('should merge partial chat appearance settings with defaults', () => {
       const normalized = normalizeChatAppearanceSettings({
         layout: { messagesPaddingTop: 24 },
+        background: {
+          imagePath: '  .opencodian/theme-backgrounds/bg.png  ',
+          imageDisplayName: '  sunset.png  ',
+          fitMode: 'stretch' as never,
+          opacity: 120,
+          blur: -4,
+          depth: 40,
+          dim: 140,
+          edgeFade: -1,
+          saturation: 400,
+          brightness: 20,
+          focusX: -10,
+          focusY: 120,
+        },
         assistant: { blur: 4 },
         input: { backgroundOpacity: 64 },
         scrollbar: { width: 10, thumbOpacity: 80 },
@@ -268,6 +305,21 @@ describe('Settings', () => {
 
       expect(normalized.layout.messagesPaddingTop).toBe(24);
       expect(normalized.layout.messagesPaddingX).toBe(16);
+      expect(normalized.background).toEqual({
+        imagePath: '.opencodian/theme-backgrounds/bg.png',
+        imageMimeType: '',
+        imageDisplayName: 'sunset.png',
+        fitMode: 'cover',
+        opacity: 100,
+        blur: 0,
+        depth: 36,
+        dim: 88,
+        edgeFade: 0,
+        saturation: 200,
+        brightness: 40,
+        focusX: 0,
+        focusY: 100,
+      });
       expect(normalized.assistant.blur).toBe(4);
       expect(normalized.assistant.radius).toBe(14);
       expect(normalized.input.backgroundOpacity).toBe(64);
@@ -297,9 +349,11 @@ describe('Settings', () => {
 
     it('normalizes partial chat appearance overrides without filling defaults', () => {
       expect(normalizePartialChatAppearanceSettings({
+        background: { dim: 36, edgeFade: 24 },
         user: { blur: 8 },
         advanced: { customCssDeclarations: '--foo: 1;' },
       })).toEqual({
+        background: { dim: 36, edgeFade: 24 },
         user: { blur: 8 },
         advanced: { customCssDeclarations: '--foo: 1;' },
       });

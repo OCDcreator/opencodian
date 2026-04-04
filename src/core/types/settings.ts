@@ -85,13 +85,14 @@ export type InputPanelThemeId =
   | 'glass-refraction-card'
   | 'glass-refraction-pill'
   | 'liquid-glass-shuding'
-  | 'liquid-glass-nikdelvin'
-  | 'liquid-glass-rdev';
+  | 'liquid-glass-nikdelvin';
 
 /** Composer action button style */
 export type InputPanelActionButtonStyleId = 'default' | 'etched';
 
-export type LiquidGlassAdapterId = 'shuding' | 'nikdelvin' | 'rdev';
+export type LiquidGlassAdapterId = 'shuding' | 'nikdelvin';
+
+export type ChatAppearanceBackgroundFitMode = 'cover' | 'contain' | 'fit-width' | 'fit-height';
 
 /** Server connection mode */
 export type ServerMode = 'local' | 'remote';
@@ -152,8 +153,9 @@ export function normalizeInputPanelThemeId(value: unknown): InputPanelThemeId {
     case 'glass-refraction-pill':
     case 'liquid-glass-shuding':
     case 'liquid-glass-nikdelvin':
-    case 'liquid-glass-rdev':
       return value;
+    case 'liquid-glass-rdev':
+      return 'liquid-glass-shuding';
     default:
       return 'preset';
   }
@@ -166,6 +168,18 @@ export function normalizeInputPanelActionButtonStyleId(value: unknown): InputPan
       return value;
     default:
       return 'default';
+  }
+}
+
+export function normalizeChatAppearanceBackgroundFitMode(value: unknown): ChatAppearanceBackgroundFitMode {
+  switch (value) {
+    case 'cover':
+    case 'contain':
+    case 'fit-width':
+    case 'fit-height':
+      return value;
+    default:
+      return 'cover';
   }
 }
 
@@ -390,6 +404,22 @@ export interface ChatAppearanceStickySettings {
   maskBlur: number;
 }
 
+export interface ChatAppearanceBackgroundSettings {
+  imagePath: string;
+  imageMimeType: string;
+  imageDisplayName: string;
+  fitMode: ChatAppearanceBackgroundFitMode;
+  opacity: number;
+  blur: number;
+  depth: number;
+  dim: number;
+  edgeFade: number;
+  saturation: number;
+  brightness: number;
+  focusX: number;
+  focusY: number;
+}
+
 export interface ChatAppearanceUserSettings {
   radius: number;
   tailRadius: number;
@@ -442,7 +472,6 @@ export interface InputPanelGlassRefractionSvgFilterSettings {
 export interface InputPanelLiquidGlassSettings {
   shuding: Record<string, number | string | boolean>;
   nikdelvin: Record<string, number | string | boolean>;
-  rdev: Record<string, number | string | boolean>;
 }
 
 export interface ChatAppearanceScrollbarSettings {
@@ -462,6 +491,7 @@ export interface ChatAppearanceAdvancedSettings {
 export interface ChatAppearanceSettings {
   layout: ChatAppearanceLayoutSettings;
   sticky: ChatAppearanceStickySettings;
+  background: ChatAppearanceBackgroundSettings;
   user: ChatAppearanceUserSettings;
   assistant: ChatAppearanceAssistantSettings;
   input: ChatAppearanceInputSettings;
@@ -472,6 +502,7 @@ export interface ChatAppearanceSettings {
 export interface PartialChatAppearanceSettings {
   layout?: Partial<ChatAppearanceLayoutSettings>;
   sticky?: Partial<ChatAppearanceStickySettings>;
+  background?: Partial<ChatAppearanceBackgroundSettings>;
   user?: Partial<ChatAppearanceUserSettings>;
   assistant?: Partial<ChatAppearanceAssistantSettings>;
   input?: Partial<ChatAppearanceInputSettings>;
@@ -520,6 +551,21 @@ export function getDefaultChatAppearanceSettings(): ChatAppearanceSettings {
       headerGap: 6,
       maskHeight: 18,
       maskBlur: 24,
+    },
+    background: {
+      imagePath: '',
+      imageMimeType: '',
+      imageDisplayName: '',
+      fitMode: 'cover',
+      opacity: 92,
+      blur: 2,
+      depth: 8,
+      dim: 28,
+      edgeFade: 28,
+      saturation: 108,
+      brightness: 94,
+      focusX: 50,
+      focusY: 50,
     },
     user: {
       radius: 16,
@@ -643,13 +689,6 @@ export function getDefaultInputPanelLiquidGlassSettings(): InputPanelLiquidGlass
       inline: false,
       customEffects: false,
     },
-    rdev: {
-      mode: 'standard',
-      displacementScale: 70,
-      aberrationIntensity: 2,
-      blurAmount: 1,
-      elasticity: 0.15,
-    },
   };
 }
 
@@ -718,7 +757,6 @@ export function normalizeInputPanelLiquidGlassSettings(
   const defaults = getDefaultInputPanelLiquidGlassSettings();
   const shuding = value?.shuding ?? {};
   const nikdelvin = value?.nikdelvin ?? {};
-  const rdev = value?.rdev ?? {};
 
   return {
     shuding: {
@@ -906,31 +944,6 @@ export function normalizeInputPanelLiquidGlassSettings(
         defaults.nikdelvin.customEffects as boolean,
       ),
     },
-    rdev: {
-      mode:
-        rdev.mode === 'standard'
-        || rdev.mode === 'polar'
-        || rdev.mode === 'prominent'
-        || rdev.mode === 'shader'
-          ? rdev.mode
-          : defaults.rdev.mode,
-      displacementScale: normalizeFiniteNumber(
-        rdev.displacementScale,
-        defaults.rdev.displacementScale as number,
-      ),
-      aberrationIntensity: normalizeFiniteNumber(
-        rdev.aberrationIntensity,
-        defaults.rdev.aberrationIntensity as number,
-      ),
-      blurAmount: normalizeFiniteNumber(
-        rdev.blurAmount,
-        defaults.rdev.blurAmount as number,
-      ),
-      elasticity: normalizeFiniteNumber(
-        rdev.elasticity,
-        defaults.rdev.elasticity as number,
-      ),
-    },
   };
 }
 
@@ -959,6 +972,11 @@ export function normalizePartialChatAppearanceSettings(
   const sticky = normalizePartialNestedObject<ChatAppearanceStickySettings>(appearance.sticky);
   if (sticky) {
     normalized.sticky = sticky;
+  }
+
+  const background = normalizePartialNestedObject<ChatAppearanceBackgroundSettings>(appearance.background);
+  if (background) {
+    normalized.background = background;
   }
 
   const user = normalizePartialNestedObject<ChatAppearanceUserSettings>(appearance.user);
@@ -993,6 +1011,7 @@ export function normalizeChatAppearanceSettings(
   appearance?: PartialChatAppearanceSettings | null,
 ): ChatAppearanceSettings {
   const defaults = getDefaultChatAppearanceSettings();
+  const background = appearance?.background;
 
   return {
     layout: {
@@ -1002,6 +1021,29 @@ export function normalizeChatAppearanceSettings(
     sticky: {
       ...defaults.sticky,
       ...(appearance?.sticky ?? {}),
+    },
+    background: {
+      ...defaults.background,
+      ...(background ?? {}),
+      imagePath: typeof background?.imagePath === 'string' ? background.imagePath.trim() : defaults.background.imagePath,
+      imageMimeType:
+        typeof background?.imageMimeType === 'string'
+          ? background.imageMimeType.trim()
+          : defaults.background.imageMimeType,
+      imageDisplayName:
+        typeof background?.imageDisplayName === 'string'
+          ? background.imageDisplayName.trim()
+          : defaults.background.imageDisplayName,
+      fitMode: normalizeChatAppearanceBackgroundFitMode(background?.fitMode),
+      opacity: normalizeFiniteNumberInRange(background?.opacity, defaults.background.opacity, 0, 100),
+      blur: normalizeFiniteNumberInRange(background?.blur, defaults.background.blur, 0, 48),
+      depth: normalizeFiniteNumberInRange(background?.depth, defaults.background.depth, 0, 36),
+      dim: normalizeFiniteNumberInRange(background?.dim, defaults.background.dim, 0, 88),
+      edgeFade: normalizeFiniteNumberInRange(background?.edgeFade, defaults.background.edgeFade, 0, 80),
+      saturation: normalizeFiniteNumberInRange(background?.saturation, defaults.background.saturation, 50, 200),
+      brightness: normalizeFiniteNumberInRange(background?.brightness, defaults.background.brightness, 40, 140),
+      focusX: normalizeFiniteNumberInRange(background?.focusX, defaults.background.focusX, 0, 100),
+      focusY: normalizeFiniteNumberInRange(background?.focusY, defaults.background.focusY, 0, 100),
     },
     user: {
       ...defaults.user,

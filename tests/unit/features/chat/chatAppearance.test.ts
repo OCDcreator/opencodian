@@ -12,6 +12,9 @@ describe('chatAppearance utilities', () => {
   it('should map chat appearance settings to CSS variables', () => {
     const appearance = getDefaultChatAppearanceSettings();
     appearance.layout.messagesPaddingTop = 20;
+    appearance.background.fitMode = 'fit-height';
+    appearance.background.opacity = 80;
+    appearance.background.edgeFade = 36;
     appearance.assistant.backgroundOpacity = 55;
     appearance.input.backgroundOpacity = 66;
     appearance.input.shadowBlur = 30;
@@ -21,6 +24,9 @@ describe('chatAppearance utilities', () => {
     const cssVariables = getChatAppearanceCssVariables(appearance);
 
     expect(cssVariables['--opencodian-messages-pad-top']).toBe('20px');
+    expect(cssVariables['--opencodian-theme-bg-size']).toBe('auto 100%');
+    expect(cssVariables['--opencodian-theme-bg-opacity']).toBe('0.8');
+    expect(cssVariables['--opencodian-theme-bg-edge-fade']).toBe('36px');
     expect(cssVariables['--opencodian-assistant-bg-opacity']).toBe('55%');
     expect(cssVariables['--opencodian-input-bg-opacity']).toBe('66%');
     expect(cssVariables['--opencodian-input-shadow-blur']).toBe('30px');

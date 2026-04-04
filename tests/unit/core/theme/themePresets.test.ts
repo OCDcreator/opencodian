@@ -77,4 +77,15 @@ describe('theme presets', () => {
       },
     })).toBe(true);
   });
+
+  it('does not treat uploaded backgrounds as preset appearance overrides', () => {
+    expect(hasThemeAppearanceOverrides({
+      activePresetId: 'sharp-neon',
+      customAppearanceOverrides: {
+        background: {
+          imagePath: '.opencodian/theme-backgrounds/test.png',
+        },
+      },
+    })).toBe(false);
+  });
 });

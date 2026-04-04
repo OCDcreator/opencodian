@@ -729,7 +729,13 @@ function syncFilterDefinition(state: NikdelvinState, metrics: ShellMetrics): voi
   state.currentFilterSignature = metrics.filterSignature;
 }
 
-function resolveOverlayBackground(settings: NikdelvinSettings): string {
+function resolveOverlayBackground(settings: NikdelvinSettings, hasBackground: boolean): string {
+  if (!hasBackground) {
+    return settings.noMorph || settings.button
+      ? 'rgba(255, 255, 255, 0.1)'
+      : 'rgba(255, 255, 255, 0.08)';
+  }
+
   if (settings.noMorph) {
     return 'rgba(255, 255, 255, 0.1)';
   }
@@ -840,18 +846,19 @@ function resolveBackgroundSource(state: NikdelvinState): string {
 function updateBaseLayers(state: NikdelvinState, metrics: ShellMetrics, mode: RenderMode): void {
   const backgroundSource = resolveBackgroundSource(state);
   const hasBackground = backgroundSource.length > 0;
+  const shouldUseBackdropRefraction = !hasBackground;
 
   state.overlayEl.style.display = 'block';
-  state.overlayEl.style.background = resolveOverlayBackground(state.settings);
+  state.overlayEl.style.background = resolveOverlayBackground(state.settings, hasBackground);
 
   state.glassBoxEl.style.display = 'block';
   state.glassBoxEl.style.width = `${metrics.width}px`;
   state.glassBoxEl.style.height = `${metrics.height}px`;
   applyGlassTint(state);
 
-  if (mode === 'svg') {
+  if (mode === 'svg' && shouldUseBackdropRefraction) {
     applyBackdropFilterValue(state.glassBoxEl, buildSvgBackdropFilterValue(state));
-  } else if (mode === 'glass' && !hasBackground) {
+  } else if (mode === 'glass' && shouldUseBackdropRefraction) {
     applyBackdropFilterValue(state.glassBoxEl, buildFallbackBackdropFilterValue(metrics));
   } else {
     applyBackdropFilterValue(state.glassBoxEl, null);
