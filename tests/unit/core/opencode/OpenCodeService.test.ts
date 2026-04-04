@@ -985,7 +985,117 @@ describe('OpenCodeService', () => {
       expect(mockSdkClient.session.unrevert).toHaveBeenCalledWith({ sessionID: 'sdk-session' });
     });
 
-    it('maps requestAssistantResponse through SDK prompt with tools and variant', async () => {
+    it('uses SDK question APIs when rollout flags are enabled', async () => {
+      service = createServiceWithSdkFlags();
+      mockSdkClient.question.list.mockResolvedValue([
+        {
+          id: 'question-1',
+          sessionID: 'sdk-session',
+          questions: [
+            {
+              question: 'Pick a speed',
+              header: 'Speed',
+              options: [{ label: 'Fast', description: 'Move quickly' }],
+              multiple: false,
+              custom: true,
+            },
+          ],
+        },
+      ]);
+
+      await expect(service.getPendingQuestions()).resolves.toEqual([
+        {
+          id: 'question-1',
+          sessionId: 'sdk-session',
+          questions: [
+            {
+              question: 'Pick a speed',
+              header: 'Speed',
+              options: [{ label: 'Fast', description: 'Move quickly' }],
+              multiple: false,
+              custom: true,
+            },
+          ],
+        },
+      ]);
+
+      await service.replyToQuestion('question-1', [['Fast']]);
+      await service.rejectQuestion('question-2');
+
+      expect(mockSdkClient.question.list).toHaveBeenCalledWith();
+      expect(mockSdkClient.question.reply).toHaveBeenCalledWith({
+        requestID: 'question-1',
+        answers: [['Fast']],
+      });
+      expect(mockSdkClient.question.reject).toHaveBeenCalledWith({
+        requestID: 'question-2',
+      });
+      expect(mockRequestUrl).not.toHaveBeenCalled();
+    });
+
+    it('falls back to legacy HTTP when SDK question APIs fail', async () => {
+      service = createServiceWithSdkFlags();
+      mockSdkClient.question.list.mockRejectedValue(new Error('sdk list failed'));
+      mockSdkClient.question.reply.mockRejectedValue(new Error('sdk reply failed'));
+      mockSdkClient.question.reject.mockRejectedValue(new Error('sdk reject failed'));
+      mockRequestUrl
+        .mockResolvedValueOnce({
+          status: 200,
+          json: [
+            {
+              id: 'question-1',
+              sessionID: 'sdk-session',
+              questions: [
+                {
+                  question: 'Pick a speed',
+                  header: 'Speed',
+                  options: [{ label: 'Fast', description: 'Move quickly' }],
+                  multiple: false,
+                  custom: true,
+                },
+              ],
+            },
+          ],
+          text: '[]',
+        })
+        .mockResolvedValueOnce({ status: 200, json: true, text: 'true' })
+        .mockResolvedValueOnce({ status: 200, json: true, text: 'true' });
+
+      await expect(service.getPendingQuestions()).resolves.toEqual([
+        {
+          id: 'question-1',
+          sessionId: 'sdk-session',
+          questions: [
+            {
+              question: 'Pick a speed',
+              header: 'Speed',
+              options: [{ label: 'Fast', description: 'Move quickly' }],
+              multiple: false,
+              custom: true,
+            },
+          ],
+        },
+      ]);
+      await service.replyToQuestion('question-1', [['Fast']]);
+      await service.rejectQuestion('question-2');
+
+      expect(mockRequestUrl).toHaveBeenNthCalledWith(1, expect.objectContaining({
+        url: 'http://127.0.0.1:4096/question',
+        method: 'GET',
+      }));
+      expect(mockRequestUrl).toHaveBeenNthCalledWith(2, expect.objectContaining({
+        url: 'http://127.0.0.1:4096/question/question-1/reply',
+        method: 'POST',
+        body: JSON.stringify({ answers: [['Fast']] }),
+      }));
+      expect(mockRequestUrl).toHaveBeenNthCalledWith(3, expect.objectContaining({
+        url: 'http://127.0.0.1:4096/question/question-2/reject',
+        method: 'POST',
+        body: JSON.stringify({}),
+      }));
+    });
+
+    it('maps requestAssistantResponse through SDK prompt with shared prompt options', async () => {
       service = createServiceWithSdkFlags();
       service.setSessionId('sdk-session');
       mockSdkClient.session.prompt.mockResolvedValue({
@@ -993,6 +1103,7 @@ describe('OpenCodeService', () => {
           id: 'assistant-1',
           sessionID: 'sdk-session',
           role: 'assistant',
+          structured: { title: 'Generated title' },
           time: { created: 1234567890 },
         },
         parts: [
@@ -1011,20 +1122,115 @@ describe('OpenCodeService', () => {
         provider: 'openai',
         model: 'gpt-5',
         system: 'Return only the title',
+        agent: 'title',
+        noReply: false,
+        format: {
+          type: 'json_schema',
+          schema: {
+            type: 'object',
+            properties: {
+              title: { type: 'string' },
+            },
+            required: ['title'],
+            additionalProperties: false,
+          },
+        },
         allowedTools: ['read', 'grep'],
         reasoningEffort: 'high',
       });
 
       expect(response?.content).toBe('Generated title');
+      expect(response?.structured).toEqual({ title: 'Generated title' });
       expect(mockSdkClient.session.prompt).toHaveBeenCalledWith(expect.objectContaining({
         sessionID: 'sdk-session',
         system: 'Return only the title',
+        agent: 'title',
+        noReply: false,
+        format: {
+          type: 'json_schema',
+          schema: {
+            type: 'object',
+            properties: {
+              title: { type: 'string' },
+            },
+            required: ['title'],
+            additionalProperties: false,
+          },
+        },
         tools: {
           read: true,
           grep: true,
         },
         variant: 'high',
       }));
+    });
+
+    it('maps sendMessage through SDK promptAsync with shared prompt options', async () => {
+      service = createServiceWithSdkFlags();
+      service.setSessionId('sdk-session');
+
+      mockSdkClient.session.promptAsync.mockResolvedValue({});
+      mockSdkClient.event.subscribe.mockResolvedValue({
+        stream: (async function* () {
+          yield {
+            type: 'session.idle',
+            properties: {
+              sessionID: 'sdk-session',
+            },
+          };
+        })(),
+      });
+      mockSdkClient.session.messages.mockResolvedValue([]);
+      mockSdkClient.session.get.mockResolvedValue({
+        id: 'sdk-session',
+        title: 'SDK',
+        time: { created: 1, updated: 1 },
+      });
+
+      const chunks: unknown[] = [];
+      for await (const chunk of service.sendMessage('Hello', {
+        sessionId: 'sdk-session',
+        agent: 'title',
+        noReply: true,
+        format: {
+          type: 'json_schema',
+          schema: {
+            type: 'object',
+            properties: {
+              title: { type: 'string' },
+            },
+            required: ['title'],
+            additionalProperties: false,
+          },
+        },
+        allowedTools: ['read'],
+        reasoningEffort: 'medium',
+      })) {
+        chunks.push(chunk);
+      }
+
+      expect(mockSdkClient.session.promptAsync).toHaveBeenCalledWith(expect.objectContaining({
+        sessionID: 'sdk-session',
+        agent: 'title',
+        noReply: true,
+        format: {
+          type: 'json_schema',
+          schema: {
+            type: 'object',
+            properties: {
+              title: { type: 'string' },
+            },
+            required: ['title'],
+            additionalProperties: false,
+          },
+        },
+        tools: {
+          read: true,
+        },
+        variant: 'medium',
+      }));
+      expect(chunks[0]).toEqual({ type: 'message_start' });
+      expect(chunks[chunks.length - 1]).toEqual({ type: 'message_stop' });
     });
 
     it('falls back to legacy SSE when the SDK event stream fails before the first event', async () => {
@@ -1792,6 +1998,38 @@ describe('OpenCodeService.openCodeMessageToChatMessage', () => {
       thinking: 'Let me think...',
       durationSeconds: 2.45,
     });
+  });
+
+  it('preserves assistant structured payloads alongside rendered content', () => {
+    const info = {
+      id: 'msg-structured',
+      sessionID: 'session-1',
+      role: 'assistant' as const,
+      structured: { title: 'Generated title' },
+      time: { created: 1234567896 },
+      parentID: 'msg-structured-user',
+      modelID: 'gpt-5',
+      providerID: 'openai',
+      mode: 'default',
+      path: { cwd: '/test', root: '/test' },
+      cost: 0,
+      tokens: { input: 5, output: 5, reasoning: 0, cache: { read: 0, write: 0 } },
+    };
+
+    const parts: Part[] = [
+      {
+        type: 'text',
+        id: 'part-structured',
+        sessionID: 'session-1',
+        messageID: 'msg-structured',
+        text: 'Generated title',
+      },
+    ];
+
+    const message = OpenCodeService.openCodeMessageToChatMessage(info, parts);
+
+    expect(message.content).toBe('Generated title');
+    expect(message.structured).toEqual({ title: 'Generated title' });
   });
 
   it('extracts OMO-injected user prompts into structured metadata', () => {

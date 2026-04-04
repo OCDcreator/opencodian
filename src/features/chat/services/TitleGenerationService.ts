@@ -1,8 +1,10 @@
+import type { LocalOutputFormat } from '../../../core/opencode/types';
 import {
   buildTitleGenerationPrompt,
   buildTitleGenerationSystemPrompt,
   normalizeTitleGenerationLocale,
 } from '../../../core/prompts/titleGeneration';
+import type { ChatMessage } from '../../../core/types';
 import type OpenCodianPlugin from '../../../main';
 
 export type TitleGenerationResult =
@@ -13,6 +15,20 @@ export type TitleGenerationCallback = (
   conversationId: string,
   result: TitleGenerationResult
 ) => Promise<void>;
+
+const TITLE_GENERATION_OUTPUT_FORMAT: LocalOutputFormat = {
+  type: 'json_schema',
+  schema: {
+    type: 'object',
+    properties: {
+      title: {
+        type: 'string',
+      },
+    },
+    required: ['title'],
+    additionalProperties: false,
+  },
+};
 
 export class TitleGenerationService {
   private readonly activeGenerations = new Map<string, AbortController>();
@@ -42,6 +58,7 @@ export class TitleGenerationService {
         sessionId: tempSessionId,
         provider,
         model,
+        format: TITLE_GENERATION_OUTPUT_FORMAT,
         system: buildTitleGenerationSystemPrompt(locale),
       });
 
@@ -49,7 +66,7 @@ export class TitleGenerationService {
         return;
       }
 
-      const title = this.parseTitle(response?.content ?? '');
+      const title = this.extractTitle(response);
       if (!title) {
         await this.safeCallback(callback, conversationId, {
           success: false,
@@ -124,6 +141,24 @@ export class TitleGenerationService {
     return `${normalized.substring(0, maxLength - 3)}...`;
   }
 
+  private extractTitle(response: ChatMessage | null): string | null {
+    const structuredTitle = this.extractStructuredTitle(response?.structured);
+    if (structuredTitle) {
+      return structuredTitle;
+    }
+
+    return this.parseTitle(response?.content ?? '');
+  }
+
+  private extractStructuredTitle(structured: unknown): string | null {
+    if (!structured || typeof structured !== 'object') {
+      return null;
+    }
+
+    const title = (structured as { title?: unknown }).title;
+    return typeof title === 'string' ? this.normalizeTitleCandidate(title) : null;
+  }
+
   private parseTitle(responseText: string): string | null {
     const firstLine = responseText
       .trim()
@@ -135,7 +170,11 @@ export class TitleGenerationService {
       return null;
     }
 
-    let title = firstLine
+    return this.normalizeTitleCandidate(firstLine);
+  }
+
+  private normalizeTitleCandidate(rawTitle: string): string | null {
+    let title = rawTitle
       .replace(/^title\s*:\s*/i, '')
       .replace(/^["'`]+/, '')
       .replace(/["'`]+$/, '')

@@ -44,9 +44,15 @@ import { createSdkClient } from './createSdkClient';
 import { detectOmoMessageMeta } from './omoCompat';
 import type { SdkFeatureFlags } from './sdkFeatureFlags';
 import { resolveSdkFeatureFlags } from './sdkFeatureFlags';
-import type { SdkEvent, SdkOpencodeClient } from './sdkTypes';
+import type { SdkEvent, SdkOpencodeClient, SdkOutputFormat } from './sdkTypes';
 import { ServerManager } from './ServerManager';
-import type { ManagedServerState, OpenCodeServerConfig, QueryOptions, ResponseHandler } from './types';
+import type {
+  LocalOutputFormat,
+  ManagedServerState,
+  OpenCodeServerConfig,
+  QueryOptions,
+  ResponseHandler,
+} from './types';
 
 const logger = createLogger('OpenCodeService');
 const INLINE_READ_TOOL_PREFIX = 'Called the Read tool with the following input:';
@@ -157,6 +163,7 @@ interface Message {
   role: 'user' | 'assistant';
   providerID?: string;
   modelID?: string;
+  structured?: unknown;
   cost?: number;
   tokens?: {
     total?: number;
@@ -824,6 +831,7 @@ export class OpenCodeService {
     }
 
     const parts = this.buildPromptRequestParts(message, options);
+    const sharedOptions = this.buildSharedPromptOptions(options);
 
     if (this.shouldUseSdk('sdkPrompt')) {
       const response = await this.getSdkClient().session.prompt(
@@ -847,8 +855,23 @@ export class OpenCodeService {
       },
     };
 
-    if (options.system?.trim()) {
-      requestBody.system = options.system.trim();
+    if (sharedOptions.system) {
+      requestBody.system = sharedOptions.system;
+    }
+    if (sharedOptions.tools) {
+      requestBody.tools = sharedOptions.tools;
+    }
+    if (sharedOptions.variant) {
+      requestBody.variant = sharedOptions.variant;
+    }
+    if (sharedOptions.agent) {
+      requestBody.agent = sharedOptions.agent;
+    }
+    if (typeof sharedOptions.noReply === 'boolean') {
+      requestBody.noReply = sharedOptions.noReply;
+    }
+    if (sharedOptions.format) {
+      requestBody.format = sharedOptions.format;
     }
 
     const response = await this.post<unknown>(`/session/${sessionId}/message`, requestBody);
@@ -879,6 +902,7 @@ export class OpenCodeService {
     }
 
     const parts = this.buildPromptRequestParts(message, options);
+    const sharedOptions = this.buildSharedPromptOptions(options);
 
     // Build model config
     const providerID = options.provider ?? this.settings.defaultProvider;
@@ -910,11 +934,26 @@ export class OpenCodeService {
           ...(Object.keys(modelOptions).length > 0 ? { options: modelOptions } : {}),
         },
       };
-      
-
+      if (sharedOptions.system) {
+        requestBody.system = sharedOptions.system;
+      }
+      if (sharedOptions.tools) {
+        requestBody.tools = sharedOptions.tools;
+      }
+      if (sharedOptions.variant) {
+        requestBody.variant = sharedOptions.variant;
+      }
+      if (sharedOptions.agent) {
+        requestBody.agent = sharedOptions.agent;
+      }
+      if (typeof sharedOptions.noReply === 'boolean') {
+        requestBody.noReply = sharedOptions.noReply;
+      }
+      if (sharedOptions.format) {
+        requestBody.format = sharedOptions.format;
+      }
 
       await this.post<void>(`/session/${sessionId}/prompt_async`, requestBody);
-
 
       const streamContext = this.createActiveStreamContext(sessionId);
       yield { type: 'message_start' };
@@ -1414,6 +1453,9 @@ export class OpenCodeService {
     system?: string;
     tools?: Record<string, boolean>;
     variant?: string;
+    agent?: string;
+    noReply?: boolean;
+    format?: SdkOutputFormat;
   } {
     if (options.thinkingBudget !== undefined) {
       logger.debug('thinkingBudget is not currently mapped to the SDK v2 prompt payload and is being omitted', {
@@ -1431,6 +1473,9 @@ export class OpenCodeService {
       system?: string;
       tools?: Record<string, boolean>;
       variant?: string;
+      agent?: string;
+      noReply?: boolean;
+      format?: SdkOutputFormat;
     } = {
       sessionID: sessionId,
       model: {
@@ -1440,18 +1485,24 @@ export class OpenCodeService {
       parts,
     };
 
-    const tools = this.buildAllowedToolsRecord(options.allowedTools);
-    if (tools) {
-      parameters.tools = tools;
+    const sharedOptions = this.buildSharedPromptOptions(options);
+    if (sharedOptions.system) {
+      parameters.system = sharedOptions.system;
     }
-
-    const variant = this.resolveSdkVariant(options);
-    if (variant) {
-      parameters.variant = variant;
+    if (sharedOptions.tools) {
+      parameters.tools = sharedOptions.tools;
     }
-
-    if (options.system?.trim()) {
-      parameters.system = options.system.trim();
+    if (sharedOptions.variant) {
+      parameters.variant = sharedOptions.variant;
+    }
+    if (sharedOptions.agent) {
+      parameters.agent = sharedOptions.agent;
+    }
+    if (typeof sharedOptions.noReply === 'boolean') {
+      parameters.noReply = sharedOptions.noReply;
+    }
+    if (sharedOptions.format) {
+      parameters.format = this.resolveSdkOutputFormat(sharedOptions.format);
     }
 
     return parameters;
@@ -1651,6 +1702,83 @@ export class OpenCodeService {
     }
 
     return Object.fromEntries(allowedTools.map((toolName) => [toolName, true]));
+  }
+
+  private buildSharedPromptOptions(
+    options: QueryOptions & { system?: string },
+  ): {
+    system?: string;
+    tools?: Record<string, boolean>;
+    variant?: string;
+    agent?: string;
+    noReply?: boolean;
+    format?: LocalOutputFormat;
+  } {
+    const sharedOptions: {
+      system?: string;
+      tools?: Record<string, boolean>;
+      variant?: string;
+      agent?: string;
+      noReply?: boolean;
+      format?: LocalOutputFormat;
+    } = {};
+
+    const tools = this.buildAllowedToolsRecord(options.allowedTools);
+    if (tools) {
+      sharedOptions.tools = tools;
+    }
+
+    const variant = this.resolveSdkVariant(options);
+    if (variant) {
+      sharedOptions.variant = variant;
+    }
+
+    if (options.system?.trim()) {
+      sharedOptions.system = options.system.trim();
+    }
+
+    if (typeof options.agent === 'string' && options.agent.trim()) {
+      sharedOptions.agent = options.agent.trim();
+    }
+
+    if (typeof options.noReply === 'boolean') {
+      sharedOptions.noReply = options.noReply;
+    }
+
+    const format = this.resolveLocalOutputFormat(options.format);
+    if (format) {
+      sharedOptions.format = format;
+    }
+
+    return sharedOptions;
+  }
+
+  private resolveLocalOutputFormat(format?: LocalOutputFormat): LocalOutputFormat | undefined {
+    if (!format) {
+      return undefined;
+    }
+
+    if (format.type === 'text') {
+      return { type: 'text' };
+    }
+
+    return {
+      type: 'json_schema',
+      schema: format.schema,
+      ...(typeof format.retryCount === 'number' ? { retryCount: format.retryCount } : {}),
+    };
+  }
+
+  private resolveSdkOutputFormat(format: LocalOutputFormat): SdkOutputFormat {
+    if (format.type === 'text') {
+      return { type: 'text' };
+    }
+
+    return {
+      type: 'json_schema',
+      schema: format.schema,
+      ...(typeof format.retryCount === 'number' ? { retryCount: format.retryCount } : {}),
+    };
   }
 
   private resolveSdkVariant(options: QueryOptions): string | undefined {
@@ -2820,6 +2948,7 @@ export class OpenCodeService {
       : omo?.kind === 'system-reminder'
         ? omo.reminderText
         : content;
+    const structured = role === 'assistant' ? info.structured : undefined;
 
     return {
       id: info.id,
@@ -2838,6 +2967,7 @@ export class OpenCodeService {
       displayStyle: omo?.kind === 'system-reminder' ? 'notice' : undefined,
       noticeTone: omo?.kind === 'system-reminder' ? 'info' : undefined,
       omo: omo ?? undefined,
+      structured,
       parts,
     };
   }

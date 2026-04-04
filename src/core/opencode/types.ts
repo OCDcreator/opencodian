@@ -37,11 +37,26 @@ export interface ServerError {
   recoverable: boolean;
 }
 
+export interface LocalTextOutputFormat {
+  type: 'text';
+}
+
+export interface LocalJsonSchemaOutputFormat {
+  type: 'json_schema';
+  schema: Record<string, unknown>;
+  retryCount?: number;
+}
+
+export type LocalOutputFormat = LocalTextOutputFormat | LocalJsonSchemaOutputFormat;
+
 /** Query options */
 export interface QueryOptions {
   sessionId?: string;
   model?: string;
   provider?: string;
+  agent?: string;
+  noReply?: boolean;
+  format?: LocalOutputFormat;
   images?: ImageAttachment[];
   contextItems?: PromptContextItem[];
   allowedTools?: string[];

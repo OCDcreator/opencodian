@@ -154,6 +154,7 @@ export interface ChatMessage {
   contextAttachments?: MessageContextAttachment[];
   questionResolution?: QuestionResolution;
   omo?: OmoMessageMeta;
+  structured?: unknown;
   // OpenCode-specific: store original parts for advanced features
   parts?: unknown[];
 }

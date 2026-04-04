@@ -12,6 +12,48 @@
 
 ---
 
+## 2026-04-04 下沉 Prompt 选项、标题结构化输出，并默认启用 SDK Questions
+
+### 🎯 改动目标
+
+- 让 `OpenCodeService` 的本地 facade 不再只支持 provider/model/tools/context，而是补齐上游已稳定的 `agent`、`format`、`noReply` prompt 能力
+- 让会话标题生成优先消费结构化输出，避免继续完全依赖“读取纯文本第一行”的脆弱解析路径
+- 把 `sdkQuestions` rollout 默认打开，同时继续保留现有 legacy `/question` fallback，降低切换风险
+
+### ✅ 本轮调整
+
+- `src/core/opencode/types.ts`
+  - 为本地 query 层新增 `LocalOutputFormat`
+  - 扩展 `QueryOptions`，补入 `agent`、`noReply`、`format`
+
+- `src/core/opencode/OpenCodeService.ts`
+  - 新增共享 prompt 选项归一化逻辑，把 `system` / `tools` / `variant` / `agent` / `noReply` / `format` 同时映射到 SDK 与 legacy prompt 请求
+  - 让 `requestAssistantResponse()` 与 `sendMessage()` 两条链路都支持新的 prompt 选项
+  - 在 assistant 消息归一化时保留 `structured` payload，同时不改变原有 text / thinking / tool / OMO / context attachment 处理
+
+- `src/core/types/chat.ts`
+  - 为 `ChatMessage` 新增可选 `structured` 字段，承接 assistant 的结构化结果
+
+- `src/features/chat/services/TitleGenerationService.ts`
+  - 标题生成改为优先请求 `json_schema` 输出，目标结构固定为 `{ title: string }`
+  - 解析顺序改为 structured title 优先，纯文本 `parseTitle()` 作为 fallback
+  - 继续保留现有标题清理、截断、标点收尾与临时 session 清理逻辑
+
+- `src/core/opencode/sdkFeatureFlags.ts`
+  - 将 `sdkQuestions` 加入运行时默认 rollout
+
+- `tests/unit/core/opencode/OpenCodeService.test.ts`
+- `tests/unit/features/chat/TitleGenerationService.test.ts`
+  - 补齐 SDK questions 优先/回退、prompt 参数映射、structured message 保留、标题生成 structured 优先与 fallback 行为的单测
+
+### 🧪 当前验证
+
+- 已通过：`node scripts/run-jest.js tests/unit/core/opencode/OpenCodeService.test.ts tests/unit/features/chat/TitleGenerationService.test.ts`
+- 已通过：`npx eslint src/core/opencode/types.ts src/core/types/chat.ts src/core/opencode/OpenCodeService.ts src/core/opencode/sdkFeatureFlags.ts src/core/opencode/index.ts src/features/chat/services/TitleGenerationService.ts tests/unit/core/opencode/OpenCodeService.test.ts tests/unit/features/chat/TitleGenerationService.test.ts`
+- 已通过：`npm run build`（`BUILD_ID: main.202604042059`）
+- 已部署：`dist/main.js`、`dist/manifest.json`、`dist/styles.css` 已复制到 Test Vault，并确认插件端 `main.js` 含 `BUILD_ID: main.202604042059`
+- 已知阻塞：`npm run typecheck` 仍被仓库中既有的 `src/core/theme/index.ts` 类型错误拦住，本轮未扩散该问题
+
 ## 2026-04-04 模块文档 review 收口：统一配置路径、修正事实偏差、提交并行工作流
 
 ### 🎯 改动目标

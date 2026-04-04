@@ -11,6 +11,9 @@ export {
 } from './sdkFeatureFlags';
 export { ServerManager } from './ServerManager';
 export type {
+  LocalJsonSchemaOutputFormat,
+  LocalOutputFormat,
+  LocalTextOutputFormat,
   OpenCodeClientConfig,
   OpenCodeServerConfig,
   QueryOptions,
