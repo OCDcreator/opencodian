@@ -19,6 +19,7 @@ export const LIQUID_DIAMOND_DEMO_STAGE_SIZE = 220;
 
 const INTERACTIVE_CANVAS_DPI = 0.55;
 const SETTLED_CANVAS_DPI = 1;
+const INTERACTION_IMAGE_SYNC_INTERVAL_MS = 33;
 const DEFAULT_THETA = 0.64;
 const DEFAULT_PHI = -0.42;
 const DRAG_ELASTIC = 0.16;
@@ -32,6 +33,11 @@ const PHI_MAX = 1.35;
 
 type RenderQuality = 'interactive' | 'settled';
 type RenderBackend = 'cpu' | 'webgl';
+type ImageSyncRequest = {
+  requestId: number;
+  scale: number;
+  force: boolean;
+};
 
 type DemoState = {
   parentEl: HTMLElement;
@@ -54,6 +60,12 @@ type DemoState = {
   size: DiamondSize;
   imageData: ImageData | null;
   rawValues: Float32Array | null;
+  currentImageUrl: string;
+  nextImageSyncRequestId: number;
+  imageSyncPendingRequest: ImageSyncRequest | null;
+  imageSyncQueuedRequest: ImageSyncRequest | null;
+  lastImageSyncTime: number;
+  destroyed: boolean;
   supportsBackdropFilterUrl: boolean;
   x: number;
   y: number;
@@ -181,6 +193,137 @@ function createFaceSvgElement(): SVGSVGElement {
   return element;
 }
 
+function setFeImageHref(state: DemoState, value: string): void {
+  state.feImageEl.setAttribute('href', value);
+  state.feImageEl.setAttributeNS(XLINK_NS, 'href', value);
+}
+
+function releaseFeImageUrl(state: DemoState): void {
+  if (
+    state.currentImageUrl.startsWith('blob:')
+    && window.URL
+    && typeof window.URL.revokeObjectURL === 'function'
+  ) {
+    window.URL.revokeObjectURL(state.currentImageUrl);
+  }
+  state.currentImageUrl = '';
+}
+
+function applyDisplacementSnapshot(
+  state: DemoState,
+  href: string,
+  scale: number,
+  isBlobUrl: boolean,
+): void {
+  releaseFeImageUrl(state);
+  state.currentImageUrl = isBlobUrl ? href : '';
+  setFeImageHref(state, href);
+  state.feDisplacementMapEl.setAttribute('scale', formatNumber(scale));
+  state.lastImageSyncTime = performance.now();
+}
+
+function flushQueuedImageSyncRequest(state: DemoState): void {
+  if (
+    state.destroyed
+    || state.imageSyncPendingRequest
+    || !state.imageSyncQueuedRequest
+  ) {
+    return;
+  }
+
+  const nextRequest = state.imageSyncQueuedRequest;
+  state.imageSyncQueuedRequest = null;
+  syncCanvasToFeImage(state, nextRequest);
+}
+
+function syncCanvasToFeImage(
+  state: DemoState,
+  syncRequest: ImageSyncRequest,
+): void {
+  if (state.destroyed) {
+    return;
+  }
+
+  if (state.imageSyncPendingRequest) {
+    state.imageSyncQueuedRequest = syncRequest;
+    return;
+  }
+
+  if (
+    !state.canvasEl.toBlob
+    || !window.URL
+    || typeof window.URL.createObjectURL !== 'function'
+  ) {
+    if (
+      !state.destroyed
+      && syncRequest.requestId === state.nextImageSyncRequestId
+    ) {
+      applyDisplacementSnapshot(
+        state,
+        state.canvasEl.toDataURL(),
+        syncRequest.scale,
+        false,
+      );
+    }
+    return;
+  }
+
+  state.imageSyncPendingRequest = syncRequest;
+  state.canvasEl.toBlob((blob) => {
+    state.imageSyncPendingRequest = null;
+
+    if (!blob || state.destroyed) {
+      flushQueuedImageSyncRequest(state);
+      return;
+    }
+
+    if (syncRequest.requestId !== state.nextImageSyncRequestId) {
+      flushQueuedImageSyncRequest(state);
+      return;
+    }
+
+    const nextUrl = window.URL.createObjectURL(blob);
+    if (
+      state.destroyed
+      || syncRequest.requestId !== state.nextImageSyncRequestId
+    ) {
+      window.URL.revokeObjectURL(nextUrl);
+      flushQueuedImageSyncRequest(state);
+      return;
+    }
+
+    applyDisplacementSnapshot(state, nextUrl, syncRequest.scale, true);
+    flushQueuedImageSyncRequest(state);
+  }, 'image/png');
+}
+
+function queueCanvasSync(
+  state: DemoState,
+  scale: number,
+  quality: RenderQuality,
+): void {
+  if (state.destroyed) {
+    return;
+  }
+
+  const force = quality === 'settled';
+  const now = performance.now();
+  const shouldSync =
+    force
+    || !!state.imageSyncPendingRequest
+    || now - state.lastImageSyncTime >= INTERACTION_IMAGE_SYNC_INTERVAL_MS;
+
+  if (!shouldSync) {
+    return;
+  }
+
+  syncCanvasToFeImage(state, {
+    requestId: (state.nextImageSyncRequestId += 1),
+    scale,
+    force,
+  });
+}
+
 function getBounds(state: DemoState): { minX: number; maxX: number; minY: number; maxY: number } {
   const width = state.interactionLayerEl.clientWidth || state.parentEl.clientWidth || LIQUID_DIAMOND_DEMO_STAGE_SIZE;
   const height = state.interactionLayerEl.clientHeight || state.parentEl.clientHeight || LIQUID_DIAMOND_DEMO_STAGE_SIZE;
@@ -256,6 +399,9 @@ function renderDisplacementMapAtQuality(
   const dpi = getCanvasDpiForQuality(quality);
   const pixelWidth = Math.max(1, Math.round(state.size.cssWidth * dpi));
   const pixelHeight = Math.max(1, Math.round(state.size.cssHeight * dpi));
+  state.size.pixelWidth = pixelWidth;
+  state.size.pixelHeight = pixelHeight;
+  state.size.dpi = dpi;
 
   if (state.canvasEl.width !== pixelWidth) {
     state.canvasEl.width = pixelWidth;
@@ -271,9 +417,6 @@ function renderDisplacementMapAtQuality(
       pixelHeight,
       dpi,
     });
-    const dataUrl = state.canvasEl.toDataURL();
-    state.feImageEl.setAttribute('href', dataUrl);
-    state.feImageEl.setAttributeNS(XLINK_NS, 'href', dataUrl);
     return displacementScale;
   }
 
@@ -330,9 +473,6 @@ function renderDisplacementMapAtQuality(
   }
 
   state.canvasCtx.putImageData(state.imageData, 0, 0);
-  const dataUrl = state.canvasEl.toDataURL();
-  state.feImageEl.setAttribute('href', dataUrl);
-  state.feImageEl.setAttributeNS(XLINK_NS, 'href', dataUrl);
   return (maxScale * 2) / dpi;
 }
 
@@ -403,7 +543,7 @@ function renderScene(state: DemoState, quality: RenderQuality): void {
   const phi = clamp(DEFAULT_PHI - state.y * PHI_PER_PX, PHI_MIN, PHI_MAX);
   const context = createDiamondContext(theta, phi, state.size);
   const displacementScale = renderDisplacementMapAtQuality(state, context, quality);
-  state.feDisplacementMapEl.setAttribute('scale', formatNumber(displacementScale));
+  queueCanvasSync(state, displacementScale, quality);
   renderVisualLayers(state, context);
 }
 
@@ -590,6 +730,12 @@ function createState(parentEl: HTMLElement, backend: RenderBackend): DemoState {
     size,
     imageData: null,
     rawValues: null,
+    currentImageUrl: '',
+    nextImageSyncRequestId: 0,
+    imageSyncPendingRequest: null,
+    imageSyncQueuedRequest: null,
+    lastImageSyncTime: 0,
+    destroyed: false,
     supportsBackdropFilterUrl: supportsBackdropFilterUrl(),
     x: 0,
     y: 0,
@@ -702,6 +848,7 @@ function createState(parentEl: HTMLElement, backend: RenderBackend): DemoState {
 }
 
 function destroyState(state: DemoState): void {
+  state.destroyed = true;
   if (state.inertiaFrameId !== null) {
     window.cancelAnimationFrame(state.inertiaFrameId);
   }
@@ -709,6 +856,8 @@ function destroyState(state: DemoState): void {
     window.cancelAnimationFrame(state.renderFrameId);
   }
 
+  state.imageSyncQueuedRequest = null;
+  state.imageSyncPendingRequest = null;
   releasePointerCaptureIfNeeded(state, state.pointerId);
   state.hostEl.removeEventListener('pointerdown', state.pointerDownHandler);
   state.hostEl.removeEventListener('pointermove', state.pointerMoveHandler);
@@ -716,6 +865,7 @@ function destroyState(state: DemoState): void {
   state.hostEl.removeEventListener('pointercancel', state.pointerUpHandler);
   window.removeEventListener('resize', state.resizeHandler);
   state.webGlRenderer?.destroy();
+  releaseFeImageUrl(state);
   state.canvasEl.width = 0;
   state.canvasEl.height = 0;
   state.overlayEl.remove();
