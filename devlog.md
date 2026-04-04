@@ -12,6 +12,47 @@
 
 ---
 
+## 2026-04-04 钻石 WebGL 命令分流、补充控制台诊断，并将命令名称统一汉化
+
+### 🎯 改动目标
+
+- 保留原有 CPU 钻石演示命令，同时新增独立的 WebGL 对照命令，方便在同一插件里直接比较两种渲染路径
+- 在 WebGL 初始化链路里补充更细的控制台诊断，快速区分“环境不支持 WebGL2”和“shader / program 初始化失败”
+- 将插件里现有英文命令名称统一翻译为中文，减少命令面板中的中英混杂
+
+### ✅ 本轮调整
+
+- `src/main.ts`
+  - 新增 `toggle-liquid-diamond-demo-webgl` 命令，和原 CPU 钻石命令并行保留
+  - 将现有命令名称统一改为中文
+  - 顺手把 ribbon 提示和 inline edit 的临时 Notice 改成中文
+
+- `src/features/chat/OpenCodianView.ts`
+  - 为钻石演示增加 CPU / WebGL 双控制器入口
+  - 切换某一条演示命令时会自动销毁另一条，避免两个 overlay 同时叠加
+  - WebGL 初始化失败时，提示用户去开发者控制台查看具体原因
+
+- `src/features/chat/liquidDiamondDemo.ts`
+  - 让现有浮动钻石 demo controller 支持 `cpu` / `webgl` 两种后端
+  - WebGL 命令不再静默回退到 CPU，避免影响效果对照
+
+- `src/features/chat/liquidDiamondDemoWebgl.ts`
+  - 新增独立 WebGL2 displacement renderer
+  - 将位移图编码范围改为自适应估算，减少固定范围导致的量化浪费
+  - 增加 WebGL2 context / API surface / shader 初始化日志
+  - 修复 GLSL 常量插值时整数被写入 `float` 常量定义，导致 shader 编译失败的问题
+
+- `tests/unit/features/chat/liquidDiamondDemo.test.ts`
+- `tests/unit/main.test.ts`
+  - 补充 WebGL 命令转发、WebGL mock 挂载，以及双命令分流的回归测试
+
+### 🧪 当前验证
+
+- 已通过：`npx jest tests/unit/features/chat/liquidDiamondDemo.test.ts tests/unit/main.test.ts --runInBand`
+- 已通过：`npm run check:devlog-order`
+- 已通过：`npm run build`（`BUILD_ID: main.202604042125`）
+- 已部署：`dist/main.js`、`dist/manifest.json`、`dist/styles.css` 已复制到 Test Vault，并确认插件端 `main.js` 含 `BUILD_ID: main.202604042125`
+
 ## 2026-04-04 下沉 Prompt 选项、标题结构化输出，并默认启用 SDK Questions
 
 ### 🎯 改动目标

@@ -217,14 +217,14 @@ export default class OpenCodianPlugin extends Plugin {
     );
 
     // Add ribbon icon
-    this.addRibbonIcon('bot', 'Open OpenCodian', () => {
+    this.addRibbonIcon('bot', '打开 OpenCodian', () => {
       this.activateView();
     });
 
     // Register commands
     this.addCommand({
       id: 'open-view',
-      name: 'Open chat view',
+      name: '打开聊天视图',
       callback: () => {
         this.activateView();
       },
@@ -232,7 +232,7 @@ export default class OpenCodianPlugin extends Plugin {
 
     this.addCommand({
       id: 'new-conversation',
-      name: 'New conversation',
+      name: '新建会话',
       callback: async () => {
         await this.createConversation();
       },
@@ -240,27 +240,40 @@ export default class OpenCodianPlugin extends Plugin {
 
     this.addCommand({
       id: 'toggle-liquid-diamond-demo',
-      name: 'Toggle diamond demo',
+      name: '切换钻石演示',
       callback: async () => {
         await this.toggleLiquidDiamondDemoForCurrentView();
       },
     });
 
     this.addCommand({
+      id: 'toggle-liquid-diamond-demo-webgl',
+      name: '切换钻石演示（WebGL）',
+      callback: async () => {
+        await this.toggleLiquidDiamondWebGlDemoForCurrentView();
+      },
+    });
+
+    this.addCommand({
       id: 'inline-edit',
-      name: 'Inline edit',
+      name: '行内编辑',
       editorCallback: async (editor: Editor, view: MarkdownView) => {
         const selectedText = editor.getSelection();
-        const notePath = view.file?.path || 'unknown';
+        const notePath = view.file?.path || '未知笔记';
 
         // TODO: Implement inline edit modal
-        new Notice('Inline edit: ' + (selectedText ? 'selection' : 'cursor') + ' at ' + notePath);
+        new Notice(
+          '行内编辑：'
+          + (selectedText ? '选区' : '光标')
+          + '，位置 '
+          + notePath,
+        );
       },
     });
 
     this.addCommand({
       id: 'add-current-note-to-context',
-      name: 'Add current note to OpenCodian context',
+      name: '将当前笔记添加到 OpenCodian 上下文',
       callback: async () => {
         await this.activateView();
         await this.getOpenCodianView()?.addCurrentNoteContextFromActiveEditor();
@@ -269,7 +282,7 @@ export default class OpenCodianPlugin extends Plugin {
 
     this.addCommand({
       id: 'add-selection-to-context',
-      name: 'Add selection to OpenCodian context',
+      name: '将选区添加到 OpenCodian 上下文',
       editorCallback: async (editor: Editor, view: MarkdownView) => {
         await this.activateView();
         await this.getOpenCodianView()?.addSelectionContextFromActiveEditor(editor, view);
@@ -323,6 +336,11 @@ export default class OpenCodianPlugin extends Plugin {
   async toggleLiquidDiamondDemoForCurrentView(): Promise<void> {
     await this.activateView();
     this.getOpenCodianView()?.toggleLiquidDiamondDemo();
+  }
+
+  async toggleLiquidDiamondWebGlDemoForCurrentView(): Promise<void> {
+    await this.activateView();
+    this.getOpenCodianView()?.toggleLiquidDiamondWebGlDemo();
   }
 
   /** Load settings from storage */

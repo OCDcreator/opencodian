@@ -6,6 +6,10 @@ import {
   type DiamondProjectedFace,
   type DiamondSize,
 } from '../../utils/glass/adapters/shudingDiamond';
+import {
+  createLiquidDiamondDemoWebGlRenderer,
+  type LiquidDiamondDemoWebGlRenderer,
+} from './liquidDiamondDemoWebgl';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const XLINK_NS = 'http://www.w3.org/1999/xlink';
@@ -27,6 +31,7 @@ const PHI_MIN = -1.35;
 const PHI_MAX = 1.35;
 
 type RenderQuality = 'interactive' | 'settled';
+type RenderBackend = 'cpu' | 'webgl';
 
 type DemoState = {
   parentEl: HTMLElement;
@@ -44,7 +49,8 @@ type DemoState = {
   rimEl: HTMLDivElement;
   faceSvgEl: SVGSVGElement;
   canvasEl: HTMLCanvasElement;
-  canvasCtx: CanvasRenderingContext2D;
+  canvasCtx: CanvasRenderingContext2D | null;
+  webGlRenderer: LiquidDiamondDemoWebGlRenderer | null;
   size: DiamondSize;
   imageData: ImageData | null;
   rawValues: Float32Array | null;
@@ -258,6 +264,23 @@ function renderDisplacementMapAtQuality(
     state.canvasEl.height = pixelHeight;
   }
 
+  if (state.webGlRenderer) {
+    const displacementScale = state.webGlRenderer.render(context, {
+      ...state.size,
+      pixelWidth,
+      pixelHeight,
+      dpi,
+    });
+    const dataUrl = state.canvasEl.toDataURL();
+    state.feImageEl.setAttribute('href', dataUrl);
+    state.feImageEl.setAttributeNS(XLINK_NS, 'href', dataUrl);
+    return displacementScale;
+  }
+
+  if (!state.canvasCtx) {
+    throw new Error('[OpenCodian] Unable to render the CPU diamond demo without a 2D canvas context.');
+  }
+
   if (
     !state.imageData
     || state.imageData.width !== pixelWidth
@@ -462,7 +485,7 @@ function releasePointerCaptureIfNeeded(state: DemoState, pointerId: number | nul
   }
 }
 
-function createState(parentEl: HTMLElement): DemoState {
+function createState(parentEl: HTMLElement, backend: RenderBackend): DemoState {
   const overlayEl = document.createElement('div');
   overlayEl.className = 'opencodian-liquid-diamond-demo-overlay';
   overlayEl.setAttribute('data-opencodian-liquid-diamond-demo-role', 'overlay');
@@ -522,9 +545,16 @@ function createState(parentEl: HTMLElement): DemoState {
   stageEl.append(bloomEl, rimEl, crystalEl, faceSvgEl);
 
   const canvasEl = document.createElement('canvas');
-  const canvasCtx = canvasEl.getContext('2d');
-  if (!canvasCtx) {
-    throw new Error('[OpenCodian] Unable to create a 2D canvas context for the floating diamond demo.');
+  const webGlRenderer =
+    backend === 'webgl'
+      ? createLiquidDiamondDemoWebGlRenderer(canvasEl)
+      : null;
+  if (backend === 'webgl' && !webGlRenderer) {
+    throw new Error('[OpenCodian] Unable to create a WebGL2 renderer for the floating diamond demo.');
+  }
+  const canvasCtx = backend === 'webgl' ? null : canvasEl.getContext('2d');
+  if (backend === 'cpu' && !canvasCtx) {
+    throw new Error('[OpenCodian] Unable to create a 2D canvas renderer for the floating diamond demo.');
   }
   canvasEl.style.display = 'none';
   hostEl.appendChild(canvasEl);
@@ -556,6 +586,7 @@ function createState(parentEl: HTMLElement): DemoState {
     faceSvgEl,
     canvasEl,
     canvasCtx,
+    webGlRenderer,
     size,
     imageData: null,
     rawValues: null,
@@ -684,6 +715,7 @@ function destroyState(state: DemoState): void {
   state.hostEl.removeEventListener('pointerup', state.pointerUpHandler);
   state.hostEl.removeEventListener('pointercancel', state.pointerUpHandler);
   window.removeEventListener('resize', state.resizeHandler);
+  state.webGlRenderer?.destroy();
   state.canvasEl.width = 0;
   state.canvasEl.height = 0;
   state.overlayEl.remove();
@@ -692,7 +724,10 @@ function destroyState(state: DemoState): void {
 export class LiquidDiamondDemoController {
   private state: DemoState | null = null;
 
-  constructor(private readonly parentEl: HTMLElement) {}
+  constructor(
+    private readonly parentEl: HTMLElement,
+    private readonly backend: RenderBackend = 'cpu',
+  ) {}
 
   isVisible(): boolean {
     return this.state !== null;
@@ -703,7 +738,7 @@ export class LiquidDiamondDemoController {
       return;
     }
 
-    this.state = createState(this.parentEl);
+    this.state = createState(this.parentEl, this.backend);
   }
 
   hide(): void {

@@ -121,3 +121,30 @@ describe('OpenCodianPlugin.toggleLiquidDiamondDemoForCurrentView', () => {
     expect(view.toggleLiquidDiamondDemo).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('OpenCodianPlugin.toggleLiquidDiamondWebGlDemoForCurrentView', () => {
+  it('activates the view and forwards the WebGL toggle to the current OpenCodian view', async () => {
+    const plugin = new OpenCodianPlugin() as OpenCodianPlugin & {
+      activateView: jest.Mock<Promise<void>, []>;
+      getOpenCodianView: () => { toggleLiquidDiamondWebGlDemo: jest.Mock } | null;
+    };
+    const view = {
+      toggleLiquidDiamondWebGlDemo: jest.fn(),
+    };
+
+    plugin.activateView = jest.fn().mockResolvedValue(undefined);
+    jest
+      .spyOn(
+        plugin as unknown as {
+          getOpenCodianView: () => typeof view | null;
+        },
+        'getOpenCodianView',
+      )
+      .mockReturnValue(view);
+
+    await plugin.toggleLiquidDiamondWebGlDemoForCurrentView();
+
+    expect(plugin.activateView).toHaveBeenCalledTimes(1);
+    expect(view.toggleLiquidDiamondWebGlDemo).toHaveBeenCalledTimes(1);
+  });
+});

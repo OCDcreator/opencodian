@@ -454,6 +454,7 @@ export class OpenCodianView extends ItemView {
   private composerSvgFilterLayerEl: HTMLElement | null = null;
   private activeLiquidGlassAdapter: GlassEffectAdapter | null = null;
   private liquidDiamondDemoController: LiquidDiamondDemoController | null = null;
+  private liquidDiamondWebGlDemoController: LiquidDiamondDemoController | null = null;
   private composerContextRowEl: HTMLElement | null = null;
   private questionDockMountEl: HTMLElement | null = null;
   private questionDock: QuestionDock | null = null;
@@ -2905,25 +2906,70 @@ export class OpenCodianView extends ItemView {
   }
 
   public toggleLiquidDiamondDemo(): void {
+    this.toggleLiquidDiamondDemoVariant('cpu');
+  }
+
+  public toggleLiquidDiamondWebGlDemo(): void {
+    this.toggleLiquidDiamondDemoVariant('webgl');
+  }
+
+  private toggleLiquidDiamondDemoVariant(backend: 'cpu' | 'webgl'): void {
     if (!this.messagesShellEl) {
       return;
     }
 
-    if (!this.liquidDiamondDemoController) {
-      this.liquidDiamondDemoController = new LiquidDiamondDemoController(this.messagesShellEl);
+    const activeController =
+      backend === 'webgl'
+        ? this.liquidDiamondWebGlDemoController
+        : this.liquidDiamondDemoController;
+    const otherController =
+      backend === 'webgl'
+        ? this.liquidDiamondDemoController
+        : this.liquidDiamondWebGlDemoController;
+
+    if (!activeController) {
+      const controller = new LiquidDiamondDemoController(this.messagesShellEl, backend);
+      if (backend === 'webgl') {
+        this.liquidDiamondWebGlDemoController = controller;
+      } else {
+        this.liquidDiamondDemoController = controller;
+      }
     }
 
-    if (this.liquidDiamondDemoController.isVisible()) {
-      this.liquidDiamondDemoController.destroy();
-      this.liquidDiamondDemoController = null;
+    const nextActiveController =
+      backend === 'webgl'
+        ? this.liquidDiamondWebGlDemoController
+        : this.liquidDiamondDemoController;
+    if (!nextActiveController) {
       return;
     }
 
+    if (nextActiveController.isVisible()) {
+      nextActiveController.destroy();
+      if (backend === 'webgl') {
+        this.liquidDiamondWebGlDemoController = null;
+      } else {
+        this.liquidDiamondDemoController = null;
+      }
+      return;
+    }
+
+    otherController?.destroy();
+    if (backend === 'webgl') {
+      this.liquidDiamondDemoController = null;
+    } else {
+      this.liquidDiamondWebGlDemoController = null;
+    }
+
     try {
-      this.liquidDiamondDemoController.show();
+      nextActiveController.show();
     } catch (error) {
-      logger.warn('Failed to initialize CPU liquid diamond demo', error);
-      new Notice('Diamond demo is not available in this environment.');
+      logger.warn(`Failed to initialize ${backend} liquid diamond demo`, error);
+      new Notice(
+        backend === 'webgl'
+          ? 'WebGL diamond demo is not available in this environment. See developer console for details.'
+          : 'Diamond demo is not available in this environment.',
+      );
       this.destroyLiquidDiamondDemo();
       return;
     }
@@ -2932,6 +2978,8 @@ export class OpenCodianView extends ItemView {
   private destroyLiquidDiamondDemo(): void {
     this.liquidDiamondDemoController?.destroy();
     this.liquidDiamondDemoController = null;
+    this.liquidDiamondWebGlDemoController?.destroy();
+    this.liquidDiamondWebGlDemoController = null;
   }
 
   private getLiquidGlassAdapterId(themeId: InputPanelThemeId): LiquidGlassAdapterId | null {
