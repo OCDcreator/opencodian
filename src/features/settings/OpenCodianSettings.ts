@@ -2025,14 +2025,42 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       group: 'assistant',
       name: t('settings.style.assistant.metaFontSize.name'),
       desc: t('settings.style.assistant.metaFontSize.desc'),
-      min: 8,
-      max: 18,
+      min: 6,
+      max: 36,
       step: 1,
       unit: 'px',
       value: () => this.plugin.settings.chatAppearance.assistant.metaFontSize,
       resetValue: () => this.plugin.getChatAppearanceBaseline().assistant.metaFontSize,
       setValue: (appearance, value) => {
         appearance.assistant.metaFontSize = value;
+      },
+    });
+    this.addNumericStyleControl(assistantGroupEl, {
+      group: 'assistant',
+      name: t('settings.style.assistant.timeFontSize.name'),
+      desc: t('settings.style.assistant.timeFontSize.desc'),
+      min: 6,
+      max: 36,
+      step: 1,
+      unit: 'px',
+      value: () => this.plugin.settings.chatAppearance.assistant.timeFontSize,
+      resetValue: () => this.plugin.getChatAppearanceBaseline().assistant.timeFontSize,
+      setValue: (appearance, value) => {
+        appearance.assistant.timeFontSize = value;
+      },
+    });
+    this.addNumericStyleControl(assistantGroupEl, {
+      group: 'assistant',
+      name: t('settings.style.assistant.timeFontWeight.name'),
+      desc: t('settings.style.assistant.timeFontWeight.desc'),
+      min: 100,
+      max: 900,
+      step: 1,
+      unit: '',
+      value: () => this.plugin.settings.chatAppearance.assistant.timeFontWeight,
+      resetValue: () => this.plugin.getChatAppearanceBaseline().assistant.timeFontWeight,
+      setValue: (appearance, value) => {
+        appearance.assistant.timeFontWeight = value;
       },
     });
     this.addColorStyleControl(assistantGroupEl, {
@@ -2063,6 +2091,34 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       resetValue: () => this.plugin.getChatAppearanceBaseline().assistant.modelIdColor,
       setValue: (appearance, value) => {
         appearance.assistant.modelIdColor = value;
+      },
+    });
+    this.addNumericStyleControl(assistantGroupEl, {
+      group: 'assistant',
+      name: t('settings.style.assistant.modelIdFontSize.name'),
+      desc: t('settings.style.assistant.modelIdFontSize.desc'),
+      min: 6,
+      max: 36,
+      step: 1,
+      unit: 'px',
+      value: () => this.plugin.settings.chatAppearance.assistant.modelIdFontSize,
+      resetValue: () => this.plugin.getChatAppearanceBaseline().assistant.modelIdFontSize,
+      setValue: (appearance, value) => {
+        appearance.assistant.modelIdFontSize = value;
+      },
+    });
+    this.addNumericStyleControl(assistantGroupEl, {
+      group: 'assistant',
+      name: t('settings.style.assistant.modelIdFontWeight.name'),
+      desc: t('settings.style.assistant.modelIdFontWeight.desc'),
+      min: 100,
+      max: 900,
+      step: 1,
+      unit: '',
+      value: () => this.plugin.settings.chatAppearance.assistant.modelIdFontWeight,
+      resetValue: () => this.plugin.getChatAppearanceBaseline().assistant.modelIdFontWeight,
+      setValue: (appearance, value) => {
+        appearance.assistant.modelIdFontWeight = value;
       },
     });
     this.createStyleResetSetting(assistantGroupEl, 'assistant');
@@ -2612,6 +2668,12 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     };
 
     const openColorPicker = () => {
+      const inputWithPicker = colorInput as HTMLInputElement & { showPicker?: () => void };
+      if (typeof inputWithPicker.showPicker === 'function') {
+        inputWithPicker.showPicker();
+        return;
+      }
+
       colorInput.click();
     };
 
@@ -2620,7 +2682,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     followThemeBtn.addEventListener('click', () => {
       commitValue(config.resetValue());
     });
-    colorInput.addEventListener('input', () => {
+    colorInput.addEventListener('change', () => {
       commitValue(colorInput.value);
     });
 
@@ -3771,8 +3833,21 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         return;
       }
 
+      const targetScrollTop = pendingOpenScrollTop ?? this.plugin.settings.settingsPanelScrollTop;
+      if (Math.abs(targetScrollTop) <= SETTINGS_SCROLL_RESTORE_SUCCESS_TOLERANCE_PX) {
+        if (Math.abs(scrollContainer.scrollTop) > SETTINGS_SCROLL_RESTORE_SUCCESS_TOLERANCE_PX) {
+          scrollContainer.scrollTop = 0;
+        }
+        this.plugin.settings.settingsPanelScrollTop = 0;
+        this.lastObservedSettingsScrollTop = 0;
+        if (pendingOpenScrollTop !== null) {
+          this.finishPendingOpenVisibility();
+        }
+        return;
+      }
+
       this.restoreSettingsPanelScrollPosition(
-        pendingOpenScrollTop ?? this.plugin.settings.settingsPanelScrollTop,
+        targetScrollTop,
         scrollContainer,
         pendingOpenScrollTop !== null ? () => this.finishPendingOpenVisibility() : undefined,
       );
@@ -3821,6 +3896,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     let restoreAttempts = 0;
     let restoreSettled = false;
     let restoreQueued = false;
+    let deferredRestoreTrackingStarted = false;
 
     const finishRestore = (reason: string, restoredScrollTop: number): void => {
       if (restoreSettled) {
@@ -3840,6 +3916,14 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       });
       onSettled?.();
     };
+
+    if (Math.abs(normalizedScrollTop) <= SETTINGS_SCROLL_RESTORE_SUCCESS_TOLERANCE_PX) {
+      if (Math.abs(resolvedScrollContainer.scrollTop) > SETTINGS_SCROLL_RESTORE_SUCCESS_TOLERANCE_PX) {
+        resolvedScrollContainer.scrollTop = 0;
+      }
+      finishRestore('already-at-top', resolvedScrollContainer.scrollTop);
+      return;
+    }
 
     const scheduleRestoreSettle = (reason: string): void => {
       if (restoreSettled) {
@@ -3861,6 +3945,49 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       }, settleDelay);
     };
 
+    const startDeferredRestoreTracking = (): void => {
+      if (restoreSettled || deferredRestoreTrackingStarted) {
+        return;
+      }
+
+      deferredRestoreTrackingStarted = true;
+
+      for (const delay of SETTINGS_SCROLL_RESTORE_RETRY_DELAYS) {
+        const timeoutId = window.setTimeout(() => {
+          this.settingsPanelRestoreTimeoutIds = this.settingsPanelRestoreTimeoutIds.filter(
+            (id) => id !== timeoutId,
+          );
+          applyRestore(`timeout-${delay}`);
+        }, delay);
+        this.settingsPanelRestoreTimeoutIds.push(timeoutId);
+      }
+
+      if (typeof MutationObserver !== 'undefined') {
+        this.settingsPanelRestoreObserver = new MutationObserver(() => {
+          queueRestore('mutation');
+        });
+        this.settingsPanelRestoreObserver.observe(this.containerEl, {
+          childList: true,
+          subtree: true,
+          characterData: true,
+        });
+
+        const observerTimeoutId = window.setTimeout(() => {
+          this.settingsPanelRestoreTimeoutIds = this.settingsPanelRestoreTimeoutIds.filter(
+            (id) => id !== observerTimeoutId,
+          );
+          if (restoreSettled) {
+            return;
+          }
+          this.settingsPanelRestoreObserver?.disconnect();
+          this.settingsPanelRestoreObserver = null;
+          applyRestore('observer-timeout');
+          scheduleRestoreSettle('observer-timeout');
+        }, SETTINGS_SCROLL_RESTORE_OBSERVER_WINDOW_MS);
+        this.settingsPanelRestoreTimeoutIds.push(observerTimeoutId);
+      }
+    };
+
     const applyRestore = (reason: string): void => {
       if (restoreSettled) {
         return;
@@ -3874,7 +4001,10 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       const currentScrollTop = resolvedScrollContainer.scrollTop;
       const alreadyAtTarget =
         Math.abs(currentScrollTop - normalizedScrollTop) <= SETTINGS_SCROLL_RESTORE_SUCCESS_TOLERANCE_PX;
-      if (alreadyAtTarget && reason.startsWith('timeout-')) {
+      if (alreadyAtTarget) {
+        if (!reason.startsWith('timeout-')) {
+          scheduleRestoreSettle(reason);
+        }
         return;
       }
 
@@ -3883,7 +4013,10 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       const restoredScrollTop = resolvedScrollContainer.scrollTop;
       if (Math.abs(restoredScrollTop - normalizedScrollTop) <= SETTINGS_SCROLL_RESTORE_SUCCESS_TOLERANCE_PX) {
         scheduleRestoreSettle(reason);
+        return;
       }
+
+      startDeferredRestoreTracking();
     };
 
     const queueRestore = (reason: string): void => {
@@ -3921,41 +4054,6 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       this.settingsPanelRestoreFrameId = null;
       applyRestore('animation-frame');
     });
-
-    for (const delay of SETTINGS_SCROLL_RESTORE_RETRY_DELAYS) {
-      const timeoutId = window.setTimeout(() => {
-        this.settingsPanelRestoreTimeoutIds = this.settingsPanelRestoreTimeoutIds.filter(
-          (id) => id !== timeoutId,
-        );
-        applyRestore(`timeout-${delay}`);
-      }, delay);
-      this.settingsPanelRestoreTimeoutIds.push(timeoutId);
-    }
-
-    if (typeof MutationObserver !== 'undefined') {
-      this.settingsPanelRestoreObserver = new MutationObserver(() => {
-        queueRestore('mutation');
-      });
-      this.settingsPanelRestoreObserver.observe(this.containerEl, {
-        childList: true,
-        subtree: true,
-        characterData: true,
-      });
-
-      const observerTimeoutId = window.setTimeout(() => {
-        this.settingsPanelRestoreTimeoutIds = this.settingsPanelRestoreTimeoutIds.filter(
-          (id) => id !== observerTimeoutId,
-        );
-        if (restoreSettled) {
-          return;
-        }
-        this.settingsPanelRestoreObserver?.disconnect();
-        this.settingsPanelRestoreObserver = null;
-        applyRestore('observer-timeout');
-        scheduleRestoreSettle('observer-timeout');
-      }, SETTINGS_SCROLL_RESTORE_OBSERVER_WINDOW_MS);
-      this.settingsPanelRestoreTimeoutIds.push(observerTimeoutId);
-    }
   }
 
   private captureSettingsPanelScrollPosition(): void {

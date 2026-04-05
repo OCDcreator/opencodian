@@ -435,8 +435,12 @@ export interface ChatAppearanceAssistantSettings {
   blur: number;
   shadowBlur: number;
   metaFontSize: number;
+  timeFontSize: number;
+  timeFontWeight: number;
   metaColor: string;
   timeColor: string;
+  modelIdFontSize: number;
+  modelIdFontWeight: number;
   modelIdColor: string;
 }
 
@@ -586,8 +590,12 @@ export function getDefaultChatAppearanceSettings(): ChatAppearanceSettings {
       blur: 10,
       shadowBlur: 24,
       metaFontSize: 10,
+      timeFontSize: 10,
+      timeFontWeight: 400,
       metaColor: 'var(--text-muted)',
       timeColor: 'var(--text-muted)',
+      modelIdFontSize: 10,
+      modelIdFontWeight: 400,
       modelIdColor: 'var(--text-faint, var(--text-muted))',
     },
     input: {
@@ -654,6 +662,15 @@ function normalizeCssColorValue(value: unknown, fallback: string): string {
 
   const trimmed = value.trim();
   return isValidCssColorValue(trimmed) ? trimmed : fallback;
+}
+
+function normalizeFontWeightValue(value: unknown, fallback: number): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return fallback;
+  }
+
+  const rounded = Math.round(value);
+  return Math.min(900, Math.max(100, rounded));
 }
 
 function normalizeBoolean(value: unknown, fallback: boolean): boolean {
@@ -1146,9 +1163,23 @@ export function normalizeChatAppearanceSettings(
     assistant: {
       ...defaults.assistant,
       ...(assistant ?? {}),
-      metaFontSize: normalizeFiniteNumberInRange(assistant?.metaFontSize, defaults.assistant.metaFontSize, 8, 18),
+      metaFontSize: normalizeFiniteNumberInRange(assistant?.metaFontSize, defaults.assistant.metaFontSize, 6, 36),
+      timeFontSize: normalizeFiniteNumberInRange(
+        assistant?.timeFontSize,
+        normalizeFiniteNumberInRange(assistant?.metaFontSize, defaults.assistant.timeFontSize, 6, 36),
+        6,
+        36,
+      ),
+      timeFontWeight: normalizeFontWeightValue(assistant?.timeFontWeight, defaults.assistant.timeFontWeight),
       metaColor: normalizeCssColorValue(assistant?.metaColor, defaults.assistant.metaColor),
       timeColor: normalizeCssColorValue(assistant?.timeColor, defaults.assistant.timeColor),
+      modelIdFontSize: normalizeFiniteNumberInRange(
+        assistant?.modelIdFontSize,
+        normalizeFiniteNumberInRange(assistant?.metaFontSize, defaults.assistant.modelIdFontSize, 6, 36),
+        6,
+        36,
+      ),
+      modelIdFontWeight: normalizeFontWeightValue(assistant?.modelIdFontWeight, defaults.assistant.modelIdFontWeight),
       modelIdColor: normalizeCssColorValue(assistant?.modelIdColor, defaults.assistant.modelIdColor),
     },
     input: {

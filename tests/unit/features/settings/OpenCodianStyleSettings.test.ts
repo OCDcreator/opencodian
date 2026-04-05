@@ -268,4 +268,63 @@ describe('OpenCodian style settings', () => {
     shudingHelp?.onClick();
     expect(openSpy).toHaveBeenCalledTimes(1);
   });
+
+  it('commits color picker changes only after the picker confirms a value', () => {
+    const chatAppearance = getDefaultChatAppearanceSettings();
+    let createdSettingEl: HTMLElement | null = null;
+    const plugin = {
+      settings: {
+        ...DEFAULT_SETTINGS,
+        chatAppearance,
+      },
+      updateChatAppearance: jest.fn((mutator: (appearance: typeof chatAppearance) => void) => {
+        mutator(chatAppearance);
+      }),
+    } as unknown as ConstructorParameters<typeof OpenCodianSettingTab>[1];
+    const tab = new OpenCodianSettingTab({} as App, plugin);
+    const containerEl = document.createElement('div');
+    const privateTab = tab as unknown as {
+      addColorStyleControl: (containerEl: HTMLElement, config: {
+        group: 'assistant';
+        name: string;
+        desc: string;
+        value: () => string;
+        resetValue: () => string;
+        setValue: (appearance: typeof chatAppearance, value: string) => void;
+      }) => void;
+      applyAndScheduleStyleUpdate: () => void;
+    };
+
+    jest.spyOn(Setting.prototype, 'setClass').mockImplementation(function setClass(this: Setting) {
+      createdSettingEl = (this as Setting & { settingEl: HTMLElement }).settingEl;
+      return this;
+    });
+    const applySpy = jest.spyOn(privateTab, 'applyAndScheduleStyleUpdate').mockImplementation(() => {});
+
+    privateTab.addColorStyleControl(containerEl, {
+      group: 'assistant',
+      name: 'Time color',
+      desc: 'desc',
+      value: () => plugin.settings.chatAppearance.assistant.timeColor,
+      resetValue: () => 'var(--text-muted)',
+      setValue: (appearance, value) => {
+        appearance.assistant.timeColor = value;
+      },
+    });
+
+    const colorInput = createdSettingEl?.querySelector<HTMLInputElement>('.opencodian-style-color-input') ?? null;
+    expect(colorInput).not.toBeNull();
+
+    colorInput!.value = '#336699';
+    colorInput!.dispatchEvent(new Event('input', { bubbles: true }));
+
+    expect(plugin.updateChatAppearance).not.toHaveBeenCalled();
+    expect(applySpy).not.toHaveBeenCalled();
+
+    colorInput!.dispatchEvent(new Event('change', { bubbles: true }));
+
+    expect(plugin.updateChatAppearance).toHaveBeenCalledTimes(1);
+    expect(applySpy).toHaveBeenCalledTimes(1);
+    expect(plugin.settings.chatAppearance.assistant.timeColor).toBe('#336699');
+  });
 });

@@ -116,8 +116,12 @@ describe('Settings', () => {
       expect(DEFAULT_SETTINGS.chatAppearance.user.radius).toBe(16);
       expect(DEFAULT_SETTINGS.chatAppearance.assistant.backgroundOpacity).toBe(72);
       expect(DEFAULT_SETTINGS.chatAppearance.assistant.metaFontSize).toBe(10);
+      expect(DEFAULT_SETTINGS.chatAppearance.assistant.timeFontSize).toBe(10);
+      expect(DEFAULT_SETTINGS.chatAppearance.assistant.timeFontWeight).toBe(400);
       expect(DEFAULT_SETTINGS.chatAppearance.assistant.metaColor).toBe('var(--text-muted)');
       expect(DEFAULT_SETTINGS.chatAppearance.assistant.timeColor).toBe('var(--text-muted)');
+      expect(DEFAULT_SETTINGS.chatAppearance.assistant.modelIdFontSize).toBe(10);
+      expect(DEFAULT_SETTINGS.chatAppearance.assistant.modelIdFontWeight).toBe(400);
       expect(DEFAULT_SETTINGS.chatAppearance.assistant.modelIdColor).toBe('var(--text-faint, var(--text-muted))');
       expect(DEFAULT_SETTINGS.chatAppearance.input.backgroundOpacity).toBe(72);
       expect(DEFAULT_SETTINGS.chatAppearance.input.shadowBlur).toBe(28);
@@ -370,7 +374,11 @@ describe('Settings', () => {
       expect(normalized.assistant.blur).toBe(4);
       expect(normalized.assistant.radius).toBe(14);
       expect(normalized.assistant.metaFontSize).toBe(10);
+      expect(normalized.assistant.timeFontSize).toBe(10);
+      expect(normalized.assistant.timeFontWeight).toBe(400);
       expect(normalized.assistant.metaColor).toBe('var(--text-muted)');
+      expect(normalized.assistant.modelIdFontSize).toBe(10);
+      expect(normalized.assistant.modelIdFontWeight).toBe(400);
       expect(normalized.input.backgroundOpacity).toBe(64);
       expect(normalized.input.blur).toBe(18);
       expect(normalized.input.actionButtonStyle).toBe('default');
@@ -394,16 +402,36 @@ describe('Settings', () => {
       const normalized = normalizeChatAppearanceSettings({
         assistant: {
           metaFontSize: 99,
+          timeFontSize: 5,
+          timeFontWeight: 537,
           metaColor: 'not-a-color',
           timeColor: '#7f8c9f',
+          modelIdFontSize: 16,
+          modelIdFontWeight: 975,
           modelIdColor: 'var(--text-normal)',
         },
       });
 
-      expect(normalized.assistant.metaFontSize).toBe(18);
+      expect(normalized.assistant.metaFontSize).toBe(36);
+      expect(normalized.assistant.timeFontSize).toBe(6);
+      expect(normalized.assistant.timeFontWeight).toBe(537);
       expect(normalized.assistant.metaColor).toBe('var(--text-muted)');
       expect(normalized.assistant.timeColor).toBe('#7f8c9f');
+      expect(normalized.assistant.modelIdFontSize).toBe(16);
+      expect(normalized.assistant.modelIdFontWeight).toBe(900);
       expect(normalized.assistant.modelIdColor).toBe('var(--text-normal)');
+    });
+
+    it('uses the legacy shared metadata font size as a fallback for separate time/model sizes', () => {
+      const normalized = normalizeChatAppearanceSettings({
+        assistant: {
+          metaFontSize: 14,
+        },
+      });
+
+      expect(normalized.assistant.metaFontSize).toBe(14);
+      expect(normalized.assistant.timeFontSize).toBe(14);
+      expect(normalized.assistant.modelIdFontSize).toBe(14);
     });
 
     it('should validate custom CSS declarations', () => {

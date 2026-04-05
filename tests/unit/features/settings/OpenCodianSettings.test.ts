@@ -166,6 +166,106 @@ describe('OpenCodianSettingTab scroll restore logging', () => {
     expect(logSpy).toHaveBeenCalledTimes(1);
   });
 
+  it('skips restore observers and timers when the requested scroll position is already at the top', () => {
+    const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const plugin = {
+      settings: {
+        settingsPanelScrollTop: 0,
+      },
+      scheduleSettingsUiStateSave: jest.fn(),
+    } as unknown as ConstructorParameters<typeof OpenCodianSettingTab>[1];
+    const tab = new OpenCodianSettingTab({} as App, plugin);
+    const scrollContainer = document.createElement('div');
+
+    installClampedScrollState(scrollContainer, {
+      clientHeight: 200,
+      scrollHeight: 800,
+    });
+    scrollContainer.scrollTop = 160;
+
+    document.body.appendChild(scrollContainer);
+    scrollContainer.appendChild(tab.containerEl);
+
+    (tab as unknown as {
+      restoreSettingsPanelScrollPosition: (scrollTop: number, scrollContainer: HTMLElement) => void;
+      settingsPanelRestoreObserver: MutationObserver | null;
+      settingsPanelRestoreTimeoutIds: number[];
+    }).restoreSettingsPanelScrollPosition(0, scrollContainer);
+
+    expect(scrollContainer.scrollTop).toBe(0);
+    expect(logSpy).toHaveBeenCalledTimes(1);
+    expect(logSpy.mock.calls[0]?.[1]).toMatchObject({
+      reason: 'already-at-top',
+      attempts: 0,
+      targetScrollTop: 0,
+      restoredScrollTop: 0,
+    });
+    expect(MutationObserverMock.instances).toHaveLength(0);
+    expect(
+      (tab as unknown as {
+        settingsPanelRestoreObserver: MutationObserver | null;
+        settingsPanelRestoreTimeoutIds: number[];
+      }).settingsPanelRestoreObserver,
+    ).toBeNull();
+    expect(
+      (tab as unknown as {
+        settingsPanelRestoreTimeoutIds: number[];
+      }).settingsPanelRestoreTimeoutIds,
+    ).toHaveLength(0);
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  it('skips deferred DOM tracking when the initial restore reaches the target immediately', () => {
+    const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const plugin = {
+      settings: {
+        settingsPanelScrollTop: 0,
+      },
+      scheduleSettingsUiStateSave: jest.fn(),
+    } as unknown as ConstructorParameters<typeof OpenCodianSettingTab>[1];
+    const tab = new OpenCodianSettingTab({} as App, plugin);
+    const scrollContainer = document.createElement('div');
+
+    installClampedScrollState(scrollContainer, {
+      clientHeight: 200,
+      scrollHeight: 800,
+    });
+
+    document.body.appendChild(scrollContainer);
+    scrollContainer.appendChild(tab.containerEl);
+
+    (tab as unknown as {
+      restoreSettingsPanelScrollPosition: (scrollTop: number, scrollContainer: HTMLElement) => void;
+      settingsPanelRestoreObserver: MutationObserver | null;
+      settingsPanelRestoreTimeoutIds: number[];
+    }).restoreSettingsPanelScrollPosition(400, scrollContainer);
+
+    jest.advanceTimersByTime(1);
+    expect(scrollContainer.scrollTop).toBe(400);
+    expect(MutationObserverMock.instances).toHaveLength(0);
+    expect(
+      (tab as unknown as {
+        settingsPanelRestoreObserver: MutationObserver | null;
+        settingsPanelRestoreTimeoutIds: number[];
+      }).settingsPanelRestoreObserver,
+    ).toBeNull();
+    expect(
+      (tab as unknown as {
+        settingsPanelRestoreTimeoutIds: number[];
+      }).settingsPanelRestoreTimeoutIds,
+    ).toHaveLength(0);
+
+    jest.advanceTimersByTime(220);
+
+    expect(logSpy).toHaveBeenCalledTimes(1);
+    expect(logSpy.mock.calls[0]?.[1]).toMatchObject({
+      reason: 'animation-frame',
+      attempts: 1,
+      targetScrollTop: 400,
+      restoredScrollTop: 400,
+    });
+  });
+
   it('reapplies the target scroll position when the panel drifts before settling', () => {
     const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
     const plugin = {

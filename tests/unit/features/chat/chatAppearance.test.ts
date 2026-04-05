@@ -17,7 +17,11 @@ describe('chatAppearance utilities', () => {
     appearance.background.edgeFade = 36;
     appearance.assistant.backgroundOpacity = 55;
     appearance.assistant.metaFontSize = 12;
+    appearance.assistant.timeFontSize = 13;
+    appearance.assistant.timeFontWeight = 600;
     appearance.assistant.timeColor = '#90a4b8';
+    appearance.assistant.modelIdFontSize = 14;
+    appearance.assistant.modelIdFontWeight = 700;
     appearance.assistant.modelIdColor = 'var(--text-normal)';
     appearance.input.backgroundOpacity = 66;
     appearance.input.shadowBlur = 30;
@@ -32,7 +36,11 @@ describe('chatAppearance utilities', () => {
     expect(cssVariables['--opencodian-theme-bg-edge-fade']).toBe('36px');
     expect(cssVariables['--opencodian-assistant-bg-opacity']).toBe('55%');
     expect(cssVariables['--opencodian-assistant-meta-font-size']).toBe('12px');
+    expect(cssVariables['--opencodian-assistant-time-font-size']).toBe('13px');
+    expect(cssVariables['--opencodian-assistant-time-font-weight']).toBe('600');
     expect(cssVariables['--opencodian-assistant-time-color']).toBe('#90a4b8');
+    expect(cssVariables['--opencodian-assistant-model-id-font-size']).toBe('14px');
+    expect(cssVariables['--opencodian-assistant-model-id-font-weight']).toBe('700');
     expect(cssVariables['--opencodian-assistant-model-id-color']).toBe('var(--text-normal)');
     expect(cssVariables['--opencodian-input-bg-opacity']).toBe('66%');
     expect(cssVariables['--opencodian-input-shadow-blur']).toBe('30px');

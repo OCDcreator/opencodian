@@ -12,6 +12,65 @@
 
 ---
 
+## 2026-04-05 助手时间行样式拆分，并收敛设置页重开时的 Forced reflow
+
+### 🎯 改动目标
+
+- 给助手消息底部时间行补齐更细的样式控制，不再只靠单一的 metadata 字号和颜色一起驱动整行
+- 修正样式设置里的颜色选择器提交时机，避免拖动过程中频繁写入设置
+- 处理设置页“第一次打开正常、关闭后再次打开开始持续出现 forced reflow 提示”的问题，在不改功能的前提下降低 reopen 时的布局压力
+
+### ✅ 本轮调整
+
+- `src/core/types/settings.ts`
+  - 为助手时间行新增 `timeFontSize`、`timeFontWeight`、`modelIdFontSize`、`modelIdFontWeight`
+  - 扩展默认值与归一化逻辑，并让旧配置在缺少新字段时继续回退到原有 `metaFontSize`
+
+- `src/features/chat/chatAppearance.ts`
+  - 为助手时间文本和 provider/model 文本补充新的 CSS 变量输出
+
+- `src/features/settings/OpenCodianSettings.ts`
+  - 在样式设置中新增时间字号、时间字重、提供商/模型字号、提供商/模型字重控制项
+  - 将颜色选择器从 `input` 改为 `change` 提交，并优先使用 `showPicker()`，减少颜色拖动过程中的连续设置写入
+  - 收紧设置页滚动恢复逻辑：
+    - 目标位置本来就是顶部时直接快速结束
+    - 首帧已经恢复到目标滚动位时不再启动 `MutationObserver` 和多轮 timeout 跟踪
+    - 只有初次恢复够不到目标位置时，才启用延期恢复追踪
+
+- `src/i18n/locales/en.ts`
+- `src/i18n/locales/zh.ts`
+  - 补齐时间/模型字号与字重相关文案
+
+- `styles.css`
+  - 为助手时间文本和 provider/model 文本分别应用独立字号、字重变量
+  - 调整时间行和 pending 占位高度计算，兼容拆分后的样式尺寸
+
+- `tests/unit/core/types/settings.test.ts`
+  - 补充新样式字段默认值、归一化和旧字段回退测试
+
+- `tests/unit/features/chat/chatAppearance.test.ts`
+  - 补充新的时间/模型样式变量输出断言
+
+- `tests/unit/features/settings/OpenCodianSettings.test.ts`
+  - 补充设置页滚动恢复快速路径与“首帧成功时不启用 DOM 跟踪”的回归测试
+
+- `tests/unit/features/settings/OpenCodianStyleSettings.test.ts`
+  - 补充颜色选择器只在确认后提交的回归测试
+
+### 🧠 问题根因
+
+- 设置页 reopen 的 forced reflow 主要不是“打开设置一定有问题”，而是“关闭后再次打开时”会带着上次滚动位置进入恢复流程
+- 旧实现里，即使首帧已经成功恢复到目标位置，也会继续挂 `MutationObserver` 和多轮 timeout 盯着设置页 DOM；模型、插件、图标缓存等分区的异步刷新再叠加上去，就容易在控制台形成连续 forced reflow 提示
+- 同时，颜色选择器如果在拖动过程中走 `input` 提交，也会把本来只是预览的操作放大成持续 UI 更新
+
+### 🧪 当前验证
+
+- 已通过：`npm test -- tests/unit/core/types/settings.test.ts tests/unit/features/chat/chatAppearance.test.ts tests/unit/features/settings/OpenCodianSettings.test.ts tests/unit/features/settings/OpenCodianStyleSettings.test.ts`
+- 已通过：`npm run check:devlog-order`
+- 已通过：`npm run build`（`BUILD_ID: main.202604051720`）
+- 已部署：`dist/main.js`、`dist/manifest.json`、`dist/styles.css` 已复制到 Test Vault，并确认插件端 `main.js` 含 `BUILD_ID: main.202604051720`
+- 未执行：完整 Jest 测试套件
+
 ## 2026-04-05 玻璃正八面体实验演示接入，并把助手流式渲染修正为节流版实时 markdown
 
 ### 🎯 改动目标
