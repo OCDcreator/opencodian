@@ -1623,6 +1623,11 @@
   z-index: 1; /* Below sticky user messages (z-index: 100) */
 }
 
+.opencodian-message--assistant.is-streaming {
+  animation: none;
+  overflow-anchor: none;
+}
+
 /* Assistant message hover effect */
 .opencodian-message--assistant:hover {
   background: transparent;
@@ -1638,6 +1643,10 @@
     box-shadow 0.25s ease,
     transform 0.25s ease,
     backdrop-filter 0.25s ease;
+}
+
+.opencodian-message--assistant.is-streaming .opencodian-message-content {
+  transition: none;
 }
 
 .opencodian-container--theme-background .opencodian-message--assistant .opencodian-message-content {
@@ -5931,6 +5940,11 @@
 /* Streaming text block */
 .streaming-text-block {
   margin: 0.5em 0;
+}
+
+.streaming-text-block--live {
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 /* Thinking block - Claudian style */

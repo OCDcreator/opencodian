@@ -12,6 +12,42 @@
 
 ---
 
+## 2026-04-05 助手流式消息抖动收敛，减少流式阶段重排与滚动回弹
+
+### 🎯 改动目标
+
+- 处理助手消息在流式生成过程中持续“上下抖动”、结束落定后仍有明显跳动的问题
+- 在保留现有消息持久化结构与最终 markdown 渲染结果的前提下，优先降低流式阶段的 DOM 重建和滚动干扰
+- 尽量用小范围修补方式改善长回复阅读观感，不扩散到无关聊天功能
+
+### ✅ 本轮调整
+
+- `src/utils/streaming/StreamController.ts`
+  - 将流式文本阶段从“每帧整块 markdown 重渲染”改为“先写入轻量 live text 预览，分段切换或完成时再做一次 markdown render”
+  - 新增 `streaming-text-block--live` 流式态标记，避免 token 高频到达时不断 `empty()` 容器并重建整段 DOM
+  - 把 `text` chunk 的滚动跟随改到实际文本内容更新后触发，并在 `thinking`、`tool_use`、`error`、`done` 前先 finalize 当前文本块
+
+- `src/features/chat/OpenCodianView.ts`
+  - 在流式中的 tab 上，阻止 `MutationObserver` / `ResizeObserver` 驱动的补偿式“settled scroll to bottom”反复插队
+  - 为流式创建的助手消息添加 `is-streaming` 标记，等时间戳与复制按钮补齐后再移除，便于样式侧关闭流式态动画
+
+- `styles.css`
+  - 关闭助手消息在 `is-streaming` 状态下的入场动画与内容过渡，减少生成中和最终落定瞬间的视觉跳动
+  - 为 `.streaming-text-block--live` 增加 `white-space: pre-wrap` 与断词规则，保证流式预览阶段排版稳定
+
+### 🧠 问题根因
+
+- 之前虽然已经把连续 text chunk 合并到“每帧最多一次 markdown render”，但那次 render 依然会完整清空并重建当前文本块 DOM
+- 同时，消息列表的布局观察器还会在流式期间不断触发二次滚底；浏览器滚动锚定、容器高度变化和自动滚动叠加后，就会表现成持续细抖
+- 结束生成时，助手气泡还会从流式态切到最终态，如果动画和过渡还在生效，会进一步放大“最后落一下”的感觉
+
+### 🧪 当前验证
+
+- 已通过：`npm run check:devlog-order`
+- 已通过：`npm run build`（`BUILD_ID: main.202604051323`）
+- 已部署：`dist/main.js`、`dist/manifest.json`、`dist/styles.css` 已复制到 Test Vault，并确认插件端 `main.js` 含 `BUILD_ID: main.202604051323`
+- 未执行：完整 Jest 测试套件
+
 ## 2026-04-05 助手流式生成时合并文本 markdown 重渲染，缓解 Forced reflow 警告
 
 ### 🎯 改动目标

@@ -2058,6 +2058,9 @@ export class OpenCodianView extends ItemView {
     }
 
     if (this.getActiveTabId() === tabId) {
+      if (paneState.runtime.isStreaming) {
+        return;
+      }
       this.scheduleSettledScrollToBottomIfNeeded(this.shouldAutoScroll(tabId), tabId);
     }
   }
@@ -7376,7 +7379,7 @@ export class OpenCodianView extends ItemView {
   private createAssistantMessageElement(tabId: TabId | null = this.getActiveTabId()): { messageEl: HTMLElement; contentEl: HTMLElement } {
     const paneState = this.getTabPaneState(tabId);
     const messageEl = this.ensureTurnBody(tabId)?.createDiv({
-      cls: 'opencodian-message opencodian-message--assistant',
+      cls: 'opencodian-message opencodian-message--assistant is-streaming',
     });
 
     if (!messageEl) {
@@ -7512,6 +7515,7 @@ export class OpenCodianView extends ItemView {
     modelId?: string,
     statusLabel?: string,
   ): void {
+    messageEl.removeClass('is-streaming');
     const timeRow = this.ensureAssistantTimestampRow(messageEl);
     timeRow.empty();
     timeRow.classList.remove('is-pending');

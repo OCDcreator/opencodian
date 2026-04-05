@@ -17,6 +17,7 @@ import type {
 import { createStreamState } from './types';
 
 const logger = createLogger('StreamController');
+const LIVE_STREAMING_TEXT_CLASS = 'streaming-text-block--live';
 
 export class StreamController {
   private containerEl: HTMLElement;
@@ -97,13 +98,14 @@ export class StreamController {
         break;
     }
 
-    if (chunk.type !== 'done') {
+    if (chunk.type !== 'done' && chunk.type !== 'text') {
       this.scrollToBottom?.();
     }
   }
 
   private async handleThinkingChunk(chunk: ThinkingChunk): Promise<void> {
     await this.flushPendingTextRender();
+    await this.finalizeCurrentTextRender();
     this.finalizeTextBlock();
 
     if (chunk.partId
@@ -150,7 +152,7 @@ export class StreamController {
 
     if (!this.state.currentTextEl) {
       this.state.currentTextEl = this.state.currentContentEl!.createDiv({
-        cls: 'streaming-text-block',
+        cls: `streaming-text-block ${LIVE_STREAMING_TEXT_CLASS}`,
       });
       this.state.currentTextContent = '';
     }
@@ -162,6 +164,7 @@ export class StreamController {
   private async handleToolUseChunk(chunk: { id: string; name: string; input: Record<string, unknown> }): Promise<void> {
     await this.flushPendingTextRender();
     this.finalizeThinkingBlock();
+    await this.finalizeCurrentTextRender();
     this.finalizeTextBlock();
 
     const existingToolCall = this.state.toolCalls.get(chunk.id);
@@ -231,6 +234,7 @@ export class StreamController {
   private async handleErrorChunk(content: string): Promise<void> {
     await this.flushPendingTextRender();
     this.finalizeThinkingBlock();
+    await this.finalizeCurrentTextRender();
     this.finalizeTextBlock();
     this.callbacks.onError?.(content);
 
@@ -246,6 +250,7 @@ export class StreamController {
 
   private async handleDoneChunk(): Promise<void> {
     await this.flushPendingTextRender();
+    await this.finalizeCurrentTextRender();
     this.flushOpenContentBlocks();
     this.finalizeToolCalls();
     this.state.isStreaming = false;
@@ -281,8 +286,11 @@ export class StreamController {
     this.textRenderRequested = false;
     const targetEl = this.state.currentTextEl;
     const content = this.state.currentTextContent;
-    this.textRenderInFlight = this.markdownService.render(targetEl, content)
-      .then(() => undefined)
+    this.textRenderInFlight = Promise.resolve()
+      .then(() => {
+        this.renderLiveText(targetEl, content);
+        this.scrollToBottom?.();
+      })
       .finally(() => {
         this.textRenderInFlight = null;
       });
@@ -323,6 +331,26 @@ export class StreamController {
 
     this.textRenderRequested = false;
     this.textRenderInFlight = null;
+  }
+
+  private renderLiveText(targetEl: HTMLElement, content: string): void {
+    targetEl.classList.add(LIVE_STREAMING_TEXT_CLASS);
+    targetEl.textContent = content;
+  }
+
+  private finalizeCurrentTextRender(): Promise<void> {
+    const targetEl = this.state.currentTextEl;
+    const content = this.state.currentTextContent;
+    if (!targetEl || !content) {
+      return Promise.resolve();
+    }
+
+    targetEl.classList.remove(LIVE_STREAMING_TEXT_CLASS);
+    return this.markdownService.render(targetEl, content)
+      .then(() => {
+        this.scrollToBottom?.();
+      })
+      .then(() => undefined);
   }
 
   private scheduleAnimationFrame(callback: () => void): number {
@@ -410,6 +438,7 @@ export class StreamController {
 
   cancelStream(): void {
     this.clearPendingTextRender();
+    void this.finalizeCurrentTextRender();
     this.flushOpenContentBlocks();
     this.state.isStreaming = false;
   }
@@ -419,6 +448,7 @@ export class StreamController {
    */
   timeoutStream(): void {
     this.clearPendingTextRender();
+    void this.finalizeCurrentTextRender();
     this.flushOpenContentBlocks();
 
     // Mark all running/pending tool calls as error
