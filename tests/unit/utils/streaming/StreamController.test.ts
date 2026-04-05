@@ -129,4 +129,46 @@ describe('StreamController', () => {
       jest.useRealTimers();
     }
   });
+
+  it('persists tool calls that only emitted tool_use when the stream completes', async () => {
+    const containerEl = document.createElement('div');
+    const contentEl = document.createElement('div');
+    containerEl.appendChild(contentEl);
+
+    const markdownService = {
+      render: jest.fn().mockResolvedValue(undefined),
+    };
+
+    const controller = new StreamController({
+      containerEl,
+      markdownService: markdownService as never,
+    });
+
+    controller.startStream(contentEl);
+
+    await controller.handleChunk({
+      type: 'tool_use',
+      id: 'tool-1',
+      name: 'read',
+      input: {
+        file_path: 'docs/spec.md',
+      },
+    });
+    await controller.handleChunk({ type: 'done' });
+
+    expect(controller.getContentBlocks()).toEqual([
+      {
+        type: 'tool_call',
+        toolCall: {
+          id: 'tool-1',
+          name: 'read',
+          input: {
+            file_path: 'docs/spec.md',
+          },
+          status: 'completed',
+          result: undefined,
+        },
+      },
+    ]);
+  });
 });

@@ -117,6 +117,7 @@ export interface StreamState {
   thinkingBlockElements: Map<string, HTMLElement>;
   toolCalls: Map<string, ToolCallInfo>;
   toolCallElements: Map<string, HTMLElement>;
+  persistedToolCallIds: Set<string>;
   contentBlocks: ContentBlock[];
 }
 
@@ -131,6 +132,7 @@ export function createStreamState(): StreamState {
     thinkingBlockElements: new Map(),
     toolCalls: new Map(),
     toolCallElements: new Map(),
+    persistedToolCallIds: new Set(),
     contentBlocks: [],
   };
 }

@@ -95,4 +95,32 @@ describe('renderGroups', () => {
     ]);
     expect(merged.sourceMessageId).toBeUndefined();
   });
+
+  it('dedupes repeated adjacent assistant text when flattened blocks already contain the same answer', () => {
+    const merged = mergeAssistantMessagesForRender([
+      createMessage({
+        id: 'assistant-1',
+        content: 'answer',
+        timestamp: 10,
+        contentBlocks: [
+          { type: 'tool_use', toolId: 'tool-1', toolName: 'structured_output' },
+          { type: 'text', text: 'answer' },
+        ],
+      }),
+      createMessage({
+        id: 'assistant-2',
+        content: 'answer',
+        timestamp: 20,
+        contentBlocks: [
+          { type: 'text', text: 'answer' },
+        ],
+      }),
+    ]);
+
+    expect(merged.content).toBe('answer');
+    expect(merged.contentBlocks).toEqual([
+      { type: 'tool_use', toolId: 'tool-1', toolName: 'structured_output' },
+      { type: 'text', text: 'answer' },
+    ]);
+  });
 });

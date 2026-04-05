@@ -37,6 +37,18 @@ const BASH_OUTPUT_FAILURE_PATTERNS = [
   /ssl\/tls connection failed/i,
 ];
 
+function canonicalizeToolName(toolName: string): string {
+  return toolName.trim().toLowerCase().replace(/[^a-z0-9]+/g, '');
+}
+
+export function isInternalStructuredOutputTool(toolName?: string | null): boolean {
+  if (typeof toolName !== 'string' || !toolName.trim()) {
+    return false;
+  }
+
+  return canonicalizeToolName(toolName) === 'structuredoutput';
+}
+
 function getNumericMetadataValue(metadata: Record<string, unknown> | undefined, key: string): number | null {
   if (!metadata) {
     return null;

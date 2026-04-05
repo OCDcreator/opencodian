@@ -327,4 +327,210 @@ describe('OpenCodian style settings', () => {
     expect(applySpy).toHaveBeenCalledTimes(1);
     expect(plugin.settings.chatAppearance.assistant.timeColor).toBe('#336699');
   });
+
+  it('allows free-form numeric input without snapping it back to the slider step', () => {
+    let currentValue = 5;
+    const committedValues: number[] = [];
+    let createdSettingEl: HTMLElement | null = null;
+    const plugin = {
+      settings: {
+        ...DEFAULT_SETTINGS,
+        chatAppearance: getDefaultChatAppearanceSettings(),
+      },
+    } as unknown as ConstructorParameters<typeof OpenCodianSettingTab>[1];
+    const tab = new OpenCodianSettingTab({} as App, plugin);
+    const containerEl = document.createElement('div');
+    const privateTab = tab as unknown as {
+      addNumericControl: (containerEl: HTMLElement, config: {
+        name: string;
+        desc: string;
+        min: number;
+        max: number;
+        step: number;
+        unit: string;
+        value: () => number;
+        resetValue: () => number;
+        commitValue: (value: number) => void;
+      }) => void;
+    };
+
+    jest.spyOn(Setting.prototype, 'setClass').mockImplementation(function setClass(this: Setting) {
+      const settingWithElements = this as Setting & { settingEl: HTMLElement; controlEl?: HTMLElement };
+      if (!(settingWithElements.controlEl instanceof HTMLElement)) {
+        settingWithElements.controlEl = document.createElement('div');
+        settingWithElements.settingEl.appendChild(settingWithElements.controlEl);
+      }
+      createdSettingEl = settingWithElements.settingEl;
+      return this;
+    });
+
+    privateTab.addNumericControl(containerEl, {
+      name: 'Blur',
+      desc: 'desc',
+      min: 0,
+      max: 10,
+      step: 1,
+      unit: 'px',
+      value: () => currentValue,
+      resetValue: () => 5,
+      commitValue: (value) => {
+        currentValue = value;
+        committedValues.push(value);
+      },
+    });
+
+    const numberInput = createdSettingEl?.querySelector<HTMLInputElement>('.opencodian-style-number') ?? null;
+    const sliderInput = createdSettingEl?.querySelector<HTMLInputElement>('.opencodian-style-slider') ?? null;
+
+    expect(numberInput).not.toBeNull();
+    expect(sliderInput).not.toBeNull();
+    expect(numberInput?.step).toBe('any');
+
+    numberInput!.dispatchEvent(new Event('focus'));
+    numberInput!.value = '8.35';
+    numberInput!.dispatchEvent(new Event('input', { bubbles: true }));
+
+    expect(currentValue).toBe(8.35);
+    expect(committedValues).toEqual([8.35]);
+    expect(numberInput!.value).toBe('8.35');
+    expect(sliderInput!.value).toBe('8.35');
+
+    numberInput!.dispatchEvent(new Event('blur'));
+
+    expect(numberInput!.value).toBe('8.35');
+  });
+
+  it('preserves unfinished decimal drafts until the number input is complete', () => {
+    let currentValue = 5;
+    let createdSettingEl: HTMLElement | null = null;
+    const plugin = {
+      settings: {
+        ...DEFAULT_SETTINGS,
+        chatAppearance: getDefaultChatAppearanceSettings(),
+      },
+    } as unknown as ConstructorParameters<typeof OpenCodianSettingTab>[1];
+    const tab = new OpenCodianSettingTab({} as App, plugin);
+    const containerEl = document.createElement('div');
+    const privateTab = tab as unknown as {
+      addNumericControl: (containerEl: HTMLElement, config: {
+        name: string;
+        desc: string;
+        min: number;
+        max: number;
+        step: number;
+        unit: string;
+        value: () => number;
+        resetValue: () => number;
+        commitValue: (value: number) => void;
+      }) => void;
+    };
+
+    jest.spyOn(Setting.prototype, 'setClass').mockImplementation(function setClass(this: Setting) {
+      const settingWithElements = this as Setting & { settingEl: HTMLElement; controlEl?: HTMLElement };
+      if (!(settingWithElements.controlEl instanceof HTMLElement)) {
+        settingWithElements.controlEl = document.createElement('div');
+        settingWithElements.settingEl.appendChild(settingWithElements.controlEl);
+      }
+      createdSettingEl = settingWithElements.settingEl;
+      return this;
+    });
+
+    privateTab.addNumericControl(containerEl, {
+      name: 'Blur',
+      desc: 'desc',
+      min: 0,
+      max: 10,
+      step: 1,
+      unit: 'px',
+      value: () => currentValue,
+      resetValue: () => 5,
+      commitValue: (value) => {
+        currentValue = value;
+      },
+    });
+
+    const numberInput = createdSettingEl?.querySelector<HTMLInputElement>('.opencodian-style-number') ?? null;
+
+    expect(numberInput).not.toBeNull();
+
+    numberInput!.dispatchEvent(new Event('focus'));
+    numberInput!.value = '8.';
+    numberInput!.dispatchEvent(new Event('input', { bubbles: true }));
+
+    expect(currentValue).toBe(5);
+    expect(numberInput!.value).toBe('8.');
+
+    numberInput!.value = '8.3';
+    numberInput!.dispatchEvent(new Event('input', { bubbles: true }));
+
+    expect(currentValue).toBe(8.3);
+    expect(numberInput!.value).toBe('8.3');
+  });
+
+  it('defers slider commits while pointer dragging and applies the final value on change', () => {
+    let currentValue = 5;
+    let createdSettingEl: HTMLElement | null = null;
+    const plugin = {
+      settings: {
+        ...DEFAULT_SETTINGS,
+        chatAppearance: getDefaultChatAppearanceSettings(),
+      },
+    } as unknown as ConstructorParameters<typeof OpenCodianSettingTab>[1];
+    const tab = new OpenCodianSettingTab({} as App, plugin);
+    const containerEl = document.createElement('div');
+    const privateTab = tab as unknown as {
+      addNumericControl: (containerEl: HTMLElement, config: {
+        name: string;
+        desc: string;
+        min: number;
+        max: number;
+        step: number;
+        unit: string;
+        value: () => number;
+        resetValue: () => number;
+        commitValue: (value: number) => void;
+      }) => void;
+    };
+
+    jest.spyOn(Setting.prototype, 'setClass').mockImplementation(function setClass(this: Setting) {
+      const settingWithElements = this as Setting & { settingEl: HTMLElement; controlEl?: HTMLElement };
+      if (!(settingWithElements.controlEl instanceof HTMLElement)) {
+        settingWithElements.controlEl = document.createElement('div');
+        settingWithElements.settingEl.appendChild(settingWithElements.controlEl);
+      }
+      createdSettingEl = settingWithElements.settingEl;
+      return this;
+    });
+
+    privateTab.addNumericControl(containerEl, {
+      name: 'Blur',
+      desc: 'desc',
+      min: 0,
+      max: 10,
+      step: 1,
+      unit: 'px',
+      value: () => currentValue,
+      resetValue: () => 5,
+      commitValue: (value) => {
+        currentValue = value;
+      },
+    });
+
+    const sliderInput = createdSettingEl?.querySelector<HTMLInputElement>('.opencodian-style-slider') ?? null;
+    const numberInput = createdSettingEl?.querySelector<HTMLInputElement>('.opencodian-style-number') ?? null;
+
+    expect(sliderInput).not.toBeNull();
+    expect(numberInput).not.toBeNull();
+
+    sliderInput!.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+    sliderInput!.value = '8';
+    sliderInput!.dispatchEvent(new Event('input', { bubbles: true }));
+
+    expect(currentValue).toBe(5);
+    expect(numberInput!.value).toBe('8');
+
+    sliderInput!.dispatchEvent(new Event('change', { bubbles: true }));
+
+    expect(currentValue).toBe(8);
+  });
 });

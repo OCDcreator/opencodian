@@ -2497,7 +2497,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     numberEl.size = numberInputChars;
     numberEl.min = String(config.min);
     numberEl.max = String(config.max);
-    numberEl.step = String(config.step);
+    numberEl.step = 'any';
     const unitEl = numberWrapEl.createSpan({ cls: 'opencodian-style-unit', text: config.unit });
 
     const incrementBtn = setting.controlEl.createEl('button', {
@@ -2515,16 +2515,43 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     resetBtn.setAttribute('aria-label', t('settings.style.resetSingle.tooltip'));
     resetBtn.setAttribute('title', t('settings.style.resetSingle.tooltip'));
 
-    const renderValue = (value: number) => {
+    let isEditingNumberInput = false;
+    let isDraggingSlider = false;
+
+    const renderValue = (value: number, options: { preserveNumberDraft?: boolean } = {}) => {
       sliderEl.value = String(value);
-      numberEl.value = String(value);
+      if (!(options.preserveNumberDraft && isEditingNumberInput)) {
+        numberEl.value = String(value);
+      }
       unitEl.setText(config.unit);
     };
 
-    const commitValue = (value: number) => {
-      const nextValue = this.clampStyleNumber(value, config.min, config.max, config.step);
+    const commitValue = (
+      value: number,
+      options: { preserveNumberDraft?: boolean; snapToStep?: boolean } = {},
+    ) => {
+      const nextValue = options.snapToStep === false
+        ? this.clampNumericControlValue(value, config.min, config.max)
+        : this.clampStyleNumber(value, config.min, config.max, config.step);
       config.commitValue(nextValue);
-      renderValue(nextValue);
+      renderValue(nextValue, { preserveNumberDraft: options.preserveNumberDraft });
+    };
+
+    const commitNumberInputDraft = () => {
+      isEditingNumberInput = false;
+      const rawValue = numberEl.value.trim();
+      if (!this.isStableNumericControlDraft(rawValue)) {
+        renderValue(config.value());
+        return;
+      }
+
+      const nextValue = Number(rawValue);
+      if (Number.isNaN(nextValue)) {
+        renderValue(config.value());
+        return;
+      }
+
+      commitValue(nextValue, { snapToStep: false });
     };
 
     decrementBtn.addEventListener('click', () => {
@@ -2534,19 +2561,68 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       commitValue(config.value() + config.step);
     });
     resetBtn.addEventListener('click', () => {
+      isDraggingSlider = false;
       commitValue(config.resetValue());
     });
-    sliderEl.addEventListener('input', () => {
-      commitValue(Number(sliderEl.value));
+    sliderEl.addEventListener('pointerdown', () => {
+      isDraggingSlider = true;
     });
-    numberEl.addEventListener('input', () => {
-      const nextValue = Number(numberEl.value);
+    sliderEl.addEventListener('input', () => {
+      const nextValue = Number(sliderEl.value);
+      if (Number.isNaN(nextValue)) {
+        return;
+      }
+
+      if (isDraggingSlider) {
+        renderValue(nextValue, { preserveNumberDraft: true });
+        return;
+      }
+
+      commitValue(nextValue);
+    });
+    sliderEl.addEventListener('change', () => {
+      isDraggingSlider = false;
+      const nextValue = Number(sliderEl.value);
       if (!Number.isNaN(nextValue)) {
         commitValue(nextValue);
       }
     });
+    sliderEl.addEventListener('blur', () => {
+      isDraggingSlider = false;
+    });
+    numberEl.addEventListener('focus', () => {
+      isEditingNumberInput = true;
+    });
+    numberEl.addEventListener('input', () => {
+      const rawValue = numberEl.value.trim();
+      if (!this.isStableNumericControlDraft(rawValue)) {
+        return;
+      }
+
+      const nextValue = Number(rawValue);
+      if (!Number.isNaN(nextValue)) {
+        commitValue(nextValue, {
+          preserveNumberDraft: true,
+          snapToStep: false,
+        });
+      }
+    });
+    numberEl.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        numberEl.blur();
+        return;
+      }
+
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        isEditingNumberInput = false;
+        renderValue(config.value());
+        numberEl.blur();
+      }
+    });
     numberEl.addEventListener('blur', () => {
-      renderValue(config.value());
+      commitNumberInputDraft();
     });
 
     renderValue(config.value());
@@ -2580,6 +2656,28 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     }
 
     return value.toFixed(precision).replace(/\.?0+$/, '');
+  }
+
+  private isStableNumericControlDraft(rawValue: string): boolean {
+    const normalized = rawValue.trim();
+    if (
+      normalized.length === 0
+      || normalized === '-'
+      || normalized === '+'
+      || normalized === '.'
+      || normalized === '-.'
+      || normalized === '+.'
+      || normalized.endsWith('.')
+      || /[eE][+-]?$/.test(normalized)
+    ) {
+      return false;
+    }
+
+    return Number.isFinite(Number(normalized));
+  }
+
+  private clampNumericControlValue(value: number, min: number, max: number): number {
+    return Math.min(max, Math.max(min, value));
   }
 
   private addNumericStyleControl(containerEl: HTMLElement, config: NumericStyleControlConfig): void {
@@ -2945,9 +3043,15 @@ export class OpenCodianSettingTab extends PluginSettingTab {
   }
 
   private clampStyleNumber(value: number, min: number, max: number, step: number): number {
-    const clampedValue = Math.min(max, Math.max(min, value));
-    const steppedValue = Math.round(clampedValue / step) * step;
-    return Math.min(max, Math.max(min, steppedValue));
+    const clampedValue = this.clampNumericControlValue(value, min, max);
+    const precision = Math.max(
+      this.getNumericControlPrecision(step),
+      this.getNumericControlPrecision(min),
+      this.getNumericControlPrecision(max),
+    );
+    const steppedValue = (Math.round(((clampedValue - min) / step) + Number.EPSILON) * step) + min;
+    const normalizedValue = precision > 0 ? Number(steppedValue.toFixed(precision)) : steppedValue;
+    return this.clampNumericControlValue(normalizedValue, min, max);
   }
 
   private applyAndScheduleStyleUpdate(): void {

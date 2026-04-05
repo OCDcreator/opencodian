@@ -44,6 +44,7 @@ import {
   getContextPathExtension,
   getVaultBasePath,
   isEligibleContextFilePath,
+  isInternalStructuredOutputTool,
   isTextLikeMime,
   resolveContextMimeFromPath,
   resolveTextMimeFromPath,
@@ -3597,6 +3598,218 @@ export class OpenCodianView extends ItemView {
     logger.debug(`${label}: ${serializedPayload}`);
   }
 
+  private logAssistantFinalizationDebug(label: string, payload: unknown): void {
+    logger.debug(`Assistant message finalization [${label}]: ${this.stringifyLogPayload(payload)}`);
+  }
+
+  private summarizeContentBlocksForDebug(
+    blocks:
+      | Array<{
+        type?: string;
+        text?: string;
+        content?: string;
+        toolId?: string;
+        toolName?: string;
+        toolCall?: { id?: string; name?: string } | null;
+      }>
+      | undefined,
+  ): {
+    count: number;
+    types: string[];
+    textLength: number;
+    toolCount: number;
+    thinkingCount: number;
+  } {
+    if (!blocks || blocks.length === 0) {
+      return {
+        count: 0,
+        types: [],
+        textLength: 0,
+        toolCount: 0,
+        thinkingCount: 0,
+      };
+    }
+
+    let textLength = 0;
+    let toolCount = 0;
+    let thinkingCount = 0;
+
+    for (const block of blocks) {
+      const type = block.type ?? 'unknown';
+      if (type === 'text') {
+        const text = typeof block.text === 'string'
+          ? block.text
+          : typeof block.content === 'string'
+            ? block.content
+            : '';
+        textLength += text.length;
+      } else if (type === 'tool_use' || type === 'tool_call' || block.toolCall) {
+        toolCount += 1;
+      } else if (type === 'thinking') {
+        thinkingCount += 1;
+      }
+    }
+
+    return {
+      count: blocks.length,
+      types: blocks.map((block) => block.type ?? 'unknown'),
+      textLength,
+      toolCount,
+      thinkingCount,
+    };
+  }
+
+  private summarizeChatMessageForDebug(message: ChatMessage | null | undefined): Record<string, unknown> | null {
+    if (!message) {
+      return null;
+    }
+
+    return {
+      id: message.id,
+      sourceMessageId: message.sourceMessageId ?? null,
+      role: message.role,
+      timestamp: message.timestamp,
+      modelId: message.modelId ?? null,
+      streamState: message.streamState ?? null,
+      displayStyle: message.displayStyle ?? 'default',
+      contentLength: message.content.length,
+      contentPreview: this.getLogPreview(message.content, 120),
+      contentBlocks: this.summarizeContentBlocksForDebug(message.contentBlocks),
+      toolCallsCount: message.toolCalls?.length ?? 0,
+      structuredPresent: message.structured !== undefined,
+      partsCount: message.parts?.length ?? 0,
+      questionResolution: message.questionResolution
+        ? {
+            requestId: message.questionResolution.request.id,
+            status: message.questionResolution.status,
+          }
+        : null,
+      omoKind: message.omo?.kind ?? null,
+    };
+  }
+
+  private summarizeCoreStreamChunkForDebug(
+    chunk: import('../../core/types').StreamChunk,
+  ): Record<string, unknown> {
+    switch (chunk.type) {
+      case 'text':
+        return {
+          type: chunk.type,
+          length: chunk.content.length,
+          preview: this.getLogPreview(chunk.content, 120),
+        };
+      case 'thinking':
+        return {
+          type: chunk.type,
+          partId: chunk.partId ?? null,
+          length: chunk.content.length,
+          preview: this.getLogPreview(chunk.content, 120),
+          durationSeconds: chunk.durationSeconds ?? null,
+        };
+      case 'tool_use':
+        return {
+          type: chunk.type,
+          id: chunk.id,
+          name: chunk.name,
+          inputKeys: Object.keys(chunk.input ?? {}),
+        };
+      case 'tool_result':
+        return {
+          type: chunk.type,
+          toolUseId: chunk.toolUseId,
+          length: chunk.content.length,
+          preview: this.getLogPreview(chunk.content, 120),
+          isError: chunk.isError ?? false,
+        };
+      case 'usage':
+        return {
+          type: chunk.type,
+          inputTokens: chunk.inputTokens,
+          outputTokens: chunk.outputTokens,
+          sessionId: chunk.sessionId ?? null,
+        };
+      case 'message_metadata':
+        return {
+          type: chunk.type,
+          messageId: chunk.messageId,
+          timestamp: chunk.timestamp,
+          modelId: chunk.modelId ?? null,
+        };
+      case 'file_edited':
+        return {
+          type: chunk.type,
+          file: chunk.file,
+        };
+      case 'permission_request':
+        return {
+          type: chunk.type,
+          id: chunk.id,
+          permission: chunk.permission,
+          patternCount: chunk.patterns.length,
+        };
+      case 'question_request':
+        return {
+          type: chunk.type,
+          requestId: chunk.request.id,
+          questionCount: chunk.request.questions.length,
+        };
+      case 'error':
+        return {
+          type: chunk.type,
+          length: chunk.content.length,
+          preview: this.getLogPreview(chunk.content, 120),
+        };
+      default:
+        return { type: chunk.type };
+    }
+  }
+
+  private summarizeRenderedStreamChunkForDebug(
+    chunk: import('../../utils/streaming').StreamChunk,
+  ): Record<string, unknown> {
+    switch (chunk.type) {
+      case 'text':
+        return {
+          type: chunk.type,
+          length: chunk.content.length,
+          preview: this.getLogPreview(chunk.content, 120),
+        };
+      case 'thinking':
+        return {
+          type: chunk.type,
+          partId: chunk.partId ?? null,
+          length: chunk.content.length,
+          preview: this.getLogPreview(chunk.content, 120),
+          durationSeconds: chunk.durationSeconds ?? null,
+        };
+      case 'tool_use':
+        return {
+          type: chunk.type,
+          id: chunk.id,
+          name: chunk.name,
+          inputKeys: Object.keys(chunk.input ?? {}),
+        };
+      case 'tool_result':
+        return {
+          type: chunk.type,
+          id: chunk.id,
+          length: chunk.content.length,
+          preview: this.getLogPreview(chunk.content, 120),
+          isError: chunk.isError ?? false,
+        };
+      case 'error':
+        return {
+          type: chunk.type,
+          length: chunk.content.length,
+          preview: this.getLogPreview(chunk.content, 120),
+        };
+      case 'done':
+        return { type: chunk.type };
+      default:
+        return { type: 'unknown' };
+    }
+  }
+
   private applyInputActionButtonStyleState(): void {
     if (!this.composerShellEl) {
       return;
@@ -4917,7 +5130,7 @@ export class OpenCodianView extends ItemView {
 
     let messages = conversation.messages;
     if (shouldSyncFromServer) {
-      const syncResult = await this.syncConversationMessagesFromServer(conversation);
+      const syncResult = await this.syncConversationMessagesFromServer(conversation, this.getActiveTabId(), 'load-conversation');
       messages = syncResult.messages;
       this.currentConversationRevertState = syncResult.revertState;
     }
@@ -5036,7 +5249,11 @@ export class OpenCodianView extends ItemView {
     runtime.isConversationSyncInFlight = true;
     try {
       const previousMessages = [...this.currentConversation.messages];
-      const syncResult = await this.syncConversationMessagesFromServer(this.currentConversation, activeTabId);
+      const syncResult = await this.syncConversationMessagesFromServer(
+        this.currentConversation,
+        activeTabId,
+        'visible-background-sync',
+      );
       await this.refreshPendingQuestionsForTab(activeTabId, expectedSessionId);
       if (!syncResult.changed || this.currentConversation?.id !== expectedConversationId) {
         if (this.currentConversation?.id === expectedConversationId) {
@@ -5095,7 +5312,11 @@ export class OpenCodianView extends ItemView {
       try {
         const previousFingerprint = runtime.lastConversationSyncFingerprint
           ?? this.getConversationSyncFingerprint(conversation.messages);
-        const syncResult = await this.syncConversationMessagesFromServer(conversation, tab.id);
+        const syncResult = await this.syncConversationMessagesFromServer(
+          conversation,
+          tab.id,
+          'background-tab-sync',
+        );
         await this.refreshPendingQuestionsForTab(tab.id, conversation.openCodeSessionId);
         this.syncBackgroundTaskStateFromConversation(conversation, tab.id);
         if (this.hasIncompleteTodos(runtime.sessionTodos) || tab.hasBackgroundTask) {
@@ -5795,6 +6016,57 @@ export class OpenCodianView extends ItemView {
     let latestErrorMessage: string | null = null;
     let finalizedAssistantMetadata: Extract<import('../../core/types').StreamChunk, { type: 'message_metadata' }> | null = null;
     let receivedMeaningfulChunk = false;
+    let rawStreamChunkCount = 0;
+    let renderedStreamChunkCount = 0;
+    let lastRawTextChunk: Record<string, unknown> | null = null;
+    let lastRenderedTextChunk: Record<string, unknown> | null = null;
+    const finalizationTraceId = `${sendingConversation.openCodeSessionId}:${userMessage.id}:${Date.now()}`;
+    const getStreamControllerSnapshot = (): Record<string, unknown> => ({
+      hasController: Boolean(streamController),
+      persistedBlocks: this.summarizeContentBlocksForDebug(
+        streamController?.getContentBlocks() as Array<{
+          type?: string;
+          text?: string;
+          content?: string;
+          toolId?: string;
+          toolName?: string;
+          toolCall?: { id?: string; name?: string } | null;
+        }> | undefined,
+      ),
+    });
+    const logAssistantFinalizationStage = (
+      stage: string,
+      payload: Record<string, unknown> = {},
+    ): void => {
+      this.logAssistantFinalizationDebug(stage, {
+        traceId: finalizationTraceId,
+        tabId: sendingTabId,
+        conversationId: sendingConversation.id,
+        sessionId: sendingConversation.openCodeSessionId,
+        userMessageId: userMessage.id,
+        streamCompleted,
+        streamInterrupted,
+        streamTimedOut,
+        latestErrorMessage: latestErrorMessage ? this.getLogPreview(latestErrorMessage, 160) : null,
+        rawStreamChunkCount,
+        renderedStreamChunkCount,
+        lastRawTextChunk,
+        lastRenderedTextChunk,
+        finalizedAssistantMetadata: finalizedAssistantMetadata
+          ? {
+              messageId: finalizedAssistantMetadata.messageId,
+              timestamp: finalizedAssistantMetadata.timestamp,
+              modelId: finalizedAssistantMetadata.modelId ?? null,
+            }
+          : null,
+        ...payload,
+      });
+    };
+    logAssistantFinalizationStage('trace-armed', {
+      activeModelId,
+      pendingMessage,
+      streamControllerAvailable: Boolean(streamController),
+    });
     logger.debug('Setting up pending indicator timeout');
     const pendingTimeout = window.setTimeout(() => {
       logger.debug('Pending indicator timeout fired, isStreaming:', sendingRuntime.isStreaming);
@@ -5828,21 +6100,42 @@ export class OpenCodianView extends ItemView {
 
     if (streamController) {
       streamController.startStream(contentEl);
+      logAssistantFinalizationStage('stream-controller-started', {
+        activeModelId,
+        pendingMessage,
+        streamController: getStreamControllerSnapshot(),
+      });
     }
 
     let receivedFirstChunk = false;
 
     try {
       for await (const chunk of stream) {
+        rawStreamChunkCount += 1;
+        if (chunk.type === 'text' && chunk.content.length > 0) {
+          lastRawTextChunk = {
+            sequence: rawStreamChunkCount,
+            length: chunk.content.length,
+            preview: this.getLogPreview(chunk.content, 120),
+          };
+        }
+        if (chunk.type !== 'usage') {
+          logAssistantFinalizationStage('raw-stream-chunk', {
+            chunkSequence: rawStreamChunkCount,
+            chunk: this.summarizeCoreStreamChunkForDebug(chunk),
+          });
+        }
         if (!sendingRuntime.isStreaming) {
           logger.debug('Streaming cancelled, breaking loop');
           streamInterrupted = true;
+          logAssistantFinalizationStage('stream-loop-break-not-streaming');
           break;
         }
 
         scheduleStreamTimeout();
 
         if (chunk.type === 'message_start') {
+          logAssistantFinalizationStage('message-start-received');
           void this.syncLatestUserMessageFromServer(
             sendingConversation,
             userMessage.id,
@@ -5859,16 +6152,26 @@ export class OpenCodianView extends ItemView {
 
         if (chunk.type === 'message_metadata') {
           finalizedAssistantMetadata = chunk;
+          logAssistantFinalizationStage('message-metadata-received', {
+            metadata: this.summarizeCoreStreamChunkForDebug(chunk),
+          });
           continue;
         }
 
         if (chunk.type === 'message_stop') {
           streamCompleted = true;
           this.completeTabContextUsageStream(sendingTabId);
+          logAssistantFinalizationStage('message-stop-received', {
+            streamController: getStreamControllerSnapshot(),
+          });
         }
 
         if (chunk.type === 'file_edited') {
           sendingRuntime.pendingEditedFiles.add(chunk.file);
+          logAssistantFinalizationStage('file-edited-recorded', {
+            file: chunk.file,
+            pendingEditedFileCount: sendingRuntime.pendingEditedFiles.size,
+          });
           continue;
         }
 
@@ -5905,13 +6208,31 @@ export class OpenCodianView extends ItemView {
 
         const streamingChunk = this.convertToStreamingChunk(chunk);
         if (streamingChunk && streamController) {
+          renderedStreamChunkCount += 1;
+          if (streamingChunk.type === 'text' && streamingChunk.content.length > 0) {
+            lastRenderedTextChunk = {
+              sequence: renderedStreamChunkCount,
+              length: streamingChunk.content.length,
+              preview: this.getLogPreview(streamingChunk.content, 120),
+            };
+          }
           if (streamingChunk.type === 'error') {
             latestErrorMessage = this.getFriendlyStreamErrorMessage(streamingChunk.content);
             streamingChunk.content = latestErrorMessage;
           } else {
             receivedMeaningfulChunk = true;
           }
+          logAssistantFinalizationStage('render-chunk-dispatch', {
+            renderedChunkSequence: renderedStreamChunkCount,
+            chunk: this.summarizeRenderedStreamChunkForDebug(streamingChunk),
+            streamController: getStreamControllerSnapshot(),
+          });
           await streamController.handleChunk(streamingChunk);
+          logAssistantFinalizationStage('render-chunk-applied', {
+            renderedChunkSequence: renderedStreamChunkCount,
+            chunkType: streamingChunk.type,
+            streamController: getStreamControllerSnapshot(),
+          });
 
           const hasContent = (streamingChunk.type === 'text' && streamingChunk.content?.trim()) ||
                             (streamingChunk.type === 'thinking' && streamingChunk.content?.trim()) ||
@@ -5940,6 +6261,7 @@ export class OpenCodianView extends ItemView {
 
       if (sendingRuntime.isStreaming && !receivedMeaningfulChunk && !latestErrorMessage && streamController) {
         latestErrorMessage = this.getFriendlyStreamErrorMessage('');
+        logAssistantFinalizationStage('injecting-fallback-error-before-done');
         await streamController.handleChunk({
           type: 'error',
           content: latestErrorMessage,
@@ -5948,13 +6270,22 @@ export class OpenCodianView extends ItemView {
       }
 
       if (sendingRuntime.isStreaming && streamController) {
+        logAssistantFinalizationStage('render-done-dispatch', {
+          streamController: getStreamControllerSnapshot(),
+        });
         await streamController.handleChunk({ type: 'done' });
+        logAssistantFinalizationStage('render-done-applied', {
+          streamController: getStreamControllerSnapshot(),
+        });
       }
     } catch (error) {
       logger.error('Streaming error:', error);
       latestErrorMessage = this.getFriendlyStreamErrorMessage(
         error instanceof Error ? error.message : 'Unknown error'
       );
+      logAssistantFinalizationStage('stream-loop-error', {
+        errorMessage: error instanceof Error ? error.message : String(error),
+      });
       if (streamController) {
         await streamController.handleChunk({
           type: 'error',
@@ -5975,6 +6306,30 @@ export class OpenCodianView extends ItemView {
       const shouldPersistInterruptedState = streamInterrupted && !streamCompleted && !latestErrorMessage;
       let interruptedNoticeMessage: ChatMessage | null = null;
 
+      const shouldSyncFromServer = streamCompleted && !streamTimedOut && !streamInterrupted && !latestErrorMessage;
+      logAssistantFinalizationStage('stream-finally-enter', {
+        shouldPersistInterruptedState,
+        shouldSyncFromServer,
+        finalTimestampCandidate: finalizedTimestamp,
+        finalModelIdCandidate: finalizedModelId,
+        finalizedAssistantMessageId: finalizedAssistantMessageId ?? null,
+        streamedTextLength: streamedTextContent.length,
+        streamContentBlocks: this.summarizeContentBlocksForDebug(
+          streamContentBlocks as Array<{
+            type?: string;
+            text?: string;
+            content?: string;
+            toolId?: string;
+            toolName?: string;
+            toolCall?: { id?: string; name?: string } | null;
+          }> | undefined,
+        ),
+        streamController: getStreamControllerSnapshot(),
+      });
+      if (shouldSyncFromServer) {
+        sendingRuntime.isConversationSyncInFlight = true;
+      }
+
       logger.debug('Stream loop ended');
       resetStreamingState();
       this.completeTabContextUsageStream(sendingTabId);
@@ -5986,6 +6341,7 @@ export class OpenCodianView extends ItemView {
       pendingState.element = null;
 
       if (finalizedStreamingMessageEl) {
+        let shellFinalizeAction = 'removed';
         if (streamContentBlocks?.length || latestErrorMessage) {
           this.addTimestampWithCopyButton(
             finalizedStreamingMessageEl,
@@ -5994,12 +6350,17 @@ export class OpenCodianView extends ItemView {
             finalizedModelId,
             shouldPersistInterruptedState ? t('chat.stream.interruptedBadge') : undefined,
           );
+          shellFinalizeAction = 'timestamp-added';
         } else if (shouldPersistInterruptedState) {
           interruptedNoticeMessage = this.buildInterruptedAssistantNotice(finalizedTimestamp, finalizedModelId);
           await this.renderAssistantPlaceholderAsNotice(finalizedStreamingMessageEl, interruptedNoticeMessage);
+          shellFinalizeAction = 'interrupted-notice-rendered';
         } else {
           finalizedStreamingMessageEl.remove();
         }
+        logAssistantFinalizationStage('streaming-shell-finalized', {
+          action: shellFinalizeAction,
+        });
 
         if (this.getActiveTabId() === sendingTabId) {
           this.scheduleSettledScrollToBottomIfNeeded();
@@ -6045,6 +6406,9 @@ export class OpenCodianView extends ItemView {
           contentBlocks,
           questionResolution: sendingRuntime.pendingQuestionResolution ?? undefined,
         };
+        logAssistantFinalizationStage('local-assistant-message-built', {
+          message: this.summarizeChatMessageForDebug(assistantMessage),
+        });
 
         if (shouldPersistInterruptedState) {
           logger.debug(`Persisting interrupted assistant message after stream cancellation: ${this.stringifyLogPayload({
@@ -6068,6 +6432,10 @@ export class OpenCodianView extends ItemView {
         }
 
         sendingConversation.messages.push(assistantMessage);
+        logAssistantFinalizationStage('local-assistant-message-appended', {
+          conversationMessageCount: sendingConversation.messages.length,
+          message: this.summarizeChatMessageForDebug(assistantMessage),
+        });
       } else if (latestErrorMessage) {
         sendingConversation.messages.push({
           id: finalizedAssistantMessageId ?? `assistant-${finalizedTimestamp}`,
@@ -6077,6 +6445,10 @@ export class OpenCodianView extends ItemView {
           modelId: finalizedModelId,
           sourceMessageId: finalizedAssistantMessageId,
         });
+        logAssistantFinalizationStage('local-error-message-appended', {
+          conversationMessageCount: sendingConversation.messages.length,
+          latestAssistantMessage: this.summarizeChatMessageForDebug(sendingConversation.messages.at(-1)),
+        });
       } else if (interruptedNoticeMessage) {
         logger.debug(`Persisting interrupted assistant notice because no visible assistant content survived cancellation: ${this.stringifyLogPayload({
           tabId: sendingTabId,
@@ -6085,63 +6457,118 @@ export class OpenCodianView extends ItemView {
           noticeId: interruptedNoticeMessage.id,
         })}`);
         sendingConversation.messages.push(interruptedNoticeMessage);
+        logAssistantFinalizationStage('local-interrupted-notice-appended', {
+          conversationMessageCount: sendingConversation.messages.length,
+          latestAssistantMessage: this.summarizeChatMessageForDebug(interruptedNoticeMessage),
+        });
       }
 
       if (streamContentBlocks?.length || latestErrorMessage || interruptedNoticeMessage) {
         sendingConversation.updatedAt = finalizedTimestamp;
         sendingConversation.lastResponseAt = finalizedTimestamp;
         await this.plugin.saveConversation(sendingConversation);
+        logAssistantFinalizationStage('conversation-saved-after-local-finalization', {
+          updatedAt: sendingConversation.updatedAt,
+          lastResponseAt: sendingConversation.lastResponseAt ?? null,
+          messageCount: sendingConversation.messages.length,
+        });
       }
 
       sendingRuntime.streamingMessageEl = null;
       sendingRuntime.streamingContentEl = null;
       sendingRuntime.pendingQuestionResolution = null;
+      logAssistantFinalizationStage('stream-runtime-cleared');
     }
 
     if (sendingConversation) {
       const shouldSyncFromServer = streamCompleted && !streamTimedOut && !streamInterrupted && !latestErrorMessage;
-      if (shouldSyncFromServer) {
-        const previousMessagesBeforeSync = [...sendingConversation.messages];
-        const previousVisualFingerprint = this.getConversationVisualFingerprint(sendingConversation.messages);
-        const syncResult = await this.syncConversationMessagesFromServer(sendingConversation, sendingTabId);
+      try {
+        if (shouldSyncFromServer) {
+          const previousMessagesBeforeSync = [...sendingConversation.messages];
+          const previousVisualFingerprint = this.getConversationVisualFingerprint(sendingConversation.messages);
+          logAssistantFinalizationStage('server-sync-requested', {
+            previousVisualFingerprint,
+            localTailAssistant: this.summarizeChatMessageForDebug(
+              [...sendingConversation.messages].reverse().find((message) => message.role === 'assistant'),
+            ),
+          });
+          const syncResult = await this.syncConversationMessagesFromServer(
+            sendingConversation,
+            sendingTabId,
+            'send-finalization',
+          );
+          logAssistantFinalizationStage('server-sync-complete', {
+            changed: syncResult.changed,
+            fingerprint: syncResult.fingerprint,
+            syncedTailAssistant: this.summarizeChatMessageForDebug(
+              [...syncResult.messages].reverse().find((message) => message.role === 'assistant'),
+            ),
+          });
+          if (this.currentConversation?.id === sendingConversation.id && this.getActiveTabId() === sendingTabId) {
+            const activeRuntime = this.getTabRuntimeState(sendingTabId);
+            if (activeRuntime) {
+              activeRuntime.lastConversationSyncFingerprint = syncResult.fingerprint;
+            }
+            if (previousVisualFingerprint !== this.getConversationVisualFingerprint(syncResult.messages)) {
+              const patchedTail = await this.patchTrailingAssistantRender(
+                previousMessagesBeforeSync,
+                syncResult.messages,
+                sendingTabId,
+              );
+              logAssistantFinalizationStage('post-sync-tail-render-attempt', {
+                patchedTail,
+              });
+              if (!patchedTail) {
+                await this.rerenderConversationMessages(sendingConversation);
+                logAssistantFinalizationStage('post-sync-full-rerender-complete');
+              }
+            }
+          }
+
+          await this.appendTurnDiffNoticeIfNeeded(
+            sendingConversation,
+            [...sendingRuntime.pendingEditedFiles],
+            sendingTabId,
+          );
+          logAssistantFinalizationStage('turn-diff-processed', {
+            pendingEditedFileCount: sendingRuntime.pendingEditedFiles.size,
+          });
+        }
+        await this.refreshTabSessionTodos(sendingTabId, sendingConversation.openCodeSessionId, { suppressErrors: true });
+        logAssistantFinalizationStage('session-todos-refreshed');
+        sendingConversation.updatedAt = Date.now();
+        await this.plugin.saveConversation(sendingConversation);
+        logAssistantFinalizationStage('conversation-final-save-complete', {
+          updatedAt: sendingConversation.updatedAt,
+          messageCount: sendingConversation.messages.length,
+        });
+        sendingRuntime.pendingEditedFiles.clear();
         if (this.currentConversation?.id === sendingConversation.id && this.getActiveTabId() === sendingTabId) {
           const activeRuntime = this.getTabRuntimeState(sendingTabId);
           if (activeRuntime) {
-            activeRuntime.lastConversationSyncFingerprint = syncResult.fingerprint;
+            activeRuntime.lastConversationSyncFingerprint = this.getConversationSyncFingerprint(sendingConversation.messages);
           }
-          if (previousVisualFingerprint !== this.getConversationVisualFingerprint(syncResult.messages)) {
-            const patchedTail = await this.patchTrailingAssistantRender(
-              previousMessagesBeforeSync,
-              syncResult.messages,
-              sendingTabId,
-            );
-            if (!patchedTail) {
-              await this.rerenderConversationMessages(sendingConversation);
-            }
-          }
+          this.tabManager?.setTabNeedsAttention(sendingTabId, false);
+          this.tabManager?.setActiveTabConversation(sendingConversation);
+          this.syncActiveTabContextUsageIdentity();
+          await this.refreshActiveTabContextUsageFromServer();
+          logAssistantFinalizationStage('assistant-message-finalization-complete', {
+            tabNeedsAttentionCleared: true,
+            latestAssistantMessage: this.summarizeChatMessageForDebug(
+              [...sendingConversation.messages].reverse().find((message) => message.role === 'assistant'),
+            ),
+          });
+        } else {
+          this.tabManager?.setTabNeedsAttention(sendingTabId, true);
+          logAssistantFinalizationStage('assistant-message-finalization-complete', {
+            tabNeedsAttentionCleared: false,
+          });
         }
-
-        await this.appendTurnDiffNoticeIfNeeded(
-          sendingConversation,
-          [...sendingRuntime.pendingEditedFiles],
-          sendingTabId,
-        );
-      }
-      await this.refreshTabSessionTodos(sendingTabId, sendingConversation.openCodeSessionId, { suppressErrors: true });
-      sendingConversation.updatedAt = Date.now();
-      await this.plugin.saveConversation(sendingConversation);
-      sendingRuntime.pendingEditedFiles.clear();
-      if (this.currentConversation?.id === sendingConversation.id && this.getActiveTabId() === sendingTabId) {
-        const activeRuntime = this.getTabRuntimeState(sendingTabId);
-        if (activeRuntime) {
-          activeRuntime.lastConversationSyncFingerprint = this.getConversationSyncFingerprint(sendingConversation.messages);
+      } finally {
+        if (shouldSyncFromServer) {
+          sendingRuntime.isConversationSyncInFlight = false;
+          logAssistantFinalizationStage('conversation-sync-lock-cleared');
         }
-        this.tabManager?.setTabNeedsAttention(sendingTabId, false);
-        this.tabManager?.setActiveTabConversation(sendingConversation);
-        this.syncActiveTabContextUsageIdentity();
-        await this.refreshActiveTabContextUsageFromServer();
-      } else {
-        this.tabManager?.setTabNeedsAttention(sendingTabId, true);
       }
     }
   }
@@ -7367,6 +7794,10 @@ export class OpenCodianView extends ItemView {
         break;
 
       case 'tool_use':
+        if (isInternalStructuredOutputTool(block.toolName)) {
+          break;
+        }
+
         if (block.toolName && block.toolId) {
           const toolRenderer = new ToolCallRenderer();
           const toolCall: ToolCallInfo = {
@@ -7851,12 +8282,96 @@ export class OpenCodianView extends ItemView {
       }
     }
 
+    let content = syncedMessage.content;
+    if (!content?.trim() && existingMessage.content?.trim()) {
+      content = existingMessage.content;
+    }
+
+    let contentBlocks = syncedMessage.contentBlocks;
+    if (this.shouldPreserveExistingAssistantContentBlocks(existingMessage, syncedMessage)) {
+      contentBlocks = existingMessage.contentBlocks;
+    }
+
+    let toolCalls = syncedMessage.toolCalls;
+    if ((!toolCalls || toolCalls.length === 0) && existingMessage.toolCalls?.length) {
+      toolCalls = existingMessage.toolCalls;
+    }
+
+    const preservedFlags = {
+      preservedExistingContent: content === existingMessage.content && content !== syncedMessage.content,
+      preservedExistingContentBlocks: contentBlocks === existingMessage.contentBlocks,
+      preservedExistingToolCalls: toolCalls === existingMessage.toolCalls && toolCalls !== syncedMessage.toolCalls,
+      preservedExistingStructured: syncedMessage.structured === undefined && existingMessage.structured !== undefined,
+      preservedExistingParts: syncedMessage.parts === undefined && existingMessage.parts !== undefined,
+    };
+    if (Object.values(preservedFlags).some(Boolean)) {
+      this.logAssistantFinalizationDebug('merge-client-only-message-fields', {
+        existingMessage: this.summarizeChatMessageForDebug(existingMessage),
+        syncedMessage: this.summarizeChatMessageForDebug(syncedMessage),
+        preservedFlags,
+      });
+    }
+
     return {
       ...syncedMessage,
+      content,
+      contentBlocks,
+      toolCalls,
       contextAttachments,
       questionResolution: syncedMessage.questionResolution ?? existingMessage.questionResolution,
       streamState: syncedMessage.streamState ?? existingMessage.streamState,
+      structured: syncedMessage.structured ?? existingMessage.structured,
+      parts: syncedMessage.parts ?? existingMessage.parts,
     };
+  }
+
+  private shouldPreserveExistingAssistantContentBlocks(
+    existingMessage: ChatMessage,
+    syncedMessage: ChatMessage,
+  ): boolean {
+    if (existingMessage.role !== 'assistant') {
+      return false;
+    }
+
+    const existingBlocks = existingMessage.contentBlocks;
+    if (!existingBlocks || existingBlocks.length === 0) {
+      return false;
+    }
+
+    const syncedBlocks = syncedMessage.contentBlocks;
+    if (!syncedBlocks || syncedBlocks.length === 0) {
+      return true;
+    }
+
+    const existingHasRichBlocks = this.hasRichAssistantContentBlocks(existingBlocks);
+    const syncedHasRichBlocks = this.hasRichAssistantContentBlocks(syncedBlocks);
+    if (existingHasRichBlocks && !syncedHasRichBlocks) {
+      return this.getAssistantTextBlockSignature(existingBlocks, existingMessage.content)
+        === this.getAssistantTextBlockSignature(syncedBlocks, syncedMessage.content);
+    }
+
+    if (existingBlocks.length <= syncedBlocks.length) {
+      return false;
+    }
+
+    return this.getAssistantTextBlockSignature(existingBlocks, existingMessage.content)
+      === this.getAssistantTextBlockSignature(syncedBlocks, syncedMessage.content);
+  }
+
+  private hasRichAssistantContentBlocks(blocks: ContentBlock[]): boolean {
+    return blocks.some((block) => block.type !== 'text');
+  }
+
+  private getAssistantTextBlockSignature(blocks: ContentBlock[] | undefined, fallbackContent: string): string {
+    if (!blocks || blocks.length === 0) {
+      return fallbackContent.trim();
+    }
+
+    return blocks
+      .filter((block) => block.type === 'text' && typeof block.text === 'string')
+      .map((block) => block.text?.trim())
+      .filter((text): text is string => Boolean(text))
+      .join('\n\n');
   }
 
   private async syncLatestUserMessageFromServer(
@@ -8249,6 +8764,7 @@ export class OpenCodianView extends ItemView {
   private async syncConversationMessagesFromServer(
     conversation: Conversation,
     tabId: TabId | null = this.getActiveTabId(),
+    reason = 'unspecified',
   ): Promise<{
     messages: ChatMessage[];
     changed: boolean;
@@ -8256,6 +8772,16 @@ export class OpenCodianView extends ItemView {
     revertState: ConversationRevertState | null;
   }> {
     try {
+      this.logAssistantFinalizationDebug('server-sync-begin', {
+        reason,
+        conversationId: conversation.id,
+        sessionId: conversation.openCodeSessionId,
+        tabId,
+        existingMessageCount: conversation.messages.length,
+        localTailAssistant: this.summarizeChatMessageForDebug(
+          [...conversation.messages].reverse().find((message) => message.role === 'assistant'),
+        ),
+      });
       const serverMessages = await this.plugin.openCodeService.getSessionMessages(conversation.openCodeSessionId);
       const revertState = serverMessages.length === 0
         ? await this.plugin.openCodeService.getSessionRevertState(conversation.openCodeSessionId)
@@ -8265,6 +8791,17 @@ export class OpenCodianView extends ItemView {
           OpenCodeService.openCodeMessageToChatMessage(info, parts, getVaultBasePath(this.app) ?? undefined),
         )
         .filter((message) => this.shouldRenderConversationMessage(message));
+      this.logAssistantFinalizationDebug('server-sync-fetched', {
+        reason,
+        conversationId: conversation.id,
+        sessionId: conversation.openCodeSessionId,
+        tabId,
+        serverMessageCount: serverMessages.length,
+        convertedMessageCount: convertedServerMessages.length,
+        serverTailAssistant: this.summarizeChatMessageForDebug(
+          [...convertedServerMessages].reverse().find((message) => message.role === 'assistant'),
+        ),
+      });
       this.logOmoBackgroundTaskDiagnostics(conversation, conversation.messages, convertedServerMessages);
       const converted = this.mergeSyncedMessageModelIds(
         conversation.messages,
@@ -8302,6 +8839,17 @@ export class OpenCodianView extends ItemView {
       }
       const merged = [...converted, ...preservedClientOnlyMessages]
         .sort((left, right) => left.timestamp - right.timestamp);
+      this.logAssistantFinalizationDebug('server-sync-merged', {
+        reason,
+        conversationId: conversation.id,
+        sessionId: conversation.openCodeSessionId,
+        tabId,
+        mergedMessageCount: merged.length,
+        preservedClientOnlyMessageCount: preservedClientOnlyMessages.length,
+        mergedTailAssistant: this.summarizeChatMessageForDebug(
+          [...merged].reverse().find((message) => message.role === 'assistant'),
+        ),
+      });
       const fingerprint = this.getConversationSyncFingerprint(merged);
       const previousFingerprint = this.getTabRuntimeState(tabId)?.lastConversationSyncFingerprint
         ?? this.getConversationSyncFingerprint(conversation.messages);
@@ -8322,6 +8870,7 @@ export class OpenCodianView extends ItemView {
         logger.debug('Conversation sync complete', {
           conversationId: conversation.id,
           sessionId: conversation.openCodeSessionId,
+          reason,
           serverMessageCount: serverMessages.length,
           mergedMessageCount: merged.length,
           preservedClientOnlyMessageCount: preservedClientOnlyMessages.length,
@@ -8330,10 +8879,27 @@ export class OpenCodianView extends ItemView {
           changed,
         });
       }
+      this.logAssistantFinalizationDebug('server-sync-finished', {
+        reason,
+        conversationId: conversation.id,
+        sessionId: conversation.openCodeSessionId,
+        tabId,
+        changed,
+        fingerprint,
+        revertApplied: Boolean(revertState),
+        revertMessageId: revertState?.messageID ?? null,
+      });
       return { messages: merged, changed, fingerprint, revertState };
     } catch (error) {
       logger.error('Failed to sync conversation messages from server:', error);
       const fingerprint = this.getConversationSyncFingerprint(conversation.messages);
+      this.logAssistantFinalizationDebug('server-sync-failed', {
+        reason,
+        conversationId: conversation.id,
+        sessionId: conversation.openCodeSessionId,
+        tabId,
+        errorMessage: error instanceof Error ? error.message : String(error),
+      });
       return {
         messages: conversation.messages,
         changed: false,
@@ -8350,6 +8916,14 @@ export class OpenCodianView extends ItemView {
       return;
     }
 
+    this.logAssistantFinalizationDebug('rerender-conversation-messages-start', {
+      conversationId: conversation.id,
+      sessionId: conversation.openCodeSessionId,
+      messageCount: conversation.messages.length,
+      tailAssistant: this.summarizeChatMessageForDebug(
+        [...conversation.messages].reverse().find((message) => message.role === 'assistant'),
+      ),
+    });
     const messagesEl = this.messagesContainer;
     const shouldStickToBottom = this.getActiveTabRuntimeState()?.autoScrollEnabled ?? this.isNearBottomForElement(messagesEl);
     const previousScrollTop = messagesEl.scrollTop;
@@ -8372,6 +8946,12 @@ export class OpenCodianView extends ItemView {
     window.requestAnimationFrame(() => {
       messagesEl.removeClass('is-rehydrating');
     });
+    this.logAssistantFinalizationDebug('rerender-conversation-messages-complete', {
+      conversationId: conversation.id,
+      sessionId: conversation.openCodeSessionId,
+      shouldStickToBottom,
+      previousScrollTop,
+    });
   }
 
   private getMessagesForRender(messages: ChatMessage[]): ChatMessage[] {
@@ -8387,8 +8967,18 @@ export class OpenCodianView extends ItemView {
     nextMessages: ChatMessage[],
     tabId: TabId | null = this.getActiveTabId(),
   ): Promise<boolean> {
-    if (!this.messagesContainer || this.getActiveTabId() !== tabId) {
+    const fail = (reason: string, payload: Record<string, unknown> = {}): false => {
+      this.logAssistantFinalizationDebug('patch-trailing-assistant-render-skipped', {
+        reason,
+        tabId,
+        previousRenderedCount: this.getMessagesForRender(previousMessages).length,
+        nextRenderedCount: this.getMessagesForRender(nextMessages).length,
+        ...payload,
+      });
       return false;
+    };
+    if (!this.messagesContainer || this.getActiveTabId() !== tabId) {
+      return fail('missing-container-or-inactive-tab');
     }
 
     const previousRenderedMessages = this.getMessagesForRender(previousMessages);
@@ -8397,7 +8987,7 @@ export class OpenCodianView extends ItemView {
       previousRenderedMessages.length === 0
       || previousRenderedMessages.length !== nextRenderedMessages.length
     ) {
-      return false;
+      return fail('rendered-message-count-mismatch');
     }
 
     const lastIndex = previousRenderedMessages.length - 1;
@@ -8406,7 +8996,9 @@ export class OpenCodianView extends ItemView {
         this.getMessageVisualSignature(previousRenderedMessages[index])
         !== this.getMessageVisualSignature(nextRenderedMessages[index])
       ) {
-        return false;
+        return fail('non-tail-message-signature-mismatch', {
+          mismatchIndex: index,
+        });
       }
     }
 
@@ -8418,7 +9010,10 @@ export class OpenCodianView extends ItemView {
       || previousTailMessage.displayStyle === 'notice'
       || nextTailMessage.displayStyle === 'notice'
     ) {
-      return false;
+      return fail('tail-message-not-mergeable-assistant', {
+        previousTail: this.summarizeChatMessageForDebug(previousTailMessage),
+        nextTail: this.summarizeChatMessageForDebug(nextTailMessage),
+      });
     }
 
     const existingTailMessageEl = Array.from(
@@ -8427,7 +9022,7 @@ export class OpenCodianView extends ItemView {
       .filter((element) => !element.classList.contains('opencodian-message--notice'))
       .pop();
     if (!existingTailMessageEl || !(existingTailMessageEl.parentElement instanceof HTMLElement)) {
-      return false;
+      return fail('missing-existing-tail-element');
     }
 
     const parentEl = existingTailMessageEl.parentElement;
@@ -8436,7 +9031,7 @@ export class OpenCodianView extends ItemView {
     const shouldStickToBottom = this.shouldAutoScroll(tabId);
     const existingContentEl = existingTailMessageEl.querySelector('.opencodian-message-content');
     if (!(existingContentEl instanceof HTMLElement)) {
-      return false;
+      return fail('missing-tail-content-element');
     }
 
     if (runtime) {
@@ -8466,6 +9061,12 @@ export class OpenCodianView extends ItemView {
       if (shouldStickToBottom) {
         this.scrollToBottom({ tabId });
       }
+      this.logAssistantFinalizationDebug('patch-trailing-assistant-render-complete', {
+        tabId,
+        shouldStickToBottom,
+        previousTail: this.summarizeChatMessageForDebug(previousTailMessage),
+        nextTail: this.summarizeChatMessageForDebug(nextTailMessage),
+      });
       return true;
     } finally {
       if (runtime) {
@@ -9927,6 +10528,9 @@ export class OpenCodianView extends ItemView {
         };
 
       case 'tool_use':
+        if (isInternalStructuredOutputTool(chunk.name)) {
+          return null;
+        }
 
         return {
           type: 'tool_use',

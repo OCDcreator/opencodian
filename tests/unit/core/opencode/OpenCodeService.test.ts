@@ -1507,6 +1507,140 @@ describe('OpenCodeService', () => {
         },
       ]));
     });
+
+    it('ignores internal StructuredOutput tool events from the SDK stream', async () => {
+      service = createServiceWithSdkFlags();
+      service.setSessionId('test-session');
+
+      mockSdkClient.session.promptAsync.mockResolvedValue({});
+      mockSdkClient.event.subscribe.mockResolvedValue({
+        stream: (async function* () {
+          yield {
+            type: 'message.part.updated',
+            properties: {
+              sessionID: 'test-session',
+              part: {
+                id: 'part-tool-1',
+                sessionID: 'test-session',
+                type: 'tool',
+                callID: 'call-tool-1',
+                tool: 'StructuredOutput',
+                state: {
+                  status: 'running',
+                  input: {
+                    schema: { type: 'object' },
+                  },
+                },
+              },
+            },
+          };
+          yield {
+            type: 'message.part.updated',
+            properties: {
+              sessionID: 'test-session',
+              part: {
+                id: 'part-tool-1',
+                sessionID: 'test-session',
+                type: 'tool',
+                callID: 'call-tool-1',
+                tool: 'StructuredOutput',
+                state: {
+                  status: 'completed',
+                  output: '{"title":"Generated title"}',
+                },
+              },
+            },
+          };
+          yield {
+            type: 'session.idle',
+            properties: {
+              sessionID: 'test-session',
+            },
+          };
+        })(),
+      });
+      mockSdkClient.session.messages.mockResolvedValue([]);
+      mockSdkClient.session.get.mockResolvedValue({
+        id: 'test-session',
+        title: 'SDK',
+        time: { created: 1, updated: 1 },
+      });
+
+      const chunks: unknown[] = [];
+      for await (const chunk of service.sendMessage('Hello', { sessionId: 'test-session' })) {
+        chunks.push(chunk);
+      }
+
+      const toolChunks = chunks.filter((chunk) => (
+        typeof chunk === 'object'
+        && chunk !== null
+        && (
+          (chunk as { type?: string }).type === 'tool_use'
+          || (chunk as { type?: string }).type === 'tool_result'
+        )
+      ));
+      expect(toolChunks).toEqual([]);
+      expect(chunks[chunks.length - 1]).toEqual({ type: 'message_stop' });
+    });
+
+    it('ignores SDK stream events when the part sessionID does not match the active session', async () => {
+      service = createServiceWithSdkFlags();
+      service.setSessionId('test-session');
+
+      mockSdkClient.session.promptAsync.mockResolvedValue({});
+      mockSdkClient.event.subscribe.mockResolvedValue({
+        stream: (async function* () {
+          yield {
+            type: 'message.part.updated',
+            properties: {
+              sessionID: 'test-session',
+              part: {
+                id: 'part-1',
+                sessionID: 'other-session',
+                type: 'text',
+              },
+            },
+          };
+          yield {
+            type: 'message.part.delta',
+            properties: {
+              sessionID: 'test-session',
+              partID: 'part-1',
+              field: 'text',
+              delta: 'Should be ignored',
+              part: {
+                id: 'part-1',
+                sessionID: 'other-session',
+                type: 'text',
+              },
+            },
+          };
+          yield {
+            type: 'session.idle',
+            properties: {
+              sessionID: 'test-session',
+            },
+          };
+        })(),
+      });
+      mockSdkClient.session.messages.mockResolvedValue([]);
+      mockSdkClient.session.get.mockResolvedValue({
+        id: 'test-session',
+        title: 'SDK',
+        time: { created: 1, updated: 1 },
+      });
+
+      const chunks: unknown[] = [];
+      for await (const chunk of service.sendMessage('Hello', { sessionId: 'test-session' })) {
+        chunks.push(chunk);
+      }
+
+      expect(chunks).not.toContainEqual({
+        type: 'text',
+        content: 'Should be ignored',
+      });
+      expect(chunks[chunks.length - 1]).toEqual({ type: 'message_stop' });
+    });
   });
 
   describe('getAvailableModels', () => {
@@ -2030,6 +2164,62 @@ describe('OpenCodeService.openCodeMessageToChatMessage', () => {
 
     expect(message.content).toBe('Generated title');
     expect(message.structured).toEqual({ title: 'Generated title' });
+  });
+
+  it('filters internal StructuredOutput tool parts while preserving structured payloads', () => {
+    const info = {
+      id: 'msg-structured-tool',
+      sessionID: 'session-1',
+      role: 'assistant' as const,
+      structured: { title: 'Generated title' },
+      time: { created: 1234567896 },
+      parentID: 'msg-structured-user',
+      modelID: 'gpt-5',
+      providerID: 'openai',
+      mode: 'default',
+      path: { cwd: '/test', root: '/test' },
+      cost: 0,
+      tokens: { input: 5, output: 5, reasoning: 0, cache: { read: 0, write: 0 } },
+    };
+
+    const parts = [
+      {
+        type: 'tool',
+        id: 'part-structured-tool',
+        sessionID: 'session-1',
+        messageID: 'msg-structured-tool',
+        callID: 'call-structured-tool',
+        tool: 'structured_output',
+        state: {
+          status: 'completed' as const,
+          input: {
+            schema: {
+              type: 'object',
+            },
+          },
+          output: '{"title":"Generated title"}',
+        },
+      },
+      {
+        type: 'text',
+        id: 'part-structured-text',
+        sessionID: 'session-1',
+        messageID: 'msg-structured-tool',
+        text: 'Generated title',
+      },
+    ] as unknown as Part[];
+
+    const message = OpenCodeService.openCodeMessageToChatMessage(info, parts);
+
+    expect(message.content).toBe('Generated title');
+    expect(message.structured).toEqual({ title: 'Generated title' });
+    expect(message.toolCalls).toBeUndefined();
+    expect(message.contentBlocks).toEqual([
+      {
+        type: 'text',
+        text: 'Generated title',
+      },
+    ]);
   });
 
   it('extracts OMO-injected user prompts into structured metadata', () => {

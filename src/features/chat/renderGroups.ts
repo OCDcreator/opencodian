@@ -23,15 +23,32 @@ function extractTextContent(message: ChatMessage): string {
 
 function flattenContentBlocks(messages: ChatMessage[]): ContentBlock[] {
   const blocks: ContentBlock[] = [];
+  let lastRenderedText: string | null = null;
 
   for (const message of messages) {
     if (message.contentBlocks && message.contentBlocks.length > 0) {
-      blocks.push(...message.contentBlocks);
+      for (const block of message.contentBlocks) {
+        if (block.type !== 'text') {
+          blocks.push(block);
+          lastRenderedText = null;
+          continue;
+        }
+
+        const normalizedText = block.text?.trim() ?? '';
+        if (!normalizedText || normalizedText === lastRenderedText) {
+          continue;
+        }
+
+        blocks.push(block);
+        lastRenderedText = normalizedText;
+      }
       continue;
     }
 
-    if (message.content) {
+    const normalizedText = message.content?.trim() ?? '';
+    if (normalizedText && normalizedText !== lastRenderedText) {
       blocks.push({ type: 'text', text: message.content });
+      lastRenderedText = normalizedText;
     }
   }
 
@@ -71,6 +88,7 @@ export function mergeAssistantMessagesForRender(messages: ChatMessage[]): ChatMe
   const content = messages
     .map(extractTextContent)
     .filter((text) => text.length > 0)
+    .filter((text, index, texts) => index === 0 || text !== texts[index - 1])
     .join('\n\n');
   const contentBlocks = flattenContentBlocks(messages);
 

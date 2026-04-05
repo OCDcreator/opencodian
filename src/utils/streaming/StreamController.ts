@@ -1,4 +1,4 @@
-import { createLogger } from '../../shared';
+import { createLogger, isInternalStructuredOutputTool } from '../../shared';
 import type { MarkdownRenderService } from '../markdown';
 import { ThinkingBlockRenderer } from './ThinkingBlockRenderer';
 import { ToolCallRenderer } from './ToolCallRenderer';
@@ -57,6 +57,27 @@ export class StreamController {
     this.callbacks = callbacks;
   }
 
+  private previewText(text: string, maxLength = 120): string {
+    const normalized = text.replace(/\s+/g, ' ').trim();
+    if (normalized.length <= maxLength) {
+      return normalized;
+    }
+
+    return `${normalized.slice(0, maxLength)}...`;
+  }
+
+  private stringifyDebugPayload(payload: unknown): string {
+    try {
+      return JSON.stringify(payload);
+    } catch {
+      return '[unserializable]';
+    }
+  }
+
+  private logDebugStage(label: string, payload: unknown): void {
+    logger.debug(`Stream controller [${label}]: ${this.stringifyDebugPayload(payload)}`);
+  }
+
   startStream(contentEl: HTMLElement): void {
 
     this.clearPendingTextRender();
@@ -66,6 +87,9 @@ export class StreamController {
     this.state.contentBlocks = [];
     this.lastTextRenderAt = 0;
     this.lastRenderedTextContent = '';
+    this.logDebugStage('start-stream', {
+      hasContentElement: Boolean(contentEl),
+    });
   }
 
   async handleChunk(chunk: StreamChunk): Promise<void> {
@@ -162,10 +186,51 @@ export class StreamController {
     }
 
     this.state.currentTextContent += content;
+    this.logDebugStage('text-buffer-appended', {
+      deltaLength: content.length,
+      deltaPreview: this.previewText(content),
+      bufferedTextLength: this.state.currentTextContent.length,
+      persistedBlockCount: this.state.contentBlocks.length,
+    });
     this.scheduleTextRender();
   }
 
+  private upsertToolCallContentBlock(toolCall: ToolCallInfo): void {
+    const persistedToolCall: ToolCallInfo = {
+      id: toolCall.id,
+      name: toolCall.name,
+      input: { ...toolCall.input },
+      status: toolCall.status,
+      result: toolCall.result,
+    };
+
+    const existingBlock = this.state.contentBlocks.find((block) =>
+      block.type === 'tool_call' && block.toolCall.id === toolCall.id,
+    );
+
+    if (existingBlock?.type === 'tool_call') {
+      existingBlock.toolCall = persistedToolCall;
+    } else {
+      this.state.contentBlocks.push({
+        type: 'tool_call',
+        toolCall: persistedToolCall,
+      });
+    }
+
+    this.state.persistedToolCallIds.add(toolCall.id);
+    this.logDebugStage('tool-call-persisted', {
+      toolId: toolCall.id,
+      status: toolCall.status,
+      hasResult: typeof toolCall.result === 'string',
+      persistedBlockCount: this.state.contentBlocks.length,
+    });
+  }
+
   private async handleToolUseChunk(chunk: { id: string; name: string; input: Record<string, unknown> }): Promise<void> {
+    if (isInternalStructuredOutputTool(chunk.name)) {
+      return;
+    }
+
     await this.flushPendingTextRender();
     this.finalizeThinkingBlock();
     await this.finalizeCurrentTextRender();
@@ -220,16 +285,12 @@ export class StreamController {
       this.toolRenderer.updateResult(toolEl, toolCall);
     }
 
-    // Add tool call to content blocks immediately to preserve order
-    this.state.contentBlocks.push({
-      type: 'tool_call',
-      toolCall: {
-        id: toolCall.id,
-        name: toolCall.name,
-        input: toolCall.input,
-        status: toolCall.status,
-        result: toolCall.result,
-      },
+    this.upsertToolCallContentBlock(toolCall);
+    this.logDebugStage('tool-result-finalized', {
+      toolId: toolCall.id,
+      status: toolCall.status,
+      resultLength: chunk.content.length,
+      persistedBlockCount: this.state.contentBlocks.length,
     });
 
     this.callbacks.onToolCallEnd?.(toolCall);
@@ -253,12 +314,22 @@ export class StreamController {
   }
 
   private async handleDoneChunk(): Promise<void> {
+    this.logDebugStage('done-received', {
+      bufferedTextLength: this.state.currentTextContent.length,
+      persistedBlockCount: this.state.contentBlocks.length,
+      openToolCallCount: this.state.toolCalls.size,
+      openThinkingBlock: Boolean(this.state.currentThinkingState),
+    });
     await this.flushPendingTextRender();
     await this.finalizeCurrentTextRender();
     this.flushOpenContentBlocks();
     this.finalizeToolCalls();
     this.state.isStreaming = false;
     this.callbacks.onDone?.();
+    this.logDebugStage('done-flushed', {
+      persistedBlockCount: this.state.contentBlocks.length,
+      blockTypes: this.state.contentBlocks.map((block) => block.type),
+    });
 
     if (this.onStreamComplete) {
       this.onStreamComplete(this.state.contentBlocks);
@@ -418,6 +489,11 @@ export class StreamController {
       type: 'text',
       content: this.state.currentTextContent,
     });
+    this.logDebugStage('text-block-finalized', {
+      textLength: this.state.currentTextContent.length,
+      textPreview: this.previewText(this.state.currentTextContent),
+      persistedBlockCount: this.state.contentBlocks.length,
+    });
 
     this.state.currentTextEl = null;
     this.state.currentTextContent = '';
@@ -426,7 +502,22 @@ export class StreamController {
   }
 
   private finalizeToolCalls(): void {
-    // Clear tool calls after finalizing (they've already been added to contentBlocks)
+    for (const toolCall of this.state.toolCalls.values()) {
+      if (toolCall.status === 'running' || toolCall.status === 'pending') {
+        toolCall.status = 'completed';
+        this.callbacks.onToolCallEnd?.(toolCall);
+
+        const toolEl = this.state.toolCallElements.get(toolCall.id);
+        if (toolEl) {
+          this.toolRenderer.updateResult(toolEl, toolCall);
+        }
+      }
+
+      if (!this.state.persistedToolCallIds.has(toolCall.id)) {
+        this.upsertToolCallContentBlock(toolCall);
+      }
+    }
+
     this.state.toolCalls.clear();
     this.state.toolCallElements.clear();
   }
@@ -441,6 +532,10 @@ export class StreamController {
     void this.finalizeCurrentTextRender();
     this.flushOpenContentBlocks();
     this.state.isStreaming = false;
+    this.logDebugStage('cancel-stream', {
+      persistedBlockCount: this.state.contentBlocks.length,
+      bufferedTextLength: this.state.currentTextContent.length,
+    });
   }
 
   /**
@@ -462,22 +557,18 @@ export class StreamController {
         if (toolEl) {
           this.toolRenderer.updateResult(toolEl, toolCall);
         }
-        
-        // Add to content blocks
-        this.state.contentBlocks.push({
-          type: 'tool_call',
-          toolCall: {
-            id: toolCall.id,
-            name: toolCall.name,
-            input: toolCall.input,
-            status: 'error',
-            result: 'Request timeout',
-          },
-        });
+
+        this.upsertToolCallContentBlock(toolCall);
       }
     }
-    
+
+    this.state.toolCalls.clear();
+    this.state.toolCallElements.clear();
     this.state.isStreaming = false;
+    this.logDebugStage('timeout-stream', {
+      persistedBlockCount: this.state.contentBlocks.length,
+      openToolCallCount: this.state.toolCalls.size,
+    });
   }
 
   getContentBlocks(): ContentBlock[] {
@@ -509,6 +600,10 @@ export class StreamController {
           break;
 
         case 'tool_call':
+          if (isInternalStructuredOutputTool(block.toolCall.name)) {
+            break;
+          }
+
           this.toolRenderer.render(parentEl, block.toolCall);
           break;
       }

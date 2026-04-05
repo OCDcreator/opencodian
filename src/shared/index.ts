@@ -26,6 +26,7 @@ export type {
   ToolExecutionStatus,
 } from './toolExecution';
 export {
+  isInternalStructuredOutputTool,
   isToolExecutionError,
   resolveToolExecutionStatus,
   resolveToolResultText,

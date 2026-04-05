@@ -12,6 +12,65 @@
 
 ---
 
+## 2026-04-05 修正助手最终同步重复/丢块问题，并优化样式数值控件交互
+
+### 🎯 改动目标
+
+- 修正助手消息在流式结束后的最终同步阶段，被更“薄”的服务端消息覆盖后出现文本重复、工具块丢失或内部 StructuredOutput 工具暴露的问题
+- 让样式设置里的数值控件支持自由小数输入，拖动滑块时只更新显示、不在拖动过程中频繁提交设置
+
+### ✅ 本轮调整
+
+- `src/shared/toolExecution.ts`
+- `src/shared/index.ts`
+  - 新增 `isInternalStructuredOutputTool()`，统一识别 `StructuredOutput` / `structured_output` 一类内部工具名，供服务层、流式渲染层和聊天 UI 共用
+
+- `src/core/opencode/OpenCodeService.ts`
+  - 在 SDK 流事件处理里忽略内部 StructuredOutput 工具事件，避免把内部结构化输出流程当成普通工具调用渲染到聊天区
+  - 对 `message.part.updated` / `message.part.delta` 增加 `part.sessionID` 过滤，防止跨 session 事件串入当前会话
+  - 在 `openCodeMessageToChatMessage()` 中过滤内部 StructuredOutput tool part，但继续保留 `info.structured` 里的结构化结果
+  - 补充助手最终收尾链路的调试日志，便于定位“流里看到的内容”和“最终落库/同步回来的内容”之间的差异
+
+- `src/utils/streaming/StreamController.ts`
+- `src/utils/streaming/types.ts`
+  - 流式渲染阶段跳过内部 StructuredOutput 工具
+  - 为 `tool_use` 但未收到 `tool_result` 的工具调用补上持久化兜底，在 `done` / timeout 收尾时也能保留工具块顺序和状态
+  - 增加流式文本、工具块落盘和完成阶段的调试信息，帮助对齐前端渲染态与最终消息态
+
+- `src/features/chat/renderGroups.ts`
+- `src/features/chat/OpenCodianView.ts`
+  - 合并助手消息时对相邻重复文本去重，避免同一答案既来自 content block 又来自 fallback content 时被重复拼接
+  - 在会话同步合并时优先保留本地更丰富的助手 `contentBlocks`、`toolCalls`、`structured` 和 `parts`，只在文本签名不一致时才让服务端结果覆盖
+  - 为加载会话、前台后台同步、发送收尾同步增加 reason tracing，并把发送收尾阶段的同步锁与尾部 rerender 日志补齐，降低后续排查成本
+  - 渲染消息内容时跳过内部 StructuredOutput 工具块，不再把结构化输出内部步骤显示给用户
+
+- `src/features/settings/OpenCodianSettings.ts`
+  - 数字输入框改为 `step="any"`，允许输入 `8.35` 这类自由小数值
+  - 为数值输入增加“未完成草稿”识别，像 `8.`、`-` 这类输入中间态不再被立即打断或重置
+  - 滑块拖动时只刷新显示，等 `change` 再真正提交，减少拖动过程中的连续设置写入
+  - 拆出通用的数值 clamp / precision 处理，避免以最小步长为 1 时把合法小数重新吸回整数步长
+
+- `tests/unit/core/opencode/OpenCodeService.test.ts`
+- `tests/unit/features/chat/conversationSyncMerge.test.ts`
+- `tests/unit/features/chat/renderGroups.test.ts`
+- `tests/unit/features/settings/OpenCodianStyleSettings.test.ts`
+- `tests/unit/utils/streaming/StreamController.test.ts`
+  - 补充内部 StructuredOutput 过滤、跨 session 事件忽略、助手同步保留富内容块、相邻重复文本去重、未完成工具调用持久化，以及数值控件自由输入/拖动提交时机等回归测试
+
+### 🧠 问题根因
+
+- StructuredOutput 在 OpenCode 里本质上是内部结构化输出辅助工具，但旧链路会把它一路透传到 SDK 流事件、持久化消息和 UI 渲染层，结果就是聊天区里会混入本不该展示的内部工具步骤
+- 助手流结束后，前端本地已经收集到了更丰富的 `contentBlocks` / `toolCalls`，但随后会话同步如果拿到的是“只有纯文本”的服务端消息，旧合并逻辑会直接覆盖本地 richer state，最终表现成尾部消息降级、重复或丢块
+- 样式设置的数值控件以前在 `input` 阶段就按步长提交，既打断了自由小数输入，也会在滑块拖动过程中产生大量不必要的设置写入
+
+### 🧪 当前验证
+
+- 已通过：`npm run check:devlog-order`
+- 已通过：`npm test -- tests/unit/core/opencode/OpenCodeService.test.ts tests/unit/features/chat/conversationSyncMerge.test.ts tests/unit/features/chat/renderGroups.test.ts tests/unit/features/settings/OpenCodianStyleSettings.test.ts tests/unit/utils/streaming/StreamController.test.ts`
+- 已通过：`npm run build`（`BUILD_ID: main.202604051821`）
+- 已部署：`dist/main.js`、`dist/manifest.json`、`dist/styles.css` 已复制到 Test Vault，并确认插件端 `main.js` 含最新 `BUILD_ID: main.202604051821`
+- 未执行：完整 Jest 测试套件
+
 ## 2026-04-05 助手时间行样式拆分，并收敛设置页重开时的 Forced reflow
 
 ### 🎯 改动目标

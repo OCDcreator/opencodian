@@ -14,6 +14,7 @@ import {
   buildObsidianContextTag,
   createLogger,
   formatContextLabel,
+  isInternalStructuredOutputTool,
   isTextLikeMime,
   parseLineRangeFromFileUrl,
   parseObsidianContextTag,
@@ -96,6 +97,7 @@ interface OpenCodeEvent {
     };
     part?: {
       id: string;
+      sessionID?: string;
       type: string;
       text?: string;
       callID?: string;
@@ -236,6 +238,74 @@ function formatModelIdentifier(providerID?: string, modelID?: string): string | 
   return undefined;
 }
 
+interface StreamingTextDeltaDebugState {
+  sequence: number;
+  source: 'event' | 'finalize';
+  partId: string | null;
+  partType: string;
+  length: number;
+  totalLength: number;
+  preview: string;
+}
+
+function getDebugTextPreview(text: string, maxLength = 160): string {
+  const normalized = text.replace(/\s+/g, ' ').trim();
+  if (normalized.length <= maxLength) {
+    return normalized;
+  }
+
+  return `${normalized.slice(0, maxLength)}...`;
+}
+
+function stringifyDebugPayload(payload: unknown): string {
+  try {
+    return JSON.stringify(payload);
+  } catch {
+    return '[unserializable]';
+  }
+}
+
+function logAssistantFinalizationDebug(label: string, payload: unknown): void {
+  logger.debug(`Assistant stream finalization [${label}]: ${stringifyDebugPayload(payload)}`);
+}
+
+function summarizeAssistantParts(parts: Part[]): {
+  totalParts: number;
+  textPartCount: number;
+  textLength: number;
+  toolPartCount: number;
+  reasoningPartCount: number;
+  filePartCount: number;
+} {
+  let textPartCount = 0;
+  let textLength = 0;
+  let toolPartCount = 0;
+  let reasoningPartCount = 0;
+  let filePartCount = 0;
+
+  for (const part of parts) {
+    if (part.type === 'text' && typeof part.text === 'string') {
+      textPartCount += 1;
+      textLength += part.text.length;
+    } else if (part.type === 'tool') {
+      toolPartCount += 1;
+    } else if (part.type === 'reasoning' || part.type === 'thinking') {
+      reasoningPartCount += 1;
+    } else if (part.type === 'file') {
+      filePartCount += 1;
+    }
+  }
+
+  return {
+    totalParts: parts.length,
+    textPartCount,
+    textLength,
+    toolPartCount,
+    reasoningPartCount,
+    filePartCount,
+  };
+}
+
 interface AssistantMessageResponse {
   info: Message;
   parts: Part[];
@@ -263,6 +333,8 @@ interface StreamingState {
   lastContent: string;
   processedToolIds: Set<string>;
   toolInputSnapshots: Map<string, string>;
+  debugChunkSequence: number;
+  lastTextDelta: StreamingTextDeltaDebugState | null;
 }
 
 interface ActiveStreamContext {
@@ -987,6 +1059,8 @@ export class OpenCodeService {
       lastContent: '',
       processedToolIds: new Set<string>(),
       toolInputSnapshots: new Map(),
+      debugChunkSequence: 0,
+      lastTextDelta: null,
     };
   }
 
@@ -1795,6 +1869,11 @@ export class OpenCodeService {
       return { chunks: [], stop: false };
     }
 
+    const partSessionId = eventData.properties?.part?.sessionID;
+    if (partSessionId && partSessionId !== sessionId) {
+      return { chunks: [], stop: false };
+    }
+
     const chunks: StreamChunk[] = [];
 
     if (eventData.properties?.usage) {
@@ -1815,6 +1894,10 @@ export class OpenCodeService {
           const toolPart = part as ToolPartData;
           const toolId = toolPart.callID || toolPart.id;
           const toolName = toolPart.tool || 'unknown';
+          if (isInternalStructuredOutputTool(toolName)) {
+            return { chunks, stop: false };
+          }
+
           if (toolId) {
             const toolInput = toolPart.state?.input || {};
             const nextSnapshot = this.getToolInputSnapshot(toolInput);
@@ -1892,6 +1975,25 @@ export class OpenCodeService {
         } else {
           chunks.push({ type: 'text', content: delta });
           state.lastContent += delta;
+          state.debugChunkSequence += 1;
+          state.lastTextDelta = {
+            sequence: state.debugChunkSequence,
+            source: 'event',
+            partId: partID ?? null,
+            partType,
+            length: delta.length,
+            totalLength: state.lastContent.length,
+            preview: getDebugTextPreview(delta, 120),
+          };
+          logAssistantFinalizationDebug('service-text-delta', {
+            sessionId,
+            chunkSequence: state.debugChunkSequence,
+            partId: partID ?? null,
+            partType,
+            deltaLength: delta.length,
+            totalLength: state.lastContent.length,
+            deltaPreview: getDebugTextPreview(delta, 120),
+          });
         }
       }
 
@@ -1923,6 +2025,11 @@ export class OpenCodeService {
     }
 
     if (eventData.type === 'session.idle') {
+      logAssistantFinalizationDebug('service-session-idle', {
+        sessionId,
+        accumulatedTextLength: state.lastContent.length,
+        lastTextDelta: state.lastTextDelta,
+      });
       return { chunks, stop: true };
     }
 
@@ -1973,6 +2080,11 @@ export class OpenCodeService {
       }
     }
 
+    logAssistantFinalizationDebug('service-legacy-event-stream-ended', {
+      sessionId,
+      accumulatedTextLength: state.lastContent.length,
+      lastTextDelta: state.lastTextDelta,
+    });
     yield* this.finishStreamingResponse(sessionId, state.lastContent);
   }
 
@@ -2047,6 +2159,11 @@ export class OpenCodeService {
         yield { type: 'message_start' };
       }
 
+      logAssistantFinalizationDebug('service-sdk-event-stream-ended', {
+        sessionId,
+        accumulatedTextLength: state.lastContent.length,
+        lastTextDelta: state.lastTextDelta,
+      });
       yield* this.finishStreamingResponse(sessionId, state.lastContent);
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Unknown error';
@@ -2058,10 +2175,27 @@ export class OpenCodeService {
   }
 
   private async *finishStreamingResponse(sessionId: string, lastContent: string): AsyncGenerator<StreamChunk> {
+    logAssistantFinalizationDebug('service-finish-start', {
+      sessionId,
+      lastContentLength: lastContent.length,
+      lastContentPreview: getDebugTextPreview(lastContent, 120),
+    });
+
+    let assistantMessageId: string | null = null;
     try {
       const messages = await this.getSessionMessages(sessionId);
       const assistantMsg = messages.reverse().find((item) => item.info.role === 'assistant');
       if (assistantMsg) {
+        assistantMessageId = assistantMsg.info.id;
+        logAssistantFinalizationDebug('service-finish-loaded-assistant', {
+          sessionId,
+          messageCount: messages.length,
+          assistantMessageId,
+          messageCreatedAt: assistantMsg.info.time.created,
+          modelId: formatModelIdentifier(assistantMsg.info.providerID, assistantMsg.info.modelID) ?? null,
+          structuredPresent: assistantMsg.info.structured !== undefined,
+          partSummary: summarizeAssistantParts(assistantMsg.parts),
+        });
         for (const part of assistantMsg.parts) {
           if (part.type !== 'text' || typeof part.text !== 'string') {
             continue;
@@ -2073,10 +2207,26 @@ export class OpenCodeService {
           }
 
           const delta = currentText.slice(lastContent.length);
+          logAssistantFinalizationDebug('service-finish-emitting-trailing-text', {
+            sessionId,
+            assistantMessageId,
+            partId: part.id,
+            deltaLength: delta.length,
+            previousLength: lastContent.length,
+            nextLength: currentText.length,
+            deltaPreview: getDebugTextPreview(delta, 120),
+          });
           yield { type: 'text', content: delta };
           lastContent = currentText;
         }
 
+        logAssistantFinalizationDebug('service-finish-emitting-message-metadata', {
+          sessionId,
+          assistantMessageId,
+          timestamp: assistantMsg.info.time.created,
+          modelId: formatModelIdentifier(assistantMsg.info.providerID, assistantMsg.info.modelID) ?? null,
+          finalTextLength: lastContent.length,
+        });
         yield {
           type: 'message_metadata',
           messageId: assistantMsg.info.id,
@@ -2095,6 +2245,12 @@ export class OpenCodeService {
       logger.error('Final message check failed:', error);
     }
 
+    logAssistantFinalizationDebug('service-finish-emitting-message-stop', {
+      sessionId,
+      assistantMessageId,
+      finalTextLength: lastContent.length,
+      finalTextPreview: getDebugTextPreview(lastContent, 120),
+    });
     yield { type: 'message_stop' };
   }
 
@@ -2790,6 +2946,10 @@ export class OpenCodeService {
       }
       case 'tool': {
         const toolPart = part as ToolPartData;
+        if (isInternalStructuredOutputTool(toolPart.tool)) {
+          break;
+        }
+
         if (toolPart.state) {
           const toolStatus = resolveToolExecutionStatus({
             toolName: toolPart.tool,
@@ -2873,7 +3033,9 @@ export class OpenCodeService {
       p.type === 'reasoning' && typeof p.text === 'string'
     );
 
-    const toolParts = parts.filter((p) => p.type === 'tool') as ToolPartData[];
+    const toolParts = parts.filter((p) =>
+      p.type === 'tool' && !isInternalStructuredOutputTool((p as ToolPartData).tool),
+    ) as ToolPartData[];
     const toolCalls = toolParts
       .filter((p) => {
         const toolStatus = resolveToolExecutionStatus({
