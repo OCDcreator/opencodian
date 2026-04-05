@@ -339,11 +339,19 @@ export class StreamController {
   }
 
   private renderMarkdownText(targetEl: HTMLElement, content: string): Promise<void> {
+    const previousHeight = targetEl.offsetHeight;
+    if (previousHeight > 0) {
+      targetEl.style.minHeight = `${previousHeight}px`;
+    }
+
     return this.markdownService.render(targetEl, content)
       .then(() => {
         this.lastTextRenderAt = Date.now();
         this.lastRenderedTextContent = content;
         this.scrollToBottom?.();
+      })
+      .finally(() => {
+        targetEl.style.removeProperty('min-height');
       })
       .then(() => undefined);
   }

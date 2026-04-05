@@ -45,10 +45,15 @@
 - `src/utils/streaming/StreamController.ts`
   - 将流式文本更新改为“节流版实时 markdown 渲染”：首段立即渲染，后续按最小时间间隔刷新，而不是拖到 `done` 才统一渲染
   - 新增最近一次文本渲染时间与内容追踪，避免流式过程中无意义的重复最终 render
+  - 为流式 markdown 更新增加最小高度保护，减少单次刷新时“先塌再长”的回弹感
+
+- `src/utils/markdown/MarkdownRenderer.ts`
+  - 将 markdown 更新改为离屏渲染后一次性替换到目标节点，避免在可见节点上先 `empty()` 再重建整块 DOM
 
 - `styles.css`
   - 新增玻璃正八面体实验层样式，包括 overlay、host、stage、caustic、refraction、canvas 与 filter defs
   - 保留助手消息在 `is-streaming` 状态下关闭动画和内容过渡的样式，继续减轻流式阶段抖动
+  - 调整时间行 pending 占位高度，使最终显示时间/模型/复制按钮时的高度跃迁更小
 
 - `tests/unit/features/chat/glassOctahedronDemo.test.ts`
   - 新增实验 demo 单测，覆盖 overlay 构建、质量分层、拖拽与回退行为
@@ -69,12 +74,24 @@
   - 也不回退到“每个 token / 每帧都整块 markdown 重绘”的方案，因为这会重新放大抖动与回流压力
   - 当前采用“实时 markdown + 节流刷新 + 流式态禁用多余动画 + 流式期间抑制补偿滚动”的折中路线
 
+### 🔍 后续收敛
+
+- `src/features/chat/OpenCodianView.ts`
+  - 将流式链路里的自动滚动从“延后补滚”收敛为“内容更新后立即锁到底部”，减少视口追内容时的补偿跳动
+  - 调整助手完成时的时间行填充顺序，先在内存中组装完整行，再一次性替换进 DOM，避免“空时间行先出现再补全”的闪烁
+  - 对流结束后的服务端同步补丁增加正文签名判断：若变化只在 `timestamp`、`modelId` 或状态标签等尾部元信息，则只更新时间行，不再清空并重绘整个助手正文
+
+- 当前根因判断：
+  - 早期抖动主要来自流式 markdown 重绘与自动滚动补偿叠加
+  - 完成瞬间的“消失再出现”则更像来自服务端同步后尾消息补丁对正文执行了 `empty()` + 重渲染
+
 ### 🧪 当前验证
 
 - 已通过：`node scripts/run-jest.js tests/unit/utils/streaming/StreamController.test.ts`
-- 已通过：`npm run build`（`BUILD_ID: main.202604051349`）
-- 已部署：`dist/main.js`、`dist/manifest.json`、`dist/styles.css` 已复制到 Test Vault，并确认插件端 `main.js` 含 `BUILD_ID: main.202604051349`
-- 待补充：本轮尚未跑完整 Jest 测试套件
+- 已通过：`node scripts/run-jest.js tests/unit/utils/markdown/MarkdownRenderer.test.ts tests/unit/utils/streaming/StreamController.test.ts`
+- 已通过：`npm run build`（`BUILD_ID: main.202604051417`）
+- 已部署：`dist/main.js`、`dist/manifest.json`、`dist/styles.css` 已复制到 Test Vault，并确认插件端 `main.js` 含 `BUILD_ID: main.202604051417`
+- 待补充：本轮未为“完成瞬间仅补时间行、不重绘正文”的尾补丁分支单独新增自动化测试
 
 ## 2026-04-05 助手流式消息抖动收敛，减少流式阶段重排与滚动回弹
 

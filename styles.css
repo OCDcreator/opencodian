@@ -2189,6 +2189,7 @@
 .opencodian-message-time-row.is-pending {
   visibility: hidden;
   pointer-events: none;
+  min-height: 30px;
 }
 
 .opencodian-message-time-row:hover {

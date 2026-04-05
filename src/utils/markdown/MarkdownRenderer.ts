@@ -44,31 +44,33 @@ export class MarkdownRenderService {
   }
 
   async render(el: HTMLElement, markdown: string): Promise<RenderResult> {
-    el.empty();
-
     try {
       const processedMarkdown = replaceImageEmbedsWithHtml(markdown, {
         app: this.app,
         mediaFolder: this.mediaFolder,
       });
+      const nextEl = document.createElement('div');
 
       await ObsidianMarkdownRenderer.renderMarkdown(
         processedMarkdown,
-        el,
+        nextEl,
         '',
         this.component
       );
 
-      this.enhanceTableLinks(el);
-      this.enhanceCodeBlocks(el);
-      processFileLinks(this.app, el);
+      this.enhanceTableLinks(nextEl);
+      this.enhanceCodeBlocks(nextEl);
+      processFileLinks(this.app, nextEl);
+      el.replaceChildren(...Array.from(nextEl.childNodes));
 
       return { success: true };
     } catch (error) {
-      el.createDiv({
+      const errorEl = document.createElement('div');
+      errorEl.createDiv({
         cls: 'markdown-render-error',
         text: 'Failed to render content.',
       });
+      el.replaceChildren(...Array.from(errorEl.childNodes));
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',

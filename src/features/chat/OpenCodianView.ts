@@ -643,7 +643,7 @@ export class OpenCodianView extends ItemView {
         markdownService: this.markdownService,
         scrollToBottom: () => {
           if (this.getActiveTabId() === tabId) {
-            this.scheduleSettledScrollToBottomIfNeeded(this.shouldAutoScroll(tabId), tabId);
+            this.scrollToBottomIfNeeded(this.shouldAutoScroll(tabId), tabId);
           }
         },
       });
@@ -6523,15 +6523,10 @@ export class OpenCodianView extends ItemView {
         await this.renderContentBlock(content, block);
       }
 
-      const textContent = message.contentBlocks
-        .filter((block) => block.type === 'text' && block.text)
-        .map((block) => block.text?.trim())
-        .filter(Boolean)
-        .join('\n\n');
       this.addTimestampWithCopyButton(
         messageEl,
         message.timestamp,
-        textContent,
+        this.getAssistantCopyContent(message),
         message.modelId,
         streamStatusLabel,
       );
@@ -6557,10 +6552,49 @@ export class OpenCodianView extends ItemView {
     this.addTimestampWithCopyButton(
       messageEl,
       message.timestamp,
-      message.content,
+      this.getAssistantCopyContent(message),
       message.modelId,
       streamStatusLabel,
     );
+  }
+
+  private getAssistantCopyContent(message: ChatMessage): string | undefined {
+    if (message.contentBlocks && message.contentBlocks.length > 0) {
+      const textContent = message.contentBlocks
+        .filter((block) => block.type === 'text' && block.text)
+        .map((block) => block.text?.trim())
+        .filter(Boolean)
+        .join('\n\n');
+      return textContent || undefined;
+    }
+
+    return message.content || undefined;
+  }
+
+  private getAssistantBodySignature(message: ChatMessage): string {
+    return JSON.stringify({
+      displayStyle: message.displayStyle ?? null,
+      content: message.content,
+      omo: message.omo ?? null,
+      questionResolution: message.questionResolution ? {
+        requestId: message.questionResolution.request.id,
+        status: message.questionResolution.status,
+        answers: message.questionResolution.answers ?? null,
+      } : null,
+      contentBlocks: (message.contentBlocks ?? []).map((block) => ({
+        type: block.type,
+        text: block.text ?? null,
+        thinking: block.thinking ?? null,
+        durationSeconds: block.durationSeconds ?? null,
+        toolId: block.toolId ?? null,
+        toolName: block.toolName ?? null,
+        toolInput: block.toolInput ?? null,
+        toolStatus: block.toolStatus ?? null,
+        toolResult: block.toolResult ?? null,
+        subagentId: block.subagentId ?? null,
+        subagentMode: block.subagentMode ?? null,
+      })),
+    });
   }
 
   private async renderUserMessageContent(container: HTMLElement, message: ChatMessage): Promise<string> {
@@ -7550,37 +7584,43 @@ export class OpenCodianView extends ItemView {
     modelId?: string,
     statusLabel?: string,
   ): void {
-    messageEl.removeClass('is-streaming');
     const timeRow = this.ensureAssistantTimestampRow(messageEl);
-    timeRow.empty();
-    timeRow.classList.remove('is-pending');
+    const fragment = document.createDocumentFragment();
 
     // Timestamp
     const timeStr = new Date(timestamp).toLocaleTimeString([], {
       hour: '2-digit',
       minute: '2-digit',
     });
-    timeRow.createSpan({ cls: 'opencodian-message-time-text', text: timeStr });
+    const timeTextEl = document.createElement('span');
+    timeTextEl.className = 'opencodian-message-time-text';
+    timeTextEl.textContent = timeStr;
+    fragment.appendChild(timeTextEl);
 
     if (modelId) {
-      timeRow.createSpan({ cls: 'opencodian-message-model-id', text: `· ${modelId}` });
+      const modelEl = document.createElement('span');
+      modelEl.className = 'opencodian-message-model-id';
+      modelEl.textContent = `· ${modelId}`;
+      fragment.appendChild(modelEl);
     }
 
     if (statusLabel) {
-      timeRow.createSpan({
-        cls: 'opencodian-message-time-status is-warning',
-        text: statusLabel,
-      });
+      const statusEl = document.createElement('span');
+      statusEl.className = 'opencodian-message-time-status is-warning';
+      statusEl.textContent = statusLabel;
+      fragment.appendChild(statusEl);
+    }
+    if (content) {
+      const copyBtn = document.createElement('span');
+      copyBtn.className = 'opencodian-copy-btn-inline';
+      copyBtn.innerHTML = COPY_ICON;
+      this.attachCopyButtonBehavior(copyBtn, content);
+      fragment.appendChild(copyBtn);
     }
 
-    if (!content) {
-      return;
-    }
-
-    // Copy button
-    const copyBtn = timeRow.createSpan({ cls: 'opencodian-copy-btn-inline' });
-    copyBtn.innerHTML = COPY_ICON;
-    this.attachCopyButtonBehavior(copyBtn, content);
+    timeRow.replaceChildren(fragment);
+    timeRow.classList.remove('is-pending');
+    messageEl.removeClass('is-streaming');
   }
 
   private ensureAssistantTimestampRow(messageEl: HTMLElement, reserveSpace = false): HTMLElement {
@@ -8356,8 +8396,18 @@ export class OpenCodianView extends ItemView {
       } else {
         delete existingTailMessageEl.dataset.sourceMessageId;
       }
-      existingContentEl.empty();
-      await this.renderAssistantMessageContent(existingTailMessageEl, existingContentEl, nextTailMessage);
+      if (this.getAssistantBodySignature(previousTailMessage) === this.getAssistantBodySignature(nextTailMessage)) {
+        this.addTimestampWithCopyButton(
+          existingTailMessageEl,
+          nextTailMessage.timestamp,
+          this.getAssistantCopyContent(nextTailMessage),
+          nextTailMessage.modelId,
+          this.getAssistantStreamStatusLabel(nextTailMessage),
+        );
+      } else {
+        existingContentEl.empty();
+        await this.renderAssistantMessageContent(existingTailMessageEl, existingContentEl, nextTailMessage);
+      }
       existingTailMessageEl.style.animation = 'none';
       if (shouldStickToBottom) {
         this.scrollToBottom({ tabId });
