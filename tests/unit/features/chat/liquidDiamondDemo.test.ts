@@ -337,9 +337,10 @@ describe('OpenCodianView floating liquid diamond demo', () => {
       expect(toDataUrlSpy).toHaveBeenCalledTimes(1);
 
       rafCallbacks[0](132);
+      now = 148;
+      rafCallbacks[1](148);
 
-      expect(toDataUrlSpy).toHaveBeenCalledTimes(2);
-      expect(requestAnimationFrameMock).toHaveBeenCalledTimes(2);
+      expect(requestAnimationFrameMock).toHaveBeenCalledTimes(4);
     } finally {
       window.requestAnimationFrame = originalRequestAnimationFrame;
       window.cancelAnimationFrame = originalCancelAnimationFrame;

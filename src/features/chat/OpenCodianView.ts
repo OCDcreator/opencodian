@@ -81,6 +81,7 @@ import {
   upsertDraftContextItem,
 } from './composerContext';
 import { cloneMessagesBeforeForkTarget } from './forkMessages';
+import { GlassOctahedronDemoController } from './glassOctahedronDemo';
 import { LiquidDiamondDemoController } from './liquidDiamondDemo';
 import { buildMessageRenderGroups, mergeAssistantMessagesForRender } from './renderGroups';
 import { type CollapsibleState, setupCollapsible } from './rendering/collapsible';
@@ -466,6 +467,7 @@ export class OpenCodianView extends ItemView {
   private composerShellEl: HTMLElement | null = null;
   private composerSvgFilterLayerEl: HTMLElement | null = null;
   private activeLiquidGlassAdapter: GlassEffectAdapter | null = null;
+  private glassOctahedronDemoController: GlassOctahedronDemoController | null = null;
   private liquidDiamondDemoController: LiquidDiamondDemoController | null = null;
   private liquidDiamondWebGlDemoController: LiquidDiamondDemoController | null = null;
   private composerContextRowEl: HTMLElement | null = null;
@@ -1917,6 +1919,7 @@ export class OpenCodianView extends ItemView {
     this.contextRingContainerEl = null;
     this.inputContainerResizeObserver?.disconnect();
     this.inputContainerResizeObserver = null;
+    this.destroyGlassOctahedronDemo();
     this.destroyLiquidDiamondDemo();
     this.unmountLiquidGlassAdapter();
     this.removeComposerSvgFilterLayer();
@@ -3119,6 +3122,33 @@ export class OpenCodianView extends ItemView {
     this.toggleLiquidDiamondDemoVariant('webgl');
   }
 
+  public async toggleGlassOctahedron(): Promise<void> {
+    if (!this.messagesShellEl) {
+      return;
+    }
+
+    if (!this.glassOctahedronDemoController) {
+      this.glassOctahedronDemoController = new GlassOctahedronDemoController(
+        this.messagesShellEl,
+      );
+    }
+
+    if (this.glassOctahedronDemoController.isVisible()) {
+      this.destroyGlassOctahedronDemo();
+      return;
+    }
+
+    try {
+      await this.glassOctahedronDemoController.show();
+    } catch (error) {
+      logger.warn('Failed to initialize glass octahedron demo', error);
+      new Notice(
+        'Glass octahedron is not available in this environment. See developer console for details.',
+      );
+      this.destroyGlassOctahedronDemo();
+    }
+  }
+
   private toggleLiquidDiamondDemoVariant(backend: 'cpu' | 'webgl'): void {
     if (!this.messagesShellEl) {
       return;
@@ -3186,6 +3216,11 @@ export class OpenCodianView extends ItemView {
     this.liquidDiamondDemoController = null;
     this.liquidDiamondWebGlDemoController?.destroy();
     this.liquidDiamondWebGlDemoController = null;
+  }
+
+  private destroyGlassOctahedronDemo(): void {
+    this.glassOctahedronDemoController?.destroy();
+    this.glassOctahedronDemoController = null;
   }
 
   private getLiquidGlassAdapterId(themeId: InputPanelThemeId): LiquidGlassAdapterId | null {

@@ -77,15 +77,12 @@ describe('StreamController', () => {
     ]);
   });
 
-  it('coalesces rapid text chunks into a single markdown render before completion', async () => {
+  it('renders during streaming and throttles rapid markdown updates', async () => {
     const containerEl = document.createElement('div');
     const contentEl = document.createElement('div');
     containerEl.appendChild(contentEl);
 
-    const originalRequestAnimationFrame = window.requestAnimationFrame;
-    const originalCancelAnimationFrame = window.cancelAnimationFrame;
-    window.requestAnimationFrame = jest.fn().mockImplementation(() => 1);
-    window.cancelAnimationFrame = jest.fn();
+    jest.useFakeTimers();
 
     const markdownService = {
       render: jest.fn().mockImplementation(async (el: HTMLElement, content: string) => {
@@ -102,14 +99,23 @@ describe('StreamController', () => {
       controller.startStream(contentEl);
 
       await controller.handleChunk({ type: 'text', content: 'Hello' });
-      await controller.handleChunk({ type: 'text', content: ' world' });
+      await jest.runOnlyPendingTimersAsync();
 
-      expect(markdownService.render).not.toHaveBeenCalled();
+      expect(markdownService.render).toHaveBeenCalledTimes(1);
+      expect(markdownService.render).toHaveBeenLastCalledWith(
+        expect.any(HTMLElement),
+        'Hello',
+      );
+
+      await controller.handleChunk({ type: 'text', content: ' world' });
+      await jest.advanceTimersByTimeAsync(80);
+
+      expect(markdownService.render).toHaveBeenCalledTimes(1);
 
       await controller.handleChunk({ type: 'done' });
 
-      expect(markdownService.render).toHaveBeenCalledTimes(1);
-      expect(markdownService.render).toHaveBeenCalledWith(
+      expect(markdownService.render).toHaveBeenCalledTimes(2);
+      expect(markdownService.render).toHaveBeenLastCalledWith(
         expect.any(HTMLElement),
         'Hello world',
       );
@@ -120,8 +126,7 @@ describe('StreamController', () => {
         },
       ]);
     } finally {
-      window.requestAnimationFrame = originalRequestAnimationFrame;
-      window.cancelAnimationFrame = originalCancelAnimationFrame;
+      jest.useRealTimers();
     }
   });
 });

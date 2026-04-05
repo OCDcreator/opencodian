@@ -17,7 +17,7 @@ import type {
 import { createStreamState } from './types';
 
 const logger = createLogger('StreamController');
-const LIVE_STREAMING_TEXT_CLASS = 'streaming-text-block--live';
+const STREAMING_MARKDOWN_RENDER_MIN_INTERVAL_MS = 96;
 
 export class StreamController {
   private containerEl: HTMLElement;
@@ -28,9 +28,11 @@ export class StreamController {
   private callbacks: StreamEventCallbacks;
   private onStreamComplete?: (contentBlocks: ContentBlock[]) => void;
   private scrollToBottom?: () => void;
-  private textRenderFrameId: number | null = null;
+  private textRenderTimerId: number | null = null;
   private textRenderInFlight: Promise<void> | null = null;
   private textRenderRequested = false;
+  private lastTextRenderAt = 0;
+  private lastRenderedTextContent = '';
 
   constructor(
     options: StreamControllerOptions,
@@ -62,6 +64,8 @@ export class StreamController {
     this.state.isStreaming = true;
     this.state.currentContentEl = contentEl;
     this.state.contentBlocks = [];
+    this.lastTextRenderAt = 0;
+    this.lastRenderedTextContent = '';
   }
 
   async handleChunk(chunk: StreamChunk): Promise<void> {
@@ -152,7 +156,7 @@ export class StreamController {
 
     if (!this.state.currentTextEl) {
       this.state.currentTextEl = this.state.currentContentEl!.createDiv({
-        cls: `streaming-text-block ${LIVE_STREAMING_TEXT_CLASS}`,
+        cls: 'streaming-text-block',
       });
       this.state.currentTextContent = '';
     }
@@ -266,16 +270,21 @@ export class StreamController {
       return;
     }
 
-    // Coalesce rapid token updates into at most one markdown render per frame.
+    // Keep streaming markdown visible, but cap redraw frequency to reduce jitter.
     this.textRenderRequested = true;
-    if (this.textRenderFrameId !== null || this.textRenderInFlight) {
+    if (this.textRenderTimerId !== null || this.textRenderInFlight) {
       return;
     }
 
-    this.textRenderFrameId = this.scheduleAnimationFrame(() => {
-      this.textRenderFrameId = null;
+    const elapsedMs = this.lastTextRenderAt === 0 ? STREAMING_MARKDOWN_RENDER_MIN_INTERVAL_MS : Date.now() - this.lastTextRenderAt;
+    const delayMs = this.lastTextRenderAt === 0
+      ? 0
+      : Math.max(0, STREAMING_MARKDOWN_RENDER_MIN_INTERVAL_MS - elapsedMs);
+
+    this.textRenderTimerId = window.setTimeout(() => {
+      this.textRenderTimerId = null;
       void this.renderPendingText();
-    });
+    }, delayMs);
   }
 
   private async renderPendingText(): Promise<void> {
@@ -286,11 +295,7 @@ export class StreamController {
     this.textRenderRequested = false;
     const targetEl = this.state.currentTextEl;
     const content = this.state.currentTextContent;
-    this.textRenderInFlight = Promise.resolve()
-      .then(() => {
-        this.renderLiveText(targetEl, content);
-        this.scrollToBottom?.();
-      })
+    this.textRenderInFlight = this.renderMarkdownText(targetEl, content)
       .finally(() => {
         this.textRenderInFlight = null;
       });
@@ -303,9 +308,9 @@ export class StreamController {
   }
 
   private async flushPendingTextRender(): Promise<void> {
-    if (this.textRenderFrameId !== null) {
-      this.cancelScheduledAnimationFrame(this.textRenderFrameId);
-      this.textRenderFrameId = null;
+    if (this.textRenderTimerId !== null) {
+      window.clearTimeout(this.textRenderTimerId);
+      this.textRenderTimerId = null;
     }
 
     if (this.textRenderInFlight) {
@@ -324,18 +329,23 @@ export class StreamController {
   }
 
   private clearPendingTextRender(): void {
-    if (this.textRenderFrameId !== null) {
-      this.cancelScheduledAnimationFrame(this.textRenderFrameId);
-      this.textRenderFrameId = null;
+    if (this.textRenderTimerId !== null) {
+      window.clearTimeout(this.textRenderTimerId);
+      this.textRenderTimerId = null;
     }
 
     this.textRenderRequested = false;
     this.textRenderInFlight = null;
   }
 
-  private renderLiveText(targetEl: HTMLElement, content: string): void {
-    targetEl.classList.add(LIVE_STREAMING_TEXT_CLASS);
-    targetEl.textContent = content;
+  private renderMarkdownText(targetEl: HTMLElement, content: string): Promise<void> {
+    return this.markdownService.render(targetEl, content)
+      .then(() => {
+        this.lastTextRenderAt = Date.now();
+        this.lastRenderedTextContent = content;
+        this.scrollToBottom?.();
+      })
+      .then(() => undefined);
   }
 
   private finalizeCurrentTextRender(): Promise<void> {
@@ -345,31 +355,11 @@ export class StreamController {
       return Promise.resolve();
     }
 
-    targetEl.classList.remove(LIVE_STREAMING_TEXT_CLASS);
-    return this.markdownService.render(targetEl, content)
-      .then(() => {
-        this.scrollToBottom?.();
-      })
-      .then(() => undefined);
-  }
-
-  private scheduleAnimationFrame(callback: () => void): number {
-    if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
-      return window.requestAnimationFrame(() => {
-        callback();
-      });
+    if (this.lastRenderedTextContent === content) {
+      return Promise.resolve();
     }
 
-    return window.setTimeout(callback, 16);
-  }
-
-  private cancelScheduledAnimationFrame(frameId: number): void {
-    if (typeof window !== 'undefined' && typeof window.cancelAnimationFrame === 'function') {
-      window.cancelAnimationFrame(frameId);
-      return;
-    }
-
-    window.clearTimeout(frameId);
+    return this.renderMarkdownText(targetEl, content);
   }
 
   private finalizeThinkingBlock(): void {
@@ -423,6 +413,8 @@ export class StreamController {
 
     this.state.currentTextEl = null;
     this.state.currentTextContent = '';
+    this.lastTextRenderAt = 0;
+    this.lastRenderedTextContent = '';
   }
 
   private finalizeToolCalls(): void {

@@ -1189,6 +1189,103 @@
   opacity: 0.96;
 }
 
+.opencodian-glass-octahedron-demo-overlay {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.opencodian-glass-octahedron-demo-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.opencodian-glass-octahedron-demo-host {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  pointer-events: auto;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  will-change: transform;
+}
+
+.opencodian-glass-octahedron-demo-host.is-dragging {
+  cursor: grabbing;
+}
+
+.opencodian-glass-octahedron-demo-stage {
+  position: relative;
+  width: 220px;
+  height: 220px;
+  overflow: visible;
+  filter:
+    drop-shadow(0 22px 34px rgba(15, 23, 42, 0.12))
+    drop-shadow(0 10px 18px rgba(176, 227, 255, 0.08));
+}
+
+.opencodian-glass-octahedron-demo-caustic,
+.opencodian-glass-octahedron-demo-refraction,
+.opencodian-glass-octahedron-demo-canvas {
+  position: absolute;
+  inset: 0;
+  width: 220px;
+  height: 220px;
+  pointer-events: none;
+}
+
+.opencodian-glass-octahedron-demo-filter-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.opencodian-glass-octahedron-demo-caustic {
+  left: 50%;
+  top: 74%;
+  width: 116px;
+  height: 56px;
+  inset: auto;
+  opacity: 0.08;
+  border-radius: 999px;
+  background:
+    radial-gradient(ellipse at center,
+      rgba(255, 255, 255, 0.12) 0%,
+      rgba(255, 255, 255, 0.04) 34%,
+      rgba(255, 255, 255, 0.015) 56%,
+      rgba(255, 255, 255, 0) 78%);
+  filter: blur(14px) brightness(1.005);
+  mix-blend-mode: screen;
+  transform: translate(-50%, -50%);
+  will-change: transform, opacity, width, height;
+}
+
+.opencodian-glass-octahedron-demo-refraction {
+  opacity: 1;
+  background:
+    radial-gradient(circle at 18% 14%, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.008) 18%, rgba(255, 255, 255, 0) 38%),
+    radial-gradient(circle at 76% 72%, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0.006) 32%, rgba(255, 255, 255, 0) 62%),
+    linear-gradient(148deg, rgba(255, 255, 255, 0.008), rgba(255, 255, 255, 0.002) 44%, rgba(255, 255, 255, 0.006));
+  will-change: clip-path, opacity;
+}
+
+.opencodian-glass-octahedron-demo-caustic.is-disabled,
+.opencodian-glass-octahedron-demo-refraction.is-disabled {
+  opacity: 0;
+}
+
+.opencodian-glass-octahedron-demo-canvas {
+  display: block;
+  background: transparent;
+}
+
 .opencodian-theme-background-layer {
   position: absolute;
   inset: 0;
@@ -5940,11 +6037,6 @@
 /* Streaming text block */
 .streaming-text-block {
   margin: 0.5em 0;
-}
-
-.streaming-text-block--live {
-  white-space: pre-wrap;
-  word-break: break-word;
 }
 
 /* Thinking block - Claudian style */

@@ -255,6 +255,14 @@ export default class OpenCodianPlugin extends Plugin {
     });
 
     this.addCommand({
+      id: 'toggle-glass-octahedron',
+      name: '切换玻璃正八面体',
+      callback: async () => {
+        await this.toggleGlassOctahedronForCurrentView();
+      },
+    });
+
+    this.addCommand({
       id: 'inline-edit',
       name: '行内编辑',
       editorCallback: async (editor: Editor, view: MarkdownView) => {
@@ -341,6 +349,11 @@ export default class OpenCodianPlugin extends Plugin {
   async toggleLiquidDiamondWebGlDemoForCurrentView(): Promise<void> {
     await this.activateView();
     this.getOpenCodianView()?.toggleLiquidDiamondWebGlDemo();
+  }
+
+  async toggleGlassOctahedronForCurrentView(): Promise<void> {
+    await this.activateView();
+    await this.getOpenCodianView()?.toggleGlassOctahedron();
   }
 
   /** Load settings from storage */

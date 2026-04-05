@@ -12,6 +12,70 @@
 
 ---
 
+## 2026-04-05 玻璃正八面体实验演示接入，并把助手流式渲染修正为节流版实时 markdown
+
+### 🎯 改动目标
+
+- 为聊天区域补一个可独立切换的玻璃正八面体实验演示，便于继续验证折射、位移贴图和降级策略
+- 修正上一版“助手流式阶段只显示轻量文本、结束后才完整 markdown 渲染”的实现偏差，恢复边生成边渲染的设计初衷
+- 在保留流式可读性的同时，继续压住频繁整块重绘带来的抖动和滚动回弹
+
+### ✅ 本轮调整
+
+- `src/main.ts`
+  - 新增 `toggle-glass-octahedron` 命令，并通过 `toggleGlassOctahedronForCurrentView()` 转发到当前 `OpenCodianView`
+
+- `src/features/chat/OpenCodianView.ts`
+  - 接入 `GlassOctahedronDemoController`，支持在消息区显示/隐藏玻璃正八面体实验层，并在视图销毁时做好清理
+  - 保留助手消息流式态的 `is-streaming` 标记，以及流式期间跳过 pane 布局补偿滚动的收敛逻辑
+
+- `src/features/chat/glassOctahedronDemo.ts`
+  - 新增实验控制器，负责 overlay / host / stage / caustic / refraction / canvas / SVG filter defs 的生命周期
+  - 支持拖拽、惯性、回弹、idle 动画、settled 渲染与慢帧检测后的质量降级
+
+- `src/features/chat/glassOctahedronDemoRefraction.ts`
+  - 新增正八面体投影、折射采样、位移快照、backdrop-filter 能力探测与 fallback 构建逻辑
+
+- `src/features/chat/glassOctahedronDemoThree.ts`
+  - 新增 three.js 渲染层，负责正八面体玻璃材质、fresnel 外壳、环境布光与 pose 到投影上下文的桥接
+
+- `src/vendor/three.ts`
+  - 新增本地 vendor barrel，统一从仓库内 `reference-projects/three.js` 暴露当前实验所需的 three.js 符号
+
+- `src/utils/streaming/StreamController.ts`
+  - 将流式文本更新改为“节流版实时 markdown 渲染”：首段立即渲染，后续按最小时间间隔刷新，而不是拖到 `done` 才统一渲染
+  - 新增最近一次文本渲染时间与内容追踪，避免流式过程中无意义的重复最终 render
+
+- `styles.css`
+  - 新增玻璃正八面体实验层样式，包括 overlay、host、stage、caustic、refraction、canvas 与 filter defs
+  - 保留助手消息在 `is-streaming` 状态下关闭动画和内容过渡的样式，继续减轻流式阶段抖动
+
+- `tests/unit/features/chat/glassOctahedronDemo.test.ts`
+  - 新增实验 demo 单测，覆盖 overlay 构建、质量分层、拖拽与回退行为
+
+- `tests/unit/main.test.ts`
+  - 新增插件命令转发测试，确认 `toggleGlassOctahedronForCurrentView()` 会激活视图并调用当前聊天视图方法
+
+- `tests/unit/utils/streaming/StreamController.test.ts`
+  - 将回归测试更新为“流式过程中会持续渲染 markdown，同时对快速 chunk 做节流”
+
+- `tests/unit/features/chat/liquidDiamondDemo.test.ts`
+  - 调整现有动画帧断言，兼容当前实验渲染调度节奏
+
+### 🧠 最终实现取舍
+
+- 这次对流式渲染的最终取舍是：
+  - 不接受“只在流结束后才完整渲染”的方案，因为这违背了聊天消息的实时阅读体验
+  - 也不回退到“每个 token / 每帧都整块 markdown 重绘”的方案，因为这会重新放大抖动与回流压力
+  - 当前采用“实时 markdown + 节流刷新 + 流式态禁用多余动画 + 流式期间抑制补偿滚动”的折中路线
+
+### 🧪 当前验证
+
+- 已通过：`node scripts/run-jest.js tests/unit/utils/streaming/StreamController.test.ts`
+- 已通过：`npm run build`（`BUILD_ID: main.202604051349`）
+- 已部署：`dist/main.js`、`dist/manifest.json`、`dist/styles.css` 已复制到 Test Vault，并确认插件端 `main.js` 含 `BUILD_ID: main.202604051349`
+- 待补充：本轮尚未跑完整 Jest 测试套件
+
 ## 2026-04-05 助手流式消息抖动收敛，减少流式阶段重排与滚动回弹
 
 ### 🎯 改动目标
