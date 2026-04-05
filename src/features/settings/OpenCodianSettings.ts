@@ -62,7 +62,7 @@ interface NumericStyleControlConfig {
   setValue: (appearance: ChatAppearanceSettings, value: number) => void;
 }
 
-interface TextStyleControlConfig {
+interface ColorStyleControlConfig {
   group: ChatAppearanceStyleGroup;
   name: string;
   desc: string;
@@ -2035,7 +2035,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         appearance.assistant.metaFontSize = value;
       },
     });
-    this.addTextStyleControl(assistantGroupEl, {
+    this.addColorStyleControl(assistantGroupEl, {
       group: 'assistant',
       name: t('settings.style.assistant.metaColor.name'),
       desc: t('settings.style.assistant.metaColor.desc'),
@@ -2045,7 +2045,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         appearance.assistant.metaColor = value;
       },
     });
-    this.addTextStyleControl(assistantGroupEl, {
+    this.addColorStyleControl(assistantGroupEl, {
       group: 'assistant',
       name: t('settings.style.assistant.timeColor.name'),
       desc: t('settings.style.assistant.timeColor.desc'),
@@ -2055,7 +2055,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         appearance.assistant.timeColor = value;
       },
     });
-    this.addTextStyleControl(assistantGroupEl, {
+    this.addColorStyleControl(assistantGroupEl, {
       group: 'assistant',
       name: t('settings.style.assistant.modelIdColor.name'),
       desc: t('settings.style.assistant.modelIdColor.desc'),
@@ -2548,7 +2548,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     });
   }
 
-  private addTextStyleControl(containerEl: HTMLElement, config: TextStyleControlConfig): void {
+  private addColorStyleControl(containerEl: HTMLElement, config: ColorStyleControlConfig): void {
     const setting = new Setting(containerEl)
       .setName(config.name)
       .setDesc(config.desc)
@@ -2560,23 +2560,47 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     controlEl.empty();
     controlEl.addClass('opencodian-style-setting-control');
 
-    const textWrapEl = controlEl.createDiv({ cls: 'opencodian-style-text-wrap' });
-    const textEl = textWrapEl.createEl('input', {
-      cls: 'opencodian-style-text',
-      type: 'text',
-    });
+    controlEl.addClass('opencodian-style-color-control');
 
-    const resetBtn = controlEl.createEl('button', {
-      cls: 'opencodian-style-reset-btn',
-      text: '⟲',
+    const previewBtn = controlEl.createEl('button', {
+      cls: 'opencodian-style-color-preview',
     });
-    resetBtn.type = 'button';
-    resetBtn.setAttribute('aria-label', t('settings.style.resetSingle.tooltip'));
-    resetBtn.setAttribute('title', t('settings.style.resetSingle.tooltip'));
+    previewBtn.type = 'button';
+    previewBtn.setAttribute('aria-label', t('settings.style.colorPicker.pick'));
+
+    const valueEl = controlEl.createSpan({ cls: 'opencodian-style-color-value' });
+
+    const pickBtn = controlEl.createEl('button', {
+      cls: 'opencodian-style-secondary-btn',
+      text: t('settings.style.colorPicker.pick'),
+    });
+    pickBtn.type = 'button';
+
+    const followThemeBtn = controlEl.createEl('button', {
+      cls: 'opencodian-style-secondary-btn',
+      text: t('settings.style.colorPicker.followTheme'),
+    });
+    followThemeBtn.type = 'button';
+
+    const colorInput = controlEl.createEl('input', {
+      cls: 'opencodian-style-color-input',
+      type: 'color',
+    });
+    colorInput.tabIndex = -1;
+    colorInput.setAttribute('aria-hidden', 'true');
 
     const renderValue = (value: string) => {
-      textEl.value = value;
-      textEl.placeholder = config.resetValue();
+      const normalizedValue = value.trim();
+      const resetValue = config.resetValue().trim();
+      const pickerHex = this.resolveStyleColorPickerHex(normalizedValue || resetValue, resetValue, setting.settingEl);
+      const followsTheme = normalizedValue === resetValue;
+
+      colorInput.value = pickerHex;
+      previewBtn.style.background = normalizedValue || resetValue;
+      previewBtn.setAttribute('title', followsTheme ? t('settings.style.colorPicker.followThemeValue') : normalizedValue);
+      valueEl.setText(followsTheme ? t('settings.style.colorPicker.followThemeValue') : pickerHex.toUpperCase());
+      valueEl.setAttribute('title', normalizedValue || resetValue);
+      followThemeBtn.disabled = followsTheme;
     };
 
     const commitValue = (value: string) => {
@@ -2587,27 +2611,63 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       renderValue(config.value());
     };
 
-    resetBtn.addEventListener('click', () => {
+    const openColorPicker = () => {
+      colorInput.click();
+    };
+
+    previewBtn.addEventListener('click', openColorPicker);
+    pickBtn.addEventListener('click', openColorPicker);
+    followThemeBtn.addEventListener('click', () => {
       commitValue(config.resetValue());
     });
-    textEl.addEventListener('change', () => {
-      commitValue(textEl.value);
-    });
-    textEl.addEventListener('blur', () => {
-      renderValue(config.value());
-    });
-    textEl.addEventListener('keydown', (event) => {
-      if (event.key === 'Enter') {
-        event.preventDefault();
-        commitValue(textEl.value);
-        textEl.blur();
-      }
+    colorInput.addEventListener('input', () => {
+      commitValue(colorInput.value);
     });
 
     renderValue(config.value());
     this.registerStyleControlBinding(config.group, () => {
       renderValue(config.value());
     });
+  }
+
+  private resolveStyleColorPickerHex(
+    value: string,
+    fallback: string,
+    hostEl?: HTMLElement | null,
+  ): string {
+    return this.resolveCssColorToHex(value, hostEl)
+      ?? this.resolveCssColorToHex(fallback, hostEl)
+      ?? '#808080';
+  }
+
+  private resolveCssColorToHex(value: string, hostEl?: HTMLElement | null): string | null {
+    const normalized = value.trim();
+    if (!normalized) {
+      return null;
+    }
+
+    const probeEl = document.createElement('span');
+    probeEl.style.color = normalized;
+    probeEl.style.position = 'absolute';
+    probeEl.style.opacity = '0';
+    probeEl.style.pointerEvents = 'none';
+
+    const mountTarget = hostEl?.isConnected ? hostEl : document.body;
+    mountTarget.appendChild(probeEl);
+    const computedColor = window.getComputedStyle(probeEl).color;
+    probeEl.remove();
+
+    return this.parseCssColorToHex(computedColor);
+  }
+
+  private parseCssColorToHex(color: string): string | null {
+    const match = color.match(/rgba?\(\s*(\d{1,3})[\s,]+(\d{1,3})[\s,]+(\d{1,3})/iu);
+    if (!match) {
+      return null;
+    }
+
+    const toHex = (value: string) => Number.parseInt(value, 10).toString(16).padStart(2, '0');
+    return `#${toHex(match[1])}${toHex(match[2])}${toHex(match[3])}`;
   }
 
   private addGlassRefractionInputControls(containerEl: HTMLElement): void {

@@ -4916,7 +4916,46 @@
   outline: none;
 }
 
-.opencodian-style-text-wrap {
+.opencodian-style-color-control {
+  position: relative;
+}
+
+.opencodian-style-color-preview,
+.opencodian-style-secondary-btn {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  padding: 0 10px;
+  box-sizing: border-box;
+  border-radius: 8px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--button-background);
+  color: var(--button-text-color);
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+
+.opencodian-style-color-preview:hover,
+.opencodian-style-secondary-btn:hover {
+  background: var(--button-background-hover);
+  border-color: var(--background-modifier-border-hover);
+  transform: translateY(-1px);
+}
+
+.opencodian-style-color-preview {
+  width: 28px;
+  min-width: 28px;
+  padding: 0;
+  background:
+    linear-gradient(45deg, rgb(255 255 255 / 0.72) 25%, transparent 25%, transparent 75%, rgb(255 255 255 / 0.72) 75%),
+    linear-gradient(45deg, rgb(255 255 255 / 0.72) 25%, transparent 25%, transparent 75%, rgb(255 255 255 / 0.72) 75%);
+  background-position: 0 0, 6px 6px;
+  background-size: 12px 12px;
+}
+
+.opencodian-style-color-value {
   display: inline-flex;
   flex: 1 1 auto;
   align-items: center;
@@ -4926,23 +4965,26 @@
   border-radius: 8px;
   border: 1px solid var(--background-modifier-border);
   background: var(--background-primary);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   box-sizing: border-box;
 }
 
-.opencodian-style-text {
-  flex: 1 1 auto;
-  min-width: 0;
-  width: 100%;
+.opencodian-style-color-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
   padding: 0;
-  border: none;
-  background: transparent;
-  color: var(--text-normal);
-  font-size: 12px;
-  font-family: var(--font-monospace);
-}
-
-.opencodian-style-text:focus {
-  outline: none;
+  margin: -1px;
+  border: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  clip-path: inset(100%);
+  white-space: nowrap;
 }
 
 .opencodian-style-unit {

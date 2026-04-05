@@ -82,7 +82,7 @@ describe('OpenCodian style settings', () => {
       addStyleSettings: (containerEl: HTMLElement) => void;
       addThemePresetSection: (containerEl: HTMLElement) => void;
       addNumericStyleControl: (containerEl: HTMLElement, config: unknown) => void;
-      addTextStyleControl: (containerEl: HTMLElement, config: unknown) => void;
+      addColorStyleControl: (containerEl: HTMLElement, config: unknown) => void;
       createStyleResetSetting: (containerEl: HTMLElement, group: unknown) => void;
       createSectionHeading: (containerEl: HTMLElement, title: string) => HTMLHeadingElement;
       createStyleGroupSection: (containerEl: HTMLElement, title: string, desc: string) => HTMLElement;
@@ -92,7 +92,7 @@ describe('OpenCodian style settings', () => {
 
     jest.spyOn(privateTab, 'addThemePresetSection').mockImplementation(() => {});
     jest.spyOn(privateTab, 'addNumericStyleControl').mockImplementation(() => {});
-    jest.spyOn(privateTab, 'addTextStyleControl').mockImplementation(() => {});
+    jest.spyOn(privateTab, 'addColorStyleControl').mockImplementation(() => {});
     jest.spyOn(privateTab, 'createStyleResetSetting').mockImplementation(() => {});
     jest.spyOn(privateTab, 'createSectionHeading').mockImplementation((parent, title) =>
       parent.createEl('h3', { text: title }),
@@ -124,7 +124,7 @@ describe('OpenCodian style settings', () => {
       addStyleSettings: (containerEl: HTMLElement) => void;
       addThemePresetSection: (containerEl: HTMLElement) => void;
       addNumericStyleControl: (containerEl: HTMLElement, config: unknown) => void;
-      addTextStyleControl: (containerEl: HTMLElement, config: unknown) => void;
+      addColorStyleControl: (containerEl: HTMLElement, config: unknown) => void;
       createStyleResetSetting: (containerEl: HTMLElement, group: unknown) => void;
       createSectionHeading: (containerEl: HTMLElement, title: string) => HTMLHeadingElement;
       createStyleGroupSection: (containerEl: HTMLElement, title: string, desc: string) => HTMLElement;
@@ -134,7 +134,7 @@ describe('OpenCodian style settings', () => {
 
     jest.spyOn(privateTab, 'addThemePresetSection').mockImplementation(() => {});
     jest.spyOn(privateTab, 'addNumericStyleControl').mockImplementation(() => {});
-    jest.spyOn(privateTab, 'addTextStyleControl').mockImplementation(() => {});
+    jest.spyOn(privateTab, 'addColorStyleControl').mockImplementation(() => {});
     jest.spyOn(privateTab, 'createStyleResetSetting').mockImplementation(() => {});
     jest.spyOn(privateTab, 'createSectionHeading').mockImplementation((parent, title) =>
       parent.createEl('h3', { text: title }),
