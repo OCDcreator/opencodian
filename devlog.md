@@ -12,6 +12,45 @@
 
 ---
 
+## 2026-04-05 助手流式生成时合并文本 markdown 重渲染，缓解 Forced reflow 警告
+
+### 🎯 改动目标
+
+- 排查“助手消息生成过程中”控制台持续刷出 `[Violation] Forced reflow while executing JavaScript` 的原因
+- 优先处理最明显的热点，避免流式 token 高速到达时每个 chunk 都触发一次完整 markdown 重绘
+- 在不改写现有消息结构和持久化格式的前提下，尽量用最小改动先把回流压力降下来
+
+### ✅ 本轮调整
+
+- `src/utils/streaming/StreamController.ts`
+  - 将流式 `text` chunk 的渲染方式从“每个 chunk 立刻完整 render 一次 markdown”改为“按帧合并后再 render”
+  - 新增 `textRenderRequested`、`textRenderFrameId`、`textRenderInFlight`，把同一帧内连续到达的文本更新折叠成一次渲染
+  - 在切换到 `thinking`、`tool_use`、`error`、`done` 前先 flush 挂起的文本 render，避免最终内容遗漏或顺序错乱
+  - 在 `cancelStream()` 和 `timeoutStream()` 时清理挂起帧，避免中断后残留异步 render 再次触发 UI 更新
+
+- `tests/unit/utils/streaming/StreamController.test.ts`
+  - 保留原有 finalized thinking duration 与 interrupted text 持久化回归测试
+  - 新增“连续快速 text chunk 会在完成前合并成一次 markdown render”的回归测试，覆盖这次节流逻辑
+
+### 🧠 问题根因
+
+- 之前助手流式输出时，`StreamController.handleTextChunk()` 每收到一个文本 chunk，就会立刻调用一次 `MarkdownRenderService.render()`
+- `MarkdownRenderService.render()` 内部会先 `empty()` 容器，再让 Obsidian markdown renderer 完整重建这一整段文本的 DOM
+- 当模型连续高速输出 token 时，这条链会变成：
+  - 文本追加
+  - 整段 markdown 重渲染
+  - 自动滚动与尺寸读取继续跟进
+  - 下一批 token 再次重复
+- 结果就是消息越长、chunk 越密，主线程上的布局与重绘压力越高，最终在控制台表现为成片的 forced reflow violation
+
+### 🧪 当前验证
+
+- 已通过：`node scripts/run-jest.js tests/unit/utils/streaming/StreamController.test.ts`
+- 已通过：`node scripts/run-jest.js tests/unit/utils/markdown/MarkdownRenderer.test.ts`
+- 已通过：`npm run check:devlog-order`
+- 已通过：`npm run build`（`BUILD_ID: main.202604051311`）
+- 已部署：`dist/main.js`、`dist/manifest.json`、`dist/styles.css` 已复制到 Test Vault，并确认插件端 `main.js` 含 `BUILD_ID: main.202604051311`
+
 ## 2026-04-04 聊天自动滚动状态机收口到现有导航按钮，并修复主题预设类型检查
 
 ### 🎯 改动目标

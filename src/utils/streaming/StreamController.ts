@@ -27,6 +27,9 @@ export class StreamController {
   private callbacks: StreamEventCallbacks;
   private onStreamComplete?: (contentBlocks: ContentBlock[]) => void;
   private scrollToBottom?: () => void;
+  private textRenderFrameId: number | null = null;
+  private textRenderInFlight: Promise<void> | null = null;
+  private textRenderRequested = false;
 
   constructor(
     options: StreamControllerOptions,
@@ -53,6 +56,7 @@ export class StreamController {
 
   startStream(contentEl: HTMLElement): void {
 
+    this.clearPendingTextRender();
     this.state = createStreamState();
     this.state.isStreaming = true;
     this.state.currentContentEl = contentEl;
@@ -73,11 +77,11 @@ export class StreamController {
         break;
 
       case 'text':
-        await this.handleTextChunk(chunk.content);
+        this.handleTextChunk(chunk.content);
         break;
 
       case 'tool_use':
-        this.handleToolUseChunk(chunk);
+        await this.handleToolUseChunk(chunk);
         break;
 
       case 'tool_result':
@@ -89,7 +93,7 @@ export class StreamController {
         break;
 
       case 'done':
-        this.handleDoneChunk();
+        await this.handleDoneChunk();
         break;
     }
 
@@ -99,6 +103,7 @@ export class StreamController {
   }
 
   private async handleThinkingChunk(chunk: ThinkingChunk): Promise<void> {
+    await this.flushPendingTextRender();
     this.finalizeTextBlock();
 
     if (chunk.partId
@@ -139,7 +144,7 @@ export class StreamController {
     await this.thinkingRenderer.appendContent(this.state.currentThinkingState, chunk.content);
   }
 
-  private async handleTextChunk(content: string): Promise<void> {
+  private handleTextChunk(content: string): void {
     this.finalizeThinkingBlock();
     this.callbacks.onTextAppend?.(content);
 
@@ -151,10 +156,11 @@ export class StreamController {
     }
 
     this.state.currentTextContent += content;
-    await this.markdownService.render(this.state.currentTextEl, this.state.currentTextContent);
+    this.scheduleTextRender();
   }
 
-  private handleToolUseChunk(chunk: { id: string; name: string; input: Record<string, unknown> }): void {
+  private async handleToolUseChunk(chunk: { id: string; name: string; input: Record<string, unknown> }): Promise<void> {
+    await this.flushPendingTextRender();
     this.finalizeThinkingBlock();
     this.finalizeTextBlock();
 
@@ -223,6 +229,7 @@ export class StreamController {
   }
 
   private async handleErrorChunk(content: string): Promise<void> {
+    await this.flushPendingTextRender();
     this.finalizeThinkingBlock();
     this.finalizeTextBlock();
     this.callbacks.onError?.(content);
@@ -237,7 +244,8 @@ export class StreamController {
     });
   }
 
-  private handleDoneChunk(): void {
+  private async handleDoneChunk(): Promise<void> {
+    await this.flushPendingTextRender();
     this.flushOpenContentBlocks();
     this.finalizeToolCalls();
     this.state.isStreaming = false;
@@ -246,6 +254,94 @@ export class StreamController {
     if (this.onStreamComplete) {
       this.onStreamComplete(this.state.contentBlocks);
     }
+  }
+
+  private scheduleTextRender(): void {
+    if (!this.state.currentTextEl) {
+      return;
+    }
+
+    // Coalesce rapid token updates into at most one markdown render per frame.
+    this.textRenderRequested = true;
+    if (this.textRenderFrameId !== null || this.textRenderInFlight) {
+      return;
+    }
+
+    this.textRenderFrameId = this.scheduleAnimationFrame(() => {
+      this.textRenderFrameId = null;
+      void this.renderPendingText();
+    });
+  }
+
+  private async renderPendingText(): Promise<void> {
+    if (!this.state.currentTextEl || !this.textRenderRequested) {
+      return;
+    }
+
+    this.textRenderRequested = false;
+    const targetEl = this.state.currentTextEl;
+    const content = this.state.currentTextContent;
+    this.textRenderInFlight = this.markdownService.render(targetEl, content)
+      .then(() => undefined)
+      .finally(() => {
+        this.textRenderInFlight = null;
+      });
+
+    await this.textRenderInFlight;
+
+    if (this.textRenderRequested) {
+      this.scheduleTextRender();
+    }
+  }
+
+  private async flushPendingTextRender(): Promise<void> {
+    if (this.textRenderFrameId !== null) {
+      this.cancelScheduledAnimationFrame(this.textRenderFrameId);
+      this.textRenderFrameId = null;
+    }
+
+    if (this.textRenderInFlight) {
+      await this.textRenderInFlight;
+    }
+
+    if (this.textRenderRequested) {
+      await this.renderPendingText();
+      if (this.textRenderInFlight) {
+        await this.textRenderInFlight;
+      }
+      if (this.textRenderRequested) {
+        await this.flushPendingTextRender();
+      }
+    }
+  }
+
+  private clearPendingTextRender(): void {
+    if (this.textRenderFrameId !== null) {
+      this.cancelScheduledAnimationFrame(this.textRenderFrameId);
+      this.textRenderFrameId = null;
+    }
+
+    this.textRenderRequested = false;
+    this.textRenderInFlight = null;
+  }
+
+  private scheduleAnimationFrame(callback: () => void): number {
+    if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+      return window.requestAnimationFrame(() => {
+        callback();
+      });
+    }
+
+    return window.setTimeout(callback, 16);
+  }
+
+  private cancelScheduledAnimationFrame(frameId: number): void {
+    if (typeof window !== 'undefined' && typeof window.cancelAnimationFrame === 'function') {
+      window.cancelAnimationFrame(frameId);
+      return;
+    }
+
+    window.clearTimeout(frameId);
   }
 
   private finalizeThinkingBlock(): void {
@@ -313,6 +409,7 @@ export class StreamController {
   }
 
   cancelStream(): void {
+    this.clearPendingTextRender();
     this.flushOpenContentBlocks();
     this.state.isStreaming = false;
   }
@@ -321,6 +418,7 @@ export class StreamController {
    * Handle stream timeout - mark all running tool calls as error
    */
   timeoutStream(): void {
+    this.clearPendingTextRender();
     this.flushOpenContentBlocks();
 
     // Mark all running/pending tool calls as error

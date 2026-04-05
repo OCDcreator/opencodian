@@ -76,4 +76,52 @@ describe('StreamController', () => {
       },
     ]);
   });
+
+  it('coalesces rapid text chunks into a single markdown render before completion', async () => {
+    const containerEl = document.createElement('div');
+    const contentEl = document.createElement('div');
+    containerEl.appendChild(contentEl);
+
+    const originalRequestAnimationFrame = window.requestAnimationFrame;
+    const originalCancelAnimationFrame = window.cancelAnimationFrame;
+    window.requestAnimationFrame = jest.fn().mockImplementation(() => 1);
+    window.cancelAnimationFrame = jest.fn();
+
+    const markdownService = {
+      render: jest.fn().mockImplementation(async (el: HTMLElement, content: string) => {
+        el.textContent = content;
+      }),
+    };
+
+    try {
+      const controller = new StreamController({
+        containerEl,
+        markdownService: markdownService as never,
+      });
+
+      controller.startStream(contentEl);
+
+      await controller.handleChunk({ type: 'text', content: 'Hello' });
+      await controller.handleChunk({ type: 'text', content: ' world' });
+
+      expect(markdownService.render).not.toHaveBeenCalled();
+
+      await controller.handleChunk({ type: 'done' });
+
+      expect(markdownService.render).toHaveBeenCalledTimes(1);
+      expect(markdownService.render).toHaveBeenCalledWith(
+        expect.any(HTMLElement),
+        'Hello world',
+      );
+      expect(controller.getContentBlocks()).toEqual([
+        {
+          type: 'text',
+          content: 'Hello world',
+        },
+      ]);
+    } finally {
+      window.requestAnimationFrame = originalRequestAnimationFrame;
+      window.cancelAnimationFrame = originalCancelAnimationFrame;
+    }
+  });
 });
