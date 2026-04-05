@@ -207,6 +207,10 @@
   --opencodian-assistant-bg-opacity: 72%;
   --opencodian-assistant-blur: 10px;
   --opencodian-assistant-shadow-blur: 24px;
+  --opencodian-assistant-meta-font-size: 10px;
+  --opencodian-assistant-meta-color: var(--text-muted);
+  --opencodian-assistant-time-color: var(--text-muted);
+  --opencodian-assistant-model-id-color: var(--text-faint, var(--text-muted));
   --opencodian-input-radius: 12px;
   --opencodian-input-bg-opacity: 72%;
   --opencodian-input-blur: 18px;
@@ -2179,17 +2183,17 @@
   gap: 8px;
   margin-top: 4px;
   padding-left: var(--opencodian-assistant-content-pad-x);
-  min-height: 14px;
-  font-size: 10px;
+  min-height: calc(var(--opencodian-assistant-meta-font-size) * 1.4);
+  font-size: var(--opencodian-assistant-meta-font-size);
   line-height: 1.4;
-  color: var(--text-muted);
+  color: var(--opencodian-assistant-meta-color);
   opacity: 0.6;
 }
 
 .opencodian-message-time-row.is-pending {
   visibility: hidden;
   pointer-events: none;
-  min-height: 30px;
+  min-height: calc((var(--opencodian-assistant-meta-font-size) * 1.4) + 16px);
 }
 
 .opencodian-message-time-row:hover {
@@ -2197,12 +2201,13 @@
 }
 
 .opencodian-message-time-text {
-  color: var(--text-muted);
+  color: var(--opencodian-assistant-time-color);
 }
 
 .opencodian-message-model-id {
-  color: var(--text-faint, var(--text-muted));
+  color: var(--opencodian-assistant-model-id-color);
   flex: 1 1 auto;
+  font-size: inherit;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2216,7 +2221,7 @@
   padding: 0 8px;
   border-radius: 999px;
   border: 1px solid color-mix(in srgb, var(--background-modifier-border) 78%, transparent);
-  font-size: 10px;
+  font-size: max(10px, var(--opencodian-assistant-meta-font-size));
   font-weight: 600;
   letter-spacing: 0.01em;
 }
@@ -4908,6 +4913,35 @@
 }
 
 .opencodian-style-number:focus {
+  outline: none;
+}
+
+.opencodian-style-text-wrap {
+  display: inline-flex;
+  flex: 1 1 auto;
+  align-items: center;
+  min-width: 0;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 8px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+  box-sizing: border-box;
+}
+
+.opencodian-style-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-normal);
+  font-size: 12px;
+  font-family: var(--font-monospace);
+}
+
+.opencodian-style-text:focus {
   outline: none;
 }
 

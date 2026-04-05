@@ -434,6 +434,10 @@ export interface ChatAppearanceAssistantSettings {
   backgroundOpacity: number;
   blur: number;
   shadowBlur: number;
+  metaFontSize: number;
+  metaColor: string;
+  timeColor: string;
+  modelIdColor: string;
 }
 
 export interface ChatAppearanceInputSettings {
@@ -581,6 +585,10 @@ export function getDefaultChatAppearanceSettings(): ChatAppearanceSettings {
       backgroundOpacity: 72,
       blur: 10,
       shadowBlur: 24,
+      metaFontSize: 10,
+      metaColor: 'var(--text-muted)',
+      timeColor: 'var(--text-muted)',
+      modelIdColor: 'var(--text-faint, var(--text-muted))',
     },
     input: {
       radius: 12,
@@ -614,6 +622,38 @@ function normalizeFiniteNumberInRange(value: unknown, fallback: number, min: num
 
 function normalizeFiniteNumber(value: unknown, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+}
+
+function isValidCssColorValue(value: string): boolean {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return false;
+  }
+
+  if (/^var\(.+\)$/u.test(trimmed)) {
+    return true;
+  }
+
+  try {
+    if (typeof globalThis.CSS?.supports === 'function' && globalThis.CSS.supports('color', trimmed)) {
+      return true;
+    }
+  } catch {
+    // Ignore platform-specific CSS parser gaps and fall back to conservative checks below.
+  }
+
+  return /^#(?:[\da-f]{3}|[\da-f]{4}|[\da-f]{6}|[\da-f]{8})$/iu.test(trimmed)
+    || /^(?:rgb|hsl)a?\(/iu.test(trimmed)
+    || /^(?:transparent|currentcolor|inherit|initial|unset)$/iu.test(trimmed);
+}
+
+function normalizeCssColorValue(value: unknown, fallback: string): string {
+  if (typeof value !== 'string') {
+    return fallback;
+  }
+
+  const trimmed = value.trim();
+  return isValidCssColorValue(trimmed) ? trimmed : fallback;
 }
 
 function normalizeBoolean(value: unknown, fallback: boolean): boolean {
@@ -1065,6 +1105,7 @@ export function normalizeChatAppearanceSettings(
 ): ChatAppearanceSettings {
   const defaults = getDefaultChatAppearanceSettings();
   const background = appearance?.background;
+  const assistant = appearance?.assistant;
 
   return {
     layout: {
@@ -1104,7 +1145,11 @@ export function normalizeChatAppearanceSettings(
     },
     assistant: {
       ...defaults.assistant,
-      ...(appearance?.assistant ?? {}),
+      ...(assistant ?? {}),
+      metaFontSize: normalizeFiniteNumberInRange(assistant?.metaFontSize, defaults.assistant.metaFontSize, 8, 18),
+      metaColor: normalizeCssColorValue(assistant?.metaColor, defaults.assistant.metaColor),
+      timeColor: normalizeCssColorValue(assistant?.timeColor, defaults.assistant.timeColor),
+      modelIdColor: normalizeCssColorValue(assistant?.modelIdColor, defaults.assistant.modelIdColor),
     },
     input: {
       ...defaults.input,

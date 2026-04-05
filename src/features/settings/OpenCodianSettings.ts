@@ -62,6 +62,15 @@ interface NumericStyleControlConfig {
   setValue: (appearance: ChatAppearanceSettings, value: number) => void;
 }
 
+interface TextStyleControlConfig {
+  group: ChatAppearanceStyleGroup;
+  name: string;
+  desc: string;
+  value: () => string;
+  resetValue: () => string;
+  setValue: (appearance: ChatAppearanceSettings, value: string) => void;
+}
+
 interface NumericControlConfig {
   name: string;
   desc: string;
@@ -2012,6 +2021,50 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         appearance.assistant.shadowBlur = value;
       },
     });
+    this.addNumericStyleControl(assistantGroupEl, {
+      group: 'assistant',
+      name: t('settings.style.assistant.metaFontSize.name'),
+      desc: t('settings.style.assistant.metaFontSize.desc'),
+      min: 8,
+      max: 18,
+      step: 1,
+      unit: 'px',
+      value: () => this.plugin.settings.chatAppearance.assistant.metaFontSize,
+      resetValue: () => this.plugin.getChatAppearanceBaseline().assistant.metaFontSize,
+      setValue: (appearance, value) => {
+        appearance.assistant.metaFontSize = value;
+      },
+    });
+    this.addTextStyleControl(assistantGroupEl, {
+      group: 'assistant',
+      name: t('settings.style.assistant.metaColor.name'),
+      desc: t('settings.style.assistant.metaColor.desc'),
+      value: () => this.plugin.settings.chatAppearance.assistant.metaColor,
+      resetValue: () => this.plugin.getChatAppearanceBaseline().assistant.metaColor,
+      setValue: (appearance, value) => {
+        appearance.assistant.metaColor = value;
+      },
+    });
+    this.addTextStyleControl(assistantGroupEl, {
+      group: 'assistant',
+      name: t('settings.style.assistant.timeColor.name'),
+      desc: t('settings.style.assistant.timeColor.desc'),
+      value: () => this.plugin.settings.chatAppearance.assistant.timeColor,
+      resetValue: () => this.plugin.getChatAppearanceBaseline().assistant.timeColor,
+      setValue: (appearance, value) => {
+        appearance.assistant.timeColor = value;
+      },
+    });
+    this.addTextStyleControl(assistantGroupEl, {
+      group: 'assistant',
+      name: t('settings.style.assistant.modelIdColor.name'),
+      desc: t('settings.style.assistant.modelIdColor.desc'),
+      value: () => this.plugin.settings.chatAppearance.assistant.modelIdColor,
+      resetValue: () => this.plugin.getChatAppearanceBaseline().assistant.modelIdColor,
+      setValue: (appearance, value) => {
+        appearance.assistant.modelIdColor = value;
+      },
+    });
     this.createStyleResetSetting(assistantGroupEl, 'assistant');
 
     const inputGroupHostEl = containerEl.createDiv({ cls: 'opencodian-style-input-group-host' });
@@ -2492,6 +2545,68 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       registerSync: (syncFromSettings) => {
         this.registerStyleControlBinding(config.group, syncFromSettings);
       },
+    });
+  }
+
+  private addTextStyleControl(containerEl: HTMLElement, config: TextStyleControlConfig): void {
+    const setting = new Setting(containerEl)
+      .setName(config.name)
+      .setDesc(config.desc)
+      .setClass('opencodian-style-setting');
+
+    const controlEl = (setting as Setting & { controlEl?: HTMLElement }).controlEl instanceof HTMLElement
+      ? (setting as Setting & { controlEl: HTMLElement }).controlEl
+      : setting.settingEl.createDiv({ cls: 'setting-item-control' });
+    controlEl.empty();
+    controlEl.addClass('opencodian-style-setting-control');
+
+    const textWrapEl = controlEl.createDiv({ cls: 'opencodian-style-text-wrap' });
+    const textEl = textWrapEl.createEl('input', {
+      cls: 'opencodian-style-text',
+      type: 'text',
+    });
+
+    const resetBtn = controlEl.createEl('button', {
+      cls: 'opencodian-style-reset-btn',
+      text: '⟲',
+    });
+    resetBtn.type = 'button';
+    resetBtn.setAttribute('aria-label', t('settings.style.resetSingle.tooltip'));
+    resetBtn.setAttribute('title', t('settings.style.resetSingle.tooltip'));
+
+    const renderValue = (value: string) => {
+      textEl.value = value;
+      textEl.placeholder = config.resetValue();
+    };
+
+    const commitValue = (value: string) => {
+      this.plugin.updateChatAppearance((appearance) => {
+        config.setValue(appearance, value.trim());
+      });
+      this.applyAndScheduleStyleUpdate();
+      renderValue(config.value());
+    };
+
+    resetBtn.addEventListener('click', () => {
+      commitValue(config.resetValue());
+    });
+    textEl.addEventListener('change', () => {
+      commitValue(textEl.value);
+    });
+    textEl.addEventListener('blur', () => {
+      renderValue(config.value());
+    });
+    textEl.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        commitValue(textEl.value);
+        textEl.blur();
+      }
+    });
+
+    renderValue(config.value());
+    this.registerStyleControlBinding(config.group, () => {
+      renderValue(config.value());
     });
   }
 

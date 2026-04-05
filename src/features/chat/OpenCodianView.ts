@@ -551,6 +551,7 @@ export class OpenCodianView extends ItemView {
   private retainedSelectionHighlight: RetainedSelectionHighlight | null = null;
   private retainedSelectionInputHandoffGraceUntil: number | null = null;
   private retainedSelectionPollIntervalId: number | null = null;
+  private lastLiquidGlassDiagnosticsFingerprint: string | null = null;
 
   private appSettings(): { open: () => void; openTabById: (id: string) => void } {
     return (this.app as typeof this.app & {
@@ -3522,10 +3523,10 @@ export class OpenCodianView extends ItemView {
 
   private logLiquidGlassDiagnostics(adapterId: LiquidGlassAdapterId): void {
     if (!this.composerShellEl || !this.composerSvgFilterLayerEl) {
-      logger.debug(`Liquid glass diagnostics skipped: ${this.stringifyLogPayload({
+      this.logLiquidGlassDiagnosticsEntry('Liquid glass diagnostics skipped', {
         adapterId,
         reason: 'missing-shell-or-filter-layer',
-      })}`);
+      });
       return;
     }
 
@@ -3582,7 +3583,18 @@ export class OpenCodianView extends ItemView {
       filterLayerAncestorChain,
     };
 
-    logger.debug(`Liquid glass diagnostics: ${this.stringifyLogPayload(payload)}`);
+    this.logLiquidGlassDiagnosticsEntry('Liquid glass diagnostics', payload);
+  }
+
+  private logLiquidGlassDiagnosticsEntry(label: string, payload: unknown): void {
+    const serializedPayload = this.stringifyLogPayload(payload);
+    const fingerprint = `${label}:${serializedPayload}`;
+    if (this.lastLiquidGlassDiagnosticsFingerprint === fingerprint) {
+      return;
+    }
+
+    this.lastLiquidGlassDiagnosticsFingerprint = fingerprint;
+    logger.debug(`${label}: ${serializedPayload}`);
   }
 
   private applyInputActionButtonStyleState(): void {
@@ -5770,7 +5782,7 @@ export class OpenCodianView extends ItemView {
     sendingRuntime.pendingEditedFiles.clear();
     this.clearDraftContextItems(sendingTabId);
 
-    const { contentEl } = this.createAssistantMessageElement(sendingTabId);
+    const { contentEl } = this.createAssistantMessageElement(sendingTabId, true);
     const streamController = this.getOrCreateTabStreamController(sendingTabId);
     if (this.getActiveTabId() === sendingTabId) {
       this.scheduleSettledScrollToBottomIfNeeded(this.shouldAutoScroll(sendingTabId), sendingTabId);
@@ -5799,6 +5811,7 @@ export class OpenCodianView extends ItemView {
       });
       const hintEl = pendingState.element.createSpan({ cls: 'opencodian-pending-hint' });
       pendingStartTime = Date.now();
+      this.revealStreamingAssistantMessageElement(sendingTabId);
 
       // Update timer every second
       const updateTimer = () => {
@@ -5904,6 +5917,10 @@ export class OpenCodianView extends ItemView {
                             (streamingChunk.type === 'thinking' && streamingChunk.content?.trim()) ||
                             streamingChunk.type === 'tool_use';
 
+          if (streamingChunk.type === 'error' || hasContent) {
+            this.revealStreamingAssistantMessageElement(sendingTabId);
+          }
+
           if (!receivedFirstChunk && hasContent) {
             receivedFirstChunk = true;
             logger.debug('First content chunk received, clearing pending timeout/indicator');
@@ -5927,6 +5944,7 @@ export class OpenCodianView extends ItemView {
           type: 'error',
           content: latestErrorMessage,
         });
+        this.revealStreamingAssistantMessageElement(sendingTabId);
       }
 
       if (sendingRuntime.isStreaming && streamController) {
@@ -5942,6 +5960,7 @@ export class OpenCodianView extends ItemView {
           type: 'error',
           content: latestErrorMessage,
         });
+        this.revealStreamingAssistantMessageElement(sendingTabId);
       }
     } finally {
       const finalizedTimestamp = finalizedAssistantMetadata?.timestamp ?? Date.now();
@@ -7444,8 +7463,35 @@ export class OpenCodianView extends ItemView {
     );
   }
 
+  private setStreamingAssistantMessageVisibility(messageEl: HTMLElement | null, visible: boolean): void {
+    if (!messageEl) {
+      return;
+    }
+
+    messageEl.hidden = !visible;
+  }
+
+  private revealStreamingAssistantMessageElement(tabId: TabId | null = this.getActiveTabId()): HTMLElement | null {
+    const messageEl = this.getTabRuntimeState(tabId)?.streamingMessageEl ?? null;
+    if (!messageEl) {
+      return null;
+    }
+
+    const wasHidden = messageEl.hidden;
+    this.setStreamingAssistantMessageVisibility(messageEl, true);
+
+    if (wasHidden && this.getActiveTabId() === tabId) {
+      this.scheduleSettledScrollToBottomIfNeeded(this.shouldAutoScroll(tabId), tabId);
+    }
+
+    return messageEl;
+  }
+
   /** Create assistant message element for streaming */
-  private createAssistantMessageElement(tabId: TabId | null = this.getActiveTabId()): { messageEl: HTMLElement; contentEl: HTMLElement } {
+  private createAssistantMessageElement(
+    tabId: TabId | null = this.getActiveTabId(),
+    hiddenUntilVisible = false,
+  ): { messageEl: HTMLElement; contentEl: HTMLElement } {
     const paneState = this.getTabPaneState(tabId);
     const messageEl = this.ensureTurnBody(tabId)?.createDiv({
       cls: 'opencodian-message opencodian-message--assistant is-streaming',
@@ -7458,6 +7504,7 @@ export class OpenCodianView extends ItemView {
 
     const contentEl = messageEl.createDiv({ cls: 'opencodian-message-content' });
     this.ensureAssistantTimestampRow(messageEl, true);
+    this.setStreamingAssistantMessageVisibility(messageEl, !hiddenUntilVisible);
 
     if (paneState) {
       paneState.runtime.streamingMessageEl = messageEl;
@@ -7620,7 +7667,13 @@ export class OpenCodianView extends ItemView {
 
     timeRow.replaceChildren(fragment);
     timeRow.classList.remove('is-pending');
-    messageEl.removeClass('is-streaming');
+    if (messageEl.classList.contains('is-streaming')) {
+      // Pin animation to 'none' before removing is-streaming so the base
+      // messageSlideIn keyframe does not re-trigger and cause a visual flicker.
+      messageEl.style.animation = 'none';
+      messageEl.removeClass('is-streaming');
+    }
+    this.setStreamingAssistantMessageVisibility(messageEl, true);
   }
 
   private ensureAssistantTimestampRow(messageEl: HTMLElement, reserveSpace = false): HTMLElement {
@@ -7664,6 +7717,7 @@ export class OpenCodianView extends ItemView {
     messageEl.addClass('opencodian-message--notice');
     messageEl.removeClass('opencodian-message--background-task');
     messageEl.empty();
+    this.setStreamingAssistantMessageVisibility(messageEl, true);
 
     const contentEl = messageEl.createDiv({ cls: 'opencodian-message-content' });
     await this.renderNoticeCard(contentEl, noticeMessage);
@@ -10313,16 +10367,19 @@ export class OpenCodianView extends ItemView {
     const lastToolCall = messageEl.querySelector('.streaming-tool-call:last-of-type');
     if (lastToolCall?.parentNode) {
       lastToolCall.parentNode.insertBefore(cardEl, lastToolCall.nextSibling);
+      this.revealStreamingAssistantMessageElement(tabId);
       return cardEl;
     }
 
     const contentEl = messageEl.querySelector('.opencodian-message-content');
     if (contentEl) {
       contentEl.appendChild(cardEl);
+      this.revealStreamingAssistantMessageElement(tabId);
       return cardEl;
     }
 
     messageEl.appendChild(cardEl);
+    this.revealStreamingAssistantMessageElement(tabId);
     return cardEl;
   }
 
@@ -10856,6 +10913,7 @@ export class OpenCodianView extends ItemView {
         messageEl.appendChild(permissionCard);
       }
     }
+    this.revealStreamingAssistantMessageElement(tabId);
 
     // Header with tool name
     const headerEl = permissionCard.createDiv({ cls: 'opencodian-permission-inline-header' });

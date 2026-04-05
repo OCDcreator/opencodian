@@ -115,6 +115,10 @@ describe('Settings', () => {
       expect(DEFAULT_SETTINGS.chatAppearance.background.edgeFade).toBe(28);
       expect(DEFAULT_SETTINGS.chatAppearance.user.radius).toBe(16);
       expect(DEFAULT_SETTINGS.chatAppearance.assistant.backgroundOpacity).toBe(72);
+      expect(DEFAULT_SETTINGS.chatAppearance.assistant.metaFontSize).toBe(10);
+      expect(DEFAULT_SETTINGS.chatAppearance.assistant.metaColor).toBe('var(--text-muted)');
+      expect(DEFAULT_SETTINGS.chatAppearance.assistant.timeColor).toBe('var(--text-muted)');
+      expect(DEFAULT_SETTINGS.chatAppearance.assistant.modelIdColor).toBe('var(--text-faint, var(--text-muted))');
       expect(DEFAULT_SETTINGS.chatAppearance.input.backgroundOpacity).toBe(72);
       expect(DEFAULT_SETTINGS.chatAppearance.input.shadowBlur).toBe(28);
       expect(DEFAULT_SETTINGS.chatAppearance.input.actionButtonStyle).toBe('default');
@@ -365,6 +369,8 @@ describe('Settings', () => {
       });
       expect(normalized.assistant.blur).toBe(4);
       expect(normalized.assistant.radius).toBe(14);
+      expect(normalized.assistant.metaFontSize).toBe(10);
+      expect(normalized.assistant.metaColor).toBe('var(--text-muted)');
       expect(normalized.input.backgroundOpacity).toBe(64);
       expect(normalized.input.blur).toBe(18);
       expect(normalized.input.actionButtonStyle).toBe('default');
@@ -382,6 +388,22 @@ describe('Settings', () => {
       });
 
       expect(normalized.input.actionButtonStyle).toBe('default');
+    });
+
+    it('normalizes assistant metadata appearance settings', () => {
+      const normalized = normalizeChatAppearanceSettings({
+        assistant: {
+          metaFontSize: 99,
+          metaColor: 'not-a-color',
+          timeColor: '#7f8c9f',
+          modelIdColor: 'var(--text-normal)',
+        },
+      });
+
+      expect(normalized.assistant.metaFontSize).toBe(18);
+      expect(normalized.assistant.metaColor).toBe('var(--text-muted)');
+      expect(normalized.assistant.timeColor).toBe('#7f8c9f');
+      expect(normalized.assistant.modelIdColor).toBe('var(--text-normal)');
     });
 
     it('should validate custom CSS declarations', () => {

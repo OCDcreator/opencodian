@@ -16,6 +16,9 @@ describe('chatAppearance utilities', () => {
     appearance.background.opacity = 80;
     appearance.background.edgeFade = 36;
     appearance.assistant.backgroundOpacity = 55;
+    appearance.assistant.metaFontSize = 12;
+    appearance.assistant.timeColor = '#90a4b8';
+    appearance.assistant.modelIdColor = 'var(--text-normal)';
     appearance.input.backgroundOpacity = 66;
     appearance.input.shadowBlur = 30;
     appearance.scrollbar.width = 10;
@@ -28,6 +31,9 @@ describe('chatAppearance utilities', () => {
     expect(cssVariables['--opencodian-theme-bg-opacity']).toBe('0.8');
     expect(cssVariables['--opencodian-theme-bg-edge-fade']).toBe('36px');
     expect(cssVariables['--opencodian-assistant-bg-opacity']).toBe('55%');
+    expect(cssVariables['--opencodian-assistant-meta-font-size']).toBe('12px');
+    expect(cssVariables['--opencodian-assistant-time-color']).toBe('#90a4b8');
+    expect(cssVariables['--opencodian-assistant-model-id-color']).toBe('var(--text-normal)');
     expect(cssVariables['--opencodian-input-bg-opacity']).toBe('66%');
     expect(cssVariables['--opencodian-input-shadow-blur']).toBe('30px');
     expect(cssVariables['--opencodian-scrollbar-width']).toBe('10px');
