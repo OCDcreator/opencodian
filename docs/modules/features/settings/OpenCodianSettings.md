@@ -34,15 +34,17 @@
 其中最近变化较大的几块是：
 
 - **Model**
-  - 同时展示 `baseEffective` 与 `effective` 语义
+  - 重构成“常用 / 可用范围 / 工具与诊断”三段式模型中心
+  - 默认聊天模型不再拆成 provider/model 两个普通下拉，而是走可搜索 picker
   - provider 级可用性开关写回 `.opencode`
   - model 级可用性开关写回插件设置 `disabledModelRefs`
-  - 支持 provider icon cache / custom icon library 管理
+  - provider 列表支持折叠、搜索、`仅看已禁用` 过滤与图标/来源 badge
+  - provider icon cache / custom icon library 管理被移到高级工具区
 - **Conversation**
   - `questionDisplayMode`
   - `questionCardPosition`
   - `showAnsweredQuestionCards`
-  - `aiTitleModel` 的 availability-aware 选项解析
+  - `aiTitleModel` 的 availability-aware 选项解析与可搜索 picker
 - **Style**
   - theme preset + custom overrides
   - 聊天背景图上传/调参
@@ -69,6 +71,12 @@
 
 因此设置页能展示“存在但被禁用”的模型，而不只是“当前下拉可选项”。
 
+新的结构把模型任务拆开了：
+
+- **常用**：默认聊天模型、来源模式、刷新摘要
+- **可用范围**：provider accordion + 模型级开关
+- **工具与诊断**：本地配置编辑、icon cache、catalog 对比
+
 ### 设置面板滚动恢复
 
 这个文件维护了一套较完整的恢复链路：
@@ -94,7 +102,7 @@
 | `onModelsLoaded()` | 模型目录刷新后合并 UI 更新 |
 | `scrollToServerSection()` / `scrollToModelSection()` | 跳转到指定分区 |
 | `prepareRestoreScrollOnNextOpen()` | 记录下次打开时的滚动恢复目标 |
-| `addModelSettings()` | 渲染模型目录、provider/model toggle、图标缓存与编辑器入口 |
+| `addModelSettings()` | 渲染模型中心，包括默认模型 picker、provider 可用范围和高级诊断区 |
 | `addConversationSettings()` | 渲染标题、question 和回答回顾相关设置 |
 | `addStyleSettings()` | 渲染 theme preset、chat appearance、glass/liquid glass 控件 |
 
@@ -104,6 +112,7 @@
 - `OpencodeConfigManager`: 读写 `.opencode` 配置
 - `PluginManagementService`: 构建插件环境快照
 - `ProviderIconService` / `ProviderIconCacheModal`: provider icon 缓存与自定义图标管理
+- `ModelPickerModal`: 默认模型和 AI 标题模型共用的搜索式 picker
 - `ModelConfigModal` / `ModelConfigJsonModal` / `OpencodeConfigModal`: 配置编辑入口
 - `ServerSettingHelpModal` / `LiquidGlassSettingHelpModal`: 帮助说明入口
 - `main.ts`: 通过 `addSettingTab()` 注册，并调用 `onModelsLoaded()` / `refreshServerStatusDisplay()`

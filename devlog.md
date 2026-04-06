@@ -12,6 +12,56 @@
 
 ---
 
+## 2026-04-06 重构模型设置中心，并修复设置页图标渲染异常
+
+### 🎯 改动目标
+
+- 解决模型设置项信息密度过高、默认模型和标题模型在大 catalog 下难以使用的问题
+- 把 provider / model 可用范围控制从“全量长列表”重组为更直观的模型管理中心
+- 修复新设置页在运行时因 `setIcon` 未导入导致的模型区加载失败
+
+### ✅ 本轮调整
+
+- `src/features/settings/OpenCodianSettings.ts`
+- `src/features/settings/ModelPickerModal.ts`
+- `src/features/settings/modelPicker.ts`
+- `styles.css`
+  - 模型设置区重构为“常用 / 可用范围 / 工具与诊断”三段式布局
+  - 默认聊天模型不再拆成 provider/model 两个普通下拉，改为共享的可搜索 picker
+  - provider 可用范围管理改为折叠式分组，支持搜索、`仅显示已禁用`、来源 badge、状态 badge 和按需展开模型列表
+  - icon cache、本地模型配置和 catalog 对比被移入默认收起的高级工具区
+  - 补上设置页运行时对 `setIcon` 的导入，修复模型区渲染时报 `ReferenceError: setIcon is not defined`
+
+- `src/i18n/locales/en.ts`
+- `src/i18n/locales/zh.ts`
+  - 更新模型设置快捷跳转说明
+  - 新增模型中心、picker、provider 状态摘要、来源 badge、筛选器等中英文本案
+
+- `docs/modules/features/settings/OpenCodianSettings.md`
+- `docs/modules/features/settings/ModelPickerModal.md`
+- `docs/modules/features/settings/index.md`
+  - 补充新的模型设置信息架构说明
+  - 新增共享模型 picker modal 的模块文档
+
+- `tests/unit/features/settings/modelPicker.test.ts`
+- `tests/unit/features/settings/OpenCodianConversationSettings.test.ts`
+- `tests/unit/features/settings/OpenCodianSettings.test.ts`
+  - 新增模型 picker helper 测试
+  - 保持设置相关回归测试通过，覆盖新的标题模型 picker 数据层
+
+### 🧠 交互变化
+
+- 默认聊天模型和 AI 标题模型现在都走同一类搜索式弹层，搜索维度包含 provider 名称 / ID 与 model 名称 / ID
+- provider 可用范围面板默认收起；只有展开 provider 或搜索命中时才渲染其模型列表，避免模型很多时把整个设置页拉得过长
+- catalog 诊断从主操作流中后移，先看摘要卡片，再按需查看 local / server / effective 明细
+
+### 🧪 当前验证
+
+- 已通过：`npm run test -- modelPicker OpenCodianConversationSettings OpenCodianSettings`
+- 已通过：`npm run build`
+- 已通过：`npm run check:devlog-order`
+- 已部署测试库并确认 `C:\Users\lt\Desktop\Write\testvault\.obsidian\plugins\opencodian\main.js` 包含 `BUILD_ID: main.202604061628`
+
 ## 2026-04-06 新增模型可用范围管理，并补齐用户时间样式与标题模型回退
 
 ### 🎯 改动目标

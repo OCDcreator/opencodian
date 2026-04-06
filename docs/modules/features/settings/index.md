@@ -39,7 +39,7 @@ export { OpenCodianSettingTab } from './OpenCodianSettings';
 ## 与其他模块的交互
 
 - 主实现见 [OpenCodianSettings.md](C:/Users/lt/Desktop/Write/custom-project/opencodian/docs/modules/features/settings/OpenCodianSettings.md)
-- 其他设置弹窗如 [ModelConfigModal.md](C:/Users/lt/Desktop/Write/custom-project/opencodian/docs/modules/features/settings/ModelConfigModal.md)、[OpencodeConfigModal.md](C:/Users/lt/Desktop/Write/custom-project/opencodian/docs/modules/features/settings/OpencodeConfigModal.md) 由设置页直接调用
+- 其他设置弹窗如 [ModelPickerModal.md](C:/Users/lt/Desktop/Write/custom-project/opencodian/docs/modules/features/settings/ModelPickerModal.md)、[ModelConfigModal.md](C:/Users/lt/Desktop/Write/custom-project/opencodian/docs/modules/features/settings/ModelConfigModal.md)、[OpencodeConfigModal.md](C:/Users/lt/Desktop/Write/custom-project/opencodian/docs/modules/features/settings/OpencodeConfigModal.md) 由设置页直接调用
 
 ## 配置项
 
