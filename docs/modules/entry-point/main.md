@@ -78,6 +78,8 @@
 - 把旧的 `debugLogPath` 合并进新的 `debugLogPaths`（按当前平台落位）。
 - 把旧的扁平 `server.{host,port,autoStart}` 迁移为新的 `server.mode/local/remote/auth` 结构。
 - 归一化 `chatAppearance`、`theme`、`tabState`、`providerIconLibrary`。
+- 归一化 `questionDisplayMode`、`questionCardPosition`、`showAnsweredQuestionCards`。
+- 归一化 `disabledModelRefs`，避免历史配置中的脏模型引用污染当前运行时。
 - 根据 `inputPanelGlassRefractionGlassDefaultsVersion` 判断是否重置 glass/card/pill 默认层级参数。
 - 检测旧版 `nikdelvin` 液态玻璃默认档案并替换为新默认值。
 - 丢弃已废弃的 `experimentalComposerGlassRefractionEnabled` 与 `inputPanelLiquidGlassMode`。
@@ -103,12 +105,14 @@
 - `activateView()`: 按 `openInMainTab` 决定在主标签页或右侧边栏打开 `OpenCodianView`。
 - ribbon 图标：`bot`
 - 命令：
-  - `open-view`
-  - `new-conversation`
-  - `toggle-liquid-diamond-demo`
-  - `inline-edit`
-  - `add-current-note-to-context`
-  - `add-selection-to-context`
+- `open-view`
+- `new-conversation`
+- `toggle-liquid-diamond-demo`
+- `toggle-liquid-diamond-demo-webgl`
+- `toggle-glass-octahedron`
+- `inline-edit`
+- `add-current-note-to-context`
+- `add-selection-to-context`
 
 同时，插件实例还向所有已打开的视图广播：
 

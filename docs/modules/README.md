@@ -25,9 +25,9 @@
 
 ### 当前基线
 
-- `src/**/*.ts`: 95 篇源码模块文档
+- `src/**/*.ts`: 101 篇源码模块文档
 - 文档元信息与基础设施: 6 篇
-- `docs/modules/**/*.md` 合计: 101 篇
+- `docs/modules/**/*.md` 合计: 107 篇
 
 ## 文档结构
 
@@ -80,10 +80,15 @@ docs/modules/
 │   ├── chat/
 │   │   ├── index.md
 │   │   ├── OpenCodianView.md
+│   │   ├── autoScrollState.md
 │   │   ├── chatAppearance.md
 │   │   ├── composerContext.md
 │   │   ├── forkMessages.md
+│   │   ├── glassOctahedronDemo.md
+│   │   ├── glassOctahedronDemoRefraction.md
+│   │   ├── glassOctahedronDemoThree.md
 │   │   ├── liquidDiamondDemo.md
+│   │   ├── liquidDiamondDemoWebgl.md
 │   │   ├── renderGroups.md
 │   │   ├── userMessageActions.md
 │   │   ├── userMessageDisplay.md
@@ -158,6 +163,8 @@ docs/modules/
 │       ├── ThinkingBlockRenderer.md
 │       ├── ToolCallRenderer.md
 │       └── types.md
+├── vendor/
+│   └── three.md
 └── infrastructure/
     ├── build-pipeline.md
     ├── scripts.md

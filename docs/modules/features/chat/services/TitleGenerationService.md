@@ -5,7 +5,12 @@
 
 ## 概述
 
-`TitleGenerationService` 为“首条用户消息后自动生成会话标题”提供异步封装。它自身不更新对话对象，真正的标题写回由调用方 `OpenCodianView.startAiConversationTitleGeneration()` 提供回调完成。
+`TitleGenerationService` 负责“首条用户消息后异步生成会话标题”。它不直接修改 conversation，而是把结果通过回调交回 `OpenCodianView`。
+
+最近这块逻辑的关键变化有两点：
+
+- 标题请求现在优先走结构化输出 `json_schema`
+- `aiTitleModel` 不再盲信配置值，而是会结合模型目录和 `disabledModelRefs` 做 availability-aware fallback
 
 ## 核心类型
 
@@ -20,60 +25,72 @@ export type TitleGenerationCallback = (
 ) => Promise<void>;
 ```
 
-## 内部状态
-
-类内部只有一个状态容器：
+内部状态仍然很简单：
 
 ```typescript
 private readonly activeGenerations = new Map<string, AbortController>();
 ```
 
-键是 `conversationId`，值是该对话当前的取消控制器。
-
 ## 关键行为
 
-### 标题生成流程
+### 生成流程
 
 `generateTitle()` 的顺序是：
 
-1. 先取消同一对话已有任务
-2. 创建新的 `AbortController` 并写入 `activeGenerations`
-3. 解析模型来源
-4. 规范化 locale
-5. 把用户首条消息归一化并截断到 600 字符
-6. 创建临时 OpenCode session：`createSession('Title Generation', { setCurrent: false })`
-7. 用 `requestAssistantResponse()` 发送非流式请求
-8. 如果期间已被取消，直接返回
-9. 解析模型响应首行，生成最终标题
-10. 通过回调把结果交回调用方
-11. 在 `finally` 中移除活动记录，并尝试删除临时 session
+1. 取消同一 conversation 已存在的标题任务
+2. 建立新的 `AbortController`
+3. 通过 `resolveModel()` 解析标题模型
+4. 按 locale 构建标题 prompt 与 system prompt
+5. 截断用户首条消息到 600 字符
+6. 创建临时 session：`createSession('Title Generation', { setCurrent: false })`
+7. 调用 `requestAssistantResponse(...)`
+8. 优先从 `response.structured.title` 提取标题，失败时再回退到文本首行解析
+9. 通过回调把结果交回调用方
+10. 在 `finally` 中删除活动记录并 best-effort 清理临时 session
 
-### 模型选择
+### 标题模型解析
 
-`resolveModel()` 读取 `plugin.settings.aiTitleModel`：
+`resolveModel()` 的行为比旧文档更严格：
 
-- 空字符串：沿用当前会话的 `{ provider, model }`
-- `provider/model`：分别拆成 provider 和 model
-- 仅写 `model`：沿用当前 provider，只覆盖 model
+- 未配置 `aiTitleModel`：直接沿用当前会话模型
+- 配置了非法模型引用：回退到当前会话模型
+- 配置了合法引用但当前模型目录不可用：也回退到当前会话模型
 
-### 标题解析
+这里会显式调用：
 
-`parseTitle()` 的规则是：
+- `modelConfigService.getCatalogs(modelSourceMode, disabledModelRefs)`
+- `resolveModelSelection(baseEffective, effective, provider, model)`
 
-- 只取第一个非空行
-- 去掉 `title:` 前缀
-- 去掉首尾引号和列表标记
-- 去掉尾部中英文标点
-- 超过 50 个字符时截断为 47 个字符再补 `...`
+所以标题生成会尊重：
 
-解析失败会返回 `null`，随后 `generateTitle()` 会以 `success: false` 回调。
+- 当前 `modelSourceMode`
+- provider 级禁用
+- `disabledModelRefs`
 
-## 模块关系
+### 标题提取
 
-- 上游依赖：`../../../core/prompts/titleGeneration`、`../../../main`
-- 下游消费者：`OpenCodianView`
+提取顺序现在是：
+
+1. `extractStructuredTitle(response?.structured)`
+2. `parseTitle(response?.content ?? '')`
+
+`normalizeTitleCandidate()` 会统一处理：
+
+- `title:` 前缀
+- 首尾引号
+- 列表标记
+- 尾部中英文标点
+- 50 字符上限截断
+
+## 与其他模块的交互
+
+- `OpenCodianView`: 发起标题生成并接收结果回调
+- `OpenCodeService`: 创建临时 session、发送非流式请求、删除临时 session
+- `core/prompts/titleGeneration.ts`: 提供 locale-aware prompt 和 system prompt
+- `ModelConfigService`: 用于 availability-aware 标题模型解析
 
 ## 注意事项
 
-- `cancelConversation()` 和 `cancelAll()` 只会 `abort()` 本地控制器；源码里没有把这个 signal 传给 `requestAssistantResponse()`，所以取消语义是“忽略后续结果”，不是强制中断服务端请求。
-- `safeCallback()` 会吞掉回调抛出的错误，避免影响标题任务清理逻辑。
+- `cancelConversation()` / `cancelAll()` 仍然只是本地忽略结果，不会强制中断服务端请求。
+- 结构化输出不是唯一来源；如果模型没返回 `structured.title`，仍会回退到纯文本解析。
+- 标题模型解析失败时会静默回退到当前会话模型，而不是抛错中断整个标题流程。

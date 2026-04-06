@@ -14,13 +14,14 @@
 
 ```
 opencodian/
-├── ARCHITECTURE.md              # 架构设计文档
 ├── README.md                    # 项目说明
 ├── LICENSE                      # MIT 许可证
 ├── PROJECT_SUMMARY.md           # 本文件
 │
 ├── docs/
-│   └── MIGRATION.md             # Claudian 迁移指南
+│   ├── README.md                # 文档入口与分类说明
+│   ├── architecture/README.md   # 当前架构总览
+│   └── modules/README.md        # 模块文档入口
 │
 ├── src/
 │   ├── main.ts                  # 插件入口
@@ -296,5 +297,5 @@ OpenCode 使用 `Part[]` 格式，需要转换为 StreamChunk 以适配 UI：
 - [Claudian AGENTS.md](https://github.com/YishenTu/claudian/blob/main/AGENTS.md)
 - [OpenCode SDK 文档](https://opencode.ai/docs/sdk/)
 - [Obsidian 开发者文档](https://docs.obsidian.md/)
-- [迁移指南](./docs/MIGRATION.md)
-- [架构文档](./ARCHITECTURE.md)
+- [文档入口](./docs/README.md)
+- [架构文档](./docs/architecture/README.md)

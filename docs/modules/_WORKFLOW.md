@@ -84,6 +84,7 @@
 - `docs/modules/shared/modals/index.md`
 - `docs/modules/shared/modals/ForkTargetModal.md`
 - `docs/modules/utils/index.md`
+- `docs/modules/vendor/three.md`
 - `docs/modules/utils/editorSelectionHighlight.md`
 - `docs/modules/utils/icons/index.md`
 - `docs/modules/utils/icons/ProviderIconService.md`
@@ -116,10 +117,15 @@
 
 - `docs/modules/features/chat/index.md`
 - `docs/modules/features/chat/OpenCodianView.md`
+- `docs/modules/features/chat/autoScrollState.md`
 - `docs/modules/features/chat/chatAppearance.md`
 - `docs/modules/features/chat/composerContext.md`
 - `docs/modules/features/chat/forkMessages.md`
+- `docs/modules/features/chat/glassOctahedronDemo.md`
+- `docs/modules/features/chat/glassOctahedronDemoRefraction.md`
+- `docs/modules/features/chat/glassOctahedronDemoThree.md`
 - `docs/modules/features/chat/liquidDiamondDemo.md`
+- `docs/modules/features/chat/liquidDiamondDemoWebgl.md`
 - `docs/modules/features/chat/renderGroups.md`
 - `docs/modules/features/chat/userMessageActions.md`
 - `docs/modules/features/chat/userMessageDisplay.md`

@@ -38,5 +38,14 @@ settings_scroll_performance_optimization.md
 providers_output.json
 # Documentation
 docs/*
+!docs/README.md
+!docs/architecture/
+!docs/architecture/**
 !docs/modules/
 !docs/modules/**
+!docs/reference/
+!docs/reference/**
+!docs/requirements/
+!docs/requirements/**
+!docs/status/
+!docs/status/**

@@ -5,7 +5,7 @@
 
 ## 概述
 
-OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings` 接口、`DEFAULT_SETTINGS` 常量、以及约 30 个归一化/验证/默认值辅助函数。涵盖服务器连接、模型配置、安全策略、UI/UX、主题、输入面板玻璃效果、标签页状态等全部可配置维度。所有设置变更都需要经过对应的 `normalize*()` 函数验证后才能持久化。
+OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings`、`DEFAULT_SETTINGS`，以及一组负责清洗历史配置和运行时输入的 `normalize*()` 辅助函数。它既是设置 UI 的数据底座，也是插件启动时的迁移和兜底入口。
 
 源码约 1396 行，是项目最大的类型定义文件。
 
@@ -79,8 +79,8 @@ OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings` 接口、`D
 | `ChatAppearanceLayoutSettings` | 布局（`messagesPaddingTop`, `messagesPaddingX`） |
 | `ChatAppearanceStickySettings` | 吸顶区（`headerGap`, `maskHeight`, `maskBlur`） |
 | `ChatAppearanceBackgroundSettings` | 背景图（`imagePath`, `fitMode`, `opacity`, `blur`, `depth`, `dim`, `edgeFade`, `saturation`, `brightness`, `focusX`, `focusY`） |
-| `ChatAppearanceUserSettings` | 用户消息气泡（`radius`, `tailRadius`, `blur`, `shadowBlur`） |
-| `ChatAppearanceAssistantSettings` | 助手消息气泡（`radius`, `backgroundOpacity`, `blur`, `shadowBlur`） |
+| `ChatAppearanceUserSettings` | 用户消息气泡，现含时间样式（`timeFontSize`, `timeFontWeight`, `timeColor`） |
+| `ChatAppearanceAssistantSettings` | 助手消息气泡，现含 meta/time/modelId 样式（字号、字重、颜色） |
 | `ChatAppearanceInputSettings` | 输入面板（`radius`, `backgroundOpacity`, `blur`, `shadowBlur`, `actionButtonStyle`） |
 | `ChatAppearanceScrollbarSettings` | 滚动条（`width`, `radius`, `trackOpacity`, `thumbOpacity`, `thumbHoverOpacity`, `edgePadding`, `shadowOpacity`） |
 | `ChatAppearanceAdvancedSettings` | 高级（`customCssDeclarations`） |
@@ -129,6 +129,7 @@ OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings` 接口、`D
 | `normalizeInputPanelActionButtonStyleId(value)` | 归一化按钮样式 |
 | `normalizeChatAppearanceBackgroundFitMode(value)` | 归一化背景填充模式 |
 | `normalizePluginIsolationMode(value)` | 归一化插件隔离模式 |
+| `normalizeDisabledModelRefs(value)` | 清洗 `provider/model` 列表，去重并剔除非法引用 |
 | `normalizeChatAppearanceSettings(appearance?)` | 归一化完整外观设置 |
 | `normalizePartialChatAppearanceSettings(appearance?)` | 归一化部分外观覆盖 |
 | `normalizeThemeSettings(value?)` | 归一化主题设置 |
@@ -164,6 +165,37 @@ OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings` 接口、`D
 | `getBashToolBlockedCommands(commands)` | 获取 Bash 工具黑名单（Windows 合并两套） |
 | `normalizeBaseUrl(value)` | 去除 URL 尾部斜杠 |
 
+## 最近值得注意的变化
+
+### 模型禁用引用
+
+`OpenCodianSettings` 现在新增了：
+
+- `disabledModelRefs: string[]`
+
+这个字段存储插件侧的模型级禁用列表，格式固定为 `provider/model`。`normalizeDisabledModelRefs()` 会：
+
+- 只保留字符串项
+- `trim()` 清理空白
+- 过滤掉没有 provider 或 model 的脏值
+- 去重，保证最终列表稳定
+
+这让设置页可以把“provider 级开关”和“model 级禁用”分开表达。
+
+### 聊天气泡元数据样式
+
+`ChatAppearanceSettings` 最近扩展了两类样式字段：
+
+- `user.time*`
+- `assistant.meta*` / `assistant.time*` / `assistant.modelId*`
+
+对应的归一化逻辑也新增了：
+
+- `normalizeCssColorValue(...)`
+- `normalizeFontWeightValue(...)`
+
+因此这份文件现在不仅定义“有没有这个字段”，还负责把颜色、字号和字重收敛到安全范围。
+
 ## OpenCodianSettings 字段参考
 
 | 字段 | 类型 | 默认值 | 说明 |
@@ -183,6 +215,7 @@ OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings` 接口、`D
 | `questionCardPosition` | `QuestionCardPosition` | `'inline'` | 问题卡片位置 |
 | `showAnsweredQuestionCards` | `boolean` | `true` | 显示已回答问题卡片 |
 | `aiTitleModel` | `string` | `''` | AI 标题专用模型 |
+| `disabledModelRefs` | `string[]` | `[]` | 插件侧禁用的 `provider/model` 列表 |
 | `renderUserMarkupAsCodeBlocks` | `boolean` | `true` | 用户标记渲染为代码块 |
 | `pluginIsolationMode` | `PluginIsolationMode` | `'default'` | 插件隔离模式 |
 | `providers` | `ModelProviderConfig[]` | Anthropic | 提供商列表 |
@@ -238,6 +271,7 @@ OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings` 接口、`D
   - `'liquid-diamond-shuding'` → `'preset'`
 - `isValidChatAppearanceCustomCssDeclarations()` 禁止花括号和 `<style>` 标签，防止 CSS 注入
 - `normalizeFiniteNumberInRange()` 用于将数值夹紧到合法范围
+- 颜色和字重现在也会被单独校验，不再只是“数字能过就行”
 - `inputPanelGlassRefractionGlassDefaultsVersion` 用于版本化默认值迁移
 - Windows 上 `getBashToolBlockedCommands()` 合并 unix + windows 两套黑名单
 - `hiddenSlashCommands` 存储用户隐藏的斜杠命令 ID

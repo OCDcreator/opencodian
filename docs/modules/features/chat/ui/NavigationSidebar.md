@@ -13,10 +13,15 @@
 
 ## 核心类型 / 接口
 
-无独立导出类型。构造参数：
+无独立导出类型，但构造器现在支持一个轻量 options：
 
 ```typescript
-constructor(mountEl: HTMLElement, anchorEl: HTMLElement, messagesEl: HTMLElement)
+constructor(
+  mountEl: HTMLElement,
+  anchorEl: HTMLElement,
+  messagesEl: HTMLElement,
+  options?: { onScrollToBottom?: () => void },
+)
 ```
 
 ## 核心逻辑
@@ -51,11 +56,19 @@ constructor(mountEl: HTMLElement, anchorEl: HTMLElement, messagesEl: HTMLElement
 - `MutationObserver` 监听 messagesEl 的 childList/subtree/characterData 变化
 - scroll 事件被动监听
 
+### 底部滚动委托
+
+底部按钮现在不是只能直接执行：
+
+`messagesEl.scrollTo({ top: messagesEl.scrollHeight, behavior: 'smooth' })`
+
+如果调用方传入 `onScrollToBottom`，会优先委托给外部处理。这让 `OpenCodianView` 可以把“滚到底部”接到自己的自动滚动和 guard 逻辑上，而不是绕开那套状态机。
+
 ## 关键方法
 
 | 方法 | 说明 |
 |------|------|
-| `constructor(mountEl, anchorEl, messagesEl)` | 创建容器、按钮、绑定事件监听 |
+| `constructor(mountEl, anchorEl, messagesEl, options?)` | 创建容器、按钮、绑定事件监听 |
 | `updateVisibility()` | 根据 scrollHeight 判断是否显示，更新位置 |
 | `scrollToMessage(direction)` | 定位上一条/下一条用户消息 |
 | `destroy()` | 移除 scroll listener、断开 observer、移除 DOM |
@@ -71,6 +84,10 @@ updatePosition()   → container.style.top
 用户点击 prev/next → scrollToMessage()
         ↓
 messagesEl.scrollTo({ top, behavior: 'smooth' })
+
+用户点击 bottom
+        ↓
+options.onScrollToBottom?.() ?? messagesEl.scrollTo(...)
 ```
 
 ## 与其他模块的交互
@@ -87,6 +104,7 @@ messagesEl.scrollTo({ top, behavior: 'smooth' })
 - `scrollPadding` 在 sticky 模式下为 0，普通模式为 10px
 - `isStickyScrollMode()` 检查 `opencodian-messages--sticky-basic` 和 `opencodian-messages--sticky-mask` 两个类
 - `threshold=30` 用于避免在当前位置附近反复跳动
+- 如果调用方需要和自动滚动状态机保持一致，应该优先传 `onScrollToBottom`，而不是让侧栏自己直接滚动到底部
 
 ## 补充说明
 

@@ -5,98 +5,112 @@
 
 ## 概述
 
-OpenCodian 插件的主设置面板，继承 Obsidian 的 `PluginSettingTab`。提供双语（en/zh）设置 UI，涵盖 10 个分区：Language、Server、Model、Conversation、Plugins、Security、UI、Style（含 Theme presets）、Debug、User。支持快速导航栏、滚动位置恢复、实时服务器状态监控、模型目录切换、chat appearance 精细调节（背景/用户/助手/输入/滚动条/高级分组）、liquid glass 折射参数、provider icon 缓存管理等功能。
+`OpenCodianSettings.ts` 是插件的主设置面板。它继承 `PluginSettingTab`，负责把大量设置项组织成可导航、可恢复滚动位置、可实时刷新的 Obsidian UI。
 
-## 导入关系
-上游: `obsidian`（App、PluginSettingTab、Setting、Notice 等）、`fs`/`os`/`path`、`core/config`（OpencodeConfigManager、PluginManagementService）、`core/theme`（getBuiltinThemePresets、hasThemeAppearanceOverrides）、`core/types`（大量类型）、`i18n`、`main`（OpenCodianPlugin）、`shared`（logger、getVaultBasePath）、`utils/glass`（getAllGlassAdapters）、`utils/icons`（ProviderIconService）、各子 Modal
-下游: 被 `main.ts` 中 `addSettingTab()` 注册
+当前文件的重点不只是“渲染设置项”，还包括：
 
-## 核心类型 / 接口
+- 设置分区导航与重建
+- 设置面板滚动位置恢复
+- 模型目录和可用性状态展示
+- 主题预设与样式控件联动
+- 服务器状态轮询
+- 对多个 modal 与辅助服务的编排
 
-```typescript
-interface NumericStyleControlConfig {
-  group: ChatAppearanceStyleGroup;
-  name: string; desc: string;
-  min: number; max: number; step: number; unit: string;
-  value: () => number;
-  resetValue: () => number;
-  setValue: (appearance: ChatAppearanceSettings, value: number) => void;
-}
+## 主要分区
 
-type ChatAppearanceStyleGroup = 'layout' | 'background' | 'user' | 'assistant' | 'input' | 'scrollbar' | 'advanced';
-```
+`display()` 会重建整个设置面板，并依次挂载这些分区：
+
+- Language
+- Server
+- Model
+- Conversation
+- Plugins
+- Security
+- UI
+- Style
+- Debug
+- User
+
+其中最近变化较大的几块是：
+
+- **Model**
+  - 同时展示 `baseEffective` 与 `effective` 语义
+  - provider 级可用性开关写回 `.opencode`
+  - model 级可用性开关写回插件设置 `disabledModelRefs`
+  - 支持 provider icon cache / custom icon library 管理
+- **Conversation**
+  - `questionDisplayMode`
+  - `questionCardPosition`
+  - `showAnsweredQuestionCards`
+  - `aiTitleModel` 的 availability-aware 选项解析
+- **Style**
+  - theme preset + custom overrides
+  - 聊天背景图上传/调参
+  - assistant metadata / time / provider-model 独立样式控制
+  - 输入面板 glass refraction / liquid glass 参数
 
 ## 核心逻辑
 
-### 分区架构
+### 面板重建
 
-`display()` 方法构建完整设置面板，调用 10 个 `add*Settings()` 方法：
-- `addLanguageSettings`: 语言下拉（en/zh），切换后刷新整个面板
-- `addServerSettings`: 模式切换（local/remote）、host/port、认证、状态监控（2s 轮询）
-- `addModelSettings`: provider/model 下拉、source mode、refresh、config 编辑器入口、icon 缓存管理
-- `addConversationSettings`: 标题模式、AI 标题模型、问题显示模式、问题卡片位置、已回答卡片显示
-- `addPluginSettings`: 插件环境快照、项目配置编辑器、隔离模式、项目目录管理、OMO 配置
-- `addSecuritySettings`: 权限模式、config 状态指示器、自动重启、blocklist、命令屏蔽、导出路径
-- `addUISettings`: 最大标签数、标签栏位置、自动滚动、聊天滚动模式、主标签打开
-- `addStyleSettings`: 主题预设、背景/布局/用户/助手/输入/滚动条/高级精细调节
-- `addDebugSettings`: 调试日志、平台日志路径、诊断导出
-- `addUserSettings`: 用户名、系统提示、排除标签
+`display()` 不是局部 patch，而是清空容器后整体重建。这让语言切换、主题预设同步和复杂控件刷新更容易保持一致，但也意味着：
 
-### 滚动位置恢复
+- DOM 引用会失效
+- 滚动位置需要显式恢复
+- 所有 section anchor 都要重新注册
 
-`prepareRestoreScrollOnNextOpen()` / `prepareScrollToServerOnNextOpen()` 支持在设置面板重新打开时恢复滚动位置或跳转到指定分区。
+### 模型目录与可用性控制
 
-### 实时状态
+模型分区现在显式区分：
 
-服务器状态通过 `setInterval(2000)` 轮询 `checkHealth()` 更新，面板关闭时清理。
+- 服务端是否存在某 provider/model
+- 当前 source mode 下是否进入 `baseEffective`
+- 插件侧是否被 `disabledModelRefs` 过滤掉
+
+因此设置页能展示“存在但被禁用”的模型，而不只是“当前下拉可选项”。
+
+### 设置面板滚动恢复
+
+这个文件维护了一套较完整的恢复链路：
+
+- `settingsPanelScrollTop` 持久化到插件设置
+- `prepareRestoreScrollOnNextOpen()` / `prepareScrollToServerOnNextOpen()` / `prepareScrollToModelOnNextOpen()` 在下次打开前注册意图
+- `MutationObserver` + 多次延迟重试用于等待 DOM 稳定
+
+这是最近文档里最容易漏掉的行为之一，因为它已经不只是简单的“记住 scrollTop”。
+
+### 实时状态与节流刷新
+
+- 服务器状态通过固定轮询刷新
+- 模型加载后的 UI 刷新走 `requestAnimationFrame`
+- 样式控件通过 `styleControlBindings` 统一同步，避免 theme preset 切换后控件显示滞后
 
 ## 关键方法
 
 | 方法 | 说明 |
 |------|------|
-| `display()` | 构建完整设置面板（清空 + 重建所有分区） |
-| `hide()` | 捕获滚动位置、清理 interval 和 rAF |
-| `onModelsLoaded()` | 模型加载后刷新下拉框（rAF 节流） |
-| `scrollToServerSection()` / `scrollToModelSection()` | 滚动到指定分区 |
-| `addServerSettings()` | 服务器配置 + 实时健康状态 |
-| `addModelSettings()` | provider/model 目录 + 配置编辑器入口 |
-| `addStyleSettings()` | chat appearance 全部精细调节 |
-
-## 数据流
-
-```
-plugin.settings → Setting UI 控件
-        ↓ onChange
-plugin.saveSettings() → StorageService 持久化
-        ↓
-可选: server restart / UI refresh / config sync
-```
+| `display()` | 重建完整设置面板 |
+| `hide()` | 记录滚动位置并清理轮询/恢复任务 |
+| `onModelsLoaded()` | 模型目录刷新后合并 UI 更新 |
+| `scrollToServerSection()` / `scrollToModelSection()` | 跳转到指定分区 |
+| `prepareRestoreScrollOnNextOpen()` | 记录下次打开时的滚动恢复目标 |
+| `addModelSettings()` | 渲染模型目录、provider/model toggle、图标缓存与编辑器入口 |
+| `addConversationSettings()` | 渲染标题、question 和回答回顾相关设置 |
+| `addStyleSettings()` | 渲染 theme preset、chat appearance、glass/liquid glass 控件 |
 
 ## 与其他模块的交互
 
-- **ModelConfigModal / ModelConfigJsonModal**: 模型配置编辑器入口
-- **OpencodeConfigModal**: 通用配置编辑器入口
-- **ProviderIconCacheModal**: 图标缓存管理入口
-- **ServerSettingHelpModal**: 各服务器设置的帮助按钮
-- **LiquidGlassSettingHelpModal**: 输入面板玻璃效果帮助
-- **ModelConfigService**: 模型目录加载
-- **PluginManagementService**: 插件环境快照
-- **OpencodeConfigManager**: 配置文件读写
-- **ProviderIconService**: 图标缓存状态
-
-## 配置项
-
-所有 `OpenCodianSettings` 接口字段（见 `core/types/settings.ts`）。
+- `ModelConfigService`: 读取 `local/server/baseEffective/effective` 目录
+- `OpencodeConfigManager`: 读写 `.opencode` 配置
+- `PluginManagementService`: 构建插件环境快照
+- `ProviderIconService` / `ProviderIconCacheModal`: provider icon 缓存与自定义图标管理
+- `ModelConfigModal` / `ModelConfigJsonModal` / `OpencodeConfigModal`: 配置编辑入口
+- `ServerSettingHelpModal` / `LiquidGlassSettingHelpModal`: 帮助说明入口
+- `main.ts`: 通过 `addSettingTab()` 注册，并调用 `onModelsLoaded()` / `refreshServerStatusDisplay()`
 
 ## 注意事项
 
-- `display()` 每次调用完全重建 DOM，语言切换时尤为明显
-- `styleControlBindings` 追踪样式控件的同步回调，用于主题预设切换后刷新控件值
-- Electron dialog 通过 `@electron/remote` 或 `electron.remote` 动态获取
-- `visibility: hidden` 用于滚动恢复前的闪烁预防
-
-## 补充说明
-
-- `addStyleSettings()` 内样式分组字段：layout（maxWidth, messageSpacing, borderRadius）、background（相关背景图片设置）、user（userBubbleColor, userTextColor, userFont, userCodeFont, userMessageMaxWidth）、assistant（assistantBubbleColor, assistantTextColor, assistantFont, assistantCodeFont, assistantMessageMaxWidth）、input（inputBackgroundColor, inputTextColor, inputFont, inputCodeFont, inputMaxHeight, inputPlaceholderColor, glass refraction 参数）、scrollbar（scrollbarWidth, scrollbarTrackColor, scrollbarThumbColor, scrollbarThumbHoverColor）、advanced（customCssDeclarations）
-- 滚动恢复机制：`SETTINGS_SCROLL_RESTORE_RETRY_DELAYS = [24, 80, 160, 320]` 定义重试延迟，`SETTINGS_SCROLL_RESTORE_OBSERVER_WINDOW_MS = 1200` 为观察窗口，`SETTINGS_SCROLL_RESTORE_MIN_STABLE_MS = 180` 为最小稳定时间，使用 `MutationObserver` 监听 DOM 变化后逐帧检查 scrollTop 是否到达目标位置
-- `renderBackgroundStyleGroup()` 处理背景图片上传/预览/移除（通过 Electron `showOpenDialog`）、blur/depth/edge blending 参数调节；`renderInputStyleGroup()` 处理 glass refraction variant 选择、SVG filter preset、折射参数（blur/offset/scale/opacity）的数值控件
+- `display()` 每次都会重建 DOM，因此不要长期持有 section 内部元素引用。
+- 样式分组和默认值最终都以 `core/types/settings.ts` 的归一化逻辑为准。
+- 这个文件同时处理“运行时 UI 状态”和“持久化设置”，两者不要混淆。
+- 任何新增设置如果涉及 i18n、默认值、迁移或视图刷新，通常都不只改这一处。

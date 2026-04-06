@@ -12,7 +12,7 @@
 - 模型、权限、effort、context usage 等工具栏控件
 - 文件/选区上下文附件、选区高亮保留
 - question / todo / background task / OMO notice 等辅助交互
-- 外观主题、输入面板玻璃效果和实验性 diamond demo
+- 外观主题、输入面板玻璃效果，以及 CPU/WebGL diamond demo 与 glass octahedron 实验演示
 
 ## 公开入口
 
@@ -31,7 +31,9 @@
 | `applyChatScrollMode()` | 把当前滚动模式应用到消息容器 |
 | `applyLocaleTexts()` | 刷新工具提示、placeholder、dock 和 tab 文案 |
 | `refreshQuestionUi()` | 重绘 question dock，并在需要时重绘当前对话 |
-| `toggleLiquidDiamondDemo()` | 切换实验性 floating diamond demo |
+| `toggleLiquidDiamondDemo()` | 切换 CPU 版 floating diamond demo |
+| `toggleLiquidDiamondWebGlDemo()` | 切换 WebGL2 版 floating diamond demo |
+| `toggleGlassOctahedron()` | 切换实验性的 glass octahedron overlay |
 | `addCurrentNoteContextFromActiveEditor()` | 把当前笔记作为 context item 加入活动 tab |
 | `addSelectionContextFromActiveEditor()` | 把当前选区作为 context item 加入活动 tab |
 | `reloadModelCatalog()` | 重新加载模型目录并刷新模型选择器 |
@@ -83,7 +85,7 @@ interface TabRuntimeState {
 - 服务器状态轮询和 badge 状态
 - context file catalog 缓存
 - retained selection highlight 状态
-- theme background / liquid glass / diamond demo 相关 DOM 引用
+- theme background / liquid glass / diamond demo / glass octahedron 相关 DOM 引用
 
 ## 主链路
 
@@ -228,7 +230,7 @@ assistant 渲染里：
 - toolbar：permission selector、model selector、context ring、effort selector
 - appearance：theme preset、chat appearance CSS variables、自定义 CSS、背景图
 - input panel glass：SVG filter layer、adapter mount/unmount、诊断日志
-- experimental demo：`LiquidDiamondDemoController`
+- experimental demo：`LiquidDiamondDemoController`（CPU / WebGL）与 `GlassOctahedronDemoController`
 
 模型选择器本身支持：
 
@@ -237,6 +239,7 @@ assistant 渲染里：
 - 键盘导航
 - provider icon 异步加载
 - 每个 tab 的 model override
+- 保留 disabled / unavailable 模型的展示元数据，不把它们简单抹掉
 
 ## 直接协作模块
 

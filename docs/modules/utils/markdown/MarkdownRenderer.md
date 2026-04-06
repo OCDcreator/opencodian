@@ -27,16 +27,19 @@ async function renderMarkdown(el, markdown, options): Promise<RenderResult>
 ### 渲染管道（3 阶段）
 
 **阶段 1: 预处理**（`render()` 方法内）
-1. `el.empty()` — 清空目标容器
-2. `replaceImageEmbedsWithHtml(markdown, options)` — 将 `![[image.png]]` 转换为 HTML `<img>` 标签
+1. `replaceImageEmbedsWithHtml(markdown, options)` — 将 `![[image.png]]` 转换为 HTML `<img>` 标签
+2. 创建离屏 `nextEl`
 
 **阶段 2: Obsidian 渲染**
-3. `ObsidianMarkdownRenderer.renderMarkdown(processedMarkdown, el, '', component)` — 委托给 Obsidian 原生渲染
+3. `ObsidianMarkdownRenderer.renderMarkdown(processedMarkdown, nextEl, '', component)` — 先渲染到离屏容器
 
 **阶段 3: 后处理**
-4. `enhanceTableLinks(el)` — 截断表格中超长 URL（>80 字符）
-5. `enhanceCodeBlocks(el)` — 包装 `<pre>` 块，添加语言标签和复制按钮
-6. `processFileLinks(app, el)` — 处理 Obsidian 未处理的 `[[wiki-links]]`
+4. `enhanceTableLinks(nextEl)` — 截断表格中超长 URL（>80 字符）
+5. `enhanceCodeBlocks(nextEl)` — 包装 `<pre>` 块，添加语言标签和复制按钮
+6. `processFileLinks(app, nextEl)` — 处理 Obsidian 未处理的 `[[wiki-links]]`
+7. `el.replaceChildren(...)` — 一次性替换目标容器内容
+
+这个“先离屏渲染，再整块替换”的改动很重要。它减少了 streaming 或频繁重渲染时的闪烁和半成品 DOM 暴露。
 
 ### 代码块增强
 
@@ -71,11 +74,12 @@ async function renderMarkdown(el, markdown, options): Promise<RenderResult>
   → new MarkdownRenderService(options)
     → registerFileLinkHandler()  // 注册一次点击委托
   → service.render(el, markdown)
-    → replaceImageEmbedsWithHtml(markdown)  // ![[img]] → <img>
-    → ObsidianMarkdownRenderer.renderMarkdown()
-    → enhanceTableLinks(el)                  // 截断长 URL
-    → enhanceCodeBlocks(el)                  // 包装 + 标签 + 复制
-    → processFileLinks(app, el)              // 处理 wikilinks
+    → replaceImageEmbedsWithHtml(markdown)   // ![[img]] → <img>
+    → render 到 nextEl
+    → enhanceTableLinks(nextEl)              // 截断长 URL
+    → enhanceCodeBlocks(nextEl)              // 包装 + 标签 + 复制
+    → processFileLinks(app, nextEl)          // 处理 wikilinks
+    → el.replaceChildren(...)
   → { success: true } | { success: false, error }
 ```
 
@@ -110,7 +114,7 @@ async function renderMarkdown(el, markdown, options): Promise<RenderResult>
 
 - 每次调用 `renderMarkdown()` 便捷函数会创建新的 Service 实例，不适合高频调用
 - 流式渲染场景应复用 `MarkdownRenderService` 实例
-- `render()` 会 `el.empty()` 清空目标元素
+- `render()` 不再先 `el.empty()`，而是离屏渲染成功后再替换内容
 - Obsidian 渲染后可能产生 `.copy-code-button`，被增强逻辑移除
-
+- 失败时也会通过 `replaceChildren()` 原子替换成错误节点，避免容器残留旧内容或半渲染结果
 

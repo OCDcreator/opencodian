@@ -13,7 +13,7 @@
 - 归一化 session、message、todo、question、diff、permission 等返回值
 - 把 OpenCode 持久化消息转换成 UI 可直接消费的 `ChatMessage`
 
-当前实现是“混合外观层”：SDK v2 已覆盖大部分 CRUD、非流式 prompt、流式主链路、abort 与 sync 事件；legacy HTTP/SSE 仍完整保留作为回滚路径。
+当前实现是“混合外观层”：SDK v2 已覆盖大部分 CRUD、非流式 prompt、流式主链路、abort、questions 与 sync 事件；legacy HTTP/SSE 仍完整保留作为回滚路径。
 
 ## 导入关系
 
@@ -293,7 +293,7 @@ graph TD
 
 | 项目 | 来源 | 当前行为 |
 |------|------|---------|
-| `sdkFeatureFlags` | 运行时注入 | 不传时全部关闭；`main.ts` 当前启用 `sdkCrud` / `sdkPrompt` / `sdkStream` / `sdkAbort` / `sdkSync`，保留 `sdkQuestions` 为关闭 |
+| `sdkFeatureFlags` | 运行时注入 | 不传时全部关闭；`main.ts` 当前 6 个 SDK rollout 开关全部开启 |
 | `server.*` | `OpenCodianSettings` | 决定 `baseUrl`、认证方式和 `ServerManager` 行为 |
 | `defaultProvider` / `defaultModel` | `OpenCodianSettings` | 调用方未显式传 `provider` / `model` 时作为默认模型 |
 | `allowedTools` | `QueryOptions` | 只在 SDK prompt 路径里映射为 `tools` 记录 |

@@ -10,7 +10,7 @@
 实现方式是：
 
 - 用 `shudingDiamond` 提供的几何和折射计算函数生成 diamond 上下文
-- 用 `canvas` 生成位移贴图
+- 用 `canvas` 或可选的 WebGL2 renderer 生成位移贴图
 - 用 SVG `feDisplacementMap` 和 CSS `backdrop-filter` 组合出“液态折射”效果
 - 用 DOM 指针事件实现拖拽、惯性和边界回弹
 
@@ -20,7 +20,7 @@
 export const LIQUID_DIAMOND_DEMO_STAGE_SIZE = 220;
 
 export class LiquidDiamondDemoController {
-  constructor(parentEl: HTMLElement)
+  constructor(parentEl: HTMLElement, backend?: 'cpu' | 'webgl')
   isVisible(): boolean
   show(): void
   hide(): void
@@ -33,12 +33,13 @@ export class LiquidDiamondDemoController {
 
 ### 场景创建
 
-`show()` 首次调用时会通过内部 `createState(parentEl)` 生成完整场景：
+`show()` 首次调用时会通过内部 `createState(parentEl, backend)` 生成完整场景：
 
 - overlay / interaction layer / host DOM
 - SVG `filter`、`feImage`、`feDisplacementMap`
 - `canvas` 和 2D 上下文
 - `bloom`、`rim`、`crystal`、`face overlay` 等视觉层
+- 按 backend 选择 2D canvas 或 `createLiquidDiamondDemoWebGlRenderer()`
 
 ### 渲染分级
 
@@ -67,7 +68,7 @@ export class LiquidDiamondDemoController {
 
 ## 模块关系
 
-- 上游依赖：`../../utils/glass/adapters/shudingDiamond`
+- 上游依赖：`../../utils/glass/adapters/shudingDiamond`、`./liquidDiamondDemoWebgl`
 - 下游消费者：`OpenCodianView`
 
 ## 注意事项

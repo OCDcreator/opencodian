@@ -43,7 +43,7 @@
 | 常量 | 值 |
 |------|----|
 | `SDK_FEATURE_FLAG_DISABLED_DEFAULTS` | 6 个标志全部 `false` |
-| `SDK_FEATURE_FLAG_ROLLOUT_DEFAULTS` | `sdkCrud` / `sdkPrompt` / `sdkStream` / `sdkAbort` / `sdkSync` 为 `true`，`sdkQuestions` 仍为 `false` |
+| `SDK_FEATURE_FLAG_ROLLOUT_DEFAULTS` | 6 个标志全部 `true` |
 
 ## 核心逻辑
 
@@ -101,6 +101,6 @@ graph TD
 
 ## 注意事项
 
-- `sdkQuestions` 当前仍默认关闭，这意味着 questions 相关接口默认继续走 legacy HTTP。
+- 现在 `sdkQuestions` 已经跟随其他 rollout 开关一起默认开启，questions 相关接口的主路径已经切到 SDK。
 - 这个文件只定义布尔开关，不维护“迁移完成度”或“最终计划”之类的元数据。
-- 只要某个 flag 仍可能关闭，对应 legacy 路径就仍然是必需实现，而不是死代码。
+- 即便 rollout 默认值已全开，legacy 路径依然是代码中的有效回滚路径。
