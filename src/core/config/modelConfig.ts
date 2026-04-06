@@ -32,6 +32,24 @@ export interface ModelCatalog {
   defaults: Record<string, string>;
 }
 
+export interface ModelReference {
+  provider: string;
+  model: string;
+  ref: string;
+}
+
+export type ResolvedModelSelectionStatus = 'available' | 'unconfigured' | 'unavailable';
+
+export interface ResolvedModelSelection {
+  status: ResolvedModelSelectionStatus;
+  provider: string;
+  model: string;
+  ref: string;
+  providerName?: string;
+  modelName?: string;
+  contextWindow?: number;
+}
+
 const MODEL_KEYS: Array<keyof OpencodeModelConfigSubset> = [
   'model',
   'small_model',
@@ -176,16 +194,12 @@ export function cleanupModelConfig(subset: OpencodeModelConfigSubset): OpencodeM
 
   if (Array.isArray(subset.enabled_providers)) {
     const values = uniqueStrings(subset.enabled_providers);
-    if (values.length > 0) {
-      next.enabled_providers = values;
-    }
+    next.enabled_providers = values;
   }
 
   if (Array.isArray(subset.disabled_providers)) {
     const values = uniqueStrings(subset.disabled_providers);
-    if (values.length > 0) {
-      next.disabled_providers = values;
-    }
+    next.disabled_providers = values;
   }
 
   return next;
@@ -318,9 +332,238 @@ export function parseModelReference(value: string | undefined): { provider: stri
     return null;
   }
 
+  const provider = value.slice(0, slash).trim();
+  const model = value.slice(slash + 1).trim();
+  if (!provider || !model) {
+    return null;
+  }
+
+  return { provider, model };
+}
+
+export function formatModelReference(
+  provider: string | null | undefined,
+  model: string | null | undefined,
+): string {
+  const trimmedProvider = provider?.trim() ?? '';
+  const trimmedModel = model?.trim() ?? '';
+  return trimmedProvider && trimmedModel ? `${trimmedProvider}/${trimmedModel}` : '';
+}
+
+export function collectConfiguredProviderIds(
+  subset: Pick<OpencodeModelConfigSubset, 'model' | 'small_model' | 'provider' | 'enabled_providers' | 'disabled_providers'>,
+): string[] {
+  const providerIds = new Set<string>();
+
+  if (isRecord(subset.provider)) {
+    for (const providerId of Object.keys(subset.provider)) {
+      const trimmed = providerId.trim();
+      if (trimmed) {
+        providerIds.add(trimmed);
+      }
+    }
+  }
+
+  for (const modelRef of [parseModelReference(subset.model), parseModelReference(subset.small_model)]) {
+    if (modelRef) {
+      providerIds.add(modelRef.provider);
+    }
+  }
+
+  for (const providerId of uniqueStrings(subset.enabled_providers ?? [])) {
+    providerIds.add(providerId);
+  }
+
+  for (const providerId of uniqueStrings(subset.disabled_providers ?? [])) {
+    providerIds.add(providerId);
+  }
+
+  return [...providerIds];
+}
+
+export function isProviderEnabled(
+  subset: Pick<OpencodeModelConfigSubset, 'enabled_providers' | 'disabled_providers'>,
+  providerId: string,
+): boolean {
+  const trimmedProviderId = providerId.trim();
+  if (!trimmedProviderId) {
+    return false;
+  }
+
+  const enabledProviders = Array.isArray(subset.enabled_providers)
+    ? new Set(uniqueStrings(subset.enabled_providers))
+    : null;
+  const disabledProviders = new Set(uniqueStrings(subset.disabled_providers ?? []));
+
+  if (enabledProviders && !enabledProviders.has(trimmedProviderId)) {
+    return false;
+  }
+
+  return !disabledProviders.has(trimmedProviderId);
+}
+
+export function getEnabledProviderIds(
+  subset: Pick<OpencodeModelConfigSubset, 'enabled_providers' | 'disabled_providers'>,
+  providerIds: Iterable<string>,
+): string[] {
+  return Array.from(providerIds)
+    .map((providerId) => providerId.trim())
+    .filter((providerId) => providerId.length > 0)
+    .filter((providerId) => isProviderEnabled(subset, providerId));
+}
+
+export function setProviderEnabled(
+  subset: OpencodeModelConfigSubset,
+  providerId: string,
+  enabled: boolean,
+  knownProviderIds: Iterable<string>,
+): OpencodeModelConfigSubset {
+  const trimmedProviderId = providerId.trim();
+  if (!trimmedProviderId) {
+    return cleanupModelConfig(subset);
+  }
+
+  const next: OpencodeModelConfigSubset = {
+    ...subset,
+  };
+  const nextDisabledProviders = new Set(uniqueStrings(subset.disabled_providers ?? []));
+  const useWhitelistMode = Array.isArray(subset.enabled_providers);
+
+  if (useWhitelistMode) {
+    const orderedKnownProviders = uniqueStrings([
+      ...Array.from(knownProviderIds),
+      ...uniqueStrings(subset.enabled_providers ?? []),
+      trimmedProviderId,
+    ]);
+    const nextEnabledProviders = new Set(uniqueStrings(subset.enabled_providers ?? []));
+
+    if (enabled) {
+      nextEnabledProviders.add(trimmedProviderId);
+      nextDisabledProviders.delete(trimmedProviderId);
+    } else {
+      nextEnabledProviders.delete(trimmedProviderId);
+    }
+
+    next.enabled_providers = orderedKnownProviders.filter((knownProviderId) => nextEnabledProviders.has(knownProviderId));
+    next.disabled_providers = Array.from(nextDisabledProviders);
+    return cleanupModelConfig(next);
+  }
+
+  if (enabled) {
+    nextDisabledProviders.delete(trimmedProviderId);
+  } else {
+    nextDisabledProviders.add(trimmedProviderId);
+  }
+
+  next.disabled_providers = Array.from(nextDisabledProviders);
+  return cleanupModelConfig(next);
+}
+
+export function filterCatalog(
+  catalog: ModelCatalog,
+  options: {
+    providerConfig?: Pick<OpencodeModelConfigSubset, 'enabled_providers' | 'disabled_providers'>;
+    disabledModelRefs?: string[];
+  } = {},
+): ModelCatalog {
+  const disabledModelRefs = new Set(
+    (options.disabledModelRefs ?? [])
+      .map((ref) => {
+        const parsed = parseModelReference(ref);
+        return parsed ? formatModelReference(parsed.provider, parsed.model) : '';
+      })
+      .filter((ref) => ref.length > 0),
+  );
+  const filteredProviders = catalog.providers.flatMap((provider) => {
+    if (options.providerConfig && !isProviderEnabled(options.providerConfig, provider.id)) {
+      return [];
+    }
+
+    const filteredModels = provider.models
+      .filter((model) => !disabledModelRefs.has(formatModelReference(provider.id, model.id)))
+      .map((model) => ({ ...model }));
+    if (filteredModels.length === 0) {
+      return [];
+    }
+
+    return [{
+      ...provider,
+      models: filteredModels,
+    }];
+  });
+
+  const filteredDefaults = Object.fromEntries(
+    Object.entries(catalog.defaults).filter(([providerId, modelId]) => (
+      filteredProviders.some((provider) => provider.id === providerId && provider.models.some((model) => model.id === modelId))
+    )),
+  );
+
   return {
-    provider: value.slice(0, slash).trim(),
-    model: value.slice(slash + 1).trim(),
+    providers: filteredProviders,
+    defaults: filteredDefaults,
+  };
+}
+
+export function resolveModelSelection(
+  baseCatalog: ModelCatalog | null | undefined,
+  effectiveCatalog: ModelCatalog | null | undefined,
+  provider: string | null | undefined,
+  model: string | null | undefined,
+): ResolvedModelSelection {
+  const ref = formatModelReference(provider, model);
+  if (!ref) {
+    return {
+      status: 'unconfigured',
+      provider: '',
+      model: '',
+      ref: '',
+    };
+  }
+
+  const parsedRef = parseModelReference(ref);
+  if (!parsedRef) {
+    return {
+      status: 'unconfigured',
+      provider: '',
+      model: '',
+      ref: '',
+    };
+  }
+
+  const effectiveEntry = findCatalogModel(effectiveCatalog, parsedRef.provider, parsedRef.model);
+  if (effectiveEntry) {
+    return {
+      status: 'available',
+      provider: parsedRef.provider,
+      model: parsedRef.model,
+      ref,
+      providerName: effectiveEntry.provider.name,
+      modelName: effectiveEntry.model.name,
+      contextWindow: effectiveEntry.model.contextWindow,
+    };
+  }
+
+  const baseEntry = findCatalogModel(baseCatalog, parsedRef.provider, parsedRef.model);
+  if (baseEntry) {
+    return {
+      status: 'unavailable',
+      provider: parsedRef.provider,
+      model: parsedRef.model,
+      ref,
+      providerName: baseEntry.provider.name,
+      modelName: baseEntry.model.name,
+      contextWindow: baseEntry.model.contextWindow,
+    };
+  }
+
+  const baseProvider = findCatalogProvider(baseCatalog, parsedRef.provider);
+  return {
+    status: 'unavailable',
+    provider: parsedRef.provider,
+    model: parsedRef.model,
+    ref,
+    providerName: baseProvider?.name ?? parsedRef.provider,
+    modelName: parsedRef.model,
   };
 }
 
@@ -329,7 +572,32 @@ function uniqueStrings(values: string[]): string[] {
     new Set(
       values
         .map((value) => value.trim())
-        .filter((value) => value.length > 0),
+      .filter((value) => value.length > 0),
     ),
   );
+}
+
+function findCatalogProvider(
+  catalog: ModelCatalog | null | undefined,
+  providerId: string,
+): ModelCatalogProvider | null {
+  return catalog?.providers.find((provider) => provider.id === providerId) ?? null;
+}
+
+function findCatalogModel(
+  catalog: ModelCatalog | null | undefined,
+  providerId: string,
+  modelId: string,
+): { provider: ModelCatalogProvider; model: ModelCatalogModel } | null {
+  const provider = findCatalogProvider(catalog, providerId);
+  if (!provider) {
+    return null;
+  }
+
+  const model = provider.models.find((entry) => entry.id === modelId);
+  if (!model) {
+    return null;
+  }
+
+  return { provider, model };
 }

@@ -1,5 +1,5 @@
 import { adapter } from '../../../../src/utils/glass/adapters/nikdelvin';
-import type { GlassMountContext, GlassAdapterSettingsValue } from '../../../../src/utils/glass/types';
+import type { GlassAdapterSettingsValue,GlassMountContext } from '../../../../src/utils/glass/types';
 
 function createMountContext(resolveAssetUrl?: (relativePath: string) => string | null): GlassMountContext {
   const shellEl = document.body.createDiv({ cls: 'opencodian-composer-shell' });

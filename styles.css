@@ -199,6 +199,9 @@
   --opencodian-user-tail-radius: 4px;
   --opencodian-user-blur: 12px;
   --opencodian-user-shadow-blur: 28px;
+  --opencodian-user-time-font-size: 11px;
+  --opencodian-user-time-font-weight: 400;
+  --opencodian-user-time-color: var(--text-muted);
   --opencodian-assistant-radius: 14px;
   --opencodian-assistant-pad-y: 0px;
   --opencodian-assistant-pad-x: 28px;
@@ -2264,8 +2267,9 @@
 }
 
 .opencodian-user-message-time {
-  font-size: 11px;
-  color: var(--text-muted);
+  font-size: var(--opencodian-user-time-font-size);
+  font-weight: var(--opencodian-user-time-font-weight);
+  color: var(--opencodian-user-time-color);
 }
 
 .opencodian-user-message-actions {
@@ -3572,6 +3576,10 @@
 
 .opencodian-model-trigger.is-open {
   background: color-mix(in srgb, var(--opencodian-composer-embedded-fill) 24%, transparent);
+}
+
+.opencodian-model-trigger.is-unavailable {
+  color: var(--text-warning);
 }
 
 .opencodian-model-trigger-content {
@@ -7537,6 +7545,119 @@
 
 .opencodian-model-catalog {
   margin: 12px 0 18px;
+}
+
+.opencodian-model-toggle-management {
+  margin: 12px 0 18px;
+}
+
+.opencodian-model-toggle-block {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 14px;
+  background: var(--background-secondary);
+  padding: 14px 16px 16px;
+}
+
+.opencodian-model-toggle-block > .opencodian-settings-subsection-heading {
+  margin: 0 0 6px;
+}
+
+.opencodian-model-toggle-desc {
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+
+.opencodian-model-toggle-empty {
+  margin-top: 14px;
+  font-size: 12px;
+  color: var(--text-faint);
+}
+
+.opencodian-model-toggle-provider {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--background-modifier-border-hover);
+}
+
+.opencodian-model-toggle-provider:first-of-type {
+  margin-top: 16px;
+}
+
+.opencodian-model-toggle-provider:first-of-type,
+.opencodian-model-toggle-provider.is-provider-disabled:first-of-type {
+  border-top: none;
+  padding-top: 0;
+}
+
+.opencodian-model-toggle-provider-header,
+.opencodian-model-toggle-model {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.opencodian-model-toggle-provider-info,
+.opencodian-model-toggle-model-info {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.opencodian-model-toggle-provider-name,
+.opencodian-model-toggle-model-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.opencodian-model-toggle-provider-meta,
+.opencodian-model-toggle-model-meta {
+  margin-top: 3px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-muted);
+  word-break: break-word;
+}
+
+.opencodian-model-toggle-models {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.opencodian-model-toggle-model {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border-hover);
+}
+
+.opencodian-model-toggle-provider.is-provider-disabled .opencodian-model-toggle-provider-name,
+.opencodian-model-toggle-provider.is-provider-disabled .opencodian-model-toggle-provider-meta,
+.opencodian-model-toggle-model.is-provider-disabled .opencodian-model-toggle-model-name,
+.opencodian-model-toggle-model.is-provider-disabled .opencodian-model-toggle-model-meta,
+.opencodian-model-toggle-model.is-model-disabled .opencodian-model-toggle-model-name,
+.opencodian-model-toggle-model.is-model-disabled .opencodian-model-toggle-model-meta {
+  opacity: 0.68;
+}
+
+.opencodian-model-toggle-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.opencodian-model-toggle-switch input[type="checkbox"] {
+  margin: 0;
+}
+
+.opencodian-model-toggle-switch-label {
+  white-space: nowrap;
 }
 
 .opencodian-plugin-block {

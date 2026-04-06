@@ -9,6 +9,9 @@ describe('TitleGenerationService', () => {
       requestAssistantResponse: jest.fn(),
       deleteSession: jest.fn().mockResolvedValue(undefined),
     };
+    const modelConfigService = {
+      getCatalogs: jest.fn(),
+    };
     const plugin = {
       settings: {
         ...DEFAULT_SETTINGS,
@@ -16,11 +19,12 @@ describe('TitleGenerationService', () => {
         aiTitleModel: '',
       },
       openCodeService,
+      modelConfigService,
     };
     const service = new TitleGenerationService(plugin as unknown as OpenCodianPlugin);
     const callback = jest.fn().mockResolvedValue(undefined);
 
-    return { service, callback, openCodeService };
+    return { service, callback, openCodeService, modelConfigService, plugin };
   };
 
   it('prefers structured title output and still normalizes punctuation and length', async () => {
@@ -100,5 +104,58 @@ describe('TitleGenerationService', () => {
       error: 'Failed to parse title from response',
     });
     expect(openCodeService.deleteSession).toHaveBeenCalledWith('temp-session');
+  });
+
+  it('falls back to the current conversation model when the explicit title model is disabled or unavailable', async () => {
+    const { service, callback, openCodeService, modelConfigService, plugin } = createHarness();
+    plugin.settings.aiTitleModel = 'openai/gpt-4.1';
+    modelConfigService.getCatalogs.mockResolvedValue({
+      local: { providers: [], defaults: {} },
+      server: { providers: [], defaults: {} },
+      baseEffective: {
+        providers: [
+          {
+            id: 'openai',
+            name: 'OpenAI',
+            source: 'server',
+            existsInLocal: false,
+            existsInServer: true,
+            models: [
+              {
+                id: 'gpt-4.1',
+                name: 'GPT-4.1',
+                source: 'server',
+                existsInLocal: false,
+                existsInServer: true,
+              },
+            ],
+          },
+        ],
+        defaults: {},
+      },
+      effective: {
+        providers: [],
+        defaults: {},
+      },
+    });
+    openCodeService.requestAssistantResponse.mockResolvedValue({
+      content: 'Title: Use the current conversation model',
+      structured: null,
+    });
+
+    await service.generateTitle(
+      'conversation-4',
+      'Help me improve fallback handling',
+      { provider: 'anthropic', model: 'claude-3-5-sonnet' },
+      callback,
+    );
+
+    expect(openCodeService.requestAssistantResponse).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        provider: 'anthropic',
+        model: 'claude-3-5-sonnet',
+      }),
+    );
   });
 });

@@ -192,6 +192,33 @@ describe('ServerManager', () => {
       expect(env.OPENCODE_CONFIG_DIR).toBe(path.join(testVaultPath, '.opencode'));
       expect(env.OPENCODE_CONFIG_CONTENT).toBe(JSON.stringify({ enabled_providers: [] }));
     });
+
+    it('should respect enabled_providers and disabled_providers when building local-only config content', () => {
+      manager = new ServerManager({
+        ...defaultConfig,
+        modelSourceMode: 'local',
+      });
+      fs.mkdirSync(path.join(testVaultPath, '.opencode'), { recursive: true });
+      fs.writeFileSync(
+        path.join(testVaultPath, '.opencode', 'opencode.json'),
+        JSON.stringify({
+          $schema: 'https://opencode.ai/config.json',
+          provider: {
+            openai: { name: 'OpenAI', models: {} },
+            anthropic: { name: 'Anthropic', models: {} },
+            ollama: { name: 'Ollama', models: {} },
+          },
+          enabled_providers: ['openai', 'anthropic'],
+          disabled_providers: ['anthropic'],
+        }),
+        'utf-8',
+      );
+
+      manager.setWorkingDirectory(testVaultPath);
+      const env = (manager as any).getSpawnEnv() as NodeJS.ProcessEnv;
+
+      expect(env.OPENCODE_CONFIG_CONTENT).toBe(JSON.stringify({ enabled_providers: ['openai'] }));
+    });
   });
 
   describe('plugin isolation mode', () => {

@@ -12,7 +12,11 @@ import { Notice, requestUrl } from 'obsidian';
 import * as path from 'path';
 
 import { createLogger } from '../../shared';
-import { parseOpencodeConfigText } from '../config/modelConfig';
+import {
+  collectConfiguredProviderIds,
+  getEnabledProviderIds,
+  parseOpencodeConfigText,
+} from '../config/modelConfig';
 import type { ManagedServerState, OpenCodeServerConfig } from './types';
 
 const logger = createLogger('ServerManager');
@@ -662,13 +666,7 @@ export class ServerManager {
 
       try {
         const config = parseOpencodeConfigText(fs.readFileSync(filepath, 'utf-8'));
-        if (config.provider && typeof config.provider === 'object') {
-          return Object.keys(config.provider);
-        }
-
-        if (typeof config.model === 'string' && config.model.includes('/')) {
-          return [config.model.slice(0, config.model.indexOf('/'))];
-        }
+        return getEnabledProviderIds(config, collectConfiguredProviderIds(config));
       } catch (error) {
         logger.error('Failed to parse local model config for source mode:', error);
       }

@@ -1,4 +1,4 @@
-import { adapter, __testing } from '../../../../src/utils/glass/adapters/shudingDiamond';
+import { __testing,adapter } from '../../../../src/utils/glass/adapters/shudingDiamond';
 import { registerBuiltinGlassAdapters } from '../../../../src/utils/glass/builtin-adapters';
 import { getGlassAdapter } from '../../../../src/utils/glass/registry';
 import type { GlassAdapterSettingsValue, GlassMountContext } from '../../../../src/utils/glass/types';

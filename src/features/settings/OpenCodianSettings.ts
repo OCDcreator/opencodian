@@ -9,8 +9,15 @@ import { App, normalizePath, Notice, PluginSettingTab, Setting } from 'obsidian'
 import * as os from 'os';
 import * as path from 'path';
 
-import { OpencodeConfigManager, PluginManagementService } from '../../core/config';
-import type { ModelCatalog, ModelCatalogProvider } from '../../core/config/modelConfig';
+import { type ModelCatalogBundle,OpencodeConfigManager, PluginManagementService } from '../../core/config';
+import {
+  formatModelReference,
+  isProviderEnabled,
+  type ModelCatalog,
+  type ModelCatalogProvider,
+  parseModelReference,
+  setProviderEnabled,
+} from '../../core/config/modelConfig';
 import type { PluginEntry, PluginEnvironmentSnapshot } from '../../core/config/PluginManagementService';
 import { getBuiltinThemePresets, hasThemeAppearanceOverrides } from '../../core/theme';
 import {
@@ -27,6 +34,7 @@ import {
   isValidChatAppearanceCustomCssDeclarations,
   type LiquidGlassAdapterId,
   type ModelSourceMode,
+  type OpencodeModelConfigSubset,
   type PluginIsolationMode,
   type QuestionCardPosition,
   type QuestionDisplayMode,
@@ -34,12 +42,12 @@ import {
   type ThemeStyleId,
   type TitleMode,
 } from '../../core/types';
-import { getChatAppearanceBackgroundSizeValue } from '../chat/chatAppearance';
 import { setLocale, t, type TranslationKey } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { createLogger, getVaultBasePath } from '../../shared';
 import { getAllGlassAdapters } from '../../utils/glass';
 import { ProviderIconService } from '../../utils/icons';
+import { getChatAppearanceBackgroundSizeValue } from '../chat/chatAppearance';
 import { LiquidGlassSettingHelpModal } from './LiquidGlassSettingHelpModal';
 import { ModelConfigJsonModal } from './ModelConfigJsonModal';
 import { ModelConfigModal } from './ModelConfigModal';
@@ -151,6 +159,7 @@ function getElectronDialog(): ElectronDialogModule | null {
 export class OpenCodianSettingTab extends PluginSettingTab {
   plugin: OpenCodianPlugin;
   private refreshModelsCallback?: () => void;
+  private refreshTitleModelsCallback?: () => void;
   private refreshServerStatusCallback?: () => Promise<void>;
   private serverStatusIntervalId: number | null = null;
   private modelRefreshFrameId: number | null = null;
@@ -189,6 +198,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     this.modelRefreshFrameId = window.requestAnimationFrame(() => {
       this.modelRefreshFrameId = null;
       this.refreshModelsCallback?.();
+      this.refreshTitleModelsCallback?.();
     });
   }
 
@@ -783,46 +793,281 @@ export class OpenCodianSettingTab extends PluginSettingTab {
 
     let providerDropdown: import('obsidian').DropdownComponent;
     let modelDropdown: import('obsidian').DropdownComponent;
-    let catalogs: { local: ModelCatalog; server: ModelCatalog; effective: ModelCatalog } | null = null;
+    let catalogs: ModelCatalogBundle | null = null;
+    let localModelConfig: OpencodeModelConfigSubset | null = null;
     const sourceCatalogEl = containerEl.createDiv({ cls: 'opencodian-model-catalog' });
+    const availabilityManagementEl = containerEl.createDiv({ cls: 'opencodian-model-toggle-management' });
 
-    const loadAvailableModels = async (showNotice = false) => {
+    const syncSettingsWithCatalogs = (nextCatalogs: ModelCatalogBundle): boolean => {
+      const effectiveProviders = nextCatalogs.effective.providers;
+      const effectiveProvider = effectiveProviders.find(
+        (provider) => provider.id === this.plugin.settings.defaultProvider,
+      ) ?? null;
+      let dirty = false;
+
+      if (!effectiveProvider && this.plugin.settings.defaultProvider !== '') {
+        this.plugin.settings.defaultProvider = '';
+        dirty = true;
+      }
+
+      const effectiveModel = effectiveProvider?.models.find(
+        (model) => model.id === this.plugin.settings.defaultModel,
+      ) ?? null;
+      if (!effectiveProvider || !effectiveModel) {
+        if (this.plugin.settings.defaultModel !== '') {
+          this.plugin.settings.defaultModel = '';
+          dirty = true;
+        }
+      }
+
+      if (this.plugin.settings.aiTitleModel.trim()) {
+        const titleRef = parseModelReference(this.plugin.settings.aiTitleModel.trim());
+        const isTitleModelAvailable = Boolean(
+          titleRef
+          && effectiveProviders.some(
+            (provider) => provider.id === titleRef.provider
+              && provider.models.some((model) => model.id === titleRef.model),
+          ),
+        );
+        if (!isTitleModelAvailable) {
+          this.plugin.settings.aiTitleModel = '';
+          dirty = true;
+        }
+      }
+
+      return dirty;
+    };
+
+    const updateProviderDropdown = (): void => {
+      providerDropdown.selectEl.empty();
+      providerDropdown.addOption('', t('settings.model.unconfigured'));
+
+      for (const provider of catalogs?.effective.providers ?? []) {
+        providerDropdown.addOption(provider.id, provider.name || provider.id);
+      }
+
+      const selectedValue = catalogs?.effective.providers.some(
+        (provider) => provider.id === this.plugin.settings.defaultProvider,
+      )
+        ? this.plugin.settings.defaultProvider
+        : '';
+      providerDropdown.setValue(selectedValue);
+    };
+
+    const updateModelDropdown = (): void => {
+      if (!modelDropdown) {
+        return;
+      }
+
+      modelDropdown.selectEl.empty();
+      modelDropdown.addOption('', t('settings.model.unconfigured'));
+
+      const providerId = providerDropdown.getValue();
+      if (!providerId) {
+        modelDropdown.setValue('');
+        return;
+      }
+
+      const provider = catalogs?.effective.providers.find((item) => item.id === providerId);
+      if (!provider) {
+        modelDropdown.setValue('');
+        return;
+      }
+
+      for (const model of provider.models) {
+        modelDropdown.addOption(model.id, model.name || model.id);
+      }
+
+      const selectedValue = provider.models.some((model) => model.id === this.plugin.settings.defaultModel)
+        ? this.plugin.settings.defaultModel
+        : '';
+      modelDropdown.setValue(selectedValue);
+    };
+
+    const renderAvailabilityManagement = (): void => {
+      availabilityManagementEl.empty();
+
+      const blockEl = availabilityManagementEl.createDiv({ cls: 'opencodian-model-toggle-block' });
+      blockEl.createDiv({
+        cls: 'opencodian-settings-subsection-heading',
+        text: t('settings.model.toggle.title'),
+      });
+      const descEl = blockEl.createDiv({ cls: 'opencodian-model-toggle-desc' });
+      this.applyInlineCodeText(descEl, t('settings.model.toggle.desc'));
+
+      const providers = catalogs?.baseEffective.providers ?? [];
+      if (providers.length === 0) {
+        blockEl.createDiv({
+          cls: 'opencodian-model-toggle-empty',
+          text: t('settings.model.toggle.empty'),
+        });
+        return;
+      }
+
+      const disabledModelRefs = new Set(this.plugin.settings.disabledModelRefs);
+
+      for (const provider of providers) {
+        const providerEnabled = isProviderEnabled(localModelConfig ?? {}, provider.id);
+        const providerEl = blockEl.createDiv({
+          cls: `opencodian-model-toggle-provider${providerEnabled ? '' : ' is-provider-disabled'}`,
+        });
+
+        const providerHeaderEl = providerEl.createDiv({ cls: 'opencodian-model-toggle-provider-header' });
+        const providerInfoEl = providerHeaderEl.createDiv({ cls: 'opencodian-model-toggle-provider-info' });
+        providerInfoEl.createDiv({
+          cls: 'opencodian-model-toggle-provider-name',
+          text: provider.name || provider.id,
+        });
+        providerInfoEl.createDiv({
+          cls: 'opencodian-model-toggle-provider-meta',
+          text: t('settings.model.toggle.providerMeta', {
+            id: provider.id,
+            count: String(provider.models.length),
+          }),
+        });
+
+        const providerToggleLabel = providerHeaderEl.createEl('label', {
+          cls: 'opencodian-model-toggle-switch',
+        });
+        const providerToggle = providerToggleLabel.createEl('input', {
+          attr: { type: 'checkbox' },
+        });
+        providerToggle.checked = providerEnabled;
+        providerToggleLabel.createSpan({
+          cls: 'opencodian-model-toggle-switch-label',
+          text: providerEnabled
+            ? t('settings.model.toggle.providerEnabled')
+            : t('settings.model.toggle.providerDisabled'),
+        });
+        providerToggle.addEventListener('change', () => {
+          const requestedEnabled = providerToggle.checked;
+          providerToggle.disabled = true;
+          void (async () => {
+            try {
+              const currentConfig = await modelConfigService.readLocalModelConfig();
+              const knownProviderIds = catalogs?.baseEffective.providers.map((entry) => entry.id) ?? [provider.id];
+              const nextConfig = setProviderEnabled(
+                currentConfig,
+                provider.id,
+                requestedEnabled,
+                knownProviderIds,
+              );
+              await modelConfigService.writeLocalModelConfig(nextConfig);
+              await refreshModelSettings({ forceViewReload: true });
+              await refreshIconCacheOverview();
+            } catch (error) {
+              logger.error('Failed to update provider availability toggle:', error);
+              new Notice(t('settings.model.toggle.saveFailed'));
+              providerToggle.checked = !requestedEnabled;
+            } finally {
+              providerToggle.disabled = false;
+            }
+          })();
+        });
+
+        if (provider.models.length === 0) {
+          providerEl.createDiv({
+            cls: 'opencodian-model-toggle-empty',
+            text: t('settings.model.toggle.emptyModels'),
+          });
+          continue;
+        }
+
+        const modelsEl = providerEl.createDiv({ cls: 'opencodian-model-toggle-models' });
+        for (const model of provider.models) {
+          const modelRef = formatModelReference(provider.id, model.id);
+          const modelEnabled = !disabledModelRefs.has(modelRef);
+          const modelEl = modelsEl.createDiv({
+            cls: `opencodian-model-toggle-model${modelEnabled ? '' : ' is-model-disabled'}${providerEnabled ? '' : ' is-provider-disabled'}`,
+          });
+          const modelInfoEl = modelEl.createDiv({ cls: 'opencodian-model-toggle-model-info' });
+          modelInfoEl.createDiv({
+            cls: 'opencodian-model-toggle-model-name',
+            text: model.name || model.id,
+          });
+          modelInfoEl.createDiv({
+            cls: 'opencodian-model-toggle-model-meta',
+            text: model.id,
+          });
+
+          const modelToggleLabel = modelEl.createEl('label', {
+            cls: 'opencodian-model-toggle-switch',
+          });
+          const modelToggle = modelToggleLabel.createEl('input', {
+            attr: { type: 'checkbox' },
+          });
+          modelToggle.checked = modelEnabled;
+          modelToggleLabel.createSpan({
+            cls: 'opencodian-model-toggle-switch-label',
+            text: !providerEnabled
+              ? t('settings.model.toggle.providerDisabledPriority')
+              : modelEnabled
+                ? t('settings.model.toggle.modelEnabled')
+                : t('settings.model.toggle.modelDisabled'),
+          });
+          modelToggle.addEventListener('change', () => {
+            const requestedEnabled = modelToggle.checked;
+            const previousDisabledModelRefs = [...this.plugin.settings.disabledModelRefs];
+            modelToggle.disabled = true;
+            if (requestedEnabled) {
+              this.plugin.settings.disabledModelRefs = this.plugin.settings.disabledModelRefs.filter((ref) => ref !== modelRef);
+            } else if (!disabledModelRefs.has(modelRef)) {
+              this.plugin.settings.disabledModelRefs = [...this.plugin.settings.disabledModelRefs, modelRef]
+                .sort((left, right) => left.localeCompare(right));
+            }
+
+            void (async () => {
+              try {
+                await refreshModelSettings({ forceViewReload: true });
+                await refreshIconCacheOverview();
+              } catch (error) {
+                logger.error('Failed to update model availability toggle:', error);
+                this.plugin.settings.disabledModelRefs = previousDisabledModelRefs;
+                new Notice(t('settings.model.toggle.saveFailed'));
+                modelToggle.checked = !requestedEnabled;
+              } finally {
+                modelToggle.disabled = false;
+              }
+            })();
+          });
+        }
+      }
+    };
+
+    const refreshModelSettings = async (
+      options: { showNotice?: boolean; forceViewReload?: boolean } = {},
+    ): Promise<ModelCatalogBundle | null> => {
+      const {
+        showNotice = false,
+        forceViewReload = false,
+      } = options;
+
       try {
-        catalogs = await modelConfigService.getCatalogs(this.plugin.settings.modelSourceMode);
-        const availableProviders = catalogs.effective.providers;
-        let dirty = false;
+        localModelConfig = await modelConfigService.readLocalModelConfig();
+        catalogs = await modelConfigService.getCatalogs(
+          this.plugin.settings.modelSourceMode,
+          this.plugin.settings.disabledModelRefs,
+        );
+        const dirty = syncSettingsWithCatalogs(catalogs);
 
-        providerDropdown.selectEl.empty();
-        for (const provider of availableProviders) {
-          providerDropdown.addOption(provider.id, provider.name || provider.id);
-        }
-
+        updateProviderDropdown();
+        updateModelDropdown();
+        renderAvailabilityManagement();
         this.renderModelCatalogPanel(sourceCatalogEl, catalogs);
+        this.refreshTitleModelsCallback?.();
 
-        if (availableProviders.find((provider) => provider.id === this.plugin.settings.defaultProvider)) {
-          providerDropdown.setValue(this.plugin.settings.defaultProvider);
-        } else if (availableProviders.length > 0) {
-          providerDropdown.setValue(availableProviders[0].id);
-          if (this.plugin.settings.defaultProvider !== availableProviders[0].id) {
-            this.plugin.settings.defaultProvider = availableProviders[0].id;
-            dirty = true;
-          }
-        } else {
-          providerDropdown.addOption('', t('settings.model.noModels'));
-          providerDropdown.setValue('');
-          if (this.plugin.settings.defaultProvider !== '') {
-            this.plugin.settings.defaultProvider = '';
-            dirty = true;
-          }
-        }
-
-        await updateModelDropdown();
-        if (dirty) {
-          await this.plugin.saveSettings();
+        if (dirty || forceViewReload) {
+          await this.plugin.saveSettings({
+            syncConfig: false,
+            reloadModels: true,
+            applyUi: true,
+          });
         }
 
         if (showNotice) {
-          new Notice(t('settings.model.refresh.success', { count: availableProviders.length }));
+          new Notice(t('settings.model.refresh.success', {
+            count: String(catalogs.effective.providers.length),
+          }));
         }
 
         return catalogs;
@@ -836,41 +1081,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     };
     
     this.refreshModelsCallback = () => {
-      void loadAvailableModels(false);
-    };
-
-    const updateModelDropdown = async () => {
-      if (!modelDropdown) return;
-      const availableProviders = catalogs?.effective.providers ?? [];
-      const currentProviderId = providerDropdown.getValue();
-      const provider = availableProviders.find((item) => item.id === currentProviderId);
-
-      modelDropdown.selectEl.empty();
-
-      if (provider && provider.models.length > 0) {
-        for (const model of provider.models) {
-          modelDropdown.addOption(model.id, model.name || model.id);
-        }
-        const currentModel = this.plugin.settings.defaultModel;
-        if (provider.models.find((model) => model.id === currentModel)) {
-          modelDropdown.setValue(currentModel);
-        } else {
-          const firstModel = provider.models[0].id;
-          modelDropdown.setValue(firstModel);
-          this.plugin.settings.defaultModel = firstModel;
-          if (this.plugin.settings.defaultProvider !== currentProviderId) {
-            this.plugin.settings.defaultProvider = currentProviderId;
-          }
-          await this.plugin.saveSettings();
-        }
-      } else {
-        modelDropdown.addOption('', t('settings.model.noModels'));
-        modelDropdown.setValue('');
-        if (this.plugin.settings.defaultModel !== '') {
-          this.plugin.settings.defaultModel = '';
-          await this.plugin.saveSettings();
-        }
-      }
+      void refreshModelSettings();
     };
 
     const modelSourceSetting = new Setting(containerEl)
@@ -884,11 +1095,14 @@ export class OpenCodianSettingTab extends PluginSettingTab {
           .onChange(async (value) => {
             this.plugin.settings.modelSourceMode = value as ModelSourceMode;
             this.activeModelCatalogTab = this.getPreferredModelCatalogTab();
-            await this.plugin.saveSettings();
+            await this.plugin.saveSettings({
+              syncConfig: false,
+              reloadModels: true,
+              applyUi: true,
+            });
             new Notice(t('settings.model.source.updated'));
-            window.setTimeout(() => {
-              void loadAvailableModels(false);
-            }, 1200);
+            await refreshModelSettings();
+            await refreshIconCacheOverview();
           });
       });
     this.setSettingDescWithFormatting(modelSourceSetting, t('settings.model.source.desc'));
@@ -900,8 +1114,19 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         providerDropdown = dropdown;
         dropdown.onChange(async (value) => {
           this.plugin.settings.defaultProvider = value;
-          await this.plugin.saveSettings();
-          await updateModelDropdown();
+          const selectedProvider = catalogs?.effective.providers.find((provider) => provider.id === value) ?? null;
+          if (
+            !selectedProvider
+            || !selectedProvider.models.some((model) => model.id === this.plugin.settings.defaultModel)
+          ) {
+            this.plugin.settings.defaultModel = '';
+          }
+          updateModelDropdown();
+          await this.plugin.saveSettings({
+            syncConfig: false,
+            reloadModels: true,
+            applyUi: true,
+          });
         });
       });
 
@@ -912,7 +1137,11 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         modelDropdown = dropdown;
         dropdown.onChange(async (value) => {
           this.plugin.settings.defaultModel = value;
-          await this.plugin.saveSettings();
+          await this.plugin.saveSettings({
+            syncConfig: false,
+            reloadModels: true,
+            applyUi: true,
+          });
         });
       });
 
@@ -925,7 +1154,8 @@ export class OpenCodianSettingTab extends PluginSettingTab {
           .onClick(async () => {
             btn.setDisabled(true);
             btn.setButtonText(t('settings.model.refresh.loading'));
-            await loadAvailableModels(true);
+            await refreshModelSettings({ showNotice: true, forceViewReload: true });
+            await refreshIconCacheOverview();
             btn.setDisabled(false);
             btn.setButtonText(t('settings.model.refresh.button'));
           })
@@ -1086,7 +1316,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     void refreshIconCacheOverview();
 
     void (async () => {
-      await loadAvailableModels(false);
+      await refreshModelSettings();
       await refreshIconCacheOverview();
     })();
 
@@ -1114,7 +1344,10 @@ export class OpenCodianSettingTab extends PluginSettingTab {
 
       try {
         if (this.plugin.modelConfigService) {
-          const catalogs = await this.plugin.modelConfigService.getCatalogs(this.plugin.settings.modelSourceMode);
+          const catalogs = await this.plugin.modelConfigService.getCatalogs(
+            this.plugin.settings.modelSourceMode,
+            this.plugin.settings.disabledModelRefs,
+          );
           for (const provider of catalogs.effective.providers) {
             for (const model of provider.models) {
               const value = `${provider.id}/${model.id}`;
@@ -1150,6 +1383,9 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       }
 
       updateTitleModelSettingVisibility();
+    };
+    this.refreshTitleModelsCallback = () => {
+      void loadTitleModels();
     };
 
     new Setting(containerEl)
@@ -1439,6 +1675,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     }
     this.styleControlBindings = [];
     this.refreshModelsCallback = undefined;
+    this.refreshTitleModelsCallback = undefined;
     super.hide();
   }
 
@@ -1956,6 +2193,44 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       resetValue: () => this.plugin.getChatAppearanceBaseline().user.shadowBlur,
       setValue: (appearance, value) => {
         appearance.user.shadowBlur = value;
+      },
+    });
+    this.addNumericStyleControl(userGroupEl, {
+      group: 'user',
+      name: t('settings.style.user.timeFontSize.name'),
+      desc: t('settings.style.user.timeFontSize.desc'),
+      min: 6,
+      max: 36,
+      step: 1,
+      unit: 'px',
+      value: () => this.plugin.settings.chatAppearance.user.timeFontSize,
+      resetValue: () => this.plugin.getChatAppearanceBaseline().user.timeFontSize,
+      setValue: (appearance, value) => {
+        appearance.user.timeFontSize = value;
+      },
+    });
+    this.addNumericStyleControl(userGroupEl, {
+      group: 'user',
+      name: t('settings.style.user.timeFontWeight.name'),
+      desc: t('settings.style.user.timeFontWeight.desc'),
+      min: 100,
+      max: 900,
+      step: 1,
+      unit: '',
+      value: () => this.plugin.settings.chatAppearance.user.timeFontWeight,
+      resetValue: () => this.plugin.getChatAppearanceBaseline().user.timeFontWeight,
+      setValue: (appearance, value) => {
+        appearance.user.timeFontWeight = value;
+      },
+    });
+    this.addColorStyleControl(userGroupEl, {
+      group: 'user',
+      name: t('settings.style.user.timeColor.name'),
+      desc: t('settings.style.user.timeColor.desc'),
+      value: () => this.plugin.settings.chatAppearance.user.timeColor,
+      resetValue: () => this.plugin.getChatAppearanceBaseline().user.timeColor,
+      setValue: (appearance, value) => {
+        appearance.user.timeColor = value;
       },
     });
     this.createStyleResetSetting(userGroupEl, 'user');
@@ -4447,7 +4722,10 @@ export class OpenCodianSettingTab extends PluginSettingTab {
 
   private async getCurrentProviderIdsForIconCache(): Promise<string[]> {
     if (this.plugin.modelConfigService) {
-      const catalogs = await this.plugin.modelConfigService.getCatalogs(this.plugin.settings.modelSourceMode);
+      const catalogs = await this.plugin.modelConfigService.getCatalogs(
+        this.plugin.settings.modelSourceMode,
+        this.plugin.settings.disabledModelRefs,
+      );
       return catalogs.effective.providers.map((provider) => provider.id);
     }
 
@@ -4803,7 +5081,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
 
   private renderModelCatalogPanel(
     containerEl: HTMLElement,
-    catalogs: { local: ModelCatalog; server: ModelCatalog; effective: ModelCatalog },
+    catalogs: ModelCatalogBundle,
   ): void {
     containerEl.empty();
     const tabs: Array<{

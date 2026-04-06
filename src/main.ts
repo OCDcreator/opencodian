@@ -41,6 +41,7 @@ import {
   isLocalServerMode,
   normalizeBelowHeaderTabBarLayout,
   normalizeChatAppearanceSettings,
+  normalizeDisabledModelRefs,
   normalizeEffortLevel,
   normalizeInputPanelGlassRefractionSettings,
   normalizeInputPanelGlassRefractionSvgFilterSettings,
@@ -600,6 +601,7 @@ export default class OpenCodianPlugin extends Plugin {
                 ? savedSettings.showAnsweredQuestionCards
                 : DEFAULT_SETTINGS.showAnsweredQuestionCards,
             aiTitleModel: typeof savedSettings.aiTitleModel === 'string' ? savedSettings.aiTitleModel.trim() : '',
+            disabledModelRefs: normalizeDisabledModelRefs(savedSettings.disabledModelRefs),
             renderUserMarkupAsCodeBlocks:
               typeof savedSettings.renderUserMarkupAsCodeBlocks === 'boolean'
                 ? savedSettings.renderUserMarkupAsCodeBlocks
@@ -635,6 +637,7 @@ export default class OpenCodianPlugin extends Plugin {
       inputPanelLiquidGlass: normalizedSettings?.inputPanelLiquidGlass
         ?? getDefaultInputPanelLiquidGlassSettings(),
       debugLogPaths: normalizedDebugLogPaths,
+      disabledModelRefs: normalizedSettings?.disabledModelRefs ?? [],
       chatAppearance: normalizedChatAppearance,
       theme: normalizedTheme,
       tabState: normalizedTabState ?? getDefaultPersistedTabState(),
@@ -970,22 +973,6 @@ export default class OpenCodianPlugin extends Plugin {
   }
 
   private handleModelsLoaded(): void {
-    const serviceSettings = this.openCodeService.getSettingsSnapshot();
-    const defaultsChanged =
-      this.settings.defaultProvider !== serviceSettings.defaultProvider
-      || this.settings.defaultModel !== serviceSettings.defaultModel;
-
-    if (defaultsChanged) {
-      this.settings.defaultProvider = serviceSettings.defaultProvider;
-      this.settings.defaultModel = serviceSettings.defaultModel;
-      void this.saveSettings({
-        syncService: false,
-        reloadModels: false,
-        syncConfig: false,
-        applyUi: false,
-      });
-    }
-
     this.queueModelRefresh();
   }
 

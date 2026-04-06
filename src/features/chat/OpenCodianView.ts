@@ -8,6 +8,8 @@ import type { EditorView } from '@codemirror/view';
 import type { Editor, EventRef, TAbstractFile, WorkspaceLeaf } from 'obsidian';
 import { addIcon, Component, ItemView, MarkdownView, normalizePath, Notice, Scope, setIcon, TFile } from 'obsidian';
 
+import type { ModelCatalogBundle } from '../../core/config';
+import { formatModelReference, type ResolvedModelSelection,resolveModelSelection } from '../../core/config/modelConfig';
 import { OpenCodeService, type SessionActivityStatus } from '../../core/opencode';
 import {
   getThemePresetDefinition,
@@ -110,6 +112,37 @@ import { syncUserMessageStreamingActionState } from './userMessageActions';
 import { prepareUserMessageMarkdownForDisplay } from './userMessageDisplay';
 
 const logger = createLogger('OpenCodianView');
+
+const ASSISTANT_DEBUG_STAGE_ALLOWLIST = new Set([
+  'assistant-message-finalization-complete',
+  'conversation-sync-lock-cleared',
+  'message-metadata-received',
+  'message-start-received',
+  'message-stop-received',
+  'patch-trailing-assistant-render-complete',
+  'patch-trailing-assistant-render-skipped',
+  'pending-indicator-cleared',
+  'pending-indicator-shown',
+  'post-sync-full-rerender-complete',
+  'post-sync-tail-render-attempt',
+  'rerender-conversation-messages-complete',
+  'rerender-conversation-messages-start',
+  'server-sync-complete',
+  'server-sync-failed',
+  'server-sync-requested',
+  'stream-controller-started',
+  'stream-finally-enter',
+  'stream-loop-break-not-streaming',
+  'stream-loop-error',
+  'stream-progress',
+  'stream-visibility-changed',
+  'streaming-shell-finalized',
+  'trace-armed',
+  'turn-diff-processed',
+]);
+
+const STREAM_PROGRESS_LOG_MIN_INTERVAL_MS = 1200;
+const STREAM_PROGRESS_LOG_MIN_TEXT_DELTA = 400;
 
 /** Logo SVG for light theme (dark logo on light bg) - from opencode-logo-light.svg */
 const LOGO_SVG_LIGHT = `<svg width="24" height="30" viewBox="0 0 240 300" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#clip0_light)"><mask id="mask0_light" style="mask-type:luminance" maskUnits="userSpaceOnUse" x="0" y="0" width="240" height="300"><path d="M240 0H0V300H240V0Z" fill="white"/></mask><g mask="url(#mask0_light)"><path d="M180 240H60V120H180V240Z" fill="#CFCECD"/><path d="M180 60H60V240H180V60ZM240 300H0V0H240V300Z" fill="#211E1E"/></g></g><defs><clipPath id="clip0_light"><rect width="240" height="300" fill="white"/></clipPath></defs></svg>`;
@@ -502,6 +535,7 @@ export class OpenCodianView extends ItemView {
   private modelSelectorScrollContainer: HTMLElement | null = null;
   private availableModels: Array<{ provider: string; model: string; label: string; providerName: string; modelName: string; contextWindow?: number }> = [];
   private availableProviders: Array<{ id: string; name: string; models: Array<{ id: string; name: string; contextWindow?: number }> }> = [];
+  private modelCatalogBundle: ModelCatalogBundle | null = null;
   private hasLoadedModelCatalog = false;
   private isModelDropdownOpen = false;
   private modelFilterQuery = '';
@@ -3598,7 +3632,15 @@ export class OpenCodianView extends ItemView {
     logger.debug(`${label}: ${serializedPayload}`);
   }
 
+  private shouldLogAssistantFinalizationDebug(label: string): boolean {
+    return ASSISTANT_DEBUG_STAGE_ALLOWLIST.has(label);
+  }
+
   private logAssistantFinalizationDebug(label: string, payload: unknown): void {
+    if (!this.shouldLogAssistantFinalizationDebug(label)) {
+      return;
+    }
+
     logger.debug(`Assistant message finalization [${label}]: ${this.stringifyLogPayload(payload)}`);
   }
 
@@ -5253,6 +5295,7 @@ export class OpenCodianView extends ItemView {
         this.currentConversation,
         activeTabId,
         'visible-background-sync',
+        { suppressVerboseLogs: true },
       );
       await this.refreshPendingQuestionsForTab(activeTabId, expectedSessionId);
       if (!syncResult.changed || this.currentConversation?.id !== expectedConversationId) {
@@ -5905,9 +5948,24 @@ export class OpenCodianView extends ItemView {
     }
 
     const draftContextItems = [...sendingRuntime.draftContextItems];
-    const contextAttachments = draftContextItems.map((item) => buildContextAttachment(item));
+    const modelOptions = this.getSendMessageOptions();
 
-    // Add user message to conversation and UI
+    const availability = await this.getServerAvailability();
+    await this.refreshServerStatusBadge();
+    if (availability !== 'running' && availability !== 'external') {
+      const ready = await this.ensureServerReadyForChat(availability);
+      if (!ready) {
+        return;
+      }
+    }
+
+    const activeModelId = this.formatModelId(modelOptions);
+    if (!(await this.ensureSelectedModelAvailable(modelOptions.provider, modelOptions.model))) {
+      await this.appendModelUnavailableNoticeMessage();
+      return;
+    }
+
+    const contextAttachments = draftContextItems.map((item) => buildContextAttachment(item));
     const userMessage: ChatMessage = {
       id: `user-${Date.now()}`,
       role: 'user',
@@ -5926,27 +5984,11 @@ export class OpenCodianView extends ItemView {
     this.scrollToBottom({ tabId: sendingTabId, enableAutoScroll: true });
 
     const isFirstUserMessage = sendingConversation.messages.filter((message) => message.role === 'user').length === 1;
-    const modelOptions = this.getSendMessageOptions();
     if (isFirstUserMessage) {
       await this.applyFallbackConversationTitle(sendingConversation.id, content);
       if (this.plugin.settings.titleMode === 'ai') {
         void this.startAiConversationTitleGeneration(sendingConversation.id, content, modelOptions);
       }
-    }
-
-    const availability = await this.getServerAvailability();
-    await this.refreshServerStatusBadge();
-    if (availability !== 'running' && availability !== 'external') {
-      const ready = await this.ensureServerReadyForChat(availability);
-      if (!ready) {
-        return;
-      }
-    }
-
-    const activeModelId = this.formatModelId(modelOptions);
-    if (!(await this.ensureSelectedModelAvailable(modelOptions.provider, modelOptions.model))) {
-      await this.appendModelUnavailableNoticeMessage();
-      return;
     }
 
     sendingRuntime.isStreaming = true;
@@ -6020,6 +6062,9 @@ export class OpenCodianView extends ItemView {
     let renderedStreamChunkCount = 0;
     let lastRawTextChunk: Record<string, unknown> | null = null;
     let lastRenderedTextChunk: Record<string, unknown> | null = null;
+    let totalRenderedTextLength = 0;
+    let lastProgressLoggedAt = 0;
+    let lastProgressLoggedTextLength = 0;
     const finalizationTraceId = `${sendingConversation.openCodeSessionId}:${userMessage.id}:${Date.now()}`;
     const getStreamControllerSnapshot = (): Record<string, unknown> => ({
       hasController: Boolean(streamController),
@@ -6062,20 +6107,40 @@ export class OpenCodianView extends ItemView {
         ...payload,
       });
     };
+    const logStreamProgressCheckpoint = (
+      reason: 'first-content' | 'text-growth' | 'thinking' | 'tool' | 'error',
+      payload: Record<string, unknown> = {},
+    ): void => {
+      const now = Date.now();
+      const shouldLog = reason !== 'text-growth'
+        || lastProgressLoggedAt === 0
+        || totalRenderedTextLength - lastProgressLoggedTextLength >= STREAM_PROGRESS_LOG_MIN_TEXT_DELTA
+        || now - lastProgressLoggedAt >= STREAM_PROGRESS_LOG_MIN_INTERVAL_MS;
+      if (!shouldLog) {
+        return;
+      }
+
+      lastProgressLoggedAt = now;
+      lastProgressLoggedTextLength = totalRenderedTextLength;
+      logAssistantFinalizationStage('stream-progress', {
+        reason,
+        totalRenderedTextLength,
+        messageVisible: !(sendingRuntime.streamingMessageEl?.hidden ?? true),
+        pendingIndicatorVisible: Boolean(pendingState.element?.isConnected),
+        streamController: getStreamControllerSnapshot(),
+        ...payload,
+      });
+    };
     logAssistantFinalizationStage('trace-armed', {
       activeModelId,
       pendingMessage,
       streamControllerAvailable: Boolean(streamController),
     });
-    logger.debug('Setting up pending indicator timeout');
     const pendingTimeout = window.setTimeout(() => {
-      logger.debug('Pending indicator timeout fired, isStreaming:', sendingRuntime.isStreaming);
       if (!sendingRuntime.isStreaming || !contentEl) {
-        logger.debug('Not showing pending indicator - not streaming or no element');
         return;
       }
 
-      logger.debug('Showing pending indicator:', pendingMessage);
       pendingState.element = contentEl.createDiv({ cls: 'opencodian-pending' });
       pendingState.element.createSpan({
         text: pendingMessage,
@@ -6093,6 +6158,10 @@ export class OpenCodianView extends ItemView {
       };
       updateTimer();
       pendingState.element.dataset.timerInterval = String(window.setInterval(updateTimer, 1000));
+      logAssistantFinalizationStage('pending-indicator-shown', {
+        pendingMessage,
+        revealReason: 'pending-timeout',
+      });
       if (this.getActiveTabId() === sendingTabId) {
         this.scheduleSettledScrollToBottomIfNeeded(this.shouldAutoScroll(sendingTabId), sendingTabId);
       }
@@ -6118,12 +6187,6 @@ export class OpenCodianView extends ItemView {
             length: chunk.content.length,
             preview: this.getLogPreview(chunk.content, 120),
           };
-        }
-        if (chunk.type !== 'usage') {
-          logAssistantFinalizationStage('raw-stream-chunk', {
-            chunkSequence: rawStreamChunkCount,
-            chunk: this.summarizeCoreStreamChunkForDebug(chunk),
-          });
         }
         if (!sendingRuntime.isStreaming) {
           logger.debug('Streaming cancelled, breaking loop');
@@ -6210,6 +6273,7 @@ export class OpenCodianView extends ItemView {
         if (streamingChunk && streamController) {
           renderedStreamChunkCount += 1;
           if (streamingChunk.type === 'text' && streamingChunk.content.length > 0) {
+            totalRenderedTextLength += streamingChunk.content.length;
             lastRenderedTextChunk = {
               sequence: renderedStreamChunkCount,
               length: streamingChunk.content.length,
@@ -6222,21 +6286,33 @@ export class OpenCodianView extends ItemView {
           } else {
             receivedMeaningfulChunk = true;
           }
-          logAssistantFinalizationStage('render-chunk-dispatch', {
-            renderedChunkSequence: renderedStreamChunkCount,
-            chunk: this.summarizeRenderedStreamChunkForDebug(streamingChunk),
-            streamController: getStreamControllerSnapshot(),
-          });
           await streamController.handleChunk(streamingChunk);
-          logAssistantFinalizationStage('render-chunk-applied', {
-            renderedChunkSequence: renderedStreamChunkCount,
-            chunkType: streamingChunk.type,
-            streamController: getStreamControllerSnapshot(),
-          });
 
           const hasContent = (streamingChunk.type === 'text' && streamingChunk.content?.trim()) ||
                             (streamingChunk.type === 'thinking' && streamingChunk.content?.trim()) ||
                             streamingChunk.type === 'tool_use';
+
+          if (streamingChunk.type === 'text' && streamingChunk.content.length > 0) {
+            logStreamProgressCheckpoint(receivedFirstChunk ? 'text-growth' : 'first-content', {
+              renderedChunkSequence: renderedStreamChunkCount,
+              chunkLength: streamingChunk.content.length,
+            });
+          } else if (streamingChunk.type === 'thinking' && streamingChunk.content?.trim()) {
+            logStreamProgressCheckpoint('thinking', {
+              renderedChunkSequence: renderedStreamChunkCount,
+              chunkLength: streamingChunk.content.length,
+            });
+          } else if (streamingChunk.type === 'tool_use') {
+            logStreamProgressCheckpoint('tool', {
+              renderedChunkSequence: renderedStreamChunkCount,
+              toolName: streamingChunk.toolCall.name,
+            });
+          } else if (streamingChunk.type === 'error') {
+            logStreamProgressCheckpoint('error', {
+              renderedChunkSequence: renderedStreamChunkCount,
+              errorPreview: this.getLogPreview(streamingChunk.content, 160),
+            });
+          }
 
           if (streamingChunk.type === 'error' || hasContent) {
             this.revealStreamingAssistantMessageElement(sendingTabId);
@@ -6244,16 +6320,19 @@ export class OpenCodianView extends ItemView {
 
           if (!receivedFirstChunk && hasContent) {
             receivedFirstChunk = true;
-            logger.debug('First content chunk received, clearing pending timeout/indicator');
             window.clearTimeout(pendingTimeout);
             if (pendingState.element?.parentNode) {
-              logger.debug('Removing pending indicator');
               // Clear timer interval
               if (pendingState.element.dataset.timerInterval) {
                 window.clearInterval(Number(pendingState.element.dataset.timerInterval));
               }
               pendingState.element.remove();
               pendingState.element = null;
+              logAssistantFinalizationStage('pending-indicator-cleared', {
+                reason: 'first-content',
+                renderedChunkSequence: renderedStreamChunkCount,
+                totalRenderedTextLength,
+              });
             }
           }
         }
@@ -7894,12 +7973,28 @@ export class OpenCodianView extends ItemView {
     );
   }
 
-  private setStreamingAssistantMessageVisibility(messageEl: HTMLElement | null, visible: boolean): void {
+  private setStreamingAssistantMessageVisibility(
+    messageEl: HTMLElement | null,
+    visible: boolean,
+    reason = 'unspecified',
+  ): void {
     if (!messageEl) {
       return;
     }
 
-    messageEl.hidden = !visible;
+    const previousHidden = messageEl.hidden;
+    const nextHidden = !visible;
+    messageEl.hidden = nextHidden;
+
+    if (previousHidden !== nextHidden) {
+      this.logAssistantFinalizationDebug('stream-visibility-changed', {
+        reason,
+        messageId: messageEl.dataset.messageId ?? null,
+        sourceMessageId: messageEl.dataset.sourceMessageId ?? null,
+        hidden: nextHidden,
+        hasStreamingClass: messageEl.classList.contains('is-streaming'),
+      });
+    }
   }
 
   private revealStreamingAssistantMessageElement(tabId: TabId | null = this.getActiveTabId()): HTMLElement | null {
@@ -7909,7 +8004,7 @@ export class OpenCodianView extends ItemView {
     }
 
     const wasHidden = messageEl.hidden;
-    this.setStreamingAssistantMessageVisibility(messageEl, true);
+    this.setStreamingAssistantMessageVisibility(messageEl, true, 'reveal-streaming-shell');
 
     if (wasHidden && this.getActiveTabId() === tabId) {
       this.scheduleSettledScrollToBottomIfNeeded(this.shouldAutoScroll(tabId), tabId);
@@ -7935,7 +8030,11 @@ export class OpenCodianView extends ItemView {
 
     const contentEl = messageEl.createDiv({ cls: 'opencodian-message-content' });
     this.ensureAssistantTimestampRow(messageEl, true);
-    this.setStreamingAssistantMessageVisibility(messageEl, !hiddenUntilVisible);
+    this.setStreamingAssistantMessageVisibility(
+      messageEl,
+      !hiddenUntilVisible,
+      hiddenUntilVisible ? 'create-streaming-shell-hidden' : 'create-streaming-shell-visible',
+    );
 
     if (paneState) {
       paneState.runtime.streamingMessageEl = messageEl;
@@ -8104,7 +8203,7 @@ export class OpenCodianView extends ItemView {
       messageEl.style.animation = 'none';
       messageEl.removeClass('is-streaming');
     }
-    this.setStreamingAssistantMessageVisibility(messageEl, true);
+    this.setStreamingAssistantMessageVisibility(messageEl, true, 'finalize-streaming-shell');
   }
 
   private ensureAssistantTimestampRow(messageEl: HTMLElement, reserveSpace = false): HTMLElement {
@@ -8148,7 +8247,7 @@ export class OpenCodianView extends ItemView {
     messageEl.addClass('opencodian-message--notice');
     messageEl.removeClass('opencodian-message--background-task');
     messageEl.empty();
-    this.setStreamingAssistantMessageVisibility(messageEl, true);
+    this.setStreamingAssistantMessageVisibility(messageEl, true, 'render-interrupted-notice');
 
     const contentEl = messageEl.createDiv({ cls: 'opencodian-message-content' });
     await this.renderNoticeCard(contentEl, noticeMessage);
@@ -8186,6 +8285,7 @@ export class OpenCodianView extends ItemView {
   private mergeSyncedMessageModelIds(
     existingMessages: ChatMessage[],
     syncedMessages: ChatMessage[],
+    verbose = true,
   ): ChatMessage[] {
     const modelIdBySourceMessageId = new Map<string, string>();
     const messageBySourceMessageId = new Map<string, ChatMessage>();
@@ -8210,7 +8310,7 @@ export class OpenCodianView extends ItemView {
         ? messageBySourceMessageId.get(message.sourceMessageId)
         : undefined;
       const mergedMessage = existingMessage
-        ? this.mergeClientOnlyMessageFields(existingMessage, message)
+        ? this.mergeClientOnlyMessageFields(existingMessage, message, verbose)
         : message;
 
       if (mergedMessage.role !== 'assistant') {
@@ -8264,7 +8364,7 @@ export class OpenCodianView extends ItemView {
     return mergedMessages;
   }
 
-  private mergeClientOnlyMessageFields(existingMessage: ChatMessage, syncedMessage: ChatMessage): ChatMessage {
+  private mergeClientOnlyMessageFields(existingMessage: ChatMessage, syncedMessage: ChatMessage, verbose = true): ChatMessage {
     let contextAttachments = syncedMessage.contextAttachments;
     if (existingMessage.contextAttachments && existingMessage.contextAttachments.length > 0) {
       if (!contextAttachments || contextAttachments.length === 0) {
@@ -8304,7 +8404,7 @@ export class OpenCodianView extends ItemView {
       preservedExistingStructured: syncedMessage.structured === undefined && existingMessage.structured !== undefined,
       preservedExistingParts: syncedMessage.parts === undefined && existingMessage.parts !== undefined,
     };
-    if (Object.values(preservedFlags).some(Boolean)) {
+    if (verbose && Object.values(preservedFlags).some(Boolean)) {
       this.logAssistantFinalizationDebug('merge-client-only-message-fields', {
         existingMessage: this.summarizeChatMessageForDebug(existingMessage),
         syncedMessage: this.summarizeChatMessageForDebug(syncedMessage),
@@ -8765,14 +8865,16 @@ export class OpenCodianView extends ItemView {
     conversation: Conversation,
     tabId: TabId | null = this.getActiveTabId(),
     reason = 'unspecified',
+    options?: { suppressVerboseLogs?: boolean },
   ): Promise<{
     messages: ChatMessage[];
     changed: boolean;
     fingerprint: string;
     revertState: ConversationRevertState | null;
   }> {
+    const verbose = !options?.suppressVerboseLogs;
     try {
-      this.logAssistantFinalizationDebug('server-sync-begin', {
+      if (verbose) this.logAssistantFinalizationDebug('server-sync-begin', {
         reason,
         conversationId: conversation.id,
         sessionId: conversation.openCodeSessionId,
@@ -8791,7 +8893,7 @@ export class OpenCodianView extends ItemView {
           OpenCodeService.openCodeMessageToChatMessage(info, parts, getVaultBasePath(this.app) ?? undefined),
         )
         .filter((message) => this.shouldRenderConversationMessage(message));
-      this.logAssistantFinalizationDebug('server-sync-fetched', {
+      if (verbose) this.logAssistantFinalizationDebug('server-sync-fetched', {
         reason,
         conversationId: conversation.id,
         sessionId: conversation.openCodeSessionId,
@@ -8806,6 +8908,7 @@ export class OpenCodianView extends ItemView {
       const converted = this.mergeSyncedMessageModelIds(
         conversation.messages,
         convertedServerMessages,
+        verbose,
       );
       const preservedClientOnlyMessages = this.getClientOnlyMessagesToPreserveOnSync(
         conversation.messages,
@@ -8839,7 +8942,7 @@ export class OpenCodianView extends ItemView {
       }
       const merged = [...converted, ...preservedClientOnlyMessages]
         .sort((left, right) => left.timestamp - right.timestamp);
-      this.logAssistantFinalizationDebug('server-sync-merged', {
+      if (verbose) this.logAssistantFinalizationDebug('server-sync-merged', {
         reason,
         conversationId: conversation.id,
         sessionId: conversation.openCodeSessionId,
@@ -8879,7 +8982,7 @@ export class OpenCodianView extends ItemView {
           changed,
         });
       }
-      this.logAssistantFinalizationDebug('server-sync-finished', {
+      if (verbose || changed) this.logAssistantFinalizationDebug('server-sync-finished', {
         reason,
         conversationId: conversation.id,
         sessionId: conversation.openCodeSessionId,
@@ -9938,10 +10041,17 @@ export class OpenCodianView extends ItemView {
   /** Load available models from OpenCode service */
   private async loadAvailableModels(): Promise<void> {
     try {
-      const providers = this.plugin.modelConfigService
-        ? (await this.plugin.modelConfigService.getCatalogs(this.plugin.settings.modelSourceMode)).effective.providers
+      const catalogBundle = this.plugin.modelConfigService
+        ? await this.plugin.modelConfigService.getCatalogs(
+            this.plugin.settings.modelSourceMode,
+            this.plugin.settings.disabledModelRefs,
+          )
+        : null;
+      const providers = catalogBundle
+        ? catalogBundle.effective.providers
         : (await this.plugin.openCodeService.getAvailableModels()).providers;
       this.hasLoadedModelCatalog = true;
+      this.modelCatalogBundle = catalogBundle;
       this.availableModels = [];
       this.availableProviders = [];
 
@@ -9981,25 +10091,35 @@ export class OpenCodianView extends ItemView {
   /** Update model selector to show current model */
   private updateModelSelectorDisplay(): void {
     const current = this.getCurrentSessionModel();
+    const resolution = this.getCurrentSessionModelResolution();
 
     if (!this.modelSelectorTrigger) return;
 
     // Find model info from available models
-    const modelInfo = current
-      ? this.availableModels.find(
-        m => m.provider === current.provider && m.model === current.model
-      )
-      : null;
+    const modelInfo = this.findKnownModelInfo(current);
+    this.modelSelectorTrigger.toggleClass('is-unavailable', resolution.status === 'unavailable');
 
     // Update text
     const textEl = this.modelSelectorTrigger.querySelector('.opencodian-model-trigger-text');
     if (textEl) {
       textEl.textContent = current
-        ? (modelInfo?.modelName || current.model)
+        ? (modelInfo?.modelName || resolution.modelName || current.model)
         : t('settings.model.unconfigured');
     }
 
-    const iconLabel = modelInfo?.providerName || current?.provider || 'model';
+    this.modelSelectorTrigger.setAttribute(
+      'title',
+      resolution.status === 'unavailable'
+        ? t('chat.notice.modelUnavailable.selectedBody')
+        : current
+          ? formatModelReference(
+              modelInfo?.providerName || resolution.providerName || current.provider,
+              modelInfo?.modelName || resolution.modelName || current.model,
+            )
+          : t('settings.model.unconfigured'),
+    );
+
+    const iconLabel = modelInfo?.providerName || resolution.providerName || current?.provider || 'model';
     void this.updateModelSelectorIcon(current?.provider ?? null, iconLabel);
 
     this.effortSelector?.updateDisplay();
@@ -10057,39 +10177,80 @@ export class OpenCodianView extends ItemView {
 
   /** Get current model for this session */
   private getCurrentSessionModel(): { provider: string; model: string } | null {
-    if (!this.hasLoadedModelCatalog) {
-      if (!this.plugin.settings.defaultProvider || !this.plugin.settings.defaultModel) {
-        return null;
-      }
+    return this.getRequestedSessionModel();
+  }
 
-      return {
-        provider: this.plugin.settings.defaultProvider,
-        model: this.plugin.settings.defaultModel,
-      };
-    }
-
+  private getRequestedSessionModel(): { provider: string; model: string } | null {
     const override = this.tabManager?.getActiveTabModelOverride() ?? null;
     if (override) {
-      if (this.isModelInAvailableProviders(override.provider, override.model)) {
-        return override;
-      }
-    }
-
-    if (this.isModelInAvailableProviders(
-      this.plugin.settings.defaultProvider,
-      this.plugin.settings.defaultModel,
-    )) {
-      return {
-        provider: this.plugin.settings.defaultProvider,
-        model: this.plugin.settings.defaultModel,
-      };
+      return override;
     }
 
     if (!this.plugin.settings.defaultProvider || !this.plugin.settings.defaultModel) {
       return null;
     }
 
-    return this.getFirstAvailableModel();
+    return {
+      provider: this.plugin.settings.defaultProvider,
+      model: this.plugin.settings.defaultModel,
+    };
+  }
+
+  private getCurrentSessionModelResolution(): ResolvedModelSelection {
+    const requestedModel = this.getRequestedSessionModel();
+    if (!requestedModel) {
+      return {
+        status: 'unconfigured',
+        provider: '',
+        model: '',
+        ref: '',
+      };
+    }
+
+    if (!this.hasLoadedModelCatalog || !this.modelCatalogBundle) {
+      return {
+        status: 'available',
+        provider: requestedModel.provider,
+        model: requestedModel.model,
+        ref: formatModelReference(requestedModel.provider, requestedModel.model),
+      };
+    }
+
+    return resolveModelSelection(
+      this.modelCatalogBundle.baseEffective,
+      this.modelCatalogBundle.effective,
+      requestedModel.provider,
+      requestedModel.model,
+    );
+  }
+
+  private findKnownModelInfo(
+    selection: { provider: string; model: string } | null,
+  ): { providerName?: string; modelName?: string; contextWindow?: number } | null {
+    if (!selection) {
+      return null;
+    }
+
+    const availableModel = this.availableModels.find(
+      (item) => item.provider === selection.provider && item.model === selection.model,
+    );
+    if (availableModel) {
+      return availableModel;
+    }
+
+    const baseProvider = this.modelCatalogBundle?.baseEffective.providers.find(
+      (provider) => provider.id === selection.provider,
+    );
+    const baseModel = baseProvider?.models.find((model) => model.id === selection.model);
+    if (!baseProvider || !baseModel) {
+      return null;
+    }
+
+    return {
+      providerName: baseProvider.name,
+      modelName: baseModel.name,
+      contextWindow: baseModel.contextWindow,
+    };
   }
 
   private formatModelId(
@@ -10159,11 +10320,18 @@ export class OpenCodianView extends ItemView {
     provider: string | undefined,
     model: string | undefined,
   ): Promise<boolean> {
-    if (!provider || !model) {
+    if (!this.hasLoadedModelCatalog) {
+      await this.loadAvailableModels();
+    }
+
+    const resolution = this.modelCatalogBundle
+      ? resolveModelSelection(this.modelCatalogBundle.baseEffective, this.modelCatalogBundle.effective, provider, model)
+      : this.getCurrentSessionModelResolution();
+    if (resolution.status !== 'available') {
       return false;
     }
 
-    if (!this.isModelInAvailableProviders(provider, model)) {
+    if (!provider || !model) {
       return false;
     }
 
@@ -10426,7 +10594,8 @@ export class OpenCodianView extends ItemView {
   }
 
   private getModelUnavailableNoticeContent(): { title: string; message: string } {
-    if (!this.getCurrentSessionModel()) {
+    const resolution = this.getCurrentSessionModelResolution();
+    if (resolution.status === 'unconfigured') {
       return {
         title: t('chat.notice.modelUnavailable.unconfiguredTitle'),
         message: t('chat.notice.modelUnavailable.unconfiguredBody'),
@@ -10487,26 +10656,6 @@ export class OpenCodianView extends ItemView {
       default:
         return;
     }
-  }
-
-  private isModelInAvailableProviders(provider: string, model: string): boolean {
-    return this.availableProviders.some(
-      (item) => item.id === provider && item.models.some((entry) => entry.id === model),
-    );
-  }
-
-  private getFirstAvailableModel(): { provider: string; model: string } | null {
-    for (const provider of this.availableProviders) {
-      const firstModel = provider.models[0];
-      if (firstModel) {
-        return {
-          provider: provider.id,
-          model: firstModel.id,
-        };
-      }
-    }
-
-    return null;
   }
 
   /** Convert OpenCode stream chunk to streaming module format */
@@ -10590,20 +10739,17 @@ export class OpenCodianView extends ItemView {
     }
 
     const currentModel = this.getCurrentSessionModel();
-    const modelInfo = currentModel
-      ? this.availableModels.find(
-        (item) => item.provider === currentModel.provider && item.model === currentModel.model,
-      )
-      : null;
+    const resolution = this.getCurrentSessionModelResolution();
+    const modelInfo = this.findKnownModelInfo(currentModel);
     const currentState = this.tabManager.getActiveTabContextUsage() ?? createEmptyTabContextState();
     const nextState = ContextUsageService.syncStateIdentity(
       currentState,
       {
         provider: currentModel?.provider ?? null,
-        providerName: modelInfo?.providerName ?? currentModel?.provider ?? null,
+        providerName: modelInfo?.providerName ?? resolution.providerName ?? currentModel?.provider ?? null,
         model: currentModel?.model ?? null,
-        modelName: modelInfo?.modelName ?? currentModel?.model ?? null,
-        contextWindow: modelInfo?.contextWindow,
+        modelName: modelInfo?.modelName ?? resolution.modelName ?? currentModel?.model ?? null,
+        contextWindow: modelInfo?.contextWindow ?? resolution.contextWindow,
       },
       {
         sessionId: this.currentConversation?.openCodeSessionId ?? null,

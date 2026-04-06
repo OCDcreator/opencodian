@@ -1,6 +1,6 @@
 import { getDefaultInputPanelLiquidGlassSettings } from '../../../../src/core/types';
-import { adapter, __testing } from '../../../../src/utils/glass/adapters/shuding';
-import type { GlassMountContext, GlassAdapterSettingsValue } from '../../../../src/utils/glass/types';
+import { __testing,adapter } from '../../../../src/utils/glass/adapters/shuding';
+import type { GlassAdapterSettingsValue,GlassMountContext } from '../../../../src/utils/glass/types';
 
 class ResizeObserverMock {
   observe = jest.fn();

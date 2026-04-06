@@ -3,15 +3,18 @@ import type { ModelSourceMode, OpencodeModelConfigSubset } from '../types';
 import {
   applyModelConfig,
   buildCatalogFromConfig,
+  collectConfiguredProviderIds,
+  filterCatalog,
+  getEnabledProviderIds,
   mergeCatalogs,
   type ModelCatalog,
-  parseModelReference,
 } from './modelConfig';
 import type { OpencodeConfigManager } from './OpencodeConfigManager';
 
 export interface ModelCatalogBundle {
   local: ModelCatalog;
   server: ModelCatalog;
+  baseEffective: ModelCatalog;
   effective: ModelCatalog;
 }
 
@@ -68,16 +71,22 @@ export class ModelConfigService {
     };
   }
 
-  async getCatalogs(mode: ModelSourceMode): Promise<ModelCatalogBundle> {
-    const [local, server] = await Promise.all([
-      this.getLocalCatalog(),
+  async getCatalogs(mode: ModelSourceMode, disabledModelRefs: string[] = []): Promise<ModelCatalogBundle> {
+    const [localConfig, server] = await Promise.all([
+      this.readLocalModelConfig(),
       this.getServerCatalog(),
     ]);
+    const local = buildCatalogFromConfig(localConfig, 'local');
+    const baseEffective = this.resolveCatalog(local, server, mode);
 
     return {
       local,
       server,
-      effective: this.resolveCatalog(local, server, mode),
+      baseEffective,
+      effective: filterCatalog(baseEffective, {
+        providerConfig: localConfig,
+        disabledModelRefs,
+      }),
     };
   }
 
@@ -93,12 +102,7 @@ export class ModelConfigService {
 
   async getLocalProviderIds(): Promise<string[]> {
     const config = await this.readLocalModelConfig();
-    if (!config.provider) {
-      const modelRef = parseModelReference(config.model);
-      return modelRef ? [modelRef.provider] : [];
-    }
-
-    return Object.keys(config.provider);
+    return getEnabledProviderIds(config, collectConfiguredProviderIds(config));
   }
 
   private resolveCatalog(local: ModelCatalog, server: ModelCatalog, mode: ModelSourceMode): ModelCatalog {

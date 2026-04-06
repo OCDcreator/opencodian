@@ -3,12 +3,12 @@ import {
   buildGlassOctahedronBackdropFilterValue,
   buildGlassOctahedronLightBackdropFilterValue,
   detectGlassOctahedronBackdropSupport,
-  renderGlassOctahedronDisplacementSnapshot,
   type GlassOctahedronBackdropSupport,
   type GlassOctahedronProjectionContext,
   type GlassOctahedronQualityTier,
   type GlassOctahedronRenderQuality,
   type GlassOctahedronStageSize,
+  renderGlassOctahedronDisplacementSnapshot,
 } from './glassOctahedronDemoRefraction';
 import type { GlassOctahedronThreeRenderer } from './glassOctahedronDemoThree';
 

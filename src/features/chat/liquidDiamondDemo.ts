@@ -1,10 +1,10 @@
 import {
   applyEdgeBulge,
   createDiamondContext,
-  traceDiamondRay,
   type DiamondContext,
   type DiamondProjectedFace,
   type DiamondSize,
+  traceDiamondRay,
 } from '../../utils/glass/adapters/shudingDiamond';
 import {
   createLiquidDiamondDemoWebGlRenderer,

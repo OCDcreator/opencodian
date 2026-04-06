@@ -462,38 +462,13 @@ export class OpenCodeService {
     return cloneSettings(this.settings);
   }
 
-  /** Auto-fetch models when server starts and update defaults if needed */
+  /** Auto-fetch models when server starts and notify listeners */
   private async autoFetchModels(): Promise<void> {
     try {
-
       const result = await this.getAvailableModels();
-      
+
       if (result.providers.length === 0) {
         logger.warn('No providers available from server');
-        return;
-      }
-
-      // Check if current default provider is valid
-      const currentProvider = result.providers.find(p => p.id === this.settings.defaultProvider);
-      
-      if (!currentProvider) {
-        // Current provider not available, default to first provider
-        const firstProvider = result.providers[0];
-        this.settings.defaultProvider = firstProvider.id;
-        
-        // Also update model to first available for this provider
-        if (firstProvider.models.length > 0) {
-          this.settings.defaultModel = firstProvider.models[0].id;
-        }
-        
-
-      } else {
-        // Provider exists, check if model is valid
-        const currentModel = currentProvider.models.find(m => m.id === this.settings.defaultModel);
-        if (!currentModel && currentProvider.models.length > 0) {
-          this.settings.defaultModel = currentProvider.models[0].id;
-
-        }
       }
 
       // Notify listeners that models are loaded

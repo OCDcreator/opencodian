@@ -11,8 +11,8 @@ import {
   getDefaultInputPanelLiquidGlassSettings,
   getDefaultThemeSettings,
 } from '../../../../src/core/types';
-import { OpenCodianView } from '../../../../src/features/chat/OpenCodianView';
 import { LIQUID_DIAMOND_DEMO_STAGE_SIZE } from '../../../../src/features/chat/liquidDiamondDemo';
+import { OpenCodianView } from '../../../../src/features/chat/OpenCodianView';
 
 type DemoViewHarness = OpenCodianView & {
   chatContainerEl: HTMLElement | null;

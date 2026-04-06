@@ -16,6 +16,7 @@ import {
   isValidChatAppearanceCustomCssDeclarations,
   normalizeBelowHeaderTabBarLayout,
   normalizeChatAppearanceSettings,
+  normalizeDisabledModelRefs,
   normalizeInputPanelActionButtonStyleId,
   normalizeInputPanelGlassRefractionSettings,
   normalizeInputPanelGlassRefractionSvgFilterPresetId,
@@ -100,6 +101,7 @@ describe('Settings', () => {
       expect(DEFAULT_SETTINGS.questionDisplayMode).toBe('all');
       expect(DEFAULT_SETTINGS.questionCardPosition).toBe('inline');
       expect(DEFAULT_SETTINGS.showAnsweredQuestionCards).toBe(true);
+      expect(DEFAULT_SETTINGS.disabledModelRefs).toEqual([]);
       expect(DEFAULT_SETTINGS.renderUserMarkupAsCodeBlocks).toBe(true);
       expect(DEFAULT_SETTINGS.pluginIsolationMode).toBe('default');
       expect(DEFAULT_SETTINGS.maxTabs).toBe(3);
@@ -114,6 +116,9 @@ describe('Settings', () => {
       expect(DEFAULT_SETTINGS.chatAppearance.background.opacity).toBe(92);
       expect(DEFAULT_SETTINGS.chatAppearance.background.edgeFade).toBe(28);
       expect(DEFAULT_SETTINGS.chatAppearance.user.radius).toBe(16);
+      expect(DEFAULT_SETTINGS.chatAppearance.user.timeFontSize).toBe(11);
+      expect(DEFAULT_SETTINGS.chatAppearance.user.timeFontWeight).toBe(400);
+      expect(DEFAULT_SETTINGS.chatAppearance.user.timeColor).toBe('var(--text-muted)');
       expect(DEFAULT_SETTINGS.chatAppearance.assistant.backgroundOpacity).toBe(72);
       expect(DEFAULT_SETTINGS.chatAppearance.assistant.metaFontSize).toBe(10);
       expect(DEFAULT_SETTINGS.chatAppearance.assistant.timeFontSize).toBe(10);
@@ -183,6 +188,26 @@ describe('Settings', () => {
       expect(normalizeQuestionDisplayMode('single')).toBe('single');
       expect(normalizeQuestionDisplayMode('grouped')).toBe('all');
       expect(normalizeQuestionDisplayMode(undefined)).toBe('all');
+    });
+  });
+
+  describe('disabled model ref normalization', () => {
+    it('keeps only trimmed provider/model references', () => {
+      expect(normalizeDisabledModelRefs([
+        ' openai/gpt-4o ',
+        'anthropic/claude-3-5-sonnet',
+        'openai/gpt-4o',
+        'invalid',
+        '',
+      ])).toEqual([
+        'openai/gpt-4o',
+        'anthropic/claude-3-5-sonnet',
+      ]);
+    });
+
+    it('returns an empty list for invalid inputs', () => {
+      expect(normalizeDisabledModelRefs(undefined)).toEqual([]);
+      expect(normalizeDisabledModelRefs('openai/gpt-4o')).toEqual([]);
     });
   });
 
@@ -373,6 +398,9 @@ describe('Settings', () => {
       });
       expect(normalized.assistant.blur).toBe(4);
       expect(normalized.assistant.radius).toBe(14);
+      expect(normalized.user.timeFontSize).toBe(11);
+      expect(normalized.user.timeFontWeight).toBe(400);
+      expect(normalized.user.timeColor).toBe('var(--text-muted)');
       expect(normalized.assistant.metaFontSize).toBe(10);
       expect(normalized.assistant.timeFontSize).toBe(10);
       expect(normalized.assistant.timeFontWeight).toBe(400);
@@ -420,6 +448,20 @@ describe('Settings', () => {
       expect(normalized.assistant.modelIdFontSize).toBe(16);
       expect(normalized.assistant.modelIdFontWeight).toBe(900);
       expect(normalized.assistant.modelIdColor).toBe('var(--text-normal)');
+    });
+
+    it('normalizes user timestamp appearance settings', () => {
+      const normalized = normalizeChatAppearanceSettings({
+        user: {
+          timeFontSize: 48,
+          timeFontWeight: 975,
+          timeColor: '#7f8c9f',
+        },
+      });
+
+      expect(normalized.user.timeFontSize).toBe(36);
+      expect(normalized.user.timeFontWeight).toBe(900);
+      expect(normalized.user.timeColor).toBe('#7f8c9f');
     });
 
     it('uses the legacy shared metadata font size as a fallback for separate time/model sizes', () => {

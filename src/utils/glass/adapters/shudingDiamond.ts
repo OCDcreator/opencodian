@@ -1600,11 +1600,11 @@ export const adapter: GlassEffectAdapter = {
 };
 
 export {
-  IOR,
-  MAX_INTERNAL_BOUNCES,
   applyEdgeBulge,
   convexHull,
   createDiamondContext,
+  IOR,
+  MAX_INTERNAL_BOUNCES,
   reflectVector,
   refractVector,
   resolveTransmissionDirection,

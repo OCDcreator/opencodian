@@ -15,6 +15,9 @@ describe('chatAppearance utilities', () => {
     appearance.background.fitMode = 'fit-height';
     appearance.background.opacity = 80;
     appearance.background.edgeFade = 36;
+    appearance.user.timeFontSize = 12;
+    appearance.user.timeFontWeight = 500;
+    appearance.user.timeColor = '#7c8798';
     appearance.assistant.backgroundOpacity = 55;
     appearance.assistant.metaFontSize = 12;
     appearance.assistant.timeFontSize = 13;
@@ -34,6 +37,9 @@ describe('chatAppearance utilities', () => {
     expect(cssVariables['--opencodian-theme-bg-size']).toBe('auto 100%');
     expect(cssVariables['--opencodian-theme-bg-opacity']).toBe('0.8');
     expect(cssVariables['--opencodian-theme-bg-edge-fade']).toBe('36px');
+    expect(cssVariables['--opencodian-user-time-font-size']).toBe('12px');
+    expect(cssVariables['--opencodian-user-time-font-weight']).toBe('500');
+    expect(cssVariables['--opencodian-user-time-color']).toBe('#7c8798');
     expect(cssVariables['--opencodian-assistant-bg-opacity']).toBe('55%');
     expect(cssVariables['--opencodian-assistant-meta-font-size']).toBe('12px');
     expect(cssVariables['--opencodian-assistant-time-font-size']).toBe('13px');

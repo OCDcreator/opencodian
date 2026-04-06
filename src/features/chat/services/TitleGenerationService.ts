@@ -1,3 +1,4 @@
+import { parseModelReference, resolveModelSelection } from '../../../core/config/modelConfig';
 import type { LocalOutputFormat } from '../../../core/opencode/types';
 import {
   buildTitleGenerationPrompt,
@@ -46,7 +47,7 @@ export class TitleGenerationService {
     const controller = new AbortController();
     this.activeGenerations.set(conversationId, controller);
 
-    const { provider, model } = this.resolveModel(currentModel);
+    const { provider, model } = await this.resolveModel(currentModel);
     const locale = normalizeTitleGenerationLocale(this.plugin.settings.locale);
     const prompt = buildTitleGenerationPrompt(this.truncateText(userMessage, 600), locale);
 
@@ -112,23 +113,42 @@ export class TitleGenerationService {
     this.activeGenerations.clear();
   }
 
-  private resolveModel(currentModel: { provider: string; model: string }): { provider: string; model: string } {
+  private async resolveModel(currentModel: { provider: string; model: string }): Promise<{ provider: string; model: string }> {
     const configuredModel = this.plugin.settings.aiTitleModel.trim();
     if (!configuredModel) {
       return currentModel;
     }
 
-    const separatorIndex = configuredModel.indexOf('/');
-    if (separatorIndex > 0 && separatorIndex < configuredModel.length - 1) {
-      return {
-        provider: configuredModel.slice(0, separatorIndex),
-        model: configuredModel.slice(separatorIndex + 1),
-      };
+    const explicitModel = parseModelReference(configuredModel);
+    if (!explicitModel) {
+      return currentModel;
+    }
+
+    if (!this.plugin.modelConfigService) {
+      return explicitModel;
+    }
+
+    try {
+      const catalogs = await this.plugin.modelConfigService.getCatalogs(
+        this.plugin.settings.modelSourceMode,
+        this.plugin.settings.disabledModelRefs,
+      );
+      const resolution = resolveModelSelection(
+        catalogs.baseEffective,
+        catalogs.effective,
+        explicitModel.provider,
+        explicitModel.model,
+      );
+      if (resolution.status === 'available') {
+        return explicitModel;
+      }
+    } catch {
+      // Fall back to the current conversation model if availability could not be resolved.
     }
 
     return {
       provider: currentModel.provider,
-      model: configuredModel,
+      model: currentModel.model,
     };
   }
 

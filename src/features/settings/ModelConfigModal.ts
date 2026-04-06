@@ -32,6 +32,8 @@ interface ProviderFormState {
 export class ModelConfigModal extends Modal {
   private modelValue = '';
   private smallModelValue = '';
+  private enabledProviders: string[] | null = null;
+  private disabledProviders: string[] | null = null;
   private providers: ProviderFormState[] = [];
   private restartToggleEl: HTMLInputElement | null = null;
   private providersEl: HTMLElement | null = null;
@@ -102,6 +104,8 @@ export class ModelConfigModal extends Modal {
   private hydrate(config: OpencodeModelConfigSubset): void {
     this.modelValue = config.model ?? '';
     this.smallModelValue = config.small_model ?? '';
+    this.enabledProviders = Array.isArray(config.enabled_providers) ? [...config.enabled_providers] : null;
+    this.disabledProviders = Array.isArray(config.disabled_providers) ? [...config.disabled_providers] : null;
     this.providers = Object.entries(config.provider ?? {}).map(([providerId, provider]) => ({
       id: providerId,
       name: typeof provider.name === 'string' ? provider.name : '',
@@ -381,6 +385,8 @@ export class ModelConfigModal extends Modal {
       model: this.modelValue.trim() || undefined,
       small_model: this.smallModelValue.trim() || undefined,
       provider: providerEntries,
+      enabled_providers: this.enabledProviders ? [...this.enabledProviders] : undefined,
+      disabled_providers: this.disabledProviders ? [...this.disabledProviders] : undefined,
     };
   }
 

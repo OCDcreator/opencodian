@@ -1,17 +1,12 @@
+import { createLogger } from '../../shared/logger';
 import {
   applyEdgeBulge,
-  traceDiamondRay,
   type DiamondContext,
   type DiamondSize,
+  traceDiamondRay,
 } from '../../utils/glass/adapters/shudingDiamond';
-import { createLogger } from '../../shared/logger';
 
 type Vec3 = [number, number, number];
-
-type DiamondTransform = Pick<
-  DiamondContext,
-  'thetaCos' | 'thetaSin' | 'phiCos' | 'phiSin'
->;
 
 type DiamondFace = {
   vertices: [Vec3, Vec3, Vec3];
@@ -75,10 +70,6 @@ const SHAPE_SCALE = 0.9;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
-}
-
-function add3(a: Vec3, b: Vec3): Vec3 {
-  return [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
 }
 
 function sub3(a: Vec3, b: Vec3): Vec3 {

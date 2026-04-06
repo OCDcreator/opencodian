@@ -372,6 +372,34 @@ export function normalizeProviderIconLibrary(value: unknown): ProviderIconLibrar
   return normalizedLibrary;
 }
 
+export function normalizeDisabledModelRefs(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return Array.from(
+    new Set(
+      value
+        .filter((item): item is string => typeof item === 'string')
+        .map((item) => item.trim())
+        .flatMap((item) => {
+          const slashIndex = item.indexOf('/');
+          if (slashIndex <= 0 || slashIndex >= item.length - 1) {
+            return [];
+          }
+
+          const provider = item.slice(0, slashIndex).trim();
+          const model = item.slice(slashIndex + 1).trim();
+          if (!provider || !model) {
+            return [];
+          }
+
+          return [`${provider}/${model}`];
+        }),
+    ),
+  );
+}
+
 /**
  * Get blocked commands for the Bash tool.
  *
@@ -427,6 +455,9 @@ export interface ChatAppearanceUserSettings {
   tailRadius: number;
   blur: number;
   shadowBlur: number;
+  timeFontSize: number;
+  timeFontWeight: number;
+  timeColor: string;
 }
 
 export interface ChatAppearanceAssistantSettings {
@@ -583,6 +614,9 @@ export function getDefaultChatAppearanceSettings(): ChatAppearanceSettings {
       tailRadius: 4,
       blur: 12,
       shadowBlur: 28,
+      timeFontSize: 11,
+      timeFontWeight: 400,
+      timeColor: 'var(--text-muted)',
     },
     assistant: {
       radius: 14,
@@ -1159,6 +1193,9 @@ export function normalizeChatAppearanceSettings(
     user: {
       ...defaults.user,
       ...(appearance?.user ?? {}),
+      timeFontSize: normalizeFiniteNumberInRange(appearance?.user?.timeFontSize, defaults.user.timeFontSize, 6, 36),
+      timeFontWeight: normalizeFontWeightValue(appearance?.user?.timeFontWeight, defaults.user.timeFontWeight),
+      timeColor: normalizeCssColorValue(appearance?.user?.timeColor, defaults.user.timeColor),
     },
     assistant: {
       ...defaults.assistant,
@@ -1339,6 +1376,7 @@ export interface OpenCodianSettings {
   questionCardPosition: QuestionCardPosition;
   showAnsweredQuestionCards: boolean;
   aiTitleModel: string;
+  disabledModelRefs: string[];
   renderUserMarkupAsCodeBlocks: boolean;
   pluginIsolationMode: PluginIsolationMode;
   providers: ModelProviderConfig[];
@@ -1414,6 +1452,7 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
   questionCardPosition: 'inline',
   showAnsweredQuestionCards: true,
   aiTitleModel: '',
+  disabledModelRefs: [],
   renderUserMarkupAsCodeBlocks: true,
   pluginIsolationMode: 'default',
   providers: [

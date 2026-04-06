@@ -12,6 +12,76 @@
 
 ---
 
+## 2026-04-06 新增模型可用范围管理，并补齐用户时间样式与标题模型回退
+
+### 🎯 改动目标
+
+- 让 OpenCodian 能在插件内直接控制哪些 provider / model 仍然可被选择，而不是只能被动接受本地或服务端 catalog
+- 避免默认模型或 AI 标题模型被禁用后继续落到不可用状态，同时给用户消息底部时间行补齐独立的样式控制
+
+### ✅ 本轮调整
+
+- `src/core/config/modelConfig.ts`
+- `src/core/config/ModelConfigService.ts`
+- `src/core/config/index.ts`
+  - 新增 `ModelReference` / `ResolvedModelSelection` 能力，以及 `formatModelReference()`、`collectConfiguredProviderIds()`、`isProviderEnabled()`、`setProviderEnabled()`、`filterCatalog()`、`resolveModelSelection()` 等模型可用性辅助函数
+  - `ModelConfigService.getCatalogs()` 现在同时返回 `baseEffective` 和过滤后的 `effective`：前者保留原始合并 catalog，后者再叠加本地 provider 开关与插件侧 `disabledModelRefs`
+  - `getLocalProviderIds()` 改为遵守 `enabled_providers` / `disabled_providers` 白名单与黑名单逻辑，而不是只看 `provider` 字段是否存在
+
+- `src/core/types/settings.ts`
+- `src/core/types/index.ts`
+- `src/main.ts`
+  - 新增 `disabledModelRefs` 设置项及归一化逻辑，只保留合法的 `provider/model` 引用
+  - 新增用户消息时间样式配置：`timeFontSize`、`timeFontWeight`、`timeColor`
+  - 插件加载设置时开始持久化并恢复 `disabledModelRefs`，同时不再在服务端模型加载后强行覆写用户的默认 provider/model
+
+- `src/features/settings/OpenCodianSettings.ts`
+- `src/features/settings/ModelConfigModal.ts`
+- `src/i18n/locales/en.ts`
+- `src/i18n/locales/zh.ts`
+- `styles.css`
+  - 模型设置区新增“提供商与模型可用范围”面板：provider 开关写回本地 `.opencode` 配置，model 开关保存在插件设置里
+  - provider / model 下拉、标题模型下拉、图标缓存来源都会基于过滤后的有效 catalog 刷新，默认模型失效时会自动清空而不是悄悄回落到别的模型
+  - 本地模型配置弹窗现在会保留并回写 `enabled_providers` / `disabled_providers`
+  - 用户消息底部时间行新增独立字号、字重、颜色设置，并补齐对应样式变量与中英文本案
+
+- `src/features/chat/OpenCodianView.ts`
+- `src/features/chat/chatAppearance.ts`
+  - 聊天视图加载模型时改为持有完整 `ModelCatalogBundle`，并在 UI 层区分“未配置 / 可用 / 不可用”三种状态
+  - 当前会话模型若已被禁用或从有效 catalog 中移除，模型选择器会进入 `is-unavailable` 警示态，同时发送前会阻止请求并插入模型不可用 notice
+  - 上下文使用环、模型显示文本、tooltip 等会优先读取解析后的模型名称，避免 catalog 过滤后丢失基本展示信息
+  - 收敛助手最终同步调试日志，只保留关键阶段和按阈值输出的流式进度日志，降低高频噪音
+
+- `src/features/chat/services/TitleGenerationService.ts`
+- `src/core/opencode/OpenCodeService.ts`
+- `src/core/opencode/ServerManager.ts`
+  - AI 标题模型若被禁用或不在有效 catalog 中，标题生成会自动回退到当前会话模型，而不是继续请求失效模型
+  - `OpenCodeService.autoFetchModels()` 改成只通知模型刷新，不再擅自改写默认 provider/model
+  - `ServerManager` 在 local source mode 下生成 `OPENCODE_CONFIG_CONTENT` 时，也会遵守 provider 白名单 / 黑名单结果
+
+- `tests/unit/core/config/ModelConfigService.test.ts`
+- `tests/unit/core/config/modelConfig.test.ts`
+- `tests/unit/core/opencode/ServerManager.test.ts`
+- `tests/unit/core/types/settings.test.ts`
+- `tests/unit/features/chat/TitleGenerationService.test.ts`
+- `tests/unit/features/chat/chatAppearance.test.ts`
+  - 新增 base/effective catalog 拆分、provider 开关规则、disabled model 过滤、失效标题模型回退、用户时间样式变量，以及 local-only server config 过滤等回归测试
+
+### 🧠 架构变化
+
+- 模型 catalog 现在不再只有一个“最终结果”概念，而是拆成：
+  - `baseEffective`：按 local / server / merge source mode 解析后的基础有效 catalog
+  - `effective`：在 `baseEffective` 之上继续叠加本地 provider 开关和插件侧 model 禁用列表后的最终可选 catalog
+- 这意味着模型选择、标题生成、图标缓存、ServerManager 本地环境生成和设置 UI 都需要明确区分“基础 catalog 仍然认识这个模型”与“当前 UI 允许用户继续选择这个模型”这两个层次
+
+### 🧪 当前验证
+
+- 已通过：`npm run check:devlog-order`
+- 已通过：`npm test -- tests/unit/core/config/ModelConfigService.test.ts tests/unit/core/config/modelConfig.test.ts tests/unit/core/opencode/ServerManager.test.ts tests/unit/core/types/settings.test.ts tests/unit/features/chat/TitleGenerationService.test.ts tests/unit/features/chat/chatAppearance.test.ts`
+- 已通过：`npm run build`（`BUILD_ID: main.202604061034`）
+- 已部署：`dist/main.js`、`dist/manifest.json`、`dist/styles.css` 已复制到 Test Vault，并确认插件端 `main.js` 含最新 `BUILD_ID: main.202604061034`
+- 未执行：完整 Jest 测试套件
+
 ## 2026-04-05 修正助手最终同步重复/丢块问题，并优化样式数值控件交互
 
 ### 🎯 改动目标

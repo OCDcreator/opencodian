@@ -356,10 +356,16 @@ Resolves local OpenCode model config and server-provided model catalogs.
 
 **Key Methods:**
 
-- `getCatalogs(mode)` - Build local / server / effective model catalogs
+- `getCatalogs(mode, disabledModelRefs?)` - Build local / server / `baseEffective` / filtered `effective` model catalogs
 - `readLocalModelConfig()` - Read model-related OpenCode config subset
 - `writeLocalModelConfig(subset)` - Persist model config subset
 - `isModelAvailableOnServer(provider, model)` - Validate server-side availability
+
+**Current responsibilities:**
+
+- Preserve a distinction between the source-mode-resolved `baseEffective` catalog and the user-selectable `effective` catalog
+- Apply local `enabled_providers` / `disabled_providers` plus plugin-side `disabledModelRefs` without mutating the base catalog
+- Provide the catalog data that settings UI, chat model selection, title-generation fallback, and provider-icon cache all consume
 
 ### 4. PluginManagementService (`src/core/config/PluginManagementService.ts`)
 
@@ -405,6 +411,7 @@ Main chat UI view (extends Obsidian's `ItemView`).
 - Inline composer context chips with per-tab focus preview, attach/detach toggles, and a built-in `+` file picker entry point
 - Cached vault file picker with suffix filters, search, and hidden-path exclusion
 - Per-session model switching dropdown
+- Model availability resolution that distinguishes configured / available / unavailable selections
 - Composer textarea that auto-grows with a capped max height and internal scrolling once capped
 - Toolbar controls for model selection, context usage ring, and effort / thinking budget
 - Real-time streaming display
@@ -426,6 +433,11 @@ Main chat UI view (extends Obsidian's `ItemView`).
 - Background-task in-progress indicator and follow-up pseudo-stream reveal
 - Hidden background-task tab sync and per-tab permission card routing
 
+**Model selection note:**
+
+- `OpenCodianView` now keeps the full `ModelCatalogBundle` in memory so it can show disabled/unavailable models accurately without losing provider/model display metadata from the base catalog
+- Sending is blocked when the requested model is unconfigured or unavailable in the filtered `effective` catalog, and the chat inserts the model-unavailable notice path instead
+
 ### 7. OpenCodianSettingTab (`src/features/settings/OpenCodianSettings.ts`)
 
 Settings UI with bilingual support (English/Chinese).
@@ -434,12 +446,12 @@ Settings UI with bilingual support (English/Chinese).
 
 - **Language**: Interface language selection
 - **Server**: Local / remote mode, auth, health status, help modal
-- **Model**: Source mode, default provider/model, model refresh, local visual/JSON config editors, provider icon cache, and custom provider icon library management
+- **Model**: Source mode, default provider/model, provider-level availability toggles persisted to local `.opencode` config, model-level availability toggles persisted to plugin settings (`disabledModelRefs`), model refresh, local visual/JSON config editors, provider icon cache, and custom provider icon library management
 - **Conversation**: Conversation title mode (default/ai), AI title model override, question display mode, question card position, answered-question recap visibility, and user-markup rendering preferences
 - **Plugins**: Global/plugin visibility, project `plugin` config, project plugin directory, pure mode, OMO config entry
 - **Security**: Permission mode, config editor, command blocklist, export paths
 - **UI**: Max tabs, tab bar position, auto-scroll, chat scroll mode, open in main tab
-- **Style**: Chat appearance controls, theme background upload/tuning, edge blending, and custom CSS declarations
+- **Style**: Chat appearance controls, theme background upload/tuning, edge blending, custom CSS declarations, and separate user-message timestamp typography/color controls
 - **Theme presets**: Built-in theme style/scheme switching, preset reset, and post-preset appearance fine-tuning
 - **Debug**: Debug logging, per-platform log paths, diagnostics export
 - **User**: User name, system prompt, excluded tags
@@ -484,6 +496,7 @@ AI-powered conversation title generation service. Creates concise titles by send
 **Configuration:**
 
 - `aiTitleModel` setting - Override the model used for title generation (format: `provider/model`), or leave empty to follow the current session model
+- Title model override is availability-aware: if the configured override is filtered out of the effective catalog, title generation falls back to the active conversation model
 - `locale` setting - Drives the language of AI-generated titles (`zh` => Chinese, `en` => English)
 - `titleGenerationStatus` on conversations - Tracks state: `'pending'` | `'success'` | `'failed'`
 
@@ -561,7 +574,7 @@ Shared registry and adapter layer for input-panel glass effects plus experimenta
 1. **New settings**: Add to `OpenCodianSettings` interface, add UI in `OpenCodianSettings.ts`
 2. **New commands**: Register in `main.ts` `onload()` method
 3. **New message types**: Extend `StreamChunk` type in `src/core/types/chat.ts`
-4. **Model config changes**: Keep `ModelConfigService`, settings UI, and `.opencode/config.json` writes in sync
+4. **Model config changes**: Keep `ModelConfigService`, settings UI, `.opencode/config.json` writes, `disabledModelRefs`, and any `baseEffective` vs `effective` catalog assumptions in sync
 5. **Plugin management changes**: Keep `PluginManagementService`, `OpencodeConfigManager`, pure-mode server env, and plugin settings UI synchronized
 6. **Chat UI additions**: Check `features/chat/tabs/`, `features/chat/ui/`, `renderGroups.ts`, `OpenCodianView.ts`, and `styles.css` together
 7. **Theme preset changes**: Keep `src/core/theme/`, `src/core/types/settings.ts`, `src/main.ts`, `OpenCodianView.ts`, `OpenCodianSettings.ts`, and `styles.css` synchronized so preset base values, runtime application, migration, and UI reset behavior stay aligned
@@ -582,6 +595,7 @@ Before handing off work, agents should verify the following when relevant:
 - **Prompt or title changes**: Keep `src/core/prompts/titleGeneration.ts`, `src/features/chat/services/TitleGenerationService.ts`, and locale-driven behavior aligned.
 - **Plugin changes**: Keep project config writes, plugin source visibility, `pluginIsolationMode`, and local-server restart expectations aligned.
 - **Settings or i18n changes**: Keep `DEFAULT_SETTINGS`, settings UI, and both locale files synchronized.
+- **Model availability changes**: Keep provider toggles, `disabledModelRefs`, title-model fallback, chat model resolution, provider icon cache refresh, and local-server env generation synchronized.
 - **Theme preset changes**: Keep preset definitions, theme migration, effective `chatAppearance`, and reset semantics synchronized across `core/theme`, `settings.ts`, `main.ts`, settings UI, and `styles.css`.
 - **Glass / diamond changes**: Keep runtime adapter registration, stored defaults/migrations, settings exposure, demo commands, and CSS layers synchronized so experimental adapters do not leak into public UI unintentionally.
 - **SDK migration changes**: Preserve rollback paths, keep rollout flags explicit, and update the mapping/checklist docs when module status changes.
