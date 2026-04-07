@@ -12,11 +12,6 @@ import { Notice, requestUrl } from 'obsidian';
 import * as path from 'path';
 
 import { createLogger } from '../../shared';
-import {
-  collectConfiguredProviderIds,
-  getEnabledProviderIds,
-  parseOpencodeConfigText,
-} from '../config/modelConfig';
 import type { ManagedServerState, OpenCodeServerConfig } from './types';
 
 const logger = createLogger('ServerManager');
@@ -88,6 +83,10 @@ export class ServerManager {
   /** Check if server is running */
   isRunning(): boolean {
     return this.status === 'running' && this.managedServerState !== null;
+  }
+
+  getManagedServerStateSnapshot(): ManagedServerState | null {
+    return this.managedServerState ? { ...this.managedServerState } : null;
   }
 
   /** Update server configuration */
@@ -317,7 +316,26 @@ export class ServerManager {
         logger.debug(`  Binary: ${opencodePath}`);
         logger.debug(`  Working directory: ${this.workingDirectory || 'current directory'}`);
         logger.debug(`  Config path: ${this.workingDirectory ? `${this.workingDirectory}/.opencode/opencode.json` : 'N/A'}`);
+        logger.debug('  Spawn context:', {
+          mode: this.config.mode,
+          modelSourceMode: this.config.modelSourceMode,
+          pluginIsolationMode: this.config.pluginIsolationMode,
+          managedServerState: this.getManagedServerStateSnapshot(),
+        });
         
+        const spawnEnv = this.getSpawnEnv();
+        logger.debug('  Spawn env summary:', {
+          hasDisableProjectConfig: typeof spawnEnv.OPENCODE_DISABLE_PROJECT_CONFIG === 'string',
+          disableProjectConfig: spawnEnv.OPENCODE_DISABLE_PROJECT_CONFIG ?? null,
+          hasConfigDir: typeof spawnEnv.OPENCODE_CONFIG_DIR === 'string',
+          configDir: spawnEnv.OPENCODE_CONFIG_DIR ?? null,
+          hasConfigContent: typeof spawnEnv.OPENCODE_CONFIG_CONTENT === 'string',
+          configContentLength: spawnEnv.OPENCODE_CONFIG_CONTENT?.length ?? 0,
+          serverUsernameConfigured: typeof spawnEnv.OPENCODE_SERVER_USERNAME === 'string' && spawnEnv.OPENCODE_SERVER_USERNAME.length > 0,
+          serverPasswordConfigured: typeof spawnEnv.OPENCODE_SERVER_PASSWORD === 'string' && spawnEnv.OPENCODE_SERVER_PASSWORD.length > 0,
+          pureMode: spawnEnv.OPENCODE_PURE ?? null,
+        });
+
         this.process = spawn(opencodePath, [
           'serve',
           '--port', String(this.config.local.port),
@@ -328,7 +346,7 @@ export class ServerManager {
           detached: false,
           stdio: ['ignore', 'pipe', 'pipe'],
           cwd: this.workingDirectory,
-          env: this.getSpawnEnv(),
+          env: spawnEnv,
         });
         this.setManagedServerState(this.process.pid);
 
@@ -640,38 +658,10 @@ export class ServerManager {
       return env;
     }
 
-    env.OPENCODE_DISABLE_PROJECT_CONFIG = 'true';
-    if (this.workingDirectory) {
-      env.OPENCODE_CONFIG_DIR = path.join(this.workingDirectory, '.opencode');
-    }
-
-    const providerIds = this.getLocalProviderIds();
-    env.OPENCODE_CONFIG_CONTENT = JSON.stringify({
-      enabled_providers: providerIds,
-    });
+    delete env.OPENCODE_DISABLE_PROJECT_CONFIG;
+    delete env.OPENCODE_CONFIG_DIR;
+    delete env.OPENCODE_CONFIG_CONTENT;
 
     return env;
-  }
-
-  private getLocalProviderIds(): string[] {
-    if (!this.workingDirectory) {
-      return [];
-    }
-
-    for (const filename of ['opencode.json', 'opencode.jsonc']) {
-      const filepath = path.join(this.workingDirectory, '.opencode', filename);
-      if (!fs.existsSync(filepath)) {
-        continue;
-      }
-
-      try {
-        const config = parseOpencodeConfigText(fs.readFileSync(filepath, 'utf-8'));
-        return getEnabledProviderIds(config, collectConfiguredProviderIds(config));
-      } catch (error) {
-        logger.error('Failed to parse local model config for source mode:', error);
-      }
-    }
-
-    return [];
   }
 }

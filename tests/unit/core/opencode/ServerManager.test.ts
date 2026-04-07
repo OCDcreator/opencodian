@@ -173,7 +173,7 @@ describe('ServerManager', () => {
   });
 
   describe('local-only model source mode', () => {
-    it('should disable all providers when local config has no models', () => {
+    it('should not inject a provider whitelist into the managed server env', () => {
       manager = new ServerManager({
         ...defaultConfig,
         modelSourceMode: 'local',
@@ -188,12 +188,12 @@ describe('ServerManager', () => {
       manager.setWorkingDirectory(testVaultPath);
       const env = (manager as any).getSpawnEnv() as NodeJS.ProcessEnv;
 
-      expect(env.OPENCODE_DISABLE_PROJECT_CONFIG).toBe('true');
-      expect(env.OPENCODE_CONFIG_DIR).toBe(path.join(testVaultPath, '.opencode'));
-      expect(env.OPENCODE_CONFIG_CONTENT).toBe(JSON.stringify({ enabled_providers: [] }));
+      expect(env.OPENCODE_DISABLE_PROJECT_CONFIG).toBeUndefined();
+      expect(env.OPENCODE_CONFIG_DIR).toBeUndefined();
+      expect(env.OPENCODE_CONFIG_CONTENT).toBeUndefined();
     });
 
-    it('should respect enabled_providers and disabled_providers when building local-only config content', () => {
+    it('should ignore local enabled_providers and disabled_providers when preparing server env', () => {
       manager = new ServerManager({
         ...defaultConfig,
         modelSourceMode: 'local',
@@ -217,7 +217,9 @@ describe('ServerManager', () => {
       manager.setWorkingDirectory(testVaultPath);
       const env = (manager as any).getSpawnEnv() as NodeJS.ProcessEnv;
 
-      expect(env.OPENCODE_CONFIG_CONTENT).toBe(JSON.stringify({ enabled_providers: ['openai'] }));
+      expect(env.OPENCODE_DISABLE_PROJECT_CONFIG).toBeUndefined();
+      expect(env.OPENCODE_CONFIG_DIR).toBeUndefined();
+      expect(env.OPENCODE_CONFIG_CONTENT).toBeUndefined();
     });
   });
 

@@ -616,6 +616,14 @@ export default class OpenCodianPlugin extends Plugin {
             chatAppearance: normalizedChatAppearance,
             theme: normalizedTheme,
             tabState: normalizedTabState,
+            modelAvailabilitySectionOpen:
+              typeof savedSettings.modelAvailabilitySectionOpen === 'boolean'
+                ? savedSettings.modelAvailabilitySectionOpen
+                : DEFAULT_SETTINGS.modelAvailabilitySectionOpen,
+            modelToolsSectionOpen:
+              typeof savedSettings.modelToolsSectionOpen === 'boolean'
+                ? savedSettings.modelToolsSectionOpen
+                : DEFAULT_SETTINGS.modelToolsSectionOpen,
             providerIconLibrary: normalizedProviderIconLibrary,
           };
         })()

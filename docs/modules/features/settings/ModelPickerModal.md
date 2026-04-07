@@ -5,7 +5,7 @@
 
 ## 概述
 
-`ModelPickerModal` 是设置侧复用的模型搜索弹层。它把模型列表按 provider 分组展示，支持搜索、键盘上下选择、回车确认，以及一个可选的“空值”入口。
+`ModelPickerModal` 是设置侧复用的模型选择弹层。它把模型列表按 provider 分组展示，支持 provider 下拉筛选、名称/ID 搜索、键盘上下选择、回车确认，以及一个可选的“空值”入口。
 
 当前主要被两处消费：
 
@@ -14,10 +14,11 @@
 
 ## 核心行为
 
-- 输入搜索词后，按 provider / model 名称和 ID 过滤
+- 可先通过 provider 下拉缩小范围，再按 provider / model 名称和 ID 过滤
 - 保留 provider 分组结构，而不是退化成扁平列表
 - 支持一个顶部的空值选项，例如“未配置”或“跟随当前会话模型”
 - 选中后通过回调把 `ModelPickerOption | null` 交回调用方，再由调用方决定写回哪个设置字段
+- 搜索框带常驻清空按钮和本地最近搜索历史，历史候选层使用插件自绘浮层，避免原生 `datalist` 在 Obsidian 滚动容器里出现定位漂移
 
 ## 关键输入
 
@@ -34,11 +35,12 @@ interface ModelPickerModalOptions {
 
 ## 与其他模块的交互
 
-- `modelPicker.ts`: 提供 `ModelPickerGroup` / `ModelPickerOption` 和过滤 helper
+- `modelPicker.ts`: 提供 `ModelPickerGroup` / `ModelPickerOption` 和 provider + 搜索过滤 helper
 - `OpenCodianSettings.ts`: 打开默认模型 picker
 - `OpenCodianSettings.ts` 的会话分区：打开 AI 标题模型 picker
 
 ## 注意事项
 
 - 这个 modal 不直接读写插件设置；它只负责 UI 和选择结果回调
-- 搜索和高亮状态都是弹层会话内状态，不做持久化
+- 搜索高亮状态仍然是弹层会话内状态，但搜索框会提供清空按钮和本地最近搜索历史
+- 最近搜索历史只存在本地 `localStorage`，并按当前输入做前端过滤

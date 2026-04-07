@@ -13,6 +13,7 @@ import { type ModelCatalogBundle,OpencodeConfigManager, PluginManagementService 
 import {
   formatModelReference,
   isProviderEnabled,
+  mergeCatalogs,
   type ModelCatalog,
   type ModelCatalogProvider,
   parseModelReference,
@@ -54,6 +55,7 @@ import { ModelConfigModal } from './ModelConfigModal';
 import { ModelPickerModal } from './ModelPickerModal';
 import { OpencodeConfigModal } from './OpencodeConfigModal';
 import { ProviderIconCacheModal } from './ProviderIconCacheModal';
+import { enhanceSearchInput } from './searchInputEnhancer';
 import { type ServerHelpTopic, ServerSettingHelpModal } from './ServerSettingHelpModal';
 import {
   buildModelPickerGroups,
@@ -176,14 +178,18 @@ export class OpenCodianSettingTab extends PluginSettingTab {
   private refreshModelsCallback?: () => void;
   private refreshTitleModelsCallback?: () => void;
   private refreshServerStatusCallback?: () => Promise<void>;
+  private refreshModelCatalogStatusCallback?: () => void;
   private serverStatusIntervalId: number | null = null;
   private modelRefreshFrameId: number | null = null;
-  private activeModelCatalogTab: 'local' | 'server' | 'effective' = 'effective';
-  private modelAvailabilitySectionOpen = false;
-  private modelToolsSectionOpen = false;
+  private lastKnownServerHealthy = false;
+  private lastKnownServerStatus = 'stopped';
+  private activeModelCatalogTab: 'local' | 'server' | 'effective' | 'disabled' = 'effective';
+  private modelAvailabilitySectionOpen = true;
+  private modelToolsSectionOpen = true;
   private expandedModelAvailabilityProviders = new Set<string>();
   private modelAvailabilityQuery = '';
   private modelAvailabilityOnlyDisabled = false;
+  private modelAvailabilityOnlyEnabled = false;
   private settingsScrollHandler?: () => void;
   private settingsScrollContainerEl: HTMLElement | null = null;
   private lastObservedSettingsScrollTop = 0;
@@ -207,6 +213,8 @@ export class OpenCodianSettingTab extends PluginSettingTab {
   constructor(app: App, plugin: OpenCodianPlugin) {
     super(app, plugin);
     this.plugin = plugin;
+    this.modelAvailabilitySectionOpen = plugin.settings.modelAvailabilitySectionOpen;
+    this.modelToolsSectionOpen = plugin.settings.modelToolsSectionOpen;
   }
 
   /** Called when models are auto-loaded - refreshes the model dropdowns */
@@ -224,6 +232,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
 
   refreshServerStatusDisplay(): void {
     void this.refreshServerStatusCallback?.();
+    this.refreshModelCatalogStatusCallback?.();
   }
 
   private buildInlineCodeFragment(text: string): DocumentFragment {
@@ -309,6 +318,8 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     const pendingOpenScrollTop = this.pendingOpenScrollTop;
     const pendingOpenSectionTitle = this.pendingOpenSectionTitle;
+    this.modelAvailabilitySectionOpen = this.plugin.settings.modelAvailabilitySectionOpen;
+    this.modelToolsSectionOpen = this.plugin.settings.modelToolsSectionOpen;
 
     this.clearSettingsPanelRestoreWork();
     if (this.serverStatusIntervalId) {
@@ -658,6 +669,8 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       
       // Get internal status
       const internalStatus = this.plugin.openCodeService.getServerStatus();
+      this.lastKnownServerHealthy = isHealthy;
+      this.lastKnownServerStatus = internalStatus;
       
       // Check if server is external (running but plugin has no process)
       isExternalServer = isHealthy && (internalStatus === 'stopped' || !this.plugin.openCodeService.isServerProcessRunning());
@@ -715,6 +728,8 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       if (refreshBtn) {
         refreshBtn.setButtonText(t('settings.server.status.refresh'));
       }
+
+      this.refreshModelCatalogStatusCallback?.();
     };
 
     this.refreshServerStatusCallback = updateStatus;
@@ -792,6 +807,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         this.serverStatusIntervalId = null;
       }
       this.refreshServerStatusCallback = undefined;
+      this.refreshModelCatalogStatusCallback = undefined;
     }, { once: true });
 
     return headingEl;
@@ -826,6 +842,8 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       defaultOpen: this.modelAvailabilitySectionOpen,
       onToggle: (isOpen) => {
         this.modelAvailabilitySectionOpen = isOpen;
+        this.plugin.settings.modelAvailabilitySectionOpen = isOpen;
+        this.plugin.scheduleSettingsUiStateSave();
       },
     });
     const toolsBodyEl = this.createSettingsBlock(containerEl, {
@@ -835,12 +853,12 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       defaultOpen: this.modelToolsSectionOpen,
       onToggle: (isOpen) => {
         this.modelToolsSectionOpen = isOpen;
+        this.plugin.settings.modelToolsSectionOpen = isOpen;
+        this.plugin.scheduleSettingsUiStateSave();
       },
     });
     const commonSummaryEl = commonBodyEl.createDiv({ cls: 'opencodian-model-common-summary' });
     const availabilityManagementEl = availabilityBodyEl.createDiv({ cls: 'opencodian-model-toggle-management' });
-    const sourceCatalogSummaryEl = toolsBodyEl.createDiv({ cls: 'opencodian-model-catalog-summary-grid' });
-    const sourceCatalogEl = toolsBodyEl.createDiv({ cls: 'opencodian-model-catalog' });
 
     const syncSettingsWithCatalogs = (nextCatalogs: ModelCatalogBundle): boolean => {
       const effectiveProviders = nextCatalogs.effective.providers;
@@ -934,14 +952,27 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       }).open();
     };
 
-    const renderAvailabilityManagement = (): void => {
+    const renderAvailabilityManagement = (
+      options: {
+        restoreSearchSelection?: {
+          start: number | null;
+          end: number | null;
+          direction?: 'forward' | 'backward' | 'none' | null;
+        };
+      } = {},
+    ): void => {
       availabilityManagementEl.empty();
 
-      const controlsEl = availabilityManagementEl.createDiv({ cls: 'opencodian-model-availability-controls' });
+      const blockEl = availabilityManagementEl.createDiv({ cls: 'opencodian-model-toggle-block' });
+      const descEl = blockEl.createDiv({ cls: 'opencodian-model-toggle-desc' });
+      this.applyInlineCodeText(descEl, t('settings.model.toggle.desc'));
+
+      const controlsEl = blockEl.createDiv({ cls: 'opencodian-model-availability-controls' });
       const searchWrapperEl = controlsEl.createDiv({ cls: 'opencodian-model-availability-search' });
-      const searchIconEl = searchWrapperEl.createSpan({ cls: 'opencodian-model-availability-search-icon' });
+      const searchContainerEl = searchWrapperEl.createDiv({ cls: 'opencodian-model-availability-search-container' });
+      const searchIconEl = searchContainerEl.createSpan({ cls: 'opencodian-model-availability-search-icon' });
       setIcon(searchIconEl, 'search');
-      const searchInputEl = searchWrapperEl.createEl('input', {
+      const searchInputEl = searchContainerEl.createEl('input', {
         cls: 'opencodian-model-availability-search-input',
         attr: {
           type: 'text',
@@ -949,10 +980,33 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         },
       });
       searchInputEl.value = this.modelAvailabilityQuery;
-      searchInputEl.addEventListener('input', () => {
-        this.modelAvailabilityQuery = searchInputEl.value;
-        renderAvailabilityManagement();
+      enhanceSearchInput({
+        historyKey: 'model-availability',
+        inputEl: searchInputEl,
+        containerEl: searchContainerEl,
       });
+      searchInputEl.addEventListener('input', () => {
+        const restoreSearchSelection = {
+          start: searchInputEl.selectionStart,
+          end: searchInputEl.selectionEnd,
+          direction: searchInputEl.selectionDirection,
+        };
+        this.modelAvailabilityQuery = searchInputEl.value;
+        renderAvailabilityManagement({ restoreSearchSelection });
+      });
+
+      if (options.restoreSearchSelection) {
+        window.requestAnimationFrame(() => {
+          if (!searchInputEl.isConnected) {
+            return;
+          }
+          searchInputEl.focus();
+          const { start, end, direction } = options.restoreSearchSelection;
+          if (start !== null && end !== null) {
+            searchInputEl.setSelectionRange(start, end, direction ?? 'none');
+          }
+        });
+      }
 
       const disabledToggleLabel = controlsEl.createEl('label', {
         cls: 'opencodian-model-availability-filter-toggle',
@@ -963,15 +1017,54 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       disabledToggleEl.checked = this.modelAvailabilityOnlyDisabled;
       disabledToggleEl.addEventListener('change', () => {
         this.modelAvailabilityOnlyDisabled = disabledToggleEl.checked;
+        if (disabledToggleEl.checked) {
+          this.modelAvailabilityOnlyEnabled = false;
+        }
         renderAvailabilityManagement();
       });
       disabledToggleLabel.createSpan({ text: t('settings.model.availability.onlyDisabled') });
 
-      const blockEl = availabilityManagementEl.createDiv({ cls: 'opencodian-model-toggle-block' });
-      const descEl = blockEl.createDiv({ cls: 'opencodian-model-toggle-desc' });
-      this.applyInlineCodeText(descEl, t('settings.model.toggle.desc'));
+      const enabledToggleLabel = controlsEl.createEl('label', {
+        cls: 'opencodian-model-availability-filter-toggle',
+      });
+      const enabledToggleEl = enabledToggleLabel.createEl('input', {
+        attr: { type: 'checkbox' },
+      });
+      enabledToggleEl.checked = this.modelAvailabilityOnlyEnabled;
+      enabledToggleEl.addEventListener('change', () => {
+        this.modelAvailabilityOnlyEnabled = enabledToggleEl.checked;
+        if (enabledToggleEl.checked) {
+          this.modelAvailabilityOnlyDisabled = false;
+        }
+        renderAvailabilityManagement();
+      });
+      enabledToggleLabel.createSpan({ text: t('settings.model.availability.onlyEnabled') });
 
-      const providers = catalogs?.baseEffective.providers ?? [];
+      if (catalogs) {
+        const catalogSectionEl = blockEl.createDiv({ cls: 'opencodian-model-toggle-catalogs' });
+        const summaryEl = catalogSectionEl.createDiv({ cls: 'opencodian-model-catalog-summary-grid' });
+        this.renderModelCatalogSummaryCards(summaryEl, catalogs, localModelConfig, () => {
+          renderAvailabilityManagement();
+        });
+      }
+
+      const selectedCatalog = catalogs
+        ? (() => {
+          switch (this.activeModelCatalogTab) {
+            case 'local':
+              return this.getDisplayCatalogForMode('local', catalogs, localModelConfig);
+            case 'server':
+              return this.getDisplayCatalogForMode('server', catalogs, localModelConfig);
+            case 'disabled':
+              return this.getDisplayCatalogForMode('disabled', catalogs, localModelConfig);
+            case 'effective':
+            default:
+              return this.getDisplayCatalogForMode('effective', catalogs, localModelConfig);
+          }
+        })()
+        : null;
+
+      const providers = selectedCatalog?.providers ?? [];
       if (providers.length === 0) {
         blockEl.createDiv({
           cls: 'opencodian-model-toggle-empty',
@@ -991,7 +1084,11 @@ export class OpenCodianSettingTab extends PluginSettingTab {
           ? provider.models.filter((model) => disabledModelRefs.has(formatModelReference(provider.id, model.id))).length
           : provider.models.length;
         const hasDisabledState = !providerEnabled || disabledCount > 0;
+        const hasEnabledState = providerEnabled && disabledCount < provider.models.length;
         if (this.modelAvailabilityOnlyDisabled && !hasDisabledState) {
+          continue;
+        }
+        if (this.modelAvailabilityOnlyEnabled && !hasEnabledState) {
           continue;
         }
 
@@ -1006,6 +1103,9 @@ export class OpenCodianSettingTab extends PluginSettingTab {
           }
 
           if (this.modelAvailabilityOnlyDisabled && providerEnabled && !disabledModelRefs.has(modelRef)) {
+            return false;
+          }
+          if (this.modelAvailabilityOnlyEnabled && (!providerEnabled || disabledModelRefs.has(modelRef))) {
             return false;
           }
 
@@ -1107,7 +1207,9 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         if (provider.models.length === 0) {
           providerEl.createDiv({
             cls: 'opencodian-model-toggle-empty',
-            text: t('settings.model.toggle.emptyModels'),
+            text: (this.activeModelCatalogTab === 'server' || this.activeModelCatalogTab === 'disabled') && !providerEnabled
+              ? t('settings.model.catalog.hiddenByLocalDisable')
+              : t('settings.model.toggle.emptyModels'),
           });
           continue;
         }
@@ -1117,7 +1219,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         }
 
         const modelsEl = providerEl.createDiv({ cls: 'opencodian-model-toggle-models' });
-        const modelsToRender = normalizedQuery.length > 0 || this.modelAvailabilityOnlyDisabled
+        const modelsToRender = normalizedQuery.length > 0 || this.modelAvailabilityOnlyDisabled || this.modelAvailabilityOnlyEnabled
           ? visibleModels
           : provider.models;
         if (modelsToRender.length === 0) {
@@ -1205,11 +1307,31 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         modelPickerGroups = buildModelPickerGroups(catalogs.effective);
         const dirty = syncSettingsWithCatalogs(catalogs);
 
+        const serializeCatalog = (catalog: ModelCatalog) => ({
+          defaults: { ...catalog.defaults },
+          providerCount: catalog.providers.length,
+          modelCount: this.getCatalogModelCount(catalog),
+          providers: catalog.providers.map((provider) => ({
+            id: provider.id,
+            name: provider.name,
+            source: provider.source,
+            existsInLocal: provider.existsInLocal,
+            existsInServer: provider.existsInServer,
+            modelCount: provider.models.length,
+            models: provider.models.map((model) => ({
+              id: model.id,
+              name: model.name,
+              source: model.source,
+              existsInLocal: model.existsInLocal,
+              existsInServer: model.existsInServer,
+              contextWindow: model.contextWindow,
+            })),
+          })),
+        });
+
         updateCommonSummary();
         updateDefaultModelButton();
         renderAvailabilityManagement();
-        this.renderModelCatalogSummaryCards(sourceCatalogSummaryEl, catalogs);
-        this.renderModelCatalogPanel(sourceCatalogEl, catalogs);
         this.refreshTitleModelsCallback?.();
 
         if (dirty || forceViewReload) {
@@ -1221,8 +1343,24 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         }
 
         if (showNotice) {
+          logger.debug('Manual model refresh snapshot', {
+            modelSourceMode: this.plugin.settings.modelSourceMode,
+            vaultPath: getVaultBasePath(this.app) ?? null,
+            disabledProviders: [...(localModelConfig.disabled_providers ?? [])],
+            enabledProviders: [...(localModelConfig.enabled_providers ?? [])],
+            disabledModelRefs: [...this.plugin.settings.disabledModelRefs],
+            selectedDefaultProvider: this.plugin.settings.defaultProvider,
+            selectedDefaultModel: this.plugin.settings.defaultModel,
+            selectedSmallModel: this.plugin.settings.smallModel,
+            local: serializeCatalog(catalogs.local),
+            server: serializeCatalog(catalogs.server),
+            baseEffective: serializeCatalog(catalogs.baseEffective),
+            effective: serializeCatalog(catalogs.effective),
+            disabled: serializeCatalog(this.getDisplayCatalogForMode('disabled', catalogs, localModelConfig)),
+          });
           new Notice(t('settings.model.refresh.success', {
-            count: String(catalogs.effective.providers.length),
+            serverCount: String(catalogs.server.providers.length),
+            effectiveCount: String(catalogs.effective.providers.length),
           }));
         }
 
@@ -1276,21 +1414,50 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       });
     this.setSettingDescWithFormatting(modelSourceSetting, t('settings.model.source.desc'));
 
+    let refreshModelsButton: import('obsidian').ButtonComponent | undefined;
+    let isRefreshingModelCatalog = false;
+    const updateModelRefreshButtonState = () => {
+      if (!refreshModelsButton) {
+        return;
+      }
+
+      const serverBusy = this.lastKnownServerStatus === 'starting' || this.lastKnownServerStatus === 'restarting';
+      refreshModelsButton.setButtonText(
+        isRefreshingModelCatalog
+          ? t('settings.model.refresh.loading')
+          : t('settings.model.refresh.button'),
+      );
+      refreshModelsButton.setDisabled(isRefreshingModelCatalog || !this.lastKnownServerHealthy || serverBusy);
+    };
+    this.refreshModelCatalogStatusCallback = updateModelRefreshButtonState;
+    updateModelRefreshButtonState();
+
     new Setting(commonBodyEl)
       .setName(t('settings.model.refresh.name'))
       .setDesc(t('settings.model.refresh.desc'))
-      .addButton((btn) =>
+      .addButton((btn) => {
+        refreshModelsButton = btn;
+        updateModelRefreshButtonState();
         btn
           .setButtonText(t('settings.model.refresh.button'))
           .onClick(async () => {
-            btn.setDisabled(true);
-            btn.setButtonText(t('settings.model.refresh.loading'));
+            isRefreshingModelCatalog = true;
+            updateModelRefreshButtonState();
+            const isHealthy = this.lastKnownServerHealthy || await this.plugin.openCodeService.checkHealth();
+            if (!isHealthy) {
+              this.lastKnownServerHealthy = false;
+              this.lastKnownServerStatus = this.plugin.openCodeService.getServerStatus();
+              isRefreshingModelCatalog = false;
+              updateModelRefreshButtonState();
+              new Notice(t('settings.model.refresh.unavailable'));
+              return;
+            }
             await refreshModelSettings({ showNotice: true, forceViewReload: true });
             await refreshIconCacheOverview();
-            btn.setDisabled(false);
-            btn.setButtonText(t('settings.model.refresh.button'));
-          })
-      );
+            isRefreshingModelCatalog = false;
+            updateModelRefreshButtonState();
+          });
+      });
 
     const modelConfigSetting = new Setting(toolsBodyEl)
       .setName(t('settings.model.config.name'))
@@ -5299,26 +5466,48 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     });
   }
 
-  private renderModelCatalogSummaryCards(containerEl: HTMLElement, catalogs: ModelCatalogBundle): void {
+  private renderModelCatalogSummaryCards(
+    containerEl: HTMLElement,
+    catalogs: ModelCatalogBundle,
+    localModelConfig: OpencodeModelConfigSubset | null,
+    onSelect?: () => void,
+  ): void {
     containerEl.empty();
 
-    const cards = [
+    const cards: Array<{
+      mode: 'local' | 'server' | 'effective' | 'disabled';
+      title: string;
+      catalog: ModelCatalog;
+    }> = [
       {
+        mode: 'local',
         title: t('settings.model.catalog.localTitle'),
-        catalog: catalogs.local,
+        catalog: this.getDisplayCatalogForMode('local', catalogs, localModelConfig),
       },
       {
+        mode: 'server',
         title: t('settings.model.catalog.serverTitle'),
-        catalog: catalogs.server,
+        catalog: this.getDisplayCatalogForMode('server', catalogs, localModelConfig),
       },
       {
+        mode: 'effective',
         title: t('settings.model.catalog.effectiveTitle'),
-        catalog: catalogs.effective,
+        catalog: this.getDisplayCatalogForMode('effective', catalogs, localModelConfig),
+      },
+      {
+        mode: 'disabled',
+        title: t('settings.model.catalog.disabledTitle'),
+        catalog: this.getDisplayCatalogForMode('disabled', catalogs, localModelConfig),
       },
     ];
 
     for (const card of cards) {
-      const cardEl = containerEl.createDiv({ cls: 'opencodian-model-catalog-summary-card' });
+      const cardEl = containerEl.createEl('button', { cls: 'opencodian-model-catalog-summary-card' });
+      cardEl.type = 'button';
+      if (card.mode === this.activeModelCatalogTab) {
+        cardEl.addClass('is-active');
+      }
+
       cardEl.createDiv({
         cls: 'opencodian-model-catalog-summary-card-title',
         text: card.title,
@@ -5330,16 +5519,25 @@ export class OpenCodianSettingTab extends PluginSettingTab {
           models: String(this.getCatalogModelCount(card.catalog)),
         }),
       });
+
+      cardEl.addEventListener('click', () => {
+        if (this.activeModelCatalogTab === card.mode) {
+          return;
+        }
+        this.activeModelCatalogTab = card.mode;
+        onSelect?.();
+      });
     }
   }
 
   private renderModelCatalogPanel(
     containerEl: HTMLElement,
     catalogs: ModelCatalogBundle,
+    localModelConfig: OpencodeModelConfigSubset | null,
   ): void {
     containerEl.empty();
-    const tabs: Array<{
-      mode: 'local' | 'server' | 'effective';
+    const sections: Array<{
+      mode: 'local' | 'server' | 'effective' | 'disabled';
       title: string;
       description: string;
       catalog: ModelCatalog;
@@ -5348,63 +5546,33 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         mode: 'local',
         title: t('settings.model.catalog.localTitle'),
         description: t('settings.model.catalog.localDesc'),
-        catalog: catalogs.local,
+        catalog: this.getDisplayCatalogForMode('local', catalogs, localModelConfig),
       },
       {
         mode: 'server',
         title: t('settings.model.catalog.serverTitle'),
         description: t('settings.model.catalog.serverDesc'),
-        catalog: catalogs.server,
+        catalog: this.getDisplayCatalogForMode('server', catalogs, localModelConfig),
       },
       {
         mode: 'effective',
         title: t('settings.model.catalog.effectiveTitle'),
         description: t('settings.model.catalog.effectiveDesc'),
-        catalog: catalogs.effective,
+        catalog: this.getDisplayCatalogForMode('effective', catalogs, localModelConfig),
+      },
+      {
+        mode: 'disabled',
+        title: t('settings.model.catalog.disabledTitle'),
+        description: t('settings.model.catalog.disabledDesc'),
+        catalog: this.getDisplayCatalogForMode('disabled', catalogs, localModelConfig),
       },
     ];
 
-    const activeTab = tabs.find((tab) => tab.mode === this.activeModelCatalogTab) ?? tabs[0];
+    const activeSection = sections.find((section) => section.mode === this.activeModelCatalogTab) ?? sections[0];
     const panelEl = containerEl.createDiv({ cls: 'opencodian-model-catalog-panel' });
-    const tabsEl = panelEl.createDiv({ cls: 'opencodian-model-catalog-tabs' });
-
-    for (const tab of tabs) {
-      const buttonEl = tabsEl.createEl('button', {
-        cls: 'opencodian-model-catalog-tab',
-        text: tab.title,
-      });
-      buttonEl.type = 'button';
-      if (tab.mode === activeTab.mode) {
-        buttonEl.addClass('is-active');
-      }
-
-      const countEl = buttonEl.createSpan({ cls: 'opencodian-model-catalog-tab-count' });
-      countEl.setText(String(this.getCatalogModelCount(tab.catalog)));
-
-      buttonEl.addEventListener('click', () => {
-        if (this.activeModelCatalogTab === tab.mode) {
-          return;
-        }
-        this.activeModelCatalogTab = tab.mode;
-        this.renderModelCatalogPanel(containerEl, catalogs);
-      });
-    }
-
-    const headerEl = panelEl.createDiv({ cls: 'opencodian-model-catalog-header' });
-    headerEl.createDiv({ cls: 'opencodian-model-catalog-title', text: activeTab.title });
-    const descEl = headerEl.createDiv({ cls: 'opencodian-model-catalog-desc' });
-    this.applyInlineCodeText(descEl, activeTab.description);
-    headerEl.createDiv({
-      cls: 'opencodian-model-catalog-summary',
-      text: t('settings.model.catalog.summary', {
-        providers: activeTab.catalog.providers.length,
-        models: this.getCatalogModelCount(activeTab.catalog),
-      }),
-    });
-
     const bodyEl = panelEl.createDiv({ cls: 'opencodian-model-catalog-body' });
 
-    if (activeTab.catalog.providers.length === 0) {
+    if (activeSection.catalog.providers.length === 0) {
       bodyEl.createDiv({
         cls: 'opencodian-model-catalog-empty',
         text: t('settings.model.catalog.empty'),
@@ -5412,7 +5580,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       return;
     }
 
-    for (const provider of activeTab.catalog.providers) {
+    for (const provider of activeSection.catalog.providers) {
       const providerEl = bodyEl.createDiv({ cls: 'opencodian-model-catalog-provider' });
       const providerHeaderEl = providerEl.createDiv({ cls: 'opencodian-model-catalog-provider-header' });
       providerHeaderEl.createDiv({
@@ -5425,12 +5593,108 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       });
       providerEl.createDiv({
         cls: 'opencodian-model-catalog-provider-models',
-        text: this.describeProviderModels(provider),
+        text: this.describeProviderModels(
+          provider,
+          (activeSection.mode === 'server' || activeSection.mode === 'disabled')
+            && !isProviderEnabled(localModelConfig ?? {}, provider.id),
+        ),
       });
     }
   }
 
-  private getPreferredModelCatalogTab(): 'local' | 'server' | 'effective' {
+  private getDisplayCatalogForMode(
+    mode: 'local' | 'server' | 'effective' | 'disabled',
+    catalogs: ModelCatalogBundle,
+    localModelConfig: OpencodeModelConfigSubset | null,
+  ): ModelCatalog {
+    switch (mode) {
+      case 'local':
+        return catalogs.local;
+      case 'server':
+        return this.withDisabledProviderPlaceholders(catalogs.server, localModelConfig, 'server');
+      case 'disabled':
+        return this.buildDisabledCatalog(catalogs, localModelConfig);
+      case 'effective':
+      default:
+        return catalogs.effective;
+    }
+  }
+
+  private buildDisabledCatalog(
+    catalogs: ModelCatalogBundle,
+    localModelConfig: OpencodeModelConfigSubset | null,
+  ): ModelCatalog {
+    const baseCatalog = this.withDisabledProviderPlaceholders(
+      mergeCatalogs(catalogs.server, catalogs.local),
+      localModelConfig,
+      'merge',
+    );
+    const disabledModelRefs = new Set(this.plugin.settings.disabledModelRefs);
+    const providers: ModelCatalogProvider[] = [];
+
+    for (const provider of baseCatalog.providers) {
+      const providerEnabled = isProviderEnabled(localModelConfig ?? {}, provider.id);
+      if (!providerEnabled) {
+        providers.push({
+          ...provider,
+          models: provider.models.map((model) => ({ ...model })),
+        });
+        continue;
+      }
+
+      const disabledModels = provider.models
+        .filter((model) => disabledModelRefs.has(formatModelReference(provider.id, model.id)))
+        .map((model) => ({ ...model }));
+      if (disabledModels.length === 0) {
+        continue;
+      }
+
+      providers.push({
+        ...provider,
+        models: disabledModels,
+      });
+    }
+
+    return {
+      providers: providers.sort((left, right) => left.name.localeCompare(right.name)),
+      defaults: {},
+    };
+  }
+
+  private withDisabledProviderPlaceholders(
+    catalog: ModelCatalog,
+    localModelConfig: OpencodeModelConfigSubset | null,
+    source: 'server' | 'merge',
+  ): ModelCatalog {
+    if (!Array.isArray(localModelConfig?.disabled_providers)) {
+      return catalog;
+    }
+
+    const existingProviderIds = new Set(catalog.providers.map((provider) => provider.id));
+    const placeholderProviders = localModelConfig.disabled_providers
+      .map((providerId) => providerId.trim())
+      .filter((providerId) => providerId.length > 0 && !existingProviderIds.has(providerId))
+      .map<ModelCatalogProvider>((providerId) => ({
+        id: providerId,
+        name: providerId,
+        models: [],
+        source,
+        existsInLocal: false,
+        existsInServer: false,
+      }));
+
+    if (placeholderProviders.length === 0) {
+      return catalog;
+    }
+
+    return {
+      ...catalog,
+      providers: [...catalog.providers, ...placeholderProviders]
+        .sort((left, right) => left.name.localeCompare(right.name)),
+    };
+  }
+
+  private getPreferredModelCatalogTab(): 'local' | 'server' | 'effective' | 'disabled' {
     switch (this.plugin.settings.modelSourceMode) {
       case 'local':
         return 'local';
@@ -5445,7 +5709,11 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     return catalog.providers.reduce((total, provider) => total + provider.models.length, 0);
   }
 
-  private describeProviderModels(provider: ModelCatalogProvider): string {
+  private describeProviderModels(provider: ModelCatalogProvider, disabledWithoutModels = false): string {
+    if (disabledWithoutModels && provider.models.length === 0) {
+      return t('settings.model.catalog.hiddenByLocalDisable');
+    }
+
     const modelNames = provider.models.map((model) => model.name);
     if (modelNames.length <= 6) {
       return modelNames.join(' · ');

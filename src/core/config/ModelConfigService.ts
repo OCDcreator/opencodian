@@ -1,5 +1,6 @@
 import type { OpenCodeService } from '../opencode';
 import type { ModelSourceMode, OpencodeModelConfigSubset } from '../types';
+import { createLogger } from '../../shared';
 import {
   applyModelConfig,
   buildCatalogFromConfig,
@@ -10,6 +11,8 @@ import {
   type ModelCatalog,
 } from './modelConfig';
 import type { OpencodeConfigManager } from './OpencodeConfigManager';
+
+const logger = createLogger('ModelConfigService');
 
 export interface ModelCatalogBundle {
   local: ModelCatalog;
@@ -50,7 +53,15 @@ export class ModelConfigService {
   }
 
   async getServerCatalog(): Promise<ModelCatalog> {
-    const result = await this.openCodeService.getAvailableModels();
+    const result = await this.openCodeService.getAvailableModels({ includeDirectory: false });
+    logger.debug('getServerCatalog raw result', {
+      providerIds: result.providers.map((provider) => provider.id),
+      providerModelCounts: result.providers.map((provider) => ({
+        id: provider.id,
+        modelCount: provider.models.length,
+      })),
+      defaults: result.defaults,
+    });
     return {
       providers: result.providers.map((provider) => ({
         id: provider.id,
@@ -79,7 +90,7 @@ export class ModelConfigService {
     const local = buildCatalogFromConfig(localConfig, 'local');
     const baseEffective = this.resolveCatalog(local, server, mode);
 
-    return {
+    const bundle = {
       local,
       server,
       baseEffective,
@@ -88,6 +99,17 @@ export class ModelConfigService {
         disabledModelRefs,
       }),
     };
+    logger.debug('getCatalogs summary', {
+      mode,
+      disabledProviders: [...(localConfig.disabled_providers ?? [])],
+      enabledProviders: [...(localConfig.enabled_providers ?? [])],
+      disabledModelRefs,
+      localProviderIds: local.providers.map((provider) => provider.id),
+      serverProviderIds: server.providers.map((provider) => provider.id),
+      baseEffectiveProviderIds: baseEffective.providers.map((provider) => provider.id),
+      effectiveProviderIds: bundle.effective.providers.map((provider) => provider.id),
+    });
+    return bundle;
   }
 
   async isModelAvailableOnServer(provider: string, model: string): Promise<boolean> {

@@ -311,3 +311,107 @@ describe('OpenCodianSettingTab scroll restore logging', () => {
     });
   });
 });
+
+describe('OpenCodianSettingTab model catalog views', () => {
+  function createTab(disabledModelRefs: string[] = []): OpenCodianSettingTab {
+    const plugin = {
+      settings: {
+        modelAvailabilitySectionOpen: true,
+        modelToolsSectionOpen: true,
+        disabledModelRefs,
+      },
+    } as unknown as ConstructorParameters<typeof OpenCodianSettingTab>[1];
+
+    return new OpenCodianSettingTab({} as App, plugin);
+  }
+
+  it('keeps locally disabled providers visible in the server catalog via placeholders', () => {
+    const tab = createTab();
+    const catalogs = {
+      local: { providers: [], defaults: {} },
+      server: {
+        providers: [{
+          id: 'openai',
+          name: 'OpenAI',
+          models: [],
+          source: 'server' as const,
+          existsInLocal: false,
+          existsInServer: true,
+        }],
+        defaults: {},
+      },
+      baseEffective: { providers: [], defaults: {} },
+      effective: { providers: [], defaults: {} },
+    };
+
+    const serverCatalog = (tab as unknown as {
+      getDisplayCatalogForMode: (mode: 'server', catalogs: typeof catalogs, localModelConfig: { disabled_providers: string[] }) => {
+        providers: Array<{ id: string; models: unknown[]; source: string }>;
+      };
+    }).getDisplayCatalogForMode('server', catalogs, { disabled_providers: ['deepseek'] });
+
+    expect(serverCatalog.providers.map((provider) => provider.id)).toEqual(['deepseek', 'openai']);
+    expect(serverCatalog.providers[0]).toMatchObject({
+      id: 'deepseek',
+      models: [],
+      source: 'server',
+    });
+  });
+
+  it('shows disabled models from merged local and server catalogs in the disabled view', () => {
+    const tab = createTab(['local-only/alpha', 'openai/gpt-4.1']);
+    const catalogs = {
+      local: {
+        providers: [{
+          id: 'local-only',
+          name: 'Local Only',
+          models: [{
+            id: 'alpha',
+            name: 'Alpha',
+            source: 'local' as const,
+            existsInLocal: true,
+            existsInServer: false,
+          }],
+          source: 'local' as const,
+          existsInLocal: true,
+          existsInServer: false,
+        }],
+        defaults: {},
+      },
+      server: {
+        providers: [{
+          id: 'openai',
+          name: 'OpenAI',
+          models: [{
+            id: 'gpt-4.1',
+            name: 'GPT-4.1',
+            source: 'server' as const,
+            existsInLocal: false,
+            existsInServer: true,
+          }],
+          source: 'server' as const,
+          existsInLocal: false,
+          existsInServer: true,
+        }],
+        defaults: {},
+      },
+      baseEffective: { providers: [], defaults: {} },
+      effective: { providers: [], defaults: {} },
+    };
+
+    const disabledCatalog = (tab as unknown as {
+      getDisplayCatalogForMode: (
+        mode: 'disabled',
+        catalogs: typeof catalogs,
+        localModelConfig: { disabled_providers: string[] },
+      ) => {
+        providers: Array<{ id: string; models: Array<{ id: string }> }>;
+      };
+    }).getDisplayCatalogForMode('disabled', catalogs, { disabled_providers: ['deepseek'] });
+
+    expect(disabledCatalog.providers.map((provider) => provider.id)).toEqual(['deepseek', 'local-only', 'openai']);
+    expect(disabledCatalog.providers.find((provider) => provider.id === 'deepseek')?.models).toEqual([]);
+    expect(disabledCatalog.providers.find((provider) => provider.id === 'local-only')?.models.map((model) => model.id)).toEqual(['alpha']);
+    expect(disabledCatalog.providers.find((provider) => provider.id === 'openai')?.models.map((model) => model.id)).toEqual(['gpt-4.1']);
+  });
+});

@@ -5,7 +5,7 @@
 
 ## 概述
 
-模型配置可视化编辑弹窗。它把本地 OpenCode 模型配置子集读入表单，允许用户编辑默认模型、small model、provider 基础信息以及每个 provider 下的模型列表，然后将结果写回本地配置，并可选触发本地 OpenCode 服务重启。
+本地 provider / model 配置弹窗。它把本地 OpenCode 模型配置子集读入表单，允许用户先编辑 provider 基础信息和每个 provider 下的模型列表，再按需设置默认聊天模型与轻量备用模型，最后将结果写回本地配置，并可选触发本地 OpenCode 服务重启。
 
 ## 导入关系
 
@@ -28,7 +28,8 @@ interface ModelFormState {
 interface ProviderFormState {
   id: string;
   name: string;
-  npm: string;
+  interfaceFormat: ProviderInterfaceFormatId;
+  customNpm: string;
   baseURL: string;
   apiKey: string;
   models: ModelFormState[];
@@ -42,7 +43,7 @@ export class ModelConfigModal extends Modal { ... }
 
 ### 配置读取与表单水合
 
-`onOpen()` 先从 `plugin.modelConfigService` 读取本地模型配置，再通过 `hydrate()` 把配置对象转换成可编辑的 `ProviderFormState[]` / `ModelFormState[]`。
+`onOpen()` 先从 `plugin.modelConfigService` 读取本地模型配置，再通过 `hydrate()` 把配置对象转换成可编辑的 `ProviderFormState[]` / `ModelFormState[]`。弹窗顶部会先给出“先添加 provider，再添加 model”的说明，并把 provider/model 编辑区放在默认项前面。
 
 ### Provider / Model 动态表单
 
@@ -50,12 +51,22 @@ export class ModelConfigModal extends Modal { ... }
 
 - 新增 / 删除 provider
 - 新增 / 删除 model
-- 编辑 provider id、name、baseURL、apiKey、npm
+- 编辑 provider id、name、baseURL、apiKey、接口格式
 - 编辑 model id、name、context/output limit
+
+可视化编辑器对用户暴露的是“接口格式”而不是原始 `npm` 包名；保存时会把已知格式映射回 `provider.npm`。如果本地配置里存在未识别的自定义包名，会落到兼容性的“自定义适配器”选项，避免用户仅仅打开再保存就把原值覆盖掉。
+
+`provider id` 被当作配置里的稳定唯一标识符处理。UI 会显示提示文本，保存时也会校验其格式必须匹配“小写字母 / 数字 / 连字符”，且不能以连字符开头或结尾。
+
+默认聊天模型和轻量备用模型不再放在顶部优先暴露，而是作为“可选默认项”放在 provider/model 编辑区后面，并附带用途说明，降低第一次配置时的术语门槛。
 
 ### 结构化校验与回写
 
 `toModelConfig()` 负责把表单状态转回 `OpencodeModelConfigSubset`，并做必填、重复 ID、数字合法性等校验；`save()` 调用 `writeLocalModelConfig()` 持久化。
+
+### 未保存关闭保护
+
+弹窗打开后会记录一份表单快照。若用户修改过内容但尚未保存，关闭弹窗时会弹出确认框；如果内容没有变化，则直接关闭。
 
 ### 可选本地服务重启
 

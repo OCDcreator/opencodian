@@ -34,7 +34,7 @@
 其中最近变化较大的几块是：
 
 - **Model**
-  - 重构成“常用 / 可用范围 / 工具与诊断”三段式模型中心
+  - 重构成“常用 / 可用范围与目录 / 配置与缓存”三段式模型中心
   - 默认聊天模型不再拆成 provider/model 两个普通下拉，而是走可搜索 picker
   - provider 级可用性开关写回 `.opencode`
   - model 级可用性开关写回插件设置 `disabledModelRefs`
@@ -74,8 +74,10 @@
 新的结构把模型任务拆开了：
 
 - **常用**：默认聊天模型、来源模式、刷新摘要
-- **可用范围**：provider accordion + 模型级开关
-- **工具与诊断**：本地配置编辑、icon cache、catalog 对比
+- **可用范围与目录**：provider accordion + 模型级开关 + local/server/effective 目录对照，三张目录摘要卡同时充当切换器；搜索框支持清空按钮与最近搜索历史
+- **可用范围与目录**：provider accordion + 模型级开关 + local/server/effective/disabled 四张目录摘要卡；其中 disabled 卡会把“整 provider 被禁用”和“provider 仅禁用部分模型”区分展示
+- **配置与缓存**：本地配置编辑、icon cache
+- “可用范围与目录”和“配置与缓存”都是默认展开的 `details` block，用户折叠状态会写回插件设置并在下次打开时恢复
 
 ### 设置面板滚动恢复
 
@@ -102,7 +104,7 @@
 | `onModelsLoaded()` | 模型目录刷新后合并 UI 更新 |
 | `scrollToServerSection()` / `scrollToModelSection()` | 跳转到指定分区 |
 | `prepareRestoreScrollOnNextOpen()` | 记录下次打开时的滚动恢复目标 |
-| `addModelSettings()` | 渲染模型中心，包括默认模型 picker、provider 可用范围和高级诊断区 |
+| `addModelSettings()` | 渲染模型中心，包括默认模型 picker、可用范围与目录对照，以及高级工具区 |
 | `addConversationSettings()` | 渲染标题、question 和回答回顾相关设置 |
 | `addStyleSettings()` | 渲染 theme preset、chat appearance、glass/liquid glass 控件 |
 

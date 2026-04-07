@@ -55,6 +55,7 @@ export class OpencodeConfigManager {
 
   /** Write configuration file */
   async write(config: OpencodeConfig): Promise<void> {
+    let tempPath: string | null = null;
     try {
       // Ensure directory exists
       if (!fs.existsSync(this.configDir)) {
@@ -66,8 +67,20 @@ export class OpencodeConfigManager {
         ...config,
       }, null, 2);
 
-      await fs.promises.writeFile(this.configPath, content, 'utf-8');
+      tempPath = path.join(
+        this.configDir,
+        `opencode.${process.pid}.${Date.now()}.${Math.random().toString(16).slice(2)}.tmp`,
+      );
+      await fs.promises.writeFile(tempPath, content, 'utf-8');
+      await fs.promises.rename(tempPath, this.configPath);
     } catch (error) {
+      if (tempPath) {
+        try {
+          await fs.promises.unlink(tempPath);
+        } catch {
+          // Ignore temp cleanup failures.
+        }
+      }
       logger.error('Failed to write config:', error);
       throw new Error('Failed to write OpenCode configuration');
     }

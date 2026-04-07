@@ -1403,6 +1403,8 @@ export interface OpenCodianSettings {
   inputPanelLiquidGlass: InputPanelLiquidGlassSettings;
   chatAppearance: ChatAppearanceSettings;
   settingsPanelScrollTop: number;
+  modelAvailabilitySectionOpen: boolean;
+  modelToolsSectionOpen: boolean;
   enableDebugLogging: boolean;
   debugLogPaths: PlatformDebugLogPaths;
   openInMainTab: boolean;
@@ -1483,6 +1485,8 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
   inputPanelLiquidGlass: getDefaultInputPanelLiquidGlassSettings(),
   chatAppearance: getDefaultChatAppearanceSettings(),
   settingsPanelScrollTop: 0,
+  modelAvailabilitySectionOpen: true,
+  modelToolsSectionOpen: true,
   enableDebugLogging: false,
   debugLogPaths: getDefaultDebugLogPaths(),
   openInMainTab: false,

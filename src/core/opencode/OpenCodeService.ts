@@ -1020,12 +1020,13 @@ export class OpenCodeService {
     return this.sdkFeatureFlags[flag];
   }
 
-  private getSdkClient(): SdkOpencodeClient {
+  private getSdkClient(options: { includeDirectory?: boolean } = {}): SdkOpencodeClient {
+    const { includeDirectory = true } = options;
     this.ensureBaseUrl();
     return createSdkClient({
       baseUrl: this.baseUrl,
       authHeaders: this.getAuthHeaders(),
-      directory: this.vaultPath,
+      directory: includeDirectory ? this.vaultPath : undefined,
     });
   }
 
@@ -2415,11 +2416,33 @@ export class OpenCodeService {
   }
 
   /** Get available models - Handles both string array and object formats */
-  async getAvailableModels(): Promise<{ providers: Array<{ id: string; name: string; models: Array<{ id: string; name: string; contextWindow?: number }> }>; defaults: Record<string, string> }> {
+  async getAvailableModels(
+    options: { includeDirectory?: boolean } = {},
+  ): Promise<{ providers: Array<{ id: string; name: string; models: Array<{ id: string; name: string; contextWindow?: number }> }>; defaults: Record<string, string> }> {
+    const { includeDirectory = true } = options;
+    logger.debug('getAvailableModels request', {
+      includeDirectory,
+      baseUrl: this.baseUrl,
+      vaultPath: this.vaultPath ?? null,
+      serverStatus: this.serverManager.getStatus(),
+      isManagedServerRunning: this.serverManager.isRunning(),
+      managedServerState: this.serverManager.getManagedServerStateSnapshot(),
+      sdkCrudEnabled: this.shouldUseSdk('sdkCrud'),
+    });
     if (this.shouldUseSdk('sdkCrud')) {
       try {
-        const data = await this.getSdkClient().config.providers();
-        return this.normalizeAvailableModels(data);
+        const data = await this.getSdkClient({ includeDirectory }).config.providers();
+        const normalized = this.normalizeAvailableModels(data);
+        logger.debug('getAvailableModels sdk response', {
+          includeDirectory,
+          providerIds: normalized.providers.map((provider) => provider.id),
+          providerModelCounts: normalized.providers.map((provider) => ({
+            id: provider.id,
+            modelCount: provider.models.length,
+          })),
+          defaults: normalized.defaults,
+        });
+        return normalized;
       } catch (error) {
         logger.warn('SDK config.providers failed, falling back to legacy HTTP', error);
       }
@@ -2430,12 +2453,22 @@ export class OpenCodeService {
       
 
       
-      return this.normalizeAvailableModels({
+      const normalized = this.normalizeAvailableModels({
         providers: data.providers,
         default: data.default?.provider && data.default?.model
           ? { [data.default.provider]: data.default.model }
           : {},
       });
+      logger.debug('getAvailableModels legacy response', {
+        includeDirectory,
+        providerIds: normalized.providers.map((provider) => provider.id),
+        providerModelCounts: normalized.providers.map((provider) => ({
+          id: provider.id,
+          modelCount: provider.models.length,
+        })),
+        defaults: normalized.defaults,
+      });
+      return normalized;
     } catch (error) {
       logger.error('Failed to get models:', error);
       return { providers: [], defaults: {} };

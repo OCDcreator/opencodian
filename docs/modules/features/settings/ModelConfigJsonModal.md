@@ -29,6 +29,10 @@ JSON 格式的模型配置编辑器 Modal。提供原始 JSON 文本编辑器，
 
 `save()`: 解析 → `validate()` → `writeLocalModelConfig()` → `maybeRestartServer()` → `saveSettings()`。
 
+### 未保存关闭保护
+
+打开时会记录当前编辑器文本。若用户改过内容但没保存，关闭 modal 时会弹确认框；如果内容未变化，则直接关闭。
+
 ### 验证
 
 `validate(value)`:

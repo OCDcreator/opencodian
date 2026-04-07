@@ -42,13 +42,23 @@ export function buildModelPickerGroups(catalog: ModelCatalog | null | undefined)
   }));
 }
 
-export function filterModelPickerGroups(groups: ModelPickerGroup[], query: string): ModelPickerGroup[] {
+export function filterModelPickerGroups(
+  groups: ModelPickerGroup[],
+  query: string,
+  providerId?: string,
+): ModelPickerGroup[] {
   const normalizedQuery = query.trim().toLowerCase();
+  const normalizedProviderId = typeof providerId === 'string' ? providerId.trim().toLowerCase() : '';
+
+  const scopedGroups = normalizedProviderId
+    ? groups.filter((group) => group.providerId.toLowerCase() === normalizedProviderId)
+    : groups;
+
   if (!normalizedQuery) {
-    return groups;
+    return scopedGroups;
   }
 
-  return groups.flatMap((group) => {
+  return scopedGroups.flatMap((group) => {
     if (group.searchText.includes(normalizedQuery)) {
       return [group];
     }

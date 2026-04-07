@@ -238,6 +238,8 @@ OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings`、`DEFAULT_
 | `inputPanelLiquidGlass` | `InputPanelLiquidGlassSettings` | 默认 | 液态玻璃设置 |
 | `chatAppearance` | `ChatAppearanceSettings` | 默认 | 聊天外观 |
 | `settingsPanelScrollTop` | `number` | `0` | 设置面板滚动位置 |
+| `modelAvailabilitySectionOpen` | `boolean` | `true` | 模型“可用范围与目录”分区是否展开 |
+| `modelToolsSectionOpen` | `boolean` | `true` | 模型“配置与缓存”分区是否展开 |
 | `enableDebugLogging` | `boolean` | `false` | 启用调试日志 |
 | `debugLogPaths` | `PlatformDebugLogPaths` | 默认 | 调试日志路径 |
 | `openInMainTab` | `boolean` | `false` | 在主标签页打开 |
@@ -275,6 +277,7 @@ OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings`、`DEFAULT_
 - `inputPanelGlassRefractionGlassDefaultsVersion` 用于版本化默认值迁移
 - Windows 上 `getBashToolBlockedCommands()` 合并 unix + windows 两套黑名单
 - `hiddenSlashCommands` 存储用户隐藏的斜杠命令 ID
+- `modelAvailabilitySectionOpen` / `modelToolsSectionOpen` 属于设置页 UI 状态，和 `settingsPanelScrollTop` 一样会被持久化
 - 归一化函数设计原则：未知值回退到默认值，而非报错
 
 ## 版本迁移

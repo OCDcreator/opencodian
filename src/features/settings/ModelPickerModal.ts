@@ -2,6 +2,7 @@ import { App, Modal, setIcon } from 'obsidian';
 
 import { t } from '../../i18n';
 import { filterModelPickerGroups, type ModelPickerGroup, type ModelPickerOption } from './modelPicker';
+import { type SearchInputEnhancerHandle, enhanceSearchInput } from './searchInputEnhancer';
 
 interface ModelPickerModalOptions {
   title: string;
@@ -17,7 +18,9 @@ export class ModelPickerModal extends Modal {
   private searchInputEl: HTMLInputElement | null = null;
   private listEl: HTMLElement | null = null;
   private highlightedValue = '';
+  private providerFilter = '';
   private query = '';
+  private searchEnhancer: SearchInputEnhancerHandle | null = null;
 
   constructor(app: App, options: ModelPickerModalOptions) {
     super(app);
@@ -34,7 +37,39 @@ export class ModelPickerModal extends Modal {
       text: this.options.description,
     });
 
-    const searchWrapperEl = this.contentEl.createDiv({ cls: 'opencodian-model-picker-search' });
+    const controlsEl = this.contentEl.createDiv({ cls: 'opencodian-model-picker-controls' });
+
+    const providerFilterWrapEl = controlsEl.createDiv({
+      cls: 'opencodian-model-picker-provider-select-wrap',
+    });
+    const providerFilterEl = providerFilterWrapEl.createEl('select', {
+      cls: 'opencodian-model-picker-provider-select',
+      attr: {
+        'aria-label': t('settings.model.picker.providerLabel'),
+      },
+    });
+    providerFilterEl.createEl('option', {
+      value: '',
+      text: t('settings.model.picker.providerAll'),
+    });
+    for (const group of this.options.groups) {
+      providerFilterEl.createEl('option', {
+        value: group.providerId,
+        text: group.providerName,
+      });
+    }
+    providerFilterEl.value = this.providerFilter;
+    providerFilterEl.addEventListener('change', () => {
+      this.providerFilter = providerFilterEl.value;
+      this.highlightedValue = '';
+      this.renderList();
+    });
+    const providerFilterChevronEl = providerFilterWrapEl.createSpan({
+      cls: 'opencodian-model-picker-provider-select-chevron',
+    });
+    setIcon(providerFilterChevronEl, 'chevron-down');
+
+    const searchWrapperEl = controlsEl.createDiv({ cls: 'opencodian-model-picker-search' });
     const searchContainerEl = searchWrapperEl.createDiv({ cls: 'opencodian-model-picker-search-container' });
     const searchIconEl = searchContainerEl.createSpan({ cls: 'opencodian-model-picker-search-icon' });
     setIcon(searchIconEl, 'search');
@@ -45,6 +80,11 @@ export class ModelPickerModal extends Modal {
         type: 'text',
         placeholder: t('settings.model.picker.searchPlaceholder'),
       },
+    });
+    this.searchEnhancer = enhanceSearchInput({
+      historyKey: 'model-picker',
+      inputEl: this.searchInputEl,
+      containerEl: searchContainerEl,
     });
     this.searchInputEl.addEventListener('input', () => {
       this.query = this.searchInputEl?.value ?? '';
@@ -79,6 +119,9 @@ export class ModelPickerModal extends Modal {
   }
 
   onClose(): void {
+    this.searchEnhancer?.commitCurrentValue();
+    this.searchEnhancer?.destroy();
+    this.searchEnhancer = null;
     this.contentEl.empty();
     this.modalEl.removeClass('opencodian-model-picker-modal');
   }
@@ -98,8 +141,9 @@ export class ModelPickerModal extends Modal {
 
     if (this.options.emptySelectionLabel) {
       const selected = !this.options.selectedRef;
+      const emptyOptionEl = this.listEl.createDiv({ cls: 'opencodian-model-picker-empty-option' });
       this.renderOption(
-        this.listEl,
+        emptyOptionEl,
         {
           ref: '',
           providerId: '',
@@ -172,7 +216,7 @@ export class ModelPickerModal extends Modal {
     const infoEl = optionEl.createDiv({ cls: 'opencodian-model-picker-option-info' });
     infoEl.createDiv({
       cls: 'opencodian-model-picker-option-name',
-      text: flags.empty ? option.modelName : option.modelName,
+      text: option.modelName,
     });
     if (!flags.empty) {
       infoEl.createDiv({
@@ -186,7 +230,7 @@ export class ModelPickerModal extends Modal {
   }
 
   private getFilteredGroups(): ModelPickerGroup[] {
-    return filterModelPickerGroups(this.options.groups, this.query);
+    return filterModelPickerGroups(this.options.groups, this.query, this.providerFilter);
   }
 
   private getOptionValues(groups: ModelPickerGroup[]): string[] {

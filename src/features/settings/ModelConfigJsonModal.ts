@@ -10,6 +10,7 @@ const logger = createLogger('ModelConfigJsonModal');
 export class ModelConfigJsonModal extends Modal {
   private editorEl: HTMLTextAreaElement | null = null;
   private restartToggleEl: HTMLInputElement | null = null;
+  private initialEditorValue = '';
 
   constructor(
     app: App,
@@ -37,13 +38,14 @@ export class ModelConfigJsonModal extends Modal {
     });
 
     this.editorEl = contentEl.createEl('textarea', {
-      cls: 'opencodian-config-editor',
+      cls: 'opencodian-config-editor opencodian-model-config-json-editor',
       attr: {
         spellcheck: 'false',
         placeholder: '{\n  "provider": {}\n}',
       },
     });
     this.editorEl.value = JSON.stringify(config, null, 2);
+    this.initialEditorValue = this.editorEl.value;
 
     const optionsEl = contentEl.createDiv({ cls: 'opencodian-model-config-options' });
     const restartLabel = optionsEl.createEl('label', { cls: 'opencodian-model-config-checkbox' });
@@ -84,12 +86,26 @@ export class ModelConfigJsonModal extends Modal {
     });
 
     const buttonContainer = contentEl.createDiv({ cls: 'opencodian-config-buttons' });
-    buttonContainer.createEl('button', { text: t('settings.model.jsonEditor.format') })
-      .addEventListener('click', () => this.formatJson());
-    buttonContainer.createEl('button', { text: t('settings.model.jsonEditor.save'), cls: 'mod-cta' })
-      .addEventListener('click', () => void this.save());
-    buttonContainer.createEl('button', { text: t('settings.model.jsonEditor.close') })
-      .addEventListener('click', () => this.close());
+    const formatButton = buttonContainer.createEl('button', { text: t('settings.model.jsonEditor.format') });
+    formatButton.type = 'button';
+    formatButton.addEventListener('click', () => this.formatJson());
+    const saveButton = buttonContainer.createEl('button', { text: t('settings.model.jsonEditor.save'), cls: 'mod-cta' });
+    saveButton.type = 'button';
+    saveButton.addEventListener('click', () => void this.save());
+    const closeButton = buttonContainer.createEl('button', { text: t('settings.model.jsonEditor.close') });
+    closeButton.type = 'button';
+    closeButton.addEventListener('click', () => this.close());
+  }
+
+  close(): void {
+    if (this.hasUnsavedChanges()) {
+      const confirmed = window.confirm(t('settings.model.config.unsavedConfirm'));
+      if (!confirmed) {
+        return;
+      }
+    }
+
+    super.close();
   }
 
   onClose() {
@@ -121,7 +137,8 @@ export class ModelConfigJsonModal extends Modal {
       this.validate(value);
       await this.plugin.modelConfigService.writeLocalModelConfig(value);
       await this.maybeRestartServer();
-      await this.plugin.saveSettings();
+      await this.plugin.saveSettings({ syncConfig: false });
+      this.initialEditorValue = this.editorEl.value;
       new Notice(t('settings.model.jsonEditor.saveSuccess'));
       this.close();
     } catch (error) {
@@ -141,6 +158,10 @@ export class ModelConfigJsonModal extends Modal {
         throw new Error(t('settings.model.jsonEditor.providerListArray'));
       }
     }
+  }
+
+  private hasUnsavedChanges(): boolean {
+    return (this.editorEl?.value ?? '') !== this.initialEditorValue;
   }
 
   private async maybeRestartServer(): Promise<void> {

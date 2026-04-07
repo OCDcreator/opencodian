@@ -52,12 +52,14 @@ describe('ModelConfigService', () => {
     const service = new ModelConfigService(configManager as never, openCodeService as never);
     const catalogs = await service.getCatalogs('merge', ['openai/gpt-4.1']);
 
+    expect(openCodeService.getAvailableModels).toHaveBeenCalledWith({ includeDirectory: false });
     expect(catalogs.baseEffective.providers.map((provider) => provider.id)).toEqual(['anthropic', 'openai']);
     expect(
       catalogs.baseEffective.providers.find((provider) => provider.id === 'openai')?.models.map((model) => model.id),
     ).toEqual(['gpt-4.1', 'gpt-4o']);
     expect(catalogs.effective.providers.map((provider) => provider.id)).toEqual(['openai']);
     expect(catalogs.effective.providers[0].models.map((model) => model.id)).toEqual(['gpt-4o']);
+    expect(configManager.write).not.toHaveBeenCalled();
   });
 
   it('returns enabled local provider ids using whitelist and blacklist rules', async () => {
@@ -81,5 +83,6 @@ describe('ModelConfigService', () => {
     const service = new ModelConfigService(configManager as never, openCodeService as never);
 
     await expect(service.getLocalProviderIds()).resolves.toEqual(['openai']);
+    expect(openCodeService.getAvailableModels).not.toHaveBeenCalled();
   });
 });

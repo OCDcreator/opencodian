@@ -12,6 +12,69 @@
 
 ---
 
+## 2026-04-07 优化模型配置编辑器与目录感知 catalog 行为
+
+### 🎯 改动目标
+
+- 让模型配置相关设置在大 catalog 和多 provider 场景下更易筛选、编辑和回看
+- 修复读取服务端模型目录时被当前 vault `.opencode` 配置污染的问题，避免“服务端 catalog 看起来不完整”
+- 提升模型配置写入与退出流程的稳健性，减少误关闭或覆盖失败带来的排障成本
+
+### ✅ 本轮调整
+
+- `src/features/settings/OpenCodianSettings.ts`
+- `src/features/settings/ModelPickerModal.ts`
+- `src/features/settings/modelPicker.ts`
+- `src/features/settings/searchInputEnhancer.ts`
+- `styles.css`
+  - 模型可用范围区新增 `仅显示已启用` 过滤、禁用视图、卡片式 catalog 摘要切换和更明确的服务端状态联动
+  - 模型 picker 新增 provider 下拉过滤、搜索清空按钮和最近搜索历史，提升大模型列表下的定位效率
+  - 设置页记住模型可用范围 / 工具区折叠状态，并为相关控件补齐交互样式与响应式细节
+
+- `src/features/settings/ModelConfigModal.ts`
+- `src/features/settings/ModelConfigJsonModal.ts`
+- `src/core/types/settings.ts`
+- `src/i18n/locales/en.ts`
+- `src/i18n/locales/zh.ts`
+  - 可视化模型配置编辑器重组为更清晰的分段结构，并新增 provider 接口格式预设与自定义 npm 支持
+  - provider id 新增格式校验，新增未保存改动确认，避免误关 modal 丢失编辑内容
+  - JSON 编辑器与可视化编辑器保存时改为仅落盘配置，不额外触发重复同步
+
+- `src/core/config/ModelConfigService.ts`
+- `src/core/config/OpencodeConfigManager.ts`
+- `src/core/opencode/OpenCodeService.ts`
+- `src/core/opencode/ServerManager.ts`
+- `src/main.ts`
+  - SDK 拉取原始服务端 catalog 时支持跳过 `directory`，确保服务端模型列表不再被 vault 级 project config 过滤
+  - 本地托管 server 启动时不再注入 provider 白名单环境变量，保留 OpenCode 自身对 project config 的处理
+  - `.opencode` 配置写入改为临时文件 + rename 的原子写入，并补充 catalog / spawn 相关调试日志
+
+- `docs/modules/core/types/settings.md`
+- `docs/modules/features/settings/ModelConfigJsonModal.md`
+- `docs/modules/features/settings/ModelConfigModal.md`
+- `docs/modules/features/settings/ModelPickerModal.md`
+- `docs/modules/features/settings/OpenCodianSettings.md`
+  - 同步补齐模型设置区、picker、编辑器和设置状态字段的模块文档
+
+- `tests/unit/core/config/ModelConfigService.test.ts`
+- `tests/unit/core/opencode/OpenCodeService.test.ts`
+- `tests/unit/core/opencode/ServerManager.test.ts`
+- `tests/unit/features/settings/OpenCodianSettings.test.ts`
+  - 新增目录感知 catalog、server env、禁用视图与占位 provider 的回归覆盖
+
+### 🧠 交互变化
+
+- 模型搜索现在会保留最近输入记录，重新打开 picker 或可用范围搜索时可直接回用常见关键字
+- 服务端 catalog 与禁用 catalog 被拆成更直观的摘要入口，便于快速区分“服务端可见”“当前生效”“被禁用”的来源
+- 可视化模型配置 editor 在 provider 接口格式、默认模型与小模型设置上给出更明确的引导，减少手填出错概率
+
+### 🧪 当前验证
+
+- 已通过：`npm run test -- OpenCodeService ServerManager ModelConfigService OpenCodianSettings`
+- 已通过：`npm run build`
+- 已通过：`npm run check:devlog-order`
+- 已部署测试库并确认 `C:\Users\lt\Desktop\Write\testvault\.obsidian\plugins\opencodian\main.js` 包含 `BUILD_ID: main.202604071110`
+
 ## 2026-04-06 重构模型设置中心，并修复设置页图标渲染异常
 
 ### 🎯 改动目标

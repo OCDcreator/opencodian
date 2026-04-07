@@ -1644,6 +1644,54 @@ describe('OpenCodeService', () => {
   });
 
   describe('getAvailableModels', () => {
+    it('uses the current vault directory for project-scoped SDK provider requests', async () => {
+      service = new OpenCodeService(DEFAULT_SETTINGS, {}, {
+        sdkFeatureFlags: { sdkCrud: true },
+      });
+      service.setVaultPath('C:/vault');
+      mockSdkClient.config.providers.mockResolvedValue({
+        providers: [{
+          id: 'openai',
+          name: 'OpenAI',
+          models: {
+            'gpt-4.1': { id: 'gpt-4.1', name: 'GPT-4.1' },
+          },
+        }],
+        default: { openai: 'gpt-4.1' },
+      });
+
+      await service.getAvailableModels();
+
+      expect(mockCreateSdkClient).toHaveBeenCalledWith(expect.objectContaining({
+        baseUrl: 'http://127.0.0.1:4096',
+        directory: 'C:/vault',
+      }));
+    });
+
+    it('omits the vault directory when fetching the raw server catalog via SDK', async () => {
+      service = new OpenCodeService(DEFAULT_SETTINGS, {}, {
+        sdkFeatureFlags: { sdkCrud: true },
+      });
+      service.setVaultPath('C:/vault');
+      mockSdkClient.config.providers.mockResolvedValue({
+        providers: [{
+          id: 'deepseek',
+          name: 'DeepSeek',
+          models: {
+            'deepseek-chat': { id: 'deepseek-chat', name: 'DeepSeek Chat' },
+          },
+        }],
+        default: { deepseek: 'deepseek-chat' },
+      });
+
+      await service.getAvailableModels({ includeDirectory: false });
+
+      expect(mockCreateSdkClient).toHaveBeenCalledWith(expect.objectContaining({
+        baseUrl: 'http://127.0.0.1:4096',
+        directory: undefined,
+      }));
+    });
+
     it('should fetch models via HTTP API', async () => {
       mockRequestUrl.mockResolvedValue({
         status: 200,
