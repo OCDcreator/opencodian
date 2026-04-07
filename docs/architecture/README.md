@@ -6,7 +6,7 @@
 
 ## 一句话概括
 
-OpenCodian 是一个 Obsidian 插件，它在 Obsidian 侧边栏里嵌入了一个 AI 聊天界面，通过 HTTP 接口与后台的 OpenCode 服务通信，再由 OpenCode 调用各种 AI 模型（Claude、GPT、本地模型等）来完成对话。
+OpenCodian 是一个 Obsidian 插件，它在 Obsidian 侧边栏里嵌入了一个 AI 聊天界面，通过 OpenCode SDK v2 与 legacy HTTP/SSE 双路径和后台 OpenCode 服务通信，再由 OpenCode 调用各种 AI 模型（Claude、GPT、本地模型等）来完成对话。
 
 ---
 
@@ -39,7 +39,7 @@ OpenCodian 是一个 Obsidian 插件，它在 Obsidian 侧边栏里嵌入了一�
 │   │    └───────────────────────────────────┘                  │   │
 │   └──────────────────────┬───────────────────────────────────┘   │
 └──────────────────────────┼───────────────────────────────────────┘
-                           │ HTTP 请求 / SSE 流
+                           │ SDK CRUD / HTTP 请求 / SSE 流
                            ▼
 ┌──────────────────────────────────────────────────────────────────┐
 │                     OpenCode 服务器                               │
@@ -98,7 +98,8 @@ OpenCodian 是一个 Obsidian 插件，它在 Obsidian 侧边栏里嵌入了一�
 **职责**：
 - 创建/删除聊天会话
 - 发送用户消息并接收流式回复
-- 获取可用的 AI 模型列表
+- 获取目录作用域下的 AI 模型列表与解析配置
+- 在设置页里执行 provider 真实发送探针
 - 管理会话标题
 
 **核心工作流程** — 用户发送一条消息：
@@ -108,7 +109,7 @@ OpenCodian 是一个 Obsidian 插件，它在 Obsidian 侧边栏里嵌入了一�
     ↓
 OpenCodeService.sendMessage()
     ↓
-构造 HTTP POST 请求 → 发送到 OpenCode 服务器
+优先走 SDK v2；失败或未启用时回退到 legacy HTTP/SSE
     ↓
 服务器返回 SSE 事件流（文本块、思考过程、工具调用...）
     ↓
@@ -124,7 +125,9 @@ OpenCodeService.sendMessage()
 | `createSession(title?)` | 创建新的聊天会话 |
 | `sendMessage(msg, opts)` | 发消息，拿到流式响应 |
 | `requestAssistantResponse(msg, opts)` | 发消息，等完整回复（非流式） |
-| `getAvailableModels()` | 获取服务器上可用的模型 |
+| `getAvailableModels()` | 获取当前目录作用域下 runtime 可用模型 |
+| `getResolvedModelConfig()` | 获取当前目录或默认作用域解析后的模型配置 |
+| `probeProviderResponse()` | 用临时 session 探测 provider 是否真能发请求 |
 | `getSessionMessages(id)` | 获取某个会话的所有消息 |
 | `updateSessionTitle(id, title)` | 修改会话标题 |
 | `deleteSession(id)` | 删除会话 |
@@ -170,23 +173,26 @@ ServerManager.start()
 
 **角色**：管理"可以用哪些 AI 模型"这件事。
 
-**两个配置来源**：
+**现在是三层来源协同**：
 
 ```
-┌──────────────────┐     ┌──────────────────┐
-│  本地配置文件      │     │  服务器返回的列表  │
-│  .opencode/       │     │  OpenCode API    │
-│  opencode.json    │     │                  │
-└────────┬─────────┘     └────────┬─────────┘
-         │                        │
-         └──────────┬─────────────┘
-                    │  合并
-                    ▼
-           最终可用的模型目录
+┌──────────────────┐   ┌──────────────────────┐   ┌──────────────────────┐
+│ 当前项目配置文件   │   │ 当前目录 runtime 列表 │   │ 继承层 / 默认作用域配置 │
+│ .opencode/        │   │ config.providers()   │   │ config.get() / 本机磁盘 │
+│ opencode.json     │   │                      │   │                      │
+└────────┬─────────┘   └──────────┬───────────┘   └──────────┬───────────┘
+         │                        │                            │
+         └──────────────┬─────────┴──────────────┬─────────────┘
+                        │                        │
+                        ▼                        ▼
+                server / local catalog     provider 继承规则
+                        └──────────────┬──────────────┘
+                                       ▼
+                        baseEffective / effective catalog
 ```
 
-- **`OpencodeConfigManager`**：读写 `.opencode/opencode.json` 文件，管理本地配置（包括权限模式）
-- **`ModelConfigService`**：把本地配置和服务器返回的模型列表合并，给界面层提供统一的模型选择列表
+- **`OpencodeConfigManager`**：读写 `.opencode/opencode.json` 文件，管理项目级配置（包括权限模式）
+- **`ModelConfigService`**：把项目配置、当前目录 runtime providers 和继承层 provider 配置拼成 `local / server / baseEffective / effective` 四套视图，并额外给设置页提供“当前真正启用的 provider 列表”和真实发送 probe 结果
 
 **权限模式**（由 OpencodeConfigManager 管理）：
 
@@ -366,7 +372,7 @@ Tab（单个标签数据）
 |------|---------|
 | **语言** | 界面语言（中文 / English） |
 | **服务器** | 本地/远程模式、地址、端口、认证 |
-| **模型** | 默认模型、模型来源（本地/服务器/合并）、JSON 编辑器 |
+| **模型** | 默认模型、模型来源（项目/服务器/当前生效）、provider 与 model 可用性、JSON 编辑器 |
 | **标题生成** | 标题模式、专用于标题生成的模型 |
 | **安全** | 权限模式（yolo/normal/plan）、命令黑名单 |
 | **界面** | 最大标签数、标签栏位置、自动滚动 |
@@ -513,6 +519,8 @@ OpenCode 本身就是一个独立的服务器程序。OpenCodian 不重新实现
 - AI 功能的更新只需升级 OpenCode，插件代码不用改
 - 用户可以使用 OpenCode 支持的所有模型提供商
 - 服务器可以独立运行在远程机器上
+
+同时插件保留了 SDK v2 主链路与 legacy HTTP/SSE 回退链路：前者更贴近 OpenCode 的新接口面，后者保证 rollout 期间的兼容和故障回退。
 
 ### 为什么使用 SSE 流式传输？
 

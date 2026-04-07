@@ -2,6 +2,8 @@ import {
   buildCatalogFromConfig,
   filterCatalog,
   isProviderEnabled,
+  mergeCatalogs,
+  mergeProviderAvailabilityConfig,
   resolveModelSelection,
   setProviderEnabled,
 } from '../../../../src/core/config/modelConfig';
@@ -55,7 +57,119 @@ describe('modelConfig helpers', () => {
 
     const reenabledAnthropic = setProviderEnabled(localConfig, 'anthropic', true, ['openai', 'anthropic']);
     expect(reenabledAnthropic.enabled_providers).toEqual(['openai', 'anthropic']);
-    expect(reenabledAnthropic.disabled_providers).toEqual([]);
+    expect(reenabledAnthropic.disabled_providers).toBeUndefined();
+  });
+
+  it('replaces inherited provider arrays field by field', () => {
+    expect(mergeProviderAvailabilityConfig(
+      {
+        enabled_providers: ['deepseek'],
+        disabled_providers: ['alibaba', 'alibaba-cn'],
+      },
+      {
+        disabled_providers: ['alibaba-cn'],
+      },
+    )).toEqual({
+      enabled_providers: ['deepseek'],
+      disabled_providers: ['alibaba-cn'],
+    });
+  });
+
+  it('preserves inherited blacklist entries when locally re-enabling one provider', () => {
+    const inherited = {
+      disabled_providers: ['alibaba', 'alibaba-cn'],
+    };
+
+    const locallyEnabledAlibaba = setProviderEnabled(
+      {},
+      'alibaba',
+      true,
+      ['deepseek', 'alibaba', 'alibaba-cn'],
+      inherited,
+    );
+    expect(locallyEnabledAlibaba).toEqual({
+      disabled_providers: ['alibaba-cn'],
+    });
+
+    const restored = setProviderEnabled(
+      locallyEnabledAlibaba,
+      'alibaba',
+      false,
+      ['deepseek', 'alibaba', 'alibaba-cn'],
+      inherited,
+    );
+    expect(restored).toEqual({});
+  });
+
+  it('extends inherited whitelist entries without clearing unrelated server rules', () => {
+    const inherited = {
+      enabled_providers: ['deepseek'],
+      disabled_providers: ['alibaba'],
+    };
+
+    const locallyEnabledOpenAI = setProviderEnabled(
+      {},
+      'openai',
+      true,
+      ['deepseek', 'openai', 'alibaba'],
+      inherited,
+    );
+    expect(locallyEnabledOpenAI).toEqual({
+      enabled_providers: ['deepseek', 'openai'],
+    });
+
+    const restored = setProviderEnabled(
+      locallyEnabledOpenAI,
+      'openai',
+      false,
+      ['deepseek', 'openai', 'alibaba'],
+      inherited,
+    );
+    expect(restored).toEqual({});
+  });
+
+  it('preserves server disabled scopes when local and server catalogs merge', () => {
+    const merged = mergeCatalogs(
+      {
+        providers: [{
+          id: 'alibaba',
+          name: 'Alibaba',
+          source: 'server',
+          existsInLocal: false,
+          existsInServer: true,
+          disabledScopes: ['global'],
+          models: [{
+            id: 'qwen-max',
+            name: 'Qwen Max',
+            source: 'server',
+            existsInLocal: false,
+            existsInServer: true,
+            disabledScopes: ['global'],
+          }],
+        }],
+        defaults: {},
+      },
+      {
+        providers: [{
+          id: 'alibaba',
+          name: 'Alibaba',
+          source: 'local',
+          existsInLocal: true,
+          existsInServer: false,
+          models: [{
+            id: 'qwen-max',
+            name: 'Qwen Max',
+            source: 'local',
+            existsInLocal: true,
+            existsInServer: false,
+          }],
+        }],
+        defaults: {},
+      },
+    );
+
+    expect(merged.providers[0]?.disabledScopes).toEqual(['global']);
+    expect(merged.providers[0]?.models[0]?.disabledScopes).toEqual(['global']);
   });
 
   it('resolves model selections as available, unconfigured, or unavailable', () => {

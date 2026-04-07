@@ -8,6 +8,7 @@ import type {
 export const OPENCODE_SCHEMA_URL = 'https://opencode.ai/config.json';
 
 export type ModelCatalogSource = 'local' | 'server' | 'merge';
+export type ModelCatalogDisableScope = 'global' | 'project';
 
 export interface ModelCatalogModel {
   id: string;
@@ -16,6 +17,7 @@ export interface ModelCatalogModel {
   source: ModelCatalogSource;
   existsInLocal: boolean;
   existsInServer: boolean;
+  disabledScopes?: ModelCatalogDisableScope[];
 }
 
 export interface ModelCatalogProvider {
@@ -25,6 +27,7 @@ export interface ModelCatalogProvider {
   source: ModelCatalogSource;
   existsInLocal: boolean;
   existsInServer: boolean;
+  disabledScopes?: ModelCatalogDisableScope[];
 }
 
 export interface ModelCatalog {
@@ -49,6 +52,8 @@ export interface ResolvedModelSelection {
   modelName?: string;
   contextWindow?: number;
 }
+
+export type ProviderAvailabilityConfig = Pick<OpencodeModelConfigSubset, 'enabled_providers' | 'disabled_providers'>;
 
 const MODEL_KEYS: Array<keyof OpencodeModelConfigSubset> = [
   'model',
@@ -205,6 +210,47 @@ export function cleanupModelConfig(subset: OpencodeModelConfigSubset): OpencodeM
   return next;
 }
 
+export function mergeModelConfigSubsets(
+  base: OpencodeModelConfigSubset | null | undefined,
+  override: OpencodeModelConfigSubset | null | undefined,
+): OpencodeModelConfigSubset {
+  const next: OpencodeModelConfigSubset = {};
+
+  if (typeof base?.model === 'string') {
+    next.model = base.model;
+  }
+  if (typeof base?.small_model === 'string') {
+    next.small_model = base.small_model;
+  }
+  if (isRecord(base?.provider)) {
+    next.provider = cloneProviderRecord(base.provider);
+  }
+  if (Array.isArray(base?.enabled_providers)) {
+    next.enabled_providers = uniqueStrings(base.enabled_providers);
+  }
+  if (Array.isArray(base?.disabled_providers)) {
+    next.disabled_providers = uniqueStrings(base.disabled_providers);
+  }
+
+  if (typeof override?.model === 'string') {
+    next.model = override.model;
+  }
+  if (typeof override?.small_model === 'string') {
+    next.small_model = override.small_model;
+  }
+  if (isRecord(override?.provider)) {
+    next.provider = mergeProviderRecords(next.provider, override.provider);
+  }
+  if (Array.isArray(override?.enabled_providers)) {
+    next.enabled_providers = uniqueStrings(override.enabled_providers);
+  }
+  if (Array.isArray(override?.disabled_providers)) {
+    next.disabled_providers = uniqueStrings(override.disabled_providers);
+  }
+
+  return cleanupModelConfig(next);
+}
+
 export function buildCatalogFromConfig(
   subset: OpencodeModelConfigSubset,
   source: 'local' | 'server',
@@ -300,6 +346,7 @@ export function mergeCatalogs(server: ModelCatalog, local: ModelCatalog): ModelC
         source: 'merge',
         existsInLocal: true,
         existsInServer: true,
+        disabledScopes: mergeCatalogDisableScopes(existingModel.disabledScopes, model.disabledScopes),
       });
     }
 
@@ -309,6 +356,7 @@ export function mergeCatalogs(server: ModelCatalog, local: ModelCatalog): ModelC
       source: 'merge',
       existsInLocal: true,
       existsInServer: true,
+      disabledScopes: mergeCatalogDisableScopes(existing.disabledScopes, provider.disabledScopes),
       models: [...models.values()].sort((left, right) => left.name.localeCompare(right.name)),
     });
   }
@@ -320,6 +368,14 @@ export function mergeCatalogs(server: ModelCatalog, local: ModelCatalog): ModelC
       ...local.defaults,
     },
   };
+}
+
+function mergeCatalogDisableScopes(
+  left: ModelCatalogDisableScope[] | undefined,
+  right: ModelCatalogDisableScope[] | undefined,
+): ModelCatalogDisableScope[] | undefined {
+  const merged = Array.from(new Set([...(left ?? []), ...(right ?? [])]));
+  return merged.length > 0 ? merged : undefined;
 }
 
 export function parseModelReference(value: string | undefined): { provider: string; model: string } | null {
@@ -412,30 +468,50 @@ export function getEnabledProviderIds(
     .filter((providerId) => isProviderEnabled(subset, providerId));
 }
 
+export function mergeProviderAvailabilityConfig(
+  inherited: ProviderAvailabilityConfig | null | undefined,
+  local: ProviderAvailabilityConfig | null | undefined,
+): ProviderAvailabilityConfig {
+  return {
+    enabled_providers: Array.isArray(local?.enabled_providers)
+      ? uniqueStrings(local.enabled_providers)
+      : Array.isArray(inherited?.enabled_providers)
+        ? uniqueStrings(inherited.enabled_providers)
+        : undefined,
+    disabled_providers: Array.isArray(local?.disabled_providers)
+      ? uniqueStrings(local.disabled_providers)
+      : Array.isArray(inherited?.disabled_providers)
+        ? uniqueStrings(inherited.disabled_providers)
+        : undefined,
+  };
+}
+
 export function setProviderEnabled(
   subset: OpencodeModelConfigSubset,
   providerId: string,
   enabled: boolean,
   knownProviderIds: Iterable<string>,
+  inherited?: ProviderAvailabilityConfig | null,
 ): OpencodeModelConfigSubset {
   const trimmedProviderId = providerId.trim();
   if (!trimmedProviderId) {
     return cleanupModelConfig(subset);
   }
 
+  const effective = mergeProviderAvailabilityConfig(inherited, subset);
   const next: OpencodeModelConfigSubset = {
     ...subset,
   };
-  const nextDisabledProviders = new Set(uniqueStrings(subset.disabled_providers ?? []));
-  const useWhitelistMode = Array.isArray(subset.enabled_providers);
+  const nextDisabledProviders = new Set(uniqueStrings(effective.disabled_providers ?? []));
+  const useWhitelistMode = Array.isArray(effective.enabled_providers);
 
   if (useWhitelistMode) {
     const orderedKnownProviders = uniqueStrings([
       ...Array.from(knownProviderIds),
-      ...uniqueStrings(subset.enabled_providers ?? []),
+      ...uniqueStrings(effective.enabled_providers ?? []),
       trimmedProviderId,
     ]);
-    const nextEnabledProviders = new Set(uniqueStrings(subset.enabled_providers ?? []));
+    const nextEnabledProviders = new Set(uniqueStrings(effective.enabled_providers ?? []));
 
     if (enabled) {
       nextEnabledProviders.add(trimmedProviderId);
@@ -444,8 +520,18 @@ export function setProviderEnabled(
       nextEnabledProviders.delete(trimmedProviderId);
     }
 
-    next.enabled_providers = orderedKnownProviders.filter((knownProviderId) => nextEnabledProviders.has(knownProviderId));
-    next.disabled_providers = Array.from(nextDisabledProviders);
+    setAvailabilityOverride(
+      next,
+      'enabled_providers',
+      orderedKnownProviders.filter((knownProviderId) => nextEnabledProviders.has(knownProviderId)),
+      inherited?.enabled_providers,
+    );
+    setAvailabilityOverride(
+      next,
+      'disabled_providers',
+      Array.from(nextDisabledProviders),
+      inherited?.disabled_providers,
+    );
     return cleanupModelConfig(next);
   }
 
@@ -455,7 +541,7 @@ export function setProviderEnabled(
     nextDisabledProviders.add(trimmedProviderId);
   }
 
-  next.disabled_providers = Array.from(nextDisabledProviders);
+  setAvailabilityOverride(next, 'disabled_providers', Array.from(nextDisabledProviders), inherited?.disabled_providers);
   return cleanupModelConfig(next);
 }
 
@@ -575,6 +661,101 @@ function uniqueStrings(values: string[]): string[] {
       .filter((value) => value.length > 0),
     ),
   );
+}
+
+function cloneUnknown<T>(value: T): T {
+  if (Array.isArray(value)) {
+    return value.map((item) => cloneUnknown(item)) as T;
+  }
+
+  if (isRecord(value)) {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [key, cloneUnknown(item)]),
+    ) as T;
+  }
+
+  return value;
+}
+
+function mergeUnknown(base: unknown, override: unknown): unknown {
+  if (Array.isArray(override)) {
+    return cloneUnknown(override);
+  }
+
+  if (isRecord(base) && isRecord(override)) {
+    const next: Record<string, unknown> = Object.fromEntries(
+      Object.entries(base).map(([key, value]) => [key, cloneUnknown(value)]),
+    );
+
+    for (const [key, value] of Object.entries(override)) {
+      next[key] = key in next ? mergeUnknown(next[key], value) : cloneUnknown(value);
+    }
+
+    return next;
+  }
+
+  return cloneUnknown(override);
+}
+
+function cloneProviderRecord(
+  provider: Record<string, OpencodeProviderConfig>,
+): Record<string, OpencodeProviderConfig> {
+  return cloneUnknown(provider);
+}
+
+function mergeProviderRecords(
+  base: Record<string, OpencodeProviderConfig> | undefined,
+  override: Record<string, OpencodeProviderConfig>,
+): Record<string, OpencodeProviderConfig> {
+  const next = base ? cloneProviderRecord(base) : {};
+
+  for (const [providerId, providerConfig] of Object.entries(override)) {
+    const existing = next[providerId];
+    next[providerId] = (
+      existing
+        ? mergeUnknown(existing, providerConfig)
+        : cloneUnknown(providerConfig)
+    ) as OpencodeProviderConfig;
+  }
+
+  return next;
+}
+
+function setAvailabilityOverride(
+  subset: OpencodeModelConfigSubset,
+  key: 'enabled_providers' | 'disabled_providers',
+  nextValues: string[] | undefined,
+  inheritedValues: string[] | undefined,
+): void {
+  const normalizedNext = Array.isArray(nextValues) ? uniqueStrings(nextValues) : undefined;
+  const normalizedInherited = Array.isArray(inheritedValues) ? uniqueStrings(inheritedValues) : undefined;
+
+  if (
+    sameStringArrays(normalizedNext, normalizedInherited)
+    || (!normalizedInherited && (!normalizedNext || normalizedNext.length === 0))
+  ) {
+    delete subset[key];
+    return;
+  }
+
+  subset[key] = normalizedNext ?? [];
+}
+
+function sameStringArrays(left: string[] | undefined, right: string[] | undefined): boolean {
+  if (left === right) {
+    return true;
+  }
+
+  if (!left || !right) {
+    return !left && !right;
+  }
+
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  const rightValues = new Set(right);
+  return left.every((value) => rightValues.has(value));
 }
 
 function findCatalogProvider(

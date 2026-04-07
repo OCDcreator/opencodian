@@ -132,8 +132,19 @@
 
 - `sdkPrompt` 开启时调用 `client.session.prompt(...)`
 - 否则 POST 到 `/session/:id/message`
+- 如果服务端返回的是“assistant message + structured error”而不是直接 throw，服务层也会优先把 `info.error` 提取成异常抛出，而不是默默返回一个空 assistant
 
 返回值不是原始 OpenCode message，而是已经过 `openCodeMessageToChatMessage()` 归一化后的 `ChatMessage`。
+
+另外还有一个专门给设置页用的 `probeProviderResponse(providerId, modelId)`：
+
+- 创建一个临时 session
+- 用指定 `provider/model` 发送一条最小真实请求
+- 成功时返回简短响应预览
+- 失败时返回真实错误文本
+- 最后无论成功失败都会删除临时 session
+
+这让设置页的 provider 测试可以验证“真实发送能力”，而不是只看目录或 runtime 是否出现。
 
 #### 流式请求
 
@@ -181,6 +192,13 @@ legacy 流式路径则会把：
 
 - 如果 SDK `event.subscribe()` 在第一条事件之前就失败，会回退到 legacy SSE
 - 一旦已经开始收到 SDK 事件，后续异常不会再切回 legacy，而是直接产出 `error` chunk
+
+`handleStreamingEvent()` 现在还会显式处理 `session.error`：
+
+- 普通 provider/API 错误会立刻转成 `error` chunk
+- `MessageAbortedError` 只会结束流，不会误报成发送失败
+
+除此之外，`finishStreamingResponse()` 在收尾重新拉取 assistant message 时，也会再检查一次 `assistant.info.error`。如果流里没收到 `session.error`，但最终持久化消息里已经带了结构化错误，服务层仍会补发 `error` chunk，避免 UI 再次把它误判成“空回复”。
 
 流结束后，`finishStreamingResponse()` 还会重新拉一次 session messages，补发任何未在流里出现的尾部文本，并补一条 `message_metadata`，最后统一输出 `message_stop`。
 
@@ -235,10 +253,19 @@ OMO 处理则基于 `detectOmoMessageMeta()`：
 
 除了聊天主链路，服务层还负责一组周边接口：
 
-- `getAvailableModels()`: 读取 SDK `config.providers()` 或 legacy `/config/providers`，并把 string-array/object 两种 provider model 结构统一成同一个返回形状。
+- `getAvailableModels()`: 读取 SDK `config.providers()` 或 legacy `/config/providers`，并把 string-array/object 两种 provider model 结构统一成同一个返回形状。开启 `includeDirectory` 时，它表示“当前项目目录作用域下的 runtime provider/model 列表”，也是设置页复现 `opencode models` 结果的主入口。
+- `getProviderDirectory()`: 读取 SDK `provider.list()` 或 legacy `/provider`，归一化 `all` / `default` / `connected`；它对应的是 connect-provider 目录总览，不是 `opencode models` 的等价接口。
+- `getResolvedModelConfig()`: 读取 SDK `config.get()` 或 legacy `/config`，只提取模型相关配置字段。开启 `includeDirectory` 时返回当前项目作用域的解析结果；关闭时返回服务端“默认工作目录作用域”的解析结果，不能把它简单等同于纯全局配置文件。
 - `getSessionContextUsageSnapshot()`: 并发读取 session、messages、providers，计算 provider/model 名称、上下文窗口、token 统计和总 cost。
 - `getPendingPermissions()` / `respondToPermission()`: 当前跟随 `sdkCrud` 开关走 SDK `permission.*` 或 legacy `/permission/*`。
 - `getPendingQuestions()` / `replyToQuestion()` / `rejectQuestion()`: 由 `sdkQuestions` 单独控制。
+
+额外要记住一个容易混淆的点：
+
+- `opencode models` CLI 与 `getAvailableModels(includeDirectory=true)` / `/config/providers` 同源，都是目录作用域下 `Provider.list()` 的结果
+- `provider.list().all` 只是当前作用域下的 connect-provider 目录，不等于当前项目实际启用列表，也不是 models.dev 的无过滤全量目录
+- 如果比较 CLI、HTTP API 和插件 UI，一定要先确认三者是不是在同一个 `directory` 作用域下
+- 在 Windows 上，插件发送给 OpenCode 的 `directory` 必须规范化成正斜杠路径（例如 `C:/vault`）；如果直接传 `C:\vault`，服务端会退回到接近“无目录作用域”的结果，常见症状就是 runtime providers 只剩 `deepseek`
 
 ## 关键方法
 
@@ -250,12 +277,15 @@ OMO 处理则基于 `detectOmoMessageMeta()`：
 | `createSession()` | 创建 session，并可同时写入 `currentSessionId` |
 | `getSessionMessages()` | 读取消息并应用 revert 过滤 |
 | `requestAssistantResponse()` | 非流式请求，返回归一化后的 `ChatMessage` |
+| `probeProviderResponse(providerId, modelId)` | 用临时 session 做一次最小真实发送探测 |
 | `sendMessage()` | 流式请求入口，按 flag 选择 SDK 或 legacy SSE |
 | `cancelStream()` | 本地 abort + 服务端 abort |
 | `detachStream()` | 只停止本地流观察 |
 | `subscribeToSessionTodoUpdates()` | 订阅 todo.updated sync 事件 |
 | `subscribeToSessionStatusUpdates()` | 订阅 session.status sync 事件 |
 | `getAvailableModels()` | 读取并统一 provider/model 目录 |
+| `getProviderDirectory()` | 读取服务端宽 provider 目录，不等同于运行时可用列表 |
+| `getResolvedModelConfig()` | 读取服务器解析后的模型配置子集 |
 | `getSessionContextUsageSnapshot()` | 计算 token/cost/context window 快照 |
 | `getPendingPermissions()` / `respondToPermission()` | 处理权限请求 |
 | `getPendingQuestions()` / `replyToQuestion()` / `rejectQuestion()` | 处理 OpenCode question 请求 |
@@ -287,7 +317,8 @@ graph TD
 - `shared/*`: 提供上下文标签、路径解析、tool 状态和结果文本等辅助能力。
 - `OpenCodianView`: 是最主要消费者，聊天发送、流式渲染、取消、diff、todo、question 都通过本服务完成。
 - `TitleGenerationService`: 调用 `requestAssistantResponse()` 走非流式链路。
-- `ModelConfigService`: 调用 `getAvailableModels()` 读取服务端目录。
+- `ModelConfigService`: 现在用 `getAvailableModels()` 的目录作用域运行时列表，加上 `getResolvedModelConfig()` 的禁用配置来构建服务器 catalog；`getProviderDirectory()` 保留给显式诊断 connect-provider 目录时使用。
+- 对本地模式的 provider/config 问题，优先用 live HTTP/CLI 调试验证：`config.providers()` 看运行时列表，`provider.list()` 看当前作用域下的 connect-provider 目录，`config.get(directory)` 看当前 vault 解析结果；不要直接拿无 `directory` 的 `/config` 当“全局文件内容”。
 
 ## 配置项
 
@@ -305,6 +336,9 @@ graph TD
 
 - `OpenCodeService.initialize()` 仍然存在，但运行时入口 `main.ts` 并不调用它；主要使用方是测试。
 - `getPendingPermissions()` / `respondToPermission()` 当前跟随的是 `sdkCrud`，不是单独的 permission flag。
-- `checkHealth()` 和 `getAvailableModels()` 也跟随 `sdkCrud`，而不是独立的 health/models flag。
+- `checkHealth()`、`getAvailableModels()`、`getProviderDirectory()` 和 `getResolvedModelConfig()` 都跟随 `sdkCrud`，而不是独立的 health/models flag。
+- `getAvailableModels()` 是运行时可用列表，也是最接近 OpenCode 主界面当前 provider 列表的数据源。
+- `getProviderDirectory()` 返回的是 connect-provider 目录；如果只禁用了少量 provider，它仍可能返回上百个可连接项，所以不要把它当成设置页服务器模型目录。
+- SDK client 会把 `directory` 作为查询参数和 `x-opencode-directory` 头一起传给服务端；直接手写 HTTP 请求如果不带这个作用域，`/config` 和 `/config/providers` 看到的通常是全局层结果。
 - legacy `connectSSE()` / `parseSSEEvents()` 仍然是有效回滚路径，不能在 SDK rollout 未完全收口前删除。
 - 文件里的 `transformEventToChunks()` / `transformPartToChunks()` 仍保留，但当前主流式路径实际走的是 `handleStreamingEvent()`。

@@ -30,6 +30,7 @@
 export const OPENCODE_SCHEMA_URL = 'https://opencode.ai/config.json';
 
 export type ModelCatalogSource = 'local' | 'server' | 'merge';
+export type ModelCatalogDisableScope = 'global' | 'project';
 
 export interface ModelCatalogModel {
   id: string;
@@ -38,6 +39,7 @@ export interface ModelCatalogModel {
   source: ModelCatalogSource;
   existsInLocal: boolean;
   existsInServer: boolean;
+  disabledScopes?: ModelCatalogDisableScope[];
 }
 
 export interface ModelCatalogProvider {
@@ -47,6 +49,7 @@ export interface ModelCatalogProvider {
   source: ModelCatalogSource;
   existsInLocal: boolean;
   existsInServer: boolean;
+  disabledScopes?: ModelCatalogDisableScope[];
 }
 
 export interface ModelCatalog {
@@ -84,6 +87,7 @@ export interface ModelCatalog {
 |------|------|
 | `extractModelConfig(config)` | 从完整 `OpencodeConfig` 中摘出模型相关字段，并做基础类型过滤 |
 | `cleanupModelConfig(subset)` | 去掉空字符串、空数组和空对象，数组去重并 trim |
+| `mergeModelConfigSubsets(base, override)` | 按 OpenCode 语义合并模型字段子集：对象深合并、数组按字段替换 |
 | `applyModelConfig(config, subset)` | 先删掉原配置中的模型相关键，再把清洗后的子集并回去 |
 
 其中 `provider` 会通过 `JSON.parse(JSON.stringify(...))` 深拷贝，避免调用方共享对象引用。
@@ -97,15 +101,16 @@ export interface ModelCatalog {
 - `contextWindow` 取 `modelConfig.limit?.context`
 - `defaults` 只从 `subset.model` 解析默认 provider/model
 
-### 合并本地与服务端 catalog
+### 合并项目配置与服务端 catalog
 
-`mergeCatalogs(server, local)` 的合并顺序是“先复制服务端，再叠加本地”：
+`mergeCatalogs(server, local)` 的合并顺序是“先复制服务端，再叠加项目配置”：
 
 - 服务端独有条目保留 `source: 'server'`
-- 本地独有 provider/model 会以 `source: 'local'` 补入
-- 两边同时存在的 provider/model 会变成 `source: 'merge'`
+- 项目配置独有 provider/model 会以 `source: 'local'` 补入
+- 两边同时存在的 provider/model 会变成 `source: 'merge'`，并由项目配置覆盖同 ID 字段
+- 合并同 ID provider/model 时会保留并并集化 `disabledScopes`，避免服务端禁用标记在 merge 后被本地配置冲掉
 - provider 和 model 最终都按 `name.localeCompare()` 排序
-- `defaults` 采用 `{ ...server.defaults, ...local.defaults }`，本地默认值覆盖同 provider 的服务端默认值
+- `defaults` 采用 `{ ...server.defaults, ...local.defaults }`，项目默认值覆盖同 provider 的服务端默认值
 
 ### 模型引用解析
 
@@ -114,6 +119,18 @@ export interface ModelCatalog {
 - 斜杠前后都必须有内容
 - 返回值会对两侧做 `trim()`
 - 其他格式返回 `null`
+
+### Provider 可用性
+
+`isProviderEnabled()` 按 OpenCode 语义判断 provider 是否可用：
+
+- 存在 `enabled_providers` 时先进入白名单模式，不在白名单里的 provider 都不可用
+- `disabled_providers` 再作为黑名单过滤
+- 两个数组都不存在时 provider 默认可用
+
+`mergeProviderAvailabilityConfig(inherited, local)` 用于把服务器配置与当前项目配置合并。数组不是追加合并，而是本地字段存在就替换继承字段；本地字段不存在才继承服务器字段。
+
+`setProviderEnabled(subset, providerId, enabled, knownProviderIds, inherited?)` 写回项目配置时会以 `inherited` 为基线生成最小本地覆盖。例如服务器禁用 `alibaba` / `alibaba-cn`，项目只启用 `alibaba` 时，本地只写 `disabled_providers: ['alibaba-cn']`，不会清空其他继承禁用项。
 
 ## 关键导出
 
@@ -126,9 +143,12 @@ export interface ModelCatalog {
 | `extractModelConfig(config)` | 提取模型字段子集 |
 | `applyModelConfig(config, subset)` | 用模型子集回写完整配置 |
 | `cleanupModelConfig(subset)` | 清洗模型子集 |
+| `mergeModelConfigSubsets(base, override)` | 按 OpenCode 语义合并模型子集 |
 | `buildCatalogFromConfig(subset, source)` | 从本地 / 服务端风格数据构建 catalog |
 | `mergeCatalogs(server, local)` | 合并 catalog 并标记存在性 |
 | `parseModelReference(value)` | 解析 `provider/model` 引用字符串 |
+| `mergeProviderAvailabilityConfig(inherited, local)` | 按字段继承或替换 provider 白名单 / 黑名单 |
+| `setProviderEnabled(subset, providerId, enabled, knownProviderIds, inherited?)` | 写入最小 provider 开关覆盖 |
 
 ## 与其他模块的交互
 
@@ -140,4 +160,5 @@ export interface ModelCatalog {
 
 - `parseOpencodeConfigText()` 本身不做错误兜底，JSON 非法时会直接抛异常，是否捕获由调用方决定。
 - `buildCatalogFromConfig()` 不会从 `enabled_providers` / `disabled_providers` 推导 provider 列表；catalog 只来自 `provider` 映射和 `model` 默认值。
+- provider 白名单 / 黑名单是集合语义；比较继承值时不依赖数组顺序。
 - `parseModelReference()` 只按第一个 `/` 切分，不做更复杂的 provider/model 语法校验。

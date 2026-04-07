@@ -41,6 +41,10 @@ class MockHeaders {
     return this.values.has(name.toLowerCase());
   }
 
+  delete(name: string): void {
+    this.values.delete(name.toLowerCase());
+  }
+
   forEach(callback: (value: string, key: string) => void): void {
     for (const [key, value] of this.values.entries()) {
       callback(value, key);
@@ -52,6 +56,7 @@ class MockRequest {
   readonly url: string;
   readonly method: string;
   readonly headers: MockHeaders;
+  readonly body?: string;
   private readonly bodyText?: string;
 
   constructor(input: RequestInfo | URL, init?: RequestInit) {
@@ -60,6 +65,7 @@ class MockRequest {
       this.method = init?.method ?? 'GET';
       this.headers = new MockHeaders(init?.headers);
       this.bodyText = typeof init?.body === 'string' ? init.body : undefined;
+      this.body = this.bodyText;
       return;
     }
 
@@ -71,6 +77,7 @@ class MockRequest {
       : typeof input.clone === 'function'
         ? undefined
         : undefined;
+    this.body = this.bodyText;
   }
 
   clone(): { text: () => Promise<string> } {
@@ -179,5 +186,38 @@ describe('createSdkFetch', () => {
 
     expect(nativeFetch).toHaveBeenCalled();
     expect(mockRequestUrl).not.toHaveBeenCalled();
+  });
+
+  it('rewrites x-opencode-directory headers into directory query params for requestUrl calls', async () => {
+    mockRequestUrl.mockResolvedValue({
+      status: 200,
+      json: { ok: true },
+      text: '{"ok":true}',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    const fetchImpl = createSdkFetch({
+      nativeFetch: jest.fn() as unknown as typeof fetch,
+    });
+
+    await fetchImpl('http://127.0.0.1:4096/config/providers', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-opencode-directory': encodeURIComponent('C:\\vault'),
+      },
+      body: '{"hello":"world"}',
+    });
+
+    expect(mockRequestUrl).toHaveBeenCalledWith(expect.objectContaining({
+      url: 'http://127.0.0.1:4096/config/providers?directory=C%3A%2Fvault',
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: '{"hello":"world"}',
+    }));
   });
 });

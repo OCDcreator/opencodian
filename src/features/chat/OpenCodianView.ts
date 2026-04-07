@@ -6382,8 +6382,17 @@ export class OpenCodianView extends ItemView {
         ?.filter((b): b is { type: 'text'; content: string } => b.type === 'text')
         .map(b => b.content)
         .join('') ?? '';
+      const hasStreamContentBlocks = Boolean(streamContentBlocks && streamContentBlocks.length > 0);
       const shouldPersistInterruptedState = streamInterrupted && !streamCompleted && !latestErrorMessage;
       let interruptedNoticeMessage: ChatMessage | null = null;
+      const streamErrorNoticeMessage = latestErrorMessage && !hasStreamContentBlocks
+        ? this.buildStreamErrorNotice(
+          finalizedTimestamp,
+          latestErrorMessage,
+          finalizedModelId,
+          finalizedAssistantMessageId,
+        )
+        : null;
 
       const shouldSyncFromServer = streamCompleted && !streamTimedOut && !streamInterrupted && !latestErrorMessage;
       logAssistantFinalizationStage('stream-finally-enter', {
@@ -6421,7 +6430,7 @@ export class OpenCodianView extends ItemView {
 
       if (finalizedStreamingMessageEl) {
         let shellFinalizeAction = 'removed';
-        if (streamContentBlocks?.length || latestErrorMessage) {
+        if (hasStreamContentBlocks) {
           this.addTimestampWithCopyButton(
             finalizedStreamingMessageEl,
             finalizedTimestamp,
@@ -6430,9 +6439,20 @@ export class OpenCodianView extends ItemView {
             shouldPersistInterruptedState ? t('chat.stream.interruptedBadge') : undefined,
           );
           shellFinalizeAction = 'timestamp-added';
+        } else if (streamErrorNoticeMessage) {
+          await this.renderAssistantPlaceholderAsNotice(
+            finalizedStreamingMessageEl,
+            streamErrorNoticeMessage,
+            'render-stream-error-notice',
+          );
+          shellFinalizeAction = 'error-notice-rendered';
         } else if (shouldPersistInterruptedState) {
           interruptedNoticeMessage = this.buildInterruptedAssistantNotice(finalizedTimestamp, finalizedModelId);
-          await this.renderAssistantPlaceholderAsNotice(finalizedStreamingMessageEl, interruptedNoticeMessage);
+          await this.renderAssistantPlaceholderAsNotice(
+            finalizedStreamingMessageEl,
+            interruptedNoticeMessage,
+            'render-interrupted-notice',
+          );
           shellFinalizeAction = 'interrupted-notice-rendered';
         } else {
           finalizedStreamingMessageEl.remove();
@@ -6451,7 +6471,7 @@ export class OpenCodianView extends ItemView {
       this.syncTabStreamLikeState(sendingTabId);
       await this.refreshServerStatusBadge();
 
-      if (streamContentBlocks && streamContentBlocks.length > 0) {
+      if (hasStreamContentBlocks && streamContentBlocks) {
         const contentBlocks: ContentBlock[] = streamContentBlocks.map((b) => {
           if (b.type === 'text') {
             return { type: 'text', text: b.content };
@@ -6515,18 +6535,11 @@ export class OpenCodianView extends ItemView {
           conversationMessageCount: sendingConversation.messages.length,
           message: this.summarizeChatMessageForDebug(assistantMessage),
         });
-      } else if (latestErrorMessage) {
-        sendingConversation.messages.push({
-          id: finalizedAssistantMessageId ?? `assistant-${finalizedTimestamp}`,
-          role: 'assistant',
-          content: latestErrorMessage,
-          timestamp: finalizedTimestamp,
-          modelId: finalizedModelId,
-          sourceMessageId: finalizedAssistantMessageId,
-        });
-        logAssistantFinalizationStage('local-error-message-appended', {
+      } else if (streamErrorNoticeMessage) {
+        sendingConversation.messages.push(streamErrorNoticeMessage);
+        logAssistantFinalizationStage('local-error-notice-appended', {
           conversationMessageCount: sendingConversation.messages.length,
-          latestAssistantMessage: this.summarizeChatMessageForDebug(sendingConversation.messages.at(-1)),
+          latestAssistantMessage: this.summarizeChatMessageForDebug(streamErrorNoticeMessage),
         });
       } else if (interruptedNoticeMessage) {
         logger.debug(`Persisting interrupted assistant notice because no visible assistant content survived cancellation: ${this.stringifyLogPayload({
@@ -6542,7 +6555,7 @@ export class OpenCodianView extends ItemView {
         });
       }
 
-      if (streamContentBlocks?.length || latestErrorMessage || interruptedNoticeMessage) {
+      if (hasStreamContentBlocks || streamErrorNoticeMessage || interruptedNoticeMessage) {
         sendingConversation.updatedAt = finalizedTimestamp;
         sendingConversation.lastResponseAt = finalizedTimestamp;
         await this.plugin.saveConversation(sendingConversation);
@@ -6905,35 +6918,18 @@ export class OpenCodianView extends ItemView {
   private async appendAssistantErrorMessage(message: string): Promise<void> {
     const activeTabId = this.getActiveTabId();
     const activeRuntime = this.getTabRuntimeState(activeTabId);
-    const { messageEl, contentEl } = this.createAssistantMessageElement(activeTabId);
-    const streamController = this.getOrCreateTabStreamController(activeTabId);
-
-    if (streamController) {
-      streamController.startStream(contentEl);
-      await streamController.handleChunk({ type: 'error', content: message });
-      await streamController.handleChunk({ type: 'done' });
-    } else {
-      const errorEl = contentEl.createDiv({ cls: 'streaming-error-block' });
-      errorEl.createSpan({ cls: 'streaming-error-icon', text: '❌' });
-      errorEl.createSpan({ cls: 'streaming-error-text', text: message });
-    }
-
     const timestamp = Date.now();
     const modelId = this.formatModelId(this.getCurrentSessionModel());
-    this.addTimestampWithCopyButton(messageEl, timestamp, message, modelId);
+    const noticeMessage = this.buildStreamErrorNotice(timestamp, message, modelId);
+    const { messageEl } = this.createAssistantMessageElement(activeTabId);
+    await this.renderAssistantPlaceholderAsNotice(messageEl, noticeMessage, 'render-stream-error-notice');
     if (activeRuntime) {
       activeRuntime.streamingMessageEl = null;
       activeRuntime.streamingContentEl = null;
     }
 
     if (this.currentConversation) {
-      this.currentConversation.messages.push({
-        id: `assistant-${timestamp}`,
-        role: 'assistant',
-        content: message,
-        timestamp,
-        modelId,
-      });
+      this.currentConversation.messages.push(noticeMessage);
       this.currentConversation.updatedAt = Date.now();
       await this.plugin.storage.saveConversation(this.currentConversation);
     }
@@ -7931,8 +7927,12 @@ export class OpenCodianView extends ItemView {
     syncedMessages: ChatMessage[],
   ): ChatMessage[] {
     return existingMessages.filter((message) => {
-      if (message.displayStyle === 'notice' && !message.sourceMessageId) {
-        return true;
+      if (message.displayStyle === 'notice') {
+        if (!message.sourceMessageId) {
+          return true;
+        }
+
+        return !syncedMessages.some((candidate) => candidate.sourceMessageId === message.sourceMessageId);
       }
 
       if (
@@ -8237,17 +8237,41 @@ export class OpenCodianView extends ItemView {
     };
   }
 
+  private buildStreamErrorNotice(
+    timestamp: number,
+    content: string,
+    modelId?: string,
+    sourceMessageId?: string,
+  ): ChatMessage {
+    return {
+      id: sourceMessageId ? `assistant-error-notice-${sourceMessageId}` : `assistant-error-notice-${timestamp}`,
+      role: 'assistant',
+      content,
+      timestamp,
+      modelId,
+      sourceMessageId,
+      displayStyle: 'notice',
+      noticeTitle: t('chat.notice.streamErrorTitle'),
+      noticeTone: 'error',
+    };
+  }
+
   private async renderAssistantPlaceholderAsNotice(
     messageEl: HTMLElement,
     noticeMessage: ChatMessage,
+    reason = 'render-notice',
   ): Promise<void> {
     messageEl.dataset.messageId = noticeMessage.id;
-    delete messageEl.dataset.sourceMessageId;
+    if (noticeMessage.sourceMessageId) {
+      messageEl.dataset.sourceMessageId = noticeMessage.sourceMessageId;
+    } else {
+      delete messageEl.dataset.sourceMessageId;
+    }
     messageEl.addClass('opencodian-message--assistant');
     messageEl.addClass('opencodian-message--notice');
     messageEl.removeClass('opencodian-message--background-task');
     messageEl.empty();
-    this.setStreamingAssistantMessageVisibility(messageEl, true, 'render-interrupted-notice');
+    this.setStreamingAssistantMessageVisibility(messageEl, true, reason);
 
     const contentEl = messageEl.createDiv({ cls: 'opencodian-message-content' });
     await this.renderNoticeCard(contentEl, noticeMessage);

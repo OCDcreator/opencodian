@@ -1,6 +1,10 @@
 import { requestUrl } from 'obsidian';
 
 const SSE_PATH_SUFFIXES = ['/event', '/global/event', '/global/sync-event'];
+const SCOPED_HEADER_TO_QUERY: Array<{ header: string; query: string }> = [
+  { header: 'x-opencode-directory', query: 'directory' },
+  { header: 'x-opencode-workspace', query: 'workspace' },
+];
 
 function isSseRequest(request: Request): boolean {
   const acceptHeader = request.headers.get('Accept') ?? '';
@@ -18,6 +22,50 @@ function headersToRecord(headers: Headers): Record<string, string> {
     record[key] = value;
   });
   return record;
+}
+
+function normalizeScopedHeaderValue(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
+function normalizeDirectoryPath(value: string): string {
+  return value.replace(/\\/g, '/');
+}
+
+function rewriteScopedRequest(request: Request): Request {
+  const url = new URL(request.url);
+  let changed = false;
+
+  for (const { header, query } of SCOPED_HEADER_TO_QUERY) {
+    const headerValue = request.headers.get(header);
+    if (!headerValue) {
+      continue;
+    }
+
+    const normalizedValue = query === 'directory'
+      ? normalizeDirectoryPath(normalizeScopedHeaderValue(headerValue))
+      : normalizeScopedHeaderValue(headerValue);
+
+    if (!url.searchParams.has(query)) {
+      url.searchParams.set(query, normalizedValue);
+      changed = true;
+    }
+    changed = true;
+  }
+
+  if (!changed) {
+    return request;
+  }
+
+  const next = new Request(url.toString(), request);
+  for (const { header } of SCOPED_HEADER_TO_QUERY) {
+    next.headers.delete(header);
+  }
+  return next;
 }
 
 async function requestBodyToText(request: Request): Promise<string | undefined> {
@@ -71,7 +119,7 @@ export function createSdkFetch(options: { nativeFetch?: typeof fetch } = {}): ty
   const nativeFetch = options.nativeFetch ?? globalThis.fetch.bind(globalThis);
 
   return async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-    const request = new Request(input, init);
+    const request = rewriteScopedRequest(new Request(input, init));
 
     if (isSseRequest(request)) {
       return nativeFetch(request);

@@ -28,6 +28,7 @@ import type {
   ContentBlock,
   ImageAttachment,
   MessageContextAttachment,
+  OpencodeModelConfigSubset,
   PermissionReply,
   PermissionRequest,
   PromptContextItem,
@@ -166,6 +167,7 @@ interface Message {
   providerID?: string;
   modelID?: string;
   structured?: unknown;
+  error?: unknown;
   cost?: number;
   tokens?: {
     total?: number;
@@ -311,6 +313,63 @@ interface AssistantMessageResponse {
   parts: Part[];
 }
 
+interface ProviderSendProbeResult {
+  providerId: string;
+  modelId: string;
+  success: boolean;
+  responsePreview?: string;
+  error?: string;
+}
+
+function extractStructuredErrorName(errorLike: unknown): string | null {
+  if (!errorLike || typeof errorLike !== 'object') {
+    return null;
+  }
+
+  const errorRecord = errorLike as { name?: unknown };
+  return typeof errorRecord.name === 'string' && errorRecord.name.trim()
+    ? errorRecord.name.trim()
+    : null;
+}
+
+function extractStructuredErrorMessage(errorLike: unknown): string | null {
+  if (!errorLike || typeof errorLike !== 'object') {
+    return null;
+  }
+
+  const errorRecord = errorLike as {
+    message?: unknown;
+    data?: {
+      message?: unknown;
+      statusCode?: unknown;
+      responseBody?: unknown;
+    };
+    name?: unknown;
+  };
+
+  const baseMessage = typeof errorRecord.data?.message === 'string' && errorRecord.data.message.trim()
+    ? errorRecord.data.message.trim()
+    : typeof errorRecord.message === 'string' && errorRecord.message.trim()
+      ? errorRecord.message.trim()
+      : typeof errorRecord.name === 'string' && errorRecord.name.trim()
+        ? errorRecord.name.trim()
+        : null;
+
+  if (!baseMessage) {
+    return null;
+  }
+
+  const statusCode = typeof errorRecord.data?.statusCode === 'number'
+    ? errorRecord.data.statusCode
+    : null;
+
+  if (statusCode === null || baseMessage.toLowerCase().includes(`http ${statusCode}`)) {
+    return baseMessage;
+  }
+
+  return `${baseMessage} (HTTP ${statusCode})`;
+}
+
 interface SessionContextUsageSnapshot {
   sessionId: string;
   sessionTitle: string;
@@ -331,6 +390,7 @@ interface SessionContextUsageSnapshot {
 
 interface StreamingState {
   lastContent: string;
+  lastErrorMessage: string | null;
   processedToolIds: Set<string>;
   toolInputSnapshots: Map<string, string>;
   debugChunkSequence: number;
@@ -528,11 +588,11 @@ export class OpenCodeService {
   }
 
   /** HTTP GET helper using Obsidian's requestUrl */
-  private async get<T>(path: string): Promise<T> {
+  private async get<T>(path: string, options: { includeDirectory?: boolean } = {}): Promise<T> {
     this.ensureBaseUrl();
 
     const response = await requestUrl({
-      url: `${this.baseUrl}${path}`,
+      url: this.buildScopedUrl(path, options.includeDirectory ?? false),
       method: 'GET',
       headers: this.getRequestHeaders(),
     });
@@ -556,11 +616,11 @@ export class OpenCodeService {
   }
 
   /** HTTP POST helper using Obsidian's requestUrl */
-  private async post<T>(path: string, body: unknown): Promise<T> {
+  private async post<T>(path: string, body: unknown, options: { includeDirectory?: boolean } = {}): Promise<T> {
     this.ensureBaseUrl();
 
     const response = await requestUrl({
-      url: `${this.baseUrl}${path}`,
+      url: this.buildScopedUrl(path, options.includeDirectory ?? false),
       method: 'POST',
       headers: this.getRequestHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(body),
@@ -590,11 +650,11 @@ export class OpenCodeService {
   }
 
   /** HTTP PATCH helper using Obsidian's requestUrl */
-  private async patch<T>(path: string, body: unknown): Promise<T> {
+  private async patch<T>(path: string, body: unknown, options: { includeDirectory?: boolean } = {}): Promise<T> {
     this.ensureBaseUrl();
 
     const response = await requestUrl({
-      url: `${this.baseUrl}${path}`,
+      url: this.buildScopedUrl(path, options.includeDirectory ?? false),
       method: 'PATCH',
       headers: this.getRequestHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(body),
@@ -621,11 +681,11 @@ export class OpenCodeService {
   }
 
   /** HTTP DELETE helper using Obsidian's requestUrl */
-  private async delete(path: string): Promise<void> {
+  private async delete(path: string, options: { includeDirectory?: boolean } = {}): Promise<void> {
     this.ensureBaseUrl();
 
     await requestUrl({
-      url: `${this.baseUrl}${path}`,
+      url: this.buildScopedUrl(path, options.includeDirectory ?? false),
       method: 'DELETE',
       headers: this.getRequestHeaders(),
     });
@@ -886,6 +946,10 @@ export class OpenCodeService {
       );
       if (response && typeof response === 'object' && 'info' in response && 'parts' in response) {
         const typedResponse = response as AssistantMessageResponse;
+        const assistantError = extractStructuredErrorMessage(typedResponse.info.error);
+        if (assistantError) {
+          throw new Error(assistantError);
+        }
         return OpenCodeService.openCodeMessageToChatMessage(typedResponse.info, typedResponse.parts, this.vaultPath);
       }
 
@@ -929,10 +993,60 @@ export class OpenCodeService {
       && 'parts' in response
     ) {
       const typedResponse = response as AssistantMessageResponse;
+      const assistantError = extractStructuredErrorMessage(typedResponse.info.error);
+      if (assistantError) {
+        throw new Error(assistantError);
+      }
       return OpenCodeService.openCodeMessageToChatMessage(typedResponse.info, typedResponse.parts, this.vaultPath);
     }
 
     throw new Error('Invalid assistant response payload');
+  }
+
+  async probeProviderResponse(providerId: string, modelId: string): Promise<ProviderSendProbeResult> {
+    const normalizedProviderId = providerId.trim();
+    const normalizedModelId = modelId.trim();
+    if (!normalizedProviderId || !normalizedModelId) {
+      throw new Error('Provider probe requires both providerId and modelId');
+    }
+
+    const probeSessionId = await this.createSession(`Provider probe: ${normalizedProviderId}`, {
+      setCurrent: false,
+    });
+
+    try {
+      const response = await this.requestAssistantResponse('ping', {
+        sessionId: probeSessionId,
+        provider: normalizedProviderId,
+        model: normalizedModelId,
+        system: 'Connectivity probe. Reply with the single word OK.',
+        format: { type: 'text' },
+      });
+      const responsePreview = response?.content?.trim() ?? '';
+      if (!responsePreview) {
+        throw new Error('OpenCode returned no response.');
+      }
+
+      return {
+        providerId: normalizedProviderId,
+        modelId: normalizedModelId,
+        success: true,
+        responsePreview: getDebugTextPreview(responsePreview, 120),
+      };
+    } catch (error) {
+      return {
+        providerId: normalizedProviderId,
+        modelId: normalizedModelId,
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    } finally {
+      try {
+        await this.deleteSession(probeSessionId);
+      } catch (error) {
+        logger.warn(`Failed to delete provider probe session ${probeSessionId}`, error);
+      }
+    }
   }
 
   /** Send a message and get streaming response using SSE */
@@ -1026,13 +1140,14 @@ export class OpenCodeService {
     return createSdkClient({
       baseUrl: this.baseUrl,
       authHeaders: this.getAuthHeaders(),
-      directory: includeDirectory ? this.vaultPath : undefined,
+      directory: includeDirectory ? this.getScopedDirectoryPath() : undefined,
     });
   }
 
   private createStreamingState(): StreamingState {
     return {
       lastContent: '',
+      lastErrorMessage: null,
       processedToolIds: new Set<string>(),
       toolInputSnapshots: new Map(),
       debugChunkSequence: 0,
@@ -1483,9 +1598,47 @@ export class OpenCodeService {
           models,
         };
       }),
-      defaults: source.default && typeof source.default === 'object'
-        ? source.default
-        : {},
+      defaults: this.normalizeProviderDefaults(source.default),
+    };
+  }
+
+  private normalizeProviderDefaults(source: unknown): Record<string, string> {
+    if (!source || typeof source !== 'object') {
+      return {};
+    }
+
+    const defaultRecord = source as Record<string, unknown>;
+    if (typeof defaultRecord.provider === 'string' && typeof defaultRecord.model === 'string') {
+      const providerId = defaultRecord.provider.trim();
+      const modelId = defaultRecord.model.trim();
+      return providerId && modelId
+        ? { [providerId]: modelId }
+        : {};
+    }
+
+    return Object.fromEntries(
+      Object.entries(defaultRecord)
+        .map(([providerId, modelId]) => [providerId.trim(), typeof modelId === 'string' ? modelId.trim() : ''] as const)
+        .filter(([providerId, modelId]) => providerId.length > 0 && modelId.length > 0),
+    );
+  }
+
+  private normalizeProviderDirectory(
+    data: unknown,
+  ): {
+    providers: Array<{ id: string; name: string; models: Array<{ id: string; name: string; contextWindow?: number }> }>;
+    defaults: Record<string, string>;
+    connected: string[];
+  } {
+    const source = data as {
+      connected?: unknown;
+    };
+
+    return {
+      ...this.normalizeAvailableModels(data),
+      connected: Array.isArray(source.connected)
+        ? source.connected.filter((item): item is string => typeof item === 'string')
+        : [],
     };
   }
 
@@ -2000,6 +2153,26 @@ export class OpenCodeService {
       return { chunks, stop: false };
     }
 
+    if (eventData.type === 'session.error') {
+      const errorName = extractStructuredErrorName(eventData.properties?.error);
+      const errorMessage = extractStructuredErrorMessage(eventData.properties?.error) ?? 'Unknown error';
+      state.lastErrorMessage = errorMessage;
+      logAssistantFinalizationDebug('service-session-error', {
+        sessionId,
+        errorName,
+        errorMessage,
+      });
+      if (errorName === 'MessageAbortedError') {
+        return { chunks, stop: true };
+      }
+
+      chunks.push({
+        type: 'error',
+        content: errorMessage,
+      });
+      return { chunks, stop: true };
+    }
+
     if (eventData.type === 'session.idle') {
       logAssistantFinalizationDebug('service-session-idle', {
         sessionId,
@@ -2061,7 +2234,7 @@ export class OpenCodeService {
       accumulatedTextLength: state.lastContent.length,
       lastTextDelta: state.lastTextDelta,
     });
-    yield* this.finishStreamingResponse(sessionId, state.lastContent);
+    yield* this.finishStreamingResponse(sessionId, state.lastContent, state.lastErrorMessage);
   }
 
   private async *sendMessageWithSdk(
@@ -2140,7 +2313,7 @@ export class OpenCodeService {
         accumulatedTextLength: state.lastContent.length,
         lastTextDelta: state.lastTextDelta,
       });
-      yield* this.finishStreamingResponse(sessionId, state.lastContent);
+      yield* this.finishStreamingResponse(sessionId, state.lastContent, state.lastErrorMessage);
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Unknown error';
       yield { type: 'error', content: msg };
@@ -2150,11 +2323,16 @@ export class OpenCodeService {
     }
   }
 
-  private async *finishStreamingResponse(sessionId: string, lastContent: string): AsyncGenerator<StreamChunk> {
+  private async *finishStreamingResponse(
+    sessionId: string,
+    lastContent: string,
+    priorErrorMessage: string | null = null,
+  ): AsyncGenerator<StreamChunk> {
     logAssistantFinalizationDebug('service-finish-start', {
       sessionId,
       lastContentLength: lastContent.length,
       lastContentPreview: getDebugTextPreview(lastContent, 120),
+      priorErrorMessage,
     });
 
     let assistantMessageId: string | null = null;
@@ -2170,8 +2348,22 @@ export class OpenCodeService {
           messageCreatedAt: assistantMsg.info.time.created,
           modelId: formatModelIdentifier(assistantMsg.info.providerID, assistantMsg.info.modelID) ?? null,
           structuredPresent: assistantMsg.info.structured !== undefined,
+          assistantError: extractStructuredErrorMessage(assistantMsg.info.error),
           partSummary: summarizeAssistantParts(assistantMsg.parts),
         });
+        const assistantError = extractStructuredErrorMessage(assistantMsg.info.error);
+        if (assistantError && !priorErrorMessage && !lastContent.trim()) {
+          logAssistantFinalizationDebug('service-finish-emitting-assistant-error', {
+            sessionId,
+            assistantMessageId,
+            assistantError,
+          });
+          yield {
+            type: 'error',
+            content: assistantError,
+          };
+          priorErrorMessage = assistantError;
+        }
         for (const part of assistantMsg.parts) {
           if (part.type !== 'text' || typeof part.text !== 'string') {
             continue;
@@ -2417,31 +2609,38 @@ export class OpenCodeService {
 
   /** Get available models - Handles both string array and object formats */
   async getAvailableModels(
-    options: { includeDirectory?: boolean } = {},
+    options: { includeDirectory?: boolean; debugReason?: string | null } = {},
   ): Promise<{ providers: Array<{ id: string; name: string; models: Array<{ id: string; name: string; contextWindow?: number }> }>; defaults: Record<string, string> }> {
-    const { includeDirectory = true } = options;
-    logger.debug('getAvailableModels request', {
-      includeDirectory,
-      baseUrl: this.baseUrl,
-      vaultPath: this.vaultPath ?? null,
-      serverStatus: this.serverManager.getStatus(),
-      isManagedServerRunning: this.serverManager.isRunning(),
-      managedServerState: this.serverManager.getManagedServerStateSnapshot(),
-      sdkCrudEnabled: this.shouldUseSdk('sdkCrud'),
-    });
+    const { includeDirectory = true, debugReason = null } = options;
+    const shouldLogDebug = typeof debugReason === 'string' && debugReason.trim().length > 0;
+    if (shouldLogDebug) {
+      logger.debug('getAvailableModels request', {
+        debugReason,
+        includeDirectory,
+        baseUrl: this.baseUrl,
+        vaultPath: this.vaultPath ?? null,
+        serverStatus: this.serverManager.getStatus(),
+        isManagedServerRunning: this.serverManager.isRunning(),
+        managedServerState: this.serverManager.getManagedServerStateSnapshot(),
+        sdkCrudEnabled: this.shouldUseSdk('sdkCrud'),
+      });
+    }
     if (this.shouldUseSdk('sdkCrud')) {
       try {
         const data = await this.getSdkClient({ includeDirectory }).config.providers();
         const normalized = this.normalizeAvailableModels(data);
-        logger.debug('getAvailableModels sdk response', {
-          includeDirectory,
-          providerIds: normalized.providers.map((provider) => provider.id),
-          providerModelCounts: normalized.providers.map((provider) => ({
-            id: provider.id,
-            modelCount: provider.models.length,
-          })),
-          defaults: normalized.defaults,
-        });
+        if (shouldLogDebug) {
+          logger.debug('getAvailableModels sdk response', {
+            debugReason,
+            includeDirectory,
+            providerIds: normalized.providers.map((provider) => provider.id),
+            providerModelCounts: normalized.providers.map((provider) => ({
+              id: provider.id,
+              modelCount: provider.models.length,
+            })),
+            defaults: normalized.defaults,
+          });
+        }
         return normalized;
       } catch (error) {
         logger.warn('SDK config.providers failed, falling back to legacy HTTP', error);
@@ -2449,7 +2648,10 @@ export class OpenCodeService {
     }
 
     try {
-      const data = await this.get<{ providers: Array<{ id: string; name: string; models: unknown }>; default: { provider?: string; model?: string } }>('/config/providers');
+      const data = await this.get<{ providers: Array<{ id: string; name: string; models: unknown }>; default: { provider?: string; model?: string } }>(
+        '/config/providers',
+        { includeDirectory },
+      );
       
 
       
@@ -2459,19 +2661,168 @@ export class OpenCodeService {
           ? { [data.default.provider]: data.default.model }
           : {},
       });
-      logger.debug('getAvailableModels legacy response', {
-        includeDirectory,
-        providerIds: normalized.providers.map((provider) => provider.id),
-        providerModelCounts: normalized.providers.map((provider) => ({
-          id: provider.id,
-          modelCount: provider.models.length,
-        })),
-        defaults: normalized.defaults,
-      });
+      if (shouldLogDebug) {
+        logger.debug('getAvailableModels legacy response', {
+          debugReason,
+          includeDirectory,
+          providerIds: normalized.providers.map((provider) => provider.id),
+          providerModelCounts: normalized.providers.map((provider) => ({
+            id: provider.id,
+            modelCount: provider.models.length,
+          })),
+          defaults: normalized.defaults,
+        });
+      }
       return normalized;
     } catch (error) {
       logger.error('Failed to get models:', error);
       return { providers: [], defaults: {} };
+    }
+  }
+
+  async getProviderDirectory(
+    options: { includeDirectory?: boolean; debugReason?: string | null } = {},
+  ): Promise<{
+    providers: Array<{ id: string; name: string; models: Array<{ id: string; name: string; contextWindow?: number }> }>;
+    defaults: Record<string, string>;
+    connected: string[];
+  }> {
+    const { includeDirectory = true, debugReason = null } = options;
+    const shouldLogDebug = typeof debugReason === 'string' && debugReason.trim().length > 0;
+    if (shouldLogDebug) {
+      logger.debug('getProviderDirectory request', {
+        debugReason,
+        includeDirectory,
+        baseUrl: this.baseUrl,
+        vaultPath: this.vaultPath ?? null,
+        serverStatus: this.serverManager.getStatus(),
+        isManagedServerRunning: this.serverManager.isRunning(),
+        managedServerState: this.serverManager.getManagedServerStateSnapshot(),
+        sdkCrudEnabled: this.shouldUseSdk('sdkCrud'),
+      });
+    }
+
+    if (this.shouldUseSdk('sdkCrud')) {
+      try {
+        const data = await this.getSdkClient({ includeDirectory }).provider.list();
+        const normalized = this.normalizeProviderDirectory(data);
+        if (shouldLogDebug) {
+          logger.debug('getProviderDirectory sdk response', {
+            debugReason,
+            includeDirectory,
+            providerIds: normalized.providers.map((provider) => provider.id),
+            providerModelCounts: normalized.providers.map((provider) => ({
+              id: provider.id,
+              modelCount: provider.models.length,
+            })),
+            connected: normalized.connected,
+            defaults: normalized.defaults,
+          });
+        }
+        return normalized;
+      } catch (error) {
+        logger.warn('SDK provider.list failed, falling back to legacy HTTP', error);
+      }
+    }
+
+    try {
+      const data = await this.get<{
+        all: Array<{ id: string; name: string; models: unknown }>;
+        default: Record<string, string>;
+        connected?: string[];
+      }>('/provider', { includeDirectory });
+      const normalized = this.normalizeProviderDirectory(data);
+      if (shouldLogDebug) {
+        logger.debug('getProviderDirectory legacy response', {
+          debugReason,
+          includeDirectory,
+          providerIds: normalized.providers.map((provider) => provider.id),
+          providerModelCounts: normalized.providers.map((provider) => ({
+            id: provider.id,
+            modelCount: provider.models.length,
+          })),
+          connected: normalized.connected,
+          defaults: normalized.defaults,
+        });
+      }
+      return normalized;
+    } catch (error) {
+      logger.error('Failed to get provider directory:', error);
+      return { providers: [], defaults: {}, connected: [] };
+    }
+  }
+
+  async getResolvedModelConfig(
+    options: { includeDirectory?: boolean; debugReason?: string | null } = {},
+  ): Promise<OpencodeModelConfigSubset> {
+    const { includeDirectory = true, debugReason = null } = options;
+    const shouldLogDebug = typeof debugReason === 'string' && debugReason.trim().length > 0;
+    if (shouldLogDebug) {
+      logger.debug('getResolvedModelConfig request', {
+        debugReason,
+        includeDirectory,
+        baseUrl: this.baseUrl,
+        vaultPath: this.vaultPath ?? null,
+        serverStatus: this.serverManager.getStatus(),
+        isManagedServerRunning: this.serverManager.isRunning(),
+        managedServerState: this.serverManager.getManagedServerStateSnapshot(),
+        sdkCrudEnabled: this.shouldUseSdk('sdkCrud'),
+      });
+    }
+
+    if (this.shouldUseSdk('sdkCrud')) {
+      try {
+        const data = await this.getSdkClient({ includeDirectory }).config.get();
+        const resolved = {
+          model: typeof data.model === 'string' ? data.model : undefined,
+          small_model: typeof data.small_model === 'string' ? data.small_model : undefined,
+          provider: data.provider,
+          enabled_providers: Array.isArray(data.enabled_providers) ? data.enabled_providers : undefined,
+          disabled_providers: Array.isArray(data.disabled_providers) ? data.disabled_providers : undefined,
+        };
+        if (shouldLogDebug) {
+          logger.debug('getResolvedModelConfig sdk response', {
+            debugReason,
+            includeDirectory,
+            providerIds: Object.keys(resolved.provider ?? {}),
+            enabledProviders: [...(resolved.enabled_providers ?? [])],
+            disabledProviders: [...(resolved.disabled_providers ?? [])],
+          });
+        }
+        return resolved;
+      } catch (error) {
+        logger.warn('SDK config.get failed, falling back to legacy HTTP', error);
+      }
+    }
+
+    try {
+      const data = await this.get<Record<string, unknown>>('/config', { includeDirectory });
+      const resolved = {
+        model: typeof data.model === 'string' ? data.model : undefined,
+        small_model: typeof data.small_model === 'string' ? data.small_model : undefined,
+        provider: typeof data.provider === 'object' && data.provider !== null
+          ? data.provider as OpencodeModelConfigSubset['provider']
+          : undefined,
+        enabled_providers: Array.isArray(data.enabled_providers)
+          ? data.enabled_providers.filter((item): item is string => typeof item === 'string')
+          : undefined,
+        disabled_providers: Array.isArray(data.disabled_providers)
+          ? data.disabled_providers.filter((item): item is string => typeof item === 'string')
+          : undefined,
+      };
+      if (shouldLogDebug) {
+        logger.debug('getResolvedModelConfig legacy response', {
+          debugReason,
+          includeDirectory,
+          providerIds: Object.keys(resolved.provider ?? {}),
+          enabledProviders: [...(resolved.enabled_providers ?? [])],
+          disabledProviders: [...(resolved.disabled_providers ?? [])],
+        });
+      }
+      return resolved;
+    } catch (error) {
+      logger.error('Failed to get resolved model config:', error);
+      return {};
     }
   }
 
@@ -2825,6 +3176,23 @@ export class OpenCodeService {
     if (!this.baseUrl) {
       throw new Error('OpenCode server URL is not configured');
     }
+  }
+
+  private buildScopedUrl(path: string, includeDirectory: boolean): string {
+    const url = new URL(`${this.baseUrl}${path}`);
+    const directory = includeDirectory ? this.getScopedDirectoryPath() : undefined;
+    if (directory && !url.searchParams.has('directory')) {
+      url.searchParams.set('directory', directory);
+    }
+    return url.toString();
+  }
+
+  private getScopedDirectoryPath(): string | undefined {
+    if (!this.vaultPath) {
+      return undefined;
+    }
+
+    return this.vaultPath.replace(/\\/g, '/');
   }
 
   private getRequestHeaders(extraHeaders: Record<string, string> = {}): Record<string, string> {

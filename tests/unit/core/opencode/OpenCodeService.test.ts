@@ -92,7 +92,8 @@ describe('OpenCodeService', () => {
       revert: jest.Mock;
       unrevert: jest.Mock;
     };
-    config: { providers: jest.Mock };
+    config: { providers: jest.Mock; get: jest.Mock };
+    provider: { list: jest.Mock };
     permission: { list: jest.Mock; reply: jest.Mock };
     question: { list: jest.Mock; reply: jest.Mock; reject: jest.Mock };
     event: { subscribe: jest.Mock };
@@ -119,7 +120,8 @@ describe('OpenCodeService', () => {
         revert: jest.fn(),
         unrevert: jest.fn(),
       },
-      config: { providers: jest.fn() },
+      config: { providers: jest.fn(), get: jest.fn() },
+      provider: { list: jest.fn() },
       permission: { list: jest.fn(), reply: jest.fn() },
       question: { list: jest.fn(), reply: jest.fn(), reject: jest.fn() },
       event: { subscribe: jest.fn() },
@@ -1165,6 +1167,82 @@ describe('OpenCodeService', () => {
       }));
     });
 
+    it('throws a structured assistant error returned by SDK prompt', async () => {
+      service = createServiceWithSdkFlags();
+      service.setSessionId('sdk-session');
+      mockSdkClient.session.prompt.mockResolvedValue({
+        info: {
+          id: 'assistant-err',
+          sessionID: 'sdk-session',
+          role: 'assistant',
+          error: {
+            name: 'APIError',
+            data: {
+              message: 'Incorrect API key provided.',
+              statusCode: 401,
+              isRetryable: false,
+            },
+          },
+          time: { created: 1234567890 },
+        },
+        parts: [],
+      });
+
+      await expect(service.requestAssistantResponse('Create a title', {
+        sessionId: 'sdk-session',
+        provider: 'alibaba',
+        model: 'qwen-plus',
+      })).rejects.toThrow('Incorrect API key provided. (HTTP 401)');
+    });
+
+    it('runs a real provider probe in a temporary session and cleans it up', async () => {
+      service = createServiceWithSdkFlags();
+      mockSdkClient.session.create.mockResolvedValue({
+        id: 'probe-session',
+        title: 'Provider probe: alibaba',
+        time: { created: 1, updated: 1 },
+      });
+      mockSdkClient.session.prompt.mockResolvedValue({
+        info: {
+          id: 'assistant-ok',
+          sessionID: 'probe-session',
+          role: 'assistant',
+          time: { created: 1234567890 },
+        },
+        parts: [
+          {
+            id: 'part-1',
+            sessionID: 'probe-session',
+            messageID: 'assistant-ok',
+            type: 'text',
+            text: 'OK',
+          },
+        ],
+      });
+      mockSdkClient.session.delete.mockResolvedValue(undefined);
+
+      await expect(service.probeProviderResponse('alibaba', 'qwen-plus')).resolves.toEqual({
+        providerId: 'alibaba',
+        modelId: 'qwen-plus',
+        success: true,
+        responsePreview: 'OK',
+      });
+      expect(mockSdkClient.session.create).toHaveBeenCalledWith({
+        title: 'Provider probe: alibaba',
+      });
+      expect(mockSdkClient.session.prompt).toHaveBeenCalledWith(expect.objectContaining({
+        sessionID: 'probe-session',
+        model: {
+          providerID: 'alibaba',
+          modelID: 'qwen-plus',
+        },
+        system: 'Connectivity probe. Reply with the single word OK.',
+      }));
+      expect(mockSdkClient.session.delete).toHaveBeenCalledWith({
+        sessionID: 'probe-session',
+      });
+    });
+
     it('maps sendMessage through SDK promptAsync with shared prompt options', async () => {
       service = createServiceWithSdkFlags();
       service.setSessionId('sdk-session');
@@ -1429,6 +1507,108 @@ describe('OpenCodeService', () => {
       expect(chunks[chunks.length - 1]).toEqual({ type: 'message_stop' });
     });
 
+    it('emits a real SDK session.error message instead of falling back to an empty response', async () => {
+      service = createServiceWithSdkFlags();
+      service.setSessionId('test-session');
+
+      mockSdkClient.session.promptAsync.mockResolvedValue({});
+      mockSdkClient.event.subscribe.mockResolvedValue({
+        stream: (async function* () {
+          yield {
+            type: 'session.error',
+            properties: {
+              sessionID: 'test-session',
+              error: {
+                name: 'APIError',
+                data: {
+                  message: 'Incorrect API key provided.',
+                  statusCode: 401,
+                  isRetryable: false,
+                },
+              },
+            },
+          };
+        })(),
+      });
+      mockSdkClient.session.messages.mockResolvedValue([]);
+      mockSdkClient.session.get.mockResolvedValue({
+        id: 'test-session',
+        title: 'SDK',
+        time: { created: 1, updated: 1 },
+      });
+
+      const chunks: unknown[] = [];
+      for await (const chunk of service.sendMessage('Hello', { sessionId: 'test-session' })) {
+        chunks.push(chunk);
+      }
+
+      expect(chunks).toContainEqual({
+        type: 'error',
+        content: 'Incorrect API key provided. (HTTP 401)',
+      });
+      expect(chunks[chunks.length - 1]).toEqual({ type: 'message_stop' });
+    });
+
+    it('falls back to assistant message error metadata when the stream ends without text', async () => {
+      service = createServiceWithSdkFlags();
+      service.setSessionId('test-session');
+
+      mockSdkClient.session.promptAsync.mockResolvedValue({});
+      mockSdkClient.event.subscribe.mockResolvedValue({
+        stream: (async function* () {
+          yield {
+            type: 'session.idle',
+            properties: {
+              sessionID: 'test-session',
+            },
+          };
+        })(),
+      });
+      mockSdkClient.session.messages.mockResolvedValue([
+        {
+          info: {
+            id: 'assistant-err',
+            sessionID: 'test-session',
+            role: 'assistant',
+            providerID: 'alibaba',
+            modelID: 'qwen-plus',
+            error: {
+              name: 'APIError',
+              data: {
+                message: 'Incorrect API key provided.',
+                statusCode: 401,
+                isRetryable: false,
+              },
+            },
+            time: { created: 1234567890 },
+          },
+          parts: [],
+        },
+      ]);
+      mockSdkClient.session.get.mockResolvedValue({
+        id: 'test-session',
+        title: 'SDK',
+        time: { created: 1, updated: 1 },
+      });
+
+      const chunks: unknown[] = [];
+      for await (const chunk of service.sendMessage('Hello', { sessionId: 'test-session' })) {
+        chunks.push(chunk);
+      }
+
+      expect(chunks).toContainEqual({
+        type: 'error',
+        content: 'Incorrect API key provided. (HTTP 401)',
+      });
+      expect(chunks).toContainEqual({
+        type: 'message_metadata',
+        messageId: 'assistant-err',
+        timestamp: 1234567890,
+        modelId: 'alibaba/qwen-plus',
+      });
+      expect(chunks[chunks.length - 1]).toEqual({ type: 'message_stop' });
+    });
+
     it('re-emits tool_use when later stream updates provide richer tool input', async () => {
       service = createServiceWithSdkFlags();
       service.setSessionId('test-session');
@@ -1648,7 +1828,7 @@ describe('OpenCodeService', () => {
       service = new OpenCodeService(DEFAULT_SETTINGS, {}, {
         sdkFeatureFlags: { sdkCrud: true },
       });
-      service.setVaultPath('C:/vault');
+      service.setVaultPath('C:\\vault');
       mockSdkClient.config.providers.mockResolvedValue({
         providers: [{
           id: 'openai',
@@ -1693,6 +1873,10 @@ describe('OpenCodeService', () => {
     });
 
     it('should fetch models via HTTP API', async () => {
+      service = new OpenCodeService(DEFAULT_SETTINGS, {}, {
+        sdkFeatureFlags: { sdkCrud: false },
+      });
+      service.setVaultPath('C:\\vault');
       mockRequestUrl.mockResolvedValue({
         status: 200,
         json: {
@@ -1710,6 +1894,10 @@ describe('OpenCodeService', () => {
 
       const result = await service.getAvailableModels();
       
+      expect(mockRequestUrl).toHaveBeenCalledWith(expect.objectContaining({
+        url: 'http://127.0.0.1:4096/config/providers?directory=C%3A%2Fvault',
+        method: 'GET',
+      }));
       expect(result.providers).toHaveLength(1);
       expect(result.providers[0].id).toBe('anthropic');
       expect(result.defaults).toEqual({ anthropic: 'claude-3' });
@@ -1741,6 +1929,155 @@ describe('OpenCodeService', () => {
         id: 'gpt-5',
         name: 'GPT-5',
         contextWindow: 400000,
+      });
+    });
+  });
+
+  describe('getProviderDirectory', () => {
+    it('uses SDK provider.list and normalizes object and array model structures', async () => {
+      service = new OpenCodeService(DEFAULT_SETTINGS, {}, {
+        sdkFeatureFlags: { sdkCrud: true },
+      });
+      service.setVaultPath('C:\\vault');
+      mockSdkClient.provider.list.mockResolvedValue({
+        all: [
+          {
+            id: 'openai',
+            name: 'OpenAI',
+            models: {
+              'gpt-4.1': {
+                name: 'GPT-4.1',
+                limit: { context: 256000 },
+              },
+            },
+          },
+          {
+            id: 'ollama',
+            name: 'Ollama',
+            models: ['llama3.1'],
+          },
+        ],
+        default: { openai: 'gpt-4.1' },
+        connected: ['openai'],
+      });
+
+      const result = await service.getProviderDirectory();
+
+      expect(mockCreateSdkClient).toHaveBeenCalledWith(expect.objectContaining({
+        baseUrl: 'http://127.0.0.1:4096',
+        directory: 'C:/vault',
+      }));
+      expect(mockSdkClient.provider.list).toHaveBeenCalledTimes(1);
+      expect(mockSdkClient.config.providers).not.toHaveBeenCalled();
+      expect(result.defaults).toEqual({ openai: 'gpt-4.1' });
+      expect(result.connected).toEqual(['openai']);
+      expect(result.providers).toEqual([
+        {
+          id: 'openai',
+          name: 'OpenAI',
+          models: [
+            {
+              id: 'gpt-4.1',
+              name: 'GPT-4.1',
+              contextWindow: 256000,
+            },
+          ],
+        },
+        {
+          id: 'ollama',
+          name: 'Ollama',
+          models: [
+            {
+              id: 'llama3.1',
+              name: 'llama3.1',
+            },
+          ],
+        },
+      ]);
+    });
+
+    it('falls back to legacy /provider and keeps connected providers', async () => {
+      service = new OpenCodeService(DEFAULT_SETTINGS, {}, {
+        sdkFeatureFlags: { sdkCrud: false },
+      });
+      service.setVaultPath('C:\\vault');
+      mockRequestUrl.mockResolvedValue({
+        status: 200,
+        json: {
+          all: [
+            {
+              id: 'deepseek',
+              name: 'DeepSeek',
+              models: {
+                'deepseek-chat': {
+                  name: 'DeepSeek Chat',
+                  limit: { context: 128000 },
+                },
+              },
+            },
+            {
+              id: 'openai',
+              name: 'OpenAI',
+              models: ['gpt-4.1'],
+            },
+          ],
+          default: { deepseek: 'deepseek-chat' },
+          connected: ['deepseek'],
+        },
+        text: '{}',
+      });
+
+      const result = await service.getProviderDirectory();
+
+      expect(mockRequestUrl).toHaveBeenCalledWith(expect.objectContaining({
+        url: 'http://127.0.0.1:4096/provider?directory=C%3A%2Fvault',
+        method: 'GET',
+      }));
+      expect(result.defaults).toEqual({ deepseek: 'deepseek-chat' });
+      expect(result.connected).toEqual(['deepseek']);
+      expect(result.providers.map((provider) => provider.id)).toEqual(['deepseek', 'openai']);
+      expect(result.providers.find((provider) => provider.id === 'deepseek')?.models[0]).toMatchObject({
+        id: 'deepseek-chat',
+        name: 'DeepSeek Chat',
+        contextWindow: 128000,
+      });
+      expect(result.providers.find((provider) => provider.id === 'openai')?.models[0]).toMatchObject({
+        id: 'gpt-4.1',
+        name: 'gpt-4.1',
+      });
+    });
+  });
+
+  describe('getResolvedModelConfig', () => {
+    it('uses a normalized directory query when falling back to legacy /config', async () => {
+      service = new OpenCodeService(DEFAULT_SETTINGS, {}, {
+        sdkFeatureFlags: { sdkCrud: false },
+      });
+      service.setVaultPath('C:\\vault');
+      mockRequestUrl.mockResolvedValue({
+        status: 200,
+        json: {
+          disabled_providers: ['zhipuai'],
+          provider: {
+            deepseek: {
+              name: 'DeepSeek',
+            },
+          },
+        },
+        text: '{}',
+      });
+
+      const result = await service.getResolvedModelConfig();
+
+      expect(mockRequestUrl).toHaveBeenCalledWith(expect.objectContaining({
+        url: 'http://127.0.0.1:4096/config?directory=C%3A%2Fvault',
+        method: 'GET',
+      }));
+      expect(result.disabled_providers).toEqual(['zhipuai']);
+      expect(result.provider).toEqual({
+        deepseek: {
+          name: 'DeepSeek',
+        },
       });
     });
   });

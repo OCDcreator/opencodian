@@ -148,6 +148,14 @@ managed pid 的持久化/恢复通过 `managedServerState` 与 `onManagedServerS
 
 provider 列表来自 `getLocalProviderIds()`，它会读取 `.opencode/opencode.json` 或 `.opencode/opencode.jsonc`，优先拿 `provider` 对象的键，否则从 `model` 的 `provider/model` 字符串里截 provider 前缀。
 
+### OpenCode 可执行文件解析
+
+`findOpenCodeBinary()` 现在会真正按候选列表解析可执行文件，而不是只返回字面量命令名：
+
+- Windows：优先 `%APPDATA%\\npm\\opencode.cmd`，再尝试 `%LOCALAPPDATA%\\npm\\opencode.cmd`，最后才回退到 `PATH` 里的 `opencode.cmd` / `opencode`
+- macOS / Linux：优先常见绝对路径，再回退到 `PATH`
+- 当系统里同时存在 npm 全局安装和其他渠道（例如 `winget`）的 `opencode` 时，这能让插件更稳定地命中 npm 版本，减少“终端 `opencode` 与插件本地 4096 服务不是同一套二进制”的偏差
+
 ## 关键方法
 
 | 方法 | 说明 |

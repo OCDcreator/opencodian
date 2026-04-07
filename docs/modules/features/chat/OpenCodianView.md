@@ -174,6 +174,13 @@ chunk 处理里显式覆盖了这些分支：
 - 1 秒后才显示 pending 指示器
 - 5 分钟无新 chunk 时，视图会主动断开本地流并转入后台同步模式
 
+如果流已经结束、服务端又没有给出任何可见 assistant 内容，`OpenCodianView` 不会再把错误当成普通 assistant 文本泡泡，而是改成持久化的 notice card。这个 notice 会尽量带上对应的 `sourceMessageId`，这样后续同步时只有在同一条服务端回复真的补回可见内容后才会自动让位，不会再出现“红条闪一下就消失”的情况。
+
+另外，错误优先级现在是：
+
+- 先显示 `OpenCodeService` 透传出来的真实 `error` chunk（包括 SDK `session.error` 和 assistant persisted message 里的结构化错误）
+- 只有在流里完全没有文本、也没有真实错误时，才退回通用的 “serverNoResponse” 提示
+
 ### 消息渲染分派
 
 `renderMessage()` 根据消息类型分成三路：

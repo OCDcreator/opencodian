@@ -325,23 +325,43 @@ describe('OpenCodianSettingTab model catalog views', () => {
     return new OpenCodianSettingTab({} as App, plugin);
   }
 
-  it('keeps locally disabled providers visible in the server catalog via placeholders', () => {
+  it('hides server-disabled providers from the server catalog', () => {
     const tab = createTab();
     const catalogs = {
       local: { providers: [], defaults: {} },
       server: {
-        providers: [{
-          id: 'openai',
-          name: 'OpenAI',
-          models: [],
-          source: 'server' as const,
-          existsInLocal: false,
-          existsInServer: true,
-        }],
+        providers: [
+          {
+            id: 'openai',
+            name: 'OpenAI',
+            models: [{
+              id: 'gpt-4.1',
+              name: 'GPT-4.1',
+              source: 'server' as const,
+              existsInLocal: false,
+              existsInServer: true,
+            }],
+            source: 'server' as const,
+            existsInLocal: false,
+            existsInServer: true,
+          },
+          {
+            id: 'alibaba',
+            name: 'Alibaba',
+            models: [],
+            source: 'server' as const,
+            existsInLocal: false,
+            existsInServer: true,
+            disabledScopes: ['global' as const],
+          },
+        ],
         defaults: {},
       },
       baseEffective: { providers: [], defaults: {} },
       effective: { providers: [], defaults: {} },
+      currentEnabledProviderIds: ['openai'],
+      serverConfig: {},
+      effectiveProviderConfig: { disabled_providers: ['deepseek'] },
     };
 
     const serverCatalog = (tab as unknown as {
@@ -350,12 +370,7 @@ describe('OpenCodianSettingTab model catalog views', () => {
       };
     }).getDisplayCatalogForMode('server', catalogs, { disabled_providers: ['deepseek'] });
 
-    expect(serverCatalog.providers.map((provider) => provider.id)).toEqual(['deepseek', 'openai']);
-    expect(serverCatalog.providers[0]).toMatchObject({
-      id: 'deepseek',
-      models: [],
-      source: 'server',
-    });
+    expect(serverCatalog.providers.map((provider) => provider.id)).toEqual(['openai']);
   });
 
   it('shows disabled models from merged local and server catalogs in the disabled view', () => {
@@ -397,6 +412,9 @@ describe('OpenCodianSettingTab model catalog views', () => {
       },
       baseEffective: { providers: [], defaults: {} },
       effective: { providers: [], defaults: {} },
+      currentEnabledProviderIds: [],
+      serverConfig: {},
+      effectiveProviderConfig: { disabled_providers: ['deepseek'] },
     };
 
     const disabledCatalog = (tab as unknown as {
@@ -413,5 +431,130 @@ describe('OpenCodianSettingTab model catalog views', () => {
     expect(disabledCatalog.providers.find((provider) => provider.id === 'deepseek')?.models).toEqual([]);
     expect(disabledCatalog.providers.find((provider) => provider.id === 'local-only')?.models.map((model) => model.id)).toEqual(['alpha']);
     expect(disabledCatalog.providers.find((provider) => provider.id === 'openai')?.models.map((model) => model.id)).toEqual(['gpt-4.1']);
+  });
+
+  it('omits server-disabled providers from the disabled view after a project override enables them', () => {
+    const tab = createTab();
+    const catalogs = {
+      local: { providers: [], defaults: {} },
+      server: {
+        providers: [
+          {
+            id: 'alibaba',
+            name: 'Alibaba',
+            models: [{
+              id: 'qwen-max',
+              name: 'Qwen Max',
+              source: 'server' as const,
+              existsInLocal: false,
+              existsInServer: true,
+            }],
+            source: 'server' as const,
+            existsInLocal: false,
+            existsInServer: true,
+            disabledScopes: ['global' as const],
+          },
+          {
+            id: 'alibaba-cn',
+            name: 'Alibaba CN',
+            models: [{
+              id: 'qwen-plus',
+              name: 'Qwen Plus',
+              source: 'server' as const,
+              existsInLocal: false,
+              existsInServer: true,
+            }],
+            source: 'server' as const,
+            existsInLocal: false,
+            existsInServer: true,
+            disabledScopes: ['global' as const],
+          },
+        ],
+        defaults: {},
+      },
+      baseEffective: { providers: [], defaults: {} },
+      effective: { providers: [], defaults: {} },
+      currentEnabledProviderIds: [],
+      serverConfig: { disabled_providers: ['alibaba', 'alibaba-cn'] },
+      effectiveProviderConfig: { disabled_providers: ['alibaba-cn'] },
+    };
+
+    const disabledCatalog = (tab as unknown as {
+      getDisplayCatalogForMode: (
+        mode: 'disabled',
+        catalogs: typeof catalogs,
+        localModelConfig: { disabled_providers: string[] },
+      ) => {
+        providers: Array<{ id: string; disabledScopes?: Array<'global' | 'project'> }>;
+      };
+    }).getDisplayCatalogForMode('disabled', catalogs, { disabled_providers: ['alibaba-cn'] });
+
+    expect(disabledCatalog.providers.map((provider) => provider.id)).toEqual(['alibaba', 'alibaba-cn']);
+    expect(disabledCatalog.providers[0].disabledScopes).toEqual(['global']);
+    expect(disabledCatalog.providers[1].disabledScopes).toEqual(['global', 'project']);
+  });
+
+  it('prefers project-disabled over server-disabled when both apply', () => {
+    const tab = createTab();
+    const reason = (tab as unknown as {
+      getProviderPrimaryDisabledReason: (
+        provider: {
+          id: string;
+          disabledScopes?: Array<'global' | 'project'>;
+        },
+        localModelConfig: { disabled_providers: string[] },
+        providerEnabled: boolean,
+      ) => 'project' | 'server' | null;
+    }).getProviderPrimaryDisabledReason(
+      {
+        id: 'alibaba',
+        disabledScopes: ['global'],
+      },
+      { disabled_providers: ['alibaba'] },
+      false,
+    );
+
+    expect(reason).toBe('project');
+  });
+
+  it('treats server catalog providers as disabled when the global server config disabled them', () => {
+    const tab = createTab();
+    const statusClass = (tab as unknown as {
+      getProviderAvailabilityStatusClass: (
+        provider: {
+          id: string;
+          disabledScopes?: Array<'global' | 'project'>;
+        },
+        providerEnabled: boolean,
+        disabledCount: number,
+        mode: 'local' | 'server' | 'effective' | 'disabled',
+      ) => 'is-disabled' | 'is-partial' | 'is-available';
+    }).getProviderAvailabilityStatusClass(
+      {
+        id: 'alibaba',
+        disabledScopes: ['global'],
+      },
+      true,
+      0,
+      'server',
+    );
+
+    expect(statusClass).toBe('is-disabled');
+  });
+
+  it('treats a provider as disabled when it is absent from currentEnabledProviderIds', () => {
+    const tab = createTab();
+    const enabled = (tab as unknown as {
+      isProviderCurrentlyEnabled: (
+        providerId: string,
+        catalogs: {
+          currentEnabledProviderIds: string[];
+        },
+      ) => boolean;
+    }).isProviderCurrentlyEnabled('alibaba', {
+      currentEnabledProviderIds: ['deepseek'],
+    });
+
+    expect(enabled).toBe(false);
   });
 });

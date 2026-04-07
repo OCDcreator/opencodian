@@ -2,7 +2,7 @@ import { App, Modal, setIcon } from 'obsidian';
 
 import { t } from '../../i18n';
 import { filterModelPickerGroups, type ModelPickerGroup, type ModelPickerOption } from './modelPicker';
-import { type SearchInputEnhancerHandle, enhanceSearchInput } from './searchInputEnhancer';
+import { enhanceSearchInput, type SearchInputEnhancerHandle } from './searchInputEnhancer';
 
 interface ModelPickerModalOptions {
   title: string;

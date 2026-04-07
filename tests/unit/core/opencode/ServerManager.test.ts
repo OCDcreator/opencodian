@@ -16,6 +16,9 @@ jest.mock('obsidian', () => ({
 const { requestUrl: mockRequestUrl } = jest.requireMock('obsidian') as {
   requestUrl: jest.Mock;
 };
+const { spawn: mockSpawn } = jest.requireMock('child_process') as {
+  spawn: jest.Mock;
+};
 
 // Mock child_process
 jest.mock('child_process', () => ({
@@ -41,6 +44,7 @@ jest.mock('net', () => ({
 describe('ServerManager', () => {
   let manager: ServerManager;
   const testVaultPath = path.join(__dirname, 'server-manager-vault');
+  const originalEnv = { ...process.env };
   const defaultConfig = {
     mode: 'local' as const,
     baseUrl: 'http://127.0.0.1:4096',
@@ -60,6 +64,7 @@ describe('ServerManager', () => {
   };
 
   beforeEach(() => {
+    process.env = { ...originalEnv };
     if (fs.existsSync(testVaultPath)) {
       fs.rmSync(testVaultPath, { recursive: true, force: true });
     }
@@ -68,6 +73,7 @@ describe('ServerManager', () => {
   });
 
   afterEach(() => {
+    process.env = { ...originalEnv };
     if (fs.existsSync(testVaultPath)) {
       fs.rmSync(testVaultPath, { recursive: true, force: true });
     }
@@ -234,5 +240,77 @@ describe('ServerManager', () => {
 
       expect(env.OPENCODE_PURE).toBe('true');
     });
+  });
+
+  describe('binary resolution', () => {
+    if (process.platform === 'win32') {
+      it('prefers npm global opencode.cmd over PATH opencode.exe', () => {
+        const npmBinDir = path.join(testVaultPath, 'AppData', 'npm');
+        const pathBinDir = path.join(testVaultPath, 'WinGetLinks');
+        const npmBinary = path.join(npmBinDir, 'opencode.cmd');
+        const pathBinary = path.join(pathBinDir, 'opencode.exe');
+
+        fs.mkdirSync(npmBinDir, { recursive: true });
+        fs.mkdirSync(pathBinDir, { recursive: true });
+        fs.writeFileSync(npmBinary, '@echo off', 'utf-8');
+        fs.writeFileSync(pathBinary, '', 'utf-8');
+
+        process.env.APPDATA = path.join(testVaultPath, 'AppData');
+        process.env.LOCALAPPDATA = path.join(testVaultPath, 'LocalAppData');
+        process.env.PATH = pathBinDir;
+
+        const resolved = (manager as any).findOpenCodeBinary() as string | null;
+
+        expect(resolved).toBe(npmBinary);
+      });
+    }
+
+    it('resolves the first matching binary from PATH', () => {
+      const pathBinDir = path.join(testVaultPath, 'PathBin');
+      const binaryName = process.platform === 'win32' ? 'opencode.cmd' : 'opencode';
+      const binaryPath = path.join(pathBinDir, binaryName);
+
+      fs.mkdirSync(pathBinDir, { recursive: true });
+      fs.writeFileSync(binaryPath, process.platform === 'win32' ? '@echo off' : '#!/bin/sh', 'utf-8');
+
+      delete process.env.APPDATA;
+      delete process.env.LOCALAPPDATA;
+      process.env.PATH = pathBinDir;
+
+      const resolved = (manager as any).findOpenCodeBinary() as string | null;
+
+      expect(resolved).toBe(binaryPath);
+    });
+
+    if (process.platform === 'win32') {
+      it('spawns npm opencode.cmd through the shell', async () => {
+        jest.useFakeTimers();
+        try {
+          const npmBinDir = path.join(testVaultPath, 'AppData', 'npm');
+          const npmBinary = path.join(npmBinDir, 'opencode.cmd');
+
+          fs.mkdirSync(npmBinDir, { recursive: true });
+          fs.writeFileSync(npmBinary, '@echo off', 'utf-8');
+          process.env.APPDATA = path.join(testVaultPath, 'AppData');
+          process.env.LOCALAPPDATA = path.join(testVaultPath, 'LocalAppData');
+          process.env.PATH = '';
+
+          const spawnPromise = (manager as any).spawnServer() as Promise<void>;
+          await jest.advanceTimersByTimeAsync(1000);
+          await spawnPromise;
+
+          expect(mockSpawn).toHaveBeenCalledWith(
+            npmBinary,
+            expect.any(Array),
+            expect.objectContaining({
+              shell: true,
+              windowsHide: true,
+            }),
+          );
+        } finally {
+          jest.useRealTimers();
+        }
+      });
+    }
   });
 });

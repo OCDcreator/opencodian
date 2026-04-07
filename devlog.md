@@ -12,6 +12,72 @@
 
 ---
 
+## 2026-04-08 对齐 provider 作用域解析，补上真实探针与流错误保留
+
+### 🎯 改动目标
+
+- 让设置页里的 provider / model 可用性展示真正对齐 OpenCode 当前 vault 作用域，而不是把 `provider.list`、默认作用域 `/config` 和 runtime 列表混成同一种“服务器目录”
+- 把 provider 可用性测试从“看目录里有没有”升级成“必要时发一条最小真实请求”，直接暴露鉴权或发送失败
+- 修复 Windows 下 `directory` 作用域路径与本地 server 二进制解析细节带来的排障偏差，并让聊天流错误 notice 在同步后不再闪退
+
+### ✅ 本轮调整
+
+- `src/core/config/ModelConfigService.ts`
+- `src/core/config/modelConfig.ts`
+- `src/core/config/index.ts`
+- `src/core/opencode/OpenCodeService.ts`
+- `src/core/opencode/sdkFetch.ts`
+- `src/core/opencode/ServerManager.ts`
+  - `ModelConfigService` 现在同时读取项目 `.opencode`、目录作用域 runtime providers、当前作用域解析配置和继承层配置，产出 `serverConfig`、`effectiveProviderConfig`、`currentEnabledProviderIds`
+  - 设置页新增 `testProviderAvailability()` 探针：能发时就用临时 session 做一次最小真实发送，区分 `available`、`send_failed`、`project_disabled`、`server_disabled`、`catalog_only`、`missing`
+  - `OpenCodeService` 新增 `getProviderDirectory()`、`getResolvedModelConfig()`、`probeProviderResponse()`，并把 SDK `session.error` 与 assistant persisted message 里的结构化错误都提升成真实 `error` chunk
+  - `sdkFetch` 会把 `x-opencode-directory` / `x-opencode-workspace` 改写成 query 参数，并把 Windows `C:\vault` 统一规范化成 `C:/vault`
+  - `ServerManager` 现在会真正解析 `opencode` 可执行文件路径；Windows 上优先 npm 全局 `opencode.cmd`，并通过 shell 启动 `.cmd`
+
+- `src/features/settings/OpenCodianSettings.ts`
+- `src/features/chat/OpenCodianView.ts`
+- `src/i18n/locales/en.ts`
+- `src/i18n/locales/zh.ts`
+- `styles.css`
+  - 设置页服务器目录改为只显示当前 runtime 真正在作用域内出现的 provider，把服务端禁用占位收敛到 `当前禁用` 视图
+  - provider 状态摘要现在区分“项目禁用”和“服务端禁用”，并新增逐 provider 的测试按钮、badge 和详情文案
+  - 聊天流在“无文本但有错误”场景下会保留 notice card，并按 `sourceMessageId` 等待同一条服务端回复真正补回可见内容后再让位
+
+- `docs/architecture/README.md`
+- `docs/modules/core/config/ModelConfigService.md`
+- `docs/modules/core/config/modelConfig.md`
+- `docs/modules/core/opencode/OpenCodeService.md`
+- `docs/modules/core/opencode/ServerManager.md`
+- `docs/modules/core/opencode/sdkFetch.md`
+- `docs/modules/features/chat/OpenCodianView.md`
+- `docs/modules/features/settings/OpenCodianSettings.md`
+- `AGENTS.md`
+  - 补齐目录作用域、provider 目录 / runtime 区分、Windows 路径规范化和流错误 notice 的模块文档与总览说明
+  - `AGENTS.md` 增补了调试 provider/config 问题时的作用域判断与 Windows `directory` 路径注意事项
+
+- `tests/unit/core/config/ModelConfigService.test.ts`
+- `tests/unit/core/config/modelConfig.test.ts`
+- `tests/unit/core/opencode/OpenCodeService.test.ts`
+- `tests/unit/core/opencode/ServerManager.test.ts`
+- `tests/unit/core/opencode/sdkFetch.test.ts`
+- `tests/unit/features/settings/OpenCodianSettings.test.ts`
+- `tests/unit/features/chat/streamErrorNoticeSync.test.ts`
+  - 新增作用域 catalog、provider probe、Windows transport / binary 解析，以及流错误 notice 保留的回归覆盖
+
+### 🧠 架构变化
+
+- 模型目录解析现在明确拆成三层：项目配置、当前目录 runtime provider 列表、继承层 / 默认作用域配置；`baseEffective` 与 `effective` 的职责边界更清楚了
+- `OpenCodeService` 不再把“模型目录”“provider 宽目录”“解析配置”混在同一个接口语义里，设置页和调试链路因此能看到更接近 OpenCode CLI 的真实结果
+- transport 层开始统一处理目录作用域 query，Windows 下 SDK / legacy HTTP 调试终于能稳定落在同一个 vault 上
+
+### 🧪 当前验证
+
+- 已通过：`npm run build`
+- 已通过：`npm run test -- ModelConfigService modelConfig OpenCodeService ServerManager sdkFetch OpenCodianSettings streamErrorNoticeSync`
+- 已通过：`npm run lint`
+- 已通过：`npm run check:devlog-order`
+- 已部署测试库并确认 `C:\Users\lt\Desktop\Write\testvault\.obsidian\plugins\opencodian\main.js` 包含 `BUILD_ID: main.202604080206`
+
 ## 2026-04-07 优化模型配置编辑器与目录感知 catalog 行为
 
 ### 🎯 改动目标

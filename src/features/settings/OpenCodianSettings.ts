@@ -9,8 +9,14 @@ import { App, normalizePath, Notice, PluginSettingTab, setIcon, Setting } from '
 import * as os from 'os';
 import * as path from 'path';
 
-import { type ModelCatalogBundle,OpencodeConfigManager, PluginManagementService } from '../../core/config';
 import {
+  type ModelCatalogBundle,
+  OpencodeConfigManager,
+  PluginManagementService,
+  type ProviderAvailabilityProbe,
+} from '../../core/config';
+import {
+  collectConfiguredProviderIds,
   formatModelReference,
   isProviderEnabled,
   mergeCatalogs,
@@ -52,17 +58,17 @@ import { getChatAppearanceBackgroundSizeValue } from '../chat/chatAppearance';
 import { LiquidGlassSettingHelpModal } from './LiquidGlassSettingHelpModal';
 import { ModelConfigJsonModal } from './ModelConfigJsonModal';
 import { ModelConfigModal } from './ModelConfigModal';
-import { ModelPickerModal } from './ModelPickerModal';
-import { OpencodeConfigModal } from './OpencodeConfigModal';
-import { ProviderIconCacheModal } from './ProviderIconCacheModal';
-import { enhanceSearchInput } from './searchInputEnhancer';
-import { type ServerHelpTopic, ServerSettingHelpModal } from './ServerSettingHelpModal';
 import {
   buildModelPickerGroups,
   findModelPickerOption,
   findModelPickerOptionByRef,
   type ModelPickerGroup,
 } from './modelPicker';
+import { ModelPickerModal } from './ModelPickerModal';
+import { OpencodeConfigModal } from './OpencodeConfigModal';
+import { ProviderIconCacheModal } from './ProviderIconCacheModal';
+import { enhanceSearchInput } from './searchInputEnhancer';
+import { type ServerHelpTopic, ServerSettingHelpModal } from './ServerSettingHelpModal';
 
 const logger = createLogger('OpenCodianSettings');
 
@@ -105,6 +111,12 @@ interface NumericControlConfig {
 interface SettingHelpButtonConfig {
   tooltip: string;
   onClick: () => void;
+}
+
+interface ProviderAvailabilityCheckState {
+  status: 'idle' | 'loading' | 'ready' | 'error';
+  probe?: ProviderAvailabilityProbe;
+  error?: string;
 }
 
 interface SettingsBlockOptions {
@@ -209,6 +221,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
   private backgroundStyleGroupHostEl: HTMLElement | null = null;
   private backgroundPreviewRequestId = 0;
   private inputStyleGroupHostEl: HTMLElement | null = null;
+  private providerAvailabilityChecks = new Map<string, ProviderAvailabilityCheckState>();
 
   constructor(app: App, plugin: OpenCodianPlugin) {
     super(app, plugin);
@@ -952,6 +965,8 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       }).open();
     };
 
+    let modelAvailabilityProviderListScrollTop = 0;
+
     const renderAvailabilityManagement = (
       options: {
         restoreSearchSelection?: {
@@ -961,6 +976,13 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         };
       } = {},
     ): void => {
+      const existingProviderListEl = availabilityManagementEl.querySelector(
+        '.opencodian-model-toggle-provider-list',
+      );
+      if (existingProviderListEl instanceof HTMLElement) {
+        modelAvailabilityProviderListScrollTop = existingProviderListEl.scrollTop;
+      }
+
       availabilityManagementEl.empty();
 
       const blockEl = availabilityManagementEl.createDiv({ cls: 'opencodian-model-toggle-block' });
@@ -1063,6 +1085,12 @@ export class OpenCodianSettingTab extends PluginSettingTab {
           }
         })()
         : null;
+      const providerStatusCatalog = catalogs
+        ? this.getProviderStatusCatalogForMode(this.activeModelCatalogTab, catalogs, localModelConfig)
+        : null;
+      const providerStatusById = new Map(
+        providerStatusCatalog?.providers.map((provider) => [provider.id, provider]) ?? [],
+      );
 
       const providers = selectedCatalog?.providers ?? [];
       if (providers.length === 0) {
@@ -1075,16 +1103,32 @@ export class OpenCodianSettingTab extends PluginSettingTab {
 
       const disabledModelRefs = new Set(this.plugin.settings.disabledModelRefs);
       const normalizedQuery = this.modelAvailabilityQuery.trim().toLowerCase();
+      const providerListEl = blockEl.createDiv({ cls: 'opencodian-model-toggle-provider-list' });
+      providerListEl.scrollTop = modelAvailabilityProviderListScrollTop;
+      providerListEl.addEventListener('scroll', () => {
+        modelAvailabilityProviderListScrollTop = providerListEl.scrollTop;
+      });
 
       for (const provider of providers) {
-        const providerEnabled = isProviderEnabled(localModelConfig ?? {}, provider.id);
+        const providerStatusSource = providerStatusById.get(provider.id) ?? provider;
+        const providerEnabled = catalogs
+          ? this.isProviderCurrentlyEnabled(provider.id, catalogs)
+          : isProviderEnabled(localModelConfig ?? {}, provider.id);
+        const primaryDisabledReason = this.getProviderPrimaryDisabledReason(
+          providerStatusSource,
+          localModelConfig,
+          providerEnabled,
+        );
+        const providerServerDisabled = primaryDisabledReason === 'server';
+        const providerProjectDisabled = primaryDisabledReason === 'project';
+        const providerCheckState = this.providerAvailabilityChecks.get(provider.id) ?? { status: 'idle' };
         const providerSearchText = `${provider.name || provider.id} ${provider.id}`.toLowerCase();
         const providerMatchesQuery = normalizedQuery.length > 0 && providerSearchText.includes(normalizedQuery);
         const disabledCount = providerEnabled
-          ? provider.models.filter((model) => disabledModelRefs.has(formatModelReference(provider.id, model.id))).length
-          : provider.models.length;
+          ? providerStatusSource.models.filter((model) => disabledModelRefs.has(formatModelReference(provider.id, model.id))).length
+          : providerStatusSource.models.length;
         const hasDisabledState = !providerEnabled || disabledCount > 0;
-        const hasEnabledState = providerEnabled && disabledCount < provider.models.length;
+        const hasEnabledState = providerEnabled && disabledCount < providerStatusSource.models.length;
         if (this.modelAvailabilityOnlyDisabled && !hasDisabledState) {
           continue;
         }
@@ -1118,7 +1162,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
 
         const isAutoExpanded = normalizedQuery.length > 0 && (providerMatchesQuery || visibleModels.length > 0);
         const isExpanded = isAutoExpanded || this.expandedModelAvailabilityProviders.has(provider.id);
-        const providerEl = blockEl.createDiv({
+        const providerEl = providerListEl.createDiv({
           cls: `opencodian-model-toggle-provider${providerEnabled ? '' : ' is-provider-disabled'}`,
         });
 
@@ -1149,7 +1193,13 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         });
         providerInfoEl.createDiv({
           cls: 'opencodian-model-toggle-provider-meta',
-          text: this.describeModelAvailabilitySummary(provider, providerEnabled, disabledCount),
+          text: this.describeModelAvailabilitySummary(
+            providerStatusSource,
+            providerEnabled,
+            disabledCount,
+            primaryDisabledReason,
+            this.activeModelCatalogTab,
+          ),
         });
         const badgesEl = providerInfoEl.createDiv({ cls: 'opencodian-model-toggle-provider-badges' });
         badgesEl.createSpan({
@@ -1157,39 +1207,101 @@ export class OpenCodianSettingTab extends PluginSettingTab {
           text: t(`settings.model.sourceBadge.${provider.source}` as const),
         });
         badgesEl.createSpan({
-          cls: `opencodian-model-status-badge${providerEnabled ? (disabledCount > 0 ? ' is-partial' : ' is-available') : ' is-disabled'}`,
-          text: providerEnabled
-            ? disabledCount > 0
-              ? t('settings.model.availability.status.partial')
-              : t('settings.model.availability.status.available')
-            : t('settings.model.availability.status.providerDisabled'),
+          cls: `opencodian-model-status-badge ${this.getProviderAvailabilityStatusClass(
+            providerStatusSource,
+            providerEnabled,
+            disabledCount,
+            this.activeModelCatalogTab,
+          )}`,
+          text: this.getProviderAvailabilityStatusLabel(
+            providerStatusSource,
+            providerEnabled,
+            disabledCount,
+            primaryDisabledReason,
+            this.activeModelCatalogTab,
+          ),
+        });
+        const serverDisabledBadge = this.getProviderServerConstraintBadge(
+          providerStatusSource,
+          providerEnabled,
+          primaryDisabledReason,
+          this.activeModelCatalogTab,
+        );
+        if (serverDisabledBadge) {
+          badgesEl.createSpan({
+            cls: `opencodian-model-status-badge ${serverDisabledBadge.className}`,
+            text: serverDisabledBadge.text,
+          });
+        }
+        const probeBadge = this.getProviderAvailabilityProbeBadge(providerCheckState);
+        if (probeBadge) {
+          badgesEl.createSpan({
+            cls: `opencodian-model-status-badge ${probeBadge.className}`,
+            text: probeBadge.text,
+          });
+        }
+        const probeDetail = this.describeProviderAvailabilityProbe(providerCheckState);
+        if (probeDetail) {
+          providerInfoEl.createDiv({
+            cls: `opencodian-model-toggle-provider-probe ${probeDetail.className}`,
+            text: probeDetail.text,
+          });
+        }
+
+        const providerActionsEl = providerHeaderEl.createDiv({ cls: 'opencodian-model-toggle-provider-actions' });
+        const providerTestButton = providerActionsEl.createEl('button', {
+          cls: 'opencodian-model-toggle-provider-test-button',
+          text: providerCheckState.status === 'loading'
+            ? t('settings.model.availability.check.loading')
+            : t('settings.model.availability.check.button'),
+        });
+        providerTestButton.type = 'button';
+        providerTestButton.disabled = providerCheckState.status === 'loading' || providerServerDisabled;
+        providerTestButton.addEventListener('click', (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          void this.runProviderAvailabilityCheck(provider.id, modelConfigService, renderAvailabilityManagement);
         });
 
-        const providerToggleLabel = providerHeaderEl.createEl('label', {
+        const providerToggleLabel = providerActionsEl.createEl('label', {
           cls: 'opencodian-model-toggle-switch',
         });
         const providerToggle = providerToggleLabel.createEl('input', {
           attr: { type: 'checkbox' },
         });
         providerToggle.checked = providerEnabled;
+        providerToggle.disabled = providerServerDisabled;
         providerToggleLabel.createSpan({
           cls: 'opencodian-model-toggle-switch-label',
-          text: providerEnabled
-            ? t('settings.model.toggle.providerEnabled')
-            : t('settings.model.toggle.providerDisabled'),
+          text: providerProjectDisabled
+              ? t('settings.model.toggle.providerProjectDisabled')
+              : providerServerDisabled
+                ? t('settings.model.toggle.providerServerDisabled')
+              : t('settings.model.toggle.providerEnabled'),
         });
         providerToggle.addEventListener('change', () => {
+          if (providerServerDisabled) {
+            providerToggle.checked = false;
+            return;
+          }
           const requestedEnabled = providerToggle.checked;
           providerToggle.disabled = true;
           void (async () => {
             try {
               const currentConfig = await modelConfigService.readLocalModelConfig();
-              const knownProviderIds = catalogs?.baseEffective.providers.map((entry) => entry.id) ?? [provider.id];
+              const knownProviderIds = Array.from(new Set([
+                ...(catalogs?.server.providers.map((entry) => entry.id) ?? []),
+                ...(catalogs?.local.providers.map((entry) => entry.id) ?? []),
+                ...collectConfiguredProviderIds(catalogs?.serverConfig ?? {}),
+                ...collectConfiguredProviderIds(currentConfig),
+                provider.id,
+              ]));
               const nextConfig = setProviderEnabled(
                 currentConfig,
                 provider.id,
                 requestedEnabled,
                 knownProviderIds,
+                catalogs?.serverConfig,
               );
               await modelConfigService.writeLocalModelConfig(nextConfig);
               await refreshModelSettings({ forceViewReload: true });
@@ -1207,9 +1319,12 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         if (provider.models.length === 0) {
           providerEl.createDiv({
             cls: 'opencodian-model-toggle-empty',
-            text: (this.activeModelCatalogTab === 'server' || this.activeModelCatalogTab === 'disabled') && !providerEnabled
-              ? t('settings.model.catalog.hiddenByLocalDisable')
-              : t('settings.model.toggle.emptyModels'),
+            text: this.describeProviderModels(
+              provider,
+              (this.activeModelCatalogTab === 'server' || this.activeModelCatalogTab === 'disabled') && !providerEnabled
+                ? this.getCatalogPlaceholderReason(provider, this.activeModelCatalogTab, localModelConfig)
+                : null,
+            ) || t('settings.model.toggle.emptyModels'),
           });
           continue;
         }
@@ -1288,6 +1403,13 @@ export class OpenCodianSettingTab extends PluginSettingTab {
           });
         }
       }
+
+      window.requestAnimationFrame(() => {
+        if (!providerListEl.isConnected) {
+          return;
+        }
+        providerListEl.scrollTop = modelAvailabilityProviderListScrollTop;
+      });
     };
 
     const refreshModelSettings = async (
@@ -1343,6 +1465,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         }
 
         if (showNotice) {
+          const serverDisplayCatalog = this.getDisplayCatalogForMode('server', catalogs, localModelConfig);
           logger.debug('Manual model refresh snapshot', {
             modelSourceMode: this.plugin.settings.modelSourceMode,
             vaultPath: getVaultBasePath(this.app) ?? null,
@@ -1359,7 +1482,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
             disabled: serializeCatalog(this.getDisplayCatalogForMode('disabled', catalogs, localModelConfig)),
           });
           new Notice(t('settings.model.refresh.success', {
-            serverCount: String(catalogs.server.providers.length),
+            serverCount: String(serverDisplayCatalog.providers.length),
             effectiveCount: String(catalogs.effective.providers.length),
           }));
         }
@@ -5444,8 +5567,31 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     provider: ModelCatalogProvider,
     providerEnabled: boolean,
     disabledCount: number,
+    primaryDisabledReason: 'project' | 'server' | null,
+    mode: 'local' | 'server' | 'effective' | 'disabled',
   ): string {
+    if (mode === 'server' && this.isProviderDisabledByScope(provider, 'global')) {
+      return t('settings.model.availability.summary.serverDisabled', {
+        id: provider.id,
+        count: String(provider.models.length),
+      });
+    }
+
     if (!providerEnabled) {
+      if (primaryDisabledReason === 'project') {
+        return t('settings.model.availability.summary.projectDisabled', {
+          id: provider.id,
+          count: String(provider.models.length),
+        });
+      }
+
+      if (primaryDisabledReason === 'server') {
+        return t('settings.model.availability.summary.serverDisabled', {
+          id: provider.id,
+          count: String(provider.models.length),
+        });
+      }
+
       return t('settings.model.availability.summary.providerDisabled', {
         id: provider.id,
         count: String(provider.models.length),
@@ -5460,10 +5606,236 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       });
     }
 
+    if (this.isProviderDisabledByScope(provider, 'global')) {
+      return t('settings.model.availability.summary.serverDisabledOverridden', {
+        id: provider.id,
+        count: String(provider.models.length),
+      });
+    }
+
     return t('settings.model.availability.summary.available', {
       id: provider.id,
       count: String(provider.models.length),
     });
+  }
+
+  private getProviderPrimaryDisabledReason(
+    provider: ModelCatalogProvider,
+    localModelConfig: OpencodeModelConfigSubset | null,
+    providerEnabled: boolean,
+  ): 'project' | 'server' | null {
+    if (providerEnabled) {
+      return null;
+    }
+
+    if (this.isProviderProjectDisabled(localModelConfig, provider.id)) {
+      return 'project';
+    }
+
+    if (this.isProviderDisabledByScope(provider, 'global')) {
+      return 'server';
+    }
+
+    return null;
+  }
+
+  private getProviderAvailabilityStatusClass(
+    provider: ModelCatalogProvider,
+    providerEnabled: boolean,
+    disabledCount: number,
+    mode: 'local' | 'server' | 'effective' | 'disabled',
+  ): 'is-disabled' | 'is-partial' | 'is-available' {
+    if (mode === 'server' && this.isProviderDisabledByScope(provider, 'global')) {
+      return 'is-disabled';
+    }
+
+    if (!providerEnabled) {
+      return 'is-disabled';
+    }
+
+    if (disabledCount > 0) {
+      return 'is-partial';
+    }
+
+    return 'is-available';
+  }
+
+  private getProviderAvailabilityStatusLabel(
+    provider: ModelCatalogProvider,
+    providerEnabled: boolean,
+    disabledCount: number,
+    primaryDisabledReason: 'project' | 'server' | null,
+    mode: 'local' | 'server' | 'effective' | 'disabled',
+  ): string {
+    if (mode === 'server' && this.isProviderDisabledByScope(provider, 'global')) {
+      return t('settings.model.availability.status.serverDisabled');
+    }
+
+    if (!providerEnabled) {
+      if (primaryDisabledReason === 'project') {
+        return t('settings.model.availability.status.projectDisabled');
+      }
+
+      if (primaryDisabledReason === 'server') {
+        return t('settings.model.availability.status.serverDisabled');
+      }
+
+      return t('settings.model.availability.status.providerDisabled');
+    }
+
+    return disabledCount > 0
+      ? t('settings.model.availability.status.partial')
+      : t('settings.model.availability.status.available');
+  }
+
+  private getProviderServerConstraintBadge(
+    provider: ModelCatalogProvider,
+    providerEnabled: boolean,
+    primaryDisabledReason: 'project' | 'server' | null,
+    mode: 'local' | 'server' | 'effective' | 'disabled',
+  ): { text: string; className: 'is-disabled' | 'is-partial' } | null {
+    if (!this.isProviderDisabledByScope(provider, 'global')) {
+      return null;
+    }
+
+    if (mode === 'server' || primaryDisabledReason === 'server') {
+      return null;
+    }
+
+    return {
+      text: providerEnabled
+        ? t('settings.model.availability.status.serverDisabledInherited')
+        : t('settings.model.availability.status.serverDisabled'),
+      className: providerEnabled ? 'is-partial' : 'is-disabled',
+    };
+  }
+
+  private getProviderAvailabilityProbeBadge(
+    state: ProviderAvailabilityCheckState,
+  ): { text: string; className: 'is-available' | 'is-partial' | 'is-disabled' } | null {
+    switch (state.status) {
+      case 'loading':
+        return {
+          text: t('settings.model.availability.check.loading'),
+          className: 'is-partial',
+        };
+      case 'error':
+        return {
+          text: t('settings.model.availability.check.failedBadge'),
+          className: 'is-disabled',
+        };
+      case 'ready':
+        if (!state.probe) {
+          return null;
+        }
+
+        switch (state.probe.status) {
+          case 'available':
+            return {
+              text: t('settings.model.availability.check.availableBadge'),
+              className: 'is-available',
+            };
+          case 'send_failed':
+            return {
+              text: t('settings.model.availability.check.failedBadge'),
+              className: 'is-disabled',
+            };
+          case 'catalog_only':
+            return {
+              text: t('settings.model.availability.check.catalogOnlyBadge'),
+              className: 'is-partial',
+            };
+          case 'project_disabled':
+            return {
+              text: t('settings.model.availability.check.projectDisabledBadge'),
+              className: 'is-disabled',
+            };
+          case 'server_disabled':
+            return {
+              text: t('settings.model.availability.check.serverDisabledBadge'),
+              className: 'is-disabled',
+            };
+          case 'missing':
+          default:
+            return {
+              text: t('settings.model.availability.check.missingBadge'),
+              className: 'is-disabled',
+            };
+        }
+      case 'idle':
+      default:
+        return null;
+    }
+  }
+
+  private describeProviderAvailabilityProbe(
+    state: ProviderAvailabilityCheckState,
+  ): { text: string; className: string } | null {
+    if (state.status === 'loading') {
+      return {
+        text: t('settings.model.availability.check.loadingDetail'),
+        className: 'is-loading',
+      };
+    }
+
+    if (state.status === 'error') {
+      return {
+        text: t('settings.model.availability.check.failedDetail', {
+          message: state.error ?? t('settings.model.availability.check.unknownError'),
+        }),
+        className: 'is-error',
+      };
+    }
+
+    if (state.status !== 'ready' || !state.probe) {
+      return null;
+    }
+
+    const runtimeCount = String(state.probe.runtimeModelCount);
+    const catalogCount = String(state.probe.catalogModelCount);
+    const testedModelId = state.probe.testedModelId ?? t('settings.model.availability.check.unknownModel');
+    switch (state.probe.status) {
+      case 'available':
+        return {
+          text: state.probe.overridesServerDisabled
+            ? t('settings.model.availability.check.availableOverrideDetail', { model: testedModelId })
+            : t('settings.model.availability.check.availableDetail', { model: testedModelId }),
+          className: 'is-success',
+        };
+      case 'send_failed':
+        return {
+          text: t('settings.model.availability.check.sendFailedDetail', {
+            model: testedModelId,
+            message: state.probe.sendTestError ?? t('settings.model.availability.check.unknownError'),
+          }),
+          className: 'is-error',
+        };
+      case 'project_disabled':
+        return {
+          text: state.probe.runtimeModelCount > 0
+            ? t('settings.model.availability.check.projectDisabledWithRuntimeDetail', { count: runtimeCount })
+            : t('settings.model.availability.check.projectDisabledDetail'),
+          className: 'is-error',
+        };
+      case 'server_disabled':
+        return {
+          text: t('settings.model.availability.check.serverDisabledDetail'),
+          className: 'is-error',
+        };
+      case 'catalog_only':
+        return {
+          text: state.probe.serverDisabled && state.probe.overridesServerDisabled
+            ? t('settings.model.availability.check.catalogOnlyOverrideDetail', { count: catalogCount })
+            : t('settings.model.availability.check.catalogOnlyDetail', { count: catalogCount }),
+          className: 'is-warning',
+        };
+      case 'missing':
+      default:
+        return {
+          text: t('settings.model.availability.check.missingDetail'),
+          className: 'is-warning',
+        };
+    }
   }
 
   private renderModelCatalogSummaryCards(
@@ -5595,11 +5967,40 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         cls: 'opencodian-model-catalog-provider-models',
         text: this.describeProviderModels(
           provider,
-          (activeSection.mode === 'server' || activeSection.mode === 'disabled')
-            && !isProviderEnabled(localModelConfig ?? {}, provider.id),
+          this.getCatalogPlaceholderReason(provider, activeSection.mode, localModelConfig),
         ),
       });
     }
+  }
+
+  private async runProviderAvailabilityCheck(
+    providerId: string,
+    modelConfigService: NonNullable<OpenCodianPlugin['modelConfigService']>,
+    rerender: () => void,
+  ): Promise<void> {
+    const existing = this.providerAvailabilityChecks.get(providerId);
+    if (existing?.status === 'loading') {
+      return;
+    }
+
+    this.providerAvailabilityChecks.set(providerId, { status: 'loading' });
+    rerender();
+
+    try {
+      const probe = await modelConfigService.testProviderAvailability(providerId);
+      this.providerAvailabilityChecks.set(providerId, {
+        status: 'ready',
+        probe,
+      });
+    } catch (error) {
+      logger.error('Failed to test provider availability:', error);
+      this.providerAvailabilityChecks.set(providerId, {
+        status: 'error',
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+
+    rerender();
   }
 
   private getDisplayCatalogForMode(
@@ -5611,7 +6012,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       case 'local':
         return catalogs.local;
       case 'server':
-        return this.withDisabledProviderPlaceholders(catalogs.server, localModelConfig, 'server');
+        return this.buildServerDisplayCatalog(catalogs.server);
       case 'disabled':
         return this.buildDisabledCatalog(catalogs, localModelConfig);
       case 'effective':
@@ -5620,11 +6021,33 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     }
   }
 
+  private getProviderStatusCatalogForMode(
+    mode: 'local' | 'server' | 'effective' | 'disabled',
+    catalogs: ModelCatalogBundle,
+    localModelConfig: OpencodeModelConfigSubset | null,
+  ): ModelCatalog {
+    switch (mode) {
+      case 'local':
+        return catalogs.local;
+      case 'server':
+        return this.buildServerDisplayCatalog(catalogs.server);
+      case 'disabled':
+        return this.withProjectDisabledProviderPlaceholders(
+          mergeCatalogs(catalogs.server, catalogs.local),
+          localModelConfig,
+          'merge',
+        );
+      case 'effective':
+      default:
+        return catalogs.baseEffective;
+    }
+  }
+
   private buildDisabledCatalog(
     catalogs: ModelCatalogBundle,
     localModelConfig: OpencodeModelConfigSubset | null,
   ): ModelCatalog {
-    const baseCatalog = this.withDisabledProviderPlaceholders(
+    const baseCatalog = this.withProjectDisabledProviderPlaceholders(
       mergeCatalogs(catalogs.server, catalogs.local),
       localModelConfig,
       'merge',
@@ -5633,10 +6056,15 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     const providers: ModelCatalogProvider[] = [];
 
     for (const provider of baseCatalog.providers) {
-      const providerEnabled = isProviderEnabled(localModelConfig ?? {}, provider.id);
+      const providerProjectDisabled = this.isProviderProjectDisabled(localModelConfig, provider.id);
+      const providerEnabled = this.isProviderCurrentlyEnabled(provider.id, catalogs);
       if (!providerEnabled) {
         providers.push({
           ...provider,
+          disabledScopes: this.mergeDisabledScopes(
+            provider.disabledScopes,
+            providerProjectDisabled ? ['project'] : undefined,
+          ),
           models: provider.models.map((model) => ({ ...model })),
         });
         continue;
@@ -5661,19 +6089,35 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     };
   }
 
-  private withDisabledProviderPlaceholders(
+  private buildServerDisplayCatalog(catalog: ModelCatalog): ModelCatalog {
+    const providers = catalog.providers
+      .filter((provider) => !this.isProviderDisabledByScope(provider, 'global'))
+      .map((provider) => ({
+        ...provider,
+        models: provider.models.map((model) => ({ ...model })),
+      }));
+
+    return {
+      providers,
+      defaults: Object.fromEntries(
+        Object.entries(catalog.defaults).filter(([providerId]) => providers.some((provider) => provider.id === providerId)),
+      ),
+    };
+  }
+
+  private withProjectDisabledProviderPlaceholders(
     catalog: ModelCatalog,
     localModelConfig: OpencodeModelConfigSubset | null,
     source: 'server' | 'merge',
   ): ModelCatalog {
-    if (!Array.isArray(localModelConfig?.disabled_providers)) {
+    if (!localModelConfig || !this.hasProviderAvailabilityConfig(localModelConfig)) {
       return catalog;
     }
 
     const existingProviderIds = new Set(catalog.providers.map((provider) => provider.id));
-    const placeholderProviders = localModelConfig.disabled_providers
-      .map((providerId) => providerId.trim())
-      .filter((providerId) => providerId.length > 0 && !existingProviderIds.has(providerId))
+    const placeholderProviders = collectConfiguredProviderIds(localModelConfig)
+      .filter((providerId) => !isProviderEnabled(localModelConfig, providerId))
+      .filter((providerId) => !existingProviderIds.has(providerId))
       .map<ModelCatalogProvider>((providerId) => ({
         id: providerId,
         name: providerId,
@@ -5681,6 +6125,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         source,
         existsInLocal: false,
         existsInServer: false,
+        disabledScopes: ['project'],
       }));
 
     if (placeholderProviders.length === 0) {
@@ -5709,9 +6154,35 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     return catalog.providers.reduce((total, provider) => total + provider.models.length, 0);
   }
 
-  private describeProviderModels(provider: ModelCatalogProvider, disabledWithoutModels = false): string {
-    if (disabledWithoutModels && provider.models.length === 0) {
-      return t('settings.model.catalog.hiddenByLocalDisable');
+  private isProviderDisabledByScope(provider: ModelCatalogProvider, scope: 'global' | 'project'): boolean {
+    return provider.disabledScopes?.includes(scope) ?? false;
+  }
+
+  private isProviderProjectDisabled(
+    localModelConfig: OpencodeModelConfigSubset | null,
+    providerId: string,
+  ): boolean {
+    if (!localModelConfig || !this.hasProviderAvailabilityConfig(localModelConfig)) {
+      return false;
+    }
+
+    return !isProviderEnabled(localModelConfig, providerId);
+  }
+
+  private isProviderCurrentlyEnabled(providerId: string, catalogs: ModelCatalogBundle): boolean {
+    return catalogs.currentEnabledProviderIds.includes(providerId);
+  }
+
+  private describeProviderModels(
+    provider: ModelCatalogProvider,
+    placeholderReason: 'project' | 'server' | null = null,
+  ): string {
+    if (provider.models.length === 0 && placeholderReason === 'project') {
+      return t('settings.model.catalog.hiddenByProjectDisable');
+    }
+
+    if (provider.models.length === 0 && placeholderReason === 'server') {
+      return t('settings.model.catalog.hiddenByServerDisable');
     }
 
     const modelNames = provider.models.map((model) => model.name);
@@ -5730,8 +6201,47 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         .setTooltip(t('settings.server.help.openDoc'))
         .onClick(() => {
           new ServerSettingHelpModal(this.app, topic).open();
-        });
+      });
     });
+  }
+
+  private hasProviderAvailabilityConfig(
+    config: Pick<OpencodeModelConfigSubset, 'enabled_providers' | 'disabled_providers'> | null | undefined,
+  ): boolean {
+    return Array.isArray(config?.enabled_providers) || Array.isArray(config?.disabled_providers);
+  }
+
+  private getCatalogPlaceholderReason(
+    provider: ModelCatalogProvider,
+    mode: 'local' | 'server' | 'effective' | 'disabled',
+    localModelConfig: OpencodeModelConfigSubset | null,
+  ): 'project' | 'server' | null {
+    if (provider.models.length > 0) {
+      return null;
+    }
+
+    if (mode === 'server' && this.isProviderDisabledByScope(provider, 'global')) {
+      return 'server';
+    }
+
+    if (mode === 'disabled') {
+      if (this.isProviderProjectDisabled(localModelConfig, provider.id)) {
+        return 'project';
+      }
+      if (this.isProviderDisabledByScope(provider, 'global')) {
+        return 'server';
+      }
+    }
+
+    return null;
+  }
+
+  private mergeDisabledScopes(
+    left: Array<'global' | 'project'> | undefined,
+    right: Array<'global' | 'project'> | undefined,
+  ): Array<'global' | 'project'> | undefined {
+    const merged = Array.from(new Set([...(left ?? []), ...(right ?? [])]));
+    return merged.length > 0 ? merged : undefined;
   }
 
   private addSettingHelpButton(setting: Setting, helpButton: SettingHelpButtonConfig): void {

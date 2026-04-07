@@ -324,6 +324,7 @@ export class ServerManager {
         });
         
         const spawnEnv = this.getSpawnEnv();
+        const spawnViaShell = this.shouldSpawnViaShell(opencodePath);
         logger.debug('  Spawn env summary:', {
           hasDisableProjectConfig: typeof spawnEnv.OPENCODE_DISABLE_PROJECT_CONFIG === 'string',
           disableProjectConfig: spawnEnv.OPENCODE_DISABLE_PROJECT_CONFIG ?? null,
@@ -334,6 +335,7 @@ export class ServerManager {
           serverUsernameConfigured: typeof spawnEnv.OPENCODE_SERVER_USERNAME === 'string' && spawnEnv.OPENCODE_SERVER_USERNAME.length > 0,
           serverPasswordConfigured: typeof spawnEnv.OPENCODE_SERVER_PASSWORD === 'string' && spawnEnv.OPENCODE_SERVER_PASSWORD.length > 0,
           pureMode: spawnEnv.OPENCODE_PURE ?? null,
+          shell: spawnViaShell,
         });
 
         this.process = spawn(opencodePath, [
@@ -347,6 +349,8 @@ export class ServerManager {
           stdio: ['ignore', 'pipe', 'pipe'],
           cwd: this.workingDirectory,
           env: spawnEnv,
+          shell: spawnViaShell,
+          windowsHide: process.platform === 'win32',
         });
         this.setManagedServerState(this.process.pid);
 
@@ -381,40 +385,101 @@ export class ServerManager {
   }
 
   private findOpenCodeBinary(): string | null {
-    // Try common locations
-    const candidates = [
-      'opencode',
-      'opencode-ai',
-    ];
+    const candidates: string[] = [];
 
-    // Platform-specific paths
     if (process.platform === 'win32') {
-      // Windows: check for .cmd extension
+      if (process.env.APPDATA) {
+        candidates.push(path.join(process.env.APPDATA, 'npm', 'opencode.cmd'));
+      }
+      if (process.env.LOCALAPPDATA) {
+        candidates.push(path.join(process.env.LOCALAPPDATA, 'npm', 'opencode.cmd'));
+      }
       candidates.push(
         'opencode.cmd',
-        `${process.env.APPDATA}\\npm\\opencode.cmd`,
-        `${process.env.LOCALAPPDATA}\\npm\\opencode.cmd`
+        'opencode',
+        'opencode-ai',
       );
     } else if (process.platform === 'darwin') {
-      // macOS: common Homebrew and npm locations
       candidates.push(
         '/usr/local/bin/opencode',
         '/opt/homebrew/bin/opencode',
         '/usr/bin/opencode',
-        `${process.env.HOME}/.npm-global/bin/opencode`,
-        `${process.env.HOME}/.nvm/current/bin/opencode`
+        process.env.HOME ? path.join(process.env.HOME, '.npm-global', 'bin', 'opencode') : '',
+        process.env.HOME ? path.join(process.env.HOME, '.nvm', 'current', 'bin', 'opencode') : '',
+        'opencode',
+        'opencode-ai',
       );
     } else {
-      // Linux
       candidates.push(
         '/usr/local/bin/opencode',
         '/usr/bin/opencode',
-        '/opt/bin/opencode'
+        '/opt/bin/opencode',
+        'opencode',
+        'opencode-ai',
       );
     }
 
-    // Return first candidate (will be tried by spawn)
-    return candidates[0];
+    for (const candidate of candidates) {
+      const resolved = this.resolveExecutableCandidate(candidate);
+      if (resolved) {
+        return resolved;
+      }
+    }
+
+    return null;
+  }
+
+  private resolveExecutableCandidate(candidate: string): string | null {
+    if (!candidate) {
+      return null;
+    }
+
+    if (path.isAbsolute(candidate)) {
+      return fs.existsSync(candidate) ? candidate : null;
+    }
+
+    const pathEntries = (process.env.PATH ?? '')
+      .split(path.delimiter)
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+
+    if (pathEntries.length === 0) {
+      return null;
+    }
+
+    if (process.platform === 'win32') {
+      const hasExtension = path.extname(candidate).length > 0;
+      const pathExts = hasExtension
+        ? ['']
+        : (process.env.PATHEXT ?? '.COM;.EXE;.BAT;.CMD')
+          .split(';')
+          .map((ext) => ext.trim())
+          .filter(Boolean);
+
+      for (const entry of pathEntries) {
+        for (const extension of pathExts) {
+          const resolvedPath = path.join(entry, `${candidate}${extension}`);
+          if (fs.existsSync(resolvedPath)) {
+            return resolvedPath;
+          }
+        }
+      }
+
+      return null;
+    }
+
+    for (const entry of pathEntries) {
+      const resolvedPath = path.join(entry, candidate);
+      if (fs.existsSync(resolvedPath)) {
+        return resolvedPath;
+      }
+    }
+
+    return null;
+  }
+
+  private shouldSpawnViaShell(opencodePath: string): boolean {
+    return process.platform === 'win32' && /\.(cmd|bat)$/i.test(opencodePath);
   }
 
   private async isPortAvailable(port: number, host = this.config.local.host): Promise<boolean> {
