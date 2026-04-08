@@ -5,7 +5,7 @@
 
 ## 概述
 
-结构化日志工具模块。通过 `createLogger(scope)` 创建带前缀的 Logger 实例，支持 info/debug/warn/error 四个级别。维护最近 500 条日志的内存环形缓冲区，用于诊断导出。Debug 级别可通过 `setDebugLoggingEnabled()` 或 localStorage 开关控制。
+结构化日志工具模块。通过 `createLogger(scope)` 创建带前缀的 Logger 实例，支持 info/debug/warn/error 四个级别。维护最近 500 条日志的内存环形缓冲区，用于诊断导出。Debug 级别可通过 `setDebugLoggingEnabled()` 或 localStorage 开关控制；另外还能通过 `setInlineSerializedDebugLogArgsEnabled()` 把 debug 的对象参数改成内联 JSON 文本，方便直接在 Console 行内查看。
 
 ## 导入关系
 上游: 无（纯工具模块）
@@ -52,7 +52,7 @@ interface LogEntry {
 
 ### 日志格式
 
-`formatArgs(scope, args)` 在第一条消息前添加 `[HH:MM:SS] [scope]` 前缀。
+`formatArgs(scope, args, options)` 在第一条消息前添加 `[HH:MM:SS] [scope]` 前缀。默认保留对象参数为独立 console 参数；当 `inlineSerializeNonStringArgs` 开启时，会把 debug 日志里的非字符串参数先序列化，再直接拼进消息文本。
 
 ### 环形缓冲区
 
@@ -71,6 +71,7 @@ interface LogEntry {
 |------|------|
 | `createLogger(scope)` | 创建带前缀的 Logger 实例 |
 | `setDebugLoggingEnabled(enabled)` | 启用/禁用 debug 级别日志 |
+| `setInlineSerializedDebugLogArgsEnabled(enabled)` | 控制 debug 日志是否把对象参数内联序列化到消息文本 |
 | `getRecentLogEntries()` | 获取最近日志条目数组 |
 | `getRecentLogText()` | 获取最近日志的格式化文本（用于诊断导出） |
 
@@ -83,7 +84,7 @@ createLogger('OpenCodeService')
 logger.info('Server started on port', port)
   → pushRecentLog('log', 'OpenCodeService', ['Server started on port', port])
   → emit('log', 'OpenCodeService', [...])
-    → formatArgs('OpenCodeService', [...])
+    → formatArgs('OpenCodeService', [...], { inlineSerializeNonStringArgs: false })
       → ['[14:30:05] [OpenCodeService] Server started on port', 3000]
     → console.log(...)
 
@@ -95,7 +96,7 @@ getRecentLogText()
 ## 与其他模块的交互
 
 - **几乎所有模块**: 通过 `createLogger(scope)` 获取日志器
-- **OpenCodianSettings (Debug 面板)**: 调用 `setDebugLoggingEnabled()` 和 `getRecentLogText()` 实现诊断导出
+- **OpenCodianSettings (Debug 面板)**: 调用 `setDebugLoggingEnabled()`、`setInlineSerializedDebugLogArgsEnabled()` 和 `getRecentLogText()` 实现调试开关与诊断导出
 - **main.ts**: 初始化时可能设置 debug 模式
 
 ## 配置项
@@ -104,6 +105,7 @@ getRecentLogText()
 |------|-----|------|
 | `DEBUG_STORAGE_KEY` | `'opencodian:debug'` | localStorage 键名 |
 | `DEBUG_FLAG_KEY` | `'__OPENCODIAN_DEBUG__'` | 全局标志键名 |
+| `INLINE_SERIALIZED_DEBUG_ARGS_FLAG_KEY` | `'__OPENCODIAN_INLINE_SERIALIZED_DEBUG_ARGS__'` | debug 参数内联序列化开关 |
 | `MAX_LOG_ENTRIES` | 500 | 内存缓冲区最大条目数 |
 
 ## 注意事项
@@ -112,5 +114,4 @@ getRecentLogText()
 - `debug` 日志包含敏感信息时应注意过滤
 - `getRecentLogText()` 返回完整日志文本，可能较大
 - 环形缓冲区在插件重载后清空（模块级状态）
-
 

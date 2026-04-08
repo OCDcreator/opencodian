@@ -177,3 +177,21 @@ describe('OpenCodianPlugin.toggleGlassOctahedronForCurrentView', () => {
     expect(view.toggleGlassOctahedron).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('OpenCodianPlugin.loadSettings', () => {
+  it('preserves the inline debug argument serialization toggle from saved settings', async () => {
+    const plugin = new OpenCodianPlugin() as OpenCodianPlugin & {
+      storage: Pick<StorageService, 'loadSettings'>;
+    };
+
+    plugin.storage = {
+      loadSettings: jest.fn().mockResolvedValue({
+        inlineSerializedDebugLogArgs: true,
+      }),
+    } as Pick<StorageService, 'loadSettings'>;
+
+    await plugin.loadSettings();
+
+    expect(plugin.settings.inlineSerializedDebugLogArgs).toBe(true);
+  });
+});

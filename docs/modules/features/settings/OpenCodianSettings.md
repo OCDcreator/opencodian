@@ -50,6 +50,10 @@
   - 聊天背景图上传/调参
   - assistant metadata / time / provider-model 独立样式控制
   - 输入面板 glass refraction / liquid glass 参数
+- **Debug**
+  - `enableDebugLogging`
+  - `inlineSerializedDebugLogArgs`
+  - 诊断导出路径、复制最近诊断、生成日志文件
 
 ## 核心逻辑
 
@@ -126,6 +130,7 @@ provider 开关写回仍遵循 `ModelConfigService` 返回的 `effectiveProvider
 - `ModelConfigModal` / `ModelConfigJsonModal` / `OpencodeConfigModal`: 配置编辑入口
 - `ServerSettingHelpModal` / `LiquidGlassSettingHelpModal`: 帮助说明入口
 - `main.ts`: 通过 `addSettingTab()` 注册，并调用 `onModelsLoaded()` / `refreshServerStatusDisplay()`
+- `shared/logger.ts`: Debug 分区通过插件设置切换 debug 输出，以及是否把对象参数内联序列化成文本
 
 ## 注意事项
 
@@ -133,3 +138,4 @@ provider 开关写回仍遵循 `ModelConfigService` 返回的 `effectiveProvider
 - 样式分组和默认值最终都以 `core/types/settings.ts` 的归一化逻辑为准。
 - 这个文件同时处理“运行时 UI 状态”和“持久化设置”，两者不要混淆。
 - 任何新增设置如果涉及 i18n、默认值、迁移或视图刷新，通常都不只改这一处。
+- Debug 分区里的“内联序列化调试参数”只影响 `logger.debug(...)` 的 console 输出形式，不改变 `info/warn/error` 的独立对象参数行为。

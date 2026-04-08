@@ -61,7 +61,13 @@ import {
 import { OpenCodianView } from './features/chat/OpenCodianView';
 import { OpenCodianSettingTab } from './features/settings/OpenCodianSettings';
 import { setLocale, t } from './i18n';
-import { createLogger, getRecentLogText, getVaultBasePath, setDebugLoggingEnabled } from './shared';
+import {
+  createLogger,
+  getRecentLogText,
+  getVaultBasePath,
+  setDebugLoggingEnabled,
+  setInlineSerializedDebugLogArgsEnabled,
+} from './shared';
 import { registerBuiltinGlassAdapters } from './utils/glass';
 
 const logger = createLogger('OpenCodian');
@@ -624,6 +630,10 @@ export default class OpenCodianPlugin extends Plugin {
               typeof savedSettings.modelToolsSectionOpen === 'boolean'
                 ? savedSettings.modelToolsSectionOpen
                 : DEFAULT_SETTINGS.modelToolsSectionOpen,
+            inlineSerializedDebugLogArgs:
+              typeof savedSettings.inlineSerializedDebugLogArgs === 'boolean'
+                ? savedSettings.inlineSerializedDebugLogArgs
+                : DEFAULT_SETTINGS.inlineSerializedDebugLogArgs,
             providerIconLibrary: normalizedProviderIconLibrary,
           };
         })()
@@ -697,6 +707,7 @@ export default class OpenCodianPlugin extends Plugin {
 
   private applyLoggerSettings(): void {
     setDebugLoggingEnabled(this.settings.enableDebugLogging);
+    setInlineSerializedDebugLogArgsEnabled(this.settings.inlineSerializedDebugLogArgs);
   }
 
   applyChatAppearanceSettings(): void {
@@ -1058,6 +1069,7 @@ export default class OpenCodianPlugin extends Plugin {
       `Locale: ${this.settings.locale}`,
       `Permission mode: ${this.settings.permissionMode}`,
       `Debug logging: ${this.settings.enableDebugLogging}`,
+      `Inline serialized debug log args: ${this.settings.inlineSerializedDebugLogArgs}`,
       `Plugin isolation mode: ${this.settings.pluginIsolationMode}`,
       `Default provider: ${this.settings.defaultProvider}`,
       `Default model: ${this.settings.defaultModel}`,

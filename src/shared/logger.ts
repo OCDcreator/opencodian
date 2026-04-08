@@ -2,7 +2,13 @@ type LogMethod = 'log' | 'warn' | 'error';
 
 const DEBUG_STORAGE_KEY = 'opencodian:debug';
 const DEBUG_FLAG_KEY = '__OPENCODIAN_DEBUG__';
+const INLINE_SERIALIZED_DEBUG_ARGS_FLAG_KEY = '__OPENCODIAN_INLINE_SERIALIZED_DEBUG_ARGS__';
 const MAX_LOG_ENTRIES = 500;
+
+type LoggerGlobalState = {
+  [DEBUG_FLAG_KEY]?: boolean;
+  [INLINE_SERIALIZED_DEBUG_ARGS_FLAG_KEY]?: boolean;
+};
 
 interface LogEntry {
   timestamp: string;
@@ -20,8 +26,12 @@ export interface Logger {
   error: (...args: unknown[]) => void;
 }
 
+function getLoggerGlobalState(): LoggerGlobalState {
+  return globalThis as LoggerGlobalState;
+}
+
 function isDebugEnabled(): boolean {
-  const debugFlag = (globalThis as { [DEBUG_FLAG_KEY]?: boolean })[DEBUG_FLAG_KEY];
+  const debugFlag = getLoggerGlobalState()[DEBUG_FLAG_KEY];
   if (typeof debugFlag === 'boolean') {
     return debugFlag;
   }
@@ -34,13 +44,21 @@ function isDebugEnabled(): boolean {
 }
 
 export function setDebugLoggingEnabled(enabled: boolean): void {
-  (globalThis as { [DEBUG_FLAG_KEY]?: boolean })[DEBUG_FLAG_KEY] = enabled;
+  getLoggerGlobalState()[DEBUG_FLAG_KEY] = enabled;
 
   try {
     globalThis.localStorage?.setItem(DEBUG_STORAGE_KEY, String(enabled));
   } catch {
     return;
   }
+}
+
+function isInlineSerializedDebugArgsEnabled(): boolean {
+  return getLoggerGlobalState()[INLINE_SERIALIZED_DEBUG_ARGS_FLAG_KEY] === true;
+}
+
+export function setInlineSerializedDebugLogArgsEnabled(enabled: boolean): void {
+  getLoggerGlobalState()[INLINE_SERIALIZED_DEBUG_ARGS_FLAG_KEY] = enabled;
 }
 
 function getTimestamp(): string {
@@ -51,13 +69,24 @@ function getTimestamp(): string {
   return `${hours}:${minutes}:${seconds}`;
 }
 
-function formatArgs(scope: string, args: unknown[]): unknown[] {
+function formatArgs(
+  scope: string,
+  args: unknown[],
+  options: { inlineSerializeNonStringArgs?: boolean } = {},
+): unknown[] {
   const timestamp = getTimestamp();
-  if (typeof args[0] === 'string') {
-    return [`[${timestamp}] [${scope}] ${args[0]}`, ...args.slice(1)];
+  const prefix = `[${timestamp}] [${scope}]`;
+
+  if (options.inlineSerializeNonStringArgs) {
+    const message = args.map((arg) => (typeof arg === 'string' ? arg : stringifyArg(arg))).filter(Boolean).join(' ');
+    return message ? [`${prefix} ${message}`] : [prefix];
   }
 
-  return [`[${timestamp}] [${scope}]`, ...args];
+  if (typeof args[0] === 'string') {
+    return [`${prefix} ${args[0]}`, ...args.slice(1)];
+  }
+
+  return [prefix, ...args];
 }
 
 function stringifyArg(arg: unknown): string {
@@ -90,14 +119,19 @@ function pushRecentLog(method: LogMethod, scope: string, args: unknown[]): void 
   }
 }
 
-function emit(method: LogMethod, scope: string, args: unknown[]): void {
+function emit(
+  method: LogMethod,
+  scope: string,
+  args: unknown[],
+  options: { inlineSerializeNonStringArgs?: boolean } = {},
+): void {
   const consoleRef = globalThis.console;
   pushRecentLog(method, scope, args);
   if (!consoleRef) {
     return;
   }
 
-  const formattedArgs = formatArgs(scope, args);
+  const formattedArgs = formatArgs(scope, args, options);
 
   switch (method) {
     case 'warn':
@@ -123,7 +157,9 @@ export function createLogger(scope: string): Logger {
         return;
       }
 
-      emit('log', scope, args);
+      emit('log', scope, args, {
+        inlineSerializeNonStringArgs: isInlineSerializedDebugArgsEnabled(),
+      });
     },
     warn: (...args: unknown[]) => {
       emit('warn', scope, args);

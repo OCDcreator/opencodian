@@ -4989,6 +4989,18 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
+      .setName(t('settings.debug.inlineSerializedArgs.name'))
+      .setDesc(t('settings.debug.inlineSerializedArgs.desc'))
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.inlineSerializedDebugLogArgs)
+          .onChange(async (value) => {
+            this.plugin.settings.inlineSerializedDebugLogArgs = value;
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
       .setName(t('settings.debug.logPath.name'))
       .setDesc(t('settings.debug.logPath.desc', { platform: platformLabel }))
       .addText((text) => {

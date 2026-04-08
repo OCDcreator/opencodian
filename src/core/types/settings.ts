@@ -1406,6 +1406,7 @@ export interface OpenCodianSettings {
   modelAvailabilitySectionOpen: boolean;
   modelToolsSectionOpen: boolean;
   enableDebugLogging: boolean;
+  inlineSerializedDebugLogArgs: boolean;
   debugLogPaths: PlatformDebugLogPaths;
   openInMainTab: boolean;
   tabState: PersistedTabState;
@@ -1488,6 +1489,7 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
   modelAvailabilitySectionOpen: true,
   modelToolsSectionOpen: true,
   enableDebugLogging: false,
+  inlineSerializedDebugLogArgs: false,
   debugLogPaths: getDefaultDebugLogPaths(),
   openInMainTab: false,
   tabState: getDefaultPersistedTabState(),

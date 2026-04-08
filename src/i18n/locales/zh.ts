@@ -870,6 +870,8 @@ export const zhTranslations = {
   'settings.ui.chatScrollMode.stickyMask': '吸顶 + 柔和遮盖',
   'settings.debug.logging.name': '调试日志',
   'settings.debug.logging.desc': '开启后，插件会将详细日志输出到开发者工具的 Console（控制台）中',
+  'settings.debug.inlineSerializedArgs.name': '内联序列化调试参数',
+  'settings.debug.inlineSerializedArgs.desc': '开启后，调试日志里的非字符串参数会先转成 JSON，再直接拼进消息文本里，这样无需展开 Console 对象也能查看。',
   'settings.debug.logPath.name': '日志默认路径',
   'settings.debug.logPath.desc': '用于保存 {platform} 调试日志文件的默认文件夹路径。Windows 与 macOS/Linux 会分别保存各自路径；若为空，导出时会提示选择。',
   'settings.debug.logPath.platformWindows': 'Windows',

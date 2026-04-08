@@ -18,7 +18,13 @@
 
 ```typescript
 export type { Logger } from './logger';
-export { createLogger, getRecentLogEntries, getRecentLogText, setDebugLoggingEnabled } from './logger';
+export {
+  createLogger,
+  getRecentLogEntries,
+  getRecentLogText,
+  setDebugLoggingEnabled,
+  setInlineSerializedDebugLogArgsEnabled,
+} from './logger';
 export {
   buildContextAttachment,
   buildObsidianContextTag,
@@ -52,6 +58,7 @@ export { getVaultBasePath } from './vault';
 | `createLogger()` | 生成带前缀日志器 |
 | `getRecentLogEntries()` / `getRecentLogText()` | 获取最近日志条目或格式化文本 |
 | `setDebugLoggingEnabled()` | 启用/禁用 debug 级别日志 |
+| `setInlineSerializedDebugLogArgsEnabled()` | 控制 debug 日志是否把对象参数内联序列化 |
 | `buildObsidianContextTag()` | 构建 `<obsidian_context>` XML 标签 |
 | `parseObsidianContextTag()` | 解析标签为 `MessageContextAttachment` |
 | `buildContextAttachment()` | `PromptContextItem` → `MessageContextAttachment` |

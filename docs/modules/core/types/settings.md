@@ -241,6 +241,7 @@ OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings`、`DEFAULT_
 | `modelAvailabilitySectionOpen` | `boolean` | `true` | 模型“可用范围与目录”分区是否展开 |
 | `modelToolsSectionOpen` | `boolean` | `true` | 模型“配置与缓存”分区是否展开 |
 | `enableDebugLogging` | `boolean` | `false` | 启用调试日志 |
+| `inlineSerializedDebugLogArgs` | `boolean` | `false` | 是否把 debug 的非字符串参数内联序列化到日志文本 |
 | `debugLogPaths` | `PlatformDebugLogPaths` | 默认 | 调试日志路径 |
 | `openInMainTab` | `boolean` | `false` | 在主标签页打开 |
 | `tabState` | `PersistedTabState` | 默认 | 标签页状态 |

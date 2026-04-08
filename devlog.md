@@ -12,6 +12,57 @@
 
 ---
 
+## 2026-04-08 调试日志增加内联序列化参数开关
+
+### 🎯 改动目标
+
+- 在设置页调试分区增加一个开关，用来控制 debug 日志里对象参数的 Console 输出形式
+- 开启后，把全部非字符串 debug 参数先做 `JSON.stringify()`，再直接拼进消息字符串，避免必须展开对象才能看内容
+- 关闭后，保持原本行为：对象继续作为独立 console 参数输出，便于开发者做结构化查看
+
+### ✅ 本轮调整
+
+- `src/core/types/settings.ts`
+- `src/main.ts`
+- `src/shared/logger.ts`
+- `src/shared/index.ts`
+  - 新增设置字段 `inlineSerializedDebugLogArgs`，默认关闭
+  - 主插件加载/保存设置时会同步应用该开关，并在诊断报告里输出当前状态
+  - logger 新增独立的运行时开关；仅影响 `logger.debug(...)`
+  - 当开关开启时，`formatArgs(...)` 会把非字符串参数序列化后拼进首个日志字符串；关闭时仍保留独立参数输出
+
+- `src/features/settings/OpenCodianSettings.ts`
+- `src/i18n/locales/en.ts`
+- `src/i18n/locales/zh.ts`
+  - 在设置 → 调试 中新增“内联序列化调试参数”切换项
+  - 补充中英文说明文案，明确该选项用于 Console 中免展开查看对象内容
+
+- `tests/unit/shared/logger.test.ts`
+- `tests/unit/main.test.ts`
+- `tests/unit/core/types/settings.test.ts`
+  - 新增 logger 单测，覆盖默认独立参数输出、开启后内联 JSON 输出、以及 `info` 不受影响
+  - 补充主设置加载与默认值回归测试
+
+- `docs/modules/shared/logger.md`
+- `docs/modules/shared/index.md`
+- `docs/modules/core/types/settings.md`
+- `docs/modules/features/settings/OpenCodianSettings.md`
+- `docs/modules/entry-point/main.md`
+  - 更新模块文档，补充新的调试输出格式开关与设置流转说明
+
+### 🧠 架构变化
+
+- debug 日志现在同时支持两种 Console 表达：结构化独立参数、或内联序列化文本
+- 该行为由设置页持久化控制，但只作用于 `debug` 级别，避免影响 `info / warn / error` 的既有调试习惯
+
+### 🧪 当前验证
+
+- 已通过：`npm run build`
+- 已通过：`npm run lint`
+- 已通过：`npm run test`
+- 已通过：`npm run check:devlog-order`
+- 已部署测试库并确认 `C:\Users\lt\Desktop\Write\testvault\.obsidian\plugins\opencodian\main.js` 包含 `BUILD_ID: main.202604081847`
+
 ## 2026-04-08 会话模型选择器接入可用性回退与未配置态
 
 ### 🎯 改动目标

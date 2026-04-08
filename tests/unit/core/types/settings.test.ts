@@ -139,6 +139,7 @@ describe('Settings', () => {
       expect(DEFAULT_SETTINGS.chatAppearance.scrollbar.width).toBe(8);
       expect(DEFAULT_SETTINGS.chatAppearance.scrollbar.thumbHoverOpacity).toBe(82);
       expect(DEFAULT_SETTINGS.settingsPanelScrollTop).toBe(0);
+      expect(DEFAULT_SETTINGS.inlineSerializedDebugLogArgs).toBe(false);
       expect(DEFAULT_SETTINGS.debugLogPaths).toEqual({ unix: '', windows: '' });
       expect(DEFAULT_SETTINGS.openInMainTab).toBe(false);
       expect(DEFAULT_SETTINGS.theme).toEqual(getDefaultThemeSettings());

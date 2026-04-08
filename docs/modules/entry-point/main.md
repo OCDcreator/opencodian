@@ -79,6 +79,7 @@
 - 把旧的扁平 `server.{host,port,autoStart}` 迁移为新的 `server.mode/local/remote/auth` 结构。
 - 归一化 `chatAppearance`、`theme`、`tabState`、`providerIconLibrary`。
 - 归一化 `questionDisplayMode`、`questionCardPosition`、`showAnsweredQuestionCards`。
+- 归一化 `inlineSerializedDebugLogArgs`，确保 debug 控制台输出格式开关总是布尔值。
 - 归一化 `disabledModelRefs`，避免历史配置中的脏模型引用污染当前运行时。
 - 根据 `inputPanelGlassRefractionGlassDefaultsVersion` 判断是否重置 glass/card/pill 默认层级参数。
 - 检测旧版 `nikdelvin` 液态玻璃默认档案并替换为新默认值。
@@ -203,7 +204,7 @@ graph TD
 - `locale`: 决定 i18n 语言。
 - `openInMainTab`: 决定 `activateView()` 打开主标签页还是右侧边栏。
 - `theme` / `chatAppearance` / `inputPanel*`: 决定外观归一化、预设覆盖与主题背景资源行为。
-- `enableDebugLogging` / `debugLogPaths`: 控制调试日志。
+- `enableDebugLogging` / `inlineSerializedDebugLogArgs` / `debugLogPaths`: 控制调试日志及其 Console 输出格式。
 - `defaultProvider` / `defaultModel`: 会在模型加载后由服务层回写和校正。
 
 ## 注意事项

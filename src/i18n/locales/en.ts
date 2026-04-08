@@ -870,6 +870,8 @@ export const enTranslations = {
   'settings.ui.chatScrollMode.stickyMask': 'Sticky + soft mask',
   'settings.debug.logging.name': 'Debug logging',
   'settings.debug.logging.desc': 'When enabled, detailed plugin logs are written to the Developer Tools Console',
+  'settings.debug.inlineSerializedArgs.name': 'Inline-serialize debug args',
+  'settings.debug.inlineSerializedArgs.desc': 'When enabled, non-string debug log arguments are JSON-stringified into the message text so you can read them without expanding Console objects.',
   'settings.debug.logPath.name': 'Default log path',
   'settings.debug.logPath.desc': 'Default folder used for exported debug log files on {platform}. Windows and macOS/Linux paths are stored separately. If empty, you will be prompted to choose one when exporting.',
   'settings.debug.logPath.platformWindows': 'Windows',
