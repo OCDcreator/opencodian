@@ -9056,6 +9056,15 @@
   color: var(--text-muted) !important;
 }
 
+.opencodian-title-model-warning-button {
+  color: var(--opencodian-status-warning);
+}
+
+.opencodian-title-model-warning-button:hover {
+  color: var(--opencodian-status-warning);
+  background: var(--opencodian-status-warning-subtle);
+}
+
 /* ==================== Navigation Sidebar ==================== */
 
 .workspace-leaf-content[data-type="opencodian-view"] {

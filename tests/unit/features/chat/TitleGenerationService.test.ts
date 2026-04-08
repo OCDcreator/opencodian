@@ -106,7 +106,7 @@ describe('TitleGenerationService', () => {
     expect(openCodeService.deleteSession).toHaveBeenCalledWith('temp-session');
   });
 
-  it('falls back to the current conversation model when the explicit title model is disabled or unavailable', async () => {
+  it('fails title generation when the explicit title model is disabled or unavailable', async () => {
     const { service, callback, openCodeService, modelConfigService, plugin } = createHarness();
     plugin.settings.aiTitleModel = 'openai/gpt-4.1';
     modelConfigService.getCatalogs.mockResolvedValue({
@@ -145,6 +145,29 @@ describe('TitleGenerationService', () => {
 
     await service.generateTitle(
       'conversation-4',
+      'Help me improve fallback handling',
+      { provider: 'anthropic', model: 'claude-3-5-sonnet' },
+      callback,
+    );
+
+    expect(openCodeService.requestAssistantResponse).not.toHaveBeenCalled();
+    expect(callback).toHaveBeenCalledWith('conversation-4', {
+      success: false,
+      error: 'Configured AI title model is unavailable',
+    });
+  });
+
+  it('falls back to the current conversation model when availability cannot be resolved', async () => {
+    const { service, callback, openCodeService, modelConfigService, plugin } = createHarness();
+    plugin.settings.aiTitleModel = 'openai/gpt-4.1';
+    modelConfigService.getCatalogs.mockRejectedValue(new Error('catalog unavailable'));
+    openCodeService.requestAssistantResponse.mockResolvedValue({
+      content: 'Title: Use the current conversation model',
+      structured: null,
+    });
+
+    await service.generateTitle(
+      'conversation-5',
       'Help me improve fallback handling',
       { provider: 'anthropic', model: 'claude-3-5-sonnet' },
       callback,

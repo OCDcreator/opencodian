@@ -1,6 +1,8 @@
 import type { App } from 'obsidian';
+import * as obsidian from 'obsidian';
 import { Setting } from 'obsidian';
 
+import { DEFAULT_SETTINGS } from '../../../../src/core/types';
 import { OpenCodianSettingTab } from '../../../../src/features/settings/OpenCodianSettings';
 import { setLocale, t } from '../../../../src/i18n';
 
@@ -26,6 +28,34 @@ interface ToggleRecord {
   name: string;
   control: MockToggleControl;
   onChange?: (value: boolean) => void | Promise<void>;
+}
+
+interface MockButtonControl {
+  setButtonText: jest.MockedFunction<(value: string) => MockButtonControl>;
+  setCta: jest.MockedFunction<() => MockButtonControl>;
+  setDisabled: jest.MockedFunction<(value: boolean) => MockButtonControl>;
+  onClick: jest.MockedFunction<(callback: () => void | Promise<void>) => MockButtonControl>;
+  buttonEl: HTMLButtonElement;
+}
+
+interface ButtonRecord {
+  name: string;
+  control: MockButtonControl;
+  onClick?: () => void | Promise<void>;
+}
+
+interface MockExtraButtonControl {
+  setIcon: jest.MockedFunction<(icon: string) => MockExtraButtonControl>;
+  setTooltip: jest.MockedFunction<(tooltip: string) => MockExtraButtonControl>;
+  setDisabled: jest.MockedFunction<(value: boolean) => MockExtraButtonControl>;
+  onClick: jest.MockedFunction<(callback: () => void | Promise<void>) => MockExtraButtonControl>;
+  extraSettingsEl: HTMLButtonElement;
+}
+
+interface ExtraButtonRecord {
+  name: string;
+  control: MockExtraButtonControl;
+  onClick?: () => void | Promise<void>;
 }
 
 function createDropdownRecord(name: string): DropdownRecord {
@@ -67,15 +97,65 @@ function createToggleRecord(name: string): ToggleRecord {
   return record;
 }
 
+function createButtonRecord(name: string): ButtonRecord {
+  const record: ButtonRecord = {
+    name,
+    control: {
+      setButtonText: jest.fn(),
+      setCta: jest.fn(),
+      setDisabled: jest.fn(),
+      onClick: jest.fn(),
+      buttonEl: document.createElement('button'),
+    },
+  };
+
+  record.control.setButtonText.mockReturnValue(record.control);
+  record.control.setCta.mockReturnValue(record.control);
+  record.control.setDisabled.mockReturnValue(record.control);
+  record.control.onClick.mockImplementation((callback) => {
+    record.onClick = callback;
+    return record.control;
+  });
+
+  return record;
+}
+
+function createExtraButtonRecord(name: string): ExtraButtonRecord {
+  const record: ExtraButtonRecord = {
+    name,
+    control: {
+      setIcon: jest.fn(),
+      setTooltip: jest.fn(),
+      setDisabled: jest.fn(),
+      onClick: jest.fn(),
+      extraSettingsEl: document.createElement('button'),
+    },
+  };
+
+  record.control.setIcon.mockReturnValue(record.control);
+  record.control.setTooltip.mockReturnValue(record.control);
+  record.control.setDisabled.mockReturnValue(record.control);
+  record.control.onClick.mockImplementation((callback) => {
+    record.onClick = callback;
+    return record.control;
+  });
+
+  return record;
+}
+
 describe('OpenCodian conversation settings', () => {
   const dropdownRecords: DropdownRecord[] = [];
   const toggleRecords: ToggleRecord[] = [];
+  const buttonRecords: ButtonRecord[] = [];
+  const extraButtonRecords: ExtraButtonRecord[] = [];
 
   beforeEach(() => {
     setLocale('en');
     document.body.innerHTML = '';
     dropdownRecords.length = 0;
     toggleRecords.length = 0;
+    buttonRecords.length = 0;
+    extraButtonRecords.length = 0;
 
     jest.spyOn(Setting.prototype, 'setName').mockImplementation(function setName(this: Setting, name: string) {
       (this as Setting & { __settingName?: string }).__settingName = name;
@@ -104,6 +184,26 @@ describe('OpenCodian conversation settings', () => {
       callback(record.control);
       return this;
     });
+    jest.spyOn(Setting.prototype, 'addButton').mockImplementation(function addButton(
+      this: Setting,
+      callback: (control: MockButtonControl) => unknown,
+    ) {
+      const name = (this as Setting & { __settingName?: string }).__settingName ?? '';
+      const record = createButtonRecord(name);
+      buttonRecords.push(record);
+      callback(record.control);
+      return this;
+    });
+    jest.spyOn(Setting.prototype, 'addExtraButton').mockImplementation(function addExtraButton(
+      this: Setting,
+      callback: (control: MockExtraButtonControl) => unknown,
+    ) {
+      const name = (this as Setting & { __settingName?: string }).__settingName ?? '';
+      const record = createExtraButtonRecord(name);
+      extraButtonRecords.push(record);
+      callback(record.control);
+      return this;
+    });
   });
 
   afterEach(() => {
@@ -113,6 +213,7 @@ describe('OpenCodian conversation settings', () => {
   function renderConversationSettings() {
     const plugin = {
       settings: {
+        ...DEFAULT_SETTINGS,
         titleMode: 'default',
         questionDisplayMode: 'all',
         questionCardPosition: 'inline',
@@ -178,5 +279,80 @@ describe('OpenCodian conversation settings', () => {
     expect(plugin.saveSettings).toHaveBeenCalledTimes(1);
     expect(plugin.refreshConversationRendering).toHaveBeenCalledTimes(1);
     expect(plugin.refreshQuestionUi).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps an unavailable AI title model selected and shows a warning action', async () => {
+    const noticeSpy = jest.spyOn(obsidian, 'Notice').mockImplementation(() => undefined as never);
+    const modelConfigService = {
+      getCatalogs: jest.fn().mockResolvedValue({
+        local: { providers: [], defaults: {} },
+        server: { providers: [], defaults: {} },
+        baseEffective: {
+          providers: [
+            {
+              id: 'openai',
+              name: 'OpenAI',
+              source: 'server',
+              existsInLocal: false,
+              existsInServer: true,
+              models: [
+                {
+                  id: 'gpt-4.1',
+                  name: 'GPT-4.1',
+                  source: 'server',
+                  existsInLocal: false,
+                  existsInServer: true,
+                },
+              ],
+            },
+          ],
+          defaults: {},
+        },
+        effective: {
+          providers: [],
+          defaults: {},
+        },
+        currentEnabledProviderIds: [],
+        serverConfig: {},
+        effectiveProviderConfig: {},
+      }),
+    };
+    const plugin = {
+      settings: {
+        ...DEFAULT_SETTINGS,
+        titleMode: 'ai',
+        aiTitleModel: 'openai/gpt-4.1',
+      },
+      modelConfigService,
+      saveSettings: jest.fn().mockResolvedValue(undefined),
+      refreshConversationRendering: jest.fn(),
+      refreshQuestionUi: jest.fn(),
+    } as unknown as ConstructorParameters<typeof OpenCodianSettingTab>[1];
+    const tab = new OpenCodianSettingTab({} as App, plugin);
+    const containerEl = document.createElement('div');
+
+    document.body.appendChild(containerEl);
+    (tab as unknown as {
+      addConversationSettings: (containerEl: HTMLElement) => HTMLHeadingElement;
+    }).addConversationSettings(containerEl);
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const titleModelButton = buttonRecords.find(
+      (record) => record.name === t('settings.titleGeneration.model.name'),
+    );
+    const titleModelWarningButton = extraButtonRecords.find(
+      (record) => record.name === t('settings.titleGeneration.model.name'),
+    );
+
+    expect(plugin.settings.aiTitleModel).toBe('openai/gpt-4.1');
+    expect(plugin.saveSettings).not.toHaveBeenCalled();
+    expect(titleModelButton?.control.setButtonText).toHaveBeenLastCalledWith('OpenAI / GPT-4.1');
+    expect(titleModelWarningButton?.control.extraSettingsEl.style.display).toBe('');
+
+    await titleModelWarningButton?.onClick?.();
+
+    expect(noticeSpy).toHaveBeenCalledWith(t('settings.titleGeneration.model.unavailableNotice'));
   });
 });

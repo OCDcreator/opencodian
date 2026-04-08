@@ -126,7 +126,7 @@ provider 开关写回仍遵循 `ModelConfigService` 返回的 `effectiveProvider
 - `OpencodeConfigManager`: 读写 `.opencode` 配置
 - `PluginManagementService`: 构建插件环境快照
 - `ProviderIconService` / `ProviderIconCacheModal`: provider icon 缓存与自定义图标管理
-- `ModelPickerModal`: 默认模型和 AI 标题模型共用的搜索式 picker
+- `ModelPickerModal`: 默认模型和 AI 标题模型共用的搜索式 picker；标题模型即使被开关链路禁用也会保留当前选择，并在设置项右侧显示警告入口
 - `ModelConfigModal` / `ModelConfigJsonModal` / `OpencodeConfigModal`: 配置编辑入口
 - `ServerSettingHelpModal` / `LiquidGlassSettingHelpModal`: 帮助说明入口
 - `main.ts`: 通过 `addSettingTab()` 注册，并调用 `onModelsLoaded()` / `refreshServerStatusDisplay()`

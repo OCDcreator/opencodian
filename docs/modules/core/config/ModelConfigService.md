@@ -176,7 +176,7 @@ baseEffective + disabledModelRefs + currentEnabledProviderIds
 
 - `OpenCodianSettings.ts`：同时消费 `baseEffective` 和 `effective`，以便区分“存在但被禁用/不可用”和“完全不存在”。
 - `OpenCodianView.ts`：使用 `effective` 约束聊天发送，但需要 `baseEffective` 保留展示元数据。
-- `TitleGenerationService.ts`：解析 `aiTitleModel` 时会先在 `baseEffective/effective` 上做 availability-aware fallback。
+- `TitleGenerationService.ts`：解析 `aiTitleModel` 时会先在 `baseEffective/effective` 上做 availability-aware 校验；显式配置的标题模型一旦不可用，会直接阻止标题生效。
 - `ModelConfigModal.ts` / `ModelConfigJsonModal.ts`：通过它读写本地模型配置。
 
 ## 注意事项

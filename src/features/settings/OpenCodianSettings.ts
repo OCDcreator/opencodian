@@ -23,6 +23,7 @@ import {
   type ModelCatalog,
   type ModelCatalogProvider,
   parseModelReference,
+  resolveModelSelection,
   setProviderEnabled,
 } from '../../core/config/modelConfig';
 import type { PluginEntry, PluginEnvironmentSnapshot } from '../../core/config/PluginManagementService';
@@ -895,21 +896,6 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         }
       }
 
-      if (this.plugin.settings.aiTitleModel.trim()) {
-        const titleRef = parseModelReference(this.plugin.settings.aiTitleModel.trim());
-        const isTitleModelAvailable = Boolean(
-          titleRef
-          && effectiveProviders.some(
-            (provider) => provider.id === titleRef.provider
-              && provider.models.some((model) => model.id === titleRef.model),
-          ),
-        );
-        if (!isTitleModelAvailable) {
-          this.plugin.settings.aiTitleModel = '';
-          dirty = true;
-        }
-      }
-
       return dirty;
     };
 
@@ -1752,6 +1738,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
 
     let titleModelSetting: Setting | null = null;
     let titleModelButton: import('obsidian').ButtonComponent | null = null;
+    let titleModelWarningButton: import('obsidian').ExtraButtonComponent | null = null;
     let titleModelGroups: ModelPickerGroup[] = [];
 
     const updateTitleModelSettingVisibility = () => {
@@ -1763,7 +1750,9 @@ export class OpenCodianSettingTab extends PluginSettingTab {
 
     const loadTitleModels = async () => {
       const selectedValue = this.plugin.settings.aiTitleModel;
-      let hasSelectedValue = !selectedValue;
+      const normalizedSelectedValue = selectedValue.trim();
+      let selectedLabel = normalizedSelectedValue;
+      let showUnavailableWarning = false;
 
       try {
         if (this.plugin.modelConfigService) {
@@ -1772,28 +1761,42 @@ export class OpenCodianSettingTab extends PluginSettingTab {
             this.plugin.settings.disabledModelRefs,
           );
           titleModelGroups = buildModelPickerGroups(catalogs.effective);
-          hasSelectedValue = !selectedValue || Boolean(findModelPickerOptionByRef(titleModelGroups, selectedValue));
-        } else {
-          titleModelGroups = [];
-        }
 
-        if (!hasSelectedValue && selectedValue) {
-          this.plugin.settings.aiTitleModel = '';
-          await this.plugin.saveSettings();
+          const selectedOption = findModelPickerOptionByRef(titleModelGroups, normalizedSelectedValue);
+          if (selectedOption) {
+            selectedLabel = `${selectedOption.providerName} / ${selectedOption.modelName}`;
+          } else if (normalizedSelectedValue) {
+            const parsedRef = parseModelReference(normalizedSelectedValue);
+            if (parsedRef) {
+              const resolution = resolveModelSelection(
+                catalogs.baseEffective,
+                catalogs.effective,
+                parsedRef.provider,
+                parsedRef.model,
+              );
+              selectedLabel = `${resolution.providerName || parsedRef.provider} / ${resolution.modelName || parsedRef.model}`;
+              showUnavailableWarning = resolution.status === 'unavailable';
+            } else {
+              selectedLabel = normalizedSelectedValue;
+            }
+          }
         }
       } catch (error) {
         logger.error('Failed to load AI title models:', error);
         titleModelGroups = [];
+        selectedLabel = normalizedSelectedValue;
       }
 
       if (titleModelButton) {
-        const selectedOption = findModelPickerOptionByRef(titleModelGroups, hasSelectedValue ? selectedValue : '');
         titleModelButton.setButtonText(
-          selectedOption
-            ? `${selectedOption.providerName} / ${selectedOption.modelName}`
-            : t('settings.titleGeneration.model.followCurrent'),
+          selectedLabel || t('settings.titleGeneration.model.followCurrent'),
         );
-        titleModelButton.setDisabled(titleModelGroups.length === 0 && !selectedOption);
+        titleModelButton.setDisabled(titleModelGroups.length === 0 && !normalizedSelectedValue);
+      }
+
+      if (titleModelWarningButton) {
+        titleModelWarningButton.extraSettingsEl.style.display = showUnavailableWarning ? '' : 'none';
+        titleModelWarningButton.setTooltip(t('settings.titleGeneration.model.unavailableNotice'));
       }
 
       updateTitleModelSettingVisibility();
@@ -1881,6 +1884,17 @@ export class OpenCodianSettingTab extends PluginSettingTab {
             },
           }).open();
         });
+      })
+      .addExtraButton((button) => {
+        titleModelWarningButton = button;
+        button
+          .setIcon('alert-triangle')
+          .setTooltip(t('settings.titleGeneration.model.unavailableNotice'))
+          .onClick(() => {
+            new Notice(t('settings.titleGeneration.model.unavailableNotice'));
+          });
+        titleModelWarningButton.extraSettingsEl.addClass('opencodian-title-model-warning-button');
+        titleModelWarningButton.extraSettingsEl.style.display = 'none';
       });
 
     updateTitleModelSettingVisibility();

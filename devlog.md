@@ -12,6 +12,52 @@
 
 ---
 
+## 2026-04-08 AI 标题模型接入模型开关链路与失效告警
+
+### 🎯 改动目标
+
+- 让设置里的“AI 标题模型”也遵循 provider / model 开关链路，而不是模型一旦失效就被静默清空
+- 当当前选中的标题模型已不在 `effective` catalog 中时，在设置项右侧直接给出醒目的 ⚠️ 告警入口
+- 点击告警后明确提示“当前模型不可用，功能无法生效”，避免用户误以为标题生成功能仍在正常工作
+
+### ✅ 本轮调整
+
+- `src/features/settings/OpenCodianSettings.ts`
+- `src/i18n/locales/zh.ts`
+- `src/i18n/locales/en.ts`
+- `styles.css`
+  - 标题模型设置现在会同时读取 `baseEffective` 和 `effective`，保留已选但当前不可用的模型引用
+  - 当模型存在于基础目录、但被 provider / model 开关链路过滤掉时，设置项右侧显示警告按钮
+  - 点击警告按钮会弹出提示：当前模型不可用，功能无法生效
+  - 为警告按钮补充单独的 warning 样式与 tooltip 文案
+
+- `src/features/chat/services/TitleGenerationService.ts`
+- `tests/unit/features/chat/TitleGenerationService.test.ts`
+  - 标题生成服务不再对“显式配置但已不可用”的标题模型静默回退到当前会话模型
+  - 仅在“目录可用性本身无法读取”这类异常情况下，才继续回退到当前会话模型
+  - 新增测试覆盖：显式不可用模型会阻止标题生效；目录读取异常时仍可回退
+
+- `tests/unit/features/settings/OpenCodianConversationSettings.test.ts`
+  - 新增设置页测试，覆盖不可用标题模型仍会保留显示，并展示可点击的警告入口
+
+- `docs/modules/features/chat/services/TitleGenerationService.md`
+- `docs/modules/features/settings/OpenCodianSettings.md`
+- `docs/modules/core/config/ModelConfigService.md`
+  - 同步更新模块文档，说明标题模型现在是 availability-aware 阻断，而不是静默回退
+
+### 🧠 架构变化
+
+- 标题模型设置现在区分“完全不存在”和“存在但被当前开关链路禁用”两类状态
+- 设置页负责保留并提示失效配置，标题生成服务负责在运行时阻止该配置继续生效
+- 这样既保留用户原始选择，也让 UI 和运行时行为保持一致
+
+### 🧪 当前验证
+
+- 已通过：`npm test -- tests/unit/features/chat/TitleGenerationService.test.ts`
+- 已通过：`npm test -- tests/unit/features/settings/OpenCodianConversationSettings.test.ts`
+- 已通过：`npm run build`
+- 已部署测试库并确认 `C:\Users\lt\Desktop\Write\testvault\.obsidian\plugins\opencodian\main.js` 包含 `BUILD_ID: main.202604081910`
+
 ## 2026-04-08 调试日志增加内联序列化参数开关
 
 ### 🎯 改动目标

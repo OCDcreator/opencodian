@@ -584,6 +584,7 @@ export const enTranslations = {
   'settings.titleGeneration.model.followCurrent': 'Follow active conversation model',
   'settings.titleGeneration.model.pickerTitle': 'Choose AI title model',
   'settings.titleGeneration.model.pickerDesc': 'Search the effective model list. Leave it empty to follow the active conversation model.',
+  'settings.titleGeneration.model.unavailableNotice': 'The current AI title model is unavailable, so this feature cannot take effect.',
   'settings.conversation.questionDisplayMode.name': 'Question display mode',
   'settings.conversation.questionDisplayMode.desc': 'Choose whether OpenCode questions are shown all at once or one at a time',
   'settings.conversation.questionDisplayMode.all': 'Show all at once',

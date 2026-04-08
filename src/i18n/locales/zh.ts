@@ -584,6 +584,7 @@ export const zhTranslations = {
   'settings.titleGeneration.model.followCurrent': '跟随当前会话模型',
   'settings.titleGeneration.model.pickerTitle': '选择 AI 标题模型',
   'settings.titleGeneration.model.pickerDesc': '从当前生效模型列表中搜索。留空时会跟随当前会话模型。',
+  'settings.titleGeneration.model.unavailableNotice': '当前模型不可用，功能无法生效。',
   'settings.conversation.questionDisplayMode.name': '提问展示方式',
   'settings.conversation.questionDisplayMode.desc': '选择 OpenCode 提问时，是一次显示全部问题，还是逐题显示',
   'settings.conversation.questionDisplayMode.all': '全部一起显示',

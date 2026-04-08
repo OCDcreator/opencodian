@@ -10,7 +10,7 @@
 最近这块逻辑的关键变化有两点：
 
 - 标题请求现在优先走结构化输出 `json_schema`
-- `aiTitleModel` 不再盲信配置值，而是会结合模型目录和 `disabledModelRefs` 做 availability-aware fallback
+- `aiTitleModel` 不再盲信配置值，而是会结合模型目录和 `disabledModelRefs` 做 availability-aware 拦截
 
 ## 核心类型
 
@@ -54,7 +54,7 @@ private readonly activeGenerations = new Map<string, AbortController>();
 
 - 未配置 `aiTitleModel`：直接沿用当前会话模型
 - 配置了非法模型引用：回退到当前会话模型
-- 配置了合法引用但当前模型目录不可用：也回退到当前会话模型
+- 配置了合法引用但当前模型目录不可用：直接让标题生成失败，不再偷偷回退到当前会话模型
 
 这里会显式调用：
 
@@ -93,4 +93,5 @@ private readonly activeGenerations = new Map<string, AbortController>();
 
 - `cancelConversation()` / `cancelAll()` 仍然只是本地忽略结果，不会强制中断服务端请求。
 - 结构化输出不是唯一来源；如果模型没返回 `structured.title`，仍会回退到纯文本解析。
-- 标题模型解析失败时会静默回退到当前会话模型，而不是抛错中断整个标题流程。
+- 设置页会保留不可用的 `aiTitleModel` 并显示警告按钮，提醒用户该功能当前不会生效。
+- 只有在“无法读取可用性信息”这类解析异常时，才会回退到当前会话模型。

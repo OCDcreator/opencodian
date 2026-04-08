@@ -8,6 +8,8 @@ import {
 import type { ChatMessage } from '../../../core/types';
 import type OpenCodianPlugin from '../../../main';
 
+const TITLE_MODEL_UNAVAILABLE_ERROR = 'Configured AI title model is unavailable';
+
 export type TitleGenerationResult =
   | { success: true; title: string }
   | { success: false; error: string };
@@ -47,13 +49,13 @@ export class TitleGenerationService {
     const controller = new AbortController();
     this.activeGenerations.set(conversationId, controller);
 
-    const { provider, model } = await this.resolveModel(currentModel);
     const locale = normalizeTitleGenerationLocale(this.plugin.settings.locale);
     const prompt = buildTitleGenerationPrompt(this.truncateText(userMessage, 600), locale);
 
     let tempSessionId: string | null = null;
 
     try {
+      const { provider, model } = await this.resolveModel(currentModel);
       tempSessionId = await this.plugin.openCodeService.createSession('Title Generation', { setCurrent: false });
       const response = await this.plugin.openCodeService.requestAssistantResponse(prompt, {
         sessionId: tempSessionId,
@@ -142,8 +144,13 @@ export class TitleGenerationService {
       if (resolution.status === 'available') {
         return explicitModel;
       }
-    } catch {
+      throw new Error(TITLE_MODEL_UNAVAILABLE_ERROR);
+    } catch (error) {
+      if (error instanceof Error && error.message === TITLE_MODEL_UNAVAILABLE_ERROR) {
+        throw error;
+      }
       // Fall back to the current conversation model if availability could not be resolved.
+      // An explicitly unavailable model should still fail the title generation flow.
     }
 
     return {
