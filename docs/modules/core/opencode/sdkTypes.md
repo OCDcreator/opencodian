@@ -82,4 +82,5 @@ graph LR
 ## 注意事项
 
 - 该文件不负责把 SDK message/session/event 转成插件内部 `ChatMessage` / `StreamChunk`；真正的归一化逻辑在 `OpenCodeService.ts`。
+- 当前升级到 `@opencode-ai/sdk@1.4.0` 后，SDK v2 的 import path 仍保持稳定；像 `session.diff()` 这类 payload 形状变化继续由 service 层兼容，不直接泄漏到 UI。
 - 如果 SDK v2 升级导致类型名或 import path 变化，应优先更新这里，再处理调用方编译错误。

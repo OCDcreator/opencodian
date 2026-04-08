@@ -1308,6 +1308,14 @@ export class OpenCodeService {
     return null;
   }
 
+  private unwrapSdkData<T>(response: unknown): T | undefined {
+    if (response && typeof response === 'object' && 'data' in response) {
+      return (response as { data?: T }).data;
+    }
+
+    return response as T | undefined;
+  }
+
   private hasSyncEventListeners(): boolean {
     return this.sessionTodoListeners.size > 0 || this.sessionStatusListeners.size > 0;
   }
@@ -1562,14 +1570,14 @@ export class OpenCodeService {
     providers: Array<{ id: string; name: string; models: Array<{ id: string; name: string; contextWindow?: number }> }>;
     defaults: Record<string, string>;
   } {
-    const source = data as {
+    const source = this.unwrapSdkData(data) as {
       providers?: Array<{ id: string; name?: string; models: unknown }>;
       all?: Array<{ id: string; name?: string; models: unknown }>;
       default?: Record<string, string>;
-    };
-    const providers = Array.isArray(source.providers)
+    } | undefined;
+    const providers = Array.isArray(source?.providers)
       ? source.providers
-      : Array.isArray(source.all)
+      : Array.isArray(source?.all)
         ? source.all
         : [];
 
@@ -1598,7 +1606,7 @@ export class OpenCodeService {
           models,
         };
       }),
-      defaults: this.normalizeProviderDefaults(source.default),
+      defaults: this.normalizeProviderDefaults(source?.default),
     };
   }
 
@@ -1630,15 +1638,36 @@ export class OpenCodeService {
     defaults: Record<string, string>;
     connected: string[];
   } {
-    const source = data as {
+    const source = this.unwrapSdkData(data) as {
       connected?: unknown;
-    };
+    } | undefined;
 
     return {
       ...this.normalizeAvailableModels(data),
-      connected: Array.isArray(source.connected)
+      connected: Array.isArray(source?.connected)
         ? source.connected.filter((item): item is string => typeof item === 'string')
         : [],
+    };
+  }
+
+  private normalizeResolvedModelConfigData(data: unknown): OpencodeModelConfigSubset {
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
+      return {};
+    }
+
+    const record = data as Record<string, unknown>;
+    return {
+      model: typeof record.model === 'string' ? record.model : undefined,
+      small_model: typeof record.small_model === 'string' ? record.small_model : undefined,
+      provider: typeof record.provider === 'object' && record.provider !== null
+        ? record.provider as OpencodeModelConfigSubset['provider']
+        : undefined,
+      enabled_providers: Array.isArray(record.enabled_providers)
+        ? record.enabled_providers.filter((item): item is string => typeof item === 'string')
+        : undefined,
+      disabled_providers: Array.isArray(record.disabled_providers)
+        ? record.disabled_providers.filter((item): item is string => typeof item === 'string')
+        : undefined,
     };
   }
 
@@ -2773,13 +2802,7 @@ export class OpenCodeService {
     if (this.shouldUseSdk('sdkCrud')) {
       try {
         const data = await this.getSdkClient({ includeDirectory }).config.get();
-        const resolved = {
-          model: typeof data.model === 'string' ? data.model : undefined,
-          small_model: typeof data.small_model === 'string' ? data.small_model : undefined,
-          provider: data.provider,
-          enabled_providers: Array.isArray(data.enabled_providers) ? data.enabled_providers : undefined,
-          disabled_providers: Array.isArray(data.disabled_providers) ? data.disabled_providers : undefined,
-        };
+        const resolved = this.normalizeResolvedModelConfigData(this.unwrapSdkData(data));
         if (shouldLogDebug) {
           logger.debug('getResolvedModelConfig sdk response', {
             debugReason,
@@ -2797,19 +2820,7 @@ export class OpenCodeService {
 
     try {
       const data = await this.get<Record<string, unknown>>('/config', { includeDirectory });
-      const resolved = {
-        model: typeof data.model === 'string' ? data.model : undefined,
-        small_model: typeof data.small_model === 'string' ? data.small_model : undefined,
-        provider: typeof data.provider === 'object' && data.provider !== null
-          ? data.provider as OpencodeModelConfigSubset['provider']
-          : undefined,
-        enabled_providers: Array.isArray(data.enabled_providers)
-          ? data.enabled_providers.filter((item): item is string => typeof item === 'string')
-          : undefined,
-        disabled_providers: Array.isArray(data.disabled_providers)
-          ? data.disabled_providers.filter((item): item is string => typeof item === 'string')
-          : undefined,
-      };
+      const resolved = this.normalizeResolvedModelConfigData(data);
       if (shouldLogDebug) {
         logger.debug('getResolvedModelConfig legacy response', {
           debugReason,
@@ -3090,19 +3101,17 @@ export class OpenCodeService {
 
   async getSessionDiff(sessionId: string, messageID?: string): Promise<SessionDiffEntry[]> {
     const normalizeResponse = (response: unknown): SessionDiffEntry[] => {
-      const rawEntries = Array.isArray(response)
-        ? response
-        : response && typeof response === 'object' && 'data' in response && Array.isArray((response as { data?: unknown }).data)
-          ? (response as { data: unknown[] }).data
-          : [];
+      const rawEntries = this.unwrapSdkData<unknown[]>(response);
+      const normalizedEntries = Array.isArray(rawEntries) ? rawEntries : [];
 
-      return rawEntries.reduce<SessionDiffEntry[]>((entries, rawEntry) => {
+      return normalizedEntries.reduce<SessionDiffEntry[]>((entries, rawEntry) => {
         if (!rawEntry || typeof rawEntry !== 'object') {
           return entries;
         }
 
         const entry = rawEntry as {
           file?: unknown;
+          patch?: unknown;
           before?: unknown;
           after?: unknown;
           additions?: unknown;
@@ -3115,6 +3124,7 @@ export class OpenCodeService {
 
         entries.push({
           file: entry.file,
+          patch: typeof entry.patch === 'string' ? entry.patch : undefined,
           before: typeof entry.before === 'string' ? entry.before : undefined,
           after: typeof entry.after === 'string' ? entry.after : undefined,
           additions: typeof entry.additions === 'number' ? entry.additions : 0,

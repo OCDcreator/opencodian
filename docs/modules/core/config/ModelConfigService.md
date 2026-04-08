@@ -118,6 +118,25 @@ provider 开关继承规则依然保留在 `effectiveProviderConfig` 里，按�
 - 目录和 runtime 看起来都行，但真实发送失败（例如 `401 invalid_api_key`）
 - 真实发送成功
 
+## 高频回归点（不要改错）
+
+这块已经反复出错，后续升级 SDK 或整理 provider 目录代码时，请先记住下面 3 条硬规则：
+
+1. **设置页 `服务器目录` 的事实来源只能是 `config.providers(includeDirectory=true)`**
+   - 它和 `opencode models` 同源，都是目录作用域下服务端内部 `Provider.list()` 的结果。
+   - 不要改成 `provider.list()`。
+   - 也不要把 `config.get().provider` 当成服务器目录。
+
+2. **继承层 / 服务端 `disabled_providers` 是硬禁用，不允许被项目本地空数组或“重新启用”覆盖**
+   - `服务器目录` = `opencode models` 当前 provider 集合，减去硬性服务端禁用 provider。
+   - `当前生效列表` = 上式结果，再叠加当前 scoped config 与项目本地 provider 开关过滤。
+   - `当前禁用列表` 仍要保留这些服务端禁用 provider 的占位。
+
+3. **如果插件 UI 的 provider 数量突然远少于 `opencode models`，先怀疑旧的本地 `4096` 进程被继续接管**
+   - 典型症状：CLI 有 9 个 provider，但插件只剩 1 个或 3 个。
+   - 这时先检查 `ServerManager` 的 managed server 接管链路、`directory` 作用域和 Windows 路径规范化。
+   - 不要第一反应去改 `mergeProviderAvailabilityConfig()` 或重新把 `provider.list()` 接回服务器目录。
+
 ## 关键方法
 
 | 方法 | 说明 |
@@ -182,9 +201,14 @@ baseEffective + disabledModelRefs + currentEnabledProviderIds
 ## 注意事项
 
 - `mode === 'local'` 时也会读取服务端目录，因为返回 bundle 需要完整 `server` 视图。
-- `opencode models` CLI 与 `config.providers()` / `getAvailableModels(includeDirectory=true)` 同源，都是目录作用域下 `Provider.list()` 的结果；设置页服务器目录现在直接复用这条链路。
+- `opencode models` CLI 与 `config.providers()` / `getAvailableModels(includeDirectory=true)` 同源，都是目录作用域下服务端内部 `Provider.list()` 的结果；这里不是指 SDK `provider.list()` / `/provider` 路由。设置页服务器目录直接复用这条链路。
 - `provider.list()` 对应的是 connect-provider 目录总览，不是 `opencode models` 的一对一替代；不要再用它来扩充设置页服务器目录。
 - `getResolvedModelConfig(includeDirectory=false)` 不是“纯全局配置文件内容”。在 OpenCode 服务端里，不带 `directory` 的 `/config` 会落到服务进程默认工作目录；本地模式下如果插件接管了一个旧进程，这个结果甚至可能对应另一个 vault。
+- 继承层 `disabled_providers` 现在视为硬性服务端禁用：项目本地空数组或“重新启用”操作都不会把这些 provider 重新算作可用项；`服务器目录` 视图会直接把它们排除，只在 `当前禁用` 视图保留占位。
+- 如果 `服务器目录`、`当前生效列表`、`当前禁用列表` 三张卡之间的关系看起来不对，先对照下面这个公式排查：
+  - `服务器目录` = `config.providers(directory)` - 服务端硬禁用 provider
+  - `当前生效列表` = `服务器目录` ∩ `currentEnabledProviderIds`
+  - `当前禁用列表` = 服务端硬禁用占位 + 项目禁用 provider + `disabledModelRefs`
 - Windows 下如果 `directory` 传的是反斜杠路径（例如 `C:\vault`），OpenCode 服务端会返回接近全局作用域的结果；插件侧现在会在 transport 层统一规范化成 `C:/vault`。
 - `effective` 不是“唯一真实目录”；`baseEffective` 同样重要，尤其是 UI 展示和降级判断。
 - 这个服务不决定“选中哪个模型”，它只提供目录与过滤后的事实数据。

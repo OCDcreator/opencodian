@@ -24,7 +24,7 @@ Use `npm run doctor:esbuild` only after dependency changes or when build/dev rep
 
 - `src/main.ts`: plugin entry point. It initializes storage, settings normalization, locale, OpenCode services, commands, and view registration.
 - `src/core/opencode/OpenCodeService.ts`: hybrid OpenCode facade. SDK v2 is the main path, but legacy HTTP/SSE fallback paths still exist and must not be removed casually.
-- `src/core/opencode/ServerManager.ts`: owns the local OpenCode process lifecycle.
+- `src/core/opencode/ServerManager.ts`: owns the local OpenCode process lifecycle and managed-server adoption; if a previously managed local `4096` server no longer matches the current vault/mode/config signature, restart it instead of silently reusing it.
 - `src/features/chat/OpenCodianView.ts`: main chat runtime. It supports concurrent tab/session streaming; do not collapse it back to a single global stream state.
 - `src/features/chat/services/ContextUsageService.ts`, `src/features/chat/userMessageDisplay.ts`, and `src/features/chat/userMessageActions.ts`: newer chat responsibilities have been split out of `OpenCodianView`; prefer extending those helpers before adding more view-local complexity.
 - `src/core/config/ModelConfigService.ts` + `src/core/config/OpencodeConfigManager.ts`: merge local config and server catalogs. Preserve the distinction between `baseEffective` and filtered `effective`.
@@ -36,6 +36,7 @@ Use `npm run doctor:esbuild` only after dependency changes or when build/dev rep
 
 - Model availability is resolved in layers: provider toggles live in local `.opencode` config, per-model toggles live in plugin `disabledModelRefs`, and the chat/title-generation flows consume the filtered catalog.
 - For OpenCode provider/config bugs, prefer live debugging against the local service before changing logic: `config.providers` is the current directory-scoped runtime list, `config.get(directory)` is the current vault's resolved config, `provider.list` is the current scope's filtered connect-provider directory, and plain `/config` without `directory` is only the server process default working-directory scope, not a pure global config file. On Windows, direct HTTP repros must use forward-slash `directory` values (for example `C:/vault`); `sdkFetch.ts` now normalizes `C:\vault` before `requestUrl`, but ad-hoc requests still need to match that behavior.
+- Treat inherited/server `disabled_providers` as hard-disabled: `服务器目录` should match `config.providers(directory)` minus those provider IDs, and if plugin counts suddenly diverge from `opencode models`, first suspect a stale managed local `4096` server before touching merge/filter logic.
 - Conversation restore is preload-sensitive: `main.ts` must finish `loadConversations()` before chat views restore their state.
 - OMO compatibility spans `src/core/opencode/omoCompat.ts`, message normalization in `OpenCodeService`, and chat rendering in `OpenCodianView`.
 - Theme, background, glass, and assistant metadata styling changes usually need coordinated updates across `src/core/theme/`, `src/core/types/settings.ts`, `src/main.ts`, `src/features/chat/OpenCodianView.ts`, `src/features/settings/OpenCodianSettings.ts`, `styles.css`, and both locale files.

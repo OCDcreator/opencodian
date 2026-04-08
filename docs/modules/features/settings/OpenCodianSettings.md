@@ -80,9 +80,13 @@
 新的结构把模型任务拆开了：
 
 - **常用**：默认聊天模型、来源模式、刷新摘要
-- **可用范围与目录**：provider accordion + 模型级开关 + project/server/effective/disabled 四张目录摘要卡；`服务器目录` 现在只显示当前服务端实际启用的 provider，显式 `server-disabled` 占位只保留在 `当前禁用` 视图；provider 卡主状态优先显示“项目禁用”，其次才是“服务端禁用”，并新增逐 provider 的“测试可用性”按钮，用当前 vault 作用域重新探测 runtime 是否真的可用
+- **可用范围与目录**：provider accordion + 模型级开关 + project/server/effective/disabled 四张目录摘要卡；`服务器目录` 只显示当前 runtime 可用且未被服务端继承禁用的 provider，显式 `server-disabled` 占位只保留在 `当前禁用` 视图；provider 卡主状态优先显示“项目禁用”，其次才是“服务端禁用”，并新增逐 provider 的“测试可用性”按钮，用当前 vault 作用域重新探测 runtime 是否真的可用
   - 这个按钮现在已经改成“最小真实发送测试”：允许发送时会挑一个测试模型创建临时 session，真正发一条极小请求；因此它能直接暴露 `invalid_api_key`、provider 鉴权失败、服务端拒绝等真实错误，而不再只是看 runtime/目录
   - `当前生效列表` 现在按 `ModelConfigService.currentEnabledProviderIds` 判断 provider 是否真启用，所以不会再把当前 scoped server 已禁用的 provider 显示成绿色“已启用”
+  - 三张卡的正确关系必须长期保持：
+    - `服务器目录` = `opencode models` 当前 provider 集合 - 服务端硬禁用 provider
+    - `当前生效列表` = `服务器目录` 再叠加项目本地 provider 开关与 source mode 过滤
+    - `当前禁用列表` = 服务端禁用占位 + 项目禁用项 + 模型级 `disabledModelRefs`
 - **配置与缓存**：当前项目配置编辑、icon cache
 - “可用范围与目录”和“配置与缓存”都是默认展开的 `details` block，用户折叠状态会写回插件设置并在下次打开时恢复
 
@@ -139,3 +143,4 @@ provider 开关写回仍遵循 `ModelConfigService` 返回的 `effectiveProvider
 - 这个文件同时处理“运行时 UI 状态”和“持久化设置”，两者不要混淆。
 - 任何新增设置如果涉及 i18n、默认值、迁移或视图刷新，通常都不只改这一处。
 - Debug 分区里的“内联序列化调试参数”只影响 `logger.debug(...)` 的 console 输出形式，不改变 `info/warn/error` 的独立对象参数行为。
+- 如果设置页 `服务器目录` 的 provider 数量明显少于 `opencode models`，先排查 `ServerManager` 是否接管了旧的本地 `4096` 进程；不要先改这里的展示过滤逻辑。

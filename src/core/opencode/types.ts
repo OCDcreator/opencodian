@@ -86,6 +86,11 @@ export interface ManagedServerState {
   pid: number;
   host: string;
   port: number;
+  signatureVersion?: number;
+  workingDirectory?: string;
+  modelSourceMode?: ModelSourceMode;
+  pluginIsolationMode?: PluginIsolationMode;
+  configFingerprint?: string;
 }
 
 export type { SdkFeatureFlags };

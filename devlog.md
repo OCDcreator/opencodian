@@ -12,6 +12,69 @@
 
 ---
 
+## 2026-04-09 SDK 1.4.0 兼容与本地服务签名接管修正
+
+### 🎯 改动目标
+
+- 升级 `@opencode-ai/sdk` 到 `1.4.0`，兼容 SDK 新的 `data` 包裹响应、`session.diff()` patch 结构，以及 scoped GET 请求改写
+- 避免插件继续误接管旧 vault / 旧配置留下的本地 `4096` managed server，导致设置页 provider 目录与 `opencode models` 严重不一致
+- 把继承层 / 服务端 `disabled_providers` 固定为硬禁用，稳定 `服务器目录`、`当前生效列表`、`当前禁用列表` 三张卡的关系
+
+### ✅ 本轮调整
+
+- `package.json`
+- `package-lock.json`
+- `src/core/opencode/OpenCodeService.ts`
+- `src/core/opencode/types.ts`
+- `src/core/types/chat.ts`
+  - SDK 升级到 `1.4.0`
+  - 新增 SDK `data` 响应解包与 `config.get()` 归一化，避免把 field-style 返回直接泄漏到上层
+  - `getSessionDiff()` 同时兼容 legacy `before/after` 与 SDK 1.4.0 `patch` 形状
+  - `SessionDiffEntry` 新增 `patch?` 兼容字段
+
+- `src/core/opencode/ServerManager.ts`
+- `src/core/config/ModelConfigService.ts`
+  - managed server 状态现在额外记录启动签名：工作目录、模型来源模式、隔离模式、配置指纹
+  - 如果本地 `4096` 上是旧的 managed server 且签名已过期，会先停掉旧进程、等待端口释放，再重启当前 vault 对应服务
+  - spawn 前会清理继承来的 `OPENCODE_*` 覆盖环境变量，避免本地服务沿用外部终端或旧集成注入
+  - 服务端继承层 `disabled_providers` 会继续作为硬禁用保留，不允许被项目本地“重新启用”覆盖
+
+- `tests/unit/core/opencode/OpenCodeService.test.ts`
+- `tests/unit/core/opencode/ServerManager.test.ts`
+- `tests/unit/core/config/modelConfig.test.ts`
+- `tests/unit/core/opencode/createSdkClient.test.ts`
+- `tests/unit/core/opencode/sdkFetch.test.ts`
+  - 新增 SDK 1.4.0 payload、scoped request、stale managed server 重启、环境变量清理等回归覆盖
+
+- `docs/modules/core/opencode/ServerManager.md`
+- `docs/modules/core/opencode/OpenCodeService.md`
+- `docs/modules/core/config/ModelConfigService.md`
+- `docs/modules/core/opencode/sdkTypes.md`
+- `docs/modules/core/types/chat.md`
+- `docs/modules/features/settings/OpenCodianSettings.md`
+- `docs/status/sdk-v2-rollout.md`
+- `docs/status/sdk-v2-manual-checklist.md`
+  - 同步刷新 SDK rollout 现状、manual checklist，以及 provider 真值排查路径
+
+- `AGENTS.md`
+  - 补充 stale managed server / hard-disabled provider 的快速排查规则，避免后续维护再把这条链路改回去
+
+### 🧠 架构变化
+
+- 本地 `4096` 服务的“可接管”条件从“端口健康 + 像 OpenCode”升级为“启动签名仍匹配当前 vault / 模式 / 配置”
+- 设置页三张 provider 卡的关系进一步固定：
+  - `服务器目录` = `config.providers(directory)` - 服务端硬禁用 provider
+  - `当前生效列表` = 上式结果再叠加项目本地 provider 开关与 source mode 过滤
+  - `当前禁用列表` = 服务端禁用占位 + 项目禁用项 + `disabledModelRefs`
+- SDK 1.4.0 的返回形状差异继续收敛在 service 层，UI 与上层类型不直接依赖 SDK 原始 payload
+
+### 🧪 当前验证
+
+- 已通过：`npm run build`
+- 已通过：`npm run check:devlog-order`
+- 已通过：`npm test -- tests/unit/core/config/modelConfig.test.ts tests/unit/core/opencode/OpenCodeService.test.ts tests/unit/core/opencode/ServerManager.test.ts tests/unit/core/opencode/createSdkClient.test.ts tests/unit/core/opencode/sdkFetch.test.ts`
+- 已部署测试库并确认 `C:\Users\lt\Desktop\Write\testvault\.obsidian\plugins\opencodian\main.js` 包含 `BUILD_ID: main.202604090009`
+
 ## 2026-04-08 AI 标题模型接入模型开关链路与失效告警
 
 ### 🎯 改动目标

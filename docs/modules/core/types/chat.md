@@ -80,7 +80,7 @@
 
 | 类型 | 说明 |
 |------|------|
-| `SessionDiffEntry` | 会话差异条目（`file`, `before?`, `after?`, `additions`, `deletions`, `status?`） |
+| `SessionDiffEntry` | 会话差异条目（`file`, `patch?`, `before?`, `after?`, `additions`, `deletions`, `status?`） |
 | `SessionTodo` | 会话待办项（`id?`, `content`, `status`, `priority?`） |
 
 ### 通知动作
@@ -119,6 +119,8 @@
 ### 会话差异
 `SessionDiffEntry` 记录单轮对话中的文件变更：
 - 用于渲染"本轮修改了这些文件"通知
+- `patch?`: SDK 1.4.0 的 unified diff 文本；当前仅作为兼容字段保留
+- `before?` / `after?`: legacy diff 形状兼容字段
 - `status`: `'added' \| 'deleted' \| 'modified'`
 - `additions`/`deletions`: 行数统计
 

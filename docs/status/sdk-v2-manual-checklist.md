@@ -15,6 +15,11 @@
   - Server mode = `local`
   - 默认 provider / model 可正常响应
   - 权限模式不是完全禁用弹窗的异常配置
+- 若这次改动涉及 provider 目录 / 模型列表 / SDK transport，再额外做 1 次“目录真值”预检：
+  - 在 vault 根目录执行 `opencode models`
+  - 再对插件本地 `4096` 执行 directory-scoped `config.providers()`
+  - 两者的 provider 集合必须一致；设置页 `服务器目录` 应等于这组结果再减去服务端硬禁用 provider
+  - 如果插件结果明显更少，优先怀疑旧 `4096` managed server 被继续接管，而不是先改 UI 过滤逻辑
 
 ## 2. 推荐验收顺序
 
@@ -31,6 +36,7 @@
 9. 中途取消
 10. 多次连续对话
 11. 服务重启后恢复
+12. provider 目录真值对照
 
 ## 3. Checklist 详情
 
@@ -181,6 +187,21 @@
   - 预期：仍可继续发送新消息
   - 预期：模型列表、标题、权限、问题、diff notice 等基础功能不受影响
 
+### 3.12 provider 目录真值对照
+
+- 在 Test Vault 根目录执行 `opencode models`
+- 记录 provider 集合（不是模型总数，而是 provider ID 集合）
+- 对插件当前本地服务执行 directory-scoped `config.providers()`
+  - 预期：provider 集合与 `opencode models` 一致
+- 打开 OpenCodian 设置页，观察三张卡
+  - 预期：`服务器目录` = 上面这组 provider，再减去服务端硬禁用 provider
+  - 预期：`当前生效列表` = `服务器目录` 再叠加项目本地 provider 开关 / source mode 过滤
+  - 预期：`当前禁用列表` 保留服务端禁用占位
+- 如果插件只剩 1 个或 3 个 provider，而 CLI 明显更多
+  - 先检查本地 `4096` 是否还是旧 pid
+  - 先检查是否被旧 managed server / 错误 `directory` 作用域污染
+  - 不要直接改 `provider.list()` / UI 过滤逻辑
+
 ## 4. 建议重点观察的异常信号
 
 - 首条流式文本重复两次
@@ -192,6 +213,7 @@
 - 文件修改后没有 diff notice，或 notice reload 后消失
 - 服务重启后当前会话无法继续发送
 - 标题生成报错后导致首轮对话异常
+- `opencode models` 明明有很多 provider，但设置页 `服务器目录` 只剩 1 个或 3 个
 
 ## 5. 当前已知“有意未完成”的范围
 
@@ -211,6 +233,8 @@
 - 当前会话标题或 `sessionId`
 - 触发问题的提示词
 - 是否本地模式 / 远程模式
+- `opencode models` 的 provider 集合
+- 插件本地 `4096` 上 `config.providers(directory)` 的 provider 集合
 - 是否涉及工具、权限、问题、取消、文件修改
 - Obsidian 开发者控制台中以下前缀的日志：
   - `[OpenCodian]`

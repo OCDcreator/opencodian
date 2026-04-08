@@ -262,10 +262,11 @@ OMO 处理则基于 `detectOmoMessageMeta()`：
 
 额外要记住一个容易混淆的点：
 
-- `opencode models` CLI 与 `getAvailableModels(includeDirectory=true)` / `/config/providers` 同源，都是目录作用域下 `Provider.list()` 的结果
+- `opencode models` CLI 与 `getAvailableModels(includeDirectory=true)` / `/config/providers` 同源，都是目录作用域下服务端内部 `Provider.list()` 的结果；这里说的是 OpenCode 内部 provider service，不是 SDK `provider.list()` / `/provider` 这条 HTTP 接口
 - `provider.list().all` 只是当前作用域下的 connect-provider 目录，不等于当前项目实际启用列表，也不是 models.dev 的无过滤全量目录
 - 如果比较 CLI、HTTP API 和插件 UI，一定要先确认三者是不是在同一个 `directory` 作用域下
 - 在 Windows 上，插件发送给 OpenCode 的 `directory` 必须规范化成正斜杠路径（例如 `C:/vault`）；如果直接传 `C:\vault`，服务端会退回到接近“无目录作用域”的结果，常见症状就是 runtime providers 只剩 `deepseek`
+- 如果 `config.providers(directory)` 和 `opencode models` 仍然对不上，下一步先看 `ServerManager` 有没有继续接管旧的本地 `4096` 服务；不要把 `provider.list()` 重新接回设置页目录
 
 ## 关键方法
 
@@ -289,7 +290,7 @@ OMO 处理则基于 `detectOmoMessageMeta()`：
 | `getSessionContextUsageSnapshot()` | 计算 token/cost/context window 快照 |
 | `getPendingPermissions()` / `respondToPermission()` | 处理权限请求 |
 | `getPendingQuestions()` / `replyToQuestion()` / `rejectQuestion()` | 处理 OpenCode question 请求 |
-| `getSessionDiff()` | 拉取 session diff 元数据 |
+| `getSessionDiff()` | 拉取 session diff 元数据，并兼容 legacy `before/after` 与 SDK 1.4.0 `patch` 形状 |
 | `openCodeMessageToChatMessage()` | 把 OpenCode persisted message 归一化为 UI message |
 
 ## 数据流
@@ -340,5 +341,6 @@ graph TD
 - `getAvailableModels()` 是运行时可用列表，也是最接近 OpenCode 主界面当前 provider 列表的数据源。
 - `getProviderDirectory()` 返回的是 connect-provider 目录；如果只禁用了少量 provider，它仍可能返回上百个可连接项，所以不要把它当成设置页服务器模型目录。
 - SDK client 会把 `directory` 作为查询参数和 `x-opencode-directory` 头一起传给服务端；直接手写 HTTP 请求如果不带这个作用域，`/config` 和 `/config/providers` 看到的通常是全局层结果。
+- 本地模式下如果 `4096` 是旧的 managed server，`getAvailableModels()` / `getResolvedModelConfig()` 即使代码本身没错，也会返回“上一份 vault / 上一份配置”对应的结果；先重启 stale server，再判断是不是 SDK/归一化问题。
 - legacy `connectSSE()` / `parseSSEEvents()` 仍然是有效回滚路径，不能在 SDK rollout 未完全收口前删除。
 - 文件里的 `transformEventToChunks()` / `transformPartToChunks()` 仍保留，但当前主流式路径实际走的是 `handleStreamingEvent()`。

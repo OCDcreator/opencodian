@@ -76,6 +76,7 @@ export interface QuestionResolution {
 
 export interface SessionDiffEntry {
   file: string;
+  patch?: string;
   before?: string;
   after?: string;
   additions: number;

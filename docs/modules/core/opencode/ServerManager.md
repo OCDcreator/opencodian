@@ -37,7 +37,7 @@
   - `initialManagedServerState`
   - `onManagedServerStateChange`
 - `process`: 当前 spawn 出来的 `ChildProcess`，只有本地 managed 进程才会有
-- `managedServerState`: 插件持久化的 `{ pid, host, port }`
+- `managedServerState`: 插件持久化的 managed server 快照，除 `{ pid, host, port }` 外还会记录启动签名（工作目录、模型来源模式、隔离模式、配置指纹）
 - `startPromise`: 避免并发重复启动
 - `workingDirectory`: 通常是 vault 根目录，用来让 OpenCode 读取 `.opencode/`
 
@@ -58,11 +58,13 @@
 - 把它作为后续 spawn 的 `cwd`
 - 额外尝试读取 `${path}/.opencode/opencode.json` 里的权限配置并写 debug log
 
-managed pid 的持久化/恢复通过 `managedServerState` 与 `onManagedServerStateChange` 完成。它只记录：
+managed pid 的持久化/恢复通过 `managedServerState` 与 `onManagedServerStateChange` 完成。现在除了 `pid` / `host` / `port`，还会一起保存：
 
-- `pid`
-- `host`
-- `port`
+- `signatureVersion`
+- `workingDirectory`
+- `modelSourceMode`
+- `pluginIsolationMode`
+- `configFingerprint`
 
 ### 启动流程 (`start` / `doStart`)
 
@@ -88,9 +90,18 @@ managed pid 的持久化/恢复通过 `managedServerState` 与 `onManagedServerS
 - 端口空闲：进入 spawn 流程
 - 端口占用但健康检查通过：
   - 先尝试 `tryAdoptManagedServer()`
-  - 如果能确认这个 pid 就是之前插件管理的 `opencode serve --port ... --hostname ...`，则恢复接管
+  - 如果能确认这个 pid 就是之前插件管理的 `opencode serve --port ... --hostname ...`，且启动签名仍与当前 vault / 模式 / 配置指纹一致，则恢复接管
+  - 如果确认是插件之前的 managed server，但签名已经过期（例如工作目录、模型来源模式、隔离模式或相关 OpenCode 配置文件已经变化），会先停掉旧进程再重新 spawn
   - 否则把它当成“外部已有 OpenCode 服务”直接标成 `running`
 - 端口占用但健康检查失败：抛出“端口被其他进程占用”的错误
+
+这里有一个反复出现的真实坑：
+
+- 不能因为 `4096` 端口上已经有一个健康的 OpenCode 服务，就直接无条件接管
+- 如果那个进程是插件之前拉起的旧 managed server，但它的工作目录、`modelSourceMode`、`pluginIsolationMode` 或相关 OpenCode 配置文件已经变化，继续复用它就会让当前 vault 看到错误的 provider/runtime 目录
+- 典型症状是：`opencode models` 有很多 provider，但插件设置页 `服务器目录` 只剩 1 个或 3 个
+
+现在 `tryAdoptManagedServer()` 必须先做“启动签名”校验；签名过期就先停旧进程，再重新 spawn 当前 vault 对应的本地服务。后续不要把这层逻辑回退成“只要端口健康就 adopt”。
 
 真正 spawn 时会：
 
@@ -128,6 +139,7 @@ managed pid 的持久化/恢复通过 `managedServerState` 与 `onManagedServerS
 - `checkHealth(timeout)` 通过 `requestUrl(GET ${baseUrl}/global/health)` 判断服务是否健康，只有 HTTP 200 才返回 `true`
 - `canBindLocalEndpoint(host, port)` 和内部 `isPortAvailable()` 通过真实 bind 一个临时 `net.Server` 来判断端口是否可用
 - `waitForHealthy(timeout)` 每 500 ms 轮询一次健康检查，直到成功或超时
+- 对“旧 managed server 需要重启”的情况，还会额外等待端口释放后再重新 spawn；目标不是单纯让 `4096` 有服务，而是让 `4096` 对应**当前 vault 的正确服务**
 
 ### Spawn 环境变量与模型来源模式
 
@@ -142,11 +154,10 @@ managed pid 的持久化/恢复通过 `managedServerState` 与 `onManagedServerS
   - 不禁用 project config
   - 清掉 `OPENCODE_CONFIG_DIR` / `OPENCODE_CONFIG_CONTENT`
 - 其他情况（本地 project config 模式）:
-  - `OPENCODE_DISABLE_PROJECT_CONFIG=true`
-  - `OPENCODE_CONFIG_DIR=<vault>/.opencode`
-  - `OPENCODE_CONFIG_CONTENT={"enabled_providers":[...]}`
+  - 同样清掉 `OPENCODE_DISABLE_PROJECT_CONFIG` / `OPENCODE_CONFIG_DIR` / `OPENCODE_CONFIG_CONTENT`
+  - 让 OpenCode 直接按 `cwd=<vault>` 去解析当前 vault 的 `.opencode` 配置
 
-provider 列表来自 `getLocalProviderIds()`，它会读取 `.opencode/opencode.json` 或 `.opencode/opencode.jsonc`，优先拿 `provider` 对象的键，否则从 `model` 的 `provider/model` 字符串里截 provider 前缀。
+另外，spawn 前还会清理一批继承来的 `OPENCODE_*` 覆盖变量（例如 `OPENCODE_CONFIG`、`OPENCODE_CONFIG_DIR`、`OPENCODE_CONFIG_CONTENT`、`OPENCODE_DISABLE_DEFAULT_PLUGINS`、`OPENCODE_PURE` 等），避免插件本地 4096 服务沿用外部终端或旧集成留下的配置注入。
 
 ### OpenCode 可执行文件解析
 
@@ -208,6 +219,8 @@ graph TD
 ## 注意事项
 
 - 远程模式下 `start()` 不是空操作；它会做健康检查并把状态置为 `running`。
-- `findOpenCodeBinary()` 虽然构造了多组候选路径，但当前实现直接返回候选数组的第一个值，实际依赖的是系统 `PATH`/spawn 解析，而不是显式文件探测。
+- `findOpenCodeBinary()` 会显式探测候选路径和 `PATH`，不再只是“构造候选字符串后交给 shell”。
 - `setWorkingDirectory()` 只会额外检查 `.opencode/opencode.json` 的存在并写日志，不会在这里解析 `.jsonc`。
 - 对“外部已有但未接管”的健康 OpenCode 服务，状态会是 `running`，但 `isRunning()` 仍可能是 `false`。
+- 对“之前插件自己拉起、但当前签名已过期”的本地服务，不会再无条件接管；它现在会先重启，以便让 provider/runtime 目录重新和当前 vault 配置、全局配置保持一致。
+- 如果未来又出现“服务器目录突然只剩 deepseek / 1 个 provider / 3 个 provider”这类问题，第一排查项不是 SDK 返回解包，而是：`4096` 是否还是旧 pid、`runtime.json` 的 managed server 签名是否过期、当前 `cwd` 是否真的指向目标 vault。

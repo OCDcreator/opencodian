@@ -227,6 +227,33 @@ describe('ServerManager', () => {
       expect(env.OPENCODE_CONFIG_DIR).toBeUndefined();
       expect(env.OPENCODE_CONFIG_CONTENT).toBeUndefined();
     });
+
+    it('should strip inherited OpenCode config override env before spawning the local server', () => {
+      process.env.OPENCODE_CONFIG = 'C:\\temp\\custom-opencode.json';
+      process.env.OPENCODE_TUI_CONFIG = 'C:\\temp\\tui.json';
+      process.env.OPENCODE_DISABLE_DEFAULT_PLUGINS = 'true';
+      process.env.OPENCODE_DISABLE_EXTERNAL_SKILLS = 'true';
+      process.env.OPENCODE_PERMISSION = '{"edit":"deny"}';
+
+      manager = new ServerManager({
+        ...defaultConfig,
+        modelSourceMode: 'local',
+      });
+
+      const env = (manager as any).getSpawnEnv() as NodeJS.ProcessEnv;
+
+      expect(env.OPENCODE_CONFIG).toBeUndefined();
+      expect(env.OPENCODE_TUI_CONFIG).toBeUndefined();
+      expect(env.OPENCODE_DISABLE_DEFAULT_PLUGINS).toBeUndefined();
+      expect(env.OPENCODE_DISABLE_EXTERNAL_SKILLS).toBeUndefined();
+      expect(env.OPENCODE_PERMISSION).toBeUndefined();
+
+      delete process.env.OPENCODE_CONFIG;
+      delete process.env.OPENCODE_TUI_CONFIG;
+      delete process.env.OPENCODE_DISABLE_DEFAULT_PLUGINS;
+      delete process.env.OPENCODE_DISABLE_EXTERNAL_SKILLS;
+      delete process.env.OPENCODE_PERMISSION;
+    });
   });
 
   describe('plugin isolation mode', () => {
@@ -239,6 +266,94 @@ describe('ServerManager', () => {
       const env = (manager as any).getSpawnEnv() as NodeJS.ProcessEnv;
 
       expect(env.OPENCODE_PURE).toBe('true');
+    });
+  });
+
+  describe('managed server adoption', () => {
+    it('treats legacy managed server state without signature metadata as stale', async () => {
+      manager = new ServerManager(
+        defaultConfig,
+        {},
+        {
+          initialManagedServerState: {
+            pid: 1234,
+            host: '127.0.0.1',
+            port: 4096,
+          },
+        },
+      );
+
+      jest.spyOn(manager as never, 'getProcessCommandLine').mockResolvedValue(
+        'opencode serve --port 4096 --hostname 127.0.0.1',
+      );
+
+      await expect((manager as never).tryAdoptManagedServer()).resolves.toBe('restart');
+    });
+
+    it('adopts a managed server when its signature still matches current launch context', async () => {
+      fs.mkdirSync(path.join(testVaultPath, '.opencode'), { recursive: true });
+      fs.writeFileSync(
+        path.join(testVaultPath, '.opencode', 'opencode.json'),
+        JSON.stringify({ $schema: 'https://opencode.ai/config.json', disabled_providers: [] }),
+        'utf-8',
+      );
+
+      const signatureManager = new ServerManager(defaultConfig);
+      signatureManager.setWorkingDirectory(testVaultPath);
+      const workingDirectory = path.resolve(testVaultPath);
+      const configFingerprint = (signatureManager as never).getConfigFingerprint() as string;
+
+      manager = new ServerManager(
+        defaultConfig,
+        {},
+        {
+          initialManagedServerState: {
+            pid: 1234,
+            host: '127.0.0.1',
+            port: 4096,
+            signatureVersion: 1,
+            workingDirectory,
+            modelSourceMode: 'merge',
+            pluginIsolationMode: 'default',
+            configFingerprint,
+          },
+        },
+      );
+      manager.setWorkingDirectory(testVaultPath);
+
+      jest.spyOn(manager as never, 'getProcessCommandLine').mockResolvedValue(
+        'opencode serve --port 4096 --hostname 127.0.0.1',
+      );
+
+      await expect((manager as never).tryAdoptManagedServer()).resolves.toBe('adopted');
+    });
+
+    it('restarts a stale managed OpenCode server instead of silently reusing it', async () => {
+      manager = new ServerManager(
+        defaultConfig,
+        {},
+        {
+          initialManagedServerState: {
+            pid: 1234,
+            host: '127.0.0.1',
+            port: 4096,
+          },
+        },
+      );
+
+      jest.spyOn(manager as never, 'isPortAvailable').mockResolvedValue(false);
+      jest.spyOn(manager, 'checkHealth').mockResolvedValue(true);
+      jest.spyOn(manager as never, 'tryAdoptManagedServer').mockResolvedValue('restart');
+      const restartManagedServer = jest.spyOn(manager as never, 'restartManagedServer').mockResolvedValue(undefined);
+      const spawnServer = jest.spyOn(manager as never, 'spawnServer').mockResolvedValue(undefined);
+      const waitForHealthy = jest.spyOn(manager as never, 'waitForHealthy').mockResolvedValue(undefined);
+
+      await expect(manager.start()).resolves.toBeUndefined();
+
+      expect(restartManagedServer).toHaveBeenCalled();
+      expect(spawnServer).toHaveBeenCalled();
+      expect(waitForHealthy).toHaveBeenCalledWith(30000);
+      expect(manager.getStatus()).toBe('running');
     });
   });
 

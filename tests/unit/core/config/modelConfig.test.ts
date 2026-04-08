@@ -76,7 +76,7 @@ describe('modelConfig helpers', () => {
     });
   });
 
-  it('preserves inherited blacklist entries when locally re-enabling one provider', () => {
+  it('preserves inherited blacklist diff when locally re-enabling one provider', () => {
     const inherited = {
       disabled_providers: ['alibaba', 'alibaba-cn'],
     };

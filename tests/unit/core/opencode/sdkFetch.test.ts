@@ -220,4 +220,32 @@ describe('createSdkFetch', () => {
       body: '{"hello":"world"}',
     }));
   });
+
+  it('keeps an existing scoped query when SDK v1.4.0 GET rewriting already ran', async () => {
+    mockRequestUrl.mockResolvedValue({
+      status: 200,
+      json: { ok: true },
+      text: '{"ok":true}',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    const fetchImpl = createSdkFetch({
+      nativeFetch: jest.fn() as unknown as typeof fetch,
+    });
+
+    await fetchImpl('http://127.0.0.1:4096/config/providers?directory=C%3A%2Fvault', {
+      method: 'GET',
+      headers: {
+        'x-opencode-directory': encodeURIComponent('C:\\vault'),
+      },
+    });
+
+    expect(mockRequestUrl).toHaveBeenCalledWith(expect.objectContaining({
+      url: 'http://127.0.0.1:4096/config/providers?directory=C%3A%2Fvault',
+      method: 'GET',
+      headers: {},
+    }));
+  });
 });

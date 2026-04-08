@@ -15,6 +15,22 @@ import { createLogger } from '../../shared';
 import type { ManagedServerState, OpenCodeServerConfig } from './types';
 
 const logger = createLogger('ServerManager');
+const MANAGED_SERVER_SIGNATURE_VERSION = 1;
+const LOCAL_SERVER_SANITIZED_ENV_KEYS = [
+  'OPENCODE_CONFIG',
+  'OPENCODE_TUI_CONFIG',
+  'OPENCODE_CONFIG_DIR',
+  'OPENCODE_CONFIG_CONTENT',
+  'OPENCODE_PERMISSION',
+  'OPENCODE_DISABLE_PROJECT_CONFIG',
+  'OPENCODE_DISABLE_DEFAULT_PLUGINS',
+  'OPENCODE_DISABLE_CLAUDE_CODE',
+  'OPENCODE_DISABLE_CLAUDE_CODE_PROMPT',
+  'OPENCODE_DISABLE_CLAUDE_CODE_SKILLS',
+  'OPENCODE_DISABLE_EXTERNAL_SKILLS',
+  'OPENCODE_PLUGIN_META_FILE',
+  'OPENCODE_PURE',
+] as const;
 
 /** Server status type */
 export type ServerStatus = 
@@ -142,10 +158,19 @@ export class ServerManager {
         // Check if it's an existing OpenCode server
         const healthy = await this.checkHealth(5000);
         if (healthy) {
-          const adopted = await this.tryAdoptManagedServer();
-          if (adopted) {
+          const adoption = await this.tryAdoptManagedServer();
+          if (adoption === 'adopted') {
             logger.debug('Adopted previously managed OpenCode server on port', this.config.local.port);
             this.setStatus('running');
+            return;
+          }
+          if (adoption === 'restart') {
+            logger.debug('Restarting stale managed OpenCode server on port', this.config.local.port);
+            await this.restartManagedServer();
+            await this.spawnServer();
+            await this.waitForHealthy(this.config.timeout ?? 30000);
+            this.setStatus('running');
+            new Notice('OpenCode server started');
             return;
           }
 
@@ -530,6 +555,11 @@ export class ServerManager {
       pid,
       host: this.config.local.host,
       port: this.config.local.port,
+      signatureVersion: MANAGED_SERVER_SIGNATURE_VERSION,
+      workingDirectory: this.normalizeManagedWorkingDirectory(this.workingDirectory),
+      modelSourceMode: this.config.modelSourceMode,
+      pluginIsolationMode: this.config.pluginIsolationMode,
+      configFingerprint: this.getConfigFingerprint(),
     };
     this.onManagedServerStateChange?.(this.managedServerState);
   }
@@ -543,20 +573,21 @@ export class ServerManager {
     this.onManagedServerStateChange?.(null);
   }
 
-  private async tryAdoptManagedServer(): Promise<boolean> {
+  private async tryAdoptManagedServer(): Promise<'adopted' | 'restart' | 'skip'> {
     const state = this.managedServerState;
     if (!state) {
-      return false;
+      return 'skip';
     }
 
     if (state.port !== this.config.local.port || state.host !== this.config.local.host) {
-      return false;
+      this.clearManagedServerState();
+      return 'skip';
     }
 
     const commandLine = await this.getProcessCommandLine(state.pid);
     if (!commandLine) {
       this.clearManagedServerState();
-      return false;
+      return 'skip';
     }
 
     const normalizedCommand = commandLine.toLowerCase();
@@ -575,11 +606,128 @@ export class ServerManager {
 
     if (!looksLikeOpenCodeServe) {
       this.clearManagedServerState();
-      return false;
+      return 'skip';
+    }
+
+    if (!this.matchesManagedServerSignature(state)) {
+      return 'restart';
     }
 
     this.onManagedServerStateChange?.(state);
-    return true;
+    return 'adopted';
+  }
+
+  private async restartManagedServer(): Promise<void> {
+    const state = this.managedServerState;
+    if (!state) {
+      return;
+    }
+
+    await this.terminateManagedPid(state.pid);
+    this.clearManagedServerState();
+
+    const released = await this.waitForPortAvailability(5000);
+    if (!released) {
+      throw new Error(`Port ${this.config.local.port} stayed busy after stopping the stale OpenCode server`);
+    }
+  }
+
+  private async waitForPortAvailability(timeout: number): Promise<boolean> {
+    const startTime = Date.now();
+
+    while (Date.now() - startTime < timeout) {
+      if (await this.isPortAvailable(this.config.local.port)) {
+        return true;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
+
+    return false;
+  }
+
+  private matchesManagedServerSignature(state: ManagedServerState): boolean {
+    return (
+      state.signatureVersion === MANAGED_SERVER_SIGNATURE_VERSION
+      && this.normalizeManagedWorkingDirectory(state.workingDirectory) === this.normalizeManagedWorkingDirectory(this.workingDirectory)
+      && state.modelSourceMode === this.config.modelSourceMode
+      && state.pluginIsolationMode === this.config.pluginIsolationMode
+      && state.configFingerprint === this.getConfigFingerprint()
+    );
+  }
+
+  private normalizeManagedWorkingDirectory(value: string | undefined): string | undefined {
+    if (!value?.trim()) {
+      return undefined;
+    }
+
+    return path.resolve(value);
+  }
+
+  private getConfigFingerprint(): string {
+    return this.getRelevantConfigPaths()
+      .map((candidate) => {
+        const normalized = path.resolve(candidate);
+        if (!fs.existsSync(normalized)) {
+          return `${normalized}:missing`;
+        }
+
+        try {
+          const stat = fs.statSync(normalized);
+          return `${normalized}:${stat.size}:${Math.trunc(stat.mtimeMs)}`;
+        } catch (error) {
+          logger.warn('Failed to stat OpenCode config candidate for server fingerprint', {
+            path: normalized,
+            error,
+          });
+          return `${normalized}:error`;
+        }
+      })
+      .join('|');
+  }
+
+  private getRelevantConfigPaths(): string[] {
+    const candidates = new Set<string>();
+    const add = (candidate: string | undefined) => {
+      if (candidate?.trim()) {
+        candidates.add(candidate);
+      }
+    };
+    const homeDir = process.env.USERPROFILE || process.env.HOME || '';
+    const xdgConfigHome = process.env.XDG_CONFIG_HOME || (homeDir ? path.join(homeDir, '.config') : '');
+    const managedDir = this.getManagedConfigDir();
+
+    if (this.workingDirectory) {
+      add(path.join(this.workingDirectory, '.opencode', 'opencode.json'));
+      add(path.join(this.workingDirectory, '.opencode', 'opencode.jsonc'));
+    }
+
+    if (xdgConfigHome) {
+      add(path.join(xdgConfigHome, 'opencode', 'opencode.jsonc'));
+      add(path.join(xdgConfigHome, 'opencode', 'opencode.json'));
+      add(path.join(xdgConfigHome, 'opencode', 'config.json'));
+    }
+
+    if (homeDir) {
+      add(path.join(homeDir, '.opencode', 'opencode.json'));
+      add(path.join(homeDir, '.opencode', 'opencode.jsonc'));
+    }
+
+    add(path.join(managedDir, 'opencode.json'));
+    add(path.join(managedDir, 'opencode.jsonc'));
+
+    return [...candidates];
+  }
+
+  private getManagedConfigDir(): string {
+    switch (process.platform) {
+      case 'darwin':
+        return '/Library/Application Support/opencode';
+      case 'win32':
+        return path.join(process.env.ProgramData || 'C:\\ProgramData', 'opencode');
+      default:
+        return '/etc/opencode';
+    }
   }
 
   private killWindowsProcessTree(pid: number | undefined): Promise<boolean> {
@@ -694,6 +842,10 @@ export class ServerManager {
 
   private getSpawnEnv(): NodeJS.ProcessEnv {
     const env = { ...process.env };
+
+    for (const key of LOCAL_SERVER_SANITIZED_ENV_KEYS) {
+      delete env[key];
+    }
 
     if (this.config.pluginIsolationMode === 'pure') {
       env.OPENCODE_PURE = 'true';

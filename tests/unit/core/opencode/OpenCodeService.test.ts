@@ -817,6 +817,39 @@ describe('OpenCodeService', () => {
       expect(mockRequestUrl).not.toHaveBeenCalled();
     });
 
+    it('normalizes SDK 1.4.0 session.diff patch payloads', async () => {
+      service = createServiceWithSdkFlags();
+      mockSdkClient.session.diff.mockResolvedValue({
+        data: [
+          {
+            file: 'notes/today.md',
+            patch: '@@ -1 +1 @@\n-old\n+new',
+            additions: 3,
+            deletions: 1,
+            status: 'modified',
+          },
+        ],
+        error: undefined,
+        request: {} as Request,
+        response: {} as Response,
+      });
+
+      await expect(service.getSessionDiff('sdk-session', 'message-1')).resolves.toEqual([
+        {
+          file: 'notes/today.md',
+          patch: '@@ -1 +1 @@\n-old\n+new',
+          additions: 3,
+          deletions: 1,
+          status: 'modified',
+        },
+      ]);
+      expect(mockSdkClient.session.diff).toHaveBeenCalledWith({
+        sessionID: 'sdk-session',
+        messageID: 'message-1',
+      });
+      expect(mockRequestUrl).not.toHaveBeenCalled();
+    });
+
     it('falls back to legacy HTTP for read-only listSessions failures', async () => {
       service = createServiceWithSdkFlags();
       mockSdkClient.session.list.mockRejectedValue(new Error('sdk read failed'));
@@ -2079,6 +2112,43 @@ describe('OpenCodeService', () => {
           name: 'DeepSeek',
         },
       });
+    });
+
+    it('unwraps SDK field-style config.get responses before normalizing model config', async () => {
+      service = new OpenCodeService(DEFAULT_SETTINGS, {}, {
+        sdkFeatureFlags: SDK_FEATURE_FLAG_ROLLOUT_DEFAULTS,
+      });
+      mockSdkClient.config.get.mockResolvedValue({
+        data: {
+          model: 'openai/gpt-5',
+          small_model: 'openai/gpt-5-mini',
+          provider: {
+            openai: {
+              name: 'OpenAI',
+            },
+          },
+          enabled_providers: ['openai'],
+          disabled_providers: ['deepseek'],
+        },
+        error: undefined,
+        request: {} as Request,
+        response: {} as Response,
+      });
+
+      const result = await service.getResolvedModelConfig();
+
+      expect(result).toEqual({
+        model: 'openai/gpt-5',
+        small_model: 'openai/gpt-5-mini',
+        provider: {
+          openai: {
+            name: 'OpenAI',
+          },
+        },
+        enabled_providers: ['openai'],
+        disabled_providers: ['deepseek'],
+      });
+      expect(mockRequestUrl).not.toHaveBeenCalled();
     });
   });
 

@@ -125,7 +125,11 @@ export class ModelConfigService {
     const local = buildCatalogFromConfig(localConfig, 'local');
     const server = serverState.server;
     const baseEffective = this.resolveCatalog(local, server, mode);
-    const effectiveProviderConfig = mergeProviderAvailabilityConfig(serverState.inheritedConfig, localConfig);
+    const effectiveProviderConfig = this.buildEffectiveProviderConfig(
+      serverState.inheritedConfig,
+      localConfig,
+      serverState.hardServerDisabledProviderIds,
+    );
     const hardServerDisabledProviderIds = new Set(serverState.hardServerDisabledProviderIds);
     const currentEnabledProviderIds = baseEffective.providers
       .map((provider) => provider.id)
@@ -182,7 +186,11 @@ export class ModelConfigService {
 
     const localConfig = await this.readLocalModelConfig();
     const serverState = await this.loadServerState(localConfig);
-    const effectiveProviderConfig = mergeProviderAvailabilityConfig(serverState.inheritedConfig, localConfig);
+    const effectiveProviderConfig = this.buildEffectiveProviderConfig(
+      serverState.inheritedConfig,
+      localConfig,
+      serverState.hardServerDisabledProviderIds,
+    );
     const runtimeProvider = serverState.runtime.providers.find((provider) => provider.id === normalizedProviderId);
     const serverProvider = serverState.server.providers.find((provider) => provider.id === normalizedProviderId);
     const projectDisabled = !isProviderEnabled(localConfig, normalizedProviderId);
@@ -604,6 +612,23 @@ export class ModelConfigService {
     }
 
     return [...providerIds];
+  }
+
+  private buildEffectiveProviderConfig(
+    inheritedConfig: ProviderAvailabilityConfig | null | undefined,
+    localConfig: ProviderAvailabilityConfig | null | undefined,
+    hardServerDisabledProviderIds: Iterable<string>,
+  ): ProviderAvailabilityConfig {
+    const effectiveConfig = mergeProviderAvailabilityConfig(inheritedConfig, localConfig);
+    const disabledProviders = this.collectHardServerDisabledProviderIds(
+      { disabled_providers: effectiveConfig.disabled_providers },
+      { disabled_providers: Array.from(hardServerDisabledProviderIds) },
+    );
+
+    return {
+      ...effectiveConfig,
+      disabled_providers: disabledProviders.length > 0 ? disabledProviders : undefined,
+    };
   }
 
   private mergeDisabledScopes(

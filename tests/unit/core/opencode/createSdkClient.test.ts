@@ -17,7 +17,7 @@ describe('createSdkClient', () => {
     jest.clearAllMocks();
   });
 
-  it('passes baseUrl, auth headers, directory and stable response options to the SDK factory', () => {
+  it('passes baseUrl, auth headers, scoped options and stable response options to the SDK factory', () => {
     const fetchImpl = jest.fn() as unknown as typeof fetch;
 
     createSdkClient({
@@ -26,12 +26,14 @@ describe('createSdkClient', () => {
         Authorization: 'Bearer token',
       },
       directory: 'C:/vault',
+      experimentalWorkspaceId: 'workspace-1',
       fetchImpl,
     });
 
     expect(mockCreateOpencodeClient).toHaveBeenCalledWith(expect.objectContaining({
       baseUrl: 'http://127.0.0.1:4096',
       directory: 'C:/vault',
+      experimental_workspaceID: 'workspace-1',
       headers: {
         Authorization: 'Bearer token',
       },
