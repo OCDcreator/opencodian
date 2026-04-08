@@ -653,6 +653,29 @@ export function resolveModelSelection(
   };
 }
 
+export function resolvePreferredAvailableModel(
+  effectiveCatalog: ModelCatalog | null | undefined,
+  provider: string | null | undefined,
+  model: string | null | undefined,
+): ModelReference | null {
+  const requestedRef = formatModelReference(provider, model);
+  const parsedRequestedRef = parseModelReference(requestedRef);
+  if (parsedRequestedRef && findCatalogModel(effectiveCatalog, parsedRequestedRef.provider, parsedRequestedRef.model)) {
+    return {
+      ...parsedRequestedRef,
+      ref: requestedRef,
+    };
+  }
+
+  const requestedProvider = provider?.trim()
+    ? findCatalogProvider(effectiveCatalog, provider.trim())
+    : null;
+  return pickCatalogProviderDefaultModel(effectiveCatalog, requestedProvider)
+    ?? pickCatalogProviderFirstModel(requestedProvider)
+    ?? pickCatalogDefaultModel(effectiveCatalog)
+    ?? pickFirstCatalogModel(effectiveCatalog);
+}
+
 function uniqueStrings(values: string[]): string[] {
   return Array.from(
     new Set(
@@ -781,4 +804,78 @@ function findCatalogModel(
   }
 
   return { provider, model };
+}
+
+function pickCatalogProviderDefaultModel(
+  catalog: ModelCatalog | null | undefined,
+  provider: ModelCatalogProvider | null | undefined,
+): ModelReference | null {
+  if (!provider) {
+    return null;
+  }
+
+  const defaultModelId = catalog?.defaults[provider.id]?.trim();
+  if (!defaultModelId) {
+    return null;
+  }
+
+  const defaultModel = provider.models.find((model) => model.id === defaultModelId);
+  if (!defaultModel) {
+    return null;
+  }
+
+  return {
+    provider: provider.id,
+    model: defaultModel.id,
+    ref: formatModelReference(provider.id, defaultModel.id),
+  };
+}
+
+function pickCatalogProviderFirstModel(
+  provider: ModelCatalogProvider | null | undefined,
+): ModelReference | null {
+  const firstModel = provider?.models.find((model) => model.id.trim());
+  if (!provider || !firstModel) {
+    return null;
+  }
+
+  return {
+    provider: provider.id,
+    model: firstModel.id,
+    ref: formatModelReference(provider.id, firstModel.id),
+  };
+}
+
+function pickCatalogDefaultModel(
+  catalog: ModelCatalog | null | undefined,
+): ModelReference | null {
+  if (!catalog) {
+    return null;
+  }
+
+  for (const provider of catalog.providers) {
+    const providerDefault = pickCatalogProviderDefaultModel(catalog, provider);
+    if (providerDefault) {
+      return providerDefault;
+    }
+  }
+
+  return null;
+}
+
+function pickFirstCatalogModel(
+  catalog: ModelCatalog | null | undefined,
+): ModelReference | null {
+  if (!catalog) {
+    return null;
+  }
+
+  for (const provider of catalog.providers) {
+    const firstModel = pickCatalogProviderFirstModel(provider);
+    if (firstModel) {
+      return firstModel;
+    }
+  }
+
+  return null;
 }

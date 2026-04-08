@@ -120,6 +120,20 @@ export interface ModelCatalog {
 - 返回值会对两侧做 `trim()`
 - 其他格式返回 `null`
 
+`resolveModelSelection(baseCatalog, effectiveCatalog, provider, model)` 用于把一个既有选择标记成三种状态：
+
+- `available`：模型存在于 `effective`
+- `unconfigured`：provider/model 为空或格式非法
+- `unavailable`：模型只存在于 `baseEffective` 或已彻底丢失
+
+`resolvePreferredAvailableModel(effectiveCatalog, provider, model)` 则负责聊天 UI / 发送前的“可用模型回退”：
+
+- 当前选择仍在 `effective` 里时直接保留
+- 同 provider 下若配置了默认模型，则优先回退到该默认模型
+- 同 provider 还有其他模型时，回退到该 provider 的第一个有效模型
+- provider 整体不可用时，再退到整个 `effective` catalog 的默认模型 / 首个模型
+- `effective` 为空时返回 `null`
+
 ### Provider 可用性
 
 `isProviderEnabled()` 按 OpenCode 语义判断 provider 是否可用：
@@ -147,6 +161,8 @@ export interface ModelCatalog {
 | `buildCatalogFromConfig(subset, source)` | 从本地 / 服务端风格数据构建 catalog |
 | `mergeCatalogs(server, local)` | 合并 catalog 并标记存在性 |
 | `parseModelReference(value)` | 解析 `provider/model` 引用字符串 |
+| `resolveModelSelection(base, effective, provider, model)` | 判断当前选择是可用、未配置还是不可用 |
+| `resolvePreferredAvailableModel(effective, provider, model)` | 从 `effective` catalog 里挑出当前应使用的可用模型 |
 | `mergeProviderAvailabilityConfig(inherited, local)` | 按字段继承或替换 provider 白名单 / 黑名单 |
 | `setProviderEnabled(subset, providerId, enabled, knownProviderIds, inherited?)` | 写入最小 provider 开关覆盖 |
 

@@ -247,6 +247,8 @@ assistant 渲染里：
 - provider icon 异步加载
 - 每个 tab 的 model override
 - 保留 disabled / unavailable 模型的展示元数据，不把它们简单抹掉
+- 会优先解析当前 tab 请求的模型；若它已被开关链路过滤，则自动回退到同 provider 默认模型 / 当前 effective catalog 的其他可用模型
+- 当 effective catalog 为空时，trigger 会回退到默认机器人图标并突出显示“未配置”
 
 ## 直接协作模块
 

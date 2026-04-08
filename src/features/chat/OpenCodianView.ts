@@ -9,7 +9,12 @@ import type { Editor, EventRef, TAbstractFile, WorkspaceLeaf } from 'obsidian';
 import { addIcon, Component, ItemView, MarkdownView, normalizePath, Notice, Scope, setIcon, TFile } from 'obsidian';
 
 import type { ModelCatalogBundle } from '../../core/config';
-import { formatModelReference, type ResolvedModelSelection,resolveModelSelection } from '../../core/config/modelConfig';
+import {
+  formatModelReference,
+  type ResolvedModelSelection,
+  resolveModelSelection,
+  resolvePreferredAvailableModel,
+} from '../../core/config/modelConfig';
 import { OpenCodeService, type SessionActivityStatus } from '../../core/opencode';
 import {
   getThemePresetDefinition,
@@ -5948,8 +5953,6 @@ export class OpenCodianView extends ItemView {
     }
 
     const draftContextItems = [...sendingRuntime.draftContextItems];
-    const modelOptions = this.getSendMessageOptions();
-
     const availability = await this.getServerAvailability();
     await this.refreshServerStatusBadge();
     if (availability !== 'running' && availability !== 'external') {
@@ -5958,6 +5961,12 @@ export class OpenCodianView extends ItemView {
         return;
       }
     }
+
+    if (!this.hasLoadedModelCatalog) {
+      await this.loadAvailableModels();
+    }
+
+    const modelOptions = this.getSendMessageOptions();
 
     const activeModelId = this.formatModelId(modelOptions);
     if (!(await this.ensureSelectedModelAvailable(modelOptions.provider, modelOptions.model))) {
@@ -10122,6 +10131,7 @@ export class OpenCodianView extends ItemView {
     // Find model info from available models
     const modelInfo = this.findKnownModelInfo(current);
     this.modelSelectorTrigger.toggleClass('is-unavailable', resolution.status === 'unavailable');
+    this.modelSelectorTrigger.toggleClass('is-unconfigured', !current);
 
     // Update text
     const textEl = this.modelSelectorTrigger.querySelector('.opencodian-model-trigger-text');
@@ -10130,6 +10140,10 @@ export class OpenCodianView extends ItemView {
         ? (modelInfo?.modelName || resolution.modelName || current.model)
         : t('settings.model.unconfigured');
     }
+
+    const emptyStateTitle = this.hasLoadedModelCatalog && this.availableProviders.length === 0
+      ? this.getModelUnavailableNoticeContent().message
+      : t('settings.model.unconfigured');
 
     this.modelSelectorTrigger.setAttribute(
       'title',
@@ -10140,10 +10154,10 @@ export class OpenCodianView extends ItemView {
               modelInfo?.providerName || resolution.providerName || current.provider,
               modelInfo?.modelName || resolution.modelName || current.model,
             )
-          : t('settings.model.unconfigured'),
+          : emptyStateTitle,
     );
 
-    const iconLabel = modelInfo?.providerName || resolution.providerName || current?.provider || 'model';
+    const iconLabel = modelInfo?.providerName || resolution.providerName || current?.provider || t('settings.model.unconfigured');
     void this.updateModelSelectorIcon(current?.provider ?? null, iconLabel);
 
     this.effortSelector?.updateDisplay();
@@ -10201,7 +10215,24 @@ export class OpenCodianView extends ItemView {
 
   /** Get current model for this session */
   private getCurrentSessionModel(): { provider: string; model: string } | null {
-    return this.getRequestedSessionModel();
+    const requestedModel = this.getRequestedSessionModel();
+    if (!this.hasLoadedModelCatalog || !this.modelCatalogBundle) {
+      return requestedModel;
+    }
+
+    const resolvedModel = resolvePreferredAvailableModel(
+      this.modelCatalogBundle.effective,
+      requestedModel?.provider,
+      requestedModel?.model,
+    );
+    if (!resolvedModel) {
+      return null;
+    }
+
+    return {
+      provider: resolvedModel.provider,
+      model: resolvedModel.model,
+    };
   }
 
   private getRequestedSessionModel(): { provider: string; model: string } | null {
@@ -10221,8 +10252,8 @@ export class OpenCodianView extends ItemView {
   }
 
   private getCurrentSessionModelResolution(): ResolvedModelSelection {
-    const requestedModel = this.getRequestedSessionModel();
-    if (!requestedModel) {
+    const currentModel = this.getCurrentSessionModel();
+    if (!currentModel) {
       return {
         status: 'unconfigured',
         provider: '',
@@ -10234,17 +10265,17 @@ export class OpenCodianView extends ItemView {
     if (!this.hasLoadedModelCatalog || !this.modelCatalogBundle) {
       return {
         status: 'available',
-        provider: requestedModel.provider,
-        model: requestedModel.model,
-        ref: formatModelReference(requestedModel.provider, requestedModel.model),
+        provider: currentModel.provider,
+        model: currentModel.model,
+        ref: formatModelReference(currentModel.provider, currentModel.model),
       };
     }
 
     return resolveModelSelection(
       this.modelCatalogBundle.baseEffective,
       this.modelCatalogBundle.effective,
-      requestedModel.provider,
-      requestedModel.model,
+      currentModel.provider,
+      currentModel.model,
     );
   }
 

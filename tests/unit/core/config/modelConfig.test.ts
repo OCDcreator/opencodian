@@ -5,6 +5,7 @@ import {
   mergeCatalogs,
   mergeProviderAvailabilityConfig,
   resolveModelSelection,
+  resolvePreferredAvailableModel,
   setProviderEnabled,
 } from '../../../../src/core/config/modelConfig';
 import type { OpencodeModelConfigSubset } from '../../../../src/core/types';
@@ -190,6 +191,39 @@ describe('modelConfig helpers', () => {
     expect(resolveModelSelection(baseCatalog, effectiveCatalog, 'anthropic', 'claude-3-5-sonnet')).toMatchObject({
       status: 'unavailable',
       ref: 'anthropic/claude-3-5-sonnet',
+    });
+  });
+
+  it('prefers another available model when the requested one is filtered out', () => {
+    const baseCatalog = buildCatalogFromConfig(localConfig, 'local');
+    const effectiveCatalog = filterCatalog(baseCatalog, {
+      providerConfig: localConfig,
+      disabledModelRefs: ['openai/gpt-4.1'],
+    });
+
+    expect(resolvePreferredAvailableModel(effectiveCatalog, 'openai', 'gpt-4.1')).toEqual({
+      provider: 'openai',
+      model: 'gpt-4o',
+      ref: 'openai/gpt-4o',
+    });
+  });
+
+  it('falls back to the first effective default when the requested provider is unavailable', () => {
+    const baseCatalog = buildCatalogFromConfig(localConfig, 'local');
+    const effectiveCatalog = filterCatalog(baseCatalog, {
+      providerConfig: localConfig,
+      disabledModelRefs: [],
+    });
+
+    expect(resolvePreferredAvailableModel(effectiveCatalog, 'anthropic', 'claude-3-5-sonnet')).toEqual({
+      provider: 'openai',
+      model: 'gpt-4o',
+      ref: 'openai/gpt-4o',
+    });
+    expect(resolvePreferredAvailableModel(effectiveCatalog, '', '')).toEqual({
+      provider: 'openai',
+      model: 'gpt-4o',
+      ref: 'openai/gpt-4o',
     });
   });
 });

@@ -3582,6 +3582,16 @@
   color: var(--text-warning);
 }
 
+.opencodian-model-trigger.is-unconfigured {
+  color: var(--text-error);
+  background: color-mix(in srgb, var(--text-error) 10%, transparent);
+}
+
+.opencodian-model-trigger.is-unconfigured:hover,
+.opencodian-model-trigger.is-unconfigured.is-open {
+  background: color-mix(in srgb, var(--text-error) 14%, transparent);
+}
+
 .opencodian-model-trigger-content {
   display: flex;
   align-items: center;
@@ -3619,6 +3629,15 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   font-weight: 500;
+}
+
+.opencodian-model-trigger.is-unconfigured .opencodian-model-trigger-text {
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.opencodian-model-trigger.is-unconfigured .opencodian-model-trigger-icon {
+  opacity: 1;
 }
 
 .opencodian-model-trigger-chevron {

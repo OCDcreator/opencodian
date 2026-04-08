@@ -12,6 +12,44 @@
 
 ---
 
+## 2026-04-08 会话模型选择器接入可用性回退与未配置态
+
+### 🎯 改动目标
+
+- 让会话面板里的模型选择器真正适配 provider / model 开关链路，而不是在当前模型失效后只停留在黄色警告态
+- 当当前会话模型被过滤或失效时，自动切到其他仍在 `effective` catalog 中可用的模型，避免发送链路继续卡在旧选择上
+- 当当前来源模式下已经没有任何生效模型时，在会话工具栏里明确显示默认机器人图标与醒目的“未配置”状态
+
+### ✅ 本轮调整
+
+- `src/core/config/modelConfig.ts`
+- `src/features/chat/OpenCodianView.ts`
+- `styles.css`
+  - 新增 `resolvePreferredAvailableModel()`：优先保留当前仍可用的模型；若当前模型已失效，则按“同 provider 默认模型 → 同 provider 首个模型 → effective catalog 默认模型 → effective catalog 首个模型”的顺序回退
+  - 会话面板的当前模型解析改为先取 tab override / 默认模型，再基于 `effective` catalog 求出真正可发送、可展示的当前模型
+  - `sendMessage()` 在发送前确保模型目录已加载，并统一使用回退后的当前模型，避免首次进入视图时仍带着失效模型发送
+  - model trigger 新增 `is-unconfigured` 态；当 `effective` catalog 为空时，继续使用默认 `bot` 图标并把文案高亮为“未配置”
+
+- `tests/unit/core/config/modelConfig.test.ts`
+  - 补充回归测试，覆盖“当前模型被过滤后回退到同 provider 可用模型”以及“provider 整体失效后回退到 catalog 默认模型”
+
+- `docs/modules/core/config/modelConfig.md`
+- `docs/modules/features/chat/OpenCodianView.md`
+  - 更新模块文档，补充模型选择器现在会基于 `effective` catalog 自动降级，以及空目录时的 trigger 展示规则
+
+### 🧠 架构变化
+
+- 会话面板里的“当前模型”不再等同于“请求时保存的模型引用”；真正参与展示、上下文标识和发送的是 availability-aware 的解析结果
+- `baseEffective` 继续负责保留不可用模型的展示元数据，而 `effective` 负责驱动会话面板当前应使用的实际模型
+
+### 🧪 当前验证
+
+- 已通过：`npm test -- tests/unit/core/config/modelConfig.test.ts`
+- 已通过：`npx eslint src/core/config/modelConfig.ts src/features/chat/OpenCodianView.ts tests/unit/core/config/modelConfig.test.ts`
+- 已通过：`npm run build`
+- 已通过：`npm run check:devlog-order`
+- 已部署测试库并确认 `C:\Users\lt\Desktop\Write\testvault\.obsidian\plugins\opencodian\main.js` 包含 `BUILD_ID: main.202604081251`
+
 ## 2026-04-08 对齐 provider 作用域解析，补上真实探针与流错误保留
 
 ### 🎯 改动目标
