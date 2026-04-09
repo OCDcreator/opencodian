@@ -408,6 +408,34 @@ interface BackgroundTaskCompletionInfo {
   description: string;
 }
 
+interface BackgroundTaskCompletionEvent {
+  anchorKey: string;
+  reminderMessageId: string;
+  reminderType: 'background-task-completed' | 'all-background-tasks-complete';
+  tasks: BackgroundTaskCompletionInfo[];
+  timestamp: number;
+}
+
+interface BackgroundTaskSegment {
+  anchorKey: string;
+  anchorTimestamp: number;
+  modeTag: string | null;
+  launches: BackgroundTaskLaunchInfo[];
+  completed: BackgroundTaskCompletionInfo[];
+  pending: BackgroundTaskLaunchInfo[];
+  sawAllTasksComplete: boolean;
+  waitingForFollowUp: boolean;
+  completionEvents: BackgroundTaskCompletionEvent[];
+}
+
+interface QueuedBackgroundTaskCompletionNotice {
+  anchorKey: string;
+  allComplete: boolean;
+  sourceReminderIds: Set<string>;
+  tasks: Map<string, BackgroundTaskCompletionInfo>;
+  latestTimestamp: number;
+}
+
 interface OmoBackgroundTaskLogState {
   anchorKey: string;
   loggedPendingTaskIds: Set<string>;
@@ -457,12 +485,16 @@ interface TabRuntimeState {
   sessionStatusLastChangedAt: number | null;
   statusRequestId: number;
   backgroundTaskIndicatorEl: HTMLElement | null;
+  backgroundTaskInlineEls: Map<string, HTMLElement>;
+  turnBodyByAnchorKey: Map<string, HTMLElement>;
   backgroundTaskStartedAt: number | null;
+  backgroundTaskActiveAnchorKey: string | null;
   backgroundTaskModeTag: string | null;
   backgroundTaskLaunches: Map<string, BackgroundTaskLaunchInfo>;
   backgroundTaskCompletedTasks: Map<string, BackgroundTaskCompletionInfo>;
   backgroundTaskWaitingForFollowUp: boolean;
   backgroundTaskStaleNoticeFingerprint: string | null;
+  queuedBackgroundTaskCompletionNotices: Map<string, QueuedBackgroundTaskCompletionNotice>;
   focusContextPreview: FocusContextPreview | null;
   draftContextItems: PromptContextItem[];
   pendingEditedFiles: Set<string>;
@@ -627,12 +659,16 @@ export class OpenCodianView extends ItemView {
       sessionStatusLastChangedAt: null,
       statusRequestId: 0,
       backgroundTaskIndicatorEl: null,
+      backgroundTaskInlineEls: new Map(),
+      turnBodyByAnchorKey: new Map(),
       backgroundTaskStartedAt: null,
+      backgroundTaskActiveAnchorKey: null,
       backgroundTaskModeTag: null,
       backgroundTaskLaunches: new Map(),
       backgroundTaskCompletedTasks: new Map(),
       backgroundTaskWaitingForFollowUp: false,
       backgroundTaskStaleNoticeFingerprint: null,
+      queuedBackgroundTaskCompletionNotices: new Map(),
       focusContextPreview: null,
       draftContextItems: [],
       pendingEditedFiles: new Set(),
@@ -2262,9 +2298,7 @@ export class OpenCodianView extends ItemView {
 
     const turnBodies = Array.from(this.messagesContainer.querySelectorAll('.opencodian-turn-body'));
     this.currentTurnBodyEl = (turnBodies[turnBodies.length - 1] as HTMLElement | undefined) ?? null;
-    this.backgroundTaskIndicatorEl = this.messagesContainer.querySelector<HTMLElement>(
-      '.opencodian-message--background-task[data-message-id="transient-background-task"]',
-    );
+    this.backgroundTaskIndicatorEl = null;
   }
 
   private initializeTabSystem(): void {
@@ -2411,6 +2445,20 @@ export class OpenCodianView extends ItemView {
     );
   }
 
+  private isTabForegroundBusy(tabId: TabId | null = this.getActiveTabId()): boolean {
+    const runtime = this.getTabRuntimeState(tabId);
+    if (!runtime) {
+      return false;
+    }
+
+    if (runtime.isStreaming) {
+      return true;
+    }
+
+    const status = this.getTabSessionStatus(tabId, this.getSessionIdForTab(tabId));
+    return status?.type === 'busy' || status?.type === 'retry';
+  }
+
   private syncTabStreamLikeState(tabId: TabId | null): void {
     if (!tabId) {
       this.updateSendButtonState();
@@ -2421,7 +2469,7 @@ export class OpenCodianView extends ItemView {
     this.tabManager?.setTabStreaming(tabId, runtime?.isStreaming ?? false);
     this.tabManager?.setTabBackgroundTaskRunning(
       tabId,
-      Boolean(runtime && this.hasTabBackgroundTaskIndicator(tabId) && !runtime.isStreaming),
+      Boolean(runtime && this.hasTabBackgroundTaskIndicator(tabId)),
     );
     this.syncTabUserMessageActionButtons(tabId);
 
@@ -2790,6 +2838,8 @@ export class OpenCodianView extends ItemView {
 
     runtime.currentTurnBodyEl = null;
     runtime.backgroundTaskIndicatorEl = null;
+    runtime.turnBodyByAnchorKey.clear();
+    runtime.backgroundTaskInlineEls.clear();
   }
 
   /** Create a new turn with sticky user header */
@@ -2823,6 +2873,18 @@ export class OpenCodianView extends ItemView {
     paneState.runtime.currentTurnBodyEl = bodyEl;
 
     return bodyEl;
+  }
+
+  private getMessageAnchorKey(message: ChatMessage): string {
+    return message.sourceMessageId ?? message.id;
+  }
+
+  private isBackgroundTaskCompletionReminder(message: ChatMessage): boolean {
+    return message.omo?.kind === 'system-reminder'
+      && (
+        message.omo.reminderType === 'background-task-completed'
+        || message.omo.reminderType === 'all-background-tasks-complete'
+      );
   }
 
   /** Build header */
@@ -4997,7 +5059,7 @@ export class OpenCodianView extends ItemView {
       return;
     }
 
-    if (this.isStreaming || this.hasActiveBackgroundTaskIndicator()) {
+    if (this.isTabForegroundBusy()) {
       new Notice(t('chat.tab.processingBlocked'));
       return;
     }
@@ -5399,6 +5461,8 @@ export class OpenCodianView extends ItemView {
           await this.refreshTabSessionStatus(tab.id, conversation.openCodeSessionId, { suppressErrors: true });
           await this.refreshTabSessionTodos(tab.id, conversation.openCodeSessionId, { suppressErrors: true });
         }
+        await this.queueBackgroundTaskCompletionNotices(tab.id, conversation);
+        await this.flushQueuedBackgroundTaskCompletionNotices(tab.id, conversation);
         this.syncTabStreamLikeState(tab.id);
 
         if (syncResult.changed || syncResult.fingerprint !== previousFingerprint) {
@@ -5448,7 +5512,7 @@ export class OpenCodianView extends ItemView {
   }
 
   private getConversationVisualFingerprint(messages: ChatMessage[]): string {
-    return messages
+    return this.getMessagesForRender(messages)
       .map((message) => this.getMessageVisualSignature(message))
       .join('|');
   }
@@ -5975,7 +6039,7 @@ export class OpenCodianView extends ItemView {
       return;
     }
 
-    if (sendingRuntime.isStreaming || this.hasTabBackgroundTaskIndicator(sendingTabId)) {
+    if (this.isTabForegroundBusy(sendingTabId)) {
       new Notice(t('chat.tab.processingBlocked'));
       return;
     }
@@ -6653,6 +6717,7 @@ export class OpenCodianView extends ItemView {
               }
             }
           }
+          await this.renderBackgroundTaskIndicatorIfNeeded(sendingTabId);
 
           await this.appendTurnDiffNoticeIfNeeded(
             sendingConversation,
@@ -7020,17 +7085,24 @@ export class OpenCodianView extends ItemView {
 
   /** Render a message */
   private async renderMessage(message: ChatMessage) {
+    const turn = message.role === 'user' && message.displayStyle !== 'notice'
+      ? this.createTurn()
+      : null;
     const parentEl =
       message.displayStyle === 'notice'
         ? this.ensureTurnBody()
         : message.role === 'user'
-        ? this.createTurn()?.headerEl
-        : this.ensureTurnBody();
+          ? turn?.headerEl
+          : this.ensureTurnBody();
     const messageEl = parentEl?.createDiv({
       cls: `opencodian-message opencodian-message--${message.role}`,
     });
 
     if (!messageEl) return;
+    if (turn && message.role === 'user') {
+      const runtime = this.getTabRuntimeState();
+      runtime?.turnBodyByAnchorKey.set(this.getMessageAnchorKey(message), turn.bodyEl);
+    }
     messageEl.dataset.messageId = message.id;
     if (message.sourceMessageId) {
       messageEl.dataset.sourceMessageId = message.sourceMessageId;
@@ -7293,13 +7365,10 @@ export class OpenCodianView extends ItemView {
     }
 
     runtime.backgroundTaskStartedAt = message.timestamp;
+    runtime.backgroundTaskActiveAnchorKey = this.getMessageAnchorKey(message);
     runtime.backgroundTaskModeTag = message.omo.modeTag;
     runtime.backgroundTaskWaitingForFollowUp = false;
     runtime.backgroundTaskStaleNoticeFingerprint = null;
-  }
-
-  private hasActiveBackgroundTaskIndicator(): boolean {
-    return this.hasTabBackgroundTaskIndicator(this.getActiveTabId());
   }
 
   private resetBackgroundTaskIndicator(tabId: TabId | null = this.getActiveTabId()): void {
@@ -7310,7 +7379,12 @@ export class OpenCodianView extends ItemView {
 
     runtime.backgroundTaskIndicatorEl?.remove();
     runtime.backgroundTaskIndicatorEl = null;
+    for (const element of runtime.backgroundTaskInlineEls.values()) {
+      element.remove();
+    }
+    runtime.backgroundTaskInlineEls.clear();
     runtime.backgroundTaskStartedAt = null;
+    runtime.backgroundTaskActiveAnchorKey = null;
     runtime.backgroundTaskModeTag = null;
     runtime.backgroundTaskWaitingForFollowUp = false;
     runtime.backgroundTaskLaunches.clear();
@@ -7424,6 +7498,223 @@ export class OpenCodianView extends ItemView {
     }
   }
 
+  private createBackgroundTaskSegment(
+    anchorMessage: ChatMessage,
+  ): BackgroundTaskSegment {
+    return {
+      anchorKey: this.getMessageAnchorKey(anchorMessage),
+      anchorTimestamp: anchorMessage.timestamp,
+      modeTag: anchorMessage.omo?.kind === 'user-injection' ? anchorMessage.omo.modeTag : null,
+      launches: [],
+      completed: [],
+      pending: [],
+      sawAllTasksComplete: false,
+      waitingForFollowUp: false,
+      completionEvents: [],
+    };
+  }
+
+  private addCompletionToSegment(
+    segment: BackgroundTaskSegment,
+    completion: BackgroundTaskCompletionInfo,
+  ): void {
+    if (segment.completed.some((item) => item.taskId === completion.taskId && item.description === completion.description)) {
+      return;
+    }
+
+    segment.completed.push(completion);
+  }
+
+  private findBackgroundTaskSegmentByTaskId(
+    segments: BackgroundTaskSegment[],
+    taskId: string,
+  ): BackgroundTaskSegment | null {
+    for (let index = segments.length - 1; index >= 0; index -= 1) {
+      if (segments[index].launches.some((launch) => launch.taskId === taskId)) {
+        return segments[index];
+      }
+    }
+
+    return null;
+  }
+
+  private getLatestPendingBackgroundTaskSegment(
+    segments: BackgroundTaskSegment[],
+  ): BackgroundTaskSegment | null {
+    for (let index = segments.length - 1; index >= 0; index -= 1) {
+      if (segments[index].pending.length > 0 || segments[index].launches.length > 0) {
+        return segments[index];
+      }
+    }
+
+    return null;
+  }
+
+  private collectBackgroundTaskSegments(
+    messages: ChatMessage[],
+    tabId: TabId | null = this.getActiveTabId(),
+  ): BackgroundTaskSegment[] {
+    if (messages.length === 0) {
+      return [];
+    }
+
+    const segments: BackgroundTaskSegment[] = [];
+    const segmentByAnchorKey = new Map<string, BackgroundTaskSegment>();
+    let latestUserMessage: ChatMessage | null = null;
+
+    const getOrCreateSegment = (anchorMessage: ChatMessage | null): BackgroundTaskSegment | null => {
+      if (!anchorMessage) {
+        return null;
+      }
+
+      const anchorKey = this.getMessageAnchorKey(anchorMessage);
+      const existing = segmentByAnchorKey.get(anchorKey);
+      if (existing) {
+        return existing;
+      }
+
+      const created = this.createBackgroundTaskSegment(anchorMessage);
+      segmentByAnchorKey.set(anchorKey, created);
+      segments.push(created);
+      return created;
+    };
+
+    const applyReminderToSegment = (
+      segment: BackgroundTaskSegment | null,
+      message: ChatMessage,
+    ): void => {
+      if (!segment || message.omo?.kind !== 'system-reminder') {
+        return;
+      }
+
+      const tasks = (message.omo.tasks ?? [])
+        .filter((task) => task.id || task.description)
+        .map((task) => ({
+          taskId: task.id || task.description,
+          description: task.description || t('chat.backgroundTask.noDescription'),
+        }));
+
+      for (const completion of tasks) {
+        this.addCompletionToSegment(segment, completion);
+      }
+
+      segment.completionEvents.push({
+        anchorKey: segment.anchorKey,
+        reminderMessageId: message.sourceMessageId ?? message.id,
+        reminderType: message.omo.reminderType === 'all-background-tasks-complete'
+          ? 'all-background-tasks-complete'
+          : 'background-task-completed',
+        tasks,
+        timestamp: message.timestamp,
+      });
+
+      if (message.omo.reminderType === 'all-background-tasks-complete') {
+        segment.sawAllTasksComplete = true;
+      }
+    };
+
+    for (const message of messages) {
+      if (message.role === 'user') {
+        latestUserMessage = message;
+        if (message.omo?.kind === 'user-injection' && message.omo.modeTag === 'search-mode') {
+          getOrCreateSegment(message);
+        }
+        continue;
+      }
+
+      for (const block of message.contentBlocks ?? []) {
+        if (block.type !== 'tool_use' || block.toolName !== 'task' || !block.toolId) {
+          continue;
+        }
+
+        const segment = getOrCreateSegment(latestUserMessage);
+        if (!segment) {
+          continue;
+        }
+
+        const launches = new Map(segment.launches.map((launch) => [launch.launchId, launch] as const));
+        this.upsertBackgroundTaskLaunch({
+          id: block.toolId,
+          input: block.toolInput ?? {},
+          result: block.toolResult,
+        }, launches);
+        segment.launches = Array.from(launches.values());
+      }
+
+      if (!this.isBackgroundTaskCompletionReminder(message) || message.omo?.kind !== 'system-reminder') {
+        continue;
+      }
+
+      const matched = new Set<BackgroundTaskSegment>();
+      for (const task of message.omo.tasks ?? []) {
+        if (!task.id) {
+          continue;
+        }
+        const segment = this.findBackgroundTaskSegmentByTaskId(segments, task.id);
+        if (segment) {
+          matched.add(segment);
+        }
+      }
+
+      if (matched.size === 0) {
+        const fallback = this.getLatestPendingBackgroundTaskSegment(segments) ?? getOrCreateSegment(latestUserMessage);
+        if (fallback) {
+          matched.add(fallback);
+        }
+      }
+
+      for (const segment of matched) {
+        applyReminderToSegment(segment, message);
+      }
+    }
+
+    const runtime = this.getTabRuntimeState(tabId);
+    if (runtime?.backgroundTaskActiveAnchorKey && runtime.backgroundTaskStartedAt) {
+      const existing = segmentByAnchorKey.get(runtime.backgroundTaskActiveAnchorKey);
+      const segment = existing ?? {
+        anchorKey: runtime.backgroundTaskActiveAnchorKey,
+        anchorTimestamp: runtime.backgroundTaskStartedAt,
+        modeTag: runtime.backgroundTaskModeTag,
+        launches: [],
+        completed: [],
+        pending: [],
+        sawAllTasksComplete: false,
+        waitingForFollowUp: false,
+        completionEvents: [],
+      };
+
+      if (!existing) {
+        segmentByAnchorKey.set(segment.anchorKey, segment);
+        segments.push(segment);
+      }
+
+      const launches = new Map(segment.launches.map((launch) => [launch.launchId, launch] as const));
+      for (const launch of runtime.backgroundTaskLaunches.values()) {
+        launches.set(launch.launchId, launch);
+      }
+      segment.launches = Array.from(launches.values());
+
+      const completed = new Map(segment.completed.map((item) => [item.taskId, item] as const));
+      for (const item of runtime.backgroundTaskCompletedTasks.values()) {
+        completed.set(item.taskId, item);
+      }
+      segment.completed = Array.from(completed.values());
+      segment.modeTag = segment.modeTag ?? runtime.backgroundTaskModeTag;
+      segment.waitingForFollowUp = runtime.backgroundTaskWaitingForFollowUp;
+    }
+
+    for (const segment of segments) {
+      segment.pending = this.filterPendingBackgroundTaskLaunches(segment.launches, segment.completed);
+      segment.waitingForFollowUp = segment.waitingForFollowUp || segment.pending.length > 0;
+      if (segment.sawAllTasksComplete) {
+        segment.pending = [];
+        segment.waitingForFollowUp = false;
+      }
+    }
+
+    return segments.sort((left, right) => left.anchorTimestamp - right.anchorTimestamp);
+  }
+
   private findBackgroundTaskAnchorIndex(messages: ChatMessage[]): number {
     for (let index = messages.length - 1; index >= 0; index -= 1) {
       if (messages[index].role === 'user') {
@@ -7444,6 +7735,7 @@ export class OpenCodianView extends ItemView {
     }
 
     runtime.backgroundTaskStartedAt = null;
+    runtime.backgroundTaskActiveAnchorKey = null;
     runtime.backgroundTaskModeTag = null;
     runtime.backgroundTaskWaitingForFollowUp = false;
     runtime.backgroundTaskLaunches.clear();
@@ -7453,73 +7745,39 @@ export class OpenCodianView extends ItemView {
     if (!conversation || conversation.messages.length === 0) {
       runtime.backgroundTaskIndicatorEl?.remove();
       runtime.backgroundTaskIndicatorEl = null;
+      for (const element of runtime.backgroundTaskInlineEls.values()) {
+        element.remove();
+      }
+      runtime.backgroundTaskInlineEls.clear();
       this.syncTabStreamLikeState(tabId);
       return;
     }
 
-    const anchorIndex = this.findBackgroundTaskAnchorIndex(conversation.messages);
-    if (anchorIndex < 0) {
-      return;
-    }
+    const segments = this.collectBackgroundTaskSegments(conversation.messages, tabId);
+    const latestActiveSegment = [...segments]
+      .reverse()
+      .find((segment) =>
+        !segment.sawAllTasksComplete
+        && (segment.pending.length > 0 || (segment.modeTag === 'search-mode' && segment.launches.length === 0)),
+      ) ?? null;
 
-    const anchorMessage = conversation.messages[anchorIndex];
-    const trailingMessages = conversation.messages.slice(anchorIndex + 1);
-    runtime.backgroundTaskStartedAt = anchorMessage.timestamp;
-    runtime.backgroundTaskModeTag = anchorMessage.omo?.kind === 'user-injection'
-      ? anchorMessage.omo.modeTag
-      : null;
-
-    let sawAllTasksComplete = false;
-    for (const message of trailingMessages) {
-      if (message.omo?.kind === 'system-reminder') {
-        this.addCompletedBackgroundTasksFromMessage(message, runtime.backgroundTaskCompletedTasks);
-        if (message.omo.reminderType === 'all-background-tasks-complete') {
-          sawAllTasksComplete = true;
-        }
-      }
-
-      for (const block of message.contentBlocks ?? []) {
-        if (block.type !== 'tool_use' || block.toolName !== 'task' || !block.toolId) {
-          continue;
-        }
-
-        this.upsertBackgroundTaskLaunch({
-          id: block.toolId,
-          input: block.toolInput ?? {},
-          result: block.toolResult,
-        }, runtime.backgroundTaskLaunches);
-      }
-    }
-
-    if (sawAllTasksComplete) {
-      runtime.backgroundTaskStartedAt = null;
-      runtime.backgroundTaskModeTag = null;
-      runtime.backgroundTaskLaunches.clear();
-      runtime.backgroundTaskCompletedTasks.clear();
+    if (!latestActiveSegment) {
       runtime.backgroundTaskIndicatorEl?.remove();
       runtime.backgroundTaskIndicatorEl = null;
       this.syncTabStreamLikeState(tabId);
       return;
     }
 
-    if (runtime.backgroundTaskLaunches.size === 0) {
-      const shouldKeepPreparingIndicator = runtime.backgroundTaskModeTag === 'search-mode'
-        && trailingMessages.length === 0;
-
-      if (shouldKeepPreparingIndicator) {
-        this.syncTabStreamLikeState(tabId);
-        return;
-      }
-
-      runtime.backgroundTaskStartedAt = null;
-      runtime.backgroundTaskModeTag = null;
-      runtime.backgroundTaskIndicatorEl?.remove();
-      runtime.backgroundTaskIndicatorEl = null;
-      this.syncTabStreamLikeState(tabId);
-      return;
+    runtime.backgroundTaskStartedAt = latestActiveSegment.anchorTimestamp;
+    runtime.backgroundTaskActiveAnchorKey = latestActiveSegment.anchorKey;
+    runtime.backgroundTaskModeTag = latestActiveSegment.modeTag;
+    runtime.backgroundTaskWaitingForFollowUp = latestActiveSegment.waitingForFollowUp && !runtime.isStreaming;
+    for (const launch of latestActiveSegment.launches) {
+      runtime.backgroundTaskLaunches.set(launch.launchId, launch);
     }
-
-    runtime.backgroundTaskWaitingForFollowUp = runtime.backgroundTaskLaunches.size > 0 && !runtime.isStreaming;
+    for (const completion of latestActiveSegment.completed) {
+      runtime.backgroundTaskCompletedTasks.set(completion.taskId, completion);
+    }
     this.syncTabStreamLikeState(tabId);
   }
 
@@ -7677,28 +7935,6 @@ export class OpenCodianView extends ItemView {
     return `launch_${launch.launchId.slice(-8)}`;
   }
 
-  private buildBackgroundTaskIndicatorTasksMarkdown(tabId: TabId | null = this.getActiveTabId()): string | undefined {
-    const lines: string[] = [];
-    const completed = this.getCompletedBackgroundTasks(tabId);
-    const pending = this.getPendingBackgroundTaskLaunches(tabId);
-
-    if (completed.length === 0 && pending.length === 0) {
-      return undefined;
-    }
-
-    lines.push(`**${t('chat.backgroundTask.taskListLabel')}**`);
-
-    for (const task of completed) {
-      lines.push(`- ${t('chat.backgroundTask.taskStatusCompleted')} · \`${task.taskId}\`: ${task.description}`);
-    }
-
-    for (const task of pending) {
-      lines.push(`- ${t('chat.backgroundTask.taskStatusRunning')} · \`${this.getBackgroundTaskLaunchDisplayId(task)}\`: ${task.description}`);
-    }
-
-    return lines.join('\n');
-  }
-
   private async handleStreamingToolCallStart(
     toolCall: ToolCallInfo,
     tabId: TabId | null = this.getActiveTabId(),
@@ -7783,77 +8019,52 @@ export class OpenCodianView extends ItemView {
     }
 
     this.reconcileBackgroundTaskStateFromLiveSignals(tabId);
-
-    if (!this.hasTabBackgroundTaskIndicator(tabId)) {
-      runtime.backgroundTaskIndicatorEl?.remove();
-      runtime.backgroundTaskIndicatorEl = null;
-      this.syncTabStreamLikeState(tabId);
-      return;
-    }
-
-    const parentEl = this.ensureTurnBody(tabId);
-    if (!parentEl) {
-      return;
-    }
-
-    let messageEl = runtime.backgroundTaskIndicatorEl;
-    if (!messageEl || !messageEl.isConnected) {
-      messageEl = parentEl.createDiv({
-        cls: 'opencodian-message opencodian-message--assistant opencodian-message--notice opencodian-message--background-task',
-      });
-      messageEl.dataset.messageId = 'transient-background-task';
-      runtime.backgroundTaskIndicatorEl = messageEl;
-    }
-
-    if (messageEl.parentElement !== parentEl || messageEl !== parentEl.lastElementChild) {
-      parentEl.appendChild(messageEl);
-    }
-
-    let contentEl = messageEl.querySelector('.opencodian-message-content') as HTMLElement | null;
-    if (!contentEl) {
-      contentEl = messageEl.createDiv({ cls: 'opencodian-message-content' });
-    }
-
-    contentEl.empty();
-
-    const cardEl = contentEl.createDiv({ cls: 'opencodian-chat-notice-card is-info is-background-task' });
-    const iconEl = cardEl.createDiv({ cls: 'opencodian-chat-notice-icon opencodian-chat-notice-icon--background-task' });
-    setIcon(iconEl, 'loader');
-
-    const bodyEl = cardEl.createDiv({ cls: 'opencodian-chat-notice-body' });
-    const copy = this.getBackgroundTaskIndicatorCopy(tabId);
-    bodyEl.createDiv({
-      cls: 'opencodian-chat-notice-title',
-      text: copy.title,
-    });
-
-    const textEl = bodyEl.createDiv({ cls: 'opencodian-chat-notice-text' });
-    await this.renderMarkdownInto(textEl, copy.body);
-
-    if (copy.detail) {
-      bodyEl.createDiv({
-        cls: 'opencodian-chat-notice-meta',
-        text: copy.detail,
-      });
-    }
-
-    if (copy.tasksMarkdown) {
-      const tasksEl = bodyEl.createDiv({ cls: 'opencodian-chat-notice-task-list' });
-      await this.renderMarkdownInto(tasksEl, copy.tasksMarkdown);
-    }
-
+    await this.renderInlineBackgroundTaskPanels(tabId);
+    await this.queueBackgroundTaskCompletionNotices(tabId);
+    await this.flushQueuedBackgroundTaskCompletionNotices(tabId);
     this.syncTabStreamLikeState(tabId);
   }
 
-  private getBackgroundTaskIndicatorCopy(
-    tabId: TabId | null = this.getActiveTabId(),
-  ): { title: string; body: string; detail?: string; tasksMarkdown?: string } {
-    const runtime = this.getTabRuntimeState(tabId);
-    const launched = runtime?.backgroundTaskLaunches.size ?? 0;
-    const completed = Math.min(launched, this.getCompletedBackgroundTasks(tabId).length);
-    const tasksMarkdown = this.buildBackgroundTaskIndicatorTasksMarkdown(tabId);
+  private shouldRenderInlineBackgroundTaskSegment(segment: BackgroundTaskSegment): boolean {
+    if (segment.sawAllTasksComplete) {
+      return false;
+    }
 
-    if (launched === 0) {
+    if (segment.pending.length > 0) {
+      return true;
+    }
+
+    return segment.modeTag === 'search-mode' && segment.launches.length === 0;
+  }
+
+  private buildBackgroundTaskTasksMarkdown(segment: BackgroundTaskSegment): string | undefined {
+    const lines: string[] = [];
+
+    if (segment.completed.length === 0 && segment.pending.length === 0) {
+      return undefined;
+    }
+
+    lines.push(`**${t('chat.backgroundTask.taskListLabel')}**`);
+
+    for (const task of segment.completed) {
+      lines.push(`- ${t('chat.backgroundTask.taskStatusCompleted')} · \`${task.taskId}\`: ${task.description}`);
+    }
+
+    for (const task of segment.pending) {
+      lines.push(`- ${t('chat.backgroundTask.taskStatusRunning')} · \`${this.getBackgroundTaskLaunchDisplayId(task)}\`: ${task.description}`);
+    }
+
+    return lines.join('\n');
+  }
+
+  private getBackgroundTaskInlineCopy(
+    segment: BackgroundTaskSegment,
+  ): { title: string; body: string; detail?: string; tasksMarkdown?: string } {
+    const total = segment.launches.length;
+    const completed = Math.min(total, segment.completed.length);
+    const tasksMarkdown = this.buildBackgroundTaskTasksMarkdown(segment);
+
+    if (total === 0) {
       return {
         title: t('chat.backgroundTask.preparingTitle'),
         body: t('chat.backgroundTask.preparingBody'),
@@ -7861,15 +8072,15 @@ export class OpenCodianView extends ItemView {
       };
     }
 
-    if (runtime?.backgroundTaskWaitingForFollowUp) {
+    if (segment.waitingForFollowUp) {
       return {
         title: t('chat.backgroundTask.waitingTitle'),
         body: t('chat.backgroundTask.waitingBody', {
-          total: String(launched),
+          total: String(total),
           completed: String(completed),
         }),
         detail: t('chat.backgroundTask.progressDetail', {
-          total: String(launched),
+          total: String(total),
           completed: String(completed),
         }),
         tasksMarkdown,
@@ -7879,15 +8090,242 @@ export class OpenCodianView extends ItemView {
     return {
       title: t('chat.backgroundTask.runningTitle'),
       body: t('chat.backgroundTask.runningBody', {
-        total: String(launched),
+        total: String(total),
         completed: String(completed),
       }),
       detail: t('chat.backgroundTask.progressDetail', {
-        total: String(launched),
+        total: String(total),
         completed: String(completed),
       }),
       tasksMarkdown,
     };
+  }
+
+  private async renderInlineBackgroundTaskPanels(
+    tabId: TabId | null = this.getActiveTabId(),
+    conversation: Conversation | null = this.currentConversation,
+  ): Promise<void> {
+    const runtime = this.getTabRuntimeState(tabId);
+    if (!runtime) {
+      return;
+    }
+
+    const segments = this.collectBackgroundTaskSegments(conversation?.messages ?? [], tabId)
+      .filter((segment) => this.shouldRenderInlineBackgroundTaskSegment(segment));
+    const activeKeys = new Set(segments.map((segment) => segment.anchorKey));
+
+    for (const [anchorKey, element] of runtime.backgroundTaskInlineEls.entries()) {
+      if (activeKeys.has(anchorKey)) {
+        continue;
+      }
+      element.remove();
+      runtime.backgroundTaskInlineEls.delete(anchorKey);
+      if (runtime.backgroundTaskIndicatorEl === element) {
+        runtime.backgroundTaskIndicatorEl = null;
+      }
+    }
+
+    for (const segment of segments) {
+      const parentEl = runtime.turnBodyByAnchorKey.get(segment.anchorKey);
+      if (!parentEl?.isConnected) {
+        continue;
+      }
+
+      let panelEl = runtime.backgroundTaskInlineEls.get(segment.anchorKey);
+      if (!panelEl || !panelEl.isConnected) {
+        panelEl = parentEl.createDiv({
+          cls: 'opencodian-background-task-inline',
+        });
+        panelEl.dataset.anchorKey = segment.anchorKey;
+        runtime.backgroundTaskInlineEls.set(segment.anchorKey, panelEl);
+      }
+
+      if (panelEl.parentElement !== parentEl || panelEl !== parentEl.lastElementChild) {
+        parentEl.appendChild(panelEl);
+      }
+
+      panelEl.empty();
+
+      const cardEl = panelEl.createDiv({ cls: 'opencodian-chat-notice-card is-info is-background-task is-inline' });
+      const iconEl = cardEl.createDiv({ cls: 'opencodian-chat-notice-icon opencodian-chat-notice-icon--background-task' });
+      setIcon(iconEl, 'loader');
+
+      const bodyEl = cardEl.createDiv({ cls: 'opencodian-chat-notice-body' });
+      const copy = this.getBackgroundTaskInlineCopy(segment);
+      bodyEl.createDiv({
+        cls: 'opencodian-chat-notice-title',
+        text: copy.title,
+      });
+
+      const textEl = bodyEl.createDiv({ cls: 'opencodian-chat-notice-text' });
+      await this.renderMarkdownInto(textEl, copy.body);
+
+      if (copy.detail) {
+        bodyEl.createDiv({
+          cls: 'opencodian-chat-notice-meta',
+          text: copy.detail,
+        });
+      }
+
+      if (copy.tasksMarkdown) {
+        const tasksEl = bodyEl.createDiv({ cls: 'opencodian-chat-notice-task-list' });
+        await this.renderMarkdownInto(tasksEl, copy.tasksMarkdown);
+      }
+
+      if (runtime.backgroundTaskActiveAnchorKey === segment.anchorKey) {
+        runtime.backgroundTaskIndicatorEl = panelEl;
+      }
+    }
+  }
+
+  private getPersistedBackgroundTaskCompletionNoticeFingerprints(
+    conversation: Conversation | null,
+  ): Set<string> {
+    const fingerprints = new Set<string>();
+    for (const message of conversation?.messages ?? []) {
+      const meta = message.noticeMeta;
+      if (meta?.kind !== 'background-task-completion') {
+        continue;
+      }
+      fingerprints.add(this.getBackgroundTaskCompletionNoticeFingerprint({
+        anchorKey: meta.anchorKey ?? 'unknown',
+        allComplete: Boolean(meta.allComplete),
+        taskIds: meta.taskIds ?? [],
+      }));
+      for (const reminderId of meta.sourceReminderIds ?? []) {
+        fingerprints.add(`source:${reminderId}`);
+      }
+    }
+
+    return fingerprints;
+  }
+
+  private getBackgroundTaskCompletionNoticeFingerprint(input: {
+    anchorKey: string;
+    allComplete: boolean;
+    taskIds: string[];
+  }): string {
+    const taskIds = [...new Set(input.taskIds)].sort();
+    return JSON.stringify({
+      anchorKey: input.anchorKey,
+      allComplete: input.allComplete,
+      taskIds,
+    });
+  }
+
+  private async queueBackgroundTaskCompletionNotices(
+    tabId: TabId | null = this.getActiveTabId(),
+    conversation: Conversation | null = this.currentConversation,
+  ): Promise<void> {
+    const runtime = this.getTabRuntimeState(tabId);
+    if (!runtime || !conversation) {
+      return;
+    }
+
+    const persisted = this.getPersistedBackgroundTaskCompletionNoticeFingerprints(conversation);
+    const segments = this.collectBackgroundTaskSegments(conversation.messages, tabId);
+
+    for (const segment of segments) {
+      for (const event of segment.completionEvents) {
+        const reminderFingerprint = `source:${event.reminderMessageId}`;
+        if (persisted.has(reminderFingerprint)) {
+          continue;
+        }
+
+        let queued = runtime.queuedBackgroundTaskCompletionNotices.get(segment.anchorKey);
+        if (!queued) {
+          queued = {
+            anchorKey: segment.anchorKey,
+            allComplete: false,
+            sourceReminderIds: new Set(),
+            tasks: new Map(),
+            latestTimestamp: event.timestamp,
+          };
+          runtime.queuedBackgroundTaskCompletionNotices.set(segment.anchorKey, queued);
+        }
+
+        queued.latestTimestamp = Math.max(queued.latestTimestamp, event.timestamp);
+        queued.sourceReminderIds.add(event.reminderMessageId);
+        queued.allComplete = queued.allComplete || event.reminderType === 'all-background-tasks-complete';
+        for (const task of event.tasks) {
+          queued.tasks.set(task.taskId, task);
+        }
+      }
+    }
+  }
+
+  private buildBackgroundTaskCompletionNoticeContent(
+    queued: QueuedBackgroundTaskCompletionNotice,
+  ): string {
+    const tasks = [...queued.tasks.values()].sort((left, right) =>
+      left.taskId.localeCompare(right.taskId) || left.description.localeCompare(right.description),
+    );
+    const lines = queued.allComplete
+      ? [t('chat.omo.system.allCompletedSummary')]
+      : [t('chat.omo.system.backgroundCompletedSummary')];
+
+    if (tasks.length > 0) {
+      lines.push('', `**${t('chat.backgroundTask.taskListLabel')}**`);
+      for (const task of tasks) {
+        lines.push(`- \`${task.taskId}\`: ${task.description}`);
+      }
+    }
+
+    return lines.join('\n');
+  }
+
+  private async flushQueuedBackgroundTaskCompletionNotices(
+    tabId: TabId | null = this.getActiveTabId(),
+    conversation: Conversation | null = this.currentConversation,
+  ): Promise<void> {
+    const runtime = this.getTabRuntimeState(tabId);
+    if (!runtime || !conversation || runtime.isStreaming) {
+      return;
+    }
+
+    for (const [anchorKey, queued] of [...runtime.queuedBackgroundTaskCompletionNotices.entries()]) {
+      const taskIds = [...queued.tasks.keys()].sort();
+      const fingerprint = this.getBackgroundTaskCompletionNoticeFingerprint({
+        anchorKey,
+        allComplete: queued.allComplete,
+        taskIds,
+      });
+      if (this.getPersistedBackgroundTaskCompletionNoticeFingerprints(conversation).has(fingerprint)) {
+        runtime.queuedBackgroundTaskCompletionNotices.delete(anchorKey);
+        continue;
+      }
+
+      const title = queued.allComplete
+        ? t('chat.omo.system.allCompleted')
+        : t('chat.omo.system.backgroundCompleted');
+      const content = this.buildBackgroundTaskCompletionNoticeContent(queued);
+      await this.appendPersistentAssistantNoticeMessage(
+        title,
+        content,
+        'info',
+        undefined,
+        {
+          conversation,
+          tabId,
+          timestamp: queued.latestTimestamp,
+          noticeMeta: {
+            kind: 'background-task-completion',
+            anchorKey,
+            sourceReminderIds: [...queued.sourceReminderIds].sort(),
+            allComplete: queued.allComplete,
+            taskIds,
+          },
+        },
+      );
+      logger.debug('Background task completion notice persisted', {
+        tabId,
+        anchorKey,
+        allComplete: queued.allComplete,
+        taskCount: taskIds.length,
+        reminderCount: queued.sourceReminderIds.size,
+      });
+      runtime.queuedBackgroundTaskCompletionNotices.delete(anchorKey);
+    }
   }
 
   /** Render a content block using the same renderers as streaming */
@@ -7996,6 +8434,10 @@ export class OpenCodianView extends ItemView {
   }
 
   private shouldRenderConversationMessage(message: ChatMessage): boolean {
+    if (this.isBackgroundTaskCompletionReminder(message)) {
+      return false;
+    }
+
     if (message.role !== 'assistant' || message.displayStyle === 'notice') {
       return true;
     }
@@ -8621,6 +9063,13 @@ export class OpenCodianView extends ItemView {
       this.armBackgroundTaskIndicatorForUserMessage(mergedHydratedMessage, tabId);
       const runtime = this.getTabRuntimeState(tabId);
       if (runtime) {
+        const previousAnchorKey = this.getMessageAnchorKey(optimisticMessage);
+        const nextAnchorKey = this.getMessageAnchorKey(mergedHydratedMessage);
+        const bodyEl = runtime.turnBodyByAnchorKey.get(previousAnchorKey);
+        if (bodyEl) {
+          runtime.turnBodyByAnchorKey.delete(previousAnchorKey);
+          runtime.turnBodyByAnchorKey.set(nextAnchorKey, bodyEl);
+        }
         runtime.lastConversationSyncFingerprint = this.getConversationSyncFingerprint(conversation.messages);
       }
       await this.plugin.saveConversation(conversation);
@@ -10559,9 +11008,11 @@ export class OpenCodianView extends ItemView {
     options: {
       conversation?: Conversation | null;
       tabId?: TabId | null;
+      timestamp?: number;
+      noticeMeta?: ChatMessage['noticeMeta'];
     } = {},
   ): Promise<void> {
-    const timestamp = Date.now();
+    const timestamp = options.timestamp ?? Date.now();
     const noticeMessage: ChatMessage = {
       id: `assistant-notice-${timestamp}`,
       role: 'assistant',
@@ -10571,6 +11022,7 @@ export class OpenCodianView extends ItemView {
       noticeTitle: title,
       noticeTone: tone,
       noticeActions,
+      noticeMeta: options.noticeMeta,
     };
 
     const targetConversation = options.conversation ?? this.currentConversation;

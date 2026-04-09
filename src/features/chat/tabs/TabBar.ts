@@ -116,6 +116,9 @@ export class TabBar {
     if (item.hasBackgroundTask) {
       tabEl.addClass('has-background-task');
     }
+    if (item.isStreaming && item.hasBackgroundTask) {
+      tabEl.addClass('has-background-task-secondary');
+    }
     if (item.needsAttention) {
       tabEl.addClass('needs-attention');
     }
@@ -202,6 +205,9 @@ export class TabBar {
       }
       if (item.hasBackgroundTask) {
         itemEl.classList.add('has-background-task');
+      }
+      if (item.isStreaming && item.hasBackgroundTask) {
+        itemEl.classList.add('has-background-task-secondary');
       }
       if (item.needsAttention) {
         itemEl.classList.add('needs-attention');

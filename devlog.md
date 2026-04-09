@@ -12,6 +12,44 @@
 
 ---
 
+## 2026-04-09 后台任务改为会话内链路与延迟完成卡片
+
+### 🎯 改动目标
+
+- 去掉后台任务运行中时的独立悬浮卡片，改成融合到当前会话 turn 内的内联状态条
+- 将后台任务完成提醒改成“检测完成后排队、前台流式结束后再持久化插入”的 notice 机制
+- 保持历史可回放：重开 Obsidian 后，运行态可从消息事实重建，完成卡片可继续浏览且不重复追加
+
+### ✅ 本轮调整
+
+- `src/features/chat/OpenCodianView.ts`
+- `src/core/types/chat.ts`
+  - 新增后台任务 segment 收集与 anchor 归属逻辑，按 `tool=task`、system reminder 与会话同步结果重建后台任务链路
+  - 取消独立 transient background task notice，改为把运行态以内联状态条挂到触发该任务的 assistant turn 下
+  - 新增完成提醒队列与 `noticeMeta` 去重信息；若当前仍有前台流式，则先缓存，流式结束后再落成持久化完成卡片
+  - 发送阻塞逻辑改为只看前台主回复是否忙碌，不再因为后台任务仍在回写就阻止继续发消息
+
+- `src/features/chat/tabs/TabBar.ts`
+- `styles.css`
+  - tab 状态改成“streaming 主态、background 次级标记”优先级
+  - 为内联后台任务状态条和 tab 次级后台标记补齐样式
+
+- `src/i18n/locales/en.ts`
+- `src/i18n/locales/zh.ts`
+  - 调整后台任务与发送阻塞相关文案，避免继续把后台任务描述成“当前标签不可交互”
+
+- `tests/unit/features/chat/backgroundTaskTimeline.test.ts`
+- `docs/modules/features/chat/OpenCodianView.md`
+- `docs/status/sdk-v2-manual-checklist.md`
+  - 新增后台任务时间线/完成提醒去重测试
+  - 同步模块文档与手工验证口径，明确 `session.status` 只代表主 runner 忙闲，不代表后台任务完成
+
+### 🧪 验证结果
+
+- `npm test -- tests/unit/features/chat/backgroundTaskTimeline.test.ts tests/unit/features/chat/backgroundTaskNoticeDedup.test.ts tests/unit/features/chat/staleSessionTodoState.test.ts` 通过
+- `npm run typecheck` 通过
+- `npm run build` 通过，最新 `BUILD_ID: main.202604091919`
+
 ## 2026-04-09 Provider 内置图标库与 OpenCode 图标集接入
 
 ### 🎯 改动目标

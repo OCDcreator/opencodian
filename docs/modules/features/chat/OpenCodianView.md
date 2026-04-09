@@ -227,7 +227,7 @@ assistant 渲染里：
 
 - session todo/status：通过 `openCodeService.subscribeToSessionTodoUpdates()` 和 `subscribeToSessionStatusUpdates()` 接入
 - question：既支持输入区上方的 `QuestionDock`，也支持内联 question card 和已回答/已拒绝回顾卡片
-- background task：从 OMO 注入和 `toolName === 'task'` 的 tool block 推导任务进度，并在必要时渲染 transient indicator 或 notice
+- background task：从 OMO 注入、`toolName === 'task'` 的 tool block、以及后续 system reminder 回写推导任务进度；运行态以内联状态条挂在对应 assistant turn 下，完成态则延迟落成持久化 notice
 
 ## 外观与控件
 
@@ -294,3 +294,5 @@ assistant 渲染里：
 - 这个文件的大部分便捷 getter/setter 都默认指向“活动 tab”；改逻辑时必须先确认是不是应该改成显式 `tabId`。
 - streaming、conversation sync、background task 和 question 队列都已经做成按 tab 隔离，不能再退回单全局状态。
 - 会话同步会保留本地 client-only message，尤其是 interrupted assistant message 和本地 notice；不要把同步理解成简单的全量覆盖。
+- `session.status` 只能代表主 runner 是否 `busy/retry/idle`；后台任务是否完成要看后续消息/提醒是否真正回写到会话历史。
+- 当 tab 同时处于前台流式和后台任务存活状态时，tab 样式遵循“streaming 主态、background 次级标记”的优先级；不要把二者重新合并成同一套阻塞语义。

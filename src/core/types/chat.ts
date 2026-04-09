@@ -106,6 +106,14 @@ export interface ChatNoticeAction {
   type: ChatNoticeActionType;
 }
 
+export interface ChatNoticeMeta {
+  kind: 'background-task-completion';
+  anchorKey?: string;
+  sourceReminderIds?: string[];
+  allComplete?: boolean;
+  taskIds?: string[];
+}
+
 export type OmoReminderType =
   | 'background-task-completed'
   | 'all-background-tasks-complete'
@@ -149,6 +157,7 @@ export interface ChatMessage {
   noticeTitle?: string;
   noticeTone?: 'info' | 'warning' | 'error';
   noticeActions?: ChatNoticeAction[];
+  noticeMeta?: ChatNoticeMeta;
   images?: ImageAttachment[];
   toolCalls?: ToolCallInfo[];
   contentBlocks?: ContentBlock[];

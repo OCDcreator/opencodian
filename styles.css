@@ -881,6 +881,24 @@
   color: var(--text-warning);
 }
 
+.opencodian-tab-bar-item.has-background-task-secondary .opencodian-tab-bar-badge,
+.opencodian-tab-overflow-menu-item.has-background-task-secondary .opencodian-tab-overflow-menu-badge {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--text-warning) 40%, transparent);
+}
+
+.opencodian-tab-bar-item.has-background-task-secondary::after,
+.opencodian-tab-overflow-menu-item.has-background-task-secondary::after {
+  content: '';
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--text-warning);
+  opacity: 0.9;
+}
+
 .opencodian-tab-activity-dots {
   display: inline-flex;
   align-items: center;
@@ -908,6 +926,16 @@
 
 .opencodian-tab-bar-item.is-streaming .opencodian-tab-bar-state {
   display: none;
+}
+
+.opencodian-background-task-inline {
+  margin-top: 10px;
+}
+
+.opencodian-chat-notice-card.is-background-task.is-inline {
+  border-radius: 14px;
+  border-color: color-mix(in srgb, var(--text-warning) 28%, var(--background-modifier-border));
+  background: color-mix(in srgb, var(--background-secondary) 82%, transparent);
 }
 
 .opencodian-tab-bar-new:disabled {
