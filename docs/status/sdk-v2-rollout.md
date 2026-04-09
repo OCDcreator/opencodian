@@ -1,12 +1,12 @@
 # OpenCodeService 与 SDK v2 当前集成状态
 
-> 更新时间：2026-04-08
+> 更新时间：2026-04-09
 >
 > 依据：当前仓库 `src/` 代码实现。
 >
 > 如果这份文档与旧说明冲突，以代码为准；如果与 SDK 行为有疑问，以 `reference-projects/opencode/packages/sdk/js/src/v2` 为准。
 >
-> 本次更新是基于代码审查的状态刷新，没有重新执行 build/test/deploy。
+> 本次更新基于代码审查，以及 `@opencode-ai/sdk` 升级到 `1.4.1` 后的 build / 定向 SDK 回归验证。
 
 ## 1. 结论先行
 
@@ -50,8 +50,8 @@
 
 | 模块 | 当前状态 | 代码中已落地的内容 | 关键文件 |
 | --- | --- | --- | --- |
-| SDK 类型桥与开关 | 已完成 | `@opencode-ai/sdk@1.4.0`、`sdkTypes.ts`、`sdkFeatureFlags.ts`、runtime rollout | `package.json`、`src/core/opencode/sdkTypes.ts`、`src/core/opencode/sdkFeatureFlags.ts`、`src/main.ts` |
-| SDK client factory 与 transport | 已完成 | `createSdkClient()` + `createSdkFetch()`；JSON 走 `requestUrl()` 包装，SSE 走原生 `fetch()`；`responseStyle: "data"` + `throwOnError: true`；兼容 SDK 1.4.0 的 scoped GET/HEAD request rewrite | `src/core/opencode/createSdkClient.ts`、`src/core/opencode/sdkFetch.ts` |
+| SDK 类型桥与开关 | 已完成 | `@opencode-ai/sdk@1.4.1`、`sdkTypes.ts`、`sdkFeatureFlags.ts`、runtime rollout | `package.json`、`src/core/opencode/sdkTypes.ts`、`src/core/opencode/sdkFeatureFlags.ts`、`src/main.ts` |
+| SDK client factory 与 transport | 已完成 | `createSdkClient()` + `createSdkFetch()`；JSON 走 `requestUrl()` 包装，SSE 走原生 `fetch()`；`responseStyle: "data"` + `throwOnError: true`；兼容 SDK `1.4.x` 的 scoped GET/HEAD request rewrite | `src/core/opencode/createSdkClient.ts`、`src/core/opencode/sdkFetch.ts` |
 | 会话 CRUD 主链 | 已完成 | `checkHealth`、`createSession`、`listSessions`、`getSessionMessages`、`deleteSession`、`updateSessionTitle`、`forkSession`、`revertSession`、`getSessionDiff`、`getSessionInfo` 已接 SDK；多数读链路保留 fallback | `src/core/opencode/OpenCodeService.ts` |
 | 模型目录与 provider 配置 | 已完成 | `getAvailableModels()` -> `config.providers()`，并继续做本地归一化与默认值修正 | `src/core/opencode/OpenCodeService.ts` |
 | session todo / status | 已完成 | `getSessionTodos()` -> `session.todo()`；`getSessionStatuses()` -> `session.status()` | `src/core/opencode/OpenCodeService.ts` |
@@ -59,7 +59,7 @@
 | 流式消息主链 | 已大面积完成 | `sendMessage()` -> `session.promptAsync()` + `event.subscribe()`；首事件前失败时回退 legacy SSE | `src/core/opencode/OpenCodeService.ts` |
 | 取消 / abort | 已完成 | 本地 `AbortController` + best-effort `session.abort()` + legacy `/abort` fallback | `src/core/opencode/OpenCodeService.ts` |
 | question 事件与 UI | 已完成 | `question.asked` 已转 `StreamChunk.question_request`，UI 已支持 inline/dock、reply/reject、持久化 answered/rejected notice | `src/core/opencode/OpenCodeService.ts`、`src/features/chat/OpenCodianView.ts`、`src/features/chat/ui/QuestionDock.ts` |
-| session diff notice | 已完成 | 流中接 `file.edited`，assistant 完成后调用 `session.diff()` 并生成持久 notice；当前已兼容 legacy `before/after` 与 SDK 1.4.0 `patch` 形状 | `src/core/opencode/OpenCodeService.ts`、`src/features/chat/OpenCodianView.ts` |
+| session diff notice | 已完成 | 流中接 `file.edited`，assistant 完成后调用 `session.diff()` 并生成持久 notice；当前已兼容 legacy `before/after` 与 SDK `1.4.x` `patch` 形状 | `src/core/opencode/OpenCodeService.ts`、`src/features/chat/OpenCodianView.ts` |
 | sync event 增量订阅 | 已完成 | `global.syncEvent.subscribe()` 已接 `todo.updated` 与 `session.status` | `src/core/opencode/OpenCodeService.ts`、`src/features/chat/OpenCodianView.ts` |
 | Obsidian 上下文 parts | 已完成 | `contextItems` 在本地模式转 `file` parts，在远程模式转 synthetic text part；历史消息可反解析 `contextAttachments` | `src/core/opencode/OpenCodeService.ts`、`src/shared/obsidianContext.ts` |
 
@@ -102,7 +102,7 @@
 | `updateSessionTitle()` | `session.update()` | 已接 SDK | 当前只改标题 |
 | `forkSession()` | `session.fork()` | 已接 SDK | UI 仍用本地最小返回值 |
 | `revertSession()` | `session.revert()` | 已接 SDK | 返回值仍归一化成 boolean |
-| `getSessionDiff()` | `session.diff()` | 已接 SDK | 已实际用于 turn 后 diff notice，并兼容 legacy `before/after` 与 SDK 1.4.0 `patch` payload |
+| `getSessionDiff()` | `session.diff()` | 已接 SDK | 已实际用于 turn 后 diff notice，并兼容 legacy `before/after` 与 SDK `1.4.x` `patch` payload |
 | `getSessionInfo()` | `session.get()` | 已接 SDK | 当前仍是 service 内部 helper |
 
 ### 4.3 Prompt 与上下文

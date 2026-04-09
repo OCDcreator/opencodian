@@ -294,7 +294,7 @@ OMO 处理则基于 `detectOmoMessageMeta()`：
 | `getSessionContextUsageSnapshot()` | 计算 token/cost/context window 快照 |
 | `getPendingPermissions()` / `respondToPermission()` | 处理权限请求 |
 | `getPendingQuestions()` / `replyToQuestion()` / `rejectQuestion()` | 处理 OpenCode question 请求 |
-| `getSessionDiff()` | 拉取 session diff 元数据，并兼容 legacy `before/after` 与 SDK 1.4.0 `patch` 形状 |
+| `getSessionDiff()` | 拉取 session diff 元数据，并兼容 legacy `before/after` 与 SDK `1.4.x` `patch` 形状 |
 | `openCodeMessageToChatMessage()` | 把 OpenCode persisted message 归一化为 UI message |
 
 ## 数据流

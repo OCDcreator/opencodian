@@ -119,7 +119,7 @@
 ### 会话差异
 `SessionDiffEntry` 记录单轮对话中的文件变更：
 - 用于渲染"本轮修改了这些文件"通知
-- `patch?`: SDK 1.4.0 的 unified diff 文本；当前仅作为兼容字段保留
+- `patch?`: SDK `1.4.x` 的 unified diff 文本；当前仅作为兼容字段保留
 - `before?` / `after?`: legacy diff 形状兼容字段
 - `status`: `'added' \| 'deleted' \| 'modified'`
 - `additions`/`deletions`: 行数统计

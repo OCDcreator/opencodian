@@ -806,9 +806,7 @@ export class GlassOctahedronDemoController {
 
     this.qualityTier = this.qualityTier === 'full-v3' ? 'light-v3' : 'mesh-only';
     logger.debug('Degrading glass octahedron quality tier', this.qualityTier);
-    if (this.qualityTier !== 'full-v3') {
-      this.clearDisplacementSnapshot();
-    }
+    this.clearDisplacementSnapshot();
     this.applyQualityTierClasses();
   }
 

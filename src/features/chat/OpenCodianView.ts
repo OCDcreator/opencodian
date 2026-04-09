@@ -6314,7 +6314,7 @@ export class OpenCodianView extends ItemView {
           } else if (streamingChunk.type === 'tool_use') {
             logStreamProgressCheckpoint('tool', {
               renderedChunkSequence: renderedStreamChunkCount,
-              toolName: streamingChunk.toolCall.name,
+              toolName: streamingChunk.name,
             });
           } else if (streamingChunk.type === 'error') {
             logStreamProgressCheckpoint('error', {
@@ -7946,7 +7946,6 @@ export class OpenCodianView extends ItemView {
 
       if (
         message.role !== 'assistant'
-        || message.displayStyle === 'notice'
         || message.streamState !== 'interrupted'
       ) {
         return false;

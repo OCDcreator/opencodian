@@ -91,6 +91,58 @@ void main() {
 }
 `;
 
+type Vec3Like = {
+  set: (x: number, y: number, z: number) => void;
+  y: number;
+};
+
+type EulerLike = {
+  set: (x: number, y: number, z: number) => void;
+};
+
+type ScaleLike = {
+  setScalar: (value: number) => void;
+};
+
+type MeshNode = InstanceType<typeof Mesh> & {
+  position: Vec3Like;
+  rotation: EulerLike;
+  scale: ScaleLike;
+  renderOrder: number;
+};
+
+type GroupNode = InstanceType<typeof Group> & {
+  position: { y: number };
+  rotation: EulerLike;
+};
+
+type CameraNode = InstanceType<typeof PerspectiveCamera> & {
+  position: Vec3Like;
+  lookAt: (x: number, y: number, z: number) => void;
+};
+
+type LightNode = {
+  position: Vec3Like;
+};
+
+type FresnelUniforms = {
+  uThreshold: { value: number };
+  uColor: { value: InstanceType<typeof Color> };
+  uOpacity: { value: number };
+  uPower: { value: number };
+  uScale: { value: number };
+};
+
+type FresnelMaterialNode = InstanceType<typeof ShaderMaterial> & {
+  uniforms: FresnelUniforms;
+  depthWrite: boolean;
+  toneMapped: boolean;
+};
+
+function addObject(parent: { add: (...objects: unknown[]) => unknown }, ...objects: unknown[]): void {
+  (parent.add as (...items: unknown[]) => void)(...objects);
+}
+
 function disposeSceneResources(scene: InstanceType<typeof Scene>): void {
   scene.traverse((object: unknown) => {
     const candidate = object as {
@@ -121,7 +173,7 @@ function createEnvironmentScene(): InstanceType<typeof Scene> {
     roughness: 1,
     side: BackSide,
   });
-  scene.add(new Mesh(roomGeometry, roomMaterial));
+  addObject(scene, new Mesh(roomGeometry, roomMaterial));
 
   const glassySphere = new Mesh(
     new SphereGeometry(1.1, 18, 18),
@@ -131,9 +183,9 @@ function createEnvironmentScene(): InstanceType<typeof Scene> {
       metalness: 0.03,
       roughness: 0.24,
     }),
-  );
+  ) as MeshNode;
   glassySphere.position.set(-2.3, -1.1, -1.9);
-  scene.add(glassySphere);
+  addObject(scene, glassySphere);
 
   const accentBox = new Mesh(
     new BoxGeometry(2.4, 4.6, 1.2),
@@ -143,10 +195,10 @@ function createEnvironmentScene(): InstanceType<typeof Scene> {
       metalness: 0.08,
       roughness: 0.44,
     }),
-  );
+  ) as MeshNode;
   accentBox.position.set(2.5, -0.8, -2.2);
   accentBox.rotation.set(0.18, -0.34, 0.08);
-  scene.add(accentBox);
+  addObject(scene, accentBox);
 
   const lightPanelA = new Mesh(
     new BoxGeometry(0.2, 3.8, 4.8),
@@ -155,9 +207,9 @@ function createEnvironmentScene(): InstanceType<typeof Scene> {
       opacity: 0.88,
       transparent: true,
     }),
-  );
+  ) as MeshNode;
   lightPanelA.position.set(-6.8, 1.2, 0.6);
-  scene.add(lightPanelA);
+  addObject(scene, lightPanelA);
 
   const lightPanelB = new Mesh(
     new BoxGeometry(3.6, 0.2, 3.3),
@@ -166,9 +218,9 @@ function createEnvironmentScene(): InstanceType<typeof Scene> {
       opacity: 0.64,
       transparent: true,
     }),
-  );
+  ) as MeshNode;
   lightPanelB.position.set(-0.3, 5.7, -1.5);
-  scene.add(lightPanelB);
+  addObject(scene, lightPanelB);
 
   const lightPanelC = new Mesh(
     new BoxGeometry(2.8, 0.2, 2.9),
@@ -177,10 +229,10 @@ function createEnvironmentScene(): InstanceType<typeof Scene> {
       opacity: 0.56,
       transparent: true,
     }),
-  );
+  ) as MeshNode;
   lightPanelC.position.set(2.7, -5.2, 2.5);
   lightPanelC.rotation.set(0.18, -0.12, 0.06);
-  scene.add(lightPanelC);
+  addObject(scene, lightPanelC);
 
   const lightPanelD = new Mesh(
     new BoxGeometry(2.5, 3.2, 0.2),
@@ -189,24 +241,24 @@ function createEnvironmentScene(): InstanceType<typeof Scene> {
       opacity: 0.32,
       transparent: true,
     }),
-  );
+  ) as MeshNode;
   lightPanelD.position.set(5.6, 0.9, -0.9);
   lightPanelD.rotation.set(-0.08, -0.38, 0.02);
-  scene.add(lightPanelD);
+  addObject(scene, lightPanelD);
 
-  scene.add(new AmbientLight(0xffffff, 0.72));
+  addObject(scene, new AmbientLight(0xffffff, 0.72));
 
-  const keyLight = new DirectionalLight(0xffffff, 1.58);
+  const keyLight = new DirectionalLight(0xffffff, 1.58) as InstanceType<typeof DirectionalLight> & LightNode;
   keyLight.position.set(4.4, 5.8, 7.5);
-  scene.add(keyLight);
+  addObject(scene, keyLight);
 
-  const fillLight = new PointLight(0xffffff, 22, 18, 2);
+  const fillLight = new PointLight(0xffffff, 22, 18, 2) as InstanceType<typeof PointLight> & LightNode;
   fillLight.position.set(-4.6, 2.6, 4.2);
-  scene.add(fillLight);
+  addObject(scene, fillLight);
 
-  const rimLight = new PointLight(0xffffff, 22, 14, 2);
+  const rimLight = new PointLight(0xffffff, 22, 14, 2) as InstanceType<typeof PointLight> & LightNode;
   rimLight.position.set(2.6, -2.8, 6.2);
-  scene.add(rimLight);
+  addObject(scene, rimLight);
 
   return scene;
 }
@@ -227,12 +279,12 @@ export function createGlassOctahedronThreeRenderer(
   renderer.toneMapping = ACESFilmicToneMapping;
 
   const scene = new Scene();
-  const camera = new PerspectiveCamera(CAMERA_FOV, 1, CAMERA_NEAR, CAMERA_FAR);
+  const camera = new PerspectiveCamera(CAMERA_FOV, 1, CAMERA_NEAR, CAMERA_FAR) as CameraNode;
   camera.position.set(0, 0.12, CAMERA_Z);
   camera.lookAt(0, 0, 0);
 
-  const octahedronGroup = new Group();
-  scene.add(octahedronGroup);
+  const octahedronGroup = new Group() as GroupNode;
+  addObject(scene, octahedronGroup);
 
   const geometry = new OctahedronGeometry(GLASS_OCTAHEDRON_GEOMETRY_RADIUS, 0);
 
@@ -249,9 +301,9 @@ export function createGlassOctahedronThreeRenderer(
     thickness: 1.72,
     transmission: 1,
   });
-  const outerMesh = new Mesh(geometry, outerMaterial);
+  const outerMesh = new Mesh(geometry, outerMaterial) as MeshNode;
   outerMesh.renderOrder = 1;
-  octahedronGroup.add(outerMesh);
+  addObject(octahedronGroup, outerMesh);
 
   const innerMaterial = new MeshPhysicalMaterial({
     clearcoat: 0.42,
@@ -266,10 +318,10 @@ export function createGlassOctahedronThreeRenderer(
     transparent: true,
   });
   innerMaterial.depthWrite = false;
-  const innerMesh = new Mesh(geometry, innerMaterial);
+  const innerMesh = new Mesh(geometry, innerMaterial) as MeshNode;
   innerMesh.renderOrder = 0;
   innerMesh.scale.setScalar(INNER_SHELL_SCALE);
-  octahedronGroup.add(innerMesh);
+  addObject(octahedronGroup, innerMesh);
 
   const fresnelMaterial = new ShaderMaterial({
     fragmentShader: FRESNEL_FRAGMENT_SHADER,
@@ -283,23 +335,23 @@ export function createGlassOctahedronThreeRenderer(
       uScale: { value: 1.18 },
     },
     vertexShader: FRESNEL_VERTEX_SHADER,
-  });
+  }) as FresnelMaterialNode;
   fresnelMaterial.depthWrite = false;
   fresnelMaterial.toneMapped = false;
-  const fresnelMesh = new Mesh(geometry, fresnelMaterial);
+  const fresnelMesh = new Mesh(geometry, fresnelMaterial) as MeshNode;
   fresnelMesh.renderOrder = 2;
   fresnelMesh.scale.setScalar(FRESNEL_SHELL_SCALE);
-  octahedronGroup.add(fresnelMesh);
+  addObject(octahedronGroup, fresnelMesh);
 
-  scene.add(new AmbientLight(0xffffff, 0.28));
+  addObject(scene, new AmbientLight(0xffffff, 0.28));
 
-  const keyLight = new DirectionalLight(0xffffff, 0.84);
+  const keyLight = new DirectionalLight(0xffffff, 0.84) as InstanceType<typeof DirectionalLight> & LightNode;
   keyLight.position.set(5.2, 6.2, 7.2);
-  scene.add(keyLight);
+  addObject(scene, keyLight);
 
-  const accentLight = new PointLight(0xffffff, 8, 18, 2);
+  const accentLight = new PointLight(0xffffff, 8, 18, 2) as InstanceType<typeof PointLight> & LightNode;
   accentLight.position.set(-2.6, -0.5, 4.5);
-  scene.add(accentLight);
+  addObject(scene, accentLight);
 
   const pmremGenerator = new PMREMGenerator(renderer);
   const environmentScene = createEnvironmentScene();

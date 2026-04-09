@@ -1003,13 +1003,14 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         renderAvailabilityManagement({ restoreSearchSelection });
       });
 
-      if (options.restoreSearchSelection) {
+      const restoreSearchSelection = options.restoreSearchSelection;
+      if (restoreSearchSelection) {
         window.requestAnimationFrame(() => {
           if (!searchInputEl.isConnected) {
             return;
           }
           searchInputEl.focus();
-          const { start, end, direction } = options.restoreSearchSelection;
+          const { start, end, direction } = restoreSearchSelection;
           if (start !== null && end !== null) {
             searchInputEl.setSelectionRange(start, end, direction ?? 'none');
           }
@@ -1460,7 +1461,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
             disabledModelRefs: [...this.plugin.settings.disabledModelRefs],
             selectedDefaultProvider: this.plugin.settings.defaultProvider,
             selectedDefaultModel: this.plugin.settings.defaultModel,
-            selectedSmallModel: this.plugin.settings.smallModel,
+            selectedSmallModel: localModelConfig.small_model ?? null,
             local: serializeCatalog(catalogs.local),
             server: serializeCatalog(catalogs.server),
             baseEffective: serializeCatalog(catalogs.baseEffective),

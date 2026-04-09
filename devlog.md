@@ -12,6 +12,82 @@
 
 ---
 
+## 2026-04-09 现有 typecheck 错误清零与构建回归
+
+### 🎯 改动目标
+
+- 修掉仓库里现有的 TypeScript 编译错误，恢复 `npm run typecheck` 绿色
+- 保持前一轮 `@opencode-ai/sdk@1.4.1` 升级后的主线稳定，不顺手改动无关运行时逻辑
+- 重新 build 并部署到 Test Vault，确认最新产物可用
+
+### ✅ 本轮调整
+
+- `src/features/chat/glassOctahedronDemo.ts`
+  - 简化质量降级后的分支，去掉已不可能命中的 `'full-v3'` 比较，消除收窄后的联合类型报错
+
+- `src/features/chat/glassOctahedronDemoThree.ts`
+  - 为本地 `vendor/three` 导入补上最小运行时结构类型
+  - 通过局部 `MeshNode` / `GroupNode` / `CameraNode` / `LightNode` / `FresnelMaterialNode` 收口 `position`、`rotation`、`scale`、`uniforms`
+  - 增加 `addObject()` 辅助函数，避免 `Scene.add()` / `Group.add()` 在当前类型面下反复报错
+
+- `src/features/chat/OpenCodianView.ts`
+  - 将流式 `tool_use` 调试日志改为读取 `streamingChunk.name`
+  - 去掉同步保留逻辑里已被前置分支排除的 `displayStyle === 'notice'` 冗余判断
+
+- `src/features/settings/OpenCodianSettings.ts`
+  - 用局部常量收窄 `restoreSearchSelection`
+  - 将调试快照里的 `selectedSmallModel` 改为读取 `localModelConfig.small_model`，不再访问不存在的 `settings.smallModel`
+
+### 🧪 验证结果
+
+- `npm run typecheck` 通过
+- `npm run build` 通过，生成 `BUILD_ID: main.202604091601`
+- Test Vault 已部署并确认 `C:\Users\lt\Desktop\Write\testvault\.obsidian\plugins\opencodian\main.js` 含最新 `BUILD_ID`
+
+## 2026-04-09 SDK 1.4.1 同步升级与上游 SDK 机制核对
+
+### 🎯 改动目标
+
+- 清理 `reference-projects/opencode` 中拉取后残留的未跟踪 `sync-conflict-*` 文件，恢复参考仓库干净状态
+- 审阅上游 `opencode` 从 `ae614d9` 到 `847fc9d` 的 19 个提交，重点确认 SDK / OpenAPI / provider schema 的变化是否会影响 OpenCodian
+- 将 `@opencode-ai/sdk` 从 `1.4.0` 同步升级到 `1.4.1`，并用现有 facade / fallback 验证插件仍稳定运行
+
+### ✅ 本轮调整
+
+- `package.json`
+- `package-lock.json`
+  - 将 `@opencode-ai/sdk` 精确升级到 `1.4.1`
+  - 保持精确版本锁定，不放宽 semver 范围，避免后续自动漂移
+
+- `docs/status/sdk-v2-rollout.md`
+- `docs/modules/core/opencode/OpenCodeService.md`
+- `docs/modules/core/opencode/sdkTypes.md`
+- `docs/modules/core/types/chat.md`
+  - 把 SDK 当前版本说明同步到 `1.4.1`
+  - 将 `session.diff()` / scoped request rewrite 的兼容描述统一收敛到 `1.4.x`
+
+### 🔎 上游 SDK / 接口面结论
+
+- `@opencode-ai/sdk` 上游已发布 `1.4.1`，本地参考仓库最新头部为 `847fc9d release: v1.4.1`
+- 这轮最直接的 SDK 机制变化不是 client factory 改写，而是 **OpenAPI 与生成类型对真实服务端响应的纠偏**
+  - `/provider` 的 `all` 响应改为复用统一 `Provider` schema，补齐 `whitelist`、`blacklist`、`options` 等字段
+  - shell/session 某些响应类型改得更贴近真实 `Message + parts` 结构，减少 SDK 类型与服务端返回不一致
+- 服务端内部还同步调整了：
+  - config provider schema 中 runtime provider 与 config model schema 的拆分
+  - `promptAsync` 路由返回更干净的 `204`
+  - workflow / provider-executed tool 的权限与消息元数据处理
+- OpenCodian 现有 `OpenCodeService` 已经把 SDK 原始 payload 收敛在 service 层，并通过 `unwrapSdkData()`、provider/model 归一化和 legacy fallback 做兼容，因此 **本轮不需要额外改 service 逻辑**
+
+### 🧪 验证结果
+
+- `npm run build` 通过，生成 `BUILD_ID: main.202604091551`
+- Test Vault 已部署并确认 `C:\Users\lt\Desktop\Write\testvault\.obsidian\plugins\opencodian\main.js` 含最新 `BUILD_ID`
+- SDK 定向回归通过：
+  - `tests/unit/core/opencode/createSdkClient.test.ts`
+  - `tests/unit/core/opencode/sdkFetch.test.ts`
+  - `tests/unit/core/opencode/OpenCodeService.test.ts`
+- `npm run typecheck` 仍失败，但报错集中在既有的 `glassOctahedronDemo*`、`OpenCodianView.ts`、`OpenCodianSettings.ts`，与本次 SDK 升级无关
+
 ## 2026-04-09 SDK 1.4.0 兼容与本地服务签名接管修正
 
 ### 🎯 改动目标
