@@ -1,0 +1,32 @@
+/* ==================== Config Status Indicator ==================== */
+
+.opencodian-status-warning .setting-item-description {
+  color: var(--text-warning) !important;
+  font-weight: 500;
+}
+
+.opencodian-status-yolo .setting-item-description {
+  color: var(--text-success) !important;
+}
+
+.opencodian-status-normal .setting-item-description {
+  color: var(--interactive-accent) !important;
+}
+
+.opencodian-status-plan .setting-item-description {
+  color: var(--background-modifier-error) !important;
+}
+
+.opencodian-status-custom .setting-item-description {
+  color: var(--text-muted) !important;
+}
+
+.opencodian-title-model-warning-button {
+  color: var(--opencodian-status-warning);
+}
+
+.opencodian-title-model-warning-button:hover {
+  color: var(--opencodian-status-warning);
+  background: var(--opencodian-status-warning-subtle);
+}
+

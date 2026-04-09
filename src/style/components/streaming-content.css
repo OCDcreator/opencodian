@@ -1,0 +1,314 @@
+/* ============================================================
+   Streaming Content Styles
+   ============================================================ */
+
+/* Streaming text block */
+.streaming-text-block {
+  margin: 0.5em 0;
+}
+
+/* Thinking block - Claudian style */
+.streaming-thinking-block {
+  margin: 0.3em 0;
+  overflow: hidden;
+}
+
+.streaming-thinking-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+  cursor: pointer;
+  user-select: none;
+  color: var(--text-accent); /* Orange/red accent color */
+  font-size: 13px;
+}
+
+.streaming-thinking-header:hover {
+  opacity: 0.8;
+}
+
+.streaming-thinking-header::before {
+  content: '';
+  display: none;
+}
+
+.streaming-thinking-label {
+  font-size: 13px;
+  color: var(--text-accent);
+  font-weight: 400;
+}
+
+.streaming-thinking-content {
+  padding: 8px 12px;
+  margin: 4px 0;
+  font-size: 13px;
+  color: var(--text-normal);
+  line-height: 1.5;
+  border-left: 2px solid var(--background-modifier-border);
+  background: transparent;
+}
+
+/* Tool call block - Claudian style */
+.streaming-tool-call {
+  margin: 8px 0;
+  overflow: hidden;
+}
+
+.streaming-tool-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.streaming-tool-header:hover {
+  opacity: 0.85;
+}
+
+.streaming-tool-icon {
+  display: flex;
+  align-items: center;
+  color: var(--text-accent);
+  flex-shrink: 0;
+}
+
+.streaming-tool-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.streaming-tool-name {
+  font-family: var(--font-monospace);
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-normal);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.streaming-tool-summary {
+  flex: 1;
+  font-size: 13px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.streaming-tool-summary:empty {
+  display: none;
+}
+
+/* Status icon on the right side */
+.streaming-tool-status {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.streaming-tool-status svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Status colors */
+.streaming-tool-status.status-running {
+  color: var(--text-accent);
+  animation: spin 1s linear infinite;
+}
+
+.streaming-tool-status.status-completed {
+  color: var(--color-green);
+}
+
+.streaming-tool-status.status-error {
+  color: var(--color-red);
+}
+
+.streaming-tool-status.status-blocked {
+  color: var(--color-orange);
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.streaming-tool-content {
+  padding: 4px 0;
+  padding-inline-start: 16px;
+  margin-inline-start: 7px;
+  border-inline-start: 2px solid var(--background-modifier-border);
+  font-size: 13px;
+  color: var(--text-normal);
+  line-height: 1.5;
+}
+
+.streaming-tool-pending {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.streaming-tool-empty {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.streaming-tool-lines {
+  font-family: var(--font-monospace);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.streaming-tool-line {
+  padding: 2px 0;
+  border-bottom: 1px solid var(--background-modifier-border-hover);
+}
+
+.streaming-tool-line:last-child {
+  border-bottom: none;
+}
+
+.streaming-tool-truncated {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--background-modifier-border);
+  font-size: 11px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* Error block */
+.streaming-error-block {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0.5em 0;
+  padding: 10px 12px;
+  background: var(--background-modifier-error);
+  border: 1px solid var(--background-modifier-error-hover);
+  border-radius: 6px;
+  color: var(--text-error);
+}
+
+.streaming-error-icon {
+  flex-shrink: 0;
+}
+
+.streaming-error-text {
+  font-size: 13px;
+  white-space: pre-wrap;
+  line-height: 1.5;
+}
+
+.opencodian-server-action-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 10px 0;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--opencodian-surface-mix);
+  box-shadow: var(--opencodian-shadow);
+}
+
+.opencodian-server-action-card.is-starting {
+  border-color: var(--opencodian-accent-border);
+}
+
+.opencodian-server-action-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-normal);
+}
+
+.opencodian-server-action-desc,
+.opencodian-server-action-status {
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.opencodian-server-action-desc {
+  color: var(--text-normal);
+}
+
+.opencodian-server-action-status {
+  color: var(--text-muted);
+}
+
+.opencodian-server-action-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.opencodian-server-action-btn {
+  border: none;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-normal);
+  background: var(--background-secondary);
+  cursor: pointer;
+  transition: transform 0.15s ease, opacity 0.15s ease, background 0.15s ease;
+}
+
+.opencodian-server-action-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  background: var(--background-modifier-hover);
+}
+
+.opencodian-server-action-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.opencodian-server-action-btn.mod-cta {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+/* Expand/collapse animation helpers */
+.streaming-thinking-block.is-expanded .streaming-thinking-content,
+.streaming-tool-call.is-expanded .streaming-tool-content {
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Pending indicator - "Getting to work..." style */
+.opencodian-pending {
+  font-size: 13px;
+  color: var(--text-accent);
+  font-style: italic;
+  margin: 8px 0;
+  opacity: 0.8;
+}
+
+.opencodian-pending-text {
+  color: var(--text-accent);
+}
+
+.opencodian-pending-hint {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+

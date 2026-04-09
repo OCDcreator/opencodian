@@ -25,9 +25,9 @@
 
 ### 当前基线
 
-- `src/**/*.ts`: 101 篇源码模块文档
-- 文档元信息与基础设施: 6 篇
-- `docs/modules/**/*.md` 合计: 107 篇
+- `src/**/*.ts`: 当前共有 107 个 TypeScript 源码模块
+- `src/style/**/*.css`: 当前共有 16 个样式模块（不含 `src/style/index.css` 聚合入口）
+- `docs/modules/**/*.md`: 当前共有 126 篇模块与基础设施文档
 
 ## 文档结构
 
@@ -165,6 +165,8 @@ docs/modules/
 │       └── types.md
 ├── vendor/
 │   └── three.md
+├── style/
+│   └── README.md
 └── infrastructure/
     ├── build-pipeline.md
     ├── scripts.md

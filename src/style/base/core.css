@@ -1,0 +1,1560 @@
+/* OpenCodian Styles */
+
+/* Dark mode filter for Lobehub icons (most are black, need inversion on dark bg) */
+.theme-dark {
+  --lobehub-icon-filter: invert(1);
+  --opencodian-glass-base: color-mix(in srgb, var(--background-primary) 68%, transparent);
+  --opencodian-glass-base-strong: color-mix(in srgb, var(--background-secondary) 62%, transparent);
+  --opencodian-glass-base-soft: color-mix(in srgb, var(--background-primary) 46%, transparent);
+  --opencodian-glass-specular: rgba(255, 255, 255, 0.14);
+  --opencodian-glass-specular-soft: rgba(255, 255, 255, 0.06);
+  --opencodian-glass-border: rgba(255, 255, 255, 0.16);
+  --opencodian-glass-border-strong: rgba(255, 255, 255, 0.24);
+  --opencodian-glass-shadow: rgba(15, 23, 42, 0.22);
+  --opencodian-glass-shadow-strong: rgba(15, 23, 42, 0.3);
+  --opencodian-glass-highlight: color-mix(in srgb, var(--interactive-accent) 10%, transparent);
+  --opencodian-glass-highlight-strong: color-mix(in srgb, var(--interactive-accent) 16%, transparent);
+  --opencodian-composer-lens-bg: rgba(2, 6, 12, 0.14);
+  --opencodian-composer-lens-bg-strong: rgba(4, 8, 16, 0.18);
+  --opencodian-composer-lens-border: rgba(255, 255, 255, 0.04);
+  --opencodian-composer-lens-border-strong: rgba(255, 255, 255, 0.08);
+  --opencodian-composer-lens-shadow: rgba(2, 6, 23, 0.14);
+  --opencodian-composer-lens-shadow-strong: rgba(2, 6, 23, 0.2);
+  --opencodian-composer-liquid-tint: rgba(2, 6, 12, 0.32);
+  --opencodian-composer-liquid-density: rgba(255, 255, 255, 0.03);
+  --opencodian-composer-liquid-base-opacity: 0.26;
+  --opencodian-composer-liquid-frost-opacity: 0.52;
+  --opencodian-composer-liquid-refract-opacity: 0.34;
+  --opencodian-composer-liquid-dispersion-opacity: 0.08;
+  --opencodian-composer-liquid-highlight: rgba(173, 216, 255, 0.1);
+  --opencodian-composer-liquid-highlight-strong: rgba(196, 230, 255, 0.16);
+  --opencodian-composer-liquid-spectrum-end: rgba(151, 211, 255, 0.12);
+  --opencodian-composer-embedded-fill: color-mix(in srgb, var(--background-primary) 8%, transparent);
+  --opencodian-composer-embedded-fill-strong: color-mix(in srgb, var(--background-primary) 12%, transparent);
+  --opencodian-composer-embedded-border: rgba(255, 255, 255, 0.06);
+  --opencodian-composer-embedded-border-strong: rgba(255, 255, 255, 0.12);
+  --opencodian-composer-hotspot-bg: color-mix(in srgb, var(--interactive-accent) 78%, var(--background-primary));
+  --opencodian-composer-hotspot-bg-hover: color-mix(in srgb, var(--interactive-accent) 86%, var(--background-primary));
+  --opencodian-composer-hotspot-shadow: color-mix(in srgb, var(--interactive-accent) 22%, transparent);
+  --opencodian-composer-hotspot-shadow-strong: color-mix(in srgb, var(--interactive-accent) 30%, transparent);
+  --opencodian-composer-danger-bg: color-mix(in srgb, var(--background-modifier-error) 74%, var(--background-primary));
+  --opencodian-composer-danger-bg-hover: color-mix(in srgb, var(--background-modifier-error) 82%, var(--background-primary));
+  --opencodian-composer-danger-shadow: color-mix(in srgb, var(--background-modifier-error) 18%, transparent);
+  --opencodian-composer-danger-shadow-strong: color-mix(in srgb, var(--background-modifier-error) 24%, transparent);
+}
+
+.theme-light {
+  --lobehub-icon-filter: none;
+  --opencodian-glass-base: color-mix(in srgb, var(--background-primary) 42%, transparent);
+  --opencodian-glass-base-strong: color-mix(in srgb, var(--background-secondary) 36%, transparent);
+  --opencodian-glass-base-soft: color-mix(in srgb, var(--background-primary) 24%, transparent);
+  --opencodian-glass-specular: rgba(255, 255, 255, 0.72);
+  --opencodian-glass-specular-soft: rgba(255, 255, 255, 0.28);
+  --opencodian-glass-border: rgba(255, 255, 255, 0.46);
+  --opencodian-glass-border-strong: rgba(255, 255, 255, 0.7);
+  --opencodian-glass-shadow: rgba(15, 23, 42, 0.12);
+  --opencodian-glass-shadow-strong: rgba(15, 23, 42, 0.18);
+  --opencodian-glass-highlight: color-mix(in srgb, var(--interactive-accent) 12%, transparent);
+  --opencodian-glass-highlight-strong: color-mix(in srgb, var(--interactive-accent) 20%, transparent);
+  --opencodian-composer-lens-bg: color-mix(in srgb, var(--background-primary) 86%, transparent);
+  --opencodian-composer-lens-bg-strong: color-mix(in srgb, var(--background-secondary) 82%, transparent);
+  --opencodian-composer-lens-border: rgba(255, 255, 255, 0.56);
+  --opencodian-composer-lens-border-strong: rgba(255, 255, 255, 0.74);
+  --opencodian-composer-lens-shadow: rgba(15, 23, 42, 0.08);
+  --opencodian-composer-lens-shadow-strong: rgba(15, 23, 42, 0.12);
+  --opencodian-composer-liquid-tint: rgba(255, 255, 255, 0.3);
+  --opencodian-composer-liquid-density: rgba(255, 255, 255, 0.18);
+  --opencodian-composer-liquid-base-opacity: 0.22;
+  --opencodian-composer-liquid-frost-opacity: 0.42;
+  --opencodian-composer-liquid-refract-opacity: 0.24;
+  --opencodian-composer-liquid-dispersion-opacity: 0.04;
+  --opencodian-composer-liquid-highlight: rgba(154, 201, 255, 0.14);
+  --opencodian-composer-liquid-highlight-strong: rgba(194, 225, 255, 0.2);
+  --opencodian-composer-liquid-spectrum-end: rgba(131, 197, 255, 0.1);
+  --opencodian-composer-embedded-fill: color-mix(in srgb, var(--background-primary) 72%, transparent);
+  --opencodian-composer-embedded-fill-strong: color-mix(in srgb, var(--background-primary) 82%, transparent);
+  --opencodian-composer-embedded-border: rgba(255, 255, 255, 0.44);
+  --opencodian-composer-embedded-border-strong: rgba(255, 255, 255, 0.6);
+  --opencodian-composer-hotspot-bg: color-mix(in srgb, var(--interactive-accent) 76%, white);
+  --opencodian-composer-hotspot-bg-hover: color-mix(in srgb, var(--interactive-accent) 84%, white);
+  --opencodian-composer-hotspot-shadow: color-mix(in srgb, var(--interactive-accent) 16%, transparent);
+  --opencodian-composer-hotspot-shadow-strong: color-mix(in srgb, var(--interactive-accent) 22%, transparent);
+  --opencodian-composer-danger-bg: color-mix(in srgb, var(--background-modifier-error) 76%, white);
+  --opencodian-composer-danger-bg-hover: color-mix(in srgb, var(--background-modifier-error) 84%, white);
+  --opencodian-composer-danger-shadow: color-mix(in srgb, var(--background-modifier-error) 14%, transparent);
+  --opencodian-composer-danger-shadow-strong: color-mix(in srgb, var(--background-modifier-error) 18%, transparent);
+}
+
+:root {
+  --opencodian-accent: var(--interactive-accent);
+  --opencodian-accent-hover: var(--interactive-accent-hover);
+  --opencodian-accent-contrast: var(--text-on-accent);
+  --opencodian-accent-text: var(--text-accent);
+  --opencodian-surface: var(--background-primary);
+  --opencodian-surface-elevated: var(--background-secondary);
+  --opencodian-surface-mix: color-mix(in srgb, var(--background-primary) 88%, var(--background-secondary));
+  --opencodian-surface-mix-strong: color-mix(in srgb, var(--background-primary) 82%, var(--background-secondary));
+  --opencodian-surface-mix-soft: color-mix(in srgb, var(--background-secondary) 92%, var(--background-primary));
+  --opencodian-glass: color-mix(in srgb, var(--background-primary) 88%, transparent);
+  --opencodian-glass-strong: color-mix(in srgb, var(--background-primary) 78%, transparent);
+  --opencodian-glass-elevated: color-mix(in srgb, var(--background-secondary) 92%, transparent);
+  --opencodian-glass-soft: color-mix(in srgb, var(--background-primary) 96%, transparent);
+  --opencodian-overlay: color-mix(in srgb, var(--background-primary) 52%, transparent);
+  --opencodian-overlay-strong: color-mix(in srgb, var(--background-primary) 38%, transparent);
+  --opencodian-border-soft: color-mix(in srgb, var(--background-modifier-border) 72%, transparent);
+  --opencodian-border-strong: color-mix(in srgb, var(--background-modifier-border-hover) 88%, transparent);
+  --opencodian-highlight-soft: color-mix(in srgb, var(--background-modifier-hover) 36%, transparent);
+  --opencodian-highlight: color-mix(in srgb, var(--background-modifier-hover) 58%, transparent);
+  --opencodian-highlight-strong: color-mix(in srgb, var(--background-modifier-hover) 78%, transparent);
+  --opencodian-inset-light: color-mix(in srgb, var(--background-modifier-hover) 64%, transparent);
+  --opencodian-inset-light-strong: color-mix(in srgb, var(--background-modifier-hover) 82%, transparent);
+  --opencodian-inset-shadow: color-mix(in srgb, var(--background-modifier-border) 52%, transparent);
+  --opencodian-shadow-xs: 0 2px 8px color-mix(in srgb, var(--text-normal) 10%, transparent);
+  --opencodian-shadow-sm: 0 4px 16px color-mix(in srgb, var(--text-normal) 10%, transparent);
+  --opencodian-shadow: 0 8px 24px color-mix(in srgb, var(--text-normal) 12%, transparent);
+  --opencodian-shadow-md: 0 10px 26px color-mix(in srgb, var(--text-normal) 12%, transparent);
+  --opencodian-shadow-lg: 0 18px 42px color-mix(in srgb, var(--text-normal) 14%, transparent);
+  --opencodian-shadow-xl: 0 24px 56px color-mix(in srgb, var(--text-normal) 18%, transparent);
+  --opencodian-text-strong: color-mix(in srgb, var(--text-normal) 90%, var(--text-muted));
+  --opencodian-accent-subtle: color-mix(in srgb, var(--interactive-accent) 10%, transparent);
+  --opencodian-accent-border: color-mix(in srgb, var(--interactive-accent) 32%, transparent);
+  --opencodian-status-warning: var(--text-warning, var(--color-orange, var(--interactive-accent)));
+  --opencodian-status-warning-subtle: color-mix(in srgb, var(--opencodian-status-warning) 10%, transparent);
+  --opencodian-status-warning-border: color-mix(in srgb, var(--opencodian-status-warning) 28%, transparent);
+  --opencodian-status-success: var(--text-success, var(--background-modifier-success));
+  --opencodian-status-success-subtle: color-mix(in srgb, var(--opencodian-status-success) 10%, transparent);
+  --opencodian-status-success-border: color-mix(in srgb, var(--opencodian-status-success) 24%, transparent);
+  --opencodian-status-error: var(--text-error, var(--background-modifier-error));
+  --opencodian-status-error-subtle: color-mix(in srgb, var(--opencodian-status-error) 10%, transparent);
+  --opencodian-status-error-border: color-mix(in srgb, var(--opencodian-status-error) 24%, transparent);
+  --opencodian-glass-base: color-mix(in srgb, var(--background-primary) 60%, transparent);
+  --opencodian-glass-base-strong: color-mix(in srgb, var(--background-secondary) 52%, transparent);
+  --opencodian-glass-base-soft: color-mix(in srgb, var(--background-primary) 34%, transparent);
+  --opencodian-glass-specular: rgba(255, 255, 255, 0.22);
+  --opencodian-glass-specular-soft: rgba(255, 255, 255, 0.1);
+  --opencodian-glass-border: rgba(255, 255, 255, 0.26);
+  --opencodian-glass-border-strong: rgba(255, 255, 255, 0.38);
+  --opencodian-glass-shadow: rgba(15, 23, 42, 0.14);
+  --opencodian-glass-shadow-strong: rgba(15, 23, 42, 0.22);
+  --opencodian-glass-highlight: color-mix(in srgb, var(--interactive-accent) 12%, transparent);
+  --opencodian-glass-highlight-strong: color-mix(in srgb, var(--interactive-accent) 18%, transparent);
+  --opencodian-composer-lens-bg: rgba(2, 6, 12, 0.16);
+  --opencodian-composer-lens-bg-strong: rgba(4, 8, 16, 0.2);
+  --opencodian-composer-lens-border: rgba(255, 255, 255, 0.06);
+  --opencodian-composer-lens-border-strong: rgba(255, 255, 255, 0.1);
+  --opencodian-composer-lens-shadow: rgba(2, 6, 23, 0.12);
+  --opencodian-composer-lens-shadow-strong: rgba(2, 6, 23, 0.18);
+  --opencodian-composer-liquid-tint: rgba(2, 6, 12, 0.34);
+  --opencodian-composer-liquid-density: rgba(255, 255, 255, 0.04);
+  --opencodian-composer-liquid-base-opacity: 0.24;
+  --opencodian-composer-liquid-frost-opacity: 0.48;
+  --opencodian-composer-liquid-refract-opacity: 0.3;
+  --opencodian-composer-liquid-dispersion-opacity: 0.06;
+  --opencodian-composer-liquid-highlight: rgba(173, 216, 255, 0.12);
+  --opencodian-composer-liquid-highlight-strong: rgba(196, 230, 255, 0.18);
+  --opencodian-composer-liquid-spectrum-end: rgba(151, 211, 255, 0.12);
+  --opencodian-composer-embedded-fill: color-mix(in srgb, var(--background-primary) 8%, transparent);
+  --opencodian-composer-embedded-fill-strong: color-mix(in srgb, var(--background-primary) 12%, transparent);
+  --opencodian-composer-embedded-border: rgba(255, 255, 255, 0.07);
+  --opencodian-composer-embedded-border-strong: rgba(255, 255, 255, 0.13);
+  --opencodian-composer-hotspot-bg: color-mix(in srgb, var(--interactive-accent) 78%, var(--background-primary));
+  --opencodian-composer-hotspot-bg-hover: color-mix(in srgb, var(--interactive-accent) 86%, var(--background-primary));
+  --opencodian-composer-hotspot-shadow: color-mix(in srgb, var(--interactive-accent) 20%, transparent);
+  --opencodian-composer-hotspot-shadow-strong: color-mix(in srgb, var(--interactive-accent) 28%, transparent);
+  --opencodian-composer-danger-bg: color-mix(in srgb, var(--background-modifier-error) 74%, var(--background-primary));
+  --opencodian-composer-danger-bg-hover: color-mix(in srgb, var(--background-modifier-error) 82%, var(--background-primary));
+  --opencodian-composer-danger-shadow: color-mix(in srgb, var(--background-modifier-error) 16%, transparent);
+  --opencodian-composer-danger-shadow-strong: color-mix(in srgb, var(--background-modifier-error) 22%, transparent);
+}
+
+.opencodian-container {
+  --interactive-accent: var(--opencodian-accent);
+  --interactive-accent-hover: var(--opencodian-accent-hover);
+  --text-on-accent: var(--opencodian-accent-contrast);
+  --text-accent: var(--opencodian-accent-text);
+  --opencodian-chat-surface: var(--background-secondary);
+  --opencodian-composer-stack-height: 0px;
+  --opencodian-messages-pad-top: 12px;
+  --opencodian-messages-pad-x: 16px;
+  --opencodian-sticky-header-gap: 6px;
+  --opencodian-sticky-push-gap: 0px;
+  --opencodian-sticky-mask-height: 18px;
+  --opencodian-sticky-mask-blur: 24px;
+  --opencodian-theme-bg-opacity: 0.92;
+  --opencodian-theme-bg-blur: 2px;
+  --opencodian-theme-bg-scale: 1.08;
+  --opencodian-theme-bg-bleed: 28px;
+  --opencodian-theme-bg-dim: 28%;
+  --opencodian-theme-bg-edge-fade: 28px;
+  --opencodian-theme-bg-overlay-opacity: 32%;
+  --opencodian-theme-bg-overlay-opacity-strong: 42%;
+  --opencodian-theme-bg-mask-opacity: 48%;
+  --opencodian-theme-bg-highlight-opacity: 14%;
+  --opencodian-theme-bg-saturation: 108%;
+  --opencodian-theme-bg-brightness: 94%;
+  --opencodian-theme-bg-size: cover;
+  --opencodian-theme-bg-focus-x: 50%;
+  --opencodian-theme-bg-focus-y: 50%;
+  --opencodian-user-radius: 16px;
+  --opencodian-user-tail-radius: 4px;
+  --opencodian-user-blur: 12px;
+  --opencodian-user-shadow-blur: 28px;
+  --opencodian-user-time-font-size: 11px;
+  --opencodian-user-time-font-weight: 400;
+  --opencodian-user-time-color: var(--text-muted);
+  --opencodian-assistant-radius: 14px;
+  --opencodian-assistant-pad-y: 0px;
+  --opencodian-assistant-pad-x: 28px;
+  --opencodian-assistant-content-pad-y: 10px;
+  --opencodian-assistant-content-pad-x: 14px;
+  --opencodian-assistant-bg-opacity: 72%;
+  --opencodian-assistant-blur: 10px;
+  --opencodian-assistant-shadow-blur: 24px;
+  --opencodian-assistant-meta-font-size: 10px;
+  --opencodian-assistant-meta-color: var(--text-muted);
+  --opencodian-assistant-time-font-size: 10px;
+  --opencodian-assistant-time-font-weight: 400;
+  --opencodian-assistant-time-color: var(--text-muted);
+  --opencodian-assistant-model-id-font-size: 10px;
+  --opencodian-assistant-model-id-font-weight: 400;
+  --opencodian-assistant-model-id-color: var(--text-faint, var(--text-muted));
+  --opencodian-input-radius: 12px;
+  --opencodian-input-bg-opacity: 72%;
+  --opencodian-input-blur: 18px;
+  --opencodian-input-shadow-blur: 28px;
+  --opencodian-gr-glass-bg-alpha: 0.48;
+  --opencodian-gr-glass-blur: 26px;
+  --opencodian-gr-glass-saturation: 170%;
+  --opencodian-gr-glass-brightness: 108%;
+  --opencodian-gr-card-bg-alpha: 0.52;
+  --opencodian-gr-card-blur: 20px;
+  --opencodian-gr-card-saturation: 150%;
+  --opencodian-gr-card-brightness: 100%;
+  --opencodian-gr-pill-bg-alpha: 0.05;
+  --opencodian-gr-pill-blur: 8px;
+  --opencodian-gr-pill-saturation: 130%;
+  --opencodian-gr-pill-brightness: 100%;
+  --opencodian-scrollbar-width: 8px;
+  --opencodian-scrollbar-radius: 999px;
+  --opencodian-scrollbar-track-opacity: 22%;
+  --opencodian-scrollbar-thumb-opacity: 68%;
+  --opencodian-scrollbar-thumb-hover-opacity: 82%;
+  --opencodian-scrollbar-edge-padding: 2px;
+  --opencodian-scrollbar-shadow-opacity: 46%;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  max-height: 100vh; /* Ensure container doesn't exceed viewport */
+  overflow: hidden;
+  position: relative; /* Create positioning context */
+}
+
+.theme-dark .opencodian-container.opencodian-theme-flat {
+  --opencodian-glass-base: color-mix(in srgb, var(--background-secondary) 96%, var(--background-primary));
+  --opencodian-glass-base-strong: color-mix(in srgb, var(--background-secondary) 92%, var(--background-primary));
+  --opencodian-glass-base-soft: color-mix(in srgb, var(--background-secondary) 88%, var(--background-primary));
+  --opencodian-glass-specular: rgba(255, 255, 255, 0.02);
+  --opencodian-glass-specular-soft: rgba(255, 255, 255, 0.01);
+  --opencodian-glass-border: rgba(148, 163, 184, 0.16);
+  --opencodian-glass-border-strong: rgba(148, 163, 184, 0.24);
+  --opencodian-glass-shadow: rgba(15, 23, 42, 0);
+  --opencodian-glass-shadow-strong: rgba(15, 23, 42, 0);
+  --opencodian-glass-highlight: color-mix(in srgb, var(--interactive-accent) 8%, transparent);
+  --opencodian-glass-highlight-strong: color-mix(in srgb, var(--interactive-accent) 12%, transparent);
+  --opencodian-shadow-xs: none;
+  --opencodian-shadow-sm: none;
+  --opencodian-shadow: none;
+  --opencodian-shadow-md: none;
+  --opencodian-shadow-lg: none;
+  --opencodian-shadow-xl: none;
+}
+
+.theme-light .opencodian-container.opencodian-theme-flat {
+  --opencodian-glass-base: color-mix(in srgb, white 98%, var(--background-secondary));
+  --opencodian-glass-base-strong: color-mix(in srgb, white 94%, var(--background-secondary));
+  --opencodian-glass-base-soft: color-mix(in srgb, white 90%, var(--background-secondary));
+  --opencodian-glass-specular: rgba(255, 255, 255, 0.04);
+  --opencodian-glass-specular-soft: rgba(255, 255, 255, 0.02);
+  --opencodian-glass-border: rgba(148, 163, 184, 0.22);
+  --opencodian-glass-border-strong: rgba(148, 163, 184, 0.3);
+  --opencodian-glass-shadow: rgba(15, 23, 42, 0);
+  --opencodian-glass-shadow-strong: rgba(15, 23, 42, 0);
+  --opencodian-glass-highlight: color-mix(in srgb, var(--interactive-accent) 6%, transparent);
+  --opencodian-glass-highlight-strong: color-mix(in srgb, var(--interactive-accent) 10%, transparent);
+  --opencodian-shadow-xs: none;
+  --opencodian-shadow-sm: none;
+  --opencodian-shadow: none;
+  --opencodian-shadow-md: none;
+  --opencodian-shadow-lg: none;
+  --opencodian-shadow-xl: none;
+}
+
+.theme-dark .opencodian-container.opencodian-theme-soft {
+  --opencodian-glass-base: color-mix(in srgb, var(--background-primary) 78%, transparent);
+  --opencodian-glass-base-strong: color-mix(in srgb, var(--background-secondary) 72%, transparent);
+  --opencodian-glass-base-soft: color-mix(in srgb, var(--background-primary) 62%, transparent);
+  --opencodian-glass-specular: rgba(255, 255, 255, 0.18);
+  --opencodian-glass-specular-soft: rgba(255, 255, 255, 0.08);
+  --opencodian-glass-border: rgba(255, 255, 255, 0.22);
+  --opencodian-glass-border-strong: rgba(255, 255, 255, 0.32);
+  --opencodian-glass-shadow: rgba(15, 23, 42, 0.14);
+  --opencodian-glass-shadow-strong: rgba(15, 23, 42, 0.2);
+  --opencodian-shadow-xs: 0 1px 6px color-mix(in srgb, var(--text-normal) 8%, transparent);
+  --opencodian-shadow-sm: 0 6px 18px color-mix(in srgb, var(--text-normal) 10%, transparent);
+  --opencodian-shadow: 0 10px 28px color-mix(in srgb, var(--text-normal) 12%, transparent);
+  --opencodian-shadow-md: 0 14px 32px color-mix(in srgb, var(--text-normal) 14%, transparent);
+}
+
+.theme-light .opencodian-container.opencodian-theme-soft {
+  --opencodian-glass-base: color-mix(in srgb, white 86%, transparent);
+  --opencodian-glass-base-strong: color-mix(in srgb, white 80%, var(--background-secondary));
+  --opencodian-glass-base-soft: color-mix(in srgb, white 94%, transparent);
+  --opencodian-glass-specular: rgba(255, 255, 255, 0.82);
+  --opencodian-glass-specular-soft: rgba(255, 255, 255, 0.38);
+  --opencodian-glass-border: rgba(255, 255, 255, 0.56);
+  --opencodian-glass-border-strong: rgba(255, 255, 255, 0.7);
+  --opencodian-glass-shadow: rgba(15, 23, 42, 0.08);
+  --opencodian-glass-shadow-strong: rgba(15, 23, 42, 0.12);
+  --opencodian-shadow-xs: 0 2px 8px color-mix(in srgb, var(--text-normal) 8%, transparent);
+  --opencodian-shadow-sm: 0 8px 18px color-mix(in srgb, var(--text-normal) 10%, transparent);
+  --opencodian-shadow: 0 12px 30px color-mix(in srgb, var(--text-normal) 12%, transparent);
+  --opencodian-shadow-md: 0 16px 34px color-mix(in srgb, var(--text-normal) 13%, transparent);
+}
+
+.theme-dark .opencodian-container.opencodian-theme-sharp {
+  --opencodian-glass-base: color-mix(in srgb, var(--background-secondary) 84%, transparent);
+  --opencodian-glass-base-strong: color-mix(in srgb, var(--background-secondary) 78%, transparent);
+  --opencodian-glass-base-soft: color-mix(in srgb, var(--background-primary) 72%, transparent);
+  --opencodian-glass-specular: rgba(255, 255, 255, 0.08);
+  --opencodian-glass-specular-soft: rgba(255, 255, 255, 0.03);
+  --opencodian-glass-border: rgba(148, 163, 184, 0.2);
+  --opencodian-glass-border-strong: rgba(148, 163, 184, 0.34);
+  --opencodian-glass-shadow: rgba(2, 6, 23, 0.22);
+  --opencodian-glass-shadow-strong: rgba(2, 6, 23, 0.3);
+  --opencodian-shadow-xs: 0 1px 4px color-mix(in srgb, var(--text-normal) 16%, transparent);
+  --opencodian-shadow-sm: 0 3px 10px color-mix(in srgb, var(--text-normal) 18%, transparent);
+  --opencodian-shadow: 0 8px 18px color-mix(in srgb, var(--text-normal) 22%, transparent);
+  --opencodian-shadow-md: 0 10px 22px color-mix(in srgb, var(--text-normal) 24%, transparent);
+  --opencodian-shadow-lg: 0 14px 28px color-mix(in srgb, var(--text-normal) 26%, transparent);
+}
+
+.theme-light .opencodian-container.opencodian-theme-sharp {
+  --opencodian-glass-base: color-mix(in srgb, white 92%, var(--background-secondary));
+  --opencodian-glass-base-strong: color-mix(in srgb, white 86%, var(--background-secondary));
+  --opencodian-glass-base-soft: color-mix(in srgb, white 94%, var(--background-primary));
+  --opencodian-glass-specular: rgba(255, 255, 255, 0.46);
+  --opencodian-glass-specular-soft: rgba(255, 255, 255, 0.18);
+  --opencodian-glass-border: rgba(100, 116, 139, 0.24);
+  --opencodian-glass-border-strong: rgba(71, 85, 105, 0.38);
+  --opencodian-glass-shadow: rgba(15, 23, 42, 0.14);
+  --opencodian-glass-shadow-strong: rgba(15, 23, 42, 0.18);
+  --opencodian-shadow-xs: 0 1px 4px color-mix(in srgb, var(--text-normal) 14%, transparent);
+  --opencodian-shadow-sm: 0 4px 12px color-mix(in srgb, var(--text-normal) 16%, transparent);
+  --opencodian-shadow: 0 8px 18px color-mix(in srgb, var(--text-normal) 18%, transparent);
+  --opencodian-shadow-md: 0 10px 22px color-mix(in srgb, var(--text-normal) 20%, transparent);
+  --opencodian-shadow-lg: 0 14px 28px color-mix(in srgb, var(--text-normal) 22%, transparent);
+}
+
+/* Header - transparent, no border */
+.opencodian-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+}
+
+.opencodian-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 800;
+  font-size: 16px;
+  color: var(--text-normal);
+}
+
+.opencodian-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 25px;
+  flex-shrink: 0;
+}
+
+.opencodian-logo svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.svg-icon.opencodian-app-icon .opencodian-app-icon-layer--dark {
+  display: none;
+}
+
+.theme-dark .svg-icon.opencodian-app-icon .opencodian-app-icon-layer--light {
+  display: none;
+}
+
+.theme-dark .svg-icon.opencodian-app-icon .opencodian-app-icon-layer--dark {
+  display: inline;
+}
+
+.opencodian-title-text {
+  display: block;
+  width: auto;
+  height: 16px;
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.opencodian-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.opencodian-server-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  margin-right: 6px;
+  border-radius: 999px;
+  border: 1px solid var(--opencodian-glass-border);
+  background:
+    linear-gradient(
+      180deg,
+      var(--opencodian-glass-specular) 0%,
+      color-mix(in srgb, var(--opencodian-glass-specular-soft) 88%, transparent) 46%,
+      transparent 100%
+    ),
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--opencodian-glass-base-strong) 96%, transparent) 0%,
+      color-mix(in srgb, var(--opencodian-glass-base) 82%, transparent) 100%
+    );
+  backdrop-filter: blur(18px) saturate(1.15);
+  -webkit-backdrop-filter: blur(18px) saturate(1.15);
+  box-shadow:
+    0 5px 14px color-mix(in srgb, var(--opencodian-glass-shadow) 82%, transparent),
+    0 1px 0 color-mix(in srgb, var(--opencodian-glass-specular) 88%, transparent) inset,
+    0 -1px 0 color-mix(in srgb, var(--background-modifier-border) 48%, transparent) inset;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.opencodian-server-status-badge:hover {
+  color: var(--text-normal);
+  border-color: var(--opencodian-glass-border-strong);
+  box-shadow:
+    0 7px 18px color-mix(in srgb, var(--opencodian-glass-shadow-strong) 84%, transparent),
+    0 1px 0 color-mix(in srgb, var(--opencodian-glass-specular) 95%, transparent) inset,
+    0 -1px 0 color-mix(in srgb, var(--background-modifier-border-hover) 64%, transparent) inset;
+  transform: translateY(-1px);
+}
+
+.opencodian-server-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.85;
+}
+
+.opencodian-server-status-text {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.opencodian-server-status-badge.is-checking,
+.opencodian-server-status-badge.is-starting {
+  color: var(--text-accent);
+}
+
+.opencodian-server-status-badge.is-running,
+.opencodian-server-status-badge.is-external {
+  color: var(--color-green);
+}
+
+.opencodian-server-status-badge.is-offline {
+  color: var(--text-error);
+}
+
+.opencodian-header-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: all 0.2s ease;
+}
+
+.opencodian-header-btn:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.opencodian-header-btn svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
+.opencodian-tab-bar-slot {
+  display: none;
+  position: relative;
+}
+
+.opencodian-tab-bar-slot.is-active-slot {
+  display: block;
+}
+
+.opencodian-tab-bar-slot--header {
+  flex: 1;
+  min-width: 0;
+  margin: 0 12px;
+}
+
+.opencodian-tab-bar-slot--below-header {
+  padding: 0 16px 10px;
+  z-index: 30;
+}
+
+.opencodian-tab-bar-slot--input {
+  margin-bottom: 10px;
+}
+
+.opencodian-tab-bar-external-host {
+  position: absolute;
+  inset: 0;
+  z-index: 220;
+  pointer-events: none;
+}
+
+.opencodian-tab-bar-slot--outer-vertical {
+  position: absolute;
+  top: 56px;
+  left: 4px;
+  padding: 0;
+  width: max-content;
+  pointer-events: auto;
+}
+
+.opencodian-tab-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 4px;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: visible;
+  scrollbar-width: none;
+  position: relative;
+}
+
+.opencodian-tab-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.opencodian-tab-bar-slot--outer-vertical.is-active-slot .opencodian-tab-bar {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  overflow: visible;
+}
+
+.opencodian-tab-bar[data-layout="below-header-grid"] {
+  flex-wrap: nowrap;
+  overflow: visible;
+}
+
+.opencodian-tab-bar-item,
+.opencodian-tab-bar-new,
+.opencodian-tab-bar-overflow {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 44px;
+  padding: 6px 8px;
+  border: 1px solid color-mix(in srgb, var(--opencodian-glass-border) 88%, var(--background-modifier-border));
+  border-radius: 999px;
+  background:
+    linear-gradient(
+      180deg,
+      var(--opencodian-glass-specular-soft) 0%,
+      color-mix(in srgb, var(--opencodian-glass-specular-soft) 55%, transparent) 42%,
+      transparent 100%
+    ),
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--opencodian-glass-base) 94%, transparent) 0%,
+      color-mix(in srgb, var(--background-secondary) 84%, transparent) 100%
+    );
+  backdrop-filter: blur(14px) saturate(1.04);
+  -webkit-backdrop-filter: blur(14px) saturate(1.04);
+  color: var(--text-muted);
+  cursor: pointer;
+  overflow: hidden;
+  box-shadow:
+    0 2px 8px color-mix(in srgb, var(--opencodian-glass-shadow) 50%, transparent),
+    0 1px 0 color-mix(in srgb, var(--opencodian-glass-specular) 82%, transparent) inset;
+  opacity: 0.24;
+  filter: blur(0.5px) saturate(0.56);
+  transition:
+    max-width 0.2s ease,
+    padding 0.2s ease,
+    gap 0.2s ease,
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease,
+    opacity 0.15s ease,
+    filter 0.15s ease,
+    transform 0.15s ease;
+}
+
+.opencodian-tab-bar-item:hover,
+.opencodian-tab-bar-new:hover:not(:disabled),
+.opencodian-tab-bar-overflow:hover,
+.opencodian-tab-bar-item:focus-visible,
+.opencodian-tab-bar-overflow:focus-visible,
+.opencodian-tab-bar-item.is-active {
+  z-index: 6;
+  background:
+    linear-gradient(
+      180deg,
+      var(--opencodian-glass-specular) 0%,
+      color-mix(in srgb, var(--opencodian-glass-specular-soft) 72%, transparent) 42%,
+      transparent 100%
+    ),
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--opencodian-glass-base-strong) 96%, transparent) 0%,
+      color-mix(in srgb, var(--background-modifier-hover) 86%, transparent) 100%
+    );
+  color: var(--text-normal);
+  border-color: color-mix(in srgb, var(--opencodian-glass-border-strong) 72%, var(--interactive-accent));
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--opencodian-glass-specular) 94%, transparent),
+    inset 0 -1px 0 color-mix(in srgb, var(--background-modifier-border-hover) 42%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, var(--opencodian-glass-border-strong) 36%, transparent),
+    inset 0 8px 14px color-mix(in srgb, var(--interactive-accent) 8%, transparent);
+  opacity: 1;
+  filter: none;
+}
+
+.opencodian-tab-bar-item.is-active {
+  border-color: color-mix(in srgb, var(--interactive-accent) 46%, var(--opencodian-glass-border-strong));
+}
+
+.opencodian-tab-bar-item.is-streaming .opencodian-tab-bar-state,
+.opencodian-tab-bar-item.has-background-task .opencodian-tab-bar-state,
+.opencodian-tab-bar-item.needs-attention .opencodian-tab-bar-state {
+  color: var(--interactive-accent);
+}
+
+.opencodian-tab-bar-item.has-background-task {
+  border-color: color-mix(in srgb, var(--text-warning) 60%, var(--opencodian-glass-border-strong));
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--opencodian-glass-specular) 94%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, var(--text-warning) 16%, transparent),
+    inset 0 8px 14px color-mix(in srgb, var(--text-warning) 8%, transparent),
+    0 6px 18px color-mix(in srgb, var(--text-warning) 12%, transparent);
+  opacity: 0.92;
+  filter: saturate(0.96);
+}
+
+.opencodian-tab-bar-item.is-active.has-background-task {
+  border-color: color-mix(in srgb, var(--text-warning) 72%, var(--interactive-accent));
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--opencodian-glass-specular) 96%, transparent),
+    inset 0 -1px 0 color-mix(in srgb, var(--background-modifier-border-hover) 42%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, var(--text-warning) 24%, transparent),
+    inset 0 10px 20px color-mix(in srgb, var(--text-warning) 10%, transparent),
+    0 8px 24px color-mix(in srgb, var(--text-warning) 16%, transparent);
+}
+
+.opencodian-tab-bar-item.needs-attention:not(.is-active) {
+  border-color: color-mix(in srgb, var(--text-warning) 50%, var(--background-modifier-border));
+}
+
+.opencodian-tab-bar-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: var(--background-modifier-hover);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-normal);
+  flex: 0 0 auto;
+}
+
+.opencodian-tab-bar-badge-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  isolation: isolate;
+  overflow: visible;
+}
+
+.opencodian-tab-bar-badge-wrap::before,
+.opencodian-tab-bar-badge-wrap::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 999px;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.opencodian-tab-bar-badge-wrap::before {
+  filter: blur(1.8px);
+}
+
+.opencodian-tab-bar-item.is-streaming .opencodian-tab-bar-badge-wrap::before,
+.opencodian-tab-bar-item.is-streaming .opencodian-tab-bar-badge-wrap::after {
+  opacity: 1;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    transparent 210deg,
+    color-mix(in srgb, var(--interactive-accent) 42%, transparent) 250deg,
+    color-mix(in srgb, var(--interactive-accent) 88%, white 8%) 292deg,
+    transparent 330deg,
+    transparent 360deg
+  );
+  animation: opencodian-tab-badge-orbit 1s linear infinite;
+}
+
+.opencodian-tab-bar-item.is-streaming .opencodian-tab-bar-badge-wrap::before {
+  opacity: 0.78;
+}
+
+.opencodian-tab-bar-item.is-streaming .opencodian-tab-bar-badge {
+  position: relative;
+  z-index: 1;
+}
+
+.opencodian-tab-bar-item.has-background-task .opencodian-tab-bar-badge-wrap::before,
+.opencodian-tab-bar-item.has-background-task .opencodian-tab-bar-badge-wrap::after {
+  opacity: 1;
+}
+
+.opencodian-tab-bar-item.has-background-task .opencodian-tab-bar-badge-wrap::before {
+  inset: -5px;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--text-warning) 34%, transparent) 0%,
+    color-mix(in srgb, var(--text-warning) 18%, transparent) 55%,
+    transparent 78%
+  );
+  animation: opencodian-tab-background-pulse 1.5s ease-in-out infinite;
+}
+
+.opencodian-tab-bar-item.has-background-task .opencodian-tab-bar-badge-wrap::after {
+  inset: -4px;
+  border: 1px solid color-mix(in srgb, var(--text-warning) 52%, transparent);
+  background: transparent;
+  animation: opencodian-tab-background-ring 1.8s ease-out infinite;
+}
+
+.opencodian-tab-bar-item.has-background-task .opencodian-tab-bar-badge {
+  position: relative;
+  z-index: 1;
+  background: color-mix(in srgb, var(--text-warning) 18%, var(--background-modifier-hover));
+  color: color-mix(in srgb, var(--text-warning) 84%, var(--text-normal));
+}
+
+.opencodian-tab-bar-title {
+  min-width: 0;
+  flex: 0 1 auto;
+  max-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0;
+  font-size: 12px;
+  font-weight: 600;
+  transition:
+    max-width 0.2s ease,
+    opacity 0.16s ease,
+    transform 0.16s ease;
+}
+
+.opencodian-tab-bar[data-layout="input"] .opencodian-tab-bar-item:is(:hover, :focus-visible, :focus-within) {
+  gap: 8px;
+  max-width: min(240px, 100%);
+  padding-right: 10px;
+}
+
+.opencodian-tab-bar[data-layout="input"] .opencodian-tab-bar-item.is-active {
+  gap: 8px;
+  max-width: min(240px, 100%);
+  padding-right: 10px;
+}
+
+.opencodian-tab-bar[data-layout="input"] .opencodian-tab-bar-item:is(:hover, :focus-visible, :focus-within) .opencodian-tab-bar-title--collapsible {
+  max-width: 180px;
+  opacity: 1;
+}
+
+.opencodian-tab-bar[data-layout="input"] .opencodian-tab-bar-item.is-active .opencodian-tab-bar-title--collapsible {
+  max-width: 180px;
+  opacity: 1;
+}
+
+.opencodian-tab-bar[data-layout="below-header-grid"] .opencodian-tab-bar-item,
+.opencodian-tab-bar[data-layout="below-header-grid"] .opencodian-tab-bar-overflow {
+  flex: 0 1 auto;
+  width: auto;
+  max-width: 44px;
+  min-width: 0;
+  justify-content: center;
+  gap: 0;
+  padding: 6px 8px;
+}
+
+.opencodian-tab-bar[data-layout="below-header-grid"] .opencodian-tab-bar-item.is-active {
+  gap: 8px;
+  max-width: min(240px, 100%);
+  padding-right: 10px;
+}
+
+.opencodian-tab-bar[data-layout="below-header-grid"] .opencodian-tab-bar-item.is-active .opencodian-tab-bar-title--collapsible,
+.opencodian-tab-bar[data-layout="below-header-grid"] .opencodian-tab-bar-item:not(.is-active):is(:hover, :focus-visible, :focus-within) {
+  gap: 8px;
+  max-width: min(240px, 100%);
+  padding-right: 10px;
+}
+
+.opencodian-tab-bar[data-layout="below-header-grid"] .opencodian-tab-bar-item.is-active .opencodian-tab-bar-title--collapsible,
+.opencodian-tab-bar[data-layout="below-header-grid"] .opencodian-tab-bar-item:not(.is-active):is(:hover, :focus-visible, :focus-within) .opencodian-tab-bar-title--collapsible {
+  max-width: 180px;
+  opacity: 1;
+}
+
+.opencodian-tab-bar-state {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  height: 12px;
+  flex: 0 0 auto;
+  overflow: visible;
+  transition:
+    width 0.2s ease,
+    opacity 0.16s ease;
+}
+
+.opencodian-tab-bar-state:empty {
+  width: 0;
+  height: 0;
+  opacity: 0;
+}
+
+.opencodian-tab-bar-state svg {
+  width: 12px;
+  height: 12px;
+}
+
+.opencodian-tab-bar-state.is-background-task {
+  width: 16px;
+  height: 12px;
+  color: var(--text-warning);
+}
+
+.opencodian-tab-bar-item.has-background-task-secondary .opencodian-tab-bar-badge,
+.opencodian-tab-overflow-menu-item.has-background-task-secondary .opencodian-tab-overflow-menu-badge {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--text-warning) 40%, transparent);
+}
+
+.opencodian-tab-bar-item.has-background-task-secondary::after,
+.opencodian-tab-overflow-menu-item.has-background-task-secondary::after {
+  content: '';
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--text-warning);
+  opacity: 0.9;
+}
+
+.opencodian-tab-activity-dots {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 100%;
+}
+
+.opencodian-tab-activity-dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.4;
+  animation: opencodian-tab-background-dots 1.15s ease-in-out infinite;
+}
+
+.opencodian-tab-activity-dot:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.opencodian-tab-activity-dot:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+.opencodian-tab-bar-item.is-streaming .opencodian-tab-bar-state {
+  display: none;
+}
+
+.opencodian-background-task-inline {
+  margin-top: 10px;
+}
+
+.opencodian-chat-notice-card.is-background-task.is-inline {
+  border-radius: 14px;
+  border-color: color-mix(in srgb, var(--text-warning) 28%, var(--background-modifier-border));
+  background: color-mix(in srgb, var(--background-secondary) 82%, transparent);
+}
+
+.opencodian-tab-bar-new:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.opencodian-tab-bar-overflow {
+  flex: 0 0 auto;
+  min-width: 46px;
+  padding: 6px 10px;
+}
+
+.opencodian-tab-bar[data-layout="below-header-vertical"] .opencodian-tab-bar-item,
+.opencodian-tab-bar[data-layout="below-header-vertical"] .opencodian-tab-bar-overflow {
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  padding: 0;
+  gap: 0;
+  border-radius: 6px;
+  overflow: visible;
+  box-shadow: 0 2px 8px var(--opencodian-glass-shadow);
+}
+
+.opencodian-tab-bar[data-layout="below-header-vertical"] .opencodian-tab-bar-item:hover,
+.opencodian-tab-bar[data-layout="below-header-vertical"] .opencodian-tab-bar-overflow:hover {
+  transform: scale(1.05);
+}
+
+.opencodian-tab-bar[data-layout="below-header-vertical"] .opencodian-tab-bar-badge {
+  width: 18px;
+  height: 18px;
+}
+
+.opencodian-tab-bar[data-layout="below-header-vertical"] .opencodian-tab-bar-title--collapsible {
+  position: absolute;
+  top: 50%;
+  left: calc(100% + 8px);
+  max-width: 0;
+  padding: 7px 11px;
+  border-radius: 10px;
+  border: 1px solid var(--opencodian-glass-border-strong);
+  background:
+    linear-gradient(
+      180deg,
+      var(--opencodian-glass-specular-soft) 0%,
+      color-mix(in srgb, var(--opencodian-glass-specular-soft) 68%, transparent) 44%,
+      transparent 100%
+    ),
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--opencodian-glass-base-strong) 97%, transparent) 0%,
+      color-mix(in srgb, var(--background-secondary) 92%, transparent) 100%
+    );
+  backdrop-filter: blur(18px) saturate(1.08);
+  -webkit-backdrop-filter: blur(18px) saturate(1.08);
+  box-shadow:
+    0 12px 28px color-mix(in srgb, var(--opencodian-glass-shadow-strong) 68%, transparent),
+    0 1px 0 color-mix(in srgb, var(--opencodian-glass-specular) 94%, transparent) inset;
+  color: var(--text-normal);
+  transform: translateY(-50%) translateX(-4px);
+  z-index: 8;
+  pointer-events: none;
+}
+
+.opencodian-tab-bar[data-layout="below-header-vertical"] .opencodian-tab-bar-item:hover .opencodian-tab-bar-title--collapsible {
+  max-width: 220px;
+  opacity: 1;
+  transform: translateY(-50%) translateX(0);
+}
+
+.opencodian-tab-bar[data-layout="below-header-vertical"] .opencodian-tab-bar-item:not(.is-streaming) .opencodian-tab-bar-state {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: var(--background-primary);
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--text-normal) 18%, transparent);
+}
+
+.opencodian-tab-bar[data-layout="below-header-vertical"] .opencodian-tab-bar-item.has-background-task .opencodian-tab-bar-state {
+  background: color-mix(in srgb, var(--text-warning) 12%, var(--background-primary));
+  box-shadow: 0 1px 6px color-mix(in srgb, var(--text-warning) 28%, transparent);
+}
+
+.opencodian-tab-overflow-menu {
+  position: fixed;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--background-primary) 96%, var(--background-secondary));
+  border: 1px solid var(--background-modifier-border);
+  box-shadow: 0 16px 36px color-mix(in srgb, var(--text-normal) 18%, transparent);
+  overflow-y: auto;
+  z-index: 1300;
+}
+
+.opencodian-tab-overflow-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-normal);
+  cursor: pointer;
+  text-align: left;
+}
+
+.opencodian-tab-overflow-menu-item:hover,
+.opencodian-tab-overflow-menu-item:focus-visible {
+  background: var(--background-modifier-hover);
+  outline: none;
+}
+
+.opencodian-tab-overflow-menu-item.is-active {
+  background: color-mix(in srgb, var(--interactive-accent) 16%, var(--background-secondary));
+}
+
+.opencodian-tab-overflow-menu-item.needs-attention:not(.is-active) {
+  color: var(--text-warning);
+}
+
+.opencodian-tab-overflow-menu-item.has-background-task:not(.is-active) {
+  background: color-mix(in srgb, var(--text-warning) 8%, transparent);
+}
+
+.opencodian-tab-overflow-menu-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+  font-size: 11px;
+  font-weight: 700;
+  flex: 0 0 auto;
+}
+
+.opencodian-tab-overflow-menu-title {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.opencodian-tab-overflow-menu-state {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  color: var(--interactive-accent);
+}
+
+.opencodian-tab-overflow-menu-state svg {
+  width: 14px;
+  height: 14px;
+}
+
+.opencodian-tab-overflow-menu-state.is-background-task {
+  width: 18px;
+  color: var(--text-warning);
+}
+
+.opencodian-tab-overflow-menu-state.is-streaming svg {
+  animation: opencodian-spin 0.9s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .opencodian-tab-bar-item,
+  .opencodian-tab-bar-title,
+  .opencodian-tab-bar-state,
+  .opencodian-tab-bar-overflow,
+  .opencodian-tab-overflow-menu-item {
+    transition: none;
+  }
+}
+
+@keyframes opencodian-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes opencodian-tab-background-pulse {
+  0%, 100% {
+    opacity: 0.35;
+    transform: scale(0.92);
+  }
+  50% {
+    opacity: 0.88;
+    transform: scale(1.08);
+  }
+}
+
+@keyframes opencodian-tab-background-ring {
+  0% {
+    opacity: 0.78;
+    transform: scale(0.8);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.25);
+  }
+}
+
+@keyframes opencodian-tab-background-dots {
+  0%, 80%, 100% {
+    opacity: 0.34;
+    transform: translateY(0) scale(0.9);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-1px) scale(1.18);
+  }
+}
+
+@keyframes opencodian-tab-badge-orbit {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.opencodian-messages-shell {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.opencodian-liquid-diamond-demo-overlay {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.opencodian-liquid-diamond-demo-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.opencodian-liquid-diamond-demo-host {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  pointer-events: auto;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  will-change: transform;
+}
+
+.opencodian-liquid-diamond-demo-host.is-dragging {
+  cursor: grabbing;
+}
+
+.opencodian-liquid-diamond-demo-filter-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.opencodian-liquid-diamond-demo-stage {
+  position: relative;
+  width: 220px;
+  height: 220px;
+  overflow: visible;
+}
+
+.opencodian-liquid-diamond-demo-bloom,
+.opencodian-liquid-diamond-demo-rim,
+.opencodian-liquid-diamond-demo-face-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.opencodian-liquid-diamond-demo-canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 220px;
+  height: 220px;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  opacity: 0.96;
+}
+
+.opencodian-glass-octahedron-demo-overlay {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.opencodian-glass-octahedron-demo-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.opencodian-glass-octahedron-demo-host {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  pointer-events: auto;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  will-change: transform;
+}
+
+.opencodian-glass-octahedron-demo-host.is-dragging {
+  cursor: grabbing;
+}
+
+.opencodian-glass-octahedron-demo-stage {
+  position: relative;
+  width: 220px;
+  height: 220px;
+  overflow: visible;
+  filter:
+    drop-shadow(0 22px 34px rgba(15, 23, 42, 0.12))
+    drop-shadow(0 10px 18px rgba(176, 227, 255, 0.08));
+}
+
+.opencodian-glass-octahedron-demo-caustic,
+.opencodian-glass-octahedron-demo-refraction,
+.opencodian-glass-octahedron-demo-canvas {
+  position: absolute;
+  inset: 0;
+  width: 220px;
+  height: 220px;
+  pointer-events: none;
+}
+
+.opencodian-glass-octahedron-demo-filter-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.opencodian-glass-octahedron-demo-caustic {
+  left: 50%;
+  top: 74%;
+  width: 116px;
+  height: 56px;
+  inset: auto;
+  opacity: 0.08;
+  border-radius: 999px;
+  background:
+    radial-gradient(ellipse at center,
+      rgba(255, 255, 255, 0.12) 0%,
+      rgba(255, 255, 255, 0.04) 34%,
+      rgba(255, 255, 255, 0.015) 56%,
+      rgba(255, 255, 255, 0) 78%);
+  filter: blur(14px) brightness(1.005);
+  mix-blend-mode: screen;
+  transform: translate(-50%, -50%);
+  will-change: transform, opacity, width, height;
+}
+
+.opencodian-glass-octahedron-demo-refraction {
+  opacity: 1;
+  background:
+    radial-gradient(circle at 18% 14%, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.008) 18%, rgba(255, 255, 255, 0) 38%),
+    radial-gradient(circle at 76% 72%, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0.006) 32%, rgba(255, 255, 255, 0) 62%),
+    linear-gradient(148deg, rgba(255, 255, 255, 0.008), rgba(255, 255, 255, 0.002) 44%, rgba(255, 255, 255, 0.006));
+  will-change: clip-path, opacity;
+}
+
+.opencodian-glass-octahedron-demo-caustic.is-disabled,
+.opencodian-glass-octahedron-demo-refraction.is-disabled {
+  opacity: 0;
+}
+
+.opencodian-glass-octahedron-demo-canvas {
+  display: block;
+  background: transparent;
+}
+
+.opencodian-theme-background-layer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+  background: var(--opencodian-chat-surface);
+  opacity: 0;
+  transition: opacity 0.28s ease;
+}
+
+.opencodian-theme-background-image {
+  position: absolute;
+  top: calc(-1 * var(--opencodian-theme-bg-bleed));
+  left: calc(-1 * var(--opencodian-theme-bg-bleed));
+  width: calc(100% + (var(--opencodian-theme-bg-bleed) * 2));
+  height: calc(100% + (var(--opencodian-theme-bg-bleed) * 2));
+  background-repeat: no-repeat;
+  background-size: var(--opencodian-theme-bg-size);
+  background-position: var(--opencodian-theme-bg-focus-x) var(--opencodian-theme-bg-focus-y);
+  transform: translateZ(0) scale(var(--opencodian-theme-bg-scale));
+  transform-origin: center;
+  filter:
+    blur(var(--opencodian-theme-bg-blur))
+    saturate(var(--opencodian-theme-bg-saturation))
+    brightness(var(--opencodian-theme-bg-brightness));
+  opacity: var(--opencodian-theme-bg-opacity);
+  -webkit-mask-image: radial-gradient(
+    140% 122% at 50% 50%,
+    rgba(0, 0, 0, 1) calc(100% - var(--opencodian-theme-bg-edge-fade)),
+    rgba(0, 0, 0, 0.82) calc(100% - (var(--opencodian-theme-bg-edge-fade) * 0.52)),
+    rgba(0, 0, 0, 0.2) calc(100% - (var(--opencodian-theme-bg-edge-fade) * 0.12)),
+    transparent 100%
+  );
+  -webkit-mask-repeat: no-repeat;
+  mask-image: radial-gradient(
+    140% 122% at 50% 50%,
+    rgba(0, 0, 0, 1) calc(100% - var(--opencodian-theme-bg-edge-fade)),
+    rgba(0, 0, 0, 0.82) calc(100% - (var(--opencodian-theme-bg-edge-fade) * 0.52)),
+    rgba(0, 0, 0, 0.2) calc(100% - (var(--opencodian-theme-bg-edge-fade) * 0.12)),
+    transparent 100%
+  );
+  mask-repeat: no-repeat;
+  transition: opacity 0.28s ease, transform 0.32s ease, filter 0.28s ease;
+}
+
+.opencodian-messages-shell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0;
+  transition: opacity 0.28s ease;
+  background:
+    radial-gradient(
+      120% 84% at 50% 0%,
+      color-mix(in srgb, white var(--opencodian-theme-bg-highlight-opacity), transparent) 0%,
+      transparent 58%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--opencodian-chat-surface) var(--opencodian-theme-bg-overlay-opacity-strong), transparent) 0%,
+      color-mix(in srgb, var(--opencodian-chat-surface) var(--opencodian-theme-bg-overlay-opacity), transparent) 26%,
+      color-mix(in srgb, var(--opencodian-chat-surface) calc(var(--opencodian-theme-bg-overlay-opacity) - 6%), transparent) 100%
+    );
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--background-modifier-border) 34%, transparent),
+    inset 0 18px 36px color-mix(in srgb, var(--opencodian-chat-surface) 12%, transparent);
+}
+
+.opencodian-container--theme-background .opencodian-theme-background-layer {
+  opacity: 1;
+}
+
+.opencodian-container--theme-background .opencodian-messages-shell::after {
+  opacity: 1;
+}
+
+/* Messages */
+.opencodian-messages {
+  height: 100%;
+  overflow-y: auto;
+  padding: var(--opencodian-messages-pad-top) var(--opencodian-messages-pad-x);
+  padding-bottom: calc(var(--opencodian-composer-stack-height) + 16px);
+  padding-right: calc(var(--opencodian-messages-pad-x) + var(--opencodian-scrollbar-edge-padding));
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: transparent;
+  scrollbar-gutter: stable;
+  position: relative;
+  z-index: 2;
+}
+
+.opencodian-messages-pane {
+  display: none;
+}
+
+.opencodian-messages-pane.is-active {
+  display: flex;
+}
+
+.opencodian-messages.is-rehydrating .opencodian-message {
+  animation: none !important;
+}
+
+.opencodian-messages--sticky-basic,
+.opencodian-messages--sticky-mask {
+  gap: 8px;
+}
+
+.opencodian-turn {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.opencodian-turn-header {
+  display: flex;
+  justify-content: flex-end;
+  align-items: flex-start;
+  padding: 0;
+  margin-bottom: var(--opencodian-sticky-header-gap);
+  background: transparent;
+}
+
+.opencodian-messages--sticky-basic .opencodian-turn-header,
+.opencodian-messages--sticky-mask .opencodian-turn-header {
+  position: sticky;
+  top: 0;
+  z-index: 22;
+  isolation: isolate;
+  margin-bottom: var(--opencodian-sticky-push-gap);
+}
+
+.opencodian-messages--sticky-mask .opencodian-turn-header::before {
+  content: "";
+  position: absolute;
+  top: calc(-1 * var(--opencodian-messages-pad-top));
+  right: calc(-1 * var(--opencodian-messages-pad-x));
+  bottom: 0;
+  left: calc(-1 * var(--opencodian-messages-pad-x));
+  background: var(--opencodian-chat-surface);
+  pointer-events: none;
+  z-index: -1;
+}
+
+.opencodian-messages--sticky-mask .opencodian-turn-header::after {
+  content: "";
+  position: absolute;
+  top: calc(100% - 1px);
+  right: calc(-1 * var(--opencodian-messages-pad-x));
+  left: calc(-1 * var(--opencodian-messages-pad-x));
+  height: var(--opencodian-sticky-mask-height);
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--opencodian-chat-surface) 90%, transparent) 0%,
+    color-mix(in srgb, var(--opencodian-chat-surface) 55%, transparent) 35%,
+    transparent 100%
+  );
+  pointer-events: none;
+  z-index: -1;
+  backdrop-filter: blur(var(--opencodian-sticky-mask-blur)) saturate(1.25);
+  -webkit-backdrop-filter: blur(var(--opencodian-sticky-mask-blur)) saturate(1.25);
+  mask-image: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--text-normal) 100%, transparent) 0%,
+    color-mix(in srgb, var(--text-normal) 78%, transparent) 28%,
+    transparent 100%
+  );
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--text-normal) 100%, transparent) 0%,
+    color-mix(in srgb, var(--text-normal) 78%, transparent) 28%,
+    transparent 100%
+  );
+}
+
+.opencodian-container--theme-background .opencodian-messages--sticky-mask .opencodian-turn-header::before {
+  background: color-mix(in srgb, var(--opencodian-chat-surface) var(--opencodian-theme-bg-mask-opacity), transparent);
+}
+
+.opencodian-container--theme-background .opencodian-messages--sticky-mask .opencodian-turn-header::after {
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--opencodian-chat-surface) var(--opencodian-theme-bg-mask-opacity), transparent) 0%,
+    color-mix(in srgb, var(--opencodian-chat-surface) var(--opencodian-theme-bg-overlay-opacity), transparent) 35%,
+    transparent 100%
+  );
+}
+
+.opencodian-messages--natural .opencodian-turn-header {
+  position: static;
+}
+
+.opencodian-turn-header > * {
+  margin-left: auto;
+}
+
+.opencodian-turn-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.opencodian-turn--assistant-only .opencodian-turn-body {
+  padding-top: 0;
+}
+
+.opencodian-message {
+  position: relative;
+  padding: 10px 4px;
+  border-radius: 8px;
+  max-width: 95%;
+  word-wrap: break-word;
+}
+

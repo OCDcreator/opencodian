@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import process from "process";
 import builtins from "builtin-modules";
+import { buildCss } from "./build-css.mjs";
 import { generateBuildId } from './build-utils.mjs';
 
 const banner =
@@ -72,6 +73,7 @@ try {
 }
 
 if (prod) {
+  buildCss();
   await context.rebuild();
   
   // Copy manifest.json to dist

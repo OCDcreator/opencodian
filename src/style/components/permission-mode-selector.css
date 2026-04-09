@@ -1,0 +1,213 @@
+/* ============================================================
+   Permission Mode Selector
+   ============================================================ */
+
+.opencodian-permission-selector {
+  flex-shrink: 0;
+  position: relative;
+  display: inline-block;
+}
+
+/* Trigger Button - Ghost style */
+.opencodian-permission-trigger {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  transition: color 0.15s ease, opacity 0.15s ease, background-color 0.15s ease;
+  user-select: none;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.opencodian-permission-trigger:hover {
+  background: transparent;
+  color: var(--text-normal);
+}
+
+/* Mode-specific colors */
+.opencodian-permission-trigger.mode-yolo {
+  color: var(--background-modifier-success);
+}
+
+.opencodian-permission-trigger.mode-yolo:hover {
+  background: transparent;
+}
+
+.opencodian-permission-trigger.mode-normal {
+  color: var(--interactive-accent);
+}
+
+.opencodian-permission-trigger.mode-normal:hover {
+  background: transparent;
+}
+
+.opencodian-permission-trigger.mode-plan {
+  color: var(--background-modifier-error);
+}
+
+.opencodian-permission-trigger.mode-plan:hover {
+  background: transparent;
+}
+
+.opencodian-permission-trigger-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+}
+
+.opencodian-permission-trigger-icon svg {
+  width: 12px;
+  height: 12px;
+}
+
+.opencodian-permission-trigger-text {
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.opencodian-permission-trigger-chevron {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 12px;
+  height: 12px;
+}
+
+.opencodian-permission-trigger-chevron svg {
+  width: 10px;
+  height: 10px;
+}
+
+/* Permission Dropdown - styled like model dropdown */
+.opencodian-permission-dropdown {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  margin-bottom: 4px;
+  min-width: 220px;
+  max-width: 280px;
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--background-primary) 96%, rgba(255, 255, 255, 0.06)) 0%,
+      color-mix(in srgb, var(--background-primary) 88%, var(--background-secondary)) 100%
+    ),
+    radial-gradient(
+      circle at top,
+      color-mix(in srgb, var(--opencodian-glass-specular-soft) 52%, transparent) 0%,
+      transparent 68%
+    );
+  border: 1px solid color-mix(in srgb, var(--opencodian-glass-border-strong) 82%, var(--background-modifier-border));
+  border-radius: 14px;
+  backdrop-filter: blur(30px) saturate(1.14);
+  -webkit-backdrop-filter: blur(30px) saturate(1.14);
+  box-shadow:
+    0 22px 44px color-mix(in srgb, var(--opencodian-glass-shadow-strong) 88%, transparent),
+    0 1px 0 color-mix(in srgb, var(--opencodian-glass-specular) 42%, transparent) inset;
+  z-index: 1000;
+  overflow: hidden;
+  padding: 4px 0;
+}
+
+.opencodian-permission-option {
+  display: flex;
+  align-items: flex-start;
+  width: 100%;
+  padding: 10px 12px;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-normal);
+  transition: background-color 0.15s ease;
+  outline: none;
+  user-select: none;
+  position: relative;
+}
+
+.opencodian-permission-option:hover,
+.opencodian-permission-option.is-highlighted {
+  background: var(--opencodian-highlight);
+}
+
+.opencodian-permission-option.is-selected {
+  background: var(--opencodian-highlight-strong);
+}
+
+.opencodian-permission-option-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+  color: var(--text-muted);
+}
+
+.opencodian-permission-option-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.opencodian-permission-option-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.opencodian-permission-option-label {
+  font-weight: 500;
+  color: var(--text-normal);
+  line-height: 1.3;
+}
+
+.opencodian-permission-option-desc {
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.3;
+}
+
+.opencodian-permission-option-check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  color: var(--text-accent);
+  opacity: 0;
+}
+
+.opencodian-permission-option.is-selected .opencodian-permission-option-check {
+  opacity: 1;
+}
+
+.opencodian-permission-option-check svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Mode-specific colors for permission options */
+.opencodian-permission-option[data-mode="yolo"] .opencodian-permission-option-icon {
+  color: var(--background-modifier-success);
+}
+
+.opencodian-permission-option[data-mode="plan"] .opencodian-permission-option-icon {
+  color: var(--background-modifier-error);
+}
+
+.opencodian-permission-option[data-mode="normal"] .opencodian-permission-option-icon {
+  color: var(--interactive-accent);
+}
+

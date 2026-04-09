@@ -21,16 +21,17 @@
 
 入口脚本，使用 esbuild 打包：
 1. 确保 `dist/` 目录存在
-2. 调用 `generateBuildId()` 生成构建 ID
-3. esbuild context 配置（entry: `src/main.ts`, format: `cjs`, target: `es2018`）
-4. `context.rebuild()` 执行构建
-5. 复制 `manifest.json`, `styles.css`, `assets/` 到 `dist/`
+2. 调用 `buildCss()` 先从 `src/style/index.css` 生成根目录 `styles.css`
+3. 调用 `generateBuildId()` 生成构建 ID
+4. esbuild context 配置（entry: `src/main.ts`, format: `cjs`, target: `es2018`）
+5. `context.rebuild()` 执行构建
+6. 复制 `manifest.json`, `styles.css`, `assets/` 到 `dist/`
 
 esbuild 平台不匹配时输出友好错误提示，引导运行 `npm run doctor:esbuild:fix`。
 
 ### build-css.mjs — CSS 合并
 
-扫描 `src/style/` 目录下所有 CSS 文件，合并到根目录 `styles.css`。每个文件添加 `/* filename */` 注释标记。
+读取 `src/style/index.css` 的 `@import` 列表，按声明顺序合并 CSS 到根目录 `styles.css`。每个片段添加 `/* filename */` 注释标记。
 
 ### build-utils.mjs — 共享工具
 
@@ -85,6 +86,8 @@ Node.js 脚本形式的 Jest 启动包装器。
 ```
 npm run build
   → scripts/build.mjs production
+    → buildCss()
+    → 生成根目录 styles.css
     → build-utils.mjs (generateBuildId)
     → esbuild build
     → 复制产物到 dist/
@@ -121,6 +124,7 @@ npm run check:devlog-order
 ## 注意事项
 
 - `build.mjs` 和 `esbuild.config.mjs` 有重叠逻辑（esbuild 配置），修改时需同步
+- `src/style/index.css` 的导入顺序就是生产产物中的样式顺序，调整覆盖关系时优先改这里
 - `doctor-esbuild.mjs` 的平台映射表需要随 esbuild 更新而维护
 - `release.mjs` 使用 `npm install --package-lock-only` 更新 lockfile
 - `check-devlog-order.mjs` 在 CI/handoff 前应运行

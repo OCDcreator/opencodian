@@ -1,0 +1,26 @@
+# Model Selector Styles
+
+> **源码**: `src/style/components/model-selector.css`
+> **状态**: [FINAL]
+
+## 职责
+
+定义聊天输入区模型选择器与其下拉菜单样式，并承载设置页中大量共享 UI（设置滚动条、快速导航、样式编辑控件等）。
+
+## 关键类名 / CSS 变量
+
+- 模型选择器：`.opencodian-model-selector`、`.opencodian-model-trigger*`、`.opencodian-model-dropdown*`、`.opencodian-model-option*`。
+- 选择态：`.is-open`、`.is-unavailable`、`.is-unconfigured`、`.is-highlighted`、`.is-selected`。
+- 设置页通用：`.opencodian-settings*`、`.opencodian-settings-quick-nav*`、`.opencodian-tooltip-trigger`。
+- 样式面板通用：`.opencodian-style-*`、`.opencodian-theme-*`、滚动条规则（含 `.opencodian-history-scroll` 皮肤）。
+
+## 关联 TS 组件
+
+- `src/features/chat/OpenCodianView.ts`
+- `src/features/settings/OpenCodianSettings.ts`
+
+## 修改注意点
+
+- 此文件体量大、覆盖面广；若只改模型下拉，务必限制在 `.opencodian-model-*` 作用域。
+- `is-unconfigured` 与警示色用于配置异常提示，不建议弱化对比度。
+- 修改后执行 `npm run build:css`（或完整 `npm run build`）。

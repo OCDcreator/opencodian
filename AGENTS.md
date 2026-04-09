@@ -40,10 +40,10 @@ Use `npm run doctor:esbuild` only after dependency changes or when build/dev rep
 
 - Model availability is resolved in layers: provider toggles live in local `.opencode` config, per-model toggles live in plugin `disabledModelRefs`, and the chat/title-generation flows consume the filtered catalog.
 - For OpenCode provider/config bugs, prefer live debugging against the local service before changing logic: `config.providers` is the current directory-scoped runtime list, `config.get(directory)` is the current vault's resolved config, `provider.list` is the current scope's filtered connect-provider directory, and plain `/config` without `directory` is only the server process default working-directory scope, not a pure global config file. On Windows, direct HTTP repros must use forward-slash `directory` values (for example `C:/vault`); `sdkFetch.ts` now normalizes `C:\vault` before `requestUrl`, but ad-hoc requests still need to match that behavior.
-- Treat inherited/server `disabled_providers` as hard-disabled: `服务器目录` should match `config.providers(directory)` minus those provider IDs, and if plugin counts suddenly diverge from `opencode models`, first suspect a stale managed local `4096` server before touching merge/filter logic.
+- Do not treat inherited/server `disabled_providers` as proof that a provider vanished from the runtime catalog: if `opencode models` / `config.providers(directory)` still returns that provider, `服务器目录` should still show it. Disable arrays are config-layer availability signals, and project-local overrides should be allowed to narrow or clear inherited disables instead of being documented as “hard-disabled”. If plugin counts suddenly diverge from `opencode models`, first suspect a stale managed local `4096` server or wrong `directory` scope before touching merge/filter logic.
 - Conversation restore is preload-sensitive: `main.ts` must finish `loadConversations()` before chat views restore their state.
 - OMO compatibility spans `src/core/opencode/omoCompat.ts`, message normalization in `OpenCodeService`, and chat rendering in `OpenCodianView`.
-- Theme, background, glass, and assistant metadata styling changes usually need coordinated updates across `src/core/theme/`, `src/core/types/settings.ts`, `src/main.ts`, `src/features/chat/OpenCodianView.ts`, `src/features/settings/OpenCodianSettings.ts`, `styles.css`, and both locale files.
+- Theme, background, glass, and assistant metadata styling changes usually need coordinated updates across `src/core/theme/`, `src/core/types/settings.ts`, `src/main.ts`, `src/features/chat/OpenCodianView.ts`, `src/features/settings/OpenCodianSettings.ts`, `src/style/`, the generated `styles.css`, and both locale files.
 - Module-level docs already exist for almost every `src/**/*.ts` file. Prefer updating the matching `docs/modules/**` page instead of expanding this file.
 
 ## Build And Deploy
@@ -51,6 +51,7 @@ Use `npm run doctor:esbuild` only after dependency changes or when build/dev rep
 - For code, style, manifest, or build-pipeline changes, run `npm run build` first.
 - After a successful build, copy `dist/main.js`, `dist/manifest.json`, and `dist/styles.css` to the Test Vault plugin directory:
   `C:\Users\lt\Desktop\Write\testvault\.obsidian\plugins\opencodian\`
+- `npm run build` now includes the CSS merge step automatically; if you only need to refresh the generated root `styles.css`, run `npm run build:css`.
 - If the change touches bundled assets (for example `assets/`, provider icons, branding, or other runtime-loaded files), also copy `dist/assets/` into that same Test Vault plugin directory before verification.
 - Build and copy must be separate sequential steps. Do not chain them with `&&`, do not parallelize them, and do not verify deployment before the copy completes.
 - After deployment, verify the Test Vault `main.js` contains the newest `BUILD_ID` from that build.

@@ -12,6 +12,48 @@
 
 ---
 
+## 2026-04-09 样式拆分构建接线、样式文档补全与索引同步
+
+### 🎯 改动目标
+
+- 让生产构建在打包前自动合并 `src/style/`，避免遗漏 `build:css` 导致 `dist/styles.css` 过期
+- 统一样式入口顺序与文档说明，明确 `src/style/index.css` 才是样式覆盖关系的真实来源
+- 将新建的样式模块文档、模块总索引和代理工作说明同步到当前仓库状态
+
+### ✅ 本轮调整
+
+- `scripts/build-css.mjs`
+- `scripts/build.mjs`
+  - 抽出可复用的 `buildCss()`，供 CLI 直接运行和生产构建复用
+  - `npm run build` 现在会先读取 `src/style/index.css`，生成根目录 `styles.css`，再继续产出 `dist/*`
+
+- `src/style/index.css`
+- `styles.css`
+  - 统一样式合并顺序为 `base -> utils -> components -> features -> modals`
+  - 重新生成根目录样式产物，确保与拆分后的源码结构一致
+
+- `docs/modules/style/README.md`
+- `docs/modules/style/base/core.md`
+- `docs/modules/style/components/*.md`
+- `docs/modules/style/features/*.md`
+- `docs/modules/style/modals/*.md`
+- `docs/modules/style/utils/markdown.md`
+  - 补齐样式模块文档，移除模板占位与错误命令
+  - 每篇文档改为记录真实职责、关键类名、消费组件与修改注意点
+
+- `docs/modules/README.md`
+- `docs/modules/infrastructure/build-pipeline.md`
+- `docs/modules/infrastructure/scripts.md`
+- `AGENTS.md`
+  - 同步模块总索引统计、样式目录说明与构建流程文档
+  - 代理说明补充 `src/style/` / `styles.css` 的关系，以及 `npm run build` 已自动包含 CSS 合并
+
+### 🧪 验证结果
+
+- `npm run build` 通过，自动执行 CSS 合并，最新 `BUILD_ID: main.202604092349`
+- 已部署 `dist/main.js`、`dist/manifest.json`、`dist/styles.css` 到 Test Vault
+- 已确认 Test Vault `main.js` 含最新 `BUILD_ID: main.202604092349`
+
 ## 2026-04-09 本地 sidecar 生命周期、孤儿进程回收与端口迁移修正
 
 ### 🎯 改动目标

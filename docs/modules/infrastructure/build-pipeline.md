@@ -5,7 +5,7 @@
 
 ## 概述
 
-基于 esbuild 的构建管线，支持开发模式（watch + hot reload）和生产模式（tree-shaking + 产物输出到 dist/）。每次构建生成唯一 `BUILD_ID`（`{branch}.{timestamp}` 格式），注入为全局常量。CSS 构建为独立步骤，合并 `src/style/` 目录下的片段。
+基于 esbuild 的构建管线，支持开发模式（watch + hot reload）和生产模式（tree-shaking + 产物输出到 dist/）。每次构建生成唯一 `BUILD_ID`（`{branch}.{timestamp}` 格式），注入为全局常量。CSS 由 `scripts/build-css.mjs` 从 `src/style/` 合并生成，生产构建会在打包前自动执行该步骤。
 
 ## 导入关系
 上游: `esbuild`, `child_process`, `fs`, `path`, `process`, `builtin-modules`
@@ -48,13 +48,14 @@ esbuild 配置：
 | outfile | dev: `'main.js'`, prod: `'dist/main.js'` |
 
 生产模式额外步骤：
-1. `fs.copyFileSync('manifest.json', 'dist/manifest.json')`
-2. `fs.copyFileSync('styles.css', 'dist/styles.css')`
-3. `copyDirectoryIfExists('assets', 'dist/assets')`
+1. 调用 `buildCss()` 读取 `src/style/index.css` 并生成根目录 `styles.css`
+2. `fs.copyFileSync('manifest.json', 'dist/manifest.json')`
+3. `fs.copyFileSync('styles.css', 'dist/styles.css')`
+4. `copyDirectoryIfExists('assets', 'dist/assets')`
 
 ### CSS 构建 (`scripts/build-css.mjs`)
 
-合并 `src/style/` 目录下的所有 CSS 片段到根目录 `styles.css`，每个片段添加注释标记。
+读取 `src/style/index.css` 的 `@import` 顺序，将引用到的 CSS 片段合并到根目录 `styles.css`，每个片段添加注释标记。
 
 ## 关键方法
 
@@ -77,6 +78,9 @@ npm run dev
 
 npm run build
   → scripts/build.mjs production
+    → buildCss()
+      → 读取 src/style/index.css
+      → 生成根目录 styles.css
     → generateBuildId()
     → esbuild.context({ ... outfile: 'dist/main.js' })
     → context.rebuild()
@@ -94,7 +98,7 @@ npm run build
 | npm script | 命令 | 说明 |
 |------------|------|------|
 | `dev` | `node esbuild.config.mjs` | 开发模式 |
-| `build` | `node scripts/build.mjs production` | 生产构建 |
+| `build` | `node scripts/build.mjs production` | 生产构建（自动包含 CSS 合并） |
 | `build:css` | `node scripts/build-css.mjs` | CSS 构建 |
 
 ## 注意事项
@@ -103,7 +107,7 @@ npm run build
 - 生产模式输出到 `dist/` 目录（需手动部署到 vault）
 - `external` 列表确保不打包 Obsidian 和 CodeMirror 运行时依赖
 - BUILD_ID 在构建时硬编码，不会在运行时改变
-- `build-css.mjs` 应在 `build.mjs` 之前运行（CSS 需要先生成）
+- `npm run build` 已内置 CSS 合并；若只想刷新根目录样式产物，可单独运行 `npm run build:css`
 
 ## 待补充
 - [ ] Source map 上传服务集成
