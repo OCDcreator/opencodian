@@ -99,7 +99,7 @@ interface TabRuntimeState {
 4. 在 `messagesShellEl` 上创建 `MarkdownRenderService`
 5. `wireEventHandlers()`
 6. 启动 retained selection polling
-7. 订阅 session todo/status 更新
+7. 订阅 session todo/status/sync-event 更新
 8. `initializeFirstTab()`
 
 `onClose()` 则会反向清理：
@@ -119,6 +119,7 @@ interface TabRuntimeState {
 - 清空当前消息区并重置 turn 状态
 - 把 `openCodeSessionId` 交给 `openCodeService`
 - 在必要时调用 `syncConversationMessagesFromServer()`
+- 装载阶段进入 hydration：先重建历史 turn / inline background task，再等待后续 authoritative message sync 决定是否允许 stale 降级
 - 重新渲染消息、背景任务指示器、todo dock、question dock
 - 启动 2 秒一次的 `startConversationSyncLoop()`
 - 更新模型显示和 context usage
@@ -127,6 +128,8 @@ interface TabRuntimeState {
 
 - `syncVisibleConversationInBackground()`：同步当前活动 tab
 - `syncBackgroundTaskTabsInBackground()`：同步非活动但仍有 background task 的 tab
+
+除此之外，`subscribeToSessionSyncEvents()` 现在还会接入 `message.updated`、`message.part.updated` 和 `session.diff`，用于提前触发当前会话或后台 tab 的 authoritative sync，而不是只能等 2 秒轮询。
 
 收到服务端新消息后，`applySyncedConversationUpdate()` 会优先尝试：
 
@@ -228,6 +231,7 @@ assistant 渲染里：
 - session todo/status：通过 `openCodeService.subscribeToSessionTodoUpdates()` 和 `subscribeToSessionStatusUpdates()` 接入
 - question：既支持输入区上方的 `QuestionDock`，也支持内联 question card 和已回答/已拒绝回顾卡片
 - background task：从 OMO 注入、`toolName === 'task'` 的 tool block、以及后续 system reminder 回写推导任务进度；运行态以内联状态条挂在对应 assistant turn 下，完成态则延迟落成持久化 notice
+- background task 的 stale 判定现在额外受 `backgroundTaskAwaitingAuthoritativeSync` / hydration 保护：reload 或首次装载后，只有在至少一次权威消息同步完成后，才允许把“仍在运行”降级成 stopped/stale notice
 
 ## 外观与控件
 
@@ -295,4 +299,5 @@ assistant 渲染里：
 - streaming、conversation sync、background task 和 question 队列都已经做成按 tab 隔离，不能再退回单全局状态。
 - 会话同步会保留本地 client-only message，尤其是 interrupted assistant message 和本地 notice；不要把同步理解成简单的全量覆盖。
 - `session.status` 只能代表主 runner 是否 `busy/retry/idle`；后台任务是否完成要看后续消息/提醒是否真正回写到会话历史。
+- 重新渲染消息列表时，滚动恢复不再只按旧 `scrollTop`，而是按“到底 / 保持距底距离 / 保持可见 anchor”三态恢复，避免 hydration 后补写 inline/notice 时把视图重新顶上去。
 - 当 tab 同时处于前台流式和后台任务存活状态时，tab 样式遵循“streaming 主态、background 次级标记”的优先级；不要把二者重新合并成同一套阻塞语义。

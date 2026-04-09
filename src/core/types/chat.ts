@@ -108,6 +108,7 @@ export interface ChatNoticeAction {
 
 export interface ChatNoticeMeta {
   kind: 'background-task-completion';
+  conversationId?: string;
   anchorKey?: string;
   sourceReminderIds?: string[];
   allComplete?: boolean;

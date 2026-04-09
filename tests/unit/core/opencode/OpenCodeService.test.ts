@@ -992,6 +992,125 @@ describe('OpenCodeService', () => {
       ]);
     });
 
+    it('emits message.updated payloads from SDK sync events', async () => {
+      service = createServiceWithSdkFlags();
+      const updates: Array<{ sessionId: string; type: string; messageId: string | null }> = [];
+      mockSdkClient.global.syncEvent.subscribe.mockResolvedValue({
+        stream: (async function* () {
+          yield {
+            type: 'message.updated',
+            properties: {
+              sessionID: 'sdk-session',
+              info: { id: 'msg-1' },
+            },
+          };
+        })(),
+      });
+
+      const dispose = (service as unknown as {
+        subscribeToSessionSyncEvents: (listener: (update: unknown) => void) => () => void;
+      }).subscribeToSessionSyncEvents((update) => {
+        updates.push(update as { sessionId: string; type: string; messageId: string | null });
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      dispose();
+
+      expect(updates).toEqual([
+        {
+          sessionId: 'sdk-session',
+          type: 'message.updated',
+          messageId: 'msg-1',
+        },
+      ]);
+    });
+
+    it('emits message.part.updated payloads from SDK sync events', async () => {
+      service = createServiceWithSdkFlags();
+      const updates: Array<{
+        sessionId: string;
+        type: string;
+        messageId: string | null;
+        partId: string | null;
+        partType: string | null;
+        time: number | null;
+      }> = [];
+      mockSdkClient.global.syncEvent.subscribe.mockResolvedValue({
+        stream: (async function* () {
+          yield {
+            type: 'message.part.updated',
+            properties: {
+              sessionID: 'sdk-session',
+              part: {
+                id: 'part-1',
+                type: 'tool',
+                messageID: 'msg-1',
+              },
+              time: 42,
+            },
+          };
+        })(),
+      });
+
+      const dispose = (service as unknown as {
+        subscribeToSessionSyncEvents: (listener: (update: unknown) => void) => () => void;
+      }).subscribeToSessionSyncEvents((update) => {
+        updates.push(update as {
+          sessionId: string;
+          type: string;
+          messageId: string | null;
+          partId: string | null;
+          partType: string | null;
+          time: number | null;
+        });
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      dispose();
+
+      expect(updates).toEqual([
+        {
+          sessionId: 'sdk-session',
+          type: 'message.part.updated',
+          messageId: 'msg-1',
+          partId: 'part-1',
+          partType: 'tool',
+          time: 42,
+        },
+      ]);
+    });
+
+    it('emits session.diff payloads from SDK sync events', async () => {
+      service = createServiceWithSdkFlags();
+      const updates: Array<{ sessionId: string; type: string }> = [];
+      mockSdkClient.global.syncEvent.subscribe.mockResolvedValue({
+        stream: (async function* () {
+          yield {
+            type: 'session.diff',
+            properties: {
+              sessionID: 'sdk-session',
+            },
+          };
+        })(),
+      });
+
+      const dispose = (service as unknown as {
+        subscribeToSessionSyncEvents: (listener: (update: unknown) => void) => () => void;
+      }).subscribeToSessionSyncEvents((update) => {
+        updates.push(update as { sessionId: string; type: string });
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      dispose();
+
+      expect(updates).toEqual([
+        {
+          sessionId: 'sdk-session',
+          type: 'session.diff',
+        },
+      ]);
+    });
+
     it('returns session revert state via SDK', async () => {
       service = createServiceWithSdkFlags();
       mockSdkClient.session.get.mockResolvedValue({

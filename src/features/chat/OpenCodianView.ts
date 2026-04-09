@@ -15,7 +15,11 @@ import {
   resolveModelSelection,
   resolvePreferredAvailableModel,
 } from '../../core/config/modelConfig';
-import { OpenCodeService, type SessionActivityStatus } from '../../core/opencode';
+import {
+  OpenCodeService,
+  type SessionActivityStatus,
+  type SessionSyncEventUpdate,
+} from '../../core/opencode';
 import {
   getThemePresetDefinition,
   THEME_PRESET_CSS_VARIABLE_NAMES,
@@ -493,8 +497,15 @@ interface TabRuntimeState {
   backgroundTaskLaunches: Map<string, BackgroundTaskLaunchInfo>;
   backgroundTaskCompletedTasks: Map<string, BackgroundTaskCompletionInfo>;
   backgroundTaskWaitingForFollowUp: boolean;
+  backgroundTaskAwaitingAuthoritativeSync: boolean;
+  backgroundTaskLastAuthoritativeSyncAt: number | null;
   backgroundTaskStaleNoticeFingerprint: string | null;
+  backgroundTaskSuppressedFingerprint: string | null;
   queuedBackgroundTaskCompletionNotices: Map<string, QueuedBackgroundTaskCompletionNotice>;
+  isHydratingConversation: boolean;
+  pendingLayoutMutations: number;
+  pendingSignalConversationSyncReasons: Set<string>;
+  signalConversationSyncTimerId: number | null;
   focusContextPreview: FocusContextPreview | null;
   draftContextItems: PromptContextItem[];
   pendingEditedFiles: Set<string>;
@@ -515,6 +526,16 @@ interface TabPaneState {
   scrollHandler: () => void;
   mutationObserver: MutationObserver | null;
   resizeObserver: ResizeObserver | null;
+}
+
+type ConversationScrollRestoreMode = 'bottom' | 'preserve-distance' | 'preserve-anchor';
+
+interface ConversationScrollRestoreSnapshot {
+  mode: ConversationScrollRestoreMode;
+  scrollTop: number;
+  distanceFromBottom: number;
+  anchorMessageId: string | null;
+  anchorOffsetTop: number;
 }
 
 /** Clipboard icon SVG for copy button */
@@ -619,6 +640,7 @@ export class OpenCodianView extends ItemView {
   private omoBackgroundTaskLogStates = new Map<string, OmoBackgroundTaskLogState>();
   private disposeSessionTodoSubscription: (() => void) | null = null;
   private disposeSessionStatusSubscription: (() => void) | null = null;
+  private disposeSessionSyncEventSubscription: (() => void) | null = null;
   private lastKnownMarkdownFilePath: string | null = null;
   private contextFileCatalogCache: ContextFileCatalog | null = null;
   private contextFileCatalogBuildPromise: Promise<ContextFileCatalog> | null = null;
@@ -667,8 +689,15 @@ export class OpenCodianView extends ItemView {
       backgroundTaskLaunches: new Map(),
       backgroundTaskCompletedTasks: new Map(),
       backgroundTaskWaitingForFollowUp: false,
+      backgroundTaskAwaitingAuthoritativeSync: false,
+      backgroundTaskLastAuthoritativeSyncAt: null,
       backgroundTaskStaleNoticeFingerprint: null,
+      backgroundTaskSuppressedFingerprint: null,
       queuedBackgroundTaskCompletionNotices: new Map(),
+      isHydratingConversation: false,
+      pendingLayoutMutations: 0,
+      pendingSignalConversationSyncReasons: new Set(),
+      signalConversationSyncTimerId: null,
       focusContextPreview: null,
       draftContextItems: [],
       pendingEditedFiles: new Set(),
@@ -1228,6 +1257,15 @@ export class OpenCodianView extends ItemView {
     );
   }
 
+  private subscribeToSessionSyncEvents(): void {
+    this.disposeSessionSyncEventSubscription?.();
+    this.disposeSessionSyncEventSubscription = this.plugin.openCodeService.subscribeToSessionSyncEvents(
+      (update) => {
+        void this.applySessionSyncEventUpdate(update);
+      },
+    );
+  }
+
   private applySessionTodoUpdate(sessionId: string, todos: SessionTodo[]): void {
     const tabs = this.tabManager?.getAllTabs() ?? [];
     const conversations = new Map(this.plugin.getConversations().map((conversation) => [conversation.id, conversation]));
@@ -1269,6 +1307,41 @@ export class OpenCodianView extends ItemView {
     if (!matched && this.currentConversation?.openCodeSessionId === sessionId) {
       this.setTabSessionStatus(this.getActiveTabId(), status, sessionId);
       this.reconcileBackgroundTaskStateFromLiveSignals(this.getActiveTabId());
+    }
+  }
+
+  private getTabIdsForSession(sessionId: string): TabId[] {
+    const tabs = this.tabManager?.getAllTabs() ?? [];
+    const conversations = new Map(this.plugin.getConversations().map((conversation) => [conversation.id, conversation]));
+
+    return tabs
+      .filter((tab) => {
+        const conversation = tab.conversationId ? conversations.get(tab.conversationId) : null;
+        return conversation?.openCodeSessionId === sessionId;
+      })
+      .map((tab) => tab.id);
+  }
+
+  private async applySessionSyncEventUpdate(update: SessionSyncEventUpdate): Promise<void> {
+    const matchedTabIds = this.getTabIdsForSession(update.sessionId);
+    const activeTabId = this.getActiveTabId();
+    if (
+      matchedTabIds.length === 0
+      && this.currentConversation?.openCodeSessionId === update.sessionId
+      && activeTabId
+    ) {
+      matchedTabIds.push(activeTabId);
+    }
+
+    for (const tabId of matchedTabIds) {
+      const runtime = this.getTabRuntimeState(tabId);
+      if (!runtime) {
+        continue;
+      }
+
+      if (update.type === 'message.updated' || update.type === 'message.part.updated' || update.type === 'session.diff') {
+        this.scheduleConversationSyncFromSignal(tabId, update.type);
+      }
     }
   }
 
@@ -1767,6 +1840,49 @@ export class OpenCodianView extends ItemView {
     return typeof startedAt === 'number' && Date.now() - startedAt < BACKGROUND_TASK_GRACE_PERIOD_MS;
   }
 
+  private beginConversationHydration(tabId: TabId | null = this.getActiveTabId()): void {
+    const runtime = this.getTabRuntimeState(tabId);
+    if (!runtime) {
+      return;
+    }
+
+    runtime.isHydratingConversation = true;
+    runtime.pendingLayoutMutations = 0;
+    runtime.backgroundTaskAwaitingAuthoritativeSync = true;
+    this.clearScheduledSignalConversationSync(tabId);
+  }
+
+  private endConversationHydration(tabId: TabId | null = this.getActiveTabId()): void {
+    const runtime = this.getTabRuntimeState(tabId);
+    if (!runtime) {
+      return;
+    }
+
+    runtime.isHydratingConversation = false;
+    if (runtime.pendingLayoutMutations > 0) {
+      runtime.pendingLayoutMutations = 0;
+      this.scheduleSettledScrollToBottomIfNeeded(this.shouldAutoScroll(tabId), tabId);
+    }
+  }
+
+  private markBackgroundTaskAuthoritativeSync(
+    tabId: TabId | null,
+    reason: string,
+  ): void {
+    const runtime = this.getTabRuntimeState(tabId);
+    if (!runtime || runtime.isHydratingConversation) {
+      return;
+    }
+
+    runtime.backgroundTaskAwaitingAuthoritativeSync = false;
+    runtime.backgroundTaskLastAuthoritativeSyncAt = Date.now();
+    logger.debug('Background task authoritative sync ready', {
+      tabId,
+      sessionId: this.getSessionIdForTab(tabId),
+      reason,
+    });
+  }
+
   private reconcileBackgroundTaskStateFromLiveSignals(tabId: TabId | null = this.getActiveTabId()): void {
     const runtime = this.getTabRuntimeState(tabId);
     if (!runtime || runtime.isStreaming || !runtime.backgroundTaskStartedAt) {
@@ -1774,6 +1890,11 @@ export class OpenCodianView extends ItemView {
     }
 
     this.reconcileStaleSessionTodoState(tabId);
+
+    if (runtime.isHydratingConversation || runtime.backgroundTaskAwaitingAuthoritativeSync) {
+      this.syncTabStreamLikeState(tabId);
+      return;
+    }
 
     const status = this.getTabSessionStatus(tabId, this.getSessionIdForTab(tabId));
     if (status?.type === 'busy' || status?.type === 'retry') {
@@ -1802,6 +1923,7 @@ export class OpenCodianView extends ItemView {
 
     const stalePending = this.getPendingBackgroundTaskLaunches(tabId);
     if (stalePending.length > 0) {
+      runtime.backgroundTaskSuppressedFingerprint = this.buildBackgroundTaskStoppedNoticeContent(stalePending);
       void this.appendBackgroundTaskStoppedNotice(tabId, stalePending);
     }
     logger.debug('Clearing stale background task indicator after session became idle without incomplete todos', {
@@ -1829,20 +1951,26 @@ export class OpenCodianView extends ItemView {
     const title = t('chat.backgroundTask.staleTitle');
     const content = this.buildBackgroundTaskStoppedNoticeContent(pending);
     if (runtime.backgroundTaskStaleNoticeFingerprint === content) {
+      runtime.backgroundTaskSuppressedFingerprint = content;
       return;
     }
 
     if (this.hasMatchingPersistentAssistantNoticeMessage(title, content, 'warning')) {
       runtime.backgroundTaskStaleNoticeFingerprint = content;
+      runtime.backgroundTaskSuppressedFingerprint = content;
       return;
     }
 
     runtime.backgroundTaskStaleNoticeFingerprint = content;
+    runtime.backgroundTaskSuppressedFingerprint = content;
     try {
       await this.appendPersistentAssistantNoticeMessage(title, content, 'warning');
     } catch (error) {
       if (runtime.backgroundTaskStaleNoticeFingerprint === content) {
         runtime.backgroundTaskStaleNoticeFingerprint = null;
+      }
+      if (runtime.backgroundTaskSuppressedFingerprint === content) {
+        runtime.backgroundTaskSuppressedFingerprint = null;
       }
       logger.warn('Failed to append stale background task notice', error);
     }
@@ -1863,6 +1991,36 @@ export class OpenCodianView extends ItemView {
         `- ${t('chat.backgroundTask.taskStatusStopped')} · \`${this.getBackgroundTaskLaunchDisplayId(task)}\`: ${task.description}`,
       ),
     ].join('\n');
+  }
+
+  private hasPersistedBackgroundTaskStoppedNoticeForPending(
+    pending: BackgroundTaskLaunchInfo[],
+    conversation: Conversation | null = this.currentConversation,
+  ): boolean {
+    return this.hasMatchingPersistentAssistantNoticeMessage(
+      t('chat.backgroundTask.staleTitle'),
+      this.buildBackgroundTaskStoppedNoticeContent(pending),
+      'warning',
+      conversation,
+    );
+  }
+
+  private isSuppressedBackgroundTaskSegment(
+    segment: BackgroundTaskSegment,
+    tabId: TabId | null = this.getActiveTabId(),
+    conversation: Conversation | null = this.currentConversation,
+  ): boolean {
+    if (segment.pending.length === 0) {
+      return false;
+    }
+
+    const fingerprint = this.buildBackgroundTaskStoppedNoticeContent(segment.pending);
+    const runtime = this.getTabRuntimeState(tabId);
+    if (runtime?.backgroundTaskSuppressedFingerprint === fingerprint) {
+      return true;
+    }
+
+    return this.hasPersistedBackgroundTaskStoppedNoticeForPending(segment.pending, conversation);
   }
 
   private async appendStaleSessionTodoNotice(
@@ -1973,6 +2131,7 @@ export class OpenCodianView extends ItemView {
     this.startRetainedSelectionPolling();
     this.subscribeToSessionTodoUpdates();
     this.subscribeToSessionStatusUpdates();
+    this.subscribeToSessionSyncEvents();
 
     await this.initializeFirstTab();
   }
@@ -2031,6 +2190,8 @@ export class OpenCodianView extends ItemView {
     this.disposeSessionTodoSubscription = null;
     this.disposeSessionStatusSubscription?.();
     this.disposeSessionStatusSubscription = null;
+    this.disposeSessionSyncEventSubscription?.();
+    this.disposeSessionSyncEventSubscription = null;
     this.tabManager = null;
 
     // Cleanup event refs
@@ -2132,6 +2293,12 @@ export class OpenCodianView extends ItemView {
   private handleMessagesPaneLayoutChange(tabId: TabId): void {
     const paneState = this.getTabPaneState(tabId);
     if (!paneState) {
+      return;
+    }
+
+    if (paneState.runtime.isHydratingConversation) {
+      paneState.runtime.pendingLayoutMutations += 1;
+      this.syncPaneScrollMetrics(tabId, paneState.messagesEl);
       return;
     }
 
@@ -2237,6 +2404,7 @@ export class OpenCodianView extends ItemView {
     }
 
     paneState.runtime.streamController?.cancelStream();
+    this.clearScheduledSignalConversationSync(tabId);
     paneState.messagesEl.removeEventListener('scroll', paneState.scrollHandler);
     paneState.mutationObserver?.disconnect();
     paneState.resizeObserver?.disconnect();
@@ -2247,6 +2415,7 @@ export class OpenCodianView extends ItemView {
   private clearTabMessagesPanes(): void {
     for (const paneState of this.tabPaneStates.values()) {
       paneState.runtime.streamController?.cancelStream();
+      this.clearScheduledSignalConversationSync(paneState.tabId);
       paneState.messagesEl.removeEventListener('scroll', paneState.scrollHandler);
       paneState.mutationObserver?.disconnect();
       paneState.resizeObserver?.disconnect();
@@ -2515,7 +2684,7 @@ export class OpenCodianView extends ItemView {
       return;
     }
 
-    if (tab.isStreaming || tab.hasBackgroundTask) {
+    if (this.isTabForegroundBusy(tabId)) {
       new Notice(t('chat.tab.streamingBlocked'));
       return;
     }
@@ -5241,6 +5410,7 @@ export class OpenCodianView extends ItemView {
 
     // Clear messages display
     this.clearScheduledScrollToBottom();
+    this.beginConversationHydration(activeTabId);
     messagesEl?.addClass('is-rehydrating');
     this.messagesContainer?.empty();
     this.resetTurnState();
@@ -5252,6 +5422,10 @@ export class OpenCodianView extends ItemView {
     }
     this.setTabSessionTodos(activeTabId, [], conversation.openCodeSessionId);
     this.setTabSessionStatus(activeTabId, null, conversation.openCodeSessionId);
+    const activeRuntime = this.getTabRuntimeState(activeTabId);
+    if (activeRuntime) {
+      activeRuntime.backgroundTaskSuppressedFingerprint = null;
+    }
 
     const shouldSyncFromServer =
       options.forceServerSync
@@ -5265,44 +5439,49 @@ export class OpenCodianView extends ItemView {
         )
       );
 
-    let messages = conversation.messages;
-    if (shouldSyncFromServer) {
-      const syncResult = await this.syncConversationMessagesFromServer(conversation, this.getActiveTabId(), 'load-conversation');
-      messages = syncResult.messages;
-      this.currentConversationRevertState = syncResult.revertState;
-    }
-
-    this.syncBackgroundTaskStateFromConversation(conversation);
-    await this.renderMessages(messages);
-    await this.renderBackgroundTaskIndicatorIfNeeded();
-    this.renderSessionTodoDock();
-    this.renderQuestionDock();
-    void this.refreshTabSessionStatus(activeTabId, conversation.openCodeSessionId, { suppressErrors: true });
-    void this.refreshPendingQuestionsForTab(activeTabId, conversation.openCodeSessionId);
-    void this.refreshActiveSessionTodos({ suppressErrors: true });
-    this.lastConversationSyncFingerprint = this.getConversationSyncFingerprint(messages);
-    this.startConversationSyncLoop();
-
-    if (messagesEl) {
-      const runtime = this.getTabRuntimeState(activeTabId);
-      if (runtime) {
-        runtime.autoScrollEnabled = shouldStickToBottom;
+    try {
+      let messages = conversation.messages;
+      if (shouldSyncFromServer) {
+        const syncResult = await this.syncConversationMessagesFromServer(conversation, this.getActiveTabId(), 'load-conversation');
+        messages = syncResult.messages;
+        this.currentConversationRevertState = syncResult.revertState;
       }
-      if (preserveScrollPosition && !shouldStickToBottom) {
-        this.restoreElementScrollTopAfterRender(messagesEl, previousScrollTop);
-      } else {
-        this.scrollElementToBottomAfterRender(messagesEl);
-      }
-      window.requestAnimationFrame(() => {
-        messagesEl.removeClass('is-rehydrating');
-      });
-    }
-    this.scheduleComposerLayoutSync();
 
-    // Update model selector to reflect this session's model
-    this.updateModelSelectorDisplay();
-    this.syncActiveTabContextUsageIdentity();
-    await this.refreshActiveTabContextUsageFromServer();
+      this.syncBackgroundTaskStateFromConversation(conversation);
+      await this.renderMessages(messages);
+      await this.renderBackgroundTaskIndicatorIfNeeded();
+      this.renderSessionTodoDock();
+      this.renderQuestionDock();
+      void this.refreshTabSessionStatus(activeTabId, conversation.openCodeSessionId, { suppressErrors: true });
+      void this.refreshPendingQuestionsForTab(activeTabId, conversation.openCodeSessionId);
+      void this.refreshActiveSessionTodos({ suppressErrors: true });
+      this.lastConversationSyncFingerprint = this.getConversationSyncFingerprint(messages);
+      this.startConversationSyncLoop();
+
+      if (messagesEl) {
+        const runtime = this.getTabRuntimeState(activeTabId);
+        if (runtime) {
+          runtime.autoScrollEnabled = shouldStickToBottom;
+        }
+        const scrollSnapshot = this.captureElementScrollRestoreSnapshot(
+          messagesEl,
+          !(preserveScrollPosition && !shouldStickToBottom),
+          previousScrollTop,
+        );
+        this.restoreElementScrollAfterRender(messagesEl, scrollSnapshot);
+        window.requestAnimationFrame(() => {
+          messagesEl.removeClass('is-rehydrating');
+        });
+      }
+      this.scheduleComposerLayoutSync();
+
+      // Update model selector to reflect this session's model
+      this.updateModelSelectorDisplay();
+      this.syncActiveTabContextUsageIdentity();
+      await this.refreshActiveTabContextUsageFromServer();
+    } finally {
+      this.endConversationHydration(activeTabId);
+    }
   }
 
   private openConversationInCurrentTab(conversation: Conversation): void {
@@ -5359,6 +5538,97 @@ export class OpenCodianView extends ItemView {
       void this.syncVisibleConversationInBackground();
       void this.syncBackgroundTaskTabsInBackground();
     }, 2000);
+  }
+
+  private clearScheduledSignalConversationSync(tabId: TabId | null): void {
+    const runtime = this.getTabRuntimeState(tabId);
+    if (!runtime || runtime.signalConversationSyncTimerId === null) {
+      return;
+    }
+
+    window.clearTimeout(runtime.signalConversationSyncTimerId);
+    runtime.signalConversationSyncTimerId = null;
+    runtime.pendingSignalConversationSyncReasons.clear();
+  }
+
+  private scheduleConversationSyncFromSignal(
+    tabId: TabId | null,
+    reason: SessionSyncEventUpdate['type'],
+  ): void {
+    const runtime = this.getTabRuntimeState(tabId);
+    if (!runtime) {
+      return;
+    }
+
+    runtime.pendingSignalConversationSyncReasons.add(reason);
+    if (runtime.signalConversationSyncTimerId !== null) {
+      return;
+    }
+
+    runtime.signalConversationSyncTimerId = window.setTimeout(() => {
+      runtime.signalConversationSyncTimerId = null;
+      const mergedReason = [...runtime.pendingSignalConversationSyncReasons].sort().join('+') || reason;
+      runtime.pendingSignalConversationSyncReasons.clear();
+      void this.syncConversationFromSignal(tabId, mergedReason);
+    }, 120);
+  }
+
+  private async syncConversationFromSignal(
+    tabId: TabId | null,
+    reason: string,
+  ): Promise<void> {
+    if (!tabId) {
+      return;
+    }
+
+    const runtime = this.getTabRuntimeState(tabId);
+    if (!runtime || runtime.isStreaming || runtime.isConversationSyncInFlight) {
+      return;
+    }
+
+    const activeTabId = this.getActiveTabId();
+    if (tabId === activeTabId && this.currentConversation?.openCodeSessionId) {
+      await this.syncVisibleConversationInBackground();
+      return;
+    }
+
+    const tab = this.tabManager?.getTab(tabId);
+    if (!tab?.conversationId) {
+      return;
+    }
+
+    const conversation = await this.plugin.getConversationById(tab.conversationId);
+    if (!conversation?.openCodeSessionId) {
+      return;
+    }
+
+    runtime.isConversationSyncInFlight = true;
+    try {
+      const previousFingerprint = runtime.lastConversationSyncFingerprint
+        ?? this.getConversationSyncFingerprint(conversation.messages);
+      const syncResult = await this.syncConversationMessagesFromServer(
+        conversation,
+        tabId,
+        `sync-event:${reason}`,
+        { suppressVerboseLogs: true },
+      );
+      runtime.lastConversationSyncFingerprint = syncResult.fingerprint;
+      this.markBackgroundTaskAuthoritativeSync(tabId, `sync-event:${reason}`);
+      await this.refreshPendingQuestionsForTab(tabId, conversation.openCodeSessionId);
+      this.syncBackgroundTaskStateFromConversation(conversation, tabId);
+      if (this.hasIncompleteTodos(runtime.sessionTodos) || tab.hasBackgroundTask) {
+        await this.refreshTabSessionStatus(tabId, conversation.openCodeSessionId, { suppressErrors: true });
+        await this.refreshTabSessionTodos(tabId, conversation.openCodeSessionId, { suppressErrors: true });
+      }
+      await this.queueBackgroundTaskCompletionNotices(tabId, conversation);
+      await this.flushQueuedBackgroundTaskCompletionNotices(tabId, conversation);
+      this.syncTabStreamLikeState(tabId);
+      if (syncResult.changed || syncResult.fingerprint !== previousFingerprint) {
+        this.tabManager?.setTabNeedsAttention(tabId, tabId !== activeTabId);
+      }
+    } finally {
+      runtime.isConversationSyncInFlight = false;
+    }
   }
 
   private stopConversationSyncLoop(): void {
@@ -7368,7 +7638,10 @@ export class OpenCodianView extends ItemView {
     runtime.backgroundTaskActiveAnchorKey = this.getMessageAnchorKey(message);
     runtime.backgroundTaskModeTag = message.omo.modeTag;
     runtime.backgroundTaskWaitingForFollowUp = false;
+    runtime.backgroundTaskAwaitingAuthoritativeSync = true;
+    runtime.backgroundTaskLastAuthoritativeSyncAt = null;
     runtime.backgroundTaskStaleNoticeFingerprint = null;
+    runtime.backgroundTaskSuppressedFingerprint = null;
   }
 
   private resetBackgroundTaskIndicator(tabId: TabId | null = this.getActiveTabId()): void {
@@ -7387,8 +7660,10 @@ export class OpenCodianView extends ItemView {
     runtime.backgroundTaskActiveAnchorKey = null;
     runtime.backgroundTaskModeTag = null;
     runtime.backgroundTaskWaitingForFollowUp = false;
+    runtime.backgroundTaskAwaitingAuthoritativeSync = false;
     runtime.backgroundTaskLaunches.clear();
     runtime.backgroundTaskCompletedTasks.clear();
+    runtime.backgroundTaskLastAuthoritativeSyncAt = null;
     runtime.backgroundTaskStaleNoticeFingerprint = null;
     this.syncTabStreamLikeState(tabId);
   }
@@ -7738,8 +8013,10 @@ export class OpenCodianView extends ItemView {
     runtime.backgroundTaskActiveAnchorKey = null;
     runtime.backgroundTaskModeTag = null;
     runtime.backgroundTaskWaitingForFollowUp = false;
+    runtime.backgroundTaskAwaitingAuthoritativeSync = false;
     runtime.backgroundTaskLaunches.clear();
     runtime.backgroundTaskCompletedTasks.clear();
+    runtime.backgroundTaskLastAuthoritativeSyncAt = null;
     runtime.backgroundTaskStaleNoticeFingerprint = null;
 
     if (!conversation || conversation.messages.length === 0) {
@@ -7757,8 +8034,9 @@ export class OpenCodianView extends ItemView {
     const latestActiveSegment = [...segments]
       .reverse()
       .find((segment) =>
-        !segment.sawAllTasksComplete
-        && (segment.pending.length > 0 || (segment.modeTag === 'search-mode' && segment.launches.length === 0)),
+        !this.isSuppressedBackgroundTaskSegment(segment, tabId, conversation)
+        && !segment.sawAllTasksComplete
+        && (segment.pending.length > 0 || (segment.modeTag === 'search-mode' && segment.launches.length === 0))
       ) ?? null;
 
     if (!latestActiveSegment) {
@@ -7772,6 +8050,8 @@ export class OpenCodianView extends ItemView {
     runtime.backgroundTaskActiveAnchorKey = latestActiveSegment.anchorKey;
     runtime.backgroundTaskModeTag = latestActiveSegment.modeTag;
     runtime.backgroundTaskWaitingForFollowUp = latestActiveSegment.waitingForFollowUp && !runtime.isStreaming;
+    runtime.backgroundTaskAwaitingAuthoritativeSync = runtime.backgroundTaskAwaitingAuthoritativeSync
+      || runtime.isHydratingConversation;
     for (const launch of latestActiveSegment.launches) {
       runtime.backgroundTaskLaunches.set(launch.launchId, launch);
     }
@@ -7953,6 +8233,8 @@ export class OpenCodianView extends ItemView {
     if (!runtime.backgroundTaskStartedAt) {
       runtime.backgroundTaskStartedAt = Date.now();
     }
+    runtime.backgroundTaskAwaitingAuthoritativeSync = true;
+    runtime.backgroundTaskLastAuthoritativeSyncAt = null;
     runtime.backgroundTaskStaleNoticeFingerprint = null;
     this.upsertBackgroundTaskLaunch({
       id: toolCall.id,
@@ -7989,6 +8271,8 @@ export class OpenCodianView extends ItemView {
       input: toolCall.input ?? {},
       result: toolCall.result,
     }, runtime.backgroundTaskLaunches);
+    runtime.backgroundTaskAwaitingAuthoritativeSync = true;
+    runtime.backgroundTaskLastAuthoritativeSyncAt = null;
     runtime.backgroundTaskStaleNoticeFingerprint = null;
     await this.renderBackgroundTaskIndicatorIfNeeded(tabId);
   }
@@ -8111,7 +8395,10 @@ export class OpenCodianView extends ItemView {
     }
 
     const segments = this.collectBackgroundTaskSegments(conversation?.messages ?? [], tabId)
-      .filter((segment) => this.shouldRenderInlineBackgroundTaskSegment(segment));
+      .filter((segment) =>
+        this.shouldRenderInlineBackgroundTaskSegment(segment)
+        && !this.isSuppressedBackgroundTaskSegment(segment, tabId, conversation),
+      );
     const activeKeys = new Set(segments.map((segment) => segment.anchorKey));
 
     for (const [anchorKey, element] of runtime.backgroundTaskInlineEls.entries()) {
@@ -8310,6 +8597,7 @@ export class OpenCodianView extends ItemView {
           timestamp: queued.latestTimestamp,
           noticeMeta: {
             kind: 'background-task-completion',
+            conversationId: conversation.id,
             anchorKey,
             sourceReminderIds: [...queued.sourceReminderIds].sort(),
             allComplete: queued.allComplete,
@@ -9475,6 +9763,8 @@ export class OpenCodianView extends ItemView {
         conversation.messages = merged;
       }
 
+      this.markBackgroundTaskAuthoritativeSync(tabId, reason);
+
       if (this.currentConversation?.id === conversation.id && this.getActiveTabId() === tabId) {
         await this.refreshActiveTabContextUsageFromServer();
       }
@@ -9539,25 +9829,31 @@ export class OpenCodianView extends ItemView {
     const messagesEl = this.messagesContainer;
     const shouldStickToBottom = this.getActiveTabRuntimeState()?.autoScrollEnabled ?? this.isNearBottomForElement(messagesEl);
     const previousScrollTop = messagesEl.scrollTop;
+    const activeTabId = this.getActiveTabId();
+    this.beginConversationHydration(activeTabId);
+    const scrollSnapshot = this.captureElementScrollRestoreSnapshot(
+      messagesEl,
+      shouldStickToBottom,
+      previousScrollTop,
+    );
 
     this.clearScheduledScrollToBottom();
     messagesEl.addClass('is-rehydrating');
     this.messagesContainer.empty();
     this.resetTurnState();
 
-    await this.renderMessages(conversation.messages);
-    await this.renderBackgroundTaskIndicatorIfNeeded();
+    try {
+      await this.renderMessages(conversation.messages);
+      await this.renderBackgroundTaskIndicatorIfNeeded();
+      this.restoreElementScrollAfterRender(messagesEl, scrollSnapshot);
+      this.scheduleComposerLayoutSync();
 
-    if (shouldStickToBottom) {
-      this.scrollElementToBottomAfterRender(messagesEl);
-    } else {
-      this.restoreElementScrollTopAfterRender(messagesEl, previousScrollTop);
+      window.requestAnimationFrame(() => {
+        messagesEl.removeClass('is-rehydrating');
+      });
+    } finally {
+      this.endConversationHydration(activeTabId);
     }
-    this.scheduleComposerLayoutSync();
-
-    window.requestAnimationFrame(() => {
-      messagesEl.removeClass('is-rehydrating');
-    });
     this.logAssistantFinalizationDebug('rerender-conversation-messages-complete', {
       conversationId: conversation.id,
       sessionId: conversation.openCodeSessionId,
@@ -10111,10 +10407,46 @@ export class OpenCodianView extends ItemView {
     this.syncPaneScrollMetrics(tabId, paneState.messagesEl);
   }
 
-  private restoreElementScrollTopAfterRender(messagesEl: HTMLElement, scrollTop: number): void {
+  private captureElementScrollRestoreSnapshot(
+    messagesEl: HTMLElement,
+    shouldStickToBottom: boolean,
+    fallbackScrollTop = messagesEl.scrollTop,
+  ): ConversationScrollRestoreSnapshot {
+    const scrollTop = Number.isFinite(fallbackScrollTop) ? fallbackScrollTop : messagesEl.scrollTop;
+    const distanceFromBottom = Math.max(0, messagesEl.scrollHeight - messagesEl.clientHeight - scrollTop);
+    const messageElements = Array.from(messagesEl.querySelectorAll<HTMLElement>('.opencodian-message[data-message-id]'));
+    const anchorMessageEl = messageElements.find((element) => {
+      const rect = element.getBoundingClientRect();
+      const containerRect = messagesEl.getBoundingClientRect();
+      return rect.bottom >= containerRect.top;
+    }) ?? null;
+
+    return {
+      mode: shouldStickToBottom
+        ? 'bottom'
+        : anchorMessageEl?.dataset.messageId
+          ? 'preserve-anchor'
+          : 'preserve-distance',
+      scrollTop,
+      distanceFromBottom,
+      anchorMessageId: anchorMessageEl?.dataset.messageId ?? null,
+      anchorOffsetTop: anchorMessageEl
+        ? anchorMessageEl.getBoundingClientRect().top - messagesEl.getBoundingClientRect().top
+        : 0,
+    };
+  }
+
+  private restoreElementScrollAfterRender(
+    messagesEl: HTMLElement,
+    snapshot: ConversationScrollRestoreSnapshot,
+  ): void {
     const tabId = messagesEl.dataset.tabId ?? null;
     const apply = () => {
-      const maxScrollTop = Math.max(0, messagesEl.scrollHeight - messagesEl.clientHeight);
+      if (snapshot.mode === 'bottom') {
+        this.scrollToBottom({ tabId });
+        return;
+      }
+
       if (tabId) {
         const runtime = this.getTabRuntimeState(tabId);
         if (runtime) {
@@ -10122,18 +10454,28 @@ export class OpenCodianView extends ItemView {
             + getProgrammaticScrollGuardDelayMs();
         }
       }
-      messagesEl.scrollTop = Math.min(Math.max(0, scrollTop), maxScrollTop);
+
+      const maxScrollTop = Math.max(0, messagesEl.scrollHeight - messagesEl.clientHeight);
+      let nextScrollTop = Math.min(Math.max(0, snapshot.scrollTop), maxScrollTop);
+
+      if (snapshot.mode === 'preserve-anchor' && snapshot.anchorMessageId) {
+        const anchorEl = Array.from(messagesEl.querySelectorAll<HTMLElement>('.opencodian-message[data-message-id]'))
+          .find((element) => element.dataset.messageId === snapshot.anchorMessageId) ?? null;
+        if (anchorEl) {
+          const anchorOffsetTop = anchorEl.getBoundingClientRect().top - messagesEl.getBoundingClientRect().top;
+          nextScrollTop = Math.min(
+            Math.max(0, messagesEl.scrollTop + (anchorOffsetTop - snapshot.anchorOffsetTop)),
+            maxScrollTop,
+          );
+        } else {
+          nextScrollTop = Math.min(Math.max(0, maxScrollTop - snapshot.distanceFromBottom), maxScrollTop);
+        }
+      } else {
+        nextScrollTop = Math.min(Math.max(0, maxScrollTop - snapshot.distanceFromBottom), maxScrollTop);
+      }
+
+      messagesEl.scrollTop = nextScrollTop;
       this.syncPaneScrollMetrics(tabId, messagesEl);
-    };
-
-    apply();
-    window.requestAnimationFrame(apply);
-  }
-
-  private scrollElementToBottomAfterRender(messagesEl: HTMLElement): void {
-    const tabId = messagesEl.dataset.tabId ?? null;
-    const apply = () => {
-      this.scrollToBottom({ tabId });
     };
 
     apply();
@@ -11044,7 +11386,12 @@ export class OpenCodianView extends ItemView {
 
     if (targetConversationIsVisible) {
       this.lastConversationSyncFingerprint = fingerprint;
-      this.scheduleSettledScrollToBottomIfNeeded();
+      const runtime = this.getTabRuntimeState(targetTabId);
+      if (runtime?.isHydratingConversation) {
+        runtime.pendingLayoutMutations += 1;
+      } else {
+        this.scheduleSettledScrollToBottomIfNeeded();
+      }
       return;
     }
 

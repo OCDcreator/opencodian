@@ -225,8 +225,8 @@
 - `format` / `agent` / `noReply` 还没有接到 `OpenCodeService` facade
 - `externalContextPaths` 仍是兼容字段，当前发送链路会忽略，新的上下文流程应使用 `contextItems`
 - `sdkQuestions` 代码已支持，但 runtime rollout 默认未打开，所以 question 的 list/reply/reject 默认仍可能走 legacy `/question`
-- `global.syncEvent.subscribe()` 当前只覆盖 `todo.updated` 与 `session.status`
-- 更丰富的 stream 事件类型，如 `message.part.removed` / `message.updated`，还没有完全接入 UI
+- `global.syncEvent.subscribe()` 已覆盖 `todo.updated`、`session.status`、`message.updated`、`message.part.updated`、`session.diff`；其中 message/diff 目前主要用于驱动聊天视图提前触发 authoritative sync，而不是直接在本地重建完整 message store
+- 更丰富的 sync / stream 事件类型（例如 `message.part.removed`）仍未完全接入 UI，本地仍保留 `syncConversationMessagesFromServer()` 轮询兜底
 - `session.summarize()` / `session.unrevert()` / `find.*` / `file.status()` / `vcs.get()` 尚未接入
 
 ## 6. 失败时建议立即记录的信息

@@ -188,8 +188,8 @@ MAXIMIZE SEARCH EFFORT...
   - `session.idle` 后直接结束本次 SSE 循环。
 - `src/features/chat/OpenCodianView.ts`
   - 发送时先把用户原始文本直接 push 到本地会话消息里并渲染。
-  - 流结束后才在特定条件下 `syncConversationMessagesFromServer()`。
-  - 没有“会话空闲时仍持续监听当前 session 新消息”的机制。
+  - 流结束后仍会通过 `syncConversationMessagesFromServer()` 与 2 秒后台轮询兜底会话历史。
+  - 现在已经会消费 `global.syncEvent.subscribe()` 里的 `message.updated` / `message.part.updated` / `session.diff`，并提前触发当前会话或后台 tab 的消息同步；但它还不是像参考应用那样直接在本地维护一整套实时 message/part store。
 
 ### 3.5 OpenCodian 已经具备“通知卡片”和中文 i18n 基础
 
@@ -289,7 +289,7 @@ OpenCodian 目前只有 `.opencode/opencode.json` 的管理能力，没有下面
 
 1. 为当前激活会话建立常驻 `/event` 订阅，在非流式阶段也继续监听与当前 session 相关的消息变化。
 2. 若实现成本过高，可增加“空闲期轻量轮询”作为兜底，例如在当前会话可见时定期拉取 `GET /session/:id/message`。
-3. 最低配也要在收到 `session.diff` / `message.updated` 等信号时触发当前会话自动同步，而不是只依赖重新打开会话。
+3. 当前实现已经满足这个最低配：收到 `session.diff` / `message.updated` / `message.part.updated` 时会触发会话自动同步；后续如果要继续提升兼容性，重点应转向“直接消费实时 message/part store”，而不是继续堆轮询。
 
 ### 预期行为
 

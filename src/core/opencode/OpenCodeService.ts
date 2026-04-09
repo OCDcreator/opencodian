@@ -462,6 +462,27 @@ type SessionStatusUpdate = {
 
 type SessionStatusListener = (update: SessionStatusUpdate) => void;
 
+export type SessionSyncEventUpdate =
+  | {
+      sessionId: string;
+      type: 'message.updated';
+      messageId: string | null;
+    }
+  | {
+      sessionId: string;
+      type: 'message.part.updated';
+      messageId: string | null;
+      partId: string | null;
+      partType: string | null;
+      time: number | null;
+    }
+  | {
+      sessionId: string;
+      type: 'session.diff';
+    };
+
+type SessionSyncEventListener = (update: SessionSyncEventUpdate) => void;
+
 const REMOTE_CONTEXT_TEXT_LIMIT_BYTES = 64 * 1024;
 
 export class OpenCodeService {
@@ -475,6 +496,7 @@ export class OpenCodeService {
   private sdkFeatureFlags: SdkFeatureFlags;
   private sessionTodoListeners = new Set<SessionTodoListener>();
   private sessionStatusListeners = new Set<SessionStatusListener>();
+  private sessionSyncEventListeners = new Set<SessionSyncEventListener>();
   private syncEventAbortController: AbortController | null = null;
   private syncEventPromise: Promise<void> | null = null;
   private syncEventWanted = false;
@@ -986,6 +1008,19 @@ export class OpenCodeService {
     };
   }
 
+  subscribeToSessionSyncEvents(listener: SessionSyncEventListener): () => void {
+    this.sessionSyncEventListeners.add(listener);
+    this.syncEventWanted = true;
+    this.ensureSyncEventSubscription();
+
+    return () => {
+      this.sessionSyncEventListeners.delete(listener);
+      if (!this.hasSyncEventListeners()) {
+        this.stopSyncEventSubscription();
+      }
+    };
+  }
+
   /** Delete a session */
   async deleteSession(sessionId: string): Promise<void> {
     if (this.shouldUseSdk('sdkCrud')) {
@@ -1402,7 +1437,9 @@ export class OpenCodeService {
   }
 
   private hasSyncEventListeners(): boolean {
-    return this.sessionTodoListeners.size > 0 || this.sessionStatusListeners.size > 0;
+    return this.sessionTodoListeners.size > 0
+      || this.sessionStatusListeners.size > 0
+      || this.sessionSyncEventListeners.size > 0;
   }
 
   private ensureSyncEventSubscription(): void {
@@ -1483,12 +1520,27 @@ export class OpenCodeService {
         sessionID?: unknown;
         todos?: unknown;
         status?: unknown;
+        info?: {
+          id?: unknown;
+          sessionID?: unknown;
+        };
+        part?: {
+          id?: unknown;
+          type?: unknown;
+          messageID?: unknown;
+          sessionID?: unknown;
+        };
+        time?: unknown;
       };
     };
 
     const sessionId = typeof value.properties?.sessionID === 'string'
       ? value.properties.sessionID
-      : '';
+      : typeof value.properties?.info?.sessionID === 'string'
+        ? value.properties.info.sessionID
+        : typeof value.properties?.part?.sessionID === 'string'
+          ? value.properties.part.sessionID
+          : '';
     if (!sessionId) {
       return;
     }
@@ -1500,6 +1552,37 @@ export class OpenCodeService {
     }
 
     if (value.type !== 'session.status') {
+      if (value.type === 'message.updated') {
+        this.emitSessionSyncEventUpdate({
+          sessionId,
+          type: 'message.updated',
+          messageId: typeof value.properties?.info?.id === 'string'
+            ? value.properties.info.id
+            : null,
+        });
+      } else if (value.type === 'message.part.updated') {
+        this.emitSessionSyncEventUpdate({
+          sessionId,
+          type: 'message.part.updated',
+          messageId: typeof value.properties?.part?.messageID === 'string'
+            ? value.properties.part.messageID
+            : null,
+          partId: typeof value.properties?.part?.id === 'string'
+            ? value.properties.part.id
+            : null,
+          partType: typeof value.properties?.part?.type === 'string'
+            ? value.properties.part.type
+            : null,
+          time: typeof value.properties?.time === 'number'
+            ? value.properties.time
+            : null,
+        });
+      } else if (value.type === 'session.diff') {
+        this.emitSessionSyncEventUpdate({
+          sessionId,
+          type: 'session.diff',
+        });
+      }
       return;
     }
 
@@ -1527,6 +1610,16 @@ export class OpenCodeService {
         listener(update);
       } catch (error) {
         logger.error('Session status listener failed', error);
+      }
+    }
+  }
+
+  private emitSessionSyncEventUpdate(update: SessionSyncEventUpdate): void {
+    for (const listener of this.sessionSyncEventListeners) {
+      try {
+        listener(update);
+      } catch (error) {
+        logger.error('Session sync-event listener failed', error);
       }
     }
   }
@@ -2967,7 +3060,7 @@ export class OpenCodeService {
 
     const nextSettings = cloneSettings(settings);
     const previousBaseUrl = this.baseUrl;
-    const shouldResumeSyncEvents = this.sessionTodoListeners.size > 0;
+    const shouldResumeSyncEvents = this.hasSyncEventListeners();
     this.settings = nextSettings;
     this.baseUrl = getServerBaseUrl(nextSettings.server);
     this.serverManager.updateConfig(this.buildServerConfig(nextSettings));

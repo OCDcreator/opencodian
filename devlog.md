@@ -12,6 +12,45 @@
 
 ---
 
+## 2026-04-09 后台任务权威同步、重载抑制与滚动恢复修正
+
+### 🎯 改动目标
+
+- 让后台任务完成时机更贴近 OpenCode SDK：优先响应 `message.updated` / `message.part.updated` / `session.diff`，不再只靠 2 秒轮询猜测
+- 修正 reload 后“明明早已结束却仍显示后台任务仍在运行”的误判链路
+- 修正重载或补写 notice 后消息区无法稳定滚到最底部、会被自动顶回去的问题
+
+### ✅ 本轮调整
+
+- `src/core/opencode/OpenCodeService.ts`
+- `src/core/opencode/index.ts`
+  - 扩展内部 sync-event 桥接，新增 `message.updated`、`message.part.updated`、`session.diff` 订阅回调
+  - 保持现有 todo/status 订阅不变，但让聊天视图能基于消息层信号更早触发 authoritative sync
+
+- `src/features/chat/OpenCodianView.ts`
+- `src/core/types/chat.ts`
+  - 新增会话 hydration / authoritative-sync 状态，reload 后先重建 inline background task，再等至少一次权威消息同步后才允许 stale 降级
+  - 为后台任务补充 `backgroundTaskAwaitingAuthoritativeSync` 等运行态字段，避免历史 launch 在 reload 后反向重建成“仍在运行”
+  - 新增 signal-driven conversation sync，收到 SDK sync-event 时会优先刷新当前会话或后台 tab，而不是只能等轮询
+  - 重做消息区滚动恢复逻辑：由“恢复旧 `scrollTop`”改成“到底 / 保持距底距离 / 保持 anchor”三态恢复
+  - hydration 期间禁止 layout change 触发自动吸底，避免补写 inline/stale/completion notice 时把视图顶上去
+  - 关闭 tab 的阻塞规则收敛到 foreground-only，不再因为后台任务仍在回写就强行阻止关闭
+  - 为后台任务完成 notice 的 `noticeMeta` 补充 `conversationId`，方便 reload 后稳定判重
+
+- `tests/unit/core/opencode/OpenCodeService.test.ts`
+- `tests/unit/features/chat/backgroundTaskHydrationState.test.ts`
+- `docs/modules/features/chat/OpenCodianView.md`
+- `docs/status/sdk-v2-manual-checklist.md`
+- `docs/requirements/omo-compatibility.md`
+  - 新增 sync-event 桥接测试与 hydration/stale/滚动保护测试
+  - 同步文档口径，明确当前实现已经具备“事件驱动 + 轮询兜底”的后台任务同步链路
+
+### 🧪 验证结果
+
+- `npm run typecheck` 通过
+- `npm test -- tests/unit/core/opencode/OpenCodeService.test.ts tests/unit/features/chat/backgroundTaskTimeline.test.ts tests/unit/features/chat/backgroundTaskHydrationState.test.ts tests/unit/features/chat/backgroundTaskNoticeDedup.test.ts tests/unit/features/chat/staleSessionTodoState.test.ts` 通过
+- `npm run build` 通过，最新 `BUILD_ID: main.202604092008`
+
 ## 2026-04-09 后台任务改为会话内链路与延迟完成卡片
 
 ### 🎯 改动目标

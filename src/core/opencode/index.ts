@@ -2,7 +2,7 @@
  * OpenCode SDK wrapper module
  */
 
-export type { SessionActivityStatus } from './OpenCodeService';
+export type { SessionActivityStatus, SessionSyncEventUpdate } from './OpenCodeService';
 export { OpenCodeService } from './OpenCodeService';
 export {
   resolveSdkFeatureFlags,
