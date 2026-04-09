@@ -1870,7 +1870,11 @@ export class OpenCodianView extends ItemView {
     reason: string,
   ): void {
     const runtime = this.getTabRuntimeState(tabId);
-    if (!runtime || runtime.isHydratingConversation) {
+    if (
+      !runtime
+      || runtime.isHydratingConversation
+      || !runtime.backgroundTaskAwaitingAuthoritativeSync
+    ) {
       return;
     }
 
@@ -2576,7 +2580,7 @@ export class OpenCodianView extends ItemView {
     };
 
     if (options.flush) {
-      void this.plugin.storage.saveSettings(this.plugin.settings);
+      void this.plugin.saveSettingsUiStateImmediately();
       return;
     }
 

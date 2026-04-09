@@ -139,6 +139,7 @@ export class ProviderBuiltinIconPickerModal extends Modal {
         cls: 'opencodian-builtin-icon-picker-card',
         attr: {
           type: 'button',
+          'aria-pressed': option.isSelected ? 'true' : 'false',
         },
       });
       cardEl.toggleClass('is-selected', option.isSelected);
@@ -147,25 +148,34 @@ export class ProviderBuiltinIconPickerModal extends Modal {
       });
 
       const previewEl = cardEl.createDiv({ cls: 'opencodian-builtin-icon-picker-card-preview' });
+      const placeholderEl = previewEl.createSpan({
+        cls: 'opencodian-builtin-icon-picker-card-placeholder',
+        text: option.iconId[0]?.toUpperCase() ?? '?',
+      });
       if (option.previewUrl) {
         const imgEl = document.createElement('img');
         imgEl.src = option.previewUrl;
         imgEl.alt = option.displayName;
-        previewEl.appendChild(imgEl);
-      } else {
-        previewEl.createSpan({
-          cls: 'opencodian-builtin-icon-picker-card-placeholder',
-          text: option.iconId[0]?.toUpperCase() ?? '?',
+        imgEl.loading = 'lazy';
+        imgEl.addEventListener('error', () => {
+          imgEl.remove();
+          previewEl.addClass('is-fallback');
+          placeholderEl.hidden = false;
         });
+        previewEl.appendChild(imgEl);
+        placeholderEl.hidden = true;
+      } else {
+        previewEl.addClass('is-fallback');
       }
 
-      const titleRowEl = cardEl.createDiv({ cls: 'opencodian-builtin-icon-picker-card-title-row' });
+      const bodyEl = cardEl.createDiv({ cls: 'opencodian-builtin-icon-picker-card-body' });
+      const titleRowEl = bodyEl.createDiv({ cls: 'opencodian-builtin-icon-picker-card-title-row' });
       titleRowEl.createDiv({
         cls: 'opencodian-builtin-icon-picker-card-title',
         text: option.displayName,
       });
 
-      const badgesEl = titleRowEl.createDiv({ cls: 'opencodian-builtin-icon-picker-card-badges' });
+      const badgesEl = bodyEl.createDiv({ cls: 'opencodian-builtin-icon-picker-card-badges' });
       badgesEl.createSpan({
         cls: 'opencodian-builtin-icon-picker-card-badge',
         text: t(`settings.model.iconCache.builtinPicker.library.${option.libraryId}` as const),
@@ -183,10 +193,15 @@ export class ProviderBuiltinIconPickerModal extends Modal {
         });
       }
 
-      cardEl.createDiv({
+      bodyEl.createDiv({
         cls: 'opencodian-builtin-icon-picker-card-meta',
         text: option.iconId,
       });
+
+      const stateEl = cardEl.createDiv({ cls: 'opencodian-builtin-icon-picker-card-state' });
+      if (option.isSelected) {
+        setIcon(stateEl, 'check');
+      }
     }
   }
 

@@ -12,7 +12,7 @@ import * as path from 'path';
 
 import { ModelConfigService, OpencodeConfigManager } from './core/config';
 import { OpenCodeService, SDK_FEATURE_FLAG_ROLLOUT_DEFAULTS } from './core/opencode';
-import { StorageService } from './core/storage';
+import { splitPersistedSettings, StorageService } from './core/storage';
 import {
   areChatAppearanceSettingsEqual,
   getThemeAppearanceOverridesFromBase,
@@ -152,6 +152,8 @@ export default class OpenCodianPlugin extends Plugin {
   private modelRefreshFrameId: number | null = null;
   private themeBackgroundDataUrlCache = new Map<string, string | null>();
   private themeBackgroundDataUrlRequests = new Map<string, Promise<string | null>>();
+  private settingsPersistenceWritable = true;
+  private settingsPersistenceWarningShown = false;
 
   async onload() {
     // Output BUILD_ID for debugging (always visible)
@@ -377,7 +379,15 @@ export default class OpenCodianPlugin extends Plugin {
 
   /** Load settings from storage */
   async loadSettings() {
-    const savedSettings = await this.storage.loadSettings();
+    const persistedSettings = await this.storage.loadPersistedSettings();
+    const savedSettings =
+      persistedSettings.core.data || persistedSettings.ui.data
+        ? ({
+            ...(persistedSettings.core.data ?? {}),
+            ...(persistedSettings.ui.data ?? {}),
+          } as Partial<OpenCodianSettings>)
+        : null;
+    this.settingsPersistenceWritable = persistedSettings.writable;
     const savedDebugLogPaths =
       savedSettings && typeof savedSettings === 'object' && 'debugLogPaths' in savedSettings
         ? (savedSettings as { debugLogPaths?: Partial<PlatformDebugLogPaths> }).debugLogPaths
@@ -674,12 +684,10 @@ export default class OpenCodianPlugin extends Plugin {
       providerIconLibrary: normalizedProviderIconLibrary,
     };
 
-    if (
-      shouldResetGlassRefractionGlassDefaults
-      && this.storage
-      && typeof this.storage.saveSettings === 'function'
-    ) {
-      await this.storage.saveSettings(this.settings);
+    this.reportSettingsLoadState(persistedSettings);
+
+    if (persistedSettings.writable && (persistedSettings.shouldPersist || shouldResetGlassRefractionGlassDefaults)) {
+      await this.persistSettingsDomains({ core: true, ui: true });
     }
   }
 
@@ -707,7 +715,7 @@ export default class OpenCodianPlugin extends Plugin {
       }
     }
 
-    await this.storage.saveSettings(this.settings);
+    await this.persistSettingsDomains({ core: true, ui: true });
 
     this.refreshOpenCodianViews({ reloadModels, applyUi });
     
@@ -951,12 +959,10 @@ export default class OpenCodianPlugin extends Plugin {
     const nextBackgroundPath = this.settings.chatAppearance.background.imagePath;
 
     try {
-      await this.saveSettings({
-        syncService: false,
-        reloadModels: false,
-        syncConfig: false,
-        applyUi: true,
-      });
+      const persisted = await this.persistSettingsDomains({ core: true });
+      if (!persisted) {
+        return;
+      }
     } catch (error) {
       this.setEffectiveChatAppearance(previousAppearance);
       this.refreshOpenCodianViews({ reloadModels: false, applyUi: true });
@@ -977,7 +983,9 @@ export default class OpenCodianPlugin extends Plugin {
     this.clearChatAppearanceSaveTimer();
     this.chatAppearanceSaveTimeoutId = window.setTimeout(() => {
       this.chatAppearanceSaveTimeoutId = null;
-      void this.storage.saveSettings(this.settings);
+      void this.persistSettingsDomains({ core: true }).catch((error) => {
+        logger.error('Failed to persist core settings', error);
+      });
     }, delay);
   }
 
@@ -985,8 +993,15 @@ export default class OpenCodianPlugin extends Plugin {
     this.clearSettingsUiStateSaveTimer();
     this.settingsUiStateSaveTimeoutId = window.setTimeout(() => {
       this.settingsUiStateSaveTimeoutId = null;
-      void this.storage.saveSettings(this.settings);
+      void this.persistSettingsDomains({ ui: true }).catch((error) => {
+        logger.error('Failed to persist UI settings state', error);
+      });
     }, delay);
+  }
+
+  async saveSettingsUiStateImmediately(): Promise<void> {
+    this.clearSettingsUiStateSaveTimer();
+    await this.persistSettingsDomains({ ui: true });
   }
 
   private clearChatAppearanceSaveTimer(): void {
@@ -1001,6 +1016,60 @@ export default class OpenCodianPlugin extends Plugin {
       window.clearTimeout(this.settingsUiStateSaveTimeoutId);
       this.settingsUiStateSaveTimeoutId = null;
     }
+  }
+
+  private async persistSettingsDomains(options: { core?: boolean; ui?: boolean }): Promise<boolean> {
+    if (!this.settingsPersistenceWritable) {
+      this.warnSettingsPersistenceBlocked(
+        'OpenCodian settings persistence is in recovery-only mode because the saved settings files could not be safely recovered.',
+      );
+      return false;
+    }
+
+    const { core, ui } = splitPersistedSettings(this.settings);
+    if (options.core) {
+      await this.storage.saveCoreSettings(core);
+    }
+    if (options.ui) {
+      await this.storage.saveUiSettings(ui);
+    }
+    return true;
+  }
+
+  private reportSettingsLoadState(result: Awaited<ReturnType<StorageService['loadPersistedSettings']>>): void {
+    const recoveredFromBackup = result.core.source === 'backup' || result.ui.source === 'backup';
+    const migratedFromLegacy = result.core.source === 'legacy' || result.ui.source === 'legacy';
+    const blocked = !result.writable;
+
+    if (recoveredFromBackup) {
+      const message = 'OpenCodian recovered settings from a backup after detecting an unreadable settings file.';
+      logger.warn(message);
+      new Notice(message, 8000);
+    }
+
+    if (migratedFromLegacy) {
+      const message = 'OpenCodian migrated settings to the new split persistence format.';
+      logger.info(message);
+      new Notice(message, 6000);
+    }
+
+    if (blocked) {
+      this.warnSettingsPersistenceBlocked(
+        result.core.message
+        ?? result.ui.message
+        ?? 'OpenCodian could not recover saved settings. Persistence is temporarily disabled to avoid overwriting data.',
+      );
+    }
+  }
+
+  private warnSettingsPersistenceBlocked(message: string): void {
+    logger.error(message);
+    if (this.settingsPersistenceWarningShown) {
+      return;
+    }
+
+    this.settingsPersistenceWarningShown = true;
+    new Notice(message, 12000);
   }
 
   private handleModelsLoaded(): void {

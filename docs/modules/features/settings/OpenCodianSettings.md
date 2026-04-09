@@ -34,12 +34,12 @@
 其中最近变化较大的几块是：
 
 - **Model**
-  - 重构成“常用 / 可用范围与目录 / 配置与缓存”三段式模型中心
+  - 重构成“常用 / 可用范围与目录 / 项目工作区”三段式模型中心
   - 默认聊天模型不再拆成 provider/model 两个普通下拉，而是走可搜索 picker
   - provider 级可用性开关只写回当前项目 `.opencode/opencode.json`，可覆盖服务器继承的 provider 白名单 / 黑名单
   - model 级可用性开关写回插件设置 `disabledModelRefs`
   - provider 列表支持折叠、搜索、`仅看已禁用` 过滤与图标/来源 badge
-  - provider icon cache / custom icon library 管理被移到高级工具区
+  - provider / model 的项目级配置与图标缓存管理收拢进 `ModelConfigModal` 工作区；该弹窗现按 `CC Switch` 风格重组为左侧 provider 导航 + 右侧单列表单流，JSON 编辑器与重启选项位于默认折叠的高级区
 - **Conversation**
   - `questionDisplayMode`
   - `questionCardPosition`
@@ -87,8 +87,8 @@
     - `服务器目录` = `opencode models` 当前 provider 集合 - 服务端硬禁用 provider
     - `当前生效列表` = `服务器目录` 再叠加项目本地 provider 开关与 source mode 过滤
     - `当前禁用列表` = 服务端禁用占位 + 项目禁用项 + 模型级 `disabledModelRefs`
-- **配置与缓存**：当前项目配置编辑、icon cache
-- “可用范围与目录”和“配置与缓存”都是默认展开的 `details` block，用户折叠状态会写回插件设置并在下次打开时恢复
+- **项目工作区**：打开项目级 provider/model 工作区，集中处理 provider 主字段、模型列表、图标缓存入口和实时 JSON 预览
+- “可用范围与目录”和“项目工作区”都是默认展开的 `details` block，用户折叠状态会写回插件设置并在下次打开时恢复
 
 provider 开关写回仍遵循 `ModelConfigService` 返回的 `effectiveProviderConfig` 继承规则：项目 `enabled_providers` / `disabled_providers` 字段存在时替换服务器字段。但设置页展示启用态时，额外参考 `currentEnabledProviderIds`，避免把当前作用域下已不可用的 provider 显示成“已启用”。设置页的 provider 可用性测试现在分两层：
 

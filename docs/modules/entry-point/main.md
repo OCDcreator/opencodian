@@ -48,6 +48,7 @@
 - `conversations`: 只在内存里缓存会话元数据；正文按需从 `StorageService.loadFullConversation()` 读取。
 - `themeBackgroundDataUrlCache` / `themeBackgroundDataUrlRequests`: 聊天背景图 data URL 缓存与并发去重。
 - `chatAppearanceSaveTimeoutId` / `settingsUiStateSaveTimeoutId` / `modelRefreshFrameId`: 插件级节流与 UI 刷新调度句柄。
+- `settingsPersistenceWritable`: 启动恢复失败时切到只读保护，阻止默认值覆盖已损坏的设置文件。
 
 ## 核心逻辑
 
@@ -73,7 +74,12 @@
 
 ### 设置归一化与迁移 (`loadSettings`)
 
-`loadSettings()` 不是简单的“读 JSON 合并默认值”，还承担了多轮历史兼容：
+`loadSettings()` 不是简单的“读 JSON 合并默认值”，还承担了多轮历史兼容与恢复：
+
+- 先读取 `StorageService.loadPersistedSettings()` 返回的分层结果，区分 `primary / backup / legacy / missing / blocked`。
+- `settings.core.json` / `settings.ui.json` 任一主文件损坏时，优先尝试对应 `.bak`。
+- 若新格式不存在或不可恢复，再尝试旧 `.opencodian/settings.json` 自动迁移。
+- 只有真正 `missing` 才按首次安装处理；`blocked` 会阻止后续自动写盘。
 
 - 把旧的 `debugLogPath` 合并进新的 `debugLogPaths`（按当前平台落位）。
 - 把旧的扁平 `server.{host,port,autoStart}` 迁移为新的 `server.mode/local/remote/auth` 结构。
@@ -94,10 +100,12 @@
 
 1. 清掉延迟保存/延迟 UI 状态的 timer。
 2. 先把新设置同步到 `OpenCodeService.updateSettings()`；若服务层更新失败，就回滚到旧快照。
-3. 把归一化后的设置写回 `StorageService`。
+3. 把归一化后的设置拆成 `core/ui` 两个域，再写回 `StorageService` 的串行写队列。
 4. 刷新所有已打开的 `OpenCodianView`，并在需要时调用 `syncOpencodeConfig()` 让 `.opencode` 权限配置与 `permissionMode` 对齐。
 
 `handleModelsLoaded()` 会在服务层模型默认值变化后把新 provider/model 回写到设置，并用 `requestAnimationFrame` 合并视图刷新。
+
+聊天外观的防抖保存只写 `core` 域；tab/设置页 UI 状态的防抖保存只写 `ui` 域。视图层不再直接把整份 `this.settings` 落盘。
 
 ### 视图、命令与插件级 UI 调度
 
@@ -186,7 +194,7 @@ graph TD
 
 ## 与其他模块的交互
 
-- `StorageService`: 读写设置、会话、managed server state、主题背景资源。
+- `StorageService`: 读写分层设置、会话、managed server state、主题背景资源。
 - `OpenCodeService`: 承担 OpenCode 侧运行时；插件把设置、vault 路径和 managed PID 状态注入进去。
 - `OpencodeConfigManager`: 用于首次创建或后续同步 `.opencode` 权限配置。
 - `ModelConfigService`: 在拿到 vault 路径后构建，供设置页和视图读取模型目录。
@@ -211,5 +219,6 @@ graph TD
 
 - `loadConversations()` 只加载元数据，不加载消息正文；正文由 `getConversationById()` 按需补读。
 - `onload()` 先预载会话，再注册 `OpenCodianView`，这是热重载/恢复链路的顺序约束。
-- `saveSettings()` 的失败回滚只覆盖服务层设置同步；磁盘写入发生在服务层更新之后。
+- `saveSettings()` 的失败回滚只覆盖服务层设置同步；分层磁盘写入发生在服务层更新之后。
+- 当启动阶段判定设置不可恢复时，插件会进入持久化只读保护，并通过 `Notice` 告警，而不是把默认值写回磁盘。
 - `onunload()` 当前没有显式调用 `clearSettingsUiStateSaveTimer()`；卸载时只清除了 chat appearance timer 与 model refresh 帧请求。

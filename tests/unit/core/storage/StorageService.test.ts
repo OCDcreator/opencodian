@@ -2,7 +2,7 @@
  * StorageService unit tests
  */
 
-import { StorageService } from '../../../../src/core/storage/StorageService';
+import { splitPersistedSettings, StorageService } from '../../../../src/core/storage/StorageService';
 
 // Mock Obsidian
 const mockAdapter = {
@@ -290,35 +290,315 @@ describe('StorageService', () => {
     });
   });
 
-  describe('saveSettings', () => {
-    it('should save settings to file', async () => {
-      const settings = { userName: 'Test User', server: { port: 4096 } };
+  describe('persisted settings', () => {
+    it('writes core settings as a versioned envelope', async () => {
+      const { core } = splitPersistedSettings({
+        userName: 'Test User',
+        server: {
+          mode: 'local',
+          local: { host: '127.0.0.1', port: 4096, autoStart: true },
+          remote: { baseUrl: 'http://127.0.0.1:4096' },
+          auth: { type: 'none', username: 'opencode', password: '', token: '' },
+        },
+        enableBlocklist: true,
+        allowExternalAccess: false,
+        blockedCommands: { unix: [], windows: [] },
+        permissionMode: 'yolo',
+        autoRestartOnPermissionChange: false,
+        modelSourceMode: 'merge',
+        defaultProvider: 'openai',
+        defaultModel: 'gpt-4o',
+        titleMode: 'default',
+        questionDisplayMode: 'all',
+        questionCardPosition: 'inline',
+        showAnsweredQuestionCards: true,
+        aiTitleModel: '',
+        disabledModelRefs: [],
+        renderUserMarkupAsCodeBlocks: true,
+        pluginIsolationMode: 'default',
+        providers: [],
+        providerIconLibrary: {
+          openai: [
+            {
+              id: 'builtin:opencode:openai',
+              type: 'builtin',
+              source: 'opencode:openai',
+              mimeType: 'image/svg+xml',
+              addedAt: 1,
+            },
+          ],
+        },
+        effortLevel: 'high',
+        thinkingBudget: 4096,
+        excludedTags: [],
+        mediaFolder: '',
+        systemPrompt: '',
+        allowedExportPaths: [],
+        maxTabs: 3,
+        tabBarPosition: 'below-header',
+        belowHeaderTabBarLayout: 'grid',
+        enableAutoScroll: true,
+        chatScrollMode: 'sticky-mask',
+        inputPanelTheme: 'preset',
+        inputPanelGlassRefraction: { glass: { backgroundOpacity: 1, blur: 1, saturation: 1, brightness: 1 }, card: { backgroundOpacity: 1, blur: 1, saturation: 1, brightness: 1 }, pill: { backgroundOpacity: 1, blur: 1, saturation: 1, brightness: 1 } },
+        inputPanelGlassRefractionSvgFilter: { preset: 'none', subtleScale: 8, strongScale: 16 },
+        inputPanelGlassRefractionGlassDefaultsVersion: 2,
+        inputPanelLiquidGlass: {
+          shuding: {
+            displacementScale: 10,
+            blurAmount: 0.25,
+            adaptiveSdf: false,
+            adaptiveSdfMix: 0,
+            rectEdgeRefraction: false,
+            rectEdgeRefractionStrength: 0,
+            cornerEnhancement: false,
+            cornerEnhancementStrength: 0,
+            edgeBandWidth: 0,
+            barrelDistortion: false,
+            barrelStrength: 0,
+            topHighlight: false,
+            topHighlightOpacity: 0.6,
+            innerBorder: false,
+            innerBorderOpacity: 0.2,
+            bottomShadow: false,
+            bottomShadowOpacity: 0.08,
+            insetDepthShadow: false,
+            insetDepthShadowOpacity: 0.12,
+            insetShadowBlur: 10,
+            contrastBoost: 1.2,
+            brightnessBoost: 1.05,
+            saturateBoost: 1.1,
+          },
+          nikdelvin: {
+            depth: 10,
+            strength: 100,
+            chromaticAberration: 0,
+            blur: 0,
+            backgroundPreset: 'none',
+            color: 'transparent',
+            background: '',
+            freeze: false,
+            noMorph: false,
+            button: false,
+            inline: false,
+            customEffects: false,
+          },
+          shudingDiamond: {
+            displacementScale: 10,
+            bloomOpacity: 1,
+            rimOpacity: 0.45,
+            faceOverlayOpacity: 1,
+            sparkleOpacity: 0.35,
+            edgeAlpha: 0.9,
+            faceAlpha: 0.82,
+            rotationSpeed: 1,
+            wobbleAmount: 0.4,
+            pointerTilt: 0.8,
+          },
+        },
+        chatAppearance: {
+          layout: { messagesPaddingTop: 12, messagesPaddingX: 12 },
+          sticky: { maskBlur: 24, edgeFade: 24, opacity: 94 },
+          background: { imagePath: '', fitMode: 'cover', opacity: 92, edgeFade: 28 },
+          user: { radius: 16, timeFontSize: 11, timeFontWeight: 400, timeColor: 'var(--text-muted)' },
+          assistant: {
+            backgroundOpacity: 72,
+            metaFontSize: 10,
+            timeFontSize: 10,
+            timeFontWeight: 400,
+            metaColor: 'var(--text-muted)',
+            timeColor: 'var(--text-muted)',
+            modelIdFontSize: 10,
+            modelIdFontWeight: 400,
+            modelIdColor: 'var(--text-faint, var(--text-muted))',
+          },
+          input: { backgroundOpacity: 72, shadowBlur: 28, actionButtonStyle: 'default' },
+          scrollbar: { width: 8, thumbOpacity: 58, thumbHoverOpacity: 82 },
+          customCss: '',
+        },
+        settingsPanelScrollTop: 42,
+        modelAvailabilitySectionOpen: true,
+        modelToolsSectionOpen: true,
+        enableDebugLogging: false,
+        inlineSerializedDebugLogArgs: false,
+        debugLogPaths: { unix: '', windows: '' },
+        openInMainTab: false,
+        tabState: { tabs: [], activeTabIndex: 0 },
+        theme: { activePresetId: null, customAppearanceOverrides: {} },
+        locale: 'en',
+        hiddenSlashCommands: [],
+      } as never);
 
-      await storage.saveSettings(settings as unknown as { userName: string; server: { port: number } });
+      await storage.saveCoreSettings(core);
 
       expect(mockAdapter.write).toHaveBeenCalledWith(
-        '.opencodian/settings.json',
-        expect.stringContaining('Test User')
+        '.opencodian/settings.core.json',
+        expect.stringContaining('"schemaVersion": 1'),
+      );
+      expect(mockAdapter.write).toHaveBeenCalledWith(
+        '.opencodian/settings.core.json',
+        expect.stringContaining('"source": "settings.core"'),
+      );
+      expect(mockAdapter.write).toHaveBeenCalledWith(
+        '.opencodian/settings.core.json',
+        expect.stringContaining('"userName": "Test User"'),
       );
     });
-  });
 
-  describe('loadSettings', () => {
-    it('should load settings from file', async () => {
-      const mockSettings = { userName: 'Test User' };
-      mockAdapter.read.mockResolvedValue(JSON.stringify(mockSettings));
+    it('loads split settings from primary files', async () => {
+      mockAdapter.exists.mockImplementation(async (filePath: string) => (
+        filePath === '.opencodian/settings.core.json' || filePath === '.opencodian/settings.ui.json'
+      ));
+      mockAdapter.read.mockImplementation(async (filePath: string) => {
+        if (filePath === '.opencodian/settings.core.json') {
+          return JSON.stringify({
+            schemaVersion: 1,
+            updatedAt: 1,
+            source: 'settings.core',
+            data: {
+              defaultProvider: 'openai',
+              providerIconLibrary: {
+                openai: [
+                  {
+                    id: 'builtin:opencode:openai',
+                    type: 'builtin',
+                    source: 'opencode:openai',
+                    mimeType: 'image/svg+xml',
+                    addedAt: 1,
+                  },
+                ],
+              },
+            },
+          });
+        }
 
-      const result = await storage.loadSettings();
+        return JSON.stringify({
+          schemaVersion: 1,
+          updatedAt: 1,
+          source: 'settings.ui',
+          data: {
+            settingsPanelScrollTop: 55,
+            modelAvailabilitySectionOpen: false,
+          },
+        });
+      });
 
-      expect(result).toEqual(mockSettings);
+      const result = await storage.loadPersistedSettings();
+
+      expect(result.writable).toBe(true);
+      expect(result.core.source).toBe('primary');
+      expect(result.ui.source).toBe('primary');
+      expect(result.core.data).toEqual(expect.objectContaining({
+        defaultProvider: 'openai',
+        providerIconLibrary: expect.objectContaining({
+          openai: [
+            expect.objectContaining({
+              type: 'builtin',
+              source: 'opencode:openai',
+            }),
+          ],
+        }),
+      }));
+      expect(result.ui.data).toEqual(expect.objectContaining({
+        settingsPanelScrollTop: 55,
+        modelAvailabilitySectionOpen: false,
+      }));
     });
 
-    it('should return null for missing settings file', async () => {
-      mockAdapter.read.mockRejectedValue(new Error('File not found'));
+    it('recovers from backup when the primary file is invalid', async () => {
+      mockAdapter.exists.mockImplementation(async (filePath: string) => (
+        filePath === '.opencodian/settings.core.json'
+        || filePath === '.opencodian/settings.core.json.bak'
+      ));
+      mockAdapter.read.mockImplementation(async (filePath: string) => {
+        if (filePath === '.opencodian/settings.core.json') {
+          return '{invalid json';
+        }
 
-      const result = await storage.loadSettings();
+        return JSON.stringify({
+          schemaVersion: 1,
+          updatedAt: 1,
+          source: 'settings.core',
+          data: {
+            defaultModel: 'gpt-4o',
+            disabledModelRefs: ['openai/gpt-4o-mini'],
+          },
+        });
+      });
 
-      expect(result).toBeNull();
+      const result = await storage.loadPersistedSettings();
+
+      expect(result.writable).toBe(true);
+      expect(result.core.source).toBe('backup');
+      expect(result.core.shouldPersist).toBe(true);
+      expect(result.core.data).toEqual(expect.objectContaining({
+        defaultModel: 'gpt-4o',
+        disabledModelRefs: ['openai/gpt-4o-mini'],
+      }));
+    });
+
+    it('migrates settings from the legacy single-file store', async () => {
+      mockAdapter.exists.mockImplementation(async (filePath: string) => filePath === '.opencodian/settings.json');
+      mockAdapter.read.mockResolvedValue(JSON.stringify({
+        defaultProvider: 'deepseek',
+        defaultModel: 'deepseek-chat',
+        providerIconLibrary: {
+          deepseek: [
+            {
+              id: 'mapped:deepseek',
+              type: 'mapped',
+              source: 'deepseek',
+              mimeType: 'image/svg+xml',
+              addedAt: 0,
+            },
+          ],
+        },
+        chatAppearance: {
+          background: { imagePath: 'wallpaper.png', fitMode: 'contain', opacity: 88, edgeFade: 10 },
+        },
+        disabledModelRefs: ['deepseek/deepseek-coder'],
+        tabState: {
+          tabs: [{ conversationId: 'conv-1', title: 'A', modelOverride: null }],
+          activeTabIndex: 0,
+        },
+        settingsPanelScrollTop: 91,
+        modelAvailabilitySectionOpen: false,
+      }));
+
+      const result = await storage.loadPersistedSettings();
+
+      expect(result.writable).toBe(true);
+      expect(result.shouldPersist).toBe(true);
+      expect(result.core.source).toBe('legacy');
+      expect(result.ui.source).toBe('legacy');
+      expect(result.core.data).toEqual(expect.objectContaining({
+        defaultProvider: 'deepseek',
+        defaultModel: 'deepseek-chat',
+        providerIconLibrary: expect.objectContaining({
+          deepseek: [
+            expect.objectContaining({
+              type: 'mapped',
+              source: 'deepseek',
+            }),
+          ],
+        }),
+        disabledModelRefs: ['deepseek/deepseek-coder'],
+      }));
+      expect(result.ui.data).toEqual(expect.objectContaining({
+        settingsPanelScrollTop: 91,
+        modelAvailabilitySectionOpen: false,
+      }));
+    });
+
+    it('blocks writes when no valid settings copy can be recovered', async () => {
+      mockAdapter.exists.mockImplementation(async (filePath: string) => filePath === '.opencodian/settings.core.json');
+      mockAdapter.read.mockImplementation(async () => '{broken');
+
+      const result = await storage.loadPersistedSettings();
+
+      expect(result.writable).toBe(false);
+      expect(result.core.source).toBe('blocked');
+      expect(result.core.data).toBeNull();
     });
   });
 

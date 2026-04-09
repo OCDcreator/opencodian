@@ -181,14 +181,31 @@ describe('OpenCodianPlugin.toggleGlassOctahedronForCurrentView', () => {
 describe('OpenCodianPlugin.loadSettings', () => {
   it('preserves the inline debug argument serialization toggle from saved settings', async () => {
     const plugin = new OpenCodianPlugin() as OpenCodianPlugin & {
-      storage: Pick<StorageService, 'loadSettings'>;
+      storage: Pick<StorageService, 'loadPersistedSettings' | 'saveCoreSettings' | 'saveUiSettings'>;
     };
 
     plugin.storage = {
-      loadSettings: jest.fn().mockResolvedValue({
-        inlineSerializedDebugLogArgs: true,
+      loadPersistedSettings: jest.fn().mockResolvedValue({
+        core: {
+          data: {
+            inlineSerializedDebugLogArgs: true,
+          },
+          filePath: '.opencodian/settings.core.json',
+          source: 'primary',
+          shouldPersist: false,
+        },
+        ui: {
+          data: null,
+          filePath: '.opencodian/settings.ui.json',
+          source: 'missing',
+          shouldPersist: false,
+        },
+        writable: true,
+        shouldPersist: false,
       }),
-    } as Pick<StorageService, 'loadSettings'>;
+      saveCoreSettings: jest.fn().mockResolvedValue(undefined),
+      saveUiSettings: jest.fn().mockResolvedValue(undefined),
+    } as Pick<StorageService, 'loadPersistedSettings' | 'saveCoreSettings' | 'saveUiSettings'>;
 
     await plugin.loadSettings();
 
