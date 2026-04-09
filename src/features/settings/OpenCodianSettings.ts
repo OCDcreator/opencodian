@@ -6221,7 +6221,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       ...(catalogs.effectiveProviderConfig.disabled_providers ?? []),
     ]);
     const placeholderProviders = [...configuredProviderIds]
-      .filter((providerId) => !this.isProviderCurrentlyEnabled(providerId, catalogs))
+      .filter((providerId) => !this.isProviderEnabledInEffectiveAvailability(providerId, catalogs))
       .filter((providerId) => !existingProviderIds.has(providerId))
       .map<ModelCatalogProvider>((providerId) => ({
         id: providerId,
@@ -6244,6 +6244,10 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       providers: [...catalog.providers, ...placeholderProviders]
         .sort((left, right) => left.name.localeCompare(right.name)),
     };
+  }
+
+  private isProviderEnabledInEffectiveAvailability(providerId: string, catalogs: ModelCatalogBundle): boolean {
+    return isProviderEnabled(catalogs.effectiveProviderConfig, providerId);
   }
 
   private getPreferredModelCatalogTab(): 'local' | 'server' | 'effective' | 'disabled' {

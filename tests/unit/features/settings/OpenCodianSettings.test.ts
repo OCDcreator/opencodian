@@ -496,6 +496,31 @@ describe('OpenCodianSettingTab model catalog views', () => {
     expect(disabledCatalog.providers[0].disabledScopes).toEqual(['project']);
   });
 
+  it('does not keep inherited disabled placeholders after local config clears them', () => {
+    const tab = createTab();
+    const catalogs = {
+      local: { providers: [], defaults: {} },
+      server: { providers: [], defaults: {} },
+      baseEffective: { providers: [], defaults: {} },
+      effective: { providers: [], defaults: {} },
+      currentEnabledProviderIds: [],
+      serverConfig: { disabled_providers: ['alibaba', 'alibaba-cn'] },
+      effectiveProviderConfig: { disabled_providers: [] },
+    };
+
+    const disabledCatalog = (tab as unknown as {
+      getDisplayCatalogForMode: (
+        mode: 'disabled',
+        catalogs: typeof catalogs,
+        localModelConfig: { disabled_providers: string[] },
+      ) => {
+        providers: Array<{ id: string }>;
+      };
+    }).getDisplayCatalogForMode('disabled', catalogs, { disabled_providers: [] });
+
+    expect(disabledCatalog.providers).toEqual([]);
+  });
+
   it('prefers project-disabled over server-disabled when both apply', () => {
     const tab = createTab();
     const reason = (tab as unknown as {
