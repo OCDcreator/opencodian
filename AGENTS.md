@@ -29,7 +29,9 @@ Use `npm run doctor:esbuild` only after dependency changes or when build/dev rep
 - `src/features/chat/services/ContextUsageService.ts`, `src/features/chat/userMessageDisplay.ts`, and `src/features/chat/userMessageActions.ts`: newer chat responsibilities have been split out of `OpenCodianView`; prefer extending those helpers before adding more view-local complexity.
 - `src/core/config/ModelConfigService.ts` + `src/core/config/OpencodeConfigManager.ts`: merge local config and server catalogs. Preserve the distinction between `baseEffective` and filtered `effective`.
 - `src/core/storage/StorageService.ts`: local-first persistence for full conversations plus theme backgrounds and provider-icon assets.
+- `src/utils/icons/ProviderIconService.ts` + `src/utils/icons/builtinIconRegistry.ts`: provider icon resolution now spans LobeHub mapped icons, bundled OpenCode builtin icons, and user custom sources; preserve the current fallback order instead of adding ad-hoc matching elsewhere.
 - `src/features/settings/OpenCodianSettings.ts` + `src/core/types/settings.ts`: the settings surface is large and heavily normalized; UI changes often require matching default, migration, style, and locale updates.
+- `src/features/settings/ProviderIconCacheModal.ts` + `src/features/settings/ProviderBuiltinIconPickerModal.ts`: provider icon management lives in the existing cache modal; prefer extending that flow instead of adding a separate settings page for builtin icon selection.
 - `src/features/chat/liquidDiamondDemo.ts`, `src/features/chat/liquidDiamondDemoWebgl.ts`, and `src/features/chat/glassOctahedronDemo.ts`: experimental visual demos. Keep them opt-in and do not expose them in stable UI paths by accident.
 
 ## Non-Obvious Rules
@@ -47,6 +49,7 @@ Use `npm run doctor:esbuild` only after dependency changes or when build/dev rep
 - For code, style, manifest, or build-pipeline changes, run `npm run build` first.
 - After a successful build, copy `dist/main.js`, `dist/manifest.json`, and `dist/styles.css` to the Test Vault plugin directory:
   `C:\Users\lt\Desktop\Write\testvault\.obsidian\plugins\opencodian\`
+- If the change touches bundled assets (for example `assets/`, provider icons, branding, or other runtime-loaded files), also copy `dist/assets/` into that same Test Vault plugin directory before verification.
 - Build and copy must be separate sequential steps. Do not chain them with `&&`, do not parallelize them, and do not verify deployment before the copy completes.
 - After deployment, verify the Test Vault `main.js` contains the newest `BUILD_ID` from that build.
 - Docs-only changes usually do not require build/deploy unless the user asks for it.

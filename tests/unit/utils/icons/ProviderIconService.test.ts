@@ -4,7 +4,7 @@
 
 import * as fs from 'fs';
 
-import type { ProviderIconLibrary } from '../../../../src/core/types';
+import { normalizeProviderIconLibrary, type ProviderIconLibrary } from '../../../../src/core/types';
 
 jest.mock('obsidian');
 jest.mock('fs', () => ({
@@ -21,12 +21,14 @@ type MockAdapter = {
   mkdir: jest.Mock<Promise<void>, [string]>;
   list: jest.Mock<Promise<{ files: string[]; folders: string[] }>, [string]>;
   remove: jest.Mock<Promise<void>, [string]>;
+  getResourcePath: jest.Mock<string, [string]>;
 };
 
 function createMockApp(adapter: MockAdapter) {
   return {
     vault: {
       adapter,
+      configDir: '.obsidian',
     },
   };
 }
@@ -39,6 +41,7 @@ function createMockAdapter(): MockAdapter {
     mkdir: jest.fn().mockResolvedValue(undefined),
     list: jest.fn().mockResolvedValue({ files: [], folders: [] }),
     remove: jest.fn().mockResolvedValue(undefined),
+    getResourcePath: jest.fn((targetPath: string) => `app://${targetPath}`),
   };
 }
 
@@ -148,6 +151,33 @@ describe('ProviderIconService', () => {
         }),
       ],
     });
+  });
+
+  it('accepts builtin provider icon entries during normalization', () => {
+    const normalized = normalizeProviderIconLibrary({
+      requesty: [
+        {
+          id: 'builtin:opencode:requesty',
+          type: 'builtin',
+          source: 'opencode:requesty',
+          addedAt: 1,
+        },
+      ],
+      invalid: [
+        {
+          id: 'bad',
+          type: 'builtin',
+          source: 'bad-source',
+          addedAt: 1,
+        },
+      ],
+    });
+
+    expect(normalized.requesty?.[0]).toMatchObject({
+      type: 'builtin',
+      source: 'opencode:requesty',
+    });
+    expect(normalized.invalid).toBeUndefined();
   });
 
   it('adds a custom URL icon source and caches it', async () => {
@@ -313,6 +343,43 @@ describe('ProviderIconService', () => {
     expect(state.providers).toHaveLength(1);
     expect(state.providers[0].providerId).toBe('code xzh');
     expect(state.providers[0].entries[0].cached).toBe(true);
+  });
+
+  it('loads a bundled OpenCode builtin icon and caches it locally', async () => {
+    const adapter = createMockAdapter();
+    adapter.exists.mockImplementation(async (targetPath: string) =>
+      targetPath === '.obsidian/plugins/opencodian/assets/provider-icons/opencode/requesty.svg',
+    );
+    adapter.readBinary.mockResolvedValue(toArrayBuffer('<svg xmlns="http://www.w3.org/2000/svg"><rect /></svg>'));
+    const app = createMockApp(adapter);
+    const { requestUrl } = jest.requireMock('obsidian') as { requestUrl: jest.Mock };
+    const { ProviderIconService } = await import('../../../../src/utils/icons/ProviderIconService');
+
+    const url = await ProviderIconService.resolveIconUrl(app as never, 'requesty', {});
+
+    expect(adapter.readBinary).toHaveBeenCalledWith(
+      '.obsidian/plugins/opencodian/assets/provider-icons/opencode/requesty.svg',
+    );
+    expect(adapter.writeBinary).toHaveBeenCalledWith(
+      '.opencodian/provider-icons/builtin-opencode-requesty.svg',
+      expect.anything(),
+    );
+    expect(requestUrl).not.toHaveBeenCalled();
+    expect(url).toContain('data:image/svg+xml');
+  });
+
+  it('deduplicates builtin selections when the same icon is chosen repeatedly', async () => {
+    const { ProviderIconService } = await import('../../../../src/utils/icons/ProviderIconService');
+
+    const once = ProviderIconService.selectBuiltinIcon('deepseek', 'lobehub', 'deepseek', {});
+    const twice = ProviderIconService.selectBuiltinIcon('deepseek', 'lobehub', 'deepseek', once);
+
+    expect(once.deepseek).toHaveLength(1);
+    expect(once.deepseek?.[0]).toMatchObject({
+      type: 'builtin',
+      source: 'lobehub:deepseek',
+    });
+    expect(twice.deepseek).toHaveLength(1);
   });
 
   it('clears cached files without deleting provider library metadata', async () => {

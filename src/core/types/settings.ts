@@ -235,7 +235,7 @@ export interface PlatformDebugLogPaths {
   windows: string;
 }
 
-export type ProviderIconEntryType = 'mapped' | 'url' | 'file';
+export type ProviderIconEntryType = 'mapped' | 'builtin' | 'url' | 'file';
 
 export interface ProviderIconEntry {
   id: string;
@@ -341,7 +341,16 @@ export function normalizeProviderIconLibrary(value: unknown): ProviderIconLibrar
         return [];
       }
 
-      if (candidate.type !== 'mapped' && candidate.type !== 'url' && candidate.type !== 'file') {
+      if (
+        candidate.type !== 'mapped'
+        && candidate.type !== 'builtin'
+        && candidate.type !== 'url'
+        && candidate.type !== 'file'
+      ) {
+        return [];
+      }
+
+      if (candidate.type === 'builtin' && !/^(lobehub|opencode):[^:\s]+$/i.test(source)) {
         return [];
       }
 

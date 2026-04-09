@@ -5,7 +5,7 @@
 
 ## 概述
 
-AI 模型提供商图标管理服务。使用 LobeHub Icons CDN（`@lobehub/icons-static-svg`）作为图标来源，支持 200+ 个 provider ID 到 LobeHub icon ID 的映射。提供图标 URL 解析、本地缓存、自定义图标上传和批量预热功能。所有静态方法设计为无状态工具类。
+AI 模型提供商图标管理服务。使用 LobeHub Icons CDN（`@lobehub/icons-static-svg`）与插件内置的 OpenCode provider 图标作为内置来源，同时保留自定义图标源。提供图标 URL 解析、本地缓存、自定义图标上传、内置图标选择和批量预热功能。所有静态方法设计为无状态工具类。
 
 ## 导入关系
 上游: `fs`, `path`, `obsidian` (App, normalizePath, requestUrl), `../../core/types` (ProviderIconEntry, ProviderIconLibrary), `../../shared` (createLogger)
@@ -26,18 +26,25 @@ AI 模型提供商图标管理服务。使用 LobeHub Icons CDN（`@lobehub/icon
 
 ### 图标 ID 解析
 
-`getIconId()` 使用 5 级策略解析 provider ID 到 LobeHub icon ID：
+`getIconId()` 使用 5 级策略解析 provider ID 到稳定的 LobeHub icon ID：
 1. 直接小写匹配
 2. 移除特殊字符后匹配
 3. 提取英文部分逐个/组合匹配
 4. 部分包含匹配（providerId 包含 key）
 5. 反向部分包含匹配（key 包含 providerId）
 
+### 默认图标决策
+
+`getDefaultEntry()` 的优先级为：
+1. 现有 `PROVIDER_ICON_MAP` 命中的 `mapped`
+2. `OpenCode` alias 命中的 `builtin`
+3. 双图库搜索命中的首个 `builtin`（同分优先 `LobeHub`）
+
 ### 图标加载管线
 
 1. **resolveIconUrl()** — 入口，委托给 `resolveEntryUrl()`
 2. **resolveEntryUrl()** — 检查内存缓存 → 检查失败记录 → 去重 in-flight 请求 → 发起加载
-3. **loadEntryUrl()** — 先尝试本地缓存文件 → 不存在则从远程下载 → 写入缓存 → 返回 data URL
+3. **loadEntryUrl()** — 先尝试本地缓存文件 → 不存在则按条目类型加载（LobeHub CDN / OpenCode 内置资源 / 自定义源）→ 写入缓存 → 返回 data URL
 
 ### 自定义图标
 
@@ -47,6 +54,12 @@ AI 模型提供商图标管理服务。使用 LobeHub Icons CDN（`@lobehub/icon
 3. 检测 MIME 类型（文件头魔数 + Content-Type + 扩展名）
 4. 写入缓存目录（`.opencodian/provider-icons/`）
 5. 添加到 library
+
+### 内置图标选择
+
+- `listBuiltinIconOptions()`：为单个 provider 生成可浏览的内置图标数据
+- `selectBuiltinIcon()`：将选中的内置图标置顶并去重
+- `getSelectedBuiltinSource()`：把当前 effective 条目归一成 `libraryId:iconId`
 
 ### 缓存管理
 
@@ -66,6 +79,8 @@ AI 模型提供商图标管理服务。使用 LobeHub Icons CDN（`@lobehub/icon
 | `hasIcon(providerId)` | 检查是否有图标映射 |
 | `createIconElement(providerId, size)` | 创建 `<img>` 元素 |
 | `getProviderCacheState(app, providerIds, library)` | 构建完整缓存状态 |
+| `listBuiltinIconOptions(app, providerId, library, options?)` | 生成内置图标选择列表 |
+| `selectBuiltinIcon(providerId, libraryId, iconId, library)` | 选择并置顶某个内置图标 |
 | `addCustomIconSource(app, providerId, source, library)` | 添加自定义图标 |
 | `updateProviderEntries(providerId, entries, library)` | 更新 provider 的图标条目 |
 | `removeProviderEntry(providerId, entryId, library)` | 删除单个图标条目 |
@@ -89,14 +104,16 @@ resolveIconUrl(app, providerId, library)
   → resolveEntryUrl()
     → 内存缓存命中? → 返回
     → readCachedAsset() → 本地文件缓存命中? → 返回 data URL
-    → loadMappedAsset() → 从 CDN 下载 → writeCachedAsset() → 返回 data URL
+    → loadMappedAsset() / loadBuiltinAsset() / loadCustomSourceAsset()
+    → writeCachedAsset() → 返回 data URL
 ```
 
 ## 与其他模块的交互
 
 - **OpenCodianView**: 调用 `resolveIconUrl()` 在模型选择器和消息头部显示 provider 图标
 - **OpenCodianSettings**: 调用 `getProviderCacheState()` 在图标缓存设置面板显示状态
-- **ProviderIconCacheModal**: 调用 `addCustomIconSource()`, `removeProviderEntry()`, `clearCache()` 管理图标
+- **ProviderIconCacheModal**: 调用 `selectBuiltinIcon()`, `addCustomIconSource()`, `removeProviderEntry()`, `clearCache()` 管理图标
+- **ProviderBuiltinIconPickerModal**: 调用 `listBuiltinIconOptions()` 浏览内置图标库
 - **StorageService**: 持久化 `ProviderIconLibrary` 到 settings
 
 ## 配置项
@@ -113,6 +130,5 @@ resolveIconUrl(app, providerId, library)
 - 内存缓存（`resolvedIconUrls`, `inFlightIconLoads`, `failedIconIds`）为模块级状态
 - `requestUrl` 使用 Obsidian API，不走系统代理
 - MIME 检测优先级：Content-Type header → 文件头魔数 → 扩展名
-- `PROVIDER_ICON_MAP` 包含 200+ 条映射，涵盖国内外主流 AI 服务商
-
+- `PROVIDER_ICON_MAP` 仍是旧映射稳定层；OpenCode 图标则通过 registry + alias + 搜索接入
 

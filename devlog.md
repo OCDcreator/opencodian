@@ -12,6 +12,54 @@
 
 ---
 
+## 2026-04-09 Provider 内置图标库与 OpenCode 图标集接入
+
+### 🎯 改动目标
+
+- 保留现有 `LobeHub + 自定义图标源` 机制，同时新增可搜索、可浏览、可选择的内置 provider 图标库
+- 把参考项目 OpenCode 的 provider 图标打包进插件，减少第三方 provider 需要手工找图标的情况
+- 保持现有设置入口不变，继续从 provider icon cache 管理弹窗进入
+
+### ✅ 本轮调整
+
+- `src/utils/icons/builtinIconRegistry.ts`
+- `src/utils/icons/ProviderIconService.ts`
+- `src/core/types/settings.ts`
+  - 新增 `builtin` 图标条目类型，支持 `lobehub:{iconId}` / `opencode:{iconId}` 内置源
+  - 抽出双图库 registry，统一管理内置图标清单、别名、搜索与默认匹配策略
+  - 扩展 provider icon service，支持 OpenCode 内置资源读取、双图库自动匹配、内置图标选择去重与预览
+
+- `src/features/settings/ProviderBuiltinIconPickerModal.ts`
+- `src/features/settings/ProviderIconCacheModal.ts`
+- `src/i18n/locales/en.ts`
+- `src/i18n/locales/zh.ts`
+- `styles.css`
+  - 在现有 provider icon cache modal 中新增“选择内置图标”入口
+  - 新增内置图标选择器，支持搜索、库过滤、推荐标记、当前选中高亮
+  - 补齐中英文文案与对应样式
+
+- `assets/provider-icons/opencode/`
+  - vendor 参考项目 OpenCode 的 provider SVG 图标资源，随插件一同分发，不再依赖 `reference-projects/` 运行时目录
+
+- `tests/unit/utils/icons/ProviderIconService.test.ts`
+- `tests/unit/utils/icons/builtinIconRegistry.test.ts`
+- `tests/unit/features/settings/ProviderBuiltinIconPickerModal.test.ts`
+- `docs/modules/utils/icons/ProviderIconService.md`
+- `docs/modules/features/settings/ProviderIconCacheModal.md`
+- `docs/modules/features/settings/ProviderBuiltinIconPickerModal.md`
+  - 补充 builtin 解析、OpenCode 内置资源加载、重复选择去重、picker 搜索/选择的测试
+  - 同步刷新相关模块文档
+
+### 🧪 验证结果
+
+- `npm run typecheck` 通过
+- 定向 Jest 测试通过：
+  - `tests/unit/utils/icons/ProviderIconService.test.ts`
+  - `tests/unit/utils/icons/builtinIconRegistry.test.ts`
+  - `tests/unit/features/settings/ProviderBuiltinIconPickerModal.test.ts`
+- `npm run build` 通过，最新 `BUILD_ID: main.202604091833`
+- Test Vault 已部署并确认 `C:\Users\lt\Desktop\Write\testvault\.obsidian\plugins\opencodian\main.js` 含最新 `BUILD_ID`
+
 ## 2026-04-09 现有 typecheck 错误清零与构建回归
 
 ### 🎯 改动目标

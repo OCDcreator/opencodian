@@ -7,6 +7,7 @@ import {
   type ProviderIconProviderState,
   ProviderIconService,
 } from '../../utils/icons/ProviderIconService';
+import { ProviderBuiltinIconPickerModal } from './ProviderBuiltinIconPickerModal';
 
 export class ProviderIconCacheModal extends Modal {
   private readonly providerSections = new Map<string, HTMLElement>();
@@ -99,6 +100,14 @@ export class ProviderIconCacheModal extends Modal {
         ? t('settings.model.iconCache.modal.currentProvider')
         : t('settings.model.iconCache.modal.savedProvider'),
     });
+    const headerActionsEl = headerEl.createDiv({ cls: 'opencodian-icon-cache-provider-header-actions' });
+    const builtinButtonEl = headerActionsEl.createEl('button', {
+      cls: 'mod-cta',
+      text: t('settings.model.iconCache.modal.chooseBuiltin'),
+    });
+    builtinButtonEl.addEventListener('click', () => {
+      this.openBuiltinPicker(provider.providerId);
+    });
 
     const listEl = sectionEl.createDiv({ cls: 'opencodian-icon-cache-entry-list' });
     let draggedEntryId: string | null = null;
@@ -157,6 +166,8 @@ export class ProviderIconCacheModal extends Modal {
         cls: 'opencodian-icon-cache-entry-title',
         text: entry.entry.type === 'mapped'
           ? t('settings.model.iconCache.modal.mappedEntry')
+          : entry.entry.type === 'builtin'
+            ? t('settings.model.iconCache.modal.builtinEntry')
           : t('settings.model.iconCache.modal.customEntry'),
       });
       if (entry.isSelected) {
@@ -351,6 +362,28 @@ export class ProviderIconCacheModal extends Modal {
       applyUi: true,
     });
     this.onLibraryChanged?.();
+  }
+
+  private openBuiltinPicker(providerId: string): void {
+    new ProviderBuiltinIconPickerModal(this.app, {
+      providerId,
+      library: this.plugin.settings.providerIconLibrary,
+      onChoose: async ({ libraryId, iconId }) => {
+        this.plugin.settings.providerIconLibrary = ProviderIconService.selectBuiltinIcon(
+          providerId,
+          libraryId,
+          iconId,
+          this.plugin.settings.providerIconLibrary,
+        );
+        const restoreScrollTop = this.contentEl.scrollTop;
+        await this.persistLibrary();
+        await this.render(restoreScrollTop);
+        new Notice(t('settings.model.iconCache.builtinPicker.chooseSuccess', {
+          providerId,
+          iconId,
+        }));
+      },
+    }).open();
   }
 
   private restoreScrollPosition(restoreScrollTop?: number): void {

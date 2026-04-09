@@ -12,6 +12,17 @@ import * as path from 'path';
 
 import type { ProviderIconEntry, ProviderIconLibrary } from '../../core/types';
 import { createLogger } from '../../shared';
+import {
+  findBuiltinIcon,
+  formatBuiltinSource,
+  getBuiltinIcon,
+  parseBuiltinSource,
+  PROVIDER_ICON_MAP,
+  resolveBuiltinIconMatch,
+  searchBuiltinIcons,
+  type BuiltinIconDefinition,
+  type BuiltinIconLibraryId,
+} from './builtinIconRegistry';
 
 const logger = createLogger('ProviderIconService');
 const loggedIconUrls = new Map<string, string | null>();
@@ -45,6 +56,16 @@ export interface ProviderIconCacheSummary {
   cachedIcons: number;
 }
 
+export interface BuiltinIconOption {
+  libraryId: BuiltinIconLibraryId;
+  iconId: string;
+  displayName: string;
+  source: string;
+  previewUrl: string | null;
+  isRecommended: boolean;
+  isSelected: boolean;
+}
+
 interface ResolveIconUrlOptions {
   retryFailed?: boolean;
 }
@@ -59,620 +80,6 @@ interface NormalizedCustomSource {
   source: string;
   localPath?: string;
 }
-
-// Map provider IDs to Lobehub icon IDs
-const PROVIDER_ICON_MAP: Record<string, string> = {
-  // OpenAI
-  'openai': 'openai',
-  'openai-compatible': 'openai',
-  
-  // Anthropic/Claude
-  'anthropic': 'anthropic',
-  'claude': 'claude',
-  
-  // Google
-  'google': 'google',
-  'gemini': 'gemini',
-  'palm': 'palm',
-  'vertexai': 'vertexai',
-  
-  // DeepSeek
-  'deepseek': 'deepseek',
-  
-  // Zhipu/GLM
-  'zhipu': 'zhipu',
-  'chatglm': 'chatglm',
-  'glm': 'zhipu',
-  
-  // Alibaba
-  'alibaba': 'alibaba',
-  'alibabacloud': 'alibabacloud',
-  'bailian': 'bailian',
-  'qwen': 'qwen',
-  'tongyi': 'qwen',
-  
-  // Baidu
-  'baidu': 'baidu',
-  'baiducloud': 'baiducloud',
-  'wenxin': 'wenxin',
-  'ernie': 'wenxin',
-  
-  // ByteDance
-  'bytedance': 'bytedance',
-  'doubao': 'doubao',
-  'coze': 'coze',
-  'capcut': 'capcut',
-  'jimeng': 'jimeng',
-  
-  // Moonshot/Kimi
-  'moonshot': 'moonshot',
-  'kimi': 'moonshot',
-  
-  // MiniMax
-  'minimax': 'minimax',
-  'abab': 'minimax',
-  
-  // 01.AI
-  '01ai': 'zeroone',
-  'yi': 'yi',
-  
-  // Baichuan
-  'baichuan': 'baichuan',
-  
-  // Huawei
-  'huawei': 'huawei',
-  'huaweicloud': 'huaweicloud',
-  'pangu': 'huaweicloud',
-  
-  // Tencent
-  'tencent': 'tencent',
-  'tencentcloud': 'tencentcloud',
-  'hunyuan': 'hunyuan',
-  'yuanbao': 'yuanbao',
-  'spark': 'spark',
-  
-  // SenseTime
-  'sensetime': 'sensenova',
-  'sensenova': 'sensenova',
-  
-  // iFlytek
-  'iflytek': 'spark',
-  'iflytekcloud': 'iflytekcloud',
-  
-  // Meta
-  'meta': 'meta',
-  'llama': 'meta',
-  
-  // Mistral
-  'mistral': 'mistral',
-  
-  // Cohere
-  'cohere': 'cohere',
-  'aya': 'aya',
-  'commanda': 'commanda',
-  
-  // AI21
-  'ai21': 'ai21',
-  'jamba': 'ai21',
-  
-  // xAI
-  'xai': 'xai',
-  'grok': 'grok',
-  
-  // Perplexity
-  'perplexity': 'perplexity',
-  
-  // Groq
-  'groq': 'groq',
-  
-  // Together
-  'together': 'together',
-  
-  // Fireworks
-  'fireworks': 'fireworks',
-  
-  // Ollama
-  'ollama': 'ollama',
-  
-  // vLLM
-  'vllm': 'vllm',
-  
-  // Azure
-  'azure': 'azure',
-  'azureai': 'azureai',
-  
-  // AWS
-  'aws': 'aws',
-  'bedrock': 'bedrock',
-  'nova': 'nova',
-  
-  // Cloudflare
-  'cloudflare': 'cloudflare',
-  'workersai': 'workersai',
-  
-  // GitHub
-  'github': 'github',
-  'copilot': 'githubcopilot',
-  'opencopilot': 'githubcopilot',
-  
-  // OpenRouter
-  'openrouter': 'openrouter',
-  
-  // SiliconFlow
-  'siliconflow': 'siliconcloud',
-  'siliconcloud': 'siliconcloud',
-  
-  // Nvidia
-  'nvidia': 'nvidia',
-  'nemotron': 'nvidia',
-  
-  // Microsoft
-  'microsoft': 'microsoft',
-  'bing': 'bing',
-  
-  // Replicate
-  'replicate': 'replicate',
-  
-  // Stability
-  'stability': 'stability',
-  
-  // Midjourney
-  'midjourney': 'midjourney',
-  
-  // Adobe
-  'adobe': 'adobe',
-  'firefly': 'adobefirefly',
-  
-  // DALL-E
-  'dalle': 'dalle',
-  
-  // Stability/FLUX
-  'flux': 'flux',
-  'bfl': 'bfl',
-  
-  // ElevenLabs
-  'elevenlabs': 'elevenlabs',
-  
-  // Suno
-  'suno': 'suno',
-  
-  // Udio
-  'udio': 'udio',
-  
-  // Pika
-  'pika': 'pika',
-  
-  // Runway
-  'runway': 'runway',
-  
-  // Luma
-  'luma': 'luma',
-  'dreammachine': 'dreammachine',
-  
-  // Kling
-  'kling': 'kling',
-  
-  // Krea
-  'krea': 'krea',
-  
-  // Fal
-  'fal': 'fal',
-  
-  // Ideogram
-  'ideogram': 'ideogram',
-  
-  // Recraft
-  'recraft': 'recraft',
-  
-  // Anthropic specific models
-  'sonnet': 'claude',
-  'opus': 'claude',
-  'haiku': 'claude',
-  
-  // LangChain
-  'langchain': 'langchain',
-  'langgraph': 'langgraph',
-  
-  // LlamaIndex
-  'llamaindex': 'llamaindex',
-  
-  // HuggingFace
-  'huggingface': 'huggingface',
-  
-  // Replit
-  'replit': 'replit',
-  
-  // Vercel
-  'vercel': 'vercel',
-  'v0': 'v0',
-  
-  // Notion
-  'notion': 'notion',
-  
-  // Figma
-  'figma': 'figma',
-  
-  // Snowflake
-  'snowflake': 'snowflake',
-  
-  // Dify
-  'dify': 'dify',
-  
-  // FastGPT
-  'fastgpt': 'fastgpt',
-  
-  // LobeHub
-  'lobehub': 'lobehub',
-  
-  // OpenCode
-  'opencode': 'opencode',
-  
-  // Cursor
-  'cursor': 'cursor',
-  
-  // Windsurf
-  'windsurf': 'windsurf',
-  
-  // Trae
-  'trae': 'trae',
-  
-  // LM Studio
-  'lmstudio': 'lmstudio',
-  
-  // Jan
-  'jan': 'menlo',
-  
-  // AnythingLLM
-  'anythingllm': 'menlo',
-  
-  // OpenWebUI
-  'openwebui': 'openwebui',
-  
-  // LobeChat
-  'lobechat': 'lobehub',
-  
-  // Cherry Studio
-  'cherrystudio': 'cherrystudio',
-  
-  // OneAPI
-  'oneapi': 'newapi',
-  'newapi': 'newapi',
-  
-  // PPIO
-  'ppio': 'ppio',
-  
-  // Volcengine
-  'volcengine': 'volcengine',
-  
-  // StepFun
-  'stepfun': 'stepfun',
-  
-  // Skywork
-  'skywork': 'skywork',
-  
-  // Tiangong
-  'tiangong': 'tiangong',
-  
-  // InternLM
-  'internlm': 'internlm',
-  
-  // Ai360
-  'ai360': 'ai360',
-  
-  // AiHubMix
-  'aihubmix': 'aihubmix',
-  
-  // API2D
-  'api2d': 'openai',
-  
-  // Anthropic Bedrock
-  'anthropic-bedrock': 'bedrock',
-  
-  // Anthropic Vertex
-  'anthropic-vertex': 'vertexai',
-  
-  // Cerebras
-  'cerebras': 'cerebras',
-  
-  // FriendliAI
-  'friendli': 'friendli',
-  
-  // Lambda
-  'lambda': 'lambda',
-  
-  // LeptonAI
-  'leptonai': 'leptonai',
-  
-  // OctoAI
-  'octoai': 'lambda',
-  
-  // Predibase
-  'predibase': 'baseten',
-  
-  // SambaNova
-  'sambanova': 'sambanova',
-  
-  // Targon
-  'targon': 'targon',
-  
-  // Tii (Falcon)
-  'tii': 'tii',
-  'falcon': 'tii',
-  
-  // Upstage
-  'upstage': 'upstage',
-  
-  // Writer
-  'writer': 'palm',
-  
-  // Zephyr
-  'zephyr': 'huggingface',
-  
-  // Yi
-  'yi-01': 'yi',
-  
-  // DeepInfra
-  'deepinfra': 'deepinfra',
-  
-  // MonsterAPI
-  'monsterapi': 'deepinfra',
-  
-  // AI71
-  'ai71': 'falcon',
-  
-  // Cloudflare Workers AI
-  'cloudflare-ai': 'cloudflare',
-  
-  // Azure OpenAI
-  'azure-openai': 'azure',
-  
-  // GCP Vertex AI
-  'gcp-vertex': 'vertexai',
-  
-  // Amazon Bedrock
-  'amazon-bedrock': 'bedrock',
-  
-  // IBM Watson
-  'ibm': 'ibm',
-  'watson': 'ibm',
-  
-  // Oracle
-  'oracle': 'aws',
-  
-  // Salesforce
-  'salesforce': 'salesforce',
-  
-  // SAP
-  'sap': 'salesforce',
-  
-  // Alibaba Qwen
-  'qwen-max': 'qwen',
-  'qwen-plus': 'qwen',
-  'qwen-turbo': 'qwen',
-  
-  // Baidu ERNIE
-  'ernie-bot': 'wenxin',
-  'ernie-bot-turbo': 'wenxin',
-  'ernie-bot-4': 'wenxin',
-  
-  // Zhipu GLM
-  'glm-4': 'zhipu',
-  'glm-3': 'zhipu',
-  'chatglm-4': 'chatglm',
-  'chatglm-3': 'chatglm',
-  
-  // MiniMax
-  'abab6': 'minimax',
-  'abab5': 'minimax',
-  
-  // Moonshot
-  'moonshot-v1': 'moonshot',
-  
-  // 01.AI
-  'yi-large': 'yi',
-  'yi-medium': 'yi',
-  'yi-spark': 'yi',
-  
-  // Baichuan
-  'baichuan2': 'baichuan',
-  'baichuan3': 'baichuan',
-  
-  // SenseTime
-  'sensechat': 'sensenova',
-  
-  // iFlytek
-  'spark-desk': 'spark',
-  
-  // Huawei
-  'pangu-2': 'huaweicloud',
-  'pangu-3': 'huaweicloud',
-  
-  // Tencent
-  'hunyuan-pro': 'hunyuan',
-  'hunyuan-standard': 'hunyuan',
-  'hunyuan-lite': 'hunyuan',
-  
-  // StepFun
-  'step-1': 'stepfun',
-  'step-2': 'stepfun',
-  
-  // Skywork
-  'skywork-gpt': 'skywork',
-  
-  // InternLM
-  'internlm2': 'internlm',
-  'internlm-chat': 'internlm',
-  
-  // DeepSeek
-  'deepseek-chat': 'deepseek',
-  'deepseek-coder': 'deepseek',
-  
-  // OpenChat
-  'openchat': 'openchat',
-  
-  // Dolphin
-  'dolphin': 'dolphin',
-  
-  // NousResearch
-  'nous': 'nousresearch',
-  'hermes': 'nousresearch',
-  
-  // WizardLM
-  'wizardlm': 'microsoft',
-  
-  // Vicuna
-  'vicuna': 'lmsys',
-  
-  // LMSYS
-  'lmsys': 'lmsys',
-  
-  // Together AI
-  'togetherai': 'together',
-  
-  // Anyscale
-  'anyscale': 'anyscale',
-  
-  // Banana
-  'banana': 'nanobanana',
-  
-  // Baseten
-  'baseten': 'baseten',
-  
-  // CoreWeave
-  'coreweave': 'coreweave',
-  
-  // Crusoe
-  'crusoe': 'crusoe',
-  
-  // Foundry
-  'foundry': 'foundry',
-  
-  // GooseAI
-  'gooseai': 'goose',
-  
-  // Gradient
-  'gradient': 'gradient',
-  
-  // Hyperbolic
-  'hyperbolic': 'hyperbolic',
-  
-  // Mystic
-  'mystic': 'mystic',
-  
-  // Novita AI
-  'novita': 'novita',
-  
-  // Perplexity Labs
-  'pplx': 'perplexity',
-  
-  // Pi
-  'pi': 'inflection',
-  
-  // Poe
-  'poe': 'poe',
-  
-  // Reka
-  'reka': 'reka',
-  
-  // ShuttleAI
-  'shuttleai': 'shuttleai',
-  
-  // StochasticAI
-  'stochasticai': 'stochasticai',
-  
-  // TheB.AI
-  'thebai': 'thebai',
-  
-  // TitanML
-  'titanml': 'titanml',
-  
-  // YandexGPT
-  'yandexgpt': 'yandex',
-  
-  // You.com
-  'you': 'youmind',
-  
-  // Claude API
-  'claude-api': 'claude',
-  
-  // GPT-4
-  'gpt-4': 'openai',
-  'gpt-4o': 'openai',
-  'gpt-4-turbo': 'openai',
-  'gpt-3.5': 'openai',
-  'gpt-3.5-turbo': 'openai',
-  
-  // Gemini
-  'gemini-pro': 'gemini',
-  'gemini-ultra': 'gemini',
-  'gemini-1.5': 'gemini',
-  
-  // Llama
-  'llama-2': 'meta',
-  'llama-3': 'meta',
-  'llama-3.1': 'meta',
-  'llama-3.2': 'meta',
-  'llama-4': 'meta',
-  
-  // Mixtral
-  'mixtral': 'mistral',
-  'mixtral-8x7b': 'mistral',
-  'mixtral-8x22b': 'mistral',
-  
-  // Mistral models
-  'mistral-tiny': 'mistral',
-  'mistral-small': 'mistral',
-  'mistral-medium': 'mistral',
-  'mistral-large': 'mistral',
-  
-  // CodeLlama
-  'codellama': 'meta',
-  
-  // Phi
-  'phi-2': 'microsoft',
-  'phi-3': 'microsoft',
-  
-  // Gemma
-  'gemma': 'gemma',
-  'gemma-2': 'gemma',
-  'gemma-3': 'gemma',
-  
-  // Qwen models
-  'qwen-72b': 'qwen',
-  'qwen-110b': 'qwen',
-  'qwen-1.5': 'qwen',
-  'qwen-2': 'qwen',
-  'qwen-2.5': 'qwen',
-  'qwen-coder': 'qwen',
-  
-  // Yi models
-  'yi-34b': 'yi',
-  
-  // DBRX
-  'dbrx': 'dbrx',
-  
-  // Command R
-  'command-r': 'cohere',
-  'command-r-plus': 'cohere',
-  
-  // Claude models
-  'claude-3-opus': 'claude',
-  'claude-3-sonnet': 'claude',
-  'claude-3-haiku': 'claude',
-  'claude-3.5-sonnet': 'claude',
-  'claude-3.5-haiku': 'claude',
-  
-  // Grok models
-  'grok-1': 'grok',
-  'grok-2': 'grok',
-  
-  // Perplexity models
-  'pplx-7b': 'perplexity',
-  'pplx-70b': 'perplexity',
-  'sonar-small': 'perplexity',
-  'sonar-medium': 'perplexity',
-  'sonar-large': 'perplexity',
-};
 
 // CDN base URL for Lobehub icons
 const LOBEHUB_CDN_BASE = 'https://unpkg.com/@lobehub/icons-static-svg@latest/icons';
@@ -782,7 +189,87 @@ export class ProviderIconService {
    * Check if provider has an icon
    */
   static hasIcon(providerId: string): boolean {
-    return this.getIconId(providerId) !== null;
+    return this.getDefaultEntry(providerId) !== null;
+  }
+
+  static listBuiltinIconOptions(
+    app: App,
+    providerId: string,
+    library: ProviderIconLibrary = {},
+    options: {
+      query?: string;
+      libraryId?: BuiltinIconLibraryId;
+    } = {},
+  ): BuiltinIconOption[] {
+    const currentSource = this.getSelectedBuiltinSource(providerId, library);
+    const recommended = this.getRecommendedBuiltinIcons(providerId, options.libraryId);
+    const recommendedSourceSet = new Set(recommended.map((item) => item.source));
+    const query = options.query?.trim() ?? '';
+    const definitions = query
+      ? searchBuiltinIcons(query, {
+          libraryId: options.libraryId,
+        })
+      : [
+          ...recommended,
+          ...searchBuiltinIcons('', { libraryId: options.libraryId }),
+        ].filter((definition, index, collection) =>
+          collection.findIndex((candidate) => candidate.source === definition.source) === index,
+        );
+
+    return definitions.map((definition) => ({
+      libraryId: definition.libraryId,
+      iconId: definition.iconId,
+      displayName: definition.displayName,
+      source: definition.source,
+      previewUrl: this.getBuiltinPreviewUrl(app, definition.libraryId, definition.iconId),
+      isRecommended: recommendedSourceSet.has(definition.source),
+      isSelected: currentSource === definition.source,
+    }));
+  }
+
+  static selectBuiltinIcon(
+    providerId: string,
+    libraryId: BuiltinIconLibraryId,
+    iconId: string,
+    library: ProviderIconLibrary,
+  ): ProviderIconLibrary {
+    const trimmedProviderId = providerId.trim();
+    if (!trimmedProviderId) {
+      return library;
+    }
+
+    const builtinDefinition = getBuiltinIcon(libraryId, iconId);
+    if (!builtinDefinition) {
+      return library;
+    }
+
+    const resolvedProviderId = this.resolveLibraryProviderId(trimmedProviderId, library) ?? trimmedProviderId;
+    const existingEntries = this.getEditableEntriesForProvider(resolvedProviderId, library);
+    const selectedEntry = this.createBuiltinEntry(libraryId, iconId);
+
+    const dedupedEntries = existingEntries.filter((entry) => !this.areEquivalentEntries(entry, selectedEntry));
+    return this.updateProviderEntries(
+      resolvedProviderId,
+      [selectedEntry, ...dedupedEntries],
+      library,
+    );
+  }
+
+  static getSelectedBuiltinSource(providerId: string, library: ProviderIconLibrary = {}): string | null {
+    const selectedEntry = this.getEffectiveEntries(providerId, library)[0] ?? null;
+    if (!selectedEntry) {
+      return null;
+    }
+
+    if (selectedEntry.type === 'builtin') {
+      return selectedEntry.source;
+    }
+
+    if (selectedEntry.type === 'mapped') {
+      return formatBuiltinSource('lobehub', selectedEntry.source);
+    }
+
+    return null;
   }
 
   /**
@@ -1064,10 +551,14 @@ export class ProviderIconService {
       return {
         providerId,
         entry,
-        iconId: entry.type === 'mapped' ? entry.source : null,
+        iconId: entry.type === 'mapped'
+          ? entry.source
+          : entry.type === 'builtin'
+            ? (parseBuiltinSource(entry.source)?.iconId ?? null)
+            : null,
         cached: cachedAsset !== null,
         cachePath: this.getCachePathForEntry(entry),
-        iconUrl: cachedAsset ? this.assetToDataUrl(cachedAsset) : null,
+        iconUrl: cachedAsset ? this.assetToDataUrl(cachedAsset) : this.getPreviewUrlForEntry(app, entry),
         isCurrentProvider,
         isSelected: index === 0,
         sourceLabel: this.getEntrySourceLabel(entry),
@@ -1087,8 +578,10 @@ export class ProviderIconService {
     }
 
     const defaultEntry = this.getDefaultEntry(providerId);
-    const hasMappedEntry = savedEntries.some((entry) => entry.type === 'mapped');
-    if (!defaultEntry || hasMappedEntry) {
+    const hasEquivalentDefaultEntry = defaultEntry
+      ? savedEntries.some((entry) => this.areEquivalentEntries(entry, defaultEntry))
+      : false;
+    if (!defaultEntry || hasEquivalentDefaultEntry) {
       return [...savedEntries];
     }
 
@@ -1098,7 +591,10 @@ export class ProviderIconService {
   private static getDefaultEntry(providerId: string): ProviderIconEntry | null {
     const iconId = this.getIconId(providerId);
     if (!iconId) {
-      return null;
+      const builtinMatch = resolveBuiltinIconMatch(providerId);
+      return builtinMatch
+        ? this.createBuiltinEntry(builtinMatch.libraryId, builtinMatch.iconId, false)
+        : null;
     }
 
     return {
@@ -1165,7 +661,9 @@ export class ProviderIconService {
     try {
       const asset = entry.type === 'mapped'
         ? await this.loadMappedAsset(entry.source, providerId)
-        : await this.loadCustomSourceAsset(this.normalizeCustomSource(entry.source, entry.type));
+        : entry.type === 'builtin'
+          ? await this.loadBuiltinAsset(app, entry.source, providerId)
+          : await this.loadCustomSourceAsset(this.normalizeCustomSource(entry.source, entry.type));
       await this.writeCachedAsset(app, this.getCachePathForEntry(entry), asset.data);
       failedIconIds.delete(runtimeKey);
       const localUrl = this.assetToDataUrl(asset);
@@ -1198,6 +696,47 @@ export class ProviderIconService {
     return {
       data: response.arrayBuffer,
       mimeType,
+    };
+  }
+
+  private static async loadBuiltinAsset(
+    app: App,
+    source: string,
+    providerId: string,
+  ): Promise<LoadedIconAsset> {
+    const parsed = parseBuiltinSource(source);
+    if (!parsed) {
+      throw new Error(`Invalid builtin icon source for ${providerId}.`);
+    }
+
+    if (parsed.libraryId === 'lobehub') {
+      return this.loadMappedAsset(parsed.iconId, providerId);
+    }
+
+    return this.loadBundledOpencodeAsset(app, parsed.iconId, providerId);
+  }
+
+  private static async loadBundledOpencodeAsset(
+    app: App,
+    iconId: string,
+    providerId: string,
+  ): Promise<LoadedIconAsset> {
+    const assetPath = this.getBundledOpencodeAssetPath(app, iconId);
+    const adapter = app.vault.adapter;
+    const exists = await adapter.exists(assetPath);
+    if (!exists) {
+      throw new Error(`Bundled OpenCode icon not found for ${providerId}: ${iconId}`);
+    }
+
+    const readBinary = adapter.readBinary?.bind(adapter) as undefined | ((targetPath: string) => Promise<ArrayBuffer>);
+    if (!readBinary) {
+      throw new Error('Vault adapter does not support binary reads for builtin icons.');
+    }
+
+    const data = await readBinary(assetPath);
+    return {
+      data,
+      mimeType: this.detectMimeType(data, undefined, assetPath),
     };
   }
 
@@ -1485,6 +1024,15 @@ export class ProviderIconService {
       return normalizePath(`${ICON_CACHE_DIR}/${entry.source}.svg`);
     }
 
+    if (entry.type === 'builtin') {
+      const parsed = parseBuiltinSource(entry.source);
+      if (!parsed) {
+        return null;
+      }
+
+      return normalizePath(`${ICON_CACHE_DIR}/builtin-${parsed.libraryId}-${parsed.iconId}.svg`);
+    }
+
     if (!entry.cacheFileName) {
       return null;
     }
@@ -1506,7 +1054,139 @@ export class ProviderIconService {
       return `LobeHub / ${entry.source}`;
     }
 
+    if (entry.type === 'builtin') {
+      const builtinIcon = findBuiltinIcon(entry.source);
+      if (!builtinIcon) {
+        return entry.source;
+      }
+
+      return `${builtinIcon.libraryId === 'lobehub' ? 'LobeHub' : 'OpenCode'} / ${builtinIcon.iconId}`;
+    }
+
     return entry.source;
+  }
+
+  private static getPreviewUrlForEntry(app: App, entry: ProviderIconEntry): string | null {
+    if (entry.type === 'mapped') {
+      return `${LOBEHUB_CDN_BASE}/${entry.source}.svg`;
+    }
+
+    if (entry.type === 'builtin') {
+      const parsed = parseBuiltinSource(entry.source);
+      if (!parsed) {
+        return null;
+      }
+
+      return this.getBuiltinPreviewUrl(app, parsed.libraryId, parsed.iconId);
+    }
+
+    if (entry.type === 'url') {
+      return entry.source;
+    }
+
+    return null;
+  }
+
+  private static getBuiltinPreviewUrl(
+    app: App,
+    libraryId: BuiltinIconLibraryId,
+    iconId: string,
+  ): string | null {
+    if (libraryId === 'lobehub') {
+      return `${LOBEHUB_CDN_BASE}/${iconId}.svg`;
+    }
+
+    const adapter = app.vault.adapter;
+    if (typeof adapter.getResourcePath !== 'function') {
+      return null;
+    }
+
+    return adapter.getResourcePath(this.getBundledOpencodeAssetPath(app, iconId));
+  }
+
+  private static getBundledOpencodeAssetPath(app: App, iconId: string): string {
+    const configDir = typeof (app.vault as { configDir?: string }).configDir === 'string'
+      ? (app.vault as { configDir?: string }).configDir
+      : null;
+    const resolvedConfigDir = configDir && configDir.trim().length > 0
+      ? configDir.trim()
+      : '.obsidian';
+    return normalizePath(`${resolvedConfigDir}/plugins/opencodian/assets/provider-icons/opencode/${iconId}.svg`);
+  }
+
+  private static createBuiltinEntry(
+    libraryId: BuiltinIconLibraryId,
+    iconId: string,
+    persisted: boolean = true,
+  ): ProviderIconEntry {
+    const source = formatBuiltinSource(libraryId, iconId);
+    return {
+      id: `builtin:${source}`,
+      type: 'builtin',
+      source,
+      mimeType: 'image/svg+xml',
+      addedAt: persisted ? Date.now() : 0,
+      updatedAt: persisted ? Date.now() : undefined,
+    };
+  }
+
+  private static areEquivalentEntries(left: ProviderIconEntry, right: ProviderIconEntry): boolean {
+    if (left.type === right.type && left.source === right.source) {
+      return true;
+    }
+
+    const leftBuiltin = left.type === 'builtin'
+      ? parseBuiltinSource(left.source)
+      : left.type === 'mapped'
+        ? { libraryId: 'lobehub' as const, iconId: left.source }
+        : null;
+    const rightBuiltin = right.type === 'builtin'
+      ? parseBuiltinSource(right.source)
+      : right.type === 'mapped'
+        ? { libraryId: 'lobehub' as const, iconId: right.source }
+        : null;
+
+    return Boolean(
+      leftBuiltin
+      && rightBuiltin
+      && leftBuiltin.libraryId === rightBuiltin.libraryId
+      && leftBuiltin.iconId === rightBuiltin.iconId,
+    );
+  }
+
+  private static getEditableEntriesForProvider(
+    providerId: string,
+    library: ProviderIconLibrary,
+  ): ProviderIconEntry[] {
+    const currentEntries = library[providerId];
+    if (currentEntries?.length) {
+      return [...currentEntries];
+    }
+
+    const defaultEntry = this.getDefaultEntry(providerId);
+    return defaultEntry ? [defaultEntry] : [];
+  }
+
+  private static getRecommendedBuiltinIcons(
+    providerId: string,
+    libraryId?: BuiltinIconLibraryId,
+  ): BuiltinIconDefinition[] {
+    const primary = resolveBuiltinIconMatch(providerId);
+    const fallback = searchBuiltinIcons(providerId, {
+      libraryId,
+      limit: 12,
+    });
+
+    return [
+      ...(primary ? [primary] : []),
+      ...fallback,
+    ].filter((definition, index, collection) => {
+      if (libraryId && definition.libraryId !== libraryId) {
+        return false;
+      }
+
+      return collection.findIndex((candidate) => candidate.source === definition.source) === index;
+    });
   }
 
   private static uniqueProviderIds(providerIds: string[]): string[] {
