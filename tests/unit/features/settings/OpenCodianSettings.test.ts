@@ -325,7 +325,7 @@ describe('OpenCodianSettingTab model catalog views', () => {
     return new OpenCodianSettingTab({} as App, plugin);
   }
 
-  it('hides server-disabled providers from the server catalog', () => {
+  it('keeps runtime providers visible in the server catalog even when they are currently disabled', () => {
     const tab = createTab();
     const catalogs = {
       local: { providers: [], defaults: {} },
@@ -348,11 +348,16 @@ describe('OpenCodianSettingTab model catalog views', () => {
           {
             id: 'alibaba',
             name: 'Alibaba',
-            models: [],
+            models: [{
+              id: 'qwen-max',
+              name: 'Qwen Max',
+              source: 'server' as const,
+              existsInLocal: false,
+              existsInServer: true,
+            }],
             source: 'server' as const,
             existsInLocal: false,
             existsInServer: true,
-            disabledScopes: ['global' as const],
           },
         ],
         defaults: {},
@@ -360,7 +365,7 @@ describe('OpenCodianSettingTab model catalog views', () => {
       baseEffective: { providers: [], defaults: {} },
       effective: { providers: [], defaults: {} },
       currentEnabledProviderIds: ['openai'],
-      serverConfig: {},
+      serverConfig: { disabled_providers: ['alibaba'] },
       effectiveProviderConfig: { disabled_providers: ['deepseek'] },
     };
 
@@ -370,7 +375,7 @@ describe('OpenCodianSettingTab model catalog views', () => {
       };
     }).getDisplayCatalogForMode('server', catalogs, { disabled_providers: ['deepseek'] });
 
-    expect(serverCatalog.providers.map((provider) => provider.id)).toEqual(['openai']);
+    expect(serverCatalog.providers.map((provider) => provider.id)).toEqual(['openai', 'alibaba']);
   });
 
   it('shows disabled models from merged local and server catalogs in the disabled view', () => {
@@ -433,7 +438,7 @@ describe('OpenCodianSettingTab model catalog views', () => {
     expect(disabledCatalog.providers.find((provider) => provider.id === 'openai')?.models.map((model) => model.id)).toEqual(['gpt-4.1']);
   });
 
-  it('omits server-disabled providers from the disabled view after a project override enables them', () => {
+  it('removes re-enabled providers from the disabled view once they are back in currentEnabledProviderIds', () => {
     const tab = createTab();
     const catalogs = {
       local: { providers: [], defaults: {} },
@@ -452,7 +457,6 @@ describe('OpenCodianSettingTab model catalog views', () => {
             source: 'server' as const,
             existsInLocal: false,
             existsInServer: true,
-            disabledScopes: ['global' as const],
           },
           {
             id: 'alibaba-cn',
@@ -467,14 +471,13 @@ describe('OpenCodianSettingTab model catalog views', () => {
             source: 'server' as const,
             existsInLocal: false,
             existsInServer: true,
-            disabledScopes: ['global' as const],
           },
         ],
         defaults: {},
       },
       baseEffective: { providers: [], defaults: {} },
       effective: { providers: [], defaults: {} },
-      currentEnabledProviderIds: [],
+      currentEnabledProviderIds: ['alibaba'],
       serverConfig: { disabled_providers: ['alibaba', 'alibaba-cn'] },
       effectiveProviderConfig: { disabled_providers: ['alibaba-cn'] },
     };
@@ -489,9 +492,8 @@ describe('OpenCodianSettingTab model catalog views', () => {
       };
     }).getDisplayCatalogForMode('disabled', catalogs, { disabled_providers: ['alibaba-cn'] });
 
-    expect(disabledCatalog.providers.map((provider) => provider.id)).toEqual(['alibaba', 'alibaba-cn']);
-    expect(disabledCatalog.providers[0].disabledScopes).toEqual(['global']);
-    expect(disabledCatalog.providers[1].disabledScopes).toEqual(['global', 'project']);
+    expect(disabledCatalog.providers.map((provider) => provider.id)).toEqual(['alibaba-cn']);
+    expect(disabledCatalog.providers[0].disabledScopes).toEqual(['project']);
   });
 
   it('prefers project-disabled over server-disabled when both apply', () => {

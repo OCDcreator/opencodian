@@ -28,7 +28,7 @@ export interface ModelCatalogBundle {
 ```
 
 - `local`: 仅来自当前项目 `.opencode` 配置。
-- `server`: 以当前项目目录作用域下的 runtime provider 集合为主。实现上直接采用 `config.providers()` 返回的目录作用域 provider/model 列表；如果当前 scoped config 明确禁用了某个 provider，才补一个 `server-disabled` 占位供禁用视图使用。
+- `server`: 以当前项目目录作用域下的 runtime provider 集合为主。实现上应直接采用 `config.providers()` 返回的目录作用域 provider/model 列表，对齐 `opencode models` 看到的结果；provider 的禁用状态属于配置层叠加信息，不应反过来把仍在 runtime 目录里的 provider 从 `服务器目录` 里扣掉。
 - `baseEffective`: 依 `modelSourceMode` 解析后的基础目录，不应用插件侧模型禁用过滤。
 - `effective`: 在 `baseEffective` 之上再应用“当前 scoped server 可用性 + 当前项目 provider 开关 + 插件侧 `disabledModelRefs`”后的最终目录。
 - `currentEnabledProviderIds`: 当前作用域下真正视为“provider 已启用”的 provider ID 列表；设置页用它避免把服务端当前不可用的 provider 误显示成绿色启用。
@@ -70,14 +70,14 @@ export interface ModelCatalogBundle {
 4. 先按当前 scoped server 状态与当前项目 provider 开关收敛出 `currentEnabledProviderIds`
 5. 再对 `baseEffective` 应用模型级过滤，并只保留 `currentEnabledProviderIds` 对应的 provider，得到 `effective`
 
-这一步是最近文档最容易过期的地方。现在服务显式区分：
+这一步是最近文档最容易过期的地方。现在服务应该显式区分：
 
 - `baseEffective`: 用于保留完整 provider/model 元数据，即使某项当前不可选也仍可显示
 - `effective`: 真正允许聊天发送、标题生成和设置默认值解析的过滤后目录
 
 过滤条件包括：
 
-- 当前 scoped server config 对 provider 的最终允许状态
+- 当前 scoped server config 对 provider 的允许状态提示
 - 当前项目配置里的 `enabled_providers` / `disabled_providers`
 - 插件设置里的 `disabledModelRefs`
 
@@ -113,7 +113,7 @@ provider 开关继承规则依然保留在 `effectiveProviderConfig` 里，按�
 这让 UI 能区分：
 
 - 当前项目明确禁用
-- 服务端明确禁用
+- 当前作用域配置把它标成禁用，但 runtime 目录里仍可能存在
 - 目录里还在，但没有可测试模型
 - 目录和 runtime 看起来都行，但真实发送失败（例如 `401 invalid_api_key`）
 - 真实发送成功
@@ -127,10 +127,10 @@ provider 开关继承规则依然保留在 `effectiveProviderConfig` 里，按�
    - 不要改成 `provider.list()`。
    - 也不要把 `config.get().provider` 当成服务器目录。
 
-2. **继承层 / 服务端 `disabled_providers` 是硬禁用，不允许被项目本地空数组或“重新启用”覆盖**
-   - `服务器目录` = `opencode models` 当前 provider 集合，减去硬性服务端禁用 provider。
-   - `当前生效列表` = 上式结果，再叠加当前 scoped config 与项目本地 provider 开关过滤。
-   - `当前禁用列表` 仍要保留这些服务端禁用 provider 的占位。
+2. **继承层 / 服务端 `disabled_providers` 不是“把 provider 从服务器目录删掉”的事实源**
+   - `服务器目录` 应直接对齐 `opencode models` / `config.providers(directory)` 当前返回的 provider 集合。
+   - `当前生效列表` 才是在这组目录之上叠加当前 scoped config、项目本地 provider 开关和 source mode 过滤后的结果。
+   - `当前禁用列表` 可以表达继承层禁用、项目禁用和模型级禁用，但不应反向改写 `服务器目录` 的真值。
 
 3. **如果插件 UI 的 provider 数量突然远少于 `opencode models`，先怀疑旧的本地 `4096` 进程被继续接管**
    - 典型症状：CLI 有 9 个 provider，但插件只剩 1 个或 3 个。
@@ -201,14 +201,14 @@ baseEffective + disabledModelRefs + currentEnabledProviderIds
 ## 注意事项
 
 - `mode === 'local'` 时也会读取服务端目录，因为返回 bundle 需要完整 `server` 视图。
-- `opencode models` CLI 与 `config.providers()` / `getAvailableModels(includeDirectory=true)` 同源，都是目录作用域下服务端内部 `Provider.list()` 的结果；这里不是指 SDK `provider.list()` / `/provider` 路由。设置页服务器目录直接复用这条链路。
+- `opencode models` CLI 与 `config.providers()` / `getAvailableModels(includeDirectory=true)` 同源，都是目录作用域下服务端内部 `Provider.list()` 的结果；这里不是指 SDK `provider.list()` / `/provider` 路由。设置页 `服务器目录` 应直接复用这条链路。
 - `provider.list()` 对应的是 connect-provider 目录总览，不是 `opencode models` 的一对一替代；不要再用它来扩充设置页服务器目录。
 - `getResolvedModelConfig(includeDirectory=false)` 不是“纯全局配置文件内容”。在 OpenCode 服务端里，不带 `directory` 的 `/config` 会落到服务进程默认工作目录；本地模式下如果插件接管了一个旧进程，这个结果甚至可能对应另一个 vault。
-- 继承层 `disabled_providers` 现在视为硬性服务端禁用：项目本地空数组或“重新启用”操作都不会把这些 provider 重新算作可用项；`服务器目录` 视图会直接把它们排除，只在 `当前禁用` 视图保留占位。
+- 继承层 `disabled_providers` 是配置层的 provider 可用性输入，不是“runtime 目录里不存在这个 provider”的证据。只要 `opencode models` 仍然列出它，它就仍属于 `服务器目录`；项目本地也应该可以通过覆盖数组重新启用它。
 - 如果 `服务器目录`、`当前生效列表`、`当前禁用列表` 三张卡之间的关系看起来不对，先对照下面这个公式排查：
-  - `服务器目录` = `config.providers(directory)` - 服务端硬禁用 provider
-  - `当前生效列表` = `服务器目录` ∩ `currentEnabledProviderIds`
-  - `当前禁用列表` = 服务端硬禁用占位 + 项目禁用 provider + `disabledModelRefs`
+  - `服务器目录` = `config.providers(directory)` / `opencode models`
+  - `当前生效列表` = `服务器目录` 再叠加当前 scoped config、项目 provider 开关与 source mode 过滤
+  - `当前禁用列表` = 当前目录中被配置禁用的 provider/model + 仅存在于配置层的禁用占位 + `disabledModelRefs`
 - Windows 下如果 `directory` 传的是反斜杠路径（例如 `C:\vault`），OpenCode 服务端会返回接近全局作用域的结果；插件侧现在会在 transport 层统一规范化成 `C:/vault`。
 - `effective` 不是“唯一真实目录”；`baseEffective` 同样重要，尤其是 UI 展示和降级判断。
 - 这个服务不决定“选中哪个模型”，它只提供目录与过滤后的事实数据。

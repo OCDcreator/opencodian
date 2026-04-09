@@ -144,7 +144,7 @@ export interface ModelCatalog {
 
 `mergeProviderAvailabilityConfig(inherited, local)` 用于把服务器配置与当前项目配置合并。数组不是追加合并，而是本地字段存在就替换继承字段；本地字段不存在才继承服务器字段。
 
-`setProviderEnabled(subset, providerId, enabled, knownProviderIds, inherited?)` 写回项目配置时会以 `inherited` 为基线生成最小本地覆盖。例如服务器禁用 `alibaba` / `alibaba-cn`，项目只启用 `alibaba` 时，本地只写 `disabled_providers: ['alibaba-cn']`，不会清空其他继承禁用项。
+`setProviderEnabled(subset, providerId, enabled, knownProviderIds, inherited?)` 写回项目配置时会以 `inherited` 为基线生成最小本地覆盖。例如继承层当前禁用 `alibaba` / `alibaba-cn`，项目如果只想重新启用 `alibaba`，本地可以写成 `disabled_providers: ['alibaba-cn']`；如果想把继承禁用全部清空，也可以显式写 `disabled_providers: []`。这里的重点是“本地字段替换继承字段”，而不是把继承禁用当成不可覆盖的硬限制。
 
 ## 关键导出
 

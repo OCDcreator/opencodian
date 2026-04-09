@@ -6088,18 +6088,23 @@ export class OpenCodianSettingTab extends PluginSettingTab {
   ): ModelCatalog {
     switch (mode) {
       case 'local':
-        return catalogs.local;
+        return this.decorateCatalogWithCurrentDisabledScopes(catalogs.local, catalogs, localModelConfig);
       case 'server':
-        return this.buildServerDisplayCatalog(catalogs.server);
+        return this.decorateCatalogWithCurrentDisabledScopes(catalogs.server, catalogs, localModelConfig);
       case 'disabled':
-        return this.withProjectDisabledProviderPlaceholders(
-          mergeCatalogs(catalogs.server, catalogs.local),
+        return this.withConfiguredDisabledProviderPlaceholders(
+          this.decorateCatalogWithCurrentDisabledScopes(
+            mergeCatalogs(catalogs.server, catalogs.local),
+            catalogs,
+            localModelConfig,
+          ),
+          catalogs,
           localModelConfig,
           'merge',
         );
       case 'effective':
       default:
-        return catalogs.baseEffective;
+        return this.decorateCatalogWithCurrentDisabledScopes(catalogs.baseEffective, catalogs, localModelConfig);
     }
   }
 
@@ -6107,8 +6112,13 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     catalogs: ModelCatalogBundle,
     localModelConfig: OpencodeModelConfigSubset | null,
   ): ModelCatalog {
-    const baseCatalog = this.withProjectDisabledProviderPlaceholders(
-      mergeCatalogs(catalogs.server, catalogs.local),
+    const baseCatalog = this.withConfiguredDisabledProviderPlaceholders(
+      this.decorateCatalogWithCurrentDisabledScopes(
+        mergeCatalogs(catalogs.server, catalogs.local),
+        catalogs,
+        localModelConfig,
+      ),
+      catalogs,
       localModelConfig,
       'merge',
     );
@@ -6150,12 +6160,10 @@ export class OpenCodianSettingTab extends PluginSettingTab {
   }
 
   private buildServerDisplayCatalog(catalog: ModelCatalog): ModelCatalog {
-    const providers = catalog.providers
-      .filter((provider) => !this.isProviderDisabledByScope(provider, 'global'))
-      .map((provider) => ({
-        ...provider,
-        models: provider.models.map((model) => ({ ...model })),
-      }));
+    const providers = catalog.providers.map((provider) => ({
+      ...provider,
+      models: provider.models.map((model) => ({ ...model })),
+    }));
 
     return {
       providers,
@@ -6165,18 +6173,55 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     };
   }
 
-  private withProjectDisabledProviderPlaceholders(
+  private decorateCatalogWithCurrentDisabledScopes(
     catalog: ModelCatalog,
+    catalogs: ModelCatalogBundle,
+    localModelConfig: OpencodeModelConfigSubset | null,
+  ): ModelCatalog {
+    const providers = catalog.providers.map((provider) => {
+      const providerEnabled = this.isProviderCurrentlyEnabled(provider.id, catalogs);
+      const projectDisabled = this.isProviderProjectDisabled(localModelConfig, provider.id);
+      const disabledScopes = this.mergeDisabledScopes(
+        provider.disabledScopes,
+        !providerEnabled
+          ? [
+            ...(projectDisabled ? ['project' as const] : []),
+            ...(!projectDisabled ? ['global' as const] : []),
+          ]
+          : undefined,
+      );
+
+      return {
+        ...provider,
+        disabledScopes,
+        models: provider.models.map((model) => ({
+          ...model,
+          disabledScopes,
+        })),
+      };
+    });
+
+    return {
+      ...catalog,
+      providers,
+    };
+  }
+
+  private withConfiguredDisabledProviderPlaceholders(
+    catalog: ModelCatalog,
+    catalogs: ModelCatalogBundle,
     localModelConfig: OpencodeModelConfigSubset | null,
     source: 'server' | 'merge',
   ): ModelCatalog {
-    if (!localModelConfig || !this.hasProviderAvailabilityConfig(localModelConfig)) {
-      return catalog;
-    }
-
     const existingProviderIds = new Set(catalog.providers.map((provider) => provider.id));
-    const placeholderProviders = collectConfiguredProviderIds(localModelConfig)
-      .filter((providerId) => !isProviderEnabled(localModelConfig, providerId))
+    const configuredProviderIds = new Set<string>([
+      ...collectConfiguredProviderIds(catalogs.serverConfig),
+      ...collectConfiguredProviderIds(localModelConfig ?? {}),
+      ...(catalogs.effectiveProviderConfig.enabled_providers ?? []),
+      ...(catalogs.effectiveProviderConfig.disabled_providers ?? []),
+    ]);
+    const placeholderProviders = [...configuredProviderIds]
+      .filter((providerId) => !this.isProviderCurrentlyEnabled(providerId, catalogs))
       .filter((providerId) => !existingProviderIds.has(providerId))
       .map<ModelCatalogProvider>((providerId) => ({
         id: providerId,
@@ -6185,7 +6230,9 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         source,
         existsInLocal: false,
         existsInServer: false,
-        disabledScopes: ['project'],
+        disabledScopes: this.isProviderProjectDisabled(localModelConfig, providerId)
+          ? ['project']
+          : ['global'],
       }));
 
     if (placeholderProviders.length === 0) {

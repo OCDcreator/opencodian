@@ -80,19 +80,19 @@
 新的结构把模型任务拆开了：
 
 - **常用**：默认聊天模型、来源模式、刷新摘要
-- **可用范围与目录**：provider accordion + 模型级开关 + project/server/effective/disabled 四张目录摘要卡；`服务器目录` 只显示当前 runtime 可用且未被服务端继承禁用的 provider，显式 `server-disabled` 占位只保留在 `当前禁用` 视图；provider 卡主状态优先显示“项目禁用”，其次才是“服务端禁用”，并新增逐 provider 的“测试可用性”按钮，用当前 vault 作用域重新探测 runtime 是否真的可用
+- **可用范围与目录**：provider accordion + 模型级开关 + project/server/effective/disabled 四张目录摘要卡；`服务器目录` 应直接反映当前 runtime / `opencode models` 看到的 provider，provider 的禁用状态则作为配置层信息叠加到 `当前生效列表` / `当前禁用列表`；provider 卡主状态优先显示“项目禁用”，其次才是“服务端/继承配置禁用”，并新增逐 provider 的“测试可用性”按钮，用当前 vault 作用域重新探测 runtime 是否真的可用
   - 这个按钮现在已经改成“最小真实发送测试”：允许发送时会挑一个测试模型创建临时 session，真正发一条极小请求；因此它能直接暴露 `invalid_api_key`、provider 鉴权失败、服务端拒绝等真实错误，而不再只是看 runtime/目录
-  - `当前生效列表` 现在按 `ModelConfigService.currentEnabledProviderIds` 判断 provider 是否真启用，所以不会再把当前 scoped server 已禁用的 provider 显示成绿色“已启用”
+  - `当前生效列表` 现在按 `ModelConfigService.currentEnabledProviderIds` 判断 provider 是否真启用，所以不会再把当前作用域里被配置禁用的 provider 显示成绿色“已启用”
   - 三张卡的正确关系必须长期保持：
-    - `服务器目录` = `opencode models` 当前 provider 集合 - 服务端硬禁用 provider
-    - `当前生效列表` = `服务器目录` 再叠加项目本地 provider 开关与 source mode 过滤
-    - `当前禁用列表` = 服务端禁用占位 + 项目禁用项 + 模型级 `disabledModelRefs`
+    - `服务器目录` = `opencode models` / `config.providers(directory)` 当前 provider 集合
+    - `当前生效列表` = `服务器目录` 再叠加当前 scoped config、项目本地 provider 开关与 source mode 过滤
+    - `当前禁用列表` = 当前目录中被配置禁用的项 + 仅来自配置层的禁用占位 + 模型级 `disabledModelRefs`
 - **项目工作区**：打开项目级 provider/model 工作区，集中处理 provider 主字段、模型列表、图标缓存入口和实时 JSON 预览
 - “可用范围与目录”和“项目工作区”都是默认展开的 `details` block，用户折叠状态会写回插件设置并在下次打开时恢复
 
-provider 开关写回仍遵循 `ModelConfigService` 返回的 `effectiveProviderConfig` 继承规则：项目 `enabled_providers` / `disabled_providers` 字段存在时替换服务器字段。但设置页展示启用态时，额外参考 `currentEnabledProviderIds`，避免把当前作用域下已不可用的 provider 显示成“已启用”。设置页的 provider 可用性测试现在分两层：
+provider 开关写回仍遵循 `ModelConfigService` 返回的 `effectiveProviderConfig` 继承规则：项目 `enabled_providers` / `disabled_providers` 字段存在时替换服务器字段，这也意味着项目本地可以缩小或清空继承层禁用数组，而不是把继承禁用视为不可覆盖的硬限制。但设置页展示启用态时，额外参考 `currentEnabledProviderIds`，避免把当前作用域下已不可用的 provider 显示成“已启用”。设置页的 provider 可用性测试现在分两层：
 
-- 先读 scoped runtime、connected directory 和 server catalog，判断当前是“项目禁用”“服务端禁用”“只有目录占位”还是“可尝试发送”
+- 先读 scoped runtime、connected directory 和 server catalog，判断当前是“项目禁用”“继承/服务端配置禁用”“只有目录占位”还是“可尝试发送”
 - 只有真正允许发送且能选出测试模型时，才会做一次最小真实请求
 
 ### 设置面板滚动恢复

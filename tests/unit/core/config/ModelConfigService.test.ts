@@ -133,7 +133,7 @@ describe('ModelConfigService', () => {
     expect(openCodeService.getAvailableModels).not.toHaveBeenCalled();
   });
 
-  it('builds the server catalog from runtime providers plus explicit disabled placeholders', async () => {
+  it('builds the server catalog from current runtime providers only', async () => {
     const configManager = {
       read: jest.fn().mockResolvedValue({}),
       write: jest.fn(),
@@ -190,18 +190,10 @@ describe('ModelConfigService', () => {
     const catalogs = await service.getCatalogs('merge');
 
     expect(catalogs.server.providers.map((provider) => provider.id)).toEqual([
-      'alibaba',
-      'alibaba-cn',
       'anthropic',
       'deepseek',
       'openai',
     ]);
-    expect(catalogs.server.providers.find((provider) => provider.id === 'alibaba')).toMatchObject({
-      disabledScopes: ['global'],
-    });
-    expect(catalogs.server.providers.find((provider) => provider.id === 'alibaba-cn')).toMatchObject({
-      disabledScopes: ['global'],
-    });
     expect(catalogs.effective.providers.map((provider) => provider.id)).toEqual([
       'anthropic',
       'deepseek',
@@ -268,7 +260,7 @@ describe('ModelConfigService', () => {
     expect(catalogs.server.providers.map((provider) => provider.id)).toEqual(['deepseek']);
   });
 
-  it('keeps inherited global disabled providers out of the current enabled list even if project disabled_providers is empty', async () => {
+  it('allows the current scoped runtime to keep inherited-disabled providers enabled when the project clears them', async () => {
     const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'opencodian-global-disable-'));
     const xdgConfigHome = path.join(tempRoot, 'xdg');
     const managedConfigDir = path.join(tempRoot, 'managed');
@@ -327,11 +319,9 @@ describe('ModelConfigService', () => {
 
       const catalogs = await service.getCatalogs('merge');
 
-      expect(catalogs.server.providers.find((provider) => provider.id === 'alibaba')).toMatchObject({
-        disabledScopes: ['global'],
-      });
-      expect(catalogs.currentEnabledProviderIds).toEqual(['deepseek']);
-      expect(catalogs.effective.providers.map((provider) => provider.id)).toEqual(['deepseek']);
+      expect(catalogs.server.providers.map((provider) => provider.id)).toEqual(['alibaba', 'deepseek']);
+      expect(catalogs.currentEnabledProviderIds).toEqual(['alibaba', 'deepseek']);
+      expect(catalogs.effective.providers.map((provider) => provider.id)).toEqual(['alibaba', 'deepseek']);
     } finally {
       fs.rmSync(tempRoot, { recursive: true, force: true });
     }
@@ -377,12 +367,7 @@ describe('ModelConfigService', () => {
     const service = new ModelConfigService(configManager as never, openCodeService as never);
     const catalogs = await service.getCatalogs('merge');
 
-    expect(catalogs.server.providers.find((provider) => provider.id === 'alibaba')).toMatchObject({
-      disabledScopes: ['global'],
-    });
-    expect(catalogs.server.providers.find((provider) => provider.id === 'alibaba-cn')).toMatchObject({
-      disabledScopes: ['global'],
-    });
+    expect(catalogs.server.providers).toEqual([]);
     expect(catalogs.currentEnabledProviderIds).toEqual([]);
     expect(catalogs.effective.providers.map((provider) => provider.id)).toEqual([]);
   });
@@ -428,7 +413,7 @@ describe('ModelConfigService', () => {
     const catalogs = await service.getCatalogs('merge');
 
     expect(openCodeService.getProviderDirectory).not.toHaveBeenCalled();
-    expect(catalogs.server.providers.map((provider) => provider.id)).toEqual(['alibaba', 'alibaba-cn', 'deepseek']);
+    expect(catalogs.server.providers.map((provider) => provider.id)).toEqual(['deepseek']);
     expect(catalogs.effective.providers.map((provider) => provider.id)).toEqual([
       'anthropic',
       'deepseek',
@@ -481,10 +466,9 @@ describe('ModelConfigService', () => {
     expect(catalogs.server.providers.map((provider) => provider.id)).toEqual([
       'codexzh',
       'deepseek',
-      'zhipuai',
     ]);
     expect(catalogs.currentEnabledProviderIds).toEqual(['codexzh', 'deepseek']);
-    expect(catalogs.baseEffective.providers.map((provider) => provider.id)).toEqual(['codexzh', 'deepseek', 'zhipuai']);
+    expect(catalogs.baseEffective.providers.map((provider) => provider.id)).toEqual(['codexzh', 'deepseek']);
     expect(catalogs.effective.providers.map((provider) => provider.id)).toEqual(['codexzh', 'deepseek']);
   });
 
@@ -547,17 +531,8 @@ describe('ModelConfigService', () => {
       const catalogs = await service.getCatalogs('merge');
 
       expect(catalogs.server.providers.map((provider) => provider.id)).toEqual([
-        'alibaba',
-        'alibaba-cn',
         'deepseek',
-        'zhipuai',
       ]);
-      expect(catalogs.server.providers.find((provider) => provider.id === 'alibaba')).toMatchObject({
-        disabledScopes: ['global'],
-      });
-      expect(catalogs.server.providers.find((provider) => provider.id === 'alibaba-cn')).toMatchObject({
-        disabledScopes: ['global'],
-      });
       expect(catalogs.server.providers.map((provider) => provider.id)).not.toContain('ccodezh');
       expect(catalogs.server.providers.map((provider) => provider.id)).not.toContain('codexzh');
       expect(catalogs.server.providers.map((provider) => provider.id)).not.toContain('kimi-for-coding');
@@ -663,8 +638,6 @@ describe('ModelConfigService', () => {
 
     expect(openCodeService.getProviderDirectory).not.toHaveBeenCalled();
     expect(catalogs.server.providers.map((provider) => provider.id)).toEqual([
-      'alibaba',
-      'alibaba-cn',
       'deepseek',
     ]);
     expect(catalogs.server.providers.map((provider) => provider.id)).not.toContain('ccodezh');
@@ -704,13 +677,13 @@ describe('ModelConfigService', () => {
       providerId: 'alibaba',
       status: 'project_disabled',
       projectDisabled: true,
-      serverDisabled: true,
+      serverDisabled: false,
       effectiveEnabled: false,
       sendTestAttempted: false,
     });
   });
 
-  it('treats inherited server-disabled providers as unavailable even if the project tries to re-enable them', async () => {
+  it('allows a project override to probe a provider when the current scoped runtime still exposes it', async () => {
     const configManager = {
       read: jest.fn().mockResolvedValue({
         enabled_providers: ['alibaba'],
@@ -721,17 +694,17 @@ describe('ModelConfigService', () => {
     };
     const openCodeService = createOpenCodeServiceMock({
       getAvailableModels: jest.fn().mockResolvedValue({
-        defaults: {},
-        providers: [],
-      }),
-      getProviderDirectory: jest.fn().mockResolvedValue({
-        defaults: {},
-        providers: [],
-        connected: [],
+        defaults: { alibaba: 'qwen-max' },
+        providers: [{
+          id: 'alibaba',
+          name: 'Alibaba',
+          models: [{ id: 'qwen-max', name: 'Qwen Max' }],
+        }],
       }),
       getResolvedModelConfig: jest.fn()
         .mockResolvedValueOnce({
-          disabled_providers: ['alibaba'],
+          enabled_providers: ['alibaba'],
+          disabled_providers: [],
         })
         .mockResolvedValueOnce({
           provider: {
@@ -755,17 +728,17 @@ describe('ModelConfigService', () => {
     const service = new ModelConfigService(configManager as never, openCodeService as never);
     await expect(service.testProviderAvailability('alibaba')).resolves.toMatchObject({
       providerId: 'alibaba',
-      status: 'server_disabled',
-      serverDisabled: true,
-      effectiveEnabled: false,
+      status: 'send_failed',
+      serverDisabled: false,
+      effectiveEnabled: true,
       overridesServerDisabled: false,
       testedModelId: 'qwen-max',
-      sendTestAttempted: false,
+      sendTestAttempted: true,
       sendTestSucceeded: false,
       catalogModelCount: 1,
-      runtimeModelCount: 0,
+      runtimeModelCount: 1,
     });
-    expect(openCodeService.probeProviderResponse).not.toHaveBeenCalled();
+    expect(openCodeService.probeProviderResponse).toHaveBeenCalledWith('alibaba', 'qwen-max');
   });
 
   it('reports missing when no provider entry remains for a real send probe', async () => {

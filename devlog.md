@@ -12,6 +12,44 @@
 
 ---
 
+## 2026-04-10 provider 目录真值修正与设置页禁用视图对齐
+
+### 🎯 改动目标
+
+- 修正 `disabled_providers` 被误当成“provider 已从 runtime 目录消失”的硬事实，避免设置页 `服务器目录` 与 `opencode models` 继续失真
+- 让项目本地 provider 覆盖真正遵循“本地字段替换继承字段”的语义，允许缩小或清空继承禁用数组
+- 对齐设置页目录卡、可用性探测与对应测试，减少 UI/运行时口径不一致
+
+### ✅ 本轮调整
+
+- `src/core/config/ModelConfigService.ts`
+  - `server` catalog 改为直接以当前 runtime provider/model 集合为真值，不再为继承层 `disabled_providers` 额外制造“硬禁用占位”
+  - `currentEnabledProviderIds` 不再先扣掉所谓“硬服务端禁用”；只按当前 scoped config 与项目本地配置共同判断当前作用域是否启用
+  - provider probe 中的 `serverDisabled` 改为表示“当前 scoped config 禁用但项目本地未禁用”，不再把继承禁用直接当成 runtime 不可用
+  - `effectiveProviderConfig` 恢复为普通继承/替换合并，不再强行并回所谓硬禁用数组
+
+- `src/features/settings/OpenCodianSettings.ts`
+  - `服务器目录` / `当前生效列表` / `当前禁用列表` 的展示逻辑改为围绕 `currentEnabledProviderIds` 与当前目录事实重算
+  - runtime 里仍存在、但当前被配置禁用的 provider，会继续显示在 `服务器目录`，同时在禁用视图和 badge 上表达禁用来源
+  - 仅对“当前目录中不存在、但配置层声明禁用”的 provider 补占位，避免把已重新启用的 provider 留在禁用列表里
+
+- `docs/modules/core/config/ModelConfigService.md`
+- `docs/modules/core/config/modelConfig.md`
+- `docs/modules/features/settings/OpenCodianSettings.md`
+  - 文档统一改为：`服务器目录` 直接对齐 `config.providers(directory)` / `opencode models`
+  - 明确 `disabled_providers` 是配置层输入，不是 provider 已离开 runtime 目录的证据
+
+- `tests/unit/core/config/ModelConfigService.test.ts`
+- `tests/unit/features/settings/OpenCodianSettings.test.ts`
+  - 回归测试改为覆盖“runtime 仍在时继续展示 provider”“项目可覆盖继承禁用”“重新启用后从禁用视图移除”等行为
+
+### 🧪 验证结果
+
+- `npm test -- tests/unit/core/config/ModelConfigService.test.ts tests/unit/features/settings/OpenCodianSettings.test.ts` 通过
+- `npm run build` 通过，最新 `BUILD_ID: main.202604100003`
+- 已部署 `dist/main.js`、`dist/manifest.json`、`dist/styles.css` 到 Test Vault
+- 已确认 Test Vault `main.js` 含最新 `BUILD_ID: main.202604100003`
+
 ## 2026-04-09 样式拆分构建接线、样式文档补全与索引同步
 
 ### 🎯 改动目标

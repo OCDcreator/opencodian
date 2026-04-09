@@ -128,14 +128,11 @@ export class ModelConfigService {
     const effectiveProviderConfig = this.buildEffectiveProviderConfig(
       serverState.inheritedConfig,
       localConfig,
-      serverState.hardServerDisabledProviderIds,
     );
-    const hardServerDisabledProviderIds = new Set(serverState.hardServerDisabledProviderIds);
     const currentEnabledProviderIds = baseEffective.providers
       .map((provider) => provider.id)
       .filter((providerId, index, providerIds) => (
         providerIds.indexOf(providerId) === index
-        && !hardServerDisabledProviderIds.has(providerId)
         && this.isProviderEnabledInCurrentScope(providerId, serverState.scopedConfig, localConfig)
       ));
     const effective = this.filterCatalogToProviderIds(
@@ -189,18 +186,13 @@ export class ModelConfigService {
     const effectiveProviderConfig = this.buildEffectiveProviderConfig(
       serverState.inheritedConfig,
       localConfig,
-      serverState.hardServerDisabledProviderIds,
     );
     const runtimeProvider = serverState.runtime.providers.find((provider) => provider.id === normalizedProviderId);
     const serverProvider = serverState.server.providers.find((provider) => provider.id === normalizedProviderId);
     const projectDisabled = !isProviderEnabled(localConfig, normalizedProviderId);
-    const serverDisabled = (
-      serverState.hardServerDisabledProviderIds.includes(normalizedProviderId)
-      || !isProviderEnabled(serverState.scopedConfig, normalizedProviderId)
-    );
+    const serverDisabled = !projectDisabled && !isProviderEnabled(serverState.scopedConfig, normalizedProviderId);
     const effectiveEnabled = (
-      !serverState.hardServerDisabledProviderIds.includes(normalizedProviderId)
-      && this.isProviderEnabledInCurrentScope(normalizedProviderId, serverState.scopedConfig, localConfig)
+      this.isProviderEnabledInCurrentScope(normalizedProviderId, serverState.scopedConfig, localConfig)
       && isProviderEnabled(effectiveProviderConfig, normalizedProviderId)
     );
     const runtimeModelCount = runtimeProvider?.models.length ?? 0;
@@ -275,7 +267,6 @@ export class ModelConfigService {
   private buildServerCatalog(
     runtimeCatalog: ModelCatalog,
     metadataConfig: OpencodeModelConfigSubset,
-    hardServerDisabledProviderIds: Iterable<string>,
   ): ModelCatalog {
     const resolvedCatalog = buildCatalogFromConfig(metadataConfig, 'server');
     const providers = new Map<string, ModelCatalogProvider>();
@@ -295,41 +286,9 @@ export class ModelConfigService {
       this.mergeServerProvider(providers, provider);
     }
 
-    for (const providerId of hardServerDisabledProviderIds) {
-      const existing = providers.get(providerId);
-      const resolvedProvider = resolvedProviders.get(providerId);
-
-      if (existing) {
-        providers.set(providerId, {
-          ...existing,
-          disabledScopes: this.mergeDisabledScopes(existing.disabledScopes, ['global']),
-          models: existing.models.map((model) => ({
-            ...model,
-            disabledScopes: this.mergeDisabledScopes(model.disabledScopes, ['global']),
-          })),
-        });
-        continue;
-      }
-
-      providers.set(providerId, {
-        id: providerId,
-        name: resolvedProvider?.name ?? providerId,
-        source: 'server',
-        existsInLocal: false,
-        existsInServer: true,
-        disabledScopes: ['global'],
-        models: (resolvedProvider?.models ?? []).map((model) => ({
-          ...model,
-          source: 'server',
-          existsInLocal: false,
-          existsInServer: true,
-        })),
-      });
-    }
-
     return {
       providers: [...providers.values()]
-        .filter((provider) => provider.models.length > 0 || provider.disabledScopes?.length)
+        .filter((provider) => provider.models.length > 0)
         .sort((left, right) => left.name.localeCompare(right.name)),
       defaults: {
         ...resolvedCatalog.defaults,
@@ -342,7 +301,6 @@ export class ModelConfigService {
     runtime: ModelCatalog;
     scopedConfig: OpencodeModelConfigSubset;
     inheritedConfig: OpencodeModelConfigSubset;
-    hardServerDisabledProviderIds: string[];
     inheritedConfigSource: 'local_disk' | 'server_default_scope';
     defaultScopeConfig: OpencodeModelConfigSubset;
     server: ModelCatalog;
@@ -358,24 +316,16 @@ export class ModelConfigService {
       scopedConfig,
       defaultScopeConfig,
     );
-    const hardServerDisabledProviderIds = this.isLocalServerMode()
-      ? this.collectHardServerDisabledProviderIds(
-          inherited.config,
-          scopedConfig,
-        )
-      : this.collectHardServerDisabledProviderIds(scopedConfig);
     const runtime = this.catalogFromResult(runtimeResult);
     return {
       runtime,
       scopedConfig,
       inheritedConfig: inherited.config,
-      hardServerDisabledProviderIds,
       inheritedConfigSource: inherited.source,
       defaultScopeConfig,
       server: this.buildServerCatalog(
         runtime,
         mergeModelConfigSubsets(inherited.config, scopedConfig),
-        hardServerDisabledProviderIds,
       ),
     };
   }
@@ -597,38 +547,11 @@ export class ModelConfigService {
     });
   }
 
-  private collectHardServerDisabledProviderIds(
-    ...configs: Array<Pick<OpencodeModelConfigSubset, 'disabled_providers'>>
-  ): string[] {
-    const providerIds = new Set<string>();
-
-    for (const config of configs) {
-      for (const providerId of config.disabled_providers ?? []) {
-        const trimmed = providerId.trim();
-        if (trimmed) {
-          providerIds.add(trimmed);
-        }
-      }
-    }
-
-    return [...providerIds];
-  }
-
   private buildEffectiveProviderConfig(
     inheritedConfig: ProviderAvailabilityConfig | null | undefined,
     localConfig: ProviderAvailabilityConfig | null | undefined,
-    hardServerDisabledProviderIds: Iterable<string>,
   ): ProviderAvailabilityConfig {
-    const effectiveConfig = mergeProviderAvailabilityConfig(inheritedConfig, localConfig);
-    const disabledProviders = this.collectHardServerDisabledProviderIds(
-      { disabled_providers: effectiveConfig.disabled_providers },
-      { disabled_providers: Array.from(hardServerDisabledProviderIds) },
-    );
-
-    return {
-      ...effectiveConfig,
-      disabled_providers: disabledProviders.length > 0 ? disabledProviders : undefined,
-    };
+    return mergeProviderAvailabilityConfig(inheritedConfig, localConfig);
   }
 
   private mergeDisabledScopes(
