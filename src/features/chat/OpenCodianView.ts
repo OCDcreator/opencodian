@@ -155,6 +155,8 @@ const LOGO_SVG_LIGHT = `<svg width="24" height="30" viewBox="0 0 240 300" fill="
 
 /** Logo SVG for dark theme (light logo on dark bg) - from opencode-logo-dark.svg */
 const LOGO_SVG_DARK = `<svg width="24" height="30" viewBox="0 0 240 300" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#clip0_dark)"><mask id="mask0_dark" style="mask-type:luminance" maskUnits="userSpaceOnUse" x="0" y="0" width="240" height="300"><path d="M240 0H0V300H240V0Z" fill="white"/></mask><g mask="url(#mask0_dark)"><path d="M180 240H60V120H180V240Z" fill="#4B4646"/><path d="M180 60H60V240H180V60ZM240 300H0V0H240V300Z" fill="#F1ECEC"/></g></g><defs><clipPath id="clip0_dark"><rect width="240" height="300" fill="white"/></clipPath></defs></svg>`;
+const TITLE_WORDMARK_LIGHT_ASSET_PATH = 'assets/branding/opencodian-wordmark-light.svg';
+const TITLE_WORDMARK_DARK_ASSET_PATH = 'assets/branding/opencodian-wordmark-dark.svg';
 
 /** Pending indicator messages - randomly selected for variety */
 const PENDING_MESSAGES = [
@@ -2832,13 +2834,21 @@ export class OpenCodianView extends ItemView {
     const logoContainer = titleEl.createDiv({ cls: 'opencodian-logo' });
     logoContainer.innerHTML = this.getLogoSvg();
 
-    titleEl.createEl('span', { text: 'OpenCodian', cls: 'opencodian-title-text' });
+    const titleTextEl = titleEl.createEl('img', {
+      cls: 'opencodian-title-text',
+      attr: {
+        alt: 'OpenCodian',
+        draggable: 'false',
+      },
+    });
+    this.syncTitleWordmarkSrc(titleTextEl);
     this.headerTabBarSlotEl = header.createDiv({ cls: 'opencodian-tab-bar-slot opencodian-tab-bar-slot--header' });
 
     // Listen for theme changes
     this.registerEvent(
       this.app.workspace.on('css-change', () => {
         logoContainer.innerHTML = this.getLogoSvg();
+        this.syncTitleWordmarkSrc(titleTextEl);
         this.scheduleChatSurfaceColorSync();
         this.scheduleComposerLayoutSync();
       })
@@ -3046,6 +3056,23 @@ export class OpenCodianView extends ItemView {
     // Check if we're in dark mode by looking for .theme-dark class
     const isDark = document.body.classList.contains('theme-dark');
     return isDark ? LOGO_SVG_DARK : LOGO_SVG_LIGHT;
+  }
+
+  /** Get title wordmark image source based on current theme */
+  private getTitleWordmarkSrc(): string | null {
+    const isDark = document.body.classList.contains('theme-dark');
+    const relativePath = isDark ? TITLE_WORDMARK_DARK_ASSET_PATH : TITLE_WORDMARK_LIGHT_ASSET_PATH;
+    return this.resolvePluginAssetUrl(relativePath);
+  }
+
+  private syncTitleWordmarkSrc(titleWordmarkEl: HTMLImageElement): void {
+    const src = this.getTitleWordmarkSrc();
+    if (src) {
+      titleWordmarkEl.setAttribute('src', src);
+      return;
+    }
+
+    titleWordmarkEl.removeAttribute('src');
   }
 
   /** Build input area */

@@ -400,9 +400,12 @@
 }
 
 .opencodian-title-text {
-  font-weight: 800;
-  font-size: 16px;
-  color: var(--text-normal);
+  display: block;
+  width: auto;
+  height: 16px;
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-drag: none;
 }
 
 .opencodian-header-actions {
