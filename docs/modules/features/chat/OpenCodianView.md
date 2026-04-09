@@ -22,7 +22,7 @@
 |------|------|
 | `getViewType()` | 返回 `VIEW_TYPE_OPENCODIAN` |
 | `getDisplayText()` | 返回视图标题 `OpenCodian` |
-| `getIcon()` | 返回 Obsidian 图标 id `bot` |
+| `getIcon()` | 返回自定义图标 id `opencodian-app-icon`，供工作区标签头按当前主题显示品牌 Logo |
 | `onOpen()` | 组装 UI、注册事件、初始化第一个 tab |
 | `onClose()` | 清理订阅、轮询、观察器、dropdown、demo 和 tab 运行时 |
 | `applyTabBarLayout()` | 根据设置把 tab bar 挂到 header / below-header / input / 外部竖排槽位 |

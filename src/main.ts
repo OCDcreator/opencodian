@@ -7,7 +7,7 @@
 
 import * as fs from 'fs';
 import type { Editor, MarkdownView } from 'obsidian';
-import { Notice, Plugin } from 'obsidian';
+import { addIcon, Notice, Plugin } from 'obsidian';
 import * as path from 'path';
 
 import { ModelConfigService, OpencodeConfigManager } from './core/config';
@@ -72,6 +72,17 @@ import { registerBuiltinGlassAdapters } from './utils/glass';
 
 const logger = createLogger('OpenCodian');
 const INPUT_PANEL_GLASS_REFRACTION_GLASS_DEFAULTS_VERSION = 2;
+const OPENCODIAN_APP_ICON = 'opencodian-app-icon';
+const OPENCODIAN_APP_ICON_SVG = `
+  <g class="opencodian-app-icon-layer opencodian-app-icon-layer--light">
+    <rect x="10" y="0" width="80" height="100" fill="#211E1E"/>
+    <rect x="30" y="40" width="40" height="40" fill="#CFCECD"/>
+  </g>
+  <g class="opencodian-app-icon-layer opencodian-app-icon-layer--dark">
+    <rect x="10" y="0" width="80" height="100" fill="#F1ECEC"/>
+    <rect x="30" y="40" width="40" height="40" fill="#4B4646"/>
+  </g>
+`;
 
 function isLegacyNikdelvinDefaultProfile(value: unknown): boolean {
   if (!value || typeof value !== 'object') {
@@ -145,6 +156,7 @@ export default class OpenCodianPlugin extends Plugin {
   async onload() {
     // Output BUILD_ID for debugging (always visible)
     logger.info(`OpenCodian BUILD_ID: ${BUILD_ID}`);
+    addIcon(OPENCODIAN_APP_ICON, OPENCODIAN_APP_ICON_SVG);
 
     // Initialize storage
     this.storage = new StorageService(this);
@@ -224,7 +236,7 @@ export default class OpenCodianPlugin extends Plugin {
     );
 
     // Add ribbon icon
-    this.addRibbonIcon('bot', '打开 OpenCodian', () => {
+    this.addRibbonIcon(OPENCODIAN_APP_ICON, '打开 OpenCodian', () => {
       this.activateView();
     });
 

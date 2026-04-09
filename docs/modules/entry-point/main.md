@@ -10,7 +10,7 @@
 - 初始化 `StorageService` 并加载/迁移持久化设置
 - 创建 `OpenCodeService`、`OpencodeConfigManager`、`ModelConfigService`
 - 在 `OpenCodianView` 注册前预加载会话元数据
-- 注册 ribbon、命令、设置页与视图
+- 注册 ribbon、明暗主题自适应品牌图标、命令、设置页与视图
 - 协调主题外观、日志、诊断导出和本地 `.opencode` 权限配置同步
 
 它不是单纯的“入口壳”，还承担了插件级状态缓存、设置归一化、UI 刷新调度和诊断导出。
@@ -67,7 +67,7 @@
 10. 如果当前是本地模式且 `autoStart` 开启，则直接调用 `openCodeService.start()`。
 11. 记录一次 server snapshot。
 12. 在注册视图之前执行 `loadConversations()`，只预热会话元数据。
-13. 注册 `OpenCodianView`、ribbon 图标、命令与设置页。
+13. 注册 `OpenCodianView`、自定义品牌 icon（供 ribbon / tab header 复用）、命令与设置页。
 
 这里没有调用 `OpenCodeService.initialize()`；实际运行时由 `main.ts` 自己决定是否启动服务。
 

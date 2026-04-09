@@ -387,6 +387,18 @@
   display: block;
 }
 
+.svg-icon.opencodian-app-icon .opencodian-app-icon-layer--dark {
+  display: none;
+}
+
+.theme-dark .svg-icon.opencodian-app-icon .opencodian-app-icon-layer--light {
+  display: none;
+}
+
+.theme-dark .svg-icon.opencodian-app-icon .opencodian-app-icon-layer--dark {
+  display: inline;
+}
+
 .opencodian-title-text {
   font-weight: 800;
   font-size: 16px;
