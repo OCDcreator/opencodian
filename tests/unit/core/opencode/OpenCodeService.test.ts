@@ -55,11 +55,13 @@ jest.mock('child_process', () => ({
   spawn: jest.fn().mockReturnValue({
     on: jest.fn(),
     once: jest.fn(),
+    removeListener: jest.fn(),
     kill: jest.fn(),
-    stdout: { on: jest.fn() },
-    stderr: { on: jest.fn() },
+    stdout: { on: jest.fn(), removeListener: jest.fn() },
+    stderr: { on: jest.fn(), removeListener: jest.fn() },
     killed: false,
   }),
+  spawnSync: jest.fn().mockReturnValue({ status: 0, error: null }),
 }));
 
 // Mock net for ServerManager
@@ -183,7 +185,7 @@ describe('OpenCodeService', () => {
       const sessionId = await service.createSession('Test');
       expect(sessionId).toBe('test-session');
       expect(mockRequestUrl).toHaveBeenCalledWith(expect.objectContaining({
-        url: 'http://127.0.0.1:4096/session',
+        url: 'http://127.0.0.1:4196/session',
         method: 'POST',
       }));
     });
@@ -269,7 +271,7 @@ describe('OpenCodeService', () => {
 
       await service.deleteSession('test-id');
       expect(mockRequestUrl).toHaveBeenCalledWith(expect.objectContaining({
-        url: 'http://127.0.0.1:4096/session/test-id',
+        url: 'http://127.0.0.1:4196/session/test-id',
         method: 'DELETE',
       }));
     });
@@ -283,7 +285,7 @@ describe('OpenCodeService', () => {
 
       await service.updateSessionTitle('test-id', 'Renamed');
       expect(mockRequestUrl).toHaveBeenCalledWith(expect.objectContaining({
-        url: 'http://127.0.0.1:4096/session/test-id',
+        url: 'http://127.0.0.1:4196/session/test-id',
         method: 'PATCH',
       }));
     });
@@ -298,7 +300,7 @@ describe('OpenCodeService', () => {
       const result = await service.forkSession('test-id', 'msg-1');
       expect(result).toEqual({ id: 'fork-session', title: 'Fork Session' });
       expect(mockRequestUrl).toHaveBeenCalledWith(expect.objectContaining({
-        url: 'http://127.0.0.1:4096/session/test-id/fork',
+        url: 'http://127.0.0.1:4196/session/test-id/fork',
         method: 'POST',
       }));
     });
@@ -313,7 +315,7 @@ describe('OpenCodeService', () => {
       const reverted = await service.revertSession('test-id', 'msg-1');
       expect(reverted).toBe(true);
       expect(mockRequestUrl).toHaveBeenCalledWith(expect.objectContaining({
-        url: 'http://127.0.0.1:4096/session/test-id/revert',
+        url: 'http://127.0.0.1:4196/session/test-id/revert',
         method: 'POST',
       }));
     });
@@ -327,7 +329,7 @@ describe('OpenCodeService', () => {
 
       await expect(service.unrevertSession('test-id')).resolves.toBe(true);
       expect(mockRequestUrl).toHaveBeenCalledWith(expect.objectContaining({
-        url: 'http://127.0.0.1:4096/session/test-id/unrevert',
+        url: 'http://127.0.0.1:4196/session/test-id/unrevert',
         method: 'POST',
       }));
     });
@@ -441,7 +443,7 @@ describe('OpenCodeService', () => {
 
       expect(response?.content).toBe('Generated title');
       expect(mockRequestUrl).toHaveBeenCalledWith(expect.objectContaining({
-        url: 'http://127.0.0.1:4096/session/test-session/message',
+        url: 'http://127.0.0.1:4196/session/test-session/message',
         method: 'POST',
       }));
     });
@@ -748,12 +750,12 @@ describe('OpenCodeService', () => {
       await service.rejectQuestion('question-2');
 
       expect(mockRequestUrl).toHaveBeenNthCalledWith(1, expect.objectContaining({
-        url: 'http://127.0.0.1:4096/question/question-1/reply',
+        url: 'http://127.0.0.1:4196/question/question-1/reply',
         method: 'POST',
         body: JSON.stringify({ answers: [['Fast']] }),
       }));
       expect(mockRequestUrl).toHaveBeenNthCalledWith(2, expect.objectContaining({
-        url: 'http://127.0.0.1:4096/question/question-2/reject',
+        url: 'http://127.0.0.1:4196/question/question-2/reject',
         method: 'POST',
         body: JSON.stringify({}),
       }));
@@ -786,7 +788,7 @@ describe('OpenCodeService', () => {
         },
       ]);
       expect(mockRequestUrl).toHaveBeenCalledWith(expect.objectContaining({
-        url: 'http://127.0.0.1:4096/session/test-session/diff?messageID=message-1',
+        url: 'http://127.0.0.1:4196/session/test-session/diff?messageID=message-1',
         method: 'GET',
       }));
     });
@@ -865,7 +867,7 @@ describe('OpenCodeService', () => {
       expect(sessions[0].id).toBe('legacy-session');
       expect(mockSdkClient.session.list).toHaveBeenCalled();
       expect(mockRequestUrl).toHaveBeenCalledWith(expect.objectContaining({
-        url: 'http://127.0.0.1:4096/session',
+        url: 'http://127.0.0.1:4196/session',
         method: 'GET',
       }));
     });
@@ -1234,16 +1236,16 @@ describe('OpenCodeService', () => {
       await service.rejectQuestion('question-2');
 
       expect(mockRequestUrl).toHaveBeenNthCalledWith(1, expect.objectContaining({
-        url: 'http://127.0.0.1:4096/question',
+        url: 'http://127.0.0.1:4196/question',
         method: 'GET',
       }));
       expect(mockRequestUrl).toHaveBeenNthCalledWith(2, expect.objectContaining({
-        url: 'http://127.0.0.1:4096/question/question-1/reply',
+        url: 'http://127.0.0.1:4196/question/question-1/reply',
         method: 'POST',
         body: JSON.stringify({ answers: [['Fast']] }),
       }));
       expect(mockRequestUrl).toHaveBeenNthCalledWith(3, expect.objectContaining({
-        url: 'http://127.0.0.1:4096/question/question-2/reject',
+        url: 'http://127.0.0.1:4196/question/question-2/reject',
         method: 'POST',
         body: JSON.stringify({}),
       }));
@@ -1534,7 +1536,7 @@ describe('OpenCodeService', () => {
       expect(chunks[chunks.length - 1]).toEqual({ type: 'message_stop' });
       expect(mockSdkClient.session.promptAsync).toHaveBeenCalled();
       expect(global.fetch).toHaveBeenCalledWith(
-        'http://127.0.0.1:4096/event',
+        'http://127.0.0.1:4196/event',
         expect.objectContaining({
           method: 'GET',
         }),
@@ -2023,7 +2025,7 @@ describe('OpenCodeService', () => {
       await service.getAvailableModels();
 
       expect(mockCreateSdkClient).toHaveBeenCalledWith(expect.objectContaining({
-        baseUrl: 'http://127.0.0.1:4096',
+        baseUrl: 'http://127.0.0.1:4196',
         directory: 'C:/vault',
       }));
     });
@@ -2047,7 +2049,7 @@ describe('OpenCodeService', () => {
       await service.getAvailableModels({ includeDirectory: false });
 
       expect(mockCreateSdkClient).toHaveBeenCalledWith(expect.objectContaining({
-        baseUrl: 'http://127.0.0.1:4096',
+        baseUrl: 'http://127.0.0.1:4196',
         directory: undefined,
       }));
     });
@@ -2075,7 +2077,7 @@ describe('OpenCodeService', () => {
       const result = await service.getAvailableModels();
       
       expect(mockRequestUrl).toHaveBeenCalledWith(expect.objectContaining({
-        url: 'http://127.0.0.1:4096/config/providers?directory=C%3A%2Fvault',
+        url: 'http://127.0.0.1:4196/config/providers?directory=C%3A%2Fvault',
         method: 'GET',
       }));
       expect(result.providers).toHaveLength(1);
@@ -2144,7 +2146,7 @@ describe('OpenCodeService', () => {
       const result = await service.getProviderDirectory();
 
       expect(mockCreateSdkClient).toHaveBeenCalledWith(expect.objectContaining({
-        baseUrl: 'http://127.0.0.1:4096',
+        baseUrl: 'http://127.0.0.1:4196',
         directory: 'C:/vault',
       }));
       expect(mockSdkClient.provider.list).toHaveBeenCalledTimes(1);
@@ -2210,7 +2212,7 @@ describe('OpenCodeService', () => {
       const result = await service.getProviderDirectory();
 
       expect(mockRequestUrl).toHaveBeenCalledWith(expect.objectContaining({
-        url: 'http://127.0.0.1:4096/provider?directory=C%3A%2Fvault',
+        url: 'http://127.0.0.1:4196/provider?directory=C%3A%2Fvault',
         method: 'GET',
       }));
       expect(result.defaults).toEqual({ deepseek: 'deepseek-chat' });
@@ -2250,7 +2252,7 @@ describe('OpenCodeService', () => {
       const result = await service.getResolvedModelConfig();
 
       expect(mockRequestUrl).toHaveBeenCalledWith(expect.objectContaining({
-        url: 'http://127.0.0.1:4096/config?directory=C%3A%2Fvault',
+        url: 'http://127.0.0.1:4196/config?directory=C%3A%2Fvault',
         method: 'GET',
       }));
       expect(result.disabled_providers).toEqual(['zhipuai']);
@@ -2433,6 +2435,10 @@ describe('OpenCodeService', () => {
   describe('server status', () => {
     it('should return stopped status initially', () => {
       expect(service.getServerStatus()).toBe('stopped');
+    });
+
+    it('should expose empty diagnostics initially', () => {
+      expect(service.getServerDiagnostics()).toEqual({ reason: 'none' });
     });
   });
 });

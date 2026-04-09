@@ -39,6 +39,9 @@ import {
   getDefaultThemeSettings,
   getServerBaseUrl,
   isLocalServerMode,
+  OPENCODE_LEGACY_LOCAL_DEFAULT_PORT,
+  OPENCODIAN_LOCAL_SIDECAR_DEFAULT_HOST,
+  OPENCODIAN_LOCAL_SIDECAR_DEFAULT_PORT,
   normalizeBelowHeaderTabBarLayout,
   normalizeChatAppearanceSettings,
   normalizeDisabledModelRefs,
@@ -325,8 +328,10 @@ export default class OpenCodianPlugin extends Plugin {
   }
 
   onunload() {
-    // Stop OpenCode service
-    void this.openCodeService.stop();
+    this.openCodeService?.dispose();
+    void this.openCodeService?.stop().catch((error) => {
+      logger.warn('Failed to asynchronously stop OpenCode service during unload:', error);
+    });
     this.clearChatAppearanceSaveTimer();
     this.clearQueuedModelRefresh();
 
@@ -469,6 +474,20 @@ export default class OpenCodianPlugin extends Plugin {
         },
       };
     })();
+    const shouldMigrateLegacyLocalDefaultPort = Boolean(
+      savedSettings
+      && normalizedServer.mode === 'local'
+      && normalizedServer.local.host === OPENCODIAN_LOCAL_SIDECAR_DEFAULT_HOST
+      && normalizedServer.local.port === OPENCODE_LEGACY_LOCAL_DEFAULT_PORT
+      && normalizedServer.local.autoStart === DEFAULT_SETTINGS.server.local.autoStart
+      && normalizedServer.remote.baseUrl === `http://${OPENCODIAN_LOCAL_SIDECAR_DEFAULT_HOST}:${OPENCODE_LEGACY_LOCAL_DEFAULT_PORT}`,
+    );
+    if (shouldMigrateLegacyLocalDefaultPort) {
+      normalizedServer.local = {
+        ...normalizedServer.local,
+        port: OPENCODIAN_LOCAL_SIDECAR_DEFAULT_PORT,
+      };
+    }
     const hasSavedChatAppearance =
       Boolean(savedSettings && typeof savedSettings === 'object' && 'chatAppearance' in savedSettings);
     const savedChatAppearance =
@@ -686,7 +705,14 @@ export default class OpenCodianPlugin extends Plugin {
 
     this.reportSettingsLoadState(persistedSettings);
 
-    if (persistedSettings.writable && (persistedSettings.shouldPersist || shouldResetGlassRefractionGlassDefaults)) {
+    if (
+      persistedSettings.writable
+      && (
+        persistedSettings.shouldPersist
+        || shouldResetGlassRefractionGlassDefaults
+        || shouldMigrateLegacyLocalDefaultPort
+      )
+    ) {
       await this.persistSettingsDomains({ core: true, ui: true });
     }
   }
@@ -1115,8 +1141,9 @@ export default class OpenCodianPlugin extends Plugin {
     const isHealthy = await this.openCodeService.checkHealth();
     const internalStatus = this.openCodeService.getServerStatus();
     const hasManagedProcess = this.openCodeService.isServerProcessRunning();
+    const diagnostics = this.openCodeService.getServerDiagnostics();
     logger.debug(
-      `Server snapshot [${source}] -> health=${isHealthy ? 'ok' : 'fail'}, status=${internalStatus}, managedProcess=${hasManagedProcess}`
+      `Server snapshot [${source}] -> health=${isHealthy ? 'ok' : 'fail'}, status=${internalStatus}, managedProcess=${hasManagedProcess}, diagnostics=${JSON.stringify(diagnostics)}`
     );
   }
 
@@ -1125,6 +1152,7 @@ export default class OpenCodianPlugin extends Plugin {
     const isHealthy = await this.openCodeService.checkHealth();
     const internalStatus = this.openCodeService.getServerStatus();
     const managedProcess = this.openCodeService.isServerProcessRunning();
+    const diagnostics = this.openCodeService.getServerDiagnostics();
 
     return [
       '# OpenCodian Diagnostic Report',
@@ -1139,6 +1167,7 @@ export default class OpenCodianPlugin extends Plugin {
       `Health: ${isHealthy ? 'ok' : 'fail'}`,
       `Status: ${internalStatus}`,
       `Managed process: ${managedProcess}`,
+      `Diagnostics: ${JSON.stringify(diagnostics)}`,
       `Mode: ${this.settings.server.mode}`,
       `Base URL: ${getServerBaseUrl(this.settings.server) || '(not set)'}`,
       `Local host: ${this.settings.server.local.host}`,

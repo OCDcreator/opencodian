@@ -211,4 +211,55 @@ describe('OpenCodianPlugin.loadSettings', () => {
 
     expect(plugin.settings.inlineSerializedDebugLogArgs).toBe(true);
   });
+
+  it('migrates the legacy local default port from 4096 to 4196', async () => {
+    const plugin = new OpenCodianPlugin() as OpenCodianPlugin & {
+      storage: Pick<StorageService, 'loadPersistedSettings' | 'saveCoreSettings' | 'saveUiSettings'>;
+    };
+
+    plugin.storage = {
+      loadPersistedSettings: jest.fn().mockResolvedValue({
+        core: {
+          data: {
+            server: {
+              mode: 'local',
+              local: {
+                host: '127.0.0.1',
+                port: 4096,
+                autoStart: true,
+              },
+              remote: {
+                baseUrl: 'http://127.0.0.1:4096',
+              },
+              auth: {
+                type: 'none',
+                username: 'opencode',
+                password: '',
+                token: '',
+              },
+            },
+          },
+          filePath: '.opencodian/settings.core.json',
+          source: 'primary',
+          shouldPersist: false,
+        },
+        ui: {
+          data: null,
+          filePath: '.opencodian/settings.ui.json',
+          source: 'missing',
+          shouldPersist: false,
+        },
+        writable: true,
+        shouldPersist: false,
+      }),
+      saveCoreSettings: jest.fn().mockResolvedValue(undefined),
+      saveUiSettings: jest.fn().mockResolvedValue(undefined),
+    } as Pick<StorageService, 'loadPersistedSettings' | 'saveCoreSettings' | 'saveUiSettings'>;
+
+    await plugin.loadSettings();
+
+    expect(plugin.settings.server.local.port).toBe(4196);
+    expect(plugin.settings.server.remote.baseUrl).toBe('http://127.0.0.1:4096');
+    expect(plugin.storage.saveCoreSettings).toHaveBeenCalled();
+  });
 });

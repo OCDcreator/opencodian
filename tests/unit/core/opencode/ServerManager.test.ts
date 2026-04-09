@@ -25,11 +25,13 @@ jest.mock('child_process', () => ({
   spawn: jest.fn().mockReturnValue({
     on: jest.fn(),
     once: jest.fn(),
+    removeListener: jest.fn(),
     kill: jest.fn(),
-    stdout: { on: jest.fn() },
-    stderr: { on: jest.fn() },
+    stdout: { on: jest.fn(), removeListener: jest.fn() },
+    stderr: { on: jest.fn(), removeListener: jest.fn() },
     killed: false,
   }),
+  spawnSync: jest.fn().mockReturnValue({ status: 0, error: null }),
 }));
 
 // Mock net
@@ -47,10 +49,10 @@ describe('ServerManager', () => {
   const originalEnv = { ...process.env };
   const defaultConfig = {
     mode: 'local' as const,
-    baseUrl: 'http://127.0.0.1:4096',
+    baseUrl: 'http://127.0.0.1:4196',
     local: {
       host: '127.0.0.1',
-      port: 4096,
+      port: 4196,
       autoStart: true,
     },
     auth: {
@@ -131,7 +133,7 @@ describe('ServerManager', () => {
 
       expect(result).toBe(true);
       expect(mockRequestUrl).toHaveBeenCalledWith(expect.objectContaining({
-        url: 'http://127.0.0.1:4096/global/health',
+        url: 'http://127.0.0.1:4196/global/health',
         method: 'GET',
       }));
     });
@@ -278,13 +280,13 @@ describe('ServerManager', () => {
           initialManagedServerState: {
             pid: 1234,
             host: '127.0.0.1',
-            port: 4096,
+            port: 4196,
           },
         },
       );
 
       jest.spyOn(manager as never, 'getProcessCommandLine').mockResolvedValue(
-        'opencode serve --port 4096 --hostname 127.0.0.1',
+        'opencode serve --port 4196 --hostname 127.0.0.1',
       );
 
       await expect((manager as never).tryAdoptManagedServer()).resolves.toBe('restart');
@@ -310,7 +312,7 @@ describe('ServerManager', () => {
           initialManagedServerState: {
             pid: 1234,
             host: '127.0.0.1',
-            port: 4096,
+            port: 4196,
             signatureVersion: 1,
             workingDirectory,
             modelSourceMode: 'merge',
@@ -322,7 +324,7 @@ describe('ServerManager', () => {
       manager.setWorkingDirectory(testVaultPath);
 
       jest.spyOn(manager as never, 'getProcessCommandLine').mockResolvedValue(
-        'opencode serve --port 4096 --hostname 127.0.0.1',
+        'opencode serve --port 4196 --hostname 127.0.0.1',
       );
 
       await expect((manager as never).tryAdoptManagedServer()).resolves.toBe('adopted');
@@ -336,7 +338,7 @@ describe('ServerManager', () => {
           initialManagedServerState: {
             pid: 1234,
             host: '127.0.0.1',
-            port: 4096,
+            port: 4196,
           },
         },
       );
@@ -354,6 +356,90 @@ describe('ServerManager', () => {
       expect(spawnServer).toHaveBeenCalled();
       expect(waitForHealthy).toHaveBeenCalledWith(30000);
       expect(manager.getStatus()).toBe('running');
+    });
+
+    it('marks a custom-port healthy server as conflict instead of silently reusing it', async () => {
+      manager = new ServerManager({
+        ...defaultConfig,
+        baseUrl: 'http://127.0.0.1:5000',
+        local: {
+          host: '127.0.0.1',
+          port: 5000,
+          autoStart: true,
+        },
+      });
+
+      jest.spyOn(manager as never, 'isPortAvailable').mockResolvedValue(false);
+      jest.spyOn(manager, 'checkHealth').mockResolvedValue(true);
+      jest.spyOn(manager as never, 'tryAdoptManagedServer').mockResolvedValue('skip');
+      jest.spyOn(manager as never, 'inspectExistingHealthyServer').mockResolvedValue({
+        pid: 4321,
+        commandLine: 'opencode serve --port 5000 --hostname 127.0.0.1',
+        looksLikeOpenCodeServe: true,
+      });
+
+      await expect(manager.start()).rejects.toThrow(/occupies local endpoint 127.0.0.1:5000/i);
+      expect(manager.getStatus()).toBe('conflict');
+      expect(manager.getServerDiagnosticsSnapshot()).toMatchObject({
+        reason: 'local-conflict',
+        host: '127.0.0.1',
+        port: 5000,
+        pid: 4321,
+      });
+    });
+
+    it('recycles an orphaned default-port OpenCode sidecar and restarts the current vault service', async () => {
+      jest.spyOn(manager as never, 'isPortAvailable').mockResolvedValue(false);
+      jest.spyOn(manager, 'checkHealth').mockResolvedValue(true);
+      jest.spyOn(manager as never, 'tryAdoptManagedServer').mockResolvedValue('skip');
+      jest.spyOn(manager as never, 'inspectExistingHealthyServer').mockResolvedValue({
+        pid: 5678,
+        commandLine: 'opencode serve --port 4196 --hostname 127.0.0.1',
+        looksLikeOpenCodeServe: true,
+      });
+      const recycleUnknownLocalServer = jest.spyOn(manager as never, 'recycleUnknownLocalServer').mockResolvedValue(undefined);
+      const spawnServer = jest.spyOn(manager as never, 'spawnServer').mockResolvedValue(undefined);
+      const waitForHealthy = jest.spyOn(manager as never, 'waitForHealthy').mockResolvedValue(undefined);
+
+      await expect(manager.start()).resolves.toBeUndefined();
+
+      expect(recycleUnknownLocalServer).toHaveBeenCalled();
+      expect(spawnServer).toHaveBeenCalled();
+      expect(waitForHealthy).toHaveBeenCalledWith(30000);
+      expect(manager.getStatus()).toBe('running');
+      expect(manager.getServerDiagnosticsSnapshot()).toMatchObject({
+        reason: 'local-orphan-restarted',
+        host: '127.0.0.1',
+        port: 4196,
+        pid: 5678,
+      });
+    });
+  });
+
+  describe('dispose', () => {
+    it('synchronously clears the managed process when unloading', () => {
+      (manager as unknown as { process: { pid: number } }).process = { pid: 2468 } as { pid: number };
+      const terminateManagedPidSync = jest.spyOn(manager as never, 'terminateManagedPidSync').mockImplementation(() => {});
+
+      manager.dispose();
+
+      expect(terminateManagedPidSync).toHaveBeenCalledWith(2468);
+      expect(manager.getStatus()).toBe('stopped');
+    });
+  });
+
+  describe('launch failures', () => {
+    it('includes captured server output when startup fails early', async () => {
+      (manager as unknown as { activeLaunch: Record<string, unknown> }).activeLaunch = {
+        outputTail: ['boot log\n', 'fatal: bad config\n'],
+        exited: true,
+        exitCode: 1,
+        signal: null,
+        error: null,
+        cleanup: jest.fn(),
+      };
+
+      await expect((manager as never).waitForHealthy(100)).rejects.toThrow(/Server output:\nboot log\nfatal: bad config/i);
     });
   });
 
@@ -399,32 +485,25 @@ describe('ServerManager', () => {
 
     if (process.platform === 'win32') {
       it('spawns npm opencode.cmd through the shell', async () => {
-        jest.useFakeTimers();
-        try {
-          const npmBinDir = path.join(testVaultPath, 'AppData', 'npm');
-          const npmBinary = path.join(npmBinDir, 'opencode.cmd');
+        const npmBinDir = path.join(testVaultPath, 'AppData', 'npm');
+        const npmBinary = path.join(npmBinDir, 'opencode.cmd');
 
-          fs.mkdirSync(npmBinDir, { recursive: true });
-          fs.writeFileSync(npmBinary, '@echo off', 'utf-8');
-          process.env.APPDATA = path.join(testVaultPath, 'AppData');
-          process.env.LOCALAPPDATA = path.join(testVaultPath, 'LocalAppData');
-          process.env.PATH = '';
+        fs.mkdirSync(npmBinDir, { recursive: true });
+        fs.writeFileSync(npmBinary, '@echo off', 'utf-8');
+        process.env.APPDATA = path.join(testVaultPath, 'AppData');
+        process.env.LOCALAPPDATA = path.join(testVaultPath, 'LocalAppData');
+        process.env.PATH = '';
 
-          const spawnPromise = (manager as any).spawnServer() as Promise<void>;
-          await jest.advanceTimersByTimeAsync(1000);
-          await spawnPromise;
+        await (manager as any).spawnServer();
 
-          expect(mockSpawn).toHaveBeenCalledWith(
-            npmBinary,
-            expect.any(Array),
-            expect.objectContaining({
-              shell: true,
-              windowsHide: true,
-            }),
-          );
-        } finally {
-          jest.useRealTimers();
-        }
+        expect(mockSpawn).toHaveBeenCalledWith(
+          npmBinary,
+          expect.any(Array),
+          expect.objectContaining({
+            shell: true,
+            windowsHide: true,
+          }),
+        );
       });
     }
   });

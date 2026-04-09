@@ -97,6 +97,10 @@ export type ChatAppearanceBackgroundFitMode = 'cover' | 'contain' | 'fit-width' 
 /** Server connection mode */
 export type ServerMode = 'local' | 'remote';
 
+export const OPENCODIAN_LOCAL_SIDECAR_DEFAULT_HOST = '127.0.0.1';
+export const OPENCODIAN_LOCAL_SIDECAR_DEFAULT_PORT = 4196;
+export const OPENCODE_LEGACY_LOCAL_DEFAULT_PORT = 4096;
+
 /** Server auth type */
 export type ServerAuthType = 'none' | 'basic' | 'bearer';
 
@@ -1435,12 +1439,12 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
   server: {
     mode: 'local',
     local: {
-      host: '127.0.0.1',
-      port: 4096,
+      host: OPENCODIAN_LOCAL_SIDECAR_DEFAULT_HOST,
+      port: OPENCODIAN_LOCAL_SIDECAR_DEFAULT_PORT,
       autoStart: true,
     },
     remote: {
-      baseUrl: 'http://127.0.0.1:4096',
+      baseUrl: `http://${OPENCODIAN_LOCAL_SIDECAR_DEFAULT_HOST}:${OPENCODE_LEGACY_LOCAL_DEFAULT_PORT}`,
     },
     auth: {
       type: 'none',

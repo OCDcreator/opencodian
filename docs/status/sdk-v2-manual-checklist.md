@@ -17,9 +17,9 @@
   - 权限模式不是完全禁用弹窗的异常配置
 - 若这次改动涉及 provider 目录 / 模型列表 / SDK transport，再额外做 1 次“目录真值”预检：
   - 在 vault 根目录执行 `opencode models`
-  - 再对插件本地 `4096` 执行 directory-scoped `config.providers()`
-  - 两者的 provider 集合必须一致；设置页 `服务器目录` 应等于这组结果再减去服务端硬禁用 provider
-  - 如果插件结果明显更少，优先怀疑旧 `4096` managed server 被继续接管，而不是先改 UI 过滤逻辑
+  - 再对插件本地 `4196` 执行 directory-scoped `config.providers()`
+  - 两者的 provider 集合必须一致；设置页 `服务器目录` 也应直接对齐这组结果
+  - 如果插件结果明显更少，优先怀疑旧 managed server / 孤儿 sidecar / 端口冲突，而不是先改 UI 过滤逻辑
 
 ## 2. 推荐验收顺序
 
@@ -196,11 +196,11 @@
 - 对插件当前本地服务执行 directory-scoped `config.providers()`
   - 预期：provider 集合与 `opencode models` 一致
 - 打开 OpenCodian 设置页，观察三张卡
-  - 预期：`服务器目录` = 上面这组 provider，再减去服务端硬禁用 provider
-  - 预期：`当前生效列表` = `服务器目录` 再叠加项目本地 provider 开关 / source mode 过滤
-  - 预期：`当前禁用列表` 保留服务端禁用占位
+  - 预期：`服务器目录` = 上面这组 provider
+  - 预期：`当前生效列表` = `服务器目录` 再叠加当前 scoped config、项目本地 provider 开关 / source mode 过滤
+  - 预期：`当前禁用列表` 反映配置层禁用项与模型级 `disabledModelRefs`，但不应反向改写 `服务器目录`
 - 如果插件只剩 1 个或 3 个 provider，而 CLI 明显更多
-  - 先检查本地 `4096` 是否还是旧 pid
+  - 先检查插件本地 `4196` 是否还是旧 pid 或孤儿 sidecar
   - 先检查是否被旧 managed server / 错误 `directory` 作用域污染
   - 不要直接改 `provider.list()` / UI 过滤逻辑
 
@@ -236,7 +236,7 @@
 - 触发问题的提示词
 - 是否本地模式 / 远程模式
 - `opencode models` 的 provider 集合
-- 插件本地 `4096` 上 `config.providers(directory)` 的 provider 集合
+- 插件本地 `4196` 上 `config.providers(directory)` 的 provider 集合
 - 是否涉及工具、权限、问题、取消、文件修改
 - Obsidian 开发者控制台中以下前缀的日志：
   - `[OpenCodian]`

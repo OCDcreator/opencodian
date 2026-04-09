@@ -31,13 +31,14 @@
 
 ## 核心类型 / 状态
 
-- `ServerStatus`: `'stopped' | 'starting' | 'running' | 'error' | 'restarting'`
+- `ServerStatus`: `'stopped' | 'starting' | 'running' | 'error' | 'restarting' | 'conflict'`
 - `ServerManagerEvents`: `onStatusChange` / `onError`
 - `ServerManagerRuntimeOptions`:
   - `initialManagedServerState`
   - `onManagedServerStateChange`
 - `process`: 当前 spawn 出来的 `ChildProcess`，只有本地 managed 进程才会有
 - `managedServerState`: 插件持久化的 managed server 快照，除 `{ pid, host, port }` 外还会记录启动签名（工作目录、模型来源模式、隔离模式、配置指纹）
+- `diagnostics`: 结构化诊断快照，供设置页区分 `managed` / `external` / `conflict` / `orphan restarted`
 - `startPromise`: 避免并发重复启动
 - `workingDirectory`: 通常是 vault 根目录，用来让 OpenCode 读取 `.opencode/`
 
@@ -46,7 +47,7 @@
 - `getStatus()` 反映状态机值
 - `isRunning()` 只有在状态是 `running` 且 `managedServerState !== null` 时才返回 `true`
 
-所以远程模式或“外部已有但未被插件接管”的服务，可能是 `status === 'running'`，但 `isRunning() === false`。
+所以远程模式可能是 `status === 'running'`，但 `isRunning() === false`；而本地未知健康服务现在会优先进入 `conflict`，不再伪装成正常运行。
 
 ## 核心逻辑
 
@@ -85,6 +86,8 @@ managed pid 的持久化/恢复通过 `managedServerState` 与 `onManagedServerS
 
 #### 本地模式
 
+插件托管 sidecar 的默认本地端点现在是 `127.0.0.1:4196`。独立 OpenCode CLI 仍常见使用 `127.0.0.1:4096`，两者不能再混为一谈。
+
 会先检查目标端口：
 
 - 端口空闲：进入 spawn 流程
@@ -92,12 +95,13 @@ managed pid 的持久化/恢复通过 `managedServerState` 与 `onManagedServerS
   - 先尝试 `tryAdoptManagedServer()`
   - 如果能确认这个 pid 就是之前插件管理的 `opencode serve --port ... --hostname ...`，且启动签名仍与当前 vault / 模式 / 配置指纹一致，则恢复接管
   - 如果确认是插件之前的 managed server，但签名已经过期（例如工作目录、模型来源模式、隔离模式或相关 OpenCode 配置文件已经变化），会先停掉旧进程再重新 spawn
-  - 否则把它当成“外部已有 OpenCode 服务”直接标成 `running`
+  - 如果当前端点正好是插件默认 `127.0.0.1:4196`，但 runtime state 丢了，而该进程看起来又是 `opencode serve --port 4196 --hostname 127.0.0.1`，则把它视为“插件孤儿 sidecar”，先同步回收，再重启当前 vault 对应服务
+  - 其他未知健康服务不再无条件标成 `running`：现在会进入 `conflict`，把 pid / command line / 端口写入 diagnostics，让 UI 明确显示冲突
 - 端口占用但健康检查失败：抛出“端口被其他进程占用”的错误
 
 这里有一个反复出现的真实坑：
 
-- 不能因为 `4096` 端口上已经有一个健康的 OpenCode 服务，就直接无条件接管
+- 不能因为目标端口上已经有一个健康的 OpenCode 服务，就直接无条件接管
 - 如果那个进程是插件之前拉起的旧 managed server，但它的工作目录、`modelSourceMode`、`pluginIsolationMode` 或相关 OpenCode 配置文件已经变化，继续复用它就会让当前 vault 看到错误的 provider/runtime 目录
 - 典型症状是：`opencode models` 有很多 provider，但插件设置页 `服务器目录` 只剩 1 个或 3 个
 
@@ -110,8 +114,10 @@ managed pid 的持久化/恢复通过 `managedServerState` 与 `onManagedServerS
 - 把 `cwd` 设为 `workingDirectory`
 - 注入由 `getSpawnEnv()` 生成的环境变量
 - 记录 managed pid
-- 监听 `error` / `exit`
-- 延迟 1 秒后进入 `waitForHealthy()` 轮询
+- 挂上 stdout/stderr tail、`error` / `exit` 追踪
+- 直接进入“健康轮询 + 进程提前退出”竞态等待；不再依赖固定延迟 1 秒
+
+如果启动失败，报错会带上最近的进程输出 tail，而不是只有泛化 timeout。
 
 本地成功启动后会弹出 `new Notice('OpenCode server started')`。
 
@@ -128,6 +134,8 @@ managed pid 的持久化/恢复通过 `managedServerState` 与 `onManagedServerS
 - 非 Windows：先发 `SIGTERM`，5 秒后仍未退出再发 `SIGKILL`
 - Windows：通过 `taskkill /PID ... /T /F` 终止整棵进程树
 
+`dispose()` 额外提供了同步 best-effort 清理路径，给 `main.ts` 的 `onunload()` 优先回收已拥有的本地 sidecar，减少 Obsidian 退出时留下孤儿进程。
+
 `restart()` 只是按顺序执行：
 
 1. `setStatus('restarting')`
@@ -138,8 +146,8 @@ managed pid 的持久化/恢复通过 `managedServerState` 与 `onManagedServerS
 
 - `checkHealth(timeout)` 通过 `requestUrl(GET ${baseUrl}/global/health)` 判断服务是否健康，只有 HTTP 200 才返回 `true`
 - `canBindLocalEndpoint(host, port)` 和内部 `isPortAvailable()` 通过真实 bind 一个临时 `net.Server` 来判断端口是否可用
-- `waitForHealthy(timeout)` 每 500 ms 轮询一次健康检查，直到成功或超时
-- 对“旧 managed server 需要重启”的情况，还会额外等待端口释放后再重新 spawn；目标不是单纯让 `4096` 有服务，而是让 `4096` 对应**当前 vault 的正确服务**
+- `waitForHealthy(timeout)` 轮询健康检查，并在进程提前退出时立刻失败
+- 对“旧 managed server 需要重启”的情况，还会额外等待端口释放后再重新 spawn；目标不是单纯让 `4196` 有服务，而是让插件默认 sidecar 端点对应**当前 vault 的正确服务**
 
 ### Spawn 环境变量与模型来源模式
 
@@ -157,7 +165,7 @@ managed pid 的持久化/恢复通过 `managedServerState` 与 `onManagedServerS
   - 同样清掉 `OPENCODE_DISABLE_PROJECT_CONFIG` / `OPENCODE_CONFIG_DIR` / `OPENCODE_CONFIG_CONTENT`
   - 让 OpenCode 直接按 `cwd=<vault>` 去解析当前 vault 的 `.opencode` 配置
 
-另外，spawn 前还会清理一批继承来的 `OPENCODE_*` 覆盖变量（例如 `OPENCODE_CONFIG`、`OPENCODE_CONFIG_DIR`、`OPENCODE_CONFIG_CONTENT`、`OPENCODE_DISABLE_DEFAULT_PLUGINS`、`OPENCODE_PURE` 等），避免插件本地 4096 服务沿用外部终端或旧集成留下的配置注入。
+另外，spawn 前还会清理一批继承来的 `OPENCODE_*` 覆盖变量（例如 `OPENCODE_CONFIG`、`OPENCODE_CONFIG_DIR`、`OPENCODE_CONFIG_CONTENT`、`OPENCODE_DISABLE_DEFAULT_PLUGINS`、`OPENCODE_PURE` 等），避免插件本地 `4196` sidecar 沿用外部终端或旧集成留下的配置注入。
 
 ### OpenCode 可执行文件解析
 
@@ -165,7 +173,7 @@ managed pid 的持久化/恢复通过 `managedServerState` 与 `onManagedServerS
 
 - Windows：优先 `%APPDATA%\\npm\\opencode.cmd`，再尝试 `%LOCALAPPDATA%\\npm\\opencode.cmd`，最后才回退到 `PATH` 里的 `opencode.cmd` / `opencode`
 - macOS / Linux：优先常见绝对路径，再回退到 `PATH`
-- 当系统里同时存在 npm 全局安装和其他渠道（例如 `winget`）的 `opencode` 时，这能让插件更稳定地命中 npm 版本，减少“终端 `opencode` 与插件本地 4096 服务不是同一套二进制”的偏差
+- 当系统里同时存在 npm 全局安装和其他渠道（例如 `winget`）的 `opencode` 时，这能让插件更稳定地命中 npm 版本，减少“终端 `opencode` 与插件本地 `4196` sidecar 不是同一套二进制”的偏差
 
 ## 关键方法
 
@@ -221,6 +229,6 @@ graph TD
 - 远程模式下 `start()` 不是空操作；它会做健康检查并把状态置为 `running`。
 - `findOpenCodeBinary()` 会显式探测候选路径和 `PATH`，不再只是“构造候选字符串后交给 shell”。
 - `setWorkingDirectory()` 只会额外检查 `.opencode/opencode.json` 的存在并写日志，不会在这里解析 `.jsonc`。
-- 对“外部已有但未接管”的健康 OpenCode 服务，状态会是 `running`，但 `isRunning()` 仍可能是 `false`。
+- 对未知健康服务，只有“确认是插件默认 `4196` 端点上的孤儿 sidecar”才允许自动回收；自定义端口上的未知健康服务一律进入 `conflict`。
 - 对“之前插件自己拉起、但当前签名已过期”的本地服务，不会再无条件接管；它现在会先重启，以便让 provider/runtime 目录重新和当前 vault 配置、全局配置保持一致。
-- 如果未来又出现“服务器目录突然只剩 deepseek / 1 个 provider / 3 个 provider”这类问题，第一排查项不是 SDK 返回解包，而是：`4096` 是否还是旧 pid、`runtime.json` 的 managed server 签名是否过期、当前 `cwd` 是否真的指向目标 vault。
+- 如果未来又出现“服务器目录突然只剩 deepseek / 1 个 provider / 3 个 provider”这类问题，第一排查项不是 SDK 返回解包，而是：插件默认 `4196` 端点是否被孤儿 sidecar / 冲突进程占用、`runtime.json` 的 managed server 签名是否过期、当前 `cwd` 是否真的指向目标 vault。

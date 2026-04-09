@@ -560,7 +560,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
           };
 
           text
-            .setPlaceholder('4096')
+            .setPlaceholder('4196')
             .setValue(String(this.plugin.settings.server.local.port));
           text.inputEl.addEventListener('change', () => {
             void commitPortChange();
@@ -680,17 +680,25 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     const updateStatus = async () => {
       // Check actual server health
       const isHealthy = await this.plugin.openCodeService.checkHealth();
-      
+      const diagnostics = this.plugin.openCodeService.getServerDiagnostics();
+
       // Get internal status
       const internalStatus = this.plugin.openCodeService.getServerStatus();
       this.lastKnownServerHealthy = isHealthy;
       this.lastKnownServerStatus = internalStatus;
-      
-      // Check if server is external (running but plugin has no process)
-      isExternalServer = isHealthy && (internalStatus === 'stopped' || !this.plugin.openCodeService.isServerProcessRunning());
-      
+
+      isExternalServer = isHealthy
+        && internalStatus !== 'conflict'
+        && (internalStatus === 'stopped' || !this.plugin.openCodeService.isServerProcessRunning());
+
       const statusText = (() => {
         if (isLocalMode) {
+          if (internalStatus === 'conflict') {
+            return t('settings.server.status.localConflict');
+          }
+          if (isHealthy && diagnostics.reason === 'local-orphan-restarted') {
+            return t('settings.server.status.localRecovered');
+          }
           if (isHealthy && isExternalServer) {
             return t('settings.server.status.localExternal');
           }
@@ -719,6 +727,13 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       let descText = `${t('settings.server.status.desc')} - ${healthIndicator} ${statusText}`;
       if (isLocalMode && isExternalServer) {
         descText += ` (${t('settings.server.external.title')})`;
+      } else if (isLocalMode && diagnostics.reason === 'local-orphan-restarted') {
+        descText += ` (${t('settings.server.orphanRestarted.title')})`;
+      } else if (isLocalMode && internalStatus === 'conflict') {
+        descText += ` (${t('settings.server.conflict.title')})`;
+      }
+      if (diagnostics.message) {
+        descText += ` — ${diagnostics.message}`;
       }
       statusSetting.setDesc(descText);
       
@@ -728,7 +743,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         );
         actionBtn.setDisabled(
           isLocalMode
-            ? (isHealthy && !isExternalServer) || internalStatus === 'starting'
+            ? (isHealthy && !isExternalServer) || internalStatus === 'starting' || internalStatus === 'restarting'
             : internalStatus === 'starting'
         );
       }
@@ -736,7 +751,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       if (stopBtn) {
         stopBtn.buttonEl.style.display = isLocalMode ? '' : 'none';
         stopBtn.setButtonText(t('settings.server.status.stop'));
-        stopBtn.setDisabled(!isHealthy || isExternalServer);
+        stopBtn.setDisabled(!isHealthy || isExternalServer || internalStatus === 'conflict');
       }
 
       if (refreshBtn) {
@@ -792,17 +807,35 @@ export class OpenCodianSettingTab extends PluginSettingTab {
             btn.setDisabled(true);
             const isHealthy = await this.plugin.openCodeService.checkHealth();
             const internalStatus = this.plugin.openCodeService.getServerStatus();
-            const isExternal = isHealthy && (internalStatus === 'stopped' || !this.plugin.openCodeService.isServerProcessRunning());
+            const diagnostics = this.plugin.openCodeService.getServerDiagnostics();
+            const isExternal = isHealthy
+              && internalStatus !== 'conflict'
+              && (internalStatus === 'stopped' || !this.plugin.openCodeService.isServerProcessRunning());
 
             await updateStatus();
 
-            const statusText = isLocalMode
-              ? (isHealthy
-                  ? (isExternal ? t('settings.server.status.localExternal') : t('settings.server.status.localManaged'))
-                  : (internalStatus === 'starting' || internalStatus === 'restarting'
-                      ? t('settings.server.status.starting')
-                      : t('settings.server.status.stopped')))
-              : (isHealthy ? t('settings.server.status.remoteConnected') : t('settings.server.status.stopped'));
+            const statusText = (() => {
+              if (!isLocalMode) {
+                return isHealthy ? t('settings.server.status.remoteConnected') : t('settings.server.status.stopped');
+              }
+
+              if (internalStatus === 'conflict') {
+                return t('settings.server.status.localConflict');
+              }
+
+              if (isHealthy) {
+                if (diagnostics.reason === 'local-orphan-restarted') {
+                  return t('settings.server.status.localRecovered');
+                }
+                return isExternal ? t('settings.server.status.localExternal') : t('settings.server.status.localManaged');
+              }
+
+              if (internalStatus === 'starting' || internalStatus === 'restarting') {
+                return t('settings.server.status.starting');
+              }
+
+              return t('settings.server.status.stopped');
+            })();
             new Notice(`Health: ${isHealthy ? 'OK' : 'FAIL'} | Status: ${statusText}`);
             btn.setDisabled(false);
           });

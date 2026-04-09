@@ -178,3 +178,5 @@ export interface ModelCatalog {
 - `buildCatalogFromConfig()` 不会从 `enabled_providers` / `disabled_providers` 推导 provider 列表；catalog 只来自 `provider` 映射和 `model` 默认值。
 - provider 白名单 / 黑名单是集合语义；比较继承值时不依赖数组顺序。
 - `parseModelReference()` 只按第一个 `/` 切分，不做更复杂的 provider/model 语法校验。
+- 目录真值排查时要先分清端口来源：插件本地 sidecar 默认是 `127.0.0.1:4196`，独立 OpenCode CLI 常见默认是 `127.0.0.1:4096`。
+- 如果设置页 `服务器目录` 与 vault 下 `opencode models` 明显不一致，优先检查 sidecar 生命周期问题（孤儿进程、旧 managed pid、端口冲突、错误 working directory），不要先改 provider 过滤逻辑。

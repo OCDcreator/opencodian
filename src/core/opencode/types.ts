@@ -28,7 +28,23 @@ export type ServerStatus =
   | 'starting'
   | 'running'
   | 'error'
-  | 'restarting';
+  | 'restarting'
+  | 'conflict';
+
+export type ServerDiagnosticReason =
+  | 'none'
+  | 'local-external'
+  | 'local-conflict'
+  | 'local-orphan-restarted';
+
+export interface ServerDiagnostics {
+  reason: ServerDiagnosticReason;
+  host?: string;
+  port?: number;
+  pid?: number;
+  commandLine?: string;
+  message?: string;
+}
 
 /** Server error */
 export interface ServerError {

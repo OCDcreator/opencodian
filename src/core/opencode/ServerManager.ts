@@ -5,17 +5,23 @@
  * Handles startup, shutdown, health checks, and crash recovery.
  */
 
-import { type ChildProcess, spawn } from 'child_process';
+import { type ChildProcess, spawn, spawnSync } from 'child_process';
 import * as fs from 'fs';
 import * as net from 'net';
 import { Notice, requestUrl } from 'obsidian';
 import * as path from 'path';
 
+import {
+  OPENCODIAN_LOCAL_SIDECAR_DEFAULT_HOST,
+  OPENCODIAN_LOCAL_SIDECAR_DEFAULT_PORT,
+} from '../types/settings';
 import { createLogger } from '../../shared';
-import type { ManagedServerState, OpenCodeServerConfig } from './types';
+import type { ManagedServerState, OpenCodeServerConfig, ServerDiagnostics, ServerStatus } from './types';
 
 const logger = createLogger('ServerManager');
 const MANAGED_SERVER_SIGNATURE_VERSION = 1;
+const LOCAL_SERVER_LOG_TAIL_LIMIT = 80;
+const PORT_RELEASE_TIMEOUT_MS = 5_000;
 const LOCAL_SERVER_SANITIZED_ENV_KEYS = [
   'OPENCODE_CONFIG',
   'OPENCODE_TUI_CONFIG',
@@ -32,14 +38,6 @@ const LOCAL_SERVER_SANITIZED_ENV_KEYS = [
   'OPENCODE_PURE',
 ] as const;
 
-/** Server status type */
-export type ServerStatus = 
-  | 'stopped'
-  | 'starting'
-  | 'running'
-  | 'error'
-  | 'restarting';
-
 /** Server manager events */
 interface ServerManagerEvents {
   onStatusChange?: (status: ServerStatus) => void;
@@ -51,6 +49,22 @@ interface ServerManagerRuntimeOptions {
   onManagedServerStateChange?: (state: ManagedServerState | null) => void;
 }
 
+interface LocalServerLaunch {
+  proc: ChildProcess;
+  outputTail: string[];
+  exited: boolean;
+  exitCode: number | null;
+  signal: NodeJS.Signals | null;
+  error: Error | null;
+  cleanup: () => void;
+}
+
+interface ExistingServerProcessInfo {
+  pid: number | null;
+  commandLine: string | null;
+  looksLikeOpenCodeServe: boolean;
+}
+
 export class ServerManager {
   private config: OpenCodeServerConfig;
   private events: ServerManagerEvents;
@@ -60,6 +74,8 @@ export class ServerManager {
   private workingDirectory: string | undefined;
   private managedServerState: ManagedServerState | null;
   private onManagedServerStateChange?: (state: ManagedServerState | null) => void;
+  private diagnostics: ServerDiagnostics = { reason: 'none' };
+  private activeLaunch: LocalServerLaunch | null = null;
 
   constructor(
     config: OpenCodeServerConfig,
@@ -105,6 +121,10 @@ export class ServerManager {
     return this.managedServerState ? { ...this.managedServerState } : null;
   }
 
+  getServerDiagnosticsSnapshot(): ServerDiagnostics {
+    return { ...this.diagnostics };
+  }
+
   /** Update server configuration */
   updateConfig(config: OpenCodeServerConfig): void {
     this.config = {
@@ -140,6 +160,7 @@ export class ServerManager {
 
   private async doStart(): Promise<void> {
     this.setStatus('starting');
+    this.setDiagnostics({ reason: 'none' });
 
     try {
       if (this.config.mode === 'remote') {
@@ -152,10 +173,8 @@ export class ServerManager {
         return;
       }
 
-      // Check if port is already in use
       const portAvailable = await this.isPortAvailable(this.config.local.port);
       if (!portAvailable) {
-        // Check if it's an existing OpenCode server
         const healthy = await this.checkHealth(5000);
         if (healthy) {
           const adoption = await this.tryAdoptManagedServer();
@@ -174,24 +193,67 @@ export class ServerManager {
             return;
           }
 
-          logger.debug('OpenCode server already running on port', this.config.local.port);
-          logger.debug('This server may have been started with different working directory/config');
-          this.setStatus('running');
-          return;
+          const existingServer = await this.inspectExistingHealthyServer();
+          if (await this.shouldRecycleUnknownLocalServer(existingServer)) {
+            logger.warn('Recycling orphaned OpenCode sidecar on default plugin endpoint', {
+              host: this.config.local.host,
+              port: this.config.local.port,
+              pid: existingServer.pid,
+            });
+            await this.recycleUnknownLocalServer(existingServer);
+            await this.spawnServer();
+            await this.waitForHealthy(this.config.timeout ?? 30000);
+            this.setDiagnostics({
+              reason: 'local-orphan-restarted',
+              host: this.config.local.host,
+              port: this.config.local.port,
+              pid: existingServer.pid ?? undefined,
+              commandLine: existingServer.commandLine ?? undefined,
+              message: 'Detected and restarted an orphaned plugin sidecar.',
+            });
+            this.setStatus('running');
+            new Notice('OpenCode server started');
+            return;
+          }
+
+          this.setDiagnostics({
+            reason: 'local-conflict',
+            host: this.config.local.host,
+            port: this.config.local.port,
+            pid: existingServer.pid ?? undefined,
+            commandLine: existingServer.commandLine ?? undefined,
+            message: 'Another healthy OpenCode server already occupies the configured local endpoint.',
+          });
+          this.setStatus('conflict');
+          throw new Error(this.buildConflictMessage(existingServer, true));
         }
+        this.setDiagnostics({
+          reason: 'local-conflict',
+          host: this.config.local.host,
+          port: this.config.local.port,
+          message: 'Another process already occupies the configured local endpoint.',
+        });
+        this.setStatus('conflict');
         throw new Error(`Port ${this.config.local.port} is already in use by another process`);
       }
 
-      // Spawn OpenCode server process
       await this.spawnServer();
-
-      // Wait for server to be healthy
       await this.waitForHealthy(this.config.timeout ?? 30000);
 
       this.setStatus('running');
       new Notice('OpenCode server started');
     } catch (error) {
-      this.setStatus('error');
+      if (this.config.mode === 'local' && (this.process || this.managedServerState)) {
+        try {
+          await this.stop();
+        } catch (stopError) {
+          logger.warn('Failed to clean up local OpenCode process after start failure:', stopError);
+        }
+      }
+
+      if (this.status !== 'conflict') {
+        this.setStatus('error');
+      }
       const err = error instanceof Error ? error : new Error(String(error));
       this.events.onError?.(err);
       throw err;
@@ -201,17 +263,18 @@ export class ServerManager {
   /** Stop the OpenCode server */
   async stop(): Promise<void> {
     if (!this.process && !this.managedServerState) {
+      this.clearLaunchState();
+      this.setDiagnostics({ reason: 'none' });
       this.setStatus('stopped');
       return;
     }
 
     if (this.status === 'stopped') {
-
       return;
     }
 
-
     this.setStatus('stopped');
+    this.setDiagnostics({ reason: 'none' });
 
     const managedProcess = this.process;
     const managedPid = this.managedServerState?.pid;
@@ -231,7 +294,7 @@ export class ServerManager {
 
     return new Promise((resolve) => {
       let resolved = false;
-      
+
       const doResolve = () => {
         if (!resolved) {
           resolved = true;
@@ -241,9 +304,7 @@ export class ServerManager {
         }
       };
 
-      // Set a timeout to force kill
       const timeout = setTimeout(() => {
-
         try {
           if (process.platform === 'win32') {
             void this.killWindowsProcessTree(managedProcess.pid).finally(doResolve);
@@ -254,20 +315,17 @@ export class ServerManager {
           if (!killed) {
             logger.warn('Process kill returned false, process may have already exited');
           }
-        } catch (e) {
-          logger.error('Error killing process:', e);
+        } catch (error) {
+          logger.error('Error killing process:', error);
           doResolve();
         }
       }, 5000);
 
-      // Listen for process exit
-      managedProcess.once('exit', (_code, _signal) => {
-
+      managedProcess.once('exit', () => {
         clearTimeout(timeout);
         doResolve();
       });
 
-      // Try graceful shutdown first
       if (process.platform === 'win32') {
         void this.killWindowsProcessTree(managedProcess.pid).then((terminated) => {
           if (!terminated) {
@@ -280,18 +338,32 @@ export class ServerManager {
 
       try {
         const terminated = managedProcess.kill('SIGTERM');
-
-        // If kill returns false, the process might already be dead
         if (terminated === false) {
           clearTimeout(timeout);
           doResolve();
         }
-      } catch (e) {
-        logger.error('Error sending SIGTERM:', e);
+      } catch (error) {
+        logger.error('Error sending SIGTERM:', error);
         clearTimeout(timeout);
         doResolve();
       }
     });
+  }
+
+  dispose(): void {
+    this.setDiagnostics({ reason: 'none' });
+
+    const managedProcess = this.process;
+    const managedPid = this.managedServerState?.pid;
+
+    if (managedProcess?.pid) {
+      this.terminateManagedPidSync(managedProcess.pid);
+    } else if (managedPid) {
+      this.terminateManagedPidSync(managedPid);
+    }
+
+    this.clearManagedServerState();
+    this.cleanup();
   }
 
   /** Restart the server */
@@ -323,90 +395,139 @@ export class ServerManager {
   }
 
   private async spawnServer(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      try {
-        // Try to find opencode binary
-        const opencodePath = this.findOpenCodeBinary();
-        
-        if (!opencodePath) {
-          reject(new Error(
-            'OpenCode not found. Please install it with: npm install -g opencode-ai'
-          ));
-          return;
-        }
+    const opencodePath = this.findOpenCodeBinary();
+    if (!opencodePath) {
+      throw new Error('OpenCode not found. Please install it with: npm install -g opencode-ai');
+    }
 
-        // Spawn server process with CORS enabled for Obsidian
-        // Use vault path as working directory so OpenCode reads project config
-        logger.debug('Starting OpenCode server:');
-        logger.debug(`  Binary: ${opencodePath}`);
-        logger.debug(`  Working directory: ${this.workingDirectory || 'current directory'}`);
-        logger.debug(`  Config path: ${this.workingDirectory ? `${this.workingDirectory}/.opencode/opencode.json` : 'N/A'}`);
-        logger.debug('  Spawn context:', {
-          mode: this.config.mode,
-          modelSourceMode: this.config.modelSourceMode,
-          pluginIsolationMode: this.config.pluginIsolationMode,
-          managedServerState: this.getManagedServerStateSnapshot(),
-        });
-        
-        const spawnEnv = this.getSpawnEnv();
-        const spawnViaShell = this.shouldSpawnViaShell(opencodePath);
-        logger.debug('  Spawn env summary:', {
-          hasDisableProjectConfig: typeof spawnEnv.OPENCODE_DISABLE_PROJECT_CONFIG === 'string',
-          disableProjectConfig: spawnEnv.OPENCODE_DISABLE_PROJECT_CONFIG ?? null,
-          hasConfigDir: typeof spawnEnv.OPENCODE_CONFIG_DIR === 'string',
-          configDir: spawnEnv.OPENCODE_CONFIG_DIR ?? null,
-          hasConfigContent: typeof spawnEnv.OPENCODE_CONFIG_CONTENT === 'string',
-          configContentLength: spawnEnv.OPENCODE_CONFIG_CONTENT?.length ?? 0,
-          serverUsernameConfigured: typeof spawnEnv.OPENCODE_SERVER_USERNAME === 'string' && spawnEnv.OPENCODE_SERVER_USERNAME.length > 0,
-          serverPasswordConfigured: typeof spawnEnv.OPENCODE_SERVER_PASSWORD === 'string' && spawnEnv.OPENCODE_SERVER_PASSWORD.length > 0,
-          pureMode: spawnEnv.OPENCODE_PURE ?? null,
-          shell: spawnViaShell,
-        });
-
-        this.process = spawn(opencodePath, [
-          'serve',
-          '--port', String(this.config.local.port),
-          '--hostname', this.config.local.host,
-          '--cors', 'app://obsidian.md',
-          '--cors', 'app://obsidian',
-        ], {
-          detached: false,
-          stdio: ['ignore', 'pipe', 'pipe'],
-          cwd: this.workingDirectory,
-          env: spawnEnv,
-          shell: spawnViaShell,
-          windowsHide: process.platform === 'win32',
-        });
-        this.setManagedServerState(this.process.pid);
-
-        // Handle process events
-        this.process.on('error', (error) => {
-          this.events.onError?.(error);
-        });
-
-        this.process.on('exit', (code, _signal) => {
-          this.clearManagedServerState();
-          if (code !== 0 && code !== null) {
-            this.events.onError?.(new Error(`Server exited with code ${code}`));
-          }
-          this.cleanup();
-        });
-
-        // Log output for debugging
-        this.process.stdout?.on('data', (_data) => {
-
-        });
-
-        this.process.stderr?.on('data', (data) => {
-          logger.error(data.toString().trim());
-        });
-
-        // Give it a moment to start
-        setTimeout(resolve, 1000);
-      } catch (error) {
-        reject(error);
-      }
+    logger.debug('Starting OpenCode server:');
+    logger.debug(`  Binary: ${opencodePath}`);
+    logger.debug(`  Working directory: ${this.workingDirectory || 'current directory'}`);
+    logger.debug(`  Config path: ${this.workingDirectory ? `${this.workingDirectory}/.opencode/opencode.json` : 'N/A'}`);
+    logger.debug('  Spawn context:', {
+      mode: this.config.mode,
+      modelSourceMode: this.config.modelSourceMode,
+      pluginIsolationMode: this.config.pluginIsolationMode,
+      managedServerState: this.getManagedServerStateSnapshot(),
     });
+
+    const spawnEnv = this.getSpawnEnv();
+    const spawnViaShell = this.shouldSpawnViaShell(opencodePath);
+    logger.debug('  Spawn env summary:', {
+      hasDisableProjectConfig: typeof spawnEnv.OPENCODE_DISABLE_PROJECT_CONFIG === 'string',
+      disableProjectConfig: spawnEnv.OPENCODE_DISABLE_PROJECT_CONFIG ?? null,
+      hasConfigDir: typeof spawnEnv.OPENCODE_CONFIG_DIR === 'string',
+      configDir: spawnEnv.OPENCODE_CONFIG_DIR ?? null,
+      hasConfigContent: typeof spawnEnv.OPENCODE_CONFIG_CONTENT === 'string',
+      configContentLength: spawnEnv.OPENCODE_CONFIG_CONTENT?.length ?? 0,
+      serverUsernameConfigured: typeof spawnEnv.OPENCODE_SERVER_USERNAME === 'string' && spawnEnv.OPENCODE_SERVER_USERNAME.length > 0,
+      serverPasswordConfigured: typeof spawnEnv.OPENCODE_SERVER_PASSWORD === 'string' && spawnEnv.OPENCODE_SERVER_PASSWORD.length > 0,
+      pureMode: spawnEnv.OPENCODE_PURE ?? null,
+      shell: spawnViaShell,
+    });
+
+    this.process = spawn(opencodePath, [
+      'serve',
+      '--port', String(this.config.local.port),
+      '--hostname', this.config.local.host,
+      '--cors', 'app://obsidian.md',
+      '--cors', 'app://obsidian',
+    ], {
+      detached: false,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      cwd: this.workingDirectory,
+      env: spawnEnv,
+      shell: spawnViaShell,
+      windowsHide: process.platform === 'win32',
+    });
+    this.setManagedServerState(this.process.pid);
+    this.attachLaunchTracking(this.process);
+  }
+
+  private attachLaunchTracking(proc: ChildProcess): void {
+    this.clearLaunchState();
+
+    let handleStdout: ((data: unknown) => void) | undefined;
+    let handleStderr: ((data: unknown) => void) | undefined;
+    let handleError: ((error: Error) => void) | undefined;
+    let handleExit: ((code: number | null, signal: NodeJS.Signals | null) => void) | undefined;
+
+    const launch: LocalServerLaunch = {
+      proc,
+      outputTail: [],
+      exited: false,
+      exitCode: null,
+      signal: null,
+      error: null,
+      cleanup: () => {
+        if (handleError) {
+          proc.removeListener('error', handleError);
+        }
+        if (handleExit) {
+          proc.removeListener('exit', handleExit);
+        }
+        if (handleStdout) {
+          proc.stdout?.removeListener('data', handleStdout);
+        }
+        if (handleStderr) {
+          proc.stderr?.removeListener('data', handleStderr);
+        }
+      },
+    };
+
+    handleStdout = (data: unknown) => {
+      const text = String(data);
+      this.pushLaunchOutput(launch, text);
+      const trimmed = text.trim();
+      if (trimmed) {
+        logger.debug(trimmed);
+      }
+    };
+
+    handleStderr = (data: unknown) => {
+      const text = String(data);
+      this.pushLaunchOutput(launch, text);
+      const trimmed = text.trim();
+      if (trimmed) {
+        logger.error(trimmed);
+      }
+    };
+
+    handleError = (error: Error) => {
+      launch.error = error;
+      if (this.status === 'running') {
+        this.events.onError?.(error);
+      }
+    };
+
+    handleExit = (code: number | null, signal: NodeJS.Signals | null) => {
+      launch.exited = true;
+      launch.exitCode = code;
+      launch.signal = signal;
+      this.clearManagedServerState();
+      if (code !== 0 && code !== null && this.status !== 'stopped') {
+        this.events.onError?.(new Error(`Server exited with code ${code}`));
+      }
+      this.cleanup();
+    };
+
+    proc.stdout?.on('data', handleStdout);
+    proc.stderr?.on('data', handleStderr);
+    proc.on('error', handleError);
+    proc.on('exit', handleExit);
+
+    this.activeLaunch = launch;
+  }
+
+  private pushLaunchOutput(launch: LocalServerLaunch, chunk: string): void {
+    if (!chunk) {
+      return;
+    }
+
+    launch.outputTail.push(chunk);
+    while (launch.outputTail.length > LOCAL_SERVER_LOG_TAIL_LIMIT) {
+      launch.outputTail.shift();
+    }
   }
 
   private findOpenCodeBinary(): string | null {
@@ -521,15 +642,55 @@ export class ServerManager {
 
   private async waitForHealthy(timeout: number): Promise<void> {
     const startTime = Date.now();
-    
+
     while (Date.now() - startTime < timeout) {
+      this.throwIfLaunchFailed('Server exited before becoming healthy');
       if (await this.checkHealth(1000)) {
         return;
       }
-      await new Promise((r) => setTimeout(r, 500));
+      this.throwIfLaunchFailed('Server exited before becoming healthy');
+      await new Promise((resolve) => setTimeout(resolve, 250));
     }
 
-    throw new Error(`Server failed to start within ${timeout}ms`);
+    this.throwIfLaunchFailed(`Server failed to start within ${timeout}ms`);
+    throw this.buildLaunchFailureError(`Server failed to start within ${timeout}ms`);
+  }
+
+  private throwIfLaunchFailed(prefix: string): void {
+    if (!this.activeLaunch) {
+      return;
+    }
+
+    if (this.activeLaunch.error) {
+      throw this.buildLaunchFailureError(`${prefix}: ${this.activeLaunch.error.message}`);
+    }
+
+    if (this.activeLaunch.exited) {
+      const suffix = this.activeLaunch.exitCode !== null
+        ? ` (exit code ${this.activeLaunch.exitCode})`
+        : this.activeLaunch.signal
+          ? ` (signal ${this.activeLaunch.signal})`
+          : '';
+      throw this.buildLaunchFailureError(`${prefix}${suffix}`);
+    }
+  }
+
+  private buildLaunchFailureError(message: string): Error {
+    const output = this.formatLaunchOutputTail();
+    if (!output) {
+      return new Error(message);
+    }
+
+    return new Error(`${message}\nServer output:\n${output}`);
+  }
+
+  private formatLaunchOutputTail(): string {
+    const output = this.activeLaunch?.outputTail.join('').trim() ?? '';
+    if (!output) {
+      return '';
+    }
+
+    return output.length > 4000 ? output.slice(output.length - 4000) : output;
   }
 
   private setStatus(status: ServerStatus): void {
@@ -540,9 +701,21 @@ export class ServerManager {
     this.events.onStatusChange?.(status);
   }
 
+  private setDiagnostics(diagnostics: ServerDiagnostics): void {
+    this.diagnostics = { ...diagnostics };
+  }
+
   private cleanup(): void {
     this.process = null;
-    this.setStatus('stopped');
+    this.clearLaunchState();
+    if (this.status !== 'stopped') {
+      this.setStatus('stopped');
+    }
+  }
+
+  private clearLaunchState(): void {
+    this.activeLaunch?.cleanup();
+    this.activeLaunch = null;
   }
 
   private setManagedServerState(pid: number | undefined): void {
@@ -590,21 +763,7 @@ export class ServerManager {
       return 'skip';
     }
 
-    const normalizedCommand = commandLine.toLowerCase();
-    const host = this.config.local.host.toLowerCase();
-    const looksLikeOpenCodeServe =
-      normalizedCommand.includes('opencode')
-      && normalizedCommand.includes(' serve')
-      && (
-        normalizedCommand.includes(`--port ${this.config.local.port}`)
-        || normalizedCommand.includes(`--port=${this.config.local.port}`)
-      )
-      && (
-        normalizedCommand.includes(`--hostname ${host}`)
-        || normalizedCommand.includes(`--hostname=${host}`)
-      );
-
-    if (!looksLikeOpenCodeServe) {
+    if (!this.looksLikeOpenCodeServeCommand(commandLine)) {
       this.clearManagedServerState();
       return 'skip';
     }
@@ -617,6 +776,80 @@ export class ServerManager {
     return 'adopted';
   }
 
+  private async inspectExistingHealthyServer(): Promise<ExistingServerProcessInfo> {
+    const pid = await this.getListeningProcessId(this.config.local.port);
+    const commandLine = pid ? await this.getProcessCommandLine(pid) : null;
+    return {
+      pid,
+      commandLine,
+      looksLikeOpenCodeServe: this.looksLikeOpenCodeServeCommand(commandLine),
+    };
+  }
+
+  private looksLikeOpenCodeServeCommand(commandLine: string | null): boolean {
+    if (!commandLine) {
+      return false;
+    }
+
+    const normalizedCommand = commandLine.toLowerCase();
+    const host = this.config.local.host.toLowerCase();
+    return normalizedCommand.includes('opencode')
+      && normalizedCommand.includes(' serve')
+      && (
+        normalizedCommand.includes(`--port ${this.config.local.port}`)
+        || normalizedCommand.includes(`--port=${this.config.local.port}`)
+      )
+      && (
+        normalizedCommand.includes(`--hostname ${host}`)
+        || normalizedCommand.includes(`--hostname=${host}`)
+      );
+  }
+
+  private async shouldRecycleUnknownLocalServer(existingServer: ExistingServerProcessInfo): Promise<boolean> {
+    if (this.managedServerState) {
+      return false;
+    }
+
+    if (!this.isDefaultManagedLocalEndpoint()) {
+      return false;
+    }
+
+    return existingServer.pid !== null && existingServer.looksLikeOpenCodeServe;
+  }
+
+  private isDefaultManagedLocalEndpoint(): boolean {
+    return this.config.local.host === OPENCODIAN_LOCAL_SIDECAR_DEFAULT_HOST
+      && this.config.local.port === OPENCODIAN_LOCAL_SIDECAR_DEFAULT_PORT;
+  }
+
+  private async recycleUnknownLocalServer(existingServer: ExistingServerProcessInfo): Promise<void> {
+    if (existingServer.pid === null) {
+      throw new Error(
+        `Cannot recycle orphaned OpenCode sidecar on ${this.config.local.host}:${this.config.local.port} because its PID could not be determined`,
+      );
+    }
+
+    await this.terminateManagedPid(existingServer.pid);
+    const released = await this.waitForPortAvailability(PORT_RELEASE_TIMEOUT_MS);
+    if (!released) {
+      throw new Error(`Port ${this.config.local.port} stayed busy after stopping the orphaned OpenCode sidecar`);
+    }
+  }
+
+  private buildConflictMessage(existingServer: ExistingServerProcessInfo, healthy: boolean): string {
+    const endpoint = `${this.config.local.host}:${this.config.local.port}`;
+    const pidLabel = existingServer.pid ? ` (PID ${existingServer.pid})` : '';
+    if (!healthy) {
+      return `Local endpoint ${endpoint} is already in use by another process${pidLabel}.`;
+    }
+
+    if (existingServer.looksLikeOpenCodeServe) {
+      return `Another OpenCode server already occupies local endpoint ${endpoint}${pidLabel}. Configure a different plugin port or stop the conflicting process.`;
+    }
+
+    return `A healthy server already occupies local endpoint ${endpoint}${pidLabel}. Configure a different plugin port or stop the conflicting process.`;
+  }
+
   private async restartManagedServer(): Promise<void> {
     const state = this.managedServerState;
     if (!state) {
@@ -626,7 +859,7 @@ export class ServerManager {
     await this.terminateManagedPid(state.pid);
     this.clearManagedServerState();
 
-    const released = await this.waitForPortAvailability(5000);
+    const released = await this.waitForPortAvailability(PORT_RELEASE_TIMEOUT_MS);
     if (!released) {
       throw new Error(`Port ${this.config.local.port} stayed busy after stopping the stale OpenCode server`);
     }
@@ -758,6 +991,28 @@ export class ServerManager {
     });
   }
 
+  private killWindowsProcessTreeSync(pid: number | undefined): boolean {
+    if (!pid) {
+      return false;
+    }
+
+    const result = spawnSync('taskkill', ['/PID', String(pid), '/T', '/F'], {
+      stdio: 'ignore',
+      windowsHide: true,
+    });
+
+    if (result.error || result.status !== 0) {
+      logger.warn('Failed to synchronously terminate OpenCode process tree during dispose', {
+        pid,
+        error: result.error ?? null,
+        status: result.status ?? null,
+      });
+      return false;
+    }
+
+    return true;
+  }
+
   private async terminateManagedPid(pid: number): Promise<void> {
     if (process.platform === 'win32') {
       await this.killWindowsProcessTree(pid);
@@ -779,6 +1034,51 @@ export class ServerManager {
     } catch {
       // Process already exited after SIGTERM.
     }
+  }
+
+  private terminateManagedPidSync(pid: number): void {
+    if (process.platform === 'win32') {
+      this.killWindowsProcessTreeSync(pid);
+      return;
+    }
+
+    try {
+      process.kill(pid, 'SIGTERM');
+    } catch {
+      return;
+    }
+
+    try {
+      process.kill(pid, 'SIGKILL');
+    } catch {
+      // Process already exited.
+    }
+  }
+
+  private async getListeningProcessId(port: number): Promise<number | null> {
+    const output = process.platform === 'win32'
+      ? await this.captureCommandOutput(
+        'powershell',
+        [
+          '-NoProfile',
+          '-Command',
+          `$conn = Get-NetTCPConnection -State Listen -LocalPort ${port} -ErrorAction SilentlyContinue | Select-Object -First 1; if ($conn) { $conn.OwningProcess }`,
+        ],
+      )
+      : await this.captureCommandOutput(
+        'sh',
+        [
+          '-lc',
+          `lsof -nP -iTCP:${port} -sTCP:LISTEN -t 2>/dev/null | head -n 1`,
+        ],
+      );
+
+    if (!output) {
+      return null;
+    }
+
+    const parsed = Number.parseInt(output.trim(), 10);
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
   }
 
   private getProcessCommandLine(pid: number): Promise<string | null> {

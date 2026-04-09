@@ -88,7 +88,7 @@ describe('Settings', () => {
       expect(DEFAULT_SETTINGS.userName).toBe('');
       expect(DEFAULT_SETTINGS.server.mode).toBe('local');
       expect(DEFAULT_SETTINGS.server.local.host).toBe('127.0.0.1');
-      expect(DEFAULT_SETTINGS.server.local.port).toBe(4096);
+      expect(DEFAULT_SETTINGS.server.local.port).toBe(4196);
       expect(DEFAULT_SETTINGS.server.local.autoStart).toBe(true);
       expect(DEFAULT_SETTINGS.server.remote.baseUrl).toBe('http://127.0.0.1:4096');
       expect(DEFAULT_SETTINGS.server.auth.type).toBe('none');

@@ -19,6 +19,8 @@ export type {
   QueryOptions,
   ResponseHandler,
   SdkFeatureFlags,
+  ServerDiagnostics,
+  ServerDiagnosticReason,
   ServerError,
   ServerStatus,
 } from './types';

@@ -12,6 +12,58 @@
 
 ---
 
+## 2026-04-09 本地 sidecar 生命周期、孤儿进程回收与端口迁移修正
+
+### 🎯 改动目标
+
+- 修正插件把错误本地服务误判成“服务器目录真值”的问题，根因聚焦到 sidecar 生命周期，而不是继续改 provider 过滤
+- 将插件默认本地 sidecar 端口从 `4096` 调整为 `4196`，避免与独立 OpenCode 默认端口混淆
+- 为设置页和诊断报告补上冲突 / 孤儿 sidecar 的明确状态，让问题定位不再依赖猜测
+
+### ✅ 本轮调整
+
+- `src/core/types/settings.ts`
+- `src/core/types/index.ts`
+- `src/main.ts`
+  - 新增 `OPENCODIAN_LOCAL_SIDECAR_DEFAULT_PORT = 4196` 与旧默认端口常量
+  - 插件本地默认端口切到 `4196`
+  - 增加一次性迁移：仅当持久化配置仍是“未改过的旧本地默认值”时，才把本地 `4096` 自动迁到 `4196`
+  - `onunload()` 先走同步 `dispose()`，再做异步 `stop()` 补清理
+
+- `src/core/opencode/ServerManager.ts`
+- `src/core/opencode/OpenCodeService.ts`
+- `src/core/opencode/types.ts`
+- `src/core/opencode/index.ts`
+  - 本地服务启动改为“健康轮询 + 提前退出”竞态等待，不再固定睡 1 秒
+  - 保留 managed server 签名校验：签名匹配才 adopt，签名过期才 restart
+  - 默认插件端点 `127.0.0.1:4196` 上的未知健康 `opencode serve` 会按“孤儿 sidecar”回收并重启
+  - 自定义端口上的未知健康服务改为 `conflict`，不再伪装成正常运行
+  - 新增结构化 diagnostics，并向设置页暴露 `getServerDiagnostics()`
+  - Windows 卸载清理补上同步 `taskkill /T /F` 路径，减少孤儿进程
+
+- `src/features/settings/OpenCodianSettings.ts`
+- `src/i18n/locales/zh.ts`
+- `src/i18n/locales/en.ts`
+  - 设置页状态区新增“已回收孤儿 sidecar”“端口冲突”等显示
+  - 端口占位符与帮助文案改成以插件默认 `4196` 为准，并明确区分独立 OpenCode 常见 `4096`
+
+- `docs/modules/core/opencode/ServerManager.md`
+- `docs/modules/core/config/modelConfig.md`
+- `docs/status/sdk-v2-manual-checklist.md`
+  - 文档口径统一为：插件 sidecar 默认 `4196`，独立 OpenCode 常见默认 `4096`
+  - provider 集合异常时，优先排查 sidecar/orphan/conflict，而不是先改模型过滤逻辑
+
+- `tests/unit/core/opencode/ServerManager.test.ts`
+- `tests/unit/core/opencode/OpenCodeService.test.ts`
+- `tests/unit/core/types/settings.test.ts`
+- `tests/unit/main.test.ts`
+  - 补充默认端口迁移、孤儿 sidecar 回收、冲突状态、同步清理、启动失败输出等回归测试
+
+### 🧪 验证结果
+
+- `npm test -- tests/unit/core/opencode/ServerManager.test.ts tests/unit/main.test.ts tests/unit/core/opencode/OpenCodeService.test.ts tests/unit/core/types/settings.test.ts tests/unit/features/settings/OpenCodianSettings.test.ts` 通过
+- `npm run build` 通过，最新 `BUILD_ID: main.202604092344`
+
 ## 2026-04-09 后台任务权威同步、重载抑制与滚动恢复修正
 
 ### 🎯 改动目标

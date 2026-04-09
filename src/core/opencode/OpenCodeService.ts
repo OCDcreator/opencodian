@@ -54,6 +54,8 @@ import type {
   OpenCodeServerConfig,
   QueryOptions,
   ResponseHandler,
+  ServerDiagnostics,
+  ServerStatus,
 } from './types';
 
 const logger = createLogger('OpenCodeService');
@@ -653,14 +655,23 @@ export class OpenCodeService {
     await this.serverManager.stop();
   }
 
+  dispose(): void {
+    this.stopSyncEventSubscription();
+    this.serverManager.dispose();
+  }
+
   /** Check if service is ready */
   isReady(): boolean {
     return this.serverManager.getStatus() === 'running';
   }
 
   /** Get server status */
-  getServerStatus(): string {
+  getServerStatus(): ServerStatus {
     return this.serverManager.getStatus();
+  }
+
+  getServerDiagnostics(): ServerDiagnostics {
+    return this.serverManager.getServerDiagnosticsSnapshot();
   }
 
   /** Check server health directly */
