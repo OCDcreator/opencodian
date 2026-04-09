@@ -11,6 +11,8 @@ import { ProviderBuiltinIconPickerModal } from './ProviderBuiltinIconPickerModal
 
 export class ProviderIconCacheModal extends Modal {
   private readonly providerSections = new Map<string, HTMLElement>();
+  private quickJumpEl: HTMLElement | null = null;
+  private scrollContainerEl: HTMLElement | null = null;
 
   constructor(
     app: App,
@@ -27,12 +29,15 @@ export class ProviderIconCacheModal extends Modal {
   }
 
   onClose(): void {
+    this.quickJumpEl = null;
+    this.scrollContainerEl = null;
     this.contentEl.empty();
   }
 
   private async render(restoreScrollTop?: number): Promise<void> {
     this.contentEl.empty();
     this.providerSections.clear();
+    this.quickJumpEl = null;
 
     const { providers, summary } = await ProviderIconService.getProviderCacheState(
       this.app,
@@ -59,6 +64,7 @@ export class ProviderIconCacheModal extends Modal {
     }
 
     const quickJumpEl = this.contentEl.createDiv({ cls: 'opencodian-icon-cache-quick-jump' });
+    this.quickJumpEl = quickJumpEl;
     quickJumpEl.createDiv({
       cls: 'opencodian-icon-cache-quick-jump-label',
       text: t('settings.model.iconCache.modal.quickJump'),
@@ -69,11 +75,9 @@ export class ProviderIconCacheModal extends Modal {
         cls: `opencodian-icon-cache-quick-jump-button ${provider.isCurrentProvider ? 'is-current' : ''}`,
         text: provider.providerId,
       });
+      buttonEl.type = 'button';
       buttonEl.addEventListener('click', () => {
-        this.providerSections.get(provider.providerId)?.scrollIntoView({
-          block: 'start',
-          behavior: 'smooth',
-        });
+        this.scrollToProviderSection(provider.providerId);
       });
     }
 
@@ -88,12 +92,13 @@ export class ProviderIconCacheModal extends Modal {
     const sectionEl = this.contentEl.createDiv({ cls: 'opencodian-icon-cache-provider-section' });
     this.providerSections.set(provider.providerId, sectionEl);
     const headerEl = sectionEl.createDiv({ cls: 'opencodian-icon-cache-provider-header' });
-    headerEl.createDiv({
+    const headingEl = headerEl.createDiv({ cls: 'opencodian-icon-cache-provider-heading' });
+    headingEl.createDiv({
       cls: 'opencodian-icon-cache-provider-title',
       text: provider.providerId,
     });
 
-    const badgesEl = headerEl.createDiv({ cls: 'opencodian-icon-cache-provider-badges' });
+    const badgesEl = headingEl.createDiv({ cls: 'opencodian-icon-cache-provider-badges' });
     badgesEl.createSpan({
       cls: `opencodian-icon-cache-provider-badge ${provider.isCurrentProvider ? 'is-current' : 'is-saved'}`,
       text: provider.isCurrentProvider
@@ -250,7 +255,7 @@ export class ProviderIconCacheModal extends Modal {
       return;
     }
 
-    const restoreScrollTop = this.contentEl.scrollTop;
+    const restoreScrollTop = this.getScrollContainer().scrollTop;
     let nextLibrary = this.plugin.settings.providerIconLibrary;
     const errors: string[] = [];
     let addedCount = 0;
@@ -292,7 +297,7 @@ export class ProviderIconCacheModal extends Modal {
   }
 
   private async removeCustomEntry(providerId: string, entryId: string): Promise<void> {
-    const restoreScrollTop = this.contentEl.scrollTop;
+    const restoreScrollTop = this.getScrollContainer().scrollTop;
     this.plugin.settings.providerIconLibrary = ProviderIconService.removeProviderEntry(
       providerId,
       entryId,
@@ -316,7 +321,7 @@ export class ProviderIconCacheModal extends Modal {
       entries,
       this.plugin.settings.providerIconLibrary,
     );
-    const restoreScrollTop = this.contentEl.scrollTop;
+    const restoreScrollTop = this.getScrollContainer().scrollTop;
     await this.persistLibrary();
     await this.render(restoreScrollTop);
   }
@@ -336,7 +341,7 @@ export class ProviderIconCacheModal extends Modal {
       entries,
       this.plugin.settings.providerIconLibrary,
     );
-    const restoreScrollTop = this.contentEl.scrollTop;
+    const restoreScrollTop = this.getScrollContainer().scrollTop;
     await this.persistLibrary();
     await this.render(restoreScrollTop);
   }
@@ -375,7 +380,7 @@ export class ProviderIconCacheModal extends Modal {
           iconId,
           this.plugin.settings.providerIconLibrary,
         );
-        const restoreScrollTop = this.contentEl.scrollTop;
+        const restoreScrollTop = this.getScrollContainer().scrollTop;
         await this.persistLibrary();
         await this.render(restoreScrollTop);
         new Notice(t('settings.model.iconCache.builtinPicker.chooseSuccess', {
@@ -386,14 +391,49 @@ export class ProviderIconCacheModal extends Modal {
     }).open();
   }
 
+  private scrollToProviderSection(providerId: string): void {
+    const sectionEl = this.providerSections.get(providerId);
+    if (!sectionEl) {
+      return;
+    }
+
+    sectionEl.style.scrollMarginTop = `${this.getQuickJumpScrollMargin()}px`;
+    sectionEl.scrollIntoView({
+      behavior: 'smooth',
+    });
+  }
+
+  private getQuickJumpScrollMargin(): number {
+    if (!this.quickJumpEl) {
+      return 0;
+    }
+
+    return this.quickJumpEl.offsetHeight + 8;
+  }
+
   private restoreScrollPosition(restoreScrollTop?: number): void {
     if (restoreScrollTop === undefined) {
       return;
     }
 
-    this.contentEl.scrollTop = restoreScrollTop;
+    const scrollContainer = this.getScrollContainer();
+    scrollContainer.scrollTop = restoreScrollTop;
     window.requestAnimationFrame(() => {
-      this.contentEl.scrollTop = restoreScrollTop;
+      scrollContainer.scrollTop = restoreScrollTop;
     });
+  }
+
+  private getScrollContainer(): HTMLElement {
+    if (
+      this.scrollContainerEl
+      && this.scrollContainerEl.isConnected
+      && this.scrollContainerEl.contains(this.contentEl)
+    ) {
+      return this.scrollContainerEl;
+    }
+
+    const matchedContainer = this.contentEl.closest<HTMLElement>('.modal-content');
+    this.scrollContainerEl = matchedContainer ?? this.contentEl;
+    return this.scrollContainerEl;
   }
 }

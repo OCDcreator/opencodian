@@ -23,7 +23,7 @@ Provider 图标缓存管理 Modal。展示所有 provider 的图标缓存状态�
 
 ### 快速跳转栏
 
-顶部按钮栏，每个 provider 一个按钮，点击滚动到对应 section。
+顶部按钮栏，每个 provider 一个按钮，点击时通过原生 `scrollIntoView()` 跳转，并给目标 section 设置 `scroll-margin-top`，避免标题被粘性快捷跳转栏遮住。
 
 ### Provider Section
 

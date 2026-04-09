@@ -169,6 +169,14 @@
   margin-bottom: 16px;
 }
 
+.opencodian-icon-cache-provider-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
 .opencodian-icon-cache-provider-title {
   font-size: 18px;
   font-weight: 600;
@@ -414,8 +422,10 @@
   position: relative;
   display: flex;
   align-items: center;
+  gap: 8px;
   min-height: 40px;
   padding-left: 40px;
+  padding-right: 10px;
   border-radius: 8px;
   border: 1px solid var(--background-modifier-border);
   background: var(--background-primary);
@@ -425,6 +435,13 @@
 .opencodian-builtin-icon-picker-search-container:focus-within {
   border-color: var(--interactive-accent);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--interactive-accent) 20%, transparent);
+}
+
+.opencodian-builtin-icon-picker-search-container .opencodian-settings-search-history-popover {
+  left: 0;
+  right: auto;
+  width: min(460px, 100%);
+  max-width: min(460px, calc(100vw - 96px));
 }
 
 .opencodian-builtin-icon-picker-search-icon {
@@ -440,7 +457,8 @@
 }
 
 .opencodian-builtin-icon-picker-search-input {
-  width: 100%;
+  flex: 1 1 auto;
+  min-width: 0;
   height: 38px;
   border: none;
   background: transparent;
