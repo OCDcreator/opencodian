@@ -71,6 +71,10 @@
 - `checkHealth()`: 优先走 SDK `global.health()`，失败时回退到 `ServerManager.checkHealth()`。
 - `updateSettings(settings)`: 根据新旧设置差异决定是否需要重启/停止 managed server；失败时会回滚内存设置、`baseUrl`、`ServerManager` 配置，并尽力恢复原服务。
 
+补充一个运行时细节：
+
+- 当本地 `4096` 服务短暂离线、SDK/legacy 都同时打到 `ERR_CONNECTION_REFUSED` / `ERR_CONNECTION_RESET` 时，`OpenCodeService` 会按操作类型节流重复的 fallback / failure 日志，避免设置页轮询、问题列表刷新和消息同步在控制台刷屏；服务恢复并重新健康后会清空这组抑制状态。
+
 特别点：
 
 - 如果本地 managed server 正在运行，切换到新的 host/port 前会先调用 `canBindLocalEndpoint()` 做端口占用预检。

@@ -1130,6 +1130,34 @@ describe('OpenCodeService', () => {
       }));
     });
 
+    it('suppresses repeated offline fallback logs while the local server is unreachable', async () => {
+      service = createServiceWithSdkFlags();
+      const offlineError = new Error('net::ERR_CONNECTION_REFUSED');
+      const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+      try {
+        mockSdkClient.question.list.mockRejectedValue(offlineError);
+        mockRequestUrl.mockRejectedValue(offlineError);
+
+        await expect(service.getPendingQuestions()).resolves.toEqual([]);
+        await expect(service.getPendingQuestions()).resolves.toEqual([]);
+
+        const offlineWarnLogs = consoleWarnSpy.mock.calls.filter(([first]) =>
+          typeof first === 'string' && first.includes('SDK question.list failed'),
+        );
+        const offlineErrorLogs = consoleErrorSpy.mock.calls.filter(([first]) =>
+          typeof first === 'string' && first.includes('Failed to get pending questions:'),
+        );
+
+        expect(offlineWarnLogs).toHaveLength(1);
+        expect(offlineErrorLogs).toHaveLength(1);
+      } finally {
+        consoleWarnSpy.mockRestore();
+        consoleErrorSpy.mockRestore();
+      }
+    });
+
     it('maps requestAssistantResponse through SDK prompt with shared prompt options', async () => {
       service = createServiceWithSdkFlags();
       service.setSessionId('sdk-session');

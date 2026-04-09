@@ -58,6 +58,13 @@ import type {
 
 const logger = createLogger('OpenCodeService');
 const INLINE_READ_TOOL_PREFIX = 'Called the Read tool with the following input:';
+const TRANSIENT_CONNECTIVITY_LOG_THROTTLE_MS = 15_000;
+const TRANSIENT_CONNECTIVITY_ERROR_PATTERNS = [
+  /net::ERR_CONNECTION_REFUSED/i,
+  /net::ERR_CONNECTION_RESET/i,
+  /\bECONNREFUSED\b/i,
+  /\bECONNRESET\b/i,
+];
 
 function cloneSettings(settings: OpenCodianSettings): OpenCodianSettings {
   return JSON.parse(JSON.stringify(settings)) as OpenCodianSettings;
@@ -472,6 +479,7 @@ export class OpenCodeService {
   private syncEventPromise: Promise<void> | null = null;
   private syncEventWanted = false;
   private vaultPath?: string;
+  private transientConnectivityLogState = new Map<string, { lastLoggedAt: number; suppressedCount: number }>();
 
   constructor(
     settings: OpenCodianSettings,
@@ -490,6 +498,7 @@ export class OpenCodeService {
           events.onServerStatusChange?.(status);
           // Auto-fetch models when server starts running
           if (status === 'running') {
+            this.resetTransientConnectivityLogState();
             void this.autoFetchModels();
           }
         },
@@ -502,6 +511,74 @@ export class OpenCodeService {
         onManagedServerStateChange: runtimeOptions.onManagedServerStateChange,
       },
     );
+  }
+
+  private static describeError(error: unknown): string {
+    if (error instanceof Error) {
+      return error.message;
+    }
+
+    return String(error);
+  }
+
+  private isTransientConnectivityError(error: unknown): boolean {
+    const message = OpenCodeService.describeError(error);
+    return TRANSIENT_CONNECTIVITY_ERROR_PATTERNS.some((pattern) => pattern.test(message));
+  }
+
+  private logTransientConnectivityIssue(
+    key: string,
+    level: 'warn' | 'error',
+    message: string,
+    error: unknown,
+  ): void {
+    const now = Date.now();
+    const previous = this.transientConnectivityLogState.get(key);
+
+    if (previous && now - previous.lastLoggedAt < TRANSIENT_CONNECTIVITY_LOG_THROTTLE_MS) {
+      previous.suppressedCount += 1;
+      this.transientConnectivityLogState.set(key, previous);
+      return;
+    }
+
+    const suppressedCount = previous?.suppressedCount ?? 0;
+    const nextMessage = suppressedCount > 0
+      ? `${message} (${suppressedCount} similar offline logs suppressed)`
+      : message;
+
+    this.transientConnectivityLogState.set(key, {
+      lastLoggedAt: now,
+      suppressedCount: 0,
+    });
+
+    if (level === 'warn') {
+      logger.warn(nextMessage, error);
+      return;
+    }
+
+    logger.error(nextMessage, error);
+  }
+
+  private logServiceWarning(key: string, message: string, error: unknown): void {
+    if (this.isTransientConnectivityError(error)) {
+      this.logTransientConnectivityIssue(`warn:${key}`, 'warn', message, error);
+      return;
+    }
+
+    logger.warn(message, error);
+  }
+
+  private logServiceError(key: string, message: string, error: unknown): void {
+    if (this.isTransientConnectivityError(error)) {
+      this.logTransientConnectivityIssue(`error:${key}`, 'error', message, error);
+      return;
+    }
+
+    logger.error(message, error);
+  }
+
+  private resetTransientConnectivityLogState(): void {
+    this.transientConnectivityLogState.clear();
   }
 
   /** Initialize the service */
@@ -573,13 +650,21 @@ export class OpenCodeService {
     if (this.shouldUseSdk('sdkCrud')) {
       try {
         const response = await this.getSdkClient().global.health();
-        return this.normalizeHealthResponse(response);
+        const healthy = this.normalizeHealthResponse(response);
+        if (healthy) {
+          this.resetTransientConnectivityLogState();
+        }
+        return healthy;
       } catch (error) {
-        logger.warn('SDK health check failed, falling back to ServerManager health probe', error);
+        this.logServiceWarning('health', 'SDK health check failed, falling back to ServerManager health probe', error);
       }
     }
 
-    return this.serverManager.checkHealth(3000);
+    const healthy = await this.serverManager.checkHealth(3000);
+    if (healthy) {
+      this.resetTransientConnectivityLogState();
+    }
+    return healthy;
   }
 
   /** Check if plugin has a server process running */
@@ -783,7 +868,7 @@ export class OpenCodeService {
         const response = await this.getSdkClient().session.list();
         return Array.isArray(response) ? response as Session[] : [];
       } catch (error) {
-        logger.warn('SDK session.list failed, falling back to legacy HTTP', error);
+        this.logServiceWarning('session.list', 'SDK session.list failed, falling back to legacy HTTP', error);
       }
     }
 
@@ -809,7 +894,7 @@ export class OpenCodeService {
           this.normalizeSessionMessages(response),
         );
       } catch (error) {
-        logger.warn(`SDK session.messages failed for ${sessionId}, falling back to legacy HTTP`, error);
+        this.logServiceWarning('session.messages', `SDK session.messages failed for ${sessionId}, falling back to legacy HTTP`, error);
       }
     }
 
@@ -826,7 +911,7 @@ export class OpenCodeService {
         Array.isArray(response) ? response : [],
       );
     } catch (error) {
-      logger.error(`Failed to get messages for session ${sessionId}:`, error);
+      this.logServiceError('session.messages', `Failed to get messages for session ${sessionId}:`, error);
       // Return empty array instead of throwing to prevent UI crash
       return [];
     }
@@ -843,7 +928,7 @@ export class OpenCodeService {
         const response = await this.getSdkClient().session.todo({ sessionID: sessionId });
         return this.normalizeSessionTodos(response);
       } catch (error) {
-        logger.warn(`SDK session.todo failed for ${sessionId}, falling back to legacy HTTP`, error);
+        this.logServiceWarning('session.todo', `SDK session.todo failed for ${sessionId}, falling back to legacy HTTP`, error);
       }
     }
 
@@ -851,7 +936,7 @@ export class OpenCodeService {
       const response = await this.get<unknown>(`/session/${sessionId}/todo`);
       return this.normalizeSessionTodos(response);
     } catch (error) {
-      logger.error(`Failed to get todos for session ${sessionId}:`, error);
+      this.logServiceError('session.todo', `Failed to get todos for session ${sessionId}:`, error);
       return [];
     }
   }
@@ -862,7 +947,7 @@ export class OpenCodeService {
         const response = await this.getSdkClient().session.status();
         return this.normalizeSessionStatuses(response);
       } catch (error) {
-        logger.warn('SDK session.status failed, falling back to legacy HTTP', error);
+        this.logServiceWarning('session.status', 'SDK session.status failed, falling back to legacy HTTP', error);
       }
     }
 
@@ -870,7 +955,7 @@ export class OpenCodeService {
       const response = await this.get<unknown>('/session/status');
       return this.normalizeSessionStatuses(response);
     } catch (error) {
-      logger.error('Failed to get session statuses:', error);
+      this.logServiceError('session.status', 'Failed to get session statuses:', error);
       return {};
     }
   }
@@ -1376,7 +1461,7 @@ export class OpenCodeService {
         if (abortController.signal.aborted) {
           break;
         }
-        logger.warn('SDK sync event stream failed', error);
+        this.logServiceWarning('global.sync-event', 'SDK sync event stream failed', error);
       }
 
       if (abortController.signal.aborted) {
@@ -1490,7 +1575,7 @@ export class OpenCodeService {
       }
       return filtered;
     } catch (error) {
-      logger.warn(`Failed to load session info for ${sessionId} while applying revert state`, error);
+      this.logServiceWarning('session.get', `Failed to load session info for ${sessionId} while applying revert state`, error);
       return messages;
     }
   }
@@ -2298,7 +2383,7 @@ export class OpenCodeService {
           result = await iterator.next() as IteratorResult<SdkEvent>;
         } catch (error) {
           if (!yieldedMessageStart) {
-            logger.warn('SDK event stream failed before first event, falling back to legacy SSE', error);
+            this.logServiceWarning('session.event-stream', 'SDK event stream failed before first event, falling back to legacy SSE', error);
             yield { type: 'message_start' };
             yieldedMessageStart = true;
             yield* this.consumeLegacyEventStream(sessionId, streamContext);
@@ -2461,14 +2546,14 @@ export class OpenCodeService {
         await this.getSdkClient().session.abort({ sessionID: sessionId });
         return;
       } catch (error) {
-        logger.warn(`SDK session.abort failed for ${sessionId}, falling back to legacy HTTP`, error);
+        this.logServiceWarning('session.abort', `SDK session.abort failed for ${sessionId}, falling back to legacy HTTP`, error);
       }
     }
 
     try {
       await this.post(`/session/${sessionId}/abort`, {});
     } catch (error) {
-      logger.warn(`Failed to abort session ${sessionId} via legacy HTTP`, error);
+      this.logServiceWarning('session.abort', `Failed to abort session ${sessionId} via legacy HTTP`, error);
     }
   }
 
@@ -2672,7 +2757,7 @@ export class OpenCodeService {
         }
         return normalized;
       } catch (error) {
-        logger.warn('SDK config.providers failed, falling back to legacy HTTP', error);
+        this.logServiceWarning('config.providers', 'SDK config.providers failed, falling back to legacy HTTP', error);
       }
     }
 
@@ -2704,7 +2789,7 @@ export class OpenCodeService {
       }
       return normalized;
     } catch (error) {
-      logger.error('Failed to get models:', error);
+      this.logServiceError('config.providers', 'Failed to get models:', error);
       return { providers: [], defaults: {} };
     }
   }
@@ -2750,7 +2835,7 @@ export class OpenCodeService {
         }
         return normalized;
       } catch (error) {
-        logger.warn('SDK provider.list failed, falling back to legacy HTTP', error);
+        this.logServiceWarning('provider.list', 'SDK provider.list failed, falling back to legacy HTTP', error);
       }
     }
 
@@ -2776,7 +2861,7 @@ export class OpenCodeService {
       }
       return normalized;
     } catch (error) {
-      logger.error('Failed to get provider directory:', error);
+      this.logServiceError('provider.list', 'Failed to get provider directory:', error);
       return { providers: [], defaults: {}, connected: [] };
     }
   }
@@ -2814,7 +2899,7 @@ export class OpenCodeService {
         }
         return resolved;
       } catch (error) {
-        logger.warn('SDK config.get failed, falling back to legacy HTTP', error);
+        this.logServiceWarning('config.get', 'SDK config.get failed, falling back to legacy HTTP', error);
       }
     }
 
@@ -2832,7 +2917,7 @@ export class OpenCodeService {
       }
       return resolved;
     } catch (error) {
-      logger.error('Failed to get resolved model config:', error);
+      this.logServiceError('config.get', 'Failed to get resolved model config:', error);
       return {};
     }
   }
@@ -2964,7 +3049,7 @@ export class OpenCodeService {
         totalCost,
       };
     } catch (error) {
-      logger.error(`Failed to get session context usage snapshot for ${sessionId}:`, error);
+      this.logServiceError('session.context-usage', `Failed to get session context usage snapshot for ${sessionId}:`, error);
       return null;
     }
   }
@@ -3055,7 +3140,7 @@ export class OpenCodeService {
         const response = await this.getSdkClient().question.list();
         return normalizeResponse(response);
       } catch (error) {
-        logger.warn('SDK question.list failed, falling back to legacy HTTP', error);
+        this.logServiceWarning('question.list', 'SDK question.list failed, falling back to legacy HTTP', error);
       }
     }
 
@@ -3063,7 +3148,7 @@ export class OpenCodeService {
       const response = await this.get<unknown>('/question');
       return normalizeResponse(response);
     } catch (error) {
-      logger.error('Failed to get pending questions:', error);
+      this.logServiceError('question.list', 'Failed to get pending questions:', error);
       return [];
     }
   }
@@ -3077,7 +3162,7 @@ export class OpenCodeService {
         });
         return;
       } catch (error) {
-        logger.warn('SDK question.reply failed, falling back to legacy HTTP', error);
+        this.logServiceWarning('question.reply', 'SDK question.reply failed, falling back to legacy HTTP', error);
       }
     }
 
@@ -3092,7 +3177,7 @@ export class OpenCodeService {
         });
         return;
       } catch (error) {
-        logger.warn('SDK question.reject failed, falling back to legacy HTTP', error);
+        this.logServiceWarning('question.reject', 'SDK question.reject failed, falling back to legacy HTTP', error);
       }
     }
 
@@ -3145,7 +3230,7 @@ export class OpenCodeService {
         });
         return normalizeResponse(response);
       } catch (error) {
-        logger.warn(`SDK session.diff failed for ${sessionId}, falling back to legacy HTTP`, error);
+        this.logServiceWarning('session.diff', `SDK session.diff failed for ${sessionId}, falling back to legacy HTTP`, error);
       }
     }
 
@@ -3154,7 +3239,7 @@ export class OpenCodeService {
       const response = await this.get<unknown>(`/session/${sessionId}/diff${query}`);
       return normalizeResponse(response);
     } catch (error) {
-      logger.error(`Failed to get session diff for ${sessionId}:`, error);
+      this.logServiceError('session.diff', `Failed to get session diff for ${sessionId}:`, error);
       return [];
     }
   }
@@ -3164,7 +3249,7 @@ export class OpenCodeService {
       try {
         return await this.getSdkClient().session.get({ sessionID: sessionId }) as unknown as Session;
       } catch (error) {
-        logger.warn(`SDK session.get failed for ${sessionId}, falling back to legacy HTTP`, error);
+        this.logServiceWarning('session.get', `SDK session.get failed for ${sessionId}, falling back to legacy HTTP`, error);
       }
     }
 
@@ -3815,14 +3900,14 @@ export class OpenCodeService {
         const response = await this.getSdkClient().permission.list();
         return Array.isArray(response) ? response as PermissionRequest[] : [];
       } catch (error) {
-        logger.warn('SDK permission.list failed, falling back to legacy HTTP', error);
+        this.logServiceWarning('permission.list', 'SDK permission.list failed, falling back to legacy HTTP', error);
       }
     }
 
     try {
       return await this.get<PermissionRequest[]>('/permission');
     } catch (error) {
-      logger.error('Failed to get pending permissions:', error);
+      this.logServiceError('permission.list', 'Failed to get pending permissions:', error);
       return [];
     }
   }
