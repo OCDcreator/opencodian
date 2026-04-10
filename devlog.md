@@ -12,6 +12,49 @@
 
 ---
 
+## 2026-04-10 新增提供商窗口按 `cc-switch` 对齐
+
+### 🎯 改动目标
+
+- 将“添加新提供商”窗口按 `cc-switch` 的 OpenCode 表单重新整理，去掉错误的“当前提供商”心智与多 provider 追加逻辑
+- 让新增 provider 的 JSON 编辑、额外选项、模型管理、按钮反馈与交互细节更接近参考项目
+- 修正新增表单中的输入焦点、字段到 JSON 同步、默认占位提示等问题，并同步部署到 Test Vault 验证
+
+### ✅ 本轮调整
+
+- `src/features/settings/ModelConfigModal.ts`
+- `src/features/settings/modelConfigWorkspace.ts`
+- `src/features/settings/providerPresets.ts`
+  - 新增 provider 流程改为单草稿模式：选择预设只覆盖当前草稿，不再追加隐藏 provider，也不再显示“当前提供商”切换条
+  - 底部 JSON 改为内嵌可编辑 textarea，并支持格式化；保存时以 JSON 内容为准，结构化字段变更会同步回 JSON
+  - `Base URL` 改成 placeholder 提示，不再把预设地址直接写成真实输入值
+  - 修正额外选项 / 模型选项的键名残留问题，避免编辑 key 时在 JSON 中累积 `o / op / ope...` 这样的前缀字段
+  - 去掉会抢焦点的重绘路径，补充输入控件事件保护，解决“点击输入框后有时键盘无响应”的问题
+  - 新增 provider 的“提供商额外选项”默认带 `setCacheKey: true`
+
+- `src/style/modals/config-editor-modal.css`
+- `styles.css`
+  - 新增 provider 窗口宽度固定为 `1480px`，去掉 footer 整行背景，只保留操作按钮
+  - 将“提供商额外选项”“模型管理”区块按 `cc-switch` 排布重做：标题与按钮同排、键名和值标签上移、删除按钮改成右侧垃圾桶样式
+  - 强化“当前还没有定义模型”的空状态，放大字号和留白
+  - 调整模型管理区块的列头、展开按钮、输入框与删除按钮中轴线对齐，并去掉该区块内难看的横线
+  - 为“拉取模型”“添加模型”“添加字段”和“接口格式”下拉框增加明显的 hover / focus-visible 动效
+
+- `src/i18n/locales/zh.ts`
+- `src/i18n/locales/en.ts`
+- `docs/modules/features/settings/ModelConfigModal.md`
+- `docs/modules/features/settings/OpenCodianSettings.md`
+- `docs/modules/style/modals/config-editor-modal.md`
+  - 补充新增 provider 流程相关文案与说明
+  - 同步更新设置页与样式模块文档，记录新的新增 provider 窗口结构与交互
+
+### 🧪 验证结果
+
+- `npm run build` 通过，最新 `BUILD_ID: main.202604101850`
+- `npm run check:devlog-order` 将在本次日志更新后执行
+- 已按顺序复制 `dist/main.js`、`dist/manifest.json`、`dist/styles.css` 到 Test Vault
+- 已确认 Test Vault `main.js` 含最新 `BUILD_ID: main.202604101850`
+
 ## 2026-04-10 provider 图标颜色模式、预览与测试回归
 
 ### 🎯 改动目标

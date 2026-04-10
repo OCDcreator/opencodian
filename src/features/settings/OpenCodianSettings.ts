@@ -883,6 +883,10 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       title: t('settings.model.common.title'),
       description: t('settings.model.common.desc'),
     });
+    const configBodyEl = this.createSettingsBlock(containerEl, {
+      title: t('settings.model.configBlock.title'),
+      description: t('settings.model.configBlock.desc'),
+    });
     const availabilityBodyEl = this.createSettingsBlock(containerEl, {
       title: t('settings.model.availability.title'),
       description: t('settings.model.availability.desc'),
@@ -894,6 +898,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         this.plugin.scheduleSettingsUiStateSave();
       },
     });
+    const availabilityManagementEl = availabilityBodyEl.createDiv({ cls: 'opencodian-model-toggle-management' });
     const toolsBodyEl = this.createSettingsBlock(containerEl, {
       title: t('settings.model.tools.title'),
       description: t('settings.model.tools.desc'),
@@ -905,8 +910,8 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         this.plugin.scheduleSettingsUiStateSave();
       },
     });
+    toolsBodyEl.parentElement?.addClass('opencodian-icon-cache-block');
     const commonSummaryEl = commonBodyEl.createDiv({ cls: 'opencodian-model-common-summary' });
-    const availabilityManagementEl = availabilityBodyEl.createDiv({ cls: 'opencodian-model-toggle-management' });
 
     const syncSettingsWithCatalogs = (nextCatalogs: ModelCatalogBundle): boolean => {
       const effectiveProviders = nextCatalogs.effective.providers;
@@ -943,6 +948,112 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         providers: String(catalogs.effective.providers.length),
         models: String(this.getCatalogModelCount(catalogs.effective)),
       }));
+    };
+
+    const openModelWorkspace = (options?: ConstructorParameters<typeof ModelConfigModal>[2]): void => {
+      new ModelConfigModal(this.app, this.plugin, {
+        ...options,
+        onSaved: async () => {
+          await refreshModelSettings({ forceViewReload: true });
+          await refreshIconCacheOverview();
+          await options?.onSaved?.();
+        },
+      }).open();
+    };
+
+    const renderConfigCards = (): void => {
+      configBodyEl.empty();
+
+      configBodyEl.createDiv({
+        cls: 'opencodian-config-path opencodian-model-config-block-path',
+        text: `${t('settings.model.config.path')}: ${modelConfigService.getConfigPath()}`,
+      });
+
+      const providers = Object.entries(localModelConfig?.provider ?? {});
+      if (providers.length === 0) {
+        configBodyEl.createDiv({
+          cls: 'opencodian-model-config-block-empty',
+          text: t('settings.model.configCard.empty'),
+        });
+      }
+
+      const gridEl = configBodyEl.createDiv({ cls: 'opencodian-settings-provider-grid' });
+      for (const [providerId, provider] of providers) {
+        const providerName = typeof provider.name === 'string' && provider.name.trim().length > 0
+          ? provider.name.trim()
+          : providerId;
+        const providerEnabled = isProviderEnabled(localModelConfig ?? {}, providerId);
+        const modelCount = Object.keys(provider.models ?? {}).length;
+        const cardEl = gridEl.createEl('button', {
+          cls: `opencodian-preset-card opencodian-settings-provider-card${providerEnabled ? '' : ' is-disabled'}`,
+        });
+        cardEl.type = 'button';
+        cardEl.addEventListener('click', () => {
+          openModelWorkspace({
+            initialProviderId: providerId,
+            initialView: 'editor',
+          });
+        });
+
+        const iconEl = cardEl.createDiv({ cls: 'opencodian-preset-card-icon' });
+        setIcon(iconEl, 'bot');
+        void this.applyProviderIcon(iconEl, providerId, providerName);
+
+        const copyEl = cardEl.createDiv({ cls: 'opencodian-preset-card-copy' });
+        copyEl.createDiv({
+          cls: 'opencodian-preset-card-title',
+          text: providerName,
+        });
+        copyEl.createDiv({
+          cls: 'opencodian-preset-card-subtitle',
+          text: providerId,
+        });
+        copyEl.createDiv({
+          cls: 'opencodian-preset-card-meta',
+          text: t('settings.model.configCard.modelCount', {
+            count: String(modelCount),
+          }),
+        });
+
+        const badgesEl = copyEl.createDiv({ cls: 'opencodian-settings-provider-card-badges' });
+        badgesEl.createSpan({
+          cls: `opencodian-model-workspace-status-badge ${providerEnabled ? 'is-enabled' : 'is-disabled'}`,
+          text: providerEnabled
+            ? t('settings.model.configCard.enabled')
+            : t('settings.model.configCard.disabled'),
+        });
+      }
+
+      const addCardEl = gridEl.createEl('button', {
+        cls: 'opencodian-preset-card opencodian-settings-provider-card is-add-card',
+      });
+      addCardEl.type = 'button';
+      addCardEl.addEventListener('click', () => {
+        openModelWorkspace({
+          initialView: 'preset-selector',
+        });
+      });
+
+      const addIconEl = addCardEl.createDiv({ cls: 'opencodian-preset-card-icon' });
+      setIcon(addIconEl, 'plus');
+      const addCopyEl = addCardEl.createDiv({ cls: 'opencodian-preset-card-copy' });
+      addCopyEl.createDiv({
+        cls: 'opencodian-preset-card-title',
+        text: t('settings.model.configCard.add'),
+      });
+      addCopyEl.createDiv({
+        cls: 'opencodian-preset-card-meta',
+        text: t('settings.model.configCard.addDesc'),
+      });
+
+      const actionsEl = configBodyEl.createDiv({ cls: 'opencodian-config-buttons' });
+      const jsonButton = actionsEl.createEl('button', {
+        text: t('settings.model.config.jsonButton'),
+      });
+      jsonButton.type = 'button';
+      jsonButton.addEventListener('click', () => {
+        new ModelConfigJsonModal(this.app, this.plugin).open();
+      });
     };
 
     const updateDefaultModelButton = (): void => {
@@ -1686,6 +1797,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         });
 
         updateCommonSummary();
+        renderConfigCards();
         updateDefaultModelButton();
         renderAvailabilityManagement();
         this.refreshTitleModelsCallback?.();
@@ -1816,28 +1928,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
           });
       });
 
-    const modelConfigSetting = new Setting(toolsBodyEl)
-      .setName(t('settings.model.config.name'))
-      .addButton((btn) => {
-        btn
-          .setButtonText(t('settings.model.config.visualButton'))
-          .setCta()
-          .onClick(() => {
-            new ModelConfigModal(this.app, this.plugin).open();
-          });
-      })
-      .addButton((btn) => {
-        btn
-          .setButtonText(t('settings.model.config.jsonButton'))
-          .onClick(() => {
-            new ModelConfigJsonModal(this.app, this.plugin).open();
-          });
-      });
-    this.setSettingDescWithFormatting(
-      modelConfigSetting,
-      `${t('settings.model.config.desc')}\n${modelConfigService.getConfigPath()}`,
-    );
-
+    renderConfigCards();
     let refreshIconCacheButton: import('obsidian').ButtonComponent;
     let warmIconCacheButton: import('obsidian').ButtonComponent;
     let viewIconCacheButton: import('obsidian').ButtonComponent;
@@ -1851,6 +1942,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
           .onClick(async () => {
             const providerIds = await this.getCurrentProviderIdsForIconCache();
             new ProviderIconCacheModal(this.app, this.plugin, providerIds, () => {
+              renderConfigCards();
               void refreshIconCacheOverview();
             }).open();
           });
@@ -1917,6 +2009,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
                 supported: String(summary.supported),
                 removed: String(removed),
               }));
+              renderConfigCards();
               await refreshIconCacheOverview();
             } catch (error) {
               logger.error('Failed to refresh provider icon cache:', error);
@@ -1958,6 +2051,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
                 cached: String(summary.cached),
                 supported: String(summary.supported),
               }));
+              renderConfigCards();
               await refreshIconCacheOverview();
             } catch (error) {
               logger.error('Failed to warm provider icon cache:', error);

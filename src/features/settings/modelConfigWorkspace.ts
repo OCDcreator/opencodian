@@ -264,7 +264,7 @@ export function createEmptyProvider(defaultFormat: ProviderInterfaceFormatId = D
     name: '',
     interfaceFormat: preset.id,
     customNpm: '',
-    baseURL: preset.defaultBaseUrl,
+    baseURL: '',
     apiKey: '',
     enabled: true,
     extraOptions: [],

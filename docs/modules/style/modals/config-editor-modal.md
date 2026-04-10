@@ -12,8 +12,9 @@
 - 配置编辑：`.opencodian-config-editor*`、`.opencodian-config-help*`、`.opencodian-config-buttons`。
 - 上下文统计：`.opencodian-context-breakdown*`、`.opencodian-context-modal-*`。
 - 模型开关管理：`.opencodian-model-toggle-*`。
-- 模型工作区：`.opencodian-model-workspace-*`（侧栏、编辑区、advanced 区块、状态徽章）。
+- 模型工作区：`.opencodian-model-workspace-*`（平铺表单、预设选择器、provider 切换条、工具条、JSON 预览、状态徽章）。
 - 设置区块：`.opencodian-settings-block*`。
+- provider 卡片 / 预设卡片：`.opencodian-settings-provider-*`、`.opencodian-preset-*`。
 
 ## 关联 TS 组件
 
@@ -26,5 +27,5 @@
 ## 修改注意点
 
 - 该文件是“设置弹窗样式聚合点”，命名冲突风险高，新增类建议保持 `opencodian-<feature>-*` 前缀。
-- 含较多响应式规则（`@media`），改网格列数时需同时检查窄屏可读性。
+- 含较多响应式规则（`@media`），改网格列数、工具条折行或 footer 粘底时需同时检查窄屏可读性。
 - 修改后执行 `npm run build:css`（或完整 `npm run build`）。

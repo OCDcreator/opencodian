@@ -34,12 +34,13 @@
 其中最近变化较大的几块是：
 
 - **Model**
-  - 重构成“常用 / 可用范围与目录 / 项目工作区”三段式模型中心
+  - 重构成“常用 / 可用范围与目录 / 当前提供商与模型”三段式模型中心
   - 默认聊天模型不再拆成 provider/model 两个普通下拉，而是走可搜索 picker
   - provider 级可用性开关只写回当前项目 `.opencode/opencode.json`，可覆盖服务器继承的 provider 白名单 / 黑名单
   - model 级可用性开关写回插件设置 `disabledModelRefs`
   - provider 列表支持折叠、搜索、`仅看已禁用` 过滤；provider 级批量启用/禁用改为跟随当前选中的目录卡片（如项目配置、服务器目录、当前生效列表）显示在对应目录容器里
-  - provider / model 的项目级配置与图标缓存管理收拢进 `ModelConfigModal` 工作区；该弹窗现按 `CC Switch` 风格重组为左侧 provider 导航 + 右侧单列表单流，JSON 编辑器与重启选项位于默认折叠的高级区
+  - 项目配置块本身改成双列 provider 卡片入口：直接展示当前项目本地 provider，点击卡片按 `provider.id` 打开 `ModelConfigModal`，点击加号则直接进入新增 provider 流程
+  - provider / model 的项目级配置与图标缓存管理收拢进 `ModelConfigModal`；该弹窗现按 `CC Switch` 风格重组为顶部预设条 + 横向 provider 切换 + 单列表单流，配置 JSON 与重启选项固定放在底部预览区
   - provider 图标缓存工具区新增全局 `providerIconColorMode` 设置，可在 `跟随系统 / 单色 / 彩色` 间切换；内置图标选择器会实时预览当前模式，方便判断 LobeHub 彩色图标是否适合当前主题
 - **Conversation**
   - `questionDisplayMode`
@@ -89,8 +90,8 @@
     - `服务器目录` = `opencode models` / `config.providers(directory)` 当前 provider 集合
     - `当前生效列表` = `服务器目录` 再叠加当前 scoped config、项目本地 provider 开关与 source mode 过滤
     - `当前禁用列表` = 当前目录中被配置禁用的项 + 仅来自配置层的禁用占位 + 模型级 `disabledModelRefs`
-- **项目工作区**：打开项目级 provider/model 工作区，集中处理 provider 主字段、模型列表、图标缓存入口和实时 JSON 预览
-- “可用范围与目录”和“项目工作区”都是默认展开的 `details` block，用户折叠状态会写回插件设置并在下次打开时恢复
+- **当前提供商与模型**：设置块直接展示当前项目 provider 卡片；点击卡片进入 provider/model 配置弹窗，集中处理 provider 主字段、模型列表、图标缓存入口和实时 JSON 预览
+- “可用范围与目录”和“当前提供商与模型”都是默认展开的 `details` block，用户折叠状态会写回插件设置并在下次打开时恢复
 
 provider 开关写回仍遵循 `ModelConfigService` 返回的 `effectiveProviderConfig` 继承规则：项目 `enabled_providers` / `disabled_providers` 字段存在时替换服务器字段，这也意味着项目本地可以缩小或清空继承层禁用数组，而不是把继承禁用视为不可覆盖的硬限制。但设置页展示启用态时，额外参考 `currentEnabledProviderIds`，避免把当前作用域下已不可用的 provider 显示成“已启用”。设置页的 provider 可用性测试现在分两层：
 

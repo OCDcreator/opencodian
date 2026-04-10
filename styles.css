@@ -7932,6 +7932,11 @@ body[data-opencodian-provider-icon-mode="color"] {
   padding-bottom: 14px;
 }
 
+.opencodian-icon-cache-block > .opencodian-settings-block-summary > .opencodian-settings-block-desc {
+  padding-left: 0;
+  text-indent: 0;
+}
+
 .opencodian-settings-block-summary::-webkit-details-marker {
   display: none;
 }
@@ -8058,7 +8063,7 @@ body[data-opencodian-provider-icon-mode="color"] {
 }
 
 .opencodian-model-toggle-management {
-  margin: 0;
+  margin: 14px 0 18px;
 }
 
 .opencodian-model-toggle-block {
@@ -8129,6 +8134,8 @@ body[data-opencodian-provider-icon-mode="color"] {
 
 .opencodian-model-toggle-block > .opencodian-settings-subsection-heading {
   margin: 0 0 6px;
+  padding-left: 0;
+  text-indent: 0;
 }
 
 .opencodian-model-toggle-desc {
@@ -9413,8 +9420,15 @@ body[data-opencodian-provider-icon-mode="color"] {
   overflow-x: auto;
 }
 
-.opencodian-model-workspace-modal .modal {
-  width: min(1280px, calc(100vw - 48px));
+.opencodian-model-workspace-modal {
+  width: min(980px, calc(100vw - 32px)) !important;
+  max-width: none !important;
+}
+
+.opencodian-model-workspace-modal .modal-content {
+  width: 100%;
+  max-width: none;
+  box-sizing: border-box;
 }
 
 .opencodian-model-workspace-header {
@@ -9437,6 +9451,167 @@ body[data-opencodian-provider-icon-mode="color"] {
 
 .opencodian-model-workspace-path {
   margin: 0;
+}
+
+.opencodian-model-config-block-path {
+  margin-bottom: 14px;
+}
+
+.opencodian-model-config-block-empty {
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px dashed color-mix(in srgb, var(--background-modifier-border) 88%, transparent);
+  background: color-mix(in srgb, var(--background-primary) 82%, transparent);
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.opencodian-settings-provider-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.opencodian-preset-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  min-height: 88px;
+  padding: 14px;
+  text-align: left;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--background-modifier-border) 85%, transparent);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--background-primary) 96%, transparent) 0%,
+      color-mix(in srgb, var(--background-secondary) 88%, transparent) 100%
+    );
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease,
+    transform 120ms ease,
+    background 120ms ease;
+}
+
+.opencodian-preset-card:hover,
+.opencodian-preset-card:focus-visible {
+  border-color: color-mix(in srgb, var(--interactive-accent) 48%, var(--background-modifier-border));
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--interactive-accent) 16%, transparent),
+    0 10px 24px color-mix(in srgb, var(--interactive-accent) 8%, transparent);
+  transform: translateY(-1px);
+}
+
+.opencodian-settings-provider-card.is-disabled {
+  opacity: 0.78;
+}
+
+.opencodian-settings-provider-card.is-add-card,
+.opencodian-preset-card.is-custom-action {
+  border-style: dashed;
+  align-items: center;
+}
+
+.opencodian-preset-card-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--background-modifier-hover) 88%, transparent);
+}
+
+.opencodian-preset-card-copy {
+  min-width: 0;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.opencodian-preset-card-title {
+  font-weight: 600;
+  color: var(--text-normal);
+  word-break: break-word;
+}
+
+.opencodian-preset-card-subtitle,
+.opencodian-preset-card-meta {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.opencodian-settings-provider-card-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.opencodian-model-workspace-preset-nav {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.opencodian-model-workspace-back-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  align-self: flex-start;
+  border-radius: 10px;
+}
+
+.opencodian-model-workspace-preset-panel {
+  padding-top: 18px;
+  padding-bottom: 18px;
+}
+
+.opencodian-model-workspace-preset-intro {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-bottom: 18px;
+}
+
+.opencodian-model-workspace-preset-section + .opencodian-model-workspace-preset-section {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid color-mix(in srgb, var(--background-modifier-border) 80%, transparent);
+}
+
+.opencodian-preset-category-label {
+  margin-bottom: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--text-normal);
+}
+
+.opencodian-preset-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.opencodian-preset-grid > .opencodian-preset-card {
+  flex: 1 1 calc(50% - 5px);
+  min-width: min(260px, 100%);
+}
+
+.opencodian-model-workspace-preset-actions {
+  display: flex;
+  margin-top: 20px;
+}
+
+.opencodian-model-workspace-preset-actions > .opencodian-preset-card {
+  min-height: 60px;
 }
 
 .opencodian-model-workspace-toolbar {
@@ -9960,7 +10135,730 @@ body[data-opencodian-provider-icon-mode="color"] {
   color: var(--text-error);
 }
 
+.opencodian-model-workspace-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.opencodian-model-workspace-topbar {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.opencodian-model-workspace-back-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border-radius: 999px;
+  flex: 0 0 auto;
+}
+
+.opencodian-model-workspace-preset-panel,
+.opencodian-model-workspace-provider-strip,
+.opencodian-model-workspace-editor-hero {
+  border: 1px solid color-mix(in srgb, var(--background-modifier-border) 82%, transparent);
+  border-radius: 18px;
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--background-secondary) 86%, transparent) 0%,
+      color-mix(in srgb, var(--background-primary) 98%, transparent) 100%
+    );
+}
+
+.opencodian-model-workspace-preset-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px;
+}
+
+.opencodian-model-workspace-preset-header,
+.opencodian-model-workspace-provider-strip-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.opencodian-model-workspace-preset-chip-row,
+.opencodian-model-workspace-provider-strip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.opencodian-model-workspace-preset-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--background-modifier-border) 85%, transparent);
+  background: color-mix(in srgb, var(--background-primary) 94%, transparent);
+  color: var(--text-muted);
+  transition:
+    border-color 120ms ease,
+    background 120ms ease,
+    color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.opencodian-model-workspace-preset-chip:hover,
+.opencodian-model-workspace-preset-chip:focus-visible,
+.opencodian-model-workspace-preset-chip.is-selected {
+  color: var(--text-on-accent);
+  background: var(--interactive-accent);
+  border-color: color-mix(in srgb, var(--interactive-accent) 72%, transparent);
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--interactive-accent) 14%, transparent);
+}
+
+.opencodian-model-workspace-provider-strip {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 18px;
+}
+
+.opencodian-model-workspace-provider-tab {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: min(260px, 100%);
+  flex: 1 1 280px;
+  padding: 12px 14px;
+  text-align: left;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--background-modifier-border) 86%, transparent);
+  background: color-mix(in srgb, var(--background-primary) 96%, transparent);
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease,
+    transform 120ms ease,
+    opacity 120ms ease;
+}
+
+.opencodian-model-workspace-provider-tab:hover {
+  border-color: color-mix(in srgb, var(--interactive-accent) 42%, var(--background-modifier-border));
+}
+
+.opencodian-model-workspace-provider-tab.is-selected {
+  border-color: var(--interactive-accent);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--interactive-accent) 24%, transparent),
+    0 10px 20px color-mix(in srgb, var(--interactive-accent) 10%, transparent);
+  transform: translateY(-1px);
+}
+
+.opencodian-model-workspace-provider-tab.is-disabled {
+  opacity: 0.72;
+}
+
+.opencodian-model-workspace-provider-tab-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.opencodian-model-workspace-editor-hero {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  padding: 18px;
+}
+
+.opencodian-model-workspace-editor-hero-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--background-modifier-hover) 88%, transparent);
+  overflow: hidden;
+}
+
+.opencodian-model-workspace-editor-hero-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.opencodian-model-workspace-editor-hero-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.opencodian-model-workspace-preview-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.opencodian-model-workspace-restart-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-muted);
+}
+
+.opencodian-model-workspace-modal .modal-content {
+  max-height: calc(100vh - 32px);
+  padding: 0;
+  overflow-y: auto;
+}
+
+.opencodian-model-workspace-shell {
+  gap: 18px;
+  padding: 20px 24px 24px;
+}
+
+.opencodian-model-workspace-topbar {
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.opencodian-model-workspace-headline h2 {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.opencodian-model-workspace-intro {
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.opencodian-model-workspace-path {
+  margin: -4px 0 0;
+}
+
+.opencodian-model-workspace-toolbar.is-cc-switch {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 14px 18px;
+  margin: 4px 0 0;
+  padding: 0 0 18px;
+  border: 0;
+  border-bottom: 1px solid var(--background-modifier-border);
+  border-radius: 0;
+  background: none;
+}
+
+.opencodian-model-workspace-toolbar-label {
+  font-size: 22px;
+  line-height: 1.3;
+  font-weight: 700;
+  color: var(--text-normal);
+}
+
+.opencodian-model-workspace-toolbar-hint {
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.opencodian-model-workspace-toolbar-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--background-secondary) 92%, transparent);
+  color: var(--text-normal);
+  white-space: nowrap;
+}
+
+.opencodian-model-workspace-toolbar-toggle input {
+  margin: 0;
+}
+
+.opencodian-model-workspace-preset-panel,
+.opencodian-model-workspace-provider-strip,
+.opencodian-model-workspace-editor-panel,
+.opencodian-model-workspace-subsection,
+.opencodian-model-workspace-import-panel,
+.opencodian-model-workspace-model-card,
+.opencodian-model-workspace-editor-hero {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+}
+
+.opencodian-model-workspace-preset-panel,
+.opencodian-model-workspace-provider-strip {
+  margin: 0;
+}
+
+.opencodian-model-workspace-preset-header,
+.opencodian-model-workspace-provider-strip-header,
+.opencodian-model-workspace-section-header,
+.opencodian-model-workspace-subsection-header,
+.opencodian-model-workspace-import-header,
+.opencodian-model-workspace-model-controls,
+.opencodian-model-workspace-preview-toolbar {
+  align-items: center;
+  gap: 12px;
+}
+
+.opencodian-model-workspace-section {
+  padding: 0;
+}
+
+.opencodian-model-workspace-section + .opencodian-model-workspace-section,
+.opencodian-model-workspace-section + .opencodian-model-workspace-advanced {
+  margin-top: 34px;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.opencodian-model-workspace-section-title,
+.opencodian-model-workspace-subsection-title,
+.opencodian-model-workspace-import-title {
+  font-size: 18px;
+  line-height: 1.35;
+  font-weight: 700;
+}
+
+.opencodian-model-workspace-section-desc,
+.opencodian-model-workspace-subsection-desc,
+.opencodian-model-workspace-field-description,
+.opencodian-model-workspace-model-hint {
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.opencodian-model-workspace-grid {
+  gap: 18px 22px;
+}
+
+.opencodian-model-workspace-grid.is-identity-grid,
+.opencodian-model-workspace-grid.is-connection-grid,
+.opencodian-model-workspace-grid.is-model-limits-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.opencodian-model-workspace-field.is-full-span {
+  grid-column: 1 / -1;
+}
+
+.opencodian-model-workspace-field label {
+  margin-bottom: 10px;
+  font-size: 16px;
+  line-height: 1.4;
+  font-weight: 700;
+  color: var(--text-normal);
+}
+
+.opencodian-model-workspace-field input,
+.opencodian-model-workspace-field select,
+.opencodian-model-workspace-model-input,
+.opencodian-model-workspace-keyvalue-input,
+.opencodian-model-workspace-keyvalue-textarea {
+  min-height: 54px;
+  padding: 12px 16px;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--background-modifier-border) 92%, transparent);
+  background: color-mix(in srgb, var(--background-primary-alt) 88%, black 12%);
+  box-shadow: none;
+  font-size: 15px;
+}
+
+.opencodian-model-workspace-field select {
+  padding-right: 40px;
+}
+
+.opencodian-model-workspace-keyvalue-textarea {
+  min-height: 54px;
+  resize: vertical;
+}
+
+.opencodian-model-workspace-template-button,
+.opencodian-model-workspace-editor-actions button,
+.opencodian-model-workspace-subsection-header button,
+.opencodian-model-workspace-model-controls button,
+.opencodian-model-workspace-advanced-actions button,
+.opencodian-model-workspace-sidebar-add,
+.opencodian-model-workspace-preset-chip,
+.opencodian-model-workspace-provider-tab {
+  min-height: 42px;
+  padding: 0 14px;
+  border-radius: 14px;
+  border: 1px solid var(--background-modifier-border);
+  background: color-mix(in srgb, var(--background-secondary) 92%, transparent);
+  box-shadow: none;
+}
+
+.opencodian-model-workspace-provider-tab {
+  min-width: 220px;
+}
+
+.opencodian-model-workspace-preset-chip-row,
+.opencodian-model-workspace-provider-strip-list {
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.opencodian-model-workspace-model-list,
+.opencodian-model-workspace-keyvalue-list {
+  gap: 14px;
+}
+
+.opencodian-model-workspace-keyvalue-row {
+  grid-template-columns: minmax(220px, 1fr) minmax(260px, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+}
+
+.opencodian-model-workspace-keyvalue-cell {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.opencodian-model-workspace-keyvalue-cell-label {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
+.opencodian-model-workspace-model-card {
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.opencodian-model-workspace-model-header {
+  align-items: flex-start;
+  padding: 14px 0;
+}
+
+.opencodian-model-workspace-model-details {
+  padding: 2px 0 18px;
+}
+
+.opencodian-model-workspace-empty {
+  padding: 8px 0;
+  border: 0;
+  background: none;
+  text-align: left;
+}
+
+.opencodian-model-workspace-empty.small {
+  padding: 0;
+}
+
+.opencodian-model-workspace-empty.is-prominent {
+  padding: 16px 0 8px;
+  font-size: 16px;
+  line-height: 1.8;
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.opencodian-model-workspace-preview-toolbar {
+  margin-bottom: 12px;
+}
+
+.opencodian-model-workspace-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 8px;
+  padding: 18px 0 0;
+  border-top: 0;
+  background: transparent;
+}
+
+.opencodian-model-workspace-footer-button-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+}
+
+.opencodian-model-workspace-editor.is-add-provider-flow,
+.opencodian-model-workspace-editor-panel.is-add-provider-flow {
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+}
+
+.opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-section {
+  margin-top: 0;
+}
+
+.opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-grid {
+  gap: 16px 20px;
+}
+
+.opencodian-model-workspace-list-header {
+  display: grid;
+  grid-template-columns: 36px minmax(220px, 1fr) minmax(220px, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--background-modifier-border);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-faint);
+}
+
+.opencodian-model-workspace-list-header.is-keyvalue {
+  grid-template-columns: minmax(220px, 1fr) minmax(260px, 1fr) auto;
+}
+
+.opencodian-model-workspace-json-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
+.opencodian-model-config-json-editor.is-add-provider-flow {
+  min-height: clamp(280px, 34vh, 460px);
+  padding: 18px 20px;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--background-modifier-border) 86%, transparent);
+  background: color-mix(in srgb, var(--background-primary-alt) 92%, black 8%);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-subsection-header,
+.opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-model-controls,
+.opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-preview-toolbar,
+.opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-section-header {
+  justify-content: space-between;
+}
+
+.opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-section-header.is-with-actions,
+.opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-subsection-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-section-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 0;
+}
+
+.opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-section-copy .opencodian-model-workspace-section-desc {
+  margin-top: 0;
+}
+
+.opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-model-controls {
+  flex: 0 0 auto;
+}
+
+.opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-model-control-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-model-controls button,
+.opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-subsection-header button {
+  transition:
+    border-color 0.16s ease,
+    background 0.16s ease,
+    box-shadow 0.16s ease,
+    transform 0.16s ease,
+    color 0.16s ease;
+}
+
+.opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-model-controls button:hover,
+.opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-subsection-header button:hover {
+  border-color: color-mix(in srgb, var(--interactive-accent) 52%, var(--background-modifier-border));
+  background: color-mix(in srgb, var(--interactive-accent) 12%, var(--background-secondary));
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--interactive-accent) 18%, transparent),
+    0 10px 22px color-mix(in srgb, var(--interactive-accent) 12%, transparent);
+  transform: translateY(-1px);
+  color: color-mix(in srgb, var(--interactive-accent) 78%, var(--text-normal));
+}
+
+.opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-model-controls button:focus-visible,
+.opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-subsection-header button:focus-visible {
+  outline: none;
+  border-color: color-mix(in srgb, var(--interactive-accent) 62%, var(--background-modifier-border));
+  background: color-mix(in srgb, var(--interactive-accent) 14%, var(--background-secondary));
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--interactive-accent) 22%, transparent),
+    0 0 0 5px color-mix(in srgb, var(--interactive-accent) 12%, transparent),
+    0 10px 22px color-mix(in srgb, var(--interactive-accent) 12%, transparent);
+  transform: translateY(-1px);
+}
+
+.opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-field select {
+  transition:
+    border-color 0.16s ease,
+    background 0.16s ease,
+    box-shadow 0.16s ease,
+    transform 0.16s ease;
+}
+
+.opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-field select:hover {
+  border-color: color-mix(in srgb, var(--interactive-accent) 48%, var(--background-modifier-border));
+  background: color-mix(in srgb, var(--interactive-accent) 8%, var(--background-primary-alt));
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--interactive-accent) 16%, transparent),
+    0 8px 18px color-mix(in srgb, var(--interactive-accent) 10%, transparent);
+  transform: translateY(-1px);
+}
+
+.opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-field select:focus-visible,
+.opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-field select:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--interactive-accent) 62%, var(--background-modifier-border));
+  background: color-mix(in srgb, var(--interactive-accent) 10%, var(--background-primary-alt));
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--interactive-accent) 20%, transparent),
+    0 0 0 5px color-mix(in srgb, var(--interactive-accent) 12%, transparent),
+    0 8px 18px color-mix(in srgb, var(--interactive-accent) 10%, transparent);
+}
+
+.opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-section-title,
+.opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-subsection-title {
+  font-size: 20px;
+}
+
+.opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-list-header {
+  grid-template-columns: 42px minmax(0, 1fr) minmax(0, 1fr) 42px;
+  align-items: end;
+  margin-top: 18px;
+  margin-bottom: 14px;
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-model-header {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) minmax(0, 1fr) 42px;
+  gap: 12px;
+  align-items: center;
+  padding: 0;
+}
+
+.opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-model-header-fields.is-compact {
+  grid-template-columns: minmax(220px, 1fr) minmax(220px, 1fr);
+  gap: 12px;
+}
+
+.opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-model-card {
+  padding: 0;
+  border-bottom: 0;
+}
+
+.opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-model-expand {
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  border-radius: 12px;
+}
+
+.opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-model-expand svg {
+  width: 18px;
+  height: 18px;
+}
+
+.opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-model-input {
+  min-height: 42px;
+  height: 42px;
+  padding: 0 14px;
+  border-radius: 12px;
+}
+
+.opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-danger-button {
+  min-height: 42px;
+  white-space: nowrap;
+}
+
+.opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-danger-button.is-icon-only {
+  width: 42px;
+  min-width: 42px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-danger-button.is-icon-only:hover {
+  color: var(--text-error);
+  background: color-mix(in srgb, var(--background-modifier-hover) 72%, transparent);
+}
+
+.opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-subsection-desc {
+  margin-top: 10px;
+}
+
+.opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-model-details {
+  margin-top: 12px;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-keyvalue-row {
+  grid-template-columns: minmax(240px, 1fr) minmax(240px, 1fr) 42px;
+  gap: 12px;
+  align-items: end;
+}
+
+.opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-keyvalue-textarea,
+.opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-keyvalue-input {
+  min-height: 56px;
+}
+
 @media (max-width: 900px) {
+  .opencodian-model-workspace-toolbar.is-cc-switch {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .opencodian-model-workspace-editor-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .opencodian-model-workspace-keyvalue-row {
+    grid-template-columns: 1fr;
+  }
+
+  .opencodian-model-workspace-list-header,
+  .opencodian-model-workspace-list-header.is-keyvalue {
+    display: none;
+  }
+
+  .opencodian-settings-provider-grid {
+    grid-template-columns: 1fr;
+  }
+
   .opencodian-model-workspace-toolbar {
     grid-template-columns: 1fr;
   }
@@ -9991,6 +10889,41 @@ body[data-opencodian-provider-icon-mode="color"] {
   .opencodian-model-workspace-keyvalue-row,
   .opencodian-model-workspace-model-header-fields.is-compact {
     grid-template-columns: 1fr;
+  }
+
+  .opencodian-model-workspace-topbar,
+  .opencodian-model-workspace-editor-hero {
+    grid-template-columns: 1fr;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .opencodian-model-workspace-provider-tab {
+    min-width: 100%;
+    flex-basis: 100%;
+  }
+
+  .opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-model-header,
+  .opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-model-header-fields.is-compact {
+    grid-template-columns: 1fr;
+  }
+
+  .opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-section-header.is-with-actions,
+  .opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-subsection-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-model-control-buttons {
+    justify-content: flex-start;
+  }
+
+  .opencodian-model-workspace-preview-toolbar {
+    align-items: stretch;
+  }
+
+  .opencodian-preset-grid > .opencodian-preset-card {
+    flex-basis: 100%;
   }
 }
 
