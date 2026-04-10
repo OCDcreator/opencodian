@@ -8183,7 +8183,7 @@ body[data-opencodian-provider-icon-mode="color"] {
 }
 
 .opencodian-model-toggle-provider + .opencodian-model-toggle-provider {
-  margin-top: 12px;
+  margin-top: 10px;
 }
 
 .opencodian-model-toggle-provider:first-of-type {

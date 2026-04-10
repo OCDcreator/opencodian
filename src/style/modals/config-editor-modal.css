@@ -619,7 +619,7 @@
 
 .opencodian-model-toggle-provider-list {
   --opencodian-model-toggle-provider-preview-height: 112px;
-  margin-top: 18px;
+  margin-top: 8px;
   max-height: calc(var(--opencodian-model-toggle-provider-preview-height) * 4 + 48px);
   overflow-y: auto;
   padding-right: 6px;
@@ -648,11 +648,11 @@
 }
 
 .opencodian-model-toggle-provider + .opencodian-model-toggle-provider {
-  margin-top: 12px;
+  margin-top: 10px;
 }
 
 .opencodian-model-toggle-provider:first-of-type {
-  margin-top: 18px;
+  margin-top: 2px;
 }
 
 .opencodian-model-toggle-provider:first-of-type,
