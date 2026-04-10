@@ -12,6 +12,30 @@
 
 ---
 
+## 2026-04-10 离线期重复连接日志收敛
+
+### 🎯 改动目标
+
+- 避免 OpenCode 服务离线时控制台被 `ERR_CONNECTION_REFUSED` / `ERR_CONNECTION_RESET` 的 fallback 与失败日志持续刷屏
+- 让 `global.syncEvent` 在离线期不要每秒重连一次，减少重复网络报错
+- 同步更新模块文档，并把最新构建部署到 Test Vault 便于验证
+
+### ✅ 本轮调整
+
+- `src/core/opencode/OpenCodeService.ts`
+  - 将瞬时离线日志抑制从“按操作类型节流”改为“整段离线期全局只报首条”
+  - 仅在服务恢复健康后清空抑制状态，避免设置轮询、消息同步、问题刷新分别重复报错
+  - `global.syncEvent` 连接失败遇到 `ERR_CONNECTION_REFUSED` / `ERR_CONNECTION_RESET` 时，改为健康轮询等待恢复后再重连
+
+- `docs/modules/core/opencode/OpenCodeService.md`
+  - 更新模块文档，说明新的离线期日志收敛与 sync-event 重连策略
+
+### 🧪 验证结果
+
+- `npm run build` 通过，最新 `BUILD_ID: main.202604101211`
+- 已按顺序复制 `dist/main.js`、`dist/manifest.json`、`dist/styles.css` 到 Test Vault
+- 已确认 Test Vault `main.js` 含最新 `BUILD_ID: main.202604101211`
+
 ## 2026-04-10 设置页目录级批量提供商开关与模型批量开关
 
 ### 🎯 改动目标

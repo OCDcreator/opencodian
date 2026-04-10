@@ -73,7 +73,7 @@
 
 补充一个运行时细节：
 
-- 当本地 `4096` 服务短暂离线、SDK/legacy 都同时打到 `ERR_CONNECTION_REFUSED` / `ERR_CONNECTION_RESET` 时，`OpenCodeService` 会按操作类型节流重复的 fallback / failure 日志，避免设置页轮询、问题列表刷新和消息同步在控制台刷屏；服务恢复并重新健康后会清空这组抑制状态。
+- 当本地服务短暂离线、SDK/legacy 都同时打到 `ERR_CONNECTION_REFUSED` / `ERR_CONNECTION_RESET` 时，`OpenCodeService` 现在会把整段离线期的重复 fallback / failure 日志合并成一次；服务恢复并重新健康后才解除抑制。`global.syncEvent.subscribe()` 在离线期也会改为健康轮询等待恢复，而不是每秒继续重连刷控制台。
 
 特别点：
 

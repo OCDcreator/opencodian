@@ -60,7 +60,7 @@ import type {
 
 const logger = createLogger('OpenCodeService');
 const INLINE_READ_TOOL_PREFIX = 'Called the Read tool with the following input:';
-const TRANSIENT_CONNECTIVITY_LOG_THROTTLE_MS = 15_000;
+const TRANSIENT_CONNECTIVITY_RECOVERY_POLL_MS = 3_000;
 const TRANSIENT_CONNECTIVITY_ERROR_PATTERNS = [
   /net::ERR_CONNECTION_REFUSED/i,
   /net::ERR_CONNECTION_RESET/i,
@@ -487,6 +487,10 @@ type SessionSyncEventListener = (update: SessionSyncEventUpdate) => void;
 
 const REMOTE_CONTEXT_TEXT_LIMIT_BYTES = 64 * 1024;
 
+interface TransientConnectivityLogState {
+  suppressedCount: number;
+}
+
 export class OpenCodeService {
   private settings: OpenCodianSettings;
   private events: OpenCodeServiceEvents;
@@ -503,7 +507,7 @@ export class OpenCodeService {
   private syncEventPromise: Promise<void> | null = null;
   private syncEventWanted = false;
   private vaultPath?: string;
-  private transientConnectivityLogState = new Map<string, { lastLoggedAt: number; suppressedCount: number }>();
+  private transientConnectivityLogState: TransientConnectivityLogState | null = null;
 
   constructor(
     settings: OpenCodianSettings,
@@ -550,30 +554,17 @@ export class OpenCodeService {
     return TRANSIENT_CONNECTIVITY_ERROR_PATTERNS.some((pattern) => pattern.test(message));
   }
 
-  private logTransientConnectivityIssue(
-    key: string,
-    level: 'warn' | 'error',
-    message: string,
-    error: unknown,
-  ): void {
-    const now = Date.now();
-    const previous = this.transientConnectivityLogState.get(key);
-
-    if (previous && now - previous.lastLoggedAt < TRANSIENT_CONNECTIVITY_LOG_THROTTLE_MS) {
-      previous.suppressedCount += 1;
-      this.transientConnectivityLogState.set(key, previous);
+  private logTransientConnectivityIssue(level: 'warn' | 'error', message: string, error: unknown): void {
+    if (this.transientConnectivityLogState) {
+      this.transientConnectivityLogState.suppressedCount += 1;
       return;
     }
 
-    const suppressedCount = previous?.suppressedCount ?? 0;
-    const nextMessage = suppressedCount > 0
-      ? `${message} (${suppressedCount} similar offline logs suppressed)`
-      : message;
-
-    this.transientConnectivityLogState.set(key, {
-      lastLoggedAt: now,
+    this.transientConnectivityLogState = {
       suppressedCount: 0,
-    });
+    };
+
+    const nextMessage = `${message} (subsequent offline logs suppressed until the server recovers)`;
 
     if (level === 'warn') {
       logger.warn(nextMessage, error);
@@ -585,7 +576,7 @@ export class OpenCodeService {
 
   private logServiceWarning(key: string, message: string, error: unknown): void {
     if (this.isTransientConnectivityError(error)) {
-      this.logTransientConnectivityIssue(`warn:${key}`, 'warn', message, error);
+      this.logTransientConnectivityIssue('warn', message, error);
       return;
     }
 
@@ -594,7 +585,7 @@ export class OpenCodeService {
 
   private logServiceError(key: string, message: string, error: unknown): void {
     if (this.isTransientConnectivityError(error)) {
-      this.logTransientConnectivityIssue(`error:${key}`, 'error', message, error);
+      this.logTransientConnectivityIssue('error', message, error);
       return;
     }
 
@@ -602,7 +593,18 @@ export class OpenCodeService {
   }
 
   private resetTransientConnectivityLogState(): void {
-    this.transientConnectivityLogState.clear();
+    this.transientConnectivityLogState = null;
+  }
+
+  private async waitForTransientConnectivityRecovery(signal: AbortSignal): Promise<void> {
+    while (!signal.aborted && this.syncEventWanted && this.hasSyncEventListeners()) {
+      const healthy = await this.checkHealth().catch(() => false);
+      if (healthy) {
+        return;
+      }
+
+      await this.delay(TRANSIENT_CONNECTIVITY_RECOVERY_POLL_MS, signal).catch(() => {});
+    }
   }
 
   /** Initialize the service */
@@ -1509,7 +1511,12 @@ export class OpenCodeService {
         if (abortController.signal.aborted) {
           break;
         }
+        const isTransientConnectivity = this.isTransientConnectivityError(error);
         this.logServiceWarning('global.sync-event', 'SDK sync event stream failed', error);
+        if (isTransientConnectivity) {
+          await this.waitForTransientConnectivityRecovery(abortController.signal);
+          continue;
+        }
       }
 
       if (abortController.signal.aborted) {
