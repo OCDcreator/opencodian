@@ -5,11 +5,13 @@
 
 ## 概述
 
-Provider 内置图标选择 Modal。面向单个 provider 展示 `LobeHub` 与 `OpenCode` 两套内置图标，支持搜索、库过滤、推荐排序与当前选中高亮；当前实现采用响应式卡片网格，每个图标单独占据一张卡片，优先保证图标、名称、来源与选中状态都能完整显示，点击卡片后回调给 `ProviderIconCacheModal` 持久化为默认图标。
+Provider 内置图标选择 Modal。面向单个 provider 展示 `LobeHub` 与 `OpenCode` 两套内置图标，支持搜索、库过滤、推荐排序、当前选中高亮，以及全局 provider 图标颜色模式（跟随系统 / 单色 / 彩色）的实时预览与保存；当前实现采用响应式卡片网格，每个图标单独占据一张卡片，优先保证图标、名称、来源与选中状态都能完整显示，点击卡片后回调给 `ProviderIconCacheModal` 持久化为默认图标。
 
 ## 核心逻辑
 
 - 顶部控件包含库过滤下拉（全部 / LobeHub / OpenCode）与搜索框
+- 顶部控件额外包含 provider 图标颜色模式按钮组；切换后会立即写回插件设置，并让整个 Modal 的图标预览同步刷新
+- 控件区内置一组 preview chips，优先抽取当前图库前几个可渲染图标，便于比较彩色与单色效果
 - 列表数据来自 `ProviderIconService.listBuiltinIconOptions()`
 - 卡片展示图标预览、显示名、icon id、库来源，以及“推荐 / 当前”徽章
 - 图标预览失败时会自动回退到首字母占位，避免破图撑坏布局

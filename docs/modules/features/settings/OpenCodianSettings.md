@@ -40,6 +40,7 @@
   - model 级可用性开关写回插件设置 `disabledModelRefs`
   - provider 列表支持折叠、搜索、`仅看已禁用` 过滤；provider 级批量启用/禁用改为跟随当前选中的目录卡片（如项目配置、服务器目录、当前生效列表）显示在对应目录容器里
   - provider / model 的项目级配置与图标缓存管理收拢进 `ModelConfigModal` 工作区；该弹窗现按 `CC Switch` 风格重组为左侧 provider 导航 + 右侧单列表单流，JSON 编辑器与重启选项位于默认折叠的高级区
+  - provider 图标缓存工具区新增全局 `providerIconColorMode` 设置，可在 `跟随系统 / 单色 / 彩色` 间切换；内置图标选择器会实时预览当前模式，方便判断 LobeHub 彩色图标是否适合当前主题
 - **Conversation**
   - `questionDisplayMode`
   - `questionCardPosition`
@@ -131,6 +132,7 @@ provider 开关写回仍遵循 `ModelConfigService` 返回的 `effectiveProvider
 - `OpencodeConfigManager`: 读写 `.opencode` 配置
 - `PluginManagementService`: 构建插件环境快照
 - `ProviderIconService` / `ProviderIconCacheModal`: provider icon 缓存与自定义图标管理
+- `ProviderBuiltinIconPickerModal`: 除了搜索与图库过滤外，还负责 provider 图标颜色模式的即时预览与保存
 - `ModelPickerModal`: 默认模型和 AI 标题模型共用的搜索式 picker；标题模型即使被开关链路禁用也会保留当前选择，并在设置项右侧显示警告入口
 - `ModelConfigModal` / `ModelConfigJsonModal` / `OpencodeConfigModal`: 配置编辑入口
 - `ServerSettingHelpModal` / `LiquidGlassSettingHelpModal`: 帮助说明入口
@@ -143,5 +145,6 @@ provider 开关写回仍遵循 `ModelConfigService` 返回的 `effectiveProvider
 - 样式分组和默认值最终都以 `core/types/settings.ts` 的归一化逻辑为准。
 - 这个文件同时处理“运行时 UI 状态”和“持久化设置”，两者不要混淆。
 - 任何新增设置如果涉及 i18n、默认值、迁移或视图刷新，通常都不只改这一处。
+- provider 图标颜色模式虽然存在于模型工具区，但它影响聊天区、设置页、模型工作区与图标管理 modal 的所有 provider 图标显示，因此保存后要同步触发全局 UI 应用。
 - Debug 分区里的“内联序列化调试参数”只影响 `logger.debug(...)` 的 console 输出形式，不改变 `info/warn/error` 的独立对象参数行为。
 - 如果设置页 `服务器目录` 的 provider 数量明显少于 `opencode models`，先排查 `ServerManager` 是否接管了旧的本地 `4096` 进程；不要先改这里的展示过滤逻辑。

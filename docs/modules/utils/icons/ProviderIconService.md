@@ -5,7 +5,7 @@
 
 ## 概述
 
-AI 模型提供商图标管理服务。使用 LobeHub Icons CDN（`@lobehub/icons-static-svg`）与插件内置的 OpenCode provider 图标作为内置来源，同时保留自定义图标源。提供图标 URL 解析、本地缓存、自定义图标上传、内置图标选择和批量预热功能。所有静态方法设计为无状态工具类。
+AI 模型提供商图标管理服务。使用 LobeHub Icons CDN（`@lobehub/icons-static-svg`）与插件内置的 OpenCode provider 图标作为内置来源，同时保留自定义图标源。提供图标 URL 解析、本地缓存、自定义图标上传、内置图标选择和批量预热功能。所有静态方法设计为无状态工具类；图标最终显示颜色由全局 `providerIconColorMode` + CSS 变量 `--lobehub-icon-filter` 决定。
 
 ## 导入关系
 上游: `fs`, `path`, `obsidian` (App, normalizePath, requestUrl), `../../core/types` (ProviderIconEntry, ProviderIconLibrary), `../../shared` (createLogger)
@@ -111,9 +111,9 @@ resolveIconUrl(app, providerId, library)
 ## 与其他模块的交互
 
 - **OpenCodianView**: 调用 `resolveIconUrl()` 在模型选择器和消息头部显示 provider 图标
-- **OpenCodianSettings**: 调用 `getProviderCacheState()` 在图标缓存设置面板显示状态
+- **OpenCodianSettings**: 调用 `getProviderCacheState()` 在图标缓存设置面板显示状态，并负责切换全局 provider 图标颜色模式
 - **ProviderIconCacheModal**: 调用 `selectBuiltinIcon()`, `addCustomIconSource()`, `removeProviderEntry()`, `clearCache()` 管理图标
-- **ProviderBuiltinIconPickerModal**: 调用 `listBuiltinIconOptions()` 浏览内置图标库
+- **ProviderBuiltinIconPickerModal**: 调用 `listBuiltinIconOptions()` 浏览内置图标库，并在颜色模式切换时复用相同的 preview URL
 - **StorageService**: 持久化 `ProviderIconLibrary` 到 settings
 
 ## 配置项
@@ -131,4 +131,3 @@ resolveIconUrl(app, providerId, library)
 - `requestUrl` 使用 Obsidian API，不走系统代理
 - MIME 检测优先级：Content-Type header → 文件头魔数 → 扩展名
 - `PROVIDER_ICON_MAP` 仍是旧映射稳定层；OpenCode 图标则通过 registry + alias + 搜索接入
-

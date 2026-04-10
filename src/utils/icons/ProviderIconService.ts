@@ -522,6 +522,7 @@ export class ProviderIconService {
     if (!iconUrl) return null;
     
     const img = document.createElement('img');
+    img.classList.add('opencodian-provider-icon-image');
     img.src = iconUrl;
     img.width = size;
     img.height = size;

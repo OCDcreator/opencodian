@@ -12,6 +12,55 @@
 
 ---
 
+## 2026-04-10 provider 图标颜色模式、预览与测试回归
+
+### 🎯 改动目标
+
+- 让 provider 图标支持 `跟随系统 / 单色 / 彩色` 三种显示模式，方便判断 LobeHub 彩色图标是否适合当前主题
+- 在内置图标选择器中提供即时预览，避免用户来回切设置后再观察效果
+- 修正相关测试基座与断言，使 `npm run test` 在当前代码状态下恢复全绿
+
+### ✅ 本轮调整
+
+- `src/core/types/settings.ts`
+- `src/main.ts`
+  - 新增全局设置 `providerIconColorMode`
+  - 在插件加载与 UI 刷新时同步把图标颜色模式写到 `body[data-opencodian-provider-icon-mode]`
+
+- `src/features/settings/OpenCodianSettings.ts`
+- `src/features/settings/ProviderBuiltinIconPickerModal.ts`
+- `src/features/settings/ProviderIconCacheModal.ts`
+  - 在模型工具区新增 provider 图标颜色模式设置项
+  - 内置图标选择器新增颜色模式按钮组与预览区，切换后即时保存并实时生效
+  - provider 图标预览统一挂接到同一套图标样式类
+
+- `src/features/chat/OpenCodianView.ts`
+- `src/features/settings/ModelConfigModal.ts`
+- `src/utils/icons/ProviderIconService.ts`
+- `src/style/base/core.css`
+- `src/style/modals/provider-icon-cache.css`
+- `styles.css`
+  - 聊天区、设置页、模型工作区、图标缓存弹窗统一接入 provider 图标颜色滤镜
+  - 增加颜色模式与预览区的样式
+
+- `tests/unit/main/themeSettingsMigration.test.ts`
+- `tests/unit/core/opencode/OpenCodeService.test.ts`
+  - 把主题迁移测试升级到当前 `loadPersistedSettings` 存储接口
+  - 调整离线 fallback 日志断言，使其与当前“整段离线期抑制重复日志”的实现一致
+
+- `docs/modules/features/settings/OpenCodianSettings.md`
+- `docs/modules/features/settings/ProviderBuiltinIconPickerModal.md`
+- `docs/modules/utils/icons/ProviderIconService.md`
+- `docs/modules/style/base/core.md`
+  - 同步补充图标颜色模式、实时预览和全局滤镜变量的文档说明
+
+### 🧪 验证结果
+
+- `npm run test` 通过，`60` 个测试套件、`488` 个测试全部通过
+- `npm run build` 通过，最新 `BUILD_ID: main.202604101239`
+- 已按顺序复制 `dist/main.js`、`dist/manifest.json`、`dist/styles.css` 到 Test Vault
+- 已确认 Test Vault `main.js` 含最新 `BUILD_ID: main.202604101239`
+
 ## 2026-04-10 离线期重复连接日志收敛
 
 ### 🎯 改动目标

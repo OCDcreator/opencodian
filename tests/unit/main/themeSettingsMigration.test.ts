@@ -7,20 +7,47 @@ import {
   getDefaultChatAppearanceSettings,
   getDefaultInputPanelGlassRefractionSettings,
 } from '../../../src/core/types';
+import type { StorageService } from '../../../src/core/storage';
 import OpenCodianPlugin from '../../../src/main';
+
+function createPluginWithSavedSettings(savedSettings: Record<string, unknown>): OpenCodianPlugin & {
+  storage: Pick<StorageService, 'loadPersistedSettings' | 'saveCoreSettings' | 'saveUiSettings'>;
+} {
+  const plugin = new OpenCodianPlugin() as OpenCodianPlugin & {
+    storage: Pick<StorageService, 'loadPersistedSettings' | 'saveCoreSettings' | 'saveUiSettings'>;
+  };
+
+  plugin.storage = {
+    loadPersistedSettings: jest.fn().mockResolvedValue({
+      core: {
+        data: savedSettings,
+        filePath: '.opencodian/settings.core.json',
+        source: 'primary',
+        shouldPersist: false,
+      },
+      ui: {
+        data: null,
+        filePath: '.opencodian/settings.ui.json',
+        source: 'missing',
+        shouldPersist: false,
+      },
+      writable: true,
+      shouldPersist: false,
+    }),
+    saveCoreSettings: jest.fn().mockResolvedValue(undefined),
+    saveUiSettings: jest.fn().mockResolvedValue(undefined),
+  } as Pick<StorageService, 'loadPersistedSettings' | 'saveCoreSettings' | 'saveUiSettings'>;
+
+  return plugin;
+}
 
 describe('OpenCodianPlugin.loadSettings theme migration', () => {
   it('binds legacy default chat appearance to the built-in current style preset', async () => {
-    const plugin = {
-      storage: {
-        loadSettings: jest.fn().mockResolvedValue({
-          chatAppearance: getDefaultChatAppearanceSettings(),
-        }),
-        saveSettings: jest.fn(),
-      },
-    } as unknown as OpenCodianPlugin;
+    const plugin = createPluginWithSavedSettings({
+      chatAppearance: getDefaultChatAppearanceSettings(),
+    });
 
-    await OpenCodianPlugin.prototype.loadSettings.call(plugin);
+    await plugin.loadSettings();
 
     expect(plugin.settings.theme).toEqual({
       activePresetId: 'glass-classic',
@@ -33,16 +60,11 @@ describe('OpenCodianPlugin.loadSettings theme migration', () => {
     const customizedAppearance = getDefaultChatAppearanceSettings();
     customizedAppearance.user.blur = 6;
 
-    const plugin = {
-      storage: {
-        loadSettings: jest.fn().mockResolvedValue({
-          chatAppearance: customizedAppearance,
-        }),
-        saveSettings: jest.fn(),
-      },
-    } as unknown as OpenCodianPlugin;
+    const plugin = createPluginWithSavedSettings({
+      chatAppearance: customizedAppearance,
+    });
 
-    await OpenCodianPlugin.prototype.loadSettings.call(plugin);
+    await plugin.loadSettings();
 
     expect(plugin.settings.theme).toEqual({
       activePresetId: null,
@@ -55,20 +77,15 @@ describe('OpenCodianPlugin.loadSettings theme migration', () => {
     const storedAppearance = getDefaultChatAppearanceSettings();
     storedAppearance.assistant.blur = 4;
 
-    const plugin = {
-      storage: {
-        loadSettings: jest.fn().mockResolvedValue({
-          chatAppearance: storedAppearance,
-          theme: {
-            activePresetId: 'glass-classic',
-            customAppearanceOverrides: {},
-          },
-        }),
-        saveSettings: jest.fn(),
+    const plugin = createPluginWithSavedSettings({
+      chatAppearance: storedAppearance,
+      theme: {
+        activePresetId: 'glass-classic',
+        customAppearanceOverrides: {},
       },
-    } as unknown as OpenCodianPlugin;
+    });
 
-    await OpenCodianPlugin.prototype.loadSettings.call(plugin);
+    await plugin.loadSettings();
 
     expect(plugin.settings.theme.activePresetId).toBe('glass-classic');
     expect(plugin.settings.theme.customAppearanceOverrides).toEqual({
@@ -86,20 +103,15 @@ describe('OpenCodianPlugin.loadSettings theme migration', () => {
     storedAppearance.background.imageDisplayName = 'theme-bg-test.png';
     storedAppearance.background.edgeFade = 36;
 
-    const plugin = {
-      storage: {
-        loadSettings: jest.fn().mockResolvedValue({
-          chatAppearance: storedAppearance,
-          theme: {
-            activePresetId: 'glass-classic',
-            customAppearanceOverrides: {},
-          },
-        }),
-        saveSettings: jest.fn(),
+    const plugin = createPluginWithSavedSettings({
+      chatAppearance: storedAppearance,
+      theme: {
+        activePresetId: 'glass-classic',
+        customAppearanceOverrides: {},
       },
-    } as unknown as OpenCodianPlugin;
+    });
 
-    await OpenCodianPlugin.prototype.loadSettings.call(plugin);
+    await plugin.loadSettings();
 
     expect(plugin.settings.theme.activePresetId).toBe('glass-classic');
     expect(plugin.settings.theme.customAppearanceOverrides).toEqual({});
@@ -121,31 +133,21 @@ describe('OpenCodianPlugin.loadSettings theme migration', () => {
   });
 
   it('migrates legacy liquid glass input theme values back to preset on load', async () => {
-    const plugin = {
-      storage: {
-        loadSettings: jest.fn().mockResolvedValue({
-          inputPanelTheme: 'liquid-glass',
-        }),
-        saveSettings: jest.fn(),
-      },
-    } as unknown as OpenCodianPlugin;
+    const plugin = createPluginWithSavedSettings({
+      inputPanelTheme: 'liquid-glass',
+    });
 
-    await OpenCodianPlugin.prototype.loadSettings.call(plugin);
+    await plugin.loadSettings();
 
     expect(plugin.settings.inputPanelTheme).toBe('preset');
   });
 
   it('migrates the removed rdev liquid glass input theme to shuding on load', async () => {
-    const plugin = {
-      storage: {
-        loadSettings: jest.fn().mockResolvedValue({
-          inputPanelTheme: 'liquid-glass-rdev',
-        }),
-        saveSettings: jest.fn(),
-      },
-    } as unknown as OpenCodianPlugin;
+    const plugin = createPluginWithSavedSettings({
+      inputPanelTheme: 'liquid-glass-rdev',
+    });
 
-    await OpenCodianPlugin.prototype.loadSettings.call(plugin);
+    await plugin.loadSettings();
 
     expect(plugin.settings.inputPanelTheme).toBe('liquid-glass-shuding');
   });
@@ -158,70 +160,55 @@ describe('OpenCodianPlugin.loadSettings theme migration', () => {
     'liquid-glass-shuding',
     'liquid-glass-nikdelvin',
   ] as const)('preserves explicit input panel theme value %s', async (inputPanelTheme) => {
-    const plugin = {
-      storage: {
-        loadSettings: jest.fn().mockResolvedValue({
-          inputPanelTheme,
-        }),
-        saveSettings: jest.fn(),
-      },
-    } as unknown as OpenCodianPlugin;
+    const plugin = createPluginWithSavedSettings({
+      inputPanelTheme,
+    });
 
-    await OpenCodianPlugin.prototype.loadSettings.call(plugin);
+    await plugin.loadSettings();
 
     expect(plugin.settings.inputPanelTheme).toBe(inputPanelTheme);
   });
 
   it('migrates the removed diamond input panel theme back to preset on load', async () => {
-    const plugin = {
-      storage: {
-        loadSettings: jest.fn().mockResolvedValue({
-          inputPanelTheme: 'liquid-diamond-shuding',
-        }),
-        saveSettings: jest.fn(),
-      },
-    } as unknown as OpenCodianPlugin;
+    const plugin = createPluginWithSavedSettings({
+      inputPanelTheme: 'liquid-diamond-shuding',
+    });
 
-    await OpenCodianPlugin.prototype.loadSettings.call(plugin);
+    await plugin.loadSettings();
 
     expect(plugin.settings.inputPanelTheme).toBe('preset');
   });
 
   it('resets legacy glass-refraction tier tuning to reference defaults', async () => {
-    const plugin = {
-      storage: {
-        loadSettings: jest.fn().mockResolvedValue({
-          chatAppearance: {
-            input: {
-              backgroundOpacity: 61,
-            },
-          },
-          inputPanelGlassRefraction: {
-            glass: {
-              backgroundOpacity: 56,
-              blur: 28,
-              saturation: 180,
-              brightness: 110,
-            },
-            card: {
-              backgroundOpacity: 44,
-              blur: 18,
-              saturation: 145,
-              brightness: 96,
-            },
-            pill: {
-              backgroundOpacity: 12,
-              blur: 10,
-              saturation: 138,
-              brightness: 104,
-            },
-          },
-        }),
-        saveSettings: jest.fn(),
+    const plugin = createPluginWithSavedSettings({
+      chatAppearance: {
+        input: {
+          backgroundOpacity: 61,
+        },
       },
-    } as unknown as OpenCodianPlugin;
+      inputPanelGlassRefraction: {
+        glass: {
+          backgroundOpacity: 56,
+          blur: 28,
+          saturation: 180,
+          brightness: 110,
+        },
+        card: {
+          backgroundOpacity: 44,
+          blur: 18,
+          saturation: 145,
+          brightness: 96,
+        },
+        pill: {
+          backgroundOpacity: 12,
+          blur: 10,
+          saturation: 138,
+          brightness: 104,
+        },
+      },
+    });
 
-    await OpenCodianPlugin.prototype.loadSettings.call(plugin);
+    await plugin.loadSettings();
 
     expect(plugin.settings.chatAppearance.input.backgroundOpacity).toBe(61);
     expect(plugin.settings.inputPanelGlassRefraction).toEqual({
@@ -233,36 +220,31 @@ describe('OpenCodianPlugin.loadSettings theme migration', () => {
   });
 
   it('preserves glass tuning from v1 while resetting card and pill to reference defaults', async () => {
-    const plugin = {
-      storage: {
-        loadSettings: jest.fn().mockResolvedValue({
-          inputPanelGlassRefractionGlassDefaultsVersion: 1,
-          inputPanelGlassRefraction: {
-            glass: {
-              backgroundOpacity: 56,
-              blur: 28,
-              saturation: 180,
-              brightness: 110,
-            },
-            card: {
-              backgroundOpacity: 44,
-              blur: 18,
-              saturation: 145,
-              brightness: 96,
-            },
-            pill: {
-              backgroundOpacity: 12,
-              blur: 10,
-              saturation: 138,
-              brightness: 104,
-            },
-          },
-        }),
-        saveSettings: jest.fn(),
+    const plugin = createPluginWithSavedSettings({
+      inputPanelGlassRefractionGlassDefaultsVersion: 1,
+      inputPanelGlassRefraction: {
+        glass: {
+          backgroundOpacity: 56,
+          blur: 28,
+          saturation: 180,
+          brightness: 110,
+        },
+        card: {
+          backgroundOpacity: 44,
+          blur: 18,
+          saturation: 145,
+          brightness: 96,
+        },
+        pill: {
+          backgroundOpacity: 12,
+          blur: 10,
+          saturation: 138,
+          brightness: 104,
+        },
       },
-    } as unknown as OpenCodianPlugin;
+    });
 
-    await OpenCodianPlugin.prototype.loadSettings.call(plugin);
+    await plugin.loadSettings();
 
     expect(plugin.settings.inputPanelGlassRefraction).toEqual({
       glass: {
@@ -278,36 +260,31 @@ describe('OpenCodianPlugin.loadSettings theme migration', () => {
   });
 
   it('preserves user-adjusted glass-refraction tuning after the v2 reset has run', async () => {
-    const plugin = {
-      storage: {
-        loadSettings: jest.fn().mockResolvedValue({
-          inputPanelGlassRefractionGlassDefaultsVersion: 2,
-          inputPanelGlassRefraction: {
-            glass: {
-              backgroundOpacity: 56,
-              blur: 28,
-              saturation: 180,
-              brightness: 110,
-            },
-            card: {
-              backgroundOpacity: 44,
-              blur: 18,
-              saturation: 145,
-              brightness: 96,
-            },
-            pill: {
-              backgroundOpacity: 12,
-              blur: 10,
-              saturation: 138,
-              brightness: 104,
-            },
-          },
-        }),
-        saveSettings: jest.fn(),
+    const plugin = createPluginWithSavedSettings({
+      inputPanelGlassRefractionGlassDefaultsVersion: 2,
+      inputPanelGlassRefraction: {
+        glass: {
+          backgroundOpacity: 56,
+          blur: 28,
+          saturation: 180,
+          brightness: 110,
+        },
+        card: {
+          backgroundOpacity: 44,
+          blur: 18,
+          saturation: 145,
+          brightness: 96,
+        },
+        pill: {
+          backgroundOpacity: 12,
+          blur: 10,
+          saturation: 138,
+          brightness: 104,
+        },
       },
-    } as unknown as OpenCodianPlugin;
+    });
 
-    await OpenCodianPlugin.prototype.loadSettings.call(plugin);
+    await plugin.loadSettings();
 
     expect(plugin.settings.inputPanelGlassRefraction).toEqual({
       glass: {
@@ -333,24 +310,19 @@ describe('OpenCodianPlugin.loadSettings theme migration', () => {
   });
 
   it('fills missing card and pill tiers with reference defaults after the v2 reset has run', async () => {
-    const plugin = {
-      storage: {
-        loadSettings: jest.fn().mockResolvedValue({
-          inputPanelGlassRefractionGlassDefaultsVersion: 2,
-          inputPanelGlassRefraction: {
-            glass: {
-              backgroundOpacity: 56,
-              blur: 28,
-              saturation: 180,
-              brightness: 110,
-            },
-          },
-        }),
-        saveSettings: jest.fn(),
+    const plugin = createPluginWithSavedSettings({
+      inputPanelGlassRefractionGlassDefaultsVersion: 2,
+      inputPanelGlassRefraction: {
+        glass: {
+          backgroundOpacity: 56,
+          blur: 28,
+          saturation: 180,
+          brightness: 110,
+        },
       },
-    } as unknown as OpenCodianPlugin;
+    });
 
-    await OpenCodianPlugin.prototype.loadSettings.call(plugin);
+    await plugin.loadSettings();
 
     expect(plugin.settings.inputPanelGlassRefraction).toEqual({
       glass: {
@@ -366,16 +338,11 @@ describe('OpenCodianPlugin.loadSettings theme migration', () => {
   });
 
   it('ignores the removed experimental composer glass refraction toggle field', async () => {
-    const plugin = {
-      storage: {
-        loadSettings: jest.fn().mockResolvedValue({
-          experimentalComposerGlassRefractionEnabled: true,
-        }),
-        saveSettings: jest.fn(),
-      },
-    } as unknown as OpenCodianPlugin;
+    const plugin = createPluginWithSavedSettings({
+      experimentalComposerGlassRefractionEnabled: true,
+    });
 
-    await OpenCodianPlugin.prototype.loadSettings.call(plugin);
+    await plugin.loadSettings();
 
     expect(plugin.settings.inputPanelTheme).toBe('preset');
     expect(

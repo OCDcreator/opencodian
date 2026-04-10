@@ -240,6 +240,7 @@ export interface PlatformDebugLogPaths {
 }
 
 export type ProviderIconEntryType = 'mapped' | 'builtin' | 'url' | 'file';
+export type ProviderIconColorMode = 'system' | 'monochrome' | 'color';
 
 export interface ProviderIconEntry {
   id: string;
@@ -252,6 +253,17 @@ export interface ProviderIconEntry {
 }
 
 export type ProviderIconLibrary = Record<string, ProviderIconEntry[]>;
+
+export function normalizeProviderIconColorMode(value: unknown): ProviderIconColorMode {
+  switch (value) {
+    case 'monochrome':
+    case 'color':
+    case 'system':
+      return value;
+    default:
+      return 'system';
+  }
+}
 
 const UNIX_BLOCKED_COMMANDS = [
   'rm -rf',
@@ -1394,6 +1406,7 @@ export interface OpenCodianSettings {
   pluginIsolationMode: PluginIsolationMode;
   providers: ModelProviderConfig[];
   providerIconLibrary: ProviderIconLibrary;
+  providerIconColorMode: ProviderIconColorMode;
   effortLevel: EffortLevel;
   thinkingBudget: ThinkingBudget;
 
@@ -1479,6 +1492,7 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
     },
   ],
   providerIconLibrary: {},
+  providerIconColorMode: 'system',
   effortLevel: 'high',
   thinkingBudget: 4096,
 

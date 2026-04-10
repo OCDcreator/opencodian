@@ -9,7 +9,7 @@
 
 ## 关键类名 / CSS 变量
 
-- `:root`、`.theme-dark`、`.theme-light`：定义 `--opencodian-*` 与 `--lobehub-icon-filter` 等主题变量。
+- `:root`、`.theme-dark`、`.theme-light`：定义 `--opencodian-*` 与 `--lobehub-icon-filter*` 等主题变量；其中 `body[data-opencodian-provider-icon-mode]` 会在 `跟随系统 / 单色 / 彩色` 三种 provider 图标模式之间切换。
 - `.opencodian-container`：聊天主容器，声明消息/输入区的尺寸变量（如 `--opencodian-messages-pad-*`、`--opencodian-composer-stack-height`）。
 - `.opencodian-messages`、`.opencodian-turn*`：消息列表、分轮结构与 sticky header 行为。
 - `.opencodian-tab-bar*`、`.opencodian-tab-overflow-menu*`：多会话标签栏与溢出菜单样式。
@@ -30,3 +30,4 @@
 - 此文件是全局变量源，改 token 前要检查 `components/`、`features/`、`modals/` 中是否有连锁影响。
 - 标签栏与 sticky header 依赖精确层级（`z-index`、`overflow`、`position`），不要单点改动后遗漏滚动场景验证。
 - 如仅调整样式拼接产物，执行 `npm run build:css`；发版前以 `npm run build` 为准。
+- provider 图标颜色模式是全局变量开关，改这里时要同时检查聊天区、设置页、模型工作区和 provider icon modal 的预览表现。

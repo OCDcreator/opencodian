@@ -1442,6 +1442,7 @@ export class ModelConfigModal extends Modal {
       return;
     }
     const imgEl = document.createElement('img');
+    imgEl.classList.add('opencodian-provider-icon-image');
     imgEl.src = url;
     imgEl.alt = label;
     targetEl.appendChild(imgEl);

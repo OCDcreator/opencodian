@@ -155,6 +155,7 @@ export class ProviderIconCacheModal extends Modal {
       const previewEl = itemEl.createDiv({ cls: 'opencodian-icon-cache-card-preview' });
       if (entry.iconUrl) {
         const img = document.createElement('img');
+        img.classList.add('opencodian-provider-icon-image');
         img.src = entry.iconUrl;
         img.alt = provider.providerId;
         previewEl.appendChild(img);
@@ -371,6 +372,7 @@ export class ProviderIconCacheModal extends Modal {
 
   private openBuiltinPicker(providerId: string): void {
     new ProviderBuiltinIconPickerModal(this.app, {
+      plugin: this.plugin,
       providerId,
       library: this.plugin.settings.providerIconLibrary,
       onChoose: async ({ libraryId, iconId }) => {

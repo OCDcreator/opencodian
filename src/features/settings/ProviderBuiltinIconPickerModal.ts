@@ -1,12 +1,14 @@
-import { Modal, setIcon } from 'obsidian';
+import { Modal, Notice, setIcon } from 'obsidian';
 
-import type { ProviderIconLibrary } from '../../core/types';
+import type { ProviderIconColorMode, ProviderIconLibrary } from '../../core/types';
 import { t } from '../../i18n';
+import type OpenCodianPlugin from '../../main';
 import { ProviderIconService } from '../../utils/icons';
 import type { BuiltinIconLibraryId } from '../../utils/icons';
 import { enhanceSearchInput, type SearchInputEnhancerHandle } from './searchInputEnhancer';
 
 interface ProviderBuiltinIconPickerModalOptions {
+  plugin?: OpenCodianPlugin;
   providerId: string;
   library: ProviderIconLibrary;
   onChoose: (selection: { libraryId: BuiltinIconLibraryId; iconId: string }) => void | Promise<void>;
@@ -16,10 +18,13 @@ export class ProviderBuiltinIconPickerModal extends Modal {
   private readonly options: ProviderBuiltinIconPickerModalOptions;
   private searchInputEl: HTMLInputElement | null = null;
   private gridEl: HTMLElement | null = null;
+  private previewEl: HTMLElement | null = null;
   private searchEnhancer: SearchInputEnhancerHandle | null = null;
+  private readonly colorModeButtons = new Map<ProviderIconColorMode, HTMLButtonElement>();
   private query = '';
   private libraryFilter: '' | BuiltinIconLibraryId = '';
   private choosing = false;
+  private updatingColorMode = false;
 
   constructor(app: Modal['app'], options: ProviderBuiltinIconPickerModalOptions) {
     super(app);
@@ -94,6 +99,22 @@ export class ProviderBuiltinIconPickerModal extends Modal {
       }
     });
 
+    const appearanceEl = controlsEl.createDiv({ cls: 'opencodian-builtin-icon-picker-appearance' });
+    const appearanceHeaderEl = appearanceEl.createDiv({ cls: 'opencodian-builtin-icon-picker-appearance-header' });
+    appearanceHeaderEl.createDiv({
+      cls: 'opencodian-builtin-icon-picker-appearance-label',
+      text: t('settings.model.iconCache.builtinPicker.colorModeLabel'),
+    });
+
+    const modeButtonsEl = appearanceHeaderEl.createDiv({ cls: 'opencodian-builtin-icon-picker-mode-buttons' });
+    this.createColorModeButton(modeButtonsEl, 'system');
+    this.createColorModeButton(modeButtonsEl, 'monochrome');
+    this.createColorModeButton(modeButtonsEl, 'color');
+
+    this.previewEl = appearanceEl.createDiv({ cls: 'opencodian-builtin-icon-picker-preview' });
+    this.renderColorModeButtons();
+    this.renderPreview();
+
     this.gridEl = this.contentEl.createDiv({ cls: 'opencodian-builtin-icon-picker-grid' });
     this.renderGrid();
 
@@ -106,6 +127,8 @@ export class ProviderBuiltinIconPickerModal extends Modal {
     this.searchEnhancer?.commitCurrentValue();
     this.searchEnhancer?.destroy();
     this.searchEnhancer = null;
+    this.colorModeButtons.clear();
+    this.previewEl = null;
     this.contentEl.empty();
     this.modalEl.removeClass('opencodian-builtin-icon-picker-modal');
   }
@@ -125,6 +148,7 @@ export class ProviderBuiltinIconPickerModal extends Modal {
         libraryId: this.libraryFilter || undefined,
       },
     );
+    this.renderPreview(options);
 
     if (options.length === 0) {
       this.gridEl.createDiv({
@@ -154,6 +178,7 @@ export class ProviderBuiltinIconPickerModal extends Modal {
       });
       if (option.previewUrl) {
         const imgEl = document.createElement('img');
+        imgEl.classList.add('opencodian-provider-icon-image');
         imgEl.src = option.previewUrl;
         imgEl.alt = option.displayName;
         imgEl.loading = 'lazy';
@@ -216,6 +241,121 @@ export class ProviderBuiltinIconPickerModal extends Modal {
       this.close();
     } finally {
       this.choosing = false;
+    }
+  }
+
+  private createColorModeButton(containerEl: HTMLElement, mode: ProviderIconColorMode): void {
+    const buttonEl = containerEl.createEl('button', {
+      cls: 'opencodian-builtin-icon-picker-mode-button',
+      text: t(`settings.model.iconCache.colorMode.${mode}` as const),
+      attr: {
+        type: 'button',
+      },
+    });
+    buttonEl.addEventListener('click', () => {
+      void this.setColorMode(mode);
+    });
+    this.colorModeButtons.set(mode, buttonEl);
+  }
+
+  private renderColorModeButtons(): void {
+    const currentMode = this.options.plugin?.settings.providerIconColorMode ?? 'system';
+    for (const [mode, buttonEl] of this.colorModeButtons.entries()) {
+      const isActive = mode === currentMode;
+      buttonEl.classList.toggle('is-active', isActive);
+      buttonEl.disabled = !this.options.plugin || (this.updatingColorMode && !isActive);
+      buttonEl.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+    }
+  }
+
+  private async setColorMode(mode: ProviderIconColorMode): Promise<void> {
+    const plugin = this.options.plugin;
+    if (!plugin || this.updatingColorMode || plugin.settings.providerIconColorMode === mode) {
+      return;
+    }
+
+    const previousMode = plugin.settings.providerIconColorMode;
+    this.updatingColorMode = true;
+    plugin.settings.providerIconColorMode = mode;
+    plugin.applyProviderIconColorMode();
+    this.renderColorModeButtons();
+
+    try {
+      await plugin.saveSettings({
+        syncService: false,
+        reloadModels: false,
+        syncConfig: false,
+        applyUi: true,
+      });
+    } catch (error) {
+      plugin.settings.providerIconColorMode = previousMode;
+      plugin.applyProviderIconColorMode();
+      new Notice(
+        error instanceof Error ? error.message : t('settings.model.iconCache.colorMode.saveFailed'),
+      );
+    } finally {
+      this.updatingColorMode = false;
+      this.renderColorModeButtons();
+    }
+  }
+
+  private renderPreview(
+    options: Array<{
+      libraryId: BuiltinIconLibraryId;
+      iconId: string;
+      displayName: string;
+      previewUrl: string | null;
+      source: string;
+    }> = ProviderIconService.listBuiltinIconOptions(
+      this.app,
+      this.options.providerId,
+      this.options.library,
+      {
+        libraryId: this.libraryFilter || undefined,
+      },
+    ),
+  ): void {
+    if (!this.previewEl) {
+      return;
+    }
+
+    this.previewEl.empty();
+    this.previewEl.createDiv({
+      cls: 'opencodian-builtin-icon-picker-preview-label',
+      text: t('settings.model.iconCache.builtinPicker.previewLabel'),
+    });
+
+    const previewListEl = this.previewEl.createDiv({ cls: 'opencodian-builtin-icon-picker-preview-list' });
+    const previewOptions = options
+      .filter((option) => Boolean(option.previewUrl))
+      .filter((option, index, collection) =>
+        collection.findIndex((candidate) => candidate.source === option.source) === index,
+      )
+      .slice(0, 4);
+
+    if (previewOptions.length === 0) {
+      previewListEl.createDiv({
+        cls: 'opencodian-builtin-icon-picker-preview-empty',
+        text: t('settings.model.iconCache.builtinPicker.previewEmpty'),
+      });
+      return;
+    }
+
+    for (const option of previewOptions) {
+      const itemEl = previewListEl.createDiv({ cls: 'opencodian-builtin-icon-picker-preview-item' });
+      const iconFrameEl = itemEl.createDiv({ cls: 'opencodian-builtin-icon-picker-preview-icon' });
+      if (option.previewUrl) {
+        const imgEl = document.createElement('img');
+        imgEl.classList.add('opencodian-provider-icon-image');
+        imgEl.src = option.previewUrl;
+        imgEl.alt = option.displayName;
+        imgEl.loading = 'lazy';
+        iconFrameEl.appendChild(imgEl);
+      }
+      itemEl.createDiv({
+        cls: 'opencodian-builtin-icon-picker-preview-name',
+        text: option.displayName,
+      });
     }
   }
 }

@@ -52,6 +52,7 @@ import {
   normalizeInputPanelThemeId,
   normalizePersistedTabState,
   normalizePluginIsolationMode,
+  normalizeProviderIconColorMode,
   normalizeProviderIconLibrary,
   normalizeQuestionCardPosition,
   normalizeQuestionDisplayMode,
@@ -171,6 +172,7 @@ export default class OpenCodianPlugin extends Plugin {
     await this.loadSettings();
     registerBuiltinGlassAdapters();
     this.applyLoggerSettings();
+    this.applyProviderIconColorMode();
 
     // Initialize locale
     setLocale(this.settings.locale as 'en' | 'zh');
@@ -334,6 +336,7 @@ export default class OpenCodianPlugin extends Plugin {
     });
     this.clearChatAppearanceSaveTimer();
     this.clearQueuedModelRefresh();
+    delete document.body.dataset.opencodianProviderIconMode;
 
   }
 
@@ -676,6 +679,7 @@ export default class OpenCodianPlugin extends Plugin {
                 ? savedSettings.inlineSerializedDebugLogArgs
                 : DEFAULT_SETTINGS.inlineSerializedDebugLogArgs,
             providerIconLibrary: normalizedProviderIconLibrary,
+            providerIconColorMode: normalizeProviderIconColorMode(savedSettings.providerIconColorMode),
           };
         })()
       : null;
@@ -701,6 +705,7 @@ export default class OpenCodianPlugin extends Plugin {
       theme: normalizedTheme,
       tabState: normalizedTabState ?? getDefaultPersistedTabState(),
       providerIconLibrary: normalizedProviderIconLibrary,
+      providerIconColorMode: normalizeProviderIconColorMode(normalizedSettings?.providerIconColorMode),
     };
 
     this.reportSettingsLoadState(persistedSettings);
@@ -754,6 +759,12 @@ export default class OpenCodianPlugin extends Plugin {
   private applyLoggerSettings(): void {
     setDebugLoggingEnabled(this.settings.enableDebugLogging);
     setInlineSerializedDebugLogArgsEnabled(this.settings.inlineSerializedDebugLogArgs);
+  }
+
+  applyProviderIconColorMode(): void {
+    document.body.dataset.opencodianProviderIconMode = normalizeProviderIconColorMode(
+      this.settings.providerIconColorMode,
+    );
   }
 
   applyChatAppearanceSettings(): void {
@@ -1104,6 +1115,10 @@ export default class OpenCodianPlugin extends Plugin {
 
   private refreshOpenCodianViews(options: { reloadModels?: boolean; applyUi?: boolean } = {}): void {
     const { reloadModels = true, applyUi = true } = options;
+
+    if (applyUi) {
+      this.applyProviderIconColorMode();
+    }
 
     for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_OPENCODIAN)) {
       const view = leaf.view;

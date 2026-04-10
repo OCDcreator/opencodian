@@ -2,7 +2,8 @@
 
 /* Dark mode filter for Lobehub icons (most are black, need inversion on dark bg) */
 .theme-dark {
-  --lobehub-icon-filter: invert(1);
+  --lobehub-icon-filter-system: invert(1);
+  --lobehub-icon-filter-monochrome: brightness(0) invert(1);
   --opencodian-glass-base: color-mix(in srgb, var(--background-primary) 68%, transparent);
   --opencodian-glass-base-strong: color-mix(in srgb, var(--background-secondary) 62%, transparent);
   --opencodian-glass-base-soft: color-mix(in srgb, var(--background-primary) 46%, transparent);
@@ -44,7 +45,8 @@
 }
 
 .theme-light {
-  --lobehub-icon-filter: none;
+  --lobehub-icon-filter-system: none;
+  --lobehub-icon-filter-monochrome: brightness(0) saturate(100%);
   --opencodian-glass-base: color-mix(in srgb, var(--background-primary) 42%, transparent);
   --opencodian-glass-base-strong: color-mix(in srgb, var(--background-secondary) 36%, transparent);
   --opencodian-glass-base-soft: color-mix(in srgb, var(--background-primary) 24%, transparent);
@@ -86,6 +88,7 @@
 }
 
 :root {
+  --lobehub-icon-filter: var(--lobehub-icon-filter-system, none);
   --opencodian-accent: var(--interactive-accent);
   --opencodian-accent-hover: var(--interactive-accent-hover);
   --opencodian-accent-contrast: var(--text-on-accent);
@@ -165,6 +168,22 @@
   --opencodian-composer-danger-bg-hover: color-mix(in srgb, var(--background-modifier-error) 82%, var(--background-primary));
   --opencodian-composer-danger-shadow: color-mix(in srgb, var(--background-modifier-error) 16%, transparent);
   --opencodian-composer-danger-shadow-strong: color-mix(in srgb, var(--background-modifier-error) 22%, transparent);
+}
+
+body[data-opencodian-provider-icon-mode="system"] {
+  --lobehub-icon-filter: var(--lobehub-icon-filter-system, none);
+}
+
+body[data-opencodian-provider-icon-mode="monochrome"] {
+  --lobehub-icon-filter: var(--lobehub-icon-filter-monochrome, none);
+}
+
+body[data-opencodian-provider-icon-mode="color"] {
+  --lobehub-icon-filter: none;
+}
+
+.opencodian-provider-icon-image {
+  filter: var(--lobehub-icon-filter, none);
 }
 
 .opencodian-container {

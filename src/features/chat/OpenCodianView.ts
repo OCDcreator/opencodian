@@ -11014,6 +11014,7 @@ export class OpenCodianView extends ItemView {
 
       if (iconUrl) {
         const img = document.createElement('img');
+        img.classList.add('opencodian-provider-icon-image');
         img.src = iconUrl;
         img.alt = iconLabel;
         img.title = iconLabel;

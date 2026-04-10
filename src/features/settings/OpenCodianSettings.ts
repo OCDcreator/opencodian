@@ -44,6 +44,7 @@ import {
   type ModelSourceMode,
   type OpencodeModelConfigSubset,
   type PluginIsolationMode,
+  type ProviderIconColorMode,
   type QuestionCardPosition,
   type QuestionDisplayMode,
   type ThemePresetDefinition,
@@ -1963,6 +1964,36 @@ export class OpenCodianSettingTab extends PluginSettingTab {
               new Notice(t('settings.model.iconCache.warmFailed'));
             } finally {
               setIconCacheButtonsDisabled(false);
+            }
+          });
+      });
+
+    new Setting(toolsBodyEl)
+      .setName(t('settings.model.iconCache.colorMode.name'))
+      .setDesc(t('settings.model.iconCache.colorMode.desc'))
+      .addDropdown((dropdown) => {
+        dropdown
+          .addOption('system', t('settings.model.iconCache.colorMode.system'))
+          .addOption('monochrome', t('settings.model.iconCache.colorMode.monochrome'))
+          .addOption('color', t('settings.model.iconCache.colorMode.color'))
+          .setValue(this.plugin.settings.providerIconColorMode)
+          .onChange(async (value) => {
+            const previousMode = this.plugin.settings.providerIconColorMode;
+            this.plugin.settings.providerIconColorMode = value as ProviderIconColorMode;
+            this.plugin.applyProviderIconColorMode();
+            try {
+              await this.plugin.saveSettings({
+                syncService: false,
+                reloadModels: false,
+                syncConfig: false,
+                applyUi: true,
+              });
+            } catch (error) {
+              this.plugin.settings.providerIconColorMode = previousMode;
+              this.plugin.applyProviderIconColorMode();
+              new Notice(
+                error instanceof Error ? error.message : t('settings.model.iconCache.colorMode.saveFailed'),
+              );
             }
           });
       });
@@ -5826,6 +5857,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     targetEl.empty();
     if (iconUrl) {
       const imgEl = document.createElement('img');
+      imgEl.classList.add('opencodian-provider-icon-image');
       imgEl.src = iconUrl;
       imgEl.alt = label;
       imgEl.title = label;

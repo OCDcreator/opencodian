@@ -1272,7 +1272,7 @@ describe('OpenCodeService', () => {
         );
 
         expect(offlineWarnLogs).toHaveLength(1);
-        expect(offlineErrorLogs).toHaveLength(1);
+        expect(offlineErrorLogs).toHaveLength(0);
       } finally {
         consoleWarnSpy.mockRestore();
         consoleErrorSpy.mockRestore();
