@@ -8067,6 +8067,47 @@
   margin: 14px 0 0;
 }
 
+.opencodian-model-catalog-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--background-modifier-border) 70%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--background-primary) 72%, var(--background-secondary));
+}
+
+.opencodian-model-catalog-actions-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1 1 220px;
+}
+
+.opencodian-model-catalog-actions-title {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--text-normal);
+}
+
+.opencodian-model-catalog-actions-meta {
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+
+.opencodian-model-catalog-actions-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
 .opencodian-model-toggle-block > .opencodian-settings-subsection-heading {
   margin: 0 0 6px;
 }
@@ -8406,6 +8447,10 @@
   transform: none;
 }
 
+.opencodian-model-toggle-action-button {
+  min-width: 148px;
+}
+
 .opencodian-model-toggle-provider-probe {
   margin-top: 8px;
   font-size: 12px;
@@ -8434,6 +8479,27 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.opencodian-model-toggle-model-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.opencodian-model-toggle-model-toolbar-summary {
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+
+.opencodian-model-toggle-model-bulk-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
 }
 
 .opencodian-model-toggle-model {
@@ -8560,6 +8626,14 @@
   }
 
   .opencodian-model-toggle-provider-test-button {
+    width: 100%;
+  }
+
+  .opencodian-model-catalog-actions-info,
+  .opencodian-model-catalog-actions-buttons,
+  .opencodian-model-toggle-model-toolbar-summary,
+  .opencodian-model-toggle-model-bulk-actions,
+  .opencodian-model-toggle-action-button {
     width: 100%;
   }
 

@@ -38,7 +38,7 @@
   - 默认聊天模型不再拆成 provider/model 两个普通下拉，而是走可搜索 picker
   - provider 级可用性开关只写回当前项目 `.opencode/opencode.json`，可覆盖服务器继承的 provider 白名单 / 黑名单
   - model 级可用性开关写回插件设置 `disabledModelRefs`
-  - provider 列表支持折叠、搜索、`仅看已禁用` 过滤与图标/来源 badge
+  - provider 列表支持折叠、搜索、`仅看已禁用` 过滤；provider 级批量启用/禁用改为跟随当前选中的目录卡片（如项目配置、服务器目录、当前生效列表）显示在对应目录容器里
   - provider / model 的项目级配置与图标缓存管理收拢进 `ModelConfigModal` 工作区；该弹窗现按 `CC Switch` 风格重组为左侧 provider 导航 + 右侧单列表单流，JSON 编辑器与重启选项位于默认折叠的高级区
 - **Conversation**
   - `questionDisplayMode`
@@ -81,6 +81,7 @@
 
 - **常用**：默认聊天模型、来源模式、刷新摘要
 - **可用范围与目录**：provider accordion + 模型级开关 + project/server/effective/disabled 四张目录摘要卡；`服务器目录` 应直接反映当前 runtime / `opencode models` 看到的 provider，provider 的禁用状态则作为配置层信息叠加到 `当前生效列表` / `当前禁用列表`；provider 卡主状态优先显示“项目禁用”，其次才是“服务端/继承配置禁用”，并新增逐 provider 的“测试可用性”按钮，用当前 vault 作用域重新探测 runtime 是否真的可用
+  - provider 批量按钮现在绑定到当前激活的目录卡片，只对该目录里的 provider 集合生效，而不是跨全部目录统一操作；provider 展开后的批量模型按钮始终针对该 provider 的完整模型集，而不是当前搜索/过滤后剩余的可见子集
   - 这个按钮现在已经改成“最小真实发送测试”：允许发送时会挑一个测试模型创建临时 session，真正发一条极小请求；因此它能直接暴露 `invalid_api_key`、provider 鉴权失败、服务端拒绝等真实错误，而不再只是看 runtime/目录
   - `当前生效列表` 现在按 `ModelConfigService.currentEnabledProviderIds` 判断 provider 是否真启用，所以不会再把当前作用域里被配置禁用的 provider 显示成绿色“已启用”
   - 三张卡的正确关系必须长期保持：

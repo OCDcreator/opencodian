@@ -962,6 +962,87 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       defaultModelButton.setDisabled(modelPickerGroups.length === 0);
     };
 
+    const applyProviderAvailabilityChange = async (
+      providerIds: Iterable<string>,
+      enabled: boolean,
+    ): Promise<void> => {
+      const normalizedProviderIds = Array.from(new Set(
+        Array.from(providerIds)
+          .map((providerId) => providerId.trim())
+          .filter((providerId) => providerId.length > 0),
+      ));
+      if (normalizedProviderIds.length === 0) {
+        return;
+      }
+
+      try {
+        const currentConfig = await modelConfigService.readLocalModelConfig();
+        const knownProviderIds = Array.from(new Set([
+          ...(catalogs?.server.providers.map((entry) => entry.id) ?? []),
+          ...(catalogs?.local.providers.map((entry) => entry.id) ?? []),
+          ...collectConfiguredProviderIds(catalogs?.serverConfig ?? {}),
+          ...collectConfiguredProviderIds(currentConfig),
+          ...normalizedProviderIds,
+        ]));
+        let nextConfig = currentConfig;
+        for (const providerId of normalizedProviderIds) {
+          nextConfig = setProviderEnabled(
+            nextConfig,
+            providerId,
+            enabled,
+            knownProviderIds,
+            catalogs?.serverConfig,
+          );
+        }
+        await modelConfigService.writeLocalModelConfig(nextConfig);
+        await refreshModelSettings({ forceViewReload: true });
+        await refreshIconCacheOverview();
+      } catch (error) {
+        logger.error('Failed to update provider availability in bulk:', error);
+        new Notice(t('settings.model.toggle.saveFailed'));
+      }
+    };
+
+    const applyModelAvailabilityChange = async (
+      modelRefs: Iterable<string>,
+      enabled: boolean,
+    ): Promise<void> => {
+      const normalizedModelRefs = Array.from(new Set(
+        Array.from(modelRefs)
+          .map((modelRef) => {
+            const parsedRef = parseModelReference(modelRef);
+            return parsedRef
+              ? formatModelReference(parsedRef.provider, parsedRef.model)
+              : '';
+          })
+          .filter((modelRef) => modelRef.length > 0),
+      ));
+      if (normalizedModelRefs.length === 0) {
+        return;
+      }
+
+      const previousDisabledModelRefs = [...this.plugin.settings.disabledModelRefs];
+      const nextDisabledModelRefs = new Set(previousDisabledModelRefs);
+      for (const modelRef of normalizedModelRefs) {
+        if (enabled) {
+          nextDisabledModelRefs.delete(modelRef);
+        } else {
+          nextDisabledModelRefs.add(modelRef);
+        }
+      }
+      this.plugin.settings.disabledModelRefs = [...nextDisabledModelRefs]
+        .sort((left, right) => left.localeCompare(right));
+
+      try {
+        await refreshModelSettings({ forceViewReload: true });
+        await refreshIconCacheOverview();
+      } catch (error) {
+        logger.error('Failed to update model availability in bulk:', error);
+        this.plugin.settings.disabledModelRefs = previousDisabledModelRefs;
+        new Notice(t('settings.model.toggle.saveFailed'));
+      }
+    };
+
     const openDefaultModelPicker = (): void => {
       new ModelPickerModal(this.app, {
         title: t('settings.model.defaultChatModel.pickerTitle'),
@@ -1082,8 +1163,9 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       });
       enabledToggleLabel.createSpan({ text: t('settings.model.availability.onlyEnabled') });
 
+      let catalogSectionEl: HTMLElement | null = null;
       if (catalogs) {
-        const catalogSectionEl = blockEl.createDiv({ cls: 'opencodian-model-toggle-catalogs' });
+        catalogSectionEl = blockEl.createDiv({ cls: 'opencodian-model-toggle-catalogs' });
         const summaryEl = catalogSectionEl.createDiv({ cls: 'opencodian-model-catalog-summary-grid' });
         this.renderModelCatalogSummaryCards(summaryEl, catalogs, localModelConfig, () => {
           renderAvailabilityManagement();
@@ -1111,6 +1193,88 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       const providerStatusById = new Map(
         providerStatusCatalog?.providers.map((provider) => [provider.id, provider]) ?? [],
       );
+      const selectedCatalogTitle = (() => {
+        switch (this.activeModelCatalogTab) {
+          case 'local':
+            return t('settings.model.catalog.localTitle');
+          case 'server':
+            return t('settings.model.catalog.serverTitle');
+          case 'disabled':
+            return t('settings.model.catalog.disabledTitle');
+          case 'effective':
+          default:
+            return t('settings.model.catalog.effectiveTitle');
+        }
+      })();
+      const selectedCatalogProviderIds = Array.from(new Set(
+        selectedCatalog?.providers.map((provider) => provider.id) ?? [],
+      ));
+      const catalogScopedProviderIds = selectedCatalogProviderIds.filter((providerId) => {
+        const provider = providerStatusById.get(providerId);
+        return provider ? !this.isProviderDisabledByScope(provider, 'global') : true;
+      });
+      if (catalogSectionEl && catalogs && this.activeModelCatalogTab !== 'disabled' && selectedCatalogProviderIds.length > 0) {
+        const catalogActionsEl = catalogSectionEl.createDiv({ cls: 'opencodian-model-catalog-actions' });
+        const catalogActionsInfoEl = catalogActionsEl.createDiv({ cls: 'opencodian-model-catalog-actions-info' });
+        catalogActionsInfoEl.createDiv({
+          cls: 'opencodian-model-catalog-actions-title',
+          text: selectedCatalogTitle,
+        });
+        catalogActionsInfoEl.createDiv({
+          cls: 'opencodian-model-catalog-actions-meta',
+          text: t('settings.model.catalog.summary', {
+            providers: String(selectedCatalog.providers.length),
+            models: String(this.getCatalogModelCount(selectedCatalog)),
+          }),
+        });
+
+        const catalogActionsButtonsEl = catalogActionsEl.createDiv({
+          cls: 'opencodian-model-catalog-actions-buttons',
+        });
+        const enableCatalogProvidersButton = catalogActionsButtonsEl.createEl('button', {
+          cls: 'opencodian-model-toggle-provider-test-button opencodian-model-toggle-action-button',
+          text: t('settings.model.availability.enableAllProviders'),
+        });
+        enableCatalogProvidersButton.type = 'button';
+        enableCatalogProvidersButton.disabled = catalogScopedProviderIds.length === 0
+          || catalogScopedProviderIds.every((providerId) => this.isProviderCurrentlyEnabled(providerId, catalogs));
+        const disableCatalogProvidersButton = catalogActionsButtonsEl.createEl('button', {
+          cls: 'opencodian-model-toggle-provider-test-button opencodian-model-toggle-action-button',
+          text: t('settings.model.availability.disableAllProviders'),
+        });
+        disableCatalogProvidersButton.type = 'button';
+        disableCatalogProvidersButton.disabled = catalogScopedProviderIds.length === 0
+          || catalogScopedProviderIds.every((providerId) => !this.isProviderCurrentlyEnabled(providerId, catalogs));
+
+        enableCatalogProvidersButton.addEventListener('click', async () => {
+          enableCatalogProvidersButton.disabled = true;
+          disableCatalogProvidersButton.disabled = true;
+          try {
+            await applyProviderAvailabilityChange(catalogScopedProviderIds, true);
+          } finally {
+            if (enableCatalogProvidersButton.isConnected) {
+              enableCatalogProvidersButton.disabled = false;
+            }
+            if (disableCatalogProvidersButton.isConnected) {
+              disableCatalogProvidersButton.disabled = false;
+            }
+          }
+        });
+        disableCatalogProvidersButton.addEventListener('click', async () => {
+          enableCatalogProvidersButton.disabled = true;
+          disableCatalogProvidersButton.disabled = true;
+          try {
+            await applyProviderAvailabilityChange(catalogScopedProviderIds, false);
+          } finally {
+            if (enableCatalogProvidersButton.isConnected) {
+              enableCatalogProvidersButton.disabled = false;
+            }
+            if (disableCatalogProvidersButton.isConnected) {
+              disableCatalogProvidersButton.disabled = false;
+            }
+          }
+        });
+      }
 
       const providers = selectedCatalog?.providers ?? [];
       if (providers.length === 0) {
@@ -1354,6 +1518,55 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         }
 
         const modelsEl = providerEl.createDiv({ cls: 'opencodian-model-toggle-models' });
+        const providerModelRefs = providerStatusSource.models.map((model) => formatModelReference(provider.id, model.id));
+        if (providerModelRefs.length > 0) {
+          const modelToolbarEl = modelsEl.createDiv({ cls: 'opencodian-model-toggle-model-toolbar' });
+          modelToolbarEl.createDiv({
+            cls: 'opencodian-model-toggle-model-toolbar-summary',
+            text: t('settings.model.toggle.allModelsSummary', {
+              count: String(providerModelRefs.length),
+            }),
+          });
+          const modelBulkActionsEl = modelToolbarEl.createDiv({ cls: 'opencodian-model-toggle-model-bulk-actions' });
+          const enableAllModelsButton = modelBulkActionsEl.createEl('button', {
+            cls: 'opencodian-model-toggle-provider-test-button opencodian-model-toggle-action-button',
+            text: t('settings.model.toggle.enableAllModels'),
+          });
+          enableAllModelsButton.type = 'button';
+          const disableAllModelsButton = modelBulkActionsEl.createEl('button', {
+            cls: 'opencodian-model-toggle-provider-test-button opencodian-model-toggle-action-button',
+            text: t('settings.model.toggle.disableAllModels'),
+          });
+          disableAllModelsButton.type = 'button';
+          enableAllModelsButton.addEventListener('click', async () => {
+            enableAllModelsButton.disabled = true;
+            disableAllModelsButton.disabled = true;
+            try {
+              await applyModelAvailabilityChange(providerModelRefs, true);
+            } finally {
+              if (enableAllModelsButton.isConnected) {
+                enableAllModelsButton.disabled = false;
+              }
+              if (disableAllModelsButton.isConnected) {
+                disableAllModelsButton.disabled = false;
+              }
+            }
+          });
+          disableAllModelsButton.addEventListener('click', async () => {
+            enableAllModelsButton.disabled = true;
+            disableAllModelsButton.disabled = true;
+            try {
+              await applyModelAvailabilityChange(providerModelRefs, false);
+            } finally {
+              if (enableAllModelsButton.isConnected) {
+                enableAllModelsButton.disabled = false;
+              }
+              if (disableAllModelsButton.isConnected) {
+                disableAllModelsButton.disabled = false;
+              }
+            }
+          });
+        }
         const modelsToRender = normalizedQuery.length > 0 || this.modelAvailabilityOnlyDisabled || this.modelAvailabilityOnlyEnabled
           ? visibleModels
           : provider.models;

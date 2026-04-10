@@ -12,6 +12,38 @@
 
 ---
 
+## 2026-04-10 设置页目录级批量提供商开关与模型批量开关
+
+### 🎯 改动目标
+
+- 在“可用范围与目录”里补充批量操作，但避免跨目录统一写回，改为跟随当前目录卡片执行对应 provider 批量启用/禁用
+- 在 provider 展开面板里补充“启用所有模型 / 禁用所有模型”，且仅影响模型禁用状态，不误改 provider 开关
+- 同步设置页文案、样式与模块文档，保持目录语义和 UI 行为一致
+
+### ✅ 本轮调整
+
+- `src/features/settings/OpenCodianSettings.ts`
+  - 新增 provider 展开后的“`一键启用所有模型` / `一键禁用所有模型`”，批量写回插件设置 `disabledModelRefs`
+  - 将 provider 级批量开关从全局顶部移到当前激活目录卡片容器下，只对该目录中的 provider 集合生效
+  - 保留服务端禁用约束：来自当前目录但被服务端 scope 禁用的 provider 不会被误作为可批量启用目标
+
+- `src/i18n/locales/zh.ts`
+- `src/i18n/locales/en.ts`
+  - 补充目录级 provider 批量操作与模型批量操作文案
+
+- `src/style/modals/config-editor-modal.css`
+- `styles.css`
+  - 增加目录操作条、模型批量操作条与响应式布局样式
+
+- `docs/modules/features/settings/OpenCodianSettings.md`
+  - 文档改为说明：provider 批量操作绑定当前目录卡片，而不是跨全部目录统一生效
+
+### 🧪 验证结果
+
+- `npm run build` 通过，最新 `BUILD_ID: main.202604101153`
+- 已部署 `dist/main.js`、`dist/manifest.json`、`dist/styles.css` 到 Test Vault
+- 已确认 Test Vault `main.js` 含最新 `BUILD_ID: main.202604101153`
+
 ## 2026-04-10 provider 目录真值修正与设置页禁用视图对齐
 
 ### 🎯 改动目标
