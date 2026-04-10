@@ -316,6 +316,7 @@ export function presetToFormState(preset: ProviderPreset): ProviderFormState {
     output: typeof model.output === 'number' ? String(model.output) : '',
     enabled: true,
     options: [],
+    variants: [],
     extraFields: [],
     raw: createModelRaw(model),
   }));

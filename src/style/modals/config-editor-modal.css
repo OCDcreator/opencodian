@@ -2301,6 +2301,21 @@
   gap: 10px;
 }
 
+.opencodian-model-workspace-subsection-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.opencodian-model-workspace-subsection-header button {
+  min-height: 34px;
+  padding: 0 14px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
 .opencodian-model-workspace-editor-actions-group {
   display: flex;
   flex-wrap: wrap;
@@ -2400,7 +2415,7 @@
 .opencodian-model-workspace-subsection {
   border: 1px solid color-mix(in srgb, var(--background-modifier-border-hover) 80%, transparent);
   border-radius: 14px;
-  padding: 12px;
+  padding: 16px;
   background:
     linear-gradient(
       180deg,
@@ -2440,10 +2455,18 @@
 .opencodian-model-workspace-model-details {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 20px;
   margin-top: 12px;
   padding-top: 12px;
   border-top: 1px solid var(--background-modifier-border);
+}
+
+.opencodian-model-workspace-model-limit-section {
+  margin-top: 12px;
+}
+
+.opencodian-model-workspace-model-limit-section .opencodian-model-workspace-grid.is-model-limits-grid {
+  margin-top: 20px;
 }
 
 .opencodian-model-workspace-empty {
@@ -2463,17 +2486,30 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
+  margin-top: 14px;
 }
 
 .opencodian-model-workspace-keyvalue-row {
   display: grid;
-  grid-template-columns: minmax(0, 180px) minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 160px) minmax(0, 1fr) 42px;
   gap: 10px;
   align-items: start;
 }
 
+.opencodian-model-workspace-keyvalue-row.is-stacked-labels {
+  align-items: start;
+}
+
+.opencodian-model-workspace-keyvalue-input {
+  min-height: 42px;
+  height: 42px;
+}
+
 .opencodian-model-workspace-keyvalue-textarea {
-  min-height: 58px;
+  min-height: 42px;
+  height: 42px;
+  padding-top: 10px;
+  padding-bottom: 10px;
   resize: vertical;
 }
 
@@ -2596,8 +2632,31 @@
   color: var(--text-muted);
 }
 
+.opencodian-model-workspace-danger-button.is-icon-only {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  min-width: 42px;
+  height: 42px;
+  min-height: 42px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  align-self: start;
+  justify-self: start;
+}
+
+.opencodian-model-workspace-keyvalue-row.is-stacked-labels .opencodian-model-workspace-danger-button.is-icon-only {
+  margin-top: 24px;
+}
+
 .opencodian-model-workspace-danger-button:hover {
   color: var(--text-error);
+}
+
+.opencodian-model-workspace-danger-button.is-icon-only:hover {
+  background: color-mix(in srgb, var(--background-modifier-hover) 72%, transparent);
 }
 
 .opencodian-model-workspace-shell {
@@ -2927,7 +2986,7 @@
 
 .opencodian-model-workspace-field label {
   margin-bottom: 10px;
-  font-size: 16px;
+  font-size: 12px;
   line-height: 1.4;
   font-weight: 700;
   color: var(--text-normal);
@@ -2945,6 +3004,8 @@
   background: color-mix(in srgb, var(--background-primary-alt) 88%, black 12%);
   box-shadow: none;
   font-size: 15px;
+  color: var(--text-normal);
+  caret-color: var(--text-normal);
 }
 
 .opencodian-model-workspace-field select {
@@ -3189,6 +3250,18 @@
     transform 0.16s ease;
 }
 
+.opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-field input,
+.opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-model-input,
+.opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-keyvalue-input,
+.opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-keyvalue-textarea {
+  transition:
+    border-color 0.16s ease,
+    background 0.16s ease,
+    box-shadow 0.16s ease,
+    transform 0.16s ease,
+    color 0.16s ease;
+}
+
 .opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-field select:hover {
   border-color: color-mix(in srgb, var(--interactive-accent) 48%, var(--background-modifier-border));
   background: color-mix(in srgb, var(--interactive-accent) 8%, var(--background-primary-alt));
@@ -3196,6 +3269,17 @@
     0 0 0 1px color-mix(in srgb, var(--interactive-accent) 16%, transparent),
     0 8px 18px color-mix(in srgb, var(--interactive-accent) 10%, transparent);
   transform: translateY(-1px);
+}
+
+.opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-field input:hover,
+.opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-model-input:hover,
+.opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-keyvalue-input:hover,
+.opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-keyvalue-textarea:hover {
+  border-color: color-mix(in srgb, var(--interactive-accent) 48%, var(--background-modifier-border));
+  background: color-mix(in srgb, var(--interactive-accent) 8%, var(--background-primary-alt));
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--interactive-accent) 16%, transparent),
+    0 8px 18px color-mix(in srgb, var(--interactive-accent) 10%, transparent);
 }
 
 .opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-field select:focus-visible,
@@ -3209,9 +3293,33 @@
     0 8px 18px color-mix(in srgb, var(--interactive-accent) 10%, transparent);
 }
 
+.opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-field input:focus-visible,
+.opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-field input:focus,
+.opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-model-input:focus-visible,
+.opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-model-input:focus,
+.opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-keyvalue-input:focus-visible,
+.opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-keyvalue-input:focus,
+.opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-keyvalue-textarea:focus-visible,
+.opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-keyvalue-textarea:focus {
+  outline: none;
+  color: var(--text-normal);
+  caret-color: var(--text-normal);
+  border-color: color-mix(in srgb, var(--interactive-accent) 62%, var(--background-modifier-border));
+  background: color-mix(in srgb, var(--interactive-accent) 10%, var(--background-primary-alt));
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--interactive-accent) 20%, transparent),
+    0 0 0 5px color-mix(in srgb, var(--interactive-accent) 12%, transparent),
+    0 8px 18px color-mix(in srgb, var(--interactive-accent) 10%, transparent);
+  transform: none;
+}
+
 .opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-section-title,
 .opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-subsection-title {
   font-size: 20px;
+}
+
+.opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-subsection-title {
+  font-size: 18px;
 }
 
 .opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-list-header {
@@ -3283,6 +3391,11 @@
   margin-top: 10px;
 }
 
+.opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-subsection-header button {
+  min-height: 42px;
+  padding: 0 16px;
+}
+
 .opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-model-details {
   margin-top: 12px;
   padding-top: 0;
@@ -3290,14 +3403,15 @@
 }
 
 .opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-keyvalue-row {
-  grid-template-columns: minmax(240px, 1fr) minmax(240px, 1fr) 42px;
+  grid-template-columns: minmax(0, 180px) minmax(0, 1fr) 42px;
   gap: 12px;
-  align-items: end;
+  align-items: start;
 }
 
 .opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-keyvalue-textarea,
 .opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-keyvalue-input {
-  min-height: 56px;
+  min-height: 42px;
+  height: 42px;
 }
 
 @media (max-width: 900px) {

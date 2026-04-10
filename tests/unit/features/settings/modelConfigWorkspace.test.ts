@@ -31,6 +31,7 @@ describe('modelConfigWorkspace', () => {
               limit: { context: 200000, output: 32000 },
               options: { reasoningEffort: 'high' },
               variants: { high: { reasoningEffort: 'high' } },
+              cost: { input: 1, output: 2 },
             },
           },
         },
@@ -45,15 +46,21 @@ describe('modelConfigWorkspace', () => {
     expect(state.providers[0].models[0].options).toEqual([
       expect.objectContaining({ key: 'reasoningEffort', value: 'high' }),
     ]);
+    expect(state.providers[0].models[0].variants).toEqual([
+      expect.objectContaining({
+        key: 'high',
+        value: JSON.stringify({ reasoningEffort: 'high' }, null, 2),
+      }),
+    ]);
     expect(state.providers[0].models[0].extraFields).toEqual([
       expect.objectContaining({
-        key: 'variants',
-        value: JSON.stringify({ high: { reasoningEffort: 'high' } }, null, 2),
+        key: 'cost',
+        value: JSON.stringify({ input: 1, output: 2 }, null, 2),
       }),
     ]);
   });
 
-  it('builds preview JSON with provider options and model extras', () => {
+  it('builds preview JSON with provider options, variants, and model extras', () => {
     const state = hydrateWorkspaceState({
       provider: {
         openai: {
@@ -69,6 +76,7 @@ describe('modelConfigWorkspace', () => {
               name: 'GPT-4.1',
               options: { reasoningEffort: 'high' },
               variants: { low: { reasoningEffort: 'low' } },
+              cost: { input: 1.25, output: 10 },
             },
           },
         },
@@ -99,6 +107,72 @@ describe('modelConfigWorkspace', () => {
     expect(parsed.provider.openai.options.timeout).toBe(120000);
     expect(parsed.provider.openai.models['gpt-4.1'].options).toEqual({ reasoningEffort: 'high' });
     expect(parsed.provider.openai.models['gpt-4.1'].variants).toEqual({ low: { reasoningEffort: 'low' } });
+    expect(parsed.provider.openai.models['gpt-4.1'].cost).toEqual({ input: 1.25, output: 10 });
+  });
+
+  it('rejects non-object variant payloads in preview output', () => {
+    const state = hydrateWorkspaceState({
+      provider: {
+        openai: {
+          name: 'OpenAI',
+          npm: '@ai-sdk/openai-compatible',
+          options: {
+            baseURL: 'https://example.com/v1',
+          },
+          models: {
+            'gpt-4.1': {
+              name: 'GPT-4.1',
+              variants: { fast: 'fast' },
+            },
+          },
+        },
+      },
+    }, []);
+
+    expect(() => buildConfigPreview(
+      '',
+      '',
+      state.providers,
+      {
+        enabled_providers: undefined,
+        disabled_providers: undefined,
+      },
+    )).toThrow('Variant `fast` must be a JSON object.');
+  });
+
+  it('rejects reserved advanced model field keys in preview output', () => {
+    const state = hydrateWorkspaceState({
+      provider: {
+        openai: {
+          name: 'OpenAI',
+          npm: '@ai-sdk/openai-compatible',
+          options: {
+            baseURL: 'https://example.com/v1',
+          },
+          models: {
+            'gpt-4.1': {
+              name: 'GPT-4.1',
+            },
+          },
+        },
+      },
+    }, []);
+
+    state.providers[0].models[0].extraFields.push({
+      uid: 'field-reserved',
+      key: 'variants',
+      value: '{"fast":{"reasoningEffort":"high"}}',
+    });
+
+    expect(() => buildConfigPreview(
+      '',
+      '',
+      state.providers,
+      {
+        enabled_providers: undefined,
+        disabled_providers: undefined,
+      },
+    )).toThrow('`variants` is managed elsewhere in this editor and cannot be added here.');
   });
 
   it('normalizes Google Gemini model responses', () => {

@@ -5,6 +5,7 @@ import type {
   OpencodeProviderConfig,
   OpencodeProviderModelConfig,
 } from '../../core/types';
+import { t } from '../../i18n';
 
 export type ProviderInterfaceFormatId =
   | 'openai-responses'
@@ -39,6 +40,7 @@ export interface ModelFormState {
   output: string;
   enabled: boolean;
   options: KeyValueFieldState[];
+  variants: KeyValueFieldState[];
   extraFields: KeyValueFieldState[];
   raw: OpencodeProviderModelConfig;
 }
@@ -143,7 +145,8 @@ const PROVIDER_INTERFACE_FORMAT_BY_NPM = new Map<string, ProviderInterfaceFormat
 );
 
 const KNOWN_PROVIDER_OPTION_KEYS = new Set(['baseURL', 'apiKey']);
-const KNOWN_MODEL_EXTRA_KEYS = new Set(['name', 'limit', 'options']);
+const RESERVED_MODEL_FIELD_KEYS = new Set(['name', 'limit', 'options', 'variants']);
+const KNOWN_MODEL_EXTRA_KEYS = RESERVED_MODEL_FIELD_KEYS;
 
 let uidCounter = 0;
 
@@ -210,6 +213,35 @@ export function extractModelOptions(model: OpencodeProviderModelConfig): KeyValu
   }));
 }
 
+export function extractModelVariants(model: OpencodeProviderModelConfig): KeyValueFieldState[] {
+  if (typeof model.variants !== 'object' || model.variants === null || Array.isArray(model.variants)) {
+    return [];
+  }
+
+  return Object.entries(model.variants).map(([key, value]) => ({
+    uid: nextUid('model-variant'),
+    key,
+    value: serializeUnknownValue(value),
+  }));
+}
+
+export function assertModelExtraFieldKeyAllowed(key: string): string {
+  const normalized = key.trim();
+  if (RESERVED_MODEL_FIELD_KEYS.has(normalized)) {
+    throw new Error(t('settings.model.visualEditor.errorModelReservedField', { field: normalized }));
+  }
+  return normalized;
+}
+
+export function parseModelVariantValue(key: string, value: string): Record<string, unknown> {
+  const normalizedKey = key.trim();
+  const parsed = parseLooseValue(value);
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    throw new Error(t('settings.model.visualEditor.errorVariantObject', { variant: normalizedKey || 'variant' }));
+  }
+  return parsed as Record<string, unknown>;
+}
+
 export function extractModelExtraFields(model: OpencodeProviderModelConfig): KeyValueFieldState[] {
   return Object.entries(model)
     .filter(([key]) => !KNOWN_MODEL_EXTRA_KEYS.has(key))
@@ -242,6 +274,7 @@ export function hydrateWorkspaceState(
       output: readNumber(model.limit, 'output'),
       enabled: !disabledModelRefSet.has(`${providerId}/${modelId}`),
       options: extractModelOptions(model),
+      variants: extractModelVariants(model),
       extraFields: extractModelExtraFields(model),
       raw: model,
     })),
@@ -282,6 +315,7 @@ export function createEmptyModel(): ModelFormState {
     output: '',
     enabled: true,
     options: [],
+    variants: [],
     extraFields: [],
     raw: {},
   };
@@ -388,8 +422,22 @@ export function buildConfigPreview(
         }
       }
 
+      if (model.variants.length > 0) {
+        const modelVariants: Record<string, unknown> = {};
+        for (const entry of model.variants) {
+          const key = entry.key.trim();
+          if (!key) {
+            continue;
+          }
+          modelVariants[key] = parseModelVariantValue(key, entry.value);
+        }
+        if (Object.keys(modelVariants).length > 0) {
+          modelEntry.variants = modelVariants;
+        }
+      }
+
       for (const entry of model.extraFields) {
-        const key = entry.key.trim();
+        const key = assertModelExtraFieldKeyAllowed(entry.key);
         if (!key) {
           continue;
         }
@@ -506,9 +554,9 @@ export function normalizeFetchedModelsFromResponse(
           name: typeof candidate.displayName === 'string' ? candidate.displayName : id,
           context: typeof candidate.inputTokenLimit === 'number' ? candidate.inputTokenLimit : undefined,
           output: typeof candidate.outputTokenLimit === 'number' ? candidate.outputTokenLimit : undefined,
-        };
+        } satisfies FetchedProviderModelCandidate;
       })
-      .filter((entry): entry is FetchedProviderModelCandidate => entry !== null);
+      .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
   }
 
   if (!Array.isArray((payload as { data?: unknown[] })?.data)) {
@@ -542,9 +590,9 @@ export function normalizeFetchedModelsFromResponse(
         name: typeof candidate.name === 'string' ? candidate.name : id,
         context,
         output,
-      };
+      } satisfies FetchedProviderModelCandidate;
     })
-    .filter((entry): entry is FetchedProviderModelCandidate => entry !== null);
+    .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
 }
 
 function readString(record: unknown, key: string): string {

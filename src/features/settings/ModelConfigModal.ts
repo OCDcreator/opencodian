@@ -16,31 +16,34 @@ import { createLogger } from '../../shared';
 import { ProviderIconService } from '../../utils/icons/ProviderIconService';
 import { ModelConfigJsonModal } from './ModelConfigJsonModal';
 import {
+  assertModelExtraFieldKeyAllowed,
   buildConfigPreview,
   createEmptyModel,
   createEmptyProvider,
   DEFAULT_PROVIDER_INTERFACE_FORMAT,
   extractModelExtraFields,
   extractModelOptions,
+  extractModelVariants,
   extractProviderExtraOptions,
-  fetchProviderModels,
   type FetchedProviderModelCandidate,
-  type KeyValueFieldState,
+  fetchProviderModels,
   hydrateWorkspaceState,
+  type KeyValueFieldState,
+  type ModelFormState,
   parseLooseValue,
+  parseModelVariantValue,
   PROVIDER_ID_PATTERN,
   PROVIDER_INTERFACE_FORMAT_OPTIONS,
-  resolveInterfaceFormatState,
-  resolveNpmForInterfaceFormat,
-  type ModelFormState,
   type ProviderFormState,
   type ProviderInterfaceFormatId,
+  resolveInterfaceFormatState,
+  resolveNpmForInterfaceFormat,
 } from './modelConfigWorkspace';
 import { ProviderIconCacheModal } from './ProviderIconCacheModal';
 import {
-  type ProviderPreset,
-  PROVIDER_PRESETS,
   presetToFormState,
+  PROVIDER_PRESETS,
+  type ProviderPreset,
 } from './providerPresets';
 
 const logger = createLogger('ModelConfigModal');
@@ -465,7 +468,7 @@ export class ModelConfigModal extends Modal {
     apiKeyField.addClass('is-full-span');
 
     const providerCheckState = this.providerChecks.get(provider.uid);
-    if (providerCheckState && providerCheckState.status !== 'idle') {
+    if (providerCheckState && providerCheckState.status !== 'idle' && providerCheckState.status !== 'loading') {
       connectionSectionEl.createDiv({
         cls: `opencodian-model-workspace-inline-status ${this.getProviderCheckClass(providerCheckState)}`,
         text: providerCheckState.message,
@@ -503,6 +506,10 @@ export class ModelConfigModal extends Modal {
         }
         field.value = value;
         this.updatePreview();
+      },
+      false,
+      {
+        stackedLabels: true,
       },
     );
 
@@ -960,24 +967,34 @@ export class ModelConfigModal extends Modal {
     }
 
     const detailsEl = modelEl.createDiv({ cls: 'opencodian-model-workspace-model-details' });
-    const gridEl = detailsEl.createDiv({ cls: 'opencodian-model-workspace-grid is-model-limits-grid' });
+    const limitsSectionEl = detailsEl.createDiv({
+      cls: 'opencodian-model-workspace-subsection opencodian-model-workspace-model-limit-section',
+    });
+    this.createSubsectionHeader(
+      limitsSectionEl,
+      t('settings.model.visualEditor.modelLimitsTitle'),
+      t('settings.model.visualEditor.modelLimitsDesc'),
+    );
+    const limitsGridEl = limitsSectionEl.createDiv({ cls: 'opencodian-model-workspace-grid is-model-limits-grid' });
     this.createTextField(
-      gridEl,
+      limitsGridEl,
       t('settings.model.visualEditor.contextLimit'),
       model.context,
       (value) => {
         model.context = value;
       },
       '200000',
+      t('settings.model.visualEditor.contextLimitDesc'),
     );
     this.createTextField(
-      gridEl,
+      limitsGridEl,
       t('settings.model.visualEditor.outputLimit'),
       model.output,
       (value) => {
         model.output = value;
       },
       '65536',
+      t('settings.model.visualEditor.outputLimitDesc'),
     );
 
     this.renderKeyValueEditor(
@@ -1010,6 +1027,51 @@ export class ModelConfigModal extends Modal {
         }
         target.value = value;
         this.updatePreview();
+      },
+      false,
+      {
+        emptyState: t('settings.model.visualEditor.modelOptionsEmpty'),
+        keyPlaceholder: t('settings.model.visualEditor.modelOptionsKeyPlaceholder'),
+        valuePlaceholder: t('settings.model.visualEditor.modelOptionsValuePlaceholder'),
+      },
+    );
+
+    this.renderKeyValueEditor(
+      detailsEl,
+      t('settings.model.visualEditor.modelVariantsTitle'),
+      t('settings.model.visualEditor.modelVariantsDesc'),
+      model.variants,
+      () => {
+        model.variants.push(this.createKeyValueState());
+        this.updatePreview();
+        this.render();
+      },
+      (uid) => {
+        model.variants = model.variants.filter((entry) => entry.uid !== uid);
+        this.updatePreview();
+        this.render();
+      },
+      (uid, value) => {
+        const target = model.variants.find((entry) => entry.uid === uid);
+        if (!target) {
+          return;
+        }
+        target.key = value;
+        this.updatePreview();
+      },
+      (uid, value) => {
+        const target = model.variants.find((entry) => entry.uid === uid);
+        if (!target) {
+          return;
+        }
+        target.value = value;
+        this.updatePreview();
+      },
+      false,
+      {
+        emptyState: t('settings.model.visualEditor.modelVariantsEmpty'),
+        keyPlaceholder: t('settings.model.visualEditor.modelVariantsKeyPlaceholder'),
+        valuePlaceholder: t('settings.model.visualEditor.modelVariantsValuePlaceholder'),
       },
     );
 
@@ -1044,6 +1106,12 @@ export class ModelConfigModal extends Modal {
         target.value = value;
         this.updatePreview();
       },
+      false,
+      {
+        emptyState: t('settings.model.visualEditor.modelAdvancedFieldsEmpty'),
+        keyPlaceholder: t('settings.model.visualEditor.modelAdvancedFieldsKeyPlaceholder'),
+        valuePlaceholder: t('settings.model.visualEditor.modelAdvancedFieldsValuePlaceholder'),
+      },
     );
   }
 
@@ -1060,28 +1128,24 @@ export class ModelConfigModal extends Modal {
     options: {
       stackedLabels?: boolean;
       iconRemoveButton?: boolean;
+      emptyState?: string;
+      keyPlaceholder?: string;
+      valuePlaceholder?: string;
     } = {},
   ): void {
+    const useIconRemoveButton = options.iconRemoveButton ?? true;
     const sectionEl = containerEl.createDiv({ cls: 'opencodian-model-workspace-subsection' });
-    const headerEl = sectionEl.createDiv({ cls: 'opencodian-model-workspace-subsection-header' });
-    headerEl.createDiv({
-      cls: 'opencodian-model-workspace-subsection-title',
-      text: title,
-    });
+    const headerEl = this.createSubsectionHeader(sectionEl, title, description);
     const addButton = headerEl.createEl('button', {
       text: t('settings.model.visualEditor.addField'),
     });
     addButton.type = 'button';
     addButton.addEventListener('click', onAdd);
-    sectionEl.createDiv({
-      cls: 'opencodian-model-workspace-subsection-desc',
-      text: description,
-    });
 
     if (values.length === 0) {
       sectionEl.createDiv({
         cls: 'opencodian-model-workspace-empty small',
-        text: t('settings.model.visualEditor.noExtraFields'),
+        text: options.emptyState ?? t('settings.model.visualEditor.noExtraFields'),
       });
       return;
     }
@@ -1094,7 +1158,9 @@ export class ModelConfigModal extends Modal {
       headerRowEl.createSpan({ text: '' });
     }
     for (const field of values) {
-      const rowEl = listEl.createDiv({ cls: 'opencodian-model-workspace-keyvalue-row' });
+      const rowEl = listEl.createDiv({
+        cls: `opencodian-model-workspace-keyvalue-row${options.stackedLabels ? ' is-stacked-labels' : ''}`,
+      });
       const keyFieldEl = options.stackedLabels
         ? rowEl.createDiv({ cls: 'opencodian-model-workspace-keyvalue-cell' })
         : rowEl;
@@ -1108,7 +1174,7 @@ export class ModelConfigModal extends Modal {
         cls: 'opencodian-model-workspace-keyvalue-input',
         attr: {
           type: 'text',
-          placeholder: t('settings.model.visualEditor.fieldKeyPlaceholder'),
+          placeholder: options.keyPlaceholder ?? t('settings.model.visualEditor.fieldKeyPlaceholder'),
         },
       });
       this.bindEditableControl(keyInput);
@@ -1129,7 +1195,7 @@ export class ModelConfigModal extends Modal {
         cls: 'opencodian-model-workspace-keyvalue-textarea',
         attr: {
           rows: '2',
-          placeholder: t('settings.model.visualEditor.fieldValuePlaceholder'),
+          placeholder: options.valuePlaceholder ?? t('settings.model.visualEditor.fieldValuePlaceholder'),
         },
       });
       this.bindEditableControl(valueInput);
@@ -1138,14 +1204,14 @@ export class ModelConfigModal extends Modal {
         onValueChange(field.uid, valueInput.value);
       });
       const removeButton = rowEl.createEl('button', {
-        cls: `opencodian-model-workspace-danger-button${options.iconRemoveButton ? ' is-icon-only' : ''}`,
-        text: options.iconRemoveButton ? '' : t('settings.model.visualEditor.removeField'),
-        attr: options.iconRemoveButton
+        cls: `opencodian-model-workspace-danger-button${useIconRemoveButton ? ' is-icon-only' : ''}`,
+        text: useIconRemoveButton ? '' : t('settings.model.visualEditor.removeField'),
+        attr: useIconRemoveButton
           ? { 'aria-label': t('settings.model.visualEditor.removeField') }
           : undefined,
       });
       removeButton.type = 'button';
-      if (options.iconRemoveButton) {
+      if (useIconRemoveButton) {
         setIcon(removeButton, 'trash-2');
       }
       removeButton.addEventListener('click', () => onRemove(field.uid));
@@ -1159,7 +1225,7 @@ export class ModelConfigModal extends Modal {
     onChange: (value: string) => void,
     placeholder = '',
     description?: string,
-    rerenderOnBlur = false,
+    _rerenderOnBlur = false,
     secret = false,
   ): HTMLElement {
     const fieldEl = containerEl.createDiv({ cls: 'opencodian-model-workspace-field' });
@@ -1179,6 +1245,20 @@ export class ModelConfigModal extends Modal {
       });
     }
     return fieldEl;
+  }
+
+  private createSubsectionHeader(containerEl: HTMLElement, title: string, description: string): HTMLDivElement {
+    const headerEl = containerEl.createDiv({ cls: 'opencodian-model-workspace-subsection-header' });
+    const copyEl = headerEl.createDiv({ cls: 'opencodian-model-workspace-subsection-copy' });
+    copyEl.createDiv({
+      cls: 'opencodian-model-workspace-subsection-title',
+      text: title,
+    });
+    copyEl.createDiv({
+      cls: 'opencodian-model-workspace-subsection-desc',
+      text: description,
+    });
+    return headerEl;
   }
 
   private createSelectField(
@@ -1421,6 +1501,7 @@ export class ModelConfigModal extends Modal {
           output: model.output,
           enabled: model.enabled,
           options: model.options.map((entry) => ({ key: entry.key, value: entry.value })),
+          variants: model.variants.map((entry) => ({ key: entry.key, value: entry.value })),
           extraFields: model.extraFields.map((entry) => ({ key: entry.key, value: entry.value })),
         })),
       })),
@@ -1957,8 +2038,22 @@ export class ModelConfigModal extends Modal {
         delete nextModel.options;
       }
 
-      for (const entry of model.extraFields) {
+      const nextModelVariants: Record<string, Record<string, unknown>> = {};
+      for (const entry of model.variants) {
         const key = entry.key.trim();
+        if (!key) {
+          continue;
+        }
+        nextModelVariants[key] = parseModelVariantValue(key, entry.value);
+      }
+      if (Object.keys(nextModelVariants).length > 0) {
+        nextModel.variants = nextModelVariants;
+      } else {
+        delete nextModel.variants;
+      }
+
+      for (const entry of model.extraFields) {
+        const key = assertModelExtraFieldKeyAllowed(entry.key);
         if (!key) {
           continue;
         }
@@ -1990,6 +2085,7 @@ export class ModelConfigModal extends Modal {
       output: this.readLimitNumber(model.limit, 'output'),
       enabled: existingModelEnabledMap.get(modelId) ?? true,
       options: extractModelOptions(model),
+      variants: extractModelVariants(model),
       extraFields: extractModelExtraFields(model),
       raw: model,
     }));

@@ -12,6 +12,37 @@
 
 ---
 
+## 2026-04-10 模型配置窗口补齐 variants 校验与保存保护
+
+### 🎯 改动目标
+
+- 继续完善模型配置可视化编辑器，避免 `variants` 配置在预览或保存时被静默丢弃
+- 防止“其他高级字段”与专门的 `variants` 编辑区重复写入同一字段，造成用户配置被覆盖
+- 为上述场景补充明确报错、回归测试，并重新构建部署到 Test Vault 验证
+
+### ✅ 本轮调整
+
+- `src/features/settings/modelConfigWorkspace.ts`
+- `src/features/settings/ModelConfigModal.ts`
+  - 抽出共享的 `variants` 值解析逻辑，要求每个 variant 条目必须是 JSON 对象；如果填入字符串、数组或 `null`，预览/保存都会直接报错，不再静默跳过
+  - 抽出模型高级字段保留键校验，禁止在“其他高级字段”里再次写入 `name`、`limit`、`options`、`variants`，避免覆盖结构化编辑区的结果
+  - 让预览构建与最终保存共用同一套校验逻辑，保证编辑器里看到的 JSON 与实际落盘结果一致
+
+- `src/i18n/locales/zh.ts`
+- `src/i18n/locales/en.ts`
+  - 新增 variant 类型错误与保留字段冲突的中英文提示，方便用户在表单里直接定位问题
+
+- `tests/unit/features/settings/modelConfigWorkspace.test.ts`
+  - 新增回归测试：覆盖非对象 variant 值时报错，以及高级字段误填 `variants` 时阻止输出
+
+### 🧪 验证结果
+
+- `npm test -- tests/unit/features/settings/modelConfigWorkspace.test.ts` 通过（6/6）
+- `npm run build` 通过，最新 `BUILD_ID: main.202604102118`
+- 已按顺序复制 `dist/main.js`、`dist/manifest.json`、`dist/styles.css` 到 Test Vault
+- 已确认 Test Vault `main.js` 含最新 `BUILD_ID: main.202604102118`
+- `npm run check:devlog-order` 将在本次日志更新后执行
+
 ## 2026-04-10 新增提供商窗口按 `cc-switch` 对齐
 
 ### 🎯 改动目标

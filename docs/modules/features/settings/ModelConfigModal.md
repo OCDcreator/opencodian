@@ -5,7 +5,7 @@
 
 ## 概述
 
-项目级 provider / model 可视化配置弹窗。它把当前 vault 的 `.opencode/opencode.json` 模型子集读入一个更贴近 `CC Switch` 的平铺单列表单：顶部标题栏 + 当前 provider 简洁工具条 + 分段表单 + 底部配置 JSON 预览，并把 provider/model 开关分别写回项目配置与插件设置。
+项目级 provider / model 可视化配置弹窗。它把当前 vault 的 `.opencode/opencode.json` 模型子集读入一个更贴近 `CC Switch` 的平铺单列表单：顶部标题栏 + 当前 provider 简洁工具条 + 分段表单 + 底部配置 JSON 预览，并把 provider/model 开关分别写回项目配置与插件设置。模型展开区按“基础限制 → 调用选项 → 模型变体 → 其他高级字段”组织，优先展示普通用户能理解的概念，把 JSON 路径留在说明文案里。
 
 ## 导入关系
 
@@ -22,6 +22,9 @@ interface ModelFormState {
   name: string;
   context: string;
   output: string;
+  options: KeyValueFieldState[];
+  variants: KeyValueFieldState[];
+  extraFields: KeyValueFieldState[];
   raw: OpencodeProviderModelConfig;
 }
 
@@ -69,7 +72,7 @@ export class ModelConfigModal extends Modal { ... }
 
 `toModelConfig()` 负责把当前弹窗状态转回 `OpencodeModelConfigSubset`，并做必填、重复 ID、数字合法性等校验；`save()` 除了写项目配置，还会同步 model 级过滤开关到插件设置。
 
-模型导入使用 provider 当前填写的 `baseURL + apiKey + 接口格式` 直接请求模型列表；导入策略是“只导入缺失模型”，避免覆盖已手工维护的模型定义。拉取结果在模型区里以次级导入条展示，不再与主表单同权重堆叠。
+模型导入使用 provider 当前填写的 `baseURL + apiKey + 接口格式` 直接请求模型列表；导入策略是“只导入缺失模型”，避免覆盖已手工维护的模型定义。拉取结果在模型区里以次级导入条展示，不再与主表单同权重堆叠。模型高级配置里，`options` 与 `variants` 被单独拆出：前者表示调用参数，后者表示同一模型的多档预设，其余未知顶层字段继续保留在“其他高级字段”里。
 
 ### 未保存关闭保护
 
@@ -89,7 +92,7 @@ export class ModelConfigModal extends Modal { ... }
 | `renderPresetPicker()` | 在新增入口渲染顶部预设选择条 |
 | `renderProviderTabs()` | 在多 provider 草稿下渲染紧凑切换条 |
 | `renderEditor()` | 渲染当前 provider 的平铺编辑表单 |
-| `renderModelCard()` | 渲染单模型的折叠 / 展开编辑卡片 |
+| `renderModelCard()` | 渲染单模型的折叠 / 展开编辑卡片，包含基础限制 / 调用选项 / 模型变体 / 其他高级字段 |
 | `toModelConfig()` | 表单状态 -> 配置对象，并执行校验 |
 | `save()` | 持久化配置、可选重启服务、提示结果 |
 | `maybeRestartServer()` | 在本地模式下重启 OpenCode 服务 |
