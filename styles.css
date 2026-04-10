@@ -8154,7 +8154,7 @@ body[data-opencodian-provider-icon-mode="color"] {
 
 .opencodian-model-toggle-provider-list {
   --opencodian-model-toggle-provider-preview-height: 112px;
-  margin-top: 18px;
+  margin-top: 8px;
   max-height: calc(var(--opencodian-model-toggle-provider-preview-height) * 4 + 48px);
   overflow-y: auto;
   padding-right: 6px;
@@ -8187,7 +8187,7 @@ body[data-opencodian-provider-icon-mode="color"] {
 }
 
 .opencodian-model-toggle-provider:first-of-type {
-  margin-top: 18px;
+  margin-top: 2px;
 }
 
 .opencodian-model-toggle-provider:first-of-type,
