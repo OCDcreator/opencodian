@@ -110,6 +110,10 @@ import {
   QuestionInlineCardRenderer,
 } from './runtime/QuestionInlineCardRenderer';
 import {
+  type QuestionResolutionCoordinatorHost,
+  QuestionResolutionCoordinator,
+} from './runtime/QuestionResolutionCoordinator';
+import {
   populateQuestionResolutionCard,
 } from './runtime/QuestionResolutionCardRenderer';
 import {
@@ -659,6 +663,7 @@ export class OpenCodianView extends ItemView {
   private streamingInlineCardRenderer: StreamingInlineCardRenderer;
   private permissionInlineCardRenderer: PermissionInlineCardRenderer;
   private questionInlineCardRenderer: QuestionInlineCardRenderer;
+  private questionResolutionCoordinator: QuestionResolutionCoordinator;
   private sendPipelineRuntime: SendPipelineRuntime;
   private conversationSyncIntervalId: number | null = null;
   private omoBackgroundTaskLogStates = new Map<string, OmoBackgroundTaskLogState>();
@@ -2144,6 +2149,10 @@ export class OpenCodianView extends ItemView {
       this.streamingInlineCardRenderer,
       this.createQuestionInlineCardRendererHost(),
     );
+    this.questionResolutionCoordinator = new QuestionResolutionCoordinator(
+      this.questionInlineCardRenderer,
+      this.createQuestionResolutionCoordinatorHost(),
+    );
     this.sendPipelineRuntime = new SendPipelineRuntime(
       this.createSendPipelineRuntimeHost(),
       this.messageSendPreparationService,
@@ -2586,6 +2595,16 @@ export class OpenCodianView extends ItemView {
     return {
       getActiveTabId: () => this.getActiveTabId(),
       getTabRuntimeState: (tabId) => this.getTabRuntimeState(tabId),
+      keepQuestionCardPinnedToBottom: (tabId) => {
+        this.keepQuestionCardPinnedToBottom(tabId);
+      },
+    };
+  }
+
+  private createQuestionResolutionCoordinatorHost(): QuestionResolutionCoordinatorHost {
+    return {
+      getTabRuntimeState: (tabId) => this.getTabRuntimeState(tabId),
+      shouldRenderQuestionResolutionCards: () => this.shouldRenderQuestionResolutionCards(),
       keepQuestionCardPinnedToBottom: (tabId) => {
         this.keepQuestionCardPinnedToBottom(tabId);
       },
@@ -5153,7 +5172,7 @@ export class OpenCodianView extends ItemView {
     try {
       await this.plugin.openCodeService.replyToQuestion(request.id, answers);
       this.suppressResolvedQuestionRequest(request.id, tabId);
-      this.applyResolvedQuestionState({
+      this.questionResolutionCoordinator.applyResolvedQuestionState({
         request,
         status: 'answered',
         answers,
@@ -5175,7 +5194,7 @@ export class OpenCodianView extends ItemView {
     try {
       await this.plugin.openCodeService.rejectQuestion(request.id);
       this.suppressResolvedQuestionRequest(request.id, tabId);
-      this.applyResolvedQuestionState({
+      this.questionResolutionCoordinator.applyResolvedQuestionState({
         request,
         status: 'rejected',
       }, tabId);
@@ -11042,7 +11061,7 @@ export class OpenCodianView extends ItemView {
       if (action.type === 'reject') {
         await this.plugin.openCodeService.rejectQuestion(request.id);
         this.suppressResolvedQuestionRequest(request.id, tabId);
-        this.applyResolvedQuestionState({
+        this.questionResolutionCoordinator.applyResolvedQuestionState({
           request,
           status: 'rejected',
         }, tabId);
@@ -11051,7 +11070,7 @@ export class OpenCodianView extends ItemView {
 
       await this.plugin.openCodeService.replyToQuestion(request.id, action.answers);
       this.suppressResolvedQuestionRequest(request.id, tabId);
-      this.applyResolvedQuestionState({
+      this.questionResolutionCoordinator.applyResolvedQuestionState({
         request,
         status: 'answered',
         answers: action.answers,
@@ -11060,39 +11079,6 @@ export class OpenCodianView extends ItemView {
       logger.error('Failed to resolve question request:', error);
       new Notice(t('chat.question.notice.error'));
     }
-  }
-
-  private applyResolvedQuestionState(
-    resolution: QuestionResolution,
-    tabId: TabId | null,
-  ): void {
-    const runtime = this.getTabRuntimeState(tabId);
-    if (runtime) {
-      runtime.pendingQuestionResolution = resolution;
-    }
-
-    if (!this.shouldRenderQuestionResolutionCards()) {
-      this.questionInlineCardRenderer.clear(tabId);
-      return;
-    }
-
-    this.renderQuestionResolutionCard(resolution, tabId);
-  }
-
-  private renderQuestionResolutionCard(
-    resolution: QuestionResolution,
-    tabId: TabId | null,
-  ): void {
-    const cardEl = this.questionInlineCardRenderer.getOrCreateCard(
-      'opencodian-question-inline opencodian-question-inline--resolved',
-      tabId,
-    );
-    if (!cardEl) {
-      return;
-    }
-
-    populateQuestionResolutionCard(cardEl, resolution);
-    this.keepQuestionCardPinnedToBottom(tabId);
   }
 
   private keepQuestionCardPinnedToBottom(tabId: TabId | null): void {

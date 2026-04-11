@@ -15,7 +15,7 @@
 
 ## 设计目的
 
-- 让 `OpenCodianView` 只决定何时展示 resolved question card，而不再拼装其细节 DOM
+- 让 `QuestionResolutionCoordinator` / `OpenCodianView` 不再拼装 resolved question card 的细节 DOM
 - 把 answered/rejected 的标题、正文和列表值格式集中到单一 helper，减少视图内重复判断
 - 让 question-resolution 的 DOM 与 markdown 摘要可以独立做小范围单测
 
@@ -23,4 +23,5 @@
 
 - 这个模块只负责 question-resolution 摘要的展示与文本构造，不负责 `replyToQuestion()` / `rejectQuestion()` 的 service 回传
 - inline question request 的 grouped/sequential 收集逻辑仍由 `QuestionInlineCardRenderer.ts` 负责
-- 这里输出的是 resolved summary 的静态内容；卡片 placement、容器复用和贴底滚动仍由上层 view / inline-card helper 决定
+- `pendingQuestionResolution` 写入、卡片 clear/render 分支与贴底滚动现由 `QuestionResolutionCoordinator.ts` 负责
+- 这里输出的是 resolved summary 的静态内容；卡片 placement 与容器复用仍由上层协调 helper / inline-card helper 决定

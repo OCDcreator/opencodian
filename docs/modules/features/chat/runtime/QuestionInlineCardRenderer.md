@@ -24,6 +24,6 @@
 ## 注意事项
 
 - 这个模块不负责调用 `replyToQuestion()` 或 `rejectQuestion()`；最终 service 回传仍由 `OpenCodianView` 处理
-- 已回答/已拒绝的 resolved question 回顾卡片与 markdown 摘要已迁到 `QuestionResolutionCardRenderer.ts`，本模块只管理待回答 inline card 的交互
+- 已回答/已拒绝的 resolved question 回顾卡片内容与协调分别由 `QuestionResolutionCardRenderer.ts` / `QuestionResolutionCoordinator.ts` 负责，本模块继续提供共享容器复用与待回答 inline card 交互
 - 不要在这里复制 streaming shell 查询或 reveal 逻辑，统一继续走 `StreamingInlineCardRenderer`
 - sequential 模式必须复用并清空同一个 question card，避免破坏当前 scroll/pin 行为
