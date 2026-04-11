@@ -163,6 +163,11 @@ type TrailingAssistantPatchCompletionDebugLoggingContext = {
   tabId: TabId | null;
 };
 
+type TrailingAssistantPatchCompletionDebugLogPlanningContextContract = {
+  payloadInputs: TrailingAssistantPatchCompletionDebugPayloadInputs;
+  tabId: TabId | null;
+};
+
 type TrailingAssistantPatchCompletionDebugLogPlanningContext = {
   payloadInputs: TrailingAssistantPatchCompletionDebugPayloadInputs;
   tabId: TabId | null;
@@ -1217,11 +1222,12 @@ export class ConversationRenderService {
   private buildTrailingAssistantPatchCompletionDebugLogPlanningContextFromLoggingContext(
     loggingContext: TrailingAssistantPatchCompletionDebugLoggingContext,
   ): TrailingAssistantPatchCompletionDebugLogPlanningContext {
-    return this.buildTrailingAssistantPatchCompletionDebugLogPlanningContext(
-      this.buildTrailingAssistantPatchCompletionDebugPayloadInputsFromLoggingContext(
+    const planningContextContract =
+      this.buildTrailingAssistantPatchCompletionDebugLogPlanningContextContractFromLoggingContext(
         loggingContext,
-      ),
-      loggingContext.tabId,
+      );
+    return this.buildTrailingAssistantPatchCompletionDebugLogPlanningContext(
+      planningContextContract,
     );
   }
 
@@ -1244,9 +1250,29 @@ export class ConversationRenderService {
   }
 
   private buildTrailingAssistantPatchCompletionDebugLogPlanningContext(
+    planningContextContract: TrailingAssistantPatchCompletionDebugLogPlanningContextContract,
+  ): TrailingAssistantPatchCompletionDebugLogPlanningContext {
+    return {
+      payloadInputs: planningContextContract.payloadInputs,
+      tabId: planningContextContract.tabId,
+    };
+  }
+
+  private buildTrailingAssistantPatchCompletionDebugLogPlanningContextContractFromLoggingContext(
+    loggingContext: TrailingAssistantPatchCompletionDebugLoggingContext,
+  ): TrailingAssistantPatchCompletionDebugLogPlanningContextContract {
+    return this.buildTrailingAssistantPatchCompletionDebugLogPlanningContextContract(
+      this.buildTrailingAssistantPatchCompletionDebugPayloadInputsFromLoggingContext(
+        loggingContext,
+      ),
+      loggingContext.tabId,
+    );
+  }
+
+  private buildTrailingAssistantPatchCompletionDebugLogPlanningContextContract(
     payloadInputs: TrailingAssistantPatchCompletionDebugPayloadInputs,
     tabId: TabId | null,
-  ): TrailingAssistantPatchCompletionDebugLogPlanningContext {
+  ): TrailingAssistantPatchCompletionDebugLogPlanningContextContract {
     return {
       payloadInputs,
       tabId,
