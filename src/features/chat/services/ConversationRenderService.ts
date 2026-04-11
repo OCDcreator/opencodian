@@ -192,6 +192,11 @@ type TrailingAssistantPatchTailOutcomePlans = {
   completionDebugPlan: TrailingAssistantPatchCompletionDebugPlan;
 };
 
+type TrailingAssistantPatchTailOutcomePlanParts = {
+  tailStatePlan: TrailingAssistantPatchTailStatePlan;
+  completionDebugPlan: TrailingAssistantPatchCompletionDebugPlan;
+};
+
 type TrailingAssistantPatchSuccessPlanParts = {
   executionPlan: TrailingAssistantPatchExecutionPlan;
   tailOutcomePlans: TrailingAssistantPatchTailOutcomePlans;
@@ -864,6 +869,16 @@ export class ConversationRenderService {
   private buildTrailingAssistantPatchTailOutcomePlans(
     planningContext: TrailingAssistantPatchTailOutcomePlanningContext,
   ): TrailingAssistantPatchTailOutcomePlans {
+    const planParts = this.buildTrailingAssistantPatchTailOutcomePlanParts(planningContext);
+    return {
+      tailStatePlan: planParts.tailStatePlan,
+      completionDebugPlan: planParts.completionDebugPlan,
+    };
+  }
+
+  private buildTrailingAssistantPatchTailOutcomePlanParts(
+    planningContext: TrailingAssistantPatchTailOutcomePlanningContext,
+  ): TrailingAssistantPatchTailOutcomePlanParts {
     const tailStatePlan =
       this.buildTrailingAssistantPatchTailStatePlanFromTailOutcomePlanningContext(
         planningContext,
@@ -874,7 +889,7 @@ export class ConversationRenderService {
         this.buildTrailingAssistantPatchCompletionDebugPlanFromTailOutcomePlanningContext(
           planningContext,
           tailStatePlan,
-      ),
+        ),
     };
   }
 
