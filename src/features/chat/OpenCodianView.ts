@@ -106,6 +106,11 @@ import {
   ConversationViewStateService,
 } from './services/ConversationViewStateService';
 import {
+  type MessageFinalizationHost,
+  MessageFinalizationService,
+  shouldSyncAfterStream,
+} from './services/MessageFinalizationService';
+import {
   isElementNearBottom,
   scrollElementToBottom,
 } from './services/ScrollManager';
@@ -654,6 +659,7 @@ export class OpenCodianView extends ItemView {
   private titleGenerationService: TitleGenerationService;
   private conversationViewStateService: ConversationViewStateService;
   private conversationRenderService: ConversationRenderService;
+  private messageFinalizationService: MessageFinalizationService;
   private conversationSyncIntervalId: number | null = null;
   private omoBackgroundTaskLogStates = new Map<string, OmoBackgroundTaskLogState>();
   private disposeSessionTodoSubscription: (() => void) | null = null;
@@ -2121,6 +2127,7 @@ export class OpenCodianView extends ItemView {
     this.titleGenerationService = new TitleGenerationService(this.plugin);
     this.conversationViewStateService = new ConversationViewStateService(this.createConversationViewStateHost());
     this.conversationRenderService = new ConversationRenderService(this.createConversationRenderHost());
+    this.messageFinalizationService = new MessageFinalizationService(this.createMessageFinalizationHost());
   }
 
   private createConversationViewStateHost(): ConversationViewStateHost {
@@ -2323,6 +2330,53 @@ export class OpenCodianView extends ItemView {
       logAssistantFinalizationDebug: (label, payload) => {
         this.logAssistantFinalizationDebug(label, payload);
       },
+      summarizeChatMessageForDebug: (message) => this.summarizeChatMessageForDebug(message),
+    };
+  }
+
+  private createMessageFinalizationHost(): MessageFinalizationHost {
+    return {
+      getCurrentConversation: () => this.currentConversation,
+      getActiveTabId: () => this.getActiveTabId(),
+      syncConversationMessagesFromServer: (conversation, tabId, reason) =>
+        this.syncConversationMessagesFromServer(conversation, tabId, reason),
+      getConversationVisualFingerprint: (messages) => this.getConversationVisualFingerprint(messages),
+      getConversationSyncFingerprint: (messages) => this.getConversationSyncFingerprint(messages),
+      patchTrailingAssistantRender: (previousMessages, nextMessages, tabId) =>
+        this.patchTrailingAssistantRender(previousMessages, nextMessages, tabId),
+      rerenderConversationMessages: (conversation) => this.rerenderConversationMessages(conversation),
+      renderBackgroundTaskIndicatorIfNeeded: (tabId) => this.renderBackgroundTaskIndicatorIfNeeded(tabId),
+      appendTurnDiffNoticeIfNeeded: (conversation, editedFiles, tabId) =>
+        this.appendTurnDiffNoticeIfNeeded(conversation, editedFiles, tabId),
+      refreshTabSessionTodos: (tabId, sessionId, options) => this.refreshTabSessionTodos(tabId, sessionId, options),
+      saveConversation: (conversation) => this.plugin.saveConversation(conversation),
+      setConversationSyncInFlight: (tabId, value) => {
+        const runtime = this.getTabRuntimeState(tabId);
+        if (runtime) {
+          runtime.isConversationSyncInFlight = value;
+        }
+      },
+      setLastConversationSyncFingerprint: (tabId, fingerprint) => {
+        const runtime = this.getTabRuntimeState(tabId);
+        if (runtime) {
+          runtime.lastConversationSyncFingerprint = fingerprint;
+        }
+      },
+      clearPendingEditedFiles: (tabId) => {
+        this.getTabRuntimeState(tabId)?.pendingEditedFiles.clear();
+      },
+      setTabNeedsAttention: (tabId, needsAttention) => {
+        if (tabId) {
+          this.tabManager?.setTabNeedsAttention(tabId, needsAttention);
+        }
+      },
+      setActiveTabConversation: (conversation) => {
+        this.tabManager?.setActiveTabConversation(conversation);
+      },
+      syncActiveTabContextUsageIdentity: () => {
+        this.syncActiveTabContextUsageIdentity();
+      },
+      refreshActiveTabContextUsageFromServer: () => this.refreshActiveTabContextUsageFromServer(),
       summarizeChatMessageForDebug: (message) => this.summarizeChatMessageForDebug(message),
     };
   }
@@ -6450,6 +6504,7 @@ export class OpenCodianView extends ItemView {
     let streamCompleted = false;
     let streamInterrupted = false;
     let streamTimedOut = false;
+    let shouldSyncFromServer = false;
     const resetStreamingState = () => {
       if (timeoutId) {
         window.clearTimeout(timeoutId);
@@ -6844,7 +6899,12 @@ export class OpenCodianView extends ItemView {
         )
         : null;
 
-      const shouldSyncFromServer = streamCompleted && !streamTimedOut && !streamInterrupted && !latestErrorMessage;
+      shouldSyncFromServer = shouldSyncAfterStream({
+        streamCompleted,
+        streamTimedOut,
+        streamInterrupted,
+        latestErrorMessage,
+      });
       logAssistantFinalizationStage('stream-finally-enter', {
         shouldPersistInterruptedState,
         shouldSyncFromServer,
@@ -7024,96 +7084,13 @@ export class OpenCodianView extends ItemView {
     }
 
     if (sendingConversation) {
-      const shouldSyncFromServer = streamCompleted && !streamTimedOut && !streamInterrupted && !latestErrorMessage;
-      try {
-        if (shouldSyncFromServer) {
-          const previousMessagesBeforeSync = [...sendingConversation.messages];
-          const previousVisualFingerprint = this.getConversationVisualFingerprint(sendingConversation.messages);
-          logAssistantFinalizationStage('server-sync-requested', {
-            previousVisualFingerprint,
-            localTailAssistant: this.summarizeChatMessageForDebug(
-              [...sendingConversation.messages].reverse().find((message) => message.role === 'assistant'),
-            ),
-          });
-          const syncResult = await this.syncConversationMessagesFromServer(
-            sendingConversation,
-            sendingTabId,
-            'send-finalization',
-          );
-          logAssistantFinalizationStage('server-sync-complete', {
-            changed: syncResult.changed,
-            fingerprint: syncResult.fingerprint,
-            syncedTailAssistant: this.summarizeChatMessageForDebug(
-              [...syncResult.messages].reverse().find((message) => message.role === 'assistant'),
-            ),
-          });
-          if (this.currentConversation?.id === sendingConversation.id && this.getActiveTabId() === sendingTabId) {
-            const activeRuntime = this.getTabRuntimeState(sendingTabId);
-            if (activeRuntime) {
-              activeRuntime.lastConversationSyncFingerprint = syncResult.fingerprint;
-            }
-            if (previousVisualFingerprint !== this.getConversationVisualFingerprint(syncResult.messages)) {
-              const patchedTail = await this.patchTrailingAssistantRender(
-                previousMessagesBeforeSync,
-                syncResult.messages,
-                sendingTabId,
-              );
-              logAssistantFinalizationStage('post-sync-tail-render-attempt', {
-                patchedTail,
-              });
-              if (!patchedTail) {
-                await this.rerenderConversationMessages(sendingConversation);
-                logAssistantFinalizationStage('post-sync-full-rerender-complete');
-              }
-            }
-          }
-          await this.renderBackgroundTaskIndicatorIfNeeded(sendingTabId);
-
-          await this.appendTurnDiffNoticeIfNeeded(
-            sendingConversation,
-            [...sendingRuntime.pendingEditedFiles],
-            sendingTabId,
-          );
-          logAssistantFinalizationStage('turn-diff-processed', {
-            pendingEditedFileCount: sendingRuntime.pendingEditedFiles.size,
-          });
-        }
-        await this.refreshTabSessionTodos(sendingTabId, sendingConversation.openCodeSessionId, { suppressErrors: true });
-        logAssistantFinalizationStage('session-todos-refreshed');
-        sendingConversation.updatedAt = Date.now();
-        await this.plugin.saveConversation(sendingConversation);
-        logAssistantFinalizationStage('conversation-final-save-complete', {
-          updatedAt: sendingConversation.updatedAt,
-          messageCount: sendingConversation.messages.length,
-        });
-        sendingRuntime.pendingEditedFiles.clear();
-        if (this.currentConversation?.id === sendingConversation.id && this.getActiveTabId() === sendingTabId) {
-          const activeRuntime = this.getTabRuntimeState(sendingTabId);
-          if (activeRuntime) {
-            activeRuntime.lastConversationSyncFingerprint = this.getConversationSyncFingerprint(sendingConversation.messages);
-          }
-          this.tabManager?.setTabNeedsAttention(sendingTabId, false);
-          this.tabManager?.setActiveTabConversation(sendingConversation);
-          this.syncActiveTabContextUsageIdentity();
-          await this.refreshActiveTabContextUsageFromServer();
-          logAssistantFinalizationStage('assistant-message-finalization-complete', {
-            tabNeedsAttentionCleared: true,
-            latestAssistantMessage: this.summarizeChatMessageForDebug(
-              [...sendingConversation.messages].reverse().find((message) => message.role === 'assistant'),
-            ),
-          });
-        } else {
-          this.tabManager?.setTabNeedsAttention(sendingTabId, true);
-          logAssistantFinalizationStage('assistant-message-finalization-complete', {
-            tabNeedsAttentionCleared: false,
-          });
-        }
-      } finally {
-        if (shouldSyncFromServer) {
-          sendingRuntime.isConversationSyncInFlight = false;
-          logAssistantFinalizationStage('conversation-sync-lock-cleared');
-        }
-      }
+      await this.messageFinalizationService.finalizeAfterStream({
+        conversation: sendingConversation,
+        tabId: sendingTabId,
+        shouldSyncFromServer,
+        editedFiles: [...sendingRuntime.pendingEditedFiles],
+        logStage: logAssistantFinalizationStage,
+      });
     }
   }
 

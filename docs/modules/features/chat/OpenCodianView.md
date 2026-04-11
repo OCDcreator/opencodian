@@ -187,10 +187,16 @@ chunk 处理里显式覆盖了这些分支：
 收尾阶段会：
 
 - 把 streaming 内容组装成持久化的 assistant `ChatMessage`
-- 在正常完成时再向服务端拉一轮最终消息并尝试 patch UI
+- 在正常完成时通过 `MessageFinalizationService` 再向服务端拉一轮最终消息，并按需 patch / rerender UI
 - 追加 turn diff notice
 - 刷新 session todos
 - 更新 context usage
+
+第五阶段后，这条链路的边界变成：
+
+- stream loop、pending/timeout/interruption、本地 streaming shell/notice 渲染、第一次本地保存，仍留在 `OpenCodianView`
+- post-stream finalization / post-sync orchestration 已迁到 `services/MessageFinalizationService.ts`
+- 消息区 patch / rerender 细节仍继续复用 `ConversationRenderService`
 
 此外，这条链路还有两个明确的运行时保护：
 
@@ -295,6 +301,7 @@ model selector 现在拆成了几层协作：
 - `OpenCodeService`：会话 CRUD、发送、stream、同步、question、todo、status、context usage
 - `ConversationViewStateService`：tab 初始化、persisted restore、tab 激活和 conversation hydration 装载编排
 - `ConversationRenderService`：消息区 full rerender、tail patch 和 append-only sync 编排
+- `MessageFinalizationService`：`sendMessage()` 末段的 final sync、post-sync patch/rerender、todo/save/attention 收尾编排
 - `TabManager` / `TabBar`：tab 生命周期和 tab 元数据
 - `MarkdownRenderService`：Markdown 渲染
 - `StreamController`：流式 assistant DOM 更新
