@@ -146,6 +146,11 @@ type TrailingAssistantPatchNonMergeableTailSummaryPlan = {
   nextTail: Record<string, unknown> | null;
 };
 
+type TrailingAssistantPatchSkippedDebugCountPlan = {
+  previousRenderedCount: number;
+  nextRenderedCount: number;
+};
+
 type TrailingAssistantPatchTurnBodyScopePlan =
   | {
     runtime: null;
@@ -416,11 +421,14 @@ export class ConversationRenderService {
     tabId: TabId | null = this.host.getActiveTabId(),
   ): Promise<boolean> {
     const fail = (reason: string, payload: Record<string, unknown> = {}): false => {
+      const skippedDebugCountPlan = this.buildTrailingAssistantPatchSkippedDebugCountPlan(
+        previousMessages,
+        nextMessages,
+      );
       this.host.logAssistantFinalizationDebug(
         'patch-trailing-assistant-render-skipped',
         this.buildTrailingAssistantPatchSkippedDebugPayload(
-          previousMessages,
-          nextMessages,
+          skippedDebugCountPlan,
           reason,
           tabId,
           payload,
@@ -970,9 +978,18 @@ export class ConversationRenderService {
     };
   }
 
-  private buildTrailingAssistantPatchSkippedDebugPayload(
+  private buildTrailingAssistantPatchSkippedDebugCountPlan(
     previousMessages: ChatMessage[],
     nextMessages: ChatMessage[],
+  ): TrailingAssistantPatchSkippedDebugCountPlan {
+    return {
+      previousRenderedCount: this.host.getMessagesForRender(previousMessages).length,
+      nextRenderedCount: this.host.getMessagesForRender(nextMessages).length,
+    };
+  }
+
+  private buildTrailingAssistantPatchSkippedDebugPayload(
+    countPlan: TrailingAssistantPatchSkippedDebugCountPlan,
     reason: string,
     tabId: TabId | null,
     payload: Record<string, unknown>,
@@ -980,8 +997,8 @@ export class ConversationRenderService {
     return {
       reason,
       tabId,
-      previousRenderedCount: this.host.getMessagesForRender(previousMessages).length,
-      nextRenderedCount: this.host.getMessagesForRender(nextMessages).length,
+      previousRenderedCount: countPlan.previousRenderedCount,
+      nextRenderedCount: countPlan.nextRenderedCount,
       ...payload,
     };
   }
