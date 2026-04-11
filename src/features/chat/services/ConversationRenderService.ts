@@ -1315,7 +1315,7 @@ export class ConversationRenderService {
         planningContext,
         payloadPlan,
       );
-    return this.buildTrailingAssistantPatchSkippedDebugFinalLogPlan(
+    return this.buildTrailingAssistantPatchSkippedDebugFinalLogPlanFromInputs(
       finalLogInputs,
     );
   }
@@ -1348,14 +1348,24 @@ export class ConversationRenderService {
     };
   }
 
-  private buildTrailingAssistantPatchSkippedDebugFinalLogPlan(
+  private buildTrailingAssistantPatchSkippedDebugFinalLogPlanFromInputs(
     inputs: TrailingAssistantPatchSkippedDebugFinalLogInputs,
+  ): TrailingAssistantPatchSkippedDebugLogPlan {
+    return this.buildTrailingAssistantPatchSkippedDebugFinalLogPlan(
+      inputs.tabId,
+      inputs.payloadPlan,
+    );
+  }
+
+  private buildTrailingAssistantPatchSkippedDebugFinalLogPlan(
+    tabId: TabId | null,
+    payloadPlan: TrailingAssistantPatchSkippedDebugPayloadPlan,
   ): TrailingAssistantPatchSkippedDebugLogPlan {
     return {
       label: 'patch-trailing-assistant-render-skipped',
       payload: {
-        tabId: inputs.tabId,
-        ...inputs.payloadPlan,
+        tabId,
+        ...payloadPlan,
       },
     };
   }
