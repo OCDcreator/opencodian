@@ -42,6 +42,7 @@ export class SendPipelineRuntime {
 第二刀后，runtime 子目录内部又继续细分成几层：
 
 - `SendPipelineTypes`：共享契约层
+- `AssistantShellRenderer`：assistant streaming shell 的创建、reveal 与 timestamp 收尾
 - `PendingIndicatorController`：pending DOM 与计时器
 - `AssistantNoticeRenderer`：stream error / interrupted notice 构造与占位 shell notice 渲染
 - `SendPipelineTrace`：trace / progress debug

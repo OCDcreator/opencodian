@@ -25,9 +25,9 @@
 
 ### 当前基线
 
-- `src/**/*.ts`: 当前共有 133 个 TypeScript 源码模块
-- `src/style/**/*.css`: 当前共有 16 个样式模块（不含 `src/style/index.css` 聚合入口）
-- `docs/modules/**/*.md`: 当前共有 149 篇模块与基础设施文档
+- `src/**/*.ts`: 当前共有 135 个 TypeScript 源码模块
+- `src/style/**/*.css`: 当前共有 17 个样式模块（不含 `src/style/index.css` 聚合入口）
+- `docs/modules/**/*.md`: 当前共有 151 篇模块与基础设施文档
 
 ## 文档结构
 
@@ -91,6 +91,7 @@ docs/modules/
 │   │   ├── liquidDiamondDemoWebgl.md
 │   │   ├── renderGroups.md
 │   │   ├── runtime/
+│   │   │   ├── AssistantShellRenderer.md
 │   │   │   ├── AssistantNoticeRenderer.md
 │   │   │   ├── buildLocalStreamOutcome.md
 │   │   │   ├── LocalStreamMessagePersistence.md

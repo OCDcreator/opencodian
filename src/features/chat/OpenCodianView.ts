@@ -99,6 +99,10 @@ import {
   renderAssistantPlaceholderAsNotice,
 } from './runtime/AssistantNoticeRenderer';
 import {
+  type AssistantShellRendererHost,
+  AssistantShellRenderer,
+} from './runtime/AssistantShellRenderer';
+import {
   type SendPipelineDebugContentBlock,
   type SendPipelineDebugPort,
   type SendPipelineHost,
@@ -637,6 +641,7 @@ export class OpenCodianView extends ItemView {
   private conversationRenderService: ConversationRenderService;
   private messageSendPreparationService: MessageSendPreparationService;
   private messageFinalizationService: MessageFinalizationService;
+  private assistantShellRenderer: AssistantShellRenderer;
   private sendPipelineRuntime: SendPipelineRuntime;
   private conversationSyncIntervalId: number | null = null;
   private omoBackgroundTaskLogStates = new Map<string, OmoBackgroundTaskLogState>();
@@ -2115,6 +2120,7 @@ export class OpenCodianView extends ItemView {
     this.conversationRenderService = new ConversationRenderService(this.createConversationRenderHost());
     this.messageSendPreparationService = new MessageSendPreparationService(this.createMessageSendPreparationHost());
     this.messageFinalizationService = new MessageFinalizationService(this.createMessageFinalizationHost());
+    this.assistantShellRenderer = new AssistantShellRenderer(this.createAssistantShellRendererHost());
     this.sendPipelineRuntime = new SendPipelineRuntime(
       this.createSendPipelineRuntimeHost(),
       this.messageSendPreparationService,
@@ -2311,7 +2317,7 @@ export class OpenCodianView extends ItemView {
       renderAssistantMessageContent: (messageEl, contentEl, message) =>
         this.renderAssistantMessageContent(messageEl, contentEl, message),
       updateAssistantTimestamp: (messageEl, message) => {
-        this.addTimestampWithCopyButton({
+        this.assistantShellRenderer.addTimestampWithCopyButton({
           messageEl,
           timestamp: message.timestamp,
           content: this.getAssistantCopyContent(message),
@@ -2489,8 +2495,9 @@ export class OpenCodianView extends ItemView {
     };
     const shellPort: SendPipelineShellPort = {
       createAssistantMessageElement: (tabId, hiddenUntilVisible) =>
-        this.createAssistantMessageElement(tabId, hiddenUntilVisible),
-      revealStreamingAssistantMessageElement: (tabId) => this.revealStreamingAssistantMessageElement(tabId),
+        this.assistantShellRenderer.createAssistantMessageElement(tabId, hiddenUntilVisible),
+      revealStreamingAssistantMessageElement: (tabId) =>
+        this.assistantShellRenderer.revealStreamingAssistantMessageElement(tabId),
       renderAssistantPlaceholderAsNotice: (messageEl, noticeMessage, reason) =>
         renderAssistantPlaceholderAsNotice({
           host: this.createAssistantNoticeRenderHost(),
@@ -2498,9 +2505,7 @@ export class OpenCodianView extends ItemView {
           noticeMessage,
           reason,
         }),
-      addTimestampWithCopyButton: (options) => {
-        this.addTimestampWithCopyButton(options);
-      },
+      addTimestampWithCopyButton: (options) => this.assistantShellRenderer.addTimestampWithCopyButton(options),
     };
     const persistencePort: SendPipelinePersistencePort = {
       saveConversation: (conversation) => this.plugin.saveConversation(conversation),
@@ -2526,11 +2531,28 @@ export class OpenCodianView extends ItemView {
     };
   }
 
+  private createAssistantShellRendererHost(): AssistantShellRendererHost {
+    return {
+      getActiveTabId: () => this.getActiveTabId(),
+      getTabRuntimeState: (tabId) => this.getTabRuntimeState(tabId),
+      ensureTurnBody: (tabId) => this.ensureTurnBody(tabId),
+      shouldAutoScroll: (tabId) => this.shouldAutoScroll(tabId),
+      scheduleSettledScrollToBottomIfNeeded: (shouldScroll, tabId) => {
+        this.scheduleSettledScrollToBottomIfNeeded(shouldScroll, tabId);
+      },
+      setStreamingAssistantMessageVisibility: (messageEl, visible, reason) => {
+        this.setStreamingAssistantMessageVisibility(messageEl, visible, reason);
+      },
+      initializeAssistantCopyButton: (copyBtn, content) => {
+        copyBtn.innerHTML = COPY_ICON;
+        this.attachCopyButtonBehavior(copyBtn, content);
+      },
+    };
+  }
+
   private createAssistantNoticeRenderHost(): AssistantNoticeRenderHost {
     return {
-      addTimestampWithCopyButton: (options) => {
-        this.addTimestampWithCopyButton(options);
-      },
+      addTimestampWithCopyButton: (options) => this.assistantShellRenderer.addTimestampWithCopyButton(options),
       renderNoticeCard: (container, message) => this.renderNoticeCard(container, message),
       setStreamingAssistantMessageVisibility: (messageEl, visible, reason) => {
         this.setStreamingAssistantMessageVisibility(messageEl, visible, reason);
@@ -6765,7 +6787,7 @@ export class OpenCodianView extends ItemView {
 
     const timestamp = Date.now();
     const modelId = this.formatModelId(this.getCurrentSessionModel());
-    this.addTimestampWithCopyButton({
+    this.assistantShellRenderer.addTimestampWithCopyButton({
       messageEl,
       timestamp,
       content: message,
@@ -6848,7 +6870,7 @@ export class OpenCodianView extends ItemView {
     const timestamp = Date.now();
     const modelId = this.formatModelId(this.getCurrentSessionModel());
     const noticeMessage = buildStreamErrorNotice(timestamp, message, modelId);
-    const { messageEl } = this.createAssistantMessageElement(activeTabId);
+    const { messageEl } = this.assistantShellRenderer.createAssistantMessageElement(activeTabId);
     await renderAssistantPlaceholderAsNotice({
       host: this.createAssistantNoticeRenderHost(),
       messageEl,
@@ -6948,7 +6970,7 @@ export class OpenCodianView extends ItemView {
     if (message.displayStyle === 'notice') {
       messageEl.addClass('opencodian-message--notice');
       await this.renderNoticeCard(content, message);
-      this.addTimestampWithCopyButton({
+      this.assistantShellRenderer.addTimestampWithCopyButton({
         messageEl,
         timestamp: message.timestamp,
         modelId: message.modelId,
@@ -6987,7 +7009,7 @@ export class OpenCodianView extends ItemView {
         await this.renderContentBlock(content, block);
       }
 
-      this.addTimestampWithCopyButton({
+      this.assistantShellRenderer.addTimestampWithCopyButton({
         messageEl,
         timestamp: message.timestamp,
         content: this.getAssistantCopyContent(message),
@@ -7013,7 +7035,7 @@ export class OpenCodianView extends ItemView {
       }
     }
 
-    this.addTimestampWithCopyButton({
+    this.assistantShellRenderer.addTimestampWithCopyButton({
       messageEl,
       timestamp: message.timestamp,
       content: this.getAssistantCopyContent(message),
@@ -8338,53 +8360,6 @@ export class OpenCodianView extends ItemView {
     }
   }
 
-  private revealStreamingAssistantMessageElement(tabId: TabId | null = this.getActiveTabId()): HTMLElement | null {
-    const messageEl = this.getTabRuntimeState(tabId)?.streamingMessageEl ?? null;
-    if (!messageEl) {
-      return null;
-    }
-
-    const wasHidden = messageEl.hidden;
-    this.setStreamingAssistantMessageVisibility(messageEl, true, 'reveal-streaming-shell');
-
-    if (wasHidden && this.getActiveTabId() === tabId) {
-      this.scheduleSettledScrollToBottomIfNeeded(this.shouldAutoScroll(tabId), tabId);
-    }
-
-    return messageEl;
-  }
-
-  /** Create assistant message element for streaming */
-  private createAssistantMessageElement(
-    tabId: TabId | null = this.getActiveTabId(),
-    hiddenUntilVisible = false,
-  ): { messageEl: HTMLElement; contentEl: HTMLElement } {
-    const paneState = this.getTabPaneState(tabId);
-    const messageEl = this.ensureTurnBody(tabId)?.createDiv({
-      cls: 'opencodian-message opencodian-message--assistant is-streaming',
-    });
-
-    if (!messageEl) {
-      const fallback = document.createElement('div');
-      return { messageEl: fallback, contentEl: fallback };
-    }
-
-    const contentEl = messageEl.createDiv({ cls: 'opencodian-message-content' });
-    this.ensureAssistantTimestampRow(messageEl, true);
-    this.setStreamingAssistantMessageVisibility(
-      messageEl,
-      !hiddenUntilVisible,
-      hiddenUntilVisible ? 'create-streaming-shell-hidden' : 'create-streaming-shell-visible',
-    );
-
-    if (paneState) {
-      paneState.runtime.streamingMessageEl = messageEl;
-      paneState.runtime.streamingContentEl = contentEl;
-    }
-
-    return { messageEl, contentEl };
-  }
-
   /** Update message content during streaming */
   private async updateMessageContent(contentEl: HTMLElement, content: string) {
     if (!this.markdownService) {
@@ -8486,82 +8461,6 @@ export class OpenCodianView extends ItemView {
     labelEl.id = labelId;
     labelEl.setAttribute('data-tooltip-label', 'true');
     buttonEl.setAttribute('aria-labelledby', labelId);
-  }
-
-  /**
-   * Adds timestamp with copy button for assistant messages.
-   * Creates a row with timestamp and copy button side by side.
-   * @param messageEl The message element container
-   * @param timestamp The message timestamp
-   * @param content The text content to copy
-   */
-  private addTimestampWithCopyButton(options: {
-    messageEl: HTMLElement;
-    timestamp: number;
-    content?: string;
-    modelId?: string;
-    statusLabel?: string;
-  }): void {
-    const {
-      messageEl,
-      timestamp,
-      content,
-      modelId,
-      statusLabel,
-    } = options;
-    const timeRow = this.ensureAssistantTimestampRow(messageEl);
-    const fragment = document.createDocumentFragment();
-
-    // Timestamp
-    const timeStr = new Date(timestamp).toLocaleTimeString([], {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-    const timeTextEl = document.createElement('span');
-    timeTextEl.className = 'opencodian-message-time-text';
-    timeTextEl.textContent = timeStr;
-    fragment.appendChild(timeTextEl);
-
-    if (modelId) {
-      const modelEl = document.createElement('span');
-      modelEl.className = 'opencodian-message-model-id';
-      modelEl.textContent = `· ${modelId}`;
-      fragment.appendChild(modelEl);
-    }
-
-    if (statusLabel) {
-      const statusEl = document.createElement('span');
-      statusEl.className = 'opencodian-message-time-status is-warning';
-      statusEl.textContent = statusLabel;
-      fragment.appendChild(statusEl);
-    }
-    if (content) {
-      const copyBtn = document.createElement('span');
-      copyBtn.className = 'opencodian-copy-btn-inline';
-      copyBtn.innerHTML = COPY_ICON;
-      this.attachCopyButtonBehavior(copyBtn, content);
-      fragment.appendChild(copyBtn);
-    }
-
-    timeRow.replaceChildren(fragment);
-    timeRow.classList.remove('is-pending');
-    if (messageEl.classList.contains('is-streaming')) {
-      // Pin animation to 'none' before removing is-streaming so the base
-      // messageSlideIn keyframe does not re-trigger and cause a visual flicker.
-      messageEl.style.animation = 'none';
-      messageEl.removeClass('is-streaming');
-    }
-    this.setStreamingAssistantMessageVisibility(messageEl, true, 'finalize-streaming-shell');
-  }
-
-  private ensureAssistantTimestampRow(messageEl: HTMLElement, reserveSpace = false): HTMLElement {
-    const existingRow = messageEl.querySelector('.opencodian-message-time-row');
-    const timeRow = existingRow instanceof HTMLElement
-      ? existingRow
-      : messageEl.createDiv({ cls: 'opencodian-message-time-row' });
-
-    timeRow.classList.toggle('is-pending', reserveSpace);
-    return timeRow;
   }
 
   private getAssistantStreamStatusLabel(message: ChatMessage): string | undefined {
@@ -9401,7 +9300,7 @@ export class OpenCodianView extends ItemView {
   }
 
   private async renderSyncedAssistantMessageWithReveal(message: ChatMessage): Promise<void> {
-    const { messageEl, contentEl } = this.createAssistantMessageElement();
+    const { messageEl, contentEl } = this.assistantShellRenderer.createAssistantMessageElement();
     const textEl = contentEl.createDiv({ cls: 'streaming-text-block' });
     const chunks = this.splitPseudoStreamChunks(message.content);
     const delayMs = this.getPseudoStreamDelay(chunks.length);
@@ -9423,7 +9322,7 @@ export class OpenCodianView extends ItemView {
     if (messageEl.style.visibility === 'hidden') {
       messageEl.style.visibility = '';
     }
-    this.addTimestampWithCopyButton({
+    this.assistantShellRenderer.addTimestampWithCopyButton({
       messageEl,
       timestamp: message.timestamp,
       content: message.content,
@@ -11088,19 +10987,19 @@ export class OpenCodianView extends ItemView {
     const lastToolCall = messageEl.querySelector('.streaming-tool-call:last-of-type');
     if (lastToolCall?.parentNode) {
       lastToolCall.parentNode.insertBefore(cardEl, lastToolCall.nextSibling);
-      this.revealStreamingAssistantMessageElement(tabId);
+      this.assistantShellRenderer.revealStreamingAssistantMessageElement(tabId);
       return cardEl;
     }
 
     const contentEl = messageEl.querySelector('.opencodian-message-content');
     if (contentEl) {
       contentEl.appendChild(cardEl);
-      this.revealStreamingAssistantMessageElement(tabId);
+      this.assistantShellRenderer.revealStreamingAssistantMessageElement(tabId);
       return cardEl;
     }
 
     messageEl.appendChild(cardEl);
-    this.revealStreamingAssistantMessageElement(tabId);
+    this.assistantShellRenderer.revealStreamingAssistantMessageElement(tabId);
     return cardEl;
   }
 
@@ -11641,7 +11540,7 @@ export class OpenCodianView extends ItemView {
         messageEl.appendChild(permissionCard);
       }
     }
-    this.revealStreamingAssistantMessageElement(tabId);
+    this.assistantShellRenderer.revealStreamingAssistantMessageElement(tabId);
 
     // Header with tool name
     const headerEl = permissionCard.createDiv({ cls: 'opencodian-permission-inline-header' });

@@ -5,6 +5,7 @@ jest.mock('../../../../src/core/opencode', () => ({
 }));
 
 import { OpenCodianView } from '../../../../src/features/chat/OpenCodianView';
+import { AssistantShellRenderer } from '../../../../src/features/chat/runtime/AssistantShellRenderer';
 
 describe('OpenCodianView streaming assistant shell visibility', () => {
   function createView(): OpenCodianView {
@@ -20,44 +21,32 @@ describe('OpenCodianView streaming assistant shell visibility', () => {
   }
 
   it('keeps deferred streaming assistant shells hidden until reveal is requested', () => {
-    const view = createView() as unknown as {
-      createAssistantMessageElement: (
-        tabId: string,
-        hiddenUntilVisible?: boolean,
-      ) => { messageEl: HTMLElement; contentEl: HTMLElement };
-      revealStreamingAssistantMessageElement: (tabId: string) => HTMLElement | null;
-      getTabPaneState: (tabId: string) => {
-        runtime: {
-          streamingMessageEl: HTMLElement | null;
-          streamingContentEl: HTMLElement | null;
-        };
-      } | null;
-      ensureTurnBody: (tabId: string) => HTMLElement;
-      getActiveTabId: () => string;
-      shouldAutoScroll: (tabId: string) => boolean;
-      scheduleSettledScrollToBottomIfNeeded: (autoScroll?: boolean, tabId?: string) => void;
-    };
-
     const turnBody = document.createElement('div');
     const runtime = {
       streamingMessageEl: null as HTMLElement | null,
       streamingContentEl: null as HTMLElement | null,
     };
+    const scrollSpy = jest.fn();
+    const renderer = new AssistantShellRenderer({
+      getActiveTabId: () => 'tab-1',
+      getTabRuntimeState: () => runtime,
+      ensureTurnBody: () => turnBody,
+      shouldAutoScroll: () => true,
+      scheduleSettledScrollToBottomIfNeeded: scrollSpy,
+      setStreamingAssistantMessageVisibility: (messageEl, visible) => {
+        messageEl.hidden = !visible;
+      },
+      initializeAssistantCopyButton: jest.fn(),
+    });
 
-    jest.spyOn(view, 'getTabPaneState').mockReturnValue({ runtime } as never);
-    jest.spyOn(view, 'ensureTurnBody').mockReturnValue(turnBody);
-    jest.spyOn(view, 'getActiveTabId').mockReturnValue('tab-1');
-    jest.spyOn(view, 'shouldAutoScroll').mockReturnValue(true);
-    const scrollSpy = jest.spyOn(view, 'scheduleSettledScrollToBottomIfNeeded').mockImplementation(() => {});
-
-    const { messageEl, contentEl } = view.createAssistantMessageElement('tab-1', true);
+    const { messageEl, contentEl } = renderer.createAssistantMessageElement('tab-1', true);
 
     expect(messageEl.hidden).toBe(true);
     expect(turnBody.contains(messageEl)).toBe(true);
     expect(runtime.streamingMessageEl).toBe(messageEl);
     expect(runtime.streamingContentEl).toBe(contentEl);
 
-    const revealed = view.revealStreamingAssistantMessageElement('tab-1');
+    const revealed = renderer.revealStreamingAssistantMessageElement('tab-1');
 
     expect(revealed).toBe(messageEl);
     expect(messageEl.hidden).toBe(false);

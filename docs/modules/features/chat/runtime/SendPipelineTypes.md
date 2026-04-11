@@ -12,7 +12,7 @@
 - `SendPipelineTabRuntime`：发送链路真正需要读写的 tab 级 streaming 状态切片
 - `SendPipelineStreamController` / `SendPipelineStreamElements`：stream shell 与流式渲染控制器边界
 - `SendPipelinePreparationPort` / `SendPipelineFinalizationPort`：对 `MessageSendPreparationService` 与 `MessageFinalizationService` 的窄接口
-- `SendPipelineViewPort` / `SendPipelineTransportPort` / `SendPipelineShellPort` / `SendPipelinePersistencePort` / `SendPipelineDebugPort`：把发送 host 面按职责拆开的窄 port，其中 shell port 现在只保留 streaming shell 创建、reveal、notice placeholder 渲染与 timestamp 收尾
+- `SendPipelineViewPort` / `SendPipelineTransportPort` / `SendPipelineShellPort` / `SendPipelinePersistencePort` / `SendPipelineDebugPort`：把发送 host 面按职责拆开的窄 port，其中 shell port 现在只保留 streaming shell 创建、reveal、notice placeholder 渲染与 timestamp 收尾，并由 `AssistantShellRenderer.ts` 统一实现 shell adapter
 - `SendPipelineHost`：由上述 port 组合出来的完整宿主契约，方便 view 侧一次性装配
 - `SendPipelineExecutionHost` / `StreamChunkRouterHost` / `StreamLocalFinalizerHost`：runtime、router 与本地收尾各自真正依赖的 host 子集
 - `SendPipelineTraceState`：chunk router 汇总出来的流状态快照
