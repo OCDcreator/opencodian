@@ -254,6 +254,11 @@ type TrailingAssistantPatchSkippedDebugFinalLogInputs = {
   payloadPlan: TrailingAssistantPatchSkippedDebugPayloadPlan;
 };
 
+type TrailingAssistantPatchSkippedDebugFinalLogInputsContract = {
+  tabId: TabId | null;
+  payloadPlan: TrailingAssistantPatchSkippedDebugPayloadPlan;
+};
+
 type TrailingAssistantPatchSkippedDebugFinalLogPayload = Record<
   string,
   unknown
@@ -1438,21 +1443,38 @@ export class ConversationRenderService {
     planningContext: TrailingAssistantPatchSkippedDebugLogPlanningContext,
     payloadPlan: TrailingAssistantPatchSkippedDebugPayloadPlan,
   ): TrailingAssistantPatchSkippedDebugFinalLogInputs {
+    const inputsContract =
+      this.buildTrailingAssistantPatchSkippedDebugFinalLogInputsContractFromLogPlanningContext(
+        planningContext,
+        payloadPlan,
+      );
     return this.buildTrailingAssistantPatchSkippedDebugFinalLogInputs(
-      planningContext.tabId,
-      payloadPlan,
+      inputsContract.tabId,
+      inputsContract.payloadPlan,
     );
+  }
+
+  private buildTrailingAssistantPatchSkippedDebugFinalLogInputsContractFromLogPlanningContext(
+    planningContext: TrailingAssistantPatchSkippedDebugLogPlanningContext,
+    payloadPlan: TrailingAssistantPatchSkippedDebugPayloadPlan,
+  ): TrailingAssistantPatchSkippedDebugFinalLogInputsContract {
+    return {
+      tabId: planningContext.tabId,
+      payloadPlan,
+    };
   }
 
   private buildTrailingAssistantPatchSkippedDebugFinalLogPlanFromLogPlanningContext(
     planningContext: TrailingAssistantPatchSkippedDebugLogPlanningContext,
     payloadPlan: TrailingAssistantPatchSkippedDebugPayloadPlan,
   ): TrailingAssistantPatchSkippedDebugLogPlan {
-    return this.buildTrailingAssistantPatchSkippedDebugFinalLogPlanFromInputs(
+    const finalLogInputs =
       this.buildTrailingAssistantPatchSkippedDebugFinalLogInputsFromLogPlanningContext(
         planningContext,
         payloadPlan,
-      ),
+      );
+    return this.buildTrailingAssistantPatchSkippedDebugFinalLogPlanFromInputs(
+      finalLogInputs,
     );
   }
 
