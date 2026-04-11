@@ -462,6 +462,49 @@ describe('ConversationRenderService', () => {
     expect(host.assistantTailRender.renderMessageContent).not.toHaveBeenCalled();
   });
 
+  it('logs skipped trailing assistant patch payloads with summarized tail messages', async () => {
+    const previousMessages = [
+      createMessage({ id: 'assistant-1', content: 'Stable answer', timestamp: 1 }),
+    ];
+    const nextMessages = [
+      createMessage({ id: 'user-2', role: 'user', content: 'Follow-up question', timestamp: 2 }),
+    ];
+    const host = createHost({
+      summarizeChatMessageForDebug: jest.fn().mockImplementation((message: ChatMessage | null | undefined) =>
+        message
+          ? {
+            id: message.id,
+            role: message.role,
+            content: message.content,
+          }
+          : null),
+    });
+    const service = new ConversationRenderService(host);
+
+    const patched = await service.patchTrailingAssistantRender(previousMessages, nextMessages, 'tab-1');
+
+    expect(patched).toBe(false);
+    expect(host.logAssistantFinalizationDebug).toHaveBeenCalledWith(
+      'patch-trailing-assistant-render-skipped',
+      {
+        reason: 'tail-message-not-mergeable-assistant',
+        tabId: 'tab-1',
+        previousRenderedCount: 1,
+        nextRenderedCount: 1,
+        previousTail: {
+          id: 'assistant-1',
+          role: 'assistant',
+          content: 'Stable answer',
+        },
+        nextTail: {
+          id: 'user-2',
+          role: 'user',
+          content: 'Follow-up question',
+        },
+      },
+    );
+  });
+
   it('uses pseudo-stream reveal for appended synced text assistants', async () => {
     const previousMessages = [
       createMessage({ id: 'user-1', role: 'user', content: 'Hi' }),

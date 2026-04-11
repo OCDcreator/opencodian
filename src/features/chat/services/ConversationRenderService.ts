@@ -256,13 +256,16 @@ export class ConversationRenderService {
     tabId: TabId | null = this.host.getActiveTabId(),
   ): Promise<boolean> {
     const fail = (reason: string, payload: Record<string, unknown> = {}): false => {
-      this.host.logAssistantFinalizationDebug('patch-trailing-assistant-render-skipped', {
-        reason,
-        tabId,
-        previousRenderedCount: this.host.getMessagesForRender(previousMessages).length,
-        nextRenderedCount: this.host.getMessagesForRender(nextMessages).length,
-        ...payload,
-      });
+      this.host.logAssistantFinalizationDebug(
+        'patch-trailing-assistant-render-skipped',
+        this.buildTrailingAssistantPatchSkippedDebugPayload(
+          previousMessages,
+          nextMessages,
+          reason,
+          tabId,
+          payload,
+        ),
+      );
       return false;
     };
     const preflight = this.resolveTrailingAssistantPatchPreflight(
@@ -453,6 +456,22 @@ export class ConversationRenderService {
       shouldStickToBottom,
       previousTail: this.host.summarizeChatMessageForDebug(previousTailMessage),
       nextTail: this.host.summarizeChatMessageForDebug(nextTailMessage),
+    };
+  }
+
+  private buildTrailingAssistantPatchSkippedDebugPayload(
+    previousMessages: ChatMessage[],
+    nextMessages: ChatMessage[],
+    reason: string,
+    tabId: TabId | null,
+    payload: Record<string, unknown>,
+  ): Record<string, unknown> {
+    return {
+      reason,
+      tabId,
+      previousRenderedCount: this.host.getMessagesForRender(previousMessages).length,
+      nextRenderedCount: this.host.getMessagesForRender(nextMessages).length,
+      ...payload,
     };
   }
 
