@@ -88,10 +88,26 @@ if (!('toggleClass' in HTMLElement.prototype)) {
   });
 }
 
+if (!('hasClass' in HTMLElement.prototype)) {
+  Object.defineProperty(HTMLElement.prototype, 'hasClass', {
+    value(className: string) {
+      return this.classList.contains(className);
+    },
+  });
+}
+
 if (!('setText' in HTMLElement.prototype)) {
   Object.defineProperty(HTMLElement.prototype, 'setText', {
     value(text: string) {
       this.textContent = text;
+    },
+  });
+}
+
+if (!('appendText' in HTMLElement.prototype)) {
+  Object.defineProperty(HTMLElement.prototype, 'appendText', {
+    value(text: string) {
+      this.append(document.createTextNode(text));
     },
   });
 }

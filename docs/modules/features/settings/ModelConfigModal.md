@@ -42,11 +42,21 @@ interface ProviderFormState {
 export class ModelConfigModal extends Modal { ... }
 ```
 
+额外的打开选项：
+
+```typescript
+interface ModelConfigModalOpenOptions {
+  initialProviderId?: string;
+  initialView?: 'preset-selector' | 'editor';
+  onSaved?: () => Promise<void> | void;
+}
+```
+
 ## 核心逻辑
 
 ### 配置读取与表单水合
 
-`onOpen()` 先从 `plugin.modelConfigService` 读取本地模型配置，再通过 `hydrate()` 把配置对象转换成可编辑的 `ProviderFormState[]` / `ModelFormState[]`。如果当前没有本地 provider，或调用方显式要求添加新 provider，会先创建一个空白 draft provider，并直接展示预设条与表单。
+`onOpen()` 先从 `plugin.modelConfigService` 读取本地模型配置，再通过 `hydrate()` 把配置对象转换成可编辑的 `ProviderFormState[]` / `ModelFormState[]`。如果当前没有本地 provider，或调用方显式要求添加新 provider，会先创建一个空白 draft provider，并直接展示预设条与表单；如果传入 `initialProviderId`，则优先选中对应 provider。
 
 ### 弹窗结构
 
@@ -77,6 +87,8 @@ export class ModelConfigModal extends Modal { ... }
 ### 未保存关闭保护
 
 弹窗打开后会记录一份表单快照。若用户修改过内容但尚未保存，关闭弹窗时会弹出确认框；如果内容没有变化，则直接关闭。
+
+这条关闭路径现在已有单测覆盖：service 不可用回退、preset-selector 初始草稿、`initialProviderId` 选中逻辑、未保存关闭确认。
 
 ### 可选本地服务重启
 

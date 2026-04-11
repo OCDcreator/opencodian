@@ -1,6 +1,7 @@
-export { StreamController } from './StreamController';
-export { ThinkingBlockRenderer } from './ThinkingBlockRenderer';
-export { ToolCallRenderer } from './ToolCallRenderer';
+export type {
+  McpSummaryCategoryDefinition,
+  McpSummaryCategoryId,
+} from './mcpSummaryConfig';
 export {
   MCP_ARGUMENT_FIELDS,
   MCP_GENERIC_SUMMARY_FIELDS,
@@ -8,10 +9,9 @@ export {
   MCP_SUMMARY_CATEGORY_DEFINITIONS,
   MCP_URL_LIKE_FIELDS,
 } from './mcpSummaryConfig';
-export type {
-  McpSummaryCategoryDefinition,
-  McpSummaryCategoryId,
-} from './mcpSummaryConfig';
+export { StreamController } from './StreamController';
+export { ThinkingBlockRenderer } from './ThinkingBlockRenderer';
+export { ToolCallRenderer } from './ToolCallRenderer';
 export type {
   ContentBlock,
   DoneChunk,

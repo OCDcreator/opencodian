@@ -1,6 +1,6 @@
 /**
  * OpenCodian Settings Tab
- * 
+ *
  * Settings UI for configuring the OpenCodian plugin.
  */
 
@@ -41,10 +41,10 @@ import {
   type InputPanelThemeId,
   isValidChatAppearanceCustomCssDeclarations,
   type LiquidGlassAdapterId,
+  type LobehubIconVariant,
   type ModelSourceMode,
   type OpencodeModelConfigSubset,
   type PluginIsolationMode,
-  type LobehubIconVariant,
   type ProviderIconColorMode,
   type QuestionCardPosition,
   type QuestionDisplayMode,
@@ -671,14 +671,14 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       .setName(t('settings.server.status.name'))
       .setDesc(t('settings.server.status.desc'));
     this.addServerHelpButton(statusSetting, 'status');
-    
+
     let actionBtn: import('obsidian').ButtonComponent;
     let stopBtn: import('obsidian').ButtonComponent;
     let refreshBtn: import('obsidian').ButtonComponent;
-    
+
     // Track server state
     let isExternalServer = false;
-    
+
     const updateStatus = async () => {
       // Check actual server health
       const isHealthy = await this.plugin.openCodeService.checkHealth();
@@ -723,7 +723,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
 
         return t('settings.server.status.stopped');
       })();
-      
+
       // Update description with status and external warning if applicable
       const healthIndicator = isHealthy ? '🟢' : '🔴';
       let descText = `${t('settings.server.status.desc')} - ${healthIndicator} ${statusText}`;
@@ -738,7 +738,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         descText += ` — ${diagnostics.message}`;
       }
       statusSetting.setDesc(descText);
-      
+
       if (actionBtn) {
         actionBtn.setButtonText(
           isLocalMode ? t('settings.server.status.start') : t('settings.server.status.test')
@@ -749,7 +749,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
             : internalStatus === 'starting'
         );
       }
-      
+
       if (stopBtn) {
         stopBtn.buttonEl.style.display = isLocalMode ? '' : 'none';
         stopBtn.setButtonText(t('settings.server.status.stop'));
@@ -764,7 +764,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     };
 
     this.refreshServerStatusCallback = updateStatus;
-    
+
     statusSetting
       .addButton((btn) => {
         actionBtn = btn;
@@ -842,13 +842,13 @@ export class OpenCodianSettingTab extends PluginSettingTab {
             btn.setDisabled(false);
           });
       });
-    
+
     // Initial status update
     void updateStatus();
-    
+
     // Set up interval to refresh status while settings tab is open
     this.serverStatusIntervalId = window.setInterval(() => void updateStatus(), 2000);
-    
+
     // Clean up interval when settings tab is closed
     this.containerEl.addEventListener('unload', () => {
       if (this.serverStatusIntervalId) {
@@ -1850,7 +1850,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         return null;
       }
     };
-    
+
     this.refreshModelsCallback = () => {
       void refreshModelSettings();
     };
@@ -2558,14 +2558,14 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     const configStatusSetting = new Setting(containerEl)
       .setName(t('settings.security.configStatus.name'))
       .setDesc(t('settings.security.configStatus.checking'));
-    
+
     // Update config status function - async but called independently
     const updateConfigStatus = async () => {
       try {
         const exists = await configManager.exists();
         const config = exists ? await configManager.read() : null;
         const permission = config?.permission;
-        
+
         // Remove old status classes
         configStatusSetting.settingEl.removeClass(
           'opencodian-status-warning',
@@ -2574,10 +2574,10 @@ export class OpenCodianSettingTab extends PluginSettingTab {
           'opencodian-status-plan',
           'opencodian-status-custom'
         );
-        
+
         let statusText: string;
         let statusClass: string;
-        
+
         if (!exists) {
           statusText = t('settings.security.configStatus.notCreated');
           statusClass = 'opencodian-status-warning';
@@ -2600,7 +2600,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
           statusText = t('settings.security.configStatus.custom');
           statusClass = 'opencodian-status-custom';
         }
-        
+
         configStatusSetting.setDesc(statusText);
         configStatusSetting.settingEl.addClass(statusClass);
       } catch {
@@ -2620,13 +2620,13 @@ export class OpenCodianSettingTab extends PluginSettingTab {
           .onChange(async (value) => {
             this.plugin.settings.permissionMode = value as 'yolo' | 'normal' | 'plan';
             await this.plugin.saveSettings();
-            
+
             // Config file is automatically updated in saveSettings()
             new Notice(t('settings.security.permissionMode.updated', { mode: value }));
-            
+
             // Refresh status display
             await updateConfigStatus();
-            
+
             // Auto restart if enabled
             if (this.plugin.settings.autoRestartOnPermissionChange) {
               if (this.plugin.settings.server.mode !== 'local') {
@@ -2689,7 +2689,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
           .onClick(async () => {
             btn.setDisabled(true);
             btn.setButtonText('Restarting...');
-            
+
             try {
               if (this.plugin.settings.server.mode !== 'local') {
                 new Notice(t('settings.server.remoteManageUnavailable'));
@@ -2698,7 +2698,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
 
               // Check if service is running
               const isRunning = await this.plugin.openCodeService.checkHealth();
-              
+
               if (isRunning) {
                 // Stop and restart
                 await this.plugin.openCodeService.stop();

@@ -17,6 +17,19 @@
 
 ## 核心逻辑
 
+### CI 门禁 (`.github/workflows/ci.yml`)
+
+仓库现在有一个最小质量门禁工作流，在 `push` 和 `pull_request` 上顺序执行：
+
+1. `npm ci`
+2. `npm run lint`
+3. `npm run typecheck`
+4. `npm run test`
+5. `npm run build`
+6. `git diff --exit-code -- styles.css`
+
+最后一步的意义是：确保提交中的 `src/style/**` 改动已经同步刷新到根目录 `styles.css`，避免 CI 通过但仓库产物滞后。
+
 ### BUILD_ID 生成 (`scripts/build-utils.mjs`)
 
 ```javascript
@@ -108,6 +121,7 @@ npm run build
 - `external` 列表确保不打包 Obsidian 和 CodeMirror 运行时依赖
 - BUILD_ID 在构建时硬编码，不会在运行时改变
 - `npm run build` 已内置 CSS 合并；若只想刷新根目录样式产物，可单独运行 `npm run build:css`
+- CI 会在构建后检查 `styles.css` 是否仍然干净，因此样式修改需要把生成产物一并提交
 
 ## 待补充
 - [ ] Source map 上传服务集成

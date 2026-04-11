@@ -1,6 +1,6 @@
 /**
  * OpenCode Server Manager
- * 
+ *
  * Manages the lifecycle of the OpenCode server process.
  * Handles startup, shutdown, health checks, and crash recovery.
  */
@@ -11,11 +11,11 @@ import * as net from 'net';
 import { Notice, requestUrl } from 'obsidian';
 import * as path from 'path';
 
+import { createLogger } from '../../shared';
 import {
   OPENCODIAN_LOCAL_SIDECAR_DEFAULT_HOST,
   OPENCODIAN_LOCAL_SIDECAR_DEFAULT_PORT,
 } from '../types/settings';
-import { createLogger } from '../../shared';
 import type { ManagedServerState, OpenCodeServerConfig, ServerDiagnostics, ServerStatus } from './types';
 
 const logger = createLogger('ServerManager');
@@ -92,7 +92,7 @@ export class ServerManager {
   setWorkingDirectory(path: string): void {
     this.workingDirectory = path;
     logger.debug(`Working directory set to: ${path}`);
-    
+
     // Check if config file exists in this directory
     const configPath = `${path}/.opencode/opencode.json`;
     if (fs.existsSync(configPath)) {
@@ -150,7 +150,7 @@ export class ServerManager {
     }
 
     this.startPromise = this.doStart();
-    
+
     try {
       await this.startPromise;
     } finally {
@@ -447,10 +447,41 @@ export class ServerManager {
   private attachLaunchTracking(proc: ChildProcess): void {
     this.clearLaunchState();
 
-    let handleStdout: ((data: unknown) => void) | undefined;
-    let handleStderr: ((data: unknown) => void) | undefined;
-    let handleError: ((error: Error) => void) | undefined;
-    let handleExit: ((code: number | null, signal: NodeJS.Signals | null) => void) | undefined;
+    const handleStdout = (data: unknown) => {
+      const text = String(data);
+      this.pushLaunchOutput(launch, text);
+      const trimmed = text.trim();
+      if (trimmed) {
+        logger.debug(trimmed);
+      }
+    };
+
+    const handleStderr = (data: unknown) => {
+      const text = String(data);
+      this.pushLaunchOutput(launch, text);
+      const trimmed = text.trim();
+      if (trimmed) {
+        logger.error(trimmed);
+      }
+    };
+
+    const handleError = (error: Error) => {
+      launch.error = error;
+      if (this.status === 'running') {
+        this.events.onError?.(error);
+      }
+    };
+
+    const handleExit = (code: number | null, signal: NodeJS.Signals | null) => {
+      launch.exited = true;
+      launch.exitCode = code;
+      launch.signal = signal;
+      this.clearManagedServerState();
+      if (code !== 0 && code !== null && this.status !== 'stopped') {
+        this.events.onError?.(new Error(`Server exited with code ${code}`));
+      }
+      this.cleanup();
+    };
 
     const launch: LocalServerLaunch = {
       proc,
@@ -460,55 +491,11 @@ export class ServerManager {
       signal: null,
       error: null,
       cleanup: () => {
-        if (handleError) {
-          proc.removeListener('error', handleError);
-        }
-        if (handleExit) {
-          proc.removeListener('exit', handleExit);
-        }
-        if (handleStdout) {
-          proc.stdout?.removeListener('data', handleStdout);
-        }
-        if (handleStderr) {
-          proc.stderr?.removeListener('data', handleStderr);
-        }
+        proc.removeListener('error', handleError);
+        proc.removeListener('exit', handleExit);
+        proc.stdout?.removeListener('data', handleStdout);
+        proc.stderr?.removeListener('data', handleStderr);
       },
-    };
-
-    handleStdout = (data: unknown) => {
-      const text = String(data);
-      this.pushLaunchOutput(launch, text);
-      const trimmed = text.trim();
-      if (trimmed) {
-        logger.debug(trimmed);
-      }
-    };
-
-    handleStderr = (data: unknown) => {
-      const text = String(data);
-      this.pushLaunchOutput(launch, text);
-      const trimmed = text.trim();
-      if (trimmed) {
-        logger.error(trimmed);
-      }
-    };
-
-    handleError = (error: Error) => {
-      launch.error = error;
-      if (this.status === 'running') {
-        this.events.onError?.(error);
-      }
-    };
-
-    handleExit = (code: number | null, signal: NodeJS.Signals | null) => {
-      launch.exited = true;
-      launch.exitCode = code;
-      launch.signal = signal;
-      this.clearManagedServerState();
-      if (code !== 0 && code !== null && this.status !== 'stopped') {
-        this.events.onError?.(new Error(`Server exited with code ${code}`));
-      }
-      this.cleanup();
     };
 
     proc.stdout?.on('data', handleStdout);

@@ -1,5 +1,5 @@
-import { setLocale } from '../../../../src/i18n';
 import { ProviderBuiltinIconPickerModal } from '../../../../src/features/settings/ProviderBuiltinIconPickerModal';
+import { setLocale } from '../../../../src/i18n';
 import { ProviderIconService } from '../../../../src/utils/icons/ProviderIconService';
 
 function createApp() {

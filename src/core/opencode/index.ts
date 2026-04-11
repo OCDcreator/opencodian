@@ -2,17 +2,17 @@
  * OpenCode SDK wrapper module
  */
 
-export type { SessionActivityStatus, SessionSyncEventUpdate } from './OpenCodeService';
-export { OpenCodeService } from './OpenCodeService';
-export {
-  OpenCodeSdkFacade,
-  SDK_FACADE_NAMESPACE_NAMES,
-} from './OpenCodeSdkFacade';
 export type {
   OpenCodeSdkFacadeClient,
   OpenCodeSdkFacadeNamespace,
   OpenCodeSdkNamespaceName,
 } from './OpenCodeSdkFacade';
+export {
+  OpenCodeSdkFacade,
+  SDK_FACADE_NAMESPACE_NAMES,
+} from './OpenCodeSdkFacade';
+export type { SessionActivityStatus, SessionSyncEventUpdate } from './OpenCodeService';
+export { OpenCodeService } from './OpenCodeService';
 export {
   resolveSdkFeatureFlags,
   SDK_FEATURE_FLAG_DISABLED_DEFAULTS,
@@ -23,17 +23,17 @@ export type {
   LocalJsonSchemaOutputFormat,
   LocalOutputFormat,
   LocalTextOutputFormat,
-  OpenCodeClientConfig,
-  OpenCodeCapabilitySnapshot,
-  OpenCodeServerConfig,
   McpServerSnapshot,
   McpServerStatus,
+  OpenCodeCapabilitySnapshot,
+  OpenCodeClientConfig,
+  OpenCodeServerConfig,
   QueryOptions,
   ResponseHandler,
   SdkEventEnvelope,
   SdkFeatureFlags,
-  ServerDiagnostics,
   ServerDiagnosticReason,
+  ServerDiagnostics,
   ServerError,
   ServerStatus,
   ToolCatalogEntry,

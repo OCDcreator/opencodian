@@ -73,9 +73,7 @@ import {
 import {
   applyPassiveScrollMeasurement,
   applyUserScrollIntent,
-  getProgrammaticScrollGuardDelayMs,
   hasProgrammaticScrollGuard,
-  isNearBottom as isNearBottomByMetrics,
 } from './autoScrollState';
 import {
   buildChatAppearanceCustomCss,
@@ -97,9 +95,15 @@ import { LiquidDiamondDemoController } from './liquidDiamondDemo';
 import { buildMessageRenderGroups, mergeAssistantMessagesForRender } from './renderGroups';
 import { type CollapsibleState, setupCollapsible } from './rendering/collapsible';
 import { ContextUsageService } from './services/ContextUsageService';
+import {
+  captureElementScrollRestoreSnapshot,
+  isElementNearBottom,
+  restoreElementScrollAfterRender,
+  scrollElementToBottom,
+} from './services/ScrollManager';
 import { TitleGenerationService } from './services/TitleGenerationService';
 import { type RestoredTabState, TabBar, type TabBarLayoutMode, type TabId, TabManager } from './tabs';
-import { ContextDetailModal,type ContextRawMessageItem } from './ui/ContextDetailModal';
+import { ContextDetailModal, type ContextRawMessageItem } from './ui/ContextDetailModal';
 import {
   chooseContextFile,
   type ContextFileCatalog,
@@ -107,6 +111,7 @@ import {
 } from './ui/ContextFilePickerModal';
 import { ContextRing } from './ui/ContextRing';
 import { EffortSelector } from './ui/EffortSelector';
+import { bindModelSelectorStickyHeaders } from './ui/modelSelectorStickyHeaders';
 import { NavigationSidebar } from './ui/NavigationSidebar';
 import { QuestionDock } from './ui/QuestionDock';
 import {
@@ -527,16 +532,6 @@ interface TabPaneState {
   resizeObserver: ResizeObserver | null;
 }
 
-type ConversationScrollRestoreMode = 'bottom' | 'preserve-distance' | 'preserve-anchor';
-
-interface ConversationScrollRestoreSnapshot {
-  mode: ConversationScrollRestoreMode;
-  scrollTop: number;
-  distanceFromBottom: number;
-  anchorMessageId: string | null;
-  anchorOffsetTop: number;
-}
-
 /** Clipboard icon SVG for copy button */
 const COPY_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`;
 const FORK_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><circle cx="18" cy="6" r="3"/><path d="M6 9v3a3 3 0 0 0 3 3h6a3 3 0 0 0 3-3V9"/><path d="M12 12v3"/></svg>`;
@@ -593,6 +588,7 @@ export class OpenCodianView extends ItemView {
   private modelSelectorDropdown: HTMLElement | null = null;
   private modelSelectorSearchInput: HTMLInputElement | null = null;
   private modelSelectorScrollContainer: HTMLElement | null = null;
+  private disposeModelSelectorStickyHeaders: (() => void) | null = null;
   private availableModels: Array<{ provider: string; model: string; label: string; providerName: string; modelName: string; contextWindow?: number }> = [];
   private availableProviders: Array<{ id: string; name: string; models: Array<{ id: string; name: string; contextWindow?: number }> }> = [];
   private modelCatalogBundle: ModelCatalogBundle | null = null;
@@ -2165,6 +2161,8 @@ export class OpenCodianView extends ItemView {
     this.destroyLiquidDiamondDemo();
     this.unmountLiquidGlassAdapter();
     this.removeComposerSvgFilterLayer();
+    this.disposeModelSelectorStickyHeaders?.();
+    this.disposeModelSelectorStickyHeaders = null;
 
     // Cleanup navigation sidebar
     this.clearTabMessagesPanes();
@@ -2265,7 +2263,7 @@ export class OpenCodianView extends ItemView {
       return true;
     }
 
-    const nearBottom = this.isNearBottomForElement(messagesEl);
+    const nearBottom = isElementNearBottom(messagesEl);
     const nextState = applyPassiveScrollMeasurement(runtime, nearBottom);
     runtime.isNearBottom = nextState.isNearBottom;
     if (this.getActiveTabId() === tabId) {
@@ -5402,7 +5400,7 @@ export class OpenCodianView extends ItemView {
       ? messagesEl.scrollTop
       : 0;
     const shouldStickToBottom = preserveScrollPosition && messagesEl
-      ? this.getTabRuntimeState(this.getActiveTabId())?.autoScrollEnabled ?? this.isNearBottomForElement(messagesEl)
+      ? this.getTabRuntimeState(this.getActiveTabId())?.autoScrollEnabled ?? isElementNearBottom(messagesEl)
       : true;
     const activeTabId = this.getActiveTabId();
     const previousSessionId = this.getSessionIdForTab(activeTabId);
@@ -5466,12 +5464,20 @@ export class OpenCodianView extends ItemView {
         if (runtime) {
           runtime.autoScrollEnabled = shouldStickToBottom;
         }
-        const scrollSnapshot = this.captureElementScrollRestoreSnapshot(
+        const scrollSnapshot = captureElementScrollRestoreSnapshot(
           messagesEl,
           !(preserveScrollPosition && !shouldStickToBottom),
           previousScrollTop,
         );
-        this.restoreElementScrollAfterRender(messagesEl, scrollSnapshot);
+        restoreElementScrollAfterRender(messagesEl, scrollSnapshot, {
+          runtime,
+          onRestoreBottom: () => {
+            this.scrollToBottom({ tabId: activeTabId });
+          },
+          onRestored: () => {
+            this.syncPaneScrollMetrics(activeTabId, messagesEl);
+          },
+        });
         window.requestAnimationFrame(() => {
           messagesEl.removeClass('is-rehydrating');
         });
@@ -9834,11 +9840,11 @@ export class OpenCodianView extends ItemView {
       ),
     });
     const messagesEl = this.messagesContainer;
-    const shouldStickToBottom = this.getActiveTabRuntimeState()?.autoScrollEnabled ?? this.isNearBottomForElement(messagesEl);
+    const shouldStickToBottom = this.getActiveTabRuntimeState()?.autoScrollEnabled ?? isElementNearBottom(messagesEl);
     const previousScrollTop = messagesEl.scrollTop;
     const activeTabId = this.getActiveTabId();
     this.beginConversationHydration(activeTabId);
-    const scrollSnapshot = this.captureElementScrollRestoreSnapshot(
+    const scrollSnapshot = captureElementScrollRestoreSnapshot(
       messagesEl,
       shouldStickToBottom,
       previousScrollTop,
@@ -9852,7 +9858,15 @@ export class OpenCodianView extends ItemView {
     try {
       await this.renderMessages(conversation.messages);
       await this.renderBackgroundTaskIndicatorIfNeeded();
-      this.restoreElementScrollAfterRender(messagesEl, scrollSnapshot);
+      restoreElementScrollAfterRender(messagesEl, scrollSnapshot, {
+        runtime: this.getActiveTabRuntimeState(),
+        onRestoreBottom: () => {
+          this.scrollToBottom({ tabId: activeTabId });
+        },
+        onRestored: () => {
+          this.syncPaneScrollMetrics(activeTabId, messagesEl);
+        },
+      });
       this.scheduleComposerLayoutSync();
 
       window.requestAnimationFrame(() => {
@@ -10153,20 +10167,12 @@ export class OpenCodianView extends ItemView {
     });
   }
 
-  private isNearBottomForElement(messagesEl: HTMLElement, threshold?: number): boolean {
-    return isNearBottomByMetrics({
-      scrollTop: messagesEl.scrollTop,
-      scrollHeight: messagesEl.scrollHeight,
-      clientHeight: messagesEl.clientHeight,
-    }, threshold);
-  }
-
   private isNearBottom(threshold?: number): boolean {
     if (!this.messagesContainer) {
       return true;
     }
 
-    return this.isNearBottomForElement(this.messagesContainer, threshold);
+    return isElementNearBottom(this.messagesContainer, threshold);
   }
 
   private cloneMessagesBefore(targetMessage: ChatMessage): ChatMessage[] {
@@ -10396,97 +10402,9 @@ export class OpenCodianView extends ItemView {
       return;
     }
 
-    if (options.enableAutoScroll) {
-      paneState.runtime.autoScrollEnabled = true;
-    }
-    paneState.runtime.programmaticScrollGuardUntil = Date.now()
-      + getProgrammaticScrollGuardDelayMs(options.behavior);
-
-    if (options.behavior === 'smooth') {
-      paneState.messagesEl.scrollTo({
-        top: paneState.messagesEl.scrollHeight,
-        behavior: 'smooth',
-      });
-    } else {
-      paneState.messagesEl.scrollTop = paneState.messagesEl.scrollHeight;
-    }
+    scrollElementToBottom(paneState.messagesEl, paneState.runtime, options);
 
     this.syncPaneScrollMetrics(tabId, paneState.messagesEl);
-  }
-
-  private captureElementScrollRestoreSnapshot(
-    messagesEl: HTMLElement,
-    shouldStickToBottom: boolean,
-    fallbackScrollTop = messagesEl.scrollTop,
-  ): ConversationScrollRestoreSnapshot {
-    const scrollTop = Number.isFinite(fallbackScrollTop) ? fallbackScrollTop : messagesEl.scrollTop;
-    const distanceFromBottom = Math.max(0, messagesEl.scrollHeight - messagesEl.clientHeight - scrollTop);
-    const messageElements = Array.from(messagesEl.querySelectorAll<HTMLElement>('.opencodian-message[data-message-id]'));
-    const anchorMessageEl = messageElements.find((element) => {
-      const rect = element.getBoundingClientRect();
-      const containerRect = messagesEl.getBoundingClientRect();
-      return rect.bottom >= containerRect.top;
-    }) ?? null;
-
-    return {
-      mode: shouldStickToBottom
-        ? 'bottom'
-        : anchorMessageEl?.dataset.messageId
-          ? 'preserve-anchor'
-          : 'preserve-distance',
-      scrollTop,
-      distanceFromBottom,
-      anchorMessageId: anchorMessageEl?.dataset.messageId ?? null,
-      anchorOffsetTop: anchorMessageEl
-        ? anchorMessageEl.getBoundingClientRect().top - messagesEl.getBoundingClientRect().top
-        : 0,
-    };
-  }
-
-  private restoreElementScrollAfterRender(
-    messagesEl: HTMLElement,
-    snapshot: ConversationScrollRestoreSnapshot,
-  ): void {
-    const tabId = messagesEl.dataset.tabId ?? null;
-    const apply = () => {
-      if (snapshot.mode === 'bottom') {
-        this.scrollToBottom({ tabId });
-        return;
-      }
-
-      if (tabId) {
-        const runtime = this.getTabRuntimeState(tabId);
-        if (runtime) {
-          runtime.programmaticScrollGuardUntil = Date.now()
-            + getProgrammaticScrollGuardDelayMs();
-        }
-      }
-
-      const maxScrollTop = Math.max(0, messagesEl.scrollHeight - messagesEl.clientHeight);
-      let nextScrollTop = Math.min(Math.max(0, snapshot.scrollTop), maxScrollTop);
-
-      if (snapshot.mode === 'preserve-anchor' && snapshot.anchorMessageId) {
-        const anchorEl = Array.from(messagesEl.querySelectorAll<HTMLElement>('.opencodian-message[data-message-id]'))
-          .find((element) => element.dataset.messageId === snapshot.anchorMessageId) ?? null;
-        if (anchorEl) {
-          const anchorOffsetTop = anchorEl.getBoundingClientRect().top - messagesEl.getBoundingClientRect().top;
-          nextScrollTop = Math.min(
-            Math.max(0, messagesEl.scrollTop + (anchorOffsetTop - snapshot.anchorOffsetTop)),
-            maxScrollTop,
-          );
-        } else {
-          nextScrollTop = Math.min(Math.max(0, maxScrollTop - snapshot.distanceFromBottom), maxScrollTop);
-        }
-      } else {
-        nextScrollTop = Math.min(Math.max(0, maxScrollTop - snapshot.distanceFromBottom), maxScrollTop);
-      }
-
-      messagesEl.scrollTop = nextScrollTop;
-      this.syncPaneScrollMetrics(tabId, messagesEl);
-    };
-
-    apply();
-    window.requestAnimationFrame(apply);
   }
 
   private shouldAutoScroll(tabId: TabId | null = this.getActiveTabId()): boolean {
@@ -10698,6 +10616,8 @@ export class OpenCodianView extends ItemView {
   private renderModelList(): void {
     if (!this.modelSelectorScrollContainer) return;
 
+    this.disposeModelSelectorStickyHeaders?.();
+    this.disposeModelSelectorStickyHeaders = null;
     this.modelSelectorScrollContainer.empty();
 
     // Check if models are still loading
@@ -10740,7 +10660,7 @@ export class OpenCodianView extends ItemView {
     });
 
     // Track headers for stuck effect
-    const headers: Array<{ el: HTMLElement; scrollHandler: () => void }> = [];
+    const headers: HTMLElement[] = [];
 
     // Create provider groups
     for (const provider of filteredProviders) {
@@ -10756,16 +10676,7 @@ export class OpenCodianView extends ItemView {
       header.setText(provider.name);
 
       // Setup stuck detection for this header
-      const scrollHandler = () => {
-        if (!this.modelSelectorScrollContainer || !header) return;
-        const scrollRect = this.modelSelectorScrollContainer.getBoundingClientRect();
-        const headerRect = header.getBoundingClientRect();
-        const isStuck = headerRect.top <= scrollRect.top + 1 &&
-                        this.modelSelectorScrollContainer.scrollTop > 0;
-        header.setAttribute('data-stuck', String(isStuck));
-      };
-
-      headers.push({ el: header, scrollHandler });
+      headers.push(header);
 
       // Models for this provider
       for (const model of provider.models) {
@@ -10803,26 +10714,10 @@ export class OpenCodianView extends ItemView {
       }
     }
 
-    // Add scroll listener to container
-    if (this.modelSelectorScrollContainer) {
-      // Remove old listener if exists
-      if ((this.modelSelectorScrollContainer as any)._stuckHandler) {
-        this.modelSelectorScrollContainer.removeEventListener(
-          'scroll',
-          (this.modelSelectorScrollContainer as any)._stuckHandler
-        );
-      }
-
-      const handler = () => {
-        headers.forEach(h => h.scrollHandler());
-      };
-
-      (this.modelSelectorScrollContainer as any)._stuckHandler = handler;
-      this.modelSelectorScrollContainer.addEventListener('scroll', handler, { passive: true });
-
-      // Initial check
-      handler();
-    }
+    this.disposeModelSelectorStickyHeaders = bindModelSelectorStickyHeaders(
+      this.modelSelectorScrollContainer,
+      headers,
+    );
   }
 
   /** Navigate model list with keyboard */

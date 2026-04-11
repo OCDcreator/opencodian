@@ -3,8 +3,8 @@ import { Modal, Notice, setIcon } from 'obsidian';
 import type { LobehubIconVariant, ProviderIconColorMode, ProviderIconLibrary } from '../../core/types';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
-import { ProviderIconService } from '../../utils/icons';
 import type { BuiltinIconLibraryId } from '../../utils/icons';
+import { ProviderIconService } from '../../utils/icons';
 import { enhanceSearchInput, type SearchInputEnhancerHandle } from './searchInputEnhancer';
 
 const LOBEHUB_ICON_VARIANT_OPTIONS: LobehubIconVariant[] = [

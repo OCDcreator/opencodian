@@ -20,6 +20,8 @@ import type {
 } from '../../core/types';
 import { createLogger } from '../../shared';
 import {
+  type BuiltinIconDefinition,
+  type BuiltinIconLibraryId,
   findBuiltinIcon,
   formatBuiltinSource,
   getBuiltinIcon,
@@ -27,8 +29,6 @@ import {
   PROVIDER_ICON_MAP,
   resolveBuiltinIconMatch,
   searchBuiltinIcons,
-  type BuiltinIconDefinition,
-  type BuiltinIconLibraryId,
 } from './builtinIconRegistry';
 import {
   LOBEHUB_ICON_MANIFEST,

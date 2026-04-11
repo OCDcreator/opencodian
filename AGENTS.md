@@ -29,7 +29,7 @@ Use `npm run doctor:esbuild` only after dependency changes or when build/dev rep
 - `src/core/opencode/ServerManager.ts`: owns the local OpenCode process lifecycle and managed-server adoption; if a previously managed local `4096` server no longer matches the current vault/mode/config signature, restart it instead of silently reusing it.
 - `src/features/chat/OpenCodianView.ts`: main chat runtime. It supports concurrent tab/session streaming; do not collapse it back to a single global stream state. Background tasks now render as inline per-turn status plus delayed persisted completion notices, and `session.status` only reflects the foreground runner, not background-task completion.
 - `src/features/chat/OpenCodianView.ts`: conversation reload now has a hydration/auth-sync phase; do not eagerly downgrade background tasks to stale before at least one authoritative message sync finishes, and preserve the current bottom/distance/anchor scroll-restore behavior.
-- `src/features/chat/services/ContextUsageService.ts`, `src/features/chat/userMessageDisplay.ts`, and `src/features/chat/userMessageActions.ts`: newer chat responsibilities have been split out of `OpenCodianView`; prefer extending those helpers before adding more view-local complexity.
+- `src/features/chat/services/ContextUsageService.ts`, `src/features/chat/services/ScrollManager.ts`, `src/features/chat/ui/modelSelectorStickyHeaders.ts`, `src/features/chat/userMessageDisplay.ts`, and `src/features/chat/userMessageActions.ts`: newer chat responsibilities have been split out of `OpenCodianView`; prefer extending those helpers before adding more view-local complexity.
 - `src/shared/toolIdentity.ts` + `src/utils/streaming/ToolCallRenderer.ts` + `src/utils/streaming/mcpSummaryConfig.ts`: tool kind/icon/summary rules are centralized here. MCP summaries now classify by tool-name action words and only inspect top-level input fields; keep `custom` tool behavior separate.
 - `src/core/config/ModelConfigService.ts` + `src/core/config/OpencodeConfigManager.ts`: merge local config and server catalogs. Preserve the distinction between `baseEffective` and filtered `effective`.
 - `src/core/storage/StorageService.ts`: local-first persistence for full conversations plus theme backgrounds and provider-icon assets.
@@ -69,6 +69,8 @@ Use `npm run doctor:esbuild` only after dependency changes or when build/dev rep
 - Build pipeline / scripts / test framework: `docs/modules/infrastructure/`
 - SDK v2 rollout status: `docs/status/sdk-v2-rollout.md`
 - SDK manual verification: `docs/status/sdk-v2-manual-checklist.md`
+- Maintainability phase handoff: `docs/status/maintainability-phase-1.md`
+- Maintainability short starter prompt: `docs/status/maintainability-next-session-prompt.md`
 - Obsidian linkage status: `docs/requirements/obsidian-linkage.md`
 - OMO compatibility / plugin requirements: `docs/requirements/`
 - Server API reference: `SERVER_API.md`

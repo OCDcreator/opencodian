@@ -39,9 +39,6 @@ import {
   getDefaultThemeSettings,
   getServerBaseUrl,
   isLocalServerMode,
-  OPENCODE_LEGACY_LOCAL_DEFAULT_PORT,
-  OPENCODIAN_LOCAL_SIDECAR_DEFAULT_HOST,
-  OPENCODIAN_LOCAL_SIDECAR_DEFAULT_PORT,
   normalizeBelowHeaderTabBarLayout,
   normalizeChatAppearanceSettings,
   normalizeDisabledModelRefs,
@@ -61,6 +58,9 @@ import {
   normalizeThemeSettings,
   normalizeThinkingBudget,
   normalizeTitleMode,
+  OPENCODE_LEGACY_LOCAL_DEFAULT_PORT,
+  OPENCODIAN_LOCAL_SIDECAR_DEFAULT_HOST,
+  OPENCODIAN_LOCAL_SIDECAR_DEFAULT_PORT,
   VIEW_TYPE_OPENCODIAN,
 } from './core/types';
 import { OpenCodianView } from './features/chat/OpenCodianView';

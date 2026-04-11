@@ -1,4 +1,6 @@
 export {
+  type BuiltinIconDefinition,
+  type BuiltinIconLibraryId,
   findBuiltinIcon,
   formatBuiltinSource,
   getBuiltinIcon,
@@ -7,7 +9,5 @@ export {
   PROVIDER_ICON_MAP,
   resolveBuiltinIconMatch,
   searchBuiltinIcons,
-  type BuiltinIconDefinition,
-  type BuiltinIconLibraryId,
 } from './builtinIconRegistry';
 export { ProviderIconService } from './ProviderIconService';

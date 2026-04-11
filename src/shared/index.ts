@@ -37,9 +37,9 @@ export type {
   ToolIdentityOptions,
 } from './toolIdentity';
 export {
-  MCP_TOOL_ICON_ID,
   getNormalizedToolName,
   getToolIdentity,
   isBuiltinToolName,
+  MCP_TOOL_ICON_ID,
 } from './toolIdentity';
 export { getVaultBasePath } from './vault';

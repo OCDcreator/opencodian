@@ -12,6 +12,58 @@
 
 ---
 
+## 2026-04-11 可维护性第一阶段护栏与第二阶段交接
+
+### 🎯 改动目标
+
+- 落地“低风险首批”可维护性改进：先补工程护栏、测试保护和小范围 `OpenCodianView` 抽取，不做一次性重写
+- 为后续大模型会话准备清晰交接文档和可直接复制的第二阶段启动提示词
+- 把第一阶段成果纳入 CI / 文档 / AGENTS 快速上下文，方便后续继续拆分
+
+### ✅ 本轮调整
+
+- `.eslintrc.cjs`
+- `.github/workflows/ci.yml`
+  - 新增 warning 级维护性规则：复杂度、函数行数、文件行数、参数数量和 `no-explicit-any`
+  - 对生成的 LobeHub manifest 和 JSX namespace shim 做定点豁免
+  - 新增 GitHub Actions CI，顺序运行 `npm ci`、lint、typecheck、test、build，并检查 `styles.css` 是否与源样式同步
+
+- `src/features/chat/services/ScrollManager.ts`
+- `src/features/chat/ui/modelSelectorStickyHeaders.ts`
+- `src/features/chat/OpenCodianView.ts`
+  - 将消息区底部检测、滚动快照、重渲后恢复和程序化滚底提取为可单测 helper
+  - 将 model selector sticky header 监听改为独立 helper + view 持有 cleanup disposer
+  - 移除 `_stuckHandler` DOM 私有属性方案，避免后续继续扩散 view-local 状态
+
+- `tests/unit/core/security/BlocklistChecker.test.ts`
+- `tests/unit/features/chat/ScrollManager.test.ts`
+- `tests/unit/features/chat/modelSelectorStickyHeaders.test.ts`
+- `tests/unit/features/chat/persistedTabRestore.test.ts`
+- `tests/unit/features/settings/ModelConfigModal.test.ts`
+- `tests/setup.ts`
+  - 补充 blocklist、滚动恢复、sticky header、persisted tab restore 和 `ModelConfigModal` 的关键单测
+  - 补齐测试环境里的 Obsidian DOM 扩展 shim：`hasClass` / `appendText`
+
+- `docs/status/maintainability-phase-1.md`
+- `docs/status/maintainability-next-session-prompt.md`
+- `docs/README.md`
+- `AGENTS.md`
+- `docs/modules/**`
+  - 新增第一阶段总结和第二阶段实施方向文档
+  - 新增可直接复制给新会话大模型的第二阶段启动提示词
+  - 在 AGENTS 文档中补充维护性阶段文档入口和最新 chat helper 边界
+  - 同步更新 `OpenCodianView`、`ModelConfigModal`、`BlocklistChecker`、构建管线及新增 helper 的模块文档
+
+### 🧪 验证结果
+
+- `npm run lint` 通过（维护性规则目前以 warning 暴露既有债务）
+- `npm run typecheck` 通过
+- `npm run test` 通过（68 个 test suites，560 个 tests）
+- `npm run build` 通过，最新 `BUILD_ID: main.202604111230`
+- 已按顺序复制 `dist/main.js`、`dist/manifest.json`、`dist/styles.css` 到 Test Vault
+- 已确认 Test Vault `main.js` 含最新 `BUILD_ID: main.202604111230`
+- `npm run check:devlog-order` 将在本次日志更新后执行
+
 ## 2026-04-11 SDK facade、工具身份与 MCP 摘要规则整理
 
 ### 🎯 改动目标

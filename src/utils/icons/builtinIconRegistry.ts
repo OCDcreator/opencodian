@@ -1,5 +1,4 @@
 import type { LobehubIconVariant, StaticLobehubIconVariant } from '../../core/types';
-
 import {
   LOBEHUB_ICON_MANIFEST,
   type LobehubManifestEntry,

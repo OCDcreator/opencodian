@@ -84,6 +84,7 @@ interface TabRuntimeState {
 - 模型目录缓存：`availableModels`、`availableProviders`
 - 服务器状态轮询和 badge 状态
 - context file catalog 缓存
+- model selector sticky header cleanup
 - retained selection highlight 状态
 - theme background / liquid glass / diamond demo / glass octahedron 相关 DOM 引用
 
@@ -110,6 +111,16 @@ interface TabRuntimeState {
 - effort selector、context ring、question dock、todo dock、navigation sidebar
 - liquid glass adapter、SVG filter layer、diamond demo
 - tab panes、tab bar、dropdown、markdown component 等
+
+### 滚动辅助抽离
+
+消息区的底部检测、scroll snapshot、重渲后恢复，现在由 `services/ScrollManager.ts` 提供纯 helper；`OpenCodianView` 只保留：
+
+- 当前 tab / pane 的查找
+- 是否应 auto-scroll 的业务判断
+- restore 后刷新 navigation sidebar 可见性和 pane metrics
+
+这次没有改变原有 bottom / preserve-anchor / preserve-distance 三种恢复语义，只是把算法从 view 内联实现挪到了可单测模块。
 
 ### 对话装载与后台同步
 
@@ -198,6 +209,10 @@ assistant 渲染里：
 - `thinking` 块走 `ThinkingBlockRenderer`
 - `tool_use` 块走 `ToolCallRenderer`
 - `text` 块和普通 `content` 走 `MarkdownRenderService`
+
+### 模型选择器粘性表头
+
+provider header 的 stuck 状态同步已转移到 `ui/modelSelectorStickyHeaders.ts`。`OpenCodianView` 在每次重绘模型列表前都会先 dispose 旧监听器，再绑定新列表，避免继续把 listener 挂到 DOM 私有属性上。
 - 已解析的 `questionResolution` 会根据设置插入 resolved card
 
 用户消息渲染里：

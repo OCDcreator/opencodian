@@ -3,11 +3,11 @@ jest.mock('../../../src/core/opencode', () => ({
   SDK_FEATURE_FLAG_ROLLOUT_DEFAULTS: {},
 }));
 
+import type { StorageService } from '../../../src/core/storage';
 import {
   getDefaultChatAppearanceSettings,
   getDefaultInputPanelGlassRefractionSettings,
 } from '../../../src/core/types';
-import type { StorageService } from '../../../src/core/storage';
 import OpenCodianPlugin from '../../../src/main';
 
 function createPluginWithSavedSettings(savedSettings: Record<string, unknown>): OpenCodianPlugin & {

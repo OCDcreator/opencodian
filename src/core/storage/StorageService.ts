@@ -244,13 +244,11 @@ export class StorageService {
       'settings.core',
       legacySettings,
       (settings) => {
-        const {
-          tabState: _tabState,
-          settingsPanelScrollTop: _settingsPanelScrollTop,
-          modelAvailabilitySectionOpen: _modelAvailabilitySectionOpen,
-          modelToolsSectionOpen: _modelToolsSectionOpen,
-          ...persistedCore
-        } = settings;
+        const persistedCore = { ...settings };
+        delete persistedCore.tabState;
+        delete persistedCore.settingsPanelScrollTop;
+        delete persistedCore.modelAvailabilitySectionOpen;
+        delete persistedCore.modelToolsSectionOpen;
         return persistedCore;
       },
     );
