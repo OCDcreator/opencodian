@@ -265,6 +265,13 @@ type TrailingAssistantPatchSkippedDebugPayloadPlan = Record<string, unknown> & {
   nextRenderedCount: number;
 };
 
+type TrailingAssistantPatchSkippedDebugPayloadPlanContract = {
+  reason: string;
+  payload: Record<string, unknown>;
+  previousRenderedCount: number;
+  nextRenderedCount: number;
+};
+
 type TrailingAssistantPatchSkippedDebugFinalLogInputs = {
   tabId: TabId | null;
   payloadPlan: TrailingAssistantPatchSkippedDebugPayloadPlan;
@@ -1545,9 +1552,32 @@ export class ConversationRenderService {
   private buildTrailingAssistantPatchSkippedDebugPayloadPlanFromLogPlanningContext(
     planningContext: TrailingAssistantPatchSkippedDebugLogPlanningContext,
   ): TrailingAssistantPatchSkippedDebugPayloadPlan {
+    const payloadPlanContract =
+      this.buildTrailingAssistantPatchSkippedDebugPayloadPlanContractFromLogPlanningContext(
+        planningContext,
+      );
     return this.buildTrailingAssistantPatchSkippedDebugPayloadPlan(
+      payloadPlanContract,
+    );
+  }
+
+  private buildTrailingAssistantPatchSkippedDebugPayloadPlanContractFromLogPlanningContext(
+    planningContext: TrailingAssistantPatchSkippedDebugLogPlanningContext,
+  ): TrailingAssistantPatchSkippedDebugPayloadPlanContract {
+    return this.buildTrailingAssistantPatchSkippedDebugPayloadPlanContract(
       planningContext.payloadInputs,
     );
+  }
+
+  private buildTrailingAssistantPatchSkippedDebugPayloadPlanContract(
+    payloadInputs: TrailingAssistantPatchSkippedDebugPayloadInputs,
+  ): TrailingAssistantPatchSkippedDebugPayloadPlanContract {
+    return {
+      reason: payloadInputs.reason,
+      payload: payloadInputs.payload,
+      previousRenderedCount: payloadInputs.countPlan.previousRenderedCount,
+      nextRenderedCount: payloadInputs.countPlan.nextRenderedCount,
+    };
   }
 
   private buildTrailingAssistantPatchSkippedDebugFinalLogInputsFromLogPlanningContext(
@@ -1645,13 +1675,13 @@ export class ConversationRenderService {
   }
 
   private buildTrailingAssistantPatchSkippedDebugPayloadPlan(
-    inputs: TrailingAssistantPatchSkippedDebugPayloadInputs,
+    payloadPlanContract: TrailingAssistantPatchSkippedDebugPayloadPlanContract,
   ): TrailingAssistantPatchSkippedDebugPayloadPlan {
     return {
-      reason: inputs.reason,
-      previousRenderedCount: inputs.countPlan.previousRenderedCount,
-      nextRenderedCount: inputs.countPlan.nextRenderedCount,
-      ...inputs.payload,
+      reason: payloadPlanContract.reason,
+      previousRenderedCount: payloadPlanContract.previousRenderedCount,
+      nextRenderedCount: payloadPlanContract.nextRenderedCount,
+      ...payloadPlanContract.payload,
     };
   }
 
