@@ -191,6 +191,11 @@ type TrailingAssistantPatchSkippedDebugCountInputs = {
   nextMessages: ChatMessage[];
 };
 
+type TrailingAssistantPatchSkippedDebugCountPlanningInputs = {
+  previousMessages: ChatMessage[];
+  nextMessages: ChatMessage[];
+};
+
 type TrailingAssistantPatchSkippedDebugCountPlanningContract = {
   countInputs: TrailingAssistantPatchSkippedDebugCountInputs;
 };
@@ -1393,29 +1398,50 @@ export class ConversationRenderService {
   private buildTrailingAssistantPatchSkippedDebugCountPlanFromLoggingContext(
     loggingContext: TrailingAssistantPatchSkippedDebugLoggingContext,
   ): TrailingAssistantPatchSkippedDebugCountPlan {
+    const countPlanningInputs =
+      this.buildTrailingAssistantPatchSkippedDebugCountPlanningInputsFromLoggingContext(
+        loggingContext,
+      );
     return this.buildTrailingAssistantPatchSkippedDebugCountPlan(
       this.buildTrailingAssistantPatchSkippedDebugCountPlanningContract(
-        loggingContext,
+        countPlanningInputs,
       ).countInputs,
     );
   }
 
-  private buildTrailingAssistantPatchSkippedDebugCountPlanningContract(
+  private buildTrailingAssistantPatchSkippedDebugCountPlanningInputsFromLoggingContext(
     loggingContext: TrailingAssistantPatchSkippedDebugLoggingContext,
+  ): TrailingAssistantPatchSkippedDebugCountPlanningInputs {
+    return this.buildTrailingAssistantPatchSkippedDebugCountPlanningInputs(
+      loggingContext.planningContext,
+    );
+  }
+
+  private buildTrailingAssistantPatchSkippedDebugCountPlanningInputs(
+    planningContext: TrailingAssistantPatchSkippedDebugPlanningContext,
+  ): TrailingAssistantPatchSkippedDebugCountPlanningInputs {
+    return {
+      previousMessages: planningContext.previousMessages,
+      nextMessages: planningContext.nextMessages,
+    };
+  }
+
+  private buildTrailingAssistantPatchSkippedDebugCountPlanningContract(
+    countPlanningInputs: TrailingAssistantPatchSkippedDebugCountPlanningInputs,
   ): TrailingAssistantPatchSkippedDebugCountPlanningContract {
     return {
       countInputs: this.buildTrailingAssistantPatchSkippedDebugCountInputs(
-        loggingContext.planningContext,
+        countPlanningInputs,
       ),
     };
   }
 
   private buildTrailingAssistantPatchSkippedDebugCountInputs(
-    planningContext: TrailingAssistantPatchSkippedDebugPlanningContext,
+    countPlanningInputs: TrailingAssistantPatchSkippedDebugCountPlanningInputs,
   ): TrailingAssistantPatchSkippedDebugCountInputs {
     return {
-      previousMessages: planningContext.previousMessages,
-      nextMessages: planningContext.nextMessages,
+      previousMessages: countPlanningInputs.previousMessages,
+      nextMessages: countPlanningInputs.nextMessages,
     };
   }
 
