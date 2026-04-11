@@ -1091,6 +1091,16 @@ export class ConversationRenderService {
       this.buildTrailingAssistantPatchCompletionDebugPayloadPlan(
         loggingContext.completionDebugPlan,
       );
+    return this.buildTrailingAssistantPatchCompletionDebugFinalLogPlan(
+      loggingContext,
+      payloadPlan,
+    );
+  }
+
+  private buildTrailingAssistantPatchCompletionDebugFinalLogPlan(
+    loggingContext: TrailingAssistantPatchCompletionDebugLoggingContext,
+    payloadPlan: TrailingAssistantPatchCompletionDebugPayloadPlan,
+  ): TrailingAssistantPatchCompletionDebugLogPlan {
     return {
       label: 'patch-trailing-assistant-render-complete',
       payload: {
