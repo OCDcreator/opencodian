@@ -189,6 +189,10 @@ type TrailingAssistantPatchCompletionDebugFinalLogInputsContract = {
   payloadPlan: TrailingAssistantPatchCompletionDebugPayloadPlan;
 };
 
+type TrailingAssistantPatchCompletionDebugFinalLogPlanContract = {
+  finalLogInputs: TrailingAssistantPatchCompletionDebugFinalLogInputs;
+};
+
 type TrailingAssistantPatchCompletionDebugFinalLogPayloadContract = {
   tabId: TabId | null;
   payloadPlan: TrailingAssistantPatchCompletionDebugPayloadPlan;
@@ -1375,14 +1379,34 @@ export class ConversationRenderService {
     planningContext: TrailingAssistantPatchCompletionDebugLogPlanningContext,
     payloadPlan: TrailingAssistantPatchCompletionDebugPayloadPlan,
   ): TrailingAssistantPatchCompletionDebugLogPlan {
-    const finalLogInputs =
-      this.buildTrailingAssistantPatchCompletionDebugFinalLogInputsFromLogPlanningContext(
+    const finalLogPlanContract =
+      this.buildTrailingAssistantPatchCompletionDebugFinalLogPlanContractFromLogPlanningContext(
         planningContext,
         payloadPlan,
       );
     return this.buildTrailingAssistantPatchCompletionDebugFinalLogPlanFromInputs(
-      finalLogInputs,
+      finalLogPlanContract.finalLogInputs,
     );
+  }
+
+  private buildTrailingAssistantPatchCompletionDebugFinalLogPlanContractFromLogPlanningContext(
+    planningContext: TrailingAssistantPatchCompletionDebugLogPlanningContext,
+    payloadPlan: TrailingAssistantPatchCompletionDebugPayloadPlan,
+  ): TrailingAssistantPatchCompletionDebugFinalLogPlanContract {
+    return this.buildTrailingAssistantPatchCompletionDebugFinalLogPlanContract(
+      this.buildTrailingAssistantPatchCompletionDebugFinalLogInputsFromLogPlanningContext(
+        planningContext,
+        payloadPlan,
+      ),
+    );
+  }
+
+  private buildTrailingAssistantPatchCompletionDebugFinalLogPlanContract(
+    finalLogInputs: TrailingAssistantPatchCompletionDebugFinalLogInputs,
+  ): TrailingAssistantPatchCompletionDebugFinalLogPlanContract {
+    return {
+      finalLogInputs,
+    };
   }
 
   private buildTrailingAssistantPatchCompletionDebugFinalLogInputs(
