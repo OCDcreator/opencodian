@@ -123,6 +123,16 @@ type TrailingAssistantPatchPreflight =
     payload?: Record<string, unknown>;
   };
 
+type TrailingAssistantPatchContainerResult =
+  | {
+    ok: true;
+    messagesEl: HTMLElement;
+  }
+  | {
+    ok: false;
+    reason: 'missing-container-or-inactive-tab';
+  };
+
 type TrailingAssistantPatchTargets =
   | {
     ok: true;
@@ -375,15 +385,30 @@ export class ConversationRenderService {
     };
   }
 
+  private resolveTrailingAssistantPatchActiveContainer(
+    tabId: TabId | null,
+  ): TrailingAssistantPatchContainerResult {
+    const messagesEl = this.host.getMessagesContainer();
+    if (!messagesEl || this.host.getActiveTabId() !== tabId) {
+      return { ok: false, reason: 'missing-container-or-inactive-tab' };
+    }
+
+    return {
+      ok: true,
+      messagesEl,
+    };
+  }
+
   private resolveTrailingAssistantPatchPreflight(
     previousMessages: ChatMessage[],
     nextMessages: ChatMessage[],
     tabId: TabId | null,
   ): TrailingAssistantPatchPreflight {
-    const messagesEl = this.host.getMessagesContainer();
-    if (!messagesEl || this.host.getActiveTabId() !== tabId) {
-      return { ok: false, reason: 'missing-container-or-inactive-tab' };
+    const activeContainer = this.resolveTrailingAssistantPatchActiveContainer(tabId);
+    if (!activeContainer.ok) {
+      return activeContainer;
     }
+    const { messagesEl } = activeContainer;
 
     const renderedMessages = this.resolveTrailingAssistantPatchRenderedMessages(
       previousMessages,
