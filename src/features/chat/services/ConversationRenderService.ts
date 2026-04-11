@@ -1306,9 +1306,10 @@ export class ConversationRenderService {
   private buildTrailingAssistantPatchSkippedDebugLogPlan(
     planningContext: TrailingAssistantPatchSkippedDebugLogPlanningContext,
   ): TrailingAssistantPatchSkippedDebugLogPlan {
-    const payloadPlan = this.buildTrailingAssistantPatchSkippedDebugPayloadPlan(
-      planningContext.payloadInputs,
-    );
+    const payloadPlan =
+      this.buildTrailingAssistantPatchSkippedDebugPayloadPlanFromLogPlanningContext(
+        planningContext,
+      );
     const finalLogInputs =
       this.buildTrailingAssistantPatchSkippedDebugFinalLogInputsFromLogPlanningContext(
         planningContext,
@@ -1316,6 +1317,14 @@ export class ConversationRenderService {
       );
     return this.buildTrailingAssistantPatchSkippedDebugFinalLogPlan(
       finalLogInputs,
+    );
+  }
+
+  private buildTrailingAssistantPatchSkippedDebugPayloadPlanFromLogPlanningContext(
+    planningContext: TrailingAssistantPatchSkippedDebugLogPlanningContext,
+  ): TrailingAssistantPatchSkippedDebugPayloadPlan {
+    return this.buildTrailingAssistantPatchSkippedDebugPayloadPlan(
+      planningContext.payloadInputs,
     );
   }
 
