@@ -151,9 +151,9 @@ type TrailingAssistantPatchSkippedDebugCountPlan = {
   nextRenderedCount: number;
 };
 
-type TrailingAssistantPatchSkippedDebugPlan = {
-  tabId: TabId | null;
-  countPlan: TrailingAssistantPatchSkippedDebugCountPlan;
+type TrailingAssistantPatchSkippedDebugLogPlan = {
+  label: 'patch-trailing-assistant-render-skipped';
+  payload: Record<string, unknown>;
 };
 
 type TrailingAssistantPatchSkippedDebugPlanningContext = {
@@ -999,25 +999,32 @@ export class ConversationRenderService {
     reason: string,
     payload: Record<string, unknown>,
   ): void {
-    this.host.logAssistantFinalizationDebug(
-      'patch-trailing-assistant-render-skipped',
-      this.buildTrailingAssistantPatchSkippedDebugPayload(
-        this.buildTrailingAssistantPatchSkippedDebugPlan(planningContext),
-        reason,
-        payload,
-      ),
+    const logPlan = this.buildTrailingAssistantPatchSkippedDebugLogPlan(
+      planningContext,
+      reason,
+      payload,
     );
+    this.host.logAssistantFinalizationDebug(logPlan.label, logPlan.payload);
   }
 
-  private buildTrailingAssistantPatchSkippedDebugPlan(
+  private buildTrailingAssistantPatchSkippedDebugLogPlan(
     planningContext: TrailingAssistantPatchSkippedDebugPlanningContext,
-  ): TrailingAssistantPatchSkippedDebugPlan {
+    reason: string,
+    payload: Record<string, unknown>,
+  ): TrailingAssistantPatchSkippedDebugLogPlan {
+    const countPlan = this.buildTrailingAssistantPatchSkippedDebugCountPlan(
+      planningContext.previousMessages,
+      planningContext.nextMessages,
+    );
     return {
-      tabId: planningContext.tabId,
-      countPlan: this.buildTrailingAssistantPatchSkippedDebugCountPlan(
-        planningContext.previousMessages,
-        planningContext.nextMessages,
-      ),
+      label: 'patch-trailing-assistant-render-skipped',
+      payload: {
+        reason,
+        tabId: planningContext.tabId,
+        previousRenderedCount: countPlan.previousRenderedCount,
+        nextRenderedCount: countPlan.nextRenderedCount,
+        ...payload,
+      },
     };
   }
 
@@ -1028,20 +1035,6 @@ export class ConversationRenderService {
     return {
       previousRenderedCount: this.host.getMessagesForRender(previousMessages).length,
       nextRenderedCount: this.host.getMessagesForRender(nextMessages).length,
-    };
-  }
-
-  private buildTrailingAssistantPatchSkippedDebugPayload(
-    skippedDebugPlan: TrailingAssistantPatchSkippedDebugPlan,
-    reason: string,
-    payload: Record<string, unknown>,
-  ): Record<string, unknown> {
-    return {
-      reason,
-      tabId: skippedDebugPlan.tabId,
-      previousRenderedCount: skippedDebugPlan.countPlan.previousRenderedCount,
-      nextRenderedCount: skippedDebugPlan.countPlan.nextRenderedCount,
-      ...payload,
     };
   }
 
