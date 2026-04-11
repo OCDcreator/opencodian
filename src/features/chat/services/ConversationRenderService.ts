@@ -1027,11 +1027,25 @@ export class ConversationRenderService {
     };
   }
 
+  private buildTrailingAssistantPatchTargetSuccessResult(
+    existingTailMessageEl: HTMLElement,
+    existingContentEl: HTMLElement,
+    parentEl: HTMLElement,
+  ): SuccessfulTrailingAssistantPatchTargets {
+    return {
+      ok: true,
+      existingTailMessageEl,
+      existingContentEl,
+      parentEl,
+    };
+  }
+
   private resolveTrailingAssistantPatchTargets(
     messagesEl: HTMLElement,
   ): TrailingAssistantPatchTargets {
     const existingTailMessageEl = this.findExistingTrailingAssistantElement(messagesEl);
-    if (!existingTailMessageEl || !(existingTailMessageEl.parentElement instanceof HTMLElement)) {
+    const parentEl = existingTailMessageEl?.parentElement;
+    if (!existingTailMessageEl || !(parentEl instanceof HTMLElement)) {
       return this.buildTrailingAssistantPatchTargetFailureResult(
         'missing-existing-tail-element',
       );
@@ -1044,12 +1058,11 @@ export class ConversationRenderService {
       );
     }
 
-    return {
-      ok: true,
+    return this.buildTrailingAssistantPatchTargetSuccessResult(
       existingTailMessageEl,
       existingContentEl,
-      parentEl: existingTailMessageEl.parentElement,
-    };
+      parentEl,
+    );
   }
 
   private findExistingTrailingAssistantElement(messagesEl: HTMLElement): HTMLElement | null {
