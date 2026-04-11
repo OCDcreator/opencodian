@@ -3,10 +3,16 @@ import {
   type Conversation,
 } from '../../../core/types';
 import type { TabId } from '../tabs';
+import { buildTrailingAssistantPatchDebugLogPlanFromLoggingContext } from './TrailingAssistantPatchDebugLogCoordinator';
 import {
   type TrailingAssistantPatchDebugLogPlan,
 } from './TrailingAssistantPatchDebugLogHelper';
-import { buildTrailingAssistantPatchDebugLogPlanFromLoggingContext } from './TrailingAssistantPatchDebugLogCoordinator';
+import {
+  buildTrailingAssistantPatchCompletionDebugPayloadInputs,
+  buildTrailingAssistantPatchCompletionDebugPayloadPlan,
+  buildTrailingAssistantPatchSkippedDebugPayloadInputs,
+  buildTrailingAssistantPatchSkippedDebugPayloadPlan,
+} from './TrailingAssistantPatchDebugPayloadHelper';
 import {
   captureElementScrollRestoreSnapshot,
   isElementNearBottom,
@@ -140,24 +146,6 @@ type TrailingAssistantPatchCompletionDebugPlan = {
   nextTail: Record<string, unknown> | null;
 };
 
-type TrailingAssistantPatchCompletionDebugPayloadPlan = {
-  shouldStickToBottom: boolean;
-  previousTail: Record<string, unknown> | null;
-  nextTail: Record<string, unknown> | null;
-};
-
-type TrailingAssistantPatchCompletionDebugPayloadInputs = {
-  shouldStickToBottom: boolean;
-  previousTail: Record<string, unknown> | null;
-  nextTail: Record<string, unknown> | null;
-};
-
-type TrailingAssistantPatchCompletionDebugPayloadPlanContract = {
-  shouldStickToBottom: boolean;
-  previousTail: Record<string, unknown> | null;
-  nextTail: Record<string, unknown> | null;
-};
-
 type TrailingAssistantPatchCompletionDebugSummaryPlan = {
   previousTail: Record<string, unknown> | null;
   nextTail: Record<string, unknown> | null;
@@ -177,69 +165,6 @@ type TrailingAssistantPatchNonMergeableTailFailurePlan = {
     previousTail: Record<string, unknown> | null;
     nextTail: Record<string, unknown> | null;
   };
-};
-
-type TrailingAssistantPatchSkippedDebugCountPlan = {
-  previousRenderedCount: number;
-  nextRenderedCount: number;
-};
-
-type TrailingAssistantPatchSkippedDebugCountInputs = {
-  previousMessages: ChatMessage[];
-  nextMessages: ChatMessage[];
-};
-
-type TrailingAssistantPatchSkippedDebugCountPlanningInputs = {
-  previousMessages: ChatMessage[];
-  nextMessages: ChatMessage[];
-};
-
-type TrailingAssistantPatchSkippedDebugCountPlanningContract = {
-  countInputs: TrailingAssistantPatchSkippedDebugCountInputs;
-};
-
-type TrailingAssistantPatchSkippedDebugReasonPayloadInputs = {
-  reason: string;
-  payload: Record<string, unknown>;
-};
-
-type TrailingAssistantPatchSkippedDebugReasonPayloadContract = {
-  reason: string;
-  payload: Record<string, unknown>;
-};
-
-type TrailingAssistantPatchSkippedDebugPayloadInputsContract = {
-  reasonPayloadInputs: TrailingAssistantPatchSkippedDebugReasonPayloadInputs;
-  countPlan: TrailingAssistantPatchSkippedDebugCountPlan;
-};
-
-type TrailingAssistantPatchSkippedDebugPayloadInputsContractPreparation = {
-  reasonPayloadInputs: TrailingAssistantPatchSkippedDebugReasonPayloadInputs;
-  countPlan: TrailingAssistantPatchSkippedDebugCountPlan;
-};
-
-type TrailingAssistantPatchSkippedDebugPayloadInputsContractPreparationInputs = {
-  reasonPayloadInputs: TrailingAssistantPatchSkippedDebugReasonPayloadInputs;
-  countPlan: TrailingAssistantPatchSkippedDebugCountPlan;
-};
-
-type TrailingAssistantPatchSkippedDebugPayloadInputs = {
-  reason: string;
-  payload: Record<string, unknown>;
-  countPlan: TrailingAssistantPatchSkippedDebugCountPlan;
-};
-
-type TrailingAssistantPatchSkippedDebugPayloadPlan = Record<string, unknown> & {
-  reason: string;
-  previousRenderedCount: number;
-  nextRenderedCount: number;
-};
-
-type TrailingAssistantPatchSkippedDebugPayloadPlanContract = {
-  reason: string;
-  payload: Record<string, unknown>;
-  previousRenderedCount: number;
-  nextRenderedCount: number;
 };
 
 type TrailingAssistantPatchSkippedDebugLogPlan =
@@ -1175,63 +1100,12 @@ export class ConversationRenderService {
       label: 'patch-trailing-assistant-render-complete',
       loggingContext,
       buildPayloadInputsFromLoggingContext: (context) =>
-        this.buildTrailingAssistantPatchCompletionDebugPayloadInputsFromLoggingContext(
-          context,
+        buildTrailingAssistantPatchCompletionDebugPayloadInputs(
+          context.completionDebugPlan,
         ),
-      buildPayloadPlan: (payloadInputs) =>
-        this.buildTrailingAssistantPatchCompletionDebugPayloadPlanFromPayloadInputs(
-          payloadInputs,
-        ),
+      buildPayloadPlan: buildTrailingAssistantPatchCompletionDebugPayloadPlan,
       getTabId: (context) => context.tabId,
     });
-  }
-
-  private buildTrailingAssistantPatchCompletionDebugPayloadInputsFromLoggingContext(
-    loggingContext: TrailingAssistantPatchCompletionDebugLoggingContext,
-  ): TrailingAssistantPatchCompletionDebugPayloadInputs {
-    return this.buildTrailingAssistantPatchCompletionDebugPayloadInputs(
-      loggingContext.completionDebugPlan,
-    );
-  }
-
-  private buildTrailingAssistantPatchCompletionDebugPayloadPlanFromPayloadInputs(
-    payloadInputs: TrailingAssistantPatchCompletionDebugPayloadInputs,
-  ): TrailingAssistantPatchCompletionDebugPayloadPlan {
-    return this.buildTrailingAssistantPatchCompletionDebugPayloadPlan(
-      this.buildTrailingAssistantPatchCompletionDebugPayloadPlanContract(
-        payloadInputs,
-      ),
-    );
-  }
-
-  private buildTrailingAssistantPatchCompletionDebugPayloadPlanContract(
-    payloadInputs: TrailingAssistantPatchCompletionDebugPayloadInputs,
-  ): TrailingAssistantPatchCompletionDebugPayloadPlanContract {
-    return {
-      shouldStickToBottom: payloadInputs.shouldStickToBottom,
-      previousTail: payloadInputs.previousTail,
-      nextTail: payloadInputs.nextTail,
-    };
-  }
-
-  private buildTrailingAssistantPatchCompletionDebugPayloadPlan(
-    payloadPlanContract: TrailingAssistantPatchCompletionDebugPayloadPlanContract,
-  ): TrailingAssistantPatchCompletionDebugPayloadPlan {
-    return {
-      shouldStickToBottom: payloadPlanContract.shouldStickToBottom,
-      previousTail: payloadPlanContract.previousTail,
-      nextTail: payloadPlanContract.nextTail,
-    };
-  }
-
-  private buildTrailingAssistantPatchCompletionDebugPayloadInputs(
-    completionDebugPlan: TrailingAssistantPatchCompletionDebugPlan,
-  ): TrailingAssistantPatchCompletionDebugPayloadInputs {
-    return {
-      shouldStickToBottom: completionDebugPlan.shouldStickToBottom,
-      previousTail: completionDebugPlan.previousTail,
-      nextTail: completionDebugPlan.nextTail,
-    };
   }
 
   private buildTrailingAssistantPatchSkippedDebugPlanningContext(
@@ -1274,213 +1148,17 @@ export class ConversationRenderService {
       label: 'patch-trailing-assistant-render-skipped',
       loggingContext,
       buildPayloadInputsFromLoggingContext: (context) =>
-        this.buildTrailingAssistantPatchSkippedDebugPayloadInputsFromLoggingContext(
-          context,
-        ),
-      buildPayloadPlan: (payloadInputs) =>
-        this.buildTrailingAssistantPatchSkippedDebugPayloadPlanFromPayloadInputs(
-          payloadInputs,
-        ),
+        buildTrailingAssistantPatchSkippedDebugPayloadInputs({
+          reason: context.reason,
+          payload: context.payload,
+          previousMessages: context.planningContext.previousMessages,
+          nextMessages: context.planningContext.nextMessages,
+          getMessagesForRender: (messages) =>
+            this.host.getMessagesForRender(messages),
+        }),
+      buildPayloadPlan: buildTrailingAssistantPatchSkippedDebugPayloadPlan,
       getTabId: (context) => context.planningContext.tabId,
     });
-  }
-
-  private buildTrailingAssistantPatchSkippedDebugPayloadPlanFromPayloadInputs(
-    payloadInputs: TrailingAssistantPatchSkippedDebugPayloadInputs,
-  ): TrailingAssistantPatchSkippedDebugPayloadPlan {
-    return this.buildTrailingAssistantPatchSkippedDebugPayloadPlan(
-      this.buildTrailingAssistantPatchSkippedDebugPayloadPlanContract(
-        payloadInputs,
-      ),
-    );
-  }
-
-  private buildTrailingAssistantPatchSkippedDebugPayloadPlanContract(
-    payloadInputs: TrailingAssistantPatchSkippedDebugPayloadInputs,
-  ): TrailingAssistantPatchSkippedDebugPayloadPlanContract {
-    return {
-      reason: payloadInputs.reason,
-      payload: payloadInputs.payload,
-      previousRenderedCount: payloadInputs.countPlan.previousRenderedCount,
-      nextRenderedCount: payloadInputs.countPlan.nextRenderedCount,
-    };
-  }
-
-  private buildTrailingAssistantPatchSkippedDebugPayloadPlan(
-    payloadPlanContract: TrailingAssistantPatchSkippedDebugPayloadPlanContract,
-  ): TrailingAssistantPatchSkippedDebugPayloadPlan {
-    return {
-      reason: payloadPlanContract.reason,
-      previousRenderedCount: payloadPlanContract.previousRenderedCount,
-      nextRenderedCount: payloadPlanContract.nextRenderedCount,
-      ...payloadPlanContract.payload,
-    };
-  }
-
-  private buildTrailingAssistantPatchSkippedDebugPayloadInputs(
-    inputsContract: TrailingAssistantPatchSkippedDebugPayloadInputsContract,
-  ): TrailingAssistantPatchSkippedDebugPayloadInputs {
-    return {
-      reason: inputsContract.reasonPayloadInputs.reason,
-      payload: inputsContract.reasonPayloadInputs.payload,
-      countPlan: inputsContract.countPlan,
-    };
-  }
-
-  private buildTrailingAssistantPatchSkippedDebugPayloadInputsFromLoggingContext(
-    loggingContext: TrailingAssistantPatchSkippedDebugLoggingContext,
-  ): TrailingAssistantPatchSkippedDebugPayloadInputs {
-    const payloadInputsContract =
-      this.buildTrailingAssistantPatchSkippedDebugPayloadInputsContractFromLoggingContext(
-        loggingContext,
-      );
-    return this.buildTrailingAssistantPatchSkippedDebugPayloadInputs(
-      payloadInputsContract,
-    );
-  }
-
-  private buildTrailingAssistantPatchSkippedDebugPayloadInputsContractFromLoggingContext(
-    loggingContext: TrailingAssistantPatchSkippedDebugLoggingContext,
-  ): TrailingAssistantPatchSkippedDebugPayloadInputsContract {
-    return this.buildTrailingAssistantPatchSkippedDebugPayloadInputsContract(
-      this.buildTrailingAssistantPatchSkippedDebugPayloadInputsContractPreparationFromLoggingContext(
-        loggingContext,
-      ),
-    );
-  }
-
-  private buildTrailingAssistantPatchSkippedDebugPayloadInputsContractPreparationFromLoggingContext(
-    loggingContext: TrailingAssistantPatchSkippedDebugLoggingContext,
-  ): TrailingAssistantPatchSkippedDebugPayloadInputsContractPreparation {
-    const reasonPayloadInputs =
-      this.buildTrailingAssistantPatchSkippedDebugReasonPayloadInputsFromLoggingContext(
-        loggingContext,
-      );
-    const countPlan =
-      this.buildTrailingAssistantPatchSkippedDebugCountPlanFromLoggingContext(
-        loggingContext,
-      );
-    return this.buildTrailingAssistantPatchSkippedDebugPayloadInputsContractPreparation(
-      {
-        reasonPayloadInputs,
-        countPlan,
-      },
-    );
-  }
-
-  private buildTrailingAssistantPatchSkippedDebugPayloadInputsContractPreparation(
-    preparationInputs: TrailingAssistantPatchSkippedDebugPayloadInputsContractPreparationInputs,
-  ): TrailingAssistantPatchSkippedDebugPayloadInputsContractPreparation {
-    return {
-      reasonPayloadInputs: preparationInputs.reasonPayloadInputs,
-      countPlan: preparationInputs.countPlan,
-    };
-  }
-
-  private buildTrailingAssistantPatchSkippedDebugPayloadInputsContract(
-    contractPreparation: TrailingAssistantPatchSkippedDebugPayloadInputsContractPreparation,
-  ): TrailingAssistantPatchSkippedDebugPayloadInputsContract {
-    return {
-      reasonPayloadInputs: contractPreparation.reasonPayloadInputs,
-      countPlan: contractPreparation.countPlan,
-    };
-  }
-
-  private buildTrailingAssistantPatchSkippedDebugReasonPayloadInputs(
-    reasonPayloadContract: TrailingAssistantPatchSkippedDebugReasonPayloadContract,
-  ): TrailingAssistantPatchSkippedDebugReasonPayloadInputs {
-    return {
-      reason: reasonPayloadContract.reason,
-      payload: reasonPayloadContract.payload,
-    };
-  }
-
-  private buildTrailingAssistantPatchSkippedDebugReasonPayloadInputsFromLoggingContext(
-    loggingContext: TrailingAssistantPatchSkippedDebugLoggingContext,
-  ): TrailingAssistantPatchSkippedDebugReasonPayloadInputs {
-    return this.buildTrailingAssistantPatchSkippedDebugReasonPayloadInputs(
-      this.buildTrailingAssistantPatchSkippedDebugReasonPayloadContract(
-        loggingContext,
-      ),
-    );
-  }
-
-  private buildTrailingAssistantPatchSkippedDebugReasonPayloadContract(
-    loggingContext: TrailingAssistantPatchSkippedDebugLoggingContext,
-  ): TrailingAssistantPatchSkippedDebugReasonPayloadContract {
-    return {
-      reason: loggingContext.reason,
-      payload: loggingContext.payload,
-    };
-  }
-
-  private buildTrailingAssistantPatchSkippedDebugCountPlanFromLoggingContext(
-    loggingContext: TrailingAssistantPatchSkippedDebugLoggingContext,
-  ): TrailingAssistantPatchSkippedDebugCountPlan {
-    const countPlanningContract =
-      this.buildTrailingAssistantPatchSkippedDebugCountPlanningContractFromLoggingContext(
-        loggingContext,
-      );
-    return this.buildTrailingAssistantPatchSkippedDebugCountPlan(
-      countPlanningContract.countInputs,
-    );
-  }
-
-  private buildTrailingAssistantPatchSkippedDebugCountPlanningContractFromLoggingContext(
-    loggingContext: TrailingAssistantPatchSkippedDebugLoggingContext,
-  ): TrailingAssistantPatchSkippedDebugCountPlanningContract {
-    return this.buildTrailingAssistantPatchSkippedDebugCountPlanningContract(
-      this.buildTrailingAssistantPatchSkippedDebugCountPlanningInputsFromLoggingContext(
-        loggingContext,
-      ),
-    );
-  }
-
-  private buildTrailingAssistantPatchSkippedDebugCountPlanningInputsFromLoggingContext(
-    loggingContext: TrailingAssistantPatchSkippedDebugLoggingContext,
-  ): TrailingAssistantPatchSkippedDebugCountPlanningInputs {
-    return this.buildTrailingAssistantPatchSkippedDebugCountPlanningInputs(
-      loggingContext.planningContext,
-    );
-  }
-
-  private buildTrailingAssistantPatchSkippedDebugCountPlanningInputs(
-    planningContext: TrailingAssistantPatchSkippedDebugPlanningContext,
-  ): TrailingAssistantPatchSkippedDebugCountPlanningInputs {
-    return {
-      previousMessages: planningContext.previousMessages,
-      nextMessages: planningContext.nextMessages,
-    };
-  }
-
-  private buildTrailingAssistantPatchSkippedDebugCountPlanningContract(
-    countPlanningInputs: TrailingAssistantPatchSkippedDebugCountPlanningInputs,
-  ): TrailingAssistantPatchSkippedDebugCountPlanningContract {
-    return {
-      countInputs: this.buildTrailingAssistantPatchSkippedDebugCountInputs(
-        countPlanningInputs,
-      ),
-    };
-  }
-
-  private buildTrailingAssistantPatchSkippedDebugCountInputs(
-    countPlanningInputs: TrailingAssistantPatchSkippedDebugCountPlanningInputs,
-  ): TrailingAssistantPatchSkippedDebugCountInputs {
-    return {
-      previousMessages: countPlanningInputs.previousMessages,
-      nextMessages: countPlanningInputs.nextMessages,
-    };
-  }
-
-  private buildTrailingAssistantPatchSkippedDebugCountPlan(
-    inputs: TrailingAssistantPatchSkippedDebugCountInputs,
-  ): TrailingAssistantPatchSkippedDebugCountPlan {
-    return {
-      previousRenderedCount:
-        this.host.getMessagesForRender(inputs.previousMessages).length,
-      nextRenderedCount:
-        this.host.getMessagesForRender(inputs.nextMessages).length,
-    };
   }
 
   private buildTrailingAssistantPatchTargetFailureResult(

@@ -33,6 +33,7 @@ export function buildTrailingAssistantPatchDebugFinalLogPlanFromTabId<
 
 ## 与 `ConversationRenderService` 的关系
 
-- `ConversationRenderService` 继续负责 completion / skipped 两条路径各自的 payload-plan 计算
+- `ConversationRenderService` 不再直接计算 completion / skipped payload-plan；这部分已迁到 `TrailingAssistantPatchDebugPayloadHelper`
+- `TrailingAssistantPatchDebugLogCoordinator` 仍把 ready `payloadPlan` 交给这里
 - 共享的 final-log contract、inputs 与 payload 收口逻辑已经迁到这里
 - 这让 service 只再决定“用哪个 label”和“提供哪个 payloadPlan”，不再重复维护对称的末端 debug log 组装

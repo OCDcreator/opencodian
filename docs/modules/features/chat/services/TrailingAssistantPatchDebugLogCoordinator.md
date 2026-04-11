@@ -9,7 +9,7 @@
 
 - 从各自的 `loggingContext` 提取 `payloadInputs`
 - 组装共享的 log `planningContext`
-- 用分支自己的 `payloadPlan` builder 生成 ready payload
+- 调用分支私有的 payload helper 生成 ready `payloadPlan`
 - 把 `label`、`tabId` 与 ready `payloadPlan` 继续交给 `TrailingAssistantPatchDebugLogHelper`
 
 它不触碰 `ConversationRenderHost`、DOM 或具体的 payload 细节；只负责共享的 “logging context → planning context → payloadPlan → final log plan” 协调骨架。
@@ -37,6 +37,7 @@ export function buildTrailingAssistantPatchDebugLogPlanFromLoggingContext<
 
 ## 与 `ConversationRenderService` 的关系
 
-- `ConversationRenderService` 继续保留 completion / skipped 两条路径各自的 payload-inputs 与 payload-plan 细节
+- `ConversationRenderService` 现在主要只负责触发 debug logging，并为 coordinator 提供最小化的 logging context / `tabId`
+- completion / skipped 两条路径各自的 payload-inputs 与 payload-plan 细节已迁到 `TrailingAssistantPatchDebugPayloadHelper`
 - 顶层共享的 log planning-context 装配与 final-log plan 协调迁到这里
 - 真正的 final-log payload 注入与 shape 仍由 `TrailingAssistantPatchDebugLogHelper` 负责
