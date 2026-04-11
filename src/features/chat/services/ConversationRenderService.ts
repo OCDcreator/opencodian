@@ -111,12 +111,26 @@ type TrailingAssistantPatchDomTarget = {
   turnBodyEl: HTMLElement;
 };
 
+type TrailingAssistantPatchExecutionPlan =
+  | {
+    kind: 'finalize-footer';
+    messageEl: HTMLElement;
+    nextTailMessage: ChatMessage;
+  }
+  | {
+    kind: 'rerender-content';
+    messageEl: HTMLElement;
+    contentEl: HTMLElement;
+    nextTailMessage: ChatMessage;
+  };
+
 type TrailingAssistantPatchPreflight =
   | {
     ok: true;
     previousTailMessage: ChatMessage;
     nextTailMessage: ChatMessage;
     patchTarget: TrailingAssistantPatchDomTarget;
+    executionPlan: TrailingAssistantPatchExecutionPlan;
     runtime: ConversationRenderRuntimeState | null;
     previousTurnBodyEl: HTMLElement | null;
     shouldStickToBottom: boolean;
@@ -502,11 +516,17 @@ export class ConversationRenderService {
   ): SuccessfulTrailingAssistantPatchPreflight {
     const runtime = this.host.getRenderRuntimeForTab(tabId);
     const patchTarget = this.buildTrailingAssistantPatchDomTarget(patchTargets);
+    const executionPlan = this.buildTrailingAssistantPatchExecutionPlan(
+      tailMessages.previousTailMessage,
+      tailMessages.nextTailMessage,
+      patchTarget,
+    );
     return {
       ok: true,
       previousTailMessage: tailMessages.previousTailMessage,
       nextTailMessage: tailMessages.nextTailMessage,
       patchTarget,
+      executionPlan,
       runtime,
       previousTurnBodyEl: runtime?.currentTurnBodyEl ?? null,
       shouldStickToBottom: this.host.shouldAutoScroll(tabId),
@@ -523,27 +543,52 @@ export class ConversationRenderService {
     };
   }
 
+  private shouldFinalizeTrailingAssistantFooterOnly(
+    previousTailMessage: ChatMessage,
+    nextTailMessage: ChatMessage,
+  ): boolean {
+    return this.host.assistantTailRender.getBodySignature(previousTailMessage)
+      === this.host.assistantTailRender.getBodySignature(nextTailMessage);
+  }
+
+  private buildTrailingAssistantPatchExecutionPlan(
+    previousTailMessage: ChatMessage,
+    nextTailMessage: ChatMessage,
+    patchTarget: TrailingAssistantPatchDomTarget,
+  ): TrailingAssistantPatchExecutionPlan {
+    if (this.shouldFinalizeTrailingAssistantFooterOnly(previousTailMessage, nextTailMessage)) {
+      return {
+        kind: 'finalize-footer',
+        messageEl: patchTarget.messageEl,
+        nextTailMessage,
+      };
+    }
+
+    return {
+      kind: 'rerender-content',
+      messageEl: patchTarget.messageEl,
+      contentEl: patchTarget.contentEl,
+      nextTailMessage,
+    };
+  }
+
   private async executeTrailingAssistantPatch(
     preflight: SuccessfulTrailingAssistantPatchPreflight,
   ): Promise<void> {
-    const {
-      previousTailMessage,
-      nextTailMessage,
-      patchTarget,
-    } = preflight;
-    if (
-      this.host.assistantTailRender.getBodySignature(previousTailMessage)
-      === this.host.assistantTailRender.getBodySignature(nextTailMessage)
-    ) {
-      this.host.assistantTailRender.finalizePersistedFooter(patchTarget.messageEl, nextTailMessage);
+    const { executionPlan } = preflight;
+    if (executionPlan.kind === 'finalize-footer') {
+      this.host.assistantTailRender.finalizePersistedFooter(
+        executionPlan.messageEl,
+        executionPlan.nextTailMessage,
+      );
       return;
     }
 
-    patchTarget.contentEl.replaceChildren();
+    executionPlan.contentEl.replaceChildren();
     await this.host.assistantTailRender.renderMessageContent(
-      patchTarget.messageEl,
-      patchTarget.contentEl,
-      nextTailMessage,
+      executionPlan.messageEl,
+      executionPlan.contentEl,
+      executionPlan.nextTailMessage,
     );
   }
 
