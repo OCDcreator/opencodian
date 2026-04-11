@@ -215,6 +215,7 @@ interface TabRuntimeState {
 
 - `AssistantCopyContent.ts`：封装 persisted assistant footer copy-content 的 structured-text / fallback source 选择
 - `AssistantFooterPayload.ts`：封装 persisted assistant footer 传给 timestamp/copy renderer 的 timestamp、copy-content、model 与 status payload 组装
+- `PersistedAssistantFooterFinalizer.ts`：封装 persisted assistant footer 的最终 renderer 调用，让 view 只传 `messageEl` 与 `message`
 - `SendPipelineTypes.ts`：定义 runtime 与 host 契约
 - `AssistantShellRenderer.ts`：封装 assistant streaming shell 的创建、reveal 与 timestamp 收尾
 - `AssistantNoticeRenderer.ts`：封装 stream error / interrupted notice 构造与 placeholder notice 渲染
@@ -255,7 +256,7 @@ assistant 渲染里：
 
 - `contentBlocks` 会按块类型渲染
 - structured assistant 分支由 `renderAssistantStructuredContent()` 消费 `buildQuestionResolutionCardRenderPlan()` 产出的 render plan
-- persisted assistant footer payload 由 `buildPersistedAssistantFooterPayload()` 统一组装，其中 copy-content 继续委托 `resolveAssistantCopyContent()`，interrupted status badge 也由 footer helper 统一判断
+- persisted assistant footer 收尾由 `PersistedAssistantFooterFinalizer.finalizeFooter()` 统一执行；它内部再调用 `buildPersistedAssistantFooterPayload()` 组装 payload，其中 copy-content 继续委托 `resolveAssistantCopyContent()`，interrupted status badge 也由 footer helper 统一判断
 - `thinking` 块走 `ThinkingBlockRenderer`
 - `tool_use` 块走 `ToolCallRenderer`
 - `text` 块和普通 `content` 走 `MarkdownRenderService`

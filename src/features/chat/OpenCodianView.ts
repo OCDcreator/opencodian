@@ -93,12 +93,12 @@ import { GlassOctahedronDemoController } from './glassOctahedronDemo';
 import { LiquidDiamondDemoController } from './liquidDiamondDemo';
 import { buildMessageRenderGroups, mergeAssistantMessagesForRender } from './renderGroups';
 import { type CollapsibleState, setupCollapsible } from './rendering/collapsible';
-import { buildPersistedAssistantFooterPayload } from './runtime/AssistantFooterPayload';
 import {
   type AssistantNoticeRenderHost,
   buildStreamErrorNotice,
   renderAssistantPlaceholderAsNotice,
 } from './runtime/AssistantNoticeRenderer';
+import { PersistedAssistantFooterFinalizer } from './runtime/PersistedAssistantFooterFinalizer';
 import {
   type AssistantShellRendererHost,
   AssistantShellRenderer,
@@ -667,6 +667,7 @@ export class OpenCodianView extends ItemView {
   private messageSendPreparationService: MessageSendPreparationService;
   private messageFinalizationService: MessageFinalizationService;
   private assistantShellRenderer: AssistantShellRenderer;
+  private persistedAssistantFooterFinalizer: PersistedAssistantFooterFinalizer;
   private streamingInlineCardRenderer: StreamingInlineCardRenderer;
   private permissionInlineCardRenderer: PermissionInlineCardRenderer;
   private questionInlineCardRenderer: QuestionInlineCardRenderer;
@@ -2150,6 +2151,7 @@ export class OpenCodianView extends ItemView {
     this.messageSendPreparationService = new MessageSendPreparationService(this.createMessageSendPreparationHost());
     this.messageFinalizationService = new MessageFinalizationService(this.createMessageFinalizationHost());
     this.assistantShellRenderer = new AssistantShellRenderer(this.createAssistantShellRendererHost());
+    this.persistedAssistantFooterFinalizer = new PersistedAssistantFooterFinalizer(this.assistantShellRenderer);
     this.streamingInlineCardRenderer = new StreamingInlineCardRenderer(this.createStreamingInlineCardRendererHost());
     this.permissionInlineCardRenderer = new PermissionInlineCardRenderer(this.streamingInlineCardRenderer);
     this.questionInlineCardRenderer = new QuestionInlineCardRenderer(
@@ -2356,10 +2358,7 @@ export class OpenCodianView extends ItemView {
       renderAssistantMessageContent: (messageEl, contentEl, message) =>
         this.renderAssistantMessageContent(messageEl, contentEl, message),
       updateAssistantTimestamp: (messageEl, message) => {
-        this.assistantShellRenderer.addTimestampWithCopyButton({
-          messageEl,
-          ...buildPersistedAssistantFooterPayload({ message }),
-        });
+        this.persistedAssistantFooterFinalizer.finalizeFooter(messageEl, message);
       },
       logAssistantFinalizationDebug: (label, payload) => {
         this.logAssistantFinalizationDebug(label, payload);
@@ -7078,10 +7077,7 @@ export class OpenCodianView extends ItemView {
       });
     }
 
-    this.assistantShellRenderer.addTimestampWithCopyButton({
-      messageEl,
-      ...buildPersistedAssistantFooterPayload({ message }),
-    });
+    this.persistedAssistantFooterFinalizer.finalizeFooter(messageEl, message);
   }
 
   private getAssistantBodySignature(message: ChatMessage): string {
