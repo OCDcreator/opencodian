@@ -94,6 +94,9 @@ import { LiquidDiamondDemoController } from './liquidDiamondDemo';
 import { buildMessageRenderGroups, mergeAssistantMessagesForRender } from './renderGroups';
 import { type CollapsibleState, setupCollapsible } from './rendering/collapsible';
 import {
+  resolveAssistantCopyContent,
+} from './runtime/AssistantCopyContent';
+import {
   type AssistantNoticeRenderHost,
   buildStreamErrorNotice,
   renderAssistantPlaceholderAsNotice,
@@ -2358,7 +2361,7 @@ export class OpenCodianView extends ItemView {
         this.assistantShellRenderer.addTimestampWithCopyButton({
           messageEl,
           timestamp: message.timestamp,
-          content: this.getAssistantCopyContent(message),
+          content: resolveAssistantCopyContent(message),
           modelId: message.modelId,
           statusLabel: this.getAssistantStreamStatusLabel(message),
         });
@@ -7084,23 +7087,10 @@ export class OpenCodianView extends ItemView {
     this.assistantShellRenderer.addTimestampWithCopyButton({
       messageEl,
       timestamp: message.timestamp,
-      content: this.getAssistantCopyContent(message),
+      content: resolveAssistantCopyContent(message),
       modelId: message.modelId,
       statusLabel: streamStatusLabel,
     });
-  }
-
-  private getAssistantCopyContent(message: ChatMessage): string | undefined {
-    if (message.contentBlocks && message.contentBlocks.length > 0) {
-      const textContent = message.contentBlocks
-        .filter((block) => block.type === 'text' && block.text)
-        .map((block) => block.text?.trim())
-        .filter(Boolean)
-        .join('\n\n');
-      return textContent || undefined;
-    }
-
-    return message.content || undefined;
   }
 
   private getAssistantBodySignature(message: ChatMessage): string {

@@ -91,6 +91,7 @@ docs/modules/
 │   │   ├── liquidDiamondDemoWebgl.md
 │   │   ├── renderGroups.md
 │   │   ├── runtime/
+│   │   │   ├── AssistantCopyContent.md
 │   │   │   ├── AssistantShellRenderer.md
 │   │   │   ├── AssistantNoticeRenderer.md
 │   │   │   ├── AssistantPlainTextFallbackRenderer.md
