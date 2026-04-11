@@ -184,6 +184,14 @@ type SuccessfulTrailingAssistantPatchPreflight = Extract<
   TrailingAssistantPatchPreflight,
   { ok: true }
 >;
+type SuccessfulTrailingAssistantPatchTargets = Extract<
+  TrailingAssistantPatchTargets,
+  { ok: true }
+>;
+type SuccessfulTrailingAssistantPatchTailMessages = Extract<
+  TrailingAssistantPatchTailMessagesResult,
+  { ok: true }
+>;
 
 export class ConversationRenderService {
   constructor(private readonly host: ConversationRenderHost) {}
@@ -470,18 +478,29 @@ export class ConversationRenderService {
     if (!tailMessages.ok) {
       return tailMessages;
     }
-    const { previousTailMessage, nextTailMessage } = tailMessages;
 
     const patchTargets = this.resolveTrailingAssistantPatchTargets(messagesEl);
     if (!patchTargets.ok) {
       return patchTargets;
     }
 
+    return this.buildSuccessfulTrailingAssistantPatchPreflight(
+      tailMessages,
+      patchTargets,
+      tabId,
+    );
+  }
+
+  private buildSuccessfulTrailingAssistantPatchPreflight(
+    tailMessages: SuccessfulTrailingAssistantPatchTailMessages,
+    patchTargets: SuccessfulTrailingAssistantPatchTargets,
+    tabId: TabId | null,
+  ): SuccessfulTrailingAssistantPatchPreflight {
     const runtime = this.host.getRenderRuntimeForTab(tabId);
     return {
       ok: true,
-      previousTailMessage,
-      nextTailMessage,
+      previousTailMessage: tailMessages.previousTailMessage,
+      nextTailMessage: tailMessages.nextTailMessage,
       existingTailMessageEl: patchTargets.existingTailMessageEl,
       existingContentEl: patchTargets.existingContentEl,
       parentEl: patchTargets.parentEl,
