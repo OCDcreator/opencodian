@@ -7,13 +7,11 @@ import {
   buildTrailingAssistantPatchCompletionDebugLoggingContext,
   buildTrailingAssistantPatchSkippedDebugLoggingContext,
   buildTrailingAssistantPatchSkippedDebugPlanningContext,
-  type TrailingAssistantPatchCompletionDebugLoggingContext,
-  type TrailingAssistantPatchSkippedDebugLoggingContext,
 } from './TrailingAssistantPatchDebugLoggingContextHelper';
 import {
-  buildTrailingAssistantPatchCompletionDebugLogPlan,
-  buildTrailingAssistantPatchSkippedDebugLogPlan,
-} from './TrailingAssistantPatchDebugLogPlanHelper';
+  emitTrailingAssistantPatchCompletionDebugLog,
+  emitTrailingAssistantPatchSkippedDebugLog,
+} from './TrailingAssistantPatchDebugLogEmitterHelper';
 import {
   captureElementScrollRestoreSnapshot,
   isElementNearBottom,
@@ -474,7 +472,10 @@ export class ConversationRenderService {
           reason,
           payload,
         );
-      this.logTrailingAssistantPatchSkippedDebug(skippedDebugLoggingContext);
+      emitTrailingAssistantPatchSkippedDebugLog(
+        skippedDebugLoggingContext,
+        this.host,
+      );
       return false;
     };
     const preflight = this.resolveTrailingAssistantPatchPreflight(
@@ -497,7 +498,10 @@ export class ConversationRenderService {
         successPlan.completionDebugPlan,
         tabId,
       );
-    this.logTrailingAssistantPatchCompletionDebug(completionDebugLoggingContext);
+    emitTrailingAssistantPatchCompletionDebugLog(
+      completionDebugLoggingContext,
+      this.host,
+    );
     return true;
   }
 
@@ -1050,23 +1054,6 @@ export class ConversationRenderService {
     if (shouldStickToBottom) {
       this.host.scrollToBottom({ tabId });
     }
-  }
-
-  private logTrailingAssistantPatchCompletionDebug(
-    loggingContext: TrailingAssistantPatchCompletionDebugLoggingContext,
-  ): void {
-    const logPlan = buildTrailingAssistantPatchCompletionDebugLogPlan(loggingContext);
-    this.host.logAssistantFinalizationDebug(logPlan.label, logPlan.payload);
-  }
-
-  private logTrailingAssistantPatchSkippedDebug(
-    loggingContext: TrailingAssistantPatchSkippedDebugLoggingContext,
-  ): void {
-    const logPlan = buildTrailingAssistantPatchSkippedDebugLogPlan(
-      loggingContext,
-      (messages) => this.host.getMessagesForRender(messages),
-    );
-    this.host.logAssistantFinalizationDebug(logPlan.label, logPlan.payload);
   }
 
   private buildTrailingAssistantPatchTargetFailureResult(
