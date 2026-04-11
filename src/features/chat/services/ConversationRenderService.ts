@@ -149,7 +149,6 @@ type TrailingAssistantPatchTurnBodyScopePlan =
 type TrailingAssistantPatchPreflight =
   | {
     ok: true;
-    patchTarget: TrailingAssistantPatchDomTarget;
     executionPlan: TrailingAssistantPatchExecutionPlan;
     tailStatePlan: TrailingAssistantPatchTailStatePlan;
     completionDebugPlan: TrailingAssistantPatchCompletionDebugPlan;
@@ -369,7 +368,7 @@ export class ConversationRenderService {
     }
 
     await this.withTrailingAssistantTurnBodyScope(preflight.turnBodyScopePlan, async () => {
-      await this.executeTrailingAssistantPatch(preflight);
+      await this.executeTrailingAssistantPatch(preflight.executionPlan);
       this.applyTrailingAssistantPatchTailState(preflight.tailStatePlan, tabId);
     });
 
@@ -561,7 +560,6 @@ export class ConversationRenderService {
     );
     return {
       ok: true,
-      patchTarget,
       executionPlan,
       tailStatePlan,
       completionDebugPlan,
@@ -648,9 +646,8 @@ export class ConversationRenderService {
   }
 
   private async executeTrailingAssistantPatch(
-    preflight: SuccessfulTrailingAssistantPatchPreflight,
+    executionPlan: TrailingAssistantPatchExecutionPlan,
   ): Promise<void> {
-    const { executionPlan } = preflight;
     if (executionPlan.kind === 'finalize-footer') {
       this.host.assistantTailRender.finalizePersistedFooter(
         executionPlan.messageEl,
