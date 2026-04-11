@@ -4,6 +4,10 @@ import {
 } from '../../../core/types';
 import type { TabId } from '../tabs';
 import {
+  buildTrailingAssistantPatchDebugFinalLogPlanFromTabId,
+  type TrailingAssistantPatchDebugLogPlan,
+} from './TrailingAssistantPatchDebugLogHelper';
+import {
   captureElementScrollRestoreSnapshot,
   isElementNearBottom,
   restoreElementScrollAfterRender,
@@ -159,10 +163,8 @@ type TrailingAssistantPatchCompletionDebugSummaryPlan = {
   nextTail: Record<string, unknown> | null;
 };
 
-type TrailingAssistantPatchCompletionDebugLogPlan = {
-  label: 'patch-trailing-assistant-render-complete';
-  payload: Record<string, unknown>;
-};
+type TrailingAssistantPatchCompletionDebugLogPlan =
+  TrailingAssistantPatchDebugLogPlan<'patch-trailing-assistant-render-complete'>;
 
 type TrailingAssistantPatchCompletionDebugLoggingContext = {
   completionDebugPlan: TrailingAssistantPatchCompletionDebugPlan;
@@ -177,32 +179,6 @@ type TrailingAssistantPatchCompletionDebugLogPlanningContextContract = {
 type TrailingAssistantPatchCompletionDebugLogPlanningContext = {
   payloadInputs: TrailingAssistantPatchCompletionDebugPayloadInputs;
   tabId: TabId | null;
-};
-
-type TrailingAssistantPatchCompletionDebugFinalLogInputs = {
-  tabId: TabId | null;
-  payloadPlan: TrailingAssistantPatchCompletionDebugPayloadPlan;
-};
-
-type TrailingAssistantPatchCompletionDebugFinalLogInputsContract = {
-  tabId: TabId | null;
-  payloadPlan: TrailingAssistantPatchCompletionDebugPayloadPlan;
-};
-
-type TrailingAssistantPatchCompletionDebugFinalLogPlanContract = {
-  finalLogInputs: TrailingAssistantPatchCompletionDebugFinalLogInputs;
-};
-
-type TrailingAssistantPatchCompletionDebugFinalLogPayloadContract = {
-  tabId: TabId | null;
-  payloadPlan: TrailingAssistantPatchCompletionDebugPayloadPlan;
-};
-
-type TrailingAssistantPatchCompletionDebugFinalLogPayload = {
-  tabId: TabId | null;
-  shouldStickToBottom: boolean;
-  previousTail: Record<string, unknown> | null;
-  nextTail: Record<string, unknown> | null;
 };
 
 type TrailingAssistantPatchNonMergeableTailFailurePlan = {
@@ -276,36 +252,8 @@ type TrailingAssistantPatchSkippedDebugPayloadPlanContract = {
   nextRenderedCount: number;
 };
 
-type TrailingAssistantPatchSkippedDebugFinalLogInputs = {
-  tabId: TabId | null;
-  payloadPlan: TrailingAssistantPatchSkippedDebugPayloadPlan;
-};
-
-type TrailingAssistantPatchSkippedDebugFinalLogInputsContract = {
-  tabId: TabId | null;
-  payloadPlan: TrailingAssistantPatchSkippedDebugPayloadPlan;
-};
-
-type TrailingAssistantPatchSkippedDebugFinalLogPlanContract = {
-  finalLogInputs: TrailingAssistantPatchSkippedDebugFinalLogInputs;
-};
-
-type TrailingAssistantPatchSkippedDebugFinalLogPayloadContract = {
-  tabId: TabId | null;
-  payloadPlan: TrailingAssistantPatchSkippedDebugPayloadPlan;
-};
-
-type TrailingAssistantPatchSkippedDebugFinalLogPayload = Record<
-  string,
-  unknown
-> & {
-  tabId: TabId | null;
-};
-
-type TrailingAssistantPatchSkippedDebugLogPlan = {
-  label: 'patch-trailing-assistant-render-skipped';
-  payload: Record<string, unknown>;
-};
+type TrailingAssistantPatchSkippedDebugLogPlan =
+  TrailingAssistantPatchDebugLogPlan<'patch-trailing-assistant-render-skipped'>;
 
 type TrailingAssistantPatchSkippedDebugLogPlanningContextContract = {
   payloadInputs: TrailingAssistantPatchSkippedDebugPayloadInputs;
@@ -1343,120 +1291,15 @@ export class ConversationRenderService {
     };
   }
 
-  private buildTrailingAssistantPatchCompletionDebugFinalLogInputsFromLogPlanningContext(
-    planningContext: TrailingAssistantPatchCompletionDebugLogPlanningContext,
-    payloadPlan: TrailingAssistantPatchCompletionDebugPayloadPlan,
-  ): TrailingAssistantPatchCompletionDebugFinalLogInputs {
-    const inputsContract =
-      this.buildTrailingAssistantPatchCompletionDebugFinalLogInputsContractFromLogPlanningContext(
-        planningContext,
-        payloadPlan,
-      );
-    return this.buildTrailingAssistantPatchCompletionDebugFinalLogInputs(inputsContract);
-  }
-
-  private buildTrailingAssistantPatchCompletionDebugFinalLogInputsContractFromLogPlanningContext(
-    planningContext: TrailingAssistantPatchCompletionDebugLogPlanningContext,
-    payloadPlan: TrailingAssistantPatchCompletionDebugPayloadPlan,
-  ): TrailingAssistantPatchCompletionDebugFinalLogInputsContract {
-    return this.buildTrailingAssistantPatchCompletionDebugFinalLogInputsContract(
-      planningContext.tabId,
-      payloadPlan,
-    );
-  }
-
-  private buildTrailingAssistantPatchCompletionDebugFinalLogInputsContract(
-    tabId: TabId | null,
-    payloadPlan: TrailingAssistantPatchCompletionDebugPayloadPlan,
-  ): TrailingAssistantPatchCompletionDebugFinalLogInputsContract {
-    return {
-      tabId,
-      payloadPlan,
-    };
-  }
-
   private buildTrailingAssistantPatchCompletionDebugFinalLogPlanFromLogPlanningContext(
     planningContext: TrailingAssistantPatchCompletionDebugLogPlanningContext,
     payloadPlan: TrailingAssistantPatchCompletionDebugPayloadPlan,
   ): TrailingAssistantPatchCompletionDebugLogPlan {
-    const finalLogPlanContract =
-      this.buildTrailingAssistantPatchCompletionDebugFinalLogPlanContractFromLogPlanningContext(
-        planningContext,
-        payloadPlan,
-      );
-    return this.buildTrailingAssistantPatchCompletionDebugFinalLogPlanFromInputs(
-      finalLogPlanContract.finalLogInputs,
+    return buildTrailingAssistantPatchDebugFinalLogPlanFromTabId(
+      'patch-trailing-assistant-render-complete',
+      planningContext.tabId,
+      payloadPlan,
     );
-  }
-
-  private buildTrailingAssistantPatchCompletionDebugFinalLogPlanContractFromLogPlanningContext(
-    planningContext: TrailingAssistantPatchCompletionDebugLogPlanningContext,
-    payloadPlan: TrailingAssistantPatchCompletionDebugPayloadPlan,
-  ): TrailingAssistantPatchCompletionDebugFinalLogPlanContract {
-    return this.buildTrailingAssistantPatchCompletionDebugFinalLogPlanContract(
-      this.buildTrailingAssistantPatchCompletionDebugFinalLogInputsFromLogPlanningContext(
-        planningContext,
-        payloadPlan,
-      ),
-    );
-  }
-
-  private buildTrailingAssistantPatchCompletionDebugFinalLogPlanContract(
-    finalLogInputs: TrailingAssistantPatchCompletionDebugFinalLogInputs,
-  ): TrailingAssistantPatchCompletionDebugFinalLogPlanContract {
-    return {
-      finalLogInputs,
-    };
-  }
-
-  private buildTrailingAssistantPatchCompletionDebugFinalLogInputs(
-    inputsContract: TrailingAssistantPatchCompletionDebugFinalLogInputsContract,
-  ): TrailingAssistantPatchCompletionDebugFinalLogInputs {
-    return {
-      tabId: inputsContract.tabId,
-      payloadPlan: inputsContract.payloadPlan,
-    };
-  }
-
-  private buildTrailingAssistantPatchCompletionDebugFinalLogPlanFromInputs(
-    inputs: TrailingAssistantPatchCompletionDebugFinalLogInputs,
-  ): TrailingAssistantPatchCompletionDebugLogPlan {
-    const payloadContract =
-      this.buildTrailingAssistantPatchCompletionDebugFinalLogPayloadContractFromInputs(
-        inputs,
-      );
-    return this.buildTrailingAssistantPatchCompletionDebugFinalLogPlan(
-      this.buildTrailingAssistantPatchCompletionDebugFinalLogPayload(
-        payloadContract,
-      ),
-    );
-  }
-
-  private buildTrailingAssistantPatchCompletionDebugFinalLogPlan(
-    payload: TrailingAssistantPatchCompletionDebugFinalLogPayload,
-  ): TrailingAssistantPatchCompletionDebugLogPlan {
-    return {
-      label: 'patch-trailing-assistant-render-complete',
-      payload,
-    };
-  }
-
-  private buildTrailingAssistantPatchCompletionDebugFinalLogPayloadContractFromInputs(
-    inputs: TrailingAssistantPatchCompletionDebugFinalLogInputs,
-  ): TrailingAssistantPatchCompletionDebugFinalLogPayloadContract {
-    return {
-      tabId: inputs.tabId,
-      payloadPlan: inputs.payloadPlan,
-    };
-  }
-
-  private buildTrailingAssistantPatchCompletionDebugFinalLogPayload(
-    payloadContract: TrailingAssistantPatchCompletionDebugFinalLogPayloadContract,
-  ): TrailingAssistantPatchCompletionDebugFinalLogPayload {
-    return {
-      tabId: payloadContract.tabId,
-      ...payloadContract.payloadPlan,
-    };
   }
 
   private buildTrailingAssistantPatchCompletionDebugPayloadPlan(
@@ -1608,118 +1451,15 @@ export class ConversationRenderService {
     };
   }
 
-  private buildTrailingAssistantPatchSkippedDebugFinalLogInputsFromLogPlanningContext(
-    planningContext: TrailingAssistantPatchSkippedDebugLogPlanningContext,
-    payloadPlan: TrailingAssistantPatchSkippedDebugPayloadPlan,
-  ): TrailingAssistantPatchSkippedDebugFinalLogInputs {
-    const inputsContract =
-      this.buildTrailingAssistantPatchSkippedDebugFinalLogInputsContractFromLogPlanningContext(
-        planningContext,
-        payloadPlan,
-      );
-    return this.buildTrailingAssistantPatchSkippedDebugFinalLogInputs(inputsContract);
-  }
-
-  private buildTrailingAssistantPatchSkippedDebugFinalLogInputsContractFromLogPlanningContext(
-    planningContext: TrailingAssistantPatchSkippedDebugLogPlanningContext,
-    payloadPlan: TrailingAssistantPatchSkippedDebugPayloadPlan,
-  ): TrailingAssistantPatchSkippedDebugFinalLogInputsContract {
-    return this.buildTrailingAssistantPatchSkippedDebugFinalLogInputsContract(
-      planningContext.tabId,
-      payloadPlan,
-    );
-  }
-
-  private buildTrailingAssistantPatchSkippedDebugFinalLogInputsContract(
-    tabId: TabId | null,
-    payloadPlan: TrailingAssistantPatchSkippedDebugPayloadPlan,
-  ): TrailingAssistantPatchSkippedDebugFinalLogInputsContract {
-    return {
-      tabId,
-      payloadPlan,
-    };
-  }
-
   private buildTrailingAssistantPatchSkippedDebugFinalLogPlanFromLogPlanningContext(
     planningContext: TrailingAssistantPatchSkippedDebugLogPlanningContext,
     payloadPlan: TrailingAssistantPatchSkippedDebugPayloadPlan,
   ): TrailingAssistantPatchSkippedDebugLogPlan {
-    const finalLogPlanContract =
-      this.buildTrailingAssistantPatchSkippedDebugFinalLogPlanContractFromLogPlanningContext(
-        planningContext,
-        payloadPlan,
-      );
-    return this.buildTrailingAssistantPatchSkippedDebugFinalLogPlanFromInputs(
-      finalLogPlanContract.finalLogInputs,
+    return buildTrailingAssistantPatchDebugFinalLogPlanFromTabId(
+      'patch-trailing-assistant-render-skipped',
+      planningContext.tabId,
+      payloadPlan,
     );
-  }
-
-  private buildTrailingAssistantPatchSkippedDebugFinalLogPlanContractFromLogPlanningContext(
-    planningContext: TrailingAssistantPatchSkippedDebugLogPlanningContext,
-    payloadPlan: TrailingAssistantPatchSkippedDebugPayloadPlan,
-  ): TrailingAssistantPatchSkippedDebugFinalLogPlanContract {
-    return this.buildTrailingAssistantPatchSkippedDebugFinalLogPlanContract(
-      this.buildTrailingAssistantPatchSkippedDebugFinalLogInputsFromLogPlanningContext(
-        planningContext,
-        payloadPlan,
-      ),
-    );
-  }
-
-  private buildTrailingAssistantPatchSkippedDebugFinalLogPlanContract(
-    finalLogInputs: TrailingAssistantPatchSkippedDebugFinalLogInputs,
-  ): TrailingAssistantPatchSkippedDebugFinalLogPlanContract {
-    return {
-      finalLogInputs,
-    };
-  }
-
-  private buildTrailingAssistantPatchSkippedDebugFinalLogInputs(
-    inputsContract: TrailingAssistantPatchSkippedDebugFinalLogInputsContract,
-  ): TrailingAssistantPatchSkippedDebugFinalLogInputs {
-    return {
-      tabId: inputsContract.tabId,
-      payloadPlan: inputsContract.payloadPlan,
-    };
-  }
-
-  private buildTrailingAssistantPatchSkippedDebugFinalLogPlanFromInputs(
-    inputs: TrailingAssistantPatchSkippedDebugFinalLogInputs,
-  ): TrailingAssistantPatchSkippedDebugLogPlan {
-    const payloadContract =
-      this.buildTrailingAssistantPatchSkippedDebugFinalLogPayloadContractFromInputs(
-        inputs,
-      );
-    return this.buildTrailingAssistantPatchSkippedDebugFinalLogPlan(
-      this.buildTrailingAssistantPatchSkippedDebugFinalLogPayload(payloadContract),
-    );
-  }
-
-  private buildTrailingAssistantPatchSkippedDebugFinalLogPayloadContractFromInputs(
-    inputs: TrailingAssistantPatchSkippedDebugFinalLogInputs,
-  ): TrailingAssistantPatchSkippedDebugFinalLogPayloadContract {
-    return {
-      tabId: inputs.tabId,
-      payloadPlan: inputs.payloadPlan,
-    };
-  }
-
-  private buildTrailingAssistantPatchSkippedDebugFinalLogPayload(
-    payloadContract: TrailingAssistantPatchSkippedDebugFinalLogPayloadContract,
-  ): TrailingAssistantPatchSkippedDebugFinalLogPayload {
-    return {
-      tabId: payloadContract.tabId,
-      ...payloadContract.payloadPlan,
-    };
-  }
-
-  private buildTrailingAssistantPatchSkippedDebugFinalLogPlan(
-    payload: TrailingAssistantPatchSkippedDebugFinalLogPayload,
-  ): TrailingAssistantPatchSkippedDebugLogPlan {
-    return {
-      label: 'patch-trailing-assistant-render-skipped',
-      payload,
-    };
   }
 
   private buildTrailingAssistantPatchSkippedDebugPayloadPlan(
