@@ -37,7 +37,8 @@ export function buildTrailingAssistantPatchDebugLogPlanFromLoggingContext<
 
 ## 与 `ConversationRenderService` 的关系
 
-- `ConversationRenderService` 现在主要只负责触发 debug logging，并为 coordinator 提供最小化的 logging context / `tabId`
+- `ConversationRenderService` 现在主要只负责触发 debug logging；completion / skipped 的 logging-context builder 已迁到 `TrailingAssistantPatchDebugLoggingContextHelper`
+- service 只再把现成的最小化 logging context / `tabId` 交给 coordinator
 - completion / skipped 两条路径各自的 payload-inputs 与 payload-plan 细节已迁到 `TrailingAssistantPatchDebugPayloadHelper`
 - 顶层共享的 log planning-context 装配与 final-log plan 协调迁到这里
 - 真正的 final-log payload 注入与 shape 仍由 `TrailingAssistantPatchDebugLogHelper` 负责

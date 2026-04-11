@@ -85,6 +85,7 @@ export class ConversationRenderService {
 - 真正执行 patch 时，assistant 正文签名比较与“只 finalize footer / 重渲正文 content”分支也由独立 helper 收口
 - patch 成功后的 completion debug 日志继续走共享的 `TrailingAssistantPatchDebugLogCoordinator`；分支私有的 completion payload inputs / payloadPlan 适配也已迁到独立的 `TrailingAssistantPatchDebugPayloadHelper`，让 service 更接近只负责触发 debug logging 与主渲染流程
 - patch skipped 分支也沿用同一条 coordinator，并把 rendered-count 统计与 skipped payload 适配下沉到 `TrailingAssistantPatchDebugPayloadHelper`；service 只再提供 logging context 与 `getMessagesForRender()` 回调，不再维护那条对称的 payload contract / count / spread 链
+- completion / skipped 两条路径最后剩下的 logging-context builder 也已迁到 `TrailingAssistantPatchDebugLoggingContextHelper`；service 现在只在失败/成功点调用纯 builder，然后把现成 context 交给共享 coordinator
 - assistant 正文签名不变时复用已有正文，只重做 persisted footer 收尾
 - patch 成功后的 message dataset 刷新、动画禁用与按需 scroll-to-bottom，现会先预计算成更窄的 `tailStatePlan` 再交给 tail-apply helper，避免这些副作用继续读取整份 `successPlan`
 - assistant 正文签名计算、正文重渲和 footer finalization 现在统一通过 `host.assistantTailRender` 这组更小的 port 完成
