@@ -1195,10 +1195,18 @@ export class ConversationRenderService {
     loggingContext: TrailingAssistantPatchCompletionDebugLoggingContext,
   ): TrailingAssistantPatchCompletionDebugLogPlanningContext {
     return this.buildTrailingAssistantPatchCompletionDebugLogPlanningContext(
-      this.buildTrailingAssistantPatchCompletionDebugPayloadInputs(
-        loggingContext.completionDebugPlan,
+      this.buildTrailingAssistantPatchCompletionDebugPayloadInputsFromLoggingContext(
+        loggingContext,
       ),
       loggingContext.tabId,
+    );
+  }
+
+  private buildTrailingAssistantPatchCompletionDebugPayloadInputsFromLoggingContext(
+    loggingContext: TrailingAssistantPatchCompletionDebugLoggingContext,
+  ): TrailingAssistantPatchCompletionDebugPayloadInputs {
+    return this.buildTrailingAssistantPatchCompletionDebugPayloadInputs(
+      loggingContext.completionDebugPlan,
     );
   }
 
