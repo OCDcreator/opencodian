@@ -142,6 +142,12 @@ type TrailingAssistantPatchCompletionDebugPayloadPlan = {
   nextTail: Record<string, unknown> | null;
 };
 
+type TrailingAssistantPatchCompletionDebugPayloadInputs = {
+  shouldStickToBottom: boolean;
+  previousTail: Record<string, unknown> | null;
+  nextTail: Record<string, unknown> | null;
+};
+
 type TrailingAssistantPatchCompletionDebugSummaryPlan = {
   previousTail: Record<string, unknown> | null;
   nextTail: Record<string, unknown> | null;
@@ -1121,9 +1127,13 @@ export class ConversationRenderService {
   private buildTrailingAssistantPatchCompletionDebugLogPlan(
     loggingContext: TrailingAssistantPatchCompletionDebugLoggingContext,
   ): TrailingAssistantPatchCompletionDebugLogPlan {
+    const payloadInputs =
+      this.buildTrailingAssistantPatchCompletionDebugPayloadInputs(
+        loggingContext.completionDebugPlan,
+      );
     const payloadPlan =
       this.buildTrailingAssistantPatchCompletionDebugPayloadPlan(
-        loggingContext.completionDebugPlan,
+        payloadInputs,
       );
     const finalLogInputs =
       this.buildTrailingAssistantPatchCompletionDebugFinalLogInputs(
@@ -1158,8 +1168,18 @@ export class ConversationRenderService {
   }
 
   private buildTrailingAssistantPatchCompletionDebugPayloadPlan(
-    completionDebugPlan: TrailingAssistantPatchCompletionDebugPlan,
+    inputs: TrailingAssistantPatchCompletionDebugPayloadInputs,
   ): TrailingAssistantPatchCompletionDebugPayloadPlan {
+    return {
+      shouldStickToBottom: inputs.shouldStickToBottom,
+      previousTail: inputs.previousTail,
+      nextTail: inputs.nextTail,
+    };
+  }
+
+  private buildTrailingAssistantPatchCompletionDebugPayloadInputs(
+    completionDebugPlan: TrailingAssistantPatchCompletionDebugPlan,
+  ): TrailingAssistantPatchCompletionDebugPayloadInputs {
     return {
       shouldStickToBottom: completionDebugPlan.shouldStickToBottom,
       previousTail: completionDebugPlan.previousTail,
