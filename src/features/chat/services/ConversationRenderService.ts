@@ -1278,18 +1278,25 @@ export class ConversationRenderService {
         planningContext,
         payloadPlan,
       );
-    return this.buildTrailingAssistantPatchCompletionDebugFinalLogInputs(
-      inputsContract.tabId,
-      inputsContract.payloadPlan,
-    );
+    return this.buildTrailingAssistantPatchCompletionDebugFinalLogInputs(inputsContract);
   }
 
   private buildTrailingAssistantPatchCompletionDebugFinalLogInputsContractFromLogPlanningContext(
     planningContext: TrailingAssistantPatchCompletionDebugLogPlanningContext,
     payloadPlan: TrailingAssistantPatchCompletionDebugPayloadPlan,
   ): TrailingAssistantPatchCompletionDebugFinalLogInputsContract {
+    return this.buildTrailingAssistantPatchCompletionDebugFinalLogInputsContract(
+      planningContext.tabId,
+      payloadPlan,
+    );
+  }
+
+  private buildTrailingAssistantPatchCompletionDebugFinalLogInputsContract(
+    tabId: TabId | null,
+    payloadPlan: TrailingAssistantPatchCompletionDebugPayloadPlan,
+  ): TrailingAssistantPatchCompletionDebugFinalLogInputsContract {
     return {
-      tabId: planningContext.tabId,
+      tabId,
       payloadPlan,
     };
   }
@@ -1309,12 +1316,11 @@ export class ConversationRenderService {
   }
 
   private buildTrailingAssistantPatchCompletionDebugFinalLogInputs(
-    tabId: TabId | null,
-    payloadPlan: TrailingAssistantPatchCompletionDebugPayloadPlan,
+    inputsContract: TrailingAssistantPatchCompletionDebugFinalLogInputsContract,
   ): TrailingAssistantPatchCompletionDebugFinalLogInputs {
     return {
-      tabId,
-      payloadPlan,
+      tabId: inputsContract.tabId,
+      payloadPlan: inputsContract.payloadPlan,
     };
   }
 
