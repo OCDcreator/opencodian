@@ -12,7 +12,7 @@
 - 在 sync 后按需执行 tail patch 或 full rerender
 - 继续推进 background-task indicator、turn diff、session todos 和最终保存
 
-它不消费流式 chunk，也不直接控制 streaming shell。真实的 chunk 消费、pending/timeout/interruption、本地 assistant/notice 组装与第一次本地保存仍保留在 `OpenCodianView`。
+它不消费流式 chunk，也不直接控制 streaming shell。真实的 chunk 消费、pending/timeout/interruption、本地 assistant/notice 组装与第一次本地保存现在保留在 `runtime/SendPipelineRuntime.ts`。
 
 ## 公开接口
 
@@ -61,6 +61,6 @@ export class MessageFinalizationService {
 
 ## 与 `OpenCodianView` 的边界
 
-- `OpenCodianView` 仍保留 stream loop、本地 shell finalization、本地 assistant/notice message 构建，以及第一次 `saveConversation()`
+- `SendPipelineRuntime` 仍保留 stream loop、本地 shell finalization、本地 assistant/notice message 构建，以及第一次 `saveConversation()`
 - `MessageFinalizationService` 只负责“stream 结束后是否 sync、sync 后如何 patch/rerender、最后如何做 todo/save/attention 收尾”
 - `ConversationRenderService` 继续负责消息区 full rerender、append-only sync 和 tail patch，本服务只决定何时调用它

@@ -1,0 +1,36 @@
+# LocalStreamMessagePersistence
+
+> **源码**: `src/features/chat/runtime/LocalStreamMessagePersistence.ts`
+> **状态**: [REVIEW]
+
+## 概述
+
+`LocalStreamMessagePersistence` 负责把本地 stream 收尾结果真正写回 conversation。它把 assistant message 构建、notice message 追加、shell dataset 回填和第一次 `saveConversation()` 从 `StreamLocalFinalizer` 中进一步拆开。
+
+## 公开函数
+
+```typescript
+persistLocalStreamOutcome(options): Promise<void>
+```
+
+## 关键行为
+
+- 有 content blocks 时：
+  - 构建 assistant `ChatMessage`
+  - 把 `streamState: 'interrupted'`、`contentBlocks`、`questionResolution` 一并落库
+  - 回填 streaming shell 的 `data-message-id` / `data-source-message-id`
+- 只有 error notice 或 interrupted notice 时：
+  - 追加对应 notice message
+  - 记录本地持久化阶段的 debug 日志
+- 只要本地实际追加了 message / notice，就更新 `updatedAt`、`lastResponseAt` 并执行第一次本地保存
+
+## 协作模块
+
+- `sendPipelineContent`：负责 block 映射
+- `StreamShellFinalizer`：负责把占位 shell 变成最终 DOM 形态
+- `StreamLocalFinalizer`：负责 orchestration
+
+## 注意事项
+
+- 这里是“本地第一次保存”，不是最终 authoritative sync。
+- interrupted notice 与 interrupted assistant message 是两条不同保底路径：前者用于“没有可见内容”，后者用于“已有部分内容但流被中断”。

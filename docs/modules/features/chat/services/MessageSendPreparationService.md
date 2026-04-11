@@ -13,7 +13,7 @@
 - 维持首条 user message 的 fallback title 与 AI title kickoff 条件
 - 在 stream 真正开始前，统一进入 streaming 状态并清理 pending edited files / draft context items
 
-它不直接调用 `openCodeService.sendMessage()`，也不消费 stream chunk。真实的 stream 调用、chunk router、pending/timeout/interruption，以及 stream 结束后的 finalization 仍保留在 `OpenCodianView` / `MessageFinalizationService`。
+它不直接调用 `openCodeService.sendMessage()`，也不消费 stream chunk。真实的 stream 调用、chunk router、pending/timeout/interruption，以及 stream 结束后的 finalization 现在由 `runtime/SendPipelineRuntime.ts` / `MessageFinalizationService` 接手。
 
 ## 公开接口
 
@@ -67,10 +67,10 @@ export class MessageSendPreparationService {
   - 清空 pending edited files
   - 清空 draft context items
 
-这让 `OpenCodianView` 可以继续掌控“真正的 stream 调用”，同时把 preparation 阶段的状态时序单独测住。
+这让发送子系统可以把“真正的 stream 调用”下沉到 `SendPipelineRuntime`，同时把 preparation 阶段的状态时序单独测住。
 
 ## 与 `OpenCodianView` 的边界
 
-- `OpenCodianView` 仍保留真实 `sendMessage()` stream 调用与 chunk 消费
+- `SendPipelineRuntime` 负责真实 `sendMessage()` stream 调用与 chunk 消费
 - `MessageSendPreparationService` 只负责决定“能不能发、发之前先做什么、optimistic user message 是否已落地”
 - `MessageFinalizationService` 继续负责 stream 结束之后的 final sync、patch/rerender、todo/save/attention 收尾

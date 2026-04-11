@@ -1,0 +1,54 @@
+import { t } from '../../../i18n';
+import type { PreparedMessageSend } from '../services/MessageSendPreparationService';
+import type {
+  LocalStreamOutcome,
+  SendPipelineHost,
+} from './SendPipelineTypes';
+
+export async function finalizeStreamingShell(options: {
+  host: SendPipelineHost;
+  preparedSend: PreparedMessageSend;
+  outcome: LocalStreamOutcome;
+}): Promise<string> {
+  const { host, outcome } = options;
+  const messageEl = outcome.finalizedStreamingMessageEl;
+  if (!messageEl) {
+    return 'removed';
+  }
+
+  if (outcome.hasStreamContentBlocks) {
+    host.addTimestampWithCopyButton(
+      messageEl,
+      outcome.finalizedTimestamp,
+      outcome.streamedTextContent.trim() || undefined,
+      outcome.finalizedModelId,
+      outcome.shouldPersistInterruptedState ? t('chat.stream.interruptedBadge') : undefined,
+    );
+    return 'timestamp-added';
+  }
+
+  if (outcome.streamErrorNoticeMessage) {
+    await host.renderAssistantPlaceholderAsNotice(
+      messageEl,
+      outcome.streamErrorNoticeMessage,
+      'render-stream-error-notice',
+    );
+    return 'error-notice-rendered';
+  }
+
+  if (outcome.shouldPersistInterruptedState) {
+    outcome.interruptedNoticeMessage = host.buildInterruptedAssistantNotice(
+      outcome.finalizedTimestamp,
+      outcome.finalizedModelId,
+    );
+    await host.renderAssistantPlaceholderAsNotice(
+      messageEl,
+      outcome.interruptedNoticeMessage,
+      'render-interrupted-notice',
+    );
+    return 'interrupted-notice-rendered';
+  }
+
+  messageEl.remove();
+  return 'removed';
+}

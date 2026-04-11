@@ -12,6 +12,53 @@
 
 ---
 
+## 2026-04-11 可维护性第七阶段发送子系统 ownership 拆分与第八阶段交接
+
+### 🎯 改动目标
+
+- 沿着第六阶段已经建立的 preparation / finalization service 边界，继续把 `src/features/chat/OpenCodianView.ts` 从“超级控制器”推进到更薄的装配层
+- 不再只抽 `sendMessage()` 的一个更小 helper，而是完整搬走发送子系统 ownership
+- 同步沉淀第七阶段总结文档，并在文档后半段明确第八阶段的工作方向与实施顺序
+
+### ✅ 本轮调整
+
+- `src/features/chat/runtime/SendPipelineRuntime.ts`
+- `src/features/chat/runtime/StreamChunkRouter.ts`
+- `src/features/chat/runtime/StreamLocalFinalizer.ts`
+- `src/features/chat/runtime/SendPipelineTypes.ts`
+- `src/features/chat/runtime/sendPipelineContent.ts`
+- `src/features/chat/runtime/PendingIndicatorController.ts`
+- `src/features/chat/runtime/SendPipelineTrace.ts`
+- `src/features/chat/runtime/buildLocalStreamOutcome.ts`
+- `src/features/chat/runtime/StreamShellFinalizer.ts`
+- `src/features/chat/runtime/LocalStreamMessagePersistence.ts`
+- `src/features/chat/OpenCodianView.ts`
+  - 新增发送子系统 runtime 子目录，正式把发送链路 ownership 从 `OpenCodianView.sendMessage()` 搬到 `SendPipelineRuntime`
+  - `OpenCodianView.sendMessage()` 现已退化成 runtime bridge，view 主要保留 host 装配和仍然与 UI 紧耦合的能力暴露
+  - runtime 内部继续细拆成 chunk router、local finalizer、pending indicator、trace、content helper、outcome builder、shell finalizer、message persistence 等更小模块，避免 runtime 自己变成第二个巨型类
+
+- `tests/unit/features/chat/SendPipelineRuntime.test.ts`
+- `tests/unit/features/chat/sendPipelineContent.test.ts`
+- `tests/unit/features/chat/buildLocalStreamOutcome.test.ts`
+  - 新增发送 runtime 与纯 helper 单测，覆盖 preparation 中止、assistant 本地持久化顺序、error-only notice、content 映射与 local outcome 推导
+
+- `docs/modules/features/chat/runtime/*.md`
+- `docs/modules/features/chat/OpenCodianView.md`
+- `docs/modules/README.md`
+- `docs/status/maintainability-phase-7.md`
+- `docs/README.md`
+  - 补齐发送 runtime 子目录文档
+  - 新增第七阶段总结与第八阶段实施说明文档
+  - 在 docs 入口中补充最新阶段文档示例
+
+### 🧪 验证结果
+
+- `npm run lint` 通过（保留仓库既有 warning baseline）
+- `npm run typecheck` 通过
+- `npm run test` 通过（78 个 test suites，611 个 tests）
+- `npm run build` 通过
+- 已部署到 Test Vault，并校验 `BUILD_ID = main.202604111609`
+
 ## 2026-04-11 可维护性第三阶段 model selector 拆分与第四阶段交接
 
 ### 🎯 改动目标

@@ -161,17 +161,19 @@ interface TabRuntimeState {
 
 ### 发送与流式渲染
 
-`sendMessage()` 是这个文件最重要的业务方法。第六阶段后，它前半段的 preparation / bootstrap orchestration 已交给 `services/MessageSendPreparationService.ts`，而 view 自己保留真实 stream 调用与 chunk loop。完整链路现在是：
+第七阶段后，`OpenCodianView.sendMessage()` 已经退化成 UI 事件到 `runtime/SendPipelineRuntime.ts` 的薄桥接。完整发送子系统现在按下面的边界协作：
 
-1. `MessageSendPreparationService` 负责确认当前 conversation / active tab / runtime 可发送
-2. `MessageSendPreparationService` 负责 server readiness、model catalog lazy load 与 selected model availability 检查
-3. `MessageSendPreparationService` 先把 optimistic user message 落到本地 conversation，并保持 save / render / scroll 时序
-4. 首条 user message 时，仍先写 fallback title，再按设置异步触发 AI title generation
-5. `MessageSendPreparationService` 统一进入 tab 级 streaming 状态，并在 stream 创建后清理 `pendingEditedFiles` / `draftContextItems`
-6. `OpenCodianView` 调用 `openCodeService.sendMessage()`，传入 `sessionId`、模型选项和 `contextItems`
-7. `OpenCodianView` 用 `StreamController` 消费流式 chunk
+1. `OpenCodianView` 只负责把输入事件转交给 `SendPipelineRuntime`
+2. `MessageSendPreparationService` 负责确认当前 conversation / active tab / runtime 可发送
+3. `MessageSendPreparationService` 负责 server readiness、model catalog lazy load 与 selected model availability 检查
+4. `MessageSendPreparationService` 先把 optimistic user message 落到本地 conversation，并保持 save / render / scroll 时序
+5. 首条 user message 时，仍先写 fallback title，再按设置异步触发 AI title generation
+6. `SendPipelineRuntime` 调用 `openCodeService.sendMessage()`，创建 streaming shell 与 `StreamController`
+7. `SendPipelineRuntime` 装配 `StreamChunkRouter` 处理 chunk / pending / timeout / interruption
+8. `SendPipelineRuntime` 装配 `StreamLocalFinalizer` 处理本地 shell finalization 与第一次本地保存
+9. `MessageFinalizationService` 再接手最终 sync、post-sync patch/rerender、todo/save/attention 收尾
 
-chunk 处理里显式覆盖了这些分支：
+`SendPipelineRuntime` 的 chunk router 仍显式覆盖这些分支：
 
 - `message_start`
 - `usage`
@@ -182,7 +184,7 @@ chunk 处理里显式覆盖了这些分支：
 - `question_request`
 - 其余可转换为本地 `StreamChunk` 的 text / thinking / tool 事件
 
-收尾阶段会：
+发送子系统的本地收尾阶段会：
 
 - 把 streaming 内容组装成持久化的 assistant `ChatMessage`
 - 在正常完成时通过 `MessageFinalizationService` 再向服务端拉一轮最终消息，并按需 patch / rerender UI
@@ -190,12 +192,24 @@ chunk 处理里显式覆盖了这些分支：
 - 刷新 session todos
 - 更新 context usage
 
-第五到第六阶段后，这条链路的边界变成：
+第七阶段后，这条链路的边界变成：
 
 - send preflight / optimistic bootstrap / stream-enter state 切换，已迁到 `services/MessageSendPreparationService.ts`
-- stream loop、pending/timeout/interruption、本地 streaming shell/notice 渲染、第一次本地保存，仍留在 `OpenCodianView`
+- stream loop、pending/timeout/interruption 已迁到 `runtime/StreamChunkRouter.ts`
+- 本地 streaming shell/notice 渲染、第一次本地保存已迁到 `runtime/StreamLocalFinalizer.ts`
 - post-stream finalization / post-sync orchestration 已迁到 `services/MessageFinalizationService.ts`
+- `OpenCodianView` 本身只保留 runtime host 装配与 bridge 方法
 - 消息区 patch / rerender 细节仍继续复用 `ConversationRenderService`
+
+发送 runtime 目录内部也继续细分成更小的职责模块：
+
+- `SendPipelineTypes.ts`：定义 runtime 与 host 契约
+- `PendingIndicatorController.ts`：管理 delayed pending DOM
+- `SendPipelineTrace.ts`：维护 trace id、progress checkpoint 与调试快照
+- `sendPipelineContent.ts`：提供 streaming content 纯函数
+- `buildLocalStreamOutcome.ts`：负责本地收尾纯推导
+- `StreamShellFinalizer.ts`：只处理 streaming shell DOM 最终落地
+- `LocalStreamMessagePersistence.ts`：只处理 assistant/notice 本地持久化
 
 此外，这条链路还有两个明确的运行时保护：
 
@@ -300,6 +314,10 @@ model selector 现在拆成了几层协作：
 - `OpenCodeService`：会话 CRUD、发送、stream、同步、question、todo、status、context usage
 - `ConversationViewStateService`：tab 初始化、persisted restore、tab 激活和 conversation hydration 装载编排
 - `ConversationRenderService`：消息区 full rerender、tail patch 和 append-only sync 编排
+- `SendPipelineRuntime`：发送子系统总入口，负责真实 stream 调用、runtime 内部模块装配，以及向 `MessageFinalizationService` 交接
+- `StreamChunkRouter`：发送子系统内部的 stream loop / pending / timeout / chunk router
+- `StreamLocalFinalizer`：发送子系统内部的本地 shell finalization 与第一次本地保存
+- `SendPipelineTrace` / `PendingIndicatorController` / `buildLocalStreamOutcome` / `StreamShellFinalizer` / `LocalStreamMessagePersistence`：发送子系统更细粒度的内部协作模块
 - `MessageSendPreparationService`：`sendMessage()` 前半段的 send preflight、optimistic user message 落地，以及 stream-enter 状态编排
 - `MessageFinalizationService`：`sendMessage()` 末段的 final sync、post-sync patch/rerender、todo/save/attention 收尾编排
 - `TabManager` / `TabBar`：tab 生命周期和 tab 元数据

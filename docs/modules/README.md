@@ -25,9 +25,9 @@
 
 ### 当前基线
 
-- `src/**/*.ts`: 当前共有 123 个 TypeScript 源码模块
+- `src/**/*.ts`: 当前共有 133 个 TypeScript 源码模块
 - `src/style/**/*.css`: 当前共有 16 个样式模块（不含 `src/style/index.css` 聚合入口）
-- `docs/modules/**/*.md`: 当前共有 139 篇模块与基础设施文档
+- `docs/modules/**/*.md`: 当前共有 149 篇模块与基础设施文档
 
 ## 文档结构
 
@@ -90,6 +90,17 @@ docs/modules/
 │   │   ├── liquidDiamondDemo.md
 │   │   ├── liquidDiamondDemoWebgl.md
 │   │   ├── renderGroups.md
+│   │   ├── runtime/
+│   │   │   ├── buildLocalStreamOutcome.md
+│   │   │   ├── LocalStreamMessagePersistence.md
+│   │   │   ├── PendingIndicatorController.md
+│   │   │   ├── sendPipelineContent.md
+│   │   │   ├── SendPipelineRuntime.md
+│   │   │   ├── SendPipelineTrace.md
+│   │   │   ├── SendPipelineTypes.md
+│   │   │   ├── StreamChunkRouter.md
+│   │   │   ├── StreamLocalFinalizer.md
+│   │   │   └── StreamShellFinalizer.md
 │   │   ├── userMessageActions.md
 │   │   ├── userMessageDisplay.md
 │   │   ├── rendering/

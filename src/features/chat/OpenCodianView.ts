@@ -93,6 +93,11 @@ import { GlassOctahedronDemoController } from './glassOctahedronDemo';
 import { LiquidDiamondDemoController } from './liquidDiamondDemo';
 import { buildMessageRenderGroups, mergeAssistantMessagesForRender } from './renderGroups';
 import { type CollapsibleState, setupCollapsible } from './rendering/collapsible';
+import {
+  type SendPipelineDebugContentBlock,
+  type SendPipelineHost,
+  SendPipelineRuntime,
+} from './runtime/SendPipelineRuntime';
 import { ContextUsageService } from './services/ContextUsageService';
 import {
   type ConversationRenderHost,
@@ -107,7 +112,6 @@ import {
 import {
   type MessageFinalizationHost,
   MessageFinalizationService,
-  shouldSyncAfterStream,
 } from './services/MessageFinalizationService';
 import {
   type MessageSendPreparationHost,
@@ -183,8 +187,6 @@ const ASSISTANT_DEBUG_STAGE_ALLOWLIST = new Set([
   'turn-diff-processed',
 ]);
 
-const STREAM_PROGRESS_LOG_MIN_INTERVAL_MS = 1200;
-const STREAM_PROGRESS_LOG_MIN_TEXT_DELTA = 400;
 const OPENCODIAN_APP_ICON = 'opencodian-app-icon';
 
 /** Logo SVG for light theme (dark logo on light bg) - from opencode-logo-light.svg */
@@ -195,46 +197,7 @@ const LOGO_SVG_DARK = `<svg width="24" height="30" viewBox="0 0 240 300" fill="n
 const TITLE_WORDMARK_LIGHT_ASSET_PATH = 'assets/branding/opencodian-wordmark-light.svg';
 const TITLE_WORDMARK_DARK_ASSET_PATH = 'assets/branding/opencodian-wordmark-dark.svg';
 
-/** Pending indicator messages - randomly selected for variety */
-const PENDING_MESSAGES = [
-  // Technical
-  'Booting up...',
-  'Initializing...',
-  'Loading modules...',
-  'Processing...',
-  'Computing...',
-  'Analyzing...',
-  'Thinking...',
-  // Action
-  'Getting to work...',
-  'Diving in...',
-  'Rolling up sleeves...',
-  'Tackling this...',
-  'On the case...',
-  'Investigating...',
-  'Exploring...',
-  'Digging deeper...',
-  // Casual
-  'Bear with me...',
-  'Hang tight...',
-  'Just a sec...',
-  'Working my magic...',
-  'Almost there...',
-  'Give me a moment...',
-  // Whimsical
-  'Asking the stars...',
-  'Consulting ancient scrolls...',
-  'Decoding the matrix...',
-  'Channeling the cosmos...',
-  'Peering into the abyss...',
-];
-
 const COMPOSER_TEXTAREA_MAX_HEIGHT = 240;
-
-/** Get a random pending message */
-function getRandomPendingMessage(): string {
-  return PENDING_MESSAGES[Math.floor(Math.random() * PENDING_MESSAGES.length)];
-}
 
 const REMOTE_CONTEXT_TEXT_LIMIT_BYTES = 64 * 1024;
 const RETAINED_SELECTION_DOM_HIGHLIGHT_KEY = 'opencodian-selection';
@@ -664,6 +627,7 @@ export class OpenCodianView extends ItemView {
   private conversationRenderService: ConversationRenderService;
   private messageSendPreparationService: MessageSendPreparationService;
   private messageFinalizationService: MessageFinalizationService;
+  private sendPipelineRuntime: SendPipelineRuntime;
   private conversationSyncIntervalId: number | null = null;
   private omoBackgroundTaskLogStates = new Map<string, OmoBackgroundTaskLogState>();
   private disposeSessionTodoSubscription: (() => void) | null = null;
@@ -2133,6 +2097,11 @@ export class OpenCodianView extends ItemView {
     this.conversationRenderService = new ConversationRenderService(this.createConversationRenderHost());
     this.messageSendPreparationService = new MessageSendPreparationService(this.createMessageSendPreparationHost());
     this.messageFinalizationService = new MessageFinalizationService(this.createMessageFinalizationHost());
+    this.sendPipelineRuntime = new SendPipelineRuntime(
+      this.createSendPipelineRuntimeHost(),
+      this.messageSendPreparationService,
+      this.messageFinalizationService,
+    );
   }
 
   private createConversationViewStateHost(): ConversationViewStateHost {
@@ -2455,6 +2424,70 @@ export class OpenCodianView extends ItemView {
       clearDraftContextItems: (tabId) => {
         this.clearDraftContextItems(tabId);
       },
+    };
+  }
+
+  private createSendPipelineRuntimeHost(): SendPipelineHost {
+    return {
+      getTabRuntimeState: (tabId) => this.getTabRuntimeState(tabId),
+      getActiveTabId: () => this.getActiveTabId(),
+      shouldAutoScroll: (tabId) => this.shouldAutoScroll(tabId),
+      scheduleSettledScrollToBottomIfNeeded: (shouldScroll, tabId) => {
+        this.scheduleSettledScrollToBottomIfNeeded(shouldScroll, tabId);
+      },
+      sendStreamMessage: (content, options) => this.plugin.openCodeService.sendMessage(content, options),
+      detachStream: (sessionId) => {
+        if (sessionId) {
+          this.plugin.openCodeService.detachStream(sessionId);
+        }
+      },
+      createAssistantMessageElement: (tabId, hiddenUntilVisible) =>
+        this.createAssistantMessageElement(tabId, hiddenUntilVisible),
+      getOrCreateTabStreamController: (tabId) => this.getOrCreateTabStreamController(tabId),
+      summarizeContentBlocksForDebug: (blocks) =>
+        this.summarizeContentBlocksForDebug(blocks as SendPipelineDebugContentBlock[] | undefined),
+      logAssistantFinalizationDebug: (label, payload) => {
+        this.logAssistantFinalizationDebug(label, payload);
+      },
+      getLogPreview: (text, maxLength) => this.getLogPreview(text, maxLength),
+      summarizeCoreStreamChunkForDebug: (chunk) => this.summarizeCoreStreamChunkForDebug(chunk),
+      getFriendlyStreamErrorMessage: (rawMessage) => this.getFriendlyStreamErrorMessage(rawMessage),
+      revealStreamingAssistantMessageElement: (tabId) => this.revealStreamingAssistantMessageElement(tabId),
+      syncLatestUserMessageFromServer: (conversation, optimisticMessageId, tabId) =>
+        this.syncLatestUserMessageFromServer(conversation, optimisticMessageId, tabId),
+      beginTabContextUsageStream: (tabId) => {
+        this.beginTabContextUsageStream(tabId);
+      },
+      completeTabContextUsageStream: (tabId) => {
+        this.completeTabContextUsageStream(tabId);
+      },
+      applyUsageChunkToTab: (tabId, chunk) => {
+        this.applyUsageChunkToTab(tabId, chunk);
+      },
+      showPermissionDialog: (request, tabId) => this.showPermissionDialog(request, tabId),
+      showQuestionDialog: (request, tabId) => this.showQuestionDialog(request, tabId),
+      convertToStreamingChunk: (chunk) => this.convertToStreamingChunk(chunk),
+      buildStreamErrorNotice: (timestamp, content, modelId, sourceMessageId) =>
+        this.buildStreamErrorNotice(timestamp, content, modelId, sourceMessageId),
+      buildInterruptedAssistantNotice: (timestamp, modelId) =>
+        this.buildInterruptedAssistantNotice(timestamp, modelId),
+      renderAssistantPlaceholderAsNotice: (messageEl, noticeMessage, reason) =>
+        this.renderAssistantPlaceholderAsNotice(messageEl, noticeMessage, reason),
+      addTimestampWithCopyButton: (messageEl, timestamp, content, modelId, statusLabel) => {
+        this.addTimestampWithCopyButton(messageEl, timestamp, content, modelId, statusLabel);
+      },
+      finalizeBackgroundTaskIndicatorAfterPrimaryStream: (tabId) =>
+        this.finalizeBackgroundTaskIndicatorAfterPrimaryStream(tabId),
+      removeEmptyAssistantShells: () => {
+        this.removeEmptyAssistantShells();
+      },
+      syncTabStreamLikeState: (tabId) => {
+        this.syncTabStreamLikeState(tabId);
+      },
+      refreshServerStatusBadge: () => this.refreshServerStatusBadge(),
+      saveConversation: (conversation) => this.plugin.saveConversation(conversation),
+      summarizeChatMessageForDebug: (message) => this.summarizeChatMessageForDebug(message),
+      stringifyLogPayload: (payload) => this.stringifyLogPayload(payload),
     };
   }
 
@@ -6504,618 +6537,7 @@ export class OpenCodianView extends ItemView {
 
   /** Send a message */
   private async sendMessage(content: string) {
-    const preparedSend = await this.messageSendPreparationService.prepareMessageSend({ content });
-    if (!preparedSend) {
-      return;
-    }
-
-    const {
-      conversation: sendingConversation,
-      tabId: sendingTabId,
-      draftContextItems,
-      modelOptions,
-      activeModelId,
-      userMessage,
-    } = preparedSend;
-    const sendingRuntime = this.getTabRuntimeState(sendingTabId);
-    if (!sendingRuntime) {
-      return;
-    }
-
-    this.messageSendPreparationService.enterStreamingState(sendingTabId);
-
-    const STREAM_IDLE_TIMEOUT_MS = 300000; // 5 minutes of no new stream chunks
-    let timeoutId: number | null = null;
-    let streamCompleted = false;
-    let streamInterrupted = false;
-    let streamTimedOut = false;
-    let shouldSyncFromServer = false;
-    const resetStreamingState = () => {
-      if (timeoutId) {
-        window.clearTimeout(timeoutId);
-        timeoutId = null;
-      }
-      sendingRuntime.isStreaming = false;
-      this.syncTabStreamLikeState(sendingTabId);
-    };
-
-    const scheduleStreamTimeout = () => {
-      if (timeoutId) {
-        window.clearTimeout(timeoutId);
-      }
-
-      timeoutId = window.setTimeout(() => {
-        if (!sendingRuntime.isStreaming) {
-          return;
-        }
-
-        streamTimedOut = true;
-        streamInterrupted = true;
-        logger.warn('Stream idle timeout reached, detaching local stream and continuing background sync', {
-          conversationId: sendingConversation.id,
-          sessionId: sendingConversation.openCodeSessionId,
-          timeoutMs: STREAM_IDLE_TIMEOUT_MS,
-          hasVisibleAssistantContent: Boolean(streamController?.getContentBlocks().length),
-        });
-
-        sendingRuntime.streamController?.cancelStream();
-        this.plugin.openCodeService.detachStream(sendingConversation.openCodeSessionId);
-        resetStreamingState();
-      }, STREAM_IDLE_TIMEOUT_MS);
-    };
-
-    scheduleStreamTimeout();
-
-    // Stream response with current session model
-    const stream = this.plugin.openCodeService.sendMessage(content, {
-      sessionId: sendingConversation.openCodeSessionId,
-      ...modelOptions,
-      contextItems: draftContextItems,
-    });
-    this.messageSendPreparationService.completePreparedStreamStart(sendingTabId);
-
-    const { contentEl } = this.createAssistantMessageElement(sendingTabId, true);
-    const streamController = this.getOrCreateTabStreamController(sendingTabId);
-    if (this.getActiveTabId() === sendingTabId) {
-      this.scheduleSettledScrollToBottomIfNeeded(this.shouldAutoScroll(sendingTabId), sendingTabId);
-    }
-
-    // Show pending indicator after a short delay
-    const pendingState: { element: HTMLElement | null } = { element: null };
-    let pendingStartTime = 0;
-    const pendingMessage = getRandomPendingMessage();
-    let latestErrorMessage: string | null = null;
-    let finalizedAssistantMetadata: Extract<import('../../core/types').StreamChunk, { type: 'message_metadata' }> | null = null;
-    let receivedMeaningfulChunk = false;
-    let rawStreamChunkCount = 0;
-    let renderedStreamChunkCount = 0;
-    let lastRawTextChunk: Record<string, unknown> | null = null;
-    let lastRenderedTextChunk: Record<string, unknown> | null = null;
-    let totalRenderedTextLength = 0;
-    let lastProgressLoggedAt = 0;
-    let lastProgressLoggedTextLength = 0;
-    const finalizationTraceId = `${sendingConversation.openCodeSessionId}:${userMessage.id}:${Date.now()}`;
-    const getStreamControllerSnapshot = (): Record<string, unknown> => ({
-      hasController: Boolean(streamController),
-      persistedBlocks: this.summarizeContentBlocksForDebug(
-        streamController?.getContentBlocks() as Array<{
-          type?: string;
-          text?: string;
-          content?: string;
-          toolId?: string;
-          toolName?: string;
-          toolCall?: { id?: string; name?: string } | null;
-        }> | undefined,
-      ),
-    });
-    const logAssistantFinalizationStage = (
-      stage: string,
-      payload: Record<string, unknown> = {},
-    ): void => {
-      this.logAssistantFinalizationDebug(stage, {
-        traceId: finalizationTraceId,
-        tabId: sendingTabId,
-        conversationId: sendingConversation.id,
-        sessionId: sendingConversation.openCodeSessionId,
-        userMessageId: userMessage.id,
-        streamCompleted,
-        streamInterrupted,
-        streamTimedOut,
-        latestErrorMessage: latestErrorMessage ? this.getLogPreview(latestErrorMessage, 160) : null,
-        rawStreamChunkCount,
-        renderedStreamChunkCount,
-        lastRawTextChunk,
-        lastRenderedTextChunk,
-        finalizedAssistantMetadata: finalizedAssistantMetadata
-          ? {
-              messageId: finalizedAssistantMetadata.messageId,
-              timestamp: finalizedAssistantMetadata.timestamp,
-              modelId: finalizedAssistantMetadata.modelId ?? null,
-            }
-          : null,
-        ...payload,
-      });
-    };
-    const logStreamProgressCheckpoint = (
-      reason: 'first-content' | 'text-growth' | 'thinking' | 'tool' | 'error',
-      payload: Record<string, unknown> = {},
-    ): void => {
-      const now = Date.now();
-      const shouldLog = reason !== 'text-growth'
-        || lastProgressLoggedAt === 0
-        || totalRenderedTextLength - lastProgressLoggedTextLength >= STREAM_PROGRESS_LOG_MIN_TEXT_DELTA
-        || now - lastProgressLoggedAt >= STREAM_PROGRESS_LOG_MIN_INTERVAL_MS;
-      if (!shouldLog) {
-        return;
-      }
-
-      lastProgressLoggedAt = now;
-      lastProgressLoggedTextLength = totalRenderedTextLength;
-      logAssistantFinalizationStage('stream-progress', {
-        reason,
-        totalRenderedTextLength,
-        messageVisible: !(sendingRuntime.streamingMessageEl?.hidden ?? true),
-        pendingIndicatorVisible: Boolean(pendingState.element?.isConnected),
-        streamController: getStreamControllerSnapshot(),
-        ...payload,
-      });
-    };
-    logAssistantFinalizationStage('trace-armed', {
-      activeModelId,
-      pendingMessage,
-      streamControllerAvailable: Boolean(streamController),
-    });
-    const pendingTimeout = window.setTimeout(() => {
-      if (!sendingRuntime.isStreaming || !contentEl) {
-        return;
-      }
-
-      pendingState.element = contentEl.createDiv({ cls: 'opencodian-pending' });
-      pendingState.element.createSpan({
-        text: pendingMessage,
-        cls: 'opencodian-pending-text'
-      });
-      const hintEl = pendingState.element.createSpan({ cls: 'opencodian-pending-hint' });
-      pendingStartTime = Date.now();
-      this.revealStreamingAssistantMessageElement(sendingTabId);
-
-      // Update timer every second
-      const updateTimer = () => {
-        if (!pendingState.element || !pendingState.element.isConnected) return;
-        const elapsed = Math.floor((Date.now() - pendingStartTime) / 1000);
-        hintEl.setText(` (esc to interrupt · ${elapsed}s)`);
-      };
-      updateTimer();
-      pendingState.element.dataset.timerInterval = String(window.setInterval(updateTimer, 1000));
-      logAssistantFinalizationStage('pending-indicator-shown', {
-        pendingMessage,
-        revealReason: 'pending-timeout',
-      });
-      if (this.getActiveTabId() === sendingTabId) {
-        this.scheduleSettledScrollToBottomIfNeeded(this.shouldAutoScroll(sendingTabId), sendingTabId);
-      }
-    }, 1000); // Show after 1s delay
-
-    if (streamController) {
-      streamController.startStream(contentEl);
-      logAssistantFinalizationStage('stream-controller-started', {
-        activeModelId,
-        pendingMessage,
-        streamController: getStreamControllerSnapshot(),
-      });
-    }
-
-    let receivedFirstChunk = false;
-
-    try {
-      for await (const chunk of stream) {
-        rawStreamChunkCount += 1;
-        if (chunk.type === 'text' && chunk.content.length > 0) {
-          lastRawTextChunk = {
-            sequence: rawStreamChunkCount,
-            length: chunk.content.length,
-            preview: this.getLogPreview(chunk.content, 120),
-          };
-        }
-        if (!sendingRuntime.isStreaming) {
-          logger.debug('Streaming cancelled, breaking loop');
-          streamInterrupted = true;
-          logAssistantFinalizationStage('stream-loop-break-not-streaming');
-          break;
-        }
-
-        scheduleStreamTimeout();
-
-        if (chunk.type === 'message_start') {
-          logAssistantFinalizationStage('message-start-received');
-          void this.syncLatestUserMessageFromServer(
-            sendingConversation,
-            userMessage.id,
-            sendingTabId,
-          );
-          this.beginTabContextUsageStream(sendingTabId);
-          continue;
-        }
-
-        if (chunk.type === 'usage') {
-          this.applyUsageChunkToTab(sendingTabId, chunk);
-          continue;
-        }
-
-        if (chunk.type === 'message_metadata') {
-          finalizedAssistantMetadata = chunk;
-          logAssistantFinalizationStage('message-metadata-received', {
-            metadata: this.summarizeCoreStreamChunkForDebug(chunk),
-          });
-          continue;
-        }
-
-        if (chunk.type === 'message_stop') {
-          streamCompleted = true;
-          this.completeTabContextUsageStream(sendingTabId);
-          logAssistantFinalizationStage('message-stop-received', {
-            streamController: getStreamControllerSnapshot(),
-          });
-        }
-
-        if (chunk.type === 'file_edited') {
-          sendingRuntime.pendingEditedFiles.add(chunk.file);
-          logAssistantFinalizationStage('file-edited-recorded', {
-            file: chunk.file,
-            pendingEditedFileCount: sendingRuntime.pendingEditedFiles.size,
-          });
-          continue;
-        }
-
-        // Handle permission request
-        if (chunk.type === 'permission_request') {
-          receivedMeaningfulChunk = true;
-          if (timeoutId) {
-            window.clearTimeout(timeoutId);
-            timeoutId = null;
-          }
-
-          await this.showPermissionDialog(chunk, sendingTabId);
-
-          if (sendingRuntime.isStreaming) {
-            scheduleStreamTimeout();
-          }
-          continue;
-        }
-
-        if (chunk.type === 'question_request') {
-          receivedMeaningfulChunk = true;
-          if (timeoutId) {
-            window.clearTimeout(timeoutId);
-            timeoutId = null;
-          }
-
-          await this.showQuestionDialog(chunk.request, sendingTabId);
-
-          if (sendingRuntime.isStreaming) {
-            scheduleStreamTimeout();
-          }
-          continue;
-        }
-
-        const streamingChunk = this.convertToStreamingChunk(chunk);
-        if (streamingChunk && streamController) {
-          renderedStreamChunkCount += 1;
-          if (streamingChunk.type === 'text' && streamingChunk.content.length > 0) {
-            totalRenderedTextLength += streamingChunk.content.length;
-            lastRenderedTextChunk = {
-              sequence: renderedStreamChunkCount,
-              length: streamingChunk.content.length,
-              preview: this.getLogPreview(streamingChunk.content, 120),
-            };
-          }
-          if (streamingChunk.type === 'error') {
-            latestErrorMessage = this.getFriendlyStreamErrorMessage(streamingChunk.content);
-            streamingChunk.content = latestErrorMessage;
-          } else {
-            receivedMeaningfulChunk = true;
-          }
-          await streamController.handleChunk(streamingChunk);
-
-          const hasContent = (streamingChunk.type === 'text' && streamingChunk.content?.trim()) ||
-                            (streamingChunk.type === 'thinking' && streamingChunk.content?.trim()) ||
-                            streamingChunk.type === 'tool_use';
-
-          if (streamingChunk.type === 'text' && streamingChunk.content.length > 0) {
-            logStreamProgressCheckpoint(receivedFirstChunk ? 'text-growth' : 'first-content', {
-              renderedChunkSequence: renderedStreamChunkCount,
-              chunkLength: streamingChunk.content.length,
-            });
-          } else if (streamingChunk.type === 'thinking' && streamingChunk.content?.trim()) {
-            logStreamProgressCheckpoint('thinking', {
-              renderedChunkSequence: renderedStreamChunkCount,
-              chunkLength: streamingChunk.content.length,
-            });
-          } else if (streamingChunk.type === 'tool_use') {
-            logStreamProgressCheckpoint('tool', {
-              renderedChunkSequence: renderedStreamChunkCount,
-              toolName: streamingChunk.name,
-            });
-          } else if (streamingChunk.type === 'error') {
-            logStreamProgressCheckpoint('error', {
-              renderedChunkSequence: renderedStreamChunkCount,
-              errorPreview: this.getLogPreview(streamingChunk.content, 160),
-            });
-          }
-
-          if (streamingChunk.type === 'error' || hasContent) {
-            this.revealStreamingAssistantMessageElement(sendingTabId);
-          }
-
-          if (!receivedFirstChunk && hasContent) {
-            receivedFirstChunk = true;
-            window.clearTimeout(pendingTimeout);
-            if (pendingState.element?.parentNode) {
-              // Clear timer interval
-              if (pendingState.element.dataset.timerInterval) {
-                window.clearInterval(Number(pendingState.element.dataset.timerInterval));
-              }
-              pendingState.element.remove();
-              pendingState.element = null;
-              logAssistantFinalizationStage('pending-indicator-cleared', {
-                reason: 'first-content',
-                renderedChunkSequence: renderedStreamChunkCount,
-                totalRenderedTextLength,
-              });
-            }
-          }
-        }
-      }
-
-      if (sendingRuntime.isStreaming && !receivedMeaningfulChunk && !latestErrorMessage && streamController) {
-        latestErrorMessage = this.getFriendlyStreamErrorMessage('');
-        logAssistantFinalizationStage('injecting-fallback-error-before-done');
-        await streamController.handleChunk({
-          type: 'error',
-          content: latestErrorMessage,
-        });
-        this.revealStreamingAssistantMessageElement(sendingTabId);
-      }
-
-      if (sendingRuntime.isStreaming && streamController) {
-        logAssistantFinalizationStage('render-done-dispatch', {
-          streamController: getStreamControllerSnapshot(),
-        });
-        await streamController.handleChunk({ type: 'done' });
-        logAssistantFinalizationStage('render-done-applied', {
-          streamController: getStreamControllerSnapshot(),
-        });
-      }
-    } catch (error) {
-      logger.error('Streaming error:', error);
-      latestErrorMessage = this.getFriendlyStreamErrorMessage(
-        error instanceof Error ? error.message : 'Unknown error'
-      );
-      logAssistantFinalizationStage('stream-loop-error', {
-        errorMessage: error instanceof Error ? error.message : String(error),
-      });
-      if (streamController) {
-        await streamController.handleChunk({
-          type: 'error',
-          content: latestErrorMessage,
-        });
-        this.revealStreamingAssistantMessageElement(sendingTabId);
-      }
-    } finally {
-      const finalizedTimestamp = finalizedAssistantMetadata?.timestamp ?? Date.now();
-      const finalizedModelId = finalizedAssistantMetadata?.modelId ?? activeModelId;
-      const finalizedAssistantMessageId = finalizedAssistantMetadata?.messageId;
-      const finalizedStreamingMessageEl = sendingRuntime.streamingMessageEl;
-      const streamContentBlocks = streamController?.getContentBlocks();
-      const streamedTextContent = streamContentBlocks
-        ?.filter((b): b is { type: 'text'; content: string } => b.type === 'text')
-        .map(b => b.content)
-        .join('') ?? '';
-      const hasStreamContentBlocks = Boolean(streamContentBlocks && streamContentBlocks.length > 0);
-      const shouldPersistInterruptedState = streamInterrupted && !streamCompleted && !latestErrorMessage;
-      let interruptedNoticeMessage: ChatMessage | null = null;
-      const streamErrorNoticeMessage = latestErrorMessage && !hasStreamContentBlocks
-        ? this.buildStreamErrorNotice(
-          finalizedTimestamp,
-          latestErrorMessage,
-          finalizedModelId,
-          finalizedAssistantMessageId,
-        )
-        : null;
-
-      shouldSyncFromServer = shouldSyncAfterStream({
-        streamCompleted,
-        streamTimedOut,
-        streamInterrupted,
-        latestErrorMessage,
-      });
-      logAssistantFinalizationStage('stream-finally-enter', {
-        shouldPersistInterruptedState,
-        shouldSyncFromServer,
-        finalTimestampCandidate: finalizedTimestamp,
-        finalModelIdCandidate: finalizedModelId,
-        finalizedAssistantMessageId: finalizedAssistantMessageId ?? null,
-        streamedTextLength: streamedTextContent.length,
-        streamContentBlocks: this.summarizeContentBlocksForDebug(
-          streamContentBlocks as Array<{
-            type?: string;
-            text?: string;
-            content?: string;
-            toolId?: string;
-            toolName?: string;
-            toolCall?: { id?: string; name?: string } | null;
-          }> | undefined,
-        ),
-        streamController: getStreamControllerSnapshot(),
-      });
-      if (shouldSyncFromServer) {
-        sendingRuntime.isConversationSyncInFlight = true;
-      }
-
-      logger.debug('Stream loop ended');
-      resetStreamingState();
-      this.completeTabContextUsageStream(sendingTabId);
-      window.clearTimeout(pendingTimeout);
-      if (pendingState.element?.dataset.timerInterval) {
-        window.clearInterval(Number(pendingState.element.dataset.timerInterval));
-      }
-      pendingState.element?.remove();
-      pendingState.element = null;
-
-      if (finalizedStreamingMessageEl) {
-        let shellFinalizeAction = 'removed';
-        if (hasStreamContentBlocks) {
-          this.addTimestampWithCopyButton(
-            finalizedStreamingMessageEl,
-            finalizedTimestamp,
-            streamedTextContent.trim() || undefined,
-            finalizedModelId,
-            shouldPersistInterruptedState ? t('chat.stream.interruptedBadge') : undefined,
-          );
-          shellFinalizeAction = 'timestamp-added';
-        } else if (streamErrorNoticeMessage) {
-          await this.renderAssistantPlaceholderAsNotice(
-            finalizedStreamingMessageEl,
-            streamErrorNoticeMessage,
-            'render-stream-error-notice',
-          );
-          shellFinalizeAction = 'error-notice-rendered';
-        } else if (shouldPersistInterruptedState) {
-          interruptedNoticeMessage = this.buildInterruptedAssistantNotice(finalizedTimestamp, finalizedModelId);
-          await this.renderAssistantPlaceholderAsNotice(
-            finalizedStreamingMessageEl,
-            interruptedNoticeMessage,
-            'render-interrupted-notice',
-          );
-          shellFinalizeAction = 'interrupted-notice-rendered';
-        } else {
-          finalizedStreamingMessageEl.remove();
-        }
-        logAssistantFinalizationStage('streaming-shell-finalized', {
-          action: shellFinalizeAction,
-        });
-
-        if (this.getActiveTabId() === sendingTabId) {
-          this.scheduleSettledScrollToBottomIfNeeded();
-        }
-      }
-
-      await this.finalizeBackgroundTaskIndicatorAfterPrimaryStream(sendingTabId);
-      this.removeEmptyAssistantShells();
-      this.syncTabStreamLikeState(sendingTabId);
-      await this.refreshServerStatusBadge();
-
-      if (hasStreamContentBlocks && streamContentBlocks) {
-        const contentBlocks: ContentBlock[] = streamContentBlocks.map((b) => {
-          if (b.type === 'text') {
-            return { type: 'text', text: b.content };
-          } else if (b.type === 'thinking') {
-            return {
-              type: 'thinking',
-              thinking: b.content,
-              durationSeconds: b.durationSeconds,
-            };
-          } else if (b.type === 'tool_call') {
-            return {
-              type: 'tool_use',
-              toolId: b.toolCall.id,
-              toolName: b.toolCall.name,
-              toolKind: b.toolCall.kind,
-              toolInput: b.toolCall.input,
-              toolStatus: b.toolCall.status,
-              toolResult: b.toolCall.result,
-            };
-          }
-          return { type: 'text', text: '' };
-        });
-
-        const assistantMessage: ChatMessage = {
-          id: finalizedAssistantMessageId ?? `assistant-${finalizedTimestamp}`,
-          role: 'assistant',
-          content: streamedTextContent,
-          timestamp: finalizedTimestamp,
-          modelId: finalizedModelId,
-          sourceMessageId: finalizedAssistantMessageId,
-          streamState: shouldPersistInterruptedState ? 'interrupted' : undefined,
-          contentBlocks,
-          questionResolution: sendingRuntime.pendingQuestionResolution ?? undefined,
-        };
-        logAssistantFinalizationStage('local-assistant-message-built', {
-          message: this.summarizeChatMessageForDebug(assistantMessage),
-        });
-
-        if (shouldPersistInterruptedState) {
-          logger.debug(`Persisting interrupted assistant message after stream cancellation: ${this.stringifyLogPayload({
-            tabId: sendingTabId,
-            conversationId: sendingConversation.id,
-            sessionId: sendingConversation.openCodeSessionId,
-            messageId: assistantMessage.id,
-            sourceMessageId: assistantMessage.sourceMessageId ?? null,
-            contentPreview: this.getLogPreview(assistantMessage.content, 160),
-            contentBlockCount: assistantMessage.contentBlocks?.length ?? 0,
-          })}`);
-        }
-
-        if (finalizedStreamingMessageEl) {
-          finalizedStreamingMessageEl.dataset.messageId = assistantMessage.id;
-          if (assistantMessage.sourceMessageId) {
-            finalizedStreamingMessageEl.dataset.sourceMessageId = assistantMessage.sourceMessageId;
-          } else {
-            delete finalizedStreamingMessageEl.dataset.sourceMessageId;
-          }
-        }
-
-        sendingConversation.messages.push(assistantMessage);
-        logAssistantFinalizationStage('local-assistant-message-appended', {
-          conversationMessageCount: sendingConversation.messages.length,
-          message: this.summarizeChatMessageForDebug(assistantMessage),
-        });
-      } else if (streamErrorNoticeMessage) {
-        sendingConversation.messages.push(streamErrorNoticeMessage);
-        logAssistantFinalizationStage('local-error-notice-appended', {
-          conversationMessageCount: sendingConversation.messages.length,
-          latestAssistantMessage: this.summarizeChatMessageForDebug(streamErrorNoticeMessage),
-        });
-      } else if (interruptedNoticeMessage) {
-        logger.debug(`Persisting interrupted assistant notice because no visible assistant content survived cancellation: ${this.stringifyLogPayload({
-          tabId: sendingTabId,
-          conversationId: sendingConversation.id,
-          sessionId: sendingConversation.openCodeSessionId,
-          noticeId: interruptedNoticeMessage.id,
-        })}`);
-        sendingConversation.messages.push(interruptedNoticeMessage);
-        logAssistantFinalizationStage('local-interrupted-notice-appended', {
-          conversationMessageCount: sendingConversation.messages.length,
-          latestAssistantMessage: this.summarizeChatMessageForDebug(interruptedNoticeMessage),
-        });
-      }
-
-      if (hasStreamContentBlocks || streamErrorNoticeMessage || interruptedNoticeMessage) {
-        sendingConversation.updatedAt = finalizedTimestamp;
-        sendingConversation.lastResponseAt = finalizedTimestamp;
-        await this.plugin.saveConversation(sendingConversation);
-        logAssistantFinalizationStage('conversation-saved-after-local-finalization', {
-          updatedAt: sendingConversation.updatedAt,
-          lastResponseAt: sendingConversation.lastResponseAt ?? null,
-          messageCount: sendingConversation.messages.length,
-        });
-      }
-
-      sendingRuntime.streamingMessageEl = null;
-      sendingRuntime.streamingContentEl = null;
-      sendingRuntime.pendingQuestionResolution = null;
-      logAssistantFinalizationStage('stream-runtime-cleared');
-    }
-
-    if (sendingConversation) {
-      await this.messageFinalizationService.finalizeAfterStream({
-        conversation: sendingConversation,
-        tabId: sendingTabId,
-        shouldSyncFromServer,
-        editedFiles: [...sendingRuntime.pendingEditedFiles],
-        logStage: logAssistantFinalizationStage,
-      });
-    }
+    await this.sendPipelineRuntime.sendMessage(content);
   }
 
   private scheduleHistoryDropdownPosition(anchorRect: DOMRect): void {
