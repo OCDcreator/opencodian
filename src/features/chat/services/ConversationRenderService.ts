@@ -105,14 +105,18 @@ export interface ConversationRenderHost {
   summarizeChatMessageForDebug(message: ChatMessage | null | undefined): Record<string, unknown> | null;
 }
 
+type TrailingAssistantPatchDomTarget = {
+  messageEl: HTMLElement;
+  contentEl: HTMLElement;
+  turnBodyEl: HTMLElement;
+};
+
 type TrailingAssistantPatchPreflight =
   | {
     ok: true;
     previousTailMessage: ChatMessage;
     nextTailMessage: ChatMessage;
-    existingTailMessageEl: HTMLElement;
-    existingContentEl: HTMLElement;
-    parentEl: HTMLElement;
+    patchTarget: TrailingAssistantPatchDomTarget;
     runtime: ConversationRenderRuntimeState | null;
     previousTurnBodyEl: HTMLElement | null;
     shouldStickToBottom: boolean;
@@ -497,16 +501,25 @@ export class ConversationRenderService {
     tabId: TabId | null,
   ): SuccessfulTrailingAssistantPatchPreflight {
     const runtime = this.host.getRenderRuntimeForTab(tabId);
+    const patchTarget = this.buildTrailingAssistantPatchDomTarget(patchTargets);
     return {
       ok: true,
       previousTailMessage: tailMessages.previousTailMessage,
       nextTailMessage: tailMessages.nextTailMessage,
-      existingTailMessageEl: patchTargets.existingTailMessageEl,
-      existingContentEl: patchTargets.existingContentEl,
-      parentEl: patchTargets.parentEl,
+      patchTarget,
       runtime,
       previousTurnBodyEl: runtime?.currentTurnBodyEl ?? null,
       shouldStickToBottom: this.host.shouldAutoScroll(tabId),
+    };
+  }
+
+  private buildTrailingAssistantPatchDomTarget(
+    patchTargets: SuccessfulTrailingAssistantPatchTargets,
+  ): TrailingAssistantPatchDomTarget {
+    return {
+      messageEl: patchTargets.existingTailMessageEl,
+      contentEl: patchTargets.existingContentEl,
+      turnBodyEl: patchTargets.parentEl,
     };
   }
 
@@ -516,21 +529,20 @@ export class ConversationRenderService {
     const {
       previousTailMessage,
       nextTailMessage,
-      existingTailMessageEl,
-      existingContentEl,
+      patchTarget,
     } = preflight;
     if (
       this.host.assistantTailRender.getBodySignature(previousTailMessage)
       === this.host.assistantTailRender.getBodySignature(nextTailMessage)
     ) {
-      this.host.assistantTailRender.finalizePersistedFooter(existingTailMessageEl, nextTailMessage);
+      this.host.assistantTailRender.finalizePersistedFooter(patchTarget.messageEl, nextTailMessage);
       return;
     }
 
-    existingContentEl.replaceChildren();
+    patchTarget.contentEl.replaceChildren();
     await this.host.assistantTailRender.renderMessageContent(
-      existingTailMessageEl,
-      existingContentEl,
+      patchTarget.messageEl,
+      patchTarget.contentEl,
       nextTailMessage,
     );
   }
@@ -541,19 +553,19 @@ export class ConversationRenderService {
   ): Promise<T> {
     const {
       runtime,
-      parentEl,
+      patchTarget,
       previousTurnBodyEl,
     } = preflight;
     if (!runtime) {
       return run();
     }
 
-    runtime.currentTurnBodyEl = parentEl;
+    runtime.currentTurnBodyEl = patchTarget.turnBodyEl;
 
     try {
       return await run();
     } finally {
-      runtime.currentTurnBodyEl = previousTurnBodyEl ?? parentEl;
+      runtime.currentTurnBodyEl = previousTurnBodyEl ?? patchTarget.turnBodyEl;
     }
   }
 
@@ -561,14 +573,14 @@ export class ConversationRenderService {
     preflight: SuccessfulTrailingAssistantPatchPreflight,
     tabId: TabId | null,
   ): void {
-    const { existingTailMessageEl, nextTailMessage, shouldStickToBottom } = preflight;
-    existingTailMessageEl.dataset.messageId = nextTailMessage.id;
+    const { patchTarget, nextTailMessage, shouldStickToBottom } = preflight;
+    patchTarget.messageEl.dataset.messageId = nextTailMessage.id;
     if (nextTailMessage.sourceMessageId) {
-      existingTailMessageEl.dataset.sourceMessageId = nextTailMessage.sourceMessageId;
+      patchTarget.messageEl.dataset.sourceMessageId = nextTailMessage.sourceMessageId;
     } else {
-      delete existingTailMessageEl.dataset.sourceMessageId;
+      delete patchTarget.messageEl.dataset.sourceMessageId;
     }
-    existingTailMessageEl.style.animation = 'none';
+    patchTarget.messageEl.style.animation = 'none';
     if (shouldStickToBottom) {
       this.host.scrollToBottom({ tabId });
     }
