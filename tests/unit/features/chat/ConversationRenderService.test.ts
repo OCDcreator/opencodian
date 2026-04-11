@@ -492,6 +492,33 @@ describe('ConversationRenderService', () => {
     );
   });
 
+  it('logs skipped trailing assistant patch payloads with non-tail mismatch indices', async () => {
+    const previousMessages = [
+      createMessage({ id: 'user-1', role: 'user', content: 'Hi', timestamp: 1 }),
+      createMessage({ id: 'assistant-1', content: 'Stable answer', timestamp: 2 }),
+    ];
+    const nextMessages = [
+      createMessage({ id: 'user-1', role: 'user', content: 'Changed', timestamp: 3 }),
+      createMessage({ id: 'assistant-2', content: 'Updated answer', timestamp: 4 }),
+    ];
+    const host = createHost();
+    const service = new ConversationRenderService(host);
+
+    const patched = await service.patchTrailingAssistantRender(previousMessages, nextMessages, 'tab-1');
+
+    expect(patched).toBe(false);
+    expect(host.logAssistantFinalizationDebug).toHaveBeenCalledWith(
+      'patch-trailing-assistant-render-skipped',
+      {
+        reason: 'non-tail-message-signature-mismatch',
+        tabId: 'tab-1',
+        previousRenderedCount: 2,
+        nextRenderedCount: 2,
+        mismatchIndex: 0,
+      },
+    );
+  });
+
   it('logs skipped trailing assistant patch payloads with summarized tail messages', async () => {
     const previousMessages = [
       createMessage({ id: 'assistant-1', content: 'Stable answer', timestamp: 1 }),

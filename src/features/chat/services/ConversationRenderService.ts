@@ -146,6 +146,18 @@ type TrailingAssistantPatchRenderedMessagesResult =
     reason: 'rendered-message-count-mismatch';
   };
 
+type TrailingAssistantPatchNonTailSignatureResult =
+  | {
+    ok: true;
+  }
+  | {
+    ok: false;
+    reason: 'non-tail-message-signature-mismatch';
+    payload: {
+      mismatchIndex: number;
+    };
+  };
+
 type SuccessfulTrailingAssistantPatchPreflight = Extract<
   TrailingAssistantPatchPreflight,
   { ok: true }
@@ -300,21 +312,27 @@ export class ConversationRenderService {
     return true;
   }
 
-  private findNonTailSignatureMismatch(
+  private resolveTrailingAssistantPatchNonTailSignatureMismatch(
     previousRenderedMessages: ChatMessage[],
     nextRenderedMessages: ChatMessage[],
-  ): number | null {
+  ): TrailingAssistantPatchNonTailSignatureResult {
     const lastIndex = previousRenderedMessages.length - 1;
     for (let index = 0; index < lastIndex; index += 1) {
       if (
         this.host.getMessageVisualSignature(previousRenderedMessages[index])
         !== this.host.getMessageVisualSignature(nextRenderedMessages[index])
       ) {
-        return index;
+        return {
+          ok: false,
+          reason: 'non-tail-message-signature-mismatch',
+          payload: {
+            mismatchIndex: index,
+          },
+        };
       }
     }
 
-    return null;
+    return { ok: true };
   }
 
   private isPatchableAssistantTail(
@@ -376,15 +394,12 @@ export class ConversationRenderService {
     }
     const { previousRenderedMessages, nextRenderedMessages } = renderedMessages;
 
-    const prefixCheck = this.findNonTailSignatureMismatch(previousRenderedMessages, nextRenderedMessages);
-    if (prefixCheck !== null) {
-      return {
-        ok: false,
-        reason: 'non-tail-message-signature-mismatch',
-        payload: {
-          mismatchIndex: prefixCheck,
-        },
-      };
+    const nonTailSignatureMismatch = this.resolveTrailingAssistantPatchNonTailSignatureMismatch(
+      previousRenderedMessages,
+      nextRenderedMessages,
+    );
+    if (!nonTailSignatureMismatch.ok) {
+      return nonTailSignatureMismatch;
     }
 
     const previousTailMessage = previousRenderedMessages[previousRenderedMessages.length - 1];
