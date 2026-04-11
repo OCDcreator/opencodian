@@ -8,7 +8,6 @@
 
 import { requestUrl } from 'obsidian';
 import * as path from 'path';
-import { fileURLToPath } from 'url';
 
 import {
   buildObsidianContextTag,
@@ -26,6 +25,12 @@ import {
   toFileContextUrl,
   type ToolIdentityKind,
 } from '../../shared';
+import {
+  contextPathFromFileUrl,
+  normalizeContextAttachmentPath,
+  normalizeContextPath,
+  resolveContextPath,
+} from '../../shared/contextPath';
 import type {
   ChatMessage,
   ContentBlock,
@@ -2059,7 +2064,7 @@ export class OpenCodeService {
 
   private createPromptContextPart(item: PromptContextItem): PromptRequestPart {
     if (this.settings.server.mode === 'local') {
-      const absolutePath = this.resolveContextAbsolutePath(item.path);
+      const absolutePath = resolveContextPath(item.path, this.vaultPath);
       const normalizedMime = isTextLikeMime(item.mime) ? 'text/plain' : item.mime;
       const part: Extract<PromptRequestPart, { type: 'file' }> = {
         type: 'file',
@@ -2115,18 +2120,6 @@ export class OpenCodeService {
         lines: item.lineRange ? `${item.lineRange.startLine}-${item.lineRange.endLine}` : undefined,
       },
     };
-  }
-
-  private resolveContextAbsolutePath(contextPath: string): string {
-    if (path.isAbsolute(contextPath)) {
-      return contextPath;
-    }
-
-    if (!this.vaultPath) {
-      return contextPath;
-    }
-
-    return path.resolve(this.vaultPath, contextPath);
   }
 
   private normalizeQuestionRequest(raw: unknown): ChatQuestionRequest | null {
@@ -3544,7 +3537,7 @@ export class OpenCodeService {
       return undefined;
     }
 
-    return this.vaultPath.replace(/\\/g, '/');
+    return normalizeContextPath(this.vaultPath);
   }
 
   private getRequestHeaders(extraHeaders: Record<string, string> = {}): Record<string, string> {
@@ -3890,10 +3883,13 @@ export class OpenCodeService {
     };
 
     const sourcePath = typeof filePart.source?.path === 'string'
-      ? OpenCodeService.normalizeContextAttachmentPath(filePart.source.path, vaultPath)
+      ? normalizeContextAttachmentPath(filePart.source.path, vaultPath)
       : undefined;
-    const urlPath = typeof filePart.url === 'string'
-      ? OpenCodeService.contextPathFromFileUrl(filePart.url, vaultPath)
+    const rawUrlPath = typeof filePart.url === 'string'
+      ? contextPathFromFileUrl(filePart.url)
+      : null;
+    const urlPath = rawUrlPath
+      ? normalizeContextAttachmentPath(rawUrlPath, vaultPath)
       : null;
     const contextPath = sourcePath ?? urlPath;
     if (!contextPath) {
@@ -3984,7 +3980,7 @@ export class OpenCodeService {
       return null;
     }
 
-    const contextPath = OpenCodeService.normalizeContextAttachmentPath(inputPath, vaultPath);
+    const contextPath = normalizeContextAttachmentPath(inputPath, vaultPath);
     const lineRange = OpenCodeService.extractLineRangeFromToolInput(parsedInput);
 
     return {
@@ -4101,33 +4097,6 @@ export class OpenCodeService {
     }
 
     return null;
-  }
-
-  private static contextPathFromFileUrl(fileUrl: string, vaultPath?: string): string | null {
-    try {
-      return OpenCodeService.normalizeContextAttachmentPath(fileURLToPath(fileUrl), vaultPath);
-    } catch {
-      return null;
-    }
-  }
-
-  private static normalizeContextAttachmentPath(filePath: string, vaultPath?: string): string {
-    const normalizedPath = path.normalize(filePath);
-    if (!vaultPath) {
-      return normalizedPath.replace(/\\/g, '/');
-    }
-
-    const normalizedVaultPath = path.normalize(vaultPath);
-    const relativePath = path.relative(normalizedVaultPath, normalizedPath);
-    if (
-      relativePath
-      && !relativePath.startsWith('..')
-      && !path.isAbsolute(relativePath)
-    ) {
-      return relativePath.replace(/\\/g, '/');
-    }
-
-    return normalizedPath.replace(/\\/g, '/');
   }
 
   private static dedupeContextAttachments(

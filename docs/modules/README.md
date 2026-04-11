@@ -160,6 +160,7 @@ docs/modules/
 │       ├── en.md
 │       └── zh.md
 ├── shared/
+│   ├── contextPath.md
 │   ├── index.md
 │   ├── logger.md
 │   ├── obsidianContext.md

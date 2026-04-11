@@ -23,6 +23,7 @@
 - Obsidian `requestUrl`
 - Node `path` / `url`
 - `../../shared/*`
+- `../../shared/contextPath`
 - `../types/*`
 - `../types/settings`
 - `./createSdkClient`
@@ -49,7 +50,7 @@
 - `sdkFeatureFlags`: 由 `resolveSdkFeatureFlags()` 合并后的运行时 SDK 开关。
 - `sessionTodoListeners` / `sessionStatusListeners`: 订阅 `global.syncEvent.subscribe()` 的本地监听集合。
 - `syncEventAbortController` / `syncEventPromise` / `syncEventWanted`: 同步事件循环的生命周期状态。
-- `vaultPath`: 用于 SDK `directory` 注入、上下文文件绝对路径解析，以及 `ServerManager` 工作目录设置。
+- `vaultPath`: 用于 SDK `directory` 注入、上下文文件绝对路径解析，以及 `ServerManager` 工作目录设置；OpenCode directory scope 和 context file path 的跨平台规范化委托给 `shared/contextPath`。
 
 `responseHandlers` 字段虽然仍然存在，但当前公开的主流式接口已经是 `AsyncGenerator<StreamChunk>`。
 
@@ -127,7 +128,7 @@
 
 - 本地模式：
   - 序列化为 `file` part
-  - `url` 使用 `toFileContextUrl()`
+  - `url` 使用 `resolveContextPath()` + `toFileContextUrl()`，Windows vault path 在 macOS/Linux 上也会稳定输出 `file:///C:/vault/...`
   - 如果是 `selection` 且带 `textSnapshot`，会把选中文本放进 `source.text`
 - 远程模式：
   - 只允许 text-like MIME
@@ -249,6 +250,8 @@ legacy 流式路径则会把：
 2. `file` parts（`parseFileContextAttachment`）
 3. 夹在文本里的 inline Read tool 记录（`Called the Read tool with the following input:`）
 
+file part 与 inline Read tool 里的路径会先通过 `shared/contextPath` 做跨平台归一化：Windows drive path 会统一成 `C:/...`，如果能确认在当前 `vaultPath` 内则再还原为 vault-relative attachment path。
+
 inline Read tool 解析成功后：
 
 - 会把对应的文件/行号转成 `MessageContextAttachment`
@@ -352,6 +355,7 @@ graph TD
 - `getAvailableModels()` 是运行时可用列表，也是最接近 OpenCode 主界面当前 provider 列表的数据源。
 - `getProviderDirectory()` 返回的是 connect-provider 目录；如果只禁用了少量 provider，它仍可能返回上百个可连接项，所以不要把它当成设置页服务器模型目录。
 - SDK client 会把 `directory` 作为查询参数和 `x-opencode-directory` 头一起传给服务端；直接手写 HTTP 请求如果不带这个作用域，`/config` 和 `/config/providers` 看到的通常是全局层结果。
+- `OpenCodeService` 不再直接使用宿主平台 `path.resolve()` / `path.relative()` 处理 context attachment 的 Windows path；相关兼容逻辑集中在 `shared/contextPath.ts`。
 - 本地模式下如果 `4096` 是旧的 managed server，`getAvailableModels()` / `getResolvedModelConfig()` 即使代码本身没错，也会返回“上一份 vault / 上一份配置”对应的结果；先重启 stale server，再判断是不是 SDK/归一化问题。
 - legacy `connectSSE()` / `parseSSEEvents()` 仍然是有效回滚路径，不能在 SDK rollout 未完全收口前删除。
 - 文件里的 `transformEventToChunks()` / `transformPartToChunks()` 仍保留，但当前主流式路径实际走的是 `handleStreamingEvent()`。

@@ -1,11 +1,10 @@
-import { pathToFileURL } from 'url';
-
 import type {
   MessageContextAttachment,
   PromptContextItem,
   PromptContextKind,
   PromptContextLineRange,
 } from '../core/types/chat';
+import { pathToContextFileUrl } from './contextPath';
 
 const TEXT_MIME_BY_EXTENSION: Record<string, string> = {
   css: 'text/css',
@@ -169,7 +168,7 @@ export function formatContextLabel(path: string, range?: PromptContextLineRange)
 }
 
 export function toFileContextUrl(path: string, range?: PromptContextLineRange): string {
-  const url = pathToFileURL(path);
+  const url = new URL(pathToContextFileUrl(path));
   if (range) {
     url.searchParams.set('start', String(range.startLine));
     url.searchParams.set('end', String(range.endLine));

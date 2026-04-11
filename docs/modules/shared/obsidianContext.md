@@ -8,7 +8,7 @@
 Obsidian 显式上下文（explicit context）工具函数。处理 `<obsidian_context>` 标签的构建和解析、上下文附件对象与标签格式之间的转换、文件路径 MIME 类型解析和行范围格式化。用于在 AI 聊天消息中编码和还原编辑器上下文信息。
 
 ## 导入关系
-上游: `url` (pathToFileURL), `../core/types/chat` (MessageContextAttachment, PromptContextItem, PromptContextKind, PromptContextLineRange)
+上游: `./contextPath`, `../core/types/chat` (MessageContextAttachment, PromptContextItem, PromptContextKind, PromptContextLineRange)
 下游: `OpenCodeService`, `OpenCodianView` (上下文附件处理)
 
 ## 核心类型 / 接口
@@ -54,6 +54,10 @@ Obsidian 显式上下文（explicit context）工具函数。处理 `<obsidian_c
 - 多行：`"10-25"`
 
 `parseLineRange(lines)` 逆解析。
+
+### file URL 构建
+
+`toFileContextUrl(path, range?)` 会委托 `contextPath.pathToContextFileUrl()` 构建 `file:///` URL，再追加 `start` / `end` 行范围参数。这样在 macOS/Linux 测试环境处理 Windows vault path（例如 `C:\vault`）时，也会稳定输出 `file:///C:/vault/...`，不会被当前宿主平台误解析成仓库内的相对路径。
 
 ### 文件路径判断
 
@@ -111,6 +115,5 @@ Obsidian 显式上下文（explicit context）工具函数。处理 `<obsidian_c
 - HTML 属性编码/解码是双向对称的（`escapeHtmlAttribute` / `decodeHtmlAttribute`）
 - `textSnapshot` 在 `buildContextAttachment()` 中仅对 `selection` 类型保留
 - MIME 检测仅基于扩展名，不检查文件内容
-- `toFileContextUrl()` 使用 Node.js `pathToFileURL`，在浏览器环境可能需要 polyfill
-
+- `toFileContextUrl()` 的底层 file URL path 规范化由 `contextPath.ts` 负责；如果要调整 Windows/POSIX 路径兼容行为，应优先扩展该模块
 
