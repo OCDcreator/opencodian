@@ -233,6 +233,13 @@ type TrailingAssistantPatchPlanningEnvironment = {
   shouldStickToBottom: boolean;
 };
 
+type TrailingAssistantPatchPlanningContextInputs = {
+  previousTailMessage: ChatMessage;
+  nextTailMessage: ChatMessage;
+  patchTarget: TrailingAssistantPatchDomTarget;
+  parentEl: HTMLElement;
+};
+
 type TrailingAssistantPatchPlanningContext = {
   previousTailMessage: ChatMessage;
   nextTailMessage: ChatMessage;
@@ -630,24 +637,32 @@ export class ConversationRenderService {
     tabId: TabId | null,
   ): TrailingAssistantPatchPlanningContext {
     return this.buildTrailingAssistantPatchSuccessPlanningContext(
-      tailMessages,
-      this.buildTrailingAssistantPatchDomTarget(patchTargets),
-      patchTargets.parentEl,
+      this.buildTrailingAssistantPatchPlanningContextInputs(tailMessages, patchTargets),
       this.buildTrailingAssistantPatchPlanningEnvironment(tabId),
     );
   }
 
-  private buildTrailingAssistantPatchSuccessPlanningContext(
+  private buildTrailingAssistantPatchPlanningContextInputs(
     tailMessages: SuccessfulTrailingAssistantPatchTailMessages,
-    patchTarget: TrailingAssistantPatchDomTarget,
-    parentEl: HTMLElement,
-    environment: TrailingAssistantPatchPlanningEnvironment,
-  ): TrailingAssistantPatchPlanningContext {
+    patchTargets: SuccessfulTrailingAssistantPatchTargets,
+  ): TrailingAssistantPatchPlanningContextInputs {
     return {
       previousTailMessage: tailMessages.previousTailMessage,
       nextTailMessage: tailMessages.nextTailMessage,
-      patchTarget,
-      parentEl,
+      patchTarget: this.buildTrailingAssistantPatchDomTarget(patchTargets),
+      parentEl: patchTargets.parentEl,
+    };
+  }
+
+  private buildTrailingAssistantPatchSuccessPlanningContext(
+    planningInputs: TrailingAssistantPatchPlanningContextInputs,
+    environment: TrailingAssistantPatchPlanningEnvironment,
+  ): TrailingAssistantPatchPlanningContext {
+    return {
+      previousTailMessage: planningInputs.previousTailMessage,
+      nextTailMessage: planningInputs.nextTailMessage,
+      patchTarget: planningInputs.patchTarget,
+      parentEl: planningInputs.parentEl,
       runtime: environment.runtime,
       shouldStickToBottom: environment.shouldStickToBottom,
     };
