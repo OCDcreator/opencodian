@@ -220,6 +220,11 @@ type TrailingAssistantPatchSkippedDebugPayloadInputsContractPreparation = {
   countPlan: TrailingAssistantPatchSkippedDebugCountPlan;
 };
 
+type TrailingAssistantPatchSkippedDebugPayloadInputsContractPreparationInputs = {
+  reasonPayloadInputs: TrailingAssistantPatchSkippedDebugReasonPayloadInputs;
+  countPlan: TrailingAssistantPatchSkippedDebugCountPlan;
+};
+
 type TrailingAssistantPatchSkippedDebugPayloadInputs = {
   reason: string;
   payload: Record<string, unknown>;
@@ -1386,9 +1391,20 @@ export class ConversationRenderService {
       this.buildTrailingAssistantPatchSkippedDebugCountPlanFromLoggingContext(
         loggingContext,
       );
+    return this.buildTrailingAssistantPatchSkippedDebugPayloadInputsContractPreparation(
+      {
+        reasonPayloadInputs,
+        countPlan,
+      },
+    );
+  }
+
+  private buildTrailingAssistantPatchSkippedDebugPayloadInputsContractPreparation(
+    preparationInputs: TrailingAssistantPatchSkippedDebugPayloadInputsContractPreparationInputs,
+  ): TrailingAssistantPatchSkippedDebugPayloadInputsContractPreparation {
     return {
-      reasonPayloadInputs,
-      countPlan,
+      reasonPayloadInputs: preparationInputs.reasonPayloadInputs,
+      countPlan: preparationInputs.countPlan,
     };
   }
 
