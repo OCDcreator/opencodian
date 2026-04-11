@@ -21,5 +21,6 @@
 ## 注意事项
 
 - 这个模块只负责 inline card 壳体创建与插入，不负责 question/permission 具体内容或交互逻辑
+- permission inline card 的内容构造与按钮等待已经迁到 `PermissionInlineCardRenderer.ts`，不要再把这部分逻辑塞回 placement helper
 - reveal 仍通过 `AssistantShellRenderer` 的 host bridge 执行，不要在这里复制 scroll 或 visibility 规则
 - tool call 仍然直接挂在 message shell 上；fallback 逻辑必须继续兼容 `.opencodian-message-content` 与 message root 两种容器

@@ -93,6 +93,7 @@ docs/modules/
 │   │   ├── runtime/
 │   │   │   ├── AssistantShellRenderer.md
 │   │   │   ├── AssistantNoticeRenderer.md
+│   │   │   ├── PermissionInlineCardRenderer.md
 │   │   │   ├── StreamingInlineCardRenderer.md
 │   │   │   ├── buildLocalStreamOutcome.md
 │   │   │   ├── LocalStreamMessagePersistence.md

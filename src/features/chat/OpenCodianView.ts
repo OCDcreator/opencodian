@@ -103,6 +103,9 @@ import {
   AssistantShellRenderer,
 } from './runtime/AssistantShellRenderer';
 import {
+  PermissionInlineCardRenderer,
+} from './runtime/PermissionInlineCardRenderer';
+import {
   type StreamingInlineCardRendererHost,
   StreamingInlineCardRenderer,
 } from './runtime/StreamingInlineCardRenderer';
@@ -647,6 +650,7 @@ export class OpenCodianView extends ItemView {
   private messageFinalizationService: MessageFinalizationService;
   private assistantShellRenderer: AssistantShellRenderer;
   private streamingInlineCardRenderer: StreamingInlineCardRenderer;
+  private permissionInlineCardRenderer: PermissionInlineCardRenderer;
   private sendPipelineRuntime: SendPipelineRuntime;
   private conversationSyncIntervalId: number | null = null;
   private omoBackgroundTaskLogStates = new Map<string, OmoBackgroundTaskLogState>();
@@ -2127,6 +2131,7 @@ export class OpenCodianView extends ItemView {
     this.messageFinalizationService = new MessageFinalizationService(this.createMessageFinalizationHost());
     this.assistantShellRenderer = new AssistantShellRenderer(this.createAssistantShellRendererHost());
     this.streamingInlineCardRenderer = new StreamingInlineCardRenderer(this.createStreamingInlineCardRendererHost());
+    this.permissionInlineCardRenderer = new PermissionInlineCardRenderer(this.streamingInlineCardRenderer);
     this.sendPipelineRuntime = new SendPipelineRuntime(
       this.createSendPipelineRuntimeHost(),
       this.messageSendPreparationService,
@@ -11484,101 +11489,18 @@ export class OpenCodianView extends ItemView {
     request: Extract<import('../../core/types').StreamChunk, { type: 'permission_request' }>,
     tabId: TabId | null = this.getActiveTabId(),
   ): Promise<void> {
-    const { t } = await import('../../i18n');
-    const { id, permission, patterns, metadata } = request;
-
-    // Get tool description based on permission type
-    const getToolDescription = (perm: string): string => {
-      // Extract base tool name (e.g., 'websearch_web_search' -> 'websearch')
-      const baseTool = perm.split('_')[0].toLowerCase();
-      const toolKey = `permissionDialog.tools.${baseTool}`;
-      const description = t(toolKey as import('../../i18n').TranslationKey);
-      // If translation not found, return default
-      return description === toolKey ? t('permissionDialog.tools.default') : description;
-    };
-
-    const permissionCard = this.streamingInlineCardRenderer.createStreamingInlineCard(
-      'opencodian-permission-inline',
+    const result = await this.permissionInlineCardRenderer.collectResponse(
+      request,
       tabId,
     );
-    if (!permissionCard) {
+    if (!result) {
       logger.error('No streaming message element found for permission card');
       return;
     }
 
-    // Header with tool name
-    const headerEl = permissionCard.createDiv({ cls: 'opencodian-permission-inline-header' });
-    headerEl.createSpan({ cls: 'opencodian-permission-inline-icon', text: '🔐' });
-    headerEl.createSpan({
-      cls: 'opencodian-permission-inline-title',
-      text: t('permissionDialog.title')
-    });
-
-    // Tool info section
-    const infoEl = permissionCard.createDiv({ cls: 'opencodian-permission-inline-info' });
-    infoEl.createDiv({
-      cls: 'opencodian-permission-inline-tool',
-      text: `${t('permissionDialog.description')} ${permission}`
-    });
-    infoEl.createDiv({
-      cls: 'opencodian-permission-inline-desc',
-      text: `${getToolDescription(permission)}`
-    });
-
-    // Show patterns (only if meaningful)
-    if (patterns.length > 0 && !(patterns.length === 1 && patterns[0] === '*')) {
-      const patternsEl = permissionCard.createDiv({ cls: 'opencodian-permission-inline-patterns' });
-      patternsEl.createDiv({
-        cls: 'opencodian-permission-inline-label',
-        text: t('permissionDialog.patterns')
-      });
-      patterns.forEach(pattern => {
-        patternsEl.createDiv({ cls: 'opencodian-permission-inline-pattern-item', text: pattern });
-      });
-    }
-
-    // Show command if present
-    if (metadata.command) {
-      const commandEl = permissionCard.createDiv({ cls: 'opencodian-permission-inline-command' });
-      commandEl.createSpan({
-        cls: 'opencodian-permission-inline-label',
-        text: `${t('permissionDialog.command')}: `
-      });
-      commandEl.createEl('code', { text: String(metadata.command) });
-    }
-
-    // Action buttons
-    const buttonsEl = permissionCard.createDiv({ cls: 'opencodian-permission-inline-buttons' });
-
-    const onceBtn = buttonsEl.createEl('button', {
-      cls: 'opencodian-permission-inline-btn opencodian-permission-inline-once',
-      text: t('permissionDialog.allowOnce')
-    });
-
-    const alwaysBtn = buttonsEl.createEl('button', {
-      cls: 'opencodian-permission-inline-btn opencodian-permission-inline-always',
-      text: t('permissionDialog.allowAlways')
-    });
-
-    const rejectBtn = buttonsEl.createEl('button', {
-      cls: 'opencodian-permission-inline-btn opencodian-permission-inline-reject',
-      text: t('permissionDialog.reject')
-    });
-
-    // Wait for user choice
-    const result = await new Promise<'once' | 'always' | 'reject'>((resolve) => {
-      onceBtn.addEventListener('click', () => resolve('once'));
-      alwaysBtn.addEventListener('click', () => resolve('always'));
-      rejectBtn.addEventListener('click', () => resolve('reject'));
-    });
-
-    // Remove the permission card entirely after selection
-    // The tool execution status will be shown by the tool call renderer
-    permissionCard.remove();
-
     // Send response to server
     try {
-      await this.plugin.openCodeService.respondToPermission(id, result);
+      await this.plugin.openCodeService.respondToPermission(request.id, result);
     } catch (error) {
       logger.error('Failed to respond to permission:', error);
       new Notice(t('permissionDialog.notice.error'));

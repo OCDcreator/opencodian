@@ -217,6 +217,7 @@ interface TabRuntimeState {
 - `AssistantShellRenderer.ts`：封装 assistant streaming shell 的创建、reveal 与 timestamp 收尾
 - `AssistantNoticeRenderer.ts`：封装 stream error / interrupted notice 构造与 placeholder notice 渲染
 - `StreamingInlineCardRenderer.ts`：封装 permission/question inline card 的共享插入位置与 shell reveal
+- `PermissionInlineCardRenderer.ts`：封装 permission inline card 的内容构造与按钮等待
 - `PendingIndicatorController.ts`：管理 delayed pending DOM
 - `SendPipelineTrace.ts`：维护 trace id、progress checkpoint 与调试快照
 - `sendPipelineContent.ts`：提供 streaming content 纯函数
@@ -330,7 +331,7 @@ model selector 现在拆成了几层协作：
 - `SendPipelineRuntime`：发送子系统总入口，负责真实 stream 调用、runtime 内部模块装配，以及向 `MessageFinalizationService` 交接
 - `StreamChunkRouter`：发送子系统内部的 stream loop / pending / timeout / chunk router
 - `StreamLocalFinalizer`：发送子系统内部的本地 shell finalization 与第一次本地保存
-- `AssistantShellRenderer` / `AssistantNoticeRenderer` / `StreamingInlineCardRenderer` / `SendPipelineTrace` / `PendingIndicatorController` / `buildLocalStreamOutcome` / `StreamShellFinalizer` / `LocalStreamMessagePersistence`：发送子系统更细粒度的内部协作模块
+- `AssistantShellRenderer` / `AssistantNoticeRenderer` / `StreamingInlineCardRenderer` / `PermissionInlineCardRenderer` / `SendPipelineTrace` / `PendingIndicatorController` / `buildLocalStreamOutcome` / `StreamShellFinalizer` / `LocalStreamMessagePersistence`：发送子系统更细粒度的内部协作模块
 - `MessageSendPreparationService`：`sendMessage()` 前半段的 send preflight、optimistic user message 落地，以及 stream-enter 状态编排
 - `MessageFinalizationService`：`sendMessage()` 末段的 final sync、post-sync patch/rerender、todo/save/attention 收尾编排
 - `TabManager` / `TabBar`：tab 生命周期和 tab 元数据
