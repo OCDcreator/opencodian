@@ -173,6 +173,13 @@ type TrailingAssistantPatchCompletionDebugFinalLogInputs = {
   payloadPlan: TrailingAssistantPatchCompletionDebugPayloadPlan;
 };
 
+type TrailingAssistantPatchCompletionDebugFinalLogPayload = {
+  tabId: TabId | null;
+  shouldStickToBottom: boolean;
+  previousTail: Record<string, unknown> | null;
+  nextTail: Record<string, unknown> | null;
+};
+
 type TrailingAssistantPatchNonMergeableTailFailurePlan = {
   reason: 'tail-message-not-mergeable-assistant';
   payload: {
@@ -1208,7 +1215,9 @@ export class ConversationRenderService {
         payloadPlan,
       );
     return this.buildTrailingAssistantPatchCompletionDebugFinalLogPlan(
-      finalLogInputs,
+      this.buildTrailingAssistantPatchCompletionDebugFinalLogPayload(
+        finalLogInputs,
+      ),
     );
   }
 
@@ -1223,14 +1232,20 @@ export class ConversationRenderService {
   }
 
   private buildTrailingAssistantPatchCompletionDebugFinalLogPlan(
-    inputs: TrailingAssistantPatchCompletionDebugFinalLogInputs,
+    payload: TrailingAssistantPatchCompletionDebugFinalLogPayload,
   ): TrailingAssistantPatchCompletionDebugLogPlan {
     return {
       label: 'patch-trailing-assistant-render-complete',
-      payload: {
-        tabId: inputs.tabId,
-        ...inputs.payloadPlan,
-      },
+      payload,
+    };
+  }
+
+  private buildTrailingAssistantPatchCompletionDebugFinalLogPayload(
+    inputs: TrailingAssistantPatchCompletionDebugFinalLogInputs,
+  ): TrailingAssistantPatchCompletionDebugFinalLogPayload {
+    return {
+      tabId: inputs.tabId,
+      ...inputs.payloadPlan,
     };
   }
 
