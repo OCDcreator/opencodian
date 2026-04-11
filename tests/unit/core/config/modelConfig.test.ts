@@ -52,11 +52,21 @@ describe('modelConfig helpers', () => {
   });
 
   it('preserves whitelist mode when toggling providers', () => {
-    const disabledOpenAi = setProviderEnabled(localConfig, 'openai', false, ['openai', 'anthropic']);
+    const disabledOpenAi = setProviderEnabled({
+      subset: localConfig,
+      providerId: 'openai',
+      enabled: false,
+      knownProviderIds: ['openai', 'anthropic'],
+    });
     expect(disabledOpenAi.enabled_providers).toEqual(['anthropic']);
     expect(disabledOpenAi.disabled_providers).toEqual(['anthropic']);
 
-    const reenabledAnthropic = setProviderEnabled(localConfig, 'anthropic', true, ['openai', 'anthropic']);
+    const reenabledAnthropic = setProviderEnabled({
+      subset: localConfig,
+      providerId: 'anthropic',
+      enabled: true,
+      knownProviderIds: ['openai', 'anthropic'],
+    });
     expect(reenabledAnthropic.enabled_providers).toEqual(['openai', 'anthropic']);
     expect(reenabledAnthropic.disabled_providers).toBeUndefined();
   });
@@ -81,24 +91,24 @@ describe('modelConfig helpers', () => {
       disabled_providers: ['alibaba', 'alibaba-cn'],
     };
 
-    const locallyEnabledAlibaba = setProviderEnabled(
-      {},
-      'alibaba',
-      true,
-      ['deepseek', 'alibaba', 'alibaba-cn'],
+    const locallyEnabledAlibaba = setProviderEnabled({
+      subset: {},
+      providerId: 'alibaba',
+      enabled: true,
+      knownProviderIds: ['deepseek', 'alibaba', 'alibaba-cn'],
       inherited,
-    );
+    });
     expect(locallyEnabledAlibaba).toEqual({
       disabled_providers: ['alibaba-cn'],
     });
 
-    const restored = setProviderEnabled(
-      locallyEnabledAlibaba,
-      'alibaba',
-      false,
-      ['deepseek', 'alibaba', 'alibaba-cn'],
+    const restored = setProviderEnabled({
+      subset: locallyEnabledAlibaba,
+      providerId: 'alibaba',
+      enabled: false,
+      knownProviderIds: ['deepseek', 'alibaba', 'alibaba-cn'],
       inherited,
-    );
+    });
     expect(restored).toEqual({});
   });
 
@@ -108,24 +118,24 @@ describe('modelConfig helpers', () => {
       disabled_providers: ['alibaba'],
     };
 
-    const locallyEnabledOpenAI = setProviderEnabled(
-      {},
-      'openai',
-      true,
-      ['deepseek', 'openai', 'alibaba'],
+    const locallyEnabledOpenAI = setProviderEnabled({
+      subset: {},
+      providerId: 'openai',
+      enabled: true,
+      knownProviderIds: ['deepseek', 'openai', 'alibaba'],
       inherited,
-    );
+    });
     expect(locallyEnabledOpenAI).toEqual({
       enabled_providers: ['deepseek', 'openai'],
     });
 
-    const restored = setProviderEnabled(
-      locallyEnabledOpenAI,
-      'openai',
-      false,
-      ['deepseek', 'openai', 'alibaba'],
+    const restored = setProviderEnabled({
+      subset: locallyEnabledOpenAI,
+      providerId: 'openai',
+      enabled: false,
+      knownProviderIds: ['deepseek', 'openai', 'alibaba'],
       inherited,
-    );
+    });
     expect(restored).toEqual({});
   });
 

@@ -1569,13 +1569,13 @@ export class ModelConfigModal extends Modal {
       if (!providerId) {
         continue;
       }
-      subset = setProviderEnabled(
+      subset = setProviderEnabled({
         subset,
         providerId,
-        provider.enabled,
-        providerIds,
-        this.serverConfigAtOpen,
-      );
+        enabled: provider.enabled,
+        knownProviderIds: providerIds,
+        inherited: this.serverConfigAtOpen,
+      });
     }
 
     return {

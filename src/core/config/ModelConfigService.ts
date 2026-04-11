@@ -197,13 +197,13 @@ export class ModelConfigService {
     );
     const runtimeModelCount = runtimeProvider?.models.length ?? 0;
     const catalogModelCount = serverProvider?.models.length ?? 0;
-    const testedModelId = this.selectProviderProbeModelId(
-      normalizedProviderId,
+    const testedModelId = this.selectProviderProbeModelId({
+      providerId: normalizedProviderId,
       localConfig,
       runtimeProvider,
       serverProvider,
-      serverState.server,
-    );
+      serverCatalog: serverState.server,
+    });
 
     let status: ProviderAvailabilityProbeStatus = 'missing';
     let sendTestAttempted = false;
@@ -590,24 +590,24 @@ export class ModelConfigService {
     return [...providerIds];
   }
 
-  private selectProviderProbeModelId(
-    providerId: string,
-    localConfig: OpencodeModelConfigSubset,
-    runtimeProvider: ModelCatalogProvider | undefined,
-    serverProvider: ModelCatalogProvider | undefined,
-    serverCatalog: ModelCatalog,
-  ): string | undefined {
-    const configuredDefault = parseModelReference(localConfig.model);
-    if (configuredDefault?.provider === providerId && configuredDefault.model) {
+  private selectProviderProbeModelId(options: {
+    providerId: string;
+    localConfig: OpencodeModelConfigSubset;
+    runtimeProvider: ModelCatalogProvider | undefined;
+    serverProvider: ModelCatalogProvider | undefined;
+    serverCatalog: ModelCatalog;
+  }): string | undefined {
+    const configuredDefault = parseModelReference(options.localConfig.model);
+    if (configuredDefault?.provider === options.providerId && configuredDefault.model) {
       return configuredDefault.model;
     }
 
-    const serverDefault = serverCatalog.defaults[providerId];
+    const serverDefault = options.serverCatalog.defaults[options.providerId];
     if (typeof serverDefault === 'string' && serverDefault.trim()) {
       return serverDefault.trim();
     }
 
-    for (const provider of [runtimeProvider, serverProvider]) {
+    for (const provider of [options.runtimeProvider, options.serverProvider]) {
       const modelId = provider?.models.find((model) => model.id.trim())?.id;
       if (modelId) {
         return modelId;

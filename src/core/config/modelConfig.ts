@@ -486,34 +486,34 @@ export function mergeProviderAvailabilityConfig(
   };
 }
 
-export function setProviderEnabled(
-  subset: OpencodeModelConfigSubset,
-  providerId: string,
-  enabled: boolean,
-  knownProviderIds: Iterable<string>,
-  inherited?: ProviderAvailabilityConfig | null,
-): OpencodeModelConfigSubset {
-  const trimmedProviderId = providerId.trim();
+export function setProviderEnabled(options: {
+  subset: OpencodeModelConfigSubset;
+  providerId: string;
+  enabled: boolean;
+  knownProviderIds: Iterable<string>;
+  inherited?: ProviderAvailabilityConfig | null;
+}): OpencodeModelConfigSubset {
+  const trimmedProviderId = options.providerId.trim();
   if (!trimmedProviderId) {
-    return cleanupModelConfig(subset);
+    return cleanupModelConfig(options.subset);
   }
 
-  const effective = mergeProviderAvailabilityConfig(inherited, subset);
+  const effective = mergeProviderAvailabilityConfig(options.inherited, options.subset);
   const next: OpencodeModelConfigSubset = {
-    ...subset,
+    ...options.subset,
   };
   const nextDisabledProviders = new Set(uniqueStrings(effective.disabled_providers ?? []));
   const useWhitelistMode = Array.isArray(effective.enabled_providers);
 
   if (useWhitelistMode) {
     const orderedKnownProviders = uniqueStrings([
-      ...Array.from(knownProviderIds),
+      ...Array.from(options.knownProviderIds),
       ...uniqueStrings(effective.enabled_providers ?? []),
       trimmedProviderId,
     ]);
     const nextEnabledProviders = new Set(uniqueStrings(effective.enabled_providers ?? []));
 
-    if (enabled) {
+    if (options.enabled) {
       nextEnabledProviders.add(trimmedProviderId);
       nextDisabledProviders.delete(trimmedProviderId);
     } else {
@@ -524,24 +524,29 @@ export function setProviderEnabled(
       next,
       'enabled_providers',
       orderedKnownProviders.filter((knownProviderId) => nextEnabledProviders.has(knownProviderId)),
-      inherited?.enabled_providers,
+      options.inherited?.enabled_providers,
     );
     setAvailabilityOverride(
       next,
       'disabled_providers',
       Array.from(nextDisabledProviders),
-      inherited?.disabled_providers,
+      options.inherited?.disabled_providers,
     );
     return cleanupModelConfig(next);
   }
 
-  if (enabled) {
+  if (options.enabled) {
     nextDisabledProviders.delete(trimmedProviderId);
   } else {
     nextDisabledProviders.add(trimmedProviderId);
   }
 
-  setAvailabilityOverride(next, 'disabled_providers', Array.from(nextDisabledProviders), inherited?.disabled_providers);
+  setAvailabilityOverride(
+    next,
+    'disabled_providers',
+    Array.from(nextDisabledProviders),
+    options.inherited?.disabled_providers,
+  );
   return cleanupModelConfig(next);
 }
 

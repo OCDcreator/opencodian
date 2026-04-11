@@ -17,13 +17,13 @@ export async function finalizeStreamingShell(options: {
   }
 
   if (outcome.hasStreamContentBlocks) {
-    host.addTimestampWithCopyButton(
+    host.addTimestampWithCopyButton({
       messageEl,
-      outcome.finalizedTimestamp,
-      outcome.streamedTextContent.trim() || undefined,
-      outcome.finalizedModelId,
-      outcome.shouldPersistInterruptedState ? t('chat.stream.interruptedBadge') : undefined,
-    );
+      timestamp: outcome.finalizedTimestamp,
+      content: outcome.streamedTextContent.trim() || undefined,
+      modelId: outcome.finalizedModelId,
+      statusLabel: outcome.shouldPersistInterruptedState ? t('chat.stream.interruptedBadge') : undefined,
+    });
     return 'timestamp-added';
   }
 

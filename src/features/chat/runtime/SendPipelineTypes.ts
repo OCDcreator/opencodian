@@ -113,13 +113,13 @@ export interface SendPipelineHost {
     noticeMessage: ChatMessage,
     reason?: string,
   ): Promise<void>;
-  addTimestampWithCopyButton(
-    messageEl: HTMLElement,
-    timestamp: number,
-    content?: string,
-    modelId?: string,
-    statusLabel?: string,
-  ): void;
+  addTimestampWithCopyButton(options: {
+    messageEl: HTMLElement;
+    timestamp: number;
+    content?: string;
+    modelId?: string;
+    statusLabel?: string;
+  }): void;
   finalizeBackgroundTaskIndicatorAfterPrimaryStream(tabId: TabId | null): Promise<void>;
   removeEmptyAssistantShells(): void;
   syncTabStreamLikeState(tabId: TabId | null): void;

@@ -101,20 +101,20 @@ function looksLikeOpencodeExternalToolName(name: string): boolean {
   return OPENCODE_EXTERNAL_NAME_PATTERN.test(name);
 }
 
-function createIdentity(
-  rawName: string,
-  normalizedName: string,
-  kind: ToolIdentityKind,
-  icon: string,
-  displayName?: string,
-): ToolIdentity {
+function createIdentity(options: {
+  rawName: string;
+  normalizedName: string;
+  kind: ToolIdentityKind;
+  icon: string;
+  displayName?: string;
+}): ToolIdentity {
   return {
-    rawName,
-    normalizedName,
-    kind,
-    icon,
-    displayName: displayName ?? rawName,
-    isMcp: kind === 'mcp',
+    rawName: options.rawName,
+    normalizedName: options.normalizedName,
+    kind: options.kind,
+    icon: options.icon,
+    displayName: options.displayName ?? options.rawName,
+    isMcp: options.kind === 'mcp',
   };
 }
 
@@ -122,11 +122,22 @@ export function getToolIdentity(name: string, options: ToolIdentityOptions = {})
   const rawName = typeof name === 'string' && name.trim() ? name.trim() : 'tool';
   const builtin = BUILTIN_TOOL_DEFINITIONS[canonicalizeToolName(rawName)];
   if (builtin) {
-    return createIdentity(rawName, builtin.normalizedName, builtin.kind, builtin.icon, builtin.displayName);
+    return createIdentity({
+      rawName,
+      normalizedName: builtin.normalizedName,
+      kind: builtin.kind,
+      icon: builtin.icon,
+      displayName: builtin.displayName,
+    });
   }
 
   if (looksLikeClaudianMcpToolName(rawName)) {
-    return createIdentity(rawName, rawName, 'mcp', MCP_TOOL_ICON_ID);
+    return createIdentity({
+      rawName,
+      normalizedName: rawName,
+      kind: 'mcp',
+      icon: MCP_TOOL_ICON_ID,
+    });
   }
 
   const registryTools = normalizeKnownToolNames(options.registryTools);
@@ -134,22 +145,47 @@ export function getToolIdentity(name: string, options: ToolIdentityOptions = {})
   const observedExternalTools = normalizeKnownToolNames(options.observedExternalTools);
 
   if (registryTools.has(rawName)) {
-    return createIdentity(rawName, rawName, 'custom', 'layers');
+    return createIdentity({
+      rawName,
+      normalizedName: rawName,
+      kind: 'custom',
+      icon: 'layers',
+    });
   }
 
   if (knownMcpTools.has(rawName)) {
-    return createIdentity(rawName, rawName, 'mcp', MCP_TOOL_ICON_ID);
+    return createIdentity({
+      rawName,
+      normalizedName: rawName,
+      kind: 'mcp',
+      icon: MCP_TOOL_ICON_ID,
+    });
   }
 
   if (observedExternalTools.has(rawName)) {
-    return createIdentity(rawName, rawName, 'mcp', MCP_TOOL_ICON_ID);
+    return createIdentity({
+      rawName,
+      normalizedName: rawName,
+      kind: 'mcp',
+      icon: MCP_TOOL_ICON_ID,
+    });
   }
 
   if (options.source === 'opencode' && looksLikeOpencodeExternalToolName(rawName)) {
-    return createIdentity(rawName, rawName, 'custom', 'layers');
+    return createIdentity({
+      rawName,
+      normalizedName: rawName,
+      kind: 'custom',
+      icon: 'layers',
+    });
   }
 
-  return createIdentity(rawName, rawName, 'unknown', 'wrench');
+  return createIdentity({
+    rawName,
+    normalizedName: rawName,
+    kind: 'unknown',
+    icon: 'wrench',
+  });
 }
 
 export function getNormalizedToolName(name: string): string {

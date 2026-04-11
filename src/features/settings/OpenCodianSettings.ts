@@ -1099,13 +1099,13 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         ]));
         let nextConfig = currentConfig;
         for (const providerId of normalizedProviderIds) {
-          nextConfig = setProviderEnabled(
-            nextConfig,
+          nextConfig = setProviderEnabled({
+            subset: nextConfig,
             providerId,
             enabled,
             knownProviderIds,
-            catalogs?.serverConfig,
-          );
+            inherited: catalogs?.serverConfig,
+          });
         }
         await modelConfigService.writeLocalModelConfig(nextConfig);
         await refreshModelSettings({ forceViewReload: true });
@@ -1600,13 +1600,13 @@ export class OpenCodianSettingTab extends PluginSettingTab {
                 ...collectConfiguredProviderIds(currentConfig),
                 provider.id,
               ]));
-              const nextConfig = setProviderEnabled(
-                currentConfig,
-                provider.id,
-                requestedEnabled,
+              const nextConfig = setProviderEnabled({
+                subset: currentConfig,
+                providerId: provider.id,
+                enabled: requestedEnabled,
                 knownProviderIds,
-                catalogs?.serverConfig,
-              );
+                inherited: catalogs?.serverConfig,
+              });
               await modelConfigService.writeLocalModelConfig(nextConfig);
               await refreshModelSettings({ forceViewReload: true });
               await refreshIconCacheOverview();

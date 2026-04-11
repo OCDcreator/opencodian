@@ -20,6 +20,12 @@ const { spawn: mockSpawn } = jest.requireMock('child_process') as {
   spawn: jest.Mock;
 };
 
+type ServerManagerTestAccess = ServerManager & {
+  getSpawnEnv(): NodeJS.ProcessEnv;
+  findOpenCodeBinary(): string | null;
+  spawnServer(): Promise<void>;
+};
+
 // Mock child_process
 jest.mock('child_process', () => ({
   spawn: jest.fn().mockReturnValue({
@@ -64,6 +70,8 @@ describe('ServerManager', () => {
     modelSourceMode: 'merge' as const,
     pluginIsolationMode: 'default' as const,
   };
+
+  const getTestAccess = (): ServerManagerTestAccess => manager as unknown as ServerManagerTestAccess;
 
   beforeEach(() => {
     process.env = { ...originalEnv };
@@ -194,7 +202,7 @@ describe('ServerManager', () => {
       );
 
       manager.setWorkingDirectory(testVaultPath);
-      const env = (manager as any).getSpawnEnv() as NodeJS.ProcessEnv;
+      const env = getTestAccess().getSpawnEnv();
 
       expect(env.OPENCODE_DISABLE_PROJECT_CONFIG).toBeUndefined();
       expect(env.OPENCODE_CONFIG_DIR).toBeUndefined();
@@ -223,7 +231,7 @@ describe('ServerManager', () => {
       );
 
       manager.setWorkingDirectory(testVaultPath);
-      const env = (manager as any).getSpawnEnv() as NodeJS.ProcessEnv;
+      const env = getTestAccess().getSpawnEnv();
 
       expect(env.OPENCODE_DISABLE_PROJECT_CONFIG).toBeUndefined();
       expect(env.OPENCODE_CONFIG_DIR).toBeUndefined();
@@ -242,7 +250,7 @@ describe('ServerManager', () => {
         modelSourceMode: 'local',
       });
 
-      const env = (manager as any).getSpawnEnv() as NodeJS.ProcessEnv;
+      const env = getTestAccess().getSpawnEnv();
 
       expect(env.OPENCODE_CONFIG).toBeUndefined();
       expect(env.OPENCODE_TUI_CONFIG).toBeUndefined();
@@ -265,7 +273,7 @@ describe('ServerManager', () => {
         pluginIsolationMode: 'pure',
       });
 
-      const env = (manager as any).getSpawnEnv() as NodeJS.ProcessEnv;
+      const env = getTestAccess().getSpawnEnv();
 
       expect(env.OPENCODE_PURE).toBe('true');
     });
@@ -460,7 +468,7 @@ describe('ServerManager', () => {
         process.env.LOCALAPPDATA = path.join(testVaultPath, 'LocalAppData');
         process.env.PATH = pathBinDir;
 
-        const resolved = (manager as any).findOpenCodeBinary() as string | null;
+        const resolved = getTestAccess().findOpenCodeBinary();
 
         expect(resolved).toBe(npmBinary);
       });
@@ -478,7 +486,7 @@ describe('ServerManager', () => {
       delete process.env.LOCALAPPDATA;
       process.env.PATH = pathBinDir;
 
-      const resolved = (manager as any).findOpenCodeBinary() as string | null;
+      const resolved = getTestAccess().findOpenCodeBinary();
 
       expect(resolved).toBe(binaryPath);
     });
@@ -494,7 +502,7 @@ describe('ServerManager', () => {
         process.env.LOCALAPPDATA = path.join(testVaultPath, 'LocalAppData');
         process.env.PATH = '';
 
-        await (manager as any).spawnServer();
+        await getTestAccess().spawnServer();
 
         expect(mockSpawn).toHaveBeenCalledWith(
           npmBinary,

@@ -1,4 +1,4 @@
-import { type CollapsibleState,setupCollapsible } from '../../../../src/features/chat/rendering/collapsible';
+import { type CollapsibleState, setupCollapsible } from '../../../../src/features/chat/rendering/collapsible';
 
 describe('setupCollapsible', () => {
   const labels = {
@@ -19,7 +19,13 @@ describe('setupCollapsible', () => {
     Object.defineProperty(contentEl, 'scrollHeight', { configurable: true, value: 120 });
 
     const state: CollapsibleState = { isExpanded: false, isCollapsible: false };
-    setupCollapsible(wrapperEl, headerEl, contentEl, state, labels);
+    setupCollapsible({
+      wrapperEl,
+      headerEl,
+      contentEl,
+      state,
+      options: labels,
+    });
 
     expect(state.isCollapsible).toBe(false);
     expect(headerEl.hidden).toBe(true);
@@ -31,7 +37,13 @@ describe('setupCollapsible', () => {
     Object.defineProperty(contentEl, 'scrollHeight', { configurable: true, value: 320 });
 
     const state: CollapsibleState = { isExpanded: false, isCollapsible: false };
-    setupCollapsible(wrapperEl, headerEl, contentEl, state, labels);
+    setupCollapsible({
+      wrapperEl,
+      headerEl,
+      contentEl,
+      state,
+      options: labels,
+    });
 
     expect(state.isCollapsible).toBe(true);
     expect(wrapperEl.classList.contains('is-collapsed')).toBe(true);
@@ -51,7 +63,13 @@ describe('setupCollapsible', () => {
     Object.defineProperty(contentEl, 'scrollHeight', { configurable: true, value: 320 });
 
     const state: CollapsibleState = { isExpanded: false, isCollapsible: false };
-    setupCollapsible(wrapperEl, headerEl, contentEl, state, labels);
+    setupCollapsible({
+      wrapperEl,
+      headerEl,
+      contentEl,
+      state,
+      options: labels,
+    });
 
     headerEl.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
     expect(state.isExpanded).toBe(true);

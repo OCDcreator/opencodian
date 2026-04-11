@@ -10,16 +10,25 @@ export interface CollapsibleOptions {
   showLessLabel?: string;
 }
 
+export interface SetupCollapsibleOptions {
+  wrapperEl: HTMLElement;
+  headerEl: HTMLElement;
+  contentEl: HTMLElement;
+  state: CollapsibleState;
+  options?: CollapsibleOptions;
+}
+
 const DEFAULT_COLLAPSED_HEIGHT = 168;
 const DEFAULT_MIN_OVERFLOW = 24;
 
-export function setupCollapsible(
-  wrapperEl: HTMLElement,
-  headerEl: HTMLElement,
-  contentEl: HTMLElement,
-  state: CollapsibleState,
-  options: CollapsibleOptions = {},
-): void {
+export function setupCollapsible(setup: SetupCollapsibleOptions): void {
+  const {
+    wrapperEl,
+    headerEl,
+    contentEl,
+    state,
+    options = {},
+  } = setup;
   const collapsedHeight = options.collapsedHeight ?? DEFAULT_COLLAPSED_HEIGHT;
   const minOverflow = options.minOverflow ?? DEFAULT_MIN_OVERFLOW;
   const showMoreLabel = options.showMoreLabel ?? 'Show more';

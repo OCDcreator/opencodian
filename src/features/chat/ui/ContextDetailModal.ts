@@ -16,13 +16,24 @@ export class ContextDetailModal extends Modal {
 
   constructor(
     app: App,
-    private readonly conversation: Conversation | null,
-    private readonly contextState: TabContextState | null,
-    private readonly systemPrompt?: string | null,
-    private readonly rawMessageLoader?: () => Promise<ContextRawMessageItem[]>,
+    options: {
+      conversation: Conversation | null;
+      contextState: TabContextState | null;
+      systemPrompt?: string | null;
+      rawMessageLoader?: () => Promise<ContextRawMessageItem[]>;
+    },
   ) {
     super(app);
+    this.conversation = options.conversation;
+    this.contextState = options.contextState;
+    this.systemPrompt = options.systemPrompt;
+    this.rawMessageLoader = options.rawMessageLoader;
   }
+
+  private readonly conversation: Conversation | null;
+  private readonly contextState: TabContextState | null;
+  private readonly systemPrompt?: string | null;
+  private readonly rawMessageLoader?: () => Promise<ContextRawMessageItem[]>;
 
   onOpen(): void {
     this.isClosed = false;

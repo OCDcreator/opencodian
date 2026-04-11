@@ -13,6 +13,23 @@ import { createLogger } from '../../shared';
 
 const logger = createLogger('OpencodeConfigModal');
 
+interface AppWithPluginRegistry extends App {
+  plugins?: {
+    plugins?: Record<string, {
+      openCodeService?: {
+        checkHealth(): Promise<boolean>;
+        stop(): Promise<void>;
+        start(): Promise<void>;
+      };
+      settings?: {
+        server?: {
+          mode?: string;
+        };
+      };
+    }>;
+  };
+}
+
 export class OpencodeConfigModal extends Modal {
   private configManager: OpencodeConfigManager;
   private config: OpencodeConfig;
@@ -238,7 +255,7 @@ export class OpencodeConfigModal extends Modal {
       // Restart service
       try {
         // Access the plugin's OpenCode service
-        const plugin = (this.app as any).plugins?.plugins?.['opencodian'];
+        const plugin = (this.app as AppWithPluginRegistry).plugins?.plugins?.opencodian;
         if (plugin?.openCodeService) {
           if (plugin.settings?.server?.mode !== 'local') {
             new Notice(t('settings.server.remoteManageUnavailable'));
