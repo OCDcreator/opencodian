@@ -83,8 +83,8 @@ export class ConversationRenderService {
 - `successPlan` 也会把 turn-body scope 切换/恢复依赖的 runtime 与目标节点预计算成 `turnBodyScopePlan`，让 `withTrailingAssistantTurnBodyScope()` 不再回读 preflight verdict 或零散 DOM 字段
 - patch 执行期间对 render runtime 的 `currentTurnBodyEl` 暂时切换与恢复，也由独立 scope helper 收口，避免主流程继续承载 DOM 上下文细节
 - 真正执行 patch 时，assistant 正文签名比较与“只 finalize footer / 重渲正文 content”分支也由独立 helper 收口
-- patch 成功后的 completion debug 日志现在仍会先收束 logging context、planning context 与 `payloadPlan`，但对称的 final-log contract / inputs / payload 末端装配已迁到独立的 `TrailingAssistantPatchDebugLogHelper`；因此 `buildTrailingAssistantPatchCompletionDebugFinalLogPlanFromLogPlanningContext()` 现在只再把固定 label、`tabId` 与 ready `payloadPlan` 交给共享 helper，`logTrailingAssistantPatchCompletionDebug()` 继续保持单纯的 “logging context → log plan → host logger” 路径
-- patch skipped 分支也沿用同一条共享末端路径：它仍先通过独立 planning / logging / count / payload helpers 得到 ready `payloadPlan`，随后只把固定 skipped label、`tabId` 与 ready `payloadPlan` 交给 `TrailingAssistantPatchDebugLogHelper` 完成 final-log contract / inputs / payload 装配，让 `ConversationRenderService` 不再重复维护 completion / skipped 两套对称的 final-log helper
+- patch 成功后的 completion debug 日志现在会把共享的 “logging context → planning context → payloadPlan → final log plan” 骨架交给独立的 `TrailingAssistantPatchDebugLogCoordinator`；service 只保留 completion 分支自己的 payload-inputs / payload-plan 细节，而 final-log contract / inputs / payload 末端装配继续复用 `TrailingAssistantPatchDebugLogHelper`
+- patch skipped 分支也沿用同一条共享 coordinator：它仍通过独立 planning / logging / count / payload helpers 准备 skipped 分支自己的 payload inputs，但顶层 log planning-context 与 final-log plan 编排已经迁到 `TrailingAssistantPatchDebugLogCoordinator`，让 `ConversationRenderService` 不再重复维护 completion / skipped 两套对称的日志协调链
 - assistant 正文签名不变时复用已有正文，只重做 persisted footer 收尾
 - patch 成功后的 message dataset 刷新、动画禁用与按需 scroll-to-bottom，现会先预计算成更窄的 `tailStatePlan` 再交给 tail-apply helper，避免这些副作用继续读取整份 `successPlan`
 - assistant 正文签名计算、正文重渲和 footer finalization 现在统一通过 `host.assistantTailRender` 这组更小的 port 完成
