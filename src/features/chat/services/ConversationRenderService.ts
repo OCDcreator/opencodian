@@ -212,6 +212,13 @@ type TrailingAssistantPatchExecutionTailPlanningContext = {
   shouldStickToBottom: boolean;
 };
 
+type TrailingAssistantPatchTailOutcomeInputs = {
+  previousTailMessage: ChatMessage;
+  nextTailMessage: ChatMessage;
+  messageEl: HTMLElement;
+  shouldStickToBottom: boolean;
+};
+
 type TrailingAssistantPatchTailOutcomePlanningContext = {
   previousTailMessage: ChatMessage;
   nextTailMessage: ChatMessage;
@@ -826,18 +833,31 @@ export class ConversationRenderService {
     planningContext: TrailingAssistantPatchExecutionTailPlanningContext,
   ): TrailingAssistantPatchTailOutcomePlans {
     return this.buildTrailingAssistantPatchTailOutcomePlans(
-      this.buildTrailingAssistantPatchTailOutcomePlanningContext(planningContext),
+      this.buildTrailingAssistantPatchTailOutcomePlanningContext(
+        this.buildTrailingAssistantPatchTailOutcomeInputs(planningContext),
+      ),
     );
   }
 
-  private buildTrailingAssistantPatchTailOutcomePlanningContext(
+  private buildTrailingAssistantPatchTailOutcomeInputs(
     planningContext: TrailingAssistantPatchExecutionTailPlanningContext,
-  ): TrailingAssistantPatchTailOutcomePlanningContext {
+  ): TrailingAssistantPatchTailOutcomeInputs {
     return {
       previousTailMessage: planningContext.previousTailMessage,
       nextTailMessage: planningContext.nextTailMessage,
       messageEl: planningContext.patchTarget.messageEl,
       shouldStickToBottom: planningContext.shouldStickToBottom,
+    };
+  }
+
+  private buildTrailingAssistantPatchTailOutcomePlanningContext(
+    inputs: TrailingAssistantPatchTailOutcomeInputs,
+  ): TrailingAssistantPatchTailOutcomePlanningContext {
+    return {
+      previousTailMessage: inputs.previousTailMessage,
+      nextTailMessage: inputs.nextTailMessage,
+      messageEl: inputs.messageEl,
+      shouldStickToBottom: inputs.shouldStickToBottom,
     };
   }
 
