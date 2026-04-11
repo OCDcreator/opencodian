@@ -124,7 +124,7 @@ interface TabRuntimeState {
 
 ### 对话装载与后台同步
 
-`loadConversation()` 会：
+`loadConversation()` 的装载编排现在先交给 `services/ConversationViewStateService.ts`，再通过 host 回调落回 view 内部能力。主链路仍然保持原来的语义：
 
 - 在切换对话时取消旧对话的标题生成
 - 清空当前消息区并重置 turn 状态
@@ -272,6 +272,7 @@ provider header 的 stuck 状态同步已转移到 `ui/modelSelectorStickyHeader
 ## 直接协作模块
 
 - `OpenCodeService`：会话 CRUD、发送、stream、同步、question、todo、status、context usage
+- `ConversationViewStateService`：tab 初始化、persisted restore、tab 激活和 conversation hydration 装载编排
 - `TabManager` / `TabBar`：tab 生命周期和 tab 元数据
 - `MarkdownRenderService`：Markdown 渲染
 - `StreamController`：流式 assistant DOM 更新

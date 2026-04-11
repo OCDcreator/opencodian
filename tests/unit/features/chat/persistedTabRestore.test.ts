@@ -5,6 +5,7 @@ jest.mock('../../../../src/core/opencode', () => ({
 }));
 
 import { OpenCodianView } from '../../../../src/features/chat/OpenCodianView';
+import { ConversationViewStateService } from '../../../../src/features/chat/services/ConversationViewStateService';
 import { TabManager } from '../../../../src/features/chat/tabs/TabManager';
 
 function createConversation(id: string, title: string) {
@@ -34,11 +35,18 @@ function createView(overrides: Record<string, unknown> = {}): OpenCodianView {
     storage: {},
     loadConversations: jest.fn().mockResolvedValue(undefined),
     getConversations: jest.fn().mockReturnValue([]),
+    getConversationById: jest.fn().mockResolvedValue(null),
     createConversation: jest.fn(),
     scheduleSettingsUiStateSave: jest.fn(),
     saveSettingsUiStateImmediately: jest.fn().mockResolvedValue(undefined),
     ...overrides,
   } as never);
+}
+
+function getConversationViewStateService(view: OpenCodianView): ConversationViewStateService {
+  return (view as unknown as {
+    conversationViewStateService: ConversationViewStateService;
+  }).conversationViewStateService;
 }
 
 describe('OpenCodianView persisted tab restore', () => {
@@ -57,8 +65,9 @@ describe('OpenCodianView persisted tab restore', () => {
       getMaxTabs: () => 4,
     });
 
-    const restoreSpy = jest.spyOn(view, 'restorePersistedTabs').mockReturnValue('restored-tab');
-    const activateSpy = jest.spyOn(view, 'activateTab').mockResolvedValue(undefined);
+    const service = getConversationViewStateService(view);
+    const restoreSpy = jest.spyOn(service, 'restorePersistedTabs').mockReturnValue('restored-tab');
+    const activateSpy = jest.spyOn(service, 'activateTab').mockResolvedValue(undefined);
 
     await view.initializeFirstTab();
 
@@ -68,6 +77,59 @@ describe('OpenCodianView persisted tab restore', () => {
     expect(plugin.loadConversations.mock.invocationCallOrder[0]).toBeLessThan(
       restoreSpy.mock.invocationCallOrder[0]!,
     );
+  });
+
+  it('reuses the first existing conversation when no persisted tabs are available', async () => {
+    const conversation = createConversation('conv-existing', 'Existing chat');
+    const view = createView({
+      getConversations: jest.fn().mockReturnValue([conversation]),
+    }) as OpenCodianView & {
+      tabManager: TabManager | null;
+      initializeFirstTab: () => Promise<void>;
+      activateTab: (tabId: string) => Promise<void>;
+    };
+
+    view.tabManager = new TabManager('New chat', {
+      getMaxTabs: () => 4,
+    });
+
+    const service = getConversationViewStateService(view);
+    const activateSpy = jest.spyOn(service, 'activateTab').mockResolvedValue(undefined);
+
+    await view.initializeFirstTab();
+
+    const tabs = view.tabManager.getAllTabs();
+    expect(tabs).toHaveLength(1);
+    expect(tabs[0]?.conversationId).toBe(conversation.id);
+    expect(activateSpy).toHaveBeenCalledWith(tabs[0]!.id);
+  });
+
+  it('creates a new conversation when the first open has no persisted tabs or existing conversations', async () => {
+    const createdConversation = createConversation('conv-created', 'Created chat');
+    const plugin = {
+      getConversations: jest.fn().mockReturnValue([]),
+      createConversation: jest.fn().mockResolvedValue(createdConversation),
+    };
+    const view = createView(plugin) as OpenCodianView & {
+      tabManager: TabManager | null;
+      initializeFirstTab: () => Promise<void>;
+      activateTab: (tabId: string) => Promise<void>;
+    };
+
+    view.tabManager = new TabManager('New chat', {
+      getMaxTabs: () => 4,
+    });
+
+    const service = getConversationViewStateService(view);
+    const activateSpy = jest.spyOn(service, 'activateTab').mockResolvedValue(undefined);
+
+    await view.initializeFirstTab();
+
+    const tabs = view.tabManager.getAllTabs();
+    expect(plugin.createConversation).toHaveBeenCalledTimes(1);
+    expect(tabs).toHaveLength(1);
+    expect(tabs[0]?.conversationId).toBe(createdConversation.id);
+    expect(activateSpy).toHaveBeenCalledWith(tabs[0]!.id);
   });
 
   it('restores per-tab model overrides without leaking them across tab activation', () => {

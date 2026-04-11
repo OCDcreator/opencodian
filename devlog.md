@@ -12,6 +12,43 @@
 
 ---
 
+## 2026-04-11 可维护性第二阶段装载编排提取与第三阶段交接
+
+### 🎯 改动目标
+
+- 沿着第一阶段已建立的 helper / 测试边界，继续拆分 `src/features/chat/OpenCodianView.ts`
+- 优先抽出 tab / conversation 装载编排，不触碰 model selector 和消息区重渲的大块逻辑
+- 为下一会话准备第三阶段交接文档和可直接复制的启动提示词
+
+### ✅ 本轮调整
+
+- `src/features/chat/services/ConversationViewStateService.ts`
+- `src/features/chat/OpenCodianView.ts`
+  - 新增 `ConversationViewStateService`，承接 `initializeFirstTab()`、`restorePersistedTabs()`、`activateTab()`、`loadConversation()` 的装载编排
+  - `OpenCodianView` 通过 host 回调向 service 暴露 tab / conversation / hydration / render / session refresh 能力
+  - 保留 view 内与 UI 紧耦合的 streaming tab 激活、空 tab 激活、切换前清理 helper，避免把 service 做成第二个巨型类
+  - conversation 装载链路继续复用 `ScrollManager`，不回退滚动恢复语义
+
+- `tests/unit/features/chat/ConversationViewStateService.test.ts`
+- `tests/unit/features/chat/persistedTabRestore.test.ts`
+  - 新增 service 单测，覆盖 streaming tab 快路径、普通 tab preserve-scroll 装载、空 tab 分支，以及 hydration + scroll restore
+  - 扩展 persisted tab restore 测试，补上无 persisted tabs 时复用首个 conversation / 创建新 conversation 的路径
+
+- `docs/modules/features/chat/OpenCodianView.md`
+- `docs/modules/features/chat/services/ConversationViewStateService.md`
+- `docs/status/maintainability-phase-2.md`
+  - 更新 `OpenCodianView` 模块文档，说明 tab / conversation 装载编排已迁出
+  - 新增 `ConversationViewStateService` 模块文档
+  - 新增第二阶段总结与第三阶段实施说明，并在文末附上可直接复制的新会话提示词
+
+### 🧪 验证结果
+
+- `npm run lint` 通过
+- `npm run typecheck` 通过
+- `npm run test` 通过（69 个 test suites，566 个 tests）
+- `npm run build` 通过
+- 已部署到 Test Vault，并校验 `BUILD_ID = main.202604111257`
+
 ## 2026-04-11 可维护性第一阶段护栏与第二阶段交接
 
 ### 🎯 改动目标

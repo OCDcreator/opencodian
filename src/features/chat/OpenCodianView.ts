@@ -96,13 +96,17 @@ import { buildMessageRenderGroups, mergeAssistantMessagesForRender } from './ren
 import { type CollapsibleState, setupCollapsible } from './rendering/collapsible';
 import { ContextUsageService } from './services/ContextUsageService';
 import {
+  type ConversationViewStateHost,
+  ConversationViewStateService,
+} from './services/ConversationViewStateService';
+import {
   captureElementScrollRestoreSnapshot,
   isElementNearBottom,
   restoreElementScrollAfterRender,
   scrollElementToBottom,
 } from './services/ScrollManager';
 import { TitleGenerationService } from './services/TitleGenerationService';
-import { type RestoredTabState, TabBar, type TabBarLayoutMode, type TabId, TabManager } from './tabs';
+import { TabBar, type TabBarLayoutMode, type TabId, TabManager } from './tabs';
 import { ContextDetailModal, type ContextRawMessageItem } from './ui/ContextDetailModal';
 import {
   chooseContextFile,
@@ -631,6 +635,7 @@ export class OpenCodianView extends ItemView {
   private chatAppearanceStyleEl: HTMLStyleElement | null = null;
   private themeBackgroundRequestId = 0;
   private titleGenerationService: TitleGenerationService;
+  private conversationViewStateService: ConversationViewStateService;
   private conversationSyncIntervalId: number | null = null;
   private omoBackgroundTaskLogStates = new Map<string, OmoBackgroundTaskLogState>();
   private disposeSessionTodoSubscription: (() => void) | null = null;
@@ -2096,6 +2101,149 @@ export class OpenCodianView extends ItemView {
     this.currentEffortLevel = this.plugin.settings.effortLevel;
     this.currentThinkingBudget = this.plugin.settings.thinkingBudget;
     this.titleGenerationService = new TitleGenerationService(this.plugin);
+    this.conversationViewStateService = new ConversationViewStateService(this.createConversationViewStateHost());
+  }
+
+  private createConversationViewStateHost(): ConversationViewStateHost {
+    return {
+      getTabManager: () => this.tabManager,
+      getPersistedTabState: () => this.plugin.settings.tabState,
+      resetPersistedTabState: () => {
+        this.plugin.settings.tabState = getDefaultPersistedTabState();
+      },
+      persistTabState: (options) => {
+        this.persistTabState(options);
+      },
+      loadConversations: () => this.plugin.loadConversations(),
+      getConversations: () => this.plugin.getConversations(),
+      createConversation: () => this.plugin.createConversation(),
+      getConversationById: async (id) => (await this.plugin.getConversationById(id)) ?? null,
+      setActiveMessagesPane: (tabId) => {
+        this.setActiveMessagesPane(tabId);
+      },
+      refreshActiveFocusContextPreview: () => {
+        this.refreshActiveFocusContextPreview();
+      },
+      renderQuestionDock: () => {
+        this.renderQuestionDock();
+      },
+      updateSessionTodoDockForTab: (tabId) => {
+        this.updateSessionTodoDockForTab(tabId);
+      },
+      applyStreamingConversationActivation: (tabId, conversation) =>
+        this.applyStreamingConversationActivation(tabId, conversation),
+      applyEmptyTabActivation: (tabId) => {
+        this.applyEmptyTabActivation(tabId);
+      },
+      prepareConversationTransition: (nextConversationId) =>
+        this.prepareConversationTransition(nextConversationId),
+      setCurrentConversation: (conversation) => {
+        this.currentConversation = conversation;
+      },
+      clearCurrentConversationRevertState: () => {
+        this.currentConversationRevertState = null;
+      },
+      setCurrentConversationRevertState: (revertState) => {
+        this.currentConversationRevertState = revertState;
+      },
+      setActiveTabConversation: (conversation) => {
+        this.tabManager?.setActiveTabConversation(conversation);
+      },
+      getMessagesContainer: () => this.messagesContainer,
+      getActiveTabId: () => this.getActiveTabId(),
+      getSessionIdForTab: (tabId) => this.getSessionIdForTab(tabId),
+      getScrollRuntimeForTab: (tabId) => this.getTabRuntimeState(tabId),
+      clearScheduledScrollToBottom: () => {
+        this.clearScheduledScrollToBottom();
+      },
+      beginConversationHydration: (tabId) => {
+        this.beginConversationHydration(tabId);
+      },
+      clearMessagesContainer: () => {
+        this.messagesContainer?.empty();
+      },
+      resetTurnState: () => {
+        this.resetTurnState();
+      },
+      setOpenCodeSessionId: (sessionId) => {
+        this.plugin.openCodeService.setSessionId(sessionId);
+      },
+      clearPendingQuestionsForTab: (tabId) => {
+        this.clearPendingQuestionsForTab(tabId);
+      },
+      setTabSessionTodos: (tabId, todos, sessionId) => {
+        this.setTabSessionTodos(tabId, todos, sessionId);
+      },
+      setTabSessionStatus: (tabId, status, sessionId) => {
+        this.setTabSessionStatus(tabId, status, sessionId);
+      },
+      resetBackgroundTaskSuppressedFingerprint: (tabId) => {
+        const runtime = this.getTabRuntimeState(tabId);
+        if (runtime) {
+          runtime.backgroundTaskSuppressedFingerprint = null;
+        }
+      },
+      shouldSyncConversationFromServer: (conversation, options) => {
+        const shouldSyncInterrupted = !this.hasInterruptedLocalAssistantTail(conversation.messages)
+          && conversation.messages.some((message) =>
+            message.displayStyle !== 'notice'
+            && !message.sourceMessageId
+          );
+        return Boolean(
+          options.forceServerSync
+          || !conversation.messages
+          || conversation.messages.length === 0
+          || shouldSyncInterrupted,
+        );
+      },
+      syncConversationMessagesFromServer: async (conversation, tabId, reason) => {
+        const syncResult = await this.syncConversationMessagesFromServer(conversation, tabId, reason);
+        return {
+          messages: syncResult.messages,
+          revertState: syncResult.revertState,
+        };
+      },
+      syncBackgroundTaskStateFromConversation: (conversation) => {
+        this.syncBackgroundTaskStateFromConversation(conversation);
+      },
+      renderMessages: (messages) => this.renderMessages(messages),
+      renderBackgroundTaskIndicatorIfNeeded: (tabId) => this.renderBackgroundTaskIndicatorIfNeeded(tabId),
+      renderSessionTodoDock: (tabId) => {
+        this.renderSessionTodoDock(tabId);
+      },
+      refreshTabSessionStatus: (tabId, sessionId, options) =>
+        this.refreshTabSessionStatus(tabId, sessionId ?? undefined, options),
+      refreshPendingQuestionsForTab: (tabId, sessionId) =>
+        this.refreshPendingQuestionsForTab(tabId, sessionId ?? undefined),
+      refreshActiveSessionTodos: (options) => this.refreshActiveSessionTodos(options),
+      getConversationSyncFingerprint: (messages) => this.getConversationSyncFingerprint(messages),
+      setLastConversationSyncFingerprint: (fingerprint) => {
+        this.lastConversationSyncFingerprint = fingerprint;
+      },
+      startConversationSyncLoop: () => {
+        this.startConversationSyncLoop();
+      },
+      scrollToBottom: ({ tabId }) => {
+        this.scrollToBottom({ tabId });
+      },
+      syncPaneScrollMetrics: (tabId, messagesEl) => {
+        this.syncPaneScrollMetrics(tabId, messagesEl);
+      },
+      scheduleComposerLayoutSync: () => {
+        this.scheduleComposerLayoutSync();
+      },
+      updateModelSelectorDisplay: () => {
+        this.updateModelSelectorDisplay();
+      },
+      syncActiveTabContextUsageIdentity: () => {
+        this.syncActiveTabContextUsageIdentity();
+      },
+      refreshActiveTabContextUsageFromServer: () => this.refreshActiveTabContextUsageFromServer(),
+      endConversationHydration: (tabId) => {
+        this.endConversationHydration(tabId);
+      },
+      requestAnimationFrame: (callback) => window.requestAnimationFrame(callback),
+    };
   }
 
   getViewType(): string {
@@ -2499,27 +2647,7 @@ export class OpenCodianView extends ItemView {
   }
 
   private async initializeFirstTab(): Promise<void> {
-    if (!this.tabManager) {
-      return;
-    }
-
-    await this.plugin.loadConversations();
-
-    const restoredTabId = this.restorePersistedTabs();
-    if (restoredTabId) {
-      await this.activateTab(restoredTabId);
-      return;
-    }
-
-    let initialConversation = this.plugin.getConversations()[0];
-    if (!initialConversation) {
-      initialConversation = await this.plugin.createConversation();
-    }
-
-    const tab = this.tabManager.createTab(initialConversation);
-    if (tab) {
-      await this.activateTab(tab.id);
-    }
+    await this.conversationViewStateService.initializeFirstTab();
   }
 
   private renderTabBar(): void {
@@ -2530,32 +2658,62 @@ export class OpenCodianView extends ItemView {
     this.tabBar.render(this.tabManager.getTabBarItems(), this.getTabBarLayoutMode());
   }
 
+  private updateSessionTodoDockForTab(tabId: TabId): void {
+    this.sessionTodoDock?.update(
+      this.getTabSessionTodos(tabId, this.getTabRuntimeState(tabId)?.sessionTodoSessionId ?? null),
+    );
+  }
+
+  private async applyStreamingConversationActivation(tabId: TabId, conversation: Conversation): Promise<void> {
+    this.currentConversation = conversation;
+    this.tabManager?.setActiveTabConversation(conversation);
+    this.plugin.openCodeService.setSessionId(conversation.openCodeSessionId);
+    this.lastConversationSyncFingerprint = this.getConversationSyncFingerprint(conversation.messages);
+    this.startConversationSyncLoop();
+    this.updateModelSelectorDisplay();
+    this.syncActiveTabContextUsageIdentity();
+    this.renderSessionTodoDock(tabId);
+    this.renderQuestionDock();
+    void this.refreshTabSessionStatus(tabId, conversation.openCodeSessionId, { suppressErrors: true });
+    void this.refreshPendingQuestionsForTab(tabId, conversation.openCodeSessionId);
+    void this.refreshTabSessionTodos(tabId, conversation.openCodeSessionId, { suppressErrors: true });
+    this.updateSendButtonState();
+  }
+
+  private applyEmptyTabActivation(tabId: TabId): void {
+    this.currentConversation = null;
+    this.stopConversationSyncLoop();
+    this.messagesContainer?.empty();
+    this.resetTurnState();
+    this.setTabSessionTodos(tabId, [], null);
+    this.setTabSessionStatus(tabId, null, null);
+    this.clearPendingQuestionsForTab(tabId);
+    this.renderSessionTodoDock(tabId);
+    this.renderQuestionDock();
+    this.updateModelSelectorDisplay();
+    this.syncActiveTabContextUsageIdentity();
+    this.updateSendButtonState();
+  }
+
+  private prepareConversationTransition(nextConversationId: string): Promise<void> {
+    if (!this.currentConversation?.id || this.currentConversation.id === nextConversationId) {
+      return Promise.resolve();
+    }
+
+    const previousConversationId = this.currentConversation.id;
+    this.titleGenerationService.cancelConversation(previousConversationId);
+    this.resetBackgroundTaskIndicator();
+    if (this.currentConversation.titleGenerationStatus === 'pending') {
+      void this.updateConversationTitleState(previousConversationId, {
+        titleGenerationStatus: undefined,
+      });
+    }
+
+    return Promise.resolve();
+  }
+
   private restorePersistedTabs(): string | null {
-    if (!this.tabManager) {
-      return null;
-    }
-
-    const savedState = this.plugin.settings.tabState;
-    if (!savedState.tabs.length) {
-      return null;
-    }
-
-    const conversationMap = new Map(
-      this.plugin.getConversations().map((conversation) => [conversation.id, conversation] as const),
-    );
-    const restoredTab = this.tabManager.restoreTabs(
-      savedState.tabs as RestoredTabState[],
-      savedState.activeTabIndex,
-      conversationMap,
-    );
-
-    if (!restoredTab) {
-      this.plugin.settings.tabState = getDefaultPersistedTabState();
-      this.persistTabState({ flush: true });
-      return null;
-    }
-
-    return restoredTab.id;
+    return this.conversationViewStateService.restorePersistedTabs();
   }
 
   private persistTabState(options: { flush?: boolean } = {}): void {
@@ -2710,63 +2868,7 @@ export class OpenCodianView extends ItemView {
   }
 
   private async activateTab(tabId: string): Promise<void> {
-    if (!this.tabManager) {
-      return;
-    }
-
-    const tab = this.tabManager.getTab(tabId);
-    if (!tab) {
-      return;
-    }
-
-    this.setActiveMessagesPane(tabId);
-    this.refreshActiveFocusContextPreview();
-    this.renderQuestionDock();
-    this.sessionTodoDock?.update(
-      this.getTabSessionTodos(tabId, this.getTabRuntimeState(tabId)?.sessionTodoSessionId ?? null),
-    );
-
-    if (tab.conversationId) {
-      if (tab.isStreaming) {
-        const conversation = await this.plugin.getConversationById(tab.conversationId);
-        if (!conversation) {
-          return;
-        }
-
-        this.currentConversation = conversation;
-        this.tabManager.setActiveTabConversation(conversation);
-        this.plugin.openCodeService.setSessionId(conversation.openCodeSessionId);
-        this.lastConversationSyncFingerprint = this.getConversationSyncFingerprint(conversation.messages);
-        this.startConversationSyncLoop();
-        this.updateModelSelectorDisplay();
-        this.syncActiveTabContextUsageIdentity();
-        this.renderSessionTodoDock(tabId);
-        this.renderQuestionDock();
-        void this.refreshTabSessionStatus(tabId, conversation.openCodeSessionId, { suppressErrors: true });
-        void this.refreshPendingQuestionsForTab(tabId, conversation.openCodeSessionId);
-        void this.refreshTabSessionTodos(tabId, conversation.openCodeSessionId, { suppressErrors: true });
-        this.updateSendButtonState();
-        return;
-      }
-
-      await this.loadConversation(tab.conversationId, {
-        preserveScrollPosition: true,
-      });
-      return;
-    }
-
-    this.currentConversation = null;
-    this.stopConversationSyncLoop();
-    this.messagesContainer?.empty();
-    this.resetTurnState();
-    this.setTabSessionTodos(tabId, [], null);
-    this.setTabSessionStatus(tabId, null, null);
-    this.clearPendingQuestionsForTab(tabId);
-    this.renderSessionTodoDock(tabId);
-    this.renderQuestionDock();
-    this.updateModelSelectorDisplay();
-    this.syncActiveTabContextUsageIdentity();
-    this.updateSendButtonState();
+    await this.conversationViewStateService.activateTab(tabId);
   }
 
   private getTabBarLayoutMode(): TabBarLayoutMode {
@@ -5375,122 +5477,8 @@ export class OpenCodianView extends ItemView {
   private async loadConversation(
     id: string,
     options: { forceServerSync?: boolean; preserveScrollPosition?: boolean } = {},
-  ) {
-    if (this.currentConversation?.id && this.currentConversation.id !== id) {
-      const previousConversationId = this.currentConversation.id;
-      this.titleGenerationService.cancelConversation(previousConversationId);
-      this.resetBackgroundTaskIndicator();
-      if (this.currentConversation.titleGenerationStatus === 'pending') {
-        void this.updateConversationTitleState(previousConversationId, {
-          titleGenerationStatus: undefined,
-        });
-      }
-    }
-
-    let conversation = await this.plugin.getConversationById(id);
-    if (!conversation) {
-      await this.plugin.loadConversations();
-      conversation = await this.plugin.getConversationById(id);
-    }
-    if (!conversation) return;
-
-    const messagesEl = this.messagesContainer;
-    const preserveScrollPosition = Boolean(options.preserveScrollPosition && messagesEl);
-    const previousScrollTop = preserveScrollPosition && messagesEl
-      ? messagesEl.scrollTop
-      : 0;
-    const shouldStickToBottom = preserveScrollPosition && messagesEl
-      ? this.getTabRuntimeState(this.getActiveTabId())?.autoScrollEnabled ?? isElementNearBottom(messagesEl)
-      : true;
-    const activeTabId = this.getActiveTabId();
-    const previousSessionId = this.getSessionIdForTab(activeTabId);
-
-    this.currentConversation = conversation;
-    this.currentConversationRevertState = null;
-    this.tabManager?.setActiveTabConversation(conversation);
-
-    // Clear messages display
-    this.clearScheduledScrollToBottom();
-    this.beginConversationHydration(activeTabId);
-    messagesEl?.addClass('is-rehydrating');
-    this.messagesContainer?.empty();
-    this.resetTurnState();
-
-    // Set session in service
-    this.plugin.openCodeService.setSessionId(conversation.openCodeSessionId);
-    if (previousSessionId !== conversation.openCodeSessionId) {
-      this.clearPendingQuestionsForTab(activeTabId);
-    }
-    this.setTabSessionTodos(activeTabId, [], conversation.openCodeSessionId);
-    this.setTabSessionStatus(activeTabId, null, conversation.openCodeSessionId);
-    const activeRuntime = this.getTabRuntimeState(activeTabId);
-    if (activeRuntime) {
-      activeRuntime.backgroundTaskSuppressedFingerprint = null;
-    }
-
-    const shouldSyncFromServer =
-      options.forceServerSync
-      || !conversation.messages
-      || conversation.messages.length === 0
-      || (
-        !this.hasInterruptedLocalAssistantTail(conversation.messages)
-        && conversation.messages.some((message) =>
-          message.displayStyle !== 'notice'
-          && !message.sourceMessageId
-        )
-      );
-
-    try {
-      let messages = conversation.messages;
-      if (shouldSyncFromServer) {
-        const syncResult = await this.syncConversationMessagesFromServer(conversation, this.getActiveTabId(), 'load-conversation');
-        messages = syncResult.messages;
-        this.currentConversationRevertState = syncResult.revertState;
-      }
-
-      this.syncBackgroundTaskStateFromConversation(conversation);
-      await this.renderMessages(messages);
-      await this.renderBackgroundTaskIndicatorIfNeeded();
-      this.renderSessionTodoDock();
-      this.renderQuestionDock();
-      void this.refreshTabSessionStatus(activeTabId, conversation.openCodeSessionId, { suppressErrors: true });
-      void this.refreshPendingQuestionsForTab(activeTabId, conversation.openCodeSessionId);
-      void this.refreshActiveSessionTodos({ suppressErrors: true });
-      this.lastConversationSyncFingerprint = this.getConversationSyncFingerprint(messages);
-      this.startConversationSyncLoop();
-
-      if (messagesEl) {
-        const runtime = this.getTabRuntimeState(activeTabId);
-        if (runtime) {
-          runtime.autoScrollEnabled = shouldStickToBottom;
-        }
-        const scrollSnapshot = captureElementScrollRestoreSnapshot(
-          messagesEl,
-          !(preserveScrollPosition && !shouldStickToBottom),
-          previousScrollTop,
-        );
-        restoreElementScrollAfterRender(messagesEl, scrollSnapshot, {
-          runtime,
-          onRestoreBottom: () => {
-            this.scrollToBottom({ tabId: activeTabId });
-          },
-          onRestored: () => {
-            this.syncPaneScrollMetrics(activeTabId, messagesEl);
-          },
-        });
-        window.requestAnimationFrame(() => {
-          messagesEl.removeClass('is-rehydrating');
-        });
-      }
-      this.scheduleComposerLayoutSync();
-
-      // Update model selector to reflect this session's model
-      this.updateModelSelectorDisplay();
-      this.syncActiveTabContextUsageIdentity();
-      await this.refreshActiveTabContextUsageFromServer();
-    } finally {
-      this.endConversationHydration(activeTabId);
-    }
+  ): Promise<void> {
+    await this.conversationViewStateService.loadConversation(id, options);
   }
 
   private openConversationInCurrentTab(conversation: Conversation): void {

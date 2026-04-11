@@ -1,0 +1,64 @@
+# ConversationViewStateService
+
+> **源码**: `src/features/chat/services/ConversationViewStateService.ts`
+> **状态**: [REVIEW]
+
+## 概述
+
+`ConversationViewStateService` 负责 `OpenCodianView` 里一条最难读的装载主链路：tab 初始化、persisted tab restore、tab 激活，以及 conversation hydration 装载编排。
+
+它不接管聊天视图的 DOM 所有权，也不直接依赖插件实例；而是通过 `ConversationViewStateHost` 回调向 `OpenCodianView` 请求：
+
+- conversation / tab 数据访问
+- hydration 生命周期信号
+- 消息重渲、todo/question 刷新、model/context usage 刷新
+- scroll restore 所需的容器和 runtime 状态
+
+## 公开接口
+
+```typescript
+export interface LoadConversationOptions {
+  forceServerSync?: boolean;
+  preserveScrollPosition?: boolean;
+}
+
+export interface ConversationViewStateHost {
+  // 省略若干 host 回调
+}
+
+export class ConversationViewStateService {
+  initializeFirstTab(): Promise<void>;
+  restorePersistedTabs(): string | null;
+  activateTab(tabId: string): Promise<void>;
+  loadConversation(id: string, options?: LoadConversationOptions): Promise<void>;
+}
+```
+
+## 关键行为
+
+### 初始 tab 装载
+
+- 先 `loadConversations()`
+- 再尝试 restore persisted tabs
+- restore 失败时重置持久化 tab state 并立即 flush
+- 如果没有 persisted tab，则复用首个已有 conversation；仍然没有时才新建 conversation
+
+### tab 激活编排
+
+- 统一处理 pane 切换、focus preview、question dock 和 todo dock 预刷新
+- streaming tab 走快速路径，不触发完整 conversation reload
+- 普通 conversation tab 统一转入 `loadConversation(..., { preserveScrollPosition: true })`
+- 空 tab 走独立清空分支，保留现有 dock / selector / send button 刷新时序
+
+### conversation hydration
+
+- 切换前先处理旧 conversation 的标题生成与背景任务指示器清理
+- 装载时仍保留 `beginConversationHydration()` / `endConversationHydration()` 的 `finally` 保护
+- scroll restore 继续复用 `ScrollManager`，保持 bottom / anchor / distance 语义
+- session 变化时先清掉 pending questions，再刷新 todo/status/question/context usage
+
+## 与 `OpenCodianView` 的边界
+
+- `OpenCodianView` 仍保留真实 UI render、插件服务装配、tab runtime 状态、scroll metrics 和后台同步实现
+- `ConversationViewStateService` 只负责决定“何时 restore / 激活 / hydrate / 刷新”
+- 这样后续继续拆 model selector 或消息区重渲时，可以沿着更清晰的 host 边界继续推进，而不必再把装载主链路塞回 view
