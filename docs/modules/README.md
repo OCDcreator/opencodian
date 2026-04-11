@@ -93,6 +93,7 @@ docs/modules/
 │   │   ├── runtime/
 │   │   │   ├── AssistantShellRenderer.md
 │   │   │   ├── AssistantNoticeRenderer.md
+│   │   │   ├── AssistantPlainTextFallbackRenderer.md
 │   │   │   ├── PermissionInlineCardRenderer.md
 │   │   │   ├── QuestionInlineCardRenderer.md
 │   │   │   ├── QuestionResolutionCoordinator.md

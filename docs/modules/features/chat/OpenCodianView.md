@@ -216,6 +216,7 @@ interface TabRuntimeState {
 - `SendPipelineTypes.ts`：定义 runtime 与 host 契约
 - `AssistantShellRenderer.ts`：封装 assistant streaming shell 的创建、reveal 与 timestamp 收尾
 - `AssistantNoticeRenderer.ts`：封装 stream error / interrupted notice 构造与 placeholder notice 渲染
+- `AssistantPlainTextFallbackRenderer.ts`：封装无 structured blocks 的 resolved card + plain-text fallback 渲染
 - `StreamingInlineCardRenderer.ts`：封装 permission/question inline card 的共享插入位置与 shell reveal
 - `PermissionInlineCardRenderer.ts`：封装 permission inline card 的内容构造与按钮等待
 - `QuestionInlineCardRenderer.ts`：封装 grouped/sequential question inline card 的内容构造、容器复用与按钮等待
@@ -255,6 +256,7 @@ assistant 渲染里：
 - `tool_use` 块走 `ToolCallRenderer`
 - `text` 块和普通 `content` 走 `MarkdownRenderService`
 - 已解析的 `questionResolution` 会先经 `buildQuestionResolutionCardRenderPlan()` 折叠成 render plan，再由 `appendQuestionResolutionCardFromRenderPlan()` 在允许显示时插入持久化 resolved card
+- 无 `contentBlocks` 的 assistant fallback 由 `renderAssistantPlainTextFallbackContent()` 统一处理 resolved card 追加与 `message.content` 渲染
 
 ### 模型选择器拆分
 
@@ -334,7 +336,7 @@ model selector 现在拆成了几层协作：
 - `SendPipelineRuntime`：发送子系统总入口，负责真实 stream 调用、runtime 内部模块装配，以及向 `MessageFinalizationService` 交接
 - `StreamChunkRouter`：发送子系统内部的 stream loop / pending / timeout / chunk router
 - `StreamLocalFinalizer`：发送子系统内部的本地 shell finalization 与第一次本地保存
-- `AssistantShellRenderer` / `AssistantNoticeRenderer` / `StreamingInlineCardRenderer` / `PermissionInlineCardRenderer` / `SendPipelineTrace` / `PendingIndicatorController` / `buildLocalStreamOutcome` / `StreamShellFinalizer` / `LocalStreamMessagePersistence`：发送子系统更细粒度的内部协作模块
+- `AssistantShellRenderer` / `AssistantNoticeRenderer` / `AssistantPlainTextFallbackRenderer` / `StreamingInlineCardRenderer` / `PermissionInlineCardRenderer` / `SendPipelineTrace` / `PendingIndicatorController` / `buildLocalStreamOutcome` / `StreamShellFinalizer` / `LocalStreamMessagePersistence`：发送子系统更细粒度的内部协作模块
 - `MessageSendPreparationService`：`sendMessage()` 前半段的 send preflight、optimistic user message 落地，以及 stream-enter 状态编排
 - `MessageFinalizationService`：`sendMessage()` 末段的 final sync、post-sync patch/rerender、todo/save/attention 收尾编排
 - `TabManager` / `TabBar`：tab 生命周期和 tab 元数据

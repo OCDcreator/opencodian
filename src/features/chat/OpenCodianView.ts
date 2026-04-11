@@ -103,6 +103,9 @@ import {
   AssistantShellRenderer,
 } from './runtime/AssistantShellRenderer';
 import {
+  renderAssistantPlainTextFallbackContent,
+} from './runtime/AssistantPlainTextFallbackRenderer';
+import {
   PermissionInlineCardRenderer,
 } from './runtime/PermissionInlineCardRenderer';
 import {
@@ -7078,16 +7081,12 @@ export class OpenCodianView extends ItemView {
       return;
     }
 
-    appendQuestionResolutionCardFromRenderPlan(content, questionResolutionRenderPlan);
-
-    if (message.content) {
-      const textEl = content.createDiv({ cls: 'opencodian-message-text' });
-      if (this.markdownService) {
-        await this.markdownService.render(textEl, message.content);
-      } else {
-        textEl.textContent = message.content;
-      }
-    }
+    await renderAssistantPlainTextFallbackContent({
+      containerEl: content,
+      messageContent: message.content,
+      markdownService: this.markdownService,
+      questionResolutionRenderPlan,
+    });
 
     this.assistantShellRenderer.addTimestampWithCopyButton({
       messageEl,
