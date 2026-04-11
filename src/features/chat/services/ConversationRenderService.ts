@@ -165,6 +165,11 @@ type TrailingAssistantPatchSkippedDebugPlanningContext = {
   tabId: TabId | null;
 };
 
+type TrailingAssistantPatchTurnBodyScopeInputs = {
+  runtime: ConversationRenderRuntimeState | null;
+  parentEl: HTMLElement;
+};
+
 type TrailingAssistantPatchTurnBodyScopePlan =
   | {
     runtime: null;
@@ -689,8 +694,9 @@ export class ConversationRenderService {
     planningContext: TrailingAssistantPatchPlanningContext,
   ): TrailingAssistantPatchSuccessPlanParts {
     return {
-      turnBodyScopePlan:
-        this.buildTrailingAssistantPatchTurnBodyScopePlanFromPlanningContext(planningContext),
+      turnBodyScopePlan: this.buildTrailingAssistantPatchTurnBodyScopePlan(
+        this.buildTrailingAssistantPatchTurnBodyScopeInputs(planningContext),
+      ),
       ...this.buildTrailingAssistantPatchExecutionTailPlanPartsFromPlanningContext(
         planningContext,
       ),
@@ -706,28 +712,27 @@ export class ConversationRenderService {
     };
   }
 
+  private buildTrailingAssistantPatchTurnBodyScopeInputs(
+    planningContext: TrailingAssistantPatchPlanningContext,
+  ): TrailingAssistantPatchTurnBodyScopeInputs {
+    return {
+      runtime: planningContext.runtime,
+      parentEl: planningContext.parentEl,
+    };
+  }
+
   private buildTrailingAssistantPatchTurnBodyScopePlan(
-    runtime: ConversationRenderRuntimeState | null,
-    scopedTurnBodyEl: HTMLElement,
+    inputs: TrailingAssistantPatchTurnBodyScopeInputs,
   ): TrailingAssistantPatchTurnBodyScopePlan {
-    if (!runtime) {
+    if (!inputs.runtime) {
       return { runtime: null };
     }
 
     return {
-      runtime,
-      scopedTurnBodyEl,
-      restoreTurnBodyEl: runtime.currentTurnBodyEl ?? scopedTurnBodyEl,
+      runtime: inputs.runtime,
+      scopedTurnBodyEl: inputs.parentEl,
+      restoreTurnBodyEl: inputs.runtime.currentTurnBodyEl ?? inputs.parentEl,
     };
-  }
-
-  private buildTrailingAssistantPatchTurnBodyScopePlanFromPlanningContext(
-    planningContext: TrailingAssistantPatchPlanningContext,
-  ): TrailingAssistantPatchTurnBodyScopePlan {
-    return this.buildTrailingAssistantPatchTurnBodyScopePlan(
-      planningContext.runtime,
-      planningContext.parentEl,
-    );
   }
 
   private buildTrailingAssistantPatchExecutionTailPlanPartsFromPlanningContext(

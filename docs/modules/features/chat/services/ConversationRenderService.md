@@ -75,7 +75,7 @@ export class ConversationRenderService {
 - preflight 成功分支里的 `existingTailMessageEl`、`existingContentEl` 与 `parentEl` 现在会先组装成更窄的 `patchTarget` contract，再与 runtime/scroll 派生值一起汇总到 `planningContext`，避免成功态结果继续暴露零散 DOM 字段
 - `TrailingAssistantPatchPreflight` 现在只表达“是否允许 patch”，成功后只返回独立的 `planningContext`；执行计划、turn-body scope、tail state 与 completion debug 改由 `buildTrailingAssistantPatchSuccessPlan()` 基于这份窄输入统一组装
 - `buildTrailingAssistantPatchSuccessPlan()` 现在进一步只保留 success-plan 骨架编排：它会先把 turn-body scope 与独立的 execution/tail-outcome contract 收束成 `planParts`，再交给最终 success-plan shape helper 统一返回
-- `planParts` 收集阶段里，turn-body scope 会先从 `planningContext` 交给独立 helper；execution plan 与 tail outcome 则会先收束到更窄的共享 planning context，再分别交给顶层 execution/tail-outcome contract builder 统一装配
+- `planParts` 收集阶段里，turn-body scope 会先把 `runtime` 与 `parentEl` 收束成更窄的 input helper，再交给 scope-plan builder；execution plan 与 tail outcome 则会先收束到更窄的共享 planning context，再分别交给顶层 execution/tail-outcome contract builder 统一装配
 - `tailOutcomePlans` 在进入 `tailStatePlan` + `completionDebugPlan` 组装前，还会把共享 execution/tail context 再缩到只保留 `messageEl`、tail messages 与 stick-to-bottom 状态的专用 planning context；其中 `tailStatePlan` 也会先经由独立 helper 收束成只保留 tail-state 所需字段的 contract，让 tail-outcome builder 更接近只组合预建子计划
 - `completionDebugPlan` 进入顶层装配前，也会先把 previous / next tail summary 抽到独立 helper，再只把预建 summary 与 `shouldStickToBottom` 组合成 debug contract，让 tail-outcome helper 更接近只负责装配顶层 tail-state / debug plan
 - 最终 `TrailingAssistantPatchSuccessPlan` 的返回结构也已交给独立 helper 统一收口，避免 success-plan builder 继续手工展开 `tailOutcomePlans` 与 turn-body scope 字段
