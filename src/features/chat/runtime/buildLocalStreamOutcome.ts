@@ -2,15 +2,15 @@ import { shouldSyncAfterStream } from '../services/MessageFinalizationService';
 import type { PreparedMessageSend } from '../services/MessageSendPreparationService';
 import { getStreamedTextContent } from './sendPipelineContent';
 import type {
+  LocalStreamOutcomeHost,
   LocalStreamOutcome,
-  SendPipelineHost,
   SendPipelineStreamController,
   SendPipelineTabRuntime,
   StreamChunkRouterResult,
 } from './SendPipelineTypes';
 
 export function buildLocalStreamOutcome(options: {
-  host: SendPipelineHost;
+  host: LocalStreamOutcomeHost;
   preparedSend: PreparedMessageSend;
   runtime: SendPipelineTabRuntime;
   streamController: SendPipelineStreamController | null;

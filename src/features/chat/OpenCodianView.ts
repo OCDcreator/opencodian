@@ -95,7 +95,12 @@ import { buildMessageRenderGroups, mergeAssistantMessagesForRender } from './ren
 import { type CollapsibleState, setupCollapsible } from './rendering/collapsible';
 import {
   type SendPipelineDebugContentBlock,
+  type SendPipelineDebugPort,
   type SendPipelineHost,
+  type SendPipelinePersistencePort,
+  type SendPipelineShellPort,
+  type SendPipelineTransportPort,
+  type SendPipelineViewPort,
   SendPipelineRuntime,
 } from './runtime/SendPipelineRuntime';
 import { ContextUsageService } from './services/ContextUsageService';
@@ -2436,31 +2441,31 @@ export class OpenCodianView extends ItemView {
   }
 
   private createSendPipelineRuntimeHost(): SendPipelineHost {
-    return {
+    const viewPort: SendPipelineViewPort = {
       getTabRuntimeState: (tabId) => this.getTabRuntimeState(tabId),
       getActiveTabId: () => this.getActiveTabId(),
       shouldAutoScroll: (tabId) => this.shouldAutoScroll(tabId),
       scheduleSettledScrollToBottomIfNeeded: (shouldScroll, tabId) => {
         this.scheduleSettledScrollToBottomIfNeeded(shouldScroll, tabId);
       },
+      getOrCreateTabStreamController: (tabId) => this.getOrCreateTabStreamController(tabId),
+      finalizeBackgroundTaskIndicatorAfterPrimaryStream: (tabId) =>
+        this.finalizeBackgroundTaskIndicatorAfterPrimaryStream(tabId),
+      removeEmptyAssistantShells: () => {
+        this.removeEmptyAssistantShells();
+      },
+      syncTabStreamLikeState: (tabId) => {
+        this.syncTabStreamLikeState(tabId);
+      },
+      refreshServerStatusBadge: () => this.refreshServerStatusBadge(),
+    };
+    const transportPort: SendPipelineTransportPort = {
       sendStreamMessage: (content, options) => this.plugin.openCodeService.sendMessage(content, options),
       detachStream: (sessionId) => {
         if (sessionId) {
           this.plugin.openCodeService.detachStream(sessionId);
         }
       },
-      createAssistantMessageElement: (tabId, hiddenUntilVisible) =>
-        this.createAssistantMessageElement(tabId, hiddenUntilVisible),
-      getOrCreateTabStreamController: (tabId) => this.getOrCreateTabStreamController(tabId),
-      summarizeContentBlocksForDebug: (blocks) =>
-        this.summarizeContentBlocksForDebug(blocks as SendPipelineDebugContentBlock[] | undefined),
-      logAssistantFinalizationDebug: (label, payload) => {
-        this.logAssistantFinalizationDebug(label, payload);
-      },
-      getLogPreview: (text, maxLength) => this.getLogPreview(text, maxLength),
-      summarizeCoreStreamChunkForDebug: (chunk) => this.summarizeCoreStreamChunkForDebug(chunk),
-      getFriendlyStreamErrorMessage: (rawMessage) => this.getFriendlyStreamErrorMessage(rawMessage),
-      revealStreamingAssistantMessageElement: (tabId) => this.revealStreamingAssistantMessageElement(tabId),
       syncLatestUserMessageFromServer: (conversation, optimisticMessageId, tabId) =>
         this.syncLatestUserMessageFromServer(conversation, optimisticMessageId, tabId),
       beginTabContextUsageStream: (tabId) => {
@@ -2475,6 +2480,12 @@ export class OpenCodianView extends ItemView {
       showPermissionDialog: (request, tabId) => this.showPermissionDialog(request, tabId),
       showQuestionDialog: (request, tabId) => this.showQuestionDialog(request, tabId),
       convertToStreamingChunk: (chunk) => this.convertToStreamingChunk(chunk),
+      getFriendlyStreamErrorMessage: (rawMessage) => this.getFriendlyStreamErrorMessage(rawMessage),
+    };
+    const shellPort: SendPipelineShellPort = {
+      createAssistantMessageElement: (tabId, hiddenUntilVisible) =>
+        this.createAssistantMessageElement(tabId, hiddenUntilVisible),
+      revealStreamingAssistantMessageElement: (tabId) => this.revealStreamingAssistantMessageElement(tabId),
       buildStreamErrorNotice: (timestamp, content, modelId, sourceMessageId) =>
         this.buildStreamErrorNotice(timestamp, content, modelId, sourceMessageId),
       buildInterruptedAssistantNotice: (timestamp, modelId) =>
@@ -2484,18 +2495,28 @@ export class OpenCodianView extends ItemView {
       addTimestampWithCopyButton: (options) => {
         this.addTimestampWithCopyButton(options);
       },
-      finalizeBackgroundTaskIndicatorAfterPrimaryStream: (tabId) =>
-        this.finalizeBackgroundTaskIndicatorAfterPrimaryStream(tabId),
-      removeEmptyAssistantShells: () => {
-        this.removeEmptyAssistantShells();
-      },
-      syncTabStreamLikeState: (tabId) => {
-        this.syncTabStreamLikeState(tabId);
-      },
-      refreshServerStatusBadge: () => this.refreshServerStatusBadge(),
+    };
+    const persistencePort: SendPipelinePersistencePort = {
       saveConversation: (conversation) => this.plugin.saveConversation(conversation),
+    };
+    const debugPort: SendPipelineDebugPort = {
+      summarizeContentBlocksForDebug: (blocks) =>
+        this.summarizeContentBlocksForDebug(blocks as SendPipelineDebugContentBlock[] | undefined),
+      logAssistantFinalizationDebug: (label, payload) => {
+        this.logAssistantFinalizationDebug(label, payload);
+      },
+      getLogPreview: (text, maxLength) => this.getLogPreview(text, maxLength),
+      summarizeCoreStreamChunkForDebug: (chunk) => this.summarizeCoreStreamChunkForDebug(chunk),
       summarizeChatMessageForDebug: (message) => this.summarizeChatMessageForDebug(message),
       stringifyLogPayload: (payload) => this.stringifyLogPayload(payload),
+    };
+
+    return {
+      ...viewPort,
+      ...transportPort,
+      ...shellPort,
+      ...persistencePort,
+      ...debugPort,
     };
   }
 

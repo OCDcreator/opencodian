@@ -2,11 +2,11 @@ import { t } from '../../../i18n';
 import type { PreparedMessageSend } from '../services/MessageSendPreparationService';
 import type {
   LocalStreamOutcome,
-  SendPipelineHost,
+  StreamShellFinalizerHost,
 } from './SendPipelineTypes';
 
 export async function finalizeStreamingShell(options: {
-  host: SendPipelineHost;
+  host: StreamShellFinalizerHost;
   preparedSend: PreparedMessageSend;
   outcome: LocalStreamOutcome;
 }): Promise<string> {

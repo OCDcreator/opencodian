@@ -201,6 +201,16 @@ interface TabRuntimeState {
 - `OpenCodianView` 本身只保留 runtime host 装配与 bridge 方法
 - 消息区 patch / rerender 细节仍继续复用 `ConversationRenderService`
 
+第八阶段起，`createSendPipelineRuntimeHost()` 也不再把全部 callback 混在一个匿名对象里，而是先按 host 能力簇分成：
+
+- `SendPipelineViewPort`
+- `SendPipelineTransportPort`
+- `SendPipelineShellPort`
+- `SendPipelinePersistencePort`
+- `SendPipelineDebugPort`
+
+再组合回完整 `SendPipelineHost`。这让 runtime 子模块可以逐步依赖更窄的 port，而不是继续面向同一个不断膨胀的 view host。
+
 发送 runtime 目录内部也继续细分成更小的职责模块：
 
 - `SendPipelineTypes.ts`：定义 runtime 与 host 契约
