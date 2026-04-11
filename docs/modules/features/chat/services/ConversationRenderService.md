@@ -69,9 +69,9 @@ export class ConversationRenderService {
 - 只有“rendered message 数量不变、非尾部 visual signature 完全一致、尾部仍是普通 assistant”时才允许 patch
 - patch 前的 `missing-container-or-inactive-tab` tab/container 预检、rendered message 收集与数量校验、non-tail signature mismatch 判定与失败 payload 组装，以及尾部 DOM 目标解析，先由更细的独立 helper 收口，再进入真正的 patch 执行
 - preflight 里 `tail-message-not-mergeable-assistant` 的 rendered tail 选择与失败 payload/result 组装也已抽到独立 helper，让 preflight 更贴近“判定失败原因 + 返回结果”的骨架
-- preflight 成功分支的 runtime 获取、previous turn body 快照与 auto-scroll 状态组装也由独立 helper 收口，让入口继续只负责串联 guard 与结果
-- preflight 成功分支里的 `existingTailMessageEl`、`existingContentEl` 与 `parentEl` 现在会先组装成更窄的 `patchTarget` contract，再交给专门的 `TrailingAssistantPatchSuccessPlan` 组装，避免成功态结果继续暴露零散 DOM 字段
-- `TrailingAssistantPatchPreflight` 现在只表达“是否允许 patch”，成功后再返回独立的 `successPlan`；执行计划、turn-body scope、tail state 与 completion debug 不再直接挂在 preflight verdict 上
+- preflight 成功分支现在会先把 tail messages、DOM patch target、parent/runtime 与 auto-scroll 状态收束成独立 `planningContext`，让 guard 判定通过后只暴露一份窄化的成功态上下文
+- preflight 成功分支里的 `existingTailMessageEl`、`existingContentEl` 与 `parentEl` 现在会先组装成更窄的 `patchTarget` contract，再与 runtime/scroll 派生值一起汇总到 `planningContext`，避免成功态结果继续暴露零散 DOM 字段
+- `TrailingAssistantPatchPreflight` 现在只表达“是否允许 patch”，成功后只返回独立的 `planningContext`；执行计划、turn-body scope、tail state 与 completion debug 改由 `buildTrailingAssistantPatchSuccessPlan()` 基于这份窄输入统一组装
 - `successPlan` 内部会继续预先把“只 finalize footer / 重渲正文 content”的执行决策收敛成 `executionPlan`，并直接把它交给 `executeTrailingAssistantPatch()`，让 patch executor 不再读取整份成功态结果或重复承担正文签名比较
 - `successPlan` 也会把 turn-body scope 切换/恢复依赖的 runtime 与目标节点预计算成 `turnBodyScopePlan`，让 `withTrailingAssistantTurnBodyScope()` 不再回读 preflight verdict 或零散 DOM 字段
 - patch 执行期间对 render runtime 的 `currentTurnBodyEl` 暂时切换与恢复，也由独立 scope helper 收口，避免主流程继续承载 DOM 上下文细节

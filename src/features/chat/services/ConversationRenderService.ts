@@ -153,10 +153,19 @@ type TrailingAssistantPatchSuccessPlan = {
   turnBodyScopePlan: TrailingAssistantPatchTurnBodyScopePlan;
 };
 
+type TrailingAssistantPatchPlanningContext = {
+  previousTailMessage: ChatMessage;
+  nextTailMessage: ChatMessage;
+  patchTarget: TrailingAssistantPatchDomTarget;
+  parentEl: HTMLElement;
+  runtime: ConversationRenderRuntimeState | null;
+  shouldStickToBottom: boolean;
+};
+
 type TrailingAssistantPatchPreflight =
   | {
     ok: true;
-    successPlan: TrailingAssistantPatchSuccessPlan;
+    planningContext: TrailingAssistantPatchPlanningContext;
   }
   | {
     ok: false;
@@ -366,7 +375,7 @@ export class ConversationRenderService {
     if (!preflight.ok) {
       return fail(preflight.reason, preflight.payload);
     }
-    const { successPlan } = preflight;
+    const successPlan = this.buildTrailingAssistantPatchSuccessPlan(preflight.planningContext);
 
     await this.withTrailingAssistantTurnBodyScope(successPlan.turnBodyScopePlan, async () => {
       await this.executeTrailingAssistantPatch(successPlan.executionPlan);
@@ -527,7 +536,7 @@ export class ConversationRenderService {
 
     return {
       ok: true,
-      successPlan: this.buildTrailingAssistantPatchSuccessPlan(
+      planningContext: this.buildTrailingAssistantPatchPlanningContext(
         tailMessages,
         patchTargets,
         tabId,
@@ -535,31 +544,42 @@ export class ConversationRenderService {
     };
   }
 
-  private buildTrailingAssistantPatchSuccessPlan(
+  private buildTrailingAssistantPatchPlanningContext(
     tailMessages: SuccessfulTrailingAssistantPatchTailMessages,
     patchTargets: SuccessfulTrailingAssistantPatchTargets,
     tabId: TabId | null,
-  ): TrailingAssistantPatchSuccessPlan {
-    const runtime = this.host.getRenderRuntimeForTab(tabId);
+  ): TrailingAssistantPatchPlanningContext {
     const patchTarget = this.buildTrailingAssistantPatchDomTarget(patchTargets);
-    const turnBodyScopePlan = this.buildTrailingAssistantPatchTurnBodyScopePlan(
-      runtime,
-      patchTargets.parentEl,
-    );
-    const shouldStickToBottom = this.host.shouldAutoScroll(tabId);
-    const executionPlan = this.buildTrailingAssistantPatchExecutionPlan(
-      tailMessages.previousTailMessage,
-      tailMessages.nextTailMessage,
+    return {
+      previousTailMessage: tailMessages.previousTailMessage,
+      nextTailMessage: tailMessages.nextTailMessage,
       patchTarget,
+      parentEl: patchTargets.parentEl,
+      runtime: this.host.getRenderRuntimeForTab(tabId),
+      shouldStickToBottom: this.host.shouldAutoScroll(tabId),
+    };
+  }
+
+  private buildTrailingAssistantPatchSuccessPlan(
+    planningContext: TrailingAssistantPatchPlanningContext,
+  ): TrailingAssistantPatchSuccessPlan {
+    const turnBodyScopePlan = this.buildTrailingAssistantPatchTurnBodyScopePlan(
+      planningContext.runtime,
+      planningContext.parentEl,
+    );
+    const executionPlan = this.buildTrailingAssistantPatchExecutionPlan(
+      planningContext.previousTailMessage,
+      planningContext.nextTailMessage,
+      planningContext.patchTarget,
     );
     const tailStatePlan = this.buildTrailingAssistantPatchTailStatePlan(
-      patchTarget,
-      tailMessages.nextTailMessage,
-      shouldStickToBottom,
+      planningContext.patchTarget,
+      planningContext.nextTailMessage,
+      planningContext.shouldStickToBottom,
     );
     const completionDebugPlan = this.buildTrailingAssistantPatchCompletionDebugPlan(
-      tailMessages.previousTailMessage,
-      tailMessages.nextTailMessage,
+      planningContext.previousTailMessage,
+      planningContext.nextTailMessage,
       tailStatePlan.shouldStickToBottom,
     );
     return {
