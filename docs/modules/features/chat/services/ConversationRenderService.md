@@ -77,7 +77,7 @@ export class ConversationRenderService {
 - patch 成功后的 completion debug payload 组装也已抽到独立 helper，让主流程只保留“记录完成日志”这一层 orchestration
 - patch skipped 分支里的 debug payload 组装同样已抽到独立 helper，主流程不再内联拼接 reason、rendered count 与附加 tail summary
 - assistant 正文签名不变时复用已有正文，只重做 persisted footer 收尾
-- patch 成功后的 message dataset 刷新、动画禁用与按需 scroll-to-bottom，也由更窄的 tail-apply helper 收口
+- patch 成功后的 message dataset 刷新、动画禁用与按需 scroll-to-bottom，现会先预计算成更窄的 `tailStatePlan` 再交给 tail-apply helper，避免这些副作用继续读取整份 preflight 成功结果
 - assistant 正文签名计算、正文重渲和 footer finalization 现在统一通过 `host.assistantTailRender` 这组更小的 port 完成
 - 缺失尾部 DOM、内容节点或前缀签名失配时，立即返回 `false` 让上层回退到 full rerender
 

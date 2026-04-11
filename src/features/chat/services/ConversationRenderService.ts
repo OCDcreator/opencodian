@@ -124,6 +124,13 @@ type TrailingAssistantPatchExecutionPlan =
     nextTailMessage: ChatMessage;
   };
 
+type TrailingAssistantPatchTailStatePlan = {
+  messageEl: HTMLElement;
+  messageId: string;
+  sourceMessageId: string | null;
+  shouldStickToBottom: boolean;
+};
+
 type TrailingAssistantPatchPreflight =
   | {
     ok: true;
@@ -131,9 +138,9 @@ type TrailingAssistantPatchPreflight =
     nextTailMessage: ChatMessage;
     patchTarget: TrailingAssistantPatchDomTarget;
     executionPlan: TrailingAssistantPatchExecutionPlan;
+    tailStatePlan: TrailingAssistantPatchTailStatePlan;
     runtime: ConversationRenderRuntimeState | null;
     previousTurnBodyEl: HTMLElement | null;
-    shouldStickToBottom: boolean;
   }
   | {
     ok: false;
@@ -350,7 +357,7 @@ export class ConversationRenderService {
 
     await this.withTrailingAssistantTurnBodyScope(preflight, async () => {
       await this.executeTrailingAssistantPatch(preflight);
-      this.applyTrailingAssistantPatchTailState(preflight, tabId);
+      this.applyTrailingAssistantPatchTailState(preflight.tailStatePlan, tabId);
     });
 
     this.host.logAssistantFinalizationDebug(
@@ -516,10 +523,16 @@ export class ConversationRenderService {
   ): SuccessfulTrailingAssistantPatchPreflight {
     const runtime = this.host.getRenderRuntimeForTab(tabId);
     const patchTarget = this.buildTrailingAssistantPatchDomTarget(patchTargets);
+    const shouldStickToBottom = this.host.shouldAutoScroll(tabId);
     const executionPlan = this.buildTrailingAssistantPatchExecutionPlan(
       tailMessages.previousTailMessage,
       tailMessages.nextTailMessage,
       patchTarget,
+    );
+    const tailStatePlan = this.buildTrailingAssistantPatchTailStatePlan(
+      patchTarget,
+      tailMessages.nextTailMessage,
+      shouldStickToBottom,
     );
     return {
       ok: true,
@@ -527,9 +540,9 @@ export class ConversationRenderService {
       nextTailMessage: tailMessages.nextTailMessage,
       patchTarget,
       executionPlan,
+      tailStatePlan,
       runtime,
       previousTurnBodyEl: runtime?.currentTurnBodyEl ?? null,
-      shouldStickToBottom: this.host.shouldAutoScroll(tabId),
     };
   }
 
@@ -569,6 +582,19 @@ export class ConversationRenderService {
       messageEl: patchTarget.messageEl,
       contentEl: patchTarget.contentEl,
       nextTailMessage,
+    };
+  }
+
+  private buildTrailingAssistantPatchTailStatePlan(
+    patchTarget: TrailingAssistantPatchDomTarget,
+    nextTailMessage: ChatMessage,
+    shouldStickToBottom: boolean,
+  ): TrailingAssistantPatchTailStatePlan {
+    return {
+      messageEl: patchTarget.messageEl,
+      messageId: nextTailMessage.id,
+      sourceMessageId: nextTailMessage.sourceMessageId ?? null,
+      shouldStickToBottom,
     };
   }
 
@@ -615,17 +641,17 @@ export class ConversationRenderService {
   }
 
   private applyTrailingAssistantPatchTailState(
-    preflight: SuccessfulTrailingAssistantPatchPreflight,
+    tailStatePlan: TrailingAssistantPatchTailStatePlan,
     tabId: TabId | null,
   ): void {
-    const { patchTarget, nextTailMessage, shouldStickToBottom } = preflight;
-    patchTarget.messageEl.dataset.messageId = nextTailMessage.id;
-    if (nextTailMessage.sourceMessageId) {
-      patchTarget.messageEl.dataset.sourceMessageId = nextTailMessage.sourceMessageId;
+    const { messageEl, messageId, sourceMessageId, shouldStickToBottom } = tailStatePlan;
+    messageEl.dataset.messageId = messageId;
+    if (sourceMessageId) {
+      messageEl.dataset.sourceMessageId = sourceMessageId;
     } else {
-      delete patchTarget.messageEl.dataset.sourceMessageId;
+      delete messageEl.dataset.sourceMessageId;
     }
-    patchTarget.messageEl.style.animation = 'none';
+    messageEl.style.animation = 'none';
     if (shouldStickToBottom) {
       this.host.scrollToBottom({ tabId });
     }
@@ -638,11 +664,11 @@ export class ConversationRenderService {
     const {
       previousTailMessage,
       nextTailMessage,
-      shouldStickToBottom,
+      tailStatePlan,
     } = preflight;
     return {
       tabId,
-      shouldStickToBottom,
+      shouldStickToBottom: tailStatePlan.shouldStickToBottom,
       previousTail: this.host.summarizeChatMessageForDebug(previousTailMessage),
       nextTail: this.host.summarizeChatMessageForDebug(nextTailMessage),
     };
