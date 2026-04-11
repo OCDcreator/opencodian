@@ -131,14 +131,19 @@ type TrailingAssistantPatchTailStatePlan = {
   shouldStickToBottom: boolean;
 };
 
+type TrailingAssistantPatchCompletionDebugPlan = {
+  shouldStickToBottom: boolean;
+  previousTail: Record<string, unknown> | null;
+  nextTail: Record<string, unknown> | null;
+};
+
 type TrailingAssistantPatchPreflight =
   | {
     ok: true;
-    previousTailMessage: ChatMessage;
-    nextTailMessage: ChatMessage;
     patchTarget: TrailingAssistantPatchDomTarget;
     executionPlan: TrailingAssistantPatchExecutionPlan;
     tailStatePlan: TrailingAssistantPatchTailStatePlan;
+    completionDebugPlan: TrailingAssistantPatchCompletionDebugPlan;
     runtime: ConversationRenderRuntimeState | null;
     previousTurnBodyEl: HTMLElement | null;
   }
@@ -362,7 +367,10 @@ export class ConversationRenderService {
 
     this.host.logAssistantFinalizationDebug(
       'patch-trailing-assistant-render-complete',
-      this.buildTrailingAssistantPatchCompletionDebugPayload(preflight, tabId),
+      this.buildTrailingAssistantPatchCompletionDebugPayload(
+        preflight.completionDebugPlan,
+        tabId,
+      ),
     );
     return true;
   }
@@ -534,13 +542,17 @@ export class ConversationRenderService {
       tailMessages.nextTailMessage,
       shouldStickToBottom,
     );
+    const completionDebugPlan = this.buildTrailingAssistantPatchCompletionDebugPlan(
+      tailMessages.previousTailMessage,
+      tailMessages.nextTailMessage,
+      tailStatePlan.shouldStickToBottom,
+    );
     return {
       ok: true,
-      previousTailMessage: tailMessages.previousTailMessage,
-      nextTailMessage: tailMessages.nextTailMessage,
       patchTarget,
       executionPlan,
       tailStatePlan,
+      completionDebugPlan,
       runtime,
       previousTurnBodyEl: runtime?.currentTurnBodyEl ?? null,
     };
@@ -595,6 +607,18 @@ export class ConversationRenderService {
       messageId: nextTailMessage.id,
       sourceMessageId: nextTailMessage.sourceMessageId ?? null,
       shouldStickToBottom,
+    };
+  }
+
+  private buildTrailingAssistantPatchCompletionDebugPlan(
+    previousTailMessage: ChatMessage,
+    nextTailMessage: ChatMessage,
+    shouldStickToBottom: boolean,
+  ): TrailingAssistantPatchCompletionDebugPlan {
+    return {
+      shouldStickToBottom,
+      previousTail: this.host.summarizeChatMessageForDebug(previousTailMessage),
+      nextTail: this.host.summarizeChatMessageForDebug(nextTailMessage),
     };
   }
 
@@ -658,19 +682,14 @@ export class ConversationRenderService {
   }
 
   private buildTrailingAssistantPatchCompletionDebugPayload(
-    preflight: SuccessfulTrailingAssistantPatchPreflight,
+    completionDebugPlan: TrailingAssistantPatchCompletionDebugPlan,
     tabId: TabId | null,
   ): Record<string, unknown> {
-    const {
-      previousTailMessage,
-      nextTailMessage,
-      tailStatePlan,
-    } = preflight;
     return {
       tabId,
-      shouldStickToBottom: tailStatePlan.shouldStickToBottom,
-      previousTail: this.host.summarizeChatMessageForDebug(previousTailMessage),
-      nextTail: this.host.summarizeChatMessageForDebug(nextTailMessage),
+      shouldStickToBottom: completionDebugPlan.shouldStickToBottom,
+      previousTail: completionDebugPlan.previousTail,
+      nextTail: completionDebugPlan.nextTail,
     };
   }
 

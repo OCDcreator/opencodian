@@ -74,7 +74,7 @@ export class ConversationRenderService {
 - preflight 成功分支现在还会预先把“只 finalize footer / 重渲正文 content”的执行决策收敛成 `executionPlan`，让真正的 patch executor 只消费更窄的执行结果，而不再同时承担正文签名比较
 - patch 执行期间对 render runtime 的 `currentTurnBodyEl` 暂时切换与恢复，也由独立 scope helper 收口，避免主流程继续承载 DOM 上下文细节
 - 真正执行 patch 时，assistant 正文签名比较与“只 finalize footer / 重渲正文 content”分支也由独立 helper 收口
-- patch 成功后的 completion debug payload 组装也已抽到独立 helper，让主流程只保留“记录完成日志”这一层 orchestration
+- patch 成功后的 completion debug payload 组装也已抽到独立 helper，而 previous / next tail 的 debug summary 现在还会先预计算成 `completionDebugPlan`，让日志阶段不再回读整份 preflight 成功结果
 - patch skipped 分支里的 debug payload 组装同样已抽到独立 helper，主流程不再内联拼接 reason、rendered count 与附加 tail summary
 - assistant 正文签名不变时复用已有正文，只重做 persisted footer 收尾
 - patch 成功后的 message dataset 刷新、动画禁用与按需 scroll-to-bottom，现会先预计算成更窄的 `tailStatePlan` 再交给 tail-apply helper，避免这些副作用继续读取整份 preflight 成功结果
