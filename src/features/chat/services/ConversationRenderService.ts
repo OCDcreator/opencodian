@@ -259,6 +259,11 @@ type TrailingAssistantPatchSkippedDebugFinalLogInputsContract = {
   payloadPlan: TrailingAssistantPatchSkippedDebugPayloadPlan;
 };
 
+type TrailingAssistantPatchSkippedDebugFinalLogPayloadContract = {
+  tabId: TabId | null;
+  payloadPlan: TrailingAssistantPatchSkippedDebugPayloadPlan;
+};
+
 type TrailingAssistantPatchSkippedDebugFinalLogPayload = Record<
   string,
   unknown
@@ -1491,17 +1496,30 @@ export class ConversationRenderService {
   private buildTrailingAssistantPatchSkippedDebugFinalLogPlanFromInputs(
     inputs: TrailingAssistantPatchSkippedDebugFinalLogInputs,
   ): TrailingAssistantPatchSkippedDebugLogPlan {
+    const payloadContract =
+      this.buildTrailingAssistantPatchSkippedDebugFinalLogPayloadContractFromInputs(
+        inputs,
+      );
     return this.buildTrailingAssistantPatchSkippedDebugFinalLogPlan(
-      this.buildTrailingAssistantPatchSkippedDebugFinalLogPayload(inputs),
+      this.buildTrailingAssistantPatchSkippedDebugFinalLogPayload(payloadContract),
     );
   }
 
-  private buildTrailingAssistantPatchSkippedDebugFinalLogPayload(
+  private buildTrailingAssistantPatchSkippedDebugFinalLogPayloadContractFromInputs(
     inputs: TrailingAssistantPatchSkippedDebugFinalLogInputs,
-  ): TrailingAssistantPatchSkippedDebugFinalLogPayload {
+  ): TrailingAssistantPatchSkippedDebugFinalLogPayloadContract {
     return {
       tabId: inputs.tabId,
-      ...inputs.payloadPlan,
+      payloadPlan: inputs.payloadPlan,
+    };
+  }
+
+  private buildTrailingAssistantPatchSkippedDebugFinalLogPayload(
+    payloadContract: TrailingAssistantPatchSkippedDebugFinalLogPayloadContract,
+  ): TrailingAssistantPatchSkippedDebugFinalLogPayload {
+    return {
+      tabId: payloadContract.tabId,
+      ...payloadContract.payloadPlan,
     };
   }
 
