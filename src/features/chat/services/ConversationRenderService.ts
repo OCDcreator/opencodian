@@ -17,6 +17,10 @@ import {
   type TrailingAssistantPatchTailStatePlan,
 } from './TrailingAssistantPatchTailStateApplierHelper';
 import {
+  type TrailingAssistantPatchTurnBodyScopePlan,
+  withTrailingAssistantTurnBodyScope,
+} from './TrailingAssistantPatchTurnBodyScopeHelper';
+import {
   captureElementScrollRestoreSnapshot,
   isElementNearBottom,
   restoreElementScrollAfterRender,
@@ -159,16 +163,6 @@ type TrailingAssistantPatchTurnBodyScopeInputs = {
   runtime: ConversationRenderRuntimeState | null;
   parentEl: HTMLElement;
 };
-
-type TrailingAssistantPatchTurnBodyScopePlan =
-  | {
-    runtime: null;
-  }
-  | {
-    runtime: ConversationRenderRuntimeState;
-    scopedTurnBodyEl: HTMLElement;
-    restoreTurnBodyEl: HTMLElement;
-  };
 
 type TrailingAssistantPatchSuccessPlan = {
   executionPlan: TrailingAssistantPatchExecutionPlan;
@@ -485,7 +479,7 @@ export class ConversationRenderService {
     }
     const successPlan = this.buildTrailingAssistantPatchSuccessPlan(preflight.planningContext);
 
-    await this.withTrailingAssistantTurnBodyScope(successPlan.turnBodyScopePlan, async () => {
+    await withTrailingAssistantTurnBodyScope(successPlan.turnBodyScopePlan, async () => {
       await this.executeTrailingAssistantPatch(successPlan.executionPlan);
       applyTrailingAssistantPatchTailState(successPlan.tailStatePlan, tabId, this.host);
     });
@@ -1012,28 +1006,6 @@ export class ConversationRenderService {
       executionPlan.contentEl,
       executionPlan.nextTailMessage,
     );
-  }
-
-  private async withTrailingAssistantTurnBodyScope<T>(
-    turnBodyScopePlan: TrailingAssistantPatchTurnBodyScopePlan,
-    run: () => Promise<T>,
-  ): Promise<T> {
-    if (!turnBodyScopePlan.runtime) {
-      return run();
-    }
-
-    const {
-      runtime,
-      scopedTurnBodyEl,
-      restoreTurnBodyEl,
-    } = turnBodyScopePlan;
-    runtime.currentTurnBodyEl = scopedTurnBodyEl;
-
-    try {
-      return await run();
-    } finally {
-      runtime.currentTurnBodyEl = restoreTurnBodyEl;
-    }
   }
 
   private buildTrailingAssistantPatchTargetFailureResult(

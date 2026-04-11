@@ -80,8 +80,8 @@ export class ConversationRenderService {
 - `completionDebugPlan` 进入顶层装配前，也会先把 previous / next tail summary 抽到独立 helper，再只把预建 summary 与 `shouldStickToBottom` 组合成 debug contract，让 tail-outcome helper 更接近只负责装配顶层 tail-state / debug plan
 - 最终 `TrailingAssistantPatchSuccessPlan` 的返回结构也已交给独立 helper 统一收口，避免 success-plan builder 继续手工展开 `tailOutcomePlans` 与 turn-body scope 字段
 - `successPlan` 内部会继续预先把“只 finalize footer / 重渲正文 content”的执行决策收敛成 `executionPlan`，并直接把它交给 `executeTrailingAssistantPatch()`，让 patch executor 不再读取整份成功态结果或重复承担正文签名比较
-- `successPlan` 也会把 turn-body scope 切换/恢复依赖的 runtime 与目标节点预计算成 `turnBodyScopePlan`，让 `withTrailingAssistantTurnBodyScope()` 不再回读 preflight verdict 或零散 DOM 字段
-- patch 执行期间对 render runtime 的 `currentTurnBodyEl` 暂时切换与恢复，也由独立 scope helper 收口，避免主流程继续承载 DOM 上下文细节
+- `successPlan` 也会把 turn-body scope 切换/恢复依赖的 runtime 与目标节点预计算成 `turnBodyScopePlan`，再交给 `TrailingAssistantPatchTurnBodyScopeHelper.withTrailingAssistantTurnBodyScope()` 执行，避免 helper 回读 preflight verdict 或零散 DOM 字段
+- patch 执行期间对 render runtime 的 `currentTurnBodyEl` 暂时切换与恢复，现由独立的 `TrailingAssistantPatchTurnBodyScopeHelper` 收口，避免主流程继续承载 DOM 上下文细节
 - 真正执行 patch 时，assistant 正文签名比较与“只 finalize footer / 重渲正文 content”分支也由独立 helper 收口
 - patch 成功后的 completion debug 日志继续走共享的 `TrailingAssistantPatchDebugLogCoordinator`；分支私有的 completion payload inputs / payloadPlan 适配也已迁到独立的 `TrailingAssistantPatchDebugPayloadHelper`
 - patch skipped 分支也沿用同一条 coordinator，并把 rendered-count 统计与 skipped payload 适配下沉到 `TrailingAssistantPatchDebugPayloadHelper`
