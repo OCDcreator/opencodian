@@ -58,6 +58,17 @@ export function populateQuestionResolutionCard(
   });
 }
 
+export function appendQuestionResolutionCard(
+  parentEl: HTMLElement,
+  resolution: QuestionResolution,
+): HTMLElement {
+  const cardEl = parentEl.createDiv({
+    cls: 'opencodian-question-inline opencodian-question-inline--resolved',
+  });
+  populateQuestionResolutionCard(cardEl, resolution);
+  return cardEl;
+}
+
 export function buildQuestionAnswerMarkdown(request: QuestionRequest, answers: string[][]): string {
   const lines = request.questions.map((question, index) => {
     const answer = answers[index]?.join(', ') ?? '';

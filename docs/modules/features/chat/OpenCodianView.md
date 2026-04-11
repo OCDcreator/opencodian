@@ -254,7 +254,7 @@ assistant 渲染里：
 - `thinking` 块走 `ThinkingBlockRenderer`
 - `tool_use` 块走 `ToolCallRenderer`
 - `text` 块和普通 `content` 走 `MarkdownRenderService`
-- 已解析的 `questionResolution` 会根据设置插入 resolved card
+- 已解析的 `questionResolution` 会根据设置通过 `appendQuestionResolutionCard()` 插入持久化 resolved card
 
 ### 模型选择器拆分
 

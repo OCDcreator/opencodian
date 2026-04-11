@@ -114,7 +114,7 @@ import {
   QuestionResolutionCoordinator,
 } from './runtime/QuestionResolutionCoordinator';
 import {
-  populateQuestionResolutionCard,
+  appendQuestionResolutionCard,
 } from './runtime/QuestionResolutionCardRenderer';
 import {
   type StreamingInlineCardRendererHost,
@@ -7061,10 +7061,7 @@ export class OpenCodianView extends ItemView {
         await this.renderContentBlock(content, block);
       }
       if (message.questionResolution && this.shouldRenderQuestionResolutionCards()) {
-        const questionCardEl = content.createDiv({
-          cls: 'opencodian-question-inline opencodian-question-inline--resolved',
-        });
-        populateQuestionResolutionCard(questionCardEl, message.questionResolution);
+        appendQuestionResolutionCard(content, message.questionResolution);
       }
       for (const block of textBlocks) {
         await this.renderContentBlock(content, block);
@@ -7081,10 +7078,7 @@ export class OpenCodianView extends ItemView {
     }
 
     if (message.questionResolution && this.shouldRenderQuestionResolutionCards()) {
-      const questionCardEl = content.createDiv({
-        cls: 'opencodian-question-inline opencodian-question-inline--resolved',
-      });
-      populateQuestionResolutionCard(questionCardEl, message.questionResolution);
+      appendQuestionResolutionCard(content, message.questionResolution);
     }
 
     if (message.content) {

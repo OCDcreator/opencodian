@@ -1,6 +1,7 @@
 import type { QuestionRequest, QuestionResolution } from '../../../../src/core/types';
 import { t } from '../../../../src/i18n';
 import {
+  appendQuestionResolutionCard,
   buildQuestionAnswerMarkdown,
   buildQuestionRejectedMarkdown,
   populateQuestionResolutionCard,
@@ -65,6 +66,26 @@ describe('QuestionResolutionCardRenderer', () => {
     detailsEl!.dispatchEvent(new Event('toggle'));
 
     expect(hintEl?.textContent).toBe(t('chat.action.showMore'));
+  });
+
+  it('creates and populates a resolved card container inside a parent element', () => {
+    const parentEl = document.createElement('div');
+    document.body.appendChild(parentEl);
+
+    const cardEl = appendQuestionResolutionCard(parentEl, {
+      request: createQuestionRequest(),
+      status: 'answered',
+      answers: [
+        ['TypeScript'],
+        ['Windows'],
+      ],
+    });
+
+    expect(cardEl.parentElement).toBe(parentEl);
+    expect(cardEl.className).toBe('opencodian-question-inline opencodian-question-inline--resolved');
+    expect(cardEl.querySelector('.opencodian-question-inline-title')?.textContent)
+      .toBe(t('chat.question.notice.answeredTitle'));
+    expect(parentEl.querySelectorAll('.opencodian-question-inline--resolved')).toHaveLength(1);
   });
 
   it('renders rejected question summaries and builds matching markdown', () => {

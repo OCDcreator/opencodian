@@ -9,6 +9,7 @@
 
 ## 公开接口
 
+- `appendQuestionResolutionCard()`：在父容器中创建 resolved question card 外层容器，并立即调用 `populateQuestionResolutionCard()` 填充内容
 - `populateQuestionResolutionCard()`：向已创建的 resolved question card 容器写入 details/header/body/list DOM
 - `buildQuestionAnswerMarkdown()`：生成 answered question 的 markdown 摘要
 - `buildQuestionRejectedMarkdown()`：生成 rejected question 的 markdown 摘要
@@ -24,4 +25,4 @@
 - 这个模块只负责 question-resolution 摘要的展示与文本构造，不负责 `replyToQuestion()` / `rejectQuestion()` 的 service 回传
 - inline question request 的 grouped/sequential 收集逻辑仍由 `QuestionInlineCardRenderer.ts` 负责
 - `pendingQuestionResolution` 写入、卡片 clear/render 分支与贴底滚动现由 `QuestionResolutionCoordinator.ts` 负责
-- 这里输出的是 resolved summary 的静态内容；卡片 placement 与容器复用仍由上层协调 helper / inline-card helper 决定
+- `appendQuestionResolutionCard()` 只服务持久化 assistant message 的静态插入；复用 inline card 容器的运行态卡片仍由 `QuestionResolutionCoordinator.ts` 先取得容器后调用 `populateQuestionResolutionCard()`
