@@ -208,6 +208,11 @@ type TrailingAssistantPatchSkippedDebugLogPlan = {
   payload: Record<string, unknown>;
 };
 
+type TrailingAssistantPatchSkippedDebugLogPlanningContext = {
+  payloadInputs: TrailingAssistantPatchSkippedDebugPayloadInputs;
+  tabId: TabId | null;
+};
+
 type TrailingAssistantPatchSkippedDebugPlanningContext = {
   previousMessages: ChatMessage[];
   nextMessages: ChatMessage[];
@@ -1230,28 +1235,40 @@ export class ConversationRenderService {
   private logTrailingAssistantPatchSkippedDebug(
     loggingContext: TrailingAssistantPatchSkippedDebugLoggingContext,
   ): void {
-    const logPlan =
-      this.buildTrailingAssistantPatchSkippedDebugLogPlan(loggingContext);
+    const logPlan = this.buildTrailingAssistantPatchSkippedDebugLogPlan(
+      this.buildTrailingAssistantPatchSkippedDebugLogPlanningContext(
+        loggingContext,
+      ),
+    );
     this.host.logAssistantFinalizationDebug(logPlan.label, logPlan.payload);
   }
 
-  private buildTrailingAssistantPatchSkippedDebugLogPlan(
+  private buildTrailingAssistantPatchSkippedDebugLogPlanningContext(
     loggingContext: TrailingAssistantPatchSkippedDebugLoggingContext,
-  ): TrailingAssistantPatchSkippedDebugLogPlan {
+  ): TrailingAssistantPatchSkippedDebugLogPlanningContext {
     const countPlan = this.buildTrailingAssistantPatchSkippedDebugCountPlan(
       loggingContext.planningContext.previousMessages,
       loggingContext.planningContext.nextMessages,
     );
-    const payloadInputs = this.buildTrailingAssistantPatchSkippedDebugPayloadInputs(
-      loggingContext,
-      countPlan,
-    );
+
+    return {
+      payloadInputs: this.buildTrailingAssistantPatchSkippedDebugPayloadInputs(
+        loggingContext,
+        countPlan,
+      ),
+      tabId: loggingContext.planningContext.tabId,
+    };
+  }
+
+  private buildTrailingAssistantPatchSkippedDebugLogPlan(
+    planningContext: TrailingAssistantPatchSkippedDebugLogPlanningContext,
+  ): TrailingAssistantPatchSkippedDebugLogPlan {
     const payloadPlan = this.buildTrailingAssistantPatchSkippedDebugPayloadPlan(
-      payloadInputs,
+      planningContext.payloadInputs,
     );
     const finalLogInputs =
       this.buildTrailingAssistantPatchSkippedDebugFinalLogInputs(
-        loggingContext.planningContext,
+        planningContext.tabId,
         payloadPlan,
       );
     return this.buildTrailingAssistantPatchSkippedDebugFinalLogPlan(
@@ -1260,11 +1277,11 @@ export class ConversationRenderService {
   }
 
   private buildTrailingAssistantPatchSkippedDebugFinalLogInputs(
-    planningContext: TrailingAssistantPatchSkippedDebugPlanningContext,
+    tabId: TabId | null,
     payloadPlan: TrailingAssistantPatchSkippedDebugPayloadPlan,
   ): TrailingAssistantPatchSkippedDebugFinalLogInputs {
     return {
-      tabId: planningContext.tabId,
+      tabId,
       payloadPlan,
     };
   }
