@@ -198,6 +198,13 @@ type TrailingAssistantPatchSuccessPlanParts = {
   turnBodyScopePlan: TrailingAssistantPatchTurnBodyScopePlan;
 };
 
+type TrailingAssistantPatchExecutionTailInputs = {
+  previousTailMessage: ChatMessage;
+  nextTailMessage: ChatMessage;
+  patchTarget: TrailingAssistantPatchDomTarget;
+  shouldStickToBottom: boolean;
+};
+
 type TrailingAssistantPatchExecutionTailPlanningContext = {
   previousTailMessage: ChatMessage;
   nextTailMessage: ChatMessage;
@@ -739,7 +746,9 @@ export class ConversationRenderService {
     planningContext: TrailingAssistantPatchPlanningContext,
   ): TrailingAssistantPatchExecutionTailPlanParts {
     const executionTailPlanningContext =
-      this.buildTrailingAssistantPatchExecutionTailPlanningContext(planningContext);
+      this.buildTrailingAssistantPatchExecutionTailPlanningContext(
+        this.buildTrailingAssistantPatchExecutionTailInputs(planningContext),
+      );
     return {
       executionPlan:
         this.buildTrailingAssistantPatchExecutionPlanFromExecutionTailPlanningContext(
@@ -752,14 +761,25 @@ export class ConversationRenderService {
     };
   }
 
-  private buildTrailingAssistantPatchExecutionTailPlanningContext(
+  private buildTrailingAssistantPatchExecutionTailInputs(
     planningContext: TrailingAssistantPatchPlanningContext,
-  ): TrailingAssistantPatchExecutionTailPlanningContext {
+  ): TrailingAssistantPatchExecutionTailInputs {
     return {
       previousTailMessage: planningContext.previousTailMessage,
       nextTailMessage: planningContext.nextTailMessage,
       patchTarget: planningContext.patchTarget,
       shouldStickToBottom: planningContext.shouldStickToBottom,
+    };
+  }
+
+  private buildTrailingAssistantPatchExecutionTailPlanningContext(
+    inputs: TrailingAssistantPatchExecutionTailInputs,
+  ): TrailingAssistantPatchExecutionTailPlanningContext {
+    return {
+      previousTailMessage: inputs.previousTailMessage,
+      nextTailMessage: inputs.nextTailMessage,
+      patchTarget: inputs.patchTarget,
+      shouldStickToBottom: inputs.shouldStickToBottom,
     };
   }
 
