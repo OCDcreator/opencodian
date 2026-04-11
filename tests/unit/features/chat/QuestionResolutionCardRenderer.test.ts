@@ -2,6 +2,7 @@ import type { QuestionRequest, QuestionResolution } from '../../../../src/core/t
 import { t } from '../../../../src/i18n';
 import {
   appendQuestionResolutionCard,
+  buildQuestionResolutionCardRenderPlan,
   buildQuestionAnswerMarkdown,
   buildQuestionRejectedMarkdown,
   populateQuestionResolutionCard,
@@ -86,6 +87,33 @@ describe('QuestionResolutionCardRenderer', () => {
     expect(cardEl.querySelector('.opencodian-question-inline-title')?.textContent)
       .toBe(t('chat.question.notice.answeredTitle'));
     expect(parentEl.querySelectorAll('.opencodian-question-inline--resolved')).toHaveLength(1);
+  });
+
+  it('splits structured assistant blocks around the resolved card insertion point', () => {
+    const renderPlan = buildQuestionResolutionCardRenderPlan([
+      { type: 'text', text: 'Final answer' },
+      { type: 'thinking', thinking: 'Reasoning' },
+      { type: 'tool_use', toolName: 'search' },
+      { type: 'text', text: 'Follow-up detail' },
+    ]);
+
+    expect(renderPlan.hasContentBlocks).toBe(true);
+    expect(renderPlan.blocksBeforeCard).toEqual([
+      { type: 'thinking', thinking: 'Reasoning' },
+      { type: 'tool_use', toolName: 'search' },
+    ]);
+    expect(renderPlan.blocksAfterCard).toEqual([
+      { type: 'text', text: 'Final answer' },
+      { type: 'text', text: 'Follow-up detail' },
+    ]);
+  });
+
+  it('returns an empty render plan when structured blocks are missing', () => {
+    expect(buildQuestionResolutionCardRenderPlan()).toEqual({
+      hasContentBlocks: false,
+      blocksBeforeCard: [],
+      blocksAfterCard: [],
+    });
   });
 
   it('renders rejected question summaries and builds matching markdown', () => {

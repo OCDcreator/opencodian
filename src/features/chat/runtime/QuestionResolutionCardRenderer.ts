@@ -1,10 +1,16 @@
-import type { QuestionRequest, QuestionResolution } from '../../../core/types';
+import type { ContentBlock, QuestionRequest, QuestionResolution } from '../../../core/types';
 import { t } from '../../../i18n';
 
 interface QuestionResolutionCopy {
   icon: string;
   title: string;
   body: string;
+}
+
+export interface QuestionResolutionCardRenderPlan {
+  hasContentBlocks: boolean;
+  blocksBeforeCard: ContentBlock[];
+  blocksAfterCard: ContentBlock[];
 }
 
 export function populateQuestionResolutionCard(
@@ -67,6 +73,34 @@ export function appendQuestionResolutionCard(
   });
   populateQuestionResolutionCard(cardEl, resolution);
   return cardEl;
+}
+
+export function buildQuestionResolutionCardRenderPlan(
+  contentBlocks?: ContentBlock[],
+): QuestionResolutionCardRenderPlan {
+  if (!contentBlocks || contentBlocks.length === 0) {
+    return {
+      hasContentBlocks: false,
+      blocksBeforeCard: [],
+      blocksAfterCard: [],
+    };
+  }
+
+  const blocksBeforeCard: ContentBlock[] = [];
+  const blocksAfterCard: ContentBlock[] = [];
+  for (const block of contentBlocks) {
+    if (block.type === 'text') {
+      blocksAfterCard.push(block);
+    } else {
+      blocksBeforeCard.push(block);
+    }
+  }
+
+  return {
+    hasContentBlocks: true,
+    blocksBeforeCard,
+    blocksAfterCard,
+  };
 }
 
 export function buildQuestionAnswerMarkdown(request: QuestionRequest, answers: string[][]): string {

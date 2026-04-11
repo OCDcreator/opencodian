@@ -115,6 +115,7 @@ import {
 } from './runtime/QuestionResolutionCoordinator';
 import {
   appendQuestionResolutionCard,
+  buildQuestionResolutionCardRenderPlan,
 } from './runtime/QuestionResolutionCardRenderer';
 import {
   type StreamingInlineCardRendererHost,
@@ -7052,18 +7053,18 @@ export class OpenCodianView extends ItemView {
     message: ChatMessage,
   ): Promise<void> {
     const streamStatusLabel = this.getAssistantStreamStatusLabel(message);
+    const questionResolutionRenderPlan = buildQuestionResolutionCardRenderPlan(
+      message.contentBlocks,
+    );
 
-    if (message.contentBlocks && message.contentBlocks.length > 0) {
-      const nonTextBlocks = message.contentBlocks.filter((block) => block.type !== 'text');
-      const textBlocks = message.contentBlocks.filter((block) => block.type === 'text');
-
-      for (const block of nonTextBlocks) {
+    if (questionResolutionRenderPlan.hasContentBlocks) {
+      for (const block of questionResolutionRenderPlan.blocksBeforeCard) {
         await this.renderContentBlock(content, block);
       }
       if (message.questionResolution && this.shouldRenderQuestionResolutionCards()) {
         appendQuestionResolutionCard(content, message.questionResolution);
       }
-      for (const block of textBlocks) {
+      for (const block of questionResolutionRenderPlan.blocksAfterCard) {
         await this.renderContentBlock(content, block);
       }
 
