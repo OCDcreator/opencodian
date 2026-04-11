@@ -173,6 +173,11 @@ type TrailingAssistantPatchCompletionDebugFinalLogInputs = {
   payloadPlan: TrailingAssistantPatchCompletionDebugPayloadPlan;
 };
 
+type TrailingAssistantPatchCompletionDebugFinalLogInputsContract = {
+  tabId: TabId | null;
+  payloadPlan: TrailingAssistantPatchCompletionDebugPayloadPlan;
+};
+
 type TrailingAssistantPatchCompletionDebugFinalLogPayload = {
   tabId: TabId | null;
   shouldStickToBottom: boolean;
@@ -1253,21 +1258,38 @@ export class ConversationRenderService {
     planningContext: TrailingAssistantPatchCompletionDebugLogPlanningContext,
     payloadPlan: TrailingAssistantPatchCompletionDebugPayloadPlan,
   ): TrailingAssistantPatchCompletionDebugFinalLogInputs {
+    const inputsContract =
+      this.buildTrailingAssistantPatchCompletionDebugFinalLogInputsContractFromLogPlanningContext(
+        planningContext,
+        payloadPlan,
+      );
     return this.buildTrailingAssistantPatchCompletionDebugFinalLogInputs(
-      planningContext.tabId,
-      payloadPlan,
+      inputsContract.tabId,
+      inputsContract.payloadPlan,
     );
+  }
+
+  private buildTrailingAssistantPatchCompletionDebugFinalLogInputsContractFromLogPlanningContext(
+    planningContext: TrailingAssistantPatchCompletionDebugLogPlanningContext,
+    payloadPlan: TrailingAssistantPatchCompletionDebugPayloadPlan,
+  ): TrailingAssistantPatchCompletionDebugFinalLogInputsContract {
+    return {
+      tabId: planningContext.tabId,
+      payloadPlan,
+    };
   }
 
   private buildTrailingAssistantPatchCompletionDebugFinalLogPlanFromLogPlanningContext(
     planningContext: TrailingAssistantPatchCompletionDebugLogPlanningContext,
     payloadPlan: TrailingAssistantPatchCompletionDebugPayloadPlan,
   ): TrailingAssistantPatchCompletionDebugLogPlan {
-    return this.buildTrailingAssistantPatchCompletionDebugFinalLogPlanFromInputs(
+    const finalLogInputs =
       this.buildTrailingAssistantPatchCompletionDebugFinalLogInputsFromLogPlanningContext(
         planningContext,
         payloadPlan,
-      ),
+      );
+    return this.buildTrailingAssistantPatchCompletionDebugFinalLogPlanFromInputs(
+      finalLogInputs,
     );
   }
 
