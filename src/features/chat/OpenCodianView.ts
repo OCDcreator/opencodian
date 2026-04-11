@@ -103,6 +103,10 @@ import {
   AssistantShellRenderer,
 } from './runtime/AssistantShellRenderer';
 import {
+  type StreamingInlineCardRendererHost,
+  StreamingInlineCardRenderer,
+} from './runtime/StreamingInlineCardRenderer';
+import {
   type SendPipelineDebugContentBlock,
   type SendPipelineDebugPort,
   type SendPipelineHost,
@@ -642,6 +646,7 @@ export class OpenCodianView extends ItemView {
   private messageSendPreparationService: MessageSendPreparationService;
   private messageFinalizationService: MessageFinalizationService;
   private assistantShellRenderer: AssistantShellRenderer;
+  private streamingInlineCardRenderer: StreamingInlineCardRenderer;
   private sendPipelineRuntime: SendPipelineRuntime;
   private conversationSyncIntervalId: number | null = null;
   private omoBackgroundTaskLogStates = new Map<string, OmoBackgroundTaskLogState>();
@@ -2121,6 +2126,7 @@ export class OpenCodianView extends ItemView {
     this.messageSendPreparationService = new MessageSendPreparationService(this.createMessageSendPreparationHost());
     this.messageFinalizationService = new MessageFinalizationService(this.createMessageFinalizationHost());
     this.assistantShellRenderer = new AssistantShellRenderer(this.createAssistantShellRendererHost());
+    this.streamingInlineCardRenderer = new StreamingInlineCardRenderer(this.createStreamingInlineCardRendererHost());
     this.sendPipelineRuntime = new SendPipelineRuntime(
       this.createSendPipelineRuntimeHost(),
       this.messageSendPreparationService,
@@ -2547,6 +2553,15 @@ export class OpenCodianView extends ItemView {
         copyBtn.innerHTML = COPY_ICON;
         this.attachCopyButtonBehavior(copyBtn, content);
       },
+    };
+  }
+
+  private createStreamingInlineCardRendererHost(): StreamingInlineCardRendererHost {
+    return {
+      getActiveTabId: () => this.getActiveTabId(),
+      getTabRuntimeState: (tabId) => this.getTabRuntimeState(tabId),
+      revealStreamingAssistantMessageElement: (tabId) =>
+        this.assistantShellRenderer.revealStreamingAssistantMessageElement(tabId),
     };
   }
 
@@ -10972,37 +10987,6 @@ export class OpenCodianView extends ItemView {
     }
   }
 
-  private createStreamingInlineCard(
-    className: string,
-    tabId: TabId | null = this.getActiveTabId(),
-  ): HTMLElement | null {
-    const messageEl = this.getTabRuntimeState(tabId)?.streamingMessageEl ?? null;
-    if (!messageEl) {
-      return null;
-    }
-
-    const cardEl = document.createElement('div');
-    cardEl.className = className;
-
-    const lastToolCall = messageEl.querySelector('.streaming-tool-call:last-of-type');
-    if (lastToolCall?.parentNode) {
-      lastToolCall.parentNode.insertBefore(cardEl, lastToolCall.nextSibling);
-      this.assistantShellRenderer.revealStreamingAssistantMessageElement(tabId);
-      return cardEl;
-    }
-
-    const contentEl = messageEl.querySelector('.opencodian-message-content');
-    if (contentEl) {
-      contentEl.appendChild(cardEl);
-      this.assistantShellRenderer.revealStreamingAssistantMessageElement(tabId);
-      return cardEl;
-    }
-
-    messageEl.appendChild(cardEl);
-    this.assistantShellRenderer.revealStreamingAssistantMessageElement(tabId);
-    return cardEl;
-  }
-
   private getOrCreateQuestionInlineCard(
     className: string,
     tabId: TabId | null = this.getActiveTabId(),
@@ -11017,7 +11001,7 @@ export class OpenCodianView extends ItemView {
       return existing;
     }
 
-    const cardEl = this.createStreamingInlineCard(className, tabId);
+    const cardEl = this.streamingInlineCardRenderer.createStreamingInlineCard(className, tabId);
     if (!cardEl) {
       return null;
     }
@@ -11513,34 +11497,14 @@ export class OpenCodianView extends ItemView {
       return description === toolKey ? t('permissionDialog.tools.default') : description;
     };
 
-    // Find the message element to insert the permission card
-    // Note: Tool calls are rendered directly on messageEl, not in contentEl
-    const messageEl = this.getTabRuntimeState(tabId)?.streamingMessageEl ?? null;
-    if (!messageEl) {
+    const permissionCard = this.streamingInlineCardRenderer.createStreamingInlineCard(
+      'opencodian-permission-inline',
+      tabId,
+    );
+    if (!permissionCard) {
       logger.error('No streaming message element found for permission card');
       return;
     }
-
-    // Find the last tool call card to insert permission card after it
-    const lastToolCall = messageEl.querySelector('.streaming-tool-call:last-of-type');
-
-    // Create inline permission card
-    const permissionCard = document.createElement('div');
-    permissionCard.className = 'opencodian-permission-inline';
-
-    if (lastToolCall && lastToolCall.parentNode) {
-      // Insert after the last tool call (so it appears right after the tool)
-      lastToolCall.parentNode.insertBefore(permissionCard, lastToolCall.nextSibling);
-    } else {
-      // Fallback: append to message content area if no tool call found
-      const contentEl = messageEl.querySelector('.opencodian-message-content');
-      if (contentEl) {
-        contentEl.appendChild(permissionCard);
-      } else {
-        messageEl.appendChild(permissionCard);
-      }
-    }
-    this.assistantShellRenderer.revealStreamingAssistantMessageElement(tabId);
 
     // Header with tool name
     const headerEl = permissionCard.createDiv({ cls: 'opencodian-permission-inline-header' });

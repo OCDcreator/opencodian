@@ -93,6 +93,7 @@ docs/modules/
 │   │   ├── runtime/
 │   │   │   ├── AssistantShellRenderer.md
 │   │   │   ├── AssistantNoticeRenderer.md
+│   │   │   ├── StreamingInlineCardRenderer.md
 │   │   │   ├── buildLocalStreamOutcome.md
 │   │   │   ├── LocalStreamMessagePersistence.md
 │   │   │   ├── PendingIndicatorController.md

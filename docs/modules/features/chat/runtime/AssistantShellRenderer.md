@@ -24,5 +24,6 @@
 ## 注意事项
 
 - 这个模块只负责 assistant streaming shell，不负责 notice message 构造；notice 仍由 `AssistantNoticeRenderer.ts` 负责。
+- permission / question inline card 的插入位置与 reveal 编排已经迁到 `StreamingInlineCardRenderer.ts`，不要再把 post-tool-call placement 细节加回这里。
 - `setStreamingAssistantMessageVisibility()` 的日志与隐藏规则仍然由 view host 决定，不要在这里复制额外状态判断。
 - `createAssistantMessageElement()` 必须继续写回 tab runtime 的 `streamingMessageEl` / `streamingContentEl`，否则 chunk router 与 local finalizer 会失联。

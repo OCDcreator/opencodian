@@ -1,25 +1,7 @@
-import { WorkspaceLeaf } from 'obsidian';
-
-jest.mock('../../../../src/core/opencode', () => ({
-  OpenCodeService: class OpenCodeService {},
-}));
-
-import { OpenCodianView } from '../../../../src/features/chat/OpenCodianView';
 import { AssistantShellRenderer } from '../../../../src/features/chat/runtime/AssistantShellRenderer';
+import { StreamingInlineCardRenderer } from '../../../../src/features/chat/runtime/StreamingInlineCardRenderer';
 
 describe('OpenCodianView streaming assistant shell visibility', () => {
-  function createView(): OpenCodianView {
-    return new OpenCodianView(new WorkspaceLeaf(), {
-      settings: {
-        effortLevel: 'medium',
-        thinkingBudget: 0,
-        locale: 'en',
-      },
-      openCodeService: {},
-      storage: {},
-    } as never);
-  }
-
   it('keeps deferred streaming assistant shells hidden until reveal is requested', () => {
     const turnBody = document.createElement('div');
     const runtime = {
@@ -54,27 +36,26 @@ describe('OpenCodianView streaming assistant shell visibility', () => {
   });
 
   it('reveals a hidden streaming shell when adding an inline card', () => {
-    const view = createView() as unknown as {
-      createStreamingInlineCard: (className: string, tabId: string) => HTMLElement | null;
-      getTabRuntimeState: (tabId: string) => { streamingMessageEl: HTMLElement | null } | null;
-      getActiveTabId: () => string;
-      shouldAutoScroll: (tabId: string) => boolean;
-      scheduleSettledScrollToBottomIfNeeded: (autoScroll?: boolean, tabId?: string) => void;
-    };
-
     const messageEl = document.createElement('div');
     messageEl.hidden = true;
-    messageEl.createDiv({ cls: 'opencodian-message-content' });
+    const contentEl = messageEl.createDiv({ cls: 'opencodian-message-content' });
+    const toolCallEl = messageEl.createDiv({ cls: 'streaming-tool-call' });
+    const revealSpy = jest.fn(() => {
+      messageEl.hidden = false;
+      return messageEl;
+    });
+    const renderer = new StreamingInlineCardRenderer({
+      getActiveTabId: () => 'tab-1',
+      getTabRuntimeState: () => ({ streamingMessageEl: messageEl }),
+      revealStreamingAssistantMessageElement: revealSpy,
+    });
 
-    jest.spyOn(view, 'getTabRuntimeState').mockReturnValue({ streamingMessageEl: messageEl } as never);
-    jest.spyOn(view, 'getActiveTabId').mockReturnValue('tab-1');
-    jest.spyOn(view, 'shouldAutoScroll').mockReturnValue(true);
-    jest.spyOn(view, 'scheduleSettledScrollToBottomIfNeeded').mockImplementation(() => {});
-
-    const cardEl = view.createStreamingInlineCard('opencodian-question-inline', 'tab-1');
+    const cardEl = renderer.createStreamingInlineCard('opencodian-question-inline', 'tab-1');
 
     expect(cardEl).not.toBeNull();
     expect(messageEl.hidden).toBe(false);
-    expect(messageEl.querySelector('.opencodian-question-inline')).toBe(cardEl);
+    expect(toolCallEl.nextSibling).toBe(cardEl);
+    expect(contentEl.contains(cardEl)).toBe(false);
+    expect(revealSpy).toHaveBeenCalledWith('tab-1');
   });
 });
