@@ -106,6 +106,10 @@ import {
   PermissionInlineCardRenderer,
 } from './runtime/PermissionInlineCardRenderer';
 import {
+  type QuestionInlineCardRendererHost,
+  QuestionInlineCardRenderer,
+} from './runtime/QuestionInlineCardRenderer';
+import {
   type StreamingInlineCardRendererHost,
   StreamingInlineCardRenderer,
 } from './runtime/StreamingInlineCardRenderer';
@@ -651,6 +655,7 @@ export class OpenCodianView extends ItemView {
   private assistantShellRenderer: AssistantShellRenderer;
   private streamingInlineCardRenderer: StreamingInlineCardRenderer;
   private permissionInlineCardRenderer: PermissionInlineCardRenderer;
+  private questionInlineCardRenderer: QuestionInlineCardRenderer;
   private sendPipelineRuntime: SendPipelineRuntime;
   private conversationSyncIntervalId: number | null = null;
   private omoBackgroundTaskLogStates = new Map<string, OmoBackgroundTaskLogState>();
@@ -2132,6 +2137,10 @@ export class OpenCodianView extends ItemView {
     this.assistantShellRenderer = new AssistantShellRenderer(this.createAssistantShellRendererHost());
     this.streamingInlineCardRenderer = new StreamingInlineCardRenderer(this.createStreamingInlineCardRendererHost());
     this.permissionInlineCardRenderer = new PermissionInlineCardRenderer(this.streamingInlineCardRenderer);
+    this.questionInlineCardRenderer = new QuestionInlineCardRenderer(
+      this.streamingInlineCardRenderer,
+      this.createQuestionInlineCardRendererHost(),
+    );
     this.sendPipelineRuntime = new SendPipelineRuntime(
       this.createSendPipelineRuntimeHost(),
       this.messageSendPreparationService,
@@ -2567,6 +2576,16 @@ export class OpenCodianView extends ItemView {
       getTabRuntimeState: (tabId) => this.getTabRuntimeState(tabId),
       revealStreamingAssistantMessageElement: (tabId) =>
         this.assistantShellRenderer.revealStreamingAssistantMessageElement(tabId),
+    };
+  }
+
+  private createQuestionInlineCardRendererHost(): QuestionInlineCardRendererHost {
+    return {
+      getActiveTabId: () => this.getActiveTabId(),
+      getTabRuntimeState: (tabId) => this.getTabRuntimeState(tabId),
+      keepQuestionCardPinnedToBottom: (tabId) => {
+        this.keepQuestionCardPinnedToBottom(tabId);
+      },
     };
   }
 
@@ -10992,40 +11011,6 @@ export class OpenCodianView extends ItemView {
     }
   }
 
-  private getOrCreateQuestionInlineCard(
-    className: string,
-    tabId: TabId | null = this.getActiveTabId(),
-  ): HTMLElement | null {
-    const runtime = this.getTabRuntimeState(tabId);
-    const existing = runtime?.questionInlineCardEl ?? null;
-
-    if (existing?.isConnected) {
-      existing.className = className;
-      existing.empty();
-      this.keepQuestionCardPinnedToBottom(tabId);
-      return existing;
-    }
-
-    const cardEl = this.streamingInlineCardRenderer.createStreamingInlineCard(className, tabId);
-    if (!cardEl) {
-      return null;
-    }
-
-    if (runtime) {
-      runtime.questionInlineCardEl = cardEl;
-    }
-    this.keepQuestionCardPinnedToBottom(tabId);
-    return cardEl;
-  }
-
-  private clearQuestionInlineCard(tabId: TabId | null = this.getActiveTabId()): void {
-    const runtime = this.getTabRuntimeState(tabId);
-    runtime?.questionInlineCardEl?.remove();
-    if (runtime) {
-      runtime.questionInlineCardEl = null;
-    }
-  }
-
   private async showQuestionDialog(
     request: QuestionRequest,
     tabId: TabId | null = this.getActiveTabId(),
@@ -11039,11 +11024,14 @@ export class OpenCodianView extends ItemView {
       }
     }
 
-    const action = this.plugin.settings.questionDisplayMode === 'single'
-      ? await this.collectSequentialQuestionAction(request, tabId)
-      : await this.collectGroupedQuestionAction(request, tabId);
+    const action = await this.questionInlineCardRenderer.collectAction(
+      request,
+      this.plugin.settings.questionDisplayMode,
+      tabId,
+    );
 
     if (!action) {
+      logger.error('No streaming message element found for question card');
       return;
     }
 
@@ -11081,7 +11069,7 @@ export class OpenCodianView extends ItemView {
     }
 
     if (!this.shouldRenderQuestionResolutionCards()) {
-      this.clearQuestionInlineCard(tabId);
+      this.questionInlineCardRenderer.clear(tabId);
       return;
     }
 
@@ -11092,7 +11080,7 @@ export class OpenCodianView extends ItemView {
     resolution: QuestionResolution,
     tabId: TabId | null,
   ): void {
-    const cardEl = this.getOrCreateQuestionInlineCard(
+    const cardEl = this.questionInlineCardRenderer.getOrCreateCard(
       'opencodian-question-inline opencodian-question-inline--resolved',
       tabId,
     );
@@ -11165,301 +11153,6 @@ export class OpenCodianView extends ItemView {
     }
 
     this.scheduleSettledScrollToBottomIfNeeded(this.shouldAutoScroll(tabId), tabId);
-  }
-
-  private async collectGroupedQuestionAction(
-    request: QuestionRequest,
-    tabId: TabId | null,
-  ): Promise<{ type: 'reply'; answers: string[][] } | { type: 'reject' } | null> {
-    const questionCard = this.getOrCreateQuestionInlineCard('opencodian-question-inline', tabId);
-    if (!questionCard) {
-      logger.error('No streaming message element found for question card');
-      return null;
-    }
-
-    const headerEl = questionCard.createDiv({ cls: 'opencodian-question-inline-header' });
-    headerEl.createSpan({ cls: 'opencodian-question-inline-icon', text: '?' });
-    headerEl.createSpan({
-      cls: 'opencodian-question-inline-title',
-      text: t('chat.question.title'),
-    });
-
-    const state = request.questions.map(() => ({
-      optionInputs: [] as HTMLInputElement[],
-      customInput: null as HTMLInputElement | null,
-    }));
-
-    request.questions.forEach((question, index) => {
-      const sectionEl = questionCard.createDiv({ cls: 'opencodian-question-inline-section' });
-      sectionEl.createDiv({
-        cls: 'opencodian-question-inline-header-text',
-        text: question.header,
-      });
-      sectionEl.createDiv({
-        cls: 'opencodian-question-inline-body-text',
-        text: question.question,
-      });
-
-      if (question.options.length > 0) {
-        const optionsEl = sectionEl.createDiv({ cls: 'opencodian-question-inline-options' });
-        const inputType = question.multiple ? 'checkbox' : 'radio';
-
-        for (const option of question.options) {
-          const labelEl = optionsEl.createEl('label', {
-            cls: 'opencodian-question-inline-option',
-          });
-          const inputEl = labelEl.createEl('input', {
-            attr: {
-              type: inputType,
-              name: `opencodian-question-${request.id}-${index}`,
-              value: option.label,
-            },
-          });
-          state[index].optionInputs.push(inputEl);
-
-          const textWrap = labelEl.createDiv({ cls: 'opencodian-question-inline-option-copy' });
-          textWrap.createDiv({
-            cls: 'opencodian-question-inline-option-label',
-            text: option.label,
-          });
-          if (option.description) {
-            textWrap.createDiv({
-              cls: 'opencodian-question-inline-option-description',
-              text: option.description,
-            });
-          }
-        }
-      }
-
-      if (question.custom !== false) {
-        const customInput = sectionEl.createEl('input', {
-          cls: 'opencodian-question-inline-custom',
-          attr: {
-            type: 'text',
-            placeholder: t('chat.question.customPlaceholder'),
-          },
-        });
-        state[index].customInput = customInput;
-      }
-    });
-
-    const buttonsEl = questionCard.createDiv({ cls: 'opencodian-question-inline-buttons' });
-    const submitBtn = buttonsEl.createEl('button', {
-      cls: 'opencodian-question-inline-btn is-submit',
-      text: t('chat.question.submit'),
-      attr: { type: 'button' },
-    });
-    const rejectBtn = buttonsEl.createEl('button', {
-      cls: 'opencodian-question-inline-btn is-reject',
-      text: t('chat.question.reject'),
-      attr: { type: 'button' },
-    });
-
-    const action = await new Promise<{ type: 'reply'; answers: string[][] } | { type: 'reject' }>((resolve) => {
-      submitBtn.addEventListener('click', () => {
-        submitBtn.blur();
-        const answers = request.questions.map((question, index) => {
-          const selectedValues = state[index].optionInputs
-            .filter((input) => input.checked)
-            .map((input) => input.value);
-          const customValue = state[index].customInput?.value.trim() ?? '';
-
-          if (question.multiple) {
-            const combined = customValue ? [...selectedValues, customValue] : selectedValues;
-            return [...new Set(combined)];
-          }
-
-          if (customValue) {
-            return [customValue];
-          }
-
-          return selectedValues.length > 0 ? [selectedValues[0]] : [];
-        });
-
-        const hasEmptyAnswer = answers.some((answer) => answer.length === 0);
-        if (hasEmptyAnswer) {
-          new Notice(t('chat.question.answerRequired'));
-          return;
-        }
-
-        resolve({ type: 'reply', answers });
-      });
-
-      rejectBtn.addEventListener('click', () => {
-        rejectBtn.blur();
-        resolve({ type: 'reject' });
-      });
-    });
-
-    this.keepQuestionCardPinnedToBottom(tabId);
-    return action;
-  }
-
-  private async collectSequentialQuestionAction(
-    request: QuestionRequest,
-    tabId: TabId | null,
-  ): Promise<{ type: 'reply'; answers: string[][] } | { type: 'reject' } | null> {
-    const answers: string[][] = [];
-
-    for (let index = 0; index < request.questions.length; index += 1) {
-      const action = await this.promptForSingleQuestion({
-        request,
-        question: request.questions[index],
-        index,
-        total: request.questions.length,
-        tabId,
-      });
-
-      if (!action) {
-        return null;
-      }
-
-      if (action.type === 'reject') {
-        return action;
-      }
-
-      answers.push(action.answer);
-    }
-
-    return {
-      type: 'reply',
-      answers,
-    };
-  }
-
-  private async promptForSingleQuestion(options: {
-    request: QuestionRequest;
-    question: QuestionRequest['questions'][number];
-    index: number;
-    total: number;
-    tabId: TabId | null;
-  }): Promise<{ type: 'reply'; answer: string[] } | { type: 'reject' } | null> {
-    const {
-      request,
-      question,
-      index,
-      total,
-      tabId,
-    } = options;
-    const questionCard = this.getOrCreateQuestionInlineCard('opencodian-question-inline', tabId);
-    if (!questionCard) {
-      logger.error('No streaming message element found for question card');
-      return null;
-    }
-
-    const headerEl = questionCard.createDiv({ cls: 'opencodian-question-inline-header' });
-    headerEl.createSpan({ cls: 'opencodian-question-inline-icon', text: '?' });
-    headerEl.createSpan({
-      cls: 'opencodian-question-inline-title',
-      text: t('chat.question.title'),
-    });
-    if (total > 1) {
-      headerEl.createSpan({
-        cls: 'opencodian-question-inline-progress',
-        text: t('chat.question.progress', {
-          current: String(index + 1),
-          total: String(total),
-        }),
-      });
-    }
-
-    const sectionEl = questionCard.createDiv({ cls: 'opencodian-question-inline-section' });
-    sectionEl.createDiv({
-      cls: 'opencodian-question-inline-header-text',
-      text: question.header,
-    });
-    sectionEl.createDiv({
-      cls: 'opencodian-question-inline-body-text',
-      text: question.question,
-    });
-
-    const optionInputs: HTMLInputElement[] = [];
-    let customInput: HTMLInputElement | null = null;
-
-    if (question.options.length > 0) {
-      const optionsEl = sectionEl.createDiv({ cls: 'opencodian-question-inline-options' });
-      const inputType = question.multiple ? 'checkbox' : 'radio';
-
-      for (const option of question.options) {
-        const labelEl = optionsEl.createEl('label', {
-          cls: 'opencodian-question-inline-option',
-        });
-        const inputEl = labelEl.createEl('input', {
-          attr: {
-            type: inputType,
-            name: `opencodian-question-${request.id}-${index}`,
-            value: option.label,
-          },
-        });
-        optionInputs.push(inputEl);
-
-        const textWrap = labelEl.createDiv({ cls: 'opencodian-question-inline-option-copy' });
-        textWrap.createDiv({
-          cls: 'opencodian-question-inline-option-label',
-          text: option.label,
-        });
-        if (option.description) {
-          textWrap.createDiv({
-            cls: 'opencodian-question-inline-option-description',
-            text: option.description,
-          });
-        }
-      }
-    }
-
-    if (question.custom !== false) {
-      customInput = sectionEl.createEl('input', {
-        cls: 'opencodian-question-inline-custom',
-        attr: {
-          type: 'text',
-          placeholder: t('chat.question.customPlaceholder'),
-        },
-      });
-    }
-
-    const buttonsEl = questionCard.createDiv({ cls: 'opencodian-question-inline-buttons' });
-    const submitBtn = buttonsEl.createEl('button', {
-      cls: 'opencodian-question-inline-btn is-submit',
-      text: index === total - 1 ? t('chat.question.submit') : t('chat.question.next'),
-      attr: { type: 'button' },
-    });
-    const rejectBtn = buttonsEl.createEl('button', {
-      cls: 'opencodian-question-inline-btn is-reject',
-      text: t('chat.question.reject'),
-      attr: { type: 'button' },
-    });
-
-    const action = await new Promise<{ type: 'reply'; answer: string[] } | { type: 'reject' }>((resolve) => {
-      submitBtn.addEventListener('click', () => {
-        submitBtn.blur();
-        const selectedValues = optionInputs
-          .filter((input) => input.checked)
-          .map((input) => input.value);
-        const customValue = customInput?.value.trim() ?? '';
-
-        const answer = question.multiple
-          ? [...new Set(customValue ? [...selectedValues, customValue] : selectedValues)]
-          : customValue
-            ? [customValue]
-            : selectedValues.length > 0
-              ? [selectedValues[0]]
-              : [];
-
-        if (answer.length === 0) {
-          new Notice(t('chat.question.answerRequired'));
-          return;
-        }
-
-        resolve({ type: 'reply', answer });
-      });
-
-      rejectBtn.addEventListener('click', () => {
-        rejectBtn.blur();
-        resolve({ type: 'reject' });
-      });
-    });
-    this.keepQuestionCardPinnedToBottom(tabId);
-    return action;
   }
 
   private buildQuestionAnswerMarkdown(request: QuestionRequest, answers: string[][]): string {

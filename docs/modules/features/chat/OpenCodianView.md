@@ -218,6 +218,7 @@ interface TabRuntimeState {
 - `AssistantNoticeRenderer.ts`：封装 stream error / interrupted notice 构造与 placeholder notice 渲染
 - `StreamingInlineCardRenderer.ts`：封装 permission/question inline card 的共享插入位置与 shell reveal
 - `PermissionInlineCardRenderer.ts`：封装 permission inline card 的内容构造与按钮等待
+- `QuestionInlineCardRenderer.ts`：封装 grouped/sequential question inline card 的内容构造、容器复用与按钮等待
 - `PendingIndicatorController.ts`：管理 delayed pending DOM
 - `SendPipelineTrace.ts`：维护 trace id、progress checkpoint 与调试快照
 - `sendPipelineContent.ts`：提供 streaming content 纯函数
@@ -298,7 +299,7 @@ model selector 现在拆成了几层协作：
 这三个辅助子系统都由 view 负责路由：
 
 - session todo/status：通过 `openCodeService.subscribeToSessionTodoUpdates()` 和 `subscribeToSessionStatusUpdates()` 接入
-- question：既支持输入区上方的 `QuestionDock`，也支持内联 question card 和已回答/已拒绝回顾卡片
+- question：既支持输入区上方的 `QuestionDock`，也支持由 `QuestionInlineCardRenderer` 管理的内联待回答卡片，以及 view 内的已回答/已拒绝回顾卡片
 - background task：从 OMO 注入、`toolName === 'task'` 的 tool block、以及后续 system reminder 回写推导任务进度；运行态以内联状态条挂在对应 assistant turn 下，完成态则延迟落成持久化 notice
 - background task 的 stale 判定现在额外受 `backgroundTaskAwaitingAuthoritativeSync` / hydration 保护：reload 或首次装载后，只有在至少一次权威消息同步完成后，才允许把“仍在运行”降级成 stopped/stale notice
 
