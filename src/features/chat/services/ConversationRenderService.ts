@@ -574,13 +574,21 @@ export class ConversationRenderService {
   private buildTrailingAssistantPatchSuccessPlan(
     planningContext: TrailingAssistantPatchPlanningContext,
   ): TrailingAssistantPatchSuccessPlan {
-    return this.buildTrailingAssistantPatchSuccessPlanFromParts({
+    return this.buildTrailingAssistantPatchSuccessPlanFromParts(
+      this.buildTrailingAssistantPatchSuccessPlanParts(planningContext),
+    );
+  }
+
+  private buildTrailingAssistantPatchSuccessPlanParts(
+    planningContext: TrailingAssistantPatchPlanningContext,
+  ): TrailingAssistantPatchSuccessPlanParts {
+    return {
       turnBodyScopePlan:
         this.buildTrailingAssistantPatchTurnBodyScopePlanFromPlanningContext(planningContext),
       executionPlan:
         this.buildTrailingAssistantPatchExecutionPlanFromPlanningContext(planningContext),
       tailOutcomePlans: this.buildTrailingAssistantPatchTailOutcomePlans(planningContext),
-    });
+    };
   }
 
   private buildTrailingAssistantPatchDomTarget(
