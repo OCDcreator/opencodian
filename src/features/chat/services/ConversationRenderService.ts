@@ -258,6 +258,15 @@ type TrailingAssistantPatchContainerResult =
     reason: 'missing-container-or-inactive-tab';
   };
 
+type TrailingAssistantPatchTargetFailureReason =
+  | 'missing-existing-tail-element'
+  | 'missing-tail-content-element';
+
+type TrailingAssistantPatchTargetFailureResult = {
+  ok: false;
+  reason: TrailingAssistantPatchTargetFailureReason;
+};
+
 type TrailingAssistantPatchTargets =
   | {
     ok: true;
@@ -265,10 +274,7 @@ type TrailingAssistantPatchTargets =
     existingContentEl: HTMLElement;
     parentEl: HTMLElement;
   }
-  | {
-    ok: false;
-    reason: string;
-  };
+  | TrailingAssistantPatchTargetFailureResult;
 
 type TrailingAssistantPatchRenderedMessagesResult =
   | {
@@ -1012,17 +1018,30 @@ export class ConversationRenderService {
     };
   }
 
+  private buildTrailingAssistantPatchTargetFailureResult(
+    reason: TrailingAssistantPatchTargetFailureReason,
+  ): TrailingAssistantPatchTargetFailureResult {
+    return {
+      ok: false,
+      reason,
+    };
+  }
+
   private resolveTrailingAssistantPatchTargets(
     messagesEl: HTMLElement,
   ): TrailingAssistantPatchTargets {
     const existingTailMessageEl = this.findExistingTrailingAssistantElement(messagesEl);
     if (!existingTailMessageEl || !(existingTailMessageEl.parentElement instanceof HTMLElement)) {
-      return { ok: false, reason: 'missing-existing-tail-element' };
+      return this.buildTrailingAssistantPatchTargetFailureResult(
+        'missing-existing-tail-element',
+      );
     }
 
     const existingContentEl = existingTailMessageEl.querySelector('.opencodian-message-content');
     if (!(existingContentEl instanceof HTMLElement)) {
-      return { ok: false, reason: 'missing-tail-content-element' };
+      return this.buildTrailingAssistantPatchTargetFailureResult(
+        'missing-tail-content-element',
+      );
     }
 
     return {
