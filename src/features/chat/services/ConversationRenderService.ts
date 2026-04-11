@@ -3,7 +3,6 @@ import {
   type Conversation,
 } from '../../../core/types';
 import type { TabId } from '../tabs';
-import { buildTrailingAssistantPatchDebugLogPlanFromLoggingContext } from './TrailingAssistantPatchDebugLogCoordinator';
 import {
   buildTrailingAssistantPatchCompletionDebugLoggingContext,
   buildTrailingAssistantPatchSkippedDebugLoggingContext,
@@ -12,14 +11,9 @@ import {
   type TrailingAssistantPatchSkippedDebugLoggingContext,
 } from './TrailingAssistantPatchDebugLoggingContextHelper';
 import {
-  type TrailingAssistantPatchDebugLogPlan,
-} from './TrailingAssistantPatchDebugLogHelper';
-import {
-  buildTrailingAssistantPatchCompletionDebugPayloadInputs,
-  buildTrailingAssistantPatchCompletionDebugPayloadPlan,
-  buildTrailingAssistantPatchSkippedDebugPayloadInputs,
-  buildTrailingAssistantPatchSkippedDebugPayloadPlan,
-} from './TrailingAssistantPatchDebugPayloadHelper';
+  buildTrailingAssistantPatchCompletionDebugLogPlan,
+  buildTrailingAssistantPatchSkippedDebugLogPlan,
+} from './TrailingAssistantPatchDebugLogPlanHelper';
 import {
   captureElementScrollRestoreSnapshot,
   isElementNearBottom,
@@ -158,9 +152,6 @@ type TrailingAssistantPatchCompletionDebugSummaryPlan = {
   nextTail: Record<string, unknown> | null;
 };
 
-type TrailingAssistantPatchCompletionDebugLogPlan =
-  TrailingAssistantPatchDebugLogPlan<'patch-trailing-assistant-render-complete'>;
-
 type TrailingAssistantPatchNonMergeableTailFailurePlan = {
   reason: 'tail-message-not-mergeable-assistant';
   payload: {
@@ -168,9 +159,6 @@ type TrailingAssistantPatchNonMergeableTailFailurePlan = {
     nextTail: Record<string, unknown> | null;
   };
 };
-
-type TrailingAssistantPatchSkippedDebugLogPlan =
-  TrailingAssistantPatchDebugLogPlan<'patch-trailing-assistant-render-skipped'>;
 
 type TrailingAssistantPatchTurnBodyScopeInputs = {
   runtime: ConversationRenderRuntimeState | null;
@@ -1067,54 +1055,18 @@ export class ConversationRenderService {
   private logTrailingAssistantPatchCompletionDebug(
     loggingContext: TrailingAssistantPatchCompletionDebugLoggingContext,
   ): void {
-    const logPlan = this.buildTrailingAssistantPatchCompletionDebugLogPlanFromLoggingContext(
-      loggingContext,
-    );
+    const logPlan = buildTrailingAssistantPatchCompletionDebugLogPlan(loggingContext);
     this.host.logAssistantFinalizationDebug(logPlan.label, logPlan.payload);
-  }
-
-  private buildTrailingAssistantPatchCompletionDebugLogPlanFromLoggingContext(
-    loggingContext: TrailingAssistantPatchCompletionDebugLoggingContext,
-  ): TrailingAssistantPatchCompletionDebugLogPlan {
-    return buildTrailingAssistantPatchDebugLogPlanFromLoggingContext({
-      label: 'patch-trailing-assistant-render-complete',
-      loggingContext,
-      buildPayloadInputsFromLoggingContext: (context) =>
-        buildTrailingAssistantPatchCompletionDebugPayloadInputs(
-          context.completionDebugPlan,
-        ),
-      buildPayloadPlan: buildTrailingAssistantPatchCompletionDebugPayloadPlan,
-      getTabId: (context) => context.tabId,
-    });
   }
 
   private logTrailingAssistantPatchSkippedDebug(
     loggingContext: TrailingAssistantPatchSkippedDebugLoggingContext,
   ): void {
-    const logPlan = this.buildTrailingAssistantPatchSkippedDebugLogPlanFromLoggingContext(
+    const logPlan = buildTrailingAssistantPatchSkippedDebugLogPlan(
       loggingContext,
+      (messages) => this.host.getMessagesForRender(messages),
     );
     this.host.logAssistantFinalizationDebug(logPlan.label, logPlan.payload);
-  }
-
-  private buildTrailingAssistantPatchSkippedDebugLogPlanFromLoggingContext(
-    loggingContext: TrailingAssistantPatchSkippedDebugLoggingContext,
-  ): TrailingAssistantPatchSkippedDebugLogPlan {
-    return buildTrailingAssistantPatchDebugLogPlanFromLoggingContext({
-      label: 'patch-trailing-assistant-render-skipped',
-      loggingContext,
-      buildPayloadInputsFromLoggingContext: (context) =>
-        buildTrailingAssistantPatchSkippedDebugPayloadInputs({
-          reason: context.reason,
-          payload: context.payload,
-          previousMessages: context.planningContext.previousMessages,
-          nextMessages: context.planningContext.nextMessages,
-          getMessagesForRender: (messages) =>
-            this.host.getMessagesForRender(messages),
-        }),
-      buildPayloadPlan: buildTrailingAssistantPatchSkippedDebugPayloadPlan,
-      getTabId: (context) => context.planningContext.tabId,
-    });
   }
 
   private buildTrailingAssistantPatchTargetFailureResult(
