@@ -178,6 +178,12 @@ type TrailingAssistantPatchTailOutcomePlanningContext = {
   shouldStickToBottom: boolean;
 };
 
+type TrailingAssistantPatchCompletionDebugPlanningContext = {
+  previousTailMessage: ChatMessage;
+  nextTailMessage: ChatMessage;
+  shouldStickToBottom: boolean;
+};
+
 type TrailingAssistantPatchExecutionTailPlanParts = {
   executionPlan: TrailingAssistantPatchExecutionPlan;
   tailOutcomePlans: TrailingAssistantPatchTailOutcomePlans;
@@ -739,11 +745,34 @@ export class ConversationRenderService {
     );
     return {
       tailStatePlan,
-      completionDebugPlan: this.buildTrailingAssistantPatchCompletionDebugPlan(
-        planningContext.previousTailMessage,
-        planningContext.nextTailMessage,
-        tailStatePlan.shouldStickToBottom,
+      completionDebugPlan:
+        this.buildTrailingAssistantPatchCompletionDebugPlanFromTailOutcomePlanningContext(
+          planningContext,
+          tailStatePlan,
+        ),
+    };
+  }
+
+  private buildTrailingAssistantPatchCompletionDebugPlanFromTailOutcomePlanningContext(
+    planningContext: TrailingAssistantPatchTailOutcomePlanningContext,
+    tailStatePlan: TrailingAssistantPatchTailStatePlan,
+  ): TrailingAssistantPatchCompletionDebugPlan {
+    return this.buildTrailingAssistantPatchCompletionDebugPlan(
+      this.buildTrailingAssistantPatchCompletionDebugPlanningContext(
+        planningContext,
+        tailStatePlan,
       ),
+    );
+  }
+
+  private buildTrailingAssistantPatchCompletionDebugPlanningContext(
+    planningContext: TrailingAssistantPatchTailOutcomePlanningContext,
+    tailStatePlan: TrailingAssistantPatchTailStatePlan,
+  ): TrailingAssistantPatchCompletionDebugPlanningContext {
+    return {
+      previousTailMessage: planningContext.previousTailMessage,
+      nextTailMessage: planningContext.nextTailMessage,
+      shouldStickToBottom: tailStatePlan.shouldStickToBottom,
     };
   }
 
@@ -772,14 +801,12 @@ export class ConversationRenderService {
   }
 
   private buildTrailingAssistantPatchCompletionDebugPlan(
-    previousTailMessage: ChatMessage,
-    nextTailMessage: ChatMessage,
-    shouldStickToBottom: boolean,
+    planningContext: TrailingAssistantPatchCompletionDebugPlanningContext,
   ): TrailingAssistantPatchCompletionDebugPlan {
     return {
-      shouldStickToBottom,
-      previousTail: this.host.summarizeChatMessageForDebug(previousTailMessage),
-      nextTail: this.host.summarizeChatMessageForDebug(nextTailMessage),
+      shouldStickToBottom: planningContext.shouldStickToBottom,
+      previousTail: this.host.summarizeChatMessageForDebug(planningContext.previousTailMessage),
+      nextTail: this.host.summarizeChatMessageForDebug(planningContext.nextTailMessage),
     };
   }
 

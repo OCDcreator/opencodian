@@ -75,12 +75,13 @@ export class ConversationRenderService {
 - `buildTrailingAssistantPatchSuccessPlan()` 现在进一步只保留 success-plan 骨架编排：它会先把 turn-body scope 与独立的 execution/tail-outcome contract 收束成 `planParts`，再交给最终 success-plan shape helper 统一返回
 - `planParts` 收集阶段里，turn-body scope 会先从 `planningContext` 交给独立 helper；execution plan 与 tail outcome 则会先收束到更窄的共享 planning context，再分别交给顶层 execution/tail-outcome contract builder 统一装配
 - `tailOutcomePlans` 在进入 `tailStatePlan` + `completionDebugPlan` 组装前，还会把共享 execution/tail context 再缩到只保留 `messageEl`、tail messages 与 stick-to-bottom 状态的专用 planning context，避免 tail-outcome builder 继续读取完整 `patchTarget`
+- `completionDebugPlan` 进入 summarized tail payload 组装前，也会再从 tail-outcome planning context 缩到只保留 tail messages 与 `shouldStickToBottom` 的 debug contract，让 tail-outcome helper 只负责装配顶层 tail-state / debug plan
 - 最终 `TrailingAssistantPatchSuccessPlan` 的返回结构也已交给独立 helper 统一收口，避免 success-plan builder 继续手工展开 `tailOutcomePlans` 与 turn-body scope 字段
 - `successPlan` 内部会继续预先把“只 finalize footer / 重渲正文 content”的执行决策收敛成 `executionPlan`，并直接把它交给 `executeTrailingAssistantPatch()`，让 patch executor 不再读取整份成功态结果或重复承担正文签名比较
 - `successPlan` 也会把 turn-body scope 切换/恢复依赖的 runtime 与目标节点预计算成 `turnBodyScopePlan`，让 `withTrailingAssistantTurnBodyScope()` 不再回读 preflight verdict 或零散 DOM 字段
 - patch 执行期间对 render runtime 的 `currentTurnBodyEl` 暂时切换与恢复，也由独立 scope helper 收口，避免主流程继续承载 DOM 上下文细节
 - 真正执行 patch 时，assistant 正文签名比较与“只 finalize footer / 重渲正文 content”分支也由独立 helper 收口
-- patch 成功后的 completion debug payload 组装也已抽到独立 helper，而 previous / next tail 的 debug summary 现在还会先预计算成 `completionDebugPlan`，让日志阶段不再回读整份 `successPlan`
+- patch 成功后的 completion debug payload 组装也已抽到独立 helper，而 previous / next tail 的 debug summary 现在会先经由更窄的 debug contract 预计算成 `completionDebugPlan`，让 tail-outcome helper 与日志阶段都不再回读整份 `successPlan`
 - patch skipped 分支里的 debug payload 组装同样已抽到独立 helper，主流程不再内联拼接 reason、rendered count 与附加 tail summary
 - assistant 正文签名不变时复用已有正文，只重做 persisted footer 收尾
 - patch 成功后的 message dataset 刷新、动画禁用与按需 scroll-to-bottom，现会先预计算成更窄的 `tailStatePlan` 再交给 tail-apply helper，避免这些副作用继续读取整份 `successPlan`
