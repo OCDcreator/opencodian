@@ -355,6 +355,46 @@ describe('ConversationRenderService', () => {
     expect(host.renderRuntime.currentTurnBodyEl).toBe(previousTurnBodyEl);
   });
 
+  it('logs trailing assistant patch completion with summarized tail payloads', async () => {
+    const previousMessages = [
+      createMessage({ id: 'assistant-1', content: 'Stable answer', timestamp: 1 }),
+    ];
+    const nextMessages = [
+      createMessage({ id: 'assistant-2', content: 'Updated answer', timestamp: 2 }),
+    ];
+    const host = createHost({
+      shouldAutoScroll: jest.fn().mockReturnValue(true),
+      summarizeChatMessageForDebug: jest.fn().mockImplementation((message: ChatMessage | null | undefined) =>
+        message
+          ? {
+            id: message.id,
+            content: message.content,
+          }
+          : null),
+    });
+    appendAssistantTail(host.messagesEl, 'Stable answer');
+    const service = new ConversationRenderService(host);
+
+    const patched = await service.patchTrailingAssistantRender(previousMessages, nextMessages, 'tab-1');
+
+    expect(patched).toBe(true);
+    expect(host.logAssistantFinalizationDebug).toHaveBeenCalledWith(
+      'patch-trailing-assistant-render-complete',
+      {
+        tabId: 'tab-1',
+        shouldStickToBottom: true,
+        previousTail: {
+          id: 'assistant-1',
+          content: 'Stable answer',
+        },
+        nextTail: {
+          id: 'assistant-2',
+          content: 'Updated answer',
+        },
+      },
+    );
+  });
+
   it('applies trailing assistant tail state after patching', async () => {
     const previousMessages = [
       createMessage({ id: 'assistant-1', content: 'Stable answer', timestamp: 1, sourceMessageId: 'source-1' }),

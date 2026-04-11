@@ -274,23 +274,15 @@ export class ConversationRenderService {
       return fail(preflight.reason, preflight.payload);
     }
 
-    const {
-      previousTailMessage,
-      nextTailMessage,
-      shouldStickToBottom,
-    } = preflight;
-
     await this.withTrailingAssistantTurnBodyScope(preflight, async () => {
       await this.executeTrailingAssistantPatch(preflight);
       this.applyTrailingAssistantPatchTailState(preflight, tabId);
     });
 
-    this.host.logAssistantFinalizationDebug('patch-trailing-assistant-render-complete', {
-      tabId,
-      shouldStickToBottom,
-      previousTail: this.host.summarizeChatMessageForDebug(previousTailMessage),
-      nextTail: this.host.summarizeChatMessageForDebug(nextTailMessage),
-    });
+    this.host.logAssistantFinalizationDebug(
+      'patch-trailing-assistant-render-complete',
+      this.buildTrailingAssistantPatchCompletionDebugPayload(preflight, tabId),
+    );
     return true;
   }
 
@@ -445,6 +437,23 @@ export class ConversationRenderService {
     if (shouldStickToBottom) {
       this.host.scrollToBottom({ tabId });
     }
+  }
+
+  private buildTrailingAssistantPatchCompletionDebugPayload(
+    preflight: SuccessfulTrailingAssistantPatchPreflight,
+    tabId: TabId | null,
+  ): Record<string, unknown> {
+    const {
+      previousTailMessage,
+      nextTailMessage,
+      shouldStickToBottom,
+    } = preflight;
+    return {
+      tabId,
+      shouldStickToBottom,
+      previousTail: this.host.summarizeChatMessageForDebug(previousTailMessage),
+      nextTail: this.host.summarizeChatMessageForDebug(nextTailMessage),
+    };
   }
 
   private resolveTrailingAssistantPatchTargets(
