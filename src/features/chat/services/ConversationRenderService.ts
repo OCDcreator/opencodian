@@ -153,6 +153,11 @@ type TrailingAssistantPatchSuccessPlan = {
   turnBodyScopePlan: TrailingAssistantPatchTurnBodyScopePlan;
 };
 
+type TrailingAssistantPatchTailOutcomePlans = {
+  tailStatePlan: TrailingAssistantPatchTailStatePlan;
+  completionDebugPlan: TrailingAssistantPatchCompletionDebugPlan;
+};
+
 type TrailingAssistantPatchPlanningContext = {
   previousTailMessage: ChatMessage;
   nextTailMessage: ChatMessage;
@@ -567,25 +572,14 @@ export class ConversationRenderService {
       planningContext.runtime,
       planningContext.parentEl,
     );
-    const executionPlan = this.buildTrailingAssistantPatchExecutionPlan(
-      planningContext.previousTailMessage,
-      planningContext.nextTailMessage,
-      planningContext.patchTarget,
+    const executionPlan = this.buildTrailingAssistantPatchExecutionPlanFromPlanningContext(
+      planningContext,
     );
-    const tailStatePlan = this.buildTrailingAssistantPatchTailStatePlan(
-      planningContext.patchTarget,
-      planningContext.nextTailMessage,
-      planningContext.shouldStickToBottom,
-    );
-    const completionDebugPlan = this.buildTrailingAssistantPatchCompletionDebugPlan(
-      planningContext.previousTailMessage,
-      planningContext.nextTailMessage,
-      tailStatePlan.shouldStickToBottom,
-    );
+    const tailOutcomePlans = this.buildTrailingAssistantPatchTailOutcomePlans(planningContext);
     return {
       executionPlan,
-      tailStatePlan,
-      completionDebugPlan,
+      tailStatePlan: tailOutcomePlans.tailStatePlan,
+      completionDebugPlan: tailOutcomePlans.completionDebugPlan,
       turnBodyScopePlan,
     };
   }
@@ -622,6 +616,16 @@ export class ConversationRenderService {
       === this.host.assistantTailRender.getBodySignature(nextTailMessage);
   }
 
+  private buildTrailingAssistantPatchExecutionPlanFromPlanningContext(
+    planningContext: TrailingAssistantPatchPlanningContext,
+  ): TrailingAssistantPatchExecutionPlan {
+    return this.buildTrailingAssistantPatchExecutionPlan(
+      planningContext.previousTailMessage,
+      planningContext.nextTailMessage,
+      planningContext.patchTarget,
+    );
+  }
+
   private buildTrailingAssistantPatchExecutionPlan(
     previousTailMessage: ChatMessage,
     nextTailMessage: ChatMessage,
@@ -640,6 +644,24 @@ export class ConversationRenderService {
       messageEl: patchTarget.messageEl,
       contentEl: patchTarget.contentEl,
       nextTailMessage,
+    };
+  }
+
+  private buildTrailingAssistantPatchTailOutcomePlans(
+    planningContext: TrailingAssistantPatchPlanningContext,
+  ): TrailingAssistantPatchTailOutcomePlans {
+    const tailStatePlan = this.buildTrailingAssistantPatchTailStatePlan(
+      planningContext.patchTarget,
+      planningContext.nextTailMessage,
+      planningContext.shouldStickToBottom,
+    );
+    return {
+      tailStatePlan,
+      completionDebugPlan: this.buildTrailingAssistantPatchCompletionDebugPlan(
+        planningContext.previousTailMessage,
+        planningContext.nextTailMessage,
+        tailStatePlan.shouldStickToBottom,
+      ),
     };
   }
 
