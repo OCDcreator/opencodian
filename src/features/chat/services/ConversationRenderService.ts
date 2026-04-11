@@ -141,9 +141,12 @@ type TrailingAssistantPatchCompletionDebugSummaryPlan = {
   nextTail: Record<string, unknown> | null;
 };
 
-type TrailingAssistantPatchNonMergeableTailSummaryPlan = {
-  previousTail: Record<string, unknown> | null;
-  nextTail: Record<string, unknown> | null;
+type TrailingAssistantPatchNonMergeableTailFailurePlan = {
+  reason: 'tail-message-not-mergeable-assistant';
+  payload: {
+    previousTail: Record<string, unknown> | null;
+    nextTail: Record<string, unknown> | null;
+  };
 };
 
 type TrailingAssistantPatchSkippedDebugCountPlan = {
@@ -216,11 +219,6 @@ type TrailingAssistantPatchCompletionDebugPlanningContext = {
 };
 
 type TrailingAssistantPatchCompletionDebugSummaryPlanningContext = {
-  previousTailMessage: ChatMessage;
-  nextTailMessage: ChatMessage;
-};
-
-type TrailingAssistantPatchNonMergeableTailSummaryPlanningContext = {
   previousTailMessage: ChatMessage;
   nextTailMessage: ChatMessage;
 };
@@ -301,11 +299,7 @@ type TrailingAssistantPatchTailMessagesResult =
     previousTailMessage: ChatMessage;
     nextTailMessage: ChatMessage;
   }
-  | {
-    ok: false;
-    reason: 'tail-message-not-mergeable-assistant';
-    payload: Record<string, unknown>;
-  };
+  | ({ ok: false } & TrailingAssistantPatchNonMergeableTailFailurePlan);
 
 type SuccessfulTrailingAssistantPatchTargets = Extract<
   TrailingAssistantPatchTargets,
@@ -498,31 +492,16 @@ export class ConversationRenderService {
       && nextTailMessage.displayStyle !== 'notice';
   }
 
-  private buildTrailingAssistantPatchNonMergeableTailPayload(
-    summaryPlan: TrailingAssistantPatchNonMergeableTailSummaryPlan,
-  ): Record<string, unknown> {
-    return {
-      previousTail: summaryPlan.previousTail,
-      nextTail: summaryPlan.nextTail,
-    };
-  }
-
-  private buildTrailingAssistantPatchNonMergeableTailSummaryPlan(
-    planningContext: TrailingAssistantPatchNonMergeableTailSummaryPlanningContext,
-  ): TrailingAssistantPatchNonMergeableTailSummaryPlan {
-    return {
-      previousTail: this.host.summarizeChatMessageForDebug(planningContext.previousTailMessage),
-      nextTail: this.host.summarizeChatMessageForDebug(planningContext.nextTailMessage),
-    };
-  }
-
-  private buildTrailingAssistantPatchNonMergeableTailSummaryPlanningContext(
+  private buildTrailingAssistantPatchNonMergeableTailFailurePlan(
     previousTailMessage: ChatMessage,
     nextTailMessage: ChatMessage,
-  ): TrailingAssistantPatchNonMergeableTailSummaryPlanningContext {
+  ): TrailingAssistantPatchNonMergeableTailFailurePlan {
     return {
-      previousTailMessage,
-      nextTailMessage,
+      reason: 'tail-message-not-mergeable-assistant',
+      payload: {
+        previousTail: this.host.summarizeChatMessageForDebug(previousTailMessage),
+        nextTail: this.host.summarizeChatMessageForDebug(nextTailMessage),
+      },
     };
   }
 
@@ -535,14 +514,9 @@ export class ConversationRenderService {
     if (!this.isPatchableAssistantTail(previousTailMessage, nextTailMessage)) {
       return {
         ok: false,
-        reason: 'tail-message-not-mergeable-assistant',
-        payload: this.buildTrailingAssistantPatchNonMergeableTailPayload(
-          this.buildTrailingAssistantPatchNonMergeableTailSummaryPlan(
-            this.buildTrailingAssistantPatchNonMergeableTailSummaryPlanningContext(
-              previousTailMessage,
-              nextTailMessage,
-            ),
-          ),
+        ...this.buildTrailingAssistantPatchNonMergeableTailFailurePlan(
+          previousTailMessage,
+          nextTailMessage,
         ),
       };
     }
