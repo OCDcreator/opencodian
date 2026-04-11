@@ -1186,10 +1186,9 @@ export class ConversationRenderService {
         loggingContext,
         payloadPlan,
       );
-    const logPlan = this.buildTrailingAssistantPatchCompletionDebugFinalLogPlan(
-      this.buildTrailingAssistantPatchCompletionDebugFinalLogPayload(
+    const logPlan =
+      this.buildTrailingAssistantPatchCompletionDebugFinalLogPlanFromInputs(
         finalLogInputs,
-      ),
     );
     this.host.logAssistantFinalizationDebug(logPlan.label, logPlan.payload);
   }
@@ -1259,6 +1258,14 @@ export class ConversationRenderService {
       tabId,
       payloadPlan,
     };
+  }
+
+  private buildTrailingAssistantPatchCompletionDebugFinalLogPlanFromInputs(
+    inputs: TrailingAssistantPatchCompletionDebugFinalLogInputs,
+  ): TrailingAssistantPatchCompletionDebugLogPlan {
+    return this.buildTrailingAssistantPatchCompletionDebugFinalLogPlan(
+      this.buildTrailingAssistantPatchCompletionDebugFinalLogPayload(inputs),
+    );
   }
 
   private buildTrailingAssistantPatchCompletionDebugFinalLogPlan(
