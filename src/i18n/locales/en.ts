@@ -1360,13 +1360,17 @@ export const enTranslations = {
   'context.usage.unavailable': 'Context usage unavailable',
   'context.usage.noData': 'No context usage data yet.',
   'context.usage.estimated': 'Estimated from streaming usage. Detailed calibration will come next.',
+  'context.rawMessages.title': 'Raw messages',
+  'context.rawMessages.loading': 'Loading raw messages...',
+  'context.rawMessages.empty': 'No raw messages available yet.',
+  'context.rawMessages.error': 'Failed to load raw messages.',
   'context.breakdown.title': 'Context breakdown',
   'context.breakdown.system': 'System',
   'context.breakdown.user': 'User',
   'context.breakdown.assistant': 'Assistant',
   'context.breakdown.tool': 'Tool',
   'context.breakdown.other': 'Other',
-  'context.breakdown.note': '* Estimated from character counts.',
+  'context.breakdown.note': '* Only the breakdown below approximates input-token attribution from character counts; the token totals above prefer OpenCode usage values.',
 
   // Tool approval
   'toolApproval.title': 'Tool Execution Request',

@@ -4,17 +4,28 @@ import type { ContextBreakdownSegment, Conversation, TabContextState } from '../
 import { getLocale, t } from '../../../i18n';
 import { ContextUsageService } from '../services/ContextUsageService';
 
+export interface ContextRawMessageItem {
+  id: string;
+  role: string;
+  createdAt: number | null;
+  payload: string;
+}
+
 export class ContextDetailModal extends Modal {
+  private isClosed = false;
+
   constructor(
     app: App,
     private readonly conversation: Conversation | null,
     private readonly contextState: TabContextState | null,
     private readonly systemPrompt?: string | null,
+    private readonly rawMessageLoader?: () => Promise<ContextRawMessageItem[]>,
   ) {
     super(app);
   }
 
   onOpen(): void {
+    this.isClosed = false;
     const { contentEl } = this;
     const summary = ContextUsageService.summarize(this.contextState);
     const tokens = ContextUsageService.getDisplayTokenBreakdown(this.contextState);
@@ -102,6 +113,20 @@ export class ContextDetailModal extends Modal {
       this.renderBreakdown(contentEl, breakdown);
     }
 
+    const rawMessagesSectionEl = contentEl.createDiv({ cls: 'opencodian-context-raw-messages' });
+    rawMessagesSectionEl.createDiv({
+      cls: 'opencodian-context-raw-messages-title',
+      text: t('context.rawMessages.title'),
+    });
+    const rawMessagesBodyEl = rawMessagesSectionEl.createDiv({
+      cls: 'opencodian-context-raw-messages-body',
+    });
+    rawMessagesBodyEl.createDiv({
+      cls: 'opencodian-context-raw-messages-state is-loading',
+      text: t('context.rawMessages.loading'),
+    });
+    void this.loadRawMessages(rawMessagesBodyEl);
+
     if (!this.contextState?.preciseTokens) {
       contentEl.createDiv({
         cls: 'opencodian-context-modal-note',
@@ -116,6 +141,7 @@ export class ContextDetailModal extends Modal {
   }
 
   onClose(): void {
+    this.isClosed = true;
     this.contentEl.empty();
   }
 
@@ -167,6 +193,72 @@ export class ContextDetailModal extends Modal {
         text: ContextUsageService.formatNumber(segment.tokens),
       });
     }
+  }
+
+  private async loadRawMessages(containerEl: HTMLElement): Promise<void> {
+    if (!this.rawMessageLoader) {
+      this.renderRawMessageState(containerEl, 'empty');
+      return;
+    }
+
+    try {
+      const items = await this.rawMessageLoader();
+      if (this.isClosed) {
+        return;
+      }
+
+      if (items.length === 0) {
+        this.renderRawMessageState(containerEl, 'empty');
+        return;
+      }
+
+      this.renderRawMessages(containerEl, items);
+    } catch {
+      if (this.isClosed) {
+        return;
+      }
+      this.renderRawMessageState(containerEl, 'error');
+    }
+  }
+
+  private renderRawMessages(containerEl: HTMLElement, items: ContextRawMessageItem[]): void {
+    containerEl.empty();
+
+    for (const item of items) {
+      const detailsEl = containerEl.createEl('details', {
+        cls: 'opencodian-context-raw-message',
+      });
+      const summaryEl = detailsEl.createEl('summary', {
+        cls: 'opencodian-context-raw-message-summary',
+      });
+      summaryEl.createDiv({
+        cls: 'opencodian-context-raw-message-summary-main',
+        text: `${item.role} • ${item.id}`,
+      });
+      summaryEl.createDiv({
+        cls: 'opencodian-context-raw-message-summary-time',
+        text: this.formatTimestamp(item.createdAt),
+      });
+
+      const contentEl = detailsEl.createDiv({
+        cls: 'opencodian-context-raw-message-content',
+      });
+      const preEl = contentEl.createEl('pre', {
+        cls: 'opencodian-context-raw-message-pre',
+      });
+      preEl.createEl('code', {
+        cls: 'opencodian-context-raw-message-code',
+        text: item.payload,
+      });
+    }
+  }
+
+  private renderRawMessageState(containerEl: HTMLElement, state: 'empty' | 'error'): void {
+    containerEl.empty();
+    containerEl.createDiv({
+      cls: `opencodian-context-raw-messages-state is-${state}`,
+      text: t(state === 'empty' ? 'context.rawMessages.empty' : 'context.rawMessages.error'),
+    });
   }
 
   private getBreakdownLabel(key: ContextBreakdownSegment['key']): string {

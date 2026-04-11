@@ -100,7 +100,7 @@ import { type CollapsibleState, setupCollapsible } from './rendering/collapsible
 import { ContextUsageService } from './services/ContextUsageService';
 import { TitleGenerationService } from './services/TitleGenerationService';
 import { type RestoredTabState, TabBar, type TabBarLayoutMode, type TabId, TabManager } from './tabs';
-import { ContextDetailModal } from './ui/ContextDetailModal';
+import { type ContextRawMessageItem, ContextDetailModal } from './ui/ContextDetailModal';
 import {
   chooseContextFile,
   type ContextFileCatalog,
@@ -11607,6 +11607,23 @@ export class OpenCodianView extends ItemView {
       this.currentConversation,
       contextState,
       this.plugin.settings.systemPrompt,
+      async (): Promise<ContextRawMessageItem[]> => {
+        const sessionId = this.currentConversation?.openCodeSessionId;
+        if (!sessionId) {
+          return [];
+        }
+
+        const messages = await this.plugin.openCodeService.getSessionMessages(sessionId);
+        return messages.map(({ info, parts }) => ({
+          id: info.id,
+          role: info.role,
+          createdAt: info.time.created ?? null,
+          payload: JSON.stringify({
+            message: info,
+            parts,
+          }, null, 2),
+        }));
+      },
     ).open();
   }
 

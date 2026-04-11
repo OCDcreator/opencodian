@@ -1360,13 +1360,17 @@ export const zhTranslations = {
   'context.usage.unavailable': '上下文使用不可用',
   'context.usage.noData': '当前还没有可显示的上下文使用数据。',
   'context.usage.estimated': '当前为基于流式 usage 的估算值，后续再补精确校准。',
+  'context.rawMessages.title': '原始消息',
+  'context.rawMessages.loading': '正在加载原始消息...',
+  'context.rawMessages.empty': '当前没有可显示的原始消息。',
+  'context.rawMessages.error': '加载原始消息失败。',
   'context.breakdown.title': '上下文拆分',
   'context.breakdown.system': '系统提示',
   'context.breakdown.user': '用户',
   'context.breakdown.assistant': '助手',
   'context.breakdown.tool': '工具',
   'context.breakdown.other': '其他',
-  'context.breakdown.note': '* 基于字符估算。',
+  'context.breakdown.note': '* 仅下方拆分图按字符近似分摊输入 Token；上方 Token 统计优先使用 OpenCode 返回的 usage。',
 
   // Tool approval
   'toolApproval.title': '工具执行请求',

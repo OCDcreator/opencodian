@@ -12,6 +12,42 @@
 
 ---
 
+## 2026-04-11 上下文使用详情补充原始消息区
+
+### 🎯 改动目标
+
+- 参考 OpenCode 桌面端，在“上下文使用详情”弹窗中补充可展开的原始消息列表
+- 保留现有 Token 统计、context ring 与上下文拆分逻辑，避免把原始消息塞进 tab usage state
+- 澄清拆分图文案：仅拆分图按字符近似分摊，上方 Token 统计优先使用 OpenCode 返回的 usage
+
+### ✅ 本轮调整
+
+- `src/features/chat/ui/ContextDetailModal.ts`
+- `src/features/chat/OpenCodianView.ts`
+  - 新增 `ContextRawMessageItem` view-model 与可选 `rawMessageLoader`
+  - 打开详情弹窗时通过当前 `openCodeSessionId` 懒加载 `getSessionMessages()`
+  - 原始消息按 `{ message, parts }` 格式化 JSON 展示，默认折叠，并支持 loading / empty / error 状态
+  - 弹窗关闭后忽略迟到的异步加载结果，避免销毁后 DOM 回写
+
+- `src/style/modals/config-editor-modal.css`
+- `styles.css`
+  - 增加原始消息区、折叠项与代码块样式，保持和现有 context modal 卡片风格一致
+
+- `src/i18n/locales/zh.ts`
+- `src/i18n/locales/en.ts`
+  - 新增 `context.rawMessages.*` 文案
+  - 更新 `context.breakdown.note`，明确“仅下方拆分图”使用字符近似分摊
+
+- `docs/modules/features/chat/ui/ContextDetailModal.md`
+  - 同步记录新的懒加载参数、原始消息区渲染行为与异步状态
+
+### 🧪 验证结果
+
+- `npm run build` 通过，最新 `BUILD_ID: main.202604110850`
+- 已按顺序复制 `dist/main.js`、`dist/manifest.json`、`dist/styles.css` 到 Test Vault
+- 已确认 Test Vault `main.js` 含最新 `BUILD_ID: main.202604110850`
+- `npm run check:devlog-order` 将在本次日志更新后执行
+
 ## 2026-04-11 Provider 图标资源改为 manifest 驱动并补齐 variant 选择
 
 ### 🎯 改动目标
