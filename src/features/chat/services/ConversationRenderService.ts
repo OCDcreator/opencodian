@@ -191,6 +191,10 @@ type TrailingAssistantPatchSkippedDebugCountInputs = {
   nextMessages: ChatMessage[];
 };
 
+type TrailingAssistantPatchSkippedDebugCountPlanningContract = {
+  countInputs: TrailingAssistantPatchSkippedDebugCountInputs;
+};
+
 type TrailingAssistantPatchSkippedDebugReasonPayloadInputs = {
   reason: string;
   payload: Record<string, unknown>;
@@ -1390,10 +1394,20 @@ export class ConversationRenderService {
     loggingContext: TrailingAssistantPatchSkippedDebugLoggingContext,
   ): TrailingAssistantPatchSkippedDebugCountPlan {
     return this.buildTrailingAssistantPatchSkippedDebugCountPlan(
-      this.buildTrailingAssistantPatchSkippedDebugCountInputs(
+      this.buildTrailingAssistantPatchSkippedDebugCountPlanningContract(
+        loggingContext,
+      ).countInputs,
+    );
+  }
+
+  private buildTrailingAssistantPatchSkippedDebugCountPlanningContract(
+    loggingContext: TrailingAssistantPatchSkippedDebugLoggingContext,
+  ): TrailingAssistantPatchSkippedDebugCountPlanningContract {
+    return {
+      countInputs: this.buildTrailingAssistantPatchSkippedDebugCountInputs(
         loggingContext.planningContext,
       ),
-    );
+    };
   }
 
   private buildTrailingAssistantPatchSkippedDebugCountInputs(
