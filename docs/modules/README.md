@@ -95,6 +95,7 @@ docs/modules/
 │   │   │   ├── AssistantNoticeRenderer.md
 │   │   │   ├── PermissionInlineCardRenderer.md
 │   │   │   ├── QuestionInlineCardRenderer.md
+│   │   │   ├── QuestionResolutionCardRenderer.md
 │   │   │   ├── StreamingInlineCardRenderer.md
 │   │   │   ├── buildLocalStreamOutcome.md
 │   │   │   ├── LocalStreamMessagePersistence.md

@@ -110,6 +110,9 @@ import {
   QuestionInlineCardRenderer,
 } from './runtime/QuestionInlineCardRenderer';
 import {
+  populateQuestionResolutionCard,
+} from './runtime/QuestionResolutionCardRenderer';
+import {
   type StreamingInlineCardRendererHost,
   StreamingInlineCardRenderer,
 } from './runtime/StreamingInlineCardRenderer';
@@ -7042,7 +7045,7 @@ export class OpenCodianView extends ItemView {
         const questionCardEl = content.createDiv({
           cls: 'opencodian-question-inline opencodian-question-inline--resolved',
         });
-        this.populateQuestionResolutionCard(questionCardEl, message.questionResolution);
+        populateQuestionResolutionCard(questionCardEl, message.questionResolution);
       }
       for (const block of textBlocks) {
         await this.renderContentBlock(content, block);
@@ -7062,7 +7065,7 @@ export class OpenCodianView extends ItemView {
       const questionCardEl = content.createDiv({
         cls: 'opencodian-question-inline opencodian-question-inline--resolved',
       });
-      this.populateQuestionResolutionCard(questionCardEl, message.questionResolution);
+      populateQuestionResolutionCard(questionCardEl, message.questionResolution);
     }
 
     if (message.content) {
@@ -11088,63 +11091,8 @@ export class OpenCodianView extends ItemView {
       return;
     }
 
-    this.populateQuestionResolutionCard(cardEl, resolution);
+    populateQuestionResolutionCard(cardEl, resolution);
     this.keepQuestionCardPinnedToBottom(tabId);
-  }
-
-  private populateQuestionResolutionCard(cardEl: HTMLElement, resolution: QuestionResolution): void {
-    const detailsEl = cardEl.createEl('details', {
-      cls: 'opencodian-question-inline-details',
-    });
-    detailsEl.open = true;
-
-    const summaryEl = detailsEl.createEl('summary', {
-      cls: 'opencodian-question-inline-summary-toggle',
-    });
-    const headerEl = summaryEl.createDiv({ cls: 'opencodian-question-inline-header' });
-    headerEl.createSpan({
-      cls: 'opencodian-question-inline-icon',
-      text: resolution.status === 'answered' ? 'i' : '!',
-    });
-    headerEl.createSpan({
-      cls: 'opencodian-question-inline-title',
-      text: resolution.status === 'answered'
-        ? t('chat.question.notice.answeredTitle')
-        : t('chat.question.notice.rejectedTitle'),
-    });
-    headerEl.createSpan({
-      cls: 'opencodian-question-inline-collapse-hint',
-      text: '',
-    });
-    const updateCollapseHint = () => {
-      const hintEl = headerEl.querySelector('.opencodian-question-inline-collapse-hint');
-      if (hintEl instanceof HTMLElement) {
-        hintEl.setText(detailsEl.open ? t('chat.action.showLess') : t('chat.action.showMore'));
-      }
-    };
-    updateCollapseHint();
-    detailsEl.addEventListener('toggle', updateCollapseHint);
-
-    const bodyEl = detailsEl.createDiv({ cls: 'opencodian-question-inline-details-body' });
-    bodyEl.createDiv({
-      cls: 'opencodian-question-inline-body-text',
-      text: resolution.status === 'answered'
-        ? t('chat.question.notice.answeredBody')
-        : t('chat.question.notice.rejectedBody'),
-    });
-
-    const listEl = bodyEl.createEl('ul', { cls: 'opencodian-question-inline-summary-list' });
-    resolution.request.questions.forEach((question, index) => {
-      const itemEl = listEl.createEl('li', { cls: 'opencodian-question-inline-summary-item' });
-      const labelEl = itemEl.createSpan({ cls: 'opencodian-question-inline-summary-label' });
-      labelEl.setText(`${question.header}: `);
-      itemEl.createSpan({
-        cls: 'opencodian-question-inline-summary-value',
-        text: resolution.status === 'answered'
-          ? (resolution.answers?.[index]?.join(', ') ?? '')
-          : t('chat.question.reject'),
-      });
-    });
   }
 
   private keepQuestionCardPinnedToBottom(tabId: TabId | null): void {
@@ -11155,27 +11103,6 @@ export class OpenCodianView extends ItemView {
     this.scheduleSettledScrollToBottomIfNeeded(this.shouldAutoScroll(tabId), tabId);
   }
 
-  private buildQuestionAnswerMarkdown(request: QuestionRequest, answers: string[][]): string {
-    const lines = request.questions.map((question, index) => {
-      const answer = answers[index]?.join(', ') ?? '';
-      return `- **${question.header}**: ${answer}`;
-    });
-
-    return [
-      t('chat.question.notice.answeredBody'),
-      '',
-      ...lines,
-    ].join('\n');
-  }
-
-  private buildQuestionRejectedMarkdown(request: QuestionRequest): string {
-    const lines = request.questions.map((question) => `- ${question.header}`);
-    return [
-      t('chat.question.notice.rejectedBody'),
-      '',
-      ...lines,
-    ].join('\n');
-  }
 
   /** Show inline permission request card in the chat stream */
   private async showPermissionDialog(
