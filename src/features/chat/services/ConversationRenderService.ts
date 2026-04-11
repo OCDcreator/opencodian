@@ -146,13 +146,17 @@ type TrailingAssistantPatchTurnBodyScopePlan =
     restoreTurnBodyEl: HTMLElement;
   };
 
+type TrailingAssistantPatchSuccessPlan = {
+  executionPlan: TrailingAssistantPatchExecutionPlan;
+  tailStatePlan: TrailingAssistantPatchTailStatePlan;
+  completionDebugPlan: TrailingAssistantPatchCompletionDebugPlan;
+  turnBodyScopePlan: TrailingAssistantPatchTurnBodyScopePlan;
+};
+
 type TrailingAssistantPatchPreflight =
   | {
     ok: true;
-    executionPlan: TrailingAssistantPatchExecutionPlan;
-    tailStatePlan: TrailingAssistantPatchTailStatePlan;
-    completionDebugPlan: TrailingAssistantPatchCompletionDebugPlan;
-    turnBodyScopePlan: TrailingAssistantPatchTurnBodyScopePlan;
+    successPlan: TrailingAssistantPatchSuccessPlan;
   }
   | {
     ok: false;
@@ -217,10 +221,6 @@ type TrailingAssistantPatchTailMessagesResult =
     payload: Record<string, unknown>;
   };
 
-type SuccessfulTrailingAssistantPatchPreflight = Extract<
-  TrailingAssistantPatchPreflight,
-  { ok: true }
->;
 type SuccessfulTrailingAssistantPatchTargets = Extract<
   TrailingAssistantPatchTargets,
   { ok: true }
@@ -366,16 +366,17 @@ export class ConversationRenderService {
     if (!preflight.ok) {
       return fail(preflight.reason, preflight.payload);
     }
+    const { successPlan } = preflight;
 
-    await this.withTrailingAssistantTurnBodyScope(preflight.turnBodyScopePlan, async () => {
-      await this.executeTrailingAssistantPatch(preflight.executionPlan);
-      this.applyTrailingAssistantPatchTailState(preflight.tailStatePlan, tabId);
+    await this.withTrailingAssistantTurnBodyScope(successPlan.turnBodyScopePlan, async () => {
+      await this.executeTrailingAssistantPatch(successPlan.executionPlan);
+      this.applyTrailingAssistantPatchTailState(successPlan.tailStatePlan, tabId);
     });
 
     this.host.logAssistantFinalizationDebug(
       'patch-trailing-assistant-render-complete',
       this.buildTrailingAssistantPatchCompletionDebugPayload(
-        preflight.completionDebugPlan,
+        successPlan.completionDebugPlan,
         tabId,
       ),
     );
@@ -524,18 +525,21 @@ export class ConversationRenderService {
       return patchTargets;
     }
 
-    return this.buildSuccessfulTrailingAssistantPatchPreflight(
-      tailMessages,
-      patchTargets,
-      tabId,
-    );
+    return {
+      ok: true,
+      successPlan: this.buildTrailingAssistantPatchSuccessPlan(
+        tailMessages,
+        patchTargets,
+        tabId,
+      ),
+    };
   }
 
-  private buildSuccessfulTrailingAssistantPatchPreflight(
+  private buildTrailingAssistantPatchSuccessPlan(
     tailMessages: SuccessfulTrailingAssistantPatchTailMessages,
     patchTargets: SuccessfulTrailingAssistantPatchTargets,
     tabId: TabId | null,
-  ): SuccessfulTrailingAssistantPatchPreflight {
+  ): TrailingAssistantPatchSuccessPlan {
     const runtime = this.host.getRenderRuntimeForTab(tabId);
     const patchTarget = this.buildTrailingAssistantPatchDomTarget(patchTargets);
     const turnBodyScopePlan = this.buildTrailingAssistantPatchTurnBodyScopePlan(
@@ -559,7 +563,6 @@ export class ConversationRenderService {
       tailStatePlan.shouldStickToBottom,
     );
     return {
-      ok: true,
       executionPlan,
       tailStatePlan,
       completionDebugPlan,

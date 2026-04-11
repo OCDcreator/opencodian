@@ -70,15 +70,16 @@ export class ConversationRenderService {
 - patch 前的 `missing-container-or-inactive-tab` tab/container 预检、rendered message 收集与数量校验、non-tail signature mismatch 判定与失败 payload 组装，以及尾部 DOM 目标解析，先由更细的独立 helper 收口，再进入真正的 patch 执行
 - preflight 里 `tail-message-not-mergeable-assistant` 的 rendered tail 选择与失败 payload/result 组装也已抽到独立 helper，让 preflight 更贴近“判定失败原因 + 返回结果”的骨架
 - preflight 成功分支的 runtime 获取、previous turn body 快照与 auto-scroll 状态组装也由独立 helper 收口，让入口继续只负责串联 guard 与结果
-- preflight 成功分支里的 `existingTailMessageEl`、`existingContentEl` 与 `parentEl` 现在会先组装成更窄的 `patchTarget` contract，再交给 `executionPlan` 组装、turn body scope 与 tail state helper 复用，避免成功态结果继续暴露零散 DOM 字段
-- preflight 成功分支现在还会预先把“只 finalize footer / 重渲正文 content”的执行决策收敛成 `executionPlan`，并直接把它交给 `executeTrailingAssistantPatch()`，让 patch executor 不再读取整份成功态结果或重复承担正文签名比较
-- preflight 成功分支现在也会把 turn-body scope 切换/恢复依赖的 runtime 与目标节点预计算成 `turnBodyScopePlan`，让 `withTrailingAssistantTurnBodyScope()` 不再回读整份成功结果或零散 DOM 字段
+- preflight 成功分支里的 `existingTailMessageEl`、`existingContentEl` 与 `parentEl` 现在会先组装成更窄的 `patchTarget` contract，再交给专门的 `TrailingAssistantPatchSuccessPlan` 组装，避免成功态结果继续暴露零散 DOM 字段
+- `TrailingAssistantPatchPreflight` 现在只表达“是否允许 patch”，成功后再返回独立的 `successPlan`；执行计划、turn-body scope、tail state 与 completion debug 不再直接挂在 preflight verdict 上
+- `successPlan` 内部会继续预先把“只 finalize footer / 重渲正文 content”的执行决策收敛成 `executionPlan`，并直接把它交给 `executeTrailingAssistantPatch()`，让 patch executor 不再读取整份成功态结果或重复承担正文签名比较
+- `successPlan` 也会把 turn-body scope 切换/恢复依赖的 runtime 与目标节点预计算成 `turnBodyScopePlan`，让 `withTrailingAssistantTurnBodyScope()` 不再回读 preflight verdict 或零散 DOM 字段
 - patch 执行期间对 render runtime 的 `currentTurnBodyEl` 暂时切换与恢复，也由独立 scope helper 收口，避免主流程继续承载 DOM 上下文细节
 - 真正执行 patch 时，assistant 正文签名比较与“只 finalize footer / 重渲正文 content”分支也由独立 helper 收口
-- patch 成功后的 completion debug payload 组装也已抽到独立 helper，而 previous / next tail 的 debug summary 现在还会先预计算成 `completionDebugPlan`，让日志阶段不再回读整份 preflight 成功结果
+- patch 成功后的 completion debug payload 组装也已抽到独立 helper，而 previous / next tail 的 debug summary 现在还会先预计算成 `completionDebugPlan`，让日志阶段不再回读整份 `successPlan`
 - patch skipped 分支里的 debug payload 组装同样已抽到独立 helper，主流程不再内联拼接 reason、rendered count 与附加 tail summary
 - assistant 正文签名不变时复用已有正文，只重做 persisted footer 收尾
-- patch 成功后的 message dataset 刷新、动画禁用与按需 scroll-to-bottom，现会先预计算成更窄的 `tailStatePlan` 再交给 tail-apply helper，避免这些副作用继续读取整份 preflight 成功结果
+- patch 成功后的 message dataset 刷新、动画禁用与按需 scroll-to-bottom，现会先预计算成更窄的 `tailStatePlan` 再交给 tail-apply helper，避免这些副作用继续读取整份 `successPlan`
 - assistant 正文签名计算、正文重渲和 footer finalization 现在统一通过 `host.assistantTailRender` 这组更小的 port 完成
 - 缺失尾部 DOM、内容节点或前缀签名失配时，立即返回 `false` 让上层回退到 full rerender
 
