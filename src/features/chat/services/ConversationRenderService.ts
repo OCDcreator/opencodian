@@ -170,6 +170,12 @@ type TrailingAssistantPatchSkippedDebugCountPlan = {
   nextRenderedCount: number;
 };
 
+type TrailingAssistantPatchSkippedDebugPayloadPlan = Record<string, unknown> & {
+  reason: string;
+  previousRenderedCount: number;
+  nextRenderedCount: number;
+};
+
 type TrailingAssistantPatchSkippedDebugLogPlan = {
   label: 'patch-trailing-assistant-render-skipped';
   payload: Record<string, unknown>;
@@ -1154,15 +1160,40 @@ export class ConversationRenderService {
       planningContext.previousMessages,
       planningContext.nextMessages,
     );
+    const payloadPlan = this.buildTrailingAssistantPatchSkippedDebugPayloadPlan(
+      reason,
+      payload,
+      countPlan,
+    );
+    return this.buildTrailingAssistantPatchSkippedDebugFinalLogPlan(
+      planningContext,
+      payloadPlan,
+    );
+  }
+
+  private buildTrailingAssistantPatchSkippedDebugFinalLogPlan(
+    planningContext: TrailingAssistantPatchSkippedDebugPlanningContext,
+    payloadPlan: TrailingAssistantPatchSkippedDebugPayloadPlan,
+  ): TrailingAssistantPatchSkippedDebugLogPlan {
     return {
       label: 'patch-trailing-assistant-render-skipped',
       payload: {
-        reason,
         tabId: planningContext.tabId,
-        previousRenderedCount: countPlan.previousRenderedCount,
-        nextRenderedCount: countPlan.nextRenderedCount,
-        ...payload,
+        ...payloadPlan,
       },
+    };
+  }
+
+  private buildTrailingAssistantPatchSkippedDebugPayloadPlan(
+    reason: string,
+    payload: Record<string, unknown>,
+    countPlan: TrailingAssistantPatchSkippedDebugCountPlan,
+  ): TrailingAssistantPatchSkippedDebugPayloadPlan {
+    return {
+      reason,
+      previousRenderedCount: countPlan.previousRenderedCount,
+      nextRenderedCount: countPlan.nextRenderedCount,
+      ...payload,
     };
   }
 
