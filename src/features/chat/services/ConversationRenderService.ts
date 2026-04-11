@@ -170,6 +170,12 @@ type TrailingAssistantPatchSkippedDebugCountPlan = {
   nextRenderedCount: number;
 };
 
+type TrailingAssistantPatchSkippedDebugPayloadInputs = {
+  reason: string;
+  payload: Record<string, unknown>;
+  countPlan: TrailingAssistantPatchSkippedDebugCountPlan;
+};
+
 type TrailingAssistantPatchSkippedDebugPayloadPlan = Record<string, unknown> & {
   reason: string;
   previousRenderedCount: number;
@@ -1177,10 +1183,12 @@ export class ConversationRenderService {
       loggingContext.planningContext.previousMessages,
       loggingContext.planningContext.nextMessages,
     );
-    const payloadPlan = this.buildTrailingAssistantPatchSkippedDebugPayloadPlan(
-      loggingContext.reason,
-      loggingContext.payload,
+    const payloadInputs = this.buildTrailingAssistantPatchSkippedDebugPayloadInputs(
+      loggingContext,
       countPlan,
+    );
+    const payloadPlan = this.buildTrailingAssistantPatchSkippedDebugPayloadPlan(
+      payloadInputs,
     );
     return this.buildTrailingAssistantPatchSkippedDebugFinalLogPlan(
       loggingContext.planningContext,
@@ -1202,15 +1210,24 @@ export class ConversationRenderService {
   }
 
   private buildTrailingAssistantPatchSkippedDebugPayloadPlan(
-    reason: string,
-    payload: Record<string, unknown>,
-    countPlan: TrailingAssistantPatchSkippedDebugCountPlan,
+    inputs: TrailingAssistantPatchSkippedDebugPayloadInputs,
   ): TrailingAssistantPatchSkippedDebugPayloadPlan {
     return {
-      reason,
-      previousRenderedCount: countPlan.previousRenderedCount,
-      nextRenderedCount: countPlan.nextRenderedCount,
-      ...payload,
+      reason: inputs.reason,
+      previousRenderedCount: inputs.countPlan.previousRenderedCount,
+      nextRenderedCount: inputs.countPlan.nextRenderedCount,
+      ...inputs.payload,
+    };
+  }
+
+  private buildTrailingAssistantPatchSkippedDebugPayloadInputs(
+    loggingContext: TrailingAssistantPatchSkippedDebugLoggingContext,
+    countPlan: TrailingAssistantPatchSkippedDebugCountPlan,
+  ): TrailingAssistantPatchSkippedDebugPayloadInputs {
+    return {
+      reason: loggingContext.reason,
+      payload: loggingContext.payload,
+      countPlan,
     };
   }
 
