@@ -96,13 +96,17 @@ import { buildMessageRenderGroups, mergeAssistantMessagesForRender } from './ren
 import { type CollapsibleState, setupCollapsible } from './rendering/collapsible';
 import { ContextUsageService } from './services/ContextUsageService';
 import {
+  type ConversationRenderHost,
+  ConversationRenderService,
+  getIncrementalRenderedMessageUpdate as getConversationIncrementalRenderedMessageUpdate,
+  type IncrementalRenderedMessageUpdate,
+} from './services/ConversationRenderService';
+import {
   type ConversationViewStateHost,
   ConversationViewStateService,
 } from './services/ConversationViewStateService';
 import {
-  captureElementScrollRestoreSnapshot,
   isElementNearBottom,
-  restoreElementScrollAfterRender,
   scrollElementToBottom,
 } from './services/ScrollManager';
 import { TitleGenerationService } from './services/TitleGenerationService';
@@ -649,6 +653,7 @@ export class OpenCodianView extends ItemView {
   private themeBackgroundRequestId = 0;
   private titleGenerationService: TitleGenerationService;
   private conversationViewStateService: ConversationViewStateService;
+  private conversationRenderService: ConversationRenderService;
   private conversationSyncIntervalId: number | null = null;
   private omoBackgroundTaskLogStates = new Map<string, OmoBackgroundTaskLogState>();
   private disposeSessionTodoSubscription: (() => void) | null = null;
@@ -2115,6 +2120,7 @@ export class OpenCodianView extends ItemView {
     this.currentThinkingBudget = this.plugin.settings.thinkingBudget;
     this.titleGenerationService = new TitleGenerationService(this.plugin);
     this.conversationViewStateService = new ConversationViewStateService(this.createConversationViewStateHost());
+    this.conversationRenderService = new ConversationRenderService(this.createConversationRenderHost());
   }
 
   private createConversationViewStateHost(): ConversationViewStateHost {
@@ -2256,6 +2262,68 @@ export class OpenCodianView extends ItemView {
         this.endConversationHydration(tabId);
       },
       requestAnimationFrame: (callback) => window.requestAnimationFrame(callback),
+    };
+  }
+
+  private createConversationRenderHost(): ConversationRenderHost {
+    return {
+      getCurrentConversation: () => this.currentConversation,
+      getMessagesContainer: () => this.messagesContainer,
+      getActiveTabId: () => this.getActiveTabId(),
+      getScrollRuntimeForTab: (tabId) => this.getTabRuntimeState(tabId),
+      getRenderRuntimeForTab: (tabId) => this.getTabRuntimeState(tabId),
+      clearScheduledScrollToBottom: () => {
+        this.clearScheduledScrollToBottom();
+      },
+      beginConversationHydration: (tabId) => {
+        this.beginConversationHydration(tabId);
+      },
+      endConversationHydration: (tabId) => {
+        this.endConversationHydration(tabId);
+      },
+      clearMessagesContainer: () => {
+        this.messagesContainer?.empty();
+      },
+      resetTurnState: () => {
+        this.resetTurnState();
+      },
+      renderMessages: (messages) => this.renderMessages(messages),
+      renderMessage: (message) => this.renderMessage(message),
+      renderSyncedAssistantMessageWithReveal: (message) => this.renderSyncedAssistantMessageWithReveal(message),
+      renderBackgroundTaskIndicatorIfNeeded: (tabId) => this.renderBackgroundTaskIndicatorIfNeeded(tabId),
+      syncBackgroundTaskStateFromConversation: (conversation) => {
+        this.syncBackgroundTaskStateFromConversation(conversation);
+      },
+      shouldAutoScroll: (tabId) => this.shouldAutoScroll(tabId),
+      scrollToBottom: (options) => {
+        this.scrollToBottom(options);
+      },
+      syncPaneScrollMetrics: (tabId, messagesEl) => {
+        this.syncPaneScrollMetrics(tabId, messagesEl);
+      },
+      scheduleComposerLayoutSync: () => {
+        this.scheduleComposerLayoutSync();
+      },
+      requestAnimationFrame: (callback) => window.requestAnimationFrame(callback),
+      getMessagesForRender: (messages) => this.getMessagesForRender(messages),
+      getMessageVisualSignature: (message) => this.getMessageVisualSignature(message),
+      getAssistantBodySignature: (message) => this.getAssistantBodySignature(message),
+      shouldPseudoStreamSyncedAssistantMessage: (message) => this.shouldPseudoStreamSyncedAssistantMessage(message),
+      renderAssistantMessageContent: (messageEl, contentEl, message) =>
+        this.renderAssistantMessageContent(messageEl, contentEl, message),
+      updateAssistantTimestamp: (messageEl, message) => {
+        this.addTimestampWithCopyButton(
+          messageEl,
+          message.timestamp,
+          this.getAssistantCopyContent(message),
+          message.modelId,
+          this.getAssistantStreamStatusLabel(message),
+        );
+      },
+      logAssistantFinalizationDebug: (label, payload) => {
+        this.logAssistantFinalizationDebug(label, payload);
+      },
+      summarizeChatMessageForDebug: (message) => this.summarizeChatMessageForDebug(message),
     };
   }
 
@@ -9828,60 +9896,7 @@ export class OpenCodianView extends ItemView {
   }
 
   private async rerenderConversationMessages(conversation: Conversation): Promise<void> {
-    if (!this.currentConversation || this.currentConversation.id !== conversation.id || !this.messagesContainer) {
-      return;
-    }
-
-    this.logAssistantFinalizationDebug('rerender-conversation-messages-start', {
-      conversationId: conversation.id,
-      sessionId: conversation.openCodeSessionId,
-      messageCount: conversation.messages.length,
-      tailAssistant: this.summarizeChatMessageForDebug(
-        [...conversation.messages].reverse().find((message) => message.role === 'assistant'),
-      ),
-    });
-    const messagesEl = this.messagesContainer;
-    const shouldStickToBottom = this.getActiveTabRuntimeState()?.autoScrollEnabled ?? isElementNearBottom(messagesEl);
-    const previousScrollTop = messagesEl.scrollTop;
-    const activeTabId = this.getActiveTabId();
-    this.beginConversationHydration(activeTabId);
-    const scrollSnapshot = captureElementScrollRestoreSnapshot(
-      messagesEl,
-      shouldStickToBottom,
-      previousScrollTop,
-    );
-
-    this.clearScheduledScrollToBottom();
-    messagesEl.addClass('is-rehydrating');
-    this.messagesContainer.empty();
-    this.resetTurnState();
-
-    try {
-      await this.renderMessages(conversation.messages);
-      await this.renderBackgroundTaskIndicatorIfNeeded();
-      restoreElementScrollAfterRender(messagesEl, scrollSnapshot, {
-        runtime: this.getActiveTabRuntimeState(),
-        onRestoreBottom: () => {
-          this.scrollToBottom({ tabId: activeTabId });
-        },
-        onRestored: () => {
-          this.syncPaneScrollMetrics(activeTabId, messagesEl);
-        },
-      });
-      this.scheduleComposerLayoutSync();
-
-      window.requestAnimationFrame(() => {
-        messagesEl.removeClass('is-rehydrating');
-      });
-    } finally {
-      this.endConversationHydration(activeTabId);
-    }
-    this.logAssistantFinalizationDebug('rerender-conversation-messages-complete', {
-      conversationId: conversation.id,
-      sessionId: conversation.openCodeSessionId,
-      shouldStickToBottom,
-      previousScrollTop,
-    });
+    await this.conversationRenderService.rerenderConversationMessages(conversation);
   }
 
   private getMessagesForRender(messages: ChatMessage[]): ChatMessage[] {
@@ -9897,192 +9912,26 @@ export class OpenCodianView extends ItemView {
     nextMessages: ChatMessage[],
     tabId: TabId | null = this.getActiveTabId(),
   ): Promise<boolean> {
-    const fail = (reason: string, payload: Record<string, unknown> = {}): false => {
-      this.logAssistantFinalizationDebug('patch-trailing-assistant-render-skipped', {
-        reason,
-        tabId,
-        previousRenderedCount: this.getMessagesForRender(previousMessages).length,
-        nextRenderedCount: this.getMessagesForRender(nextMessages).length,
-        ...payload,
-      });
-      return false;
-    };
-    if (!this.messagesContainer || this.getActiveTabId() !== tabId) {
-      return fail('missing-container-or-inactive-tab');
-    }
-
-    const previousRenderedMessages = this.getMessagesForRender(previousMessages);
-    const nextRenderedMessages = this.getMessagesForRender(nextMessages);
-    if (
-      previousRenderedMessages.length === 0
-      || previousRenderedMessages.length !== nextRenderedMessages.length
-    ) {
-      return fail('rendered-message-count-mismatch');
-    }
-
-    const lastIndex = previousRenderedMessages.length - 1;
-    for (let index = 0; index < lastIndex; index += 1) {
-      if (
-        this.getMessageVisualSignature(previousRenderedMessages[index])
-        !== this.getMessageVisualSignature(nextRenderedMessages[index])
-      ) {
-        return fail('non-tail-message-signature-mismatch', {
-          mismatchIndex: index,
-        });
-      }
-    }
-
-    const previousTailMessage = previousRenderedMessages[lastIndex];
-    const nextTailMessage = nextRenderedMessages[lastIndex];
-    if (
-      previousTailMessage.role !== 'assistant'
-      || nextTailMessage.role !== 'assistant'
-      || previousTailMessage.displayStyle === 'notice'
-      || nextTailMessage.displayStyle === 'notice'
-    ) {
-      return fail('tail-message-not-mergeable-assistant', {
-        previousTail: this.summarizeChatMessageForDebug(previousTailMessage),
-        nextTail: this.summarizeChatMessageForDebug(nextTailMessage),
-      });
-    }
-
-    const existingTailMessageEl = Array.from(
-      this.messagesContainer.querySelectorAll<HTMLElement>('.opencodian-message--assistant'),
-    )
-      .filter((element) => !element.classList.contains('opencodian-message--notice'))
-      .pop();
-    if (!existingTailMessageEl || !(existingTailMessageEl.parentElement instanceof HTMLElement)) {
-      return fail('missing-existing-tail-element');
-    }
-
-    const parentEl = existingTailMessageEl.parentElement;
-    const runtime = this.getTabRuntimeState(tabId);
-    const previousTurnBodyEl = runtime?.currentTurnBodyEl ?? null;
-    const shouldStickToBottom = this.shouldAutoScroll(tabId);
-    const existingContentEl = existingTailMessageEl.querySelector('.opencodian-message-content');
-    if (!(existingContentEl instanceof HTMLElement)) {
-      return fail('missing-tail-content-element');
-    }
-
-    if (runtime) {
-      runtime.currentTurnBodyEl = parentEl;
-    }
-
-    try {
-      existingTailMessageEl.dataset.messageId = nextTailMessage.id;
-      if (nextTailMessage.sourceMessageId) {
-        existingTailMessageEl.dataset.sourceMessageId = nextTailMessage.sourceMessageId;
-      } else {
-        delete existingTailMessageEl.dataset.sourceMessageId;
-      }
-      if (this.getAssistantBodySignature(previousTailMessage) === this.getAssistantBodySignature(nextTailMessage)) {
-        this.addTimestampWithCopyButton(
-          existingTailMessageEl,
-          nextTailMessage.timestamp,
-          this.getAssistantCopyContent(nextTailMessage),
-          nextTailMessage.modelId,
-          this.getAssistantStreamStatusLabel(nextTailMessage),
-        );
-      } else {
-        existingContentEl.empty();
-        await this.renderAssistantMessageContent(existingTailMessageEl, existingContentEl, nextTailMessage);
-      }
-      existingTailMessageEl.style.animation = 'none';
-      if (shouldStickToBottom) {
-        this.scrollToBottom({ tabId });
-      }
-      this.logAssistantFinalizationDebug('patch-trailing-assistant-render-complete', {
-        tabId,
-        shouldStickToBottom,
-        previousTail: this.summarizeChatMessageForDebug(previousTailMessage),
-        nextTail: this.summarizeChatMessageForDebug(nextTailMessage),
-      });
-      return true;
-    } finally {
-      if (runtime) {
-        runtime.currentTurnBodyEl = previousTurnBodyEl ?? parentEl;
-      }
-    }
+    return this.conversationRenderService.patchTrailingAssistantRender(previousMessages, nextMessages, tabId);
   }
 
   private async applySyncedConversationUpdate(
     previousMessages: ChatMessage[],
     nextMessages: ChatMessage[],
   ): Promise<void> {
-    if (!this.currentConversation) {
-      return;
-    }
-
-    const incrementalUpdate = this.getIncrementalRenderedMessageUpdate(previousMessages, nextMessages);
-    if (!incrementalUpdate) {
-      await this.rerenderConversationMessages(this.currentConversation);
-      return;
-    }
-
-    const shouldStickToBottom = this.shouldAutoScroll();
-    this.syncBackgroundTaskStateFromConversation(this.currentConversation);
-
-    if (incrementalUpdate.patchTrailingAssistant) {
-      const patchedTail = await this.patchTrailingAssistantRender(previousMessages, nextMessages);
-      if (!patchedTail) {
-        await this.rerenderConversationMessages(this.currentConversation);
-        return;
-      }
-    }
-
-    for (const messageToRender of incrementalUpdate.appendedRenderedMessages) {
-      if (this.shouldPseudoStreamSyncedAssistantMessage(messageToRender)) {
-        await this.renderSyncedAssistantMessageWithReveal(messageToRender);
-      } else {
-        await this.renderMessage(messageToRender);
-      }
-    }
-
-    await this.renderBackgroundTaskIndicatorIfNeeded();
-
-    if (shouldStickToBottom) {
-      this.scrollToBottom();
-    }
+    await this.conversationRenderService.applySyncedConversationUpdate(previousMessages, nextMessages);
   }
 
   private getIncrementalRenderedMessageUpdate(
     previousMessages: ChatMessage[],
     nextMessages: ChatMessage[],
-  ): {
-    appendedRenderedMessages: ChatMessage[];
-    patchTrailingAssistant: boolean;
-  } | null {
-    const previousRenderedMessages = this.getMessagesForRender(previousMessages);
-    const nextRenderedMessages = this.getMessagesForRender(nextMessages);
-
-    if (nextRenderedMessages.length < previousRenderedMessages.length) {
-      return null;
-    }
-
-    if (previousRenderedMessages.length === 0) {
-      return {
-        appendedRenderedMessages: nextRenderedMessages,
-        patchTrailingAssistant: false,
-      };
-    }
-
-    for (let index = 0; index < previousRenderedMessages.length - 1; index += 1) {
-      if (
-        this.getMessageVisualSignature(previousRenderedMessages[index])
-        !== this.getMessageVisualSignature(nextRenderedMessages[index])
-      ) {
-        return null;
-      }
-    }
-
-    const lastSharedIndex = previousRenderedMessages.length - 1;
-    const patchTrailingAssistant = this.getMessageVisualSignature(previousRenderedMessages[lastSharedIndex])
-      !== this.getMessageVisualSignature(nextRenderedMessages[lastSharedIndex]);
-
-    return {
-      appendedRenderedMessages: nextRenderedMessages.slice(previousRenderedMessages.length),
-      patchTrailingAssistant,
-    };
+  ): IncrementalRenderedMessageUpdate | null {
+    return getConversationIncrementalRenderedMessageUpdate({
+      previousMessages,
+      nextMessages,
+      getMessagesForRender: (messages) => this.getMessagesForRender(messages),
+      getMessageVisualSignature: (message) => this.getMessageVisualSignature(message),
+    });
   }
 
   private shouldPseudoStreamSyncedAssistantMessage(message: ChatMessage): boolean {

@@ -124,7 +124,7 @@ interface TabRuntimeState {
 
 ### 对话装载与后台同步
 
-`loadConversation()` 的装载编排现在先交给 `services/ConversationViewStateService.ts`，再通过 host 回调落回 view 内部能力。主链路仍然保持原来的语义：
+`loadConversation()` 的装载编排现在先交给 `services/ConversationViewStateService.ts`，而消息区 full rerender / tail patch / append-only 增量更新则交给 `services/ConversationRenderService.ts`；两者都通过 host 回调落回 view 内部能力。主链路仍然保持原来的语义：
 
 - 在切换对话时取消旧对话的标题生成
 - 清空当前消息区并重置 turn 状态
@@ -141,6 +141,15 @@ interface TabRuntimeState {
 - `syncBackgroundTaskTabsInBackground()`：同步非活动但仍有 background task 的 tab
 
 除此之外，`subscribeToSessionSyncEvents()` 现在还会接入 `message.updated`、`message.part.updated` 和 `session.diff`，用于提前触发当前会话或后台 tab 的 authoritative sync，而不是只能等 2 秒轮询。
+
+### 消息区重渲编排
+
+消息区的 render orchestration 现在由 `ConversationRenderService` 统一决定：
+
+- `rerenderConversationMessages()`：整段历史重渲、scroll snapshot/restore、hydration begin/end
+- `applySyncedConversationUpdate()`：先判定是否可增量，再决定 append / tail patch / full rerender
+- `patchTrailingAssistantRender()`：只在前缀 rendered message 完全稳定时 patch 最后一条 assistant
+- `getIncrementalRenderedMessageUpdate()`：作为纯 helper 判断当前 sync 是否还能走 append-only 路径
 
 收到服务端新消息后，`applySyncedConversationUpdate()` 会优先尝试：
 
@@ -285,6 +294,7 @@ model selector 现在拆成了几层协作：
 
 - `OpenCodeService`：会话 CRUD、发送、stream、同步、question、todo、status、context usage
 - `ConversationViewStateService`：tab 初始化、persisted restore、tab 激活和 conversation hydration 装载编排
+- `ConversationRenderService`：消息区 full rerender、tail patch 和 append-only sync 编排
 - `TabManager` / `TabBar`：tab 生命周期和 tab 元数据
 - `MarkdownRenderService`：Markdown 渲染
 - `StreamController`：流式 assistant DOM 更新
