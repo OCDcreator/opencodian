@@ -292,6 +292,26 @@ describe('ConversationRenderService', () => {
     expect(host.endConversationHydration).toHaveBeenCalledWith('tab-1');
   });
 
+  it('skips trailing assistant patching when the target tab is no longer active', async () => {
+    const previousMessages = [
+      createMessage({ id: 'assistant-1', content: 'Stable answer', timestamp: 1 }),
+    ];
+    const nextMessages = [
+      createMessage({ id: 'assistant-2', content: 'Updated answer', timestamp: 2 }),
+    ];
+    const host = createHost({
+      getActiveTabId: jest.fn().mockReturnValue('tab-2'),
+    });
+    appendAssistantTail(host.messagesEl);
+    const service = new ConversationRenderService(host);
+
+    const patched = await service.patchTrailingAssistantRender(previousMessages, nextMessages, 'tab-1');
+
+    expect(patched).toBe(false);
+    expect(host.assistantTailRender.finalizePersistedFooter).not.toHaveBeenCalled();
+    expect(host.assistantTailRender.renderMessageContent).not.toHaveBeenCalled();
+  });
+
   it('uses pseudo-stream reveal for appended synced text assistants', async () => {
     const previousMessages = [
       createMessage({ id: 'user-1', role: 'user', content: 'Hi' }),

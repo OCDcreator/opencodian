@@ -67,6 +67,7 @@ export class ConversationRenderService {
 ### 尾部 assistant patch
 
 - 只有“rendered message 数量不变、非尾部 visual signature 完全一致、尾部仍是普通 assistant”时才允许 patch
+- patch 前的 tab/container 校验、前缀签名检查和尾部 DOM 目标解析，先由独立 preflight helper 收口，再进入真正的 patch 执行
 - assistant 正文签名不变时复用已有正文，只重做 persisted footer 收尾
 - assistant 正文签名计算、正文重渲和 footer finalization 现在统一通过 `host.assistantTailRender` 这组更小的 port 完成
 - 缺失尾部 DOM、内容节点或前缀签名失配时，立即返回 `false` 让上层回退到 full rerender

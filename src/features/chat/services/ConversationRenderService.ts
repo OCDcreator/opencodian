@@ -105,6 +105,36 @@ export interface ConversationRenderHost {
   summarizeChatMessageForDebug(message: ChatMessage | null | undefined): Record<string, unknown> | null;
 }
 
+type TrailingAssistantPatchPreflight =
+  | {
+    ok: true;
+    previousTailMessage: ChatMessage;
+    nextTailMessage: ChatMessage;
+    existingTailMessageEl: HTMLElement;
+    existingContentEl: HTMLElement;
+    parentEl: HTMLElement;
+    runtime: ConversationRenderRuntimeState | null;
+    previousTurnBodyEl: HTMLElement | null;
+    shouldStickToBottom: boolean;
+  }
+  | {
+    ok: false;
+    reason: string;
+    payload?: Record<string, unknown>;
+  };
+
+type TrailingAssistantPatchTargets =
+  | {
+    ok: true;
+    existingTailMessageEl: HTMLElement;
+    existingContentEl: HTMLElement;
+    parentEl: HTMLElement;
+  }
+  | {
+    ok: false;
+    reason: string;
+  };
+
 export class ConversationRenderService {
   constructor(private readonly host: ConversationRenderHost) {}
 
@@ -230,49 +260,25 @@ export class ConversationRenderService {
       });
       return false;
     };
-    const messagesEl = this.host.getMessagesContainer();
-    if (!messagesEl || this.host.getActiveTabId() !== tabId) {
-      return fail('missing-container-or-inactive-tab');
+    const preflight = this.resolveTrailingAssistantPatchPreflight(
+      previousMessages,
+      nextMessages,
+      tabId,
+    );
+    if (!preflight.ok) {
+      return fail(preflight.reason, preflight.payload);
     }
 
-    const previousRenderedMessages = this.host.getMessagesForRender(previousMessages);
-    const nextRenderedMessages = this.host.getMessagesForRender(nextMessages);
-    if (
-      previousRenderedMessages.length === 0
-      || previousRenderedMessages.length !== nextRenderedMessages.length
-    ) {
-      return fail('rendered-message-count-mismatch');
-    }
-
-    const prefixCheck = this.findNonTailSignatureMismatch(previousRenderedMessages, nextRenderedMessages);
-    if (prefixCheck !== null) {
-      return fail('non-tail-message-signature-mismatch', {
-        mismatchIndex: prefixCheck,
-      });
-    }
-
-    const previousTailMessage = previousRenderedMessages[previousRenderedMessages.length - 1];
-    const nextTailMessage = nextRenderedMessages[nextRenderedMessages.length - 1];
-    if (!this.isPatchableAssistantTail(previousTailMessage, nextTailMessage)) {
-      return fail('tail-message-not-mergeable-assistant', {
-        previousTail: this.host.summarizeChatMessageForDebug(previousTailMessage),
-        nextTail: this.host.summarizeChatMessageForDebug(nextTailMessage),
-      });
-    }
-
-    const existingTailMessageEl = this.findExistingTrailingAssistantElement(messagesEl);
-    if (!existingTailMessageEl || !(existingTailMessageEl.parentElement instanceof HTMLElement)) {
-      return fail('missing-existing-tail-element');
-    }
-
-    const parentEl = existingTailMessageEl.parentElement;
-    const runtime = this.host.getRenderRuntimeForTab(tabId);
-    const previousTurnBodyEl = runtime?.currentTurnBodyEl ?? null;
-    const shouldStickToBottom = this.host.shouldAutoScroll(tabId);
-    const existingContentEl = existingTailMessageEl.querySelector('.opencodian-message-content');
-    if (!(existingContentEl instanceof HTMLElement)) {
-      return fail('missing-tail-content-element');
-    }
+    const {
+      previousTailMessage,
+      nextTailMessage,
+      existingTailMessageEl,
+      existingContentEl,
+      parentEl,
+      runtime,
+      previousTurnBodyEl,
+      shouldStickToBottom,
+    } = preflight;
 
     if (runtime) {
       runtime.currentTurnBodyEl = parentEl;
@@ -341,6 +347,89 @@ export class ConversationRenderService {
       && nextTailMessage.role === 'assistant'
       && previousTailMessage.displayStyle !== 'notice'
       && nextTailMessage.displayStyle !== 'notice';
+  }
+
+  private resolveTrailingAssistantPatchPreflight(
+    previousMessages: ChatMessage[],
+    nextMessages: ChatMessage[],
+    tabId: TabId | null,
+  ): TrailingAssistantPatchPreflight {
+    const messagesEl = this.host.getMessagesContainer();
+    if (!messagesEl || this.host.getActiveTabId() !== tabId) {
+      return { ok: false, reason: 'missing-container-or-inactive-tab' };
+    }
+
+    const previousRenderedMessages = this.host.getMessagesForRender(previousMessages);
+    const nextRenderedMessages = this.host.getMessagesForRender(nextMessages);
+    if (
+      previousRenderedMessages.length === 0
+      || previousRenderedMessages.length !== nextRenderedMessages.length
+    ) {
+      return { ok: false, reason: 'rendered-message-count-mismatch' };
+    }
+
+    const prefixCheck = this.findNonTailSignatureMismatch(previousRenderedMessages, nextRenderedMessages);
+    if (prefixCheck !== null) {
+      return {
+        ok: false,
+        reason: 'non-tail-message-signature-mismatch',
+        payload: {
+          mismatchIndex: prefixCheck,
+        },
+      };
+    }
+
+    const previousTailMessage = previousRenderedMessages[previousRenderedMessages.length - 1];
+    const nextTailMessage = nextRenderedMessages[nextRenderedMessages.length - 1];
+    if (!this.isPatchableAssistantTail(previousTailMessage, nextTailMessage)) {
+      return {
+        ok: false,
+        reason: 'tail-message-not-mergeable-assistant',
+        payload: {
+          previousTail: this.host.summarizeChatMessageForDebug(previousTailMessage),
+          nextTail: this.host.summarizeChatMessageForDebug(nextTailMessage),
+        },
+      };
+    }
+
+    const patchTargets = this.resolveTrailingAssistantPatchTargets(messagesEl);
+    if (!patchTargets.ok) {
+      return patchTargets;
+    }
+
+    const runtime = this.host.getRenderRuntimeForTab(tabId);
+    return {
+      ok: true,
+      previousTailMessage,
+      nextTailMessage,
+      existingTailMessageEl: patchTargets.existingTailMessageEl,
+      existingContentEl: patchTargets.existingContentEl,
+      parentEl: patchTargets.parentEl,
+      runtime,
+      previousTurnBodyEl: runtime?.currentTurnBodyEl ?? null,
+      shouldStickToBottom: this.host.shouldAutoScroll(tabId),
+    };
+  }
+
+  private resolveTrailingAssistantPatchTargets(
+    messagesEl: HTMLElement,
+  ): TrailingAssistantPatchTargets {
+    const existingTailMessageEl = this.findExistingTrailingAssistantElement(messagesEl);
+    if (!existingTailMessageEl || !(existingTailMessageEl.parentElement instanceof HTMLElement)) {
+      return { ok: false, reason: 'missing-existing-tail-element' };
+    }
+
+    const existingContentEl = existingTailMessageEl.querySelector('.opencodian-message-content');
+    if (!(existingContentEl instanceof HTMLElement)) {
+      return { ok: false, reason: 'missing-tail-content-element' };
+    }
+
+    return {
+      ok: true,
+      existingTailMessageEl,
+      existingContentEl,
+      parentEl: existingTailMessageEl.parentElement,
+    };
   }
 
   private findExistingTrailingAssistantElement(messagesEl: HTMLElement): HTMLElement | null {
