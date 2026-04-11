@@ -148,6 +148,12 @@ type TrailingAssistantPatchCompletionDebugPayloadInputs = {
   nextTail: Record<string, unknown> | null;
 };
 
+type TrailingAssistantPatchCompletionDebugPayloadPlanContract = {
+  shouldStickToBottom: boolean;
+  previousTail: Record<string, unknown> | null;
+  nextTail: Record<string, unknown> | null;
+};
+
 type TrailingAssistantPatchCompletionDebugSummaryPlan = {
   previousTail: Record<string, unknown> | null;
   nextTail: Record<string, unknown> | null;
@@ -1295,9 +1301,31 @@ export class ConversationRenderService {
   private buildTrailingAssistantPatchCompletionDebugPayloadPlanFromLogPlanningContext(
     planningContext: TrailingAssistantPatchCompletionDebugLogPlanningContext,
   ): TrailingAssistantPatchCompletionDebugPayloadPlan {
+    const payloadPlanContract =
+      this.buildTrailingAssistantPatchCompletionDebugPayloadPlanContractFromLogPlanningContext(
+        planningContext,
+      );
     return this.buildTrailingAssistantPatchCompletionDebugPayloadPlan(
+      payloadPlanContract,
+    );
+  }
+
+  private buildTrailingAssistantPatchCompletionDebugPayloadPlanContractFromLogPlanningContext(
+    planningContext: TrailingAssistantPatchCompletionDebugLogPlanningContext,
+  ): TrailingAssistantPatchCompletionDebugPayloadPlanContract {
+    return this.buildTrailingAssistantPatchCompletionDebugPayloadPlanContract(
       planningContext.payloadInputs,
     );
+  }
+
+  private buildTrailingAssistantPatchCompletionDebugPayloadPlanContract(
+    payloadInputs: TrailingAssistantPatchCompletionDebugPayloadInputs,
+  ): TrailingAssistantPatchCompletionDebugPayloadPlanContract {
+    return {
+      shouldStickToBottom: payloadInputs.shouldStickToBottom,
+      previousTail: payloadInputs.previousTail,
+      nextTail: payloadInputs.nextTail,
+    };
   }
 
   private buildTrailingAssistantPatchCompletionDebugFinalLogInputsFromLogPlanningContext(
@@ -1397,12 +1425,12 @@ export class ConversationRenderService {
   }
 
   private buildTrailingAssistantPatchCompletionDebugPayloadPlan(
-    inputs: TrailingAssistantPatchCompletionDebugPayloadInputs,
+    payloadPlanContract: TrailingAssistantPatchCompletionDebugPayloadPlanContract,
   ): TrailingAssistantPatchCompletionDebugPayloadPlan {
     return {
-      shouldStickToBottom: inputs.shouldStickToBottom,
-      previousTail: inputs.previousTail,
-      nextTail: inputs.nextTail,
+      shouldStickToBottom: payloadPlanContract.shouldStickToBottom,
+      previousTail: payloadPlanContract.previousTail,
+      nextTail: payloadPlanContract.nextTail,
     };
   }
 
