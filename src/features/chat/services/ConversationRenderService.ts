@@ -196,6 +196,11 @@ type TrailingAssistantPatchSkippedDebugReasonPayloadInputs = {
   payload: Record<string, unknown>;
 };
 
+type TrailingAssistantPatchSkippedDebugReasonPayloadContract = {
+  reason: string;
+  payload: Record<string, unknown>;
+};
+
 type TrailingAssistantPatchSkippedDebugPayloadInputsContract = {
   reasonPayloadInputs: TrailingAssistantPatchSkippedDebugReasonPayloadInputs;
   countPlan: TrailingAssistantPatchSkippedDebugCountPlan;
@@ -1337,7 +1342,9 @@ export class ConversationRenderService {
   ): TrailingAssistantPatchSkippedDebugPayloadInputs {
     const reasonPayloadInputs =
       this.buildTrailingAssistantPatchSkippedDebugReasonPayloadInputs(
-        loggingContext,
+        this.buildTrailingAssistantPatchSkippedDebugReasonPayloadContract(
+          loggingContext,
+        ),
       );
     const countPlan =
       this.buildTrailingAssistantPatchSkippedDebugCountPlanFromLoggingContext(
@@ -1362,8 +1369,17 @@ export class ConversationRenderService {
   }
 
   private buildTrailingAssistantPatchSkippedDebugReasonPayloadInputs(
-    loggingContext: TrailingAssistantPatchSkippedDebugLoggingContext,
+    reasonPayloadContract: TrailingAssistantPatchSkippedDebugReasonPayloadContract,
   ): TrailingAssistantPatchSkippedDebugReasonPayloadInputs {
+    return {
+      reason: reasonPayloadContract.reason,
+      payload: reasonPayloadContract.payload,
+    };
+  }
+
+  private buildTrailingAssistantPatchSkippedDebugReasonPayloadContract(
+    loggingContext: TrailingAssistantPatchSkippedDebugLoggingContext,
+  ): TrailingAssistantPatchSkippedDebugReasonPayloadContract {
     return {
       reason: loggingContext.reason,
       payload: loggingContext.payload,
