@@ -484,6 +484,8 @@ describe('ConversationRenderService', () => {
     const patched = await service.patchTrailingAssistantRender(previousMessages, nextMessages, 'tab-1');
 
     expect(patched).toBe(false);
+    expect(host.summarizeChatMessageForDebug).toHaveBeenNthCalledWith(1, previousMessages[0]);
+    expect(host.summarizeChatMessageForDebug).toHaveBeenNthCalledWith(2, nextMessages[0]);
     expect(host.logAssistantFinalizationDebug).toHaveBeenCalledWith(
       'patch-trailing-assistant-render-skipped',
       {

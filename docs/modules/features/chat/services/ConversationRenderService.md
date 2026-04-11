@@ -68,6 +68,7 @@ export class ConversationRenderService {
 
 - 只有“rendered message 数量不变、非尾部 visual signature 完全一致、尾部仍是普通 assistant”时才允许 patch
 - patch 前的 tab/container 校验、前缀签名检查和尾部 DOM 目标解析，先由独立 preflight helper 收口，再进入真正的 patch 执行
+- preflight 里 `tail-message-not-mergeable-assistant` 的 tail summary payload 组装也已抽到独立 helper，让 preflight 更贴近“判定失败原因 + 返回结果”的骨架
 - patch 执行期间对 render runtime 的 `currentTurnBodyEl` 暂时切换与恢复，也由独立 scope helper 收口，避免主流程继续承载 DOM 上下文细节
 - 真正执行 patch 时，assistant 正文签名比较与“只 finalize footer / 重渲正文 content”分支也由独立 helper 收口
 - patch 成功后的 completion debug payload 组装也已抽到独立 helper，让主流程只保留“记录完成日志”这一层 orchestration

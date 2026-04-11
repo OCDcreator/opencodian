@@ -316,6 +316,16 @@ export class ConversationRenderService {
       && nextTailMessage.displayStyle !== 'notice';
   }
 
+  private buildTrailingAssistantPatchNonMergeableTailPayload(
+    previousTailMessage: ChatMessage,
+    nextTailMessage: ChatMessage,
+  ): Record<string, unknown> {
+    return {
+      previousTail: this.host.summarizeChatMessageForDebug(previousTailMessage),
+      nextTail: this.host.summarizeChatMessageForDebug(nextTailMessage),
+    };
+  }
+
   private resolveTrailingAssistantPatchPreflight(
     previousMessages: ChatMessage[],
     nextMessages: ChatMessage[],
@@ -352,10 +362,10 @@ export class ConversationRenderService {
       return {
         ok: false,
         reason: 'tail-message-not-mergeable-assistant',
-        payload: {
-          previousTail: this.host.summarizeChatMessageForDebug(previousTailMessage),
-          nextTail: this.host.summarizeChatMessageForDebug(nextTailMessage),
-        },
+        payload: this.buildTrailingAssistantPatchNonMergeableTailPayload(
+          previousTailMessage,
+          nextTailMessage,
+        ),
       };
     }
 
