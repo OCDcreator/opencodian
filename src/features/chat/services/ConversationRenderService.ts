@@ -186,6 +186,11 @@ type TrailingAssistantPatchSkippedDebugCountPlan = {
   nextRenderedCount: number;
 };
 
+type TrailingAssistantPatchSkippedDebugCountInputs = {
+  previousMessages: ChatMessage[];
+  nextMessages: ChatMessage[];
+};
+
 type TrailingAssistantPatchSkippedDebugPayloadInputs = {
   reason: string;
   payload: Record<string, unknown>;
@@ -1235,28 +1240,26 @@ export class ConversationRenderService {
   private logTrailingAssistantPatchSkippedDebug(
     loggingContext: TrailingAssistantPatchSkippedDebugLoggingContext,
   ): void {
+    const payloadInputs =
+      this.buildTrailingAssistantPatchSkippedDebugPayloadInputsFromLoggingContext(
+        loggingContext,
+      );
     const logPlan = this.buildTrailingAssistantPatchSkippedDebugLogPlan(
       this.buildTrailingAssistantPatchSkippedDebugLogPlanningContext(
-        loggingContext,
+        payloadInputs,
+        loggingContext.planningContext.tabId,
       ),
     );
     this.host.logAssistantFinalizationDebug(logPlan.label, logPlan.payload);
   }
 
   private buildTrailingAssistantPatchSkippedDebugLogPlanningContext(
-    loggingContext: TrailingAssistantPatchSkippedDebugLoggingContext,
+    payloadInputs: TrailingAssistantPatchSkippedDebugPayloadInputs,
+    tabId: TabId | null,
   ): TrailingAssistantPatchSkippedDebugLogPlanningContext {
-    const countPlan = this.buildTrailingAssistantPatchSkippedDebugCountPlan(
-      loggingContext.planningContext.previousMessages,
-      loggingContext.planningContext.nextMessages,
-    );
-
     return {
-      payloadInputs: this.buildTrailingAssistantPatchSkippedDebugPayloadInputs(
-        loggingContext,
-        countPlan,
-      ),
-      tabId: loggingContext.planningContext.tabId,
+      payloadInputs,
+      tabId,
     };
   }
 
@@ -1320,13 +1323,36 @@ export class ConversationRenderService {
     };
   }
 
+  private buildTrailingAssistantPatchSkippedDebugPayloadInputsFromLoggingContext(
+    loggingContext: TrailingAssistantPatchSkippedDebugLoggingContext,
+  ): TrailingAssistantPatchSkippedDebugPayloadInputs {
+    return this.buildTrailingAssistantPatchSkippedDebugPayloadInputs(
+      loggingContext,
+      this.buildTrailingAssistantPatchSkippedDebugCountPlan(
+        this.buildTrailingAssistantPatchSkippedDebugCountInputs(
+          loggingContext.planningContext,
+        ),
+      ),
+    );
+  }
+
+  private buildTrailingAssistantPatchSkippedDebugCountInputs(
+    planningContext: TrailingAssistantPatchSkippedDebugPlanningContext,
+  ): TrailingAssistantPatchSkippedDebugCountInputs {
+    return {
+      previousMessages: planningContext.previousMessages,
+      nextMessages: planningContext.nextMessages,
+    };
+  }
+
   private buildTrailingAssistantPatchSkippedDebugCountPlan(
-    previousMessages: ChatMessage[],
-    nextMessages: ChatMessage[],
+    inputs: TrailingAssistantPatchSkippedDebugCountInputs,
   ): TrailingAssistantPatchSkippedDebugCountPlan {
     return {
-      previousRenderedCount: this.host.getMessagesForRender(previousMessages).length,
-      nextRenderedCount: this.host.getMessagesForRender(nextMessages).length,
+      previousRenderedCount:
+        this.host.getMessagesForRender(inputs.previousMessages).length,
+      nextRenderedCount:
+        this.host.getMessagesForRender(inputs.nextMessages).length,
     };
   }
 
