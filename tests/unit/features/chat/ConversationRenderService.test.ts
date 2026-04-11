@@ -269,6 +269,30 @@ describe('ConversationRenderService', () => {
     expect(tailEl.dataset.messageId).toBe('assistant-2');
   });
 
+  it('applies trailing assistant tail state after patching', async () => {
+    const previousMessages = [
+      createMessage({ id: 'assistant-1', content: 'Stable answer', timestamp: 1, sourceMessageId: 'source-1' }),
+    ];
+    const nextMessages = [
+      createMessage({ id: 'assistant-2', content: 'Stable answer', timestamp: 2 }),
+    ];
+    const host = createHost({
+      shouldAutoScroll: jest.fn().mockReturnValue(true),
+    });
+    const tailEl = appendAssistantTail(host.messagesEl);
+    tailEl.dataset.sourceMessageId = 'source-1';
+    tailEl.style.animation = 'fade-in 1s';
+    const service = new ConversationRenderService(host);
+
+    const patched = await service.patchTrailingAssistantRender(previousMessages, nextMessages, 'tab-1');
+
+    expect(patched).toBe(true);
+    expect(tailEl.dataset.messageId).toBe('assistant-2');
+    expect(tailEl.dataset.sourceMessageId).toBeUndefined();
+    expect(tailEl.style.animation).toBe('none');
+    expect(host.scrollToBottom).toHaveBeenCalledWith({ tabId: 'tab-1' });
+  });
+
   it('falls back to a full rerender when trailing assistant patching fails', async () => {
     const previousMessages = [
       createMessage({ id: 'assistant-1', content: 'Stable answer', timestamp: 1 }),

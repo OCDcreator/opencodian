@@ -135,6 +135,11 @@ type TrailingAssistantPatchTargets =
     reason: string;
   };
 
+type SuccessfulTrailingAssistantPatchPreflight = Extract<
+  TrailingAssistantPatchPreflight,
+  { ok: true }
+>;
+
 export class ConversationRenderService {
   constructor(private readonly host: ConversationRenderHost) {}
 
@@ -285,12 +290,6 @@ export class ConversationRenderService {
     }
 
     try {
-      existingTailMessageEl.dataset.messageId = nextTailMessage.id;
-      if (nextTailMessage.sourceMessageId) {
-        existingTailMessageEl.dataset.sourceMessageId = nextTailMessage.sourceMessageId;
-      } else {
-        delete existingTailMessageEl.dataset.sourceMessageId;
-      }
       if (
         this.host.assistantTailRender.getBodySignature(previousTailMessage)
         === this.host.assistantTailRender.getBodySignature(nextTailMessage)
@@ -304,10 +303,7 @@ export class ConversationRenderService {
           nextTailMessage,
         );
       }
-      existingTailMessageEl.style.animation = 'none';
-      if (shouldStickToBottom) {
-        this.host.scrollToBottom({ tabId });
-      }
+      this.applyTrailingAssistantPatchTailState(preflight, tabId);
       this.host.logAssistantFinalizationDebug('patch-trailing-assistant-render-complete', {
         tabId,
         shouldStickToBottom,
@@ -409,6 +405,23 @@ export class ConversationRenderService {
       previousTurnBodyEl: runtime?.currentTurnBodyEl ?? null,
       shouldStickToBottom: this.host.shouldAutoScroll(tabId),
     };
+  }
+
+  private applyTrailingAssistantPatchTailState(
+    preflight: SuccessfulTrailingAssistantPatchPreflight,
+    tabId: TabId | null,
+  ): void {
+    const { existingTailMessageEl, nextTailMessage, shouldStickToBottom } = preflight;
+    existingTailMessageEl.dataset.messageId = nextTailMessage.id;
+    if (nextTailMessage.sourceMessageId) {
+      existingTailMessageEl.dataset.sourceMessageId = nextTailMessage.sourceMessageId;
+    } else {
+      delete existingTailMessageEl.dataset.sourceMessageId;
+    }
+    existingTailMessageEl.style.animation = 'none';
+    if (shouldStickToBottom) {
+      this.host.scrollToBottom({ tabId });
+    }
   }
 
   private resolveTrailingAssistantPatchTargets(
