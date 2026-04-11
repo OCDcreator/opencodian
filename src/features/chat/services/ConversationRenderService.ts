@@ -277,31 +277,21 @@ export class ConversationRenderService {
     const {
       previousTailMessage,
       nextTailMessage,
-      parentEl,
-      runtime,
-      previousTurnBodyEl,
       shouldStickToBottom,
     } = preflight;
 
-    if (runtime) {
-      runtime.currentTurnBodyEl = parentEl;
-    }
-
-    try {
+    await this.withTrailingAssistantTurnBodyScope(preflight, async () => {
       await this.executeTrailingAssistantPatch(preflight);
       this.applyTrailingAssistantPatchTailState(preflight, tabId);
-      this.host.logAssistantFinalizationDebug('patch-trailing-assistant-render-complete', {
-        tabId,
-        shouldStickToBottom,
-        previousTail: this.host.summarizeChatMessageForDebug(previousTailMessage),
-        nextTail: this.host.summarizeChatMessageForDebug(nextTailMessage),
-      });
-      return true;
-    } finally {
-      if (runtime) {
-        runtime.currentTurnBodyEl = previousTurnBodyEl ?? parentEl;
-      }
-    }
+    });
+
+    this.host.logAssistantFinalizationDebug('patch-trailing-assistant-render-complete', {
+      tabId,
+      shouldStickToBottom,
+      previousTail: this.host.summarizeChatMessageForDebug(previousTailMessage),
+      nextTail: this.host.summarizeChatMessageForDebug(nextTailMessage),
+    });
+    return true;
   }
 
   private findNonTailSignatureMismatch(
@@ -416,6 +406,28 @@ export class ConversationRenderService {
       existingContentEl,
       nextTailMessage,
     );
+  }
+
+  private async withTrailingAssistantTurnBodyScope<T>(
+    preflight: SuccessfulTrailingAssistantPatchPreflight,
+    run: () => Promise<T>,
+  ): Promise<T> {
+    const {
+      runtime,
+      parentEl,
+      previousTurnBodyEl,
+    } = preflight;
+    if (!runtime) {
+      return run();
+    }
+
+    runtime.currentTurnBodyEl = parentEl;
+
+    try {
+      return await run();
+    } finally {
+      runtime.currentTurnBodyEl = previousTurnBodyEl ?? parentEl;
+    }
   }
 
   private applyTrailingAssistantPatchTailState(

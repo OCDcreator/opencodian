@@ -296,6 +296,65 @@ describe('ConversationRenderService', () => {
     expect(contentEl.textContent).toBe('Updated answer');
   });
 
+  it('temporarily swaps the current turn body during trailing assistant content patching', async () => {
+    const previousMessages = [
+      createMessage({ id: 'assistant-1', content: 'Stable answer', timestamp: 1 }),
+    ];
+    const nextMessages = [
+      createMessage({ id: 'assistant-2', content: 'Updated answer', timestamp: 2 }),
+    ];
+    let host: ReturnType<typeof createHost>;
+    const renderMessageContent = jest.fn().mockImplementation(
+      async (_messageEl: HTMLElement, contentEl: HTMLElement, message: ChatMessage) => {
+        expect(host.renderRuntime.currentTurnBodyEl).toBe(host.messagesEl);
+        contentEl.textContent = message.content;
+      },
+    );
+    host = createHost({
+      assistantTailRender: {
+        renderMessageContent,
+      },
+    });
+    const previousTurnBodyEl = document.createElement('div');
+    host.renderRuntime.currentTurnBodyEl = previousTurnBodyEl;
+    appendAssistantTail(host.messagesEl, 'Stable answer');
+    const service = new ConversationRenderService(host);
+
+    const patched = await service.patchTrailingAssistantRender(previousMessages, nextMessages, 'tab-1');
+
+    expect(patched).toBe(true);
+    expect(host.renderRuntime.currentTurnBodyEl).toBe(previousTurnBodyEl);
+  });
+
+  it('restores the current turn body after trailing assistant content patch failures', async () => {
+    const previousMessages = [
+      createMessage({ id: 'assistant-1', content: 'Stable answer', timestamp: 1 }),
+    ];
+    const nextMessages = [
+      createMessage({ id: 'assistant-2', content: 'Updated answer', timestamp: 2 }),
+    ];
+    const renderError = new Error('render failed');
+    let host: ReturnType<typeof createHost>;
+    const renderMessageContent = jest.fn().mockImplementation(async () => {
+      expect(host.renderRuntime.currentTurnBodyEl).toBe(host.messagesEl);
+      throw renderError;
+    });
+    host = createHost({
+      assistantTailRender: {
+        renderMessageContent,
+      },
+    });
+    const previousTurnBodyEl = document.createElement('div');
+    host.renderRuntime.currentTurnBodyEl = previousTurnBodyEl;
+    appendAssistantTail(host.messagesEl, 'Stable answer');
+    const service = new ConversationRenderService(host);
+
+    await expect(
+      service.patchTrailingAssistantRender(previousMessages, nextMessages, 'tab-1'),
+    ).rejects.toThrow('render failed');
+    expect(host.renderRuntime.currentTurnBodyEl).toBe(previousTurnBodyEl);
+  });
+
   it('applies trailing assistant tail state after patching', async () => {
     const previousMessages = [
       createMessage({ id: 'assistant-1', content: 'Stable answer', timestamp: 1, sourceMessageId: 'source-1' }),
