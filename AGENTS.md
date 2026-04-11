@@ -69,8 +69,6 @@ Use `npm run doctor:esbuild` only after dependency changes or when build/dev rep
 - Build pipeline / scripts / test framework: `docs/modules/infrastructure/`
 - SDK v2 rollout status: `docs/status/sdk-v2-rollout.md`
 - SDK manual verification: `docs/status/sdk-v2-manual-checklist.md`
-- Maintainability phase handoff: `docs/status/maintainability-phase-1.md`
-- Maintainability short starter prompt: `docs/status/maintainability-next-session-prompt.md`
 - Obsidian linkage status: `docs/requirements/obsidian-linkage.md`
 - OMO compatibility / plugin requirements: `docs/requirements/`
 - Server API reference: `SERVER_API.md`

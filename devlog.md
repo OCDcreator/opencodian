@@ -45,13 +45,12 @@
   - 补齐测试环境里的 Obsidian DOM 扩展 shim：`hasClass` / `appendText`
 
 - `docs/status/maintainability-phase-1.md`
-- `docs/status/maintainability-next-session-prompt.md`
 - `docs/README.md`
 - `AGENTS.md`
 - `docs/modules/**`
   - 新增第一阶段总结和第二阶段实施方向文档
-  - 新增可直接复制给新会话大模型的第二阶段启动提示词
-  - 在 AGENTS 文档中补充维护性阶段文档入口和最新 chat helper 边界
+  - 将可直接复制给新会话大模型的第二阶段启动提示词收敛到阶段文档内
+  - 在 AGENTS 文档中补充最新 chat helper 边界
   - 同步更新 `OpenCodianView`、`ModelConfigModal`、`BlocklistChecker`、构建管线及新增 helper 的模块文档
 
 ### 🧪 验证结果
