@@ -168,6 +168,18 @@ type TrailingAssistantPatchNonTailSignatureResult =
     };
   };
 
+type TrailingAssistantPatchTailMessagesResult =
+  | {
+    ok: true;
+    previousTailMessage: ChatMessage;
+    nextTailMessage: ChatMessage;
+  }
+  | {
+    ok: false;
+    reason: 'tail-message-not-mergeable-assistant';
+    payload: Record<string, unknown>;
+  };
+
 type SuccessfulTrailingAssistantPatchPreflight = Extract<
   TrailingAssistantPatchPreflight,
   { ok: true }
@@ -365,6 +377,30 @@ export class ConversationRenderService {
     };
   }
 
+  private resolveTrailingAssistantPatchTailMessages(
+    previousRenderedMessages: ChatMessage[],
+    nextRenderedMessages: ChatMessage[],
+  ): TrailingAssistantPatchTailMessagesResult {
+    const previousTailMessage = previousRenderedMessages[previousRenderedMessages.length - 1];
+    const nextTailMessage = nextRenderedMessages[nextRenderedMessages.length - 1];
+    if (!this.isPatchableAssistantTail(previousTailMessage, nextTailMessage)) {
+      return {
+        ok: false,
+        reason: 'tail-message-not-mergeable-assistant',
+        payload: this.buildTrailingAssistantPatchNonMergeableTailPayload(
+          previousTailMessage,
+          nextTailMessage,
+        ),
+      };
+    }
+
+    return {
+      ok: true,
+      previousTailMessage,
+      nextTailMessage,
+    };
+  }
+
   private resolveTrailingAssistantPatchRenderedMessages(
     previousMessages: ChatMessage[],
     nextMessages: ChatMessage[],
@@ -427,18 +463,14 @@ export class ConversationRenderService {
       return nonTailSignatureMismatch;
     }
 
-    const previousTailMessage = previousRenderedMessages[previousRenderedMessages.length - 1];
-    const nextTailMessage = nextRenderedMessages[nextRenderedMessages.length - 1];
-    if (!this.isPatchableAssistantTail(previousTailMessage, nextTailMessage)) {
-      return {
-        ok: false,
-        reason: 'tail-message-not-mergeable-assistant',
-        payload: this.buildTrailingAssistantPatchNonMergeableTailPayload(
-          previousTailMessage,
-          nextTailMessage,
-        ),
-      };
+    const tailMessages = this.resolveTrailingAssistantPatchTailMessages(
+      previousRenderedMessages,
+      nextRenderedMessages,
+    );
+    if (!tailMessages.ok) {
+      return tailMessages;
     }
+    const { previousTailMessage, nextTailMessage } = tailMessages;
 
     const patchTargets = this.resolveTrailingAssistantPatchTargets(messagesEl);
     if (!patchTargets.ok) {

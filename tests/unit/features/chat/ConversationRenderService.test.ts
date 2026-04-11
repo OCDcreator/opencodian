@@ -547,14 +547,18 @@ describe('ConversationRenderService', () => {
     );
   });
 
-  it('logs skipped trailing assistant patch payloads with summarized tail messages', async () => {
+  it('logs skipped trailing assistant patch payloads with summarized rendered tail messages', async () => {
     const previousMessages = [
       createMessage({ id: 'assistant-1', content: 'Stable answer', timestamp: 1 }),
+      createMessage({ id: 'filtered-assistant-1', content: 'Filtered previous tail', timestamp: 2 }),
     ];
     const nextMessages = [
-      createMessage({ id: 'user-2', role: 'user', content: 'Follow-up question', timestamp: 2 }),
+      createMessage({ id: 'user-2', role: 'user', content: 'Follow-up question', timestamp: 3 }),
+      createMessage({ id: 'filtered-assistant-2', content: 'Filtered next tail', timestamp: 4 }),
     ];
     const host = createHost({
+      getMessagesForRender: jest.fn().mockImplementation((messages: ChatMessage[]) =>
+        messages.filter((message) => !message.id.startsWith('filtered-'))),
       summarizeChatMessageForDebug: jest.fn().mockImplementation((message: ChatMessage | null | undefined) =>
         message
           ? {
