@@ -1,0 +1,23 @@
+{
+  "objective": "Continue the maintainability program by decomposing large responsibilities into smaller single-purpose modules with one verified refactor slice per round.",
+  "starting_phase_doc": "docs/status/maintainability-phase-7.md",
+  "next_phase_number": 8,
+  "focus_hint": "Start by splitting the createSendPipelineRuntimeHost host surface into narrower ports, then extract assistant shell / notice rendering ownership from OpenCodianView.",
+  "max_rounds": 200,
+  "max_consecutive_failures": 3,
+  "test_command": "npm test",
+  "build_command": "npm run build",
+  "deploy_after_build": true,
+  "test_vault_plugin_dir": "C:\\Users\\lt\\Desktop\\Write\\testvault\\.obsidian\\plugins\\opencodian",
+  "platform_note": "Windows / PowerShell environment",
+  "allowed_branch_prefixes": [
+    "automation/",
+    "maintainability/",
+    "autopilot/"
+  ],
+  "commit_prefix": "maintainability",
+  "phase_doc_prefix": "docs/status/maintainability-phase-",
+  "prompt_template": "automation/round-prompt.md",
+  "result_schema": "automation/round-result.schema.json",
+  "codex_model": ""
+}

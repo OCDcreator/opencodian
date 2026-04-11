@@ -49,3 +49,6 @@ docs/*
 !docs/requirements/**
 !docs/status/
 !docs/status/**
+
+# Automation runtime
+automation/runtime/
