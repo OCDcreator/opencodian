@@ -135,6 +135,17 @@ type TrailingAssistantPatchTargets =
     reason: string;
   };
 
+type TrailingAssistantPatchRenderedMessagesResult =
+  | {
+    ok: true;
+    previousRenderedMessages: ChatMessage[];
+    nextRenderedMessages: ChatMessage[];
+  }
+  | {
+    ok: false;
+    reason: 'rendered-message-count-mismatch';
+  };
+
 type SuccessfulTrailingAssistantPatchPreflight = Extract<
   TrailingAssistantPatchPreflight,
   { ok: true }
@@ -326,6 +337,26 @@ export class ConversationRenderService {
     };
   }
 
+  private resolveTrailingAssistantPatchRenderedMessages(
+    previousMessages: ChatMessage[],
+    nextMessages: ChatMessage[],
+  ): TrailingAssistantPatchRenderedMessagesResult {
+    const previousRenderedMessages = this.host.getMessagesForRender(previousMessages);
+    const nextRenderedMessages = this.host.getMessagesForRender(nextMessages);
+    if (
+      previousRenderedMessages.length === 0
+      || previousRenderedMessages.length !== nextRenderedMessages.length
+    ) {
+      return { ok: false, reason: 'rendered-message-count-mismatch' };
+    }
+
+    return {
+      ok: true,
+      previousRenderedMessages,
+      nextRenderedMessages,
+    };
+  }
+
   private resolveTrailingAssistantPatchPreflight(
     previousMessages: ChatMessage[],
     nextMessages: ChatMessage[],
@@ -336,14 +367,14 @@ export class ConversationRenderService {
       return { ok: false, reason: 'missing-container-or-inactive-tab' };
     }
 
-    const previousRenderedMessages = this.host.getMessagesForRender(previousMessages);
-    const nextRenderedMessages = this.host.getMessagesForRender(nextMessages);
-    if (
-      previousRenderedMessages.length === 0
-      || previousRenderedMessages.length !== nextRenderedMessages.length
-    ) {
-      return { ok: false, reason: 'rendered-message-count-mismatch' };
+    const renderedMessages = this.resolveTrailingAssistantPatchRenderedMessages(
+      previousMessages,
+      nextMessages,
+    );
+    if (!renderedMessages.ok) {
+      return renderedMessages;
     }
+    const { previousRenderedMessages, nextRenderedMessages } = renderedMessages;
 
     const prefixCheck = this.findNonTailSignatureMismatch(previousRenderedMessages, nextRenderedMessages);
     if (prefixCheck !== null) {

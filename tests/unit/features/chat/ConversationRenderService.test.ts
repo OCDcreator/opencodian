@@ -462,6 +462,36 @@ describe('ConversationRenderService', () => {
     expect(host.assistantTailRender.renderMessageContent).not.toHaveBeenCalled();
   });
 
+  it('logs skipped trailing assistant patch payloads when rendered message counts mismatch', async () => {
+    const previousMessages = [
+      createMessage({ id: 'assistant-1', content: 'Stable answer', timestamp: 1 }),
+    ];
+    const nextMessages = [
+      createMessage({ id: 'assistant-2', content: 'Updated answer', timestamp: 2 }),
+    ];
+    const host = createHost({
+      getMessagesForRender: jest.fn().mockImplementation((messages: ChatMessage[]) =>
+        messages.some((message) => message.id === 'assistant-2')
+          ? []
+          : messages),
+    });
+    appendAssistantTail(host.messagesEl);
+    const service = new ConversationRenderService(host);
+
+    const patched = await service.patchTrailingAssistantRender(previousMessages, nextMessages, 'tab-1');
+
+    expect(patched).toBe(false);
+    expect(host.logAssistantFinalizationDebug).toHaveBeenCalledWith(
+      'patch-trailing-assistant-render-skipped',
+      {
+        reason: 'rendered-message-count-mismatch',
+        tabId: 'tab-1',
+        previousRenderedCount: 1,
+        nextRenderedCount: 0,
+      },
+    );
+  });
+
   it('logs skipped trailing assistant patch payloads with summarized tail messages', async () => {
     const previousMessages = [
       createMessage({ id: 'assistant-1', content: 'Stable answer', timestamp: 1 }),
