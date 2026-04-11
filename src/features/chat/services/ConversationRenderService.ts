@@ -215,6 +215,11 @@ type TrailingAssistantPatchSkippedDebugPayloadInputsContract = {
   countPlan: TrailingAssistantPatchSkippedDebugCountPlan;
 };
 
+type TrailingAssistantPatchSkippedDebugPayloadInputsContractPreparation = {
+  reasonPayloadInputs: TrailingAssistantPatchSkippedDebugReasonPayloadInputs;
+  countPlan: TrailingAssistantPatchSkippedDebugCountPlan;
+};
+
 type TrailingAssistantPatchSkippedDebugPayloadInputs = {
   reason: string;
   payload: Record<string, unknown>;
@@ -1361,6 +1366,16 @@ export class ConversationRenderService {
   private buildTrailingAssistantPatchSkippedDebugPayloadInputsContractFromLoggingContext(
     loggingContext: TrailingAssistantPatchSkippedDebugLoggingContext,
   ): TrailingAssistantPatchSkippedDebugPayloadInputsContract {
+    return this.buildTrailingAssistantPatchSkippedDebugPayloadInputsContract(
+      this.buildTrailingAssistantPatchSkippedDebugPayloadInputsContractPreparationFromLoggingContext(
+        loggingContext,
+      ),
+    );
+  }
+
+  private buildTrailingAssistantPatchSkippedDebugPayloadInputsContractPreparationFromLoggingContext(
+    loggingContext: TrailingAssistantPatchSkippedDebugLoggingContext,
+  ): TrailingAssistantPatchSkippedDebugPayloadInputsContractPreparation {
     const reasonPayloadInputs =
       this.buildTrailingAssistantPatchSkippedDebugReasonPayloadInputs(
         this.buildTrailingAssistantPatchSkippedDebugReasonPayloadContract(
@@ -1371,19 +1386,18 @@ export class ConversationRenderService {
       this.buildTrailingAssistantPatchSkippedDebugCountPlanFromLoggingContext(
         loggingContext,
       );
-    return this.buildTrailingAssistantPatchSkippedDebugPayloadInputsContract(
-      reasonPayloadInputs,
-      countPlan,
-    );
-  }
-
-  private buildTrailingAssistantPatchSkippedDebugPayloadInputsContract(
-    reasonPayloadInputs: TrailingAssistantPatchSkippedDebugReasonPayloadInputs,
-    countPlan: TrailingAssistantPatchSkippedDebugCountPlan,
-  ): TrailingAssistantPatchSkippedDebugPayloadInputsContract {
     return {
       reasonPayloadInputs,
       countPlan,
+    };
+  }
+
+  private buildTrailingAssistantPatchSkippedDebugPayloadInputsContract(
+    contractPreparation: TrailingAssistantPatchSkippedDebugPayloadInputsContractPreparation,
+  ): TrailingAssistantPatchSkippedDebugPayloadInputsContract {
+    return {
+      reasonPayloadInputs: contractPreparation.reasonPayloadInputs,
+      countPlan: contractPreparation.countPlan,
     };
   }
 
