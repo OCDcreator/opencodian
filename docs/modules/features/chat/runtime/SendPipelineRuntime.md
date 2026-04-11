@@ -43,6 +43,7 @@ export class SendPipelineRuntime {
 
 - `SendPipelineTypes`：共享契约层
 - `PendingIndicatorController`：pending DOM 与计时器
+- `AssistantNoticeRenderer`：stream error / interrupted notice 构造与占位 shell notice 渲染
 - `SendPipelineTrace`：trace / progress debug
 - `sendPipelineContent`：纯 content helper
 - `buildLocalStreamOutcome`：本地收尾纯推导
@@ -94,6 +95,7 @@ chunk router 现在由 `runtime/StreamChunkRouter.ts` 承接，并继续下钻�
 - `buildLocalStreamOutcome` 负责纯推导最终 outcome
 - `StreamShellFinalizer` 负责把 streaming shell 落成 timestamp / notice / removed
 - `LocalStreamMessagePersistence` 负责第一次本地 `saveConversation()`
+- `AssistantNoticeRenderer` 负责 notice message 构造与 assistant placeholder notice 渲染 adapter
 
 ## 与 `OpenCodianView` 的边界
 

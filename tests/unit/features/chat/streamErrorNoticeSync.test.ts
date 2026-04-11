@@ -1,5 +1,11 @@
 import { WorkspaceLeaf } from 'obsidian';
 
+import type { ChatMessage } from '../../../../src/core/types';
+import {
+  type AssistantNoticeRenderHost,
+  renderAssistantPlaceholderAsNotice,
+} from '../../../../src/features/chat/runtime/AssistantNoticeRenderer';
+
 const openCodeMessageToChatMessage = jest.fn();
 
 jest.mock('../../../../src/core/opencode', () => ({
@@ -129,20 +135,26 @@ describe('OpenCodianView stream error notice preservation', () => {
   });
 
   it('renders stream error placeholders as notice cards and keeps the source message id', async () => {
-    const view = createView() as unknown as {
-      renderAssistantPlaceholderAsNotice: (
-        messageEl: HTMLElement,
-        noticeMessage: Record<string, unknown>,
-        reason?: string,
-      ) => Promise<void>;
-    };
-
     const messageEl = document.createElement('div');
     messageEl.hidden = true;
+    const renderHost: AssistantNoticeRenderHost = {
+      addTimestampWithCopyButton: ({ messageEl: targetEl }) => {
+        targetEl.createDiv({ cls: 'opencodian-message-time-row' });
+      },
+      renderNoticeCard: async (container, message) => {
+        container.createDiv({
+          cls: `opencodian-chat-notice-card is-${message.noticeTone ?? 'info'}`,
+        });
+      },
+      setStreamingAssistantMessageVisibility: (targetEl, visible) => {
+        targetEl.hidden = !visible;
+      },
+    };
 
-    await view.renderAssistantPlaceholderAsNotice(
+    await renderAssistantPlaceholderAsNotice({
+      host: renderHost,
       messageEl,
-      {
+      noticeMessage: {
         id: 'assistant-error-notice-msg-1',
         role: 'assistant',
         content: 'OpenCode returned no response.',
@@ -152,9 +164,9 @@ describe('OpenCodianView stream error notice preservation', () => {
         displayStyle: 'notice',
         noticeTitle: 'Reply did not complete',
         noticeTone: 'error',
-      },
-      'render-stream-error-notice',
-    );
+      } satisfies ChatMessage,
+      reason: 'render-stream-error-notice',
+    });
 
     expect(messageEl.hidden).toBe(false);
     expect(messageEl.dataset.sourceMessageId).toBe('msg-1');

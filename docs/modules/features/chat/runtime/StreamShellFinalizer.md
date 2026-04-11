@@ -24,7 +24,7 @@ finalizeStreamingShell(options): Promise<string>
 
 - 有 stream content blocks：追加时间戳与 copy button
 - 只有 error：把占位 assistant shell 渲染成 error notice
-- interrupted 且没有 block：创建 interrupted notice 并渲染到原 shell
+- interrupted 且没有 block：通过 `AssistantNoticeRenderer.buildInterruptedAssistantNotice()` 创建 interrupted notice 并渲染到原 shell
 - 既无内容也无 notice：移除空 shell
 
 ## 协作边界

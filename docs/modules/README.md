@@ -91,6 +91,7 @@ docs/modules/
 │   │   ├── liquidDiamondDemoWebgl.md
 │   │   ├── renderGroups.md
 │   │   ├── runtime/
+│   │   │   ├── AssistantNoticeRenderer.md
 │   │   │   ├── buildLocalStreamOutcome.md
 │   │   │   ├── LocalStreamMessagePersistence.md
 │   │   │   ├── PendingIndicatorController.md

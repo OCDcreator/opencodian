@@ -94,6 +94,11 @@ import { LiquidDiamondDemoController } from './liquidDiamondDemo';
 import { buildMessageRenderGroups, mergeAssistantMessagesForRender } from './renderGroups';
 import { type CollapsibleState, setupCollapsible } from './rendering/collapsible';
 import {
+  type AssistantNoticeRenderHost,
+  buildStreamErrorNotice,
+  renderAssistantPlaceholderAsNotice,
+} from './runtime/AssistantNoticeRenderer';
+import {
   type SendPipelineDebugContentBlock,
   type SendPipelineDebugPort,
   type SendPipelineHost,
@@ -2486,12 +2491,13 @@ export class OpenCodianView extends ItemView {
       createAssistantMessageElement: (tabId, hiddenUntilVisible) =>
         this.createAssistantMessageElement(tabId, hiddenUntilVisible),
       revealStreamingAssistantMessageElement: (tabId) => this.revealStreamingAssistantMessageElement(tabId),
-      buildStreamErrorNotice: (timestamp, content, modelId, sourceMessageId) =>
-        this.buildStreamErrorNotice(timestamp, content, modelId, sourceMessageId),
-      buildInterruptedAssistantNotice: (timestamp, modelId) =>
-        this.buildInterruptedAssistantNotice(timestamp, modelId),
       renderAssistantPlaceholderAsNotice: (messageEl, noticeMessage, reason) =>
-        this.renderAssistantPlaceholderAsNotice(messageEl, noticeMessage, reason),
+        renderAssistantPlaceholderAsNotice({
+          host: this.createAssistantNoticeRenderHost(),
+          messageEl,
+          noticeMessage,
+          reason,
+        }),
       addTimestampWithCopyButton: (options) => {
         this.addTimestampWithCopyButton(options);
       },
@@ -2517,6 +2523,18 @@ export class OpenCodianView extends ItemView {
       ...shellPort,
       ...persistencePort,
       ...debugPort,
+    };
+  }
+
+  private createAssistantNoticeRenderHost(): AssistantNoticeRenderHost {
+    return {
+      addTimestampWithCopyButton: (options) => {
+        this.addTimestampWithCopyButton(options);
+      },
+      renderNoticeCard: (container, message) => this.renderNoticeCard(container, message),
+      setStreamingAssistantMessageVisibility: (messageEl, visible, reason) => {
+        this.setStreamingAssistantMessageVisibility(messageEl, visible, reason);
+      },
     };
   }
 
@@ -6829,9 +6847,14 @@ export class OpenCodianView extends ItemView {
     const activeRuntime = this.getTabRuntimeState(activeTabId);
     const timestamp = Date.now();
     const modelId = this.formatModelId(this.getCurrentSessionModel());
-    const noticeMessage = this.buildStreamErrorNotice(timestamp, message, modelId);
+    const noticeMessage = buildStreamErrorNotice(timestamp, message, modelId);
     const { messageEl } = this.createAssistantMessageElement(activeTabId);
-    await this.renderAssistantPlaceholderAsNotice(messageEl, noticeMessage, 'render-stream-error-notice');
+    await renderAssistantPlaceholderAsNotice({
+      host: this.createAssistantNoticeRenderHost(),
+      messageEl,
+      noticeMessage,
+      reason: 'render-stream-error-notice',
+    });
     if (activeRuntime) {
       activeRuntime.streamingMessageEl = null;
       activeRuntime.streamingContentEl = null;
@@ -8547,64 +8570,6 @@ export class OpenCodianView extends ItemView {
     }
 
     return undefined;
-  }
-
-  private buildInterruptedAssistantNotice(timestamp: number, modelId?: string): ChatMessage {
-    return {
-      id: `assistant-interrupted-${timestamp}`,
-      role: 'assistant',
-      content: t('chat.stream.interruptedNoticeBody'),
-      timestamp,
-      modelId,
-      displayStyle: 'notice',
-      noticeTitle: t('chat.stream.interruptedNoticeTitle'),
-      noticeTone: 'warning',
-    };
-  }
-
-  private buildStreamErrorNotice(
-    timestamp: number,
-    content: string,
-    modelId?: string,
-    sourceMessageId?: string,
-  ): ChatMessage {
-    return {
-      id: sourceMessageId ? `assistant-error-notice-${sourceMessageId}` : `assistant-error-notice-${timestamp}`,
-      role: 'assistant',
-      content,
-      timestamp,
-      modelId,
-      sourceMessageId,
-      displayStyle: 'notice',
-      noticeTitle: t('chat.notice.streamErrorTitle'),
-      noticeTone: 'error',
-    };
-  }
-
-  private async renderAssistantPlaceholderAsNotice(
-    messageEl: HTMLElement,
-    noticeMessage: ChatMessage,
-    reason = 'render-notice',
-  ): Promise<void> {
-    messageEl.dataset.messageId = noticeMessage.id;
-    if (noticeMessage.sourceMessageId) {
-      messageEl.dataset.sourceMessageId = noticeMessage.sourceMessageId;
-    } else {
-      delete messageEl.dataset.sourceMessageId;
-    }
-    messageEl.addClass('opencodian-message--assistant');
-    messageEl.addClass('opencodian-message--notice');
-    messageEl.removeClass('opencodian-message--background-task');
-    messageEl.empty();
-    this.setStreamingAssistantMessageVisibility(messageEl, true, reason);
-
-    const contentEl = messageEl.createDiv({ cls: 'opencodian-message-content' });
-    await this.renderNoticeCard(contentEl, noticeMessage);
-    this.addTimestampWithCopyButton({
-      messageEl,
-      timestamp: noticeMessage.timestamp,
-      modelId: noticeMessage.modelId,
-    });
   }
 
   private removeEmptyAssistantShells(): void {

@@ -12,7 +12,7 @@
 - `SendPipelineTabRuntime`：发送链路真正需要读写的 tab 级 streaming 状态切片
 - `SendPipelineStreamController` / `SendPipelineStreamElements`：stream shell 与流式渲染控制器边界
 - `SendPipelinePreparationPort` / `SendPipelineFinalizationPort`：对 `MessageSendPreparationService` 与 `MessageFinalizationService` 的窄接口
-- `SendPipelineViewPort` / `SendPipelineTransportPort` / `SendPipelineShellPort` / `SendPipelinePersistencePort` / `SendPipelineDebugPort`：把发送 host 面按职责拆开的窄 port
+- `SendPipelineViewPort` / `SendPipelineTransportPort` / `SendPipelineShellPort` / `SendPipelinePersistencePort` / `SendPipelineDebugPort`：把发送 host 面按职责拆开的窄 port，其中 shell port 现在只保留 streaming shell 创建、reveal、notice placeholder 渲染与 timestamp 收尾
 - `SendPipelineHost`：由上述 port 组合出来的完整宿主契约，方便 view 侧一次性装配
 - `SendPipelineExecutionHost` / `StreamChunkRouterHost` / `StreamLocalFinalizerHost`：runtime、router 与本地收尾各自真正依赖的 host 子集
 - `SendPipelineTraceState`：chunk router 汇总出来的流状态快照
@@ -30,5 +30,6 @@
 
 - `SendPipelineHost` 仍然只是内部协作契约，不是插件对外 API。
 - 新增 host 能力时，优先先判断它属于 view / transport / shell / persistence / debug 哪个 port，再决定是否真的需要扩张完整 `SendPipelineHost`。
+- 纯 notice message 构造优先放在 `AssistantNoticeRenderer.ts` 这类 helper，而不是继续塞回 shell port。
 - 新的发送 helper 应优先扩展这里的类型，而不是继续在实现文件里发散匿名结构。
 - `SendPipelineTabRuntime` 只收录发送链路真正关心的字段；不要把整个 view runtime 状态无差别搬进来。

@@ -105,13 +105,6 @@ export interface SendPipelineShellPort {
     hiddenUntilVisible: boolean,
   ): SendPipelineStreamElements;
   revealStreamingAssistantMessageElement(tabId: TabId | null): HTMLElement | null;
-  buildStreamErrorNotice(
-    timestamp: number,
-    content: string,
-    modelId?: string,
-    sourceMessageId?: string,
-  ): ChatMessage;
-  buildInterruptedAssistantNotice(timestamp: number, modelId?: string): ChatMessage;
   renderAssistantPlaceholderAsNotice(
     messageEl: HTMLElement,
     noticeMessage: ChatMessage,
@@ -177,11 +170,9 @@ export type StreamChunkRouterHost =
   & SendPipelineTraceHost
   & Pick<SendPipelineDebugPort, 'summarizeCoreStreamChunkForDebug'>;
 
-export type LocalStreamOutcomeHost = Pick<SendPipelineShellPort, 'buildStreamErrorNotice'>;
-
 export type StreamShellFinalizerHost = Pick<
   SendPipelineShellPort,
-  'addTimestampWithCopyButton' | 'renderAssistantPlaceholderAsNotice' | 'buildInterruptedAssistantNotice'
+  'addTimestampWithCopyButton' | 'renderAssistantPlaceholderAsNotice'
 >;
 
 export type LocalStreamPersistenceHost =
@@ -199,7 +190,6 @@ export type StreamLocalFinalizerHost =
   >
   & Pick<SendPipelineTransportPort, 'completeTabContextUsageStream'>
   & Pick<SendPipelineDebugPort, 'summarizeContentBlocksForDebug'>
-  & LocalStreamOutcomeHost
   & StreamShellFinalizerHost
   & LocalStreamPersistenceHost;
 

@@ -1,8 +1,8 @@
 import { shouldSyncAfterStream } from '../services/MessageFinalizationService';
 import type { PreparedMessageSend } from '../services/MessageSendPreparationService';
+import { buildStreamErrorNotice } from './AssistantNoticeRenderer';
 import { getStreamedTextContent } from './sendPipelineContent';
 import type {
-  LocalStreamOutcomeHost,
   LocalStreamOutcome,
   SendPipelineStreamController,
   SendPipelineTabRuntime,
@@ -10,7 +10,6 @@ import type {
 } from './SendPipelineTypes';
 
 export function buildLocalStreamOutcome(options: {
-  host: LocalStreamOutcomeHost;
   preparedSend: PreparedMessageSend;
   runtime: SendPipelineTabRuntime;
   streamController: SendPipelineStreamController | null;
@@ -27,7 +26,7 @@ export function buildLocalStreamOutcome(options: {
     && !options.routedStream.streamCompleted
     && !options.routedStream.latestErrorMessage;
   const streamErrorNoticeMessage = options.routedStream.latestErrorMessage && !hasStreamContentBlocks
-    ? options.host.buildStreamErrorNotice(
+    ? buildStreamErrorNotice(
         finalizedTimestamp,
         options.routedStream.latestErrorMessage,
         finalizedModelId,

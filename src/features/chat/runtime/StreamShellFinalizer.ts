@@ -1,5 +1,6 @@
 import { t } from '../../../i18n';
 import type { PreparedMessageSend } from '../services/MessageSendPreparationService';
+import { buildInterruptedAssistantNotice } from './AssistantNoticeRenderer';
 import type {
   LocalStreamOutcome,
   StreamShellFinalizerHost,
@@ -37,7 +38,7 @@ export async function finalizeStreamingShell(options: {
   }
 
   if (outcome.shouldPersistInterruptedState) {
-    outcome.interruptedNoticeMessage = host.buildInterruptedAssistantNotice(
+    outcome.interruptedNoticeMessage = buildInterruptedAssistantNotice(
       outcome.finalizedTimestamp,
       outcome.finalizedModelId,
     );
