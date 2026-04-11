@@ -624,14 +624,29 @@ export class ConversationRenderService {
     patchTargets: SuccessfulTrailingAssistantPatchTargets,
     tabId: TabId | null,
   ): TrailingAssistantPatchPlanningContext {
-    const patchTarget = this.buildTrailingAssistantPatchDomTarget(patchTargets);
+    return this.buildTrailingAssistantPatchSuccessPlanningContext(
+      tailMessages,
+      this.buildTrailingAssistantPatchDomTarget(patchTargets),
+      patchTargets.parentEl,
+      this.host.getRenderRuntimeForTab(tabId),
+      this.host.shouldAutoScroll(tabId),
+    );
+  }
+
+  private buildTrailingAssistantPatchSuccessPlanningContext(
+    tailMessages: SuccessfulTrailingAssistantPatchTailMessages,
+    patchTarget: TrailingAssistantPatchDomTarget,
+    parentEl: HTMLElement,
+    runtime: ConversationRenderRuntimeState | null,
+    shouldStickToBottom: boolean,
+  ): TrailingAssistantPatchPlanningContext {
     return {
       previousTailMessage: tailMessages.previousTailMessage,
       nextTailMessage: tailMessages.nextTailMessage,
       patchTarget,
-      parentEl: patchTargets.parentEl,
-      runtime: this.host.getRenderRuntimeForTab(tabId),
-      shouldStickToBottom: this.host.shouldAutoScroll(tabId),
+      parentEl,
+      runtime,
+      shouldStickToBottom,
     };
   }
 
