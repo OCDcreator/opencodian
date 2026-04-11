@@ -20,6 +20,7 @@ export interface ToolUseChunk {
   type: 'tool_use';
   id: string;
   name: string;
+  kind?: 'builtin' | 'mcp' | 'custom' | 'task' | 'question' | 'skill' | 'plan' | 'unknown';
   input: Record<string, unknown>;
 }
 
@@ -56,6 +57,8 @@ export type ToolCallStatus = 'pending' | 'running' | 'completed' | 'error' | 'bl
 export interface ToolCallInfo {
   id: string;
   name: string;
+  toolSourceKey?: string;
+  kind?: 'builtin' | 'mcp' | 'custom' | 'task' | 'question' | 'skill' | 'plan' | 'unknown';
   input: Record<string, unknown>;
   status: ToolCallStatus;
   result?: string;
@@ -156,7 +159,11 @@ export interface StreamControllerOptions {
 export interface ToolRendererOptions {
   iconMap?: Record<string, string>;
   getToolName?: (name: string, input: Record<string, unknown>) => string;
-  getToolSummary?: (name: string, input: Record<string, unknown>) => string;
+  getToolSummary?: (
+    name: string,
+    input: Record<string, unknown>,
+    toolKind?: ToolCallInfo['kind']
+  ) => string;
   renderExpandedContent?: (container: HTMLElement, toolName: string, result: string | undefined) => void;
 }
 

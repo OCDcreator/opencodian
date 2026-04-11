@@ -12,6 +12,70 @@
 
 ---
 
+## 2026-04-11 SDK facade、工具身份与 MCP 摘要规则整理
+
+### 🎯 改动目标
+
+- 为 OpenCode SDK v2 增加更稳定的 façade 层与能力快照，减少服务层到处手写 namespace 访问、响应解包与错误归一化
+- 统一 builtin / MCP / custom 工具身份识别，把工具 `kind`、图标与摘要规则贯通到消息恢复、流式渲染和设置/目录相关 UI
+- 修复 MCP 工具图标显示过小的问题，并把 MCP 摘要升级为“工具名动作语义优先 + 顶层输入字段回退”的可维护规则
+
+### ✅ 本轮调整
+
+- `src/core/opencode/OpenCodeSdkFacade.ts`
+- `src/core/opencode/OpenCodeService.ts`
+- `src/core/opencode/types.ts`
+- `src/core/opencode/index.ts`
+  - 新增 SDK façade，统一 namespace 调用、`data` 解包与错误归一化
+  - `OpenCodeService` 增加 tool catalog / MCP 状态快照、事件订阅与运行时工具观察
+  - 流式 `tool_use` 与历史消息恢复会保留结构化 `toolKind`
+
+- `src/shared/toolIdentity.ts`
+- `src/shared/index.ts`
+- `src/core/types/chat.ts`
+- `src/core/types/tools.ts`
+  - 新增统一工具身份层，归一化 builtin / MCP / custom / task / question / skill / plan
+  - builtin 编辑类工具图标改为 `file-pen`
+  - MCP 工具图标统一使用 `opencodian-tool-mcp`
+
+- `src/utils/streaming/ToolCallRenderer.ts`
+- `src/utils/streaming/mcpSummaryConfig.ts`
+- `src/utils/streaming/types.ts`
+- `src/utils/streaming/index.ts`
+- `src/utils/streaming/StreamController.ts`
+- `src/features/chat/OpenCodianView.ts`
+  - `ToolCallRenderer` 头部摘要支持基于 `toolKind` 分流
+  - MCP 图标改为适配 Obsidian 100×100 自定义图标视口的 LobeHub MCP SVG
+  - MCP 摘要改为“动作词优先 + 类别字段优先级 + 通用字段回退 + 首个顶层短标量回退”
+  - 新增 `mcpSummaryConfig` 作为独立配置模块，方便后续维护动作词和字段表
+
+- `src/features/settings/ModelConfigModal.ts`
+- `src/features/settings/OpenCodianSettings.ts`
+- `src/features/chat/ui/EffortSelector.ts`
+- `src/style/components/model-selector.css`
+  - 补充模型配置弹窗初始视图类型
+  - 修正 catalog provider toggle 的可用性判断
+  - 调整 effort selector tooltip 向左展开，并补齐对应样式
+
+- `tests/unit/core/opencode/OpenCodeSdkFacade.test.ts`
+- `tests/unit/core/opencode/OpenCodeService.sdkCompat.test.ts`
+- `tests/unit/core/opencode/OpenCodeService.test.ts`
+- `tests/unit/shared/toolIdentity.test.ts`
+- `tests/unit/utils/streaming/ToolCallRenderer.test.ts`
+  - 覆盖 SDK façade、工具身份、MCP 图标、MCP 语义摘要与流式兼容行为
+
+- `docs/modules/**`
+  - 新增 `OpenCodeSdkFacade`、`toolIdentity`、`mcp-summary-fields` 模块文档
+  - 同步更新 `OpenCodeService`、streaming、shared index、chat types 与模块索引页
+
+### 🧪 验证结果
+
+- `npm test -- tests/unit/utils/streaming/ToolCallRenderer.test.ts` 通过
+- `npm run build` 通过，最新 `BUILD_ID: main.202604111153`
+- 已按顺序复制 `dist/main.js`、`dist/manifest.json`、`dist/styles.css` 到 Test Vault
+- 已确认 Test Vault `main.js` 含最新 `BUILD_ID: main.202604111153`
+- `npm run check:devlog-order` 将在本次日志更新后执行
+
 ## 2026-04-11 上下文使用详情补充原始消息区
 
 ### 🎯 改动目标

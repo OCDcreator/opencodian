@@ -1,5 +1,14 @@
-import { setIcon } from 'obsidian';
+import { addIcon, setIcon } from 'obsidian';
 
+import { getToolIdentity, MCP_TOOL_ICON_ID } from '../../shared';
+import {
+  MCP_ARGUMENT_FIELDS,
+  MCP_GENERIC_SUMMARY_FIELDS,
+  MCP_PATH_LIKE_FIELDS,
+  MCP_SUMMARY_CATEGORY_DEFINITIONS,
+  MCP_URL_LIKE_FIELDS,
+  type McpSummaryCategoryDefinition,
+} from './mcpSummaryConfig';
 import type { ToolCallInfo, ToolCallStatus, ToolRendererOptions } from './types';
 
 const STATUS_ICONS: Record<ToolCallStatus, string> = {
@@ -10,60 +19,19 @@ const STATUS_ICONS: Record<ToolCallStatus, string> = {
   blocked: 'shield-off',
 };
 
-const DEFAULT_TOOL_NAMES: Record<string, string> = {
-  read: 'Read',
-  write: 'Write',
-  edit: 'Edit',
-  multiedit: 'MultiEdit',
-  apply_patch: 'Patch',
-  patch: 'Patch',
-  bash: 'Bash',
-  grep: 'Grep',
-  glob: 'Glob',
-  list: 'List',
-  lsp: 'LSP',
-  web_search: 'WebSearch',
-  web_fetch: 'WebFetch',
-  websearch: 'WebSearch',
-  webfetch: 'WebFetch',
-  codesearch: 'CodeSearch',
-  task: 'Background Task',
-  question: 'Questions',
-  skill: 'Skill',
-  plan_enter: 'EnterPlanMode',
-  plan_exit: 'ExitPlanMode',
-  enter_plan_mode: 'EnterPlanMode',
-  exit_plan_mode: 'ExitPlanMode',
-  todowrite: 'Todos',
-  todoread: 'Todo Read',
-};
-
-// Claudian-style tool icons
-const TOOL_ICONS: Record<string, string> = {
-  read: 'file-text',
-  write: 'file-plus',
-  edit: 'file-edit',
-  multiedit: 'file-edit',
-  apply_patch: 'file-edit',
-  bash: 'terminal',
-  grep: 'search',
-  glob: 'folder-search',
-  list: 'folder-tree',
-  lsp: 'search',
-  web_search: 'search',
-  web_fetch: 'download',
-  websearch: 'search',
-  webfetch: 'download',
-  codesearch: 'code',
-  task: 'git-branch',
-  skill: 'brain',
-  question: 'message-square',
-  plan_enter: 'list',
-  plan_exit: 'check',
-  // MCP tools
-  mcp: 'layers',
+const FALLBACK_TOOL_ICONS: Record<string, string> = {
   get_repo_structure: 'folder-tree',
 };
+
+const MCP_TOOL_ICON_SVG = `
+  <title>ModelContextProtocol</title>
+  <g fill="currentColor" fill-rule="evenodd" transform="scale(4.166667)">
+    <path d="M15.688 2.343a2.588 2.588 0 00-3.61 0l-9.626 9.44a.863.863 0 01-1.203 0 .823.823 0 010-1.18l9.626-9.44a4.313 4.313 0 016.016 0 4.116 4.116 0 011.204 3.54 4.3 4.3 0 013.609 1.18l.05.05a4.115 4.115 0 010 5.9l-8.706 8.537a.274.274 0 000 .393l1.788 1.754a.823.823 0 010 1.18.863.863 0 01-1.203 0l-1.788-1.753a1.92 1.92 0 010-2.754l8.706-8.538a2.47 2.47 0 000-3.54l-.05-.049a2.588 2.588 0 00-3.607-.003l-7.172 7.034-.002.002-.098.097a.863.863 0 01-1.204 0 .823.823 0 010-1.18l7.273-7.133a2.47 2.47 0 00-.003-3.537z"></path>
+    <path d="M14.485 4.703a.823.823 0 000-1.18.863.863 0 00-1.204 0l-7.119 6.982a4.115 4.115 0 000 5.9 4.314 4.314 0 006.016 0l7.12-6.982a.823.823 0 000-1.18.863.863 0 00-1.204 0l-7.119 6.982a2.588 2.588 0 01-3.61 0 2.47 2.47 0 010-3.54l7.12-6.982z"></path>
+  </g>
+`;
+
+addIcon(MCP_TOOL_ICON_ID, MCP_TOOL_ICON_SVG);
 
 export class ToolCallRenderer {
   private options: ToolRendererOptions;
@@ -79,14 +47,19 @@ export class ToolCallRenderer {
   }
 
   private defaultGetToolName = (name: string): string => {
-    return DEFAULT_TOOL_NAMES[name] || name;
+    return getToolIdentity(name).displayName;
   };
 
   private defaultGetToolSummary = (
     name: string,
-    input: Record<string, unknown>
+    input: Record<string, unknown>,
+    toolKind?: ToolCallInfo['kind']
   ): string => {
-    switch (name) {
+    if (toolKind === 'mcp') {
+      return this.getMcpSummary(name, input);
+    }
+
+    switch (getToolIdentity(name).normalizedName) {
       case 'read':
         return this.getReadSummary(input);
       case 'write':
@@ -141,6 +114,113 @@ export class ToolCallRenderer {
         return '';
     }
   };
+
+  private getMcpSummary(name: string, input: Record<string, unknown>): string {
+    const tokens = this.tokenizeMcpToolName(name);
+    const category = this.resolveMcpSummaryCategory(tokens);
+
+    if (category) {
+      const categorySummary = this.getMcpSummaryFromFields(input, category.fields);
+      if (categorySummary) {
+        return categorySummary;
+      }
+    }
+
+    const genericSummary = this.getMcpSummaryFromFields(input, MCP_GENERIC_SUMMARY_FIELDS);
+    if (genericSummary) {
+      return genericSummary;
+    }
+
+    for (const value of Object.values(input)) {
+      if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (trimmed) {
+          return this.truncateText(trimmed, 60);
+        }
+        continue;
+      }
+
+      if (typeof value === 'number' && Number.isFinite(value)) {
+        return String(value);
+      }
+
+      if (typeof value === 'boolean') {
+        return String(value);
+      }
+    }
+
+    return '';
+  }
+
+  private tokenizeMcpToolName(name: string): string[] {
+    return name
+      .toLowerCase()
+      .split(/(?:__|[_:-])+/)
+      .map((token) => token.trim())
+      .filter((token) => token.length > 0);
+  }
+
+  private resolveMcpSummaryCategory(tokens: string[]): McpSummaryCategoryDefinition | null {
+    for (let index = tokens.length - 1; index >= 0; index -= 1) {
+      const token = tokens[index];
+      const matched = MCP_SUMMARY_CATEGORY_DEFINITIONS.find((category) => category.verbs.includes(token));
+      if (matched) {
+        return matched;
+      }
+    }
+
+    for (const category of MCP_SUMMARY_CATEGORY_DEFINITIONS) {
+      if (category.verbs.some((verb) => tokens.includes(verb))) {
+        return category;
+      }
+    }
+
+    return null;
+  }
+
+  private getMcpSummaryFromFields(
+    input: Record<string, unknown>,
+    fields: readonly string[],
+  ): string {
+    for (const field of fields) {
+      const rawValue = input[field];
+      const formatted = this.formatMcpSummaryField(field, rawValue);
+      if (formatted) {
+        return formatted;
+      }
+    }
+
+    return '';
+  }
+
+  private formatMcpSummaryField(field: string, value: unknown): string {
+    if (MCP_ARGUMENT_FIELDS.has(field)) {
+      if (typeof value !== 'string') {
+        return '';
+      }
+      const trimmed = value.trim();
+      return trimmed ? this.truncateText(trimmed, 60) : '';
+    }
+
+    if (typeof value !== 'string') {
+      return '';
+    }
+
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return '';
+    }
+
+    if (MCP_PATH_LIKE_FIELDS.has(field)) {
+      return this.fileNameOnly(trimmed);
+    }
+
+    if (MCP_URL_LIKE_FIELDS.has(field)) {
+      return this.truncateText(trimmed, 60);
+    }
+
+    return this.truncateText(trimmed, 60);
+  }
 
   private defaultRenderExpandedContent = (
     container: HTMLElement,
@@ -412,7 +492,7 @@ export class ToolCallRenderer {
 
     const iconEl = header.createSpan({ cls: 'streaming-tool-icon' });
     iconEl.setAttribute('aria-hidden', 'true');
-    this.setToolIcon(iconEl, toolCall.name);
+    this.setToolIcon(iconEl, toolCall);
 
     const nameEl = header.createSpan({ cls: 'streaming-tool-name' });
     nameEl.setText(
@@ -420,7 +500,7 @@ export class ToolCallRenderer {
     );
 
     const summaryEl = header.createSpan({ cls: 'streaming-tool-summary' });
-    const summaryText = this.options.getToolSummary!(toolCall.name, toolCall.input);
+    const summaryText = this.options.getToolSummary!(toolCall.name, toolCall.input, toolCall.kind);
     summaryEl.setText(summaryText);
     summaryEl.title = summaryText;
 
@@ -446,25 +526,29 @@ export class ToolCallRenderer {
     return toolEl;
   }
 
-  private setToolIcon(el: HTMLElement, name: string): void {
+  private setToolIcon(el: HTMLElement, toolCall: Pick<ToolCallInfo, 'name' | 'kind'>): void {
+    const { name } = toolCall;
     // Use custom icon map if provided
     if (this.options.iconMap?.[name]) {
       setIcon(el, this.options.iconMap[name]);
       return;
     }
-    
-    // Check for MCP tool pattern (mcp__xxx__toolname)
-    if (name.startsWith('mcp__')) {
-      const parts = name.split('__');
-      if (parts.length >= 3) {
-        // Use MCP-specific icon
-        setIcon(el, 'layers');
-        return;
-      }
+
+    if (toolCall.kind === 'mcp') {
+      setIcon(el, MCP_TOOL_ICON_ID);
+      return;
     }
-    
-    // Use tool-specific icon or default
-    const icon = TOOL_ICONS[name] || 'wrench';
+
+    if (toolCall.kind === 'custom') {
+      setIcon(el, 'layers');
+      return;
+    }
+
+    const identity = getToolIdentity(name);
+    const icon = FALLBACK_TOOL_ICONS[identity.normalizedName]
+      || FALLBACK_TOOL_ICONS[name]
+      || identity.icon
+      || 'wrench';
     setIcon(el, icon);
   }
 
@@ -529,14 +613,18 @@ export class ToolCallRenderer {
     toolEl: HTMLElement,
     toolCall: ToolCallInfo
   ): void {
+    const iconEl = toolEl.querySelector('.streaming-tool-icon') as HTMLElement;
     const nameEl = toolEl.querySelector('.streaming-tool-name') as HTMLElement;
     const summaryEl = toolEl.querySelector('.streaming-tool-summary') as HTMLElement;
 
+    if (iconEl) {
+      this.setToolIcon(iconEl, toolCall);
+    }
     if (nameEl) {
       nameEl.setText(this.options.getToolName!(toolCall.name, toolCall.input));
     }
     if (summaryEl) {
-      const summaryText = this.options.getToolSummary!(toolCall.name, toolCall.input);
+      const summaryText = this.options.getToolSummary!(toolCall.name, toolCall.input, toolCall.kind);
       summaryEl.setText(summaryText);
       summaryEl.title = summaryText;
     }

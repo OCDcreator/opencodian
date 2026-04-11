@@ -37,8 +37,8 @@
 | 类型 | 说明 |
 |------|------|
 | `ChatMessage` | 聊天消息（`id`, `role`, `content`, `timestamp`, `modelId?`, `sourceMessageId?`, `streamState?`, `displayStyle?`, `noticeTitle?`, `noticeTone?`, `noticeActions?`, `images?`, `toolCalls?`, `contentBlocks?`, `contextAttachments?`, `questionResolution?`, `omo?`, `parts?`） |
-| `ContentBlock` | 消息内容块（`type: 'text' \| 'thinking' \| 'tool_use' \| 'tool_result' \| 'subagent'`） |
-| `ToolCallInfo` | 工具调用信息（`id`, `name`, `input`, `status`, `result?`, `isExpanded?`） |
+| `ContentBlock` | 消息内容块（`type: 'text' \| 'thinking' \| 'tool_use' \| 'tool_result' \| 'subagent'`，工具块可带 `toolKind?`） |
+| `ToolCallInfo` | 工具调用信息（`id`, `name`, `kind?`, `input`, `status`, `result?`, `isExpanded?`） |
 | `ConversationMeta` | 会话元数据（不含消息体） |
 | `Conversation` | 完整会话（含 `messages` 数组） |
 
@@ -46,7 +46,7 @@
 
 | 类型 | 说明 |
 |------|------|
-| `StreamChunk` | 联合类型，14 种流式事件（`text`, `thinking`, `tool_use`, `tool_result`, `file_edited`, `message_metadata`, `usage`, `error`, `message_start`, `message_stop`, `content_block_start`, `content_block_stop`, `permission_request`, `question_request`） |
+| `StreamChunk` | 联合类型，14 种流式事件（`text`, `thinking`, `tool_use`, `tool_result`, `file_edited`, `message_metadata`, `usage`, `error`, `message_start`, `message_stop`, `content_block_start`, `content_block_stop`, `permission_request`, `question_request`；其中 `tool_use` 可带 `kind?`） |
 
 ### OMO 兼容
 
@@ -103,7 +103,7 @@
 `ContentBlock.type` 支持五种：
 - `text` — 文本内容
 - `thinking` — AI 推理过程（`durationSeconds?`）
-- `tool_use` — 工具调用（`toolId`, `toolName`, `toolInput`）
+- `tool_use` — 工具调用（`toolId`, `toolName`, `toolKind?`, `toolInput`）
 - `tool_result` — 工具结果（`toolStatus`, `toolResult`）
 - `subagent` — 子代理调用（`subagentId`, `subagentMode`）
 

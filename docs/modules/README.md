@@ -131,6 +131,7 @@ docs/modules/
 │   ├── index.md
 │   ├── logger.md
 │   ├── obsidianContext.md
+│   ├── toolIdentity.md
 │   ├── toolExecution.md
 │   ├── vault.md
 │   └── modals/

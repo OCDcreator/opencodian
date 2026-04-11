@@ -664,6 +664,33 @@
   transform: translateX(-50%) rotate(45deg) translateY(0);
 }
 
+/* Tooltip aligned to the left of the trigger */
+.opencodian-tooltip-trigger[data-tooltip-align="left"]::after {
+  top: 50%;
+  left: auto;
+  bottom: auto;
+  right: calc(100% + 10px);
+  transform: translateY(-50%) translateX(4px);
+}
+
+.opencodian-tooltip-trigger[data-tooltip-align="left"]::before {
+  top: 50%;
+  left: auto;
+  bottom: auto;
+  right: calc(100% + 5px);
+  transform: translateY(-50%) rotate(-45deg) translateX(4px);
+}
+
+.opencodian-tooltip-trigger[data-tooltip-align="left"]:hover::after,
+.opencodian-tooltip-trigger[data-tooltip-align="left"]:focus-visible::after {
+  transform: translateY(-50%) translateX(0);
+}
+
+.opencodian-tooltip-trigger[data-tooltip-align="left"]:hover::before,
+.opencodian-tooltip-trigger[data-tooltip-align="left"]:focus-visible::before {
+  transform: translateY(-50%) rotate(-45deg) translateX(0);
+}
+
 .opencodian-settings-quick-nav-btn::after {
   content: attr(data-tooltip);
   position: absolute;

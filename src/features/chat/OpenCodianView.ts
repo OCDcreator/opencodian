@@ -16,7 +16,6 @@ import {
   resolvePreferredAvailableModel,
 } from '../../core/config/modelConfig';
 import {
-  OpenCodeService,
   type SessionActivityStatus,
   type SessionSyncEventUpdate,
 } from '../../core/opencode';
@@ -100,7 +99,7 @@ import { type CollapsibleState, setupCollapsible } from './rendering/collapsible
 import { ContextUsageService } from './services/ContextUsageService';
 import { TitleGenerationService } from './services/TitleGenerationService';
 import { type RestoredTabState, TabBar, type TabBarLayoutMode, type TabId, TabManager } from './tabs';
-import { type ContextRawMessageItem, ContextDetailModal } from './ui/ContextDetailModal';
+import { ContextDetailModal,type ContextRawMessageItem } from './ui/ContextDetailModal';
 import {
   chooseContextFile,
   type ContextFileCatalog,
@@ -5816,6 +5815,7 @@ export class OpenCodianView extends ItemView {
         durationSeconds: block.durationSeconds ?? null,
         toolId: block.toolId ?? null,
         toolName: block.toolName ?? null,
+        toolKind: block.toolKind ?? null,
         toolInput: block.toolInput ?? null,
         toolStatus: block.toolStatus ?? null,
         toolResult: block.toolResult ?? null,
@@ -6861,6 +6861,7 @@ export class OpenCodianView extends ItemView {
               type: 'tool_use',
               toolId: b.toolCall.id,
               toolName: b.toolCall.name,
+              toolKind: b.toolCall.kind,
               toolInput: b.toolCall.input,
               toolStatus: b.toolCall.status,
               toolResult: b.toolCall.result,
@@ -7492,6 +7493,7 @@ export class OpenCodianView extends ItemView {
         durationSeconds: block.durationSeconds ?? null,
         toolId: block.toolId ?? null,
         toolName: block.toolName ?? null,
+        toolKind: block.toolKind ?? null,
         toolInput: block.toolInput ?? null,
         toolStatus: block.toolStatus ?? null,
         toolResult: block.toolResult ?? null,
@@ -8645,6 +8647,7 @@ export class OpenCodianView extends ItemView {
           const toolCall: ToolCallInfo = {
             id: block.toolId,
             name: block.toolName,
+            kind: block.toolKind,
             input: block.toolInput || {},
             status: this.getStoredToolStatus(block),
             result: block.toolResult,
@@ -9287,7 +9290,7 @@ export class OpenCodianView extends ItemView {
         return;
       }
 
-      const hydratedMessage = OpenCodeService.openCodeMessageToChatMessage(
+      const hydratedMessage = this.plugin.openCodeService.hydrateOpenCodeMessage(
         latestServerUser.info,
         latestServerUser.parts,
         getVaultBasePath(this.app) ?? undefined,
@@ -9691,7 +9694,7 @@ export class OpenCodianView extends ItemView {
         : null;
       const convertedServerMessages = serverMessages
         .map(({ info, parts }) =>
-          OpenCodeService.openCodeMessageToChatMessage(info, parts, getVaultBasePath(this.app) ?? undefined),
+          this.plugin.openCodeService.hydrateOpenCodeMessage(info, parts, getVaultBasePath(this.app) ?? undefined),
         )
         .filter((message) => this.shouldRenderConversationMessage(message));
       if (verbose) this.logAssistantFinalizationDebug('server-sync-fetched', {
@@ -11571,6 +11574,7 @@ export class OpenCodianView extends ItemView {
           type: 'tool_use',
           id: chunk.id,
           name: chunk.name,
+          kind: chunk.kind,
           input: chunk.input,
         };
 

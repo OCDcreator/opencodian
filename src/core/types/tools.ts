@@ -8,6 +8,8 @@ export type ToolCallStatus = 'pending' | 'running' | 'completed' | 'error' | 'bl
 export interface ToolCallInfo {
   id: string;
   name: string;
+  toolSourceKey?: string;
+  kind?: 'builtin' | 'mcp' | 'custom' | 'task' | 'question' | 'skill' | 'plan' | 'unknown';
   input: Record<string, unknown>;
   status: ToolCallStatus;
   result?: string;

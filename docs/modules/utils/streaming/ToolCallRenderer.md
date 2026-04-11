@@ -5,10 +5,10 @@
 
 ## 概述
 
-渲染 AI 工具调用卡片。显示工具名称、摘要信息、状态图标和可展开的执行结果。为每个工具类型提供专门的摘要生成逻辑（文件名提取、命令截断等），支持 MCP 工具和自定义图标映射。
+渲染 AI 工具调用卡片。显示工具名称、摘要信息、状态图标和可展开的执行结果。摘要逻辑仍按工具规范名分流，但工具名称/图标识别现在统一委托给 `shared/toolIdentity`，兼容 OpenCode 与 Claudian 的不同命名体系。
 
 ## 导入关系
-上游: `obsidian` (setIcon), `./types` (ToolCallInfo, ToolCallStatus, ToolRendererOptions)
+上游: `obsidian` (setIcon), `../../shared` (tool identity), `./types` (ToolCallInfo, ToolCallStatus, ToolRendererOptions)
 下游: `StreamController` (持有并调用)
 
 ## 核心类型 / 接口
@@ -18,7 +18,7 @@
 {
   iconMap?: Record<string, string>;           // 自定义工具图标
   getToolName?: (name, input) => string;      // 工具名称解析
-  getToolSummary?: (name, input) => string;   // 摘要生成
+  getToolSummary?: (name, input, toolKind?) => string;   // 摘要生成
   renderExpandedContent?: (container, toolName, result) => void;  // 展开内容渲染
 }
 ```
@@ -50,13 +50,70 @@
 | `web_search` / `websearch` / `codesearch` | 查询文本（截断 60 字符） |
 | `web_fetch` / `webfetch` | URL 文本（截断 60 字符） |
 
+对结构化 `kind: 'mcp'` 的工具，摘要规则改为“工具名语义优先”；字段配置集中维护在 `src/utils/streaming/mcpSummaryConfig.ts`，完整对照表见 [mcp-summary-fields.md](C:/Users/lt/Desktop/Write/custom-project/opencodian/docs/modules/utils/streaming/mcp-summary-fields.md)：
+
+1. 先把工具名按 `__` / `_` / `-` / `:` 拆词，并优先取最后一个命中的动作词
+2. 若命中动作词，则按该类别的字段优先级取摘要
+3. 若类别字段没有可用值，再回退到通用 MCP 字段顺序
+4. 最后才回退到首个顶层非空 `string/number/boolean`
+
+| MCP 类别 | 动作词 | 字段优先级 |
+|---|---|---|
+| 搜索 / 查询 | `search`, `find`, `query`, `lookup`, `match` | `query` → `q` → `keywords` → `term` → `search` → `searchTerm` → `prompt` → `text` |
+| 抓取 / 打开 / 下载 | `fetch`, `get`, `open`, `request`, `download`, `crawl`, `scrape`, `visit` | `url` → `uri` → `link` → `href` → `resource` → `resourceUrl` → `endpoint` → `path` |
+| 读取 / 查看 / 加载 | `read`, `cat`, `show`, `view`, `load` | `path` → `file_path` → `filePath` → `filename` → `file` → `source` → `url` → `uri` |
+| 列举 / 枚举 | `list`, `ls`, `glob`, `enumerate`, `browse` | `path` → `dir` → `directory` → `folder` → `cwd` → `root` → `pattern` → `glob` |
+| 执行 / 命令 | `run`, `exec`, `execute`, `command`, `shell`, `bash`, `spawn` | `command` → `cmd` → `script` → `argv` → `arguments` → `args` → `prompt` |
+| 写入 / 创建 / 生成 | `write`, `create`, `save`, `export`, `generate`, `emit` | `path` → `file_path` → `filePath` → `target` → `output` → `destination` → `dest` → `name` → `title` |
+| 编辑 / 更新 / Patch | `edit`, `update`, `patch`, `modify`, `replace`, `rename` | `path` → `file_path` → `filePath` → `target` → `resource` → `instruction` → `prompt` → `name` |
+| 删除 / 移除 | `delete`, `remove`, `unlink`, `clear`, `purge` | `path` → `file_path` → `filePath` → `target` → `resource` → `id` → `name` |
+| 导航 / 选择 / 定位 | `navigate`, `goto`, `select`, `click`, `focus`, `locate` | `url` → `path` → `selector` → `element` → `target` → `id` → `name` |
+| 鉴权 / 连接 / 会话 | `auth`, `login`, `authorize`, `connect`, `callback`, `session` | `url` → `provider` → `server` → `name` → `id` → `clientId` |
+| 信息 / 状态 / 元数据 | `info`, `status`, `describe`, `metadata`, `inspect` | `name` → `id` → `resource` → `target` → `path` → `url` |
+
+通用 MCP 回退字段顺序：
+
+`query` → `url` → `path` → `file_path` → `filePath` → `command` → `prompt` → `title` → `name` → `id` → `target` → `resource` → `selector` → `arguments` → `args`
+
+字段展示规则：
+
+- 路径类字段只显示末级文件/目录名
+- URL / 普通文本统一截断到 60 字符
+- `arguments` / `args` / `argv` 仅接受字符串值
+- 只有最终顶层标量回退才会使用 `number/boolean`
+
 ### 工具图标映射
 
-两层图标查找：
+三层图标查找：
 1. `options.iconMap[name]` — 自定义映射
-2. `TOOL_ICONS[name]` — 内置映射（read→file-text, bash→terminal 等）
-3. MCP 工具（`mcp__*`）→ `layers` 图标
-4. 默认 → `wrench` 图标
+2. `toolCall.kind` — 若上游已提供结构化 kind，则 `mcp` 直接走内置注册的 `opencodian-tool-mcp`（LobeHub MCP 图标，已按 Obsidian 100×100 视口适配），`custom` 走 `layers`
+3. `shared/toolIdentity` — 统一识别 builtin / MCP / OpenCode 外部工具
+4. 最后才回退到本地补充映射或 `wrench`
+
+当前默认工具图标表：
+
+| 工具 | 图标 |
+|------|------|
+| `read` | `file-text` |
+| `write` | `file-plus` |
+| `edit` / `multiedit` / `apply_patch` / `patch` | `file-pen` |
+| `bash` | `terminal` |
+| `grep` | `search` |
+| `glob` | `folder-search` |
+| `list` / `ls` / `get_repo_structure` | `folder-tree` |
+| `lsp` | `search` |
+| `web_search` / `websearch` | `search` |
+| `web_fetch` / `webfetch` | `download` |
+| `codesearch` | `code` |
+| `task` | `git-branch` |
+| `question` / `askuserquestion` | `message-square` |
+| `skill` | `brain` |
+| `enter_plan_mode` / `plan_enter` | `list` |
+| `exit_plan_mode` / `plan_exit` | `check` |
+| `todowrite` / `todoread` | `list-checks` |
+| `mcp__*` / 结构化 `kind: 'mcp'` | `opencodian-tool-mcp` |
+| `kind: 'custom'` | `layers` |
+| 其他未知工具 | `wrench` |
 
 ### 状态图标
 
@@ -116,6 +173,4 @@ StreamController.handleToolResultChunk(chunk)
 - 同一 tool call ID 的重复 `tool_use` chunk 会合并 input（`Object.assign`）
 - 结果渲染截断为 20 行，大输出可能丢失信息
 - Obsidian 内置的 `.copy-code-button` 不在此处处理（由 MarkdownRenderer 处理）
-- 工具名称映射 `DEFAULT_TOOL_NAMES` 包含约 26 个常用工具的显示名
-
-
+- OpenCode 风格的 `server_tool` 若未携带结构化 kind，也会通过统一 identity 层做保守识别，不再直接掉回扳手

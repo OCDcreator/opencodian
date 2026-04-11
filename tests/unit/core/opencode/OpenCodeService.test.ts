@@ -1853,21 +1853,66 @@ describe('OpenCodeService', () => {
       }
 
       expect(chunks).toEqual(expect.arrayContaining([
-        {
+        expect.objectContaining({
           type: 'tool_use',
           id: 'call-tool-1',
           name: 'read',
+          kind: 'builtin',
           input: {},
-        },
-        {
+        }),
+        expect.objectContaining({
           type: 'tool_use',
           id: 'call-tool-1',
           name: 'read',
+          kind: 'builtin',
           input: {
             file_path: 'docs/architecture/README.md',
           },
-        },
+        }),
       ]));
+    });
+
+    it('classifies known OpenCode MCP stream tool parts as MCP tools', () => {
+      (service as unknown as { observeRuntimeToolNames: (tools: string[]) => void }).observeRuntimeToolNames(['exa_search']);
+
+      const outcome = (service as unknown as {
+        handleStreamingEvent: (
+          eventData: unknown,
+          sessionId: string,
+          state: unknown,
+          streamContext: unknown,
+        ) => { chunks: unknown[]; stop: boolean };
+      }).handleStreamingEvent(
+        {
+          type: 'message.part.updated',
+          properties: {
+            sessionID: 'test-session',
+            part: {
+              id: 'part-tool-mcp',
+              type: 'tool',
+              callID: 'call-tool-mcp',
+              tool: 'exa_search',
+              state: {
+                status: 'running',
+                input: { query: 'latest docs' },
+              },
+            },
+          },
+        },
+        'test-session',
+        { lastContent: '', processedToolIds: new Set(), toolInputSnapshots: new Map() },
+        { partTypeMap: new Map() },
+      );
+
+      expect(outcome.chunks).toEqual([
+        {
+          type: 'tool_use',
+          id: 'call-tool-mcp',
+          name: 'exa_search',
+          kind: 'mcp',
+          input: { query: 'latest docs' },
+        },
+      ]);
     });
 
     it('ignores internal StructuredOutput tool events from the SDK stream', async () => {
@@ -2654,7 +2699,96 @@ describe('OpenCodeService.openCodeMessageToChatMessage', () => {
     expect(message.toolCalls).toHaveLength(1);
     expect(message.toolCalls?.[0].id).toBe('call-1');
     expect(message.toolCalls?.[0].name).toBe('file_read');
+    expect(message.toolCalls?.[0].kind).toBe('custom');
     expect(message.toolCalls?.[0].input).toEqual({ path: '/test/file.txt' });
+  });
+
+  it('classifies known OpenCode MCP tools in historical messages', () => {
+    const info = {
+      id: 'msg-mcp-history',
+      sessionID: 'session-1',
+      role: 'assistant' as const,
+      time: { created: 1234567892 },
+      parentID: 'msg-2',
+      modelID: 'gpt-5',
+      providerID: 'openai',
+      mode: 'default',
+      path: { cwd: '/test', root: '/test' },
+      cost: 0.002,
+      tokens: { input: 15, output: 25, reasoning: 0, cache: { read: 0, write: 0 } },
+    };
+
+    const parts: Part[] = [
+      {
+        type: 'tool',
+        id: 'part-mcp-history',
+        sessionID: 'session-1',
+        messageID: 'msg-mcp-history',
+        callID: 'call-mcp-history',
+        tool: 'exa_search',
+        state: {
+          status: 'completed' as const,
+          input: { query: 'latest docs' },
+          output: 'done',
+        },
+      } as unknown as Part,
+    ];
+
+    const message = OpenCodeService.openCodeMessageToChatMessage(
+      info,
+      parts,
+      undefined,
+      { knownMcpTools: ['exa_search'] },
+    );
+
+    expect(message.toolCalls).toBeUndefined();
+    expect(message.contentBlocks?.[0]).toMatchObject({
+      type: 'tool_use',
+      toolId: 'call-mcp-history',
+      toolName: 'exa_search',
+      toolKind: 'mcp',
+      toolResult: 'done',
+    });
+  });
+
+  it('falls back to OpenCode external-tool styling when MCP catalog is unavailable', () => {
+    const info = {
+      id: 'msg-custom-history',
+      sessionID: 'session-1',
+      role: 'assistant' as const,
+      time: { created: 1234567892 },
+      parentID: 'msg-2',
+      modelID: 'gpt-5',
+      providerID: 'openai',
+      mode: 'default',
+      path: { cwd: '/test', root: '/test' },
+      cost: 0.002,
+      tokens: { input: 15, output: 25, reasoning: 0, cache: { read: 0, write: 0 } },
+    };
+
+    const parts: Part[] = [
+      {
+        type: 'tool',
+        id: 'part-custom-history',
+        sessionID: 'session-1',
+        messageID: 'msg-custom-history',
+        callID: 'call-custom-history',
+        tool: 'exa_search',
+        state: {
+          status: 'completed' as const,
+          input: { query: 'latest docs' },
+          output: 'done',
+        },
+      } as unknown as Part,
+    ];
+
+    const message = OpenCodeService.openCodeMessageToChatMessage(info, parts);
+
+    expect(message.contentBlocks?.[0]).toMatchObject({
+      type: 'tool_use',
+      toolName: 'exa_search',
+      toolKind: 'custom',
+    });
   });
 
   it('should handle multiple text parts', () => {

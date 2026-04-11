@@ -11,6 +11,7 @@
 - 在 SDK v2 与 legacy HTTP/SSE 两条链路之间按 feature flag 路由
 - 维护按 session 隔离的流式状态，支持多标签并发流式响应
 - 归一化 session、message、todo、question、diff、permission 等返回值
+- 归一化 OpenCode 工具身份（builtin / MCP / custom），避免流式与历史恢复出现不同图标判断
 - 把 OpenCode 持久化消息转换成 UI 可直接消费的 `ChatMessage`
 
 当前实现是“混合外观层”：SDK v2 已覆盖大部分 CRUD、非流式 prompt、流式主链路、abort、questions 与 sync 事件；legacy HTTP/SSE 仍完整保留作为回滚路径。
@@ -51,6 +52,12 @@
 - `vaultPath`: 用于 SDK `directory` 注入、上下文文件绝对路径解析，以及 `ServerManager` 工作目录设置。
 
 `responseHandlers` 字段虽然仍然存在，但当前公开的主流式接口已经是 `AsyncGenerator<StreamChunk>`。
+
+另外，服务层现在维护一份轻量的 `knownMcpToolNames` 集合：
+
+- 优先从请求期可见的 `allowedTools` 中缓存外部工具键名
+- 流式 `tool_use` 与历史 `openCodeMessageToChatMessage()` 都会通过 `shared/toolIdentity` 写入结构化 `toolKind`
+- 当没有稳定 MCP 目录时，OpenCode 风格外部工具也会按保守 `custom` 图标 `layers` 兜底，而不是回落成 `wrench`；一旦命中 MCP 目录则会切到 `opencodian-tool-mcp`
 
 ## 核心逻辑
 

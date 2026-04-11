@@ -109,4 +109,42 @@ export interface ManagedServerState {
   configFingerprint?: string;
 }
 
+export interface ToolCatalogEntry {
+  id: string;
+  description: string;
+  parameters: unknown;
+}
+
+export type McpServerStatus =
+  | { status: 'connected' }
+  | { status: 'disabled' }
+  | { status: 'failed'; error: string }
+  | { status: 'needs_auth' }
+  | { status: 'needs_client_registration'; error: string };
+
+export interface ToolCatalogSnapshot {
+  registryToolIds: string[];
+  toolSchemasByModel: Record<string, ToolCatalogEntry[]>;
+  observedExternalTools: string[];
+  updatedAt: number | null;
+}
+
+export interface McpServerSnapshot {
+  servers: Record<string, McpServerStatus>;
+  updatedAt: number | null;
+}
+
+export type OpenCodeEventSource = 'global' | 'event' | 'sync';
+
+export interface SdkEventEnvelope<TPayload = unknown> {
+  source: OpenCodeEventSource;
+  payload: TPayload;
+  timestamp: number;
+}
+
+export interface OpenCodeCapabilitySnapshot {
+  toolCatalog: ToolCatalogSnapshot;
+  mcp: McpServerSnapshot;
+}
+
 export type { SdkFeatureFlags };

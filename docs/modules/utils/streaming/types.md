@@ -81,7 +81,7 @@ interface ToolCallInfo {
 
 ### 渲染器选项
 
-**ToolRendererOptions**: `iconMap?`, `getToolName?`, `getToolSummary?`, `renderExpandedContent?`
+**ToolRendererOptions**: `iconMap?`, `getToolName?`, `getToolSummary?(name, input, toolKind?)`, `renderExpandedContent?`
 
 **ThinkingRendererOptions**: `collapsedByDefault?`, `showTimer?`, `collapsedLabel?`, `expandedLabel?`
 
@@ -141,5 +141,4 @@ SSE event → StreamChunk (输入类型)
 - `ContentBlock` 是持久化格式，不包含 DOM 引用
 - `ThinkingBlockState` 包含 DOM 引用和 `setInterval` ID，不能序列化
 - `createStreamState()` 是唯一的状态创建入口
-
 

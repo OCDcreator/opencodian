@@ -1326,7 +1326,14 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         const provider = providerStatusById.get(providerId);
         return provider ? !this.isProviderDisabledByScope(provider, 'global') : true;
       });
-      if (catalogSectionEl && catalogs && this.activeModelCatalogTab !== 'disabled' && selectedCatalogProviderIds.length > 0) {
+      if (
+        catalogSectionEl
+        && catalogs
+        && selectedCatalog
+        && this.activeModelCatalogTab !== 'disabled'
+        && selectedCatalogProviderIds.length > 0
+      ) {
+        const activeCatalogs = catalogs;
         const catalogActionsEl = catalogSectionEl.createDiv({ cls: 'opencodian-model-catalog-actions' });
         const catalogActionsInfoEl = catalogActionsEl.createDiv({ cls: 'opencodian-model-catalog-actions-info' });
         catalogActionsInfoEl.createDiv({
@@ -1350,14 +1357,14 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         });
         enableCatalogProvidersButton.type = 'button';
         enableCatalogProvidersButton.disabled = catalogScopedProviderIds.length === 0
-          || catalogScopedProviderIds.every((providerId) => this.isProviderCurrentlyEnabled(providerId, catalogs));
+          || catalogScopedProviderIds.every((providerId) => this.isProviderCurrentlyEnabled(providerId, activeCatalogs));
         const disableCatalogProvidersButton = catalogActionsButtonsEl.createEl('button', {
           cls: 'opencodian-model-toggle-provider-test-button opencodian-model-toggle-action-button',
           text: t('settings.model.availability.disableAllProviders'),
         });
         disableCatalogProvidersButton.type = 'button';
         disableCatalogProvidersButton.disabled = catalogScopedProviderIds.length === 0
-          || catalogScopedProviderIds.every((providerId) => !this.isProviderCurrentlyEnabled(providerId, catalogs));
+          || catalogScopedProviderIds.every((providerId) => !this.isProviderCurrentlyEnabled(providerId, activeCatalogs));
 
         enableCatalogProvidersButton.addEventListener('click', async () => {
           enableCatalogProvidersButton.disabled = true;

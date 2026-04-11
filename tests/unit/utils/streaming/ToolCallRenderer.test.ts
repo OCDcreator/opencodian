@@ -1,13 +1,19 @@
 import { ToolCallRenderer } from '../../../../src/utils/streaming/ToolCallRenderer';
 
 describe('ToolCallRenderer', () => {
-  const getHeader = (name: string, input: Record<string, unknown>, status: 'running' | 'completed' = 'running') => {
+  const getHeader = (
+    name: string,
+    input: Record<string, unknown>,
+    status: 'running' | 'completed' = 'running',
+    kind?: 'builtin' | 'mcp' | 'custom' | 'task' | 'question' | 'skill' | 'plan' | 'unknown'
+  ) => {
     const parentEl = document.createElement('div');
     const renderer = new ToolCallRenderer();
 
     renderer.render(parentEl, {
       id: 'tool-test',
       name,
+      kind,
       input,
       status,
       result: status === 'completed' ? 'ok' : undefined,
@@ -98,5 +104,66 @@ describe('ToolCallRenderer', () => {
     const header = getHeader(toolName, input);
     expect(header.name).toBe(expectedName);
     expect(header.summary).toBe(expectedSummary);
+  });
+
+  it('renders MCP brand icon for Claudian MCP tool names', () => {
+    const parentEl = document.createElement('div');
+    const renderer = new ToolCallRenderer();
+
+    renderer.render(parentEl, {
+      id: 'tool-mcp-1',
+      name: 'mcp__exa__search',
+      input: { query: 'latest docs' },
+      status: 'running',
+    });
+
+    expect(parentEl.querySelector('.streaming-tool-icon svg')?.getAttribute('data-icon')).toBe('opencodian-tool-mcp');
+  });
+
+  it.each([
+    [{ query: 'latest docs' }, 'latest docs'],
+    [{ url: 'https://example.com/docs' }, 'https://example.com/docs'],
+    [{ path: '/tmp/demo.md' }, 'demo.md'],
+    [{ command: 'git status' }, 'git status'],
+    [{ limit: 20, verbose: true }, '20'],
+    [{ filters: { tag: 'a' }, items: [] }, ''],
+  ])('renders MCP summary for input %j', (input, expectedSummary) => {
+    const header = getHeader('mcp__exa__search', input, 'running', 'mcp');
+    expect(header.summary ?? '').toBe(expectedSummary);
+  });
+
+  it.each([
+    ['mcp__exa__search', { query: 'latest docs', url: 'https://example.com' }, 'latest docs'],
+    ['web-search-prime_web_search_prime', { query: 'AI news', url: 'https://example.com' }, 'AI news'],
+    ['mcp__fetch__get', { url: 'https://example.com/docs', query: 'ignored query' }, 'https://example.com/docs'],
+    ['mcp__fs__read', { path: '/tmp/demo.md', url: 'https://example.com/fallback' }, 'demo.md'],
+    ['mcp__vault__list', { directory: '/tmp/notes', pattern: '*.md' }, 'notes'],
+    ['mcp__shell__run', { command: 'git status', args: '--short' }, 'git status'],
+    ['mcp__fs__write', { output: '/tmp/result.json', name: 'ignored' }, 'result.json'],
+    ['mcp__editor__patch', { target: '/tmp/a.ts', instruction: 'rename symbol' }, '/tmp/a.ts'],
+    ['mcp__fs__delete', { path: '/tmp/trash.txt', name: 'ignored' }, 'trash.txt'],
+    ['mcp__browser__click', { selector: '#submit', name: 'ignored' }, '#submit'],
+    ['mcp__auth__login', { url: 'https://example.com/login', provider: 'github' }, 'https://example.com/login'],
+    ['mcp__service__status', { name: 'search-index', path: '/tmp/status.json' }, 'search-index'],
+    ['mcp__unknown__thing', { target: 'fallback target', query: 'fallback query' }, 'fallback query'],
+    ['mcp__unknown__thing', { filters: { tag: 'a' }, items: [] }, ''],
+  ])('prefers semantic MCP summary fields for %s', (toolName, input, expectedSummary) => {
+    const header = getHeader(toolName, input, 'running', 'mcp');
+    expect(header.summary ?? '').toBe(expectedSummary);
+  });
+
+  it('renders non-wrench fallback for OpenCode external tools when kind is provided', () => {
+    const parentEl = document.createElement('div');
+    const renderer = new ToolCallRenderer();
+
+    renderer.render(parentEl, {
+      id: 'tool-mcp-2',
+      name: 'exa_search',
+      kind: 'custom',
+      input: { query: 'latest docs' },
+      status: 'running',
+    });
+
+    expect(parentEl.querySelector('.streaming-tool-icon svg')?.getAttribute('data-icon')).toBe('layers');
   });
 });

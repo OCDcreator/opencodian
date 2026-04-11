@@ -199,6 +199,7 @@ export class StreamController {
     const persistedToolCall: ToolCallInfo = {
       id: toolCall.id,
       name: toolCall.name,
+      kind: toolCall.kind,
       input: { ...toolCall.input },
       status: toolCall.status,
       result: toolCall.result,
@@ -226,7 +227,14 @@ export class StreamController {
     });
   }
 
-  private async handleToolUseChunk(chunk: { id: string; name: string; input: Record<string, unknown> }): Promise<void> {
+  private async handleToolUseChunk(
+    chunk: {
+      id: string;
+      name: string;
+      kind?: ToolCallInfo['kind'];
+      input: Record<string, unknown>;
+    },
+  ): Promise<void> {
     if (isInternalStructuredOutputTool(chunk.name)) {
       return;
     }
@@ -238,6 +246,9 @@ export class StreamController {
 
     const existingToolCall = this.state.toolCalls.get(chunk.id);
     if (existingToolCall) {
+      if (chunk.kind) {
+        existingToolCall.kind = chunk.kind;
+      }
       const newInput = chunk.input || {};
       if (Object.keys(newInput).length > 0) {
         existingToolCall.input = { ...existingToolCall.input, ...newInput };
@@ -253,6 +264,7 @@ export class StreamController {
     const toolCall: ToolCallInfo = {
       id: chunk.id,
       name: chunk.name,
+      kind: chunk.kind,
       input: chunk.input || {},
       status: 'running',
     };

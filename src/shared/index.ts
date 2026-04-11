@@ -31,4 +31,15 @@ export {
   resolveToolExecutionStatus,
   resolveToolResultText,
 } from './toolExecution';
+export type {
+  ToolIdentity,
+  ToolIdentityKind,
+  ToolIdentityOptions,
+} from './toolIdentity';
+export {
+  MCP_TOOL_ICON_ID,
+  getNormalizedToolName,
+  getToolIdentity,
+  isBuiltinToolName,
+} from './toolIdentity';
 export { getVaultBasePath } from './vault';

@@ -92,6 +92,8 @@ export interface ContentBlock {
   durationSeconds?: number;
   toolId?: string;
   toolName?: string;
+  toolSourceKey?: string;
+  toolKind?: 'builtin' | 'mcp' | 'custom' | 'task' | 'question' | 'skill' | 'plan' | 'unknown';
   toolInput?: Record<string, unknown>;
   toolStatus?: 'pending' | 'running' | 'completed' | 'error' | 'blocked';
   toolResult?: string;
@@ -174,6 +176,8 @@ export interface ChatMessage {
 export interface ToolCallInfo {
   id: string;
   name: string;
+  toolSourceKey?: string;
+  kind?: 'builtin' | 'mcp' | 'custom' | 'task' | 'question' | 'skill' | 'plan' | 'unknown';
   input: Record<string, unknown>;
   status?: 'pending' | 'running' | 'completed' | 'error' | 'blocked';
   result?: string;
@@ -251,7 +255,13 @@ export function createEmptyTabContextState(): TabContextState {
 export type StreamChunk =
   | { type: 'text'; content: string }
   | { type: 'thinking'; content: string; partId?: string; durationSeconds?: number }
-  | { type: 'tool_use'; id: string; name: string; input: Record<string, unknown> }
+  | {
+      type: 'tool_use';
+      id: string;
+      name: string;
+      kind?: 'builtin' | 'mcp' | 'custom' | 'task' | 'question' | 'skill' | 'plan' | 'unknown';
+      input: Record<string, unknown>;
+    }
   | { type: 'tool_result'; toolUseId: string; content: string; isError?: boolean }
   | { type: 'file_edited'; file: string }
   | { type: 'message_metadata'; messageId: string; timestamp: number; modelId?: string }

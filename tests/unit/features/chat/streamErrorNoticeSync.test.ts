@@ -21,6 +21,7 @@ describe('OpenCodianView stream error notice preservation', () => {
       openCodeService: {
         getSessionMessages: jest.fn().mockResolvedValue([{ info: {}, parts: [] }]),
         getSessionRevertState: jest.fn().mockResolvedValue(null),
+        hydrateOpenCodeMessage: openCodeMessageToChatMessage,
       },
       saveConversation: jest.fn().mockResolvedValue(undefined),
       storage: {

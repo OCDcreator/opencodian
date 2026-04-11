@@ -57,7 +57,7 @@ type ProviderCheckState =
 
 interface ModelConfigModalOpenOptions {
   initialProviderId?: string;
-  initialView?: 'preset-selector';
+  initialView?: 'preset-selector' | 'editor';
   onSaved?: () => Promise<void> | void;
 }
 

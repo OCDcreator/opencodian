@@ -196,7 +196,7 @@ export class EffortSelector {
       gearEl.setText(budget.label);
       gearEl.addClass('opencodian-tooltip-trigger');
       gearEl.setAttribute('data-tooltip', tooltip);
-      gearEl.setAttribute('data-tooltip-align', 'right');
+      gearEl.setAttribute('data-tooltip-align', 'left');
       this.attachTooltipLabel(gearEl, tooltip);
 
       if (budget.value === currentBudget) {

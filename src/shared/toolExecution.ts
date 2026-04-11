@@ -1,3 +1,5 @@
+import { getNormalizedToolName } from './toolIdentity';
+
 export type ToolExecutionStatus = 'pending' | 'running' | 'completed' | 'error' | 'blocked';
 
 export interface ToolExecutionStateLike {
@@ -37,16 +39,12 @@ const BASH_OUTPUT_FAILURE_PATTERNS = [
   /ssl\/tls connection failed/i,
 ];
 
-function canonicalizeToolName(toolName: string): string {
-  return toolName.trim().toLowerCase().replace(/[^a-z0-9]+/g, '');
-}
-
 export function isInternalStructuredOutputTool(toolName?: string | null): boolean {
   if (typeof toolName !== 'string' || !toolName.trim()) {
     return false;
   }
 
-  return canonicalizeToolName(toolName) === 'structuredoutput';
+  return getNormalizedToolName(toolName) === 'structuredoutput';
 }
 
 function getNumericMetadataValue(metadata: Record<string, unknown> | undefined, key: string): number | null {
@@ -121,10 +119,11 @@ export function resolveToolResultText(
 }
 
 export function isToolExecutionError(options: ResolveToolExecutionStatusOptions): boolean {
-  const { toolName, state } = options;
+  const normalizedName = options.toolName ? getNormalizedToolName(options.toolName) : '';
+  const { state } = options;
   const result = resolveToolResultText(state, options.result) ?? '';
 
-  if (toolName === 'invalid') {
+  if (normalizedName === 'invalid') {
     return true;
   }
 
@@ -144,7 +143,7 @@ export function isToolExecutionError(options: ResolveToolExecutionStatusOptions)
     return true;
   }
 
-  return toolName === 'bash' && hasBashFailureMarkers(result);
+  return normalizedName === 'bash' && hasBashFailureMarkers(result);
 }
 
 export function isToolExecutionBlocked(options: ResolveToolExecutionStatusOptions): boolean {

@@ -14,6 +14,8 @@ import {
   buildObsidianContextTag,
   createLogger,
   formatContextLabel,
+  getToolIdentity,
+  isBuiltinToolName,
   isInternalStructuredOutputTool,
   isTextLikeMime,
   parseLineRangeFromFileUrl,
@@ -22,6 +24,7 @@ import {
   resolveToolExecutionStatus,
   resolveToolResultText,
   toFileContextUrl,
+  type ToolIdentityKind,
 } from '../../shared';
 import type {
   ChatMessage,
@@ -44,6 +47,7 @@ import type { OpenCodianSettings } from '../types/settings';
 import { getServerBaseUrl, isLocalServerMode } from '../types/settings';
 import { createSdkClient } from './createSdkClient';
 import { detectOmoMessageMeta } from './omoCompat';
+import { OpenCodeSdkFacade } from './OpenCodeSdkFacade';
 import type { SdkFeatureFlags } from './sdkFeatureFlags';
 import { resolveSdkFeatureFlags } from './sdkFeatureFlags';
 import type { SdkEvent, SdkOpencodeClient, SdkOutputFormat } from './sdkTypes';
@@ -51,11 +55,17 @@ import { ServerManager } from './ServerManager';
 import type {
   LocalOutputFormat,
   ManagedServerState,
+  McpServerSnapshot,
+  McpServerStatus,
+  OpenCodeCapabilitySnapshot,
   OpenCodeServerConfig,
   QueryOptions,
   ResponseHandler,
+  SdkEventEnvelope,
   ServerDiagnostics,
   ServerStatus,
+  ToolCatalogEntry,
+  ToolCatalogSnapshot,
 } from './types';
 
 const logger = createLogger('OpenCodeService');
@@ -412,6 +422,12 @@ interface ActiveStreamContext {
   partTypeMap: Map<string, string>;
 }
 
+interface OpenCodeToolIdentityContext {
+  knownMcpTools?: Iterable<string>;
+  registryTools?: Iterable<string>;
+  observedExternalTools?: Iterable<string>;
+}
+
 type PromptRequestPart =
   | {
       type: 'text';
@@ -485,6 +501,10 @@ export type SessionSyncEventUpdate =
 
 type SessionSyncEventListener = (update: SessionSyncEventUpdate) => void;
 
+type OpenCodeEventListener = (update: SdkEventEnvelope) => void;
+
+type CatalogUpdateListener = (snapshot: OpenCodeCapabilitySnapshot) => void;
+
 const REMOTE_CONTEXT_TEXT_LIMIT_BYTES = 64 * 1024;
 
 interface TransientConnectivityLogState {
@@ -492,6 +512,7 @@ interface TransientConnectivityLogState {
 }
 
 export class OpenCodeService {
+  readonly sdk: OpenCodeSdkFacade;
   private settings: OpenCodianSettings;
   private events: OpenCodeServiceEvents;
   private serverManager: ServerManager;
@@ -506,7 +527,20 @@ export class OpenCodeService {
   private syncEventAbortController: AbortController | null = null;
   private syncEventPromise: Promise<void> | null = null;
   private syncEventWanted = false;
+  private openCodeEventListeners = new Set<OpenCodeEventListener>();
+  private catalogUpdateListeners = new Set<CatalogUpdateListener>();
+  private eventAbortController: AbortController | null = null;
+  private eventPromise: Promise<void> | null = null;
+  private globalEventAbortController: AbortController | null = null;
+  private globalEventPromise: Promise<void> | null = null;
+  private eventWanted = false;
   private vaultPath?: string;
+  private registryToolIds = new Set<string>();
+  private toolSchemasByModel = new Map<string, ToolCatalogEntry[]>();
+  private observedExternalToolNames = new Set<string>();
+  private mcpServerStatus = new Map<string, McpServerStatus>();
+  private toolCatalogUpdatedAt: number | null = null;
+  private mcpCatalogUpdatedAt: number | null = null;
   private transientConnectivityLogState: TransientConnectivityLogState | null = null;
 
   constructor(
@@ -518,6 +552,11 @@ export class OpenCodeService {
     this.events = events;
     this.baseUrl = getServerBaseUrl(settings.server);
     this.sdkFeatureFlags = resolveSdkFeatureFlags(runtimeOptions.sdkFeatureFlags);
+    this.sdk = new OpenCodeSdkFacade(() => ({
+      baseUrl: this.baseUrl,
+      authHeaders: this.getAuthHeaders(),
+      directory: this.getScopedDirectoryPath(),
+    }));
 
     this.serverManager = new ServerManager(
       this.buildServerConfig(settings),
@@ -616,9 +655,14 @@ export class OpenCodeService {
 
   /** Set the vault path for OpenCode server to use project config */
   setVaultPath(path: string): void {
+    const previousDirectory = this.getScopedDirectoryPath();
     this.vaultPath = path;
     this.serverManager.setWorkingDirectory(path);
+    if (previousDirectory !== this.getScopedDirectoryPath()) {
+      this.toolSchemasByModel.clear();
+    }
     this.restartSyncEventSubscription();
+    this.restartOpenCodeEventSubscriptions();
   }
 
   getSettingsSnapshot(): OpenCodianSettings {
@@ -629,6 +673,10 @@ export class OpenCodeService {
   private async autoFetchModels(): Promise<void> {
     try {
       const result = await this.getAvailableModels();
+      await Promise.allSettled([
+        this.refreshToolIds(),
+        this.refreshMcpServerStatus(),
+      ]);
 
       if (result.providers.length === 0) {
         logger.warn('No providers available from server');
@@ -649,16 +697,19 @@ export class OpenCodeService {
 
     await this.serverManager.start();
     this.ensureSyncEventSubscription();
+    this.ensureOpenCodeEventSubscriptions();
   }
 
   /** Stop the service */
   async stop(): Promise<void> {
     this.stopSyncEventSubscription();
+    this.stopOpenCodeEventSubscriptions();
     await this.serverManager.stop();
   }
 
   dispose(): void {
     this.stopSyncEventSubscription();
+    this.stopOpenCodeEventSubscriptions();
     this.serverManager.dispose();
   }
 
@@ -924,10 +975,12 @@ export class OpenCodeService {
     if (this.shouldUseSdk('sdkCrud')) {
       try {
         const response = await this.getSdkClient().session.messages({ sessionID: sessionId });
-        return await this.applySessionRevertState(
+        const messages = await this.applySessionRevertState(
           sessionId,
           this.normalizeSessionMessages(response),
         );
+        this.observeToolNamesInMessages(messages);
+        return messages;
       } catch (error) {
         this.logServiceWarning('session.messages', `SDK session.messages failed for ${sessionId}, falling back to legacy HTTP`, error);
       }
@@ -941,10 +994,12 @@ export class OpenCodeService {
       
       const response = await this.get<unknown>(path);
 
-      return await this.applySessionRevertState(
+      const messages = await this.applySessionRevertState(
         sessionId,
         Array.isArray(response) ? response : [],
       );
+      this.observeToolNamesInMessages(messages);
+      return messages;
     } catch (error) {
       this.logServiceError('session.messages', `Failed to get messages for session ${sessionId}:`, error);
       // Return empty array instead of throwing to prevent UI crash
@@ -1083,7 +1138,12 @@ export class OpenCodeService {
         if (assistantError) {
           throw new Error(assistantError);
         }
-        return OpenCodeService.openCodeMessageToChatMessage(typedResponse.info, typedResponse.parts, this.vaultPath);
+        return OpenCodeService.openCodeMessageToChatMessage(
+          typedResponse.info,
+          typedResponse.parts,
+          this.vaultPath,
+          this.buildOpenCodeToolIdentityContext(),
+        );
       }
 
       throw new Error('Invalid assistant response payload');
@@ -1130,7 +1190,12 @@ export class OpenCodeService {
       if (assistantError) {
         throw new Error(assistantError);
       }
-      return OpenCodeService.openCodeMessageToChatMessage(typedResponse.info, typedResponse.parts, this.vaultPath);
+      return OpenCodeService.openCodeMessageToChatMessage(
+        typedResponse.info,
+        typedResponse.parts,
+        this.vaultPath,
+        this.buildOpenCodeToolIdentityContext(),
+      );
     }
 
     throw new Error('Invalid assistant response payload');
@@ -1267,6 +1332,15 @@ export class OpenCodeService {
     return this.sdkFeatureFlags[flag];
   }
 
+  private getSdkFacade(options: { includeDirectory?: boolean } = {}): OpenCodeSdkFacade {
+    const { includeDirectory = true } = options;
+    return new OpenCodeSdkFacade(() => ({
+      baseUrl: this.baseUrl,
+      authHeaders: this.getAuthHeaders(),
+      directory: includeDirectory ? this.getScopedDirectoryPath() : undefined,
+    }));
+  }
+
   private getSdkClient(options: { includeDirectory?: boolean } = {}): SdkOpencodeClient {
     const { includeDirectory = true } = options;
     this.ensureBaseUrl();
@@ -1286,6 +1360,25 @@ export class OpenCodeService {
       debugChunkSequence: 0,
       lastTextDelta: null,
     };
+  }
+
+  private observeToolNamesInMessages(messages: Array<{ info: Message; parts: Part[] }>): void {
+    for (const message of messages) {
+      for (const part of message.parts) {
+        if (part.type !== 'tool') {
+          continue;
+        }
+
+        const toolName = typeof (part as ToolPartData).tool === 'string'
+          ? (part as ToolPartData).tool?.trim()
+          : '';
+        if (!toolName || isInternalStructuredOutputTool(toolName)) {
+          continue;
+        }
+
+        this.observeRuntimeToolNames([toolName]);
+      }
+    }
   }
 
   private getToolInputSnapshot(input: Record<string, unknown> | undefined): string {
@@ -2129,7 +2222,43 @@ export class OpenCodeService {
       return undefined;
     }
 
+    this.observeRuntimeToolNames(allowedTools);
     return Object.fromEntries(allowedTools.map((toolName) => [toolName, true]));
+  }
+
+  private observeRuntimeToolNames(toolNames: Iterable<string>): void {
+    for (const toolName of toolNames) {
+      const normalizedName = typeof toolName === 'string' ? toolName.trim() : '';
+      if (!normalizedName || isBuiltinToolName(normalizedName)) {
+        continue;
+      }
+
+      this.observedExternalToolNames.add(normalizedName);
+    }
+  }
+
+  private buildOpenCodeToolIdentityContext(): OpenCodeToolIdentityContext {
+    return {
+      knownMcpTools: this.registryToolIds.size > 0 ? this.observedExternalToolNames : undefined,
+      registryTools: this.registryToolIds,
+      observedExternalTools: this.observedExternalToolNames,
+    };
+  }
+
+  private getOpenCodeToolKind(toolName: string | undefined | null): ToolIdentityKind {
+    return OpenCodeService.getOpenCodeToolKind(toolName, this.buildOpenCodeToolIdentityContext());
+  }
+
+  private static getOpenCodeToolKind(
+    toolName: string | undefined | null,
+    context: OpenCodeToolIdentityContext = {},
+  ): ToolIdentityKind {
+    return getToolIdentity(toolName || 'unknown', {
+      source: 'opencode',
+      knownMcpTools: context.knownMcpTools,
+      registryTools: context.registryTools,
+      observedExternalTools: context.observedExternalTools,
+    }).kind;
   }
 
   private buildSharedPromptOptions(
@@ -2252,7 +2381,10 @@ export class OpenCodeService {
             return { chunks, stop: false };
           }
 
+          this.observeRuntimeToolNames([toolName]);
+
           if (toolId) {
+            const toolKind = this.getOpenCodeToolKind(toolName);
             const toolInput = toolPart.state?.input || {};
             const nextSnapshot = this.getToolInputSnapshot(toolInput);
             const previousSnapshot = state.toolInputSnapshots.get(toolId);
@@ -2267,6 +2399,7 @@ export class OpenCodeService {
                 type: 'tool_use',
                 id: toolId,
                 name: toolName,
+                kind: toolKind,
                 input: toolInput,
               });
             }
@@ -3038,6 +3171,7 @@ export class OpenCodeService {
     const previousSettings = this.settings;
     const previousMode = previousSettings.server.mode;
     const nextMode = settings.server.mode;
+    const previousToolCatalogScope = this.getToolCatalogScopeKey();
     const serverConfigChanged =
       previousSettings.server.local.host !== settings.server.local.host ||
       previousSettings.server.local.port !== settings.server.local.port;
@@ -3079,15 +3213,21 @@ export class OpenCodeService {
     const nextSettings = cloneSettings(settings);
     const previousBaseUrl = this.baseUrl;
     const shouldResumeSyncEvents = this.hasSyncEventListeners();
+    const shouldResumeOpenCodeEvents = this.hasOpenCodeEventListeners();
     this.settings = nextSettings;
     this.baseUrl = getServerBaseUrl(nextSettings.server);
     this.serverManager.updateConfig(this.buildServerConfig(nextSettings));
+    if (previousToolCatalogScope !== this.getToolCatalogScopeKey()) {
+      this.toolSchemasByModel.clear();
+    }
     this.stopSyncEventSubscription(shouldResumeSyncEvents);
+    this.stopOpenCodeEventSubscriptions(shouldResumeOpenCodeEvents);
 
     try {
       if (shouldStopManagedServer) {
         await this.serverManager.stop();
         this.ensureSyncEventSubscription();
+        this.ensureOpenCodeEventSubscriptions();
         return;
       }
 
@@ -3096,11 +3236,16 @@ export class OpenCodeService {
       }
 
       this.ensureSyncEventSubscription();
+      this.ensureOpenCodeEventSubscriptions();
     } catch (error) {
       this.settings = previousSettings;
       this.baseUrl = previousBaseUrl;
       this.serverManager.updateConfig(this.buildServerConfig(previousSettings));
+      if (previousToolCatalogScope !== this.getToolCatalogScopeKey()) {
+        this.toolSchemasByModel.clear();
+      }
       this.stopSyncEventSubscription(shouldResumeSyncEvents);
+      this.stopOpenCodeEventSubscriptions(shouldResumeOpenCodeEvents);
       if (previousMode === 'local' && (shouldRestartManagedServer || shouldStopManagedServer)) {
         try {
           await this.serverManager.start();
@@ -3109,6 +3254,7 @@ export class OpenCodeService {
         }
       }
       this.ensureSyncEventSubscription();
+      this.ensureOpenCodeEventSubscriptions();
       throw error;
     }
   }
@@ -3537,11 +3683,13 @@ export class OpenCodeService {
             toolName: toolPart.tool,
             state: toolPart.state,
           });
+          const toolName = toolPart.tool ?? '';
           if (toolStatus === 'pending' || toolStatus === 'running') {
             chunks.push({
               type: 'tool_use',
               id: toolPart.callID ?? '',
-              name: toolPart.tool ?? '',
+              name: toolName,
+              kind: this.getOpenCodeToolKind(toolName),
               input: toolPart.state.input ?? {},
             });
           } else if (toolStatus === 'completed' || toolStatus === 'error') {
@@ -3567,6 +3715,7 @@ export class OpenCodeService {
     info: Message,
     parts: Part[],
     vaultPath?: string,
+    toolIdentityContext: OpenCodeToolIdentityContext = {},
   ): ChatMessage {
     const role = info.role === 'assistant' ? 'assistant' : 'user';
 
@@ -3629,6 +3778,8 @@ export class OpenCodeService {
       .map((p) => ({
         id: p.callID ?? '',
         name: p.tool ?? '',
+        toolSourceKey: p.tool ?? undefined,
+        kind: OpenCodeService.getOpenCodeToolKind(p.tool, toolIdentityContext),
         input: p.state?.input ?? {},
         status: 'pending' as const,
       }));
@@ -3672,6 +3823,8 @@ export class OpenCodeService {
         type: 'tool_use',
         toolId,
         toolName: part.tool || 'unknown',
+        toolSourceKey: part.tool || undefined,
+        toolKind: OpenCodeService.getOpenCodeToolKind(part.tool, toolIdentityContext),
         toolInput: part.state?.input || {},
         toolStatus,
         toolResult: resolveToolResultText(resultPart?.state),
@@ -4000,6 +4153,560 @@ export class OpenCodeService {
     }
 
     return deduped;
+  }
+
+  private hasOpenCodeEventListeners(): boolean {
+    return this.openCodeEventListeners.size > 0 || this.catalogUpdateListeners.size > 0;
+  }
+
+  private ensureOpenCodeEventSubscriptions(): void {
+    if (!this.hasOpenCodeEventListeners()) {
+      return;
+    }
+
+    this.eventWanted = true;
+
+    if (!this.eventPromise) {
+      this.eventAbortController = new AbortController();
+      this.eventPromise = this.runScopedEventLoop('event', this.eventAbortController);
+    }
+
+    if (!this.globalEventPromise) {
+      this.globalEventAbortController = new AbortController();
+      this.globalEventPromise = this.runScopedEventLoop('global', this.globalEventAbortController);
+    }
+  }
+
+  private stopOpenCodeEventSubscriptions(keepWanted = false): void {
+    if (!keepWanted) {
+      this.eventWanted = false;
+    }
+
+    this.eventAbortController?.abort();
+    this.globalEventAbortController?.abort();
+  }
+
+  private restartOpenCodeEventSubscriptions(): void {
+    this.stopOpenCodeEventSubscriptions(true);
+    if (this.eventWanted && this.hasOpenCodeEventListeners()) {
+      this.ensureOpenCodeEventSubscriptions();
+    }
+  }
+
+  private async runScopedEventLoop(
+    source: Exclude<SdkEventEnvelope['source'], 'sync'>,
+    abortController: AbortController,
+  ): Promise<void> {
+    try {
+      while (this.eventWanted && !abortController.signal.aborted) {
+        try {
+          const subscription = source === 'event'
+            ? await this.getSdkFacade().event.subscribe(undefined, {
+              signal: abortController.signal,
+            } as never)
+            : await this.getSdkFacade({ includeDirectory: false }).global.event({
+              signal: abortController.signal,
+            } as never);
+
+          if (!subscription || typeof subscription !== 'object' || !('stream' in subscription)) {
+            throw new Error(`Invalid ${source} subscription payload`);
+          }
+
+          for await (const value of (subscription as { stream: AsyncIterable<unknown> }).stream) {
+            if (abortController.signal.aborted) {
+              return;
+            }
+
+            this.handleSdkEventEnvelope({
+              source,
+              payload: value,
+              timestamp: Date.now(),
+            });
+          }
+
+          if (abortController.signal.aborted || !this.eventWanted) {
+            return;
+          }
+
+          await new Promise((resolve) => setTimeout(resolve, 250));
+        } catch (error) {
+          if (abortController.signal.aborted || !this.eventWanted) {
+            return;
+          }
+
+          this.logServiceWarning(`${source}.subscribe`, `SDK ${source} subscription failed, retrying`, error);
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+        }
+      }
+    } finally {
+      if (source === 'event') {
+        this.eventPromise = null;
+        this.eventAbortController = null;
+      } else {
+        this.globalEventPromise = null;
+        this.globalEventAbortController = null;
+      }
+    }
+  }
+
+  private normalizeMcpServerStatusMap(
+    input: unknown,
+  ): Record<string, McpServerStatus> {
+    if (!input || typeof input !== 'object') {
+      return {};
+    }
+
+    const result: Record<string, McpServerStatus> = {};
+    for (const [name, value] of Object.entries(input as Record<string, unknown>)) {
+      if (!value || typeof value !== 'object') {
+        continue;
+      }
+
+      const status = typeof (value as { status?: unknown }).status === 'string'
+        ? (value as { status: string }).status
+        : '';
+      if (status === 'connected' || status === 'disabled' || status === 'needs_auth') {
+        result[name] = { status };
+      } else if ((status === 'failed' || status === 'needs_client_registration')
+        && typeof (value as { error?: unknown }).error === 'string') {
+        result[name] = {
+          status,
+          error: (value as { error: string }).error,
+        };
+      }
+    }
+
+    return result;
+  }
+
+  private updateRegistryToolIds(toolIds: string[]): string[] {
+    this.registryToolIds = new Set(
+      toolIds
+        .filter((toolId) => typeof toolId === 'string')
+        .map((toolId) => toolId.trim())
+        .filter((toolId) => toolId.length > 0),
+    );
+    this.toolCatalogUpdatedAt = Date.now();
+    this.emitCatalogUpdate();
+    return [...this.registryToolIds];
+  }
+
+  private updateToolSchemaCache(modelKey: string, tools: ToolCatalogEntry[]): ToolCatalogEntry[] {
+    this.toolSchemasByModel.set(modelKey, tools);
+    this.toolCatalogUpdatedAt = Date.now();
+    this.emitCatalogUpdate();
+    return tools;
+  }
+
+  private updateMcpServerStatus(statusMap: Record<string, McpServerStatus>): Record<string, McpServerStatus> {
+    this.mcpServerStatus = new Map(Object.entries(statusMap));
+    this.mcpCatalogUpdatedAt = Date.now();
+    this.emitCatalogUpdate();
+    return Object.fromEntries(this.mcpServerStatus.entries());
+  }
+
+  private getEventPayload(payload: unknown): SdkEvent | null {
+    if (payload && typeof payload === 'object' && 'payload' in (payload as Record<string, unknown>)) {
+      const nestedPayload = (payload as { payload?: unknown }).payload;
+      return nestedPayload && typeof nestedPayload === 'object' && 'type' in (nestedPayload as Record<string, unknown>)
+        ? nestedPayload as SdkEvent
+        : null;
+    }
+
+    return payload && typeof payload === 'object' && 'type' in (payload as Record<string, unknown>)
+      ? payload as SdkEvent
+      : null;
+  }
+
+  private handleCatalogRelevantEvent(payload: unknown): void {
+    const event = this.getEventPayload(payload);
+    if (!event || typeof event.type !== 'string') {
+      return;
+    }
+
+    if (event.type === 'mcp.tools.changed') {
+      void this.refreshMcpServerStatus();
+      return;
+    }
+
+    if (event.type === 'message.part.updated') {
+      const part = (event as { properties?: { part?: ToolPartData } }).properties?.part;
+      if (part?.type === 'tool' && typeof part.tool === 'string') {
+        this.observeRuntimeToolNames([part.tool]);
+      }
+      return;
+    }
+
+    if (event.type === 'message.updated') {
+      const info = (event as { properties?: { info?: { tools?: Record<string, boolean> } } }).properties?.info;
+      if (info?.tools && typeof info.tools === 'object') {
+        this.observeRuntimeToolNames(Object.keys(info.tools));
+      }
+      return;
+    }
+
+    if (event.type === 'permission.asked') {
+      const permission = (event as { properties?: { permission?: string } }).properties?.permission;
+      if (typeof permission === 'string') {
+        this.observeRuntimeToolNames([permission]);
+      }
+    }
+  }
+
+  private emitOpenCodeEvent(update: SdkEventEnvelope): void {
+    for (const listener of [...this.openCodeEventListeners]) {
+      try {
+        listener(update);
+      } catch (error) {
+        logger.error('OpenCode event listener failed', error);
+      }
+    }
+  }
+
+  private createToolCatalogSnapshot(): ToolCatalogSnapshot {
+    return {
+      registryToolIds: [...this.registryToolIds].sort(),
+      toolSchemasByModel: Object.fromEntries(
+        [...this.toolSchemasByModel.entries()]
+          .sort(([left], [right]) => left.localeCompare(right))
+          .map(([key, value]) => [key, value.map((entry) => ({ ...entry }))]),
+      ),
+      observedExternalTools: [...this.observedExternalToolNames].sort(),
+      updatedAt: this.toolCatalogUpdatedAt,
+    };
+  }
+
+  private createMcpServerSnapshot(): McpServerSnapshot {
+    return {
+      servers: Object.fromEntries(
+        [...this.mcpServerStatus.entries()].sort(([left], [right]) => left.localeCompare(right)),
+      ),
+      updatedAt: this.mcpCatalogUpdatedAt,
+    };
+  }
+
+  private emitCatalogUpdate(): void {
+    if (this.catalogUpdateListeners.size === 0) {
+      return;
+    }
+
+    const snapshot = this.getCapabilitySnapshot();
+    for (const listener of [...this.catalogUpdateListeners]) {
+      try {
+        listener(snapshot);
+      } catch (error) {
+        logger.error('OpenCode catalog listener failed', error);
+      }
+    }
+  }
+
+  private handleSdkEventEnvelope(update: SdkEventEnvelope): void {
+    this.handleCatalogRelevantEvent(update.payload);
+    this.emitOpenCodeEvent(update);
+  }
+
+  async refreshToolIds(): Promise<string[]> {
+    const toolIds = await this.sdk.tool.ids();
+    return this.updateRegistryToolIds(Array.isArray(toolIds) ? toolIds : []);
+  }
+
+  async listTools(
+    providerID: string,
+    modelID: string,
+    options: { refresh?: boolean } = {},
+  ): Promise<ToolCatalogEntry[]> {
+    const normalizedProviderID = providerID.trim();
+    const normalizedModelID = modelID.trim();
+    const modelKey = this.getToolSchemaCacheKey(normalizedProviderID, normalizedModelID);
+
+    if (!options.refresh && this.toolSchemasByModel.has(modelKey)) {
+      return (this.toolSchemasByModel.get(modelKey) ?? []).map((entry) => ({ ...entry }));
+    }
+
+    const response = await this.sdk.tool.list({
+      provider: normalizedProviderID,
+      model: normalizedModelID,
+    });
+    const tools = Array.isArray(response)
+      ? response.reduce<ToolCatalogEntry[]>((items, item) => {
+        if (!item || typeof item !== 'object') {
+          return items;
+        }
+
+        const candidate = item as { id?: unknown; description?: unknown; parameters?: unknown };
+        if (typeof candidate.id !== 'string' || typeof candidate.description !== 'string') {
+          return items;
+        }
+
+        items.push({
+          id: candidate.id,
+          description: candidate.description,
+          parameters: candidate.parameters,
+        });
+        return items;
+      }, [])
+      : [];
+
+    return this.updateToolSchemaCache(modelKey, tools).map((entry) => ({ ...entry }));
+  }
+
+  private getToolCatalogScopeKey(): string {
+    return `${this.baseUrl}::${this.getScopedDirectoryPath() ?? ''}`;
+  }
+
+  private getToolSchemaCacheKey(providerID: string, modelID: string): string {
+    return `${this.getToolCatalogScopeKey()}::${providerID}::${modelID}`;
+  }
+
+  async refreshMcpServerStatus(): Promise<Record<string, McpServerStatus>> {
+    return this.updateMcpServerStatus(
+      this.normalizeMcpServerStatusMap(await this.sdk.mcp.status()),
+    );
+  }
+
+  getToolCatalogSnapshot(): ToolCatalogSnapshot {
+    return this.createToolCatalogSnapshot();
+  }
+
+  getMcpServerSnapshot(): McpServerSnapshot {
+    return this.createMcpServerSnapshot();
+  }
+
+  getCapabilitySnapshot(): OpenCodeCapabilitySnapshot {
+    return {
+      toolCatalog: this.createToolCatalogSnapshot(),
+      mcp: this.createMcpServerSnapshot(),
+    };
+  }
+
+  subscribeToOpenCodeEvents(listener: OpenCodeEventListener): () => void {
+    this.openCodeEventListeners.add(listener);
+    this.ensureOpenCodeEventSubscriptions();
+    return () => {
+      this.openCodeEventListeners.delete(listener);
+      if (!this.hasOpenCodeEventListeners()) {
+        this.stopOpenCodeEventSubscriptions();
+      }
+    };
+  }
+
+  subscribeToCatalogUpdates(listener: CatalogUpdateListener): () => void {
+    this.catalogUpdateListeners.add(listener);
+    this.ensureOpenCodeEventSubscriptions();
+    listener(this.getCapabilitySnapshot());
+    return () => {
+      this.catalogUpdateListeners.delete(listener);
+      if (!this.hasOpenCodeEventListeners()) {
+        this.stopOpenCodeEventSubscriptions();
+      }
+    };
+  }
+
+  hydrateOpenCodeMessage(
+    info: Message,
+    parts: Part[],
+    vaultPath = this.vaultPath,
+  ): ChatMessage {
+    return OpenCodeService.openCodeMessageToChatMessage(
+      info,
+      parts,
+      vaultPath,
+      this.buildOpenCodeToolIdentityContext(),
+    );
+  }
+
+  async getMcpStatus(): Promise<Record<string, McpServerStatus>> {
+    return this.refreshMcpServerStatus();
+  }
+
+  async addMcpServer(name: string, config: Record<string, unknown>): Promise<Record<string, McpServerStatus>> {
+    const response = await this.sdk.mcp.add({ name, config: config as never });
+    return this.updateMcpServerStatus(this.normalizeMcpServerStatusMap(response));
+  }
+
+  async connectMcpServer(name: string): Promise<boolean> {
+    const response = await this.sdk.mcp.connect({ name });
+    await this.refreshMcpServerStatus();
+    return response === true;
+  }
+
+  async disconnectMcpServer(name: string): Promise<boolean> {
+    const response = await this.sdk.mcp.disconnect({ name });
+    await this.refreshMcpServerStatus();
+    return response === true;
+  }
+
+  async startMcpAuth(name: string): Promise<unknown> {
+    return this.sdk.mcp.auth.start({ name });
+  }
+
+  async completeMcpAuth(name: string, code: string): Promise<McpServerStatus> {
+    const response = await this.sdk.mcp.auth.callback({ name, code });
+    await this.refreshMcpServerStatus();
+    return this.normalizeMcpServerStatusMap({ [name]: response })[name] ?? { status: 'failed', error: 'Unknown MCP auth result' };
+  }
+
+  async authenticateMcp(name: string): Promise<McpServerStatus> {
+    const response = await this.sdk.mcp.auth.authenticate({ name });
+    await this.refreshMcpServerStatus();
+    return this.normalizeMcpServerStatusMap({ [name]: response })[name] ?? { status: 'failed', error: 'Unknown MCP auth result' };
+  }
+
+  async removeMcpAuth(name: string): Promise<{ success: true }> {
+    const response = await this.sdk.mcp.auth.remove({ name });
+    return response && typeof response === 'object' && 'success' in (response as Record<string, unknown>)
+      ? (response as unknown as { success: true })
+      : { success: true };
+  }
+
+  async initializeSession(sessionId: string, providerID: string, modelID: string, messageID: string): Promise<boolean> {
+    return (await this.sdk.session.init({ sessionID: sessionId, providerID, modelID, messageID })) === true;
+  }
+
+  async getSessionChildren(sessionId: string): Promise<Session[]> {
+    const response = await this.sdk.session.children({ sessionID: sessionId });
+    return Array.isArray(response) ? response as Session[] : [];
+  }
+
+  async shareSession(sessionId: string): Promise<Session> {
+    return await this.sdk.session.share({ sessionID: sessionId }) as unknown as Session;
+  }
+
+  async unshareSession(sessionId: string): Promise<Session> {
+    return await this.sdk.session.unshare({ sessionID: sessionId }) as unknown as Session;
+  }
+
+  async summarizeSession(sessionId: string, providerID: string, modelID: string, auto = false): Promise<boolean> {
+    return (await this.sdk.session.summarize({ sessionID: sessionId, providerID, modelID, auto })) === true;
+  }
+
+  async getSessionMessage(sessionId: string, messageId: string): Promise<{ info: Message; parts: Part[] }> {
+    return this.sdk.session.message({ sessionID: sessionId, messageID: messageId }) as Promise<{ info: Message; parts: Part[] }>;
+  }
+
+  async deleteSessionMessage(sessionId: string, messageId: string): Promise<boolean> {
+    return (await this.sdk.session.deleteMessage({ sessionID: sessionId, messageID: messageId })) === true;
+  }
+
+  async runSessionCommand(
+    sessionId: string,
+    input: { command: string; arguments: string; agent?: string; model?: string; messageID?: string; variant?: string; parts?: unknown[] },
+  ): Promise<{ info: Message; parts: Part[] }> {
+    return this.sdk.session.command({
+      sessionID: sessionId,
+      ...input,
+    } as never) as Promise<{ info: Message; parts: Part[] }>;
+  }
+
+  async runSessionShell(
+    sessionId: string,
+    input: { agent: string; command: string; model?: { providerID: string; modelID: string }; messageID?: string },
+  ): Promise<{ info: Message; parts: Part[] }> {
+    return this.sdk.session.shell({
+      sessionID: sessionId,
+      ...input,
+    }) as Promise<{ info: Message; parts: Part[] }>;
+  }
+
+  async updateMessagePart(sessionId: string, messageId: string, partId: string, part: Part): Promise<Part> {
+    return await this.sdk.part.update({
+      sessionID: sessionId,
+      messageID: messageId,
+      partID: partId,
+      body: part as never,
+    } as never) as Part;
+  }
+
+  async deleteMessagePart(sessionId: string, messageId: string, partId: string): Promise<boolean> {
+    return (await this.sdk.part.delete({
+      sessionID: sessionId,
+      messageID: messageId,
+      partID: partId,
+    })) === true;
+  }
+
+  async getProviderAuthMethods(): Promise<unknown> {
+    return this.sdk.provider.auth();
+  }
+
+  async authorizeProviderOAuth(providerID: string): Promise<unknown> {
+    return this.sdk.provider.oauth.authorize({ providerID });
+  }
+
+  async completeProviderOAuth(providerID: string, code: string, method?: number): Promise<unknown> {
+    return this.sdk.provider.oauth.callback({ providerID, code, method });
+  }
+
+  async listProjects(): Promise<unknown> {
+    return this.sdk.project.list();
+  }
+
+  async getCurrentProject(): Promise<unknown> {
+    return this.sdk.project.current();
+  }
+
+  async initializeProjectGit(): Promise<unknown> {
+    return this.sdk.project.initGit();
+  }
+
+  async updateProject(projectID: string, input: Record<string, unknown>): Promise<unknown> {
+    return this.sdk.project.update({ projectID, ...input });
+  }
+
+  async listFiles(input: Record<string, unknown> = {}): Promise<unknown> {
+    return this.sdk.file.list(input as never);
+  }
+
+  async readFile(input: Record<string, unknown>): Promise<unknown> {
+    return this.sdk.file.read(input as never);
+  }
+
+  async getFileStatus(input: Record<string, unknown> = {}): Promise<unknown> {
+    return this.sdk.file.status(input as never);
+  }
+
+  async findText(input: Record<string, unknown>): Promise<unknown> {
+    return this.sdk.find.text(input as never);
+  }
+
+  async findFiles(input: Record<string, unknown>): Promise<unknown> {
+    return this.sdk.find.files(input as never);
+  }
+
+  async findSymbols(input: Record<string, unknown>): Promise<unknown> {
+    return this.sdk.find.symbols(input as never);
+  }
+
+  async getPaths(): Promise<unknown> {
+    return this.sdk.path.get();
+  }
+
+  async getVcsInfo(input: Record<string, unknown> = {}): Promise<unknown> {
+    return this.sdk.vcs.get(input as never);
+  }
+
+  async getVcsDiff(input: Record<string, unknown> = {}): Promise<unknown> {
+    return this.sdk.vcs.diff(input as never);
+  }
+
+  async getFormatterStatus(): Promise<unknown> {
+    return this.sdk.formatter.status();
+  }
+
+  async getLspStatus(): Promise<unknown> {
+    return this.sdk.lsp.status();
+  }
+
+  async respondToSessionPermission(
+    sessionId: string,
+    permissionId: string,
+    reply: PermissionReply,
+  ): Promise<void> {
+    await this.sdk.permission.respond({
+      sessionID: sessionId,
+      permissionID: permissionId,
+      response: reply,
+    });
   }
 
   // ==================== Permission API Methods ====================

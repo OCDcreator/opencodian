@@ -54,7 +54,7 @@ export { createStreamState } from './types';
 
 ## 与其他模块的交互
 
-- 与 [StreamController.md](C:/Users/lt/Desktop/Write/custom-project/opencodian/docs/modules/utils/streaming/StreamController.md)、[ThinkingBlockRenderer.md](C:/Users/lt/Desktop/Write/custom-project/opencodian/docs/modules/utils/streaming/ThinkingBlockRenderer.md)、[ToolCallRenderer.md](C:/Users/lt/Desktop/Write/custom-project/opencodian/docs/modules/utils/streaming/ToolCallRenderer.md)、[types.md](C:/Users/lt/Desktop/Write/custom-project/opencodian/docs/modules/utils/streaming/types.md) 组成同一子系统
+- 与 [StreamController.md](C:/Users/lt/Desktop/Write/custom-project/opencodian/docs/modules/utils/streaming/StreamController.md)、[ThinkingBlockRenderer.md](C:/Users/lt/Desktop/Write/custom-project/opencodian/docs/modules/utils/streaming/ThinkingBlockRenderer.md)、[ToolCallRenderer.md](C:/Users/lt/Desktop/Write/custom-project/opencodian/docs/modules/utils/streaming/ToolCallRenderer.md)、[mcp-summary-fields.md](C:/Users/lt/Desktop/Write/custom-project/opencodian/docs/modules/utils/streaming/mcp-summary-fields.md)、[types.md](C:/Users/lt/Desktop/Write/custom-project/opencodian/docs/modules/utils/streaming/types.md) 组成同一子系统
 
 ## 配置项
 
@@ -63,5 +63,4 @@ export { createStreamState } from './types';
 ## 注意事项
 
 - 如果未来新增更多流式渲染器，应评估是否一起纳入此 barrel，避免公开 API 面失衡
-
 

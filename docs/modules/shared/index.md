@@ -5,12 +5,12 @@
 
 ## 概述
 
-共享工具层的主聚合入口。它把日志、Obsidian 上下文解析、工具执行状态解析和 vault 路径工具统一暴露给主功能层使用，是多个 feature 与 core 模块都依赖的横切工具入口。
+共享工具层的主聚合入口。它把日志、Obsidian 上下文解析、工具身份归一化、工具执行状态解析和 vault 路径工具统一暴露给主功能层使用，是多个 feature 与 core 模块都依赖的横切工具入口。
 
 ## 导入关系
 
 ```text
-上游: ./logger, ./obsidianContext, ./toolExecution, ./vault
+上游: ./logger, ./obsidianContext, ./toolIdentity, ./toolExecution, ./vault
 下游: features/chat/*, features/settings/*, main.ts, 测试代码
 ```
 
@@ -42,6 +42,8 @@ export {
 } from './obsidianContext';
 export type { ToolExecutionStateLike, ToolExecutionStatus } from './toolExecution';
 export { isToolExecutionError, resolveToolExecutionStatus, resolveToolResultText } from './toolExecution';
+export type { ToolIdentity, ToolIdentityKind, ToolIdentityOptions } from './toolIdentity';
+export { getNormalizedToolName, getToolIdentity, isBuiltinToolName } from './toolIdentity';
 export { getVaultBasePath } from './vault';
 ```
 
@@ -72,6 +74,9 @@ export { getVaultBasePath } from './vault';
 | `resolveToolExecutionStatus()` | 工具执行状态归一化 |
 | `isToolExecutionError()` | 判断是否为错误状态 |
 | `resolveToolResultText()` | 统一获取工具结果文本 |
+| `getToolIdentity()` | 统一解析工具种类、显示名和图标 |
+| `getNormalizedToolName()` | 获取工具规范名 |
+| `isBuiltinToolName()` | 判断是否属于内置/特殊内建工具 |
 | `getVaultBasePath()` | 解析当前 vault 根路径 |
 
 ## 数据流
@@ -81,7 +86,7 @@ export { getVaultBasePath } from './vault';
 ## 与其他模块的交互
 
 - 被聊天、设置和主入口广泛依赖
-- 各具体实现文档见 [logger.md](logger.md)、[obsidianContext.md](obsidianContext.md)、[toolExecution.md](toolExecution.md)、[vault.md](vault.md)
+- 各具体实现文档见 [logger.md](logger.md)、[obsidianContext.md](obsidianContext.md)、[toolIdentity.md](toolIdentity.md)、[toolExecution.md](toolExecution.md)、[vault.md](vault.md)
 
 ## 配置项
 
