@@ -161,17 +161,15 @@ interface TabRuntimeState {
 
 ### 发送与流式渲染
 
-`sendMessage()` 是这个文件最重要的业务方法。它会：
+`sendMessage()` 是这个文件最重要的业务方法。第六阶段后，它前半段的 preparation / bootstrap orchestration 已交给 `services/MessageSendPreparationService.ts`，而 view 自己保留真实 stream 调用与 chunk loop。完整链路现在是：
 
-1. 必要时新建 conversation
-2. 读取当前 tab 的 `draftContextItems`
-3. 先把用户消息乐观写入本地 conversation 并渲染到 UI
-4. 首条用户消息时先写默认标题，再按设置异步触发 AI 标题生成
-5. 检查 server availability，必要时通过 `ensureServerReadyForChat()` 给出启动/重试/跳过/进设置的交互卡片
-6. 校验当前模型是否可用
-7. 打开 tab 级 streaming 状态，并开始 context usage streaming
-8. 调用 `openCodeService.sendMessage()`，传入 `sessionId`、模型选项和 `contextItems`
-9. 用 `StreamController` 消费流式 chunk
+1. `MessageSendPreparationService` 负责确认当前 conversation / active tab / runtime 可发送
+2. `MessageSendPreparationService` 负责 server readiness、model catalog lazy load 与 selected model availability 检查
+3. `MessageSendPreparationService` 先把 optimistic user message 落到本地 conversation，并保持 save / render / scroll 时序
+4. 首条 user message 时，仍先写 fallback title，再按设置异步触发 AI title generation
+5. `MessageSendPreparationService` 统一进入 tab 级 streaming 状态，并在 stream 创建后清理 `pendingEditedFiles` / `draftContextItems`
+6. `OpenCodianView` 调用 `openCodeService.sendMessage()`，传入 `sessionId`、模型选项和 `contextItems`
+7. `OpenCodianView` 用 `StreamController` 消费流式 chunk
 
 chunk 处理里显式覆盖了这些分支：
 
@@ -192,8 +190,9 @@ chunk 处理里显式覆盖了这些分支：
 - 刷新 session todos
 - 更新 context usage
 
-第五阶段后，这条链路的边界变成：
+第五到第六阶段后，这条链路的边界变成：
 
+- send preflight / optimistic bootstrap / stream-enter state 切换，已迁到 `services/MessageSendPreparationService.ts`
 - stream loop、pending/timeout/interruption、本地 streaming shell/notice 渲染、第一次本地保存，仍留在 `OpenCodianView`
 - post-stream finalization / post-sync orchestration 已迁到 `services/MessageFinalizationService.ts`
 - 消息区 patch / rerender 细节仍继续复用 `ConversationRenderService`
@@ -301,6 +300,7 @@ model selector 现在拆成了几层协作：
 - `OpenCodeService`：会话 CRUD、发送、stream、同步、question、todo、status、context usage
 - `ConversationViewStateService`：tab 初始化、persisted restore、tab 激活和 conversation hydration 装载编排
 - `ConversationRenderService`：消息区 full rerender、tail patch 和 append-only sync 编排
+- `MessageSendPreparationService`：`sendMessage()` 前半段的 send preflight、optimistic user message 落地，以及 stream-enter 状态编排
 - `MessageFinalizationService`：`sendMessage()` 末段的 final sync、post-sync patch/rerender、todo/save/attention 收尾编排
 - `TabManager` / `TabBar`：tab 生命周期和 tab 元数据
 - `MarkdownRenderService`：Markdown 渲染

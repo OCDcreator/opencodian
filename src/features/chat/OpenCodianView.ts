@@ -48,7 +48,6 @@ import type { EffortLevel, ThinkingBudget } from '../../core/types/settings';
 import { t, type TranslationKey } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import {
-  buildContextAttachment,
   createLogger,
   formatContextLabel,
   getContextPathExtension,
@@ -110,6 +109,10 @@ import {
   MessageFinalizationService,
   shouldSyncAfterStream,
 } from './services/MessageFinalizationService';
+import {
+  type MessageSendPreparationHost,
+  MessageSendPreparationService,
+} from './services/MessageSendPreparationService';
 import {
   isElementNearBottom,
   scrollElementToBottom,
@@ -659,6 +662,7 @@ export class OpenCodianView extends ItemView {
   private titleGenerationService: TitleGenerationService;
   private conversationViewStateService: ConversationViewStateService;
   private conversationRenderService: ConversationRenderService;
+  private messageSendPreparationService: MessageSendPreparationService;
   private messageFinalizationService: MessageFinalizationService;
   private conversationSyncIntervalId: number | null = null;
   private omoBackgroundTaskLogStates = new Map<string, OmoBackgroundTaskLogState>();
@@ -2127,6 +2131,7 @@ export class OpenCodianView extends ItemView {
     this.titleGenerationService = new TitleGenerationService(this.plugin);
     this.conversationViewStateService = new ConversationViewStateService(this.createConversationViewStateHost());
     this.conversationRenderService = new ConversationRenderService(this.createConversationRenderHost());
+    this.messageSendPreparationService = new MessageSendPreparationService(this.createMessageSendPreparationHost());
     this.messageFinalizationService = new MessageFinalizationService(this.createMessageFinalizationHost());
   }
 
@@ -2378,6 +2383,78 @@ export class OpenCodianView extends ItemView {
       },
       refreshActiveTabContextUsageFromServer: () => this.refreshActiveTabContextUsageFromServer(),
       summarizeChatMessageForDebug: (message) => this.summarizeChatMessageForDebug(message),
+    };
+  }
+
+  private createMessageSendPreparationHost(): MessageSendPreparationHost {
+    return {
+      ensureConversationReady: async () => {
+        if (!this.currentConversation) {
+          await this.createNewConversation();
+        }
+
+        return this.currentConversation;
+      },
+      getActiveTabId: () => this.getActiveTabId(),
+      ensureTabRuntime: (tabId) => Boolean(this.ensureTabRuntimeState(tabId)),
+      isTabForegroundBusy: (tabId) => this.isTabForegroundBusy(tabId),
+      notifyForegroundBusy: () => {
+        new Notice(t('chat.tab.processingBlocked'));
+      },
+      getDraftContextItems: (tabId) => [...(this.getTabRuntimeState(tabId)?.draftContextItems ?? [])],
+      getServerAvailability: () => this.getServerAvailability(),
+      refreshServerStatusBadge: () => this.refreshServerStatusBadge(),
+      ensureServerReadyForChat: (availability) => this.ensureServerReadyForChat(availability),
+      hasLoadedModelCatalog: () => this.hasLoadedModelCatalog,
+      loadAvailableModels: () => this.loadAvailableModels(),
+      getSendMessageOptions: () => this.getSendMessageOptions(),
+      formatModelId: (model) => this.formatModelId(model),
+      ensureSelectedModelAvailable: (provider, model) => this.ensureSelectedModelAvailable(provider, model),
+      appendModelUnavailableNoticeMessage: () => this.appendModelUnavailableNoticeMessage(),
+      resetBackgroundTaskIndicator: (tabId) => {
+        this.resetBackgroundTaskIndicator(tabId);
+      },
+      armBackgroundTaskIndicatorForUserMessage: (message, tabId) => {
+        this.armBackgroundTaskIndicatorForUserMessage(message, tabId);
+      },
+      startConversationSyncLoop: () => {
+        this.startConversationSyncLoop();
+      },
+      saveConversation: (conversation) => this.plugin.saveConversation(conversation),
+      setAutoScrollEnabled: (tabId, enabled) => {
+        const runtime = this.getTabRuntimeState(tabId);
+        if (runtime) {
+          runtime.autoScrollEnabled = enabled;
+        }
+      },
+      renderMessage: (message) => this.renderMessage(message),
+      scrollToBottom: (options) => {
+        this.scrollToBottom(options);
+      },
+      applyFallbackConversationTitle: (conversationId, firstMessage) =>
+        this.applyFallbackConversationTitle(conversationId, firstMessage),
+      shouldGenerateAiTitle: () => this.plugin.settings.titleMode === 'ai',
+      startAiConversationTitleGeneration: (conversationId, firstMessage, modelOptions) => {
+        void this.startAiConversationTitleGeneration(conversationId, firstMessage, modelOptions);
+      },
+      setStreaming: (tabId, value) => {
+        const runtime = this.getTabRuntimeState(tabId);
+        if (runtime) {
+          runtime.isStreaming = value;
+        }
+      },
+      syncTabStreamLikeState: (tabId) => {
+        this.syncTabStreamLikeState(tabId);
+      },
+      beginTabContextUsageStream: (tabId) => {
+        this.beginTabContextUsageStream(tabId);
+      },
+      clearPendingEditedFiles: (tabId) => {
+        this.getTabRuntimeState(tabId)?.pendingEditedFiles.clear();
+      },
+      clearDraftContextItems: (tabId) => {
+        this.clearDraftContextItems(tabId);
+      },
     };
   }
 
@@ -6427,77 +6504,25 @@ export class OpenCodianView extends ItemView {
 
   /** Send a message */
   private async sendMessage(content: string) {
-    if (!this.currentConversation) {
-      await this.createNewConversation();
-    }
-
-    if (!this.currentConversation) return;
-    const sendingConversation = this.currentConversation;
-    const sendingTabId = this.getActiveTabId();
-    if (!sendingTabId) {
+    const preparedSend = await this.messageSendPreparationService.prepareMessageSend({ content });
+    if (!preparedSend) {
       return;
     }
-    const sendingRuntime = this.ensureTabRuntimeState(sendingTabId);
+
+    const {
+      conversation: sendingConversation,
+      tabId: sendingTabId,
+      draftContextItems,
+      modelOptions,
+      activeModelId,
+      userMessage,
+    } = preparedSend;
+    const sendingRuntime = this.getTabRuntimeState(sendingTabId);
     if (!sendingRuntime) {
       return;
     }
 
-    if (this.isTabForegroundBusy(sendingTabId)) {
-      new Notice(t('chat.tab.processingBlocked'));
-      return;
-    }
-
-    const draftContextItems = [...sendingRuntime.draftContextItems];
-    const availability = await this.getServerAvailability();
-    await this.refreshServerStatusBadge();
-    if (availability !== 'running' && availability !== 'external') {
-      const ready = await this.ensureServerReadyForChat(availability);
-      if (!ready) {
-        return;
-      }
-    }
-
-    if (!this.hasLoadedModelCatalog) {
-      await this.loadAvailableModels();
-    }
-
-    const modelOptions = this.getSendMessageOptions();
-
-    const activeModelId = this.formatModelId(modelOptions);
-    if (!(await this.ensureSelectedModelAvailable(modelOptions.provider, modelOptions.model))) {
-      await this.appendModelUnavailableNoticeMessage();
-      return;
-    }
-
-    const contextAttachments = draftContextItems.map((item) => buildContextAttachment(item));
-    const userMessage: ChatMessage = {
-      id: `user-${Date.now()}`,
-      role: 'user',
-      content,
-      timestamp: Date.now(),
-      contextAttachments: contextAttachments.length > 0 ? contextAttachments : undefined,
-    };
-    this.resetBackgroundTaskIndicator();
-    this.armBackgroundTaskIndicatorForUserMessage(userMessage);
-    sendingConversation.messages.push(userMessage);
-    sendingConversation.updatedAt = userMessage.timestamp;
-    this.startConversationSyncLoop();
-    await this.plugin.saveConversation(sendingConversation);
-    sendingRuntime.autoScrollEnabled = true;
-    await this.renderMessage(userMessage);
-    this.scrollToBottom({ tabId: sendingTabId, enableAutoScroll: true });
-
-    const isFirstUserMessage = sendingConversation.messages.filter((message) => message.role === 'user').length === 1;
-    if (isFirstUserMessage) {
-      await this.applyFallbackConversationTitle(sendingConversation.id, content);
-      if (this.plugin.settings.titleMode === 'ai') {
-        void this.startAiConversationTitleGeneration(sendingConversation.id, content, modelOptions);
-      }
-    }
-
-    sendingRuntime.isStreaming = true;
-    this.syncTabStreamLikeState(sendingTabId);
-    this.beginTabContextUsageStream(sendingTabId);
+    this.messageSendPreparationService.enterStreamingState(sendingTabId);
 
     const STREAM_IDLE_TIMEOUT_MS = 300000; // 5 minutes of no new stream chunks
     let timeoutId: number | null = null;
@@ -6547,8 +6572,7 @@ export class OpenCodianView extends ItemView {
       ...modelOptions,
       contextItems: draftContextItems,
     });
-    sendingRuntime.pendingEditedFiles.clear();
-    this.clearDraftContextItems(sendingTabId);
+    this.messageSendPreparationService.completePreparedStreamStart(sendingTabId);
 
     const { contentEl } = this.createAssistantMessageElement(sendingTabId, true);
     const streamController = this.getOrCreateTabStreamController(sendingTabId);
