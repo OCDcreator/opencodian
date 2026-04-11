@@ -282,6 +282,10 @@ type TrailingAssistantPatchSkippedDebugFinalLogInputsContract = {
   payloadPlan: TrailingAssistantPatchSkippedDebugPayloadPlan;
 };
 
+type TrailingAssistantPatchSkippedDebugFinalLogPlanContract = {
+  finalLogInputs: TrailingAssistantPatchSkippedDebugFinalLogInputs;
+};
+
 type TrailingAssistantPatchSkippedDebugFinalLogPayloadContract = {
   tabId: TabId | null;
   payloadPlan: TrailingAssistantPatchSkippedDebugPayloadPlan;
@@ -1616,14 +1620,34 @@ export class ConversationRenderService {
     planningContext: TrailingAssistantPatchSkippedDebugLogPlanningContext,
     payloadPlan: TrailingAssistantPatchSkippedDebugPayloadPlan,
   ): TrailingAssistantPatchSkippedDebugLogPlan {
-    const finalLogInputs =
-      this.buildTrailingAssistantPatchSkippedDebugFinalLogInputsFromLogPlanningContext(
+    const finalLogPlanContract =
+      this.buildTrailingAssistantPatchSkippedDebugFinalLogPlanContractFromLogPlanningContext(
         planningContext,
         payloadPlan,
       );
     return this.buildTrailingAssistantPatchSkippedDebugFinalLogPlanFromInputs(
-      finalLogInputs,
+      finalLogPlanContract.finalLogInputs,
     );
+  }
+
+  private buildTrailingAssistantPatchSkippedDebugFinalLogPlanContractFromLogPlanningContext(
+    planningContext: TrailingAssistantPatchSkippedDebugLogPlanningContext,
+    payloadPlan: TrailingAssistantPatchSkippedDebugPayloadPlan,
+  ): TrailingAssistantPatchSkippedDebugFinalLogPlanContract {
+    return this.buildTrailingAssistantPatchSkippedDebugFinalLogPlanContract(
+      this.buildTrailingAssistantPatchSkippedDebugFinalLogInputsFromLogPlanningContext(
+        planningContext,
+        payloadPlan,
+      ),
+    );
+  }
+
+  private buildTrailingAssistantPatchSkippedDebugFinalLogPlanContract(
+    finalLogInputs: TrailingAssistantPatchSkippedDebugFinalLogInputs,
+  ): TrailingAssistantPatchSkippedDebugFinalLogPlanContract {
+    return {
+      finalLogInputs,
+    };
   }
 
   private buildTrailingAssistantPatchSkippedDebugFinalLogInputs(
