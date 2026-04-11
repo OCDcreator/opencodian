@@ -1274,17 +1274,23 @@ export class ConversationRenderService {
   private logTrailingAssistantPatchSkippedDebug(
     loggingContext: TrailingAssistantPatchSkippedDebugLoggingContext,
   ): void {
-    const payloadInputs =
-      this.buildTrailingAssistantPatchSkippedDebugPayloadInputsFromLoggingContext(
-        loggingContext,
-      );
     const logPlan = this.buildTrailingAssistantPatchSkippedDebugLogPlan(
-      this.buildTrailingAssistantPatchSkippedDebugLogPlanningContext(
-        payloadInputs,
-        loggingContext.planningContext.tabId,
+      this.buildTrailingAssistantPatchSkippedDebugLogPlanningContextFromLoggingContext(
+        loggingContext,
       ),
     );
     this.host.logAssistantFinalizationDebug(logPlan.label, logPlan.payload);
+  }
+
+  private buildTrailingAssistantPatchSkippedDebugLogPlanningContextFromLoggingContext(
+    loggingContext: TrailingAssistantPatchSkippedDebugLoggingContext,
+  ): TrailingAssistantPatchSkippedDebugLogPlanningContext {
+    return this.buildTrailingAssistantPatchSkippedDebugLogPlanningContext(
+      this.buildTrailingAssistantPatchSkippedDebugPayloadInputsFromLoggingContext(
+        loggingContext,
+      ),
+      loggingContext.planningContext.tabId,
+    );
   }
 
   private buildTrailingAssistantPatchSkippedDebugLogPlanningContext(
