@@ -5,7 +5,7 @@
 
 ## 概述
 
-Provider 图标缓存管理 Modal。展示所有 provider 的图标缓存状态，支持查看、选择默认图标、打开内置图标选择器、添加自定义图标源（URL/SVG/路径）、拖拽排序、删除自定义条目。数据来源于 `ProviderIconService` 和 `plugin.settings.providerIconLibrary`。
+Provider 图标缓存管理 Modal。展示所有 provider 的图标缓存状态，支持查看、选择默认图标、打开内置图标选择器、添加自定义图标源（URL/SVG/路径）、拖拽排序、删除自定义条目。除了是否已缓存外，当前还会展示每个条目的请求 variant、实际命中 variant、命中 format 与是否发生 fallback。
 
 ## 导入关系
 上游: `obsidian`（App、Modal、Notice）、`ProviderIconEntry`（core/types）、`i18n`、`main`（OpenCodianPlugin）、`ProviderIconService`（utils/icons）
@@ -30,14 +30,14 @@ Provider 图标缓存管理 Modal。展示所有 provider 的图标缓存状态�
 每个 provider 渲染：
 - Header：provider ID + 状态徽章（current/saved）
 - Header Action：打开内置图标选择器
-- Entry 列表：图标预览、类型（mapped/builtin/custom）、选中状态、缓存状态、源信息
+- Entry 列表：图标预览、类型（mapped/builtin/custom）、选中状态、缓存状态、fallback 状态、源信息，以及 `requestedVariant / resolvedVariant / resolvedFormat`
 - 操作：选为默认、删除（仅 custom）、拖拽排序
 - 添加行：textarea 输入自定义源 + 添加按钮
 
 ### 内置图标选择
 
 `openBuiltinPicker()` 会打开 `ProviderBuiltinIconPickerModal`。用户点选卡片后：
-1. 调用 `ProviderIconService.selectBuiltinIcon()`
+1. 调用 `ProviderIconService.selectBuiltinIcon()`，并把 picker 返回的显式 `variant` 一起写入
 2. 写回 `plugin.settings.providerIconLibrary`
 3. `persistLibrary()` 保存设置
 4. 重新渲染当前 modal，并显示成功 Notice

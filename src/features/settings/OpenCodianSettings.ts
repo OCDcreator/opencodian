@@ -44,6 +44,7 @@ import {
   type ModelSourceMode,
   type OpencodeModelConfigSubset,
   type PluginIsolationMode,
+  type LobehubIconVariant,
   type ProviderIconColorMode,
   type QuestionCardPosition,
   type QuestionDisplayMode,
@@ -2087,6 +2088,49 @@ export class OpenCodianSettingTab extends PluginSettingTab {
               this.plugin.applyProviderIconColorMode();
               new Notice(
                 error instanceof Error ? error.message : t('settings.model.iconCache.colorMode.saveFailed'),
+              );
+            }
+          });
+      });
+
+    new Setting(toolsBodyEl)
+      .setName(t('settings.model.iconCache.defaultVariant.name'))
+      .setDesc(t('settings.model.iconCache.defaultVariant.desc'))
+      .addDropdown((dropdown) => {
+        const variantOptions: LobehubIconVariant[] = [
+          'auto',
+          'mono',
+          'color',
+          'brand',
+          'brand-color',
+          'text',
+          'text-cn',
+          'text-color',
+          'combine',
+          'avatar',
+        ];
+        for (const variant of variantOptions) {
+          dropdown.addOption(variant, t(`settings.model.iconCache.variant.${variant}` as const));
+        }
+
+        dropdown
+          .setValue(this.plugin.settings.providerIconDefaultVariant)
+          .onChange(async (value) => {
+            const previousVariant = this.plugin.settings.providerIconDefaultVariant;
+            this.plugin.settings.providerIconDefaultVariant = value as LobehubIconVariant;
+            this.plugin.applyProviderIconColorMode();
+            try {
+              await this.plugin.saveSettings({
+                syncService: false,
+                reloadModels: false,
+                syncConfig: false,
+                applyUi: true,
+              });
+            } catch (error) {
+              this.plugin.settings.providerIconDefaultVariant = previousVariant;
+              this.plugin.applyProviderIconColorMode();
+              new Notice(
+                error instanceof Error ? error.message : t('settings.model.iconCache.defaultVariant.saveFailed'),
               );
             }
           });

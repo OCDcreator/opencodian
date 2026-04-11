@@ -9,6 +9,13 @@ import {
 } from '../../utils/icons/ProviderIconService';
 import { ProviderBuiltinIconPickerModal } from './ProviderBuiltinIconPickerModal';
 
+type ScrollRestoreState = {
+  scrollTop: number;
+  providerId?: string;
+  providerOffset?: number;
+  refocusAddInput?: boolean;
+};
+
 export class ProviderIconCacheModal extends Modal {
   private readonly providerSections = new Map<string, HTMLElement>();
   private quickJumpEl: HTMLElement | null = null;
@@ -34,16 +41,16 @@ export class ProviderIconCacheModal extends Modal {
     this.contentEl.empty();
   }
 
-  private async render(restoreScrollTop?: number): Promise<void> {
-    this.contentEl.empty();
-    this.providerSections.clear();
-    this.quickJumpEl = null;
-
+  private async render(restoreState?: ScrollRestoreState): Promise<void> {
     const { providers, summary } = await ProviderIconService.getProviderCacheState(
       this.app,
       this.currentProviderIds,
       this.plugin.settings.providerIconLibrary,
     );
+
+    this.contentEl.empty();
+    this.providerSections.clear();
+    this.quickJumpEl = null;
 
     const summaryEl = this.contentEl.createDiv({ cls: 'opencodian-icon-cache-modal-summary' });
     summaryEl.setText(t('settings.model.iconCache.modal.summary', {
@@ -59,7 +66,7 @@ export class ProviderIconCacheModal extends Modal {
         cls: 'opencodian-icon-cache-modal-empty',
         text: t('settings.model.iconCache.noProviders'),
       });
-      this.restoreScrollPosition(restoreScrollTop);
+      this.restoreScrollPosition(restoreState);
       return;
     }
 
@@ -85,11 +92,12 @@ export class ProviderIconCacheModal extends Modal {
       this.renderProviderSection(provider);
     }
 
-    this.restoreScrollPosition(restoreScrollTop);
+    this.restoreScrollPosition(restoreState);
   }
 
   private renderProviderSection(provider: ProviderIconProviderState): void {
     const sectionEl = this.contentEl.createDiv({ cls: 'opencodian-icon-cache-provider-section' });
+    sectionEl.dataset.providerId = provider.providerId;
     this.providerSections.set(provider.providerId, sectionEl);
     const headerEl = sectionEl.createDiv({ cls: 'opencodian-icon-cache-provider-header' });
     const headingEl = headerEl.createDiv({ cls: 'opencodian-icon-cache-provider-heading' });
@@ -188,11 +196,43 @@ export class ProviderIconCacheModal extends Modal {
           text: t('settings.model.iconCache.modal.cachedBadge'),
         });
       }
+      if (entry.fallbackUsed) {
+        titleRow.createSpan({
+          cls: 'opencodian-icon-cache-entry-badge is-fallback',
+          text: t('settings.model.iconCache.modal.fallbackBadge'),
+        });
+      }
 
       bodyEl.createDiv({
         cls: 'opencodian-icon-cache-entry-source',
         text: entry.sourceLabel,
       });
+      const resolvedParts = [
+        entry.requestedVariant
+          ? t('settings.model.iconCache.modal.requestedVariant', {
+              variant: t(`settings.model.iconCache.variant.${entry.requestedVariant}` as const),
+            })
+          : null,
+        entry.resolvedVariant
+          ? t('settings.model.iconCache.modal.resolvedVariant', {
+              variant: t(`settings.model.iconCache.variant.${entry.resolvedVariant}` as const),
+            })
+          : null,
+        entry.resolvedFormat
+          ? t('settings.model.iconCache.modal.resolvedFormat', {
+              format: entry.resolvedFormat,
+            })
+          : null,
+      ].filter((part): part is string => Boolean(part));
+      if (resolvedParts.length > 0) {
+        const resolvedEl = bodyEl.createDiv({ cls: 'opencodian-icon-cache-entry-resolved' });
+        for (const part of resolvedParts) {
+          resolvedEl.createSpan({
+            cls: 'opencodian-icon-cache-entry-resolved-badge',
+            text: part,
+          });
+        }
+      }
       if (entry.cachePath) {
         bodyEl.createDiv({
           cls: 'opencodian-icon-cache-entry-path',
@@ -256,7 +296,7 @@ export class ProviderIconCacheModal extends Modal {
       return;
     }
 
-    const restoreScrollTop = this.getScrollContainer().scrollTop;
+    const restoreState = this.captureScrollRestoreState(providerId, { refocusAddInput: true });
     let nextLibrary = this.plugin.settings.providerIconLibrary;
     const errors: string[] = [];
     let addedCount = 0;
@@ -283,7 +323,7 @@ export class ProviderIconCacheModal extends Modal {
       this.plugin.settings.providerIconLibrary = nextLibrary;
       await this.persistLibrary();
       inputEl.value = '';
-      await this.render(restoreScrollTop);
+      await this.render(restoreState);
 
       if (errors.length > 0) {
         new Notice(t('settings.model.iconCache.modal.addPartial', {
@@ -298,14 +338,14 @@ export class ProviderIconCacheModal extends Modal {
   }
 
   private async removeCustomEntry(providerId: string, entryId: string): Promise<void> {
-    const restoreScrollTop = this.getScrollContainer().scrollTop;
+    const restoreState = this.captureScrollRestoreState(providerId);
     this.plugin.settings.providerIconLibrary = ProviderIconService.removeProviderEntry(
       providerId,
       entryId,
       this.plugin.settings.providerIconLibrary,
     );
     await this.persistLibrary();
-    await this.render(restoreScrollTop);
+    await this.render(restoreState);
   }
 
   private async moveEntryToFront(providerId: string, entryId: string): Promise<void> {
@@ -322,9 +362,9 @@ export class ProviderIconCacheModal extends Modal {
       entries,
       this.plugin.settings.providerIconLibrary,
     );
-    const restoreScrollTop = this.getScrollContainer().scrollTop;
+    const restoreState = this.captureScrollRestoreState(providerId);
     await this.persistLibrary();
-    await this.render(restoreScrollTop);
+    await this.render(restoreState);
   }
 
   private async reorderProviderEntries(providerId: string, draggedId: string, targetId: string): Promise<void> {
@@ -342,9 +382,9 @@ export class ProviderIconCacheModal extends Modal {
       entries,
       this.plugin.settings.providerIconLibrary,
     );
-    const restoreScrollTop = this.getScrollContainer().scrollTop;
+    const restoreState = this.captureScrollRestoreState(providerId);
     await this.persistLibrary();
-    await this.render(restoreScrollTop);
+    await this.render(restoreState);
   }
 
   private getEditableEntries(providerId: string): ProviderIconEntry[] {
@@ -375,16 +415,17 @@ export class ProviderIconCacheModal extends Modal {
       plugin: this.plugin,
       providerId,
       library: this.plugin.settings.providerIconLibrary,
-      onChoose: async ({ libraryId, iconId }) => {
+      onChoose: async ({ libraryId, iconId, variant }) => {
         this.plugin.settings.providerIconLibrary = ProviderIconService.selectBuiltinIcon(
           providerId,
           libraryId,
           iconId,
           this.plugin.settings.providerIconLibrary,
+          variant,
         );
-        const restoreScrollTop = this.getScrollContainer().scrollTop;
+        const restoreState = this.captureScrollRestoreState(providerId);
         await this.persistLibrary();
-        await this.render(restoreScrollTop);
+        await this.render(restoreState);
         new Notice(t('settings.model.iconCache.builtinPicker.chooseSuccess', {
           providerId,
           iconId,
@@ -413,16 +454,55 @@ export class ProviderIconCacheModal extends Modal {
     return this.quickJumpEl.offsetHeight + 8;
   }
 
-  private restoreScrollPosition(restoreScrollTop?: number): void {
-    if (restoreScrollTop === undefined) {
+  private captureScrollRestoreState(
+    providerId?: string,
+    options?: { refocusAddInput?: boolean },
+  ): ScrollRestoreState {
+    const scrollContainer = this.getScrollContainer();
+    const sectionEl = providerId ? this.providerSections.get(providerId) : null;
+
+    return {
+      scrollTop: scrollContainer.scrollTop,
+      providerId,
+      providerOffset: sectionEl
+        ? scrollContainer.scrollTop - this.getElementOffsetWithinContainer(sectionEl, scrollContainer)
+        : undefined,
+      refocusAddInput: options?.refocusAddInput ?? false,
+    };
+  }
+
+  private restoreScrollPosition(restoreState?: ScrollRestoreState): void {
+    if (!restoreState) {
       return;
     }
 
     const scrollContainer = this.getScrollContainer();
-    scrollContainer.scrollTop = restoreScrollTop;
+    const applyRestore = () => {
+      const sectionEl = restoreState.providerId
+        ? this.providerSections.get(restoreState.providerId) ?? null
+        : null;
+      const nextScrollTop = sectionEl && restoreState.providerOffset !== undefined
+        ? this.getElementOffsetWithinContainer(sectionEl, scrollContainer) + restoreState.providerOffset
+        : restoreState.scrollTop;
+      scrollContainer.scrollTop = Math.max(0, nextScrollTop);
+
+      if (restoreState.refocusAddInput && sectionEl) {
+        sectionEl.querySelector<HTMLTextAreaElement>('.opencodian-icon-cache-add-input')
+          ?.focus({ preventScroll: true });
+      }
+    };
+
+    applyRestore();
     window.requestAnimationFrame(() => {
-      scrollContainer.scrollTop = restoreScrollTop;
+      applyRestore();
+      window.requestAnimationFrame(applyRestore);
     });
+  }
+
+  private getElementOffsetWithinContainer(element: HTMLElement, container: HTMLElement): number {
+    const elementRect = element.getBoundingClientRect();
+    const containerRect = container.getBoundingClientRect();
+    return elementRect.top - containerRect.top + container.scrollTop;
   }
 
   private getScrollContainer(): HTMLElement {

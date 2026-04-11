@@ -241,11 +241,27 @@ export interface PlatformDebugLogPaths {
 
 export type ProviderIconEntryType = 'mapped' | 'builtin' | 'url' | 'file';
 export type ProviderIconColorMode = 'system' | 'monochrome' | 'color';
+export type LobehubIconVariant =
+  | 'auto'
+  | 'mono'
+  | 'color'
+  | 'brand'
+  | 'brand-color'
+  | 'text'
+  | 'text-cn'
+  | 'text-color'
+  | 'combine'
+  | 'avatar';
+export type StaticLobehubIconVariant = Exclude<LobehubIconVariant, 'auto' | 'combine'>;
+export type ProviderIconResolvedFormat = 'svg' | 'png' | 'webp' | 'avatar';
 
 export interface ProviderIconEntry {
   id: string;
   type: ProviderIconEntryType;
   source: string;
+  variant?: LobehubIconVariant;
+  resolvedVariant?: Exclude<LobehubIconVariant, 'auto'>;
+  resolvedFormat?: ProviderIconResolvedFormat;
   mimeType?: string;
   cacheFileName?: string;
   addedAt: number;
@@ -262,6 +278,36 @@ export function normalizeProviderIconColorMode(value: unknown): ProviderIconColo
       return value;
     default:
       return 'system';
+  }
+}
+
+export function normalizeLobehubIconVariant(value: unknown): LobehubIconVariant {
+  switch (value) {
+    case 'auto':
+    case 'mono':
+    case 'color':
+    case 'brand':
+    case 'brand-color':
+    case 'text':
+    case 'text-cn':
+    case 'text-color':
+    case 'combine':
+    case 'avatar':
+      return value;
+    default:
+      return 'auto';
+  }
+}
+
+export function normalizeProviderIconResolvedFormat(value: unknown): ProviderIconResolvedFormat | undefined {
+  switch (value) {
+    case 'svg':
+    case 'png':
+    case 'webp':
+    case 'avatar':
+      return value;
+    default:
+      return undefined;
   }
 }
 
@@ -374,6 +420,13 @@ export function normalizeProviderIconLibrary(value: unknown): ProviderIconLibrar
         id,
         type: candidate.type,
         source,
+        variant: normalizeLobehubIconVariant(candidate.variant),
+        resolvedVariant: candidate.resolvedVariant === undefined
+          ? undefined
+          : normalizeLobehubIconVariant(candidate.resolvedVariant) === 'auto'
+            ? undefined
+            : normalizeLobehubIconVariant(candidate.resolvedVariant) as Exclude<LobehubIconVariant, 'auto'>,
+        resolvedFormat: normalizeProviderIconResolvedFormat(candidate.resolvedFormat),
         mimeType: typeof candidate.mimeType === 'string' && candidate.mimeType.trim()
           ? candidate.mimeType.trim()
           : undefined,
@@ -1407,6 +1460,7 @@ export interface OpenCodianSettings {
   providers: ModelProviderConfig[];
   providerIconLibrary: ProviderIconLibrary;
   providerIconColorMode: ProviderIconColorMode;
+  providerIconDefaultVariant: LobehubIconVariant;
   effortLevel: EffortLevel;
   thinkingBudget: ThinkingBudget;
 
@@ -1493,6 +1547,7 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
   ],
   providerIconLibrary: {},
   providerIconColorMode: 'system',
+  providerIconDefaultVariant: 'auto',
   effortLevel: 'high',
   thinkingBudget: 4096,
 

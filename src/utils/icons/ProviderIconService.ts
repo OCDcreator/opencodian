@@ -10,7 +10,14 @@ import type { App } from 'obsidian';
 import { normalizePath, requestUrl } from 'obsidian';
 import * as path from 'path';
 
-import type { ProviderIconEntry, ProviderIconLibrary } from '../../core/types';
+import type {
+  LobehubIconVariant,
+  ProviderIconColorMode,
+  ProviderIconEntry,
+  ProviderIconLibrary,
+  ProviderIconResolvedFormat,
+  StaticLobehubIconVariant,
+} from '../../core/types';
 import { createLogger } from '../../shared';
 import {
   findBuiltinIcon,
@@ -23,11 +30,15 @@ import {
   type BuiltinIconDefinition,
   type BuiltinIconLibraryId,
 } from './builtinIconRegistry';
+import {
+  LOBEHUB_ICON_MANIFEST,
+  type LobehubManifestEntry,
+} from './lobehubIconManifest';
 
 const logger = createLogger('ProviderIconService');
 const loggedIconUrls = new Map<string, string | null>();
-const resolvedIconUrls = new Map<string, string | null>();
-const inFlightIconLoads = new Map<string, Promise<string | null>>();
+const resolvedIconUrls = new Map<string, ResolvedProviderIconAsset | null>();
+const inFlightIconLoads = new Map<string, Promise<ResolvedProviderIconAsset | null>>();
 const failedIconIds = new Set<string>();
 
 export interface ProviderIconCacheEntry {
@@ -39,6 +50,10 @@ export interface ProviderIconCacheEntry {
   iconUrl: string | null;
   isCurrentProvider: boolean;
   isSelected: boolean;
+  requestedVariant?: LobehubIconVariant;
+  resolvedVariant?: Exclude<LobehubIconVariant, 'auto' | 'combine'>;
+  resolvedFormat?: ProviderIconResolvedFormat;
+  fallbackUsed?: boolean;
   sourceLabel: string;
 }
 
@@ -62,6 +77,12 @@ export interface BuiltinIconOption {
   displayName: string;
   source: string;
   previewUrl: string | null;
+  previewCandidates: string[];
+  requestedVariant: LobehubIconVariant;
+  resolvedVariant?: Exclude<LobehubIconVariant, 'auto' | 'combine'>;
+  resolvedFormat?: ProviderIconResolvedFormat;
+  staticVariants: StaticLobehubIconVariant[];
+  supportedVariants: LobehubIconVariant[];
   isRecommended: boolean;
   isSelected: boolean;
 }
@@ -75,11 +96,25 @@ interface LoadedIconAsset {
   mimeType: string;
 }
 
+interface ResolvedProviderIconAsset {
+  cachePath: string | null;
+  cached: boolean;
+  fallbackUsed: boolean;
+  iconId: string | null;
+  iconUrl: string | null;
+  requestedVariant?: LobehubIconVariant;
+  resolvedFormat?: ProviderIconResolvedFormat;
+  resolvedVariant?: Exclude<LobehubIconVariant, 'auto' | 'combine'>;
+  sourceLabel: string;
+}
+
 interface NormalizedCustomSource {
   type: 'url' | 'file';
   source: string;
   localPath?: string;
 }
+
+type ResolvedLobehubVariant = Exclude<LobehubIconVariant, 'auto' | 'combine'>;
 
 // CDN base URL for Lobehub icons
 const LOBEHUB_CDN_BASE = 'https://unpkg.com/@lobehub/icons-static-svg@latest/icons';
@@ -99,6 +134,19 @@ const MIME_TYPE_TO_EXTENSION: Record<string, string> = {
   'image/webp': 'webp',
   'image/gif': 'gif',
 };
+const LOBEHUB_MANIFEST_BY_ICON_ID = new Map(LOBEHUB_ICON_MANIFEST.map((entry) => [entry.iconId, entry]));
+const ALL_VARIANT_OPTIONS: LobehubIconVariant[] = [
+  'auto',
+  'mono',
+  'color',
+  'brand',
+  'brand-color',
+  'text',
+  'text-cn',
+  'text-color',
+  'combine',
+  'avatar',
+];
 
 export class ProviderIconService {
   /**
@@ -110,7 +158,7 @@ export class ProviderIconService {
       return null;
     }
 
-    return `${LOBEHUB_CDN_BASE}/${iconId}.svg`;
+    return this.getPreviewUrlForLobehubIcon(iconId, 'auto')?.previewUrl ?? null;
   }
 
   static async resolveIconUrl(
@@ -128,7 +176,8 @@ export class ProviderIconService {
       return null;
     }
 
-    return this.resolveEntryUrl(app, providerId, entry, options);
+    const asset = await this.resolveEntryAsset(app, providerId, entry, options);
+    return asset?.iconUrl ?? null;
   }
   
   /**
@@ -199,9 +248,12 @@ export class ProviderIconService {
     options: {
       query?: string;
       libraryId?: BuiltinIconLibraryId;
+      requestedVariant?: LobehubIconVariant;
     } = {},
   ): BuiltinIconOption[] {
     const currentSource = this.getSelectedBuiltinSource(providerId, library);
+    const selectedVariant = this.getSelectedBuiltinVariant(providerId, library);
+    const requestedVariant = options.requestedVariant ?? selectedVariant;
     const recommended = this.getRecommendedBuiltinIcons(providerId, options.libraryId);
     const recommendedSourceSet = new Set(recommended.map((item) => item.source));
     const query = options.query?.trim() ?? '';
@@ -216,15 +268,31 @@ export class ProviderIconService {
           collection.findIndex((candidate) => candidate.source === definition.source) === index,
         );
 
-    return definitions.map((definition) => ({
-      libraryId: definition.libraryId,
-      iconId: definition.iconId,
-      displayName: definition.displayName,
-      source: definition.source,
-      previewUrl: this.getBuiltinPreviewUrl(app, definition.libraryId, definition.iconId),
-      isRecommended: recommendedSourceSet.has(definition.source),
-      isSelected: currentSource === definition.source,
-    }));
+    return definitions
+      .filter((definition) => this.isDefinitionAvailableForVariant(definition, requestedVariant))
+      .map((definition) => {
+        const preview = this.getBuiltinPreview(app, definition, requestedVariant);
+        return {
+          libraryId: definition.libraryId,
+          iconId: definition.iconId,
+          displayName: definition.displayName,
+          source: definition.source,
+          previewUrl: preview.previewUrl,
+          previewCandidates: preview.previewCandidates,
+          requestedVariant: requestedVariant,
+          resolvedVariant: preview.resolvedVariant,
+          resolvedFormat: preview.resolvedFormat,
+          staticVariants: definition.lobehub?.staticVariants ?? ['mono'],
+          supportedVariants: definition.lobehub?.supportedVariants ?? ['auto', 'mono'],
+          isRecommended: recommendedSourceSet.has(definition.source),
+          isSelected: currentSource === definition.source && (
+            requestedVariant === 'auto'
+            || selectedVariant === 'auto'
+            || definition.libraryId !== 'lobehub'
+            || selectedVariant === requestedVariant
+          ),
+        } satisfies BuiltinIconOption;
+      });
   }
 
   static selectBuiltinIcon(
@@ -232,6 +300,7 @@ export class ProviderIconService {
     libraryId: BuiltinIconLibraryId,
     iconId: string,
     library: ProviderIconLibrary,
+    variant: LobehubIconVariant = 'auto',
   ): ProviderIconLibrary {
     const trimmedProviderId = providerId.trim();
     if (!trimmedProviderId) {
@@ -245,7 +314,12 @@ export class ProviderIconService {
 
     const resolvedProviderId = this.resolveLibraryProviderId(trimmedProviderId, library) ?? trimmedProviderId;
     const existingEntries = this.getEditableEntriesForProvider(resolvedProviderId, library);
-    const selectedEntry = this.createBuiltinEntry(libraryId, iconId);
+    const selectedEntry = this.createBuiltinEntry(
+      libraryId,
+      iconId,
+      true,
+      libraryId === 'lobehub' ? variant : 'auto',
+    );
 
     const dedupedEntries = existingEntries.filter((entry) => !this.areEquivalentEntries(entry, selectedEntry));
     return this.updateProviderEntries(
@@ -270,6 +344,15 @@ export class ProviderIconService {
     }
 
     return null;
+  }
+
+  static getSelectedBuiltinVariant(providerId: string, library: ProviderIconLibrary = {}): LobehubIconVariant {
+    const selectedEntry = this.getEffectiveEntries(providerId, library)[0] ?? null;
+    if (!selectedEntry) {
+      return this.getActiveDefaultVariant();
+    }
+
+    return selectedEntry.variant ?? 'auto';
   }
 
   /**
@@ -548,21 +631,27 @@ export class ProviderIconService {
   ): Promise<ProviderIconCacheEntry[]> {
     const entries = this.getEffectiveEntries(providerId, library);
     return Promise.all(entries.map(async (entry, index) => {
-      const cachedAsset = await this.readCachedAsset(app, entry);
+      const asset = await this.resolveEntryAsset(app, providerId, entry, { cacheOnly: true });
       return {
         providerId,
         entry,
-        iconId: entry.type === 'mapped'
-          ? entry.source
-          : entry.type === 'builtin'
-            ? (parseBuiltinSource(entry.source)?.iconId ?? null)
-            : null,
-        cached: cachedAsset !== null,
-        cachePath: this.getCachePathForEntry(entry),
-        iconUrl: cachedAsset ? this.assetToDataUrl(cachedAsset) : this.getPreviewUrlForEntry(app, entry),
+        iconId: asset?.iconId ?? (
+          entry.type === 'mapped'
+            ? entry.source
+            : entry.type === 'builtin'
+              ? (parseBuiltinSource(entry.source)?.iconId ?? null)
+              : null
+        ),
+        cached: asset?.cached ?? false,
+        cachePath: asset?.cachePath ?? this.getCachePathForEntry(entry),
+        iconUrl: asset?.iconUrl ?? this.getPreviewUrlForEntry(app, entry),
         isCurrentProvider,
         isSelected: index === 0,
-        sourceLabel: this.getEntrySourceLabel(entry),
+        requestedVariant: asset?.requestedVariant ?? entry.variant,
+        resolvedVariant: asset?.resolvedVariant,
+        resolvedFormat: asset?.resolvedFormat,
+        fallbackUsed: asset?.fallbackUsed ?? false,
+        sourceLabel: asset?.sourceLabel ?? this.getEntrySourceLabel(entry),
       } satisfies ProviderIconCacheEntry;
     }));
   }
@@ -594,7 +683,7 @@ export class ProviderIconService {
     if (!iconId) {
       const builtinMatch = resolveBuiltinIconMatch(providerId);
       return builtinMatch
-        ? this.createBuiltinEntry(builtinMatch.libraryId, builtinMatch.iconId, false)
+        ? this.createBuiltinEntry(builtinMatch.libraryId, builtinMatch.iconId, false, 'auto')
         : null;
     }
 
@@ -602,96 +691,111 @@ export class ProviderIconService {
       id: `mapped:${iconId}`,
       type: 'mapped',
       source: iconId,
+      variant: 'auto',
       mimeType: 'image/svg+xml',
       addedAt: 0,
     };
   }
 
-  private static async resolveEntryUrl(
+  private static async resolveEntryAsset(
     app: App,
     providerId: string,
     entry: ProviderIconEntry,
-    options: ResolveIconUrlOptions,
-  ): Promise<string | null> {
+    options: ResolveIconUrlOptions & { cacheOnly?: boolean } = {},
+  ): Promise<ResolvedProviderIconAsset | null> {
     const runtimeKey = this.getEntryRuntimeKey(providerId, entry);
-    if (resolvedIconUrls.has(runtimeKey)) {
+    if (!options.cacheOnly && resolvedIconUrls.has(runtimeKey)) {
       return resolvedIconUrls.get(runtimeKey) ?? null;
     }
 
     if (options.retryFailed) {
       failedIconIds.delete(runtimeKey);
-    } else if (failedIconIds.has(runtimeKey)) {
+    } else if (!options.cacheOnly && failedIconIds.has(runtimeKey)) {
       return null;
     }
 
-    const inFlight = inFlightIconLoads.get(runtimeKey);
-    if (inFlight) {
-      return inFlight;
+    if (!options.cacheOnly) {
+      const inFlight = inFlightIconLoads.get(runtimeKey);
+      if (inFlight) {
+        return inFlight;
+      }
     }
 
-    const loadPromise = this.loadEntryUrl(app, providerId, entry);
-    inFlightIconLoads.set(runtimeKey, loadPromise);
+    const loadPromise = this.loadEntryAsset(app, providerId, entry, options);
+    if (!options.cacheOnly) {
+      inFlightIconLoads.set(runtimeKey, loadPromise);
+    }
 
     try {
-      const resolvedUrl = await loadPromise;
-      if (resolvedUrl) {
-        resolvedIconUrls.set(runtimeKey, resolvedUrl);
-      } else {
-        resolvedIconUrls.delete(runtimeKey);
+      const resolvedAsset = await loadPromise;
+      if (!options.cacheOnly) {
+        if (resolvedAsset) {
+          resolvedIconUrls.set(runtimeKey, resolvedAsset);
+        } else {
+          resolvedIconUrls.delete(runtimeKey);
+        }
       }
-      return resolvedUrl;
+      return resolvedAsset;
     } finally {
-      inFlightIconLoads.delete(runtimeKey);
+      if (!options.cacheOnly) {
+        inFlightIconLoads.delete(runtimeKey);
+      }
     }
   }
 
-  private static async loadEntryUrl(
+  private static async loadEntryAsset(
     app: App,
     providerId: string,
     entry: ProviderIconEntry,
-  ): Promise<string | null> {
+    options: ResolveIconUrlOptions & { cacheOnly?: boolean },
+  ): Promise<ResolvedProviderIconAsset | null> {
     const runtimeKey = this.getEntryRuntimeKey(providerId, entry);
-    const cachedAsset = await this.readCachedAsset(app, entry);
-    if (cachedAsset) {
-      failedIconIds.delete(runtimeKey);
-      const localUrl = this.assetToDataUrl(cachedAsset);
-      loggedIconUrls.set(providerId, localUrl);
-      return localUrl;
-    }
 
     try {
-      const asset = entry.type === 'mapped'
-        ? await this.loadMappedAsset(entry.source, providerId)
+      const asset = entry.type === 'mapped' || this.isLobehubBuiltinEntry(entry)
+        ? await this.loadLobehubEntryAsset(app, providerId, entry, options.cacheOnly ?? false)
         : entry.type === 'builtin'
-          ? await this.loadBuiltinAsset(app, entry.source, providerId)
-          : await this.loadCustomSourceAsset(this.normalizeCustomSource(entry.source, entry.type));
-      await this.writeCachedAsset(app, this.getCachePathForEntry(entry), asset.data);
+          ? await this.loadBundledBuiltinEntryAsset(app, providerId, entry, options.cacheOnly ?? false)
+          : await this.loadCustomEntryAsset(app, providerId, entry, options.cacheOnly ?? false);
+
+      if (!asset?.iconUrl && !options.cacheOnly) {
+        failedIconIds.add(runtimeKey);
+        return null;
+      }
+
       failedIconIds.delete(runtimeKey);
-      const localUrl = this.assetToDataUrl(asset);
-      loggedIconUrls.set(providerId, localUrl);
-      return localUrl;
+      loggedIconUrls.set(providerId, asset?.iconUrl ?? null);
+      return asset;
     } catch (error) {
-      failedIconIds.add(runtimeKey);
-      logger.warn(`Failed to fetch icon for ${providerId}`, error);
+      if (!options.cacheOnly) {
+        failedIconIds.add(runtimeKey);
+        logger.warn(`Failed to fetch icon for ${providerId}`, error);
+      } else {
+        logger.debug(`Failed to inspect icon cache for ${providerId}`, error);
+      }
       return null;
     }
   }
 
   private static async loadMappedAsset(iconId: string, providerId: string): Promise<LoadedIconAsset> {
     const remoteUrl = `${LOBEHUB_CDN_BASE}/${iconId}.svg`;
+    return this.loadRemotePreviewAsset(remoteUrl, `HTTP error while fetching ${providerId}`);
+  }
+
+  private static async loadRemotePreviewAsset(url: string, errorPrefix?: string): Promise<LoadedIconAsset> {
     const response = await requestUrl({
-      url: remoteUrl,
+      url,
       method: 'GET',
       throw: false,
     });
 
     if (response.status >= 400) {
-      throw new Error(`HTTP ${response.status} while fetching ${providerId}`);
+      throw new Error(errorPrefix ?? `HTTP ${response.status} while fetching preview asset.`);
     }
 
-    const mimeType = this.detectMimeType(response.arrayBuffer, response.headers['content-type'], remoteUrl);
-    if (mimeType !== 'image/svg+xml') {
-      throw new Error('Default mapped icon did not return valid SVG content.');
+    const mimeType = this.detectMimeType(response.arrayBuffer, response.headers['content-type'], url);
+    if (!ALLOWED_IMAGE_MIME_TYPES.has(mimeType)) {
+      throw new Error('Preview asset did not return a supported image.');
     }
 
     return {
@@ -780,6 +884,219 @@ export class ProviderIconService {
       data: arrayBuffer,
       mimeType,
     };
+  }
+
+  private static async loadLobehubEntryAsset(
+    app: App,
+    providerId: string,
+    entry: ProviderIconEntry,
+    cacheOnly: boolean,
+  ): Promise<ResolvedProviderIconAsset | null> {
+    const iconId = this.getLobehubIconId(entry);
+    if (!iconId) {
+      return null;
+    }
+
+    const candidateState = this.getPreviewUrlForLobehubIcon(iconId, entry.variant ?? 'auto');
+    if (!candidateState) {
+      return null;
+    }
+
+    for (const candidate of candidateState.candidates) {
+      const cachedAsset = await this.readCachedAssetByPath(
+        app,
+        candidate.cachePath,
+        this.getMimeTypeForResolvedFormat(candidate.format),
+      );
+      if (cachedAsset) {
+        return {
+          cachePath: candidate.cachePath,
+          cached: true,
+          fallbackUsed: candidate.fallbackUsed,
+          iconId,
+          iconUrl: this.assetToDataUrl(cachedAsset),
+          requestedVariant: candidateState.requestedVariant,
+          resolvedFormat: candidate.format,
+          resolvedVariant: candidate.resolvedVariant,
+          sourceLabel: this.getEntrySourceLabel(entry),
+        };
+      }
+
+      if (cacheOnly) {
+        continue;
+      }
+
+      try {
+        const remoteAsset = await this.loadRemotePreviewAsset(candidate.remoteUrl);
+        await this.writeCachedAsset(app, candidate.cachePath, remoteAsset.data);
+        return {
+          cachePath: candidate.cachePath,
+          cached: false,
+          fallbackUsed: candidate.fallbackUsed,
+          iconId,
+          iconUrl: this.assetToDataUrl(remoteAsset),
+          requestedVariant: candidateState.requestedVariant,
+          resolvedFormat: candidate.format,
+          resolvedVariant: candidate.resolvedVariant,
+          sourceLabel: this.getEntrySourceLabel(entry),
+        };
+      } catch {
+        continue;
+      }
+    }
+
+    if (!cacheOnly) {
+      return null;
+    }
+
+    return {
+      cachePath: candidateState.candidates[0]?.cachePath ?? null,
+      cached: false,
+      fallbackUsed: candidateState.candidates[0]?.fallbackUsed ?? false,
+      iconId,
+      iconUrl: candidateState.previewUrl,
+      requestedVariant: candidateState.requestedVariant,
+      resolvedFormat: candidateState.resolvedFormat,
+      resolvedVariant: candidateState.resolvedVariant,
+      sourceLabel: this.getEntrySourceLabel(entry),
+    };
+  }
+
+  private static async loadBundledBuiltinEntryAsset(
+    app: App,
+    providerId: string,
+    entry: ProviderIconEntry,
+    cacheOnly: boolean,
+  ): Promise<ResolvedProviderIconAsset | null> {
+    const parsed = parseBuiltinSource(entry.source);
+    if (!parsed) {
+      return null;
+    }
+
+    const cachePath = this.getCachePathForEntry(entry);
+    const cachedAsset = await this.readCachedAssetByPath(app, cachePath, 'image/svg+xml');
+    if (cachedAsset) {
+      return {
+        cachePath,
+        cached: true,
+        fallbackUsed: false,
+        iconId: parsed.iconId,
+        iconUrl: this.assetToDataUrl(cachedAsset),
+        requestedVariant: 'auto',
+        resolvedFormat: 'svg',
+        resolvedVariant: 'mono',
+        sourceLabel: this.getEntrySourceLabel(entry),
+      };
+    }
+
+    const previewUrl = this.getPreviewUrlForEntry(app, entry);
+    if (cacheOnly) {
+      return {
+        cachePath,
+        cached: false,
+        fallbackUsed: false,
+        iconId: parsed.iconId,
+        iconUrl: previewUrl,
+        requestedVariant: 'auto',
+        resolvedFormat: 'svg',
+        resolvedVariant: 'mono',
+        sourceLabel: this.getEntrySourceLabel(entry),
+      };
+    }
+
+    const asset = await this.loadBundledOpencodeAsset(app, parsed.iconId, providerId);
+    await this.writeCachedAsset(app, cachePath, asset.data);
+    return {
+      cachePath,
+      cached: false,
+      fallbackUsed: false,
+      iconId: parsed.iconId,
+      iconUrl: this.assetToDataUrl(asset),
+      requestedVariant: 'auto',
+      resolvedFormat: 'svg',
+      resolvedVariant: 'mono',
+      sourceLabel: this.getEntrySourceLabel(entry),
+    };
+  }
+
+  private static async loadCustomEntryAsset(
+    app: App,
+    providerId: string,
+    entry: ProviderIconEntry,
+    cacheOnly: boolean,
+  ): Promise<ResolvedProviderIconAsset | null> {
+    const cachePath = this.getCachePathForEntry(entry);
+    const cachedAsset = await this.readCachedAsset(app, entry);
+    if (cachedAsset) {
+      return {
+        cachePath,
+        cached: true,
+        fallbackUsed: false,
+        iconId: null,
+        iconUrl: this.assetToDataUrl(cachedAsset),
+        resolvedFormat: this.getResolvedFormatForMimeType(cachedAsset.mimeType),
+        sourceLabel: this.getEntrySourceLabel(entry),
+      };
+    }
+
+    const previewUrl = this.getPreviewUrlForEntry(app, entry);
+    if (cacheOnly) {
+      return {
+        cachePath,
+        cached: false,
+        fallbackUsed: false,
+        iconId: null,
+        iconUrl: previewUrl,
+        resolvedFormat: this.getResolvedFormatForMimeType(entry.mimeType),
+        sourceLabel: this.getEntrySourceLabel(entry),
+      };
+    }
+
+    const asset = await this.loadCustomSourceAsset(
+      this.normalizeCustomSource(entry.source, entry.type === 'file' ? 'file' : 'url'),
+    );
+    await this.writeCachedAsset(app, cachePath, asset.data);
+    return {
+      cachePath,
+      cached: false,
+      fallbackUsed: false,
+      iconId: null,
+      iconUrl: this.assetToDataUrl(asset),
+      resolvedFormat: this.getResolvedFormatForMimeType(asset.mimeType),
+      sourceLabel: this.getEntrySourceLabel(entry),
+    };
+  }
+
+  private static async readCachedAssetByPath(
+    app: App,
+    cachePath: string | null,
+    fallbackMimeType?: string,
+  ): Promise<LoadedIconAsset | null> {
+    if (!cachePath) {
+      return null;
+    }
+
+    try {
+      const adapter = app.vault.adapter;
+      const exists = await adapter.exists(cachePath);
+      if (!exists) {
+        return null;
+      }
+
+      const readBinary = adapter.readBinary?.bind(adapter) as undefined | ((path: string) => Promise<ArrayBuffer>);
+      if (!readBinary) {
+        return null;
+      }
+
+      const data = await readBinary(cachePath);
+      return {
+        data,
+        mimeType: fallbackMimeType ?? this.getMimeTypeFromPath(cachePath) ?? 'image/svg+xml',
+      };
+    } catch (error) {
+      logger.debug(`Failed to read cached icon: ${cachePath}`, error);
+      return null;
+    }
   }
 
   private static async readCachedAsset(app: App, entry: ProviderIconEntry): Promise<LoadedIconAsset | null> {
@@ -1021,8 +1338,13 @@ export class ProviderIconService {
   }
 
   private static getCachePathForEntry(entry: ProviderIconEntry): string | null {
-    if (entry.type === 'mapped') {
-      return normalizePath(`${ICON_CACHE_DIR}/${entry.source}.svg`);
+    if (entry.type === 'mapped' || this.isLobehubBuiltinEntry(entry)) {
+      const iconId = this.getLobehubIconId(entry);
+      if (!iconId) {
+        return null;
+      }
+
+      return this.getPreviewUrlForLobehubIcon(iconId, entry.variant ?? 'auto')?.candidates[0]?.cachePath ?? null;
     }
 
     if (entry.type === 'builtin') {
@@ -1042,7 +1364,15 @@ export class ProviderIconService {
   }
 
   private static getEntryRuntimeKey(providerId: string, entry: ProviderIconEntry): string {
-    return `${providerId}::${entry.id}`;
+    if (!this.isLobehubBackedEntry(entry)) {
+      return `${providerId}::${entry.id}`;
+    }
+
+    const requestedVariant = entry.variant ?? 'auto';
+    const activeVariant = this.getActiveDefaultVariant();
+    const themeKey = this.getActiveThemeVariant();
+    const colorMode = this.getActiveColorMode();
+    return `${providerId}::${entry.id}::${requestedVariant}::${activeVariant}::${colorMode}::${themeKey}`;
   }
 
   private static assetToDataUrl(asset: LoadedIconAsset): string {
@@ -1069,7 +1399,7 @@ export class ProviderIconService {
 
   private static getPreviewUrlForEntry(app: App, entry: ProviderIconEntry): string | null {
     if (entry.type === 'mapped') {
-      return `${LOBEHUB_CDN_BASE}/${entry.source}.svg`;
+      return this.getPreviewUrlForLobehubIcon(entry.source, entry.variant ?? 'auto')?.previewUrl ?? null;
     }
 
     if (entry.type === 'builtin') {
@@ -1078,7 +1408,16 @@ export class ProviderIconService {
         return null;
       }
 
-      return this.getBuiltinPreviewUrl(app, parsed.libraryId, parsed.iconId);
+      return this.getBuiltinPreview(app, findBuiltinIcon(entry.source) ?? {
+        libraryId: parsed.libraryId,
+        iconId: parsed.iconId,
+        displayName: parsed.iconId,
+        aliases: [],
+        normalizedAliases: [],
+        tokens: [],
+        searchText: parsed.iconId,
+        source: entry.source,
+      }, entry.variant ?? 'auto').previewUrl;
     }
 
     if (entry.type === 'url') {
@@ -1092,17 +1431,312 @@ export class ProviderIconService {
     app: App,
     libraryId: BuiltinIconLibraryId,
     iconId: string,
+    requestedVariant: LobehubIconVariant = 'auto',
   ): string | null {
+    const candidates = this.getBuiltinPreviewCandidates(app, libraryId, iconId, requestedVariant);
+    return candidates[0] ?? null;
+  }
+
+  static getBuiltinPreviewCandidates(
+    app: App,
+    libraryId: BuiltinIconLibraryId,
+    iconId: string,
+    requestedVariant: LobehubIconVariant = 'auto',
+  ): string[] {
     if (libraryId === 'lobehub') {
-      return `${LOBEHUB_CDN_BASE}/${iconId}.svg`;
+      return this.getPreviewUrlForLobehubIcon(iconId, requestedVariant)?.previewCandidates ?? [];
     }
 
     const adapter = app.vault.adapter;
     if (typeof adapter.getResourcePath !== 'function') {
+      return [];
+    }
+
+    return [adapter.getResourcePath(this.getBundledOpencodeAssetPath(app, iconId))];
+  }
+
+  private static isDefinitionAvailableForVariant(
+    definition: BuiltinIconDefinition,
+    requestedVariant: LobehubIconVariant,
+  ): boolean {
+    if (definition.libraryId !== 'lobehub') {
+      return true;
+    }
+
+    if (requestedVariant === 'auto') {
+      return true;
+    }
+
+    return definition.lobehub?.supportedVariants.includes(requestedVariant) ?? false;
+  }
+
+  private static getBuiltinPreview(
+    app: App,
+    definition: BuiltinIconDefinition,
+    requestedVariant: LobehubIconVariant,
+  ): {
+    previewCandidates: string[];
+    previewUrl: string | null;
+    resolvedFormat?: ProviderIconResolvedFormat;
+    resolvedVariant?: ResolvedLobehubVariant;
+  } {
+    if (definition.libraryId === 'lobehub') {
+      const preview = this.getPreviewUrlForLobehubIcon(definition.iconId, requestedVariant);
+      return {
+        previewCandidates: preview?.previewCandidates ?? [],
+        previewUrl: preview?.previewUrl ?? null,
+        resolvedFormat: preview?.resolvedFormat,
+        resolvedVariant: preview?.resolvedVariant,
+      };
+    }
+
+    return {
+      previewCandidates: this.getBuiltinPreviewCandidates(app, definition.libraryId, definition.iconId, requestedVariant),
+      previewUrl: this.getBuiltinPreviewUrl(app, definition.libraryId, definition.iconId, requestedVariant),
+      resolvedFormat: 'svg',
+      resolvedVariant: 'mono',
+    };
+  }
+
+  private static getPreviewUrlForLobehubIcon(iconId: string, requestedVariant: LobehubIconVariant): {
+    candidates: Array<{
+      cachePath: string;
+      fallbackUsed: boolean;
+      format: ProviderIconResolvedFormat;
+      remoteUrl: string;
+      resolvedVariant: ResolvedLobehubVariant;
+    }>;
+    previewCandidates: string[];
+    previewUrl: string | null;
+    requestedVariant: LobehubIconVariant;
+    resolvedFormat?: ProviderIconResolvedFormat;
+    resolvedVariant?: ResolvedLobehubVariant;
+  } | null {
+    const manifestEntry = this.getLobehubManifestEntry(iconId);
+    if (!manifestEntry) {
       return null;
     }
 
-    return adapter.getResourcePath(this.getBundledOpencodeAssetPath(app, iconId));
+    const candidateVariants = this.getLobehubCandidateVariants(requestedVariant);
+    const themeKey = this.getActiveThemeVariant();
+    const candidates = candidateVariants.flatMap((variant, index) => {
+      const variantEntry = manifestEntry.variants[variant];
+      if (!variantEntry?.staticSupport) {
+        return [];
+      }
+
+      const format: ProviderIconResolvedFormat = variant === 'avatar' ? 'avatar' : 'svg';
+      const remoteUrl = this.getManifestVariantUrl(variantEntry, format, themeKey);
+      if (!remoteUrl) {
+        return [];
+      }
+
+      return [{
+        cachePath: this.getLobehubCachePath(iconId, requestedVariant, variant, format, themeKey),
+        fallbackUsed: index > 0,
+        format,
+        remoteUrl,
+        resolvedVariant: variant,
+      }];
+    });
+
+    if (candidates.length === 0) {
+      return null;
+    }
+
+    return {
+      candidates,
+      previewCandidates: candidates.map((candidate) => candidate.remoteUrl),
+      previewUrl: candidates[0]?.remoteUrl ?? null,
+      requestedVariant,
+      resolvedFormat: candidates[0]?.format,
+      resolvedVariant: candidates[0]?.resolvedVariant,
+    };
+  }
+
+  private static getLobehubManifestEntry(iconId: string): LobehubManifestEntry | null {
+    return LOBEHUB_MANIFEST_BY_ICON_ID.get(iconId) ?? LOBEHUB_MANIFEST_BY_ICON_ID.get(iconId.toLowerCase()) ?? null;
+  }
+
+  private static getLobehubCandidateVariants(requestedVariant: LobehubIconVariant): ResolvedLobehubVariant[] {
+    const orderedVariants: ResolvedLobehubVariant[] = [];
+    const seen = new Set<ResolvedLobehubVariant>();
+
+    const pushVariant = (variant: LobehubIconVariant): void => {
+      if (variant === 'auto' || variant === 'combine' || seen.has(variant)) {
+        return;
+      }
+
+      seen.add(variant);
+      orderedVariants.push(variant);
+    };
+
+    const pushVariants = (variants: LobehubIconVariant[]): void => {
+      for (const variant of variants) {
+        pushVariant(variant);
+      }
+    };
+
+    if (requestedVariant !== 'auto') {
+      pushVariants(this.getFallbackVariantSequence(requestedVariant));
+    } else {
+      const globalVariant = this.getActiveDefaultVariant();
+      if (globalVariant !== 'auto') {
+        pushVariants(this.getFallbackVariantSequence(globalVariant));
+      }
+
+      pushVariants(this.getColorModeVariantSequence(this.getActiveColorMode()));
+    }
+
+    pushVariants(['mono', 'color', 'brand-color', 'brand', 'text-color', 'text', 'text-cn', 'avatar']);
+    return orderedVariants;
+  }
+
+  private static getFallbackVariantSequence(requestedVariant: LobehubIconVariant): LobehubIconVariant[] {
+    switch (requestedVariant) {
+      case 'mono':
+        return ['mono', 'brand', 'brand-color', 'color', 'avatar', 'text', 'text-color', 'text-cn'];
+      case 'color':
+        return ['color', 'brand-color', 'brand', 'mono', 'avatar', 'text-color', 'text', 'text-cn'];
+      case 'brand':
+        return ['brand', 'brand-color', 'color', 'mono', 'avatar', 'text-color', 'text', 'text-cn'];
+      case 'brand-color':
+        return ['brand-color', 'color', 'brand', 'mono', 'avatar', 'text-color', 'text', 'text-cn'];
+      case 'text':
+        return ['text', 'text-color', 'text-cn', 'mono', 'brand-color', 'color', 'brand', 'avatar'];
+      case 'text-cn':
+        return ['text-cn', 'text', 'text-color', 'mono', 'brand-color', 'color', 'brand', 'avatar'];
+      case 'text-color':
+        return ['text-color', 'text', 'text-cn', 'mono', 'brand-color', 'color', 'brand', 'avatar'];
+      case 'avatar':
+        return ['avatar', 'color', 'brand-color', 'brand', 'mono', 'text-color', 'text', 'text-cn'];
+      case 'combine':
+        return ['brand-color', 'color', 'brand', 'mono', 'avatar', 'text-color', 'text', 'text-cn'];
+      case 'auto':
+      default:
+        return ['mono'];
+    }
+  }
+
+  private static getColorModeVariantSequence(colorMode: ProviderIconColorMode): LobehubIconVariant[] {
+    switch (colorMode) {
+      case 'color':
+        return ['color', 'brand-color', 'brand', 'mono', 'avatar', 'text-color', 'text', 'text-cn'];
+      case 'monochrome':
+      case 'system':
+      default:
+        return ['mono', 'brand', 'brand-color', 'color', 'avatar', 'text', 'text-color', 'text-cn'];
+    }
+  }
+
+  private static getManifestVariantUrl(
+    variantEntry: LobehubManifestEntry['variants'][Exclude<keyof LobehubManifestEntry['variants'], 'auto'>],
+    format: ProviderIconResolvedFormat,
+    themeKey: 'light' | 'dark',
+  ): string | null {
+    if (!variantEntry) {
+      return null;
+    }
+
+    switch (format) {
+      case 'svg':
+        return variantEntry.urls.svg ?? null;
+      case 'png':
+        return variantEntry.urls.png?.[themeKey] ?? null;
+      case 'webp':
+        return variantEntry.urls.webp?.[themeKey] ?? null;
+      case 'avatar':
+        return variantEntry.urls.avatar ?? null;
+      default:
+        return null;
+    }
+  }
+
+  private static getLobehubCachePath(
+    iconId: string,
+    requestedVariant: LobehubIconVariant,
+    resolvedVariant: ResolvedLobehubVariant,
+    format: ProviderIconResolvedFormat,
+    themeKey: 'light' | 'dark',
+  ): string {
+    const safeIconId = iconId.replace(/[^a-z0-9_-]/gi, '-');
+    const extension = format === 'avatar' ? 'webp' : format;
+    return normalizePath(
+      `${ICON_CACHE_DIR}/lobehub-${safeIconId}-${requestedVariant}-${resolvedVariant}-${themeKey}-${format}.${extension}`,
+    );
+  }
+
+  private static getMimeTypeForResolvedFormat(format: ProviderIconResolvedFormat): string {
+    switch (format) {
+      case 'svg':
+        return 'image/svg+xml';
+      case 'png':
+        return 'image/png';
+      case 'webp':
+      case 'avatar':
+      default:
+        return 'image/webp';
+    }
+  }
+
+  private static getResolvedFormatForMimeType(mimeType?: string): ProviderIconResolvedFormat | undefined {
+    switch (mimeType) {
+      case 'image/svg+xml':
+        return 'svg';
+      case 'image/png':
+        return 'png';
+      case 'image/webp':
+        return 'webp';
+      default:
+        return undefined;
+    }
+  }
+
+  private static isLobehubBuiltinEntry(entry: ProviderIconEntry): boolean {
+    return entry.type === 'builtin' && parseBuiltinSource(entry.source)?.libraryId === 'lobehub';
+  }
+
+  private static isLobehubBackedEntry(entry: ProviderIconEntry): boolean {
+    if (entry.type === 'mapped') {
+      return true;
+    }
+
+    if (entry.type !== 'builtin') {
+      return false;
+    }
+
+    return parseBuiltinSource(entry.source)?.libraryId === 'lobehub';
+  }
+
+  private static getLobehubIconId(entry: ProviderIconEntry): string | null {
+    if (entry.type === 'mapped') {
+      return entry.source;
+    }
+
+    if (entry.type !== 'builtin') {
+      return null;
+    }
+
+    const parsed = parseBuiltinSource(entry.source);
+    return parsed?.libraryId === 'lobehub' ? parsed.iconId : null;
+  }
+
+  private static getActiveColorMode(): ProviderIconColorMode {
+    const value = document.body.dataset.opencodianProviderIconMode;
+    return value === 'color' || value === 'monochrome' || value === 'system'
+      ? value
+      : 'system';
+  }
+
+  private static getActiveDefaultVariant(): LobehubIconVariant {
+    const value = document.body.dataset.opencodianProviderIconVariant;
+    return ALL_VARIANT_OPTIONS.includes(value as LobehubIconVariant)
+      ? value as LobehubIconVariant
+      : 'auto';
+  }
+
+  private static getActiveThemeVariant(): 'light' | 'dark' {
+    return document.body.classList.contains('theme-dark') ? 'dark' : 'light';
   }
 
   private static getBundledOpencodeAssetPath(app: App, iconId: string): string {
@@ -1119,12 +1753,14 @@ export class ProviderIconService {
     libraryId: BuiltinIconLibraryId,
     iconId: string,
     persisted: boolean = true,
+    variant: LobehubIconVariant = 'auto',
   ): ProviderIconEntry {
     const source = formatBuiltinSource(libraryId, iconId);
     return {
       id: `builtin:${source}`,
       type: 'builtin',
       source,
+      variant: libraryId === 'lobehub' ? variant : 'auto',
       mimeType: 'image/svg+xml',
       addedAt: persisted ? Date.now() : 0,
       updatedAt: persisted ? Date.now() : undefined,

@@ -41,7 +41,7 @@
   - provider 列表支持折叠、搜索、`仅看已禁用` 过滤；provider 级批量启用/禁用改为跟随当前选中的目录卡片（如项目配置、服务器目录、当前生效列表）显示在对应目录容器里
   - 项目配置块本身改成双列 provider 卡片入口：直接展示当前项目本地 provider，点击卡片按 `provider.id` 打开 `ModelConfigModal`，点击加号则直接进入新增 provider 流程
   - provider / model 的项目级配置与图标缓存管理收拢进 `ModelConfigModal`；该弹窗现按 `CC Switch` 风格重组为顶部预设条 + 横向 provider 切换 + 单列表单流，配置 JSON 与重启选项固定放在底部预览区
-  - provider 图标缓存工具区新增全局 `providerIconColorMode` 设置，可在 `跟随系统 / 单色 / 彩色` 间切换；内置图标选择器会实时预览当前模式，方便判断 LobeHub 彩色图标是否适合当前主题
+  - provider 图标缓存工具区新增全局 `providerIconColorMode` 与 `providerIconDefaultVariant`：前者控制运行时颜色策略（跟随系统 / 单色 / 彩色），后者控制 `auto` 条目优先尝试的 LobeHub 静态 variant；内置图标选择器会实时预览当前模式并允许显式保存 variant
 - **Conversation**
   - `questionDisplayMode`
   - `questionCardPosition`

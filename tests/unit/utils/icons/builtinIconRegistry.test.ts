@@ -1,5 +1,6 @@
 import {
   formatBuiltinSource,
+  getBuiltinIcon,
   parseBuiltinSource,
   resolveBuiltinIconMatch,
   searchBuiltinIcons,
@@ -33,6 +34,18 @@ describe('builtinIconRegistry', () => {
     expect(resolveBuiltinIconMatch('requesty')).toMatchObject({
       libraryId: 'opencode',
       iconId: 'requesty',
+    });
+  });
+
+  it('uses generated LobeHub manifest metadata for definitions', () => {
+    expect(getBuiltinIcon('lobehub', 'adobe')).toMatchObject({
+      libraryId: 'lobehub',
+      iconId: 'adobe',
+      lobehub: expect.objectContaining({
+        componentId: 'Adobe',
+        staticVariants: expect.arrayContaining(['mono', 'color']),
+        supportedVariants: expect.arrayContaining(['auto', 'mono', 'color', 'combine']),
+      }),
     });
   });
 });

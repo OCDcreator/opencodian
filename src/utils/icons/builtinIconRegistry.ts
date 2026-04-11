@@ -1,4 +1,23 @@
+import type { LobehubIconVariant, StaticLobehubIconVariant } from '../../core/types';
+
+import {
+  LOBEHUB_ICON_MANIFEST,
+  type LobehubManifestEntry,
+} from './lobehubIconManifest';
+
 export type BuiltinIconLibraryId = 'lobehub' | 'opencode';
+
+export interface BuiltinIconLobehubMetadata {
+  color: string;
+  colorGradient?: string;
+  componentId: string;
+  docsUrl: string;
+  fullTitle: string;
+  group: 'model' | 'provider' | 'application';
+  staticVariants: StaticLobehubIconVariant[];
+  supportedVariants: LobehubIconVariant[];
+  title: string;
+}
 
 export interface BuiltinIconDefinition {
   libraryId: BuiltinIconLibraryId;
@@ -9,6 +28,7 @@ export interface BuiltinIconDefinition {
   tokens: string[];
   searchText: string;
   source: string;
+  lobehub?: BuiltinIconLobehubMetadata;
 }
 
 export interface SearchBuiltinIconsOptions {
@@ -503,9 +523,9 @@ function buildLobehubDefinitions(): BuiltinIconDefinition[] {
     aliasesByIconId.set(iconId, aliases);
   }
 
-  return Array.from(aliasesByIconId.entries())
-    .sort(([left], [right]) => left.localeCompare(right))
-    .map(([iconId, aliases]) => createDefinition('lobehub', iconId, aliases));
+  return LOBEHUB_ICON_MANIFEST
+    .map((entry) => createDefinition('lobehub', entry.iconId, aliasesByIconId.get(entry.iconId) ?? [], entry))
+    .sort(sortDefinitions);
 }
 
 function buildOpencodeDefinitions(): BuiltinIconDefinition[] {
@@ -526,9 +546,18 @@ function createDefinition(
   libraryId: BuiltinIconLibraryId,
   iconId: string,
   aliases: string[],
+  manifestEntry?: LobehubManifestEntry,
 ): BuiltinIconDefinition {
-  const displayName = getDisplayName(iconId);
-  const values = Array.from(new Set([iconId, displayName, ...aliases]));
+  const displayName = manifestEntry?.fullTitle ?? getDisplayName(iconId);
+  const searchValues = [
+    iconId,
+    displayName,
+    manifestEntry?.title,
+    manifestEntry?.docsUrl,
+    manifestEntry?.componentId,
+    ...aliases,
+  ].filter((value): value is string => Boolean(value));
+  const values = Array.from(new Set(searchValues));
   return {
     libraryId,
     iconId,
@@ -538,6 +567,22 @@ function createDefinition(
     tokens: Array.from(new Set(values.flatMap((value) => tokenize(value)))),
     searchText: values.join(' ').toLowerCase(),
     source: formatBuiltinSource(libraryId, iconId),
+    lobehub: manifestEntry ? {
+      color: manifestEntry.color,
+      colorGradient: manifestEntry.colorGradient,
+      componentId: manifestEntry.componentId,
+      docsUrl: manifestEntry.docsUrl,
+      fullTitle: manifestEntry.fullTitle,
+      group: manifestEntry.group,
+      staticVariants: Object.entries(manifestEntry.variants)
+        .filter(([, variantEntry]) => variantEntry?.staticSupport)
+        .map(([variant]) => variant as StaticLobehubIconVariant),
+      supportedVariants: [
+        'auto',
+        ...Object.keys(manifestEntry.variants) as Array<Exclude<LobehubIconVariant, 'auto'>>,
+      ],
+      title: manifestEntry.title,
+    } : undefined,
   };
 }
 

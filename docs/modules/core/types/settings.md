@@ -108,8 +108,11 @@ OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings`、`DEFAULT_
 
 | 类型 | 说明 |
 |------|------|
-| `ProviderIconEntryType` | `'mapped' \| 'url' \| 'file'` |
-| `ProviderIconEntry` | 图标条目（`id`, `type`, `source`, `mimeType?`, `cacheFileName?`, `addedAt`, `updatedAt?`） |
+| `ProviderIconEntryType` | `'mapped' \| 'builtin' \| 'url' \| 'file'` |
+| `LobehubIconVariant` | `'auto' \| 'mono' \| 'color' \| 'brand' \| 'brand-color' \| 'text' \| 'text-cn' \| 'text-color' \| 'combine' \| 'avatar'` |
+| `StaticLobehubIconVariant` | 去掉 `auto/combine` 后可直接映射静态资源的 variant |
+| `ProviderIconResolvedFormat` | `'svg' \| 'png' \| 'webp' \| 'avatar'` |
+| `ProviderIconEntry` | 图标条目（`id`, `type`, `source`, `variant?`, `resolvedVariant?`, `resolvedFormat?`, `mimeType?`, `cacheFileName?`, `addedAt`, `updatedAt?`） |
 | `ProviderIconLibrary` | `Record<string, ProviderIconEntry[]>` |
 
 ## 关键方法
@@ -134,7 +137,9 @@ OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings`、`DEFAULT_
 | `normalizePartialChatAppearanceSettings(appearance?)` | 归一化部分外观覆盖 |
 | `normalizeThemeSettings(value?)` | 归一化主题设置 |
 | `normalizePersistedTabState(state?)` | 归一化标签页持久化状态 |
+| `normalizeLobehubIconVariant(value)` | 归一化 LobeHub icon variant，未知值回退到 `auto` |
 | `normalizeProviderIconLibrary(value)` | 归一化图标库 |
+| `normalizeProviderIconResolvedFormat(value)` | 归一化 provider 图标命中格式 |
 | `normalizeInputPanelGlassRefractionSettings(value?)` | 归一化玻璃折射设置 |
 | `normalizeInputPanelGlassRefractionSvgFilterSettings(value?)` | 归一化 SVG 滤镜设置 |
 | `normalizeInputPanelLiquidGlassSettings(value?)` | 归一化液态玻璃设置 |
@@ -220,6 +225,8 @@ OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings`、`DEFAULT_
 | `pluginIsolationMode` | `PluginIsolationMode` | `'default'` | 插件隔离模式 |
 | `providers` | `ModelProviderConfig[]` | Anthropic | 提供商列表 |
 | `providerIconLibrary` | `ProviderIconLibrary` | `{}` | 图标库 |
+| `providerIconColorMode` | `ProviderIconColorMode` | `'system'` | provider 图标颜色策略 |
+| `providerIconDefaultVariant` | `LobehubIconVariant` | `'auto'` | LobeHub provider 图标默认 variant |
 | `effortLevel` | `EffortLevel` | `'high'` | 努力级别 |
 | `thinkingBudget` | `ThinkingBudget` | `4096` | 思考预算 |
 | `excludedTags` | `string[]` | `[]` | 排除标签 |

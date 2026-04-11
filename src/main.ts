@@ -50,6 +50,7 @@ import {
   normalizeInputPanelGlassRefractionSvgFilterSettings,
   normalizeInputPanelLiquidGlassSettings,
   normalizeInputPanelThemeId,
+  normalizeLobehubIconVariant,
   normalizePersistedTabState,
   normalizePluginIsolationMode,
   normalizeProviderIconColorMode,
@@ -680,6 +681,7 @@ export default class OpenCodianPlugin extends Plugin {
                 : DEFAULT_SETTINGS.inlineSerializedDebugLogArgs,
             providerIconLibrary: normalizedProviderIconLibrary,
             providerIconColorMode: normalizeProviderIconColorMode(savedSettings.providerIconColorMode),
+            providerIconDefaultVariant: normalizeLobehubIconVariant(savedSettings.providerIconDefaultVariant),
           };
         })()
       : null;
@@ -706,6 +708,7 @@ export default class OpenCodianPlugin extends Plugin {
       tabState: normalizedTabState ?? getDefaultPersistedTabState(),
       providerIconLibrary: normalizedProviderIconLibrary,
       providerIconColorMode: normalizeProviderIconColorMode(normalizedSettings?.providerIconColorMode),
+      providerIconDefaultVariant: normalizeLobehubIconVariant(normalizedSettings?.providerIconDefaultVariant),
     };
 
     this.reportSettingsLoadState(persistedSettings);
@@ -764,6 +767,9 @@ export default class OpenCodianPlugin extends Plugin {
   applyProviderIconColorMode(): void {
     document.body.dataset.opencodianProviderIconMode = normalizeProviderIconColorMode(
       this.settings.providerIconColorMode,
+    );
+    document.body.dataset.opencodianProviderIconVariant = normalizeLobehubIconVariant(
+      this.settings.providerIconDefaultVariant,
     );
   }
 

@@ -12,6 +12,69 @@
 
 ---
 
+## 2026-04-11 Provider 图标资源改为 manifest 驱动并补齐 variant 选择
+
+### 🎯 改动目标
+
+- 将 provider 图标从“按文件名猜测彩色资源”升级为基于 `@lobehub/icons` 官方元数据的稳定解析链路
+- 保持插件运行时继续使用原生 `<img>` 与本地缓存，不把 React 图标组件打进 Obsidian 插件 bundle
+- 在缓存窗口与内置图标选择器中补齐显式 variant 选择、命中信息展示与 fallback 可视化
+
+### ✅ 本轮调整
+
+- `package.json`
+- `package-lock.json`
+- `scripts/sync-lobehub-icons.mjs`
+- `src/utils/icons/lobehubIconManifest.ts`
+  - 新增 `sync:lobehub-icons` 构建期脚本，基于 `@lobehub/icons` 官方 `toc` 与 CDN 规则生成本地 manifest
+  - 将生成后的 manifest 入库，避免普通 `build` 依赖联网或在运行时动态解析图标能力
+
+- `src/core/types/settings.ts`
+- `src/core/types/index.ts`
+- `src/main.ts`
+  - 新增 `LobehubIconVariant`、`ProviderIconResolvedFormat` 等类型，并让 `ProviderIconEntry` 支持保存 `variant / resolvedVariant / resolvedFormat`
+  - 设置新增 `providerIconDefaultVariant`，默认值为 `auto`
+  - 启动与设置应用阶段把 provider 图标颜色模式、默认 variant 同步到 `document.body.dataset`
+
+- `src/utils/icons/builtinIconRegistry.ts`
+- `src/utils/icons/ProviderIconService.ts`
+  - LobeHub 内置图标改为直接读取 manifest 构造定义，不再只靠手写 alias 与文件名推断
+  - 图标解析改为 manifest 驱动候选 URL、fallback 顺序与缓存 key；缓存 key 现包含 `iconId + requestedVariant + resolvedVariant + theme + format`
+  - 显式 `color / brand / text / avatar` 等 variant 现在会按能力表精确回退，不再误用不存在的静态资源
+  - 保留 OpenCode 内置图标、自定义 URL/本地文件图标与默认映射的既有优先级
+
+- `src/features/settings/OpenCodianSettings.ts`
+- `src/features/settings/ProviderBuiltinIconPickerModal.ts`
+- `src/features/settings/ProviderIconCacheModal.ts`
+- `src/style/modals/provider-icon-cache.css`
+- `src/i18n/locales/zh.ts`
+- `src/i18n/locales/en.ts`
+  - 设置页新增“默认提供商图标变体”高级选项
+  - 内置图标选择器新增 variant 下拉，并在卡片上显示命中 variant / format / fallback
+  - provider 图标缓存窗口新增命中信息 badge，并把 picker 返回的显式 variant 一起持久化
+  - 修正选择器下拉 `<option>` 的真实 `value` 写入，避免测试与运行时拿到空字符串
+
+- `tests/unit/utils/icons/ProviderIconService.test.ts`
+- `tests/unit/utils/icons/builtinIconRegistry.test.ts`
+- `tests/unit/features/settings/ProviderBuiltinIconPickerModal.test.ts`
+- `tests/unit/core/types/settings.test.ts`
+  - 补充 manifest 元数据、variant fallback、cache key、设置归一化与 picker variant 透传回归测试
+
+- `docs/modules/utils/icons/ProviderIconService.md`
+- `docs/modules/features/settings/ProviderBuiltinIconPickerModal.md`
+- `docs/modules/features/settings/ProviderIconCacheModal.md`
+- `docs/modules/features/settings/OpenCodianSettings.md`
+- `docs/modules/core/types/settings.md`
+  - 同步更新模块文档，记录 manifest 驱动解析、variant 规则、设置入口与缓存窗口展示行为
+
+### 🧪 验证结果
+
+- `npm test -- ProviderIconService builtinIconRegistry ProviderBuiltinIconPickerModal settings.test` 通过（91/91）
+- `npm run build` 通过，最新 `BUILD_ID: main.202604110004`
+- 已按顺序复制 `dist/main.js`、`dist/manifest.json`、`dist/styles.css` 到 Test Vault
+- 已确认 Test Vault `main.js` 含最新 `BUILD_ID: main.202604110004`
+- `npm run check:devlog-order` 将在本次日志更新后执行
+
 ## 2026-04-10 模型配置窗口补齐 variants 校验与保存保护
 
 ### 🎯 改动目标

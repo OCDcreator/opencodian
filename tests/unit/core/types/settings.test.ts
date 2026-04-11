@@ -23,7 +23,10 @@ import {
   normalizeInputPanelGlassRefractionSvgFilterSettings,
   normalizeInputPanelLiquidGlassSettings,
   normalizeInputPanelThemeId,
+  normalizeLobehubIconVariant,
   normalizePartialChatAppearanceSettings,
+  normalizeProviderIconLibrary,
+  normalizeProviderIconResolvedFormat,
   normalizeQuestionCardPosition,
   normalizeQuestionDisplayMode,
   normalizeTabBarPosition,
@@ -31,6 +34,41 @@ import {
 } from '../../../../src/core/types/settings';
 
 describe('Settings', () => {
+  describe('provider icon variants', () => {
+    it('defaults provider icon variant to auto', () => {
+      expect(DEFAULT_SETTINGS.providerIconDefaultVariant).toBe('auto');
+    });
+
+    it('normalizes LobeHub icon variants and resolved formats', () => {
+      expect(normalizeLobehubIconVariant('brand-color')).toBe('brand-color');
+      expect(normalizeLobehubIconVariant('invalid')).toBe('auto');
+      expect(normalizeProviderIconResolvedFormat('avatar')).toBe('avatar');
+      expect(normalizeProviderIconResolvedFormat('jpeg')).toBeUndefined();
+    });
+
+    it('preserves provider icon entry variant metadata', () => {
+      const normalized = normalizeProviderIconLibrary({
+        adobe: [
+          {
+            id: 'builtin:lobehub:adobe',
+            type: 'builtin',
+            source: 'lobehub:adobe',
+            variant: 'color',
+            resolvedVariant: 'color',
+            resolvedFormat: 'svg',
+            addedAt: 1,
+          },
+        ],
+      });
+
+      expect(normalized.adobe?.[0]).toMatchObject({
+        variant: 'color',
+        resolvedVariant: 'color',
+        resolvedFormat: 'svg',
+      });
+    });
+  });
+
   describe('getDefaultBlockedCommands', () => {
     it('should return default blocked commands for both platforms', () => {
       const commands = getDefaultBlockedCommands();

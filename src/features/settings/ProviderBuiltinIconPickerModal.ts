@@ -1,17 +1,30 @@
 import { Modal, Notice, setIcon } from 'obsidian';
 
-import type { ProviderIconColorMode, ProviderIconLibrary } from '../../core/types';
+import type { LobehubIconVariant, ProviderIconColorMode, ProviderIconLibrary } from '../../core/types';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { ProviderIconService } from '../../utils/icons';
 import type { BuiltinIconLibraryId } from '../../utils/icons';
 import { enhanceSearchInput, type SearchInputEnhancerHandle } from './searchInputEnhancer';
 
+const LOBEHUB_ICON_VARIANT_OPTIONS: LobehubIconVariant[] = [
+  'auto',
+  'mono',
+  'color',
+  'brand',
+  'brand-color',
+  'text',
+  'text-cn',
+  'text-color',
+  'combine',
+  'avatar',
+];
+
 interface ProviderBuiltinIconPickerModalOptions {
   plugin?: OpenCodianPlugin;
   providerId: string;
   library: ProviderIconLibrary;
-  onChoose: (selection: { libraryId: BuiltinIconLibraryId; iconId: string }) => void | Promise<void>;
+  onChoose: (selection: { libraryId: BuiltinIconLibraryId; iconId: string; variant: LobehubIconVariant }) => void | Promise<void>;
 }
 
 export class ProviderBuiltinIconPickerModal extends Modal {
@@ -23,12 +36,14 @@ export class ProviderBuiltinIconPickerModal extends Modal {
   private readonly colorModeButtons = new Map<ProviderIconColorMode, HTMLButtonElement>();
   private query = '';
   private libraryFilter: '' | BuiltinIconLibraryId = '';
+  private requestedVariant: LobehubIconVariant = 'auto';
   private choosing = false;
   private updatingColorMode = false;
 
   constructor(app: Modal['app'], options: ProviderBuiltinIconPickerModalOptions) {
     super(app);
     this.options = options;
+    this.requestedVariant = ProviderIconService.getSelectedBuiltinVariant(options.providerId, options.library);
   }
 
   onOpen(): void {
@@ -53,24 +68,45 @@ export class ProviderBuiltinIconPickerModal extends Modal {
         'aria-label': t('settings.model.iconCache.builtinPicker.libraryLabel'),
       },
     });
-    filterEl.createEl('option', {
-      value: '',
+    const allOptionEl = filterEl.createEl('option', {
       text: t('settings.model.iconCache.builtinPicker.library.all'),
     });
-    filterEl.createEl('option', {
-      value: 'lobehub',
+    allOptionEl.value = '';
+    const lobehubOptionEl = filterEl.createEl('option', {
       text: t('settings.model.iconCache.builtinPicker.library.lobehub'),
     });
-    filterEl.createEl('option', {
-      value: 'opencode',
+    lobehubOptionEl.value = 'lobehub';
+    const opencodeOptionEl = filterEl.createEl('option', {
       text: t('settings.model.iconCache.builtinPicker.library.opencode'),
     });
+    opencodeOptionEl.value = 'opencode';
     filterEl.addEventListener('change', () => {
       this.libraryFilter = (filterEl.value as '' | BuiltinIconLibraryId) ?? '';
       this.renderGrid();
     });
     const chevronEl = filterWrapEl.createSpan({ cls: 'opencodian-builtin-icon-picker-filter-chevron' });
     setIcon(chevronEl, 'chevron-down');
+
+    const variantWrapEl = controlsEl.createDiv({ cls: 'opencodian-builtin-icon-picker-filter-wrap' });
+    const variantEl = variantWrapEl.createEl('select', {
+      cls: 'opencodian-builtin-icon-picker-filter',
+      attr: {
+        'aria-label': t('settings.model.iconCache.builtinPicker.variantLabel'),
+      },
+    });
+    for (const variant of LOBEHUB_ICON_VARIANT_OPTIONS) {
+      const optionEl = variantEl.createEl('option', {
+        text: t(`settings.model.iconCache.variant.${variant}` as const),
+      });
+      optionEl.value = variant;
+    }
+    variantEl.value = this.requestedVariant;
+    variantEl.addEventListener('change', () => {
+      this.requestedVariant = variantEl.value as LobehubIconVariant;
+      this.renderGrid();
+    });
+    const variantChevronEl = variantWrapEl.createSpan({ cls: 'opencodian-builtin-icon-picker-filter-chevron' });
+    setIcon(variantChevronEl, 'chevron-down');
 
     const searchWrapEl = controlsEl.createDiv({ cls: 'opencodian-builtin-icon-picker-search' });
     const searchContainerEl = searchWrapEl.createDiv({ cls: 'opencodian-builtin-icon-picker-search-container' });
@@ -146,6 +182,7 @@ export class ProviderBuiltinIconPickerModal extends Modal {
       {
         query: this.query,
         libraryId: this.libraryFilter || undefined,
+        requestedVariant: this.requestedVariant,
       },
     );
     this.renderPreview(options);
@@ -168,7 +205,7 @@ export class ProviderBuiltinIconPickerModal extends Modal {
       });
       cardEl.toggleClass('is-selected', option.isSelected);
       cardEl.addEventListener('click', () => {
-        void this.choose(option.libraryId, option.iconId);
+        void this.choose(option.libraryId, option.iconId, option.requestedVariant);
       });
 
       const previewEl = cardEl.createDiv({ cls: 'opencodian-builtin-icon-picker-card-preview' });
@@ -179,14 +216,17 @@ export class ProviderBuiltinIconPickerModal extends Modal {
       if (option.previewUrl) {
         const imgEl = document.createElement('img');
         imgEl.classList.add('opencodian-provider-icon-image');
-        imgEl.src = option.previewUrl;
         imgEl.alt = option.displayName;
         imgEl.loading = 'lazy';
-        imgEl.addEventListener('error', () => {
-          imgEl.remove();
-          previewEl.addClass('is-fallback');
-          placeholderEl.hidden = false;
-        });
+        this.applyPreviewImageSources(
+          imgEl,
+          option.previewCandidates,
+          () => {
+            imgEl.remove();
+            previewEl.addClass('is-fallback');
+            placeholderEl.hidden = false;
+          },
+        );
         previewEl.appendChild(imgEl);
         placeholderEl.hidden = true;
       } else {
@@ -217,6 +257,29 @@ export class ProviderBuiltinIconPickerModal extends Modal {
           text: t('settings.model.iconCache.builtinPicker.selected'),
         });
       }
+      if (option.resolvedVariant) {
+        badgesEl.createSpan({
+          cls: 'opencodian-builtin-icon-picker-card-badge',
+          text: t(`settings.model.iconCache.variant.${option.resolvedVariant}` as const),
+        });
+      }
+      if (option.resolvedFormat) {
+        badgesEl.createSpan({
+          cls: 'opencodian-builtin-icon-picker-card-badge',
+          text: option.resolvedFormat,
+        });
+      }
+      if (
+        option.libraryId === 'lobehub'
+        && option.requestedVariant !== 'auto'
+        && option.resolvedVariant
+        && option.requestedVariant !== option.resolvedVariant
+      ) {
+        badgesEl.createSpan({
+          cls: 'opencodian-builtin-icon-picker-card-badge is-fallback',
+          text: t('settings.model.iconCache.builtinPicker.fallbackBadge'),
+        });
+      }
 
       bodyEl.createDiv({
         cls: 'opencodian-builtin-icon-picker-card-meta',
@@ -230,14 +293,18 @@ export class ProviderBuiltinIconPickerModal extends Modal {
     }
   }
 
-  private async choose(libraryId: BuiltinIconLibraryId, iconId: string): Promise<void> {
+  private async choose(
+    libraryId: BuiltinIconLibraryId,
+    iconId: string,
+    variant: LobehubIconVariant,
+  ): Promise<void> {
     if (this.choosing) {
       return;
     }
 
     this.choosing = true;
     try {
-      await this.options.onChoose({ libraryId, iconId });
+      await this.options.onChoose({ libraryId, iconId, variant });
       this.close();
     } finally {
       this.choosing = false;
@@ -279,6 +346,7 @@ export class ProviderBuiltinIconPickerModal extends Modal {
     plugin.settings.providerIconColorMode = mode;
     plugin.applyProviderIconColorMode();
     this.renderColorModeButtons();
+    this.renderGrid();
 
     try {
       await plugin.saveSettings({
@@ -290,6 +358,7 @@ export class ProviderBuiltinIconPickerModal extends Modal {
     } catch (error) {
       plugin.settings.providerIconColorMode = previousMode;
       plugin.applyProviderIconColorMode();
+      this.renderGrid();
       new Notice(
         error instanceof Error ? error.message : t('settings.model.iconCache.colorMode.saveFailed'),
       );
@@ -305,13 +374,18 @@ export class ProviderBuiltinIconPickerModal extends Modal {
       iconId: string;
       displayName: string;
       previewUrl: string | null;
+      previewCandidates: string[];
       source: string;
+      requestedVariant?: LobehubIconVariant;
+      resolvedFormat?: string;
+      resolvedVariant?: string;
     }> = ProviderIconService.listBuiltinIconOptions(
       this.app,
       this.options.providerId,
       this.options.library,
       {
         libraryId: this.libraryFilter || undefined,
+        requestedVariant: this.requestedVariant,
       },
     ),
   ): void {
@@ -347,9 +421,13 @@ export class ProviderBuiltinIconPickerModal extends Modal {
       if (option.previewUrl) {
         const imgEl = document.createElement('img');
         imgEl.classList.add('opencodian-provider-icon-image');
-        imgEl.src = option.previewUrl;
         imgEl.alt = option.displayName;
         imgEl.loading = 'lazy';
+        this.applyPreviewImageSources(
+          imgEl,
+          option.previewCandidates,
+          () => imgEl.remove(),
+        );
         iconFrameEl.appendChild(imgEl);
       }
       itemEl.createDiv({
@@ -357,5 +435,32 @@ export class ProviderBuiltinIconPickerModal extends Modal {
         text: option.displayName,
       });
     }
+  }
+
+  private applyPreviewImageSources(
+    imgEl: HTMLImageElement,
+    sources: string[],
+    onExhausted: () => void,
+  ): void {
+    const candidates = sources.filter(Boolean);
+    if (candidates.length === 0) {
+      onExhausted();
+      return;
+    }
+
+    let index = 0;
+    const applyNext = () => {
+      if (index >= candidates.length) {
+        imgEl.removeEventListener('error', applyNext);
+        onExhausted();
+        return;
+      }
+
+      imgEl.src = candidates[index]!;
+      index += 1;
+    };
+
+    imgEl.addEventListener('error', applyNext);
+    applyNext();
   }
 }

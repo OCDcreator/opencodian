@@ -7,6 +7,7 @@
     "build:css": "node scripts/build-css.mjs",
     "dev": "npm run build:css && node esbuild.config.mjs",
     "build": "node scripts/build.mjs production",
+    "sync:lobehub-icons": "node scripts/sync-lobehub-icons.mjs",
     "release:patch": "node scripts/release.mjs patch",
     "release:minor": "node scripts/release.mjs minor",
     "release:major": "node scripts/release.mjs major",
@@ -31,6 +32,7 @@
   "author": "OpenCodian Team",
   "license": "MIT",
   "devDependencies": {
+    "@lobehub/icons": "5.4.0",
     "@types/jest": "^30.0.0",
     "@types/node": "^20.0.0",
     "@typescript-eslint/eslint-plugin": "^8.30.0",

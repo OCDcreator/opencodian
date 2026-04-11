@@ -5,7 +5,7 @@
 
 ## 概述
 
-AI 模型提供商图标管理服务。使用 LobeHub Icons CDN（`@lobehub/icons-static-svg`）与插件内置的 OpenCode provider 图标作为内置来源，同时保留自定义图标源。提供图标 URL 解析、本地缓存、自定义图标上传、内置图标选择和批量预热功能。所有静态方法设计为无状态工具类；图标最终显示颜色由全局 `providerIconColorMode` + CSS 变量 `--lobehub-icon-filter` 决定。
+AI 模型提供商图标管理服务。运行时继续使用原生 `<img>`，但 LobeHub 图标的可用 variant/静态资源 URL 不再靠文件名猜测，而是读取构建期生成的 `lobehubIconManifest.ts`。服务统一管理 LobeHub CDN、插件内置 OpenCode provider 图标，以及自定义 URL/文件图标，并把解析结果缓存到本地。
 
 ## 导入关系
 上游: `fs`, `path`, `obsidian` (App, normalizePath, requestUrl), `../../core/types` (ProviderIconEntry, ProviderIconLibrary), `../../shared` (createLogger)
@@ -14,7 +14,7 @@ AI 模型提供商图标管理服务。使用 LobeHub Icons CDN（`@lobehub/icon
 ## 核心类型 / 接口
 
 ### ProviderIconCacheEntry
-单个图标缓存条目的视图模型：`providerId`, `entry`, `iconId`, `cached`, `cachePath`, `iconUrl`, `isCurrentProvider`, `isSelected`, `sourceLabel`。
+单个图标缓存条目的视图模型：`providerId`, `entry`, `iconId`, `cached`, `cachePath`, `iconUrl`, `isCurrentProvider`, `isSelected`, `requestedVariant`, `resolvedVariant`, `resolvedFormat`, `fallbackUsed`, `sourceLabel`。
 
 ### ProviderIconProviderState
 按 provider 分组的缓存状态：`providerId`, `isCurrentProvider`, `entries[]`。
@@ -40,11 +40,19 @@ AI 模型提供商图标管理服务。使用 LobeHub Icons CDN（`@lobehub/icon
 2. `OpenCode` alias 命中的 `builtin`
 3. 双图库搜索命中的首个 `builtin`（同分优先 `LobeHub`）
 
+### Manifest 驱动 variant 决策
+
+- 构建期脚本 `sync:lobehub-icons` 会把 `@lobehub/icons` 的 `toc` 与 CDN 规则固化成 `lobehubIconManifest.ts`
+- 运行时先看 provider entry 的显式 `variant`
+- 若条目是 `auto`，再读全局 `providerIconDefaultVariant`
+- 如果全局仍是 `auto`，才按 `providerIconColorMode` 推导候选顺序
+- 所有候选最终都会回到 `mono` 兜底；`combine` 目前只保留能力信息，不假设存在静态资源
+
 ### 图标加载管线
 
 1. **resolveIconUrl()** — 入口，委托给 `resolveEntryUrl()`
 2. **resolveEntryUrl()** — 检查内存缓存 → 检查失败记录 → 去重 in-flight 请求 → 发起加载
-3. **loadEntryUrl()** — 先尝试本地缓存文件 → 不存在则按条目类型加载（LobeHub CDN / OpenCode 内置资源 / 自定义源）→ 写入缓存 → 返回 data URL
+3. **loadEntryUrl()** — 先尝试本地缓存文件 → 不存在则按条目类型加载（manifest 驱动的 LobeHub CDN / OpenCode 内置资源 / 自定义源）→ 写入缓存 → 返回 data URL
 
 ### 自定义图标
 
@@ -57,14 +65,15 @@ AI 模型提供商图标管理服务。使用 LobeHub Icons CDN（`@lobehub/icon
 
 ### 内置图标选择
 
-- `listBuiltinIconOptions()`：为单个 provider 生成可浏览的内置图标数据
-- `selectBuiltinIcon()`：将选中的内置图标置顶并去重
+- `listBuiltinIconOptions()`：为单个 provider 生成可浏览的内置图标数据，并给出 `requestedVariant / resolvedVariant / resolvedFormat`
+- `selectBuiltinIcon()`：将选中的内置图标置顶并去重；LobeHub 条目会同时持久化显式 `variant`
 - `getSelectedBuiltinSource()`：把当前 effective 条目归一成 `libraryId:iconId`
 
 ### 缓存管理
 
 - 缓存目录：`.opencodian/provider-icons/`
-- 文件名格式：`{provider}-{timestamp}-{random}.{ext}`
+- LobeHub 缓存 key 包含 `iconId + requestedVariant + resolvedVariant + theme + format`
+- 自定义文件名仍是 `{provider}-{timestamp}-{random}.{ext}`
 - 最大文件大小：1 MB
 - 支持格式：SVG, PNG, JPEG, WEBP, GIF
 - `clearCache()` 清空缓存目录和内存映射
@@ -73,7 +82,7 @@ AI 模型提供商图标管理服务。使用 LobeHub Icons CDN（`@lobehub/icon
 
 | 方法 | 说明 |
 |------|------|
-| `getIconUrl(providerId)` | 获取 CDN URL（仅 mapped 类型） |
+| `getIconUrl(providerId)` | 获取预览 URL（优先 manifest 首选候选） |
 | `resolveIconUrl(app, providerId, library, options)` | 解析图标 URL（含缓存和远程加载） |
 | `getIconId(providerId)` | 5 级策略匹配 provider ID |
 | `hasIcon(providerId)` | 检查是否有图标映射 |
@@ -111,16 +120,15 @@ resolveIconUrl(app, providerId, library)
 ## 与其他模块的交互
 
 - **OpenCodianView**: 调用 `resolveIconUrl()` 在模型选择器和消息头部显示 provider 图标
-- **OpenCodianSettings**: 调用 `getProviderCacheState()` 在图标缓存设置面板显示状态，并负责切换全局 provider 图标颜色模式
-- **ProviderIconCacheModal**: 调用 `selectBuiltinIcon()`, `addCustomIconSource()`, `removeProviderEntry()`, `clearCache()` 管理图标
-- **ProviderBuiltinIconPickerModal**: 调用 `listBuiltinIconOptions()` 浏览内置图标库，并在颜色模式切换时复用相同的 preview URL
+- **OpenCodianSettings**: 负责写回 `providerIconColorMode` 与 `providerIconDefaultVariant`
+- **ProviderIconCacheModal**: 展示命中的 `variant / format / fallback`，并调用 `selectBuiltinIcon()`, `addCustomIconSource()`, `removeProviderEntry()`, `clearCache()`
+- **ProviderBuiltinIconPickerModal**: 调用 `listBuiltinIconOptions()` 浏览内置图标库，并把显式 `variant` 一起传回上层
 - **StorageService**: 持久化 `ProviderIconLibrary` 到 settings
 
 ## 配置项
 
 | 常量 | 值 | 说明 |
 |------|-----|------|
-| `LOBEHUB_CDN_BASE` | `https://unpkg.com/@lobehub/icons-static-svg@latest/icons` | CDN 基础 URL |
 | `ICON_CACHE_DIR` | `.opencodian/provider-icons` | 缓存目录（vault 相对路径） |
 | `MAX_ICON_BYTES` | 1048576 | 最大图标文件大小 |
 
@@ -131,3 +139,4 @@ resolveIconUrl(app, providerId, library)
 - `requestUrl` 使用 Obsidian API，不走系统代理
 - MIME 检测优先级：Content-Type header → 文件头魔数 → 扩展名
 - `PROVIDER_ICON_MAP` 仍是旧映射稳定层；OpenCode 图标则通过 registry + alias + 搜索接入
+- `providerIconColorMode` 仍会通过 CSS filter 影响最终显示，但资源选择本身已优先使用更合适的静态 variant
