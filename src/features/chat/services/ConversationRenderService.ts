@@ -1398,14 +1398,22 @@ export class ConversationRenderService {
   private buildTrailingAssistantPatchSkippedDebugCountPlanFromLoggingContext(
     loggingContext: TrailingAssistantPatchSkippedDebugLoggingContext,
   ): TrailingAssistantPatchSkippedDebugCountPlan {
-    const countPlanningInputs =
-      this.buildTrailingAssistantPatchSkippedDebugCountPlanningInputsFromLoggingContext(
+    const countPlanningContract =
+      this.buildTrailingAssistantPatchSkippedDebugCountPlanningContractFromLoggingContext(
         loggingContext,
       );
     return this.buildTrailingAssistantPatchSkippedDebugCountPlan(
-      this.buildTrailingAssistantPatchSkippedDebugCountPlanningContract(
-        countPlanningInputs,
-      ).countInputs,
+      countPlanningContract.countInputs,
+    );
+  }
+
+  private buildTrailingAssistantPatchSkippedDebugCountPlanningContractFromLoggingContext(
+    loggingContext: TrailingAssistantPatchSkippedDebugLoggingContext,
+  ): TrailingAssistantPatchSkippedDebugCountPlanningContract {
+    return this.buildTrailingAssistantPatchSkippedDebugCountPlanningContract(
+      this.buildTrailingAssistantPatchSkippedDebugCountPlanningInputsFromLoggingContext(
+        loggingContext,
+      ),
     );
   }
 
