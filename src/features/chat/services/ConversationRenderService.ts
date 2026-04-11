@@ -164,6 +164,18 @@ type TrailingAssistantPatchSuccessPlanParts = {
   turnBodyScopePlan: TrailingAssistantPatchTurnBodyScopePlan;
 };
 
+type TrailingAssistantPatchExecutionTailPlanningContext = {
+  previousTailMessage: ChatMessage;
+  nextTailMessage: ChatMessage;
+  patchTarget: TrailingAssistantPatchDomTarget;
+  shouldStickToBottom: boolean;
+};
+
+type TrailingAssistantPatchExecutionTailPlanParts = {
+  executionPlan: TrailingAssistantPatchExecutionPlan;
+  tailOutcomePlans: TrailingAssistantPatchTailOutcomePlans;
+};
+
 type TrailingAssistantPatchPlanningContext = {
   previousTailMessage: ChatMessage;
   nextTailMessage: ChatMessage;
@@ -585,9 +597,9 @@ export class ConversationRenderService {
     return {
       turnBodyScopePlan:
         this.buildTrailingAssistantPatchTurnBodyScopePlanFromPlanningContext(planningContext),
-      executionPlan:
-        this.buildTrailingAssistantPatchExecutionPlanFromPlanningContext(planningContext),
-      tailOutcomePlans: this.buildTrailingAssistantPatchTailOutcomePlans(planningContext),
+      ...this.buildTrailingAssistantPatchExecutionTailPlanPartsFromPlanningContext(
+        planningContext,
+      ),
     };
   }
 
@@ -624,6 +636,33 @@ export class ConversationRenderService {
     );
   }
 
+  private buildTrailingAssistantPatchExecutionTailPlanPartsFromPlanningContext(
+    planningContext: TrailingAssistantPatchPlanningContext,
+  ): TrailingAssistantPatchExecutionTailPlanParts {
+    const executionTailPlanningContext =
+      this.buildTrailingAssistantPatchExecutionTailPlanningContext(planningContext);
+    return {
+      executionPlan:
+        this.buildTrailingAssistantPatchExecutionPlanFromExecutionTailPlanningContext(
+          executionTailPlanningContext,
+        ),
+      tailOutcomePlans: this.buildTrailingAssistantPatchTailOutcomePlans(
+        executionTailPlanningContext,
+      ),
+    };
+  }
+
+  private buildTrailingAssistantPatchExecutionTailPlanningContext(
+    planningContext: TrailingAssistantPatchPlanningContext,
+  ): TrailingAssistantPatchExecutionTailPlanningContext {
+    return {
+      previousTailMessage: planningContext.previousTailMessage,
+      nextTailMessage: planningContext.nextTailMessage,
+      patchTarget: planningContext.patchTarget,
+      shouldStickToBottom: planningContext.shouldStickToBottom,
+    };
+  }
+
   private shouldFinalizeTrailingAssistantFooterOnly(
     previousTailMessage: ChatMessage,
     nextTailMessage: ChatMessage,
@@ -632,8 +671,8 @@ export class ConversationRenderService {
       === this.host.assistantTailRender.getBodySignature(nextTailMessage);
   }
 
-  private buildTrailingAssistantPatchExecutionPlanFromPlanningContext(
-    planningContext: TrailingAssistantPatchPlanningContext,
+  private buildTrailingAssistantPatchExecutionPlanFromExecutionTailPlanningContext(
+    planningContext: TrailingAssistantPatchExecutionTailPlanningContext,
   ): TrailingAssistantPatchExecutionPlan {
     return this.buildTrailingAssistantPatchExecutionPlan(
       planningContext.previousTailMessage,
@@ -664,7 +703,7 @@ export class ConversationRenderService {
   }
 
   private buildTrailingAssistantPatchTailOutcomePlans(
-    planningContext: TrailingAssistantPatchPlanningContext,
+    planningContext: TrailingAssistantPatchExecutionTailPlanningContext,
   ): TrailingAssistantPatchTailOutcomePlans {
     const tailStatePlan = this.buildTrailingAssistantPatchTailStatePlan(
       planningContext.patchTarget,

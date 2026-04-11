@@ -72,8 +72,8 @@ export class ConversationRenderService {
 - preflight 成功分支现在会先把 tail messages、DOM patch target、parent/runtime 与 auto-scroll 状态收束成独立 `planningContext`，让 guard 判定通过后只暴露一份窄化的成功态上下文
 - preflight 成功分支里的 `existingTailMessageEl`、`existingContentEl` 与 `parentEl` 现在会先组装成更窄的 `patchTarget` contract，再与 runtime/scroll 派生值一起汇总到 `planningContext`，避免成功态结果继续暴露零散 DOM 字段
 - `TrailingAssistantPatchPreflight` 现在只表达“是否允许 patch”，成功后只返回独立的 `planningContext`；执行计划、turn-body scope、tail state 与 completion debug 改由 `buildTrailingAssistantPatchSuccessPlan()` 基于这份窄输入统一组装
-- `buildTrailingAssistantPatchSuccessPlan()` 现在进一步只保留 success-plan 骨架编排：它会先把 turn-body scope、execution plan 与 tail outcome 收束成独立 `planParts`，再交给最终 success-plan shape helper 统一返回
-- `planParts` 收集阶段里，turn-body scope 会先从 `planningContext` 交给独立 helper，execution plan 会先交给独立的 context helper，tail state + completion debug 也会先收敛成独立 `tailOutcomePlans`
+- `buildTrailingAssistantPatchSuccessPlan()` 现在进一步只保留 success-plan 骨架编排：它会先把 turn-body scope 与独立的 execution/tail-outcome contract 收束成 `planParts`，再交给最终 success-plan shape helper 统一返回
+- `planParts` 收集阶段里，turn-body scope 会先从 `planningContext` 交给独立 helper；execution plan 与 tail outcome 则会先收束到更窄的共享 planning context，再统一映射成独立 `executionPlan` + `tailOutcomePlans`
 - 最终 `TrailingAssistantPatchSuccessPlan` 的返回结构也已交给独立 helper 统一收口，避免 success-plan builder 继续手工展开 `tailOutcomePlans` 与 turn-body scope 字段
 - `successPlan` 内部会继续预先把“只 finalize footer / 重渲正文 content”的执行决策收敛成 `executionPlan`，并直接把它交给 `executeTrailingAssistantPatch()`，让 patch executor 不再读取整份成功态结果或重复承担正文签名比较
 - `successPlan` 也会把 turn-body scope 切换/恢复依赖的 runtime 与目标节点预计算成 `turnBodyScopePlan`，让 `withTrailingAssistantTurnBodyScope()` 不再回读 preflight verdict 或零散 DOM 字段
