@@ -35,12 +35,12 @@ export function withTrailingAssistantTurnBodyScope<T>(
 
 ## 边界
 
-- 本 helper 不决定 scope 应该指向哪个 DOM 节点；`ConversationRenderService` 仍负责在 success plan 中预计算 `scopedTurnBodyEl` 与 `restoreTurnBodyEl`
+- 本 helper 不决定 scope plan 应该如何构建；`TrailingAssistantPatchTurnBodyScopePlanHelper` 负责预计算 `scopedTurnBodyEl` 与 `restoreTurnBodyEl`
 - 本 helper 不执行 assistant 正文渲染、footer finalization、tail-state 更新或 debug logging
 - `finally` 恢复保证 scoped work 抛错时也会回到 plan 指定的 turn body
 
 ## 与 `ConversationRenderService` 的关系
 
 - `ConversationRenderService` 继续负责编排 trailing-assistant patch 成功路径
-- patch 执行时，service 只把预建的 `turnBodyScopePlan` 和正文执行回调交给这里
+- patch 执行时，service 只把由 `TrailingAssistantPatchTurnBodyScopePlanHelper` 预建的 `turnBodyScopePlan` 和正文执行回调交给这里
 - 这样 service 内部不再直接承担 `currentTurnBodyEl` 临时切换 / 恢复副作用

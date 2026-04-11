@@ -20,6 +20,7 @@ import {
   type TrailingAssistantPatchTurnBodyScopePlan,
   withTrailingAssistantTurnBodyScope,
 } from './TrailingAssistantPatchTurnBodyScopeHelper';
+import { buildTrailingAssistantPatchTurnBodyScopePlan } from './TrailingAssistantPatchTurnBodyScopePlanHelper';
 import {
   captureElementScrollRestoreSnapshot,
   isElementNearBottom,
@@ -157,11 +158,6 @@ type TrailingAssistantPatchNonMergeableTailFailurePlan = {
     previousTail: Record<string, unknown> | null;
     nextTail: Record<string, unknown> | null;
   };
-};
-
-type TrailingAssistantPatchTurnBodyScopeInputs = {
-  runtime: ConversationRenderRuntimeState | null;
-  parentEl: HTMLElement;
 };
 
 type TrailingAssistantPatchSuccessPlan = {
@@ -708,9 +704,7 @@ export class ConversationRenderService {
     planningContext: TrailingAssistantPatchPlanningContext,
   ): TrailingAssistantPatchSuccessPlanParts {
     return {
-      turnBodyScopePlan: this.buildTrailingAssistantPatchTurnBodyScopePlan(
-        this.buildTrailingAssistantPatchTurnBodyScopeInputs(planningContext),
-      ),
+      turnBodyScopePlan: buildTrailingAssistantPatchTurnBodyScopePlan(planningContext),
       ...this.buildTrailingAssistantPatchExecutionTailPlanPartsFromPlanningContext(
         planningContext,
       ),
@@ -723,29 +717,6 @@ export class ConversationRenderService {
     return {
       messageEl: patchTargets.existingTailMessageEl,
       contentEl: patchTargets.existingContentEl,
-    };
-  }
-
-  private buildTrailingAssistantPatchTurnBodyScopeInputs(
-    planningContext: TrailingAssistantPatchPlanningContext,
-  ): TrailingAssistantPatchTurnBodyScopeInputs {
-    return {
-      runtime: planningContext.runtime,
-      parentEl: planningContext.parentEl,
-    };
-  }
-
-  private buildTrailingAssistantPatchTurnBodyScopePlan(
-    inputs: TrailingAssistantPatchTurnBodyScopeInputs,
-  ): TrailingAssistantPatchTurnBodyScopePlan {
-    if (!inputs.runtime) {
-      return { runtime: null };
-    }
-
-    return {
-      runtime: inputs.runtime,
-      scopedTurnBodyEl: inputs.parentEl,
-      restoreTurnBodyEl: inputs.runtime.currentTurnBodyEl ?? inputs.parentEl,
     };
   }
 
