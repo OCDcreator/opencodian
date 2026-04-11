@@ -72,6 +72,7 @@ export class ConversationRenderService {
 - preflight 成功分支的 runtime 获取、previous turn body 快照与 auto-scroll 状态组装也由独立 helper 收口，让入口继续只负责串联 guard 与结果
 - preflight 成功分支里的 `existingTailMessageEl`、`existingContentEl` 与 `parentEl` 现在会先组装成更窄的 `patchTarget` contract，再交给 patch 执行、turn body scope 与 tail state helper 复用，避免成功态结果继续暴露零散 DOM 字段
 - preflight 成功分支现在还会预先把“只 finalize footer / 重渲正文 content”的执行决策收敛成 `executionPlan`，让真正的 patch executor 只消费更窄的执行结果，而不再同时承担正文签名比较
+- preflight 成功分支现在也会把 turn-body scope 切换/恢复依赖的 runtime 与目标节点预计算成 `turnBodyScopePlan`，让 `withTrailingAssistantTurnBodyScope()` 不再回读整份成功结果或零散 DOM 字段
 - patch 执行期间对 render runtime 的 `currentTurnBodyEl` 暂时切换与恢复，也由独立 scope helper 收口，避免主流程继续承载 DOM 上下文细节
 - 真正执行 patch 时，assistant 正文签名比较与“只 finalize footer / 重渲正文 content”分支也由独立 helper 收口
 - patch 成功后的 completion debug payload 组装也已抽到独立 helper，而 previous / next tail 的 debug summary 现在还会先预计算成 `completionDebugPlan`，让日志阶段不再回读整份 preflight 成功结果

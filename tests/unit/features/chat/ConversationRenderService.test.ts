@@ -326,6 +326,36 @@ describe('ConversationRenderService', () => {
     expect(host.renderRuntime.currentTurnBodyEl).toBe(previousTurnBodyEl);
   });
 
+  it('restores the patched turn body when no previous turn body exists', async () => {
+    const previousMessages = [
+      createMessage({ id: 'assistant-1', content: 'Stable answer', timestamp: 1 }),
+    ];
+    const nextMessages = [
+      createMessage({ id: 'assistant-2', content: 'Updated answer', timestamp: 2 }),
+    ];
+    const transientTurnBodyEl = document.createElement('div');
+    let host: ReturnType<typeof createHost>;
+    const renderMessageContent = jest.fn().mockImplementation(
+      async (_messageEl: HTMLElement, contentEl: HTMLElement, message: ChatMessage) => {
+        expect(host.renderRuntime.currentTurnBodyEl).toBe(host.messagesEl);
+        host.renderRuntime.currentTurnBodyEl = transientTurnBodyEl;
+        contentEl.textContent = message.content;
+      },
+    );
+    host = createHost({
+      assistantTailRender: {
+        renderMessageContent,
+      },
+    });
+    appendAssistantTail(host.messagesEl, 'Stable answer');
+    const service = new ConversationRenderService(host);
+
+    const patched = await service.patchTrailingAssistantRender(previousMessages, nextMessages, 'tab-1');
+
+    expect(patched).toBe(true);
+    expect(host.renderRuntime.currentTurnBodyEl).toBe(host.messagesEl);
+  });
+
   it('restores the current turn body after trailing assistant content patch failures', async () => {
     const previousMessages = [
       createMessage({ id: 'assistant-1', content: 'Stable answer', timestamp: 1 }),

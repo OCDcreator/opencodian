@@ -108,7 +108,6 @@ export interface ConversationRenderHost {
 type TrailingAssistantPatchDomTarget = {
   messageEl: HTMLElement;
   contentEl: HTMLElement;
-  turnBodyEl: HTMLElement;
 };
 
 type TrailingAssistantPatchExecutionPlan =
@@ -137,6 +136,16 @@ type TrailingAssistantPatchCompletionDebugPlan = {
   nextTail: Record<string, unknown> | null;
 };
 
+type TrailingAssistantPatchTurnBodyScopePlan =
+  | {
+    runtime: null;
+  }
+  | {
+    runtime: ConversationRenderRuntimeState;
+    scopedTurnBodyEl: HTMLElement;
+    restoreTurnBodyEl: HTMLElement;
+  };
+
 type TrailingAssistantPatchPreflight =
   | {
     ok: true;
@@ -144,8 +153,7 @@ type TrailingAssistantPatchPreflight =
     executionPlan: TrailingAssistantPatchExecutionPlan;
     tailStatePlan: TrailingAssistantPatchTailStatePlan;
     completionDebugPlan: TrailingAssistantPatchCompletionDebugPlan;
-    runtime: ConversationRenderRuntimeState | null;
-    previousTurnBodyEl: HTMLElement | null;
+    turnBodyScopePlan: TrailingAssistantPatchTurnBodyScopePlan;
   }
   | {
     ok: false;
@@ -360,7 +368,7 @@ export class ConversationRenderService {
       return fail(preflight.reason, preflight.payload);
     }
 
-    await this.withTrailingAssistantTurnBodyScope(preflight, async () => {
+    await this.withTrailingAssistantTurnBodyScope(preflight.turnBodyScopePlan, async () => {
       await this.executeTrailingAssistantPatch(preflight);
       this.applyTrailingAssistantPatchTailState(preflight.tailStatePlan, tabId);
     });
@@ -531,6 +539,10 @@ export class ConversationRenderService {
   ): SuccessfulTrailingAssistantPatchPreflight {
     const runtime = this.host.getRenderRuntimeForTab(tabId);
     const patchTarget = this.buildTrailingAssistantPatchDomTarget(patchTargets);
+    const turnBodyScopePlan = this.buildTrailingAssistantPatchTurnBodyScopePlan(
+      runtime,
+      patchTargets.parentEl,
+    );
     const shouldStickToBottom = this.host.shouldAutoScroll(tabId);
     const executionPlan = this.buildTrailingAssistantPatchExecutionPlan(
       tailMessages.previousTailMessage,
@@ -553,8 +565,7 @@ export class ConversationRenderService {
       executionPlan,
       tailStatePlan,
       completionDebugPlan,
-      runtime,
-      previousTurnBodyEl: runtime?.currentTurnBodyEl ?? null,
+      turnBodyScopePlan,
     };
   }
 
@@ -564,7 +575,21 @@ export class ConversationRenderService {
     return {
       messageEl: patchTargets.existingTailMessageEl,
       contentEl: patchTargets.existingContentEl,
-      turnBodyEl: patchTargets.parentEl,
+    };
+  }
+
+  private buildTrailingAssistantPatchTurnBodyScopePlan(
+    runtime: ConversationRenderRuntimeState | null,
+    scopedTurnBodyEl: HTMLElement,
+  ): TrailingAssistantPatchTurnBodyScopePlan {
+    if (!runtime) {
+      return { runtime: null };
+    }
+
+    return {
+      runtime,
+      scopedTurnBodyEl,
+      restoreTurnBodyEl: runtime.currentTurnBodyEl ?? scopedTurnBodyEl,
     };
   }
 
@@ -643,24 +668,24 @@ export class ConversationRenderService {
   }
 
   private async withTrailingAssistantTurnBodyScope<T>(
-    preflight: SuccessfulTrailingAssistantPatchPreflight,
+    turnBodyScopePlan: TrailingAssistantPatchTurnBodyScopePlan,
     run: () => Promise<T>,
   ): Promise<T> {
-    const {
-      runtime,
-      patchTarget,
-      previousTurnBodyEl,
-    } = preflight;
-    if (!runtime) {
+    if (!turnBodyScopePlan.runtime) {
       return run();
     }
 
-    runtime.currentTurnBodyEl = patchTarget.turnBodyEl;
+    const {
+      runtime,
+      scopedTurnBodyEl,
+      restoreTurnBodyEl,
+    } = turnBodyScopePlan;
+    runtime.currentTurnBodyEl = scopedTurnBodyEl;
 
     try {
       return await run();
     } finally {
-      runtime.currentTurnBodyEl = previousTurnBodyEl ?? patchTarget.turnBodyEl;
+      runtime.currentTurnBodyEl = restoreTurnBodyEl;
     }
   }
 
