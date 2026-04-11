@@ -136,9 +136,20 @@ type TrailingAssistantPatchCompletionDebugPlan = {
   nextTail: Record<string, unknown> | null;
 };
 
+type TrailingAssistantPatchCompletionDebugPayloadPlan = {
+  shouldStickToBottom: boolean;
+  previousTail: Record<string, unknown> | null;
+  nextTail: Record<string, unknown> | null;
+};
+
 type TrailingAssistantPatchCompletionDebugSummaryPlan = {
   previousTail: Record<string, unknown> | null;
   nextTail: Record<string, unknown> | null;
+};
+
+type TrailingAssistantPatchCompletionDebugLogPlan = {
+  label: 'patch-trailing-assistant-render-complete';
+  payload: Record<string, unknown>;
 };
 
 type TrailingAssistantPatchNonMergeableTailFailurePlan = {
@@ -491,13 +502,7 @@ export class ConversationRenderService {
       this.applyTrailingAssistantPatchTailState(successPlan.tailStatePlan, tabId);
     });
 
-    this.host.logAssistantFinalizationDebug(
-      'patch-trailing-assistant-render-complete',
-      this.buildTrailingAssistantPatchCompletionDebugPayload(
-        successPlan.completionDebugPlan,
-        tabId,
-      ),
-    );
+    this.logTrailingAssistantPatchCompletionDebug(successPlan.completionDebugPlan, tabId);
     return true;
   }
 
@@ -1052,12 +1057,36 @@ export class ConversationRenderService {
     }
   }
 
-  private buildTrailingAssistantPatchCompletionDebugPayload(
+  private logTrailingAssistantPatchCompletionDebug(
     completionDebugPlan: TrailingAssistantPatchCompletionDebugPlan,
     tabId: TabId | null,
-  ): Record<string, unknown> {
-    return {
+  ): void {
+    const logPlan = this.buildTrailingAssistantPatchCompletionDebugLogPlan(
+      completionDebugPlan,
       tabId,
+    );
+    this.host.logAssistantFinalizationDebug(logPlan.label, logPlan.payload);
+  }
+
+  private buildTrailingAssistantPatchCompletionDebugLogPlan(
+    completionDebugPlan: TrailingAssistantPatchCompletionDebugPlan,
+    tabId: TabId | null,
+  ): TrailingAssistantPatchCompletionDebugLogPlan {
+    const payloadPlan =
+      this.buildTrailingAssistantPatchCompletionDebugPayloadPlan(completionDebugPlan);
+    return {
+      label: 'patch-trailing-assistant-render-complete',
+      payload: {
+        tabId,
+        ...payloadPlan,
+      },
+    };
+  }
+
+  private buildTrailingAssistantPatchCompletionDebugPayloadPlan(
+    completionDebugPlan: TrailingAssistantPatchCompletionDebugPlan,
+  ): TrailingAssistantPatchCompletionDebugPayloadPlan {
+    return {
       shouldStickToBottom: completionDebugPlan.shouldStickToBottom,
       previousTail: completionDebugPlan.previousTail,
       nextTail: completionDebugPlan.nextTail,
