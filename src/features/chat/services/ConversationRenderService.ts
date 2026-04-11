@@ -277,8 +277,6 @@ export class ConversationRenderService {
     const {
       previousTailMessage,
       nextTailMessage,
-      existingTailMessageEl,
-      existingContentEl,
       parentEl,
       runtime,
       previousTurnBodyEl,
@@ -290,19 +288,7 @@ export class ConversationRenderService {
     }
 
     try {
-      if (
-        this.host.assistantTailRender.getBodySignature(previousTailMessage)
-        === this.host.assistantTailRender.getBodySignature(nextTailMessage)
-      ) {
-        this.host.assistantTailRender.finalizePersistedFooter(existingTailMessageEl, nextTailMessage);
-      } else {
-        existingContentEl.replaceChildren();
-        await this.host.assistantTailRender.renderMessageContent(
-          existingTailMessageEl,
-          existingContentEl,
-          nextTailMessage,
-        );
-      }
+      await this.executeTrailingAssistantPatch(preflight);
       this.applyTrailingAssistantPatchTailState(preflight, tabId);
       this.host.logAssistantFinalizationDebug('patch-trailing-assistant-render-complete', {
         tabId,
@@ -405,6 +391,31 @@ export class ConversationRenderService {
       previousTurnBodyEl: runtime?.currentTurnBodyEl ?? null,
       shouldStickToBottom: this.host.shouldAutoScroll(tabId),
     };
+  }
+
+  private async executeTrailingAssistantPatch(
+    preflight: SuccessfulTrailingAssistantPatchPreflight,
+  ): Promise<void> {
+    const {
+      previousTailMessage,
+      nextTailMessage,
+      existingTailMessageEl,
+      existingContentEl,
+    } = preflight;
+    if (
+      this.host.assistantTailRender.getBodySignature(previousTailMessage)
+      === this.host.assistantTailRender.getBodySignature(nextTailMessage)
+    ) {
+      this.host.assistantTailRender.finalizePersistedFooter(existingTailMessageEl, nextTailMessage);
+      return;
+    }
+
+    existingContentEl.replaceChildren();
+    await this.host.assistantTailRender.renderMessageContent(
+      existingTailMessageEl,
+      existingContentEl,
+      nextTailMessage,
+    );
   }
 
   private applyTrailingAssistantPatchTailState(

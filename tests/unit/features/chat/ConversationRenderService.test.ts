@@ -269,6 +269,33 @@ describe('ConversationRenderService', () => {
     expect(tailEl.dataset.messageId).toBe('assistant-2');
   });
 
+  it('re-renders trailing assistant content when the body signature changes', async () => {
+    const previousMessages = [
+      createMessage({ id: 'assistant-1', content: 'Stable answer', timestamp: 1 }),
+    ];
+    const nextMessages = [
+      createMessage({ id: 'assistant-2', content: 'Updated answer', timestamp: 2 }),
+    ];
+    const host = createHost();
+    const tailEl = appendAssistantTail(host.messagesEl, 'Stable answer');
+    const contentEl = tailEl.querySelector('.opencodian-message-content');
+    if (!(contentEl instanceof HTMLElement)) {
+      throw new Error('expected assistant content element');
+    }
+    const service = new ConversationRenderService(host);
+
+    const patched = await service.patchTrailingAssistantRender(previousMessages, nextMessages, 'tab-1');
+
+    expect(patched).toBe(true);
+    expect(host.assistantTailRender.renderMessageContent).toHaveBeenCalledWith(
+      tailEl,
+      contentEl,
+      nextMessages[0],
+    );
+    expect(host.assistantTailRender.finalizePersistedFooter).not.toHaveBeenCalled();
+    expect(contentEl.textContent).toBe('Updated answer');
+  });
+
   it('applies trailing assistant tail state after patching', async () => {
     const previousMessages = [
       createMessage({ id: 'assistant-1', content: 'Stable answer', timestamp: 1, sourceMessageId: 'source-1' }),
