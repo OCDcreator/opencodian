@@ -93,9 +93,7 @@ import { GlassOctahedronDemoController } from './glassOctahedronDemo';
 import { LiquidDiamondDemoController } from './liquidDiamondDemo';
 import { buildMessageRenderGroups, mergeAssistantMessagesForRender } from './renderGroups';
 import { type CollapsibleState, setupCollapsible } from './rendering/collapsible';
-import {
-  resolveAssistantCopyContent,
-} from './runtime/AssistantCopyContent';
+import { buildPersistedAssistantFooterPayload } from './runtime/AssistantFooterPayload';
 import {
   type AssistantNoticeRenderHost,
   buildStreamErrorNotice,
@@ -2360,10 +2358,10 @@ export class OpenCodianView extends ItemView {
       updateAssistantTimestamp: (messageEl, message) => {
         this.assistantShellRenderer.addTimestampWithCopyButton({
           messageEl,
-          timestamp: message.timestamp,
-          content: resolveAssistantCopyContent(message),
-          modelId: message.modelId,
-          statusLabel: this.getAssistantStreamStatusLabel(message),
+          ...buildPersistedAssistantFooterPayload({
+            message,
+            statusLabel: this.getAssistantStreamStatusLabel(message),
+          }),
         });
       },
       logAssistantFinalizationDebug: (label, payload) => {
@@ -7086,10 +7084,10 @@ export class OpenCodianView extends ItemView {
 
     this.assistantShellRenderer.addTimestampWithCopyButton({
       messageEl,
-      timestamp: message.timestamp,
-      content: resolveAssistantCopyContent(message),
-      modelId: message.modelId,
-      statusLabel: streamStatusLabel,
+      ...buildPersistedAssistantFooterPayload({
+        message,
+        statusLabel: streamStatusLabel,
+      }),
     });
   }
 

@@ -92,6 +92,7 @@ docs/modules/
 │   │   ├── renderGroups.md
 │   │   ├── runtime/
 │   │   │   ├── AssistantCopyContent.md
+│   │   │   ├── AssistantFooterPayload.md
 │   │   │   ├── AssistantShellRenderer.md
 │   │   │   ├── AssistantNoticeRenderer.md
 │   │   │   ├── AssistantPlainTextFallbackRenderer.md

@@ -17,10 +17,10 @@
 
 - 让 `OpenCodianView` 不再持有 structured text copy-source 选择细节
 - 让 assistant footer copy-content 规则有独立单测，不必依赖 view 级测试覆盖
-- 保持 `AssistantShellRenderer` 继续只关心 footer DOM，本 helper 只关心 copy-content 来源
+- 保持 `AssistantFooterPayload` / `AssistantShellRenderer` 继续分别关心 footer payload 组装与 DOM，本 helper 只关心 copy-content 来源
 
 ## 注意事项
 
 - 只提取 `type === 'text'` 且 trim 后非空的 block 文本；`thinking`、`tool_use` 等 block 不能进入 copy 内容
 - 只要存在 structured `contentBlocks`，就继续沿用 structured copy-source 规则，不自动回退到 `message.content`
-- 这个 helper 不负责 timestamp / copy button DOM 收尾；这些仍由 `AssistantShellRenderer` 统一处理
+- 这个 helper 不负责 timestamp / model / status payload 或 copy button DOM 收尾；payload 由 `AssistantFooterPayload` 组装，DOM 仍由 `AssistantShellRenderer` 统一处理
