@@ -228,6 +228,11 @@ type TrailingAssistantPatchExecutionTailPlanParts = {
   tailOutcomePlans: TrailingAssistantPatchTailOutcomePlans;
 };
 
+type TrailingAssistantPatchPlanningEnvironment = {
+  runtime: ConversationRenderRuntimeState | null;
+  shouldStickToBottom: boolean;
+};
+
 type TrailingAssistantPatchPlanningContext = {
   previousTailMessage: ChatMessage;
   nextTailMessage: ChatMessage;
@@ -628,8 +633,7 @@ export class ConversationRenderService {
       tailMessages,
       this.buildTrailingAssistantPatchDomTarget(patchTargets),
       patchTargets.parentEl,
-      this.host.getRenderRuntimeForTab(tabId),
-      this.host.shouldAutoScroll(tabId),
+      this.buildTrailingAssistantPatchPlanningEnvironment(tabId),
     );
   }
 
@@ -637,16 +641,24 @@ export class ConversationRenderService {
     tailMessages: SuccessfulTrailingAssistantPatchTailMessages,
     patchTarget: TrailingAssistantPatchDomTarget,
     parentEl: HTMLElement,
-    runtime: ConversationRenderRuntimeState | null,
-    shouldStickToBottom: boolean,
+    environment: TrailingAssistantPatchPlanningEnvironment,
   ): TrailingAssistantPatchPlanningContext {
     return {
       previousTailMessage: tailMessages.previousTailMessage,
       nextTailMessage: tailMessages.nextTailMessage,
       patchTarget,
       parentEl,
-      runtime,
-      shouldStickToBottom,
+      runtime: environment.runtime,
+      shouldStickToBottom: environment.shouldStickToBottom,
+    };
+  }
+
+  private buildTrailingAssistantPatchPlanningEnvironment(
+    tabId: TabId | null,
+  ): TrailingAssistantPatchPlanningEnvironment {
+    return {
+      runtime: this.host.getRenderRuntimeForTab(tabId),
+      shouldStickToBottom: this.host.shouldAutoScroll(tabId),
     };
   }
 
