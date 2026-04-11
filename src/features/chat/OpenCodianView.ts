@@ -139,6 +139,7 @@ import {
 } from './runtime/SendPipelineRuntime';
 import { ContextUsageService } from './services/ContextUsageService';
 import {
+  type ConversationAssistantTailRenderPort,
   type ConversationRenderHost,
   ConversationRenderService,
   getIncrementalRenderedMessageUpdate as getConversationIncrementalRenderedMessageUpdate,
@@ -2312,6 +2313,9 @@ export class OpenCodianView extends ItemView {
   }
 
   private createConversationRenderHost(): ConversationRenderHost {
+    const assistantTailRender: ConversationAssistantTailRenderPort =
+      this.createConversationAssistantTailRenderPort();
+
     return {
       getCurrentConversation: () => this.currentConversation,
       getMessagesContainer: () => this.messagesContainer,
@@ -2353,17 +2357,23 @@ export class OpenCodianView extends ItemView {
       requestAnimationFrame: (callback) => window.requestAnimationFrame(callback),
       getMessagesForRender: (messages) => this.getMessagesForRender(messages),
       getMessageVisualSignature: (message) => this.getMessageVisualSignature(message),
-      getAssistantBodySignature: (message) => this.getAssistantBodySignature(message),
       shouldPseudoStreamSyncedAssistantMessage: (message) => this.shouldPseudoStreamSyncedAssistantMessage(message),
-      renderAssistantMessageContent: (messageEl, contentEl, message) =>
-        this.renderAssistantMessageContent(messageEl, contentEl, message),
-      finalizePersistedAssistantFooter: (messageEl, message) => {
-        this.persistedAssistantFooterFinalizer.finalizeFooter(messageEl, message);
-      },
+      assistantTailRender,
       logAssistantFinalizationDebug: (label, payload) => {
         this.logAssistantFinalizationDebug(label, payload);
       },
       summarizeChatMessageForDebug: (message) => this.summarizeChatMessageForDebug(message),
+    };
+  }
+
+  private createConversationAssistantTailRenderPort(): ConversationAssistantTailRenderPort {
+    return {
+      getBodySignature: (message) => this.getAssistantBodySignature(message),
+      renderMessageContent: (messageEl, contentEl, message) =>
+        this.renderAssistantMessageContent(messageEl, contentEl, message),
+      finalizePersistedFooter: (messageEl, message) => {
+        this.persistedAssistantFooterFinalizer.finalizeFooter(messageEl, message);
+      },
     };
   }
 

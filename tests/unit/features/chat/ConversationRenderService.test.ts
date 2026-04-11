@@ -21,6 +21,7 @@ import type {
   Conversation,
 } from '../../../../src/core/types';
 import {
+  type ConversationAssistantTailRenderPort,
   type ConversationRenderHost,
   ConversationRenderService,
   getIncrementalRenderedMessageUpdate,
@@ -29,6 +30,13 @@ import {
   captureElementScrollRestoreSnapshot,
   restoreElementScrollAfterRender,
 } from '../../../../src/features/chat/services/ScrollManager';
+
+type MockedConversationAssistantTailRenderPort = {
+  [Key in keyof ConversationAssistantTailRenderPort]:
+    ConversationAssistantTailRenderPort[Key] extends (...args: infer Args) => infer Result
+      ? jest.Mock<Result, Args>
+      : ConversationAssistantTailRenderPort[Key];
+};
 
 function createMessage(overrides: Partial<ChatMessage> = {}): ChatMessage {
   return {
@@ -53,13 +61,17 @@ function createConversation(messages: ChatMessage[]): Conversation {
 
 type MockedConversationRenderHost = {
   [Key in keyof ConversationRenderHost]:
-    ConversationRenderHost[Key] extends (...args: infer Args) => infer Result
-      ? jest.Mock<Result, Args>
-      : ConversationRenderHost[Key];
+    Key extends 'assistantTailRender'
+      ? MockedConversationAssistantTailRenderPort
+      : ConversationRenderHost[Key] extends (...args: infer Args) => infer Result
+        ? jest.Mock<Result, Args>
+        : ConversationRenderHost[Key];
 };
 
 function createHost(
-  overrides: Partial<MockedConversationRenderHost> = {},
+  overrides: Partial<Omit<MockedConversationRenderHost, 'assistantTailRender'>> & {
+    assistantTailRender?: Partial<MockedConversationAssistantTailRenderPort>;
+  } = {},
 ): MockedConversationRenderHost & {
   messagesEl: HTMLElement;
   renderRuntime: { currentTurnBodyEl: HTMLElement | null };
@@ -88,6 +100,24 @@ function createHost(
     currentTurnBodyEl: null,
   };
   const conversation = createConversation([]);
+  const assistantTailRender: MockedConversationAssistantTailRenderPort = {
+    getBodySignature: jest.fn().mockImplementation((message: ChatMessage) => JSON.stringify({
+      content: message.content,
+      displayStyle: message.displayStyle ?? null,
+      contentBlocks: message.contentBlocks ?? null,
+    })),
+    renderMessageContent: jest.fn().mockImplementation(
+      async (_messageEl: HTMLElement, contentEl: HTMLElement, message: ChatMessage) => {
+        contentEl.textContent = message.content;
+      },
+    ),
+    finalizePersistedFooter: jest.fn(),
+    ...overrides.assistantTailRender,
+  };
+  const {
+    assistantTailRender: _assistantTailRenderOverrides,
+    ...hostOverrides
+  } = overrides;
 
   return {
     messagesEl,
@@ -128,18 +158,8 @@ function createHost(
       streamState: message.streamState ?? null,
       contentBlocks: message.contentBlocks ?? null,
     })),
-    getAssistantBodySignature: jest.fn().mockImplementation((message: ChatMessage) => JSON.stringify({
-      content: message.content,
-      displayStyle: message.displayStyle ?? null,
-      contentBlocks: message.contentBlocks ?? null,
-    })),
     shouldPseudoStreamSyncedAssistantMessage: jest.fn().mockReturnValue(false),
-    renderAssistantMessageContent: jest.fn().mockImplementation(
-      async (_messageEl: HTMLElement, contentEl: HTMLElement, message: ChatMessage) => {
-        contentEl.textContent = message.content;
-      },
-    ),
-    finalizePersistedAssistantFooter: jest.fn(),
+    assistantTailRender,
     logAssistantFinalizationDebug: jest.fn(),
     summarizeChatMessageForDebug: jest.fn().mockImplementation((message: ChatMessage | null | undefined) =>
       message
@@ -148,7 +168,7 @@ function createHost(
           role: message.role,
         }
         : null),
-    ...overrides,
+    ...hostOverrides,
   };
 }
 
@@ -243,8 +263,8 @@ describe('ConversationRenderService', () => {
 
     await service.applySyncedConversationUpdate(previousMessages, nextMessages);
 
-    expect(host.finalizePersistedAssistantFooter).toHaveBeenCalledWith(tailEl, nextMessages[0]);
-    expect(host.renderAssistantMessageContent).not.toHaveBeenCalled();
+    expect(host.assistantTailRender.finalizePersistedFooter).toHaveBeenCalledWith(tailEl, nextMessages[0]);
+    expect(host.assistantTailRender.renderMessageContent).not.toHaveBeenCalled();
     expect(host.renderMessages).not.toHaveBeenCalled();
     expect(tailEl.dataset.messageId).toBe('assistant-2');
   });

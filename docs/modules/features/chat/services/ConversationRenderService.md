@@ -12,7 +12,7 @@
 - 尾部 assistant render patch
 - 无法安全增量时回退 full rerender
 
-它不持有聊天视图的 DOM 根状态，也不直接依赖插件实例；所有真实渲染、scroll runtime、background-task UI 和调试日志都通过 `ConversationRenderHost` 回调回到 `OpenCodianView`。
+它不持有聊天视图的 DOM 根状态，也不直接依赖插件实例；所有真实渲染、scroll runtime、background-task UI 和调试日志都通过 `ConversationRenderHost` 回调回到 `OpenCodianView`。其中 assistant tail 相关的正文签名、正文重渲与 persisted footer 收尾，进一步收束在嵌套的 `ConversationAssistantTailRenderPort`。
 
 ## 公开接口
 
@@ -25,6 +25,16 @@ export interface IncrementalRenderedMessageUpdate {
 export function getIncrementalRenderedMessageUpdate(
   options: IncrementalRenderedMessageUpdateOptions,
 ): IncrementalRenderedMessageUpdate | null;
+
+export interface ConversationAssistantTailRenderPort {
+  getBodySignature(message: ChatMessage): string;
+  renderMessageContent(
+    messageEl: HTMLElement,
+    contentEl: HTMLElement,
+    message: ChatMessage,
+  ): Promise<void>;
+  finalizePersistedFooter(messageEl: HTMLElement, message: ChatMessage): void;
+}
 
 export class ConversationRenderService {
   rerenderConversationMessages(conversation: Conversation): Promise<void>;
@@ -58,10 +68,12 @@ export class ConversationRenderService {
 
 - 只有“rendered message 数量不变、非尾部 visual signature 完全一致、尾部仍是普通 assistant”时才允许 patch
 - assistant 正文签名不变时复用已有正文，只重做 persisted footer 收尾
+- assistant 正文签名计算、正文重渲和 footer finalization 现在统一通过 `host.assistantTailRender` 这组更小的 port 完成
 - 缺失尾部 DOM、内容节点或前缀签名失配时，立即返回 `false` 让上层回退到 full rerender
 
 ## 与 `OpenCodianView` 的边界
 
 - `OpenCodianView` 仍保留 `renderMessage()`、`renderMessages()`、`renderAssistantMessageContent()`、pseudo-stream reveal 和 tab runtime 所有权
+- `OpenCodianView` 会先组装 `ConversationAssistantTailRenderPort`，再把它作为 `ConversationRenderHost` 的 assistant-tail 子边界传给 service
 - `ConversationRenderService` 只负责决定“何时整段重渲、何时 patch 尾部、何时仅追加”
 - 这样消息区编排逻辑首次拥有独立单测边界，而不用把 assistant renderer 一起打散

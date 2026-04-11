@@ -62,6 +62,16 @@ export interface ConversationRenderRuntimeState {
   currentTurnBodyEl: HTMLElement | null;
 }
 
+export interface ConversationAssistantTailRenderPort {
+  getBodySignature(message: ChatMessage): string;
+  renderMessageContent(
+    messageEl: HTMLElement,
+    contentEl: HTMLElement,
+    message: ChatMessage,
+  ): Promise<void>;
+  finalizePersistedFooter(messageEl: HTMLElement, message: ChatMessage): void;
+}
+
 export interface ConversationRenderHost {
   getCurrentConversation(): Conversation | null;
   getMessagesContainer(): HTMLElement | null;
@@ -88,14 +98,8 @@ export interface ConversationRenderHost {
 
   getMessagesForRender(messages: ChatMessage[]): ChatMessage[];
   getMessageVisualSignature(message: ChatMessage): string;
-  getAssistantBodySignature(message: ChatMessage): string;
   shouldPseudoStreamSyncedAssistantMessage(message: ChatMessage): boolean;
-  renderAssistantMessageContent(
-    messageEl: HTMLElement,
-    contentEl: HTMLElement,
-    message: ChatMessage,
-  ): Promise<void>;
-  finalizePersistedAssistantFooter(messageEl: HTMLElement, message: ChatMessage): void;
+  assistantTailRender: ConversationAssistantTailRenderPort;
 
   logAssistantFinalizationDebug(label: string, payload: unknown): void;
   summarizeChatMessageForDebug(message: ChatMessage | null | undefined): Record<string, unknown> | null;
@@ -281,11 +285,18 @@ export class ConversationRenderService {
       } else {
         delete existingTailMessageEl.dataset.sourceMessageId;
       }
-      if (this.host.getAssistantBodySignature(previousTailMessage) === this.host.getAssistantBodySignature(nextTailMessage)) {
-        this.host.finalizePersistedAssistantFooter(existingTailMessageEl, nextTailMessage);
+      if (
+        this.host.assistantTailRender.getBodySignature(previousTailMessage)
+        === this.host.assistantTailRender.getBodySignature(nextTailMessage)
+      ) {
+        this.host.assistantTailRender.finalizePersistedFooter(existingTailMessageEl, nextTailMessage);
       } else {
         existingContentEl.replaceChildren();
-        await this.host.renderAssistantMessageContent(existingTailMessageEl, existingContentEl, nextTailMessage);
+        await this.host.assistantTailRender.renderMessageContent(
+          existingTailMessageEl,
+          existingContentEl,
+          nextTailMessage,
+        );
       }
       existingTailMessageEl.style.animation = 'none';
       if (shouldStickToBottom) {

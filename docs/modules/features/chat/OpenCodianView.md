@@ -150,6 +150,7 @@ interface TabRuntimeState {
 - `applySyncedConversationUpdate()`：先判定是否可增量，再决定 append / tail patch / full rerender
 - `patchTrailingAssistantRender()`：只在前缀 rendered message 完全稳定时 patch 最后一条 assistant
 - `getIncrementalRenderedMessageUpdate()`：作为纯 helper 判断当前 sync 是否还能走 append-only 路径
+- `createConversationAssistantTailRenderPort()`：把 assistant tail 的正文签名、正文重渲和 persisted footer finalization 先收束成更小 port，再挂回 `ConversationRenderHost`
 
 收到服务端新消息后，`applySyncedConversationUpdate()` 会优先尝试：
 
@@ -257,6 +258,7 @@ assistant 渲染里：
 - `contentBlocks` 会按块类型渲染
 - structured assistant 分支由 `renderAssistantStructuredContent()` 消费 `buildQuestionResolutionCardRenderPlan()` 产出的 render plan
 - persisted assistant footer 收尾由 `PersistedAssistantFooterFinalizer.finalizeFooter()` 统一执行；它内部再调用 `buildPersistedAssistantFooterPayload()` 组装 payload，其中 copy-content 继续委托 `resolveAssistantCopyContent()`，interrupted status badge 也由 footer helper 统一判断
+- `ConversationRenderService` 需要 patch 尾部 assistant 时，不再直接抓整块 view host 上的多个独立 callback，而是通过 `ConversationAssistantTailRenderPort` 回到这组 assistant-tail bridge
 - `thinking` 块走 `ThinkingBlockRenderer`
 - `tool_use` 块走 `ToolCallRenderer`
 - `text` 块和普通 `content` 走 `MarkdownRenderService`
