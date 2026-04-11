@@ -114,7 +114,7 @@ import {
   QuestionResolutionCoordinator,
 } from './runtime/QuestionResolutionCoordinator';
 import {
-  appendQuestionResolutionCard,
+  appendQuestionResolutionCardFromRenderPlan,
   buildQuestionResolutionCardRenderPlan,
 } from './runtime/QuestionResolutionCardRenderer';
 import {
@@ -7053,17 +7053,17 @@ export class OpenCodianView extends ItemView {
     message: ChatMessage,
   ): Promise<void> {
     const streamStatusLabel = this.getAssistantStreamStatusLabel(message);
-    const questionResolutionRenderPlan = buildQuestionResolutionCardRenderPlan(
-      message.contentBlocks,
-    );
+    const questionResolutionRenderPlan = buildQuestionResolutionCardRenderPlan({
+      contentBlocks: message.contentBlocks,
+      questionResolution: message.questionResolution,
+      shouldRenderQuestionResolutionCard: this.shouldRenderQuestionResolutionCards(),
+    });
 
     if (questionResolutionRenderPlan.hasContentBlocks) {
       for (const block of questionResolutionRenderPlan.blocksBeforeCard) {
         await this.renderContentBlock(content, block);
       }
-      if (message.questionResolution && this.shouldRenderQuestionResolutionCards()) {
-        appendQuestionResolutionCard(content, message.questionResolution);
-      }
+      appendQuestionResolutionCardFromRenderPlan(content, questionResolutionRenderPlan);
       for (const block of questionResolutionRenderPlan.blocksAfterCard) {
         await this.renderContentBlock(content, block);
       }
@@ -7078,9 +7078,7 @@ export class OpenCodianView extends ItemView {
       return;
     }
 
-    if (message.questionResolution && this.shouldRenderQuestionResolutionCards()) {
-      appendQuestionResolutionCard(content, message.questionResolution);
-    }
+    appendQuestionResolutionCardFromRenderPlan(content, questionResolutionRenderPlan);
 
     if (message.content) {
       const textEl = content.createDiv({ cls: 'opencodian-message-text' });

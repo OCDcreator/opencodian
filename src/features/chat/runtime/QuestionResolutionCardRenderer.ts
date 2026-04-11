@@ -11,6 +11,7 @@ export interface QuestionResolutionCardRenderPlan {
   hasContentBlocks: boolean;
   blocksBeforeCard: ContentBlock[];
   blocksAfterCard: ContentBlock[];
+  resolvedCardResolution: QuestionResolution | null;
 }
 
 export function populateQuestionResolutionCard(
@@ -75,14 +76,38 @@ export function appendQuestionResolutionCard(
   return cardEl;
 }
 
+export function appendQuestionResolutionCardFromRenderPlan(
+  parentEl: HTMLElement,
+  renderPlan: QuestionResolutionCardRenderPlan,
+): HTMLElement | null {
+  if (!renderPlan.resolvedCardResolution) {
+    return null;
+  }
+
+  return appendQuestionResolutionCard(parentEl, renderPlan.resolvedCardResolution);
+}
+
 export function buildQuestionResolutionCardRenderPlan(
-  contentBlocks?: ContentBlock[],
+  {
+    contentBlocks,
+    questionResolution = null,
+    shouldRenderQuestionResolutionCard = false,
+  }: {
+    contentBlocks?: ContentBlock[];
+    questionResolution?: QuestionResolution | null;
+    shouldRenderQuestionResolutionCard?: boolean;
+  } = {},
 ): QuestionResolutionCardRenderPlan {
+  const resolvedCardResolution = shouldRenderQuestionResolutionCard
+    ? questionResolution
+    : null;
+
   if (!contentBlocks || contentBlocks.length === 0) {
     return {
       hasContentBlocks: false,
       blocksBeforeCard: [],
       blocksAfterCard: [],
+      resolvedCardResolution,
     };
   }
 
@@ -100,6 +125,7 @@ export function buildQuestionResolutionCardRenderPlan(
     hasContentBlocks: true,
     blocksBeforeCard,
     blocksAfterCard,
+    resolvedCardResolution,
   };
 }
 

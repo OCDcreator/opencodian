@@ -254,7 +254,7 @@ assistant 渲染里：
 - `thinking` 块走 `ThinkingBlockRenderer`
 - `tool_use` 块走 `ToolCallRenderer`
 - `text` 块和普通 `content` 走 `MarkdownRenderService`
-- 已解析的 `questionResolution` 会根据设置插入持久化 resolved card，而前后块顺序由 `buildQuestionResolutionCardRenderPlan()` 决定、DOM 创建由 `appendQuestionResolutionCard()` 负责
+- 已解析的 `questionResolution` 会先经 `buildQuestionResolutionCardRenderPlan()` 折叠成 render plan，再由 `appendQuestionResolutionCardFromRenderPlan()` 在允许显示时插入持久化 resolved card
 
 ### 模型选择器拆分
 

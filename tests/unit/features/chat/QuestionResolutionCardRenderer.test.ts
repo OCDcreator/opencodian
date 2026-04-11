@@ -2,6 +2,7 @@ import type { QuestionRequest, QuestionResolution } from '../../../../src/core/t
 import { t } from '../../../../src/i18n';
 import {
   appendQuestionResolutionCard,
+  appendQuestionResolutionCardFromRenderPlan,
   buildQuestionResolutionCardRenderPlan,
   buildQuestionAnswerMarkdown,
   buildQuestionRejectedMarkdown,
@@ -90,12 +91,24 @@ describe('QuestionResolutionCardRenderer', () => {
   });
 
   it('splits structured assistant blocks around the resolved card insertion point', () => {
-    const renderPlan = buildQuestionResolutionCardRenderPlan([
-      { type: 'text', text: 'Final answer' },
-      { type: 'thinking', thinking: 'Reasoning' },
-      { type: 'tool_use', toolName: 'search' },
-      { type: 'text', text: 'Follow-up detail' },
-    ]);
+    const resolution: QuestionResolution = {
+      request: createQuestionRequest(),
+      status: 'answered',
+      answers: [
+        ['TypeScript'],
+        ['Windows'],
+      ],
+    };
+    const renderPlan = buildQuestionResolutionCardRenderPlan({
+      contentBlocks: [
+        { type: 'text', text: 'Final answer' },
+        { type: 'thinking', thinking: 'Reasoning' },
+        { type: 'tool_use', toolName: 'search' },
+        { type: 'text', text: 'Follow-up detail' },
+      ],
+      questionResolution: resolution,
+      shouldRenderQuestionResolutionCard: true,
+    });
 
     expect(renderPlan.hasContentBlocks).toBe(true);
     expect(renderPlan.blocksBeforeCard).toEqual([
@@ -106,6 +119,7 @@ describe('QuestionResolutionCardRenderer', () => {
       { type: 'text', text: 'Final answer' },
       { type: 'text', text: 'Follow-up detail' },
     ]);
+    expect(renderPlan.resolvedCardResolution).toEqual(resolution);
   });
 
   it('returns an empty render plan when structured blocks are missing', () => {
@@ -113,7 +127,30 @@ describe('QuestionResolutionCardRenderer', () => {
       hasContentBlocks: false,
       blocksBeforeCard: [],
       blocksAfterCard: [],
+      resolvedCardResolution: null,
     });
+  });
+
+  it('keeps the persisted resolved card hidden when the visibility gate is off', () => {
+    const renderPlan = buildQuestionResolutionCardRenderPlan({
+      questionResolution: {
+        request: createQuestionRequest(),
+        status: 'answered',
+        answers: [
+          ['TypeScript'],
+          ['Windows'],
+        ],
+      },
+      shouldRenderQuestionResolutionCard: false,
+    });
+    const parentEl = document.createElement('div');
+    document.body.appendChild(parentEl);
+
+    const cardEl = appendQuestionResolutionCardFromRenderPlan(parentEl, renderPlan);
+
+    expect(renderPlan.resolvedCardResolution).toBeNull();
+    expect(cardEl).toBeNull();
+    expect(parentEl.querySelector('.opencodian-question-inline--resolved')).toBeNull();
   });
 
   it('renders rejected question summaries and builds matching markdown', () => {
