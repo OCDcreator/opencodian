@@ -281,6 +281,11 @@ type TrailingAssistantPatchSkippedDebugLogPlan = {
   payload: Record<string, unknown>;
 };
 
+type TrailingAssistantPatchSkippedDebugLogPlanningContextContract = {
+  payloadInputs: TrailingAssistantPatchSkippedDebugPayloadInputs;
+  tabId: TabId | null;
+};
+
 type TrailingAssistantPatchSkippedDebugLogPlanningContext = {
   payloadInputs: TrailingAssistantPatchSkippedDebugPayloadInputs;
   tabId: TabId | null;
@@ -1421,7 +1426,28 @@ export class ConversationRenderService {
   private buildTrailingAssistantPatchSkippedDebugLogPlanningContextFromLoggingContext(
     loggingContext: TrailingAssistantPatchSkippedDebugLoggingContext,
   ): TrailingAssistantPatchSkippedDebugLogPlanningContext {
+    const planningContextContract =
+      this.buildTrailingAssistantPatchSkippedDebugLogPlanningContextContractFromLoggingContext(
+        loggingContext,
+      );
     return this.buildTrailingAssistantPatchSkippedDebugLogPlanningContext(
+      planningContextContract,
+    );
+  }
+
+  private buildTrailingAssistantPatchSkippedDebugLogPlanningContext(
+    planningContextContract: TrailingAssistantPatchSkippedDebugLogPlanningContextContract,
+  ): TrailingAssistantPatchSkippedDebugLogPlanningContext {
+    return {
+      payloadInputs: planningContextContract.payloadInputs,
+      tabId: planningContextContract.tabId,
+    };
+  }
+
+  private buildTrailingAssistantPatchSkippedDebugLogPlanningContextContractFromLoggingContext(
+    loggingContext: TrailingAssistantPatchSkippedDebugLoggingContext,
+  ): TrailingAssistantPatchSkippedDebugLogPlanningContextContract {
+    return this.buildTrailingAssistantPatchSkippedDebugLogPlanningContextContract(
       this.buildTrailingAssistantPatchSkippedDebugPayloadInputsFromLoggingContext(
         loggingContext,
       ),
@@ -1429,10 +1455,10 @@ export class ConversationRenderService {
     );
   }
 
-  private buildTrailingAssistantPatchSkippedDebugLogPlanningContext(
+  private buildTrailingAssistantPatchSkippedDebugLogPlanningContextContract(
     payloadInputs: TrailingAssistantPatchSkippedDebugPayloadInputs,
     tabId: TabId | null,
-  ): TrailingAssistantPatchSkippedDebugLogPlanningContext {
+  ): TrailingAssistantPatchSkippedDebugLogPlanningContextContract {
     return {
       payloadInputs,
       tabId,
