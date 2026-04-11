@@ -152,6 +152,11 @@ type TrailingAssistantPatchCompletionDebugLogPlan = {
   payload: Record<string, unknown>;
 };
 
+type TrailingAssistantPatchCompletionDebugLoggingContext = {
+  completionDebugPlan: TrailingAssistantPatchCompletionDebugPlan;
+  tabId: TabId | null;
+};
+
 type TrailingAssistantPatchNonMergeableTailFailurePlan = {
   reason: 'tail-message-not-mergeable-assistant';
   payload: {
@@ -502,7 +507,12 @@ export class ConversationRenderService {
       this.applyTrailingAssistantPatchTailState(successPlan.tailStatePlan, tabId);
     });
 
-    this.logTrailingAssistantPatchCompletionDebug(successPlan.completionDebugPlan, tabId);
+    const completionDebugLoggingContext =
+      this.buildTrailingAssistantPatchCompletionDebugLoggingContext(
+        successPlan.completionDebugPlan,
+        tabId,
+      );
+    this.logTrailingAssistantPatchCompletionDebug(completionDebugLoggingContext);
     return true;
   }
 
@@ -1058,26 +1068,33 @@ export class ConversationRenderService {
   }
 
   private logTrailingAssistantPatchCompletionDebug(
-    completionDebugPlan: TrailingAssistantPatchCompletionDebugPlan,
-    tabId: TabId | null,
+    loggingContext: TrailingAssistantPatchCompletionDebugLoggingContext,
   ): void {
-    const logPlan = this.buildTrailingAssistantPatchCompletionDebugLogPlan(
-      completionDebugPlan,
-      tabId,
-    );
+    const logPlan = this.buildTrailingAssistantPatchCompletionDebugLogPlan(loggingContext);
     this.host.logAssistantFinalizationDebug(logPlan.label, logPlan.payload);
   }
 
-  private buildTrailingAssistantPatchCompletionDebugLogPlan(
+  private buildTrailingAssistantPatchCompletionDebugLoggingContext(
     completionDebugPlan: TrailingAssistantPatchCompletionDebugPlan,
     tabId: TabId | null,
+  ): TrailingAssistantPatchCompletionDebugLoggingContext {
+    return {
+      completionDebugPlan,
+      tabId,
+    };
+  }
+
+  private buildTrailingAssistantPatchCompletionDebugLogPlan(
+    loggingContext: TrailingAssistantPatchCompletionDebugLoggingContext,
   ): TrailingAssistantPatchCompletionDebugLogPlan {
     const payloadPlan =
-      this.buildTrailingAssistantPatchCompletionDebugPayloadPlan(completionDebugPlan);
+      this.buildTrailingAssistantPatchCompletionDebugPayloadPlan(
+        loggingContext.completionDebugPlan,
+      );
     return {
       label: 'patch-trailing-assistant-render-complete',
       payload: {
-        tabId,
+        tabId: loggingContext.tabId,
         ...payloadPlan,
       },
     };
