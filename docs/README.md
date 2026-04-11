@@ -10,7 +10,7 @@
   - 按 `src/**/*.ts` 映射的模块文档入口。代码行为变更时，优先更新这里。
 - `status/`
   - 当前 rollout、迁移状态和手工验收清单。
-  - 也放阶段性维护/重构说明，例如 `status/maintainability-phase-1.md`。
+  - 也放阶段性维护/重构说明，例如 `status/maintainability-phase-1.md`、`status/maintainability-phase-3.md`。
 - `requirements/`
   - 仍有维护价值的功能需求、实现状态和产品约束说明。
 - `reference/`

@@ -115,7 +115,20 @@ import {
 } from './ui/ContextFilePickerModal';
 import { ContextRing } from './ui/ContextRing';
 import { EffortSelector } from './ui/EffortSelector';
-import { bindModelSelectorStickyHeaders } from './ui/modelSelectorStickyHeaders';
+import { buildModelSelectorDisplayState } from './ui/modelSelector/ModelSelectorDisplay';
+import {
+  highlightModelOption as highlightRenderedModelOption,
+  navigateModelList as navigateRenderedModelList,
+  scrollToCurrentModel as scrollRenderedCurrentModel,
+  selectHighlightedModel as selectRenderedHighlightedModel,
+} from './ui/modelSelector/ModelSelectorInteractions';
+import { renderModelList as renderModelSelectorList } from './ui/modelSelector/ModelSelectorRenderer';
+import type {
+  ModelSelectorAvailableModelInfo,
+  ModelSelectorKnownModelInfo,
+  ModelSelectorProvider,
+  ModelSelectorSelection,
+} from './ui/modelSelector/types';
 import { NavigationSidebar } from './ui/NavigationSidebar';
 import { QuestionDock } from './ui/QuestionDock';
 import {
@@ -593,8 +606,8 @@ export class OpenCodianView extends ItemView {
   private modelSelectorSearchInput: HTMLInputElement | null = null;
   private modelSelectorScrollContainer: HTMLElement | null = null;
   private disposeModelSelectorStickyHeaders: (() => void) | null = null;
-  private availableModels: Array<{ provider: string; model: string; label: string; providerName: string; modelName: string; contextWindow?: number }> = [];
-  private availableProviders: Array<{ id: string; name: string; models: Array<{ id: string; name: string; contextWindow?: number }> }> = [];
+  private availableModels: ModelSelectorAvailableModelInfo[] = [];
+  private availableProviders: ModelSelectorProvider[] = [];
   private modelCatalogBundle: ModelCatalogBundle | null = null;
   private hasLoadedModelCatalog = false;
   private isModelDropdownOpen = false;
@@ -10526,21 +10539,7 @@ export class OpenCodianView extends ItemView {
       cls: 'opencodian-model-dropdown-scroll'
     });
 
-    // Don't render list here - wait for models to load
-    // Initial render will show loading state
-    this.renderLoadingState();
-  }
-
-  /** Render loading state */
-  private renderLoadingState(): void {
-    if (!this.modelSelectorScrollContainer) return;
-
-    this.modelSelectorScrollContainer.empty();
-
-    const loading = this.modelSelectorScrollContainer.createDiv({
-      cls: 'opencodian-model-dropdown-loading'
-    });
-    loading.setText('Loading models...');
+    this.renderModelList();
   }
 
   /** Toggle dropdown visibility */
@@ -10604,175 +10603,65 @@ export class OpenCodianView extends ItemView {
   private renderModelList(): void {
     if (!this.modelSelectorScrollContainer) return;
 
-    this.disposeModelSelectorStickyHeaders?.();
-    this.disposeModelSelectorStickyHeaders = null;
-    this.modelSelectorScrollContainer.empty();
-
-    // Check if models are still loading
-    if (this.availableProviders.length === 0) {
-      if (!this.hasLoadedModelCatalog) {
-        this.renderLoadingState();
-      } else {
-        const emptyState = this.modelSelectorScrollContainer.createDiv({
-          cls: 'opencodian-model-dropdown-empty',
-        });
-        emptyState.setText(t('settings.model.noModels'));
-      }
-      return;
-    }
-
-    // Filter models
-    const filteredProviders = this.availableProviders
-      .map(provider => ({
-        ...provider,
-        models: provider.models.filter(model =>
-          model.name.toLowerCase().includes(this.modelFilterQuery) ||
-          provider.name.toLowerCase().includes(this.modelFilterQuery)
-        )
-      }))
-      .filter(provider => provider.models.length > 0);
-
-    if (filteredProviders.length === 0) {
-      const emptyState = this.modelSelectorScrollContainer.createDiv({
-        cls: 'opencodian-model-dropdown-empty'
-      });
-      emptyState.setText(this.modelFilterQuery ? 'No models found' : 'No models available');
-      return;
-    }
-
-    const current = this.getCurrentSessionModel();
-
-    // Create all groups in a single container for proper scrolling
-    const groupsContainer = this.modelSelectorScrollContainer.createDiv({
-      cls: 'opencodian-model-groups'
+    const highlightedValue = this.modelSelectorScrollContainer
+      .querySelector<HTMLElement>('.opencodian-model-option.is-highlighted')
+      ?.dataset.value ?? null;
+    const renderResult = renderModelSelectorList({
+      scrollContainer: this.modelSelectorScrollContainer,
+      providers: this.availableProviders,
+      hasLoadedModelCatalog: this.hasLoadedModelCatalog,
+      filterQuery: this.modelFilterQuery,
+      currentSelection: this.getCurrentSessionModel(),
+      highlightedValue,
+      previousStickyHeadersCleanup: this.disposeModelSelectorStickyHeaders,
+      texts: {
+        loading: 'Loading models...',
+        noModels: t('settings.model.noModels'),
+        noModelsFound: 'No models found',
+        noModelsAvailable: 'No models available',
+      },
+      onSelect: (provider, model) => {
+        this.switchModel(provider, model);
+        this.closeModelDropdown();
+      },
+      onHighlight: (value) => {
+        this.highlightModelOption(value);
+      },
     });
 
-    // Track headers for stuck effect
-    const headers: HTMLElement[] = [];
-
-    // Create provider groups
-    for (const provider of filteredProviders) {
-      // Group container
-      const groupEl = groupsContainer.createDiv({
-        cls: 'opencodian-model-group'
-      });
-
-      // Provider header (sticky)
-      const header = groupEl.createDiv({
-        cls: 'opencodian-model-provider-header'
-      });
-      header.setText(provider.name);
-
-      // Setup stuck detection for this header
-      headers.push(header);
-
-      // Models for this provider
-      for (const model of provider.models) {
-        const isSelected = current?.provider === provider.id && current?.model === model.id;
-        const modelValue = `${provider.id}::${model.id}`;
-
-        const modelOption = groupEl.createDiv({
-          cls: 'opencodian-model-option',
-          attr: { 'data-value': modelValue }
-        });
-
-        if (isSelected) {
-          modelOption.addClass('is-selected');
-        }
-
-        // Model name
-        const nameSpan = modelOption.createSpan({ cls: 'opencodian-model-option-name' });
-        nameSpan.setText(model.name);
-
-        // Checkmark for selected model
-        const checkmark = modelOption.createSpan({ cls: 'opencodian-model-option-check' });
-        setIcon(checkmark, 'check');
-
-        // Click handler
-        modelOption.addEventListener('click', (e) => {
-          e.stopPropagation();
-          this.switchModel(provider.id, model.id);
-          this.closeModelDropdown();
-        });
-
-        // Hover handler for keyboard navigation
-        modelOption.addEventListener('mouseenter', () => {
-          this.highlightModelOption(modelValue);
-        });
-      }
-    }
-
-    this.disposeModelSelectorStickyHeaders = bindModelSelectorStickyHeaders(
-      this.modelSelectorScrollContainer,
-      headers,
-    );
+    this.disposeModelSelectorStickyHeaders = renderResult.disposeStickyHeaders;
   }
 
   /** Navigate model list with keyboard */
   private navigateModelList(direction: 1 | -1): void {
     if (!this.modelSelectorScrollContainer) return;
-
-    const options = Array.from(this.modelSelectorScrollContainer.querySelectorAll('.opencodian-model-option'));
-    if (options.length === 0) return;
-
-    const currentIndex = options.findIndex(opt => opt.hasClass('is-highlighted'));
-    let nextIndex = currentIndex + direction;
-
-    if (nextIndex < 0) nextIndex = 0;
-    if (nextIndex >= options.length) nextIndex = options.length - 1;
-
-    if (currentIndex >= 0) {
-      options[currentIndex].removeClass('is-highlighted');
-    }
-    options[nextIndex].addClass('is-highlighted');
-
-    // Scroll into view
-    options[nextIndex].scrollIntoView({ block: 'nearest' });
+    navigateRenderedModelList(this.modelSelectorScrollContainer, direction);
   }
 
   /** Highlight a specific model option */
   private highlightModelOption(value: string): void {
     if (!this.modelSelectorScrollContainer) return;
-
-    this.modelSelectorScrollContainer.querySelectorAll('.opencodian-model-option').forEach(opt => {
-      opt.removeClass('is-highlighted');
-    });
-
-    const option = this.modelSelectorScrollContainer.querySelector(`[data-value="${value}"]`);
-    if (option) {
-      option.addClass('is-highlighted');
-    }
+    highlightRenderedModelOption(this.modelSelectorScrollContainer, value);
   }
 
   /** Select currently highlighted model */
   private selectHighlightedModel(): void {
     if (!this.modelSelectorScrollContainer) return;
-
-    const highlighted = this.modelSelectorScrollContainer.querySelector('.opencodian-model-option.is-highlighted');
-    if (highlighted) {
-      const value = highlighted.getAttribute('data-value');
-      if (value) {
-        const [provider, model] = value.split('::');
+    const didSelect = selectRenderedHighlightedModel(
+      this.modelSelectorScrollContainer,
+      (provider, model) => {
         this.switchModel(provider, model);
-        this.closeModelDropdown();
-      }
+      },
+    );
+    if (didSelect) {
+      this.closeModelDropdown();
     }
   }
 
   /** Scroll to current model in dropdown */
   private scrollToCurrentModel(): void {
     if (!this.modelSelectorScrollContainer) return;
-
-    const current = this.getCurrentSessionModel();
-    if (!current) {
-      return;
-    }
-    const currentValue = `${current.provider}::${current.model}`;
-
-    const currentEl = this.modelSelectorScrollContainer.querySelector(`[data-value="${currentValue}"]`) as HTMLElement;
-    if (currentEl) {
-      currentEl.scrollIntoView({ block: 'center' });
-    }
+    scrollRenderedCurrentModel(this.modelSelectorScrollContainer, this.getCurrentSessionModel());
   }
 
   public async reloadModelCatalog(): Promise<void> {
@@ -10836,37 +10725,26 @@ export class OpenCodianView extends ItemView {
 
     if (!this.modelSelectorTrigger) return;
 
-    // Find model info from available models
     const modelInfo = this.findKnownModelInfo(current);
-    this.modelSelectorTrigger.toggleClass('is-unavailable', resolution.status === 'unavailable');
-    this.modelSelectorTrigger.toggleClass('is-unconfigured', !current);
+    const displayState = buildModelSelectorDisplayState({
+      currentSelection: current,
+      resolution,
+      knownModelInfo: modelInfo,
+      hasLoadedModelCatalog: this.hasLoadedModelCatalog,
+      availableProviderCount: this.availableProviders.length,
+      unavailableTitle: this.getModelUnavailableNoticeContent().message,
+      unconfiguredLabel: t('settings.model.unconfigured'),
+    });
+    this.modelSelectorTrigger.toggleClass('is-unavailable', displayState.isUnavailable);
+    this.modelSelectorTrigger.toggleClass('is-unconfigured', displayState.isUnconfigured);
 
-    // Update text
     const textEl = this.modelSelectorTrigger.querySelector('.opencodian-model-trigger-text');
     if (textEl) {
-      textEl.textContent = current
-        ? (modelInfo?.modelName || resolution.modelName || current.model)
-        : t('settings.model.unconfigured');
+      textEl.textContent = displayState.text;
     }
 
-    const emptyStateTitle = this.hasLoadedModelCatalog && this.availableProviders.length === 0
-      ? this.getModelUnavailableNoticeContent().message
-      : t('settings.model.unconfigured');
-
-    this.modelSelectorTrigger.setAttribute(
-      'title',
-      resolution.status === 'unavailable'
-        ? t('chat.notice.modelUnavailable.selectedBody')
-        : current
-          ? formatModelReference(
-              modelInfo?.providerName || resolution.providerName || current.provider,
-              modelInfo?.modelName || resolution.modelName || current.model,
-            )
-          : emptyStateTitle,
-    );
-
-    const iconLabel = modelInfo?.providerName || resolution.providerName || current?.provider || t('settings.model.unconfigured');
-    void this.updateModelSelectorIcon(current?.provider ?? null, iconLabel);
+    this.modelSelectorTrigger.setAttribute('title', displayState.title);
+    void this.updateModelSelectorIcon(current?.provider ?? null, displayState.iconLabel);
 
     this.effortSelector?.updateDisplay();
   }
@@ -10923,7 +10801,7 @@ export class OpenCodianView extends ItemView {
   }
 
   /** Get current model for this session */
-  private getCurrentSessionModel(): { provider: string; model: string } | null {
+  private getCurrentSessionModel(): ModelSelectorSelection | null {
     const requestedModel = this.getRequestedSessionModel();
     if (!this.hasLoadedModelCatalog || !this.modelCatalogBundle) {
       return requestedModel;
@@ -10944,7 +10822,7 @@ export class OpenCodianView extends ItemView {
     };
   }
 
-  private getRequestedSessionModel(): { provider: string; model: string } | null {
+  private getRequestedSessionModel(): ModelSelectorSelection | null {
     const override = this.tabManager?.getActiveTabModelOverride() ?? null;
     if (override) {
       return override;
@@ -10989,8 +10867,8 @@ export class OpenCodianView extends ItemView {
   }
 
   private findKnownModelInfo(
-    selection: { provider: string; model: string } | null,
-  ): { providerName?: string; modelName?: string; contextWindow?: number } | null {
+    selection: ModelSelectorSelection | null,
+  ): ModelSelectorKnownModelInfo | null {
     if (!selection) {
       return null;
     }
@@ -11018,7 +10896,7 @@ export class OpenCodianView extends ItemView {
   }
 
   private formatModelId(
-    model: { provider?: string; model?: string } | null | undefined,
+    model: Partial<ModelSelectorSelection> | null | undefined,
   ): string | undefined {
     if (!model?.provider || !model.model) {
       return undefined;

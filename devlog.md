@@ -12,6 +12,47 @@
 
 ---
 
+## 2026-04-11 可维护性第三阶段 model selector 拆分与第四阶段交接
+
+### 🎯 改动目标
+
+- 继续沿着第一、第二阶段已建立的 helper / service / 测试边界，逐步拆分 `src/features/chat/OpenCodianView.ts`
+- 优先处理第三阶段里边界最清晰、风险最低的 model selector UI 逻辑
+- 产出可直接带到新会话的第三阶段总结文档，并在文末给出第四阶段实施方案和提示词
+
+### ✅ 本轮调整
+
+- `src/features/chat/ui/modelSelector/types.ts`
+- `src/features/chat/ui/modelSelector/ModelSelectorRenderer.ts`
+- `src/features/chat/ui/modelSelector/ModelSelectorInteractions.ts`
+- `src/features/chat/ui/modelSelector/ModelSelectorDisplay.ts`
+- `src/features/chat/OpenCodianView.ts`
+  - 新增 model selector 子模块，分别承接共享类型、列表渲染、键盘/高亮交互和 trigger display state 推导
+  - `OpenCodianView` 中的 `renderModelList()`、`navigateModelList()`、`highlightModelOption()`、`selectHighlightedModel()`、`scrollToCurrentModel()`、`updateModelSelectorDisplay()` 已收薄为装配/包装入口
+  - 继续把 catalog loading、provider icon 异步解析、tab model override 与 context usage identity 刷新保留在 view 内，避免为了“多挪几行”而制造第二个巨型模块
+
+- `tests/unit/features/chat/modelSelectorRenderer.test.ts`
+- `tests/unit/features/chat/modelSelectorInteractions.test.ts`
+- `tests/unit/features/chat/modelSelectorDisplay.test.ts`
+  - 新增 model selector 单测，覆盖 loading / empty state、provider 分组渲染、sticky-header cleanup 重绑、键盘高亮、选中当前高亮项、滚动当前模型到可见区域，以及 trigger display state 推导
+
+- `docs/status/maintainability-phase-3.md`
+- `docs/modules/features/chat/OpenCodianView.md`
+- `docs/modules/features/chat/ui/modelSelector/*.md`
+- `docs/modules/README.md`
+- `docs/README.md`
+  - 新增第三阶段总结与第四阶段实施说明文档
+  - 同步更新 `OpenCodianView` 模块文档和 model selector 子模块文档
+  - 在 docs 入口中补充最新阶段文档示例
+
+### 🧪 验证结果
+
+- `npm run lint` 通过（保留仓库既有 warning 基线）
+- `npm run typecheck` 通过
+- `npm run test` 通过（72 个 test suites，577 个 tests）
+- `npm run build` 通过
+- 已部署到 Test Vault，并校验 `BUILD_ID = main.202604111323`
+
 ## 2026-04-11 可维护性第二阶段装载编排提取与第三阶段交接
 
 ### 🎯 改动目标

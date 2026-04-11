@@ -209,11 +209,23 @@ assistant 渲染里：
 - `thinking` 块走 `ThinkingBlockRenderer`
 - `tool_use` 块走 `ToolCallRenderer`
 - `text` 块和普通 `content` 走 `MarkdownRenderService`
-
-### 模型选择器粘性表头
-
-provider header 的 stuck 状态同步已转移到 `ui/modelSelectorStickyHeaders.ts`。`OpenCodianView` 在每次重绘模型列表前都会先 dispose 旧监听器，再绑定新列表，避免继续把 listener 挂到 DOM 私有属性上。
 - 已解析的 `questionResolution` 会根据设置插入 resolved card
+
+### 模型选择器拆分
+
+model selector 现在拆成了几层协作：
+
+- `ui/modelSelector/ModelSelectorRenderer.ts`：下拉列表的 loading / empty / provider group / option DOM 渲染
+- `ui/modelSelector/ModelSelectorInteractions.ts`：高亮、键盘导航、选中高亮项、滚动当前模型到可见区域
+- `ui/modelSelector/ModelSelectorDisplay.ts`：trigger text / title / class 所需 display state 推导
+- `ui/modelSelector/types.ts`：共享输入/输出类型
+- `ui/modelSelectorStickyHeaders.ts`：provider header 的 stuck 监听绑定与 cleanup
+
+`OpenCodianView` 现在保留：
+
+- dropdown 容器、搜索框和 trigger 的真实 DOM
+- catalog 加载、tab model override、provider icon 异步解析
+- `switchModel()`、`reloadModelCatalog()`、`syncActiveTabContextUsageIdentity()` 等视图级副作用
 
 用户消息渲染里：
 
@@ -267,7 +279,7 @@ provider header 的 stuck 状态同步已转移到 `ui/modelSelectorStickyHeader
 - 每个 tab 的 model override
 - 保留 disabled / unavailable 模型的展示元数据，不把它们简单抹掉
 - 会优先解析当前 tab 请求的模型；若它已被开关链路过滤，则自动回退到同 provider 默认模型 / 当前 effective catalog 的其他可用模型
-- 当 effective catalog 为空时，trigger 会回退到默认机器人图标并突出显示“未配置”
+- 当 effective catalog 为空时，trigger 会回退到默认机器人图标，并保留空 catalog 对应的 tooltip 文案
 
 ## 直接协作模块
 
@@ -279,6 +291,7 @@ provider header 的 stuck 状态同步已转移到 `ui/modelSelectorStickyHeader
 - `ContextUsageService`：context usage state 维护
 - `TitleGenerationService`：AI 标题生成
 - `composerContext`、`renderGroups`、`collapsible`、`forkMessages`
+- `ui/modelSelector/*`：模型选择器列表渲染、交互和 trigger display state
 - `ContextRing`、`QuestionDock`、`SessionTodoDock`、`NavigationSidebar`、`EffortSelector`
 
 ## 主要设置依赖
