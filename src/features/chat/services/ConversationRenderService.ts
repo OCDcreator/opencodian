@@ -187,6 +187,12 @@ type TrailingAssistantPatchSkippedDebugPlanningContext = {
   tabId: TabId | null;
 };
 
+type TrailingAssistantPatchSkippedDebugLoggingContext = {
+  planningContext: TrailingAssistantPatchSkippedDebugPlanningContext;
+  reason: string;
+  payload: Record<string, unknown>;
+};
+
 type TrailingAssistantPatchTurnBodyScopeInputs = {
   runtime: ConversationRenderRuntimeState | null;
   parentEl: HTMLElement;
@@ -495,7 +501,13 @@ export class ConversationRenderService {
       tabId,
     );
     const fail = (reason: string, payload: Record<string, unknown> = {}): false => {
-      this.logTrailingAssistantPatchSkippedDebug(skippedDebugPlanningContext, reason, payload);
+      const skippedDebugLoggingContext =
+        this.buildTrailingAssistantPatchSkippedDebugLoggingContext(
+          skippedDebugPlanningContext,
+          reason,
+          payload,
+        );
+      this.logTrailingAssistantPatchSkippedDebug(skippedDebugLoggingContext);
       return false;
     };
     const preflight = this.resolveTrailingAssistantPatchPreflight(
@@ -1138,35 +1150,40 @@ export class ConversationRenderService {
     };
   }
 
-  private logTrailingAssistantPatchSkippedDebug(
+  private buildTrailingAssistantPatchSkippedDebugLoggingContext(
     planningContext: TrailingAssistantPatchSkippedDebugPlanningContext,
     reason: string,
     payload: Record<string, unknown>,
-  ): void {
-    const logPlan = this.buildTrailingAssistantPatchSkippedDebugLogPlan(
+  ): TrailingAssistantPatchSkippedDebugLoggingContext {
+    return {
       planningContext,
       reason,
       payload,
-    );
+    };
+  }
+
+  private logTrailingAssistantPatchSkippedDebug(
+    loggingContext: TrailingAssistantPatchSkippedDebugLoggingContext,
+  ): void {
+    const logPlan =
+      this.buildTrailingAssistantPatchSkippedDebugLogPlan(loggingContext);
     this.host.logAssistantFinalizationDebug(logPlan.label, logPlan.payload);
   }
 
   private buildTrailingAssistantPatchSkippedDebugLogPlan(
-    planningContext: TrailingAssistantPatchSkippedDebugPlanningContext,
-    reason: string,
-    payload: Record<string, unknown>,
+    loggingContext: TrailingAssistantPatchSkippedDebugLoggingContext,
   ): TrailingAssistantPatchSkippedDebugLogPlan {
     const countPlan = this.buildTrailingAssistantPatchSkippedDebugCountPlan(
-      planningContext.previousMessages,
-      planningContext.nextMessages,
+      loggingContext.planningContext.previousMessages,
+      loggingContext.planningContext.nextMessages,
     );
     const payloadPlan = this.buildTrailingAssistantPatchSkippedDebugPayloadPlan(
-      reason,
-      payload,
+      loggingContext.reason,
+      loggingContext.payload,
       countPlan,
     );
     return this.buildTrailingAssistantPatchSkippedDebugFinalLogPlan(
-      planningContext,
+      loggingContext.planningContext,
       payloadPlan,
     );
   }
