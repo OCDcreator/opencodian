@@ -88,7 +88,7 @@ export class ConversationRenderService {
 - completion / skipped 两条路径最后剩下的 logging-context builder 已迁到 `TrailingAssistantPatchDebugLoggingContextHelper`，对应的 log-plan builder 与最终日志发送包装也已分别抽到 `TrailingAssistantPatchDebugLogPlanHelper` 和 `TrailingAssistantPatchDebugLogEmitterHelper`
 - service 现在只在失败/成功点构造 logging context，并把最终 debug logging 发送交给 emitter helper
 - assistant 正文签名不变时复用已有正文，只重做 persisted footer 收尾
-- patch 成功后的 message dataset 刷新、动画禁用与按需 scroll-to-bottom，现会先预计算成更窄的 `tailStatePlan` 再交给 tail-apply helper，避免这些副作用继续读取整份 `successPlan`
+- patch 成功后的 message dataset 刷新、动画禁用与按需 scroll-to-bottom，现会先预计算成更窄的 `tailStatePlan`，再交给独立的 `TrailingAssistantPatchTailStateApplierHelper`，让 service 更接近只保留 patch 控制流
 - assistant 正文签名计算、正文重渲和 footer finalization 现在统一通过 `host.assistantTailRender` 这组更小的 port 完成
 - 缺失尾部 DOM、内容节点或前缀签名失配时，立即返回 `false` 让上层回退到 full rerender
 

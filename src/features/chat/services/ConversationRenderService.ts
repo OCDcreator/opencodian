@@ -13,6 +13,10 @@ import {
   emitTrailingAssistantPatchSkippedDebugLog,
 } from './TrailingAssistantPatchDebugLogEmitterHelper';
 import {
+  applyTrailingAssistantPatchTailState,
+  type TrailingAssistantPatchTailStatePlan,
+} from './TrailingAssistantPatchTailStateApplierHelper';
+import {
   captureElementScrollRestoreSnapshot,
   isElementNearBottom,
   restoreElementScrollAfterRender,
@@ -131,13 +135,6 @@ type TrailingAssistantPatchExecutionPlan =
     contentEl: HTMLElement;
     nextTailMessage: ChatMessage;
   };
-
-type TrailingAssistantPatchTailStatePlan = {
-  messageEl: HTMLElement;
-  messageId: string;
-  sourceMessageId: string | null;
-  shouldStickToBottom: boolean;
-};
 
 type TrailingAssistantPatchCompletionDebugPlan = {
   shouldStickToBottom: boolean;
@@ -490,7 +487,7 @@ export class ConversationRenderService {
 
     await this.withTrailingAssistantTurnBodyScope(successPlan.turnBodyScopePlan, async () => {
       await this.executeTrailingAssistantPatch(successPlan.executionPlan);
-      this.applyTrailingAssistantPatchTailState(successPlan.tailStatePlan, tabId);
+      applyTrailingAssistantPatchTailState(successPlan.tailStatePlan, tabId, this.host);
     });
 
     const completionDebugLoggingContext =
@@ -1036,23 +1033,6 @@ export class ConversationRenderService {
       return await run();
     } finally {
       runtime.currentTurnBodyEl = restoreTurnBodyEl;
-    }
-  }
-
-  private applyTrailingAssistantPatchTailState(
-    tailStatePlan: TrailingAssistantPatchTailStatePlan,
-    tabId: TabId | null,
-  ): void {
-    const { messageEl, messageId, sourceMessageId, shouldStickToBottom } = tailStatePlan;
-    messageEl.dataset.messageId = messageId;
-    if (sourceMessageId) {
-      messageEl.dataset.sourceMessageId = sourceMessageId;
-    } else {
-      delete messageEl.dataset.sourceMessageId;
-    }
-    messageEl.style.animation = 'none';
-    if (shouldStickToBottom) {
-      this.host.scrollToBottom({ tabId });
     }
   }
 
