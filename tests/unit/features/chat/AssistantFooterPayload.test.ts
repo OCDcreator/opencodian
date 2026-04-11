@@ -1,5 +1,8 @@
 import type { ChatMessage } from '../../../../src/core/types';
-import { buildPersistedAssistantFooterPayload } from '../../../../src/features/chat/runtime/AssistantFooterPayload';
+import {
+  buildPersistedAssistantFooterPayload,
+  resolvePersistedAssistantFooterStatusLabel,
+} from '../../../../src/features/chat/runtime/AssistantFooterPayload';
 
 describe('AssistantFooterPayload', () => {
   it('assembles timestamp copy content model and status for persisted assistant messages', () => {
@@ -16,15 +19,30 @@ describe('AssistantFooterPayload', () => {
       ],
     };
 
-    expect(buildPersistedAssistantFooterPayload({
-      message,
-      statusLabel: 'Interrupted',
-    })).toEqual({
+    expect(buildPersistedAssistantFooterPayload({ message })).toEqual({
       timestamp: 12345,
       content: 'Visible answer',
       modelId: 'anthropic/claude-sonnet-4',
       statusLabel: 'Interrupted',
     });
+  });
+
+  it('returns an interrupted badge only for interrupted persisted assistant messages', () => {
+    expect(resolvePersistedAssistantFooterStatusLabel({
+      id: 'assistant-3',
+      role: 'assistant',
+      content: 'Stopped',
+      timestamp: 123,
+      streamState: 'interrupted',
+    } as ChatMessage)).toBe('Interrupted');
+
+    expect(resolvePersistedAssistantFooterStatusLabel({
+      id: 'assistant-4',
+      role: 'assistant',
+      content: 'Done',
+      timestamp: 456,
+      streamState: 'done',
+    } as ChatMessage)).toBeUndefined();
   });
 
   it('keeps optional footer payload fields undefined when the message does not provide them', () => {

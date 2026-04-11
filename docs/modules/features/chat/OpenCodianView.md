@@ -255,7 +255,7 @@ assistant 渲染里：
 
 - `contentBlocks` 会按块类型渲染
 - structured assistant 分支由 `renderAssistantStructuredContent()` 消费 `buildQuestionResolutionCardRenderPlan()` 产出的 render plan
-- persisted assistant footer payload 由 `buildPersistedAssistantFooterPayload()` 统一组装，其中 copy-content 继续委托 `resolveAssistantCopyContent()` 选择 structured text blocks 或 plain `message.content`
+- persisted assistant footer payload 由 `buildPersistedAssistantFooterPayload()` 统一组装，其中 copy-content 继续委托 `resolveAssistantCopyContent()`，interrupted status badge 也由 footer helper 统一判断
 - `thinking` 块走 `ThinkingBlockRenderer`
 - `tool_use` 块走 `ToolCallRenderer`
 - `text` 块和普通 `content` 走 `MarkdownRenderService`

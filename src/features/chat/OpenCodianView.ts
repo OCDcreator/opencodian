@@ -2358,10 +2358,7 @@ export class OpenCodianView extends ItemView {
       updateAssistantTimestamp: (messageEl, message) => {
         this.assistantShellRenderer.addTimestampWithCopyButton({
           messageEl,
-          ...buildPersistedAssistantFooterPayload({
-            message,
-            statusLabel: this.getAssistantStreamStatusLabel(message),
-          }),
+          ...buildPersistedAssistantFooterPayload({ message }),
         });
       },
       logAssistantFinalizationDebug: (label, payload) => {
@@ -7058,7 +7055,6 @@ export class OpenCodianView extends ItemView {
     content: HTMLElement,
     message: ChatMessage,
   ): Promise<void> {
-    const streamStatusLabel = this.getAssistantStreamStatusLabel(message);
     const questionResolutionRenderPlan = buildQuestionResolutionCardRenderPlan({
       contentBlocks: message.contentBlocks,
       questionResolution: message.questionResolution,
@@ -7084,10 +7080,7 @@ export class OpenCodianView extends ItemView {
 
     this.assistantShellRenderer.addTimestampWithCopyButton({
       messageEl,
-      ...buildPersistedAssistantFooterPayload({
-        message,
-        statusLabel: streamStatusLabel,
-      }),
+      ...buildPersistedAssistantFooterPayload({ message }),
     });
   }
 
@@ -8495,14 +8488,6 @@ export class OpenCodianView extends ItemView {
     labelEl.id = labelId;
     labelEl.setAttribute('data-tooltip-label', 'true');
     buttonEl.setAttribute('aria-labelledby', labelId);
-  }
-
-  private getAssistantStreamStatusLabel(message: ChatMessage): string | undefined {
-    if (message.streamState === 'interrupted') {
-      return t('chat.stream.interruptedBadge');
-    }
-
-    return undefined;
   }
 
   private removeEmptyAssistantShells(): void {
