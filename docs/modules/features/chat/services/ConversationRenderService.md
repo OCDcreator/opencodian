@@ -82,7 +82,7 @@ export class ConversationRenderService {
 - patch 执行期间对 render runtime 的 `currentTurnBodyEl` 暂时切换与恢复，也由独立 scope helper 收口，避免主流程继续承载 DOM 上下文细节
 - 真正执行 patch 时，assistant 正文签名比较与“只 finalize footer / 重渲正文 content”分支也由独立 helper 收口
 - patch 成功后的 completion debug payload 组装也已抽到独立 helper，而 previous / next tail 的 debug summary 现在会先经由专用 summary helper 预计算成 `completionDebugPlan`，让 tail-outcome helper 与日志阶段都不再回读整份 `successPlan`
-- patch skipped 分支里的 rendered count 现在也会先经由专用 helper 预计算，再由 debug payload builder 只组合 reason、tabId、预建 counts 与附加 payload
+- patch skipped 分支现在会先把 previous / next messages 与 `tabId` 收束成独立 planning context，再由专用 logger helper 统一生成 skipped-debug plan；`fail()` closure 只负责记录日志并返回 `false`，而 rendered count 仍由更小的 count helper 预计算
 - assistant 正文签名不变时复用已有正文，只重做 persisted footer 收尾
 - patch 成功后的 message dataset 刷新、动画禁用与按需 scroll-to-bottom，现会先预计算成更窄的 `tailStatePlan` 再交给 tail-apply helper，避免这些副作用继续读取整份 `successPlan`
 - assistant 正文签名计算、正文重渲和 footer finalization 现在统一通过 `host.assistantTailRender` 这组更小的 port 完成

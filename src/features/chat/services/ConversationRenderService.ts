@@ -151,6 +151,17 @@ type TrailingAssistantPatchSkippedDebugCountPlan = {
   nextRenderedCount: number;
 };
 
+type TrailingAssistantPatchSkippedDebugPlan = {
+  tabId: TabId | null;
+  countPlan: TrailingAssistantPatchSkippedDebugCountPlan;
+};
+
+type TrailingAssistantPatchSkippedDebugPlanningContext = {
+  previousMessages: ChatMessage[];
+  nextMessages: ChatMessage[];
+  tabId: TabId | null;
+};
+
 type TrailingAssistantPatchTurnBodyScopePlan =
   | {
     runtime: null;
@@ -420,20 +431,13 @@ export class ConversationRenderService {
     nextMessages: ChatMessage[],
     tabId: TabId | null = this.host.getActiveTabId(),
   ): Promise<boolean> {
+    const skippedDebugPlanningContext = this.buildTrailingAssistantPatchSkippedDebugPlanningContext(
+      previousMessages,
+      nextMessages,
+      tabId,
+    );
     const fail = (reason: string, payload: Record<string, unknown> = {}): false => {
-      const skippedDebugCountPlan = this.buildTrailingAssistantPatchSkippedDebugCountPlan(
-        previousMessages,
-        nextMessages,
-      );
-      this.host.logAssistantFinalizationDebug(
-        'patch-trailing-assistant-render-skipped',
-        this.buildTrailingAssistantPatchSkippedDebugPayload(
-          skippedDebugCountPlan,
-          reason,
-          tabId,
-          payload,
-        ),
-      );
+      this.logTrailingAssistantPatchSkippedDebug(skippedDebugPlanningContext, reason, payload);
       return false;
     };
     const preflight = this.resolveTrailingAssistantPatchPreflight(
@@ -978,6 +982,45 @@ export class ConversationRenderService {
     };
   }
 
+  private buildTrailingAssistantPatchSkippedDebugPlanningContext(
+    previousMessages: ChatMessage[],
+    nextMessages: ChatMessage[],
+    tabId: TabId | null,
+  ): TrailingAssistantPatchSkippedDebugPlanningContext {
+    return {
+      previousMessages,
+      nextMessages,
+      tabId,
+    };
+  }
+
+  private logTrailingAssistantPatchSkippedDebug(
+    planningContext: TrailingAssistantPatchSkippedDebugPlanningContext,
+    reason: string,
+    payload: Record<string, unknown>,
+  ): void {
+    this.host.logAssistantFinalizationDebug(
+      'patch-trailing-assistant-render-skipped',
+      this.buildTrailingAssistantPatchSkippedDebugPayload(
+        this.buildTrailingAssistantPatchSkippedDebugPlan(planningContext),
+        reason,
+        payload,
+      ),
+    );
+  }
+
+  private buildTrailingAssistantPatchSkippedDebugPlan(
+    planningContext: TrailingAssistantPatchSkippedDebugPlanningContext,
+  ): TrailingAssistantPatchSkippedDebugPlan {
+    return {
+      tabId: planningContext.tabId,
+      countPlan: this.buildTrailingAssistantPatchSkippedDebugCountPlan(
+        planningContext.previousMessages,
+        planningContext.nextMessages,
+      ),
+    };
+  }
+
   private buildTrailingAssistantPatchSkippedDebugCountPlan(
     previousMessages: ChatMessage[],
     nextMessages: ChatMessage[],
@@ -989,16 +1032,15 @@ export class ConversationRenderService {
   }
 
   private buildTrailingAssistantPatchSkippedDebugPayload(
-    countPlan: TrailingAssistantPatchSkippedDebugCountPlan,
+    skippedDebugPlan: TrailingAssistantPatchSkippedDebugPlan,
     reason: string,
-    tabId: TabId | null,
     payload: Record<string, unknown>,
   ): Record<string, unknown> {
     return {
       reason,
-      tabId,
-      previousRenderedCount: countPlan.previousRenderedCount,
-      nextRenderedCount: countPlan.nextRenderedCount,
+      tabId: skippedDebugPlan.tabId,
+      previousRenderedCount: skippedDebugPlan.countPlan.previousRenderedCount,
+      nextRenderedCount: skippedDebugPlan.countPlan.nextRenderedCount,
       ...payload,
     };
   }
