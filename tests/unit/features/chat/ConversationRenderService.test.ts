@@ -139,7 +139,7 @@ function createHost(
         contentEl.textContent = message.content;
       },
     ),
-    updateAssistantTimestamp: jest.fn(),
+    finalizePersistedAssistantFooter: jest.fn(),
     logAssistantFinalizationDebug: jest.fn(),
     summarizeChatMessageForDebug: jest.fn().mockImplementation((message: ChatMessage | null | undefined) =>
       message
@@ -227,12 +227,12 @@ describe('ConversationRenderService', () => {
     expect(host.renderMessages).not.toHaveBeenCalled();
   });
 
-  it('patches a trailing assistant timestamp without forcing a full rerender', async () => {
+  it('finalizes a stable trailing assistant footer without forcing a full rerender', async () => {
     const previousMessages = [
       createMessage({ id: 'assistant-1', content: 'Stable answer', timestamp: 1 }),
     ];
     const nextMessages = [
-      createMessage({ id: 'assistant-2', content: 'Stable answer', timestamp: 2 }),
+      createMessage({ id: 'assistant-2', content: 'Stable answer', timestamp: 2, streamState: 'interrupted' }),
     ];
     const conversation = createConversation(nextMessages);
     const host = createHost({
@@ -243,7 +243,7 @@ describe('ConversationRenderService', () => {
 
     await service.applySyncedConversationUpdate(previousMessages, nextMessages);
 
-    expect(host.updateAssistantTimestamp).toHaveBeenCalledWith(tailEl, nextMessages[0]);
+    expect(host.finalizePersistedAssistantFooter).toHaveBeenCalledWith(tailEl, nextMessages[0]);
     expect(host.renderAssistantMessageContent).not.toHaveBeenCalled();
     expect(host.renderMessages).not.toHaveBeenCalled();
     expect(tailEl.dataset.messageId).toBe('assistant-2');

@@ -2357,7 +2357,7 @@ export class OpenCodianView extends ItemView {
       shouldPseudoStreamSyncedAssistantMessage: (message) => this.shouldPseudoStreamSyncedAssistantMessage(message),
       renderAssistantMessageContent: (messageEl, contentEl, message) =>
         this.renderAssistantMessageContent(messageEl, contentEl, message),
-      updateAssistantTimestamp: (messageEl, message) => {
+      finalizePersistedAssistantFooter: (messageEl, message) => {
         this.persistedAssistantFooterFinalizer.finalizeFooter(messageEl, message);
       },
       logAssistantFinalizationDebug: (label, payload) => {

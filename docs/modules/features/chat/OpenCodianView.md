@@ -215,7 +215,7 @@ interface TabRuntimeState {
 
 - `AssistantCopyContent.ts`：封装 persisted assistant footer copy-content 的 structured-text / fallback source 选择
 - `AssistantFooterPayload.ts`：封装 persisted assistant footer 传给 timestamp/copy renderer 的 timestamp、copy-content、model 与 status payload 组装
-- `PersistedAssistantFooterFinalizer.ts`：封装 persisted assistant footer 的最终 renderer 调用，让 view 只传 `messageEl` 与 `message`
+- `PersistedAssistantFooterFinalizer.ts`：封装 persisted assistant footer 的最终 renderer 调用，让 view 与 `ConversationRenderService` 都只通过 `messageEl` + `message` bridge 回到同一个 finalizer
 - `SendPipelineTypes.ts`：定义 runtime 与 host 契约
 - `AssistantShellRenderer.ts`：封装 assistant streaming shell 的创建、reveal 与 timestamp 收尾
 - `AssistantNoticeRenderer.ts`：封装 stream error / interrupted notice 构造与 placeholder notice 渲染

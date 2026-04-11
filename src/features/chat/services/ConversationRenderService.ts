@@ -95,7 +95,7 @@ export interface ConversationRenderHost {
     contentEl: HTMLElement,
     message: ChatMessage,
   ): Promise<void>;
-  updateAssistantTimestamp(messageEl: HTMLElement, message: ChatMessage): void;
+  finalizePersistedAssistantFooter(messageEl: HTMLElement, message: ChatMessage): void;
 
   logAssistantFinalizationDebug(label: string, payload: unknown): void;
   summarizeChatMessageForDebug(message: ChatMessage | null | undefined): Record<string, unknown> | null;
@@ -282,7 +282,7 @@ export class ConversationRenderService {
         delete existingTailMessageEl.dataset.sourceMessageId;
       }
       if (this.host.getAssistantBodySignature(previousTailMessage) === this.host.getAssistantBodySignature(nextTailMessage)) {
-        this.host.updateAssistantTimestamp(existingTailMessageEl, nextTailMessage);
+        this.host.finalizePersistedAssistantFooter(existingTailMessageEl, nextTailMessage);
       } else {
         existingContentEl.replaceChildren();
         await this.host.renderAssistantMessageContent(existingTailMessageEl, existingContentEl, nextTailMessage);

@@ -57,7 +57,7 @@ export class ConversationRenderService {
 ### 尾部 assistant patch
 
 - 只有“rendered message 数量不变、非尾部 visual signature 完全一致、尾部仍是普通 assistant”时才允许 patch
-- 仅时间戳等 metadata 变化时复用已有正文，只刷新 timestamp row
+- assistant 正文签名不变时复用已有正文，只重做 persisted footer 收尾
 - 缺失尾部 DOM、内容节点或前缀签名失配时，立即返回 `false` 让上层回退到 full rerender
 
 ## 与 `OpenCodianView` 的边界
