@@ -1382,10 +1382,8 @@ export class ConversationRenderService {
     loggingContext: TrailingAssistantPatchSkippedDebugLoggingContext,
   ): TrailingAssistantPatchSkippedDebugPayloadInputsContractPreparation {
     const reasonPayloadInputs =
-      this.buildTrailingAssistantPatchSkippedDebugReasonPayloadInputs(
-        this.buildTrailingAssistantPatchSkippedDebugReasonPayloadContract(
-          loggingContext,
-        ),
+      this.buildTrailingAssistantPatchSkippedDebugReasonPayloadInputsFromLoggingContext(
+        loggingContext,
       );
     const countPlan =
       this.buildTrailingAssistantPatchSkippedDebugCountPlanFromLoggingContext(
@@ -1424,6 +1422,16 @@ export class ConversationRenderService {
       reason: reasonPayloadContract.reason,
       payload: reasonPayloadContract.payload,
     };
+  }
+
+  private buildTrailingAssistantPatchSkippedDebugReasonPayloadInputsFromLoggingContext(
+    loggingContext: TrailingAssistantPatchSkippedDebugLoggingContext,
+  ): TrailingAssistantPatchSkippedDebugReasonPayloadInputs {
+    return this.buildTrailingAssistantPatchSkippedDebugReasonPayloadInputs(
+      this.buildTrailingAssistantPatchSkippedDebugReasonPayloadContract(
+        loggingContext,
+      ),
+    );
   }
 
   private buildTrailingAssistantPatchSkippedDebugReasonPayloadContract(
