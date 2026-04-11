@@ -94,6 +94,7 @@ docs/modules/
 │   │   │   ├── AssistantShellRenderer.md
 │   │   │   ├── AssistantNoticeRenderer.md
 │   │   │   ├── AssistantPlainTextFallbackRenderer.md
+│   │   │   ├── AssistantStructuredContentRenderer.md
 │   │   │   ├── PermissionInlineCardRenderer.md
 │   │   │   ├── QuestionInlineCardRenderer.md
 │   │   │   ├── QuestionResolutionCoordinator.md

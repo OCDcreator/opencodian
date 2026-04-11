@@ -252,10 +252,11 @@ interface TabRuntimeState {
 assistant 渲染里：
 
 - `contentBlocks` 会按块类型渲染
+- structured assistant 分支由 `renderAssistantStructuredContent()` 消费 `buildQuestionResolutionCardRenderPlan()` 产出的 render plan
 - `thinking` 块走 `ThinkingBlockRenderer`
 - `tool_use` 块走 `ToolCallRenderer`
 - `text` 块和普通 `content` 走 `MarkdownRenderService`
-- 已解析的 `questionResolution` 会先经 `buildQuestionResolutionCardRenderPlan()` 折叠成 render plan，再由 `appendQuestionResolutionCardFromRenderPlan()` 在允许显示时插入持久化 resolved card
+- 已解析的 `questionResolution` 会先经 `buildQuestionResolutionCardRenderPlan()` 折叠成 render plan，再由 structured/fallback helper 在允许显示时插入持久化 resolved card
 - 无 `contentBlocks` 的 assistant fallback 由 `renderAssistantPlainTextFallbackContent()` 统一处理 resolved card 追加与 `message.content` 渲染
 
 ### 模型选择器拆分
@@ -336,7 +337,7 @@ model selector 现在拆成了几层协作：
 - `SendPipelineRuntime`：发送子系统总入口，负责真实 stream 调用、runtime 内部模块装配，以及向 `MessageFinalizationService` 交接
 - `StreamChunkRouter`：发送子系统内部的 stream loop / pending / timeout / chunk router
 - `StreamLocalFinalizer`：发送子系统内部的本地 shell finalization 与第一次本地保存
-- `AssistantShellRenderer` / `AssistantNoticeRenderer` / `AssistantPlainTextFallbackRenderer` / `StreamingInlineCardRenderer` / `PermissionInlineCardRenderer` / `SendPipelineTrace` / `PendingIndicatorController` / `buildLocalStreamOutcome` / `StreamShellFinalizer` / `LocalStreamMessagePersistence`：发送子系统更细粒度的内部协作模块
+- `AssistantShellRenderer` / `AssistantNoticeRenderer` / `AssistantPlainTextFallbackRenderer` / `AssistantStructuredContentRenderer` / `StreamingInlineCardRenderer` / `PermissionInlineCardRenderer` / `SendPipelineTrace` / `PendingIndicatorController` / `buildLocalStreamOutcome` / `StreamShellFinalizer` / `LocalStreamMessagePersistence`：发送子系统更细粒度的内部协作模块
 - `MessageSendPreparationService`：`sendMessage()` 前半段的 send preflight、optimistic user message 落地，以及 stream-enter 状态编排
 - `MessageFinalizationService`：`sendMessage()` 末段的 final sync、post-sync patch/rerender、todo/save/attention 收尾编排
 - `TabManager` / `TabBar`：tab 生命周期和 tab 元数据

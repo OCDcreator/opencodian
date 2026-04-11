@@ -106,6 +106,9 @@ import {
   renderAssistantPlainTextFallbackContent,
 } from './runtime/AssistantPlainTextFallbackRenderer';
 import {
+  renderAssistantStructuredContent,
+} from './runtime/AssistantStructuredContentRenderer';
+import {
   PermissionInlineCardRenderer,
 } from './runtime/PermissionInlineCardRenderer';
 import {
@@ -117,7 +120,6 @@ import {
   QuestionResolutionCoordinator,
 } from './runtime/QuestionResolutionCoordinator';
 import {
-  appendQuestionResolutionCardFromRenderPlan,
   buildQuestionResolutionCardRenderPlan,
 } from './runtime/QuestionResolutionCardRenderer';
 import {
@@ -7063,30 +7065,21 @@ export class OpenCodianView extends ItemView {
     });
 
     if (questionResolutionRenderPlan.hasContentBlocks) {
-      for (const block of questionResolutionRenderPlan.blocksBeforeCard) {
-        await this.renderContentBlock(content, block);
-      }
-      appendQuestionResolutionCardFromRenderPlan(content, questionResolutionRenderPlan);
-      for (const block of questionResolutionRenderPlan.blocksAfterCard) {
-        await this.renderContentBlock(content, block);
-      }
-
-      this.assistantShellRenderer.addTimestampWithCopyButton({
-        messageEl,
-        timestamp: message.timestamp,
-        content: this.getAssistantCopyContent(message),
-        modelId: message.modelId,
-        statusLabel: streamStatusLabel,
+      await renderAssistantStructuredContent({
+        containerEl: content,
+        questionResolutionRenderPlan,
+        renderContentBlock: async (containerEl, block) => {
+          await this.renderContentBlock(containerEl, block);
+        },
       });
-      return;
+    } else {
+      await renderAssistantPlainTextFallbackContent({
+        containerEl: content,
+        messageContent: message.content,
+        markdownService: this.markdownService,
+        questionResolutionRenderPlan,
+      });
     }
-
-    await renderAssistantPlainTextFallbackContent({
-      containerEl: content,
-      messageContent: message.content,
-      markdownService: this.markdownService,
-      questionResolutionRenderPlan,
-    });
 
     this.assistantShellRenderer.addTimestampWithCopyButton({
       messageEl,

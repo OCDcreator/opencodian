@@ -16,7 +16,7 @@
 
 - 让 `OpenCodianView.renderAssistantMessageContent()` 只负责 assistant 消息分支选择和 timestamp 收尾
 - 让无 `contentBlocks` 的 persisted assistant 正文渲染与 resolved card 顺序有独立单测
-- 保持有 `contentBlocks` 的 structured block 渲染仍由 `OpenCodianView.renderContentBlock()` 逐块处理
+- 让有 `contentBlocks` 的 structured 分支交给 `AssistantStructuredContentRenderer.ts`，避免 fallback helper 再承担额外职责
 
 ## 注意事项
 
