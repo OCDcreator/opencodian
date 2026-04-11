@@ -163,6 +163,11 @@ type TrailingAssistantPatchCompletionDebugLoggingContext = {
   tabId: TabId | null;
 };
 
+type TrailingAssistantPatchCompletionDebugLogPlanningContext = {
+  payloadInputs: TrailingAssistantPatchCompletionDebugPayloadInputs;
+  tabId: TabId | null;
+};
+
 type TrailingAssistantPatchCompletionDebugFinalLogInputs = {
   tabId: TabId | null;
   payloadPlan: TrailingAssistantPatchCompletionDebugPayloadPlan;
@@ -1110,7 +1115,11 @@ export class ConversationRenderService {
   private logTrailingAssistantPatchCompletionDebug(
     loggingContext: TrailingAssistantPatchCompletionDebugLoggingContext,
   ): void {
-    const logPlan = this.buildTrailingAssistantPatchCompletionDebugLogPlan(loggingContext);
+    const logPlan = this.buildTrailingAssistantPatchCompletionDebugLogPlan(
+      this.buildTrailingAssistantPatchCompletionDebugLogPlanningContext(
+        loggingContext,
+      ),
+    );
     this.host.logAssistantFinalizationDebug(logPlan.label, logPlan.payload);
   }
 
@@ -1124,20 +1133,27 @@ export class ConversationRenderService {
     };
   }
 
-  private buildTrailingAssistantPatchCompletionDebugLogPlan(
+  private buildTrailingAssistantPatchCompletionDebugLogPlanningContext(
     loggingContext: TrailingAssistantPatchCompletionDebugLoggingContext,
-  ): TrailingAssistantPatchCompletionDebugLogPlan {
-    const payloadInputs =
-      this.buildTrailingAssistantPatchCompletionDebugPayloadInputs(
+  ): TrailingAssistantPatchCompletionDebugLogPlanningContext {
+    return {
+      payloadInputs: this.buildTrailingAssistantPatchCompletionDebugPayloadInputs(
         loggingContext.completionDebugPlan,
-      );
+      ),
+      tabId: loggingContext.tabId,
+    };
+  }
+
+  private buildTrailingAssistantPatchCompletionDebugLogPlan(
+    planningContext: TrailingAssistantPatchCompletionDebugLogPlanningContext,
+  ): TrailingAssistantPatchCompletionDebugLogPlan {
     const payloadPlan =
       this.buildTrailingAssistantPatchCompletionDebugPayloadPlan(
-        payloadInputs,
+        planningContext.payloadInputs,
       );
     const finalLogInputs =
       this.buildTrailingAssistantPatchCompletionDebugFinalLogInputs(
-        loggingContext,
+        planningContext.tabId,
         payloadPlan,
       );
     return this.buildTrailingAssistantPatchCompletionDebugFinalLogPlan(
@@ -1146,11 +1162,11 @@ export class ConversationRenderService {
   }
 
   private buildTrailingAssistantPatchCompletionDebugFinalLogInputs(
-    loggingContext: TrailingAssistantPatchCompletionDebugLoggingContext,
+    tabId: TabId | null,
     payloadPlan: TrailingAssistantPatchCompletionDebugPayloadPlan,
   ): TrailingAssistantPatchCompletionDebugFinalLogInputs {
     return {
-      tabId: loggingContext.tabId,
+      tabId,
       payloadPlan,
     };
   }
