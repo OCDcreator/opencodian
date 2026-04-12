@@ -33,7 +33,7 @@ export function buildTrailingAssistantPatchTailOutcomePlans(
 
 ## 与其他模块的关系
 
-- `TrailingAssistantPatchTailOutcomePlanPartsHelper` 现在先负责把 `{ tailStatePlan, completionDebugPlan }` 收口成局部 plan-parts，再由这里生成最终返回值
-- `TrailingAssistantPatchTailOutcomeExecutionTailPlanHelper` 现在更接近只负责 orchestrate `tailStatePlan` 与 completion-debug 子计划
+- `TrailingAssistantPatchTailOutcomePlanPartsHelper` 继续先负责把 `{ tailStatePlan, completionDebugPlan }` 收口成局部 plan-parts，再由这里生成最终返回值
+- `TrailingAssistantPatchTailOutcomeChildPlansHelper` 现在串联局部 plan-parts helper 与这里的最终 plan helper
 - `TrailingAssistantPatchTailOutcomePlanningContextHelper` 继续负责把 execution-tail planning-context 缩成 tail-outcome 专用 contract
 - `TrailingAssistantPatchTailStatePlanningContextHelper` 与 `TrailingAssistantPatchCompletionDebugPlanningContextHelper` 仍分别负责各自下游 plan 的输入收束

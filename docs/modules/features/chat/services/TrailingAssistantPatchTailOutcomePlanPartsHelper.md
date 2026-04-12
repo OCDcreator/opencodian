@@ -9,7 +9,7 @@
 
 - 接收已分别算好的 `tailStatePlan` 与 `completionDebugPlan`
 - 统一返回稳定的 tail-outcome plan-parts contract
-- 让 `TrailingAssistantPatchTailOutcomeExecutionTailPlanHelper` 更接近只负责 orchestrate tail-state / completion-debug 两条子计划
+- 让更上游模块把 child-plan 结果装配与最终 plan shape 收口保持分层
 
 它不收窄 planning-context、不计算 tail-message summary，也不执行任何 DOM/runtime 副作用；只负责 tail-outcome plan-parts 的纯装配。
 
@@ -28,6 +28,6 @@ export function buildTrailingAssistantPatchTailOutcomePlanParts(
 
 ## 与其他模块的关系
 
-- `TrailingAssistantPatchTailOutcomeExecutionTailPlanHelper` 现在会先分别预建 `tailStatePlan` 与 `completionDebugPlan`，再把这一层局部 shape 收口委托给这里
-- `TrailingAssistantPatchTailOutcomePlanHelper` 继续只负责把既成的 tail-outcome plan-parts 变成最终 `tailOutcomePlans` 返回值
+- `TrailingAssistantPatchTailOutcomeChildPlansHelper` 现在会消费这里返回的局部 plan-parts，并继续交给 `TrailingAssistantPatchTailOutcomePlanHelper`
+- `TrailingAssistantPatchTailOutcomeExecutionTailPlanHelper` 继续只负责预建 `tailStatePlan` 与 `completionDebugPlan` 两条子计划，再把顶层结果装配交给更窄 helper
 - `TrailingAssistantPatchTailStateTailOutcomePlanHelper` 与 `TrailingAssistantPatchCompletionDebugTailOutcomePlanHelper` 仍分别负责各自子计划的纯编排
