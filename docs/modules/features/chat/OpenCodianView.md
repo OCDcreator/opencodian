@@ -168,6 +168,8 @@ streaming tab 激活时那条 active-conversation/session 写回 + baseline + se
 
 header 上“新建会话”与“在当前 tab 新建会话”两条入口里的 max-tabs、streaming block、success/error notice，以及“创建后该 activate 新 tab 还是复用当前 tab open shell”的分支，也不再继续留在 view 自己内联判断；这些 open/reuse 决策现在先由 `services/ConversationTabOpenCoordinator.ts` 承接，再分别复用 `ConversationViewStateService.activateTab()` 与 `runtime/TabConversationActivationBridge.ts`。
 
+tab close 与 delete conversation 后的 tab recovery 分支也不再由 view 自己逐项判断；`handleTabClose()` 和 `deleteConversationsAndCleanupTabs()` 现在委托 `services/ConversationTabLifecycleRecoveryCoordinator.ts` 处理 foreground busy guard、closed-pane cleanup、next-active activation，以及删除导致 tab 清空时的 fallback 新建会话路径。close-last-tab 仍保持静默创建 fallback tab，delete fallback 则继续复用 `ConversationTabOpenCoordinator` 的 noticed new-tab 路径。
+
 loaded-conversation 切换里旧标题生成取消、background-task indicator reset、scheduled scroll cleanup、消息区清空、turn state reset，以及 hydration lifecycle shell，也不再由 `ConversationViewStateService` 直接通过散落 host 回调持有；这些壳层步骤现在先由 `runtime/ConversationTransitionBridge.ts` 统一桥接。随后消息容器的 `is-rehydrating` class、scroll snapshot、restore-bottom / restore-anchor / restore-distance 调度，以及 pane scroll metrics 回写，再由 `runtime/ConversationHydrationRenderBridge.ts` 承接，view 只保留 title/background indicator/message container/runtime 的真实实现。
 
 loaded-conversation activate 前的 conversation lookup、reload retry、interrupted-tail 驱动的 server-sync 判定，以及 `load-conversation` sync 返回的 revert-state 写回，也不再由 `ConversationViewStateService` 直接通过散落的 host 回调组合；这些数据解析入口现在先由 `runtime/ConversationLoadRuntimeBridge.ts` 统一桥接，view 只保留真实的 conversation 查询、sync 与 revert-state 落点实现。
@@ -380,6 +382,7 @@ background task notice 这条子链路现在的边界是：
 - `TabConversationActivationBridge`：当前活动 tab 的 empty-state activation 与 current-tab 新建会话打开路径的消息区 shell cleanup、baseline commit 与 question/todo/context/background-task 后续刷新编排
 - `TabViewActivationBridge`：tab/pane activation 预刷新写回，以及 streaming / empty-tab activation outcome 的 selector、context identity、dock、send-button 刷新编排
 - `ConversationRestoreBootstrapCoordinator`：首开 load / persisted restore / fallback-create 决策与 restore 失败后的 tab state reset/flush
+- `ConversationTabLifecycleRecoveryCoordinator`：tab close / conversation delete 后的 pane cleanup、next-active activation 与 fallback-create recovery 决策
 - `ConversationTransitionBridge`：loaded-conversation 的切换前 cleanup、消息区清空、turn reset 与 hydration lifecycle shell
 - `ConversationHydrationOutcomeBridge`：loaded-conversation 消息装载后的 background-task rebuild、message rerender、post-render outcome 与 baseline commit 编排
 - `TabRuntimeStateBridge`：tab stream-like / background-task badge、rewind-fork 按钮禁用态与 attention 标记的 runtime→UI 写回
@@ -414,6 +417,7 @@ background task notice 这条子链路现在的边界是：
 
 - `OpenCodeService`：会话 CRUD、发送、stream、同步、question、todo、status、context usage
 - `ConversationRestoreBootstrapCoordinator`：首开 tab 初始化、persisted restore、fallback create/activate 决策
+- `ConversationTabLifecycleRecoveryCoordinator`：tab close / conversation delete 后的 tab recovery create-or-activate 决策
 - `ConversationViewStateService`：tab 激活和 conversation hydration 装载编排
 - `ConversationRenderService`：消息区 full rerender、tail patch 和 append-only sync 编排
 - `ConversationLoadRuntimeBridge`：loaded-conversation 的 resolve / reload retry、server-sync 判定与 revert-state 写回

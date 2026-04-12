@@ -240,6 +240,10 @@ import {
   type ConversationTabOpenHost,
 } from './services/ConversationTabOpenCoordinator';
 import {
+  ConversationTabLifecycleRecoveryCoordinator,
+  type ConversationTabLifecycleRecoveryHost,
+} from './services/ConversationTabLifecycleRecoveryCoordinator';
+import {
   type ConversationViewStateHost,
   ConversationViewStateService,
 } from './services/ConversationViewStateService';
@@ -735,6 +739,7 @@ export class OpenCodianView extends ItemView {
   private conversationSyncEventAdapter: ConversationSyncEventAdapter;
   private conversationSessionLiveSignalAdapter: ConversationSessionLiveSignalAdapter;
   private conversationTabOpenCoordinator: ConversationTabOpenCoordinator;
+  private conversationTabLifecycleRecoveryCoordinator: ConversationTabLifecycleRecoveryCoordinator;
   private conversationRestoreBootstrapCoordinator: ConversationRestoreBootstrapCoordinator;
   private conversationViewStateService: ConversationViewStateService;
   private conversationRenderService: ConversationRenderService;
@@ -1331,6 +1336,14 @@ export class OpenCodianView extends ItemView {
         },
       },
     );
+    this.conversationTabLifecycleRecoveryCoordinator = new ConversationTabLifecycleRecoveryCoordinator(
+      this.createConversationTabLifecycleRecoveryHost(),
+      {
+        activateTab: (tabId) => this.conversationViewStateService.activateTab(tabId),
+        createConversationInNewTab: () =>
+          this.conversationTabOpenCoordinator.createConversationInNewTab(),
+      },
+    );
     this.conversationRestoreBootstrapCoordinator = new ConversationRestoreBootstrapCoordinator(
       this.createConversationRestoreBootstrapHost(),
       {
@@ -1844,6 +1857,22 @@ export class OpenCodianView extends ItemView {
       getMaxTabs: () => this.plugin.settings.maxTabs,
       isActiveTabStreaming: () => this.isActiveTabStreaming(),
       createConversation: () => this.plugin.createConversation(),
+      showNotice: (message) => {
+        new Notice(message);
+      },
+    };
+  }
+
+  private createConversationTabLifecycleRecoveryHost(): ConversationTabLifecycleRecoveryHost {
+    return {
+      getTabManager: () => this.tabManager,
+      isTabForegroundBusy: (tabId) => this.isTabForegroundBusy(tabId),
+      getCurrentConversationId: () => this.currentConversation?.id ?? null,
+      createConversation: () => this.plugin.createConversation(),
+      deleteConversation: (conversationId) => this.plugin.deleteConversation(conversationId),
+      removeTabMessagesPane: (tabId) => {
+        this.removeTabMessagesPane(tabId);
+      },
       showNotice: (message) => {
         new Notice(message);
       },
@@ -2727,37 +2756,7 @@ export class OpenCodianView extends ItemView {
   }
 
   private async handleTabClose(tabId: string): Promise<void> {
-    if (!this.tabManager) {
-      return;
-    }
-
-    const tab = this.tabManager.getTab(tabId);
-    if (!tab) {
-      return;
-    }
-
-    if (this.isTabForegroundBusy(tabId)) {
-      new Notice(t('chat.tab.streamingBlocked'));
-      return;
-    }
-
-    const result = this.tabManager.closeTab(tabId);
-    if (!result.closed) {
-      return;
-    }
-
-    this.removeTabMessagesPane(tabId);
-
-    if (result.nextActiveTabId) {
-      await this.activateTab(result.nextActiveTabId);
-      return;
-    }
-
-    const conversation = await this.plugin.createConversation();
-    const nextTab = this.tabManager.createTab(conversation);
-    if (nextTab) {
-      await this.activateTab(nextTab.id);
-    }
+    await this.conversationTabLifecycleRecoveryCoordinator.closeTabAndRecover(tabId);
   }
 
   private async activateTab(tabId: string): Promise<void> {
@@ -4733,43 +4732,7 @@ export class OpenCodianView extends ItemView {
   }
 
   private async deleteConversationsAndCleanupTabs(conversationIds: string[]): Promise<void> {
-    const uniqueConversationIds = Array.from(new Set(conversationIds));
-    if (uniqueConversationIds.length === 0) {
-      return;
-    }
-
-    const conversationIdSet = new Set(uniqueConversationIds);
-    for (const conversationId of uniqueConversationIds) {
-      await this.plugin.deleteConversation(conversationId);
-    }
-
-    if (!this.tabManager) {
-      if (this.currentConversation && conversationIdSet.has(this.currentConversation.id)) {
-        await this.createNewConversation();
-      }
-      return;
-    }
-
-    const tabsToClose = this.tabManager.getAllTabs()
-      .filter((tab) => tab.conversationId && conversationIdSet.has(tab.conversationId));
-    const activeTabId = this.tabManager.getActiveTab()?.id ?? null;
-    const activeTabWillBeClosed = activeTabId
-      ? tabsToClose.some((tab) => tab.id === activeTabId)
-      : false;
-    const closeResult = this.tabManager.closeTabs(tabsToClose.map((tab) => tab.id));
-
-    for (const tabId of closeResult.closedTabIds) {
-      this.removeTabMessagesPane(tabId);
-    }
-
-    if (this.tabManager.getTabCount() === 0) {
-      await this.createNewConversation();
-      return;
-    }
-
-    if (activeTabWillBeClosed && closeResult.nextActiveTabId) {
-      await this.activateTab(closeResult.nextActiveTabId);
-    }
+    await this.conversationTabLifecycleRecoveryCoordinator.deleteConversationsAndRecover(conversationIds);
   }
 
   /** Show delete current conversation confirmation dialog with 3-second countdown */
