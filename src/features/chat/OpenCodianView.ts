@@ -6,7 +6,7 @@
 
 import type { EditorView } from '@codemirror/view';
 import type { Editor, EventRef, WorkspaceLeaf } from 'obsidian';
-import { addIcon, Component, ItemView, MarkdownView, normalizePath, Notice, Scope, setIcon, TFile } from 'obsidian';
+import { addIcon, Component, ItemView, MarkdownView, normalizePath, Notice, Scope, setIcon } from 'obsidian';
 
 import type { ModelCatalogBundle } from '../../core/config';
 import {
@@ -35,7 +35,6 @@ import {
   type InputPanelThemeId,
   type LiquidGlassAdapterId,
   type PromptContextItem,
-  type PromptContextLineRange,
   type QuestionRequest,
   type QuestionResolution,
   type SessionDiffEntry,
@@ -48,12 +47,8 @@ import { t, type TranslationKey } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import {
   createLogger,
-  formatContextLabel,
   getVaultBasePath,
   isInternalStructuredOutputTool,
-  isTextLikeMime,
-  resolveContextMimeFromPath,
-  resolveTextMimeFromPath,
   resolveToolExecutionStatus,
 } from '../../shared';
 import { chooseForkTarget } from '../../shared/modals';
@@ -194,6 +189,7 @@ import {
   type BackgroundTaskTimelineServiceHost,
   BackgroundTaskTimelineService,
 } from './services/BackgroundTaskTimelineService';
+import { ContextAttachmentBuilder } from './services/ContextAttachmentBuilder';
 import { ContextFileCatalogService } from './services/ContextFileCatalogService';
 import { ContextUsageService } from './services/ContextUsageService';
 import {
@@ -315,7 +311,6 @@ const TITLE_WORDMARK_DARK_ASSET_PATH = 'assets/branding/opencodian-wordmark-dark
 
 const COMPOSER_TEXTAREA_MAX_HEIGHT = 240;
 
-const REMOTE_CONTEXT_TEXT_LIMIT_BYTES = 64 * 1024;
 const RETAINED_SELECTION_DOM_HIGHLIGHT_KEY = 'opencodian-selection';
 const RETAINED_SELECTION_INPUT_HANDOFF_GRACE_MS = 1500;
 const RETAINED_SELECTION_POLL_INTERVAL_MS = 250;
@@ -729,6 +724,7 @@ export class OpenCodianView extends ItemView {
   private questionResolutionCoordinator: QuestionResolutionCoordinator;
   private questionDockCoordinator: QuestionDockCoordinator;
   private sendPipelineRuntime: SendPipelineRuntime;
+  private contextAttachmentBuilder: ContextAttachmentBuilder;
   private contextFileCatalogService: ContextFileCatalogService;
   private omoBackgroundTaskLogStates = new Map<string, OmoBackgroundTaskLogState>();
   private lastKnownMarkdownFilePath: string | null = null;
@@ -1559,6 +1555,9 @@ export class OpenCodianView extends ItemView {
     this.currentEffortLevel = this.plugin.settings.effortLevel;
     this.currentThinkingBudget = this.plugin.settings.thinkingBudget;
     this.titleGenerationService = new TitleGenerationService(this.plugin);
+    this.contextAttachmentBuilder = new ContextAttachmentBuilder(this.app, {
+      getServerMode: () => this.plugin.settings.server.mode,
+    });
     this.contextFileCatalogService = new ContextFileCatalogService(this.app);
     this.sessionTodoStateService = new SessionTodoStateService(this.createSessionTodoStateServiceHost());
     this.backgroundTaskTimelineService = new BackgroundTaskTimelineService(
@@ -4482,23 +4481,24 @@ export class OpenCodianView extends ItemView {
 
   private async attachFocusContextPreview(preview: FocusContextPreview): Promise<void> {
     if (preview.kind === 'selection') {
-      const contextItem = this.buildSelectionContextItemFromPreview(preview);
+      const contextItem = this.contextAttachmentBuilder.buildSelectionContextItemFromPreview(preview);
       if (contextItem) {
         this.addDraftContextItem(contextItem);
       }
       return;
     }
 
-    const targetFile = this.app.vault.getAbstractFileByPath(preview.path);
-    if (!(targetFile instanceof TFile)) {
-      new Notice(t('chat.context.notice.noActiveNote'));
-      this.refreshActiveFocusContextPreview();
+    const contextItem = await this.contextAttachmentBuilder.buildFileContextItemFromPath(
+      preview.path,
+      'current_note',
+    );
+    if (contextItem) {
+      this.addDraftContextItem(contextItem);
       return;
     }
 
-    const contextItem = await this.buildFileContextItem(targetFile, 'current_note');
-    if (contextItem) {
-      this.addDraftContextItem(contextItem);
+    if (!this.contextAttachmentBuilder.hasFileAtPath(preview.path)) {
+      this.refreshActiveFocusContextPreview();
     }
   }
 
@@ -4649,7 +4649,9 @@ export class OpenCodianView extends ItemView {
   }
 
   public async addCurrentNoteContextFromActiveEditor(view?: MarkdownView | null): Promise<boolean> {
-    const contextItem = await this.buildCurrentNoteContextItem(view ?? this.getActiveMarkdownView());
+    const contextItem = await this.contextAttachmentBuilder.buildCurrentNoteContextItem(
+      view ?? this.getActiveMarkdownView(),
+    );
     if (!contextItem) {
       return false;
     }
@@ -4662,7 +4664,7 @@ export class OpenCodianView extends ItemView {
     editor?: Editor | null,
     view?: MarkdownView | null,
   ): Promise<boolean> {
-    const contextItem = await this.buildSelectionContextItem(
+    const contextItem = await this.contextAttachmentBuilder.buildSelectionContextItem(
       editor ?? (view ?? this.getActiveMarkdownView())?.editor ?? null,
       view ?? this.getActiveMarkdownView(),
     );
@@ -4680,145 +4682,13 @@ export class OpenCodianView extends ItemView {
       return false;
     }
 
-    const contextItem = await this.buildFileContextItem(file, 'file');
+    const contextItem = await this.contextAttachmentBuilder.buildFileContextItem(file, 'file');
     if (!contextItem) {
       return false;
     }
 
     this.addDraftContextItem(contextItem);
     return true;
-  }
-
-  private async buildCurrentNoteContextItem(view: MarkdownView | null): Promise<PromptContextItem | null> {
-    const file = view?.file ?? null;
-    if (!file) {
-      new Notice(t('chat.context.notice.noActiveNote'));
-      return null;
-    }
-
-    return this.buildFileContextItem(file, 'current_note');
-  }
-
-  private async buildSelectionContextItem(
-    editor: Editor | null,
-    view: MarkdownView | null,
-  ): Promise<PromptContextItem | null> {
-    const file = view?.file ?? null;
-    if (!editor || !file) {
-      new Notice(t('chat.context.notice.noActiveNote'));
-      return null;
-    }
-
-    const selectedText = editor.getSelection();
-    if (!selectedText.trim()) {
-      new Notice(t('chat.context.notice.noSelection'));
-      return null;
-    }
-
-    const from = editor.getCursor('from');
-    const to = editor.getCursor('to');
-    return this.createSelectionContextItem(file.path, {
-      startLine: from.line + 1,
-      endLine: to.line + 1,
-    }, selectedText);
-  }
-
-  private buildSelectionContextItemFromPreview(preview: FocusContextPreview): PromptContextItem | null {
-    if (
-      preview.kind !== 'selection'
-      || !preview.lineRange
-      || !preview.textSnapshot?.trim()
-    ) {
-      new Notice(t('chat.context.notice.noSelection'));
-      return null;
-    }
-
-    const targetFile = this.app.vault.getAbstractFileByPath(preview.path);
-    if (!(targetFile instanceof TFile)) {
-      new Notice(t('chat.context.notice.noActiveNote'));
-      return null;
-    }
-
-    return this.createSelectionContextItem(targetFile.path, preview.lineRange, preview.textSnapshot);
-  }
-
-  private createSelectionContextItem(
-    path: string,
-    lineRange: PromptContextLineRange,
-    selectedText: string,
-  ): PromptContextItem | null {
-    const mime = resolveTextMimeFromPath(path);
-    if (!isTextLikeMime(mime)) {
-      new Notice(t('chat.context.notice.binaryUnsupported'));
-      return null;
-    }
-
-    const textSnapshot = this.validateRemoteContextText(selectedText, path);
-    if (this.isRemoteContextMode() && textSnapshot === null) {
-      return null;
-    }
-
-    return {
-      id: this.createPromptContextId(),
-      kind: 'selection',
-      path,
-      label: formatContextLabel(path, lineRange),
-      mime,
-      lineRange,
-      textSnapshot: textSnapshot ?? undefined,
-    };
-  }
-
-  private async buildFileContextItem(
-    file: TFile,
-    kind: 'current_note' | 'file',
-  ): Promise<PromptContextItem | null> {
-    const mime = resolveContextMimeFromPath(file.path);
-    if (this.isRemoteContextMode() && !isTextLikeMime(mime)) {
-      new Notice(t('chat.context.notice.binaryUnsupportedRemote'));
-      return null;
-    }
-
-    let textSnapshot: string | undefined;
-    if (this.isRemoteContextMode()) {
-      const fileText = await this.app.vault.read(file);
-      const validatedText = this.validateRemoteContextText(fileText, file.path);
-      if (validatedText === null) {
-        return null;
-      }
-      textSnapshot = validatedText;
-    }
-
-    return {
-      id: this.createPromptContextId(),
-      kind,
-      path: file.path,
-      label: formatContextLabel(file.path),
-      mime,
-      textSnapshot,
-    };
-  }
-
-  private isRemoteContextMode(): boolean {
-    return this.plugin.settings.server.mode === 'remote';
-  }
-
-  private validateRemoteContextText(text: string, label: string): string | null {
-    if (!this.isRemoteContextMode()) {
-      return text;
-    }
-
-    const byteLength = new TextEncoder().encode(text).length;
-    if (byteLength > REMOTE_CONTEXT_TEXT_LIMIT_BYTES) {
-      new Notice(t('chat.context.notice.tooLarge', { label }));
-      return null;
-    }
-
-    return text;
-  }
-
-  private createPromptContextId(): string {
-    return `context-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   }
 
   private trySubmitCurrentInput(): void {

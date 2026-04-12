@@ -329,11 +329,11 @@ model selector 现在拆成了几层协作：
 
 ### context、选区与文件目录
 
-这个视图把 composer context 相关逻辑也集中在本文件：
+这个视图仍负责 composer context 的入口与焦点预览，但附件构建 ownership 已开始迁出：
 
 - 活动编辑器焦点预览通过 `createFocusContextPreview()` / `resolveFocusContextPreview()` 维护
-- `addCurrentNoteContextFromActiveEditor()`、`addSelectionContextFromActiveEditor()`、`addChosenFileContextToActiveTab()` 负责把不同来源转成 `PromptContextItem`
-- remote server 模式下，附件文本会经过 `validateRemoteContextText()`，单项上限是 `64 KiB`
+- `addCurrentNoteContextFromActiveEditor()`、`addSelectionContextFromActiveEditor()`、`addChosenFileContextToActiveTab()` 现在只负责触发附件入口，再把结果写回 active tab
+- `ContextAttachmentBuilder` 负责 current-note / selection / file 三类 `PromptContextItem` 构建，以及 remote 模式下的文本快照读取与 `64 KiB` 校验
 - 文件选择器使用 `ContextFileCatalogService` 惰性构建和缓存 `ContextFileCatalog`；`OpenCodianView` 只转发 vault `create/delete/rename` 事件
 
 选区高亮保留逻辑同样在这里：
@@ -412,6 +412,7 @@ background task notice 这条子链路现在的边界是：
 - `TabManager` / `TabBar`：tab 生命周期和 tab 元数据
 - `MarkdownRenderService`：Markdown 渲染
 - `StreamController`：流式 assistant DOM 更新
+- `ContextAttachmentBuilder`：composer current-note / selection / file 附件构建，以及 remote 文本快照校验
 - `ContextFileCatalogService`：composer 文件上下文选择器使用的 Vault catalog 构建、缓存与增量更新
 - `ContextUsageService`：context usage state 维护
 - `TitleGenerationService`：AI 标题生成
