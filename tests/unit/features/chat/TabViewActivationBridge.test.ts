@@ -2,11 +2,11 @@ import {
   TabViewActivationBridge,
   type TabViewActivationBridgeHost,
 } from '../../../../src/features/chat/runtime/TabViewActivationBridge';
-import type { QuestionTodoStatusRefreshCoordinator } from '../../../../src/features/chat/services/QuestionTodoStatusRefreshCoordinator';
+import type { QuestionTodoActivationRefreshCoordinator } from '../../../../src/features/chat/services/QuestionTodoActivationRefreshCoordinator';
 
-type QuestionTodoStatusRefreshPort = Pick<
-  QuestionTodoStatusRefreshCoordinator,
-  'refreshAfterActivation'
+type QuestionTodoActivationRefreshPort = Pick<
+  QuestionTodoActivationRefreshCoordinator,
+  'applyActivationPreflight' | 'applyConversationActivation' | 'applyEmptyActivation'
 >;
 
 function createHost(callOrder: string[]): jest.Mocked<TabViewActivationBridgeHost> {
@@ -16,15 +16,6 @@ function createHost(callOrder: string[]): jest.Mocked<TabViewActivationBridgeHos
     }),
     refreshActiveFocusContextPreview: jest.fn(() => {
       callOrder.push('focus');
-    }),
-    renderQuestionDock: jest.fn(() => {
-      callOrder.push('question');
-    }),
-    updateSessionTodoDockForTab: jest.fn(() => {
-      callOrder.push('todo');
-    }),
-    renderSessionTodoDock: jest.fn(() => {
-      callOrder.push('todo');
     }),
     renderBackgroundTaskIndicatorIfNeeded: jest.fn(() => {
       callOrder.push('indicator');
@@ -51,11 +42,16 @@ function createHost(callOrder: string[]): jest.Mocked<TabViewActivationBridgeHos
 
 function createRefreshCoordinator(
   callOrder: string[],
-): jest.Mocked<QuestionTodoStatusRefreshPort> {
+): jest.Mocked<QuestionTodoActivationRefreshPort> {
   return {
-    refreshAfterActivation: jest.fn(() => {
-      callOrder.push('supplemental-refresh');
-      return Promise.resolve(undefined);
+    applyActivationPreflight: jest.fn(() => {
+      callOrder.push('preflight-refresh');
+    }),
+    applyConversationActivation: jest.fn(() => {
+      callOrder.push('activation-refresh');
+    }),
+    applyEmptyActivation: jest.fn(() => {
+      callOrder.push('empty-refresh');
     }),
   };
 }
@@ -70,9 +66,9 @@ describe('TabViewActivationBridge', () => {
     bridge.applyActivationPreflight('tab-1');
 
     expect(host.setActiveMessagesPane).toHaveBeenCalledWith('tab-1');
-    expect(host.updateSessionTodoDockForTab).toHaveBeenCalledWith('tab-1');
-    expect(refreshCoordinator.refreshAfterActivation).not.toHaveBeenCalled();
-    expect(callOrder).toEqual(['pane', 'focus', 'question', 'todo']);
+    expect(refreshCoordinator.applyActivationPreflight).toHaveBeenCalledWith('tab-1');
+    expect(refreshCoordinator.applyConversationActivation).not.toHaveBeenCalled();
+    expect(callOrder).toEqual(['pane', 'focus', 'preflight-refresh']);
   });
 
   it('applies streaming activation outcome UI refreshes in order', () => {
@@ -83,14 +79,14 @@ describe('TabViewActivationBridge', () => {
 
     bridge.applyStreamingActivationOutcome('tab-1', 'session-1');
 
-    expect(host.renderSessionTodoDock).toHaveBeenCalledWith('tab-1');
-    expect(refreshCoordinator.refreshAfterActivation).toHaveBeenCalledWith('tab-1', 'session-1');
+    expect(refreshCoordinator.applyConversationActivation).toHaveBeenCalledWith(
+      'tab-1',
+      'session-1',
+    );
     expect(callOrder).toEqual([
       'selector',
       'context',
-      'todo',
-      'question',
-      'supplemental-refresh',
+      'activation-refresh',
       'send',
     ]);
   });
@@ -103,9 +99,9 @@ describe('TabViewActivationBridge', () => {
 
     bridge.applyEmptyActivationOutcome('tab-1');
 
-    expect(host.renderSessionTodoDock).toHaveBeenCalledWith('tab-1');
-    expect(refreshCoordinator.refreshAfterActivation).not.toHaveBeenCalled();
-    expect(callOrder).toEqual(['todo', 'question', 'selector', 'context', 'send']);
+    expect(refreshCoordinator.applyEmptyActivation).toHaveBeenCalledWith('tab-1');
+    expect(refreshCoordinator.applyConversationActivation).not.toHaveBeenCalled();
+    expect(callOrder).toEqual(['empty-refresh', 'selector', 'context', 'send']);
   });
 
   it('applies loaded-conversation post-render outcome in order', async () => {
@@ -117,9 +113,11 @@ describe('TabViewActivationBridge', () => {
     await bridge.applyLoadedConversationPostRenderOutcome('tab-1', 'session-1');
 
     expect(host.renderBackgroundTaskIndicatorIfNeeded).toHaveBeenCalledWith('tab-1');
-    expect(host.renderSessionTodoDock).toHaveBeenCalledWith('tab-1');
-    expect(refreshCoordinator.refreshAfterActivation).toHaveBeenCalledWith('tab-1', 'session-1');
-    expect(callOrder).toEqual(['indicator', 'todo', 'question', 'supplemental-refresh']);
+    expect(refreshCoordinator.applyConversationActivation).toHaveBeenCalledWith(
+      'tab-1',
+      'session-1',
+    );
+    expect(callOrder).toEqual(['indicator', 'activation-refresh']);
   });
 
   it('applies loaded-conversation hydration tail refreshes in order', async () => {
@@ -130,7 +128,8 @@ describe('TabViewActivationBridge', () => {
 
     await bridge.applyLoadedConversationHydrationTail();
 
-    expect(refreshCoordinator.refreshAfterActivation).not.toHaveBeenCalled();
+    expect(refreshCoordinator.applyActivationPreflight).not.toHaveBeenCalled();
+    expect(refreshCoordinator.applyConversationActivation).not.toHaveBeenCalled();
     expect(callOrder).toEqual(['layout', 'selector', 'context', 'fetch-context']);
   });
 });

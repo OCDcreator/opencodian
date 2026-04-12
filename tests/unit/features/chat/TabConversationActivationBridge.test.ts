@@ -3,7 +3,7 @@ import {
   TabConversationActivationBridge,
   type TabConversationActivationBridgeHost,
 } from '../../../../src/features/chat/runtime/TabConversationActivationBridge';
-import type { QuestionTodoStatusRefreshCoordinator } from '../../../../src/features/chat/services/QuestionTodoStatusRefreshCoordinator';
+import type { QuestionTodoActivationRefreshCoordinator } from '../../../../src/features/chat/services/QuestionTodoActivationRefreshCoordinator';
 import type { TabConversationStateBridge } from '../../../../src/features/chat/runtime/TabConversationStateBridge';
 import type { TabViewActivationBridge } from '../../../../src/features/chat/runtime/TabViewActivationBridge';
 
@@ -12,9 +12,9 @@ type TabConversationStatePort = Pick<
   'applyActiveConversation' | 'clearActiveConversation' | 'commitConversationSyncBaseline'
 >;
 
-type QuestionTodoStatusRefreshPort = Pick<
-  QuestionTodoStatusRefreshCoordinator,
-  'refreshAfterActivation'
+type QuestionTodoActivationRefreshPort = Pick<
+  QuestionTodoActivationRefreshCoordinator,
+  'applyConversationActivation'
 >;
 
 type TabViewActivationPort = Pick<
@@ -65,12 +65,6 @@ function createHost(
     syncBackgroundTaskStateFromConversation: jest.fn(() => {
       callOrder.push('syncBackgroundTaskStateFromConversation');
     }),
-    renderSessionTodoDock: jest.fn(() => {
-      callOrder.push('renderSessionTodoDock');
-    }),
-    renderQuestionDock: jest.fn(() => {
-      callOrder.push('renderQuestionDock');
-    }),
     renderBackgroundTaskIndicatorIfNeeded: jest.fn(() => {
       callOrder.push('renderBackgroundTaskIndicatorIfNeeded');
       return Promise.resolve(undefined);
@@ -117,11 +111,10 @@ function createTabViewActivationBridge(
 
 function createRefreshCoordinator(
   callOrder: string[],
-): jest.Mocked<QuestionTodoStatusRefreshPort> {
+): jest.Mocked<QuestionTodoActivationRefreshPort> {
   return {
-    refreshAfterActivation: jest.fn(() => {
-      callOrder.push('refreshAfterActivation');
-      return Promise.resolve(undefined);
+    applyConversationActivation: jest.fn(() => {
+      callOrder.push('applyConversationActivation');
     }),
   };
 }
@@ -144,7 +137,7 @@ describe('TabConversationActivationBridge', () => {
 
     expect(tabConversationStateBridge.clearActiveConversation).toHaveBeenCalledWith('tab-1');
     expect(tabViewActivationBridge.applyEmptyActivationOutcome).toHaveBeenCalledWith('tab-1');
-    expect(refreshCoordinator.refreshAfterActivation).not.toHaveBeenCalled();
+    expect(refreshCoordinator.applyConversationActivation).not.toHaveBeenCalled();
     expect(callOrder).toEqual([
       'clearActiveConversation',
       'clearMessagesContainer',
@@ -252,8 +245,7 @@ describe('TabConversationActivationBridge', () => {
       conversation,
       'tab-1',
     );
-    expect(host.renderSessionTodoDock).toHaveBeenCalledWith('tab-1');
-    expect(refreshCoordinator.refreshAfterActivation).toHaveBeenCalledWith(
+    expect(refreshCoordinator.applyConversationActivation).toHaveBeenCalledWith(
       'tab-1',
       conversation.openCodeSessionId,
     );
@@ -266,9 +258,7 @@ describe('TabConversationActivationBridge', () => {
       'updateModelSelectorDisplay',
       'syncActiveTabContextUsageIdentity',
       'syncBackgroundTaskStateFromConversation',
-      'renderSessionTodoDock',
-      'renderQuestionDock',
-      'refreshAfterActivation',
+      'applyConversationActivation',
       'renderBackgroundTaskIndicatorIfNeeded',
       'refreshActiveTabContextUsageFromServer',
       'scheduleSettledScrollToBottom',

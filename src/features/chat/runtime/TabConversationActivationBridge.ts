@@ -1,5 +1,5 @@
 import type { Conversation } from '../../../core/types';
-import type { QuestionTodoStatusRefreshCoordinator } from '../services/QuestionTodoStatusRefreshCoordinator';
+import type { QuestionTodoActivationRefreshCoordinator } from '../services/QuestionTodoActivationRefreshCoordinator';
 import type { TabId } from '../tabs';
 import type { TabConversationStateBridge } from './TabConversationStateBridge';
 import type { TabViewActivationBridge } from './TabViewActivationBridge';
@@ -9,9 +9,9 @@ type TabConversationStatePort = Pick<
   'applyActiveConversation' | 'clearActiveConversation' | 'commitConversationSyncBaseline'
 >;
 
-type QuestionTodoStatusRefreshPort = Pick<
-  QuestionTodoStatusRefreshCoordinator,
-  'refreshAfterActivation'
+type QuestionTodoActivationRefreshPort = Pick<
+  QuestionTodoActivationRefreshCoordinator,
+  'applyConversationActivation'
 >;
 
 type TabViewActivationPort = Pick<
@@ -28,8 +28,6 @@ export interface TabConversationActivationBridgeHost {
   updateModelSelectorDisplay(): void;
   syncActiveTabContextUsageIdentity(): void;
   syncBackgroundTaskStateFromConversation(conversation: Conversation, tabId: TabId | null): void;
-  renderSessionTodoDock(tabId: TabId | null): void;
-  renderQuestionDock(): void;
   renderBackgroundTaskIndicatorIfNeeded(tabId: TabId | null): Promise<void>;
   refreshActiveTabContextUsageFromServer(): Promise<void>;
   scheduleSettledScrollToBottom(tabId: TabId | null): void;
@@ -40,7 +38,7 @@ export class TabConversationActivationBridge {
     private readonly host: TabConversationActivationBridgeHost,
     private readonly tabConversationStateBridge: TabConversationStatePort,
     private readonly tabViewActivationBridge: TabViewActivationPort,
-    private readonly questionTodoStatusRefreshCoordinator: QuestionTodoStatusRefreshPort,
+    private readonly questionTodoActivationRefreshCoordinator: QuestionTodoActivationRefreshPort,
   ) {}
 
   applyEmptyTabActivation(tabId: TabId): void {
@@ -84,9 +82,7 @@ export class TabConversationActivationBridge {
     this.host.updateModelSelectorDisplay();
     this.host.syncActiveTabContextUsageIdentity();
     this.host.syncBackgroundTaskStateFromConversation(conversation, activeTabId);
-    this.host.renderSessionTodoDock(activeTabId);
-    this.host.renderQuestionDock();
-    void this.questionTodoStatusRefreshCoordinator.refreshAfterActivation(
+    this.questionTodoActivationRefreshCoordinator.applyConversationActivation(
       activeTabId,
       conversation.openCodeSessionId,
     );

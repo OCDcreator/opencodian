@@ -262,6 +262,10 @@ import {
   createQuestionRuntimeViewHostAdapter,
   type QuestionRuntimeViewHostAdapterHost,
 } from './services/QuestionRuntimeViewHostAdapter';
+import {
+  QuestionTodoActivationRefreshCoordinator,
+  type QuestionTodoActivationRefreshCoordinatorHost,
+} from './services/QuestionTodoActivationRefreshCoordinator';
 import type { QuestionTodoStatusRefreshCoordinator } from './services/QuestionTodoStatusRefreshCoordinator';
 import {
   createQuestionTodoBackgroundTaskRefreshServices,
@@ -1141,6 +1145,10 @@ export class OpenCodianView extends ItemView {
     );
     this.questionTodoStatusRefreshCoordinator = questionTodoStatusRefreshCoordinator;
     this.backgroundTaskPostSyncCoordinator = backgroundTaskPostSyncCoordinator;
+    const questionTodoActivationRefreshCoordinator = new QuestionTodoActivationRefreshCoordinator(
+      this.createQuestionTodoActivationRefreshCoordinatorHost(),
+      this.questionTodoStatusRefreshCoordinator,
+    );
     this.backgroundTaskNoticeStateService = new BackgroundTaskNoticeStateService(
       this.createBackgroundTaskNoticeStateServiceHost(),
     );
@@ -1165,7 +1173,7 @@ export class OpenCodianView extends ItemView {
     );
     this.tabViewActivationBridge = new TabViewActivationBridge(
       this.createTabViewActivationBridgeHost(),
-      this.questionTodoStatusRefreshCoordinator,
+      questionTodoActivationRefreshCoordinator,
     );
     this.conversationHydrationOutcomeBridge = new ConversationHydrationOutcomeBridge(
       this.createConversationHydrationOutcomeBridgeHost(),
@@ -1176,7 +1184,7 @@ export class OpenCodianView extends ItemView {
       this.createTabConversationActivationBridgeHost(),
       this.tabConversationStateBridge,
       this.tabViewActivationBridge,
-      this.questionTodoStatusRefreshCoordinator,
+      questionTodoActivationRefreshCoordinator,
     );
     this.tabRuntimeStateBridge = new TabRuntimeStateBridge(this.createTabRuntimeStateBridgeHost());
     const conversationSyncServices = createConversationSyncServices(
@@ -1458,6 +1466,20 @@ export class OpenCodianView extends ItemView {
     };
   }
 
+  private createQuestionTodoActivationRefreshCoordinatorHost(): QuestionTodoActivationRefreshCoordinatorHost {
+    return {
+      renderQuestionDock: () => {
+        this.questionDockSlotCoordinator.render();
+      },
+      updateSessionTodoDockForTab: (tabId) => {
+        this.sessionTodoDockCoordinator.updateForTab(tabId);
+      },
+      renderSessionTodoDock: (tabId) => {
+        this.renderSessionTodoDock(tabId);
+      },
+    };
+  }
+
   private createTabViewActivationBridgeHost(): TabViewActivationBridgeHost {
     return {
       setActiveMessagesPane: (tabId) => {
@@ -1465,15 +1487,6 @@ export class OpenCodianView extends ItemView {
       },
       refreshActiveFocusContextPreview: () => {
         this.refreshActiveFocusContextPreview();
-      },
-      renderQuestionDock: () => {
-        this.questionDockSlotCoordinator.render();
-      },
-      updateSessionTodoDockForTab: (tabId) => {
-        this.updateSessionTodoDockForTab(tabId);
-      },
-      renderSessionTodoDock: (tabId) => {
-        this.renderSessionTodoDock(tabId);
       },
       renderBackgroundTaskIndicatorIfNeeded: (tabId) => this.renderBackgroundTaskIndicatorIfNeeded(tabId),
       scheduleComposerLayoutSync: () => {
@@ -1513,12 +1526,6 @@ export class OpenCodianView extends ItemView {
       },
       syncBackgroundTaskStateFromConversation: (conversation, tabId) => {
         this.syncBackgroundTaskStateFromConversation(conversation, tabId);
-      },
-      renderSessionTodoDock: (tabId) => {
-        this.renderSessionTodoDock(tabId);
-      },
-      renderQuestionDock: () => {
-        this.questionDockSlotCoordinator.render();
       },
       renderBackgroundTaskIndicatorIfNeeded: (tabId) => this.renderBackgroundTaskIndicatorIfNeeded(tabId),
       refreshActiveTabContextUsageFromServer: () => this.refreshActiveTabContextUsageFromServer(),
@@ -2490,10 +2497,6 @@ export class OpenCodianView extends ItemView {
     }
 
     this.tabBar.render(this.tabManager.getTabBarItems(), this.getTabBarLayoutMode());
-  }
-
-  private updateSessionTodoDockForTab(tabId: TabId): void {
-    this.sessionTodoDockCoordinator.updateForTab(tabId);
   }
 
   private restorePersistedTabs(): string | null {

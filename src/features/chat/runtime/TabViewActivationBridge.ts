@@ -1,17 +1,14 @@
-import type { QuestionTodoStatusRefreshCoordinator } from '../services/QuestionTodoStatusRefreshCoordinator';
+import type { QuestionTodoActivationRefreshCoordinator } from '../services/QuestionTodoActivationRefreshCoordinator';
 import type { TabId } from '../tabs';
 
-type QuestionTodoStatusRefreshPort = Pick<
-  QuestionTodoStatusRefreshCoordinator,
-  'refreshAfterActivation'
+type QuestionTodoActivationRefreshPort = Pick<
+  QuestionTodoActivationRefreshCoordinator,
+  'applyActivationPreflight' | 'applyConversationActivation' | 'applyEmptyActivation'
 >;
 
 export interface TabViewActivationBridgeHost {
   setActiveMessagesPane(tabId: TabId): void;
   refreshActiveFocusContextPreview(): void;
-  renderQuestionDock(): void;
-  updateSessionTodoDockForTab(tabId: TabId): void;
-  renderSessionTodoDock(tabId: TabId | null): void;
   renderBackgroundTaskIndicatorIfNeeded(tabId?: TabId | null): Promise<void>;
   scheduleComposerLayoutSync(): void;
   updateModelSelectorDisplay(): void;
@@ -23,28 +20,24 @@ export interface TabViewActivationBridgeHost {
 export class TabViewActivationBridge {
   constructor(
     private readonly host: TabViewActivationBridgeHost,
-    private readonly questionTodoStatusRefreshCoordinator: QuestionTodoStatusRefreshPort,
+    private readonly questionTodoActivationRefreshCoordinator: QuestionTodoActivationRefreshPort,
   ) {}
 
   applyActivationPreflight(tabId: TabId): void {
     this.host.setActiveMessagesPane(tabId);
     this.host.refreshActiveFocusContextPreview();
-    this.host.renderQuestionDock();
-    this.host.updateSessionTodoDockForTab(tabId);
+    this.questionTodoActivationRefreshCoordinator.applyActivationPreflight(tabId);
   }
 
   applyStreamingActivationOutcome(tabId: TabId, sessionId: string | null): void {
     this.host.updateModelSelectorDisplay();
     this.host.syncActiveTabContextUsageIdentity();
-    this.host.renderSessionTodoDock(tabId);
-    this.host.renderQuestionDock();
-    void this.questionTodoStatusRefreshCoordinator.refreshAfterActivation(tabId, sessionId);
+    this.questionTodoActivationRefreshCoordinator.applyConversationActivation(tabId, sessionId);
     this.host.updateSendButtonState();
   }
 
   applyEmptyActivationOutcome(tabId: TabId): void {
-    this.host.renderSessionTodoDock(tabId);
-    this.host.renderQuestionDock();
+    this.questionTodoActivationRefreshCoordinator.applyEmptyActivation(tabId);
     this.host.updateModelSelectorDisplay();
     this.host.syncActiveTabContextUsageIdentity();
     this.host.updateSendButtonState();
@@ -55,9 +48,7 @@ export class TabViewActivationBridge {
     sessionId: string | null,
   ): Promise<void> {
     await this.host.renderBackgroundTaskIndicatorIfNeeded(tabId);
-    this.host.renderSessionTodoDock(tabId);
-    this.host.renderQuestionDock();
-    void this.questionTodoStatusRefreshCoordinator.refreshAfterActivation(tabId, sessionId);
+    this.questionTodoActivationRefreshCoordinator.applyConversationActivation(tabId, sessionId);
   }
 
   async applyLoadedConversationHydrationTail(): Promise<void> {
