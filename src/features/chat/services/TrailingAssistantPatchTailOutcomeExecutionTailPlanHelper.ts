@@ -3,6 +3,7 @@ import {
   buildTrailingAssistantPatchTailOutcomePlans,
   type TrailingAssistantPatchTailOutcomePlans,
 } from './TrailingAssistantPatchTailOutcomePlanHelper';
+import { buildTrailingAssistantPatchTailOutcomePlanParts } from './TrailingAssistantPatchTailOutcomePlanPartsHelper';
 import {
   buildTrailingAssistantPatchTailOutcomeExecutionTailPlanSourceContract,
   type TrailingAssistantPatchTailOutcomeExecutionTailPlanSourceContractParts,
@@ -23,14 +24,17 @@ export function buildTrailingAssistantPatchTailOutcomePlansFromExecutionTailPlan
     buildTrailingAssistantPatchTailStatePlanFromTailOutcomePlanningContext(
       sourceContract.planningContext,
     );
+  const completionDebugPlan =
+    buildTrailingAssistantPatchCompletionDebugPlanFromTailOutcomePlanningContext({
+      planningContext: sourceContract.planningContext,
+      tailStatePlan,
+      summarizeChatMessageForDebug: sourceContract.summarizeChatMessageForDebug,
+    });
 
-  return buildTrailingAssistantPatchTailOutcomePlans({
-    tailStatePlan,
-    completionDebugPlan:
-      buildTrailingAssistantPatchCompletionDebugPlanFromTailOutcomePlanningContext({
-        planningContext: sourceContract.planningContext,
-        tailStatePlan,
-        summarizeChatMessageForDebug: sourceContract.summarizeChatMessageForDebug,
-      }),
-  });
+  return buildTrailingAssistantPatchTailOutcomePlans(
+    buildTrailingAssistantPatchTailOutcomePlanParts({
+      tailStatePlan,
+      completionDebugPlan,
+    }),
+  );
 }

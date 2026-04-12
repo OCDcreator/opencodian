@@ -1,17 +1,14 @@
 import type { TrailingAssistantPatchCompletionDebugPlan } from './TrailingAssistantPatchCompletionDebugPlanHelper';
 import type { TrailingAssistantPatchTailStatePlan } from './TrailingAssistantPatchTailStateApplierHelper';
-import type { TrailingAssistantPatchTailOutcomePlanParts } from './TrailingAssistantPatchTailOutcomePlanPartsHelper';
 
-export type TrailingAssistantPatchTailOutcomePlans = {
+export type TrailingAssistantPatchTailOutcomePlanParts = {
   tailStatePlan: TrailingAssistantPatchTailStatePlan;
   completionDebugPlan: TrailingAssistantPatchCompletionDebugPlan;
 };
 
-export type { TrailingAssistantPatchTailOutcomePlanParts } from './TrailingAssistantPatchTailOutcomePlanPartsHelper';
-
-export function buildTrailingAssistantPatchTailOutcomePlans(
+export function buildTrailingAssistantPatchTailOutcomePlanParts(
   planParts: TrailingAssistantPatchTailOutcomePlanParts,
-): TrailingAssistantPatchTailOutcomePlans {
+): TrailingAssistantPatchTailOutcomePlanParts {
   return {
     tailStatePlan: planParts.tailStatePlan,
     completionDebugPlan: planParts.completionDebugPlan,
