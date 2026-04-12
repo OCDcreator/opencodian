@@ -131,6 +131,10 @@ import {
   BackgroundTaskIndicatorCoordinator,
 } from './runtime/BackgroundTaskIndicatorCoordinator';
 import {
+  type BackgroundTaskStreamTriggerCoordinatorHost,
+  BackgroundTaskStreamTriggerCoordinator,
+} from './runtime/BackgroundTaskStreamTriggerCoordinator';
+import {
   type StreamingInlineCardRendererHost,
   StreamingInlineCardRenderer,
 } from './runtime/StreamingInlineCardRenderer';
@@ -696,6 +700,7 @@ export class OpenCodianView extends ItemView {
   private persistedAssistantFooterFinalizer: PersistedAssistantFooterFinalizer;
   private backgroundTaskInlinePanelRenderer: BackgroundTaskInlinePanelRenderer;
   private backgroundTaskIndicatorCoordinator: BackgroundTaskIndicatorCoordinator;
+  private backgroundTaskStreamTriggerCoordinator: BackgroundTaskStreamTriggerCoordinator;
   private streamingInlineCardRenderer: StreamingInlineCardRenderer;
   private permissionInlineCardRenderer: PermissionInlineCardRenderer;
   private questionInlineCardRenderer: QuestionInlineCardRenderer;
@@ -820,10 +825,10 @@ export class OpenCodianView extends ItemView {
       });
       paneState.runtime.streamController.setCallbacks({
         onToolCallStart: (toolCall) => {
-          void this.handleStreamingToolCallStart(toolCall, tabId);
+          void this.backgroundTaskStreamTriggerCoordinator.handleToolCallStart(toolCall, tabId);
         },
         onToolCallEnd: (toolCall) => {
-          void this.handleStreamingToolCallEnd(toolCall, tabId);
+          void this.backgroundTaskStreamTriggerCoordinator.handleToolCallEnd(toolCall, tabId);
         },
       });
     }
@@ -901,55 +906,10 @@ export class OpenCodianView extends ItemView {
     }
   }
 
-  private get backgroundTaskIndicatorEl(): HTMLElement | null {
-    return this.getActiveTabRuntimeState()?.backgroundTaskIndicatorEl ?? null;
-  }
-
   private set backgroundTaskIndicatorEl(value: HTMLElement | null) {
     const runtime = this.ensureTabRuntimeState();
     if (runtime) {
       runtime.backgroundTaskIndicatorEl = value;
-    }
-  }
-
-  private get backgroundTaskStartedAt(): number | null {
-    return this.getActiveTabRuntimeState()?.backgroundTaskStartedAt ?? null;
-  }
-
-  private set backgroundTaskStartedAt(value: number | null) {
-    const runtime = this.ensureTabRuntimeState();
-    if (runtime) {
-      runtime.backgroundTaskStartedAt = value;
-    }
-  }
-
-  private get backgroundTaskModeTag(): string | null {
-    return this.getActiveTabRuntimeState()?.backgroundTaskModeTag ?? null;
-  }
-
-  private set backgroundTaskModeTag(value: string | null) {
-    const runtime = this.ensureTabRuntimeState();
-    if (runtime) {
-      runtime.backgroundTaskModeTag = value;
-    }
-  }
-
-  private get backgroundTaskLaunches(): Map<string, BackgroundTaskLaunchInfo> {
-    return this.getActiveTabRuntimeState()?.backgroundTaskLaunches ?? new Map();
-  }
-
-  private get backgroundTaskCompletedTasks(): Map<string, BackgroundTaskCompletionInfo> {
-    return this.getActiveTabRuntimeState()?.backgroundTaskCompletedTasks ?? new Map();
-  }
-
-  private get backgroundTaskWaitingForFollowUp(): boolean {
-    return this.getActiveTabRuntimeState()?.backgroundTaskWaitingForFollowUp ?? false;
-  }
-
-  private set backgroundTaskWaitingForFollowUp(value: boolean) {
-    const runtime = this.ensureTabRuntimeState();
-    if (runtime) {
-      runtime.backgroundTaskWaitingForFollowUp = value;
     }
   }
 
@@ -1626,6 +1586,11 @@ export class OpenCodianView extends ItemView {
       this.backgroundTaskCompletionNoticeService,
       this.createBackgroundTaskIndicatorCoordinatorHost(),
     );
+    this.backgroundTaskStreamTriggerCoordinator = new BackgroundTaskStreamTriggerCoordinator(
+      this.backgroundTaskIndicatorCoordinator,
+      this.backgroundTaskTimelineService,
+      this.createBackgroundTaskStreamTriggerCoordinatorHost(),
+    );
     this.conversationViewStateService = new ConversationViewStateService(this.createConversationViewStateHost());
     this.conversationRenderService = new ConversationRenderService(this.createConversationRenderHost());
     this.messageSendPreparationService = new MessageSendPreparationService(this.createMessageSendPreparationHost());
@@ -1794,6 +1759,26 @@ export class OpenCodianView extends ItemView {
         if (tabId) {
           this.tabManager?.setTabNeedsAttention(tabId, needsAttention);
         }
+      },
+    };
+  }
+
+  private createBackgroundTaskStreamTriggerCoordinatorHost(): BackgroundTaskStreamTriggerCoordinatorHost {
+    return {
+      getActiveTabId: () => this.getActiveTabId(),
+      getTabRuntimeState: (tabId: TabId | null) => this.getTabRuntimeState(tabId),
+      applyStreamingTodoSnapshotFromTool: (toolCall, tabId) => {
+        this.applyStreamingTodoSnapshotFromTool(toolCall, tabId);
+      },
+      getSessionIdForTab: (tabId: TabId | null) => this.getSessionIdForTab(tabId),
+      refreshTabSessionTodos: (tabId, sessionId, options) =>
+        this.refreshTabSessionTodos(tabId, sessionId, options),
+      armAuthoritativeSyncGate: (tabId) => {
+        this.backgroundTaskLiveSignalCoordinator.armAuthoritativeSyncGate(tabId);
+      },
+      hasTabBackgroundTaskIndicator: (tabId) => this.hasTabBackgroundTaskIndicator(tabId),
+      resetBackgroundTaskIndicator: (tabId) => {
+        this.resetBackgroundTaskIndicator(tabId);
       },
     };
   }
@@ -2194,7 +2179,7 @@ export class OpenCodianView extends ItemView {
       },
       getOrCreateTabStreamController: (tabId) => this.getOrCreateTabStreamController(tabId),
       finalizeBackgroundTaskIndicatorAfterPrimaryStream: (tabId) =>
-        this.finalizeBackgroundTaskIndicatorAfterPrimaryStream(tabId),
+        this.backgroundTaskStreamTriggerCoordinator.finalizeAfterPrimaryStream(tabId),
       removeEmptyAssistantShells: () => {
         this.removeEmptyAssistantShells();
       },
@@ -6386,18 +6371,6 @@ export class OpenCodianView extends ItemView {
     this.syncTabStreamLikeState(tabId);
   }
 
-  private isBackgroundTaskTool(toolName: string): boolean {
-    return toolName === 'task';
-  }
-
-  private upsertBackgroundTaskLaunch(toolCall: {
-    id: string;
-    input: Record<string, unknown>;
-    result?: string;
-  }, target: Map<string, BackgroundTaskLaunchInfo> = this.backgroundTaskLaunches): void {
-    this.backgroundTaskTimelineService.upsertLaunch(toolCall, target);
-  }
-
   private collectBackgroundTaskSegments(
     messages: ChatMessage[],
     tabId: TabId | null = this.getActiveTabId(),
@@ -6483,83 +6456,6 @@ export class OpenCodianView extends ItemView {
     }
 
     this.omoBackgroundTaskLogStates.set(conversation.id, state);
-  }
-
-  private async handleStreamingToolCallStart(
-    toolCall: ToolCallInfo,
-    tabId: TabId | null = this.getActiveTabId(),
-  ): Promise<void> {
-    const runtime = this.getTabRuntimeState(tabId);
-    if (!runtime) {
-      return;
-    }
-
-    this.applyStreamingTodoSnapshotFromTool(toolCall, tabId);
-
-    if (!this.isBackgroundTaskTool(toolCall.name)) {
-      return;
-    }
-
-    if (!runtime.backgroundTaskStartedAt) {
-      runtime.backgroundTaskStartedAt = Date.now();
-    }
-    this.backgroundTaskLiveSignalCoordinator.armAuthoritativeSyncGate(tabId);
-    runtime.backgroundTaskStaleNoticeFingerprint = null;
-    this.upsertBackgroundTaskLaunch({
-      id: toolCall.id,
-      input: toolCall.input ?? {},
-    }, runtime.backgroundTaskLaunches);
-    runtime.backgroundTaskWaitingForFollowUp = false;
-    await this.renderBackgroundTaskIndicatorIfNeeded(tabId);
-  }
-
-  private async handleStreamingToolCallEnd(
-    toolCall: ToolCallInfo,
-    tabId: TabId | null = this.getActiveTabId(),
-  ): Promise<void> {
-    const runtime = this.getTabRuntimeState(tabId);
-    if (!runtime) {
-      return;
-    }
-
-    this.applyStreamingTodoSnapshotFromTool(toolCall, tabId);
-
-    if (toolCall.name === 'todowrite' || toolCall.name === 'todoread') {
-      const sessionId = this.getSessionIdForTab(tabId);
-      if (sessionId) {
-        await this.refreshTabSessionTodos(tabId, sessionId, { suppressErrors: true });
-      }
-    }
-
-    if (!this.isBackgroundTaskTool(toolCall.name)) {
-      return;
-    }
-
-    this.upsertBackgroundTaskLaunch({
-      id: toolCall.id,
-      input: toolCall.input ?? {},
-      result: toolCall.result,
-    }, runtime.backgroundTaskLaunches);
-    this.backgroundTaskLiveSignalCoordinator.armAuthoritativeSyncGate(tabId);
-    runtime.backgroundTaskStaleNoticeFingerprint = null;
-    await this.renderBackgroundTaskIndicatorIfNeeded(tabId);
-  }
-
-  private async finalizeBackgroundTaskIndicatorAfterPrimaryStream(
-    tabId: TabId | null = this.getActiveTabId(),
-  ): Promise<void> {
-    const runtime = this.getTabRuntimeState(tabId);
-    if (!runtime || !this.hasTabBackgroundTaskIndicator(tabId)) {
-      return;
-    }
-
-    if (runtime.backgroundTaskLaunches.size === 0) {
-      this.resetBackgroundTaskIndicator(tabId);
-      return;
-    }
-
-    runtime.backgroundTaskWaitingForFollowUp = true;
-    await this.renderBackgroundTaskIndicatorIfNeeded(tabId);
   }
 
   private async renderBackgroundTaskIndicatorIfNeeded(

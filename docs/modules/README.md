@@ -99,6 +99,7 @@ docs/modules/
 │   │   │   ├── AssistantStructuredContentRenderer.md
 │   │   │   ├── BackgroundTaskIndicatorCoordinator.md
 │   │   │   ├── BackgroundTaskInlinePanelRenderer.md
+│   │   │   ├── BackgroundTaskStreamTriggerCoordinator.md
 │   │   │   ├── PermissionInlineCardRenderer.md
 │   │   │   ├── QuestionInlineCardRenderer.md
 │   │   │   ├── QuestionResolutionCoordinator.md
