@@ -15,7 +15,7 @@
 ## 导入关系
 
 上游: `FocusContextEventBridge`、`ContextFileCatalogEventBridge`
-下游: `OpenCodianView`
+下游: `ComposerContextViewFacade`
 
 ## 公开接口
 
@@ -36,14 +36,15 @@ class ComposerContextEventBridge {
 
 ### 单一入口保留
 
-- `OpenCodianView` 与 `createComposerContextServices()` 仍然只暴露一份 `eventBridge`
-- 这保证 view 侧的装配面不变，同时把更细的责任边界下沉到 services 目录
+- `createComposerContextServices()` 仍然只组装一份 `eventBridge`
+- `ComposerContextViewFacade` 继续把这份 lifecycle seam 作为单一 `start()/dispose()` 入口暴露给 `OpenCodianView`
+- 这保证 view 侧的装配面继续收窄，同时把更细的责任边界下沉到 services 目录
 
 ## 与其他模块的交互
 
 - **FocusContextEventBridge**：承接 focus-preview activation、DOM focus handoff 与 retained-selection polling
 - **ContextFileCatalogEventBridge**：承接 vault catalog mutation 桥接
-- **OpenCodianView**：继续只持有单一的 composer-context lifecycle 入口
+- **ComposerContextViewFacade**：承接单一的 composer-context lifecycle 入口，再暴露给 view
 
 ## 注意事项
 

@@ -185,18 +185,13 @@ import {
   BackgroundTaskTimelineService,
   type BackgroundTaskTimelineServiceHost,
 } from './services/BackgroundTaskTimelineService';
-import type { ComposerContextActionService } from './services/ComposerContextActionService';
-import type { ComposerContextChipActionService } from './services/ComposerContextChipActionService';
-import type { ComposerContextCoordinator } from './services/ComposerContextCoordinator';
-import type { ComposerContextEventBridge } from './services/ComposerContextEventBridge';
-import type { ComposerContextPickerActionService } from './services/ComposerContextPickerActionService';
 import {
   createComposerContextServices,
   type ComposerContextViewHost,
   type FocusContextPreviewWritebackHost,
   type FocusContextRuntimeViewHost,
 } from './services/ComposerContextHostAdapter';
-import { ComposerContextRuntimeStore } from './services/ComposerContextRuntimeStore';
+import type { ComposerContextViewFacade } from './services/ComposerContextViewFacade';
 import { ContextAttachmentBuilder } from './services/ContextAttachmentBuilder';
 import { ContextFileCatalogService } from './services/ContextFileCatalogService';
 import { ContextUsageService } from './services/ContextUsageService';
@@ -244,8 +239,6 @@ import {
   type ConversationViewStateHost,
   ConversationViewStateService,
 } from './services/ConversationViewStateService';
-import type { FocusContextPreviewCoordinator } from './services/FocusContextPreviewCoordinator';
-import type { FocusContextRuntimeService } from './services/FocusContextRuntimeService';
 import {
   type MessageFinalizationHost,
   MessageFinalizationService,
@@ -751,16 +744,9 @@ export class OpenCodianView extends ItemView {
   private permissionInlineCardRenderer: PermissionInlineCardRenderer;
   private questionRuntimeServices: QuestionRuntimeServices;
   private sendPipelineRuntime: SendPipelineRuntime;
-  private composerContextActionService: ComposerContextActionService;
-  private composerContextPickerActionService: ComposerContextPickerActionService;
-  private composerContextChipActionService: ComposerContextChipActionService;
-  private composerContextCoordinator: ComposerContextCoordinator;
-  private composerContextEventBridge: ComposerContextEventBridge;
-  private composerContextRuntimeStore: ComposerContextRuntimeStore;
+  private composerContextViewFacade: ComposerContextViewFacade;
   private contextAttachmentBuilder: ContextAttachmentBuilder;
   private contextFileCatalogService: ContextFileCatalogService;
-  private focusContextPreviewCoordinator: FocusContextPreviewCoordinator;
-  private focusContextRuntimeService: FocusContextRuntimeService;
   private omoBackgroundTaskLogStates = new Map<string, OmoBackgroundTaskLogState>();
   private lastLiquidGlassDiagnosticsFingerprint: string | null = null;
 
@@ -1107,14 +1093,7 @@ export class OpenCodianView extends ItemView {
       focusRuntimeViewHost: this.createFocusContextRuntimeViewHost(),
       focusPreviewWritebackHost: this.createFocusContextPreviewWritebackHost(),
     });
-    this.composerContextRuntimeStore = composerContextServices.runtimeStore;
-    this.composerContextActionService = composerContextServices.actionService;
-    this.composerContextPickerActionService = composerContextServices.pickerActionService;
-    this.focusContextRuntimeService = composerContextServices.focusContextRuntimeService;
-    this.focusContextPreviewCoordinator = composerContextServices.focusContextPreviewCoordinator;
-    this.composerContextChipActionService = composerContextServices.chipActionService;
-    this.composerContextCoordinator = composerContextServices.coordinator;
-    this.composerContextEventBridge = composerContextServices.eventBridge;
+    this.composerContextViewFacade = composerContextServices.viewFacade;
     this.persistentAssistantNoticeService = new PersistentAssistantNoticeService(
       this.createPersistentAssistantNoticeServiceHost(),
     );
@@ -1178,7 +1157,7 @@ export class OpenCodianView extends ItemView {
     );
     this.tabViewActivationBridge = new TabViewActivationBridge(
       this.createTabViewActivationBridgeHost(),
-      this.focusContextPreviewCoordinator,
+      this.composerContextViewFacade,
       questionTodoActivationRefreshCoordinator,
       backgroundTaskActivationIndicatorCoordinator,
       this.activeTabContextUsageCoordinator,
@@ -1942,7 +1921,7 @@ export class OpenCodianView extends ItemView {
       notifyForegroundBusy: () => {
         new Notice(t('chat.tab.processingBlocked'));
       },
-      getDraftContextItems: (tabId) => this.composerContextRuntimeStore.getDraftContextItems(tabId),
+      getDraftContextItems: (tabId) => this.composerContextViewFacade.getDraftContextItems(tabId),
       getServerAvailability: () => this.getServerAvailability(),
       refreshServerStatusBadge: () => this.refreshServerStatusBadge(),
       ensureServerReadyForChat: (availability) => this.ensureServerReadyForChat(availability),
@@ -1994,7 +1973,7 @@ export class OpenCodianView extends ItemView {
         this.getTabRuntimeState(tabId)?.pendingEditedFiles.clear();
       },
       clearDraftContextItems: (tabId) => {
-        this.composerContextRuntimeStore.clearDraftContextItems(tabId);
+        this.composerContextViewFacade.clearDraftContextItems(tabId);
       },
     };
   }
@@ -2148,7 +2127,7 @@ export class OpenCodianView extends ItemView {
     this.persistTabState({ flush: true });
     this.stopServerStatusLoop();
     this.stopConversationSyncLoop();
-    this.composerContextEventBridge.dispose();
+    this.composerContextViewFacade.dispose();
     this.clearChatSurfaceSyncTimers();
     this.clearScheduledComposerLayoutSync();
     this.clearScheduledScrollToBottom();
@@ -2183,7 +2162,7 @@ export class OpenCodianView extends ItemView {
     this.inputTabBarSlotEl = null;
     this.inputWrapperEl = null;
     this.composerShellEl = null;
-    this.composerContextCoordinator.setContextRowElement(null);
+    this.composerContextViewFacade.setContextRowElement(null);
     this.addContextBtn = null;
     this.sendBtn = null;
     this.inputTextarea = null;
@@ -3154,7 +3133,7 @@ export class OpenCodianView extends ItemView {
     const inputWrapper = composerShellEl.createDiv({ cls: 'opencodian-input-wrapper' });
     this.inputWrapperEl = inputWrapper;
     const composerContentEl = inputWrapper.createDiv({ cls: 'opencodian-composer-content' });
-    this.composerContextCoordinator.setContextRowElement(
+    this.composerContextViewFacade.setContextRowElement(
       composerContentEl.createDiv({ cls: 'opencodian-composer-context-row is-empty' }),
     );
 
@@ -3189,7 +3168,7 @@ export class OpenCodianView extends ItemView {
     setIcon(addContextBtn, 'plus');
     this.setTooltipLabel(addContextBtn, t('chat.context.addContext'), 'top');
     addContextBtn.addEventListener('click', () => {
-      void this.composerContextPickerActionService.addChosenFileContextToActiveTab();
+      void this.composerContextViewFacade.addChosenFileContextToActiveTab();
     });
 
     this.sendBtn = composerFooterEl.createEl('button', {
@@ -4073,18 +4052,18 @@ export class OpenCodianView extends ItemView {
   }
 
   private getActiveMarkdownView(): MarkdownView | null {
-    return this.focusContextRuntimeService.getActiveMarkdownView();
+    return this.composerContextViewFacade.getActiveMarkdownView();
   }
 
   public async addCurrentNoteContextFromActiveEditor(view?: MarkdownView | null): Promise<boolean> {
-    return this.composerContextActionService.addCurrentNoteContextFromActiveEditor(view);
+    return this.composerContextViewFacade.addCurrentNoteContextFromActiveEditor(view);
   }
 
   public async addSelectionContextFromActiveEditor(
     editor?: Editor | null,
     view?: MarkdownView | null,
   ): Promise<boolean> {
-    return this.composerContextActionService.addSelectionContextFromActiveEditor(editor, view);
+    return this.composerContextViewFacade.addSelectionContextFromActiveEditor(editor, view);
   }
 
   private trySubmitCurrentInput(): void {
@@ -4132,7 +4111,7 @@ export class OpenCodianView extends ItemView {
       return false;
     });
 
-    this.composerContextEventBridge.start();
+    this.composerContextViewFacade.start();
   }
 
   /** Create a new conversation */

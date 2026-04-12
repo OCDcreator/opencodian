@@ -120,7 +120,7 @@ describe('ComposerContextHostAdapter', () => {
     jest.clearAllMocks();
   });
 
-  it('wires current-note context actions through the shared runtime store and coordinator render bridge', async () => {
+  it('wires current-note context actions through the shared view facade and coordinator render bridge', async () => {
     const activeView = { file: { path: 'notes/current.md' } } as unknown as MarkdownView;
     const currentNoteItem = createContextItem({
       kind: 'current_note',
@@ -131,15 +131,17 @@ describe('ComposerContextHostAdapter', () => {
       activeView,
       currentNoteItem,
     });
-    const renderSpy = jest.spyOn(services.coordinator, 'render').mockImplementation(() => {});
+    const contextRowEl = document.createElement('div');
+    services.viewFacade.setContextRowElement(contextRowEl);
 
-    const result = await services.actionService.addCurrentNoteContextFromActiveEditor();
+    const result = await services.viewFacade.addCurrentNoteContextFromActiveEditor();
 
     expect(result).toBe(true);
     expect(viewHost.getActiveMarkdownView).toHaveBeenCalledTimes(1);
     expect(contextAttachmentBuilder.buildCurrentNoteContextItem).toHaveBeenCalledWith(activeView);
-    expect(services.runtimeStore.getDraftContextItems()).toEqual([currentNoteItem]);
-    expect(renderSpy).toHaveBeenCalledTimes(1);
+    expect(services.viewFacade.getDraftContextItems()).toEqual([currentNoteItem]);
+    expect(contextRowEl.querySelectorAll('.opencodian-composer-context-chip')).toHaveLength(1);
+    expect(contextRowEl.textContent).toContain('notes/current.md');
   });
 
   it('wires file-open preview updates through the current-conversation note host', () => {
@@ -188,12 +190,12 @@ describe('ComposerContextHostAdapter', () => {
     ).mockImplementation(() => {});
     chooseContextFileMock.mockResolvedValue(file);
 
-    const result = await services.pickerActionService.addChosenFileContextToActiveTab();
+    const result = await services.viewFacade.addChosenFileContextToActiveTab();
 
     expect(result).toBe(true);
     expect(pointerDownSpy).toHaveBeenCalledTimes(1);
     expect(refreshSpy).toHaveBeenCalledTimes(1);
     expect(contextAttachmentBuilder.buildFileContextItem).toHaveBeenCalledWith(file, 'file');
-    expect(services.runtimeStore.getDraftContextItems()).toEqual([fileItem]);
+    expect(services.viewFacade.getDraftContextItems()).toEqual([fileItem]);
   });
 });

@@ -18,8 +18,9 @@
 - `FocusContextEventBridge`
 - `ContextFileCatalogEventBridge`
 - `ComposerContextEventBridge`
+- `ComposerContextViewFacade`
 
-这样 `OpenCodianView` 不再自己逐项 new 出 retained-selection / context picker 相关 service，也不再直接拼多份 host 闭包；view 只保留 `ComposerContextViewHost`、`FocusContextRuntimeViewHost` 与 `FocusContextPreviewWritebackHost` 三条更窄 seam，避免把 picker interaction gate 与 current-note writeback 混在同一个 host。
+这样 `OpenCodianView` 不再自己逐项 new 出 retained-selection / context picker 相关 service，也不再直接持有 action / picker / coordinator / event bridge 等多条依赖；view 只保留 `ComposerContextViewHost`、`FocusContextRuntimeViewHost` 与 `FocusContextPreviewWritebackHost` 三条更窄 seam，再通过 `ComposerContextViewFacade` 接入 composer/context runtime。
 
 ## 导入关系
 
@@ -50,6 +51,12 @@ interface FocusContextPreviewWritebackHost {
 function createComposerContextServices(
   dependencies: ComposerContextServiceDependencies,
 ): ComposerContextServices
+
+interface ComposerContextServices {
+  viewFacade: ComposerContextViewFacade
+  focusContextPreviewCoordinator: FocusContextPreviewCoordinator
+  focusContextRuntimeService: FocusContextRuntimeService
+}
 ```
 
 ## 核心逻辑
@@ -64,10 +71,12 @@ function createComposerContextServices(
 - `FocusContextEventBridge` 现在单独承接 workspace / DOM 事件桥接与 retained-selection polling 启动
 - `ContextFileCatalogEventBridge` 单独承接 vault catalog mutation 注册
 - `ComposerContextEventBridge` 退回为组合层，统一把这两个更窄的 bridge 暴露给 view
+- `ComposerContextViewFacade` 最后把 view 真正需要的 draft-context、picker、action、context-row 与 lifecycle 入口收敛成一条更窄的 facade seam
 
 ## 注意事项
 
 - 这个模块只负责 composer context bundle 的 host 装配，不负责 `PromptContextItem` 构建、Vault catalog 维护或 retained-selection 具体算法
 - `ComposerContextViewHostAdapter` 与 `FocusContextViewHostAdapter` 都只是 runtime-store → service-host 的窄适配层；这里负责的是更上层的 view → service-bundle 装配
 - picker lifecycle 只通过 `ContextPickerInteractionBridge` 连接到 focus runtime，避免把 picker interaction gate 与 current-note writeback 再次混到同一个 view host
+- `ComposerContextViewFacade` 是 view-facing 收口层；若 `OpenCodianView` 又开始逐项保存内部 service，应优先回到 facade 收束，而不是扩大 view 的 service fan-out
 - 新增事件桥时，优先判断它属于 focus-preview/runtime 侧还是 catalog mutation 侧，避免重新把两类事件混回同一个 bridge

@@ -6,6 +6,7 @@ import { ComposerContextChipActionService } from './ComposerContextChipActionSer
 import { ComposerContextCoordinator } from './ComposerContextCoordinator';
 import { ComposerContextEventBridge } from './ComposerContextEventBridge';
 import { ComposerContextPickerActionService } from './ComposerContextPickerActionService';
+import { ComposerContextViewFacade } from './ComposerContextViewFacade';
 import { ContextFileCatalogEventBridge } from './ContextFileCatalogEventBridge';
 import { ContextPickerInteractionBridge } from './ContextPickerInteractionBridge';
 import {
@@ -68,12 +69,7 @@ export interface ComposerContextServiceDependencies {
 }
 
 export interface ComposerContextServices {
-  runtimeStore: ComposerContextRuntimeStore;
-  actionService: ComposerContextActionService;
-  pickerActionService: ComposerContextPickerActionService;
-  chipActionService: ComposerContextChipActionService;
-  coordinator: ComposerContextCoordinator;
-  eventBridge: ComposerContextEventBridge;
+  viewFacade: ComposerContextViewFacade;
   focusContextPreviewCoordinator: FocusContextPreviewCoordinator;
   focusContextRuntimeService: FocusContextRuntimeService;
 }
@@ -164,14 +160,18 @@ export function createComposerContextServices(
     focusContextEventBridge,
     contextFileCatalogEventBridge,
   );
-
-  return {
+  const viewFacade = new ComposerContextViewFacade({
     runtimeStore,
     actionService,
     pickerActionService,
-    chipActionService,
     coordinator,
     eventBridge,
+    focusContextPreviewCoordinator,
+    focusContextRuntimeService,
+  });
+
+  return {
+    viewFacade,
     focusContextPreviewCoordinator,
     focusContextRuntimeService,
   };
