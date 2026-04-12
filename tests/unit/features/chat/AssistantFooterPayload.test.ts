@@ -1,6 +1,9 @@
 import type { ChatMessage } from '../../../../src/core/types';
 import {
+  buildErrorAssistantFooterPayload,
+  buildNoticeAssistantFooterPayload,
   buildPersistedAssistantFooterPayload,
+  buildPseudoStreamAssistantFooterPayload,
   resolvePersistedAssistantFooterStatusLabel,
 } from '../../../../src/features/chat/runtime/AssistantFooterPayload';
 
@@ -57,6 +60,46 @@ describe('AssistantFooterPayload', () => {
       timestamp: 67890,
       content: undefined,
       modelId: undefined,
+      statusLabel: undefined,
+    });
+  });
+
+  it('assembles notice footers without copy content or status', () => {
+    expect(buildNoticeAssistantFooterPayload({
+      message: {
+        timestamp: 11111,
+        modelId: 'openai/gpt-5.4',
+      },
+    })).toEqual({
+      timestamp: 11111,
+      content: undefined,
+      modelId: 'openai/gpt-5.4',
+      statusLabel: undefined,
+    });
+  });
+
+  it('assembles pseudo-stream and error footer payloads with copy content', () => {
+    expect(buildPseudoStreamAssistantFooterPayload({
+      message: {
+        content: 'Reveal me',
+        timestamp: 22222,
+        modelId: 'anthropic/claude-sonnet-4',
+      },
+    })).toEqual({
+      timestamp: 22222,
+      content: 'Reveal me',
+      modelId: 'anthropic/claude-sonnet-4',
+      statusLabel: undefined,
+    });
+
+    expect(buildErrorAssistantFooterPayload({
+      timestamp: 33333,
+      content: 'Server unavailable',
+      modelId: 'anthropic/claude-sonnet-4',
+    })).toEqual({
+      timestamp: 33333,
+      content: 'Server unavailable',
+      modelId: 'anthropic/claude-sonnet-4',
       statusLabel: undefined,
     });
   });

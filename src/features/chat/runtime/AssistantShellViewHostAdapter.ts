@@ -1,6 +1,10 @@
 import type { ChatMessage } from '../../../core/types';
 import type { TabId } from '../tabs';
 import {
+  AssistantFooterRenderer,
+  type AssistantErrorFooterOptions,
+} from './AssistantFooterRenderer';
+import {
   type AssistantNoticeRenderHost,
   renderAssistantPlaceholderAsNotice,
 } from './AssistantNoticeRenderer';
@@ -9,7 +13,6 @@ import {
   type AssistantShellRendererHost,
   type AssistantShellTimestampOptions,
 } from './AssistantShellRenderer';
-import { PersistedAssistantFooterFinalizer } from './PersistedAssistantFooterFinalizer';
 import type {
   SendPipelineShellPort,
   SendPipelineStreamElements,
@@ -21,11 +24,11 @@ export interface AssistantShellViewHostAdapterHost extends AssistantShellRendere
 
 export class AssistantShellViewHostAdapter {
   private readonly shellRenderer: AssistantShellRenderer;
-  private readonly persistedFooterFinalizer: PersistedAssistantFooterFinalizer;
+  private readonly footerRenderer: AssistantFooterRenderer;
 
   constructor(private readonly host: AssistantShellViewHostAdapterHost) {
     this.shellRenderer = new AssistantShellRenderer(host);
-    this.persistedFooterFinalizer = new PersistedAssistantFooterFinalizer(this.shellRenderer);
+    this.footerRenderer = new AssistantFooterRenderer(this.shellRenderer);
   }
 
   createAssistantMessageElement(
@@ -44,7 +47,22 @@ export class AssistantShellViewHostAdapter {
   }
 
   finalizePersistedFooter(messageEl: HTMLElement, message: ChatMessage): void {
-    this.persistedFooterFinalizer.finalizeFooter(messageEl, message);
+    this.footerRenderer.finalizePersistedFooter(messageEl, message);
+  }
+
+  finalizeNoticeFooter(messageEl: HTMLElement, message: Pick<ChatMessage, 'timestamp' | 'modelId'>): void {
+    this.footerRenderer.finalizeNoticeFooter(messageEl, message);
+  }
+
+  finalizePseudoStreamFooter(
+    messageEl: HTMLElement,
+    message: Pick<ChatMessage, 'content' | 'timestamp' | 'modelId'>,
+  ): void {
+    this.footerRenderer.finalizePseudoStreamFooter(messageEl, message);
+  }
+
+  finalizeErrorFooter(options: AssistantErrorFooterOptions): void {
+    this.footerRenderer.finalizeErrorFooter(options);
   }
 
   renderAssistantPlaceholderAsNotice(options: {

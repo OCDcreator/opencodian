@@ -93,4 +93,23 @@ describe('AssistantShellViewHostAdapter', () => {
     );
     expect(messageEl.querySelector('.opencodian-message-time-status')?.textContent).toBe('Interrupted');
   });
+
+  it('finalizes pseudo-stream assistant footers through the shared shell renderer', () => {
+    const { adapter, initializeAssistantCopyButton, turnBody } = createAdapter();
+    const { messageEl } = adapter.createAssistantMessageElement('tab-1', true);
+
+    adapter.finalizePseudoStreamFooter(messageEl, {
+      content: 'Reveal me',
+      timestamp: 34567,
+      modelId: 'openai/gpt-5.4',
+    });
+
+    expect(messageEl.hidden).toBe(false);
+    expect(turnBody.contains(messageEl)).toBe(true);
+    expect(initializeAssistantCopyButton).toHaveBeenCalledWith(
+      expect.any(HTMLElement),
+      'Reveal me',
+    );
+    expect(messageEl.querySelector('.opencodian-message-time-row')?.textContent).toContain('gpt-5.4');
+  });
 });

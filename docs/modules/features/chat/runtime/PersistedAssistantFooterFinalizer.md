@@ -5,7 +5,7 @@
 
 ## 概述
 
-`PersistedAssistantFooterFinalizer` 是 persisted assistant footer 的 renderer-bridge helper。它把 `OpenCodianView` 里“拿到 `messageEl` 与 `message` 后，调用 payload helper 再转交 `AssistantShellRenderer`”这一步抽成独立模块。
+`PersistedAssistantFooterFinalizer` 是 persisted assistant footer 的 renderer-bridge helper。它把 `OpenCodianView` 里“拿到 `messageEl` 与 `message` 后，调用 payload helper 再转交 `AssistantShellRenderer`”这一步抽成独立模块；现在这条 persisted 路径也会被 `AssistantFooterRenderer` 复用。
 
 ## 公开接口
 
@@ -21,7 +21,7 @@
 
 ## 注意事项
 
-- 这个 helper 只适用于 persisted assistant message footer；streaming shell、notice 与 pseudo-stream footer 仍在各自 runtime 路径内单独收尾
+- 这个 helper 只适用于 persisted assistant message footer；notice / pseudo-stream / error footer 现在由 `AssistantFooterRenderer` 统一桥接
 - `ConversationRenderService` 复用已有 assistant 正文时，也通过 `ConversationRenderHost.assistantTailRender.finalizePersistedFooter()` 这条更窄的 assistant-tail bridge 回到这里，而不是暴露散落在大 host 上的 footer callback；`OpenCodianView` 侧的 host 装配现已交给 `AssistantShellViewHostAdapter.ts`
 - DOM 最终仍由 `AssistantShellRenderer` 创建和更新；本模块只负责 bridge，不复制时间行或 copy button 的实现
 - 如果 persisted assistant footer 未来新增字段，应优先扩展 `AssistantFooterPayload`，再由这里透传给 renderer

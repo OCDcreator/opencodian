@@ -4861,7 +4861,7 @@ export class OpenCodianView extends ItemView {
 
     const timestamp = Date.now();
     const modelId = this.formatModelId(this.getCurrentSessionModel());
-    this.assistantShellViewHostAdapter.addTimestampWithCopyButton({
+    this.assistantShellViewHostAdapter.finalizeErrorFooter({
       messageEl,
       timestamp,
       content: message,
@@ -5043,11 +5043,7 @@ export class OpenCodianView extends ItemView {
     if (message.displayStyle === 'notice') {
       messageEl.addClass('opencodian-message--notice');
       await this.renderNoticeCard(content, message);
-      this.assistantShellViewHostAdapter.addTimestampWithCopyButton({
-        messageEl,
-        timestamp: message.timestamp,
-        modelId: message.modelId,
-      });
+      this.assistantShellViewHostAdapter.finalizeNoticeFooter(messageEl, message);
     } else if (message.role === 'user') {
       const copyContent = await this.renderUserMessageContent(content, message);
       this.addUserMessageFooter(messageEl, message, copyContent);
@@ -6468,12 +6464,7 @@ export class OpenCodianView extends ItemView {
     if (messageEl.style.visibility === 'hidden') {
       messageEl.style.visibility = '';
     }
-    this.assistantShellViewHostAdapter.addTimestampWithCopyButton({
-      messageEl,
-      timestamp: message.timestamp,
-      content: message.content,
-      modelId: message.modelId,
-    });
+    this.assistantShellViewHostAdapter.finalizePseudoStreamFooter(messageEl, message);
     this.streamingMessageEl = null;
     this.streamingContentEl = null;
   }

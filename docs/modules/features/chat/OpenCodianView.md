@@ -264,11 +264,12 @@ question dock 与 pending-question refresh 的主要 runtime/UI ownership 现在
 发送 runtime 目录内部也继续细分成更小的职责模块：
 
 - `AssistantCopyContent.ts`：封装 persisted assistant footer copy-content 的 structured-text / fallback source 选择
-- `AssistantFooterPayload.ts`：封装 persisted assistant footer 传给 timestamp/copy renderer 的 timestamp、copy-content、model 与 status payload 组装
-- `PersistedAssistantFooterFinalizer.ts`：封装 persisted assistant footer 的最终 renderer 调用，让 view 与 `ConversationRenderService` 都只通过 `messageEl` + `message` bridge 回到同一个 finalizer
+- `AssistantFooterPayload.ts`：封装 persisted / notice / pseudo-stream / error assistant footer 传给 timestamp/copy renderer 的 payload 组装
+- `AssistantFooterRenderer.ts`：封装 notice / pseudo-stream / error footer 的最终 renderer 调用，并继续复用 persisted footer finalizer
+- `PersistedAssistantFooterFinalizer.ts`：封装 persisted assistant footer 的最终 renderer 调用，让 view、`ConversationRenderService` 与 `AssistantFooterRenderer` 都只通过 `messageEl` + `message` bridge 回到同一个 finalizer
 - `SendPipelineTypes.ts`：定义 runtime 与 host 契约
 - `AssistantShellRenderer.ts`：封装 assistant streaming shell 的创建、reveal 与 timestamp 收尾
-- `AssistantShellViewHostAdapter.ts`：统一装配 assistant shell / notice / persisted-footer 相关 host，让 `SendPipelineShellPort` 与 notice/footer bridge 共用同一条 view seam
+- `AssistantShellViewHostAdapter.ts`：统一装配 assistant shell / notice / footer 相关 host，让 `SendPipelineShellPort` 与 notice/footer bridge 共用同一条 view seam
 - `AssistantNoticeRenderer.ts`：封装 stream error / interrupted notice 构造与 placeholder notice 渲染
 - `AssistantPlainTextFallbackRenderer.ts`：封装无 structured blocks 的 resolved card + plain-text fallback 渲染
 - `StreamingInlineCardRenderer.ts`：封装 permission/question inline card 的共享插入位置与 shell reveal
@@ -308,7 +309,7 @@ assistant 渲染里：
 
 - `contentBlocks` 会按块类型渲染
 - structured assistant 分支由 `renderAssistantStructuredContent()` 消费 `buildQuestionResolutionCardRenderPlan()` 产出的 render plan
-- persisted assistant footer 收尾由 `PersistedAssistantFooterFinalizer.finalizeFooter()` 统一执行；它内部再调用 `buildPersistedAssistantFooterPayload()` 组装 payload，其中 copy-content 继续委托 `resolveAssistantCopyContent()`，interrupted status badge 也由 footer helper 统一判断，而 view 侧 shell / notice / footer host 则通过 `AssistantShellViewHostAdapter.ts` 统一装配
+- persisted assistant footer 收尾由 `PersistedAssistantFooterFinalizer.finalizeFooter()` 统一执行；notice / pseudo-stream / error footer 则由 `AssistantFooterRenderer` 统一执行。它们内部继续分别复用 `buildPersistedAssistantFooterPayload()` 与其它 footer payload helper 组装 timestamp/copy/model/status，而 view 侧 shell / notice / footer host 则通过 `AssistantShellViewHostAdapter.ts` 统一装配
 - `ConversationRenderService` 需要 patch 尾部 assistant 时，不再直接抓整块 view host 上的多个独立 callback，而是通过 `ConversationAssistantTailRenderPort` 回到这组 assistant-tail bridge
 - `thinking` 块走 `ThinkingBlockRenderer`
 - `tool_use` 块走 `ToolCallRenderer`
