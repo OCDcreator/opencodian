@@ -71,9 +71,6 @@ import {
 } from './chatAppearance';
 import {
   type FocusContextPreview,
-  getContextTargetKey,
-  removeDraftContextItemsByTarget,
-  upsertDraftContextItem,
 } from './composerContext';
 import { cloneMessagesBeforeForkTarget } from './forkMessages';
 import { GlassOctahedronDemoController } from './glassOctahedronDemo';
@@ -195,6 +192,7 @@ import {
   ComposerContextEventBridge,
   type ComposerContextEventBridgeHost,
 } from './services/ComposerContextEventBridge';
+import { ComposerContextViewHostAdapter } from './services/ComposerContextViewHostAdapter';
 import { ContextAttachmentBuilder } from './services/ContextAttachmentBuilder';
 import { ContextFileCatalogService } from './services/ContextFileCatalogService';
 import { ContextUsageService } from './services/ContextUsageService';
@@ -749,6 +747,7 @@ export class OpenCodianView extends ItemView {
   private composerContextActionService: ComposerContextActionService;
   private composerContextCoordinator: ComposerContextCoordinator;
   private composerContextEventBridge: ComposerContextEventBridge;
+  private composerContextViewHostAdapter: ComposerContextViewHostAdapter;
   private contextAttachmentBuilder: ContextAttachmentBuilder;
   private contextFileCatalogService: ContextFileCatalogService;
   private focusContextRuntimeService: FocusContextRuntimeService;
@@ -971,84 +970,6 @@ export class OpenCodianView extends ItemView {
     }
   }
 
-  private getDraftContextItems(tabId: TabId | null = this.getActiveTabId()): PromptContextItem[] {
-    const runtime = this.getTabRuntimeState(tabId);
-    return runtime ? [...runtime.draftContextItems] : [];
-  }
-
-  private getFocusContextPreview(tabId: TabId | null = this.getActiveTabId()): FocusContextPreview | null {
-    return this.getTabRuntimeState(tabId)?.focusContextPreview ?? null;
-  }
-
-  private setDraftContextItems(
-    items: PromptContextItem[],
-    tabId: TabId | null = this.getActiveTabId(),
-  ): void {
-    const runtime = this.getTabRuntimeState(tabId);
-    if (!runtime) {
-      return;
-    }
-
-    runtime.draftContextItems = [...items];
-    if (tabId === this.getActiveTabId()) {
-      this.composerContextCoordinator.render();
-    }
-  }
-
-  private addDraftContextItem(
-    item: PromptContextItem,
-    tabId: TabId | null = this.getActiveTabId(),
-  ): void {
-    const existingItems = this.getDraftContextItems(tabId);
-    const nextItems = upsertDraftContextItem(existingItems, item);
-    this.setDraftContextItems(nextItems, tabId);
-  }
-
-  private setFocusContextPreview(
-    preview: FocusContextPreview | null,
-    tabId: TabId | null = this.getActiveTabId(),
-  ): void {
-    const runtime = this.getTabRuntimeState(tabId);
-    if (!runtime) {
-      return;
-    }
-
-    const previous = runtime.focusContextPreview;
-    if (this.areFocusContextPreviewsEqual(previous, preview)) {
-      return;
-    }
-
-    runtime.focusContextPreview = preview;
-    if (tabId === this.getActiveTabId()) {
-      this.composerContextCoordinator.render();
-    }
-  }
-
-  private removeDraftContextItemsForTarget(
-    target: Pick<PromptContextItem, 'path' | 'lineRange'>,
-    tabId: TabId | null = this.getActiveTabId(),
-  ): void {
-    const nextItems = removeDraftContextItemsByTarget(this.getDraftContextItems(tabId), target);
-    this.setDraftContextItems(nextItems, tabId);
-  }
-
-  private clearDraftContextItems(tabId: TabId | null = this.getActiveTabId()): void {
-    this.setDraftContextItems([], tabId);
-  }
-
-  private areFocusContextPreviewsEqual(
-    left: FocusContextPreview | null,
-    right: FocusContextPreview | null,
-  ): boolean {
-    if (!left || !right) {
-      return left === right;
-    }
-
-    return left.kind === right.kind
-      && left.textSnapshot === right.textSnapshot
-      && getContextTargetKey(left.path, left.lineRange) === getContextTargetKey(right.path, right.lineRange);
-  }
-
   private isComposerInteractionFocused(): boolean {
     const activeElement = document.activeElement;
     return Boolean(activeElement && this.inputContainer?.contains(activeElement));
@@ -1168,6 +1089,13 @@ export class OpenCodianView extends ItemView {
       getServerMode: () => this.plugin.settings.server.mode,
     });
     this.contextFileCatalogService = new ContextFileCatalogService(this.app);
+    this.composerContextViewHostAdapter = new ComposerContextViewHostAdapter({
+      getActiveTabId: () => this.getActiveTabId(),
+      getTabRuntimeState: (tabId) => this.getTabRuntimeState(tabId),
+      renderComposerContext: () => {
+        this.composerContextCoordinator.render();
+      },
+    });
     this.composerContextActionService = new ComposerContextActionService(
       this.app,
       this.contextAttachmentBuilder,
@@ -1342,39 +1270,24 @@ export class OpenCodianView extends ItemView {
   }
 
   private createComposerContextCoordinatorHost(): ComposerContextCoordinatorHost {
-    return {
-      getDraftContextItems: () => this.getDraftContextItems(),
-      getFocusContextPreview: () => this.getFocusContextPreview(),
-      addDraftContextItem: (item) => {
-        this.addDraftContextItem(item);
-      },
-      removeDraftContextItemsForTarget: (target) => {
-        this.removeDraftContextItemsForTarget(target);
-      },
+    return this.composerContextViewHostAdapter.createCoordinatorHost({
       refreshActiveFocusContextPreview: () => {
         this.refreshActiveFocusContextPreview();
       },
-    };
+    });
   }
 
   private createComposerContextActionServiceHost(): ComposerContextActionServiceHost {
-    return {
+    return this.composerContextViewHostAdapter.createActionServiceHost({
       getActiveMarkdownView: () => this.getActiveMarkdownView(),
-      addDraftContextItem: (item) => {
-        this.addDraftContextItem(item);
-      },
-    };
+    });
   }
 
   private createFocusContextRuntimeServiceHost(): FocusContextRuntimeServiceHost {
-    return {
+    return this.composerContextViewHostAdapter.createFocusContextRuntimeServiceHost({
       getCurrentConversationNotePath: () => this.currentConversation?.currentNote ?? null,
-      getFocusContextPreview: () => this.getFocusContextPreview(),
-      setFocusContextPreview: (preview) => {
-        this.setFocusContextPreview(preview);
-      },
       isComposerInteractionFocused: () => this.isComposerInteractionFocused(),
-    };
+    });
   }
 
   private createComposerContextEventBridgeHost(): ComposerContextEventBridgeHost {
@@ -2014,7 +1927,7 @@ export class OpenCodianView extends ItemView {
       notifyForegroundBusy: () => {
         new Notice(t('chat.tab.processingBlocked'));
       },
-      getDraftContextItems: (tabId) => [...(this.getTabRuntimeState(tabId)?.draftContextItems ?? [])],
+      getDraftContextItems: (tabId) => this.composerContextViewHostAdapter.getDraftContextItems(tabId),
       getServerAvailability: () => this.getServerAvailability(),
       refreshServerStatusBadge: () => this.refreshServerStatusBadge(),
       ensureServerReadyForChat: (availability) => this.ensureServerReadyForChat(availability),
@@ -2066,7 +1979,7 @@ export class OpenCodianView extends ItemView {
         this.getTabRuntimeState(tabId)?.pendingEditedFiles.clear();
       },
       clearDraftContextItems: (tabId) => {
-        this.clearDraftContextItems(tabId);
+        this.composerContextViewHostAdapter.clearDraftContextItems(tabId);
       },
     };
   }
