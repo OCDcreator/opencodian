@@ -10,6 +10,7 @@ import {
   type ConversationViewStateHost,
   ConversationViewStateService,
 } from '../../../../src/features/chat/services/ConversationViewStateService';
+import type { QuestionTodoStatusRefreshCoordinator } from '../../../../src/features/chat/services/QuestionTodoStatusRefreshCoordinator';
 import { TabManager } from '../../../../src/features/chat/tabs/TabManager';
 
 function createConversation(id: string, title = `Chat ${id}`) {
@@ -55,6 +56,12 @@ function createHost(
 }
 
 function createActivationBridge() {
+  const refreshCoordinator: jest.Mocked<Pick<
+    QuestionTodoStatusRefreshCoordinator,
+    'refreshAfterActivation'
+  >> = {
+    refreshAfterActivation: jest.fn().mockResolvedValue(undefined),
+  };
   const host: jest.Mocked<TabViewActivationBridgeHost> = {
     setActiveMessagesPane: jest.fn(),
     refreshActiveFocusContextPreview: jest.fn(),
@@ -66,15 +73,13 @@ function createActivationBridge() {
     updateModelSelectorDisplay: jest.fn(),
     syncActiveTabContextUsageIdentity: jest.fn(),
     refreshActiveTabContextUsageFromServer: jest.fn().mockResolvedValue(undefined),
-    refreshTabSessionStatus: jest.fn().mockResolvedValue(null),
-    refreshPendingQuestionsForTab: jest.fn().mockResolvedValue([]),
-    refreshTabSessionTodos: jest.fn().mockResolvedValue([]),
     updateSendButtonState: jest.fn(),
   };
 
   return {
-    bridge: new TabViewActivationBridge(host),
+    bridge: new TabViewActivationBridge(host, refreshCoordinator),
     host,
+    refreshCoordinator,
   };
 }
 

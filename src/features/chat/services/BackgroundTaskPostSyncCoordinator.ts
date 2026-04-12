@@ -1,16 +1,11 @@
-import type { SessionActivityStatus } from '../../../core/opencode';
-import type {
-  Conversation,
-  QuestionRequest,
-  SessionTodo,
-} from '../../../core/types';
+import type { Conversation } from '../../../core/types';
 import type { TabId } from '../tabs';
+import type { QuestionTodoStatusRefreshCoordinator } from './QuestionTodoStatusRefreshCoordinator';
 
-export interface BackgroundTaskPostSyncRuntime {
-  sessionTodos: readonly SessionTodo[];
-  backgroundTaskLaunches: ReadonlyMap<string, unknown>;
-  backgroundTaskWaitingForFollowUp: boolean;
-}
+type QuestionTodoStatusRefreshPort = Pick<
+  QuestionTodoStatusRefreshCoordinator,
+  'refreshAfterPostSync'
+>;
 
 export interface BackgroundTaskPostSyncResult {
   changed: boolean;
@@ -29,26 +24,10 @@ export interface VisibleConversationPostSyncResult extends BackgroundTaskPostSyn
 export interface BackgroundTaskPostSyncCoordinatorHost {
   getCurrentConversationId(): string | null;
   getCurrentConversationSessionId(): string | undefined;
-  getTabRuntimeState(tabId: TabId | null): BackgroundTaskPostSyncRuntime | null;
-  hasIncompleteTodos(todos: readonly SessionTodo[]): boolean;
   setCurrentConversationRevertState(revertState: ConversationRevertStateSnapshot | null): void;
   setTabConversationSyncFingerprint(tabId: TabId, fingerprint: string): void;
   markBackgroundTaskAuthoritativeSync(tabId: TabId | null, reason: string): void;
-  refreshPendingQuestionsForTab(
-    tabId: TabId | null,
-    sessionId: string | null | undefined,
-  ): Promise<QuestionRequest[]>;
   syncBackgroundTaskStateFromConversation(conversation: Conversation, tabId?: TabId | null): void;
-  refreshTabSessionStatus(
-    tabId: TabId | null,
-    sessionId: string | undefined,
-    options: { suppressErrors?: boolean },
-  ): Promise<SessionActivityStatus | null>;
-  refreshTabSessionTodos(
-    tabId: TabId | null,
-    sessionId: string | undefined,
-    options: { suppressErrors?: boolean },
-  ): Promise<SessionTodo[]>;
   refreshBackgroundTaskCompletionNotices(tabId: TabId | null, conversation: Conversation | null): Promise<void>;
   syncTabStreamLikeState(tabId: TabId | null): void;
   setTabNeedsAttention(tabId: TabId | null, needsAttention: boolean): void;
@@ -82,16 +61,22 @@ export interface VisibleConversationPostSyncOutcome {
 }
 
 export class BackgroundTaskPostSyncCoordinator {
-  constructor(private readonly host: BackgroundTaskPostSyncCoordinatorHost) {}
+  constructor(
+    private readonly host: BackgroundTaskPostSyncCoordinatorHost,
+    private readonly questionTodoStatusRefreshCoordinator: QuestionTodoStatusRefreshPort,
+  ) {}
 
   async handleVisibleConversationSyncComplete(
     options: VisibleConversationPostSyncOptions,
   ): Promise<VisibleConversationPostSyncOutcome> {
-    await this.host.refreshPendingQuestionsForTab(options.tabId, options.questionSessionId);
+    await this.questionTodoStatusRefreshCoordinator.refreshAfterPostSync({
+      tabId: options.tabId,
+      questionSessionId: options.questionSessionId,
+      todoStatusSessionId: this.host.getCurrentConversationSessionId(),
+    });
 
     const currentConversationMatchesExpected =
       this.host.getCurrentConversationId() === options.expectedConversationId;
-    await this.refreshVisibleConversationTodoStatus(options.tabId);
     if (currentConversationMatchesExpected) {
       this.host.setCurrentConversationRevertState(options.syncResult.revertState);
       if (options.syncResult.changed) {
@@ -128,42 +113,20 @@ export class BackgroundTaskPostSyncCoordinator {
     }
   }
 
-  private async refreshVisibleConversationTodoStatus(
-    tabId: TabId,
-  ): Promise<void> {
-    const runtime = this.host.getTabRuntimeState(tabId);
-    if (
-      !runtime
-      || (
-        !this.host.hasIncompleteTodos(runtime.sessionTodos)
-        && runtime.backgroundTaskLaunches.size === 0
-        && !runtime.backgroundTaskWaitingForFollowUp
-      )
-    ) {
-      return;
-    }
-
-    await this.host.refreshTabSessionStatus(tabId, this.host.getCurrentConversationSessionId(), {
-      suppressErrors: true,
-    });
-    await this.host.refreshTabSessionTodos(tabId, this.host.getCurrentConversationSessionId(), {
-      suppressErrors: true,
-    });
-  }
-
   private async refreshPostSyncState(
     tabId: TabId,
     conversation: Conversation,
     options: { shouldRefreshTodoStatus: boolean },
   ): Promise<void> {
-    await this.host.refreshPendingQuestionsForTab(tabId, conversation.openCodeSessionId);
-    this.host.syncBackgroundTaskStateFromConversation(conversation, tabId);
-
-    const runtime = this.host.getTabRuntimeState(tabId);
-    if (runtime && (this.host.hasIncompleteTodos(runtime.sessionTodos) || options.shouldRefreshTodoStatus)) {
-      await this.host.refreshTabSessionStatus(tabId, conversation.openCodeSessionId, { suppressErrors: true });
-      await this.host.refreshTabSessionTodos(tabId, conversation.openCodeSessionId, { suppressErrors: true });
-    }
+    await this.questionTodoStatusRefreshCoordinator.refreshAfterPostSync({
+      tabId,
+      questionSessionId: conversation.openCodeSessionId,
+      todoStatusSessionId: conversation.openCodeSessionId,
+      forceTodoStatusRefresh: options.shouldRefreshTodoStatus,
+      afterPendingQuestionRefresh: () => {
+        this.host.syncBackgroundTaskStateFromConversation(conversation, tabId);
+      },
+    });
 
     await this.host.refreshBackgroundTaskCompletionNotices(tabId, conversation);
     this.host.syncTabStreamLikeState(tabId);
