@@ -5040,9 +5040,11 @@ export class OpenCodianView extends ItemView {
     const content = messageEl.createDiv({ cls: 'opencodian-message-content' });
 
     if (message.displayStyle === 'notice') {
-      messageEl.addClass('opencodian-message--notice');
-      await this.assistantNoticeCardRenderer.render(content, message);
-      this.assistantShellViewHostAdapter.finalizeNoticeFooter(messageEl, message);
+      await this.assistantShellViewHostAdapter.renderPersistedAssistantNotice({
+        messageEl,
+        contentEl: content,
+        noticeMessage: message,
+      });
     } else if (message.role === 'user') {
       const copyContent = await this.renderUserMessageContent(content, message);
       this.addUserMessageFooter(messageEl, message, copyContent);

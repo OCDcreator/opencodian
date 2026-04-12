@@ -46,6 +46,27 @@ export function buildStreamErrorNotice(
   };
 }
 
+export async function renderPersistedAssistantNotice(options: {
+  host: AssistantNoticeRenderHost;
+  messageEl: HTMLElement;
+  contentEl: HTMLElement;
+  noticeMessage: ChatMessage;
+}): Promise<void> {
+  const {
+    host,
+    messageEl,
+    contentEl,
+    noticeMessage,
+  } = options;
+
+  await renderAssistantNoticeCardAndFooter({
+    host,
+    messageEl,
+    contentEl,
+    noticeMessage,
+  });
+}
+
 export async function renderAssistantPlaceholderAsNotice(options: {
   host: AssistantNoticeRenderHost;
   messageEl: HTMLElement;
@@ -72,6 +93,28 @@ export async function renderAssistantPlaceholderAsNotice(options: {
   host.setStreamingAssistantMessageVisibility(messageEl, true, reason);
 
   const contentEl = messageEl.createDiv({ cls: 'opencodian-message-content' });
+  await renderAssistantNoticeCardAndFooter({
+    host,
+    messageEl,
+    contentEl,
+    noticeMessage,
+  });
+}
+
+async function renderAssistantNoticeCardAndFooter(options: {
+  host: AssistantNoticeRenderHost;
+  messageEl: HTMLElement;
+  contentEl: HTMLElement;
+  noticeMessage: ChatMessage;
+}): Promise<void> {
+  const {
+    host,
+    messageEl,
+    contentEl,
+    noticeMessage,
+  } = options;
+
+  messageEl.addClass('opencodian-message--notice');
   await host.renderNoticeCard(contentEl, noticeMessage);
   host.finalizeNoticeFooter(messageEl, noticeMessage);
 }

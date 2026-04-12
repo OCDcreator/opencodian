@@ -7,6 +7,7 @@ import type { TabId } from '../tabs';
 import { AssistantFooterRenderer } from './AssistantFooterRenderer';
 import {
   type AssistantNoticeRenderHost,
+  renderPersistedAssistantNotice,
   renderAssistantPlaceholderAsNotice,
 } from './AssistantNoticeRenderer';
 import {
@@ -62,6 +63,17 @@ export class AssistantShellViewHostAdapter {
     message: Pick<ChatMessage, 'content' | 'timestamp' | 'modelId'>,
   ): void {
     this.footerRenderer.finalizePseudoStreamFooter(messageEl, message);
+  }
+
+  renderPersistedAssistantNotice(options: {
+    messageEl: HTMLElement;
+    contentEl: HTMLElement;
+    noticeMessage: ChatMessage;
+  }): Promise<void> {
+    return renderPersistedAssistantNotice({
+      host: this.createAssistantNoticeRenderHost(),
+      ...options,
+    });
   }
 
   renderStreamError(options: AssistantStreamErrorRenderOptions): void {

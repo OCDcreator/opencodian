@@ -12,6 +12,7 @@
 - `AssistantShellViewHostAdapter`：统一持有 `AssistantShellRenderer`、`AssistantFooterRenderer`、`AssistantNoticeFooterFinalizer` 的 host seam，以及 `AssistantErrorRenderer`
 - `createAssistantMessageElement()` / `revealStreamingAssistantMessageElement()`：透传 streaming assistant shell 创建与 reveal
 - `addTimestampWithCopyButton()`：透传 footer timestamp / copy button 收尾
+- `renderPersistedAssistantNotice()`：通过内部 notice host 渲染 persisted assistant notice 的 card + footer 编排
 - `renderAssistantPlaceholderAsNotice()`：通过内部 notice host 把已有 shell 改写成 notice card
 - `finalizePersistedFooter()` / `finalizeNoticeFooter()` / `finalizePseudoStreamFooter()`：让 persisted、notice 与 pseudo-stream assistant footer 变体都复用同一条 footer renderer seam
 - `renderStreamError()`：通过 `AssistantErrorRenderer` 统一渲染本地 stream-error block，并复用既有 error footer 收尾
@@ -21,7 +22,7 @@
 ## 设计目的
 
 - 让 `OpenCodianView` 不再同时维护 assistant shell renderer host、notice render host、多种 footer helper wiring，以及本地 stream-error block DOM 组装
-- 让 `SendPipelineShellPort`、persisted / notice / pseudo-stream / error footer 收尾、stream error notice 渲染，以及本地错误泡泡 DOM 渲染都回到同一条 assistant shell host seam
+- 让 `SendPipelineShellPort`、persisted notice card + footer、notice / pseudo-stream / error footer 收尾、stream error notice 渲染，以及本地错误泡泡 DOM 渲染都回到同一条 assistant shell host seam
 - 保持 `AssistantShellRenderer` / `AssistantNoticeRenderer` / `AssistantFooterRenderer` / `AssistantNoticeFooterFinalizer` / `AssistantErrorRenderer` / `PersistedAssistantFooterFinalizer` 继续各自专注 shell、notice、footer 与错误块 DOM，而不是重新并回 view
 
 ## 注意事项

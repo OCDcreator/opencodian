@@ -10,7 +10,10 @@ describe('AssistantShellViewHostAdapter', () => {
     };
     const scrollSpy = jest.fn();
     const renderNoticeCard = jest.fn(async (container: HTMLElement, message: ChatMessage) => {
-      container.setText(`${message.noticeTitle ?? 'Notice'}:${message.content}`);
+      container.createDiv({
+        cls: `opencodian-chat-notice-card is-${message.noticeTone ?? 'info'}`,
+        text: `${message.noticeTitle ?? 'Notice'}:${message.content}`,
+      });
     });
     const initializeAssistantCopyButton = jest.fn((copyBtn: HTMLElement, content: string) => {
       copyBtn.setText(`copy:${content}`);
@@ -64,6 +67,35 @@ describe('AssistantShellViewHostAdapter', () => {
     expect(messageEl.classList.contains('opencodian-message--notice')).toBe(true);
     expect(messageEl.querySelector('.opencodian-message-time-row')?.textContent).toContain('claude-sonnet-4');
     expect(runtime.streamingMessageEl).toBe(messageEl);
+  });
+
+  it('renders persisted notices through the shared notice host', async () => {
+    const { adapter, renderNoticeCard, turnBody } = createAdapter();
+    const messageEl = turnBody.createDiv({
+      cls: 'opencodian-message opencodian-message--assistant',
+    });
+    const contentEl = messageEl.createDiv({ cls: 'opencodian-message-content' });
+    const noticeMessage: ChatMessage = {
+      id: 'assistant-notice-persisted-1',
+      role: 'assistant',
+      content: 'Model unavailable',
+      timestamp: 22345,
+      modelId: 'openai/gpt-5.4',
+      displayStyle: 'notice',
+      noticeTitle: 'Need setup',
+      noticeTone: 'warning',
+    };
+
+    await adapter.renderPersistedAssistantNotice({
+      messageEl,
+      contentEl,
+      noticeMessage,
+    });
+
+    expect(renderNoticeCard).toHaveBeenCalledWith(expect.any(HTMLElement), noticeMessage);
+    expect(messageEl.classList.contains('opencodian-message--notice')).toBe(true);
+    expect(contentEl.querySelector('.opencodian-chat-notice-card')).not.toBeNull();
+    expect(messageEl.querySelector('.opencodian-message-time-row')?.textContent).toContain('gpt-5.4');
   });
 
   it('finalizes persisted assistant footers through the shared shell renderer', () => {
