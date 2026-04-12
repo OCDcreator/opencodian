@@ -350,12 +350,13 @@ model selector 现在拆成了几层协作：
 
 - `ComposerContextHostAdapter` 负责把 view 提供的较窄 seam 组装成 composer context service bundle，并把 retained-selection / context picker 相关 host wiring 从 `OpenCodianView` 构造函数里迁走
 - `ComposerContextEventBridge` 负责 composer/context 相关的 workspace / vault / DOM 事件注册、当前会话 note path 写回，以及 retained-selection polling lifecycle
-- `ComposerContextViewHostAdapter` 负责 active-tab `draftContextItems` / `focusContextPreview` 的统一读写，并把同一份 state seam 暴露给 action/coordinator/focus-runtime 三条路径
+- `ComposerContextViewHostAdapter` 负责 active-tab `draftContextItems` / `focusContextPreview` 的统一读写，并把同一份 state seam 暴露给 action/picker/coordinator/focus-runtime 几条路径
 - `FocusContextRuntimeService` 负责活动 `MarkdownView` 回退查找、focus preview 计算，以及 composer pointer handoff / focusin/focusout / polling 驱动的 retained-selection 协调
-- `ComposerContextActionService` 负责 current-note / selection / file 三个 composer context 入口动作、活动编辑器回退，以及文件选择器 + catalog 加载编排
+- `ComposerContextActionService` 负责 current-note / selection 两个活动编辑器入口动作与 draft 写回
+- `ComposerContextPickerActionService` 负责 add-context 文件选择器的打开/关闭、catalog 加载，以及 file context draft 写回
 - `ComposerContextCoordinator` 负责 composer context chips 渲染、preview attach/detach click 编排，以及失效 preview 的 refresh handoff
 - `ContextAttachmentBuilder` 负责 current-note / selection / file 三类 `PromptContextItem` 构建，以及 remote 模式下的文本快照读取与 `64 KiB` 校验
-- 文件选择器使用 `ContextFileCatalogService` 惰性构建和缓存 `ContextFileCatalog`；入口动作 service 负责把 catalog loader 交给 picker，而 vault `create/delete/rename` 增量同步则由 `ComposerContextEventBridge` 统一桥接
+- 文件选择器使用 `ContextFileCatalogService` 惰性构建和缓存 `ContextFileCatalog`；picker action service 负责把 catalog loader 交给 picker，并把 picker open/close 生命周期桥接到 retained-selection handoff / preview writeback，而 vault `create/delete/rename` 增量同步则由 `ComposerContextEventBridge` 统一桥接
 
 选区高亮保留逻辑现在由 runtime service 集中承接：
 
@@ -459,7 +460,8 @@ background task notice 这条子链路现在的边界是：
 - `MarkdownRenderService`：Markdown 渲染
 - `StreamController`：流式 assistant DOM 更新
 - `ComposerContextHostAdapter`：composer context / retained-selection 相关 bundle 装配，以及 view host → service bundle 的收束层
-- `ComposerContextActionService`：current-note / selection / file 入口动作、活动编辑器回退，以及文件选择器 + catalog 编排
+- `ComposerContextActionService`：current-note / selection 入口动作与活动编辑器回退
+- `ComposerContextPickerActionService`：文件选择器打开/关闭、catalog 编排，以及 file context draft 写回
 - `ComposerContextEventBridge`：composer/context 相关的 workspace / vault / DOM 事件桥接，以及 retained-selection polling lifecycle
 - `ComposerContextViewHostAdapter`：active-tab `draftContextItems` / `focusContextPreview` 的共享 host adapter，以及 composer services 的 state seam
 - `ComposerContextCoordinator`：composer context chip 渲染、preview attach/detach click 编排，以及 stale preview refresh handoff

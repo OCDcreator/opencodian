@@ -1,4 +1,4 @@
-import type { App, MarkdownView } from 'obsidian';
+import type { App, MarkdownView, TFile } from 'obsidian';
 
 import type { PromptContextItem } from '../../../../src/core/types';
 import {
@@ -7,6 +7,11 @@ import {
 } from '../../../../src/features/chat/services/ComposerContextHostAdapter';
 import type { ComposerContextRuntimeState } from '../../../../src/features/chat/services/ComposerContextRuntimeStore';
 import type { TabId } from '../../../../src/features/chat/tabs';
+import { chooseContextFile } from '../../../../src/features/chat/ui/ContextFilePickerModal';
+
+jest.mock('../../../../src/features/chat/ui/ContextFilePickerModal', () => ({
+  chooseContextFile: jest.fn(),
+}));
 
 type Mocked<T> = {
   [Key in keyof T]:
@@ -40,6 +45,7 @@ function createRuntimeState(
 function createHarness(options: {
   activeView?: MarkdownView | null;
   currentNoteItem?: PromptContextItem | null;
+  fileItem?: PromptContextItem | null;
 } = {}) {
   const runtimes = new Map<TabId, ComposerContextRuntimeState>([
     ['tab-1' as TabId, createRuntimeState()],
@@ -69,7 +75,7 @@ function createHarness(options: {
   const contextAttachmentBuilder = {
     buildCurrentNoteContextItem: jest.fn(async () => options.currentNoteItem ?? null),
     buildSelectionContextItem: jest.fn(async () => null),
-    buildFileContextItem: jest.fn(async () => null),
+    buildFileContextItem: jest.fn(async () => options.fileItem ?? null),
     buildFileContextItemFromPath: jest.fn(async () => null),
     buildSelectionContextItemFromPreview: jest.fn(() => null),
     hasFileAtPath: jest.fn().mockReturnValue(true),
@@ -148,5 +154,34 @@ describe('ComposerContextHostAdapter', () => {
     } finally {
       jest.useRealTimers();
     }
+  });
+
+  it('wires picker context actions through retained-selection begin/complete lifecycle hooks', async () => {
+    const file = { path: 'docs/spec.md' } as TFile;
+    const fileItem = createContextItem({
+      path: 'docs/spec.md',
+      label: 'docs/spec.md',
+    });
+    const chooseContextFileMock = chooseContextFile as jest.MockedFunction<typeof chooseContextFile>;
+    const { services, contextAttachmentBuilder } = createHarness({
+      fileItem,
+    });
+    const pointerDownSpy = jest.spyOn(
+      services.focusContextRuntimeService,
+      'handleComposerPointerDown',
+    ).mockImplementation(() => {});
+    const refreshSpy = jest.spyOn(
+      services.focusContextPreviewCoordinator,
+      'scheduleFocusContextPreviewRefresh',
+    ).mockImplementation(() => {});
+    chooseContextFileMock.mockResolvedValue(file);
+
+    const result = await services.pickerActionService.addChosenFileContextToActiveTab();
+
+    expect(result).toBe(true);
+    expect(pointerDownSpy).toHaveBeenCalledTimes(1);
+    expect(refreshSpy).toHaveBeenCalledTimes(1);
+    expect(contextAttachmentBuilder.buildFileContextItem).toHaveBeenCalledWith(file, 'file');
+    expect(services.runtimeStore.getDraftContextItems()).toEqual([fileItem]);
   });
 });

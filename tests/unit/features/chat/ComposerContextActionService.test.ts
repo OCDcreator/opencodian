@@ -1,15 +1,10 @@
-import type { App, Editor, MarkdownView, TFile } from 'obsidian';
+import type { Editor, MarkdownView } from 'obsidian';
 
 import type { PromptContextItem } from '../../../../src/core/types';
 import {
   ComposerContextActionService,
   type ComposerContextActionServiceHost,
 } from '../../../../src/features/chat/services/ComposerContextActionService';
-import { chooseContextFile } from '../../../../src/features/chat/ui/ContextFilePickerModal';
-
-jest.mock('../../../../src/features/chat/ui/ContextFilePickerModal', () => ({
-  chooseContextFile: jest.fn(),
-}));
 
 function createContextItem(overrides: Partial<PromptContextItem> = {}): PromptContextItem {
   return {
@@ -29,7 +24,6 @@ function createHarness(options: {
   selectionItem?: PromptContextItem | null;
   fileItem?: PromptContextItem | null;
 } = {}) {
-  const app = {} as App;
   const activeView = options.activeView ?? null;
   const addDraftContextItem = jest.fn();
 
@@ -44,26 +38,15 @@ function createHarness(options: {
     buildFileContextItem: jest.fn(async () => options.fileItem ?? null),
   };
 
-  const contextFileCatalogService = {
-    getCatalog: jest.fn(async () => ({
-      entries: [],
-      extensions: [],
-    })),
-  };
-
   const service = new ComposerContextActionService(
-    app,
     contextAttachmentBuilder,
-    contextFileCatalogService,
     host,
   );
 
   return {
     service,
-    app,
     addDraftContextItem,
     contextAttachmentBuilder,
-    contextFileCatalogService,
   };
 }
 
@@ -112,45 +95,5 @@ describe('ComposerContextActionService', () => {
     expect(result).toBe(true);
     expect(contextAttachmentBuilder.buildSelectionContextItem).toHaveBeenCalledWith(activeEditor, activeView);
     expect(addDraftContextItem).toHaveBeenCalledWith(selectionItem);
-  });
-
-  it('opens the file picker, loads the catalog, and attaches the chosen file context', async () => {
-    const file = { path: 'docs/spec.md' } as TFile;
-    const fileItem = createContextItem({ path: 'docs/spec.md' });
-    const chooseContextFileMock = chooseContextFile as jest.MockedFunction<typeof chooseContextFile>;
-    const {
-      service,
-      app,
-      addDraftContextItem,
-      contextAttachmentBuilder,
-      contextFileCatalogService,
-    } = createHarness({
-      fileItem,
-    });
-
-    chooseContextFileMock.mockImplementation(async (actualApp, loadCatalog) => {
-      expect(actualApp).toBe(app);
-      await loadCatalog();
-      return file;
-    });
-
-    const result = await service.addChosenFileContextToActiveTab();
-
-    expect(result).toBe(true);
-    expect(contextFileCatalogService.getCatalog).toHaveBeenCalledTimes(1);
-    expect(contextAttachmentBuilder.buildFileContextItem).toHaveBeenCalledWith(file, 'file');
-    expect(addDraftContextItem).toHaveBeenCalledWith(fileItem);
-  });
-
-  it('returns false without mutating draft context when the picker is cancelled', async () => {
-    const chooseContextFileMock = chooseContextFile as jest.MockedFunction<typeof chooseContextFile>;
-    const { service, addDraftContextItem, contextAttachmentBuilder } = createHarness();
-    chooseContextFileMock.mockResolvedValue(null);
-
-    const result = await service.addChosenFileContextToActiveTab();
-
-    expect(result).toBe(false);
-    expect(contextAttachmentBuilder.buildFileContextItem).not.toHaveBeenCalled();
-    expect(addDraftContextItem).not.toHaveBeenCalled();
   });
 });

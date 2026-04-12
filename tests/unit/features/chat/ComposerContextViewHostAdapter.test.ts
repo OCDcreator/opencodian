@@ -62,9 +62,11 @@ function createHarness() {
 }
 
 describe('ComposerContextViewHostAdapter', () => {
-  it('builds coordinator, chip-action, action, and focus-runtime hosts on top of the shared runtime store', () => {
+  it('builds coordinator, chip-action, action, picker-action, and focus-runtime hosts on top of the shared runtime store', () => {
     const { adapter, runtimeStore, runtimes, setActiveTabId } = createHarness();
     const refreshActiveFocusContextPreview = jest.fn();
+    const beginContextPickerInteraction = jest.fn();
+    const completeContextPickerInteraction = jest.fn();
     const coordinatorHost = adapter.createCoordinatorHost();
     const chipActionHost = adapter.createChipActionServiceHost({
       refreshActiveFocusContextPreview,
@@ -72,12 +74,17 @@ describe('ComposerContextViewHostAdapter', () => {
     const actionHost = adapter.createActionServiceHost({
       getActiveMarkdownView: () => null,
     });
+    const pickerActionHost = adapter.createPickerActionServiceHost({
+      beginContextPickerInteraction,
+      completeContextPickerInteraction,
+    });
     const focusHost = adapter.createFocusContextRuntimeServiceHost({
       getCurrentConversationNotePath: () => 'notes/current.md',
       isComposerInteractionFocused: () => false,
     });
     const selectionItem = createContextItem('item-1', 'notes/alpha.md', { startLine: 1, endLine: 4 });
     const fileItem = createContextItem('item-2', 'notes/beta.md');
+    const pickerItem = createContextItem('item-4', 'notes/delta.md');
 
     runtimes.get('tab-1' as TabId)?.draftContextItems.push(selectionItem, fileItem);
     runtimes.get('tab-1' as TabId)!.focusContextPreview = createPreview('notes/alpha.md');
@@ -94,13 +101,26 @@ describe('ComposerContextViewHostAdapter', () => {
       lineRange: { startLine: 1, endLine: 4 },
     });
     actionHost.addDraftContextItem(createContextItem('item-3', 'notes/gamma.md'));
+    pickerActionHost.addDraftContextItem(pickerItem);
+    pickerActionHost.beginContextPickerInteraction();
+    pickerActionHost.completeContextPickerInteraction();
     focusHost.setFocusContextPreview(createPreview('notes/gamma.md'));
     chipActionHost.refreshActiveFocusContextPreview();
 
-    expect(runtimeStore.getDraftContextItems()).toEqual([fileItem, createContextItem('item-3', 'notes/gamma.md')]);
-    expect(coordinatorHost.getDraftContextItems()).toEqual([fileItem, createContextItem('item-3', 'notes/gamma.md')]);
+    expect(runtimeStore.getDraftContextItems()).toEqual([
+      fileItem,
+      createContextItem('item-3', 'notes/gamma.md'),
+      pickerItem,
+    ]);
+    expect(coordinatorHost.getDraftContextItems()).toEqual([
+      fileItem,
+      createContextItem('item-3', 'notes/gamma.md'),
+      pickerItem,
+    ]);
     expect(coordinatorHost.getFocusContextPreview()).toEqual(createPreview('notes/gamma.md'));
     expect(refreshActiveFocusContextPreview).toHaveBeenCalledTimes(1);
+    expect(beginContextPickerInteraction).toHaveBeenCalledTimes(1);
+    expect(completeContextPickerInteraction).toHaveBeenCalledTimes(1);
 
     setActiveTabId('tab-2' as TabId);
     expect(coordinatorHost.getDraftContextItems()).toEqual([]);

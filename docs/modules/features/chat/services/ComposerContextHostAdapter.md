@@ -9,6 +9,7 @@
 
 - `ComposerContextRuntimeStore`
 - `ComposerContextActionService`
+- `ComposerContextPickerActionService`
 - `ComposerContextChipActionService`
 - `ComposerContextCoordinator`
 - `FocusContextRuntimeService`
@@ -20,7 +21,7 @@
 ## 导入关系
 
 上游: `OpenCodianView`
-下游: `ComposerContextRuntimeStore`、`ComposerContextViewHostAdapter`、`ComposerContextActionService`、`ComposerContextChipActionService`、`ComposerContextCoordinator`、`FocusContextRuntimeService`、`FocusContextPreviewCoordinator`、`ComposerContextEventBridge`
+下游: `ComposerContextRuntimeStore`、`ComposerContextViewHostAdapter`、`ComposerContextActionService`、`ComposerContextPickerActionService`、`ComposerContextChipActionService`、`ComposerContextCoordinator`、`FocusContextRuntimeService`、`FocusContextPreviewCoordinator`、`ComposerContextEventBridge`
 
 ## 公开接口
 
@@ -47,8 +48,9 @@ function createComposerContextServices(
 ### bundle 装配
 
 - 先创建 `ComposerContextRuntimeStore`，把 active-tab `draftContextItems` / `focusContextPreview` 写回集中到同一份 runtime seam
-- 再复用 `ComposerContextViewHostAdapter` 暴露给 action/chip/coordinator/focus-runtime 四条路径所需的细粒度 host
-- `FocusContextPreviewCoordinator` 仍只负责 file-open note path 写回与 refresh 调度，但它的 host 现在由 adapter 统一拼装
+- 再复用 `ComposerContextViewHostAdapter` 暴露给 action/picker/chip/coordinator/focus-runtime 五条路径所需的细粒度 host
+- `FocusContextPreviewCoordinator` 仍只负责 file-open note path 写回与 refresh 调度，但现在也通过 picker host 接手 picker close 后的 preview writeback
+- `ComposerContextPickerActionService` 通过 host 把 picker open → retained-selection handoff、picker close → preview refresh 统一挂到同一份 bundle 装配里
 - `ComposerContextEventBridge` 继续承接 workspace / vault / DOM 事件桥接与 retained-selection polling 启动，只是注册/DOM seam 不再由 view 逐项散落提供
 
 ## 注意事项

@@ -5,6 +5,7 @@ import { ComposerContextActionService } from './ComposerContextActionService';
 import { ComposerContextChipActionService } from './ComposerContextChipActionService';
 import { ComposerContextCoordinator } from './ComposerContextCoordinator';
 import { ComposerContextEventBridge } from './ComposerContextEventBridge';
+import { ComposerContextPickerActionService } from './ComposerContextPickerActionService';
 import {
   ComposerContextRuntimeStore,
   type ComposerContextRuntimeState,
@@ -57,6 +58,7 @@ export interface ComposerContextServiceDependencies {
 export interface ComposerContextServices {
   runtimeStore: ComposerContextRuntimeStore;
   actionService: ComposerContextActionService;
+  pickerActionService: ComposerContextPickerActionService;
   chipActionService: ComposerContextChipActionService;
   coordinator: ComposerContextCoordinator;
   eventBridge: ComposerContextEventBridge;
@@ -78,9 +80,7 @@ export function createComposerContextServices(
   });
   const viewHostAdapter = new ComposerContextViewHostAdapter(runtimeStore);
   const actionService = new ComposerContextActionService(
-    dependencies.app,
     dependencies.contextAttachmentBuilder,
-    dependencies.contextFileCatalogService,
     viewHostAdapter.createActionServiceHost({
       getActiveMarkdownView: () => dependencies.viewHost.getActiveMarkdownView(),
     }),
@@ -99,6 +99,19 @@ export function createComposerContextServices(
       },
     },
     focusContextRuntimeService,
+  );
+  const pickerActionService = new ComposerContextPickerActionService(
+    dependencies.app,
+    dependencies.contextAttachmentBuilder,
+    dependencies.contextFileCatalogService,
+    viewHostAdapter.createPickerActionServiceHost({
+      beginContextPickerInteraction: () => {
+        focusContextRuntimeService.handleComposerPointerDown();
+      },
+      completeContextPickerInteraction: () => {
+        focusContextPreviewCoordinator.scheduleFocusContextPreviewRefresh();
+      },
+    }),
   );
   const chipActionService = new ComposerContextChipActionService(
     dependencies.contextAttachmentBuilder,
@@ -131,6 +144,7 @@ export function createComposerContextServices(
   return {
     runtimeStore,
     actionService,
+    pickerActionService,
     chipActionService,
     coordinator,
     eventBridge,

@@ -1,18 +1,11 @@
-import type { App, Editor, MarkdownView } from 'obsidian';
+import type { Editor, MarkdownView } from 'obsidian';
 
 import type { PromptContextItem } from '../../../core/types';
-import { chooseContextFile } from '../ui/ContextFilePickerModal';
 import type { ContextAttachmentBuilder } from './ContextAttachmentBuilder';
-import type { ContextFileCatalogService } from './ContextFileCatalogService';
 
 type ComposerContextActionAttachmentBuilderPort = Pick<
   ContextAttachmentBuilder,
-  'buildCurrentNoteContextItem' | 'buildSelectionContextItem' | 'buildFileContextItem'
->;
-
-type ComposerContextActionCatalogPort = Pick<
-  ContextFileCatalogService,
-  'getCatalog'
+  'buildCurrentNoteContextItem' | 'buildSelectionContextItem'
 >;
 
 export interface ComposerContextActionServiceHost {
@@ -22,9 +15,7 @@ export interface ComposerContextActionServiceHost {
 
 export class ComposerContextActionService {
   constructor(
-    private readonly app: App,
     private readonly contextAttachmentBuilder: ComposerContextActionAttachmentBuilderPort,
-    private readonly contextFileCatalogService: ComposerContextActionCatalogPort,
     private readonly host: ComposerContextActionServiceHost,
   ) {}
 
@@ -44,16 +35,6 @@ export class ComposerContextActionService {
       editor ?? activeView?.editor ?? null,
       activeView,
     );
-    return this.addBuiltContextItem(contextItem);
-  }
-
-  async addChosenFileContextToActiveTab(): Promise<boolean> {
-    const file = await chooseContextFile(this.app, async () => this.contextFileCatalogService.getCatalog());
-    if (!file) {
-      return false;
-    }
-
-    const contextItem = await this.contextAttachmentBuilder.buildFileContextItem(file, 'file');
     return this.addBuiltContextItem(contextItem);
   }
 

@@ -189,6 +189,7 @@ import type { ComposerContextActionService } from './services/ComposerContextAct
 import type { ComposerContextChipActionService } from './services/ComposerContextChipActionService';
 import type { ComposerContextCoordinator } from './services/ComposerContextCoordinator';
 import type { ComposerContextEventBridge } from './services/ComposerContextEventBridge';
+import type { ComposerContextPickerActionService } from './services/ComposerContextPickerActionService';
 import {
   createComposerContextServices,
   type ComposerContextViewHost,
@@ -749,6 +750,7 @@ export class OpenCodianView extends ItemView {
   private questionRuntimeServices: QuestionRuntimeServices;
   private sendPipelineRuntime: SendPipelineRuntime;
   private composerContextActionService: ComposerContextActionService;
+  private composerContextPickerActionService: ComposerContextPickerActionService;
   private composerContextChipActionService: ComposerContextChipActionService;
   private composerContextCoordinator: ComposerContextCoordinator;
   private composerContextEventBridge: ComposerContextEventBridge;
@@ -1103,6 +1105,7 @@ export class OpenCodianView extends ItemView {
     });
     this.composerContextRuntimeStore = composerContextServices.runtimeStore;
     this.composerContextActionService = composerContextServices.actionService;
+    this.composerContextPickerActionService = composerContextServices.pickerActionService;
     this.focusContextRuntimeService = composerContextServices.focusContextRuntimeService;
     this.focusContextPreviewCoordinator = composerContextServices.focusContextPreviewCoordinator;
     this.composerContextChipActionService = composerContextServices.chipActionService;
@@ -3172,7 +3175,7 @@ export class OpenCodianView extends ItemView {
     setIcon(addContextBtn, 'plus');
     this.setTooltipLabel(addContextBtn, t('chat.context.addContext'), 'top');
     addContextBtn.addEventListener('click', () => {
-      void this.addChosenFileContextToActiveTab();
+      void this.composerContextPickerActionService.addChosenFileContextToActiveTab();
     });
 
     this.sendBtn = composerFooterEl.createEl('button', {
@@ -4068,10 +4071,6 @@ export class OpenCodianView extends ItemView {
     view?: MarkdownView | null,
   ): Promise<boolean> {
     return this.composerContextActionService.addSelectionContextFromActiveEditor(editor, view);
-  }
-
-  private async addChosenFileContextToActiveTab(): Promise<boolean> {
-    return this.composerContextActionService.addChosenFileContextToActiveTab();
   }
 
   private trySubmitCurrentInput(): void {
