@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import signal
 import shutil
 import socket
 import subprocess
@@ -136,6 +137,13 @@ def run_git(args: list[str], *, check: bool = True) -> CommandResult:
     return run_command(["git", "-C", str(REPO_ROOT), *args], check=check)
 
 
+def run_git_no_capture(args: list[str], *, check: bool = True) -> int:
+    process = subprocess.run(["git", "-C", str(REPO_ROOT), *args], check=False)
+    if check and process.returncode != 0:
+        raise AutopilotError(f"git {' '.join(args)} failed with exit code {process.returncode}")
+    return int(process.returncode)
+
+
 def new_state(config: dict[str, Any]) -> dict[str, Any]:
     timestamp = now_timestamp()
     return {
@@ -216,6 +224,98 @@ def test_build_required(files: list[str]) -> bool:
         ):
             return True
     return False
+
+
+def normalize_repo_file_path(file_path: str) -> str:
+    return file_path.replace("\\", "/").strip()
+
+
+def path_matches_any(file_path: str, configured_paths: list[str]) -> bool:
+    normalized = normalize_repo_file_path(file_path)
+    for configured_path in configured_paths:
+        candidate = normalize_repo_file_path(str(configured_path))
+        if not candidate:
+            continue
+        if candidate.endswith("/"):
+            if normalized.startswith(candidate):
+                return True
+            continue
+        if normalized == candidate or normalized.startswith(f"{candidate}/"):
+            return True
+    return False
+
+
+def test_targeted_tests_required(files: list[str]) -> bool:
+    for file_path in files:
+        normalized = normalize_repo_file_path(file_path)
+        if normalized.startswith(("src/", "tests/", "automation/")):
+            return True
+        if normalized in {"package.json", "package-lock.json", "manifest.json", "styles.css", "esbuild.config.mjs"}:
+            return True
+    return False
+
+
+def test_full_test_required(files: list[str], attempt_number: int, config: dict[str, Any]) -> bool:
+    configured_paths = list(config.get("full_test_required_paths", []))
+    cadence_rounds = int(config.get("full_test_cadence_rounds", 0) or 0)
+    if cadence_rounds > 0 and attempt_number > 0 and attempt_number % cadence_rounds == 0:
+        return True
+    return any(path_matches_any(file_path, configured_paths) for file_path in files)
+
+
+def test_deploy_required(files: list[str], config: dict[str, Any]) -> bool:
+    deploy_policy = clean_string(config.get("deploy_policy")).lower()
+    configured_paths = list(config.get("deploy_required_paths", []))
+    if deploy_policy == "always":
+        return True
+    if deploy_policy == "targeted":
+        return any(path_matches_any(file_path, configured_paths) for file_path in files)
+    return bool(config.get("deploy_after_build"))
+
+
+def count_command_occurrences(commands_run: list[str], needle: str) -> int:
+    return sum(str(command).count(needle) for command in commands_run)
+
+
+def test_command_budget_exceeded(commands_run: list[str], config: dict[str, Any]) -> list[str]:
+    errors: list[str] = []
+    max_git_status = int(config.get("max_git_status_per_round", 0) or 0)
+    max_git_diff_stat = int(config.get("max_git_diff_stat_per_round", 0) or 0)
+
+    git_status_count = count_command_occurrences(commands_run, "git status --short")
+    git_diff_stat_count = count_command_occurrences(commands_run, "git diff --stat")
+
+    if max_git_status > 0 and git_status_count > max_git_status:
+        errors.append(
+            f"commands_run used 'git status --short' {git_status_count} times, exceeding limit {max_git_status}."
+        )
+    if max_git_diff_stat > 0 and git_diff_stat_count > max_git_diff_stat:
+        errors.append(
+            f"commands_run used 'git diff --stat' {git_diff_stat_count} times, exceeding limit {max_git_diff_stat}."
+        )
+    return errors
+
+
+def command_matches_full_test(command: str, full_test_command: str) -> bool:
+    return clean_string(command) == clean_string(full_test_command)
+
+
+def command_matches_targeted_test(command: str, full_test_command: str) -> bool:
+    normalized_command = clean_string(command)
+    normalized_full = clean_string(full_test_command)
+    if not normalized_command or not normalized_full:
+        return False
+    return normalized_command.startswith(f"{normalized_full} --")
+
+
+def test_runs_include_targeted_tests(tests_run: list[str], config: dict[str, Any]) -> bool:
+    full_test_command = clean_string(config.get("full_test_command")) or clean_string(config.get("test_command"))
+    return any(command_matches_targeted_test(str(command), full_test_command) for command in tests_run)
+
+
+def test_runs_include_full_test(tests_run: list[str], config: dict[str, Any]) -> bool:
+    full_test_command = clean_string(config.get("full_test_command")) or clean_string(config.get("test_command"))
+    return any(command_matches_full_test(str(command), full_test_command) for command in tests_run)
 
 
 def test_deployed_build_id(plugin_directory: str, build_id: str) -> bool:
@@ -581,6 +681,7 @@ def build_history_entry(
 
 def validate_round_result(
     *,
+    attempt_number: int,
     result: dict[str, Any],
     schema: dict[str, Any],
     phase_doc_relative_path: str,
@@ -631,12 +732,31 @@ def validate_round_result(
             if test_build_required(validated_commit_files) and not bool(result.get("build_ran")):
                 validation_errors.append("This round changed build-relevant files but reported build_ran=false.")
 
+            tests_run = [str(command) for command in result.get("tests_run", [])]
+            if bool(config.get("targeted_test_required")) and test_targeted_tests_required(validated_commit_files):
+                if not test_runs_include_targeted_tests(tests_run, config):
+                    validation_errors.append("This round changed code/test files but did not report targeted tests.")
+
+            if test_full_test_required(validated_commit_files, attempt_number, config):
+                if not test_runs_include_full_test(tests_run, config):
+                    validation_errors.append("This round required full test coverage but did not report full npm test.")
+
+            validation_errors.extend(
+                test_command_budget_exceeded([str(command) for command in result.get("commands_run", [])], config)
+            )
+
         build_id = clean_string(result.get("build_id"))
         if bool(result.get("build_ran")) and not build_id:
             validation_errors.append("build_ran=true requires a non-empty build_id.")
 
-        if bool(result.get("build_ran")) and bool(config.get("deploy_after_build")) and not bool(result.get("deploy_ran")):
-            validation_errors.append("build_ran=true requires deploy_ran=true for this repo.")
+        validated_commit_files = get_commit_files(commit_sha) if commit_sha else []
+        deploy_required = test_deploy_required(validated_commit_files, config)
+
+        if bool(result.get("build_ran")) and deploy_required and not bool(result.get("deploy_ran")):
+            validation_errors.append("This round required deployment after build but reported deploy_ran=false.")
+
+        if bool(result.get("deploy_ran")) and not deploy_required:
+            info("Result reported deployment for a non-deploy-required round; allowing it.")
 
         if bool(result.get("deploy_ran")) and not bool(result.get("deploy_verified")):
             validation_errors.append("deploy_ran=true requires deploy_verified=true.")
@@ -833,6 +953,7 @@ def run_start(args: argparse.Namespace) -> int:
 
             if not failure_reason and result is not None:
                 failure_reason = validate_round_result(
+                    attempt_number=attempt_number,
                     result=result,
                     schema=schema,
                     phase_doc_relative_path=phase_doc_relative_path,
@@ -937,6 +1058,167 @@ def latest_round_directory(runtime_directory: Path) -> Path | None:
     return round_directories[-1] if round_directories else None
 
 
+def stop_process(pid: int, *, graceful_timeout_seconds: int = 30) -> None:
+    if pid <= 0:
+        return
+    if not pid_exists(pid):
+        info(f"Process {pid} already exited.")
+        return
+
+    info(f"Stopping process {pid}.")
+    if os.name == "nt":
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except OSError:
+            pass
+        deadline = time.time() + graceful_timeout_seconds
+        while time.time() < deadline:
+            if not pid_exists(pid):
+                info(f"Process {pid} stopped cleanly.")
+                return
+            time.sleep(1)
+
+        taskkill_result = subprocess.run(
+            ["taskkill", "/PID", str(pid), "/T", "/F"],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            check=False,
+        )
+        if taskkill_result.returncode != 0 and pid_exists(pid):
+            combined = "\n".join(part for part in (taskkill_result.stdout, taskkill_result.stderr) if part.strip())
+            raise AutopilotError(f"Failed to force-stop pid {pid}: {combined}")
+    else:
+        os.kill(pid, signal.SIGTERM)
+        deadline = time.time() + graceful_timeout_seconds
+        while time.time() < deadline:
+            if not pid_exists(pid):
+                info(f"Process {pid} stopped cleanly.")
+                return
+            time.sleep(1)
+
+        os.kill(pid, signal.SIGKILL)
+        deadline = time.time() + 10
+        while time.time() < deadline:
+            if not pid_exists(pid):
+                info(f"Process {pid} force-stopped.")
+                return
+            time.sleep(1)
+
+    if pid_exists(pid):
+        raise AutopilotError(f"Failed to stop pid {pid}.")
+
+
+def remove_stale_lock(runtime_directory: Path, *, expected_pid: int | None = None) -> None:
+    lock_path = runtime_directory / LOCK_FILENAME
+    lock_data = read_lock(lock_path)
+    if not lock_data:
+        return
+
+    lock_pid_raw = lock_data.get("pid")
+    try:
+        lock_pid = int(lock_pid_raw)
+    except (TypeError, ValueError):
+        lock_pid = -1
+
+    if expected_pid is not None and lock_pid not in (-1, expected_pid):
+        return
+
+    if lock_pid > 0 and pid_exists(lock_pid):
+        raise AutopilotError(f"Refusing to remove active lock owned by pid {lock_pid}.")
+
+    lock_path.unlink(missing_ok=True)
+    info(f"Removed stale lock file at {lock_path}.")
+
+
+def build_restart_start_args(args: argparse.Namespace) -> list[str]:
+    restart_profile = clean_string(args.restart_profile) or clean_string(args.profile) or DEFAULT_PROFILE_NAME
+    restart_config_path = clean_string(args.restart_config_path) or clean_string(args.config_path) or DEFAULT_CONFIG_PATH
+    restart_state_path = clean_string(args.restart_state_path) or clean_string(args.state_path) or DEFAULT_STATE_PATH
+    restart_profile_path = clean_string(args.restart_profile_path) or clean_string(args.profile_path)
+
+    start_args = [
+        sys.executable,
+        str(resolve_repo_path("automation/autopilot.py")),
+        "start",
+        "--profile",
+        restart_profile,
+        "--config-path",
+        restart_config_path,
+        "--state-path",
+        restart_state_path,
+    ]
+    if restart_profile_path:
+        start_args.extend(["--profile-path", restart_profile_path])
+    return start_args
+
+
+def git_ref_exists(ref_name: str) -> bool:
+    return run_git(["rev-parse", "--verify", f"{ref_name}^{{commit}}"], check=False).returncode == 0
+
+
+def git_is_ancestor(ancestor_ref: str, descendant_ref: str) -> bool:
+    return run_git(["merge-base", "--is-ancestor", ancestor_ref, descendant_ref], check=False).returncode == 0
+
+
+def sync_repo_to_restart_ref(
+    *,
+    restart_sync_ref: str,
+    stopped_head: str,
+    timeout_seconds: int,
+    refresh_seconds: int,
+) -> None:
+    started_monotonic = time.monotonic()
+    while True:
+        run_git_no_capture(["fetch", "--all", "--prune"], check=True)
+
+        if git_ref_exists(restart_sync_ref):
+            if git_is_ancestor(stopped_head, restart_sync_ref):
+                info(f"Fast-forwarding repo to cutover ref {restart_sync_ref}.")
+                run_git_no_capture(["merge", "--ff-only", restart_sync_ref], check=True)
+                return
+            info(f"Ref {restart_sync_ref} exists but is not a fast-forward successor of stopped HEAD {stopped_head}.")
+        else:
+            info(f"Waiting for cutover ref {restart_sync_ref} to appear.")
+
+        if timeout_seconds > 0 and time.monotonic() - started_monotonic >= timeout_seconds:
+            raise AutopilotError(
+                f"Timed out waiting for cutover ref '{restart_sync_ref}' to become a fast-forward successor of {stopped_head}."
+            )
+
+        time.sleep(refresh_seconds)
+
+
+def spawn_background_autopilot(command_args: list[str], *, output_path: Path, pid_path: Path | None = None) -> int:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_handle = output_path.open("ab")
+    popen_kwargs: dict[str, Any] = {
+        "args": command_args,
+        "cwd": str(REPO_ROOT),
+        "stdin": subprocess.DEVNULL,
+        "stdout": output_handle,
+        "stderr": subprocess.STDOUT,
+    }
+
+    if os.name == "nt":
+        detached_process = getattr(subprocess, "DETACHED_PROCESS", 0)
+        new_process_group = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+        popen_kwargs["creationflags"] = detached_process | new_process_group
+    else:
+        popen_kwargs["start_new_session"] = True
+
+    try:
+        process = subprocess.Popen(**popen_kwargs)
+    finally:
+        output_handle.close()
+
+    if pid_path:
+        pid_path.parent.mkdir(parents=True, exist_ok=True)
+        pid_path.write_text(f"{process.pid}\n", encoding="utf-8")
+    return int(process.pid)
+
+
 def run_watch(args: argparse.Namespace) -> int:
     runtime_directory = resolve_repo_path(args.runtime_path)
     state_path = runtime_directory / "maintainability-state.json"
@@ -979,6 +1261,78 @@ def run_watch(args: argparse.Namespace) -> int:
         if args.once:
             break
         time.sleep(args.refresh_seconds)
+    return 0
+
+
+def run_restart_after_next_commit(args: argparse.Namespace) -> int:
+    state_path = resolve_repo_path(args.state_path)
+    runtime_directory = state_path.parent
+    if not state_path.exists():
+        raise AutopilotError(f"State file not found: {state_path}")
+
+    state = read_json(state_path)
+    target_commit_sha = clean_string(state.get("last_commit_sha"))
+    if not target_commit_sha:
+        raise AutopilotError("State file does not have last_commit_sha; nothing to watch yet.")
+
+    lock_path = runtime_directory / LOCK_FILENAME
+    lock_data = read_lock(lock_path)
+    current_pid = -1
+    if lock_data:
+        try:
+            current_pid = int(lock_data.get("pid", -1))
+        except (TypeError, ValueError):
+            current_pid = -1
+
+    info(
+        "Watching for the next successful commit after "
+        f"{target_commit_sha} (current pid {current_pid if current_pid > 0 else 'unknown'})."
+    )
+
+    refresh_seconds = max(1, int(args.refresh_seconds))
+    while True:
+        time.sleep(refresh_seconds)
+        state = read_json(state_path)
+        latest_commit_sha = clean_string(state.get("last_commit_sha"))
+        current_round = state.get("current_round")
+        current_status = clean_string(state.get("status"))
+
+        if latest_commit_sha and latest_commit_sha != target_commit_sha:
+            info(
+                "Detected new commit "
+                f"{latest_commit_sha} at round {current_round} with status {current_status or '<empty>'}."
+            )
+            break
+
+        if current_status and current_status != "active" and args.stop_if_status_changes:
+            raise AutopilotError(f"State changed to '{current_status}' before a new commit was detected.")
+
+    if current_pid > 0:
+        stop_process(current_pid, graceful_timeout_seconds=max(1, int(args.stop_timeout_seconds)))
+    else:
+        info("No active pid was captured from the lock file; skipping process stop step.")
+
+    remove_stale_lock(runtime_directory, expected_pid=current_pid if current_pid > 0 else None)
+
+    stopped_head = get_head_sha()
+
+    if args.hard_reset:
+        run_git_no_capture(["reset", "--hard", "HEAD"], check=True)
+
+    restart_sync_ref = clean_string(args.restart_sync_ref)
+    if restart_sync_ref:
+        sync_repo_to_restart_ref(
+            restart_sync_ref=restart_sync_ref,
+            stopped_head=stopped_head,
+            timeout_seconds=max(0, int(args.restart_sync_timeout_seconds)),
+            refresh_seconds=max(1, int(args.restart_sync_refresh_seconds)),
+        )
+
+    restart_args = build_restart_start_args(args)
+    restart_output_path = resolve_repo_path(args.restart_output_path)
+    restart_pid_path = resolve_repo_path(args.restart_pid_path) if clean_string(args.restart_pid_path) else None
+    new_pid = spawn_background_autopilot(restart_args, output_path=restart_output_path, pid_path=restart_pid_path)
+    info(f"Started replacement autopilot pid {new_pid}.")
     return 0
 
 
@@ -1068,6 +1422,70 @@ def build_parser() -> argparse.ArgumentParser:
     doctor_parser.add_argument("--config-path", default=DEFAULT_CONFIG_PATH, help="Base config JSON path.")
     doctor_parser.add_argument("--runtime-path", default=DEFAULT_RUNTIME_PATH, help="Runtime directory path.")
     doctor_parser.set_defaults(handler=run_doctor)
+
+    restart_parser = subparsers.add_parser(
+        "restart-after-next-commit",
+        help="Wait for the next successful commit, then restart autopilot with replacement settings.",
+    )
+    restart_parser.add_argument("--profile", default=DEFAULT_PROFILE_NAME, help="Current profile name under automation/profiles.")
+    restart_parser.add_argument("--profile-path", help="Current explicit profile JSON path.")
+    restart_parser.add_argument("--config-path", default=DEFAULT_CONFIG_PATH, help="Current base config JSON path.")
+    restart_parser.add_argument("--state-path", default=DEFAULT_STATE_PATH, help="State JSON path to watch.")
+    restart_parser.add_argument("--restart-profile", help="Profile name to use for the replacement start command.")
+    restart_parser.add_argument("--restart-profile-path", help="Explicit profile JSON path for the replacement start command.")
+    restart_parser.add_argument("--restart-config-path", help="Config JSON path for the replacement start command.")
+    restart_parser.add_argument("--restart-state-path", help="State JSON path for the replacement start command.")
+    restart_parser.add_argument(
+        "--restart-output-path",
+        default="automation/runtime/autopilot-restart.out",
+        help="Where to write the replacement autopilot stdout/stderr stream.",
+    )
+    restart_parser.add_argument(
+        "--restart-pid-path",
+        default="automation/runtime/autopilot.pid",
+        help="Where to write the replacement autopilot pid.",
+    )
+    restart_parser.add_argument("--refresh-seconds", type=int, default=5, help="Polling interval while waiting.")
+    restart_parser.add_argument(
+        "--stop-timeout-seconds",
+        type=int,
+        default=30,
+        help="How long to wait for the current autopilot to stop before forcing it.",
+    )
+    restart_parser.add_argument(
+        "--hard-reset",
+        action="store_true",
+        default=True,
+        help="Run `git reset --hard HEAD` before launching the replacement process.",
+    )
+    restart_parser.add_argument(
+        "--no-hard-reset",
+        dest="hard_reset",
+        action="store_false",
+        help="Skip `git reset --hard HEAD` before relaunching.",
+    )
+    restart_parser.add_argument(
+        "--stop-if-status-changes",
+        action="store_true",
+        help="Abort instead of waiting forever if the watched state leaves `active` before a new commit appears.",
+    )
+    restart_parser.add_argument(
+        "--restart-sync-ref",
+        help="After stopping the current autopilot, wait for this git ref and fast-forward merge it before relaunching.",
+    )
+    restart_parser.add_argument(
+        "--restart-sync-timeout-seconds",
+        type=int,
+        default=0,
+        help="How long to wait for the cutover ref to become a fast-forward successor; 0 waits forever.",
+    )
+    restart_parser.add_argument(
+        "--restart-sync-refresh-seconds",
+        type=int,
+        default=5,
+        help="Polling interval while waiting for the cutover ref.",
+    )
+    restart_parser.set_defaults(handler=run_restart_after_next_commit)
 
     return parser
 
