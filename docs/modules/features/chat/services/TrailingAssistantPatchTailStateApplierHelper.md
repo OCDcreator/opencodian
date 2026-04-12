@@ -35,5 +35,5 @@ export function applyTrailingAssistantPatchTailState(
 ## 与其他模块的关系
 
 - `ConversationRenderService` 继续负责 trailing-assistant patch 的控制流，只在 patch 成功后把预建的 `tailStatePlan` 交给这里执行
-- `buildTrailingAssistantPatchTailStatePlan()` 继续留在 `ConversationRenderService` 内，负责从 planning-context 预计算副作用输入
+- `TrailingAssistantPatchTailStateTailOutcomePlanHelper` 继续负责从 tail-outcome planning-context 预计算副作用输入
 - 该 helper 与 debug logging helpers 相互独立：它不关心 completion / skipped log context，也不会读取整份 `successPlan`

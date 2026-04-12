@@ -18,6 +18,7 @@ import {
   applyTrailingAssistantPatchTailState,
   type TrailingAssistantPatchTailStatePlan,
 } from './TrailingAssistantPatchTailStateApplierHelper';
+import { buildTrailingAssistantPatchTailStatePlanFromTailOutcomePlanningContext } from './TrailingAssistantPatchTailStateTailOutcomePlanHelper';
 import {
   type TrailingAssistantPatchTurnBodyScopePlan,
   withTrailingAssistantTurnBodyScope,
@@ -35,10 +36,6 @@ import {
   type TrailingAssistantPatchTailOutcomePlanParts,
   type TrailingAssistantPatchTailOutcomePlans,
 } from './TrailingAssistantPatchTailOutcomePlanHelper';
-import {
-  buildTrailingAssistantPatchTailStatePlanningContext,
-  type TrailingAssistantPatchTailStatePlanningContext,
-} from './TrailingAssistantPatchTailStatePlanningContextHelper';
 import { buildTrailingAssistantPatchTurnBodyScopePlan } from './TrailingAssistantPatchTurnBodyScopePlanHelper';
 import {
   captureElementScrollRestoreSnapshot,
@@ -744,9 +741,7 @@ export class ConversationRenderService {
     planningContext: TrailingAssistantPatchTailOutcomePlanningContext,
   ): TrailingAssistantPatchTailOutcomePlanParts {
     const tailStatePlan =
-      this.buildTrailingAssistantPatchTailStatePlanFromTailOutcomePlanningContext(
-        planningContext,
-      );
+      buildTrailingAssistantPatchTailStatePlanFromTailOutcomePlanningContext(planningContext);
     return {
       tailStatePlan,
       completionDebugPlan:
@@ -759,14 +754,6 @@ export class ConversationRenderService {
     };
   }
 
-  private buildTrailingAssistantPatchTailStatePlanFromTailOutcomePlanningContext(
-    planningContext: TrailingAssistantPatchTailOutcomePlanningContext,
-  ): TrailingAssistantPatchTailStatePlan {
-    return this.buildTrailingAssistantPatchTailStatePlan(
-      buildTrailingAssistantPatchTailStatePlanningContext(planningContext),
-    );
-  }
-
   private buildTrailingAssistantPatchSuccessPlanFromParts(
     planParts: TrailingAssistantPatchSuccessPlanParts,
   ): TrailingAssistantPatchSuccessPlan {
@@ -775,17 +762,6 @@ export class ConversationRenderService {
       tailStatePlan: planParts.tailOutcomePlans.tailStatePlan,
       completionDebugPlan: planParts.tailOutcomePlans.completionDebugPlan,
       turnBodyScopePlan: planParts.turnBodyScopePlan,
-    };
-  }
-
-  private buildTrailingAssistantPatchTailStatePlan(
-    planningContext: TrailingAssistantPatchTailStatePlanningContext,
-  ): TrailingAssistantPatchTailStatePlan {
-    return {
-      messageEl: planningContext.messageEl,
-      messageId: planningContext.nextTailMessage.id,
-      sourceMessageId: planningContext.nextTailMessage.sourceMessageId ?? null,
-      shouldStickToBottom: planningContext.shouldStickToBottom,
     };
   }
 
