@@ -2,27 +2,10 @@ import type { App, TFile } from 'obsidian';
 import { Modal } from 'obsidian';
 
 import { t } from '../../../i18n';
+import type { ContextFileCatalog, ContextFileEntry } from '../services/ContextFileCatalogService';
 
 const MAX_RENDERED_FILES = 200;
 const ALL_EXTENSION_FILTER = '__all__';
-
-export interface ContextFileEntry {
-  file: TFile;
-  lowerPath: string;
-  lowerBasename: string;
-  lowerExtension: string;
-  extension: string;
-}
-
-export interface ContextFileExtensionBucket {
-  value: string;
-  count: number;
-}
-
-export interface ContextFileCatalog {
-  entries: ContextFileEntry[];
-  extensions: ContextFileExtensionBucket[];
-}
 
 export function chooseContextFile(
   app: App,

@@ -87,7 +87,6 @@ background task 相关的 `backgroundTaskLaunches`、`backgroundTaskCompletedTas
 - `currentConversation` / `currentConversationRevertState`
 - 模型目录缓存：`availableModels`、`availableProviders`
 - 服务器状态轮询和 badge 状态
-- context file catalog 缓存
 - model selector sticky header cleanup
 - retained selection highlight 状态
 - theme background / liquid glass / diamond demo / glass octahedron 相关 DOM 引用
@@ -335,7 +334,7 @@ model selector 现在拆成了几层协作：
 - 活动编辑器焦点预览通过 `createFocusContextPreview()` / `resolveFocusContextPreview()` 维护
 - `addCurrentNoteContextFromActiveEditor()`、`addSelectionContextFromActiveEditor()`、`addChosenFileContextToActiveTab()` 负责把不同来源转成 `PromptContextItem`
 - remote server 模式下，附件文本会经过 `validateRemoteContextText()`，单项上限是 `64 KiB`
-- 文件选择器使用惰性构建的 `ContextFileCatalog`，并监听 vault `create/delete/rename` 做增量更新
+- 文件选择器使用 `ContextFileCatalogService` 惰性构建和缓存 `ContextFileCatalog`；`OpenCodianView` 只转发 vault `create/delete/rename` 事件
 
 选区高亮保留逻辑同样在这里：
 
@@ -413,6 +412,7 @@ background task notice 这条子链路现在的边界是：
 - `TabManager` / `TabBar`：tab 生命周期和 tab 元数据
 - `MarkdownRenderService`：Markdown 渲染
 - `StreamController`：流式 assistant DOM 更新
+- `ContextFileCatalogService`：composer 文件上下文选择器使用的 Vault catalog 构建、缓存与增量更新
 - `ContextUsageService`：context usage state 维护
 - `TitleGenerationService`：AI 标题生成
 - `composerContext`、`renderGroups`、`collapsible`、`forkMessages`

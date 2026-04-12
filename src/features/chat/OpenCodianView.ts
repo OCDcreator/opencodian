@@ -5,7 +5,7 @@
  */
 
 import type { EditorView } from '@codemirror/view';
-import type { Editor, EventRef, TAbstractFile, WorkspaceLeaf } from 'obsidian';
+import type { Editor, EventRef, WorkspaceLeaf } from 'obsidian';
 import { addIcon, Component, ItemView, MarkdownView, normalizePath, Notice, Scope, setIcon, TFile } from 'obsidian';
 
 import type { ModelCatalogBundle } from '../../core/config';
@@ -49,9 +49,7 @@ import type OpenCodianPlugin from '../../main';
 import {
   createLogger,
   formatContextLabel,
-  getContextPathExtension,
   getVaultBasePath,
-  isEligibleContextFilePath,
   isInternalStructuredOutputTool,
   isTextLikeMime,
   resolveContextMimeFromPath,
@@ -172,7 +170,6 @@ import {
   type SendPipelineViewPort,
   SendPipelineRuntime,
 } from './runtime/SendPipelineRuntime';
-import { ContextUsageService } from './services/ContextUsageService';
 import {
   type BackgroundTaskCompletionInfo,
   type BackgroundTaskCompletionNoticeServiceHost,
@@ -197,6 +194,8 @@ import {
   type BackgroundTaskTimelineServiceHost,
   BackgroundTaskTimelineService,
 } from './services/BackgroundTaskTimelineService';
+import { ContextFileCatalogService } from './services/ContextFileCatalogService';
+import { ContextUsageService } from './services/ContextUsageService';
 import {
   ConversationSyncOrchestrationService,
 } from './services/ConversationSyncOrchestrationService';
@@ -252,11 +251,7 @@ import {
 import { TitleGenerationService } from './services/TitleGenerationService';
 import { TabBar, type TabBarLayoutMode, type TabId, TabManager } from './tabs';
 import { ContextDetailModal, type ContextRawMessageItem } from './ui/ContextDetailModal';
-import {
-  chooseContextFile,
-  type ContextFileCatalog,
-  type ContextFileEntry,
-} from './ui/ContextFilePickerModal';
+import { chooseContextFile } from './ui/ContextFilePickerModal';
 import { ContextRing } from './ui/ContextRing';
 import { EffortSelector } from './ui/EffortSelector';
 import { buildModelSelectorDisplayState } from './ui/modelSelector/ModelSelectorDisplay';
@@ -734,10 +729,9 @@ export class OpenCodianView extends ItemView {
   private questionResolutionCoordinator: QuestionResolutionCoordinator;
   private questionDockCoordinator: QuestionDockCoordinator;
   private sendPipelineRuntime: SendPipelineRuntime;
+  private contextFileCatalogService: ContextFileCatalogService;
   private omoBackgroundTaskLogStates = new Map<string, OmoBackgroundTaskLogState>();
   private lastKnownMarkdownFilePath: string | null = null;
-  private contextFileCatalogCache: ContextFileCatalog | null = null;
-  private contextFileCatalogBuildPromise: Promise<ContextFileCatalog> | null = null;
   private focusContextRefreshTimeoutId: number | null = null;
   private retainedSelectionHighlight: RetainedSelectionHighlight | null = null;
   private retainedSelectionInputHandoffGraceUntil: number | null = null;
@@ -1565,6 +1559,7 @@ export class OpenCodianView extends ItemView {
     this.currentEffortLevel = this.plugin.settings.effortLevel;
     this.currentThinkingBudget = this.plugin.settings.thinkingBudget;
     this.titleGenerationService = new TitleGenerationService(this.plugin);
+    this.contextFileCatalogService = new ContextFileCatalogService(this.app);
     this.sessionTodoStateService = new SessionTodoStateService(this.createSessionTodoStateServiceHost());
     this.backgroundTaskTimelineService = new BackgroundTaskTimelineService(
       this.createBackgroundTaskTimelineServiceHost(),
@@ -4680,7 +4675,7 @@ export class OpenCodianView extends ItemView {
   }
 
   private async addChosenFileContextToActiveTab(): Promise<boolean> {
-    const file = await chooseContextFile(this.app, async () => this.getContextFileCatalog());
+    const file = await chooseContextFile(this.app, async () => this.contextFileCatalogService.getCatalog());
     if (!file) {
       return false;
     }
@@ -4692,196 +4687,6 @@ export class OpenCodianView extends ItemView {
 
     this.addDraftContextItem(contextItem);
     return true;
-  }
-
-  private async getContextFileCatalog(): Promise<ContextFileCatalog> {
-    if (this.contextFileCatalogCache) {
-      return this.contextFileCatalogCache;
-    }
-
-    if (this.contextFileCatalogBuildPromise) {
-      return this.contextFileCatalogBuildPromise;
-    }
-
-    this.contextFileCatalogBuildPromise = this.buildContextFileCatalog();
-    try {
-      const catalog = await this.contextFileCatalogBuildPromise;
-      this.contextFileCatalogCache = catalog;
-      return catalog;
-    } finally {
-      this.contextFileCatalogBuildPromise = null;
-    }
-  }
-
-  private async buildContextFileCatalog(): Promise<ContextFileCatalog> {
-    const files = this.app.vault.getFiles();
-    const entries: ContextFileEntry[] = [];
-    const extensionCounts = new Map<string, number>();
-    const batchSize = 400;
-
-    for (let index = 0; index < files.length; index += batchSize) {
-      const batch = files.slice(index, index + batchSize);
-      for (const file of batch) {
-        const entry = this.createContextFileEntry(file);
-        if (!entry) {
-          continue;
-        }
-
-        entries.push(entry);
-        extensionCounts.set(entry.extension, (extensionCounts.get(entry.extension) ?? 0) + 1);
-      }
-
-      if (index + batchSize < files.length) {
-        await this.yieldContextCatalogBuild();
-      }
-    }
-
-    entries.sort((left, right) => this.compareContextFileEntries(left, right));
-
-    return {
-      entries,
-      extensions: this.buildContextFileExtensionBuckets(extensionCounts),
-    };
-  }
-
-  private createContextFileEntry(file: TFile): ContextFileEntry | null {
-    if (!isEligibleContextFilePath(file.path)) {
-      return null;
-    }
-
-    const extension = getContextPathExtension(file.path);
-    if (!extension) {
-      return null;
-    }
-
-    return {
-      file,
-      lowerPath: file.path.toLowerCase(),
-      lowerBasename: file.basename.toLowerCase(),
-      lowerExtension: extension.toLowerCase(),
-      extension,
-    };
-  }
-
-  private buildContextFileExtensionBuckets(extensionCounts: Map<string, number>) {
-    return [...extensionCounts.entries()]
-      .sort((left, right) => {
-        return left[0].localeCompare(right[0]);
-      })
-      .map(([value, count]) => ({ value, count }));
-  }
-
-  private async yieldContextCatalogBuild(): Promise<void> {
-    await new Promise<void>((resolve) => {
-      window.setTimeout(resolve, 0);
-    });
-  }
-
-  private invalidateContextFileCatalogCache(): void {
-    this.contextFileCatalogCache = null;
-    this.contextFileCatalogBuildPromise = null;
-  }
-
-  private updateContextFileCatalogForCreate(file: TAbstractFile): void {
-    if (!(file instanceof TFile)) {
-      this.invalidateContextFileCatalogCache();
-      return;
-    }
-
-    if (!this.contextFileCatalogCache) {
-      return;
-    }
-
-    this.upsertContextFileCatalogEntry(file);
-  }
-
-  private updateContextFileCatalogForDelete(file: TAbstractFile): void {
-    if (!(file instanceof TFile)) {
-      this.invalidateContextFileCatalogCache();
-      return;
-    }
-
-    if (!this.contextFileCatalogCache) {
-      return;
-    }
-
-    this.removeContextFileCatalogEntry(file.path);
-  }
-
-  private updateContextFileCatalogForRename(file: TAbstractFile, oldPath: string): void {
-    if (!(file instanceof TFile)) {
-      this.invalidateContextFileCatalogCache();
-      return;
-    }
-
-    if (!this.contextFileCatalogCache) {
-      return;
-    }
-
-    this.removeContextFileCatalogEntry(oldPath);
-    this.upsertContextFileCatalogEntry(file);
-  }
-
-  private upsertContextFileCatalogEntry(file: TFile): void {
-    if (!this.contextFileCatalogCache) {
-      return;
-    }
-
-    const existingIndex = this.contextFileCatalogCache.entries.findIndex((entry) => entry.file.path === file.path);
-    if (existingIndex >= 0) {
-      this.contextFileCatalogCache.entries.splice(existingIndex, 1);
-    }
-
-    const nextEntry = this.createContextFileEntry(file);
-    if (!nextEntry) {
-      this.recomputeContextFileCatalogBuckets();
-      return;
-    }
-
-    this.contextFileCatalogCache.entries.push(nextEntry);
-    this.contextFileCatalogCache.entries.sort((left, right) => this.compareContextFileEntries(left, right));
-    this.recomputeContextFileCatalogBuckets();
-  }
-
-  private removeContextFileCatalogEntry(targetPath: string): void {
-    if (!this.contextFileCatalogCache) {
-      return;
-    }
-
-    const nextEntries = this.contextFileCatalogCache.entries.filter((entry) => entry.file.path !== targetPath);
-    if (nextEntries.length === this.contextFileCatalogCache.entries.length) {
-      return;
-    }
-
-    this.contextFileCatalogCache.entries = nextEntries;
-    this.recomputeContextFileCatalogBuckets();
-  }
-
-  private recomputeContextFileCatalogBuckets(): void {
-    if (!this.contextFileCatalogCache) {
-      return;
-    }
-
-    const extensionCounts = new Map<string, number>();
-    for (const entry of this.contextFileCatalogCache.entries) {
-      extensionCounts.set(entry.extension, (extensionCounts.get(entry.extension) ?? 0) + 1);
-    }
-
-    this.contextFileCatalogCache.extensions = this.buildContextFileExtensionBuckets(extensionCounts);
-  }
-
-  private compareContextFileEntries(left: ContextFileEntry, right: ContextFileEntry): number {
-    const extensionCompare = left.extension.localeCompare(right.extension);
-    if (extensionCompare !== 0) {
-      return extensionCompare;
-    }
-
-    const basenameCompare = left.file.basename.localeCompare(right.file.basename);
-    if (basenameCompare !== 0) {
-      return basenameCompare;
-    }
-
-    return left.file.path.localeCompare(right.file.path);
   }
 
   private async buildCurrentNoteContextItem(view: MarkdownView | null): Promise<PromptContextItem | null> {
@@ -5108,13 +4913,13 @@ export class OpenCodianView extends ItemView {
     this.registerDomEvent(document, 'keyup', scheduleFocusPreviewRefresh);
 
     this.registerEvent(this.plugin.app.vault.on('create', (file) => {
-      this.updateContextFileCatalogForCreate(file);
+      this.contextFileCatalogService.handleCreate(file);
     }));
     this.registerEvent(this.plugin.app.vault.on('delete', (file) => {
-      this.updateContextFileCatalogForDelete(file);
+      this.contextFileCatalogService.handleDelete(file);
     }));
     this.registerEvent(this.plugin.app.vault.on('rename', (file, oldPath) => {
-      this.updateContextFileCatalogForRename(file, oldPath);
+      this.contextFileCatalogService.handleRename(file, oldPath);
     }));
   }
 
