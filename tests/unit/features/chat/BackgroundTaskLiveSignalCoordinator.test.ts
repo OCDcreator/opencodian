@@ -42,29 +42,39 @@ describe('BackgroundTaskLiveSignalCoordinator', () => {
       backgroundTaskLastAuthoritativeSyncAt: null,
       ...options?.runtime,
     };
-    const reconcileStaleSessionTodoState = jest.fn();
+    const sessionTodoStateService = {
+      hasIncompleteTabSessionTodos: jest.fn().mockReturnValue(options?.hasIncompleteTodos ?? false),
+      reconcileStaleSessionTodoState: jest.fn(),
+    };
+    const timelineService = {
+      getPendingLaunches: jest.fn().mockReturnValue(options?.pendingLaunches ?? []),
+    };
+    const noticeStateService = {
+      handleStoppedPendingLaunches: jest.fn().mockResolvedValue(undefined),
+    };
     const syncTabStreamLikeState = jest.fn();
-    const appendBackgroundTaskStoppedNotice = jest.fn().mockResolvedValue(undefined);
     const resetBackgroundTaskIndicator = jest.fn();
 
-    const service = new BackgroundTaskLiveSignalCoordinator({
-      getTabRuntimeState: jest.fn().mockReturnValue(runtime),
-      getSessionIdForTab: jest.fn().mockReturnValue(options?.sessionId ?? 'session-1'),
-      getTabSessionStatus: jest.fn().mockReturnValue(options?.status ?? null),
-      hasIncompleteTabSessionTodos: jest.fn().mockReturnValue(options?.hasIncompleteTodos ?? false),
-      getPendingBackgroundTaskLaunches: jest.fn().mockReturnValue(options?.pendingLaunches ?? []),
-      reconcileStaleSessionTodoState,
-      syncTabStreamLikeState,
-      appendBackgroundTaskStoppedNotice,
-      resetBackgroundTaskIndicator,
-    });
+    const service = new BackgroundTaskLiveSignalCoordinator(
+      sessionTodoStateService,
+      timelineService,
+      noticeStateService,
+      {
+        getTabRuntimeState: jest.fn().mockReturnValue(runtime),
+        getSessionIdForTab: jest.fn().mockReturnValue(options?.sessionId ?? 'session-1'),
+        getTabSessionStatus: jest.fn().mockReturnValue(options?.status ?? null),
+        syncTabStreamLikeState,
+        resetBackgroundTaskIndicator,
+      },
+    );
 
     return {
       service,
       runtime,
-      reconcileStaleSessionTodoState,
+      sessionTodoStateService,
+      timelineService,
+      noticeStateService,
       syncTabStreamLikeState,
-      appendBackgroundTaskStoppedNotice,
       resetBackgroundTaskIndicator,
     };
   }
@@ -142,9 +152,9 @@ describe('BackgroundTaskLiveSignalCoordinator', () => {
     const {
       service,
       runtime,
-      reconcileStaleSessionTodoState,
+      sessionTodoStateService,
       syncTabStreamLikeState,
-      appendBackgroundTaskStoppedNotice,
+      noticeStateService,
       resetBackgroundTaskIndicator,
     } = createService({
       runtime: {
@@ -156,10 +166,10 @@ describe('BackgroundTaskLiveSignalCoordinator', () => {
 
     service.reconcileStateFromLiveSignals('tab-1');
 
-    expect(reconcileStaleSessionTodoState).toHaveBeenCalledWith('tab-1');
+    expect(sessionTodoStateService.reconcileStaleSessionTodoState).toHaveBeenCalledWith('tab-1');
     expect(syncTabStreamLikeState).toHaveBeenCalledWith('tab-1');
     expect(runtime.backgroundTaskWaitingForFollowUp).toBe(true);
-    expect(appendBackgroundTaskStoppedNotice).not.toHaveBeenCalled();
+    expect(noticeStateService.handleStoppedPendingLaunches).not.toHaveBeenCalled();
     expect(resetBackgroundTaskIndicator).not.toHaveBeenCalled();
   });
 
@@ -168,7 +178,7 @@ describe('BackgroundTaskLiveSignalCoordinator', () => {
     const {
       service,
       runtime,
-      appendBackgroundTaskStoppedNotice,
+      noticeStateService,
       resetBackgroundTaskIndicator,
     } = createService({
       runtime: {
@@ -181,12 +191,12 @@ describe('BackgroundTaskLiveSignalCoordinator', () => {
     service.reconcileStateFromLiveSignals('tab-1');
 
     expect(runtime.backgroundTaskWaitingForFollowUp).toBe(false);
-    expect(appendBackgroundTaskStoppedNotice).toHaveBeenCalledWith('tab-1', [launch]);
+    expect(noticeStateService.handleStoppedPendingLaunches).toHaveBeenCalledWith('tab-1', [launch]);
     expect(resetBackgroundTaskIndicator).toHaveBeenCalledWith('tab-1');
   });
 
   it('clears empty search-mode placeholders after the grace period', () => {
-    const { service, appendBackgroundTaskStoppedNotice, resetBackgroundTaskIndicator } = createService({
+    const { service, noticeStateService, resetBackgroundTaskIndicator } = createService({
       runtime: {
         backgroundTaskModeTag: 'search-mode',
       },
@@ -195,7 +205,7 @@ describe('BackgroundTaskLiveSignalCoordinator', () => {
 
     service.reconcileStateFromLiveSignals('tab-1');
 
-    expect(appendBackgroundTaskStoppedNotice).not.toHaveBeenCalled();
+    expect(noticeStateService.handleStoppedPendingLaunches).not.toHaveBeenCalled();
     expect(resetBackgroundTaskIndicator).toHaveBeenCalledWith('tab-1');
   });
 });

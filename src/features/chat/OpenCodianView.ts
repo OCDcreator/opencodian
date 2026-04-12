@@ -1182,18 +1182,10 @@ export class OpenCodianView extends ItemView {
     return this.sessionTodoStateService.hasIncompleteTodos(todos);
   }
 
-  private hasIncompleteTabSessionTodos(tabId: TabId | null = this.getActiveTabId()): boolean {
-    return this.sessionTodoStateService.hasIncompleteTabSessionTodos(tabId);
-  }
-
   private suppressStaleSessionTodosIfNeeded(
     tabId: TabId | null = this.getActiveTabId(),
   ): SessionTodo[] | null {
     return this.sessionTodoStateService.suppressStaleSessionTodosIfNeeded(tabId);
-  }
-
-  private reconcileStaleSessionTodoState(tabId: TabId | null = this.getActiveTabId()): void {
-    this.sessionTodoStateService.reconcileStaleSessionTodoState(tabId);
   }
 
   private buildStaleSessionTodoNoticeContent(todos: SessionTodo[]): string {
@@ -1234,13 +1226,6 @@ export class OpenCodianView extends ItemView {
 
   private reconcileBackgroundTaskStateFromLiveSignals(tabId: TabId | null = this.getActiveTabId()): void {
     this.backgroundTaskLiveSignalCoordinator.reconcileStateFromLiveSignals(tabId);
-  }
-
-  private async appendBackgroundTaskStoppedNotice(
-    tabId: TabId | null,
-    pending: BackgroundTaskLaunchInfo[],
-  ): Promise<void> {
-    await this.backgroundTaskNoticeStateService.handleStoppedPendingLaunches(tabId, pending);
   }
 
   private isSuppressedBackgroundTaskSegment(
@@ -1288,10 +1273,16 @@ export class OpenCodianView extends ItemView {
       this.createPersistentAssistantNoticeServiceHost(),
     );
     this.sessionTodoStateService = new SessionTodoStateService(this.createSessionTodoStateServiceHost());
+    this.backgroundTaskNoticeStateService = new BackgroundTaskNoticeStateService(
+      this.createBackgroundTaskNoticeStateServiceHost(),
+    );
     this.backgroundTaskTimelineService = new BackgroundTaskTimelineService(
       this.createBackgroundTaskTimelineServiceHost(),
     );
     this.backgroundTaskLiveSignalCoordinator = new BackgroundTaskLiveSignalCoordinator(
+      this.sessionTodoStateService,
+      this.backgroundTaskTimelineService,
+      this.backgroundTaskNoticeStateService,
       this.createBackgroundTaskLiveSignalCoordinatorHost(),
     );
     this.conversationHydrationRenderBridge = new ConversationHydrationRenderBridge(
@@ -1326,9 +1317,6 @@ export class OpenCodianView extends ItemView {
     );
     this.backgroundTaskCompletionNoticeService = new BackgroundTaskCompletionNoticeService(
       this.createBackgroundTaskCompletionNoticeServiceHost(),
-    );
-    this.backgroundTaskNoticeStateService = new BackgroundTaskNoticeStateService(
-      this.createBackgroundTaskNoticeStateServiceHost(),
     );
     this.backgroundTaskInlinePanelRenderer = new BackgroundTaskInlinePanelRenderer(
       this.backgroundTaskTimelineService,
@@ -1584,16 +1572,9 @@ export class OpenCodianView extends ItemView {
       getTabRuntimeState: (tabId: TabId | null) => this.getTabRuntimeState(tabId),
       getSessionIdForTab: (tabId: TabId | null) => this.getSessionIdForTab(tabId),
       getTabSessionStatus: (tabId, sessionId) => this.getTabSessionStatus(tabId, sessionId),
-      hasIncompleteTabSessionTodos: (tabId) => this.hasIncompleteTabSessionTodos(tabId),
-      getPendingBackgroundTaskLaunches: (tabId) => this.getPendingBackgroundTaskLaunches(tabId),
-      reconcileStaleSessionTodoState: (tabId) => {
-        this.reconcileStaleSessionTodoState(tabId);
-      },
       syncTabStreamLikeState: (tabId) => {
         this.syncTabStreamLikeState(tabId);
       },
-      appendBackgroundTaskStoppedNotice: (tabId, pending) =>
-        this.appendBackgroundTaskStoppedNotice(tabId, pending),
       resetBackgroundTaskIndicator: (tabId) => {
         this.resetBackgroundTaskIndicator(tabId);
       },
@@ -5635,10 +5616,6 @@ export class OpenCodianView extends ItemView {
     tabId: TabId | null = this.getActiveTabId(),
   ): void {
     this.backgroundTaskTimelineService.syncStateFromConversation(conversation, tabId);
-  }
-
-  private getPendingBackgroundTaskLaunches(tabId: TabId | null = this.getActiveTabId()): BackgroundTaskLaunchInfo[] {
-    return this.backgroundTaskTimelineService.getPendingLaunches(tabId);
   }
 
   private collectBackgroundTaskDiagnostics(messages: ChatMessage[]): {

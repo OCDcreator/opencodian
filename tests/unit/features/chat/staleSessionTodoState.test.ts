@@ -74,7 +74,9 @@ describe('OpenCodianView stale session todo suppression', () => {
       getTabSessionStatus: () => null;
       getActiveTabId: () => string;
       renderSessionTodoDock: () => void;
-      reconcileStaleSessionTodoState: () => void;
+      sessionTodoStateService: {
+        reconcileStaleSessionTodoState: (tabId: string) => void;
+      };
     };
 
     const todos = [
@@ -110,7 +112,7 @@ describe('OpenCodianView stale session todo suppression', () => {
     jest.spyOn(view, 'getTabSessionStatus').mockReturnValue(null);
     jest.spyOn(view, 'getActiveTabId').mockReturnValue('tab-1');
     jest.spyOn(view, 'renderSessionTodoDock').mockImplementation(() => {});
-    jest.spyOn(view, 'reconcileStaleSessionTodoState').mockImplementation(() => {});
+    jest.spyOn(view.sessionTodoStateService, 'reconcileStaleSessionTodoState').mockImplementation(() => {});
 
     view.setTabSessionTodos('tab-1', todos, 'session-1');
 

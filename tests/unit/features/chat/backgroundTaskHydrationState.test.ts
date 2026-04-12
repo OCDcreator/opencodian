@@ -24,9 +24,13 @@ describe('OpenCodianView background task hydration state', () => {
     const view = createView() as unknown as {
       reconcileBackgroundTaskStateFromLiveSignals: (tabId: string) => void;
       getTabRuntimeState: () => Record<string, unknown>;
-      reconcileStaleSessionTodoState: () => void;
+      sessionTodoStateService: {
+        reconcileStaleSessionTodoState: (tabId: string) => void;
+      };
+      backgroundTaskNoticeStateService: {
+        handleStoppedPendingLaunches: (tabId: string, pending: unknown[]) => Promise<void>;
+      };
       syncTabStreamLikeState: () => void;
-      appendBackgroundTaskStoppedNotice: () => Promise<void>;
       resetBackgroundTaskIndicator: () => void;
     };
 
@@ -36,17 +40,25 @@ describe('OpenCodianView background task hydration state', () => {
       backgroundTaskStartedAt: Date.now() - 30_000,
       backgroundTaskAwaitingAuthoritativeSync: true,
       backgroundTaskLaunches: new Map([['call-1', { launchId: 'call-1', taskId: 'bg_1', description: 'Search docs' }]]),
+      backgroundTaskCompletedTasks: new Map(),
       backgroundTaskWaitingForFollowUp: true,
     };
 
     jest.spyOn(view, 'getTabRuntimeState').mockReturnValue(runtime);
-    jest.spyOn(view, 'reconcileStaleSessionTodoState').mockImplementation(() => {});
+    const reconcileSpy = jest.spyOn(
+      view.sessionTodoStateService,
+      'reconcileStaleSessionTodoState',
+    ).mockImplementation(() => {});
     const syncSpy = jest.spyOn(view, 'syncTabStreamLikeState').mockImplementation(() => {});
-    const staleSpy = jest.spyOn(view, 'appendBackgroundTaskStoppedNotice').mockResolvedValue(undefined);
+    const staleSpy = jest.spyOn(
+      view.backgroundTaskNoticeStateService,
+      'handleStoppedPendingLaunches',
+    ).mockResolvedValue(undefined);
     const resetSpy = jest.spyOn(view, 'resetBackgroundTaskIndicator').mockImplementation(() => {});
 
     view.reconcileBackgroundTaskStateFromLiveSignals('tab-1');
 
+    expect(reconcileSpy).toHaveBeenCalledWith('tab-1');
     expect(syncSpy).toHaveBeenCalledWith('tab-1');
     expect(staleSpy).not.toHaveBeenCalled();
     expect(resetSpy).not.toHaveBeenCalled();

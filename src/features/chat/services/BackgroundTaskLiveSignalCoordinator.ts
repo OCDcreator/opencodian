@@ -1,9 +1,22 @@
 import type { SessionActivityStatus } from '../../../core/opencode';
 import { createLogger } from '../../../shared';
 import type { TabId } from '../tabs';
+import type { BackgroundTaskNoticeStateService } from './BackgroundTaskNoticeStateService';
+import type { BackgroundTaskTimelineService } from './BackgroundTaskTimelineService';
+import type { SessionTodoStateService } from './SessionTodoStateService';
 
 const logger = createLogger('BackgroundTaskLiveSignalCoordinator');
 const BACKGROUND_TASK_GRACE_PERIOD_MS = 15_000;
+
+type BackgroundTaskLiveSignalTodoPort = Pick<
+  SessionTodoStateService,
+  'hasIncompleteTabSessionTodos' | 'reconcileStaleSessionTodoState'
+>;
+type BackgroundTaskLiveSignalTimelinePort = Pick<BackgroundTaskTimelineService, 'getPendingLaunches'>;
+type BackgroundTaskLiveSignalNoticePort = Pick<
+  BackgroundTaskNoticeStateService,
+  'handleStoppedPendingLaunches'
+>;
 
 export interface BackgroundTaskLiveSignalLaunchInfo {
   launchId: string;
@@ -29,19 +42,17 @@ export interface BackgroundTaskLiveSignalCoordinatorHost {
     tabId: TabId | null,
     sessionId: string | null,
   ): SessionActivityStatus | null;
-  hasIncompleteTabSessionTodos(tabId: TabId | null): boolean;
-  getPendingBackgroundTaskLaunches(tabId: TabId | null): BackgroundTaskLiveSignalLaunchInfo[];
-  reconcileStaleSessionTodoState(tabId: TabId | null): void;
   syncTabStreamLikeState(tabId: TabId | null): void;
-  appendBackgroundTaskStoppedNotice(
-    tabId: TabId | null,
-    pending: BackgroundTaskLiveSignalLaunchInfo[],
-  ): Promise<void>;
   resetBackgroundTaskIndicator(tabId: TabId | null): void;
 }
 
 export class BackgroundTaskLiveSignalCoordinator {
-  constructor(private readonly host: BackgroundTaskLiveSignalCoordinatorHost) {}
+  constructor(
+    private readonly sessionTodoStateService: BackgroundTaskLiveSignalTodoPort,
+    private readonly timelineService: BackgroundTaskLiveSignalTimelinePort,
+    private readonly noticeStateService: BackgroundTaskLiveSignalNoticePort,
+    private readonly host: BackgroundTaskLiveSignalCoordinatorHost,
+  ) {}
 
   hasIndicator(tabId: TabId | null): boolean {
     const runtime = this.host.getTabRuntimeState(tabId);
@@ -50,7 +61,7 @@ export class BackgroundTaskLiveSignalCoordinator {
     }
 
     const status = this.host.getTabSessionStatus(tabId, this.host.getSessionIdForTab(tabId));
-    const pending = this.host.getPendingBackgroundTaskLaunches(tabId);
+    const pending = this.timelineService.getPendingLaunches(tabId);
     const gracePeriodActive = this.isGracePeriodActive(tabId);
 
     if (pending.length > 0) {
@@ -60,7 +71,7 @@ export class BackgroundTaskLiveSignalCoordinator {
 
       return runtime.isStreaming
         || this.isSessionLive(status)
-        || this.host.hasIncompleteTabSessionTodos(tabId)
+        || this.sessionTodoStateService.hasIncompleteTabSessionTodos(tabId)
         || gracePeriodActive;
     }
 
@@ -117,7 +128,7 @@ export class BackgroundTaskLiveSignalCoordinator {
       return;
     }
 
-    this.host.reconcileStaleSessionTodoState(tabId);
+    this.sessionTodoStateService.reconcileStaleSessionTodoState(tabId);
 
     if (runtime.isHydratingConversation || runtime.backgroundTaskAwaitingAuthoritativeSync) {
       this.host.syncTabStreamLikeState(tabId);
@@ -132,7 +143,7 @@ export class BackgroundTaskLiveSignalCoordinator {
       return;
     }
 
-    if (status?.type !== 'idle' && this.host.hasIncompleteTabSessionTodos(tabId)) {
+    if (status?.type !== 'idle' && this.sessionTodoStateService.hasIncompleteTabSessionTodos(tabId)) {
       runtime.backgroundTaskWaitingForFollowUp = runtime.backgroundTaskLaunches.size > 0;
       this.host.syncTabStreamLikeState(tabId);
       return;
@@ -150,9 +161,9 @@ export class BackgroundTaskLiveSignalCoordinator {
       return;
     }
 
-    const stalePending = this.host.getPendingBackgroundTaskLaunches(tabId);
+    const stalePending = this.timelineService.getPendingLaunches(tabId);
     if (stalePending.length > 0) {
-      void this.host.appendBackgroundTaskStoppedNotice(tabId, stalePending);
+      void this.noticeStateService.handleStoppedPendingLaunches(tabId, stalePending);
     }
     logger.debug('Clearing stale background task indicator after session became idle without incomplete todos', {
       tabId,

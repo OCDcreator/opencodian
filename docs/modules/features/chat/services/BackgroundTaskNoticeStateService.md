@@ -52,6 +52,7 @@ export class BackgroundTaskNoticeStateService {
 - `BackgroundTaskInlinePanelRenderer` 负责 inline panel DOM 渲染
 - `BackgroundTaskIndicatorCoordinator` 负责 completion notice queue/flush 触发顺序
 - `PersistentAssistantNoticeService` 负责 stopped/stale persisted notice 的历史匹配、落盘与可见/隐藏 tab 后续动作
-- `OpenCodianView` 负责 hydration gate host bridge
+- `BackgroundTaskLiveSignalCoordinator` 现在会直接在 stale settle 路径里调用本服务，不再经由 `OpenCodianView` 转发 `appendBackgroundTaskStoppedNotice()`
+- `OpenCodianView` 负责 hydration gate 与其余上层 host bridge
 - `BackgroundTaskNoticeStateService` 只负责 stopped/stale notice 的 content、fingerprint、persisted dedupe 与 suppression state 协调
 - 这样 P2 `question / todo / background task` lane 可以继续从 view 迁出更清晰的 background-task ownership，而不是把 notice 细节继续留在主视图里
