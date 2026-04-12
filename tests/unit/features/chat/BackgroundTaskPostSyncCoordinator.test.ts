@@ -3,10 +3,7 @@ import {
   BackgroundTaskPostSyncCoordinator,
   type BackgroundTaskPostSyncCoordinatorHost,
 } from '../../../../src/features/chat/services/BackgroundTaskPostSyncCoordinator';
-import type {
-  PostSyncQuestionTodoStatusRefreshOptions,
-  QuestionTodoStatusRefreshCoordinator,
-} from '../../../../src/features/chat/services/QuestionTodoStatusRefreshCoordinator';
+import type { PostSyncQuestionTodoRefreshFacade } from '../../../../src/features/chat/services/PostSyncQuestionTodoRefreshFacade';
 
 type MockedBackgroundTaskPostSyncHost = {
   [Key in keyof BackgroundTaskPostSyncCoordinatorHost]:
@@ -15,9 +12,9 @@ type MockedBackgroundTaskPostSyncHost = {
       : BackgroundTaskPostSyncCoordinatorHost[Key];
 };
 
-type QuestionTodoStatusRefreshPort = Pick<
-  QuestionTodoStatusRefreshCoordinator,
-  'refreshAfterPostSync'
+type PostSyncQuestionTodoRefreshPort = Pick<
+  PostSyncQuestionTodoRefreshFacade,
+  'refreshBackgroundConversation' | 'refreshVisibleConversation'
 >;
 
 function createConversation(): Conversation {
@@ -34,22 +31,17 @@ function createConversation(): Conversation {
 function createHost(): MockedBackgroundTaskPostSyncHost {
   return {
     getCurrentConversationId: jest.fn().mockReturnValue('conversation-1'),
-    getCurrentConversationSessionId: jest.fn().mockReturnValue('session-1'),
     setCurrentConversationRevertState: jest.fn(),
     setTabConversationSyncFingerprint: jest.fn(),
     markBackgroundTaskAuthoritativeSync: jest.fn(),
-    syncBackgroundTaskStateFromConversation: jest.fn(),
-    refreshBackgroundTaskCompletionNotices: jest.fn().mockResolvedValue(undefined),
-    syncTabStreamLikeState: jest.fn(),
     setTabNeedsAttention: jest.fn(),
   };
 }
 
-function createRefreshCoordinator(): jest.Mocked<QuestionTodoStatusRefreshPort> {
+function createRefreshFacade(): jest.Mocked<PostSyncQuestionTodoRefreshPort> {
   return {
-    refreshAfterPostSync: jest.fn(async (options: PostSyncQuestionTodoStatusRefreshOptions) => {
-      await options.afterPendingQuestionRefresh?.();
-    }),
+    refreshVisibleConversation: jest.fn().mockResolvedValue(undefined),
+    refreshBackgroundConversation: jest.fn().mockResolvedValue(undefined),
   };
 }
 
@@ -60,8 +52,8 @@ describe('BackgroundTaskPostSyncCoordinator', () => {
 
   it('refreshes active visible-conversation state and returns an apply outcome', async () => {
     const host = createHost();
-    const refreshCoordinator = createRefreshCoordinator();
-    const coordinator = new BackgroundTaskPostSyncCoordinator(host, refreshCoordinator);
+    const refreshFacade = createRefreshFacade();
+    const coordinator = new BackgroundTaskPostSyncCoordinator(host, refreshFacade);
 
     const outcome = await coordinator.handleVisibleConversationSyncComplete({
       tabId: 'tab-active',
@@ -74,10 +66,9 @@ describe('BackgroundTaskPostSyncCoordinator', () => {
       },
     });
 
-    expect(refreshCoordinator.refreshAfterPostSync).toHaveBeenCalledWith({
+    expect(refreshFacade.refreshVisibleConversation).toHaveBeenCalledWith({
       tabId: 'tab-active',
       questionSessionId: 'session-1',
-      todoStatusSessionId: 'session-1',
     });
     expect(host.setCurrentConversationRevertState).toHaveBeenCalledWith({
       messageID: 'assistant-1',
@@ -93,9 +84,8 @@ describe('BackgroundTaskPostSyncCoordinator', () => {
   it('keeps indicator-only handling when visible sync no longer targets the current conversation', async () => {
     const host = createHost();
     host.getCurrentConversationId.mockReturnValue('conversation-2');
-    host.getCurrentConversationSessionId.mockReturnValue('session-2');
-    const refreshCoordinator = createRefreshCoordinator();
-    const coordinator = new BackgroundTaskPostSyncCoordinator(host, refreshCoordinator);
+    const refreshFacade = createRefreshFacade();
+    const coordinator = new BackgroundTaskPostSyncCoordinator(host, refreshFacade);
 
     const outcome = await coordinator.handleVisibleConversationSyncComplete({
       tabId: 'tab-active',
@@ -108,10 +98,9 @@ describe('BackgroundTaskPostSyncCoordinator', () => {
       },
     });
 
-    expect(refreshCoordinator.refreshAfterPostSync).toHaveBeenCalledWith({
+    expect(refreshFacade.refreshVisibleConversation).toHaveBeenCalledWith({
       tabId: 'tab-active',
       questionSessionId: 'session-1',
-      todoStatusSessionId: 'session-2',
     });
     expect(host.setCurrentConversationRevertState).not.toHaveBeenCalled();
     expect(host.setTabConversationSyncFingerprint).not.toHaveBeenCalled();
@@ -123,8 +112,8 @@ describe('BackgroundTaskPostSyncCoordinator', () => {
 
   it('commits revert state but skips fingerprint updates when visible sync is unchanged', async () => {
     const host = createHost();
-    const refreshCoordinator = createRefreshCoordinator();
-    const coordinator = new BackgroundTaskPostSyncCoordinator(host, refreshCoordinator);
+    const refreshFacade = createRefreshFacade();
+    const coordinator = new BackgroundTaskPostSyncCoordinator(host, refreshFacade);
 
     const outcome = await coordinator.handleVisibleConversationSyncComplete({
       tabId: 'tab-active',
@@ -137,10 +126,9 @@ describe('BackgroundTaskPostSyncCoordinator', () => {
       },
     });
 
-    expect(refreshCoordinator.refreshAfterPostSync).toHaveBeenCalledWith({
+    expect(refreshFacade.refreshVisibleConversation).toHaveBeenCalledWith({
       tabId: 'tab-active',
       questionSessionId: 'session-1',
-      todoStatusSessionId: 'session-1',
     });
     expect(host.setCurrentConversationRevertState).toHaveBeenCalledWith({
       messageID: 'assistant-3',
@@ -155,8 +143,8 @@ describe('BackgroundTaskPostSyncCoordinator', () => {
   it('orchestrates signal sync refresh and marks hidden changed tabs for attention', async () => {
     const conversation = createConversation();
     const host = createHost();
-    const refreshCoordinator = createRefreshCoordinator();
-    const coordinator = new BackgroundTaskPostSyncCoordinator(host, refreshCoordinator);
+    const refreshFacade = createRefreshFacade();
+    const coordinator = new BackgroundTaskPostSyncCoordinator(host, refreshFacade);
 
     await coordinator.handleSignalSyncComplete({
       tabId: 'tab-bg',
@@ -172,24 +160,19 @@ describe('BackgroundTaskPostSyncCoordinator', () => {
       'tab-bg',
       'sync-event:message.updated',
     );
-    expect(refreshCoordinator.refreshAfterPostSync).toHaveBeenCalledWith({
+    expect(refreshFacade.refreshBackgroundConversation).toHaveBeenCalledWith({
       tabId: 'tab-bg',
-      questionSessionId: 'session-1',
-      todoStatusSessionId: 'session-1',
+      conversation,
       forceTodoStatusRefresh: false,
-      afterPendingQuestionRefresh: expect.any(Function),
     });
-    expect(host.syncBackgroundTaskStateFromConversation).toHaveBeenCalledWith(conversation, 'tab-bg');
-    expect(host.refreshBackgroundTaskCompletionNotices).toHaveBeenCalledWith('tab-bg', conversation);
-    expect(host.syncTabStreamLikeState).toHaveBeenCalledWith('tab-bg');
     expect(host.setTabNeedsAttention).toHaveBeenCalledWith('tab-bg', true);
   });
 
   it('skips attention changes when a signal sync is unchanged', async () => {
     const conversation = createConversation();
     const host = createHost();
-    const refreshCoordinator = createRefreshCoordinator();
-    const coordinator = new BackgroundTaskPostSyncCoordinator(host, refreshCoordinator);
+    const refreshFacade = createRefreshFacade();
+    const coordinator = new BackgroundTaskPostSyncCoordinator(host, refreshFacade);
 
     await coordinator.handleSignalSyncComplete({
       tabId: 'tab-bg',
@@ -201,22 +184,19 @@ describe('BackgroundTaskPostSyncCoordinator', () => {
       syncResult: { changed: false, fingerprint: 'same' },
     });
 
-    expect(refreshCoordinator.refreshAfterPostSync).toHaveBeenCalledWith({
+    expect(refreshFacade.refreshBackgroundConversation).toHaveBeenCalledWith({
       tabId: 'tab-bg',
-      questionSessionId: 'session-1',
-      todoStatusSessionId: 'session-1',
+      conversation,
       forceTodoStatusRefresh: false,
-      afterPendingQuestionRefresh: expect.any(Function),
     });
-    expect(host.refreshBackgroundTaskCompletionNotices).toHaveBeenCalledWith('tab-bg', conversation);
     expect(host.setTabNeedsAttention).not.toHaveBeenCalled();
   });
 
   it('forces todo/status refresh and marks attention after background-tab sync changes', async () => {
     const conversation = createConversation();
     const host = createHost();
-    const refreshCoordinator = createRefreshCoordinator();
-    const coordinator = new BackgroundTaskPostSyncCoordinator(host, refreshCoordinator);
+    const refreshFacade = createRefreshFacade();
+    const coordinator = new BackgroundTaskPostSyncCoordinator(host, refreshFacade);
 
     await coordinator.handleBackgroundTabSyncComplete({
       tabId: 'tab-bg',
@@ -226,14 +206,11 @@ describe('BackgroundTaskPostSyncCoordinator', () => {
     });
 
     expect(host.markBackgroundTaskAuthoritativeSync).not.toHaveBeenCalled();
-    expect(refreshCoordinator.refreshAfterPostSync).toHaveBeenCalledWith({
+    expect(refreshFacade.refreshBackgroundConversation).toHaveBeenCalledWith({
       tabId: 'tab-bg',
-      questionSessionId: 'session-1',
-      todoStatusSessionId: 'session-1',
+      conversation,
       forceTodoStatusRefresh: true,
-      afterPendingQuestionRefresh: expect.any(Function),
     });
-    expect(host.refreshBackgroundTaskCompletionNotices).toHaveBeenCalledWith('tab-bg', conversation);
     expect(host.setTabNeedsAttention).toHaveBeenCalledWith('tab-bg', true);
   });
 });

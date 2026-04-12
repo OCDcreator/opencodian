@@ -1,10 +1,10 @@
 import type { Conversation } from '../../../core/types';
 import type { TabId } from '../tabs';
-import type { QuestionTodoStatusRefreshCoordinator } from './QuestionTodoStatusRefreshCoordinator';
+import type { PostSyncQuestionTodoRefreshFacade } from './PostSyncQuestionTodoRefreshFacade';
 
-type QuestionTodoStatusRefreshPort = Pick<
-  QuestionTodoStatusRefreshCoordinator,
-  'refreshAfterPostSync'
+type PostSyncQuestionTodoRefreshPort = Pick<
+  PostSyncQuestionTodoRefreshFacade,
+  'refreshBackgroundConversation' | 'refreshVisibleConversation'
 >;
 
 export interface BackgroundTaskPostSyncResult {
@@ -23,13 +23,9 @@ export interface VisibleConversationPostSyncResult extends BackgroundTaskPostSyn
 
 export interface BackgroundTaskPostSyncCoordinatorHost {
   getCurrentConversationId(): string | null;
-  getCurrentConversationSessionId(): string | undefined;
   setCurrentConversationRevertState(revertState: ConversationRevertStateSnapshot | null): void;
   setTabConversationSyncFingerprint(tabId: TabId, fingerprint: string): void;
   markBackgroundTaskAuthoritativeSync(tabId: TabId | null, reason: string): void;
-  syncBackgroundTaskStateFromConversation(conversation: Conversation, tabId?: TabId | null): void;
-  refreshBackgroundTaskCompletionNotices(tabId: TabId | null, conversation: Conversation | null): Promise<void>;
-  syncTabStreamLikeState(tabId: TabId | null): void;
   setTabNeedsAttention(tabId: TabId | null, needsAttention: boolean): void;
 }
 
@@ -63,16 +59,15 @@ export interface VisibleConversationPostSyncOutcome {
 export class BackgroundTaskPostSyncCoordinator {
   constructor(
     private readonly host: BackgroundTaskPostSyncCoordinatorHost,
-    private readonly questionTodoStatusRefreshCoordinator: QuestionTodoStatusRefreshPort,
+    private readonly postSyncQuestionTodoRefreshFacade: PostSyncQuestionTodoRefreshPort,
   ) {}
 
   async handleVisibleConversationSyncComplete(
     options: VisibleConversationPostSyncOptions,
   ): Promise<VisibleConversationPostSyncOutcome> {
-    await this.questionTodoStatusRefreshCoordinator.refreshAfterPostSync({
+    await this.postSyncQuestionTodoRefreshFacade.refreshVisibleConversation({
       tabId: options.tabId,
       questionSessionId: options.questionSessionId,
-      todoStatusSessionId: this.host.getCurrentConversationSessionId(),
     });
 
     const currentConversationMatchesExpected =
@@ -94,8 +89,10 @@ export class BackgroundTaskPostSyncCoordinator {
 
   async handleSignalSyncComplete(options: SignalBackgroundTaskPostSyncOptions): Promise<void> {
     this.host.markBackgroundTaskAuthoritativeSync(options.tabId, `sync-event:${options.reason}`);
-    await this.refreshPostSyncState(options.tabId, options.conversation, {
-      shouldRefreshTodoStatus: options.tabHasBackgroundTask,
+    await this.postSyncQuestionTodoRefreshFacade.refreshBackgroundConversation({
+      tabId: options.tabId,
+      conversation: options.conversation,
+      forceTodoStatusRefresh: options.tabHasBackgroundTask,
     });
 
     if (this.didConversationChange(options.syncResult, options.previousFingerprint)) {
@@ -104,32 +101,15 @@ export class BackgroundTaskPostSyncCoordinator {
   }
 
   async handleBackgroundTabSyncComplete(options: BackgroundTabPostSyncOptions): Promise<void> {
-    await this.refreshPostSyncState(options.tabId, options.conversation, {
-      shouldRefreshTodoStatus: true,
+    await this.postSyncQuestionTodoRefreshFacade.refreshBackgroundConversation({
+      tabId: options.tabId,
+      conversation: options.conversation,
+      forceTodoStatusRefresh: true,
     });
 
     if (this.didConversationChange(options.syncResult, options.previousFingerprint)) {
       this.host.setTabNeedsAttention(options.tabId, true);
     }
-  }
-
-  private async refreshPostSyncState(
-    tabId: TabId,
-    conversation: Conversation,
-    options: { shouldRefreshTodoStatus: boolean },
-  ): Promise<void> {
-    await this.questionTodoStatusRefreshCoordinator.refreshAfterPostSync({
-      tabId,
-      questionSessionId: conversation.openCodeSessionId,
-      todoStatusSessionId: conversation.openCodeSessionId,
-      forceTodoStatusRefresh: options.shouldRefreshTodoStatus,
-      afterPendingQuestionRefresh: () => {
-        this.host.syncBackgroundTaskStateFromConversation(conversation, tabId);
-      },
-    });
-
-    await this.host.refreshBackgroundTaskCompletionNotices(tabId, conversation);
-    this.host.syncTabStreamLikeState(tabId);
   }
 
   private didConversationChange(
