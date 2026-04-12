@@ -1,0 +1,38 @@
+# TrailingAssistantPatchCompletionDebugPlanningContextSourceHelper
+
+> **源码**: `src/features/chat/services/TrailingAssistantPatchCompletionDebugPlanningContextSourceHelper.ts`
+> **状态**: [REVIEW]
+
+## 概述
+
+`TrailingAssistantPatchCompletionDebugPlanningContextSourceHelper` 把 trailing-assistant tail-outcome 路径里 completion-debug planning-context source 的最后一层纯装配从 `ConversationRenderService` 抽成了独立 helper：
+
+- 接收已经缩好的 tail-outcome `planningContext`
+- 追加 `tailStatePlan` 与消息摘要函数，统一返回 `TrailingAssistantPatchCompletionDebugPlanningContextHelper` 所需的稳定 source
+- 让 `ConversationRenderService` 不再手工展开 `...planningContext`、`tailStatePlan` 与 `summarizeChatMessageForDebug`
+
+它不负责计算 tail-message summary、不生成最终 planning-context，也不处理 debug log；只负责 source contract 的纯组装。
+
+## 公开接口
+
+```typescript
+export type TrailingAssistantPatchCompletionDebugPlanningContextSourceParts = {
+  planningContext: TrailingAssistantPatchTailOutcomePlanningContext;
+  tailStatePlan: {
+    shouldStickToBottom: boolean;
+  };
+  summarizeChatMessageForDebug(
+    message: ChatMessage | null | undefined,
+  ): Record<string, unknown> | null;
+};
+
+export function buildTrailingAssistantPatchCompletionDebugPlanningContextSource(
+  parts: TrailingAssistantPatchCompletionDebugPlanningContextSourceParts,
+): TrailingAssistantPatchCompletionDebugPlanningContextSource;
+```
+
+## 与其他模块的关系
+
+- `ConversationRenderService` 现在先调用这里装配 completion-debug source，再交给 `TrailingAssistantPatchCompletionDebugPlanningContextHelper`
+- `TrailingAssistantPatchTailOutcomePlanningContextHelper` 继续负责更上游的共享 tail-outcome contract 收束
+- `TrailingAssistantPatchCompletionDebugPlanningContextHelper` 继续负责消费这里返回的 source，并生成更窄的 completion-debug planning-context

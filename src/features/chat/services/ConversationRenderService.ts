@@ -15,6 +15,7 @@ import {
 import {
   buildTrailingAssistantPatchCompletionDebugPlanningContext,
 } from './TrailingAssistantPatchCompletionDebugPlanningContextHelper';
+import { buildTrailingAssistantPatchCompletionDebugPlanningContextSource } from './TrailingAssistantPatchCompletionDebugPlanningContextSourceHelper';
 import {
   buildTrailingAssistantPatchCompletionDebugPlan,
   type TrailingAssistantPatchCompletionDebugPlan,
@@ -775,12 +776,14 @@ export class ConversationRenderService {
     tailStatePlan: TrailingAssistantPatchTailStatePlan,
   ): TrailingAssistantPatchCompletionDebugPlan {
     return buildTrailingAssistantPatchCompletionDebugPlan(
-      buildTrailingAssistantPatchCompletionDebugPlanningContext({
-        ...planningContext,
-        tailStatePlan,
-        summarizeChatMessageForDebug: (message) =>
-          this.host.summarizeChatMessageForDebug(message),
-      }),
+      buildTrailingAssistantPatchCompletionDebugPlanningContext(
+        buildTrailingAssistantPatchCompletionDebugPlanningContextSource({
+          planningContext,
+          tailStatePlan,
+          summarizeChatMessageForDebug: (message) =>
+            this.host.summarizeChatMessageForDebug(message),
+        }),
+      ),
     );
   }
 
