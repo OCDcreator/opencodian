@@ -41,4 +41,4 @@ export function buildTrailingAssistantPatchTailOutcomePlanningContext(
 
 - `ConversationRenderService` 现在直接把 execution-tail planning-context 交给这里，不再在 service 内部自行拼装 tail-outcome inputs 或 planning-context
 - `TrailingAssistantPatchExecutionTailPlanningContextHelper` 继续负责从 success planning-context 收窄出 execution/tail 共用字段；本 helper 再把它进一步缩成 tail-outcome 专用 contract
-- `ConversationRenderService` 里的 tail-state 与 completion-debug builder 继续消费这里返回的窄 planning-context
+- `ConversationRenderService` 里的 tail-state 与 completion-debug builder 继续消费这里返回的窄 planning-context，最终 `{ tailStatePlan, completionDebugPlan }` 顶层返回则交给 `TrailingAssistantPatchTailOutcomePlanHelper`

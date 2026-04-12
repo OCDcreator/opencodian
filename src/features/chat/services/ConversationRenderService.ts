@@ -36,6 +36,11 @@ import {
   type TrailingAssistantPatchTailOutcomePlanningContext,
 } from './TrailingAssistantPatchTailOutcomePlanningContextHelper';
 import {
+  buildTrailingAssistantPatchTailOutcomePlans,
+  type TrailingAssistantPatchTailOutcomePlanParts,
+  type TrailingAssistantPatchTailOutcomePlans,
+} from './TrailingAssistantPatchTailOutcomePlanHelper';
+import {
   buildTrailingAssistantPatchTailStatePlanningContext,
   type TrailingAssistantPatchTailStatePlanningContext,
 } from './TrailingAssistantPatchTailStatePlanningContextHelper';
@@ -173,16 +178,6 @@ type TrailingAssistantPatchSuccessPlan = {
   tailStatePlan: TrailingAssistantPatchTailStatePlan;
   completionDebugPlan: TrailingAssistantPatchCompletionDebugPlan;
   turnBodyScopePlan: TrailingAssistantPatchTurnBodyScopePlan;
-};
-
-type TrailingAssistantPatchTailOutcomePlans = {
-  tailStatePlan: TrailingAssistantPatchTailStatePlan;
-  completionDebugPlan: TrailingAssistantPatchCompletionDebugPlan;
-};
-
-type TrailingAssistantPatchTailOutcomePlanParts = {
-  tailStatePlan: TrailingAssistantPatchTailStatePlan;
-  completionDebugPlan: TrailingAssistantPatchCompletionDebugPlan;
 };
 
 type TrailingAssistantPatchSuccessPlanParts = {
@@ -743,19 +738,11 @@ export class ConversationRenderService {
   private buildTrailingAssistantPatchTailOutcomePlansFromExecutionTailPlanningContext(
     planningContext: TrailingAssistantPatchExecutionTailPlanningContext,
   ): TrailingAssistantPatchTailOutcomePlans {
-    return this.buildTrailingAssistantPatchTailOutcomePlans(
-      buildTrailingAssistantPatchTailOutcomePlanningContext(planningContext),
+    return buildTrailingAssistantPatchTailOutcomePlans(
+      this.buildTrailingAssistantPatchTailOutcomePlanParts(
+        buildTrailingAssistantPatchTailOutcomePlanningContext(planningContext),
+      ),
     );
-  }
-
-  private buildTrailingAssistantPatchTailOutcomePlans(
-    planningContext: TrailingAssistantPatchTailOutcomePlanningContext,
-  ): TrailingAssistantPatchTailOutcomePlans {
-    const planParts = this.buildTrailingAssistantPatchTailOutcomePlanParts(planningContext);
-    return {
-      tailStatePlan: planParts.tailStatePlan,
-      completionDebugPlan: planParts.completionDebugPlan,
-    };
   }
 
   private buildTrailingAssistantPatchTailOutcomePlanParts(
