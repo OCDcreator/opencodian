@@ -92,7 +92,10 @@ export class BackgroundTaskPostSyncCoordinator {
     await this.postSyncQuestionTodoRefreshFacade.refreshBackgroundConversation({
       tabId: options.tabId,
       conversation: options.conversation,
-      forceTodoStatusRefresh: options.tabHasBackgroundTask,
+      todoStatusRefreshPolicy: {
+        source: 'signal-sync',
+        tabHasBackgroundTask: options.tabHasBackgroundTask,
+      },
     });
 
     if (this.didConversationChange(options.syncResult, options.previousFingerprint)) {
@@ -104,7 +107,9 @@ export class BackgroundTaskPostSyncCoordinator {
     await this.postSyncQuestionTodoRefreshFacade.refreshBackgroundConversation({
       tabId: options.tabId,
       conversation: options.conversation,
-      forceTodoStatusRefresh: true,
+      todoStatusRefreshPolicy: {
+        source: 'background-tab',
+      },
     });
 
     if (this.didConversationChange(options.syncResult, options.previousFingerprint)) {

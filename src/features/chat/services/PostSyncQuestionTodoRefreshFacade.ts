@@ -27,10 +27,19 @@ export interface VisibleConversationRefreshOptions {
   questionSessionId: string | null | undefined;
 }
 
+export type BackgroundConversationTodoStatusRefreshPolicy =
+  | {
+      source: 'signal-sync';
+      tabHasBackgroundTask: boolean;
+    }
+  | {
+      source: 'background-tab';
+    };
+
 export interface BackgroundConversationRefreshOptions {
   tabId: TabId;
   conversation: Conversation;
-  forceTodoStatusRefresh: boolean;
+  todoStatusRefreshPolicy: BackgroundConversationTodoStatusRefreshPolicy;
 }
 
 export class PostSyncQuestionTodoRefreshFacade {
@@ -57,7 +66,9 @@ export class PostSyncQuestionTodoRefreshFacade {
       tabId: options.tabId,
       questionSessionId: options.conversation.openCodeSessionId,
       todoStatusSessionId: options.conversation.openCodeSessionId,
-      forceTodoStatusRefresh: options.forceTodoStatusRefresh,
+      forceTodoStatusRefresh: this.shouldForceTodoStatusRefresh(
+        options.todoStatusRefreshPolicy,
+      ),
       afterPendingQuestionRefresh: () => {
         this.backgroundTaskPostSyncRefresh.syncBackgroundTaskStateFromConversation(
           options.conversation,
@@ -70,5 +81,15 @@ export class PostSyncQuestionTodoRefreshFacade {
       options.tabId,
       options.conversation,
     );
+  }
+
+  private shouldForceTodoStatusRefresh(
+    policy: BackgroundConversationTodoStatusRefreshPolicy,
+  ): boolean {
+    if (policy.source === 'background-tab') {
+      return true;
+    }
+
+    return policy.tabHasBackgroundTask;
   }
 }

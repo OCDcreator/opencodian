@@ -103,7 +103,9 @@ describe('PostSyncQuestionTodoRefreshFacade', () => {
     await facade.refreshBackgroundConversation({
       tabId: 'tab-bg',
       conversation,
-      forceTodoStatusRefresh: true,
+      todoStatusRefreshPolicy: {
+        source: 'background-tab',
+      },
     });
 
     expect(refreshCoordinator.refreshAfterPostSync).toHaveBeenCalledWith({
@@ -122,5 +124,34 @@ describe('PostSyncQuestionTodoRefreshFacade', () => {
       conversation,
     );
     expect(callOrder).toEqual(['refresh', 'rebuild', 'writeback']);
+  });
+
+  it('keeps signal refresh forcing behind the background refresh policy', async () => {
+    const conversation = createConversation();
+    const host = createHost();
+    const refreshCoordinator = createRefreshCoordinator();
+    const writebackPort = createWritebackPort();
+    const facade = new PostSyncQuestionTodoRefreshFacade(
+      host,
+      refreshCoordinator,
+      writebackPort,
+    );
+
+    await facade.refreshBackgroundConversation({
+      tabId: 'tab-bg',
+      conversation,
+      todoStatusRefreshPolicy: {
+        source: 'signal-sync',
+        tabHasBackgroundTask: false,
+      },
+    });
+
+    expect(refreshCoordinator.refreshAfterPostSync).toHaveBeenCalledWith({
+      tabId: 'tab-bg',
+      questionSessionId: 'session-1',
+      todoStatusSessionId: 'session-1',
+      forceTodoStatusRefresh: false,
+      afterPendingQuestionRefresh: expect.any(Function),
+    });
   });
 });

@@ -163,7 +163,10 @@ describe('BackgroundTaskPostSyncCoordinator', () => {
     expect(refreshFacade.refreshBackgroundConversation).toHaveBeenCalledWith({
       tabId: 'tab-bg',
       conversation,
-      forceTodoStatusRefresh: false,
+      todoStatusRefreshPolicy: {
+        source: 'signal-sync',
+        tabHasBackgroundTask: false,
+      },
     });
     expect(host.setTabNeedsAttention).toHaveBeenCalledWith('tab-bg', true);
   });
@@ -187,7 +190,10 @@ describe('BackgroundTaskPostSyncCoordinator', () => {
     expect(refreshFacade.refreshBackgroundConversation).toHaveBeenCalledWith({
       tabId: 'tab-bg',
       conversation,
-      forceTodoStatusRefresh: false,
+      todoStatusRefreshPolicy: {
+        source: 'signal-sync',
+        tabHasBackgroundTask: false,
+      },
     });
     expect(host.setTabNeedsAttention).not.toHaveBeenCalled();
   });
@@ -209,7 +215,9 @@ describe('BackgroundTaskPostSyncCoordinator', () => {
     expect(refreshFacade.refreshBackgroundConversation).toHaveBeenCalledWith({
       tabId: 'tab-bg',
       conversation,
-      forceTodoStatusRefresh: true,
+      todoStatusRefreshPolicy: {
+        source: 'background-tab',
+      },
     });
     expect(host.setTabNeedsAttention).toHaveBeenCalledWith('tab-bg', true);
   });
