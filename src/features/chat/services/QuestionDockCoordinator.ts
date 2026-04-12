@@ -4,7 +4,7 @@ import type { QuestionDisplayMode, QuestionRequest, QuestionResolution } from '.
 import { t } from '../../../i18n';
 import { createLogger } from '../../../shared';
 import type { TabId } from '../tabs';
-import type { QuestionDock, QuestionDockCallbacks } from '../ui/QuestionDock';
+import type { QuestionDock } from '../ui/QuestionDock';
 import type {
   QuestionDockQueueRuntimeFacade,
 } from './QuestionDockQueueRuntimeFacade';
@@ -15,14 +15,14 @@ import type {
 import type { QuestionPostResolutionRuntimeFacade } from './QuestionPostResolutionRuntimeFacade';
 import { isQuestionAnswerComplete } from '../ui/questionDockState';
 import {
-  getQuestionDockActiveInteractionState,
   getQuestionDockDraftAnswers,
   sanitizeQuestionDockAnswer,
-  selectQuestionDockGroup,
-  selectQuestionDockQuestion,
-  setQuestionDockDraftAnswer,
   type QuestionDockInteractionRuntimeState,
 } from './QuestionDockInteractionState';
+import {
+  createEmptyQuestionDockRenderPayload,
+  createQuestionDockRenderPayload,
+} from './QuestionDockRenderAdapter';
 
 const logger = createLogger('QuestionDockCoordinator');
 
@@ -67,15 +67,6 @@ export interface QuestionDockCoordinatorHost {
   applyResolvedQuestionState(resolution: QuestionResolution, tabId: TabId | null): void;
 }
 
-const EMPTY_DOCK_CALLBACKS: QuestionDockCallbacks = {
-  onAnswerChange: () => {},
-  onSelectGroup: () => {},
-  onSelectQuestion: () => {},
-  onSubmit: () => {},
-  onReject: () => {},
-  onClose: () => {},
-};
-
 export class QuestionDockCoordinator {
   constructor(
     private readonly host: QuestionDockCoordinatorHost,
@@ -110,40 +101,24 @@ export class QuestionDockCoordinator {
     }
 
     const displayMode = this.host.getQuestionDisplayMode();
-    const { answers, viewModel } = getQuestionDockActiveInteractionState(
+    const renderPayload = createQuestionDockRenderPayload(
       runtime,
       activeRequest,
       displayMode,
+      {
+        rerender: () => {
+          this.render();
+        },
+        submit: () => {
+          void this.handleQuestionDockSubmit(activeTabId);
+        },
+        reject: () => {
+          void this.handleQuestionDockReject(activeTabId);
+        },
+      },
     );
 
-    questionDock.render({
-      request: activeRequest,
-      answers,
-      displayMode,
-      activeGroupKey: viewModel.activeGroupKey,
-      activeQuestionIndex: viewModel.activeQuestionIndex,
-    }, {
-      onAnswerChange: (questionIndex, answer) => {
-        setQuestionDockDraftAnswer(runtime, activeRequest, questionIndex, answer);
-      },
-      onSelectGroup: (groupKey) => {
-        selectQuestionDockGroup(runtime, activeRequest, groupKey);
-        this.render();
-      },
-      onSelectQuestion: (questionIndex) => {
-        selectQuestionDockQuestion(runtime, activeRequest, questionIndex, displayMode);
-        this.render();
-      },
-      onSubmit: () => {
-        void this.handleQuestionDockSubmit(activeTabId);
-      },
-      onReject: () => {
-        void this.handleQuestionDockReject(activeTabId);
-      },
-      onClose: () => {
-        void this.handleQuestionDockReject(activeTabId);
-      },
-    });
+    questionDock.render(renderPayload.state, renderPayload.callbacks);
   }
 
   clearPendingQuestionsForTab(tabId: TabId | null = this.host.getActiveTabId()): void {
@@ -219,11 +194,8 @@ export class QuestionDockCoordinator {
   }
 
   private renderEmptyDock(questionDock: QuestionDockPort): void {
-    questionDock.render({
-      request: null,
-      answers: [],
-      displayMode: this.host.getQuestionDisplayMode(),
-    }, EMPTY_DOCK_CALLBACKS);
+    const renderPayload = createEmptyQuestionDockRenderPayload(this.host.getQuestionDisplayMode());
+    questionDock.render(renderPayload.state, renderPayload.callbacks);
   }
 
   private getActivePendingQuestionRequest(
