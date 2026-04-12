@@ -5,61 +5,40 @@ import {
   type FocusContextPreview,
   resolveFocusContextPreview,
 } from '../composerContext';
+import {
+  FocusContextMarkdownViewLocator,
+  type FocusContextMarkdownViewLocatorHost,
+} from './FocusContextMarkdownViewLocator';
 import { RetainedSelectionHighlightService } from './RetainedSelectionHighlightService';
 
 const RETAINED_SELECTION_POLL_INTERVAL_MS = 250;
 
-export interface FocusContextRuntimeServiceHost {
-  getCurrentConversationNotePath(): string | null;
+export interface FocusContextRuntimeServiceHost extends FocusContextMarkdownViewLocatorHost {
   getFocusContextPreview(): FocusContextPreview | null;
   setFocusContextPreview(preview: FocusContextPreview | null): void;
   isComposerInteractionFocused(): boolean;
 }
 
 export class FocusContextRuntimeService {
-  private lastKnownMarkdownFilePath: string | null = null;
   private focusContextRefreshTimeoutId: number | null = null;
   private retainedSelectionPollIntervalId: number | null = null;
+  private readonly markdownViewLocator: FocusContextMarkdownViewLocator;
   private readonly retainedSelectionHighlightService: RetainedSelectionHighlightService;
 
   constructor(
-    private readonly app: App,
+    app: App,
     private readonly host: FocusContextRuntimeServiceHost,
   ) {
+    this.markdownViewLocator = new FocusContextMarkdownViewLocator(app, host);
     this.retainedSelectionHighlightService = new RetainedSelectionHighlightService(host);
   }
 
   rememberMarkdownFilePath(path: string | null): void {
-    this.lastKnownMarkdownFilePath = path;
+    this.markdownViewLocator.rememberMarkdownFilePath(path);
   }
 
   getActiveMarkdownView(): MarkdownView | null {
-    const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
-    if (activeView?.file) {
-      this.lastKnownMarkdownFilePath = activeView.file.path;
-      return activeView;
-    }
-
-    const preferredPaths = [
-      this.lastKnownMarkdownFilePath,
-      this.host.getCurrentConversationNotePath(),
-    ].filter((value): value is string => Boolean(value));
-    const markdownViews = this.getMarkdownViews();
-
-    for (const preferredPath of preferredPaths) {
-      const matchedView = markdownViews.find((view) => view.file?.path === preferredPath);
-      if (matchedView?.file) {
-        this.lastKnownMarkdownFilePath = matchedView.file.path;
-        return matchedView;
-      }
-    }
-
-    const fallbackView = markdownViews[0] ?? null;
-    if (fallbackView?.file) {
-      this.lastKnownMarkdownFilePath = fallbackView.file.path;
-    }
-
-    return fallbackView;
+    return this.markdownViewLocator.getActiveMarkdownView();
   }
 
   refreshActiveFocusContextPreview(
@@ -119,12 +98,6 @@ export class FocusContextRuntimeService {
     this.stopRetainedSelectionPolling();
     this.clearScheduledFocusContextPreviewRefresh();
     this.retainedSelectionHighlightService.dispose();
-  }
-
-  private getMarkdownViews(): MarkdownView[] {
-    return this.app.workspace.getLeavesOfType('markdown')
-      .map((leaf) => leaf.view)
-      .filter((view): view is MarkdownView => view instanceof MarkdownView && Boolean(view.file));
   }
 
   private computeFocusContextPreview(
