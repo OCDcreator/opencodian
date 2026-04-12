@@ -1,29 +1,21 @@
 import {
+  buildTrailingAssistantPatchTailOutcomePlanningContextShape,
+  type TrailingAssistantPatchTailOutcomePlanningContext,
+} from './TrailingAssistantPatchTailOutcomePlanningContextShapeHelper';
+import {
   buildTrailingAssistantPatchTailOutcomePlanningContextInputs,
-  type TrailingAssistantPatchTailOutcomePlanningContextInputs,
-  type TrailingAssistantPatchTailOutcomePlanningContextInputsSource,
+} from './TrailingAssistantPatchTailOutcomePlanningContextInputsHelper';
+import type {
+  TrailingAssistantPatchTailOutcomePlanningContextInputsSource as TrailingAssistantPatchTailOutcomePlanningContextSource,
 } from './TrailingAssistantPatchTailOutcomePlanningContextInputsHelper';
 
-export type TrailingAssistantPatchTailOutcomePlanningContextSource =
-  TrailingAssistantPatchTailOutcomePlanningContextInputsSource;
-export type TrailingAssistantPatchTailOutcomePlanningContext =
-  TrailingAssistantPatchTailOutcomePlanningContextInputs;
+export type { TrailingAssistantPatchTailOutcomePlanningContext } from './TrailingAssistantPatchTailOutcomePlanningContextShapeHelper';
+export type { TrailingAssistantPatchTailOutcomePlanningContextInputsSource as TrailingAssistantPatchTailOutcomePlanningContextSource } from './TrailingAssistantPatchTailOutcomePlanningContextInputsHelper';
 
 export function buildTrailingAssistantPatchTailOutcomePlanningContext(
   source: TrailingAssistantPatchTailOutcomePlanningContextSource,
 ): TrailingAssistantPatchTailOutcomePlanningContext {
-  return buildTrailingAssistantPatchTailOutcomePlanningContextFromInputs(
+  return buildTrailingAssistantPatchTailOutcomePlanningContextShape(
     buildTrailingAssistantPatchTailOutcomePlanningContextInputs(source),
   );
-}
-
-function buildTrailingAssistantPatchTailOutcomePlanningContextFromInputs(
-  inputs: TrailingAssistantPatchTailOutcomePlanningContextInputs,
-): TrailingAssistantPatchTailOutcomePlanningContext {
-  return {
-    previousTailMessage: inputs.previousTailMessage,
-    nextTailMessage: inputs.nextTailMessage,
-    messageEl: inputs.messageEl,
-    shouldStickToBottom: inputs.shouldStickToBottom,
-  };
 }
