@@ -9,7 +9,7 @@
 
 - 从更宽的 success `planningContext` 里只挑出 execution plan / tail outcome 共用的四个字段
 - 保持 `previousTailMessage`、`nextTailMessage`、`patchTarget` 与 `shouldStickToBottom` 的 contract shape 不变
-- 让 `ConversationRenderService` 更接近只负责组合 execution-tail child plans、turn-body scope 与其他已预建子计划
+- 让上层 success-plan 编排更接近只负责组合 execution-tail child plans、turn-body scope 与其他已预建子计划
 
 它不负责正文签名比较、不负责 tail outcome plan 构建，也不触碰 DOM 副作用；只负责 execution-tail planning-context 的纯输入收束。
 
@@ -43,8 +43,8 @@ export function buildTrailingAssistantPatchExecutionTailPlanningContext(
 
 ## 与其他模块的关系
 
-- `ConversationRenderService` 现在直接把 success `planningContext` 交给这里，不再在 service 内自行拼装 execution-tail inputs 或 planning-context
-- `ConversationRenderService` 现在只把这里返回的窄 context 与 host ports 一并交给 `TrailingAssistantPatchExecutionTailChildPlansHelper`
+- `TrailingAssistantPatchSuccessPlanningContextPlanHelper` 现在直接把 success `planningContext` 交给这里，不再让 service 自行拼装 execution-tail inputs 或 planning-context
+- `TrailingAssistantPatchSuccessPlanningContextPlanHelper` 现在只把这里返回的窄 context 与 host ports 一并交给 `TrailingAssistantPatchExecutionTailChildPlansHelper`
 - `TrailingAssistantPatchExecutionTailChildPlansHelper` 会继续把这里返回的窄 context 分发给 `TrailingAssistantPatchFooterFinalizationExecutionTailDecisionHelper`、`TrailingAssistantPatchExecutionTailExecutionPlanHelper` 与 `TrailingAssistantPatchTailOutcomeExecutionTailPlanHelper`
 - 当 `executionPlan` 与 `tailOutcomePlans` 都已预建后，`TrailingAssistantPatchExecutionTailChildPlansHelper` 会再把二者交给 `TrailingAssistantPatchExecutionTailPlanPartsHelper` 收口成 execution/tail plan-parts
 - 下一步若继续拆分 execution/tail 链路，可以继续沿着这里返回的窄 contract 抽离更细的子计划编排

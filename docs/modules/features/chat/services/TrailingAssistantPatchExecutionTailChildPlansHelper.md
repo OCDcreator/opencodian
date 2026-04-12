@@ -5,7 +5,7 @@
 
 ## 概述
 
-`TrailingAssistantPatchExecutionTailChildPlansHelper` 把 trailing-assistant success-plan 里“execution-tail planning-context + host ports → `{ executionPlan, tailOutcomePlans }`”的剩余纯编排从 `ConversationRenderService` 抽成了独立 helper：
+`TrailingAssistantPatchExecutionTailChildPlansHelper` 把 trailing-assistant success-plan 里“execution-tail planning-context + host ports → `{ executionPlan, tailOutcomePlans }`”的纯编排收口成独立 helper：
 
 - 接收已经收束好的 execution-tail planning-context
 - 接收 `getBodySignature()` 与 `summarizeChatMessageForDebug()` 两个 host port，但不直接读取 host 其他依赖
@@ -31,9 +31,9 @@ export function buildTrailingAssistantPatchExecutionTailPlanPartsFromExecutionTa
 
 ## 与其他模块的关系
 
-- `ConversationRenderService` 现在只把 execution-tail planning-context 与两个 host port 注入到这里，再单独协调 `turnBodyScopePlan`
+- `TrailingAssistantPatchSuccessPlanningContextPlanHelper` 会把收窄后的 execution-tail planning-context 与两个 host port 注入到这里，再单独协调 `turnBodyScopePlan`
 - `TrailingAssistantPatchFooterFinalizationExecutionTailDecisionHelper` 继续只负责正文签名 source-contract 与布尔决策子链
 - `TrailingAssistantPatchExecutionTailExecutionPlanHelper` 继续只负责 `shouldFinalizeFooterOnly + planningContext → executionPlan`
 - `TrailingAssistantPatchTailOutcomeExecutionTailPlanHelper` 继续只负责 `planningContext + summarizeChatMessageForDebug → tailOutcomePlans`
 - `TrailingAssistantPatchExecutionTailPlanPartsHelper` 继续只负责 `{ executionPlan, tailOutcomePlans }` 的局部 shape 收口
-- `TrailingAssistantPatchSuccessChildPlansHelper` 会消费这里返回的 execution-tail plan-parts，并与 `turnBodyScopePlan` 合成为最终 success-plan
+- `TrailingAssistantPatchSuccessPlanningContextPlanHelper` 会把这里返回的 execution-tail plan-parts 继续交给 `TrailingAssistantPatchSuccessChildPlansHelper`，并与 `turnBodyScopePlan` 合成为最终 success-plan

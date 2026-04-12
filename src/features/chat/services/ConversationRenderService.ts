@@ -22,14 +22,8 @@ import {
   type TrailingAssistantPatchExecutionPlan,
 } from './TrailingAssistantPatchExecutionPlanHelper';
 import {
-  buildTrailingAssistantPatchExecutionTailPlanningContext,
-} from './TrailingAssistantPatchExecutionTailPlanningContextHelper';
-import {
-  buildTrailingAssistantPatchExecutionTailPlanPartsFromExecutionTailPlanningContext,
-} from './TrailingAssistantPatchExecutionTailChildPlansHelper';
-import {
-  buildTrailingAssistantPatchSuccessPlanFromChildPlanSource,
-} from './TrailingAssistantPatchSuccessChildPlansHelper';
+  buildTrailingAssistantPatchSuccessPlanFromPlanningContext,
+} from './TrailingAssistantPatchSuccessPlanningContextPlanHelper';
 import { type TrailingAssistantPatchSuccessPlan } from './TrailingAssistantPatchSuccessPlanHelper';
 import {
   applyTrailingAssistantPatchTailState,
@@ -609,17 +603,11 @@ export class ConversationRenderService {
   private buildTrailingAssistantPatchSuccessPlan(
     planningContext: TrailingAssistantPatchPlanningContext,
   ): TrailingAssistantPatchSuccessPlan {
-    const executionTailPlanningContext =
-      buildTrailingAssistantPatchExecutionTailPlanningContext(planningContext);
-
-    return buildTrailingAssistantPatchSuccessPlanFromChildPlanSource({
-      ...buildTrailingAssistantPatchExecutionTailPlanPartsFromExecutionTailPlanningContext({
-        planningContext: executionTailPlanningContext,
-        getBodySignature: (message) => this.host.assistantTailRender.getBodySignature(message),
-        summarizeChatMessageForDebug: (message) =>
-          this.host.summarizeChatMessageForDebug(message),
-      }),
-      turnBodyScopePlanSource: planningContext,
+    return buildTrailingAssistantPatchSuccessPlanFromPlanningContext({
+      ...planningContext,
+      getBodySignature: (message) => this.host.assistantTailRender.getBodySignature(message),
+      summarizeChatMessageForDebug: (message) =>
+        this.host.summarizeChatMessageForDebug(message),
     });
   }
 

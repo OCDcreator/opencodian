@@ -12,7 +12,7 @@
 - 需要 turn-body scope plan 时，会先委托 `TrailingAssistantPatchTurnBodyScopePlanHelper`
 - 先委托 `TrailingAssistantPatchExecutionTailPlanPartsHelper` 收口 `{ executionPlan, tailOutcomePlans }`
 - 再委托 `TrailingAssistantPatchSuccessPlanHelper` 生成最终 success-plan 返回值
-- 让 `ConversationRenderService` 更接近只保留 execution-tail planning-context 构建与 host port wiring
+- 让上层 success-plan 编排更接近只保留 success planning-context 与 host port wiring
 
 它不比较正文签名，也不执行任何 DOM/runtime 副作用；只负责 success child plans 到最终 success-plan 的纯装配，并把 turn-body scope plan 的预计算继续委托给更窄的 helper。
 
@@ -38,7 +38,7 @@ export function buildTrailingAssistantPatchSuccessPlanFromChildPlanSource(
 
 ## 与其他模块的关系
 
-- `ConversationRenderService` 现在把 `TrailingAssistantPatchExecutionTailChildPlansHelper` 返回的 execution-tail plan-parts 与更窄的 `turnBodyScopePlanSource` 交给这里，不再在 service 内直接预建 `turnBodyScopePlan`
+- `TrailingAssistantPatchSuccessPlanningContextPlanHelper` 现在把 `TrailingAssistantPatchExecutionTailChildPlansHelper` 返回的 execution-tail plan-parts 与更窄的 `turnBodyScopePlanSource` 交给这里，不再让 service 直接预建 `turnBodyScopePlan`
 - `TrailingAssistantPatchExecutionTailChildPlansHelper` 继续负责把 execution-tail planning-context 与 host ports 编排成 `{ executionPlan, tailOutcomePlans }`
 - `TrailingAssistantPatchTurnBodyScopePlanHelper` 继续负责把 `turnBodyScopePlanSource` 预计算成稳定的 `turnBodyScopePlan`
 - `TrailingAssistantPatchExecutionTailPlanPartsHelper` 继续只负责 `{ executionPlan, tailOutcomePlans }` 这一层局部 shape
