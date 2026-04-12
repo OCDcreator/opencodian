@@ -3,7 +3,7 @@
   "starting_phase_doc": "docs/status/maintainability-phase-7.md",
   "next_phase_number": 8,
   "focus_hint": "Follow `docs/status/maintainability-master-plan.md` first. Prioritize `OpenCodianView` ownership extraction around question/todo/background task, context/composer, message-shell/notice, or activation/runtime bridge boundaries.",
-  "max_rounds": 200,
+  "max_rounds": 1000,
   "max_consecutive_failures": 3,
   "test_command": "npm test",
   "targeted_test_required": true,
