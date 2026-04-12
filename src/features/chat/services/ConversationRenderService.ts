@@ -28,6 +28,10 @@ import {
   buildTrailingAssistantPatchTailOutcomePlanningContext,
   type TrailingAssistantPatchTailOutcomePlanningContext,
 } from './TrailingAssistantPatchTailOutcomePlanningContextHelper';
+import {
+  buildTrailingAssistantPatchTailStatePlanningContext,
+  type TrailingAssistantPatchTailStatePlanningContext,
+} from './TrailingAssistantPatchTailStatePlanningContextHelper';
 import { buildTrailingAssistantPatchTurnBodyScopePlan } from './TrailingAssistantPatchTurnBodyScopePlanHelper';
 import {
   captureElementScrollRestoreSnapshot,
@@ -189,12 +193,6 @@ type TrailingAssistantPatchSuccessPlanParts = {
   executionPlan: TrailingAssistantPatchExecutionPlan;
   tailOutcomePlans: TrailingAssistantPatchTailOutcomePlans;
   turnBodyScopePlan: TrailingAssistantPatchTurnBodyScopePlan;
-};
-
-type TrailingAssistantPatchTailStatePlanningContext = {
-  messageEl: HTMLElement;
-  nextTailMessage: ChatMessage;
-  shouldStickToBottom: boolean;
 };
 
 type TrailingAssistantPatchCompletionDebugPlanningContext = {
@@ -795,18 +793,8 @@ export class ConversationRenderService {
     planningContext: TrailingAssistantPatchTailOutcomePlanningContext,
   ): TrailingAssistantPatchTailStatePlan {
     return this.buildTrailingAssistantPatchTailStatePlan(
-      this.buildTrailingAssistantPatchTailStatePlanningContext(planningContext),
+      buildTrailingAssistantPatchTailStatePlanningContext(planningContext),
     );
-  }
-
-  private buildTrailingAssistantPatchTailStatePlanningContext(
-    planningContext: TrailingAssistantPatchTailOutcomePlanningContext,
-  ): TrailingAssistantPatchTailStatePlanningContext {
-    return {
-      messageEl: planningContext.messageEl,
-      nextTailMessage: planningContext.nextTailMessage,
-      shouldStickToBottom: planningContext.shouldStickToBottom,
-    };
   }
 
   private buildTrailingAssistantPatchCompletionDebugPlanFromTailOutcomePlanningContext(
