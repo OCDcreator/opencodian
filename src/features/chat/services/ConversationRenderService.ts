@@ -19,13 +19,14 @@ import {
   buildTrailingAssistantPatchSkippedDebugPlanningContext,
 } from './TrailingAssistantPatchDebugLoggingContextHelper';
 import {
-  buildTrailingAssistantPatchExecutionPlan,
   type TrailingAssistantPatchExecutionPlan,
 } from './TrailingAssistantPatchExecutionPlanHelper';
 import {
   buildTrailingAssistantPatchExecutionTailPlanningContext,
-  type TrailingAssistantPatchExecutionTailPlanningContext,
 } from './TrailingAssistantPatchExecutionTailPlanningContextHelper';
+import {
+  buildTrailingAssistantPatchExecutionPlanFromExecutionTailPlanningContext,
+} from './TrailingAssistantPatchExecutionTailExecutionPlanHelper';
 import { buildTrailingAssistantPatchExecutionTailPlanParts } from './TrailingAssistantPatchExecutionTailPlanPartsHelper';
 import {
   buildTrailingAssistantPatchSuccessPlanFromParts,
@@ -624,13 +625,18 @@ export class ConversationRenderService {
   ): TrailingAssistantPatchSuccessPlanParts {
     const executionTailPlanningContext =
       buildTrailingAssistantPatchExecutionTailPlanningContext(planningContext);
+    const shouldFinalizeFooterOnly = this.shouldFinalizeTrailingAssistantFooterOnly(
+      executionTailPlanningContext.previousTailMessage,
+      executionTailPlanningContext.nextTailMessage,
+    );
+
     return {
       turnBodyScopePlan: buildTrailingAssistantPatchTurnBodyScopePlan(planningContext),
       ...buildTrailingAssistantPatchExecutionTailPlanParts({
-        executionPlan:
-          this.buildTrailingAssistantPatchExecutionPlanFromExecutionTailPlanningContext(
-            executionTailPlanningContext,
-          ),
+        executionPlan: buildTrailingAssistantPatchExecutionPlanFromExecutionTailPlanningContext({
+          planningContext: executionTailPlanningContext,
+          shouldFinalizeFooterOnly,
+        }),
         tailOutcomePlans: buildTrailingAssistantPatchTailOutcomePlansFromExecutionTailPlanningContext(
           {
             planningContext: executionTailPlanningContext,
@@ -657,19 +663,6 @@ export class ConversationRenderService {
   ): boolean {
     return this.host.assistantTailRender.getBodySignature(previousTailMessage)
       === this.host.assistantTailRender.getBodySignature(nextTailMessage);
-  }
-
-  private buildTrailingAssistantPatchExecutionPlanFromExecutionTailPlanningContext(
-    planningContext: TrailingAssistantPatchExecutionTailPlanningContext,
-  ): TrailingAssistantPatchExecutionPlan {
-    return buildTrailingAssistantPatchExecutionPlan({
-      nextTailMessage: planningContext.nextTailMessage,
-      patchTarget: planningContext.patchTarget,
-      shouldFinalizeFooterOnly: this.shouldFinalizeTrailingAssistantFooterOnly(
-        planningContext.previousTailMessage,
-        planningContext.nextTailMessage,
-      ),
-    });
   }
 
   private async executeTrailingAssistantPatch(

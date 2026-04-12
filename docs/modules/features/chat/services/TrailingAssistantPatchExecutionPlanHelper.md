@@ -45,6 +45,6 @@ export function buildTrailingAssistantPatchExecutionPlan(
 
 ## 与其他模块的关系
 
-- `ConversationRenderService` 现在先通过 `host.assistantTailRender.getBodySignature()` 比较正文签名，再把 execution-plan shape 装配委托给这里
+- `TrailingAssistantPatchExecutionTailExecutionPlanHelper` 现在会在更窄的 execution-tail planning-context 边界上复用这里，不再由 `ConversationRenderService` 直接调用
 - `TrailingAssistantPatchExecutionTailPlanningContextHelper` 继续负责从 success planning-context 缩成 execution/tail 共用的窄 contract
 - `TrailingAssistantPatchSuccessPlanHelper` 继续只负责 success-plan 顶层 shape，并复用这里导出的 `TrailingAssistantPatchExecutionPlan` 类型
