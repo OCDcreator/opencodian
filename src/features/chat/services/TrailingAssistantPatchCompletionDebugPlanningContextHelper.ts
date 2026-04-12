@@ -1,8 +1,10 @@
 import {
   buildTrailingAssistantPatchCompletionDebugPlanningContextShape,
   type TrailingAssistantPatchCompletionDebugPlanningContext,
-  type TrailingAssistantPatchCompletionDebugPlanningContextShapeInputs,
 } from './TrailingAssistantPatchCompletionDebugPlanningContextShapeHelper';
+import {
+  buildTrailingAssistantPatchCompletionDebugPlanningContextInputs,
+} from './TrailingAssistantPatchCompletionDebugPlanningContextInputsHelper';
 import type { TrailingAssistantPatchCompletionDebugPlanningContextSource } from './TrailingAssistantPatchCompletionDebugPlanningContextSourceContractHelper';
 import {
   buildTrailingAssistantPatchCompletionDebugSummaryPlan,
@@ -14,16 +16,12 @@ export type { TrailingAssistantPatchCompletionDebugPlanningContextSource } from 
 export function buildTrailingAssistantPatchCompletionDebugPlanningContext(
   source: TrailingAssistantPatchCompletionDebugPlanningContextSource,
 ): TrailingAssistantPatchCompletionDebugPlanningContext {
-  return buildTrailingAssistantPatchCompletionDebugPlanningContextShape(
-    buildTrailingAssistantPatchCompletionDebugInputs(source),
-  );
-}
+  const summaryPlan = buildTrailingAssistantPatchCompletionDebugSummaryPlan(source);
 
-function buildTrailingAssistantPatchCompletionDebugInputs(
-  source: TrailingAssistantPatchCompletionDebugPlanningContextSource,
-): TrailingAssistantPatchCompletionDebugPlanningContextShapeInputs {
-  return {
-    shouldStickToBottom: source.tailStatePlan.shouldStickToBottom,
-    summaryPlan: buildTrailingAssistantPatchCompletionDebugSummaryPlan(source),
-  };
+  return buildTrailingAssistantPatchCompletionDebugPlanningContextShape(
+    buildTrailingAssistantPatchCompletionDebugPlanningContextInputs({
+      tailStatePlan: source.tailStatePlan,
+      summaryPlan,
+    }),
+  );
 }
