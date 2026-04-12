@@ -5,7 +5,7 @@
 
 ## 概述
 
-`FocusContextRuntimeService` 把 `OpenCodianView` 里的 focus context preview、活动 MarkdownView 回退查找，以及 retained-selection handoff/highlight/polling 运行态收束到一个单一职责 service。这样 view 只保留 workspace / editor / composer 事件注册和 tab-level preview state writeback，不再自己持有这整段 editor-runtime 协调逻辑。
+`FocusContextRuntimeService` 把 `OpenCodianView` 里的 focus context preview、活动 MarkdownView 回退查找，以及 retained-selection handoff/highlight/polling 运行态收束到一个单一职责 service。workspace / vault / composer 事件注册现在进一步由 `ComposerContextEventBridge` 接管，因此这个 service 更集中于 editor-runtime 自身的 preview 与 highlight 协调。
 
 ## 导入关系
 
@@ -57,7 +57,8 @@ class FocusContextRuntimeService {
 
 ## 与其他模块的交互
 
-- **OpenCodianView**：提供 host callback（当前会话 note、preview state、composer focus），并把 workspace / DOM 事件转发给这里
+- **OpenCodianView**：提供 host callback（当前会话 note、preview state、composer focus）
+- **ComposerContextEventBridge**：桥接 workspace / vault / composer DOM 事件，并统一启动 polling 与关闭时的 `dispose()`
 - **composerContext**：提供 preview 结构和 selection-preview retain 规则
 - **editorSelectionHighlight**：负责真正把 retained selection 渲染成 CodeMirror 装饰
 - **ComposerContextCoordinator**：继续消费这里写回的 preview state，负责 chips 渲染与 preview attach/detach click 编排
@@ -66,5 +67,5 @@ class FocusContextRuntimeService {
 ## 注意事项
 
 - 不改变既有 focus preview 文案、selection line-range 语义或 retained highlight 的显示策略
-- `dispose()` 必须在 view `onClose()` 时调用，避免轮询、timeout 和残留高亮泄漏
+- `dispose()` 现在经由 `ComposerContextEventBridge` 在 view `onClose()` 时调用，避免轮询、timeout 和残留高亮泄漏
 - service 只管理 editor/runtime 侧的 focus context；附件构建留在 `ContextAttachmentBuilder`，chips 编排留在 `ComposerContextCoordinator`，draft item state 写回仍留在 `OpenCodianView`

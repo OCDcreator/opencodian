@@ -191,6 +191,10 @@ import {
   ComposerContextCoordinator,
   type ComposerContextCoordinatorHost,
 } from './services/ComposerContextCoordinator';
+import {
+  ComposerContextEventBridge,
+  type ComposerContextEventBridgeHost,
+} from './services/ComposerContextEventBridge';
 import { ContextAttachmentBuilder } from './services/ContextAttachmentBuilder';
 import { ContextFileCatalogService } from './services/ContextFileCatalogService';
 import { ContextUsageService } from './services/ContextUsageService';
@@ -744,6 +748,7 @@ export class OpenCodianView extends ItemView {
   private sendPipelineRuntime: SendPipelineRuntime;
   private composerContextActionService: ComposerContextActionService;
   private composerContextCoordinator: ComposerContextCoordinator;
+  private composerContextEventBridge: ComposerContextEventBridge;
   private contextAttachmentBuilder: ContextAttachmentBuilder;
   private contextFileCatalogService: ContextFileCatalogService;
   private focusContextRuntimeService: FocusContextRuntimeService;
@@ -1177,6 +1182,12 @@ export class OpenCodianView extends ItemView {
       this.app,
       this.createFocusContextRuntimeServiceHost(),
     );
+    this.composerContextEventBridge = new ComposerContextEventBridge(
+      this.app,
+      this.focusContextRuntimeService,
+      this.contextFileCatalogService,
+      this.createComposerContextEventBridgeHost(),
+    );
     this.persistentAssistantNoticeService = new PersistentAssistantNoticeService(
       this.createPersistentAssistantNoticeServiceHost(),
     );
@@ -1363,6 +1374,23 @@ export class OpenCodianView extends ItemView {
         this.setFocusContextPreview(preview);
       },
       isComposerInteractionFocused: () => this.isComposerInteractionFocused(),
+    };
+  }
+
+  private createComposerContextEventBridgeHost(): ComposerContextEventBridgeHost {
+    return {
+      setCurrentConversationNotePath: (path) => {
+        if (this.currentConversation) {
+          this.currentConversation.currentNote = path;
+        }
+      },
+      getInputContainer: () => this.inputContainer,
+      registerEvent: (eventRef) => {
+        this.registerEvent(eventRef);
+      },
+      registerDomEvent: (target, type, callback, options) => {
+        this.registerDomEvent(target, type, callback, options);
+      },
     };
   }
 
@@ -2204,7 +2232,6 @@ export class OpenCodianView extends ItemView {
 
     // Wire events
     this.wireEventHandlers();
-    this.focusContextRuntimeService.startRetainedSelectionPolling();
     this.conversationSessionLiveSignalAdapter.start();
     this.conversationSyncEventAdapter.start();
 
@@ -2215,7 +2242,7 @@ export class OpenCodianView extends ItemView {
     this.persistTabState({ flush: true });
     this.stopServerStatusLoop();
     this.stopConversationSyncLoop();
-    this.focusContextRuntimeService.dispose();
+    this.composerContextEventBridge.dispose();
     this.clearChatSurfaceSyncTimers();
     this.clearScheduledComposerLayoutSync();
     this.clearScheduledScrollToBottom();
@@ -4154,10 +4181,6 @@ export class OpenCodianView extends ItemView {
     this.focusContextRuntimeService.refreshActiveFocusContextPreview(view, editor);
   }
 
-  private scheduleFocusContextPreviewRefresh(): void {
-    this.focusContextRuntimeService.scheduleFocusContextPreviewRefresh();
-  }
-
   public async addCurrentNoteContextFromActiveEditor(view?: MarkdownView | null): Promise<boolean> {
     return this.composerContextActionService.addCurrentNoteContextFromActiveEditor(view);
   }
@@ -4218,53 +4241,7 @@ export class OpenCodianView extends ItemView {
       return false;
     });
 
-    const scheduleFocusPreviewRefresh = () => {
-      this.scheduleFocusContextPreviewRefresh();
-    };
-
-    this.registerEvent(
-      this.plugin.app.workspace.on('file-open', (file) => {
-        this.focusContextRuntimeService.rememberMarkdownFilePath(file?.path ?? null);
-        if (file && this.currentConversation) {
-          this.currentConversation.currentNote = file.path;
-        }
-        scheduleFocusPreviewRefresh();
-      })
-    );
-    this.registerEvent(
-      this.plugin.app.workspace.on('active-leaf-change', () => {
-        scheduleFocusPreviewRefresh();
-      })
-    );
-    this.registerEvent(
-      this.plugin.app.workspace.on('editor-change', (editor, info) => {
-        this.refreshActiveFocusContextPreview(info instanceof MarkdownView ? info : undefined, editor);
-      })
-    );
-    if (this.inputContainer) {
-      this.registerDomEvent(this.inputContainer, 'pointerdown', () => {
-        this.focusContextRuntimeService.handleComposerPointerDown();
-      });
-      this.registerDomEvent(this.inputContainer, 'focusin', () => {
-        this.focusContextRuntimeService.handleComposerFocusIn();
-      });
-      this.registerDomEvent(this.inputContainer, 'focusout', () => {
-        this.focusContextRuntimeService.handleComposerFocusOut();
-      });
-    }
-    this.registerDomEvent(document, 'selectionchange', scheduleFocusPreviewRefresh);
-    this.registerDomEvent(document, 'mouseup', scheduleFocusPreviewRefresh);
-    this.registerDomEvent(document, 'keyup', scheduleFocusPreviewRefresh);
-
-    this.registerEvent(this.plugin.app.vault.on('create', (file) => {
-      this.contextFileCatalogService.handleCreate(file);
-    }));
-    this.registerEvent(this.plugin.app.vault.on('delete', (file) => {
-      this.contextFileCatalogService.handleDelete(file);
-    }));
-    this.registerEvent(this.plugin.app.vault.on('rename', (file, oldPath) => {
-      this.contextFileCatalogService.handleRename(file, oldPath);
-    }));
+    this.composerContextEventBridge.start();
   }
 
   /** Create a new conversation */

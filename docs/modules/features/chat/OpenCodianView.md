@@ -88,7 +88,7 @@ background task 相关的 `backgroundTaskLaunches`、`backgroundTaskCompletedTas
 - 模型目录缓存：`availableModels`、`availableProviders`
 - 服务器状态轮询和 badge 状态
 - model selector sticky header cleanup
-- `ComposerContextCoordinator`、`FocusContextRuntimeService`、`PersistentAssistantNoticeService` 等视图级运行时协作对象
+- `ComposerContextEventBridge`、`ComposerContextCoordinator`、`FocusContextRuntimeService`、`PersistentAssistantNoticeService` 等视图级运行时协作对象
 - theme background / liquid glass / diamond demo / glass octahedron 相关 DOM 引用
 
 ## 主链路
@@ -101,10 +101,9 @@ background task 相关的 `backgroundTaskLaunches`、`backgroundTaskCompletedTas
 2. `initializeTabSystem()`
 3. `startServerStatusLoop()`
 4. 在 `messagesShellEl` 上创建 `MarkdownRenderService`
-5. `wireEventHandlers()`
-6. 启动 `FocusContextRuntimeService` 的 retained-selection polling
-7. 通过 `ConversationSessionLiveSignalAdapter` / `ConversationSyncEventAdapter` 订阅 session live signal 与 sync-event 更新
-8. `initializeFirstTab()`
+5. `wireEventHandlers()`，其中 composer/context 相关的 workspace / vault / DOM 事件注册与 retained-selection polling 启动都会转交给 `ComposerContextEventBridge`
+6. 通过 `ConversationSessionLiveSignalAdapter` / `ConversationSyncEventAdapter` 订阅 session live signal 与 sync-event 更新
+7. `initializeFirstTab()`
 
 `onClose()` 则会反向清理：
 
@@ -346,11 +345,12 @@ model selector 现在拆成了几层协作：
 
 这个视图仍负责 composer context 按钮装配，以及 draft context / focus preview 的 active-tab state 写回；焦点预览 runtime、入口动作和 chips 编排已经分别迁出：
 
+- `ComposerContextEventBridge` 负责 composer/context 相关的 workspace / vault / DOM 事件注册、当前会话 note path 写回，以及 retained-selection polling lifecycle
 - `FocusContextRuntimeService` 负责活动 `MarkdownView` 回退查找、focus preview 计算，以及 composer pointer handoff / focusin/focusout / polling 驱动的 retained-selection 协调
 - `ComposerContextActionService` 负责 current-note / selection / file 三个 composer context 入口动作、活动编辑器回退，以及文件选择器 + catalog 加载编排
 - `ComposerContextCoordinator` 负责 composer context chips 渲染、preview attach/detach click 编排，以及失效 preview 的 refresh handoff
 - `ContextAttachmentBuilder` 负责 current-note / selection / file 三类 `PromptContextItem` 构建，以及 remote 模式下的文本快照读取与 `64 KiB` 校验
-- 文件选择器使用 `ContextFileCatalogService` 惰性构建和缓存 `ContextFileCatalog`；入口动作 service 负责把 catalog loader 交给 picker，而 `OpenCodianView` 只转发 vault `create/delete/rename` 事件
+- 文件选择器使用 `ContextFileCatalogService` 惰性构建和缓存 `ContextFileCatalog`；入口动作 service 负责把 catalog loader 交给 picker，而 vault `create/delete/rename` 增量同步则由 `ComposerContextEventBridge` 统一桥接
 
 选区高亮保留逻辑现在由 runtime service 集中承接：
 
@@ -450,6 +450,7 @@ background task notice 这条子链路现在的边界是：
 - `MarkdownRenderService`：Markdown 渲染
 - `StreamController`：流式 assistant DOM 更新
 - `ComposerContextActionService`：current-note / selection / file 入口动作、活动编辑器回退，以及文件选择器 + catalog 编排
+- `ComposerContextEventBridge`：composer/context 相关的 workspace / vault / DOM 事件桥接，以及 retained-selection polling lifecycle
 - `ComposerContextCoordinator`：composer context chip 渲染、preview attach/detach click 编排，以及 stale preview refresh handoff
 - `ContextAttachmentBuilder`：composer current-note / selection / file 附件构建，以及 remote 文本快照校验
 - `ContextFileCatalogService`：composer 文件上下文选择器使用的 Vault catalog 构建、缓存与增量更新
