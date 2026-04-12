@@ -6,6 +6,9 @@ jest.mock('../../../../src/core/opencode', () => ({
 
 import type { ChatMessage } from '../../../../src/core/types';
 import { OpenCodianView } from '../../../../src/features/chat/OpenCodianView';
+import { BackgroundTaskIndicatorCoordinator } from '../../../../src/features/chat/runtime/BackgroundTaskIndicatorCoordinator';
+import { BackgroundTaskCompletionNoticeService } from '../../../../src/features/chat/services/BackgroundTaskCompletionNoticeService';
+import { BackgroundTaskTimelineService } from '../../../../src/features/chat/services/BackgroundTaskTimelineService';
 
 function createView(): OpenCodianView {
   return new OpenCodianView(new WorkspaceLeaf(), {
@@ -132,24 +135,25 @@ describe('OpenCodianView background task timeline', () => {
   });
 
   it('queues completion notices during streaming and dedupes against persisted local notices', async () => {
-    const view = createView() as unknown as {
-      queueBackgroundTaskCompletionNotices: (tabId: string, conversation: { messages: ChatMessage[] }) => Promise<void>;
-      flushQueuedBackgroundTaskCompletionNotices: (tabId: string, conversation: { messages: ChatMessage[] }) => Promise<void>;
-      appendPersistentAssistantNoticeMessage: (...args: unknown[]) => Promise<void>;
-      getTabRuntimeState: () => {
-        isStreaming: boolean;
-        queuedBackgroundTaskCompletionNotices: Map<string, unknown>;
-      };
-    };
-
     const runtime = {
       isStreaming: true,
+      isHydratingConversation: false,
+      backgroundTaskStartedAt: null,
+      backgroundTaskActiveAnchorKey: null,
+      backgroundTaskModeTag: null,
+      backgroundTaskLaunches: new Map(),
+      backgroundTaskCompletedTasks: new Map(),
+      backgroundTaskWaitingForFollowUp: false,
+      backgroundTaskStaleNoticeFingerprint: null,
+      backgroundTaskSuppressedFingerprint: null,
       queuedBackgroundTaskCompletionNotices: new Map<string, unknown>(),
     };
-    jest.spyOn(view, 'getTabRuntimeState').mockReturnValue(runtime);
-    const appendSpy = jest.spyOn(view, 'appendPersistentAssistantNoticeMessage').mockResolvedValue(undefined);
-
     const conversation = {
+      id: 'conversation-1',
+      title: 'Conversation',
+      createdAt: 1,
+      updatedAt: 1,
+      openCodeSessionId: 'session-1',
       messages: [
         {
           id: 'user-local-1',
@@ -169,9 +173,34 @@ describe('OpenCodianView background task timeline', () => {
         createReminderMessage('msg-reminder-1'),
       ],
     };
+    const timelineService = new BackgroundTaskTimelineService({
+      getTabRuntimeState: jest.fn().mockReturnValue(runtime),
+      getActiveTabId: jest.fn().mockReturnValue('tab-1'),
+      getMessageAnchorKey: (message) => message.sourceMessageId ?? message.id,
+      armAuthoritativeSyncGate: jest.fn(),
+      clearAuthoritativeSyncGate: jest.fn(),
+      syncTabStreamLikeState: jest.fn(),
+      isSuppressedBackgroundTaskSegment: jest.fn().mockReturnValue(false),
+    });
+    const appendSpy = jest.fn().mockResolvedValue(undefined);
+    const completionNoticeService = new BackgroundTaskCompletionNoticeService({
+      getTabRuntimeState: jest.fn().mockReturnValue(runtime),
+      appendPersistentAssistantNoticeMessage: appendSpy,
+    });
+    const coordinator = new BackgroundTaskIndicatorCoordinator(
+      { render: jest.fn().mockResolvedValue(undefined) },
+      timelineService,
+      completionNoticeService,
+      {
+        getActiveTabId: jest.fn().mockReturnValue('tab-1'),
+        getCurrentConversation: jest.fn().mockReturnValue(conversation),
+        getTabRuntimeState: jest.fn().mockReturnValue(runtime),
+        reconcileBackgroundTaskStateFromLiveSignals: jest.fn(),
+        syncTabStreamLikeState: jest.fn(),
+      },
+    );
 
-    await view.queueBackgroundTaskCompletionNotices('tab-1', conversation);
-    await view.flushQueuedBackgroundTaskCompletionNotices('tab-1', conversation);
+    await coordinator.queueAndFlushCompletionNotices('tab-1', conversation as never);
 
     expect(runtime.queuedBackgroundTaskCompletionNotices.size).toBe(1);
     expect(appendSpy).not.toHaveBeenCalled();
@@ -193,9 +222,8 @@ describe('OpenCodianView background task timeline', () => {
       },
     });
 
-    await view.queueBackgroundTaskCompletionNotices('tab-1', conversation);
-    expect(runtime.queuedBackgroundTaskCompletionNotices.size).toBe(1);
-    await view.flushQueuedBackgroundTaskCompletionNotices('tab-1', conversation);
+    await coordinator.queueAndFlushCompletionNotices('tab-1', conversation as never);
+    expect(runtime.queuedBackgroundTaskCompletionNotices.size).toBe(0);
     expect(appendSpy).not.toHaveBeenCalled();
   });
 });

@@ -49,8 +49,7 @@ export interface BackgroundTaskPostSyncCoordinatorHost {
     sessionId: string | undefined,
     options: { suppressErrors?: boolean },
   ): Promise<SessionTodo[]>;
-  queueBackgroundTaskCompletionNotices(tabId: TabId | null, conversation: Conversation | null): Promise<void>;
-  flushQueuedBackgroundTaskCompletionNotices(tabId: TabId | null, conversation: Conversation | null): Promise<void>;
+  refreshBackgroundTaskCompletionNotices(tabId: TabId | null, conversation: Conversation | null): Promise<void>;
   syncTabStreamLikeState(tabId: TabId | null): void;
   setTabNeedsAttention(tabId: TabId | null, needsAttention: boolean): void;
 }
@@ -166,8 +165,7 @@ export class BackgroundTaskPostSyncCoordinator {
       await this.host.refreshTabSessionTodos(tabId, conversation.openCodeSessionId, { suppressErrors: true });
     }
 
-    await this.host.queueBackgroundTaskCompletionNotices(tabId, conversation);
-    await this.host.flushQueuedBackgroundTaskCompletionNotices(tabId, conversation);
+    await this.host.refreshBackgroundTaskCompletionNotices(tabId, conversation);
     this.host.syncTabStreamLikeState(tabId);
   }
 

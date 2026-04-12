@@ -12,10 +12,10 @@
 - 判定 visible background sync 完成后当前 conversation 是否仍然匹配发起同步时的 active conversation
 - 在 visible background sync 仍命中当前 conversation 时提交 `currentConversationRevertState` 与 active-tab sync fingerprint
 - 调用 background task timeline rebuild host bridge
-- 协调 completion notice queue/flush 与 tab stream-like 状态刷新
+- 触发 completion notice refresh 与 tab stream-like 状态刷新
 - 根据 sync fingerprint 变化标记后台 tab attention
 
-它不负责 background task segment/timeline 推导，也不负责 inline panel DOM 渲染；这些现在分别由 `BackgroundTaskTimelineService` 和 `BackgroundTaskInlinePanelRenderer` 承接，并通过 host bridge 被 post-sync coordinator 调用。
+它不负责 background task segment/timeline 推导，也不负责 inline panel DOM 渲染；这些现在分别由 `BackgroundTaskTimelineService` 和 `BackgroundTaskInlinePanelRenderer` 承接。completion notice 的 queue/flush 顺序也不再由本 coordinator 拆开编排，而是通过 `BackgroundTaskIndicatorCoordinator` 的 host bridge 统一刷新。
 
 ## 公开接口
 
@@ -32,8 +32,7 @@ export interface BackgroundTaskPostSyncCoordinatorHost {
   syncBackgroundTaskStateFromConversation(...): void;
   refreshTabSessionStatus(...): Promise<SessionActivityStatus | null>;
   refreshTabSessionTodos(...): Promise<SessionTodo[]>;
-  queueBackgroundTaskCompletionNotices(...): Promise<void>;
-  flushQueuedBackgroundTaskCompletionNotices(...): Promise<void>;
+  refreshBackgroundTaskCompletionNotices(...): Promise<void>;
   syncTabStreamLikeState(tabId: TabId | null): void;
   setTabNeedsAttention(tabId: TabId | null, needsAttention: boolean): void;
 }
@@ -56,7 +55,7 @@ export class BackgroundTaskPostSyncCoordinator {
 
 ### signal sync 收尾
 
-- `handleSignalSyncComplete()` 保留原有 signal-sync authoritative mark，随后统一执行 question refresh、background task rebuild、todo/status refresh、completion notice queue/flush 和 tab stream-like refresh
+- `handleSignalSyncComplete()` 保留原有 signal-sync authoritative mark，随后统一执行 question refresh、background task rebuild、todo/status refresh、completion notice refresh 和 tab stream-like refresh
 - 只有 sync result changed 或 fingerprint 相对上一轮变化时，才更新 tab attention；如果目标 tab 不是当前 active tab，则标记为需要关注
 
 ### background-tab sync 收尾
@@ -66,9 +65,10 @@ export class BackgroundTaskPostSyncCoordinator {
 
 ## 与 `OpenCodianView` 的边界
 
-- `OpenCodianView` 负责把 timeline rebuild / inline-panel render / notice queue host bridge 接到各个 background-task helper
+- `OpenCodianView` 负责把 timeline rebuild / indicator coordinator host bridge 接到各个 background-task helper
 - `BackgroundTaskTimelineService` 负责 background task segment/timeline 推导，以及 completion notice 所需的 segment 收集
 - `BackgroundTaskInlinePanelRenderer` 负责 inline panel DOM 渲染与 mounted panel 生命周期
+- `BackgroundTaskIndicatorCoordinator` 负责 inline render 场景和 post-sync 场景共用的 completion notice queue/flush 顺序
 - `ConversationSyncBridge` 负责把 visible/signal/background sync 的 server-sync 结果统一路由到 post-sync coordinator 和 view render host
 - `BackgroundTaskPostSyncCoordinator` 负责 hidden signal/background-tab sync，以及 active visible-conversation background sync 之后的跨 question/todo/background-task service 编排
 - 这让本轮继续沿着 master-plan 的 `OpenCodianView` sync orchestration ownership 迁移，把后台同步后的 question/todo/background-task 收尾，以及 visible sync 的 state-commit 判定，稳定留在 dedicated coordinator，而不是继续散落在 view 的多个 sync 入口中

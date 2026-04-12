@@ -58,8 +58,7 @@ function createHost(options: {
     syncBackgroundTaskStateFromConversation: jest.fn(),
     refreshTabSessionStatus: jest.fn().mockResolvedValue({ type: 'idle' } as SessionActivityStatus),
     refreshTabSessionTodos: jest.fn().mockResolvedValue([] as SessionTodo[]),
-    queueBackgroundTaskCompletionNotices: jest.fn().mockResolvedValue(undefined),
-    flushQueuedBackgroundTaskCompletionNotices: jest.fn().mockResolvedValue(undefined),
+    refreshBackgroundTaskCompletionNotices: jest.fn().mockResolvedValue(undefined),
     syncTabStreamLikeState: jest.fn(),
     setTabNeedsAttention: jest.fn(),
   };
@@ -218,8 +217,7 @@ describe('BackgroundTaskPostSyncCoordinator', () => {
       'session-1',
       { suppressErrors: true },
     );
-    expect(host.queueBackgroundTaskCompletionNotices).toHaveBeenCalledWith('tab-bg', conversation);
-    expect(host.flushQueuedBackgroundTaskCompletionNotices).toHaveBeenCalledWith('tab-bg', conversation);
+    expect(host.refreshBackgroundTaskCompletionNotices).toHaveBeenCalledWith('tab-bg', conversation);
     expect(host.syncTabStreamLikeState).toHaveBeenCalledWith('tab-bg');
     expect(host.setTabNeedsAttention).toHaveBeenCalledWith('tab-bg', true);
   });
@@ -242,8 +240,7 @@ describe('BackgroundTaskPostSyncCoordinator', () => {
     expect(host.refreshPendingQuestionsForTab).toHaveBeenCalledWith('tab-bg', 'session-1');
     expect(host.refreshTabSessionStatus).not.toHaveBeenCalled();
     expect(host.refreshTabSessionTodos).not.toHaveBeenCalled();
-    expect(host.queueBackgroundTaskCompletionNotices).toHaveBeenCalledWith('tab-bg', conversation);
-    expect(host.flushQueuedBackgroundTaskCompletionNotices).toHaveBeenCalledWith('tab-bg', conversation);
+    expect(host.refreshBackgroundTaskCompletionNotices).toHaveBeenCalledWith('tab-bg', conversation);
     expect(host.setTabNeedsAttention).not.toHaveBeenCalled();
   });
 
@@ -271,8 +268,7 @@ describe('BackgroundTaskPostSyncCoordinator', () => {
       'session-1',
       { suppressErrors: true },
     );
-    expect(host.queueBackgroundTaskCompletionNotices).toHaveBeenCalledWith('tab-bg', conversation);
-    expect(host.flushQueuedBackgroundTaskCompletionNotices).toHaveBeenCalledWith('tab-bg', conversation);
+    expect(host.refreshBackgroundTaskCompletionNotices).toHaveBeenCalledWith('tab-bg', conversation);
     expect(host.setTabNeedsAttention).toHaveBeenCalledWith('tab-bg', true);
   });
 });

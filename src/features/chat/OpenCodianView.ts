@@ -127,6 +127,10 @@ import {
   BackgroundTaskInlinePanelRenderer,
 } from './runtime/BackgroundTaskInlinePanelRenderer';
 import {
+  type BackgroundTaskIndicatorCoordinatorHost,
+  BackgroundTaskIndicatorCoordinator,
+} from './runtime/BackgroundTaskIndicatorCoordinator';
+import {
   type StreamingInlineCardRendererHost,
   StreamingInlineCardRenderer,
 } from './runtime/StreamingInlineCardRenderer';
@@ -691,6 +695,7 @@ export class OpenCodianView extends ItemView {
   private assistantShellRenderer: AssistantShellRenderer;
   private persistedAssistantFooterFinalizer: PersistedAssistantFooterFinalizer;
   private backgroundTaskInlinePanelRenderer: BackgroundTaskInlinePanelRenderer;
+  private backgroundTaskIndicatorCoordinator: BackgroundTaskIndicatorCoordinator;
   private streamingInlineCardRenderer: StreamingInlineCardRenderer;
   private permissionInlineCardRenderer: PermissionInlineCardRenderer;
   private questionInlineCardRenderer: QuestionInlineCardRenderer;
@@ -1615,6 +1620,12 @@ export class OpenCodianView extends ItemView {
       this.backgroundTaskTimelineService,
       this.createBackgroundTaskInlinePanelRendererHost(),
     );
+    this.backgroundTaskIndicatorCoordinator = new BackgroundTaskIndicatorCoordinator(
+      this.backgroundTaskInlinePanelRenderer,
+      this.backgroundTaskTimelineService,
+      this.backgroundTaskCompletionNoticeService,
+      this.createBackgroundTaskIndicatorCoordinatorHost(),
+    );
     this.conversationViewStateService = new ConversationViewStateService(this.createConversationViewStateHost());
     this.conversationRenderService = new ConversationRenderService(this.createConversationRenderHost());
     this.messageSendPreparationService = new MessageSendPreparationService(this.createMessageSendPreparationHost());
@@ -1733,6 +1744,20 @@ export class OpenCodianView extends ItemView {
     };
   }
 
+  private createBackgroundTaskIndicatorCoordinatorHost(): BackgroundTaskIndicatorCoordinatorHost {
+    return {
+      getActiveTabId: () => this.getActiveTabId(),
+      getCurrentConversation: () => this.currentConversation,
+      getTabRuntimeState: (tabId: TabId | null) => this.getTabRuntimeState(tabId),
+      reconcileBackgroundTaskStateFromLiveSignals: (tabId) => {
+        this.reconcileBackgroundTaskStateFromLiveSignals(tabId);
+      },
+      syncTabStreamLikeState: (tabId) => {
+        this.syncTabStreamLikeState(tabId);
+      },
+    };
+  }
+
   private createBackgroundTaskPostSyncCoordinatorHost(): BackgroundTaskPostSyncCoordinatorHost {
     return {
       getCurrentConversationId: () => this.currentConversation?.id ?? null,
@@ -1760,10 +1785,8 @@ export class OpenCodianView extends ItemView {
         this.refreshTabSessionStatus(tabId, sessionId, options),
       refreshTabSessionTodos: (tabId, sessionId, options) =>
         this.refreshTabSessionTodos(tabId, sessionId, options),
-      queueBackgroundTaskCompletionNotices: (tabId, conversation) =>
-        this.queueBackgroundTaskCompletionNotices(tabId, conversation),
-      flushQueuedBackgroundTaskCompletionNotices: (tabId, conversation) =>
-        this.flushQueuedBackgroundTaskCompletionNotices(tabId, conversation),
+      refreshBackgroundTaskCompletionNotices: (tabId, conversation) =>
+        this.backgroundTaskIndicatorCoordinator.queueAndFlushCompletionNotices(tabId, conversation),
       syncTabStreamLikeState: (tabId) => {
         this.syncTabStreamLikeState(tabId);
       },
@@ -6542,38 +6565,7 @@ export class OpenCodianView extends ItemView {
   private async renderBackgroundTaskIndicatorIfNeeded(
     tabId: TabId | null = this.getActiveTabId(),
   ): Promise<void> {
-    const runtime = this.getTabRuntimeState(tabId);
-    if (!runtime) {
-      return;
-    }
-
-    this.reconcileBackgroundTaskStateFromLiveSignals(tabId);
-    await this.backgroundTaskInlinePanelRenderer.render(this.currentConversation, tabId);
-    await this.queueBackgroundTaskCompletionNotices(tabId);
-    await this.flushQueuedBackgroundTaskCompletionNotices(tabId);
-    this.syncTabStreamLikeState(tabId);
-  }
-
-  private async queueBackgroundTaskCompletionNotices(
-    tabId: TabId | null = this.getActiveTabId(),
-    conversation: Conversation | null = this.currentConversation,
-  ): Promise<void> {
-    if (!conversation) {
-      return;
-    }
-
-    this.backgroundTaskCompletionNoticeService.queueNotices(
-      this.collectBackgroundTaskSegments(conversation.messages, tabId),
-      tabId,
-      conversation,
-    );
-  }
-
-  private async flushQueuedBackgroundTaskCompletionNotices(
-    tabId: TabId | null = this.getActiveTabId(),
-    conversation: Conversation | null = this.currentConversation,
-  ): Promise<void> {
-    await this.backgroundTaskCompletionNoticeService.flushQueuedNotices(tabId, conversation);
+    await this.backgroundTaskIndicatorCoordinator.renderIfNeeded(tabId);
   }
 
   /** Render a content block using the same renderers as streaming */

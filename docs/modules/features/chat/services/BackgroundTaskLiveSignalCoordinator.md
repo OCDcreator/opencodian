@@ -11,7 +11,7 @@
 - 在 session todo/status live signal 到来时，根据 hydration、authoritative-sync、grace period 与 pending launch 状态决定是否继续保留 indicator
 - 当后台任务已经明显 stale 时，协调 stopped notice 追加请求与 indicator reset 的触发时机
 
-它不负责 background task timeline 推导、inline panel DOM 渲染、post-sync completion notice 编排，也不直接操作 notice 内容；这些能力现在由 `BackgroundTaskTimelineService`、`BackgroundTaskInlinePanelRenderer`、`BackgroundTaskPostSyncCoordinator`、`BackgroundTaskNoticeStateService` 和 `BackgroundTaskCompletionNoticeService` 分别承接。
+它不负责 background task timeline 推导、inline panel DOM 渲染、post-sync completion notice 编排，也不直接操作 notice 内容；这些能力现在由 `BackgroundTaskTimelineService`、`BackgroundTaskInlinePanelRenderer`、`BackgroundTaskIndicatorCoordinator`、`BackgroundTaskPostSyncCoordinator`、`BackgroundTaskNoticeStateService` 和 `BackgroundTaskCompletionNoticeService` 分别承接。
 
 ## 公开接口
 
@@ -55,6 +55,7 @@ export class BackgroundTaskLiveSignalCoordinator {
 
 - `BackgroundTaskTimelineService` 负责 background task segment/timeline 推导
 - `BackgroundTaskInlinePanelRenderer` 负责 inline panel DOM 渲染
+- `BackgroundTaskIndicatorCoordinator` 负责 live-signal reconcile 后的 inline render 与 completion notice queue/flush 顺序
 - `OpenCodianView` 负责具体 notice / reset host bridge，以及这组 background-task helper 的上层触发
 - `BackgroundTaskPostSyncCoordinator` 负责 hidden signal/background-tab sync 后的 question/todo/background-task post-sync orchestration
 - `BackgroundTaskLiveSignalCoordinator` 只负责 authoritative-sync runtime gate 与 live-signal reconciliation 决策
