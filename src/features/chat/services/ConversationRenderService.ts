@@ -4,52 +4,44 @@ import {
 } from '../../../core/types';
 import type { TabId } from '../tabs';
 import {
+  captureElementScrollRestoreSnapshot,
+  isElementNearBottom,
+  restoreElementScrollAfterRender,
+  type ScrollRuntimeState,
+} from './ScrollManager';
+import {
+  emitTrailingAssistantPatchCompletionDebugLog,
+  emitTrailingAssistantPatchSkippedDebugLog,
+} from './TrailingAssistantPatchDebugLogEmitterHelper';
+import {
   buildTrailingAssistantPatchCompletionDebugLoggingContext,
   buildTrailingAssistantPatchSkippedDebugLoggingContext,
   buildTrailingAssistantPatchSkippedDebugPlanningContext,
 } from './TrailingAssistantPatchDebugLoggingContextHelper';
 import {
-  emitTrailingAssistantPatchCompletionDebugLog,
-  emitTrailingAssistantPatchSkippedDebugLog,
-} from './TrailingAssistantPatchDebugLogEmitterHelper';
-import { buildTrailingAssistantPatchCompletionDebugPlanFromTailOutcomePlanningContext } from './TrailingAssistantPatchCompletionDebugTailOutcomePlanHelper';
+  buildTrailingAssistantPatchExecutionPlan,
+  type TrailingAssistantPatchExecutionPlan,
+} from './TrailingAssistantPatchExecutionPlanHelper';
 import {
-  applyTrailingAssistantPatchTailState,
-} from './TrailingAssistantPatchTailStateApplierHelper';
-import { buildTrailingAssistantPatchTailStatePlanFromTailOutcomePlanningContext } from './TrailingAssistantPatchTailStateTailOutcomePlanHelper';
+  buildTrailingAssistantPatchExecutionTailPlanningContext,
+  type TrailingAssistantPatchExecutionTailPlanningContext,
+} from './TrailingAssistantPatchExecutionTailPlanningContextHelper';
+import { buildTrailingAssistantPatchExecutionTailPlanParts } from './TrailingAssistantPatchExecutionTailPlanPartsHelper';
 import {
   buildTrailingAssistantPatchSuccessPlanFromParts,
   type TrailingAssistantPatchSuccessPlan,
   type TrailingAssistantPatchSuccessPlanParts,
 } from './TrailingAssistantPatchSuccessPlanHelper';
 import {
-  buildTrailingAssistantPatchExecutionPlan,
-  type TrailingAssistantPatchExecutionPlan,
-} from './TrailingAssistantPatchExecutionPlanHelper';
-import { buildTrailingAssistantPatchExecutionTailPlanParts } from './TrailingAssistantPatchExecutionTailPlanPartsHelper';
+  buildTrailingAssistantPatchTailOutcomePlansFromExecutionTailPlanningContext,
+} from './TrailingAssistantPatchTailOutcomeExecutionTailPlanHelper';
+import {
+  applyTrailingAssistantPatchTailState,
+} from './TrailingAssistantPatchTailStateApplierHelper';
 import {
   withTrailingAssistantTurnBodyScope,
 } from './TrailingAssistantPatchTurnBodyScopeHelper';
-import {
-  buildTrailingAssistantPatchExecutionTailPlanningContext,
-  type TrailingAssistantPatchExecutionTailPlanningContext,
-} from './TrailingAssistantPatchExecutionTailPlanningContextHelper';
-import {
-  buildTrailingAssistantPatchTailOutcomePlanningContext,
-  type TrailingAssistantPatchTailOutcomePlanningContext,
-} from './TrailingAssistantPatchTailOutcomePlanningContextHelper';
-import {
-  buildTrailingAssistantPatchTailOutcomePlans,
-  type TrailingAssistantPatchTailOutcomePlanParts,
-  type TrailingAssistantPatchTailOutcomePlans,
-} from './TrailingAssistantPatchTailOutcomePlanHelper';
 import { buildTrailingAssistantPatchTurnBodyScopePlan } from './TrailingAssistantPatchTurnBodyScopePlanHelper';
-import {
-  captureElementScrollRestoreSnapshot,
-  isElementNearBottom,
-  restoreElementScrollAfterRender,
-  type ScrollRuntimeState,
-} from './ScrollManager';
 
 export interface IncrementalRenderedMessageUpdate {
   appendedRenderedMessages: ChatMessage[];
@@ -639,10 +631,13 @@ export class ConversationRenderService {
           this.buildTrailingAssistantPatchExecutionPlanFromExecutionTailPlanningContext(
             executionTailPlanningContext,
           ),
-        tailOutcomePlans:
-          this.buildTrailingAssistantPatchTailOutcomePlansFromExecutionTailPlanningContext(
-            executionTailPlanningContext,
-          ),
+        tailOutcomePlans: buildTrailingAssistantPatchTailOutcomePlansFromExecutionTailPlanningContext(
+          {
+            planningContext: executionTailPlanningContext,
+            summarizeChatMessageForDebug: (message) =>
+              this.host.summarizeChatMessageForDebug(message),
+          },
+        ),
       }),
     };
   }
@@ -675,33 +670,6 @@ export class ConversationRenderService {
         planningContext.nextTailMessage,
       ),
     });
-  }
-
-  private buildTrailingAssistantPatchTailOutcomePlansFromExecutionTailPlanningContext(
-    planningContext: TrailingAssistantPatchExecutionTailPlanningContext,
-  ): TrailingAssistantPatchTailOutcomePlans {
-    return buildTrailingAssistantPatchTailOutcomePlans(
-      this.buildTrailingAssistantPatchTailOutcomePlanParts(
-        buildTrailingAssistantPatchTailOutcomePlanningContext(planningContext),
-      ),
-    );
-  }
-
-  private buildTrailingAssistantPatchTailOutcomePlanParts(
-    planningContext: TrailingAssistantPatchTailOutcomePlanningContext,
-  ): TrailingAssistantPatchTailOutcomePlanParts {
-    const tailStatePlan =
-      buildTrailingAssistantPatchTailStatePlanFromTailOutcomePlanningContext(planningContext);
-    return {
-      tailStatePlan,
-      completionDebugPlan:
-        buildTrailingAssistantPatchCompletionDebugPlanFromTailOutcomePlanningContext({
-          planningContext,
-          tailStatePlan,
-          summarizeChatMessageForDebug: (message) =>
-            this.host.summarizeChatMessageForDebug(message),
-        }),
-    };
   }
 
   private async executeTrailingAssistantPatch(

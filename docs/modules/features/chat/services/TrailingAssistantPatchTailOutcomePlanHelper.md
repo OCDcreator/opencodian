@@ -33,6 +33,6 @@ export function buildTrailingAssistantPatchTailOutcomePlans(
 
 ## 与其他模块的关系
 
-- `ConversationRenderService` 现在先分别生成 `tailStatePlan` 与 `completionDebugPlan`，再把最终 shape 装配委托给这里
+- `TrailingAssistantPatchTailOutcomeExecutionTailPlanHelper` 现在先分别生成 `tailStatePlan` 与 `completionDebugPlan`，再把最终 shape 装配委托给这里
 - `TrailingAssistantPatchTailOutcomePlanningContextHelper` 继续负责把 execution-tail planning-context 缩成 tail-outcome 专用 contract
 - `TrailingAssistantPatchTailStatePlanningContextHelper` 与 `TrailingAssistantPatchCompletionDebugPlanningContextHelper` 仍分别负责各自下游 plan 的输入收束

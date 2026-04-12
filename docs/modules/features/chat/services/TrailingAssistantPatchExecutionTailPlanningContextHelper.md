@@ -45,6 +45,6 @@ export function buildTrailingAssistantPatchExecutionTailPlanningContext(
 
 - `ConversationRenderService` 现在直接把 success `planningContext` 交给这里，不再在 service 内自行拼装 execution-tail inputs 或 planning-context
 - `ConversationRenderService` 里的 `buildTrailingAssistantPatchExecutionPlanFromExecutionTailPlanningContext()` 现在只负责基于这里返回的窄 context 做正文签名比较，再把最终 execution-plan shape 委托给 `TrailingAssistantPatchExecutionPlanHelper`
-- `ConversationRenderService` 里的 `buildTrailingAssistantPatchTailOutcomePlansFromExecutionTailPlanningContext()` 继续消费这里返回的窄 context
+- `TrailingAssistantPatchTailOutcomeExecutionTailPlanHelper` 继续消费这里返回的窄 context，并把它下沉到 tail-outcome 子链
 - 当 `executionPlan` 与 `tailOutcomePlans` 都已预建后，service 会再把二者交给 `TrailingAssistantPatchExecutionTailPlanPartsHelper` 收口成 execution/tail plan-parts
 - 下一步若继续拆分 execution/tail 链路，可以继续沿着这里返回的窄 contract 抽离更细的子计划编排
