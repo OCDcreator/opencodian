@@ -44,7 +44,7 @@ export function buildTrailingAssistantPatchCompletionDebugPlanningContext(
 
 - `ConversationRenderService` 现在先通过 `TrailingAssistantPatchCompletionDebugPlanningContextSourceHelper` 装配 source，再把结果交给这里，不再在 service 内部展开 completion-debug source 字段
 - `TrailingAssistantPatchTailOutcomePlanningContextHelper` 继续负责收束 tail messages、`messageEl` 与 `shouldStickToBottom` 的共享 tail-outcome contract；本 helper 再把它进一步缩成 completion-debug 专用 contract
-- `TrailingAssistantPatchCompletionDebugPlanningContextSourceHelper` 负责把 tail-outcome `planningContext`、`tailStatePlan` 与摘要函数拼成这里消费的 source
+- `TrailingAssistantPatchCompletionDebugPlanningContextSourceContractHelper` 负责定义并装配这里消费的稳定 completion-debug source contract，`TrailingAssistantPatchCompletionDebugPlanningContextSourceHelper` 继续保留 service 侧桥接入口
 - `TrailingAssistantPatchCompletionDebugSummaryPlanHelper` 负责把 source 中的 tail messages 与摘要函数进一步收束成 `summaryPlan`
 - `TrailingAssistantPatchCompletionDebugPlanningContextShapeHelper` 负责把已经收窄的 `shouldStickToBottom` 与 `summaryPlan` 组装成最终 planning-context shape
 - `TrailingAssistantPatchCompletionDebugPlanHelper` 继续消费这里返回的窄 planning-context，并把最终 `completionDebugPlan` 交给 logging-context / emitter helper 链使用

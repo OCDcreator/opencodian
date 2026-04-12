@@ -1,25 +1,15 @@
-import type { TrailingAssistantPatchTailOutcomePlanningContext } from './TrailingAssistantPatchTailOutcomePlanningContextHelper';
 import {
   buildTrailingAssistantPatchCompletionDebugPlanningContextShape,
   type TrailingAssistantPatchCompletionDebugPlanningContext,
   type TrailingAssistantPatchCompletionDebugPlanningContextShapeInputs,
 } from './TrailingAssistantPatchCompletionDebugPlanningContextShapeHelper';
+import type { TrailingAssistantPatchCompletionDebugPlanningContextSource } from './TrailingAssistantPatchCompletionDebugPlanningContextSourceContractHelper';
 import {
   buildTrailingAssistantPatchCompletionDebugSummaryPlan,
-  type TrailingAssistantPatchCompletionDebugMessageSummarizer,
 } from './TrailingAssistantPatchCompletionDebugSummaryPlanHelper';
 
-type TrailingAssistantPatchCompletionDebugTailStatePlan = {
-  shouldStickToBottom: boolean;
-};
-
-export type TrailingAssistantPatchCompletionDebugPlanningContextSource =
-  TrailingAssistantPatchTailOutcomePlanningContext & {
-    tailStatePlan: TrailingAssistantPatchCompletionDebugTailStatePlan;
-    summarizeChatMessageForDebug: TrailingAssistantPatchCompletionDebugMessageSummarizer;
-  };
-
 export type { TrailingAssistantPatchCompletionDebugPlanningContext } from './TrailingAssistantPatchCompletionDebugPlanningContextShapeHelper';
+export type { TrailingAssistantPatchCompletionDebugPlanningContextSource } from './TrailingAssistantPatchCompletionDebugPlanningContextSourceContractHelper';
 
 export function buildTrailingAssistantPatchCompletionDebugPlanningContext(
   source: TrailingAssistantPatchCompletionDebugPlanningContextSource,
