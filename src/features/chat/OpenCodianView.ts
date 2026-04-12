@@ -267,14 +267,16 @@ import {
 import {
   createQuestionTodoBackgroundTaskActivationServices,
   createQuestionTodoBackgroundTaskActivationViewHostAdapter,
-  type QuestionTodoBackgroundTaskActivationViewHostAdapterHost,
 } from './services/QuestionTodoBackgroundTaskActivationHostAdapter';
 import {
   createQuestionTodoBackgroundTaskRefreshServices,
   createQuestionTodoBackgroundTaskRefreshViewHostAdapter,
-  type QuestionTodoBackgroundTaskRefreshViewHostAdapterHost,
 } from './services/QuestionTodoBackgroundTaskRefreshHostAdapter';
 import type { QuestionTodoStatusRefreshCoordinator } from './services/QuestionTodoStatusRefreshCoordinator';
+import {
+  createQuestionTodoBackgroundTaskViewHosts,
+  type QuestionTodoBackgroundTaskViewHostFactoryHost,
+} from './services/QuestionTodoBackgroundTaskViewHostFactory';
 import {
   isElementNearBottom,
   scrollElementToBottom,
@@ -1111,12 +1113,15 @@ export class OpenCodianView extends ItemView {
         this.questionDockCoordinator.render();
       },
     );
+    const questionTodoBackgroundTaskViewHosts = createQuestionTodoBackgroundTaskViewHosts(
+      this.createQuestionTodoBackgroundTaskViewHostFactoryHost(),
+    );
     const {
       questionTodoStatusRefreshCoordinator,
       backgroundTaskPostSyncCoordinator,
     } = createQuestionTodoBackgroundTaskRefreshServices(
       createQuestionTodoBackgroundTaskRefreshViewHostAdapter({
-        viewHost: this.createQuestionTodoBackgroundTaskRefreshViewHostAdapterHost(),
+        viewHost: questionTodoBackgroundTaskViewHosts.refreshViewHostAdapterHost,
         getQuestionDockCoordinator: () => this.questionDockCoordinator,
         getSessionTodoStateService: () => this.sessionTodoStateService,
         getSessionTodoStatusRefreshService: () => this.sessionTodoStatusRefreshService,
@@ -1132,7 +1137,7 @@ export class OpenCodianView extends ItemView {
       backgroundTaskActivationIndicatorCoordinator,
     } = createQuestionTodoBackgroundTaskActivationServices(
       createQuestionTodoBackgroundTaskActivationViewHostAdapter({
-        viewHost: this.createQuestionTodoBackgroundTaskActivationViewHostAdapterHost(),
+        viewHost: questionTodoBackgroundTaskViewHosts.activationViewHostAdapterHost,
         getQuestionDockSlotCoordinator: () => this.questionDockSlotCoordinator,
         getSessionTodoDockCoordinator: () => this.sessionTodoDockCoordinator,
       }),
@@ -1370,13 +1375,10 @@ export class OpenCodianView extends ItemView {
     };
   }
 
-  private createQuestionTodoBackgroundTaskRefreshViewHostAdapterHost(): QuestionTodoBackgroundTaskRefreshViewHostAdapterHost {
+  private createQuestionTodoBackgroundTaskViewHostFactoryHost(): QuestionTodoBackgroundTaskViewHostFactoryHost {
     return {
       getCurrentConversation: () => this.currentConversation,
       getTabRuntimeState: (tabId: TabId | null) => this.getTabRuntimeState(tabId),
-      syncBackgroundTaskStateFromConversation: (conversation, tabId) => {
-        this.syncBackgroundTaskStateFromConversation(conversation, tabId);
-      },
       setCurrentConversationRevertState: (revertState) => {
         this.currentConversationRevertState = revertState;
       },
@@ -1386,6 +1388,17 @@ export class OpenCodianView extends ItemView {
           runtime.lastConversationSyncFingerprint = fingerprint;
         }
       },
+      renderSessionTodoDock: (tabId) => {
+        this.renderSessionTodoDock(tabId);
+      },
+      resetBackgroundTaskIndicator: () => {
+        this.resetBackgroundTaskIndicator();
+      },
+      syncBackgroundTaskStateFromConversation: (conversation, tabId) => {
+        this.syncBackgroundTaskStateFromConversation(conversation, tabId);
+      },
+      renderBackgroundTaskIndicatorIfNeeded: (tabId) =>
+        this.renderBackgroundTaskIndicatorIfNeeded(tabId),
     };
   }
 
@@ -1514,23 +1527,6 @@ export class OpenCodianView extends ItemView {
       scheduleSettledScrollToBottom: (tabId) => {
         this.scheduleSettledScrollToBottom(tabId);
       },
-    };
-  }
-
-  private createQuestionTodoBackgroundTaskActivationViewHostAdapterHost(): QuestionTodoBackgroundTaskActivationViewHostAdapterHost {
-    return {
-      getCurrentConversation: () => this.currentConversation,
-      renderSessionTodoDock: (tabId) => {
-        this.renderSessionTodoDock(tabId);
-      },
-      resetBackgroundTaskIndicator: () => {
-        this.resetBackgroundTaskIndicator();
-      },
-      syncBackgroundTaskStateFromConversation: (conversation, tabId) => {
-        this.syncBackgroundTaskStateFromConversation(conversation, tabId);
-      },
-      renderBackgroundTaskIndicatorIfNeeded: (tabId) =>
-        this.renderBackgroundTaskIndicatorIfNeeded(tabId),
     };
   }
 

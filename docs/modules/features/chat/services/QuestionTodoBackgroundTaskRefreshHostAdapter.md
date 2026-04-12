@@ -51,6 +51,7 @@ export function createQuestionTodoBackgroundTaskRefreshServices(...): QuestionTo
 ### shared host assembly
 
 - `createQuestionTodoBackgroundTaskRefreshViewHostAdapter()` 把 view-local state/read-write 落点与 question dock、session todo state/status refresh、background-task indicator/live-signal、tab runtime bridge 这些 late-bound ports 组合成完整 view host
+- 这一层现在通常会先接收 `QuestionTodoBackgroundTaskViewHostFactory` 派生出的 `refreshViewHostAdapterHost`，把 `OpenCodianView` 里 activation/post-sync 共用的 conversation/background-task writeback seam 再进一步与 refresh-side late-bound ports 组合起来
 - late-bound getter 让 adapter 可以在 `OpenCodianView` 构造期提前创建 post-sync service bundle，同时仍安全引用稍后才初始化的 background-task / tab runtime collaborators
 - `createQuestionTodoBackgroundTaskRefreshHosts()` 从同一份 view host 派生四组 host 外加一条 dedicated post-sync refresh port，避免 `OpenCodianView` 继续维护多段闭包工厂和额外 background-task effect wiring
 - `PostSyncQuestionTodoRefreshFacade` 所需的当前 conversation session 与 `VisibleConversationPostSyncStateCoordinator` 所需的当前 conversation id，都从同一份 `getCurrentConversation()` 推导
@@ -67,5 +68,6 @@ export function createQuestionTodoBackgroundTaskRefreshServices(...): QuestionTo
 ## 与 `OpenCodianView` 的边界
 
 - `OpenCodianView` 现在只提供更窄的 `QuestionTodoBackgroundTaskRefreshViewHostAdapterHost` 与 collaborator getters，不再直接组装完整 `QuestionTodoBackgroundTaskRefreshViewHost`
+- activation/post-sync 共用的 conversation/runtime writeback host 现在先由 `QuestionTodoBackgroundTaskViewHostFactory` 收束，再交给本模块继续扩成 refresh-side host
 - `QuestionTodoStatusRefreshCoordinator`、`PostSyncQuestionTodoRefreshFacade`、`VisibleConversationPostSyncStateCoordinator` 与 `BackgroundTaskPostSyncCoordinator` 的业务边界保持分离
 - 这次切片推进的是 master plan 的 P2 `question / todo / background task` lane：继续削弱 `OpenCodianView` 对 question/todo/background-task post-sync wiring 和 visible sync state-commit bridge 的直接 ownership
