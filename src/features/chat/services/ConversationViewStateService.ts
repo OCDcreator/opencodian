@@ -80,15 +80,12 @@ export interface ConversationViewStateHost {
   commitConversationSyncBaseline(messages: ChatMessage[]): void;
   scrollToBottom(options: { tabId: TabId | null }): void;
   syncPaneScrollMetrics(tabId: TabId | null, messagesEl: HTMLElement): void;
-  scheduleComposerLayoutSync(): void;
-  updateModelSelectorDisplay(): void;
-  syncActiveTabContextUsageIdentity(): void;
-  refreshActiveTabContextUsageFromServer(): Promise<void>;
   endConversationHydration(tabId: TabId | null): void;
   requestAnimationFrame(callback: FrameRequestCallback): number;
 }
 
-type TabViewActivationPort = Pick<TabViewActivationBridge, 'applyActivationPreflight'>;
+type TabViewActivationPort =
+  Pick<TabViewActivationBridge, 'applyActivationPreflight' | 'applyLoadedConversationHydrationTail'>;
 
 export class ConversationViewStateService {
   constructor(
@@ -260,10 +257,7 @@ export class ConversationViewStateService {
         });
       }
 
-      this.host.scheduleComposerLayoutSync();
-      this.host.updateModelSelectorDisplay();
-      this.host.syncActiveTabContextUsageIdentity();
-      await this.host.refreshActiveTabContextUsageFromServer();
+      await this.tabViewActivationBridge.applyLoadedConversationHydrationTail();
     } finally {
       this.host.endConversationHydration(activeTabId);
     }

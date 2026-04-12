@@ -22,12 +22,14 @@ describe('TabViewActivationBridge', () => {
       renderSessionTodoDock: jest.fn(() => {
         callOrder.push('render-todo');
       }),
+      scheduleComposerLayoutSync: jest.fn(),
       updateModelSelectorDisplay: jest.fn(() => {
         callOrder.push('selector');
       }),
       syncActiveTabContextUsageIdentity: jest.fn(() => {
         callOrder.push('context');
       }),
+      refreshActiveTabContextUsageFromServer: jest.fn().mockResolvedValue(undefined),
       refreshTabSessionStatus: jest.fn(() => {
         callOrder.push('status');
         return Promise.resolve(null);
@@ -65,12 +67,14 @@ describe('TabViewActivationBridge', () => {
       renderSessionTodoDock: jest.fn(() => {
         callOrder.push('todo');
       }),
+      scheduleComposerLayoutSync: jest.fn(),
       updateModelSelectorDisplay: jest.fn(() => {
         callOrder.push('selector');
       }),
       syncActiveTabContextUsageIdentity: jest.fn(() => {
         callOrder.push('context');
       }),
+      refreshActiveTabContextUsageFromServer: jest.fn().mockResolvedValue(undefined),
       refreshTabSessionStatus: jest.fn(() => {
         callOrder.push('status');
         return Promise.resolve(null);
@@ -119,12 +123,14 @@ describe('TabViewActivationBridge', () => {
       renderSessionTodoDock: jest.fn(() => {
         callOrder.push('todo');
       }),
+      scheduleComposerLayoutSync: jest.fn(),
       updateModelSelectorDisplay: jest.fn(() => {
         callOrder.push('selector');
       }),
       syncActiveTabContextUsageIdentity: jest.fn(() => {
         callOrder.push('context');
       }),
+      refreshActiveTabContextUsageFromServer: jest.fn().mockResolvedValue(undefined),
       refreshTabSessionStatus: jest.fn().mockResolvedValue(null),
       refreshPendingQuestionsForTab: jest.fn().mockResolvedValue([]),
       refreshTabSessionTodos: jest.fn().mockResolvedValue([]),
@@ -141,5 +147,41 @@ describe('TabViewActivationBridge', () => {
     expect(host.refreshPendingQuestionsForTab).not.toHaveBeenCalled();
     expect(host.refreshTabSessionTodos).not.toHaveBeenCalled();
     expect(callOrder).toEqual(['todo', 'question', 'selector', 'context', 'send']);
+  });
+
+  it('applies loaded-conversation hydration tail refreshes in order', async () => {
+    const callOrder: string[] = [];
+    const host: jest.Mocked<TabViewActivationBridgeHost> = {
+      setActiveMessagesPane: jest.fn(),
+      refreshActiveFocusContextPreview: jest.fn(),
+      renderQuestionDock: jest.fn(),
+      updateSessionTodoDockForTab: jest.fn(),
+      renderSessionTodoDock: jest.fn(),
+      scheduleComposerLayoutSync: jest.fn(() => {
+        callOrder.push('layout');
+      }),
+      updateModelSelectorDisplay: jest.fn(() => {
+        callOrder.push('selector');
+      }),
+      syncActiveTabContextUsageIdentity: jest.fn(() => {
+        callOrder.push('context');
+      }),
+      refreshActiveTabContextUsageFromServer: jest.fn(() => {
+        callOrder.push('fetch-context');
+        return Promise.resolve(undefined);
+      }),
+      refreshTabSessionStatus: jest.fn().mockResolvedValue(null),
+      refreshPendingQuestionsForTab: jest.fn().mockResolvedValue([]),
+      refreshTabSessionTodos: jest.fn().mockResolvedValue([]),
+      updateSendButtonState: jest.fn(),
+    };
+    const bridge = new TabViewActivationBridge(host);
+
+    await bridge.applyLoadedConversationHydrationTail();
+
+    expect(host.refreshTabSessionStatus).not.toHaveBeenCalled();
+    expect(host.refreshPendingQuestionsForTab).not.toHaveBeenCalled();
+    expect(host.refreshTabSessionTodos).not.toHaveBeenCalled();
+    expect(callOrder).toEqual(['layout', 'selector', 'context', 'fetch-context']);
   });
 });

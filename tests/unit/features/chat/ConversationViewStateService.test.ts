@@ -110,10 +110,6 @@ function createHost(
     commitConversationSyncBaseline: jest.fn(),
     scrollToBottom: jest.fn(),
     syncPaneScrollMetrics: jest.fn(),
-    scheduleComposerLayoutSync: jest.fn(),
-    updateModelSelectorDisplay: jest.fn(),
-    syncActiveTabContextUsageIdentity: jest.fn(),
-    refreshActiveTabContextUsageFromServer: jest.fn().mockResolvedValue(undefined),
     endConversationHydration: jest.fn(),
     requestAnimationFrame: jest.fn().mockImplementation((callback: FrameRequestCallback) => {
       callback(0);
@@ -130,8 +126,10 @@ function createActivationBridge() {
     renderQuestionDock: jest.fn(),
     updateSessionTodoDockForTab: jest.fn(),
     renderSessionTodoDock: jest.fn(),
+    scheduleComposerLayoutSync: jest.fn(),
     updateModelSelectorDisplay: jest.fn(),
     syncActiveTabContextUsageIdentity: jest.fn(),
+    refreshActiveTabContextUsageFromServer: jest.fn().mockResolvedValue(undefined),
     refreshTabSessionStatus: jest.fn().mockResolvedValue(null),
     refreshPendingQuestionsForTab: jest.fn().mockResolvedValue([]),
     refreshTabSessionTodos: jest.fn().mockResolvedValue([]),
@@ -225,6 +223,7 @@ describe('ConversationViewStateService', () => {
     const { bridge } = createActivationBridge();
     const service = new ConversationViewStateService(host, bridge);
     const messagesEl = host.getMessagesContainer();
+    const hydrationTailSpy = jest.spyOn(bridge, 'applyLoadedConversationHydrationTail');
 
     await service.loadConversation(conversation.id, {
       preserveScrollPosition: true,
@@ -238,6 +237,7 @@ describe('ConversationViewStateService', () => {
     expect(captureElementScrollRestoreSnapshot).toHaveBeenCalledWith(messagesEl, false, 120);
     expect(restoreElementScrollAfterRender).toHaveBeenCalled();
     expect(host.syncPaneScrollMetrics).toHaveBeenCalledWith('tab-1', messagesEl);
+    expect(hydrationTailSpy).toHaveBeenCalledTimes(1);
     expect(host.endConversationHydration).toHaveBeenCalledWith('tab-1');
     expect(messagesEl?.classList.contains('is-rehydrating')).toBe(false);
   });

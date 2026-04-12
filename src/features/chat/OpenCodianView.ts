@@ -1746,12 +1746,16 @@ export class OpenCodianView extends ItemView {
       renderSessionTodoDock: (tabId) => {
         this.renderSessionTodoDock(tabId);
       },
+      scheduleComposerLayoutSync: () => {
+        this.scheduleComposerLayoutSync();
+      },
       updateModelSelectorDisplay: () => {
         this.updateModelSelectorDisplay();
       },
       syncActiveTabContextUsageIdentity: () => {
         this.syncActiveTabContextUsageIdentity();
       },
+      refreshActiveTabContextUsageFromServer: () => this.refreshActiveTabContextUsageFromServer(),
       refreshTabSessionStatus: (tabId, sessionId, options) =>
         this.refreshTabSessionStatus(tabId, sessionId ?? undefined, options),
       refreshPendingQuestionsForTab: (tabId, sessionId) =>
@@ -2029,16 +2033,6 @@ export class OpenCodianView extends ItemView {
       syncPaneScrollMetrics: (tabId, messagesEl) => {
         this.syncPaneScrollMetrics(tabId, messagesEl);
       },
-      scheduleComposerLayoutSync: () => {
-        this.scheduleComposerLayoutSync();
-      },
-      updateModelSelectorDisplay: () => {
-        this.updateModelSelectorDisplay();
-      },
-      syncActiveTabContextUsageIdentity: () => {
-        this.syncActiveTabContextUsageIdentity();
-      },
-      refreshActiveTabContextUsageFromServer: () => this.refreshActiveTabContextUsageFromServer(),
       endConversationHydration: (tabId) => {
         this.endConversationHydration(tabId);
       },

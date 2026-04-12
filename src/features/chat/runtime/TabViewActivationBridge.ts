@@ -8,8 +8,10 @@ export interface TabViewActivationBridgeHost {
   renderQuestionDock(): void;
   updateSessionTodoDockForTab(tabId: TabId): void;
   renderSessionTodoDock(tabId: TabId): void;
+  scheduleComposerLayoutSync(): void;
   updateModelSelectorDisplay(): void;
   syncActiveTabContextUsageIdentity(): void;
+  refreshActiveTabContextUsageFromServer(): Promise<void>;
   refreshTabSessionStatus(
     tabId: TabId,
     sessionId: string | null,
@@ -51,5 +53,12 @@ export class TabViewActivationBridge {
     this.host.updateModelSelectorDisplay();
     this.host.syncActiveTabContextUsageIdentity();
     this.host.updateSendButtonState();
+  }
+
+  async applyLoadedConversationHydrationTail(): Promise<void> {
+    this.host.scheduleComposerLayoutSync();
+    this.host.updateModelSelectorDisplay();
+    this.host.syncActiveTabContextUsageIdentity();
+    await this.host.refreshActiveTabContextUsageFromServer();
   }
 }
