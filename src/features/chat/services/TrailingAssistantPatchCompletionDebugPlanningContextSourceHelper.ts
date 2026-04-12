@@ -1,7 +1,7 @@
 import type {
-  TrailingAssistantPatchCompletionDebugMessageSummarizer,
   TrailingAssistantPatchCompletionDebugPlanningContextSource,
 } from './TrailingAssistantPatchCompletionDebugPlanningContextHelper';
+import type { TrailingAssistantPatchCompletionDebugMessageSummarizer } from './TrailingAssistantPatchCompletionDebugSummaryPlanHelper';
 import type { TrailingAssistantPatchTailOutcomePlanningContext } from './TrailingAssistantPatchTailOutcomePlanningContextHelper';
 
 export type TrailingAssistantPatchCompletionDebugPlanningContextSourceParts = {

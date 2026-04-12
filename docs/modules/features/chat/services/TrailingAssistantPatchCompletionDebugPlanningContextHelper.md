@@ -8,7 +8,7 @@
 `TrailingAssistantPatchCompletionDebugPlanningContextHelper` 把 trailing-assistant tail-outcome 路径里 completion-debug planning-context 的纯装配从 `ConversationRenderService` 抽成了独立 helper：
 
 - 接收已经由 source helper 组好的 tail-outcome planning-context 风格 source：tail messages、`messageEl`、`shouldStickToBottom`、`tailStatePlan` 与消息摘要函数
-- 在 helper 内部改为读取 `tailStatePlan.shouldStickToBottom`，并统一调用消息摘要函数收束 `summaryPlan`
+- 在 helper 内部改为读取 `tailStatePlan.shouldStickToBottom`，并把 tail-message summary 委托给 `TrailingAssistantPatchCompletionDebugSummaryPlanHelper`
 - 保持下游 `TrailingAssistantPatchCompletionDebugPlanHelper.buildTrailingAssistantPatchCompletionDebugPlan()` 继续消费同一份稳定的 completion-debug contract
 
 它不负责最终 `completionDebugPlan` shape、不处理 tail-state plan，也不发送任何 debug 日志；只负责 completion-debug planning-context 的纯输入收口。
@@ -44,4 +44,5 @@ export function buildTrailingAssistantPatchCompletionDebugPlanningContext(
 - `ConversationRenderService` 现在先通过 `TrailingAssistantPatchCompletionDebugPlanningContextSourceHelper` 装配 source，再把结果交给这里，不再在 service 内部展开 completion-debug source 字段
 - `TrailingAssistantPatchTailOutcomePlanningContextHelper` 继续负责收束 tail messages、`messageEl` 与 `shouldStickToBottom` 的共享 tail-outcome contract；本 helper 再把它进一步缩成 completion-debug 专用 contract
 - `TrailingAssistantPatchCompletionDebugPlanningContextSourceHelper` 负责把 tail-outcome `planningContext`、`tailStatePlan` 与摘要函数拼成这里消费的 source
+- `TrailingAssistantPatchCompletionDebugSummaryPlanHelper` 负责把 source 中的 tail messages 与摘要函数进一步收束成 `summaryPlan`
 - `TrailingAssistantPatchCompletionDebugPlanHelper` 继续消费这里返回的窄 planning-context，并把最终 `completionDebugPlan` 交给 logging-context / emitter helper 链使用
