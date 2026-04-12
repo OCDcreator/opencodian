@@ -150,6 +150,11 @@ import {
   BackgroundTaskNoticeStateService,
 } from './services/BackgroundTaskNoticeStateService';
 import {
+  type BackgroundTaskLiveSignalCoordinatorHost,
+  type BackgroundTaskLiveSignalLaunchInfo,
+  BackgroundTaskLiveSignalCoordinator,
+} from './services/BackgroundTaskLiveSignalCoordinator';
+import {
   type ConversationAssistantTailRenderPort,
   type ConversationRenderHost,
   ConversationRenderService,
@@ -452,11 +457,7 @@ function ensureComposerGlassSvgDefs(settings: InputPanelGlassRefractionSvgFilter
 
 type ChatServerAvailability = 'checking' | 'running' | 'starting' | 'offline' | 'external';
 
-interface BackgroundTaskLaunchInfo {
-  launchId: string;
-  taskId: string | null;
-  description: string;
-}
+type BackgroundTaskLaunchInfo = BackgroundTaskLiveSignalLaunchInfo;
 
 interface BackgroundTaskSegment {
   anchorKey: string;
@@ -659,6 +660,7 @@ export class OpenCodianView extends ItemView {
   private sessionTodoStateService: SessionTodoStateService;
   private backgroundTaskCompletionNoticeService: BackgroundTaskCompletionNoticeService;
   private backgroundTaskNoticeStateService: BackgroundTaskNoticeStateService;
+  private backgroundTaskLiveSignalCoordinator: BackgroundTaskLiveSignalCoordinator;
   private conversationViewStateService: ConversationViewStateService;
   private conversationRenderService: ConversationRenderService;
   private messageSendPreparationService: MessageSendPreparationService;
@@ -1588,7 +1590,7 @@ export class OpenCodianView extends ItemView {
 
     runtime.isHydratingConversation = true;
     runtime.pendingLayoutMutations = 0;
-    runtime.backgroundTaskAwaitingAuthoritativeSync = true;
+    this.backgroundTaskLiveSignalCoordinator.armAuthoritativeSyncGate(tabId);
     this.clearScheduledSignalConversationSync(tabId);
   }
 
@@ -1609,72 +1611,11 @@ export class OpenCodianView extends ItemView {
     tabId: TabId | null,
     reason: string,
   ): void {
-    const runtime = this.getTabRuntimeState(tabId);
-    if (
-      !runtime
-      || runtime.isHydratingConversation
-      || !runtime.backgroundTaskAwaitingAuthoritativeSync
-    ) {
-      return;
-    }
-
-    runtime.backgroundTaskAwaitingAuthoritativeSync = false;
-    runtime.backgroundTaskLastAuthoritativeSyncAt = Date.now();
-    logger.debug('Background task authoritative sync ready', {
-      tabId,
-      sessionId: this.getSessionIdForTab(tabId),
-      reason,
-    });
+    this.backgroundTaskLiveSignalCoordinator.markAuthoritativeSync(tabId, reason);
   }
 
   private reconcileBackgroundTaskStateFromLiveSignals(tabId: TabId | null = this.getActiveTabId()): void {
-    const runtime = this.getTabRuntimeState(tabId);
-    if (!runtime || runtime.isStreaming || !runtime.backgroundTaskStartedAt) {
-      return;
-    }
-
-    this.reconcileStaleSessionTodoState(tabId);
-
-    if (runtime.isHydratingConversation || runtime.backgroundTaskAwaitingAuthoritativeSync) {
-      this.syncTabStreamLikeState(tabId);
-      return;
-    }
-
-    const status = this.getTabSessionStatus(tabId, this.getSessionIdForTab(tabId));
-    if (status?.type === 'busy' || status?.type === 'retry') {
-      runtime.backgroundTaskWaitingForFollowUp = runtime.backgroundTaskLaunches.size > 0;
-      this.syncTabStreamLikeState(tabId);
-      return;
-    }
-
-    if (status?.type !== 'idle' && this.hasIncompleteTabSessionTodos(tabId)) {
-      runtime.backgroundTaskWaitingForFollowUp = runtime.backgroundTaskLaunches.size > 0;
-      this.syncTabStreamLikeState(tabId);
-      return;
-    }
-
-    if (this.isBackgroundTaskGracePeriodActive(tabId)) {
-      this.syncTabStreamLikeState(tabId);
-      return;
-    }
-
-    if (runtime.backgroundTaskLaunches.size === 0) {
-      if (runtime.backgroundTaskModeTag === 'search-mode') {
-        this.resetBackgroundTaskIndicator(tabId);
-      }
-      return;
-    }
-
-    const stalePending = this.getPendingBackgroundTaskLaunches(tabId);
-    if (stalePending.length > 0) {
-      void this.appendBackgroundTaskStoppedNotice(tabId, stalePending);
-    }
-    logger.debug('Clearing stale background task indicator after session became idle without incomplete todos', {
-      tabId,
-      sessionId: this.getSessionIdForTab(tabId),
-      launchCount: runtime.backgroundTaskLaunches.size,
-    });
-    this.resetBackgroundTaskIndicator(tabId);
+    this.backgroundTaskLiveSignalCoordinator.reconcileStateFromLiveSignals(tabId);
   }
 
   private async appendBackgroundTaskStoppedNotice(
@@ -1727,6 +1668,9 @@ export class OpenCodianView extends ItemView {
     this.currentThinkingBudget = this.plugin.settings.thinkingBudget;
     this.titleGenerationService = new TitleGenerationService(this.plugin);
     this.sessionTodoStateService = new SessionTodoStateService(this.createSessionTodoStateServiceHost());
+    this.backgroundTaskLiveSignalCoordinator = new BackgroundTaskLiveSignalCoordinator(
+      this.createBackgroundTaskLiveSignalCoordinatorHost(),
+    );
     this.backgroundTaskCompletionNoticeService = new BackgroundTaskCompletionNoticeService(
       this.createBackgroundTaskCompletionNoticeServiceHost(),
     );
@@ -1796,6 +1740,28 @@ export class OpenCodianView extends ItemView {
         content: string;
         tone: ChatMessage['noticeTone'];
       }) => this.appendPersistentAssistantNoticeMessage(options),
+    };
+  }
+
+  private createBackgroundTaskLiveSignalCoordinatorHost(): BackgroundTaskLiveSignalCoordinatorHost {
+    return {
+      getTabRuntimeState: (tabId: TabId | null) => this.getTabRuntimeState(tabId),
+      getSessionIdForTab: (tabId: TabId | null) => this.getSessionIdForTab(tabId),
+      getTabSessionStatus: (tabId, sessionId) => this.getTabSessionStatus(tabId, sessionId),
+      hasIncompleteTabSessionTodos: (tabId) => this.hasIncompleteTabSessionTodos(tabId),
+      isBackgroundTaskGracePeriodActive: (tabId) => this.isBackgroundTaskGracePeriodActive(tabId),
+      getPendingBackgroundTaskLaunches: (tabId) => this.getPendingBackgroundTaskLaunches(tabId),
+      reconcileStaleSessionTodoState: (tabId) => {
+        this.reconcileStaleSessionTodoState(tabId);
+      },
+      syncTabStreamLikeState: (tabId) => {
+        this.syncTabStreamLikeState(tabId);
+      },
+      appendBackgroundTaskStoppedNotice: (tabId, pending) =>
+        this.appendBackgroundTaskStoppedNotice(tabId, pending),
+      resetBackgroundTaskIndicator: (tabId) => {
+        this.resetBackgroundTaskIndicator(tabId);
+      },
     };
   }
 
@@ -6906,8 +6872,7 @@ export class OpenCodianView extends ItemView {
     runtime.backgroundTaskActiveAnchorKey = this.getMessageAnchorKey(message);
     runtime.backgroundTaskModeTag = message.omo.modeTag;
     runtime.backgroundTaskWaitingForFollowUp = false;
-    runtime.backgroundTaskAwaitingAuthoritativeSync = true;
-    runtime.backgroundTaskLastAuthoritativeSyncAt = null;
+    this.backgroundTaskLiveSignalCoordinator.armAuthoritativeSyncGate(tabId);
     runtime.backgroundTaskStaleNoticeFingerprint = null;
     runtime.backgroundTaskSuppressedFingerprint = null;
   }
@@ -6928,10 +6893,9 @@ export class OpenCodianView extends ItemView {
     runtime.backgroundTaskActiveAnchorKey = null;
     runtime.backgroundTaskModeTag = null;
     runtime.backgroundTaskWaitingForFollowUp = false;
-    runtime.backgroundTaskAwaitingAuthoritativeSync = false;
     runtime.backgroundTaskLaunches.clear();
     runtime.backgroundTaskCompletedTasks.clear();
-    runtime.backgroundTaskLastAuthoritativeSyncAt = null;
+    this.backgroundTaskLiveSignalCoordinator.clearAuthoritativeSyncGate(tabId);
     runtime.backgroundTaskStaleNoticeFingerprint = null;
     this.syncTabStreamLikeState(tabId);
   }
@@ -7280,10 +7244,9 @@ export class OpenCodianView extends ItemView {
     runtime.backgroundTaskActiveAnchorKey = null;
     runtime.backgroundTaskModeTag = null;
     runtime.backgroundTaskWaitingForFollowUp = false;
-    runtime.backgroundTaskAwaitingAuthoritativeSync = false;
     runtime.backgroundTaskLaunches.clear();
     runtime.backgroundTaskCompletedTasks.clear();
-    runtime.backgroundTaskLastAuthoritativeSyncAt = null;
+    this.backgroundTaskLiveSignalCoordinator.clearAuthoritativeSyncGate(tabId);
     runtime.backgroundTaskStaleNoticeFingerprint = null;
 
     if (!conversation || conversation.messages.length === 0) {
@@ -7317,8 +7280,9 @@ export class OpenCodianView extends ItemView {
     runtime.backgroundTaskActiveAnchorKey = latestActiveSegment.anchorKey;
     runtime.backgroundTaskModeTag = latestActiveSegment.modeTag;
     runtime.backgroundTaskWaitingForFollowUp = latestActiveSegment.waitingForFollowUp && !runtime.isStreaming;
-    runtime.backgroundTaskAwaitingAuthoritativeSync = runtime.backgroundTaskAwaitingAuthoritativeSync
-      || runtime.isHydratingConversation;
+    if (runtime.isHydratingConversation) {
+      this.backgroundTaskLiveSignalCoordinator.armAuthoritativeSyncGate(tabId);
+    }
     for (const launch of latestActiveSegment.launches) {
       runtime.backgroundTaskLaunches.set(launch.launchId, launch);
     }
@@ -7500,8 +7464,7 @@ export class OpenCodianView extends ItemView {
     if (!runtime.backgroundTaskStartedAt) {
       runtime.backgroundTaskStartedAt = Date.now();
     }
-    runtime.backgroundTaskAwaitingAuthoritativeSync = true;
-    runtime.backgroundTaskLastAuthoritativeSyncAt = null;
+    this.backgroundTaskLiveSignalCoordinator.armAuthoritativeSyncGate(tabId);
     runtime.backgroundTaskStaleNoticeFingerprint = null;
     this.upsertBackgroundTaskLaunch({
       id: toolCall.id,
@@ -7538,8 +7501,7 @@ export class OpenCodianView extends ItemView {
       input: toolCall.input ?? {},
       result: toolCall.result,
     }, runtime.backgroundTaskLaunches);
-    runtime.backgroundTaskAwaitingAuthoritativeSync = true;
-    runtime.backgroundTaskLastAuthoritativeSyncAt = null;
+    this.backgroundTaskLiveSignalCoordinator.armAuthoritativeSyncGate(tabId);
     runtime.backgroundTaskStaleNoticeFingerprint = null;
     await this.renderBackgroundTaskIndicatorIfNeeded(tabId);
   }

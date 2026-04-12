@@ -311,8 +311,8 @@ model selector 现在拆成了几层协作：
 
 - session todo/status：订阅入口仍在 view，但 normalized snapshot、status fingerprint、stale suppression 与 persisted notice 恢复已经下沉到 `services/SessionTodoStateService.ts`
 - question：既支持输入区上方的 `QuestionDock`，也支持由 `QuestionInlineCardRenderer` 管理的内联待回答卡片，以及由 `QuestionResolutionCoordinator` + `QuestionResolutionCardRenderer` 协作管理的已回答/已拒绝回顾卡片
-- background task：从 OMO 注入、`toolName === 'task'` 的 tool block、以及后续 system reminder 回写推导任务进度；运行态以内联状态条挂在对应 assistant turn 下，完成态则延迟落成持久化 notice；其中 stopped/stale warning notice 的 content、fingerprint、persisted dedupe 与 suppression 已下沉到 `services/BackgroundTaskNoticeStateService.ts`，completion notice 的 queued-state、fingerprint/content 与 persisted dedupe/flush 则下沉到 `services/BackgroundTaskCompletionNoticeService.ts`
-- background task 的 stale 判定现在额外受 `backgroundTaskAwaitingAuthoritativeSync` / hydration 保护：reload 或首次装载后，只有在至少一次权威消息同步完成后，才允许把“仍在运行”降级成 stopped/stale notice
+- background task：从 OMO 注入、`toolName === 'task'` 的 tool block、以及后续 system reminder 回写推导任务进度；运行态以内联状态条挂在对应 assistant turn 下，完成态则延迟落成持久化 notice；其中 live-signal reconciliation 与 authoritative-sync gate runtime 已下沉到 `services/BackgroundTaskLiveSignalCoordinator.ts`，stopped/stale warning notice 的 content、fingerprint、persisted dedupe 与 suppression 已下沉到 `services/BackgroundTaskNoticeStateService.ts`，completion notice 的 queued-state、fingerprint/content 与 persisted dedupe/flush 则下沉到 `services/BackgroundTaskCompletionNoticeService.ts`
+- background task 的 stale 判定现在额外受 `backgroundTaskAwaitingAuthoritativeSync` / hydration 保护：reload 或首次装载后，只有在至少一次权威消息同步完成后，才允许把“仍在运行”降级成 stopped/stale notice；这段 gate + live-signal 决策现在集中在 `BackgroundTaskLiveSignalCoordinator`
 
 session todo 这条子链路现在的边界是：
 
@@ -321,7 +321,8 @@ session todo 这条子链路现在的边界是：
 
 background task notice 这条子链路现在的边界是：
 
-- `OpenCodianView`：background task timeline 推导、hydration / authoritative-sync gate、inline panel 渲染，以及 queue/flush 的上层调用时机
+- `OpenCodianView`：background task timeline 推导、inline panel 渲染，以及 queue/flush 的上层调用时机
+- `BackgroundTaskLiveSignalCoordinator`：authoritative-sync gate arm/clear、live-signal reconciliation，以及 stale downgrade / reset 的运行时判定
 - `BackgroundTaskNoticeStateService`：stopped/stale notice content、fingerprint、persisted dedupe 与 suppression runtime 协调
 - `BackgroundTaskCompletionNoticeService`：completion notice queued state、content/fingerprint 与 persisted dedupe/append 协调
 
