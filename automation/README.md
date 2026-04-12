@@ -65,6 +65,45 @@ python .\automation\autopilot.py start --profile windows --dry-run --single-roun
 python .\automation\autopilot.py start --profile windows --single-round
 ```
 
+## Reusable delayed restart
+
+If the current round should finish first, use the built-in sentinel command instead of hand-writing a one-off script.
+
+It watches `automation/runtime/maintainability-state.json`, waits for the next successful commit, stops the current autopilot process from the lock file, clears the stale lock, optionally hard-resets the repo to `HEAD`, and starts a replacement `start` process with a new config/profile.
+
+### macOS example: switch to a local 1000-round config after the next commit
+
+First create a local config override outside the repo, for example:
+
+```bash
+mkdir -p ~/.config/opencodian
+cp ./automation/maintainability-config.json ~/.config/opencodian/maintainability-config.local.json
+```
+
+Edit that copied file and change `max_rounds` there without dirtying the repo.
+
+Then launch the sentinel in another terminal:
+
+```bash
+nohup python3 ./automation/autopilot.py restart-after-next-commit \
+  --profile mac \
+  --profile-path /Users/dht/.config/opencodian/mac-autopilot-profile.json \
+  --restart-profile mac \
+  --restart-profile-path /Users/dht/.config/opencodian/mac-autopilot-profile.json \
+  --restart-config-path /Users/dht/.config/opencodian/maintainability-config.local.json \
+  --restart-output-path automation/runtime/mac-autopilot.out \
+  --restart-pid-path automation/runtime/mac-autopilot.pid \
+  > automation/runtime/restart-after-next-commit.launch.log 2>&1 &
+```
+
+Useful files:
+
+- `automation/runtime/restart-after-next-commit.launch.log`: launcher stdout/stderr
+- `automation/runtime/autopilot-restart.out` or your custom output path: replacement autopilot stream
+- `automation/runtime/autopilot.pid` or your custom pid path: replacement autopilot pid
+
+The sentinel itself can also run in the foreground if you just want to watch it.
+
 The Python driver prints live milestones such as:
 
 - session started
