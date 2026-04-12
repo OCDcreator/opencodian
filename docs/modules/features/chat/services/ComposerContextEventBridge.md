@@ -5,27 +5,21 @@
 
 ## 概述
 
-`ComposerContextEventBridge` 把 `OpenCodianView` 里的 composer/context 相关事件注册收束到一个单一职责 bridge。它统一桥接 workspace、vault 和 composer/document DOM 事件，再把事件分别落到 `FocusContextPreviewCoordinator`、`FocusContextRuntimeService` 与 `ContextFileCatalogService`，同时代持 retained-selection polling 的启动/清理入口。
+`ComposerContextEventBridge` 现在只承担 **composer-context 事件桥的组合入口**。它不再自己直接注册 workspace、vault 和 DOM 事件，而是把启动/清理顺序委托给两个更窄的 bridge：
+
+- `FocusContextEventBridge`：负责 focus-preview activation、composer/document DOM 事件与 retained-selection polling 生命周期
+- `ContextFileCatalogEventBridge`：负责 vault `create/delete/rename` 到 catalog 增量维护的桥接
+
+这样 `OpenCodianView` 仍只面对一个 `start()/dispose()` 入口，但 `ComposerContextEventBridge` 本身退回到组合层，不再同时持有 focus-preview 与 catalog 两类职责。
 
 ## 导入关系
 
-上游: `obsidian`（`App`、`MarkdownView`）、`FocusContextPreviewCoordinator`、`FocusContextRuntimeService`、`ContextFileCatalogService`
+上游: `FocusContextEventBridge`、`ContextFileCatalogEventBridge`
 下游: `OpenCodianView`
 
 ## 公开接口
 
 ```typescript
-interface ComposerContextEventBridgeHost {
-  getInputContainer(): HTMLElement | null
-  registerEvent(eventRef: EventRef): void
-  registerDomEvent(
-    target: Window | Document | HTMLElement,
-    type: string,
-    callback: (event: Event) => unknown,
-    options?: boolean | AddEventListenerOptions,
-  ): void
-}
-
 class ComposerContextEventBridge {
   start(): void
   dispose(): void
@@ -34,33 +28,25 @@ class ComposerContextEventBridge {
 
 ## 核心逻辑
 
-### workspace / editor 事件桥接
+### 组合启动顺序
 
-- 监听 `file-open`，经由 `FocusContextPreviewCoordinator` 同步 remembered markdown path、当前会话 note path，并触发 focus preview refresh
-- 监听 `active-leaf-change`，经由 `FocusContextPreviewCoordinator` 统一触发 focus preview refresh
-- 监听 `editor-change`，把活动 `MarkdownView` 与 editor 交给 `FocusContextPreviewCoordinator`，再复用同一条 runtime refresh 入口
+- `start()` 先启动 `FocusContextEventBridge`，再启动 `ContextFileCatalogEventBridge`
+- `dispose()` 先清理 catalog bridge，再清理 focus bridge
+- 组合层不再知道任何 Obsidian 事件名，只保证两个子 bridge 作为同一份 composer-context lifecycle 被一起装配
 
-### composer / document 事件桥接
+### 单一入口保留
 
-- 在 composer 容器上桥接 `pointerdown`、`focusin`、`focusout`
-- 在 `document` 上桥接 `selectionchange`、`mouseup`、`keyup`
-- bridge 只负责注册和路由，不重写 retained-selection 的真实判定逻辑
-
-### catalog 与 polling 生命周期
-
-- 监听 vault `create/delete/rename`，把文件目录增量更新交给 `ContextFileCatalogService`
-- `start()` 末尾启动 `FocusContextRuntimeService.startRetainedSelectionPolling()`
-- `dispose()` 统一转发给 `FocusContextRuntimeService.dispose()`
+- `OpenCodianView` 与 `createComposerContextServices()` 仍然只暴露一份 `eventBridge`
+- 这保证 view 侧的装配面不变，同时把更细的责任边界下沉到 services 目录
 
 ## 与其他模块的交互
 
-- **OpenCodianView**：提供 composer DOM 容器，以及 Obsidian view 自带的 event/dom-event 注册入口
-- **FocusContextPreviewCoordinator**：负责 file-open/current-note writeback 与 activation/editor-change 相邻的 preview refresh 协调
-- **FocusContextRuntimeService**：负责 composer focus handoff、retained-selection polling 与 highlight 运行态
-- **ContextFileCatalogService**：负责 context 文件目录的缓存与增量维护
+- **FocusContextEventBridge**：承接 focus-preview activation、DOM focus handoff 与 retained-selection polling
+- **ContextFileCatalogEventBridge**：承接 vault catalog mutation 桥接
+- **OpenCodianView**：继续只持有单一的 composer-context lifecycle 入口
 
 ## 注意事项
 
-- bridge 只桥接事件和 lifecycle，不持有 draft context、preview state 或附件构建逻辑
-- `start()` 依赖 `OpenCodianView.buildUI()` 已经创建 composer 容器
-- 保持既有 workspace/vault/document 事件来源与回调顺序，避免改变 focus preview 与 catalog 刷新语义
+- 这个组合层不应重新长回具体事件注册逻辑；新事件优先落到对应的子 bridge
+- 组合层继续不持有 draft context、preview state 或附件构建逻辑
+- 若将来再拆更细的事件桥，优先保持 `OpenCodianView` 的单一 `eventBridge` 入口不变

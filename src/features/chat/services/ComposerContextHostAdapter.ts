@@ -6,6 +6,7 @@ import { ComposerContextChipActionService } from './ComposerContextChipActionSer
 import { ComposerContextCoordinator } from './ComposerContextCoordinator';
 import { ComposerContextEventBridge } from './ComposerContextEventBridge';
 import { ComposerContextPickerActionService } from './ComposerContextPickerActionService';
+import { ContextFileCatalogEventBridge } from './ContextFileCatalogEventBridge';
 import {
   ComposerContextRuntimeStore,
   type ComposerContextRuntimeState,
@@ -14,6 +15,7 @@ import { ComposerContextViewHostAdapter } from './ComposerContextViewHostAdapter
 import type { ContextAttachmentBuilder } from './ContextAttachmentBuilder';
 import type { ContextFileCatalogService } from './ContextFileCatalogService';
 import { FocusContextPreviewCoordinator } from './FocusContextPreviewCoordinator';
+import { FocusContextEventBridge } from './FocusContextEventBridge';
 import { FocusContextRuntimeService } from './FocusContextRuntimeService';
 import { FocusContextViewHostAdapter } from './FocusContextViewHostAdapter';
 
@@ -131,11 +133,10 @@ export function createComposerContextServices(
     viewHostAdapter.createCoordinatorHost(),
     chipActionService,
   );
-  const eventBridge = new ComposerContextEventBridge(
+  const focusContextEventBridge = new FocusContextEventBridge(
     dependencies.app,
     focusContextRuntimeService,
     focusContextPreviewCoordinator,
-    dependencies.contextFileCatalogService,
     {
       getInputContainer: () => dependencies.viewHost.getInputContainer(),
       registerEvent: (eventRef) => {
@@ -145,6 +146,19 @@ export function createComposerContextServices(
         dependencies.viewHost.registerDomEvent(target, type, callback, options);
       },
     },
+  );
+  const contextFileCatalogEventBridge = new ContextFileCatalogEventBridge(
+    dependencies.app,
+    dependencies.contextFileCatalogService,
+    {
+      registerEvent: (eventRef) => {
+        dependencies.viewHost.registerEvent(eventRef);
+      },
+    },
+  );
+  const eventBridge = new ComposerContextEventBridge(
+    focusContextEventBridge,
+    contextFileCatalogEventBridge,
   );
 
   return {
