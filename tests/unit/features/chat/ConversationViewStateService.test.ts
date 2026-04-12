@@ -46,7 +46,6 @@ function createHost(
     loadConversations: jest.fn().mockResolvedValue(undefined),
     getConversations: jest.fn().mockReturnValue([]),
     createConversation: jest.fn().mockResolvedValue(createConversation('created')),
-    applyStreamingConversationActivation: jest.fn(),
     applyLoadedConversationActivation: jest.fn(),
     syncBackgroundTaskStateFromConversation: jest.fn(),
     renderMessages: jest.fn().mockResolvedValue(undefined),
@@ -56,12 +55,16 @@ function createHost(
 }
 
 type MockedTabConversationActivationPort = jest.Mocked<
-  Pick<TabConversationActivationBridge, 'applyEmptyTabActivation'>
+  Pick<
+    TabConversationActivationBridge,
+    'applyEmptyTabActivation' | 'applyStreamingConversationActivation'
+  >
 >;
 
 function createTabConversationActivationBridge(): MockedTabConversationActivationPort {
   return {
     applyEmptyTabActivation: jest.fn(),
+    applyStreamingConversationActivation: jest.fn(),
   };
 }
 
@@ -182,7 +185,10 @@ describe('ConversationViewStateService', () => {
 
     expect(activationPreflightSpy).toHaveBeenCalledWith(tab!.id);
     expect(conversationLoadRuntimeBridge.resolveConversation).toHaveBeenCalledWith(conversation.id);
-    expect(host.applyStreamingConversationActivation).toHaveBeenCalledWith(tab!.id, conversation);
+    expect(tabConversationActivationBridge.applyStreamingConversationActivation).toHaveBeenCalledWith(
+      tab!.id,
+      conversation,
+    );
     expect(loadConversationSpy).not.toHaveBeenCalled();
     expect(transitionBridge.captureLoadedConversationTransition).not.toHaveBeenCalled();
   });
@@ -216,7 +222,7 @@ describe('ConversationViewStateService', () => {
     expect(loadConversationSpy).toHaveBeenCalledWith(conversation.id, {
       preserveScrollPosition: true,
     });
-    expect(host.applyStreamingConversationActivation).not.toHaveBeenCalled();
+    expect(tabConversationActivationBridge.applyStreamingConversationActivation).not.toHaveBeenCalled();
     expect(tabConversationActivationBridge.applyEmptyTabActivation).not.toHaveBeenCalled();
   });
 
@@ -245,7 +251,7 @@ describe('ConversationViewStateService', () => {
     await service.activateTab(tab!.id);
 
     expect(tabConversationActivationBridge.applyEmptyTabActivation).toHaveBeenCalledWith(tab!.id);
-    expect(host.applyStreamingConversationActivation).not.toHaveBeenCalled();
+    expect(tabConversationActivationBridge.applyStreamingConversationActivation).not.toHaveBeenCalled();
     expect(transitionBridge.captureLoadedConversationTransition).not.toHaveBeenCalled();
   });
 

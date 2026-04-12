@@ -37,15 +37,16 @@ export interface ConversationViewStateHost {
   getConversations(): Conversation[];
   createConversation(): Promise<Conversation>;
 
-  applyStreamingConversationActivation(tabId: TabId, conversation: Conversation): Promise<void> | void;
-
   applyLoadedConversationActivation(tabId: TabId | null, conversation: Conversation): void;
   syncBackgroundTaskStateFromConversation(conversation: Conversation): void;
   renderMessages(messages: ChatMessage[]): Promise<void>;
   commitConversationSyncBaseline(messages: ChatMessage[]): void;
 }
 
-type TabConversationActivationPort = Pick<TabConversationActivationBridge, 'applyEmptyTabActivation'>;
+type TabConversationActivationPort = Pick<
+  TabConversationActivationBridge,
+  'applyEmptyTabActivation' | 'applyStreamingConversationActivation'
+>;
 
 type TabViewActivationPort =
   Pick<
@@ -138,7 +139,10 @@ export class ConversationViewStateService {
           return;
         }
 
-        await this.host.applyStreamingConversationActivation(tabId, conversation);
+        this.tabConversationActivationBridge.applyStreamingConversationActivation(
+          tabId,
+          conversation,
+        );
         return;
       }
 

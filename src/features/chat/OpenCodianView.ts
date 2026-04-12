@@ -1800,8 +1800,6 @@ export class OpenCodianView extends ItemView {
       loadConversations: () => this.plugin.loadConversations(),
       getConversations: () => this.plugin.getConversations(),
       createConversation: () => this.plugin.createConversation(),
-      applyStreamingConversationActivation: (tabId, conversation) =>
-        this.applyStreamingConversationActivation(tabId, conversation),
       applyLoadedConversationActivation: (tabId, conversation) => {
         this.tabConversationStateBridge.applyActiveConversation(tabId, conversation, {
           clearRevertState: true,
@@ -2602,15 +2600,6 @@ export class OpenCodianView extends ItemView {
     this.sessionTodoDock?.update(
       this.getTabSessionTodos(tabId, this.getTabRuntimeState(tabId)?.sessionTodoSessionId ?? null),
     );
-  }
-
-  private async applyStreamingConversationActivation(tabId: TabId, conversation: Conversation): Promise<void> {
-    this.tabConversationStateBridge.applyActiveConversation(tabId, conversation, {
-      clearRevertState: true,
-      resetSessionState: true,
-    });
-    this.tabConversationStateBridge.commitConversationSyncBaseline(conversation.messages);
-    this.tabViewActivationBridge.applyStreamingActivationOutcome(tabId, conversation.openCodeSessionId);
   }
 
   private restorePersistedTabs(): string | null {

@@ -17,7 +17,10 @@ type QuestionTodoStatusRefreshPort = Pick<
   'refreshAfterActivation'
 >;
 
-type TabViewActivationPort = Pick<TabViewActivationBridge, 'applyEmptyActivationOutcome'>;
+type TabViewActivationPort = Pick<
+  TabViewActivationBridge,
+  'applyEmptyActivationOutcome' | 'applyStreamingActivationOutcome'
+>;
 
 function createConversation(id = 'conversation-1'): Conversation {
   return {
@@ -106,6 +109,9 @@ function createTabViewActivationBridge(
     applyEmptyActivationOutcome: jest.fn(() => {
       callOrder.push('applyEmptyActivationOutcome');
     }),
+    applyStreamingActivationOutcome: jest.fn(() => {
+      callOrder.push('applyStreamingActivationOutcome');
+    }),
   };
 }
 
@@ -144,6 +150,45 @@ describe('TabConversationActivationBridge', () => {
       'clearMessagesContainer',
       'resetTurnState',
       'applyEmptyActivationOutcome',
+    ]);
+  });
+
+  it('applies streaming activation in bridge order', () => {
+    const callOrder: string[] = [];
+    const conversation = createConversation('streaming-conversation');
+    const host = createHost(callOrder);
+    const tabConversationStateBridge = createTabConversationStateBridge(callOrder);
+    const tabViewActivationBridge = createTabViewActivationBridge(callOrder);
+    const refreshCoordinator = createRefreshCoordinator(callOrder);
+    const bridge = new TabConversationActivationBridge(
+      host,
+      tabConversationStateBridge,
+      tabViewActivationBridge,
+      refreshCoordinator,
+    );
+
+    bridge.applyStreamingConversationActivation('tab-1', conversation);
+
+    expect(tabConversationStateBridge.applyActiveConversation).toHaveBeenCalledWith(
+      'tab-1',
+      conversation,
+      {
+        clearRevertState: true,
+        resetSessionState: true,
+      },
+    );
+    expect(tabConversationStateBridge.commitConversationSyncBaseline).toHaveBeenCalledWith(
+      conversation.messages,
+    );
+    expect(tabViewActivationBridge.applyStreamingActivationOutcome).toHaveBeenCalledWith(
+      'tab-1',
+      conversation.openCodeSessionId,
+    );
+    expect(host.resetBackgroundTaskIndicator).not.toHaveBeenCalled();
+    expect(callOrder).toEqual([
+      'applyActiveConversation',
+      'commitConversationSyncBaseline',
+      'applyStreamingActivationOutcome',
     ]);
   });
 

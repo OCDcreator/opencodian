@@ -14,7 +14,10 @@ type QuestionTodoStatusRefreshPort = Pick<
   'refreshAfterActivation'
 >;
 
-type TabViewActivationPort = Pick<TabViewActivationBridge, 'applyEmptyActivationOutcome'>;
+type TabViewActivationPort = Pick<
+  TabViewActivationBridge,
+  'applyEmptyActivationOutcome' | 'applyStreamingActivationOutcome'
+>;
 
 export interface TabConversationActivationBridgeHost {
   getCurrentConversationId(): string | null;
@@ -44,6 +47,18 @@ export class TabConversationActivationBridge {
     this.tabConversationStateBridge.clearActiveConversation(tabId);
     this.resetActivePaneShell();
     this.tabViewActivationBridge.applyEmptyActivationOutcome(tabId);
+  }
+
+  applyStreamingConversationActivation(tabId: TabId, conversation: Conversation): void {
+    this.tabConversationStateBridge.applyActiveConversation(tabId, conversation, {
+      clearRevertState: true,
+      resetSessionState: true,
+    });
+    this.tabConversationStateBridge.commitConversationSyncBaseline(conversation.messages);
+    this.tabViewActivationBridge.applyStreamingActivationOutcome(
+      tabId,
+      conversation.openCodeSessionId,
+    );
   }
 
   openConversation(conversation: Conversation): void {
