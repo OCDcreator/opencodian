@@ -276,17 +276,10 @@ import {
   scrollElementToBottom,
 } from './services/ScrollManager';
 import {
-  SessionTodoDockCoordinator,
-  type SessionTodoDockCoordinatorHost,
-} from './services/SessionTodoDockCoordinator';
-import {
-  SessionTodoStateService,
-  type SessionTodoStateServiceHost,
-} from './services/SessionTodoStateService';
-import {
-  SessionTodoStatusRefreshService,
-  type SessionTodoStatusRefreshServiceHost,
-} from './services/SessionTodoStatusRefreshService';
+  createSessionTodoServices,
+  type SessionTodoServices,
+  type SessionTodoViewHost,
+} from './services/SessionTodoHostAdapter';
 import { TitleGenerationService } from './services/TitleGenerationService';
 import { TabBar, type TabBarLayoutMode, type TabId, TabManager } from './tabs';
 import { ContextDetailModal, type ContextRawMessageItem } from './ui/ContextDetailModal';
@@ -719,9 +712,7 @@ export class OpenCodianView extends ItemView {
   private themeBackgroundRequestId = 0;
   private titleGenerationService: TitleGenerationService;
   private persistentAssistantNoticeService: PersistentAssistantNoticeService;
-  private sessionTodoDockCoordinator: SessionTodoDockCoordinator;
-  private sessionTodoStateService: SessionTodoStateService;
-  private sessionTodoStatusRefreshService: SessionTodoStatusRefreshService;
+  private sessionTodoServices: SessionTodoServices;
   private questionTodoStatusRefreshCoordinator: QuestionTodoStatusRefreshCoordinator;
   private backgroundTaskTimelineService: BackgroundTaskTimelineService;
   private backgroundTaskCompletionNoticeService: BackgroundTaskCompletionNoticeService;
@@ -770,6 +761,18 @@ export class OpenCodianView extends ItemView {
     return (this.app as typeof this.app & {
       setting: { open: () => void; openTabById: (id: string) => void };
     }).setting;
+  }
+
+  private get sessionTodoDockCoordinator(): SessionTodoServices['dockCoordinator'] {
+    return this.sessionTodoServices.dockCoordinator;
+  }
+
+  private get sessionTodoStateService(): SessionTodoServices['stateService'] {
+    return this.sessionTodoServices.stateService;
+  }
+
+  private get sessionTodoStatusRefreshService(): SessionTodoServices['statusRefreshService'] {
+    return this.sessionTodoServices.statusRefreshService;
   }
 
   private createTabRuntimeState(): TabRuntimeState {
@@ -1231,13 +1234,7 @@ export class OpenCodianView extends ItemView {
     this.persistentAssistantNoticeService = new PersistentAssistantNoticeService(
       this.createPersistentAssistantNoticeServiceHost(),
     );
-    this.sessionTodoDockCoordinator = new SessionTodoDockCoordinator(
-      this.createSessionTodoDockCoordinatorHost(),
-    );
-    this.sessionTodoStateService = new SessionTodoStateService(this.createSessionTodoStateServiceHost());
-    this.sessionTodoStatusRefreshService = new SessionTodoStatusRefreshService(
-      this.createSessionTodoStatusRefreshServiceHost(),
-    );
+    this.sessionTodoServices = createSessionTodoServices(this.createSessionTodoViewHost());
     this.questionTodoStatusRefreshCoordinator = new QuestionTodoStatusRefreshCoordinator(
       this.createQuestionTodoStatusRefreshCoordinatorHost(),
     );
@@ -1439,15 +1436,13 @@ export class OpenCodianView extends ItemView {
     };
   }
 
-  private createSessionTodoStateServiceHost(): SessionTodoStateServiceHost {
+  private createSessionTodoViewHost(): SessionTodoViewHost {
     return {
       getTabRuntimeState: (tabId: TabId | null) => this.getTabRuntimeState(tabId),
       getActiveTabId: () => this.getActiveTabId(),
+      getCurrentConversationSessionId: () => this.currentConversation?.openCodeSessionId ?? null,
       getSessionIdForTab: (tabId: TabId | null) => this.getSessionIdForTab(tabId),
       getConversationForTab: (tabId: TabId | null) => this.getConversationForTab(tabId),
-      renderSessionTodoDock: (tabId: TabId | null) => {
-        this.renderSessionTodoDock(tabId);
-      },
       hasMatchingPersistentAssistantNoticeMessage: (
         title: string,
         content: string,
@@ -1459,32 +1454,6 @@ export class OpenCodianView extends ItemView {
         content: string;
         tone: ChatMessage['noticeTone'];
       }) => this.persistentAssistantNoticeService.appendMessage(options),
-    };
-  }
-
-  private createSessionTodoDockCoordinatorHost(): SessionTodoDockCoordinatorHost {
-    return {
-      getActiveTabId: () => this.getActiveTabId(),
-      getCurrentConversationSessionId: () => this.currentConversation?.openCodeSessionId ?? null,
-      getTabRuntimeState: (tabId: TabId | null) => this.getTabRuntimeState(tabId),
-      getTabSessionTodos: (tabId, sessionId) => this.getTabSessionTodos(tabId, sessionId),
-    };
-  }
-
-  private createSessionTodoStatusRefreshServiceHost(): SessionTodoStatusRefreshServiceHost {
-    return {
-      getTabRuntimeState: (tabId: TabId | null) => this.getTabRuntimeState(tabId),
-      getTabSessionTodos: (tabId, sessionId) => this.getTabSessionTodos(tabId, sessionId),
-      setTabSessionTodos: (tabId, todos, sessionId) => {
-        this.setTabSessionTodos(tabId, todos, sessionId);
-      },
-      renderSessionTodoDock: (tabId: TabId | null) => {
-        this.renderSessionTodoDock(tabId);
-      },
-      getTabSessionStatus: (tabId, sessionId) => this.getTabSessionStatus(tabId, sessionId),
-      setTabSessionStatus: (tabId, status, sessionId) => {
-        this.setTabSessionStatus(tabId, status, sessionId);
-      },
       getSessionTodos: (sessionId) => this.plugin.openCodeService.getSessionTodos(sessionId),
       getSessionStatuses: () => this.plugin.openCodeService.getSessionStatuses(),
       reconcileBackgroundTaskLiveSignals: (tabId) => {

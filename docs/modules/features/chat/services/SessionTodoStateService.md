@@ -12,7 +12,7 @@
 - 在 reload / hydration 后恢复已持久化的 stale todo notice 抑制
 - 在长时间无活动时隐藏过期 todo snapshot，并在需要时补写持久化 warning notice
 
-它不拥有 dock DOM，也不直接依赖插件实例；所有 view 相关能力都通过 `SessionTodoStateServiceHost` 回调获得。
+它不拥有 dock DOM，也不直接依赖插件实例；所有 view 相关能力都通过 `SessionTodoStateServiceHost` 回调获得，而这组 host 现在通常由 `SessionTodoHostAdapter` 统一装配。
 
 ## 公开接口
 
@@ -59,10 +59,11 @@ export class SessionTodoStateService {
 ## 与 `OpenCodianView` 的边界
 
 - `ConversationSessionLiveSignalAdapter` 负责 session todo/status live listener 的生命周期、session→tab 路由与 active-tab fallback
+- `SessionTodoHostAdapter` 负责把 `OpenCodianView` 的单一 session todo host 适配成 state/dock/refresh 三组服务能消费的 wiring
 - `SessionTodoStatusRefreshService` 负责主动调用 OpenCode todo/status API、维护 request-id stale guard，并在刷新成功后触发 foreground background-task reconcile
 - `PersistentAssistantNoticeService` 负责 persisted stale notice 的历史匹配、追加落盘，以及可见/隐藏 tab 的后续动作
 - `BackgroundTaskLiveSignalCoordinator` 现在会直接调用 `reconcileStaleSessionTodoState()` 参与 live-signal settle；view 不再转发这条 stale follow-up callback
 - `SessionTodoDockCoordinator` 负责 session todo dock 的 DOM 生命周期，以及 active/background tab 的 session→dock 渲染选择
-- `OpenCodianView` 只保留 host 装配与上层触发入口，不再内联 session todo/status 的 OpenCode 拉取刷新，也不再直接持有 dock DOM
+- `OpenCodianView` 只保留单一 session todo host 与上层触发入口，不再自己分别构造 state/dock/refresh 三段 host wiring
 - `SessionTodoStateService` 负责 todo/status runtime 的纯状态机和 stale notice 协调
 - 这样后续继续推进 master-plan 的 `question / todo / background task` lane 时，可以把 background task stale/notice 边界继续从 view 拆走，而不是再把 session todo 细节塞回主视图

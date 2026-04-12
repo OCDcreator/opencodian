@@ -40,8 +40,8 @@ export class SessionTodoDockCoordinator {
 
 ## 与其他模块的交互
 
-- `OpenCodianView` 只保留 host bridge，并在构建输入区/销毁 view 时调用 coordinator
-- `SessionTodoStateService` 与 `SessionTodoStatusRefreshService` 仍通过 view host 触发 `renderSessionTodoDock()`，但真实 dock render 已由本 coordinator 承接
+- `OpenCodianView` 现在通过 `SessionTodoHostAdapter` 持有 coordinator，并在构建输入区/销毁 view 时调用它
+- `SessionTodoStateService` 与 `SessionTodoStatusRefreshService` 仍通过 shared host 触发 `renderSessionTodoDock()`，但真实 dock render 已由本 coordinator 承接
 - `TabViewActivationBridge` 继续复用 `renderSessionTodoDock()` / `updateSessionTodoDockForTab()`，只是底层实现不再直接操作 DOM
 
 ## 维护收益

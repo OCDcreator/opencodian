@@ -44,7 +44,8 @@ export class SessionTodoStatusRefreshService {
 
 ## 与 `OpenCodianView` 的边界
 
-- `OpenCodianView` 现在只负责装配 host：提供 tab runtime、`SessionTodoStateService` 写回入口、OpenCode API 调用，以及 `BackgroundTaskLiveSignalCoordinator` reconcile callback
+- `SessionTodoHostAdapter` 现在负责把 `OpenCodianView` 的单一 session todo host 装配成 refresh service 需要的 host 形状，并复用同一份 `SessionTodoStateService` / `SessionTodoDockCoordinator`
+- `OpenCodianView` 现在只负责提供 tab runtime、session 选择、OpenCode API 与 background-task reconcile 这份 shared host
 - `QuestionTodoStatusRefreshCoordinator` 会把本 service 与 `QuestionDockCoordinator` 组合起来，统一承接 activation/open 和 post-sync 场景的 status + pending-question + todo 刷新顺序
 - `TabViewActivationBridge`、`BackgroundTaskPostSyncCoordinator`、`BackgroundTaskStreamTriggerCoordinator`、`QuestionDockCoordinator`、`MessageFinalizationService` 与 view 自身的 open-conversation fast path，都会复用同一份 refresh service，而不是继续各自回调 view 内联实现
 - `SessionTodoStateService` 继续负责 todo/status runtime 的纯状态机、stale suppression 与 persisted notice 协调；refresh service 不接管这些规则
