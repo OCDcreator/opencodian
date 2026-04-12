@@ -64,6 +64,9 @@ function createTabConversationActivationBridge(): MockedTabConversationActivatio
 }
 
 function createActivationBridge() {
+  const focusContextPreviewCoordinator = {
+    refreshActiveFocusContextPreview: jest.fn(),
+  };
   const refreshCoordinator: jest.Mocked<Pick<
     QuestionTodoActivationRefreshCoordinator,
     'applyActivationPreflight' | 'applyConversationActivation' | 'applyEmptyActivation'
@@ -87,7 +90,6 @@ function createActivationBridge() {
   };
   const host: jest.Mocked<TabViewActivationBridgeHost> = {
     setActiveMessagesPane: jest.fn(),
-    refreshActiveFocusContextPreview: jest.fn(),
     scheduleComposerLayoutSync: jest.fn(),
     updateModelSelectorDisplay: jest.fn(),
     updateSendButtonState: jest.fn(),
@@ -96,11 +98,13 @@ function createActivationBridge() {
   return {
     bridge: new TabViewActivationBridge(
       host,
+      focusContextPreviewCoordinator,
       refreshCoordinator,
       backgroundTaskCoordinator,
       contextUsageCoordinator,
     ),
     host,
+    focusContextPreviewCoordinator,
     refreshCoordinator,
     backgroundTaskCoordinator,
     contextUsageCoordinator,
