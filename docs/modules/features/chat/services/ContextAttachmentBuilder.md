@@ -5,12 +5,12 @@
 
 ## 概述
 
-`ContextAttachmentBuilder` 负责把 composer 的 current-note / selection / file 三类输入统一收束成 `PromptContextItem`。它把 `OpenCodianView` / `ComposerContextCoordinator` 需要的上下文附件构建、remote 模式下的文本快照读取与 `64 KiB` 限制校验，集中到一个单一职责 service，让 view 只保留编辑器焦点预览、文件选择入口和附件写回。
+`ContextAttachmentBuilder` 负责把 composer 的 current-note / selection / file 三类输入统一收束成 `PromptContextItem`。它把 `ComposerContextActionService` / `ComposerContextCoordinator` 需要的上下文附件构建、remote 模式下的文本快照读取与 `64 KiB` 限制校验，集中到一个单一职责 service，让 view 只保留 host 装配、tab state 写回和 vault 事件转发。
 
 ## 导入关系
 
 上游: `obsidian`（App、Editor、MarkdownView、TFile、Notice）、`core/types`、`core/types/settings`、`i18n`、`shared/obsidianContext`、`composerContext`
-下游: `OpenCodianView`、`ComposerContextCoordinator`
+下游: `ComposerContextActionService`、`ComposerContextCoordinator`、`OpenCodianView`
 
 ## 公开接口
 
@@ -58,8 +58,9 @@ class ContextAttachmentBuilder {
 
 ## 与其他模块的交互
 
-- **OpenCodianView**：注入当前 server mode getter，并把 current-note / selection / file 附件构建委托给这里
+- **ComposerContextActionService**：把 current-note / selection / file 入口动作统一委托给这里
 - **ComposerContextCoordinator**：复用 preview attach 入口，把 current-note / selection focus preview 转成最终附件
+- **OpenCodianView**：注入当前 server mode getter，并通过 action / coordinator 两条子链路间接消费附件构建
 - **shared/obsidianContext**：复用 MIME 推导、label 格式化与 text-like 判定
 - **composerContext**：复用 `FocusContextPreview` 类型，承接 retained selection preview → attachment 的桥接
 

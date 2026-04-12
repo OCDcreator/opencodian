@@ -123,6 +123,7 @@ docs/modules/
 │   │   ├── rendering/
 │   │   │   └── collapsible.md
 │   │   ├── services/
+│   │   │   ├── ComposerContextActionService.md
 │   │   │   ├── ComposerContextCoordinator.md
 │   │   │   ├── ContextAttachmentBuilder.md
 │   │   │   ├── ContextFileCatalogService.md

@@ -85,137 +85,116 @@ import {
   buildStreamErrorNotice,
   renderAssistantPlaceholderAsNotice,
 } from './runtime/AssistantNoticeRenderer';
-import { PersistedAssistantFooterFinalizer } from './runtime/PersistedAssistantFooterFinalizer';
-import {
-  type AssistantShellRendererHost,
-  AssistantShellRenderer,
-} from './runtime/AssistantShellRenderer';
 import {
   renderAssistantPlainTextFallbackContent,
 } from './runtime/AssistantPlainTextFallbackRenderer';
 import {
+  AssistantShellRenderer,
+  type AssistantShellRendererHost,
+} from './runtime/AssistantShellRenderer';
+import {
   renderAssistantStructuredContent,
 } from './runtime/AssistantStructuredContentRenderer';
 import {
+  BackgroundTaskIndicatorCoordinator,
+  type BackgroundTaskIndicatorCoordinatorHost,
+} from './runtime/BackgroundTaskIndicatorCoordinator';
+import {
+  BackgroundTaskInlinePanelRenderer,
+  type BackgroundTaskInlinePanelRendererHost,
+} from './runtime/BackgroundTaskInlinePanelRenderer';
+import {
+  BackgroundTaskStreamTriggerCoordinator,
+  type BackgroundTaskStreamTriggerCoordinatorHost,
+} from './runtime/BackgroundTaskStreamTriggerCoordinator';
+import {
+  ConversationHydrationRenderBridge,
+  type ConversationHydrationRenderBridgeHost,
+} from './runtime/ConversationHydrationRenderBridge';
+import {
+  ConversationLoadRuntimeBridge,
+  type ConversationLoadRuntimeBridgeHost,
+} from './runtime/ConversationLoadRuntimeBridge';
+import {
+  ConversationTransitionBridge,
+  type ConversationTransitionBridgeHost,
+} from './runtime/ConversationTransitionBridge';
+import {
   PermissionInlineCardRenderer,
 } from './runtime/PermissionInlineCardRenderer';
+import { PersistedAssistantFooterFinalizer } from './runtime/PersistedAssistantFooterFinalizer';
 import {
-  type QuestionInlineCardRendererHost,
   QuestionInlineCardRenderer,
+  type QuestionInlineCardRendererHost,
 } from './runtime/QuestionInlineCardRenderer';
-import {
-  type QuestionResolutionCoordinatorHost,
-  QuestionResolutionCoordinator,
-} from './runtime/QuestionResolutionCoordinator';
 import {
   buildQuestionResolutionCardRenderPlan,
 } from './runtime/QuestionResolutionCardRenderer';
 import {
-  type BackgroundTaskInlinePanelRendererHost,
-  BackgroundTaskInlinePanelRenderer,
-} from './runtime/BackgroundTaskInlinePanelRenderer';
-import {
-  type BackgroundTaskIndicatorCoordinatorHost,
-  BackgroundTaskIndicatorCoordinator,
-} from './runtime/BackgroundTaskIndicatorCoordinator';
-import {
-  type BackgroundTaskStreamTriggerCoordinatorHost,
-  BackgroundTaskStreamTriggerCoordinator,
-} from './runtime/BackgroundTaskStreamTriggerCoordinator';
-import {
-  type ConversationHydrationRenderBridgeHost,
-  ConversationHydrationRenderBridge,
-} from './runtime/ConversationHydrationRenderBridge';
-import {
-  type ConversationLoadRuntimeBridgeHost,
-  ConversationLoadRuntimeBridge,
-} from './runtime/ConversationLoadRuntimeBridge';
-import {
-  type ConversationTransitionBridgeHost,
-  ConversationTransitionBridge,
-} from './runtime/ConversationTransitionBridge';
-import {
-  type TabConversationStateBridgeHost,
-  TabConversationStateBridge,
-} from './runtime/TabConversationStateBridge';
-import {
-  type TabViewActivationBridgeHost,
-  TabViewActivationBridge,
-} from './runtime/TabViewActivationBridge';
-import {
-  type TabRuntimeStateBridgeHost,
-  TabRuntimeStateBridge,
-} from './runtime/TabRuntimeStateBridge';
-import {
-  type StreamingInlineCardRendererHost,
-  StreamingInlineCardRenderer,
-} from './runtime/StreamingInlineCardRenderer';
+  QuestionResolutionCoordinator,
+  type QuestionResolutionCoordinatorHost,
+} from './runtime/QuestionResolutionCoordinator';
 import {
   type SendPipelineDebugContentBlock,
   type SendPipelineDebugPort,
   type SendPipelineHost,
   type SendPipelinePersistencePort,
+  SendPipelineRuntime,
   type SendPipelineShellPort,
   type SendPipelineTransportPort,
   type SendPipelineViewPort,
-  SendPipelineRuntime,
 } from './runtime/SendPipelineRuntime';
 import {
+  StreamingInlineCardRenderer,
+  type StreamingInlineCardRendererHost,
+} from './runtime/StreamingInlineCardRenderer';
+import {
+  TabConversationStateBridge,
+  type TabConversationStateBridgeHost,
+} from './runtime/TabConversationStateBridge';
+import {
+  TabRuntimeStateBridge,
+  type TabRuntimeStateBridgeHost,
+} from './runtime/TabRuntimeStateBridge';
+import {
+  TabViewActivationBridge,
+  type TabViewActivationBridgeHost,
+} from './runtime/TabViewActivationBridge';
+import {
   type BackgroundTaskCompletionInfo,
-  type BackgroundTaskCompletionNoticeServiceHost,
   BackgroundTaskCompletionNoticeService,
+  type BackgroundTaskCompletionNoticeServiceHost,
   type QueuedBackgroundTaskCompletionNotice,
 } from './services/BackgroundTaskCompletionNoticeService';
 import {
-  type BackgroundTaskNoticeStateServiceHost,
-  BackgroundTaskNoticeStateService,
-} from './services/BackgroundTaskNoticeStateService';
-import {
-  type BackgroundTaskLiveSignalCoordinatorHost,
   BackgroundTaskLiveSignalCoordinator,
+  type BackgroundTaskLiveSignalCoordinatorHost,
 } from './services/BackgroundTaskLiveSignalCoordinator';
 import {
-  type BackgroundTaskPostSyncCoordinatorHost,
+  BackgroundTaskNoticeStateService,
+  type BackgroundTaskNoticeStateServiceHost,
+} from './services/BackgroundTaskNoticeStateService';
+import {
   BackgroundTaskPostSyncCoordinator,
+  type BackgroundTaskPostSyncCoordinatorHost,
 } from './services/BackgroundTaskPostSyncCoordinator';
 import {
   type BackgroundTaskLaunchInfo,
   type BackgroundTaskSegment,
-  type BackgroundTaskTimelineServiceHost,
   BackgroundTaskTimelineService,
+  type BackgroundTaskTimelineServiceHost,
 } from './services/BackgroundTaskTimelineService';
+import {
+  ComposerContextActionService,
+  type ComposerContextActionServiceHost,
+} from './services/ComposerContextActionService';
+import {
+  ComposerContextCoordinator,
+  type ComposerContextCoordinatorHost,
+} from './services/ComposerContextCoordinator';
 import { ContextAttachmentBuilder } from './services/ContextAttachmentBuilder';
 import { ContextFileCatalogService } from './services/ContextFileCatalogService';
-import {
-  type ComposerContextCoordinatorHost,
-  ComposerContextCoordinator,
-} from './services/ComposerContextCoordinator';
-import {
-  type FocusContextRuntimeServiceHost,
-  FocusContextRuntimeService,
-} from './services/FocusContextRuntimeService';
 import { ContextUsageService } from './services/ContextUsageService';
-import {
-  ConversationSyncOrchestrationService,
-} from './services/ConversationSyncOrchestrationService';
-import {
-  ConversationSyncBridge,
-} from './services/ConversationSyncBridge';
-import {
-  ConversationSyncRuntimeCoordinator,
-} from './services/ConversationSyncRuntimeCoordinator';
-import {
-  type ConversationSyncEventAdapterHost,
-  ConversationSyncEventAdapter,
-} from './services/ConversationSyncEventAdapter';
-import {
-  type ConversationSessionLiveSignalAdapterHost,
-  ConversationSessionLiveSignalAdapter,
-} from './services/ConversationSessionLiveSignalAdapter';
-import {
-  createConversationSyncServices,
-  type ConversationSyncViewHost,
-} from './services/ConversationSyncHostAdapter';
 import {
   type ConversationAssistantTailRenderPort,
   type ConversationRenderHost,
@@ -224,9 +203,34 @@ import {
   type IncrementalRenderedMessageUpdate,
 } from './services/ConversationRenderService';
 import {
+  ConversationSessionLiveSignalAdapter,
+  type ConversationSessionLiveSignalAdapterHost,
+} from './services/ConversationSessionLiveSignalAdapter';
+import {
+  ConversationSyncBridge,
+} from './services/ConversationSyncBridge';
+import {
+  ConversationSyncEventAdapter,
+  type ConversationSyncEventAdapterHost,
+} from './services/ConversationSyncEventAdapter';
+import {
+  type ConversationSyncViewHost,
+  createConversationSyncServices,
+} from './services/ConversationSyncHostAdapter';
+import {
+  ConversationSyncOrchestrationService,
+} from './services/ConversationSyncOrchestrationService';
+import {
+  ConversationSyncRuntimeCoordinator,
+} from './services/ConversationSyncRuntimeCoordinator';
+import {
   type ConversationViewStateHost,
   ConversationViewStateService,
 } from './services/ConversationViewStateService';
+import {
+  FocusContextRuntimeService,
+  type FocusContextRuntimeServiceHost,
+} from './services/FocusContextRuntimeService';
 import {
   type MessageFinalizationHost,
   MessageFinalizationService,
@@ -236,21 +240,20 @@ import {
   MessageSendPreparationService,
 } from './services/MessageSendPreparationService';
 import {
-  type QuestionDockCoordinatorHost,
   QuestionDockCoordinator,
+  type QuestionDockCoordinatorHost,
 } from './services/QuestionDockCoordinator';
 import {
   isElementNearBottom,
   scrollElementToBottom,
 } from './services/ScrollManager';
 import {
-  type SessionTodoStateServiceHost,
   SessionTodoStateService,
+  type SessionTodoStateServiceHost,
 } from './services/SessionTodoStateService';
 import { TitleGenerationService } from './services/TitleGenerationService';
 import { TabBar, type TabBarLayoutMode, type TabId, TabManager } from './tabs';
 import { ContextDetailModal, type ContextRawMessageItem } from './ui/ContextDetailModal';
-import { chooseContextFile } from './ui/ContextFilePickerModal';
 import { ContextRing } from './ui/ContextRing';
 import { EffortSelector } from './ui/EffortSelector';
 import { buildModelSelectorDisplayState } from './ui/modelSelector/ModelSelectorDisplay';
@@ -713,6 +716,7 @@ export class OpenCodianView extends ItemView {
   private questionResolutionCoordinator: QuestionResolutionCoordinator;
   private questionDockCoordinator: QuestionDockCoordinator;
   private sendPipelineRuntime: SendPipelineRuntime;
+  private composerContextActionService: ComposerContextActionService;
   private composerContextCoordinator: ComposerContextCoordinator;
   private contextAttachmentBuilder: ContextAttachmentBuilder;
   private contextFileCatalogService: ContextFileCatalogService;
@@ -1280,6 +1284,12 @@ export class OpenCodianView extends ItemView {
       getServerMode: () => this.plugin.settings.server.mode,
     });
     this.contextFileCatalogService = new ContextFileCatalogService(this.app);
+    this.composerContextActionService = new ComposerContextActionService(
+      this.app,
+      this.contextAttachmentBuilder,
+      this.contextFileCatalogService,
+      this.createComposerContextActionServiceHost(),
+    );
     this.composerContextCoordinator = new ComposerContextCoordinator(
       this.contextAttachmentBuilder,
       this.createComposerContextCoordinatorHost(),
@@ -1393,6 +1403,15 @@ export class OpenCodianView extends ItemView {
       },
       refreshActiveFocusContextPreview: () => {
         this.refreshActiveFocusContextPreview();
+      },
+    };
+  }
+
+  private createComposerContextActionServiceHost(): ComposerContextActionServiceHost {
+    return {
+      getActiveMarkdownView: () => this.getActiveMarkdownView(),
+      addDraftContextItem: (item) => {
+        this.addDraftContextItem(item);
       },
     };
   }
@@ -4227,46 +4246,18 @@ export class OpenCodianView extends ItemView {
   }
 
   public async addCurrentNoteContextFromActiveEditor(view?: MarkdownView | null): Promise<boolean> {
-    const contextItem = await this.contextAttachmentBuilder.buildCurrentNoteContextItem(
-      view ?? this.getActiveMarkdownView(),
-    );
-    if (!contextItem) {
-      return false;
-    }
-
-    this.addDraftContextItem(contextItem);
-    return true;
+    return this.composerContextActionService.addCurrentNoteContextFromActiveEditor(view);
   }
 
   public async addSelectionContextFromActiveEditor(
     editor?: Editor | null,
     view?: MarkdownView | null,
   ): Promise<boolean> {
-    const contextItem = await this.contextAttachmentBuilder.buildSelectionContextItem(
-      editor ?? (view ?? this.getActiveMarkdownView())?.editor ?? null,
-      view ?? this.getActiveMarkdownView(),
-    );
-    if (!contextItem) {
-      return false;
-    }
-
-    this.addDraftContextItem(contextItem);
-    return true;
+    return this.composerContextActionService.addSelectionContextFromActiveEditor(editor, view);
   }
 
   private async addChosenFileContextToActiveTab(): Promise<boolean> {
-    const file = await chooseContextFile(this.app, async () => this.contextFileCatalogService.getCatalog());
-    if (!file) {
-      return false;
-    }
-
-    const contextItem = await this.contextAttachmentBuilder.buildFileContextItem(file, 'file');
-    if (!contextItem) {
-      return false;
-    }
-
-    this.addDraftContextItem(contextItem);
-    return true;
+    return this.composerContextActionService.addChosenFileContextToActiveTab();
   }
 
   private trySubmitCurrentInput(): void {
