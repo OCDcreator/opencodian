@@ -44,13 +44,14 @@ export class BackgroundTaskNoticeStateService {
 
 - `isPendingLaunchSetSuppressed()` 先检查 runtime fingerprint；若未命中，再检查 conversation 历史里是否已有同一条 warning notice
 - 命中持久化 notice 时，服务会把 suppression 状态恢复回当前 tab runtime，避免 reload 后重复渲染 inline stale 段或重复写 notice
-- `handleStoppedPendingLaunches()` 仍保留原来的“先写 suppression，再决定是否真的追加 notice”顺序，因此后台 tab 也会先隐藏已判定为 stopped 的 segment
+- `handleStoppedPendingLaunches()` 仍保留原来的“先写 suppression，再决定是否真的追加 notice”顺序，因此后台 tab 也会先隐藏已判定为 stopped 的 segment；真正的 persisted append 现由 `PersistentAssistantNoticeService` 执行
 
 ## 与 `OpenCodianView` 的边界
 
 - `BackgroundTaskTimelineService` 负责 background task 的 launch/completion timeline 推导
 - `BackgroundTaskInlinePanelRenderer` 负责 inline panel DOM 渲染
 - `BackgroundTaskIndicatorCoordinator` 负责 completion notice queue/flush 触发顺序
+- `PersistentAssistantNoticeService` 负责 stopped/stale persisted notice 的历史匹配、落盘与可见/隐藏 tab 后续动作
 - `OpenCodianView` 负责 hydration gate host bridge
 - `BackgroundTaskNoticeStateService` 只负责 stopped/stale notice 的 content、fingerprint、persisted dedupe 与 suppression state 协调
 - 这样 P2 `question / todo / background task` lane 可以继续从 view 迁出更清晰的 background-task ownership，而不是把 notice 细节继续留在主视图里

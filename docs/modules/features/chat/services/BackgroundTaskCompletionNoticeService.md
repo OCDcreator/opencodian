@@ -40,7 +40,7 @@ export class BackgroundTaskCompletionNoticeService {
 
 - `flushQueuedNotices()` 只在 tab 不再 streaming 时真正落盘，避免 primary stream 期间插入额外 notice
 - flush 前会再次用 `anchorKey + allComplete + sorted taskIds` fingerprint 对照历史 notice，防止 reload / sync 后重复写入
-- 追加 notice 时会把 `sourceReminderIds`、`taskIds` 和 `allComplete` 写回 `noticeMeta`，供后续 reload、后台同步和 dedupe 复用
+- 追加 notice 时会把 `sourceReminderIds`、`taskIds` 和 `allComplete` 写回 `noticeMeta`，供后续 reload、后台同步和 dedupe 复用；真正的 persisted append 现统一经由 `PersistentAssistantNoticeService`
 
 ## 与 `OpenCodianView` 的边界
 
@@ -49,5 +49,6 @@ export class BackgroundTaskCompletionNoticeService {
 - `OpenCodianView` 负责 hydration / authoritative-sync gate host bridge
 - `BackgroundTaskIndicatorCoordinator` 负责 completion notice queue/flush 的调用顺序，并供 hidden signal/background-tab sync 复用
 - `BackgroundTaskPostSyncCoordinator` 负责 hidden signal/background-tab sync 后触发 completion notice refresh
+- `PersistentAssistantNoticeService` 负责 completion notice 的持久化 append、sync fingerprint 写回，以及 hidden-tab attention/visible scroll follow-up
 - `BackgroundTaskCompletionNoticeService` 负责 completion notice queued state、content/fingerprint 和 persisted dedupe/append 协调
 - 这让 P2 `question / todo / background task` lane 继续把 background-task completion ownership 从主 view 迁到 dedicated service，而不是继续把 notice 细节留在 `OpenCodianView`

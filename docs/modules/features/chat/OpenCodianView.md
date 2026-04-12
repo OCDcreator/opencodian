@@ -88,7 +88,7 @@ background task 相关的 `backgroundTaskLaunches`、`backgroundTaskCompletedTas
 - 模型目录缓存：`availableModels`、`availableProviders`
 - 服务器状态轮询和 badge 状态
 - model selector sticky header cleanup
-- `ComposerContextCoordinator`、`FocusContextRuntimeService` 等视图级运行时协作对象
+- `ComposerContextCoordinator`、`FocusContextRuntimeService`、`PersistentAssistantNoticeService` 等视图级运行时协作对象
 - theme background / liquid glass / diamond demo / glass octahedron 相关 DOM 引用
 
 ## 主链路
@@ -346,9 +346,9 @@ model selector 现在拆成了几层协作：
 
 这三个辅助子系统都由 view 负责路由：
 
-- session todo/status：OpenCode live listener 生命周期、session→tab 路由和 active-tab fallback 已下沉到 `services/ConversationSessionLiveSignalAdapter.ts`；normalized snapshot、status fingerprint、stale suppression 与 persisted notice 恢复继续由 `services/SessionTodoStateService.ts` 负责
+- session todo/status：OpenCode live listener 生命周期、session→tab 路由和 active-tab fallback 已下沉到 `services/ConversationSessionLiveSignalAdapter.ts`；normalized snapshot、status fingerprint、stale suppression 与 persisted notice 恢复继续由 `services/SessionTodoStateService.ts` 负责，而真正的 persisted assistant notice append/dedupe 则进一步收束到 `services/PersistentAssistantNoticeService.ts`
 - question：既支持输入区上方的 `QuestionDock`，也支持由 `QuestionInlineCardRenderer` 管理的内联待回答卡片，以及由 `QuestionResolutionCoordinator` + `QuestionResolutionCardRenderer` 协作管理的已回答/已拒绝回顾卡片
-- background task：从 OMO 注入、`toolName === 'task'` 的 tool block、以及后续 system reminder 回写推导任务进度；运行态以内联状态条挂在对应 assistant turn 下，完成态则延迟落成持久化 notice；其中 timeline segment 推导、launch/completion runtime 重建、pending matching，以及 inline notice copy 组装已下沉到 `services/BackgroundTaskTimelineService.ts`，inline panel 的 DOM 创建/挂载/复用/清理已下沉到 `runtime/BackgroundTaskInlinePanelRenderer.ts`，indicator render 与 completion notice queue/flush 顺序已下沉到 `runtime/BackgroundTaskIndicatorCoordinator.ts`，streaming tool-call start/end 与 primary-stream finalize 触发已下沉到 `runtime/BackgroundTaskStreamTriggerCoordinator.ts`，live-signal reconciliation、authoritative-sync gate，以及 tab badge / finalize 共用的 live/grace-period running predicate 已下沉到 `services/BackgroundTaskLiveSignalCoordinator.ts`，而 tab stream-like/background-task badge 与 rewind-fork 按钮禁用态写回则进一步下沉到 `runtime/TabRuntimeStateBridge.ts`；hidden signal/background-tab sync 以及 active visible-conversation background sync 后的 question refresh、todo/status refresh、completion notice refresh、attention 标记与 active-conversation match 判定编排已下沉到 `services/BackgroundTaskPostSyncCoordinator.ts`，stopped/stale warning notice 的 content、fingerprint、persisted dedupe 与 suppression 已下沉到 `services/BackgroundTaskNoticeStateService.ts`，completion notice 的 queued-state、fingerprint/content 与 persisted dedupe/flush 则下沉到 `services/BackgroundTaskCompletionNoticeService.ts`
+- background task：从 OMO 注入、`toolName === 'task'` 的 tool block、以及后续 system reminder 回写推导任务进度；运行态以内联状态条挂在对应 assistant turn 下，完成态则延迟落成持久化 notice；其中 timeline segment 推导、launch/completion runtime 重建、pending matching，以及 inline notice copy 组装已下沉到 `services/BackgroundTaskTimelineService.ts`，inline panel 的 DOM 创建/挂载/复用/清理已下沉到 `runtime/BackgroundTaskInlinePanelRenderer.ts`，indicator render 与 completion notice queue/flush 顺序已下沉到 `runtime/BackgroundTaskIndicatorCoordinator.ts`，streaming tool-call start/end 与 primary-stream finalize 触发已下沉到 `runtime/BackgroundTaskStreamTriggerCoordinator.ts`，live-signal reconciliation、authoritative-sync gate，以及 tab badge / finalize 共用的 live/grace-period running predicate 已下沉到 `services/BackgroundTaskLiveSignalCoordinator.ts`，而 tab stream-like/background-task badge 与 rewind-fork 按钮禁用态写回则进一步下沉到 `runtime/TabRuntimeStateBridge.ts`；hidden signal/background-tab sync 以及 active visible-conversation background sync 后的 question refresh、todo/status refresh、completion notice refresh、attention 标记与 active-conversation match 判定编排已下沉到 `services/BackgroundTaskPostSyncCoordinator.ts`，stopped/stale warning notice 的 content、fingerprint、suppression runtime 已下沉到 `services/BackgroundTaskNoticeStateService.ts`，completion notice 的 queued-state、fingerprint/content 则下沉到 `services/BackgroundTaskCompletionNoticeService.ts`，而两条链路共用的 persisted assistant notice append/dedupe 与 visible/hidden tab 后续动作已进一步下沉到 `services/PersistentAssistantNoticeService.ts`
 - background task 的 stale 判定现在额外受 `backgroundTaskAwaitingAuthoritativeSync` / hydration 保护：reload 或首次装载后，只有在至少一次权威消息同步完成后，才允许把“仍在运行”降级成 stopped/stale notice；这段 gate + live-signal 决策现在集中在 `BackgroundTaskLiveSignalCoordinator`
 
 session todo 这条子链路现在的边界是：
@@ -356,6 +356,7 @@ session todo 这条子链路现在的边界是：
 - `OpenCodianView`：OpenCode 主动刷新、dock 装配，以及命中 tab 后的 background task 上层路由
 - `ConversationSessionLiveSignalAdapter`：session todo/status live listener 生命周期、session→tab 路由与 active-tab fallback
 - `SessionTodoStateService`：todo/status runtime state、snapshot 规范化、stale notice suppression 与 persisted notice dedupe/restore
+- `PersistentAssistantNoticeService`：session todo stale notice 的历史匹配、持久化 append，以及 visible/hidden tab 后续动作
 
 background task notice 这条子链路现在的边界是：
 
@@ -372,6 +373,7 @@ background task notice 这条子链路现在的边界是：
 - `BackgroundTaskPostSyncCoordinator`：hidden signal/background-tab sync 与 active visible-conversation background sync 后的 question refresh、todo/status refresh、completion notice refresh、attention 标记，以及 visible sync 的 active-conversation match/state-commit 编排
 - `BackgroundTaskNoticeStateService`：stopped/stale notice content、fingerprint、persisted dedupe 与 suppression runtime 协调
 - `BackgroundTaskCompletionNoticeService`：completion notice queued state、content/fingerprint 与 persisted dedupe/append 协调
+- `PersistentAssistantNoticeService`：session todo / background task / diff / model-unavailable 共享的 persisted notice append、conversation save、sync fingerprint 写回，以及 visible/hidden tab 后续动作
 
 ## 外观与控件
 

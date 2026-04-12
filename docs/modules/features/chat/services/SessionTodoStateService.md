@@ -53,12 +53,13 @@ export class SessionTodoStateService {
 ### stale todo 降级
 
 - `suppressStaleSessionTodosIfNeeded()` 继续沿用原先的 inactivity timeout、session live gate 与 background-task activity 参与的 last-activity 计算
-- 当 snapshot 被降级后，服务只通过 host 请求 dock 重绘与持久化 notice 追加，不再把这些时机判断留在 `OpenCodianView`
+- 当 snapshot 被降级后，服务只通过 host 请求 dock 重绘与持久化 notice 追加；具体的 persisted notice append/dedupe 现已复用 `PersistentAssistantNoticeService`
 - 如果 conversation 历史里已经存在完全相同的 stale notice，服务会恢复 suppression，而不会重复写 notice
 
 ## 与 `OpenCodianView` 的边界
 
 - `ConversationSessionLiveSignalAdapter` 负责 session todo/status live listener 的生命周期、session→tab 路由与 active-tab fallback
+- `PersistentAssistantNoticeService` 负责 persisted stale notice 的历史匹配、追加落盘，以及可见/隐藏 tab 的后续动作
 - `OpenCodianView` 仍保留 dock 装配、OpenCode 拉取刷新，以及命中 tab 后与 background task 之间的上层路由
 - `SessionTodoStateService` 负责 todo/status runtime 的纯状态机和 stale notice 协调
 - 这样后续继续推进 master-plan 的 `question / todo / background task` lane 时，可以把 background task stale/notice 边界继续从 view 拆走，而不是再把 session todo 细节塞回主视图

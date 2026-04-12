@@ -240,6 +240,10 @@ import {
   MessageSendPreparationService,
 } from './services/MessageSendPreparationService';
 import {
+  PersistentAssistantNoticeService,
+  type PersistentAssistantNoticeServiceHost,
+} from './services/PersistentAssistantNoticeService';
+import {
   QuestionDockCoordinator,
   type QuestionDockCoordinatorHost,
 } from './services/QuestionDockCoordinator';
@@ -685,6 +689,7 @@ export class OpenCodianView extends ItemView {
   private chatAppearanceStyleEl: HTMLStyleElement | null = null;
   private themeBackgroundRequestId = 0;
   private titleGenerationService: TitleGenerationService;
+  private persistentAssistantNoticeService: PersistentAssistantNoticeService;
   private sessionTodoStateService: SessionTodoStateService;
   private backgroundTaskTimelineService: BackgroundTaskTimelineService;
   private backgroundTaskCompletionNoticeService: BackgroundTaskCompletionNoticeService;
@@ -1238,10 +1243,6 @@ export class OpenCodianView extends ItemView {
     await this.backgroundTaskNoticeStateService.handleStoppedPendingLaunches(tabId, pending);
   }
 
-  private buildBackgroundTaskStoppedNoticeContent(pending: BackgroundTaskLaunchInfo[]): string {
-    return this.backgroundTaskNoticeStateService.buildStoppedNoticeContent(pending);
-  }
-
   private isSuppressedBackgroundTaskSegment(
     segment: BackgroundTaskSegment,
     tabId: TabId | null = this.getActiveTabId(),
@@ -1256,21 +1257,6 @@ export class OpenCodianView extends ItemView {
       tabId,
       conversation,
     );
-  }
-
-  private hasMatchingPersistentAssistantNoticeMessage(
-    title: string,
-    content: string,
-    tone: ChatMessage['noticeTone'],
-    conversation: Conversation | null = this.currentConversation,
-  ): boolean {
-    return conversation?.messages.some((message) =>
-      message.role === 'assistant'
-      && message.displayStyle === 'notice'
-      && message.noticeTitle === title
-      && message.noticeTone === tone
-      && message.content === content,
-    ) ?? false;
   }
 
   constructor(leaf: WorkspaceLeaf, plugin: OpenCodianPlugin) {
@@ -1297,6 +1283,9 @@ export class OpenCodianView extends ItemView {
     this.focusContextRuntimeService = new FocusContextRuntimeService(
       this.app,
       this.createFocusContextRuntimeServiceHost(),
+    );
+    this.persistentAssistantNoticeService = new PersistentAssistantNoticeService(
+      this.createPersistentAssistantNoticeServiceHost(),
     );
     this.sessionTodoStateService = new SessionTodoStateService(this.createSessionTodoStateServiceHost());
     this.backgroundTaskTimelineService = new BackgroundTaskTimelineService(
@@ -1427,6 +1416,32 @@ export class OpenCodianView extends ItemView {
     };
   }
 
+  private createPersistentAssistantNoticeServiceHost(): PersistentAssistantNoticeServiceHost {
+    return {
+      getCurrentConversation: () => this.currentConversation,
+      getActiveTabId: () => this.getActiveTabId(),
+      getConversationSyncFingerprint: (messages) => this.getConversationSyncFingerprint(messages),
+      renderMessage: (message) => this.renderMessage(message),
+      saveConversation: (conversation) => this.plugin.saveConversation(conversation),
+      setTabConversationSyncFingerprint: (tabId, fingerprint) => {
+        const runtime = this.getTabRuntimeState(tabId);
+        if (runtime) {
+          runtime.lastConversationSyncFingerprint = fingerprint;
+        }
+      },
+      handleVisibleNoticeMessageAppended: () => {
+        const runtime = this.getActiveTabRuntimeState();
+        if (runtime?.isHydratingConversation) {
+          runtime.pendingLayoutMutations += 1;
+          return;
+        }
+
+        this.scheduleSettledScrollToBottomIfNeeded();
+      },
+      setTabNeedsAttention: (tabId, needsAttention) => this.setTabNeedsAttention(tabId, needsAttention),
+    };
+  }
+
   private createSessionTodoStateServiceHost(): SessionTodoStateServiceHost {
     return {
       getTabRuntimeState: (tabId: TabId | null) => this.getTabRuntimeState(tabId),
@@ -1441,12 +1456,12 @@ export class OpenCodianView extends ItemView {
         content: string,
         tone: ChatMessage['noticeTone'],
         conversation?: Conversation | null,
-      ) => this.hasMatchingPersistentAssistantNoticeMessage(title, content, tone, conversation),
+      ) => this.persistentAssistantNoticeService.hasMatchingMessage(title, content, tone, conversation),
       appendPersistentAssistantNoticeMessage: (options: {
         title: string;
         content: string;
         tone: ChatMessage['noticeTone'];
-      }) => this.appendPersistentAssistantNoticeMessage(options),
+      }) => this.persistentAssistantNoticeService.appendMessage(options),
     };
   }
 
@@ -1461,12 +1476,12 @@ export class OpenCodianView extends ItemView {
         content: string,
         tone: ChatMessage['noticeTone'],
         conversation?: Conversation | null,
-      ) => this.hasMatchingPersistentAssistantNoticeMessage(title, content, tone, conversation),
+      ) => this.persistentAssistantNoticeService.hasMatchingMessage(title, content, tone, conversation),
       appendPersistentAssistantNoticeMessage: (options: {
         title: string;
         content: string;
         tone: ChatMessage['noticeTone'];
-      }) => this.appendPersistentAssistantNoticeMessage(options),
+      }) => this.persistentAssistantNoticeService.appendMessage(options),
     };
   }
 
@@ -1734,7 +1749,7 @@ export class OpenCodianView extends ItemView {
   private createBackgroundTaskCompletionNoticeServiceHost(): BackgroundTaskCompletionNoticeServiceHost {
     return {
       getTabRuntimeState: (tabId: TabId | null) => this.getTabRuntimeState(tabId),
-      appendPersistentAssistantNoticeMessage: (options) => this.appendPersistentAssistantNoticeMessage(options),
+      appendPersistentAssistantNoticeMessage: (options) => this.persistentAssistantNoticeService.appendMessage(options),
     };
   }
 
@@ -7797,66 +7812,6 @@ export class OpenCodianView extends ItemView {
     }
   }
 
-  private async appendPersistentAssistantNoticeMessage(options: {
-    title: string;
-    content: string;
-    tone?: ChatMessage['noticeTone'];
-    noticeActions?: ChatMessage['noticeActions'];
-    conversation?: Conversation | null;
-    tabId?: TabId | null;
-    timestamp?: number;
-    noticeMeta?: ChatMessage['noticeMeta'];
-  }): Promise<void> {
-    const timestamp = options.timestamp ?? Date.now();
-    const noticeMessage: ChatMessage = {
-      id: `assistant-notice-${timestamp}`,
-      role: 'assistant',
-      content: options.content,
-      timestamp,
-      displayStyle: 'notice',
-      noticeTitle: options.title,
-      noticeTone: options.tone ?? 'warning',
-      noticeActions: options.noticeActions,
-      noticeMeta: options.noticeMeta,
-    };
-
-    const targetConversation = options.conversation ?? this.currentConversation;
-    if (!targetConversation) {
-      return;
-    }
-
-    const targetTabId = options.tabId ?? this.getActiveTabId();
-    const fingerprint = this.getConversationSyncFingerprint([...targetConversation.messages, noticeMessage]);
-    const targetConversationIsVisible = this.currentConversation?.id === targetConversation.id;
-
-    if (targetConversationIsVisible) {
-      await this.renderMessage(noticeMessage);
-    }
-
-    targetConversation.messages.push(noticeMessage);
-    targetConversation.updatedAt = timestamp;
-    await this.plugin.saveConversation(targetConversation);
-
-    if (targetConversationIsVisible) {
-      this.lastConversationSyncFingerprint = fingerprint;
-      const runtime = this.getTabRuntimeState(targetTabId);
-      if (runtime?.isHydratingConversation) {
-        runtime.pendingLayoutMutations += 1;
-      } else {
-        this.scheduleSettledScrollToBottomIfNeeded();
-      }
-      return;
-    }
-
-    if (targetTabId) {
-      const runtime = this.getTabRuntimeState(targetTabId);
-      if (runtime) {
-        runtime.lastConversationSyncFingerprint = fingerprint;
-      }
-      this.setTabNeedsAttention(targetTabId, true);
-    }
-  }
-
   private async appendTurnDiffNoticeIfNeeded(
     conversation: Conversation,
     editedFiles: string[],
@@ -7887,7 +7842,7 @@ export class OpenCodianView extends ItemView {
       return;
     }
 
-    await this.appendPersistentAssistantNoticeMessage({
+    await this.persistentAssistantNoticeService.appendMessage({
       title: t('chat.diffNotice.title'),
       content: this.buildDiffNoticeMarkdown(entries),
       tone: 'info',
@@ -7919,7 +7874,7 @@ export class OpenCodianView extends ItemView {
 
   private async appendModelUnavailableNoticeMessage(): Promise<void> {
     const { title, message } = this.getModelUnavailableNoticeContent();
-    await this.appendPersistentAssistantNoticeMessage({
+    await this.persistentAssistantNoticeService.appendMessage({
       title,
       content: message,
       tone: 'warning',

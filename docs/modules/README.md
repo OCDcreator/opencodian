@@ -133,6 +133,7 @@ docs/modules/
 │   │   │   ├── ConversationViewStateService.md
 │   │   │   ├── MessageFinalizationService.md
 │   │   │   ├── MessageSendPreparationService.md
+│   │   │   ├── PersistentAssistantNoticeService.md
 │   │   │   ├── ScrollManager.md
 │   │   │   └── TitleGenerationService.md
 │   │   ├── tabs/
