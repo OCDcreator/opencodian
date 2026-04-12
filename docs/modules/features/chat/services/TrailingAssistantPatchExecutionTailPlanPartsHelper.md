@@ -5,7 +5,7 @@
 
 ## 概述
 
-`TrailingAssistantPatchExecutionTailPlanPartsHelper` 把 trailing-assistant success-plan 里 execution/tail 这一层 `{ executionPlan, tailOutcomePlans }` 局部 shape 装配从 `ConversationRenderService` 抽成了独立纯 helper：
+`TrailingAssistantPatchExecutionTailPlanPartsHelper` 把 trailing-assistant success-plan 里 execution/tail 这一层 `{ executionPlan, tailOutcomePlans }` 局部 shape 装配从更高层 child-plans orchestration 中抽成了独立纯 helper：
 
 - 接收已分别算好的 `executionPlan` 与 `tailOutcomePlans`
 - 统一返回稳定的 execution-tail plan-parts contract
@@ -28,7 +28,7 @@ export function buildTrailingAssistantPatchExecutionTailPlanParts(
 
 ## 与其他模块的关系
 
-- `ConversationRenderService` 现在会先基于 execution-tail planning-context 分别预建 `executionPlan` 与 `tailOutcomePlans`，再把最终二元 shape 收口委托给这里
+- `TrailingAssistantPatchSuccessChildPlansHelper` 现在会消费这里返回的 execution/tail plan-parts，并继续交给 `TrailingAssistantPatchSuccessPlanHelper`
 - `TrailingAssistantPatchExecutionPlanHelper` 继续只负责 finalize-footer / rerender-content 两种 execution-plan shape
 - `TrailingAssistantPatchTailOutcomePlanHelper` 继续只负责 `{ tailStatePlan, completionDebugPlan }` 这一层 tail-outcome shape
-- `TrailingAssistantPatchSuccessPlanHelper` 则继续在更上一层把 execution/tail plan-parts 与 `turnBodyScopePlan` 合成为最终 success-plan
+- `ConversationRenderService` 现在会先基于 execution-tail planning-context 分别预建 `executionPlan` 与 `tailOutcomePlans`，再把这些 child plans 交给 `TrailingAssistantPatchSuccessChildPlansHelper`，由后者复用这里完成局部 shape 收口
