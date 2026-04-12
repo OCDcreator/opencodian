@@ -8,7 +8,7 @@
 `TrailingAssistantPatchTailOutcomeExecutionTailPlanHelper` 把 trailing-assistant success-plan 里“execution-tail planning-context → tailOutcomePlans”的纯编排从 `ConversationRenderService` 抽成了独立 helper：
 
 - 接收共享的 execution-tail planning-context 与 completion-debug 消息摘要函数
-- 先委托 `TrailingAssistantPatchTailOutcomePlanningContextHelper` 收束 tail-outcome 专用 planning-context
+- 先委托 `TrailingAssistantPatchTailOutcomeExecutionTailPlanSourceContractHelper` 收束 `planningContext + summarizeChatMessageForDebug` 的 tail-outcome source contract
 - 再串联 `TrailingAssistantPatchTailStateTailOutcomePlanHelper`、`TrailingAssistantPatchCompletionDebugTailOutcomePlanHelper` 与 `TrailingAssistantPatchTailOutcomePlanHelper`
 - 最后返回稳定的 `{ tailStatePlan, completionDebugPlan }` contract
 
@@ -30,6 +30,6 @@ export function buildTrailingAssistantPatchTailOutcomePlansFromExecutionTailPlan
 ## 与其他模块的关系
 
 - `ConversationRenderService` 现在只把 execution-tail planning-context 与 `summarizeChatMessageForDebug` 依赖交给这里，不再在 service 内直接串联 tail-outcome planning-context、tail-state plan 与 completion-debug plan
-- `TrailingAssistantPatchTailOutcomePlanningContextHelper` 继续负责把 execution-tail contract 缩成 tail-outcome 专用 planning-context
+- `TrailingAssistantPatchTailOutcomeExecutionTailPlanSourceContractHelper` 现在先把 execution-tail context 与 debug summarizer 收束成窄 source contract，再交给这里继续串联 tail-state / completion-debug / final shape
 - `TrailingAssistantPatchTailStateTailOutcomePlanHelper` 与 `TrailingAssistantPatchCompletionDebugTailOutcomePlanHelper` 继续分别负责各自子计划的纯编排
 - `TrailingAssistantPatchTailOutcomePlanHelper` 继续负责最终 `{ tailStatePlan, completionDebugPlan }` 顶层 shape 收口

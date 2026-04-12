@@ -39,6 +39,6 @@ export function buildTrailingAssistantPatchTailOutcomePlanningContext(
 
 ## 与其他模块的关系
 
-- `TrailingAssistantPatchTailOutcomeExecutionTailPlanHelper` 现在直接把 execution-tail planning-context 交给这里，不再让更上游模块自行拼装 tail-outcome inputs 或 planning-context
+- `TrailingAssistantPatchTailOutcomeExecutionTailPlanSourceContractHelper` 现在先把 execution-tail planning-context 交给这里，再把收束后的 tail-outcome context 与 debug summarizer 一起继续传给更下游的 execution-tail plan helper
 - `TrailingAssistantPatchExecutionTailPlanningContextHelper` 继续负责从 success planning-context 收窄出 execution/tail 共用字段；本 helper 再把它进一步缩成 tail-outcome 专用 contract
 - `TrailingAssistantPatchTailOutcomeExecutionTailPlanHelper` 继续消费这里返回的窄 planning-context，并把最终 `{ tailStatePlan, completionDebugPlan }` 顶层返回交给 `TrailingAssistantPatchTailOutcomePlanHelper`

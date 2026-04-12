@@ -1,34 +1,36 @@
-import type { TrailingAssistantPatchCompletionDebugMessageSummarizer } from './TrailingAssistantPatchCompletionDebugSummaryPlanHelper';
 import { buildTrailingAssistantPatchCompletionDebugPlanFromTailOutcomePlanningContext } from './TrailingAssistantPatchCompletionDebugTailOutcomePlanHelper';
-import type { TrailingAssistantPatchExecutionTailPlanningContext } from './TrailingAssistantPatchExecutionTailPlanningContextHelper';
 import {
   buildTrailingAssistantPatchTailOutcomePlans,
   type TrailingAssistantPatchTailOutcomePlans,
 } from './TrailingAssistantPatchTailOutcomePlanHelper';
-import { buildTrailingAssistantPatchTailOutcomePlanningContext } from './TrailingAssistantPatchTailOutcomePlanningContextHelper';
+import {
+  buildTrailingAssistantPatchTailOutcomeExecutionTailPlanSourceContract,
+  type TrailingAssistantPatchTailOutcomeExecutionTailPlanSourceContractParts,
+} from './TrailingAssistantPatchTailOutcomeExecutionTailPlanSourceContractHelper';
 import { buildTrailingAssistantPatchTailStatePlanFromTailOutcomePlanningContext } from './TrailingAssistantPatchTailStateTailOutcomePlanHelper';
 
-export type TrailingAssistantPatchTailOutcomeExecutionTailPlanSource = {
-  planningContext: TrailingAssistantPatchExecutionTailPlanningContext;
-  summarizeChatMessageForDebug: TrailingAssistantPatchCompletionDebugMessageSummarizer;
-};
+export type TrailingAssistantPatchTailOutcomeExecutionTailPlanSource =
+  TrailingAssistantPatchTailOutcomeExecutionTailPlanSourceContractParts;
 
 export function buildTrailingAssistantPatchTailOutcomePlansFromExecutionTailPlanningContext(
   source: TrailingAssistantPatchTailOutcomeExecutionTailPlanSource,
 ): TrailingAssistantPatchTailOutcomePlans {
-  const planningContext = buildTrailingAssistantPatchTailOutcomePlanningContext(
-    source.planningContext,
-  );
+  const sourceContract =
+    buildTrailingAssistantPatchTailOutcomeExecutionTailPlanSourceContract(
+      source,
+    );
   const tailStatePlan =
-    buildTrailingAssistantPatchTailStatePlanFromTailOutcomePlanningContext(planningContext);
+    buildTrailingAssistantPatchTailStatePlanFromTailOutcomePlanningContext(
+      sourceContract.planningContext,
+    );
 
   return buildTrailingAssistantPatchTailOutcomePlans({
     tailStatePlan,
     completionDebugPlan:
       buildTrailingAssistantPatchCompletionDebugPlanFromTailOutcomePlanningContext({
-        planningContext,
+        planningContext: sourceContract.planningContext,
         tailStatePlan,
-        summarizeChatMessageForDebug: source.summarizeChatMessageForDebug,
+        summarizeChatMessageForDebug: sourceContract.summarizeChatMessageForDebug,
       }),
   });
 }
