@@ -2,7 +2,13 @@ import {
   TabViewActivationBridge,
   type TabViewActivationBridgeHost,
 } from '../../../../src/features/chat/runtime/TabViewActivationBridge';
+import type { BackgroundTaskActivationIndicatorCoordinator } from '../../../../src/features/chat/services/BackgroundTaskActivationIndicatorCoordinator';
 import type { QuestionTodoActivationRefreshCoordinator } from '../../../../src/features/chat/services/QuestionTodoActivationRefreshCoordinator';
+
+type BackgroundTaskActivationIndicatorPort = Pick<
+  BackgroundTaskActivationIndicatorCoordinator,
+  'renderLoadedConversationIndicator'
+>;
 
 type QuestionTodoActivationRefreshPort = Pick<
   QuestionTodoActivationRefreshCoordinator,
@@ -16,10 +22,6 @@ function createHost(callOrder: string[]): jest.Mocked<TabViewActivationBridgeHos
     }),
     refreshActiveFocusContextPreview: jest.fn(() => {
       callOrder.push('focus');
-    }),
-    renderBackgroundTaskIndicatorIfNeeded: jest.fn(() => {
-      callOrder.push('indicator');
-      return Promise.resolve(undefined);
     }),
     scheduleComposerLayoutSync: jest.fn(() => {
       callOrder.push('layout');
@@ -36,6 +38,17 @@ function createHost(callOrder: string[]): jest.Mocked<TabViewActivationBridgeHos
     }),
     updateSendButtonState: jest.fn(() => {
       callOrder.push('send');
+    }),
+  };
+}
+
+function createBackgroundTaskCoordinator(
+  callOrder: string[],
+): jest.Mocked<BackgroundTaskActivationIndicatorPort> {
+  return {
+    renderLoadedConversationIndicator: jest.fn(() => {
+      callOrder.push('indicator');
+      return Promise.resolve(undefined);
     }),
   };
 }
@@ -61,7 +74,12 @@ describe('TabViewActivationBridge', () => {
     const callOrder: string[] = [];
     const host = createHost(callOrder);
     const refreshCoordinator = createRefreshCoordinator(callOrder);
-    const bridge = new TabViewActivationBridge(host, refreshCoordinator);
+    const backgroundTaskCoordinator = createBackgroundTaskCoordinator(callOrder);
+    const bridge = new TabViewActivationBridge(
+      host,
+      refreshCoordinator,
+      backgroundTaskCoordinator,
+    );
 
     bridge.applyActivationPreflight('tab-1');
 
@@ -75,7 +93,12 @@ describe('TabViewActivationBridge', () => {
     const callOrder: string[] = [];
     const host = createHost(callOrder);
     const refreshCoordinator = createRefreshCoordinator(callOrder);
-    const bridge = new TabViewActivationBridge(host, refreshCoordinator);
+    const backgroundTaskCoordinator = createBackgroundTaskCoordinator(callOrder);
+    const bridge = new TabViewActivationBridge(
+      host,
+      refreshCoordinator,
+      backgroundTaskCoordinator,
+    );
 
     bridge.applyStreamingActivationOutcome('tab-1', 'session-1');
 
@@ -95,7 +118,12 @@ describe('TabViewActivationBridge', () => {
     const callOrder: string[] = [];
     const host = createHost(callOrder);
     const refreshCoordinator = createRefreshCoordinator(callOrder);
-    const bridge = new TabViewActivationBridge(host, refreshCoordinator);
+    const backgroundTaskCoordinator = createBackgroundTaskCoordinator(callOrder);
+    const bridge = new TabViewActivationBridge(
+      host,
+      refreshCoordinator,
+      backgroundTaskCoordinator,
+    );
 
     bridge.applyEmptyActivationOutcome('tab-1');
 
@@ -108,11 +136,18 @@ describe('TabViewActivationBridge', () => {
     const callOrder: string[] = [];
     const host = createHost(callOrder);
     const refreshCoordinator = createRefreshCoordinator(callOrder);
-    const bridge = new TabViewActivationBridge(host, refreshCoordinator);
+    const backgroundTaskCoordinator = createBackgroundTaskCoordinator(callOrder);
+    const bridge = new TabViewActivationBridge(
+      host,
+      refreshCoordinator,
+      backgroundTaskCoordinator,
+    );
 
     await bridge.applyLoadedConversationPostRenderOutcome('tab-1', 'session-1');
 
-    expect(host.renderBackgroundTaskIndicatorIfNeeded).toHaveBeenCalledWith('tab-1');
+    expect(backgroundTaskCoordinator.renderLoadedConversationIndicator).toHaveBeenCalledWith(
+      'tab-1',
+    );
     expect(refreshCoordinator.applyConversationActivation).toHaveBeenCalledWith(
       'tab-1',
       'session-1',
@@ -124,7 +159,12 @@ describe('TabViewActivationBridge', () => {
     const callOrder: string[] = [];
     const host = createHost(callOrder);
     const refreshCoordinator = createRefreshCoordinator(callOrder);
-    const bridge = new TabViewActivationBridge(host, refreshCoordinator);
+    const backgroundTaskCoordinator = createBackgroundTaskCoordinator(callOrder);
+    const bridge = new TabViewActivationBridge(
+      host,
+      refreshCoordinator,
+      backgroundTaskCoordinator,
+    );
 
     await bridge.applyLoadedConversationHydrationTail();
 

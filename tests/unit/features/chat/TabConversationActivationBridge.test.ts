@@ -3,6 +3,7 @@ import {
   TabConversationActivationBridge,
   type TabConversationActivationBridgeHost,
 } from '../../../../src/features/chat/runtime/TabConversationActivationBridge';
+import type { BackgroundTaskActivationIndicatorCoordinator } from '../../../../src/features/chat/services/BackgroundTaskActivationIndicatorCoordinator';
 import type { QuestionTodoActivationRefreshCoordinator } from '../../../../src/features/chat/services/QuestionTodoActivationRefreshCoordinator';
 import type { TabConversationStateBridge } from '../../../../src/features/chat/runtime/TabConversationStateBridge';
 import type { TabViewActivationBridge } from '../../../../src/features/chat/runtime/TabViewActivationBridge';
@@ -15,6 +16,13 @@ type TabConversationStatePort = Pick<
 type QuestionTodoActivationRefreshPort = Pick<
   QuestionTodoActivationRefreshCoordinator,
   'applyConversationActivation'
+>;
+
+type BackgroundTaskActivationIndicatorPort = Pick<
+  BackgroundTaskActivationIndicatorCoordinator,
+  | 'prepareOpenConversation'
+  | 'syncOpenConversationState'
+  | 'renderOpenConversationIndicator'
 >;
 
 type TabViewActivationPort = Pick<
@@ -45,11 +53,7 @@ function createHost(
   overrides: Partial<jest.Mocked<TabConversationActivationBridgeHost>> = {},
 ): jest.Mocked<TabConversationActivationBridgeHost> {
   return {
-    getCurrentConversationId: jest.fn().mockReturnValue('previous-conversation'),
     getActiveTabId: jest.fn().mockReturnValue('tab-1'),
-    resetBackgroundTaskIndicator: jest.fn(() => {
-      callOrder.push('resetBackgroundTaskIndicator');
-    }),
     clearMessagesContainer: jest.fn(() => {
       callOrder.push('clearMessagesContainer');
     }),
@@ -62,13 +66,6 @@ function createHost(
     syncActiveTabContextUsageIdentity: jest.fn(() => {
       callOrder.push('syncActiveTabContextUsageIdentity');
     }),
-    syncBackgroundTaskStateFromConversation: jest.fn(() => {
-      callOrder.push('syncBackgroundTaskStateFromConversation');
-    }),
-    renderBackgroundTaskIndicatorIfNeeded: jest.fn(() => {
-      callOrder.push('renderBackgroundTaskIndicatorIfNeeded');
-      return Promise.resolve(undefined);
-    }),
     refreshActiveTabContextUsageFromServer: jest.fn(() => {
       callOrder.push('refreshActiveTabContextUsageFromServer');
       return Promise.resolve(undefined);
@@ -77,6 +74,22 @@ function createHost(
       callOrder.push('scheduleSettledScrollToBottom');
     }),
     ...overrides,
+  };
+}
+
+function createBackgroundTaskCoordinator(
+  callOrder: string[],
+): jest.Mocked<BackgroundTaskActivationIndicatorPort> {
+  return {
+    prepareOpenConversation: jest.fn(() => {
+      callOrder.push('prepareOpenConversation');
+    }),
+    syncOpenConversationState: jest.fn(() => {
+      callOrder.push('syncOpenConversationState');
+    }),
+    renderOpenConversationIndicator: jest.fn(() => {
+      callOrder.push('renderOpenConversationIndicator');
+    }),
   };
 }
 
@@ -126,11 +139,13 @@ describe('TabConversationActivationBridge', () => {
     const tabConversationStateBridge = createTabConversationStateBridge(callOrder);
     const tabViewActivationBridge = createTabViewActivationBridge(callOrder);
     const refreshCoordinator = createRefreshCoordinator(callOrder);
+    const backgroundTaskCoordinator = createBackgroundTaskCoordinator(callOrder);
     const bridge = new TabConversationActivationBridge(
       host,
       tabConversationStateBridge,
       tabViewActivationBridge,
       refreshCoordinator,
+      backgroundTaskCoordinator,
     );
 
     bridge.applyEmptyTabActivation('tab-1');
@@ -153,11 +168,13 @@ describe('TabConversationActivationBridge', () => {
     const tabConversationStateBridge = createTabConversationStateBridge(callOrder);
     const tabViewActivationBridge = createTabViewActivationBridge(callOrder);
     const refreshCoordinator = createRefreshCoordinator(callOrder);
+    const backgroundTaskCoordinator = createBackgroundTaskCoordinator(callOrder);
     const bridge = new TabConversationActivationBridge(
       host,
       tabConversationStateBridge,
       tabViewActivationBridge,
       refreshCoordinator,
+      backgroundTaskCoordinator,
     );
 
     bridge.applyStreamingConversationActivation('tab-1', conversation);
@@ -177,7 +194,7 @@ describe('TabConversationActivationBridge', () => {
       'tab-1',
       conversation.openCodeSessionId,
     );
-    expect(host.resetBackgroundTaskIndicator).not.toHaveBeenCalled();
+    expect(backgroundTaskCoordinator.prepareOpenConversation).not.toHaveBeenCalled();
     expect(callOrder).toEqual([
       'applyActiveConversation',
       'commitConversationSyncBaseline',
@@ -192,11 +209,13 @@ describe('TabConversationActivationBridge', () => {
     const tabConversationStateBridge = createTabConversationStateBridge(callOrder);
     const tabViewActivationBridge = createTabViewActivationBridge(callOrder);
     const refreshCoordinator = createRefreshCoordinator(callOrder);
+    const backgroundTaskCoordinator = createBackgroundTaskCoordinator(callOrder);
     const bridge = new TabConversationActivationBridge(
       host,
       tabConversationStateBridge,
       tabViewActivationBridge,
       refreshCoordinator,
+      backgroundTaskCoordinator,
     );
 
     bridge.applyLoadedConversationActivation('tab-1', conversation);
@@ -224,11 +243,13 @@ describe('TabConversationActivationBridge', () => {
     const tabConversationStateBridge = createTabConversationStateBridge(callOrder);
     const tabViewActivationBridge = createTabViewActivationBridge(callOrder);
     const refreshCoordinator = createRefreshCoordinator(callOrder);
+    const backgroundTaskCoordinator = createBackgroundTaskCoordinator(callOrder);
     const bridge = new TabConversationActivationBridge(
       host,
       tabConversationStateBridge,
       tabViewActivationBridge,
       refreshCoordinator,
+      backgroundTaskCoordinator,
     );
 
     bridge.openConversation(conversation);
@@ -241,7 +262,8 @@ describe('TabConversationActivationBridge', () => {
         resetSessionState: true,
       },
     );
-    expect(host.syncBackgroundTaskStateFromConversation).toHaveBeenCalledWith(
+    expect(backgroundTaskCoordinator.prepareOpenConversation).toHaveBeenCalledWith(conversation);
+    expect(backgroundTaskCoordinator.syncOpenConversationState).toHaveBeenCalledWith(
       conversation,
       'tab-1',
     );
@@ -250,40 +272,40 @@ describe('TabConversationActivationBridge', () => {
       conversation.openCodeSessionId,
     );
     expect(callOrder).toEqual([
-      'resetBackgroundTaskIndicator',
+      'prepareOpenConversation',
       'applyActiveConversation',
       'clearMessagesContainer',
       'resetTurnState',
       'commitConversationSyncBaseline',
       'updateModelSelectorDisplay',
       'syncActiveTabContextUsageIdentity',
-      'syncBackgroundTaskStateFromConversation',
+      'syncOpenConversationState',
       'applyConversationActivation',
-      'renderBackgroundTaskIndicatorIfNeeded',
+      'renderOpenConversationIndicator',
       'refreshActiveTabContextUsageFromServer',
       'scheduleSettledScrollToBottom',
     ]);
   });
 
-  it('keeps the indicator when reopening the same conversation', () => {
+  it('delegates open-conversation background-task preparation', () => {
     const callOrder: string[] = [];
     const conversation = createConversation('same-conversation');
-    const host = createHost(callOrder, {
-      getCurrentConversationId: jest.fn().mockReturnValue(conversation.id),
-    });
+    const host = createHost(callOrder);
     const tabConversationStateBridge = createTabConversationStateBridge(callOrder);
     const tabViewActivationBridge = createTabViewActivationBridge(callOrder);
     const refreshCoordinator = createRefreshCoordinator(callOrder);
+    const backgroundTaskCoordinator = createBackgroundTaskCoordinator(callOrder);
     const bridge = new TabConversationActivationBridge(
       host,
       tabConversationStateBridge,
       tabViewActivationBridge,
       refreshCoordinator,
+      backgroundTaskCoordinator,
     );
 
     bridge.openConversation(conversation);
 
-    expect(host.resetBackgroundTaskIndicator).not.toHaveBeenCalled();
+    expect(backgroundTaskCoordinator.prepareOpenConversation).toHaveBeenCalledWith(conversation);
     expect(tabConversationStateBridge.commitConversationSyncBaseline).toHaveBeenCalledWith(
       conversation.messages,
     );

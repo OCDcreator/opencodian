@@ -165,6 +165,10 @@ import {
   type BackgroundTaskLiveSignalCoordinatorHost,
 } from './services/BackgroundTaskLiveSignalCoordinator';
 import {
+  BackgroundTaskActivationIndicatorCoordinator,
+  type BackgroundTaskActivationIndicatorCoordinatorHost,
+} from './services/BackgroundTaskActivationIndicatorCoordinator';
+import {
   BackgroundTaskNoticeStateService,
   type BackgroundTaskNoticeStateServiceHost,
 } from './services/BackgroundTaskNoticeStateService';
@@ -1149,6 +1153,10 @@ export class OpenCodianView extends ItemView {
       this.createQuestionTodoActivationRefreshCoordinatorHost(),
       this.questionTodoStatusRefreshCoordinator,
     );
+    const backgroundTaskActivationIndicatorCoordinator =
+      new BackgroundTaskActivationIndicatorCoordinator(
+        this.createBackgroundTaskActivationIndicatorCoordinatorHost(),
+      );
     this.backgroundTaskNoticeStateService = new BackgroundTaskNoticeStateService(
       this.createBackgroundTaskNoticeStateServiceHost(),
     );
@@ -1174,6 +1182,7 @@ export class OpenCodianView extends ItemView {
     this.tabViewActivationBridge = new TabViewActivationBridge(
       this.createTabViewActivationBridgeHost(),
       questionTodoActivationRefreshCoordinator,
+      backgroundTaskActivationIndicatorCoordinator,
     );
     this.conversationHydrationOutcomeBridge = new ConversationHydrationOutcomeBridge(
       this.createConversationHydrationOutcomeBridgeHost(),
@@ -1185,6 +1194,7 @@ export class OpenCodianView extends ItemView {
       this.tabConversationStateBridge,
       this.tabViewActivationBridge,
       questionTodoActivationRefreshCoordinator,
+      backgroundTaskActivationIndicatorCoordinator,
     );
     this.tabRuntimeStateBridge = new TabRuntimeStateBridge(this.createTabRuntimeStateBridgeHost());
     const conversationSyncServices = createConversationSyncServices(
@@ -1488,7 +1498,6 @@ export class OpenCodianView extends ItemView {
       refreshActiveFocusContextPreview: () => {
         this.refreshActiveFocusContextPreview();
       },
-      renderBackgroundTaskIndicatorIfNeeded: (tabId) => this.renderBackgroundTaskIndicatorIfNeeded(tabId),
       scheduleComposerLayoutSync: () => {
         this.scheduleComposerLayoutSync();
       },
@@ -1507,11 +1516,7 @@ export class OpenCodianView extends ItemView {
 
   private createTabConversationActivationBridgeHost(): TabConversationActivationBridgeHost {
     return {
-      getCurrentConversationId: () => this.currentConversation?.id ?? null,
       getActiveTabId: () => this.getActiveTabId(),
-      resetBackgroundTaskIndicator: () => {
-        this.resetBackgroundTaskIndicator();
-      },
       clearMessagesContainer: () => {
         this.messagesContainer?.empty();
       },
@@ -1524,14 +1529,24 @@ export class OpenCodianView extends ItemView {
       syncActiveTabContextUsageIdentity: () => {
         this.syncActiveTabContextUsageIdentity();
       },
-      syncBackgroundTaskStateFromConversation: (conversation, tabId) => {
-        this.syncBackgroundTaskStateFromConversation(conversation, tabId);
-      },
-      renderBackgroundTaskIndicatorIfNeeded: (tabId) => this.renderBackgroundTaskIndicatorIfNeeded(tabId),
       refreshActiveTabContextUsageFromServer: () => this.refreshActiveTabContextUsageFromServer(),
       scheduleSettledScrollToBottom: (tabId) => {
         this.scheduleSettledScrollToBottom(tabId);
       },
+    };
+  }
+
+  private createBackgroundTaskActivationIndicatorCoordinatorHost(): BackgroundTaskActivationIndicatorCoordinatorHost {
+    return {
+      getCurrentConversationId: () => this.currentConversation?.id ?? null,
+      resetBackgroundTaskIndicator: () => {
+        this.resetBackgroundTaskIndicator();
+      },
+      syncBackgroundTaskStateFromConversation: (conversation, tabId) => {
+        this.syncBackgroundTaskStateFromConversation(conversation, tabId);
+      },
+      renderBackgroundTaskIndicatorIfNeeded: (tabId) =>
+        this.renderBackgroundTaskIndicatorIfNeeded(tabId),
     };
   }
 

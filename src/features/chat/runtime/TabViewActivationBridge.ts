@@ -1,5 +1,11 @@
+import type { BackgroundTaskActivationIndicatorCoordinator } from '../services/BackgroundTaskActivationIndicatorCoordinator';
 import type { QuestionTodoActivationRefreshCoordinator } from '../services/QuestionTodoActivationRefreshCoordinator';
 import type { TabId } from '../tabs';
+
+type BackgroundTaskActivationIndicatorPort = Pick<
+  BackgroundTaskActivationIndicatorCoordinator,
+  'renderLoadedConversationIndicator'
+>;
 
 type QuestionTodoActivationRefreshPort = Pick<
   QuestionTodoActivationRefreshCoordinator,
@@ -9,7 +15,6 @@ type QuestionTodoActivationRefreshPort = Pick<
 export interface TabViewActivationBridgeHost {
   setActiveMessagesPane(tabId: TabId): void;
   refreshActiveFocusContextPreview(): void;
-  renderBackgroundTaskIndicatorIfNeeded(tabId?: TabId | null): Promise<void>;
   scheduleComposerLayoutSync(): void;
   updateModelSelectorDisplay(): void;
   syncActiveTabContextUsageIdentity(): void;
@@ -21,6 +26,7 @@ export class TabViewActivationBridge {
   constructor(
     private readonly host: TabViewActivationBridgeHost,
     private readonly questionTodoActivationRefreshCoordinator: QuestionTodoActivationRefreshPort,
+    private readonly backgroundTaskActivationIndicatorCoordinator: BackgroundTaskActivationIndicatorPort,
   ) {}
 
   applyActivationPreflight(tabId: TabId): void {
@@ -47,7 +53,7 @@ export class TabViewActivationBridge {
     tabId: TabId | null,
     sessionId: string | null,
   ): Promise<void> {
-    await this.host.renderBackgroundTaskIndicatorIfNeeded(tabId);
+    await this.backgroundTaskActivationIndicatorCoordinator.renderLoadedConversationIndicator(tabId);
     this.questionTodoActivationRefreshCoordinator.applyConversationActivation(tabId, sessionId);
   }
 

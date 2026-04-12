@@ -1,4 +1,5 @@
 import type { Conversation } from '../../../core/types';
+import type { BackgroundTaskActivationIndicatorCoordinator } from '../services/BackgroundTaskActivationIndicatorCoordinator';
 import type { QuestionTodoActivationRefreshCoordinator } from '../services/QuestionTodoActivationRefreshCoordinator';
 import type { TabId } from '../tabs';
 import type { TabConversationStateBridge } from './TabConversationStateBridge';
@@ -14,21 +15,24 @@ type QuestionTodoActivationRefreshPort = Pick<
   'applyConversationActivation'
 >;
 
+type BackgroundTaskActivationIndicatorPort = Pick<
+  BackgroundTaskActivationIndicatorCoordinator,
+  | 'prepareOpenConversation'
+  | 'syncOpenConversationState'
+  | 'renderOpenConversationIndicator'
+>;
+
 type TabViewActivationPort = Pick<
   TabViewActivationBridge,
   'applyEmptyActivationOutcome' | 'applyStreamingActivationOutcome'
 >;
 
 export interface TabConversationActivationBridgeHost {
-  getCurrentConversationId(): string | null;
   getActiveTabId(): TabId | null;
-  resetBackgroundTaskIndicator(): void;
   clearMessagesContainer(): void;
   resetTurnState(): void;
   updateModelSelectorDisplay(): void;
   syncActiveTabContextUsageIdentity(): void;
-  syncBackgroundTaskStateFromConversation(conversation: Conversation, tabId: TabId | null): void;
-  renderBackgroundTaskIndicatorIfNeeded(tabId: TabId | null): Promise<void>;
   refreshActiveTabContextUsageFromServer(): Promise<void>;
   scheduleSettledScrollToBottom(tabId: TabId | null): void;
 }
@@ -39,6 +43,7 @@ export class TabConversationActivationBridge {
     private readonly tabConversationStateBridge: TabConversationStatePort,
     private readonly tabViewActivationBridge: TabViewActivationPort,
     private readonly questionTodoActivationRefreshCoordinator: QuestionTodoActivationRefreshPort,
+    private readonly backgroundTaskActivationIndicatorCoordinator: BackgroundTaskActivationIndicatorPort,
   ) {}
 
   applyEmptyTabActivation(tabId: TabId): void {
@@ -68,9 +73,7 @@ export class TabConversationActivationBridge {
   }
 
   openConversation(conversation: Conversation): void {
-    if (this.host.getCurrentConversationId() !== conversation.id) {
-      this.host.resetBackgroundTaskIndicator();
-    }
+    this.backgroundTaskActivationIndicatorCoordinator.prepareOpenConversation(conversation);
 
     const activeTabId = this.host.getActiveTabId();
     this.tabConversationStateBridge.applyActiveConversation(activeTabId, conversation, {
@@ -81,12 +84,15 @@ export class TabConversationActivationBridge {
     this.tabConversationStateBridge.commitConversationSyncBaseline(conversation.messages);
     this.host.updateModelSelectorDisplay();
     this.host.syncActiveTabContextUsageIdentity();
-    this.host.syncBackgroundTaskStateFromConversation(conversation, activeTabId);
+    this.backgroundTaskActivationIndicatorCoordinator.syncOpenConversationState(
+      conversation,
+      activeTabId,
+    );
     this.questionTodoActivationRefreshCoordinator.applyConversationActivation(
       activeTabId,
       conversation.openCodeSessionId,
     );
-    void this.host.renderBackgroundTaskIndicatorIfNeeded(activeTabId);
+    this.backgroundTaskActivationIndicatorCoordinator.renderOpenConversationIndicator(activeTabId);
     void this.host.refreshActiveTabContextUsageFromServer();
     this.host.scheduleSettledScrollToBottom(activeTabId);
   }
