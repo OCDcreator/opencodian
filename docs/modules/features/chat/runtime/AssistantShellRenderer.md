@@ -18,6 +18,7 @@
 ## 设计目的
 
 - 让 `OpenCodianView` 不再直接持有 streaming assistant shell DOM 细节
+- 让 `OpenCodianView` 通过 `AssistantShellViewHostAdapter.ts` 统一装配 shell / notice / persisted-footer 相关 host，而不是继续散落多个私有 host factory
 - 让 `SendPipelineShellPort` 的实现收敛到一个专用 shell adapter，而不是继续分散在 view 私有方法里
 - 让 shell 可见性和 timestamp 行行为可以脱离大视图类单测
 

@@ -78,17 +78,15 @@ import { LiquidDiamondDemoController } from './liquidDiamondDemo';
 import { buildMessageRenderGroups, mergeAssistantMessagesForRender } from './renderGroups';
 import { type CollapsibleState, setupCollapsible } from './rendering/collapsible';
 import {
-  type AssistantNoticeRenderHost,
   buildStreamErrorNotice,
-  renderAssistantPlaceholderAsNotice,
 } from './runtime/AssistantNoticeRenderer';
 import {
   renderAssistantPlainTextFallbackContent,
 } from './runtime/AssistantPlainTextFallbackRenderer';
 import {
-  AssistantShellRenderer,
-  type AssistantShellRendererHost,
-} from './runtime/AssistantShellRenderer';
+  AssistantShellViewHostAdapter,
+  type AssistantShellViewHostAdapterHost,
+} from './runtime/AssistantShellViewHostAdapter';
 import {
   renderAssistantStructuredContent,
 } from './runtime/AssistantStructuredContentRenderer';
@@ -127,7 +125,6 @@ import {
 import {
   PermissionInlineCardRenderer,
 } from './runtime/PermissionInlineCardRenderer';
-import { PersistedAssistantFooterFinalizer } from './runtime/PersistedAssistantFooterFinalizer';
 import {
   buildQuestionResolutionCardRenderPlan,
 } from './runtime/QuestionResolutionCardRenderer';
@@ -735,8 +732,7 @@ export class OpenCodianView extends ItemView {
   private conversationRenderService: ConversationRenderService;
   private messageSendPreparationService: MessageSendPreparationService;
   private messageFinalizationService: MessageFinalizationService;
-  private assistantShellRenderer: AssistantShellRenderer;
-  private persistedAssistantFooterFinalizer: PersistedAssistantFooterFinalizer;
+  private assistantShellViewHostAdapter: AssistantShellViewHostAdapter;
   private backgroundTaskInlinePanelRenderer: BackgroundTaskInlinePanelRenderer;
   private backgroundTaskIndicatorCoordinator: BackgroundTaskIndicatorCoordinator;
   private backgroundTaskStreamTriggerCoordinator: BackgroundTaskStreamTriggerCoordinator;
@@ -1246,8 +1242,9 @@ export class OpenCodianView extends ItemView {
     this.conversationRenderService = new ConversationRenderService(this.createConversationRenderHost());
     this.messageSendPreparationService = new MessageSendPreparationService(this.createMessageSendPreparationHost());
     this.messageFinalizationService = new MessageFinalizationService(this.createMessageFinalizationHost());
-    this.assistantShellRenderer = new AssistantShellRenderer(this.createAssistantShellRendererHost());
-    this.persistedAssistantFooterFinalizer = new PersistedAssistantFooterFinalizer(this.assistantShellRenderer);
+    this.assistantShellViewHostAdapter = new AssistantShellViewHostAdapter(
+      this.createAssistantShellViewHostAdapterHost(),
+    );
     this.streamingInlineCardRenderer = new StreamingInlineCardRenderer(this.createStreamingInlineCardRendererHost());
     this.permissionInlineCardRenderer = new PermissionInlineCardRenderer(this.streamingInlineCardRenderer);
     this.questionRuntimeServices = createQuestionRuntimeServices(
@@ -1863,7 +1860,7 @@ export class OpenCodianView extends ItemView {
       renderMessageContent: (messageEl, contentEl, message) =>
         this.renderAssistantMessageContent(messageEl, contentEl, message),
       finalizePersistedFooter: (messageEl, message) => {
-        this.persistedAssistantFooterFinalizer.finalizeFooter(messageEl, message);
+        this.assistantShellViewHostAdapter.finalizePersistedFooter(messageEl, message);
       },
     };
   }
@@ -2027,20 +2024,7 @@ export class OpenCodianView extends ItemView {
       convertToStreamingChunk: (chunk) => this.convertToStreamingChunk(chunk),
       getFriendlyStreamErrorMessage: (rawMessage) => this.getFriendlyStreamErrorMessage(rawMessage),
     };
-    const shellPort: SendPipelineShellPort = {
-      createAssistantMessageElement: (tabId, hiddenUntilVisible) =>
-        this.assistantShellRenderer.createAssistantMessageElement(tabId, hiddenUntilVisible),
-      revealStreamingAssistantMessageElement: (tabId) =>
-        this.assistantShellRenderer.revealStreamingAssistantMessageElement(tabId),
-      renderAssistantPlaceholderAsNotice: (messageEl, noticeMessage, reason) =>
-        renderAssistantPlaceholderAsNotice({
-          host: this.createAssistantNoticeRenderHost(),
-          messageEl,
-          noticeMessage,
-          reason,
-        }),
-      addTimestampWithCopyButton: (options) => this.assistantShellRenderer.addTimestampWithCopyButton(options),
-    };
+    const shellPort: SendPipelineShellPort = this.assistantShellViewHostAdapter.createSendPipelineShellPort();
     const persistencePort: SendPipelinePersistencePort = {
       saveConversation: (conversation) => this.plugin.saveConversation(conversation),
     };
@@ -2065,7 +2049,7 @@ export class OpenCodianView extends ItemView {
     };
   }
 
-  private createAssistantShellRendererHost(): AssistantShellRendererHost {
+  private createAssistantShellViewHostAdapterHost(): AssistantShellViewHostAdapterHost {
     return {
       getActiveTabId: () => this.getActiveTabId(),
       getTabRuntimeState: (tabId) => this.getTabRuntimeState(tabId),
@@ -2081,6 +2065,7 @@ export class OpenCodianView extends ItemView {
         copyBtn.innerHTML = COPY_ICON;
         this.attachCopyButtonBehavior(copyBtn, content);
       },
+      renderNoticeCard: (container, message) => this.renderNoticeCard(container, message),
     };
   }
 
@@ -2089,7 +2074,7 @@ export class OpenCodianView extends ItemView {
       getActiveTabId: () => this.getActiveTabId(),
       getTabRuntimeState: (tabId) => this.getTabRuntimeState(tabId),
       revealStreamingAssistantMessageElement: (tabId) =>
-        this.assistantShellRenderer.revealStreamingAssistantMessageElement(tabId),
+        this.assistantShellViewHostAdapter.revealStreamingAssistantMessageElement(tabId),
     };
   }
 
@@ -2102,16 +2087,6 @@ export class OpenCodianView extends ItemView {
       getSessionIdForTab: (tabId) => this.getSessionIdForTab(tabId),
       keepQuestionCardPinnedToBottom: (tabId) => {
         this.keepQuestionCardPinnedToBottom(tabId);
-      },
-    };
-  }
-
-  private createAssistantNoticeRenderHost(): AssistantNoticeRenderHost {
-    return {
-      addTimestampWithCopyButton: (options) => this.assistantShellRenderer.addTimestampWithCopyButton(options),
-      renderNoticeCard: (container, message) => this.renderNoticeCard(container, message),
-      setStreamingAssistantMessageVisibility: (messageEl, visible, reason) => {
-        this.setStreamingAssistantMessageVisibility(messageEl, visible, reason);
       },
     };
   }
@@ -4886,7 +4861,7 @@ export class OpenCodianView extends ItemView {
 
     const timestamp = Date.now();
     const modelId = this.formatModelId(this.getCurrentSessionModel());
-    this.assistantShellRenderer.addTimestampWithCopyButton({
+    this.assistantShellViewHostAdapter.addTimestampWithCopyButton({
       messageEl,
       timestamp,
       content: message,
@@ -4969,9 +4944,8 @@ export class OpenCodianView extends ItemView {
     const timestamp = Date.now();
     const modelId = this.formatModelId(this.getCurrentSessionModel());
     const noticeMessage = buildStreamErrorNotice(timestamp, message, modelId);
-    const { messageEl } = this.assistantShellRenderer.createAssistantMessageElement(activeTabId);
-    await renderAssistantPlaceholderAsNotice({
-      host: this.createAssistantNoticeRenderHost(),
+    const { messageEl } = this.assistantShellViewHostAdapter.createAssistantMessageElement(activeTabId);
+    await this.assistantShellViewHostAdapter.renderAssistantPlaceholderAsNotice({
       messageEl,
       noticeMessage,
       reason: 'render-stream-error-notice',
@@ -5069,7 +5043,7 @@ export class OpenCodianView extends ItemView {
     if (message.displayStyle === 'notice') {
       messageEl.addClass('opencodian-message--notice');
       await this.renderNoticeCard(content, message);
-      this.assistantShellRenderer.addTimestampWithCopyButton({
+      this.assistantShellViewHostAdapter.addTimestampWithCopyButton({
         messageEl,
         timestamp: message.timestamp,
         modelId: message.modelId,
@@ -5112,7 +5086,7 @@ export class OpenCodianView extends ItemView {
       });
     }
 
-    this.persistedAssistantFooterFinalizer.finalizeFooter(messageEl, message);
+    this.assistantShellViewHostAdapter.finalizePersistedFooter(messageEl, message);
   }
 
   private getAssistantBodySignature(message: ChatMessage): string {
@@ -6472,7 +6446,7 @@ export class OpenCodianView extends ItemView {
   }
 
   private async renderSyncedAssistantMessageWithReveal(message: ChatMessage): Promise<void> {
-    const { messageEl, contentEl } = this.assistantShellRenderer.createAssistantMessageElement();
+    const { messageEl, contentEl } = this.assistantShellViewHostAdapter.createAssistantMessageElement();
     const textEl = contentEl.createDiv({ cls: 'streaming-text-block' });
     const chunks = this.splitPseudoStreamChunks(message.content);
     const delayMs = this.getPseudoStreamDelay(chunks.length);
@@ -6494,7 +6468,7 @@ export class OpenCodianView extends ItemView {
     if (messageEl.style.visibility === 'hidden') {
       messageEl.style.visibility = '';
     }
-    this.assistantShellRenderer.addTimestampWithCopyButton({
+    this.assistantShellViewHostAdapter.addTimestampWithCopyButton({
       messageEl,
       timestamp: message.timestamp,
       content: message.content,

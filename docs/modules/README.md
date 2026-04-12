@@ -94,6 +94,7 @@ docs/modules/
 │   │   │   ├── AssistantCopyContent.md
 │   │   │   ├── AssistantFooterPayload.md
 │   │   │   ├── AssistantShellRenderer.md
+│   │   │   ├── AssistantShellViewHostAdapter.md
 │   │   │   ├── AssistantNoticeRenderer.md
 │   │   │   ├── AssistantPlainTextFallbackRenderer.md
 │   │   │   ├── AssistantStructuredContentRenderer.md

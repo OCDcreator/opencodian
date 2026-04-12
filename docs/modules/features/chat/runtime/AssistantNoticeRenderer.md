@@ -22,6 +22,6 @@
 
 ## 注意事项
 
-- 这个模块仍通过 `AssistantNoticeRenderHost` 复用 `OpenCodianView.renderNoticeCard()`，不要在这里复制完整 notice card 样式逻辑。
+- 这个模块仍通过 `AssistantNoticeRenderHost` 复用 view 的 notice card 渲染；当前这层 host 已由 `AssistantShellViewHostAdapter.ts` 统一装配，不要在这里复制完整 notice card 样式逻辑。
 - assistant shell 的创建、reveal 与 timestamp row 具体实现已经迁到 `AssistantShellRenderer.ts`；这里继续只关心 notice 改写流程。
 - notice id / `sourceMessageId` 规则会影响后续 server sync 是否保留本地 error notice，修改时需要同步检查 `streamErrorNoticeSync` 测试。

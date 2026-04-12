@@ -22,6 +22,6 @@
 ## 注意事项
 
 - 这个 helper 只适用于 persisted assistant message footer；streaming shell、notice 与 pseudo-stream footer 仍在各自 runtime 路径内单独收尾
-- `ConversationRenderService` 复用已有 assistant 正文时，也通过 `ConversationRenderHost.assistantTailRender.finalizePersistedFooter()` 这条更窄的 assistant-tail bridge 回到这里，而不是暴露散落在大 host 上的 footer callback
+- `ConversationRenderService` 复用已有 assistant 正文时，也通过 `ConversationRenderHost.assistantTailRender.finalizePersistedFooter()` 这条更窄的 assistant-tail bridge 回到这里，而不是暴露散落在大 host 上的 footer callback；`OpenCodianView` 侧的 host 装配现已交给 `AssistantShellViewHostAdapter.ts`
 - DOM 最终仍由 `AssistantShellRenderer` 创建和更新；本模块只负责 bridge，不复制时间行或 copy button 的实现
 - 如果 persisted assistant footer 未来新增字段，应优先扩展 `AssistantFooterPayload`，再由这里透传给 renderer
