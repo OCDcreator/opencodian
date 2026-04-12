@@ -185,6 +185,7 @@ tab stream-like badge、background-task badge、rewind/fork 按钮禁用态，�
 question dock 与 pending-question refresh 的主要 runtime/UI ownership 现在由 `QuestionDockCoordinator` 承担：
 
 - `OpenCodianView` 只保留更薄的 `QuestionRuntimeHostAdapter` host bridge：提供 active tab / current session / `QuestionDock` 实例、question display settings、OpenCode question API，以及 status-refresh / sync follow-up host
+- `QuestionDockSlotCoordinator` 现在代持 `QuestionDock` slot / instance 生命周期、`questionCardPosition` 设置门控和显式 render trigger；view 只在输入区构建、locale refresh、tab activation 与 close 时调用它
 - `QuestionRuntimeHostAdapter` 统一装配 `QuestionInlineCardRenderer`、`QuestionResolutionCoordinator`、`QuestionDockCoordinator` 与 `QuestionResolutionFlowCoordinator`，并把 pending-question refresh / clear 与 dock-or-inline resolve flow 一起收束回同一份 question runtime bundle
 - `QuestionDockCoordinator` 统一持有 pending-question refresh、waiter 保活、draft answer sanitize、dock render callbacks，以及回答/拒绝后的 status refresh + visible sync follow-up
 - `QuestionResolutionFlowCoordinator` 会先尝试把请求交给上方 dock；如果当前设置仍使用 inline question card，才退回 `QuestionInlineCardRenderer`

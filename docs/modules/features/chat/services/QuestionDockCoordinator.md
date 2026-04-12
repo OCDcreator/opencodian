@@ -61,6 +61,6 @@ export class QuestionDockCoordinator {
 
 ## 与 `OpenCodianView` 的边界
 
-- `OpenCodianView` 仍实例化 `QuestionDock` 并保存 tab runtime 字段，但 question dock/pending question 的主要 orchestration 已迁到 `QuestionDockCoordinator`，其 host 也由 `QuestionRuntimeHostAdapter` 统一装配
+- `OpenCodianView` 不再直接持有 `QuestionDock` slot lifecycle；这部分 UI ownership 现在由 `QuestionDockSlotCoordinator` 负责，而 question dock/pending question 的主要 orchestration 继续留在本 coordinator
 - `BackgroundTaskPostSyncCoordinator` 与 `TabConversationStateBridge` 仍需要 pending-question refresh / clear，但现在会经由同一份 question runtime bundle 调用本 service，而不是继续走 view 内单独 forwarding 方法
 - `QuestionInlineCardRenderer` 继续负责 inline 提问 UI；dock 未接管时的 inline resolve orchestration 现在改由 `QuestionResolutionFlowCoordinator` 统一调用 `markQuestionRequestResolved()` 与 `QuestionResolutionCoordinator`

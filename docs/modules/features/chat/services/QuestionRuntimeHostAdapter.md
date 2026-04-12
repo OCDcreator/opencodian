@@ -51,10 +51,11 @@ export function createQuestionRuntimeServices(...): QuestionRuntimeServices;
 - `createQuestionRuntimeServices()` 顺序实例化 `QuestionInlineCardRenderer` → `QuestionResolutionCoordinator` → `QuestionDockCoordinator` → `QuestionResolutionFlowCoordinator`，保留原来的协作依赖关系，并把 inline resolve flow 也收束回同一份 runtime bundle
 - dock resolve 时的 `applyResolvedQuestionState()` 不再由 view 单独转发，而是通过 adapter 直接映射到共享 `QuestionResolutionCoordinator`
 - send pipeline 触发 question request 时，`OpenCodianView` 也不再持有 `showQuestionDialog()`；现在直接经由 bundle 中的 `QuestionResolutionFlowCoordinator`
+- `getQuestionDock()` / `shouldUseAboveInputQuestionDock()` 这组 dock host 能力现在通常由 `QuestionDockSlotCoordinator` 代持，因此 adapter 只消费 dock port，不再要求 view 本身继续管理 slot lifecycle
 - `OpenCodianView` 的 background-task post-sync refresh host 与 tab conversation state bridge 现在也直接经由同一份 question runtime bundle 调用 pending-question refresh / clear，不再额外经过 view forwarding 方法
 
 ## 与 `OpenCodianView` 的边界
 
-- `OpenCodianView` 现在只提供一份 `QuestionRuntimeViewHost`，并保存一份 `QuestionRuntimeServices` bundle，而不是继续散落地持有多段 host factory 与 inline question resolve flow
+- `OpenCodianView` 现在只提供一份 `QuestionRuntimeViewHost`，并保存一份 `QuestionRuntimeServices` bundle，而 dock slot/gate 相关 host 细节则可继续委托给 `QuestionDockSlotCoordinator`
 - `QuestionDockCoordinator` 继续负责 pending-question queue、dock callbacks 与 resolve follow-up；adapter 不接管其业务逻辑
 - `QuestionInlineCardRenderer`、`QuestionResolutionCoordinator` 与 `QuestionResolutionFlowCoordinator` 继续分别负责 inline question card、resolved question runtime 与 dock-or-inline resolve orchestration；adapter 只负责共享装配

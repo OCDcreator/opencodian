@@ -254,6 +254,7 @@ import {
   PersistentAssistantNoticeService,
   type PersistentAssistantNoticeServiceHost,
 } from './services/PersistentAssistantNoticeService';
+import { QuestionDockSlotCoordinator } from './services/QuestionDockSlotCoordinator';
 import {
   createQuestionRuntimeServices,
   type QuestionRuntimeServices,
@@ -293,7 +294,6 @@ import type {
   ModelSelectorSelection,
 } from './ui/modelSelector/types';
 import { NavigationSidebar } from './ui/NavigationSidebar';
-import { QuestionDock } from './ui/QuestionDock';
 import { prepareUserMessageMarkdownForDisplay } from './userMessageDisplay';
 
 const logger = createLogger('OpenCodianView');
@@ -635,8 +635,6 @@ export class OpenCodianView extends ItemView {
   private glassOctahedronDemoController: GlassOctahedronDemoController | null = null;
   private liquidDiamondDemoController: LiquidDiamondDemoController | null = null;
   private liquidDiamondWebGlDemoController: LiquidDiamondDemoController | null = null;
-  private questionDockMountEl: HTMLElement | null = null;
-  private questionDock: QuestionDock | null = null;
   private currentConversation: Conversation | null = null;
   private currentConversationRevertState: ConversationRevertState | null = null;
   private markdownService: MarkdownRenderService | null = null;
@@ -706,6 +704,7 @@ export class OpenCodianView extends ItemView {
   private titleGenerationService: TitleGenerationService;
   private persistentAssistantNoticeService: PersistentAssistantNoticeService;
   private sessionTodoServices: SessionTodoServices;
+  private questionDockSlotCoordinator: QuestionDockSlotCoordinator;
   private questionTodoStatusRefreshCoordinator: QuestionTodoStatusRefreshCoordinator;
   private backgroundTaskTimelineService: BackgroundTaskTimelineService;
   private backgroundTaskCompletionNoticeService: BackgroundTaskCompletionNoticeService;
@@ -1179,6 +1178,14 @@ export class OpenCodianView extends ItemView {
       this.createPersistentAssistantNoticeServiceHost(),
     );
     this.sessionTodoServices = createSessionTodoServices(this.createSessionTodoViewHost());
+    this.questionDockSlotCoordinator = new QuestionDockSlotCoordinator(
+      {
+        shouldUseAboveInputQuestionDock: () => this.plugin.settings.questionCardPosition === 'above_input',
+      },
+      () => {
+        this.questionDockCoordinator.render();
+      },
+    );
     const {
       questionTodoStatusRefreshCoordinator,
       backgroundTaskPostSyncCoordinator,
@@ -1518,7 +1525,7 @@ export class OpenCodianView extends ItemView {
         this.refreshActiveFocusContextPreview();
       },
       renderQuestionDock: () => {
-        this.renderQuestionDock();
+        this.questionDockSlotCoordinator.render();
       },
       updateSessionTodoDockForTab: (tabId) => {
         this.updateSessionTodoDockForTab(tabId);
@@ -1569,7 +1576,7 @@ export class OpenCodianView extends ItemView {
         this.renderSessionTodoDock(tabId);
       },
       renderQuestionDock: () => {
-        this.renderQuestionDock();
+        this.questionDockSlotCoordinator.render();
       },
       renderBackgroundTaskIndicatorIfNeeded: (tabId) => this.renderBackgroundTaskIndicatorIfNeeded(tabId),
       refreshActiveTabContextUsageFromServer: () => this.refreshActiveTabContextUsageFromServer(),
@@ -2141,9 +2148,9 @@ export class OpenCodianView extends ItemView {
       ensureTabRuntimeState: (tabId) => this.ensureTabRuntimeState(tabId),
       getCurrentConversationSessionId: () => this.currentConversation?.openCodeSessionId,
       getSessionIdForTab: (tabId) => this.getSessionIdForTab(tabId),
-      getQuestionDock: () => this.questionDock,
+      getQuestionDock: () => this.questionDockSlotCoordinator.getQuestionDock(),
       getQuestionDisplayMode: () => this.plugin.settings.questionDisplayMode,
-      shouldUseAboveInputQuestionDock: () => this.shouldUseAboveInputQuestionDock(),
+      shouldUseAboveInputQuestionDock: () => this.questionDockSlotCoordinator.shouldUseAboveInputQuestionDock(),
       shouldRenderQuestionResolutionCards: () => this.shouldRenderQuestionResolutionCards(),
       keepQuestionCardPinnedToBottom: (tabId) => {
         this.keepQuestionCardPinnedToBottom(tabId);
@@ -2250,9 +2257,7 @@ export class OpenCodianView extends ItemView {
     this.addContextBtn = null;
     this.sendBtn = null;
     this.inputTextarea = null;
-    this.questionDock?.destroy();
-    this.questionDock = null;
-    this.questionDockMountEl = null;
+    this.questionDockSlotCoordinator.destroy();
     this.sessionTodoDockCoordinator.destroy();
     this.conversationSessionLiveSignalAdapter.stop();
     this.conversationSyncEventAdapter.stop();
@@ -3068,12 +3073,12 @@ export class OpenCodianView extends ItemView {
 
     this.inputTextarea?.setAttribute('placeholder', this.getInputPlaceholder());
     this.renderSessionTodoDock();
-    this.renderQuestionDock();
+    this.questionDockSlotCoordinator.render();
     this.renderTabBar();
   }
 
   public refreshQuestionUi(): void {
-    this.renderQuestionDock();
+    this.questionDockSlotCoordinator.render();
     if (this.currentConversation) {
       void this.rerenderConversationMessages(this.currentConversation);
     }
@@ -3215,9 +3220,7 @@ export class OpenCodianView extends ItemView {
     this.inputTabBarSlotEl = container.createDiv({ cls: 'opencodian-tab-bar-slot opencodian-tab-bar-slot--input' });
     this.sessionTodoDockCoordinator.attach(container);
 
-    this.questionDockMountEl = container.createDiv({ cls: 'opencodian-question-dock-slot' });
-    this.questionDock = new QuestionDock(this.questionDockMountEl);
-    this.renderQuestionDock();
+    this.questionDockSlotCoordinator.attach(container);
 
     const composerShellEl = container.createDiv({ cls: 'opencodian-composer-shell' });
     this.composerShellEl = composerShellEl;
@@ -4128,16 +4131,8 @@ export class OpenCodianView extends ItemView {
     this.scheduleSettledScrollToBottomIfNeeded();
   }
 
-  private shouldUseAboveInputQuestionDock(): boolean {
-    return this.plugin.settings.questionCardPosition === 'above_input';
-  }
-
   private shouldRenderQuestionResolutionCards(): boolean {
     return this.plugin.settings.showAnsweredQuestionCards;
-  }
-
-  private renderQuestionDock(): void {
-    this.questionDockCoordinator.render();
   }
 
   private getContextKindLabel(kind: PromptContextItem['kind']): string {
