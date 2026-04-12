@@ -27,7 +27,9 @@ import {
 import {
   buildTrailingAssistantPatchExecutionTailPlanPartsFromExecutionTailPlanningContext,
 } from './TrailingAssistantPatchExecutionTailChildPlansHelper';
-import { buildTrailingAssistantPatchSuccessPlanFromChildPlans } from './TrailingAssistantPatchSuccessChildPlansHelper';
+import {
+  buildTrailingAssistantPatchSuccessPlanFromChildPlanSource,
+} from './TrailingAssistantPatchSuccessChildPlansHelper';
 import { type TrailingAssistantPatchSuccessPlan } from './TrailingAssistantPatchSuccessPlanHelper';
 import {
   applyTrailingAssistantPatchTailState,
@@ -35,7 +37,6 @@ import {
 import {
   withTrailingAssistantTurnBodyScope,
 } from './TrailingAssistantPatchTurnBodyScopeHelper';
-import { buildTrailingAssistantPatchTurnBodyScopePlan } from './TrailingAssistantPatchTurnBodyScopePlanHelper';
 
 export interface IncrementalRenderedMessageUpdate {
   appendedRenderedMessages: ChatMessage[];
@@ -611,14 +612,14 @@ export class ConversationRenderService {
     const executionTailPlanningContext =
       buildTrailingAssistantPatchExecutionTailPlanningContext(planningContext);
 
-    return buildTrailingAssistantPatchSuccessPlanFromChildPlans({
+    return buildTrailingAssistantPatchSuccessPlanFromChildPlanSource({
       ...buildTrailingAssistantPatchExecutionTailPlanPartsFromExecutionTailPlanningContext({
         planningContext: executionTailPlanningContext,
         getBodySignature: (message) => this.host.assistantTailRender.getBodySignature(message),
         summarizeChatMessageForDebug: (message) =>
           this.host.summarizeChatMessageForDebug(message),
       }),
-      turnBodyScopePlan: buildTrailingAssistantPatchTurnBodyScopePlan(planningContext),
+      turnBodyScopePlanSource: planningContext,
     });
   }
 

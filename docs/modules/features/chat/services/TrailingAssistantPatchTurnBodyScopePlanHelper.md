@@ -5,7 +5,7 @@
 
 ## 概述
 
-`TrailingAssistantPatchTurnBodyScopePlanHelper` 把 trailing-assistant patch success-plan 里的 turn-body scope 计划构建从 `ConversationRenderService` 抽成了独立纯 helper：
+`TrailingAssistantPatchTurnBodyScopePlanHelper` 把 trailing-assistant patch success-plan 里的 turn-body scope 计划构建从更高层 success-plan 编排中抽成了独立纯 helper：
 
 - 接收最小化的 source：`runtime` 与目标 `parentEl`
 - 在 helper 内部完成 scope-plan inputs 装配
@@ -29,6 +29,6 @@ export function buildTrailingAssistantPatchTurnBodyScopePlan(
 
 ## 与其他 helper 的关系
 
-- `ConversationRenderService` 现在只把 success planning-context 直接交给这里，不再自行拼装 turn-body scope inputs 或 restore-target 默认值
+- `TrailingAssistantPatchSuccessChildPlansHelper` 现在会把更窄的 `turnBodyScopePlanSource` 交给这里，不再让 `ConversationRenderService` 直接协调 scope-plan 预建
 - `TrailingAssistantPatchTurnBodyScopeHelper` 继续负责真正的 `currentTurnBodyEl` 临时切换与恢复
 - 这样 turn-body scope 的“计划构建”和“副作用执行”边界被拆成两个更单一的模块

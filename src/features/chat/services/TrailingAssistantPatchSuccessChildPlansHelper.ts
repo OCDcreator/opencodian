@@ -1,5 +1,9 @@
 import { buildTrailingAssistantPatchExecutionTailPlanParts } from './TrailingAssistantPatchExecutionTailPlanPartsHelper';
 import {
+  buildTrailingAssistantPatchTurnBodyScopePlan,
+  type TrailingAssistantPatchTurnBodyScopePlanSource,
+} from './TrailingAssistantPatchTurnBodyScopePlanHelper';
+import {
   buildTrailingAssistantPatchSuccessPlanFromParts,
   type TrailingAssistantPatchSuccessPlan,
   type TrailingAssistantPatchSuccessPlanParts,
@@ -7,6 +11,11 @@ import {
 
 export type TrailingAssistantPatchSuccessChildPlans =
   TrailingAssistantPatchSuccessPlanParts;
+
+export type TrailingAssistantPatchSuccessPlanChildPlanSource =
+  Omit<TrailingAssistantPatchSuccessChildPlans, 'turnBodyScopePlan'> & {
+    turnBodyScopePlanSource: TrailingAssistantPatchTurnBodyScopePlanSource;
+  };
 
 export function buildTrailingAssistantPatchSuccessPlanFromChildPlans(
   childPlans: TrailingAssistantPatchSuccessChildPlans,
@@ -17,5 +26,17 @@ export function buildTrailingAssistantPatchSuccessPlanFromChildPlans(
       tailOutcomePlans: childPlans.tailOutcomePlans,
     }),
     turnBodyScopePlan: childPlans.turnBodyScopePlan,
+  });
+}
+
+export function buildTrailingAssistantPatchSuccessPlanFromChildPlanSource(
+  source: TrailingAssistantPatchSuccessPlanChildPlanSource,
+): TrailingAssistantPatchSuccessPlan {
+  return buildTrailingAssistantPatchSuccessPlanFromChildPlans({
+    executionPlan: source.executionPlan,
+    tailOutcomePlans: source.tailOutcomePlans,
+    turnBodyScopePlan: buildTrailingAssistantPatchTurnBodyScopePlan(
+      source.turnBodyScopePlanSource,
+    ),
   });
 }
