@@ -139,6 +139,10 @@ import {
   TabConversationStateBridge,
 } from './runtime/TabConversationStateBridge';
 import {
+  type TabViewActivationBridgeHost,
+  TabViewActivationBridge,
+} from './runtime/TabViewActivationBridge';
+import {
   type TabRuntimeStateBridgeHost,
   TabRuntimeStateBridge,
 } from './runtime/TabRuntimeStateBridge';
@@ -694,6 +698,7 @@ export class OpenCodianView extends ItemView {
   private backgroundTaskLiveSignalCoordinator: BackgroundTaskLiveSignalCoordinator;
   private backgroundTaskPostSyncCoordinator: BackgroundTaskPostSyncCoordinator;
   private tabConversationStateBridge: TabConversationStateBridge;
+  private tabViewActivationBridge: TabViewActivationBridge;
   private tabRuntimeStateBridge: TabRuntimeStateBridge;
   private conversationSyncOrchestrationService: ConversationSyncOrchestrationService;
   private conversationSyncRuntimeCoordinator: ConversationSyncRuntimeCoordinator;
@@ -1556,6 +1561,9 @@ export class OpenCodianView extends ItemView {
     this.tabConversationStateBridge = new TabConversationStateBridge(
       this.createTabConversationStateBridgeHost(),
     );
+    this.tabViewActivationBridge = new TabViewActivationBridge(
+      this.createTabViewActivationBridgeHost(),
+    );
     this.tabRuntimeStateBridge = new TabRuntimeStateBridge(this.createTabRuntimeStateBridgeHost());
     this.backgroundTaskPostSyncCoordinator = new BackgroundTaskPostSyncCoordinator(
       this.createBackgroundTaskPostSyncCoordinatorHost(),
@@ -1595,7 +1603,10 @@ export class OpenCodianView extends ItemView {
       this.backgroundTaskLiveSignalCoordinator,
       this.createBackgroundTaskStreamTriggerCoordinatorHost(),
     );
-    this.conversationViewStateService = new ConversationViewStateService(this.createConversationViewStateHost());
+    this.conversationViewStateService = new ConversationViewStateService(
+      this.createConversationViewStateHost(),
+      this.tabViewActivationBridge,
+    );
     this.conversationRenderService = new ConversationRenderService(this.createConversationRenderHost());
     this.messageSendPreparationService = new MessageSendPreparationService(this.createMessageSendPreparationHost());
     this.messageFinalizationService = new MessageFinalizationService(this.createMessageFinalizationHost());
@@ -1714,6 +1725,23 @@ export class OpenCodianView extends ItemView {
       },
       stopConversationSyncLoop: () => {
         this.stopConversationSyncLoop();
+      },
+    };
+  }
+
+  private createTabViewActivationBridgeHost(): TabViewActivationBridgeHost {
+    return {
+      setActiveMessagesPane: (tabId) => {
+        this.setActiveMessagesPane(tabId);
+      },
+      refreshActiveFocusContextPreview: () => {
+        this.refreshActiveFocusContextPreview();
+      },
+      renderQuestionDock: () => {
+        this.renderQuestionDock();
+      },
+      updateSessionTodoDockForTab: (tabId) => {
+        this.updateSessionTodoDockForTab(tabId);
       },
     };
   }
@@ -1906,17 +1934,8 @@ export class OpenCodianView extends ItemView {
       getConversations: () => this.plugin.getConversations(),
       createConversation: () => this.plugin.createConversation(),
       getConversationById: async (id) => (await this.plugin.getConversationById(id)) ?? null,
-      setActiveMessagesPane: (tabId) => {
-        this.setActiveMessagesPane(tabId);
-      },
-      refreshActiveFocusContextPreview: () => {
-        this.refreshActiveFocusContextPreview();
-      },
       renderQuestionDock: () => {
         this.renderQuestionDock();
-      },
-      updateSessionTodoDockForTab: (tabId) => {
-        this.updateSessionTodoDockForTab(tabId);
       },
       applyStreamingConversationActivation: (tabId, conversation) =>
         this.applyStreamingConversationActivation(tabId, conversation),

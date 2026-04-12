@@ -6,6 +6,7 @@ import {
   type QuestionRequest,
   type SessionTodo,
 } from '../../../core/types';
+import type { TabViewActivationBridge } from '../runtime/TabViewActivationBridge';
 import type { RestoredTabState, TabData, TabId } from '../tabs';
 import {
   captureElementScrollRestoreSnapshot,
@@ -45,10 +46,7 @@ export interface ConversationViewStateHost {
   createConversation(): Promise<Conversation>;
   getConversationById(id: string): Promise<Conversation | null>;
 
-  setActiveMessagesPane(tabId: TabId): void;
-  refreshActiveFocusContextPreview(): void;
   renderQuestionDock(): void;
-  updateSessionTodoDockForTab(tabId: TabId): void;
   applyStreamingConversationActivation(tabId: TabId, conversation: Conversation): Promise<void> | void;
   applyEmptyTabActivation(tabId: TabId): void;
 
@@ -90,8 +88,13 @@ export interface ConversationViewStateHost {
   requestAnimationFrame(callback: FrameRequestCallback): number;
 }
 
+type TabViewActivationPort = Pick<TabViewActivationBridge, 'applyActivationPreflight'>;
+
 export class ConversationViewStateService {
-  constructor(private readonly host: ConversationViewStateHost) {}
+  constructor(
+    private readonly host: ConversationViewStateHost,
+    private readonly tabViewActivationBridge: TabViewActivationPort,
+  ) {}
 
   async initializeFirstTab(): Promise<void> {
     const tabManager = this.host.getTabManager();
@@ -158,10 +161,7 @@ export class ConversationViewStateService {
       return;
     }
 
-    this.host.setActiveMessagesPane(tabId);
-    this.host.refreshActiveFocusContextPreview();
-    this.host.renderQuestionDock();
-    this.host.updateSessionTodoDockForTab(tabId);
+    this.tabViewActivationBridge.applyActivationPreflight(tabId);
 
     if (tab.conversationId) {
       if (tab.isStreaming) {

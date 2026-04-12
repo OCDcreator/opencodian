@@ -2,6 +2,10 @@ import {
   type ConversationViewStateHost,
   ConversationViewStateService,
 } from '../../../../src/features/chat/services/ConversationViewStateService';
+import {
+  TabViewActivationBridge,
+  type TabViewActivationBridgeHost,
+} from '../../../../src/features/chat/runtime/TabViewActivationBridge';
 import { TabManager } from '../../../../src/features/chat/tabs/TabManager';
 
 jest.mock('../../../../src/features/chat/services/ScrollManager', () => {
@@ -75,10 +79,7 @@ function createHost(
     getConversations: jest.fn().mockReturnValue([]),
     createConversation: jest.fn().mockResolvedValue(createConversation('created')),
     getConversationById: jest.fn().mockResolvedValue(null),
-    setActiveMessagesPane: jest.fn(),
-    refreshActiveFocusContextPreview: jest.fn(),
     renderQuestionDock: jest.fn(),
-    updateSessionTodoDockForTab: jest.fn(),
     applyStreamingConversationActivation: jest.fn(),
     applyEmptyTabActivation: jest.fn(),
     prepareConversationTransition: jest.fn().mockResolvedValue(undefined),
@@ -122,6 +123,20 @@ function createHost(
   };
 }
 
+function createActivationBridge() {
+  const host: jest.Mocked<TabViewActivationBridgeHost> = {
+    setActiveMessagesPane: jest.fn(),
+    refreshActiveFocusContextPreview: jest.fn(),
+    renderQuestionDock: jest.fn(),
+    updateSessionTodoDockForTab: jest.fn(),
+  };
+
+  return {
+    bridge: new TabViewActivationBridge(host),
+    host,
+  };
+}
+
 describe('ConversationViewStateService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -140,12 +155,14 @@ describe('ConversationViewStateService', () => {
       getTabManager: jest.fn().mockReturnValue(tabManager),
       getConversationById: jest.fn().mockResolvedValue(conversation),
     });
-    const service = new ConversationViewStateService(host);
+    const { bridge } = createActivationBridge();
+    const service = new ConversationViewStateService(host, bridge);
     const loadConversationSpy = jest.spyOn(service, 'loadConversation').mockResolvedValue(undefined);
+    const activationPreflightSpy = jest.spyOn(bridge, 'applyActivationPreflight');
 
     await service.activateTab(tab!.id);
 
-    expect(host.setActiveMessagesPane).toHaveBeenCalledWith(tab!.id);
+    expect(activationPreflightSpy).toHaveBeenCalledWith(tab!.id);
     expect(host.applyStreamingConversationActivation).toHaveBeenCalledWith(tab!.id, conversation);
     expect(loadConversationSpy).not.toHaveBeenCalled();
   });
@@ -161,7 +178,8 @@ describe('ConversationViewStateService', () => {
     const host = createHost({
       getTabManager: jest.fn().mockReturnValue(tabManager),
     });
-    const service = new ConversationViewStateService(host);
+    const { bridge } = createActivationBridge();
+    const service = new ConversationViewStateService(host, bridge);
     const loadConversationSpy = jest.spyOn(service, 'loadConversation').mockResolvedValue(undefined);
 
     await service.activateTab(tab!.id);
@@ -183,7 +201,8 @@ describe('ConversationViewStateService', () => {
     const host = createHost({
       getTabManager: jest.fn().mockReturnValue(tabManager),
     });
-    const service = new ConversationViewStateService(host);
+    const { bridge } = createActivationBridge();
+    const service = new ConversationViewStateService(host, bridge);
 
     await service.activateTab(tab!.id);
 
@@ -195,9 +214,9 @@ describe('ConversationViewStateService', () => {
     const conversation = createConversation('load-target');
     const host = createHost({
       getConversationById: jest.fn().mockResolvedValue(conversation),
-      getSessionIdForTab: jest.fn().mockReturnValue('old-session'),
     });
-    const service = new ConversationViewStateService(host);
+    const { bridge } = createActivationBridge();
+    const service = new ConversationViewStateService(host, bridge);
     const messagesEl = host.getMessagesContainer();
 
     await service.loadConversation(conversation.id, {
