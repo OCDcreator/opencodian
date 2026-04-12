@@ -127,7 +127,7 @@ background task 相关的 `backgroundTaskLaunches`、`backgroundTaskCompletedTas
 
 ### 对话装载与后台同步
 
-`loadConversation()` 的装载编排现在先交给 `services/ConversationViewStateService.ts`，而消息区 full rerender / tail patch / append-only 增量更新则交给 `services/ConversationRenderService.ts`；其中 loaded-conversation 的 resolve / reload retry / server-sync 判定先经由 `runtime/ConversationLoadRuntimeBridge.ts` 落回 view host，tab/pane activation 预刷新会先经由 `runtime/TabViewActivationBridge.ts` 落回 view host，active-tab conversation/session 写回则先经由 `runtime/TabConversationActivationBridge.ts` 收束 activation 入口，再复用 `runtime/TabConversationStateBridge.ts` 落回 view host，loaded-conversation 的 preflight cleanup / hydration shell 则先经由 `runtime/ConversationTransitionBridge.ts` 收束，再由 `runtime/ConversationHydrationRenderBridge.ts` 处理 scroll/class restore，而消息装载完成后的 background-task rebuild / message rerender / post-render outcome / baseline 则继续经由 `runtime/ConversationHydrationOutcomeBridge.ts` 收束。主链路仍然保持原来的语义：
+`initializeFirstTab()` / `restorePersistedTabs()` 的首开恢复与回退决策现在先交给 `services/ConversationRestoreBootstrapCoordinator.ts`，而 `loadConversation()` 的装载编排继续交给 `services/ConversationViewStateService.ts`，消息区 full rerender / tail patch / append-only 增量更新则交给 `services/ConversationRenderService.ts`；其中 loaded-conversation 的 resolve / reload retry / server-sync 判定先经由 `runtime/ConversationLoadRuntimeBridge.ts` 落回 view host，tab/pane activation 预刷新会先经由 `runtime/TabViewActivationBridge.ts` 落回 view host，active-tab conversation/session 写回则先经由 `runtime/TabConversationActivationBridge.ts` 收束 activation 入口，再复用 `runtime/TabConversationStateBridge.ts` 落回 view host，loaded-conversation 的 preflight cleanup / hydration shell 则先经由 `runtime/ConversationTransitionBridge.ts` 收束，再由 `runtime/ConversationHydrationRenderBridge.ts` 处理 scroll/class restore，而消息装载完成后的 background-task rebuild / message rerender / post-render outcome / baseline 则继续经由 `runtime/ConversationHydrationOutcomeBridge.ts` 收束。主链路仍然保持原来的语义：
 
 - 在切换对话时取消旧对话的标题生成
 - 清空当前消息区并重置 turn 状态
@@ -163,6 +163,8 @@ tab conversation/session activation 写回现在也不再由 view 自己在 load
 tab 激活入口里剩余的 pane-activation UI preflight（`setActiveMessagesPane()`、focus preview、question dock、todo dock）现在也不再由 `ConversationViewStateService` 直接通过四个分散 host 回调驱动，而是统一交给 `runtime/TabViewActivationBridge.ts`；streaming / empty-tab activation 后续的 selector、context usage identity、send-button 与相邻 dock 刷新顺序，以及 loaded-conversation 在消息重渲后的 background-task indicator / todo dock / question dock outcome，加上 scroll restore 之后的 composer layout / model selector / context usage 写回，也都收束到同一 bridge。不同的是，loaded-conversation 的消息装载后壳层现在先由 `runtime/ConversationHydrationOutcomeBridge.ts` 统一串起 background-task rebuild、message rerender 与 post-render outcome，再复用 `TabViewActivationBridge`；status / pending question / session todo lazy refresh 则由 `QuestionTodoStatusRefreshCoordinator` 共享给 activation/open 与 post-sync 入口，view 只保留 state writeback 与 host 装配。与此同时，streaming fast-path activation、empty-tab activation 本体与 current-tab new conversation open 的消息区清空 / turn reset 壳层，也进一步统一下沉到 `runtime/TabConversationActivationBridge.ts`。
 
 streaming tab 激活时那条 active-conversation/session 写回 + baseline + selector/context/todo/question/send-button outcome，loaded-conversation hydration 前的 activation state writeback，current-tab 新建会话后的 open shell，以及 empty-tab 激活时相邻的 active-pane reset shell，现在也不再由 view 自己分散内联；这些步骤已统一交给 `runtime/TabConversationActivationBridge.ts`，并继续复用 `TabConversationStateBridge`、`TabViewActivationBridge` 与 `QuestionTodoStatusRefreshCoordinator`。因此 `ConversationViewStateService.activateTab()` 的 streaming fast path、`loadConversation()` 里的 loaded activation state writeback、`openConversationInCurrentTab()` 与 empty-tab activation 都只保留分支决策或命令入口，不再持有整段 activation/open orchestration。
+
+首次打开聊天视图时那段 `loadConversations()`、persisted tab restore、restore 失败后的 tab state reset/flush，以及“复用首个已有 conversation / 不存在时创建新 conversation”的 fallback，也不再由 `ConversationViewStateService` 继续兼管；这些 bootstrap 决策现在先由 `services/ConversationRestoreBootstrapCoordinator.ts` 统一承接，再通过 `ConversationViewStateService.activateTab()` 复用现有 activation/hydration 分支。
 
 loaded-conversation 切换里旧标题生成取消、background-task indicator reset、scheduled scroll cleanup、消息区清空、turn state reset，以及 hydration lifecycle shell，也不再由 `ConversationViewStateService` 直接通过散落 host 回调持有；这些壳层步骤现在先由 `runtime/ConversationTransitionBridge.ts` 统一桥接。随后消息容器的 `is-rehydrating` class、scroll snapshot、restore-bottom / restore-anchor / restore-distance 调度，以及 pane scroll metrics 回写，再由 `runtime/ConversationHydrationRenderBridge.ts` 承接，view 只保留 title/background indicator/message container/runtime 的真实实现。
 
@@ -375,6 +377,7 @@ background task notice 这条子链路现在的边界是：
 - `TabConversationStateBridge`：active-tab conversation/session 激活写回、pending-question reset 与 sync fingerprint baseline 提交
 - `TabConversationActivationBridge`：当前活动 tab 的 empty-state activation 与 current-tab 新建会话打开路径的消息区 shell cleanup、baseline commit 与 question/todo/context/background-task 后续刷新编排
 - `TabViewActivationBridge`：tab/pane activation 预刷新写回，以及 streaming / empty-tab activation outcome 的 selector、context identity、dock、send-button 刷新编排
+- `ConversationRestoreBootstrapCoordinator`：首开 load / persisted restore / fallback-create 决策与 restore 失败后的 tab state reset/flush
 - `ConversationTransitionBridge`：loaded-conversation 的切换前 cleanup、消息区清空、turn reset 与 hydration lifecycle shell
 - `ConversationHydrationOutcomeBridge`：loaded-conversation 消息装载后的 background-task rebuild、message rerender、post-render outcome 与 baseline commit 编排
 - `TabRuntimeStateBridge`：tab stream-like / background-task badge、rewind-fork 按钮禁用态与 attention 标记的 runtime→UI 写回
@@ -408,7 +411,8 @@ background task notice 这条子链路现在的边界是：
 ## 直接协作模块
 
 - `OpenCodeService`：会话 CRUD、发送、stream、同步、question、todo、status、context usage
-- `ConversationViewStateService`：tab 初始化、persisted restore、tab 激活和 conversation hydration 装载编排
+- `ConversationRestoreBootstrapCoordinator`：首开 tab 初始化、persisted restore、fallback create/activate 决策
+- `ConversationViewStateService`：tab 激活和 conversation hydration 装载编排
 - `ConversationRenderService`：消息区 full rerender、tail patch 和 append-only sync 编排
 - `ConversationLoadRuntimeBridge`：loaded-conversation 的 resolve / reload retry、server-sync 判定与 revert-state 写回
 - `TabConversationStateBridge`：active-tab conversation/session 写回、pending question reset 与 sync baseline 提交

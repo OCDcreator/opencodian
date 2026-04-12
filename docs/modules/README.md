@@ -131,6 +131,7 @@ docs/modules/
 │   │   │   ├── FocusContextRuntimeService.md
 │   │   │   ├── ContextUsageService.md
 │   │   │   ├── ConversationRenderService.md
+│   │   │   ├── ConversationRestoreBootstrapCoordinator.md
 │   │   │   ├── ConversationViewStateService.md
 │   │   │   ├── MessageFinalizationService.md
 │   │   │   ├── MessageSendPreparationService.md

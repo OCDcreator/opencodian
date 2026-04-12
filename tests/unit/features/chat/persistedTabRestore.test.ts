@@ -5,6 +5,7 @@ jest.mock('../../../../src/core/opencode', () => ({
 }));
 
 import { OpenCodianView } from '../../../../src/features/chat/OpenCodianView';
+import { ConversationRestoreBootstrapCoordinator } from '../../../../src/features/chat/services/ConversationRestoreBootstrapCoordinator';
 import { ConversationViewStateService } from '../../../../src/features/chat/services/ConversationViewStateService';
 import { TabManager } from '../../../../src/features/chat/tabs/TabManager';
 
@@ -49,6 +50,14 @@ function getConversationViewStateService(view: OpenCodianView): ConversationView
   }).conversationViewStateService;
 }
 
+function getConversationRestoreBootstrapCoordinator(
+  view: OpenCodianView,
+): ConversationRestoreBootstrapCoordinator {
+  return (view as unknown as {
+    conversationRestoreBootstrapCoordinator: ConversationRestoreBootstrapCoordinator;
+  }).conversationRestoreBootstrapCoordinator;
+}
+
 describe('OpenCodianView persisted tab restore', () => {
   it('loads conversations before attempting to restore tabs during first open', async () => {
     const plugin = {
@@ -65,8 +74,9 @@ describe('OpenCodianView persisted tab restore', () => {
       getMaxTabs: () => 4,
     });
 
+    const coordinator = getConversationRestoreBootstrapCoordinator(view);
     const service = getConversationViewStateService(view);
-    const restoreSpy = jest.spyOn(service, 'restorePersistedTabs').mockReturnValue('restored-tab');
+    const restoreSpy = jest.spyOn(coordinator, 'restorePersistedTabs').mockReturnValue('restored-tab');
     const activateSpy = jest.spyOn(service, 'activateTab').mockResolvedValue(undefined);
 
     await view.initializeFirstTab();
@@ -93,8 +103,7 @@ describe('OpenCodianView persisted tab restore', () => {
       getMaxTabs: () => 4,
     });
 
-    const service = getConversationViewStateService(view);
-    const activateSpy = jest.spyOn(service, 'activateTab').mockResolvedValue(undefined);
+    const activateSpy = jest.spyOn(getConversationViewStateService(view), 'activateTab').mockResolvedValue(undefined);
 
     await view.initializeFirstTab();
 
@@ -120,8 +129,7 @@ describe('OpenCodianView persisted tab restore', () => {
       getMaxTabs: () => 4,
     });
 
-    const service = getConversationViewStateService(view);
-    const activateSpy = jest.spyOn(service, 'activateTab').mockResolvedValue(undefined);
+    const activateSpy = jest.spyOn(getConversationViewStateService(view), 'activateTab').mockResolvedValue(undefined);
 
     await view.initializeFirstTab();
 

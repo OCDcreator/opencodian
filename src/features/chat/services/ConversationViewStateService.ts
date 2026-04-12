@@ -1,7 +1,3 @@
-import {
-  type Conversation,
-  type PersistedTabState,
-} from '../../../core/types';
 import type {
   ConversationLoadRuntimePort,
   ConversationLoadRuntimeOptions,
@@ -10,7 +6,7 @@ import type { ConversationHydrationOutcomePort } from '../runtime/ConversationHy
 import type { TabConversationActivationBridge } from '../runtime/TabConversationActivationBridge';
 import type { TabViewActivationBridge } from '../runtime/TabViewActivationBridge';
 import type { ConversationTransitionPort } from '../runtime/ConversationTransitionBridge';
-import type { RestoredTabState, TabData, TabId } from '../tabs';
+import type { TabData, TabId } from '../tabs';
 
 export interface LoadConversationOptions {
   forceServerSync?: boolean;
@@ -18,24 +14,11 @@ export interface LoadConversationOptions {
 }
 
 interface ConversationViewStateTabManager {
-  createTab(conversation?: Pick<Conversation, 'id' | 'title'> | null): TabData | null;
   getTab(tabId: TabId): TabData | null;
-  restoreTabs(
-    items: RestoredTabState[],
-    activeTabIndex: number,
-    conversations: ReadonlyMap<string, Pick<Conversation, 'id' | 'title'>>,
-  ): TabData | null;
 }
 
 export interface ConversationViewStateHost {
   getTabManager(): ConversationViewStateTabManager | null;
-  getPersistedTabState(): PersistedTabState;
-  resetPersistedTabState(): void;
-  persistTabState(options?: { flush?: boolean }): void;
-
-  loadConversations(): Promise<void>;
-  getConversations(): Conversation[];
-  createConversation(): Promise<Conversation>;
 }
 
 type TabConversationActivationPort = Pick<
@@ -61,61 +44,7 @@ export class ConversationViewStateService {
     private readonly conversationLoadRuntimeBridge: ConversationLoadRuntimePort,
   ) {}
 
-  async initializeFirstTab(): Promise<void> {
-    const tabManager = this.host.getTabManager();
-    if (!tabManager) {
-      return;
-    }
-
-    await this.host.loadConversations();
-
-    const restoredTabId = this.restorePersistedTabs();
-    if (restoredTabId) {
-      await this.activateTab(restoredTabId);
-      return;
-    }
-
-    let initialConversation = this.host.getConversations()[0];
-    if (!initialConversation) {
-      initialConversation = await this.host.createConversation();
-    }
-
-    const tab = tabManager.createTab(initialConversation);
-    if (tab) {
-      await this.activateTab(tab.id);
-    }
-  }
-
-  restorePersistedTabs(): string | null {
-    const tabManager = this.host.getTabManager();
-    if (!tabManager) {
-      return null;
-    }
-
-    const savedState = this.host.getPersistedTabState();
-    if (!savedState.tabs.length) {
-      return null;
-    }
-
-    const conversationMap = new Map(
-      this.host.getConversations().map((conversation) => [conversation.id, conversation] as const),
-    );
-    const restoredTab = tabManager.restoreTabs(
-      savedState.tabs as RestoredTabState[],
-      savedState.activeTabIndex,
-      conversationMap,
-    );
-
-    if (!restoredTab) {
-      this.host.resetPersistedTabState();
-      this.host.persistTabState({ flush: true });
-      return null;
-    }
-
-    return restoredTab.id;
-  }
-
-  async activateTab(tabId: string): Promise<void> {
+  async activateTab(tabId: TabId): Promise<void> {
     const tabManager = this.host.getTabManager();
     if (!tabManager) {
       return;

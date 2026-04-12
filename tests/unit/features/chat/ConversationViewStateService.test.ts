@@ -40,15 +40,6 @@ function createHost(
 ): MockedConversationViewStateHost {
   return {
     getTabManager: jest.fn().mockReturnValue(null),
-    getPersistedTabState: jest.fn().mockReturnValue({
-      tabs: [],
-      activeTabIndex: 0,
-    }),
-    resetPersistedTabState: jest.fn(),
-    persistTabState: jest.fn(),
-    loadConversations: jest.fn().mockResolvedValue(undefined),
-    getConversations: jest.fn().mockReturnValue([]),
-    createConversation: jest.fn().mockResolvedValue(createConversation('created')),
     ...overrides,
   };
 }

@@ -232,6 +232,10 @@ import {
   ConversationSyncRuntimeCoordinator,
 } from './services/ConversationSyncRuntimeCoordinator';
 import {
+  ConversationRestoreBootstrapCoordinator,
+  type ConversationRestoreBootstrapHost,
+} from './services/ConversationRestoreBootstrapCoordinator';
+import {
   type ConversationViewStateHost,
   ConversationViewStateService,
 } from './services/ConversationViewStateService';
@@ -726,6 +730,7 @@ export class OpenCodianView extends ItemView {
   private conversationSyncBridge: ConversationSyncBridge;
   private conversationSyncEventAdapter: ConversationSyncEventAdapter;
   private conversationSessionLiveSignalAdapter: ConversationSessionLiveSignalAdapter;
+  private conversationRestoreBootstrapCoordinator: ConversationRestoreBootstrapCoordinator;
   private conversationViewStateService: ConversationViewStateService;
   private conversationRenderService: ConversationRenderService;
   private messageSendPreparationService: MessageSendPreparationService;
@@ -1312,6 +1317,12 @@ export class OpenCodianView extends ItemView {
       this.conversationTransitionBridge,
       conversationLoadRuntimeBridge,
     );
+    this.conversationRestoreBootstrapCoordinator = new ConversationRestoreBootstrapCoordinator(
+      this.createConversationRestoreBootstrapHost(),
+      {
+        activateTab: (tabId) => this.conversationViewStateService.activateTab(tabId),
+      },
+    );
     this.conversationRenderService = new ConversationRenderService(this.createConversationRenderHost());
     this.messageSendPreparationService = new MessageSendPreparationService(this.createMessageSendPreparationHost());
     this.messageFinalizationService = new MessageFinalizationService(this.createMessageFinalizationHost());
@@ -1808,6 +1819,12 @@ export class OpenCodianView extends ItemView {
   }
 
   private createConversationViewStateHost(): ConversationViewStateHost {
+    return {
+      getTabManager: () => this.tabManager,
+    };
+  }
+
+  private createConversationRestoreBootstrapHost(): ConversationRestoreBootstrapHost {
     return {
       getTabManager: () => this.tabManager,
       getPersistedTabState: () => this.plugin.settings.tabState,
@@ -2591,7 +2608,7 @@ export class OpenCodianView extends ItemView {
   }
 
   private async initializeFirstTab(): Promise<void> {
-    await this.conversationViewStateService.initializeFirstTab();
+    await this.conversationRestoreBootstrapCoordinator.initializeFirstTab();
   }
 
   private renderTabBar(): void {
@@ -2609,7 +2626,7 @@ export class OpenCodianView extends ItemView {
   }
 
   private restorePersistedTabs(): string | null {
-    return this.conversationViewStateService.restorePersistedTabs();
+    return this.conversationRestoreBootstrapCoordinator.restorePersistedTabs();
   }
 
   private persistTabState(options: { flush?: boolean } = {}): void {
