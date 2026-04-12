@@ -16,14 +16,14 @@
 
 ## 设计目的
 
-- 让 `OpenCodianView.showQuestionDialog()` 不再持有 grouped/sequential DOM 拼装与按钮等待细节
+- 让 question resolve flow 不再直接持有 grouped/sequential DOM 拼装与按钮等待细节
 - 继续复用既有 question inline card 容器，避免 sequential 模式每题都创建新的 stream card
 - 继续复用 `StreamingInlineCardRenderer` 的 post-tool-call placement 与 reveal 规则
 - 让 question inline card 的 grouped/sequential 行为可以独立于大视图类做小范围单测，并通过 `QuestionRuntimeHostAdapter` 复用统一的 question runtime host 装配
 
 ## 注意事项
 
-- 这个模块不负责调用 `replyToQuestion()` 或 `rejectQuestion()`；最终 service 回传仍由 `OpenCodianView` 处理
+- 这个模块不负责调用 `replyToQuestion()` 或 `rejectQuestion()`；最终 service 回传现在由 `QuestionResolutionFlowCoordinator` 处理
 - 已回答/已拒绝的 resolved question 回顾卡片内容与协调分别由 `QuestionResolutionCardRenderer.ts` / `QuestionResolutionCoordinator.ts` 负责，本模块继续提供共享容器复用与待回答 inline card 交互
 - host wiring 现在通常由 `QuestionRuntimeHostAdapter.ts` 统一提供，不要再把 active tab / runtime / pin-to-bottom 三段回调重新散落回 view
 - 不要在这里复制 streaming shell 查询或 reveal 逻辑，统一继续走 `StreamingInlineCardRenderer`

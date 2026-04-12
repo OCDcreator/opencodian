@@ -20,6 +20,10 @@ import {
   type QuestionDockCoordinatorHost,
   type QuestionDockCoordinatorRuntimeState,
 } from './QuestionDockCoordinator';
+import {
+  QuestionResolutionFlowCoordinator,
+  type QuestionResolutionFlowCoordinatorHost,
+} from './QuestionResolutionFlowCoordinator';
 
 type QuestionDockPort = Pick<QuestionDock, 'render'>;
 type QuestionResolutionApplyPort = Pick<QuestionResolutionCoordinator, 'applyResolvedQuestionState'>;
@@ -63,6 +67,7 @@ export interface QuestionRuntimeServices {
   inlineCardRenderer: QuestionInlineCardRenderer;
   resolutionCoordinator: QuestionResolutionCoordinator;
   dockCoordinator: QuestionDockCoordinator;
+  resolutionFlowCoordinator: QuestionResolutionFlowCoordinator;
 }
 
 export function createQuestionRuntimeHosts(
@@ -137,10 +142,25 @@ export function createQuestionRuntimeServices(
     hosts.resolutionCoordinatorHost,
   );
   const dockCoordinator = new QuestionDockCoordinator(hosts.dockCoordinatorHost);
+  const resolutionFlowCoordinatorHost: QuestionResolutionFlowCoordinatorHost = {
+    getActiveTabId: () => viewHost.getActiveTabId(),
+    getQuestionDisplayMode: () => viewHost.getQuestionDisplayMode(),
+    replyToQuestion: (requestId, answers) => viewHost.replyToQuestion(requestId, answers),
+    rejectQuestion: (requestId) => viewHost.rejectQuestion(requestId),
+  };
+  const resolutionFlowCoordinator = new QuestionResolutionFlowCoordinator(
+    resolutionFlowCoordinatorHost,
+    {
+      dockCoordinator,
+      inlineCardRenderer,
+      resolutionCoordinator,
+    },
+  );
 
   return {
     inlineCardRenderer,
     resolutionCoordinator,
     dockCoordinator,
+    resolutionFlowCoordinator,
   };
 }

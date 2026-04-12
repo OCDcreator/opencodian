@@ -252,4 +252,33 @@ describe('QuestionRuntimeHostAdapter', () => {
       answers: [['TypeScript']],
     });
   });
+
+  it('wires inline fallback resolution through the shared question runtime bundle', async () => {
+    const request = createQuestionRequest();
+    const { viewHost, runtimeByTab } = createViewHost({
+      shouldUseAboveInputQuestionDock: false,
+      shouldRenderQuestionResolutionCards: false,
+    });
+    const streamingInlineCardRenderer = new StreamingInlineCardRenderer({
+      getActiveTabId: () => 'tab-active',
+      getTabRuntimeState: () => ({ streamingMessageEl: null }),
+      revealStreamingAssistantMessageElement: () => null,
+    });
+    const services = createQuestionRuntimeServices(viewHost, streamingInlineCardRenderer);
+    const collectActionSpy = jest.spyOn(services.inlineCardRenderer, 'collectAction').mockResolvedValue({
+      type: 'reply',
+      answers: [['TypeScript']],
+    });
+
+    await services.resolutionFlowCoordinator.showQuestionDialog(request, 'tab-active');
+
+    expect(collectActionSpy).toHaveBeenCalledWith(request, 'all', 'tab-active');
+    expect(viewHost.replyToQuestion).toHaveBeenCalledWith(request.id, [['TypeScript']]);
+    expect(runtimeByTab.get('tab-active')?.resolvedQuestionRequestIds.has(request.id)).toBe(true);
+    expect(runtimeByTab.get('tab-active')?.pendingQuestionResolution).toEqual({
+      request,
+      status: 'answered',
+      answers: [['TypeScript']],
+    });
+  });
 });

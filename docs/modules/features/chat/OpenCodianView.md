@@ -185,9 +185,9 @@ tab stream-like badge、background-task badge、rewind/fork 按钮禁用态，�
 question dock 与 pending-question refresh 的主要 runtime/UI ownership 现在由 `QuestionDockCoordinator` 承担：
 
 - `OpenCodianView` 只保留更薄的 `QuestionRuntimeHostAdapter` host bridge：提供 active tab / current session / `QuestionDock` 实例、question display settings、OpenCode question API，以及 status-refresh / sync follow-up host
-- `QuestionRuntimeHostAdapter` 统一装配 `QuestionInlineCardRenderer`、`QuestionResolutionCoordinator` 与 `QuestionDockCoordinator`，并把 pending-question refresh / clear 路由收束回同一份 question runtime bundle
+- `QuestionRuntimeHostAdapter` 统一装配 `QuestionInlineCardRenderer`、`QuestionResolutionCoordinator`、`QuestionDockCoordinator` 与 `QuestionResolutionFlowCoordinator`，并把 pending-question refresh / clear 与 dock-or-inline resolve flow 一起收束回同一份 question runtime bundle
 - `QuestionDockCoordinator` 统一持有 pending-question refresh、waiter 保活、draft answer sanitize、dock render callbacks，以及回答/拒绝后的 status refresh + visible sync follow-up
-- `showQuestionDialog()` 会先尝试把请求交给上方 dock；如果当前设置仍使用 inline question card，才退回 `QuestionInlineCardRenderer`
+- `QuestionResolutionFlowCoordinator` 会先尝试把请求交给上方 dock；如果当前设置仍使用 inline question card，才退回 `QuestionInlineCardRenderer`
 
 ### 消息区重渲编排
 
@@ -271,6 +271,7 @@ question dock 与 pending-question refresh 的主要 runtime/UI ownership 现在
 - `StreamingInlineCardRenderer.ts`：封装 permission/question inline card 的共享插入位置与 shell reveal
 - `PermissionInlineCardRenderer.ts`：封装 permission inline card 的内容构造与按钮等待
 - `QuestionInlineCardRenderer.ts`：封装 grouped/sequential question inline card 的内容构造、容器复用与按钮等待
+- `QuestionResolutionFlowCoordinator.ts`：封装 dock-or-inline question resolve flow、OpenCode reply/reject 调用与 resolved-state follow-up
 - `QuestionResolutionCoordinator.ts`：封装 resolved question 的 pending state 写入、clear/render 分支与贴底滚动
 - `QuestionResolutionCardRenderer.ts`：封装 resolved question 回顾卡片与 answered/rejected markdown 摘要构造
 - `PendingIndicatorController.ts`：管理 delayed pending DOM
@@ -358,7 +359,7 @@ model selector 现在拆成了几层协作：
 这三个辅助子系统都由 view 负责路由：
 
 - session todo/status：OpenCode live listener 生命周期、session→tab 路由和 active-tab fallback 已下沉到 `services/ConversationSessionLiveSignalAdapter.ts`；state/dock/refresh/runtime-facade 四段 session todo wiring 现在统一由 `services/SessionTodoHostAdapter.ts` + `services/SessionTodoRuntimeFacade.ts` 装配；主动拉取刷新、request-id stale guard 与刷新成功后的 foreground reconcile 已下沉到 `services/SessionTodoStatusRefreshService.ts`；activation/open 和 post-sync 场景里 status + pending-question + todo 的组合刷新顺序已下沉到 `services/QuestionTodoStatusRefreshCoordinator.ts`，而这条链路与 background-task post-sync follow-up 的剩余 host wiring 现在再由 `services/QuestionTodoBackgroundTaskRefreshHostAdapter.ts` 统一装配；normalized snapshot、status fingerprint、stale suppression 与 persisted notice 恢复继续由 `services/SessionTodoStateService.ts` 负责，session todo dock 的挂载/销毁与 active-vs-runtime session 选择则进一步下沉到 `services/SessionTodoDockCoordinator.ts`，而真正的 persisted assistant notice append/dedupe 则进一步收束到 `services/PersistentAssistantNoticeService.ts`
-- question：既支持输入区上方的 `QuestionDock`，也支持由 `QuestionRuntimeHostAdapter.ts` 装配的 `QuestionInlineCardRenderer` 管理内联待回答卡片，以及由 `QuestionResolutionCoordinator` + `QuestionResolutionCardRenderer` 协作管理的已回答/已拒绝回顾卡片；pending-question refresh / clear 的共享路由也继续留在这份 bundle 内
+- question：既支持输入区上方的 `QuestionDock`，也支持由 `QuestionRuntimeHostAdapter.ts` 装配的 `QuestionInlineCardRenderer` 管理内联待回答卡片，再由 `QuestionResolutionFlowCoordinator` 统一承接 dock-or-inline resolve flow，以及由 `QuestionResolutionCoordinator` + `QuestionResolutionCardRenderer` 协作管理的已回答/已拒绝回顾卡片；pending-question refresh / clear 的共享路由也继续留在这份 bundle 内
 - background task：从 OMO 注入、`toolName === 'task'` 的 tool block、以及后续 system reminder 回写推导任务进度；运行态以内联状态条挂在对应 assistant turn 下，完成态则延迟落成持久化 notice；其中 timeline segment 推导、launch/completion runtime 重建、pending matching，以及 inline notice copy 组装已下沉到 `services/BackgroundTaskTimelineService.ts`，inline panel 的 DOM 创建、挂载、复用/清理已下沉到 `runtime/BackgroundTaskInlinePanelRenderer.ts`，indicator render 与 completion notice queue/flush 顺序已下沉到 `runtime/BackgroundTaskIndicatorCoordinator.ts`，streaming tool-call start/end 与 primary-stream finalize 触发已下沉到 `runtime/BackgroundTaskStreamTriggerCoordinator.ts`，live-signal reconciliation、authoritative-sync gate，以及 tab badge / finalize 共用的 live/grace-period running predicate 已下沉到 `services/BackgroundTaskLiveSignalCoordinator.ts`，而 tab stream-like/background-task badge 与 rewind-fork 按钮禁用态写回则进一步下沉到 `runtime/TabRuntimeStateBridge.ts`；hidden signal/background-tab sync 以及 active visible-conversation background sync 后的 question/todo/background-task refresh 组合装配已继续下沉到 `services/QuestionTodoBackgroundTaskRefreshHostAdapter.ts` 装配的 `services/PostSyncQuestionTodoRefreshFacade.ts` + `services/BackgroundTaskPostSyncCoordinator.ts`，其中前者负责 rebuild / completion / stream-like follow-up，后者只保留 authoritative mark、attention 标记与 active-conversation match/state-commit 判定；stopped/stale warning notice 的 content、fingerprint、suppression runtime 已下沉到 `services/BackgroundTaskNoticeStateService.ts`，completion notice 的 queued-state、fingerprint/content 则下沉到 `services/BackgroundTaskCompletionNoticeService.ts`，而两条链路共用的 persisted assistant notice append/dedupe 与 visible/hidden tab 后续动作已进一步下沉到 `services/PersistentAssistantNoticeService.ts`
 - background task 的 stale 判定现在额外受 `backgroundTaskAwaitingAuthoritativeSync` / hydration 保护：reload 或首次装载后，只有在至少一次权威消息同步完成后，才允许把“仍在运行”降级成 stopped/stale notice；这段 gate + live-signal 决策现在集中在 `BackgroundTaskLiveSignalCoordinator`
 
@@ -371,7 +372,7 @@ session todo 这条子链路现在的边界是：
 - `SessionTodoDockCoordinator`：session todo dock 的 slot 生命周期，以及 active/background tab 的 session→dock 渲染选择
 - `SessionTodoStatusRefreshService`：session todo/status 主动拉取刷新、request-id stale guard，以及刷新成功后的 foreground background-task reconcile
 - `QuestionTodoBackgroundTaskRefreshHostAdapter`：`QuestionTodoStatusRefreshCoordinator`、`PostSyncQuestionTodoRefreshFacade` 与 `BackgroundTaskPostSyncCoordinator` 共用的 host factory 与 service bundle 装配
-- `QuestionRuntimeHostAdapter`：`QuestionInlineCardRenderer`、`QuestionResolutionCoordinator` 与 `QuestionDockCoordinator` 共用的 host factory 与 service bundle 装配
+- `QuestionRuntimeHostAdapter`：`QuestionInlineCardRenderer`、`QuestionResolutionCoordinator`、`QuestionDockCoordinator` 与 `QuestionResolutionFlowCoordinator` 共用的 host factory 与 service bundle 装配
 - `QuestionTodoStatusRefreshCoordinator`：activation/open 与 post-sync 共享的 status + pending-question + todo 组合刷新顺序，以及 post-sync todo/status runtime gate
 - `PostSyncQuestionTodoRefreshFacade`：background sync 下的 question/todo refresh session 配对，以及 rebuild / completion / stream-like follow-up
 - `SessionTodoStateService`：todo/status runtime state、snapshot 规范化、stale notice suppression 与 persisted notice dedupe/restore

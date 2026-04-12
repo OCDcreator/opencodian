@@ -770,14 +770,6 @@ export class OpenCodianView extends ItemView {
     return this.sessionTodoServices.runtimeFacade;
   }
 
-  private get questionInlineCardRenderer(): QuestionRuntimeServices['inlineCardRenderer'] {
-    return this.questionRuntimeServices.inlineCardRenderer;
-  }
-
-  private get questionResolutionCoordinator(): QuestionRuntimeServices['resolutionCoordinator'] {
-    return this.questionRuntimeServices.resolutionCoordinator;
-  }
-
   private get questionDockCoordinator(): QuestionRuntimeServices['dockCoordinator'] {
     return this.questionRuntimeServices.dockCoordinator;
   }
@@ -2071,7 +2063,8 @@ export class OpenCodianView extends ItemView {
         this.applyUsageChunkToTab(tabId, chunk);
       },
       showPermissionDialog: (request, tabId) => this.showPermissionDialog(request, tabId),
-      showQuestionDialog: (request, tabId) => this.showQuestionDialog(request, tabId),
+      showQuestionDialog: (request, tabId) =>
+        this.questionRuntimeServices.resolutionFlowCoordinator.showQuestionDialog(request, tabId),
       convertToStreamingChunk: (chunk) => this.convertToStreamingChunk(chunk),
       getFriendlyStreamErrorMessage: (rawMessage) => this.getFriendlyStreamErrorMessage(rawMessage),
     };
@@ -4141,13 +4134,6 @@ export class OpenCodianView extends ItemView {
 
   private shouldRenderQuestionResolutionCards(): boolean {
     return this.plugin.settings.showAnsweredQuestionCards;
-  }
-
-  private suppressResolvedQuestionRequest(
-    requestId: string,
-    tabId: TabId | null = this.getActiveTabId(),
-  ): void {
-    this.questionDockCoordinator.markQuestionRequestResolved(requestId, tabId);
   }
 
   private renderQuestionDock(): void {
@@ -8213,49 +8199,6 @@ export class OpenCodianView extends ItemView {
     } catch (error) {
       logger.error('Failed to switch permission mode:', error);
       new Notice(t('settings.security.autoRestart.failed'));
-    }
-  }
-
-  private async showQuestionDialog(
-    request: QuestionRequest,
-    tabId: TabId | null = this.getActiveTabId(),
-  ): Promise<void> {
-    if (await this.questionDockCoordinator.waitForDockResolutionIfEnabled(request, tabId)) {
-      return;
-    }
-
-    const action = await this.questionInlineCardRenderer.collectAction(
-      request,
-      this.plugin.settings.questionDisplayMode,
-      tabId,
-    );
-
-    if (!action) {
-      logger.error('No streaming message element found for question card');
-      return;
-    }
-
-    try {
-      if (action.type === 'reject') {
-        await this.plugin.openCodeService.rejectQuestion(request.id);
-        this.suppressResolvedQuestionRequest(request.id, tabId);
-        this.questionResolutionCoordinator.applyResolvedQuestionState({
-          request,
-          status: 'rejected',
-        }, tabId);
-        return;
-      }
-
-      await this.plugin.openCodeService.replyToQuestion(request.id, action.answers);
-      this.suppressResolvedQuestionRequest(request.id, tabId);
-      this.questionResolutionCoordinator.applyResolvedQuestionState({
-        request,
-        status: 'answered',
-        answers: action.answers,
-      }, tabId);
-    } catch (error) {
-      logger.error('Failed to resolve question request:', error);
-      new Notice(t('chat.question.notice.error'));
     }
   }
 
