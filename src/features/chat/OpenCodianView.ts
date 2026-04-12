@@ -258,8 +258,11 @@ import { QuestionDockSlotCoordinator } from './services/QuestionDockSlotCoordina
 import {
   createQuestionRuntimeServices,
   type QuestionRuntimeServices,
-  type QuestionRuntimeViewHost,
 } from './services/QuestionRuntimeHostAdapter';
+import {
+  createQuestionRuntimeViewHostAdapter,
+  type QuestionRuntimeViewHostAdapterHost,
+} from './services/QuestionRuntimeViewHostAdapter';
 import type { QuestionTodoStatusRefreshCoordinator } from './services/QuestionTodoStatusRefreshCoordinator';
 import {
   createQuestionTodoBackgroundTaskRefreshServices,
@@ -1309,7 +1312,13 @@ export class OpenCodianView extends ItemView {
     this.streamingInlineCardRenderer = new StreamingInlineCardRenderer(this.createStreamingInlineCardRendererHost());
     this.permissionInlineCardRenderer = new PermissionInlineCardRenderer(this.streamingInlineCardRenderer);
     this.questionRuntimeServices = createQuestionRuntimeServices(
-      this.createQuestionRuntimeViewHost(),
+      createQuestionRuntimeViewHostAdapter({
+        viewHost: this.createQuestionRuntimeViewHostAdapterHost(),
+        settings: this.plugin.settings,
+        questionDockSlotCoordinator: this.questionDockSlotCoordinator,
+        questionApi: this.plugin.openCodeService,
+        statusRefresh: this.sessionTodoStatusRefreshService,
+      }),
       this.streamingInlineCardRenderer,
     );
     this.sendPipelineRuntime = new SendPipelineRuntime(
@@ -2141,26 +2150,18 @@ export class OpenCodianView extends ItemView {
     };
   }
 
-  private createQuestionRuntimeViewHost(): QuestionRuntimeViewHost {
+  private createQuestionRuntimeViewHostAdapterHost(): QuestionRuntimeViewHostAdapterHost {
     return {
       getActiveTabId: () => this.getActiveTabId(),
       getTabRuntimeState: (tabId) => this.getTabRuntimeState(tabId),
       ensureTabRuntimeState: (tabId) => this.ensureTabRuntimeState(tabId),
       getCurrentConversationSessionId: () => this.currentConversation?.openCodeSessionId,
       getSessionIdForTab: (tabId) => this.getSessionIdForTab(tabId),
-      getQuestionDock: () => this.questionDockSlotCoordinator.getQuestionDock(),
-      getQuestionDisplayMode: () => this.plugin.settings.questionDisplayMode,
-      shouldUseAboveInputQuestionDock: () => this.questionDockSlotCoordinator.shouldUseAboveInputQuestionDock(),
       shouldRenderQuestionResolutionCards: () => this.shouldRenderQuestionResolutionCards(),
       keepQuestionCardPinnedToBottom: (tabId) => {
         this.keepQuestionCardPinnedToBottom(tabId);
       },
       setTabNeedsAttention: (tabId, needsAttention) => this.setTabNeedsAttention(tabId, needsAttention),
-      getPendingQuestions: () => this.plugin.openCodeService.getPendingQuestions(),
-      replyToQuestion: (requestId, answers) => this.plugin.openCodeService.replyToQuestion(requestId, answers),
-      rejectQuestion: (requestId) => this.plugin.openCodeService.rejectQuestion(requestId),
-      refreshTabSessionStatus: (tabId, sessionId, options) =>
-        this.sessionTodoStatusRefreshService.refreshTabSessionStatus(tabId, sessionId, options),
       startConversationSyncLoop: () => {
         this.startConversationSyncLoop();
       },

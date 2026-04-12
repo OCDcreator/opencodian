@@ -11,6 +11,8 @@
 - 顺序装配 inline question card、resolved-question runtime、上方 question dock，以及 `QuestionResolutionFlowCoordinator` 四个协作模块，避免 view 继续维护多段 `create*Host()` 和散落的 resolve flow instantiation
 - 让 `QuestionDockCoordinator` 的 resolved-state callback 直接回连到共享的 `QuestionResolutionCoordinator`，保持 dock resolve 与 inline fallback 共用同一份 question-resolution state bridge
 
+当前这份 `QuestionRuntimeViewHost` 通常先由 `QuestionRuntimeViewHostAdapter` 准备：view 自己只保留较通用的 tab/runtime host，question 专属的 dock/settings/API/status bridge 则在 adapter 里组合。
+
 它不负责 question request 的服务端数据获取、resolved card DOM 内容拼装，或 question dock 的真正 DOM 渲染；这些仍分别留给 `OpenCodeService`、`QuestionResolutionCardRenderer` 与 `QuestionDock`。
 
 ## 公开接口
@@ -56,6 +58,6 @@ export function createQuestionRuntimeServices(...): QuestionRuntimeServices;
 
 ## 与 `OpenCodianView` 的边界
 
-- `OpenCodianView` 现在只提供一份 `QuestionRuntimeViewHost`，并保存一份 `QuestionRuntimeServices` bundle，而 dock slot/gate 相关 host 细节则可继续委托给 `QuestionDockSlotCoordinator`
+- `OpenCodianView` 现在只提供一份更窄的 `QuestionRuntimeViewHostAdapterHost`，再由 `QuestionRuntimeViewHostAdapter` 组合成 `QuestionRuntimeViewHost`；dock slot/gate 相关 host 细节则继续委托给 `QuestionDockSlotCoordinator`
 - `QuestionDockCoordinator` 继续负责 pending-question queue、dock callbacks 与 resolve follow-up；adapter 不接管其业务逻辑
 - `QuestionInlineCardRenderer`、`QuestionResolutionCoordinator` 与 `QuestionResolutionFlowCoordinator` 继续分别负责 inline question card、resolved question runtime 与 dock-or-inline resolve orchestration；adapter 只负责共享装配
