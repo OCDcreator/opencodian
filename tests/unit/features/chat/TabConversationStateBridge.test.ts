@@ -36,8 +36,8 @@ describe('TabConversationStateBridge', () => {
       setCurrentConversationRevertState: jest.fn(),
       setOpenCodeSessionId: jest.fn(),
       clearPendingQuestionsForTab: jest.fn(),
-      setTabSessionTodos: jest.fn(),
-      setTabSessionStatus: jest.fn(),
+      resetTabSessionState: jest.fn(),
+      clearTabSessionState: jest.fn(),
       resetBackgroundTaskSuppressedFingerprint: jest.fn(),
       getConversationSyncFingerprint: jest.fn().mockReturnValue('fingerprint'),
       setLastConversationSyncFingerprint: jest.fn(),
@@ -67,8 +67,7 @@ describe('TabConversationStateBridge', () => {
     expect(host.setCurrentConversationRevertState).toHaveBeenCalledWith(null);
     expect(host.setOpenCodeSessionId).toHaveBeenCalledWith(conversation.openCodeSessionId);
     expect(host.clearPendingQuestionsForTab).toHaveBeenCalledWith('tab-1');
-    expect(host.setTabSessionTodos).toHaveBeenCalledWith('tab-1', [], conversation.openCodeSessionId);
-    expect(host.setTabSessionStatus).toHaveBeenCalledWith('tab-1', null, conversation.openCodeSessionId);
+    expect(host.resetTabSessionState).toHaveBeenCalledWith('tab-1', conversation.openCodeSessionId);
     expect(host.resetBackgroundTaskSuppressedFingerprint).toHaveBeenCalledWith('tab-1');
   });
 
@@ -92,8 +91,7 @@ describe('TabConversationStateBridge', () => {
 
     expect(host.setCurrentConversation).toHaveBeenCalledWith(null);
     expect(host.stopConversationSyncLoop).toHaveBeenCalledTimes(1);
-    expect(host.setTabSessionTodos).toHaveBeenCalledWith('tab-1', [], null);
-    expect(host.setTabSessionStatus).toHaveBeenCalledWith('tab-1', null, null);
+    expect(host.clearTabSessionState).toHaveBeenCalledWith('tab-1');
     expect(host.clearPendingQuestionsForTab).toHaveBeenCalledWith('tab-1');
   });
 

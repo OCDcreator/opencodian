@@ -12,7 +12,7 @@
 - 当 tab 尚未和当前 conversation state 完全重建对齐时，为当前活动 conversation 提供 active-tab fallback
 - 在命中 tab 写入 todo/status runtime state 后，直接触发 `BackgroundTaskLiveSignalCoordinator.reconcileStateFromLiveSignals()`
 
-它不负责 todo/status runtime state 的 fingerprint、stale suppression，也不自己决定 background task stale/notice；这些能力仍分别由 `SessionTodoStateService` 与 `BackgroundTaskLiveSignalCoordinator` 负责。本 adapter 只负责把 live signal 更新后的 tab 直接交给 background-task coordinator 做 reconcile，不再让 `OpenCodianView` host callback 额外转发这一步。
+它不负责 todo/status runtime state 的 fingerprint、stale suppression，也不自己决定 background task stale/notice；这些能力仍分别由 `SessionTodoStateService` 与 `BackgroundTaskLiveSignalCoordinator` 负责。本 adapter 只负责把 live signal 更新后的 tab 直接交给共享的 session todo runtime facade + background-task coordinator，不再让 `OpenCodianView` 私有 helper 额外转发这一步。
 
 ## 公开接口
 
@@ -50,6 +50,6 @@ export class ConversationSessionLiveSignalAdapter {
 
 ## 与 `OpenCodianView` 的边界
 
-- `OpenCodianView` 只保留 host bridge：把匹配后的 live update 写入 `setTabSessionTodos()` / `setTabSessionStatus()`
+- `OpenCodianView` 只保留 host bridge：把匹配后的 live update 交给 `SessionTodoRuntimeFacade.applySessionTodoUpdate()` / `applySessionStatusUpdate()`
 - `SessionTodoStateService` 继续负责 todo/status runtime state、stale suppression 与 persisted notice 协调
 - `ConversationSessionLiveSignalAdapter` 会在 runtime state 写入后直接调用 `BackgroundTaskLiveSignalCoordinator`，决定 indicator/stopped notice 是否需要变化

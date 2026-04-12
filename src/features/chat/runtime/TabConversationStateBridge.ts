@@ -1,8 +1,6 @@
-import type { SessionActivityStatus } from '../../../core/opencode';
 import type {
   ChatMessage,
   Conversation,
-  SessionTodo,
 } from '../../../core/types';
 import type { TabId } from '../tabs';
 
@@ -25,12 +23,8 @@ export interface TabConversationStateBridgeHost {
   setCurrentConversationRevertState(revertState: ConversationRevertState): void;
   setOpenCodeSessionId(sessionId: string): void;
   clearPendingQuestionsForTab(tabId: TabId | null): void;
-  setTabSessionTodos(tabId: TabId | null, todos: SessionTodo[], sessionId: string | null): void;
-  setTabSessionStatus(
-    tabId: TabId | null,
-    status: SessionActivityStatus | null,
-    sessionId: string | null,
-  ): void;
+  resetTabSessionState(tabId: TabId | null, sessionId: string | null): void;
+  clearTabSessionState(tabId: TabId | null): void;
   resetBackgroundTaskSuppressedFingerprint(tabId: TabId | null): void;
   getConversationSyncFingerprint(messages: ChatMessage[]): string;
   setLastConversationSyncFingerprint(fingerprint: string): void;
@@ -66,8 +60,7 @@ export class TabConversationStateBridge {
     }
 
     if (options.resetSessionState) {
-      this.host.setTabSessionTodos(tabId, [], conversation.openCodeSessionId);
-      this.host.setTabSessionStatus(tabId, null, conversation.openCodeSessionId);
+      this.host.resetTabSessionState(tabId, conversation.openCodeSessionId);
     }
 
     if (options.resetBackgroundTaskSuppressedFingerprint) {
@@ -78,8 +71,7 @@ export class TabConversationStateBridge {
   clearActiveConversation(tabId: TabId | null): void {
     this.host.setCurrentConversation(null);
     this.host.stopConversationSyncLoop();
-    this.host.setTabSessionTodos(tabId, [], null);
-    this.host.setTabSessionStatus(tabId, null, null);
+    this.host.clearTabSessionState(tabId);
     this.host.clearPendingQuestionsForTab(tabId);
   }
 

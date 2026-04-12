@@ -13,6 +13,7 @@ import {
   SessionTodoStatusRefreshService,
   type SessionTodoStatusRefreshRuntime,
 } from './SessionTodoStatusRefreshService';
+import { SessionTodoRuntimeFacade } from './SessionTodoRuntimeFacade';
 
 export interface SessionTodoRuntimeState
   extends SessionTodoStateRuntime,
@@ -45,19 +46,13 @@ export interface SessionTodoServices {
   dockCoordinator: SessionTodoDockCoordinator;
   stateService: SessionTodoStateService;
   statusRefreshService: SessionTodoStatusRefreshService;
+  runtimeFacade: SessionTodoRuntimeFacade;
 }
 
 export function createSessionTodoServices(host: SessionTodoViewHost): SessionTodoServices {
-  let stateService: SessionTodoStateService;
+  let dockCoordinator!: SessionTodoDockCoordinator;
 
-  const dockCoordinator = new SessionTodoDockCoordinator({
-    getActiveTabId: () => host.getActiveTabId(),
-    getCurrentConversationSessionId: () => host.getCurrentConversationSessionId(),
-    getTabRuntimeState: (tabId) => host.getTabRuntimeState(tabId),
-    getTabSessionTodos: (tabId, sessionId) => stateService.getTabSessionTodos(tabId, sessionId),
-  });
-
-  stateService = new SessionTodoStateService({
+  const stateService = new SessionTodoStateService({
     getTabRuntimeState: (tabId) => host.getTabRuntimeState(tabId),
     getActiveTabId: () => host.getActiveTabId(),
     getSessionIdForTab: (tabId) => host.getSessionIdForTab(tabId),
@@ -75,18 +70,29 @@ export function createSessionTodoServices(host: SessionTodoViewHost): SessionTod
       host.appendPersistentAssistantNoticeMessage(options),
   });
 
+  const runtimeFacade = new SessionTodoRuntimeFacade(stateService, {
+    getSessionIdForTab: (tabId) => host.getSessionIdForTab(tabId),
+  });
+
+  dockCoordinator = new SessionTodoDockCoordinator({
+    getActiveTabId: () => host.getActiveTabId(),
+    getCurrentConversationSessionId: () => host.getCurrentConversationSessionId(),
+    getTabRuntimeState: (tabId) => host.getTabRuntimeState(tabId),
+    getTabSessionTodos: (tabId, sessionId) => runtimeFacade.getTabSessionTodos(tabId, sessionId),
+  });
+
   const statusRefreshService = new SessionTodoStatusRefreshService({
     getTabRuntimeState: (tabId) => host.getTabRuntimeState(tabId),
-    getTabSessionTodos: (tabId, sessionId) => stateService.getTabSessionTodos(tabId, sessionId),
+    getTabSessionTodos: (tabId, sessionId) => runtimeFacade.getTabSessionTodos(tabId, sessionId),
     setTabSessionTodos: (tabId, todos, sessionId) => {
-      stateService.setTabSessionTodos(tabId, todos, sessionId);
+      runtimeFacade.setTabSessionTodos(tabId, todos, sessionId);
     },
     renderSessionTodoDock: (tabId) => {
       dockCoordinator.render(tabId);
     },
-    getTabSessionStatus: (tabId, sessionId) => stateService.getTabSessionStatus(tabId, sessionId),
+    getTabSessionStatus: (tabId, sessionId) => runtimeFacade.getTabSessionStatus(tabId, sessionId),
     setTabSessionStatus: (tabId, status, sessionId) => {
-      stateService.setTabSessionStatus(tabId, status, sessionId);
+      runtimeFacade.setTabSessionStatus(tabId, status, sessionId);
     },
     getSessionTodos: (sessionId) => host.getSessionTodos(sessionId),
     getSessionStatuses: () => host.getSessionStatuses(),
@@ -99,5 +105,6 @@ export function createSessionTodoServices(host: SessionTodoViewHost): SessionTod
     dockCoordinator,
     stateService,
     statusRefreshService,
+    runtimeFacade,
   };
 }

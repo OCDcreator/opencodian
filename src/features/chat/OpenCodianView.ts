@@ -775,6 +775,10 @@ export class OpenCodianView extends ItemView {
     return this.sessionTodoServices.statusRefreshService;
   }
 
+  private get sessionTodoRuntimeFacade(): SessionTodoServices['runtimeFacade'] {
+    return this.sessionTodoServices.runtimeFacade;
+  }
+
   private createTabRuntimeState(): TabRuntimeState {
     return {
       isStreaming: false,
@@ -1048,36 +1052,6 @@ export class OpenCodianView extends ItemView {
     return Boolean(activeElement && this.inputContainer?.contains(activeElement));
   }
 
-  private getTabSessionTodos(
-    tabId: TabId | null = this.getActiveTabId(),
-    sessionId = this.currentConversation?.openCodeSessionId ?? null,
-  ): SessionTodo[] {
-    return this.sessionTodoStateService.getTabSessionTodos(tabId, sessionId);
-  }
-
-  private setTabSessionTodos(
-    tabId: TabId | null,
-    todos: SessionTodo[],
-    sessionId: string | null = this.currentConversation?.openCodeSessionId ?? null,
-  ): void {
-    this.sessionTodoStateService.setTabSessionTodos(tabId, todos, sessionId);
-  }
-
-  private getTabSessionStatus(
-    tabId: TabId | null = this.getActiveTabId(),
-    sessionId = this.currentConversation?.openCodeSessionId ?? null,
-  ): SessionActivityStatus | null {
-    return this.sessionTodoStateService.getTabSessionStatus(tabId, sessionId);
-  }
-
-  private setTabSessionStatus(
-    tabId: TabId | null,
-    status: SessionActivityStatus | null,
-    sessionId: string | null = this.currentConversation?.openCodeSessionId ?? null,
-  ): void {
-    this.sessionTodoStateService.setTabSessionStatus(tabId, status, sessionId);
-  }
-
   private getSessionIdForTab(tabId: TabId | null = this.getActiveTabId()): string | null {
     if (!tabId) {
       return null;
@@ -1113,31 +1087,6 @@ export class OpenCodianView extends ItemView {
     }
 
     return this.plugin.getConversations().find((item) => item.id === tab.conversationId) ?? null;
-  }
-
-  private extractSessionTodosFromToolInput(input: Record<string, unknown>): SessionTodo[] {
-    return this.sessionTodoStateService.extractSessionTodosFromToolInput(input);
-  }
-
-  private applyStreamingTodoSnapshotFromTool(
-    toolCall: ToolCallInfo,
-    tabId: TabId | null = this.getActiveTabId(),
-  ): void {
-    if (toolCall.name !== 'todowrite') {
-      return;
-    }
-
-    const todos = this.extractSessionTodosFromToolInput(toolCall.input ?? {});
-    if (todos.length === 0) {
-      return;
-    }
-
-    const sessionId = this.getSessionIdForTab(tabId);
-    if (!sessionId) {
-      return;
-    }
-
-    this.setTabSessionTodos(tabId, todos, sessionId);
   }
 
   private renderSessionTodoDock(tabId: TabId | null = this.getActiveTabId()): void {
@@ -1524,11 +1473,11 @@ export class OpenCodianView extends ItemView {
       clearPendingQuestionsForTab: (tabId) => {
         this.clearPendingQuestionsForTab(tabId);
       },
-      setTabSessionTodos: (tabId, todos, sessionId) => {
-        this.setTabSessionTodos(tabId, todos, sessionId);
+      resetTabSessionState: (tabId, sessionId) => {
+        this.sessionTodoRuntimeFacade.resetTabSessionState(tabId, sessionId);
       },
-      setTabSessionStatus: (tabId, status, sessionId) => {
-        this.setTabSessionStatus(tabId, status, sessionId);
+      clearTabSessionState: (tabId) => {
+        this.sessionTodoRuntimeFacade.clearTabSessionState(tabId);
       },
       resetBackgroundTaskSuppressedFingerprint: (tabId) => {
         const runtime = this.getTabRuntimeState(tabId);
@@ -1623,7 +1572,8 @@ export class OpenCodianView extends ItemView {
     return {
       getTabRuntimeState: (tabId: TabId | null) => this.getTabRuntimeState(tabId),
       getSessionIdForTab: (tabId: TabId | null) => this.getSessionIdForTab(tabId),
-      getTabSessionStatus: (tabId, sessionId) => this.getTabSessionStatus(tabId, sessionId),
+      getTabSessionStatus: (tabId, sessionId) =>
+        this.sessionTodoRuntimeFacade.getTabSessionStatus(tabId, sessionId),
       syncTabStreamLikeState: (tabId) => {
         this.syncTabStreamLikeState(tabId);
       },
@@ -1701,7 +1651,7 @@ export class OpenCodianView extends ItemView {
       getActiveTabId: () => this.getActiveTabId(),
       getTabRuntimeState: (tabId: TabId | null) => this.getTabRuntimeState(tabId),
       applyStreamingTodoSnapshotFromTool: (toolCall, tabId) => {
-        this.applyStreamingTodoSnapshotFromTool(toolCall, tabId);
+        this.sessionTodoRuntimeFacade.applyStreamingTodoSnapshotFromTool(toolCall, tabId);
       },
       getSessionIdForTab: (tabId: TabId | null) => this.getSessionIdForTab(tabId),
       refreshTabSessionTodos: (tabId, sessionId, options) =>
@@ -1755,10 +1705,10 @@ export class OpenCodianView extends ItemView {
       getCurrentConversation: () => this.currentConversation,
       getActiveTabId: () => this.getActiveTabId(),
       applySessionTodoUpdate: (tabId, sessionId, todos) => {
-        this.setTabSessionTodos(tabId, todos, sessionId);
+        this.sessionTodoRuntimeFacade.applySessionTodoUpdate(tabId, sessionId, todos);
       },
       applySessionStatusUpdate: (tabId, sessionId, status) => {
-        this.setTabSessionStatus(tabId, status, sessionId);
+        this.sessionTodoRuntimeFacade.applySessionStatusUpdate(tabId, sessionId, status);
       },
     };
   }
@@ -2719,7 +2669,10 @@ export class OpenCodianView extends ItemView {
       return true;
     }
 
-    const status = this.getTabSessionStatus(tabId, this.getSessionIdForTab(tabId));
+    const status = this.sessionTodoRuntimeFacade.getTabSessionStatus(
+      tabId,
+      this.getSessionIdForTab(tabId),
+    );
     return status?.type === 'busy' || status?.type === 'retry';
   }
 

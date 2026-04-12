@@ -24,7 +24,6 @@ describe('OpenCodianView stale session todo suppression', () => {
     const view = createView() as unknown as {
       suppressStaleSessionTodosIfNeeded: (tabId: string) => Array<Record<string, unknown>> | null;
       getTabRuntimeState: () => Record<string, unknown>;
-      getTabSessionStatus: () => null;
       getSessionIdForTab: () => string;
       getActiveTabId: () => string;
       renderSessionTodoDock: () => void;
@@ -51,7 +50,6 @@ describe('OpenCodianView stale session todo suppression', () => {
     };
 
     jest.spyOn(view, 'getTabRuntimeState').mockReturnValue(runtime);
-    jest.spyOn(view, 'getTabSessionStatus').mockReturnValue(null);
     jest.spyOn(view, 'getSessionIdForTab').mockReturnValue('session-1');
     jest.spyOn(view, 'getActiveTabId').mockReturnValue('tab-1');
     jest.spyOn(view, 'renderSessionTodoDock').mockImplementation(() => {});
@@ -68,12 +66,17 @@ describe('OpenCodianView stale session todo suppression', () => {
   it('keeps a previously downgraded todo snapshot hidden after reload when the stale notice is already persisted', () => {
     const view = createView() as unknown as {
       currentConversation: { openCodeSessionId: string; messages: Array<Record<string, unknown>> } | null;
-      setTabSessionTodos: (tabId: string, todos: Array<Record<string, unknown>>, sessionId: string) => void;
       buildStaleSessionTodoNoticeContent: (todos: Array<Record<string, unknown>>) => string;
       getTabRuntimeState: () => Record<string, unknown>;
-      getTabSessionStatus: () => null;
       getActiveTabId: () => string;
       renderSessionTodoDock: () => void;
+      sessionTodoRuntimeFacade: {
+        setTabSessionTodos: (
+          tabId: string,
+          todos: Array<Record<string, unknown>>,
+          sessionId: string,
+        ) => void;
+      };
       sessionTodoStateService: {
         reconcileStaleSessionTodoState: (tabId: string) => void;
       };
@@ -109,12 +112,11 @@ describe('OpenCodianView stale session todo suppression', () => {
     };
 
     jest.spyOn(view, 'getTabRuntimeState').mockReturnValue(runtime);
-    jest.spyOn(view, 'getTabSessionStatus').mockReturnValue(null);
     jest.spyOn(view, 'getActiveTabId').mockReturnValue('tab-1');
     jest.spyOn(view, 'renderSessionTodoDock').mockImplementation(() => {});
     jest.spyOn(view.sessionTodoStateService, 'reconcileStaleSessionTodoState').mockImplementation(() => {});
 
-    view.setTabSessionTodos('tab-1', todos, 'session-1');
+    view.sessionTodoRuntimeFacade.setTabSessionTodos('tab-1', todos, 'session-1');
 
     expect(runtime.sessionTodoSessionId).toBe('session-1');
     expect(runtime.sessionTodoSuppressedFingerprint).toBe(runtime.sessionTodoFingerprint);
