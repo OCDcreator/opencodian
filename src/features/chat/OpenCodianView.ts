@@ -169,10 +169,6 @@ import {
   type BackgroundTaskLiveSignalCoordinatorHost,
 } from './services/BackgroundTaskLiveSignalCoordinator';
 import {
-  BackgroundTaskActivationIndicatorCoordinator,
-  type BackgroundTaskActivationIndicatorCoordinatorHost,
-} from './services/BackgroundTaskActivationIndicatorCoordinator';
-import {
   BackgroundTaskNoticeStateService,
   type BackgroundTaskNoticeStateServiceHost,
 } from './services/BackgroundTaskNoticeStateService';
@@ -261,15 +257,16 @@ import {
   type QuestionRuntimeViewHostAdapterHost,
 } from './services/QuestionRuntimeViewHostAdapter';
 import {
-  QuestionTodoActivationRefreshCoordinator,
-  type QuestionTodoActivationRefreshCoordinatorHost,
-} from './services/QuestionTodoActivationRefreshCoordinator';
-import type { QuestionTodoStatusRefreshCoordinator } from './services/QuestionTodoStatusRefreshCoordinator';
+  createQuestionTodoBackgroundTaskActivationServices,
+  createQuestionTodoBackgroundTaskActivationViewHostAdapter,
+  type QuestionTodoBackgroundTaskActivationViewHostAdapterHost,
+} from './services/QuestionTodoBackgroundTaskActivationHostAdapter';
 import {
   createQuestionTodoBackgroundTaskRefreshServices,
   createQuestionTodoBackgroundTaskRefreshViewHostAdapter,
   type QuestionTodoBackgroundTaskRefreshViewHostAdapterHost,
 } from './services/QuestionTodoBackgroundTaskRefreshHostAdapter';
+import type { QuestionTodoStatusRefreshCoordinator } from './services/QuestionTodoStatusRefreshCoordinator';
 import {
   isElementNearBottom,
   scrollElementToBottom,
@@ -1122,14 +1119,17 @@ export class OpenCodianView extends ItemView {
     );
     this.questionTodoStatusRefreshCoordinator = questionTodoStatusRefreshCoordinator;
     this.backgroundTaskPostSyncCoordinator = backgroundTaskPostSyncCoordinator;
-    const questionTodoActivationRefreshCoordinator = new QuestionTodoActivationRefreshCoordinator(
-      this.createQuestionTodoActivationRefreshCoordinatorHost(),
+    const {
+      questionTodoActivationRefreshCoordinator,
+      backgroundTaskActivationIndicatorCoordinator,
+    } = createQuestionTodoBackgroundTaskActivationServices(
+      createQuestionTodoBackgroundTaskActivationViewHostAdapter({
+        viewHost: this.createQuestionTodoBackgroundTaskActivationViewHostAdapterHost(),
+        getQuestionDockSlotCoordinator: () => this.questionDockSlotCoordinator,
+        getSessionTodoDockCoordinator: () => this.sessionTodoDockCoordinator,
+      }),
       this.questionTodoStatusRefreshCoordinator,
     );
-    const backgroundTaskActivationIndicatorCoordinator =
-      new BackgroundTaskActivationIndicatorCoordinator(
-        this.createBackgroundTaskActivationIndicatorCoordinatorHost(),
-      );
     this.activeTabContextUsageCoordinator = new ActiveTabContextUsageCoordinator(
       this.createActiveTabContextUsageCoordinatorHost(),
     );
@@ -1449,20 +1449,6 @@ export class OpenCodianView extends ItemView {
     };
   }
 
-  private createQuestionTodoActivationRefreshCoordinatorHost(): QuestionTodoActivationRefreshCoordinatorHost {
-    return {
-      renderQuestionDock: () => {
-        this.questionDockSlotCoordinator.render();
-      },
-      updateSessionTodoDockForTab: (tabId) => {
-        this.sessionTodoDockCoordinator.updateForTab(tabId);
-      },
-      renderSessionTodoDock: (tabId) => {
-        this.renderSessionTodoDock(tabId);
-      },
-    };
-  }
-
   private createActiveTabContextUsageCoordinatorHost(): ActiveTabContextUsageCoordinatorHost {
     return {
       hasActiveTab: () => Boolean(this.tabManager?.getActiveTab()),
@@ -1517,9 +1503,12 @@ export class OpenCodianView extends ItemView {
     };
   }
 
-  private createBackgroundTaskActivationIndicatorCoordinatorHost(): BackgroundTaskActivationIndicatorCoordinatorHost {
+  private createQuestionTodoBackgroundTaskActivationViewHostAdapterHost(): QuestionTodoBackgroundTaskActivationViewHostAdapterHost {
     return {
-      getCurrentConversationId: () => this.currentConversation?.id ?? null,
+      getCurrentConversation: () => this.currentConversation,
+      renderSessionTodoDock: (tabId) => {
+        this.renderSessionTodoDock(tabId);
+      },
       resetBackgroundTaskIndicator: () => {
         this.resetBackgroundTaskIndicator();
       },
