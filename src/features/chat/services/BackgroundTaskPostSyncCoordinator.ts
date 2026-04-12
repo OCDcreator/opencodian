@@ -17,11 +17,22 @@ export interface BackgroundTaskPostSyncResult {
   fingerprint: string;
 }
 
+export interface ConversationRevertStateSnapshot {
+  messageID: string;
+  partID?: string;
+}
+
+export interface VisibleConversationPostSyncResult extends BackgroundTaskPostSyncResult {
+  revertState: ConversationRevertStateSnapshot | null;
+}
+
 export interface BackgroundTaskPostSyncCoordinatorHost {
   getCurrentConversationId(): string | null;
   getCurrentConversationSessionId(): string | undefined;
   getTabRuntimeState(tabId: TabId | null): BackgroundTaskPostSyncRuntime | null;
   hasIncompleteTodos(todos: readonly SessionTodo[]): boolean;
+  setCurrentConversationRevertState(revertState: ConversationRevertStateSnapshot | null): void;
+  setTabConversationSyncFingerprint(tabId: TabId, fingerprint: string): void;
   markBackgroundTaskAuthoritativeSync(tabId: TabId | null, reason: string): void;
   refreshPendingQuestionsForTab(
     tabId: TabId | null,
@@ -63,11 +74,10 @@ export interface VisibleConversationPostSyncOptions {
   tabId: TabId;
   expectedConversationId: string;
   questionSessionId: string | null | undefined;
-  syncResult: BackgroundTaskPostSyncResult;
+  syncResult: VisibleConversationPostSyncResult;
 }
 
 export interface VisibleConversationPostSyncOutcome {
-  currentConversationMatchesExpected: boolean;
   shouldApplySyncedConversationUpdate: boolean;
   shouldRenderBackgroundTaskIndicator: boolean;
 }
@@ -83,9 +93,14 @@ export class BackgroundTaskPostSyncCoordinator {
     const currentConversationMatchesExpected =
       this.host.getCurrentConversationId() === options.expectedConversationId;
     await this.refreshVisibleConversationTodoStatus(options.tabId);
+    if (currentConversationMatchesExpected) {
+      this.host.setCurrentConversationRevertState(options.syncResult.revertState);
+      if (options.syncResult.changed) {
+        this.host.setTabConversationSyncFingerprint(options.tabId, options.syncResult.fingerprint);
+      }
+    }
 
     return {
-      currentConversationMatchesExpected,
       shouldApplySyncedConversationUpdate:
         currentConversationMatchesExpected && options.syncResult.changed,
       shouldRenderBackgroundTaskIndicator:

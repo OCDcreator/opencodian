@@ -1779,6 +1779,15 @@ export class OpenCodianView extends ItemView {
       getCurrentConversationSessionId: () => this.currentConversation?.openCodeSessionId,
       getTabRuntimeState: (tabId: TabId | null) => this.getTabRuntimeState(tabId),
       hasIncompleteTodos: (todos) => this.hasIncompleteTodos(todos),
+      setCurrentConversationRevertState: (revertState) => {
+        this.currentConversationRevertState = revertState;
+      },
+      setTabConversationSyncFingerprint: (tabId, fingerprint) => {
+        const runtime = this.getTabRuntimeState(tabId);
+        if (runtime) {
+          runtime.lastConversationSyncFingerprint = fingerprint;
+        }
+      },
       markBackgroundTaskAuthoritativeSync: (tabId, reason) => {
         this.markBackgroundTaskAuthoritativeSync(tabId, reason);
       },
@@ -5692,19 +5701,14 @@ export class OpenCodianView extends ItemView {
         questionSessionId: expectedSessionId,
         syncResult,
       });
-      if (!postSyncOutcome.shouldApplySyncedConversationUpdate) {
-        if (postSyncOutcome.currentConversationMatchesExpected) {
-          this.currentConversationRevertState = syncResult.revertState;
-        }
-        if (postSyncOutcome.shouldRenderBackgroundTaskIndicator) {
-          await this.renderBackgroundTaskIndicatorIfNeeded(activeTabId);
-        }
+      if (postSyncOutcome.shouldApplySyncedConversationUpdate) {
+        await this.applySyncedConversationUpdate(previousMessages, this.currentConversation.messages);
         return;
       }
 
-      this.currentConversationRevertState = syncResult.revertState;
-      runtime.lastConversationSyncFingerprint = syncResult.fingerprint;
-      await this.applySyncedConversationUpdate(previousMessages, this.currentConversation.messages);
+      if (postSyncOutcome.shouldRenderBackgroundTaskIndicator) {
+        await this.renderBackgroundTaskIndicatorIfNeeded(activeTabId);
+      }
     } finally {
       runtime.isConversationSyncInFlight = false;
     }

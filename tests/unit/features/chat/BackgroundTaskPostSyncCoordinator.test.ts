@@ -51,6 +51,8 @@ function createHost(options: {
     getCurrentConversationSessionId: jest.fn().mockReturnValue('session-1'),
     getTabRuntimeState: jest.fn().mockReturnValue(runtime),
     hasIncompleteTodos: jest.fn().mockReturnValue(options.hasIncompleteTodos ?? false),
+    setCurrentConversationRevertState: jest.fn(),
+    setTabConversationSyncFingerprint: jest.fn(),
     markBackgroundTaskAuthoritativeSync: jest.fn(),
     refreshPendingQuestionsForTab: jest.fn().mockResolvedValue([] as QuestionRequest[]),
     syncBackgroundTaskStateFromConversation: jest.fn(),
@@ -81,7 +83,11 @@ describe('BackgroundTaskPostSyncCoordinator', () => {
       tabId: 'tab-active',
       expectedConversationId: 'conversation-1',
       questionSessionId: 'session-1',
-      syncResult: { changed: true, fingerprint: 'new' },
+      syncResult: {
+        changed: true,
+        fingerprint: 'new',
+        revertState: { messageID: 'assistant-1', partID: 'part-1' },
+      },
     });
 
     expect(host.refreshPendingQuestionsForTab).toHaveBeenCalledWith('tab-active', 'session-1');
@@ -95,8 +101,12 @@ describe('BackgroundTaskPostSyncCoordinator', () => {
       'session-1',
       { suppressErrors: true },
     );
+    expect(host.setCurrentConversationRevertState).toHaveBeenCalledWith({
+      messageID: 'assistant-1',
+      partID: 'part-1',
+    });
+    expect(host.setTabConversationSyncFingerprint).toHaveBeenCalledWith('tab-active', 'new');
     expect(outcome).toEqual({
-      currentConversationMatchesExpected: true,
       shouldApplySyncedConversationUpdate: true,
       shouldRenderBackgroundTaskIndicator: false,
     });
@@ -117,7 +127,11 @@ describe('BackgroundTaskPostSyncCoordinator', () => {
       tabId: 'tab-active',
       expectedConversationId: 'conversation-1',
       questionSessionId: 'session-1',
-      syncResult: { changed: true, fingerprint: 'new' },
+      syncResult: {
+        changed: true,
+        fingerprint: 'new',
+        revertState: { messageID: 'assistant-2' },
+      },
     });
 
     expect(host.refreshPendingQuestionsForTab).toHaveBeenCalledWith('tab-active', 'session-1');
@@ -131,8 +145,37 @@ describe('BackgroundTaskPostSyncCoordinator', () => {
       'session-2',
       { suppressErrors: true },
     );
+    expect(host.setCurrentConversationRevertState).not.toHaveBeenCalled();
+    expect(host.setTabConversationSyncFingerprint).not.toHaveBeenCalled();
     expect(outcome).toEqual({
-      currentConversationMatchesExpected: false,
+      shouldApplySyncedConversationUpdate: false,
+      shouldRenderBackgroundTaskIndicator: true,
+    });
+  });
+
+  it('commits revert state but skips fingerprint updates when visible sync is unchanged', async () => {
+    const host = createHost();
+    const coordinator = new BackgroundTaskPostSyncCoordinator(host);
+
+    const outcome = await coordinator.handleVisibleConversationSyncComplete({
+      tabId: 'tab-active',
+      expectedConversationId: 'conversation-1',
+      questionSessionId: 'session-1',
+      syncResult: {
+        changed: false,
+        fingerprint: 'same',
+        revertState: { messageID: 'assistant-3' },
+      },
+    });
+
+    expect(host.refreshPendingQuestionsForTab).toHaveBeenCalledWith('tab-active', 'session-1');
+    expect(host.refreshTabSessionStatus).not.toHaveBeenCalled();
+    expect(host.refreshTabSessionTodos).not.toHaveBeenCalled();
+    expect(host.setCurrentConversationRevertState).toHaveBeenCalledWith({
+      messageID: 'assistant-3',
+    });
+    expect(host.setTabConversationSyncFingerprint).not.toHaveBeenCalled();
+    expect(outcome).toEqual({
       shouldApplySyncedConversationUpdate: false,
       shouldRenderBackgroundTaskIndicator: true,
     });

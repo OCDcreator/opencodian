@@ -140,7 +140,7 @@ interface TabRuntimeState {
 - `syncVisibleConversationInBackground()`：同步当前活动 tab
 - `syncBackgroundTaskTabsInBackground()`：同步非活动但仍有 background task 的 tab
 
-其中当前活动 tab 的后台同步收尾现在会把 question refresh、todo/status live refresh 和 active-conversation match 判定委托给 `BackgroundTaskPostSyncCoordinator`；`OpenCodianView` 只保留 `currentConversationRevertState` / sync fingerprint 更新，以及 `applySyncedConversationUpdate()` / `renderBackgroundTaskIndicatorIfNeeded()` 这类真正依赖当前 DOM/render host 的路径。
+其中当前活动 tab 的后台同步收尾现在会把 question refresh、todo/status live refresh、active-conversation match 判定，以及 `currentConversationRevertState` / active-tab sync fingerprint 的 state commit 委托给 `BackgroundTaskPostSyncCoordinator`；`OpenCodianView` 只保留 `applySyncedConversationUpdate()` / `renderBackgroundTaskIndicatorIfNeeded()` 这类真正依赖当前 DOM/render host 的路径。
 
 除此之外，`subscribeToSessionSyncEvents()` 现在还会接入 `message.updated`、`message.part.updated` 和 `session.diff`，用于提前触发当前会话或后台 tab 的 authoritative sync，而不是只能等 2 秒轮询。
 
@@ -325,7 +325,7 @@ background task notice 这条子链路现在的边界是：
 
 - `OpenCodianView`：background task timeline 推导、inline panel 渲染，以及 post-sync coordinator / notice services 的 host bridge
 - `BackgroundTaskLiveSignalCoordinator`：authoritative-sync gate arm/clear、live-signal reconciliation，以及 stale downgrade / reset 的运行时判定
-- `BackgroundTaskPostSyncCoordinator`：hidden signal/background-tab sync 与 active visible-conversation background sync 后的 question refresh、todo/status refresh、completion notice queue/flush、attention 标记和 active-conversation match 判定编排
+- `BackgroundTaskPostSyncCoordinator`：hidden signal/background-tab sync 与 active visible-conversation background sync 后的 question refresh、todo/status refresh、completion notice queue/flush、attention 标记，以及 visible sync 的 active-conversation match/state-commit 编排
 - `BackgroundTaskNoticeStateService`：stopped/stale notice content、fingerprint、persisted dedupe 与 suppression runtime 协调
 - `BackgroundTaskCompletionNoticeService`：completion notice queued state、content/fingerprint 与 persisted dedupe/append 协调
 
