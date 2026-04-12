@@ -5,6 +5,7 @@ import {
   type QuestionDockCoordinatorHost,
   type QuestionDockCoordinatorRuntimeState,
 } from '../../../../src/features/chat/services/QuestionDockCoordinator';
+import { QuestionPendingRefreshRuntimeFacade } from '../../../../src/features/chat/services/QuestionPendingRefreshRuntimeFacade';
 import type { QuestionPostResolutionRuntimeFacade } from '../../../../src/features/chat/services/QuestionPostResolutionRuntimeFacade';
 import type { TabId } from '../../../../src/features/chat/tabs';
 import type {
@@ -118,9 +119,13 @@ function createHost(options?: {
   >> = {
     followUpAfterResolution: jest.fn().mockResolvedValue(undefined),
   };
+  const pendingRefreshRuntime = new QuestionPendingRefreshRuntimeFacade({
+    getTabRuntimeState: (tabId) => host.getTabRuntimeState(tabId),
+  });
 
   return {
     host,
+    pendingRefreshRuntime,
     postResolutionRuntime,
     runtimeByTab,
     questionDock,
@@ -149,12 +154,17 @@ describe('QuestionDockCoordinator', () => {
     const request = createQuestionRequest();
     const {
       host,
+      pendingRefreshRuntime,
       postResolutionRuntime,
       runtimeByTab,
       getLatestCallbacks,
       getLatestRenderState,
     } = createHost();
-    const coordinator = new QuestionDockCoordinator(host, postResolutionRuntime);
+    const coordinator = new QuestionDockCoordinator(
+      host,
+      pendingRefreshRuntime,
+      postResolutionRuntime,
+    );
 
     const resolutionPromise = coordinator.waitForDockResolutionIfEnabled(request, 'tab-active');
 
@@ -185,7 +195,7 @@ describe('QuestionDockCoordinator', () => {
       id: 'request-background',
       sessionId: 'session-background',
     });
-    const { host, postResolutionRuntime, runtimeByTab } = createHost({
+    const { host, pendingRefreshRuntime, postResolutionRuntime, runtimeByTab } = createHost({
       activeTabId: 'tab-active',
       sessionIdsByTab: {
         'tab-active': 'session-active',
@@ -202,7 +212,11 @@ describe('QuestionDockCoordinator', () => {
     backgroundRuntime.questionRequestWaiters.set(waitingRequest.id, { promise, resolve });
     runtimeByTab.set('tab-background', backgroundRuntime);
     host.getPendingQuestions.mockResolvedValueOnce([]);
-    const coordinator = new QuestionDockCoordinator(host, postResolutionRuntime);
+    const coordinator = new QuestionDockCoordinator(
+      host,
+      pendingRefreshRuntime,
+      postResolutionRuntime,
+    );
 
     const refreshed = await coordinator.refreshPendingQuestionsForTab('tab-background', 'session-background');
 
@@ -213,11 +227,21 @@ describe('QuestionDockCoordinator', () => {
 
   it('renders an empty dock state when the above-input dock is disabled', () => {
     const request = createQuestionRequest();
-    const { runtimeByTab, getLatestRenderState, host, postResolutionRuntime } = createHost({
+    const {
+      runtimeByTab,
+      getLatestRenderState,
+      host,
+      pendingRefreshRuntime,
+      postResolutionRuntime,
+    } = createHost({
       shouldUseAboveInputQuestionDock: false,
     });
     runtimeByTab.get('tab-active')!.pendingQuestionRequests = [request];
-    const coordinator = new QuestionDockCoordinator(host, postResolutionRuntime);
+    const coordinator = new QuestionDockCoordinator(
+      host,
+      pendingRefreshRuntime,
+      postResolutionRuntime,
+    );
 
     coordinator.render();
 

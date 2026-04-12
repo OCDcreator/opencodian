@@ -21,6 +21,10 @@ import {
   type QuestionDockCoordinatorRuntimeState,
 } from './QuestionDockCoordinator';
 import {
+  QuestionPendingRefreshRuntimeFacade,
+  type QuestionPendingRefreshRuntimeFacadeHost,
+} from './QuestionPendingRefreshRuntimeFacade';
+import {
   QuestionPostResolutionRuntimeFacade,
   type QuestionPostResolutionRuntimeFacadeHost,
 } from './QuestionPostResolutionRuntimeFacade';
@@ -65,6 +69,7 @@ export interface QuestionRuntimeHosts {
   inlineCardRendererHost: QuestionInlineCardRendererHost;
   resolutionCoordinatorHost: QuestionResolutionCoordinatorHost;
   dockCoordinatorHost: QuestionDockCoordinatorHost;
+  pendingRefreshRuntimeHost: QuestionPendingRefreshRuntimeFacadeHost;
   postResolutionRuntimeHost: QuestionPostResolutionRuntimeFacadeHost;
 }
 
@@ -114,6 +119,9 @@ export function createQuestionRuntimeHosts(
         resolutionCoordinator.applyResolvedQuestionState(resolution, tabId);
       },
     },
+    pendingRefreshRuntimeHost: {
+      getTabRuntimeState: (tabId: TabId | null) => viewHost.getTabRuntimeState(tabId),
+    },
     postResolutionRuntimeHost: {
       getActiveTabId: () => viewHost.getActiveTabId(),
       getTabRuntimeState: (tabId: TabId | null) => viewHost.getTabRuntimeState(tabId),
@@ -151,11 +159,15 @@ export function createQuestionRuntimeServices(
     inlineCardRenderer,
     hosts.resolutionCoordinatorHost,
   );
+  const pendingRefreshRuntimeFacade = new QuestionPendingRefreshRuntimeFacade(
+    hosts.pendingRefreshRuntimeHost,
+  );
   const postResolutionRuntimeFacade = new QuestionPostResolutionRuntimeFacade(
     hosts.postResolutionRuntimeHost,
   );
   const dockCoordinator = new QuestionDockCoordinator(
     hosts.dockCoordinatorHost,
+    pendingRefreshRuntimeFacade,
     postResolutionRuntimeFacade,
   );
   const resolutionFlowCoordinatorHost: QuestionResolutionFlowCoordinatorHost = {

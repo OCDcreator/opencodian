@@ -5,6 +5,7 @@ import type {
 } from '../../../../src/core/types';
 import { setLocale } from '../../../../src/i18n';
 import { StreamingInlineCardRenderer } from '../../../../src/features/chat/runtime/StreamingInlineCardRenderer';
+import { QuestionPendingRefreshRuntimeFacade } from '../../../../src/features/chat/services/QuestionPendingRefreshRuntimeFacade';
 import { QuestionPostResolutionRuntimeFacade } from '../../../../src/features/chat/services/QuestionPostResolutionRuntimeFacade';
 import {
   createQuestionRuntimeHosts,
@@ -192,6 +193,10 @@ describe('QuestionRuntimeHostAdapter', () => {
     const postResolutionRuntimeFacade = new QuestionPostResolutionRuntimeFacade(
       hosts.postResolutionRuntimeHost,
     );
+    const pendingRefreshRuntimeFacade = new QuestionPendingRefreshRuntimeFacade(
+      hosts.pendingRefreshRuntimeHost,
+    );
+    pendingRefreshRuntimeFacade.markQuestionRequestResolved(request.id, 'tab-active');
     await postResolutionRuntimeFacade.followUpAfterResolution('tab-active');
 
     expect(viewHost.keepQuestionCardPinnedToBottom).toHaveBeenCalledWith('tab-active');
@@ -211,6 +216,7 @@ describe('QuestionRuntimeHostAdapter', () => {
       },
       'tab-active',
     );
+    expect(runtimeByTab.get('tab-active')?.resolvedQuestionRequestIds.has(request.id)).toBe(true);
     expect(viewHost.startConversationSyncLoop).toHaveBeenCalledTimes(1);
     expect(viewHost.syncVisibleConversationInBackground).toHaveBeenCalledTimes(1);
   });
