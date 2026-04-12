@@ -201,6 +201,7 @@ import {
   ComposerContextEventBridge,
   type ComposerContextEventBridgeHost,
 } from './services/ComposerContextEventBridge';
+import { ComposerContextRuntimeStore } from './services/ComposerContextRuntimeStore';
 import { ComposerContextViewHostAdapter } from './services/ComposerContextViewHostAdapter';
 import { ContextAttachmentBuilder } from './services/ContextAttachmentBuilder';
 import { ContextFileCatalogService } from './services/ContextFileCatalogService';
@@ -766,6 +767,7 @@ export class OpenCodianView extends ItemView {
   private composerContextChipActionService: ComposerContextChipActionService;
   private composerContextCoordinator: ComposerContextCoordinator;
   private composerContextEventBridge: ComposerContextEventBridge;
+  private composerContextRuntimeStore: ComposerContextRuntimeStore;
   private composerContextViewHostAdapter: ComposerContextViewHostAdapter;
   private contextAttachmentBuilder: ContextAttachmentBuilder;
   private contextFileCatalogService: ContextFileCatalogService;
@@ -1109,13 +1111,16 @@ export class OpenCodianView extends ItemView {
       getServerMode: () => this.plugin.settings.server.mode,
     });
     this.contextFileCatalogService = new ContextFileCatalogService(this.app);
-    this.composerContextViewHostAdapter = new ComposerContextViewHostAdapter({
+    this.composerContextRuntimeStore = new ComposerContextRuntimeStore({
       getActiveTabId: () => this.getActiveTabId(),
       getTabRuntimeState: (tabId) => this.getTabRuntimeState(tabId),
       renderComposerContext: () => {
         this.composerContextCoordinator.render();
       },
     });
+    this.composerContextViewHostAdapter = new ComposerContextViewHostAdapter(
+      this.composerContextRuntimeStore,
+    );
     this.composerContextActionService = new ComposerContextActionService(
       this.app,
       this.contextAttachmentBuilder,
@@ -1987,7 +1992,7 @@ export class OpenCodianView extends ItemView {
       notifyForegroundBusy: () => {
         new Notice(t('chat.tab.processingBlocked'));
       },
-      getDraftContextItems: (tabId) => this.composerContextViewHostAdapter.getDraftContextItems(tabId),
+      getDraftContextItems: (tabId) => this.composerContextRuntimeStore.getDraftContextItems(tabId),
       getServerAvailability: () => this.getServerAvailability(),
       refreshServerStatusBadge: () => this.refreshServerStatusBadge(),
       ensureServerReadyForChat: (availability) => this.ensureServerReadyForChat(availability),
@@ -2039,7 +2044,7 @@ export class OpenCodianView extends ItemView {
         this.getTabRuntimeState(tabId)?.pendingEditedFiles.clear();
       },
       clearDraftContextItems: (tabId) => {
-        this.composerContextViewHostAdapter.clearDraftContextItems(tabId);
+        this.composerContextRuntimeStore.clearDraftContextItems(tabId);
       },
     };
   }

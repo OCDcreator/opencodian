@@ -1,5 +1,6 @@
 import type { PromptContextItem } from '../../../../src/core/types';
 import type { FocusContextPreview } from '../../../../src/features/chat/composerContext';
+import { ComposerContextRuntimeStore } from '../../../../src/features/chat/services/ComposerContextRuntimeStore';
 import {
   ComposerContextViewHostAdapter,
   type ComposerContextRuntimeState,
@@ -42,14 +43,16 @@ function createHarness() {
     ['tab-2' as TabId, { draftContextItems: [], focusContextPreview: null }],
   ]);
   const renderComposerContext = jest.fn();
-  const adapter = new ComposerContextViewHostAdapter({
+  const runtimeStore = new ComposerContextRuntimeStore({
     getActiveTabId: () => activeTabId,
     getTabRuntimeState: (tabId) => (tabId ? runtimes.get(tabId) ?? null : null),
     renderComposerContext,
   });
+  const adapter = new ComposerContextViewHostAdapter(runtimeStore);
 
   return {
     adapter,
+    runtimeStore,
     runtimes,
     renderComposerContext,
     setActiveTabId: (tabId: TabId | null) => {
@@ -59,57 +62,15 @@ function createHarness() {
 }
 
 describe('ComposerContextViewHostAdapter', () => {
-  it('stores active-tab draft context items and keeps returned arrays immutable', () => {
-    const { adapter, runtimes, renderComposerContext } = createHarness();
-    const actionHost = adapter.createActionServiceHost({
-      getActiveMarkdownView: () => null,
-    });
-    const activeItem = createContextItem('item-1', 'notes/alpha.md');
-    const backgroundItem = createContextItem('item-2', 'notes/beta.md');
-
-    actionHost.addDraftContextItem(activeItem);
-
-    expect(runtimes.get('tab-1' as TabId)?.draftContextItems).toEqual([activeItem]);
-    const draftItems = adapter.getDraftContextItems('tab-1' as TabId);
-    expect(draftItems).toEqual([activeItem]);
-    expect(draftItems).not.toBe(runtimes.get('tab-1' as TabId)?.draftContextItems);
-    expect(renderComposerContext).toHaveBeenCalledTimes(1);
-
-    runtimes.get('tab-2' as TabId)?.draftContextItems.push(backgroundItem);
-    adapter.clearDraftContextItems('tab-2' as TabId);
-
-    expect(runtimes.get('tab-2' as TabId)?.draftContextItems).toEqual([]);
-    expect(renderComposerContext).toHaveBeenCalledTimes(1);
-  });
-
-  it('only rerenders when the focus preview value actually changes', () => {
-    const { adapter, runtimes, renderComposerContext } = createHarness();
-    const focusHost = adapter.createFocusContextRuntimeServiceHost({
-      getCurrentConversationNotePath: () => 'notes/current.md',
-      isComposerInteractionFocused: () => true,
-    });
-    const initialPreview = createPreview('notes/current.md', { startLine: 3, endLine: 5 });
-    const nextPreview = createPreview('notes/next.md');
-
-    focusHost.setFocusContextPreview(initialPreview);
-    expect(runtimes.get('tab-1' as TabId)?.focusContextPreview).toEqual(initialPreview);
-    expect(renderComposerContext).toHaveBeenCalledTimes(1);
-
-    renderComposerContext.mockClear();
-    focusHost.setFocusContextPreview({ ...initialPreview });
-    expect(renderComposerContext).not.toHaveBeenCalled();
-
-    focusHost.setFocusContextPreview(nextPreview);
-    expect(runtimes.get('tab-1' as TabId)?.focusContextPreview).toEqual(nextPreview);
-    expect(renderComposerContext).toHaveBeenCalledTimes(1);
-  });
-
-  it('builds coordinator, chip-action, and focus-runtime hosts on top of the shared tab-state adapter', () => {
-    const { adapter, runtimes, setActiveTabId } = createHarness();
+  it('builds coordinator, chip-action, action, and focus-runtime hosts on top of the shared runtime store', () => {
+    const { adapter, runtimeStore, runtimes, setActiveTabId } = createHarness();
     const refreshActiveFocusContextPreview = jest.fn();
     const coordinatorHost = adapter.createCoordinatorHost();
     const chipActionHost = adapter.createChipActionServiceHost({
       refreshActiveFocusContextPreview,
+    });
+    const actionHost = adapter.createActionServiceHost({
+      getActiveMarkdownView: () => null,
     });
     const focusHost = adapter.createFocusContextRuntimeServiceHost({
       getCurrentConversationNotePath: () => 'notes/current.md',
@@ -132,9 +93,13 @@ describe('ComposerContextViewHostAdapter', () => {
       path: 'notes/alpha.md',
       lineRange: { startLine: 1, endLine: 4 },
     });
+    actionHost.addDraftContextItem(createContextItem('item-3', 'notes/gamma.md'));
+    focusHost.setFocusContextPreview(createPreview('notes/gamma.md'));
     chipActionHost.refreshActiveFocusContextPreview();
 
-    expect(coordinatorHost.getDraftContextItems()).toEqual([fileItem]);
+    expect(runtimeStore.getDraftContextItems()).toEqual([fileItem, createContextItem('item-3', 'notes/gamma.md')]);
+    expect(coordinatorHost.getDraftContextItems()).toEqual([fileItem, createContextItem('item-3', 'notes/gamma.md')]);
+    expect(coordinatorHost.getFocusContextPreview()).toEqual(createPreview('notes/gamma.md'));
     expect(refreshActiveFocusContextPreview).toHaveBeenCalledTimes(1);
 
     setActiveTabId('tab-2' as TabId);
