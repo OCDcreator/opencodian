@@ -139,6 +139,10 @@ import {
   ConversationHydrationRenderBridge,
 } from './runtime/ConversationHydrationRenderBridge';
 import {
+  type ConversationLoadRuntimeBridgeHost,
+  ConversationLoadRuntimeBridge,
+} from './runtime/ConversationLoadRuntimeBridge';
+import {
   type ConversationTransitionBridgeHost,
   ConversationTransitionBridge,
 } from './runtime/ConversationTransitionBridge';
@@ -1620,10 +1624,14 @@ export class OpenCodianView extends ItemView {
       this.backgroundTaskLiveSignalCoordinator,
       this.createBackgroundTaskStreamTriggerCoordinatorHost(),
     );
+    const conversationLoadRuntimeBridge = new ConversationLoadRuntimeBridge(
+      this.createConversationLoadRuntimeBridgeHost(),
+    );
     this.conversationViewStateService = new ConversationViewStateService(
       this.createConversationViewStateHost(),
       this.tabViewActivationBridge,
       this.conversationTransitionBridge,
+      conversationLoadRuntimeBridge,
     );
     this.conversationRenderService = new ConversationRenderService(this.createConversationRenderHost());
     this.messageSendPreparationService = new MessageSendPreparationService(this.createMessageSendPreparationHost());
@@ -2020,7 +2028,6 @@ export class OpenCodianView extends ItemView {
       loadConversations: () => this.plugin.loadConversations(),
       getConversations: () => this.plugin.getConversations(),
       createConversation: () => this.plugin.createConversation(),
-      getConversationById: async (id) => (await this.plugin.getConversationById(id)) ?? null,
       applyStreamingConversationActivation: (tabId, conversation) =>
         this.applyStreamingConversationActivation(tabId, conversation),
       applyEmptyTabActivation: (tabId) => {
@@ -2033,9 +2040,20 @@ export class OpenCodianView extends ItemView {
           resetBackgroundTaskSuppressedFingerprint: true,
         });
       },
-      setCurrentConversationRevertState: (revertState) => {
-        this.currentConversationRevertState = revertState;
+      syncBackgroundTaskStateFromConversation: (conversation) => {
+        this.syncBackgroundTaskStateFromConversation(conversation);
       },
+      renderMessages: (messages) => this.renderMessages(messages),
+      commitConversationSyncBaseline: (messages) => {
+        this.tabConversationStateBridge.commitConversationSyncBaseline(messages);
+      },
+    };
+  }
+
+  private createConversationLoadRuntimeBridgeHost(): ConversationLoadRuntimeBridgeHost {
+    return {
+      loadConversations: () => this.plugin.loadConversations(),
+      getConversationById: async (id) => (await this.plugin.getConversationById(id)) ?? null,
       shouldSyncConversationFromServer: (conversation, options) => {
         const shouldSyncInterrupted = !this.hasInterruptedLocalAssistantTail(conversation.messages)
           && conversation.messages.some((message) =>
@@ -2056,12 +2074,8 @@ export class OpenCodianView extends ItemView {
           revertState: syncResult.revertState,
         };
       },
-      syncBackgroundTaskStateFromConversation: (conversation) => {
-        this.syncBackgroundTaskStateFromConversation(conversation);
-      },
-      renderMessages: (messages) => this.renderMessages(messages),
-      commitConversationSyncBaseline: (messages) => {
-        this.tabConversationStateBridge.commitConversationSyncBaseline(messages);
+      setCurrentConversationRevertState: (revertState) => {
+        this.currentConversationRevertState = revertState;
       },
     };
   }

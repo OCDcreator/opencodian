@@ -14,7 +14,7 @@
 - active-tab conversation/session 写回（现在经由 `runtime/TabConversationStateBridge.ts`）
 - 消息重渲
 
-loaded-conversation 切换前的 cleanup 与 hydration preflight shell，现在通过 `runtime/ConversationTransitionBridge.ts` 单独承接；其中消息容器的 rehydrating class / scroll-restore shell，则继续通过 `runtime/ConversationHydrationRenderBridge.ts` 提供底层 scroll/class bridge。
+loaded-conversation 切换前的 cleanup 与 hydration preflight shell，现在通过 `runtime/ConversationTransitionBridge.ts` 单独承接；其中消息容器的 rehydrating class / scroll-restore shell，则继续通过 `runtime/ConversationHydrationRenderBridge.ts` 提供底层 scroll/class bridge，而 conversation resolve / server-sync 判定则进一步交给 `runtime/ConversationLoadRuntimeBridge.ts`。
 
 ## 公开接口
 
@@ -55,6 +55,7 @@ export class ConversationViewStateService {
 ### conversation hydration
 
 - 切换前先通过 `ConversationTransitionBridge` 处理旧 conversation 的标题生成与背景任务指示器清理
+- loaded conversation 的 resolve / reload retry 与是否触发 `load-conversation` server sync，现在先委托给 `ConversationLoadRuntimeBridge`
 - 装载时仍保留 hydration lifecycle 的 `finally` 保护，但 begin/end shell 已通过 `ConversationTransitionBridge` 收束
 - scroll restore 的 snapshot / restore 与 `is-rehydrating` class shell 现在通过 `ConversationHydrationRenderBridge` 复用 `ScrollManager`，保持 bottom / anchor / distance 语义
 - loaded conversation 的 `currentConversation` / active-tab conversation / session reset 写回现在先委托给 `TabConversationStateBridge`
@@ -64,5 +65,5 @@ export class ConversationViewStateService {
 ## 与 `OpenCodianView` 的边界
 
 - `OpenCodianView` 仍保留真实 UI render、插件服务装配、tab runtime 状态、scroll metrics 和后台同步实现
-- `ConversationViewStateService` 只负责决定“何时 restore / 激活 / hydrate / 刷新”，不再逐项写入 active-tab conversation/session state，也不再直接触发 pane activation 预刷新、loaded-conversation 的 preflight cleanup / hydration shell、post-render background-task indicator / dock/status/question/todo outcome、streaming/empty activation outcome UI 回调，或 hydration 尾段的 composer/model/context usage 写回
+- `ConversationViewStateService` 只负责决定“何时 restore / 激活 / hydrate / 刷新”，不再逐项写入 active-tab conversation/session state，也不再直接触发 pane activation 预刷新、loaded-conversation 的 conversation resolve / server-sync 判定、preflight cleanup / hydration shell、post-render background-task indicator / dock/status/question/todo outcome、streaming/empty activation outcome UI 回调，或 hydration 尾段的 composer/model/context usage 写回
 - 这样后续继续拆 model selector 或消息区重渲时，可以沿着更清晰的 host 边界继续推进，而不必再把装载主链路塞回 view

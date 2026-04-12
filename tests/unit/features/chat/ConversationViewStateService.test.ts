@@ -1,11 +1,11 @@
 import {
+  type ConversationLoadRuntimePort,
+} from '../../../../src/features/chat/runtime/ConversationLoadRuntimeBridge';
+import {
   TabViewActivationBridge,
   type TabViewActivationBridgeHost,
 } from '../../../../src/features/chat/runtime/TabViewActivationBridge';
-import type {
-  ConversationTransitionPort,
-  LoadedConversationTransitionContext,
-} from '../../../../src/features/chat/runtime/ConversationTransitionBridge';
+import type { ConversationTransitionPort, LoadedConversationTransitionContext } from '../../../../src/features/chat/runtime/ConversationTransitionBridge';
 import {
   type ConversationViewStateHost,
   ConversationViewStateService,
@@ -44,16 +44,9 @@ function createHost(
     loadConversations: jest.fn().mockResolvedValue(undefined),
     getConversations: jest.fn().mockReturnValue([]),
     createConversation: jest.fn().mockResolvedValue(createConversation('created')),
-    getConversationById: jest.fn().mockResolvedValue(null),
     applyStreamingConversationActivation: jest.fn(),
     applyEmptyTabActivation: jest.fn(),
     applyLoadedConversationActivation: jest.fn(),
-    setCurrentConversationRevertState: jest.fn(),
-    shouldSyncConversationFromServer: jest.fn().mockReturnValue(false),
-    syncConversationMessagesFromServer: jest.fn().mockResolvedValue({
-      messages: [],
-      revertState: null,
-    }),
     syncBackgroundTaskStateFromConversation: jest.fn(),
     renderMessages: jest.fn().mockResolvedValue(undefined),
     commitConversationSyncBaseline: jest.fn(),
@@ -82,6 +75,23 @@ function createActivationBridge() {
   return {
     bridge: new TabViewActivationBridge(host),
     host,
+  };
+}
+
+type MockedConversationLoadRuntimePort = {
+  [Key in keyof ConversationLoadRuntimePort]:
+    ConversationLoadRuntimePort[Key] extends (...args: infer Args) => infer Result
+      ? jest.Mock<Result, Args>
+      : ConversationLoadRuntimePort[Key];
+};
+
+function createConversationLoadRuntimeBridge(
+  overrides: Partial<MockedConversationLoadRuntimePort> = {},
+): MockedConversationLoadRuntimePort {
+  return {
+    resolveConversation: jest.fn().mockResolvedValue(null),
+    loadConversationMessages: jest.fn().mockResolvedValue([]),
+    ...overrides,
   };
 }
 
@@ -136,17 +146,25 @@ describe('ConversationViewStateService', () => {
 
     const host = createHost({
       getTabManager: jest.fn().mockReturnValue(tabManager),
-      getConversationById: jest.fn().mockResolvedValue(conversation),
     });
     const { bridge } = createActivationBridge();
     const transitionBridge = createTransitionBridge();
-    const service = new ConversationViewStateService(host, bridge, transitionBridge);
+    const conversationLoadRuntimeBridge = createConversationLoadRuntimeBridge({
+      resolveConversation: jest.fn().mockResolvedValue(conversation),
+    });
+    const service = new ConversationViewStateService(
+      host,
+      bridge,
+      transitionBridge,
+      conversationLoadRuntimeBridge,
+    );
     const loadConversationSpy = jest.spyOn(service, 'loadConversation').mockResolvedValue(undefined);
     const activationPreflightSpy = jest.spyOn(bridge, 'applyActivationPreflight');
 
     await service.activateTab(tab!.id);
 
     expect(activationPreflightSpy).toHaveBeenCalledWith(tab!.id);
+    expect(conversationLoadRuntimeBridge.resolveConversation).toHaveBeenCalledWith(conversation.id);
     expect(host.applyStreamingConversationActivation).toHaveBeenCalledWith(tab!.id, conversation);
     expect(loadConversationSpy).not.toHaveBeenCalled();
     expect(transitionBridge.captureLoadedConversationTransition).not.toHaveBeenCalled();
@@ -165,7 +183,13 @@ describe('ConversationViewStateService', () => {
     });
     const { bridge } = createActivationBridge();
     const transitionBridge = createTransitionBridge();
-    const service = new ConversationViewStateService(host, bridge, transitionBridge);
+    const conversationLoadRuntimeBridge = createConversationLoadRuntimeBridge();
+    const service = new ConversationViewStateService(
+      host,
+      bridge,
+      transitionBridge,
+      conversationLoadRuntimeBridge,
+    );
     const loadConversationSpy = jest.spyOn(service, 'loadConversation').mockResolvedValue(undefined);
 
     await service.activateTab(tab!.id);
@@ -189,7 +213,13 @@ describe('ConversationViewStateService', () => {
     });
     const { bridge } = createActivationBridge();
     const transitionBridge = createTransitionBridge();
-    const service = new ConversationViewStateService(host, bridge, transitionBridge);
+    const conversationLoadRuntimeBridge = createConversationLoadRuntimeBridge();
+    const service = new ConversationViewStateService(
+      host,
+      bridge,
+      transitionBridge,
+      conversationLoadRuntimeBridge,
+    );
 
     await service.activateTab(tab!.id);
 
@@ -200,12 +230,19 @@ describe('ConversationViewStateService', () => {
 
   it('delegates the loaded-conversation transition shell to the dedicated bridge', async () => {
     const conversation = createConversation('load-target');
-    const host = createHost({
-      getConversationById: jest.fn().mockResolvedValue(conversation),
-    });
+    const host = createHost();
     const { bridge } = createActivationBridge();
     const transitionBridge = createTransitionBridge();
-    const service = new ConversationViewStateService(host, bridge, transitionBridge);
+    const conversationLoadRuntimeBridge = createConversationLoadRuntimeBridge({
+      resolveConversation: jest.fn().mockResolvedValue(conversation),
+      loadConversationMessages: jest.fn().mockResolvedValue(conversation.messages),
+    });
+    const service = new ConversationViewStateService(
+      host,
+      bridge,
+      transitionBridge,
+      conversationLoadRuntimeBridge,
+    );
     const postRenderOutcomeSpy = jest.spyOn(bridge, 'applyLoadedConversationPostRenderOutcome');
     const hydrationTailSpy = jest.spyOn(bridge, 'applyLoadedConversationHydrationTail');
 
@@ -214,9 +251,17 @@ describe('ConversationViewStateService', () => {
     });
 
     expect(transitionBridge.prepareLoadedConversationTransition).toHaveBeenCalledWith(conversation.id);
+    expect(conversationLoadRuntimeBridge.resolveConversation).toHaveBeenCalledWith(conversation.id, {
+      reloadIfMissing: true,
+    });
     expect(transitionBridge.captureLoadedConversationTransition).toHaveBeenCalledWith(true);
     expect(host.applyLoadedConversationActivation).toHaveBeenCalledWith('tab-1', conversation);
     expect(transitionBridge.beginLoadedConversationTransition).toHaveBeenCalledTimes(1);
+    expect(conversationLoadRuntimeBridge.loadConversationMessages).toHaveBeenCalledWith(
+      conversation,
+      'tab-1',
+      { forceServerSync: undefined },
+    );
     expect(host.renderMessages).toHaveBeenCalledWith(conversation.messages);
     expect(postRenderOutcomeSpy).toHaveBeenCalledWith('tab-1', conversation.openCodeSessionId);
     expect(host.commitConversationSyncBaseline).toHaveBeenCalledWith(conversation.messages);

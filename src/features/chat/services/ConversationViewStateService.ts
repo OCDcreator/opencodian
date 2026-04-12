@@ -3,6 +3,10 @@ import {
   type Conversation,
   type PersistedTabState,
 } from '../../../core/types';
+import type {
+  ConversationLoadRuntimePort,
+  ConversationLoadRuntimeOptions,
+} from '../runtime/ConversationLoadRuntimeBridge';
 import type { TabViewActivationBridge } from '../runtime/TabViewActivationBridge';
 import type { ConversationTransitionPort } from '../runtime/ConversationTransitionBridge';
 import type { RestoredTabState, TabData, TabId } from '../tabs';
@@ -10,11 +14,6 @@ import type { RestoredTabState, TabData, TabId } from '../tabs';
 export interface LoadConversationOptions {
   forceServerSync?: boolean;
   preserveScrollPosition?: boolean;
-}
-
-interface ConversationSyncResult {
-  messages: ChatMessage[];
-  revertState: { messageID: string; partID?: string } | null;
 }
 
 interface ConversationViewStateTabManager {
@@ -36,19 +35,11 @@ export interface ConversationViewStateHost {
   loadConversations(): Promise<void>;
   getConversations(): Conversation[];
   createConversation(): Promise<Conversation>;
-  getConversationById(id: string): Promise<Conversation | null>;
 
   applyStreamingConversationActivation(tabId: TabId, conversation: Conversation): Promise<void> | void;
   applyEmptyTabActivation(tabId: TabId): void;
 
   applyLoadedConversationActivation(tabId: TabId | null, conversation: Conversation): void;
-  setCurrentConversationRevertState(revertState: { messageID: string; partID?: string } | null): void;
-  shouldSyncConversationFromServer(conversation: Conversation, options: LoadConversationOptions): boolean;
-  syncConversationMessagesFromServer(
-    conversation: Conversation,
-    tabId: TabId | null,
-    reason: string,
-  ): Promise<ConversationSyncResult>;
   syncBackgroundTaskStateFromConversation(conversation: Conversation): void;
   renderMessages(messages: ChatMessage[]): Promise<void>;
   commitConversationSyncBaseline(messages: ChatMessage[]): void;
@@ -65,6 +56,7 @@ export class ConversationViewStateService {
     private readonly host: ConversationViewStateHost,
     private readonly tabViewActivationBridge: TabViewActivationPort,
     private readonly conversationTransitionBridge: ConversationTransitionPort,
+    private readonly conversationLoadRuntimeBridge: ConversationLoadRuntimePort,
   ) {}
 
   async initializeFirstTab(): Promise<void> {
@@ -136,7 +128,9 @@ export class ConversationViewStateService {
 
     if (tab.conversationId) {
       if (tab.isStreaming) {
-        const conversation = await this.host.getConversationById(tab.conversationId);
+        const conversation = await this.conversationLoadRuntimeBridge.resolveConversation(
+          tab.conversationId,
+        );
         if (!conversation) {
           return;
         }
@@ -160,7 +154,9 @@ export class ConversationViewStateService {
   ): Promise<void> {
     await this.conversationTransitionBridge.prepareLoadedConversationTransition(id);
 
-    const conversation = await this.resolveConversation(id);
+    const conversation = await this.conversationLoadRuntimeBridge.resolveConversation(id, {
+      reloadIfMissing: true,
+    });
     if (!conversation) {
       return;
     }
@@ -173,20 +169,12 @@ export class ConversationViewStateService {
     this.host.applyLoadedConversationActivation(activeTabId, conversation);
     this.conversationTransitionBridge.beginLoadedConversationTransition(transitionContext);
 
-    const shouldSyncFromServer = this.host.shouldSyncConversationFromServer(conversation, options);
-
     try {
-      let messages = conversation.messages;
-      if (shouldSyncFromServer) {
-        const syncResult = await this.host.syncConversationMessagesFromServer(
-          conversation,
-          activeTabId,
-          'load-conversation',
-        );
-        messages = syncResult.messages;
-        this.host.setCurrentConversationRevertState(syncResult.revertState);
-      }
-
+      const messages = await this.conversationLoadRuntimeBridge.loadConversationMessages(
+        conversation,
+        activeTabId,
+        this.buildConversationLoadRuntimeOptions(options),
+      );
       this.host.syncBackgroundTaskStateFromConversation(conversation);
       await this.host.renderMessages(messages);
       await this.tabViewActivationBridge.applyLoadedConversationPostRenderOutcome(
@@ -201,13 +189,11 @@ export class ConversationViewStateService {
     }
   }
 
-  private async resolveConversation(id: string): Promise<Conversation | null> {
-    let conversation = await this.host.getConversationById(id);
-    if (!conversation) {
-      await this.host.loadConversations();
-      conversation = await this.host.getConversationById(id);
-    }
-
-    return conversation;
+  private buildConversationLoadRuntimeOptions(
+    options: LoadConversationOptions,
+  ): ConversationLoadRuntimeOptions {
+    return {
+      forceServerSync: options.forceServerSync,
+    };
   }
 }
