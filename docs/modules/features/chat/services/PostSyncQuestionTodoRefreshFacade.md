@@ -11,7 +11,7 @@
 - 在 signal sync / background-tab sync 完成后，沿用同一份 pending-question → background-task rebuild → todo/status refresh 顺序
 - 在 background conversation refresh 完成后，继续串起 completion notice refresh 与 tab stream-like 状态写回
 
-它不负责 authoritative mark、attention、visible sync 的 state-commit 判定，也不自己决定 todo/status runtime gate；这些职责仍分别留在 `BackgroundTaskPostSyncCoordinator` 与 `QuestionTodoStatusRefreshCoordinator`。
+它不负责 authoritative mark、attention、visible sync 的 state-commit 判定，也不自己决定 todo/status runtime gate；这些职责仍分别留在 `BackgroundTaskPostSyncCoordinator` 与 `QuestionTodoStatusRefreshCoordinator`。它的 host 装配现在通常由 `QuestionTodoBackgroundTaskRefreshHostAdapter` 统一提供。
 
 ## 公开接口
 
@@ -37,7 +37,7 @@ export class PostSyncQuestionTodoRefreshFacade {
 
 ## 与 `OpenCodianView` 的边界
 
-- `OpenCodianView` 只负责提供当前 conversation session、background-task timeline rebuild、completion notice flush 和 stream-like 状态写回的 host bridge
+- `OpenCodianView` 现在通过 `QuestionTodoBackgroundTaskRefreshHostAdapter` 提供当前 conversation session、background-task timeline rebuild、completion notice flush 和 stream-like 状态写回的 host bridge
 - `QuestionTodoStatusRefreshCoordinator` 继续拥有 pending-question + todo/status 的组合刷新顺序与 runtime gate
 - `BackgroundTaskPostSyncCoordinator` 继续拥有 authoritative mark、attention、visible sync apply/indicator outcome 与 state-commit 判定
 - 这条边界推进的是 master plan 的 P2 `question / todo / background task` lane：把 post-sync refresh 组合装配从 `OpenCodianView` / `BackgroundTaskPostSyncCoordinator` 继续下沉到 dedicated facade

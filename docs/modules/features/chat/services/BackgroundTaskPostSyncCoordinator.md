@@ -13,7 +13,7 @@
 - 在 visible background sync 仍命中当前 conversation 时提交 `currentConversationRevertState` 与 active-tab sync fingerprint
 - 根据 sync fingerprint 变化标记后台 tab attention
 
-它不负责 background task segment/timeline 推导，也不负责 inline panel DOM 渲染；这些现在分别由 `BackgroundTaskTimelineService` 和 `BackgroundTaskInlinePanelRenderer` 承接。completion notice 的 queue/flush 顺序也不再由本 coordinator 拆开编排，而是通过 `PostSyncQuestionTodoRefreshFacade` 统一接在组合刷新之后。pending-question 与 todo/status 组合刷新顺序本身则继续委托给 `QuestionTodoStatusRefreshCoordinator`。
+它不负责 background task segment/timeline 推导，也不负责 inline panel DOM 渲染；这些现在分别由 `BackgroundTaskTimelineService` 和 `BackgroundTaskInlinePanelRenderer` 承接。completion notice 的 queue/flush 顺序也不再由本 coordinator 拆开编排，而是通过 `PostSyncQuestionTodoRefreshFacade` 统一接在组合刷新之后。pending-question 与 todo/status 组合刷新顺序本身则继续委托给 `QuestionTodoStatusRefreshCoordinator`。它的 host 装配现在通常由 `QuestionTodoBackgroundTaskRefreshHostAdapter` 统一提供。
 
 ## 公开接口
 
@@ -55,7 +55,7 @@ export class BackgroundTaskPostSyncCoordinator {
 
 ## 与 `OpenCodianView` 的边界
 
-- `OpenCodianView` 负责把 visible sync state-commit、authoritative mark 与 attention host bridge 接到本 coordinator
+- `OpenCodianView` 现在通过 `QuestionTodoBackgroundTaskRefreshHostAdapter` 把 visible sync state-commit、authoritative mark 与 attention host bridge 接到本 coordinator
 - `BackgroundTaskTimelineService` 负责 background task segment/timeline 推导，以及 completion notice 所需的 segment 收集
 - `BackgroundTaskInlinePanelRenderer` 负责 inline panel DOM 渲染与 mounted panel 生命周期
 - `BackgroundTaskIndicatorCoordinator` 负责 inline render 场景和 post-sync 场景共用的 completion notice queue/flush 顺序

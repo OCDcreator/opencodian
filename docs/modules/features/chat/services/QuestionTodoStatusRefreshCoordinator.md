@@ -11,7 +11,7 @@
 - 在 visible/signal/background post-sync 后，先刷新 pending question，再执行 background-task runtime reconcile hook，最后按 runtime gate 刷新 todo/status live state
 - 复用 `SessionTodoStatusRefreshService` 的 request-id stale guard 与 `QuestionDockCoordinator` 的 pending-question state 更新，而不是在 view/bridge/coordinator host 上继续暴露三组分散 callback
 
-它不直接调用 OpenCode API，也不拥有 question dock DOM、todo/status snapshot state、background-task timeline rebuild 或 completion notice flush；这些仍分别由 `QuestionDockCoordinator`、`SessionTodoStatusRefreshService`、`SessionTodoStateService`、`BackgroundTaskTimelineService` 与 `PostSyncQuestionTodoRefreshFacade` 承接。本模块只负责 activation/post-sync 场景里的组合刷新顺序与 runtime gate。
+它不直接调用 OpenCode API，也不拥有 question dock DOM、todo/status snapshot state、background-task timeline rebuild 或 completion notice flush；这些仍分别由 `QuestionDockCoordinator`、`SessionTodoStatusRefreshService`、`SessionTodoStateService`、`BackgroundTaskTimelineService` 与 `PostSyncQuestionTodoRefreshFacade` 承接。本模块只负责 activation/post-sync 场景里的组合刷新顺序与 runtime gate。它的 host 装配现在通常由 `QuestionTodoBackgroundTaskRefreshHostAdapter` 统一提供。
 
 ## 公开接口
 
@@ -39,7 +39,7 @@ export class QuestionTodoStatusRefreshCoordinator {
 
 ## 与 `OpenCodianView` 的边界
 
-- `OpenCodianView` 只装配 host：提供 tab runtime、`QuestionDockCoordinator` pending-question refresh、`SessionTodoStatusRefreshService` todo/status refresh，以及 `SessionTodoStateService` 的 incomplete-todo 判断
+- `OpenCodianView` 现在通过 `QuestionTodoBackgroundTaskRefreshHostAdapter` 提供 host：adapter 继续映射 tab runtime、`QuestionDockCoordinator` pending-question refresh、`SessionTodoStatusRefreshService` todo/status refresh，以及 `SessionTodoStateService` 的 incomplete-todo 判断
 - `TabViewActivationBridge` 现在只负责 activation UI writeback，并把 status/question/todo lazy refresh 委托给本 coordinator
 - `PostSyncQuestionTodoRefreshFacade` 会在 signal/background sync 后复用本 coordinator，再串起 background-task rebuild、completion notice refresh 与 stream-like follow-up
 - `BackgroundTaskPostSyncCoordinator` 现在只负责 authoritative mark、attention 与 state-commit 判定；pending-question + todo/status refresh order 继续由本 coordinator 承接
