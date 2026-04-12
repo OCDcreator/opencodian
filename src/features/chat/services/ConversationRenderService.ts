@@ -14,8 +14,11 @@ import {
 } from './TrailingAssistantPatchDebugLogEmitterHelper';
 import {
   buildTrailingAssistantPatchCompletionDebugPlanningContext,
-  type TrailingAssistantPatchCompletionDebugPlanningContext,
 } from './TrailingAssistantPatchCompletionDebugPlanningContextHelper';
+import {
+  buildTrailingAssistantPatchCompletionDebugPlan,
+  type TrailingAssistantPatchCompletionDebugPlan,
+} from './TrailingAssistantPatchCompletionDebugPlanHelper';
 import {
   applyTrailingAssistantPatchTailState,
   type TrailingAssistantPatchTailStatePlan,
@@ -156,12 +159,6 @@ type TrailingAssistantPatchExecutionPlan =
     contentEl: HTMLElement;
     nextTailMessage: ChatMessage;
   };
-
-type TrailingAssistantPatchCompletionDebugPlan = {
-  shouldStickToBottom: boolean;
-  previousTail: Record<string, unknown> | null;
-  nextTail: Record<string, unknown> | null;
-};
 
 type TrailingAssistantPatchNonMergeableTailFailurePlan = {
   reason: 'tail-message-not-mergeable-assistant';
@@ -790,7 +787,7 @@ export class ConversationRenderService {
     planningContext: TrailingAssistantPatchTailOutcomePlanningContext,
     tailStatePlan: TrailingAssistantPatchTailStatePlan,
   ): TrailingAssistantPatchCompletionDebugPlan {
-    return this.buildTrailingAssistantPatchCompletionDebugPlan(
+    return buildTrailingAssistantPatchCompletionDebugPlan(
       buildTrailingAssistantPatchCompletionDebugPlanningContext({
         ...planningContext,
         tailStatePlan,
@@ -819,16 +816,6 @@ export class ConversationRenderService {
       messageId: planningContext.nextTailMessage.id,
       sourceMessageId: planningContext.nextTailMessage.sourceMessageId ?? null,
       shouldStickToBottom: planningContext.shouldStickToBottom,
-    };
-  }
-
-  private buildTrailingAssistantPatchCompletionDebugPlan(
-    planningContext: TrailingAssistantPatchCompletionDebugPlanningContext,
-  ): TrailingAssistantPatchCompletionDebugPlan {
-    return {
-      shouldStickToBottom: planningContext.shouldStickToBottom,
-      previousTail: planningContext.summaryPlan.previousTail,
-      nextTail: planningContext.summaryPlan.nextTail,
     };
   }
 
