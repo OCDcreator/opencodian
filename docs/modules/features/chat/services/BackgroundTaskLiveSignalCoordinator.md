@@ -8,6 +8,7 @@
 `BackgroundTaskLiveSignalCoordinator` 把 `OpenCodianView` 里 background task live-signal reconciliation 与 authoritative-sync gate runtime bridge 独立出来，专门负责：
 
 - 统一维护 `backgroundTaskAwaitingAuthoritativeSync` / `backgroundTaskLastAuthoritativeSyncAt` 的 arm、clear 与 ready 过渡
+- 统一维护 background-task indicator 的 live/grace-period 运行态判定，回答某个 tab 当前是否仍应算作 background-task running
 - 在 session todo/status live signal 到来时，根据 hydration、authoritative-sync、grace period 与 pending launch 状态决定是否继续保留 indicator
 - 当后台任务已经明显 stale 时，协调 stopped notice 追加请求与 indicator reset 的触发时机
 
@@ -21,7 +22,6 @@ export interface BackgroundTaskLiveSignalCoordinatorHost {
   getSessionIdForTab(tabId: TabId | null): string | null;
   getTabSessionStatus(tabId: TabId | null, sessionId: string | null): SessionActivityStatus | null;
   hasIncompleteTabSessionTodos(tabId: TabId | null): boolean;
-  isBackgroundTaskGracePeriodActive(tabId: TabId | null): boolean;
   getPendingBackgroundTaskLaunches(tabId: TabId | null): BackgroundTaskLiveSignalLaunchInfo[];
   reconcileStaleSessionTodoState(tabId: TabId | null): void;
   syncTabStreamLikeState(tabId: TabId | null): void;
@@ -30,6 +30,7 @@ export interface BackgroundTaskLiveSignalCoordinatorHost {
 }
 
 export class BackgroundTaskLiveSignalCoordinator {
+  hasIndicator(...): boolean;
   armAuthoritativeSyncGate(...): void;
   clearAuthoritativeSyncGate(...): void;
   markAuthoritativeSync(...): void;
@@ -45,6 +46,11 @@ export class BackgroundTaskLiveSignalCoordinator {
 - `clearAuthoritativeSyncGate()` 在 runtime reset / conversation-derived state rebuild 前清掉旧 gate，避免沿用失效的 sync timestamp
 - `markAuthoritativeSync()` 只有在当前 tab 仍等待权威同步、且不处于 hydration 时才会落下 gate 并写入最新 ready 时间
 
+### indicator running predicate
+
+- `hasIndicator()` 现在集中复用 `backgroundTaskStartedAt`、pending launch、session status / todos 与 search-mode runtime，统一回答 tab badge / stream finalize 是否还应把该 tab 视为 background-task running
+- grace period 计时不再由 `OpenCodianView` 额外保留一个私有 helper，而是作为 live-signal coordinator 的内部运行时规则，与后续 stale downgrade 判定共用同一份 started-at 语义
+
 ### live-signal reconciliation
 
 - `reconcileStateFromLiveSignals()` 先复用 `SessionTodoStateService` 的 stale todo 协调，再根据 session status、todo 完成度和 grace period 判断 background task 是否仍应显示为 running
@@ -58,5 +64,5 @@ export class BackgroundTaskLiveSignalCoordinator {
 - `BackgroundTaskIndicatorCoordinator` 负责 live-signal reconcile 后的 inline render 与 completion notice queue/flush 顺序
 - `OpenCodianView` 负责具体 notice / reset host bridge，以及这组 background-task helper 的上层触发
 - `BackgroundTaskPostSyncCoordinator` 负责 hidden signal/background-tab sync 后的 question/todo/background-task post-sync orchestration
-- `BackgroundTaskLiveSignalCoordinator` 只负责 authoritative-sync runtime gate 与 live-signal reconciliation 决策
+- `BackgroundTaskLiveSignalCoordinator` 现在同时负责 authoritative-sync runtime gate、indicator running predicate 与 live-signal reconciliation 决策
 - 这让 P2 `question / todo / background task` lane 继续把 background task 的运行时判定从主 view 迁到 dedicated coordinator，而不是把这段状态机继续留在 `OpenCodianView`

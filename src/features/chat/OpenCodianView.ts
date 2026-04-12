@@ -589,7 +589,6 @@ const FORK_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24
 const REWIND_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5v0a5.5 5.5 0 0 1-5.5 5.5H11"/></svg>`;
 const NEW_TAB_ICON = `<g fill="none" stroke="currentColor" stroke-width="8.333" stroke-linecap="round" stroke-linejoin="round"><circle cx="50" cy="50" r="41.667"/><path d="M33.333 50h33.334"/><path d="M50 33.333v33.334"/></g>`;
 const CURRENT_TAB_NEW_CONVERSATION_ICON = `<g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" transform="scale(4.166667)"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/><path d="M12 8v6"/><path d="M9 11h6"/></g>`;
-const BACKGROUND_TASK_GRACE_PERIOD_MS = 15_000;
 
 addIcon('opencodian-circle-plus', NEW_TAB_ICON);
 addIcon('opencodian-message-square-plus', CURRENT_TAB_NEW_CONVERSATION_ICON);
@@ -1439,10 +1438,6 @@ export class OpenCodianView extends ItemView {
     return this.sessionTodoStateService.hasIncompleteTabSessionTodos(tabId);
   }
 
-  private isTabSessionLive(tabId: TabId | null = this.getActiveTabId()): boolean {
-    return this.sessionTodoStateService.isTabSessionLive(tabId);
-  }
-
   private suppressStaleSessionTodosIfNeeded(
     tabId: TabId | null = this.getActiveTabId(),
   ): SessionTodo[] | null {
@@ -1455,11 +1450,6 @@ export class OpenCodianView extends ItemView {
 
   private buildStaleSessionTodoNoticeContent(todos: SessionTodo[]): string {
     return this.sessionTodoStateService.buildStaleSessionTodoNoticeContent(todos);
-  }
-
-  private isBackgroundTaskGracePeriodActive(tabId: TabId | null = this.getActiveTabId()): boolean {
-    const startedAt = this.getTabRuntimeState(tabId)?.backgroundTaskStartedAt;
-    return typeof startedAt === 'number' && Date.now() - startedAt < BACKGROUND_TASK_GRACE_PERIOD_MS;
   }
 
   private beginConversationHydration(tabId: TabId | null = this.getActiveTabId()): void {
@@ -1589,6 +1579,7 @@ export class OpenCodianView extends ItemView {
     this.backgroundTaskStreamTriggerCoordinator = new BackgroundTaskStreamTriggerCoordinator(
       this.backgroundTaskIndicatorCoordinator,
       this.backgroundTaskTimelineService,
+      this.backgroundTaskLiveSignalCoordinator,
       this.createBackgroundTaskStreamTriggerCoordinatorHost(),
     );
     this.conversationViewStateService = new ConversationViewStateService(this.createConversationViewStateHost());
@@ -1666,7 +1657,6 @@ export class OpenCodianView extends ItemView {
       getSessionIdForTab: (tabId: TabId | null) => this.getSessionIdForTab(tabId),
       getTabSessionStatus: (tabId, sessionId) => this.getTabSessionStatus(tabId, sessionId),
       hasIncompleteTabSessionTodos: (tabId) => this.hasIncompleteTabSessionTodos(tabId),
-      isBackgroundTaskGracePeriodActive: (tabId) => this.isBackgroundTaskGracePeriodActive(tabId),
       getPendingBackgroundTaskLaunches: (tabId) => this.getPendingBackgroundTaskLaunches(tabId),
       reconcileStaleSessionTodoState: (tabId) => {
         this.reconcileStaleSessionTodoState(tabId);
@@ -1773,10 +1763,6 @@ export class OpenCodianView extends ItemView {
       getSessionIdForTab: (tabId: TabId | null) => this.getSessionIdForTab(tabId),
       refreshTabSessionTodos: (tabId, sessionId, options) =>
         this.refreshTabSessionTodos(tabId, sessionId, options),
-      armAuthoritativeSyncGate: (tabId) => {
-        this.backgroundTaskLiveSignalCoordinator.armAuthoritativeSyncGate(tabId);
-      },
-      hasTabBackgroundTaskIndicator: (tabId) => this.hasTabBackgroundTaskIndicator(tabId),
       resetBackgroundTaskIndicator: (tabId) => {
         this.resetBackgroundTaskIndicator(tabId);
       },
@@ -2836,29 +2822,6 @@ export class OpenCodianView extends ItemView {
     return Boolean(this.getActiveTabRuntimeState()?.isStreaming);
   }
 
-  private hasTabBackgroundTaskIndicator(tabId: TabId | null): boolean {
-    const runtime = this.getTabRuntimeState(tabId);
-    if (!runtime?.backgroundTaskStartedAt) {
-      return false;
-    }
-
-    const status = this.getTabSessionStatus(tabId, this.getSessionIdForTab(tabId));
-    const pending = this.getPendingBackgroundTaskLaunches(tabId);
-    if (pending.length > 0) {
-      if (status?.type === 'idle') {
-        return this.isBackgroundTaskGracePeriodActive(tabId);
-      }
-
-      return this.isTabSessionLive(tabId)
-        || this.hasIncompleteTabSessionTodos(tabId)
-        || this.isBackgroundTaskGracePeriodActive(tabId);
-    }
-
-    return runtime.backgroundTaskModeTag === 'search-mode' && (
-      runtime.isStreaming || this.isBackgroundTaskGracePeriodActive(tabId)
-    );
-  }
-
   private isTabForegroundBusy(tabId: TabId | null = this.getActiveTabId()): boolean {
     const runtime = this.getTabRuntimeState(tabId);
     if (!runtime) {
@@ -2883,7 +2846,7 @@ export class OpenCodianView extends ItemView {
     this.tabManager?.setTabStreaming(tabId, runtime?.isStreaming ?? false);
     this.tabManager?.setTabBackgroundTaskRunning(
       tabId,
-      Boolean(runtime && this.hasTabBackgroundTaskIndicator(tabId)),
+      Boolean(runtime && this.backgroundTaskLiveSignalCoordinator.hasIndicator(tabId)),
     );
     this.syncTabUserMessageActionButtons(tabId);
 

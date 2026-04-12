@@ -1,4 +1,5 @@
 import type { ToolCallInfo } from '../../../core/types';
+import type { BackgroundTaskLiveSignalCoordinator } from '../services/BackgroundTaskLiveSignalCoordinator';
 import type {
   BackgroundTaskLaunchInfo,
   BackgroundTaskTimelineService,
@@ -7,6 +8,10 @@ import type { TabId } from '../tabs';
 import type { BackgroundTaskIndicatorCoordinator } from './BackgroundTaskIndicatorCoordinator';
 
 type BackgroundTaskIndicatorRenderPort = Pick<BackgroundTaskIndicatorCoordinator, 'renderIfNeeded'>;
+type BackgroundTaskStreamLiveSignalPort = Pick<
+  BackgroundTaskLiveSignalCoordinator,
+  'armAuthoritativeSyncGate' | 'hasIndicator'
+>;
 type BackgroundTaskTriggerTimelinePort = Pick<BackgroundTaskTimelineService, 'upsertLaunch'>;
 
 export interface BackgroundTaskStreamTriggerRuntime {
@@ -26,8 +31,6 @@ export interface BackgroundTaskStreamTriggerCoordinatorHost {
     sessionId: string,
     options?: { suppressErrors?: boolean },
   ): Promise<unknown>;
-  armAuthoritativeSyncGate(tabId: TabId | null): void;
-  hasTabBackgroundTaskIndicator(tabId: TabId | null): boolean;
   resetBackgroundTaskIndicator(tabId: TabId | null): void;
 }
 
@@ -35,6 +38,7 @@ export class BackgroundTaskStreamTriggerCoordinator {
   constructor(
     private readonly indicatorCoordinator: BackgroundTaskIndicatorRenderPort,
     private readonly timelineService: BackgroundTaskTriggerTimelinePort,
+    private readonly liveSignalCoordinator: BackgroundTaskStreamLiveSignalPort,
     private readonly host: BackgroundTaskStreamTriggerCoordinatorHost,
   ) {}
 
@@ -57,7 +61,7 @@ export class BackgroundTaskStreamTriggerCoordinator {
       runtime.backgroundTaskStartedAt = Date.now();
     }
 
-    this.host.armAuthoritativeSyncGate(tabId);
+    this.liveSignalCoordinator.armAuthoritativeSyncGate(tabId);
     runtime.backgroundTaskStaleNoticeFingerprint = null;
     this.timelineService.upsertLaunch(
       {
@@ -100,7 +104,7 @@ export class BackgroundTaskStreamTriggerCoordinator {
       },
       runtime.backgroundTaskLaunches,
     );
-    this.host.armAuthoritativeSyncGate(tabId);
+    this.liveSignalCoordinator.armAuthoritativeSyncGate(tabId);
     runtime.backgroundTaskStaleNoticeFingerprint = null;
     await this.indicatorCoordinator.renderIfNeeded(tabId);
   }
@@ -109,7 +113,7 @@ export class BackgroundTaskStreamTriggerCoordinator {
     tabId: TabId | null = this.host.getActiveTabId(),
   ): Promise<void> {
     const runtime = this.host.getTabRuntimeState(tabId);
-    if (!runtime || !this.host.hasTabBackgroundTaskIndicator(tabId)) {
+    if (!runtime || !this.liveSignalCoordinator.hasIndicator(tabId)) {
       return;
     }
 

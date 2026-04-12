@@ -3,6 +3,7 @@ import { createLogger } from '../../../shared';
 import type { TabId } from '../tabs';
 
 const logger = createLogger('BackgroundTaskLiveSignalCoordinator');
+const BACKGROUND_TASK_GRACE_PERIOD_MS = 15_000;
 
 export interface BackgroundTaskLiveSignalLaunchInfo {
   launchId: string;
@@ -29,7 +30,6 @@ export interface BackgroundTaskLiveSignalCoordinatorHost {
     sessionId: string | null,
   ): SessionActivityStatus | null;
   hasIncompleteTabSessionTodos(tabId: TabId | null): boolean;
-  isBackgroundTaskGracePeriodActive(tabId: TabId | null): boolean;
   getPendingBackgroundTaskLaunches(tabId: TabId | null): BackgroundTaskLiveSignalLaunchInfo[];
   reconcileStaleSessionTodoState(tabId: TabId | null): void;
   syncTabStreamLikeState(tabId: TabId | null): void;
@@ -42,6 +42,32 @@ export interface BackgroundTaskLiveSignalCoordinatorHost {
 
 export class BackgroundTaskLiveSignalCoordinator {
   constructor(private readonly host: BackgroundTaskLiveSignalCoordinatorHost) {}
+
+  hasIndicator(tabId: TabId | null): boolean {
+    const runtime = this.host.getTabRuntimeState(tabId);
+    if (!runtime?.backgroundTaskStartedAt) {
+      return false;
+    }
+
+    const status = this.host.getTabSessionStatus(tabId, this.host.getSessionIdForTab(tabId));
+    const pending = this.host.getPendingBackgroundTaskLaunches(tabId);
+    const gracePeriodActive = this.isGracePeriodActive(tabId);
+
+    if (pending.length > 0) {
+      if (status?.type === 'idle') {
+        return gracePeriodActive;
+      }
+
+      return runtime.isStreaming
+        || this.isSessionLive(status)
+        || this.host.hasIncompleteTabSessionTodos(tabId)
+        || gracePeriodActive;
+    }
+
+    return runtime.backgroundTaskModeTag === 'search-mode' && (
+      runtime.isStreaming || gracePeriodActive
+    );
+  }
 
   armAuthoritativeSyncGate(tabId: TabId | null): void {
     const runtime = this.host.getTabRuntimeState(tabId);
@@ -112,7 +138,7 @@ export class BackgroundTaskLiveSignalCoordinator {
       return;
     }
 
-    if (this.host.isBackgroundTaskGracePeriodActive(tabId)) {
+    if (this.isGracePeriodActive(tabId)) {
       this.host.syncTabStreamLikeState(tabId);
       return;
     }
@@ -134,5 +160,14 @@ export class BackgroundTaskLiveSignalCoordinator {
       launchCount: runtime.backgroundTaskLaunches.size,
     });
     this.host.resetBackgroundTaskIndicator(tabId);
+  }
+
+  private isGracePeriodActive(tabId: TabId | null): boolean {
+    const startedAt = this.host.getTabRuntimeState(tabId)?.backgroundTaskStartedAt;
+    return typeof startedAt === 'number' && Date.now() - startedAt < BACKGROUND_TASK_GRACE_PERIOD_MS;
+  }
+
+  private isSessionLive(status: SessionActivityStatus | null | undefined): boolean {
+    return status?.type === 'busy' || status?.type === 'retry';
   }
 }

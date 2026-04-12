@@ -29,7 +29,6 @@ describe('BackgroundTaskLiveSignalCoordinator', () => {
     status?: SessionActivityStatus | null;
     sessionId?: string | null;
     hasIncompleteTodos?: boolean;
-    isGracePeriodActive?: boolean;
     pendingLaunches?: BackgroundTaskLiveSignalLaunchInfo[];
   }) {
     const runtime: BackgroundTaskLiveSignalRuntime = {
@@ -53,7 +52,6 @@ describe('BackgroundTaskLiveSignalCoordinator', () => {
       getSessionIdForTab: jest.fn().mockReturnValue(options?.sessionId ?? 'session-1'),
       getTabSessionStatus: jest.fn().mockReturnValue(options?.status ?? null),
       hasIncompleteTabSessionTodos: jest.fn().mockReturnValue(options?.hasIncompleteTodos ?? false),
-      isBackgroundTaskGracePeriodActive: jest.fn().mockReturnValue(options?.isGracePeriodActive ?? false),
       getPendingBackgroundTaskLaunches: jest.fn().mockReturnValue(options?.pendingLaunches ?? []),
       reconcileStaleSessionTodoState,
       syncTabStreamLikeState,
@@ -70,6 +68,46 @@ describe('BackgroundTaskLiveSignalCoordinator', () => {
       resetBackgroundTaskIndicator,
     };
   }
+
+  it('keeps the indicator alive during the post-launch grace period', () => {
+    const launch = createLaunch();
+    const { service } = createService({
+      runtime: {
+        backgroundTaskStartedAt: Date.now(),
+        backgroundTaskLaunches: new Map([[launch.launchId, launch]]),
+      },
+      status: { type: 'idle' },
+      pendingLaunches: [launch],
+    });
+
+    expect(service.hasIndicator('tab-1')).toBe(true);
+  });
+
+  it('keeps the indicator alive when pending launches still have incomplete todos', () => {
+    const launch = createLaunch();
+    const { service } = createService({
+      runtime: {
+        backgroundTaskLaunches: new Map([[launch.launchId, launch]]),
+      },
+      hasIncompleteTodos: true,
+      pendingLaunches: [launch],
+    });
+
+    expect(service.hasIndicator('tab-1')).toBe(true);
+  });
+
+  it('clears the indicator visibility when pending launches are idle after the grace period', () => {
+    const launch = createLaunch();
+    const { service } = createService({
+      runtime: {
+        backgroundTaskLaunches: new Map([[launch.launchId, launch]]),
+      },
+      status: { type: 'idle' },
+      pendingLaunches: [launch],
+    });
+
+    expect(service.hasIndicator('tab-1')).toBe(false);
+  });
 
   it('does not log when authoritative sync is already clear', () => {
     const { service, runtime } = createService();

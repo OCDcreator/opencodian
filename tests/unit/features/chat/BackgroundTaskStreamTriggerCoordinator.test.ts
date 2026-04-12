@@ -37,6 +37,10 @@ describe('BackgroundTaskStreamTriggerCoordinator', () => {
     const indicatorCoordinator = {
       renderIfNeeded: jest.fn().mockResolvedValue(undefined),
     };
+    const liveSignalCoordinator = {
+      armAuthoritativeSyncGate: jest.fn(),
+      hasIndicator: jest.fn().mockReturnValue(options.hasIndicator ?? true),
+    };
     const timelineService = {
       upsertLaunch: jest.fn((toolCall: { id: string; input: Record<string, unknown> }, target: Map<string, unknown>) => {
         target.set(toolCall.id, {
@@ -52,13 +56,12 @@ describe('BackgroundTaskStreamTriggerCoordinator', () => {
       applyStreamingTodoSnapshotFromTool: jest.fn(),
       getSessionIdForTab: jest.fn().mockReturnValue(options.sessionId ?? 'session-1'),
       refreshTabSessionTodos: jest.fn().mockResolvedValue(undefined),
-      armAuthoritativeSyncGate: jest.fn(),
-      hasTabBackgroundTaskIndicator: jest.fn().mockReturnValue(options.hasIndicator ?? true),
       resetBackgroundTaskIndicator: jest.fn(),
     };
     const coordinator = new BackgroundTaskStreamTriggerCoordinator(
       indicatorCoordinator,
       timelineService,
+      liveSignalCoordinator,
       host,
     );
 
@@ -67,6 +70,7 @@ describe('BackgroundTaskStreamTriggerCoordinator', () => {
       runtime,
       host,
       indicatorCoordinator,
+      liveSignalCoordinator,
       timelineService,
     };
   }
@@ -77,6 +81,7 @@ describe('BackgroundTaskStreamTriggerCoordinator', () => {
       runtime,
       host,
       indicatorCoordinator,
+      liveSignalCoordinator,
       timelineService,
     } = createCoordinator();
 
@@ -87,7 +92,7 @@ describe('BackgroundTaskStreamTriggerCoordinator', () => {
       'tab-1',
     );
     expect(runtime?.backgroundTaskStartedAt).not.toBeNull();
-    expect(host.armAuthoritativeSyncGate).toHaveBeenCalledWith('tab-1');
+    expect(liveSignalCoordinator.armAuthoritativeSyncGate).toHaveBeenCalledWith('tab-1');
     expect(runtime?.backgroundTaskStaleNoticeFingerprint).toBeNull();
     expect(timelineService.upsertLaunch).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -106,6 +111,7 @@ describe('BackgroundTaskStreamTriggerCoordinator', () => {
       runtime,
       host,
       indicatorCoordinator,
+      liveSignalCoordinator,
       timelineService,
     } = createCoordinator();
 
@@ -124,7 +130,7 @@ describe('BackgroundTaskStreamTriggerCoordinator', () => {
       { suppressErrors: true },
     );
     expect(timelineService.upsertLaunch).not.toHaveBeenCalled();
-    expect(host.armAuthoritativeSyncGate).not.toHaveBeenCalled();
+    expect(liveSignalCoordinator.armAuthoritativeSyncGate).not.toHaveBeenCalled();
     expect(runtime?.backgroundTaskStaleNoticeFingerprint).toBe('stale');
     expect(indicatorCoordinator.renderIfNeeded).not.toHaveBeenCalled();
   });
@@ -135,6 +141,7 @@ describe('BackgroundTaskStreamTriggerCoordinator', () => {
       runtime,
       host,
       indicatorCoordinator,
+      liveSignalCoordinator,
       timelineService,
     } = createCoordinator();
 
@@ -150,7 +157,7 @@ describe('BackgroundTaskStreamTriggerCoordinator', () => {
       }),
       runtime?.backgroundTaskLaunches,
     );
-    expect(host.armAuthoritativeSyncGate).toHaveBeenCalledWith('tab-1');
+    expect(liveSignalCoordinator.armAuthoritativeSyncGate).toHaveBeenCalledWith('tab-1');
     expect(runtime?.backgroundTaskStaleNoticeFingerprint).toBeNull();
     expect(indicatorCoordinator.renderIfNeeded).toHaveBeenCalledWith('tab-1');
     expect(host.refreshTabSessionTodos).not.toHaveBeenCalled();
@@ -161,11 +168,12 @@ describe('BackgroundTaskStreamTriggerCoordinator', () => {
       coordinator,
       host,
       indicatorCoordinator,
+      liveSignalCoordinator,
     } = createCoordinator();
 
     await coordinator.finalizeAfterPrimaryStream('tab-1');
 
-    expect(host.hasTabBackgroundTaskIndicator).toHaveBeenCalledWith('tab-1');
+    expect(liveSignalCoordinator.hasIndicator).toHaveBeenCalledWith('tab-1');
     expect(host.resetBackgroundTaskIndicator).toHaveBeenCalledWith('tab-1');
     expect(indicatorCoordinator.renderIfNeeded).not.toHaveBeenCalled();
   });
