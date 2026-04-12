@@ -1,19 +1,6 @@
-import type { ChatMessage } from '../../../core/types';
+import type { TrailingAssistantPatchExecutionPlan } from './TrailingAssistantPatchExecutionPlanHelper';
 import type { TrailingAssistantPatchTailOutcomePlans } from './TrailingAssistantPatchTailOutcomePlanHelper';
 import type { TrailingAssistantPatchTurnBodyScopePlan } from './TrailingAssistantPatchTurnBodyScopeHelper';
-
-export type TrailingAssistantPatchExecutionPlan =
-  | {
-    kind: 'finalize-footer';
-    messageEl: HTMLElement;
-    nextTailMessage: ChatMessage;
-  }
-  | {
-    kind: 'rerender-content';
-    messageEl: HTMLElement;
-    contentEl: HTMLElement;
-    nextTailMessage: ChatMessage;
-  };
 
 export type TrailingAssistantPatchSuccessPlan = {
   executionPlan: TrailingAssistantPatchExecutionPlan;

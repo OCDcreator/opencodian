@@ -19,10 +19,13 @@ import {
 import { buildTrailingAssistantPatchTailStatePlanFromTailOutcomePlanningContext } from './TrailingAssistantPatchTailStateTailOutcomePlanHelper';
 import {
   buildTrailingAssistantPatchSuccessPlanFromParts,
-  type TrailingAssistantPatchExecutionPlan,
   type TrailingAssistantPatchSuccessPlan,
   type TrailingAssistantPatchSuccessPlanParts,
 } from './TrailingAssistantPatchSuccessPlanHelper';
+import {
+  buildTrailingAssistantPatchExecutionPlan,
+  type TrailingAssistantPatchExecutionPlan,
+} from './TrailingAssistantPatchExecutionPlanHelper';
 import {
   withTrailingAssistantTurnBodyScope,
 } from './TrailingAssistantPatchTurnBodyScopeHelper';
@@ -676,32 +679,14 @@ export class ConversationRenderService {
   private buildTrailingAssistantPatchExecutionPlanFromExecutionTailPlanningContext(
     planningContext: TrailingAssistantPatchExecutionTailPlanningContext,
   ): TrailingAssistantPatchExecutionPlan {
-    return this.buildTrailingAssistantPatchExecutionPlan(
-      planningContext.previousTailMessage,
-      planningContext.nextTailMessage,
-      planningContext.patchTarget,
-    );
-  }
-
-  private buildTrailingAssistantPatchExecutionPlan(
-    previousTailMessage: ChatMessage,
-    nextTailMessage: ChatMessage,
-    patchTarget: TrailingAssistantPatchDomTarget,
-  ): TrailingAssistantPatchExecutionPlan {
-    if (this.shouldFinalizeTrailingAssistantFooterOnly(previousTailMessage, nextTailMessage)) {
-      return {
-        kind: 'finalize-footer',
-        messageEl: patchTarget.messageEl,
-        nextTailMessage,
-      };
-    }
-
-    return {
-      kind: 'rerender-content',
-      messageEl: patchTarget.messageEl,
-      contentEl: patchTarget.contentEl,
-      nextTailMessage,
-    };
+    return buildTrailingAssistantPatchExecutionPlan({
+      nextTailMessage: planningContext.nextTailMessage,
+      patchTarget: planningContext.patchTarget,
+      shouldFinalizeFooterOnly: this.shouldFinalizeTrailingAssistantFooterOnly(
+        planningContext.previousTailMessage,
+        planningContext.nextTailMessage,
+      ),
+    });
   }
 
   private buildTrailingAssistantPatchTailOutcomePlansFromExecutionTailPlanningContext(
