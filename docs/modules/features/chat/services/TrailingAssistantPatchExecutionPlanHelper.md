@@ -9,9 +9,9 @@
 
 - 接收已经完成正文签名比较后的 `shouldFinalizeFooterOnly` 结论
 - 统一返回稳定的 `finalize-footer` / `rerender-content` execution-plan contract
-- 让 `ConversationRenderService` 在 execution-plan 阶段只保留 execution-tail context 协调与签名比较
+- 让 `ConversationRenderService` 在 execution-plan 阶段只保留 execution-tail context 协调，以及读取 host body signature 后把布尔结论传入的职责
 
-它不读取 previous tail、不自行比较正文签名，也不执行任何 DOM 副作用；只负责根据既有决策装配最终 execution plan。
+它不读取 previous tail、不自行比较正文签名，也不执行任何 DOM 副作用；只负责根据既有决策装配最终 execution plan。正文签名的纯比较现已另交给 `TrailingAssistantPatchFooterFinalizationDecisionHelper`。
 
 ## 公开接口
 
@@ -46,5 +46,6 @@ export function buildTrailingAssistantPatchExecutionPlan(
 ## 与其他模块的关系
 
 - `TrailingAssistantPatchExecutionTailExecutionPlanHelper` 现在会在更窄的 execution-tail planning-context 边界上复用这里，不再由 `ConversationRenderService` 直接调用
+- `TrailingAssistantPatchFooterFinalizationDecisionHelper` 负责把 previous / next body signature 收口为 `shouldFinalizeFooterOnly` 布尔结论，再把结果交给这里消费
 - `TrailingAssistantPatchExecutionTailPlanningContextHelper` 继续负责从 success planning-context 缩成 execution/tail 共用的窄 contract
 - `TrailingAssistantPatchSuccessPlanHelper` 继续只负责 success-plan 顶层 shape，并复用这里导出的 `TrailingAssistantPatchExecutionPlan` 类型

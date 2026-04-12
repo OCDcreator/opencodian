@@ -18,6 +18,7 @@ import {
   buildTrailingAssistantPatchSkippedDebugLoggingContext,
   buildTrailingAssistantPatchSkippedDebugPlanningContext,
 } from './TrailingAssistantPatchDebugLoggingContextHelper';
+import { shouldFinalizeTrailingAssistantFooterOnly } from './TrailingAssistantPatchFooterFinalizationDecisionHelper';
 import {
   type TrailingAssistantPatchExecutionPlan,
 } from './TrailingAssistantPatchExecutionPlanHelper';
@@ -625,10 +626,16 @@ export class ConversationRenderService {
   ): TrailingAssistantPatchSuccessPlanParts {
     const executionTailPlanningContext =
       buildTrailingAssistantPatchExecutionTailPlanningContext(planningContext);
-    const shouldFinalizeFooterOnly = this.shouldFinalizeTrailingAssistantFooterOnly(
+    const previousBodySignature = this.host.assistantTailRender.getBodySignature(
       executionTailPlanningContext.previousTailMessage,
+    );
+    const nextBodySignature = this.host.assistantTailRender.getBodySignature(
       executionTailPlanningContext.nextTailMessage,
     );
+    const shouldFinalizeFooterOnly = shouldFinalizeTrailingAssistantFooterOnly({
+      previousBodySignature,
+      nextBodySignature,
+    });
 
     return {
       turnBodyScopePlan: buildTrailingAssistantPatchTurnBodyScopePlan(planningContext),
@@ -655,14 +662,6 @@ export class ConversationRenderService {
       messageEl: patchTargets.existingTailMessageEl,
       contentEl: patchTargets.existingContentEl,
     };
-  }
-
-  private shouldFinalizeTrailingAssistantFooterOnly(
-    previousTailMessage: ChatMessage,
-    nextTailMessage: ChatMessage,
-  ): boolean {
-    return this.host.assistantTailRender.getBodySignature(previousTailMessage)
-      === this.host.assistantTailRender.getBodySignature(nextTailMessage);
   }
 
   private async executeTrailingAssistantPatch(
