@@ -26,6 +26,7 @@ import {
   buildTrailingAssistantPatchExecutionPlan,
   type TrailingAssistantPatchExecutionPlan,
 } from './TrailingAssistantPatchExecutionPlanHelper';
+import { buildTrailingAssistantPatchExecutionTailPlanParts } from './TrailingAssistantPatchExecutionTailPlanPartsHelper';
 import {
   withTrailingAssistantTurnBodyScope,
 } from './TrailingAssistantPatchTurnBodyScopeHelper';
@@ -156,11 +157,6 @@ type TrailingAssistantPatchNonMergeableTailFailurePlan = {
     previousTail: Record<string, unknown> | null;
     nextTail: Record<string, unknown> | null;
   };
-};
-
-type TrailingAssistantPatchExecutionTailPlanParts = {
-  executionPlan: TrailingAssistantPatchExecutionPlan;
-  tailOutcomePlans: TrailingAssistantPatchTailOutcomePlans;
 };
 
 type TrailingAssistantPatchPlanningEnvironment = {
@@ -634,11 +630,20 @@ export class ConversationRenderService {
   private buildTrailingAssistantPatchSuccessPlanParts(
     planningContext: TrailingAssistantPatchPlanningContext,
   ): TrailingAssistantPatchSuccessPlanParts {
+    const executionTailPlanningContext =
+      buildTrailingAssistantPatchExecutionTailPlanningContext(planningContext);
     return {
       turnBodyScopePlan: buildTrailingAssistantPatchTurnBodyScopePlan(planningContext),
-      ...this.buildTrailingAssistantPatchExecutionTailPlanPartsFromPlanningContext(
-        planningContext,
-      ),
+      ...buildTrailingAssistantPatchExecutionTailPlanParts({
+        executionPlan:
+          this.buildTrailingAssistantPatchExecutionPlanFromExecutionTailPlanningContext(
+            executionTailPlanningContext,
+          ),
+        tailOutcomePlans:
+          this.buildTrailingAssistantPatchTailOutcomePlansFromExecutionTailPlanningContext(
+            executionTailPlanningContext,
+          ),
+      }),
     };
   }
 
@@ -648,23 +653,6 @@ export class ConversationRenderService {
     return {
       messageEl: patchTargets.existingTailMessageEl,
       contentEl: patchTargets.existingContentEl,
-    };
-  }
-
-  private buildTrailingAssistantPatchExecutionTailPlanPartsFromPlanningContext(
-    planningContext: TrailingAssistantPatchPlanningContext,
-  ): TrailingAssistantPatchExecutionTailPlanParts {
-    const executionTailPlanningContext =
-      buildTrailingAssistantPatchExecutionTailPlanningContext(planningContext);
-    return {
-      executionPlan:
-        this.buildTrailingAssistantPatchExecutionPlanFromExecutionTailPlanningContext(
-          executionTailPlanningContext,
-        ),
-      tailOutcomePlans:
-        this.buildTrailingAssistantPatchTailOutcomePlansFromExecutionTailPlanningContext(
-          executionTailPlanningContext,
-        ),
     };
   }
 

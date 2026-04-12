@@ -16,11 +16,10 @@
 ## 公开接口
 
 ```typescript
-export type TrailingAssistantPatchSuccessPlanParts = {
-  executionPlan: TrailingAssistantPatchExecutionPlan;
-  tailOutcomePlans: TrailingAssistantPatchTailOutcomePlans;
-  turnBodyScopePlan: TrailingAssistantPatchTurnBodyScopePlan;
-};
+export type TrailingAssistantPatchSuccessPlanParts =
+  TrailingAssistantPatchExecutionTailPlanParts & {
+    turnBodyScopePlan: TrailingAssistantPatchTurnBodyScopePlan;
+  };
 
 export type TrailingAssistantPatchSuccessPlan = {
   executionPlan: TrailingAssistantPatchExecutionPlan;
@@ -36,7 +35,8 @@ export function buildTrailingAssistantPatchSuccessPlanFromParts(
 
 ## 与其他模块的关系
 
-- `ConversationRenderService` 现在只负责组装 success-plan parts，并把最终 shape 收口委托给这里
+- `ConversationRenderService` 现在只负责把 `turnBodyScopePlan` 与既成的 execution/tail plan-parts 组合成 success-plan parts，并把最终 shape 收口委托给这里
+- `TrailingAssistantPatchExecutionTailPlanPartsHelper` 负责把 `{ executionPlan, tailOutcomePlans }` 这一层局部 shape 预先收口；这里再在更上一层补上 `turnBodyScopePlan`
 - `TrailingAssistantPatchExecutionPlanHelper` 负责 `executionPlan` 自身的 finalize/rerender shape；这里不再拥有该子计划的类型定义
 - `TrailingAssistantPatchTailOutcomePlanHelper` 继续负责 `{ tailStatePlan, completionDebugPlan }` 这一层 tail-outcome shape
 - `TrailingAssistantPatchTurnBodyScopePlanHelper` 与 execution plan 分支仍分别负责各自子计划的预计算

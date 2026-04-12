@@ -1,3 +1,4 @@
+import type { TrailingAssistantPatchExecutionTailPlanParts } from './TrailingAssistantPatchExecutionTailPlanPartsHelper';
 import type { TrailingAssistantPatchExecutionPlan } from './TrailingAssistantPatchExecutionPlanHelper';
 import type { TrailingAssistantPatchTailOutcomePlans } from './TrailingAssistantPatchTailOutcomePlanHelper';
 import type { TrailingAssistantPatchTurnBodyScopePlan } from './TrailingAssistantPatchTurnBodyScopeHelper';
@@ -9,11 +10,10 @@ export type TrailingAssistantPatchSuccessPlan = {
   turnBodyScopePlan: TrailingAssistantPatchTurnBodyScopePlan;
 };
 
-export type TrailingAssistantPatchSuccessPlanParts = {
-  executionPlan: TrailingAssistantPatchExecutionPlan;
-  tailOutcomePlans: TrailingAssistantPatchTailOutcomePlans;
-  turnBodyScopePlan: TrailingAssistantPatchTurnBodyScopePlan;
-};
+export type TrailingAssistantPatchSuccessPlanParts =
+  TrailingAssistantPatchExecutionTailPlanParts & {
+    turnBodyScopePlan: TrailingAssistantPatchTurnBodyScopePlan;
+  };
 
 export function buildTrailingAssistantPatchSuccessPlanFromParts(
   planParts: TrailingAssistantPatchSuccessPlanParts,
