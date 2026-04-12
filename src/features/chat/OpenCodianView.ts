@@ -687,7 +687,6 @@ export class OpenCodianView extends ItemView {
   private questionInlineCardRenderer: QuestionInlineCardRenderer;
   private questionResolutionCoordinator: QuestionResolutionCoordinator;
   private sendPipelineRuntime: SendPipelineRuntime;
-  private conversationSyncIntervalId: number | null = null;
   private omoBackgroundTaskLogStates = new Map<string, OmoBackgroundTaskLogState>();
   private disposeSessionTodoSubscription: (() => void) | null = null;
   private disposeSessionStatusSubscription: (() => void) | null = null;
@@ -5591,66 +5590,21 @@ export class OpenCodianView extends ItemView {
   }
 
   private startConversationSyncLoop(): void {
-    this.stopConversationSyncLoop();
-
-    const shouldSyncVisibleConversation = Boolean(
-      this.currentConversation?.openCodeSessionId
-      && this.currentConversation.messages.length > 0,
-    );
-    const shouldSyncBackgroundTabs = Boolean(
-      this.tabManager?.getAllTabs().some((tab) =>
-        Boolean(tab.conversationId) && tab.hasBackgroundTask,
-      ),
-    );
-
-    if (!shouldSyncVisibleConversation && !shouldSyncBackgroundTabs) {
-      return;
-    }
-
-    this.conversationSyncIntervalId = window.setInterval(() => {
-      void this.syncVisibleConversationInBackground();
-      void this.syncBackgroundTaskTabsInBackground();
-    }, 2000);
+    this.conversationSyncOrchestrationService.startConversationSyncLoop({
+      syncVisibleConversation: () => this.syncVisibleConversationInBackground(),
+      syncBackgroundTaskTabs: () => this.syncBackgroundTaskTabsInBackground(),
+    });
   }
 
   private clearScheduledSignalConversationSync(tabId: TabId | null): void {
-    const runtime = this.getTabRuntimeState(tabId);
-    if (!runtime || runtime.signalConversationSyncTimerId === null) {
-      return;
-    }
-
-    window.clearTimeout(runtime.signalConversationSyncTimerId);
-    runtime.signalConversationSyncTimerId = null;
-    runtime.pendingSignalConversationSyncReasons.clear();
+    this.conversationSyncOrchestrationService.clearScheduledSignalConversationSync(tabId);
   }
 
   private scheduleConversationSyncFromSignal(
     tabId: TabId | null,
     reason: SessionSyncEventUpdate['type'],
   ): void {
-    const runtime = this.getTabRuntimeState(tabId);
-    if (!runtime) {
-      return;
-    }
-
-    runtime.pendingSignalConversationSyncReasons.add(reason);
-    if (runtime.signalConversationSyncTimerId !== null) {
-      return;
-    }
-
-    runtime.signalConversationSyncTimerId = window.setTimeout(() => {
-      runtime.signalConversationSyncTimerId = null;
-      const mergedReason = [...runtime.pendingSignalConversationSyncReasons].sort().join('+') || reason;
-      runtime.pendingSignalConversationSyncReasons.clear();
-      void this.syncConversationFromSignal(tabId, mergedReason);
-    }, 120);
-  }
-
-  private async syncConversationFromSignal(
-    tabId: TabId | null,
-    reason: string,
-  ): Promise<void> {
-    await this.conversationSyncOrchestrationService.syncConversationFromSignal(
+    this.conversationSyncOrchestrationService.scheduleConversationSyncFromSignal(
       tabId,
       reason,
       {
@@ -5658,6 +5612,7 @@ export class OpenCodianView extends ItemView {
         syncTabConversation: async ({
           tabId: syncedTabId,
           conversation,
+          reason: syncReason,
           previousFingerprint,
           activeTabId,
           tabHasBackgroundTask,
@@ -5665,7 +5620,7 @@ export class OpenCodianView extends ItemView {
           const syncResult = await this.syncConversationMessagesFromServer(
             conversation,
             syncedTabId,
-            `sync-event:${reason}`,
+            `sync-event:${syncReason}`,
             { suppressVerboseLogs: true },
           );
           const runtime = this.getTabRuntimeState(syncedTabId);
@@ -5675,7 +5630,7 @@ export class OpenCodianView extends ItemView {
           await this.backgroundTaskPostSyncCoordinator.handleSignalSyncComplete({
             tabId: syncedTabId,
             conversation,
-            reason,
+            reason: syncReason,
             activeTabId,
             tabHasBackgroundTask,
             previousFingerprint,
@@ -5687,10 +5642,7 @@ export class OpenCodianView extends ItemView {
   }
 
   private stopConversationSyncLoop(): void {
-    if (this.conversationSyncIntervalId !== null) {
-      window.clearInterval(this.conversationSyncIntervalId);
-      this.conversationSyncIntervalId = null;
-    }
+    this.conversationSyncOrchestrationService.stopConversationSyncLoop();
   }
 
   private async syncVisibleConversationInBackground(): Promise<void> {
