@@ -159,6 +159,10 @@ import {
   BackgroundTaskPostSyncCoordinator,
 } from './services/BackgroundTaskPostSyncCoordinator';
 import {
+  type ConversationSyncRuntimeCoordinatorHost,
+  ConversationSyncRuntimeCoordinator,
+} from './services/ConversationSyncRuntimeCoordinator';
+import {
   type ConversationAssistantTailRenderPort,
   type ConversationRenderHost,
   ConversationRenderService,
@@ -666,6 +670,7 @@ export class OpenCodianView extends ItemView {
   private backgroundTaskNoticeStateService: BackgroundTaskNoticeStateService;
   private backgroundTaskLiveSignalCoordinator: BackgroundTaskLiveSignalCoordinator;
   private backgroundTaskPostSyncCoordinator: BackgroundTaskPostSyncCoordinator;
+  private conversationSyncRuntimeCoordinator: ConversationSyncRuntimeCoordinator;
   private conversationViewStateService: ConversationViewStateService;
   private conversationRenderService: ConversationRenderService;
   private messageSendPreparationService: MessageSendPreparationService;
@@ -1679,6 +1684,9 @@ export class OpenCodianView extends ItemView {
     this.backgroundTaskPostSyncCoordinator = new BackgroundTaskPostSyncCoordinator(
       this.createBackgroundTaskPostSyncCoordinatorHost(),
     );
+    this.conversationSyncRuntimeCoordinator = new ConversationSyncRuntimeCoordinator(
+      this.createConversationSyncRuntimeCoordinatorHost(),
+    );
     this.backgroundTaskCompletionNoticeService = new BackgroundTaskCompletionNoticeService(
       this.createBackgroundTaskCompletionNoticeServiceHost(),
     );
@@ -1812,6 +1820,14 @@ export class OpenCodianView extends ItemView {
           this.tabManager?.setTabNeedsAttention(tabId, needsAttention);
         }
       },
+    };
+  }
+
+  private createConversationSyncRuntimeCoordinatorHost(): ConversationSyncRuntimeCoordinatorHost {
+    return {
+      getActiveTabId: () => this.getActiveTabId(),
+      getTabRuntimeState: (tabId: TabId | null) => this.getTabRuntimeState(tabId),
+      getConversationSyncFingerprint: (messages) => this.getConversationSyncFingerprint(messages),
     };
   }
 
@@ -5618,11 +5634,6 @@ export class OpenCodianView extends ItemView {
       return;
     }
 
-    const runtime = this.getTabRuntimeState(tabId);
-    if (!runtime || runtime.isStreaming || runtime.isConversationSyncInFlight) {
-      return;
-    }
-
     const activeTabId = this.getActiveTabId();
     if (tabId === activeTabId && this.currentConversation?.openCodeSessionId) {
       await this.syncVisibleConversationInBackground();
@@ -5635,33 +5646,33 @@ export class OpenCodianView extends ItemView {
     }
 
     const conversation = await this.plugin.getConversationById(tab.conversationId);
-    if (!conversation?.openCodeSessionId) {
-      return;
-    }
-
-    runtime.isConversationSyncInFlight = true;
-    try {
-      const previousFingerprint = runtime.lastConversationSyncFingerprint
-        ?? this.getConversationSyncFingerprint(conversation.messages);
-      const syncResult = await this.syncConversationMessagesFromServer(
-        conversation,
-        tabId,
-        `sync-event:${reason}`,
-        { suppressVerboseLogs: true },
-      );
-      runtime.lastConversationSyncFingerprint = syncResult.fingerprint;
-      await this.backgroundTaskPostSyncCoordinator.handleSignalSyncComplete({
+    await this.conversationSyncRuntimeCoordinator.runTabConversationSync(
+      {
         tabId,
         conversation,
-        reason,
-        activeTabId,
-        tabHasBackgroundTask: tab.hasBackgroundTask,
-        previousFingerprint,
-        syncResult,
-      });
-    } finally {
-      runtime.isConversationSyncInFlight = false;
-    }
+      },
+      async ({ tabId: syncedTabId, conversation: syncedConversation, previousFingerprint }) => {
+        const syncResult = await this.syncConversationMessagesFromServer(
+          syncedConversation,
+          syncedTabId,
+          `sync-event:${reason}`,
+          { suppressVerboseLogs: true },
+        );
+        const runtime = this.getTabRuntimeState(syncedTabId);
+        if (runtime) {
+          runtime.lastConversationSyncFingerprint = syncResult.fingerprint;
+        }
+        await this.backgroundTaskPostSyncCoordinator.handleSignalSyncComplete({
+          tabId: syncedTabId,
+          conversation: syncedConversation,
+          reason,
+          activeTabId,
+          tabHasBackgroundTask: tab.hasBackgroundTask,
+          previousFingerprint,
+          syncResult,
+        });
+      },
+    );
   }
 
   private stopConversationSyncLoop(): void {
@@ -5672,46 +5683,34 @@ export class OpenCodianView extends ItemView {
   }
 
   private async syncVisibleConversationInBackground(): Promise<void> {
-    const activeTabId = this.getActiveTabId();
-    const runtime = this.getTabRuntimeState(activeTabId);
-    if (
-      !activeTabId
-      || !runtime
-      || runtime.isStreaming
-      || runtime.isConversationSyncInFlight
-      || !this.currentConversation?.openCodeSessionId
-    ) {
-      return;
-    }
+    await this.conversationSyncRuntimeCoordinator.runVisibleConversationSync(
+      this.currentConversation,
+      async ({ tabId: activeTabId, conversation }) => {
+        const expectedConversationId = conversation.id;
+        const expectedSessionId = conversation.openCodeSessionId;
+        const previousMessages = [...conversation.messages];
+        const syncResult = await this.syncConversationMessagesFromServer(
+          conversation,
+          activeTabId,
+          'visible-background-sync',
+          { suppressVerboseLogs: true },
+        );
+        const postSyncOutcome = await this.backgroundTaskPostSyncCoordinator.handleVisibleConversationSyncComplete({
+          tabId: activeTabId,
+          expectedConversationId,
+          questionSessionId: expectedSessionId,
+          syncResult,
+        });
+        if (postSyncOutcome.shouldApplySyncedConversationUpdate) {
+          await this.applySyncedConversationUpdate(previousMessages, conversation.messages);
+          return;
+        }
 
-    const expectedConversationId = this.currentConversation.id;
-    const expectedSessionId = this.currentConversation.openCodeSessionId;
-    runtime.isConversationSyncInFlight = true;
-    try {
-      const previousMessages = [...this.currentConversation.messages];
-      const syncResult = await this.syncConversationMessagesFromServer(
-        this.currentConversation,
-        activeTabId,
-        'visible-background-sync',
-        { suppressVerboseLogs: true },
-      );
-      const postSyncOutcome = await this.backgroundTaskPostSyncCoordinator.handleVisibleConversationSyncComplete({
-        tabId: activeTabId,
-        expectedConversationId,
-        questionSessionId: expectedSessionId,
-        syncResult,
-      });
-      if (postSyncOutcome.shouldApplySyncedConversationUpdate) {
-        await this.applySyncedConversationUpdate(previousMessages, this.currentConversation.messages);
-        return;
-      }
-
-      if (postSyncOutcome.shouldRenderBackgroundTaskIndicator) {
-        await this.renderBackgroundTaskIndicatorIfNeeded(activeTabId);
-      }
-    } finally {
-      runtime.isConversationSyncInFlight = false;
-    }
+        if (postSyncOutcome.shouldRenderBackgroundTaskIndicator) {
+          await this.renderBackgroundTaskIndicatorIfNeeded(activeTabId);
+        }
+      },
+    );
   }
 
   private async syncBackgroundTaskTabsInBackground(): Promise<void> {
@@ -5731,28 +5730,25 @@ export class OpenCodianView extends ItemView {
       }
 
       const conversation = await this.plugin.getConversationById(tab.conversationId);
-      if (!conversation?.openCodeSessionId) {
-        continue;
-      }
-
-      runtime.isConversationSyncInFlight = true;
-      try {
-        const previousFingerprint = runtime.lastConversationSyncFingerprint
-          ?? this.getConversationSyncFingerprint(conversation.messages);
-        const syncResult = await this.syncConversationMessagesFromServer(
-          conversation,
-          tab.id,
-          'background-tab-sync',
-        );
-        await this.backgroundTaskPostSyncCoordinator.handleBackgroundTabSyncComplete({
+      await this.conversationSyncRuntimeCoordinator.runTabConversationSync(
+        {
           tabId: tab.id,
           conversation,
-          previousFingerprint,
-          syncResult,
-        });
-      } finally {
-        runtime.isConversationSyncInFlight = false;
-      }
+        },
+        async ({ tabId: syncedTabId, conversation: syncedConversation, previousFingerprint }) => {
+          const syncResult = await this.syncConversationMessagesFromServer(
+            syncedConversation,
+            syncedTabId,
+            'background-tab-sync',
+          );
+          await this.backgroundTaskPostSyncCoordinator.handleBackgroundTabSyncComplete({
+            tabId: syncedTabId,
+            conversation: syncedConversation,
+            previousFingerprint,
+            syncResult,
+          });
+        },
+      );
     }
   }
 
