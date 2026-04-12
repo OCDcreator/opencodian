@@ -32,6 +32,6 @@ export function buildTrailingAssistantPatchFooterFinalizationDecisionSourceContr
 
 ## 与其他模块的关系
 
-- `ConversationRenderService` 现在把 execution-tail planning-context 与 `host.assistantTailRender.getBodySignature()` 交给这里，不再手工读取前后正文签名
+- `TrailingAssistantPatchFooterFinalizationExecutionTailDecisionHelper` 现在把 execution-tail planning-context 与 `getBodySignature()` 交给这里，不再让更高层直接读取前后正文签名
 - `TrailingAssistantPatchFooterFinalizationDecisionHelper` 继续消费这里返回的 source，并纯比较前后正文签名是否相等
 - `TrailingAssistantPatchExecutionTailPlanningContextHelper` 继续提供这里读取所需的 `previousTailMessage` / `nextTailMessage`

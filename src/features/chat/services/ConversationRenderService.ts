@@ -19,15 +19,14 @@ import {
   buildTrailingAssistantPatchSkippedDebugPlanningContext,
 } from './TrailingAssistantPatchDebugLoggingContextHelper';
 import {
-  buildTrailingAssistantPatchFooterFinalizationDecisionSourceContract,
-} from './TrailingAssistantPatchFooterFinalizationDecisionSourceContractHelper';
-import { shouldFinalizeTrailingAssistantFooterOnly } from './TrailingAssistantPatchFooterFinalizationDecisionHelper';
-import {
   type TrailingAssistantPatchExecutionPlan,
 } from './TrailingAssistantPatchExecutionPlanHelper';
 import {
   buildTrailingAssistantPatchExecutionTailPlanningContext,
 } from './TrailingAssistantPatchExecutionTailPlanningContextHelper';
+import {
+  shouldFinalizeTrailingAssistantFooterOnlyFromExecutionTailPlanningContext,
+} from './TrailingAssistantPatchFooterFinalizationExecutionTailDecisionHelper';
 import {
   buildTrailingAssistantPatchExecutionPlanFromExecutionTailPlanningContext,
 } from './TrailingAssistantPatchExecutionTailExecutionPlanHelper';
@@ -621,12 +620,11 @@ export class ConversationRenderService {
   ): TrailingAssistantPatchSuccessPlan {
     const executionTailPlanningContext =
       buildTrailingAssistantPatchExecutionTailPlanningContext(planningContext);
-    const shouldFinalizeFooterOnly = shouldFinalizeTrailingAssistantFooterOnly(
-      buildTrailingAssistantPatchFooterFinalizationDecisionSourceContract({
+    const shouldFinalizeFooterOnly =
+      shouldFinalizeTrailingAssistantFooterOnlyFromExecutionTailPlanningContext({
         planningContext: executionTailPlanningContext,
         getBodySignature: (message) => this.host.assistantTailRender.getBodySignature(message),
-      }),
-    );
+      });
 
     return buildTrailingAssistantPatchSuccessPlanFromChildPlans({
       executionPlan: buildTrailingAssistantPatchExecutionPlanFromExecutionTailPlanningContext({
