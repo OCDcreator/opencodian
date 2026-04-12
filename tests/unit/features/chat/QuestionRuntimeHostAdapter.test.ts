@@ -5,6 +5,7 @@ import type {
 } from '../../../../src/core/types';
 import { setLocale } from '../../../../src/i18n';
 import { StreamingInlineCardRenderer } from '../../../../src/features/chat/runtime/StreamingInlineCardRenderer';
+import { QuestionDockQueueRuntimeFacade } from '../../../../src/features/chat/services/QuestionDockQueueRuntimeFacade';
 import { QuestionPendingRefreshRuntimeFacade } from '../../../../src/features/chat/services/QuestionPendingRefreshRuntimeFacade';
 import { QuestionPostResolutionRuntimeFacade } from '../../../../src/features/chat/services/QuestionPostResolutionRuntimeFacade';
 import {
@@ -196,7 +197,13 @@ describe('QuestionRuntimeHostAdapter', () => {
     const pendingRefreshRuntimeFacade = new QuestionPendingRefreshRuntimeFacade(
       hosts.pendingRefreshRuntimeHost,
     );
+    const dockQueueRuntimeFacade = new QuestionDockQueueRuntimeFacade(
+      hosts.dockQueueRuntimeHost,
+    );
     pendingRefreshRuntimeFacade.markQuestionRequestResolved(request.id, 'tab-active');
+    dockQueueRuntimeFacade.getOrCreateQuestionWaiter(request.id, 'tab-active');
+    dockQueueRuntimeFacade.enqueuePendingQuestionRequest(request, 'tab-active', 'single');
+    dockQueueRuntimeFacade.removePendingQuestionRequest(request.id, 'tab-active');
     await postResolutionRuntimeFacade.followUpAfterResolution('tab-active');
 
     expect(viewHost.keepQuestionCardPinnedToBottom).toHaveBeenCalledWith('tab-active');

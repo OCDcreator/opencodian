@@ -11,7 +11,7 @@
 - 在 refresh 快照缺失时保留仍由上方 dock waiter 持有的 request，避免提交/拒绝中的 UI 被短暂服务端快照抹掉
 - 统一维护 `pendingQuestionRequests`、draft answers、active group/index 与 resolved-id pruning，避免 coordinator 在 refresh 分支里直接铺开多组 runtime map 操作
 
-它不负责向 OpenCode 拉取 pending question、按 session 过滤、dock DOM render、回答/拒绝请求，或 resolve 后的 status/sync follow-up；这些仍分别留给 `QuestionDockCoordinator`、`QuestionDock`、question API 与 `QuestionPostResolutionRuntimeFacade`。
+它不负责向 OpenCode 拉取 pending question、按 session 过滤、dock DOM render、dock waiter 生命周期、回答/拒绝请求，或 resolve 后的 status/sync follow-up；这些仍分别留给 `QuestionDockCoordinator`、`QuestionDock`、`QuestionDockQueueRuntimeFacade`、question API 与 `QuestionPostResolutionRuntimeFacade`。
 
 ## 公开接口
 
@@ -35,10 +35,10 @@ export class QuestionPendingRefreshRuntimeFacade {
 
 - `applyRefreshedPendingQuestionRequests()` 接收已经按 session 过滤过的 request 列表，再统一执行 resolved-id 过滤、waiter-owned request 合并、draft answer normalization 与 stale draft/group/index pruning
 - `markQuestionRequestResolved()` 只写入本地 suppression set，等待下一次 pending refresh 时压制服务端尚未清理的 request
-- `clearPendingQuestionState()` 清空 pending requests、resolved ids、draft answers、active group/index 与 waiter map，用于 tab/session 切换或显式清理
+- `clearPendingQuestionState()` 清空 pending requests、resolved ids、draft answers、active group/index 与 waiter map，用于 tab/session 切换或显式清理；其中 waiter map 的创建/resolve 生命周期由 `QuestionDockQueueRuntimeFacade` 负责，本 facade 只在 refresh/clear 时读写整体集合
 
 ## 与 `OpenCodianView` 的边界
 
 - `QuestionRuntimeHostAdapter` 负责从共享 `QuestionRuntimeViewHost` 派生本 facade 所需的 runtime host；`OpenCodianView` 不需要暴露额外的 question-refresh 专属 helper
-- `QuestionDockCoordinator` 继续负责 question API fetch、session 过滤、attention/render 决策与 dock resolution flow，但 pending refresh 期间的 runtime map 读写现在委托给本 facade
+- `QuestionDockCoordinator` 继续负责 question API fetch、session 过滤、attention/render 决策与 dock resolution flow；dock queue 的 waiter/enqueue/remove runtime 读写由 `QuestionDockQueueRuntimeFacade` 承接，pending refresh 期间的 resolved-state / stale-state 读写由本 facade 承接
 - `QuestionResolutionFlowCoordinator` 仍经由 `QuestionDockCoordinator.markQuestionRequestResolved()` 标记 inline fallback resolution；底层 suppression set 写入由本 facade 承接

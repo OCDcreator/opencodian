@@ -1,6 +1,7 @@
 import type { QuestionRequest } from '../../../core/types';
 import type { TabId } from '../tabs';
 import { normalizeQuestionDraftAnswers } from '../ui/questionDockState';
+import type { QuestionDockQueueDeferredRequest } from './QuestionDockQueueRuntimeFacade';
 
 export interface QuestionPendingRefreshRuntimeState {
   pendingQuestionRequests: QuestionRequest[];
@@ -8,7 +9,7 @@ export interface QuestionPendingRefreshRuntimeState {
   questionDraftAnswers: Map<string, string[][]>;
   questionActiveGroupKeys: Map<string, string>;
   questionActiveIndexes: Map<string, number>;
-  questionRequestWaiters: Pick<Map<string, unknown>, 'keys' | 'clear'>;
+  questionRequestWaiters: Map<string, QuestionDockQueueDeferredRequest>;
 }
 
 export interface QuestionPendingRefreshRuntimeFacadeHost {

@@ -16,6 +16,11 @@ import type { StreamingInlineCardRenderer } from '../runtime/StreamingInlineCard
 import type { TabId } from '../tabs';
 import type { QuestionDock } from '../ui/QuestionDock';
 import {
+  QuestionDockQueueRuntimeFacade,
+  type QuestionDockQueueRuntimeFacadeHost,
+  type QuestionDockQueueRuntimeState,
+} from './QuestionDockQueueRuntimeFacade';
+import {
   QuestionDockCoordinator,
   type QuestionDockCoordinatorHost,
   type QuestionDockCoordinatorRuntimeState,
@@ -23,6 +28,7 @@ import {
 import {
   QuestionPendingRefreshRuntimeFacade,
   type QuestionPendingRefreshRuntimeFacadeHost,
+  type QuestionPendingRefreshRuntimeState,
 } from './QuestionPendingRefreshRuntimeFacade';
 import {
   QuestionPostResolutionRuntimeFacade,
@@ -38,6 +44,8 @@ type QuestionResolutionApplyPort = Pick<QuestionResolutionCoordinator, 'applyRes
 
 export interface QuestionRuntimeState
   extends QuestionDockCoordinatorRuntimeState,
+    QuestionDockQueueRuntimeState,
+    QuestionPendingRefreshRuntimeState,
     QuestionInlineCardRuntimeState,
     QuestionResolutionCoordinatorRuntimeState {}
 
@@ -69,6 +77,7 @@ export interface QuestionRuntimeHosts {
   inlineCardRendererHost: QuestionInlineCardRendererHost;
   resolutionCoordinatorHost: QuestionResolutionCoordinatorHost;
   dockCoordinatorHost: QuestionDockCoordinatorHost;
+  dockQueueRuntimeHost: QuestionDockQueueRuntimeFacadeHost;
   pendingRefreshRuntimeHost: QuestionPendingRefreshRuntimeFacadeHost;
   postResolutionRuntimeHost: QuestionPostResolutionRuntimeFacadeHost;
 }
@@ -101,7 +110,6 @@ export function createQuestionRuntimeHosts(
     },
     dockCoordinatorHost: {
       getTabRuntimeState: (tabId: TabId | null) => viewHost.getTabRuntimeState(tabId),
-      ensureTabRuntimeState: (tabId: TabId | null) => viewHost.ensureTabRuntimeState(tabId),
       getActiveTabId: () => viewHost.getActiveTabId(),
       getCurrentConversationSessionId: () => viewHost.getCurrentConversationSessionId(),
       getSessionIdForTab: (tabId: TabId | null) => viewHost.getSessionIdForTab(tabId),
@@ -118,6 +126,10 @@ export function createQuestionRuntimeHosts(
       applyResolvedQuestionState: (resolution, tabId) => {
         resolutionCoordinator.applyResolvedQuestionState(resolution, tabId);
       },
+    },
+    dockQueueRuntimeHost: {
+      getTabRuntimeState: (tabId: TabId | null) => viewHost.getTabRuntimeState(tabId),
+      ensureTabRuntimeState: (tabId: TabId | null) => viewHost.ensureTabRuntimeState(tabId),
     },
     pendingRefreshRuntimeHost: {
       getTabRuntimeState: (tabId: TabId | null) => viewHost.getTabRuntimeState(tabId),
@@ -159,6 +171,9 @@ export function createQuestionRuntimeServices(
     inlineCardRenderer,
     hosts.resolutionCoordinatorHost,
   );
+  const dockQueueRuntimeFacade = new QuestionDockQueueRuntimeFacade(
+    hosts.dockQueueRuntimeHost,
+  );
   const pendingRefreshRuntimeFacade = new QuestionPendingRefreshRuntimeFacade(
     hosts.pendingRefreshRuntimeHost,
   );
@@ -167,6 +182,7 @@ export function createQuestionRuntimeServices(
   );
   const dockCoordinator = new QuestionDockCoordinator(
     hosts.dockCoordinatorHost,
+    dockQueueRuntimeFacade,
     pendingRefreshRuntimeFacade,
     postResolutionRuntimeFacade,
   );

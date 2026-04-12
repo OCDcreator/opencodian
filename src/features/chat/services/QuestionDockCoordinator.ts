@@ -6,6 +6,9 @@ import { createLogger } from '../../../shared';
 import type { TabId } from '../tabs';
 import type { QuestionDock, QuestionDockCallbacks } from '../ui/QuestionDock';
 import type {
+  QuestionDockQueueRuntimeFacade,
+} from './QuestionDockQueueRuntimeFacade';
+import type {
   QuestionPendingRefreshRuntimeFacade,
   QuestionPendingRefreshRuntimeState,
 } from './QuestionPendingRefreshRuntimeFacade';
@@ -19,14 +22,13 @@ import {
 
 const logger = createLogger('QuestionDockCoordinator');
 
-interface DeferredQuestionRequest {
-  promise: Promise<void>;
-  resolve: () => void;
-}
-
 type QuestionPostResolutionRuntimePort = Pick<
   QuestionPostResolutionRuntimeFacade,
   'followUpAfterResolution'
+>;
+type QuestionDockQueueRuntimePort = Pick<
+  QuestionDockQueueRuntimeFacade,
+  'enqueuePendingQuestionRequest' | 'getOrCreateQuestionWaiter' | 'removePendingQuestionRequest'
 >;
 type QuestionPendingRefreshRuntimePort = Pick<
   QuestionPendingRefreshRuntimeFacade,
@@ -39,18 +41,15 @@ type QuestionPendingRefreshRuntimePort = Pick<
 export interface QuestionDockCoordinatorRuntimeState {
   isStreaming: boolean;
   pendingQuestionRequests: QuestionPendingRefreshRuntimeState['pendingQuestionRequests'];
-  resolvedQuestionRequestIds: QuestionPendingRefreshRuntimeState['resolvedQuestionRequestIds'];
   questionDraftAnswers: QuestionPendingRefreshRuntimeState['questionDraftAnswers'];
   questionActiveGroupKeys: QuestionPendingRefreshRuntimeState['questionActiveGroupKeys'];
   questionActiveIndexes: QuestionPendingRefreshRuntimeState['questionActiveIndexes'];
-  questionRequestWaiters: Map<string, DeferredQuestionRequest>;
 }
 
 type QuestionDockPort = Pick<QuestionDock, 'render'>;
 
 export interface QuestionDockCoordinatorHost {
   getTabRuntimeState(tabId: TabId | null): QuestionDockCoordinatorRuntimeState | null;
-  ensureTabRuntimeState(tabId: TabId | null): QuestionDockCoordinatorRuntimeState | null;
   getActiveTabId(): TabId | null;
   getCurrentConversationSessionId(): string | null | undefined;
   getSessionIdForTab(tabId: TabId | null): string | null | undefined;
@@ -76,6 +75,7 @@ const EMPTY_DOCK_CALLBACKS: QuestionDockCallbacks = {
 export class QuestionDockCoordinator {
   constructor(
     private readonly host: QuestionDockCoordinatorHost,
+    private readonly dockQueueRuntime: QuestionDockQueueRuntimePort,
     private readonly pendingRefreshRuntime: QuestionPendingRefreshRuntimePort,
     private readonly postResolutionRuntime: QuestionPostResolutionRuntimePort,
   ) {}
@@ -297,63 +297,19 @@ export class QuestionDockCoordinator {
   private getOrCreateQuestionWaiter(
     requestId: string,
     tabId: TabId | null = this.host.getActiveTabId(),
-  ): DeferredQuestionRequest | null {
-    const runtime = this.host.getTabRuntimeState(tabId);
-    if (!runtime) {
-      return null;
-    }
-
-    const existing = runtime.questionRequestWaiters.get(requestId);
-    if (existing) {
-      return existing;
-    }
-
-    let resolve = () => {};
-    const promise = new Promise<void>((resolver) => {
-      resolve = resolver;
-    });
-    const waiter = { promise, resolve };
-    runtime.questionRequestWaiters.set(requestId, waiter);
-    return waiter;
-  }
-
-  private resolveQuestionWaiter(
-    requestId: string,
-    tabId: TabId | null = this.host.getActiveTabId(),
-  ): void {
-    const runtime = this.host.getTabRuntimeState(tabId);
-    const waiter = runtime?.questionRequestWaiters.get(requestId);
-    if (!waiter) {
-      return;
-    }
-
-    waiter.resolve();
-    runtime?.questionRequestWaiters.delete(requestId);
+  ) {
+    return this.dockQueueRuntime.getOrCreateQuestionWaiter(requestId, tabId);
   }
 
   private enqueuePendingQuestionRequest(
     request: QuestionRequest,
     tabId: TabId | null = this.host.getActiveTabId(),
   ): void {
-    const runtime = this.host.ensureTabRuntimeState(tabId);
-    if (!runtime) {
-      return;
-    }
-
-    if (!runtime.pendingQuestionRequests.some((item) => item.id === request.id)) {
-      runtime.pendingQuestionRequests = [...runtime.pendingQuestionRequests, request];
-    }
-
-    this.getQuestionDraftAnswers(request, tabId);
-
-    const answers = this.getQuestionDraftAnswers(request, tabId);
-    if (!runtime.questionActiveGroupKeys.has(request.id)) {
-      const viewModel = buildQuestionDockViewModel(request, answers, {
-        displayMode: this.host.getQuestionDisplayMode(),
-      });
-      runtime.questionActiveGroupKeys.set(request.id, viewModel.activeGroupKey);
-      runtime.questionActiveIndexes.set(request.id, viewModel.activeQuestionIndex);
-    }
+    this.dockQueueRuntime.enqueuePendingQuestionRequest(
+      request,
+      tabId,
+      this.host.getQuestionDisplayMode(),
+    );
 
     if (tabId !== this.host.getActiveTabId()) {
       this.host.setTabNeedsAttention(tabId, true);
@@ -368,16 +324,7 @@ export class QuestionDockCoordinator {
     requestId: string,
     tabId: TabId | null = this.host.getActiveTabId(),
   ): void {
-    const runtime = this.host.getTabRuntimeState(tabId);
-    if (!runtime) {
-      return;
-    }
-
-    runtime.pendingQuestionRequests = runtime.pendingQuestionRequests.filter((request) => request.id !== requestId);
-    runtime.questionDraftAnswers.delete(requestId);
-    runtime.questionActiveGroupKeys.delete(requestId);
-    runtime.questionActiveIndexes.delete(requestId);
-    this.resolveQuestionWaiter(requestId, tabId);
+    const remainingRequests = this.dockQueueRuntime.removePendingQuestionRequest(requestId, tabId);
 
     if (tabId === this.host.getActiveTabId()) {
       this.host.setTabNeedsAttention(tabId, false);
@@ -385,7 +332,7 @@ export class QuestionDockCoordinator {
       return;
     }
 
-    this.host.setTabNeedsAttention(tabId, runtime.pendingQuestionRequests.length > 0);
+    this.host.setTabNeedsAttention(tabId, remainingRequests.length > 0);
   }
 
   private async handleQuestionDockSubmit(

@@ -1,9 +1,11 @@
 import type { QuestionDisplayMode, QuestionRequest } from '../../../../src/core/types';
 import { setLocale } from '../../../../src/i18n';
 import {
+  QuestionDockQueueRuntimeFacade,
+} from '../../../../src/features/chat/services/QuestionDockQueueRuntimeFacade';
+import {
   QuestionDockCoordinator,
   type QuestionDockCoordinatorHost,
-  type QuestionDockCoordinatorRuntimeState,
 } from '../../../../src/features/chat/services/QuestionDockCoordinator';
 import { QuestionPendingRefreshRuntimeFacade } from '../../../../src/features/chat/services/QuestionPendingRefreshRuntimeFacade';
 import type { QuestionPostResolutionRuntimeFacade } from '../../../../src/features/chat/services/QuestionPostResolutionRuntimeFacade';
@@ -12,6 +14,16 @@ import type {
   QuestionDockCallbacks,
   QuestionDockRenderState,
 } from '../../../../src/features/chat/ui/QuestionDock';
+
+interface TestRuntimeState {
+  isStreaming: boolean;
+  pendingQuestionRequests: QuestionRequest[];
+  resolvedQuestionRequestIds: Set<string>;
+  questionDraftAnswers: Map<string, string[][]>;
+  questionActiveGroupKeys: Map<string, string>;
+  questionActiveIndexes: Map<string, number>;
+  questionRequestWaiters: Map<string, { promise: Promise<void>; resolve: () => void }>;
+}
 
 type Mocked<T> = {
   [Key in keyof T]:
@@ -40,8 +52,8 @@ function createQuestionRequest(overrides?: Partial<QuestionRequest>): QuestionRe
 }
 
 function createRuntimeState(
-  overrides?: Partial<QuestionDockCoordinatorRuntimeState>,
-): QuestionDockCoordinatorRuntimeState {
+  overrides?: Partial<TestRuntimeState>,
+): TestRuntimeState {
   return {
     isStreaming: false,
     pendingQuestionRequests: [],
@@ -62,7 +74,7 @@ function createHost(options?: {
   sessionIdsByTab?: Record<string, string | null>;
 }) {
   const activeTabId = options?.activeTabId ?? 'tab-active';
-  const runtimeByTab = new Map<TabId, QuestionDockCoordinatorRuntimeState>([
+  const runtimeByTab = new Map<TabId, TestRuntimeState>([
     ['tab-active', createRuntimeState()],
   ]);
   const sessionIdsByTab = new Map<TabId, string | null>([
@@ -87,18 +99,6 @@ function createHost(options?: {
 
   const host: Mocked<QuestionDockCoordinatorHost> = {
     getTabRuntimeState: jest.fn((tabId) => (tabId ? runtimeByTab.get(tabId) ?? null : null)),
-    ensureTabRuntimeState: jest.fn((tabId) => {
-      if (!tabId) {
-        return null;
-      }
-      const existing = runtimeByTab.get(tabId);
-      if (existing) {
-        return existing;
-      }
-      const created = createRuntimeState();
-      runtimeByTab.set(tabId, created);
-      return created;
-    }),
     getActiveTabId: jest.fn().mockReturnValue(activeTabId),
     getCurrentConversationSessionId: jest.fn().mockReturnValue(
       options?.currentConversationSessionId ?? sessionIdsByTab.get(activeTabId ?? '') ?? null,
@@ -120,11 +120,27 @@ function createHost(options?: {
     followUpAfterResolution: jest.fn().mockResolvedValue(undefined),
   };
   const pendingRefreshRuntime = new QuestionPendingRefreshRuntimeFacade({
-    getTabRuntimeState: (tabId) => host.getTabRuntimeState(tabId),
+    getTabRuntimeState: (tabId) => (tabId ? runtimeByTab.get(tabId) ?? null : null),
+  });
+  const dockQueueRuntime = new QuestionDockQueueRuntimeFacade({
+    getTabRuntimeState: (tabId) => (tabId ? runtimeByTab.get(tabId) ?? null : null),
+    ensureTabRuntimeState: (tabId) => {
+      if (!tabId) {
+        return null;
+      }
+      const existing = runtimeByTab.get(tabId);
+      if (existing) {
+        return existing;
+      }
+      const created = createRuntimeState();
+      runtimeByTab.set(tabId, created);
+      return created;
+    },
   });
 
   return {
     host,
+    dockQueueRuntime,
     pendingRefreshRuntime,
     postResolutionRuntime,
     runtimeByTab,
@@ -154,6 +170,7 @@ describe('QuestionDockCoordinator', () => {
     const request = createQuestionRequest();
     const {
       host,
+      dockQueueRuntime,
       pendingRefreshRuntime,
       postResolutionRuntime,
       runtimeByTab,
@@ -162,6 +179,7 @@ describe('QuestionDockCoordinator', () => {
     } = createHost();
     const coordinator = new QuestionDockCoordinator(
       host,
+      dockQueueRuntime,
       pendingRefreshRuntime,
       postResolutionRuntime,
     );
@@ -195,7 +213,13 @@ describe('QuestionDockCoordinator', () => {
       id: 'request-background',
       sessionId: 'session-background',
     });
-    const { host, pendingRefreshRuntime, postResolutionRuntime, runtimeByTab } = createHost({
+    const {
+      host,
+      dockQueueRuntime,
+      pendingRefreshRuntime,
+      postResolutionRuntime,
+      runtimeByTab,
+    } = createHost({
       activeTabId: 'tab-active',
       sessionIdsByTab: {
         'tab-active': 'session-active',
@@ -214,6 +238,7 @@ describe('QuestionDockCoordinator', () => {
     host.getPendingQuestions.mockResolvedValueOnce([]);
     const coordinator = new QuestionDockCoordinator(
       host,
+      dockQueueRuntime,
       pendingRefreshRuntime,
       postResolutionRuntime,
     );
@@ -231,6 +256,7 @@ describe('QuestionDockCoordinator', () => {
       runtimeByTab,
       getLatestRenderState,
       host,
+      dockQueueRuntime,
       pendingRefreshRuntime,
       postResolutionRuntime,
     } = createHost({
@@ -239,6 +265,7 @@ describe('QuestionDockCoordinator', () => {
     runtimeByTab.get('tab-active')!.pendingQuestionRequests = [request];
     const coordinator = new QuestionDockCoordinator(
       host,
+      dockQueueRuntime,
       pendingRefreshRuntime,
       postResolutionRuntime,
     );
