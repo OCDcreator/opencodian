@@ -193,6 +193,7 @@ import type { ComposerContextPickerActionService } from './services/ComposerCont
 import {
   createComposerContextServices,
   type ComposerContextViewHost,
+  type FocusContextViewHost,
 } from './services/ComposerContextHostAdapter';
 import { ComposerContextRuntimeStore } from './services/ComposerContextRuntimeStore';
 import { ContextAttachmentBuilder } from './services/ContextAttachmentBuilder';
@@ -1102,6 +1103,7 @@ export class OpenCodianView extends ItemView {
       contextAttachmentBuilder: this.contextAttachmentBuilder,
       contextFileCatalogService: this.contextFileCatalogService,
       viewHost: this.createComposerContextViewHost(),
+      focusViewHost: this.createFocusContextViewHost(),
     });
     this.composerContextRuntimeStore = composerContextServices.runtimeStore;
     this.composerContextActionService = composerContextServices.actionService;
@@ -1293,14 +1295,7 @@ export class OpenCodianView extends ItemView {
     return {
       getActiveTabId: () => this.getActiveTabId(),
       getTabRuntimeState: (tabId) => this.getTabRuntimeState(tabId),
-      getCurrentConversationNotePath: () => this.currentConversation?.currentNote ?? null,
-      setCurrentConversationNotePath: (path) => {
-        if (this.currentConversation) {
-          this.currentConversation.currentNote = path;
-        }
-      },
       getActiveMarkdownView: () => this.getActiveMarkdownView(),
-      isComposerInteractionFocused: () => this.isComposerInteractionFocused(),
       getInputContainer: () => this.inputContainer,
       registerEvent: (eventRef) => {
         this.registerEvent(eventRef);
@@ -1308,6 +1303,18 @@ export class OpenCodianView extends ItemView {
       registerDomEvent: (target, type, callback, options) => {
         this.registerDomEvent(target, type, callback, options);
       },
+    };
+  }
+
+  private createFocusContextViewHost(): FocusContextViewHost {
+    return {
+      getCurrentConversationNotePath: () => this.currentConversation?.currentNote ?? null,
+      setCurrentConversationNotePath: (path) => {
+        if (this.currentConversation) {
+          this.currentConversation.currentNote = path;
+        }
+      },
+      isComposerInteractionFocused: () => this.isComposerInteractionFocused(),
     };
   }
 

@@ -5,7 +5,6 @@ import type { ComposerContextActionServiceHost } from './ComposerContextActionSe
 import type { ComposerContextChipActionServiceHost } from './ComposerContextChipActionService';
 import type { ComposerContextCoordinatorHost } from './ComposerContextCoordinator';
 import type { ComposerContextPickerActionServiceHost } from './ComposerContextPickerActionService';
-import type { FocusContextRuntimeServiceHost } from './FocusContextRuntimeService';
 export type { ComposerContextRuntimeState } from './ComposerContextRuntimeStore';
 
 export interface ComposerContextChipActionHostOptions {
@@ -19,11 +18,6 @@ export interface ComposerContextActionHostOptions {
 export interface ComposerContextPickerActionHostOptions {
   beginContextPickerInteraction(): void;
   completeContextPickerInteraction(): void;
-}
-
-export interface ComposerContextFocusRuntimeHostOptions {
-  getCurrentConversationNotePath(): string | null;
-  isComposerInteractionFocused(): boolean;
 }
 
 export class ComposerContextViewHostAdapter {
@@ -79,19 +73,6 @@ export class ComposerContextViewHostAdapter {
       completeContextPickerInteraction: () => {
         options.completeContextPickerInteraction();
       },
-    };
-  }
-
-  createFocusContextRuntimeServiceHost(
-    options: ComposerContextFocusRuntimeHostOptions,
-  ): FocusContextRuntimeServiceHost {
-    return {
-      getCurrentConversationNotePath: () => options.getCurrentConversationNotePath(),
-      getFocusContextPreview: () => this.runtimeStore.getFocusContextPreview(),
-      setFocusContextPreview: (preview) => {
-        this.runtimeStore.setFocusContextPreview(preview);
-      },
-      isComposerInteractionFocused: () => options.isComposerInteractionFocused(),
     };
   }
 }
