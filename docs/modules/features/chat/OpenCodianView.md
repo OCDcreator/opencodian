@@ -132,7 +132,7 @@ interface TabRuntimeState {
 - 在必要时调用 `syncConversationMessagesFromServer()`
 - 装载阶段进入 hydration：先重建历史 turn / inline background task，再等待后续 authoritative message sync 决定是否允许 stale 降级
 - 重新渲染消息、背景任务指示器、todo dock、question dock
-- 通过 `ConversationSyncHostAdapter` 组装 `ConversationSyncRuntimeCoordinator` / `ConversationSyncOrchestrationService` / `ConversationSyncBridge`，并刷新 2 秒一次的 conversation sync loop 生命周期
+- 通过 `ConversationSyncHostAdapter` 组装 `ConversationSyncRuntimeCoordinator` / `ConversationSyncOrchestrationService` / `ConversationSyncBridge`，并通过 `ConversationSyncEventAdapter` 接入 session sync event 订阅与 cleanup 生命周期
 - 更新模型显示和 context usage
 
 后台同步分两路：
@@ -142,13 +142,15 @@ interface TabRuntimeState {
 
 `OpenCodianView` 现在只提供一份 `ConversationSyncViewHost`；真正把这份 view-state / render bridge 适配成 runtime/orchestration/bridge 三组 host 的层，是 `ConversationSyncHostAdapter`。这样 sync service bundle 的 wiring 不再散落在 view 构造函数里。
 
+session sync event 的入口也不再由 view 自己持有 `subscribeToSessionSyncEvents()` / dispose 状态：`ConversationSyncEventAdapter` 会接管 OpenCodeService listener 生命周期、session→tab 匹配，以及 active-tab fallback，然后再把真正的 signal sync 调度交回 `ConversationSyncOrchestrationService`。
+
 signal sync 与后台轮询里的 loop lifecycle、signal debounce、tab / conversation 选择、conversation 加载和 dispatch 编排现在先交给 `ConversationSyncOrchestrationService`。它会判断 signal 是否应回到当前可见会话，或转向 hidden tab sync；会把同一 tab 上短时间内连续到达的 signal reason 合并；轮询时也只会在确实存在 visible/background sync 目标时持有 interval，并只枚举非活动、仍有 background task、且 runtime 当前允许同步的 tab。
 
 真正把 visible/signal/background 三条 sync 回调装配到一起的层现在是 `ConversationSyncBridge`：它会把 orchestration 的 dispatch 回调统一接到 server sync、fingerprint commit 和 post-sync coordinator，再把真正依赖当前 DOM/render host 的 `applySyncedConversationUpdate()` / `renderBackgroundTaskIndicatorIfNeeded()` 留在 view。hidden-tab 与 active-tab 同步入口仍通过 `ConversationSyncRuntimeCoordinator` 统一处理 tab runtime guard、`isConversationSyncInFlight` 生命周期，以及 per-tab fingerprint baseline 判定。
 
 其中当前活动 tab 的后台同步收尾会把 question refresh、todo/status live refresh、active-conversation match 判定，以及 `currentConversationRevertState` / active-tab sync fingerprint 的 state commit 委托给 `BackgroundTaskPostSyncCoordinator`；`ConversationSyncBridge` 负责把这些 post-sync outcome 路由回 view，`OpenCodianView` 只保留 `applySyncedConversationUpdate()` / `renderBackgroundTaskIndicatorIfNeeded()` 这类真正依赖当前 DOM/render host 的路径。
 
-除此之外，`subscribeToSessionSyncEvents()` 现在还会接入 `message.updated`、`message.part.updated` 和 `session.diff`，并先交给 `ConversationSyncOrchestrationService` 做 debounce/dispatch，用于提前触发当前会话或后台 tab 的 authoritative sync，而不是只能等 2 秒轮询。
+除此之外，`ConversationSyncEventAdapter` 现在会接入 `message.updated`、`message.part.updated` 和 `session.diff`，先按 session 匹配 tab，再交给 `ConversationSyncOrchestrationService` 做 debounce/dispatch，用于提前触发当前会话或后台 tab 的 authoritative sync，而不是只能等 2 秒轮询。
 
 ### 消息区重渲编排
 

@@ -17,7 +17,6 @@ import {
 } from '../../core/config/modelConfig';
 import {
   type SessionActivityStatus,
-  type SessionSyncEventUpdate,
 } from '../../core/opencode';
 import {
   getThemePresetDefinition,
@@ -167,6 +166,10 @@ import {
 import {
   ConversationSyncRuntimeCoordinator,
 } from './services/ConversationSyncRuntimeCoordinator';
+import {
+  type ConversationSyncEventAdapterHost,
+  ConversationSyncEventAdapter,
+} from './services/ConversationSyncEventAdapter';
 import {
   createConversationSyncServices,
   type ConversationSyncViewHost,
@@ -682,6 +685,7 @@ export class OpenCodianView extends ItemView {
   private conversationSyncOrchestrationService: ConversationSyncOrchestrationService;
   private conversationSyncRuntimeCoordinator: ConversationSyncRuntimeCoordinator;
   private conversationSyncBridge: ConversationSyncBridge;
+  private conversationSyncEventAdapter: ConversationSyncEventAdapter;
   private conversationViewStateService: ConversationViewStateService;
   private conversationRenderService: ConversationRenderService;
   private messageSendPreparationService: MessageSendPreparationService;
@@ -696,7 +700,6 @@ export class OpenCodianView extends ItemView {
   private omoBackgroundTaskLogStates = new Map<string, OmoBackgroundTaskLogState>();
   private disposeSessionTodoSubscription: (() => void) | null = null;
   private disposeSessionStatusSubscription: (() => void) | null = null;
-  private disposeSessionSyncEventSubscription: (() => void) | null = null;
   private lastKnownMarkdownFilePath: string | null = null;
   private contextFileCatalogCache: ContextFileCatalog | null = null;
   private contextFileCatalogBuildPromise: Promise<ContextFileCatalog> | null = null;
@@ -1313,15 +1316,6 @@ export class OpenCodianView extends ItemView {
     );
   }
 
-  private subscribeToSessionSyncEvents(): void {
-    this.disposeSessionSyncEventSubscription?.();
-    this.disposeSessionSyncEventSubscription = this.plugin.openCodeService.subscribeToSessionSyncEvents(
-      (update) => {
-        void this.applySessionSyncEventUpdate(update);
-      },
-    );
-  }
-
   private applySessionTodoUpdate(sessionId: string, todos: SessionTodo[]): void {
     const tabs = this.tabManager?.getAllTabs() ?? [];
     const conversations = new Map(this.plugin.getConversations().map((conversation) => [conversation.id, conversation]));
@@ -1363,41 +1357,6 @@ export class OpenCodianView extends ItemView {
     if (!matched && this.currentConversation?.openCodeSessionId === sessionId) {
       this.setTabSessionStatus(this.getActiveTabId(), status, sessionId);
       this.reconcileBackgroundTaskStateFromLiveSignals(this.getActiveTabId());
-    }
-  }
-
-  private getTabIdsForSession(sessionId: string): TabId[] {
-    const tabs = this.tabManager?.getAllTabs() ?? [];
-    const conversations = new Map(this.plugin.getConversations().map((conversation) => [conversation.id, conversation]));
-
-    return tabs
-      .filter((tab) => {
-        const conversation = tab.conversationId ? conversations.get(tab.conversationId) : null;
-        return conversation?.openCodeSessionId === sessionId;
-      })
-      .map((tab) => tab.id);
-  }
-
-  private async applySessionSyncEventUpdate(update: SessionSyncEventUpdate): Promise<void> {
-    const matchedTabIds = this.getTabIdsForSession(update.sessionId);
-    const activeTabId = this.getActiveTabId();
-    if (
-      matchedTabIds.length === 0
-      && this.currentConversation?.openCodeSessionId === update.sessionId
-      && activeTabId
-    ) {
-      matchedTabIds.push(activeTabId);
-    }
-
-    for (const tabId of matchedTabIds) {
-      const runtime = this.getTabRuntimeState(tabId);
-      if (!runtime) {
-        continue;
-      }
-
-      if (update.type === 'message.updated' || update.type === 'message.part.updated' || update.type === 'session.diff') {
-        this.scheduleConversationSyncFromSignal(tabId, update.type);
-      }
     }
   }
 
@@ -1701,6 +1660,9 @@ export class OpenCodianView extends ItemView {
     this.conversationSyncRuntimeCoordinator = conversationSyncServices.runtimeCoordinator;
     this.conversationSyncOrchestrationService = conversationSyncServices.orchestrationService;
     this.conversationSyncBridge = conversationSyncServices.bridge;
+    this.conversationSyncEventAdapter = new ConversationSyncEventAdapter(
+      this.createConversationSyncEventAdapterHost(),
+    );
     this.backgroundTaskCompletionNoticeService = new BackgroundTaskCompletionNoticeService(
       this.createBackgroundTaskCompletionNoticeServiceHost(),
     );
@@ -1852,6 +1814,20 @@ export class OpenCodianView extends ItemView {
         this.applySyncedConversationUpdate(previousMessages, nextMessages),
       renderBackgroundTaskIndicatorIfNeeded: (tabId) =>
         this.renderBackgroundTaskIndicatorIfNeeded(tabId),
+    };
+  }
+
+  private createConversationSyncEventAdapterHost(): ConversationSyncEventAdapterHost {
+    return {
+      subscribeToSessionSyncEvents: (listener) =>
+        this.plugin.openCodeService.subscribeToSessionSyncEvents(listener),
+      getAllTabs: () => this.tabManager?.getAllTabs() ?? [],
+      getConversations: () => this.plugin.getConversations(),
+      getCurrentConversation: () => this.currentConversation,
+      getActiveTabId: () => this.getActiveTabId(),
+      scheduleConversationSyncFromSignal: (tabId, reason) => {
+        this.scheduleConversationSyncFromSignal(tabId, reason);
+      },
     };
   }
 
@@ -2358,7 +2334,7 @@ export class OpenCodianView extends ItemView {
     this.startRetainedSelectionPolling();
     this.subscribeToSessionTodoUpdates();
     this.subscribeToSessionStatusUpdates();
-    this.subscribeToSessionSyncEvents();
+    this.conversationSyncEventAdapter.start();
 
     await this.initializeFirstTab();
   }
@@ -2419,8 +2395,7 @@ export class OpenCodianView extends ItemView {
     this.disposeSessionTodoSubscription = null;
     this.disposeSessionStatusSubscription?.();
     this.disposeSessionStatusSubscription = null;
-    this.disposeSessionSyncEventSubscription?.();
-    this.disposeSessionSyncEventSubscription = null;
+    this.conversationSyncEventAdapter.stop();
     this.tabManager = null;
 
     // Cleanup event refs
