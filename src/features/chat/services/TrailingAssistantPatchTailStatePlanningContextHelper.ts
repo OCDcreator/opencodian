@@ -1,42 +1,24 @@
-import type { ChatMessage } from '../../../core/types';
-
-type TrailingAssistantPatchTailStateSourceFields = {
-  previousTailMessage: ChatMessage;
-  nextTailMessage: ChatMessage;
-  messageEl: HTMLElement;
-  shouldStickToBottom: boolean;
-};
-
-type TrailingAssistantPatchTailStateInputs = Omit<
-  TrailingAssistantPatchTailStateSourceFields,
-  'previousTailMessage'
->;
+import {
+  buildTrailingAssistantPatchTailStatePlanningContextInputs,
+  type TrailingAssistantPatchTailStatePlanningContextInputs,
+  type TrailingAssistantPatchTailStatePlanningContextInputsSource,
+} from './TrailingAssistantPatchTailStatePlanningContextInputsHelper';
 
 export type TrailingAssistantPatchTailStatePlanningContextSource =
-  TrailingAssistantPatchTailStateSourceFields;
+  TrailingAssistantPatchTailStatePlanningContextInputsSource;
 export type TrailingAssistantPatchTailStatePlanningContext =
-  TrailingAssistantPatchTailStateInputs;
+  TrailingAssistantPatchTailStatePlanningContextInputs;
 
 export function buildTrailingAssistantPatchTailStatePlanningContext(
   source: TrailingAssistantPatchTailStatePlanningContextSource,
 ): TrailingAssistantPatchTailStatePlanningContext {
   return buildTrailingAssistantPatchTailStatePlanningContextFromInputs(
-    buildTrailingAssistantPatchTailStateInputs(source),
+    buildTrailingAssistantPatchTailStatePlanningContextInputs(source),
   );
 }
 
-function buildTrailingAssistantPatchTailStateInputs(
-  source: TrailingAssistantPatchTailStatePlanningContextSource,
-): TrailingAssistantPatchTailStateInputs {
-  return {
-    nextTailMessage: source.nextTailMessage,
-    messageEl: source.messageEl,
-    shouldStickToBottom: source.shouldStickToBottom,
-  };
-}
-
 function buildTrailingAssistantPatchTailStatePlanningContextFromInputs(
-  inputs: TrailingAssistantPatchTailStateInputs,
+  inputs: TrailingAssistantPatchTailStatePlanningContextInputs,
 ): TrailingAssistantPatchTailStatePlanningContext {
   return {
     nextTailMessage: inputs.nextTailMessage,
