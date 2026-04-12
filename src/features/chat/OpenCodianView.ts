@@ -265,7 +265,8 @@ import {
 import type { QuestionTodoStatusRefreshCoordinator } from './services/QuestionTodoStatusRefreshCoordinator';
 import {
   createQuestionTodoBackgroundTaskRefreshServices,
-  type QuestionTodoBackgroundTaskRefreshViewHost,
+  createQuestionTodoBackgroundTaskRefreshViewHostAdapter,
+  type QuestionTodoBackgroundTaskRefreshViewHostAdapterHost,
 } from './services/QuestionTodoBackgroundTaskRefreshHostAdapter';
 import {
   isElementNearBottom,
@@ -1128,7 +1129,15 @@ export class OpenCodianView extends ItemView {
       questionTodoStatusRefreshCoordinator,
       backgroundTaskPostSyncCoordinator,
     } = createQuestionTodoBackgroundTaskRefreshServices(
-      this.createQuestionTodoBackgroundTaskRefreshViewHost(),
+      createQuestionTodoBackgroundTaskRefreshViewHostAdapter({
+        viewHost: this.createQuestionTodoBackgroundTaskRefreshViewHostAdapterHost(),
+        getQuestionDockCoordinator: () => this.questionDockCoordinator,
+        getSessionTodoStateService: () => this.sessionTodoStateService,
+        getSessionTodoStatusRefreshService: () => this.sessionTodoStatusRefreshService,
+        getBackgroundTaskIndicatorCoordinator: () => this.backgroundTaskIndicatorCoordinator,
+        getBackgroundTaskLiveSignalCoordinator: () => this.backgroundTaskLiveSignalCoordinator,
+        getTabRuntimeStateBridge: () => this.tabRuntimeStateBridge,
+      }),
     );
     this.questionTodoStatusRefreshCoordinator = questionTodoStatusRefreshCoordinator;
     this.backgroundTaskPostSyncCoordinator = backgroundTaskPostSyncCoordinator;
@@ -1356,24 +1365,12 @@ export class OpenCodianView extends ItemView {
     };
   }
 
-  private createQuestionTodoBackgroundTaskRefreshViewHost(): QuestionTodoBackgroundTaskRefreshViewHost {
+  private createQuestionTodoBackgroundTaskRefreshViewHostAdapterHost(): QuestionTodoBackgroundTaskRefreshViewHostAdapterHost {
     return {
       getCurrentConversation: () => this.currentConversation,
       getTabRuntimeState: (tabId: TabId | null) => this.getTabRuntimeState(tabId),
-      hasIncompleteTodos: (todos) => this.hasIncompleteTodos(todos),
-      refreshPendingQuestionsForTab: (tabId, sessionId) =>
-        this.questionDockCoordinator.refreshPendingQuestionsForTab(tabId, sessionId),
-      refreshTabSessionStatus: (tabId, sessionId, options) =>
-        this.sessionTodoStatusRefreshService.refreshTabSessionStatus(tabId, sessionId, options),
-      refreshTabSessionTodos: (tabId, sessionId, options) =>
-        this.sessionTodoStatusRefreshService.refreshTabSessionTodos(tabId, sessionId, options),
       syncBackgroundTaskStateFromConversation: (conversation, tabId) => {
         this.syncBackgroundTaskStateFromConversation(conversation, tabId);
-      },
-      refreshBackgroundTaskCompletionNotices: (tabId, conversation) =>
-        this.backgroundTaskIndicatorCoordinator.queueAndFlushCompletionNotices(tabId, conversation),
-      syncTabStreamLikeState: (tabId) => {
-        this.syncTabStreamLikeState(tabId);
       },
       setCurrentConversationRevertState: (revertState) => {
         this.currentConversationRevertState = revertState;
@@ -1384,10 +1381,6 @@ export class OpenCodianView extends ItemView {
           runtime.lastConversationSyncFingerprint = fingerprint;
         }
       },
-      markBackgroundTaskAuthoritativeSync: (tabId, reason) => {
-        this.markBackgroundTaskAuthoritativeSync(tabId, reason);
-      },
-      setTabNeedsAttention: (tabId, needsAttention) => this.setTabNeedsAttention(tabId, needsAttention),
     };
   }
 

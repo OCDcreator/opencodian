@@ -7,6 +7,7 @@
 
 `QuestionTodoBackgroundTaskRefreshHostAdapter` 把 `OpenCodianView` 里剩余的 question / todo / background-task post-sync host factory 与 service bundle 装配集中到一个模块，专门负责：
 
+- 从更窄的 `QuestionTodoBackgroundTaskRefreshViewHostAdapterHost` 加上 late-bound coordinator / service / bridge ports 组合出完整 `QuestionTodoBackgroundTaskRefreshViewHost`
 - 从单一 `QuestionTodoBackgroundTaskRefreshViewHost` 派生 `QuestionTodoStatusRefreshCoordinator`、`PostSyncQuestionTodoRefreshFacade`、`BackgroundTaskPostSyncCoordinator` 三段链路需要的 host 回调
 - 让 activation/post-sync 共享的 question/todo refresh、background-task rebuild/completion follow-up，以及 visible sync state-commit/attention 判定复用同一份 view bridge
 - 在不改变既有 post-sync 语义的前提下，把这组三段 P2 wiring 从 `OpenCodianView` 构造函数与分散 host factory 中迁走
@@ -16,6 +17,16 @@
 ## 公开接口
 
 ```typescript
+export interface QuestionTodoBackgroundTaskRefreshViewHostAdapterHost {
+  getCurrentConversation(): Conversation | null;
+  getTabRuntimeState(tabId: TabId | null): QuestionTodoStatusRefreshRuntime | null;
+  syncBackgroundTaskStateFromConversation(...): void;
+  setCurrentConversationRevertState(...): void;
+  setTabConversationSyncFingerprint(...): void;
+}
+
+export function createQuestionTodoBackgroundTaskRefreshViewHostAdapter(...): QuestionTodoBackgroundTaskRefreshViewHost;
+
 export interface QuestionTodoBackgroundTaskRefreshViewHost {
   getCurrentConversation(): Conversation | null;
   getTabRuntimeState(tabId: TabId | null): QuestionTodoStatusRefreshRuntime | null;
@@ -40,6 +51,8 @@ export function createQuestionTodoBackgroundTaskRefreshServices(...): QuestionTo
 
 ### shared host assembly
 
+- `createQuestionTodoBackgroundTaskRefreshViewHostAdapter()` 把 view-local state/read-write 落点与 question dock、session todo state/status refresh、background-task indicator/live-signal、tab runtime bridge 这些 late-bound ports 组合成完整 view host
+- late-bound getter 让 adapter 可以在 `OpenCodianView` 构造期提前创建 post-sync service bundle，同时仍安全引用稍后才初始化的 background-task / tab runtime collaborators
 - `createQuestionTodoBackgroundTaskRefreshHosts()` 从同一份 view host 派生三组 host，避免 `OpenCodianView` 继续维护三段闭包工厂
 - `PostSyncQuestionTodoRefreshFacade` 所需的当前 conversation session 与 `BackgroundTaskPostSyncCoordinator` 所需的当前 conversation id，都从同一份 `getCurrentConversation()` 推导
 - visible/background sync 之后的 rebuild、completion notice、stream-like writeback 与 revert-state/fingerprint/attention 写回，都继续通过单一 adapter 回落到 view
@@ -52,6 +65,6 @@ export function createQuestionTodoBackgroundTaskRefreshServices(...): QuestionTo
 
 ## 与 `OpenCodianView` 的边界
 
-- `OpenCodianView` 现在只提供一份 `QuestionTodoBackgroundTaskRefreshViewHost`，不再直接持有三段 host factory 与两次 service instantiation
+- `OpenCodianView` 现在只提供更窄的 `QuestionTodoBackgroundTaskRefreshViewHostAdapterHost` 与 collaborator getters，不再直接组装完整 `QuestionTodoBackgroundTaskRefreshViewHost`
 - `QuestionTodoStatusRefreshCoordinator`、`PostSyncQuestionTodoRefreshFacade` 与 `BackgroundTaskPostSyncCoordinator` 的业务边界保持不变
 - 这次切片推进的是 master plan 的 P2 `question / todo / background task` lane：继续削弱 `OpenCodianView` 对 question/todo/background-task post-sync wiring 的直接 ownership
