@@ -18,6 +18,9 @@ import {
   buildTrailingAssistantPatchSkippedDebugLoggingContext,
   buildTrailingAssistantPatchSkippedDebugPlanningContext,
 } from './TrailingAssistantPatchDebugLoggingContextHelper';
+import {
+  buildTrailingAssistantPatchFooterFinalizationDecisionSourceContract,
+} from './TrailingAssistantPatchFooterFinalizationDecisionSourceContractHelper';
 import { shouldFinalizeTrailingAssistantFooterOnly } from './TrailingAssistantPatchFooterFinalizationDecisionHelper';
 import {
   type TrailingAssistantPatchExecutionPlan,
@@ -626,16 +629,12 @@ export class ConversationRenderService {
   ): TrailingAssistantPatchSuccessPlanParts {
     const executionTailPlanningContext =
       buildTrailingAssistantPatchExecutionTailPlanningContext(planningContext);
-    const previousBodySignature = this.host.assistantTailRender.getBodySignature(
-      executionTailPlanningContext.previousTailMessage,
+    const shouldFinalizeFooterOnly = shouldFinalizeTrailingAssistantFooterOnly(
+      buildTrailingAssistantPatchFooterFinalizationDecisionSourceContract({
+        planningContext: executionTailPlanningContext,
+        getBodySignature: (message) => this.host.assistantTailRender.getBodySignature(message),
+      }),
     );
-    const nextBodySignature = this.host.assistantTailRender.getBodySignature(
-      executionTailPlanningContext.nextTailMessage,
-    );
-    const shouldFinalizeFooterOnly = shouldFinalizeTrailingAssistantFooterOnly({
-      previousBodySignature,
-      nextBodySignature,
-    });
 
     return {
       turnBodyScopePlan: buildTrailingAssistantPatchTurnBodyScopePlan(planningContext),
