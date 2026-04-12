@@ -101,6 +101,7 @@ docs/modules/
 │   │   │   ├── BackgroundTaskInlinePanelRenderer.md
 │   │   │   ├── BackgroundTaskStreamTriggerCoordinator.md
 │   │   │   ├── ConversationHydrationRenderBridge.md
+│   │   │   ├── ConversationTransitionBridge.md
 │   │   │   ├── PermissionInlineCardRenderer.md
 │   │   │   ├── QuestionInlineCardRenderer.md
 │   │   │   ├── QuestionResolutionCoordinator.md

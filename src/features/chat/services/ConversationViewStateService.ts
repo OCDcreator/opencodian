@@ -3,8 +3,8 @@ import {
   type Conversation,
   type PersistedTabState,
 } from '../../../core/types';
-import type { ConversationHydrationRenderPort } from '../runtime/ConversationHydrationRenderBridge';
 import type { TabViewActivationBridge } from '../runtime/TabViewActivationBridge';
+import type { ConversationTransitionPort } from '../runtime/ConversationTransitionBridge';
 import type { RestoredTabState, TabData, TabId } from '../tabs';
 
 export interface LoadConversationOptions {
@@ -41,13 +41,8 @@ export interface ConversationViewStateHost {
   applyStreamingConversationActivation(tabId: TabId, conversation: Conversation): Promise<void> | void;
   applyEmptyTabActivation(tabId: TabId): void;
 
-  prepareConversationTransition(nextConversationId: string): Promise<void>;
   applyLoadedConversationActivation(tabId: TabId | null, conversation: Conversation): void;
   setCurrentConversationRevertState(revertState: { messageID: string; partID?: string } | null): void;
-  clearScheduledScrollToBottom(): void;
-  beginConversationHydration(tabId: TabId | null): void;
-  clearMessagesContainer(): void;
-  resetTurnState(): void;
   shouldSyncConversationFromServer(conversation: Conversation, options: LoadConversationOptions): boolean;
   syncConversationMessagesFromServer(
     conversation: Conversation,
@@ -57,7 +52,6 @@ export interface ConversationViewStateHost {
   syncBackgroundTaskStateFromConversation(conversation: Conversation): void;
   renderMessages(messages: ChatMessage[]): Promise<void>;
   commitConversationSyncBaseline(messages: ChatMessage[]): void;
-  endConversationHydration(tabId: TabId | null): void;
 }
 
 type TabViewActivationPort =
@@ -70,7 +64,7 @@ export class ConversationViewStateService {
   constructor(
     private readonly host: ConversationViewStateHost,
     private readonly tabViewActivationBridge: TabViewActivationPort,
-    private readonly conversationHydrationRenderBridge: ConversationHydrationRenderPort,
+    private readonly conversationTransitionBridge: ConversationTransitionPort,
   ) {}
 
   async initializeFirstTab(): Promise<void> {
@@ -164,24 +158,20 @@ export class ConversationViewStateService {
     id: string,
     options: LoadConversationOptions = {},
   ): Promise<void> {
-    await this.host.prepareConversationTransition(id);
+    await this.conversationTransitionBridge.prepareLoadedConversationTransition(id);
 
     const conversation = await this.resolveConversation(id);
     if (!conversation) {
       return;
     }
 
-    const hydrationContext = this.conversationHydrationRenderBridge.captureHydrationContext(
+    const transitionContext = this.conversationTransitionBridge.captureLoadedConversationTransition(
       Boolean(options.preserveScrollPosition),
     );
-    const { activeTabId } = hydrationContext;
+    const { activeTabId } = transitionContext;
 
     this.host.applyLoadedConversationActivation(activeTabId, conversation);
-    this.host.clearScheduledScrollToBottom();
-    this.host.beginConversationHydration(activeTabId);
-    this.conversationHydrationRenderBridge.beginHydrationShell(hydrationContext);
-    this.host.clearMessagesContainer();
-    this.host.resetTurnState();
+    this.conversationTransitionBridge.beginLoadedConversationTransition(transitionContext);
 
     const shouldSyncFromServer = this.host.shouldSyncConversationFromServer(conversation, options);
 
@@ -204,10 +194,10 @@ export class ConversationViewStateService {
         conversation.openCodeSessionId,
       );
       this.host.commitConversationSyncBaseline(messages);
-      this.conversationHydrationRenderBridge.restoreHydrationShell(hydrationContext);
+      this.conversationTransitionBridge.restoreLoadedConversationTransition(transitionContext);
       await this.tabViewActivationBridge.applyLoadedConversationHydrationTail();
     } finally {
-      this.host.endConversationHydration(activeTabId);
+      this.conversationTransitionBridge.endLoadedConversationTransition(transitionContext);
     }
   }
 
