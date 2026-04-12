@@ -305,7 +305,7 @@ assistant notice card 的 tone / icon、OMO system-reminder 标题与 raw block�
 
 `renderMessage()` 根据消息类型分成三路：
 
-- `displayStyle === 'notice'` -> `renderNoticeCard()`
+- `displayStyle === 'notice'` -> `AssistantShellViewHostAdapter.renderPersistedAssistantNoticeMessage()`
 - `role === 'user'` -> `renderUserMessageContent()`
 - 其余 assistant -> `renderAssistantMessageContent()`
 

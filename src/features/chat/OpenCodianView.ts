@@ -5009,15 +5009,18 @@ export class OpenCodianView extends ItemView {
 
   /** Render a message */
   private async renderMessage(message: ChatMessage) {
-    const turn = message.role === 'user' && message.displayStyle !== 'notice'
+    if (message.displayStyle === 'notice') {
+      return this.assistantShellViewHostAdapter.renderPersistedAssistantNoticeMessage({
+        noticeMessage: message,
+      });
+    }
+
+    const turn = message.role === 'user'
       ? this.createTurn()
       : null;
-    const parentEl =
-      message.displayStyle === 'notice'
-        ? this.ensureTurnBody()
-        : message.role === 'user'
-          ? turn?.headerEl
-          : this.ensureTurnBody();
+    const parentEl = message.role === 'user'
+      ? turn?.headerEl
+      : this.ensureTurnBody();
     const messageEl = parentEl?.createDiv({
       cls: `opencodian-message opencodian-message--${message.role}`,
     });
@@ -5031,21 +5034,11 @@ export class OpenCodianView extends ItemView {
     if (message.sourceMessageId) {
       messageEl.dataset.sourceMessageId = message.sourceMessageId;
     }
-    if (message.displayStyle === 'notice') {
-      messageEl.removeClass('opencodian-message--user');
-      messageEl.addClass('opencodian-message--assistant');
-    }
 
     // Content container
     const content = messageEl.createDiv({ cls: 'opencodian-message-content' });
 
-    if (message.displayStyle === 'notice') {
-      await this.assistantShellViewHostAdapter.renderPersistedAssistantNotice({
-        messageEl,
-        contentEl: content,
-        noticeMessage: message,
-      });
-    } else if (message.role === 'user') {
+    if (message.role === 'user') {
       const copyContent = await this.renderUserMessageContent(content, message);
       this.addUserMessageFooter(messageEl, message, copyContent);
     } else {

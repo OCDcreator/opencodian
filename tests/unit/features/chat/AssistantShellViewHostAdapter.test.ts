@@ -69,32 +69,31 @@ describe('AssistantShellViewHostAdapter', () => {
     expect(runtime.streamingMessageEl).toBe(messageEl);
   });
 
-  it('renders persisted notices through the shared notice host', async () => {
+  it('creates and renders persisted notices through the shared notice host', async () => {
     const { adapter, renderNoticeCard, turnBody } = createAdapter();
-    const messageEl = turnBody.createDiv({
-      cls: 'opencodian-message opencodian-message--assistant',
-    });
-    const contentEl = messageEl.createDiv({ cls: 'opencodian-message-content' });
     const noticeMessage: ChatMessage = {
       id: 'assistant-notice-persisted-1',
       role: 'assistant',
       content: 'Model unavailable',
       timestamp: 22345,
       modelId: 'openai/gpt-5.4',
+      sourceMessageId: 'source-1',
       displayStyle: 'notice',
       noticeTitle: 'Need setup',
       noticeTone: 'warning',
     };
 
-    await adapter.renderPersistedAssistantNotice({
-      messageEl,
-      contentEl,
+    const messageEl = await adapter.renderPersistedAssistantNoticeMessage({
       noticeMessage,
     });
 
     expect(renderNoticeCard).toHaveBeenCalledWith(expect.any(HTMLElement), noticeMessage);
+    expect(turnBody.contains(messageEl)).toBe(true);
+    expect(messageEl.dataset.messageId).toBe('assistant-notice-persisted-1');
+    expect(messageEl.dataset.sourceMessageId).toBe('source-1');
+    expect(messageEl.classList.contains('opencodian-message--assistant')).toBe(true);
     expect(messageEl.classList.contains('opencodian-message--notice')).toBe(true);
-    expect(contentEl.querySelector('.opencodian-chat-notice-card')).not.toBeNull();
+    expect(messageEl.querySelector('.opencodian-chat-notice-card')).not.toBeNull();
     expect(messageEl.querySelector('.opencodian-message-time-row')?.textContent).toContain('gpt-5.4');
   });
 

@@ -65,15 +65,24 @@ export class AssistantShellViewHostAdapter {
     this.footerRenderer.finalizePseudoStreamFooter(messageEl, message);
   }
 
-  renderPersistedAssistantNotice(options: {
-    messageEl: HTMLElement;
-    contentEl: HTMLElement;
+  async renderPersistedAssistantNoticeMessage(options: {
     noticeMessage: ChatMessage;
-  }): Promise<void> {
-    return renderPersistedAssistantNotice({
-      host: this.createAssistantNoticeRenderHost(),
-      ...options,
+    tabId?: TabId | null;
+  }): Promise<HTMLElement> {
+    const { noticeMessage, tabId } = options;
+    const { messageEl, contentEl } = this.shellRenderer.createPersistedAssistantMessageElement({
+      message: noticeMessage,
+      tabId,
+      additionalClasses: ['opencodian-message--notice'],
     });
+
+    await this.renderPersistedAssistantNotice({
+      messageEl,
+      contentEl,
+      noticeMessage,
+    });
+
+    return messageEl;
   }
 
   renderStreamError(options: AssistantStreamErrorRenderOptions): void {
@@ -111,5 +120,16 @@ export class AssistantShellViewHostAdapter {
         this.host.setStreamingAssistantMessageVisibility(messageEl, visible, reason);
       },
     };
+  }
+
+  private renderPersistedAssistantNotice(options: {
+    messageEl: HTMLElement;
+    contentEl: HTMLElement;
+    noticeMessage: ChatMessage;
+  }): Promise<void> {
+    return renderPersistedAssistantNotice({
+      host: this.createAssistantNoticeRenderHost(),
+      ...options,
+    });
   }
 }

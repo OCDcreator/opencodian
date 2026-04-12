@@ -1,3 +1,4 @@
+import type { ChatMessage } from '../../../core/types';
 import type { TabId } from '../tabs';
 import type { SendPipelineStreamElements } from './SendPipelineTypes';
 
@@ -26,6 +27,12 @@ export interface AssistantShellTimestampOptions {
   content?: string;
   modelId?: string;
   statusLabel?: string;
+}
+
+export interface PersistedAssistantMessageShellOptions {
+  message: Pick<ChatMessage, 'id' | 'sourceMessageId'>;
+  tabId?: TabId | null;
+  additionalClasses?: string[];
 }
 
 export class AssistantShellRenderer {
@@ -58,6 +65,37 @@ export class AssistantShellRenderer {
       runtime.streamingContentEl = contentEl;
     }
 
+    return { messageEl, contentEl };
+  }
+
+  createPersistedAssistantMessageElement(
+    options: PersistedAssistantMessageShellOptions,
+  ): SendPipelineStreamElements {
+    const {
+      message,
+      tabId = this.host.getActiveTabId(),
+      additionalClasses = [],
+    } = options;
+    const classes = [
+      'opencodian-message',
+      'opencodian-message--assistant',
+      ...additionalClasses,
+    ].join(' ');
+    const messageEl = this.host.ensureTurnBody(tabId)?.createDiv({ cls: classes });
+
+    if (!messageEl) {
+      const fallback = document.createElement('div');
+      return { messageEl: fallback, contentEl: fallback };
+    }
+
+    messageEl.dataset.messageId = message.id;
+    if (message.sourceMessageId) {
+      messageEl.dataset.sourceMessageId = message.sourceMessageId;
+    } else {
+      delete messageEl.dataset.sourceMessageId;
+    }
+
+    const contentEl = messageEl.createDiv({ cls: 'opencodian-message-content' });
     return { messageEl, contentEl };
   }
 
