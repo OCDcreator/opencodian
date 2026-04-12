@@ -11,7 +11,7 @@
 - 处理 foreground busy、server readiness、model catalog 与 selected model availability 检查
 - 落地 optimistic user message，并保持现有 save / render / scroll 时序
 - 维持首条 user message 的 fallback title 与 AI title kickoff 条件
-- 在 stream 真正开始前，统一进入 streaming 状态并清理 pending edited files / draft context items
+- 在 stream 真正开始前，统一进入 streaming 状态并通过 composer send-context 端口清理 pending edited files / draft context items
 
 它不直接调用 `openCodeService.sendMessage()`，也不消费 stream chunk。真实的 stream 调用、chunk router、pending/timeout/interruption，以及 stream 结束后的 finalization 现在由 `runtime/SendPipelineRuntime.ts` / `MessageFinalizationService` 接手。
 
@@ -42,7 +42,7 @@ export class MessageSendPreparationService {
 ### optimistic bootstrap 时序
 
 - 先完成 server readiness 与 model availability 检查
-- 再构造 optimistic user message，并把 context items 映射成 `contextAttachments`
+- 再通过 `ComposerContextViewFacade.sendContext` 读取 context items，构造 optimistic user message，并把 context items 映射成 `contextAttachments`
 - 保持既有顺序：
   - reset / arm background task indicator
   - append 到 conversation
@@ -65,7 +65,7 @@ export class MessageSendPreparationService {
   - 开始 context usage stream
 - `completePreparedStreamStart()` 只负责：
   - 清空 pending edited files
-  - 清空 draft context items
+  - 通过 composer send-context 端口清空 draft context items
 
 这让发送子系统可以把“真正的 stream 调用”下沉到 `SendPipelineRuntime`，同时把 preparation 阶段的状态时序单独测住。
 
@@ -73,4 +73,5 @@ export class MessageSendPreparationService {
 
 - `SendPipelineRuntime` 负责真实 `sendMessage()` stream 调用与 chunk 消费
 - `MessageSendPreparationService` 只负责决定“能不能发、发之前先做什么、optimistic user message 是否已落地”
+- `MessageSendPreparationService` 只消费 `ComposerSendContextPort`，不需要知道完整 composer/context facade 的 action、picker、focus-preview 或 lifecycle 入口
 - `MessageFinalizationService` 继续负责 stream 结束之后的 final sync、patch/rerender、todo/save/attention 收尾

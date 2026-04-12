@@ -9,7 +9,7 @@
 
 - composer context actions（current note / selection / file picker）
 - context row 装配与 focus preview refresh
-- draft context items 的读取与清空
+- send-preparation 专用的 draft context 读取 / 清空端口
 - composer-context lifecycle 的启动与清理
 
 这样 `OpenCodianView` 更接近 host assembly，composer/context 的具体 service fan-out 收回到 services 目录。
@@ -22,9 +22,13 @@
 ## 公开接口
 
 ```typescript
-class ComposerContextViewFacade {
+interface ComposerSendContextPort {
   getDraftContextItems(tabId?: TabId | null): PromptContextItem[]
   clearDraftContextItems(tabId?: TabId | null): void
+}
+
+class ComposerContextViewFacade {
+  readonly sendContext: ComposerSendContextPort
   getActiveMarkdownView(): MarkdownView | null
   refreshActiveFocusContextPreview(): void
   setContextRowElement(contextRowEl: HTMLElement | null): void
@@ -43,7 +47,7 @@ class ComposerContextViewFacade {
 
 ### view-facing 收口
 
-- `getDraftContextItems()` / `clearDraftContextItems()` 继续复用 `ComposerContextRuntimeStore`
+- `sendContext.getDraftContextItems()` / `sendContext.clearDraftContextItems()` 继续复用 `ComposerContextRuntimeStore`，但只把发送前依赖暴露给 send-preparation
 - `setContextRowElement()` 只把 row-element 写给 `ComposerContextCoordinator`
 - `addChosenFileContextToActiveTab()` / `addCurrentNoteContextFromActiveEditor()` / `addSelectionContextFromActiveEditor()` 分别委托给现有 action service，不改动 picker、chips 或 retained-selection 行为
 - `refreshActiveFocusContextPreview()` 与 `getActiveMarkdownView()` 保留 focus-preview/runtime 的窄入口，供 activation bridge 与 view helper 复用
@@ -52,5 +56,6 @@ class ComposerContextViewFacade {
 ## 注意事项
 
 - 这个 facade 是 view-facing seam，不应重新长回 `PromptContextItem` 构建、catalog mutation 或 retained-selection 算法
+- send-preparation 只应消费 `sendContext` 端口，避免重新依赖完整 composer facade
 - 新增 composer/context 入口时，优先判断是否属于现有 facade 的 host-facing职责；若需要多个内部 service 协作，再考虑继续下沉到 services 层
 - 若未来其它 runtime bridge 只需要 focus-preview refresh 端口，可直接复用 facade，而不必重新把 `FocusContextPreviewCoordinator` 暴露给 `OpenCodianView`

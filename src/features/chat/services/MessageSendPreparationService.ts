@@ -6,6 +6,7 @@ import type {
 import type { EffortLevel, ThinkingBudget } from '../../../core/types/settings';
 import { buildContextAttachment } from '../../../shared';
 import type { TabId } from '../tabs';
+import type { ComposerSendContextPort } from './ComposerContextViewFacade';
 
 export type SendPreparationServerAvailability =
   'checking'
@@ -56,7 +57,7 @@ export interface MessageSendPreparationHost {
   ensureTabRuntime(tabId: TabId | null): boolean;
   isTabForegroundBusy(tabId: TabId | null): boolean;
   notifyForegroundBusy(): void;
-  getDraftContextItems(tabId: TabId | null): PromptContextItem[];
+  composerSendContext: ComposerSendContextPort;
   getServerAvailability(): Promise<SendPreparationServerAvailability>;
   refreshServerStatusBadge(): Promise<void>;
   ensureServerReadyForChat(
@@ -86,7 +87,6 @@ export interface MessageSendPreparationHost {
   syncTabStreamLikeState(tabId: TabId | null): void;
   beginTabContextUsageStream(tabId: TabId | null): void;
   clearPendingEditedFiles(tabId: TabId | null): void;
-  clearDraftContextItems(tabId: TabId | null): void;
 }
 
 export class MessageSendPreparationService {
@@ -110,7 +110,7 @@ export class MessageSendPreparationService {
       return null;
     }
 
-    const draftContextItems = this.host.getDraftContextItems(tabId);
+    const draftContextItems = this.host.composerSendContext.getDraftContextItems(tabId);
     const availability = await this.host.getServerAvailability();
     await this.host.refreshServerStatusBadge();
     if (availability !== 'running' && availability !== 'external') {
@@ -171,7 +171,7 @@ export class MessageSendPreparationService {
 
   completePreparedStreamStart(tabId: TabId | null): void {
     this.host.clearPendingEditedFiles(tabId);
-    this.host.clearDraftContextItems(tabId);
+    this.host.composerSendContext.clearDraftContextItems(tabId);
   }
 
   private isFirstUserMessage(conversation: Conversation): boolean {

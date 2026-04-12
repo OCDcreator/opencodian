@@ -139,7 +139,7 @@ describe('ComposerContextHostAdapter', () => {
     expect(result).toBe(true);
     expect(viewHost.getActiveMarkdownView).toHaveBeenCalledTimes(1);
     expect(contextAttachmentBuilder.buildCurrentNoteContextItem).toHaveBeenCalledWith(activeView);
-    expect(services.viewFacade.getDraftContextItems()).toEqual([currentNoteItem]);
+    expect(services.viewFacade.sendContext.getDraftContextItems()).toEqual([currentNoteItem]);
     expect(contextRowEl.querySelectorAll('.opencodian-composer-context-chip')).toHaveLength(1);
     expect(contextRowEl.textContent).toContain('notes/current.md');
   });
@@ -196,6 +196,6 @@ describe('ComposerContextHostAdapter', () => {
     expect(pointerDownSpy).toHaveBeenCalledTimes(1);
     expect(refreshSpy).toHaveBeenCalledTimes(1);
     expect(contextAttachmentBuilder.buildFileContextItem).toHaveBeenCalledWith(file, 'file');
-    expect(services.viewFacade.getDraftContextItems()).toEqual([fileItem]);
+    expect(services.viewFacade.sendContext.getDraftContextItems()).toEqual([fileItem]);
   });
 });

@@ -36,6 +36,11 @@ type FocusContextPreviewPort = Pick<
   'refreshActiveFocusContextPreview'
 >;
 
+export interface ComposerSendContextPort {
+  getDraftContextItems(tabId?: TabId | null): PromptContextItem[];
+  clearDraftContextItems(tabId?: TabId | null): void;
+}
+
 export interface ComposerContextViewFacadeDependencies {
   runtimeStore: ComposerContextRuntimeStorePort;
   actionService: ComposerContextActionPort;
@@ -47,15 +52,18 @@ export interface ComposerContextViewFacadeDependencies {
 }
 
 export class ComposerContextViewFacade {
-  constructor(private readonly dependencies: ComposerContextViewFacadeDependencies) {}
+  readonly sendContext: ComposerSendContextPort;
 
-  getDraftContextItems(tabId?: TabId | null): PromptContextItem[] {
-    return this.dependencies.runtimeStore.getDraftContextItems(tabId);
+  constructor(private readonly dependencies: ComposerContextViewFacadeDependencies) {
+    this.sendContext = {
+      getDraftContextItems: (tabId?: TabId | null) =>
+        this.dependencies.runtimeStore.getDraftContextItems(tabId),
+      clearDraftContextItems: (tabId?: TabId | null) => {
+        this.dependencies.runtimeStore.clearDraftContextItems(tabId);
+      },
+    };
   }
 
-  clearDraftContextItems(tabId?: TabId | null): void {
-    this.dependencies.runtimeStore.clearDraftContextItems(tabId);
-  }
 
   getActiveMarkdownView(): MarkdownView | null {
     return this.dependencies.focusContextRuntimeService.getActiveMarkdownView();

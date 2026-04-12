@@ -1921,7 +1921,7 @@ export class OpenCodianView extends ItemView {
       notifyForegroundBusy: () => {
         new Notice(t('chat.tab.processingBlocked'));
       },
-      getDraftContextItems: (tabId) => this.composerContextViewFacade.getDraftContextItems(tabId),
+      composerSendContext: this.composerContextViewFacade.sendContext,
       getServerAvailability: () => this.getServerAvailability(),
       refreshServerStatusBadge: () => this.refreshServerStatusBadge(),
       ensureServerReadyForChat: (availability) => this.ensureServerReadyForChat(availability),
@@ -1971,9 +1971,6 @@ export class OpenCodianView extends ItemView {
       },
       clearPendingEditedFiles: (tabId) => {
         this.getTabRuntimeState(tabId)?.pendingEditedFiles.clear();
-      },
-      clearDraftContextItems: (tabId) => {
-        this.composerContextViewFacade.clearDraftContextItems(tabId);
       },
     };
   }

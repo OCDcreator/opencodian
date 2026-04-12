@@ -38,9 +38,18 @@ function createPromptContextItem(overrides: Partial<PromptContextItem> = {}): Pr
 
 type MockedMessageSendPreparationHost = {
   [Key in keyof MessageSendPreparationHost]:
-    MessageSendPreparationHost[Key] extends (...args: infer Args) => infer Result
+    Key extends 'composerSendContext'
+      ? MockedComposerSendContextPort
+      : MessageSendPreparationHost[Key] extends (...args: infer Args) => infer Result
+        ? jest.Mock<Result, Args>
+        : MessageSendPreparationHost[Key];
+};
+
+type MockedComposerSendContextPort = {
+  [Key in keyof MessageSendPreparationHost['composerSendContext']]:
+    MessageSendPreparationHost['composerSendContext'][Key] extends (...args: infer Args) => infer Result
       ? jest.Mock<Result, Args>
-      : MessageSendPreparationHost[Key];
+      : MessageSendPreparationHost['composerSendContext'][Key];
 };
 
 function createHost(
@@ -56,7 +65,12 @@ function createHost(
     notifyForegroundBusy: jest.fn().mockImplementation(() => {
       callOrder.push('notifyForegroundBusy');
     }),
-    getDraftContextItems: jest.fn().mockReturnValue([]),
+    composerSendContext: {
+      getDraftContextItems: jest.fn().mockReturnValue([]),
+      clearDraftContextItems: jest.fn().mockImplementation(() => {
+        callOrder.push('clearDraftContextItems');
+      }),
+    },
     getServerAvailability: jest.fn().mockResolvedValue('running'),
     refreshServerStatusBadge: jest.fn().mockResolvedValue(undefined),
     ensureServerReadyForChat: jest.fn().mockResolvedValue(true),
@@ -117,9 +131,6 @@ function createHost(
     }),
     clearPendingEditedFiles: jest.fn().mockImplementation(() => {
       callOrder.push('clearPendingEditedFiles');
-    }),
-    clearDraftContextItems: jest.fn().mockImplementation(() => {
-      callOrder.push('clearDraftContextItems');
     }),
     ...overrides,
   };
@@ -209,7 +220,12 @@ describe('MessageSendPreparationService', () => {
     const conversation = createConversation();
     const contextItem = createPromptContextItem();
     const host = createHost(conversation, callOrder, {
-      getDraftContextItems: jest.fn().mockReturnValue([contextItem]),
+      composerSendContext: {
+        getDraftContextItems: jest.fn().mockReturnValue([contextItem]),
+        clearDraftContextItems: jest.fn().mockImplementation(() => {
+          callOrder.push('clearDraftContextItems');
+        }),
+      },
       shouldGenerateAiTitle: jest.fn().mockReturnValue(true),
     });
     const service = new MessageSendPreparationService(host);
