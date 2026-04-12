@@ -8,13 +8,15 @@ import {
   TabViewActivationBridge,
   type TabViewActivationBridgeHost,
 } from '../../../../src/features/chat/runtime/TabViewActivationBridge';
+import type { ActiveTabContextUsageCoordinator } from '../../../../src/features/chat/services/ActiveTabContextUsageCoordinator';
+import type { BackgroundTaskActivationIndicatorCoordinator } from '../../../../src/features/chat/services/BackgroundTaskActivationIndicatorCoordinator';
 import type { TabConversationActivationBridge } from '../../../../src/features/chat/runtime/TabConversationActivationBridge';
 import type { ConversationTransitionPort, LoadedConversationTransitionContext } from '../../../../src/features/chat/runtime/ConversationTransitionBridge';
 import {
   type ConversationViewStateHost,
   ConversationViewStateService,
 } from '../../../../src/features/chat/services/ConversationViewStateService';
-import type { QuestionTodoStatusRefreshCoordinator } from '../../../../src/features/chat/services/QuestionTodoStatusRefreshCoordinator';
+import type { QuestionTodoActivationRefreshCoordinator } from '../../../../src/features/chat/services/QuestionTodoActivationRefreshCoordinator';
 import { TabManager } from '../../../../src/features/chat/tabs/TabManager';
 
 function createConversation(id: string, title = `Chat ${id}`) {
@@ -63,29 +65,45 @@ function createTabConversationActivationBridge(): MockedTabConversationActivatio
 
 function createActivationBridge() {
   const refreshCoordinator: jest.Mocked<Pick<
-    QuestionTodoStatusRefreshCoordinator,
-    'refreshAfterActivation'
+    QuestionTodoActivationRefreshCoordinator,
+    'applyActivationPreflight' | 'applyConversationActivation' | 'applyEmptyActivation'
   >> = {
-    refreshAfterActivation: jest.fn().mockResolvedValue(undefined),
+    applyActivationPreflight: jest.fn(),
+    applyConversationActivation: jest.fn(),
+    applyEmptyActivation: jest.fn(),
+  };
+  const backgroundTaskCoordinator: jest.Mocked<Pick<
+    BackgroundTaskActivationIndicatorCoordinator,
+    'renderLoadedConversationIndicator'
+  >> = {
+    renderLoadedConversationIndicator: jest.fn().mockResolvedValue(undefined),
+  };
+  const contextUsageCoordinator: jest.Mocked<Pick<
+    ActiveTabContextUsageCoordinator,
+    'syncIdentity' | 'refreshFromServer'
+  >> = {
+    syncIdentity: jest.fn(),
+    refreshFromServer: jest.fn().mockResolvedValue(undefined),
   };
   const host: jest.Mocked<TabViewActivationBridgeHost> = {
     setActiveMessagesPane: jest.fn(),
     refreshActiveFocusContextPreview: jest.fn(),
-    renderQuestionDock: jest.fn(),
-    updateSessionTodoDockForTab: jest.fn(),
-    renderSessionTodoDock: jest.fn(),
-    renderBackgroundTaskIndicatorIfNeeded: jest.fn().mockResolvedValue(undefined),
     scheduleComposerLayoutSync: jest.fn(),
     updateModelSelectorDisplay: jest.fn(),
-    syncActiveTabContextUsageIdentity: jest.fn(),
-    refreshActiveTabContextUsageFromServer: jest.fn().mockResolvedValue(undefined),
     updateSendButtonState: jest.fn(),
   };
 
   return {
-    bridge: new TabViewActivationBridge(host, refreshCoordinator),
+    bridge: new TabViewActivationBridge(
+      host,
+      refreshCoordinator,
+      backgroundTaskCoordinator,
+      contextUsageCoordinator,
+    ),
     host,
     refreshCoordinator,
+    backgroundTaskCoordinator,
+    contextUsageCoordinator,
   };
 }
 

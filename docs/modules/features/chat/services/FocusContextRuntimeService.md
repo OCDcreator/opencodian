@@ -5,11 +5,11 @@
 
 ## 概述
 
-`FocusContextRuntimeService` 把 `OpenCodianView` 里的 focus context preview、活动 MarkdownView 回退查找，以及 retained-selection handoff/highlight/polling 运行态收束到一个单一职责 service。workspace / vault / composer 事件注册现在进一步由 `ComposerContextEventBridge` 接管，而 active-tab preview state host 则由 `ComposerContextViewHostAdapter` 提供，因此这个 service 更集中于 editor-runtime 自身的 preview 与 highlight 协调。
+`FocusContextRuntimeService` 把 `OpenCodianView` 里的 focus context preview 与活动 MarkdownView 回退查找收束到 editor-runtime service。workspace / vault / composer 事件注册现在由 `ComposerContextEventBridge` 接管，而 retained-selection handoff/highlight 细节则进一步下沉到 `RetainedSelectionHighlightService`，因此这里更专注于 preview 计算、活动 MarkdownView 解析与 retained-selection polling 编排。
 
 ## 导入关系
 
-上游: `obsidian`（`MarkdownView`）、`shared/logger`、`utils/editorSelectionHighlight`、`composerContext`
+上游: `obsidian`（`MarkdownView`）、`composerContext`、`RetainedSelectionHighlightService`
 下游: `OpenCodianView`
 
 ## 公开接口
@@ -51,17 +51,17 @@ class FocusContextRuntimeService {
 
 ### retained selection 协调
 
-- service 同时捕获 CodeMirror offsets 和 DOM `Range[]`，优先保留质量更高的 capture
-- composer focus 内优先显示 CodeMirror 装饰高亮；拿不到 offsets 时，再退回 CSS Highlight API 的 DOM range 高亮
-- polling、pointer handoff grace、focusin/focusout follow-up 和 cleanup 都集中在这个 service，不再散落在 view 内
+- `FocusContextRuntimeService` 仍负责 retained-selection polling 与 active editor 取样时机
+- pointer handoff grace、capture-quality 比较、CodeMirror/DOM highlight 显示与 cleanup 已下沉到 `RetainedSelectionHighlightService`
+- 因而 preview retain 规则继续由 `resolveFocusContextPreview()` 驱动，但具体 retained-selection runtime 不再与 MarkdownView fallback 逻辑混在同一个类里
 
 ## 与其他模块的交互
 
 - **OpenCodianView**：提供当前会话 note path 与 composer focus gate
 - **ComposerContextViewHostAdapter**：提供 active-tab focus preview 的读写 host，并把 runtime state 写回限制在活动 tab seam 内
 - **ComposerContextEventBridge**：桥接 workspace / vault / composer DOM 事件，并统一启动 polling 与关闭时的 `dispose()`
+- **RetainedSelectionHighlightService**：持有 retained-selection handoff/highlight state，并负责 CodeMirror/DOM 高亮 writeback
 - **composerContext**：提供 preview 结构和 selection-preview retain 规则
-- **editorSelectionHighlight**：负责真正把 retained selection 渲染成 CodeMirror 装饰
 - **ComposerContextCoordinator**：继续消费这里写回的 preview state，负责 chips 渲染与 preview attach/detach click 编排
 - **ContextAttachmentBuilder**：通过 `ComposerContextCoordinator` 消费最终的 `FocusContextPreview`，把 preview attach 成 `PromptContextItem`
 
@@ -69,4 +69,4 @@ class FocusContextRuntimeService {
 
 - 不改变既有 focus preview 文案、selection line-range 语义或 retained highlight 的显示策略
 - `dispose()` 现在经由 `ComposerContextEventBridge` 在 view `onClose()` 时调用，避免轮询、timeout 和残留高亮泄漏
-- service 只管理 editor/runtime 侧的 focus context；附件构建留在 `ContextAttachmentBuilder`，chips 编排留在 `ComposerContextCoordinator`，active-tab preview state 写回则经由 `ComposerContextViewHostAdapter`
+- service 只管理 editor/runtime 侧的 focus context；附件构建留在 `ContextAttachmentBuilder`，chips 编排留在 `ComposerContextCoordinator`，retained-selection highlight 留在 `RetainedSelectionHighlightService`，active-tab preview state 写回则经由 `ComposerContextViewHostAdapter`
