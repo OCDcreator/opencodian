@@ -13,7 +13,7 @@
 - 为 inline panel 渲染和 completion notice queue 提供统一的 segment 视图
 - 为 OMO background-task diagnostics 提供稳定的 anchor / pending / completed 快照
 
-它不负责 stale/stopped notice 的内容与 suppression，也不直接渲染 inline panel DOM；这些仍分别由 `BackgroundTaskNoticeStateService` 和 `OpenCodianView` 承接。
+它不负责 stale/stopped notice 的内容与 suppression，也不直接渲染 inline panel DOM；这些现在分别由 `BackgroundTaskNoticeStateService` 和 `BackgroundTaskInlinePanelRenderer` 承接。
 
 ## 公开接口
 
@@ -58,7 +58,7 @@ export class BackgroundTaskTimelineService {
 
 ## 与 `OpenCodianView` 的边界
 
-- `OpenCodianView` 仍负责 inline panel 的真实 DOM 创建、位置挂载和 Markdown 渲染
+- `BackgroundTaskInlinePanelRenderer` 负责 inline panel 的真实 DOM 创建、位置挂载、Markdown 渲染与 mount 复用
 - `BackgroundTaskTimelineService` 负责 timeline 数据、runtime 重建、inline copy，以及 completion segment / diagnostics 快照
 - `BackgroundTaskLiveSignalCoordinator`、`BackgroundTaskPostSyncCoordinator`、`BackgroundTaskNoticeStateService` 和 `BackgroundTaskCompletionNoticeService` 继续分别负责 live-signal gate、post-sync orchestration、stale notice state、completion notice queue
 - 这让 P2 `question / todo / background task` lane 继续把 background-task 的核心 runtime ownership 从 `OpenCodianView` 迁到可单测服务，而不是继续把 timeline 逻辑留在主视图里

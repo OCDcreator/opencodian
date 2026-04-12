@@ -157,7 +157,7 @@ signal sync 与后台轮询里的 loop lifecycle、signal debounce、tab / conve
 
 其中当前活动 tab 的后台同步收尾会把 question refresh、todo/status live refresh、active-conversation match 判定，以及 `currentConversationRevertState` / active-tab sync fingerprint 的 state commit 委托给 `BackgroundTaskPostSyncCoordinator`；`ConversationSyncBridge` 负责把这些 post-sync outcome 路由回 view，`OpenCodianView` 只保留 `applySyncedConversationUpdate()` / `renderBackgroundTaskIndicatorIfNeeded()` 这类真正依赖当前 DOM/render host 的路径。
 
-background task 的 conversation-derived timeline rebuild 现在也不再由 view 自己内联实现：`syncBackgroundTaskStateFromConversation()`、completion-segment 收集，以及 inline notice copy 组装都转交给 `BackgroundTaskTimelineService`，view 只保留实际 DOM panel 渲染与 host bridge。
+background task 的 conversation-derived timeline rebuild 现在也不再由 view 自己内联实现：`syncBackgroundTaskStateFromConversation()`、completion-segment 收集，以及 inline notice copy 组装都转交给 `BackgroundTaskTimelineService`；inline panel 的 DOM 创建、挂载、复用与清理则转交给 `BackgroundTaskInlinePanelRenderer`，view 只保留这些 background-task helper 的 host bridge 与上层触发入口。
 
 除此之外，`ConversationSyncEventAdapter` 现在会接入 `message.updated`、`message.part.updated` 和 `session.diff`，先按 session 匹配 tab，再交给 `ConversationSyncOrchestrationService` 做 debounce/dispatch，用于提前触发当前会话或后台 tab 的 authoritative sync，而不是只能等 2 秒轮询。
 
@@ -338,7 +338,7 @@ model selector 现在拆成了几层协作：
 
 - session todo/status：OpenCode live listener 生命周期、session→tab 路由和 active-tab fallback 已下沉到 `services/ConversationSessionLiveSignalAdapter.ts`；normalized snapshot、status fingerprint、stale suppression 与 persisted notice 恢复继续由 `services/SessionTodoStateService.ts` 负责
 - question：既支持输入区上方的 `QuestionDock`，也支持由 `QuestionInlineCardRenderer` 管理的内联待回答卡片，以及由 `QuestionResolutionCoordinator` + `QuestionResolutionCardRenderer` 协作管理的已回答/已拒绝回顾卡片
-- background task：从 OMO 注入、`toolName === 'task'` 的 tool block、以及后续 system reminder 回写推导任务进度；运行态以内联状态条挂在对应 assistant turn 下，完成态则延迟落成持久化 notice；其中 timeline segment 推导、launch/completion runtime 重建、pending matching，以及 inline notice copy 组装已下沉到 `services/BackgroundTaskTimelineService.ts`，live-signal reconciliation 与 authoritative-sync gate runtime 已下沉到 `services/BackgroundTaskLiveSignalCoordinator.ts`，hidden signal/background-tab sync 以及 active visible-conversation background sync 后的 question refresh、todo/status refresh、completion notice queue/flush、attention 标记与 active-conversation match 判定编排已下沉到 `services/BackgroundTaskPostSyncCoordinator.ts`，stopped/stale warning notice 的 content、fingerprint、persisted dedupe 与 suppression 已下沉到 `services/BackgroundTaskNoticeStateService.ts`，completion notice 的 queued-state、fingerprint/content 与 persisted dedupe/flush 则下沉到 `services/BackgroundTaskCompletionNoticeService.ts`
+- background task：从 OMO 注入、`toolName === 'task'` 的 tool block、以及后续 system reminder 回写推导任务进度；运行态以内联状态条挂在对应 assistant turn 下，完成态则延迟落成持久化 notice；其中 timeline segment 推导、launch/completion runtime 重建、pending matching，以及 inline notice copy 组装已下沉到 `services/BackgroundTaskTimelineService.ts`，inline panel 的 DOM 创建/挂载/复用/清理已下沉到 `runtime/BackgroundTaskInlinePanelRenderer.ts`，live-signal reconciliation 与 authoritative-sync gate runtime 已下沉到 `services/BackgroundTaskLiveSignalCoordinator.ts`，hidden signal/background-tab sync 以及 active visible-conversation background sync 后的 question refresh、todo/status refresh、completion notice queue/flush、attention 标记与 active-conversation match 判定编排已下沉到 `services/BackgroundTaskPostSyncCoordinator.ts`，stopped/stale warning notice 的 content、fingerprint、persisted dedupe 与 suppression 已下沉到 `services/BackgroundTaskNoticeStateService.ts`，completion notice 的 queued-state、fingerprint/content 与 persisted dedupe/flush 则下沉到 `services/BackgroundTaskCompletionNoticeService.ts`
 - background task 的 stale 判定现在额外受 `backgroundTaskAwaitingAuthoritativeSync` / hydration 保护：reload 或首次装载后，只有在至少一次权威消息同步完成后，才允许把“仍在运行”降级成 stopped/stale notice；这段 gate + live-signal 决策现在集中在 `BackgroundTaskLiveSignalCoordinator`
 
 session todo 这条子链路现在的边界是：
@@ -349,8 +349,9 @@ session todo 这条子链路现在的边界是：
 
 background task notice 这条子链路现在的边界是：
 
-- `OpenCodianView`：inline panel DOM 渲染，以及 background-task service bundle 的 host bridge
+- `OpenCodianView`：background-task service bundle / inline-panel renderer 的 host bridge，以及上层触发入口
 - `BackgroundTaskTimelineService`：launch/completion timeline segment 推导、conversation→runtime rebuild、pending matching、completion segment 收集，与 inline copy 组装
+- `BackgroundTaskInlinePanelRenderer`：inline panel DOM 创建、位置挂载、Markdown 渲染、mount 复用与 active indicator element 清理
 - `BackgroundTaskLiveSignalCoordinator`：authoritative-sync gate arm/clear、live-signal reconciliation，以及 stale downgrade / reset 的运行时判定
 - `BackgroundTaskPostSyncCoordinator`：hidden signal/background-tab sync 与 active visible-conversation background sync 后的 question refresh、todo/status refresh、completion notice queue/flush、attention 标记，以及 visible sync 的 active-conversation match/state-commit 编排
 - `BackgroundTaskNoticeStateService`：stopped/stale notice content、fingerprint、persisted dedupe 与 suppression runtime 协调

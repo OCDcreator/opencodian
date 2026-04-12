@@ -123,6 +123,10 @@ import {
   buildQuestionResolutionCardRenderPlan,
 } from './runtime/QuestionResolutionCardRenderer';
 import {
+  type BackgroundTaskInlinePanelRendererHost,
+  BackgroundTaskInlinePanelRenderer,
+} from './runtime/BackgroundTaskInlinePanelRenderer';
+import {
   type StreamingInlineCardRendererHost,
   StreamingInlineCardRenderer,
 } from './runtime/StreamingInlineCardRenderer';
@@ -686,6 +690,7 @@ export class OpenCodianView extends ItemView {
   private messageFinalizationService: MessageFinalizationService;
   private assistantShellRenderer: AssistantShellRenderer;
   private persistedAssistantFooterFinalizer: PersistedAssistantFooterFinalizer;
+  private backgroundTaskInlinePanelRenderer: BackgroundTaskInlinePanelRenderer;
   private streamingInlineCardRenderer: StreamingInlineCardRenderer;
   private permissionInlineCardRenderer: PermissionInlineCardRenderer;
   private questionInlineCardRenderer: QuestionInlineCardRenderer;
@@ -1606,6 +1611,10 @@ export class OpenCodianView extends ItemView {
     this.backgroundTaskNoticeStateService = new BackgroundTaskNoticeStateService(
       this.createBackgroundTaskNoticeStateServiceHost(),
     );
+    this.backgroundTaskInlinePanelRenderer = new BackgroundTaskInlinePanelRenderer(
+      this.backgroundTaskTimelineService,
+      this.createBackgroundTaskInlinePanelRendererHost(),
+    );
     this.conversationViewStateService = new ConversationViewStateService(this.createConversationViewStateHost());
     this.conversationRenderService = new ConversationRenderService(this.createConversationRenderHost());
     this.messageSendPreparationService = new MessageSendPreparationService(this.createMessageSendPreparationHost());
@@ -1713,6 +1722,14 @@ export class OpenCodianView extends ItemView {
       },
       isSuppressedBackgroundTaskSegment: (segment, tabId, conversation) =>
         this.isSuppressedBackgroundTaskSegment(segment, tabId, conversation),
+    };
+  }
+
+  private createBackgroundTaskInlinePanelRendererHost(): BackgroundTaskInlinePanelRendererHost {
+    return {
+      getActiveTabId: () => this.getActiveTabId(),
+      getTabRuntimeState: (tabId: TabId | null) => this.getTabRuntimeState(tabId),
+      renderMarkdownInto: (container, markdown) => this.renderMarkdownInto(container, markdown),
     };
   }
 
@@ -6334,12 +6351,7 @@ export class OpenCodianView extends ItemView {
       return;
     }
 
-    runtime.backgroundTaskIndicatorEl?.remove();
-    runtime.backgroundTaskIndicatorEl = null;
-    for (const element of runtime.backgroundTaskInlineEls.values()) {
-      element.remove();
-    }
-    runtime.backgroundTaskInlineEls.clear();
+    this.backgroundTaskInlinePanelRenderer.clear(tabId);
     runtime.backgroundTaskStartedAt = null;
     runtime.backgroundTaskActiveAnchorKey = null;
     runtime.backgroundTaskModeTag = null;
@@ -6536,92 +6548,10 @@ export class OpenCodianView extends ItemView {
     }
 
     this.reconcileBackgroundTaskStateFromLiveSignals(tabId);
-    await this.renderInlineBackgroundTaskPanels(tabId);
+    await this.backgroundTaskInlinePanelRenderer.render(this.currentConversation, tabId);
     await this.queueBackgroundTaskCompletionNotices(tabId);
     await this.flushQueuedBackgroundTaskCompletionNotices(tabId);
     this.syncTabStreamLikeState(tabId);
-  }
-
-  private getBackgroundTaskInlineCopy(
-    segment: BackgroundTaskSegment,
-  ): { title: string; body: string; detail?: string; tasksMarkdown?: string } {
-    return this.backgroundTaskTimelineService.getInlineCopy(segment);
-  }
-
-  private async renderInlineBackgroundTaskPanels(
-    tabId: TabId | null = this.getActiveTabId(),
-    conversation: Conversation | null = this.currentConversation,
-  ): Promise<void> {
-    const runtime = this.getTabRuntimeState(tabId);
-    if (!runtime) {
-      return;
-    }
-
-    const segments = this.backgroundTaskTimelineService.collectInlineSegments(conversation, tabId);
-    const activeKeys = new Set(segments.map((segment) => segment.anchorKey));
-
-    for (const [anchorKey, element] of runtime.backgroundTaskInlineEls.entries()) {
-      if (activeKeys.has(anchorKey)) {
-        continue;
-      }
-      element.remove();
-      runtime.backgroundTaskInlineEls.delete(anchorKey);
-      if (runtime.backgroundTaskIndicatorEl === element) {
-        runtime.backgroundTaskIndicatorEl = null;
-      }
-    }
-
-    for (const segment of segments) {
-      const parentEl = runtime.turnBodyByAnchorKey.get(segment.anchorKey);
-      if (!parentEl?.isConnected) {
-        continue;
-      }
-
-      let panelEl = runtime.backgroundTaskInlineEls.get(segment.anchorKey);
-      if (!panelEl || !panelEl.isConnected) {
-        panelEl = parentEl.createDiv({
-          cls: 'opencodian-background-task-inline',
-        });
-        panelEl.dataset.anchorKey = segment.anchorKey;
-        runtime.backgroundTaskInlineEls.set(segment.anchorKey, panelEl);
-      }
-
-      if (panelEl.parentElement !== parentEl || panelEl !== parentEl.lastElementChild) {
-        parentEl.appendChild(panelEl);
-      }
-
-      panelEl.empty();
-
-      const cardEl = panelEl.createDiv({ cls: 'opencodian-chat-notice-card is-info is-background-task is-inline' });
-      const iconEl = cardEl.createDiv({ cls: 'opencodian-chat-notice-icon opencodian-chat-notice-icon--background-task' });
-      setIcon(iconEl, 'loader');
-
-      const bodyEl = cardEl.createDiv({ cls: 'opencodian-chat-notice-body' });
-      const copy = this.getBackgroundTaskInlineCopy(segment);
-      bodyEl.createDiv({
-        cls: 'opencodian-chat-notice-title',
-        text: copy.title,
-      });
-
-      const textEl = bodyEl.createDiv({ cls: 'opencodian-chat-notice-text' });
-      await this.renderMarkdownInto(textEl, copy.body);
-
-      if (copy.detail) {
-        bodyEl.createDiv({
-          cls: 'opencodian-chat-notice-meta',
-          text: copy.detail,
-        });
-      }
-
-      if (copy.tasksMarkdown) {
-        const tasksEl = bodyEl.createDiv({ cls: 'opencodian-chat-notice-task-list' });
-        await this.renderMarkdownInto(tasksEl, copy.tasksMarkdown);
-      }
-
-      if (runtime.backgroundTaskActiveAnchorKey === segment.anchorKey) {
-        runtime.backgroundTaskIndicatorEl = panelEl;
-      }
-    }
   }
 
   private async queueBackgroundTaskCompletionNotices(
