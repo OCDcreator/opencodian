@@ -9,9 +9,7 @@ import {
   FocusContextMarkdownViewLocator,
   type FocusContextMarkdownViewLocatorHost,
 } from './FocusContextMarkdownViewLocator';
-import { RetainedSelectionHighlightService } from './RetainedSelectionHighlightService';
-
-const RETAINED_SELECTION_POLL_INTERVAL_MS = 250;
+import { RetainedSelectionRuntimeCoordinator } from './RetainedSelectionRuntimeCoordinator';
 
 export interface FocusContextRuntimeServiceHost extends FocusContextMarkdownViewLocatorHost {
   getFocusContextPreview(): FocusContextPreview | null;
@@ -21,16 +19,22 @@ export interface FocusContextRuntimeServiceHost extends FocusContextMarkdownView
 
 export class FocusContextRuntimeService {
   private focusContextRefreshTimeoutId: number | null = null;
-  private retainedSelectionPollIntervalId: number | null = null;
   private readonly markdownViewLocator: FocusContextMarkdownViewLocator;
-  private readonly retainedSelectionHighlightService: RetainedSelectionHighlightService;
+  private readonly retainedSelectionRuntimeCoordinator: RetainedSelectionRuntimeCoordinator;
 
   constructor(
     app: App,
     private readonly host: FocusContextRuntimeServiceHost,
   ) {
     this.markdownViewLocator = new FocusContextMarkdownViewLocator(app, host);
-    this.retainedSelectionHighlightService = new RetainedSelectionHighlightService(host);
+    this.retainedSelectionRuntimeCoordinator = new RetainedSelectionRuntimeCoordinator({
+      getFocusContextPreview: () => this.host.getFocusContextPreview(),
+      isComposerInteractionFocused: () => this.host.isComposerInteractionFocused(),
+      getActiveMarkdownView: () => this.getActiveMarkdownView(),
+      refreshActiveFocusContextPreview: (view, editor) => {
+        this.refreshActiveFocusContextPreview(view, editor);
+      },
+    });
   }
 
   rememberMarkdownFilePath(path: string | null): void {
@@ -50,11 +54,11 @@ export class FocusContextRuntimeService {
       actualPreview,
       this.host.getFocusContextPreview(),
       {
-        retainSelectionPreview: this.retainedSelectionHighlightService.shouldRetainPreviewDuringTransition(),
+        retainSelectionPreview: this.retainedSelectionRuntimeCoordinator.shouldRetainPreviewDuringTransition(),
       },
     );
     this.host.setFocusContextPreview(nextPreview);
-    this.retainedSelectionHighlightService.syncFromPreview(actualPreview, view, editor);
+    this.retainedSelectionRuntimeCoordinator.syncFromPreview(actualPreview, view, editor);
   }
 
   scheduleFocusContextPreviewRefresh(): void {
@@ -66,38 +70,24 @@ export class FocusContextRuntimeService {
   }
 
   startRetainedSelectionPolling(): void {
-    if (this.retainedSelectionPollIntervalId !== null) {
-      return;
-    }
-
-    this.pollRetainedSelectionState();
-    this.retainedSelectionPollIntervalId = window.setInterval(() => {
-      this.pollRetainedSelectionState();
-    }, RETAINED_SELECTION_POLL_INTERVAL_MS);
+    this.retainedSelectionRuntimeCoordinator.startPolling();
   }
 
   handleComposerPointerDown(): void {
-    this.retainedSelectionHighlightService.markInputHandoff();
-    this.primeRetainedSelectionHighlightFromActiveEditor();
+    this.retainedSelectionRuntimeCoordinator.handleComposerPointerDown();
   }
 
   handleComposerFocusIn(): void {
-    this.retainedSelectionHighlightService.clearInputHandoff();
-    this.refreshActiveFocusContextPreview();
-    this.retainedSelectionHighlightService.refreshHighlight();
+    this.retainedSelectionRuntimeCoordinator.handleComposerFocusIn();
   }
 
   handleComposerFocusOut(): void {
-    window.setTimeout(() => {
-      this.refreshActiveFocusContextPreview();
-      this.retainedSelectionHighlightService.refreshHighlight();
-    }, 0);
+    this.retainedSelectionRuntimeCoordinator.handleComposerFocusOut();
   }
 
   dispose(): void {
-    this.stopRetainedSelectionPolling();
+    this.retainedSelectionRuntimeCoordinator.dispose();
     this.clearScheduledFocusContextPreviewRefresh();
-    this.retainedSelectionHighlightService.dispose();
   }
 
   private computeFocusContextPreview(
@@ -131,23 +121,4 @@ export class FocusContextRuntimeService {
     }
   }
 
-  private stopRetainedSelectionPolling(): void {
-    if (this.retainedSelectionPollIntervalId === null) {
-      return;
-    }
-
-    window.clearInterval(this.retainedSelectionPollIntervalId);
-    this.retainedSelectionPollIntervalId = null;
-  }
-
-  private pollRetainedSelectionState(): void {
-    const view = this.getActiveMarkdownView();
-    this.refreshActiveFocusContextPreview(view, view?.editor ?? null);
-    this.retainedSelectionHighlightService.refreshHighlight();
-  }
-
-  private primeRetainedSelectionHighlightFromActiveEditor(): void {
-    const view = this.getActiveMarkdownView();
-    this.refreshActiveFocusContextPreview(view, view?.editor ?? null);
-  }
 }

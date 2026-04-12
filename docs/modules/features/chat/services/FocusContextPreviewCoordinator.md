@@ -37,7 +37,7 @@ class FocusContextPreviewCoordinator {
 - **OpenCodianView**：提供当前会话 note path 的真实写回入口
 - **ComposerContextEventBridge**：把 workspace / document / editor 事件中的 preview refresh 与 file-open writeback 委托给本 coordinator
 - **TabViewActivationBridge**：在 tab activation preflight 时复用同一条 preview refresh 入口
-- **FocusContextRuntimeService**：继续持有 preview 计算与 retained-selection polling/highlight runtime，并经由 `FocusContextMarkdownViewLocator` 解析活动 MarkdownView
+- **FocusContextRuntimeService**：继续持有 preview 计算与 debounce 调度，并经由 `FocusContextMarkdownViewLocator` 解析活动 MarkdownView；retained-selection polling/highlight runtime 已委托给 `RetainedSelectionRuntimeCoordinator`
 
 ## 注意事项
 

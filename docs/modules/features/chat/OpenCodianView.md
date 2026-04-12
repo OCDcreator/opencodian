@@ -351,14 +351,14 @@ model selector 现在拆成了几层协作：
 - `ComposerContextHostAdapter` 负责把 view 提供的较窄 seam 组装成 composer context service bundle，并把 retained-selection / context picker 相关 host wiring 从 `OpenCodianView` 构造函数里迁走
 - `ComposerContextEventBridge` 负责 composer/context 相关的 workspace / vault / DOM 事件注册、当前会话 note path 写回，以及 retained-selection polling lifecycle
 - `ComposerContextViewHostAdapter` 负责 active-tab `draftContextItems` / `focusContextPreview` 的统一读写，并把同一份 state seam 暴露给 action/picker/coordinator/focus-runtime 几条路径
-- `FocusContextRuntimeService` 负责活动 `MarkdownView` 回退查找、focus preview 计算，以及 composer pointer handoff / focusin/focusout / polling 驱动的 retained-selection 协调
+- `FocusContextRuntimeService` 负责活动 `MarkdownView` 回退查找与 focus preview 计算，并通过 `RetainedSelectionRuntimeCoordinator` 承接 composer pointer handoff / focusin/focusout / polling 驱动的 retained-selection 协调
 - `ComposerContextActionService` 负责 current-note / selection 两个活动编辑器入口动作与 draft 写回
 - `ComposerContextPickerActionService` 负责 add-context 文件选择器的打开/关闭、catalog 加载，以及 file context draft 写回
 - `ComposerContextCoordinator` 负责 composer context chips 渲染、preview attach/detach click 编排，以及失效 preview 的 refresh handoff
 - `ContextAttachmentBuilder` 负责 current-note / selection / file 三类 `PromptContextItem` 构建，以及 remote 模式下的文本快照读取与 `64 KiB` 校验
 - 文件选择器使用 `ContextFileCatalogService` 惰性构建和缓存 `ContextFileCatalog`；picker action service 负责把 catalog loader 交给 picker，并把 picker open/close 生命周期桥接到 retained-selection handoff / preview writeback，而 vault `create/delete/rename` 增量同步则由 `ComposerContextEventBridge` 统一桥接
 
-选区高亮保留逻辑现在由 runtime service 集中承接：
+选区高亮保留逻辑现在由 retained-selection runtime coordinator 集中承接：
 
 - 会尝试同时保存 CodeMirror 偏移和 DOM range
 - 通过轮询和 composer focus/pointer 事件维护 retained highlight，并把 cleanup 收束到 `dispose()`
@@ -467,7 +467,7 @@ background task notice 这条子链路现在的边界是：
 - `ComposerContextCoordinator`：composer context chip 渲染、preview attach/detach click 编排，以及 stale preview refresh handoff
 - `ContextAttachmentBuilder`：composer current-note / selection / file 附件构建，以及 remote 文本快照校验
 - `ContextFileCatalogService`：composer 文件上下文选择器使用的 Vault catalog 构建、缓存与增量更新
-- `FocusContextRuntimeService`：活动编辑器 focus preview、MarkdownView 回退查找，以及 retained-selection handoff/highlight/polling 运行态
+- `FocusContextRuntimeService`：活动编辑器 focus preview、MarkdownView 回退查找，以及 retained-selection runtime coordinator 的入口转发
 - `ContextUsageService`：context usage state 维护
 - `TitleGenerationService`：AI 标题生成
 - `composerContext`、`renderGroups`、`collapsible`、`forkMessages`

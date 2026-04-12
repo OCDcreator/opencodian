@@ -55,7 +55,7 @@ class FocusContextEventBridge {
 
 - **ComposerContextHostAdapter**：提供 composer DOM 容器与 view 的 `registerEvent` / `registerDomEvent` seam
 - **FocusContextPreviewCoordinator**：负责 file-open/current-note writeback 与 activation/editor-change 相邻的 preview refresh 协调
-- **FocusContextRuntimeService**：负责 composer focus handoff、retained-selection polling 与 highlight 运行态
+- **FocusContextRuntimeService**：暴露 composer focus handoff、retained-selection polling 与 cleanup 入口，并把 retained-selection runtime 委托给 `RetainedSelectionRuntimeCoordinator`
 
 ## 注意事项
 

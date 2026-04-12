@@ -5,12 +5,12 @@
 
 ## 概述
 
-`RetainedSelectionHighlightService` 从 `FocusContextRuntimeService` 中接管 retained-selection handoff grace、capture-quality 比较，以及 CodeMirror / DOM highlight 的显示与清理。这样 `FocusContextRuntimeService` 只保留 preview 计算与 polling 编排，而 retained-selection runtime 细节集中在单一模块。
+`RetainedSelectionHighlightService` 持有 retained-selection handoff grace、capture-quality 比较，以及 CodeMirror / DOM highlight 的显示与清理。它现在由 `RetainedSelectionRuntimeCoordinator` 持有，让 polling / composer handoff 与 highlight writeback 集中在 retained-selection runtime 边界内。
 
 ## 导入关系
 
 上游: `obsidian`（`MarkdownView`）、`shared/logger`、`utils/editorSelectionHighlight`、`composerContext`
-下游: `FocusContextRuntimeService`
+下游: `RetainedSelectionRuntimeCoordinator`
 
 ## 公开接口
 
@@ -35,7 +35,7 @@ class RetainedSelectionHighlightService {
 ### handoff grace
 
 - 在 composer pointerdown 时记录短暂 grace window，让 selection preview 能跨越编辑器到输入框的焦点切换
-- `FocusContextRuntimeService` 通过 `shouldRetainPreviewDuringTransition()` 继续复用同一条 preview-retain 判定
+- `RetainedSelectionRuntimeCoordinator` 通过 `shouldRetainPreviewDuringTransition()` 继续复用同一条 preview-retain 判定
 
 ### retained capture 质量
 
@@ -50,7 +50,7 @@ class RetainedSelectionHighlightService {
 
 ## 与其他模块的交互
 
-- **FocusContextRuntimeService**：决定何时重新计算 preview，并把实际 preview 结果传给本 service 同步 highlight
+- **RetainedSelectionRuntimeCoordinator**：决定何时同步 retained-selection highlight，并把实际 preview 结果传给本 service
 - **composerContext**：提供 `FocusContextPreview` 结构，供路径和 selection 类型判定使用
 - **editorSelectionHighlight**：执行 CodeMirror 装饰高亮的具体读写
 
