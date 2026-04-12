@@ -132,13 +132,15 @@ interface TabRuntimeState {
 - 在必要时调用 `syncConversationMessagesFromServer()`
 - 装载阶段进入 hydration：先重建历史 turn / inline background task，再等待后续 authoritative message sync 决定是否允许 stale 降级
 - 重新渲染消息、背景任务指示器、todo dock、question dock
-- 通过 `ConversationSyncBridge` / `ConversationSyncOrchestrationService` 刷新 2 秒一次的 conversation sync loop 生命周期
+- 通过 `ConversationSyncHostAdapter` 组装 `ConversationSyncRuntimeCoordinator` / `ConversationSyncOrchestrationService` / `ConversationSyncBridge`，并刷新 2 秒一次的 conversation sync loop 生命周期
 - 更新模型显示和 context usage
 
 后台同步分两路：
 
 - `syncVisibleConversationInBackground()`：同步当前活动 tab
 - `syncBackgroundTaskTabsInBackground()`：同步非活动但仍有 background task 的 tab
+
+`OpenCodianView` 现在只提供一份 `ConversationSyncViewHost`；真正把这份 view-state / render bridge 适配成 runtime/orchestration/bridge 三组 host 的层，是 `ConversationSyncHostAdapter`。这样 sync service bundle 的 wiring 不再散落在 view 构造函数里。
 
 signal sync 与后台轮询里的 loop lifecycle、signal debounce、tab / conversation 选择、conversation 加载和 dispatch 编排现在先交给 `ConversationSyncOrchestrationService`。它会判断 signal 是否应回到当前可见会话，或转向 hidden tab sync；会把同一 tab 上短时间内连续到达的 signal reason 合并；轮询时也只会在确实存在 visible/background sync 目标时持有 interval，并只枚举非活动、仍有 background task、且 runtime 当前允许同步的 tab。
 

@@ -159,17 +159,18 @@ import {
   BackgroundTaskPostSyncCoordinator,
 } from './services/BackgroundTaskPostSyncCoordinator';
 import {
-  type ConversationSyncOrchestrationHost,
   ConversationSyncOrchestrationService,
 } from './services/ConversationSyncOrchestrationService';
 import {
-  type ConversationSyncBridgeHost,
   ConversationSyncBridge,
 } from './services/ConversationSyncBridge';
 import {
-  type ConversationSyncRuntimeCoordinatorHost,
   ConversationSyncRuntimeCoordinator,
 } from './services/ConversationSyncRuntimeCoordinator';
+import {
+  createConversationSyncServices,
+  type ConversationSyncViewHost,
+} from './services/ConversationSyncHostAdapter';
 import {
   type ConversationAssistantTailRenderPort,
   type ConversationRenderHost,
@@ -1693,19 +1694,13 @@ export class OpenCodianView extends ItemView {
     this.backgroundTaskPostSyncCoordinator = new BackgroundTaskPostSyncCoordinator(
       this.createBackgroundTaskPostSyncCoordinatorHost(),
     );
-    this.conversationSyncRuntimeCoordinator = new ConversationSyncRuntimeCoordinator(
-      this.createConversationSyncRuntimeCoordinatorHost(),
-    );
-    this.conversationSyncOrchestrationService = new ConversationSyncOrchestrationService(
-      this.createConversationSyncOrchestrationHost(),
-      this.conversationSyncRuntimeCoordinator,
-    );
-    this.conversationSyncBridge = new ConversationSyncBridge(
-      this.createConversationSyncBridgeHost(),
-      this.conversationSyncRuntimeCoordinator,
-      this.conversationSyncOrchestrationService,
+    const conversationSyncServices = createConversationSyncServices(
+      this.createConversationSyncViewHost(),
       this.backgroundTaskPostSyncCoordinator,
     );
+    this.conversationSyncRuntimeCoordinator = conversationSyncServices.runtimeCoordinator;
+    this.conversationSyncOrchestrationService = conversationSyncServices.orchestrationService;
+    this.conversationSyncBridge = conversationSyncServices.bridge;
     this.backgroundTaskCompletionNoticeService = new BackgroundTaskCompletionNoticeService(
       this.createBackgroundTaskCompletionNoticeServiceHost(),
     );
@@ -1842,29 +1837,15 @@ export class OpenCodianView extends ItemView {
     };
   }
 
-  private createConversationSyncRuntimeCoordinatorHost(): ConversationSyncRuntimeCoordinatorHost {
-    return {
-      getActiveTabId: () => this.getActiveTabId(),
-      getTabRuntimeState: (tabId: TabId | null) => this.getTabRuntimeState(tabId),
-      getConversationSyncFingerprint: (messages) => this.getConversationSyncFingerprint(messages),
-    };
-  }
-
-  private createConversationSyncOrchestrationHost(): ConversationSyncOrchestrationHost {
+  private createConversationSyncViewHost(): ConversationSyncViewHost {
     return {
       getCurrentConversation: () => this.currentConversation,
       getActiveTabId: () => this.getActiveTabId(),
       getAllTabs: () => this.tabManager?.getAllTabs() ?? [],
       getTab: (tabId) => this.tabManager?.getTab(tabId) ?? null,
-      getTabRuntimeState: (tabId) => this.getTabRuntimeState(tabId),
-      getConversationById: async (id) => (await this.plugin.getConversationById(id)) ?? null,
-    };
-  }
-
-  private createConversationSyncBridgeHost(): ConversationSyncBridgeHost {
-    return {
-      getCurrentConversation: () => this.currentConversation,
       getTabRuntimeState: (tabId: TabId | null) => this.getTabRuntimeState(tabId),
+      getConversationById: async (id) => (await this.plugin.getConversationById(id)) ?? null,
+      getConversationSyncFingerprint: (messages) => this.getConversationSyncFingerprint(messages),
       syncConversationMessagesFromServer: (conversation, tabId, reason, options) =>
         this.syncConversationMessagesFromServer(conversation, tabId, reason, options),
       applySyncedConversationUpdate: (previousMessages, nextMessages) =>

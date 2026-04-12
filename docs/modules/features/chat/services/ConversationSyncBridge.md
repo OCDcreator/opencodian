@@ -12,7 +12,7 @@
 - 为 signal sync 统一绑定 `sync-event:*` reason、hidden-tab fingerprint commit 和 post-sync coordinator 调用
 - 为 visible/background sync 统一调用 `BackgroundTaskPostSyncCoordinator`，再把真正依赖 DOM 的 render work 回落到 host
 
-它不负责 tab / conversation 选择，也不负责 runtime lock / baseline fingerprint 判定；这些职责仍分别留在 `ConversationSyncOrchestrationService` 与 `ConversationSyncRuntimeCoordinator`。它也不直接操作消息 DOM，只把 `applySyncedConversationUpdate()` / `renderBackgroundTaskIndicatorIfNeeded()` 这类 render host 保留给 `OpenCodianView`。
+它不负责 tab / conversation 选择，也不负责 runtime lock / baseline fingerprint 判定；这些职责仍分别留在 `ConversationSyncOrchestrationService` 与 `ConversationSyncRuntimeCoordinator`。它也不直接操作消息 DOM，只把 `applySyncedConversationUpdate()` / `renderBackgroundTaskIndicatorIfNeeded()` 这类 render host 保留给 `OpenCodianView`，而这些 host 现在由 `ConversationSyncHostAdapter` 统一装配。
 
 ## 公开接口
 
@@ -56,5 +56,6 @@ export class ConversationSyncBridge {
 - `ConversationSyncOrchestrationService`：负责 loop 生命周期、signal debounce、tab / conversation 选择与 dispatch
 - `ConversationSyncRuntimeCoordinator`：负责 active/hidden tab 的 sync guard、lock 生命周期与 baseline fingerprint
 - `BackgroundTaskPostSyncCoordinator`：负责 sync 完成后的 question/todo/background-task 收尾
+- `ConversationSyncHostAdapter`：负责把 `OpenCodianView` 的单一 sync host 适配成 bridge 所需的 host 形状
 - `OpenCodianView`：只保留 host bridge 与真正依赖 DOM 的 `applySyncedConversationUpdate()` / `renderBackgroundTaskIndicatorIfNeeded()`
 - 这次切片继续推进 master plan 的 P1 `OpenCodianView` 核心 ownership 迁移：把 sync callback assembly 从主 view 移到 dedicated bridge，而不是继续留在 runtime/orchestration 调用点之间散落
