@@ -135,6 +135,10 @@ import {
   BackgroundTaskStreamTriggerCoordinator,
 } from './runtime/BackgroundTaskStreamTriggerCoordinator';
 import {
+  type TabConversationStateBridgeHost,
+  TabConversationStateBridge,
+} from './runtime/TabConversationStateBridge';
+import {
   type TabRuntimeStateBridgeHost,
   TabRuntimeStateBridge,
 } from './runtime/TabRuntimeStateBridge';
@@ -689,6 +693,7 @@ export class OpenCodianView extends ItemView {
   private backgroundTaskNoticeStateService: BackgroundTaskNoticeStateService;
   private backgroundTaskLiveSignalCoordinator: BackgroundTaskLiveSignalCoordinator;
   private backgroundTaskPostSyncCoordinator: BackgroundTaskPostSyncCoordinator;
+  private tabConversationStateBridge: TabConversationStateBridge;
   private tabRuntimeStateBridge: TabRuntimeStateBridge;
   private conversationSyncOrchestrationService: ConversationSyncOrchestrationService;
   private conversationSyncRuntimeCoordinator: ConversationSyncRuntimeCoordinator;
@@ -1548,6 +1553,9 @@ export class OpenCodianView extends ItemView {
     this.backgroundTaskLiveSignalCoordinator = new BackgroundTaskLiveSignalCoordinator(
       this.createBackgroundTaskLiveSignalCoordinatorHost(),
     );
+    this.tabConversationStateBridge = new TabConversationStateBridge(
+      this.createTabConversationStateBridgeHost(),
+    );
     this.tabRuntimeStateBridge = new TabRuntimeStateBridge(this.createTabRuntimeStateBridgeHost());
     this.backgroundTaskPostSyncCoordinator = new BackgroundTaskPostSyncCoordinator(
       this.createBackgroundTaskPostSyncCoordinatorHost(),
@@ -1665,6 +1673,47 @@ export class OpenCodianView extends ItemView {
       hasBackgroundTaskIndicator: (tabId) => Boolean(this.backgroundTaskLiveSignalCoordinator.hasIndicator(tabId)),
       updateSendButtonState: () => {
         this.updateSendButtonState();
+      },
+    };
+  }
+
+  private createTabConversationStateBridgeHost(): TabConversationStateBridgeHost {
+    return {
+      getTabManager: () => this.tabManager,
+      getSessionIdForTab: (tabId) => this.getSessionIdForTab(tabId),
+      setCurrentConversation: (conversation) => {
+        this.currentConversation = conversation;
+      },
+      setCurrentConversationRevertState: (revertState) => {
+        this.currentConversationRevertState = revertState;
+      },
+      setOpenCodeSessionId: (sessionId) => {
+        this.plugin.openCodeService.setSessionId(sessionId);
+      },
+      clearPendingQuestionsForTab: (tabId) => {
+        this.clearPendingQuestionsForTab(tabId);
+      },
+      setTabSessionTodos: (tabId, todos, sessionId) => {
+        this.setTabSessionTodos(tabId, todos, sessionId);
+      },
+      setTabSessionStatus: (tabId, status, sessionId) => {
+        this.setTabSessionStatus(tabId, status, sessionId);
+      },
+      resetBackgroundTaskSuppressedFingerprint: (tabId) => {
+        const runtime = this.getTabRuntimeState(tabId);
+        if (runtime) {
+          runtime.backgroundTaskSuppressedFingerprint = null;
+        }
+      },
+      getConversationSyncFingerprint: (messages) => this.getConversationSyncFingerprint(messages),
+      setLastConversationSyncFingerprint: (fingerprint) => {
+        this.lastConversationSyncFingerprint = fingerprint;
+      },
+      startConversationSyncLoop: () => {
+        this.startConversationSyncLoop();
+      },
+      stopConversationSyncLoop: () => {
+        this.stopConversationSyncLoop();
       },
     };
   }
@@ -1876,21 +1925,18 @@ export class OpenCodianView extends ItemView {
       },
       prepareConversationTransition: (nextConversationId) =>
         this.prepareConversationTransition(nextConversationId),
-      setCurrentConversation: (conversation) => {
-        this.currentConversation = conversation;
-      },
-      clearCurrentConversationRevertState: () => {
-        this.currentConversationRevertState = null;
+      applyLoadedConversationActivation: (tabId, conversation) => {
+        this.tabConversationStateBridge.applyActiveConversation(tabId, conversation, {
+          clearRevertState: true,
+          resetSessionState: true,
+          resetBackgroundTaskSuppressedFingerprint: true,
+        });
       },
       setCurrentConversationRevertState: (revertState) => {
         this.currentConversationRevertState = revertState;
       },
-      setActiveTabConversation: (conversation) => {
-        this.tabManager?.setActiveTabConversation(conversation);
-      },
       getMessagesContainer: () => this.messagesContainer,
       getActiveTabId: () => this.getActiveTabId(),
-      getSessionIdForTab: (tabId) => this.getSessionIdForTab(tabId),
       getScrollRuntimeForTab: (tabId) => this.getTabRuntimeState(tabId),
       clearScheduledScrollToBottom: () => {
         this.clearScheduledScrollToBottom();
@@ -1903,24 +1949,6 @@ export class OpenCodianView extends ItemView {
       },
       resetTurnState: () => {
         this.resetTurnState();
-      },
-      setOpenCodeSessionId: (sessionId) => {
-        this.plugin.openCodeService.setSessionId(sessionId);
-      },
-      clearPendingQuestionsForTab: (tabId) => {
-        this.clearPendingQuestionsForTab(tabId);
-      },
-      setTabSessionTodos: (tabId, todos, sessionId) => {
-        this.setTabSessionTodos(tabId, todos, sessionId);
-      },
-      setTabSessionStatus: (tabId, status, sessionId) => {
-        this.setTabSessionStatus(tabId, status, sessionId);
-      },
-      resetBackgroundTaskSuppressedFingerprint: (tabId) => {
-        const runtime = this.getTabRuntimeState(tabId);
-        if (runtime) {
-          runtime.backgroundTaskSuppressedFingerprint = null;
-        }
       },
       shouldSyncConversationFromServer: (conversation, options) => {
         const shouldSyncInterrupted = !this.hasInterruptedLocalAssistantTail(conversation.messages)
@@ -1955,12 +1983,8 @@ export class OpenCodianView extends ItemView {
       refreshPendingQuestionsForTab: (tabId, sessionId) =>
         this.refreshPendingQuestionsForTab(tabId, sessionId ?? undefined),
       refreshActiveSessionTodos: (options) => this.refreshActiveSessionTodos(options),
-      getConversationSyncFingerprint: (messages) => this.getConversationSyncFingerprint(messages),
-      setLastConversationSyncFingerprint: (fingerprint) => {
-        this.lastConversationSyncFingerprint = fingerprint;
-      },
-      startConversationSyncLoop: () => {
-        this.startConversationSyncLoop();
+      commitConversationSyncBaseline: (messages) => {
+        this.tabConversationStateBridge.commitConversationSyncBaseline(messages);
       },
       scrollToBottom: ({ tabId }) => {
         this.scrollToBottom({ tabId });
@@ -2083,7 +2107,7 @@ export class OpenCodianView extends ItemView {
       },
       setTabNeedsAttention: (tabId, needsAttention) => this.setTabNeedsAttention(tabId, needsAttention),
       setActiveTabConversation: (conversation) => {
-        this.tabManager?.setActiveTabConversation(conversation);
+        this.tabConversationStateBridge.syncActiveTabConversation(conversation);
       },
       syncActiveTabContextUsageIdentity: () => {
         this.syncActiveTabContextUsageIdentity();
@@ -2743,11 +2767,11 @@ export class OpenCodianView extends ItemView {
   }
 
   private async applyStreamingConversationActivation(tabId: TabId, conversation: Conversation): Promise<void> {
-    this.currentConversation = conversation;
-    this.tabManager?.setActiveTabConversation(conversation);
-    this.plugin.openCodeService.setSessionId(conversation.openCodeSessionId);
-    this.lastConversationSyncFingerprint = this.getConversationSyncFingerprint(conversation.messages);
-    this.startConversationSyncLoop();
+    this.tabConversationStateBridge.applyActiveConversation(tabId, conversation, {
+      clearRevertState: true,
+      resetSessionState: true,
+    });
+    this.tabConversationStateBridge.commitConversationSyncBaseline(conversation.messages);
     this.updateModelSelectorDisplay();
     this.syncActiveTabContextUsageIdentity();
     this.renderSessionTodoDock(tabId);
@@ -2759,13 +2783,9 @@ export class OpenCodianView extends ItemView {
   }
 
   private applyEmptyTabActivation(tabId: TabId): void {
-    this.currentConversation = null;
-    this.stopConversationSyncLoop();
+    this.tabConversationStateBridge.clearActiveConversation(tabId);
     this.messagesContainer?.empty();
     this.resetTurnState();
-    this.setTabSessionTodos(tabId, [], null);
-    this.setTabSessionStatus(tabId, null, null);
-    this.clearPendingQuestionsForTab(tabId);
     this.renderSessionTodoDock(tabId);
     this.renderQuestionDock();
     this.updateModelSelectorDisplay();
@@ -5113,21 +5133,13 @@ export class OpenCodianView extends ItemView {
       this.resetBackgroundTaskIndicator();
     }
     const activeTabId = this.getActiveTabId();
-    const previousSessionId = this.getSessionIdForTab(activeTabId);
-
-    this.tabManager?.setActiveTabConversation(conversation);
-    this.currentConversation = conversation;
-    this.currentConversationRevertState = null;
-    this.plugin.openCodeService.setSessionId(conversation.openCodeSessionId);
-    if (previousSessionId !== conversation.openCodeSessionId) {
-      this.clearPendingQuestionsForTab(activeTabId);
-    }
-    this.setTabSessionTodos(activeTabId, [], conversation.openCodeSessionId);
-    this.setTabSessionStatus(activeTabId, null, conversation.openCodeSessionId);
+    this.tabConversationStateBridge.applyActiveConversation(activeTabId, conversation, {
+      clearRevertState: true,
+      resetSessionState: true,
+    });
     this.messagesContainer?.empty();
     this.resetTurnState();
-    this.lastConversationSyncFingerprint = this.getConversationSyncFingerprint(conversation.messages);
-    this.startConversationSyncLoop();
+    this.tabConversationStateBridge.commitConversationSyncBaseline(conversation.messages);
     this.updateModelSelectorDisplay();
     this.syncActiveTabContextUsageIdentity();
     this.syncBackgroundTaskStateFromConversation(conversation);
@@ -7266,7 +7278,7 @@ export class OpenCodianView extends ItemView {
         return;
       }
 
-      this.tabManager.setActiveTabConversation(forkConversation);
+      this.tabConversationStateBridge.syncActiveTabConversation(forkConversation);
       await this.loadConversation(forkConversation.id, { forceServerSync: false });
       new Notice(t('chat.fork.successCurrentTab'));
     } catch (error) {

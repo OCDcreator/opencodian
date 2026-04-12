@@ -32,7 +32,6 @@ interface ConversationViewStateTabManager {
     activeTabIndex: number,
     conversations: ReadonlyMap<string, Pick<Conversation, 'id' | 'title'>>,
   ): TabData | null;
-  setActiveTabConversation(conversation: Pick<Conversation, 'id' | 'title'> | null): void;
 }
 
 export interface ConversationViewStateHost {
@@ -54,27 +53,15 @@ export interface ConversationViewStateHost {
   applyEmptyTabActivation(tabId: TabId): void;
 
   prepareConversationTransition(nextConversationId: string): Promise<void>;
-  setCurrentConversation(conversation: Conversation): void;
-  clearCurrentConversationRevertState(): void;
+  applyLoadedConversationActivation(tabId: TabId | null, conversation: Conversation): void;
   setCurrentConversationRevertState(revertState: { messageID: string; partID?: string } | null): void;
-  setActiveTabConversation(conversation: Conversation | null): void;
   getMessagesContainer(): HTMLElement | null;
   getActiveTabId(): TabId | null;
-  getSessionIdForTab(tabId: TabId | null): string | null;
   getScrollRuntimeForTab(tabId: TabId | null): ScrollRuntimeState | null;
   clearScheduledScrollToBottom(): void;
   beginConversationHydration(tabId: TabId | null): void;
   clearMessagesContainer(): void;
   resetTurnState(): void;
-  setOpenCodeSessionId(sessionId: string): void;
-  clearPendingQuestionsForTab(tabId: TabId | null): void;
-  setTabSessionTodos(tabId: TabId | null, todos: SessionTodo[], sessionId: string | null): void;
-  setTabSessionStatus(
-    tabId: TabId | null,
-    status: SessionActivityStatus | null,
-    sessionId: string | null,
-  ): void;
-  resetBackgroundTaskSuppressedFingerprint(tabId: TabId | null): void;
   shouldSyncConversationFromServer(conversation: Conversation, options: LoadConversationOptions): boolean;
   syncConversationMessagesFromServer(
     conversation: Conversation,
@@ -92,9 +79,7 @@ export interface ConversationViewStateHost {
   ): Promise<SessionActivityStatus | null>;
   refreshPendingQuestionsForTab(tabId: TabId | null, sessionId: string | null): Promise<QuestionRequest[]>;
   refreshActiveSessionTodos(options: { suppressErrors?: boolean }): Promise<SessionTodo[]>;
-  getConversationSyncFingerprint(messages: ChatMessage[]): string;
-  setLastConversationSyncFingerprint(fingerprint: string): void;
-  startConversationSyncLoop(): void;
+  commitConversationSyncBaseline(messages: ChatMessage[]): void;
   scrollToBottom(options: { tabId: TabId | null }): void;
   syncPaneScrollMetrics(tabId: TabId | null, messagesEl: HTMLElement): void;
   scheduleComposerLayoutSync(): void;
@@ -219,24 +204,13 @@ export class ConversationViewStateService {
     const shouldStickToBottom = preserveScrollPosition && messagesEl
       ? runtime?.autoScrollEnabled ?? isElementNearBottom(messagesEl)
       : true;
-    const previousSessionId = this.host.getSessionIdForTab(activeTabId);
 
-    this.host.setCurrentConversation(conversation);
-    this.host.clearCurrentConversationRevertState();
-    this.host.setActiveTabConversation(conversation);
+    this.host.applyLoadedConversationActivation(activeTabId, conversation);
     this.host.clearScheduledScrollToBottom();
     this.host.beginConversationHydration(activeTabId);
     messagesEl?.classList.add('is-rehydrating');
     this.host.clearMessagesContainer();
     this.host.resetTurnState();
-
-    this.host.setOpenCodeSessionId(conversation.openCodeSessionId);
-    if (previousSessionId !== conversation.openCodeSessionId) {
-      this.host.clearPendingQuestionsForTab(activeTabId);
-    }
-    this.host.setTabSessionTodos(activeTabId, [], conversation.openCodeSessionId);
-    this.host.setTabSessionStatus(activeTabId, null, conversation.openCodeSessionId);
-    this.host.resetBackgroundTaskSuppressedFingerprint(activeTabId);
 
     const shouldSyncFromServer = this.host.shouldSyncConversationFromServer(conversation, options);
 
@@ -260,8 +234,7 @@ export class ConversationViewStateService {
       void this.host.refreshTabSessionStatus(activeTabId, conversation.openCodeSessionId, { suppressErrors: true });
       void this.host.refreshPendingQuestionsForTab(activeTabId, conversation.openCodeSessionId);
       void this.host.refreshActiveSessionTodos({ suppressErrors: true });
-      this.host.setLastConversationSyncFingerprint(this.host.getConversationSyncFingerprint(messages));
-      this.host.startConversationSyncLoop();
+      this.host.commitConversationSyncBaseline(messages);
 
       if (messagesEl) {
         if (runtime) {

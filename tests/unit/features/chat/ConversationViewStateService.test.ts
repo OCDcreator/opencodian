@@ -82,13 +82,10 @@ function createHost(
     applyStreamingConversationActivation: jest.fn(),
     applyEmptyTabActivation: jest.fn(),
     prepareConversationTransition: jest.fn().mockResolvedValue(undefined),
-    setCurrentConversation: jest.fn(),
-    clearCurrentConversationRevertState: jest.fn(),
+    applyLoadedConversationActivation: jest.fn(),
     setCurrentConversationRevertState: jest.fn(),
-    setActiveTabConversation: jest.fn(),
     getMessagesContainer: jest.fn().mockReturnValue(messagesEl),
     getActiveTabId: jest.fn().mockReturnValue('tab-1'),
-    getSessionIdForTab: jest.fn().mockReturnValue('previous-session'),
     getScrollRuntimeForTab: jest.fn().mockReturnValue({
       autoScrollEnabled: false,
       programmaticScrollGuardUntil: 0,
@@ -97,11 +94,6 @@ function createHost(
     beginConversationHydration: jest.fn(),
     clearMessagesContainer: jest.fn(),
     resetTurnState: jest.fn(),
-    setOpenCodeSessionId: jest.fn(),
-    clearPendingQuestionsForTab: jest.fn(),
-    setTabSessionTodos: jest.fn(),
-    setTabSessionStatus: jest.fn(),
-    resetBackgroundTaskSuppressedFingerprint: jest.fn(),
     shouldSyncConversationFromServer: jest.fn().mockReturnValue(false),
     syncConversationMessagesFromServer: jest.fn().mockResolvedValue({
       messages: [],
@@ -114,9 +106,7 @@ function createHost(
     refreshTabSessionStatus: jest.fn().mockResolvedValue(null),
     refreshPendingQuestionsForTab: jest.fn().mockResolvedValue([]),
     refreshActiveSessionTodos: jest.fn().mockResolvedValue([]),
-    getConversationSyncFingerprint: jest.fn().mockReturnValue('fingerprint'),
-    setLastConversationSyncFingerprint: jest.fn(),
-    startConversationSyncLoop: jest.fn(),
+    commitConversationSyncBaseline: jest.fn(),
     scrollToBottom: jest.fn(),
     syncPaneScrollMetrics: jest.fn(),
     scheduleComposerLayoutSync: jest.fn(),
@@ -215,9 +205,10 @@ describe('ConversationViewStateService', () => {
     });
 
     expect(host.prepareConversationTransition).toHaveBeenCalledWith(conversation.id);
+    expect(host.applyLoadedConversationActivation).toHaveBeenCalledWith('tab-1', conversation);
     expect(host.beginConversationHydration).toHaveBeenCalledWith('tab-1');
-    expect(host.clearPendingQuestionsForTab).toHaveBeenCalledWith('tab-1');
     expect(host.renderMessages).toHaveBeenCalledWith(conversation.messages);
+    expect(host.commitConversationSyncBaseline).toHaveBeenCalledWith(conversation.messages);
     expect(captureElementScrollRestoreSnapshot).toHaveBeenCalledWith(messagesEl, false, 120);
     expect(restoreElementScrollAfterRender).toHaveBeenCalled();
     expect(host.syncPaneScrollMetrics).toHaveBeenCalledWith('tab-1', messagesEl);
