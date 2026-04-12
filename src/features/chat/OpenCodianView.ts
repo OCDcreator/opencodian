@@ -1133,7 +1133,7 @@ export class OpenCodianView extends ItemView {
       }
 
       this.setTabSessionTodos(tabId, todos, sessionId);
-      this.reconcileBackgroundTaskStateFromLiveSignals(tabId);
+      this.backgroundTaskLiveSignalCoordinator.reconcileStateFromLiveSignals(tabId);
       return todos;
     } catch (error) {
       logger.debug('Failed to refresh session todos', error);
@@ -1167,7 +1167,7 @@ export class OpenCodianView extends ItemView {
 
       const status = statuses[sessionId] ?? { type: 'idle' as const };
       this.setTabSessionStatus(tabId, status, sessionId);
-      this.reconcileBackgroundTaskStateFromLiveSignals(tabId);
+      this.backgroundTaskLiveSignalCoordinator.reconcileStateFromLiveSignals(tabId);
       return status;
     } catch (error) {
       logger.debug('Failed to refresh session status', error);
@@ -1222,10 +1222,6 @@ export class OpenCodianView extends ItemView {
     reason: string,
   ): void {
     this.backgroundTaskLiveSignalCoordinator.markAuthoritativeSync(tabId, reason);
-  }
-
-  private reconcileBackgroundTaskStateFromLiveSignals(tabId: TabId | null = this.getActiveTabId()): void {
-    this.backgroundTaskLiveSignalCoordinator.reconcileStateFromLiveSignals(tabId);
   }
 
   private isSuppressedBackgroundTaskSegment(
@@ -1314,6 +1310,7 @@ export class OpenCodianView extends ItemView {
     );
     this.conversationSessionLiveSignalAdapter = new ConversationSessionLiveSignalAdapter(
       this.createConversationSessionLiveSignalAdapterHost(),
+      this.backgroundTaskLiveSignalCoordinator,
     );
     this.backgroundTaskCompletionNoticeService = new BackgroundTaskCompletionNoticeService(
       this.createBackgroundTaskCompletionNoticeServiceHost(),
@@ -1714,11 +1711,9 @@ export class OpenCodianView extends ItemView {
       getActiveTabId: () => this.getActiveTabId(),
       applySessionTodoUpdate: (tabId, sessionId, todos) => {
         this.setTabSessionTodos(tabId, todos, sessionId);
-        this.reconcileBackgroundTaskStateFromLiveSignals(tabId);
       },
       applySessionStatusUpdate: (tabId, sessionId, status) => {
         this.setTabSessionStatus(tabId, status, sessionId);
-        this.reconcileBackgroundTaskStateFromLiveSignals(tabId);
       },
     };
   }

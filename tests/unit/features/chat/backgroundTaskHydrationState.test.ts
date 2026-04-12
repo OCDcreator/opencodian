@@ -22,7 +22,9 @@ function createView(): OpenCodianView {
 describe('OpenCodianView background task hydration state', () => {
   it('does not downgrade background tasks to stale before authoritative sync is ready', () => {
     const view = createView() as unknown as {
-      reconcileBackgroundTaskStateFromLiveSignals: (tabId: string) => void;
+      backgroundTaskLiveSignalCoordinator: {
+        reconcileStateFromLiveSignals: (tabId: string) => void;
+      };
       getTabRuntimeState: () => Record<string, unknown>;
       sessionTodoStateService: {
         reconcileStaleSessionTodoState: (tabId: string) => void;
@@ -56,7 +58,7 @@ describe('OpenCodianView background task hydration state', () => {
     ).mockResolvedValue(undefined);
     const resetSpy = jest.spyOn(view, 'resetBackgroundTaskIndicator').mockImplementation(() => {});
 
-    view.reconcileBackgroundTaskStateFromLiveSignals('tab-1');
+    view.backgroundTaskLiveSignalCoordinator.reconcileStateFromLiveSignals('tab-1');
 
     expect(reconcileSpy).toHaveBeenCalledWith('tab-1');
     expect(syncSpy).toHaveBeenCalledWith('tab-1');

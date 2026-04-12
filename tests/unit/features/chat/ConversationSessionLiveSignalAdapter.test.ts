@@ -89,9 +89,13 @@ function createHost(options?: {
     applySessionTodoUpdate: jest.fn(),
     applySessionStatusUpdate: jest.fn(),
   };
+  const backgroundTaskLiveSignalCoordinator = {
+    reconcileStateFromLiveSignals: jest.fn(),
+  };
 
   return {
     host,
+    backgroundTaskLiveSignalCoordinator,
     disposeTodoSubscription,
     disposeStatusSubscription,
     emitTodo(sessionId: string, todos: SessionTodo[]) {
@@ -109,8 +113,13 @@ describe('ConversationSessionLiveSignalAdapter', () => {
   });
 
   it('owns todo and status subscription cleanup across restarts', () => {
-    const { host, disposeTodoSubscription, disposeStatusSubscription } = createHost();
-    const adapter = new ConversationSessionLiveSignalAdapter(host);
+    const {
+      host,
+      backgroundTaskLiveSignalCoordinator,
+      disposeTodoSubscription,
+      disposeStatusSubscription,
+    } = createHost();
+    const adapter = new ConversationSessionLiveSignalAdapter(host, backgroundTaskLiveSignalCoordinator);
 
     adapter.start();
     adapter.start();
@@ -124,7 +133,7 @@ describe('ConversationSessionLiveSignalAdapter', () => {
 
   it('routes todo updates to every tab sharing the same session', () => {
     const todos: SessionTodo[] = [{ id: 'todo-1', content: 'Finish task', status: 'in_progress' }];
-    const { host, emitTodo } = createHost({
+    const { host, backgroundTaskLiveSignalCoordinator, emitTodo } = createHost({
       conversations: [
         createConversation('conversation-active', { openCodeSessionId: 'session-shared' }),
         createConversation('conversation-hidden', { openCodeSessionId: 'session-shared' }),
@@ -146,7 +155,7 @@ describe('ConversationSessionLiveSignalAdapter', () => {
         }),
       ],
     });
-    const adapter = new ConversationSessionLiveSignalAdapter(host);
+    const adapter = new ConversationSessionLiveSignalAdapter(host, backgroundTaskLiveSignalCoordinator);
 
     adapter.start();
     emitTodo('session-shared', todos);
@@ -154,6 +163,13 @@ describe('ConversationSessionLiveSignalAdapter', () => {
     expect(host.applySessionTodoUpdate).toHaveBeenCalledTimes(2);
     expect(host.applySessionTodoUpdate).toHaveBeenNthCalledWith(1, 'tab-active', 'session-shared', todos);
     expect(host.applySessionTodoUpdate).toHaveBeenNthCalledWith(2, 'tab-hidden', 'session-shared', todos);
+    expect(backgroundTaskLiveSignalCoordinator.reconcileStateFromLiveSignals).toHaveBeenCalledTimes(2);
+    expect(
+      backgroundTaskLiveSignalCoordinator.reconcileStateFromLiveSignals,
+    ).toHaveBeenNthCalledWith(1, 'tab-active');
+    expect(
+      backgroundTaskLiveSignalCoordinator.reconcileStateFromLiveSignals,
+    ).toHaveBeenNthCalledWith(2, 'tab-hidden');
   });
 
   it('falls back to the active tab for status updates when the current conversation matches the session', () => {
@@ -161,7 +177,7 @@ describe('ConversationSessionLiveSignalAdapter', () => {
     const currentConversation = createConversation('conversation-active', {
       openCodeSessionId: 'session-active-only',
     });
-    const { host, emitStatus } = createHost({
+    const { host, backgroundTaskLiveSignalCoordinator, emitStatus } = createHost({
       activeTabId: 'tab-active',
       currentConversation,
       conversations: [createConversation('conversation-other', { openCodeSessionId: 'session-other' })],
@@ -174,7 +190,7 @@ describe('ConversationSessionLiveSignalAdapter', () => {
         }),
       ],
     });
-    const adapter = new ConversationSessionLiveSignalAdapter(host);
+    const adapter = new ConversationSessionLiveSignalAdapter(host, backgroundTaskLiveSignalCoordinator);
 
     adapter.start();
     emitStatus('session-active-only', status);
@@ -185,5 +201,8 @@ describe('ConversationSessionLiveSignalAdapter', () => {
       'session-active-only',
       status,
     );
+    expect(
+      backgroundTaskLiveSignalCoordinator.reconcileStateFromLiveSignals,
+    ).toHaveBeenCalledWith('tab-active');
   });
 });

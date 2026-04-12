@@ -1,6 +1,12 @@
 import type { SessionActivityStatus } from '../../../core/opencode';
 import type { Conversation, SessionTodo } from '../../../core/types';
 import type { TabData, TabId } from '../tabs';
+import type { BackgroundTaskLiveSignalCoordinator } from './BackgroundTaskLiveSignalCoordinator';
+
+type ConversationSessionLiveSignalBackgroundTaskPort = Pick<
+  BackgroundTaskLiveSignalCoordinator,
+  'reconcileStateFromLiveSignals'
+>;
 
 export interface ConversationSessionLiveSignalAdapterHost {
   subscribeToSessionTodoUpdates(
@@ -29,7 +35,10 @@ export class ConversationSessionLiveSignalAdapter {
   private disposeTodoSubscription: (() => void) | null = null;
   private disposeStatusSubscription: (() => void) | null = null;
 
-  constructor(private readonly host: ConversationSessionLiveSignalAdapterHost) {}
+  constructor(
+    private readonly host: ConversationSessionLiveSignalAdapterHost,
+    private readonly backgroundTaskLiveSignalCoordinator: ConversationSessionLiveSignalBackgroundTaskPort,
+  ) {}
 
   start(): void {
     this.stop();
@@ -51,12 +60,14 @@ export class ConversationSessionLiveSignalAdapter {
   private handleSessionTodoUpdate(sessionId: string, todos: SessionTodo[]): void {
     for (const tabId of this.getMatchedTabIds(sessionId)) {
       this.host.applySessionTodoUpdate(tabId, sessionId, todos);
+      this.backgroundTaskLiveSignalCoordinator.reconcileStateFromLiveSignals(tabId);
     }
   }
 
   private handleSessionStatusUpdate(sessionId: string, status: SessionActivityStatus): void {
     for (const tabId of this.getMatchedTabIds(sessionId)) {
       this.host.applySessionStatusUpdate(tabId, sessionId, status);
+      this.backgroundTaskLiveSignalCoordinator.reconcileStateFromLiveSignals(tabId);
     }
   }
 
