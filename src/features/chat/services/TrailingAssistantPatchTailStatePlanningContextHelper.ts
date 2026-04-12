@@ -1,28 +1,21 @@
 import {
+  buildTrailingAssistantPatchTailStatePlanningContextShape,
+  type TrailingAssistantPatchTailStatePlanningContext,
+} from './TrailingAssistantPatchTailStatePlanningContextShapeHelper';
+import {
   buildTrailingAssistantPatchTailStatePlanningContextInputs,
-  type TrailingAssistantPatchTailStatePlanningContextInputs,
-  type TrailingAssistantPatchTailStatePlanningContextInputsSource,
+} from './TrailingAssistantPatchTailStatePlanningContextInputsHelper';
+import type {
+  TrailingAssistantPatchTailStatePlanningContextInputsSource as TrailingAssistantPatchTailStatePlanningContextSource,
 } from './TrailingAssistantPatchTailStatePlanningContextInputsHelper';
 
-export type TrailingAssistantPatchTailStatePlanningContextSource =
-  TrailingAssistantPatchTailStatePlanningContextInputsSource;
-export type TrailingAssistantPatchTailStatePlanningContext =
-  TrailingAssistantPatchTailStatePlanningContextInputs;
+export type { TrailingAssistantPatchTailStatePlanningContext } from './TrailingAssistantPatchTailStatePlanningContextShapeHelper';
+export type { TrailingAssistantPatchTailStatePlanningContextInputsSource as TrailingAssistantPatchTailStatePlanningContextSource } from './TrailingAssistantPatchTailStatePlanningContextInputsHelper';
 
 export function buildTrailingAssistantPatchTailStatePlanningContext(
   source: TrailingAssistantPatchTailStatePlanningContextSource,
 ): TrailingAssistantPatchTailStatePlanningContext {
-  return buildTrailingAssistantPatchTailStatePlanningContextFromInputs(
+  return buildTrailingAssistantPatchTailStatePlanningContextShape(
     buildTrailingAssistantPatchTailStatePlanningContextInputs(source),
   );
-}
-
-function buildTrailingAssistantPatchTailStatePlanningContextFromInputs(
-  inputs: TrailingAssistantPatchTailStatePlanningContextInputs,
-): TrailingAssistantPatchTailStatePlanningContext {
-  return {
-    nextTailMessage: inputs.nextTailMessage,
-    messageEl: inputs.messageEl,
-    shouldStickToBottom: inputs.shouldStickToBottom,
-  };
 }

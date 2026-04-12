@@ -36,6 +36,7 @@ export function buildTrailingAssistantPatchTailStatePlanningContextInputs(
 
 ## 与其他模块的关系
 
-- `TrailingAssistantPatchTailStatePlanningContextHelper` 现在先委托这里把 tail-outcome source 收束成 tail-state inputs，再装配最终 planning-context shape
+- `TrailingAssistantPatchTailStatePlanningContextHelper` 现在先委托这里把 tail-outcome source 收束成 tail-state inputs，再交给 shape helper 生成最终 planning-context
+- `TrailingAssistantPatchTailStatePlanningContextShapeHelper` 消费这里返回的窄 inputs，并负责最后一层 planning-context shape 装配
 - `TrailingAssistantPatchTailOutcomePlanningContextHelper` 继续提供更上游的 tail-outcome planning-context source
 - `TrailingAssistantPatchTailStateTailOutcomePlanHelper` 继续经由 planning-context helper 暴露 tail-state planning-context 给更下游的 tail-state plan 装配
