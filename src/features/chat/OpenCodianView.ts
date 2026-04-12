@@ -1800,13 +1800,6 @@ export class OpenCodianView extends ItemView {
       loadConversations: () => this.plugin.loadConversations(),
       getConversations: () => this.plugin.getConversations(),
       createConversation: () => this.plugin.createConversation(),
-      applyLoadedConversationActivation: (tabId, conversation) => {
-        this.tabConversationStateBridge.applyActiveConversation(tabId, conversation, {
-          clearRevertState: true,
-          resetSessionState: true,
-          resetBackgroundTaskSuppressedFingerprint: true,
-        });
-      },
       syncBackgroundTaskStateFromConversation: (conversation) => {
         this.syncBackgroundTaskStateFromConversation(conversation);
       },

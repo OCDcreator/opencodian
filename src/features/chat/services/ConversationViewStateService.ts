@@ -37,7 +37,6 @@ export interface ConversationViewStateHost {
   getConversations(): Conversation[];
   createConversation(): Promise<Conversation>;
 
-  applyLoadedConversationActivation(tabId: TabId | null, conversation: Conversation): void;
   syncBackgroundTaskStateFromConversation(conversation: Conversation): void;
   renderMessages(messages: ChatMessage[]): Promise<void>;
   commitConversationSyncBaseline(messages: ChatMessage[]): void;
@@ -45,7 +44,9 @@ export interface ConversationViewStateHost {
 
 type TabConversationActivationPort = Pick<
   TabConversationActivationBridge,
-  'applyEmptyTabActivation' | 'applyStreamingConversationActivation'
+  | 'applyEmptyTabActivation'
+  | 'applyLoadedConversationActivation'
+  | 'applyStreamingConversationActivation'
 >;
 
 type TabViewActivationPort =
@@ -173,7 +174,10 @@ export class ConversationViewStateService {
     );
     const { activeTabId } = transitionContext;
 
-    this.host.applyLoadedConversationActivation(activeTabId, conversation);
+    this.tabConversationActivationBridge.applyLoadedConversationActivation(
+      activeTabId,
+      conversation,
+    );
     this.conversationTransitionBridge.beginLoadedConversationTransition(transitionContext);
 
     try {

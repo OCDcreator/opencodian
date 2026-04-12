@@ -46,7 +46,6 @@ function createHost(
     loadConversations: jest.fn().mockResolvedValue(undefined),
     getConversations: jest.fn().mockReturnValue([]),
     createConversation: jest.fn().mockResolvedValue(createConversation('created')),
-    applyLoadedConversationActivation: jest.fn(),
     syncBackgroundTaskStateFromConversation: jest.fn(),
     renderMessages: jest.fn().mockResolvedValue(undefined),
     commitConversationSyncBaseline: jest.fn(),
@@ -57,13 +56,16 @@ function createHost(
 type MockedTabConversationActivationPort = jest.Mocked<
   Pick<
     TabConversationActivationBridge,
-    'applyEmptyTabActivation' | 'applyStreamingConversationActivation'
+    | 'applyEmptyTabActivation'
+    | 'applyLoadedConversationActivation'
+    | 'applyStreamingConversationActivation'
   >
 >;
 
 function createTabConversationActivationBridge(): MockedTabConversationActivationPort {
   return {
     applyEmptyTabActivation: jest.fn(),
+    applyLoadedConversationActivation: jest.fn(),
     applyStreamingConversationActivation: jest.fn(),
   };
 }
@@ -255,7 +257,7 @@ describe('ConversationViewStateService', () => {
     expect(transitionBridge.captureLoadedConversationTransition).not.toHaveBeenCalled();
   });
 
-  it('delegates the loaded-conversation transition shell to the dedicated bridge', async () => {
+  it('delegates loaded-conversation activation state and transition shell to dedicated bridges', async () => {
     const conversation = createConversation('load-target');
     const host = createHost();
     const tabConversationActivationBridge = createTabConversationActivationBridge();
@@ -284,7 +286,10 @@ describe('ConversationViewStateService', () => {
       reloadIfMissing: true,
     });
     expect(transitionBridge.captureLoadedConversationTransition).toHaveBeenCalledWith(true);
-    expect(host.applyLoadedConversationActivation).toHaveBeenCalledWith('tab-1', conversation);
+    expect(tabConversationActivationBridge.applyLoadedConversationActivation).toHaveBeenCalledWith(
+      'tab-1',
+      conversation,
+    );
     expect(transitionBridge.beginLoadedConversationTransition).toHaveBeenCalledTimes(1);
     expect(conversationLoadRuntimeBridge.loadConversationMessages).toHaveBeenCalledWith(
       conversation,

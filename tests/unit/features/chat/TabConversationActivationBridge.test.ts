@@ -192,6 +192,38 @@ describe('TabConversationActivationBridge', () => {
     ]);
   });
 
+  it('applies loaded-conversation activation state through the shared state bridge', () => {
+    const callOrder: string[] = [];
+    const conversation = createConversation('loaded-conversation');
+    const host = createHost(callOrder);
+    const tabConversationStateBridge = createTabConversationStateBridge(callOrder);
+    const tabViewActivationBridge = createTabViewActivationBridge(callOrder);
+    const refreshCoordinator = createRefreshCoordinator(callOrder);
+    const bridge = new TabConversationActivationBridge(
+      host,
+      tabConversationStateBridge,
+      tabViewActivationBridge,
+      refreshCoordinator,
+    );
+
+    bridge.applyLoadedConversationActivation('tab-1', conversation);
+
+    expect(tabConversationStateBridge.applyActiveConversation).toHaveBeenCalledWith(
+      'tab-1',
+      conversation,
+      {
+        clearRevertState: true,
+        resetSessionState: true,
+        resetBackgroundTaskSuppressedFingerprint: true,
+      },
+    );
+    expect(tabConversationStateBridge.commitConversationSyncBaseline).not.toHaveBeenCalled();
+    expect(tabViewActivationBridge.applyStreamingActivationOutcome).not.toHaveBeenCalled();
+    expect(callOrder).toEqual([
+      'applyActiveConversation',
+    ]);
+  });
+
   it('opens the current-tab conversation shell in bridge order', () => {
     const callOrder: string[] = [];
     const conversation = createConversation('next-conversation');

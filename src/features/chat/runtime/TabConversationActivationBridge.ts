@@ -61,6 +61,14 @@ export class TabConversationActivationBridge {
     );
   }
 
+  applyLoadedConversationActivation(tabId: TabId | null, conversation: Conversation): void {
+    this.tabConversationStateBridge.applyActiveConversation(tabId, conversation, {
+      clearRevertState: true,
+      resetSessionState: true,
+      resetBackgroundTaskSuppressedFingerprint: true,
+    });
+  }
+
   openConversation(conversation: Conversation): void {
     if (this.host.getCurrentConversationId() !== conversation.id) {
       this.host.resetBackgroundTaskIndicator();
