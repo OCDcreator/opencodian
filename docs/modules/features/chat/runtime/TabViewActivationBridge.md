@@ -38,6 +38,7 @@ export class TabViewActivationBridge {
 - `ConversationViewStateService.activateTab()` 现在只决定激活后走 streaming / hydration / empty-tab 哪条分支，不再直接持有这些 pane-level UI writeback
 - `ConversationHydrationOutcomeBridge` 现在负责在消息装载后触发本 bridge 的 loaded-conversation post-render outcome；`ConversationViewStateService.loadConversation()` 继续保留 hydrate 主链路和 scroll restore，但不再直接持有这段 post-render outcome
 - `ConversationViewStateService.loadConversation()` 也不再直接持有 composer/model/context usage 这段 hydration 尾部 writeback；activation/open 侧的 dock + supplemental refresh 现在先交给 `QuestionTodoActivationRefreshCoordinator`
+- `OpenCodianView` 提供给本 bridge 的 pane/composer/model/send-button host shape 现在先经由 `TabActivationBridgeHostFactory` 统一派生，不再单独维护一份 `createTabViewActivationBridgeHost()` 闭包
 - 这样后续如果继续沿 P1 收紧 tab activation ownership，可以在不改动 hydrate 主链路的情况下扩展同一桥接边界
 
 ## 与 `OpenCodianView` 的边界

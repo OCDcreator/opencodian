@@ -128,8 +128,11 @@ import {
 } from './runtime/ConversationTransitionBridge';
 import {
   TabConversationActivationBridge,
-  type TabConversationActivationBridgeHost,
 } from './runtime/TabConversationActivationBridge';
+import {
+  createTabActivationBridgeHosts,
+  type TabActivationBridgeHostFactoryHost,
+} from './runtime/TabActivationBridgeHostFactory';
 import {
   PermissionInlineCardRenderer,
 } from './runtime/PermissionInlineCardRenderer';
@@ -160,7 +163,6 @@ import {
 } from './runtime/TabRuntimeStateBridge';
 import {
   TabViewActivationBridge,
-  type TabViewActivationBridgeHost,
 } from './runtime/TabViewActivationBridge';
 import {
   ActiveTabContextUsageCoordinator,
@@ -1168,8 +1170,11 @@ export class OpenCodianView extends ItemView {
     this.tabConversationStateBridge = new TabConversationStateBridge(
       this.createTabConversationStateBridgeHost(),
     );
+    const tabActivationBridgeHosts = createTabActivationBridgeHosts(
+      this.createTabActivationBridgeHostFactoryHost(),
+    );
     this.tabViewActivationBridge = new TabViewActivationBridge(
-      this.createTabViewActivationBridgeHost(),
+      tabActivationBridgeHosts.tabViewActivationBridgeHost,
       this.composerContextViewFacade,
       questionTodoActivationRefreshCoordinator,
       backgroundTaskActivationIndicatorCoordinator,
@@ -1181,7 +1186,7 @@ export class OpenCodianView extends ItemView {
       this.tabViewActivationBridge,
     );
     this.tabConversationActivationBridge = new TabConversationActivationBridge(
-      this.createTabConversationActivationBridgeHost(),
+      tabActivationBridgeHosts.tabConversationActivationBridgeHost,
       this.tabConversationStateBridge,
       this.tabViewActivationBridge,
       questionTodoActivationRefreshCoordinator,
@@ -1495,8 +1500,9 @@ export class OpenCodianView extends ItemView {
     };
   }
 
-  private createTabViewActivationBridgeHost(): TabViewActivationBridgeHost {
+  private createTabActivationBridgeHostFactoryHost(): TabActivationBridgeHostFactoryHost {
     return {
+      getActiveTabId: () => this.getActiveTabId(),
       setActiveMessagesPane: (tabId) => {
         this.setActiveMessagesPane(tabId);
       },
@@ -1509,20 +1515,11 @@ export class OpenCodianView extends ItemView {
       updateSendButtonState: () => {
         this.updateSendButtonState();
       },
-    };
-  }
-
-  private createTabConversationActivationBridgeHost(): TabConversationActivationBridgeHost {
-    return {
-      getActiveTabId: () => this.getActiveTabId(),
       clearMessagesContainer: () => {
         this.messagesContainer?.empty();
       },
       resetTurnState: () => {
         this.resetTurnState();
-      },
-      updateModelSelectorDisplay: () => {
-        this.updateModelSelectorDisplay();
       },
       scheduleSettledScrollToBottom: (tabId) => {
         this.scheduleSettledScrollToBottom(tabId);
