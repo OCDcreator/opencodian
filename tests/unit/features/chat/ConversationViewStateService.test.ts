@@ -79,7 +79,6 @@ function createHost(
     getConversations: jest.fn().mockReturnValue([]),
     createConversation: jest.fn().mockResolvedValue(createConversation('created')),
     getConversationById: jest.fn().mockResolvedValue(null),
-    renderQuestionDock: jest.fn(),
     applyStreamingConversationActivation: jest.fn(),
     applyEmptyTabActivation: jest.fn(),
     prepareConversationTransition: jest.fn().mockResolvedValue(undefined),
@@ -103,10 +102,6 @@ function createHost(
     syncBackgroundTaskStateFromConversation: jest.fn(),
     renderMessages: jest.fn().mockResolvedValue(undefined),
     renderBackgroundTaskIndicatorIfNeeded: jest.fn().mockResolvedValue(undefined),
-    renderSessionTodoDock: jest.fn(),
-    refreshTabSessionStatus: jest.fn().mockResolvedValue(null),
-    refreshPendingQuestionsForTab: jest.fn().mockResolvedValue([]),
-    refreshActiveSessionTodos: jest.fn().mockResolvedValue([]),
     commitConversationSyncBaseline: jest.fn(),
     scrollToBottom: jest.fn(),
     syncPaneScrollMetrics: jest.fn(),
@@ -215,7 +210,7 @@ describe('ConversationViewStateService', () => {
     expect(host.applyStreamingConversationActivation).not.toHaveBeenCalled();
   });
 
-  it('preserves scroll hydration flow and clears pending questions when the session changes', async () => {
+  it('preserves scroll hydration flow while delegating loaded-conversation refresh bridges', async () => {
     const conversation = createConversation('load-target');
     const host = createHost({
       getConversationById: jest.fn().mockResolvedValue(conversation),
@@ -223,6 +218,7 @@ describe('ConversationViewStateService', () => {
     const { bridge } = createActivationBridge();
     const service = new ConversationViewStateService(host, bridge);
     const messagesEl = host.getMessagesContainer();
+    const postRenderRefreshSpy = jest.spyOn(bridge, 'applyLoadedConversationPostRenderRefreshes');
     const hydrationTailSpy = jest.spyOn(bridge, 'applyLoadedConversationHydrationTail');
 
     await service.loadConversation(conversation.id, {
@@ -233,6 +229,7 @@ describe('ConversationViewStateService', () => {
     expect(host.applyLoadedConversationActivation).toHaveBeenCalledWith('tab-1', conversation);
     expect(host.beginConversationHydration).toHaveBeenCalledWith('tab-1');
     expect(host.renderMessages).toHaveBeenCalledWith(conversation.messages);
+    expect(postRenderRefreshSpy).toHaveBeenCalledWith('tab-1', conversation.openCodeSessionId);
     expect(host.commitConversationSyncBaseline).toHaveBeenCalledWith(conversation.messages);
     expect(captureElementScrollRestoreSnapshot).toHaveBeenCalledWith(messagesEl, false, 120);
     expect(restoreElementScrollAfterRender).toHaveBeenCalled();

@@ -13,7 +13,7 @@
 - hydration 生命周期信号
 - tab/pane activation 分支所需的 render host 回调
 - active-tab conversation/session 写回（现在经由 `runtime/TabConversationStateBridge.ts`）
-- 消息重渲、todo/question 刷新
+- 消息重渲与 background-task indicator render
 - scroll restore 所需的容器和 runtime 状态
 
 ## 公开接口
@@ -50,7 +50,7 @@ export class ConversationViewStateService {
 - tab 激活入口现在先委托 `runtime/TabViewActivationBridge.ts` 统一处理 pane 切换、focus preview、question dock 和 todo dock 预刷新
 - streaming tab 走快速路径，不触发完整 conversation reload
 - 普通 conversation tab 统一转入 `loadConversation(..., { preserveScrollPosition: true })`
-- streaming / empty-tab 分支的后续 dock / selector / context identity / send button 刷新顺序，以及 loaded conversation hydration 尾段的 composer/model/context usage 写回，也通过 `TabViewActivationBridge` 统一编排
+- streaming / empty-tab 分支的后续 dock / selector / context identity / send button 刷新顺序，以及 loaded conversation 的 post-render dock/status/question/todo refresh 和 hydration 尾段的 composer/model/context usage 写回，也通过 `TabViewActivationBridge` 统一编排
 
 ### conversation hydration
 
@@ -58,10 +58,11 @@ export class ConversationViewStateService {
 - 装载时仍保留 `beginConversationHydration()` / `endConversationHydration()` 的 `finally` 保护
 - scroll restore 继续复用 `ScrollManager`，保持 bottom / anchor / distance 语义
 - loaded conversation 的 `currentConversation` / active-tab conversation / session reset 写回现在先委托给 `TabConversationStateBridge`
-- session 变化时仍会先清掉 pending questions，再刷新 todo/status/question；hydrate 尾段的 composer layout、model selector 与 context usage snapshot 刷新则转交给 `TabViewActivationBridge`
+- loaded conversation 在消息重渲后的 todo dock / question dock / status / pending question / session todo refresh，现在先转交给 `TabViewActivationBridge`
+- hydrate 尾段的 composer layout、model selector 与 context usage snapshot 刷新同样转交给 `TabViewActivationBridge`
 
 ## 与 `OpenCodianView` 的边界
 
 - `OpenCodianView` 仍保留真实 UI render、插件服务装配、tab runtime 状态、scroll metrics 和后台同步实现
-- `ConversationViewStateService` 只负责决定“何时 restore / 激活 / hydrate / 刷新”，不再逐项写入 active-tab conversation/session state，也不再直接触发 pane activation 预刷新、streaming/empty activation outcome UI 回调，或 loaded-conversation hydration 尾段的 composer/model/context usage 写回
+- `ConversationViewStateService` 只负责决定“何时 restore / 激活 / hydrate / 刷新”，不再逐项写入 active-tab conversation/session state，也不再直接触发 pane activation 预刷新、loaded-conversation 的 post-render dock/status/question/todo refresh、streaming/empty activation outcome UI 回调，或 loaded-conversation hydration 尾段的 composer/model/context usage 写回
 - 这样后续继续拆 model selector 或消息区重渲时，可以沿着更清晰的 host 边界继续推进，而不必再把装载主链路塞回 view

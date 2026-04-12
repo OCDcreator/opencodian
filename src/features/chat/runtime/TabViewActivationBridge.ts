@@ -7,19 +7,19 @@ export interface TabViewActivationBridgeHost {
   refreshActiveFocusContextPreview(): void;
   renderQuestionDock(): void;
   updateSessionTodoDockForTab(tabId: TabId): void;
-  renderSessionTodoDock(tabId: TabId): void;
+  renderSessionTodoDock(tabId: TabId | null): void;
   scheduleComposerLayoutSync(): void;
   updateModelSelectorDisplay(): void;
   syncActiveTabContextUsageIdentity(): void;
   refreshActiveTabContextUsageFromServer(): Promise<void>;
   refreshTabSessionStatus(
-    tabId: TabId,
+    tabId: TabId | null,
     sessionId: string | null,
     options: { suppressErrors?: boolean },
   ): Promise<SessionActivityStatus | null>;
-  refreshPendingQuestionsForTab(tabId: TabId, sessionId: string | null): Promise<QuestionRequest[]>;
+  refreshPendingQuestionsForTab(tabId: TabId | null, sessionId: string | null): Promise<QuestionRequest[]>;
   refreshTabSessionTodos(
-    tabId: TabId,
+    tabId: TabId | null,
     sessionId: string | null,
     options: { suppressErrors?: boolean },
   ): Promise<SessionTodo[]>;
@@ -53,6 +53,14 @@ export class TabViewActivationBridge {
     this.host.updateModelSelectorDisplay();
     this.host.syncActiveTabContextUsageIdentity();
     this.host.updateSendButtonState();
+  }
+
+  applyLoadedConversationPostRenderRefreshes(tabId: TabId | null, sessionId: string | null): void {
+    this.host.renderSessionTodoDock(tabId);
+    this.host.renderQuestionDock();
+    void this.host.refreshTabSessionStatus(tabId, sessionId, { suppressErrors: true });
+    void this.host.refreshPendingQuestionsForTab(tabId, sessionId);
+    void this.host.refreshTabSessionTodos(tabId, sessionId, { suppressErrors: true });
   }
 
   async applyLoadedConversationHydrationTail(): Promise<void> {

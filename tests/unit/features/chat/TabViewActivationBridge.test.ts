@@ -149,6 +149,47 @@ describe('TabViewActivationBridge', () => {
     expect(callOrder).toEqual(['todo', 'question', 'selector', 'context', 'send']);
   });
 
+  it('applies loaded-conversation post-render refreshes in order', () => {
+    const callOrder: string[] = [];
+    const host: jest.Mocked<TabViewActivationBridgeHost> = {
+      setActiveMessagesPane: jest.fn(),
+      refreshActiveFocusContextPreview: jest.fn(),
+      renderQuestionDock: jest.fn(() => {
+        callOrder.push('question');
+      }),
+      updateSessionTodoDockForTab: jest.fn(),
+      renderSessionTodoDock: jest.fn(() => {
+        callOrder.push('todo');
+      }),
+      scheduleComposerLayoutSync: jest.fn(),
+      updateModelSelectorDisplay: jest.fn(),
+      syncActiveTabContextUsageIdentity: jest.fn(),
+      refreshActiveTabContextUsageFromServer: jest.fn().mockResolvedValue(undefined),
+      refreshTabSessionStatus: jest.fn(() => {
+        callOrder.push('status');
+        return Promise.resolve(null);
+      }),
+      refreshPendingQuestionsForTab: jest.fn(() => {
+        callOrder.push('pending-question');
+        return Promise.resolve([]);
+      }),
+      refreshTabSessionTodos: jest.fn(() => {
+        callOrder.push('refresh-todo');
+        return Promise.resolve([]);
+      }),
+      updateSendButtonState: jest.fn(),
+    };
+    const bridge = new TabViewActivationBridge(host);
+
+    bridge.applyLoadedConversationPostRenderRefreshes('tab-1', 'session-1');
+
+    expect(host.renderSessionTodoDock).toHaveBeenCalledWith('tab-1');
+    expect(host.refreshTabSessionStatus).toHaveBeenCalledWith('tab-1', 'session-1', { suppressErrors: true });
+    expect(host.refreshPendingQuestionsForTab).toHaveBeenCalledWith('tab-1', 'session-1');
+    expect(host.refreshTabSessionTodos).toHaveBeenCalledWith('tab-1', 'session-1', { suppressErrors: true });
+    expect(callOrder).toEqual(['todo', 'question', 'status', 'pending-question', 'refresh-todo']);
+  });
+
   it('applies loaded-conversation hydration tail refreshes in order', async () => {
     const callOrder: string[] = [];
     const host: jest.Mocked<TabViewActivationBridgeHost> = {

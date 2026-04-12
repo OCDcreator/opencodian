@@ -1,10 +1,7 @@
-import type { SessionActivityStatus } from '../../../core/opencode';
 import {
   type ChatMessage,
   type Conversation,
   type PersistedTabState,
-  type QuestionRequest,
-  type SessionTodo,
 } from '../../../core/types';
 import type { TabViewActivationBridge } from '../runtime/TabViewActivationBridge';
 import type { RestoredTabState, TabData, TabId } from '../tabs';
@@ -46,7 +43,6 @@ export interface ConversationViewStateHost {
   createConversation(): Promise<Conversation>;
   getConversationById(id: string): Promise<Conversation | null>;
 
-  renderQuestionDock(): void;
   applyStreamingConversationActivation(tabId: TabId, conversation: Conversation): Promise<void> | void;
   applyEmptyTabActivation(tabId: TabId): void;
 
@@ -69,14 +65,6 @@ export interface ConversationViewStateHost {
   syncBackgroundTaskStateFromConversation(conversation: Conversation): void;
   renderMessages(messages: ChatMessage[]): Promise<void>;
   renderBackgroundTaskIndicatorIfNeeded(tabId?: TabId | null): Promise<void>;
-  renderSessionTodoDock(tabId?: TabId | null): void;
-  refreshTabSessionStatus(
-    tabId: TabId | null,
-    sessionId: string | null,
-    options: { suppressErrors?: boolean },
-  ): Promise<SessionActivityStatus | null>;
-  refreshPendingQuestionsForTab(tabId: TabId | null, sessionId: string | null): Promise<QuestionRequest[]>;
-  refreshActiveSessionTodos(options: { suppressErrors?: boolean }): Promise<SessionTodo[]>;
   commitConversationSyncBaseline(messages: ChatMessage[]): void;
   scrollToBottom(options: { tabId: TabId | null }): void;
   syncPaneScrollMetrics(tabId: TabId | null, messagesEl: HTMLElement): void;
@@ -85,7 +73,10 @@ export interface ConversationViewStateHost {
 }
 
 type TabViewActivationPort =
-  Pick<TabViewActivationBridge, 'applyActivationPreflight' | 'applyLoadedConversationHydrationTail'>;
+  Pick<
+    TabViewActivationBridge,
+    'applyActivationPreflight' | 'applyLoadedConversationPostRenderRefreshes' | 'applyLoadedConversationHydrationTail'
+  >;
 
 export class ConversationViewStateService {
   constructor(
@@ -226,11 +217,10 @@ export class ConversationViewStateService {
       this.host.syncBackgroundTaskStateFromConversation(conversation);
       await this.host.renderMessages(messages);
       await this.host.renderBackgroundTaskIndicatorIfNeeded(activeTabId);
-      this.host.renderSessionTodoDock(activeTabId);
-      this.host.renderQuestionDock();
-      void this.host.refreshTabSessionStatus(activeTabId, conversation.openCodeSessionId, { suppressErrors: true });
-      void this.host.refreshPendingQuestionsForTab(activeTabId, conversation.openCodeSessionId);
-      void this.host.refreshActiveSessionTodos({ suppressErrors: true });
+      this.tabViewActivationBridge.applyLoadedConversationPostRenderRefreshes(
+        activeTabId,
+        conversation.openCodeSessionId,
+      );
       this.host.commitConversationSyncBaseline(messages);
 
       if (messagesEl) {

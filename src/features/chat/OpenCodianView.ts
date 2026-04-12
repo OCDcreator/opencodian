@@ -1956,9 +1956,6 @@ export class OpenCodianView extends ItemView {
       getConversations: () => this.plugin.getConversations(),
       createConversation: () => this.plugin.createConversation(),
       getConversationById: async (id) => (await this.plugin.getConversationById(id)) ?? null,
-      renderQuestionDock: () => {
-        this.renderQuestionDock();
-      },
       applyStreamingConversationActivation: (tabId, conversation) =>
         this.applyStreamingConversationActivation(tabId, conversation),
       applyEmptyTabActivation: (tabId) => {
@@ -2016,14 +2013,6 @@ export class OpenCodianView extends ItemView {
       },
       renderMessages: (messages) => this.renderMessages(messages),
       renderBackgroundTaskIndicatorIfNeeded: (tabId) => this.renderBackgroundTaskIndicatorIfNeeded(tabId),
-      renderSessionTodoDock: (tabId) => {
-        this.renderSessionTodoDock(tabId);
-      },
-      refreshTabSessionStatus: (tabId, sessionId, options) =>
-        this.refreshTabSessionStatus(tabId, sessionId ?? undefined, options),
-      refreshPendingQuestionsForTab: (tabId, sessionId) =>
-        this.refreshPendingQuestionsForTab(tabId, sessionId ?? undefined),
-      refreshActiveSessionTodos: (options) => this.refreshActiveSessionTodos(options),
       commitConversationSyncBaseline: (messages) => {
         this.tabConversationStateBridge.commitConversationSyncBaseline(messages);
       },
