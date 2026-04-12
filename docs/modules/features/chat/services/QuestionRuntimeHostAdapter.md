@@ -13,7 +13,7 @@
 - 让 `QuestionDockCoordinator` 的 resolved-state callback 直接回连到共享的 `QuestionResolutionCoordinator`，保持 dock resolve 与 inline fallback 共用同一份 question-resolution state bridge
 - 让 dock 与 inline resolve 后的 status/sync follow-up 统一经由 `QuestionPostResolutionRuntimeFacade` 执行，而不是继续把这段运行时收尾逻辑散落在多个 coordinator 里
 
-当前这份 `QuestionRuntimeViewHost` 通常先由 `QuestionRuntimeViewHostAdapter` 准备：view 自己只保留较通用的 tab/runtime host，question 专属的 dock/settings/API/status bridge 则在 adapter 里组合；其中 tab attention 与 question resolve 后的 sync follow-up 也优先复用已有 `TabRuntimeStateBridge` / `ConversationSyncBridge` 稳定 port。
+当前这份 `QuestionRuntimeViewHost` 通常先由 `QuestionRuntimeViewHostFactory` + `QuestionRuntimeViewHostAdapter` 两层准备：factory 先从 view 收口 late-bound 的 question 相邻端口，adapter 再把 dock/settings/API/status bridge 组合成稳定 host；其中 tab attention 与 question resolve 后的 sync follow-up 也优先复用已有 `TabRuntimeStateBridge` / `ConversationSyncBridge` 稳定 port。
 
 它不负责 question request 的服务端数据获取、resolved card DOM 内容拼装，或 question dock 的真正 DOM 渲染；这些仍分别留给 `OpenCodeService`、`QuestionResolutionCardRenderer` 与 `QuestionDock`。
 
@@ -64,6 +64,6 @@ export function createQuestionRuntimeServices(...): QuestionRuntimeServices;
 
 ## 与 `OpenCodianView` 的边界
 
-- `OpenCodianView` 现在只提供一份更窄的 `QuestionRuntimeViewHostAdapterHost`，再由 `QuestionRuntimeViewHostAdapter` 组合成 `QuestionRuntimeViewHost`；dock slot/gate 相关 host 细节则继续委托给 `QuestionDockSlotCoordinator`，attention/sync follow-up 则优先委托给现成 runtime bridge
+- `OpenCodianView` 现在只提供一份更窄的 `QuestionRuntimeViewHostFactoryHost`；late-bound 的 dock/API/attention/sync/status wiring 先交给 `QuestionRuntimeViewHostFactory`，再由 `QuestionRuntimeViewHostAdapter` 组合成 `QuestionRuntimeViewHost`
 - `QuestionDockCoordinator` 继续负责 pending-question API refresh/session filter、dock callbacks 与 dock resolve flow；dock queue runtime map 维护由 `QuestionDockQueueRuntimeFacade` 接管，pending refresh runtime map 维护由 `QuestionPendingRefreshRuntimeFacade` 接管，inline resolved-request marking 也直接使用同一个 pending-refresh facade 小 port，resolve 后的 runtime follow-up 由 `QuestionPostResolutionRuntimeFacade` 接管
 - `QuestionInlineCardRenderer`、`QuestionResolutionCoordinator` 与 `QuestionResolutionFlowCoordinator` 继续分别负责 inline question card、resolved question runtime 与 dock-or-inline resolve orchestration；adapter 只负责共享装配

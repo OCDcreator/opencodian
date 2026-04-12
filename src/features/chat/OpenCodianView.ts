@@ -263,9 +263,9 @@ import {
   type QuestionRuntimeServices,
 } from './services/QuestionRuntimeHostAdapter';
 import {
-  createQuestionRuntimeViewHostAdapter,
-  type QuestionRuntimeViewHostAdapterHost,
-} from './services/QuestionRuntimeViewHostAdapter';
+  createQuestionRuntimeViewHost,
+  type QuestionRuntimeViewHostFactoryHost,
+} from './services/QuestionRuntimeViewHostFactory';
 import {
   createQuestionTodoBackgroundTaskActivationServices,
   createQuestionTodoBackgroundTaskActivationViewHostAdapter,
@@ -1278,15 +1278,7 @@ export class OpenCodianView extends ItemView {
     this.streamingInlineCardRenderer = new StreamingInlineCardRenderer(this.createStreamingInlineCardRendererHost());
     this.permissionInlineCardRenderer = new PermissionInlineCardRenderer(this.streamingInlineCardRenderer);
     this.questionRuntimeServices = createQuestionRuntimeServices(
-      createQuestionRuntimeViewHostAdapter({
-        viewHost: this.createQuestionRuntimeViewHostAdapterHost(),
-        settings: this.plugin.settings,
-        questionDockSlotCoordinator: this.questionDockSlotCoordinator,
-        questionApi: this.plugin.openCodeService,
-        tabAttention: this.tabRuntimeStateBridge,
-        conversationSync: this.conversationSyncBridge,
-        statusRefresh: this.sessionTodoStatusRefreshService,
-      }),
+      createQuestionRuntimeViewHost(this.createQuestionRuntimeViewHostFactoryHost()),
       this.streamingInlineCardRenderer,
     );
     this.sendPipelineRuntime = new SendPipelineRuntime(
@@ -2089,7 +2081,7 @@ export class OpenCodianView extends ItemView {
     };
   }
 
-  private createQuestionRuntimeViewHostAdapterHost(): QuestionRuntimeViewHostAdapterHost {
+  private createQuestionRuntimeViewHostFactoryHost(): QuestionRuntimeViewHostFactoryHost {
     return {
       getActiveTabId: () => this.getActiveTabId(),
       getTabRuntimeState: (tabId) => this.getTabRuntimeState(tabId),
@@ -2099,6 +2091,12 @@ export class OpenCodianView extends ItemView {
       keepQuestionCardPinnedToBottom: (tabId) => {
         this.keepQuestionCardPinnedToBottom(tabId);
       },
+      settings: this.plugin.settings,
+      getQuestionDockSlotCoordinator: () => this.questionDockSlotCoordinator,
+      getQuestionApi: () => this.plugin.openCodeService,
+      getTabAttention: () => this.tabRuntimeStateBridge,
+      getConversationSync: () => this.conversationSyncBridge,
+      getStatusRefresh: () => this.sessionTodoStatusRefreshService,
     };
   }
 

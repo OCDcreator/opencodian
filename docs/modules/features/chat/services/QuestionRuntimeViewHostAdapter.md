@@ -5,9 +5,9 @@
 
 ## 概述
 
-`QuestionRuntimeViewHostAdapter` 负责把 `OpenCodianView` 持有的通用 tab/runtime 回调，与 question 专属依赖（设置、`QuestionDockSlotCoordinator`、OpenCode question API、session-status refresh）组合成 `QuestionRuntimeHostAdapter` 所需的 `QuestionRuntimeViewHost`。
+`QuestionRuntimeViewHostAdapter` 负责把 question runtime 所需的 dock/settings/API/sync/status 端口组合成 `QuestionRuntimeHostAdapter` 所需的 `QuestionRuntimeViewHost`。
 
-这样 question runtime 的 host bridge 不再继续直接写在 view 里，而是落到一个只负责依赖拼装的 P2 helper。
+现在这层 adapter 通常由 `QuestionRuntimeViewHostFactory` 喂入：late-bound 的 question runtime 依赖先在 factory 里从 `OpenCodianView` 收口，再交给 adapter 做最终 host 适配。
 
 当前这层 adapter 也会直接复用已有稳定 runtime port：question resolution-card gate 直接读取设置，tab attention 写回直接委托 `TabRuntimeStateBridge`，question resolve 后的 sync follow-up 直接委托 `ConversationSyncBridge`；因此 view 自己只需要继续暴露更窄的 tab/runtime 读取与 scroll pin 能力。
 
@@ -38,6 +38,7 @@ export function createQuestionRuntimeViewHostAdapter(...): QuestionRuntimeViewHo
 
 ## 与其它模块的边界
 
-- `OpenCodianView` 只提供更窄的 `QuestionRuntimeViewHostAdapterHost`，不再直接拼 `QuestionRuntimeViewHost`，也不再包装 attention/sync/resolution-card gate 这三类稳定 port
+- `QuestionRuntimeViewHostFactory` 负责把 `OpenCodianView` 的 late-bound question runtime 依赖先收束到一份 shared host，再调用本 adapter
+- `OpenCodianView` 只提供更窄的 `QuestionRuntimeViewHostFactoryHost` / `QuestionRuntimeViewHostAdapterHost` 能力，不再在构造函数里直接拼 `QuestionRuntimeViewHost`
 - `QuestionRuntimeHostAdapter` 继续负责真正的 question runtime bundle 装配；本模块只负责准备它消费的 host
 - `QuestionDockSlotCoordinator` 继续拥有 slot lifecycle / render trigger；本模块只消费它暴露的 dock/gate port
