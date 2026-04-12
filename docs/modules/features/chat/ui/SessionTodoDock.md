@@ -9,7 +9,7 @@ Session Todo Dock 是可折叠的浮动面板，用于展示当前 AI 会话的�
 
 ## 导入关系
 上游: `obsidian`（setIcon）、`SessionTodo`（core/types）、`i18n`
-下游: 被 `OpenCodianView` 在输入区域附近实例化
+下游: 被 `SessionTodoDockCoordinator` 在输入区域附近实例化
 
 ## 核心类型 / 接口
 
@@ -64,7 +64,7 @@ interface SessionTodo {
 ```
 OpenCode session.todo() / todo.updated sync event
         ↓
-OpenCodeService → OpenCodianView → SessionTodoDock.update(todos)
+OpenCodeService / SessionTodoStateService → SessionTodoDockCoordinator → SessionTodoDock.update(todos)
         ↓
 进度标签 + 预览文本 + 任务列表渲染
 ```
@@ -72,7 +72,7 @@ OpenCodeService → OpenCodianView → SessionTodoDock.update(todos)
 ## 与其他模块的交互
 
 - **OpenCodeService**: 通过 SDK `session.todo()` 获取快照，`todo.updated` 事件推送增量更新
-- **OpenCodianView**: 持有实例，在 sync 事件触发时调用 `update()`
+- **SessionTodoDockCoordinator**: 持有实例，负责挂载/销毁与 active/background tab 的 session 选择，再调用 `update()`
 - **i18n**: `chat.todo.*` 命名空间
 
 ## 配置项
@@ -88,5 +88,5 @@ OpenCodeService → OpenCodianView → SessionTodoDock.update(todos)
 ## 补充说明
 
 - `session.todo()` SDK 调用：由 `OpenCodeService` 在 stream 完成后主动调用获取快照，不进行定时轮询
-- `todo.updated` 同步事件：通过 `global.syncEvent.subscribe('todo.updated', ...)` 订阅，事件数据为最新的 `SessionTodo[]` 数组，由 `OpenCodianView` 接收后调用 `SessionTodoDock.update(todos)`
+- `todo.updated` 同步事件：通过 `global.syncEvent.subscribe('todo.updated', ...)` 订阅，事件数据为最新的 `SessionTodo[]` 数组；写入 runtime state 后由 `SessionTodoDockCoordinator` 刷新 dock
 - `cancelled` 状态的视觉处理：marker 区域不显示任何图标（与 `pending` 相同），通过 `itemEl.dataset.state = 'cancelled'` 传递给 CSS 控制透明度/灰度样式

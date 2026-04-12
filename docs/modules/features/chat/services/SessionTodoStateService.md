@@ -62,6 +62,7 @@ export class SessionTodoStateService {
 - `SessionTodoStatusRefreshService` 负责主动调用 OpenCode todo/status API、维护 request-id stale guard，并在刷新成功后触发 foreground background-task reconcile
 - `PersistentAssistantNoticeService` 负责 persisted stale notice 的历史匹配、追加落盘，以及可见/隐藏 tab 的后续动作
 - `BackgroundTaskLiveSignalCoordinator` 现在会直接调用 `reconcileStaleSessionTodoState()` 参与 live-signal settle；view 不再转发这条 stale follow-up callback
-- `OpenCodianView` 仍保留 dock 装配与 host 装配，但不再内联 session todo/status 的 OpenCode 拉取刷新
+- `SessionTodoDockCoordinator` 负责 session todo dock 的 DOM 生命周期，以及 active/background tab 的 session→dock 渲染选择
+- `OpenCodianView` 只保留 host 装配与上层触发入口，不再内联 session todo/status 的 OpenCode 拉取刷新，也不再直接持有 dock DOM
 - `SessionTodoStateService` 负责 todo/status runtime 的纯状态机和 stale notice 协调
 - 这样后续继续推进 master-plan 的 `question / todo / background task` lane 时，可以把 background task stale/notice 边界继续从 view 拆走，而不是再把 session todo 细节塞回主视图

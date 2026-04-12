@@ -276,6 +276,10 @@ import {
   scrollElementToBottom,
 } from './services/ScrollManager';
 import {
+  SessionTodoDockCoordinator,
+  type SessionTodoDockCoordinatorHost,
+} from './services/SessionTodoDockCoordinator';
+import {
   SessionTodoStateService,
   type SessionTodoStateServiceHost,
 } from './services/SessionTodoStateService';
@@ -304,7 +308,6 @@ import type {
 } from './ui/modelSelector/types';
 import { NavigationSidebar } from './ui/NavigationSidebar';
 import { QuestionDock } from './ui/QuestionDock';
-import { SessionTodoDock } from './ui/SessionTodoDock';
 import { prepareUserMessageMarkdownForDisplay } from './userMessageDisplay';
 
 const logger = createLogger('OpenCodianView');
@@ -648,8 +651,6 @@ export class OpenCodianView extends ItemView {
   private liquidDiamondWebGlDemoController: LiquidDiamondDemoController | null = null;
   private questionDockMountEl: HTMLElement | null = null;
   private questionDock: QuestionDock | null = null;
-  private todoDockMountEl: HTMLElement | null = null;
-  private sessionTodoDock: SessionTodoDock | null = null;
   private currentConversation: Conversation | null = null;
   private currentConversationRevertState: ConversationRevertState | null = null;
   private markdownService: MarkdownRenderService | null = null;
@@ -718,6 +719,7 @@ export class OpenCodianView extends ItemView {
   private themeBackgroundRequestId = 0;
   private titleGenerationService: TitleGenerationService;
   private persistentAssistantNoticeService: PersistentAssistantNoticeService;
+  private sessionTodoDockCoordinator: SessionTodoDockCoordinator;
   private sessionTodoStateService: SessionTodoStateService;
   private sessionTodoStatusRefreshService: SessionTodoStatusRefreshService;
   private questionTodoStatusRefreshCoordinator: QuestionTodoStatusRefreshCoordinator;
@@ -1136,10 +1138,7 @@ export class OpenCodianView extends ItemView {
   }
 
   private renderSessionTodoDock(tabId: TabId | null = this.getActiveTabId()): void {
-    const activeSessionId = tabId === this.getActiveTabId()
-      ? (this.currentConversation?.openCodeSessionId ?? null)
-      : this.getTabRuntimeState(tabId)?.sessionTodoSessionId ?? null;
-    this.sessionTodoDock?.update(this.getTabSessionTodos(tabId, activeSessionId));
+    this.sessionTodoDockCoordinator.render(tabId);
   }
 
   private hasIncompleteTodos(todos: readonly SessionTodo[]): boolean {
@@ -1231,6 +1230,9 @@ export class OpenCodianView extends ItemView {
     );
     this.persistentAssistantNoticeService = new PersistentAssistantNoticeService(
       this.createPersistentAssistantNoticeServiceHost(),
+    );
+    this.sessionTodoDockCoordinator = new SessionTodoDockCoordinator(
+      this.createSessionTodoDockCoordinatorHost(),
     );
     this.sessionTodoStateService = new SessionTodoStateService(this.createSessionTodoStateServiceHost());
     this.sessionTodoStatusRefreshService = new SessionTodoStatusRefreshService(
@@ -1457,6 +1459,15 @@ export class OpenCodianView extends ItemView {
         content: string;
         tone: ChatMessage['noticeTone'];
       }) => this.persistentAssistantNoticeService.appendMessage(options),
+    };
+  }
+
+  private createSessionTodoDockCoordinatorHost(): SessionTodoDockCoordinatorHost {
+    return {
+      getActiveTabId: () => this.getActiveTabId(),
+      getCurrentConversationSessionId: () => this.currentConversation?.openCodeSessionId ?? null,
+      getTabRuntimeState: (tabId: TabId | null) => this.getTabRuntimeState(tabId),
+      getTabSessionTodos: (tabId, sessionId) => this.getTabSessionTodos(tabId, sessionId),
     };
   }
 
@@ -2358,9 +2369,7 @@ export class OpenCodianView extends ItemView {
     this.questionDock?.destroy();
     this.questionDock = null;
     this.questionDockMountEl = null;
-    this.sessionTodoDock?.destroy();
-    this.sessionTodoDock = null;
-    this.todoDockMountEl = null;
+    this.sessionTodoDockCoordinator.destroy();
     this.conversationSessionLiveSignalAdapter.stop();
     this.conversationSyncEventAdapter.stop();
     this.tabManager = null;
@@ -2690,9 +2699,7 @@ export class OpenCodianView extends ItemView {
   }
 
   private updateSessionTodoDockForTab(tabId: TabId): void {
-    this.sessionTodoDock?.update(
-      this.getTabSessionTodos(tabId, this.getTabRuntimeState(tabId)?.sessionTodoSessionId ?? null),
-    );
+    this.sessionTodoDockCoordinator.updateForTab(tabId);
   }
 
   private restorePersistedTabs(): string | null {
@@ -3319,8 +3326,7 @@ export class OpenCodianView extends ItemView {
   /** Build input area */
   private buildInputArea(container: HTMLElement) {
     this.inputTabBarSlotEl = container.createDiv({ cls: 'opencodian-tab-bar-slot opencodian-tab-bar-slot--input' });
-    this.todoDockMountEl = container.createDiv({ cls: 'opencodian-session-todo-slot' });
-    this.sessionTodoDock = new SessionTodoDock(this.todoDockMountEl);
+    this.sessionTodoDockCoordinator.attach(container);
 
     this.questionDockMountEl = container.createDiv({ cls: 'opencodian-question-dock-slot' });
     this.questionDock = new QuestionDock(this.questionDockMountEl);
