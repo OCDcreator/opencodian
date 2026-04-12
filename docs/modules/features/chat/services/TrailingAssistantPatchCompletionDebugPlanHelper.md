@@ -29,6 +29,6 @@ export function buildTrailingAssistantPatchCompletionDebugPlan(
 
 ## 与其他模块的关系
 
+- `TrailingAssistantPatchCompletionDebugTailOutcomePlanHelper` 现在负责从 tail-outcome context parts 串联到这里，让 `ConversationRenderService` 不再直接接触 completion-debug planning-context 与最终 plan 的组合链
 - `TrailingAssistantPatchCompletionDebugPlanningContextHelper` 继续负责把 tail-outcome source 缩成 completion-debug 专用 planning-context
-- `ConversationRenderService` 现在只负责把 tail-outcome planning-context、`tailStatePlan` 与摘要回调交给 planning-context helper，再把结果直接交给这里生成最终 plan
 - `TrailingAssistantPatchDebugLoggingContextHelper` 与后续 emitter/helper 链继续消费这里返回的稳定 `completionDebugPlan`

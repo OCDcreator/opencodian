@@ -12,14 +12,8 @@ import {
   emitTrailingAssistantPatchCompletionDebugLog,
   emitTrailingAssistantPatchSkippedDebugLog,
 } from './TrailingAssistantPatchDebugLogEmitterHelper';
-import {
-  buildTrailingAssistantPatchCompletionDebugPlanningContext,
-} from './TrailingAssistantPatchCompletionDebugPlanningContextHelper';
-import { buildTrailingAssistantPatchCompletionDebugPlanningContextSourceContract } from './TrailingAssistantPatchCompletionDebugPlanningContextSourceContractHelper';
-import {
-  buildTrailingAssistantPatchCompletionDebugPlan,
-  type TrailingAssistantPatchCompletionDebugPlan,
-} from './TrailingAssistantPatchCompletionDebugPlanHelper';
+import type { TrailingAssistantPatchCompletionDebugPlan } from './TrailingAssistantPatchCompletionDebugPlanHelper';
+import { buildTrailingAssistantPatchCompletionDebugPlanFromTailOutcomePlanningContext } from './TrailingAssistantPatchCompletionDebugTailOutcomePlanHelper';
 import {
   applyTrailingAssistantPatchTailState,
   type TrailingAssistantPatchTailStatePlan,
@@ -756,10 +750,12 @@ export class ConversationRenderService {
     return {
       tailStatePlan,
       completionDebugPlan:
-        this.buildTrailingAssistantPatchCompletionDebugPlanFromTailOutcomePlanningContext(
+        buildTrailingAssistantPatchCompletionDebugPlanFromTailOutcomePlanningContext({
           planningContext,
           tailStatePlan,
-        ),
+          summarizeChatMessageForDebug: (message) =>
+            this.host.summarizeChatMessageForDebug(message),
+        }),
     };
   }
 
@@ -768,22 +764,6 @@ export class ConversationRenderService {
   ): TrailingAssistantPatchTailStatePlan {
     return this.buildTrailingAssistantPatchTailStatePlan(
       buildTrailingAssistantPatchTailStatePlanningContext(planningContext),
-    );
-  }
-
-  private buildTrailingAssistantPatchCompletionDebugPlanFromTailOutcomePlanningContext(
-    planningContext: TrailingAssistantPatchTailOutcomePlanningContext,
-    tailStatePlan: TrailingAssistantPatchTailStatePlan,
-  ): TrailingAssistantPatchCompletionDebugPlan {
-    return buildTrailingAssistantPatchCompletionDebugPlan(
-      buildTrailingAssistantPatchCompletionDebugPlanningContext(
-        buildTrailingAssistantPatchCompletionDebugPlanningContextSourceContract({
-          planningContext,
-          tailStatePlan,
-          summarizeChatMessageForDebug: (message) =>
-            this.host.summarizeChatMessageForDebug(message),
-        }),
-      ),
     );
   }
 

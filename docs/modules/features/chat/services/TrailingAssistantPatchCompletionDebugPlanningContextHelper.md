@@ -5,7 +5,7 @@
 
 ## 概述
 
-`TrailingAssistantPatchCompletionDebugPlanningContextHelper` 把 trailing-assistant tail-outcome 路径里 completion-debug planning-context 的纯装配从 `ConversationRenderService` 抽成了独立 helper：
+`TrailingAssistantPatchCompletionDebugPlanningContextHelper` 把 trailing-assistant tail-outcome 路径里 completion-debug planning-context 的纯装配收束在独立 helper：
 
 - 接收已经由 source helper 组好的 tail-outcome planning-context 风格 source：tail messages、`messageEl`、`shouldStickToBottom`、`tailStatePlan` 与消息摘要函数
 - 在 helper 内部改为读取 `tailStatePlan.shouldStickToBottom`，把 tail-message summary 委托给 `TrailingAssistantPatchCompletionDebugSummaryPlanHelper`
@@ -42,9 +42,9 @@ export function buildTrailingAssistantPatchCompletionDebugPlanningContext(
 
 ## 与其他模块的关系
 
-- `ConversationRenderService` 现在先通过 `TrailingAssistantPatchCompletionDebugPlanningContextSourceContractHelper` 直接装配 source，再把结果交给这里，不再在 service 内部展开 completion-debug source 字段
+- `TrailingAssistantPatchCompletionDebugTailOutcomePlanHelper` 现在先通过 `TrailingAssistantPatchCompletionDebugPlanningContextSourceContractHelper` 装配 source，再把结果交给这里，不让 `ConversationRenderService` 直接接触 completion-debug source / planning-context 串联细节
 - `TrailingAssistantPatchTailOutcomePlanningContextHelper` 继续负责收束 tail messages、`messageEl` 与 `shouldStickToBottom` 的共享 tail-outcome contract；本 helper 再把它进一步缩成 completion-debug 专用 contract
-- `TrailingAssistantPatchCompletionDebugPlanningContextSourceContractHelper` 负责定义并装配这里消费的稳定 completion-debug source contract，并由 `ConversationRenderService` 直接依赖
+- `TrailingAssistantPatchCompletionDebugPlanningContextSourceContractHelper` 负责定义并装配这里消费的稳定 completion-debug source contract
 - `TrailingAssistantPatchCompletionDebugSummaryPlanHelper` 负责把 source 中的 tail messages 与摘要函数进一步收束成 `summaryPlan`
 - `TrailingAssistantPatchCompletionDebugPlanningContextShapeHelper` 负责把已经收窄的 `shouldStickToBottom` 与 `summaryPlan` 组装成最终 planning-context shape
 - `TrailingAssistantPatchCompletionDebugPlanHelper` 继续消费这里返回的窄 planning-context，并把最终 `completionDebugPlan` 交给 logging-context / emitter helper 链使用
