@@ -2,6 +2,7 @@ import type { App, EventRef } from 'obsidian';
 import { MarkdownView } from 'obsidian';
 
 import type { ContextFileCatalogService } from './ContextFileCatalogService';
+import type { FocusContextPreviewCoordinator } from './FocusContextPreviewCoordinator';
 import type { FocusContextRuntimeService } from './FocusContextRuntimeService';
 
 type ComposerContextEventFocusRuntimePort = Pick<
@@ -10,10 +11,14 @@ type ComposerContextEventFocusRuntimePort = Pick<
   | 'handleComposerFocusIn'
   | 'handleComposerFocusOut'
   | 'handleComposerPointerDown'
-  | 'refreshActiveFocusContextPreview'
-  | 'rememberMarkdownFilePath'
-  | 'scheduleFocusContextPreviewRefresh'
   | 'startRetainedSelectionPolling'
+>;
+
+type ComposerContextEventPreviewPort = Pick<
+  FocusContextPreviewCoordinator,
+  | 'handleFileOpen'
+  | 'refreshActiveFocusContextPreview'
+  | 'scheduleFocusContextPreviewRefresh'
 >;
 
 type ComposerContextEventCatalogPort = Pick<
@@ -22,7 +27,6 @@ type ComposerContextEventCatalogPort = Pick<
 >;
 
 export interface ComposerContextEventBridgeHost {
-  setCurrentConversationNotePath(path: string | null): void;
   getInputContainer(): HTMLElement | null;
   registerEvent(eventRef: EventRef): void;
   registerDomEvent(
@@ -37,21 +41,19 @@ export class ComposerContextEventBridge {
   constructor(
     private readonly app: App,
     private readonly focusContextRuntimeService: ComposerContextEventFocusRuntimePort,
+    private readonly focusContextPreviewCoordinator: ComposerContextEventPreviewPort,
     private readonly contextFileCatalogService: ComposerContextEventCatalogPort,
     private readonly host: ComposerContextEventBridgeHost,
   ) {}
 
   start(): void {
     const scheduleFocusPreviewRefresh = () => {
-      this.focusContextRuntimeService.scheduleFocusContextPreviewRefresh();
+      this.focusContextPreviewCoordinator.scheduleFocusContextPreviewRefresh();
     };
 
     this.host.registerEvent(
       this.app.workspace.on('file-open', (file) => {
-        const path = file?.path ?? null;
-        this.focusContextRuntimeService.rememberMarkdownFilePath(path);
-        this.host.setCurrentConversationNotePath(path);
-        scheduleFocusPreviewRefresh();
+        this.focusContextPreviewCoordinator.handleFileOpen(file?.path ?? null);
       }),
     );
     this.host.registerEvent(
@@ -61,7 +63,7 @@ export class ComposerContextEventBridge {
     );
     this.host.registerEvent(
       this.app.workspace.on('editor-change', (editor, info) => {
-        this.focusContextRuntimeService.refreshActiveFocusContextPreview(
+        this.focusContextPreviewCoordinator.refreshActiveFocusContextPreview(
           info instanceof MarkdownView ? info : undefined,
           editor,
         );

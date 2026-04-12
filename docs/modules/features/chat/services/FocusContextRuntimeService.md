@@ -5,7 +5,7 @@
 
 ## 概述
 
-`FocusContextRuntimeService` 把 `OpenCodianView` 里的 focus context preview 与活动 MarkdownView 回退查找收束到 editor-runtime service。workspace / vault / composer 事件注册现在由 `ComposerContextEventBridge` 接管，而 retained-selection handoff/highlight 细节则进一步下沉到 `RetainedSelectionHighlightService`，因此这里更专注于 preview 计算、活动 MarkdownView 解析与 retained-selection polling 编排。
+`FocusContextRuntimeService` 把 `OpenCodianView` 里的 focus context preview 与活动 MarkdownView 回退查找收束到 editor-runtime service。workspace / vault / composer 事件注册现在由 `ComposerContextEventBridge` 接管，activation / file-open 相邻的 preview refresh 与 current-note writeback 由 `FocusContextPreviewCoordinator` 收束，而 retained-selection handoff/highlight 细节则进一步下沉到 `RetainedSelectionHighlightService`，因此这里更专注于 preview 计算、活动 MarkdownView 解析与 retained-selection polling 编排。
 
 ## 导入关系
 
@@ -60,6 +60,7 @@ class FocusContextRuntimeService {
 - **OpenCodianView**：提供当前会话 note path 与 composer focus gate
 - **ComposerContextViewHostAdapter**：提供 active-tab focus preview 的读写 host，并把 runtime state 写回限制在活动 tab seam 内
 - **ComposerContextEventBridge**：桥接 workspace / vault / composer DOM 事件，并统一启动 polling 与关闭时的 `dispose()`
+- **FocusContextPreviewCoordinator**：收束 file-open / activation / editor-change 相邻的 preview refresh 与 current-note writeback
 - **RetainedSelectionHighlightService**：持有 retained-selection handoff/highlight state，并负责 CodeMirror/DOM 高亮 writeback
 - **composerContext**：提供 preview 结构和 selection-preview retain 规则
 - **ComposerContextCoordinator**：继续消费这里写回的 preview state，负责 chips 渲染与 preview attach/detach click 编排

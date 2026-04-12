@@ -4,11 +4,17 @@ import {
 } from '../../../../src/features/chat/runtime/TabViewActivationBridge';
 import type { ActiveTabContextUsageCoordinator } from '../../../../src/features/chat/services/ActiveTabContextUsageCoordinator';
 import type { BackgroundTaskActivationIndicatorCoordinator } from '../../../../src/features/chat/services/BackgroundTaskActivationIndicatorCoordinator';
+import type { FocusContextPreviewCoordinator } from '../../../../src/features/chat/services/FocusContextPreviewCoordinator';
 import type { QuestionTodoActivationRefreshCoordinator } from '../../../../src/features/chat/services/QuestionTodoActivationRefreshCoordinator';
 
 type ActiveTabContextUsagePort = Pick<
   ActiveTabContextUsageCoordinator,
   'syncIdentity' | 'refreshFromServer'
+>;
+
+type FocusContextPreviewPort = Pick<
+  FocusContextPreviewCoordinator,
+  'refreshActiveFocusContextPreview'
 >;
 
 type BackgroundTaskActivationIndicatorPort = Pick<
@@ -26,9 +32,6 @@ function createHost(callOrder: string[]): jest.Mocked<TabViewActivationBridgeHos
     setActiveMessagesPane: jest.fn(() => {
       callOrder.push('pane');
     }),
-    refreshActiveFocusContextPreview: jest.fn(() => {
-      callOrder.push('focus');
-    }),
     scheduleComposerLayoutSync: jest.fn(() => {
       callOrder.push('layout');
     }),
@@ -37,6 +40,16 @@ function createHost(callOrder: string[]): jest.Mocked<TabViewActivationBridgeHos
     }),
     updateSendButtonState: jest.fn(() => {
       callOrder.push('send');
+    }),
+  };
+}
+
+function createFocusContextPreviewCoordinator(
+  callOrder: string[],
+): jest.Mocked<FocusContextPreviewPort> {
+  return {
+    refreshActiveFocusContextPreview: jest.fn(() => {
+      callOrder.push('focus');
     }),
   };
 }
@@ -86,11 +99,13 @@ describe('TabViewActivationBridge', () => {
   it('applies pane activation preflight UI refreshes in order', () => {
     const callOrder: string[] = [];
     const host = createHost(callOrder);
+    const focusContextPreviewCoordinator = createFocusContextPreviewCoordinator(callOrder);
     const refreshCoordinator = createRefreshCoordinator(callOrder);
     const backgroundTaskCoordinator = createBackgroundTaskCoordinator(callOrder);
     const contextUsageCoordinator = createContextUsageCoordinator(callOrder);
     const bridge = new TabViewActivationBridge(
       host,
+      focusContextPreviewCoordinator,
       refreshCoordinator,
       backgroundTaskCoordinator,
       contextUsageCoordinator,
@@ -99,6 +114,7 @@ describe('TabViewActivationBridge', () => {
     bridge.applyActivationPreflight('tab-1');
 
     expect(host.setActiveMessagesPane).toHaveBeenCalledWith('tab-1');
+    expect(focusContextPreviewCoordinator.refreshActiveFocusContextPreview).toHaveBeenCalledTimes(1);
     expect(refreshCoordinator.applyActivationPreflight).toHaveBeenCalledWith('tab-1');
     expect(refreshCoordinator.applyConversationActivation).not.toHaveBeenCalled();
     expect(callOrder).toEqual(['pane', 'focus', 'preflight-refresh']);
@@ -107,11 +123,13 @@ describe('TabViewActivationBridge', () => {
   it('applies streaming activation outcome UI refreshes in order', () => {
     const callOrder: string[] = [];
     const host = createHost(callOrder);
+    const focusContextPreviewCoordinator = createFocusContextPreviewCoordinator(callOrder);
     const refreshCoordinator = createRefreshCoordinator(callOrder);
     const backgroundTaskCoordinator = createBackgroundTaskCoordinator(callOrder);
     const contextUsageCoordinator = createContextUsageCoordinator(callOrder);
     const bridge = new TabViewActivationBridge(
       host,
+      focusContextPreviewCoordinator,
       refreshCoordinator,
       backgroundTaskCoordinator,
       contextUsageCoordinator,
@@ -134,11 +152,13 @@ describe('TabViewActivationBridge', () => {
   it('applies empty-tab activation outcome UI refreshes in order', () => {
     const callOrder: string[] = [];
     const host = createHost(callOrder);
+    const focusContextPreviewCoordinator = createFocusContextPreviewCoordinator(callOrder);
     const refreshCoordinator = createRefreshCoordinator(callOrder);
     const backgroundTaskCoordinator = createBackgroundTaskCoordinator(callOrder);
     const contextUsageCoordinator = createContextUsageCoordinator(callOrder);
     const bridge = new TabViewActivationBridge(
       host,
+      focusContextPreviewCoordinator,
       refreshCoordinator,
       backgroundTaskCoordinator,
       contextUsageCoordinator,
@@ -154,11 +174,13 @@ describe('TabViewActivationBridge', () => {
   it('applies loaded-conversation post-render outcome in order', async () => {
     const callOrder: string[] = [];
     const host = createHost(callOrder);
+    const focusContextPreviewCoordinator = createFocusContextPreviewCoordinator(callOrder);
     const refreshCoordinator = createRefreshCoordinator(callOrder);
     const backgroundTaskCoordinator = createBackgroundTaskCoordinator(callOrder);
     const contextUsageCoordinator = createContextUsageCoordinator(callOrder);
     const bridge = new TabViewActivationBridge(
       host,
+      focusContextPreviewCoordinator,
       refreshCoordinator,
       backgroundTaskCoordinator,
       contextUsageCoordinator,
@@ -179,11 +201,13 @@ describe('TabViewActivationBridge', () => {
   it('applies loaded-conversation hydration tail refreshes in order', async () => {
     const callOrder: string[] = [];
     const host = createHost(callOrder);
+    const focusContextPreviewCoordinator = createFocusContextPreviewCoordinator(callOrder);
     const refreshCoordinator = createRefreshCoordinator(callOrder);
     const backgroundTaskCoordinator = createBackgroundTaskCoordinator(callOrder);
     const contextUsageCoordinator = createContextUsageCoordinator(callOrder);
     const bridge = new TabViewActivationBridge(
       host,
+      focusContextPreviewCoordinator,
       refreshCoordinator,
       backgroundTaskCoordinator,
       contextUsageCoordinator,

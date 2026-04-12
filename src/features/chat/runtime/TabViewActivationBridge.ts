@@ -1,11 +1,17 @@
 import type { ActiveTabContextUsageCoordinator } from '../services/ActiveTabContextUsageCoordinator';
 import type { BackgroundTaskActivationIndicatorCoordinator } from '../services/BackgroundTaskActivationIndicatorCoordinator';
+import type { FocusContextPreviewCoordinator } from '../services/FocusContextPreviewCoordinator';
 import type { QuestionTodoActivationRefreshCoordinator } from '../services/QuestionTodoActivationRefreshCoordinator';
 import type { TabId } from '../tabs';
 
 type ActiveTabContextUsagePort = Pick<
   ActiveTabContextUsageCoordinator,
   'syncIdentity' | 'refreshFromServer'
+>;
+
+type FocusContextPreviewRefreshPort = Pick<
+  FocusContextPreviewCoordinator,
+  'refreshActiveFocusContextPreview'
 >;
 
 type BackgroundTaskActivationIndicatorPort = Pick<
@@ -20,7 +26,6 @@ type QuestionTodoActivationRefreshPort = Pick<
 
 export interface TabViewActivationBridgeHost {
   setActiveMessagesPane(tabId: TabId): void;
-  refreshActiveFocusContextPreview(): void;
   scheduleComposerLayoutSync(): void;
   updateModelSelectorDisplay(): void;
   updateSendButtonState(): void;
@@ -29,6 +34,7 @@ export interface TabViewActivationBridgeHost {
 export class TabViewActivationBridge {
   constructor(
     private readonly host: TabViewActivationBridgeHost,
+    private readonly focusContextPreviewCoordinator: FocusContextPreviewRefreshPort,
     private readonly questionTodoActivationRefreshCoordinator: QuestionTodoActivationRefreshPort,
     private readonly backgroundTaskActivationIndicatorCoordinator: BackgroundTaskActivationIndicatorPort,
     private readonly activeTabContextUsageCoordinator: ActiveTabContextUsagePort,
@@ -36,7 +42,7 @@ export class TabViewActivationBridge {
 
   applyActivationPreflight(tabId: TabId): void {
     this.host.setActiveMessagesPane(tabId);
-    this.host.refreshActiveFocusContextPreview();
+    this.focusContextPreviewCoordinator.refreshActiveFocusContextPreview();
     this.questionTodoActivationRefreshCoordinator.applyActivationPreflight(tabId);
   }
 

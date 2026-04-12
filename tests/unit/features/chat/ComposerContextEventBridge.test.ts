@@ -40,14 +40,16 @@ function createHarness(options: { inputContainer?: HTMLElement | null } = {}) {
     },
   } as unknown as App;
   const focusContextRuntimeService = {
-    rememberMarkdownFilePath: jest.fn(),
-    refreshActiveFocusContextPreview: jest.fn(),
-    scheduleFocusContextPreviewRefresh: jest.fn(),
     handleComposerPointerDown: jest.fn(),
     handleComposerFocusIn: jest.fn(),
     handleComposerFocusOut: jest.fn(),
     startRetainedSelectionPolling: jest.fn(),
     dispose: jest.fn(),
+  };
+  const focusContextPreviewCoordinator = {
+    handleFileOpen: jest.fn(),
+    refreshActiveFocusContextPreview: jest.fn(),
+    scheduleFocusContextPreviewRefresh: jest.fn(),
   };
   const contextFileCatalogService = {
     handleCreate: jest.fn(),
@@ -56,7 +58,6 @@ function createHarness(options: { inputContainer?: HTMLElement | null } = {}) {
   };
   const inputContainer = options.inputContainer ?? document.createElement('div');
   const host: Mocked<ComposerContextEventBridgeHost> = {
-    setCurrentConversationNotePath: jest.fn(),
     getInputContainer: jest.fn(() => inputContainer),
     registerEvent: jest.fn(),
     registerDomEvent: jest.fn((target, type, callback) => {
@@ -66,6 +67,7 @@ function createHarness(options: { inputContainer?: HTMLElement | null } = {}) {
   const bridge = new ComposerContextEventBridge(
     app,
     focusContextRuntimeService,
+    focusContextPreviewCoordinator,
     contextFileCatalogService,
     host,
   );
@@ -74,6 +76,7 @@ function createHarness(options: { inputContainer?: HTMLElement | null } = {}) {
     bridge,
     host,
     focusContextRuntimeService,
+    focusContextPreviewCoordinator,
     contextFileCatalogService,
     workspaceOn,
     vaultOn,
@@ -142,6 +145,7 @@ describe('ComposerContextEventBridge', () => {
       bridge,
       host,
       focusContextRuntimeService,
+      focusContextPreviewCoordinator,
       emitWorkspace,
       fireDom,
     } = createHarness();
@@ -159,16 +163,15 @@ describe('ComposerContextEventBridge', () => {
     fireDom('mouseup');
     fireDom('keyup');
 
-    expect(focusContextRuntimeService.rememberMarkdownFilePath).toHaveBeenCalledWith('notes/open.md');
-    expect(host.setCurrentConversationNotePath).toHaveBeenCalledWith('notes/open.md');
-    expect(focusContextRuntimeService.refreshActiveFocusContextPreview).toHaveBeenCalledWith(
+    expect(focusContextPreviewCoordinator.handleFileOpen).toHaveBeenCalledWith('notes/open.md');
+    expect(focusContextPreviewCoordinator.refreshActiveFocusContextPreview).toHaveBeenCalledWith(
       markdownView,
       editor,
     );
     expect(focusContextRuntimeService.handleComposerPointerDown).toHaveBeenCalledTimes(1);
     expect(focusContextRuntimeService.handleComposerFocusIn).toHaveBeenCalledTimes(1);
     expect(focusContextRuntimeService.handleComposerFocusOut).toHaveBeenCalledTimes(1);
-    expect(focusContextRuntimeService.scheduleFocusContextPreviewRefresh).toHaveBeenCalledTimes(5);
+    expect(focusContextPreviewCoordinator.scheduleFocusContextPreviewRefresh).toHaveBeenCalledTimes(4);
   });
 
   it('routes vault mutations and dispose through the dedicated collaborators', () => {

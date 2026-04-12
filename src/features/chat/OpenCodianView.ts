@@ -246,6 +246,10 @@ import {
   ConversationViewStateService,
 } from './services/ConversationViewStateService';
 import {
+  FocusContextPreviewCoordinator,
+  type FocusContextPreviewCoordinatorHost,
+} from './services/FocusContextPreviewCoordinator';
+import {
   FocusContextRuntimeService,
   type FocusContextRuntimeServiceHost,
 } from './services/FocusContextRuntimeService';
@@ -760,6 +764,7 @@ export class OpenCodianView extends ItemView {
   private composerContextViewHostAdapter: ComposerContextViewHostAdapter;
   private contextAttachmentBuilder: ContextAttachmentBuilder;
   private contextFileCatalogService: ContextFileCatalogService;
+  private focusContextPreviewCoordinator: FocusContextPreviewCoordinator;
   private focusContextRuntimeService: FocusContextRuntimeService;
   private omoBackgroundTaskLogStates = new Map<string, OmoBackgroundTaskLogState>();
   private lastLiquidGlassDiagnosticsFingerprint: string | null = null;
@@ -1112,17 +1117,22 @@ export class OpenCodianView extends ItemView {
       this.contextFileCatalogService,
       this.createComposerContextActionServiceHost(),
     );
-    this.composerContextCoordinator = new ComposerContextCoordinator(
-      this.contextAttachmentBuilder,
-      this.createComposerContextCoordinatorHost(),
-    );
     this.focusContextRuntimeService = new FocusContextRuntimeService(
       this.app,
       this.createFocusContextRuntimeServiceHost(),
     );
+    this.focusContextPreviewCoordinator = new FocusContextPreviewCoordinator(
+      this.createFocusContextPreviewCoordinatorHost(),
+      this.focusContextRuntimeService,
+    );
+    this.composerContextCoordinator = new ComposerContextCoordinator(
+      this.contextAttachmentBuilder,
+      this.createComposerContextCoordinatorHost(),
+    );
     this.composerContextEventBridge = new ComposerContextEventBridge(
       this.app,
       this.focusContextRuntimeService,
+      this.focusContextPreviewCoordinator,
       this.contextFileCatalogService,
       this.createComposerContextEventBridgeHost(),
     );
@@ -1189,6 +1199,7 @@ export class OpenCodianView extends ItemView {
     );
     this.tabViewActivationBridge = new TabViewActivationBridge(
       this.createTabViewActivationBridgeHost(),
+      this.focusContextPreviewCoordinator,
       questionTodoActivationRefreshCoordinator,
       backgroundTaskActivationIndicatorCoordinator,
       this.activeTabContextUsageCoordinator,
@@ -1306,7 +1317,7 @@ export class OpenCodianView extends ItemView {
   private createComposerContextCoordinatorHost(): ComposerContextCoordinatorHost {
     return this.composerContextViewHostAdapter.createCoordinatorHost({
       refreshActiveFocusContextPreview: () => {
-        this.refreshActiveFocusContextPreview();
+        this.focusContextPreviewCoordinator.refreshActiveFocusContextPreview();
       },
     });
   }
@@ -1324,13 +1335,18 @@ export class OpenCodianView extends ItemView {
     });
   }
 
-  private createComposerContextEventBridgeHost(): ComposerContextEventBridgeHost {
+  private createFocusContextPreviewCoordinatorHost(): FocusContextPreviewCoordinatorHost {
     return {
       setCurrentConversationNotePath: (path) => {
         if (this.currentConversation) {
           this.currentConversation.currentNote = path;
         }
       },
+    };
+  }
+
+  private createComposerContextEventBridgeHost(): ComposerContextEventBridgeHost {
+    return {
       getInputContainer: () => this.inputContainer,
       registerEvent: (eventRef) => {
         this.registerEvent(eventRef);
@@ -1523,9 +1539,6 @@ export class OpenCodianView extends ItemView {
     return {
       setActiveMessagesPane: (tabId) => {
         this.setActiveMessagesPane(tabId);
-      },
-      refreshActiveFocusContextPreview: () => {
-        this.refreshActiveFocusContextPreview();
       },
       scheduleComposerLayoutSync: () => {
         this.scheduleComposerLayoutSync();
@@ -4093,13 +4106,6 @@ export class OpenCodianView extends ItemView {
 
   private getActiveMarkdownView(): MarkdownView | null {
     return this.focusContextRuntimeService.getActiveMarkdownView();
-  }
-
-  private refreshActiveFocusContextPreview(
-    view?: MarkdownView | null,
-    editor?: Editor | null,
-  ): void {
-    this.focusContextRuntimeService.refreshActiveFocusContextPreview(view, editor);
   }
 
   public async addCurrentNoteContextFromActiveEditor(view?: MarkdownView | null): Promise<boolean> {
