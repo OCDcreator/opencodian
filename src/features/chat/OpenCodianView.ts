@@ -161,6 +161,10 @@ import {
   isElementNearBottom,
   scrollElementToBottom,
 } from './services/ScrollManager';
+import {
+  type SessionTodoStateServiceHost,
+  SessionTodoStateService,
+} from './services/SessionTodoStateService';
 import { TitleGenerationService } from './services/TitleGenerationService';
 import { TabBar, type TabBarLayoutMode, type TabId, TabManager } from './tabs';
 import { ContextDetailModal, type ContextRawMessageItem } from './ui/ContextDetailModal';
@@ -571,7 +575,6 @@ const REWIND_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="
 const NEW_TAB_ICON = `<g fill="none" stroke="currentColor" stroke-width="8.333" stroke-linecap="round" stroke-linejoin="round"><circle cx="50" cy="50" r="41.667"/><path d="M33.333 50h33.334"/><path d="M50 33.333v33.334"/></g>`;
 const CURRENT_TAB_NEW_CONVERSATION_ICON = `<g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" transform="scale(4.166667)"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/><path d="M12 8v6"/><path d="M9 11h6"/></g>`;
 const BACKGROUND_TASK_GRACE_PERIOD_MS = 15_000;
-const STALE_SESSION_TODO_TIMEOUT_MS = 120_000;
 
 addIcon('opencodian-circle-plus', NEW_TAB_ICON);
 addIcon('opencodian-message-square-plus', CURRENT_TAB_NEW_CONVERSATION_ICON);
@@ -663,6 +666,7 @@ export class OpenCodianView extends ItemView {
   private chatAppearanceStyleEl: HTMLStyleElement | null = null;
   private themeBackgroundRequestId = 0;
   private titleGenerationService: TitleGenerationService;
+  private sessionTodoStateService: SessionTodoStateService;
   private conversationViewStateService: ConversationViewStateService;
   private conversationRenderService: ConversationRenderService;
   private messageSendPreparationService: MessageSendPreparationService;
@@ -1387,16 +1391,7 @@ export class OpenCodianView extends ItemView {
     tabId: TabId | null = this.getActiveTabId(),
     sessionId = this.currentConversation?.openCodeSessionId ?? null,
   ): SessionTodo[] {
-    const runtime = this.getTabRuntimeState(tabId);
-    if (!runtime) {
-      return [];
-    }
-
-    if (sessionId && runtime.sessionTodoSessionId && runtime.sessionTodoSessionId !== sessionId) {
-      return [];
-    }
-
-    return [...runtime.sessionTodos];
+    return this.sessionTodoStateService.getTabSessionTodos(tabId, sessionId);
   }
 
   private setTabSessionTodos(
@@ -1404,67 +1399,14 @@ export class OpenCodianView extends ItemView {
     todos: SessionTodo[],
     sessionId: string | null = this.currentConversation?.openCodeSessionId ?? null,
   ): void {
-    const runtime = this.getTabRuntimeState(tabId);
-    if (!runtime) {
-      return;
-    }
-
-    runtime.sessionTodoSessionId = sessionId;
-    const normalizedTodos = this.normalizeSessionTodosForView(todos);
-    const fingerprint = this.getSessionTodoFingerprint(normalizedTodos);
-    if (runtime.sessionTodoFingerprint !== fingerprint) {
-      runtime.sessionTodoFingerprint = fingerprint;
-      runtime.sessionTodoLastChangedAt = Date.now();
-
-      if (
-        runtime.sessionTodoSuppressedFingerprint
-        && runtime.sessionTodoSuppressedFingerprint !== fingerprint
-      ) {
-        logger.debug(`Clearing stale session todo suppression after snapshot changed: ${this.stringifyLogPayload({
-          tabId,
-          sessionId,
-          fingerprint,
-        })}`);
-        runtime.sessionTodoSuppressedFingerprint = null;
-        runtime.sessionTodoStaleNoticeFingerprint = null;
-      }
-    }
-
-    if (!this.hasIncompleteTodos(normalizedTodos)) {
-      runtime.sessionTodoSuppressedFingerprint = null;
-      runtime.sessionTodoStaleNoticeFingerprint = null;
-    } else {
-      this.restorePersistedStaleSessionTodoSuppressionIfNeeded(
-        tabId,
-        sessionId,
-        normalizedTodos,
-        fingerprint,
-      );
-    }
-
-    runtime.sessionTodos = this.shouldHideSuppressedTodoSnapshot(tabId, sessionId, fingerprint)
-      ? []
-      : normalizedTodos;
-    if (tabId === this.getActiveTabId()) {
-      this.renderSessionTodoDock(tabId);
-    }
-    this.reconcileStaleSessionTodoState(tabId);
+    this.sessionTodoStateService.setTabSessionTodos(tabId, todos, sessionId);
   }
 
   private getTabSessionStatus(
     tabId: TabId | null = this.getActiveTabId(),
     sessionId = this.currentConversation?.openCodeSessionId ?? null,
   ): SessionActivityStatus | null {
-    const runtime = this.getTabRuntimeState(tabId);
-    if (!runtime) {
-      return null;
-    }
-
-    if (sessionId && runtime.sessionStatusSessionId && runtime.sessionStatusSessionId !== sessionId) {
-      return null;
-    }
-
-    return runtime.sessionStatus;
+    return this.sessionTodoStateService.getTabSessionStatus(tabId, sessionId);
   }
 
   private setTabSessionStatus(
@@ -1472,242 +1414,7 @@ export class OpenCodianView extends ItemView {
     status: SessionActivityStatus | null,
     sessionId: string | null = this.currentConversation?.openCodeSessionId ?? null,
   ): void {
-    const runtime = this.getTabRuntimeState(tabId);
-    if (!runtime) {
-      return;
-    }
-
-    const previousFingerprint = this.getSessionStatusFingerprint(runtime.sessionStatus);
-    const nextFingerprint = this.getSessionStatusFingerprint(status);
-
-    runtime.sessionStatusSessionId = sessionId;
-    runtime.sessionStatus = status;
-    if (previousFingerprint !== nextFingerprint) {
-      runtime.sessionStatusLastChangedAt = Date.now();
-    }
-
-    if (this.isSessionStatusLive(status) && runtime.sessionTodoSuppressedFingerprint) {
-      logger.debug(`Clearing stale session todo suppression because session became live again: ${this.stringifyLogPayload({
-        tabId,
-        sessionId,
-        status,
-      })}`);
-      runtime.sessionTodoSuppressedFingerprint = null;
-      runtime.sessionTodoStaleNoticeFingerprint = null;
-      if (tabId === this.getActiveTabId()) {
-        this.renderSessionTodoDock(tabId);
-      }
-    }
-
-    this.reconcileStaleSessionTodoState(tabId);
-  }
-
-  private getSessionTodoFingerprint(todos: readonly SessionTodo[]): string {
-    return JSON.stringify(todos.map((todo) => ({
-      id: todo.id ?? null,
-      content: todo.content,
-      status: todo.status,
-      priority: todo.priority ?? null,
-    })));
-  }
-
-  private getSessionStatusFingerprint(status: SessionActivityStatus | null): string {
-    return JSON.stringify(status ?? null);
-  }
-
-  private isSessionStatusLive(status: SessionActivityStatus | null | undefined): boolean {
-    return status?.type === 'busy' || status?.type === 'retry';
-  }
-
-  private restorePersistedStaleSessionTodoSuppressionIfNeeded(
-    tabId: TabId | null,
-    sessionId: string | null,
-    todos: SessionTodo[],
-    fingerprint: string,
-  ): void {
-    const runtime = this.getTabRuntimeState(tabId);
-    if (
-      !runtime
-      || !sessionId
-      || runtime.isStreaming
-      || runtime.sessionTodoSuppressedFingerprint
-      || !this.hasIncompleteTodos(todos)
-      || this.isSessionStatusLive(this.getTabSessionStatus(tabId, sessionId))
-    ) {
-      return;
-    }
-
-    const conversation = this.getConversationForTab(tabId);
-    if (!conversation || conversation.openCodeSessionId !== sessionId) {
-      return;
-    }
-
-    const content = this.buildStaleSessionTodoNoticeContent(todos);
-    if (!this.hasMatchingPersistentAssistantNoticeMessage(
-      t('chat.todo.staleTitle'),
-      content,
-      'warning',
-      conversation,
-    )) {
-      return;
-    }
-
-    runtime.sessionTodoSuppressedFingerprint = fingerprint;
-    runtime.sessionTodoStaleNoticeFingerprint = content;
-    logger.debug(`Restored stale session todo suppression from persisted notice: ${this.stringifyLogPayload({
-      tabId,
-      sessionId,
-      fingerprint,
-    })}`);
-  }
-
-  private shouldHideSuppressedTodoSnapshot(
-    tabId: TabId | null,
-    sessionId: string | null,
-    fingerprint: string,
-  ): boolean {
-    const runtime = this.getTabRuntimeState(tabId);
-    if (!runtime || runtime.sessionTodoSuppressedFingerprint !== fingerprint) {
-      return false;
-    }
-
-    const status = this.getTabSessionStatus(tabId, sessionId);
-    return !runtime.isStreaming && !this.isSessionStatusLive(status);
-  }
-
-  private getTabSessionTodoStaleAgeMs(tabId: TabId | null = this.getActiveTabId()): number | null {
-    const runtime = this.getTabRuntimeState(tabId);
-    if (!runtime) {
-      return null;
-    }
-
-    const lastActivity = Math.max(
-      runtime.sessionTodoLastChangedAt ?? 0,
-      runtime.sessionStatusLastChangedAt ?? 0,
-      runtime.backgroundTaskStartedAt ?? 0,
-    );
-    if (lastActivity <= 0) {
-      return null;
-    }
-
-    return Date.now() - lastActivity;
-  }
-
-  private suppressStaleSessionTodosIfNeeded(
-    tabId: TabId | null = this.getActiveTabId(),
-  ): SessionTodo[] | null {
-    const runtime = this.getTabRuntimeState(tabId);
-    const sessionId = this.getSessionIdForTab(tabId);
-    if (!runtime || !sessionId || runtime.isStreaming) {
-      return null;
-    }
-
-    const status = this.getTabSessionStatus(tabId, sessionId);
-    if (this.isSessionStatusLive(status)) {
-      return null;
-    }
-
-    const staleAgeMs = this.getTabSessionTodoStaleAgeMs(tabId);
-    if (staleAgeMs === null || staleAgeMs < STALE_SESSION_TODO_TIMEOUT_MS) {
-      return null;
-    }
-
-    const visibleTodos = this.getTabSessionTodos(tabId, sessionId);
-    if (!this.hasIncompleteTodos(visibleTodos)) {
-      return null;
-    }
-
-    const fingerprint = runtime.sessionTodoFingerprint ?? this.getSessionTodoFingerprint(visibleTodos);
-    if (runtime.sessionTodoSuppressedFingerprint === fingerprint) {
-      return null;
-    }
-
-    runtime.sessionTodoSuppressedFingerprint = fingerprint;
-    runtime.sessionTodos = [];
-    if (tabId === this.getActiveTabId()) {
-      this.renderSessionTodoDock(tabId);
-    }
-
-    logger.debug(`Suppressing stale session todos after prolonged inactivity: ${this.stringifyLogPayload({
-      tabId,
-      sessionId,
-      staleAgeMs,
-      todoCount: visibleTodos.length,
-      status,
-      todos: visibleTodos.map((todo) => ({
-        id: todo.id ?? null,
-        status: todo.status,
-        content: this.getLogPreview(todo.content, 120),
-      })),
-    })}`);
-
-    return visibleTodos;
-  }
-
-  private reconcileStaleSessionTodoState(tabId: TabId | null = this.getActiveTabId()): void {
-    const staleTodos = this.suppressStaleSessionTodosIfNeeded(tabId);
-    if (staleTodos && staleTodos.length > 0) {
-      void this.appendStaleSessionTodoNotice(tabId, staleTodos);
-    }
-  }
-
-  private normalizeSessionTodosForView(todos: readonly SessionTodo[] | unknown[]): SessionTodo[] {
-    const normalized: SessionTodo[] = [];
-    const seen = new Set<string>();
-
-    for (const rawTodo of todos) {
-      const todo = this.normalizeSessionTodoForView(rawTodo);
-      if (!todo) {
-        continue;
-      }
-
-      const dedupeKey = todo.id
-        ? `id:${todo.id}`
-        : `${todo.status}:${todo.content.trim().toLowerCase()}`;
-      if (seen.has(dedupeKey)) {
-        continue;
-      }
-
-      seen.add(dedupeKey);
-      normalized.push(todo);
-    }
-
-    return normalized;
-  }
-
-  private normalizeSessionTodoForView(todo: unknown): SessionTodo | null {
-    if (!todo || typeof todo !== 'object') {
-      return null;
-    }
-
-    const raw = todo as Record<string, unknown>;
-    const content = typeof raw.content === 'string' ? raw.content.trim() : '';
-    const status = raw.status;
-
-    if (!content) {
-      return null;
-    }
-
-    if (
-      status !== 'pending'
-      && status !== 'in_progress'
-      && status !== 'completed'
-      && status !== 'cancelled'
-    ) {
-      return null;
-    }
-
-    const priority = raw.priority;
-    const id = typeof raw.id === 'string' && raw.id.trim() ? raw.id.trim() : undefined;
-
-    return {
-      id,
-      content,
-      status,
-      priority: priority === 'low' || priority === 'medium' || priority === 'high'
-        ? priority
-        : undefined,
-    };
+    this.sessionTodoStateService.setTabSessionStatus(tabId, status, sessionId);
   }
 
   private getSessionIdForTab(tabId: TabId | null = this.getActiveTabId()): string | null {
@@ -1748,8 +1455,7 @@ export class OpenCodianView extends ItemView {
   }
 
   private extractSessionTodosFromToolInput(input: Record<string, unknown>): SessionTodo[] {
-    const rawTodos = Array.isArray(input.todos) ? input.todos : [];
-    return this.normalizeSessionTodosForView(rawTodos);
+    return this.sessionTodoStateService.extractSessionTodosFromToolInput(input);
   }
 
   private applyStreamingTodoSnapshotFromTool(
@@ -1852,25 +1558,29 @@ export class OpenCodianView extends ItemView {
   }
 
   private hasIncompleteTodos(todos: readonly SessionTodo[]): boolean {
-    return todos.some((todo) => todo.status !== 'completed' && todo.status !== 'cancelled');
+    return this.sessionTodoStateService.hasIncompleteTodos(todos);
   }
 
   private hasIncompleteTabSessionTodos(tabId: TabId | null = this.getActiveTabId()): boolean {
-    return this.hasIncompleteTodos(this.getTabSessionTodos(tabId, this.getSessionIdForTab(tabId)));
+    return this.sessionTodoStateService.hasIncompleteTabSessionTodos(tabId);
   }
 
   private isTabSessionLive(tabId: TabId | null = this.getActiveTabId()): boolean {
-    const runtime = this.getTabRuntimeState(tabId);
-    if (!runtime) {
-      return false;
-    }
+    return this.sessionTodoStateService.isTabSessionLive(tabId);
+  }
 
-    if (runtime.isStreaming) {
-      return true;
-    }
+  private suppressStaleSessionTodosIfNeeded(
+    tabId: TabId | null = this.getActiveTabId(),
+  ): SessionTodo[] | null {
+    return this.sessionTodoStateService.suppressStaleSessionTodosIfNeeded(tabId);
+  }
 
-    const status = this.getTabSessionStatus(tabId, this.getSessionIdForTab(tabId));
-    return status?.type === 'busy' || status?.type === 'retry';
+  private reconcileStaleSessionTodoState(tabId: TabId | null = this.getActiveTabId()): void {
+    this.sessionTodoStateService.reconcileStaleSessionTodoState(tabId);
+  }
+
+  private buildStaleSessionTodoNoticeContent(todos: SessionTodo[]): string {
+    return this.sessionTodoStateService.buildStaleSessionTodoNoticeContent(todos);
   }
 
   private isBackgroundTaskGracePeriodActive(tabId: TabId | null = this.getActiveTabId()): boolean {
@@ -2069,62 +1779,6 @@ export class OpenCodianView extends ItemView {
     return this.hasPersistedBackgroundTaskStoppedNoticeForPending(segment.pending, conversation);
   }
 
-  private async appendStaleSessionTodoNotice(
-    tabId: TabId | null,
-    todos: SessionTodo[],
-  ): Promise<void> {
-    const runtime = this.getTabRuntimeState(tabId);
-    if (!runtime || !tabId || tabId !== this.getActiveTabId() || !this.currentConversation) {
-      return;
-    }
-
-    const sessionId = this.getSessionIdForTab(tabId);
-    if (!sessionId || sessionId !== this.currentConversation.openCodeSessionId) {
-      return;
-    }
-
-    const title = t('chat.todo.staleTitle');
-    const content = this.buildStaleSessionTodoNoticeContent(todos);
-    if (runtime.sessionTodoStaleNoticeFingerprint === content) {
-      return;
-    }
-
-    if (this.hasMatchingPersistentAssistantNoticeMessage(title, content, 'warning')) {
-      runtime.sessionTodoStaleNoticeFingerprint = content;
-      return;
-    }
-
-    runtime.sessionTodoStaleNoticeFingerprint = content;
-    try {
-      await this.appendPersistentAssistantNoticeMessage({
-        title,
-        content,
-        tone: 'warning',
-      });
-    } catch (error) {
-      if (runtime.sessionTodoStaleNoticeFingerprint === content) {
-        runtime.sessionTodoStaleNoticeFingerprint = null;
-      }
-      logger.warn('Failed to append stale session todo notice', error);
-    }
-  }
-
-  private buildStaleSessionTodoNoticeContent(todos: SessionTodo[]): string {
-    const incompleteTodos = todos.filter((todo) =>
-      todo.status !== 'completed' && todo.status !== 'cancelled',
-    );
-    if (incompleteTodos.length === 0) {
-      return t('chat.todo.staleBody');
-    }
-
-    return [
-      t('chat.todo.staleBody'),
-      '',
-      `**${t('chat.backgroundTask.taskListLabel')}**`,
-      ...incompleteTodos.map((todo) => `- ${todo.content}`),
-    ].join('\n');
-  }
-
   private hasMatchingPersistentAssistantNoticeMessage(
     title: string,
     content: string,
@@ -2147,6 +1801,7 @@ export class OpenCodianView extends ItemView {
     this.currentEffortLevel = this.plugin.settings.effortLevel;
     this.currentThinkingBudget = this.plugin.settings.thinkingBudget;
     this.titleGenerationService = new TitleGenerationService(this.plugin);
+    this.sessionTodoStateService = new SessionTodoStateService(this.createSessionTodoStateServiceHost());
     this.conversationViewStateService = new ConversationViewStateService(this.createConversationViewStateHost());
     this.conversationRenderService = new ConversationRenderService(this.createConversationRenderHost());
     this.messageSendPreparationService = new MessageSendPreparationService(this.createMessageSendPreparationHost());
@@ -2168,6 +1823,29 @@ export class OpenCodianView extends ItemView {
       this.messageSendPreparationService,
       this.messageFinalizationService,
     );
+  }
+
+  private createSessionTodoStateServiceHost(): SessionTodoStateServiceHost {
+    return {
+      getTabRuntimeState: (tabId: TabId | null) => this.getTabRuntimeState(tabId),
+      getActiveTabId: () => this.getActiveTabId(),
+      getSessionIdForTab: (tabId: TabId | null) => this.getSessionIdForTab(tabId),
+      getConversationForTab: (tabId: TabId | null) => this.getConversationForTab(tabId),
+      renderSessionTodoDock: (tabId: TabId | null) => {
+        this.renderSessionTodoDock(tabId);
+      },
+      hasMatchingPersistentAssistantNoticeMessage: (
+        title: string,
+        content: string,
+        tone: ChatMessage['noticeTone'],
+        conversation?: Conversation | null,
+      ) => this.hasMatchingPersistentAssistantNoticeMessage(title, content, tone, conversation),
+      appendPersistentAssistantNoticeMessage: (options: {
+        title: string;
+        content: string;
+        tone: ChatMessage['noticeTone'];
+      }) => this.appendPersistentAssistantNoticeMessage(options),
+    };
   }
 
   private createConversationViewStateHost(): ConversationViewStateHost {

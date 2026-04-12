@@ -309,10 +309,15 @@ model selector 现在拆成了几层协作：
 
 这三个辅助子系统都由 view 负责路由：
 
-- session todo/status：通过 `openCodeService.subscribeToSessionTodoUpdates()` 和 `subscribeToSessionStatusUpdates()` 接入
+- session todo/status：订阅入口仍在 view，但 normalized snapshot、status fingerprint、stale suppression 与 persisted notice 恢复已经下沉到 `services/SessionTodoStateService.ts`
 - question：既支持输入区上方的 `QuestionDock`，也支持由 `QuestionInlineCardRenderer` 管理的内联待回答卡片，以及由 `QuestionResolutionCoordinator` + `QuestionResolutionCardRenderer` 协作管理的已回答/已拒绝回顾卡片
 - background task：从 OMO 注入、`toolName === 'task'` 的 tool block、以及后续 system reminder 回写推导任务进度；运行态以内联状态条挂在对应 assistant turn 下，完成态则延迟落成持久化 notice
 - background task 的 stale 判定现在额外受 `backgroundTaskAwaitingAuthoritativeSync` / hydration 保护：reload 或首次装载后，只有在至少一次权威消息同步完成后，才允许把“仍在运行”降级成 stopped/stale notice
+
+session todo 这条子链路现在的边界是：
+
+- `OpenCodianView`：session todo/status 订阅、OpenCode 主动刷新、dock 装配，以及和 background task 的上层路由
+- `SessionTodoStateService`：todo/status runtime state、snapshot 规范化、stale notice suppression 与 persisted notice dedupe/restore
 
 ## 外观与控件
 
