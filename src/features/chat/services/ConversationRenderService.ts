@@ -24,6 +24,9 @@ import {
 import {
   buildTrailingAssistantPatchSuccessPlanFromPlanningContext,
 } from './TrailingAssistantPatchSuccessPlanningContextPlanHelper';
+import {
+  buildTrailingAssistantPatchSuccessPlanningContextPlanSourceContract,
+} from './TrailingAssistantPatchSuccessPlanningContextPlanSourceContractHelper';
 import { type TrailingAssistantPatchSuccessPlan } from './TrailingAssistantPatchSuccessPlanHelper';
 import {
   applyTrailingAssistantPatchTailState,
@@ -603,12 +606,13 @@ export class ConversationRenderService {
   private buildTrailingAssistantPatchSuccessPlan(
     planningContext: TrailingAssistantPatchPlanningContext,
   ): TrailingAssistantPatchSuccessPlan {
-    return buildTrailingAssistantPatchSuccessPlanFromPlanningContext({
-      ...planningContext,
-      getBodySignature: (message) => this.host.assistantTailRender.getBodySignature(message),
-      summarizeChatMessageForDebug: (message) =>
-        this.host.summarizeChatMessageForDebug(message),
-    });
+    return buildTrailingAssistantPatchSuccessPlanFromPlanningContext(
+      buildTrailingAssistantPatchSuccessPlanningContextPlanSourceContract({
+        planningContext,
+        assistantTailRender: this.host.assistantTailRender,
+        summarizeChatMessageForDebug: this.host.summarizeChatMessageForDebug,
+      }),
+    );
   }
 
   private buildTrailingAssistantPatchDomTarget(
