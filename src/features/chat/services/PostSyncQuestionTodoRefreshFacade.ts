@@ -9,13 +9,13 @@ type QuestionTodoStatusRefreshPort = Pick<
 
 export interface PostSyncQuestionTodoRefreshFacadeHost {
   getCurrentConversationSessionId(): string | null | undefined;
+}
+
+export interface BackgroundTaskPostSyncRefreshPort {
   syncBackgroundTaskStateFromConversation(
     conversation: Conversation,
     tabId?: TabId | null,
   ): void;
-}
-
-export interface BackgroundTaskPostSyncWritebackPort {
   flushBackgroundTaskPostSyncWriteback(
     tabId: TabId | null,
     conversation: Conversation | null,
@@ -37,7 +37,7 @@ export class PostSyncQuestionTodoRefreshFacade {
   constructor(
     private readonly host: PostSyncQuestionTodoRefreshFacadeHost,
     private readonly questionTodoStatusRefreshCoordinator: QuestionTodoStatusRefreshPort,
-    private readonly backgroundTaskPostSyncWriteback: BackgroundTaskPostSyncWritebackPort,
+    private readonly backgroundTaskPostSyncRefresh: BackgroundTaskPostSyncRefreshPort,
   ) {}
 
   async refreshVisibleConversation(
@@ -59,14 +59,14 @@ export class PostSyncQuestionTodoRefreshFacade {
       todoStatusSessionId: options.conversation.openCodeSessionId,
       forceTodoStatusRefresh: options.forceTodoStatusRefresh,
       afterPendingQuestionRefresh: () => {
-        this.host.syncBackgroundTaskStateFromConversation(
+        this.backgroundTaskPostSyncRefresh.syncBackgroundTaskStateFromConversation(
           options.conversation,
           options.tabId,
         );
       },
     });
 
-    await this.backgroundTaskPostSyncWriteback.flushBackgroundTaskPostSyncWriteback(
+    await this.backgroundTaskPostSyncRefresh.flushBackgroundTaskPostSyncWriteback(
       options.tabId,
       options.conversation,
     );

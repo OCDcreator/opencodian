@@ -14,7 +14,7 @@ import {
 } from './BackgroundTaskPostSyncCoordinator';
 import type { BackgroundTaskLiveSignalCoordinator } from './BackgroundTaskLiveSignalCoordinator';
 import {
-  type BackgroundTaskPostSyncWritebackPort,
+  type BackgroundTaskPostSyncRefreshPort,
   PostSyncQuestionTodoRefreshFacade,
   type PostSyncQuestionTodoRefreshFacadeHost,
 } from './PostSyncQuestionTodoRefreshFacade';
@@ -167,7 +167,7 @@ export function createQuestionTodoBackgroundTaskRefreshViewHostAdapter(
 export interface QuestionTodoBackgroundTaskRefreshHosts {
   questionTodoStatusRefreshHost: QuestionTodoStatusRefreshCoordinatorHost;
   postSyncQuestionTodoRefreshFacadeHost: PostSyncQuestionTodoRefreshFacadeHost;
-  backgroundTaskPostSyncWritebackPort: BackgroundTaskPostSyncWritebackPort;
+  backgroundTaskPostSyncRefreshPort: BackgroundTaskPostSyncRefreshPort;
   backgroundTaskPostSyncCoordinatorHost: BackgroundTaskPostSyncCoordinatorHost;
 }
 
@@ -202,12 +202,12 @@ export function createQuestionTodoBackgroundTaskRefreshHosts(
     postSyncQuestionTodoRefreshFacadeHost: {
       getCurrentConversationSessionId: () =>
         viewHost.getCurrentConversation()?.openCodeSessionId,
+    },
+    backgroundTaskPostSyncRefreshPort: {
       syncBackgroundTaskStateFromConversation: (
         conversation: Conversation,
         tabId?: TabId | null,
       ) => viewHost.syncBackgroundTaskStateFromConversation(conversation, tabId),
-    },
-    backgroundTaskPostSyncWritebackPort: {
       flushBackgroundTaskPostSyncWriteback: (
         tabId: TabId | null,
         conversation: Conversation | null,
@@ -242,7 +242,7 @@ export function createQuestionTodoBackgroundTaskRefreshServices(
   const postSyncQuestionTodoRefreshFacade = new PostSyncQuestionTodoRefreshFacade(
     hosts.postSyncQuestionTodoRefreshFacadeHost,
     questionTodoStatusRefreshCoordinator,
-    hosts.backgroundTaskPostSyncWritebackPort,
+    hosts.backgroundTaskPostSyncRefreshPort,
   );
   const backgroundTaskPostSyncCoordinator = new BackgroundTaskPostSyncCoordinator(
     hosts.backgroundTaskPostSyncCoordinatorHost,

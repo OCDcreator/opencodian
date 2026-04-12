@@ -1,6 +1,6 @@
 import type { Conversation } from '../../../../src/core/types';
 import {
-  type BackgroundTaskPostSyncWritebackPort,
+  type BackgroundTaskPostSyncRefreshPort,
   PostSyncQuestionTodoRefreshFacade,
   type PostSyncQuestionTodoRefreshFacadeHost,
 } from '../../../../src/features/chat/services/PostSyncQuestionTodoRefreshFacade';
@@ -32,12 +32,9 @@ function createConversation(): Conversation {
   };
 }
 
-function createHost(callOrder?: string[]): Mocked<PostSyncQuestionTodoRefreshFacadeHost> {
+function createHost(): Mocked<PostSyncQuestionTodoRefreshFacadeHost> {
   return {
     getCurrentConversationSessionId: jest.fn().mockReturnValue('active-session'),
-    syncBackgroundTaskStateFromConversation: jest.fn(() => {
-      callOrder?.push('rebuild');
-    }),
   };
 }
 
@@ -52,8 +49,11 @@ function createRefreshCoordinator(callOrder?: string[]): jest.Mocked<QuestionTod
 
 function createWritebackPort(
   callOrder?: string[],
-): jest.Mocked<BackgroundTaskPostSyncWritebackPort> {
+): jest.Mocked<BackgroundTaskPostSyncRefreshPort> {
   return {
+    syncBackgroundTaskStateFromConversation: jest.fn(() => {
+      callOrder?.push('rebuild');
+    }),
     flushBackgroundTaskPostSyncWriteback: jest.fn(async () => {
       callOrder?.push('writeback');
     }),
@@ -91,7 +91,7 @@ describe('PostSyncQuestionTodoRefreshFacade', () => {
   it('reuses the post-sync refresh order for background conversations before completion updates', async () => {
     const callOrder: string[] = [];
     const conversation = createConversation();
-    const host = createHost(callOrder);
+    const host = createHost();
     const refreshCoordinator = createRefreshCoordinator(callOrder);
     const writebackPort = createWritebackPort(callOrder);
     const facade = new PostSyncQuestionTodoRefreshFacade(
@@ -113,7 +113,10 @@ describe('PostSyncQuestionTodoRefreshFacade', () => {
       forceTodoStatusRefresh: true,
       afterPendingQuestionRefresh: expect.any(Function),
     });
-    expect(host.syncBackgroundTaskStateFromConversation).toHaveBeenCalledWith(conversation, 'tab-bg');
+    expect(writebackPort.syncBackgroundTaskStateFromConversation).toHaveBeenCalledWith(
+      conversation,
+      'tab-bg',
+    );
     expect(writebackPort.flushBackgroundTaskPostSyncWriteback).toHaveBeenCalledWith(
       'tab-bg',
       conversation,

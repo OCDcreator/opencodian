@@ -293,11 +293,11 @@ describe('QuestionTodoBackgroundTaskRefreshHostAdapter', () => {
       'session-todo',
       { suppressErrors: true },
     );
-    hosts.postSyncQuestionTodoRefreshFacadeHost.syncBackgroundTaskStateFromConversation(
+    hosts.backgroundTaskPostSyncRefreshPort.syncBackgroundTaskStateFromConversation(
       currentConversation,
       'tab-active',
     );
-    await hosts.backgroundTaskPostSyncWritebackPort.flushBackgroundTaskPostSyncWriteback(
+    await hosts.backgroundTaskPostSyncRefreshPort.flushBackgroundTaskPostSyncWriteback(
       'tab-active',
       currentConversation,
     );
