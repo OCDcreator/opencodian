@@ -12,15 +12,18 @@ import {
   emitTrailingAssistantPatchCompletionDebugLog,
   emitTrailingAssistantPatchSkippedDebugLog,
 } from './TrailingAssistantPatchDebugLogEmitterHelper';
-import type { TrailingAssistantPatchCompletionDebugPlan } from './TrailingAssistantPatchCompletionDebugPlanHelper';
 import { buildTrailingAssistantPatchCompletionDebugPlanFromTailOutcomePlanningContext } from './TrailingAssistantPatchCompletionDebugTailOutcomePlanHelper';
 import {
   applyTrailingAssistantPatchTailState,
-  type TrailingAssistantPatchTailStatePlan,
 } from './TrailingAssistantPatchTailStateApplierHelper';
 import { buildTrailingAssistantPatchTailStatePlanFromTailOutcomePlanningContext } from './TrailingAssistantPatchTailStateTailOutcomePlanHelper';
 import {
-  type TrailingAssistantPatchTurnBodyScopePlan,
+  buildTrailingAssistantPatchSuccessPlanFromParts,
+  type TrailingAssistantPatchExecutionPlan,
+  type TrailingAssistantPatchSuccessPlan,
+  type TrailingAssistantPatchSuccessPlanParts,
+} from './TrailingAssistantPatchSuccessPlanHelper';
+import {
   withTrailingAssistantTurnBodyScope,
 } from './TrailingAssistantPatchTurnBodyScopeHelper';
 import {
@@ -144,38 +147,12 @@ type TrailingAssistantPatchDomTarget = {
   contentEl: HTMLElement;
 };
 
-type TrailingAssistantPatchExecutionPlan =
-  | {
-    kind: 'finalize-footer';
-    messageEl: HTMLElement;
-    nextTailMessage: ChatMessage;
-  }
-  | {
-    kind: 'rerender-content';
-    messageEl: HTMLElement;
-    contentEl: HTMLElement;
-    nextTailMessage: ChatMessage;
-  };
-
 type TrailingAssistantPatchNonMergeableTailFailurePlan = {
   reason: 'tail-message-not-mergeable-assistant';
   payload: {
     previousTail: Record<string, unknown> | null;
     nextTail: Record<string, unknown> | null;
   };
-};
-
-type TrailingAssistantPatchSuccessPlan = {
-  executionPlan: TrailingAssistantPatchExecutionPlan;
-  tailStatePlan: TrailingAssistantPatchTailStatePlan;
-  completionDebugPlan: TrailingAssistantPatchCompletionDebugPlan;
-  turnBodyScopePlan: TrailingAssistantPatchTurnBodyScopePlan;
-};
-
-type TrailingAssistantPatchSuccessPlanParts = {
-  executionPlan: TrailingAssistantPatchExecutionPlan;
-  tailOutcomePlans: TrailingAssistantPatchTailOutcomePlans;
-  turnBodyScopePlan: TrailingAssistantPatchTurnBodyScopePlan;
 };
 
 type TrailingAssistantPatchExecutionTailPlanParts = {
@@ -646,7 +623,7 @@ export class ConversationRenderService {
   private buildTrailingAssistantPatchSuccessPlan(
     planningContext: TrailingAssistantPatchPlanningContext,
   ): TrailingAssistantPatchSuccessPlan {
-    return this.buildTrailingAssistantPatchSuccessPlanFromParts(
+    return buildTrailingAssistantPatchSuccessPlanFromParts(
       this.buildTrailingAssistantPatchSuccessPlanParts(planningContext),
     );
   }
@@ -751,17 +728,6 @@ export class ConversationRenderService {
           summarizeChatMessageForDebug: (message) =>
             this.host.summarizeChatMessageForDebug(message),
         }),
-    };
-  }
-
-  private buildTrailingAssistantPatchSuccessPlanFromParts(
-    planParts: TrailingAssistantPatchSuccessPlanParts,
-  ): TrailingAssistantPatchSuccessPlan {
-    return {
-      executionPlan: planParts.executionPlan,
-      tailStatePlan: planParts.tailOutcomePlans.tailStatePlan,
-      completionDebugPlan: planParts.tailOutcomePlans.completionDebugPlan,
-      turnBodyScopePlan: planParts.turnBodyScopePlan,
     };
   }
 
