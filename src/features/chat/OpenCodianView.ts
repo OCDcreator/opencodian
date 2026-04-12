@@ -139,6 +139,10 @@ import {
 } from './runtime/SendPipelineRuntime';
 import { ContextUsageService } from './services/ContextUsageService';
 import {
+  type BackgroundTaskNoticeStateServiceHost,
+  BackgroundTaskNoticeStateService,
+} from './services/BackgroundTaskNoticeStateService';
+import {
   type ConversationAssistantTailRenderPort,
   type ConversationRenderHost,
   ConversationRenderService,
@@ -667,6 +671,7 @@ export class OpenCodianView extends ItemView {
   private themeBackgroundRequestId = 0;
   private titleGenerationService: TitleGenerationService;
   private sessionTodoStateService: SessionTodoStateService;
+  private backgroundTaskNoticeStateService: BackgroundTaskNoticeStateService;
   private conversationViewStateService: ConversationViewStateService;
   private conversationRenderService: ConversationRenderService;
   private messageSendPreparationService: MessageSendPreparationService;
@@ -1675,7 +1680,6 @@ export class OpenCodianView extends ItemView {
 
     const stalePending = this.getPendingBackgroundTaskLaunches(tabId);
     if (stalePending.length > 0) {
-      runtime.backgroundTaskSuppressedFingerprint = this.buildBackgroundTaskStoppedNoticeContent(stalePending);
       void this.appendBackgroundTaskStoppedNotice(tabId, stalePending);
     }
     logger.debug('Clearing stale background task indicator after session became idle without incomplete todos', {
@@ -1690,75 +1694,11 @@ export class OpenCodianView extends ItemView {
     tabId: TabId | null,
     pending: BackgroundTaskLaunchInfo[],
   ): Promise<void> {
-    const runtime = this.getTabRuntimeState(tabId);
-    if (!runtime || !tabId || tabId !== this.getActiveTabId() || !this.currentConversation) {
-      return;
-    }
-
-    const sessionId = this.getSessionIdForTab(tabId);
-    if (!sessionId || sessionId !== this.currentConversation.openCodeSessionId) {
-      return;
-    }
-
-    const title = t('chat.backgroundTask.staleTitle');
-    const content = this.buildBackgroundTaskStoppedNoticeContent(pending);
-    if (runtime.backgroundTaskStaleNoticeFingerprint === content) {
-      runtime.backgroundTaskSuppressedFingerprint = content;
-      return;
-    }
-
-    if (this.hasMatchingPersistentAssistantNoticeMessage(title, content, 'warning')) {
-      runtime.backgroundTaskStaleNoticeFingerprint = content;
-      runtime.backgroundTaskSuppressedFingerprint = content;
-      return;
-    }
-
-    runtime.backgroundTaskStaleNoticeFingerprint = content;
-    runtime.backgroundTaskSuppressedFingerprint = content;
-    try {
-      await this.appendPersistentAssistantNoticeMessage({
-        title,
-        content,
-        tone: 'warning',
-      });
-    } catch (error) {
-      if (runtime.backgroundTaskStaleNoticeFingerprint === content) {
-        runtime.backgroundTaskStaleNoticeFingerprint = null;
-      }
-      if (runtime.backgroundTaskSuppressedFingerprint === content) {
-        runtime.backgroundTaskSuppressedFingerprint = null;
-      }
-      logger.warn('Failed to append stale background task notice', error);
-    }
+    await this.backgroundTaskNoticeStateService.handleStoppedPendingLaunches(tabId, pending);
   }
 
   private buildBackgroundTaskStoppedNoticeContent(pending: BackgroundTaskLaunchInfo[]): string {
-    const sortedPending = [...pending].sort((left, right) => {
-      const leftId = this.getBackgroundTaskLaunchDisplayId(left);
-      const rightId = this.getBackgroundTaskLaunchDisplayId(right);
-      return leftId.localeCompare(rightId) || left.description.localeCompare(right.description);
-    });
-
-    return [
-      t('chat.backgroundTask.staleBody'),
-      '',
-      `**${t('chat.backgroundTask.taskListLabel')}**`,
-      ...sortedPending.map((task) =>
-        `- ${t('chat.backgroundTask.taskStatusStopped')} · \`${this.getBackgroundTaskLaunchDisplayId(task)}\`: ${task.description}`,
-      ),
-    ].join('\n');
-  }
-
-  private hasPersistedBackgroundTaskStoppedNoticeForPending(
-    pending: BackgroundTaskLaunchInfo[],
-    conversation: Conversation | null = this.currentConversation,
-  ): boolean {
-    return this.hasMatchingPersistentAssistantNoticeMessage(
-      t('chat.backgroundTask.staleTitle'),
-      this.buildBackgroundTaskStoppedNoticeContent(pending),
-      'warning',
-      conversation,
-    );
+    return this.backgroundTaskNoticeStateService.buildStoppedNoticeContent(pending);
   }
 
   private isSuppressedBackgroundTaskSegment(
@@ -1770,13 +1710,11 @@ export class OpenCodianView extends ItemView {
       return false;
     }
 
-    const fingerprint = this.buildBackgroundTaskStoppedNoticeContent(segment.pending);
-    const runtime = this.getTabRuntimeState(tabId);
-    if (runtime?.backgroundTaskSuppressedFingerprint === fingerprint) {
-      return true;
-    }
-
-    return this.hasPersistedBackgroundTaskStoppedNoticeForPending(segment.pending, conversation);
+    return this.backgroundTaskNoticeStateService.isPendingLaunchSetSuppressed(
+      segment.pending,
+      tabId,
+      conversation,
+    );
   }
 
   private hasMatchingPersistentAssistantNoticeMessage(
@@ -1802,6 +1740,9 @@ export class OpenCodianView extends ItemView {
     this.currentThinkingBudget = this.plugin.settings.thinkingBudget;
     this.titleGenerationService = new TitleGenerationService(this.plugin);
     this.sessionTodoStateService = new SessionTodoStateService(this.createSessionTodoStateServiceHost());
+    this.backgroundTaskNoticeStateService = new BackgroundTaskNoticeStateService(
+      this.createBackgroundTaskNoticeStateServiceHost(),
+    );
     this.conversationViewStateService = new ConversationViewStateService(this.createConversationViewStateHost());
     this.conversationRenderService = new ConversationRenderService(this.createConversationRenderHost());
     this.messageSendPreparationService = new MessageSendPreparationService(this.createMessageSendPreparationHost());
@@ -1834,6 +1775,26 @@ export class OpenCodianView extends ItemView {
       renderSessionTodoDock: (tabId: TabId | null) => {
         this.renderSessionTodoDock(tabId);
       },
+      hasMatchingPersistentAssistantNoticeMessage: (
+        title: string,
+        content: string,
+        tone: ChatMessage['noticeTone'],
+        conversation?: Conversation | null,
+      ) => this.hasMatchingPersistentAssistantNoticeMessage(title, content, tone, conversation),
+      appendPersistentAssistantNoticeMessage: (options: {
+        title: string;
+        content: string;
+        tone: ChatMessage['noticeTone'];
+      }) => this.appendPersistentAssistantNoticeMessage(options),
+    };
+  }
+
+  private createBackgroundTaskNoticeStateServiceHost(): BackgroundTaskNoticeStateServiceHost {
+    return {
+      getTabRuntimeState: (tabId: TabId | null) => this.getTabRuntimeState(tabId),
+      getActiveTabId: () => this.getActiveTabId(),
+      getSessionIdForTab: (tabId: TabId | null) => this.getSessionIdForTab(tabId),
+      getCurrentConversation: () => this.currentConversation,
       hasMatchingPersistentAssistantNoticeMessage: (
         title: string,
         content: string,
