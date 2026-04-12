@@ -11,7 +11,7 @@
 - 为 signal sync / background-tab sync 统一检查目标 tab runtime，并产出 `previousFingerprint`
 - 用同一处 lock/unlock 包裹同步回调，避免这些入口各自手写 `isConversationSyncInFlight = true/false`
 
-它不负责具体的服务端拉取、question/todo/background-task post-sync orchestration，也不负责 tab 枚举、conversation 查询或 signal/background polling dispatch；这些职责现在分别由 `OpenCodianView`、`ConversationSyncOrchestrationService` 与 `BackgroundTaskPostSyncCoordinator` 承接。
+它不负责具体的服务端拉取、question/todo/background-task post-sync orchestration，也不负责 tab 枚举、conversation 查询或 signal/background polling dispatch；这些职责现在分别由 `ConversationSyncBridge`、`ConversationSyncOrchestrationService` 与 `BackgroundTaskPostSyncCoordinator` 承接。
 
 ## 公开接口
 
@@ -44,7 +44,7 @@ export class ConversationSyncRuntimeCoordinator {
 
 ## 与 `OpenCodianView` 的边界
 
-- `OpenCodianView` 仍负责决定何时发起 visible/signal/background sync，并提供具体服务端拉取与 post-sync host bridge
+- `OpenCodianView` 仍负责暴露 render host；`ConversationSyncBridge` 负责把 runtime coordinator、server sync 和 post-sync 回调装配起来
 - `ConversationSyncOrchestrationService` 负责 signal/background polling sync 的 tab/conversation 选择、conversation 加载与 dispatch
 - `ConversationSyncRuntimeCoordinator` 只负责“这个 tab 现在能不能进 sync、进入后怎么持有 runtime lock、基线 fingerprint 怎么取”
 - `BackgroundTaskPostSyncCoordinator` 继续负责 sync 完成后的 question/todo/background-task 收尾编排

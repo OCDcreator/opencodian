@@ -14,7 +14,7 @@
 - 轮询时只枚举非活动、仍有 background task、且 runtime 允许发起同步的 tab
 - 把真正的 per-tab runtime lock / fingerprint baseline 继续委托给 `ConversationSyncRuntimeCoordinator`
 
-它不负责具体的服务端拉取，也不负责 post-sync question/todo/background-task 收尾；这些能力仍分别留在 `OpenCodianView` 与 `BackgroundTaskPostSyncCoordinator`。
+它不负责具体的服务端拉取，也不负责 post-sync question/todo/background-task 收尾；这些能力现在分别留在 `ConversationSyncBridge` 与 `BackgroundTaskPostSyncCoordinator`。
 
 ## 公开接口
 
@@ -59,7 +59,8 @@ export class ConversationSyncOrchestrationService {
 
 ## 与相邻模块的边界
 
-- `OpenCodianView` 现在只保留实际服务端同步调用，以及 post-sync host bridge
+- `ConversationSyncBridge` 现在承接 orchestration dispatch 后的 server sync / post-sync callback 装配
 - `ConversationSyncOrchestrationService` 负责 “是否继续跑 sync loop、signal 是否需要 debounce、该同步哪个 tab / conversation、按哪条入口 dispatch”
 - `ConversationSyncRuntimeCoordinator` 继续负责 “这个 tab 现在能不能同步、进入后怎么持有 runtime lock、baseline fingerprint 怎么取”
-- 这次切片继续推进 master plan 的 P1 sync orchestration lane，让 `OpenCodianView` 再少持有一层 sync loop / signal timer ownership，而不是继续在已有 helper 链里做更窄的碎片化抽离
+- `OpenCodianView` 只保留真正依赖当前 DOM/render host 的 render 入口
+- 这次切片继续推进 master plan 的 P1 sync orchestration lane，让 `OpenCodianView` 再少持有一层 sync callback assembly ownership，而不是继续在已有 helper 链里做更窄的碎片化抽离

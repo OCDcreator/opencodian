@@ -5,7 +5,7 @@
 
 ## 概述
 
-`BackgroundTaskPostSyncCoordinator` 把 `OpenCodianView` 里 hidden signal sync / background-tab sync / active visible-conversation background sync 完成后的 background-task 收尾编排独立出来，专门负责：
+`BackgroundTaskPostSyncCoordinator` 把原本散落在 `OpenCodianView`、现在经由 `ConversationSyncBridge` 汇入的 hidden signal sync / background-tab sync / active visible-conversation background sync 收尾编排独立出来，专门负责：
 
 - 在 signal sync 完成后落下 background task authoritative-sync ready 标记
 - 刷新 pending question、session todo/status live state
@@ -49,7 +49,7 @@ export class BackgroundTaskPostSyncCoordinator {
 
 ### visible active-conversation sync 收尾
 
-- `handleVisibleConversationSyncComplete()` 统一接手 `syncVisibleConversationInBackground()` 里原本散落的 question refresh、todo/status live refresh，以及“当前 conversation 是否还是发起 sync 时那一页”的判定
+- `handleVisibleConversationSyncComplete()` 统一接手 `ConversationSyncBridge.syncVisibleConversationInBackground()` 里原本散落的 question refresh、todo/status live refresh，以及“当前 conversation 是否还是发起 sync 时那一页”的判定
 - 当 visible sync 仍对应当前 conversation 时，coordinator 会顺手提交 `currentConversationRevertState`；只有 `syncResult.changed === true` 时才同步 active-tab `lastConversationSyncFingerprint`
 - coordinator 继续只把 render plan 回传给 view：是否还能继续 `applySyncedConversationUpdate()`，或者应回退到 `renderBackgroundTaskIndicatorIfNeeded()`；真正的 DOM 渲染仍留在 view
 - todo/status refresh 仍沿用既有 runtime gate：只有存在 incomplete todos、pending background-task launch 或 waiting-for-follow-up 时才会主动刷新
@@ -66,6 +66,7 @@ export class BackgroundTaskPostSyncCoordinator {
 
 ## 与 `OpenCodianView` 的边界
 
-- `OpenCodianView` 仍负责 conversation sync 的发起、background task segment/timeline 推导、inline panel DOM 渲染，以及 completion notice segment 的收集实现
+- `OpenCodianView` 仍负责 background task segment/timeline 推导、inline panel DOM 渲染，以及 completion notice segment 的收集实现
+- `ConversationSyncBridge` 负责把 visible/signal/background sync 的 server-sync 结果统一路由到 post-sync coordinator 和 view render host
 - `BackgroundTaskPostSyncCoordinator` 负责 hidden signal/background-tab sync，以及 active visible-conversation background sync 之后的跨 question/todo/background-task service 编排
-- 这让本轮继续沿着 master-plan 的 `OpenCodianView` sync orchestration ownership 迁移，把后台同步后的 question/todo/background-task 收尾，以及 visible sync 的 state-commit 判定，从主 view 挪到 dedicated coordinator，而不是继续散落在 `syncConversationFromSignal()`、`syncVisibleConversationInBackground()` 和 `syncBackgroundTaskTabsInBackground()` 中
+- 这让本轮继续沿着 master-plan 的 `OpenCodianView` sync orchestration ownership 迁移，把后台同步后的 question/todo/background-task 收尾，以及 visible sync 的 state-commit 判定，稳定留在 dedicated coordinator，而不是继续散落在 view 的多个 sync 入口中
