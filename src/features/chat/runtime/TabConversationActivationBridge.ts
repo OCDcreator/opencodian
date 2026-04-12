@@ -2,10 +2,11 @@ import type { Conversation } from '../../../core/types';
 import type { QuestionTodoStatusRefreshCoordinator } from '../services/QuestionTodoStatusRefreshCoordinator';
 import type { TabId } from '../tabs';
 import type { TabConversationStateBridge } from './TabConversationStateBridge';
+import type { TabViewActivationBridge } from './TabViewActivationBridge';
 
 type TabConversationStatePort = Pick<
   TabConversationStateBridge,
-  'applyActiveConversation' | 'commitConversationSyncBaseline'
+  'applyActiveConversation' | 'clearActiveConversation' | 'commitConversationSyncBaseline'
 >;
 
 type QuestionTodoStatusRefreshPort = Pick<
@@ -13,7 +14,9 @@ type QuestionTodoStatusRefreshPort = Pick<
   'refreshAfterActivation'
 >;
 
-export interface CurrentTabConversationOpenBridgeHost {
+type TabViewActivationPort = Pick<TabViewActivationBridge, 'applyEmptyActivationOutcome'>;
+
+export interface TabConversationActivationBridgeHost {
   getCurrentConversationId(): string | null;
   getActiveTabId(): TabId | null;
   resetBackgroundTaskIndicator(): void;
@@ -29,12 +32,19 @@ export interface CurrentTabConversationOpenBridgeHost {
   scheduleSettledScrollToBottom(tabId: TabId | null): void;
 }
 
-export class CurrentTabConversationOpenBridge {
+export class TabConversationActivationBridge {
   constructor(
-    private readonly host: CurrentTabConversationOpenBridgeHost,
+    private readonly host: TabConversationActivationBridgeHost,
     private readonly tabConversationStateBridge: TabConversationStatePort,
+    private readonly tabViewActivationBridge: TabViewActivationPort,
     private readonly questionTodoStatusRefreshCoordinator: QuestionTodoStatusRefreshPort,
   ) {}
+
+  applyEmptyTabActivation(tabId: TabId): void {
+    this.tabConversationStateBridge.clearActiveConversation(tabId);
+    this.resetActivePaneShell();
+    this.tabViewActivationBridge.applyEmptyActivationOutcome(tabId);
+  }
 
   openConversation(conversation: Conversation): void {
     if (this.host.getCurrentConversationId() !== conversation.id) {
@@ -46,8 +56,7 @@ export class CurrentTabConversationOpenBridge {
       clearRevertState: true,
       resetSessionState: true,
     });
-    this.host.clearMessagesContainer();
-    this.host.resetTurnState();
+    this.resetActivePaneShell();
     this.tabConversationStateBridge.commitConversationSyncBaseline(conversation.messages);
     this.host.updateModelSelectorDisplay();
     this.host.syncActiveTabContextUsageIdentity();
@@ -61,5 +70,10 @@ export class CurrentTabConversationOpenBridge {
     void this.host.renderBackgroundTaskIndicatorIfNeeded(activeTabId);
     void this.host.refreshActiveTabContextUsageFromServer();
     this.host.scheduleSettledScrollToBottom(activeTabId);
+  }
+
+  private resetActivePaneShell(): void {
+    this.host.clearMessagesContainer();
+    this.host.resetTurnState();
   }
 }

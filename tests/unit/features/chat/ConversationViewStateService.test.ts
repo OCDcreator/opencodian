@@ -5,6 +5,7 @@ import {
   TabViewActivationBridge,
   type TabViewActivationBridgeHost,
 } from '../../../../src/features/chat/runtime/TabViewActivationBridge';
+import type { TabConversationActivationBridge } from '../../../../src/features/chat/runtime/TabConversationActivationBridge';
 import type { ConversationTransitionPort, LoadedConversationTransitionContext } from '../../../../src/features/chat/runtime/ConversationTransitionBridge';
 import {
   type ConversationViewStateHost,
@@ -46,12 +47,21 @@ function createHost(
     getConversations: jest.fn().mockReturnValue([]),
     createConversation: jest.fn().mockResolvedValue(createConversation('created')),
     applyStreamingConversationActivation: jest.fn(),
-    applyEmptyTabActivation: jest.fn(),
     applyLoadedConversationActivation: jest.fn(),
     syncBackgroundTaskStateFromConversation: jest.fn(),
     renderMessages: jest.fn().mockResolvedValue(undefined),
     commitConversationSyncBaseline: jest.fn(),
     ...overrides,
+  };
+}
+
+type MockedTabConversationActivationPort = jest.Mocked<
+  Pick<TabConversationActivationBridge, 'applyEmptyTabActivation'>
+>;
+
+function createTabConversationActivationBridge(): MockedTabConversationActivationPort {
+  return {
+    applyEmptyTabActivation: jest.fn(),
   };
 }
 
@@ -152,6 +162,7 @@ describe('ConversationViewStateService', () => {
     const host = createHost({
       getTabManager: jest.fn().mockReturnValue(tabManager),
     });
+    const tabConversationActivationBridge = createTabConversationActivationBridge();
     const { bridge } = createActivationBridge();
     const transitionBridge = createTransitionBridge();
     const conversationLoadRuntimeBridge = createConversationLoadRuntimeBridge({
@@ -159,6 +170,7 @@ describe('ConversationViewStateService', () => {
     });
     const service = new ConversationViewStateService(
       host,
+      tabConversationActivationBridge,
       bridge,
       transitionBridge,
       conversationLoadRuntimeBridge,
@@ -186,11 +198,13 @@ describe('ConversationViewStateService', () => {
     const host = createHost({
       getTabManager: jest.fn().mockReturnValue(tabManager),
     });
+    const tabConversationActivationBridge = createTabConversationActivationBridge();
     const { bridge } = createActivationBridge();
     const transitionBridge = createTransitionBridge();
     const conversationLoadRuntimeBridge = createConversationLoadRuntimeBridge();
     const service = new ConversationViewStateService(
       host,
+      tabConversationActivationBridge,
       bridge,
       transitionBridge,
       conversationLoadRuntimeBridge,
@@ -203,7 +217,7 @@ describe('ConversationViewStateService', () => {
       preserveScrollPosition: true,
     });
     expect(host.applyStreamingConversationActivation).not.toHaveBeenCalled();
-    expect(host.applyEmptyTabActivation).not.toHaveBeenCalled();
+    expect(tabConversationActivationBridge.applyEmptyTabActivation).not.toHaveBeenCalled();
   });
 
   it('clears the active conversation state when activating an empty tab', async () => {
@@ -216,11 +230,13 @@ describe('ConversationViewStateService', () => {
     const host = createHost({
       getTabManager: jest.fn().mockReturnValue(tabManager),
     });
+    const tabConversationActivationBridge = createTabConversationActivationBridge();
     const { bridge } = createActivationBridge();
     const transitionBridge = createTransitionBridge();
     const conversationLoadRuntimeBridge = createConversationLoadRuntimeBridge();
     const service = new ConversationViewStateService(
       host,
+      tabConversationActivationBridge,
       bridge,
       transitionBridge,
       conversationLoadRuntimeBridge,
@@ -228,7 +244,7 @@ describe('ConversationViewStateService', () => {
 
     await service.activateTab(tab!.id);
 
-    expect(host.applyEmptyTabActivation).toHaveBeenCalledWith(tab!.id);
+    expect(tabConversationActivationBridge.applyEmptyTabActivation).toHaveBeenCalledWith(tab!.id);
     expect(host.applyStreamingConversationActivation).not.toHaveBeenCalled();
     expect(transitionBridge.captureLoadedConversationTransition).not.toHaveBeenCalled();
   });
@@ -236,6 +252,7 @@ describe('ConversationViewStateService', () => {
   it('delegates the loaded-conversation transition shell to the dedicated bridge', async () => {
     const conversation = createConversation('load-target');
     const host = createHost();
+    const tabConversationActivationBridge = createTabConversationActivationBridge();
     const { bridge } = createActivationBridge();
     const transitionBridge = createTransitionBridge();
     const conversationLoadRuntimeBridge = createConversationLoadRuntimeBridge({
@@ -244,6 +261,7 @@ describe('ConversationViewStateService', () => {
     });
     const service = new ConversationViewStateService(
       host,
+      tabConversationActivationBridge,
       bridge,
       transitionBridge,
       conversationLoadRuntimeBridge,

@@ -1,20 +1,23 @@
 import type { Conversation } from '../../../../src/core/types';
 import {
-  CurrentTabConversationOpenBridge,
-  type CurrentTabConversationOpenBridgeHost,
-} from '../../../../src/features/chat/runtime/CurrentTabConversationOpenBridge';
+  TabConversationActivationBridge,
+  type TabConversationActivationBridgeHost,
+} from '../../../../src/features/chat/runtime/TabConversationActivationBridge';
 import type { QuestionTodoStatusRefreshCoordinator } from '../../../../src/features/chat/services/QuestionTodoStatusRefreshCoordinator';
 import type { TabConversationStateBridge } from '../../../../src/features/chat/runtime/TabConversationStateBridge';
+import type { TabViewActivationBridge } from '../../../../src/features/chat/runtime/TabViewActivationBridge';
 
 type TabConversationStatePort = Pick<
   TabConversationStateBridge,
-  'applyActiveConversation' | 'commitConversationSyncBaseline'
+  'applyActiveConversation' | 'clearActiveConversation' | 'commitConversationSyncBaseline'
 >;
 
 type QuestionTodoStatusRefreshPort = Pick<
   QuestionTodoStatusRefreshCoordinator,
   'refreshAfterActivation'
 >;
+
+type TabViewActivationPort = Pick<TabViewActivationBridge, 'applyEmptyActivationOutcome'>;
 
 function createConversation(id = 'conversation-1'): Conversation {
   return {
@@ -36,8 +39,8 @@ function createConversation(id = 'conversation-1'): Conversation {
 
 function createHost(
   callOrder: string[],
-  overrides: Partial<jest.Mocked<CurrentTabConversationOpenBridgeHost>> = {},
-): jest.Mocked<CurrentTabConversationOpenBridgeHost> {
+  overrides: Partial<jest.Mocked<TabConversationActivationBridgeHost>> = {},
+): jest.Mocked<TabConversationActivationBridgeHost> {
   return {
     getCurrentConversationId: jest.fn().mockReturnValue('previous-conversation'),
     getActiveTabId: jest.fn().mockReturnValue('tab-1'),
@@ -87,8 +90,21 @@ function createTabConversationStateBridge(
     applyActiveConversation: jest.fn(() => {
       callOrder.push('applyActiveConversation');
     }),
+    clearActiveConversation: jest.fn(() => {
+      callOrder.push('clearActiveConversation');
+    }),
     commitConversationSyncBaseline: jest.fn(() => {
       callOrder.push('commitConversationSyncBaseline');
+    }),
+  };
+}
+
+function createTabViewActivationBridge(
+  callOrder: string[],
+): jest.Mocked<TabViewActivationPort> {
+  return {
+    applyEmptyActivationOutcome: jest.fn(() => {
+      callOrder.push('applyEmptyActivationOutcome');
     }),
   };
 }
@@ -104,16 +120,44 @@ function createRefreshCoordinator(
   };
 }
 
-describe('CurrentTabConversationOpenBridge', () => {
+describe('TabConversationActivationBridge', () => {
+  it('applies empty-tab activation in bridge order', () => {
+    const callOrder: string[] = [];
+    const host = createHost(callOrder);
+    const tabConversationStateBridge = createTabConversationStateBridge(callOrder);
+    const tabViewActivationBridge = createTabViewActivationBridge(callOrder);
+    const refreshCoordinator = createRefreshCoordinator(callOrder);
+    const bridge = new TabConversationActivationBridge(
+      host,
+      tabConversationStateBridge,
+      tabViewActivationBridge,
+      refreshCoordinator,
+    );
+
+    bridge.applyEmptyTabActivation('tab-1');
+
+    expect(tabConversationStateBridge.clearActiveConversation).toHaveBeenCalledWith('tab-1');
+    expect(tabViewActivationBridge.applyEmptyActivationOutcome).toHaveBeenCalledWith('tab-1');
+    expect(refreshCoordinator.refreshAfterActivation).not.toHaveBeenCalled();
+    expect(callOrder).toEqual([
+      'clearActiveConversation',
+      'clearMessagesContainer',
+      'resetTurnState',
+      'applyEmptyActivationOutcome',
+    ]);
+  });
+
   it('opens the current-tab conversation shell in bridge order', () => {
     const callOrder: string[] = [];
     const conversation = createConversation('next-conversation');
     const host = createHost(callOrder);
     const tabConversationStateBridge = createTabConversationStateBridge(callOrder);
+    const tabViewActivationBridge = createTabViewActivationBridge(callOrder);
     const refreshCoordinator = createRefreshCoordinator(callOrder);
-    const bridge = new CurrentTabConversationOpenBridge(
+    const bridge = new TabConversationActivationBridge(
       host,
       tabConversationStateBridge,
+      tabViewActivationBridge,
       refreshCoordinator,
     );
 
@@ -161,10 +205,12 @@ describe('CurrentTabConversationOpenBridge', () => {
       getCurrentConversationId: jest.fn().mockReturnValue(conversation.id),
     });
     const tabConversationStateBridge = createTabConversationStateBridge(callOrder);
+    const tabViewActivationBridge = createTabViewActivationBridge(callOrder);
     const refreshCoordinator = createRefreshCoordinator(callOrder);
-    const bridge = new CurrentTabConversationOpenBridge(
+    const bridge = new TabConversationActivationBridge(
       host,
       tabConversationStateBridge,
+      tabViewActivationBridge,
       refreshCoordinator,
     );
 

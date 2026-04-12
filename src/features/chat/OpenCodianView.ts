@@ -120,9 +120,9 @@ import {
   type ConversationTransitionBridgeHost,
 } from './runtime/ConversationTransitionBridge';
 import {
-  CurrentTabConversationOpenBridge,
-  type CurrentTabConversationOpenBridgeHost,
-} from './runtime/CurrentTabConversationOpenBridge';
+  TabConversationActivationBridge,
+  type TabConversationActivationBridgeHost,
+} from './runtime/TabConversationActivationBridge';
 import {
   PermissionInlineCardRenderer,
 } from './runtime/PermissionInlineCardRenderer';
@@ -713,7 +713,7 @@ export class OpenCodianView extends ItemView {
   private conversationHydrationRenderBridge: ConversationHydrationRenderBridge;
   private conversationTransitionBridge: ConversationTransitionBridge;
   private tabConversationStateBridge: TabConversationStateBridge;
-  private currentTabConversationOpenBridge: CurrentTabConversationOpenBridge;
+  private tabConversationActivationBridge: TabConversationActivationBridge;
   private tabViewActivationBridge: TabViewActivationBridge;
   private tabRuntimeStateBridge: TabRuntimeStateBridge;
   private conversationSyncOrchestrationService: ConversationSyncOrchestrationService;
@@ -1241,13 +1241,14 @@ export class OpenCodianView extends ItemView {
     this.tabConversationStateBridge = new TabConversationStateBridge(
       this.createTabConversationStateBridgeHost(),
     );
-    this.currentTabConversationOpenBridge = new CurrentTabConversationOpenBridge(
-      this.createCurrentTabConversationOpenBridgeHost(),
-      this.tabConversationStateBridge,
-      this.questionTodoStatusRefreshCoordinator,
-    );
     this.tabViewActivationBridge = new TabViewActivationBridge(
       this.createTabViewActivationBridgeHost(),
+      this.questionTodoStatusRefreshCoordinator,
+    );
+    this.tabConversationActivationBridge = new TabConversationActivationBridge(
+      this.createTabConversationActivationBridgeHost(),
+      this.tabConversationStateBridge,
+      this.tabViewActivationBridge,
       this.questionTodoStatusRefreshCoordinator,
     );
     this.tabRuntimeStateBridge = new TabRuntimeStateBridge(this.createTabRuntimeStateBridgeHost());
@@ -1295,6 +1296,7 @@ export class OpenCodianView extends ItemView {
     );
     this.conversationViewStateService = new ConversationViewStateService(
       this.createConversationViewStateHost(),
+      this.tabConversationActivationBridge,
       this.tabViewActivationBridge,
       this.conversationTransitionBridge,
       conversationLoadRuntimeBridge,
@@ -1552,7 +1554,7 @@ export class OpenCodianView extends ItemView {
     };
   }
 
-  private createCurrentTabConversationOpenBridgeHost(): CurrentTabConversationOpenBridgeHost {
+  private createTabConversationActivationBridgeHost(): TabConversationActivationBridgeHost {
     return {
       getCurrentConversationId: () => this.currentConversation?.id ?? null,
       getActiveTabId: () => this.getActiveTabId(),
@@ -1800,9 +1802,6 @@ export class OpenCodianView extends ItemView {
       createConversation: () => this.plugin.createConversation(),
       applyStreamingConversationActivation: (tabId, conversation) =>
         this.applyStreamingConversationActivation(tabId, conversation),
-      applyEmptyTabActivation: (tabId) => {
-        this.applyEmptyTabActivation(tabId);
-      },
       applyLoadedConversationActivation: (tabId, conversation) => {
         this.tabConversationStateBridge.applyActiveConversation(tabId, conversation, {
           clearRevertState: true,
@@ -2612,13 +2611,6 @@ export class OpenCodianView extends ItemView {
     });
     this.tabConversationStateBridge.commitConversationSyncBaseline(conversation.messages);
     this.tabViewActivationBridge.applyStreamingActivationOutcome(tabId, conversation.openCodeSessionId);
-  }
-
-  private applyEmptyTabActivation(tabId: TabId): void {
-    this.tabConversationStateBridge.clearActiveConversation(tabId);
-    this.messagesContainer?.empty();
-    this.resetTurnState();
-    this.tabViewActivationBridge.applyEmptyActivationOutcome(tabId);
   }
 
   private restorePersistedTabs(): string | null {
@@ -4410,7 +4402,7 @@ export class OpenCodianView extends ItemView {
   }
 
   private openConversationInCurrentTab(conversation: Conversation): void {
-    this.currentTabConversationOpenBridge.openConversation(conversation);
+    this.tabConversationActivationBridge.openConversation(conversation);
   }
 
   private startConversationSyncLoop(): void {

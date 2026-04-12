@@ -7,6 +7,7 @@ import type {
   ConversationLoadRuntimePort,
   ConversationLoadRuntimeOptions,
 } from '../runtime/ConversationLoadRuntimeBridge';
+import type { TabConversationActivationBridge } from '../runtime/TabConversationActivationBridge';
 import type { TabViewActivationBridge } from '../runtime/TabViewActivationBridge';
 import type { ConversationTransitionPort } from '../runtime/ConversationTransitionBridge';
 import type { RestoredTabState, TabData, TabId } from '../tabs';
@@ -37,13 +38,14 @@ export interface ConversationViewStateHost {
   createConversation(): Promise<Conversation>;
 
   applyStreamingConversationActivation(tabId: TabId, conversation: Conversation): Promise<void> | void;
-  applyEmptyTabActivation(tabId: TabId): void;
 
   applyLoadedConversationActivation(tabId: TabId | null, conversation: Conversation): void;
   syncBackgroundTaskStateFromConversation(conversation: Conversation): void;
   renderMessages(messages: ChatMessage[]): Promise<void>;
   commitConversationSyncBaseline(messages: ChatMessage[]): void;
 }
+
+type TabConversationActivationPort = Pick<TabConversationActivationBridge, 'applyEmptyTabActivation'>;
 
 type TabViewActivationPort =
   Pick<
@@ -54,6 +56,7 @@ type TabViewActivationPort =
 export class ConversationViewStateService {
   constructor(
     private readonly host: ConversationViewStateHost,
+    private readonly tabConversationActivationBridge: TabConversationActivationPort,
     private readonly tabViewActivationBridge: TabViewActivationPort,
     private readonly conversationTransitionBridge: ConversationTransitionPort,
     private readonly conversationLoadRuntimeBridge: ConversationLoadRuntimePort,
@@ -145,7 +148,7 @@ export class ConversationViewStateService {
       return;
     }
 
-    this.host.applyEmptyTabActivation(tabId);
+    this.tabConversationActivationBridge.applyEmptyTabActivation(tabId);
   }
 
   async loadConversation(
