@@ -14,16 +14,21 @@ import type {
 import type { QuestionResolutionCoordinator } from '../runtime/QuestionResolutionCoordinator';
 import type { TabId } from '../tabs';
 import type { QuestionDockCoordinator } from './QuestionDockCoordinator';
+import type { QuestionPendingRefreshRuntimeFacade } from './QuestionPendingRefreshRuntimeFacade';
 import type { QuestionPostResolutionRuntimeFacade } from './QuestionPostResolutionRuntimeFacade';
 
 const logger = createLogger('QuestionResolutionFlowCoordinator');
 
 type QuestionDockResolutionPort = Pick<
   QuestionDockCoordinator,
-  'waitForDockResolutionIfEnabled' | 'markQuestionRequestResolved'
+  'waitForDockResolutionIfEnabled'
 >;
 type QuestionInlineCardActionPort = Pick<QuestionInlineCardRenderer, 'collectAction'>;
 type QuestionResolutionStatePort = Pick<QuestionResolutionCoordinator, 'applyResolvedQuestionState'>;
+type QuestionResolvedRequestRuntimePort = Pick<
+  QuestionPendingRefreshRuntimeFacade,
+  'markQuestionRequestResolved'
+>;
 type QuestionPostResolutionRuntimePort = Pick<
   QuestionPostResolutionRuntimeFacade,
   'followUpAfterResolution'
@@ -40,6 +45,7 @@ export interface QuestionResolutionFlowCoordinatorPorts {
   dockCoordinator: QuestionDockResolutionPort;
   inlineCardRenderer: QuestionInlineCardActionPort;
   resolutionCoordinator: QuestionResolutionStatePort;
+  resolvedRequestRuntime: QuestionResolvedRequestRuntimePort;
   postResolutionRuntime: QuestionPostResolutionRuntimePort;
 }
 
@@ -102,7 +108,7 @@ export class QuestionResolutionFlowCoordinator {
     resolution: QuestionResolution,
     tabId: TabId | null,
   ): Promise<void> {
-    this.ports.dockCoordinator.markQuestionRequestResolved(resolution.request.id, tabId);
+    this.ports.resolvedRequestRuntime.markQuestionRequestResolved(resolution.request.id, tabId);
     this.ports.resolutionCoordinator.applyResolvedQuestionState(resolution, tabId);
     await this.ports.postResolutionRuntime.followUpAfterResolution(tabId);
   }

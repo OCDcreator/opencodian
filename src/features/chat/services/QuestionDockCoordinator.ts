@@ -206,7 +206,7 @@ export class QuestionDockCoordinator {
     }
   }
 
-  markQuestionRequestResolved(
+  private markQuestionRequestResolved(
     requestId: string,
     tabId: TabId | null = this.host.getActiveTabId(),
   ): void {

@@ -36,7 +36,6 @@ export class QuestionDockCoordinator {
   render(): void;
   clearPendingQuestionsForTab(tabId?: TabId | null): void;
   refreshPendingQuestionsForTab(tabId: TabId | null, sessionId?: string | null): Promise<QuestionRequest[]>;
-  markQuestionRequestResolved(requestId: string, tabId?: TabId | null): void;
   waitForDockResolutionIfEnabled(request: QuestionRequest, tabId?: TabId | null): Promise<boolean>;
 }
 ```
@@ -60,6 +59,6 @@ export class QuestionDockCoordinator {
 
 - `OpenCodianView` 不再直接持有 `QuestionDock` slot lifecycle；这部分 UI ownership 现在由 `QuestionDockSlotCoordinator` 负责，而 question dock/pending question 的主要 orchestration 继续留在本 coordinator
 - `BackgroundTaskPostSyncCoordinator` 与 `TabConversationStateBridge` 仍需要 pending-question refresh / clear，但现在会经由同一份 question runtime bundle 调用本 service，而不是继续走 view 内单独 forwarding 方法
-- `QuestionInlineCardRenderer` 继续负责 inline 提问 UI；dock 未接管时的 inline resolve orchestration 现在改由 `QuestionResolutionFlowCoordinator` 统一调用 `markQuestionRequestResolved()` 与 `QuestionResolutionCoordinator`
+- `QuestionInlineCardRenderer` 继续负责 inline 提问 UI；dock 未接管时的 inline resolve orchestration 由 `QuestionResolutionFlowCoordinator` 处理，并通过 `QuestionPendingRefreshRuntimeFacade` 的小 port 标记 resolved-request suppression
 - dock queue 的 waiter / enqueue / remove runtime map 维护现在由 `QuestionDockQueueRuntimeFacade` 承接，pending-question refresh 的 resolved-state / stale-state 维护继续由 `QuestionPendingRefreshRuntimeFacade` 承接，本模块只保留 fetch/session-filter、attention 与 dock render 决策
 - dock resolve 后的 runtime 收尾现在与 inline fallback 共用 `QuestionPostResolutionRuntimeFacade`，本模块不再单独持有 sync/status follow-up 细节

@@ -198,6 +198,7 @@ export function createQuestionRuntimeServices(
       dockCoordinator,
       inlineCardRenderer,
       resolutionCoordinator,
+      resolvedRequestRuntime: pendingRefreshRuntimeFacade,
       postResolutionRuntime: postResolutionRuntimeFacade,
     },
   );
