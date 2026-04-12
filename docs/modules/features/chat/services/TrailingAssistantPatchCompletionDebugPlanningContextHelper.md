@@ -1,0 +1,46 @@
+# TrailingAssistantPatchCompletionDebugPlanningContextHelper
+
+> **源码**: `src/features/chat/services/TrailingAssistantPatchCompletionDebugPlanningContextHelper.ts`
+> **状态**: [REVIEW]
+
+## 概述
+
+`TrailingAssistantPatchCompletionDebugPlanningContextHelper` 把 trailing-assistant tail-outcome 路径里 completion-debug planning-context 的纯装配从 `ConversationRenderService` 抽成了独立 helper：
+
+- 接收 tail-outcome planning-context 风格的 source：tail messages、`messageEl` 与 `shouldStickToBottom`
+- 在 helper 内部改为读取 `tailStatePlan.shouldStickToBottom`，并统一调用消息摘要函数收束 `summaryPlan`
+- 保持 `buildTrailingAssistantPatchCompletionDebugPlan()` 下游继续消费同一份稳定的 completion-debug contract
+
+它不负责最终 `completionDebugPlan` shape、不处理 tail-state plan，也不发送任何 debug 日志；只负责 completion-debug planning-context 的纯输入收口。
+
+## 公开接口
+
+```typescript
+export type TrailingAssistantPatchCompletionDebugPlanningContextSource =
+  TrailingAssistantPatchTailOutcomePlanningContext & {
+    tailStatePlan: {
+      shouldStickToBottom: boolean;
+    };
+    summarizeChatMessageForDebug(
+      message: ChatMessage | null | undefined,
+    ): Record<string, unknown> | null;
+  };
+
+export type TrailingAssistantPatchCompletionDebugPlanningContext = {
+  shouldStickToBottom: boolean;
+  summaryPlan: {
+    previousTail: Record<string, unknown> | null;
+    nextTail: Record<string, unknown> | null;
+  };
+};
+
+export function buildTrailingAssistantPatchCompletionDebugPlanningContext(
+  source: TrailingAssistantPatchCompletionDebugPlanningContextSource,
+): TrailingAssistantPatchCompletionDebugPlanningContext;
+```
+
+## 与其他模块的关系
+
+- `ConversationRenderService` 现在直接把 tail-outcome `planningContext`、`tailStatePlan` 与消息摘要函数交给这里，不再在 service 内部拼装 completion-debug inputs
+- `TrailingAssistantPatchTailOutcomePlanningContextHelper` 继续负责收束 tail messages、`messageEl` 与 `shouldStickToBottom` 的共享 tail-outcome contract；本 helper 再把它进一步缩成 completion-debug 专用 contract
+- `ConversationRenderService` 里的 `buildTrailingAssistantPatchCompletionDebugPlan()` 继续消费这里返回的窄 planning-context，并把最终 `completionDebugPlan` 交给 logging-context / emitter helper

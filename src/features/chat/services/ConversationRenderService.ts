@@ -13,6 +13,10 @@ import {
   emitTrailingAssistantPatchSkippedDebugLog,
 } from './TrailingAssistantPatchDebugLogEmitterHelper';
 import {
+  buildTrailingAssistantPatchCompletionDebugPlanningContext,
+  type TrailingAssistantPatchCompletionDebugPlanningContext,
+} from './TrailingAssistantPatchCompletionDebugPlanningContextHelper';
+import {
   applyTrailingAssistantPatchTailState,
   type TrailingAssistantPatchTailStatePlan,
 } from './TrailingAssistantPatchTailStateApplierHelper';
@@ -159,11 +163,6 @@ type TrailingAssistantPatchCompletionDebugPlan = {
   nextTail: Record<string, unknown> | null;
 };
 
-type TrailingAssistantPatchCompletionDebugSummaryPlan = {
-  previousTail: Record<string, unknown> | null;
-  nextTail: Record<string, unknown> | null;
-};
-
 type TrailingAssistantPatchNonMergeableTailFailurePlan = {
   reason: 'tail-message-not-mergeable-assistant';
   payload: {
@@ -193,16 +192,6 @@ type TrailingAssistantPatchSuccessPlanParts = {
   executionPlan: TrailingAssistantPatchExecutionPlan;
   tailOutcomePlans: TrailingAssistantPatchTailOutcomePlans;
   turnBodyScopePlan: TrailingAssistantPatchTurnBodyScopePlan;
-};
-
-type TrailingAssistantPatchCompletionDebugPlanningContext = {
-  shouldStickToBottom: boolean;
-  summaryPlan: TrailingAssistantPatchCompletionDebugSummaryPlan;
-};
-
-type TrailingAssistantPatchCompletionDebugSummaryPlanningContext = {
-  previousTailMessage: ChatMessage;
-  nextTailMessage: ChatMessage;
 };
 
 type TrailingAssistantPatchExecutionTailPlanParts = {
@@ -802,41 +791,13 @@ export class ConversationRenderService {
     tailStatePlan: TrailingAssistantPatchTailStatePlan,
   ): TrailingAssistantPatchCompletionDebugPlan {
     return this.buildTrailingAssistantPatchCompletionDebugPlan(
-      this.buildTrailingAssistantPatchCompletionDebugPlanningContext(
-        planningContext,
+      buildTrailingAssistantPatchCompletionDebugPlanningContext({
+        ...planningContext,
         tailStatePlan,
-      ),
+        summarizeChatMessageForDebug: (message) =>
+          this.host.summarizeChatMessageForDebug(message),
+      }),
     );
-  }
-
-  private buildTrailingAssistantPatchCompletionDebugPlanningContext(
-    planningContext: TrailingAssistantPatchTailOutcomePlanningContext,
-    tailStatePlan: TrailingAssistantPatchTailStatePlan,
-  ): TrailingAssistantPatchCompletionDebugPlanningContext {
-    return {
-      shouldStickToBottom: tailStatePlan.shouldStickToBottom,
-      summaryPlan:
-        this.buildTrailingAssistantPatchCompletionDebugSummaryPlanFromTailOutcomePlanningContext(
-          planningContext,
-        ),
-    };
-  }
-
-  private buildTrailingAssistantPatchCompletionDebugSummaryPlanFromTailOutcomePlanningContext(
-    planningContext: TrailingAssistantPatchTailOutcomePlanningContext,
-  ): TrailingAssistantPatchCompletionDebugSummaryPlan {
-    return this.buildTrailingAssistantPatchCompletionDebugSummaryPlan(
-      this.buildTrailingAssistantPatchCompletionDebugSummaryPlanningContext(planningContext),
-    );
-  }
-
-  private buildTrailingAssistantPatchCompletionDebugSummaryPlanningContext(
-    planningContext: TrailingAssistantPatchTailOutcomePlanningContext,
-  ): TrailingAssistantPatchCompletionDebugSummaryPlanningContext {
-    return {
-      previousTailMessage: planningContext.previousTailMessage,
-      nextTailMessage: planningContext.nextTailMessage,
-    };
   }
 
   private buildTrailingAssistantPatchSuccessPlanFromParts(
@@ -868,15 +829,6 @@ export class ConversationRenderService {
       shouldStickToBottom: planningContext.shouldStickToBottom,
       previousTail: planningContext.summaryPlan.previousTail,
       nextTail: planningContext.summaryPlan.nextTail,
-    };
-  }
-
-  private buildTrailingAssistantPatchCompletionDebugSummaryPlan(
-    planningContext: TrailingAssistantPatchCompletionDebugSummaryPlanningContext,
-  ): TrailingAssistantPatchCompletionDebugSummaryPlan {
-    return {
-      previousTail: this.host.summarizeChatMessageForDebug(planningContext.previousTailMessage),
-      nextTail: this.host.summarizeChatMessageForDebug(planningContext.nextTailMessage),
     };
   }
 
