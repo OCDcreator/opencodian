@@ -11,11 +11,11 @@
 - 刷新 pending question、session todo/status live state
 - 判定 visible background sync 完成后当前 conversation 是否仍然匹配发起同步时的 active conversation
 - 在 visible background sync 仍命中当前 conversation 时提交 `currentConversationRevertState` 与 active-tab sync fingerprint
-- 调用 view 侧 background task timeline rebuild host bridge
+- 调用 background task timeline rebuild host bridge
 - 协调 completion notice queue/flush 与 tab stream-like 状态刷新
 - 根据 sync fingerprint 变化标记后台 tab attention
 
-它不负责 background task segment/timeline 推导，也不负责 inline panel DOM 渲染；这些仍保留在 `OpenCodianView`，并通过 host bridge 被 post-sync coordinator 调用。
+它不负责 background task segment/timeline 推导，也不负责 inline panel DOM 渲染；这些现在分别由 `BackgroundTaskTimelineService` 和 `OpenCodianView` 承接，并通过 host bridge 被 post-sync coordinator 调用。
 
 ## 公开接口
 
@@ -66,7 +66,8 @@ export class BackgroundTaskPostSyncCoordinator {
 
 ## 与 `OpenCodianView` 的边界
 
-- `OpenCodianView` 仍负责 background task segment/timeline 推导、inline panel DOM 渲染，以及 completion notice segment 的收集实现
+- `OpenCodianView` 仍负责 inline panel DOM 渲染，以及把 timeline rebuild / notice queue host bridge 接到各个 background-task service
+- `BackgroundTaskTimelineService` 负责 background task segment/timeline 推导，以及 completion notice 所需的 segment 收集
 - `ConversationSyncBridge` 负责把 visible/signal/background sync 的 server-sync 结果统一路由到 post-sync coordinator 和 view render host
 - `BackgroundTaskPostSyncCoordinator` 负责 hidden signal/background-tab sync，以及 active visible-conversation background sync 之后的跨 question/todo/background-task service 编排
 - 这让本轮继续沿着 master-plan 的 `OpenCodianView` sync orchestration ownership 迁移，把后台同步后的 question/todo/background-task 收尾，以及 visible sync 的 state-commit 判定，稳定留在 dedicated coordinator，而不是继续散落在 view 的多个 sync 入口中

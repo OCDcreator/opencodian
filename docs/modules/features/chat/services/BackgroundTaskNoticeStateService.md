@@ -12,7 +12,7 @@
 - 在 reload / hydration 后根据已持久化 notice 恢复 suppression
 - 在当前前台会话仍匹配时去重并追加持久化 stopped/stale notice
 
-它不负责 background task timeline 推导、inline panel 渲染、completion reminder 队列，也不接管 `OpenCodianView` 的 sync / hydration 时机判断。
+它不负责 background task timeline 推导、inline panel 渲染、completion reminder 队列，也不接管 `BackgroundTaskTimelineService` / `OpenCodianView` 的 sync / hydration 时机判断。
 
 ## 公开接口
 
@@ -48,6 +48,7 @@ export class BackgroundTaskNoticeStateService {
 
 ## 与 `OpenCodianView` 的边界
 
-- `OpenCodianView` 仍负责 background task 的 launch/completion timeline 推导、hydration gate、inline panel 渲染和 completion notice 队列
+- `BackgroundTaskTimelineService` 负责 background task 的 launch/completion timeline 推导
+- `OpenCodianView` 仍负责 hydration gate host bridge、inline panel DOM 渲染和 completion notice 队列触发
 - `BackgroundTaskNoticeStateService` 只负责 stopped/stale notice 的 content、fingerprint、persisted dedupe 与 suppression state 协调
 - 这样 P2 `question / todo / background task` lane 可以继续从 view 迁出更清晰的 background-task ownership，而不是把 notice 细节继续留在主视图里
