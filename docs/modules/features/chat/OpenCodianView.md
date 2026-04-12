@@ -76,6 +76,8 @@ interface TabRuntimeState {
 
 这就是多标签并发不共享一个全局 streaming 状态的实现基础。
 
+其中 question 相关的 `pendingQuestionRequests`、draft answers、active group/index 与 waiter map 现在虽然仍存放在 `TabRuntimeState`，但读写和 refresh/render 编排已经统一收束到 `services/QuestionDockCoordinator.ts`，不再由 `OpenCodianView` 直接维护这整条链路。
+
 ### 视图级状态
 
 除此之外，类里还维护若干跨 tab 的视图级状态：
@@ -154,6 +156,14 @@ signal sync 与后台轮询里的 loop lifecycle、signal debounce、tab / conve
 其中当前活动 tab 的后台同步收尾会把 question refresh、todo/status live refresh、active-conversation match 判定，以及 `currentConversationRevertState` / active-tab sync fingerprint 的 state commit 委托给 `BackgroundTaskPostSyncCoordinator`；`ConversationSyncBridge` 负责把这些 post-sync outcome 路由回 view，`OpenCodianView` 只保留 `applySyncedConversationUpdate()` / `renderBackgroundTaskIndicatorIfNeeded()` 这类真正依赖当前 DOM/render host 的路径。
 
 除此之外，`ConversationSyncEventAdapter` 现在会接入 `message.updated`、`message.part.updated` 和 `session.diff`，先按 session 匹配 tab，再交给 `ConversationSyncOrchestrationService` 做 debounce/dispatch，用于提前触发当前会话或后台 tab 的 authoritative sync，而不是只能等 2 秒轮询。
+
+### question dock / pending question 编排
+
+question dock 与 pending-question refresh 的主要 runtime/UI ownership 现在由 `QuestionDockCoordinator` 承担：
+
+- `OpenCodianView` 只保留 host bridge：提供 active tab / current session / `QuestionDock` 实例、OpenCode question API，以及 resolved question state bridge
+- `QuestionDockCoordinator` 统一持有 pending-question refresh、waiter 保活、draft answer sanitize、dock render callbacks，以及回答/拒绝后的 status refresh + visible sync follow-up
+- `showQuestionDialog()` 会先尝试把请求交给上方 dock；如果当前设置仍使用 inline question card，才退回 `QuestionInlineCardRenderer`
 
 ### 消息区重渲编排
 

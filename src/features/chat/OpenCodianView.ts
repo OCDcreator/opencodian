@@ -198,6 +198,10 @@ import {
   MessageSendPreparationService,
 } from './services/MessageSendPreparationService';
 import {
+  type QuestionDockCoordinatorHost,
+  QuestionDockCoordinator,
+} from './services/QuestionDockCoordinator';
+import {
   isElementNearBottom,
   scrollElementToBottom,
 } from './services/ScrollManager';
@@ -231,12 +235,6 @@ import type {
 } from './ui/modelSelector/types';
 import { NavigationSidebar } from './ui/NavigationSidebar';
 import { QuestionDock } from './ui/QuestionDock';
-import {
-  buildQuestionDockViewModel,
-  getPreferredQuestionIndexForGroup,
-  isQuestionAnswerComplete,
-  normalizeQuestionDraftAnswers,
-} from './ui/questionDockState';
 import { SessionTodoDock } from './ui/SessionTodoDock';
 import { syncUserMessageStreamingActionState } from './userMessageActions';
 import { prepareUserMessageMarkdownForDisplay } from './userMessageDisplay';
@@ -701,6 +699,7 @@ export class OpenCodianView extends ItemView {
   private permissionInlineCardRenderer: PermissionInlineCardRenderer;
   private questionInlineCardRenderer: QuestionInlineCardRenderer;
   private questionResolutionCoordinator: QuestionResolutionCoordinator;
+  private questionDockCoordinator: QuestionDockCoordinator;
   private sendPipelineRuntime: SendPipelineRuntime;
   private omoBackgroundTaskLogStates = new Map<string, OmoBackgroundTaskLogState>();
   private lastKnownMarkdownFilePath: string | null = null;
@@ -1629,6 +1628,9 @@ export class OpenCodianView extends ItemView {
       this.questionInlineCardRenderer,
       this.createQuestionResolutionCoordinatorHost(),
     );
+    this.questionDockCoordinator = new QuestionDockCoordinator(
+      this.createQuestionDockCoordinatorHost(),
+    );
     this.sendPipelineRuntime = new SendPipelineRuntime(
       this.createSendPipelineRuntimeHost(),
       this.messageSendPreparationService,
@@ -2254,6 +2256,36 @@ export class OpenCodianView extends ItemView {
       keepQuestionCardPinnedToBottom: (tabId) => {
         this.keepQuestionCardPinnedToBottom(tabId);
       },
+    };
+  }
+
+  private createQuestionDockCoordinatorHost(): QuestionDockCoordinatorHost {
+    return {
+      getTabRuntimeState: (tabId) => this.getTabRuntimeState(tabId),
+      ensureTabRuntimeState: (tabId) => this.ensureTabRuntimeState(tabId),
+      getActiveTabId: () => this.getActiveTabId(),
+      getCurrentConversationSessionId: () => this.currentConversation?.openCodeSessionId,
+      getSessionIdForTab: (tabId) => this.getSessionIdForTab(tabId),
+      getQuestionDock: () => this.questionDock,
+      getQuestionDisplayMode: () => this.plugin.settings.questionDisplayMode,
+      shouldUseAboveInputQuestionDock: () => this.shouldUseAboveInputQuestionDock(),
+      setTabNeedsAttention: (tabId, needsAttention) => {
+        if (tabId) {
+          this.tabManager?.setTabNeedsAttention(tabId, needsAttention);
+        }
+      },
+      getPendingQuestions: () => this.plugin.openCodeService.getPendingQuestions(),
+      replyToQuestion: (requestId, answers) => this.plugin.openCodeService.replyToQuestion(requestId, answers),
+      rejectQuestion: (requestId) => this.plugin.openCodeService.rejectQuestion(requestId),
+      applyResolvedQuestionState: (resolution, tabId) => {
+        this.questionResolutionCoordinator.applyResolvedQuestionState(resolution, tabId);
+      },
+      refreshTabSessionStatus: (tabId, sessionId, options) =>
+        this.refreshTabSessionStatus(tabId, sessionId ?? undefined, options),
+      startConversationSyncLoop: () => {
+        this.startConversationSyncLoop();
+      },
+      syncVisibleConversationInBackground: () => this.syncVisibleConversationInBackground(),
     };
   }
 
@@ -4436,431 +4468,26 @@ export class OpenCodianView extends ItemView {
     return this.plugin.settings.showAnsweredQuestionCards;
   }
 
-  private sanitizeQuestionAnswer(
-    answer: readonly string[],
-    request: QuestionRequest,
-    questionIndex: number,
-  ): string[] {
-    const cleaned = answer
-      .map((item) => item.trim())
-      .filter((item) => item.length > 0);
-
-    if (request.questions[questionIndex]?.multiple) {
-      return [...new Set(cleaned)];
-    }
-
-    return cleaned.length > 0 ? [cleaned[0]] : [];
-  }
-
-  private getActivePendingQuestionRequest(tabId: TabId | null = this.getActiveTabId()): QuestionRequest | null {
-    return this.getTabRuntimeState(tabId)?.pendingQuestionRequests[0] ?? null;
-  }
-
-  private getQuestionDraftAnswers(
-    request: QuestionRequest,
-    tabId: TabId | null = this.getActiveTabId(),
-  ): string[][] {
-    const runtime = this.getTabRuntimeState(tabId);
-    if (!runtime) {
-      return normalizeQuestionDraftAnswers(request.questions.length);
-    }
-
-    const normalized = normalizeQuestionDraftAnswers(
-      request.questions.length,
-      runtime.questionDraftAnswers.get(request.id),
-    );
-    runtime.questionDraftAnswers.set(request.id, normalized);
-    return normalized;
-  }
-
-  private setQuestionDraftAnswer(
-    request: QuestionRequest,
-    questionIndex: number,
-    answer: readonly string[],
-    tabId: TabId | null = this.getActiveTabId(),
-  ): void {
-    const runtime = this.getTabRuntimeState(tabId);
-    if (!runtime) {
-      return;
-    }
-
-    const nextAnswers = this.getQuestionDraftAnswers(request, tabId);
-    nextAnswers[questionIndex] = this.sanitizeQuestionAnswer(answer, request, questionIndex);
-    runtime.questionDraftAnswers.set(request.id, nextAnswers);
-  }
-
-  private getOrCreateQuestionWaiter(
-    requestId: string,
-    tabId: TabId | null = this.getActiveTabId(),
-  ): DeferredQuestionRequest | null {
-    const runtime = this.getTabRuntimeState(tabId);
-    if (!runtime) {
-      return null;
-    }
-
-    const existing = runtime.questionRequestWaiters.get(requestId);
-    if (existing) {
-      return existing;
-    }
-
-    let resolve = () => {};
-    const promise = new Promise<void>((resolver) => {
-      resolve = resolver;
-    });
-    const waiter = { promise, resolve };
-    runtime.questionRequestWaiters.set(requestId, waiter);
-    return waiter;
-  }
-
-  private resolveQuestionWaiter(
-    requestId: string,
-    tabId: TabId | null = this.getActiveTabId(),
-  ): void {
-    const runtime = this.getTabRuntimeState(tabId);
-    const waiter = runtime?.questionRequestWaiters.get(requestId);
-    if (!waiter) {
-      return;
-    }
-
-    waiter.resolve();
-    runtime?.questionRequestWaiters.delete(requestId);
-  }
-
-  private enqueuePendingQuestionRequest(
-    request: QuestionRequest,
-    tabId: TabId | null = this.getActiveTabId(),
-  ): void {
-    const runtime = this.ensureTabRuntimeState(tabId);
-    if (!runtime) {
-      return;
-    }
-
-    if (!runtime.pendingQuestionRequests.some((item) => item.id === request.id)) {
-      runtime.pendingQuestionRequests = [...runtime.pendingQuestionRequests, request];
-    }
-
-    this.getQuestionDraftAnswers(request, tabId);
-
-    const answers = this.getQuestionDraftAnswers(request, tabId);
-    if (!runtime.questionActiveGroupKeys.has(request.id)) {
-      const viewModel = buildQuestionDockViewModel(request, answers, {
-        displayMode: this.plugin.settings.questionDisplayMode,
-      });
-      runtime.questionActiveGroupKeys.set(request.id, viewModel.activeGroupKey);
-      runtime.questionActiveIndexes.set(request.id, viewModel.activeQuestionIndex);
-    }
-
-    if (tabId !== this.getActiveTabId()) {
-      if (tabId) {
-        this.tabManager?.setTabNeedsAttention(tabId, true);
-      }
-      return;
-    }
-
-    if (tabId) {
-      this.tabManager?.setTabNeedsAttention(tabId, false);
-    }
-    this.renderQuestionDock();
-  }
-
-  private removePendingQuestionRequest(
-    requestId: string,
-    tabId: TabId | null = this.getActiveTabId(),
-  ): void {
-    const runtime = this.getTabRuntimeState(tabId);
-    if (!runtime) {
-      return;
-    }
-
-    runtime.pendingQuestionRequests = runtime.pendingQuestionRequests.filter((request) => request.id !== requestId);
-    runtime.questionDraftAnswers.delete(requestId);
-    runtime.questionActiveGroupKeys.delete(requestId);
-    runtime.questionActiveIndexes.delete(requestId);
-    this.resolveQuestionWaiter(requestId, tabId);
-
-    if (tabId === this.getActiveTabId()) {
-      if (tabId) {
-        this.tabManager?.setTabNeedsAttention(tabId, false);
-      }
-      this.renderQuestionDock();
-      return;
-    }
-
-    if (tabId) {
-      this.tabManager?.setTabNeedsAttention(tabId, runtime.pendingQuestionRequests.length > 0);
-    }
-  }
-
   private suppressResolvedQuestionRequest(
     requestId: string,
     tabId: TabId | null = this.getActiveTabId(),
   ): void {
-    const runtime = this.getTabRuntimeState(tabId);
-    runtime?.resolvedQuestionRequestIds.add(requestId);
+    this.questionDockCoordinator.markQuestionRequestResolved(requestId, tabId);
   }
 
   private clearPendingQuestionsForTab(tabId: TabId | null = this.getActiveTabId()): void {
-    const runtime = this.getTabRuntimeState(tabId);
-    if (!runtime) {
-      return;
-    }
-
-    runtime.pendingQuestionRequests = [];
-    runtime.resolvedQuestionRequestIds.clear();
-    runtime.questionDraftAnswers.clear();
-    runtime.questionActiveGroupKeys.clear();
-    runtime.questionActiveIndexes.clear();
-    runtime.questionRequestWaiters.clear();
-
-    if (tabId) {
-      this.tabManager?.setTabNeedsAttention(tabId, false);
-    }
-
-    if (tabId === this.getActiveTabId()) {
-      this.renderQuestionDock();
-    }
+    this.questionDockCoordinator.clearPendingQuestionsForTab(tabId);
   }
 
   private async refreshPendingQuestionsForTab(
     tabId: TabId | null,
     sessionId: string | null | undefined = this.getSessionIdForTab(tabId),
   ): Promise<QuestionRequest[]> {
-    const runtime = this.getTabRuntimeState(tabId);
-    if (!runtime || !sessionId) {
-      this.clearPendingQuestionsForTab(tabId);
-      return [];
-    }
-
-    try {
-      const pendingRequests = await this.plugin.openCodeService.getPendingQuestions();
-      const sessionRequests = pendingRequests.filter((request) => request.sessionId === sessionId);
-      const rawSessionRequestIds = new Set(sessionRequests.map((request) => request.id));
-      const filteredSessionRequests = sessionRequests.filter(
-        (request) => !runtime.resolvedQuestionRequestIds.has(request.id),
-      );
-      const waitingIds = new Set(runtime.questionRequestWaiters.keys());
-      const mergedRequests = [...filteredSessionRequests];
-
-      for (const existing of runtime.pendingQuestionRequests) {
-        if (waitingIds.has(existing.id) && !mergedRequests.some((request) => request.id === existing.id)) {
-          mergedRequests.push(existing);
-        }
-      }
-
-      for (const requestId of [...runtime.resolvedQuestionRequestIds]) {
-        if (!rawSessionRequestIds.has(requestId)) {
-          runtime.resolvedQuestionRequestIds.delete(requestId);
-        }
-      }
-
-      runtime.pendingQuestionRequests = mergedRequests;
-      const activeRequestIds = new Set(mergedRequests.map((request) => request.id));
-
-      for (const request of mergedRequests) {
-        this.getQuestionDraftAnswers(request, tabId);
-      }
-
-      for (const requestId of [...runtime.questionDraftAnswers.keys()]) {
-        if (!activeRequestIds.has(requestId)) {
-          runtime.questionDraftAnswers.delete(requestId);
-        }
-      }
-      for (const requestId of [...runtime.questionActiveGroupKeys.keys()]) {
-        if (!activeRequestIds.has(requestId)) {
-          runtime.questionActiveGroupKeys.delete(requestId);
-        }
-      }
-      for (const requestId of [...runtime.questionActiveIndexes.keys()]) {
-        if (!activeRequestIds.has(requestId)) {
-          runtime.questionActiveIndexes.delete(requestId);
-        }
-      }
-
-      if (tabId === this.getActiveTabId()) {
-        if (tabId) {
-          this.tabManager?.setTabNeedsAttention(tabId, false);
-        }
-        this.renderQuestionDock();
-      } else {
-        if (tabId) {
-          this.tabManager?.setTabNeedsAttention(tabId, mergedRequests.length > 0);
-        }
-      }
-
-      return mergedRequests;
-    } catch (error) {
-      logger.debug('Failed to refresh pending questions', error);
-      return runtime.pendingQuestionRequests;
-    }
+    return this.questionDockCoordinator.refreshPendingQuestionsForTab(tabId, sessionId);
   }
 
   private renderQuestionDock(): void {
-    if (!this.questionDock) {
-      return;
-    }
-
-    if (!this.shouldUseAboveInputQuestionDock()) {
-      this.questionDock.render({
-        request: null,
-        answers: [],
-        displayMode: this.plugin.settings.questionDisplayMode,
-      }, {
-        onAnswerChange: () => {},
-        onSelectGroup: () => {},
-        onSelectQuestion: () => {},
-        onSubmit: () => {},
-        onReject: () => {},
-        onClose: () => {},
-      });
-      return;
-    }
-
-    const activeTabId = this.getActiveTabId();
-    const activeRequest = this.getActivePendingQuestionRequest(activeTabId);
-    const activeSessionId = this.currentConversation?.openCodeSessionId ?? null;
-
-    if (!activeTabId || !activeRequest || activeRequest.sessionId !== activeSessionId) {
-      this.questionDock.render({
-        request: null,
-        answers: [],
-        displayMode: this.plugin.settings.questionDisplayMode,
-      }, {
-        onAnswerChange: () => {},
-        onSelectGroup: () => {},
-        onSelectQuestion: () => {},
-        onSubmit: () => {},
-        onReject: () => {},
-        onClose: () => {},
-      });
-      return;
-    }
-
-    const runtime = this.getTabRuntimeState(activeTabId);
-    if (!runtime) {
-      return;
-    }
-
-    const answers = this.getQuestionDraftAnswers(activeRequest, activeTabId);
-    const viewModel = buildQuestionDockViewModel(activeRequest, answers, {
-      activeGroupKey: runtime.questionActiveGroupKeys.get(activeRequest.id),
-      activeQuestionIndex: runtime.questionActiveIndexes.get(activeRequest.id),
-      displayMode: this.plugin.settings.questionDisplayMode,
-    });
-    runtime.questionActiveGroupKeys.set(activeRequest.id, viewModel.activeGroupKey);
-    runtime.questionActiveIndexes.set(activeRequest.id, viewModel.activeQuestionIndex);
-
-    this.questionDock.render({
-      request: activeRequest,
-      answers,
-      displayMode: this.plugin.settings.questionDisplayMode,
-      activeGroupKey: viewModel.activeGroupKey,
-      activeQuestionIndex: viewModel.activeQuestionIndex,
-    }, {
-      onAnswerChange: (questionIndex, answer) => {
-        this.setQuestionDraftAnswer(activeRequest, questionIndex, answer, activeTabId);
-      },
-      onSelectGroup: (groupKey) => {
-        const nextAnswers = this.getQuestionDraftAnswers(activeRequest, activeTabId);
-        runtime.questionActiveGroupKeys.set(activeRequest.id, groupKey);
-        runtime.questionActiveIndexes.set(
-          activeRequest.id,
-          getPreferredQuestionIndexForGroup(activeRequest, nextAnswers, groupKey),
-        );
-        this.renderQuestionDock();
-      },
-      onSelectQuestion: (questionIndex) => {
-        const nextViewModel = buildQuestionDockViewModel(
-          activeRequest,
-          this.getQuestionDraftAnswers(activeRequest, activeTabId),
-          {
-            activeQuestionIndex: questionIndex,
-            displayMode: this.plugin.settings.questionDisplayMode,
-          },
-        );
-        runtime.questionActiveGroupKeys.set(activeRequest.id, nextViewModel.activeGroupKey);
-        runtime.questionActiveIndexes.set(activeRequest.id, nextViewModel.activeQuestionIndex);
-        this.renderQuestionDock();
-      },
-      onSubmit: () => {
-        void this.handleQuestionDockSubmit(activeTabId);
-      },
-      onReject: () => {
-        void this.handleQuestionDockReject(activeTabId);
-      },
-      onClose: () => {
-        void this.handleQuestionDockReject(activeTabId);
-      },
-    });
-  }
-
-  private async handleQuestionDockSubmit(tabId: TabId | null = this.getActiveTabId()): Promise<void> {
-    const request = this.getActivePendingQuestionRequest(tabId);
-    if (!request) {
-      return;
-    }
-
-    const answers = this.getQuestionDraftAnswers(request, tabId).map((answer, index) =>
-      this.sanitizeQuestionAnswer(answer, request, index),
-    );
-    const hasEmptyAnswer = request.questions.some((question, index) =>
-      !isQuestionAnswerComplete(question, answers[index]),
-    );
-    if (hasEmptyAnswer) {
-      new Notice(t('chat.question.answerRequired'));
-      return;
-    }
-
-    try {
-      await this.plugin.openCodeService.replyToQuestion(request.id, answers);
-      this.suppressResolvedQuestionRequest(request.id, tabId);
-      this.questionResolutionCoordinator.applyResolvedQuestionState({
-        request,
-        status: 'answered',
-        answers,
-      }, tabId);
-      this.removePendingQuestionRequest(request.id, tabId);
-      await this.afterQuestionDockResolution(tabId);
-    } catch (error) {
-      logger.error('Failed to resolve question request:', error);
-      new Notice(t('chat.question.notice.error'));
-    }
-  }
-
-  private async handleQuestionDockReject(tabId: TabId | null = this.getActiveTabId()): Promise<void> {
-    const request = this.getActivePendingQuestionRequest(tabId);
-    if (!request) {
-      return;
-    }
-
-    try {
-      await this.plugin.openCodeService.rejectQuestion(request.id);
-      this.suppressResolvedQuestionRequest(request.id, tabId);
-      this.questionResolutionCoordinator.applyResolvedQuestionState({
-        request,
-        status: 'rejected',
-      }, tabId);
-      this.removePendingQuestionRequest(request.id, tabId);
-      await this.afterQuestionDockResolution(tabId);
-    } catch (error) {
-      logger.error('Failed to resolve question request:', error);
-      new Notice(t('chat.question.notice.error'));
-    }
-  }
-
-  private async afterQuestionDockResolution(tabId: TabId | null): Promise<void> {
-    const sessionId = this.getSessionIdForTab(tabId);
-    this.renderQuestionDock();
-
-    if (!sessionId) {
-      return;
-    }
-
-    void this.refreshTabSessionStatus(tabId, sessionId, { suppressErrors: true });
-    this.startConversationSyncLoop();
-
-    if (tabId === this.getActiveTabId() && !this.getTabRuntimeState(tabId)?.isStreaming) {
-      await this.syncVisibleConversationInBackground();
-    }
+    this.questionDockCoordinator.render();
   }
 
   private getContextKindLabel(kind: PromptContextItem['kind']): string {
@@ -10298,13 +9925,8 @@ export class OpenCodianView extends ItemView {
     request: QuestionRequest,
     tabId: TabId | null = this.getActiveTabId(),
   ): Promise<void> {
-    if (this.shouldUseAboveInputQuestionDock() && tabId) {
-      const waiter = this.getOrCreateQuestionWaiter(request.id, tabId);
-      if (waiter) {
-        this.enqueuePendingQuestionRequest(request, tabId);
-        await waiter.promise;
-        return;
-      }
+    if (await this.questionDockCoordinator.waitForDockResolutionIfEnabled(request, tabId)) {
+      return;
     }
 
     const action = await this.questionInlineCardRenderer.collectAction(

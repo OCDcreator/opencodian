@@ -9,7 +9,7 @@ Question Dock 是输入框上方的浮动面板，用于展示 OpenCode 服务�
 
 ## 导入关系
 上游: `obsidian`（setIcon）、`QuestionDisplayMode`/`QuestionRequest`（core/types）、`i18n`、`questionDockState`（buildQuestionDockViewModel、isQuestionAnswerComplete）
-下游: 被 `OpenCodianView` 在输入区域上方实例化
+下游: 被 `OpenCodianView` 在输入区域上方实例化，并由 `QuestionDockCoordinator` 组装 render state / callbacks
 
 ## 核心类型 / 接口
 
@@ -89,7 +89,8 @@ render() → Header + Tabs + Body + Footer
 ## 与其他模块的交互
 
 - **questionDockState**: 提供 `buildQuestionDockViewModel()`、`isQuestionAnswerComplete()` 纯函数
-- **OpenCodianView**: 持有 `QuestionDock` 实例，管理 `QuestionDockRenderState`，处理回调
+- **QuestionDockCoordinator**: 管理 `QuestionDockRenderState`、pending-question draft state 和 submit/reject 回调
+- **OpenCodianView**: 持有 `QuestionDock` 实例，并把 host bridge 暴露给 `QuestionDockCoordinator`
 - **i18n**: `chat.question.*` 命名空间
 
 ## 配置项
