@@ -255,6 +255,10 @@ import {
   SessionTodoStateService,
   type SessionTodoStateServiceHost,
 } from './services/SessionTodoStateService';
+import {
+  SessionTodoStatusRefreshService,
+  type SessionTodoStatusRefreshServiceHost,
+} from './services/SessionTodoStatusRefreshService';
 import { TitleGenerationService } from './services/TitleGenerationService';
 import { TabBar, type TabBarLayoutMode, type TabId, TabManager } from './tabs';
 import { ContextDetailModal, type ContextRawMessageItem } from './ui/ContextDetailModal';
@@ -691,6 +695,7 @@ export class OpenCodianView extends ItemView {
   private titleGenerationService: TitleGenerationService;
   private persistentAssistantNoticeService: PersistentAssistantNoticeService;
   private sessionTodoStateService: SessionTodoStateService;
+  private sessionTodoStatusRefreshService: SessionTodoStatusRefreshService;
   private backgroundTaskTimelineService: BackgroundTaskTimelineService;
   private backgroundTaskCompletionNoticeService: BackgroundTaskCompletionNoticeService;
   private backgroundTaskNoticeStateService: BackgroundTaskNoticeStateService;
@@ -1107,77 +1112,6 @@ export class OpenCodianView extends ItemView {
     this.sessionTodoDock?.update(this.getTabSessionTodos(tabId, activeSessionId));
   }
 
-  private async refreshActiveSessionTodos(options: { suppressErrors?: boolean } = {}): Promise<SessionTodo[]> {
-    return this.refreshTabSessionTodos(this.getActiveTabId(), this.currentConversation?.openCodeSessionId, options);
-  }
-
-  private async refreshTabSessionTodos(
-    tabId: TabId | null,
-    sessionId: string | undefined,
-    options: { suppressErrors?: boolean } = {},
-  ): Promise<SessionTodo[]> {
-    const runtime = this.getTabRuntimeState(tabId);
-    if (!runtime || !sessionId) {
-      this.renderSessionTodoDock(tabId);
-      return [];
-    }
-
-    const requestId = runtime.todoRequestId + 1;
-    runtime.todoRequestId = requestId;
-
-    try {
-      const todos = await this.plugin.openCodeService.getSessionTodos(sessionId);
-      const latestRuntime = this.getTabRuntimeState(tabId);
-      if (!latestRuntime || latestRuntime.todoRequestId !== requestId) {
-        return this.getTabSessionTodos(tabId);
-      }
-
-      this.setTabSessionTodos(tabId, todos, sessionId);
-      this.backgroundTaskLiveSignalCoordinator.reconcileStateFromLiveSignals(tabId);
-      return todos;
-    } catch (error) {
-      logger.debug('Failed to refresh session todos', error);
-      if (!options.suppressErrors) {
-        new Notice(t('chat.todo.loadFailed'));
-      }
-      return this.getTabSessionTodos(tabId);
-    }
-  }
-
-  private async refreshTabSessionStatus(
-    tabId: TabId | null,
-    sessionId: string | undefined,
-    options: { suppressErrors?: boolean } = {},
-  ): Promise<SessionActivityStatus | null> {
-    const runtime = this.getTabRuntimeState(tabId);
-    if (!runtime || !sessionId) {
-      this.setTabSessionStatus(tabId, null, sessionId ?? null);
-      return null;
-    }
-
-    const requestId = runtime.statusRequestId + 1;
-    runtime.statusRequestId = requestId;
-
-    try {
-      const statuses = await this.plugin.openCodeService.getSessionStatuses();
-      const latestRuntime = this.getTabRuntimeState(tabId);
-      if (!latestRuntime || latestRuntime.statusRequestId !== requestId) {
-        return this.getTabSessionStatus(tabId, sessionId);
-      }
-
-      const status = statuses[sessionId] ?? { type: 'idle' as const };
-      this.setTabSessionStatus(tabId, status, sessionId);
-      this.backgroundTaskLiveSignalCoordinator.reconcileStateFromLiveSignals(tabId);
-      return status;
-    } catch (error) {
-      logger.debug('Failed to refresh session status', error);
-      if (!options.suppressErrors) {
-        new Notice(t('chat.todo.loadFailed'));
-      }
-      return this.getTabSessionStatus(tabId, sessionId);
-    }
-  }
-
   private hasIncompleteTodos(todos: readonly SessionTodo[]): boolean {
     return this.sessionTodoStateService.hasIncompleteTodos(todos);
   }
@@ -1269,6 +1203,9 @@ export class OpenCodianView extends ItemView {
       this.createPersistentAssistantNoticeServiceHost(),
     );
     this.sessionTodoStateService = new SessionTodoStateService(this.createSessionTodoStateServiceHost());
+    this.sessionTodoStatusRefreshService = new SessionTodoStatusRefreshService(
+      this.createSessionTodoStatusRefreshServiceHost(),
+    );
     this.backgroundTaskNoticeStateService = new BackgroundTaskNoticeStateService(
       this.createBackgroundTaskNoticeStateServiceHost(),
     );
@@ -1452,6 +1389,28 @@ export class OpenCodianView extends ItemView {
     };
   }
 
+  private createSessionTodoStatusRefreshServiceHost(): SessionTodoStatusRefreshServiceHost {
+    return {
+      getTabRuntimeState: (tabId: TabId | null) => this.getTabRuntimeState(tabId),
+      getTabSessionTodos: (tabId, sessionId) => this.getTabSessionTodos(tabId, sessionId),
+      setTabSessionTodos: (tabId, todos, sessionId) => {
+        this.setTabSessionTodos(tabId, todos, sessionId);
+      },
+      renderSessionTodoDock: (tabId: TabId | null) => {
+        this.renderSessionTodoDock(tabId);
+      },
+      getTabSessionStatus: (tabId, sessionId) => this.getTabSessionStatus(tabId, sessionId),
+      setTabSessionStatus: (tabId, status, sessionId) => {
+        this.setTabSessionStatus(tabId, status, sessionId);
+      },
+      getSessionTodos: (sessionId) => this.plugin.openCodeService.getSessionTodos(sessionId),
+      getSessionStatuses: () => this.plugin.openCodeService.getSessionStatuses(),
+      reconcileBackgroundTaskLiveSignals: (tabId) => {
+        this.backgroundTaskLiveSignalCoordinator.reconcileStateFromLiveSignals(tabId);
+      },
+    };
+  }
+
   private createBackgroundTaskNoticeStateServiceHost(): BackgroundTaskNoticeStateServiceHost {
     return {
       getTabRuntimeState: (tabId: TabId | null) => this.getTabRuntimeState(tabId),
@@ -1555,11 +1514,11 @@ export class OpenCodianView extends ItemView {
       },
       refreshActiveTabContextUsageFromServer: () => this.refreshActiveTabContextUsageFromServer(),
       refreshTabSessionStatus: (tabId, sessionId, options) =>
-        this.refreshTabSessionStatus(tabId, sessionId ?? undefined, options),
+        this.sessionTodoStatusRefreshService.refreshTabSessionStatus(tabId, sessionId, options),
       refreshPendingQuestionsForTab: (tabId, sessionId) =>
         this.refreshPendingQuestionsForTab(tabId, sessionId ?? undefined),
       refreshTabSessionTodos: (tabId, sessionId, options) =>
-        this.refreshTabSessionTodos(tabId, sessionId ?? undefined, options),
+        this.sessionTodoStatusRefreshService.refreshTabSessionTodos(tabId, sessionId, options),
       updateSendButtonState: () => {
         this.updateSendButtonState();
       },
@@ -1639,9 +1598,9 @@ export class OpenCodianView extends ItemView {
         this.syncBackgroundTaskStateFromConversation(conversation, tabId);
       },
       refreshTabSessionStatus: (tabId, sessionId, options) =>
-        this.refreshTabSessionStatus(tabId, sessionId, options),
+        this.sessionTodoStatusRefreshService.refreshTabSessionStatus(tabId, sessionId, options),
       refreshTabSessionTodos: (tabId, sessionId, options) =>
-        this.refreshTabSessionTodos(tabId, sessionId, options),
+        this.sessionTodoStatusRefreshService.refreshTabSessionTodos(tabId, sessionId, options),
       refreshBackgroundTaskCompletionNotices: (tabId, conversation) =>
         this.backgroundTaskIndicatorCoordinator.queueAndFlushCompletionNotices(tabId, conversation),
       syncTabStreamLikeState: (tabId) => {
@@ -1660,7 +1619,7 @@ export class OpenCodianView extends ItemView {
       },
       getSessionIdForTab: (tabId: TabId | null) => this.getSessionIdForTab(tabId),
       refreshTabSessionTodos: (tabId, sessionId, options) =>
-        this.refreshTabSessionTodos(tabId, sessionId, options),
+        this.sessionTodoStatusRefreshService.refreshTabSessionTodos(tabId, sessionId, options),
       resetBackgroundTaskIndicator: (tabId) => {
         this.resetBackgroundTaskIndicator(tabId);
       },
@@ -1915,7 +1874,8 @@ export class OpenCodianView extends ItemView {
       renderBackgroundTaskIndicatorIfNeeded: (tabId) => this.renderBackgroundTaskIndicatorIfNeeded(tabId),
       appendTurnDiffNoticeIfNeeded: (conversation, editedFiles, tabId) =>
         this.appendTurnDiffNoticeIfNeeded(conversation, editedFiles, tabId),
-      refreshTabSessionTodos: (tabId, sessionId, options) => this.refreshTabSessionTodos(tabId, sessionId, options),
+      refreshTabSessionTodos: (tabId, sessionId, options) =>
+        this.sessionTodoStatusRefreshService.refreshTabSessionTodos(tabId, sessionId, options),
       saveConversation: (conversation) => this.plugin.saveConversation(conversation),
       setConversationSyncInFlight: (tabId, value) => {
         const runtime = this.getTabRuntimeState(tabId);
@@ -2162,7 +2122,7 @@ export class OpenCodianView extends ItemView {
         this.questionResolutionCoordinator.applyResolvedQuestionState(resolution, tabId);
       },
       refreshTabSessionStatus: (tabId, sessionId, options) =>
-        this.refreshTabSessionStatus(tabId, sessionId ?? undefined, options),
+        this.sessionTodoStatusRefreshService.refreshTabSessionStatus(tabId, sessionId, options),
       startConversationSyncLoop: () => {
         this.startConversationSyncLoop();
       },
@@ -4411,9 +4371,17 @@ export class OpenCodianView extends ItemView {
     this.syncBackgroundTaskStateFromConversation(conversation);
     this.renderSessionTodoDock();
     this.renderQuestionDock();
-    void this.refreshTabSessionStatus(activeTabId, conversation.openCodeSessionId, { suppressErrors: true });
+    void this.sessionTodoStatusRefreshService.refreshTabSessionStatus(
+      activeTabId,
+      conversation.openCodeSessionId,
+      { suppressErrors: true },
+    );
     void this.refreshPendingQuestionsForTab(activeTabId, conversation.openCodeSessionId);
-    void this.refreshActiveSessionTodos({ suppressErrors: true });
+    void this.sessionTodoStatusRefreshService.refreshTabSessionTodos(
+      activeTabId,
+      conversation.openCodeSessionId,
+      { suppressErrors: true },
+    );
     void this.renderBackgroundTaskIndicatorIfNeeded();
     void this.refreshActiveTabContextUsageFromServer();
     this.scheduleSettledScrollToBottom();
