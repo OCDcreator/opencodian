@@ -5,11 +5,11 @@
 
 ## 概述
 
-`ContextFileCatalogService` 负责 composer “添加文件上下文”入口使用的 Vault 文件目录。它现在把 catalog 条目规范化、排序与增量 mutation 进一步下沉到 `ContextFileCatalogIndex`，自身只保留 Vault 扫描、惰性缓存、build promise 协调与非文件事件失效判断，让视图继续只负责调用选择器和把选中的文件转成 `PromptContextItem`。
+`ContextFileCatalogService` 负责 composer “添加文件上下文”入口使用的 Vault 文件目录。它现在把 build 阶段的批量扫描/异步让步下沉到 `ContextFileCatalogBuildRunner`，把 catalog 条目规范化、排序与增量 mutation 下沉到 `ContextFileCatalogIndex`，自身只保留惰性缓存、build promise 协调与非文件事件失效判断，让视图继续只负责调用选择器和把选中的文件转成 `PromptContextItem`。
 
 ## 导入关系
 
-上游: `obsidian`（App、TFile、TAbstractFile）、`ContextFileCatalogIndex`
+上游: `obsidian`（App、TFile、TAbstractFile）、`ContextFileCatalogBuildRunner`、`ContextFileCatalogIndex`
 下游: `OpenCodianView`、`ContextFilePickerModal`（使用导出的 catalog 类型）
 
 ## 核心类型 / 接口
@@ -46,11 +46,11 @@ class ContextFileCatalogService {
 
 ### 惰性构建与缓存
 
-`getCatalog()` 首次调用时遍历 `app.vault.getFiles()`，并把文件批量追加到 `ContextFileCatalogIndex`；扫描结束后再统一 `finalizeBuild()` 生成稳定排序与扩展名桶。后续调用复用缓存；同一时间已有构建任务时复用 `catalogBuildPromise`，避免重复扫描。
+`getCatalog()` 首次调用时读取 `app.vault.getFiles()`，并委托 `ContextFileCatalogBuildRunner` 分批构建 `ContextFileCatalogIndex`；扫描结束后复用同一个 index 作为缓存。后续调用直接返回缓存；同一时间已有构建任务时复用 `catalogBuildPromise`，避免重复扫描。
 
 ### 扫描批次
 
-构建目录时每 `400` 个文件让出一次事件循环，避免大 Vault 文件扫描长时间阻塞 UI。
+批次大小与事件循环让步策略已移到 `ContextFileCatalogBuildRunner`。service 不再直接持有 `400` 条/批与 `setTimeout(0)` 的执行细节。
 
 ### 增量更新
 
@@ -64,6 +64,7 @@ class ContextFileCatalogService {
 
 - **OpenCodianView**: 持有一个 service 实例；文件选择器打开时传入 `getCatalog()`；vault 事件直接转发到 `handleCreate/Delete/Rename`
 - **ContextFilePickerModal**: 只消费 `ContextFileCatalog` 数据，不再知道目录如何扫描或缓存
+- **ContextFileCatalogBuildRunner**: 负责 build 阶段的 batch scan 与 async yield
 - **ContextFileCatalogIndex**: 持有 catalog 条目规范化、排序、bucket 重算与增量 mutation
 - **shared/obsidianContext**: `isEligibleContextFilePath()` 负责隐藏路径 / 无扩展名过滤，`getContextPathExtension()` 负责扩展名规范化
 
@@ -72,4 +73,4 @@ class ContextFileCatalogService {
 - 排序顺序保持为扩展名 → basename → path，确保文件选择器结果稳定
 - 只有缓存已存在时才增量更新；尚未打开过文件选择器时，vault 事件不会触发提前扫描
 - 非 `TFile` vault 事件必须 invalidate，避免文件夹变更导致缓存结构陈旧
-- service 自身不再持有 entry/bucket 维护细节；后续如果继续拆分 context catalog，应优先沿 `ContextFileCatalogIndex` 与 build pipeline 的边界推进
+- service 自身不再持有 batch scan/yield 或 entry/bucket 维护细节；后续如果继续拆分 context catalog，应优先沿 `ContextFileCatalogBuildRunner` / `ContextFileCatalogIndex` 与 cache orchestration 的边界推进

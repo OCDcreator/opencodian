@@ -1,6 +1,7 @@
 import type { App, TAbstractFile } from 'obsidian';
 import { TFile } from 'obsidian';
 
+import { ContextFileCatalogBuildRunner } from './ContextFileCatalogBuildRunner';
 import {
   ContextFileCatalogIndex,
   type ContextFileCatalog,
@@ -12,6 +13,7 @@ export type {
 } from './ContextFileCatalogIndex';
 
 export class ContextFileCatalogService {
+  private readonly catalogBuildRunner = new ContextFileCatalogBuildRunner();
   private catalogCache: ContextFileCatalogIndex | null = null;
   private catalogBuildPromise: Promise<ContextFileCatalogIndex> | null = null;
 
@@ -82,28 +84,6 @@ export class ContextFileCatalogService {
   }
 
   private async buildCatalogIndex(): Promise<ContextFileCatalogIndex> {
-    const files = this.app.vault.getFiles();
-    const catalogIndex = new ContextFileCatalogIndex();
-    const batchSize = 400;
-
-    for (let index = 0; index < files.length; index += batchSize) {
-      const batch = files.slice(index, index + batchSize);
-      for (const file of batch) {
-        catalogIndex.appendBuildFile(file);
-      }
-
-      if (index + batchSize < files.length) {
-        await this.yieldCatalogBuild();
-      }
-    }
-
-    catalogIndex.finalizeBuild();
-    return catalogIndex;
-  }
-
-  private async yieldCatalogBuild(): Promise<void> {
-    await new Promise<void>((resolve) => {
-      window.setTimeout(resolve, 0);
-    });
+    return this.catalogBuildRunner.buildIndex(this.app.vault.getFiles());
   }
 }
