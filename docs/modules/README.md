@@ -100,6 +100,7 @@ docs/modules/
 │   │   │   ├── BackgroundTaskIndicatorCoordinator.md
 │   │   │   ├── BackgroundTaskInlinePanelRenderer.md
 │   │   │   ├── BackgroundTaskStreamTriggerCoordinator.md
+│   │   │   ├── ConversationHydrationRenderBridge.md
 │   │   │   ├── PermissionInlineCardRenderer.md
 │   │   │   ├── QuestionInlineCardRenderer.md
 │   │   │   ├── QuestionResolutionCoordinator.md

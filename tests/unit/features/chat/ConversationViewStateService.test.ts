@@ -1,35 +1,16 @@
-import {
-  type ConversationViewStateHost,
-  ConversationViewStateService,
-} from '../../../../src/features/chat/services/ConversationViewStateService';
+import type {
+  ConversationHydrationRenderContext,
+  ConversationHydrationRenderPort,
+} from '../../../../src/features/chat/runtime/ConversationHydrationRenderBridge';
 import {
   TabViewActivationBridge,
   type TabViewActivationBridgeHost,
 } from '../../../../src/features/chat/runtime/TabViewActivationBridge';
-import { TabManager } from '../../../../src/features/chat/tabs/TabManager';
-
-jest.mock('../../../../src/features/chat/services/ScrollManager', () => {
-  const actual = jest.requireActual('../../../../src/features/chat/services/ScrollManager');
-  return {
-    ...actual,
-    captureElementScrollRestoreSnapshot: jest.fn(() => ({
-      mode: 'preserve-distance',
-      scrollTop: 120,
-      distanceFromBottom: 40,
-      anchorMessageId: null,
-      anchorOffsetTop: 0,
-    })),
-    restoreElementScrollAfterRender: jest.fn((_messagesEl, _snapshot, options) => {
-      options?.onRestored?.(120);
-    }),
-    isElementNearBottom: jest.fn(() => false),
-  };
-});
-
 import {
-  captureElementScrollRestoreSnapshot,
-  restoreElementScrollAfterRender,
-} from '../../../../src/features/chat/services/ScrollManager';
+  type ConversationViewStateHost,
+  ConversationViewStateService,
+} from '../../../../src/features/chat/services/ConversationViewStateService';
+import { TabManager } from '../../../../src/features/chat/tabs/TabManager';
 
 function createConversation(id: string, title = `Chat ${id}`) {
   return {
@@ -52,21 +33,6 @@ type MockedConversationViewStateHost = {
 function createHost(
   overrides: Partial<MockedConversationViewStateHost> = {},
 ): MockedConversationViewStateHost {
-  const messagesEl = document.createElement('div');
-  Object.defineProperty(messagesEl, 'scrollTop', {
-    value: 120,
-    writable: true,
-    configurable: true,
-  });
-  Object.defineProperty(messagesEl, 'scrollHeight', {
-    value: 600,
-    configurable: true,
-  });
-  Object.defineProperty(messagesEl, 'clientHeight', {
-    value: 300,
-    configurable: true,
-  });
-
   return {
     getTabManager: jest.fn().mockReturnValue(null),
     getPersistedTabState: jest.fn().mockReturnValue({
@@ -84,12 +50,6 @@ function createHost(
     prepareConversationTransition: jest.fn().mockResolvedValue(undefined),
     applyLoadedConversationActivation: jest.fn(),
     setCurrentConversationRevertState: jest.fn(),
-    getMessagesContainer: jest.fn().mockReturnValue(messagesEl),
-    getActiveTabId: jest.fn().mockReturnValue('tab-1'),
-    getScrollRuntimeForTab: jest.fn().mockReturnValue({
-      autoScrollEnabled: false,
-      programmaticScrollGuardUntil: 0,
-    }),
     clearScheduledScrollToBottom: jest.fn(),
     beginConversationHydration: jest.fn(),
     clearMessagesContainer: jest.fn(),
@@ -102,13 +62,7 @@ function createHost(
     syncBackgroundTaskStateFromConversation: jest.fn(),
     renderMessages: jest.fn().mockResolvedValue(undefined),
     commitConversationSyncBaseline: jest.fn(),
-    scrollToBottom: jest.fn(),
-    syncPaneScrollMetrics: jest.fn(),
     endConversationHydration: jest.fn(),
-    requestAnimationFrame: jest.fn().mockImplementation((callback: FrameRequestCallback) => {
-      callback(0);
-      return 1;
-    }),
     ...overrides,
   };
 }
@@ -137,6 +91,36 @@ function createActivationBridge() {
   };
 }
 
+type MockedConversationHydrationRenderPort = {
+  [Key in keyof ConversationHydrationRenderPort]:
+    ConversationHydrationRenderPort[Key] extends (...args: infer Args) => infer Result
+      ? jest.Mock<Result, Args>
+      : ConversationHydrationRenderPort[Key];
+};
+
+function createHydrationRenderBridge(
+  overrides: Partial<MockedConversationHydrationRenderPort> = {},
+): MockedConversationHydrationRenderPort {
+  const context: ConversationHydrationRenderContext = {
+    activeTabId: 'tab-1',
+    messagesEl: document.createElement('div'),
+    runtime: {
+      autoScrollEnabled: false,
+      programmaticScrollGuardUntil: 0,
+    },
+    preserveScrollPosition: true,
+    previousScrollTop: 120,
+    shouldStickToBottom: false,
+  };
+
+  return {
+    captureHydrationContext: jest.fn().mockReturnValue(context),
+    beginHydrationShell: jest.fn(),
+    restoreHydrationShell: jest.fn(),
+    ...overrides,
+  };
+}
+
 describe('ConversationViewStateService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -156,7 +140,8 @@ describe('ConversationViewStateService', () => {
       getConversationById: jest.fn().mockResolvedValue(conversation),
     });
     const { bridge } = createActivationBridge();
-    const service = new ConversationViewStateService(host, bridge);
+    const hydrationRenderBridge = createHydrationRenderBridge();
+    const service = new ConversationViewStateService(host, bridge, hydrationRenderBridge);
     const loadConversationSpy = jest.spyOn(service, 'loadConversation').mockResolvedValue(undefined);
     const activationPreflightSpy = jest.spyOn(bridge, 'applyActivationPreflight');
 
@@ -165,6 +150,7 @@ describe('ConversationViewStateService', () => {
     expect(activationPreflightSpy).toHaveBeenCalledWith(tab!.id);
     expect(host.applyStreamingConversationActivation).toHaveBeenCalledWith(tab!.id, conversation);
     expect(loadConversationSpy).not.toHaveBeenCalled();
+    expect(hydrationRenderBridge.captureHydrationContext).not.toHaveBeenCalled();
   });
 
   it('loads a non-streaming tab conversation with preserved scroll state', async () => {
@@ -179,7 +165,8 @@ describe('ConversationViewStateService', () => {
       getTabManager: jest.fn().mockReturnValue(tabManager),
     });
     const { bridge } = createActivationBridge();
-    const service = new ConversationViewStateService(host, bridge);
+    const hydrationRenderBridge = createHydrationRenderBridge();
+    const service = new ConversationViewStateService(host, bridge, hydrationRenderBridge);
     const loadConversationSpy = jest.spyOn(service, 'loadConversation').mockResolvedValue(undefined);
 
     await service.activateTab(tab!.id);
@@ -202,22 +189,24 @@ describe('ConversationViewStateService', () => {
       getTabManager: jest.fn().mockReturnValue(tabManager),
     });
     const { bridge } = createActivationBridge();
-    const service = new ConversationViewStateService(host, bridge);
+    const hydrationRenderBridge = createHydrationRenderBridge();
+    const service = new ConversationViewStateService(host, bridge, hydrationRenderBridge);
 
     await service.activateTab(tab!.id);
 
     expect(host.applyEmptyTabActivation).toHaveBeenCalledWith(tab!.id);
     expect(host.applyStreamingConversationActivation).not.toHaveBeenCalled();
+    expect(hydrationRenderBridge.captureHydrationContext).not.toHaveBeenCalled();
   });
 
-  it('preserves scroll hydration flow while delegating loaded-conversation refresh bridges', async () => {
+  it('delegates the loaded-conversation hydration shell to the dedicated bridge', async () => {
     const conversation = createConversation('load-target');
     const host = createHost({
       getConversationById: jest.fn().mockResolvedValue(conversation),
     });
     const { bridge } = createActivationBridge();
-    const service = new ConversationViewStateService(host, bridge);
-    const messagesEl = host.getMessagesContainer();
+    const hydrationRenderBridge = createHydrationRenderBridge();
+    const service = new ConversationViewStateService(host, bridge, hydrationRenderBridge);
     const postRenderOutcomeSpy = jest.spyOn(bridge, 'applyLoadedConversationPostRenderOutcome');
     const hydrationTailSpy = jest.spyOn(bridge, 'applyLoadedConversationHydrationTail');
 
@@ -226,16 +215,15 @@ describe('ConversationViewStateService', () => {
     });
 
     expect(host.prepareConversationTransition).toHaveBeenCalledWith(conversation.id);
+    expect(hydrationRenderBridge.captureHydrationContext).toHaveBeenCalledWith(true);
     expect(host.applyLoadedConversationActivation).toHaveBeenCalledWith('tab-1', conversation);
     expect(host.beginConversationHydration).toHaveBeenCalledWith('tab-1');
+    expect(hydrationRenderBridge.beginHydrationShell).toHaveBeenCalledTimes(1);
     expect(host.renderMessages).toHaveBeenCalledWith(conversation.messages);
     expect(postRenderOutcomeSpy).toHaveBeenCalledWith('tab-1', conversation.openCodeSessionId);
     expect(host.commitConversationSyncBaseline).toHaveBeenCalledWith(conversation.messages);
-    expect(captureElementScrollRestoreSnapshot).toHaveBeenCalledWith(messagesEl, false, 120);
-    expect(restoreElementScrollAfterRender).toHaveBeenCalled();
-    expect(host.syncPaneScrollMetrics).toHaveBeenCalledWith('tab-1', messagesEl);
+    expect(hydrationRenderBridge.restoreHydrationShell).toHaveBeenCalledTimes(1);
     expect(hydrationTailSpy).toHaveBeenCalledTimes(1);
     expect(host.endConversationHydration).toHaveBeenCalledWith('tab-1');
-    expect(messagesEl?.classList.contains('is-rehydrating')).toBe(false);
   });
 });

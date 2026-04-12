@@ -3,14 +3,9 @@ import {
   type Conversation,
   type PersistedTabState,
 } from '../../../core/types';
+import type { ConversationHydrationRenderPort } from '../runtime/ConversationHydrationRenderBridge';
 import type { TabViewActivationBridge } from '../runtime/TabViewActivationBridge';
 import type { RestoredTabState, TabData, TabId } from '../tabs';
-import {
-  captureElementScrollRestoreSnapshot,
-  isElementNearBottom,
-  restoreElementScrollAfterRender,
-  type ScrollRuntimeState,
-} from './ScrollManager';
 
 export interface LoadConversationOptions {
   forceServerSync?: boolean;
@@ -49,9 +44,6 @@ export interface ConversationViewStateHost {
   prepareConversationTransition(nextConversationId: string): Promise<void>;
   applyLoadedConversationActivation(tabId: TabId | null, conversation: Conversation): void;
   setCurrentConversationRevertState(revertState: { messageID: string; partID?: string } | null): void;
-  getMessagesContainer(): HTMLElement | null;
-  getActiveTabId(): TabId | null;
-  getScrollRuntimeForTab(tabId: TabId | null): ScrollRuntimeState | null;
   clearScheduledScrollToBottom(): void;
   beginConversationHydration(tabId: TabId | null): void;
   clearMessagesContainer(): void;
@@ -65,10 +57,7 @@ export interface ConversationViewStateHost {
   syncBackgroundTaskStateFromConversation(conversation: Conversation): void;
   renderMessages(messages: ChatMessage[]): Promise<void>;
   commitConversationSyncBaseline(messages: ChatMessage[]): void;
-  scrollToBottom(options: { tabId: TabId | null }): void;
-  syncPaneScrollMetrics(tabId: TabId | null, messagesEl: HTMLElement): void;
   endConversationHydration(tabId: TabId | null): void;
-  requestAnimationFrame(callback: FrameRequestCallback): number;
 }
 
 type TabViewActivationPort =
@@ -81,6 +70,7 @@ export class ConversationViewStateService {
   constructor(
     private readonly host: ConversationViewStateHost,
     private readonly tabViewActivationBridge: TabViewActivationPort,
+    private readonly conversationHydrationRenderBridge: ConversationHydrationRenderPort,
   ) {}
 
   async initializeFirstTab(): Promise<void> {
@@ -181,21 +171,15 @@ export class ConversationViewStateService {
       return;
     }
 
-    const messagesEl = this.host.getMessagesContainer();
-    const preserveScrollPosition = Boolean(options.preserveScrollPosition && messagesEl);
-    const previousScrollTop = preserveScrollPosition && messagesEl
-      ? messagesEl.scrollTop
-      : 0;
-    const activeTabId = this.host.getActiveTabId();
-    const runtime = this.host.getScrollRuntimeForTab(activeTabId);
-    const shouldStickToBottom = preserveScrollPosition && messagesEl
-      ? runtime?.autoScrollEnabled ?? isElementNearBottom(messagesEl)
-      : true;
+    const hydrationContext = this.conversationHydrationRenderBridge.captureHydrationContext(
+      Boolean(options.preserveScrollPosition),
+    );
+    const { activeTabId } = hydrationContext;
 
     this.host.applyLoadedConversationActivation(activeTabId, conversation);
     this.host.clearScheduledScrollToBottom();
     this.host.beginConversationHydration(activeTabId);
-    messagesEl?.classList.add('is-rehydrating');
+    this.conversationHydrationRenderBridge.beginHydrationShell(hydrationContext);
     this.host.clearMessagesContainer();
     this.host.resetTurnState();
 
@@ -220,31 +204,7 @@ export class ConversationViewStateService {
         conversation.openCodeSessionId,
       );
       this.host.commitConversationSyncBaseline(messages);
-
-      if (messagesEl) {
-        if (runtime) {
-          runtime.autoScrollEnabled = shouldStickToBottom;
-        }
-        const scrollSnapshot = captureElementScrollRestoreSnapshot(
-          messagesEl,
-          !preserveScrollPosition || shouldStickToBottom,
-          previousScrollTop,
-        );
-        restoreElementScrollAfterRender(messagesEl, scrollSnapshot, {
-          runtime,
-          onRestoreBottom: () => {
-            this.host.scrollToBottom({ tabId: activeTabId });
-          },
-          onRestored: () => {
-            this.host.syncPaneScrollMetrics(activeTabId, messagesEl);
-          },
-          requestAnimationFrame: (callback) => this.host.requestAnimationFrame(callback),
-        });
-        this.host.requestAnimationFrame(() => {
-          messagesEl.classList.remove('is-rehydrating');
-        });
-      }
-
+      this.conversationHydrationRenderBridge.restoreHydrationShell(hydrationContext);
       await this.tabViewActivationBridge.applyLoadedConversationHydrationTail();
     } finally {
       this.host.endConversationHydration(activeTabId);
