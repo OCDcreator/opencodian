@@ -93,7 +93,7 @@ export class AssistantShellViewHostAdapter {
 
   private createAssistantNoticeRenderHost(): AssistantNoticeRenderHost {
     return {
-      addTimestampWithCopyButton: (options) => this.addTimestampWithCopyButton(options),
+      finalizeNoticeFooter: (messageEl, message) => this.finalizeNoticeFooter(messageEl, message),
       renderNoticeCard: (container, message) => this.host.renderNoticeCard(container, message),
       setStreamingAssistantMessageVisibility: (messageEl, visible, reason) => {
         this.host.setStreamingAssistantMessageVisibility(messageEl, visible, reason);

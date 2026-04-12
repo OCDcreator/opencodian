@@ -138,7 +138,7 @@ describe('OpenCodianView stream error notice preservation', () => {
     const messageEl = document.createElement('div');
     messageEl.hidden = true;
     const renderHost: AssistantNoticeRenderHost = {
-      addTimestampWithCopyButton: ({ messageEl: targetEl }) => {
+      finalizeNoticeFooter: (targetEl) => {
         targetEl.createDiv({ cls: 'opencodian-message-time-row' });
       },
       renderNoticeCard: async (container, message) => {

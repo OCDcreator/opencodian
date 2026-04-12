@@ -1,9 +1,9 @@
 import type { ChatMessage } from '../../../core/types';
 import {
   buildErrorAssistantFooterPayload,
-  buildNoticeAssistantFooterPayload,
   buildPseudoStreamAssistantFooterPayload,
 } from './AssistantFooterPayload';
+import { AssistantNoticeFooterFinalizer } from './AssistantNoticeFooterFinalizer';
 import type { AssistantShellTimestampOptions } from './AssistantShellRenderer';
 import { PersistedAssistantFooterFinalizer } from './PersistedAssistantFooterFinalizer';
 
@@ -20,9 +20,11 @@ export interface AssistantErrorFooterOptions {
 
 export class AssistantFooterRenderer {
   private readonly persistedFooterFinalizer: PersistedAssistantFooterFinalizer;
+  private readonly noticeFooterFinalizer: AssistantNoticeFooterFinalizer;
 
   constructor(private readonly host: AssistantFooterRendererHost) {
     this.persistedFooterFinalizer = new PersistedAssistantFooterFinalizer(host);
+    this.noticeFooterFinalizer = new AssistantNoticeFooterFinalizer(host);
   }
 
   finalizePersistedFooter(messageEl: HTMLElement, message: ChatMessage): void {
@@ -30,10 +32,7 @@ export class AssistantFooterRenderer {
   }
 
   finalizeNoticeFooter(messageEl: HTMLElement, message: Pick<ChatMessage, 'timestamp' | 'modelId'>): void {
-    this.host.addTimestampWithCopyButton({
-      messageEl,
-      ...buildNoticeAssistantFooterPayload({ message }),
-    });
+    this.noticeFooterFinalizer.finalizeFooter(messageEl, message);
   }
 
   finalizePseudoStreamFooter(

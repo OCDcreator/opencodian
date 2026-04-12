@@ -1,16 +1,11 @@
 import type { ChatMessage } from '../../../core/types';
 import { t } from '../../../i18n';
 
-export interface AssistantNoticeTimestampOptions {
-  messageEl: HTMLElement;
-  timestamp: number;
-  content?: string;
-  modelId?: string;
-  statusLabel?: string;
-}
-
 export interface AssistantNoticeRenderHost {
-  addTimestampWithCopyButton(options: AssistantNoticeTimestampOptions): void;
+  finalizeNoticeFooter(
+    messageEl: HTMLElement,
+    message: Pick<ChatMessage, 'timestamp' | 'modelId'>,
+  ): void;
   renderNoticeCard(container: HTMLElement, message: ChatMessage): Promise<void>;
   setStreamingAssistantMessageVisibility(
     messageEl: HTMLElement,
@@ -78,9 +73,5 @@ export async function renderAssistantPlaceholderAsNotice(options: {
 
   const contentEl = messageEl.createDiv({ cls: 'opencodian-message-content' });
   await host.renderNoticeCard(contentEl, noticeMessage);
-  host.addTimestampWithCopyButton({
-    messageEl,
-    timestamp: noticeMessage.timestamp,
-    modelId: noticeMessage.modelId,
-  });
+  host.finalizeNoticeFooter(messageEl, noticeMessage);
 }
