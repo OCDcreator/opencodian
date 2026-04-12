@@ -209,7 +209,7 @@ question dock 与 pending-question refresh 的主要 runtime/UI ownership 现在
 
 否则回退到整段重渲。
 
-assistant notice card 的 tone / icon、OMO system-reminder 标题与 raw block、notice action label 等 DOM 细节现在由 `runtime/AssistantNoticeCardRenderer.ts` 承接；`OpenCodianView` 只保留 Markdown 渲染和 action 副作用的 host 回调，以及 footer finalization。
+assistant notice card 的 tone / icon、OMO system-reminder 标题与 raw block、notice action label 等 DOM 细节现在由 `runtime/AssistantNoticeCardRenderer.ts` 承接；而 user message footer 的 copy / rewind / fork / timestamp 组装则由 `runtime/UserMessageFooterRenderer.ts` 承接。`OpenCodianView` 只保留 Markdown 渲染与 rewind/fork 等副作用的 host 回调，以及 assistant footer finalization。
 
 ### 发送与流式渲染
 
@@ -270,6 +270,7 @@ assistant notice card 的 tone / icon、OMO system-reminder 标题与 raw block�
 - `AssistantFooterPayload.ts`：封装 persisted / notice / pseudo-stream / error assistant footer 传给 timestamp/copy renderer 的 payload 组装
 - `AssistantFooterRenderer.ts`：封装 notice / pseudo-stream / error footer 的最终 renderer 调用，并继续复用 persisted footer finalizer
 - `PersistedAssistantFooterFinalizer.ts`：封装 persisted assistant footer 的最终 renderer 调用，让 view、`ConversationRenderService` 与 `AssistantFooterRenderer` 都只通过 `messageEl` + `message` bridge 回到同一个 finalizer
+- `UserMessageFooterRenderer.ts`：封装 user message footer 的 copy / rewind / fork button 与 timestamp 组装，view 只保留副作用 host
 - `SendPipelineTypes.ts`：定义 runtime 与 host 契约
 - `AssistantShellRenderer.ts`：封装 assistant streaming shell 的创建、reveal 与 timestamp 收尾
 - `AssistantShellViewHostAdapter.ts`：统一装配 assistant shell / notice / footer 相关 host，让 `SendPipelineShellPort` 与 notice/footer bridge 共用同一条 view seam
@@ -342,7 +343,7 @@ model selector 现在拆成了几层协作：
 - 通过 `setupCollapsible()` 给长文本加折叠
 - 渲染 context attachment chips
 - 渲染 OMO 注入面板
-- footer 上追加 copy、rewind、fork 按钮和时间
+- 通过 `UserMessageFooterRenderer` 追加 footer，并把 copy / rewind / fork 的真实副作用留在 host
 
 渲染消息列表前还会经过 `getMessagesForRender()`，也就是先用 `renderGroups` 合并连续 assistant message。
 

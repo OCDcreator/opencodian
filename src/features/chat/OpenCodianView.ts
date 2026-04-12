@@ -88,6 +88,10 @@ import {
   renderAssistantPlainTextFallbackContent,
 } from './runtime/AssistantPlainTextFallbackRenderer';
 import {
+  UserMessageFooterRenderer,
+  type UserMessageFooterRendererHost,
+} from './runtime/UserMessageFooterRenderer';
+import {
   AssistantShellViewHostAdapter,
   type AssistantShellViewHostAdapterHost,
 } from './runtime/AssistantShellViewHostAdapter';
@@ -618,8 +622,6 @@ interface TabPaneState {
 
 /** Clipboard icon SVG for copy button */
 const COPY_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`;
-const FORK_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><circle cx="18" cy="6" r="3"/><path d="M6 9v3a3 3 0 0 0 3 3h6a3 3 0 0 0 3-3V9"/><path d="M12 12v3"/></svg>`;
-const REWIND_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5v0a5.5 5.5 0 0 1-5.5 5.5H11"/></svg>`;
 const NEW_TAB_ICON = `<g fill="none" stroke="currentColor" stroke-width="8.333" stroke-linecap="round" stroke-linejoin="round"><circle cx="50" cy="50" r="41.667"/><path d="M33.333 50h33.334"/><path d="M50 33.333v33.334"/></g>`;
 const CURRENT_TAB_NEW_CONVERSATION_ICON = `<g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" transform="scale(4.166667)"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/><path d="M12 8v6"/><path d="M9 11h6"/></g>`;
 
@@ -738,6 +740,7 @@ export class OpenCodianView extends ItemView {
   private messageSendPreparationService: MessageSendPreparationService;
   private messageFinalizationService: MessageFinalizationService;
   private assistantNoticeCardRenderer: AssistantNoticeCardRenderer;
+  private userMessageFooterRenderer: UserMessageFooterRenderer;
   private assistantShellViewHostAdapter: AssistantShellViewHostAdapter;
   private backgroundTaskInlinePanelRenderer: BackgroundTaskInlinePanelRenderer;
   private backgroundTaskIndicatorCoordinator: BackgroundTaskIndicatorCoordinator;
@@ -1255,6 +1258,9 @@ export class OpenCodianView extends ItemView {
     this.messageFinalizationService = new MessageFinalizationService(this.createMessageFinalizationHost());
     this.assistantNoticeCardRenderer = new AssistantNoticeCardRenderer(
       this.createAssistantNoticeCardRendererHost(),
+    );
+    this.userMessageFooterRenderer = new UserMessageFooterRenderer(
+      this.createUserMessageFooterRendererHost(),
     );
     this.assistantShellViewHostAdapter = new AssistantShellViewHostAdapter(
       this.createAssistantShellViewHostAdapterHost(),
@@ -2044,6 +2050,19 @@ export class OpenCodianView extends ItemView {
     return {
       renderMarkdownInto: (container, markdown) => this.renderMarkdownInto(container, markdown),
       handleNoticeAction: (actionType) => this.handleNoticeAction(actionType),
+    };
+  }
+
+  private createUserMessageFooterRendererHost(): UserMessageFooterRendererHost {
+    return {
+      attachTooltipLabel: (buttonEl, label) => this.attachTooltipLabel(buttonEl, label),
+      initializeCopyButton: (copyBtn, content) => {
+        copyBtn.insertAdjacentHTML('afterbegin', COPY_ICON);
+        this.attachCopyButtonBehavior(copyBtn, content);
+      },
+      isStreaming: () => this.isActiveTabStreaming(),
+      handleRewindRequest: (message) => this.handleRewindRequest(message),
+      handleForkRequest: (message) => this.handleForkRequest(message),
     };
   }
 
@@ -5967,67 +5986,7 @@ export class OpenCodianView extends ItemView {
   }
 
   private addUserMessageFooter(messageEl: HTMLElement, message: ChatMessage, content?: string): void {
-    const footerEl = messageEl.createDiv({ cls: 'opencodian-user-message-footer' });
-    const hasActions = Boolean(content) || Boolean(message.sourceMessageId);
-
-    if (hasActions) {
-      const actionsEl = footerEl.createDiv({ cls: 'opencodian-user-message-actions' });
-
-      if (content) {
-        const copyLabel = t('chat.action.copy');
-        const copyBtn = actionsEl.createEl('button', {
-          cls: 'opencodian-copy-btn-inline opencodian-copy-btn-inline--user opencodian-tooltip-trigger',
-          attr: {
-            type: 'button',
-            'data-tooltip': copyLabel,
-          },
-        });
-        copyBtn.innerHTML = COPY_ICON;
-        this.attachTooltipLabel(copyBtn, copyLabel);
-        this.attachCopyButtonBehavior(copyBtn, content);
-      }
-
-      if (message.sourceMessageId) {
-        const rewindLabel = t('chat.rewind.button');
-        const rewindBtn = actionsEl.createEl('button', {
-          cls: 'opencodian-user-action-btn opencodian-user-action-btn--icon opencodian-tooltip-trigger',
-          attr: {
-            type: 'button',
-            'data-tooltip': rewindLabel,
-          },
-        });
-        rewindBtn.innerHTML = REWIND_ICON;
-        this.attachTooltipLabel(rewindBtn, rewindLabel);
-        rewindBtn.disabled = this.isActiveTabStreaming();
-        rewindBtn.addEventListener('click', (event) => {
-          event.stopPropagation();
-          void this.handleRewindRequest(message);
-        });
-
-        const forkLabel = t('chat.fork.button');
-        const forkBtn = actionsEl.createEl('button', {
-          cls: 'opencodian-user-action-btn opencodian-user-action-btn--icon opencodian-tooltip-trigger',
-          attr: {
-            type: 'button',
-            'data-tooltip': forkLabel,
-          },
-        });
-        forkBtn.innerHTML = FORK_ICON;
-        this.attachTooltipLabel(forkBtn, forkLabel);
-        forkBtn.disabled = this.isActiveTabStreaming();
-        forkBtn.addEventListener('click', (event) => {
-          event.stopPropagation();
-          void this.handleForkRequest(message);
-        });
-      }
-    }
-
-    const timeStr = new Date(message.timestamp).toLocaleTimeString([], {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-    const timeEl = footerEl.createSpan({ cls: 'opencodian-message-time-text', text: timeStr });
-    timeEl.addClass('opencodian-user-message-time');
+    this.userMessageFooterRenderer.render(messageEl, message, content);
   }
 
   private async handleRewindRequest(message: ChatMessage): Promise<void> {
