@@ -5,10 +5,12 @@ import type {
 import type { QuestionRuntimeState } from '../../../../src/features/chat/services/QuestionRuntimeHostAdapter';
 import {
   createQuestionRuntimeViewHostAdapter,
+  type QuestionRuntimeConversationSyncPort,
   type QuestionRuntimeViewHostAdapterHost,
   type QuestionRuntimeQuestionApiPort,
   type QuestionRuntimeSettingsPort,
   type QuestionRuntimeStatusRefreshPort,
+  type QuestionRuntimeTabAttentionPort,
 } from '../../../../src/features/chat/services/QuestionRuntimeViewHostAdapter';
 import type { TabId } from '../../../../src/features/chat/tabs';
 import type { QuestionDockRenderState } from '../../../../src/features/chat/ui/QuestionDock';
@@ -59,20 +61,17 @@ function createViewHost(runtimeState: QuestionRuntimeState): Mocked<QuestionRunt
     ensureTabRuntimeState: jest.fn().mockReturnValue(runtimeState),
     getCurrentConversationSessionId: jest.fn().mockReturnValue('session-1'),
     getSessionIdForTab: jest.fn().mockReturnValue('session-1'),
-    shouldRenderQuestionResolutionCards: jest.fn().mockReturnValue(true),
     keepQuestionCardPinnedToBottom: jest.fn(),
-    setTabNeedsAttention: jest.fn(),
-    startConversationSyncLoop: jest.fn(),
-    syncVisibleConversationInBackground: jest.fn().mockResolvedValue(undefined),
   };
 }
 
 describe('QuestionRuntimeViewHostAdapter', () => {
-  it('exposes view-owned runtime callbacks without owning question service details', async () => {
+  it('exposes stable runtime ports without re-expanding question wiring in the view host', async () => {
     const runtimeState = createRuntimeState();
     const viewHost = createViewHost(runtimeState);
     const settings: QuestionRuntimeSettingsPort = {
       questionDisplayMode: 'single',
+      showAnsweredQuestionCards: true,
     };
     const questionDock = {
       render: jest.fn<void, [QuestionDockRenderState]>(),
@@ -90,12 +89,21 @@ describe('QuestionRuntimeViewHostAdapter', () => {
     const statusRefresh: Mocked<QuestionRuntimeStatusRefreshPort> = {
       refreshTabSessionStatus: jest.fn().mockResolvedValue({ type: 'idle' }),
     };
+    const tabAttention: Mocked<QuestionRuntimeTabAttentionPort> = {
+      setNeedsAttention: jest.fn(),
+    };
+    const conversationSync: Mocked<QuestionRuntimeConversationSyncPort> = {
+      startConversationSyncLoop: jest.fn(),
+      syncVisibleConversationInBackground: jest.fn().mockResolvedValue(undefined),
+    };
 
     const adapter = createQuestionRuntimeViewHostAdapter({
       viewHost,
       settings,
       questionDockSlotCoordinator,
       questionApi,
+      tabAttention,
+      conversationSync,
       statusRefresh,
     });
 
@@ -119,7 +127,7 @@ describe('QuestionRuntimeViewHostAdapter', () => {
     await adapter.syncVisibleConversationInBackground();
 
     expect(viewHost.keepQuestionCardPinnedToBottom).toHaveBeenCalledWith('tab-active');
-    expect(viewHost.setTabNeedsAttention).toHaveBeenCalledWith('tab-background', true);
+    expect(tabAttention.setNeedsAttention).toHaveBeenCalledWith('tab-background', true);
     expect(questionApi.replyToQuestion).toHaveBeenCalledWith(request.id, [['Yes']]);
     expect(questionApi.rejectQuestion).toHaveBeenCalledWith(request.id);
     expect(statusRefresh.refreshTabSessionStatus).toHaveBeenCalledWith(
@@ -127,14 +135,15 @@ describe('QuestionRuntimeViewHostAdapter', () => {
       'session-1',
       { suppressErrors: true },
     );
-    expect(viewHost.startConversationSyncLoop).toHaveBeenCalledTimes(1);
-    expect(viewHost.syncVisibleConversationInBackground).toHaveBeenCalledTimes(1);
+    expect(conversationSync.startConversationSyncLoop).toHaveBeenCalledTimes(1);
+    expect(conversationSync.syncVisibleConversationInBackground).toHaveBeenCalledTimes(1);
   });
 
   it('reads mutable settings and dock gates at call time', () => {
     const runtimeState = createRuntimeState();
     const settings: QuestionRuntimeSettingsPort = {
       questionDisplayMode: 'all',
+      showAnsweredQuestionCards: false,
     };
     let shouldUseAboveInputQuestionDock = false;
     const adapter = createQuestionRuntimeViewHostAdapter({
@@ -149,6 +158,13 @@ describe('QuestionRuntimeViewHostAdapter', () => {
         replyToQuestion: jest.fn().mockResolvedValue(undefined),
         rejectQuestion: jest.fn().mockResolvedValue(undefined),
       },
+      tabAttention: {
+        setNeedsAttention: jest.fn(),
+      },
+      conversationSync: {
+        startConversationSyncLoop: jest.fn(),
+        syncVisibleConversationInBackground: jest.fn().mockResolvedValue(undefined),
+      },
       statusRefresh: {
         refreshTabSessionStatus: jest.fn().mockResolvedValue(null),
       },
@@ -156,11 +172,14 @@ describe('QuestionRuntimeViewHostAdapter', () => {
 
     expect(adapter.getQuestionDisplayMode()).toBe('all');
     expect(adapter.shouldUseAboveInputQuestionDock()).toBe(false);
+    expect(adapter.shouldRenderQuestionResolutionCards()).toBe(false);
 
     settings.questionDisplayMode = 'single' as QuestionDisplayMode;
+    settings.showAnsweredQuestionCards = true;
     shouldUseAboveInputQuestionDock = true;
 
     expect(adapter.getQuestionDisplayMode()).toBe('single');
     expect(adapter.shouldUseAboveInputQuestionDock()).toBe(true);
+    expect(adapter.shouldRenderQuestionResolutionCards()).toBe(true);
   });
 });

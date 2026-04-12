@@ -16,12 +16,22 @@ type QuestionDockSlotCoordinatorPort = Pick<
 
 export interface QuestionRuntimeSettingsPort {
   questionDisplayMode: QuestionDisplayMode;
+  showAnsweredQuestionCards: boolean;
 }
 
 export interface QuestionRuntimeQuestionApiPort {
   getPendingQuestions(): Promise<QuestionRequest[]>;
   replyToQuestion(requestId: string, answers: string[][]): Promise<void>;
   rejectQuestion(requestId: string): Promise<void>;
+}
+
+export interface QuestionRuntimeTabAttentionPort {
+  setNeedsAttention(tabId: TabId | null, needsAttention: boolean): void;
+}
+
+export interface QuestionRuntimeConversationSyncPort {
+  startConversationSyncLoop(): void;
+  syncVisibleConversationInBackground(): Promise<void>;
 }
 
 export interface QuestionRuntimeStatusRefreshPort {
@@ -38,11 +48,7 @@ export interface QuestionRuntimeViewHostAdapterHost {
   ensureTabRuntimeState(tabId: TabId | null): QuestionRuntimeState | null;
   getCurrentConversationSessionId(): string | null | undefined;
   getSessionIdForTab(tabId: TabId | null): string | null | undefined;
-  shouldRenderQuestionResolutionCards(): boolean;
   keepQuestionCardPinnedToBottom(tabId: TabId | null): void;
-  setTabNeedsAttention(tabId: TabId | null, needsAttention: boolean): void;
-  startConversationSyncLoop(): void;
-  syncVisibleConversationInBackground(): Promise<void>;
 }
 
 export interface QuestionRuntimeViewHostAdapterDependencies {
@@ -50,6 +56,8 @@ export interface QuestionRuntimeViewHostAdapterDependencies {
   settings: QuestionRuntimeSettingsPort;
   questionDockSlotCoordinator: QuestionDockSlotCoordinatorPort;
   questionApi: QuestionRuntimeQuestionApiPort;
+  tabAttention: QuestionRuntimeTabAttentionPort;
+  conversationSync: QuestionRuntimeConversationSyncPort;
   statusRefresh: QuestionRuntimeStatusRefreshPort;
 }
 
@@ -68,12 +76,12 @@ export function createQuestionRuntimeViewHostAdapter(
     shouldUseAboveInputQuestionDock: () =>
       dependencies.questionDockSlotCoordinator.shouldUseAboveInputQuestionDock(),
     shouldRenderQuestionResolutionCards: () =>
-      dependencies.viewHost.shouldRenderQuestionResolutionCards(),
+      dependencies.settings.showAnsweredQuestionCards,
     keepQuestionCardPinnedToBottom: (tabId) => {
       dependencies.viewHost.keepQuestionCardPinnedToBottom(tabId);
     },
     setTabNeedsAttention: (tabId, needsAttention) => {
-      dependencies.viewHost.setTabNeedsAttention(tabId, needsAttention);
+      dependencies.tabAttention.setNeedsAttention(tabId, needsAttention);
     },
     getPendingQuestions: () => dependencies.questionApi.getPendingQuestions(),
     replyToQuestion: (requestId, answers) =>
@@ -82,9 +90,9 @@ export function createQuestionRuntimeViewHostAdapter(
     refreshTabSessionStatus: (tabId, sessionId, options) =>
       dependencies.statusRefresh.refreshTabSessionStatus(tabId, sessionId, options),
     startConversationSyncLoop: () => {
-      dependencies.viewHost.startConversationSyncLoop();
+      dependencies.conversationSync.startConversationSyncLoop();
     },
     syncVisibleConversationInBackground: () =>
-      dependencies.viewHost.syncVisibleConversationInBackground(),
+      dependencies.conversationSync.syncVisibleConversationInBackground(),
   };
 }

@@ -1317,6 +1317,8 @@ export class OpenCodianView extends ItemView {
         settings: this.plugin.settings,
         questionDockSlotCoordinator: this.questionDockSlotCoordinator,
         questionApi: this.plugin.openCodeService,
+        tabAttention: this.tabRuntimeStateBridge,
+        conversationSync: this.conversationSyncBridge,
         statusRefresh: this.sessionTodoStatusRefreshService,
       }),
       this.streamingInlineCardRenderer,
@@ -2157,15 +2159,9 @@ export class OpenCodianView extends ItemView {
       ensureTabRuntimeState: (tabId) => this.ensureTabRuntimeState(tabId),
       getCurrentConversationSessionId: () => this.currentConversation?.openCodeSessionId,
       getSessionIdForTab: (tabId) => this.getSessionIdForTab(tabId),
-      shouldRenderQuestionResolutionCards: () => this.shouldRenderQuestionResolutionCards(),
       keepQuestionCardPinnedToBottom: (tabId) => {
         this.keepQuestionCardPinnedToBottom(tabId);
       },
-      setTabNeedsAttention: (tabId, needsAttention) => this.setTabNeedsAttention(tabId, needsAttention),
-      startConversationSyncLoop: () => {
-        this.startConversationSyncLoop();
-      },
-      syncVisibleConversationInBackground: () => this.syncVisibleConversationInBackground(),
     };
   }
 
