@@ -1,10 +1,25 @@
 import type { Conversation } from '../../../core/types';
 import type { TabId } from '../tabs';
 import type { PostSyncQuestionTodoRefreshFacade } from './PostSyncQuestionTodoRefreshFacade';
+import type {
+  VisibleConversationPostSyncOutcome,
+  VisibleConversationPostSyncResult,
+  VisibleConversationPostSyncStateCoordinator,
+} from './VisibleConversationPostSyncStateCoordinator';
+
+export type {
+  ConversationRevertStateSnapshot,
+  VisibleConversationPostSyncOutcome,
+  VisibleConversationPostSyncResult,
+} from './VisibleConversationPostSyncStateCoordinator';
 
 type PostSyncQuestionTodoRefreshPort = Pick<
   PostSyncQuestionTodoRefreshFacade,
   'refreshBackgroundConversation' | 'refreshVisibleConversation'
+>;
+type VisibleConversationPostSyncStatePort = Pick<
+  VisibleConversationPostSyncStateCoordinator,
+  'commitPostSyncState'
 >;
 
 export interface BackgroundTaskPostSyncResult {
@@ -12,19 +27,7 @@ export interface BackgroundTaskPostSyncResult {
   fingerprint: string;
 }
 
-export interface ConversationRevertStateSnapshot {
-  messageID: string;
-  partID?: string;
-}
-
-export interface VisibleConversationPostSyncResult extends BackgroundTaskPostSyncResult {
-  revertState: ConversationRevertStateSnapshot | null;
-}
-
 export interface BackgroundTaskPostSyncCoordinatorHost {
-  getCurrentConversationId(): string | null;
-  setCurrentConversationRevertState(revertState: ConversationRevertStateSnapshot | null): void;
-  setTabConversationSyncFingerprint(tabId: TabId, fingerprint: string): void;
   markBackgroundTaskAuthoritativeSync(tabId: TabId | null, reason: string): void;
   setTabNeedsAttention(tabId: TabId | null, needsAttention: boolean): void;
 }
@@ -51,15 +54,11 @@ export interface VisibleConversationPostSyncOptions {
   syncResult: VisibleConversationPostSyncResult;
 }
 
-export interface VisibleConversationPostSyncOutcome {
-  shouldApplySyncedConversationUpdate: boolean;
-  shouldRenderBackgroundTaskIndicator: boolean;
-}
-
 export class BackgroundTaskPostSyncCoordinator {
   constructor(
     private readonly host: BackgroundTaskPostSyncCoordinatorHost,
     private readonly postSyncQuestionTodoRefreshFacade: PostSyncQuestionTodoRefreshPort,
+    private readonly visibleConversationPostSyncState: VisibleConversationPostSyncStatePort,
   ) {}
 
   async handleVisibleConversationSyncComplete(
@@ -70,21 +69,11 @@ export class BackgroundTaskPostSyncCoordinator {
       questionSessionId: options.questionSessionId,
     });
 
-    const currentConversationMatchesExpected =
-      this.host.getCurrentConversationId() === options.expectedConversationId;
-    if (currentConversationMatchesExpected) {
-      this.host.setCurrentConversationRevertState(options.syncResult.revertState);
-      if (options.syncResult.changed) {
-        this.host.setTabConversationSyncFingerprint(options.tabId, options.syncResult.fingerprint);
-      }
-    }
-
-    return {
-      shouldApplySyncedConversationUpdate:
-        currentConversationMatchesExpected && options.syncResult.changed,
-      shouldRenderBackgroundTaskIndicator:
-        !currentConversationMatchesExpected || !options.syncResult.changed,
-    };
+    return this.visibleConversationPostSyncState.commitPostSyncState({
+      tabId: options.tabId,
+      expectedConversationId: options.expectedConversationId,
+      syncResult: options.syncResult,
+    });
   }
 
   async handleSignalSyncComplete(options: SignalBackgroundTaskPostSyncOptions): Promise<void> {

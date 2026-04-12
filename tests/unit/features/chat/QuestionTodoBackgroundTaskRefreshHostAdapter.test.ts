@@ -275,7 +275,7 @@ describe('QuestionTodoBackgroundTaskRefreshHostAdapter', () => {
     expect(hosts.postSyncQuestionTodoRefreshFacadeHost.getCurrentConversationSessionId()).toBe(
       'session-conversation-active',
     );
-    expect(hosts.backgroundTaskPostSyncCoordinatorHost.getCurrentConversationId()).toBe(
+    expect(hosts.visibleConversationPostSyncStateCoordinatorHost.getCurrentConversationId()).toBe(
       'conversation-active',
     );
 
@@ -301,10 +301,10 @@ describe('QuestionTodoBackgroundTaskRefreshHostAdapter', () => {
       'tab-active',
       currentConversation,
     );
-    hosts.backgroundTaskPostSyncCoordinatorHost.setCurrentConversationRevertState({
+    hosts.visibleConversationPostSyncStateCoordinatorHost.setCurrentConversationRevertState({
       messageID: 'assistant-1',
     });
-    hosts.backgroundTaskPostSyncCoordinatorHost.setTabConversationSyncFingerprint(
+    hosts.visibleConversationPostSyncStateCoordinatorHost.setTabConversationSyncFingerprint(
       'tab-active',
       'next-fingerprint',
     );

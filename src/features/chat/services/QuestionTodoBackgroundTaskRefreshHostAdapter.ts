@@ -10,7 +10,6 @@ import type { TabId } from '../tabs';
 import {
   BackgroundTaskPostSyncCoordinator,
   type BackgroundTaskPostSyncCoordinatorHost,
-  type ConversationRevertStateSnapshot,
 } from './BackgroundTaskPostSyncCoordinator';
 import type { BackgroundTaskLiveSignalCoordinator } from './BackgroundTaskLiveSignalCoordinator';
 import {
@@ -26,6 +25,11 @@ import {
 } from './QuestionTodoStatusRefreshCoordinator';
 import type { SessionTodoStateService } from './SessionTodoStateService';
 import type { SessionTodoStatusRefreshService } from './SessionTodoStatusRefreshService';
+import {
+  type ConversationRevertStateSnapshot,
+  VisibleConversationPostSyncStateCoordinator,
+  type VisibleConversationPostSyncStateCoordinatorHost,
+} from './VisibleConversationPostSyncStateCoordinator';
 
 type QuestionPendingRefreshPort = Pick<
   QuestionDockCoordinator,
@@ -168,6 +172,7 @@ export interface QuestionTodoBackgroundTaskRefreshHosts {
   questionTodoStatusRefreshHost: QuestionTodoStatusRefreshCoordinatorHost;
   postSyncQuestionTodoRefreshFacadeHost: PostSyncQuestionTodoRefreshFacadeHost;
   backgroundTaskPostSyncRefreshPort: BackgroundTaskPostSyncRefreshPort;
+  visibleConversationPostSyncStateCoordinatorHost: VisibleConversationPostSyncStateCoordinatorHost;
   backgroundTaskPostSyncCoordinatorHost: BackgroundTaskPostSyncCoordinatorHost;
 }
 
@@ -213,7 +218,7 @@ export function createQuestionTodoBackgroundTaskRefreshHosts(
         conversation: Conversation | null,
       ) => viewHost.flushBackgroundTaskPostSyncWriteback(tabId, conversation),
     },
-    backgroundTaskPostSyncCoordinatorHost: {
+    visibleConversationPostSyncStateCoordinatorHost: {
       getCurrentConversationId: () => viewHost.getCurrentConversation()?.id ?? null,
       setCurrentConversationRevertState: (
         revertState: ConversationRevertStateSnapshot | null,
@@ -223,6 +228,8 @@ export function createQuestionTodoBackgroundTaskRefreshHosts(
       setTabConversationSyncFingerprint: (tabId: TabId, fingerprint: string) => {
         viewHost.setTabConversationSyncFingerprint(tabId, fingerprint);
       },
+    },
+    backgroundTaskPostSyncCoordinatorHost: {
       markBackgroundTaskAuthoritativeSync: (tabId: TabId | null, reason: string) => {
         viewHost.markBackgroundTaskAuthoritativeSync(tabId, reason);
       },
@@ -244,9 +251,14 @@ export function createQuestionTodoBackgroundTaskRefreshServices(
     questionTodoStatusRefreshCoordinator,
     hosts.backgroundTaskPostSyncRefreshPort,
   );
+  const visibleConversationPostSyncStateCoordinator =
+    new VisibleConversationPostSyncStateCoordinator(
+      hosts.visibleConversationPostSyncStateCoordinatorHost,
+    );
   const backgroundTaskPostSyncCoordinator = new BackgroundTaskPostSyncCoordinator(
     hosts.backgroundTaskPostSyncCoordinatorHost,
     postSyncQuestionTodoRefreshFacade,
+    visibleConversationPostSyncStateCoordinator,
   );
 
   return {
