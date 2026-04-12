@@ -14,6 +14,7 @@ import {
 } from './BackgroundTaskPostSyncCoordinator';
 import type { BackgroundTaskLiveSignalCoordinator } from './BackgroundTaskLiveSignalCoordinator';
 import {
+  type BackgroundTaskPostSyncWritebackPort,
   PostSyncQuestionTodoRefreshFacade,
   type PostSyncQuestionTodoRefreshFacadeHost,
 } from './PostSyncQuestionTodoRefreshFacade';
@@ -37,7 +38,7 @@ type SessionTodoStatusRefreshPort = Pick<
 >;
 type BackgroundTaskIndicatorPort = Pick<
   BackgroundTaskIndicatorCoordinator,
-  'queueAndFlushCompletionNotices'
+  'flushCompletionNoticesAndSyncStreamLikeState'
 >;
 type BackgroundTaskLiveSignalPort = Pick<
   BackgroundTaskLiveSignalCoordinator,
@@ -91,11 +92,10 @@ export interface QuestionTodoBackgroundTaskRefreshViewHost {
     conversation: Conversation,
     tabId?: TabId | null,
   ): void;
-  refreshBackgroundTaskCompletionNotices(
+  flushBackgroundTaskPostSyncWriteback(
     tabId: TabId | null,
     conversation: Conversation | null,
   ): Promise<void>;
-  syncTabStreamLikeState(tabId: TabId | null): void;
   setCurrentConversationRevertState(revertState: ConversationRevertStateSnapshot | null): void;
   setTabConversationSyncFingerprint(tabId: TabId, fingerprint: string): void;
   markBackgroundTaskAuthoritativeSync(tabId: TabId | null, reason: string): void;
@@ -138,16 +138,13 @@ export function createQuestionTodoBackgroundTaskRefreshViewHostAdapter(
       conversation: Conversation,
       tabId?: TabId | null,
     ) => dependencies.viewHost.syncBackgroundTaskStateFromConversation(conversation, tabId),
-    refreshBackgroundTaskCompletionNotices: (
+    flushBackgroundTaskPostSyncWriteback: (
       tabId: TabId | null,
       conversation: Conversation | null,
     ) =>
       dependencies
         .getBackgroundTaskIndicatorCoordinator()
-        .queueAndFlushCompletionNotices(tabId, conversation),
-    syncTabStreamLikeState: (tabId: TabId | null) => {
-      dependencies.getTabRuntimeStateBridge().syncStreamLikeState(tabId);
-    },
+        .flushCompletionNoticesAndSyncStreamLikeState(tabId, conversation),
     setCurrentConversationRevertState: (
       revertState: ConversationRevertStateSnapshot | null,
     ) => {
@@ -170,6 +167,7 @@ export function createQuestionTodoBackgroundTaskRefreshViewHostAdapter(
 export interface QuestionTodoBackgroundTaskRefreshHosts {
   questionTodoStatusRefreshHost: QuestionTodoStatusRefreshCoordinatorHost;
   postSyncQuestionTodoRefreshFacadeHost: PostSyncQuestionTodoRefreshFacadeHost;
+  backgroundTaskPostSyncWritebackPort: BackgroundTaskPostSyncWritebackPort;
   backgroundTaskPostSyncCoordinatorHost: BackgroundTaskPostSyncCoordinatorHost;
 }
 
@@ -208,13 +206,12 @@ export function createQuestionTodoBackgroundTaskRefreshHosts(
         conversation: Conversation,
         tabId?: TabId | null,
       ) => viewHost.syncBackgroundTaskStateFromConversation(conversation, tabId),
-      refreshBackgroundTaskCompletionNotices: (
+    },
+    backgroundTaskPostSyncWritebackPort: {
+      flushBackgroundTaskPostSyncWriteback: (
         tabId: TabId | null,
         conversation: Conversation | null,
-      ) => viewHost.refreshBackgroundTaskCompletionNotices(tabId, conversation),
-      syncTabStreamLikeState: (tabId: TabId | null) => {
-        viewHost.syncTabStreamLikeState(tabId);
-      },
+      ) => viewHost.flushBackgroundTaskPostSyncWriteback(tabId, conversation),
     },
     backgroundTaskPostSyncCoordinatorHost: {
       getCurrentConversationId: () => viewHost.getCurrentConversation()?.id ?? null,
@@ -245,6 +242,7 @@ export function createQuestionTodoBackgroundTaskRefreshServices(
   const postSyncQuestionTodoRefreshFacade = new PostSyncQuestionTodoRefreshFacade(
     hosts.postSyncQuestionTodoRefreshFacadeHost,
     questionTodoStatusRefreshCoordinator,
+    hosts.backgroundTaskPostSyncWritebackPort,
   );
   const backgroundTaskPostSyncCoordinator = new BackgroundTaskPostSyncCoordinator(
     hosts.backgroundTaskPostSyncCoordinatorHost,

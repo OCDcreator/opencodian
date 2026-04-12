@@ -13,11 +13,13 @@ export interface PostSyncQuestionTodoRefreshFacadeHost {
     conversation: Conversation,
     tabId?: TabId | null,
   ): void;
-  refreshBackgroundTaskCompletionNotices(
+}
+
+export interface BackgroundTaskPostSyncWritebackPort {
+  flushBackgroundTaskPostSyncWriteback(
     tabId: TabId | null,
     conversation: Conversation | null,
   ): Promise<void>;
-  syncTabStreamLikeState(tabId: TabId | null): void;
 }
 
 export interface VisibleConversationRefreshOptions {
@@ -35,6 +37,7 @@ export class PostSyncQuestionTodoRefreshFacade {
   constructor(
     private readonly host: PostSyncQuestionTodoRefreshFacadeHost,
     private readonly questionTodoStatusRefreshCoordinator: QuestionTodoStatusRefreshPort,
+    private readonly backgroundTaskPostSyncWriteback: BackgroundTaskPostSyncWritebackPort,
   ) {}
 
   async refreshVisibleConversation(
@@ -63,10 +66,9 @@ export class PostSyncQuestionTodoRefreshFacade {
       },
     });
 
-    await this.host.refreshBackgroundTaskCompletionNotices(
+    await this.backgroundTaskPostSyncWriteback.flushBackgroundTaskPostSyncWriteback(
       options.tabId,
       options.conversation,
     );
-    this.host.syncTabStreamLikeState(options.tabId);
   }
 }

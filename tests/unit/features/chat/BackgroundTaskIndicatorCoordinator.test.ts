@@ -107,6 +107,26 @@ describe('BackgroundTaskIndicatorCoordinator', () => {
     ).toBeLessThan(completionNoticeService.flushQueuedNotices.mock.invocationCallOrder[0]);
   });
 
+  it('flushes completion notices and syncs stream-like state without rerendering inline panels', async () => {
+    const {
+      coordinator,
+      conversation,
+      inlinePanelRenderer,
+      timelineService,
+      completionNoticeService,
+      tabRuntimeStateBridge,
+      segments,
+    } = createCoordinator();
+
+    await coordinator.flushCompletionNoticesAndSyncStreamLikeState('tab-1', conversation);
+
+    expect(inlinePanelRenderer.render).not.toHaveBeenCalled();
+    expect(timelineService.collectSegments).toHaveBeenCalledWith(conversation?.messages, 'tab-1');
+    expect(completionNoticeService.queueNotices).toHaveBeenCalledWith(segments, 'tab-1', conversation);
+    expect(completionNoticeService.flushQueuedNotices).toHaveBeenCalledWith('tab-1', conversation);
+    expect(tabRuntimeStateBridge.syncStreamLikeState).toHaveBeenCalledWith('tab-1');
+  });
+
   it('skips rendering and notice work when the tab runtime is missing', async () => {
     const {
       coordinator,

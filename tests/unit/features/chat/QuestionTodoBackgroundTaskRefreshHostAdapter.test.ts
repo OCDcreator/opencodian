@@ -72,8 +72,7 @@ function createViewHost(options?: {
       .mockResolvedValue({ status: 'idle' } as SessionActivityStatus),
     refreshTabSessionTodos: jest.fn().mockResolvedValue([] as SessionTodo[]),
     syncBackgroundTaskStateFromConversation: jest.fn(),
-    refreshBackgroundTaskCompletionNotices: jest.fn().mockResolvedValue(undefined),
-    syncTabStreamLikeState: jest.fn(),
+    flushBackgroundTaskPostSyncWriteback: jest.fn().mockResolvedValue(undefined),
     setCurrentConversationRevertState: jest.fn(),
     setTabConversationSyncFingerprint: jest.fn(),
     markBackgroundTaskAuthoritativeSync: jest.fn(),
@@ -136,7 +135,7 @@ describe('QuestionTodoBackgroundTaskRefreshHostAdapter', () => {
       >;
     };
     let backgroundTaskIndicatorCoordinator!: {
-      queueAndFlushCompletionNotices: jest.Mock<
+      flushCompletionNoticesAndSyncStreamLikeState: jest.Mock<
         Promise<void>,
         [string | null, Conversation | null]
       >;
@@ -174,7 +173,7 @@ describe('QuestionTodoBackgroundTaskRefreshHostAdapter', () => {
       refreshTabSessionTodos: jest.fn().mockResolvedValue([] as SessionTodo[]),
     };
     backgroundTaskIndicatorCoordinator = {
-      queueAndFlushCompletionNotices: jest.fn().mockResolvedValue(undefined),
+      flushCompletionNoticesAndSyncStreamLikeState: jest.fn().mockResolvedValue(undefined),
     };
     backgroundTaskLiveSignalCoordinator = {
       markAuthoritativeSync: jest.fn(),
@@ -204,11 +203,10 @@ describe('QuestionTodoBackgroundTaskRefreshHostAdapter', () => {
       { suppressErrors: true },
     );
     adaptedViewHost.syncBackgroundTaskStateFromConversation(currentConversation, 'tab-active');
-    await adaptedViewHost.refreshBackgroundTaskCompletionNotices(
+    await adaptedViewHost.flushBackgroundTaskPostSyncWriteback(
       'tab-active',
       currentConversation,
     );
-    adaptedViewHost.syncTabStreamLikeState('tab-active');
     adaptedViewHost.setCurrentConversationRevertState({ messageID: 'assistant-1' });
     adaptedViewHost.setTabConversationSyncFingerprint('tab-active', 'next-fingerprint');
     adaptedViewHost.markBackgroundTaskAuthoritativeSync(
@@ -238,11 +236,12 @@ describe('QuestionTodoBackgroundTaskRefreshHostAdapter', () => {
       currentConversation,
       'tab-active',
     );
-    expect(backgroundTaskIndicatorCoordinator.queueAndFlushCompletionNotices).toHaveBeenCalledWith(
+    expect(
+      backgroundTaskIndicatorCoordinator.flushCompletionNoticesAndSyncStreamLikeState,
+    ).toHaveBeenCalledWith(
       'tab-active',
       currentConversation,
     );
-    expect(tabRuntimeStateBridge.syncStreamLikeState).toHaveBeenCalledWith('tab-active');
     expect(viewHost.setCurrentConversationRevertState).toHaveBeenCalledWith({
       messageID: 'assistant-1',
     });
@@ -298,11 +297,10 @@ describe('QuestionTodoBackgroundTaskRefreshHostAdapter', () => {
       currentConversation,
       'tab-active',
     );
-    await hosts.postSyncQuestionTodoRefreshFacadeHost.refreshBackgroundTaskCompletionNotices(
+    await hosts.backgroundTaskPostSyncWritebackPort.flushBackgroundTaskPostSyncWriteback(
       'tab-active',
       currentConversation,
     );
-    hosts.postSyncQuestionTodoRefreshFacadeHost.syncTabStreamLikeState('tab-active');
     hosts.backgroundTaskPostSyncCoordinatorHost.setCurrentConversationRevertState({
       messageID: 'assistant-1',
     });
@@ -334,11 +332,10 @@ describe('QuestionTodoBackgroundTaskRefreshHostAdapter', () => {
       currentConversation,
       'tab-active',
     );
-    expect(viewHost.refreshBackgroundTaskCompletionNotices).toHaveBeenCalledWith(
+    expect(viewHost.flushBackgroundTaskPostSyncWriteback).toHaveBeenCalledWith(
       'tab-active',
       currentConversation,
     );
-    expect(viewHost.syncTabStreamLikeState).toHaveBeenCalledWith('tab-active');
     expect(viewHost.setCurrentConversationRevertState).toHaveBeenCalledWith({
       messageID: 'assistant-1',
     });
@@ -451,11 +448,10 @@ describe('QuestionTodoBackgroundTaskRefreshHostAdapter', () => {
       'session-conversation-bg',
       { suppressErrors: true },
     );
-    expect(viewHost.refreshBackgroundTaskCompletionNotices).toHaveBeenCalledWith(
+    expect(viewHost.flushBackgroundTaskPostSyncWriteback).toHaveBeenCalledWith(
       'tab-bg',
       conversation,
     );
-    expect(viewHost.syncTabStreamLikeState).toHaveBeenCalledWith('tab-bg');
     expect(viewHost.setTabNeedsAttention).toHaveBeenCalledWith('tab-bg', true);
   });
 });

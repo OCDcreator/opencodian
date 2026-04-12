@@ -1,5 +1,6 @@
 import type { Conversation } from '../../../../src/core/types';
 import {
+  type BackgroundTaskPostSyncWritebackPort,
   PostSyncQuestionTodoRefreshFacade,
   type PostSyncQuestionTodoRefreshFacadeHost,
 } from '../../../../src/features/chat/services/PostSyncQuestionTodoRefreshFacade';
@@ -37,12 +38,6 @@ function createHost(callOrder?: string[]): Mocked<PostSyncQuestionTodoRefreshFac
     syncBackgroundTaskStateFromConversation: jest.fn(() => {
       callOrder?.push('rebuild');
     }),
-    refreshBackgroundTaskCompletionNotices: jest.fn(async () => {
-      callOrder?.push('completion');
-    }),
-    syncTabStreamLikeState: jest.fn(() => {
-      callOrder?.push('stream');
-    }),
   };
 }
 
@@ -55,6 +50,16 @@ function createRefreshCoordinator(callOrder?: string[]): jest.Mocked<QuestionTod
   };
 }
 
+function createWritebackPort(
+  callOrder?: string[],
+): jest.Mocked<BackgroundTaskPostSyncWritebackPort> {
+  return {
+    flushBackgroundTaskPostSyncWriteback: jest.fn(async () => {
+      callOrder?.push('writeback');
+    }),
+  };
+}
+
 describe('PostSyncQuestionTodoRefreshFacade', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -63,7 +68,12 @@ describe('PostSyncQuestionTodoRefreshFacade', () => {
   it('refreshes visible conversations against the current live session id', async () => {
     const host = createHost();
     const refreshCoordinator = createRefreshCoordinator();
-    const facade = new PostSyncQuestionTodoRefreshFacade(host, refreshCoordinator);
+    const writebackPort = createWritebackPort();
+    const facade = new PostSyncQuestionTodoRefreshFacade(
+      host,
+      refreshCoordinator,
+      writebackPort,
+    );
 
     await facade.refreshVisibleConversation({
       tabId: 'tab-active',
@@ -83,7 +93,12 @@ describe('PostSyncQuestionTodoRefreshFacade', () => {
     const conversation = createConversation();
     const host = createHost(callOrder);
     const refreshCoordinator = createRefreshCoordinator(callOrder);
-    const facade = new PostSyncQuestionTodoRefreshFacade(host, refreshCoordinator);
+    const writebackPort = createWritebackPort(callOrder);
+    const facade = new PostSyncQuestionTodoRefreshFacade(
+      host,
+      refreshCoordinator,
+      writebackPort,
+    );
 
     await facade.refreshBackgroundConversation({
       tabId: 'tab-bg',
@@ -99,8 +114,10 @@ describe('PostSyncQuestionTodoRefreshFacade', () => {
       afterPendingQuestionRefresh: expect.any(Function),
     });
     expect(host.syncBackgroundTaskStateFromConversation).toHaveBeenCalledWith(conversation, 'tab-bg');
-    expect(host.refreshBackgroundTaskCompletionNotices).toHaveBeenCalledWith('tab-bg', conversation);
-    expect(host.syncTabStreamLikeState).toHaveBeenCalledWith('tab-bg');
-    expect(callOrder).toEqual(['refresh', 'rebuild', 'completion', 'stream']);
+    expect(writebackPort.flushBackgroundTaskPostSyncWriteback).toHaveBeenCalledWith(
+      'tab-bg',
+      conversation,
+    );
+    expect(callOrder).toEqual(['refresh', 'rebuild', 'writeback']);
   });
 });

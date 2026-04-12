@@ -44,6 +44,13 @@ export class BackgroundTaskIndicatorCoordinator {
 
     this.liveSignalCoordinator.reconcileStateFromLiveSignals(tabId);
     await this.inlinePanelRenderer.render(conversation, tabId);
+    await this.flushCompletionNoticesAndSyncStreamLikeState(tabId, conversation);
+  }
+
+  async flushCompletionNoticesAndSyncStreamLikeState(
+    tabId: TabId | null = this.host.getActiveTabId(),
+    conversation: Conversation | null = this.host.getCurrentConversation(),
+  ): Promise<void> {
     await this.queueAndFlushCompletionNotices(tabId, conversation);
     this.tabRuntimeStateBridge.syncStreamLikeState(tabId);
   }
