@@ -5,6 +5,7 @@ import {
   type QuestionDockCoordinatorHost,
   type QuestionDockCoordinatorRuntimeState,
 } from '../../../../src/features/chat/services/QuestionDockCoordinator';
+import type { QuestionPostResolutionRuntimeFacade } from '../../../../src/features/chat/services/QuestionPostResolutionRuntimeFacade';
 import type { TabId } from '../../../../src/features/chat/tabs';
 import type {
   QuestionDockCallbacks,
@@ -110,13 +111,17 @@ function createHost(options?: {
     replyToQuestion: jest.fn().mockResolvedValue(undefined),
     rejectQuestion: jest.fn().mockResolvedValue(undefined),
     applyResolvedQuestionState: jest.fn(),
-    refreshTabSessionStatus: jest.fn().mockResolvedValue(null),
-    startConversationSyncLoop: jest.fn(),
-    syncVisibleConversationInBackground: jest.fn().mockResolvedValue(undefined),
+  };
+  const postResolutionRuntime: jest.Mocked<Pick<
+    QuestionPostResolutionRuntimeFacade,
+    'followUpAfterResolution'
+  >> = {
+    followUpAfterResolution: jest.fn().mockResolvedValue(undefined),
   };
 
   return {
     host,
+    postResolutionRuntime,
     runtimeByTab,
     questionDock,
     getLatestRenderState(): QuestionDockRenderState {
@@ -142,8 +147,14 @@ describe('QuestionDockCoordinator', () => {
 
   it('waits for above-input dock submission and runs the active-tab follow-up flow', async () => {
     const request = createQuestionRequest();
-    const { host, runtimeByTab, getLatestCallbacks, getLatestRenderState } = createHost();
-    const coordinator = new QuestionDockCoordinator(host);
+    const {
+      host,
+      postResolutionRuntime,
+      runtimeByTab,
+      getLatestCallbacks,
+      getLatestRenderState,
+    } = createHost();
+    const coordinator = new QuestionDockCoordinator(host, postResolutionRuntime);
 
     const resolutionPromise = coordinator.waitForDockResolutionIfEnabled(request, 'tab-active');
 
@@ -164,13 +175,7 @@ describe('QuestionDockCoordinator', () => {
       }),
       'tab-active',
     );
-    expect(host.refreshTabSessionStatus).toHaveBeenCalledWith(
-      'tab-active',
-      'session-1',
-      { suppressErrors: true },
-    );
-    expect(host.startConversationSyncLoop).toHaveBeenCalledTimes(1);
-    expect(host.syncVisibleConversationInBackground).toHaveBeenCalledTimes(1);
+    expect(postResolutionRuntime.followUpAfterResolution).toHaveBeenCalledWith('tab-active');
     expect(runtimeByTab.get('tab-active')?.pendingQuestionRequests).toEqual([]);
     expect(runtimeByTab.get('tab-active')?.resolvedQuestionRequestIds.has(request.id)).toBe(true);
   });
@@ -180,7 +185,7 @@ describe('QuestionDockCoordinator', () => {
       id: 'request-background',
       sessionId: 'session-background',
     });
-    const { host, runtimeByTab } = createHost({
+    const { host, postResolutionRuntime, runtimeByTab } = createHost({
       activeTabId: 'tab-active',
       sessionIdsByTab: {
         'tab-active': 'session-active',
@@ -197,7 +202,7 @@ describe('QuestionDockCoordinator', () => {
     backgroundRuntime.questionRequestWaiters.set(waitingRequest.id, { promise, resolve });
     runtimeByTab.set('tab-background', backgroundRuntime);
     host.getPendingQuestions.mockResolvedValueOnce([]);
-    const coordinator = new QuestionDockCoordinator(host);
+    const coordinator = new QuestionDockCoordinator(host, postResolutionRuntime);
 
     const refreshed = await coordinator.refreshPendingQuestionsForTab('tab-background', 'session-background');
 
@@ -208,11 +213,11 @@ describe('QuestionDockCoordinator', () => {
 
   it('renders an empty dock state when the above-input dock is disabled', () => {
     const request = createQuestionRequest();
-    const { runtimeByTab, getLatestRenderState, host } = createHost({
+    const { runtimeByTab, getLatestRenderState, host, postResolutionRuntime } = createHost({
       shouldUseAboveInputQuestionDock: false,
     });
     runtimeByTab.get('tab-active')!.pendingQuestionRequests = [request];
-    const coordinator = new QuestionDockCoordinator(host);
+    const coordinator = new QuestionDockCoordinator(host, postResolutionRuntime);
 
     coordinator.render();
 

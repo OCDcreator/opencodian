@@ -5,6 +5,7 @@ import { t } from '../../../i18n';
 import { createLogger } from '../../../shared';
 import type { TabId } from '../tabs';
 import type { QuestionDock, QuestionDockCallbacks } from '../ui/QuestionDock';
+import type { QuestionPostResolutionRuntimeFacade } from './QuestionPostResolutionRuntimeFacade';
 import {
   buildQuestionDockViewModel,
   getPreferredQuestionIndexForGroup,
@@ -18,6 +19,11 @@ interface DeferredQuestionRequest {
   promise: Promise<void>;
   resolve: () => void;
 }
+
+type QuestionPostResolutionRuntimePort = Pick<
+  QuestionPostResolutionRuntimeFacade,
+  'followUpAfterResolution'
+>;
 
 export interface QuestionDockCoordinatorRuntimeState {
   isStreaming: boolean;
@@ -45,13 +51,6 @@ export interface QuestionDockCoordinatorHost {
   replyToQuestion(requestId: string, answers: string[][]): Promise<void>;
   rejectQuestion(requestId: string): Promise<void>;
   applyResolvedQuestionState(resolution: QuestionResolution, tabId: TabId | null): void;
-  refreshTabSessionStatus(
-    tabId: TabId | null,
-    sessionId: string | undefined,
-    options: { suppressErrors?: boolean },
-  ): Promise<unknown>;
-  startConversationSyncLoop(): void;
-  syncVisibleConversationInBackground(): Promise<void>;
 }
 
 const EMPTY_DOCK_CALLBACKS: QuestionDockCallbacks = {
@@ -64,7 +63,10 @@ const EMPTY_DOCK_CALLBACKS: QuestionDockCallbacks = {
 };
 
 export class QuestionDockCoordinator {
-  constructor(private readonly host: QuestionDockCoordinatorHost) {}
+  constructor(
+    private readonly host: QuestionDockCoordinatorHost,
+    private readonly postResolutionRuntime: QuestionPostResolutionRuntimePort,
+  ) {}
 
   render(): void {
     const questionDock = this.host.getQuestionDock();
@@ -478,18 +480,7 @@ export class QuestionDockCoordinator {
   }
 
   private async afterQuestionDockResolution(tabId: TabId | null): Promise<void> {
-    const sessionId = this.host.getSessionIdForTab(tabId) ?? undefined;
     this.render();
-
-    if (!sessionId) {
-      return;
-    }
-
-    void this.host.refreshTabSessionStatus(tabId, sessionId, { suppressErrors: true });
-    this.host.startConversationSyncLoop();
-
-    if (tabId === this.host.getActiveTabId() && !this.host.getTabRuntimeState(tabId)?.isStreaming) {
-      await this.host.syncVisibleConversationInBackground();
-    }
+    await this.postResolutionRuntime.followUpAfterResolution(tabId);
   }
 }

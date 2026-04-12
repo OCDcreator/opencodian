@@ -5,12 +5,12 @@
 
 ## 概述
 
-`QuestionDockCoordinator` 把 `OpenCodianView` 中与上方 question dock 相关的 **pending-question 队列、草稿答案、dock 渲染回调、server refresh，以及回答/拒绝后的 follow-up 编排** 收束到一个 dedicated service，专门负责：
+`QuestionDockCoordinator` 把 `OpenCodianView` 中与上方 question dock 相关的 **pending-question 队列、草稿答案、dock 渲染回调，以及 dock 回答/拒绝流程** 收束到一个 dedicated service，专门负责：
 
 - 管理每个 tab 的 `pendingQuestionRequests`、`resolvedQuestionRequestIds`、draft answers、active group/index 与 waiter 生命周期
 - 把 `OpenCodeService.getPendingQuestions()` 的结果过滤到当前 session，并保留仍在等待上方 dock 回答的 request
 - 组装 `QuestionDock` 的 render state / callbacks，处理 group 切换、单题/多题显示模式和 answer sanitize
-- 在上方 dock 提交或拒绝问题后，统一执行 `replyToQuestion()` / `rejectQuestion()`、resolved state bridge、status refresh 与 visible-conversation sync follow-up
+- 在上方 dock 提交或拒绝问题后，统一执行 `replyToQuestion()` / `rejectQuestion()`、resolved state bridge，并把 runtime follow-up 委托给共享的 `QuestionPostResolutionRuntimeFacade`
 
 它不负责 inline question card 的 DOM 渲染，也不负责 answered/rejected 回顾卡片；这些仍分别由 `QuestionInlineCardRenderer` 与 `QuestionResolutionCoordinator` 负责。它的 host 装配现在通常由 `QuestionRuntimeHostAdapter` 统一提供。
 
@@ -31,9 +31,6 @@ export interface QuestionDockCoordinatorHost {
   replyToQuestion(requestId: string, answers: string[][]): Promise<void>;
   rejectQuestion(requestId: string): Promise<void>;
   applyResolvedQuestionState(resolution: QuestionResolution, tabId: TabId | null): void;
-  refreshTabSessionStatus(...): Promise<unknown>;
-  startConversationSyncLoop(): void;
-  syncVisibleConversationInBackground(): Promise<void>;
 }
 
 export class QuestionDockCoordinator {
@@ -57,10 +54,11 @@ export class QuestionDockCoordinator {
 
 - `render()` 会检查 `questionCardPosition === 'above_input'`、active tab、active request 与当前 conversation session 是否一致，不满足时统一回退到空 dock
 - dock callback 里维护 draft answer、active group 与 active question index；真实 DOM 渲染仍由 `QuestionDock` 完成
-- 提交/拒绝成功后，coordinator 会统一调用 `QuestionResolutionCoordinator` host bridge、刷新 session status、重启 conversation sync loop，并在当前 tab 非 streaming 时触发 visible background sync
+- 提交/拒绝成功后，coordinator 会统一调用 `QuestionResolutionCoordinator` host bridge，并把 session status refresh / sync loop / visible background sync follow-up 交给共享的 `QuestionPostResolutionRuntimeFacade`
 
 ## 与 `OpenCodianView` 的边界
 
 - `OpenCodianView` 不再直接持有 `QuestionDock` slot lifecycle；这部分 UI ownership 现在由 `QuestionDockSlotCoordinator` 负责，而 question dock/pending question 的主要 orchestration 继续留在本 coordinator
 - `BackgroundTaskPostSyncCoordinator` 与 `TabConversationStateBridge` 仍需要 pending-question refresh / clear，但现在会经由同一份 question runtime bundle 调用本 service，而不是继续走 view 内单独 forwarding 方法
 - `QuestionInlineCardRenderer` 继续负责 inline 提问 UI；dock 未接管时的 inline resolve orchestration 现在改由 `QuestionResolutionFlowCoordinator` 统一调用 `markQuestionRequestResolved()` 与 `QuestionResolutionCoordinator`
+- dock resolve 后的 runtime 收尾现在与 inline fallback 共用 `QuestionPostResolutionRuntimeFacade`，本模块不再单独持有 sync/status follow-up 细节

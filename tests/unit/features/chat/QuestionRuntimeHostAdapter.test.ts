@@ -5,6 +5,7 @@ import type {
 } from '../../../../src/core/types';
 import { setLocale } from '../../../../src/i18n';
 import { StreamingInlineCardRenderer } from '../../../../src/features/chat/runtime/StreamingInlineCardRenderer';
+import { QuestionPostResolutionRuntimeFacade } from '../../../../src/features/chat/services/QuestionPostResolutionRuntimeFacade';
 import {
   createQuestionRuntimeHosts,
   createQuestionRuntimeServices,
@@ -180,9 +181,6 @@ describe('QuestionRuntimeHostAdapter', () => {
     await hosts.dockCoordinatorHost.getPendingQuestions();
     await hosts.dockCoordinatorHost.replyToQuestion(request.id, [['TypeScript']]);
     await hosts.dockCoordinatorHost.rejectQuestion(request.id);
-    await hosts.dockCoordinatorHost.refreshTabSessionStatus('tab-active', 'session-1', {
-      suppressErrors: true,
-    });
     hosts.dockCoordinatorHost.applyResolvedQuestionState(
       {
         request,
@@ -191,8 +189,10 @@ describe('QuestionRuntimeHostAdapter', () => {
       },
       'tab-active',
     );
-    hosts.dockCoordinatorHost.startConversationSyncLoop();
-    await hosts.dockCoordinatorHost.syncVisibleConversationInBackground();
+    const postResolutionRuntimeFacade = new QuestionPostResolutionRuntimeFacade(
+      hosts.postResolutionRuntimeHost,
+    );
+    await postResolutionRuntimeFacade.followUpAfterResolution('tab-active');
 
     expect(viewHost.keepQuestionCardPinnedToBottom).toHaveBeenCalledWith('tab-active');
     expect(viewHost.getPendingQuestions).toHaveBeenCalledTimes(1);
@@ -274,6 +274,13 @@ describe('QuestionRuntimeHostAdapter', () => {
 
     expect(collectActionSpy).toHaveBeenCalledWith(request, 'all', 'tab-active');
     expect(viewHost.replyToQuestion).toHaveBeenCalledWith(request.id, [['TypeScript']]);
+    expect(viewHost.refreshTabSessionStatus).toHaveBeenCalledWith(
+      'tab-active',
+      'session-1',
+      { suppressErrors: true },
+    );
+    expect(viewHost.startConversationSyncLoop).toHaveBeenCalledTimes(1);
+    expect(viewHost.syncVisibleConversationInBackground).toHaveBeenCalledTimes(1);
     expect(runtimeByTab.get('tab-active')?.resolvedQuestionRequestIds.has(request.id)).toBe(true);
     expect(runtimeByTab.get('tab-active')?.pendingQuestionResolution).toEqual({
       request,

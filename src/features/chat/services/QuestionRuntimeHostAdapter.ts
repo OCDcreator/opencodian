@@ -21,6 +21,10 @@ import {
   type QuestionDockCoordinatorRuntimeState,
 } from './QuestionDockCoordinator';
 import {
+  QuestionPostResolutionRuntimeFacade,
+  type QuestionPostResolutionRuntimeFacadeHost,
+} from './QuestionPostResolutionRuntimeFacade';
+import {
   QuestionResolutionFlowCoordinator,
   type QuestionResolutionFlowCoordinatorHost,
 } from './QuestionResolutionFlowCoordinator';
@@ -61,6 +65,7 @@ export interface QuestionRuntimeHosts {
   inlineCardRendererHost: QuestionInlineCardRendererHost;
   resolutionCoordinatorHost: QuestionResolutionCoordinatorHost;
   dockCoordinatorHost: QuestionDockCoordinatorHost;
+  postResolutionRuntimeHost: QuestionPostResolutionRuntimeFacadeHost;
 }
 
 export interface QuestionRuntimeServices {
@@ -108,6 +113,11 @@ export function createQuestionRuntimeHosts(
       applyResolvedQuestionState: (resolution, tabId) => {
         resolutionCoordinator.applyResolvedQuestionState(resolution, tabId);
       },
+    },
+    postResolutionRuntimeHost: {
+      getActiveTabId: () => viewHost.getActiveTabId(),
+      getTabRuntimeState: (tabId: TabId | null) => viewHost.getTabRuntimeState(tabId),
+      getSessionIdForTab: (tabId: TabId | null) => viewHost.getSessionIdForTab(tabId),
       refreshTabSessionStatus: (
         tabId: TabId | null,
         sessionId: string | undefined,
@@ -141,7 +151,13 @@ export function createQuestionRuntimeServices(
     inlineCardRenderer,
     hosts.resolutionCoordinatorHost,
   );
-  const dockCoordinator = new QuestionDockCoordinator(hosts.dockCoordinatorHost);
+  const postResolutionRuntimeFacade = new QuestionPostResolutionRuntimeFacade(
+    hosts.postResolutionRuntimeHost,
+  );
+  const dockCoordinator = new QuestionDockCoordinator(
+    hosts.dockCoordinatorHost,
+    postResolutionRuntimeFacade,
+  );
   const resolutionFlowCoordinatorHost: QuestionResolutionFlowCoordinatorHost = {
     getActiveTabId: () => viewHost.getActiveTabId(),
     getQuestionDisplayMode: () => viewHost.getQuestionDisplayMode(),
@@ -154,6 +170,7 @@ export function createQuestionRuntimeServices(
       dockCoordinator,
       inlineCardRenderer,
       resolutionCoordinator,
+      postResolutionRuntime: postResolutionRuntimeFacade,
     },
   );
 
