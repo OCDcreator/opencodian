@@ -112,4 +112,28 @@ describe('AssistantShellViewHostAdapter', () => {
     );
     expect(messageEl.querySelector('.opencodian-message-time-row')?.textContent).toContain('gpt-5.4');
   });
+
+  it('renders local stream errors through the shared assistant error helper', () => {
+    const { adapter, initializeAssistantCopyButton, turnBody } = createAdapter();
+    const { messageEl, contentEl } = adapter.createAssistantMessageElement('tab-1', true);
+
+    adapter.renderStreamError({
+      messageEl,
+      contentEl,
+      content: 'Server unavailable',
+      timestamp: 45678,
+      modelId: 'anthropic/claude-sonnet-4',
+    });
+
+    expect(turnBody.contains(messageEl)).toBe(true);
+    expect(messageEl.hidden).toBe(false);
+    expect(contentEl.querySelector('.streaming-error-block')).not.toBeNull();
+    expect(contentEl.querySelector('.streaming-error-icon')?.textContent).toBe('❌');
+    expect(contentEl.querySelector('.streaming-error-text')?.textContent).toBe('Server unavailable');
+    expect(initializeAssistantCopyButton).toHaveBeenCalledWith(
+      expect.any(HTMLElement),
+      'Server unavailable',
+    );
+    expect(messageEl.querySelector('.opencodian-message-time-row')?.textContent).toContain('claude-sonnet-4');
+  });
 });

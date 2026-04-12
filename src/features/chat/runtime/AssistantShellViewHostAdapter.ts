@@ -1,9 +1,10 @@
+import {
+  AssistantErrorRenderer,
+  type AssistantStreamErrorRenderOptions,
+} from './AssistantErrorRenderer';
 import type { ChatMessage } from '../../../core/types';
 import type { TabId } from '../tabs';
-import {
-  AssistantFooterRenderer,
-  type AssistantErrorFooterOptions,
-} from './AssistantFooterRenderer';
+import { AssistantFooterRenderer } from './AssistantFooterRenderer';
 import {
   type AssistantNoticeRenderHost,
   renderAssistantPlaceholderAsNotice,
@@ -25,10 +26,12 @@ export interface AssistantShellViewHostAdapterHost extends AssistantShellRendere
 export class AssistantShellViewHostAdapter {
   private readonly shellRenderer: AssistantShellRenderer;
   private readonly footerRenderer: AssistantFooterRenderer;
+  private readonly errorRenderer: AssistantErrorRenderer;
 
   constructor(private readonly host: AssistantShellViewHostAdapterHost) {
     this.shellRenderer = new AssistantShellRenderer(host);
     this.footerRenderer = new AssistantFooterRenderer(this.shellRenderer);
+    this.errorRenderer = new AssistantErrorRenderer(this.footerRenderer);
   }
 
   createAssistantMessageElement(
@@ -61,8 +64,8 @@ export class AssistantShellViewHostAdapter {
     this.footerRenderer.finalizePseudoStreamFooter(messageEl, message);
   }
 
-  finalizeErrorFooter(options: AssistantErrorFooterOptions): void {
-    this.footerRenderer.finalizeErrorFooter(options);
+  renderStreamError(options: AssistantStreamErrorRenderOptions): void {
+    this.errorRenderer.renderStreamError(options);
   }
 
   renderAssistantPlaceholderAsNotice(options: {

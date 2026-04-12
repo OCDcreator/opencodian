@@ -4854,15 +4854,11 @@ export class OpenCodianView extends ItemView {
     contentEl: HTMLElement,
     message: string
   ): Promise<void> {
-    contentEl.empty();
-    const errorEl = contentEl.createDiv({ cls: 'streaming-error-block' });
-    errorEl.createSpan({ cls: 'streaming-error-icon', text: '❌' });
-    errorEl.createSpan({ cls: 'streaming-error-text', text: message });
-
     const timestamp = Date.now();
     const modelId = this.formatModelId(this.getCurrentSessionModel());
-    this.assistantShellViewHostAdapter.finalizeErrorFooter({
+    this.assistantShellViewHostAdapter.renderStreamError({
       messageEl,
+      contentEl,
       timestamp,
       content: message,
       modelId,
