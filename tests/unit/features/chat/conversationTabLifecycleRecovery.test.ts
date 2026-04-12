@@ -24,6 +24,7 @@ function createView(overrides: Record<string, unknown> = {}): OpenCodianView {
     storage: {},
     createConversation: jest.fn(),
     deleteConversation: jest.fn(),
+    getConversations: jest.fn().mockReturnValue([]),
     scheduleSettingsUiStateSave: jest.fn(),
     saveSettingsUiStateImmediately: jest.fn().mockResolvedValue(undefined),
     ...overrides,
@@ -62,6 +63,28 @@ describe('OpenCodianView tab lifecycle recovery delegation', () => {
 
     await view.deleteConversationsAndCleanupTabs(['conv-1', 'conv-2']);
 
+    expect(spy).toHaveBeenCalledWith(['conv-1', 'conv-2']);
+  });
+
+  it('delegates delete-all tab reset and fallback bootstrap to ConversationTabLifecycleRecoveryCoordinator', async () => {
+    const view = createView({
+      getConversations: jest.fn().mockReturnValue([
+        { id: 'conv-1', title: 'One' },
+        { id: 'conv-2', title: 'Two' },
+      ]),
+    }) as OpenCodianView & {
+      deleteAllConversations: () => Promise<void>;
+      showDeleteAllConfirmDialog: (count: number) => Promise<boolean>;
+    };
+    const coordinator = getConversationTabLifecycleRecoveryCoordinator(view);
+    const spy = jest
+      .spyOn(coordinator, 'deleteAllConversationsAndReset')
+      .mockResolvedValue(undefined);
+    view.showDeleteAllConfirmDialog = jest.fn().mockResolvedValue(true);
+
+    await view.deleteAllConversations();
+
+    expect(view.showDeleteAllConfirmDialog).toHaveBeenCalledWith(2);
     expect(spy).toHaveBeenCalledWith(['conv-1', 'conv-2']);
   });
 });

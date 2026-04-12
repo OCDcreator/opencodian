@@ -33,6 +33,8 @@ function createHost(
     getCurrentConversationId: jest.fn().mockReturnValue(null),
     createConversation: jest.fn().mockResolvedValue(createConversation('created')),
     deleteConversation: jest.fn().mockResolvedValue(undefined),
+    clearTabMessagesPanes: jest.fn(),
+    resetTabManager: jest.fn(),
     removeTabMessagesPane: jest.fn(),
     showNotice: jest.fn(),
     ...overrides,
@@ -167,5 +169,21 @@ describe('ConversationTabLifecycleRecoveryCoordinator', () => {
 
     expect(host.deleteConversation).toHaveBeenCalledWith('current');
     expect(port.createConversationInNewTab).toHaveBeenCalledTimes(1);
+  });
+
+  it('resets the tab manager and bootstraps a new tab after deleting all conversations', async () => {
+    const host = createHost();
+    const port = createPort();
+    const coordinator = new ConversationTabLifecycleRecoveryCoordinator(host, port);
+
+    await coordinator.deleteAllConversationsAndReset(['first', 'second', 'second']);
+
+    expect(host.deleteConversation).toHaveBeenCalledTimes(2);
+    expect(host.deleteConversation).toHaveBeenNthCalledWith(1, 'first');
+    expect(host.deleteConversation).toHaveBeenNthCalledWith(2, 'second');
+    expect(host.clearTabMessagesPanes).toHaveBeenCalledTimes(1);
+    expect(host.resetTabManager).toHaveBeenCalledTimes(1);
+    expect(port.createConversationInNewTab).toHaveBeenCalledTimes(1);
+    expect(host.removeTabMessagesPane).not.toHaveBeenCalled();
   });
 });

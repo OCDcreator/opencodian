@@ -1870,6 +1870,12 @@ export class OpenCodianView extends ItemView {
       getCurrentConversationId: () => this.currentConversation?.id ?? null,
       createConversation: () => this.plugin.createConversation(),
       deleteConversation: (conversationId) => this.plugin.deleteConversation(conversationId),
+      clearTabMessagesPanes: () => {
+        this.clearTabMessagesPanes();
+      },
+      resetTabManager: () => {
+        this.resetTabManager();
+      },
       removeTabMessagesPane: (tabId) => {
         this.removeTabMessagesPane(tabId);
       },
@@ -2651,15 +2657,24 @@ export class OpenCodianView extends ItemView {
       },
     });
 
-    this.tabManager = new TabManager(t('chat.tab.new'), {
+    this.tabManager = this.createTabManager();
+
+    this.applyTabBarLayout();
+  }
+
+  private createTabManager(): TabManager {
+    return new TabManager(t('chat.tab.new'), {
       getMaxTabs: () => this.plugin.settings.maxTabs,
       onChanged: () => {
         this.renderTabBar();
         this.persistTabState();
       },
     });
+  }
 
-    this.applyTabBarLayout();
+  private resetTabManager(): void {
+    this.tabManager = this.createTabManager();
+    this.renderTabBar();
   }
 
   private async initializeFirstTab(): Promise<void> {
@@ -4772,21 +4787,9 @@ export class OpenCodianView extends ItemView {
     const confirmed = await this.showDeleteAllConfirmDialog(conversations.length);
     if (!confirmed) return;
 
-    for (const conv of conversations) {
-      await this.plugin.deleteConversation(conv.id);
-    }
-
-    this.clearTabMessagesPanes();
-
-    this.tabManager = new TabManager(t('chat.tab.new'), {
-      getMaxTabs: () => this.plugin.settings.maxTabs,
-      onChanged: () => {
-        this.renderTabBar();
-        this.persistTabState();
-      },
-    });
-    this.renderTabBar();
-    await this.createNewConversation();
+    await this.conversationTabLifecycleRecoveryCoordinator.deleteAllConversationsAndReset(
+      conversations.map((conversation) => conversation.id),
+    );
     new Notice(t('chat.deleteAllConfirm.success') || 'All conversations deleted');
   }
 

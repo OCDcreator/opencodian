@@ -18,6 +18,8 @@ export interface ConversationTabLifecycleRecoveryHost {
   getCurrentConversationId(): string | null;
   createConversation(): Promise<Conversation>;
   deleteConversation(conversationId: string): Promise<void>;
+  clearTabMessagesPanes(): void;
+  resetTabManager(): void;
   removeTabMessagesPane(tabId: TabId): void;
   showNotice(message: string): void;
 }
@@ -103,6 +105,21 @@ export class ConversationTabLifecycleRecoveryCoordinator {
     if (activeTabWillBeClosed && closeResult.nextActiveTabId) {
       await this.port.activateTab(closeResult.nextActiveTabId);
     }
+  }
+
+  async deleteAllConversationsAndReset(conversationIds: readonly string[]): Promise<void> {
+    const uniqueConversationIds = Array.from(new Set(conversationIds));
+    if (uniqueConversationIds.length === 0) {
+      return;
+    }
+
+    for (const conversationId of uniqueConversationIds) {
+      await this.host.deleteConversation(conversationId);
+    }
+
+    this.host.clearTabMessagesPanes();
+    this.host.resetTabManager();
+    await this.port.createConversationInNewTab();
   }
 
   private shouldRecoverCurrentConversation(conversationIdSet: ReadonlySet<string>): boolean {
