@@ -185,24 +185,15 @@ import {
   BackgroundTaskTimelineService,
   type BackgroundTaskTimelineServiceHost,
 } from './services/BackgroundTaskTimelineService';
+import type { ComposerContextActionService } from './services/ComposerContextActionService';
+import type { ComposerContextChipActionService } from './services/ComposerContextChipActionService';
+import type { ComposerContextCoordinator } from './services/ComposerContextCoordinator';
+import type { ComposerContextEventBridge } from './services/ComposerContextEventBridge';
 import {
-  ComposerContextActionService,
-  type ComposerContextActionServiceHost,
-} from './services/ComposerContextActionService';
-import {
-  ComposerContextChipActionService,
-  type ComposerContextChipActionServiceHost,
-} from './services/ComposerContextChipActionService';
-import {
-  ComposerContextCoordinator,
-  type ComposerContextCoordinatorHost,
-} from './services/ComposerContextCoordinator';
-import {
-  ComposerContextEventBridge,
-  type ComposerContextEventBridgeHost,
-} from './services/ComposerContextEventBridge';
+  createComposerContextServices,
+  type ComposerContextViewHost,
+} from './services/ComposerContextHostAdapter';
 import { ComposerContextRuntimeStore } from './services/ComposerContextRuntimeStore';
-import { ComposerContextViewHostAdapter } from './services/ComposerContextViewHostAdapter';
 import { ContextAttachmentBuilder } from './services/ContextAttachmentBuilder';
 import { ContextFileCatalogService } from './services/ContextFileCatalogService';
 import { ContextUsageService } from './services/ContextUsageService';
@@ -250,14 +241,8 @@ import {
   type ConversationViewStateHost,
   ConversationViewStateService,
 } from './services/ConversationViewStateService';
-import {
-  FocusContextPreviewCoordinator,
-  type FocusContextPreviewCoordinatorHost,
-} from './services/FocusContextPreviewCoordinator';
-import {
-  FocusContextRuntimeService,
-  type FocusContextRuntimeServiceHost,
-} from './services/FocusContextRuntimeService';
+import type { FocusContextPreviewCoordinator } from './services/FocusContextPreviewCoordinator';
+import type { FocusContextRuntimeService } from './services/FocusContextRuntimeService';
 import {
   type MessageFinalizationHost,
   MessageFinalizationService,
@@ -768,7 +753,6 @@ export class OpenCodianView extends ItemView {
   private composerContextCoordinator: ComposerContextCoordinator;
   private composerContextEventBridge: ComposerContextEventBridge;
   private composerContextRuntimeStore: ComposerContextRuntimeStore;
-  private composerContextViewHostAdapter: ComposerContextViewHostAdapter;
   private contextAttachmentBuilder: ContextAttachmentBuilder;
   private contextFileCatalogService: ContextFileCatalogService;
   private focusContextPreviewCoordinator: FocusContextPreviewCoordinator;
@@ -1111,45 +1095,19 @@ export class OpenCodianView extends ItemView {
       getServerMode: () => this.plugin.settings.server.mode,
     });
     this.contextFileCatalogService = new ContextFileCatalogService(this.app);
-    this.composerContextRuntimeStore = new ComposerContextRuntimeStore({
-      getActiveTabId: () => this.getActiveTabId(),
-      getTabRuntimeState: (tabId) => this.getTabRuntimeState(tabId),
-      renderComposerContext: () => {
-        this.composerContextCoordinator.render();
-      },
+    const composerContextServices = createComposerContextServices({
+      app: this.app,
+      contextAttachmentBuilder: this.contextAttachmentBuilder,
+      contextFileCatalogService: this.contextFileCatalogService,
+      viewHost: this.createComposerContextViewHost(),
     });
-    this.composerContextViewHostAdapter = new ComposerContextViewHostAdapter(
-      this.composerContextRuntimeStore,
-    );
-    this.composerContextActionService = new ComposerContextActionService(
-      this.app,
-      this.contextAttachmentBuilder,
-      this.contextFileCatalogService,
-      this.createComposerContextActionServiceHost(),
-    );
-    this.focusContextRuntimeService = new FocusContextRuntimeService(
-      this.app,
-      this.createFocusContextRuntimeServiceHost(),
-    );
-    this.focusContextPreviewCoordinator = new FocusContextPreviewCoordinator(
-      this.createFocusContextPreviewCoordinatorHost(),
-      this.focusContextRuntimeService,
-    );
-    this.composerContextChipActionService = new ComposerContextChipActionService(
-      this.contextAttachmentBuilder,
-      this.createComposerContextChipActionServiceHost(),
-    );
-    this.composerContextCoordinator = new ComposerContextCoordinator(
-      this.createComposerContextCoordinatorHost(),
-      this.composerContextChipActionService,
-    );
-    this.composerContextEventBridge = new ComposerContextEventBridge(
-      this.app,
-      this.focusContextRuntimeService,
-      this.focusContextPreviewCoordinator,
-      this.contextFileCatalogService,
-      this.createComposerContextEventBridgeHost(),
-    );
+    this.composerContextRuntimeStore = composerContextServices.runtimeStore;
+    this.composerContextActionService = composerContextServices.actionService;
+    this.focusContextRuntimeService = composerContextServices.focusContextRuntimeService;
+    this.focusContextPreviewCoordinator = composerContextServices.focusContextPreviewCoordinator;
+    this.composerContextChipActionService = composerContextServices.chipActionService;
+    this.composerContextCoordinator = composerContextServices.coordinator;
+    this.composerContextEventBridge = composerContextServices.eventBridge;
     this.persistentAssistantNoticeService = new PersistentAssistantNoticeService(
       this.createPersistentAssistantNoticeServiceHost(),
     );
@@ -1328,43 +1286,18 @@ export class OpenCodianView extends ItemView {
     );
   }
 
-  private createComposerContextCoordinatorHost(): ComposerContextCoordinatorHost {
-    return this.composerContextViewHostAdapter.createCoordinatorHost();
-  }
-
-  private createComposerContextChipActionServiceHost(): ComposerContextChipActionServiceHost {
-    return this.composerContextViewHostAdapter.createChipActionServiceHost({
-      refreshActiveFocusContextPreview: () => {
-        this.focusContextPreviewCoordinator.refreshActiveFocusContextPreview();
-      },
-    });
-  }
-
-  private createComposerContextActionServiceHost(): ComposerContextActionServiceHost {
-    return this.composerContextViewHostAdapter.createActionServiceHost({
-      getActiveMarkdownView: () => this.getActiveMarkdownView(),
-    });
-  }
-
-  private createFocusContextRuntimeServiceHost(): FocusContextRuntimeServiceHost {
-    return this.composerContextViewHostAdapter.createFocusContextRuntimeServiceHost({
-      getCurrentConversationNotePath: () => this.currentConversation?.currentNote ?? null,
-      isComposerInteractionFocused: () => this.isComposerInteractionFocused(),
-    });
-  }
-
-  private createFocusContextPreviewCoordinatorHost(): FocusContextPreviewCoordinatorHost {
+  private createComposerContextViewHost(): ComposerContextViewHost {
     return {
+      getActiveTabId: () => this.getActiveTabId(),
+      getTabRuntimeState: (tabId) => this.getTabRuntimeState(tabId),
+      getCurrentConversationNotePath: () => this.currentConversation?.currentNote ?? null,
       setCurrentConversationNotePath: (path) => {
         if (this.currentConversation) {
           this.currentConversation.currentNote = path;
         }
       },
-    };
-  }
-
-  private createComposerContextEventBridgeHost(): ComposerContextEventBridgeHost {
-    return {
+      getActiveMarkdownView: () => this.getActiveMarkdownView(),
+      isComposerInteractionFocused: () => this.isComposerInteractionFocused(),
       getInputContainer: () => this.inputContainer,
       registerEvent: (eventRef) => {
         this.registerEvent(eventRef);

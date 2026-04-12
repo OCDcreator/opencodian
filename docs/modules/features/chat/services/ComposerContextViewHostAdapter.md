@@ -5,12 +5,12 @@
 
 ## 概述
 
-`ComposerContextViewHostAdapter` 现在只负责把 `ComposerContextRuntimeStore` 暴露成各个 composer service 所需的 host 形状。它统一给 `ComposerContextActionService`、`ComposerContextChipActionService`、`ComposerContextCoordinator` 和 `FocusContextRuntimeService` 提供同一份 runtime-store seam，让 adapter 收窄为 host assembly，而 preview / draft 的写回逻辑交给独立 store。
+`ComposerContextViewHostAdapter` 现在只负责把 `ComposerContextRuntimeStore` 暴露成各个 composer service 所需的 host 形状。它统一给 `ComposerContextActionService`、`ComposerContextChipActionService`、`ComposerContextCoordinator` 和 `FocusContextRuntimeService` 提供同一份 runtime-store seam，让 adapter 收窄为 runtime-store → service-host 适配层；更上层的 view → service-bundle 装配则交给 `ComposerContextHostAdapter`。
 
 ## 导入关系
 
 上游: `ComposerContextRuntimeStore`、`ComposerContextActionService`、`ComposerContextChipActionService`、`ComposerContextCoordinator`、`FocusContextRuntimeService`
-下游: `OpenCodianView`
+下游: `ComposerContextHostAdapter`
 
 ## 公开接口
 
@@ -39,5 +39,5 @@ class ComposerContextViewHostAdapter {
 
 ## 注意事项
 
-- adapter 只处理 host 形状组装，不负责 `TabRuntimeState` 的实际写回、editor runtime、vault catalog、事件桥接或 context item 构建
+- adapter 只处理 runtime-store host 形状组装，不负责 view host 收束、`TabRuntimeState` 的实际写回、editor runtime、vault catalog、事件桥接或 context item 构建
 - preview / draft 的 active-tab rerender gate、equality guard 与数组防御性复制现在由 `ComposerContextRuntimeStore` 集中维护
