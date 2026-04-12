@@ -155,6 +155,10 @@ import {
   type TabViewActivationBridgeHost,
 } from './runtime/TabViewActivationBridge';
 import {
+  ActiveTabContextUsageCoordinator,
+  type ActiveTabContextUsageCoordinatorHost,
+} from './services/ActiveTabContextUsageCoordinator';
+import {
   type BackgroundTaskCompletionInfo,
   BackgroundTaskCompletionNoticeService,
   type BackgroundTaskCompletionNoticeServiceHost,
@@ -717,6 +721,7 @@ export class OpenCodianView extends ItemView {
   private sessionTodoServices: SessionTodoServices;
   private questionDockSlotCoordinator: QuestionDockSlotCoordinator;
   private questionTodoStatusRefreshCoordinator: QuestionTodoStatusRefreshCoordinator;
+  private activeTabContextUsageCoordinator: ActiveTabContextUsageCoordinator;
   private backgroundTaskTimelineService: BackgroundTaskTimelineService;
   private backgroundTaskCompletionNoticeService: BackgroundTaskCompletionNoticeService;
   private backgroundTaskNoticeStateService: BackgroundTaskNoticeStateService;
@@ -1157,6 +1162,9 @@ export class OpenCodianView extends ItemView {
       new BackgroundTaskActivationIndicatorCoordinator(
         this.createBackgroundTaskActivationIndicatorCoordinatorHost(),
       );
+    this.activeTabContextUsageCoordinator = new ActiveTabContextUsageCoordinator(
+      this.createActiveTabContextUsageCoordinatorHost(),
+    );
     this.backgroundTaskNoticeStateService = new BackgroundTaskNoticeStateService(
       this.createBackgroundTaskNoticeStateServiceHost(),
     );
@@ -1183,6 +1191,7 @@ export class OpenCodianView extends ItemView {
       this.createTabViewActivationBridgeHost(),
       questionTodoActivationRefreshCoordinator,
       backgroundTaskActivationIndicatorCoordinator,
+      this.activeTabContextUsageCoordinator,
     );
     this.conversationHydrationOutcomeBridge = new ConversationHydrationOutcomeBridge(
       this.createConversationHydrationOutcomeBridgeHost(),
@@ -1195,6 +1204,7 @@ export class OpenCodianView extends ItemView {
       this.tabViewActivationBridge,
       questionTodoActivationRefreshCoordinator,
       backgroundTaskActivationIndicatorCoordinator,
+      this.activeTabContextUsageCoordinator,
     );
     this.tabRuntimeStateBridge = new TabRuntimeStateBridge(this.createTabRuntimeStateBridgeHost());
     const conversationSyncServices = createConversationSyncServices(
@@ -1490,6 +1500,25 @@ export class OpenCodianView extends ItemView {
     };
   }
 
+  private createActiveTabContextUsageCoordinatorHost(): ActiveTabContextUsageCoordinatorHost {
+    return {
+      hasActiveTab: () => Boolean(this.tabManager?.getActiveTab()),
+      getCurrentConversation: () => this.currentConversation,
+      getCurrentSessionModel: () => this.getCurrentSessionModel(),
+      getCurrentSessionModelResolution: () => this.getCurrentSessionModelResolution(),
+      findKnownModelInfo: (selection) => this.findKnownModelInfo(selection),
+      getActiveTabContextUsage: () => this.tabManager?.getActiveTabContextUsage() ?? null,
+      setActiveTabContextUsage: (contextUsage) => {
+        this.tabManager?.setActiveTabContextUsage(contextUsage);
+      },
+      renderContextUsageIndicator: (state) => {
+        this.contextRing?.update(state);
+      },
+      getSessionContextUsageSnapshot: (sessionId) =>
+        this.plugin.openCodeService.getSessionContextUsageSnapshot(sessionId),
+    };
+  }
+
   private createTabViewActivationBridgeHost(): TabViewActivationBridgeHost {
     return {
       setActiveMessagesPane: (tabId) => {
@@ -1504,10 +1533,6 @@ export class OpenCodianView extends ItemView {
       updateModelSelectorDisplay: () => {
         this.updateModelSelectorDisplay();
       },
-      syncActiveTabContextUsageIdentity: () => {
-        this.syncActiveTabContextUsageIdentity();
-      },
-      refreshActiveTabContextUsageFromServer: () => this.refreshActiveTabContextUsageFromServer(),
       updateSendButtonState: () => {
         this.updateSendButtonState();
       },
@@ -1526,10 +1551,6 @@ export class OpenCodianView extends ItemView {
       updateModelSelectorDisplay: () => {
         this.updateModelSelectorDisplay();
       },
-      syncActiveTabContextUsageIdentity: () => {
-        this.syncActiveTabContextUsageIdentity();
-      },
-      refreshActiveTabContextUsageFromServer: () => this.refreshActiveTabContextUsageFromServer(),
       scheduleSettledScrollToBottom: (tabId) => {
         this.scheduleSettledScrollToBottom(tabId);
       },
@@ -1917,9 +1938,10 @@ export class OpenCodianView extends ItemView {
         this.tabConversationStateBridge.syncActiveTabConversation(conversation);
       },
       syncActiveTabContextUsageIdentity: () => {
-        this.syncActiveTabContextUsageIdentity();
+        this.activeTabContextUsageCoordinator.syncIdentity();
       },
-      refreshActiveTabContextUsageFromServer: () => this.refreshActiveTabContextUsageFromServer(),
+      refreshActiveTabContextUsageFromServer: () =>
+        this.activeTabContextUsageCoordinator.refreshFromServer(),
       summarizeChatMessageForDebug: (message) => this.summarizeChatMessageForDebug(message),
     };
   }
@@ -6342,7 +6364,7 @@ export class OpenCodianView extends ItemView {
       this.markBackgroundTaskAuthoritativeSync(tabId, reason);
 
       if (this.currentConversation?.id === conversation.id && this.getActiveTabId() === tabId) {
-        await this.refreshActiveTabContextUsageFromServer();
+        await this.activeTabContextUsageCoordinator.refreshFromServer();
       }
       if (changed) {
         logger.debug('Conversation sync complete', {
@@ -7055,7 +7077,7 @@ export class OpenCodianView extends ItemView {
       // Re-render dropdown with new data
       this.renderModelList();
       this.updateModelSelectorDisplay();
-      this.syncActiveTabContextUsageIdentity();
+      this.activeTabContextUsageCoordinator.syncIdentity();
     } catch (error) {
       logger.error('Failed to load models:', error);
     }
@@ -7256,7 +7278,7 @@ export class OpenCodianView extends ItemView {
 
     // Update display
     this.updateModelSelectorDisplay();
-    this.syncActiveTabContextUsageIdentity();
+    this.activeTabContextUsageCoordinator.syncIdentity();
 
     // Show notification with model name only
     const modelInfo = this.availableModels.find(
@@ -7684,87 +7706,6 @@ export class OpenCodianView extends ItemView {
     }
 
     this.contextRing.update(this.tabManager?.getActiveTabContextUsage() ?? null);
-  }
-
-  private syncActiveTabContextUsageIdentity(): void {
-    if (!this.tabManager?.getActiveTab()) {
-      this.contextRing?.update(null);
-      return;
-    }
-
-    const currentModel = this.getCurrentSessionModel();
-    const resolution = this.getCurrentSessionModelResolution();
-    const modelInfo = this.findKnownModelInfo(currentModel);
-    const currentState = this.tabManager.getActiveTabContextUsage() ?? createEmptyTabContextState();
-    const nextState = ContextUsageService.syncStateIdentity(
-      currentState,
-      {
-        provider: currentModel?.provider ?? null,
-        providerName: modelInfo?.providerName ?? resolution.providerName ?? currentModel?.provider ?? null,
-        model: currentModel?.model ?? null,
-        modelName: modelInfo?.modelName ?? resolution.modelName ?? currentModel?.model ?? null,
-        contextWindow: modelInfo?.contextWindow ?? resolution.contextWindow,
-      },
-      {
-        sessionId: this.currentConversation?.openCodeSessionId ?? null,
-        sessionTitle: this.currentConversation?.title ?? null,
-        createdAt: this.currentConversation?.createdAt ?? null,
-        updatedAt: this.currentConversation?.updatedAt ?? null,
-      },
-    );
-
-    this.tabManager.setActiveTabContextUsage(nextState);
-    this.refreshContextUsageIndicator();
-  }
-
-  private async refreshActiveTabContextUsageFromServer(): Promise<void> {
-    if (!this.currentConversation?.openCodeSessionId || !this.tabManager?.getActiveTab()) {
-      return;
-    }
-
-    const expectedConversationId = this.currentConversation.id;
-    const expectedSessionId = this.currentConversation.openCodeSessionId;
-    const snapshot = await this.plugin.openCodeService.getSessionContextUsageSnapshot(
-      expectedSessionId,
-    );
-    if (
-      !snapshot
-      || this.currentConversation?.id !== expectedConversationId
-      || this.currentConversation?.openCodeSessionId !== expectedSessionId
-      || !this.tabManager?.getActiveTab()
-    ) {
-      return;
-    }
-
-    const currentState = this.tabManager.getActiveTabContextUsage() ?? createEmptyTabContextState();
-    const nextState = ContextUsageService.syncStateIdentity(
-      currentState,
-      {
-        provider: snapshot.providerId,
-        providerName: snapshot.providerName,
-        model: snapshot.modelId,
-        modelName: snapshot.modelName,
-        contextWindow: snapshot.contextWindow,
-      },
-      {
-        sessionId: snapshot.sessionId,
-        sessionTitle: snapshot.sessionTitle,
-        createdAt: snapshot.createdAt,
-        updatedAt: snapshot.updatedAt,
-      },
-    );
-
-    const calibratedState = ContextUsageService.applyPreciseUsage(nextState, {
-      input: snapshot.inputTokens,
-      output: snapshot.outputTokens,
-      reasoning: snapshot.reasoningTokens,
-      cacheRead: snapshot.cacheReadTokens,
-      cacheWrite: snapshot.cacheWriteTokens,
-      totalCost: snapshot.totalCost,
-    });
-
-    this.tabManager.setActiveTabContextUsage(calibratedState);
-    this.refreshContextUsageIndicator();
   }
 
   private beginActiveTabContextUsageStream(): void {

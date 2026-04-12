@@ -1,4 +1,5 @@
 import type { Conversation } from '../../../core/types';
+import type { ActiveTabContextUsageCoordinator } from '../services/ActiveTabContextUsageCoordinator';
 import type { BackgroundTaskActivationIndicatorCoordinator } from '../services/BackgroundTaskActivationIndicatorCoordinator';
 import type { QuestionTodoActivationRefreshCoordinator } from '../services/QuestionTodoActivationRefreshCoordinator';
 import type { TabId } from '../tabs';
@@ -13,6 +14,11 @@ type TabConversationStatePort = Pick<
 type QuestionTodoActivationRefreshPort = Pick<
   QuestionTodoActivationRefreshCoordinator,
   'applyConversationActivation'
+>;
+
+type ActiveTabContextUsagePort = Pick<
+  ActiveTabContextUsageCoordinator,
+  'syncIdentity' | 'refreshFromServer'
 >;
 
 type BackgroundTaskActivationIndicatorPort = Pick<
@@ -32,8 +38,6 @@ export interface TabConversationActivationBridgeHost {
   clearMessagesContainer(): void;
   resetTurnState(): void;
   updateModelSelectorDisplay(): void;
-  syncActiveTabContextUsageIdentity(): void;
-  refreshActiveTabContextUsageFromServer(): Promise<void>;
   scheduleSettledScrollToBottom(tabId: TabId | null): void;
 }
 
@@ -44,6 +48,7 @@ export class TabConversationActivationBridge {
     private readonly tabViewActivationBridge: TabViewActivationPort,
     private readonly questionTodoActivationRefreshCoordinator: QuestionTodoActivationRefreshPort,
     private readonly backgroundTaskActivationIndicatorCoordinator: BackgroundTaskActivationIndicatorPort,
+    private readonly activeTabContextUsageCoordinator: ActiveTabContextUsagePort,
   ) {}
 
   applyEmptyTabActivation(tabId: TabId): void {
@@ -83,7 +88,7 @@ export class TabConversationActivationBridge {
     this.resetActivePaneShell();
     this.tabConversationStateBridge.commitConversationSyncBaseline(conversation.messages);
     this.host.updateModelSelectorDisplay();
-    this.host.syncActiveTabContextUsageIdentity();
+    this.activeTabContextUsageCoordinator.syncIdentity();
     this.backgroundTaskActivationIndicatorCoordinator.syncOpenConversationState(
       conversation,
       activeTabId,
@@ -93,7 +98,7 @@ export class TabConversationActivationBridge {
       conversation.openCodeSessionId,
     );
     this.backgroundTaskActivationIndicatorCoordinator.renderOpenConversationIndicator(activeTabId);
-    void this.host.refreshActiveTabContextUsageFromServer();
+    void this.activeTabContextUsageCoordinator.refreshFromServer();
     this.host.scheduleSettledScrollToBottom(activeTabId);
   }
 

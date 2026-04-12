@@ -2,8 +2,14 @@ import {
   TabViewActivationBridge,
   type TabViewActivationBridgeHost,
 } from '../../../../src/features/chat/runtime/TabViewActivationBridge';
+import type { ActiveTabContextUsageCoordinator } from '../../../../src/features/chat/services/ActiveTabContextUsageCoordinator';
 import type { BackgroundTaskActivationIndicatorCoordinator } from '../../../../src/features/chat/services/BackgroundTaskActivationIndicatorCoordinator';
 import type { QuestionTodoActivationRefreshCoordinator } from '../../../../src/features/chat/services/QuestionTodoActivationRefreshCoordinator';
+
+type ActiveTabContextUsagePort = Pick<
+  ActiveTabContextUsageCoordinator,
+  'syncIdentity' | 'refreshFromServer'
+>;
 
 type BackgroundTaskActivationIndicatorPort = Pick<
   BackgroundTaskActivationIndicatorCoordinator,
@@ -29,15 +35,22 @@ function createHost(callOrder: string[]): jest.Mocked<TabViewActivationBridgeHos
     updateModelSelectorDisplay: jest.fn(() => {
       callOrder.push('selector');
     }),
-    syncActiveTabContextUsageIdentity: jest.fn(() => {
-      callOrder.push('context');
-    }),
-    refreshActiveTabContextUsageFromServer: jest.fn(() => {
-      callOrder.push('fetch-context');
-      return Promise.resolve(undefined);
-    }),
     updateSendButtonState: jest.fn(() => {
       callOrder.push('send');
+    }),
+  };
+}
+
+function createContextUsageCoordinator(
+  callOrder: string[],
+): jest.Mocked<ActiveTabContextUsagePort> {
+  return {
+    syncIdentity: jest.fn(() => {
+      callOrder.push('context');
+    }),
+    refreshFromServer: jest.fn(() => {
+      callOrder.push('fetch-context');
+      return Promise.resolve(undefined);
     }),
   };
 }
@@ -75,10 +88,12 @@ describe('TabViewActivationBridge', () => {
     const host = createHost(callOrder);
     const refreshCoordinator = createRefreshCoordinator(callOrder);
     const backgroundTaskCoordinator = createBackgroundTaskCoordinator(callOrder);
+    const contextUsageCoordinator = createContextUsageCoordinator(callOrder);
     const bridge = new TabViewActivationBridge(
       host,
       refreshCoordinator,
       backgroundTaskCoordinator,
+      contextUsageCoordinator,
     );
 
     bridge.applyActivationPreflight('tab-1');
@@ -94,10 +109,12 @@ describe('TabViewActivationBridge', () => {
     const host = createHost(callOrder);
     const refreshCoordinator = createRefreshCoordinator(callOrder);
     const backgroundTaskCoordinator = createBackgroundTaskCoordinator(callOrder);
+    const contextUsageCoordinator = createContextUsageCoordinator(callOrder);
     const bridge = new TabViewActivationBridge(
       host,
       refreshCoordinator,
       backgroundTaskCoordinator,
+      contextUsageCoordinator,
     );
 
     bridge.applyStreamingActivationOutcome('tab-1', 'session-1');
@@ -119,10 +136,12 @@ describe('TabViewActivationBridge', () => {
     const host = createHost(callOrder);
     const refreshCoordinator = createRefreshCoordinator(callOrder);
     const backgroundTaskCoordinator = createBackgroundTaskCoordinator(callOrder);
+    const contextUsageCoordinator = createContextUsageCoordinator(callOrder);
     const bridge = new TabViewActivationBridge(
       host,
       refreshCoordinator,
       backgroundTaskCoordinator,
+      contextUsageCoordinator,
     );
 
     bridge.applyEmptyActivationOutcome('tab-1');
@@ -137,10 +156,12 @@ describe('TabViewActivationBridge', () => {
     const host = createHost(callOrder);
     const refreshCoordinator = createRefreshCoordinator(callOrder);
     const backgroundTaskCoordinator = createBackgroundTaskCoordinator(callOrder);
+    const contextUsageCoordinator = createContextUsageCoordinator(callOrder);
     const bridge = new TabViewActivationBridge(
       host,
       refreshCoordinator,
       backgroundTaskCoordinator,
+      contextUsageCoordinator,
     );
 
     await bridge.applyLoadedConversationPostRenderOutcome('tab-1', 'session-1');
@@ -160,10 +181,12 @@ describe('TabViewActivationBridge', () => {
     const host = createHost(callOrder);
     const refreshCoordinator = createRefreshCoordinator(callOrder);
     const backgroundTaskCoordinator = createBackgroundTaskCoordinator(callOrder);
+    const contextUsageCoordinator = createContextUsageCoordinator(callOrder);
     const bridge = new TabViewActivationBridge(
       host,
       refreshCoordinator,
       backgroundTaskCoordinator,
+      contextUsageCoordinator,
     );
 
     await bridge.applyLoadedConversationHydrationTail();

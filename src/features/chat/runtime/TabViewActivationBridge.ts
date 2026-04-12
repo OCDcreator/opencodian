@@ -1,6 +1,12 @@
+import type { ActiveTabContextUsageCoordinator } from '../services/ActiveTabContextUsageCoordinator';
 import type { BackgroundTaskActivationIndicatorCoordinator } from '../services/BackgroundTaskActivationIndicatorCoordinator';
 import type { QuestionTodoActivationRefreshCoordinator } from '../services/QuestionTodoActivationRefreshCoordinator';
 import type { TabId } from '../tabs';
+
+type ActiveTabContextUsagePort = Pick<
+  ActiveTabContextUsageCoordinator,
+  'syncIdentity' | 'refreshFromServer'
+>;
 
 type BackgroundTaskActivationIndicatorPort = Pick<
   BackgroundTaskActivationIndicatorCoordinator,
@@ -17,8 +23,6 @@ export interface TabViewActivationBridgeHost {
   refreshActiveFocusContextPreview(): void;
   scheduleComposerLayoutSync(): void;
   updateModelSelectorDisplay(): void;
-  syncActiveTabContextUsageIdentity(): void;
-  refreshActiveTabContextUsageFromServer(): Promise<void>;
   updateSendButtonState(): void;
 }
 
@@ -27,6 +31,7 @@ export class TabViewActivationBridge {
     private readonly host: TabViewActivationBridgeHost,
     private readonly questionTodoActivationRefreshCoordinator: QuestionTodoActivationRefreshPort,
     private readonly backgroundTaskActivationIndicatorCoordinator: BackgroundTaskActivationIndicatorPort,
+    private readonly activeTabContextUsageCoordinator: ActiveTabContextUsagePort,
   ) {}
 
   applyActivationPreflight(tabId: TabId): void {
@@ -37,7 +42,7 @@ export class TabViewActivationBridge {
 
   applyStreamingActivationOutcome(tabId: TabId, sessionId: string | null): void {
     this.host.updateModelSelectorDisplay();
-    this.host.syncActiveTabContextUsageIdentity();
+    this.activeTabContextUsageCoordinator.syncIdentity();
     this.questionTodoActivationRefreshCoordinator.applyConversationActivation(tabId, sessionId);
     this.host.updateSendButtonState();
   }
@@ -45,7 +50,7 @@ export class TabViewActivationBridge {
   applyEmptyActivationOutcome(tabId: TabId): void {
     this.questionTodoActivationRefreshCoordinator.applyEmptyActivation(tabId);
     this.host.updateModelSelectorDisplay();
-    this.host.syncActiveTabContextUsageIdentity();
+    this.activeTabContextUsageCoordinator.syncIdentity();
     this.host.updateSendButtonState();
   }
 
@@ -60,7 +65,7 @@ export class TabViewActivationBridge {
   async applyLoadedConversationHydrationTail(): Promise<void> {
     this.host.scheduleComposerLayoutSync();
     this.host.updateModelSelectorDisplay();
-    this.host.syncActiveTabContextUsageIdentity();
-    await this.host.refreshActiveTabContextUsageFromServer();
+    this.activeTabContextUsageCoordinator.syncIdentity();
+    await this.activeTabContextUsageCoordinator.refreshFromServer();
   }
 }

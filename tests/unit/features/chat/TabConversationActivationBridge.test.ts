@@ -3,6 +3,7 @@ import {
   TabConversationActivationBridge,
   type TabConversationActivationBridgeHost,
 } from '../../../../src/features/chat/runtime/TabConversationActivationBridge';
+import type { ActiveTabContextUsageCoordinator } from '../../../../src/features/chat/services/ActiveTabContextUsageCoordinator';
 import type { BackgroundTaskActivationIndicatorCoordinator } from '../../../../src/features/chat/services/BackgroundTaskActivationIndicatorCoordinator';
 import type { QuestionTodoActivationRefreshCoordinator } from '../../../../src/features/chat/services/QuestionTodoActivationRefreshCoordinator';
 import type { TabConversationStateBridge } from '../../../../src/features/chat/runtime/TabConversationStateBridge';
@@ -16,6 +17,11 @@ type TabConversationStatePort = Pick<
 type QuestionTodoActivationRefreshPort = Pick<
   QuestionTodoActivationRefreshCoordinator,
   'applyConversationActivation'
+>;
+
+type ActiveTabContextUsagePort = Pick<
+  ActiveTabContextUsageCoordinator,
+  'syncIdentity' | 'refreshFromServer'
 >;
 
 type BackgroundTaskActivationIndicatorPort = Pick<
@@ -63,17 +69,24 @@ function createHost(
     updateModelSelectorDisplay: jest.fn(() => {
       callOrder.push('updateModelSelectorDisplay');
     }),
-    syncActiveTabContextUsageIdentity: jest.fn(() => {
-      callOrder.push('syncActiveTabContextUsageIdentity');
-    }),
-    refreshActiveTabContextUsageFromServer: jest.fn(() => {
-      callOrder.push('refreshActiveTabContextUsageFromServer');
-      return Promise.resolve(undefined);
-    }),
     scheduleSettledScrollToBottom: jest.fn(() => {
       callOrder.push('scheduleSettledScrollToBottom');
     }),
     ...overrides,
+  };
+}
+
+function createContextUsageCoordinator(
+  callOrder: string[],
+): jest.Mocked<ActiveTabContextUsagePort> {
+  return {
+    syncIdentity: jest.fn(() => {
+      callOrder.push('syncActiveTabContextUsageIdentity');
+    }),
+    refreshFromServer: jest.fn(() => {
+      callOrder.push('refreshActiveTabContextUsageFromServer');
+      return Promise.resolve(undefined);
+    }),
   };
 }
 
@@ -140,12 +153,14 @@ describe('TabConversationActivationBridge', () => {
     const tabViewActivationBridge = createTabViewActivationBridge(callOrder);
     const refreshCoordinator = createRefreshCoordinator(callOrder);
     const backgroundTaskCoordinator = createBackgroundTaskCoordinator(callOrder);
+    const contextUsageCoordinator = createContextUsageCoordinator(callOrder);
     const bridge = new TabConversationActivationBridge(
       host,
       tabConversationStateBridge,
       tabViewActivationBridge,
       refreshCoordinator,
       backgroundTaskCoordinator,
+      contextUsageCoordinator,
     );
 
     bridge.applyEmptyTabActivation('tab-1');
@@ -169,12 +184,14 @@ describe('TabConversationActivationBridge', () => {
     const tabViewActivationBridge = createTabViewActivationBridge(callOrder);
     const refreshCoordinator = createRefreshCoordinator(callOrder);
     const backgroundTaskCoordinator = createBackgroundTaskCoordinator(callOrder);
+    const contextUsageCoordinator = createContextUsageCoordinator(callOrder);
     const bridge = new TabConversationActivationBridge(
       host,
       tabConversationStateBridge,
       tabViewActivationBridge,
       refreshCoordinator,
       backgroundTaskCoordinator,
+      contextUsageCoordinator,
     );
 
     bridge.applyStreamingConversationActivation('tab-1', conversation);
@@ -210,12 +227,14 @@ describe('TabConversationActivationBridge', () => {
     const tabViewActivationBridge = createTabViewActivationBridge(callOrder);
     const refreshCoordinator = createRefreshCoordinator(callOrder);
     const backgroundTaskCoordinator = createBackgroundTaskCoordinator(callOrder);
+    const contextUsageCoordinator = createContextUsageCoordinator(callOrder);
     const bridge = new TabConversationActivationBridge(
       host,
       tabConversationStateBridge,
       tabViewActivationBridge,
       refreshCoordinator,
       backgroundTaskCoordinator,
+      contextUsageCoordinator,
     );
 
     bridge.applyLoadedConversationActivation('tab-1', conversation);
@@ -244,12 +263,14 @@ describe('TabConversationActivationBridge', () => {
     const tabViewActivationBridge = createTabViewActivationBridge(callOrder);
     const refreshCoordinator = createRefreshCoordinator(callOrder);
     const backgroundTaskCoordinator = createBackgroundTaskCoordinator(callOrder);
+    const contextUsageCoordinator = createContextUsageCoordinator(callOrder);
     const bridge = new TabConversationActivationBridge(
       host,
       tabConversationStateBridge,
       tabViewActivationBridge,
       refreshCoordinator,
       backgroundTaskCoordinator,
+      contextUsageCoordinator,
     );
 
     bridge.openConversation(conversation);
@@ -295,12 +316,14 @@ describe('TabConversationActivationBridge', () => {
     const tabViewActivationBridge = createTabViewActivationBridge(callOrder);
     const refreshCoordinator = createRefreshCoordinator(callOrder);
     const backgroundTaskCoordinator = createBackgroundTaskCoordinator(callOrder);
+    const contextUsageCoordinator = createContextUsageCoordinator(callOrder);
     const bridge = new TabConversationActivationBridge(
       host,
       tabConversationStateBridge,
       tabViewActivationBridge,
       refreshCoordinator,
       backgroundTaskCoordinator,
+      contextUsageCoordinator,
     );
 
     bridge.openConversation(conversation);
