@@ -69,7 +69,7 @@ python .\automation\autopilot.py start --profile windows --single-round
 
 If the current round should finish first, use the built-in sentinel command instead of hand-writing a one-off script.
 
-It watches `automation/runtime/maintainability-state.json`, waits for the next successful commit, stops the current autopilot process from the lock file, clears the stale lock, optionally hard-resets the repo to `HEAD`, and starts a replacement `start` process with a new config/profile.
+It watches `automation/runtime/maintainability-state.json`, waits for the next successful commit, stops the current autopilot process from the lock file, clears the stale lock, optionally hard-resets the repo to `HEAD`, can optionally wait for a cutover ref to become a fast-forward successor of the stopped `HEAD`, and then starts a replacement `start` process with a new config/profile.
 
 ### macOS example: switch to a local 1000-round config after the next commit
 
@@ -90,9 +90,10 @@ nohup python3 ./automation/autopilot.py restart-after-next-commit \
   --profile-path /Users/dht/.config/opencodian/mac-autopilot-profile.json \
   --restart-profile mac \
   --restart-profile-path /Users/dht/.config/opencodian/mac-autopilot-profile.json \
-  --restart-config-path /Users/dht/.config/opencodian/maintainability-config.local.json \
-  --restart-output-path automation/runtime/mac-autopilot.out \
-  --restart-pid-path automation/runtime/mac-autopilot.pid \
+  --restart-config-path automation/maintainability-config.json \
+  --restart-output-path automation/runtime/mac-autopilot.optimized.out \
+  --restart-pid-path automation/runtime/mac-autopilot.optimized.pid \
+  --restart-sync-ref origin/automation/maintainability-cutover \
   > automation/runtime/restart-after-next-commit.launch.log 2>&1 &
 ```
 
@@ -101,6 +102,12 @@ Useful files:
 - `automation/runtime/restart-after-next-commit.launch.log`: launcher stdout/stderr
 - `automation/runtime/autopilot-restart.out` or your custom output path: replacement autopilot stream
 - `automation/runtime/autopilot.pid` or your custom pid path: replacement autopilot pid
+
+Additional restart options:
+
+- `--restart-sync-ref <git ref>`: wait for a cutover ref, then `git merge --ff-only <ref>` before launching the replacement autopilot
+- `--restart-sync-timeout-seconds <int>`: abort if the cutover ref never becomes a fast-forward successor in time; `0` waits forever
+- `--restart-sync-refresh-seconds <int>`: polling interval while waiting on the cutover ref
 
 The sentinel itself can also run in the foreground if you just want to watch it.
 
@@ -127,11 +134,13 @@ What each round does:
 1. Reads `AGENTS.md` and the last maintainability phase doc
 2. Chooses exactly one small maintainability slice
 3. Refactors the code
-4. Runs `npm test`
-5. Runs `npm run build` + Test Vault deployment when build-relevant files changed
-6. Writes the next `docs/status/maintainability-phase-N.md`
-7. Commits the round on success
-8. Updates `automation/runtime/maintainability-state.json`
+4. Runs targeted tests first for code/test changes
+5. Runs full `npm test` only on cadence rounds or when high-risk paths changed
+6. Runs `npm run build` when build-relevant files changed
+7. Deploys to Test Vault only when deploy-relevant files changed or deployment was explicitly requested
+8. Writes the next `docs/status/maintainability-phase-N.md`
+9. Commits the round on success
+10. Updates `automation/runtime/maintainability-state.json`
 
 ## Resume after interruption
 
