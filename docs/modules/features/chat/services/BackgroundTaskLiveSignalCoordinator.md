@@ -59,8 +59,8 @@ export class BackgroundTaskLiveSignalCoordinator {
 - `BackgroundTaskTimelineService` 负责 background task segment/timeline 推导，并向 live-signal coordinator 提供 pending launch 查询
 - `BackgroundTaskNoticeStateService` 负责 stopped/stale notice 的 content、fingerprint 与 persisted dedupe；live-signal coordinator 直接调用它落地 stale follow-up notice
 - `BackgroundTaskInlinePanelRenderer` 负责 inline panel DOM 渲染
-- `BackgroundTaskIndicatorCoordinator` 负责 live-signal reconcile 后的 inline render 与 completion notice queue/flush 顺序
-- `OpenCodianView` 只保留 tab runtime、session status 与 stream-like UI reset 这类更薄的 host bridge，以及上层触发入口
+- `BackgroundTaskIndicatorCoordinator` 现在直接复用本模块的 foreground live-signal reconcile，再串联 inline render、completion notice queue/flush 与 tab runtime UI 写回
+- `OpenCodianView` 只保留 tab runtime、session status 与上层触发入口；foreground indicator lane 不再经由 view 转发 reconcile callback
 - `BackgroundTaskPostSyncCoordinator` 负责 hidden signal/background-tab sync 后的 question/todo/background-task post-sync orchestration
 - `BackgroundTaskLiveSignalCoordinator` 现在同时负责 authoritative-sync runtime gate、indicator running predicate 与 live-signal reconciliation 决策
 - 这让 P2 `question / todo / background task` lane 继续把 background task 的运行时判定从主 view 迁到 dedicated coordinator，而不是把这段状态机继续留在 `OpenCodianView`

@@ -192,11 +192,15 @@ describe('OpenCodianView background task timeline', () => {
       timelineService,
       completionNoticeService,
       {
+        reconcileStateFromLiveSignals: jest.fn(),
+      },
+      {
+        syncStreamLikeState: jest.fn(),
+      },
+      {
         getActiveTabId: jest.fn().mockReturnValue('tab-1'),
         getCurrentConversation: jest.fn().mockReturnValue(conversation),
-        getTabRuntimeState: jest.fn().mockReturnValue(runtime),
-        reconcileBackgroundTaskStateFromLiveSignals: jest.fn(),
-        syncTabStreamLikeState: jest.fn(),
+        hasTabRuntime: jest.fn().mockReturnValue(true),
       },
     );
 

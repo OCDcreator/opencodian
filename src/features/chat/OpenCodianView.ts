@@ -1326,6 +1326,8 @@ export class OpenCodianView extends ItemView {
       this.backgroundTaskInlinePanelRenderer,
       this.backgroundTaskTimelineService,
       this.backgroundTaskCompletionNoticeService,
+      this.backgroundTaskLiveSignalCoordinator,
+      this.tabRuntimeStateBridge,
       this.createBackgroundTaskIndicatorCoordinatorHost(),
     );
     this.backgroundTaskStreamTriggerCoordinator = new BackgroundTaskStreamTriggerCoordinator(
@@ -1612,13 +1614,7 @@ export class OpenCodianView extends ItemView {
     return {
       getActiveTabId: () => this.getActiveTabId(),
       getCurrentConversation: () => this.currentConversation,
-      getTabRuntimeState: (tabId: TabId | null) => this.getTabRuntimeState(tabId),
-      reconcileBackgroundTaskStateFromLiveSignals: (tabId) => {
-        this.reconcileBackgroundTaskStateFromLiveSignals(tabId);
-      },
-      syncTabStreamLikeState: (tabId) => {
-        this.syncTabStreamLikeState(tabId);
-      },
+      hasTabRuntime: (tabId: TabId | null) => Boolean(this.getTabRuntimeState(tabId)),
     };
   }
 

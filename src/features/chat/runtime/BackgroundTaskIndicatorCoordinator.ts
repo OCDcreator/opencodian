@@ -1,11 +1,18 @@
 import type { Conversation } from '../../../core/types';
+import type { BackgroundTaskLiveSignalCoordinator } from '../services/BackgroundTaskLiveSignalCoordinator';
 import type { TabId } from '../tabs';
 import type { BackgroundTaskInlinePanelRenderer } from './BackgroundTaskInlinePanelRenderer';
+import type { TabRuntimeStateBridge } from './TabRuntimeStateBridge';
 import type { BackgroundTaskCompletionNoticeService } from '../services/BackgroundTaskCompletionNoticeService';
 import type { BackgroundTaskTimelineService } from '../services/BackgroundTaskTimelineService';
 
 type BackgroundTaskIndicatorInlinePanelPort = Pick<BackgroundTaskInlinePanelRenderer, 'render'>;
 type BackgroundTaskIndicatorTimelinePort = Pick<BackgroundTaskTimelineService, 'collectSegments'>;
+type BackgroundTaskIndicatorLiveSignalPort = Pick<
+  BackgroundTaskLiveSignalCoordinator,
+  'reconcileStateFromLiveSignals'
+>;
+type BackgroundTaskIndicatorTabRuntimePort = Pick<TabRuntimeStateBridge, 'syncStreamLikeState'>;
 type BackgroundTaskIndicatorCompletionNoticePort = Pick<
   BackgroundTaskCompletionNoticeService,
   'queueNotices' | 'flushQueuedNotices'
@@ -14,9 +21,7 @@ type BackgroundTaskIndicatorCompletionNoticePort = Pick<
 export interface BackgroundTaskIndicatorCoordinatorHost {
   getActiveTabId(): TabId | null;
   getCurrentConversation(): Conversation | null;
-  getTabRuntimeState(tabId: TabId | null): object | null;
-  reconcileBackgroundTaskStateFromLiveSignals(tabId: TabId | null): void;
-  syncTabStreamLikeState(tabId: TabId | null): void;
+  hasTabRuntime(tabId: TabId | null): boolean;
 }
 
 export class BackgroundTaskIndicatorCoordinator {
@@ -24,6 +29,8 @@ export class BackgroundTaskIndicatorCoordinator {
     private readonly inlinePanelRenderer: BackgroundTaskIndicatorInlinePanelPort,
     private readonly timelineService: BackgroundTaskIndicatorTimelinePort,
     private readonly completionNoticeService: BackgroundTaskIndicatorCompletionNoticePort,
+    private readonly liveSignalCoordinator: BackgroundTaskIndicatorLiveSignalPort,
+    private readonly tabRuntimeStateBridge: BackgroundTaskIndicatorTabRuntimePort,
     private readonly host: BackgroundTaskIndicatorCoordinatorHost,
   ) {}
 
@@ -31,15 +38,14 @@ export class BackgroundTaskIndicatorCoordinator {
     tabId: TabId | null = this.host.getActiveTabId(),
     conversation: Conversation | null = this.host.getCurrentConversation(),
   ): Promise<void> {
-    const runtime = this.host.getTabRuntimeState(tabId);
-    if (!runtime) {
+    if (!this.host.hasTabRuntime(tabId)) {
       return;
     }
 
-    this.host.reconcileBackgroundTaskStateFromLiveSignals(tabId);
+    this.liveSignalCoordinator.reconcileStateFromLiveSignals(tabId);
     await this.inlinePanelRenderer.render(conversation, tabId);
     await this.queueAndFlushCompletionNotices(tabId, conversation);
-    this.host.syncTabStreamLikeState(tabId);
+    this.tabRuntimeStateBridge.syncStreamLikeState(tabId);
   }
 
   async queueAndFlushCompletionNotices(

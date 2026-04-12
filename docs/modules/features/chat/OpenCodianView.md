@@ -154,9 +154,9 @@ signal sync 与后台轮询里的 loop lifecycle、signal debounce、tab / conve
 
 真正把 visible/signal/background 三条 sync 回调装配到一起的层现在是 `ConversationSyncBridge`：它会把 orchestration 的 dispatch 回调统一接到 server sync、fingerprint commit 和 post-sync coordinator，再把真正依赖当前 DOM/render host 的 `applySyncedConversationUpdate()` / `renderBackgroundTaskIndicatorIfNeeded()` 留在 view。hidden-tab 与 active-tab 同步入口仍通过 `ConversationSyncRuntimeCoordinator` 统一处理 tab runtime guard、`isConversationSyncInFlight` 生命周期，以及 per-tab fingerprint baseline 判定。
 
-其中当前活动 tab 的后台同步收尾会把 question refresh、todo/status live refresh、active-conversation match 判定，以及 `currentConversationRevertState` / active-tab sync fingerprint 的 state commit 委托给 `BackgroundTaskPostSyncCoordinator`；`ConversationSyncBridge` 负责把这些 post-sync outcome 路由回 view，`OpenCodianView` 只保留 `applySyncedConversationUpdate()` / `renderBackgroundTaskIndicatorIfNeeded()` 这类 render host 入口，background-task indicator 的 render/queue/flush 顺序则由 `BackgroundTaskIndicatorCoordinator` 承接。
+其中当前活动 tab 的后台同步收尾会把 question refresh、todo/status live refresh、active-conversation match 判定，以及 `currentConversationRevertState` / active-tab sync fingerprint 的 state commit 委托给 `BackgroundTaskPostSyncCoordinator`；`ConversationSyncBridge` 负责把这些 post-sync outcome 路由回 view，`OpenCodianView` 只保留 `applySyncedConversationUpdate()` / `renderBackgroundTaskIndicatorIfNeeded()` 这类 render host 入口，background-task indicator 的 render/queue/flush 顺序则由 `BackgroundTaskIndicatorCoordinator` 承接，而 foreground live-signal reconcile 与 stream-like UI 写回也已直接收束到 coordinator 对 `BackgroundTaskLiveSignalCoordinator` / `TabRuntimeStateBridge` 的组合。
 
-background task 的 conversation-derived timeline rebuild 现在也不再由 view 自己内联实现：`syncBackgroundTaskStateFromConversation()`、completion-segment 收集，以及 inline notice copy 组装都转交给 `BackgroundTaskTimelineService`；inline panel 的 DOM 创建、挂载、复用与清理则转交给 `BackgroundTaskInlinePanelRenderer`；indicator render、completion notice queue/flush 与 stream-like sync 顺序转交给 `BackgroundTaskIndicatorCoordinator`。另外，`BackgroundTaskLiveSignalCoordinator` 现在会直接组合 `SessionTodoStateService`、`BackgroundTaskTimelineService` 和 `BackgroundTaskNoticeStateService` 来处理 stale follow-up，因此 view 不再手动转发 `hasIncompleteTabSessionTodos()` / pending-launch 查询 / stopped-notice 追加这一组 background-task host routing，只保留 tab runtime、session status 与 stream-like UI reset 这类更薄的 host bridge。
+background task 的 conversation-derived timeline rebuild 现在也不再由 view 自己内联实现：`syncBackgroundTaskStateFromConversation()`、completion-segment 收集，以及 inline notice copy 组装都转交给 `BackgroundTaskTimelineService`；inline panel 的 DOM 创建、挂载、复用与清理则转交给 `BackgroundTaskInlinePanelRenderer`；indicator render、completion notice queue/flush、foreground live-signal reconcile 与 stream-like sync 顺序则由 `BackgroundTaskIndicatorCoordinator` 直接组合 `BackgroundTaskLiveSignalCoordinator` 和 `TabRuntimeStateBridge` 承接。另一方面，`BackgroundTaskLiveSignalCoordinator` 自身也会直接组合 `SessionTodoStateService`、`BackgroundTaskTimelineService` 和 `BackgroundTaskNoticeStateService` 来处理 stale follow-up，因此 view 不再手动转发 `hasIncompleteTabSessionTodos()` / pending-launch 查询 / stopped-notice 追加这一组 background-task host routing，只保留 tab runtime、session status 与上层触发入口这类更薄的 bridge。
 
 tab conversation/session activation 写回现在也不再由 view 自己在 load / streaming activation / current-tab open / fork 等路径里逐项改 `currentConversation`、tab conversation 与 session reset：这些 active-tab state writeback 统一交给 `runtime/TabConversationStateBridge.ts`，view 只保留 activation/render orchestration。
 
@@ -360,10 +360,10 @@ session todo 这条子链路现在的边界是：
 
 background task notice 这条子链路现在的边界是：
 
-- `OpenCodianView`：background-task service bundle、indicator / stream-trigger coordinator 的 host bridge，以及上层触发入口
+- `OpenCodianView`：background-task service bundle、indicator / stream-trigger coordinator 的最薄 host bridge，以及上层触发入口
 - `BackgroundTaskTimelineService`：launch/completion timeline segment 推导、conversation→runtime rebuild、pending matching、completion segment 收集，与 inline copy 组装
 - `BackgroundTaskInlinePanelRenderer`：inline panel DOM 创建、位置挂载、Markdown 渲染、mount 复用与 active indicator element 清理
-- `BackgroundTaskIndicatorCoordinator`：live-signal reconcile 后的 inline render、completion notice queue/flush 与 stream-like sync 编排
+- `BackgroundTaskIndicatorCoordinator`：直接组合 live-signal reconcile、inline render、completion notice queue/flush 与 stream-like sync 编排
 - `BackgroundTaskStreamTriggerCoordinator`：streaming tool-call start/end、todo refresh、background-task launch runtime 更新，与 primary-stream finalize 后的 waiting/reset trigger 编排
 - `BackgroundTaskLiveSignalCoordinator`：authoritative-sync gate arm/clear、tab badge / finalize 共用的 indicator running predicate、live-signal reconciliation，以及 stale downgrade / reset 的运行时判定
 - `TabConversationStateBridge`：active-tab conversation/session 激活写回、pending-question reset 与 sync fingerprint baseline 提交

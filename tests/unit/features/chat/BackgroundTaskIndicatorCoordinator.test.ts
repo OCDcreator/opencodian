@@ -45,17 +45,23 @@ describe('BackgroundTaskIndicatorCoordinator', () => {
       queueNotices: jest.fn(),
       flushQueuedNotices: jest.fn().mockResolvedValue(undefined),
     };
+    const liveSignalCoordinator = {
+      reconcileStateFromLiveSignals: jest.fn(),
+    };
+    const tabRuntimeStateBridge = {
+      syncStreamLikeState: jest.fn(),
+    };
     const host: jest.Mocked<BackgroundTaskIndicatorCoordinatorHost> = {
       getActiveTabId: jest.fn().mockReturnValue('tab-1'),
       getCurrentConversation: jest.fn().mockReturnValue(conversation),
-      getTabRuntimeState: jest.fn().mockReturnValue(runtime),
-      reconcileBackgroundTaskStateFromLiveSignals: jest.fn(),
-      syncTabStreamLikeState: jest.fn(),
+      hasTabRuntime: jest.fn().mockReturnValue(Boolean(runtime)),
     };
     const coordinator = new BackgroundTaskIndicatorCoordinator(
       inlinePanelRenderer,
       timelineService,
       completionNoticeService,
+      liveSignalCoordinator,
+      tabRuntimeStateBridge,
       host,
     );
 
@@ -66,6 +72,8 @@ describe('BackgroundTaskIndicatorCoordinator', () => {
       inlinePanelRenderer,
       timelineService,
       completionNoticeService,
+      liveSignalCoordinator,
+      tabRuntimeStateBridge,
       segments,
     };
   }
@@ -78,17 +86,19 @@ describe('BackgroundTaskIndicatorCoordinator', () => {
       inlinePanelRenderer,
       timelineService,
       completionNoticeService,
+      liveSignalCoordinator,
+      tabRuntimeStateBridge,
       segments,
     } = createCoordinator();
 
     await coordinator.renderIfNeeded('tab-1');
 
-    expect(host.reconcileBackgroundTaskStateFromLiveSignals).toHaveBeenCalledWith('tab-1');
+    expect(liveSignalCoordinator.reconcileStateFromLiveSignals).toHaveBeenCalledWith('tab-1');
     expect(inlinePanelRenderer.render).toHaveBeenCalledWith(conversation, 'tab-1');
     expect(timelineService.collectSegments).toHaveBeenCalledWith(conversation?.messages, 'tab-1');
     expect(completionNoticeService.queueNotices).toHaveBeenCalledWith(segments, 'tab-1', conversation);
     expect(completionNoticeService.flushQueuedNotices).toHaveBeenCalledWith('tab-1', conversation);
-    expect(host.syncTabStreamLikeState).toHaveBeenCalledWith('tab-1');
+    expect(tabRuntimeStateBridge.syncStreamLikeState).toHaveBeenCalledWith('tab-1');
     expect(
       inlinePanelRenderer.render.mock.invocationCallOrder[0],
     ).toBeLessThan(completionNoticeService.queueNotices.mock.invocationCallOrder[0]);
@@ -104,16 +114,18 @@ describe('BackgroundTaskIndicatorCoordinator', () => {
       inlinePanelRenderer,
       timelineService,
       completionNoticeService,
+      liveSignalCoordinator,
+      tabRuntimeStateBridge,
     } = createCoordinator({ runtime: null });
 
     await coordinator.renderIfNeeded('tab-missing');
 
-    expect(host.reconcileBackgroundTaskStateFromLiveSignals).not.toHaveBeenCalled();
+    expect(liveSignalCoordinator.reconcileStateFromLiveSignals).not.toHaveBeenCalled();
     expect(inlinePanelRenderer.render).not.toHaveBeenCalled();
     expect(timelineService.collectSegments).not.toHaveBeenCalled();
     expect(completionNoticeService.queueNotices).not.toHaveBeenCalled();
     expect(completionNoticeService.flushQueuedNotices).not.toHaveBeenCalled();
-    expect(host.syncTabStreamLikeState).not.toHaveBeenCalled();
+    expect(tabRuntimeStateBridge.syncStreamLikeState).not.toHaveBeenCalled();
   });
 
   it('skips completion notice refresh when no conversation is available', async () => {
