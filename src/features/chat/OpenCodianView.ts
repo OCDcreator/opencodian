@@ -135,6 +135,10 @@ import {
   BackgroundTaskStreamTriggerCoordinator,
 } from './runtime/BackgroundTaskStreamTriggerCoordinator';
 import {
+  type TabRuntimeStateBridgeHost,
+  TabRuntimeStateBridge,
+} from './runtime/TabRuntimeStateBridge';
+import {
   type StreamingInlineCardRendererHost,
   StreamingInlineCardRenderer,
 } from './runtime/StreamingInlineCardRenderer';
@@ -252,7 +256,6 @@ import type {
 import { NavigationSidebar } from './ui/NavigationSidebar';
 import { QuestionDock } from './ui/QuestionDock';
 import { SessionTodoDock } from './ui/SessionTodoDock';
-import { syncUserMessageStreamingActionState } from './userMessageActions';
 import { prepareUserMessageMarkdownForDisplay } from './userMessageDisplay';
 
 const logger = createLogger('OpenCodianView');
@@ -686,6 +689,7 @@ export class OpenCodianView extends ItemView {
   private backgroundTaskNoticeStateService: BackgroundTaskNoticeStateService;
   private backgroundTaskLiveSignalCoordinator: BackgroundTaskLiveSignalCoordinator;
   private backgroundTaskPostSyncCoordinator: BackgroundTaskPostSyncCoordinator;
+  private tabRuntimeStateBridge: TabRuntimeStateBridge;
   private conversationSyncOrchestrationService: ConversationSyncOrchestrationService;
   private conversationSyncRuntimeCoordinator: ConversationSyncRuntimeCoordinator;
   private conversationSyncBridge: ConversationSyncBridge;
@@ -1544,6 +1548,7 @@ export class OpenCodianView extends ItemView {
     this.backgroundTaskLiveSignalCoordinator = new BackgroundTaskLiveSignalCoordinator(
       this.createBackgroundTaskLiveSignalCoordinatorHost(),
     );
+    this.tabRuntimeStateBridge = new TabRuntimeStateBridge(this.createTabRuntimeStateBridgeHost());
     this.backgroundTaskPostSyncCoordinator = new BackgroundTaskPostSyncCoordinator(
       this.createBackgroundTaskPostSyncCoordinatorHost(),
     );
@@ -1651,6 +1656,19 @@ export class OpenCodianView extends ItemView {
     };
   }
 
+  private createTabRuntimeStateBridgeHost(): TabRuntimeStateBridgeHost {
+    return {
+      getTabManager: () => this.tabManager,
+      getActiveTabId: () => this.getActiveTabId(),
+      getTabRuntimeState: (tabId) => this.getTabRuntimeState(tabId),
+      getTabMessagesContainer: (tabId) => this.getTabPaneState(tabId)?.messagesEl ?? null,
+      hasBackgroundTaskIndicator: (tabId) => Boolean(this.backgroundTaskLiveSignalCoordinator.hasIndicator(tabId)),
+      updateSendButtonState: () => {
+        this.updateSendButtonState();
+      },
+    };
+  }
+
   private createBackgroundTaskLiveSignalCoordinatorHost(): BackgroundTaskLiveSignalCoordinatorHost {
     return {
       getTabRuntimeState: (tabId: TabId | null) => this.getTabRuntimeState(tabId),
@@ -1745,11 +1763,7 @@ export class OpenCodianView extends ItemView {
       syncTabStreamLikeState: (tabId) => {
         this.syncTabStreamLikeState(tabId);
       },
-      setTabNeedsAttention: (tabId, needsAttention) => {
-        if (tabId) {
-          this.tabManager?.setTabNeedsAttention(tabId, needsAttention);
-        }
-      },
+      setTabNeedsAttention: (tabId, needsAttention) => this.setTabNeedsAttention(tabId, needsAttention),
     };
   }
 
@@ -2067,11 +2081,7 @@ export class OpenCodianView extends ItemView {
       clearPendingEditedFiles: (tabId) => {
         this.getTabRuntimeState(tabId)?.pendingEditedFiles.clear();
       },
-      setTabNeedsAttention: (tabId, needsAttention) => {
-        if (tabId) {
-          this.tabManager?.setTabNeedsAttention(tabId, needsAttention);
-        }
-      },
+      setTabNeedsAttention: (tabId, needsAttention) => this.setTabNeedsAttention(tabId, needsAttention),
       setActiveTabConversation: (conversation) => {
         this.tabManager?.setActiveTabConversation(conversation);
       },
@@ -2293,11 +2303,7 @@ export class OpenCodianView extends ItemView {
       getQuestionDock: () => this.questionDock,
       getQuestionDisplayMode: () => this.plugin.settings.questionDisplayMode,
       shouldUseAboveInputQuestionDock: () => this.shouldUseAboveInputQuestionDock(),
-      setTabNeedsAttention: (tabId, needsAttention) => {
-        if (tabId) {
-          this.tabManager?.setTabNeedsAttention(tabId, needsAttention);
-        }
-      },
+      setTabNeedsAttention: (tabId, needsAttention) => this.setTabNeedsAttention(tabId, needsAttention),
       getPendingQuestions: () => this.plugin.openCodeService.getPendingQuestions(),
       replyToQuestion: (requestId, answers) => this.plugin.openCodeService.replyToQuestion(requestId, answers),
       rejectQuestion: (requestId) => this.plugin.openCodeService.rejectQuestion(requestId),
@@ -2837,38 +2843,15 @@ export class OpenCodianView extends ItemView {
   }
 
   private syncTabStreamLikeState(tabId: TabId | null): void {
-    if (!tabId) {
-      this.updateSendButtonState();
-      return;
-    }
-
-    const runtime = this.getTabRuntimeState(tabId);
-    this.tabManager?.setTabStreaming(tabId, runtime?.isStreaming ?? false);
-    this.tabManager?.setTabBackgroundTaskRunning(
-      tabId,
-      Boolean(runtime && this.backgroundTaskLiveSignalCoordinator.hasIndicator(tabId)),
-    );
-    this.syncTabUserMessageActionButtons(tabId);
-
-    if (tabId === this.getActiveTabId()) {
-      this.updateSendButtonState();
-    }
-  }
-
-  private syncTabUserMessageActionButtons(tabId: TabId | null): void {
-    const pane = this.getTabPaneState(tabId);
-    if (!pane) {
-      return;
-    }
-
-    syncUserMessageStreamingActionState(
-      pane.messagesEl,
-      Boolean(this.getTabRuntimeState(tabId)?.isStreaming),
-    );
+    this.tabRuntimeStateBridge.syncStreamLikeState(tabId);
   }
 
   private syncActiveTabStreamLikeState(): void {
-    this.syncTabStreamLikeState(this.getActiveTabId());
+    this.tabRuntimeStateBridge.syncActiveStreamLikeState();
+  }
+
+  private setTabNeedsAttention(tabId: TabId | null, needsAttention: boolean): void {
+    this.tabRuntimeStateBridge.setNeedsAttention(tabId, needsAttention);
   }
 
   private async handleTabSwitch(tabId: string): Promise<void> {
@@ -8579,7 +8562,7 @@ export class OpenCodianView extends ItemView {
       if (runtime) {
         runtime.lastConversationSyncFingerprint = fingerprint;
       }
-      this.tabManager?.setTabNeedsAttention(targetTabId, true);
+      this.setTabNeedsAttention(targetTabId, true);
     }
   }
 
