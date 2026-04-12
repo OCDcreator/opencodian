@@ -139,6 +139,13 @@ import {
 } from './runtime/SendPipelineRuntime';
 import { ContextUsageService } from './services/ContextUsageService';
 import {
+  type BackgroundTaskCompletionEvent,
+  type BackgroundTaskCompletionInfo,
+  type BackgroundTaskCompletionNoticeServiceHost,
+  BackgroundTaskCompletionNoticeService,
+  type QueuedBackgroundTaskCompletionNotice,
+} from './services/BackgroundTaskCompletionNoticeService';
+import {
   type BackgroundTaskNoticeStateServiceHost,
   BackgroundTaskNoticeStateService,
 } from './services/BackgroundTaskNoticeStateService';
@@ -451,19 +458,6 @@ interface BackgroundTaskLaunchInfo {
   description: string;
 }
 
-interface BackgroundTaskCompletionInfo {
-  taskId: string;
-  description: string;
-}
-
-interface BackgroundTaskCompletionEvent {
-  anchorKey: string;
-  reminderMessageId: string;
-  reminderType: 'background-task-completed' | 'all-background-tasks-complete';
-  tasks: BackgroundTaskCompletionInfo[];
-  timestamp: number;
-}
-
 interface BackgroundTaskSegment {
   anchorKey: string;
   anchorTimestamp: number;
@@ -474,14 +468,6 @@ interface BackgroundTaskSegment {
   sawAllTasksComplete: boolean;
   waitingForFollowUp: boolean;
   completionEvents: BackgroundTaskCompletionEvent[];
-}
-
-interface QueuedBackgroundTaskCompletionNotice {
-  anchorKey: string;
-  allComplete: boolean;
-  sourceReminderIds: Set<string>;
-  tasks: Map<string, BackgroundTaskCompletionInfo>;
-  latestTimestamp: number;
 }
 
 interface OmoBackgroundTaskLogState {
@@ -671,6 +657,7 @@ export class OpenCodianView extends ItemView {
   private themeBackgroundRequestId = 0;
   private titleGenerationService: TitleGenerationService;
   private sessionTodoStateService: SessionTodoStateService;
+  private backgroundTaskCompletionNoticeService: BackgroundTaskCompletionNoticeService;
   private backgroundTaskNoticeStateService: BackgroundTaskNoticeStateService;
   private conversationViewStateService: ConversationViewStateService;
   private conversationRenderService: ConversationRenderService;
@@ -1740,6 +1727,9 @@ export class OpenCodianView extends ItemView {
     this.currentThinkingBudget = this.plugin.settings.thinkingBudget;
     this.titleGenerationService = new TitleGenerationService(this.plugin);
     this.sessionTodoStateService = new SessionTodoStateService(this.createSessionTodoStateServiceHost());
+    this.backgroundTaskCompletionNoticeService = new BackgroundTaskCompletionNoticeService(
+      this.createBackgroundTaskCompletionNoticeServiceHost(),
+    );
     this.backgroundTaskNoticeStateService = new BackgroundTaskNoticeStateService(
       this.createBackgroundTaskNoticeStateServiceHost(),
     );
@@ -1806,6 +1796,13 @@ export class OpenCodianView extends ItemView {
         content: string;
         tone: ChatMessage['noticeTone'];
       }) => this.appendPersistentAssistantNoticeMessage(options),
+    };
+  }
+
+  private createBackgroundTaskCompletionNoticeServiceHost(): BackgroundTaskCompletionNoticeServiceHost {
+    return {
+      getTabRuntimeState: (tabId: TabId | null) => this.getTabRuntimeState(tabId),
+      appendPersistentAssistantNoticeMessage: (options) => this.appendPersistentAssistantNoticeMessage(options),
     };
   }
 
@@ -7145,7 +7142,6 @@ export class OpenCodianView extends ItemView {
       }
 
       segment.completionEvents.push({
-        anchorKey: segment.anchorKey,
         reminderMessageId: message.sourceMessageId ?? message.id,
         reminderType: message.omo.reminderType === 'all-background-tasks-complete'
           ? 'all-background-tasks-complete'
@@ -7736,152 +7732,26 @@ export class OpenCodianView extends ItemView {
     }
   }
 
-  private getPersistedBackgroundTaskCompletionNoticeFingerprints(
-    conversation: Conversation | null,
-  ): Set<string> {
-    const fingerprints = new Set<string>();
-    for (const message of conversation?.messages ?? []) {
-      const meta = message.noticeMeta;
-      if (meta?.kind !== 'background-task-completion') {
-        continue;
-      }
-      fingerprints.add(this.getBackgroundTaskCompletionNoticeFingerprint({
-        anchorKey: meta.anchorKey ?? 'unknown',
-        allComplete: Boolean(meta.allComplete),
-        taskIds: meta.taskIds ?? [],
-      }));
-      for (const reminderId of meta.sourceReminderIds ?? []) {
-        fingerprints.add(`source:${reminderId}`);
-      }
-    }
-
-    return fingerprints;
-  }
-
-  private getBackgroundTaskCompletionNoticeFingerprint(input: {
-    anchorKey: string;
-    allComplete: boolean;
-    taskIds: string[];
-  }): string {
-    const taskIds = [...new Set(input.taskIds)].sort();
-    return JSON.stringify({
-      anchorKey: input.anchorKey,
-      allComplete: input.allComplete,
-      taskIds,
-    });
-  }
-
   private async queueBackgroundTaskCompletionNotices(
     tabId: TabId | null = this.getActiveTabId(),
     conversation: Conversation | null = this.currentConversation,
   ): Promise<void> {
-    const runtime = this.getTabRuntimeState(tabId);
-    if (!runtime || !conversation) {
+    if (!conversation) {
       return;
     }
 
-    const persisted = this.getPersistedBackgroundTaskCompletionNoticeFingerprints(conversation);
-    const segments = this.collectBackgroundTaskSegments(conversation.messages, tabId);
-
-    for (const segment of segments) {
-      for (const event of segment.completionEvents) {
-        const reminderFingerprint = `source:${event.reminderMessageId}`;
-        if (persisted.has(reminderFingerprint)) {
-          continue;
-        }
-
-        let queued = runtime.queuedBackgroundTaskCompletionNotices.get(segment.anchorKey);
-        if (!queued) {
-          queued = {
-            anchorKey: segment.anchorKey,
-            allComplete: false,
-            sourceReminderIds: new Set(),
-            tasks: new Map(),
-            latestTimestamp: event.timestamp,
-          };
-          runtime.queuedBackgroundTaskCompletionNotices.set(segment.anchorKey, queued);
-        }
-
-        queued.latestTimestamp = Math.max(queued.latestTimestamp, event.timestamp);
-        queued.sourceReminderIds.add(event.reminderMessageId);
-        queued.allComplete = queued.allComplete || event.reminderType === 'all-background-tasks-complete';
-        for (const task of event.tasks) {
-          queued.tasks.set(task.taskId, task);
-        }
-      }
-    }
-  }
-
-  private buildBackgroundTaskCompletionNoticeContent(
-    queued: QueuedBackgroundTaskCompletionNotice,
-  ): string {
-    const tasks = [...queued.tasks.values()].sort((left, right) =>
-      left.taskId.localeCompare(right.taskId) || left.description.localeCompare(right.description),
+    this.backgroundTaskCompletionNoticeService.queueNotices(
+      this.collectBackgroundTaskSegments(conversation.messages, tabId),
+      tabId,
+      conversation,
     );
-    const lines = queued.allComplete
-      ? [t('chat.omo.system.allCompletedSummary')]
-      : [t('chat.omo.system.backgroundCompletedSummary')];
-
-    if (tasks.length > 0) {
-      lines.push('', `**${t('chat.backgroundTask.taskListLabel')}**`);
-      for (const task of tasks) {
-        lines.push(`- \`${task.taskId}\`: ${task.description}`);
-      }
-    }
-
-    return lines.join('\n');
   }
 
   private async flushQueuedBackgroundTaskCompletionNotices(
     tabId: TabId | null = this.getActiveTabId(),
     conversation: Conversation | null = this.currentConversation,
   ): Promise<void> {
-    const runtime = this.getTabRuntimeState(tabId);
-    if (!runtime || !conversation || runtime.isStreaming) {
-      return;
-    }
-
-    for (const [anchorKey, queued] of [...runtime.queuedBackgroundTaskCompletionNotices.entries()]) {
-      const taskIds = [...queued.tasks.keys()].sort();
-      const fingerprint = this.getBackgroundTaskCompletionNoticeFingerprint({
-        anchorKey,
-        allComplete: queued.allComplete,
-        taskIds,
-      });
-      if (this.getPersistedBackgroundTaskCompletionNoticeFingerprints(conversation).has(fingerprint)) {
-        runtime.queuedBackgroundTaskCompletionNotices.delete(anchorKey);
-        continue;
-      }
-
-      const title = queued.allComplete
-        ? t('chat.omo.system.allCompleted')
-        : t('chat.omo.system.backgroundCompleted');
-      const content = this.buildBackgroundTaskCompletionNoticeContent(queued);
-      await this.appendPersistentAssistantNoticeMessage({
-        title,
-        content,
-        tone: 'info',
-        conversation,
-        tabId,
-        timestamp: queued.latestTimestamp,
-        noticeMeta: {
-          kind: 'background-task-completion',
-          conversationId: conversation.id,
-          anchorKey,
-          sourceReminderIds: [...queued.sourceReminderIds].sort(),
-          allComplete: queued.allComplete,
-          taskIds,
-        },
-      });
-      logger.debug('Background task completion notice persisted', {
-        tabId,
-        anchorKey,
-        allComplete: queued.allComplete,
-        taskCount: taskIds.length,
-        reminderCount: queued.sourceReminderIds.size,
-      });
-      runtime.queuedBackgroundTaskCompletionNotices.delete(anchorKey);
-    }
+    await this.backgroundTaskCompletionNoticeService.flushQueuedNotices(tabId, conversation);
   }
 
   /** Render a content block using the same renderers as streaming */
