@@ -1743,6 +1743,24 @@ export class OpenCodianView extends ItemView {
       updateSessionTodoDockForTab: (tabId) => {
         this.updateSessionTodoDockForTab(tabId);
       },
+      renderSessionTodoDock: (tabId) => {
+        this.renderSessionTodoDock(tabId);
+      },
+      updateModelSelectorDisplay: () => {
+        this.updateModelSelectorDisplay();
+      },
+      syncActiveTabContextUsageIdentity: () => {
+        this.syncActiveTabContextUsageIdentity();
+      },
+      refreshTabSessionStatus: (tabId, sessionId, options) =>
+        this.refreshTabSessionStatus(tabId, sessionId ?? undefined, options),
+      refreshPendingQuestionsForTab: (tabId, sessionId) =>
+        this.refreshPendingQuestionsForTab(tabId, sessionId ?? undefined),
+      refreshTabSessionTodos: (tabId, sessionId, options) =>
+        this.refreshTabSessionTodos(tabId, sessionId ?? undefined, options),
+      updateSendButtonState: () => {
+        this.updateSendButtonState();
+      },
     };
   }
 
@@ -2791,25 +2809,14 @@ export class OpenCodianView extends ItemView {
       resetSessionState: true,
     });
     this.tabConversationStateBridge.commitConversationSyncBaseline(conversation.messages);
-    this.updateModelSelectorDisplay();
-    this.syncActiveTabContextUsageIdentity();
-    this.renderSessionTodoDock(tabId);
-    this.renderQuestionDock();
-    void this.refreshTabSessionStatus(tabId, conversation.openCodeSessionId, { suppressErrors: true });
-    void this.refreshPendingQuestionsForTab(tabId, conversation.openCodeSessionId);
-    void this.refreshTabSessionTodos(tabId, conversation.openCodeSessionId, { suppressErrors: true });
-    this.updateSendButtonState();
+    this.tabViewActivationBridge.applyStreamingActivationOutcome(tabId, conversation.openCodeSessionId);
   }
 
   private applyEmptyTabActivation(tabId: TabId): void {
     this.tabConversationStateBridge.clearActiveConversation(tabId);
     this.messagesContainer?.empty();
     this.resetTurnState();
-    this.renderSessionTodoDock(tabId);
-    this.renderQuestionDock();
-    this.updateModelSelectorDisplay();
-    this.syncActiveTabContextUsageIdentity();
-    this.updateSendButtonState();
+    this.tabViewActivationBridge.applyEmptyActivationOutcome(tabId);
   }
 
   private prepareConversationTransition(nextConversationId: string): Promise<void> {

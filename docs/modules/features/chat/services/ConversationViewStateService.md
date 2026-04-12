@@ -50,7 +50,7 @@ export class ConversationViewStateService {
 - tab 激活入口现在先委托 `runtime/TabViewActivationBridge.ts` 统一处理 pane 切换、focus preview、question dock 和 todo dock 预刷新
 - streaming tab 走快速路径，不触发完整 conversation reload
 - 普通 conversation tab 统一转入 `loadConversation(..., { preserveScrollPosition: true })`
-- 空 tab 走独立清空分支，保留现有 dock / selector / send button 刷新时序
+- streaming / empty-tab 分支的后续 dock / selector / context identity / send button 刷新顺序也通过 `TabViewActivationBridge` 统一编排
 
 ### conversation hydration
 
@@ -63,5 +63,5 @@ export class ConversationViewStateService {
 ## 与 `OpenCodianView` 的边界
 
 - `OpenCodianView` 仍保留真实 UI render、插件服务装配、tab runtime 状态、scroll metrics 和后台同步实现
-- `ConversationViewStateService` 只负责决定“何时 restore / 激活 / hydrate / 刷新”，不再逐项写入 active-tab conversation/session state，也不再直接触发 pane activation 预刷新回调
+- `ConversationViewStateService` 只负责决定“何时 restore / 激活 / hydrate / 刷新”，不再逐项写入 active-tab conversation/session state，也不再直接触发 pane activation 预刷新或 streaming/empty activation outcome UI 回调
 - 这样后续继续拆 model selector 或消息区重渲时，可以沿着更清晰的 host 边界继续推进，而不必再把装载主链路塞回 view

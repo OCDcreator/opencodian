@@ -129,6 +129,13 @@ function createActivationBridge() {
     refreshActiveFocusContextPreview: jest.fn(),
     renderQuestionDock: jest.fn(),
     updateSessionTodoDockForTab: jest.fn(),
+    renderSessionTodoDock: jest.fn(),
+    updateModelSelectorDisplay: jest.fn(),
+    syncActiveTabContextUsageIdentity: jest.fn(),
+    refreshTabSessionStatus: jest.fn().mockResolvedValue(null),
+    refreshPendingQuestionsForTab: jest.fn().mockResolvedValue([]),
+    refreshTabSessionTodos: jest.fn().mockResolvedValue([]),
+    updateSendButtonState: jest.fn(),
   };
 
   return {
