@@ -6,19 +6,19 @@ import {
   buildTrailingAssistantPatchCompletionDebugPlanningContext,
 } from './TrailingAssistantPatchCompletionDebugPlanningContextHelper';
 import {
-  buildTrailingAssistantPatchCompletionDebugPlanningContextSourceContract,
-  type TrailingAssistantPatchCompletionDebugPlanningContextSourceContractParts,
-} from './TrailingAssistantPatchCompletionDebugPlanningContextSourceContractHelper';
+  buildTrailingAssistantPatchCompletionDebugSourceContractFromTailOutcomePlanningContext,
+  type TrailingAssistantPatchCompletionDebugTailOutcomeSourceContractParts,
+} from './TrailingAssistantPatchCompletionDebugTailOutcomeSourceContractHelper';
 
 export type TrailingAssistantPatchCompletionDebugTailOutcomePlanParts =
-  TrailingAssistantPatchCompletionDebugPlanningContextSourceContractParts;
+  TrailingAssistantPatchCompletionDebugTailOutcomeSourceContractParts;
 
 export function buildTrailingAssistantPatchCompletionDebugPlanFromTailOutcomePlanningContext(
   parts: TrailingAssistantPatchCompletionDebugTailOutcomePlanParts,
 ): TrailingAssistantPatchCompletionDebugPlan {
   return buildTrailingAssistantPatchCompletionDebugPlan(
     buildTrailingAssistantPatchCompletionDebugPlanningContext(
-      buildTrailingAssistantPatchCompletionDebugPlanningContextSourceContract(parts),
+      buildTrailingAssistantPatchCompletionDebugSourceContractFromTailOutcomePlanningContext(parts),
     ),
   );
 }

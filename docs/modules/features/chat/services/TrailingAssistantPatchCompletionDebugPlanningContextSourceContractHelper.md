@@ -43,6 +43,6 @@ export function buildTrailingAssistantPatchCompletionDebugPlanningContextSourceC
 
 ## 与其他模块的关系
 
-- `TrailingAssistantPatchCompletionDebugTailOutcomePlanHelper` 现在直接调用这里装配 completion-debug source contract，让 `ConversationRenderService` 只传入 tail-outcome context parts
+- `TrailingAssistantPatchCompletionDebugTailOutcomeSourceContractHelper` 现在先以 tail-outcome 命名边界包装这里，让更上游的 tail-outcome plan helper 不再直接触碰最终 source-contract shape 装配
 - `TrailingAssistantPatchTailOutcomePlanningContextHelper` 继续提供更上游的共享 tail-outcome planning-context
 - `TrailingAssistantPatchCompletionDebugPlanningContextHelper` 继续消费这里返回的 source，并进一步收束成 completion-debug planning-context

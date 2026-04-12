@@ -8,8 +8,8 @@
 `TrailingAssistantPatchCompletionDebugTailOutcomePlanHelper` 把 trailing-assistant tail-outcome 路径里“tail-outcome context parts → completionDebugPlan”的纯编排从更上游的 success-plan 组合链中抽成了独立 helper：
 
 - 接收共享的 tail-outcome planning-context、已经算好的窄 `tailStatePlan` 与消息摘要函数
-- 先委托 `TrailingAssistantPatchCompletionDebugPlanningContextSourceContractHelper` 组装 completion-debug source contract
-- 再交给 `TrailingAssistantPatchCompletionDebugPlanningContextHelper` 收束 completion-debug planning-context
+- 先委托 `TrailingAssistantPatchCompletionDebugTailOutcomeSourceContractHelper` 收束 tail-outcome source contract
+- 再交给 `TrailingAssistantPatchCompletionDebugPlanningContextHelper` 组装 completion-debug planning-context
 - 最后通过 `TrailingAssistantPatchCompletionDebugPlanHelper` 返回稳定的 `completionDebugPlan`
 
 它不读取 host、不触碰 DOM 副作用，也不发送 debug 日志；只负责 completion-debug tail-outcome 子链的纯 helper 编排。
@@ -28,6 +28,7 @@ export function buildTrailingAssistantPatchCompletionDebugPlanFromTailOutcomePla
 ## 与其他模块的关系
 
 - `TrailingAssistantPatchTailOutcomeExecutionTailPlanHelper` 现在只把 tail-outcome planning-context、`tailStatePlan` 与 `summarizeChatMessageForDebug` 回调交给这里，不再让更上游模块直接串联 completion-debug source / planning-context / final-plan helper
-- `TrailingAssistantPatchCompletionDebugPlanningContextSourceContractHelper` 继续负责 `{ ...planningContext, tailStatePlan, summarizeChatMessageForDebug }` source contract 的纯装配
+- `TrailingAssistantPatchCompletionDebugTailOutcomeSourceContractHelper` 现在先固定 tail-outcome source-contract 命名边界，再交给下游通用 source-contract helper
+- `TrailingAssistantPatchCompletionDebugPlanningContextSourceContractHelper` 继续负责 `{ ...planningContext, tailStatePlan, summarizeChatMessageForDebug }` 的最终 source-contract shape 装配
 - `TrailingAssistantPatchCompletionDebugPlanningContextHelper` 继续负责把 source contract 缩成 completion-debug 专用 planning-context
 - `TrailingAssistantPatchCompletionDebugPlanHelper` 继续负责最终 `completionDebugPlan` shape 的字段展开
