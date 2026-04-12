@@ -60,10 +60,11 @@ class FocusContextRuntimeService {
 - **OpenCodianView**：提供 host callback（当前会话 note、preview state、composer focus），并把 workspace / DOM 事件转发给这里
 - **composerContext**：提供 preview 结构和 selection-preview retain 规则
 - **editorSelectionHighlight**：负责真正把 retained selection 渲染成 CodeMirror 装饰
-- **ContextAttachmentBuilder**：继续消费最终的 `FocusContextPreview`，把 preview attach 成 `PromptContextItem`
+- **ComposerContextCoordinator**：继续消费这里写回的 preview state，负责 chips 渲染与 preview attach/detach click 编排
+- **ContextAttachmentBuilder**：通过 `ComposerContextCoordinator` 消费最终的 `FocusContextPreview`，把 preview attach 成 `PromptContextItem`
 
 ## 注意事项
 
 - 不改变既有 focus preview 文案、selection line-range 语义或 retained highlight 的显示策略
 - `dispose()` 必须在 view `onClose()` 时调用，避免轮询、timeout 和残留高亮泄漏
-- service 只管理 editor/runtime 侧的 focus context；附件构建、context chips 渲染和 draft item 写回仍留在 `OpenCodianView`
+- service 只管理 editor/runtime 侧的 focus context；附件构建留在 `ContextAttachmentBuilder`，chips 编排留在 `ComposerContextCoordinator`，draft item state 写回仍留在 `OpenCodianView`

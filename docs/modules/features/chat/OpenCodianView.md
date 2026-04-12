@@ -88,7 +88,7 @@ background task 相关的 `backgroundTaskLaunches`、`backgroundTaskCompletedTas
 - 模型目录缓存：`availableModels`、`availableProviders`
 - 服务器状态轮询和 badge 状态
 - model selector sticky header cleanup
-- `FocusContextRuntimeService` 等视图级运行时协作对象
+- `ComposerContextCoordinator`、`FocusContextRuntimeService` 等视图级运行时协作对象
 - theme background / liquid glass / diamond demo / glass octahedron 相关 DOM 引用
 
 ## 主链路
@@ -329,9 +329,10 @@ model selector 现在拆成了几层协作：
 
 ### context、选区与文件目录
 
-这个视图仍负责 composer context 的入口、附件写回和 chips 渲染，但焦点预览 / retained-selection runtime 已开始迁出：
+这个视图仍负责 composer context 的入口，以及 draft context / focus preview 的 active-tab state 写回；焦点预览 runtime 和 chips 编排已经分别迁出：
 
 - `FocusContextRuntimeService` 负责活动 `MarkdownView` 回退查找、focus preview 计算，以及 composer pointer handoff / focusin/focusout / polling 驱动的 retained-selection 协调
+- `ComposerContextCoordinator` 负责 composer context chips 渲染、preview attach/detach click 编排，以及失效 preview 的 refresh handoff
 - `addCurrentNoteContextFromActiveEditor()`、`addSelectionContextFromActiveEditor()`、`addChosenFileContextToActiveTab()` 现在只负责触发附件入口，再把结果写回 active tab
 - `ContextAttachmentBuilder` 负责 current-note / selection / file 三类 `PromptContextItem` 构建，以及 remote 模式下的文本快照读取与 `64 KiB` 校验
 - 文件选择器使用 `ContextFileCatalogService` 惰性构建和缓存 `ContextFileCatalog`；`OpenCodianView` 只转发 vault `create/delete/rename` 事件
@@ -412,6 +413,7 @@ background task notice 这条子链路现在的边界是：
 - `TabManager` / `TabBar`：tab 生命周期和 tab 元数据
 - `MarkdownRenderService`：Markdown 渲染
 - `StreamController`：流式 assistant DOM 更新
+- `ComposerContextCoordinator`：composer context chip 渲染、preview attach/detach click 编排，以及 stale preview refresh handoff
 - `ContextAttachmentBuilder`：composer current-note / selection / file 附件构建，以及 remote 文本快照校验
 - `ContextFileCatalogService`：composer 文件上下文选择器使用的 Vault catalog 构建、缓存与增量更新
 - `FocusContextRuntimeService`：活动编辑器 focus preview、MarkdownView 回退查找，以及 retained-selection handoff/highlight/polling 运行态

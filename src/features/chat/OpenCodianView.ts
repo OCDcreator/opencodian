@@ -70,7 +70,6 @@ import {
   getInputPanelGlassRefractionCssVariables,
 } from './chatAppearance';
 import {
-  buildComposerContextChipStates,
   type FocusContextPreview,
   getContextTargetKey,
   removeDraftContextItemsByTarget,
@@ -187,6 +186,10 @@ import {
 } from './services/BackgroundTaskTimelineService';
 import { ContextAttachmentBuilder } from './services/ContextAttachmentBuilder';
 import { ContextFileCatalogService } from './services/ContextFileCatalogService';
+import {
+  type ComposerContextCoordinatorHost,
+  ComposerContextCoordinator,
+} from './services/ComposerContextCoordinator';
 import {
   type FocusContextRuntimeServiceHost,
   FocusContextRuntimeService,
@@ -608,7 +611,6 @@ export class OpenCodianView extends ItemView {
   private glassOctahedronDemoController: GlassOctahedronDemoController | null = null;
   private liquidDiamondDemoController: LiquidDiamondDemoController | null = null;
   private liquidDiamondWebGlDemoController: LiquidDiamondDemoController | null = null;
-  private composerContextRowEl: HTMLElement | null = null;
   private questionDockMountEl: HTMLElement | null = null;
   private questionDock: QuestionDock | null = null;
   private todoDockMountEl: HTMLElement | null = null;
@@ -711,6 +713,7 @@ export class OpenCodianView extends ItemView {
   private questionResolutionCoordinator: QuestionResolutionCoordinator;
   private questionDockCoordinator: QuestionDockCoordinator;
   private sendPipelineRuntime: SendPipelineRuntime;
+  private composerContextCoordinator: ComposerContextCoordinator;
   private contextAttachmentBuilder: ContextAttachmentBuilder;
   private contextFileCatalogService: ContextFileCatalogService;
   private focusContextRuntimeService: FocusContextRuntimeService;
@@ -933,7 +936,7 @@ export class OpenCodianView extends ItemView {
 
     runtime.draftContextItems = [...items];
     if (tabId === this.getActiveTabId()) {
-      this.renderComposerContextChips();
+      this.composerContextCoordinator.render();
     }
   }
 
@@ -962,7 +965,7 @@ export class OpenCodianView extends ItemView {
 
     runtime.focusContextPreview = preview;
     if (tabId === this.getActiveTabId()) {
-      this.renderComposerContextChips();
+      this.composerContextCoordinator.render();
     }
   }
 
@@ -1277,6 +1280,10 @@ export class OpenCodianView extends ItemView {
       getServerMode: () => this.plugin.settings.server.mode,
     });
     this.contextFileCatalogService = new ContextFileCatalogService(this.app);
+    this.composerContextCoordinator = new ComposerContextCoordinator(
+      this.contextAttachmentBuilder,
+      this.createComposerContextCoordinatorHost(),
+    );
     this.focusContextRuntimeService = new FocusContextRuntimeService(
       this.app,
       this.createFocusContextRuntimeServiceHost(),
@@ -1372,6 +1379,22 @@ export class OpenCodianView extends ItemView {
       this.messageSendPreparationService,
       this.messageFinalizationService,
     );
+  }
+
+  private createComposerContextCoordinatorHost(): ComposerContextCoordinatorHost {
+    return {
+      getDraftContextItems: () => this.getDraftContextItems(),
+      getFocusContextPreview: () => this.getFocusContextPreview(),
+      addDraftContextItem: (item) => {
+        this.addDraftContextItem(item);
+      },
+      removeDraftContextItemsForTarget: (target) => {
+        this.removeDraftContextItemsForTarget(target);
+      },
+      refreshActiveFocusContextPreview: () => {
+        this.refreshActiveFocusContextPreview();
+      },
+    };
   }
 
   private createFocusContextRuntimeServiceHost(): FocusContextRuntimeServiceHost {
@@ -2226,7 +2249,7 @@ export class OpenCodianView extends ItemView {
     this.inputTabBarSlotEl = null;
     this.inputWrapperEl = null;
     this.composerShellEl = null;
-    this.composerContextRowEl = null;
+    this.composerContextCoordinator.setContextRowElement(null);
     this.addContextBtn = null;
     this.sendBtn = null;
     this.inputTextarea = null;
@@ -3244,8 +3267,9 @@ export class OpenCodianView extends ItemView {
     const inputWrapper = composerShellEl.createDiv({ cls: 'opencodian-input-wrapper' });
     this.inputWrapperEl = inputWrapper;
     const composerContentEl = inputWrapper.createDiv({ cls: 'opencodian-composer-content' });
-    this.composerContextRowEl = composerContentEl.createDiv({ cls: 'opencodian-composer-context-row is-empty' });
-    this.renderComposerContextChips();
+    this.composerContextCoordinator.setContextRowElement(
+      composerContentEl.createDiv({ cls: 'opencodian-composer-context-row is-empty' }),
+    );
 
     this.inputTextarea = composerContentEl.createEl('textarea', {
       cls: 'opencodian-input',
@@ -4144,92 +4168,6 @@ export class OpenCodianView extends ItemView {
     const stackHeight = Math.ceil(this.inputContainer.offsetHeight);
     this.chatContainerEl.style.setProperty('--opencodian-composer-stack-height', `${Math.max(0, stackHeight)}px`);
     this.scheduleSettledScrollToBottomIfNeeded();
-  }
-
-  private renderComposerContextChips(): void {
-    if (!this.composerContextRowEl) {
-      return;
-    }
-
-    const chipStates = buildComposerContextChipStates(
-      this.getDraftContextItems(),
-      this.getFocusContextPreview(),
-    );
-
-    this.composerContextRowEl.empty();
-    this.composerContextRowEl.toggleClass('is-empty', chipStates.length === 0);
-    if (chipStates.length === 0) {
-      return;
-    }
-
-    for (const chipState of chipStates) {
-      const chipEl = this.composerContextRowEl.createEl('button', {
-        cls: 'opencodian-composer-context-chip',
-        text: chipState.label,
-        attr: {
-          type: 'button',
-          title: chipState.path,
-          'aria-pressed': String(chipState.attached),
-        },
-      });
-
-      if (chipState.preview) {
-        chipEl.addClass('is-preview');
-      } else {
-        chipEl.addClass('is-attached');
-      }
-      if (chipState.lineRange) {
-        chipEl.addClass('is-selection');
-      }
-
-      chipEl.addEventListener('click', () => {
-        void this.handleComposerContextChipClick(chipState);
-      });
-    }
-  }
-
-  private async handleComposerContextChipClick(
-    chipState: ReturnType<typeof buildComposerContextChipStates>[number],
-  ): Promise<void> {
-    if (chipState.attached) {
-      this.removeDraftContextItemsForTarget(chipState);
-      return;
-    }
-
-    const focusPreview = this.getFocusContextPreview();
-    if (!focusPreview) {
-      return;
-    }
-
-    if (getContextTargetKey(focusPreview.path, focusPreview.lineRange) !== chipState.key) {
-      this.refreshActiveFocusContextPreview();
-      return;
-    }
-
-    await this.attachFocusContextPreview(focusPreview);
-  }
-
-  private async attachFocusContextPreview(preview: FocusContextPreview): Promise<void> {
-    if (preview.kind === 'selection') {
-      const contextItem = this.contextAttachmentBuilder.buildSelectionContextItemFromPreview(preview);
-      if (contextItem) {
-        this.addDraftContextItem(contextItem);
-      }
-      return;
-    }
-
-    const contextItem = await this.contextAttachmentBuilder.buildFileContextItemFromPath(
-      preview.path,
-      'current_note',
-    );
-    if (contextItem) {
-      this.addDraftContextItem(contextItem);
-      return;
-    }
-
-    if (!this.contextAttachmentBuilder.hasFileAtPath(preview.path)) {
-      this.refreshActiveFocusContextPreview();
-    }
   }
 
   private shouldUseAboveInputQuestionDock(): boolean {
