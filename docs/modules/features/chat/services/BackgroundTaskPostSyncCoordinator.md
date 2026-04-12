@@ -5,10 +5,11 @@
 
 ## 概述
 
-`BackgroundTaskPostSyncCoordinator` 把 `OpenCodianView` 里 hidden signal sync / background-tab sync 完成后的 background-task 收尾编排独立出来，专门负责：
+`BackgroundTaskPostSyncCoordinator` 把 `OpenCodianView` 里 hidden signal sync / background-tab sync / active visible-conversation background sync 完成后的 background-task 收尾编排独立出来，专门负责：
 
 - 在 signal sync 完成后落下 background task authoritative-sync ready 标记
 - 刷新 pending question、session todo/status live state
+- 判定 visible background sync 完成后当前 conversation 是否仍然匹配发起同步时的 active conversation
 - 调用 view 侧 background task timeline rebuild host bridge
 - 协调 completion notice queue/flush 与 tab stream-like 状态刷新
 - 根据 sync fingerprint 变化标记后台 tab attention
@@ -19,6 +20,8 @@
 
 ```typescript
 export interface BackgroundTaskPostSyncCoordinatorHost {
+  getCurrentConversationId(): string | null;
+  getCurrentConversationSessionId(): string | undefined;
   getTabRuntimeState(tabId: TabId | null): BackgroundTaskPostSyncRuntime | null;
   hasIncompleteTodos(todos: readonly SessionTodo[]): boolean;
   markBackgroundTaskAuthoritativeSync(tabId: TabId | null, reason: string): void;
@@ -33,12 +36,19 @@ export interface BackgroundTaskPostSyncCoordinatorHost {
 }
 
 export class BackgroundTaskPostSyncCoordinator {
+  handleVisibleConversationSyncComplete(...): Promise<VisibleConversationPostSyncOutcome>;
   handleSignalSyncComplete(...): Promise<void>;
   handleBackgroundTabSyncComplete(...): Promise<void>;
 }
 ```
 
 ## 关键行为
+
+### visible active-conversation sync 收尾
+
+- `handleVisibleConversationSyncComplete()` 统一接手 `syncVisibleConversationInBackground()` 里原本散落的 question refresh、todo/status live refresh，以及“当前 conversation 是否还是发起 sync 时那一页”的判定
+- coordinator 只返回 render plan：是否还能继续 `applySyncedConversationUpdate()`，或者应回退到 `renderBackgroundTaskIndicatorIfNeeded()`；真正的 `currentConversationRevertState` / sync fingerprint 更新和 DOM 渲染仍留在 view
+- todo/status refresh 仍沿用既有 runtime gate：只有存在 incomplete todos、pending background-task launch 或 waiting-for-follow-up 时才会主动刷新
 
 ### signal sync 收尾
 
@@ -53,5 +63,5 @@ export class BackgroundTaskPostSyncCoordinator {
 ## 与 `OpenCodianView` 的边界
 
 - `OpenCodianView` 仍负责 conversation sync 的发起、background task segment/timeline 推导、inline panel DOM 渲染，以及 completion notice segment 的收集实现
-- `BackgroundTaskPostSyncCoordinator` 只负责 hidden signal/background-tab sync 之后的跨 question/todo/background-task service 编排
-- 这让 P2 `question / todo / background task` lane 把后台同步后的运行时收尾 ownership 从主 view 迁到 dedicated coordinator，而不是继续散落在 `syncConversationFromSignal()` 和 `syncBackgroundTaskTabsInBackground()` 中
+- `BackgroundTaskPostSyncCoordinator` 负责 hidden signal/background-tab sync，以及 active visible-conversation background sync 之后的跨 question/todo/background-task service 编排
+- 这让本轮继续沿着 master-plan 的 `OpenCodianView` sync orchestration ownership 迁移，把后台同步后的 question/todo/background-task 收尾从主 view 挪到 dedicated coordinator，而不是继续散落在 `syncConversationFromSignal()`、`syncVisibleConversationInBackground()` 和 `syncBackgroundTaskTabsInBackground()` 中

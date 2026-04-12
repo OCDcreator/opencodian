@@ -1775,6 +1775,8 @@ export class OpenCodianView extends ItemView {
 
   private createBackgroundTaskPostSyncCoordinatorHost(): BackgroundTaskPostSyncCoordinatorHost {
     return {
+      getCurrentConversationId: () => this.currentConversation?.id ?? null,
+      getCurrentConversationSessionId: () => this.currentConversation?.openCodeSessionId,
       getTabRuntimeState: (tabId: TabId | null) => this.getTabRuntimeState(tabId),
       hasIncompleteTodos: (todos) => this.hasIncompleteTodos(todos),
       markBackgroundTaskAuthoritativeSync: (tabId, reason) => {
@@ -5684,33 +5686,24 @@ export class OpenCodianView extends ItemView {
         'visible-background-sync',
         { suppressVerboseLogs: true },
       );
-      await this.refreshPendingQuestionsForTab(activeTabId, expectedSessionId);
-      if (!syncResult.changed || this.currentConversation?.id !== expectedConversationId) {
-        if (this.currentConversation?.id === expectedConversationId) {
+      const postSyncOutcome = await this.backgroundTaskPostSyncCoordinator.handleVisibleConversationSyncComplete({
+        tabId: activeTabId,
+        expectedConversationId,
+        questionSessionId: expectedSessionId,
+        syncResult,
+      });
+      if (!postSyncOutcome.shouldApplySyncedConversationUpdate) {
+        if (postSyncOutcome.currentConversationMatchesExpected) {
           this.currentConversationRevertState = syncResult.revertState;
         }
-        if (
-          this.hasIncompleteTodos(runtime.sessionTodos)
-          || runtime.backgroundTaskLaunches.size > 0
-          || runtime.backgroundTaskWaitingForFollowUp
-        ) {
-          await this.refreshTabSessionStatus(activeTabId, this.currentConversation?.openCodeSessionId, { suppressErrors: true });
-          await this.refreshTabSessionTodos(activeTabId, this.currentConversation?.openCodeSessionId, { suppressErrors: true });
+        if (postSyncOutcome.shouldRenderBackgroundTaskIndicator) {
+          await this.renderBackgroundTaskIndicatorIfNeeded(activeTabId);
         }
-        await this.renderBackgroundTaskIndicatorIfNeeded(activeTabId);
         return;
       }
 
       this.currentConversationRevertState = syncResult.revertState;
       runtime.lastConversationSyncFingerprint = syncResult.fingerprint;
-      if (
-        this.hasIncompleteTodos(runtime.sessionTodos)
-        || runtime.backgroundTaskLaunches.size > 0
-        || runtime.backgroundTaskWaitingForFollowUp
-      ) {
-        await this.refreshTabSessionStatus(activeTabId, this.currentConversation.openCodeSessionId, { suppressErrors: true });
-        await this.refreshTabSessionTodos(activeTabId, this.currentConversation.openCodeSessionId, { suppressErrors: true });
-      }
       await this.applySyncedConversationUpdate(previousMessages, this.currentConversation.messages);
     } finally {
       runtime.isConversationSyncInFlight = false;

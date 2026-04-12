@@ -8,6 +8,8 @@ import type { TabId } from '../tabs';
 
 export interface BackgroundTaskPostSyncRuntime {
   sessionTodos: readonly SessionTodo[];
+  backgroundTaskLaunches: ReadonlyMap<string, unknown>;
+  backgroundTaskWaitingForFollowUp: boolean;
 }
 
 export interface BackgroundTaskPostSyncResult {
@@ -16,6 +18,8 @@ export interface BackgroundTaskPostSyncResult {
 }
 
 export interface BackgroundTaskPostSyncCoordinatorHost {
+  getCurrentConversationId(): string | null;
+  getCurrentConversationSessionId(): string | undefined;
   getTabRuntimeState(tabId: TabId | null): BackgroundTaskPostSyncRuntime | null;
   hasIncompleteTodos(todos: readonly SessionTodo[]): boolean;
   markBackgroundTaskAuthoritativeSync(tabId: TabId | null, reason: string): void;
@@ -55,8 +59,39 @@ export interface SignalBackgroundTaskPostSyncOptions extends BackgroundTaskPostS
 
 export type BackgroundTabPostSyncOptions = BackgroundTaskPostSyncBaseOptions;
 
+export interface VisibleConversationPostSyncOptions {
+  tabId: TabId;
+  expectedConversationId: string;
+  questionSessionId: string | null | undefined;
+  syncResult: BackgroundTaskPostSyncResult;
+}
+
+export interface VisibleConversationPostSyncOutcome {
+  currentConversationMatchesExpected: boolean;
+  shouldApplySyncedConversationUpdate: boolean;
+  shouldRenderBackgroundTaskIndicator: boolean;
+}
+
 export class BackgroundTaskPostSyncCoordinator {
   constructor(private readonly host: BackgroundTaskPostSyncCoordinatorHost) {}
+
+  async handleVisibleConversationSyncComplete(
+    options: VisibleConversationPostSyncOptions,
+  ): Promise<VisibleConversationPostSyncOutcome> {
+    await this.host.refreshPendingQuestionsForTab(options.tabId, options.questionSessionId);
+
+    const currentConversationMatchesExpected =
+      this.host.getCurrentConversationId() === options.expectedConversationId;
+    await this.refreshVisibleConversationTodoStatus(options.tabId);
+
+    return {
+      currentConversationMatchesExpected,
+      shouldApplySyncedConversationUpdate:
+        currentConversationMatchesExpected && options.syncResult.changed,
+      shouldRenderBackgroundTaskIndicator:
+        !currentConversationMatchesExpected || !options.syncResult.changed,
+    };
+  }
 
   async handleSignalSyncComplete(options: SignalBackgroundTaskPostSyncOptions): Promise<void> {
     this.host.markBackgroundTaskAuthoritativeSync(options.tabId, `sync-event:${options.reason}`);
@@ -77,6 +112,29 @@ export class BackgroundTaskPostSyncCoordinator {
     if (this.didConversationChange(options.syncResult, options.previousFingerprint)) {
       this.host.setTabNeedsAttention(options.tabId, true);
     }
+  }
+
+  private async refreshVisibleConversationTodoStatus(
+    tabId: TabId,
+  ): Promise<void> {
+    const runtime = this.host.getTabRuntimeState(tabId);
+    if (
+      !runtime
+      || (
+        !this.host.hasIncompleteTodos(runtime.sessionTodos)
+        && runtime.backgroundTaskLaunches.size === 0
+        && !runtime.backgroundTaskWaitingForFollowUp
+      )
+    ) {
+      return;
+    }
+
+    await this.host.refreshTabSessionStatus(tabId, this.host.getCurrentConversationSessionId(), {
+      suppressErrors: true,
+    });
+    await this.host.refreshTabSessionTodos(tabId, this.host.getCurrentConversationSessionId(), {
+      suppressErrors: true,
+    });
   }
 
   private async refreshPostSyncState(

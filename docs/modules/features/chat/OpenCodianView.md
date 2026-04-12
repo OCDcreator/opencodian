@@ -140,6 +140,8 @@ interface TabRuntimeState {
 - `syncVisibleConversationInBackground()`：同步当前活动 tab
 - `syncBackgroundTaskTabsInBackground()`：同步非活动但仍有 background task 的 tab
 
+其中当前活动 tab 的后台同步收尾现在会把 question refresh、todo/status live refresh 和 active-conversation match 判定委托给 `BackgroundTaskPostSyncCoordinator`；`OpenCodianView` 只保留 `currentConversationRevertState` / sync fingerprint 更新，以及 `applySyncedConversationUpdate()` / `renderBackgroundTaskIndicatorIfNeeded()` 这类真正依赖当前 DOM/render host 的路径。
+
 除此之外，`subscribeToSessionSyncEvents()` 现在还会接入 `message.updated`、`message.part.updated` 和 `session.diff`，用于提前触发当前会话或后台 tab 的 authoritative sync，而不是只能等 2 秒轮询。
 
 ### 消息区重渲编排
@@ -311,7 +313,7 @@ model selector 现在拆成了几层协作：
 
 - session todo/status：订阅入口仍在 view，但 normalized snapshot、status fingerprint、stale suppression 与 persisted notice 恢复已经下沉到 `services/SessionTodoStateService.ts`
 - question：既支持输入区上方的 `QuestionDock`，也支持由 `QuestionInlineCardRenderer` 管理的内联待回答卡片，以及由 `QuestionResolutionCoordinator` + `QuestionResolutionCardRenderer` 协作管理的已回答/已拒绝回顾卡片
-- background task：从 OMO 注入、`toolName === 'task'` 的 tool block、以及后续 system reminder 回写推导任务进度；运行态以内联状态条挂在对应 assistant turn 下，完成态则延迟落成持久化 notice；其中 live-signal reconciliation 与 authoritative-sync gate runtime 已下沉到 `services/BackgroundTaskLiveSignalCoordinator.ts`，hidden signal/background-tab sync 后的 question refresh、todo/status refresh、completion notice queue/flush 与 attention 标记编排已下沉到 `services/BackgroundTaskPostSyncCoordinator.ts`，stopped/stale warning notice 的 content、fingerprint、persisted dedupe 与 suppression 已下沉到 `services/BackgroundTaskNoticeStateService.ts`，completion notice 的 queued-state、fingerprint/content 与 persisted dedupe/flush 则下沉到 `services/BackgroundTaskCompletionNoticeService.ts`
+- background task：从 OMO 注入、`toolName === 'task'` 的 tool block、以及后续 system reminder 回写推导任务进度；运行态以内联状态条挂在对应 assistant turn 下，完成态则延迟落成持久化 notice；其中 live-signal reconciliation 与 authoritative-sync gate runtime 已下沉到 `services/BackgroundTaskLiveSignalCoordinator.ts`，hidden signal/background-tab sync 以及 active visible-conversation background sync 后的 question refresh、todo/status refresh、completion notice queue/flush、attention 标记与 active-conversation match 判定编排已下沉到 `services/BackgroundTaskPostSyncCoordinator.ts`，stopped/stale warning notice 的 content、fingerprint、persisted dedupe 与 suppression 已下沉到 `services/BackgroundTaskNoticeStateService.ts`，completion notice 的 queued-state、fingerprint/content 与 persisted dedupe/flush 则下沉到 `services/BackgroundTaskCompletionNoticeService.ts`
 - background task 的 stale 判定现在额外受 `backgroundTaskAwaitingAuthoritativeSync` / hydration 保护：reload 或首次装载后，只有在至少一次权威消息同步完成后，才允许把“仍在运行”降级成 stopped/stale notice；这段 gate + live-signal 决策现在集中在 `BackgroundTaskLiveSignalCoordinator`
 
 session todo 这条子链路现在的边界是：
@@ -323,7 +325,7 @@ background task notice 这条子链路现在的边界是：
 
 - `OpenCodianView`：background task timeline 推导、inline panel 渲染，以及 post-sync coordinator / notice services 的 host bridge
 - `BackgroundTaskLiveSignalCoordinator`：authoritative-sync gate arm/clear、live-signal reconciliation，以及 stale downgrade / reset 的运行时判定
-- `BackgroundTaskPostSyncCoordinator`：hidden signal/background-tab sync 后的 question refresh、todo/status refresh、completion notice queue/flush 与 attention 标记编排
+- `BackgroundTaskPostSyncCoordinator`：hidden signal/background-tab sync 与 active visible-conversation background sync 后的 question refresh、todo/status refresh、completion notice queue/flush、attention 标记和 active-conversation match 判定编排
 - `BackgroundTaskNoticeStateService`：stopped/stale notice content、fingerprint、persisted dedupe 与 suppression runtime 协调
 - `BackgroundTaskCompletionNoticeService`：completion notice queued state、content/fingerprint 与 persisted dedupe/append 协调
 

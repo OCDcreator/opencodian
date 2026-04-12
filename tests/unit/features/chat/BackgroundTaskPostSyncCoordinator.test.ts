@@ -41,8 +41,14 @@ function createHost(options: {
   runtime?: BackgroundTaskPostSyncRuntime | null;
   hasIncompleteTodos?: boolean;
 } = {}): MockedBackgroundTaskPostSyncHost {
-  const runtime = options.runtime ?? { sessionTodos: [] };
+  const runtime = options.runtime ?? {
+    sessionTodos: [],
+    backgroundTaskLaunches: new Map(),
+    backgroundTaskWaitingForFollowUp: false,
+  };
   return {
+    getCurrentConversationId: jest.fn().mockReturnValue('conversation-1'),
+    getCurrentConversationSessionId: jest.fn().mockReturnValue('session-1'),
     getTabRuntimeState: jest.fn().mockReturnValue(runtime),
     hasIncompleteTodos: jest.fn().mockReturnValue(options.hasIncompleteTodos ?? false),
     markBackgroundTaskAuthoritativeSync: jest.fn(),
@@ -62,9 +68,83 @@ describe('BackgroundTaskPostSyncCoordinator', () => {
     jest.clearAllMocks();
   });
 
+  it('refreshes active visible-conversation state and returns an apply outcome', async () => {
+    const runtime = {
+      sessionTodos: [createTodo('pending')],
+      backgroundTaskLaunches: new Map(),
+      backgroundTaskWaitingForFollowUp: false,
+    };
+    const host = createHost({ runtime, hasIncompleteTodos: true });
+    const coordinator = new BackgroundTaskPostSyncCoordinator(host);
+
+    const outcome = await coordinator.handleVisibleConversationSyncComplete({
+      tabId: 'tab-active',
+      expectedConversationId: 'conversation-1',
+      questionSessionId: 'session-1',
+      syncResult: { changed: true, fingerprint: 'new' },
+    });
+
+    expect(host.refreshPendingQuestionsForTab).toHaveBeenCalledWith('tab-active', 'session-1');
+    expect(host.refreshTabSessionStatus).toHaveBeenCalledWith(
+      'tab-active',
+      'session-1',
+      { suppressErrors: true },
+    );
+    expect(host.refreshTabSessionTodos).toHaveBeenCalledWith(
+      'tab-active',
+      'session-1',
+      { suppressErrors: true },
+    );
+    expect(outcome).toEqual({
+      currentConversationMatchesExpected: true,
+      shouldApplySyncedConversationUpdate: true,
+      shouldRenderBackgroundTaskIndicator: false,
+    });
+  });
+
+  it('keeps indicator-only handling when visible sync no longer targets the current conversation', async () => {
+    const runtime = {
+      sessionTodos: [],
+      backgroundTaskLaunches: new Map([['launch-1', {}]]),
+      backgroundTaskWaitingForFollowUp: false,
+    };
+    const host = createHost({ runtime });
+    host.getCurrentConversationId.mockReturnValue('conversation-2');
+    host.getCurrentConversationSessionId.mockReturnValue('session-2');
+    const coordinator = new BackgroundTaskPostSyncCoordinator(host);
+
+    const outcome = await coordinator.handleVisibleConversationSyncComplete({
+      tabId: 'tab-active',
+      expectedConversationId: 'conversation-1',
+      questionSessionId: 'session-1',
+      syncResult: { changed: true, fingerprint: 'new' },
+    });
+
+    expect(host.refreshPendingQuestionsForTab).toHaveBeenCalledWith('tab-active', 'session-1');
+    expect(host.refreshTabSessionStatus).toHaveBeenCalledWith(
+      'tab-active',
+      'session-2',
+      { suppressErrors: true },
+    );
+    expect(host.refreshTabSessionTodos).toHaveBeenCalledWith(
+      'tab-active',
+      'session-2',
+      { suppressErrors: true },
+    );
+    expect(outcome).toEqual({
+      currentConversationMatchesExpected: false,
+      shouldApplySyncedConversationUpdate: false,
+      shouldRenderBackgroundTaskIndicator: true,
+    });
+  });
+
   it('orchestrates signal sync refresh and marks hidden changed tabs for attention', async () => {
     const conversation = createConversation();
-    const runtime = { sessionTodos: [createTodo('pending')] };
+    const runtime = {
+      sessionTodos: [createTodo('pending')],
+      backgroundTaskLaunches: new Map(),
+      backgroundTaskWaitingForFollowUp: false,
+    };
     const host = createHost({ runtime, hasIncompleteTodos: true });
     const coordinator = new BackgroundTaskPostSyncCoordinator(host);
 
