@@ -23,43 +23,29 @@ function createContextItem(overrides: Partial<PromptContextItem> = {}): PromptCo
 function createHarness(options: {
   draftContextItems?: PromptContextItem[];
   focusPreview?: FocusContextPreview | null;
-  selectionContextItem?: PromptContextItem | null;
-  fileContextItem?: PromptContextItem | null;
-  hasFileAtPath?: boolean;
 } = {}) {
   let draftContextItems = [...(options.draftContextItems ?? [])];
   let focusPreview = options.focusPreview ?? null;
-  const addDraftContextItem = jest.fn((item: PromptContextItem) => {
-    draftContextItems = [...draftContextItems, item];
-  });
-  const removeDraftContextItemsForTarget = jest.fn();
-  const refreshActiveFocusContextPreview = jest.fn();
+  const chipActionService = {
+    handleChipClick: jest.fn(async () => undefined),
+  };
 
   const host: ComposerContextCoordinatorHost = {
     getDraftContextItems: () => draftContextItems,
     getFocusContextPreview: () => focusPreview,
-    addDraftContextItem,
-    removeDraftContextItemsForTarget,
-    refreshActiveFocusContextPreview,
   };
 
-  const contextAttachmentBuilder = {
-    buildSelectionContextItemFromPreview: jest.fn(() => options.selectionContextItem ?? null),
-    buildFileContextItemFromPath: jest.fn(async () => options.fileContextItem ?? null),
-    hasFileAtPath: jest.fn(() => options.hasFileAtPath ?? true),
-  };
-
-  const coordinator = new ComposerContextCoordinator(contextAttachmentBuilder, host);
+  const coordinator = new ComposerContextCoordinator(host, chipActionService);
   const rowEl = document.createElement('div');
   coordinator.setContextRowElement(rowEl);
 
   return {
     coordinator,
     rowEl,
-    addDraftContextItem,
-    removeDraftContextItemsForTarget,
-    refreshActiveFocusContextPreview,
-    contextAttachmentBuilder,
+    chipActionService,
+    setDraftContextItems: (items: PromptContextItem[]) => {
+      draftContextItems = [...items];
+    },
     setFocusPreview: (preview: FocusContextPreview | null) => {
       focusPreview = preview;
     },
@@ -67,25 +53,16 @@ function createHarness(options: {
 }
 
 describe('ComposerContextCoordinator', () => {
-  it('renders preview chips and attaches a selection preview on click', () => {
+  it('renders preview chips and delegates click handling to the chip action service', () => {
     const selectionPreview = createFocusContextPreview('notes/A.md', {
       startLine: 12,
       endLine: 18,
     }, 'Selected paragraph');
-    const contextItem = createContextItem({
-      id: 'selection-context',
-      kind: 'selection',
-      label: 'A.md:12-18',
-      lineRange: selectionPreview.lineRange,
-      textSnapshot: selectionPreview.textSnapshot,
-    });
     const {
       rowEl,
-      addDraftContextItem,
-      contextAttachmentBuilder,
+      chipActionService,
     } = createHarness({
       focusPreview: selectionPreview,
-      selectionContextItem: contextItem,
     });
 
     const chipEl = rowEl.querySelector('button');
@@ -95,69 +72,51 @@ describe('ComposerContextCoordinator', () => {
 
     chipEl?.click();
 
-    expect(contextAttachmentBuilder.buildSelectionContextItemFromPreview).toHaveBeenCalledWith(selectionPreview);
-    expect(addDraftContextItem).toHaveBeenCalledWith(contextItem);
+    expect(chipActionService.handleChipClick).toHaveBeenCalledWith(expect.objectContaining({
+      key: 'notes/A.md:12-18',
+      path: 'notes/A.md',
+      preview: true,
+    }));
   });
 
-  it('detaches an attached chip on click', () => {
+  it('renders attached chips from draft context items', () => {
     const attachedItem = createContextItem({
       id: 'context-file',
       kind: 'file',
     });
-    const { rowEl, removeDraftContextItemsForTarget } = createHarness({
+    const { rowEl } = createHarness({
       draftContextItems: [attachedItem],
     });
 
     const chipEl = rowEl.querySelector('button');
     expect(chipEl?.classList.contains('is-attached')).toBe(true);
-
-    chipEl?.click();
-
-    expect(removeDraftContextItemsForTarget).toHaveBeenCalledWith(expect.objectContaining({
-      path: 'notes/A.md',
-    }));
+    expect(chipEl?.classList.contains('is-preview')).toBe(false);
+    expect(chipEl?.getAttribute('aria-pressed')).toBe('true');
   });
 
-  it('refreshes focus preview instead of attaching a stale preview chip', () => {
-    const stalePreview = createFocusContextPreview('notes/A.md');
+  it('rerenders when draft items or the focus preview change', () => {
+    const attachedItem = createContextItem({
+      id: 'context-selection',
+      kind: 'selection',
+      label: 'A.md:1-2',
+      lineRange: { startLine: 1, endLine: 2 },
+      textSnapshot: 'Selected text',
+    });
     const {
+      coordinator,
       rowEl,
-      refreshActiveFocusContextPreview,
-      contextAttachmentBuilder,
+      setDraftContextItems,
       setFocusPreview,
-    } = createHarness({
-      focusPreview: stalePreview,
-      selectionContextItem: createContextItem(),
-    });
+    } = createHarness();
 
+    expect(rowEl.classList.contains('is-empty')).toBe(true);
+
+    setDraftContextItems([attachedItem]);
     setFocusPreview(createFocusContextPreview('notes/B.md'));
+    coordinator.render();
 
-    rowEl.querySelector('button')?.click();
-
-    expect(refreshActiveFocusContextPreview).toHaveBeenCalledTimes(1);
-    expect(contextAttachmentBuilder.buildSelectionContextItemFromPreview).not.toHaveBeenCalled();
-    expect(contextAttachmentBuilder.buildFileContextItemFromPath).not.toHaveBeenCalled();
-  });
-
-  it('refreshes focus preview when file preview attachment can no longer resolve its file', async () => {
-    const filePreview = createFocusContextPreview('notes/missing.md');
-    const {
-      rowEl,
-      refreshActiveFocusContextPreview,
-      contextAttachmentBuilder,
-    } = createHarness({
-      focusPreview: filePreview,
-      hasFileAtPath: false,
-    });
-
-    rowEl.querySelector('button')?.click();
-    await Promise.resolve();
-    await Promise.resolve();
-
-    expect(contextAttachmentBuilder.buildFileContextItemFromPath).toHaveBeenCalledWith(
-      'notes/missing.md',
-      'current_note',
-    );
-    expect(refreshActiveFocusContextPreview).toHaveBeenCalledTimes(1);
+    const chipLabels = Array.from(rowEl.querySelectorAll('button')).map((chip) => chip.textContent);
+    expect(chipLabels).toEqual(['B.md', 'A.md:1-2']);
+    expect(rowEl.classList.contains('is-empty')).toBe(false);
   });
 });

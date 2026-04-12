@@ -190,6 +190,10 @@ import {
   type ComposerContextActionServiceHost,
 } from './services/ComposerContextActionService';
 import {
+  ComposerContextChipActionService,
+  type ComposerContextChipActionServiceHost,
+} from './services/ComposerContextChipActionService';
+import {
   ComposerContextCoordinator,
   type ComposerContextCoordinatorHost,
 } from './services/ComposerContextCoordinator';
@@ -759,6 +763,7 @@ export class OpenCodianView extends ItemView {
   private questionRuntimeServices: QuestionRuntimeServices;
   private sendPipelineRuntime: SendPipelineRuntime;
   private composerContextActionService: ComposerContextActionService;
+  private composerContextChipActionService: ComposerContextChipActionService;
   private composerContextCoordinator: ComposerContextCoordinator;
   private composerContextEventBridge: ComposerContextEventBridge;
   private composerContextViewHostAdapter: ComposerContextViewHostAdapter;
@@ -1125,9 +1130,13 @@ export class OpenCodianView extends ItemView {
       this.createFocusContextPreviewCoordinatorHost(),
       this.focusContextRuntimeService,
     );
-    this.composerContextCoordinator = new ComposerContextCoordinator(
+    this.composerContextChipActionService = new ComposerContextChipActionService(
       this.contextAttachmentBuilder,
+      this.createComposerContextChipActionServiceHost(),
+    );
+    this.composerContextCoordinator = new ComposerContextCoordinator(
       this.createComposerContextCoordinatorHost(),
+      this.composerContextChipActionService,
     );
     this.composerContextEventBridge = new ComposerContextEventBridge(
       this.app,
@@ -1315,7 +1324,11 @@ export class OpenCodianView extends ItemView {
   }
 
   private createComposerContextCoordinatorHost(): ComposerContextCoordinatorHost {
-    return this.composerContextViewHostAdapter.createCoordinatorHost({
+    return this.composerContextViewHostAdapter.createCoordinatorHost();
+  }
+
+  private createComposerContextChipActionServiceHost(): ComposerContextChipActionServiceHost {
+    return this.composerContextViewHostAdapter.createChipActionServiceHost({
       refreshActiveFocusContextPreview: () => {
         this.focusContextPreviewCoordinator.refreshActiveFocusContextPreview();
       },

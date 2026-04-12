@@ -104,10 +104,11 @@ describe('ComposerContextViewHostAdapter', () => {
     expect(renderComposerContext).toHaveBeenCalledTimes(1);
   });
 
-  it('builds coordinator and focus-runtime hosts on top of the shared tab-state adapter', () => {
+  it('builds coordinator, chip-action, and focus-runtime hosts on top of the shared tab-state adapter', () => {
     const { adapter, runtimes, setActiveTabId } = createHarness();
     const refreshActiveFocusContextPreview = jest.fn();
-    const coordinatorHost = adapter.createCoordinatorHost({
+    const coordinatorHost = adapter.createCoordinatorHost();
+    const chipActionHost = adapter.createChipActionServiceHost({
       refreshActiveFocusContextPreview,
     });
     const focusHost = adapter.createFocusContextRuntimeServiceHost({
@@ -121,21 +122,24 @@ describe('ComposerContextViewHostAdapter', () => {
     runtimes.get('tab-1' as TabId)!.focusContextPreview = createPreview('notes/alpha.md');
 
     expect(coordinatorHost.getDraftContextItems()).toEqual([selectionItem, fileItem]);
+    expect(coordinatorHost.getFocusContextPreview()).toEqual(createPreview('notes/alpha.md'));
+    expect(chipActionHost.getFocusContextPreview()).toEqual(createPreview('notes/alpha.md'));
     expect(focusHost.getFocusContextPreview()).toEqual(createPreview('notes/alpha.md'));
     expect(focusHost.getCurrentConversationNotePath()).toBe('notes/current.md');
     expect(focusHost.isComposerInteractionFocused()).toBe(false);
 
-    coordinatorHost.removeDraftContextItemsForTarget({
+    chipActionHost.removeDraftContextItemsForTarget({
       path: 'notes/alpha.md',
       lineRange: { startLine: 1, endLine: 4 },
     });
-    coordinatorHost.refreshActiveFocusContextPreview();
+    chipActionHost.refreshActiveFocusContextPreview();
 
     expect(coordinatorHost.getDraftContextItems()).toEqual([fileItem]);
     expect(refreshActiveFocusContextPreview).toHaveBeenCalledTimes(1);
 
     setActiveTabId('tab-2' as TabId);
     expect(coordinatorHost.getDraftContextItems()).toEqual([]);
+    expect(chipActionHost.getFocusContextPreview()).toBeNull();
     expect(focusHost.getFocusContextPreview()).toBeNull();
   });
 });

@@ -5,11 +5,11 @@
 
 ## 概述
 
-`ComposerContextViewHostAdapter` 把 `OpenCodianView` 里 active-tab `draftContextItems` / `focusContextPreview` 的读写入口收束到一个更窄的 host adapter。它统一给 `ComposerContextActionService`、`ComposerContextCoordinator`、`FocusContextRuntimeService`，以及发送前的 context-draft 读取/清空路径提供同一份 tab-state seam，让 view 不再直接维护这一组 getter/setter。
+`ComposerContextViewHostAdapter` 把 `OpenCodianView` 里 active-tab `draftContextItems` / `focusContextPreview` 的读写入口收束到一个更窄的 host adapter。它统一给 `ComposerContextActionService`、`ComposerContextChipActionService`、`ComposerContextCoordinator`、`FocusContextRuntimeService`，以及发送前的 context-draft 读取/清空路径提供同一份 tab-state seam，让 view 不再直接维护这一组 getter/setter。
 
 ## 导入关系
 
-上游: `core/types`、`tabs`、`composerContext`、`ComposerContextActionService`、`ComposerContextCoordinator`、`FocusContextRuntimeService`
+上游: `core/types`、`tabs`、`composerContext`、`ComposerContextActionService`、`ComposerContextChipActionService`、`ComposerContextCoordinator`、`FocusContextRuntimeService`
 下游: `OpenCodianView`
 
 ## 公开接口
@@ -29,7 +29,10 @@ interface ComposerContextViewHostAdapterViewHost {
 class ComposerContextViewHostAdapter {
   getDraftContextItems(tabId?: TabId | null): PromptContextItem[]
   clearDraftContextItems(tabId?: TabId | null): void
-  createCoordinatorHost(options: ComposerContextCoordinatorHostOptions): ComposerContextCoordinatorHost
+  createCoordinatorHost(): ComposerContextCoordinatorHost
+  createChipActionServiceHost(
+    options: ComposerContextChipActionHostOptions,
+  ): ComposerContextChipActionServiceHost
   createActionServiceHost(options: ComposerContextActionHostOptions): ComposerContextActionServiceHost
   createFocusContextRuntimeServiceHost(
     options: ComposerContextFocusRuntimeHostOptions,
@@ -48,14 +51,15 @@ class ComposerContextViewHostAdapter {
 
 ### host 组装
 
-- `createCoordinatorHost()` 把 chip 渲染、attach/detach 与 stale-preview refresh handoff 统一接回同一份 state seam
+- `createCoordinatorHost()` 只暴露 render 所需的只读 draft / preview seam
+- `createChipActionServiceHost()` 把 attach/detach、副作用写回和 stale-preview refresh handoff 收束到专用 host
 - `createActionServiceHost()` 让 current-note / selection / file 三条入口动作复用同一份 draft-item 写回
 - `createFocusContextRuntimeServiceHost()` 让 focus runtime 与 chips 共享同一份 preview state，同时仍由 view 提供 current-note path 与 composer-focus gate
 
 ### send 前复用
 
 - `OpenCodianView` 还会直接复用 `getDraftContextItems()` / `clearDraftContextItems()` 交给 `MessageSendPreparationService`
-- 因此 optimistic send 前读取 context attachments，以及 stream 启动后清空 draft chips，都会落在和 action/coordinator/runtime 相同的 state 边界上
+- 因此 optimistic send 前读取 context attachments，以及 stream 启动后清空 draft chips，都会落在和 action/chip-action/runtime 相同的 state 边界上
 
 ## 注意事项
 

@@ -9,6 +9,7 @@ import {
   type FocusContextPreview,
 } from '../composerContext';
 import type { ComposerContextActionServiceHost } from './ComposerContextActionService';
+import type { ComposerContextChipActionServiceHost } from './ComposerContextChipActionService';
 import type { ComposerContextCoordinatorHost } from './ComposerContextCoordinator';
 import type { FocusContextRuntimeServiceHost } from './FocusContextRuntimeService';
 
@@ -23,7 +24,7 @@ export interface ComposerContextViewHostAdapterViewHost {
   renderComposerContext(): void;
 }
 
-export interface ComposerContextCoordinatorHostOptions {
+export interface ComposerContextChipActionHostOptions {
   refreshActiveFocusContextPreview(): void;
 }
 
@@ -50,11 +51,17 @@ export class ComposerContextViewHostAdapter {
     this.setDraftContextItems([], tabId);
   }
 
-  createCoordinatorHost(
-    options: ComposerContextCoordinatorHostOptions,
-  ): ComposerContextCoordinatorHost {
+  createCoordinatorHost(): ComposerContextCoordinatorHost {
     return {
       getDraftContextItems: () => this.getDraftContextItems(),
+      getFocusContextPreview: () => this.getFocusContextPreview(),
+    };
+  }
+
+  createChipActionServiceHost(
+    options: ComposerContextChipActionHostOptions,
+  ): ComposerContextChipActionServiceHost {
+    return {
       getFocusContextPreview: () => this.getFocusContextPreview(),
       addDraftContextItem: (item) => {
         this.addDraftContextItem(item);
