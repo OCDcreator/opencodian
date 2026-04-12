@@ -24,6 +24,10 @@ import {
   buildTrailingAssistantPatchExecutionTailPlanningContext,
   type TrailingAssistantPatchExecutionTailPlanningContext,
 } from './TrailingAssistantPatchExecutionTailPlanningContextHelper';
+import {
+  buildTrailingAssistantPatchTailOutcomePlanningContext,
+  type TrailingAssistantPatchTailOutcomePlanningContext,
+} from './TrailingAssistantPatchTailOutcomePlanningContextHelper';
 import { buildTrailingAssistantPatchTurnBodyScopePlan } from './TrailingAssistantPatchTurnBodyScopePlanHelper';
 import {
   captureElementScrollRestoreSnapshot,
@@ -185,20 +189,6 @@ type TrailingAssistantPatchSuccessPlanParts = {
   executionPlan: TrailingAssistantPatchExecutionPlan;
   tailOutcomePlans: TrailingAssistantPatchTailOutcomePlans;
   turnBodyScopePlan: TrailingAssistantPatchTurnBodyScopePlan;
-};
-
-type TrailingAssistantPatchTailOutcomeInputs = {
-  previousTailMessage: ChatMessage;
-  nextTailMessage: ChatMessage;
-  messageEl: HTMLElement;
-  shouldStickToBottom: boolean;
-};
-
-type TrailingAssistantPatchTailOutcomePlanningContext = {
-  previousTailMessage: ChatMessage;
-  nextTailMessage: ChatMessage;
-  messageEl: HTMLElement;
-  shouldStickToBottom: boolean;
 };
 
 type TrailingAssistantPatchTailStatePlanningContext = {
@@ -770,32 +760,8 @@ export class ConversationRenderService {
     planningContext: TrailingAssistantPatchExecutionTailPlanningContext,
   ): TrailingAssistantPatchTailOutcomePlans {
     return this.buildTrailingAssistantPatchTailOutcomePlans(
-      this.buildTrailingAssistantPatchTailOutcomePlanningContext(
-        this.buildTrailingAssistantPatchTailOutcomeInputs(planningContext),
-      ),
+      buildTrailingAssistantPatchTailOutcomePlanningContext(planningContext),
     );
-  }
-
-  private buildTrailingAssistantPatchTailOutcomeInputs(
-    planningContext: TrailingAssistantPatchExecutionTailPlanningContext,
-  ): TrailingAssistantPatchTailOutcomeInputs {
-    return {
-      previousTailMessage: planningContext.previousTailMessage,
-      nextTailMessage: planningContext.nextTailMessage,
-      messageEl: planningContext.patchTarget.messageEl,
-      shouldStickToBottom: planningContext.shouldStickToBottom,
-    };
-  }
-
-  private buildTrailingAssistantPatchTailOutcomePlanningContext(
-    inputs: TrailingAssistantPatchTailOutcomeInputs,
-  ): TrailingAssistantPatchTailOutcomePlanningContext {
-    return {
-      previousTailMessage: inputs.previousTailMessage,
-      nextTailMessage: inputs.nextTailMessage,
-      messageEl: inputs.messageEl,
-      shouldStickToBottom: inputs.shouldStickToBottom,
-    };
   }
 
   private buildTrailingAssistantPatchTailOutcomePlans(
