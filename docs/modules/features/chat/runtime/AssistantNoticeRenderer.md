@@ -5,13 +5,13 @@
 
 ## 概述
 
-`AssistantNoticeRenderer` 是发送 runtime 的 assistant notice 专用 helper。它把 stream error / interrupted notice 的 message 构造，以及“把现有 streaming shell 改造成 notice card”的 DOM 过程从 `OpenCodianView` 中抽出。
+`AssistantNoticeRenderer` 是发送 runtime 的 assistant notice 专用 helper。它把 stream error / interrupted notice 的 message 构造，以及“把现有 streaming shell 改造成 notice card”的 shell 改写过程从 `OpenCodianView` 中抽出；notice card 内部 DOM 组装则交给相邻的 `AssistantNoticeCardRenderer`。
 
 ## 公开接口
 
 - `buildStreamErrorNotice()`：构建带 `displayStyle: 'notice'` 的 stream error assistant message
 - `buildInterruptedAssistantNotice()`：构建 interrupted assistant notice message
-- `renderAssistantPlaceholderAsNotice()`：把已创建的 assistant shell 清空、标记为 notice、渲染 notice card，并通过 host 补上时间戳行
+- `renderAssistantPlaceholderAsNotice()`：把已创建的 assistant shell 清空、标记为 notice、调用 host 渲染 notice card，并通过 host 补上时间戳行
 - `AssistantNoticeRenderHost`：只暴露 notice 渲染需要的三个 view adapter：notice card 渲染、timestamp 渲染和 streaming shell 可见性切换
 
 ## 设计目的
@@ -22,6 +22,6 @@
 
 ## 注意事项
 
-- 这个模块仍通过 `AssistantNoticeRenderHost` 复用 view 的 notice card 渲染；当前这层 host 已由 `AssistantShellViewHostAdapter.ts` 统一装配，不要在这里复制完整 notice card 样式逻辑。
+- 这个模块仍通过 `AssistantNoticeRenderHost` 复用宿主提供的 notice card 渲染；当前这层 host 由 `AssistantShellViewHostAdapter.ts` 统一装配，并应落到 `AssistantNoticeCardRenderer.ts`。
 - assistant shell 的创建、reveal 与 timestamp row 具体实现已经迁到 `AssistantShellRenderer.ts`；这里继续只关心 notice 改写流程。
 - notice id / `sourceMessageId` 规则会影响后续 server sync 是否保留本地 error notice，修改时需要同步检查 `streamErrorNoticeSync` 测试。

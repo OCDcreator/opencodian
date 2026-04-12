@@ -78,6 +78,10 @@ import { LiquidDiamondDemoController } from './liquidDiamondDemo';
 import { buildMessageRenderGroups, mergeAssistantMessagesForRender } from './renderGroups';
 import { type CollapsibleState, setupCollapsible } from './rendering/collapsible';
 import {
+  AssistantNoticeCardRenderer,
+  type AssistantNoticeCardRendererHost,
+} from './runtime/AssistantNoticeCardRenderer';
+import {
   buildStreamErrorNotice,
 } from './runtime/AssistantNoticeRenderer';
 import {
@@ -733,6 +737,7 @@ export class OpenCodianView extends ItemView {
   private conversationRenderService: ConversationRenderService;
   private messageSendPreparationService: MessageSendPreparationService;
   private messageFinalizationService: MessageFinalizationService;
+  private assistantNoticeCardRenderer: AssistantNoticeCardRenderer;
   private assistantShellViewHostAdapter: AssistantShellViewHostAdapter;
   private backgroundTaskInlinePanelRenderer: BackgroundTaskInlinePanelRenderer;
   private backgroundTaskIndicatorCoordinator: BackgroundTaskIndicatorCoordinator;
@@ -1248,6 +1253,9 @@ export class OpenCodianView extends ItemView {
     this.conversationRenderService = new ConversationRenderService(this.createConversationRenderHost());
     this.messageSendPreparationService = new MessageSendPreparationService(this.createMessageSendPreparationHost());
     this.messageFinalizationService = new MessageFinalizationService(this.createMessageFinalizationHost());
+    this.assistantNoticeCardRenderer = new AssistantNoticeCardRenderer(
+      this.createAssistantNoticeCardRendererHost(),
+    );
     this.assistantShellViewHostAdapter = new AssistantShellViewHostAdapter(
       this.createAssistantShellViewHostAdapterHost(),
     );
@@ -2032,6 +2040,13 @@ export class OpenCodianView extends ItemView {
     };
   }
 
+  private createAssistantNoticeCardRendererHost(): AssistantNoticeCardRendererHost {
+    return {
+      renderMarkdownInto: (container, markdown) => this.renderMarkdownInto(container, markdown),
+      handleNoticeAction: (actionType) => this.handleNoticeAction(actionType),
+    };
+  }
+
   private createAssistantShellViewHostAdapterHost(): AssistantShellViewHostAdapterHost {
     return {
       getActiveTabId: () => this.getActiveTabId(),
@@ -2048,7 +2063,8 @@ export class OpenCodianView extends ItemView {
         copyBtn.innerHTML = COPY_ICON;
         this.attachCopyButtonBehavior(copyBtn, content);
       },
-      renderNoticeCard: (container, message) => this.renderNoticeCard(container, message),
+      renderNoticeCard: (container, message) =>
+        this.assistantNoticeCardRenderer.render(container, message),
     };
   }
 
@@ -5006,7 +5022,7 @@ export class OpenCodianView extends ItemView {
 
     if (message.displayStyle === 'notice') {
       messageEl.addClass('opencodian-message--notice');
-      await this.renderNoticeCard(content, message);
+      await this.assistantNoticeCardRenderer.render(content, message);
       this.assistantShellViewHostAdapter.finalizeNoticeFooter(messageEl, message);
     } else if (message.role === 'user') {
       const copyContent = await this.renderUserMessageContent(content, message);
@@ -7293,70 +7309,6 @@ export class OpenCodianView extends ItemView {
     return false;
   }
 
-  private async renderNoticeCard(container: HTMLElement, message: ChatMessage): Promise<void> {
-    const tone = message.noticeTone ?? 'info';
-    const cardEl = container.createDiv({ cls: `opencodian-chat-notice-card is-${tone}` });
-    const iconEl = cardEl.createDiv({ cls: 'opencodian-chat-notice-icon' });
-    setIcon(
-      iconEl,
-      tone === 'error' ? 'x-circle' : tone === 'warning' ? 'alert-triangle' : 'info',
-    );
-
-    const bodyEl = cardEl.createDiv({ cls: 'opencodian-chat-notice-body' });
-    const noticeTitle = message.noticeTitle ?? this.getOmoNoticeTitle(message);
-    if (noticeTitle) {
-      bodyEl.createDiv({
-        cls: 'opencodian-chat-notice-title',
-        text: noticeTitle,
-      });
-    }
-
-    const textEl = bodyEl.createDiv({ cls: 'opencodian-chat-notice-text' });
-    await this.renderMarkdownInto(textEl, this.getNoticeBodyText(message));
-
-    if (message.omo?.kind === 'system-reminder') {
-      const rawWrapperEl = bodyEl.createDiv({ cls: 'opencodian-omo-raw-block opencodian-omo-raw-block--notice' });
-      rawWrapperEl.createDiv({
-        cls: 'opencodian-omo-raw-label',
-        text: t('chat.omo.system.rawLabel'),
-      });
-      const rawContentEl = rawWrapperEl.createEl('pre', {
-        cls: 'opencodian-omo-raw-content',
-        text: message.omo.rawText,
-      });
-      const rawToggleEl = rawWrapperEl.createEl('button');
-      const rawState: CollapsibleState = {
-        isExpanded: false,
-        isCollapsible: false,
-      };
-      setupCollapsible({
-        wrapperEl: rawWrapperEl,
-        headerEl: rawToggleEl,
-        contentEl: rawContentEl,
-        state: rawState,
-        options: {
-          collapsedHeight: 88,
-          showMoreLabel: t('chat.omo.system.showRaw'),
-          showLessLabel: t('chat.omo.system.hideRaw'),
-        },
-      });
-    }
-
-    if (message.noticeActions && message.noticeActions.length > 0) {
-      const actionsEl = bodyEl.createDiv({ cls: 'opencodian-chat-notice-actions' });
-      for (const action of message.noticeActions) {
-        const buttonEl = actionsEl.createEl('button', {
-          cls: 'opencodian-chat-notice-action-btn',
-          text: this.getNoticeActionLabel(action.type),
-        });
-        buttonEl.type = 'button';
-        buttonEl.addEventListener('click', () => {
-          void this.handleNoticeAction(action.type);
-        });
-      }
-    }
-  }
-
   private getOmoModeBadgeLabel(modeTag: string): string {
     switch (modeTag) {
       case 'search-mode':
@@ -7375,46 +7327,6 @@ export class OpenCodianView extends ItemView {
 
     const headline = message.omo.headline || t('chat.omo.injected.defaultHeadline');
     return t('chat.omo.injected.summary', { headline });
-  }
-
-  private getOmoNoticeTitle(message: ChatMessage): string | undefined {
-    if (message.omo?.kind !== 'system-reminder') {
-      return undefined;
-    }
-
-    switch (message.omo.reminderType) {
-      case 'background-task-completed':
-        return t('chat.omo.system.backgroundCompleted');
-      case 'all-background-tasks-complete':
-        return t('chat.omo.system.allCompleted');
-      default:
-        return t('chat.omo.system.generic');
-    }
-  }
-
-  private getNoticeBodyText(message: ChatMessage): string {
-    if (message.omo?.kind !== 'system-reminder') {
-      return message.content;
-    }
-
-    const lines = message.omo.reminderText
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter((line) => line.length > 0);
-    const headline = message.omo.headline;
-    const detailLines = lines.filter((line) => line !== headline);
-    if (detailLines.length > 0) {
-      return detailLines.join('\n\n');
-    }
-
-    switch (message.omo.reminderType) {
-      case 'background-task-completed':
-        return t('chat.omo.system.backgroundCompletedSummary');
-      case 'all-background-tasks-complete':
-        return t('chat.omo.system.allCompletedSummary');
-      default:
-        return message.content || headline;
-    }
   }
 
   private async appendTurnDiffNoticeIfNeeded(
@@ -7520,17 +7432,6 @@ export class OpenCodianView extends ItemView {
       title: t('chat.notice.modelUnavailable.selectedTitle'),
       message: t('chat.notice.modelUnavailable.selectedBody'),
     };
-  }
-
-  private getNoticeActionLabel(actionType: NonNullable<ChatMessage['noticeActions']>[number]['type']): string {
-    switch (actionType) {
-      case 'open_model_settings':
-        return t('chat.notice.action.openModelSettings');
-      case 'restore_rewind':
-        return t('chat.rewind.empty.restore');
-      default:
-        return t('chat.notice.action.openModelSettings');
-    }
   }
 
   private async handleNoticeAction(

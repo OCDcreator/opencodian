@@ -209,6 +209,8 @@ question dock 与 pending-question refresh 的主要 runtime/UI ownership 现在
 
 否则回退到整段重渲。
 
+assistant notice card 的 tone / icon、OMO system-reminder 标题与 raw block、notice action label 等 DOM 细节现在由 `runtime/AssistantNoticeCardRenderer.ts` 承接；`OpenCodianView` 只保留 Markdown 渲染和 action 副作用的 host 回调，以及 footer finalization。
+
 ### 发送与流式渲染
 
 第七阶段后，`OpenCodianView.sendMessage()` 已经退化成 UI 事件到 `runtime/SendPipelineRuntime.ts` 的薄桥接。完整发送子系统现在按下面的边界协作：
