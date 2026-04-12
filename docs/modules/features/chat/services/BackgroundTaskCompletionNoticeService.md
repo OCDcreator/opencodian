@@ -12,7 +12,7 @@
 - 根据已持久化的 `noticeMeta` 做 source-reminder / task 集合去重
 - 在 stream 结束后追加持久化 completion notice，并保留 noticeMeta 供 reload 后恢复
 
-它不负责 background task timeline 推导，也不决定何时收集 segment 或何时触发 queue/flush；这些时机仍由 `OpenCodianView` 控制。
+它不负责 background task timeline 推导，也不决定何时收集 segment；queue/flush 的调用时机现在由 `OpenCodianView` 与 `BackgroundTaskPostSyncCoordinator` 分别在 inline render / post-sync 场景下协调。
 
 ## 公开接口
 
@@ -44,6 +44,7 @@ export class BackgroundTaskCompletionNoticeService {
 
 ## 与 `OpenCodianView` 的边界
 
-- `OpenCodianView` 仍负责 background task timeline 推导、hydration / authoritative-sync gate、inline panel 渲染，以及 queue/flush 的调用时机
+- `OpenCodianView` 仍负责 background task timeline 推导、hydration / authoritative-sync gate、inline panel 渲染，以及 completion segment 的收集
+- `BackgroundTaskPostSyncCoordinator` 负责 hidden signal/background-tab sync 后的 completion notice queue/flush 调用编排
 - `BackgroundTaskCompletionNoticeService` 负责 completion notice queued state、content/fingerprint 和 persisted dedupe/append 协调
 - 这让 P2 `question / todo / background task` lane 继续把 background-task completion ownership 从主 view 迁到 dedicated service，而不是继续把 notice 细节留在 `OpenCodianView`

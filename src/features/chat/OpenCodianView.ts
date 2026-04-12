@@ -155,6 +155,10 @@ import {
   BackgroundTaskLiveSignalCoordinator,
 } from './services/BackgroundTaskLiveSignalCoordinator';
 import {
+  type BackgroundTaskPostSyncCoordinatorHost,
+  BackgroundTaskPostSyncCoordinator,
+} from './services/BackgroundTaskPostSyncCoordinator';
+import {
   type ConversationAssistantTailRenderPort,
   type ConversationRenderHost,
   ConversationRenderService,
@@ -661,6 +665,7 @@ export class OpenCodianView extends ItemView {
   private backgroundTaskCompletionNoticeService: BackgroundTaskCompletionNoticeService;
   private backgroundTaskNoticeStateService: BackgroundTaskNoticeStateService;
   private backgroundTaskLiveSignalCoordinator: BackgroundTaskLiveSignalCoordinator;
+  private backgroundTaskPostSyncCoordinator: BackgroundTaskPostSyncCoordinator;
   private conversationViewStateService: ConversationViewStateService;
   private conversationRenderService: ConversationRenderService;
   private messageSendPreparationService: MessageSendPreparationService;
@@ -1671,6 +1676,9 @@ export class OpenCodianView extends ItemView {
     this.backgroundTaskLiveSignalCoordinator = new BackgroundTaskLiveSignalCoordinator(
       this.createBackgroundTaskLiveSignalCoordinatorHost(),
     );
+    this.backgroundTaskPostSyncCoordinator = new BackgroundTaskPostSyncCoordinator(
+      this.createBackgroundTaskPostSyncCoordinatorHost(),
+    );
     this.backgroundTaskCompletionNoticeService = new BackgroundTaskCompletionNoticeService(
       this.createBackgroundTaskCompletionNoticeServiceHost(),
     );
@@ -1761,6 +1769,37 @@ export class OpenCodianView extends ItemView {
         this.appendBackgroundTaskStoppedNotice(tabId, pending),
       resetBackgroundTaskIndicator: (tabId) => {
         this.resetBackgroundTaskIndicator(tabId);
+      },
+    };
+  }
+
+  private createBackgroundTaskPostSyncCoordinatorHost(): BackgroundTaskPostSyncCoordinatorHost {
+    return {
+      getTabRuntimeState: (tabId: TabId | null) => this.getTabRuntimeState(tabId),
+      hasIncompleteTodos: (todos) => this.hasIncompleteTodos(todos),
+      markBackgroundTaskAuthoritativeSync: (tabId, reason) => {
+        this.markBackgroundTaskAuthoritativeSync(tabId, reason);
+      },
+      refreshPendingQuestionsForTab: (tabId, sessionId) =>
+        this.refreshPendingQuestionsForTab(tabId, sessionId),
+      syncBackgroundTaskStateFromConversation: (conversation, tabId) => {
+        this.syncBackgroundTaskStateFromConversation(conversation, tabId);
+      },
+      refreshTabSessionStatus: (tabId, sessionId, options) =>
+        this.refreshTabSessionStatus(tabId, sessionId, options),
+      refreshTabSessionTodos: (tabId, sessionId, options) =>
+        this.refreshTabSessionTodos(tabId, sessionId, options),
+      queueBackgroundTaskCompletionNotices: (tabId, conversation) =>
+        this.queueBackgroundTaskCompletionNotices(tabId, conversation),
+      flushQueuedBackgroundTaskCompletionNotices: (tabId, conversation) =>
+        this.flushQueuedBackgroundTaskCompletionNotices(tabId, conversation),
+      syncTabStreamLikeState: (tabId) => {
+        this.syncTabStreamLikeState(tabId);
+      },
+      setTabNeedsAttention: (tabId, needsAttention) => {
+        if (tabId) {
+          this.tabManager?.setTabNeedsAttention(tabId, needsAttention);
+        }
       },
     };
   }
@@ -5600,19 +5639,15 @@ export class OpenCodianView extends ItemView {
         { suppressVerboseLogs: true },
       );
       runtime.lastConversationSyncFingerprint = syncResult.fingerprint;
-      this.markBackgroundTaskAuthoritativeSync(tabId, `sync-event:${reason}`);
-      await this.refreshPendingQuestionsForTab(tabId, conversation.openCodeSessionId);
-      this.syncBackgroundTaskStateFromConversation(conversation, tabId);
-      if (this.hasIncompleteTodos(runtime.sessionTodos) || tab.hasBackgroundTask) {
-        await this.refreshTabSessionStatus(tabId, conversation.openCodeSessionId, { suppressErrors: true });
-        await this.refreshTabSessionTodos(tabId, conversation.openCodeSessionId, { suppressErrors: true });
-      }
-      await this.queueBackgroundTaskCompletionNotices(tabId, conversation);
-      await this.flushQueuedBackgroundTaskCompletionNotices(tabId, conversation);
-      this.syncTabStreamLikeState(tabId);
-      if (syncResult.changed || syncResult.fingerprint !== previousFingerprint) {
-        this.tabManager?.setTabNeedsAttention(tabId, tabId !== activeTabId);
-      }
+      await this.backgroundTaskPostSyncCoordinator.handleSignalSyncComplete({
+        tabId,
+        conversation,
+        reason,
+        activeTabId,
+        tabHasBackgroundTask: tab.hasBackgroundTask,
+        previousFingerprint,
+        syncResult,
+      });
     } finally {
       runtime.isConversationSyncInFlight = false;
     }
@@ -5712,19 +5747,12 @@ export class OpenCodianView extends ItemView {
           tab.id,
           'background-tab-sync',
         );
-        await this.refreshPendingQuestionsForTab(tab.id, conversation.openCodeSessionId);
-        this.syncBackgroundTaskStateFromConversation(conversation, tab.id);
-        if (this.hasIncompleteTodos(runtime.sessionTodos) || tab.hasBackgroundTask) {
-          await this.refreshTabSessionStatus(tab.id, conversation.openCodeSessionId, { suppressErrors: true });
-          await this.refreshTabSessionTodos(tab.id, conversation.openCodeSessionId, { suppressErrors: true });
-        }
-        await this.queueBackgroundTaskCompletionNotices(tab.id, conversation);
-        await this.flushQueuedBackgroundTaskCompletionNotices(tab.id, conversation);
-        this.syncTabStreamLikeState(tab.id);
-
-        if (syncResult.changed || syncResult.fingerprint !== previousFingerprint) {
-          this.tabManager?.setTabNeedsAttention(tab.id, true);
-        }
+        await this.backgroundTaskPostSyncCoordinator.handleBackgroundTabSyncComplete({
+          tabId: tab.id,
+          conversation,
+          previousFingerprint,
+          syncResult,
+        });
       } finally {
         runtime.isConversationSyncInFlight = false;
       }
