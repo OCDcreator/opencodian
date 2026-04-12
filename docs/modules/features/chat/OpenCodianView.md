@@ -162,6 +162,8 @@ tab conversation/session activation 写回现在也不再由 view 自己在 load
 
 tab 激活入口里剩余的 pane-activation UI preflight（`setActiveMessagesPane()`、focus preview、question dock、todo dock）现在也不再由 `ConversationViewStateService` 直接通过四个分散 host 回调驱动，而是统一交给 `runtime/TabViewActivationBridge.ts`；streaming / empty-tab activation 后续的 selector、context usage identity、send-button 与相邻 dock 刷新顺序，以及 loaded-conversation 在消息重渲后的 background-task indicator / todo dock / question dock outcome，加上 scroll restore 之后的 composer layout / model selector / context usage 写回，也都收束到同一 bridge；status / pending question / session todo lazy refresh 则由 `QuestionTodoStatusRefreshCoordinator` 共享给 activation/open 与 post-sync 入口，view 只保留 state writeback 与 host 装配。
 
+current-tab 新建会话后那条 open shell 现在也不再由 view 自己按顺序内联 background-task indicator reset、消息区清空、turn reset、baseline commit、question/todo/context/background-task 后续刷新；这些步骤已统一交给 `runtime/CurrentTabConversationOpenBridge.ts`，并继续复用 `TabConversationStateBridge` 与 `QuestionTodoStatusRefreshCoordinator`。因此 `openConversationInCurrentTab()` 现在只保留命令入口与 bridge 调用，不再持有整段 current-tab open orchestration。
+
 loaded-conversation 切换里旧标题生成取消、background-task indicator reset、scheduled scroll cleanup、消息区清空、turn state reset，以及 hydration lifecycle shell，也不再由 `ConversationViewStateService` 直接通过散落 host 回调持有；这些壳层步骤现在先由 `runtime/ConversationTransitionBridge.ts` 统一桥接。随后消息容器的 `is-rehydrating` class、scroll snapshot、restore-bottom / restore-anchor / restore-distance 调度，以及 pane scroll metrics 回写，再由 `runtime/ConversationHydrationRenderBridge.ts` 承接，view 只保留 title/background indicator/message container/runtime 的真实实现。
 
 loaded-conversation activate 前的 conversation lookup、reload retry、interrupted-tail 驱动的 server-sync 判定，以及 `load-conversation` sync 返回的 revert-state 写回，也不再由 `ConversationViewStateService` 直接通过散落的 host 回调组合；这些数据解析入口现在先由 `runtime/ConversationLoadRuntimeBridge.ts` 统一桥接，view 只保留真实的 conversation 查询、sync 与 revert-state 落点实现。
@@ -369,6 +371,7 @@ background task notice 这条子链路现在的边界是：
 - `BackgroundTaskStreamTriggerCoordinator`：streaming tool-call start/end、todo refresh、background-task launch runtime 更新，与 primary-stream finalize 后的 waiting/reset trigger 编排
 - `BackgroundTaskLiveSignalCoordinator`：authoritative-sync gate arm/clear、tab badge / finalize 共用的 indicator running predicate、live-signal reconciliation，以及 stale downgrade / reset 的运行时判定
 - `TabConversationStateBridge`：active-tab conversation/session 激活写回、pending-question reset 与 sync fingerprint baseline 提交
+- `CurrentTabConversationOpenBridge`：current-tab 新建会话打开路径的 indicator reset、消息区 shell cleanup、baseline commit 与 question/todo/context/background-task 后续刷新编排
 - `TabViewActivationBridge`：tab/pane activation 预刷新写回，以及 streaming / empty-tab activation outcome 的 selector、context identity、dock、send-button 刷新编排
 - `ConversationTransitionBridge`：loaded-conversation 的切换前 cleanup、消息区清空、turn reset 与 hydration lifecycle shell
 - `TabRuntimeStateBridge`：tab stream-like / background-task badge、rewind-fork 按钮禁用态与 attention 标记的 runtime→UI 写回
@@ -406,6 +409,7 @@ background task notice 这条子链路现在的边界是：
 - `ConversationRenderService`：消息区 full rerender、tail patch 和 append-only sync 编排
 - `ConversationLoadRuntimeBridge`：loaded-conversation 的 resolve / reload retry、server-sync 判定与 revert-state 写回
 - `TabConversationStateBridge`：active-tab conversation/session 写回、pending question reset 与 sync baseline 提交
+- `CurrentTabConversationOpenBridge`：current-tab 新建会话打开路径的 shell orchestration 与后续 UI refresh 编排
 - `TabViewActivationBridge`：tab/pane activation 预刷新写回与 streaming / empty-tab activation outcome UI 刷新
 - `ConversationTransitionBridge`：loaded-conversation 的 preflight cleanup、消息区 shell 与 hydration lifecycle bridge
 - `ConversationHydrationRenderBridge`：loaded-conversation hydration 的消息容器 scroll/class shell 与 pane metrics 回写

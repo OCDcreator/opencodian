@@ -120,6 +120,10 @@ import {
   type ConversationTransitionBridgeHost,
 } from './runtime/ConversationTransitionBridge';
 import {
+  CurrentTabConversationOpenBridge,
+  type CurrentTabConversationOpenBridgeHost,
+} from './runtime/CurrentTabConversationOpenBridge';
+import {
   PermissionInlineCardRenderer,
 } from './runtime/PermissionInlineCardRenderer';
 import { PersistedAssistantFooterFinalizer } from './runtime/PersistedAssistantFooterFinalizer';
@@ -709,6 +713,7 @@ export class OpenCodianView extends ItemView {
   private conversationHydrationRenderBridge: ConversationHydrationRenderBridge;
   private conversationTransitionBridge: ConversationTransitionBridge;
   private tabConversationStateBridge: TabConversationStateBridge;
+  private currentTabConversationOpenBridge: CurrentTabConversationOpenBridge;
   private tabViewActivationBridge: TabViewActivationBridge;
   private tabRuntimeStateBridge: TabRuntimeStateBridge;
   private conversationSyncOrchestrationService: ConversationSyncOrchestrationService;
@@ -1236,6 +1241,11 @@ export class OpenCodianView extends ItemView {
     this.tabConversationStateBridge = new TabConversationStateBridge(
       this.createTabConversationStateBridgeHost(),
     );
+    this.currentTabConversationOpenBridge = new CurrentTabConversationOpenBridge(
+      this.createCurrentTabConversationOpenBridgeHost(),
+      this.tabConversationStateBridge,
+      this.questionTodoStatusRefreshCoordinator,
+    );
     this.tabViewActivationBridge = new TabViewActivationBridge(
       this.createTabViewActivationBridgeHost(),
       this.questionTodoStatusRefreshCoordinator,
@@ -1538,6 +1548,42 @@ export class OpenCodianView extends ItemView {
       refreshActiveTabContextUsageFromServer: () => this.refreshActiveTabContextUsageFromServer(),
       updateSendButtonState: () => {
         this.updateSendButtonState();
+      },
+    };
+  }
+
+  private createCurrentTabConversationOpenBridgeHost(): CurrentTabConversationOpenBridgeHost {
+    return {
+      getCurrentConversationId: () => this.currentConversation?.id ?? null,
+      getActiveTabId: () => this.getActiveTabId(),
+      resetBackgroundTaskIndicator: () => {
+        this.resetBackgroundTaskIndicator();
+      },
+      clearMessagesContainer: () => {
+        this.messagesContainer?.empty();
+      },
+      resetTurnState: () => {
+        this.resetTurnState();
+      },
+      updateModelSelectorDisplay: () => {
+        this.updateModelSelectorDisplay();
+      },
+      syncActiveTabContextUsageIdentity: () => {
+        this.syncActiveTabContextUsageIdentity();
+      },
+      syncBackgroundTaskStateFromConversation: (conversation, tabId) => {
+        this.syncBackgroundTaskStateFromConversation(conversation, tabId);
+      },
+      renderSessionTodoDock: (tabId) => {
+        this.renderSessionTodoDock(tabId);
+      },
+      renderQuestionDock: () => {
+        this.renderQuestionDock();
+      },
+      renderBackgroundTaskIndicatorIfNeeded: (tabId) => this.renderBackgroundTaskIndicatorIfNeeded(tabId),
+      refreshActiveTabContextUsageFromServer: () => this.refreshActiveTabContextUsageFromServer(),
+      scheduleSettledScrollToBottom: (tabId) => {
+        this.scheduleSettledScrollToBottom(tabId);
       },
     };
   }
@@ -4364,29 +4410,7 @@ export class OpenCodianView extends ItemView {
   }
 
   private openConversationInCurrentTab(conversation: Conversation): void {
-    if (this.currentConversation?.id !== conversation.id) {
-      this.resetBackgroundTaskIndicator();
-    }
-    const activeTabId = this.getActiveTabId();
-    this.tabConversationStateBridge.applyActiveConversation(activeTabId, conversation, {
-      clearRevertState: true,
-      resetSessionState: true,
-    });
-    this.messagesContainer?.empty();
-    this.resetTurnState();
-    this.tabConversationStateBridge.commitConversationSyncBaseline(conversation.messages);
-    this.updateModelSelectorDisplay();
-    this.syncActiveTabContextUsageIdentity();
-    this.syncBackgroundTaskStateFromConversation(conversation);
-    this.renderSessionTodoDock();
-    this.renderQuestionDock();
-    void this.questionTodoStatusRefreshCoordinator.refreshAfterActivation(
-      activeTabId,
-      conversation.openCodeSessionId,
-    );
-    void this.renderBackgroundTaskIndicatorIfNeeded();
-    void this.refreshActiveTabContextUsageFromServer();
-    this.scheduleSettledScrollToBottom();
+    this.currentTabConversationOpenBridge.openConversation(conversation);
   }
 
   private startConversationSyncLoop(): void {
