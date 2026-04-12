@@ -37,5 +37,5 @@ export function buildTrailingAssistantPatchCompletionDebugSummaryPlan(
 ## 与其他模块的关系
 
 - `TrailingAssistantPatchCompletionDebugPlanningContextHelper` 现在委托这里生成 `summaryPlan`，自己只再组合 `shouldStickToBottom`
-- `TrailingAssistantPatchCompletionDebugPlanningContextSourceHelper` 继续负责更上游的 source contract 装配
+- `TrailingAssistantPatchCompletionDebugPlanningContextSourceContractHelper` 继续负责更上游的 source contract 装配
 - `TrailingAssistantPatchCompletionDebugPlanHelper` 继续消费包含 `summaryPlan` 的窄 completion-debug planning-context
