@@ -236,6 +236,10 @@ import {
   type ConversationRestoreBootstrapHost,
 } from './services/ConversationRestoreBootstrapCoordinator';
 import {
+  ConversationTabOpenCoordinator,
+  type ConversationTabOpenHost,
+} from './services/ConversationTabOpenCoordinator';
+import {
   type ConversationViewStateHost,
   ConversationViewStateService,
 } from './services/ConversationViewStateService';
@@ -730,6 +734,7 @@ export class OpenCodianView extends ItemView {
   private conversationSyncBridge: ConversationSyncBridge;
   private conversationSyncEventAdapter: ConversationSyncEventAdapter;
   private conversationSessionLiveSignalAdapter: ConversationSessionLiveSignalAdapter;
+  private conversationTabOpenCoordinator: ConversationTabOpenCoordinator;
   private conversationRestoreBootstrapCoordinator: ConversationRestoreBootstrapCoordinator;
   private conversationViewStateService: ConversationViewStateService;
   private conversationRenderService: ConversationRenderService;
@@ -1317,6 +1322,15 @@ export class OpenCodianView extends ItemView {
       this.conversationTransitionBridge,
       conversationLoadRuntimeBridge,
     );
+    this.conversationTabOpenCoordinator = new ConversationTabOpenCoordinator(
+      this.createConversationTabOpenHost(),
+      {
+        activateTab: (tabId) => this.conversationViewStateService.activateTab(tabId),
+        openConversationInCurrentTab: (conversation) => {
+          this.tabConversationActivationBridge.openConversation(conversation);
+        },
+      },
+    );
     this.conversationRestoreBootstrapCoordinator = new ConversationRestoreBootstrapCoordinator(
       this.createConversationRestoreBootstrapHost(),
       {
@@ -1821,6 +1835,18 @@ export class OpenCodianView extends ItemView {
   private createConversationViewStateHost(): ConversationViewStateHost {
     return {
       getTabManager: () => this.tabManager,
+    };
+  }
+
+  private createConversationTabOpenHost(): ConversationTabOpenHost {
+    return {
+      getTabManager: () => this.tabManager,
+      getMaxTabs: () => this.plugin.settings.maxTabs,
+      isActiveTabStreaming: () => this.isActiveTabStreaming(),
+      createConversation: () => this.plugin.createConversation(),
+      showNotice: (message) => {
+        new Notice(message);
+      },
     };
   }
 
@@ -4362,47 +4388,12 @@ export class OpenCodianView extends ItemView {
 
   /** Create a new conversation */
   private async createNewConversation() {
-    if (!this.tabManager) {
-      return;
-    }
-
-    if (!this.tabManager.canCreateTab()) {
-      new Notice(t('chat.tab.maxReached', { count: String(this.plugin.settings.maxTabs) }));
-      return;
-    }
-
-    try {
-      const conversation = await this.plugin.createConversation();
-      const tab = this.tabManager.createTab(conversation);
-      if (tab) {
-        await this.activateTab(tab.id);
-      }
-      new Notice(t('chat.tab.created'));
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : 'Failed to create conversation';
-      new Notice(msg);
-    }
+    await this.conversationTabOpenCoordinator.createConversationInNewTab();
   }
 
   /** Create a new conversation in the current tab */
   private async createNewConversationInCurrentTab(): Promise<void> {
-    if (!this.tabManager) {
-      return;
-    }
-
-    if (this.isActiveTabStreaming()) {
-      new Notice(t('chat.tab.newBlockedWhileStreaming'));
-      return;
-    }
-
-    try {
-      const conversation = await this.plugin.createConversation();
-      this.openConversationInCurrentTab(conversation);
-      new Notice(t('chat.tab.newCurrentCreated'));
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : 'Failed to create conversation';
-      new Notice(msg);
-    }
+    await this.conversationTabOpenCoordinator.createConversationInCurrentTab();
   }
 
   /** Load a conversation */
@@ -4411,10 +4402,6 @@ export class OpenCodianView extends ItemView {
     options: { forceServerSync?: boolean; preserveScrollPosition?: boolean } = {},
   ): Promise<void> {
     await this.conversationViewStateService.loadConversation(id, options);
-  }
-
-  private openConversationInCurrentTab(conversation: Conversation): void {
-    this.tabConversationActivationBridge.openConversation(conversation);
   }
 
   private startConversationSyncLoop(): void {
