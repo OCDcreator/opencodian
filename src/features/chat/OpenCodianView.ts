@@ -1746,6 +1746,7 @@ export class OpenCodianView extends ItemView {
       renderSessionTodoDock: (tabId) => {
         this.renderSessionTodoDock(tabId);
       },
+      renderBackgroundTaskIndicatorIfNeeded: (tabId) => this.renderBackgroundTaskIndicatorIfNeeded(tabId),
       scheduleComposerLayoutSync: () => {
         this.scheduleComposerLayoutSync();
       },
@@ -2012,7 +2013,6 @@ export class OpenCodianView extends ItemView {
         this.syncBackgroundTaskStateFromConversation(conversation);
       },
       renderMessages: (messages) => this.renderMessages(messages),
-      renderBackgroundTaskIndicatorIfNeeded: (tabId) => this.renderBackgroundTaskIndicatorIfNeeded(tabId),
       commitConversationSyncBaseline: (messages) => {
         this.tabConversationStateBridge.commitConversationSyncBaseline(messages);
       },

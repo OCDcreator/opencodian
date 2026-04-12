@@ -64,7 +64,6 @@ export interface ConversationViewStateHost {
   ): Promise<ConversationSyncResult>;
   syncBackgroundTaskStateFromConversation(conversation: Conversation): void;
   renderMessages(messages: ChatMessage[]): Promise<void>;
-  renderBackgroundTaskIndicatorIfNeeded(tabId?: TabId | null): Promise<void>;
   commitConversationSyncBaseline(messages: ChatMessage[]): void;
   scrollToBottom(options: { tabId: TabId | null }): void;
   syncPaneScrollMetrics(tabId: TabId | null, messagesEl: HTMLElement): void;
@@ -75,7 +74,7 @@ export interface ConversationViewStateHost {
 type TabViewActivationPort =
   Pick<
     TabViewActivationBridge,
-    'applyActivationPreflight' | 'applyLoadedConversationPostRenderRefreshes' | 'applyLoadedConversationHydrationTail'
+    'applyActivationPreflight' | 'applyLoadedConversationPostRenderOutcome' | 'applyLoadedConversationHydrationTail'
   >;
 
 export class ConversationViewStateService {
@@ -216,8 +215,7 @@ export class ConversationViewStateService {
 
       this.host.syncBackgroundTaskStateFromConversation(conversation);
       await this.host.renderMessages(messages);
-      await this.host.renderBackgroundTaskIndicatorIfNeeded(activeTabId);
-      this.tabViewActivationBridge.applyLoadedConversationPostRenderRefreshes(
+      await this.tabViewActivationBridge.applyLoadedConversationPostRenderOutcome(
         activeTabId,
         conversation.openCodeSessionId,
       );

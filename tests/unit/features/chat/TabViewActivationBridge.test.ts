@@ -22,6 +22,7 @@ describe('TabViewActivationBridge', () => {
       renderSessionTodoDock: jest.fn(() => {
         callOrder.push('render-todo');
       }),
+      renderBackgroundTaskIndicatorIfNeeded: jest.fn().mockResolvedValue(undefined),
       scheduleComposerLayoutSync: jest.fn(),
       updateModelSelectorDisplay: jest.fn(() => {
         callOrder.push('selector');
@@ -67,6 +68,7 @@ describe('TabViewActivationBridge', () => {
       renderSessionTodoDock: jest.fn(() => {
         callOrder.push('todo');
       }),
+      renderBackgroundTaskIndicatorIfNeeded: jest.fn().mockResolvedValue(undefined),
       scheduleComposerLayoutSync: jest.fn(),
       updateModelSelectorDisplay: jest.fn(() => {
         callOrder.push('selector');
@@ -123,6 +125,7 @@ describe('TabViewActivationBridge', () => {
       renderSessionTodoDock: jest.fn(() => {
         callOrder.push('todo');
       }),
+      renderBackgroundTaskIndicatorIfNeeded: jest.fn().mockResolvedValue(undefined),
       scheduleComposerLayoutSync: jest.fn(),
       updateModelSelectorDisplay: jest.fn(() => {
         callOrder.push('selector');
@@ -149,7 +152,7 @@ describe('TabViewActivationBridge', () => {
     expect(callOrder).toEqual(['todo', 'question', 'selector', 'context', 'send']);
   });
 
-  it('applies loaded-conversation post-render refreshes in order', () => {
+  it('applies loaded-conversation post-render outcome in order', async () => {
     const callOrder: string[] = [];
     const host: jest.Mocked<TabViewActivationBridgeHost> = {
       setActiveMessagesPane: jest.fn(),
@@ -160,6 +163,10 @@ describe('TabViewActivationBridge', () => {
       updateSessionTodoDockForTab: jest.fn(),
       renderSessionTodoDock: jest.fn(() => {
         callOrder.push('todo');
+      }),
+      renderBackgroundTaskIndicatorIfNeeded: jest.fn(() => {
+        callOrder.push('indicator');
+        return Promise.resolve(undefined);
       }),
       scheduleComposerLayoutSync: jest.fn(),
       updateModelSelectorDisplay: jest.fn(),
@@ -181,13 +188,14 @@ describe('TabViewActivationBridge', () => {
     };
     const bridge = new TabViewActivationBridge(host);
 
-    bridge.applyLoadedConversationPostRenderRefreshes('tab-1', 'session-1');
+    await bridge.applyLoadedConversationPostRenderOutcome('tab-1', 'session-1');
 
+    expect(host.renderBackgroundTaskIndicatorIfNeeded).toHaveBeenCalledWith('tab-1');
     expect(host.renderSessionTodoDock).toHaveBeenCalledWith('tab-1');
     expect(host.refreshTabSessionStatus).toHaveBeenCalledWith('tab-1', 'session-1', { suppressErrors: true });
     expect(host.refreshPendingQuestionsForTab).toHaveBeenCalledWith('tab-1', 'session-1');
     expect(host.refreshTabSessionTodos).toHaveBeenCalledWith('tab-1', 'session-1', { suppressErrors: true });
-    expect(callOrder).toEqual(['todo', 'question', 'status', 'pending-question', 'refresh-todo']);
+    expect(callOrder).toEqual(['indicator', 'todo', 'question', 'status', 'pending-question', 'refresh-todo']);
   });
 
   it('applies loaded-conversation hydration tail refreshes in order', async () => {
@@ -198,6 +206,7 @@ describe('TabViewActivationBridge', () => {
       renderQuestionDock: jest.fn(),
       updateSessionTodoDockForTab: jest.fn(),
       renderSessionTodoDock: jest.fn(),
+      renderBackgroundTaskIndicatorIfNeeded: jest.fn().mockResolvedValue(undefined),
       scheduleComposerLayoutSync: jest.fn(() => {
         callOrder.push('layout');
       }),

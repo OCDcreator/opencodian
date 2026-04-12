@@ -101,7 +101,6 @@ function createHost(
     }),
     syncBackgroundTaskStateFromConversation: jest.fn(),
     renderMessages: jest.fn().mockResolvedValue(undefined),
-    renderBackgroundTaskIndicatorIfNeeded: jest.fn().mockResolvedValue(undefined),
     commitConversationSyncBaseline: jest.fn(),
     scrollToBottom: jest.fn(),
     syncPaneScrollMetrics: jest.fn(),
@@ -121,6 +120,7 @@ function createActivationBridge() {
     renderQuestionDock: jest.fn(),
     updateSessionTodoDockForTab: jest.fn(),
     renderSessionTodoDock: jest.fn(),
+    renderBackgroundTaskIndicatorIfNeeded: jest.fn().mockResolvedValue(undefined),
     scheduleComposerLayoutSync: jest.fn(),
     updateModelSelectorDisplay: jest.fn(),
     syncActiveTabContextUsageIdentity: jest.fn(),
@@ -218,7 +218,7 @@ describe('ConversationViewStateService', () => {
     const { bridge } = createActivationBridge();
     const service = new ConversationViewStateService(host, bridge);
     const messagesEl = host.getMessagesContainer();
-    const postRenderRefreshSpy = jest.spyOn(bridge, 'applyLoadedConversationPostRenderRefreshes');
+    const postRenderOutcomeSpy = jest.spyOn(bridge, 'applyLoadedConversationPostRenderOutcome');
     const hydrationTailSpy = jest.spyOn(bridge, 'applyLoadedConversationHydrationTail');
 
     await service.loadConversation(conversation.id, {
@@ -229,7 +229,7 @@ describe('ConversationViewStateService', () => {
     expect(host.applyLoadedConversationActivation).toHaveBeenCalledWith('tab-1', conversation);
     expect(host.beginConversationHydration).toHaveBeenCalledWith('tab-1');
     expect(host.renderMessages).toHaveBeenCalledWith(conversation.messages);
-    expect(postRenderRefreshSpy).toHaveBeenCalledWith('tab-1', conversation.openCodeSessionId);
+    expect(postRenderOutcomeSpy).toHaveBeenCalledWith('tab-1', conversation.openCodeSessionId);
     expect(host.commitConversationSyncBaseline).toHaveBeenCalledWith(conversation.messages);
     expect(captureElementScrollRestoreSnapshot).toHaveBeenCalledWith(messagesEl, false, 120);
     expect(restoreElementScrollAfterRender).toHaveBeenCalled();

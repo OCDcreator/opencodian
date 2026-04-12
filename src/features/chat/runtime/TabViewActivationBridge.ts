@@ -8,6 +8,7 @@ export interface TabViewActivationBridgeHost {
   renderQuestionDock(): void;
   updateSessionTodoDockForTab(tabId: TabId): void;
   renderSessionTodoDock(tabId: TabId | null): void;
+  renderBackgroundTaskIndicatorIfNeeded(tabId?: TabId | null): Promise<void>;
   scheduleComposerLayoutSync(): void;
   updateModelSelectorDisplay(): void;
   syncActiveTabContextUsageIdentity(): void;
@@ -55,7 +56,11 @@ export class TabViewActivationBridge {
     this.host.updateSendButtonState();
   }
 
-  applyLoadedConversationPostRenderRefreshes(tabId: TabId | null, sessionId: string | null): void {
+  async applyLoadedConversationPostRenderOutcome(
+    tabId: TabId | null,
+    sessionId: string | null,
+  ): Promise<void> {
+    await this.host.renderBackgroundTaskIndicatorIfNeeded(tabId);
     this.host.renderSessionTodoDock(tabId);
     this.host.renderQuestionDock();
     void this.host.refreshTabSessionStatus(tabId, sessionId, { suppressErrors: true });
