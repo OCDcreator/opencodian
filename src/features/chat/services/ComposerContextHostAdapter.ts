@@ -8,7 +8,6 @@ import { ComposerContextEventBridge } from './ComposerContextEventBridge';
 import { ComposerContextPickerActionService } from './ComposerContextPickerActionService';
 import { ComposerContextViewFacade } from './ComposerContextViewFacade';
 import { ContextFileCatalogEventBridge } from './ContextFileCatalogEventBridge';
-import { ContextPickerInteractionBridge } from './ContextPickerInteractionBridge';
 import {
   ComposerContextRuntimeStore,
   type ComposerContextRuntimeState,
@@ -16,10 +15,14 @@ import {
 import { ComposerContextViewHostAdapter } from './ComposerContextViewHostAdapter';
 import type { ContextAttachmentBuilder } from './ContextAttachmentBuilder';
 import type { ContextFileCatalogService } from './ContextFileCatalogService';
-import { FocusContextPreviewCoordinator } from './FocusContextPreviewCoordinator';
+import {
+  createFocusContextServices,
+  type FocusContextPreviewWritebackHost,
+  type FocusContextRuntimeViewHost,
+} from './FocusContextHostAdapter';
 import { FocusContextEventBridge } from './FocusContextEventBridge';
-import { FocusContextRuntimeService } from './FocusContextRuntimeService';
-import { FocusContextViewHostAdapter } from './FocusContextViewHostAdapter';
+import type { FocusContextPreviewCoordinator } from './FocusContextPreviewCoordinator';
+import type { FocusContextRuntimeService } from './FocusContextRuntimeService';
 
 type ComposerContextAttachmentBuilderPort = Pick<
   ContextAttachmentBuilder,
@@ -50,14 +53,10 @@ export interface ComposerContextViewHost {
   ): void;
 }
 
-export interface FocusContextRuntimeViewHost {
-  getCurrentConversationNotePath(): string | null;
-  isComposerInteractionFocused(): boolean;
-}
-
-export interface FocusContextPreviewWritebackHost {
-  setCurrentConversationNotePath(path: string | null): void;
-}
+export type {
+  FocusContextPreviewWritebackHost,
+  FocusContextRuntimeViewHost,
+} from './FocusContextHostAdapter';
 
 export interface ComposerContextServiceDependencies {
   app: App;
@@ -87,34 +86,22 @@ export function createComposerContextServices(
     },
   });
   const viewHostAdapter = new ComposerContextViewHostAdapter(runtimeStore);
-  const focusViewHostAdapter = new FocusContextViewHostAdapter(runtimeStore);
   const actionService = new ComposerContextActionService(
     dependencies.contextAttachmentBuilder,
     viewHostAdapter.createActionServiceHost({
       getActiveMarkdownView: () => dependencies.viewHost.getActiveMarkdownView(),
     }),
   );
-  const focusContextRuntimeService = new FocusContextRuntimeService(
-    dependencies.app,
-    focusViewHostAdapter.createFocusContextRuntimeServiceHost({
-      getCurrentConversationNotePath: () =>
-        dependencies.focusRuntimeViewHost.getCurrentConversationNotePath(),
-      isComposerInteractionFocused: () =>
-        dependencies.focusRuntimeViewHost.isComposerInteractionFocused(),
-    }),
-  );
-  const focusContextPreviewCoordinator = new FocusContextPreviewCoordinator(
-    focusViewHostAdapter.createFocusContextPreviewCoordinatorHost({
-      setCurrentConversationNotePath: (path) => {
-        dependencies.focusPreviewWritebackHost.setCurrentConversationNotePath(path);
-      },
-    }),
-    focusContextRuntimeService,
-  );
-  const contextPickerInteractionBridge = new ContextPickerInteractionBridge(
-    focusContextRuntimeService,
+  const {
     focusContextPreviewCoordinator,
-  );
+    focusContextRuntimeService,
+    contextPickerInteractionBridge,
+  } = createFocusContextServices({
+    app: dependencies.app,
+    runtimeStore,
+    focusRuntimeViewHost: dependencies.focusRuntimeViewHost,
+    focusPreviewWritebackHost: dependencies.focusPreviewWritebackHost,
+  });
   const pickerActionService = new ComposerContextPickerActionService(
     dependencies.app,
     dependencies.contextAttachmentBuilder,

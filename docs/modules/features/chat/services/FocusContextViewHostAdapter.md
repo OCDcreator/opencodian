@@ -10,7 +10,7 @@
 ## 导入关系
 
 上游: `ComposerContextRuntimeStore`、`FocusContextRuntimeService`、`FocusContextPreviewCoordinator`
-下游: `ComposerContextHostAdapter`
+下游: `FocusContextHostAdapter`
 
 ## 公开接口
 

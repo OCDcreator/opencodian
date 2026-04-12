@@ -10,7 +10,7 @@
 ## 导入关系
 
 上游: `obsidian`（`MarkdownView`）、`FocusContextRuntimeService`
-下游: `OpenCodianView`、`ComposerContextEventBridge`、`TabViewActivationBridge`
+下游: `FocusContextHostAdapter`、`ComposerContextEventBridge`、`ComposerContextViewFacade`、`ContextPickerInteractionBridge`
 
 ## 公开接口
 
@@ -34,9 +34,10 @@ class FocusContextPreviewCoordinator {
 
 ## 与其他模块的交互
 
-- **OpenCodianView**：提供当前会话 note path 的真实写回入口
+- **FocusContextHostAdapter**：提供当前会话 note path 的真实写回入口，并把 coordinator 接到更外层的 composer context bundle
 - **ComposerContextEventBridge**：把 workspace / document / editor 事件中的 preview refresh 与 file-open writeback 委托给本 coordinator
-- **TabViewActivationBridge**：在 tab activation preflight 时复用同一条 preview refresh 入口
+- **ComposerContextViewFacade**：把显式的 preview refresh 入口继续暴露给 `OpenCodianView`
+- **ContextPickerInteractionBridge**：复用同一条 delayed preview refresh 入口，保持 picker close 后的刷新语义
 - **FocusContextRuntimeService**：继续持有 preview 计算与 debounce 调度，并经由 `FocusContextMarkdownViewLocator` 解析活动 MarkdownView；retained-selection polling/highlight runtime 已委托给 `RetainedSelectionRuntimeCoordinator`
 
 ## 注意事项
