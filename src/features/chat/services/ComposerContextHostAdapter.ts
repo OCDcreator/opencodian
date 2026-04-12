@@ -7,6 +7,7 @@ import { ComposerContextCoordinator } from './ComposerContextCoordinator';
 import { ComposerContextEventBridge } from './ComposerContextEventBridge';
 import { ComposerContextPickerActionService } from './ComposerContextPickerActionService';
 import { ContextFileCatalogEventBridge } from './ContextFileCatalogEventBridge';
+import { ContextPickerInteractionBridge } from './ContextPickerInteractionBridge';
 import {
   ComposerContextRuntimeStore,
   type ComposerContextRuntimeState,
@@ -48,10 +49,13 @@ export interface ComposerContextViewHost {
   ): void;
 }
 
-export interface FocusContextViewHost {
+export interface FocusContextRuntimeViewHost {
   getCurrentConversationNotePath(): string | null;
-  setCurrentConversationNotePath(path: string | null): void;
   isComposerInteractionFocused(): boolean;
+}
+
+export interface FocusContextPreviewWritebackHost {
+  setCurrentConversationNotePath(path: string | null): void;
 }
 
 export interface ComposerContextServiceDependencies {
@@ -59,7 +63,8 @@ export interface ComposerContextServiceDependencies {
   contextAttachmentBuilder: ComposerContextAttachmentBuilderPort;
   contextFileCatalogService: ComposerContextFileCatalogPort;
   viewHost: ComposerContextViewHost;
-  focusViewHost: FocusContextViewHost;
+  focusRuntimeViewHost: FocusContextRuntimeViewHost;
+  focusPreviewWritebackHost: FocusContextPreviewWritebackHost;
 }
 
 export interface ComposerContextServices {
@@ -96,30 +101,29 @@ export function createComposerContextServices(
   const focusContextRuntimeService = new FocusContextRuntimeService(
     dependencies.app,
     focusViewHostAdapter.createFocusContextRuntimeServiceHost({
-      getCurrentConversationNotePath: () => dependencies.focusViewHost.getCurrentConversationNotePath(),
-      isComposerInteractionFocused: () => dependencies.focusViewHost.isComposerInteractionFocused(),
+      getCurrentConversationNotePath: () =>
+        dependencies.focusRuntimeViewHost.getCurrentConversationNotePath(),
+      isComposerInteractionFocused: () =>
+        dependencies.focusRuntimeViewHost.isComposerInteractionFocused(),
     }),
   );
   const focusContextPreviewCoordinator = new FocusContextPreviewCoordinator(
     focusViewHostAdapter.createFocusContextPreviewCoordinatorHost({
       setCurrentConversationNotePath: (path) => {
-        dependencies.focusViewHost.setCurrentConversationNotePath(path);
+        dependencies.focusPreviewWritebackHost.setCurrentConversationNotePath(path);
       },
     }),
     focusContextRuntimeService,
+  );
+  const contextPickerInteractionBridge = new ContextPickerInteractionBridge(
+    focusContextRuntimeService,
+    focusContextPreviewCoordinator,
   );
   const pickerActionService = new ComposerContextPickerActionService(
     dependencies.app,
     dependencies.contextAttachmentBuilder,
     dependencies.contextFileCatalogService,
-    viewHostAdapter.createPickerActionServiceHost({
-      beginContextPickerInteraction: () => {
-        focusContextRuntimeService.handleComposerPointerDown();
-      },
-      completeContextPickerInteraction: () => {
-        focusContextPreviewCoordinator.scheduleFocusContextPreviewRefresh();
-      },
-    }),
+    viewHostAdapter.createPickerActionServiceHost(contextPickerInteractionBridge),
   );
   const chipActionService = new ComposerContextChipActionService(
     dependencies.contextAttachmentBuilder,

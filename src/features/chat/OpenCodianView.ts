@@ -193,7 +193,8 @@ import type { ComposerContextPickerActionService } from './services/ComposerCont
 import {
   createComposerContextServices,
   type ComposerContextViewHost,
-  type FocusContextViewHost,
+  type FocusContextPreviewWritebackHost,
+  type FocusContextRuntimeViewHost,
 } from './services/ComposerContextHostAdapter';
 import { ComposerContextRuntimeStore } from './services/ComposerContextRuntimeStore';
 import { ContextAttachmentBuilder } from './services/ContextAttachmentBuilder';
@@ -1103,7 +1104,8 @@ export class OpenCodianView extends ItemView {
       contextAttachmentBuilder: this.contextAttachmentBuilder,
       contextFileCatalogService: this.contextFileCatalogService,
       viewHost: this.createComposerContextViewHost(),
-      focusViewHost: this.createFocusContextViewHost(),
+      focusRuntimeViewHost: this.createFocusContextRuntimeViewHost(),
+      focusPreviewWritebackHost: this.createFocusContextPreviewWritebackHost(),
     });
     this.composerContextRuntimeStore = composerContextServices.runtimeStore;
     this.composerContextActionService = composerContextServices.actionService;
@@ -1306,15 +1308,20 @@ export class OpenCodianView extends ItemView {
     };
   }
 
-  private createFocusContextViewHost(): FocusContextViewHost {
+  private createFocusContextRuntimeViewHost(): FocusContextRuntimeViewHost {
     return {
       getCurrentConversationNotePath: () => this.currentConversation?.currentNote ?? null,
+      isComposerInteractionFocused: () => this.isComposerInteractionFocused(),
+    };
+  }
+
+  private createFocusContextPreviewWritebackHost(): FocusContextPreviewWritebackHost {
+    return {
       setCurrentConversationNotePath: (path) => {
         if (this.currentConversation) {
           this.currentConversation.currentNote = path;
         }
       },
-      isComposerInteractionFocused: () => this.isComposerInteractionFocused(),
     };
   }
 

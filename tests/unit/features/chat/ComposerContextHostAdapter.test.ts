@@ -3,8 +3,9 @@ import type { App, MarkdownView, TFile } from 'obsidian';
 import type { PromptContextItem } from '../../../../src/core/types';
 import {
   createComposerContextServices,
-  type FocusContextViewHost,
   type ComposerContextViewHost,
+  type FocusContextPreviewWritebackHost,
+  type FocusContextRuntimeViewHost,
 } from '../../../../src/features/chat/services/ComposerContextHostAdapter';
 import type { ComposerContextRuntimeState } from '../../../../src/features/chat/services/ComposerContextRuntimeStore';
 import type { TabId } from '../../../../src/features/chat/tabs';
@@ -62,12 +63,14 @@ function createHarness(options: {
     registerEvent: jest.fn(),
     registerDomEvent: jest.fn(),
   };
-  const focusViewHost: Mocked<FocusContextViewHost> = {
+  const focusRuntimeViewHost: Mocked<FocusContextRuntimeViewHost> = {
     getCurrentConversationNotePath: jest.fn(() => currentConversationNotePath),
+    isComposerInteractionFocused: jest.fn().mockReturnValue(false),
+  };
+  const focusPreviewWritebackHost: Mocked<FocusContextPreviewWritebackHost> = {
     setCurrentConversationNotePath: jest.fn((path) => {
       currentConversationNotePath = path;
     }),
-    isComposerInteractionFocused: jest.fn().mockReturnValue(false),
   };
   const app = {
     workspace: {
@@ -98,13 +101,15 @@ function createHarness(options: {
     contextAttachmentBuilder,
     contextFileCatalogService,
     viewHost,
-    focusViewHost,
+    focusRuntimeViewHost,
+    focusPreviewWritebackHost,
   });
 
   return {
     services,
     viewHost,
-    focusViewHost,
+    focusRuntimeViewHost,
+    focusPreviewWritebackHost,
     contextAttachmentBuilder,
     getCurrentConversationNotePath: () => currentConversationNotePath,
   };
@@ -143,13 +148,15 @@ describe('ComposerContextHostAdapter', () => {
     try {
       const {
         services,
-        focusViewHost,
+        focusPreviewWritebackHost,
         getCurrentConversationNotePath,
       } = createHarness();
 
       services.focusContextPreviewCoordinator.handleFileOpen('notes/active.md');
 
-      expect(focusViewHost.setCurrentConversationNotePath).toHaveBeenCalledWith('notes/active.md');
+      expect(focusPreviewWritebackHost.setCurrentConversationNotePath).toHaveBeenCalledWith(
+        'notes/active.md',
+      );
       expect(getCurrentConversationNotePath()).toBe('notes/active.md');
       expect(jest.getTimerCount()).toBe(1);
 

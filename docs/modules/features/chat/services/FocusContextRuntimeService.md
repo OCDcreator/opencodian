@@ -57,7 +57,7 @@ class FocusContextRuntimeService {
 
 ## 与其他模块的交互
 
-- **OpenCodianView**：通过单独的 `FocusContextViewHost` 提供当前会话 note path 与 composer focus gate
+- **OpenCodianView**：通过单独的 `FocusContextRuntimeViewHost` 提供当前会话 note path fallback 与 composer focus gate
 - **FocusContextViewHostAdapter**：提供 active-tab focus preview 的读写 host，并把 runtime state 写回限制在活动 tab seam 内
 - **ComposerContextEventBridge**：桥接 workspace / vault / composer DOM 事件，并统一启动 polling 与关闭时的 `dispose()`
 - **FocusContextMarkdownViewLocator**：集中活动 `MarkdownView` 的 remembered-path 与 fallback 解析
