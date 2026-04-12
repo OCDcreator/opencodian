@@ -27,6 +27,7 @@ export function buildTrailingAssistantPatchSuccessPlanFromChildPlans(
 
 ## 与其他模块的关系
 
-- `ConversationRenderService` 现在把已算好的 `executionPlan`、`tailOutcomePlans` 与 `turnBodyScopePlan` 交给这里，不再在 service 内手工组装 success-plan parts
+- `ConversationRenderService` 现在把 `TrailingAssistantPatchExecutionTailChildPlansHelper` 返回的 execution-tail plan-parts 与 `turnBodyScopePlan` 交给这里，不再在 service 内手工组装 success-plan parts
+- `TrailingAssistantPatchExecutionTailChildPlansHelper` 继续负责把 execution-tail planning-context 与 host ports 编排成 `{ executionPlan, tailOutcomePlans }`
 - `TrailingAssistantPatchExecutionTailPlanPartsHelper` 继续只负责 `{ executionPlan, tailOutcomePlans }` 这一层局部 shape
 - `TrailingAssistantPatchSuccessPlanHelper` 继续只负责最终 `TrailingAssistantPatchSuccessPlan` 顶层 shape

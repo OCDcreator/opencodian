@@ -27,7 +27,7 @@ export function shouldFinalizeTrailingAssistantFooterOnlyFromExecutionTailPlanni
 
 ## 与其他模块的关系
 
-- `ConversationRenderService` 现在只把 execution-tail planning-context 与 `host.assistantTailRender.getBodySignature()` 注入到这里，不再直接串联 source-contract helper 与布尔决策 helper
+- `TrailingAssistantPatchExecutionTailChildPlansHelper` 现在只把 execution-tail planning-context 与 `getBodySignature()` 注入到这里，不再让更高层直接串联 source-contract helper 与布尔决策 helper
 - `TrailingAssistantPatchFooterFinalizationDecisionSourceContractHelper` 继续负责 execution-tail context 到前后正文签名 source contract 的纯读取
 - `TrailingAssistantPatchFooterFinalizationDecisionHelper` 继续只负责比较前后正文签名并返回布尔决策
-- `TrailingAssistantPatchExecutionTailExecutionPlanHelper` 会继续消费这里产出的 `shouldFinalizeFooterOnly`，与 execution-tail planning-context 一起映射为最终 `executionPlan`
+- `TrailingAssistantPatchExecutionTailChildPlansHelper` 会继续消费这里产出的 `shouldFinalizeFooterOnly`，并把它连同 execution-tail planning-context 交给 `TrailingAssistantPatchExecutionTailExecutionPlanHelper`

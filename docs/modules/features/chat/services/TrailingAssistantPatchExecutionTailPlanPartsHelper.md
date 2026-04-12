@@ -31,4 +31,5 @@ export function buildTrailingAssistantPatchExecutionTailPlanParts(
 - `TrailingAssistantPatchSuccessChildPlansHelper` 现在会消费这里返回的 execution/tail plan-parts，并继续交给 `TrailingAssistantPatchSuccessPlanHelper`
 - `TrailingAssistantPatchExecutionPlanHelper` 继续只负责 finalize-footer / rerender-content 两种 execution-plan shape
 - `TrailingAssistantPatchTailOutcomePlanHelper` 继续只负责 `{ tailStatePlan, completionDebugPlan }` 这一层 tail-outcome shape
-- `ConversationRenderService` 现在会先基于 execution-tail planning-context 分别预建 `executionPlan` 与 `tailOutcomePlans`，再把这些 child plans 交给 `TrailingAssistantPatchSuccessChildPlansHelper`，由后者复用这里完成局部 shape 收口
+- `TrailingAssistantPatchExecutionTailChildPlansHelper` 现在会先基于 execution-tail planning-context 预建 `executionPlan` 与 `tailOutcomePlans`，再复用这里完成 execution/tail plan-parts 的局部 shape 收口
+- `TrailingAssistantPatchSuccessChildPlansHelper` 则继续消费这里返回的 execution-tail plan-parts，并补上 `turnBodyScopePlan`

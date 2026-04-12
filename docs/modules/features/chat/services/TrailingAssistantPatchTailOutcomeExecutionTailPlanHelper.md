@@ -30,7 +30,7 @@ export function buildTrailingAssistantPatchTailOutcomePlansFromExecutionTailPlan
 
 ## 与其他模块的关系
 
-- `ConversationRenderService` 现在只把 execution-tail planning-context 与 `summarizeChatMessageForDebug` 依赖交给这里，不再在 service 内直接串联 tail-outcome planning-context、tail-state plan 与 completion-debug plan
+- `TrailingAssistantPatchExecutionTailChildPlansHelper` 现在只把 execution-tail planning-context 与 `summarizeChatMessageForDebug` 依赖交给这里，不再让更高层直接串联 tail-outcome planning-context、tail-state plan 与 completion-debug plan
 - `TrailingAssistantPatchTailOutcomeExecutionTailPlanSourceContractHelper` 现在先把 execution-tail context 与 debug summarizer 收束成窄 source contract，再交给这里继续串联 tail-state / completion-debug / final shape
 - `TrailingAssistantPatchTailStateTailOutcomePlanHelper` 与 `TrailingAssistantPatchCompletionDebugTailOutcomePlanHelper` 继续分别负责各自子计划的纯编排
 - `TrailingAssistantPatchTailOutcomeChildPlansHelper` 负责把已算好的 `tailStatePlan` 与 `completionDebugPlan` 继续串联成最终 `tailOutcomePlans`

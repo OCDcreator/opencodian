@@ -25,20 +25,10 @@ import {
   buildTrailingAssistantPatchExecutionTailPlanningContext,
 } from './TrailingAssistantPatchExecutionTailPlanningContextHelper';
 import {
-  shouldFinalizeTrailingAssistantFooterOnlyFromExecutionTailPlanningContext,
-} from './TrailingAssistantPatchFooterFinalizationExecutionTailDecisionHelper';
-import {
-  buildTrailingAssistantPatchExecutionPlanFromExecutionTailPlanningContext,
-} from './TrailingAssistantPatchExecutionTailExecutionPlanHelper';
-import {
-  buildTrailingAssistantPatchSuccessPlanFromChildPlans,
-} from './TrailingAssistantPatchSuccessChildPlansHelper';
-import {
-  type TrailingAssistantPatchSuccessPlan,
-} from './TrailingAssistantPatchSuccessPlanHelper';
-import {
-  buildTrailingAssistantPatchTailOutcomePlansFromExecutionTailPlanningContext,
-} from './TrailingAssistantPatchTailOutcomeExecutionTailPlanHelper';
+  buildTrailingAssistantPatchExecutionTailPlanPartsFromExecutionTailPlanningContext,
+} from './TrailingAssistantPatchExecutionTailChildPlansHelper';
+import { buildTrailingAssistantPatchSuccessPlanFromChildPlans } from './TrailingAssistantPatchSuccessChildPlansHelper';
+import { type TrailingAssistantPatchSuccessPlan } from './TrailingAssistantPatchSuccessPlanHelper';
 import {
   applyTrailingAssistantPatchTailState,
 } from './TrailingAssistantPatchTailStateApplierHelper';
@@ -620,24 +610,14 @@ export class ConversationRenderService {
   ): TrailingAssistantPatchSuccessPlan {
     const executionTailPlanningContext =
       buildTrailingAssistantPatchExecutionTailPlanningContext(planningContext);
-    const shouldFinalizeFooterOnly =
-      shouldFinalizeTrailingAssistantFooterOnlyFromExecutionTailPlanningContext({
-        planningContext: executionTailPlanningContext,
-        getBodySignature: (message) => this.host.assistantTailRender.getBodySignature(message),
-      });
 
     return buildTrailingAssistantPatchSuccessPlanFromChildPlans({
-      executionPlan: buildTrailingAssistantPatchExecutionPlanFromExecutionTailPlanningContext({
+      ...buildTrailingAssistantPatchExecutionTailPlanPartsFromExecutionTailPlanningContext({
         planningContext: executionTailPlanningContext,
-        shouldFinalizeFooterOnly,
+        getBodySignature: (message) => this.host.assistantTailRender.getBodySignature(message),
+        summarizeChatMessageForDebug: (message) =>
+          this.host.summarizeChatMessageForDebug(message),
       }),
-      tailOutcomePlans: buildTrailingAssistantPatchTailOutcomePlansFromExecutionTailPlanningContext(
-        {
-          planningContext: executionTailPlanningContext,
-          summarizeChatMessageForDebug: (message) =>
-            this.host.summarizeChatMessageForDebug(message),
-        },
-      ),
       turnBodyScopePlan: buildTrailingAssistantPatchTurnBodyScopePlan(planningContext),
     });
   }
