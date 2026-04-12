@@ -125,6 +125,7 @@ docs/modules/
 │   │   ├── services/
 │   │   │   ├── ContextAttachmentBuilder.md
 │   │   │   ├── ContextFileCatalogService.md
+│   │   │   ├── FocusContextRuntimeService.md
 │   │   │   ├── ContextUsageService.md
 │   │   │   ├── ConversationRenderService.md
 │   │   │   ├── ConversationViewStateService.md
