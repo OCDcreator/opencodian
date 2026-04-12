@@ -58,6 +58,7 @@ export class SessionTodoStateService {
 
 ## 与 `OpenCodianView` 的边界
 
-- `OpenCodianView` 仍保留 session todo/status 的订阅入口、dock 装配、OpenCode 拉取刷新与 background task 之间的上层路由
+- `ConversationSessionLiveSignalAdapter` 负责 session todo/status live listener 的生命周期、session→tab 路由与 active-tab fallback
+- `OpenCodianView` 仍保留 dock 装配、OpenCode 拉取刷新，以及命中 tab 后与 background task 之间的上层路由
 - `SessionTodoStateService` 负责 todo/status runtime 的纯状态机和 stale notice 协调
 - 这样后续继续推进 master-plan 的 `question / todo / background task` lane 时，可以把 background task stale/notice 边界继续从 view 拆走，而不是再把 session todo 细节塞回主视图

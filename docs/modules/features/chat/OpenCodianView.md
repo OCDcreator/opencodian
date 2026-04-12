@@ -100,7 +100,7 @@ interface TabRuntimeState {
 4. 在 `messagesShellEl` 上创建 `MarkdownRenderService`
 5. `wireEventHandlers()`
 6. 启动 retained selection polling
-7. 订阅 session todo/status/sync-event 更新
+7. 通过 `ConversationSessionLiveSignalAdapter` / `ConversationSyncEventAdapter` 订阅 session live signal 与 sync-event 更新
 8. `initializeFirstTab()`
 
 `onClose()` 则会反向清理：
@@ -133,6 +133,7 @@ interface TabRuntimeState {
 - 装载阶段进入 hydration：先重建历史 turn / inline background task，再等待后续 authoritative message sync 决定是否允许 stale 降级
 - 重新渲染消息、背景任务指示器、todo dock、question dock
 - 通过 `ConversationSyncHostAdapter` 组装 `ConversationSyncRuntimeCoordinator` / `ConversationSyncOrchestrationService` / `ConversationSyncBridge`，并通过 `ConversationSyncEventAdapter` 接入 session sync event 订阅与 cleanup 生命周期
+- 通过 `ConversationSessionLiveSignalAdapter` 接入 session todo/status live signal 的订阅、session→tab 匹配与 cleanup 生命周期
 - 更新模型显示和 context usage
 
 后台同步分两路：
@@ -143,6 +144,8 @@ interface TabRuntimeState {
 `OpenCodianView` 现在只提供一份 `ConversationSyncViewHost`；真正把这份 view-state / render bridge 适配成 runtime/orchestration/bridge 三组 host 的层，是 `ConversationSyncHostAdapter`。这样 sync service bundle 的 wiring 不再散落在 view 构造函数里。
 
 session sync event 的入口也不再由 view 自己持有 `subscribeToSessionSyncEvents()` / dispose 状态：`ConversationSyncEventAdapter` 会接管 OpenCodeService listener 生命周期、session→tab 匹配，以及 active-tab fallback，然后再把真正的 signal sync 调度交回 `ConversationSyncOrchestrationService`。
+
+session todo/status 的 live signal 入口同样不再由 view 自己持有 `subscribeToSessionTodoUpdates()` / `subscribeToSessionStatusUpdates()`：`ConversationSessionLiveSignalAdapter` 会接管两条 listener 的生命周期、session→tab 匹配，以及 active-tab fallback，然后只把命中的 tab update 交回 view host 去刷新 `SessionTodoStateService` 与 `BackgroundTaskLiveSignalCoordinator`。
 
 signal sync 与后台轮询里的 loop lifecycle、signal debounce、tab / conversation 选择、conversation 加载和 dispatch 编排现在先交给 `ConversationSyncOrchestrationService`。它会判断 signal 是否应回到当前可见会话，或转向 hidden tab sync；会把同一 tab 上短时间内连续到达的 signal reason 合并；轮询时也只会在确实存在 visible/background sync 目标时持有 interval，并只枚举非活动、仍有 background task、且 runtime 当前允许同步的 tab。
 
@@ -319,14 +322,15 @@ model selector 现在拆成了几层协作：
 
 这三个辅助子系统都由 view 负责路由：
 
-- session todo/status：订阅入口仍在 view，但 normalized snapshot、status fingerprint、stale suppression 与 persisted notice 恢复已经下沉到 `services/SessionTodoStateService.ts`
+- session todo/status：OpenCode live listener 生命周期、session→tab 路由和 active-tab fallback 已下沉到 `services/ConversationSessionLiveSignalAdapter.ts`；normalized snapshot、status fingerprint、stale suppression 与 persisted notice 恢复继续由 `services/SessionTodoStateService.ts` 负责
 - question：既支持输入区上方的 `QuestionDock`，也支持由 `QuestionInlineCardRenderer` 管理的内联待回答卡片，以及由 `QuestionResolutionCoordinator` + `QuestionResolutionCardRenderer` 协作管理的已回答/已拒绝回顾卡片
 - background task：从 OMO 注入、`toolName === 'task'` 的 tool block、以及后续 system reminder 回写推导任务进度；运行态以内联状态条挂在对应 assistant turn 下，完成态则延迟落成持久化 notice；其中 live-signal reconciliation 与 authoritative-sync gate runtime 已下沉到 `services/BackgroundTaskLiveSignalCoordinator.ts`，hidden signal/background-tab sync 以及 active visible-conversation background sync 后的 question refresh、todo/status refresh、completion notice queue/flush、attention 标记与 active-conversation match 判定编排已下沉到 `services/BackgroundTaskPostSyncCoordinator.ts`，stopped/stale warning notice 的 content、fingerprint、persisted dedupe 与 suppression 已下沉到 `services/BackgroundTaskNoticeStateService.ts`，completion notice 的 queued-state、fingerprint/content 与 persisted dedupe/flush 则下沉到 `services/BackgroundTaskCompletionNoticeService.ts`
 - background task 的 stale 判定现在额外受 `backgroundTaskAwaitingAuthoritativeSync` / hydration 保护：reload 或首次装载后，只有在至少一次权威消息同步完成后，才允许把“仍在运行”降级成 stopped/stale notice；这段 gate + live-signal 决策现在集中在 `BackgroundTaskLiveSignalCoordinator`
 
 session todo 这条子链路现在的边界是：
 
-- `OpenCodianView`：session todo/status 订阅、OpenCode 主动刷新、dock 装配，以及和 background task 的上层路由
+- `OpenCodianView`：OpenCode 主动刷新、dock 装配，以及命中 tab 后的 background task 上层路由
+- `ConversationSessionLiveSignalAdapter`：session todo/status live listener 生命周期、session→tab 路由与 active-tab fallback
 - `SessionTodoStateService`：todo/status runtime state、snapshot 规范化、stale notice suppression 与 persisted notice dedupe/restore
 
 background task notice 这条子链路现在的边界是：

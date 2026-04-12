@@ -1,0 +1,53 @@
+# ConversationSessionLiveSignalAdapter
+
+> **源码**: `src/features/chat/services/ConversationSessionLiveSignalAdapter.ts`
+> **状态**: [REVIEW]
+
+## 概述
+
+`ConversationSessionLiveSignalAdapter` 把 `OpenCodianView` 里 session todo/status live signal 的 **订阅生命周期、session→tab 匹配，以及 active-tab fallback** 收束到一个独立模块，专门负责：
+
+- 同时持有 `subscribeToSessionTodoUpdates()` 与 `subscribeToSessionStatusUpdates()` 的 start/stop/restart cleanup
+- 把 session todo/status live update 路由到所有共享同一 `openCodeSessionId` 的 tab
+- 当 tab 尚未和当前 conversation state 完全重建对齐时，为当前活动 conversation 提供 active-tab fallback
+
+它不负责 todo/status runtime state 的 fingerprint、stale suppression，也不直接决定 background task stale/notice；这些能力仍分别由 `SessionTodoStateService` 与 `BackgroundTaskLiveSignalCoordinator` 负责。
+
+## 公开接口
+
+```typescript
+export interface ConversationSessionLiveSignalAdapterHost {
+  subscribeToSessionTodoUpdates(...): () => void;
+  subscribeToSessionStatusUpdates(...): () => void;
+  getAllTabs(): readonly TabData[];
+  getConversations(): readonly Conversation[];
+  getCurrentConversation(): Conversation | null;
+  getActiveTabId(): TabId | null;
+  applySessionTodoUpdate(...): void;
+  applySessionStatusUpdate(...): void;
+}
+
+export class ConversationSessionLiveSignalAdapter {
+  start(): void;
+  stop(): void;
+}
+```
+
+## 关键行为
+
+### 双订阅生命周期
+
+- `start()` 每次都会先调用 `stop()`，避免 view reopen 或 host rebuild 后保留旧 listener
+- `stop()` 会统一释放 todo/status 两条 listener，保证 cleanup wiring 不再散落在 `OpenCodianView`
+
+### session→tab 路由
+
+- live update 先按 `conversation.openCodeSessionId` 匹配当前打开的全部 tab
+- 同一 session 被多个 tab 打开时，adapter 会把同一条 todo/status signal 分发给所有匹配 tab
+- 只有当没有任何 tab 命中、但当前活动 conversation 的 session 相符时，才回退到活动 tab
+
+## 与 `OpenCodianView` 的边界
+
+- `OpenCodianView` 只保留 host bridge：把匹配后的 live update 交给 `setTabSessionTodos()` / `setTabSessionStatus()` 和 background-task reconciliation
+- `SessionTodoStateService` 继续负责 todo/status runtime state、stale suppression 与 persisted notice 协调
+- `BackgroundTaskLiveSignalCoordinator` 继续消费这些 live signal 更新后的 tab state，决定 indicator/stopped notice 是否需要变化

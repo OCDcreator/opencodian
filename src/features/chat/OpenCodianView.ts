@@ -171,6 +171,10 @@ import {
   ConversationSyncEventAdapter,
 } from './services/ConversationSyncEventAdapter';
 import {
+  type ConversationSessionLiveSignalAdapterHost,
+  ConversationSessionLiveSignalAdapter,
+} from './services/ConversationSessionLiveSignalAdapter';
+import {
   createConversationSyncServices,
   type ConversationSyncViewHost,
 } from './services/ConversationSyncHostAdapter';
@@ -686,6 +690,7 @@ export class OpenCodianView extends ItemView {
   private conversationSyncRuntimeCoordinator: ConversationSyncRuntimeCoordinator;
   private conversationSyncBridge: ConversationSyncBridge;
   private conversationSyncEventAdapter: ConversationSyncEventAdapter;
+  private conversationSessionLiveSignalAdapter: ConversationSessionLiveSignalAdapter;
   private conversationViewStateService: ConversationViewStateService;
   private conversationRenderService: ConversationRenderService;
   private messageSendPreparationService: MessageSendPreparationService;
@@ -698,8 +703,6 @@ export class OpenCodianView extends ItemView {
   private questionResolutionCoordinator: QuestionResolutionCoordinator;
   private sendPipelineRuntime: SendPipelineRuntime;
   private omoBackgroundTaskLogStates = new Map<string, OmoBackgroundTaskLogState>();
-  private disposeSessionTodoSubscription: (() => void) | null = null;
-  private disposeSessionStatusSubscription: (() => void) | null = null;
   private lastKnownMarkdownFilePath: string | null = null;
   private contextFileCatalogCache: ContextFileCatalog | null = null;
   private contextFileCatalogBuildPromise: Promise<ContextFileCatalog> | null = null;
@@ -1298,68 +1301,6 @@ export class OpenCodianView extends ItemView {
     this.refreshRetainedSelectionHighlight();
   }
 
-  private subscribeToSessionTodoUpdates(): void {
-    this.disposeSessionTodoSubscription?.();
-    this.disposeSessionTodoSubscription = this.plugin.openCodeService.subscribeToSessionTodoUpdates(
-      ({ sessionId, todos }) => {
-        this.applySessionTodoUpdate(sessionId, todos);
-      },
-    );
-  }
-
-  private subscribeToSessionStatusUpdates(): void {
-    this.disposeSessionStatusSubscription?.();
-    this.disposeSessionStatusSubscription = this.plugin.openCodeService.subscribeToSessionStatusUpdates(
-      ({ sessionId, status }) => {
-        this.applySessionStatusUpdate(sessionId, status);
-      },
-    );
-  }
-
-  private applySessionTodoUpdate(sessionId: string, todos: SessionTodo[]): void {
-    const tabs = this.tabManager?.getAllTabs() ?? [];
-    const conversations = new Map(this.plugin.getConversations().map((conversation) => [conversation.id, conversation]));
-    let matched = false;
-
-    for (const tab of tabs) {
-      const conversation = tab.conversationId ? conversations.get(tab.conversationId) : null;
-      if (conversation?.openCodeSessionId !== sessionId) {
-        continue;
-      }
-
-      this.setTabSessionTodos(tab.id, todos, sessionId);
-      this.reconcileBackgroundTaskStateFromLiveSignals(tab.id);
-      matched = true;
-    }
-
-    if (!matched && this.currentConversation?.openCodeSessionId === sessionId) {
-      this.setTabSessionTodos(this.getActiveTabId(), todos, sessionId);
-      this.reconcileBackgroundTaskStateFromLiveSignals(this.getActiveTabId());
-    }
-  }
-
-  private applySessionStatusUpdate(sessionId: string, status: SessionActivityStatus): void {
-    const tabs = this.tabManager?.getAllTabs() ?? [];
-    const conversations = new Map(this.plugin.getConversations().map((conversation) => [conversation.id, conversation]));
-    let matched = false;
-
-    for (const tab of tabs) {
-      const conversation = tab.conversationId ? conversations.get(tab.conversationId) : null;
-      if (conversation?.openCodeSessionId !== sessionId) {
-        continue;
-      }
-
-      this.setTabSessionStatus(tab.id, status, sessionId);
-      this.reconcileBackgroundTaskStateFromLiveSignals(tab.id);
-      matched = true;
-    }
-
-    if (!matched && this.currentConversation?.openCodeSessionId === sessionId) {
-      this.setTabSessionStatus(this.getActiveTabId(), status, sessionId);
-      this.reconcileBackgroundTaskStateFromLiveSignals(this.getActiveTabId());
-    }
-  }
-
   private getTabSessionTodos(
     tabId: TabId | null = this.getActiveTabId(),
     sessionId = this.currentConversation?.openCodeSessionId ?? null,
@@ -1663,6 +1604,9 @@ export class OpenCodianView extends ItemView {
     this.conversationSyncEventAdapter = new ConversationSyncEventAdapter(
       this.createConversationSyncEventAdapterHost(),
     );
+    this.conversationSessionLiveSignalAdapter = new ConversationSessionLiveSignalAdapter(
+      this.createConversationSessionLiveSignalAdapterHost(),
+    );
     this.backgroundTaskCompletionNoticeService = new BackgroundTaskCompletionNoticeService(
       this.createBackgroundTaskCompletionNoticeServiceHost(),
     );
@@ -1827,6 +1771,27 @@ export class OpenCodianView extends ItemView {
       getActiveTabId: () => this.getActiveTabId(),
       scheduleConversationSyncFromSignal: (tabId, reason) => {
         this.scheduleConversationSyncFromSignal(tabId, reason);
+      },
+    };
+  }
+
+  private createConversationSessionLiveSignalAdapterHost(): ConversationSessionLiveSignalAdapterHost {
+    return {
+      subscribeToSessionTodoUpdates: (listener) =>
+        this.plugin.openCodeService.subscribeToSessionTodoUpdates(listener),
+      subscribeToSessionStatusUpdates: (listener) =>
+        this.plugin.openCodeService.subscribeToSessionStatusUpdates(listener),
+      getAllTabs: () => this.tabManager?.getAllTabs() ?? [],
+      getConversations: () => this.plugin.getConversations(),
+      getCurrentConversation: () => this.currentConversation,
+      getActiveTabId: () => this.getActiveTabId(),
+      applySessionTodoUpdate: (tabId, sessionId, todos) => {
+        this.setTabSessionTodos(tabId, todos, sessionId);
+        this.reconcileBackgroundTaskStateFromLiveSignals(tabId);
+      },
+      applySessionStatusUpdate: (tabId, sessionId, status) => {
+        this.setTabSessionStatus(tabId, status, sessionId);
+        this.reconcileBackgroundTaskStateFromLiveSignals(tabId);
       },
     };
   }
@@ -2332,8 +2297,7 @@ export class OpenCodianView extends ItemView {
     // Wire events
     this.wireEventHandlers();
     this.startRetainedSelectionPolling();
-    this.subscribeToSessionTodoUpdates();
-    this.subscribeToSessionStatusUpdates();
+    this.conversationSessionLiveSignalAdapter.start();
     this.conversationSyncEventAdapter.start();
 
     await this.initializeFirstTab();
@@ -2391,10 +2355,7 @@ export class OpenCodianView extends ItemView {
     this.sessionTodoDock?.destroy();
     this.sessionTodoDock = null;
     this.todoDockMountEl = null;
-    this.disposeSessionTodoSubscription?.();
-    this.disposeSessionTodoSubscription = null;
-    this.disposeSessionStatusSubscription?.();
-    this.disposeSessionStatusSubscription = null;
+    this.conversationSessionLiveSignalAdapter.stop();
     this.conversationSyncEventAdapter.stop();
     this.tabManager = null;
 
