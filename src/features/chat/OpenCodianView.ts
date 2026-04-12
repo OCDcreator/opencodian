@@ -132,16 +132,8 @@ import {
 } from './runtime/PermissionInlineCardRenderer';
 import { PersistedAssistantFooterFinalizer } from './runtime/PersistedAssistantFooterFinalizer';
 import {
-  QuestionInlineCardRenderer,
-  type QuestionInlineCardRendererHost,
-} from './runtime/QuestionInlineCardRenderer';
-import {
   buildQuestionResolutionCardRenderPlan,
 } from './runtime/QuestionResolutionCardRenderer';
-import {
-  QuestionResolutionCoordinator,
-  type QuestionResolutionCoordinatorHost,
-} from './runtime/QuestionResolutionCoordinator';
 import {
   type SendPipelineDebugContentBlock,
   type SendPipelineDebugPort,
@@ -263,12 +255,11 @@ import {
   type PersistentAssistantNoticeServiceHost,
 } from './services/PersistentAssistantNoticeService';
 import {
-  QuestionDockCoordinator,
-  type QuestionDockCoordinatorHost,
-} from './services/QuestionDockCoordinator';
-import {
-  type QuestionTodoStatusRefreshCoordinator,
-} from './services/QuestionTodoStatusRefreshCoordinator';
+  createQuestionRuntimeServices,
+  type QuestionRuntimeServices,
+  type QuestionRuntimeViewHost,
+} from './services/QuestionRuntimeHostAdapter';
+import type { QuestionTodoStatusRefreshCoordinator } from './services/QuestionTodoStatusRefreshCoordinator';
 import {
   createQuestionTodoBackgroundTaskRefreshServices,
   type QuestionTodoBackgroundTaskRefreshViewHost,
@@ -747,9 +738,7 @@ export class OpenCodianView extends ItemView {
   private backgroundTaskStreamTriggerCoordinator: BackgroundTaskStreamTriggerCoordinator;
   private streamingInlineCardRenderer: StreamingInlineCardRenderer;
   private permissionInlineCardRenderer: PermissionInlineCardRenderer;
-  private questionInlineCardRenderer: QuestionInlineCardRenderer;
-  private questionResolutionCoordinator: QuestionResolutionCoordinator;
-  private questionDockCoordinator: QuestionDockCoordinator;
+  private questionRuntimeServices: QuestionRuntimeServices;
   private sendPipelineRuntime: SendPipelineRuntime;
   private composerContextActionService: ComposerContextActionService;
   private composerContextCoordinator: ComposerContextCoordinator;
@@ -779,6 +768,18 @@ export class OpenCodianView extends ItemView {
 
   private get sessionTodoRuntimeFacade(): SessionTodoServices['runtimeFacade'] {
     return this.sessionTodoServices.runtimeFacade;
+  }
+
+  private get questionInlineCardRenderer(): QuestionRuntimeServices['inlineCardRenderer'] {
+    return this.questionRuntimeServices.inlineCardRenderer;
+  }
+
+  private get questionResolutionCoordinator(): QuestionRuntimeServices['resolutionCoordinator'] {
+    return this.questionRuntimeServices.resolutionCoordinator;
+  }
+
+  private get questionDockCoordinator(): QuestionRuntimeServices['dockCoordinator'] {
+    return this.questionRuntimeServices.dockCoordinator;
   }
 
   private createTabRuntimeState(): TabRuntimeState {
@@ -1308,16 +1309,9 @@ export class OpenCodianView extends ItemView {
     this.persistedAssistantFooterFinalizer = new PersistedAssistantFooterFinalizer(this.assistantShellRenderer);
     this.streamingInlineCardRenderer = new StreamingInlineCardRenderer(this.createStreamingInlineCardRendererHost());
     this.permissionInlineCardRenderer = new PermissionInlineCardRenderer(this.streamingInlineCardRenderer);
-    this.questionInlineCardRenderer = new QuestionInlineCardRenderer(
+    this.questionRuntimeServices = createQuestionRuntimeServices(
+      this.createQuestionRuntimeViewHost(),
       this.streamingInlineCardRenderer,
-      this.createQuestionInlineCardRendererHost(),
-    );
-    this.questionResolutionCoordinator = new QuestionResolutionCoordinator(
-      this.questionInlineCardRenderer,
-      this.createQuestionResolutionCoordinatorHost(),
-    );
-    this.questionDockCoordinator = new QuestionDockCoordinator(
-      this.createQuestionDockCoordinatorHost(),
     );
     this.sendPipelineRuntime = new SendPipelineRuntime(
       this.createSendPipelineRuntimeHost(),
@@ -1420,7 +1414,7 @@ export class OpenCodianView extends ItemView {
       getTabRuntimeState: (tabId: TabId | null) => this.getTabRuntimeState(tabId),
       hasIncompleteTodos: (todos) => this.hasIncompleteTodos(todos),
       refreshPendingQuestionsForTab: (tabId, sessionId) =>
-        this.refreshPendingQuestionsForTab(tabId, sessionId),
+        this.questionDockCoordinator.refreshPendingQuestionsForTab(tabId, sessionId),
       refreshTabSessionStatus: (tabId, sessionId, options) =>
         this.sessionTodoStatusRefreshService.refreshTabSessionStatus(tabId, sessionId, options),
       refreshTabSessionTodos: (tabId, sessionId, options) =>
@@ -1496,7 +1490,7 @@ export class OpenCodianView extends ItemView {
         this.plugin.openCodeService.setSessionId(sessionId);
       },
       clearPendingQuestionsForTab: (tabId) => {
-        this.clearPendingQuestionsForTab(tabId);
+        this.questionDockCoordinator.clearPendingQuestionsForTab(tabId);
       },
       resetTabSessionState: (tabId, sessionId) => {
         this.sessionTodoRuntimeFacade.resetTabSessionState(tabId, sessionId);
@@ -2147,43 +2141,24 @@ export class OpenCodianView extends ItemView {
     };
   }
 
-  private createQuestionInlineCardRendererHost(): QuestionInlineCardRendererHost {
+  private createQuestionRuntimeViewHost(): QuestionRuntimeViewHost {
     return {
       getActiveTabId: () => this.getActiveTabId(),
-      getTabRuntimeState: (tabId) => this.getTabRuntimeState(tabId),
-      keepQuestionCardPinnedToBottom: (tabId) => {
-        this.keepQuestionCardPinnedToBottom(tabId);
-      },
-    };
-  }
-
-  private createQuestionResolutionCoordinatorHost(): QuestionResolutionCoordinatorHost {
-    return {
-      getTabRuntimeState: (tabId) => this.getTabRuntimeState(tabId),
-      shouldRenderQuestionResolutionCards: () => this.shouldRenderQuestionResolutionCards(),
-      keepQuestionCardPinnedToBottom: (tabId) => {
-        this.keepQuestionCardPinnedToBottom(tabId);
-      },
-    };
-  }
-
-  private createQuestionDockCoordinatorHost(): QuestionDockCoordinatorHost {
-    return {
       getTabRuntimeState: (tabId) => this.getTabRuntimeState(tabId),
       ensureTabRuntimeState: (tabId) => this.ensureTabRuntimeState(tabId),
-      getActiveTabId: () => this.getActiveTabId(),
       getCurrentConversationSessionId: () => this.currentConversation?.openCodeSessionId,
       getSessionIdForTab: (tabId) => this.getSessionIdForTab(tabId),
       getQuestionDock: () => this.questionDock,
       getQuestionDisplayMode: () => this.plugin.settings.questionDisplayMode,
       shouldUseAboveInputQuestionDock: () => this.shouldUseAboveInputQuestionDock(),
+      shouldRenderQuestionResolutionCards: () => this.shouldRenderQuestionResolutionCards(),
+      keepQuestionCardPinnedToBottom: (tabId) => {
+        this.keepQuestionCardPinnedToBottom(tabId);
+      },
       setTabNeedsAttention: (tabId, needsAttention) => this.setTabNeedsAttention(tabId, needsAttention),
       getPendingQuestions: () => this.plugin.openCodeService.getPendingQuestions(),
       replyToQuestion: (requestId, answers) => this.plugin.openCodeService.replyToQuestion(requestId, answers),
       rejectQuestion: (requestId) => this.plugin.openCodeService.rejectQuestion(requestId),
-      applyResolvedQuestionState: (resolution, tabId) => {
-        this.questionResolutionCoordinator.applyResolvedQuestionState(resolution, tabId);
-      },
       refreshTabSessionStatus: (tabId, sessionId, options) =>
         this.sessionTodoStatusRefreshService.refreshTabSessionStatus(tabId, sessionId, options),
       startConversationSyncLoop: () => {
@@ -4173,17 +4148,6 @@ export class OpenCodianView extends ItemView {
     tabId: TabId | null = this.getActiveTabId(),
   ): void {
     this.questionDockCoordinator.markQuestionRequestResolved(requestId, tabId);
-  }
-
-  private clearPendingQuestionsForTab(tabId: TabId | null = this.getActiveTabId()): void {
-    this.questionDockCoordinator.clearPendingQuestionsForTab(tabId);
-  }
-
-  private async refreshPendingQuestionsForTab(
-    tabId: TabId | null,
-    sessionId: string | null | undefined = this.getSessionIdForTab(tabId),
-  ): Promise<QuestionRequest[]> {
-    return this.questionDockCoordinator.refreshPendingQuestionsForTab(tabId, sessionId);
   }
 
   private renderQuestionDock(): void {

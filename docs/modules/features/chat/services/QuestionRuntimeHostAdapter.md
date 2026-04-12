@@ -1,0 +1,59 @@
+# QuestionRuntimeHostAdapter
+
+> **源码**: `src/features/chat/services/QuestionRuntimeHostAdapter.ts`
+> **状态**: [REVIEW]
+
+## 概述
+
+`QuestionRuntimeHostAdapter` 把 `OpenCodianView` 里原本分散的 question runtime host factory 与 service instantiation 收束到一个模块，专门负责：
+
+- 从单一 `QuestionRuntimeViewHost` 派生 `QuestionInlineCardRenderer`、`QuestionResolutionCoordinator`、`QuestionDockCoordinator` 三段 question runtime 所需的 host 回调
+- 顺序装配 inline question card、resolved-question runtime 与上方 question dock 三个协作模块，避免 view 继续维护三段 `create*Host()` 和三次实例化
+- 让 `QuestionDockCoordinator` 的 resolved-state callback 直接回连到共享的 `QuestionResolutionCoordinator`，保持 dock resolve 与 inline fallback 共用同一份 question-resolution state bridge
+
+它不负责 question request 的服务端数据获取、resolved card DOM 内容拼装，或 question dock 的真正 DOM 渲染；这些仍分别留给 `OpenCodeService`、`QuestionResolutionCardRenderer` 与 `QuestionDock`。
+
+## 公开接口
+
+```typescript
+export interface QuestionRuntimeState
+  extends QuestionDockCoordinatorRuntimeState,
+    QuestionInlineCardRuntimeState,
+    QuestionResolutionCoordinatorRuntimeState {}
+
+export interface QuestionRuntimeViewHost {
+  getActiveTabId(): TabId | null;
+  getTabRuntimeState(tabId: TabId | null): QuestionRuntimeState | null;
+  ensureTabRuntimeState(tabId: TabId | null): QuestionRuntimeState | null;
+  getCurrentConversationSessionId(): string | null | undefined;
+  getSessionIdForTab(tabId: TabId | null): string | null | undefined;
+  getQuestionDock(): Pick<QuestionDock, 'render'> | null;
+  getQuestionDisplayMode(): QuestionDisplayMode;
+  shouldUseAboveInputQuestionDock(): boolean;
+  shouldRenderQuestionResolutionCards(): boolean;
+  keepQuestionCardPinnedToBottom(tabId: TabId | null): void;
+  setTabNeedsAttention(tabId: TabId | null, needsAttention: boolean): void;
+  getPendingQuestions(): Promise<QuestionRequest[]>;
+  replyToQuestion(requestId: string, answers: string[][]): Promise<void>;
+  rejectQuestion(requestId: string): Promise<void>;
+  refreshTabSessionStatus(...): Promise<unknown>;
+  startConversationSyncLoop(): void;
+  syncVisibleConversationInBackground(): Promise<void>;
+}
+
+export function createQuestionRuntimeHosts(...): QuestionRuntimeHosts;
+export function createQuestionRuntimeServices(...): QuestionRuntimeServices;
+```
+
+## 关键行为
+
+- `createQuestionRuntimeHosts()` 从同一份 view host 派生 inline-card、resolution、dock 三组 host，避免 `OpenCodianView` 继续为 question 子链维护三段闭包工厂
+- `createQuestionRuntimeServices()` 顺序实例化 `QuestionInlineCardRenderer` → `QuestionResolutionCoordinator` → `QuestionDockCoordinator`，保留原来的协作依赖关系
+- dock resolve 时的 `applyResolvedQuestionState()` 不再由 view 单独转发，而是通过 adapter 直接映射到共享 `QuestionResolutionCoordinator`
+- `OpenCodianView` 的 background-task post-sync refresh host 与 tab conversation state bridge 现在也直接经由同一份 question runtime bundle 调用 pending-question refresh / clear，不再额外经过 view forwarding 方法
+
+## 与 `OpenCodianView` 的边界
+
+- `OpenCodianView` 现在只提供一份 `QuestionRuntimeViewHost`，并保存一份 `QuestionRuntimeServices` bundle，而不是继续散落地持有三段 host factory
+- `QuestionDockCoordinator` 继续负责 pending-question queue、dock callbacks 与 resolve follow-up；adapter 不接管其业务逻辑
+- `QuestionInlineCardRenderer` 与 `QuestionResolutionCoordinator` 继续分别负责 inline question card 与 resolved question runtime；adapter 只负责共享装配

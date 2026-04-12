@@ -12,7 +12,7 @@
 - 组装 `QuestionDock` 的 render state / callbacks，处理 group 切换、单题/多题显示模式和 answer sanitize
 - 在上方 dock 提交或拒绝问题后，统一执行 `replyToQuestion()` / `rejectQuestion()`、resolved state bridge、status refresh 与 visible-conversation sync follow-up
 
-它不负责 inline question card 的 DOM 渲染，也不负责 answered/rejected 回顾卡片；这些仍分别由 `QuestionInlineCardRenderer` 与 `QuestionResolutionCoordinator` 负责。
+它不负责 inline question card 的 DOM 渲染，也不负责 answered/rejected 回顾卡片；这些仍分别由 `QuestionInlineCardRenderer` 与 `QuestionResolutionCoordinator` 负责。它的 host 装配现在通常由 `QuestionRuntimeHostAdapter` 统一提供。
 
 ## 公开接口
 
@@ -61,6 +61,6 @@ export class QuestionDockCoordinator {
 
 ## 与 `OpenCodianView` 的边界
 
-- `OpenCodianView` 仍实例化 `QuestionDock` 并保存 tab runtime 字段，但 question dock/pending question 的主要 orchestration 已迁到 `QuestionDockCoordinator`
-- `BackgroundTaskPostSyncCoordinator` 与 `ConversationViewStateService` 仍通过 view host 调用 `refreshPendingQuestionsForTab()` / `clearPendingQuestionsForTab()`，但实际逻辑已经落到本 service
+- `OpenCodianView` 仍实例化 `QuestionDock` 并保存 tab runtime 字段，但 question dock/pending question 的主要 orchestration 已迁到 `QuestionDockCoordinator`，其 host 也由 `QuestionRuntimeHostAdapter` 统一装配
+- `BackgroundTaskPostSyncCoordinator` 与 `TabConversationStateBridge` 仍需要 pending-question refresh / clear，但现在会经由同一份 question runtime bundle 调用本 service，而不是继续走 view 内单独 forwarding 方法
 - `QuestionInlineCardRenderer` 继续负责 inline 提问 UI；inline resolve 仍经由 view 调用 `markQuestionRequestResolved()` 与 `QuestionResolutionCoordinator`
