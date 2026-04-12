@@ -1,6 +1,9 @@
 import {
   type ConversationLoadRuntimePort,
 } from '../../../../src/features/chat/runtime/ConversationLoadRuntimeBridge';
+import type {
+  ConversationHydrationOutcomePort,
+} from '../../../../src/features/chat/runtime/ConversationHydrationOutcomeBridge';
 import {
   TabViewActivationBridge,
   type TabViewActivationBridgeHost,
@@ -46,9 +49,6 @@ function createHost(
     loadConversations: jest.fn().mockResolvedValue(undefined),
     getConversations: jest.fn().mockReturnValue([]),
     createConversation: jest.fn().mockResolvedValue(createConversation('created')),
-    syncBackgroundTaskStateFromConversation: jest.fn(),
-    renderMessages: jest.fn().mockResolvedValue(undefined),
-    commitConversationSyncBaseline: jest.fn(),
     ...overrides,
   };
 }
@@ -95,6 +95,14 @@ function createActivationBridge() {
     bridge: new TabViewActivationBridge(host, refreshCoordinator),
     host,
     refreshCoordinator,
+  };
+}
+
+type MockedConversationHydrationOutcomePort = jest.Mocked<ConversationHydrationOutcomePort>;
+
+function createConversationHydrationOutcomeBridge(): MockedConversationHydrationOutcomePort {
+  return {
+    applyLoadedConversationOutcome: jest.fn().mockResolvedValue(undefined),
   };
 }
 
@@ -169,6 +177,7 @@ describe('ConversationViewStateService', () => {
     });
     const tabConversationActivationBridge = createTabConversationActivationBridge();
     const { bridge } = createActivationBridge();
+    const conversationHydrationOutcomeBridge = createConversationHydrationOutcomeBridge();
     const transitionBridge = createTransitionBridge();
     const conversationLoadRuntimeBridge = createConversationLoadRuntimeBridge({
       resolveConversation: jest.fn().mockResolvedValue(conversation),
@@ -177,6 +186,7 @@ describe('ConversationViewStateService', () => {
       host,
       tabConversationActivationBridge,
       bridge,
+      conversationHydrationOutcomeBridge,
       transitionBridge,
       conversationLoadRuntimeBridge,
     );
@@ -208,12 +218,14 @@ describe('ConversationViewStateService', () => {
     });
     const tabConversationActivationBridge = createTabConversationActivationBridge();
     const { bridge } = createActivationBridge();
+    const conversationHydrationOutcomeBridge = createConversationHydrationOutcomeBridge();
     const transitionBridge = createTransitionBridge();
     const conversationLoadRuntimeBridge = createConversationLoadRuntimeBridge();
     const service = new ConversationViewStateService(
       host,
       tabConversationActivationBridge,
       bridge,
+      conversationHydrationOutcomeBridge,
       transitionBridge,
       conversationLoadRuntimeBridge,
     );
@@ -240,12 +252,14 @@ describe('ConversationViewStateService', () => {
     });
     const tabConversationActivationBridge = createTabConversationActivationBridge();
     const { bridge } = createActivationBridge();
+    const conversationHydrationOutcomeBridge = createConversationHydrationOutcomeBridge();
     const transitionBridge = createTransitionBridge();
     const conversationLoadRuntimeBridge = createConversationLoadRuntimeBridge();
     const service = new ConversationViewStateService(
       host,
       tabConversationActivationBridge,
       bridge,
+      conversationHydrationOutcomeBridge,
       transitionBridge,
       conversationLoadRuntimeBridge,
     );
@@ -262,6 +276,7 @@ describe('ConversationViewStateService', () => {
     const host = createHost();
     const tabConversationActivationBridge = createTabConversationActivationBridge();
     const { bridge } = createActivationBridge();
+    const conversationHydrationOutcomeBridge = createConversationHydrationOutcomeBridge();
     const transitionBridge = createTransitionBridge();
     const conversationLoadRuntimeBridge = createConversationLoadRuntimeBridge({
       resolveConversation: jest.fn().mockResolvedValue(conversation),
@@ -271,10 +286,10 @@ describe('ConversationViewStateService', () => {
       host,
       tabConversationActivationBridge,
       bridge,
+      conversationHydrationOutcomeBridge,
       transitionBridge,
       conversationLoadRuntimeBridge,
     );
-    const postRenderOutcomeSpy = jest.spyOn(bridge, 'applyLoadedConversationPostRenderOutcome');
     const hydrationTailSpy = jest.spyOn(bridge, 'applyLoadedConversationHydrationTail');
 
     await service.loadConversation(conversation.id, {
@@ -296,9 +311,11 @@ describe('ConversationViewStateService', () => {
       'tab-1',
       { forceServerSync: undefined },
     );
-    expect(host.renderMessages).toHaveBeenCalledWith(conversation.messages);
-    expect(postRenderOutcomeSpy).toHaveBeenCalledWith('tab-1', conversation.openCodeSessionId);
-    expect(host.commitConversationSyncBaseline).toHaveBeenCalledWith(conversation.messages);
+    expect(conversationHydrationOutcomeBridge.applyLoadedConversationOutcome).toHaveBeenCalledWith(
+      'tab-1',
+      conversation,
+      conversation.messages,
+    );
     expect(transitionBridge.restoreLoadedConversationTransition).toHaveBeenCalledTimes(1);
     expect(hydrationTailSpy).toHaveBeenCalledTimes(1);
     expect(transitionBridge.endLoadedConversationTransition).toHaveBeenCalledTimes(1);

@@ -100,6 +100,7 @@ docs/modules/
 │   │   │   ├── BackgroundTaskIndicatorCoordinator.md
 │   │   │   ├── BackgroundTaskInlinePanelRenderer.md
 │   │   │   ├── BackgroundTaskStreamTriggerCoordinator.md
+│   │   │   ├── ConversationHydrationOutcomeBridge.md
 │   │   │   ├── ConversationHydrationRenderBridge.md
 │   │   │   ├── ConversationLoadRuntimeBridge.md
 │   │   │   ├── ConversationTransitionBridge.md

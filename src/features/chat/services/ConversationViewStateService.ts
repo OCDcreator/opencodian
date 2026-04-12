@@ -1,5 +1,4 @@
 import {
-  type ChatMessage,
   type Conversation,
   type PersistedTabState,
 } from '../../../core/types';
@@ -7,6 +6,7 @@ import type {
   ConversationLoadRuntimePort,
   ConversationLoadRuntimeOptions,
 } from '../runtime/ConversationLoadRuntimeBridge';
+import type { ConversationHydrationOutcomePort } from '../runtime/ConversationHydrationOutcomeBridge';
 import type { TabConversationActivationBridge } from '../runtime/TabConversationActivationBridge';
 import type { TabViewActivationBridge } from '../runtime/TabViewActivationBridge';
 import type { ConversationTransitionPort } from '../runtime/ConversationTransitionBridge';
@@ -36,10 +36,6 @@ export interface ConversationViewStateHost {
   loadConversations(): Promise<void>;
   getConversations(): Conversation[];
   createConversation(): Promise<Conversation>;
-
-  syncBackgroundTaskStateFromConversation(conversation: Conversation): void;
-  renderMessages(messages: ChatMessage[]): Promise<void>;
-  commitConversationSyncBaseline(messages: ChatMessage[]): void;
 }
 
 type TabConversationActivationPort = Pick<
@@ -52,7 +48,7 @@ type TabConversationActivationPort = Pick<
 type TabViewActivationPort =
   Pick<
     TabViewActivationBridge,
-    'applyActivationPreflight' | 'applyLoadedConversationPostRenderOutcome' | 'applyLoadedConversationHydrationTail'
+    'applyActivationPreflight' | 'applyLoadedConversationHydrationTail'
   >;
 
 export class ConversationViewStateService {
@@ -60,6 +56,7 @@ export class ConversationViewStateService {
     private readonly host: ConversationViewStateHost,
     private readonly tabConversationActivationBridge: TabConversationActivationPort,
     private readonly tabViewActivationBridge: TabViewActivationPort,
+    private readonly conversationHydrationOutcomeBridge: ConversationHydrationOutcomePort,
     private readonly conversationTransitionBridge: ConversationTransitionPort,
     private readonly conversationLoadRuntimeBridge: ConversationLoadRuntimePort,
   ) {}
@@ -186,13 +183,11 @@ export class ConversationViewStateService {
         activeTabId,
         this.buildConversationLoadRuntimeOptions(options),
       );
-      this.host.syncBackgroundTaskStateFromConversation(conversation);
-      await this.host.renderMessages(messages);
-      await this.tabViewActivationBridge.applyLoadedConversationPostRenderOutcome(
+      await this.conversationHydrationOutcomeBridge.applyLoadedConversationOutcome(
         activeTabId,
-        conversation.openCodeSessionId,
+        conversation,
+        messages,
       );
-      this.host.commitConversationSyncBaseline(messages);
       this.conversationTransitionBridge.restoreLoadedConversationTransition(transitionContext);
       await this.tabViewActivationBridge.applyLoadedConversationHydrationTail();
     } finally {
