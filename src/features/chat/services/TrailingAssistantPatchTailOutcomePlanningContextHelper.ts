@@ -1,49 +1,24 @@
-import type { ChatMessage } from '../../../core/types';
-
-type TrailingAssistantPatchTailOutcomePatchTarget = {
-  messageEl: HTMLElement;
-};
-
-type TrailingAssistantPatchTailOutcomeSourceFields = {
-  previousTailMessage: ChatMessage;
-  nextTailMessage: ChatMessage;
-  patchTarget: TrailingAssistantPatchTailOutcomePatchTarget;
-  shouldStickToBottom: boolean;
-};
-
-type TrailingAssistantPatchTailOutcomeInputs = {
-  previousTailMessage: ChatMessage;
-  nextTailMessage: ChatMessage;
-  messageEl: HTMLElement;
-  shouldStickToBottom: boolean;
-};
+import {
+  buildTrailingAssistantPatchTailOutcomePlanningContextInputs,
+  type TrailingAssistantPatchTailOutcomePlanningContextInputs,
+  type TrailingAssistantPatchTailOutcomePlanningContextInputsSource,
+} from './TrailingAssistantPatchTailOutcomePlanningContextInputsHelper';
 
 export type TrailingAssistantPatchTailOutcomePlanningContextSource =
-  TrailingAssistantPatchTailOutcomeSourceFields;
+  TrailingAssistantPatchTailOutcomePlanningContextInputsSource;
 export type TrailingAssistantPatchTailOutcomePlanningContext =
-  TrailingAssistantPatchTailOutcomeInputs;
+  TrailingAssistantPatchTailOutcomePlanningContextInputs;
 
 export function buildTrailingAssistantPatchTailOutcomePlanningContext(
   source: TrailingAssistantPatchTailOutcomePlanningContextSource,
 ): TrailingAssistantPatchTailOutcomePlanningContext {
   return buildTrailingAssistantPatchTailOutcomePlanningContextFromInputs(
-    buildTrailingAssistantPatchTailOutcomeInputs(source),
+    buildTrailingAssistantPatchTailOutcomePlanningContextInputs(source),
   );
 }
 
-function buildTrailingAssistantPatchTailOutcomeInputs(
-  source: TrailingAssistantPatchTailOutcomePlanningContextSource,
-): TrailingAssistantPatchTailOutcomeInputs {
-  return {
-    previousTailMessage: source.previousTailMessage,
-    nextTailMessage: source.nextTailMessage,
-    messageEl: source.patchTarget.messageEl,
-    shouldStickToBottom: source.shouldStickToBottom,
-  };
-}
-
 function buildTrailingAssistantPatchTailOutcomePlanningContextFromInputs(
-  inputs: TrailingAssistantPatchTailOutcomeInputs,
+  inputs: TrailingAssistantPatchTailOutcomePlanningContextInputs,
 ): TrailingAssistantPatchTailOutcomePlanningContext {
   return {
     previousTailMessage: inputs.previousTailMessage,
