@@ -13,12 +13,16 @@ import type {
   QuestionPendingRefreshRuntimeState,
 } from './QuestionPendingRefreshRuntimeFacade';
 import type { QuestionPostResolutionRuntimeFacade } from './QuestionPostResolutionRuntimeFacade';
+import { isQuestionAnswerComplete } from '../ui/questionDockState';
 import {
-  buildQuestionDockViewModel,
-  getPreferredQuestionIndexForGroup,
-  isQuestionAnswerComplete,
-  normalizeQuestionDraftAnswers,
-} from '../ui/questionDockState';
+  getQuestionDockActiveInteractionState,
+  getQuestionDockDraftAnswers,
+  sanitizeQuestionDockAnswer,
+  selectQuestionDockGroup,
+  selectQuestionDockQuestion,
+  setQuestionDockDraftAnswer,
+  type QuestionDockInteractionRuntimeState,
+} from './QuestionDockInteractionState';
 
 const logger = createLogger('QuestionDockCoordinator');
 
@@ -41,9 +45,9 @@ type QuestionPendingRefreshRuntimePort = Pick<
 export interface QuestionDockCoordinatorRuntimeState {
   isStreaming: boolean;
   pendingQuestionRequests: QuestionPendingRefreshRuntimeState['pendingQuestionRequests'];
-  questionDraftAnswers: QuestionPendingRefreshRuntimeState['questionDraftAnswers'];
-  questionActiveGroupKeys: QuestionPendingRefreshRuntimeState['questionActiveGroupKeys'];
-  questionActiveIndexes: QuestionPendingRefreshRuntimeState['questionActiveIndexes'];
+  questionDraftAnswers: QuestionDockInteractionRuntimeState['questionDraftAnswers'];
+  questionActiveGroupKeys: QuestionDockInteractionRuntimeState['questionActiveGroupKeys'];
+  questionActiveIndexes: QuestionDockInteractionRuntimeState['questionActiveIndexes'];
 }
 
 type QuestionDockPort = Pick<QuestionDock, 'render'>;
@@ -105,15 +109,12 @@ export class QuestionDockCoordinator {
       return;
     }
 
-    const answers = this.getQuestionDraftAnswers(activeRequest, activeTabId);
     const displayMode = this.host.getQuestionDisplayMode();
-    const viewModel = buildQuestionDockViewModel(activeRequest, answers, {
-      activeGroupKey: runtime.questionActiveGroupKeys.get(activeRequest.id),
-      activeQuestionIndex: runtime.questionActiveIndexes.get(activeRequest.id),
+    const { answers, viewModel } = getQuestionDockActiveInteractionState(
+      runtime,
+      activeRequest,
       displayMode,
-    });
-    runtime.questionActiveGroupKeys.set(activeRequest.id, viewModel.activeGroupKey);
-    runtime.questionActiveIndexes.set(activeRequest.id, viewModel.activeQuestionIndex);
+    );
 
     questionDock.render({
       request: activeRequest,
@@ -123,28 +124,14 @@ export class QuestionDockCoordinator {
       activeQuestionIndex: viewModel.activeQuestionIndex,
     }, {
       onAnswerChange: (questionIndex, answer) => {
-        this.setQuestionDraftAnswer(activeRequest, questionIndex, answer, activeTabId);
+        setQuestionDockDraftAnswer(runtime, activeRequest, questionIndex, answer);
       },
       onSelectGroup: (groupKey) => {
-        const nextAnswers = this.getQuestionDraftAnswers(activeRequest, activeTabId);
-        runtime.questionActiveGroupKeys.set(activeRequest.id, groupKey);
-        runtime.questionActiveIndexes.set(
-          activeRequest.id,
-          getPreferredQuestionIndexForGroup(activeRequest, nextAnswers, groupKey),
-        );
+        selectQuestionDockGroup(runtime, activeRequest, groupKey);
         this.render();
       },
       onSelectQuestion: (questionIndex) => {
-        const nextViewModel = buildQuestionDockViewModel(
-          activeRequest,
-          this.getQuestionDraftAnswers(activeRequest, activeTabId),
-          {
-            activeQuestionIndex: questionIndex,
-            displayMode,
-          },
-        );
-        runtime.questionActiveGroupKeys.set(activeRequest.id, nextViewModel.activeGroupKey);
-        runtime.questionActiveIndexes.set(activeRequest.id, nextViewModel.activeQuestionIndex);
+        selectQuestionDockQuestion(runtime, activeRequest, questionIndex, displayMode);
         this.render();
       },
       onSubmit: () => {
@@ -239,59 +226,10 @@ export class QuestionDockCoordinator {
     }, EMPTY_DOCK_CALLBACKS);
   }
 
-  private sanitizeQuestionAnswer(
-    answer: readonly string[],
-    request: QuestionRequest,
-    questionIndex: number,
-  ): string[] {
-    const cleaned = answer
-      .map((item) => item.trim())
-      .filter((item) => item.length > 0);
-
-    if (request.questions[questionIndex]?.multiple) {
-      return [...new Set(cleaned)];
-    }
-
-    return cleaned.length > 0 ? [cleaned[0]] : [];
-  }
-
   private getActivePendingQuestionRequest(
     tabId: TabId | null = this.host.getActiveTabId(),
   ): QuestionRequest | null {
     return this.host.getTabRuntimeState(tabId)?.pendingQuestionRequests[0] ?? null;
-  }
-
-  private getQuestionDraftAnswers(
-    request: QuestionRequest,
-    tabId: TabId | null = this.host.getActiveTabId(),
-  ): string[][] {
-    const runtime = this.host.getTabRuntimeState(tabId);
-    if (!runtime) {
-      return normalizeQuestionDraftAnswers(request.questions.length);
-    }
-
-    const normalized = normalizeQuestionDraftAnswers(
-      request.questions.length,
-      runtime.questionDraftAnswers.get(request.id),
-    );
-    runtime.questionDraftAnswers.set(request.id, normalized);
-    return normalized;
-  }
-
-  private setQuestionDraftAnswer(
-    request: QuestionRequest,
-    questionIndex: number,
-    answer: readonly string[],
-    tabId: TabId | null = this.host.getActiveTabId(),
-  ): void {
-    const runtime = this.host.getTabRuntimeState(tabId);
-    if (!runtime) {
-      return;
-    }
-
-    const nextAnswers = this.getQuestionDraftAnswers(request, tabId);
-    nextAnswers[questionIndex] = this.sanitizeQuestionAnswer(answer, request, questionIndex);
-    runtime.questionDraftAnswers.set(request.id, nextAnswers);
   }
 
   private getOrCreateQuestionWaiter(
@@ -343,8 +281,9 @@ export class QuestionDockCoordinator {
       return;
     }
 
-    const answers = this.getQuestionDraftAnswers(request, tabId).map((answer, index) =>
-      this.sanitizeQuestionAnswer(answer, request, index),
+    const runtime = this.host.getTabRuntimeState(tabId);
+    const answers = getQuestionDockDraftAnswers(runtime, request).map((answer, index) =>
+      sanitizeQuestionDockAnswer(answer, request, index),
     );
     const hasEmptyAnswer = request.questions.some((question, index) =>
       !isQuestionAnswerComplete(question, answers[index]),
