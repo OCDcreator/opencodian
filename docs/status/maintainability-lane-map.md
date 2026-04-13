@@ -1,22 +1,22 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [CONFIRMED_NEXT_BATCH] R13-R18 已确认；当前 `[NEXT]` 是 R14 header and server status shell presenter。
+> **当前状态**: [CONFIRMED_NEXT_BATCH] R13-R18 已确认；当前 `[NEXT]` 是 R15 composer input shell coordinator。
 
 ## 当前优先级
 
-- **P1 / R14**: header / server status shell（header DOM、status label/action、wordmark/settings button）
-- **P1 / R13**: 已完成 tab messages pane surface（messages pane lifecycle、active pane、scroll metrics、pane observer）
 - **P1 / R15**: composer input shell（input area DOM、textarea、高度同步、layout metrics）
+- **P1 / R14**: 已完成 header / server status shell（header DOM、status label/action、wordmark/settings button）
+- **P1 / R13**: 已完成 tab messages pane surface（messages pane lifecycle、active pane、scroll metrics、pane observer）
 - **P1 / R16**: model / permission selection controls（chat 内 dropdown/search/list/selection display）
 - **P5 / R17**: input appearance / glass state（theme class、SVG filter、liquid-glass mount/diagnostics）
 - **Checkpoint / R18**: UI shell checkpoint；再判断是否转向 `OpenCodeService`
 
 ## 当前热点首查入口
 
-- R14 首查 `buildHeader`、server status loop/label、wordmark/settings button；不要混入 model/input selector
-- R13 已完成：pane lifecycle / observer / scroll metrics / cleanup 已收束到 `services/TabMessagesPaneCoordinator.ts`
 - R15 首查 `buildInputArea`、textarea submit/height、composer layout metrics；liquid-glass diagnostics 留给 R17
+- R14 已完成：header DOM、server status loop/label、wordmark/settings button 已收束到 `services/ChatHeaderPresenter.ts`
+- R13 已完成：pane lifecycle / observer / scroll metrics / cleanup 已收束到 `services/TabMessagesPaneCoordinator.ts`
 - R16 首查 model selector 与 permission selector dropdown lifecycle；不要改 settings catalog 或 core catalog state
 - R17 首查 input panel theme/glass/filter/diagnostics state；保持 experimental demos opt-in
 - `OpenCodeService` 本批只作为 R18 checkpoint 候选，不在 R13-R17 中修改

@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`。R18 完成后必须暂停复盘，不得自动扩展新队列。
-> **当前状态**: [CONFIRMED_NEXT_BATCH] R13-R18 已确认；当前唯一可执行 `[NEXT]` 是 R14，R18 后必须再次暂停。
+> **当前状态**: [CONFIRMED_NEXT_BATCH] R13-R18 已确认；当前唯一可执行 `[NEXT]` 是 R15，R18 后必须再次暂停。
 
 ## 控制规则
 
@@ -307,7 +307,7 @@
   - 新 owner 满足粒度规则，且不是单方法 wrapper。
   - 运行 targeted tests、全量 `npm test`、`npm run build`。
 
-### [NEXT] R14 - Header and server status shell presenter
+### [DONE] R14 - Header and server status shell presenter
 
 - **Lane**: P1 `OpenCodianView header / server status shell`
 - **目标**: 把 header DOM、server status label/action、wordmark/settings button 组装迁到 `ChatHeaderPresenter` 或同等厚 owner，让 view 只提供 server/status/settings 回调。
@@ -328,7 +328,7 @@
   - Locale/status refresh 有 focused coverage 或稳定验证。
   - 运行 targeted tests、全量 `npm test`、`npm run build`。
 
-### [QUEUED] R15 - Composer input shell coordinator
+### [NEXT] R15 - Composer input shell coordinator
 
 - **Lane**: P1 `OpenCodianView composer input shell`
 - **目标**: 把 input area DOM、textarea 行为、submit gate、高度同步与 composer layout metrics 收束为较厚 input shell owner。

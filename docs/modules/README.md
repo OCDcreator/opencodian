@@ -127,6 +127,7 @@ docs/modules/
 │   │   ├── rendering/
 │   │   │   └── collapsible.md
 │   │   ├── services/
+│   │   │   ├── ChatHeaderPresenter.md
 │   │   │   ├── ComposerContextActionService.md
 │   │   │   ├── ComposerContextCoordinator.md
 │   │   │   ├── ContextAttachmentBuilder.md

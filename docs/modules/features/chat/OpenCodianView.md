@@ -29,7 +29,7 @@
 | `applyChatAppearanceSettings()` | 应用主题 preset、聊天外观变量、自定义 CSS、输入面板 glass 状态 |
 | `refreshCurrentConversationRendering()` | 重新渲染当前对话 |
 | `applyChatScrollMode()` | 把当前滚动模式应用到消息容器 |
-| `applyLocaleTexts()` | 刷新工具提示、placeholder、dock 和 tab 文案 |
+| `applyLocaleTexts()` | 委托 header presenter 刷新 header/status 文案，并刷新 placeholder、dock 和 tab 文案 |
 | `refreshQuestionUi()` | 重绘 question dock，并在需要时重绘当前对话 |
 | `toggleLiquidDiamondDemo()` | 切换 CPU 版 floating diamond demo |
 | `toggleLiquidDiamondWebGlDemo()` | 切换 WebGL2 版 floating diamond demo |
@@ -88,7 +88,7 @@ background task completion notice 的 queued-state 则已经完全移出 `TabRun
 
 - `currentConversation` / `currentConversationRevertState`
 - 模型目录缓存：`availableModels`、`availableProviders`
-- 服务器状态轮询和 badge 状态
+- `services/ChatHeaderPresenter.ts` 的 host seam：server availability、settings/history/new-tab callbacks、status refresh 和 header tab-slot 写回
 - model selector sticky header cleanup
 - 由 `ComposerContextViewFacade.create()` 基于独立的 `createComposerContextViewHost()` / `createFocusContextViewHost()` seam 装配出的 `ComposerContextEventBridge`、`ComposerContextCoordinator`、`FocusContextRuntimeService`、`PersistentAssistantNoticeService` 等视图级运行时协作对象
 - theme background / liquid glass / diamond demo / glass octahedron 相关 DOM 引用
@@ -101,7 +101,7 @@ background task completion notice 的 queued-state 则已经完全移出 `TabRun
 
 1. `buildUI()`
 2. `initializeTabSystem()`
-3. `startServerStatusLoop()`
+3. `chatHeaderPresenter.startServerStatusLoop()`
 4. 在 `messagesShellEl` 上创建 `MarkdownRenderService`
 5. `wireEventHandlers()`，其中 composer/context 相关的 workspace / vault / DOM 事件注册与 retained-selection polling 启动都会转交给 `ComposerContextEventBridge`
 6. 通过 `ConversationSessionSignalRuntime` 统一订阅 session sync event 与 todo/status live signal 更新
@@ -110,7 +110,7 @@ background task completion notice 的 queued-state 则已经完全移出 `TabRun
 `onClose()` 则会反向清理：
 
 - tab 持久化
-- server status / conversation sync / selection polling / layout / scroll 定时器
+- header presenter / conversation sync / selection polling / layout / scroll 定时器
 - title generation
 - effort selector、context ring、question dock、todo dock、navigation sidebar
 - liquid glass adapter、SVG filter layer、diamond demo
@@ -125,6 +125,17 @@ background task completion notice 的 queued-state 则已经完全移出 `TabRun
 - restore 后的高层 render / hydration / bridge 调度
 
 这次没有改变原有 bottom / preserve-anchor / preserve-distance 三种恢复语义，只是把算法从 view 内联实现挪到了可单测模块。
+
+### Header/status shell 抽离
+
+header DOM、server status badge、title logo/wordmark、new/current-tab、history 与 settings 按钮现在由 `services/ChatHeaderPresenter.ts` 承接。`OpenCodianView` 只保留 presenter host seam：
+
+- server availability 查询与 settings server mode 读取
+- settings / server section / history / new-tab callbacks
+- tooltip 标签、plugin asset URL、css-change 注册和 layout/color sync 回调
+- header tab bar slot 写回给 tab bar layout
+
+server status loop、badge class、status label、本地/远端文案判定和 locale refresh 都在 presenter 内部完成；view 不再直接持有 header button refs 或 status interval 状态。
 
 ### 对话装载与后台同步
 

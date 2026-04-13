@@ -301,6 +301,11 @@ import {
 import {
   createTabActivationRuntimeViewHosts,
 } from './services/TabActivationRuntimeViewHostFactory';
+import {
+  ChatHeaderPresenter,
+  type ChatHeaderPresenterHost,
+  type ChatServerAvailability,
+} from './services/ChatHeaderPresenter';
 import { TitleGenerationService } from './services/TitleGenerationService';
 import { TabBar, type TabBarLayoutMode, type TabId, TabManager } from './tabs';
 import { ContextDetailModal, type ContextRawMessageItem } from './ui/ContextDetailModal';
@@ -354,14 +359,6 @@ const ASSISTANT_DEBUG_STAGE_ALLOWLIST = new Set([
 ]);
 
 const OPENCODIAN_APP_ICON = 'opencodian-app-icon';
-
-/** Logo SVG for light theme (dark logo on light bg) - from opencode-logo-light.svg */
-const LOGO_SVG_LIGHT = `<svg width="24" height="30" viewBox="0 0 240 300" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#clip0_light)"><mask id="mask0_light" style="mask-type:luminance" maskUnits="userSpaceOnUse" x="0" y="0" width="240" height="300"><path d="M240 0H0V300H240V0Z" fill="white"/></mask><g mask="url(#mask0_light)"><path d="M180 240H60V120H180V240Z" fill="#CFCECD"/><path d="M180 60H60V240H180V60ZM240 300H0V0H240V300Z" fill="#211E1E"/></g></g><defs><clipPath id="clip0_light"><rect width="240" height="300" fill="white"/></clipPath></defs></svg>`;
-
-/** Logo SVG for dark theme (light logo on dark bg) - from opencode-logo-dark.svg */
-const LOGO_SVG_DARK = `<svg width="24" height="30" viewBox="0 0 240 300" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#clip0_dark)"><mask id="mask0_dark" style="mask-type:luminance" maskUnits="userSpaceOnUse" x="0" y="0" width="240" height="300"><path d="M240 0H0V300H240V0Z" fill="white"/></mask><g mask="url(#mask0_dark)"><path d="M180 240H60V120H180V240Z" fill="#4B4646"/><path d="M180 60H60V240H180V60ZM240 300H0V0H240V300Z" fill="#F1ECEC"/></g></g><defs><clipPath id="clip0_dark"><rect width="240" height="300" fill="white"/></clipPath></defs></svg>`;
-const TITLE_WORDMARK_LIGHT_ASSET_PATH = 'assets/branding/opencodian-wordmark-light.svg';
-const TITLE_WORDMARK_DARK_ASSET_PATH = 'assets/branding/opencodian-wordmark-dark.svg';
 
 const COMPOSER_TEXTAREA_MAX_HEIGHT = 240;
 const INPUT_PANEL_THEME_CLASS_BY_ID: Record<
@@ -556,8 +553,6 @@ function ensureComposerGlassSvgDefs(settings: InputPanelGlassRefractionSvgFilter
   svg.replaceChildren(defs);
 }
 
-type ChatServerAvailability = 'checking' | 'running' | 'starting' | 'offline' | 'external';
-
 interface OmoBackgroundTaskLogState {
   anchorKey: string;
   loggedPendingTaskIds: Set<string>;
@@ -669,6 +664,7 @@ export class OpenCodianView extends ItemView {
   private tabBar: TabBar | null = null;
   private tabManager: TabManager | null = null;
   private tabMessagesPaneCoordinator: TabMessagesPaneCoordinator<TabRuntimeState>;
+  private chatHeaderPresenter: ChatHeaderPresenter;
 
   // Model selector state
   private modelSelectorContainer: HTMLElement | null = null;
@@ -702,15 +698,6 @@ export class OpenCodianView extends ItemView {
   private sendBtn: HTMLElement | null = null;
   private addContextBtn: HTMLElement | null = null;
   private inputTextarea: HTMLTextAreaElement | null = null;
-  private serverStatusBadgeEl: HTMLElement | null = null;
-  private serverStatusTextEl: HTMLElement | null = null;
-  private newConversationBtnEl: HTMLElement | null = null;
-  private newConversationCurrentTabBtnEl: HTMLElement | null = null;
-  private historyBtnEl: HTMLElement | null = null;
-  private settingsBtnEl: HTMLElement | null = null;
-  private serverStatusIntervalId: number | null = null;
-  private isRefreshingServerStatus = false;
-  private lastServerAvailability: ChatServerAvailability | null = null;
   private chatSurfaceSyncFrameId: number | null = null;
   private chatSurfaceSyncTimeoutId: number | null = null;
   private composerLayoutSyncFrameId: number | null = null;
@@ -771,6 +758,40 @@ export class OpenCodianView extends ItemView {
 
   private get questionDockCoordinator(): QuestionRuntimeServices['dockCoordinator'] {
     return this.questionRuntimeServices.dockCoordinator;
+  }
+
+  private createChatHeaderPresenterHost(): ChatHeaderPresenterHost {
+    return {
+      setTooltipLabel: (element, label, position) => {
+        this.setTooltipLabel(element, label, position);
+      },
+      registerCssChangeListener: (listener) => {
+        this.registerEvent(this.app.workspace.on('css-change', listener));
+      },
+      resolveAssetUrl: (relativePath) => this.resolvePluginAssetUrl(relativePath),
+      scheduleChatSurfaceColorSync: () => {
+        this.scheduleChatSurfaceColorSync();
+      },
+      scheduleComposerLayoutSync: () => {
+        this.scheduleComposerLayoutSync();
+      },
+      resolveServerAvailability: () => this.getServerAvailability(),
+      isLocalServerMode: () => this.plugin.settings.server.mode === 'local',
+      refreshContextUsageIndicator: () => {
+        this.refreshContextUsageIndicator();
+      },
+      openServerSettings: () => {
+        this.openPluginSettingsAtServerSection();
+      },
+      createConversationInNewTab: () => this.createNewConversation(),
+      createConversationInCurrentTab: () => this.createNewConversationInCurrentTab(),
+      showConversationHistory: (event) => {
+        this.showConversationHistory(event);
+      },
+      openSettings: () => {
+        this.openPluginSettingsPreservingScroll();
+      },
+    };
   }
 
   private createTabRuntimeState(): TabRuntimeState {
@@ -1098,6 +1119,7 @@ export class OpenCodianView extends ItemView {
     this.tabMessagesPaneCoordinator = new TabMessagesPaneCoordinator(
       this.createTabMessagesPaneCoordinatorHost(),
     );
+    this.chatHeaderPresenter = new ChatHeaderPresenter(this.createChatHeaderPresenterHost());
     this.composerContextViewFacade = ComposerContextViewFacade.create({
       app: this.app,
       getServerMode: () => this.plugin.settings.server.mode,
@@ -1912,7 +1934,7 @@ export class OpenCodianView extends ItemView {
       },
       composerSendContext: this.composerContextViewFacade.sendContext,
       getServerAvailability: () => this.getServerAvailability(),
-      refreshServerStatusBadge: () => this.refreshServerStatusBadge(),
+      refreshServerStatusBadge: () => this.chatHeaderPresenter.refreshServerStatusBadge(),
       ensureServerReadyForChat: (availability) => this.ensureServerReadyForChat(availability),
       hasLoadedModelCatalog: () => this.hasLoadedModelCatalog,
       loadAvailableModels: () => this.loadAvailableModels(),
@@ -1981,7 +2003,7 @@ export class OpenCodianView extends ItemView {
       syncTabStreamLikeState: (tabId) => {
         this.syncTabStreamLikeState(tabId);
       },
-      refreshServerStatusBadge: () => this.refreshServerStatusBadge(),
+      refreshServerStatusBadge: () => this.chatHeaderPresenter.refreshServerStatusBadge(),
     };
     const transportPort: SendPipelineTransportPort = {
       sendStreamMessage: (content, options) => this.plugin.openCodeService.sendMessage(content, options),
@@ -2117,7 +2139,7 @@ export class OpenCodianView extends ItemView {
     // Build UI
     this.buildUI();
     this.initializeTabSystem();
-    this.startServerStatusLoop();
+    this.chatHeaderPresenter.startServerStatusLoop();
 
     // Initialize markdown service
     if (this.messagesShellEl) {
@@ -2137,7 +2159,7 @@ export class OpenCodianView extends ItemView {
 
   async onClose() {
     this.persistTabState({ flush: true });
-    this.stopServerStatusLoop();
+    this.chatHeaderPresenter.destroy();
     this.conversationSyncBridgePorts.getLoopControl().stopConversationSyncLoop();
     this.composerContextViewFacade.dispose();
     this.clearChatSurfaceSyncTimers();
@@ -2200,7 +2222,8 @@ export class OpenCodianView extends ItemView {
 
     // Header
     const header = this.chatContainerEl.createDiv({ cls: 'opencodian-header' });
-    this.buildHeader(header);
+    this.chatHeaderPresenter.build(header);
+    this.headerTabBarSlotEl = this.chatHeaderPresenter.getTabBarSlotEl();
     this.belowHeaderTabBarSlotEl = this.chatContainerEl.createDiv({
       cls: 'opencodian-tab-bar-slot opencodian-tab-bar-slot--below-header',
     });
@@ -2713,103 +2736,8 @@ export class OpenCodianView extends ItemView {
       );
   }
 
-  /** Build header */
-  private buildHeader(header: HTMLElement) {
-    // Logo and title
-    const titleEl = header.createDiv({ cls: 'opencodian-title' });
-
-    // Create logo container
-    const logoContainer = titleEl.createDiv({ cls: 'opencodian-logo' });
-    logoContainer.innerHTML = this.getLogoSvg();
-
-    const titleTextEl = titleEl.createEl('img', {
-      cls: 'opencodian-title-text',
-      attr: {
-        alt: 'OpenCodian',
-        draggable: 'false',
-      },
-    });
-    this.syncTitleWordmarkSrc(titleTextEl);
-    this.headerTabBarSlotEl = header.createDiv({ cls: 'opencodian-tab-bar-slot opencodian-tab-bar-slot--header' });
-
-    // Listen for theme changes
-    this.registerEvent(
-      this.app.workspace.on('css-change', () => {
-        logoContainer.innerHTML = this.getLogoSvg();
-        this.syncTitleWordmarkSrc(titleTextEl);
-        this.scheduleChatSurfaceColorSync();
-        this.scheduleComposerLayoutSync();
-      })
-    );
-
-    // Actions
-    const actions = header.createDiv({ cls: 'opencodian-header-actions' });
-
-    this.serverStatusBadgeEl = actions.createDiv({ cls: 'opencodian-server-status-badge is-checking' });
-    this.serverStatusBadgeEl.addClass('opencodian-tooltip-trigger');
-    this.setTooltipLabel(this.serverStatusBadgeEl, t('chat.serverStatus.openSettings'), 'bottom');
-    this.serverStatusBadgeEl.createSpan({ cls: 'opencodian-server-status-dot' });
-    this.serverStatusTextEl = this.serverStatusBadgeEl.createSpan({
-      cls: 'opencodian-server-status-text',
-      text: t('chat.serverStatus.checking'),
-    });
-    this.serverStatusBadgeEl.addEventListener('click', () => {
-      this.openPluginSettingsAtServerSection();
-    });
-
-    // New conversation button
-    this.newConversationBtnEl = actions.createDiv({ cls: 'opencodian-header-btn opencodian-tooltip-trigger' });
-    setIcon(this.newConversationBtnEl, 'opencodian-circle-plus');
-    this.setTooltipLabel(this.newConversationBtnEl, t('chat.tab.newTooltip'), 'bottom');
-    this.newConversationBtnEl.addEventListener('click', () => {
-      void this.createNewConversation();
-    });
-
-    // New conversation in current tab button
-    this.newConversationCurrentTabBtnEl = actions.createDiv({ cls: 'opencodian-header-btn opencodian-tooltip-trigger' });
-    setIcon(this.newConversationCurrentTabBtnEl, 'opencodian-message-square-plus');
-    this.setTooltipLabel(this.newConversationCurrentTabBtnEl, t('chat.tab.newCurrentTooltip'), 'bottom');
-    this.newConversationCurrentTabBtnEl.addEventListener('click', () => {
-      void this.createNewConversationInCurrentTab();
-    });
-
-    // History button
-    this.historyBtnEl = actions.createDiv({ cls: 'opencodian-header-btn opencodian-tooltip-trigger' });
-    setIcon(this.historyBtnEl, 'history');
-    this.setTooltipLabel(this.historyBtnEl, t('chat.history.open'), 'bottom');
-    this.historyBtnEl.addEventListener('click', (event) => {
-      this.showConversationHistory(event);
-    });
-
-    // Settings button
-    this.settingsBtnEl = actions.createDiv({ cls: 'opencodian-header-btn opencodian-tooltip-trigger' });
-    setIcon(this.settingsBtnEl, 'settings');
-    this.setTooltipLabel(this.settingsBtnEl, t('chat.settings.open'), 'bottom');
-    this.settingsBtnEl.addEventListener('click', () => {
-      this.openPluginSettingsPreservingScroll();
-    });
-  }
-
   public applyLocaleTexts(): void {
-    if (this.serverStatusBadgeEl) {
-      this.setTooltipLabel(this.serverStatusBadgeEl, t('chat.serverStatus.openSettings'), 'bottom');
-    }
-
-    if (this.newConversationBtnEl) {
-      this.setTooltipLabel(this.newConversationBtnEl, t('chat.tab.newTooltip'), 'bottom');
-    }
-
-    if (this.newConversationCurrentTabBtnEl) {
-      this.setTooltipLabel(this.newConversationCurrentTabBtnEl, t('chat.tab.newCurrentTooltip'), 'bottom');
-    }
-
-    if (this.historyBtnEl) {
-      this.setTooltipLabel(this.historyBtnEl, t('chat.history.open'), 'bottom');
-    }
-
-    if (this.settingsBtnEl) {
-      this.setTooltipLabel(this.settingsBtnEl, t('chat.settings.open'), 'bottom');
-    }
+    this.chatHeaderPresenter.applyLocaleTexts();
 
     if (this.addContextBtn) {
       this.setTooltipLabel(this.addContextBtn, t('chat.context.addContext'), 'top');
@@ -2847,78 +2775,6 @@ export class OpenCodianView extends ItemView {
     settings.openTabById('opencodian');
   }
 
-  private startServerStatusLoop(): void {
-    void this.refreshServerStatusBadge();
-    if (this.serverStatusIntervalId) {
-      window.clearInterval(this.serverStatusIntervalId);
-    }
-    this.serverStatusIntervalId = window.setInterval(() => {
-      void this.refreshServerStatusBadge();
-    }, 5000);
-  }
-
-  private stopServerStatusLoop(): void {
-    if (this.serverStatusIntervalId) {
-      window.clearInterval(this.serverStatusIntervalId);
-      this.serverStatusIntervalId = null;
-    }
-  }
-
-  private async refreshServerStatusBadge(): Promise<void> {
-    if (!this.serverStatusBadgeEl || !this.serverStatusTextEl || this.isRefreshingServerStatus) {
-      return;
-    }
-
-    this.isRefreshingServerStatus = true;
-    try {
-      const availability = await this.getServerAvailability();
-      if (availability !== this.lastServerAvailability) {
-        logger.debug(`Chat server availability -> ${availability}`);
-        this.lastServerAvailability = availability;
-      }
-      const statusKeyMap: Record<ChatServerAvailability, 'chat.serverStatus.checking' | 'chat.serverStatus.running' | 'chat.serverStatus.starting' | 'chat.serverStatus.offline' | 'chat.serverStatus.external'> = {
-        checking: 'chat.serverStatus.checking',
-        running: 'chat.serverStatus.running',
-        starting: 'chat.serverStatus.starting',
-        offline: 'chat.serverStatus.offline',
-        external: 'chat.serverStatus.external',
-      };
-      this.serverStatusBadgeEl.removeClass(
-        'is-checking',
-        'is-running',
-        'is-starting',
-        'is-offline',
-        'is-external'
-      );
-      this.serverStatusBadgeEl.addClass(`is-${availability}`);
-      this.serverStatusTextEl.setText(this.getServerStatusLabel(availability, statusKeyMap));
-      this.setTooltipLabel(this.serverStatusBadgeEl, t('chat.serverStatus.openSettings'), 'bottom');
-      this.refreshContextUsageIndicator();
-    } finally {
-      this.isRefreshingServerStatus = false;
-    }
-  }
-
-  private getServerStatusLabel(
-    availability: ChatServerAvailability,
-    statusKeyMap: Record<ChatServerAvailability, 'chat.serverStatus.checking' | 'chat.serverStatus.running' | 'chat.serverStatus.starting' | 'chat.serverStatus.offline' | 'chat.serverStatus.external'>
-  ): string {
-    if (this.plugin.settings.server.mode === 'local') {
-      if (availability === 'running') {
-        return t('chat.serverStatus.localManaged');
-      }
-      if (availability === 'external') {
-        return t('chat.serverStatus.localExternal');
-      }
-    }
-
-    if (availability === 'running' || availability === 'external') {
-      return t('chat.serverStatus.remoteConnected');
-    }
-
-    return t(statusKeyMap[availability]);
-  }
-
   private async getServerAvailability(): Promise<ChatServerAvailability> {
     const isHealthy = await this.plugin.openCodeService.checkHealth();
     const internalStatus = this.plugin.openCodeService.getServerStatus();
@@ -2937,30 +2793,6 @@ export class OpenCodianView extends ItemView {
     }
 
     return 'offline';
-  }
-
-  /** Get logo SVG based on current theme */
-  private getLogoSvg(): string {
-    // Check if we're in dark mode by looking for .theme-dark class
-    const isDark = document.body.classList.contains('theme-dark');
-    return isDark ? LOGO_SVG_DARK : LOGO_SVG_LIGHT;
-  }
-
-  /** Get title wordmark image source based on current theme */
-  private getTitleWordmarkSrc(): string | null {
-    const isDark = document.body.classList.contains('theme-dark');
-    const relativePath = isDark ? TITLE_WORDMARK_DARK_ASSET_PATH : TITLE_WORDMARK_LIGHT_ASSET_PATH;
-    return this.resolvePluginAssetUrl(relativePath);
-  }
-
-  private syncTitleWordmarkSrc(titleWordmarkEl: HTMLImageElement): void {
-    const src = this.getTitleWordmarkSrc();
-    if (src) {
-      titleWordmarkEl.setAttribute('src', src);
-      return;
-    }
-
-    titleWordmarkEl.removeAttribute('src');
   }
 
   /** Build input area */
@@ -4679,7 +4511,7 @@ export class OpenCodianView extends ItemView {
   }
 
   private async refreshStatusSurfaces(): Promise<void> {
-    await this.refreshServerStatusBadge();
+    await this.chatHeaderPresenter.refreshServerStatusBadge();
     this.plugin.settingsTab?.refreshServerStatusDisplay();
   }
 
