@@ -4,25 +4,14 @@ import type {
   QuestionRequest,
   SessionTodo,
 } from '../../../core/types';
-import type { BackgroundTaskIndicatorCoordinator } from '../runtime/BackgroundTaskIndicatorCoordinator';
-import type { TabRuntimeStateBridge } from '../runtime/TabRuntimeStateBridge';
 import type { TabId } from '../tabs';
 import {
-  BackgroundConversationAttentionCoordinator,
-  type BackgroundConversationAttentionCoordinatorHost,
-} from './BackgroundConversationAttentionCoordinator';
+  createBackgroundConversationPostSyncHandoffServices,
+  type BackgroundConversationPostSyncHandoffViewHost,
+} from './BackgroundConversationPostSyncHandoffHostAdapter';
 import {
   BackgroundConversationPostSyncHandoffCoordinator,
 } from './BackgroundConversationPostSyncHandoffCoordinator';
-import {
-  BackgroundConversationPostSyncRefreshExecutor,
-  type BackgroundTaskPostSyncRefreshPort,
-} from './BackgroundConversationPostSyncRefreshExecutor';
-import {
-  BackgroundConversationSignalSyncStateCoordinator,
-  type BackgroundConversationSignalSyncStateCoordinatorHost,
-} from './BackgroundConversationSignalSyncStateCoordinator';
-import type { BackgroundTaskLiveSignalCoordinator } from './BackgroundTaskLiveSignalCoordinator';
 import type { PostSyncQuestionTodoRefreshFacade } from './PostSyncQuestionTodoRefreshFacade';
 import {
   createPostSyncQuestionTodoRefreshServices,
@@ -55,18 +44,6 @@ type SessionTodoStatusRefreshPort = Pick<
   SessionTodoStatusRefreshService,
   'refreshTabSessionStatus' | 'refreshTabSessionTodos'
 >;
-type BackgroundTaskIndicatorPort = Pick<
-  BackgroundTaskIndicatorCoordinator,
-  'flushCompletionNoticesAndSyncStreamLikeState'
->;
-type BackgroundTaskLiveSignalPort = Pick<
-  BackgroundTaskLiveSignalCoordinator,
-  'markAuthoritativeSync'
->;
-type TabRuntimeStateBridgePort = Pick<
-  TabRuntimeStateBridge,
-  'setNeedsAttention'
->;
 type VisibleConversationPostSyncStatePort = Pick<
   VisibleConversationPostSyncStateCoordinator,
   'commitPostSyncState'
@@ -75,10 +52,6 @@ type VisibleConversationPostSyncStatePort = Pick<
 export interface QuestionTodoBackgroundTaskRefreshViewHostAdapterHost {
   getCurrentConversation(): Conversation | null;
   getTabRuntimeState(tabId: TabId | null): QuestionTodoStatusRefreshRuntime | null;
-  syncBackgroundTaskStateFromConversation(
-    conversation: Conversation,
-    tabId?: TabId | null,
-  ): void;
 }
 
 export interface QuestionTodoBackgroundTaskRefreshViewHostAdapterDependencies {
@@ -86,24 +59,10 @@ export interface QuestionTodoBackgroundTaskRefreshViewHostAdapterDependencies {
   getQuestionDockCoordinator(): QuestionPendingRefreshPort;
   getSessionTodoStateService(): SessionTodoStatePort;
   getSessionTodoStatusRefreshService(): SessionTodoStatusRefreshPort;
-  getBackgroundTaskIndicatorCoordinator(): BackgroundTaskIndicatorPort;
-  getBackgroundTaskLiveSignalCoordinator(): BackgroundTaskLiveSignalPort;
-  getTabRuntimeStateBridge(): TabRuntimeStateBridgePort;
 }
 
 export interface QuestionTodoBackgroundTaskRefreshViewHost
-  extends PostSyncQuestionTodoRefreshViewHost {
-  syncBackgroundTaskStateFromConversation(
-    conversation: Conversation,
-    tabId?: TabId | null,
-  ): void;
-  flushBackgroundTaskPostSyncWriteback(
-    tabId: TabId | null,
-    conversation: Conversation | null,
-  ): Promise<void>;
-  markBackgroundTaskAuthoritativeSync(tabId: TabId | null, reason: string): void;
-  setTabNeedsAttention(tabId: TabId | null, needsAttention: boolean): void;
-}
+  extends PostSyncQuestionTodoRefreshViewHost {}
 
 export function createQuestionTodoBackgroundTaskRefreshViewHostAdapter(
   dependencies: QuestionTodoBackgroundTaskRefreshViewHostAdapterDependencies,
@@ -137,34 +96,11 @@ export function createQuestionTodoBackgroundTaskRefreshViewHostAdapter(
       dependencies
         .getSessionTodoStatusRefreshService()
         .refreshTabSessionTodos(tabId, sessionId, options),
-    syncBackgroundTaskStateFromConversation: (
-      conversation: Conversation,
-      tabId?: TabId | null,
-    ) => dependencies.viewHost.syncBackgroundTaskStateFromConversation(conversation, tabId),
-    flushBackgroundTaskPostSyncWriteback: (
-      tabId: TabId | null,
-      conversation: Conversation | null,
-    ) =>
-      dependencies
-        .getBackgroundTaskIndicatorCoordinator()
-        .flushCompletionNoticesAndSyncStreamLikeState(tabId, conversation),
-    markBackgroundTaskAuthoritativeSync: (tabId: TabId | null, reason: string) => {
-      dependencies
-        .getBackgroundTaskLiveSignalCoordinator()
-        .markAuthoritativeSync(tabId, reason);
-    },
-    setTabNeedsAttention: (tabId: TabId | null, needsAttention: boolean) => {
-      dependencies.getTabRuntimeStateBridge().setNeedsAttention(tabId, needsAttention);
-    },
   };
 }
 
 export interface QuestionTodoBackgroundTaskRefreshHosts {
   questionTodoActivationRefreshHost: QuestionTodoActivationRefreshBridgeHost;
-  backgroundTaskPostSyncRefreshPort: BackgroundTaskPostSyncRefreshPort;
-  backgroundConversationAttentionCoordinatorHost: BackgroundConversationAttentionCoordinatorHost;
-  backgroundConversationSignalSyncStateCoordinatorHost:
-    BackgroundConversationSignalSyncStateCoordinatorHost;
 }
 
 export interface QuestionTodoBackgroundTaskRefreshServices {
@@ -196,30 +132,13 @@ export function createQuestionTodoBackgroundTaskRefreshHosts(
         options: { suppressErrors?: boolean },
       ) => viewHost.refreshTabSessionTodos(tabId, sessionId, options),
     },
-    backgroundTaskPostSyncRefreshPort: {
-      syncBackgroundTaskStateFromConversation: (
-        conversation: Conversation,
-        tabId?: TabId | null,
-      ) => viewHost.syncBackgroundTaskStateFromConversation(conversation, tabId),
-      flushBackgroundTaskPostSyncWriteback: (
-        tabId: TabId | null,
-        conversation: Conversation | null,
-      ) => viewHost.flushBackgroundTaskPostSyncWriteback(tabId, conversation),
-    },
-    backgroundConversationAttentionCoordinatorHost: {
-      setTabNeedsAttention: (tabId: TabId | null, needsAttention: boolean) =>
-        viewHost.setTabNeedsAttention(tabId, needsAttention),
-    },
-    backgroundConversationSignalSyncStateCoordinatorHost: {
-      markBackgroundTaskAuthoritativeSync: (tabId: TabId | null, reason: string) => {
-        viewHost.markBackgroundTaskAuthoritativeSync(tabId, reason);
-      },
-    },
   };
 }
 
 export function createQuestionTodoBackgroundTaskRefreshServices(
   viewHost: QuestionTodoBackgroundTaskRefreshViewHost,
+  backgroundConversationPostSyncHandoffViewHost:
+    BackgroundConversationPostSyncHandoffViewHost,
   visibleConversationPostSyncStateCoordinator: VisibleConversationPostSyncStatePort,
 ): QuestionTodoBackgroundTaskRefreshServices {
   const hosts = createQuestionTodoBackgroundTaskRefreshHosts(viewHost);
@@ -231,30 +150,16 @@ export function createQuestionTodoBackgroundTaskRefreshServices(
   const questionTodoActivationRefreshBridge = new QuestionTodoActivationRefreshBridge(
     hosts.questionTodoActivationRefreshHost,
   );
-  const backgroundConversationPostSyncRefreshExecutor =
-    new BackgroundConversationPostSyncRefreshExecutor(
-      postSyncQuestionTodoRefreshPlanBuilder,
-      questionTodoStatusRefreshCoordinator,
-      hosts.backgroundTaskPostSyncRefreshPort,
-    );
   const visibleConversationPostSyncCoordinator =
     new VisibleConversationPostSyncCoordinator(
       postSyncQuestionTodoRefreshFacade,
       visibleConversationPostSyncStateCoordinator,
     );
-  const backgroundConversationAttentionCoordinator =
-    new BackgroundConversationAttentionCoordinator(
-      hosts.backgroundConversationAttentionCoordinatorHost,
-    );
-  const backgroundConversationSignalSyncStateCoordinator =
-    new BackgroundConversationSignalSyncStateCoordinator(
-      hosts.backgroundConversationSignalSyncStateCoordinatorHost,
-    );
-  const backgroundConversationPostSyncHandoffCoordinator =
-    new BackgroundConversationPostSyncHandoffCoordinator(
-      backgroundConversationPostSyncRefreshExecutor,
-      backgroundConversationSignalSyncStateCoordinator,
-      backgroundConversationAttentionCoordinator,
+  const { backgroundConversationPostSyncHandoffCoordinator } =
+    createBackgroundConversationPostSyncHandoffServices(
+      backgroundConversationPostSyncHandoffViewHost,
+      postSyncQuestionTodoRefreshPlanBuilder,
+      questionTodoStatusRefreshCoordinator,
     );
   return {
     questionTodoActivationRefreshBridge,
