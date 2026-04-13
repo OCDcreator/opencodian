@@ -53,6 +53,11 @@ import { getServerBaseUrl, isLocalServerMode } from '../types/settings';
 import { createSdkClient } from './createSdkClient';
 import { detectOmoMessageMeta } from './omoCompat';
 import {
+  OpenCodeEventSubscriptionCoordinator,
+  type CatalogUpdateListener,
+  type OpenCodeEventListener,
+} from './OpenCodeEventSubscriptionCoordinator';
+import {
   OpenCodeSyncEventRuntimeCoordinator,
   type SessionActivityStatus,
   type SessionSyncEventUpdate,
@@ -71,7 +76,6 @@ import type {
   OpenCodeServerConfig,
   QueryOptions,
   ResponseHandler,
-  SdkEventEnvelope,
   ServerDiagnostics,
   ServerStatus,
   ToolCatalogEntry,
@@ -473,10 +477,6 @@ type SessionStatusUpdate = {
   status: SessionActivityStatus;
 };
 
-type OpenCodeEventListener = (update: SdkEventEnvelope) => void;
-
-type CatalogUpdateListener = (snapshot: OpenCodeCapabilitySnapshot) => void;
-
 const REMOTE_CONTEXT_TEXT_LIMIT_BYTES = 64 * 1024;
 
 interface TransientConnectivityLogState {
@@ -494,13 +494,7 @@ export class OpenCodeService {
   private activeStreams = new Map<string, ActiveStreamContext>();
   private sdkFeatureFlags: SdkFeatureFlags;
   private syncEventRuntime: OpenCodeSyncEventRuntimeCoordinator;
-  private openCodeEventListeners = new Set<OpenCodeEventListener>();
-  private catalogUpdateListeners = new Set<CatalogUpdateListener>();
-  private eventAbortController: AbortController | null = null;
-  private eventPromise: Promise<void> | null = null;
-  private globalEventAbortController: AbortController | null = null;
-  private globalEventPromise: Promise<void> | null = null;
-  private eventWanted = false;
+  private openCodeEventRuntime: OpenCodeEventSubscriptionCoordinator;
   private vaultPath?: string;
   private registryToolIds = new Set<string>();
   private toolSchemasByModel = new Map<string, ToolCatalogEntry[]>();
@@ -536,6 +530,25 @@ export class OpenCodeService {
       logSyncEventStreamFailure: (error) =>
         this.logServiceWarning('global.sync-event', 'SDK sync event stream failed', error),
       checkHealth: () => this.checkHealth(),
+      delay: (ms, signal) => this.delay(ms, signal),
+    });
+    this.openCodeEventRuntime = new OpenCodeEventSubscriptionCoordinator({
+      subscribeToEvents: async (source, signal) => {
+        const subscription = source === 'event'
+          ? await this.getSdkFacade().event.subscribe(undefined, { signal } as never)
+          : await this.getSdkFacade({ includeDirectory: false }).global.event({ signal } as never);
+
+        if (!subscription || typeof subscription !== 'object' || !('stream' in subscription)) {
+          throw new Error(`Invalid ${source} subscription payload`);
+        }
+
+        return (subscription as { stream: AsyncIterable<unknown> }).stream;
+      },
+      observeRuntimeToolNames: (toolNames) => this.observeRuntimeToolNames(toolNames),
+      refreshMcpServerStatus: () => this.refreshMcpServerStatus(),
+      getCapabilitySnapshot: () => this.getCapabilitySnapshot(),
+      logEventSubscriptionFailure: (source, error) =>
+        this.logServiceWarning(`${source}.subscribe`, `SDK ${source} subscription failed, retrying`, error),
       delay: (ms, signal) => this.delay(ms, signal),
     });
 
@@ -632,7 +645,7 @@ export class OpenCodeService {
       this.toolSchemasByModel.clear();
     }
     this.syncEventRuntime.restartSubscription();
-    this.restartOpenCodeEventSubscriptions();
+    this.openCodeEventRuntime.restartSubscriptions();
   }
 
   getSettingsSnapshot(): OpenCodianSettings {
@@ -667,19 +680,19 @@ export class OpenCodeService {
 
     await this.serverManager.start();
     this.syncEventRuntime.ensureSubscription();
-    this.ensureOpenCodeEventSubscriptions();
+    this.openCodeEventRuntime.ensureSubscriptions();
   }
 
   /** Stop the service */
   async stop(): Promise<void> {
     this.syncEventRuntime.stopSubscription();
-    this.stopOpenCodeEventSubscriptions();
+    this.openCodeEventRuntime.stopSubscriptions();
     await this.serverManager.stop();
   }
 
   dispose(): void {
     this.syncEventRuntime.stopSubscription();
-    this.stopOpenCodeEventSubscriptions();
+    this.openCodeEventRuntime.stopSubscriptions();
     this.serverManager.dispose();
   }
 
@@ -2957,7 +2970,7 @@ export class OpenCodeService {
     const nextSettings = cloneSettings(settings);
     const previousBaseUrl = this.baseUrl;
     const shouldResumeSyncEvents = this.syncEventRuntime.hasListeners();
-    const shouldResumeOpenCodeEvents = this.hasOpenCodeEventListeners();
+    const shouldResumeOpenCodeEvents = this.openCodeEventRuntime.hasListeners();
     this.settings = nextSettings;
     this.baseUrl = getServerBaseUrl(nextSettings.server);
     this.serverManager.updateConfig(this.buildServerConfig(nextSettings));
@@ -2965,13 +2978,13 @@ export class OpenCodeService {
       this.toolSchemasByModel.clear();
     }
     this.syncEventRuntime.stopSubscription(shouldResumeSyncEvents);
-    this.stopOpenCodeEventSubscriptions(shouldResumeOpenCodeEvents);
+    this.openCodeEventRuntime.stopSubscriptions(shouldResumeOpenCodeEvents);
 
     try {
       if (shouldStopManagedServer) {
         await this.serverManager.stop();
         this.syncEventRuntime.ensureSubscription();
-        this.ensureOpenCodeEventSubscriptions();
+        this.openCodeEventRuntime.ensureSubscriptions();
         return;
       }
 
@@ -2980,7 +2993,7 @@ export class OpenCodeService {
       }
 
       this.syncEventRuntime.ensureSubscription();
-      this.ensureOpenCodeEventSubscriptions();
+      this.openCodeEventRuntime.ensureSubscriptions();
     } catch (error) {
       this.settings = previousSettings;
       this.baseUrl = previousBaseUrl;
@@ -2989,7 +3002,7 @@ export class OpenCodeService {
         this.toolSchemasByModel.clear();
       }
       this.syncEventRuntime.stopSubscription(shouldResumeSyncEvents);
-      this.stopOpenCodeEventSubscriptions(shouldResumeOpenCodeEvents);
+      this.openCodeEventRuntime.stopSubscriptions(shouldResumeOpenCodeEvents);
       if (previousMode === 'local' && (shouldRestartManagedServer || shouldStopManagedServer)) {
         try {
           await this.serverManager.start();
@@ -2998,7 +3011,7 @@ export class OpenCodeService {
         }
       }
       this.syncEventRuntime.ensureSubscription();
-      this.ensureOpenCodeEventSubscriptions();
+      this.openCodeEventRuntime.ensureSubscriptions();
       throw error;
     }
   }
@@ -3875,100 +3888,6 @@ export class OpenCodeService {
     return deduped;
   }
 
-  private hasOpenCodeEventListeners(): boolean {
-    return this.openCodeEventListeners.size > 0 || this.catalogUpdateListeners.size > 0;
-  }
-
-  private ensureOpenCodeEventSubscriptions(): void {
-    if (!this.hasOpenCodeEventListeners()) {
-      return;
-    }
-
-    this.eventWanted = true;
-
-    if (!this.eventPromise) {
-      this.eventAbortController = new AbortController();
-      this.eventPromise = this.runScopedEventLoop('event', this.eventAbortController);
-    }
-
-    if (!this.globalEventPromise) {
-      this.globalEventAbortController = new AbortController();
-      this.globalEventPromise = this.runScopedEventLoop('global', this.globalEventAbortController);
-    }
-  }
-
-  private stopOpenCodeEventSubscriptions(keepWanted = false): void {
-    if (!keepWanted) {
-      this.eventWanted = false;
-    }
-
-    this.eventAbortController?.abort();
-    this.globalEventAbortController?.abort();
-  }
-
-  private restartOpenCodeEventSubscriptions(): void {
-    this.stopOpenCodeEventSubscriptions(true);
-    if (this.eventWanted && this.hasOpenCodeEventListeners()) {
-      this.ensureOpenCodeEventSubscriptions();
-    }
-  }
-
-  private async runScopedEventLoop(
-    source: Exclude<SdkEventEnvelope['source'], 'sync'>,
-    abortController: AbortController,
-  ): Promise<void> {
-    try {
-      while (this.eventWanted && !abortController.signal.aborted) {
-        try {
-          const subscription = source === 'event'
-            ? await this.getSdkFacade().event.subscribe(undefined, {
-              signal: abortController.signal,
-            } as never)
-            : await this.getSdkFacade({ includeDirectory: false }).global.event({
-              signal: abortController.signal,
-            } as never);
-
-          if (!subscription || typeof subscription !== 'object' || !('stream' in subscription)) {
-            throw new Error(`Invalid ${source} subscription payload`);
-          }
-
-          for await (const value of (subscription as { stream: AsyncIterable<unknown> }).stream) {
-            if (abortController.signal.aborted) {
-              return;
-            }
-
-            this.handleSdkEventEnvelope({
-              source,
-              payload: value,
-              timestamp: Date.now(),
-            });
-          }
-
-          if (abortController.signal.aborted || !this.eventWanted) {
-            return;
-          }
-
-          await new Promise((resolve) => setTimeout(resolve, 250));
-        } catch (error) {
-          if (abortController.signal.aborted || !this.eventWanted) {
-            return;
-          }
-
-          this.logServiceWarning(`${source}.subscribe`, `SDK ${source} subscription failed, retrying`, error);
-          await new Promise((resolve) => setTimeout(resolve, 1000));
-        }
-      }
-    } finally {
-      if (source === 'event') {
-        this.eventPromise = null;
-        this.eventAbortController = null;
-      } else {
-        this.globalEventPromise = null;
-        this.globalEventAbortController = null;
-      }
-    }
-  }
-
   private normalizeMcpServerStatusMap(
     input: unknown,
   ): Record<string, McpServerStatus> {
@@ -4007,80 +3926,22 @@ export class OpenCodeService {
         .filter((toolId) => toolId.length > 0),
     );
     this.toolCatalogUpdatedAt = Date.now();
-    this.emitCatalogUpdate();
+    this.openCodeEventRuntime.emitCatalogUpdate();
     return [...this.registryToolIds];
   }
 
   private updateToolSchemaCache(modelKey: string, tools: ToolCatalogEntry[]): ToolCatalogEntry[] {
     this.toolSchemasByModel.set(modelKey, tools);
     this.toolCatalogUpdatedAt = Date.now();
-    this.emitCatalogUpdate();
+    this.openCodeEventRuntime.emitCatalogUpdate();
     return tools;
   }
 
   private updateMcpServerStatus(statusMap: Record<string, McpServerStatus>): Record<string, McpServerStatus> {
     this.mcpServerStatus = new Map(Object.entries(statusMap));
     this.mcpCatalogUpdatedAt = Date.now();
-    this.emitCatalogUpdate();
+    this.openCodeEventRuntime.emitCatalogUpdate();
     return Object.fromEntries(this.mcpServerStatus.entries());
-  }
-
-  private getEventPayload(payload: unknown): SdkEvent | null {
-    if (payload && typeof payload === 'object' && 'payload' in (payload as Record<string, unknown>)) {
-      const nestedPayload = (payload as { payload?: unknown }).payload;
-      return nestedPayload && typeof nestedPayload === 'object' && 'type' in (nestedPayload as Record<string, unknown>)
-        ? nestedPayload as SdkEvent
-        : null;
-    }
-
-    return payload && typeof payload === 'object' && 'type' in (payload as Record<string, unknown>)
-      ? payload as SdkEvent
-      : null;
-  }
-
-  private handleCatalogRelevantEvent(payload: unknown): void {
-    const event = this.getEventPayload(payload);
-    if (!event || typeof event.type !== 'string') {
-      return;
-    }
-
-    if (event.type === 'mcp.tools.changed') {
-      void this.refreshMcpServerStatus();
-      return;
-    }
-
-    if (event.type === 'message.part.updated') {
-      const part = (event as { properties?: { part?: ToolPartData } }).properties?.part;
-      if (part?.type === 'tool' && typeof part.tool === 'string') {
-        this.observeRuntimeToolNames([part.tool]);
-      }
-      return;
-    }
-
-    if (event.type === 'message.updated') {
-      const info = (event as { properties?: { info?: { tools?: Record<string, boolean> } } }).properties?.info;
-      if (info?.tools && typeof info.tools === 'object') {
-        this.observeRuntimeToolNames(Object.keys(info.tools));
-      }
-      return;
-    }
-
-    if (event.type === 'permission.asked') {
-      const permission = (event as { properties?: { permission?: string } }).properties?.permission;
-      if (typeof permission === 'string') {
-        this.observeRuntimeToolNames([permission]);
-      }
-    }
-  }
-
-  private emitOpenCodeEvent(update: SdkEventEnvelope): void {
-    for (const listener of [...this.openCodeEventListeners]) {
-      try {
-        listener(update);
-      } catch (error) {
-        logger.error('OpenCode event listener failed', error);
-      }
-    }
   }
 
   private createToolCatalogSnapshot(): ToolCatalogSnapshot {
@@ -4103,26 +3964,6 @@ export class OpenCodeService {
       ),
       updatedAt: this.mcpCatalogUpdatedAt,
     };
-  }
-
-  private emitCatalogUpdate(): void {
-    if (this.catalogUpdateListeners.size === 0) {
-      return;
-    }
-
-    const snapshot = this.getCapabilitySnapshot();
-    for (const listener of [...this.catalogUpdateListeners]) {
-      try {
-        listener(snapshot);
-      } catch (error) {
-        logger.error('OpenCode catalog listener failed', error);
-      }
-    }
-  }
-
-  private handleSdkEventEnvelope(update: SdkEventEnvelope): void {
-    this.handleCatalogRelevantEvent(update.payload);
-    this.emitOpenCodeEvent(update);
   }
 
   async refreshToolIds(): Promise<string[]> {
@@ -4200,26 +4041,11 @@ export class OpenCodeService {
   }
 
   subscribeToOpenCodeEvents(listener: OpenCodeEventListener): () => void {
-    this.openCodeEventListeners.add(listener);
-    this.ensureOpenCodeEventSubscriptions();
-    return () => {
-      this.openCodeEventListeners.delete(listener);
-      if (!this.hasOpenCodeEventListeners()) {
-        this.stopOpenCodeEventSubscriptions();
-      }
-    };
+    return this.openCodeEventRuntime.subscribeToOpenCodeEvents(listener);
   }
 
   subscribeToCatalogUpdates(listener: CatalogUpdateListener): () => void {
-    this.catalogUpdateListeners.add(listener);
-    this.ensureOpenCodeEventSubscriptions();
-    listener(this.getCapabilitySnapshot());
-    return () => {
-      this.catalogUpdateListeners.delete(listener);
-      if (!this.hasOpenCodeEventListeners()) {
-        this.stopOpenCodeEventSubscriptions();
-      }
-    };
+    return this.openCodeEventRuntime.subscribeToCatalogUpdates(listener);
   }
 
   hydrateOpenCodeMessage(

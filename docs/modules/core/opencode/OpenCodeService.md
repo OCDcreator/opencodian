@@ -28,6 +28,7 @@
 - `../types/settings`
 - `./createSdkClient`
 - `./omoCompat`
+- `./OpenCodeEventSubscriptionCoordinator`
 - `./OpenCodeSyncEventRuntimeCoordinator`
 - `./sdkFeatureFlags`
 - `./sdkTypes`
@@ -50,6 +51,7 @@
 - `activeStreams: Map<string, ActiveStreamContext>`: 以 `sessionId` 为键保存当前流的 `AbortController` 和 part 类型映射。
 - `sdkFeatureFlags`: 由 `resolveSdkFeatureFlags()` 合并后的运行时 SDK 开关。
 - `syncEventRuntime`: `OpenCodeSyncEventRuntimeCoordinator` 实例，负责 session todo/status/message sync event 的监听集合、wanted state、SDK 订阅生命周期与 emit 路径。
+- `openCodeEventRuntime`: `OpenCodeEventSubscriptionCoordinator` 实例，负责 open-code event / catalog listener registry、`event` / `global` 订阅生命周期、catalog-relevant payload routing 与 catalog emit。
 - `vaultPath`: 用于 SDK `directory` 注入、上下文文件绝对路径解析，以及 `ServerManager` 工作目录设置；OpenCode directory scope 和 context file path 的跨平台规范化委托给 `shared/contextPath`。
 
 `responseHandlers` 字段虽然仍然存在，但当前公开的主流式接口已经是 `AsyncGenerator<StreamChunk>`。
@@ -75,7 +77,7 @@
 
 运行时还有三条重要的配置通道：
 
-- `setVaultPath(path)`: 更新 vault 路径、把工作目录传给 `ServerManager`，并重启 sync event 订阅。
+- `setVaultPath(path)`: 更新 vault 路径、把工作目录传给 `ServerManager`，并重启 sync / open-code 两类 event runtime。
 - `checkHealth()`: 优先走 SDK `global.health()`，失败时回退到 `ServerManager.checkHealth()`。
 - `updateSettings(settings)`: 根据新旧设置差异决定是否需要重启/停止 managed server；失败时会回滚内存设置、`baseUrl`、`ServerManager` 配置，并尽力恢复原服务。
 
@@ -327,6 +329,7 @@ graph TD
 
 - `ServerManager`: 负责本地/远程服务生命周期与健康检查。
 - `OpenCodeSyncEventRuntimeCoordinator`: 负责 `global.syncEvent.subscribe()` 的 session todo/status/message sync event listener registry、订阅重启和 transient connectivity recovery 循环。
+- `OpenCodeEventSubscriptionCoordinator`: 负责 `event.subscribe()` / `global.event()` 的 open-code event listener registry、catalog-relevant payload routing、双路订阅重启与 catalog listener emit。
 - `createSdkClient`: 为每次 SDK 调用创建客户端实例。
 - `sdkFeatureFlags`: 定义 SDK 与 legacy 的路由开关。
 - `omoCompat`: 负责 OMO 文本检测与元数据提取。

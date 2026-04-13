@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`。R27 完成后必须暂停复盘，不得自动扩展新队列。
-> **当前状态**: [AWAITING_MANUAL_CONFIRMATION] R13-R18 已在 R18 checkpoint 完成；当前没有可自动执行的 `[NEXT]`，必须等待人工确认下一批队列。
+> **当前状态**: [CONFIRMED_NIGHT_BATCH] R19-R27 已确认；当前 `[NEXT]` 是 R21 Tool and MCP catalog state store。
 
 ## 控制规则
 
@@ -446,7 +446,7 @@
   - 新 owner 满足粒度规则，且有 focused coverage。
   - 运行 targeted tests、全量 `npm test`、`npm run build`。
 
-### [NEXT] R20 - OpenCode event subscription coordinator
+### [DONE] R20 - OpenCode event subscription coordinator
 
 - **Lane**: OpenCodeService `open-code event runtime`
 - **目标**: 把 OpenCode event listeners、event subscription lifecycle、catalog-relevant event routing 与 emit path 从 `OpenCodeService` 收束到单一 coordinator。
@@ -465,14 +465,15 @@
   - event payload routing 保持行为不变，并有 focused coverage。
   - 运行 targeted tests、全量 `npm test`、`npm run build`。
 
-### [QUEUED] R21 - Tool and MCP catalog state store
+### [NEXT] R21 - Tool and MCP catalog state store
 
 - **Lane**: OpenCodeService `catalog / MCP state`
 - **目标**: 把 registry tool ids、tool schema cache、MCP server status map、catalog snapshot 构造和 catalog update state 收束到一个 state store owner。
 - **优先入口**:
   - `src/core/opencode/OpenCodeService.ts` 中 `normalizeMcpServerStatusMap`
   - `src/core/opencode/OpenCodeService.ts` 中 `updateRegistryToolIds` / `updateToolSchemaCache` / `updateMcpServerStatus`
-  - `src/core/opencode/OpenCodeService.ts` 中 `createToolCatalogSnapshot` / `createMcpServerSnapshot` / `emitCatalogUpdate`
+  - `src/core/opencode/OpenCodeService.ts` 中 `createToolCatalogSnapshot` / `createMcpServerSnapshot`
+  - `src/core/opencode/OpenCodeEventSubscriptionCoordinator.ts` 中 `emitCatalogUpdate`
   - `src/core/opencode/OpenCodeService.ts` 中 `refreshToolIds` / `listTools` / `refreshMcpServerStatus`
 - **允许边界**:
   - 可新增 `OpenCodeCatalogStateStore`，同时覆盖 cache + snapshot + update lifecycle。
