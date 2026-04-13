@@ -1,20 +1,22 @@
 import type { SessionSyncEventUpdate } from '../../../core/opencode';
-import type { Conversation } from '../../../core/types';
-import type { TabData, TabId } from '../tabs';
+import type { TabId } from '../tabs';
+import {
+  ConversationSessionTabResolver,
+  type ConversationSessionTabResolverHost,
+} from './ConversationSessionTabResolver';
 
-export interface ConversationSyncEventAdapterHost {
+export interface ConversationSyncEventAdapterHost extends ConversationSessionTabResolverHost {
   subscribeToSessionSyncEvents(listener: (update: SessionSyncEventUpdate) => void): () => void;
-  getAllTabs(): readonly TabData[];
-  getConversations(): readonly Conversation[];
-  getCurrentConversation(): Conversation | null;
-  getActiveTabId(): TabId | null;
   scheduleConversationSyncFromSignal(tabId: TabId | null, reason: SessionSyncEventUpdate['type']): void;
 }
 
 export class ConversationSyncEventAdapter {
   private disposeSubscription: (() => void) | null = null;
+  private readonly sessionTabResolver: ConversationSessionTabResolver;
 
-  constructor(private readonly host: ConversationSyncEventAdapterHost) {}
+  constructor(private readonly host: ConversationSyncEventAdapterHost) {
+    this.sessionTabResolver = new ConversationSessionTabResolver(host);
+  }
 
   start(): void {
     this.stop();
@@ -29,31 +31,8 @@ export class ConversationSyncEventAdapter {
   }
 
   private handleSessionSyncEvent(update: SessionSyncEventUpdate): void {
-    for (const tabId of this.getMatchedTabIds(update.sessionId)) {
+    for (const tabId of this.sessionTabResolver.resolveMatchedTabIds(update.sessionId)) {
       this.host.scheduleConversationSyncFromSignal(tabId, update.type);
     }
-  }
-
-  private getMatchedTabIds(sessionId: string): TabId[] {
-    const conversations = new Map(
-      this.host.getConversations().map((conversation) => [conversation.id, conversation]),
-    );
-    const matchedTabIds = this.host.getAllTabs()
-      .filter((tab) => {
-        const conversation = tab.conversationId ? conversations.get(tab.conversationId) : null;
-        return conversation?.openCodeSessionId === sessionId;
-      })
-      .map((tab) => tab.id);
-
-    const activeTabId = this.host.getActiveTabId();
-    if (
-      matchedTabIds.length === 0
-      && this.host.getCurrentConversation()?.openCodeSessionId === sessionId
-      && activeTabId
-    ) {
-      matchedTabIds.push(activeTabId);
-    }
-
-    return matchedTabIds;
   }
 }

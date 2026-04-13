@@ -5,11 +5,10 @@
 
 ## 概述
 
-`ConversationSessionLiveSignalAdapter` 把 `OpenCodianView` 里 session todo/status live signal 的 **订阅生命周期、session→tab 匹配，以及 active-tab fallback** 收束到一个独立模块，专门负责：
+`ConversationSessionLiveSignalAdapter` 把 `OpenCodianView` 里 session todo/status live signal 的 **订阅生命周期、runtime 写回，以及 background-task reconcile 触发** 收束到一个独立模块，专门负责：
 
 - 同时持有 `subscribeToSessionTodoUpdates()` 与 `subscribeToSessionStatusUpdates()` 的 start/stop/restart cleanup
-- 把 session todo/status live update 路由到所有共享同一 `openCodeSessionId` 的 tab
-- 当 tab 尚未和当前 conversation state 完全重建对齐时，为当前活动 conversation 提供 active-tab fallback
+- 通过 `ConversationSessionTabResolver` 把 session todo/status live update 路由到所有共享同一 `openCodeSessionId` 的 tab
 - 在命中 tab 写入 todo/status runtime state 后，直接触发 `BackgroundTaskLiveSignalCoordinator.reconcileStateFromLiveSignals()`
 
 它不负责 todo/status runtime state 的 fingerprint、stale suppression，也不自己决定 background task stale/notice；这些能力仍分别由 `SessionTodoStateService` 与 `BackgroundTaskLiveSignalCoordinator` 负责。本 adapter 只负责把 live signal 更新后的 tab 直接交给共享的 session todo runtime facade + background-task coordinator，不再让 `OpenCodianView` 私有 helper 额外转发这一步。
@@ -44,13 +43,13 @@ export class ConversationSessionLiveSignalAdapter {
 
 ### session→tab 路由
 
-- live update 先按 `conversation.openCodeSessionId` 匹配当前打开的全部 tab
+- live update 通过 `ConversationSessionTabResolver` 复用共享的 session→tab 匹配与 active-tab fallback
 - 同一 session 被多个 tab 打开时，adapter 会把同一条 todo/status signal 分发给所有匹配 tab
-- 只有当没有任何 tab 命中、但当前活动 conversation 的 session 相符时，才回退到活动 tab
 
 ## 与 `OpenCodianView` 的边界
 
 - `OpenCodianView` 现在通过 `ConversationSyncEventLiveSignalHostAdapter` 提供共享 live-signal seam，不再单独维护 todo/status host factory
+- `ConversationSessionTabResolver` 负责把共享 lookup seam 解释成 live signal 当前应命中的 tab 集合
 - `ConversationSyncEventLiveSignalHostAdapter` 负责把共享 lookup seam 装配成 `ConversationSessionLiveSignalAdapterHost`
 - `SessionTodoStateService` 继续负责 todo/status runtime state、stale suppression 与 persisted notice 协调
 - `ConversationSessionLiveSignalAdapter` 会在 runtime state 写入后直接调用 `BackgroundTaskLiveSignalCoordinator`，决定 indicator/stopped notice 是否需要变化
