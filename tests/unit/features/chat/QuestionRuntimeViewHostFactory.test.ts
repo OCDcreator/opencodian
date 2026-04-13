@@ -8,10 +8,8 @@ import {
   type QuestionRuntimeViewHostFactoryHost,
 } from '../../../../src/features/chat/services/QuestionRuntimeViewHostFactory';
 import type {
-  QuestionRuntimeConversationSyncPort,
   QuestionRuntimeQuestionApiPort,
   QuestionRuntimeSettingsPort,
-  QuestionRuntimeStatusRefreshPort,
   QuestionRuntimeTabAttentionPort,
 } from '../../../../src/features/chat/services/QuestionRuntimeViewHostAdapter';
 import type { QuestionDockRenderState } from '../../../../src/features/chat/ui/QuestionDock';
@@ -75,13 +73,6 @@ function createFactoryFixture(runtimeState: QuestionRuntimeState = createRuntime
   let tabAttention: Mocked<QuestionRuntimeTabAttentionPort> = {
     setNeedsAttention: jest.fn(),
   };
-  let conversationSync: Mocked<QuestionRuntimeConversationSyncPort> = {
-    startConversationSyncLoop: jest.fn(),
-    syncVisibleConversationInBackground: jest.fn().mockResolvedValue(undefined),
-  };
-  let statusRefresh: Mocked<QuestionRuntimeStatusRefreshPort> = {
-    refreshTabSessionStatus: jest.fn().mockResolvedValue({ type: 'idle' }),
-  };
 
   const host: Mocked<QuestionRuntimeViewHostFactoryHost> = {
     getActiveTabId: jest.fn().mockReturnValue('tab-active'),
@@ -94,8 +85,6 @@ function createFactoryFixture(runtimeState: QuestionRuntimeState = createRuntime
     getQuestionDockSlotCoordinator: jest.fn(() => questionDockSlotCoordinator),
     getQuestionApi: jest.fn(() => questionApi),
     getTabAttention: jest.fn(() => tabAttention),
-    getConversationSync: jest.fn(() => conversationSync),
-    getStatusRefresh: jest.fn(() => statusRefresh),
   };
 
   return {
@@ -112,12 +101,6 @@ function createFactoryFixture(runtimeState: QuestionRuntimeState = createRuntime
     },
     setTabAttention: (nextAttention: Mocked<QuestionRuntimeTabAttentionPort>) => {
       tabAttention = nextAttention;
-    },
-    setConversationSync: (nextConversationSync: Mocked<QuestionRuntimeConversationSyncPort>) => {
-      conversationSync = nextConversationSync;
-    },
-    setStatusRefresh: (nextStatusRefresh: Mocked<QuestionRuntimeStatusRefreshPort>) => {
-      statusRefresh = nextStatusRefresh;
     },
   };
 }
@@ -141,18 +124,11 @@ describe('QuestionRuntimeViewHostFactory', () => {
     await expect(adapter.getPendingQuestions()).resolves.toHaveLength(1);
     await adapter.replyToQuestion(request.id, [['Yes']]);
     await adapter.rejectQuestion(request.id);
-    await adapter.refreshTabSessionStatus('tab-active', 'session-1', {
-      suppressErrors: true,
-    });
     adapter.setTabNeedsAttention('tab-background', true);
-    adapter.startConversationSyncLoop();
-    await adapter.syncVisibleConversationInBackground();
 
     expect(fixture.host.getQuestionDockSlotCoordinator).toHaveBeenCalled();
     expect(fixture.host.getQuestionApi).toHaveBeenCalled();
-    expect(fixture.host.getStatusRefresh).toHaveBeenCalled();
     expect(fixture.host.getTabAttention).toHaveBeenCalled();
-    expect(fixture.host.getConversationSync).toHaveBeenCalled();
 
     const nextQuestionDock = {
       render: jest.fn<void, [QuestionDockRenderState]>(),
@@ -165,13 +141,6 @@ describe('QuestionRuntimeViewHostFactory', () => {
     const nextTabAttention: Mocked<QuestionRuntimeTabAttentionPort> = {
       setNeedsAttention: jest.fn(),
     };
-    const nextConversationSync: Mocked<QuestionRuntimeConversationSyncPort> = {
-      startConversationSyncLoop: jest.fn(),
-      syncVisibleConversationInBackground: jest.fn().mockResolvedValue(undefined),
-    };
-    const nextStatusRefresh: Mocked<QuestionRuntimeStatusRefreshPort> = {
-      refreshTabSessionStatus: jest.fn().mockResolvedValue({ type: 'busy' }),
-    };
 
     fixture.settings.questionDisplayMode = 'all' as QuestionDisplayMode;
     fixture.settings.showAnsweredQuestionCards = false;
@@ -181,8 +150,6 @@ describe('QuestionRuntimeViewHostFactory', () => {
     });
     fixture.setQuestionApi(nextQuestionApi);
     fixture.setTabAttention(nextTabAttention);
-    fixture.setConversationSync(nextConversationSync);
-    fixture.setStatusRefresh(nextStatusRefresh);
 
     expect(adapter.getQuestionDock()).toBe(nextQuestionDock);
     expect(adapter.getQuestionDisplayMode()).toBe('all');
@@ -190,18 +157,8 @@ describe('QuestionRuntimeViewHostFactory', () => {
     expect(adapter.shouldRenderQuestionResolutionCards()).toBe(false);
     await expect(adapter.getPendingQuestions()).resolves.toHaveLength(2);
     adapter.setTabNeedsAttention('tab-next', false);
-    adapter.startConversationSyncLoop();
-    await adapter.syncVisibleConversationInBackground();
-    await adapter.refreshTabSessionStatus('tab-next', 'session-2', {});
 
     expect(nextQuestionApi.getPendingQuestions).toHaveBeenCalledTimes(1);
     expect(nextTabAttention.setNeedsAttention).toHaveBeenCalledWith('tab-next', false);
-    expect(nextConversationSync.startConversationSyncLoop).toHaveBeenCalledTimes(1);
-    expect(nextConversationSync.syncVisibleConversationInBackground).toHaveBeenCalledTimes(1);
-    expect(nextStatusRefresh.refreshTabSessionStatus).toHaveBeenCalledWith(
-      'tab-next',
-      'session-2',
-      {},
-    );
   });
 });

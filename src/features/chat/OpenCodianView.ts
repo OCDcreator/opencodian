@@ -256,6 +256,9 @@ import {
 } from './services/PersistentAssistantNoticeService';
 import { QuestionDockSlotCoordinator } from './services/QuestionDockSlotCoordinator';
 import {
+  createQuestionPostResolutionRuntimeHostAdapter,
+} from './services/QuestionPostResolutionRuntimeHostAdapter';
+import {
   createQuestionRuntimeServices,
   type QuestionRuntimeServices,
 } from './services/QuestionRuntimeHostAdapter';
@@ -1257,8 +1260,14 @@ export class OpenCodianView extends ItemView {
     );
     this.streamingInlineCardRenderer = new StreamingInlineCardRenderer(this.createStreamingInlineCardRendererHost());
     this.permissionInlineCardRenderer = new PermissionInlineCardRenderer(this.streamingInlineCardRenderer);
+    const questionRuntimeViewHostFactoryHost = this.createQuestionRuntimeViewHostFactoryHost();
     this.questionRuntimeServices = createQuestionRuntimeServices(
-      createQuestionRuntimeViewHost(this.createQuestionRuntimeViewHostFactoryHost()),
+      createQuestionRuntimeViewHost(questionRuntimeViewHostFactoryHost),
+      createQuestionPostResolutionRuntimeHostAdapter({
+        viewHost: questionRuntimeViewHostFactoryHost,
+        conversationSync: this.conversationSyncBridge,
+        statusRefresh: this.sessionTodoStatusRefreshService,
+      }),
       this.streamingInlineCardRenderer,
     );
     this.sendPipelineRuntime = new SendPipelineRuntime(
@@ -2081,8 +2090,6 @@ export class OpenCodianView extends ItemView {
       getQuestionDockSlotCoordinator: () => this.questionDockSlotCoordinator,
       getQuestionApi: () => this.plugin.openCodeService,
       getTabAttention: () => this.tabRuntimeStateBridge,
-      getConversationSync: () => this.conversationSyncBridge,
-      getStatusRefresh: () => this.sessionTodoStatusRefreshService,
     };
   }
 

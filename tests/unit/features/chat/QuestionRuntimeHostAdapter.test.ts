@@ -9,7 +9,10 @@ import type { QuestionDockRenderStateFacadeHost } from '../../../../src/features
 import { QuestionDockQueueRuntimeFacade } from '../../../../src/features/chat/services/QuestionDockQueueRuntimeFacade';
 import type { QuestionInlineResolutionActionFacadeHost } from '../../../../src/features/chat/services/QuestionInlineResolutionActionFacade';
 import { QuestionPendingRefreshRuntimeFacade } from '../../../../src/features/chat/services/QuestionPendingRefreshRuntimeFacade';
-import { QuestionPostResolutionRuntimeFacade } from '../../../../src/features/chat/services/QuestionPostResolutionRuntimeFacade';
+import {
+  QuestionPostResolutionRuntimeFacade,
+  type QuestionPostResolutionRuntimeFacadeHost,
+} from '../../../../src/features/chat/services/QuestionPostResolutionRuntimeFacade';
 import {
   createQuestionRejectExecutionAction,
   createQuestionReplyExecutionAction,
@@ -132,6 +135,16 @@ function createViewHost(options?: {
     getPendingQuestions: jest.fn().mockResolvedValue([] as QuestionRequest[]),
     replyToQuestion: jest.fn().mockResolvedValue(undefined),
     rejectQuestion: jest.fn().mockResolvedValue(undefined),
+  };
+
+  const postResolutionRuntimeHost: Mocked<QuestionPostResolutionRuntimeFacadeHost> = {
+    getActiveTabId: jest.fn().mockImplementation(() => viewHost.getActiveTabId()),
+    getTabRuntimeState: jest
+      .fn()
+      .mockImplementation((tabId) => viewHost.getTabRuntimeState(tabId)),
+    getSessionIdForTab: jest
+      .fn()
+      .mockImplementation((tabId) => viewHost.getSessionIdForTab(tabId)),
     refreshTabSessionStatus: jest.fn().mockResolvedValue(null),
     startConversationSyncLoop: jest.fn(),
     syncVisibleConversationInBackground: jest.fn().mockResolvedValue(undefined),
@@ -139,6 +152,7 @@ function createViewHost(options?: {
 
   return {
     viewHost,
+    postResolutionRuntimeHost,
     runtimeByTab,
     questionDock,
     getLatestRenderState(): QuestionDockRenderState {
@@ -164,12 +178,12 @@ describe('QuestionRuntimeHostAdapter', () => {
 
   it('derives inline-card, resolution, and dock hosts from one view host', async () => {
     const request = createQuestionRequest();
-    const { viewHost, runtimeByTab } = createViewHost({
+    const { viewHost, postResolutionRuntimeHost, runtimeByTab } = createViewHost({
       questionDisplayMode: 'single',
       shouldRenderQuestionResolutionCards: true,
     });
 
-    const hosts = createQuestionRuntimeHosts(viewHost);
+    const hosts = createQuestionRuntimeHosts(viewHost, postResolutionRuntimeHost);
 
     expect(hosts.inlineCardRendererHost.getActiveTabId()).toBe('tab-active');
     expect(hosts.inlineCardRendererHost.getTabRuntimeState('tab-active')).toBe(
@@ -223,30 +237,41 @@ describe('QuestionRuntimeHostAdapter', () => {
     dockQueueRuntimeFacade.removePendingQuestionRequest(request.id, 'tab-active');
     await postResolutionRuntimeFacade.followUpAfterResolution('tab-active');
 
+    expect(hosts.postResolutionRuntimeHost).toBe(postResolutionRuntimeHost);
     expect(viewHost.keepQuestionCardPinnedToBottom).toHaveBeenCalledWith('tab-active');
     expect(viewHost.getPendingQuestions).toHaveBeenCalledTimes(1);
     expect(viewHost.replyToQuestion).toHaveBeenCalledWith(request.id, [['TypeScript']]);
     expect(viewHost.rejectQuestion).toHaveBeenCalledWith(request.id);
-    expect(viewHost.refreshTabSessionStatus).toHaveBeenCalledWith(
+    expect(postResolutionRuntimeHost.refreshTabSessionStatus).toHaveBeenCalledWith(
       'tab-active',
       'session-1',
       { suppressErrors: true },
     );
     expect(runtimeByTab.get('tab-active')?.resolvedQuestionRequestIds.has(request.id)).toBe(true);
-    expect(viewHost.startConversationSyncLoop).toHaveBeenCalledTimes(1);
-    expect(viewHost.syncVisibleConversationInBackground).toHaveBeenCalledTimes(1);
+    expect(postResolutionRuntimeHost.startConversationSyncLoop).toHaveBeenCalledTimes(1);
+    expect(postResolutionRuntimeHost.syncVisibleConversationInBackground).toHaveBeenCalledTimes(1);
   });
 
   it('wires dock resolution through the shared question runtime bundle', async () => {
     const request = createQuestionRequest();
-    const { viewHost, runtimeByTab, getLatestCallbacks, getLatestRenderState } = createViewHost();
+    const {
+      viewHost,
+      postResolutionRuntimeHost,
+      runtimeByTab,
+      getLatestCallbacks,
+      getLatestRenderState,
+    } = createViewHost();
     const streamingInlineCardRenderer = new StreamingInlineCardRenderer({
       getActiveTabId: () => 'tab-active',
       getTabRuntimeState: () => ({ streamingMessageEl: null }),
       revealStreamingAssistantMessageElement: () => null,
     });
 
-    const services = createQuestionRuntimeServices(viewHost, streamingInlineCardRenderer);
+    const services = createQuestionRuntimeServices(
+      viewHost,
+      postResolutionRuntimeHost,
+      streamingInlineCardRenderer,
+    );
     const resolutionPromise = services.dockCoordinator.waitForDockResolutionIfEnabled(
       request,
       'tab-active',
@@ -261,13 +286,13 @@ describe('QuestionRuntimeHostAdapter', () => {
     await expect(resolutionPromise).resolves.toBe(true);
 
     expect(viewHost.replyToQuestion).toHaveBeenCalledWith(request.id, [['TypeScript']]);
-    expect(viewHost.refreshTabSessionStatus).toHaveBeenCalledWith(
+    expect(postResolutionRuntimeHost.refreshTabSessionStatus).toHaveBeenCalledWith(
       'tab-active',
       'session-1',
       { suppressErrors: true },
     );
-    expect(viewHost.startConversationSyncLoop).toHaveBeenCalledTimes(1);
-    expect(viewHost.syncVisibleConversationInBackground).toHaveBeenCalledTimes(1);
+    expect(postResolutionRuntimeHost.startConversationSyncLoop).toHaveBeenCalledTimes(1);
+    expect(postResolutionRuntimeHost.syncVisibleConversationInBackground).toHaveBeenCalledTimes(1);
     expect(runtimeByTab.get('tab-active')?.pendingQuestionResolution).toEqual({
       request,
       status: 'answered',
@@ -277,7 +302,7 @@ describe('QuestionRuntimeHostAdapter', () => {
 
   it('wires inline fallback resolution through the shared question runtime bundle', async () => {
     const request = createQuestionRequest();
-    const { viewHost, runtimeByTab } = createViewHost({
+    const { viewHost, postResolutionRuntimeHost, runtimeByTab } = createViewHost({
       shouldUseAboveInputQuestionDock: false,
       shouldRenderQuestionResolutionCards: false,
     });
@@ -286,7 +311,11 @@ describe('QuestionRuntimeHostAdapter', () => {
       getTabRuntimeState: () => ({ streamingMessageEl: null }),
       revealStreamingAssistantMessageElement: () => null,
     });
-    const services = createQuestionRuntimeServices(viewHost, streamingInlineCardRenderer);
+    const services = createQuestionRuntimeServices(
+      viewHost,
+      postResolutionRuntimeHost,
+      streamingInlineCardRenderer,
+    );
     const collectActionSpy = jest.spyOn(services.inlineCardRenderer, 'collectAction').mockResolvedValue({
       type: 'reply',
       answers: [['TypeScript']],
@@ -296,13 +325,13 @@ describe('QuestionRuntimeHostAdapter', () => {
 
     expect(collectActionSpy).toHaveBeenCalledWith(request, 'all', 'tab-active');
     expect(viewHost.replyToQuestion).toHaveBeenCalledWith(request.id, [['TypeScript']]);
-    expect(viewHost.refreshTabSessionStatus).toHaveBeenCalledWith(
+    expect(postResolutionRuntimeHost.refreshTabSessionStatus).toHaveBeenCalledWith(
       'tab-active',
       'session-1',
       { suppressErrors: true },
     );
-    expect(viewHost.startConversationSyncLoop).toHaveBeenCalledTimes(1);
-    expect(viewHost.syncVisibleConversationInBackground).toHaveBeenCalledTimes(1);
+    expect(postResolutionRuntimeHost.startConversationSyncLoop).toHaveBeenCalledTimes(1);
+    expect(postResolutionRuntimeHost.syncVisibleConversationInBackground).toHaveBeenCalledTimes(1);
     expect(runtimeByTab.get('tab-active')?.resolvedQuestionRequestIds.has(request.id)).toBe(true);
     expect(runtimeByTab.get('tab-active')?.pendingQuestionResolution).toEqual({
       request,

@@ -2,10 +2,8 @@ import type { QuestionRuntimeViewHost } from './QuestionRuntimeHostAdapter';
 import type { QuestionDockSlotCoordinator } from './QuestionDockSlotCoordinator';
 import {
   createQuestionRuntimeViewHostAdapter,
-  type QuestionRuntimeConversationSyncPort,
   type QuestionRuntimeQuestionApiPort,
   type QuestionRuntimeSettingsPort,
-  type QuestionRuntimeStatusRefreshPort,
   type QuestionRuntimeTabAttentionPort,
   type QuestionRuntimeViewHostAdapterHost,
 } from './QuestionRuntimeViewHostAdapter';
@@ -20,8 +18,6 @@ export interface QuestionRuntimeViewHostFactoryHost extends QuestionRuntimeViewH
   getQuestionDockSlotCoordinator(): QuestionDockSlotCoordinatorPort;
   getQuestionApi(): QuestionRuntimeQuestionApiPort;
   getTabAttention(): QuestionRuntimeTabAttentionPort;
-  getConversationSync(): QuestionRuntimeConversationSyncPort;
-  getStatusRefresh(): QuestionRuntimeStatusRefreshPort;
 }
 
 export function createQuestionRuntimeViewHost(
@@ -54,17 +50,6 @@ export function createQuestionRuntimeViewHost(
       setNeedsAttention: (tabId, needsAttention) => {
         host.getTabAttention().setNeedsAttention(tabId, needsAttention);
       },
-    },
-    conversationSync: {
-      startConversationSyncLoop: () => {
-        host.getConversationSync().startConversationSyncLoop();
-      },
-      syncVisibleConversationInBackground: () =>
-        host.getConversationSync().syncVisibleConversationInBackground(),
-    },
-    statusRefresh: {
-      refreshTabSessionStatus: (tabId, sessionId, options) =>
-        host.getStatusRefresh().refreshTabSessionStatus(tabId, sessionId, options),
     },
   });
 }

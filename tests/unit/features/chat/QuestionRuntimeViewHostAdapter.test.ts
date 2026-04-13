@@ -5,11 +5,9 @@ import type {
 import type { QuestionRuntimeState } from '../../../../src/features/chat/services/QuestionRuntimeHostAdapter';
 import {
   createQuestionRuntimeViewHostAdapter,
-  type QuestionRuntimeConversationSyncPort,
   type QuestionRuntimeViewHostAdapterHost,
   type QuestionRuntimeQuestionApiPort,
   type QuestionRuntimeSettingsPort,
-  type QuestionRuntimeStatusRefreshPort,
   type QuestionRuntimeTabAttentionPort,
 } from '../../../../src/features/chat/services/QuestionRuntimeViewHostAdapter';
 import type { TabId } from '../../../../src/features/chat/tabs';
@@ -86,15 +84,8 @@ describe('QuestionRuntimeViewHostAdapter', () => {
       replyToQuestion: jest.fn().mockResolvedValue(undefined),
       rejectQuestion: jest.fn().mockResolvedValue(undefined),
     };
-    const statusRefresh: Mocked<QuestionRuntimeStatusRefreshPort> = {
-      refreshTabSessionStatus: jest.fn().mockResolvedValue({ type: 'idle' }),
-    };
     const tabAttention: Mocked<QuestionRuntimeTabAttentionPort> = {
       setNeedsAttention: jest.fn(),
-    };
-    const conversationSync: Mocked<QuestionRuntimeConversationSyncPort> = {
-      startConversationSyncLoop: jest.fn(),
-      syncVisibleConversationInBackground: jest.fn().mockResolvedValue(undefined),
     };
 
     const adapter = createQuestionRuntimeViewHostAdapter({
@@ -103,8 +94,6 @@ describe('QuestionRuntimeViewHostAdapter', () => {
       questionDockSlotCoordinator,
       questionApi,
       tabAttention,
-      conversationSync,
-      statusRefresh,
     });
 
     expect(adapter.getActiveTabId()).toBe('tab-active');
@@ -122,21 +111,11 @@ describe('QuestionRuntimeViewHostAdapter', () => {
     await expect(adapter.getPendingQuestions()).resolves.toEqual([request]);
     await adapter.replyToQuestion(request.id, [['Yes']]);
     await adapter.rejectQuestion(request.id);
-    await adapter.refreshTabSessionStatus('tab-active', 'session-1', { suppressErrors: true });
-    adapter.startConversationSyncLoop();
-    await adapter.syncVisibleConversationInBackground();
 
     expect(viewHost.keepQuestionCardPinnedToBottom).toHaveBeenCalledWith('tab-active');
     expect(tabAttention.setNeedsAttention).toHaveBeenCalledWith('tab-background', true);
     expect(questionApi.replyToQuestion).toHaveBeenCalledWith(request.id, [['Yes']]);
     expect(questionApi.rejectQuestion).toHaveBeenCalledWith(request.id);
-    expect(statusRefresh.refreshTabSessionStatus).toHaveBeenCalledWith(
-      'tab-active',
-      'session-1',
-      { suppressErrors: true },
-    );
-    expect(conversationSync.startConversationSyncLoop).toHaveBeenCalledTimes(1);
-    expect(conversationSync.syncVisibleConversationInBackground).toHaveBeenCalledTimes(1);
   });
 
   it('reads mutable settings and dock gates at call time', () => {
@@ -160,13 +139,6 @@ describe('QuestionRuntimeViewHostAdapter', () => {
       },
       tabAttention: {
         setNeedsAttention: jest.fn(),
-      },
-      conversationSync: {
-        startConversationSyncLoop: jest.fn(),
-        syncVisibleConversationInBackground: jest.fn().mockResolvedValue(undefined),
-      },
-      statusRefresh: {
-        refreshTabSessionStatus: jest.fn().mockResolvedValue(null),
       },
     });
 

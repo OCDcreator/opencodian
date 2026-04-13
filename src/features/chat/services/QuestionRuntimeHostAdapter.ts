@@ -90,13 +90,6 @@ export interface QuestionRuntimeViewHost {
   getPendingQuestions(): Promise<QuestionRequest[]>;
   replyToQuestion(requestId: string, answers: string[][]): Promise<void>;
   rejectQuestion(requestId: string): Promise<void>;
-  refreshTabSessionStatus(
-    tabId: TabId | null,
-    sessionId: string | undefined,
-    options: { suppressErrors?: boolean },
-  ): Promise<unknown>;
-  startConversationSyncLoop(): void;
-  syncVisibleConversationInBackground(): Promise<void>;
 }
 
 export interface QuestionRuntimeHosts {
@@ -122,6 +115,7 @@ export interface QuestionRuntimeServices {
 
 export function createQuestionRuntimeHosts(
   viewHost: QuestionRuntimeViewHost,
+  postResolutionRuntimeHost: QuestionPostResolutionRuntimeFacadeHost,
 ): QuestionRuntimeHosts {
   return {
     inlineCardRendererHost: {
@@ -176,31 +170,19 @@ export function createQuestionRuntimeHosts(
     pendingRefreshRuntimeHost: {
       getTabRuntimeState: (tabId: TabId | null) => viewHost.getTabRuntimeState(tabId),
     },
-    postResolutionRuntimeHost: {
-      getActiveTabId: () => viewHost.getActiveTabId(),
-      getTabRuntimeState: (tabId: TabId | null) => viewHost.getTabRuntimeState(tabId),
-      getSessionIdForTab: (tabId: TabId | null) => viewHost.getSessionIdForTab(tabId),
-      refreshTabSessionStatus: (
-        tabId: TabId | null,
-        sessionId: string | undefined,
-        options: { suppressErrors?: boolean },
-      ) => viewHost.refreshTabSessionStatus(tabId, sessionId, options),
-      startConversationSyncLoop: () => {
-        viewHost.startConversationSyncLoop();
-      },
-      syncVisibleConversationInBackground: () => viewHost.syncVisibleConversationInBackground(),
-    },
+    postResolutionRuntimeHost,
   };
 }
 
 export function createQuestionRuntimeServices(
   viewHost: QuestionRuntimeViewHost,
+  postResolutionRuntimeHost: QuestionPostResolutionRuntimeFacadeHost,
   streamingInlineCardRenderer: StreamingInlineCardRenderer,
 ): QuestionRuntimeServices {
   let resolutionCoordinator!: QuestionResolutionCoordinator;
   let dockCoordinator!: QuestionDockCoordinator;
 
-  const hosts = createQuestionRuntimeHosts(viewHost);
+  const hosts = createQuestionRuntimeHosts(viewHost, postResolutionRuntimeHost);
 
   const inlineCardRenderer = new QuestionInlineCardRenderer(
     streamingInlineCardRenderer,

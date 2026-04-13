@@ -57,8 +57,6 @@ export interface QuestionRuntimeViewHostAdapterDependencies {
   questionDockSlotCoordinator: QuestionDockSlotCoordinatorPort;
   questionApi: QuestionRuntimeQuestionApiPort;
   tabAttention: QuestionRuntimeTabAttentionPort;
-  conversationSync: QuestionRuntimeConversationSyncPort;
-  statusRefresh: QuestionRuntimeStatusRefreshPort;
 }
 
 export function createQuestionRuntimeViewHostAdapter(
@@ -87,12 +85,5 @@ export function createQuestionRuntimeViewHostAdapter(
     replyToQuestion: (requestId, answers) =>
       dependencies.questionApi.replyToQuestion(requestId, answers),
     rejectQuestion: (requestId) => dependencies.questionApi.rejectQuestion(requestId),
-    refreshTabSessionStatus: (tabId, sessionId, options) =>
-      dependencies.statusRefresh.refreshTabSessionStatus(tabId, sessionId, options),
-    startConversationSyncLoop: () => {
-      dependencies.conversationSync.startConversationSyncLoop();
-    },
-    syncVisibleConversationInBackground: () =>
-      dependencies.conversationSync.syncVisibleConversationInBackground(),
   };
 }
