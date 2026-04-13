@@ -208,7 +208,7 @@
   - 新 owner 满足粒度规则并有 tests 或可验证覆盖。
   - 运行 targeted tests、全量 `npm test`、`npm run build`。
 
-### [NEXT] R10 - Settings model catalog presenter
+### [DONE] R10 - Settings model catalog presenter
 
 - **Lane**: Settings maintainability
 - **目标**: 把 provider/model accordion、search、bulk toggle、probe presentation 从 `OpenCodianSettings.ts` 收束为 presenter。
@@ -229,7 +229,7 @@
   - Presenter 有 focused coverage 或稳定验证。
   - 运行 targeted tests、全量 `npm test`、`npm run build`。
 
-### [QUEUED] R11 - Core catalog state service
+### [NEXT] R11 - Core catalog state service
 
 - **Lane**: Core config maintainability
 - **目标**: 围绕 `ModelConfigService` + `OpencodeConfigManager` 提供明确 catalog state API，集中 `baseEffective` / `effective` / `currentEnabledProviderIds` 与 provider/model availability 操作。
