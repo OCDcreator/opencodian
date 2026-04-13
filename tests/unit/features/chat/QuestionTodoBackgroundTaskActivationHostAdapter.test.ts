@@ -6,10 +6,10 @@ import {
   type QuestionTodoBackgroundTaskActivationViewHost,
   type QuestionTodoBackgroundTaskActivationViewHostAdapterHost,
 } from '../../../../src/features/chat/services/QuestionTodoBackgroundTaskActivationHostAdapter';
-import type { QuestionTodoStatusRefreshCoordinator } from '../../../../src/features/chat/services/QuestionTodoStatusRefreshCoordinator';
+import type { QuestionTodoActivationRefreshBridge } from '../../../../src/features/chat/services/QuestionTodoActivationRefreshBridge';
 
-type QuestionTodoStatusRefreshPort = Pick<
-  QuestionTodoStatusRefreshCoordinator,
+type QuestionTodoActivationRefreshPort = Pick<
+  QuestionTodoActivationRefreshBridge,
   'refreshAfterActivation'
 >;
 
@@ -57,7 +57,7 @@ function createViewHostAdapterHost(
   };
 }
 
-function createRefreshCoordinator(): Mocked<QuestionTodoStatusRefreshPort> {
+function createRefreshCoordinator(): Mocked<QuestionTodoActivationRefreshPort> {
   return {
     refreshAfterActivation: jest.fn().mockResolvedValue(undefined),
   };

@@ -58,7 +58,7 @@ export class BackgroundTaskPostSyncCoordinator {
 - `BackgroundTaskIndicatorCoordinator` 负责 inline render 场景和 post-sync 场景共用的 completion notice queue/flush 顺序
 - `PostSyncQuestionTodoRefreshFacade` 负责把 question/todo refresh、background-task rebuild、completion notice / stream-like follow-up 串成共享 post-sync 执行边界
 - `PostSyncQuestionTodoRefreshPlanBuilder` 负责 visible/background session-id 与 signal/background-tab todo/status force-refresh policy 选择
-- `QuestionTodoStatusRefreshCoordinator` 负责 activation/post-sync 共享的 pending-question + todo/status refresh 顺序与 runtime gate
+- `QuestionTodoStatusRefreshCoordinator` 负责 post-sync 的 pending-question + todo/status refresh 顺序与 runtime gate，而 activation/open 侧 supplemental refresh 由 `QuestionTodoActivationRefreshBridge` 单独承接
 - `ConversationSyncBridge` 负责把 visible/signal/background sync 的 server-sync 结果统一路由到 post-sync coordinator 和 view render host
 - `BackgroundTaskPostSyncCoordinator` 负责 hidden signal/background-tab sync，以及 active visible-conversation background sync 之后的 refresh routing、authoritative mark 与 attention 判定
 - 这让本轮继续沿着 master plan 的 P2 `question / todo / background task` lane，把后台同步后的组合 refresh、visible sync state-commit 判定和 attention 判定保持在三个稳定边界，而不是继续散落在 view 的多个 sync 入口中

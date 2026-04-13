@@ -274,7 +274,6 @@ import {
   createQuestionTodoBackgroundTaskRefreshServices,
   createQuestionTodoBackgroundTaskRefreshViewHostAdapter,
 } from './services/QuestionTodoBackgroundTaskRefreshHostAdapter';
-import type { QuestionTodoStatusRefreshCoordinator } from './services/QuestionTodoStatusRefreshCoordinator';
 import {
   createQuestionTodoBackgroundTaskViewHosts,
   type QuestionTodoBackgroundTaskViewHostFactoryHost,
@@ -717,7 +716,6 @@ export class OpenCodianView extends ItemView {
   private persistentAssistantNoticeService: PersistentAssistantNoticeService;
   private sessionTodoServices: SessionTodoServices;
   private questionDockSlotCoordinator: QuestionDockSlotCoordinator;
-  private questionTodoStatusRefreshCoordinator: QuestionTodoStatusRefreshCoordinator;
   private activeTabContextUsageCoordinator: ActiveTabContextUsageCoordinator;
   private backgroundTaskTimelineService: BackgroundTaskTimelineService;
   private backgroundTaskCompletionNoticeService: BackgroundTaskCompletionNoticeService;
@@ -1119,6 +1117,7 @@ export class OpenCodianView extends ItemView {
       this.createQuestionTodoBackgroundTaskViewHostFactoryHost(),
     );
     const {
+      questionTodoActivationRefreshBridge,
       questionTodoStatusRefreshCoordinator,
       backgroundTaskPostSyncCoordinator,
     } = createQuestionTodoBackgroundTaskRefreshServices(
@@ -1132,7 +1131,6 @@ export class OpenCodianView extends ItemView {
         getTabRuntimeStateBridge: () => this.tabRuntimeStateBridge,
       }),
     );
-    this.questionTodoStatusRefreshCoordinator = questionTodoStatusRefreshCoordinator;
     this.backgroundTaskPostSyncCoordinator = backgroundTaskPostSyncCoordinator;
     const {
       questionTodoActivationRefreshCoordinator,
@@ -1143,7 +1141,7 @@ export class OpenCodianView extends ItemView {
         getQuestionDockSlotCoordinator: () => this.questionDockSlotCoordinator,
         getSessionTodoDockCoordinator: () => this.sessionTodoDockCoordinator,
       }),
-      this.questionTodoStatusRefreshCoordinator,
+      questionTodoActivationRefreshBridge,
     );
     this.activeTabContextUsageCoordinator = new ActiveTabContextUsageCoordinator(
       this.createActiveTabContextUsageCoordinatorHost(),

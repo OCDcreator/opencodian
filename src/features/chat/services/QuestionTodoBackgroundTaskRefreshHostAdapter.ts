@@ -20,6 +20,10 @@ import {
   PostSyncQuestionTodoRefreshPlanBuilder,
   type PostSyncQuestionTodoRefreshPlanBuilderHost,
 } from './PostSyncQuestionTodoRefreshPlanBuilder';
+import {
+  QuestionTodoActivationRefreshBridge,
+  type QuestionTodoActivationRefreshBridgeHost,
+} from './QuestionTodoActivationRefreshBridge';
 import type { QuestionDockCoordinator } from './QuestionDockCoordinator';
 import {
   QuestionTodoStatusRefreshCoordinator,
@@ -172,6 +176,7 @@ export function createQuestionTodoBackgroundTaskRefreshViewHostAdapter(
 }
 
 export interface QuestionTodoBackgroundTaskRefreshHosts {
+  questionTodoActivationRefreshHost: QuestionTodoActivationRefreshBridgeHost;
   questionTodoStatusRefreshHost: QuestionTodoStatusRefreshCoordinatorHost;
   postSyncQuestionTodoRefreshPlanBuilderHost: PostSyncQuestionTodoRefreshPlanBuilderHost;
   backgroundTaskPostSyncRefreshPort: BackgroundTaskPostSyncRefreshPort;
@@ -180,6 +185,7 @@ export interface QuestionTodoBackgroundTaskRefreshHosts {
 }
 
 export interface QuestionTodoBackgroundTaskRefreshServices {
+  questionTodoActivationRefreshBridge: QuestionTodoActivationRefreshBridge;
   questionTodoStatusRefreshCoordinator: QuestionTodoStatusRefreshCoordinator;
   postSyncQuestionTodoRefreshFacade: PostSyncQuestionTodoRefreshFacade;
   backgroundTaskPostSyncCoordinator: BackgroundTaskPostSyncCoordinator;
@@ -189,6 +195,22 @@ export function createQuestionTodoBackgroundTaskRefreshHosts(
   viewHost: QuestionTodoBackgroundTaskRefreshViewHost,
 ): QuestionTodoBackgroundTaskRefreshHosts {
   return {
+    questionTodoActivationRefreshHost: {
+      refreshPendingQuestionsForTab: (
+        tabId: TabId | null,
+        sessionId: string | null | undefined,
+      ) => viewHost.refreshPendingQuestionsForTab(tabId, sessionId),
+      refreshTabSessionStatus: (
+        tabId: TabId | null,
+        sessionId: string | null | undefined,
+        options: { suppressErrors?: boolean },
+      ) => viewHost.refreshTabSessionStatus(tabId, sessionId, options),
+      refreshTabSessionTodos: (
+        tabId: TabId | null,
+        sessionId: string | null | undefined,
+        options: { suppressErrors?: boolean },
+      ) => viewHost.refreshTabSessionTodos(tabId, sessionId, options),
+    },
     questionTodoStatusRefreshHost: {
       getTabRuntimeState: (tabId: TabId | null) => viewHost.getTabRuntimeState(tabId),
       hasIncompleteTodos: (todos: readonly SessionTodo[]) => viewHost.hasIncompleteTodos(todos),
@@ -246,6 +268,9 @@ export function createQuestionTodoBackgroundTaskRefreshServices(
   viewHost: QuestionTodoBackgroundTaskRefreshViewHost,
 ): QuestionTodoBackgroundTaskRefreshServices {
   const hosts = createQuestionTodoBackgroundTaskRefreshHosts(viewHost);
+  const questionTodoActivationRefreshBridge = new QuestionTodoActivationRefreshBridge(
+    hosts.questionTodoActivationRefreshHost,
+  );
   const questionTodoStatusRefreshCoordinator = new QuestionTodoStatusRefreshCoordinator(
     hosts.questionTodoStatusRefreshHost,
   );
@@ -268,6 +293,7 @@ export function createQuestionTodoBackgroundTaskRefreshServices(
   );
 
   return {
+    questionTodoActivationRefreshBridge,
     questionTodoStatusRefreshCoordinator,
     postSyncQuestionTodoRefreshFacade,
     backgroundTaskPostSyncCoordinator,

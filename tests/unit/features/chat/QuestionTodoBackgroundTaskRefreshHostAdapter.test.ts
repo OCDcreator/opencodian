@@ -259,7 +259,7 @@ describe('QuestionTodoBackgroundTaskRefreshHostAdapter', () => {
     );
   });
 
-  it('derives the three host shapes from one shared view host', async () => {
+  it('derives activation and post-sync host shapes from one shared view host', async () => {
     const runtime = createRuntime();
     const currentConversation = createConversation('conversation-active');
     const viewHost = createViewHost({
@@ -271,6 +271,20 @@ describe('QuestionTodoBackgroundTaskRefreshHostAdapter', () => {
 
     const hosts = createQuestionTodoBackgroundTaskRefreshHosts(viewHost);
 
+    await hosts.questionTodoActivationRefreshHost.refreshPendingQuestionsForTab(
+      'tab-active',
+      'session-activation',
+    );
+    await hosts.questionTodoActivationRefreshHost.refreshTabSessionStatus(
+      'tab-active',
+      'session-activation',
+      { suppressErrors: true },
+    );
+    await hosts.questionTodoActivationRefreshHost.refreshTabSessionTodos(
+      'tab-active',
+      'session-activation',
+      { suppressErrors: true },
+    );
     expect(hosts.questionTodoStatusRefreshHost.getTabRuntimeState('tab-active')).toBe(runtime);
     expect(hosts.postSyncQuestionTodoRefreshPlanBuilderHost.getCurrentConversationSessionId()).toBe(
       'session-conversation-active',
@@ -316,14 +330,32 @@ describe('QuestionTodoBackgroundTaskRefreshHostAdapter', () => {
 
     expect(viewHost.refreshPendingQuestionsForTab).toHaveBeenCalledWith(
       'tab-active',
+      'session-activation',
+    );
+    expect(viewHost.refreshTabSessionStatus).toHaveBeenNthCalledWith(
+      1,
+      'tab-active',
+      'session-activation',
+      { suppressErrors: true },
+    );
+    expect(viewHost.refreshTabSessionTodos).toHaveBeenNthCalledWith(
+      1,
+      'tab-active',
+      'session-activation',
+      { suppressErrors: true },
+    );
+    expect(viewHost.refreshPendingQuestionsForTab).toHaveBeenCalledWith(
+      'tab-active',
       'session-question',
     );
-    expect(viewHost.refreshTabSessionStatus).toHaveBeenCalledWith(
+    expect(viewHost.refreshTabSessionStatus).toHaveBeenNthCalledWith(
+      2,
       'tab-active',
       'session-status',
       { suppressErrors: true },
     );
-    expect(viewHost.refreshTabSessionTodos).toHaveBeenCalledWith(
+    expect(viewHost.refreshTabSessionTodos).toHaveBeenNthCalledWith(
+      2,
       'tab-active',
       'session-todo',
       { suppressErrors: true },
@@ -364,6 +396,11 @@ describe('QuestionTodoBackgroundTaskRefreshHostAdapter', () => {
 
     const services = createQuestionTodoBackgroundTaskRefreshServices(viewHost);
 
+    await services.questionTodoActivationRefreshBridge.refreshAfterActivation(
+      'tab-active',
+      'session-activation',
+    );
+
     const outcome = await services.backgroundTaskPostSyncCoordinator.handleVisibleConversationSyncComplete({
       tabId: 'tab-active',
       expectedConversationId: 'conversation-active',
@@ -377,14 +414,32 @@ describe('QuestionTodoBackgroundTaskRefreshHostAdapter', () => {
 
     expect(viewHost.refreshPendingQuestionsForTab).toHaveBeenCalledWith(
       'tab-active',
+      'session-activation',
+    );
+    expect(viewHost.refreshTabSessionStatus).toHaveBeenNthCalledWith(
+      1,
+      'tab-active',
+      'session-activation',
+      { suppressErrors: true },
+    );
+    expect(viewHost.refreshTabSessionTodos).toHaveBeenNthCalledWith(
+      1,
+      'tab-active',
+      'session-activation',
+      { suppressErrors: true },
+    );
+    expect(viewHost.refreshPendingQuestionsForTab).toHaveBeenCalledWith(
+      'tab-active',
       'question-session',
     );
-    expect(viewHost.refreshTabSessionStatus).toHaveBeenCalledWith(
+    expect(viewHost.refreshTabSessionStatus).toHaveBeenNthCalledWith(
+      2,
       'tab-active',
       'session-conversation-active',
       { suppressErrors: true },
     );
-    expect(viewHost.refreshTabSessionTodos).toHaveBeenCalledWith(
+    expect(viewHost.refreshTabSessionTodos).toHaveBeenNthCalledWith(
+      2,
       'tab-active',
       'session-conversation-active',
       { suppressErrors: true },

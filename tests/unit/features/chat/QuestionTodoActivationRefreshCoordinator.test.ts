@@ -2,10 +2,10 @@ import {
   QuestionTodoActivationRefreshCoordinator,
   type QuestionTodoActivationRefreshCoordinatorHost,
 } from '../../../../src/features/chat/services/QuestionTodoActivationRefreshCoordinator';
-import type { QuestionTodoStatusRefreshCoordinator } from '../../../../src/features/chat/services/QuestionTodoStatusRefreshCoordinator';
+import type { QuestionTodoActivationRefreshBridge } from '../../../../src/features/chat/services/QuestionTodoActivationRefreshBridge';
 
-type QuestionTodoStatusRefreshPort = Pick<
-  QuestionTodoStatusRefreshCoordinator,
+type QuestionTodoActivationRefreshPort = Pick<
+  QuestionTodoActivationRefreshBridge,
   'refreshAfterActivation'
 >;
 
@@ -27,7 +27,7 @@ function createHost(
 
 function createRefreshCoordinator(
   callOrder: string[],
-): jest.Mocked<QuestionTodoStatusRefreshPort> {
+): jest.Mocked<QuestionTodoActivationRefreshPort> {
   return {
     refreshAfterActivation: jest.fn(() => {
       callOrder.push('refresh');
