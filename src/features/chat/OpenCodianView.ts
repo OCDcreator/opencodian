@@ -265,21 +265,16 @@ import {
 } from './services/QuestionRuntimeViewHostFactory';
 import {
   createQuestionTodoBackgroundTaskActivationServices,
-  createQuestionTodoBackgroundTaskActivationViewHostAdapter,
-  type QuestionTodoBackgroundTaskActivationViewHostAdapterHost,
 } from './services/QuestionTodoBackgroundTaskActivationHostAdapter';
 import {
-  createBackgroundConversationPostSyncHandoffViewHostAdapter,
-  type BackgroundConversationPostSyncHandoffViewHostAdapterHost,
-} from './services/BackgroundConversationPostSyncHandoffHostAdapter';
+  createQuestionTodoBackgroundTaskRuntimeViewHosts,
+  type QuestionTodoBackgroundTaskRuntimeViewHostFactoryHost,
+} from './services/QuestionTodoBackgroundTaskRuntimeViewHostFactory';
 import {
   createQuestionTodoBackgroundTaskRefreshServices,
-  createQuestionTodoBackgroundTaskRefreshViewHostAdapter,
-  type QuestionTodoBackgroundTaskRefreshViewHostAdapterHost,
 } from './services/QuestionTodoBackgroundTaskRefreshHostAdapter';
 import {
   createVisibleConversationPostSyncStateServices,
-  type VisibleConversationPostSyncStateViewHost,
 } from './services/VisibleConversationPostSyncStateHostAdapter';
 import {
   isElementNearBottom,
@@ -566,12 +561,6 @@ interface DeferredQuestionRequest {
   promise: Promise<void>;
   resolve: () => void;
 }
-
-type QuestionTodoBackgroundTaskViewHost =
-  BackgroundConversationPostSyncHandoffViewHostAdapterHost
-  & QuestionTodoBackgroundTaskRefreshViewHostAdapterHost
-  & QuestionTodoBackgroundTaskActivationViewHostAdapterHost
-  & VisibleConversationPostSyncStateViewHost;
 
 interface TabRuntimeState {
   isStreaming: boolean;
@@ -1110,42 +1099,29 @@ export class OpenCodianView extends ItemView {
         this.questionDockCoordinator.render();
       },
     );
-    const questionTodoBackgroundTaskViewHost = this.createQuestionTodoBackgroundTaskViewHost();
-    const questionTodoBackgroundTaskRefreshViewHost =
-      createQuestionTodoBackgroundTaskRefreshViewHostAdapter({
-        viewHost: questionTodoBackgroundTaskViewHost,
-        getQuestionDockCoordinator: () => this.questionDockCoordinator,
-        getSessionTodoStateService: () => this.sessionTodoStateService,
-        getSessionTodoStatusRefreshService: () => this.sessionTodoStatusRefreshService,
-      });
-    const backgroundConversationPostSyncHandoffViewHost =
-      createBackgroundConversationPostSyncHandoffViewHostAdapter({
-        viewHost: questionTodoBackgroundTaskViewHost,
-        getBackgroundTaskIndicatorCoordinator: () => this.backgroundTaskIndicatorCoordinator,
-        getBackgroundTaskLiveSignalCoordinator: () => this.backgroundTaskLiveSignalCoordinator,
-        getTabRuntimeStateBridge: () => this.tabRuntimeStateBridge,
-      });
+    const questionTodoBackgroundTaskRuntimeViewHosts =
+      createQuestionTodoBackgroundTaskRuntimeViewHosts(
+        this.createQuestionTodoBackgroundTaskRuntimeViewHostFactoryHost(),
+      );
     const {
       visibleConversationPostSyncStateCoordinator,
-    } = createVisibleConversationPostSyncStateServices(questionTodoBackgroundTaskViewHost);
+    } = createVisibleConversationPostSyncStateServices(
+      questionTodoBackgroundTaskRuntimeViewHosts.visibleConversationPostSyncStateViewHost,
+    );
     const {
       questionTodoActivationRefreshBridge,
       visibleConversationPostSyncCoordinator,
       backgroundConversationPostSyncHandoffCoordinator,
     } = createQuestionTodoBackgroundTaskRefreshServices(
-      questionTodoBackgroundTaskRefreshViewHost,
-      backgroundConversationPostSyncHandoffViewHost,
+      questionTodoBackgroundTaskRuntimeViewHosts.questionTodoBackgroundTaskRefreshViewHost,
+      questionTodoBackgroundTaskRuntimeViewHosts.backgroundConversationPostSyncHandoffViewHost,
       visibleConversationPostSyncStateCoordinator,
     );
     const {
       questionTodoActivationRefreshCoordinator,
       backgroundTaskActivationIndicatorCoordinator,
     } = createQuestionTodoBackgroundTaskActivationServices(
-      createQuestionTodoBackgroundTaskActivationViewHostAdapter({
-        viewHost: questionTodoBackgroundTaskViewHost,
-        getQuestionDockSlotCoordinator: () => this.questionDockSlotCoordinator,
-        getSessionTodoDockCoordinator: () => this.sessionTodoDockCoordinator,
-      }),
+      questionTodoBackgroundTaskRuntimeViewHosts.questionTodoBackgroundTaskActivationViewHost,
       questionTodoActivationRefreshBridge,
     );
     this.activeTabContextUsageCoordinator = new ActiveTabContextUsageCoordinator(
@@ -1389,33 +1365,50 @@ export class OpenCodianView extends ItemView {
     };
   }
 
-  private createQuestionTodoBackgroundTaskViewHost(): QuestionTodoBackgroundTaskViewHost {
+  private createQuestionTodoBackgroundTaskRuntimeViewHostFactoryHost():
+    QuestionTodoBackgroundTaskRuntimeViewHostFactoryHost {
     return {
-      getCurrentConversation: () => this.currentConversation,
-      getTabRuntimeState: (tabId: TabId | null) => this.getTabRuntimeState(tabId),
-      setCurrentConversationRevertState: (revertState) => {
-        this.currentConversationRevertState = revertState;
-      },
-      setTabConversationSyncFingerprint: (tabId, fingerprint) => {
-        const runtime = this.getTabRuntimeState(tabId);
-        if (runtime) {
-          runtime.lastConversationSyncFingerprint = fingerprint;
-        }
-      },
-      renderSessionTodoDock: (tabId) => {
-        this.renderSessionTodoDock(tabId);
-      },
-      resetBackgroundTaskIndicator: () => {
-        this.resetBackgroundTaskIndicator();
-      },
-      syncBackgroundTaskStateFromConversation: (
-        conversation,
-        tabId?: TabId | null,
-      ) => {
-        this.syncBackgroundTaskStateFromConversation(conversation, tabId);
-      },
-      renderBackgroundTaskIndicatorIfNeeded: (tabId) =>
-        this.renderBackgroundTaskIndicatorIfNeeded(tabId),
+      getConversationState: () => ({
+        getCurrentConversation: () => this.currentConversation,
+        setCurrentConversationRevertState: (revertState) => {
+          this.currentConversationRevertState = revertState;
+        },
+        setTabConversationSyncFingerprint: (tabId, fingerprint) => {
+          const runtime = this.getTabRuntimeState(tabId);
+          if (runtime) {
+            runtime.lastConversationSyncFingerprint = fingerprint;
+          }
+        },
+      }),
+      getQuestionTodoRefreshRuntime: () => ({
+        getTabRuntimeState: (tabId: TabId | null) => this.getTabRuntimeState(tabId),
+        renderSessionTodoDock: (tabId) => {
+          this.renderSessionTodoDock(tabId);
+        },
+        getQuestionDockCoordinator: () => this.questionDockCoordinator,
+        getSessionTodoStateService: () => this.sessionTodoStateService,
+        getSessionTodoStatusRefreshService: () => this.sessionTodoStatusRefreshService,
+      }),
+      getQuestionTodoActivationWriteback: () => ({
+        getQuestionDockSlotCoordinator: () => this.questionDockSlotCoordinator,
+        getSessionTodoDockCoordinator: () => this.sessionTodoDockCoordinator,
+      }),
+      getBackgroundTaskRuntime: () => ({
+        resetBackgroundTaskIndicator: () => {
+          this.resetBackgroundTaskIndicator();
+        },
+        syncBackgroundTaskStateFromConversation: (
+          conversation,
+          tabId?: TabId | null,
+        ) => {
+          this.syncBackgroundTaskStateFromConversation(conversation, tabId);
+        },
+        renderBackgroundTaskIndicatorIfNeeded: (tabId) =>
+          this.renderBackgroundTaskIndicatorIfNeeded(tabId),
+        getBackgroundTaskIndicatorCoordinator: () => this.backgroundTaskIndicatorCoordinator,
+        getBackgroundTaskLiveSignalCoordinator: () => this.backgroundTaskLiveSignalCoordinator,
+        getTabRuntimeStateBridge: () => this.tabRuntimeStateBridge,
+      }),
     };
   }
 

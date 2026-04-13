@@ -7,7 +7,7 @@
 
 `BackgroundConversationPostSyncHandoffHostAdapter` 把 background-task post-sync handoff 所需的 host assembly 从 `QuestionTodoBackgroundTaskRefreshHostAdapter` 中拆出，专门负责：
 
-- 从 `OpenCodianView` 提供的窄 `syncBackgroundTaskStateFromConversation()` seam 与 late-bound background indicator / live-signal / tab-runtime bridge ports 组合出 dedicated background handoff view host
+- 从 `QuestionTodoBackgroundTaskRuntimeViewHostFactory` 提供的窄 `syncBackgroundTaskStateFromConversation()` seam 与 late-bound background indicator / live-signal / tab-runtime bridge ports 组合出 dedicated background handoff view host
 - 为 `BackgroundConversationPostSyncRefreshExecutor`、`BackgroundConversationSignalSyncStateCoordinator` 与 `BackgroundConversationAttentionCoordinator` 派生各自需要的 host 回调
 - 统一装配 `BackgroundConversationPostSyncHandoffCoordinator`，让 signal/background-tab post-sync handoff 的 host wiring 留在 single-purpose 模块里
 
@@ -35,7 +35,7 @@ export function createBackgroundConversationPostSyncHandoffServices(...):
 ### dedicated background host assembly
 
 - `createBackgroundConversationPostSyncHandoffViewHostAdapter()` 只暴露 background handoff 自己需要的四个 writeback seam：background task state rebuild、completion notice flush、authoritative-sync mark 与 tab attention writeback
-- late-bound getters 让 `OpenCodianView` 仍能在构造期提前建立 handoff bundle，同时安全引用稍后初始化的 `BackgroundTaskIndicatorCoordinator`、`BackgroundTaskLiveSignalCoordinator` 与 `TabRuntimeStateBridge`
+- late-bound getters 让 runtime factory 仍能在构造期提前建立 handoff bundle，同时安全引用稍后初始化的 `BackgroundTaskIndicatorCoordinator`、`BackgroundTaskLiveSignalCoordinator` 与 `TabRuntimeStateBridge`
 
 ### handoff coordinator wiring
 
