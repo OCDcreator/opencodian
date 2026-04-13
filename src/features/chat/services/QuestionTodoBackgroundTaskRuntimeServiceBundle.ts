@@ -7,8 +7,11 @@ import {
   type QuestionTodoBackgroundTaskRefreshServices,
 } from './QuestionTodoBackgroundTaskRefreshHostAdapter';
 import {
+  createQuestionTodoBackgroundTaskRuntimeViewHostFactoryHost,
+  type QuestionTodoBackgroundTaskRuntimeHostProviderHost,
+} from './QuestionTodoBackgroundTaskRuntimeHostProvider';
+import {
   createQuestionTodoBackgroundTaskRuntimeViewHosts,
-  type QuestionTodoBackgroundTaskRuntimeViewHostFactoryHost,
 } from './QuestionTodoBackgroundTaskRuntimeViewHostFactory';
 import {
   createVisibleConversationPostSyncStateServices,
@@ -27,9 +30,11 @@ export interface QuestionTodoBackgroundTaskRuntimeServiceBundle
     > {}
 
 export function createQuestionTodoBackgroundTaskRuntimeServiceBundle(
-  host: QuestionTodoBackgroundTaskRuntimeViewHostFactoryHost,
+  host: QuestionTodoBackgroundTaskRuntimeHostProviderHost,
 ): QuestionTodoBackgroundTaskRuntimeServiceBundle {
-  const runtimeViewHosts = createQuestionTodoBackgroundTaskRuntimeViewHosts(host);
+  const runtimeViewHosts = createQuestionTodoBackgroundTaskRuntimeViewHosts(
+    createQuestionTodoBackgroundTaskRuntimeViewHostFactoryHost(host),
+  );
   const {
     visibleConversationPostSyncStateCoordinator,
   } = createVisibleConversationPostSyncStateServices(

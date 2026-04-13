@@ -264,11 +264,11 @@ import {
   type QuestionRuntimeViewHostFactoryHost,
 } from './services/QuestionRuntimeViewHostFactory';
 import {
-  type QuestionTodoBackgroundTaskRuntimeViewHostFactoryHost,
-} from './services/QuestionTodoBackgroundTaskRuntimeViewHostFactory';
-import {
   createQuestionTodoBackgroundTaskRuntimeServiceBundle,
 } from './services/QuestionTodoBackgroundTaskRuntimeServiceBundle';
+import {
+  type QuestionTodoBackgroundTaskRuntimeHostProviderHost,
+} from './services/QuestionTodoBackgroundTaskRuntimeHostProvider';
 import {
   isElementNearBottom,
   scrollElementToBottom,
@@ -1098,7 +1098,7 @@ export class OpenCodianView extends ItemView {
       questionTodoActivationRefreshCoordinator,
       backgroundTaskActivationIndicatorCoordinator,
     } = createQuestionTodoBackgroundTaskRuntimeServiceBundle(
-      this.createQuestionTodoBackgroundTaskRuntimeViewHostFactoryHost(),
+      this.createQuestionTodoBackgroundTaskRuntimeHostProviderHost(),
     );
     this.activeTabContextUsageCoordinator = new ActiveTabContextUsageCoordinator(
       this.createActiveTabContextUsageCoordinatorHost(),
@@ -1341,50 +1341,39 @@ export class OpenCodianView extends ItemView {
     };
   }
 
-  private createQuestionTodoBackgroundTaskRuntimeViewHostFactoryHost():
-    QuestionTodoBackgroundTaskRuntimeViewHostFactoryHost {
+  private createQuestionTodoBackgroundTaskRuntimeHostProviderHost():
+    QuestionTodoBackgroundTaskRuntimeHostProviderHost {
     return {
-      getConversationState: () => ({
-        getCurrentConversation: () => this.currentConversation,
-        setCurrentConversationRevertState: (revertState) => {
-          this.currentConversationRevertState = revertState;
-        },
-        setTabConversationSyncFingerprint: (tabId, fingerprint) => {
-          const runtime = this.getTabRuntimeState(tabId);
-          if (runtime) {
-            runtime.lastConversationSyncFingerprint = fingerprint;
-          }
-        },
-      }),
-      getQuestionTodoRefreshRuntime: () => ({
-        getTabRuntimeState: (tabId: TabId | null) => this.getTabRuntimeState(tabId),
-        renderSessionTodoDock: (tabId) => {
-          this.renderSessionTodoDock(tabId);
-        },
-        getQuestionDockCoordinator: () => this.questionDockCoordinator,
-        getSessionTodoStateService: () => this.sessionTodoStateService,
-        getSessionTodoStatusRefreshService: () => this.sessionTodoStatusRefreshService,
-      }),
-      getQuestionTodoActivationWriteback: () => ({
-        getQuestionDockSlotCoordinator: () => this.questionDockSlotCoordinator,
-        getSessionTodoDockCoordinator: () => this.sessionTodoDockCoordinator,
-      }),
-      getBackgroundTaskRuntime: () => ({
-        resetBackgroundTaskIndicator: () => {
-          this.resetBackgroundTaskIndicator();
-        },
-        syncBackgroundTaskStateFromConversation: (
-          conversation,
-          tabId?: TabId | null,
-        ) => {
-          this.syncBackgroundTaskStateFromConversation(conversation, tabId);
-        },
-        renderBackgroundTaskIndicatorIfNeeded: (tabId) =>
-          this.renderBackgroundTaskIndicatorIfNeeded(tabId),
-        getBackgroundTaskIndicatorCoordinator: () => this.backgroundTaskIndicatorCoordinator,
-        getBackgroundTaskLiveSignalCoordinator: () => this.backgroundTaskLiveSignalCoordinator,
-        getTabRuntimeStateBridge: () => this.tabRuntimeStateBridge,
-      }),
+      getCurrentConversation: () => this.currentConversation,
+      setCurrentConversationRevertState: (revertState) => {
+        this.currentConversationRevertState = revertState;
+      },
+      setTabConversationSyncFingerprint: (tabId, fingerprint) => {
+        const runtime = this.getTabRuntimeState(tabId);
+        if (runtime) {
+          runtime.lastConversationSyncFingerprint = fingerprint;
+        }
+      },
+      getTabRuntimeState: (tabId: TabId | null) => this.getTabRuntimeState(tabId),
+      renderSessionTodoDock: (tabId) => {
+        this.renderSessionTodoDock(tabId);
+      },
+      getQuestionDockCoordinator: () => this.questionDockCoordinator,
+      getSessionTodoStateService: () => this.sessionTodoStateService,
+      getSessionTodoStatusRefreshService: () => this.sessionTodoStatusRefreshService,
+      getQuestionDockSlotCoordinator: () => this.questionDockSlotCoordinator,
+      getSessionTodoDockCoordinator: () => this.sessionTodoDockCoordinator,
+      resetBackgroundTaskIndicator: () => {
+        this.resetBackgroundTaskIndicator();
+      },
+      syncBackgroundTaskStateFromConversation: (conversation, tabId?: TabId | null) => {
+        this.syncBackgroundTaskStateFromConversation(conversation, tabId);
+      },
+      renderBackgroundTaskIndicatorIfNeeded: (tabId) =>
+        this.renderBackgroundTaskIndicatorIfNeeded(tabId),
+      getBackgroundTaskIndicatorCoordinator: () => this.backgroundTaskIndicatorCoordinator,
+      getBackgroundTaskLiveSignalCoordinator: () => this.backgroundTaskLiveSignalCoordinator,
+      getTabRuntimeStateBridge: () => this.tabRuntimeStateBridge,
     };
   }
 

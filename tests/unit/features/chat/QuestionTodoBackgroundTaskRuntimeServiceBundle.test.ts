@@ -10,6 +10,10 @@ import {
   createQuestionTodoBackgroundTaskRuntimeServiceBundle,
 } from '../../../../src/features/chat/services/QuestionTodoBackgroundTaskRuntimeServiceBundle';
 import type {
+  QuestionTodoBackgroundTaskRuntimeHostProviderHost,
+} from '../../../../src/features/chat/services/QuestionTodoBackgroundTaskRuntimeHostProvider';
+import * as QuestionTodoBackgroundTaskRuntimeHostProviderModule from '../../../../src/features/chat/services/QuestionTodoBackgroundTaskRuntimeHostProvider';
+import type {
   QuestionTodoBackgroundTaskRuntimeViewHostFactoryHost,
   QuestionTodoBackgroundTaskRuntimeViewHosts,
 } from '../../../../src/features/chat/services/QuestionTodoBackgroundTaskRuntimeViewHostFactory';
@@ -19,12 +23,24 @@ import {
 } from '../../../../src/features/chat/services/VisibleConversationPostSyncStateHostAdapter';
 import * as VisibleConversationPostSyncStateHostAdapterModule from '../../../../src/features/chat/services/VisibleConversationPostSyncStateHostAdapter';
 
-function createHost(): QuestionTodoBackgroundTaskRuntimeViewHostFactoryHost {
+function createHost(): QuestionTodoBackgroundTaskRuntimeHostProviderHost {
   return {
-    getConversationState: jest.fn(),
-    getQuestionTodoRefreshRuntime: jest.fn(),
-    getQuestionTodoActivationWriteback: jest.fn(),
-    getBackgroundTaskRuntime: jest.fn(),
+    getCurrentConversation: jest.fn(),
+    setCurrentConversationRevertState: jest.fn(),
+    setTabConversationSyncFingerprint: jest.fn(),
+    getTabRuntimeState: jest.fn(),
+    renderSessionTodoDock: jest.fn(),
+    getQuestionDockCoordinator: jest.fn(),
+    getSessionTodoStateService: jest.fn(),
+    getSessionTodoStatusRefreshService: jest.fn(),
+    getQuestionDockSlotCoordinator: jest.fn(),
+    getSessionTodoDockCoordinator: jest.fn(),
+    resetBackgroundTaskIndicator: jest.fn(),
+    syncBackgroundTaskStateFromConversation: jest.fn(),
+    renderBackgroundTaskIndicatorIfNeeded: jest.fn(),
+    getBackgroundTaskIndicatorCoordinator: jest.fn(),
+    getBackgroundTaskLiveSignalCoordinator: jest.fn(),
+    getTabRuntimeStateBridge: jest.fn(),
   };
 }
 
@@ -70,6 +86,7 @@ describe('QuestionTodoBackgroundTaskRuntimeServiceBundle', () => {
 
   it('assembles the runtime view-host and service layers behind one P2 seam', () => {
     const host = createHost();
+    const factoryHost = {} as QuestionTodoBackgroundTaskRuntimeViewHostFactoryHost;
     const runtimeViewHosts = createRuntimeViewHosts();
     const visibleConversationPostSyncStateServices =
       createVisibleConversationPostSyncStateServices();
@@ -77,6 +94,12 @@ describe('QuestionTodoBackgroundTaskRuntimeServiceBundle', () => {
       createQuestionTodoBackgroundTaskRefreshServices();
     const questionTodoBackgroundTaskActivationServices =
       createQuestionTodoBackgroundTaskActivationServices();
+    const createRuntimeViewHostFactoryHostSpy = jest
+      .spyOn(
+        QuestionTodoBackgroundTaskRuntimeHostProviderModule,
+        'createQuestionTodoBackgroundTaskRuntimeViewHostFactoryHost',
+      )
+      .mockReturnValue(factoryHost);
 
     const createRuntimeViewHostsSpy = jest
       .spyOn(
@@ -105,7 +128,8 @@ describe('QuestionTodoBackgroundTaskRuntimeServiceBundle', () => {
 
     const bundle = createQuestionTodoBackgroundTaskRuntimeServiceBundle(host);
 
-    expect(createRuntimeViewHostsSpy).toHaveBeenCalledWith(host);
+    expect(createRuntimeViewHostFactoryHostSpy).toHaveBeenCalledWith(host);
+    expect(createRuntimeViewHostsSpy).toHaveBeenCalledWith(factoryHost);
     expect(createVisibleConversationPostSyncStateServicesSpy).toHaveBeenCalledWith(
       runtimeViewHosts.visibleConversationPostSyncStateViewHost,
     );
