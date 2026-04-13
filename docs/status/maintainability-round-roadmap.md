@@ -62,7 +62,7 @@
   - 新 owner 至少覆盖 request hydration 与 respond/reject 后处理。
   - 运行 targeted tests、全量 `npm test`、`npm run build`。
 
-### [NEXT] R3 - Session todo refresh/status 收束
+### [DONE] R3 - Session todo refresh/status 收束
 
 - **Lane**: P2 `question / todo / background task`
 - **目标**: 集中 `applySessionTodoUpdate`、`setTabSessionTodos`、stale suppression、dock render trigger，让 todo 初始同步、live update、stale 处理统一走一个 coordinator。
@@ -84,7 +84,7 @@
   - Todo live update 和 stale 处理路径统一。
   - 运行 targeted tests、全量 `npm test`、`npm run build`。
 
-### [QUEUED] R4 - Background task notice pipeline
+### [NEXT] R4 - Background task notice pipeline
 
 - **Lane**: P2 `question / todo / background task`
 - **目标**: 迁出 `collectBackgroundTaskSegments`、completion notice queue、flush/fingerprint 逻辑，形成 `BackgroundTaskNoticeService` 或相邻厚 owner。

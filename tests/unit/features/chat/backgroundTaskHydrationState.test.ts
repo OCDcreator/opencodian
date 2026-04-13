@@ -26,7 +26,7 @@ describe('OpenCodianView background task hydration state', () => {
         reconcileStateFromLiveSignals: (tabId: string) => void;
       };
       getTabRuntimeState: () => Record<string, unknown>;
-      sessionTodoStateService: {
+      sessionTodoCoordinator: {
         reconcileStaleSessionTodoState: (tabId: string) => void;
       };
       backgroundTaskNoticeStateService: {
@@ -48,7 +48,7 @@ describe('OpenCodianView background task hydration state', () => {
 
     jest.spyOn(view, 'getTabRuntimeState').mockReturnValue(runtime);
     const reconcileSpy = jest.spyOn(
-      view.sessionTodoStateService,
+      view.sessionTodoCoordinator,
       'reconcileStaleSessionTodoState',
     ).mockImplementation(() => {});
     const syncSpy = jest.spyOn(view, 'syncTabStreamLikeState').mockImplementation(() => {});

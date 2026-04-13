@@ -11,7 +11,7 @@
 - 继续把 question resolve 之后的 status refresh / conversation sync follow-up 作为单独的 `QuestionPostResolutionRuntimeFacadeHost` 注入，避免通用 view host 背负这组后处理端口
 - 顺序装配 inline card、inline action source、resolved-question runtime、dock render-state/action facades、execution facade、post-resolution runtime、加厚后的 `QuestionDockCoordinator` 与 `QuestionResolutionFlowCoordinator`
 
-当前这份 `QuestionRuntimeViewHost` 通常先由 `QuestionRuntimeViewHostFactory` + `QuestionRuntimeViewHostAdapter` 两层准备：factory 从 view 收口 late-bound 的 question 相邻端口，adapter 再把 dock/settings/API/tab-attention 组合成稳定 host；question resolve 后的 status refresh / sync follow-up 继续由独立的 `QuestionPostResolutionRuntimeHostAdapter` 复用已有 `SessionTodoStatusRefreshService` 与 `ConversationSyncBridge` 稳定 port。
+当前这份 `QuestionRuntimeViewHost` 通常先由 `QuestionRuntimeViewHostFactory` + `QuestionRuntimeViewHostAdapter` 两层准备：factory 从 view 收口 late-bound 的 question 相邻端口，adapter 再把 dock/settings/API/tab-attention 组合成稳定 host；question resolve 后的 status refresh / sync follow-up 继续由独立的 `QuestionPostResolutionRuntimeHostAdapter` 复用已有 `SessionTodoCoordinator` 与 `ConversationSyncBridge` 稳定 port。
 
 它不负责 question request 的服务端数据获取、resolved card DOM 内容拼装、question dock 的真正 DOM 渲染，或 pending-question lifecycle 规则本身；这些仍分别留给 `OpenCodeService`、`QuestionResolutionCardRenderer`、`QuestionDock` 与 `QuestionDockCoordinator`。
 

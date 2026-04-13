@@ -26,7 +26,7 @@ export function createQuestionPostResolutionRuntimeHostAdapter(
 ## 关键行为
 
 - 透传 active tab、tab runtime state 与 tab session id，供 `QuestionPostResolutionRuntimeFacade` 判断 follow-up 是否继续执行
-- 复用 `SessionTodoStatusRefreshService.refreshTabSessionStatus()` 作为 question resolve 之后的状态刷新端口
+- 复用 `SessionTodoCoordinator.refreshTabSessionStatus()` 作为 question resolve 之后的状态刷新端口
 - 复用 `ConversationSyncBridge.startConversationSyncLoop()` / `syncVisibleConversationInBackground()` 作为 question resolve 之后的 sync follow-up 端口
 - 让 `OpenCodianView` 在 question runtime 装配时显式区分“通用 question host”和“post-resolution follow-up host”，减少单一 host 的职责堆叠
 

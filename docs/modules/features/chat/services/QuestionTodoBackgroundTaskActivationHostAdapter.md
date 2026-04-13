@@ -7,7 +7,7 @@
 
 `QuestionTodoBackgroundTaskActivationHostAdapter` 把 question / todo / background-task activation host factory 与 coordinator bundle 装配集中到一个模块，专门负责：
 
-- 从更窄的 `QuestionTodoBackgroundTaskActivationViewHostAdapterHost` 加上 late-bound 的 dock coordinator ports 组合出完整 activation view host
+- 从更窄的 `QuestionTodoBackgroundTaskActivationViewHostAdapterHost` 加上 late-bound 的 question dock port 与 `SessionTodoCoordinator.updateForTab()` 组合出完整 activation view host
 - 从单一 activation view host 派生 `QuestionTodoActivationRefreshCoordinator` 与 `BackgroundTaskActivationIndicatorCoordinator` 需要的两组 host 回调
 - 让 question/todo dock refresh 与 background-task indicator reset/sync/render 共用同一份 activation-side view bridge，而不是继续散落在 `OpenCodianView` 的两个独立 host factory 中
 

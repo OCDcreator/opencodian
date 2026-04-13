@@ -26,8 +26,7 @@ import type {
   QuestionTodoStatusRefreshCoordinator,
   QuestionTodoStatusRefreshRuntime,
 } from './QuestionTodoStatusRefreshCoordinator';
-import type { SessionTodoStateService } from './SessionTodoStateService';
-import type { SessionTodoStatusRefreshService } from './SessionTodoStatusRefreshService';
+import type { SessionTodoCoordinator } from './SessionTodoCoordinator';
 import {
   type VisibleConversationPostSyncStateCoordinator,
 } from './VisibleConversationPostSyncStateCoordinator';
@@ -39,10 +38,9 @@ type QuestionPendingRefreshPort = Pick<
   QuestionDockCoordinator,
   'refreshPendingQuestionsForTab'
 >;
-type SessionTodoStatePort = Pick<SessionTodoStateService, 'hasIncompleteTodos'>;
-type SessionTodoStatusRefreshPort = Pick<
-  SessionTodoStatusRefreshService,
-  'refreshTabSessionStatus' | 'refreshTabSessionTodos'
+type SessionTodoCoordinatorPort = Pick<
+  SessionTodoCoordinator,
+  'hasIncompleteTodos' | 'refreshTabSessionStatus' | 'refreshTabSessionTodos'
 >;
 type VisibleConversationPostSyncStatePort = Pick<
   VisibleConversationPostSyncStateCoordinator,
@@ -57,8 +55,7 @@ export interface QuestionTodoBackgroundTaskRefreshViewHostAdapterHost {
 export interface QuestionTodoBackgroundTaskRefreshViewHostAdapterDependencies {
   viewHost: QuestionTodoBackgroundTaskRefreshViewHostAdapterHost;
   getQuestionDockCoordinator(): QuestionPendingRefreshPort;
-  getSessionTodoStateService(): SessionTodoStatePort;
-  getSessionTodoStatusRefreshService(): SessionTodoStatusRefreshPort;
+  getSessionTodoCoordinator(): SessionTodoCoordinatorPort;
 }
 
 export interface QuestionTodoBackgroundTaskRefreshViewHost
@@ -72,7 +69,7 @@ export function createQuestionTodoBackgroundTaskRefreshViewHostAdapter(
     getTabRuntimeState: (tabId: TabId | null) =>
       dependencies.viewHost.getTabRuntimeState(tabId),
     hasIncompleteTodos: (todos: readonly SessionTodo[]) =>
-      dependencies.getSessionTodoStateService().hasIncompleteTodos(todos),
+      dependencies.getSessionTodoCoordinator().hasIncompleteTodos(todos),
     refreshPendingQuestionsForTab: (
       tabId: TabId | null,
       sessionId: string | null | undefined,
@@ -86,7 +83,7 @@ export function createQuestionTodoBackgroundTaskRefreshViewHostAdapter(
       options: { suppressErrors?: boolean },
     ) =>
       dependencies
-        .getSessionTodoStatusRefreshService()
+        .getSessionTodoCoordinator()
         .refreshTabSessionStatus(tabId, sessionId, options),
     refreshTabSessionTodos: (
       tabId: TabId | null,
@@ -94,7 +91,7 @@ export function createQuestionTodoBackgroundTaskRefreshViewHostAdapter(
       options: { suppressErrors?: boolean },
     ) =>
       dependencies
-        .getSessionTodoStatusRefreshService()
+        .getSessionTodoCoordinator()
         .refreshTabSessionTodos(tabId, sessionId, options),
   };
 }

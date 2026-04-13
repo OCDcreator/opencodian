@@ -3,13 +3,13 @@ import { createLogger } from '../../../shared';
 import type { TabId } from '../tabs';
 import type { BackgroundTaskNoticeStateService } from './BackgroundTaskNoticeStateService';
 import type { BackgroundTaskTimelineService } from './BackgroundTaskTimelineService';
-import type { SessionTodoStateService } from './SessionTodoStateService';
+import type { SessionTodoCoordinator } from './SessionTodoCoordinator';
 
 const logger = createLogger('BackgroundTaskLiveSignalCoordinator');
 const BACKGROUND_TASK_GRACE_PERIOD_MS = 15_000;
 
 type BackgroundTaskLiveSignalTodoPort = Pick<
-  SessionTodoStateService,
+  SessionTodoCoordinator,
   'hasIncompleteTabSessionTodos' | 'reconcileStaleSessionTodoState'
 >;
 type BackgroundTaskLiveSignalTimelinePort = Pick<BackgroundTaskTimelineService, 'getPendingLaunches'>;

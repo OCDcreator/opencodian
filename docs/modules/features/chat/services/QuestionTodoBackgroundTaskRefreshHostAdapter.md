@@ -7,7 +7,7 @@
 
 `QuestionTodoBackgroundTaskRefreshHostAdapter` 把 question / todo refresh 与 visible post-sync/activation host factory 集中到一个模块，专门负责：
 
-- 从更窄的 `QuestionTodoBackgroundTaskRefreshViewHostAdapterHost` 加上 late-bound question dock / session todo refresh ports 组合出完整 `QuestionTodoBackgroundTaskRefreshViewHost`
+- 从更窄的 `QuestionTodoBackgroundTaskRefreshViewHostAdapterHost` 加上 late-bound question dock / `SessionTodoCoordinator` ports 组合出完整 `QuestionTodoBackgroundTaskRefreshViewHost`
 - 从单一 `QuestionTodoBackgroundTaskRefreshViewHost` 派生 `QuestionTodoActivationRefreshBridge` 需要的 activation refresh host，并复用 `PostSyncQuestionTodoRefreshHostAdapter` 提供 visible/background question-todo refresh services
 - 让 activation-side supplemental refresh 与 visible conversation post-sync refresh 继续复用同一份 current-conversation/runtime bridge，同时把 background handoff host 装配下沉到 `BackgroundConversationPostSyncHandoffHostAdapter`，把 visible state writeback host 装配下沉到 `VisibleConversationPostSyncStateHostAdapter`
 - 在不改变既有 post-sync 语义的前提下，把这组三段 P2 wiring 从 `OpenCodianView` 构造函数与分散 host factory 中迁走
@@ -32,7 +32,7 @@ export function createQuestionTodoBackgroundTaskRefreshServices(...): QuestionTo
 
 ### shared host assembly
 
-- `createQuestionTodoBackgroundTaskRefreshViewHostAdapter()` 现在只把 view-local current conversation/runtime seam 与 question dock、session todo state/status refresh 这些 late-bound ports 组合成窄 refresh view host
+- `createQuestionTodoBackgroundTaskRefreshViewHostAdapter()` 现在只把 view-local current conversation/runtime seam 与 question dock、`SessionTodoCoordinator` 暴露的 incomplete/status/todo refresh 端口组合成窄 refresh view host
 - 这一层通常接收 `QuestionTodoBackgroundTaskRuntimeServiceBundle` 组装的 shared question/todo/background-task view host，但不再继续夹带 background-task completion / signal / attention writeback seam；这些 pass-through 已迁到 `BackgroundConversationPostSyncHandoffHostAdapter`
 - late-bound getter 让 adapter 仍可在构造期提前创建 post-sync service bundle，同时把 refresh-side依赖限制在 question/todo 相关 collaborator
 - `createQuestionTodoBackgroundTaskRefreshHosts()` 现在只从同一份 view host 派生 activation refresh host，避免 shared refresh bundle 继续承担 background handoff host factory

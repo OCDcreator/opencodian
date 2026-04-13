@@ -54,5 +54,5 @@ export class TabConversationStateBridge {
 
 - `OpenCodianView` 现在只保留 activation/render orchestration、本地消息区清理，以及 model/context usage/question dock 的 UI 刷新
 - `ConversationViewStateService` 现在通过 `TabConversationActivationBridge.applyLoadedConversationActivation()` 间接复用本 bridge，不再为 loaded-conversation state writeback 额外暴露一层 view host 回调
-- `SessionTodoRuntimeFacade` 负责承接本 bridge 的 todo/status reset 写回，因此 bridge 不再依赖 `OpenCodianView` 私有的 session todo helper
+- `SessionTodoCoordinator` 负责承接本 bridge 的 todo/status reset 写回，因此 bridge 不再依赖 `OpenCodianView` 私有的 session todo helper
 - 这条边界主轴仍推进 master plan 的 P1 `tab / pane / conversation activation` ownership，同时复用了本轮 P2 session todo runtime facade

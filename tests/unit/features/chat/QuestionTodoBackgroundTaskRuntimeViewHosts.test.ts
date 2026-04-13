@@ -21,17 +21,11 @@ type Mocked<T> = {
 type QuestionDockCoordinator = ReturnType<
   QuestionTodoBackgroundTaskRuntimeServiceBundleHost['getQuestionDockCoordinator']
 >;
-type SessionTodoStateService = ReturnType<
-  QuestionTodoBackgroundTaskRuntimeServiceBundleHost['getSessionTodoStateService']
->;
-type SessionTodoStatusRefreshService = ReturnType<
-  QuestionTodoBackgroundTaskRuntimeServiceBundleHost['getSessionTodoStatusRefreshService']
+type SessionTodoCoordinator = ReturnType<
+  QuestionTodoBackgroundTaskRuntimeServiceBundleHost['getSessionTodoCoordinator']
 >;
 type QuestionDockSlotCoordinator = ReturnType<
   QuestionTodoBackgroundTaskRuntimeServiceBundleHost['getQuestionDockSlotCoordinator']
->;
-type SessionTodoDockCoordinator = ReturnType<
-  QuestionTodoBackgroundTaskRuntimeServiceBundleHost['getSessionTodoDockCoordinator']
 >;
 type BackgroundTaskIndicatorCoordinator = ReturnType<
   QuestionTodoBackgroundTaskRuntimeServiceBundleHost['getBackgroundTaskIndicatorCoordinator']
@@ -74,32 +68,22 @@ function createQuestionDockCoordinator(): QuestionDockCoordinator {
   };
 }
 
-function createSessionTodoStateService(): SessionTodoStateService {
+function createSessionTodoCoordinator(): SessionTodoCoordinator {
   return {
     hasIncompleteTodos: jest.fn((todos: readonly SessionTodo[]) =>
       todos.some((todo) => todo.status !== 'completed'),
     ),
-  };
-}
-
-function createSessionTodoStatusRefreshService(): SessionTodoStatusRefreshService {
-  return {
     refreshTabSessionStatus: jest
       .fn()
       .mockResolvedValue({ status: 'idle' } as SessionActivityStatus),
     refreshTabSessionTodos: jest.fn().mockResolvedValue([] as SessionTodo[]),
+    updateForTab: jest.fn(),
   };
 }
 
 function createQuestionDockSlotCoordinator(): QuestionDockSlotCoordinator {
   return {
     render: jest.fn(),
-  };
-}
-
-function createSessionTodoDockCoordinator(): SessionTodoDockCoordinator {
-  return {
-    updateForTab: jest.fn(),
   };
 }
 
@@ -134,10 +118,8 @@ function createFixture() {
   let runtime = createRuntime();
   let conversationSyncRuntime = createConversationSyncRuntime();
   let questionDockCoordinator = createQuestionDockCoordinator();
-  let sessionTodoStateService = createSessionTodoStateService();
-  let sessionTodoStatusRefreshService = createSessionTodoStatusRefreshService();
+  let sessionTodoCoordinator = createSessionTodoCoordinator();
   let questionDockSlotCoordinator = createQuestionDockSlotCoordinator();
-  let sessionTodoDockCoordinator = createSessionTodoDockCoordinator();
   let backgroundTaskIndicatorCoordinator = createBackgroundTaskIndicatorCoordinator();
   let backgroundTaskLiveSignalCoordinator = createBackgroundTaskLiveSignalCoordinator();
   let tabRuntimeStateBridge = createTabRuntimeStateBridge();
@@ -149,10 +131,8 @@ function createFixture() {
     getTabRuntimeState: jest.fn((tabId: string | null) => (tabId ? runtime : null)),
     renderSessionTodoDock: jest.fn(),
     getQuestionDockCoordinator: jest.fn(() => questionDockCoordinator),
-    getSessionTodoStateService: jest.fn(() => sessionTodoStateService),
-    getSessionTodoStatusRefreshService: jest.fn(() => sessionTodoStatusRefreshService),
+    getSessionTodoCoordinator: jest.fn(() => sessionTodoCoordinator),
     getQuestionDockSlotCoordinator: jest.fn(() => questionDockSlotCoordinator),
-    getSessionTodoDockCoordinator: jest.fn(() => sessionTodoDockCoordinator),
     resetBackgroundTaskIndicator: jest.fn(),
     syncBackgroundTaskStateFromConversation: jest.fn(),
     renderBackgroundTaskIndicatorIfNeeded: jest.fn().mockResolvedValue(undefined),
@@ -175,17 +155,11 @@ function createFixture() {
     setQuestionDockCoordinator: (next: QuestionDockCoordinator) => {
       questionDockCoordinator = next;
     },
-    setSessionTodoStateService: (next: SessionTodoStateService) => {
-      sessionTodoStateService = next;
-    },
-    setSessionTodoStatusRefreshService: (next: SessionTodoStatusRefreshService) => {
-      sessionTodoStatusRefreshService = next;
+    setSessionTodoCoordinator: (next: SessionTodoCoordinator) => {
+      sessionTodoCoordinator = next;
     },
     setQuestionDockSlotCoordinator: (next: QuestionDockSlotCoordinator) => {
       questionDockSlotCoordinator = next;
-    },
-    setSessionTodoDockCoordinator: (next: SessionTodoDockCoordinator) => {
-      sessionTodoDockCoordinator = next;
     },
     setBackgroundTaskIndicatorCoordinator: (next: BackgroundTaskIndicatorCoordinator) => {
       backgroundTaskIndicatorCoordinator = next;
@@ -292,15 +266,15 @@ describe('QuestionTodoBackgroundTaskRuntimeViewHosts', () => {
       fixture.host.getQuestionDockCoordinator.mock.results[0].value.refreshPendingQuestionsForTab,
     ).toHaveBeenCalledWith('tab-active', 'session-question');
     expect(
-      fixture.host.getSessionTodoStateService.mock.results[0].value.hasIncompleteTodos,
+      fixture.host.getSessionTodoCoordinator.mock.results[0].value.hasIncompleteTodos,
     ).toHaveBeenCalledWith([
       { id: 'todo-1', content: 'Todo', status: 'pending' },
     ]);
     expect(
-      fixture.host.getSessionTodoStatusRefreshService.mock.results[0].value.refreshTabSessionStatus,
+      fixture.host.getSessionTodoCoordinator.mock.results[1].value.refreshTabSessionStatus,
     ).toHaveBeenCalledWith('tab-active', 'session-status', { suppressErrors: true });
     expect(
-      fixture.host.getSessionTodoStatusRefreshService.mock.results[1].value.refreshTabSessionTodos,
+      fixture.host.getSessionTodoCoordinator.mock.results[2].value.refreshTabSessionTodos,
     ).toHaveBeenCalledWith('tab-active', 'session-status', { suppressErrors: true });
     expect(fixture.host.syncBackgroundTaskStateFromConversation)
       .toHaveBeenNthCalledWith(1, conversation, 'tab-active');
@@ -321,7 +295,7 @@ describe('QuestionTodoBackgroundTaskRuntimeViewHosts', () => {
     ).toHaveBeenCalledWith('tab-active', true);
     expect(fixture.host.getQuestionDockSlotCoordinator.mock.results[0].value.render)
       .toHaveBeenCalledTimes(1);
-    expect(fixture.host.getSessionTodoDockCoordinator.mock.results[0].value.updateForTab)
+    expect(fixture.host.getSessionTodoCoordinator.mock.results[3].value.updateForTab)
       .toHaveBeenCalledWith('tab-active');
     expect(fixture.host.renderSessionTodoDock).toHaveBeenCalledWith('tab-active');
     expect(fixture.host.resetBackgroundTaskIndicator).toHaveBeenCalledTimes(1);
@@ -345,10 +319,8 @@ describe('QuestionTodoBackgroundTaskRuntimeViewHosts', () => {
     });
     const nextConversationSyncRuntime = createConversationSyncRuntime();
     const nextQuestionDockCoordinator = createQuestionDockCoordinator();
-    const nextSessionTodoStateService = createSessionTodoStateService();
-    const nextSessionTodoStatusRefreshService = createSessionTodoStatusRefreshService();
+    const nextSessionTodoCoordinator = createSessionTodoCoordinator();
     const nextQuestionDockSlotCoordinator = createQuestionDockSlotCoordinator();
-    const nextSessionTodoDockCoordinator = createSessionTodoDockCoordinator();
     const nextBackgroundTaskIndicatorCoordinator =
       createBackgroundTaskIndicatorCoordinator();
     const nextBackgroundTaskLiveSignalCoordinator =
@@ -359,10 +331,8 @@ describe('QuestionTodoBackgroundTaskRuntimeViewHosts', () => {
     fixture.setRuntime(nextRuntime);
     fixture.setConversationSyncRuntime(nextConversationSyncRuntime);
     fixture.setQuestionDockCoordinator(nextQuestionDockCoordinator);
-    fixture.setSessionTodoStateService(nextSessionTodoStateService);
-    fixture.setSessionTodoStatusRefreshService(nextSessionTodoStatusRefreshService);
+    fixture.setSessionTodoCoordinator(nextSessionTodoCoordinator);
     fixture.setQuestionDockSlotCoordinator(nextQuestionDockSlotCoordinator);
-    fixture.setSessionTodoDockCoordinator(nextSessionTodoDockCoordinator);
     fixture.setBackgroundTaskIndicatorCoordinator(nextBackgroundTaskIndicatorCoordinator);
     fixture.setBackgroundTaskLiveSignalCoordinator(nextBackgroundTaskLiveSignalCoordinator);
     fixture.setTabRuntimeStateBridge(nextTabRuntimeStateBridge);
@@ -404,8 +374,8 @@ describe('QuestionTodoBackgroundTaskRuntimeViewHosts', () => {
       .toHaveBeenCalledWith('tab-next', 'fingerprint-late');
     expect(nextQuestionDockCoordinator.refreshPendingQuestionsForTab)
       .toHaveBeenCalledWith('tab-next', 'session-question-next');
-    expect(fixture.host.getSessionTodoStateService).toHaveBeenCalledTimes(1);
-    expect(nextSessionTodoStatusRefreshService.refreshTabSessionTodos)
+    expect(fixture.host.getSessionTodoCoordinator).toHaveBeenCalledTimes(2);
+    expect(nextSessionTodoCoordinator.refreshTabSessionTodos)
       .toHaveBeenCalledWith('tab-next', 'session-next', { suppressErrors: true });
     expect(nextQuestionDockSlotCoordinator.render).toHaveBeenCalledTimes(1);
     expect(nextBackgroundTaskLiveSignalCoordinator.markAuthoritativeSync)

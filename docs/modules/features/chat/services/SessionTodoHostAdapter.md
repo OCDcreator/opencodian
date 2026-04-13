@@ -5,13 +5,13 @@
 
 ## 概述
 
-`SessionTodoHostAdapter` 把 `OpenCodianView` 里原本分散的 session todo host factory 与 service wiring 收束到一个模块，专门负责：
+`SessionTodoHostAdapter` 现在只负责把 `OpenCodianView` 暴露的一份 `SessionTodoViewHost` 收束成单一 `SessionTodoCoordinator` 的构造入口。它专门负责：
 
-- 从单一 `SessionTodoViewHost` 派生 `SessionTodoStateService`、`SessionTodoDockCoordinator`、`SessionTodoStatusRefreshService` 与 `SessionTodoRuntimeFacade` 需要的 host 回调
-- 让 dock render、todo/status state 写回、主动 refresh，以及 stream/live-signal/session-reset 入口复用同一套 session todo bridge
-- 把 session todo service bundle 的装配从主视图构造函数迁走，而不改变既有行为
+- 复用统一的 `SessionTodoViewHost` 作为 `SessionTodoCoordinator` 的稳定 host 形状
+- 把 session todo coordinator 的装配从主视图构造函数迁走，而不再让 view 自己拼接 refresh/runtime/dock 三段 wiring
+- 保持 view 侧只感知一个 session todo owner
 
-它不重新定义 todo/status 规则，也不拥有任何新的运行时状态；真正的状态机、dock UI 选择和 refresh 语义仍分别留在现有 session todo 模块里。
+它不重新定义 todo/status 规则，也不拥有新的运行时状态；真正的状态机与 dock/render 语义已分别留在 `SessionTodoCoordinator`、`SessionTodoStateService` 与 `SessionTodoDockCoordinator`。
 
 ## 公开接口
 
@@ -29,32 +29,17 @@ export interface SessionTodoViewHost {
   reconcileBackgroundTaskLiveSignals(tabId: TabId | null): void;
 }
 
-export interface SessionTodoServices {
-  dockCoordinator: SessionTodoDockCoordinator;
-  stateService: SessionTodoStateService;
-  statusRefreshService: SessionTodoStatusRefreshService;
-  runtimeFacade: SessionTodoRuntimeFacade;
-}
-
-export function createSessionTodoServices(host: SessionTodoViewHost): SessionTodoServices;
+export function createSessionTodoCoordinator(host: SessionTodoViewHost): SessionTodoCoordinator;
 ```
 
 ## 关键行为
 
-### shared host assembly
-
-- `createSessionTodoServices()` 只接收一份 `SessionTodoViewHost`，再派生出 state / dock / refresh / runtime-facade 四条链路需要的 host 形状
-- `SessionTodoDockCoordinator` 读取的 todo snapshot 与 `SessionTodoStatusRefreshService` 的 todo/status 写回，都会统一复用 `SessionTodoRuntimeFacade`
-- `SessionTodoRuntimeFacade` 会继续回落到同一份 `SessionTodoStateService`，让 stream/live-signal/session-reset 入口不再各自重写默认 session 选择
-
-### shared service bundle
-
-- 返回值里的四个 session todo 协作对象仍保持各自原来的边界，但它们的 wiring 不再散落在 `OpenCodianView`
-- `reconcileBackgroundTaskLiveSignals()` 仍保持 refresh 成功后的既有顺序，只是由 adapter 统一转发
-- 这层不会吞掉 view 的 session 选择逻辑：`getSessionIdForTab()`、`getConversationForTab()` 仍由上游 host 提供
+- `createSessionTodoCoordinator()` 只接收一份 `SessionTodoViewHost`，并把这组 host 直接交给更厚的 `SessionTodoCoordinator`
+- `reconcileBackgroundTaskLiveSignals()`、`getSessionIdForTab()` 与 `getConversationForTab()` 等 view-level seam 仍由上游 host 提供；adapter 不新增业务逻辑
+- 这层的收益是让 session todo 相关模块的装配收束到一个入口，而不是让 `OpenCodianView` 自己维护多个相邻 service/facade
 
 ## 与 `OpenCodianView` 的边界
 
-- `OpenCodianView` 现在只需要提供一份 `SessionTodoViewHost`，并持有 `createSessionTodoServices()` 返回的 bundle
-- `SessionTodoStateService`、`SessionTodoDockCoordinator`、`SessionTodoStatusRefreshService` 与 `SessionTodoRuntimeFacade` 的业务职责保持分离
-- 这次切片推进的是 master plan 的 P2 `question / todo / background task` lane：把剩余的 session todo host-bridge wiring 与 runtime trigger 入口一起从 `OpenCodianView` 迁到 dedicated adapter/facade
+- `OpenCodianView` 现在只需要提供一份 `SessionTodoViewHost`，并持有 `createSessionTodoCoordinator()` 返回的单一 owner
+- `SessionTodoStateService` 与 `SessionTodoDockCoordinator` 继续保持自己的底层职责，但 view 不再分别持有它们
+- 这次切片推进的是 master plan 的 P2 `question / todo / background task` lane：把剩余的 session todo host-bridge wiring 与 runtime trigger 入口一起从 `OpenCodianView` 收束到单一 coordinator

@@ -306,8 +306,8 @@ import {
   scrollElementToBottom,
 } from './services/ScrollManager';
 import {
-  createSessionTodoServices,
-  type SessionTodoServices,
+  createSessionTodoCoordinator,
+  type SessionTodoCoordinator,
   type SessionTodoViewHost,
 } from './services/SessionTodoHostAdapter';
 import {
@@ -740,7 +740,7 @@ export class OpenCodianView extends ItemView {
   private themeBackgroundRequestId = 0;
   private titleGenerationService: TitleGenerationService;
   private persistentAssistantNoticeService: PersistentAssistantNoticeService;
-  private sessionTodoServices: SessionTodoServices;
+  private sessionTodoCoordinator: SessionTodoCoordinator;
   private questionDockSlotCoordinator: QuestionDockSlotCoordinator;
   private activeTabContextUsageCoordinator: ActiveTabContextUsageCoordinator;
   private backgroundTaskTimelineService: BackgroundTaskTimelineService;
@@ -789,22 +789,6 @@ export class OpenCodianView extends ItemView {
     return (this.app as typeof this.app & {
       setting: { open: () => void; openTabById: (id: string) => void };
     }).setting;
-  }
-
-  private get sessionTodoDockCoordinator(): SessionTodoServices['dockCoordinator'] {
-    return this.sessionTodoServices.dockCoordinator;
-  }
-
-  private get sessionTodoStateService(): SessionTodoServices['stateService'] {
-    return this.sessionTodoServices.stateService;
-  }
-
-  private get sessionTodoStatusRefreshService(): SessionTodoServices['statusRefreshService'] {
-    return this.sessionTodoServices.statusRefreshService;
-  }
-
-  private get sessionTodoRuntimeFacade(): SessionTodoServices['runtimeFacade'] {
-    return this.sessionTodoServices.runtimeFacade;
   }
 
   private get questionDockCoordinator(): QuestionRuntimeServices['dockCoordinator'] {
@@ -1044,7 +1028,7 @@ export class OpenCodianView extends ItemView {
   }
 
   private renderSessionTodoDock(tabId: TabId | null = this.getActiveTabId()): void {
-    this.sessionTodoDockCoordinator.render(tabId);
+    this.sessionTodoCoordinator.render(tabId);
   }
 
   private beginConversationHydration(tabId: TabId | null = this.getActiveTabId()): void {
@@ -1122,7 +1106,7 @@ export class OpenCodianView extends ItemView {
     this.persistentAssistantNoticeService = new PersistentAssistantNoticeService(
       this.createPersistentAssistantNoticeServiceHost(),
     );
-    this.sessionTodoServices = createSessionTodoServices(this.createSessionTodoViewHost());
+    this.sessionTodoCoordinator = createSessionTodoCoordinator(this.createSessionTodoViewHost());
     this.questionDockSlotCoordinator = new QuestionDockSlotCoordinator(
       {
         shouldUseAboveInputQuestionDock: () => this.plugin.settings.questionCardPosition === 'above_input',
@@ -1149,7 +1133,7 @@ export class OpenCodianView extends ItemView {
       this.createBackgroundTaskTimelineServiceHost(),
     );
     this.backgroundTaskLiveSignalCoordinator = new BackgroundTaskLiveSignalCoordinator(
-      this.sessionTodoStateService,
+      this.sessionTodoCoordinator,
       this.backgroundTaskTimelineService,
       this.backgroundTaskNoticeStateService,
       createBackgroundTaskLiveSignalCoordinatorHost(
@@ -1304,7 +1288,7 @@ export class OpenCodianView extends ItemView {
       createQuestionPostResolutionRuntimeHostAdapter({
         viewHost: questionRuntimeViewHostFactoryHost,
         conversationSync: this.conversationSyncBridgePorts.getVisibleSyncFollowUp(),
-        statusRefresh: this.sessionTodoStatusRefreshService,
+        statusRefresh: this.sessionTodoCoordinator,
       }),
       this.streamingInlineCardRenderer,
     );
@@ -1406,10 +1390,8 @@ export class OpenCodianView extends ItemView {
         this.renderSessionTodoDock(tabId);
       },
       getQuestionDockCoordinator: () => this.questionDockCoordinator,
-      getSessionTodoStateService: () => this.sessionTodoStateService,
-      getSessionTodoStatusRefreshService: () => this.sessionTodoStatusRefreshService,
+      getSessionTodoCoordinator: () => this.sessionTodoCoordinator,
       getQuestionDockSlotCoordinator: () => this.questionDockSlotCoordinator,
-      getSessionTodoDockCoordinator: () => this.sessionTodoDockCoordinator,
       resetBackgroundTaskIndicator: () => {
         this.resetBackgroundTaskIndicator();
       },
@@ -1464,10 +1446,10 @@ export class OpenCodianView extends ItemView {
         this.questionDockCoordinator.clearPendingQuestionsForTab(tabId);
       },
       resetTabSessionState: (tabId, sessionId) => {
-        this.sessionTodoRuntimeFacade.resetTabSessionState(tabId, sessionId);
+        this.sessionTodoCoordinator.resetTabSessionState(tabId, sessionId);
       },
       clearTabSessionState: (tabId) => {
-        this.sessionTodoRuntimeFacade.clearTabSessionState(tabId);
+        this.sessionTodoCoordinator.clearTabSessionState(tabId);
       },
       resetBackgroundTaskSuppressedFingerprint: (tabId) => {
         const runtime = this.getTabRuntimeState(tabId);
@@ -1527,7 +1509,7 @@ export class OpenCodianView extends ItemView {
       getTabRuntimeState: (tabId: TabId | null) => this.getTabRuntimeState(tabId),
       getSessionIdForTab: (tabId: TabId | null) => this.getSessionIdForTab(tabId),
       getTabSessionStatus: (tabId, sessionId) =>
-        this.sessionTodoRuntimeFacade.getTabSessionStatus(tabId, sessionId),
+        this.sessionTodoCoordinator.getTabSessionStatus(tabId, sessionId),
       syncTabStreamLikeState: (tabId) => {
         this.syncTabStreamLikeState(tabId);
       },
@@ -1580,11 +1562,11 @@ export class OpenCodianView extends ItemView {
       getActiveTabId: () => this.getActiveTabId(),
       getTabRuntimeState: (tabId: TabId | null) => this.getTabRuntimeState(tabId),
       applyStreamingTodoSnapshotFromTool: (toolCall, tabId) => {
-        this.sessionTodoRuntimeFacade.applyStreamingTodoSnapshotFromTool(toolCall, tabId);
+        this.sessionTodoCoordinator.applyStreamingTodoSnapshotFromTool(toolCall, tabId);
       },
       getSessionIdForTab: (tabId: TabId | null) => this.getSessionIdForTab(tabId),
       refreshTabSessionTodos: (tabId, sessionId, options) =>
-        this.sessionTodoStatusRefreshService.refreshTabSessionTodos(tabId, sessionId, options),
+        this.sessionTodoCoordinator.refreshTabSessionTodos(tabId, sessionId, options),
       resetBackgroundTaskIndicator: (tabId) => {
         this.resetBackgroundTaskIndicator(tabId);
       },
@@ -1676,9 +1658,9 @@ export class OpenCodianView extends ItemView {
       subscribeToSessionStatusUpdates: (listener) =>
         this.plugin.openCodeService.subscribeToSessionStatusUpdates(listener),
       applySessionTodoUpdate: (tabId, sessionId, todos) =>
-        this.sessionTodoRuntimeFacade.applySessionTodoUpdate(tabId, sessionId, todos),
+        this.sessionTodoCoordinator.applySessionTodoUpdate(tabId, sessionId, todos),
       applySessionStatusUpdate: (tabId, sessionId, status) =>
-        this.sessionTodoRuntimeFacade.applySessionStatusUpdate(tabId, sessionId, status),
+        this.sessionTodoCoordinator.applySessionStatusUpdate(tabId, sessionId, status),
       getAllTabs: () => this.tabManager?.getAllTabs() ?? [],
       getConversations: () => this.plugin.getConversations(),
       getCurrentConversation: () => this.currentConversation,
@@ -1880,7 +1862,7 @@ export class OpenCodianView extends ItemView {
       appendTurnDiffNoticeIfNeeded: (conversation, editedFiles, tabId) =>
         this.appendTurnDiffNoticeIfNeeded(conversation, editedFiles, tabId),
       refreshTabSessionTodos: (tabId, sessionId, options) =>
-        this.sessionTodoStatusRefreshService.refreshTabSessionTodos(tabId, sessionId, options),
+        this.sessionTodoCoordinator.refreshTabSessionTodos(tabId, sessionId, options),
       saveConversation: (conversation) => this.plugin.saveConversation(conversation),
       setConversationSyncInFlight: (tabId, value) => {
         const runtime = this.getTabRuntimeState(tabId);
@@ -2192,7 +2174,7 @@ export class OpenCodianView extends ItemView {
     this.sendBtn = null;
     this.inputTextarea = null;
     this.questionDockSlotCoordinator.destroy();
-    this.sessionTodoDockCoordinator.destroy();
+    this.sessionTodoCoordinator.destroy();
     this.conversationSessionSignalRuntime.stop();
     this.tabManager = null;
 
@@ -2570,7 +2552,7 @@ export class OpenCodianView extends ItemView {
       return true;
     }
 
-    const status = this.sessionTodoRuntimeFacade.getTabSessionStatus(
+    const status = this.sessionTodoCoordinator.getTabSessionStatus(
       tabId,
       this.getSessionIdForTab(tabId),
     );
@@ -3149,7 +3131,7 @@ export class OpenCodianView extends ItemView {
   /** Build input area */
   private buildInputArea(container: HTMLElement) {
     this.inputTabBarSlotEl = container.createDiv({ cls: 'opencodian-tab-bar-slot opencodian-tab-bar-slot--input' });
-    this.sessionTodoDockCoordinator.attach(container);
+    this.sessionTodoCoordinator.attach(container);
 
     this.questionDockSlotCoordinator.attach(container);
 

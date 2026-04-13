@@ -5,7 +5,7 @@ import type {
   SessionTodo,
 } from '../../../../src/core/types';
 import {
-  createSessionTodoServices,
+  createSessionTodoCoordinator,
   type SessionTodoRuntimeState,
   type SessionTodoViewHost,
 } from '../../../../src/features/chat/services/SessionTodoHostAdapter';
@@ -89,11 +89,11 @@ describe('SessionTodoHostAdapter', () => {
 
   it('routes active-tab todo state writes through the dock coordinator render bridge', () => {
     const { host } = createHost();
-    const services = createSessionTodoServices(host);
-    const renderSpy = jest.spyOn(services.dockCoordinator, 'render').mockImplementation(() => {});
+    const coordinator = createSessionTodoCoordinator(host);
+    const renderSpy = jest.spyOn(coordinator, 'render').mockImplementation(() => {});
     const todos: SessionTodo[] = [{ content: 'Investigate runtime wiring', status: 'in_progress' }];
 
-    services.stateService.setTabSessionTodos('tab-1', todos, 'session-1');
+    coordinator.applySessionTodoUpdate('tab-1', 'session-1', todos);
 
     expect(renderSpy).toHaveBeenCalledWith('tab-1');
   });
@@ -106,11 +106,11 @@ describe('SessionTodoHostAdapter', () => {
         'tab-1': runtime,
       },
     });
-    const services = createSessionTodoServices(host);
+    const coordinator = createSessionTodoCoordinator(host);
     const todos: SessionTodo[] = [{ id: 'todo-1', content: 'Refresh snapshot', status: 'pending' }];
     host.getSessionTodos.mockResolvedValue(todos);
 
-    const result = await services.statusRefreshService.refreshTabSessionTodos(
+    const result = await coordinator.refreshTabSessionTodos(
       'tab-1',
       'session-1',
       { suppressErrors: true },

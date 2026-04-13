@@ -75,20 +75,20 @@ describe('QuestionTodoBackgroundTaskActivationHostAdapter', () => {
     let questionDockSlotCoordinator!: {
       render: jest.Mock<void, []>;
     };
-    let sessionTodoDockCoordinator!: {
+    let sessionTodoCoordinator!: {
       updateForTab: jest.Mock<void, [string]>;
     };
 
     const adaptedViewHost = createQuestionTodoBackgroundTaskActivationViewHostAdapter({
       viewHost,
       getQuestionDockSlotCoordinator: () => questionDockSlotCoordinator,
-      getSessionTodoDockCoordinator: () => sessionTodoDockCoordinator,
+      getSessionTodoCoordinator: () => sessionTodoCoordinator,
     });
 
     questionDockSlotCoordinator = {
       render: jest.fn(),
     };
-    sessionTodoDockCoordinator = {
+    sessionTodoCoordinator = {
       updateForTab: jest.fn(),
     };
 
@@ -103,7 +103,7 @@ describe('QuestionTodoBackgroundTaskActivationHostAdapter', () => {
     await adaptedViewHost.renderBackgroundTaskIndicatorIfNeeded('tab-1');
 
     expect(questionDockSlotCoordinator.render).toHaveBeenCalledTimes(1);
-    expect(sessionTodoDockCoordinator.updateForTab).toHaveBeenCalledWith('tab-1');
+    expect(sessionTodoCoordinator.updateForTab).toHaveBeenCalledWith('tab-1');
     expect(viewHost.renderSessionTodoDock).toHaveBeenCalledWith('tab-1');
     expect(viewHost.resetBackgroundTaskIndicator).toHaveBeenCalledTimes(1);
     expect(viewHost.syncBackgroundTaskStateFromConversation).toHaveBeenCalledWith(

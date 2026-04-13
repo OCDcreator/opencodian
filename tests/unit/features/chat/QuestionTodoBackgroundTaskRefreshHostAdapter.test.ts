@@ -145,10 +145,8 @@ describe('QuestionTodoBackgroundTaskRefreshHostAdapter', () => {
     let questionDockCoordinator!: {
       refreshPendingQuestionsForTab: jest.Mock<Promise<QuestionRequest[]>, [string | null, string | null | undefined]>;
     };
-    let sessionTodoStateService!: {
+    let sessionTodoCoordinator!: {
       hasIncompleteTodos: jest.Mock<boolean, [readonly SessionTodo[]]>;
-    };
-    let sessionTodoStatusRefreshService!: {
       refreshTabSessionStatus: jest.Mock<
         Promise<SessionActivityStatus | null>,
         [string | null, string | null | undefined, { suppressErrors?: boolean }]
@@ -162,19 +160,16 @@ describe('QuestionTodoBackgroundTaskRefreshHostAdapter', () => {
     const adaptedViewHost = createQuestionTodoBackgroundTaskRefreshViewHostAdapter({
       viewHost,
       getQuestionDockCoordinator: () => questionDockCoordinator,
-      getSessionTodoStateService: () => sessionTodoStateService,
-      getSessionTodoStatusRefreshService: () => sessionTodoStatusRefreshService,
+      getSessionTodoCoordinator: () => sessionTodoCoordinator,
     });
 
     questionDockCoordinator = {
       refreshPendingQuestionsForTab: jest.fn().mockResolvedValue([] as QuestionRequest[]),
     };
-    sessionTodoStateService = {
+    sessionTodoCoordinator = {
       hasIncompleteTodos: jest.fn().mockImplementation((todos: readonly SessionTodo[]) =>
         todos.some((todo) => todo.status !== 'completed'),
       ),
-    };
-    sessionTodoStatusRefreshService = {
       refreshTabSessionStatus: jest
         .fn()
         .mockResolvedValue({ type: 'idle' } as SessionActivityStatus),
@@ -205,15 +200,15 @@ describe('QuestionTodoBackgroundTaskRefreshHostAdapter', () => {
       'tab-active',
       'session-question',
     );
-    expect(sessionTodoStateService.hasIncompleteTodos).toHaveBeenCalledWith([
+    expect(sessionTodoCoordinator.hasIncompleteTodos).toHaveBeenCalledWith([
       { id: 'todo-1', content: 'Answer', status: 'pending' },
     ]);
-    expect(sessionTodoStatusRefreshService.refreshTabSessionStatus).toHaveBeenCalledWith(
+    expect(sessionTodoCoordinator.refreshTabSessionStatus).toHaveBeenCalledWith(
       'tab-active',
       'session-status',
       { suppressErrors: true },
     );
-    expect(sessionTodoStatusRefreshService.refreshTabSessionTodos).toHaveBeenCalledWith(
+    expect(sessionTodoCoordinator.refreshTabSessionTodos).toHaveBeenCalledWith(
       'tab-active',
       'session-status',
       { suppressErrors: true },

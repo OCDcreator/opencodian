@@ -10,10 +10,10 @@ import {
   QuestionTodoActivationRefreshCoordinator,
   type QuestionTodoActivationRefreshCoordinatorHost,
 } from './QuestionTodoActivationRefreshCoordinator';
-import type { SessionTodoDockCoordinator } from './SessionTodoDockCoordinator';
+import type { SessionTodoCoordinator } from './SessionTodoCoordinator';
 
 type QuestionDockRenderPort = Pick<QuestionDockSlotCoordinator, 'render'>;
-type SessionTodoDockPort = Pick<SessionTodoDockCoordinator, 'updateForTab'>;
+type SessionTodoDockPort = Pick<SessionTodoCoordinator, 'updateForTab'>;
 type QuestionTodoActivationRefreshPort = Pick<
   QuestionTodoActivationRefreshBridge,
   'refreshAfterActivation'
@@ -30,7 +30,7 @@ export interface QuestionTodoBackgroundTaskActivationViewHostAdapterHost {
 export interface QuestionTodoBackgroundTaskActivationViewHostAdapterDependencies {
   viewHost: QuestionTodoBackgroundTaskActivationViewHostAdapterHost;
   getQuestionDockSlotCoordinator(): QuestionDockRenderPort;
-  getSessionTodoDockCoordinator(): SessionTodoDockPort;
+  getSessionTodoCoordinator(): SessionTodoDockPort;
 }
 
 export interface QuestionTodoBackgroundTaskActivationViewHost {
@@ -52,7 +52,7 @@ export function createQuestionTodoBackgroundTaskActivationViewHostAdapter(
       dependencies.getQuestionDockSlotCoordinator().render();
     },
     updateSessionTodoDockForTab: (tabId: TabId) => {
-      dependencies.getSessionTodoDockCoordinator().updateForTab(tabId);
+      dependencies.getSessionTodoCoordinator().updateForTab(tabId);
     },
     renderSessionTodoDock: (tabId: TabId | null) => {
       dependencies.viewHost.renderSessionTodoDock(tabId);

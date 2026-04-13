@@ -27,10 +27,8 @@ export interface QuestionTodoBackgroundTaskRuntimeServiceBundleHost {
   getTabRuntimeState(tabId: TabId | null): QuestionTodoStatusRefreshRuntime | null;
   renderSessionTodoDock(tabId: TabId | null): void;
   getQuestionDockCoordinator(): QuestionDockCoordinatorPort;
-  getSessionTodoStateService(): SessionTodoStateServicePort;
-  getSessionTodoStatusRefreshService(): SessionTodoStatusRefreshServicePort;
+  getSessionTodoCoordinator(): SessionTodoCoordinatorPort;
   getQuestionDockSlotCoordinator(): QuestionDockSlotCoordinatorPort;
-  getSessionTodoDockCoordinator(): SessionTodoDockCoordinatorPort;
   resetBackgroundTaskIndicator(): void;
   syncBackgroundTaskStateFromConversation(...): void;
   renderBackgroundTaskIndicatorIfNeeded(tabId?: TabId | null): Promise<void>;
@@ -57,7 +55,7 @@ export function createQuestionTodoBackgroundTaskRuntimeServiceBundle(
 
 ## 关键行为
 
-- `createQuestionTodoBackgroundTaskRuntimeViewHosts()` 直接从扁平 runtime seam 组装 visible-state、refresh、background handoff、activation 共用的 host
+- `createQuestionTodoBackgroundTaskRuntimeViewHosts()` 直接从扁平 runtime seam 组装 visible-state、refresh、background handoff、activation 共用的 host，并让 refresh/activation 共享同一份 session todo coordinator port
 - `createQuestionTodoBackgroundTaskRuntimeServiceBundle()` 复用这份 shared host，再创建 visible-state services、refresh services、activation services，保留原有依赖顺序
 - `VisibleConversationPostSyncStateCoordinator` 与 `QuestionTodoActivationRefreshBridge` 继续作为 bundle 内部依赖存在，不再由 `OpenCodianView` 直接持有
 - 返回值只暴露 visible/background post-sync 与 activation 两侧真正需要的 coordinator，缩小 view 构造函数对中间 wiring 细节的感知面

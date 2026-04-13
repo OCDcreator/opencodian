@@ -9,7 +9,7 @@
 
 - 在 streaming activation、loaded-conversation post-render、current-tab open 后并行启动 status、pending-question、todo 三条 lazy refresh
 - 让 `QuestionTodoActivationRefreshCoordinator` 只负责 dock writeback 顺序，不再依赖同时承接 post-sync 规则的 coordinator
-- 复用 `SessionTodoStatusRefreshService` 与 `QuestionDockCoordinator` 的既有刷新入口，而不是在 activation bridge host 上重新暴露三组 callback
+- 复用 `SessionTodoCoordinator` 与 `QuestionDockCoordinator` 的既有刷新入口，而不是在 activation bridge host 上重新暴露三组 callback
 
 它不负责 activation preflight、question/todo dock render、post-sync runtime gate、background-task rebuild 或 completion notice flush；这些职责仍分别留给 `QuestionTodoActivationRefreshCoordinator`、`QuestionTodoStatusRefreshCoordinator` 与 post-sync 相关 coordinator/facade。
 
