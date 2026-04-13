@@ -8,6 +8,7 @@
 `BackgroundTaskTimelineService` 把 `OpenCodianView` 里仍然成块耦合的 background-task timeline/runtime ownership 收束成一个 dedicated service，专门负责：
 
 - 从 search-mode user injection、`toolName === 'task'` 的 tool block，以及 system reminder 组装 segment timeline
+- 在 indicator reset / conversation reload 之前统一清空 active anchor、launch/completion、waiting-for-follow-up 等 runtime state
 - 维护 launch/completion 的 pending matching、completion event 收集与 display copy 组装
 - 把 conversation 历史重建回 tab runtime 的 active anchor / launch / completion / waiting-for-follow-up 状态
 - 为 inline panel 渲染和 completion notice queue 提供统一的 segment 视图
@@ -22,6 +23,7 @@ export interface BackgroundTaskTimelineServiceHost {
   getTabRuntimeState(tabId: TabId | null): BackgroundTaskTimelineRuntime | null;
   getActiveTabId(): TabId | null;
   getMessageAnchorKey(message: ChatMessage): string;
+  clearInlinePanel(tabId: TabId | null): void;
   armAuthoritativeSyncGate(tabId: TabId | null): void;
   clearAuthoritativeSyncGate(tabId: TabId | null): void;
   syncTabStreamLikeState(tabId: TabId | null): void;
@@ -29,6 +31,7 @@ export interface BackgroundTaskTimelineServiceHost {
 }
 
 export class BackgroundTaskTimelineService {
+  resetIndicatorState(...): void;
   armIndicatorForUserMessage(...): void;
   upsertLaunch(...): void;
   collectSegments(...): BackgroundTaskSegment[];
@@ -43,6 +46,11 @@ export class BackgroundTaskTimelineService {
 ```
 
 ## 关键行为
+
+### indicator reset / runtime 清空
+
+- `resetIndicatorState()` 会统一清空 inline panel、active anchor、launch/completion map、waiting-for-follow-up 与 stale notice fingerprint，并在同一处复用 authoritative-sync gate 清理与 stream-like 状态回写
+- `syncStateFromConversation()` 也会复用同一条 runtime-reset 逻辑，只是不会提前清空 inline panel，这样 conversation reload / authoritative sync 的重建和主动 reset 共用一份 field-reset 规则
 
 ### timeline segment 推导
 
@@ -59,7 +67,7 @@ export class BackgroundTaskTimelineService {
 ## 与 `OpenCodianView` 的边界
 
 - `BackgroundTaskInlinePanelRenderer` 负责 inline panel 的真实 DOM 创建、位置挂载、Markdown 渲染与 mount 复用
-- `BackgroundTaskTimelineService` 负责 timeline 数据、runtime 重建、inline copy，以及 completion segment / diagnostics 快照
+- `BackgroundTaskTimelineService` 负责 timeline 数据、indicator reset/runtime 清空、conversation→runtime 重建、inline copy，以及 completion segment / diagnostics 快照
 - `BackgroundTaskIndicatorCoordinator` 负责 indicator render 场景和 post-sync 场景共用的 completion notice queue/flush 顺序
 - `BackgroundTaskLiveSignalCoordinator`、`BackgroundConversationPostSyncHandoffCoordinator`、`BackgroundTaskNoticeStateService` 和 `BackgroundTaskCompletionNoticeService` 继续分别负责 live-signal gate、hidden/background post-sync handoff、stale notice state、completion notice queue state
 - 这让 P2 `question / todo / background task` lane 继续把 background-task 的核心 runtime ownership 从 `OpenCodianView` 迁到可单测服务，而不是继续把 timeline 逻辑留在主视图里

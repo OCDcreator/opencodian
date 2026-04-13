@@ -1536,6 +1536,9 @@ export class OpenCodianView extends ItemView {
       getTabRuntimeState: (tabId: TabId | null) => this.getTabRuntimeState(tabId),
       getActiveTabId: () => this.getActiveTabId(),
       getMessageAnchorKey: (message) => this.getMessageAnchorKey(message),
+      clearInlinePanel: (tabId) => {
+        this.backgroundTaskInlinePanelRenderer.clear(tabId);
+      },
       armAuthoritativeSyncGate: (tabId) => {
         this.backgroundTaskLiveSignalCoordinator.armAuthoritativeSyncGate(tabId);
       },
@@ -5238,21 +5241,7 @@ export class OpenCodianView extends ItemView {
   }
 
   private resetBackgroundTaskIndicator(tabId: TabId | null = this.getActiveTabId()): void {
-    const runtime = this.getTabRuntimeState(tabId);
-    if (!runtime) {
-      return;
-    }
-
-    this.backgroundTaskInlinePanelRenderer.clear(tabId);
-    runtime.backgroundTaskStartedAt = null;
-    runtime.backgroundTaskActiveAnchorKey = null;
-    runtime.backgroundTaskModeTag = null;
-    runtime.backgroundTaskWaitingForFollowUp = false;
-    runtime.backgroundTaskLaunches.clear();
-    runtime.backgroundTaskCompletedTasks.clear();
-    this.backgroundTaskLiveSignalCoordinator.clearAuthoritativeSyncGate(tabId);
-    runtime.backgroundTaskStaleNoticeFingerprint = null;
-    this.syncTabStreamLikeState(tabId);
+    this.backgroundTaskTimelineService.resetIndicatorState(tabId);
   }
 
   private collectBackgroundTaskSegments(

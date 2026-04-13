@@ -37,6 +37,7 @@ function createHost(
     getTabRuntimeState: jest.fn().mockReturnValue(runtime),
     getActiveTabId: jest.fn().mockReturnValue('tab-1'),
     getMessageAnchorKey: jest.fn((message: ChatMessage) => message.sourceMessageId ?? message.id),
+    clearInlinePanel: jest.fn(),
     armAuthoritativeSyncGate: jest.fn(),
     clearAuthoritativeSyncGate: jest.fn(),
     syncTabStreamLikeState: jest.fn(),
@@ -197,6 +198,39 @@ describe('BackgroundTaskTimelineService', () => {
       launches: [],
       pending: [],
     }));
+  });
+
+  it('clears inline panel and follow-up runtime when resetting indicator state', () => {
+    const runtime = createRuntime({
+      backgroundTaskStartedAt: 12,
+      backgroundTaskActiveAnchorKey: 'msg-user-1',
+      backgroundTaskModeTag: 'search-mode',
+      backgroundTaskWaitingForFollowUp: true,
+      backgroundTaskStaleNoticeFingerprint: 'stale',
+      backgroundTaskSuppressedFingerprint: 'keep-me',
+      backgroundTaskLaunches: new Map([
+        ['call-1', { launchId: 'call-1', taskId: 'bg_1', description: 'Search docs' }],
+      ]),
+      backgroundTaskCompletedTasks: new Map([
+        ['bg_1', { taskId: 'bg_1', description: 'Search docs' }],
+      ]),
+    });
+    const host = createHost(runtime);
+    const service = new BackgroundTaskTimelineService(host);
+
+    service.resetIndicatorState('tab-1');
+
+    expect(host.clearInlinePanel).toHaveBeenCalledWith('tab-1');
+    expect(host.clearAuthoritativeSyncGate).toHaveBeenCalledWith('tab-1');
+    expect(host.syncTabStreamLikeState).toHaveBeenCalledWith('tab-1');
+    expect(runtime.backgroundTaskStartedAt).toBeNull();
+    expect(runtime.backgroundTaskActiveAnchorKey).toBeNull();
+    expect(runtime.backgroundTaskModeTag).toBeNull();
+    expect(runtime.backgroundTaskWaitingForFollowUp).toBe(false);
+    expect(runtime.backgroundTaskStaleNoticeFingerprint).toBeNull();
+    expect(runtime.backgroundTaskSuppressedFingerprint).toBe('keep-me');
+    expect(runtime.backgroundTaskLaunches.size).toBe(0);
+    expect(runtime.backgroundTaskCompletedTasks.size).toBe(0);
   });
 
   it('rehydrates runtime state from the latest active segment during hydration', () => {

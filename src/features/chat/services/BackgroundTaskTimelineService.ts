@@ -52,6 +52,7 @@ export interface BackgroundTaskTimelineServiceHost {
   getTabRuntimeState(tabId: TabId | null): BackgroundTaskTimelineRuntime | null;
   getActiveTabId(): TabId | null;
   getMessageAnchorKey(message: ChatMessage): string;
+  clearInlinePanel(tabId: TabId | null): void;
   armAuthoritativeSyncGate(tabId: TabId | null): void;
   clearAuthoritativeSyncGate(tabId: TabId | null): void;
   syncTabStreamLikeState(tabId: TabId | null): void;
@@ -64,6 +65,17 @@ export interface BackgroundTaskTimelineServiceHost {
 
 export class BackgroundTaskTimelineService {
   constructor(private readonly host: BackgroundTaskTimelineServiceHost) {}
+
+  resetIndicatorState(
+    tabId: TabId | null = this.host.getActiveTabId(),
+  ): void {
+    const runtime = this.resetRuntimeState(tabId, { clearInlinePanel: true });
+    if (!runtime) {
+      return;
+    }
+
+    this.host.syncTabStreamLikeState(tabId);
+  }
 
   armIndicatorForUserMessage(
     message: ChatMessage,
@@ -292,19 +304,10 @@ export class BackgroundTaskTimelineService {
     conversation: Conversation | null = null,
     tabId: TabId | null = this.host.getActiveTabId(),
   ): void {
-    const runtime = this.host.getTabRuntimeState(tabId);
+    const runtime = this.resetRuntimeState(tabId, { clearInlinePanel: false });
     if (!runtime) {
       return;
     }
-
-    runtime.backgroundTaskStartedAt = null;
-    runtime.backgroundTaskActiveAnchorKey = null;
-    runtime.backgroundTaskModeTag = null;
-    runtime.backgroundTaskWaitingForFollowUp = false;
-    runtime.backgroundTaskLaunches.clear();
-    runtime.backgroundTaskCompletedTasks.clear();
-    this.host.clearAuthoritativeSyncGate(tabId);
-    runtime.backgroundTaskStaleNoticeFingerprint = null;
 
     if (!conversation || conversation.messages.length === 0) {
       this.host.syncTabStreamLikeState(tabId);
@@ -559,6 +562,30 @@ export class BackgroundTaskTimelineService {
       waitingForFollowUp: false,
       completionEvents: [],
     };
+  }
+
+  private resetRuntimeState(
+    tabId: TabId | null,
+    options: { clearInlinePanel: boolean },
+  ): BackgroundTaskTimelineRuntime | null {
+    const runtime = this.host.getTabRuntimeState(tabId);
+    if (!runtime) {
+      return null;
+    }
+
+    if (options.clearInlinePanel) {
+      this.host.clearInlinePanel(tabId);
+    }
+
+    runtime.backgroundTaskStartedAt = null;
+    runtime.backgroundTaskActiveAnchorKey = null;
+    runtime.backgroundTaskModeTag = null;
+    runtime.backgroundTaskWaitingForFollowUp = false;
+    runtime.backgroundTaskLaunches.clear();
+    runtime.backgroundTaskCompletedTasks.clear();
+    this.host.clearAuthoritativeSyncGate(tabId);
+    runtime.backgroundTaskStaleNoticeFingerprint = null;
+    return runtime;
   }
 
   private addCompletionToSegment(
