@@ -5,6 +5,10 @@ import { t } from '../../../i18n';
 import type { TabId } from '../tabs';
 import type { QuestionDock } from '../ui/QuestionDock';
 import type { QuestionDockRefreshFacade } from './QuestionDockRefreshFacade';
+import type {
+  QuestionDockRenderStateFacade,
+  QuestionDockRenderStateRuntimeState,
+} from './QuestionDockRenderStateFacade';
 import type { QuestionDockWritebackFacade } from './QuestionDockWritebackFacade';
 import type {
   QuestionDockQueueRuntimeFacade,
@@ -14,7 +18,6 @@ import { isQuestionAnswerComplete } from '../ui/questionDockState';
 import {
   getQuestionDockDraftAnswers,
   sanitizeQuestionDockAnswer,
-  type QuestionDockInteractionRuntimeState,
 } from './QuestionDockInteractionState';
 import {
   createEmptyQuestionDockRenderPayload,
@@ -33,6 +36,10 @@ type QuestionDockRefreshPort = Pick<
   QuestionDockRefreshFacade,
   'clearPendingQuestionsForTab' | 'refreshPendingQuestionsForTab'
 >;
+type QuestionDockRenderStatePort = Pick<
+  QuestionDockRenderStateFacade,
+  'getActivePendingQuestionRequest' | 'resolveRenderState'
+>;
 type QuestionDockWritebackPort = Pick<
   QuestionDockWritebackFacade,
   | 'applyClearedPendingQuestions'
@@ -41,12 +48,8 @@ type QuestionDockWritebackPort = Pick<
   | 'applyRemovedPendingQuestionRequest'
 >;
 
-export interface QuestionDockCoordinatorRuntimeState {
+export interface QuestionDockCoordinatorRuntimeState extends QuestionDockRenderStateRuntimeState {
   isStreaming: boolean;
-  pendingQuestionRequests: QuestionRequest[];
-  questionDraftAnswers: QuestionDockInteractionRuntimeState['questionDraftAnswers'];
-  questionActiveGroupKeys: QuestionDockInteractionRuntimeState['questionActiveGroupKeys'];
-  questionActiveIndexes: QuestionDockInteractionRuntimeState['questionActiveIndexes'];
 }
 
 type QuestionDockPort = Pick<QuestionDock, 'render'>;
@@ -54,7 +57,6 @@ type QuestionDockPort = Pick<QuestionDock, 'render'>;
 export interface QuestionDockCoordinatorHost {
   getTabRuntimeState(tabId: TabId | null): QuestionDockCoordinatorRuntimeState | null;
   getActiveTabId(): TabId | null;
-  getCurrentConversationSessionId(): string | null | undefined;
   getQuestionDock(): QuestionDockPort | null;
   getQuestionDisplayMode(): QuestionDisplayMode;
   shouldUseAboveInputQuestionDock(): boolean;
@@ -66,6 +68,7 @@ export interface QuestionDockCoordinatorHost {
 export class QuestionDockCoordinator {
   constructor(
     private readonly host: QuestionDockCoordinatorHost,
+    private readonly dockRenderState: QuestionDockRenderStatePort,
     private readonly dockQueueRuntime: QuestionDockQueueRuntimePort,
     private readonly dockRefresh: QuestionDockRefreshPort,
     private readonly dockWriteback: QuestionDockWritebackPort,
@@ -78,39 +81,28 @@ export class QuestionDockCoordinator {
       return;
     }
 
-    if (!this.host.shouldUseAboveInputQuestionDock()) {
-      this.renderEmptyDock(questionDock);
+    const renderState = this.dockRenderState.resolveRenderState();
+    if (renderState.kind === 'skip') {
       return;
     }
 
-    const activeTabId = this.host.getActiveTabId();
-    const activeRequest = this.getActivePendingQuestionRequest(activeTabId);
-    const activeSessionId = this.host.getCurrentConversationSessionId() ?? null;
-
-    if (!activeTabId || !activeRequest || activeRequest.sessionId !== activeSessionId) {
-      this.renderEmptyDock(questionDock);
+    if (renderState.kind === 'empty') {
+      this.renderEmptyDock(questionDock, renderState.displayMode);
       return;
     }
-
-    const runtime = this.host.getTabRuntimeState(activeTabId);
-    if (!runtime) {
-      return;
-    }
-
-    const displayMode = this.host.getQuestionDisplayMode();
     const renderPayload = createQuestionDockRenderPayload(
-      runtime,
-      activeRequest,
-      displayMode,
+      renderState.runtime,
+      renderState.request,
+      renderState.displayMode,
       {
         rerender: () => {
           this.render();
         },
         submit: () => {
-          void this.handleQuestionDockSubmit(activeTabId);
+          void this.handleQuestionDockSubmit(renderState.tabId);
         },
         reject: () => {
-          void this.handleQuestionDockReject(activeTabId);
+          void this.handleQuestionDockReject(renderState.tabId);
         },
       },
     );
@@ -147,15 +139,18 @@ export class QuestionDockCoordinator {
     return true;
   }
 
-  private renderEmptyDock(questionDock: QuestionDockPort): void {
-    const renderPayload = createEmptyQuestionDockRenderPayload(this.host.getQuestionDisplayMode());
+  private renderEmptyDock(
+    questionDock: QuestionDockPort,
+    displayMode: QuestionDisplayMode = this.host.getQuestionDisplayMode(),
+  ): void {
+    const renderPayload = createEmptyQuestionDockRenderPayload(displayMode);
     questionDock.render(renderPayload.state, renderPayload.callbacks);
   }
 
   private getActivePendingQuestionRequest(
     tabId: TabId | null = this.host.getActiveTabId(),
   ): QuestionRequest | null {
-    return this.host.getTabRuntimeState(tabId)?.pendingQuestionRequests[0] ?? null;
+    return this.dockRenderState.getActivePendingQuestionRequest(tabId);
   }
 
   private getOrCreateQuestionWaiter(

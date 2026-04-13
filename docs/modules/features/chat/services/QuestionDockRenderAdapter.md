@@ -5,7 +5,7 @@
 
 ## 概述
 
-`QuestionDockRenderAdapter` 是上方 question dock 的渲染适配 helper，负责把 `QuestionDockCoordinator` 已经筛选出的 active request/runtime 组装成 `QuestionDock` 需要的 render state 与 callbacks。它把 dock callback composition 从 coordinator 中拆出，让 coordinator 更专注于 pending refresh、queue 与 resolve orchestration。
+`QuestionDockRenderAdapter` 是上方 question dock 的渲染适配 helper，负责把 `QuestionDockRenderStateFacade` 解析出的 active request/runtime 组装成 `QuestionDock` 需要的 render state 与 callbacks。它把 dock callback composition 从 coordinator 中拆出，让 coordinator 更专注于 dock callbacks 与 resolve orchestration。
 
 ## 公开接口
 
@@ -33,6 +33,6 @@ export function createQuestionDockRenderPayload(...): QuestionDockRenderPayload;
 
 ## 与其他模块的边界
 
-- 上游通常由 `QuestionDockCoordinator` 调用；coordinator 仍负责判断是否显示上方 dock、选择 active request，并在提交/拒绝后执行 pending refresh 与 resolve follow-up
+- 上游通常由 `QuestionDockCoordinator` 调用；coordinator 先消费 `QuestionDockRenderStateFacade` 解析出的 active/empty render-state，再把 active request/runtime 交给本 adapter，并在提交/拒绝后执行 resolve follow-up
 - 下游依赖 `QuestionDockInteractionState` 维护 runtime map，但不直接触碰 waiter queue、pending refresh suppression、resolved state 或 API 调用
 - 本模块不负责真实 DOM 渲染；最终仍由 `QuestionDock.render()` 消费这里产出的 state/callbacks

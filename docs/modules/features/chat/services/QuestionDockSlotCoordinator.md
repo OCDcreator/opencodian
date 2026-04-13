@@ -11,7 +11,7 @@
 - 在 view locale/activation/question UI 刷新时，提供统一的 `render()` 入口把重绘触发回 question runtime bundle
 - 在 view 关闭时销毁自己拥有的 slot 与 dock，并保留 `questionCardPosition` 设置门控查询
 
-它不负责 pending-question 队列、draft answer、resolved follow-up 或真实的 dock render state 计算；这些业务职责仍由 `QuestionDockCoordinator` 承接。
+它不负责 pending-question 队列、draft answer、resolved follow-up 或真实的 dock render state 计算；这些业务职责仍由 `QuestionDockCoordinator` 与 `QuestionDockRenderStateFacade` 承接。
 
 ## 公开接口
 

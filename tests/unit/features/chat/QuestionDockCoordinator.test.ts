@@ -2,6 +2,10 @@ import type { QuestionDisplayMode, QuestionRequest } from '../../../../src/core/
 import { setLocale } from '../../../../src/i18n';
 import type { QuestionDockRefreshFacade } from '../../../../src/features/chat/services/QuestionDockRefreshFacade';
 import {
+  QuestionDockRenderStateFacade,
+  type QuestionDockRenderStateFacadeHost,
+} from '../../../../src/features/chat/services/QuestionDockRenderStateFacade';
+import {
   QuestionDockWritebackFacade,
 } from '../../../../src/features/chat/services/QuestionDockWritebackFacade';
 import {
@@ -92,7 +96,10 @@ function createHost(options?: {
     }),
   };
 
-  const host: Mocked<QuestionDockCoordinatorHost> = {
+  const host: Mocked<
+    QuestionDockCoordinatorHost
+    & Pick<QuestionDockRenderStateFacadeHost, 'getCurrentConversationSessionId'>
+  > = {
     getTabRuntimeState: jest.fn((tabId) => (tabId ? runtimeByTab.get(tabId) ?? null : null)),
     getActiveTabId: jest.fn().mockReturnValue(activeTabId),
     getCurrentConversationSessionId: jest.fn().mockReturnValue(
@@ -114,6 +121,7 @@ function createHost(options?: {
     clearPendingQuestionsForTab: jest.fn(),
     refreshPendingQuestionsForTab: jest.fn().mockResolvedValue([] as QuestionRequest[]),
   };
+  const dockRenderState = new QuestionDockRenderStateFacade(host);
   const postResolutionRuntime: jest.Mocked<Pick<
     QuestionPostResolutionRuntimeFacade,
     'followUpAfterResolution'
@@ -163,6 +171,7 @@ function createHost(options?: {
   return {
     host,
     dockRefresh,
+    dockRenderState,
     dockQueueRuntime,
     pendingRefreshRuntime,
     dockWriteback,
@@ -201,6 +210,7 @@ describe('QuestionDockCoordinator', () => {
     const {
       host,
       dockRefresh,
+      dockRenderState,
       dockQueueRuntime,
       pendingRefreshRuntime,
       dockWriteback,
@@ -214,6 +224,7 @@ describe('QuestionDockCoordinator', () => {
     } = createHost();
     const coordinator = new QuestionDockCoordinator(
       host,
+      dockRenderState,
       dockQueueRuntime,
       dockRefresh,
       dockWriteback,
@@ -255,6 +266,7 @@ describe('QuestionDockCoordinator', () => {
     const {
       dockRefresh,
       host,
+      dockRenderState,
       dockQueueRuntime,
       dockWriteback,
       resolutionWriteback,
@@ -262,6 +274,7 @@ describe('QuestionDockCoordinator', () => {
     dockRefresh.refreshPendingQuestionsForTab.mockResolvedValueOnce([request]);
     const coordinator = new QuestionDockCoordinator(
       host,
+      dockRenderState,
       dockQueueRuntime,
       dockRefresh,
       dockWriteback,
@@ -282,12 +295,14 @@ describe('QuestionDockCoordinator', () => {
     const {
       dockRefresh,
       host,
+      dockRenderState,
       dockQueueRuntime,
       dockWriteback,
       resolutionWriteback,
     } = createHost();
     const coordinator = new QuestionDockCoordinator(
       host,
+      dockRenderState,
       dockQueueRuntime,
       dockRefresh,
       dockWriteback,
@@ -306,6 +321,7 @@ describe('QuestionDockCoordinator', () => {
       getLatestRenderState,
       host,
       dockRefresh,
+      dockRenderState,
       dockQueueRuntime,
       dockWriteback,
       resolutionWriteback,
@@ -316,6 +332,7 @@ describe('QuestionDockCoordinator', () => {
     runtimeByTab.get('tab-active')!.pendingQuestionRequests = [request];
     const coordinator = new QuestionDockCoordinator(
       host,
+      dockRenderState,
       dockQueueRuntime,
       dockRefresh,
       dockWriteback,

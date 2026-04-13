@@ -5,6 +5,7 @@ import type {
 import { setLocale } from '../../../../src/i18n';
 import { StreamingInlineCardRenderer } from '../../../../src/features/chat/runtime/StreamingInlineCardRenderer';
 import type { QuestionDockRefreshFacadeHost } from '../../../../src/features/chat/services/QuestionDockRefreshFacade';
+import type { QuestionDockRenderStateFacadeHost } from '../../../../src/features/chat/services/QuestionDockRenderStateFacade';
 import { QuestionDockQueueRuntimeFacade } from '../../../../src/features/chat/services/QuestionDockQueueRuntimeFacade';
 import { QuestionPendingRefreshRuntimeFacade } from '../../../../src/features/chat/services/QuestionPendingRefreshRuntimeFacade';
 import { QuestionPostResolutionRuntimeFacade } from '../../../../src/features/chat/services/QuestionPostResolutionRuntimeFacade';
@@ -176,7 +177,11 @@ describe('QuestionRuntimeHostAdapter', () => {
     expect(hosts.resolutionCoordinatorHost.shouldRenderQuestionResolutionCards()).toBe(true);
 
     expect(hosts.dockCoordinatorHost.getQuestionDisplayMode()).toBe('single');
-    expect(hosts.dockCoordinatorHost.getCurrentConversationSessionId()).toBe('session-1');
+    const dockRenderStateHost: QuestionDockRenderStateFacadeHost = hosts.dockRenderStateHost;
+    expect(dockRenderStateHost.getActiveTabId()).toBe('tab-active');
+    expect(dockRenderStateHost.getCurrentConversationSessionId()).toBe('session-1');
+    expect(dockRenderStateHost.getQuestionDisplayMode()).toBe('single');
+    expect(dockRenderStateHost.shouldUseAboveInputQuestionDock()).toBe(true);
     const dockRefreshHost: QuestionDockRefreshFacadeHost = hosts.dockRefreshHost;
     expect(dockRefreshHost.getSessionIdForTab('tab-active')).toBe('session-1');
     await dockRefreshHost.getPendingQuestions();

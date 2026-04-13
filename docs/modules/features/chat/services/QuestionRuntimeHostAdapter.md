@@ -8,8 +8,8 @@
 `QuestionRuntimeHostAdapter` 把 `OpenCodianView` 里原本分散的 question runtime host factory 与 service instantiation 收束到一个模块，专门负责：
 
 - 从单一 `QuestionRuntimeViewHost` 派生 `QuestionInlineCardRenderer`、`QuestionResolutionCoordinator`、`QuestionDockCoordinator` 与 `QuestionPostResolutionRuntimeFacade` 所需的 host 回调
-- 从同一份 host 继续派生 `QuestionDockRefreshFacade`、`QuestionDockQueueRuntimeFacade` 与 `QuestionPendingRefreshRuntimeFacade` 所需的 refresh / dock-queue / pending-refresh port，并把 dock attention/render writeback 接到 `QuestionDockWritebackFacade`
-- 顺序装配 inline question card、resolved-question runtime、dock-queue runtime facade、pending-refresh runtime facade、dock writeback facade、dock refresh facade、post-resolution runtime facade、resolution writeback facade、上方 question dock，以及 `QuestionResolutionFlowCoordinator` 十个协作模块，避免 view 继续维护多段 `create*Host()` 和散落的 resolve flow instantiation
+- 从同一份 host 继续派生 `QuestionDockRenderStateFacade`、`QuestionDockRefreshFacade`、`QuestionDockQueueRuntimeFacade` 与 `QuestionPendingRefreshRuntimeFacade` 所需的 render-state / refresh / dock-queue / pending-refresh port，并把 dock attention/render writeback 接到 `QuestionDockWritebackFacade`
+- 顺序装配 inline question card、resolved-question runtime、dock render-state facade、dock-queue runtime facade、pending-refresh runtime facade、dock writeback facade、dock refresh facade、post-resolution runtime facade、resolution writeback facade、上方 question dock，以及 `QuestionResolutionFlowCoordinator` 十一个协作模块，避免 view 继续维护多段 `create*Host()` 和散落的 resolve flow instantiation
 - 让 `QuestionDockCoordinator` 的 resolved-state callback 直接回连到共享的 `QuestionResolutionCoordinator`，保持 dock resolve 与 inline fallback 共用同一份 question-resolution state bridge
 - 让 dock 与 inline resolve 后的 resolved-id suppression、resolved-state bridge 与 status/sync follow-up 统一经由 `QuestionResolutionWritebackFacade` 串联，而不是继续把这段运行时收尾逻辑散落在多个 coordinator 里
 
@@ -22,6 +22,8 @@
 ```typescript
 export interface QuestionRuntimeState
   extends QuestionDockCoordinatorRuntimeState,
+    QuestionDockQueueRuntimeState,
+    QuestionPendingRefreshRuntimeState,
     QuestionInlineCardRuntimeState,
     QuestionResolutionCoordinatorRuntimeState {}
 
@@ -51,9 +53,10 @@ export function createQuestionRuntimeServices(...): QuestionRuntimeServices;
 
 ## 关键行为
 
-- `createQuestionRuntimeHosts()` 从同一份 view host 派生 inline-card、resolution、dock、dock-refresh、dock-queue runtime、pending-refresh runtime 与 post-resolution runtime 七组 host，避免 `OpenCodianView` 继续为 question 子链维护多段闭包工厂
-- `createQuestionRuntimeServices()` 顺序实例化 `QuestionInlineCardRenderer` → `QuestionResolutionCoordinator` → `QuestionDockQueueRuntimeFacade` → `QuestionPendingRefreshRuntimeFacade` → `QuestionPostResolutionRuntimeFacade` → `QuestionDockWritebackFacade` → `QuestionDockRefreshFacade` → `QuestionResolutionWritebackFacade` → `QuestionDockCoordinator` → `QuestionResolutionFlowCoordinator`，保留原来的协作依赖关系，并把 dock / inline resolve flow 的 resolved-request suppression 接到同一条 writeback seam
+- `createQuestionRuntimeHosts()` 从同一份 view host 派生 inline-card、resolution、dock、dock-render-state、dock-refresh、dock-queue runtime、pending-refresh runtime 与 post-resolution runtime 八组 host，避免 `OpenCodianView` 继续为 question 子链维护多段闭包工厂
+- `createQuestionRuntimeServices()` 顺序实例化 `QuestionInlineCardRenderer` → `QuestionResolutionCoordinator` → `QuestionDockRenderStateFacade` → `QuestionDockQueueRuntimeFacade` → `QuestionPendingRefreshRuntimeFacade` → `QuestionPostResolutionRuntimeFacade` → `QuestionDockWritebackFacade` → `QuestionDockRefreshFacade` → `QuestionResolutionWritebackFacade` → `QuestionDockCoordinator` → `QuestionResolutionFlowCoordinator`，保留原来的协作依赖关系，并把 dock / inline resolve flow 的 resolved-request suppression 接到同一条 writeback seam
 - dock resolve 时的 `applyResolvedQuestionState()` 不再由 view 单独转发，而是通过 adapter 直接映射到共享 `QuestionResolutionCoordinator`
+- dock render 时的 above-input / active-tab / active-request / session-match gating 不再留在 `QuestionDockCoordinator`，而是通过 adapter-wired `QuestionDockRenderStateFacade` 统一解析
 - dock waiter / enqueue / remove queue runtime state 不再留在 `QuestionDockCoordinator` 里直接读写，而是通过 adapter-wired `QuestionDockQueueRuntimeFacade` 承接
 - pending-question refresh 的 API fetch/session filter/writeback 不再留在 `QuestionDockCoordinator` 的 refresh 分支里铺开，而是交给 adapter-wired `QuestionDockRefreshFacade`；resolved-request suppression 与 runtime map pruning 继续由 adapter-wired `QuestionPendingRefreshRuntimeFacade` 承接；queue enqueue/remove 与 refresh/clear 完成后的 attention/render writeback 继续由 adapter-wired `QuestionDockWritebackFacade` 承接；dock 与 inline resolve 都通过 adapter-wired `QuestionResolutionWritebackFacade` 标记 suppression
 - dock 与 inline resolve 成功后的 runtime follow-up 也不再分别内嵌在 coordinator 中，而是由 `QuestionResolutionWritebackFacade` 统一串到 `QuestionPostResolutionRuntimeFacade.followUpAfterResolution()`
@@ -65,5 +68,5 @@ export function createQuestionRuntimeServices(...): QuestionRuntimeServices;
 ## 与 `OpenCodianView` 的边界
 
 - `OpenCodianView` 现在只提供一份更窄的 `QuestionRuntimeViewHostFactoryHost`；late-bound 的 dock/API/attention/sync/status wiring 先交给 `QuestionRuntimeViewHostFactory`，再由 `QuestionRuntimeViewHostAdapter` 组合成 `QuestionRuntimeViewHost`
-- `QuestionDockCoordinator` 继续负责 dock callbacks 与 dock resolve flow；pending-question API refresh/session filter/writeback 协调由 `QuestionDockRefreshFacade` 接管，dock queue runtime map 维护由 `QuestionDockQueueRuntimeFacade` 接管，pending refresh runtime map 维护由 `QuestionPendingRefreshRuntimeFacade` 接管，queue enqueue/remove 与 refresh/clear 完成后的 attention/render writeback 由 `QuestionDockWritebackFacade` 接管，dock/inline resolved-request marking 与 resolved-state follow-up 由 `QuestionResolutionWritebackFacade` 接管
+- `QuestionDockCoordinator` 继续负责 dock callbacks 与 dock resolve flow；dock render-state 选择由 `QuestionDockRenderStateFacade` 接管，pending-question API refresh/session filter/writeback 协调由 `QuestionDockRefreshFacade` 接管，dock queue runtime map 维护由 `QuestionDockQueueRuntimeFacade` 接管，pending refresh runtime map 维护由 `QuestionPendingRefreshRuntimeFacade` 接管，queue enqueue/remove 与 refresh/clear 完成后的 attention/render writeback 由 `QuestionDockWritebackFacade` 接管，dock/inline resolved-request marking 与 resolved-state follow-up 由 `QuestionResolutionWritebackFacade` 接管
 - `QuestionInlineCardRenderer`、`QuestionResolutionCoordinator` 与 `QuestionResolutionFlowCoordinator` 继续分别负责 inline question card、resolved question runtime 与 dock-or-inline resolve orchestration；adapter 只负责共享装配

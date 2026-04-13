@@ -20,6 +20,10 @@ import {
   type QuestionDockRefreshFacadeHost,
 } from './QuestionDockRefreshFacade';
 import {
+  QuestionDockRenderStateFacade,
+  type QuestionDockRenderStateFacadeHost,
+} from './QuestionDockRenderStateFacade';
+import {
   QuestionDockQueueRuntimeFacade,
   type QuestionDockQueueRuntimeFacadeHost,
   type QuestionDockQueueRuntimeState,
@@ -83,6 +87,7 @@ export interface QuestionRuntimeHosts {
   resolutionCoordinatorHost: QuestionResolutionCoordinatorHost;
   dockCoordinatorHost: QuestionDockCoordinatorHost;
   dockRefreshHost: QuestionDockRefreshFacadeHost;
+  dockRenderStateHost: QuestionDockRenderStateFacadeHost;
   dockQueueRuntimeHost: QuestionDockQueueRuntimeFacadeHost;
   pendingRefreshRuntimeHost: QuestionPendingRefreshRuntimeFacadeHost;
   postResolutionRuntimeHost: QuestionPostResolutionRuntimeFacadeHost;
@@ -116,7 +121,6 @@ export function createQuestionRuntimeHosts(
     dockCoordinatorHost: {
       getTabRuntimeState: (tabId: TabId | null) => viewHost.getTabRuntimeState(tabId),
       getActiveTabId: () => viewHost.getActiveTabId(),
-      getCurrentConversationSessionId: () => viewHost.getCurrentConversationSessionId(),
       getQuestionDock: () => viewHost.getQuestionDock(),
       getQuestionDisplayMode: () => viewHost.getQuestionDisplayMode(),
       shouldUseAboveInputQuestionDock: () => viewHost.shouldUseAboveInputQuestionDock(),
@@ -131,6 +135,13 @@ export function createQuestionRuntimeHosts(
       getTabRuntimeState: (tabId: TabId | null) => viewHost.getTabRuntimeState(tabId),
       getSessionIdForTab: (tabId: TabId | null) => viewHost.getSessionIdForTab(tabId),
       getPendingQuestions: () => viewHost.getPendingQuestions(),
+    },
+    dockRenderStateHost: {
+      getActiveTabId: () => viewHost.getActiveTabId(),
+      getCurrentConversationSessionId: () => viewHost.getCurrentConversationSessionId(),
+      getQuestionDisplayMode: () => viewHost.getQuestionDisplayMode(),
+      shouldUseAboveInputQuestionDock: () => viewHost.shouldUseAboveInputQuestionDock(),
+      getTabRuntimeState: (tabId: TabId | null) => viewHost.getTabRuntimeState(tabId),
     },
     dockQueueRuntimeHost: {
       getTabRuntimeState: (tabId: TabId | null) => viewHost.getTabRuntimeState(tabId),
@@ -173,6 +184,9 @@ export function createQuestionRuntimeServices(
     inlineCardRenderer,
     hosts.resolutionCoordinatorHost,
   );
+  const dockRenderStateFacade = new QuestionDockRenderStateFacade(
+    hosts.dockRenderStateHost,
+  );
   const dockQueueRuntimeFacade = new QuestionDockQueueRuntimeFacade(
     hosts.dockQueueRuntimeHost,
   );
@@ -208,6 +222,7 @@ export function createQuestionRuntimeServices(
   });
   dockCoordinator = new QuestionDockCoordinator(
     hosts.dockCoordinatorHost,
+    dockRenderStateFacade,
     dockQueueRuntimeFacade,
     dockRefreshFacade,
     dockWritebackFacade,
