@@ -128,6 +128,7 @@ docs/modules/
 │   │   │   └── collapsible.md
 │   │   ├── services/
 │   │   │   ├── ChatHeaderPresenter.md
+│   │   │   ├── ChatSelectionControlsCoordinator.md
 │   │   │   ├── ComposerInputShellCoordinator.md
 │   │   │   ├── ComposerContextActionService.md
 │   │   │   ├── ComposerContextCoordinator.md

@@ -15,8 +15,7 @@ export interface ComposerInputShellCoordinatorHost {
   ): void;
   getInputPlaceholder(): string;
   addChosenFileContextToActiveTab(): Promise<void>;
-  initializePermissionSelector(container: HTMLElement): void;
-  initializeModelSelector(container: HTMLElement): void;
+  mountSelectionControls(toolbar: HTMLElement): void;
   mountContextUsageIndicator(container: HTMLElement): void;
   mountEffortSelector(container: HTMLElement): void;
   isActiveTabStreaming(): boolean;
@@ -103,8 +102,7 @@ export class ComposerInputShellCoordinator {
     this.updateSendButtonState();
 
     const toolbarEl = this.composerShellEl.createDiv({ cls: 'opencodian-input-toolbar' });
-    this.host.initializePermissionSelector(toolbarEl.createDiv({ cls: 'opencodian-permission-selector' }));
-    this.host.initializeModelSelector(toolbarEl.createDiv({ cls: 'opencodian-model-selector' }));
+    this.host.mountSelectionControls(toolbarEl);
     this.host.mountContextUsageIndicator(toolbarEl.createDiv({ cls: 'opencodian-context-usage-slot' }));
     this.host.mountEffortSelector(toolbarEl.createDiv({ cls: 'opencodian-effort-slot' }));
 

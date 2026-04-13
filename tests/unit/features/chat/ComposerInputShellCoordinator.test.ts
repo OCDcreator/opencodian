@@ -50,8 +50,7 @@ function createFixture() {
     }),
     getInputPlaceholder: jest.fn(() => t('chat.input.placeholder')),
     addChosenFileContextToActiveTab: jest.fn().mockResolvedValue(undefined),
-    initializePermissionSelector: jest.fn(),
-    initializeModelSelector: jest.fn(),
+    mountSelectionControls: jest.fn(),
     mountContextUsageIndicator: jest.fn(),
     mountEffortSelector: jest.fn(),
     isActiveTabStreaming: jest.fn(() => isStreaming),
@@ -152,8 +151,7 @@ describe('ComposerInputShellCoordinator', () => {
     );
     expect(fixture.host.attachSessionTodo).toHaveBeenCalledWith(fixture.container);
     expect(fixture.host.attachQuestionDock).toHaveBeenCalledWith(fixture.container);
-    expect(fixture.host.initializePermissionSelector).toHaveBeenCalledTimes(1);
-    expect(fixture.host.initializeModelSelector).toHaveBeenCalledTimes(1);
+    expect(fixture.host.mountSelectionControls).toHaveBeenCalledTimes(1);
     expect(fixture.host.mountContextUsageIndicator).toHaveBeenCalledTimes(1);
     expect(fixture.host.mountEffortSelector).toHaveBeenCalledTimes(1);
     expect(fixture.host.submitMessage).toHaveBeenCalledWith('Hello coordinator');

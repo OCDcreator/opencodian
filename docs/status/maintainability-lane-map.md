@@ -1,11 +1,11 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [CONFIRMED_NEXT_BATCH] R13-R18 已确认；当前 `[NEXT]` 是 R16 model and permission selector ownership。
+> **当前状态**: [CONFIRMED_NEXT_BATCH] R13-R18 已确认；当前 `[NEXT]` 是 R17 input appearance and glass state coordinator。
 
 ## 当前优先级
 
-- **P1 / R16**: model / permission selection controls（chat 内 dropdown/search/list/selection display）
+- **P1 / R16**: 已完成 model / permission selection controls（chat 内 dropdown/search/list/selection display）
 - **P1 / R15**: 已完成 composer input shell（input area DOM、textarea、高度同步、layout metrics）
 - **P1 / R14**: 已完成 header / server status shell（header DOM、status label/action、wordmark/settings button）
 - **P1 / R13**: 已完成 tab messages pane surface（messages pane lifecycle、active pane、scroll metrics、pane observer）
@@ -14,7 +14,7 @@
 
 ## 当前热点首查入口
 
-- R16 首查 model selector 与 permission selector dropdown lifecycle；不要改 settings catalog 或 core catalog state
+- R16 已完成：model / permission selector dropdown/search/list/selection display 已收束到 `services/ChatSelectionControlsCoordinator.ts`
 - R15 已完成：input area DOM、textarea submit gate、高度同步与 composer stack metrics 已收束到 `services/ComposerInputShellCoordinator.ts`
 - R14 已完成：header DOM、server status loop/label、wordmark/settings button 已收束到 `services/ChatHeaderPresenter.ts`
 - R13 已完成：pane lifecycle / observer / scroll metrics / cleanup 已收束到 `services/TabMessagesPaneCoordinator.ts`

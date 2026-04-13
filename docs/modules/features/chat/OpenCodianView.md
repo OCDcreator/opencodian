@@ -29,7 +29,7 @@
 | `applyChatAppearanceSettings()` | 应用主题 preset、聊天外观变量、自定义 CSS、输入面板 glass 状态 |
 | `refreshCurrentConversationRendering()` | 重新渲染当前对话 |
 | `applyChatScrollMode()` | 把当前滚动模式应用到消息容器 |
-| `applyLocaleTexts()` | 委托 header presenter 与 composer input coordinator 刷新 header/status、placeholder、send/add-context tooltip、dock 和 tab 文案 |
+| `applyLocaleTexts()` | 委托 header presenter、selection controls coordinator 与 composer input coordinator 刷新 header/status、selector、placeholder、dock 和 tab 文案 |
 | `refreshQuestionUi()` | 重绘 question dock，并在需要时重绘当前对话 |
 | `toggleLiquidDiamondDemo()` | 切换 CPU 版 floating diamond demo |
 | `toggleLiquidDiamondWebGlDemo()` | 切换 WebGL2 版 floating diamond demo |
@@ -89,8 +89,8 @@ background task completion notice 的 queued-state 则已经完全移出 `TabRun
 - `currentConversation` / `currentConversationRevertState`
 - 模型目录缓存：`availableModels`、`availableProviders`
 - `services/ChatHeaderPresenter.ts` 的 host seam：server availability、settings/history/new-tab callbacks、status refresh 和 header tab-slot 写回
+- `services/ChatSelectionControlsCoordinator.ts` 的 host seam：model catalog reload、current selection resolution、provider icon lookup、permission mode writeback 和 effort selector 联动
 - `services/ComposerInputShellCoordinator.ts` 的 host seam：input shell DOM 装配、submit gate、textarea 高度同步、composer stack height 与 toolbar slot mount
-- model selector sticky header cleanup
 - 由 `ComposerContextViewFacade.create()` 基于独立的 `createComposerContextViewHost()` / `createFocusContextViewHost()` seam 装配出的 `ComposerContextEventBridge`、`ComposerContextCoordinator`、`FocusContextRuntimeService`、`PersistentAssistantNoticeService` 等视图级运行时协作对象
 - theme background / liquid glass / diamond demo / glass octahedron 相关 DOM 引用
 
@@ -143,11 +143,21 @@ server status loop、badge class、status label、本地/远端文案判定和 l
 输入区的 tab slot、composer shell、textarea、自适应高度、send/stop affordance 与 composer stack height 现在由 `services/ComposerInputShellCoordinator.ts` 承接。`OpenCodianView` 只保留 coordinator host seam：
 
 - question/todo dock attach、context row writeback，以及 add-context / send message / foreground-busy notice 的回调
-- permission selector、model selector、context usage ring 与 effort selector 的既有 mount 入口
+- selection controls、context usage ring 与 effort selector 的既有 mount 入口
 - chat container 上 `--opencodian-composer-stack-height` 的写回，以及 settled scroll 调度
 - 供后续 glass/theme 逻辑读取的 composer shell / input wrapper DOM refs
 
-这样 view 不再直接维护 textarea Enter-submit、高度同步、`ResizeObserver` / RAF layout 节流或 send/stop button tooltip 状态；但 R15 刻意没有改动 model / permission selector 状态机，也没有碰 liquid-glass diagnostics，这些仍留给后续 lane。
+这样 view 不再直接维护 textarea Enter-submit、高度同步、`ResizeObserver` / RAF layout 节流或 send/stop button tooltip 状态；toolbar 里的 selector 区域也已经进一步交给专门 owner，input shell 只保留 slot 级挂载职责。
+
+### Model / permission selector ownership
+
+聊天工具栏里的 model selector 与 permission selector 现在由 `services/ChatSelectionControlsCoordinator.ts` 承接。`OpenCodianView` 只保留 selection host seam：
+
+- model catalog reload、current selection / resolution 与 unavailable notice 文案
+- provider icon URL lookup、model override writeback、permission mode settings writeback
+- effort selector display 刷新，以及共用的 Escape scope 注册
+
+因此 view 不再直接铺开 model dropdown search/list/sticky-header cleanup、provider icon trigger 刷新，或 permission dropdown selected-state / open-close 状态机；这些 UI lifecycle 已集中到 coordinator，而 send options、`ModelCatalogStateService` 语义与 provider icon fallback 顺序保持不变。
 
 ### 对话装载与后台同步
 

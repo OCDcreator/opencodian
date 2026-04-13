@@ -41,7 +41,7 @@ import {
   type ToolCallInfo,
   VIEW_TYPE_OPENCODIAN,
 } from '../../core/types';
-import type { EffortLevel, ThinkingBudget } from '../../core/types/settings';
+import type { EffortLevel, PermissionMode, ThinkingBudget } from '../../core/types/settings';
 import { t, type TranslationKey } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import {
@@ -307,6 +307,10 @@ import {
   type ChatServerAvailability,
 } from './services/ChatHeaderPresenter';
 import {
+  ChatSelectionControlsCoordinator,
+  type ChatSelectionControlsCoordinatorHost,
+} from './services/ChatSelectionControlsCoordinator';
+import {
   ComposerInputShellCoordinator,
   type ComposerInputShellCoordinatorHost,
 } from './services/ComposerInputShellCoordinator';
@@ -315,14 +319,6 @@ import { TabBar, type TabBarLayoutMode, type TabId, TabManager } from './tabs';
 import { ContextDetailModal, type ContextRawMessageItem } from './ui/ContextDetailModal';
 import { ContextRing } from './ui/ContextRing';
 import { EffortSelector } from './ui/EffortSelector';
-import { buildModelSelectorDisplayState } from './ui/modelSelector/ModelSelectorDisplay';
-import {
-  highlightModelOption as highlightRenderedModelOption,
-  navigateModelList as navigateRenderedModelList,
-  scrollToCurrentModel as scrollRenderedCurrentModel,
-  selectHighlightedModel as selectRenderedHighlightedModel,
-} from './ui/modelSelector/ModelSelectorInteractions';
-import { renderModelList as renderModelSelectorList } from './ui/modelSelector/ModelSelectorRenderer';
 import type {
   ModelSelectorAvailableModelInfo,
   ModelSelectorKnownModelInfo,
@@ -665,24 +661,14 @@ export class OpenCodianView extends ItemView {
   private tabManager: TabManager | null = null;
   private tabMessagesPaneCoordinator: TabMessagesPaneCoordinator<TabRuntimeState>;
   private chatHeaderPresenter: ChatHeaderPresenter;
+  private chatSelectionControlsCoordinator: ChatSelectionControlsCoordinator;
   private composerInputShellCoordinator: ComposerInputShellCoordinator;
 
-  // Model selector state
-  private modelSelectorContainer: HTMLElement | null = null;
-  private modelSelectorTrigger: HTMLElement | null = null;
-  private modelSelectorDropdown: HTMLElement | null = null;
-  private modelSelectorSearchInput: HTMLInputElement | null = null;
-  private modelSelectorScrollContainer: HTMLElement | null = null;
-  private disposeModelSelectorStickyHeaders: (() => void) | null = null;
+  // Model catalog state
   private availableModels: ModelSelectorAvailableModelInfo[] = [];
   private availableProviders: ModelSelectorProvider[] = [];
   private modelCatalogBundle: ModelCatalogBundle | null = null;
   private hasLoadedModelCatalog = false;
-  private isModelDropdownOpen = false;
-  private modelFilterQuery = '';
-  private modelDropdownClickOutsideHandler: ((e: MouseEvent) => void) | null = null;
-  private currentModelTriggerIconUrl: string | null = null;
-  private modelSelectorIconRequestId = 0;
 
   // Navigation sidebar
   private navigationSidebar: NavigationSidebar | null = null;
@@ -806,12 +792,8 @@ export class OpenCodianView extends ItemView {
       getInputPlaceholder: () => this.getInputPlaceholder(),
       addChosenFileContextToActiveTab: () =>
         this.composerContextViewFacade.addChosenFileContextToActiveTab(),
-      initializePermissionSelector: (container) => {
-        this.initializePermissionSelector(container);
-      },
-      initializeModelSelector: (container) => {
-        this.modelSelectorContainer = container;
-        this.initializeModelSelector(container);
+      mountSelectionControls: (toolbar) => {
+        this.chatSelectionControlsCoordinator.build(toolbar);
       },
       mountContextUsageIndicator: (container) => {
         this.contextRingContainerEl = container;
@@ -857,6 +839,35 @@ export class OpenCodianView extends ItemView {
       scheduleSettledScrollToBottomIfNeeded: () => {
         this.scheduleSettledScrollToBottomIfNeeded();
       },
+    };
+  }
+
+  private createChatSelectionControlsCoordinatorHost(): ChatSelectionControlsCoordinatorHost {
+    return {
+      registerEscapeHandler: (handler) => {
+        this.scope?.register([], 'Escape', handler);
+      },
+      loadModelCatalog: () => this.loadAvailableModels(),
+      getAvailableProviders: () => this.availableProviders,
+      hasLoadedModelCatalog: () => this.hasLoadedModelCatalog,
+      getCurrentSessionModel: () => this.getCurrentSessionModel(),
+      getCurrentSessionModelResolution: () => this.getCurrentSessionModelResolution(),
+      findKnownModelInfo: (selection) => this.findKnownModelInfo(selection),
+      getModelUnavailableTitle: () => this.getModelUnavailableNoticeContent().message,
+      resolveProviderIconUrl: (providerId) =>
+        ProviderIconService.resolveIconUrl(
+          this.app,
+          providerId,
+          this.plugin.settings.providerIconLibrary,
+        ),
+      switchModel: (provider, model) => {
+        this.switchModel(provider, model);
+      },
+      updateEffortSelectorDisplay: () => {
+        this.effortSelector?.updateDisplay();
+      },
+      getPermissionMode: () => this.plugin.settings.permissionMode,
+      switchPermissionMode: (mode) => this.switchPermissionMode(mode),
     };
   }
 
@@ -1186,6 +1197,9 @@ export class OpenCodianView extends ItemView {
       this.createTabMessagesPaneCoordinatorHost(),
     );
     this.chatHeaderPresenter = new ChatHeaderPresenter(this.createChatHeaderPresenterHost());
+    this.chatSelectionControlsCoordinator = new ChatSelectionControlsCoordinator(
+      this.createChatSelectionControlsCoordinatorHost(),
+    );
     this.composerInputShellCoordinator = new ComposerInputShellCoordinator(
       this.createComposerInputShellCoordinatorHost(),
     );
@@ -2006,7 +2020,7 @@ export class OpenCodianView extends ItemView {
       refreshServerStatusBadge: () => this.chatHeaderPresenter.refreshServerStatusBadge(),
       ensureServerReadyForChat: (availability) => this.ensureServerReadyForChat(availability),
       hasLoadedModelCatalog: () => this.hasLoadedModelCatalog,
-      loadAvailableModels: () => this.loadAvailableModels(),
+      loadAvailableModels: () => this.reloadModelCatalog(),
       getSendMessageOptions: () => this.getSendMessageOptions(),
       formatModelId: (model) => this.formatModelId(model),
       ensureSelectedModelAvailable: (provider, model) => this.ensureSelectedModelAvailable(provider, model),
@@ -2237,6 +2251,7 @@ export class OpenCodianView extends ItemView {
     this.chatAppearanceStyleEl?.remove();
     this.chatAppearanceStyleEl = null;
     this.titleGenerationService.cancelAll();
+    this.chatSelectionControlsCoordinator.destroy();
     this.composerInputShellCoordinator.destroy();
     this.effortSelector?.destroy();
     this.effortSelector = null;
@@ -2248,8 +2263,6 @@ export class OpenCodianView extends ItemView {
     this.destroyLiquidDiamondDemo();
     this.unmountLiquidGlassAdapter();
     this.removeComposerSvgFilterLayer();
-    this.disposeModelSelectorStickyHeaders?.();
-    this.disposeModelSelectorStickyHeaders = null;
 
     // Cleanup navigation sidebar
     this.clearTabMessagesPanes();
@@ -2801,6 +2814,7 @@ export class OpenCodianView extends ItemView {
   public applyLocaleTexts(): void {
     this.chatHeaderPresenter.applyLocaleTexts();
     this.composerInputShellCoordinator.applyLocaleTexts();
+    this.chatSelectionControlsCoordinator.applyLocaleTexts();
     this.renderSessionTodoDock();
     this.questionDockSlotCoordinator.render();
     this.renderTabBar();
@@ -6178,220 +6192,8 @@ export class OpenCodianView extends ItemView {
     }
   }
 
-  /** Initialize model selector (opencode-style) */
-  private initializeModelSelector(containerEl: HTMLElement): void {
-    this.modelSelectorContainer = containerEl;
-
-    // Create trigger button - ghost style, shows provider icon + model name + chevron
-    this.modelSelectorTrigger = containerEl.createDiv({ cls: 'opencodian-model-trigger' });
-    const triggerContent = this.modelSelectorTrigger.createDiv({ cls: 'opencodian-model-trigger-content' });
-
-    // Provider icon
-    const iconWrapper = triggerContent.createSpan({ cls: 'opencodian-model-trigger-icon' });
-    setIcon(iconWrapper, 'bot'); // Default icon, will be updated
-
-    // Model name
-    triggerContent.createSpan({ cls: 'opencodian-model-trigger-text' });
-
-    // Create dropdown (hidden by default)
-    this.modelSelectorDropdown = containerEl.createDiv({ cls: 'opencodian-model-dropdown' });
-    this.modelSelectorDropdown.style.display = 'none';
-
-    // Build dropdown structure
-    this.buildModelDropdown();
-
-    // Load models
-    void this.reloadModelCatalog();
-
-    // Update display
-    this.updateModelSelectorDisplay();
-
-    // Handle trigger click
-    this.modelSelectorTrigger.addEventListener('click', (e) => {
-      e.stopPropagation();
-      this.toggleModelDropdown();
-    });
-
-    // Setup click outside handler
-    this.modelDropdownClickOutsideHandler = (e: MouseEvent) => {
-      if (!this.modelSelectorContainer?.contains(e.target as Node)) {
-        this.closeModelDropdown();
-      }
-    };
-  }
-
-  /** Build model dropdown structure */
-  private buildModelDropdown(): void {
-    if (!this.modelSelectorDropdown) return;
-
-    this.modelSelectorDropdown.empty();
-
-    // Search section
-    const searchWrapper = this.modelSelectorDropdown.createDiv({ cls: 'opencodian-model-dropdown-search' });
-    const searchContainer = searchWrapper.createDiv({ cls: 'opencodian-model-dropdown-search-container' });
-    const searchIcon = searchContainer.createSpan({ cls: 'opencodian-model-dropdown-search-icon' });
-    setIcon(searchIcon, 'search');
-
-    this.modelSelectorSearchInput = searchContainer.createEl('input', {
-      cls: 'opencodian-model-dropdown-search-input',
-      attr: {
-        type: 'text',
-        placeholder: 'Search models...'
-      }
-    });
-
-    // Handle search input
-    this.modelSelectorSearchInput.addEventListener('input', (e) => {
-      this.modelFilterQuery = (e.target as HTMLInputElement).value.toLowerCase();
-      this.renderModelList();
-    });
-
-    // Handle keyboard navigation in search
-    this.modelSelectorSearchInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') {
-        this.closeModelDropdown();
-        e.preventDefault();
-      } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-        this.navigateModelList(e.key === 'ArrowDown' ? 1 : -1);
-        e.preventDefault();
-      } else if (e.key === 'Enter') {
-        this.selectHighlightedModel();
-        e.preventDefault();
-      }
-    });
-
-    // Scrollable list container
-    this.modelSelectorScrollContainer = this.modelSelectorDropdown.createDiv({
-      cls: 'opencodian-model-dropdown-scroll'
-    });
-
-    this.renderModelList();
-  }
-
-  /** Toggle dropdown visibility */
-  private toggleModelDropdown(): void {
-    if (this.isModelDropdownOpen) {
-      this.closeModelDropdown();
-    } else {
-      this.openModelDropdown();
-    }
-  }
-
-  /** Open dropdown */
-  private openModelDropdown(): void {
-    if (!this.modelSelectorDropdown || !this.modelSelectorTrigger) return;
-
-    this.isModelDropdownOpen = true;
-    this.modelSelectorDropdown.style.display = 'block';
-    this.modelSelectorTrigger.addClass('is-open');
-
-    // Reset filter
-    this.modelFilterQuery = '';
-    if (this.modelSelectorSearchInput) {
-      this.modelSelectorSearchInput.value = '';
-    }
-    this.renderModelList();
-
-    // Focus search input
-    setTimeout(() => {
-      this.modelSelectorSearchInput?.focus();
-      this.scrollToCurrentModel();
-    }, 0);
-
-    // Add click outside listener
-    document.addEventListener('click', this.modelDropdownClickOutsideHandler!);
-
-    // Register escape key handler
-    this.scope?.register([], 'Escape', () => {
-      if (this.isModelDropdownOpen) {
-        this.closeModelDropdown();
-        return true;
-      }
-      return false;
-    });
-  }
-
-  /** Close dropdown */
-  private closeModelDropdown(): void {
-    if (!this.modelSelectorDropdown || !this.modelSelectorTrigger) return;
-
-    this.isModelDropdownOpen = false;
-    this.modelSelectorDropdown.style.display = 'none';
-    this.modelSelectorTrigger.removeClass('is-open');
-
-    // Remove click outside listener
-    if (this.modelDropdownClickOutsideHandler) {
-      document.removeEventListener('click', this.modelDropdownClickOutsideHandler);
-    }
-  }
-
-  /** Render model list based on filter */
-  private renderModelList(): void {
-    if (!this.modelSelectorScrollContainer) return;
-
-    const highlightedValue = this.modelSelectorScrollContainer
-      .querySelector<HTMLElement>('.opencodian-model-option.is-highlighted')
-      ?.dataset.value ?? null;
-    const renderResult = renderModelSelectorList({
-      scrollContainer: this.modelSelectorScrollContainer,
-      providers: this.availableProviders,
-      hasLoadedModelCatalog: this.hasLoadedModelCatalog,
-      filterQuery: this.modelFilterQuery,
-      currentSelection: this.getCurrentSessionModel(),
-      highlightedValue,
-      previousStickyHeadersCleanup: this.disposeModelSelectorStickyHeaders,
-      texts: {
-        loading: 'Loading models...',
-        noModels: t('settings.model.noModels'),
-        noModelsFound: 'No models found',
-        noModelsAvailable: 'No models available',
-      },
-      onSelect: (provider, model) => {
-        this.switchModel(provider, model);
-        this.closeModelDropdown();
-      },
-      onHighlight: (value) => {
-        this.highlightModelOption(value);
-      },
-    });
-
-    this.disposeModelSelectorStickyHeaders = renderResult.disposeStickyHeaders;
-  }
-
-  /** Navigate model list with keyboard */
-  private navigateModelList(direction: 1 | -1): void {
-    if (!this.modelSelectorScrollContainer) return;
-    navigateRenderedModelList(this.modelSelectorScrollContainer, direction);
-  }
-
-  /** Highlight a specific model option */
-  private highlightModelOption(value: string): void {
-    if (!this.modelSelectorScrollContainer) return;
-    highlightRenderedModelOption(this.modelSelectorScrollContainer, value);
-  }
-
-  /** Select currently highlighted model */
-  private selectHighlightedModel(): void {
-    if (!this.modelSelectorScrollContainer) return;
-    const didSelect = selectRenderedHighlightedModel(
-      this.modelSelectorScrollContainer,
-      (provider, model) => {
-        this.switchModel(provider, model);
-      },
-    );
-    if (didSelect) {
-      this.closeModelDropdown();
-    }
-  }
-
-  /** Scroll to current model in dropdown */
-  private scrollToCurrentModel(): void {
-    if (!this.modelSelectorScrollContainer) return;
-    scrollRenderedCurrentModel(this.modelSelectorScrollContainer, this.getCurrentSessionModel());
-  }
-
   public async reloadModelCatalog(): Promise<void> {
-    await this.loadAvailableModels();
+    await this.chatSelectionControlsCoordinator.reloadModelCatalog();
   }
 
   /** Load available models from OpenCode service */
@@ -6435,95 +6237,14 @@ export class OpenCodianView extends ItemView {
         });
       }
 
-      // Re-render dropdown with new data
-      this.renderModelList();
-      this.updateModelSelectorDisplay();
       this.activeTabContextUsageCoordinator.syncIdentity();
     } catch (error) {
       logger.error('Failed to load models:', error);
     }
   }
 
-  /** Update model selector to show current model */
   private updateModelSelectorDisplay(): void {
-    const current = this.getCurrentSessionModel();
-    const resolution = this.getCurrentSessionModelResolution();
-
-    if (!this.modelSelectorTrigger) return;
-
-    const modelInfo = this.findKnownModelInfo(current);
-    const displayState = buildModelSelectorDisplayState({
-      currentSelection: current,
-      resolution,
-      knownModelInfo: modelInfo,
-      hasLoadedModelCatalog: this.hasLoadedModelCatalog,
-      availableProviderCount: this.availableProviders.length,
-      unavailableTitle: this.getModelUnavailableNoticeContent().message,
-      unconfiguredLabel: t('settings.model.unconfigured'),
-    });
-    this.modelSelectorTrigger.toggleClass('is-unavailable', displayState.isUnavailable);
-    this.modelSelectorTrigger.toggleClass('is-unconfigured', displayState.isUnconfigured);
-
-    const textEl = this.modelSelectorTrigger.querySelector('.opencodian-model-trigger-text');
-    if (textEl) {
-      textEl.textContent = displayState.text;
-    }
-
-    this.modelSelectorTrigger.setAttribute('title', displayState.title);
-    void this.updateModelSelectorIcon(current?.provider ?? null, displayState.iconLabel);
-
-    this.effortSelector?.updateDisplay();
-  }
-
-  private async updateModelSelectorIcon(providerId: string | null, iconLabel: string): Promise<void> {
-    if (!this.modelSelectorTrigger) return;
-
-    const iconWrapper = this.modelSelectorTrigger.querySelector('.opencodian-model-trigger-icon');
-    if (!iconWrapper) return;
-
-    const requestId = ++this.modelSelectorIconRequestId;
-
-    if (!providerId) {
-      iconWrapper.empty();
-      setIcon(iconWrapper as HTMLElement, 'bot');
-      this.currentModelTriggerIconUrl = null;
-      return;
-    }
-
-    const iconUrl = await ProviderIconService.resolveIconUrl(
-      this.app,
-      providerId,
-      this.plugin.settings.providerIconLibrary,
-    );
-    if (requestId !== this.modelSelectorIconRequestId) {
-      return;
-    }
-
-    if (iconUrl !== this.currentModelTriggerIconUrl) {
-      iconWrapper.empty();
-
-      if (iconUrl) {
-        const img = document.createElement('img');
-        img.classList.add('opencodian-provider-icon-image');
-        img.src = iconUrl;
-        img.alt = iconLabel;
-        img.title = iconLabel;
-        iconWrapper.appendChild(img);
-      } else {
-        setIcon(iconWrapper as HTMLElement, 'bot');
-      }
-
-      this.currentModelTriggerIconUrl = iconUrl;
-      return;
-    }
-
-    if (iconUrl) {
-      const existingImg = iconWrapper.querySelector('img');
-      if (existingImg) {
-        existingImg.alt = iconLabel;
-        existingImg.title = iconLabel;
-      }
-    }
+    this.chatSelectionControlsCoordinator.updateModelSelectorDisplay();
   }
 
   /** Get current model for this session */
@@ -6636,9 +6357,6 @@ export class OpenCodianView extends ItemView {
     if (!this.tabManager?.getActiveTab()) return;
 
     this.tabManager.setActiveTabModelOverride({ provider, model });
-
-    // Update display
-    this.updateModelSelectorDisplay();
     this.activeTabContextUsageCoordinator.syncIdentity();
 
     // Show notification with model name only
@@ -6689,7 +6407,7 @@ export class OpenCodianView extends ItemView {
     model: string | undefined,
   ): Promise<boolean> {
     if (!this.hasLoadedModelCatalog) {
-      await this.loadAvailableModels();
+      await this.reloadModelCatalog();
     }
 
     const resolution = this.modelCatalogBundle
@@ -7014,211 +6732,8 @@ export class OpenCodianView extends ItemView {
     }
   }
 
-  // Permission selector state
-  private permissionSelectorContainer: HTMLElement | null = null;
-  private permissionSelectorTrigger: HTMLElement | null = null;
-  private permissionSelectorDropdown: HTMLElement | null = null;
-  private isPermissionDropdownOpen = false;
-  private permissionDropdownClickOutsideHandler: ((e: MouseEvent) => void) | null = null;
-
-  /** Initialize permission mode selector */
-  private initializePermissionSelector(containerEl: HTMLElement): void {
-    this.permissionSelectorContainer = containerEl;
-
-    // Create trigger button
-    this.permissionSelectorTrigger = containerEl.createDiv({ cls: 'opencodian-permission-trigger' });
-
-    const iconEl = this.permissionSelectorTrigger.createSpan({ cls: 'opencodian-permission-trigger-icon' });
-    setIcon(iconEl, 'shield');
-
-    const textEl = this.permissionSelectorTrigger.createSpan({ cls: 'opencodian-permission-trigger-text' });
-
-    // Create dropdown (hidden by default)
-    this.permissionSelectorDropdown = containerEl.createDiv({ cls: 'opencodian-permission-dropdown' });
-    this.permissionSelectorDropdown.style.display = 'none';
-
-    // Build dropdown content
-    this.buildPermissionDropdown();
-
-    // Update display based on current mode
-    const updateDisplay = () => {
-      const mode = this.plugin.settings.permissionMode;
-      // Use uppercase mode names for consistency: YOLO / ASK / PLAN
-      const modeText: Record<string, string> = {
-        'yolo': 'YOLO',
-        'normal': 'ASK',
-        'plan': 'PLAN',
-      };
-      textEl.textContent = modeText[mode] || mode;
-
-      // Update icon color based on mode
-      this.permissionSelectorTrigger?.removeClass('mode-yolo', 'mode-normal', 'mode-plan');
-      this.permissionSelectorTrigger?.addClass(`mode-${mode}`);
-
-      // Update dropdown selection
-      this.updatePermissionDropdownSelection();
-    };
-
-    updateDisplay();
-
-    // Handle trigger click
-    this.permissionSelectorTrigger.addEventListener('click', (e) => {
-      e.stopPropagation();
-      this.togglePermissionDropdown();
-    });
-
-    // Setup click outside handler
-    this.permissionDropdownClickOutsideHandler = (e: MouseEvent) => {
-      if (!this.permissionSelectorContainer?.contains(e.target as Node)) {
-        this.closePermissionDropdown();
-      }
-    };
-  }
-
-  /** Build permission dropdown content */
-  private buildPermissionDropdown(): void {
-    if (!this.permissionSelectorDropdown) return;
-
-    this.permissionSelectorDropdown.empty();
-
-    // Create option items
-    const modes: Array<{ id: string; label: string; description: string }> = [
-      {
-        id: 'yolo',
-        label: t('settings.security.permissionMode.yolo'),
-        description: t('settings.security.permissionMode.yoloDescription') || 'Allow all tools without asking'
-      },
-      {
-        id: 'normal',
-        label: t('settings.security.permissionMode.normal'),
-        description: t('settings.security.permissionMode.normalDescription') || 'Ask before executing tools'
-      },
-      {
-        id: 'plan',
-        label: t('settings.security.permissionMode.plan'),
-        description: t('settings.security.permissionMode.planDescription') || 'Review and approve all actions'
-      },
-    ];
-
-    for (const mode of modes) {
-      const optionEl = this.permissionSelectorDropdown.createDiv({
-        cls: 'opencodian-permission-option',
-        attr: { 'data-mode': mode.id }
-      });
-
-      // Icon - use consistent shield icon like the trigger
-      const iconWrapper = optionEl.createSpan({ cls: 'opencodian-permission-option-icon' });
-      setIcon(iconWrapper, 'shield');
-
-      // Content container for label and description
-      const contentEl = optionEl.createDiv({ cls: 'opencodian-permission-option-content' });
-      contentEl.createDiv({ cls: 'opencodian-permission-option-label', text: mode.label });
-      contentEl.createDiv({ cls: 'opencodian-permission-option-desc', text: mode.description });
-
-      // Checkmark for selected state
-      const checkmark = optionEl.createSpan({ cls: 'opencodian-permission-option-check' });
-      setIcon(checkmark, 'check');
-
-      // Click handler
-      optionEl.addEventListener('click', (e) => {
-        e.stopPropagation();
-        void this.switchPermissionMode(mode.id as 'yolo' | 'normal' | 'plan').then(() => {
-          this.updatePermissionTriggerDisplay();
-          this.closePermissionDropdown();
-        });
-      });
-    }
-
-    // Update selection state
-    this.updatePermissionDropdownSelection();
-  }
-
-  /** Update permission dropdown selection state */
-  private updatePermissionDropdownSelection(): void {
-    if (!this.permissionSelectorDropdown) return;
-
-    const currentMode = this.plugin.settings.permissionMode;
-
-    this.permissionSelectorDropdown.querySelectorAll('.opencodian-permission-option').forEach(opt => {
-      const mode = opt.getAttribute('data-mode');
-      if (mode === currentMode) {
-        opt.addClass('is-selected');
-      } else {
-        opt.removeClass('is-selected');
-      }
-    });
-  }
-
-  /** Update permission trigger display */
-  private updatePermissionTriggerDisplay(): void {
-    if (!this.permissionSelectorTrigger) return;
-
-    const mode = this.plugin.settings.permissionMode;
-    const modeText: Record<string, string> = {
-      'yolo': 'YOLO',
-      'normal': 'ASK',
-      'plan': 'PLAN',
-    };
-
-    const textEl = this.permissionSelectorTrigger.querySelector('.opencodian-permission-trigger-text');
-    if (textEl) {
-      textEl.textContent = modeText[mode] || mode;
-    }
-
-    // Update icon color based on mode
-    this.permissionSelectorTrigger.removeClass('mode-yolo', 'mode-normal', 'mode-plan');
-    this.permissionSelectorTrigger.addClass(`mode-${mode}`);
-  }
-
-  /** Toggle permission dropdown visibility */
-  private togglePermissionDropdown(): void {
-    if (this.isPermissionDropdownOpen) {
-      this.closePermissionDropdown();
-    } else {
-      this.openPermissionDropdown();
-    }
-  }
-
-  /** Open permission dropdown */
-  private openPermissionDropdown(): void {
-    if (!this.permissionSelectorDropdown || !this.permissionSelectorTrigger) return;
-
-    this.isPermissionDropdownOpen = true;
-    this.permissionSelectorDropdown.style.display = 'block';
-    this.permissionSelectorTrigger.addClass('is-open');
-
-    // Update selection
-    this.updatePermissionDropdownSelection();
-
-    // Add click outside listener
-    document.addEventListener('click', this.permissionDropdownClickOutsideHandler!);
-
-    // Register escape key handler
-    this.scope?.register([], 'Escape', () => {
-      if (this.isPermissionDropdownOpen) {
-        this.closePermissionDropdown();
-        return true;
-      }
-      return false;
-    });
-  }
-
-  /** Close permission dropdown */
-  private closePermissionDropdown(): void {
-    if (!this.permissionSelectorDropdown || !this.permissionSelectorTrigger) return;
-
-    this.isPermissionDropdownOpen = false;
-    this.permissionSelectorDropdown.style.display = 'none';
-    this.permissionSelectorTrigger.removeClass('is-open');
-
-    // Remove click outside listener
-    if (this.permissionDropdownClickOutsideHandler) {
-      document.removeEventListener('click', this.permissionDropdownClickOutsideHandler);
-    }
-  }
-
   /** Switch permission mode and restart OpenCode service */
-  private async switchPermissionMode(mode: 'yolo' | 'normal' | 'plan'): Promise<void> {
+  private async switchPermissionMode(mode: PermissionMode): Promise<void> {
     try {
       // Update setting
       this.plugin.settings.permissionMode = mode;

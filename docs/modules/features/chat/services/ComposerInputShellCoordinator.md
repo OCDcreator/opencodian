@@ -13,7 +13,7 @@
 - 绑定 textarea Enter 提交、Shift+Enter 换行，以及 textarea 高度同步
 - 统一处理 submit gate、send/stop affordance 和 add-context 按钮事件
 - 通过 `ResizeObserver` + `requestAnimationFrame` 维护 composer stack height，并触发 settled scroll
-- 把 permission/model/context-usage/effort 这四个既有子控件挂到稳定的 toolbar slot
+- 把 selection controls/context-usage/effort 这些既有子控件挂到稳定的 toolbar slot
 
 ## 公开接口
 
@@ -25,8 +25,7 @@ export interface ComposerInputShellCoordinatorHost {
   setTooltipLabel(...): void;
   getInputPlaceholder(): string;
   addChosenFileContextToActiveTab(): Promise<void>;
-  initializePermissionSelector(container: HTMLElement): void;
-  initializeModelSelector(container: HTMLElement): void;
+  mountSelectionControls(toolbar: HTMLElement): void;
   mountContextUsageIndicator(container: HTMLElement): void;
   mountEffortSelector(container: HTMLElement): void;
   isActiveTabStreaming(): boolean;
@@ -62,7 +61,7 @@ export class ComposerInputShellCoordinator {
 ## 与 `OpenCodianView` 的边界
 
 - `OpenCodianView` 只创建 coordinator、提供 host callbacks，并在外观 / glass 逻辑需要时读取 shell DOM refs
-- 既有 send pipeline、question/todo runtime、permission/model selector 状态机都没有迁入本模块
+- 既有 send pipeline、question/todo runtime 没有迁入本模块；model / permission selector 状态机 已进一步交给 `ChatSelectionControlsCoordinator`
 - liquid-glass adapter mount、SVG filter 和 diagnostics 仍留在 view，等后续 R17 input appearance/glass lane 处理
 
-本模块推进 master plan 的 P1 `OpenCodianView composer input shell` lane：把输入区 DOM、textarea 行为、submit gate 与 layout metrics 从主 view 迁出，但刻意不改 selector ownership 或 glass diagnostics。
+本模块推进 master plan 的 P1 `OpenCodianView composer input shell` lane：把输入区 DOM、textarea 行为、submit gate 与 layout metrics 从主 view 迁出，并把 selector toolbar 区域留给后续 dedicated owner 接管。
