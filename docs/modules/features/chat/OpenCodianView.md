@@ -90,7 +90,7 @@ background task completion notice 的 queued-state 则已经完全移出 `TabRun
 - 模型目录缓存：`availableModels`、`availableProviders`
 - 服务器状态轮询和 badge 状态
 - model selector sticky header cleanup
-- 由 `ComposerContextHostAdapter` 基于独立的 `createComposerContextViewHost()` / `createFocusContextViewHost()` seam 装配出的 `ComposerContextEventBridge`、`ComposerContextCoordinator`、`FocusContextRuntimeService`、`PersistentAssistantNoticeService` 等视图级运行时协作对象
+- 由 `ComposerContextViewFacade.create()` 基于独立的 `createComposerContextViewHost()` / `createFocusContextViewHost()` seam 装配出的 `ComposerContextEventBridge`、`ComposerContextCoordinator`、`FocusContextRuntimeService`、`PersistentAssistantNoticeService` 等视图级运行时协作对象
 - theme background / liquid glass / diamond demo / glass octahedron 相关 DOM 引用
 
 ## 主链路
@@ -348,9 +348,9 @@ model selector 现在拆成了几层协作：
 
 ### context、选区与文件目录
 
-这个视图仍负责 composer context 按钮装配；而 context picker / retained-selection 相关 host wiring 现在先收束到 `ComposerContextHostAdapter`，再由它装配 active-tab `draftContextItems` / `focusContextPreview` 写回、焦点预览 runtime、入口动作和 chips 编排：
+这个视图仍负责 composer context 按钮装配；而 context picker / retained-selection 相关 host wiring 现在先收束到 `ComposerContextViewFacade.create()`，再由它装配 active-tab `draftContextItems` / `focusContextPreview` 写回、焦点预览 runtime、入口动作和 chips 编排：
 
-- `ComposerContextHostAdapter` 负责把 view 提供的较窄 seam 组装成 composer context service bundle，并把 retained-selection / context picker 相关 host wiring 从 `OpenCodianView` 构造函数里迁走
+- `ComposerContextViewFacade.create()` 负责把 view 提供的较窄 seam 组装成 composer context service bundle，并把 `ContextAttachmentBuilder`、`ContextFileCatalogService`、retained-selection / context picker 相关 host wiring 从 `OpenCodianView` 构造函数里迁走
 - `ComposerContextEventBridge` 负责 composer/context 相关的 workspace / vault / DOM 事件注册、当前会话 note path 写回，以及 retained-selection polling lifecycle
 - `ComposerContextViewHostAdapter` 负责 active-tab `draftContextItems` / `focusContextPreview` 的统一读写，并把同一份 state seam 暴露给 action/picker/coordinator/focus-runtime 几条路径
 - `FocusContextRuntimeService` 负责活动 `MarkdownView` 回退查找与 focus preview 计算，并通过 `RetainedSelectionRuntimeCoordinator` 承接 composer pointer handoff / focusin/focusout / polling 驱动的 retained-selection 协调
@@ -461,7 +461,7 @@ background task notice 这条子链路现在的边界是：
 - `TabManager` / `TabBar`：tab 生命周期和 tab 元数据
 - `MarkdownRenderService`：Markdown 渲染
 - `StreamController`：流式 assistant DOM 更新
-- `ComposerContextHostAdapter`：composer context / retained-selection 相关 bundle 装配，以及 view host → service bundle 的收束层
+- `ComposerContextViewFacade`：composer context / retained-selection 相关 bundle 的总装配入口，以及 view-facing 收束层
 - `ComposerContextActionService`：current-note / selection 入口动作与活动编辑器回退
 - `ComposerContextPickerActionService`：文件选择器打开/关闭、catalog 编排，以及 file context draft 写回
 - `ComposerContextEventBridge`：composer/context 相关的 workspace / vault / DOM 事件桥接，以及 retained-selection polling lifecycle

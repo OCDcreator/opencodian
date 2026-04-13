@@ -6,7 +6,7 @@ import {
   type ComposerContextViewHost,
   type FocusContextPreviewWritebackHost,
   type FocusContextRuntimeViewHost,
-} from '../../../../src/features/chat/services/ComposerContextHostAdapter';
+} from '../../../../src/features/chat/services/ComposerContextViewFacade';
 import type { ComposerContextRuntimeState } from '../../../../src/features/chat/services/ComposerContextRuntimeStore';
 import type { TabId } from '../../../../src/features/chat/tabs';
 import { chooseContextFile } from '../../../../src/features/chat/ui/ContextFilePickerModal';
@@ -115,7 +115,7 @@ function createHarness(options: {
   };
 }
 
-describe('ComposerContextHostAdapter', () => {
+describe('ComposerContextViewFacade', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });

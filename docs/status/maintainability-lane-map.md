@@ -4,15 +4,15 @@
 
 ## 当前优先级
 
-- **P3**: context / composer / retained-selection 相关 ownership（roadmap 当前 `[NEXT]`）
-- **P4**: message shell / notice / timestamp 组装边界
+- **P4**: message shell / notice / timestamp 组装边界（roadmap 当前 `[NEXT]`）
+- **P3**: context / composer / retained-selection 相关 ownership（R7 已完成；后续只保留 facade/focus runtime 回归 watchpoints）
 - **P1**: `OpenCodianView` 里剩余的 activation / sync / runtime bridge ownership
 - **P2**: question / todo / background task queue 已完成 R1-R6；后续只保留 regression watchpoints，不再继续拆新 owner
 
 ## 当前热点首查入口
 
-- P3 首查 composer/context builder、context catalog 与 retained-selection runtime
 - P4 首查 assistant shell / notice / footer / timestamp 组装入口，再看现有 renderer/finalizer/service
+- P3 regression-only 首查 composer-context facade 创建、context catalog ownership 与 retained-selection runtime
 - P1 首查 `OpenCodianView` 里 activation / sync host 与 runtime bridge 创建区段，再看对应 bridge/service
 - P2 regression-only 首查顺序固定为：
   1. `tests/unit/features/chat/QuestionDockCoordinator.test.ts`
@@ -26,6 +26,12 @@
 - R1-R6 已把 question dock lifecycle、todo refresh/status、background completion notice、post-sync handoff 与 session signal orchestration 收束到稳定 owner
 - 当前剩余风险以回归为主：background tab 无 session 时的 dock 清理、post-sync todo/status gate、completion notice queue/fingerprint 去重，以及 live signal 进入 `SessionTodoCoordinator` 后的 writeback 顺序
 - 后续若不是测试、构建或正确性问题，默认不要再回到 P2 开新拆分切口
+
+## P3 收束状态
+
+- R7 已把 composer-context bundle 创建、`ContextAttachmentBuilder` 与 `ContextFileCatalogService` ownership 收进 `ComposerContextViewFacade.create()`
+- `OpenCodianView` 只保留 view host seam、context row DOM 挂载、add-context 按钮和公开的 editor context 入口；不要再把 builder/catalog/service fan-out 放回 view
+- 后续若不是回归或正确性问题，默认按 roadmap 转向 P4 message shell / notice / timestamp ownership
 
 ## 可复用模式
 

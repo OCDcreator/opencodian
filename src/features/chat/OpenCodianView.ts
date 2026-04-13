@@ -184,14 +184,11 @@ import {
   type BackgroundTaskTimelineServiceHost,
 } from './services/BackgroundTaskTimelineService';
 import {
-  createComposerContextServices,
+  ComposerContextViewFacade,
   type ComposerContextViewHost,
   type FocusContextPreviewWritebackHost,
   type FocusContextRuntimeViewHost,
-} from './services/ComposerContextHostAdapter';
-import type { ComposerContextViewFacade } from './services/ComposerContextViewFacade';
-import { ContextAttachmentBuilder } from './services/ContextAttachmentBuilder';
-import { ContextFileCatalogService } from './services/ContextFileCatalogService';
+} from './services/ComposerContextViewFacade';
 import { ContextUsageService } from './services/ContextUsageService';
 import {
   createConversationHydrationRuntimeViewHostFactoryHost,
@@ -771,8 +768,6 @@ export class OpenCodianView extends ItemView {
   private questionRuntimeServices: QuestionRuntimeServices;
   private sendPipelineRuntime: SendPipelineRuntime;
   private composerContextViewFacade: ComposerContextViewFacade;
-  private contextAttachmentBuilder: ContextAttachmentBuilder;
-  private contextFileCatalogService: ContextFileCatalogService;
   private omoBackgroundTaskLogStates = new Map<string, OmoBackgroundTaskLogState>();
   private lastLiquidGlassDiagnosticsFingerprint: string | null = null;
 
@@ -1076,19 +1071,13 @@ export class OpenCodianView extends ItemView {
     this.currentEffortLevel = this.plugin.settings.effortLevel;
     this.currentThinkingBudget = this.plugin.settings.thinkingBudget;
     this.titleGenerationService = new TitleGenerationService(this.plugin);
-    this.contextAttachmentBuilder = new ContextAttachmentBuilder(this.app, {
-      getServerMode: () => this.plugin.settings.server.mode,
-    });
-    this.contextFileCatalogService = new ContextFileCatalogService(this.app);
-    const composerContextServices = createComposerContextServices({
+    this.composerContextViewFacade = ComposerContextViewFacade.create({
       app: this.app,
-      contextAttachmentBuilder: this.contextAttachmentBuilder,
-      contextFileCatalogService: this.contextFileCatalogService,
+      getServerMode: () => this.plugin.settings.server.mode,
       viewHost: this.createComposerContextViewHost(),
       focusRuntimeViewHost: this.createFocusContextRuntimeViewHost(),
       focusPreviewWritebackHost: this.createFocusContextPreviewWritebackHost(),
     });
-    this.composerContextViewFacade = composerContextServices.viewFacade;
     this.tabConversationSyncFingerprintRuntimePort =
       createTabConversationSyncFingerprintRuntimePort(
         this.createTabConversationSyncFingerprintPortProviderHost(),

@@ -18,6 +18,8 @@
 本轮规划目标是提升整体可维护性，降低单一文件复杂度，同时避免把“大单体”拆成“微碎片”。优先顺序是：先收束已经过碎的 P2 question/todo/background-task 链，再迁出 `OpenCodianView` 中仍然成块的 context 与 message ownership，最后处理 settings/core 的大 owner。
 
 > **P2 状态（R6 完成后）**: R1-R6 已完成 question dock、todo refresh/status、background completion notice、post-sync handoff 与 session signal orchestration 的收束。剩余风险以回归为主：background tab 无 session 时的 dock 清理、post-sync todo/status gate、completion notice queue/fingerprint 去重，以及 live signal writeback 顺序。
+>
+> **P3 状态（R7 完成后）**: composer-context bundle 创建、`ContextAttachmentBuilder` 与 `ContextFileCatalogService` ownership 已收进 `ComposerContextViewFacade.create()`；`OpenCodianView` 只保留 view host seam、context row 挂载和按钮事件入口，后续 P3 风险以 facade / focus runtime 回归为主。
 
 ## Queue
 
@@ -145,7 +147,7 @@
   - roadmap 标明 P2 收束完成/剩余风险。
   - 运行 targeted tests、全量 `npm test`、`npm run build`。
 
-### [NEXT] R7 - P3 context/composer/retained-selection ownership
+### [DONE] R7 - P3 context/composer/retained-selection ownership
 
 - **Lane**: P3 `context / composer / retained-selection`
 - **目标**: 迁出 context catalog、composer chips、focus preview、retained selection 的一块完整 ownership，让 `OpenCodianView` 只通过小接口消费 context orchestration。
@@ -166,7 +168,7 @@
   - 新 owner 有 focused tests。
   - 运行 targeted tests、全量 `npm test`、`npm run build`。
 
-### [QUEUED] R8 - P4 message shell / notice / timestamp ownership
+### [NEXT] R8 - P4 message shell / notice / timestamp ownership
 
 - **Lane**: P4 `message shell / notice / timestamp`
 - **目标**: 把 assistant shell、notice、footer/timestamp 组装迁到更厚的 render/finalizer service，减少 `OpenCodianView` 的消息级 DOM 细节。
