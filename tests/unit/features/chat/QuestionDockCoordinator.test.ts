@@ -1,44 +1,25 @@
 import type { QuestionDisplayMode, QuestionRequest } from '../../../../src/core/types';
 import { setLocale } from '../../../../src/i18n';
-import type { QuestionDockRefreshFacade } from '../../../../src/features/chat/services/QuestionDockRefreshFacade';
-import { QuestionResolutionApplyFacade } from '../../../../src/features/chat/services/QuestionResolutionApplyFacade';
 import { QuestionDockResolutionActionFacade } from '../../../../src/features/chat/services/QuestionDockResolutionActionFacade';
+import {
+  QuestionDockCoordinator,
+  type QuestionDockCoordinatorHost,
+  type QuestionDockRuntimeState,
+} from '../../../../src/features/chat/services/QuestionDockCoordinator';
 import {
   QuestionDockRenderStateFacade,
   type QuestionDockRenderStateFacadeHost,
 } from '../../../../src/features/chat/services/QuestionDockRenderStateFacade';
-import {
-  QuestionDockWritebackFacade,
-} from '../../../../src/features/chat/services/QuestionDockWritebackFacade';
-import {
-  QuestionDockQueueRuntimeFacade,
-} from '../../../../src/features/chat/services/QuestionDockQueueRuntimeFacade';
-import {
-  QuestionDockCoordinator,
-  type QuestionDockCoordinatorHost,
-} from '../../../../src/features/chat/services/QuestionDockCoordinator';
-import { QuestionPendingRefreshRuntimeFacade } from '../../../../src/features/chat/services/QuestionPendingRefreshRuntimeFacade';
+import type { QuestionPostResolutionRuntimeFacade } from '../../../../src/features/chat/services/QuestionPostResolutionRuntimeFacade';
 import {
   QuestionResolutionExecutionFacade,
   type QuestionResolutionExecutionFacadeHost,
 } from '../../../../src/features/chat/services/QuestionResolutionExecutionFacade';
-import type { QuestionPostResolutionRuntimeFacade } from '../../../../src/features/chat/services/QuestionPostResolutionRuntimeFacade';
-import { QuestionResolutionWritebackFacade } from '../../../../src/features/chat/services/QuestionResolutionWritebackFacade';
 import type { TabId } from '../../../../src/features/chat/tabs';
 import type {
   QuestionDockCallbacks,
   QuestionDockRenderState,
 } from '../../../../src/features/chat/ui/QuestionDock';
-
-interface TestRuntimeState {
-  isStreaming: boolean;
-  pendingQuestionRequests: QuestionRequest[];
-  resolvedQuestionRequestIds: Set<string>;
-  questionDraftAnswers: Map<string, string[][]>;
-  questionActiveGroupKeys: Map<string, string>;
-  questionActiveIndexes: Map<string, number>;
-  questionRequestWaiters: Map<string, { promise: Promise<void>; resolve: () => void }>;
-}
 
 type Mocked<T> = {
   [Key in keyof T]:
@@ -67,10 +48,9 @@ function createQuestionRequest(overrides?: Partial<QuestionRequest>): QuestionRe
 }
 
 function createRuntimeState(
-  overrides?: Partial<TestRuntimeState>,
-): TestRuntimeState {
+  overrides?: Partial<QuestionDockRuntimeState>,
+): QuestionDockRuntimeState {
   return {
-    isStreaming: false,
     pendingQuestionRequests: [],
     resolvedQuestionRequestIds: new Set(),
     questionDraftAnswers: new Map(),
@@ -81,19 +61,30 @@ function createRuntimeState(
   };
 }
 
-function createHost(options?: {
+function createCoordinator(options?: {
   activeTabId?: TabId | null;
   currentConversationSessionId?: string | null;
   questionDisplayMode?: QuestionDisplayMode;
   shouldUseAboveInputQuestionDock?: boolean;
+  pendingQuestions?: QuestionRequest[];
+  sessionIdsByTab?: Record<string, string | null>;
 }) {
   const activeTabId = options?.activeTabId ?? 'tab-active';
-  const runtimeByTab = new Map<TabId, TestRuntimeState>([
+  const runtimeByTab = new Map<TabId, QuestionDockRuntimeState>([
     ['tab-active', createRuntimeState()],
+  ]);
+  const sessionIdsByTab = new Map<TabId, string | null>([
+    ['tab-active', options?.sessionIdsByTab?.['tab-active'] ?? 'session-1'],
   ]);
   let latestRenderState: QuestionDockRenderState | null = null;
   let latestCallbacks: QuestionDockCallbacks | null = null;
-  let renderQuestionDockImpl: (() => void) | null = null;
+
+  for (const [tabId, sessionId] of Object.entries(options?.sessionIdsByTab ?? {})) {
+    sessionIdsByTab.set(tabId, sessionId);
+    if (!runtimeByTab.has(tabId)) {
+      runtimeByTab.set(tabId, createRuntimeState());
+    }
+  }
 
   const questionDock = {
     render: jest.fn((state: QuestionDockRenderState, callbacks: QuestionDockCallbacks) => {
@@ -101,32 +92,43 @@ function createHost(options?: {
       latestCallbacks = callbacks;
     }),
   };
-  const setTabNeedsAttention = jest.fn();
 
   const host: Mocked<
     QuestionDockCoordinatorHost
     & QuestionDockRenderStateFacadeHost
     & QuestionResolutionExecutionFacadeHost
   > = {
-    getTabRuntimeState: jest.fn((tabId) => (tabId ? runtimeByTab.get(tabId) ?? null : null)),
     getActiveTabId: jest.fn().mockReturnValue(activeTabId),
-    getCurrentConversationSessionId: jest.fn().mockReturnValue(
-      options?.currentConversationSessionId ?? 'session-1',
-    ),
     getQuestionDock: jest.fn().mockReturnValue(questionDock),
     getQuestionDisplayMode: jest.fn().mockReturnValue(options?.questionDisplayMode ?? 'all'),
     shouldUseAboveInputQuestionDock: jest
       .fn()
       .mockReturnValue(options?.shouldUseAboveInputQuestionDock ?? true),
+    getCurrentConversationSessionId: jest.fn().mockReturnValue(
+      options?.currentConversationSessionId ?? sessionIdsByTab.get(activeTabId ?? '') ?? null,
+    ),
+    getTabRuntimeState: jest.fn((tabId) => (tabId ? runtimeByTab.get(tabId) ?? null : null)),
+    ensureTabRuntimeState: jest.fn((tabId) => {
+      if (!tabId) {
+        return null;
+      }
+
+      const existing = runtimeByTab.get(tabId);
+      if (existing) {
+        return existing;
+      }
+
+      const created = createRuntimeState();
+      runtimeByTab.set(tabId, created);
+      return created;
+    }),
+    getSessionIdForTab: jest.fn((tabId) => (tabId ? sessionIdsByTab.get(tabId) ?? null : null)),
+    getPendingQuestions: jest
+      .fn()
+      .mockResolvedValue(options?.pendingQuestions ?? ([] as QuestionRequest[])),
+    setTabNeedsAttention: jest.fn(),
     replyToQuestion: jest.fn().mockResolvedValue(undefined),
     rejectQuestion: jest.fn().mockResolvedValue(undefined),
-  };
-  const dockRefresh: Mocked<Pick<
-    QuestionDockRefreshFacade,
-    'clearPendingQuestionsForTab' | 'refreshPendingQuestionsForTab'
-  >> = {
-    clearPendingQuestionsForTab: jest.fn(),
-    refreshPendingQuestionsForTab: jest.fn().mockResolvedValue([] as QuestionRequest[]),
   };
   const dockRenderState = new QuestionDockRenderStateFacade(host);
   const dockResolutionAction = new QuestionDockResolutionActionFacade(
@@ -137,76 +139,30 @@ function createHost(options?: {
     dockRenderState,
   );
   const resolutionExecution = new QuestionResolutionExecutionFacade(host);
+  const applyResolvedQuestionState = jest.fn();
   const postResolutionRuntime: jest.Mocked<Pick<
     QuestionPostResolutionRuntimeFacade,
     'followUpAfterResolution'
   >> = {
     followUpAfterResolution: jest.fn().mockResolvedValue(undefined),
   };
-  const pendingRefreshRuntime = new QuestionPendingRefreshRuntimeFacade({
-    getTabRuntimeState: (tabId) => (tabId ? runtimeByTab.get(tabId) ?? null : null),
-  });
-  const renderQuestionDock = jest.fn(() => {
-    renderQuestionDockImpl?.();
-  });
-  const dockWriteback = new QuestionDockWritebackFacade({
-    getActiveTabId: () => host.getActiveTabId(),
-    setTabNeedsAttention: (tabId, needsAttention) => {
-      setTabNeedsAttention(tabId, needsAttention);
-    },
-    renderQuestionDock,
-  });
-  const dockQueueRuntime = new QuestionDockQueueRuntimeFacade({
-    getTabRuntimeState: (tabId) => (tabId ? runtimeByTab.get(tabId) ?? null : null),
-    ensureTabRuntimeState: (tabId) => {
-      if (!tabId) {
-        return null;
-      }
-      const existing = runtimeByTab.get(tabId);
-      if (existing) {
-        return existing;
-      }
-      const created = createRuntimeState();
-      runtimeByTab.set(tabId, created);
-      return created;
-    },
-  });
-  const applyResolvedQuestionState = jest.fn();
-  const resolutionWriteback = new QuestionResolutionWritebackFacade({
-    markQuestionRequestResolved: (requestId, tabId) => {
-      pendingRefreshRuntime.markQuestionRequestResolved(requestId, tabId);
-    },
-    applyResolvedQuestionState: (resolution, tabId) => {
-      applyResolvedQuestionState(resolution, tabId);
-    },
-    followUpAfterResolution: (tabId) =>
-      postResolutionRuntime.followUpAfterResolution(tabId),
-  });
-  const resolutionApply = new QuestionResolutionApplyFacade(
-    resolutionExecution,
-    resolutionWriteback,
-  );
-
-  return {
+  const coordinator = new QuestionDockCoordinator(
     host,
-    dockRefresh,
     dockRenderState,
     dockResolutionAction,
     resolutionExecution,
-    dockQueueRuntime,
-    pendingRefreshRuntime,
-    dockWriteback,
-    resolutionApply,
-    renderQuestionDock,
-    setTabNeedsAttention,
-    postResolutionRuntime,
-    resolutionWriteback,
-    applyResolvedQuestionState,
-    runtimeByTab,
-    questionDock,
-    setRenderQuestionDockImpl(callback: (() => void) | null): void {
-      renderQuestionDockImpl = callback;
+    {
+      applyResolvedQuestionState,
     },
+    postResolutionRuntime,
+  );
+
+  return {
+    coordinator,
+    host,
+    runtimeByTab,
+    applyResolvedQuestionState,
+    postResolutionRuntime,
     getLatestRenderState(): QuestionDockRenderState {
       if (!latestRenderState) {
         throw new Error('Question dock was not rendered');
@@ -231,33 +187,14 @@ describe('QuestionDockCoordinator', () => {
   it('waits for above-input dock submission and runs the active-tab follow-up flow', async () => {
     const request = createQuestionRequest();
     const {
+      coordinator,
       host,
-      dockRefresh,
-      dockRenderState,
-      dockResolutionAction,
-      resolutionApply,
-      dockQueueRuntime,
-      pendingRefreshRuntime,
-      dockWriteback,
-      postResolutionRuntime,
-      applyResolvedQuestionState,
       runtimeByTab,
-      setRenderQuestionDockImpl,
-      getLatestCallbacks,
+      applyResolvedQuestionState,
+      postResolutionRuntime,
       getLatestRenderState,
-    } = createHost();
-    const coordinator = new QuestionDockCoordinator(
-      host,
-      dockRenderState,
-      dockResolutionAction,
-      resolutionApply,
-      dockQueueRuntime,
-      dockRefresh,
-      dockWriteback,
-    );
-    setRenderQuestionDockImpl(() => {
-      coordinator.render();
-    });
+      getLatestCallbacks,
+    } = createCoordinator();
 
     const resolutionPromise = coordinator.waitForDockResolutionIfEnabled(request, 'tab-active');
 
@@ -283,98 +220,91 @@ describe('QuestionDockCoordinator', () => {
     expect(runtimeByTab.get('tab-active')?.resolvedQuestionRequestIds.has(request.id)).toBe(true);
   });
 
-  it('delegates pending refresh orchestration to the refresh facade', async () => {
-    const request = createQuestionRequest({
-      id: 'request-background',
+  it('hydrates pending requests and background attention through one lifecycle path', async () => {
+    const freshRequest = createQuestionRequest({
+      id: 'request-fresh',
       sessionId: 'session-background',
     });
+    const waiterOwnedRequest = createQuestionRequest({
+      id: 'request-waiting',
+      sessionId: 'session-background',
+    });
+    const resolvedServerRequest = createQuestionRequest({
+      id: 'request-resolved',
+      sessionId: 'session-background',
+    });
+    const otherSessionRequest = createQuestionRequest({
+      id: 'request-other-session',
+      sessionId: 'session-other',
+    });
     const {
-      dockRefresh,
+      coordinator,
       host,
-      dockRenderState,
-      dockResolutionAction,
-      resolutionApply,
-      dockQueueRuntime,
-      dockWriteback,
-    } = createHost();
-    dockRefresh.refreshPendingQuestionsForTab.mockResolvedValueOnce([request]);
-    const coordinator = new QuestionDockCoordinator(
-      host,
-      dockRenderState,
-      dockResolutionAction,
-      resolutionApply,
-      dockQueueRuntime,
-      dockRefresh,
-      dockWriteback,
-    );
+      runtimeByTab,
+    } = createCoordinator({
+      pendingQuestions: [freshRequest, resolvedServerRequest, otherSessionRequest],
+      sessionIdsByTab: {
+        'tab-background': 'session-background',
+      },
+    });
+    const backgroundRuntime = runtimeByTab.get('tab-background');
+    if (!backgroundRuntime) {
+      throw new Error('Expected background runtime');
+    }
+
+    backgroundRuntime.pendingQuestionRequests = [waiterOwnedRequest];
+    backgroundRuntime.resolvedQuestionRequestIds.add(resolvedServerRequest.id);
+    backgroundRuntime.resolvedQuestionRequestIds.add('request-gone');
+    backgroundRuntime.questionDraftAnswers.set('request-stale', [['stale']]);
+    backgroundRuntime.questionActiveGroupKeys.set('request-stale', 'group-stale');
+    backgroundRuntime.questionActiveIndexes.set('request-stale', 0);
+    backgroundRuntime.questionRequestWaiters.set(waiterOwnedRequest.id, {
+      promise: Promise.resolve(),
+      resolve: jest.fn(),
+    });
 
     await expect(
       coordinator.refreshPendingQuestionsForTab('tab-background', 'session-background'),
-    ).resolves.toEqual([request]);
+    ).resolves.toEqual([freshRequest, waiterOwnedRequest]);
 
-    expect(dockRefresh.refreshPendingQuestionsForTab).toHaveBeenCalledWith(
-      'tab-background',
-      'session-background',
-    );
+    expect(host.getPendingQuestions).toHaveBeenCalledTimes(1);
+    expect(backgroundRuntime.pendingQuestionRequests).toEqual([
+      freshRequest,
+      waiterOwnedRequest,
+    ]);
+    expect(backgroundRuntime.questionDraftAnswers.get(freshRequest.id)).toEqual([[]]);
+    expect(backgroundRuntime.questionDraftAnswers.has('request-stale')).toBe(false);
+    expect(backgroundRuntime.questionActiveGroupKeys.has('request-stale')).toBe(false);
+    expect(backgroundRuntime.questionActiveIndexes.has('request-stale')).toBe(false);
+    expect(backgroundRuntime.resolvedQuestionRequestIds.has('request-gone')).toBe(false);
+    expect(host.setTabNeedsAttention).toHaveBeenCalledWith('tab-background', true);
   });
 
-  it('delegates pending-question clearing to the refresh facade using the active tab by default', () => {
+  it('clears the active-tab lifecycle state and rerenders an empty dock', () => {
+    const request = createQuestionRequest();
     const {
-      dockRefresh,
+      coordinator,
       host,
-      dockRenderState,
-      dockResolutionAction,
-      resolutionApply,
-      dockQueueRuntime,
-      dockWriteback,
-    } = createHost();
-    const coordinator = new QuestionDockCoordinator(
-      host,
-      dockRenderState,
-      dockResolutionAction,
-      resolutionApply,
-      dockQueueRuntime,
-      dockRefresh,
-      dockWriteback,
-    );
+      runtimeByTab,
+      getLatestRenderState,
+    } = createCoordinator();
+    const activeRuntime = runtimeByTab.get('tab-active');
+    if (!activeRuntime) {
+      throw new Error('Expected active runtime');
+    }
+
+    activeRuntime.pendingQuestionRequests = [request];
+    activeRuntime.questionDraftAnswers.set(request.id, [['TypeScript']]);
+    activeRuntime.questionActiveGroupKeys.set(request.id, 'Programming');
+    activeRuntime.questionActiveIndexes.set(request.id, 0);
 
     coordinator.clearPendingQuestionsForTab();
 
-    expect(dockRefresh.clearPendingQuestionsForTab).toHaveBeenCalledWith('tab-active');
-  });
-
-  it('renders an empty dock state when the above-input dock is disabled', () => {
-    const request = createQuestionRequest();
-    const {
-      runtimeByTab,
-      getLatestRenderState,
-      host,
-      dockRefresh,
-      dockRenderState,
-      dockResolutionAction,
-      resolutionApply,
-      dockQueueRuntime,
-      dockWriteback,
-      setRenderQuestionDockImpl,
-    } = createHost({
-      shouldUseAboveInputQuestionDock: false,
-    });
-    runtimeByTab.get('tab-active')!.pendingQuestionRequests = [request];
-    const coordinator = new QuestionDockCoordinator(
-      host,
-      dockRenderState,
-      dockResolutionAction,
-      resolutionApply,
-      dockQueueRuntime,
-      dockRefresh,
-      dockWriteback,
-    );
-    setRenderQuestionDockImpl(() => {
-      coordinator.render();
-    });
-
-    coordinator.render();
-
+    expect(activeRuntime.pendingQuestionRequests).toEqual([]);
+    expect(activeRuntime.questionDraftAnswers.size).toBe(0);
+    expect(activeRuntime.questionActiveGroupKeys.size).toBe(0);
+    expect(activeRuntime.questionActiveIndexes.size).toBe(0);
+    expect(host.setTabNeedsAttention).toHaveBeenCalledWith('tab-active', false);
     expect(getLatestRenderState()).toEqual({
       request: null,
       answers: [],

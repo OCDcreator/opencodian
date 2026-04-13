@@ -11,7 +11,7 @@
 - 把 inline card 返回的 `reply` / `reject` 统一映射成 `QuestionResolutionExecutionFacade` 可复用的 execution action
 - 在 inline question card 无法挂载时，集中记录同一条错误日志
 
-它不负责 dock handoff 判定、共享 execute-then-writeback 骨架，或 resolved-state follow-up；这些仍分别由 `QuestionResolutionFlowCoordinator`、`QuestionResolutionApplyFacade` 与 `QuestionResolutionWritebackFacade` 负责。
+它不负责 dock handoff 判定、共享 execute-then-writeback 骨架，或 resolved-state follow-up；这些仍分别由 `QuestionResolutionFlowCoordinator` 与 `QuestionDockCoordinator` 负责。
 
 ## 公开接口
 
@@ -38,5 +38,5 @@ export class QuestionInlineResolutionActionFacade {
 ## 与 question bundle 的边界
 
 - `QuestionRuntimeHostAdapter` 负责把本 facade 与 `QuestionInlineCardRenderer` 装进同一份 question runtime bundle
-- `QuestionResolutionFlowCoordinator` 现在只关心 dock 是否接管，以及 inline 分支是否拿到统一 execution action
+- `QuestionResolutionFlowCoordinator` 现在只关心 dock 是否接管，以及 inline 分支是否拿到统一 execution action；执行与 writeback 会交回 `QuestionDockCoordinator.applyResolutionAction()`
 - `OpenCodianView` 仍只提供 `questionDisplayMode` 与 runtime host；inline action 收集细节继续留在 question 服务层

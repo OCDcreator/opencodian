@@ -40,7 +40,7 @@
   - phase 文档说明主调用链少跨了哪些文件。
   - 运行 targeted tests、全量 `npm test`、`npm run build`。
 
-### [NEXT] R2 - Question dock 生命周期协调
+### [DONE] R2 - Question dock 生命周期协调
 
 - **Lane**: P2 `question / todo / background task`
 - **目标**: 把 pending requests、draft answers、active indexes、submit/reject 后处理收进一个较厚的 question lifecycle coordinator。
@@ -62,7 +62,7 @@
   - 新 owner 至少覆盖 request hydration 与 respond/reject 后处理。
   - 运行 targeted tests、全量 `npm test`、`npm run build`。
 
-### [QUEUED] R3 - Session todo refresh/status 收束
+### [NEXT] R3 - Session todo refresh/status 收束
 
 - **Lane**: P2 `question / todo / background task`
 - **目标**: 集中 `applySessionTodoUpdate`、`setTabSessionTodos`、stale suppression、dock render trigger，让 todo 初始同步、live update、stale 处理统一走一个 coordinator。

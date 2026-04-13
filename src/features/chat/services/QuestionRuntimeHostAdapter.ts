@@ -20,41 +20,23 @@ import {
   type QuestionInlineResolutionActionFacadeHost,
 } from './QuestionInlineResolutionActionFacade';
 import {
-  QuestionDockRefreshFacade,
-  type QuestionDockRefreshFacadeHost,
-} from './QuestionDockRefreshFacade';
-import {
   QuestionDockResolutionActionFacade,
   type QuestionDockResolutionActionFacadeHost,
 } from './QuestionDockResolutionActionFacade';
 import {
   QuestionDockRenderStateFacade,
-  type QuestionDockRenderStateRuntimeState,
   type QuestionDockRenderStateFacadeHost,
 } from './QuestionDockRenderStateFacade';
 import {
-  QuestionDockQueueRuntimeFacade,
-  type QuestionDockQueueRuntimeFacadeHost,
-  type QuestionDockQueueRuntimeState,
-} from './QuestionDockQueueRuntimeFacade';
-import {
   QuestionDockCoordinator,
   type QuestionDockCoordinatorHost,
+  type QuestionDockRuntimeState,
 } from './QuestionDockCoordinator';
-import { QuestionDockWritebackFacade } from './QuestionDockWritebackFacade';
-import {
-  QuestionPendingRefreshRuntimeFacade,
-  type QuestionPendingRefreshRuntimeFacadeHost,
-  type QuestionPendingRefreshRuntimeState,
-} from './QuestionPendingRefreshRuntimeFacade';
 import {
   QuestionPostResolutionRuntimeFacade,
   type QuestionPostResolutionRuntimeFacadeHost,
   type QuestionPostResolutionRuntimeState,
 } from './QuestionPostResolutionRuntimeFacade';
-import {
-  QuestionResolutionApplyFacade,
-} from './QuestionResolutionApplyFacade';
 import {
   QuestionResolutionFlowCoordinator,
   type QuestionResolutionFlowCoordinatorHost,
@@ -63,14 +45,11 @@ import {
   QuestionResolutionExecutionFacade,
   type QuestionResolutionExecutionFacadeHost,
 } from './QuestionResolutionExecutionFacade';
-import { QuestionResolutionWritebackFacade } from './QuestionResolutionWritebackFacade';
 
 type QuestionDockPort = Pick<QuestionDock, 'render'>;
 
 export interface QuestionRuntimeState
-  extends QuestionDockRenderStateRuntimeState,
-    QuestionDockQueueRuntimeState,
-    QuestionPendingRefreshRuntimeState,
+  extends QuestionDockRuntimeState,
     QuestionInlineCardRuntimeState,
     QuestionResolutionCoordinatorRuntimeState,
     QuestionPostResolutionRuntimeState {}
@@ -97,12 +76,9 @@ export interface QuestionRuntimeHosts {
   inlineResolutionActionHost: QuestionInlineResolutionActionFacadeHost;
   resolutionCoordinatorHost: QuestionResolutionCoordinatorHost;
   dockCoordinatorHost: QuestionDockCoordinatorHost;
-  dockRefreshHost: QuestionDockRefreshFacadeHost;
   dockRenderStateHost: QuestionDockRenderStateFacadeHost;
   dockResolutionActionHost: QuestionDockResolutionActionFacadeHost;
   resolutionExecutionHost: QuestionResolutionExecutionFacadeHost;
-  dockQueueRuntimeHost: QuestionDockQueueRuntimeFacadeHost;
-  pendingRefreshRuntimeHost: QuestionPendingRefreshRuntimeFacadeHost;
   postResolutionRuntimeHost: QuestionPostResolutionRuntimeFacadeHost;
 }
 
@@ -141,11 +117,14 @@ export function createQuestionRuntimeHosts(
       getQuestionDock: () => viewHost.getQuestionDock(),
       getQuestionDisplayMode: () => viewHost.getQuestionDisplayMode(),
       shouldUseAboveInputQuestionDock: () => viewHost.shouldUseAboveInputQuestionDock(),
-    },
-    dockRefreshHost: {
+      getCurrentConversationSessionId: () => viewHost.getCurrentConversationSessionId(),
       getTabRuntimeState: (tabId: TabId | null) => viewHost.getTabRuntimeState(tabId),
+      ensureTabRuntimeState: (tabId: TabId | null) => viewHost.ensureTabRuntimeState(tabId),
       getSessionIdForTab: (tabId: TabId | null) => viewHost.getSessionIdForTab(tabId),
       getPendingQuestions: () => viewHost.getPendingQuestions(),
+      setTabNeedsAttention: (tabId, needsAttention) => {
+        viewHost.setTabNeedsAttention(tabId, needsAttention);
+      },
     },
     dockRenderStateHost: {
       getActiveTabId: () => viewHost.getActiveTabId(),
@@ -163,13 +142,6 @@ export function createQuestionRuntimeHosts(
         viewHost.replyToQuestion(requestId, answers),
       rejectQuestion: (requestId: string) => viewHost.rejectQuestion(requestId),
     },
-    dockQueueRuntimeHost: {
-      getTabRuntimeState: (tabId: TabId | null) => viewHost.getTabRuntimeState(tabId),
-      ensureTabRuntimeState: (tabId: TabId | null) => viewHost.ensureTabRuntimeState(tabId),
-    },
-    pendingRefreshRuntimeHost: {
-      getTabRuntimeState: (tabId: TabId | null) => viewHost.getTabRuntimeState(tabId),
-    },
     postResolutionRuntimeHost,
   };
 }
@@ -179,9 +151,6 @@ export function createQuestionRuntimeServices(
   postResolutionRuntimeHost: QuestionPostResolutionRuntimeFacadeHost,
   streamingInlineCardRenderer: StreamingInlineCardRenderer,
 ): QuestionRuntimeServices {
-  let resolutionCoordinator!: QuestionResolutionCoordinator;
-  let dockCoordinator!: QuestionDockCoordinator;
-
   const hosts = createQuestionRuntimeHosts(viewHost, postResolutionRuntimeHost);
 
   const inlineCardRenderer = new QuestionInlineCardRenderer(
@@ -192,7 +161,7 @@ export function createQuestionRuntimeServices(
     hosts.inlineResolutionActionHost,
     inlineCardRenderer,
   );
-  resolutionCoordinator = new QuestionResolutionCoordinator(
+  const resolutionCoordinator = new QuestionResolutionCoordinator(
     inlineCardRenderer,
     hosts.resolutionCoordinatorHost,
   );
@@ -206,62 +175,25 @@ export function createQuestionRuntimeServices(
   const resolutionExecutionFacade = new QuestionResolutionExecutionFacade(
     hosts.resolutionExecutionHost,
   );
-  const dockQueueRuntimeFacade = new QuestionDockQueueRuntimeFacade(
-    hosts.dockQueueRuntimeHost,
-  );
-  const pendingRefreshRuntimeFacade = new QuestionPendingRefreshRuntimeFacade(
-    hosts.pendingRefreshRuntimeHost,
-  );
   const postResolutionRuntimeFacade = new QuestionPostResolutionRuntimeFacade(
     hosts.postResolutionRuntimeHost,
   );
-  const dockWritebackFacade = new QuestionDockWritebackFacade({
-    getActiveTabId: () => viewHost.getActiveTabId(),
-    setTabNeedsAttention: (tabId, needsAttention) => {
-      viewHost.setTabNeedsAttention(tabId, needsAttention);
-    },
-    renderQuestionDock: () => {
-      dockCoordinator.render();
-    },
-  });
-  const dockRefreshFacade = new QuestionDockRefreshFacade(
-    hosts.dockRefreshHost,
-    pendingRefreshRuntimeFacade,
-    dockWritebackFacade,
-  );
-  const resolutionWritebackFacade = new QuestionResolutionWritebackFacade({
-    markQuestionRequestResolved: (requestId, tabId) => {
-      pendingRefreshRuntimeFacade.markQuestionRequestResolved(requestId, tabId);
-    },
-    applyResolvedQuestionState: (resolution, tabId) => {
-      resolutionCoordinator.applyResolvedQuestionState(resolution, tabId);
-    },
-    followUpAfterResolution: (tabId) =>
-      postResolutionRuntimeFacade.followUpAfterResolution(tabId),
-  });
-  const resolutionApplyFacade = new QuestionResolutionApplyFacade(
-    resolutionExecutionFacade,
-    resolutionWritebackFacade,
-  );
-  dockCoordinator = new QuestionDockCoordinator(
+  const dockCoordinator = new QuestionDockCoordinator(
     hosts.dockCoordinatorHost,
     dockRenderStateFacade,
     dockResolutionActionFacade,
-    resolutionApplyFacade,
-    dockQueueRuntimeFacade,
-    dockRefreshFacade,
-    dockWritebackFacade,
+    resolutionExecutionFacade,
+    resolutionCoordinator,
+    postResolutionRuntimeFacade,
   );
   const resolutionFlowCoordinatorHost: QuestionResolutionFlowCoordinatorHost = {
     getActiveTabId: () => viewHost.getActiveTabId(),
-    getQuestionDisplayMode: () => viewHost.getQuestionDisplayMode(),
   };
   const resolutionFlowCoordinator = new QuestionResolutionFlowCoordinator(
     resolutionFlowCoordinatorHost,
     {
       dockCoordinator,
       inlineResolutionAction: inlineResolutionActionFacade,
-      resolutionApply: resolutionApplyFacade,
     },
   );
 

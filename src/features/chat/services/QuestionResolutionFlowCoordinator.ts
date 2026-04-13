@@ -2,19 +2,14 @@ import type { QuestionRequest } from '../../../core/types';
 import type { TabId } from '../tabs';
 import type { QuestionDockCoordinator } from './QuestionDockCoordinator';
 import type { QuestionInlineResolutionActionFacade } from './QuestionInlineResolutionActionFacade';
-import type { QuestionResolutionApplyFacade } from './QuestionResolutionApplyFacade';
 
 type QuestionDockResolutionPort = Pick<
   QuestionDockCoordinator,
-  'waitForDockResolutionIfEnabled'
+  'waitForDockResolutionIfEnabled' | 'applyResolutionAction'
 >;
 type QuestionInlineResolutionActionPort = Pick<
   QuestionInlineResolutionActionFacade,
   'collectResolutionAction'
->;
-type QuestionResolutionApplyPort = Pick<
-  QuestionResolutionApplyFacade,
-  'applyAction'
 >;
 
 export interface QuestionResolutionFlowCoordinatorHost {
@@ -24,7 +19,6 @@ export interface QuestionResolutionFlowCoordinatorHost {
 export interface QuestionResolutionFlowCoordinatorPorts {
   dockCoordinator: QuestionDockResolutionPort;
   inlineResolutionAction: QuestionInlineResolutionActionPort;
-  resolutionApply: QuestionResolutionApplyPort;
 }
 
 export class QuestionResolutionFlowCoordinator {
@@ -49,6 +43,6 @@ export class QuestionResolutionFlowCoordinator {
       return;
     }
 
-    await this.ports.resolutionApply.applyAction(action, tabId);
+    await this.ports.dockCoordinator.applyResolutionAction(action, tabId);
   }
 }

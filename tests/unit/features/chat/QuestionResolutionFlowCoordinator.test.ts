@@ -50,16 +50,13 @@ function createCoordinator(options?: {
   const ports: {
     dockCoordinator: jest.Mocked<QuestionResolutionFlowCoordinatorPorts['dockCoordinator']>;
     inlineResolutionAction: jest.Mocked<QuestionResolutionFlowCoordinatorPorts['inlineResolutionAction']>;
-    resolutionApply: jest.Mocked<QuestionResolutionFlowCoordinatorPorts['resolutionApply']>;
   } = {
     dockCoordinator: {
       waitForDockResolutionIfEnabled: jest.fn().mockResolvedValue(options?.dockResolves ?? false),
+      applyResolutionAction: jest.fn().mockResolvedValue(options?.applyResult ?? true),
     },
     inlineResolutionAction: {
       collectResolutionAction: jest.fn().mockResolvedValue(action),
-    },
-    resolutionApply: {
-      applyAction: jest.fn().mockResolvedValue(options?.applyResult ?? true),
     },
   };
 
@@ -87,10 +84,10 @@ describe('QuestionResolutionFlowCoordinator', () => {
       'tab-active',
     );
     expect(ports.inlineResolutionAction.collectResolutionAction).not.toHaveBeenCalled();
-    expect(ports.resolutionApply.applyAction).not.toHaveBeenCalled();
+    expect(ports.dockCoordinator.applyResolutionAction).not.toHaveBeenCalled();
   });
 
-  it('replays inline resolution actions through the shared apply seam', async () => {
+  it('replays inline resolution actions through the dock lifecycle owner', async () => {
     const request = createQuestionRequest();
     const inlineAction = {
       type: 'reply' as const,
@@ -110,13 +107,13 @@ describe('QuestionResolutionFlowCoordinator', () => {
       request,
       'tab-active',
     );
-    expect(ports.resolutionApply.applyAction).toHaveBeenCalledWith(
+    expect(ports.dockCoordinator.applyResolutionAction).toHaveBeenCalledWith(
       inlineAction,
       'tab-active',
     );
   });
 
-  it('replays inline reject actions through the shared apply seam', async () => {
+  it('replays inline reject actions through the dock lifecycle owner', async () => {
     const request = createQuestionRequest();
     const inlineAction = {
       type: 'reject' as const,
@@ -132,7 +129,7 @@ describe('QuestionResolutionFlowCoordinator', () => {
 
     await coordinator.showQuestionDialog(request, 'tab-active');
 
-    expect(ports.resolutionApply.applyAction).toHaveBeenCalledWith(
+    expect(ports.dockCoordinator.applyResolutionAction).toHaveBeenCalledWith(
       inlineAction,
       'tab-active',
     );
@@ -144,15 +141,15 @@ describe('QuestionResolutionFlowCoordinator', () => {
 
     await coordinator.showQuestionDialog(request, 'tab-active');
 
-    expect(ports.resolutionApply.applyAction).not.toHaveBeenCalled();
+    expect(ports.dockCoordinator.applyResolutionAction).not.toHaveBeenCalled();
   });
 
-  it('still delegates inline failures to the shared apply seam', async () => {
+  it('still delegates inline failures to the dock lifecycle owner', async () => {
     const request = createQuestionRequest();
     const { coordinator, ports } = createCoordinator({ applyResult: false });
 
     await coordinator.showQuestionDialog(request, 'tab-active');
 
-    expect(ports.resolutionApply.applyAction).toHaveBeenCalledTimes(1);
+    expect(ports.dockCoordinator.applyResolutionAction).toHaveBeenCalledTimes(1);
   });
 });

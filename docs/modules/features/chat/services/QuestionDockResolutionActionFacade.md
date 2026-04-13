@@ -12,7 +12,7 @@
 - 复用 `questionDockState.isQuestionAnswerComplete()` 判断 required answer 是否仍缺失，并返回稳定的 `answer-required` action
 - 在 submit / reject 两种 intent 之间产出共享的 `reply` / `reject` execution action，让 coordinator 不再直接分支铺开答案收集与 execution-action / resolution shape 组装
 
-它不负责 `QuestionDock` DOM 渲染、dock render-state gating、queue waiter/runtime map 维护、pending-question refresh、真正调用 `replyToQuestion()` / `rejectQuestion()`，或 resolved-state / status/sync follow-up；这些仍分别由 `QuestionDock`、`QuestionDockRenderStateFacade`、`QuestionDockQueueRuntimeFacade`、`QuestionDockRefreshFacade`、`QuestionResolutionExecutionFacade` 与 `QuestionResolutionWritebackFacade` / `QuestionPostResolutionRuntimeFacade` 负责。
+它不负责 `QuestionDock` DOM 渲染、dock render-state gating、queue waiter/runtime map 维护、pending-question refresh、真正调用 `replyToQuestion()` / `rejectQuestion()`，或 resolved-state / status/sync follow-up；这些仍分别由 `QuestionDock`、`QuestionDockRenderStateFacade`、`QuestionDockCoordinator`、`QuestionResolutionExecutionFacade` 与 `QuestionPostResolutionRuntimeFacade` 负责。
 
 ## 公开接口
 
@@ -42,5 +42,5 @@ export class QuestionDockResolutionActionFacade {
 ## 与 question bundle 的边界
 
 - `QuestionRuntimeHostAdapter` 负责从共享 `QuestionRuntimeViewHost` 派生本 facade 所需的 active tab 与 runtime-state host，并把同一份 `QuestionDockRenderStateFacade` 作为 active-request port 注入
-- `QuestionDockCoordinator` 只消费本 facade 的 `skip` / `answer-required` / `reply` / `reject` action；真实 API 调用与错误 notice 现在交给共享的 `QuestionResolutionExecutionFacade`
+- `QuestionDockCoordinator` 只消费本 facade 的 `skip` / `answer-required` / `reply` / `reject` action；真实 API 调用与错误 notice 继续交给共享的 `QuestionResolutionExecutionFacade`，执行成功后的 lifecycle writeback 回到 coordinator
 - `OpenCodianView` 不需要新增 dock resolution helper；view 仍只提供 question runtime 的 view host，dock action assembly 留在服务层

@@ -4,11 +4,8 @@ import type {
 } from '../../../../src/core/types';
 import { setLocale } from '../../../../src/i18n';
 import { StreamingInlineCardRenderer } from '../../../../src/features/chat/runtime/StreamingInlineCardRenderer';
-import type { QuestionDockRefreshFacadeHost } from '../../../../src/features/chat/services/QuestionDockRefreshFacade';
 import type { QuestionDockRenderStateFacadeHost } from '../../../../src/features/chat/services/QuestionDockRenderStateFacade';
-import { QuestionDockQueueRuntimeFacade } from '../../../../src/features/chat/services/QuestionDockQueueRuntimeFacade';
 import type { QuestionInlineResolutionActionFacadeHost } from '../../../../src/features/chat/services/QuestionInlineResolutionActionFacade';
-import { QuestionPendingRefreshRuntimeFacade } from '../../../../src/features/chat/services/QuestionPendingRefreshRuntimeFacade';
 import {
   QuestionPostResolutionRuntimeFacade,
   type QuestionPostResolutionRuntimeFacadeHost,
@@ -190,6 +187,7 @@ describe('QuestionRuntimeHostAdapter', () => {
       runtimeByTab.get('tab-active'),
     );
     hosts.inlineCardRendererHost.keepQuestionCardPinnedToBottom('tab-active');
+
     const inlineResolutionActionHost: QuestionInlineResolutionActionFacadeHost =
       hosts.inlineResolutionActionHost;
     expect(inlineResolutionActionHost.getActiveTabId()).toBe('tab-active');
@@ -201,6 +199,18 @@ describe('QuestionRuntimeHostAdapter', () => {
     expect(hosts.resolutionCoordinatorHost.shouldRenderQuestionResolutionCards()).toBe(true);
 
     expect(hosts.dockCoordinatorHost.getQuestionDisplayMode()).toBe('single');
+    expect(hosts.dockCoordinatorHost.getCurrentConversationSessionId()).toBe('session-1');
+    expect(hosts.dockCoordinatorHost.shouldUseAboveInputQuestionDock()).toBe(true);
+    expect(hosts.dockCoordinatorHost.getSessionIdForTab('tab-active')).toBe('session-1');
+    await hosts.dockCoordinatorHost.getPendingQuestions();
+    expect(hosts.dockCoordinatorHost.getTabRuntimeState('tab-active')).toBe(
+      runtimeByTab.get('tab-active'),
+    );
+    expect(hosts.dockCoordinatorHost.ensureTabRuntimeState('tab-created')).toBe(
+      runtimeByTab.get('tab-created'),
+    );
+    hosts.dockCoordinatorHost.setTabNeedsAttention('tab-active', true);
+
     const dockRenderStateHost: QuestionDockRenderStateFacadeHost = hosts.dockRenderStateHost;
     expect(dockRenderStateHost.getActiveTabId()).toBe('tab-active');
     expect(dockRenderStateHost.getCurrentConversationSessionId()).toBe('session-1');
@@ -210,9 +220,7 @@ describe('QuestionRuntimeHostAdapter', () => {
     expect(hosts.dockResolutionActionHost.getTabRuntimeState('tab-active')).toBe(
       runtimeByTab.get('tab-active'),
     );
-    const dockRefreshHost: QuestionDockRefreshFacadeHost = hosts.dockRefreshHost;
-    expect(dockRefreshHost.getSessionIdForTab('tab-active')).toBe('session-1');
-    await dockRefreshHost.getPendingQuestions();
+
     const resolutionExecutionFacade = new QuestionResolutionExecutionFacade(
       hosts.resolutionExecutionHost,
     );
@@ -225,21 +233,13 @@ describe('QuestionRuntimeHostAdapter', () => {
     const postResolutionRuntimeFacade = new QuestionPostResolutionRuntimeFacade(
       hosts.postResolutionRuntimeHost,
     );
-    const pendingRefreshRuntimeFacade = new QuestionPendingRefreshRuntimeFacade(
-      hosts.pendingRefreshRuntimeHost,
-    );
-    const dockQueueRuntimeFacade = new QuestionDockQueueRuntimeFacade(
-      hosts.dockQueueRuntimeHost,
-    );
-    pendingRefreshRuntimeFacade.markQuestionRequestResolved(request.id, 'tab-active');
-    dockQueueRuntimeFacade.getOrCreateQuestionWaiter(request.id, 'tab-active');
-    dockQueueRuntimeFacade.enqueuePendingQuestionRequest(request, 'tab-active', 'single');
-    dockQueueRuntimeFacade.removePendingQuestionRequest(request.id, 'tab-active');
+    runtimeByTab.get('tab-active')!.resolvedQuestionRequestIds.add(request.id);
     await postResolutionRuntimeFacade.followUpAfterResolution('tab-active');
 
     expect(hosts.postResolutionRuntimeHost).toBe(postResolutionRuntimeHost);
     expect(viewHost.keepQuestionCardPinnedToBottom).toHaveBeenCalledWith('tab-active');
     expect(viewHost.getPendingQuestions).toHaveBeenCalledTimes(1);
+    expect(viewHost.setTabNeedsAttention).toHaveBeenCalledWith('tab-active', true);
     expect(viewHost.replyToQuestion).toHaveBeenCalledWith(request.id, [['TypeScript']]);
     expect(viewHost.rejectQuestion).toHaveBeenCalledWith(request.id);
     expect(postResolutionRuntimeHost.refreshTabSessionStatus).toHaveBeenCalledWith(
@@ -247,7 +247,6 @@ describe('QuestionRuntimeHostAdapter', () => {
       'session-1',
       { suppressErrors: true },
     );
-    expect(runtimeByTab.get('tab-active')?.resolvedQuestionRequestIds.has(request.id)).toBe(true);
     expect(postResolutionRuntimeHost.startConversationSyncLoop).toHaveBeenCalledTimes(1);
     expect(postResolutionRuntimeHost.syncVisibleConversationInBackground).toHaveBeenCalledTimes(1);
   });

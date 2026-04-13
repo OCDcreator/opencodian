@@ -12,7 +12,7 @@
 - 比对 active request 的 `sessionId` 与当前 conversation session
 - 为 coordinator 返回 `active` / `empty` / `skip` 三种稳定 render-state 结果
 
-它不负责真正的 `QuestionDock` DOM 渲染、render payload callbacks 组装、pending-question refresh、dock queue runtime map 维护、提交/拒绝回答，或 resolve 后的状态收尾；这些仍分别由 `QuestionDock`、`QuestionDockRenderAdapter`、`QuestionDockRefreshFacade`、`QuestionDockQueueRuntimeFacade`、`QuestionDockCoordinator` 与 `QuestionResolutionWritebackFacade` / `QuestionPostResolutionRuntimeFacade` 负责。
+它不负责真正的 `QuestionDock` DOM 渲染、render payload callbacks 组装、pending-question refresh、dock queue runtime map 维护、提交/拒绝回答，或 resolve 后的状态收尾；这些仍分别由 `QuestionDock`、`QuestionDockRenderAdapter`、`QuestionDockCoordinator`、`QuestionDockResolutionActionFacade`、`QuestionResolutionExecutionFacade` 与 `QuestionPostResolutionRuntimeFacade` 负责。
 
 ## 公开接口
 
@@ -41,5 +41,5 @@ export class QuestionDockRenderStateFacade {
 ## 与 `OpenCodianView` 的边界
 
 - `QuestionRuntimeHostAdapter` 负责从共享 `QuestionRuntimeViewHost` 派生本 facade 所需的 active tab、current session、display mode、dock position 与 runtime state host
-- `QuestionDockCoordinator` 只消费本 facade 产出的 render-state 结果，再把 active state 转交 `QuestionDockRenderAdapter` 组装 payload
+- `QuestionDockCoordinator` 拥有 pending-question lifecycle，但只消费本 facade 产出的 render-state 结果，再把 active state 转交 `QuestionDockRenderAdapter` 组装 payload
 - `OpenCodianView` 不再需要通过 coordinator 间接持有 session-match dock render gating；它只继续提供 runtime/session/settings 的 host port

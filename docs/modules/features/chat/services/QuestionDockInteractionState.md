@@ -5,7 +5,7 @@
 
 ## 概述
 
-`QuestionDockInteractionState` 是上方 question dock 的交互状态 helper，负责把 dock callback 产生的 draft answer、active group 与 active question index 写回 tab runtime。它复用 `questionDockState` 的纯函数 view-model 推导，但把可变 runtime map 的读写从 `QuestionDockCoordinator` 中拆出来。
+`QuestionDockInteractionState` 是上方 question dock 的交互状态 helper，负责把 dock callback 产生的 draft answer、active group 与 active question index 写回 tab runtime。它复用 `questionDockState` 的纯函数 view-model 推导，让加厚后的 `QuestionDockCoordinator` 可以拥有 lifecycle map，同时避免把 answer sanitize / selection 推导铺在 render callback 内。
 
 ## 公开接口
 
@@ -33,6 +33,6 @@ export function sanitizeQuestionDockAnswer(...): string[];
 
 ## 与其他模块的边界
 
-- 上游由 `QuestionDockCoordinator` 调用；coordinator 仍负责 pending-question fetch/session filter、dock render 入口、submit/reject API 调用与 resolve 后 follow-up
+- 上游由 `QuestionDockCoordinator` 经 `QuestionDockRenderAdapter` 与 `QuestionDockResolutionActionFacade` 间接调用；coordinator 负责 pending-question hydration、waiter lifecycle、dock render 入口、submit/reject API 调用与 resolve 后 follow-up
 - 下游复用 `questionDockState` 的 `normalizeQuestionDraftAnswers()`、`buildQuestionDockViewModel()` 与 `getPreferredQuestionIndexForGroup()`，保持分组和显示模式推导规则一致
-- 本模块不触碰 dock queue waiter、pending refresh suppression、resolved card state 或 DOM 渲染；这些仍分别由 `QuestionDockQueueRuntimeFacade`、`QuestionPendingRefreshRuntimeFacade`、`QuestionResolutionCoordinator` 与 `QuestionDock` 负责
+- 本模块不触碰 dock queue waiter、pending refresh suppression、resolved card state 或 DOM 渲染；这些仍分别由 `QuestionDockCoordinator`、`QuestionResolutionCoordinator` 与 `QuestionDock` 负责
