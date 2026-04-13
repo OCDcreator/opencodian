@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`。R18 完成后必须暂停复盘，不得自动扩展新队列。
-> **当前状态**: [CONFIRMED_NEXT_BATCH] R13-R18 已确认；当前唯一可执行 `[NEXT]` 是 R18，完成后必须暂停并等待人工确认。
+> **当前状态**: [AWAITING_MANUAL_CONFIRMATION] R13-R18 已在 R18 checkpoint 完成；当前没有可自动执行的 `[NEXT]`，必须等待人工确认下一批队列。
 
 ## 控制规则
 
@@ -391,7 +391,7 @@
   - 变更若命中 deploy-relevant runtime/style 路径，按 AGENTS 规则 build 后部署 Test Vault 并验证 BUILD_ID。
   - 运行 targeted tests、全量 `npm test`、`npm run build`。
 
-### [NEXT] R18 - UI shell checkpoint and next-lane decision
+### [DONE] R18 - UI shell checkpoint and next-lane decision
 
 - **Lane**: Checkpoint
 - **目标**: 暂停自动推进，复盘 R13-R17 对 `OpenCodianView` 的体量和调用链影响，并决定下一批是否转向 `OpenCodeService`。
@@ -412,3 +412,10 @@
   - 明确下一批是否进入 `OpenCodeService` SDK/legacy/sync-event boundary。
   - 将 roadmap 状态设置为需要人工确认后再继续。
   - 运行全量 `npm test`、`npm run build`。
+
+## R18 Checkpoint Result
+
+- `OpenCodianView.ts` 已从 R12 checkpoint 的 **7732 行** 收缩到当前 **6203 行**，R13-R17 合计减少 **1529 行**（约 **19.8%**），tab pane、header/status、composer input、selection controls、input appearance/glass 五块 UI shell ownership 已迁出。
+- `OpenCodianSettings.ts` / `OpenCodeService.ts` 当前分别保持在 **4989** / **4733** 行；settings 不是本批默认下一站，而 `OpenCodeService` 仍保留 SDK facade consumption、legacy HTTP/SSE fallback、sync-event normalization、question/tool/session/config glue 的高集中 ownership。
+- 结论：本批 UI shell queue 已完成，`OpenCodianView` 剩余职责更偏向 runtime bridge、hydration/send pipeline seam 与少量实验路径，不再是下一轮无人值守的首选大块 DOM shell 切口。
+- 下一批建议：如需继续 maintainability，应先由人工确认一个专门针对 `OpenCodeService` 的新队列，明确 SDK-first、legacy fallback、sync-event boundary 的兼容规则；未经人工确认不得自动生成 R19+。

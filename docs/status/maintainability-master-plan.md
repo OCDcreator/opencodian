@@ -1,8 +1,8 @@
 # Maintainability Master Plan
 
-> **状态**: [CONFIRMED_NEXT_BATCH]
+> **状态**: [AWAITING_MANUAL_CONFIRMATION]
 > **作用**: 这是 maintainability 无人值守的战略文档。后续每一轮开始前，必须先读本文件，再读最近的 `docs/status/maintainability-phase-XXX.md`。
-> **自动推进状态**: R13-R18 下一批 roadmap 已确认；autopilot 只能按 `docs/status/maintainability-round-roadmap.md` 的 `[NEXT]` 顺序执行，R18 完成后必须再次暂停复盘。
+> **自动推进状态**: R13-R18 已在 R18 checkpoint 完成；当前没有可自动执行的 `[NEXT]`，autopilot 必须暂停并等待人工确认下一批队列。
 
 ## 1. 总体目标
 
@@ -19,20 +19,20 @@ maintainability 的目标是：
 
 ## 2. 当前阶段判断
 
-**当前判断：中期，R13-R18 已确认为下一批受控队列。**
+**当前判断：中期 checkpoint，R13-R18 已完成并等待下一批人工确认。**
 
 原因：
 
 - R1-R12 已按受控 roadmap 完成 P2、P3、P4、Settings、Core config 与 checkpoint；本轮不再继续拆新的 owner
-- `src/features/chat/OpenCodianView.ts` 当前实测 **7732 行**，仍是聊天域最大集成热点；R1-R8 已把 question/todo/background-task、session signal、composer-context、persisted assistant shell 等链路迁到更明确 owner，但 tab activation / runtime bridge / header-appearance 等职责仍需下一批人工排序
+- `src/features/chat/OpenCodianView.ts` 已从 R12 checkpoint 的 **7732 行** 收缩到当前 **6203 行**；R13-R17 已把 tab/pane、header/status、composer input、selection controls、input appearance/glass 等 UI/runtime shell 收束到独立 owner，剩余职责更偏向运行时桥接、hydration/send pipeline seam 与少量实验特性
 - `src/features/settings/OpenCodianSettings.ts` 当前实测 **4989 行**，较 R9 前 baseline **6756 行**明显收缩；section lifecycle、model catalog presenter、catalog state writeback 已迁出，但 settings tab 仍负责 section composition、settings persistence、modal launch 与多处分区业务装配
-- `src/core/opencode/OpenCodeService.ts` 当前实测 **4733 行**，本批 roadmap 未直接收缩；它仍集中 SDK facade consumption、legacy HTTP/SSE fallback、sync event normalization、question/tool/session/config API glue，后续若处理必须先设计高风险兼容边界
+- `src/core/opencode/OpenCodeService.ts` 当前实测 **4733 行**，在 R13-R18 期间没有直接收缩；它仍集中 SDK facade consumption、legacy HTTP/SSE fallback、sync event normalization、question/tool/session/config API glue，已经成为下一批最需要人工确认边界的候选 hotspot
 
-结论：本批队列已经证明“迁出完整 ownership”比继续粉碎 helper 更有效，但项目仍不是收尾阶段。下一批已确认优先处理 `OpenCodianView` 的 tab/pane、header/input、selector/appearance 等 UI/runtime shell 大块 ownership；`OpenCodeService` 的 SDK/legacy/sync-event 边界先保留为下一次 checkpoint 后的高风险候选，不在 R13-R18 中贸然改动。
+结论：R13-R18 已证明“迁出完整 ownership”比继续粉碎 helper 更有效，并且 `OpenCodianView` 的本批 UI shell 大块 ownership 已按计划完成。项目仍不是收尾阶段，但下一批不应自动展开；应由人工先确认是否围绕 `OpenCodeService` 设计一个专门的高风险兼容边界队列，再决定是否继续无人值守。
 
-## 2.1 下一批确认方向（R13-R18）
+## 2.1 已完成批次（R13-R18）
 
-下一批目标是继续削弱 `OpenCodianView`，但不再回到已完成的 P2 question/todo/background-task、P3 composer-context、P4 persisted assistant shell 细节链路。优先选择仍在 view 内成块存在、可以形成较厚 owner 的 UI/runtime shell：
+R13-R18 的目标是继续削弱 `OpenCodianView`，但不再回到已完成的 P2 question/todo/background-task、P3 composer-context、P4 persisted assistant shell 细节链路。该批次已经按顺序完成以下 UI/runtime shell ownership 迁移：
 
 1. **R13 tab/messages pane surface**：迁出 messages pane lifecycle、active pane 切换、scroll metrics 和 pane observer，让 view 不再直接管理 pane DOM map 的主要生命周期。
 2. **R14 header/server status shell**：迁出 header DOM、server status label/action、wordmark/settings button 组装，让 view 只提供 plugin/service 回调。
@@ -41,7 +41,7 @@ maintainability 的目标是：
 5. **R17 input appearance/glass state**：迁出 input panel theme class、SVG filter layer、liquid-glass adapter mount/diagnostic state；保持 experimental demos opt-in。
 6. **R18 checkpoint**：只做回归、指标和文档复盘，决定是否下一批转向 `OpenCodeService`。
 
-本批不处理 `OpenCodeService` 的原因：它的 SDK-first 与 legacy HTTP/SSE fallback 双路径风险更高，必须先在 R18 checkpoint 后单独定义兼容边界；不要把 core service 与 chat UI shell 重构混在同一批里。
+本批没有处理 `OpenCodeService`，原因是它的 SDK-first 与 legacy HTTP/SSE fallback 双路径风险更高，必须在 R18 checkpoint 后单独定义兼容边界；不要把 core service 与 chat UI shell 重构混在同一批里。
 
 
 ## 3. 高优先级方向
@@ -133,9 +133,9 @@ R8 已完成 persisted assistant shell / notice / footer / timestamp 的主要�
 
 ## 7. 当前执行指令
 
-从第三百二十七阶段 checkpoint 之后：
+从第三百三十三阶段 checkpoint 之后：
 
-- R13-R18 受控队列已经确认，`docs/status/maintainability-round-roadmap.md` 的 `R13` 是唯一可自动执行的 `[NEXT]`
-- Autopilot 可以按 R13-R18 顺序运行，但不得越过 R18 自动扩展新队列
-- 下一批人工 roadmap 明确优先 `OpenCodianView` 的 tab/messages pane、header/server status、composer input、model/permission selector、input appearance/glass state；`OpenCodeService` 暂不进入 R13-R18
+- R13-R18 受控队列已经全部完成，当前没有新的可自动执行 `[NEXT]`
+- Autopilot 不得自动扩展 R19+；必须等待人工确认下一批 roadmap
+- 下一批若继续 maintainability，优先由人工评估是否把 `OpenCodeService` 的 SDK facade / legacy HTTP-SSE fallback / sync-event normalization 设计为新队列；未经确认不得自动开工
 - `ConversationRenderService` trailing-assistant helper 链仍保持降优先级；除非正确性、测试或构建阻塞，不要把它作为新 queue 的默认起点
