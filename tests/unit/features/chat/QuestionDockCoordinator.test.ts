@@ -1,6 +1,7 @@
 import type { QuestionDisplayMode, QuestionRequest } from '../../../../src/core/types';
 import { setLocale } from '../../../../src/i18n';
 import type { QuestionDockRefreshFacade } from '../../../../src/features/chat/services/QuestionDockRefreshFacade';
+import { QuestionDockResolutionActionFacade } from '../../../../src/features/chat/services/QuestionDockResolutionActionFacade';
 import {
   QuestionDockRenderStateFacade,
   type QuestionDockRenderStateFacadeHost,
@@ -95,10 +96,11 @@ function createHost(options?: {
       latestCallbacks = callbacks;
     }),
   };
+  const setTabNeedsAttention = jest.fn();
 
   const host: Mocked<
     QuestionDockCoordinatorHost
-    & Pick<QuestionDockRenderStateFacadeHost, 'getCurrentConversationSessionId'>
+    & QuestionDockRenderStateFacadeHost
   > = {
     getTabRuntimeState: jest.fn((tabId) => (tabId ? runtimeByTab.get(tabId) ?? null : null)),
     getActiveTabId: jest.fn().mockReturnValue(activeTabId),
@@ -110,7 +112,6 @@ function createHost(options?: {
     shouldUseAboveInputQuestionDock: jest
       .fn()
       .mockReturnValue(options?.shouldUseAboveInputQuestionDock ?? true),
-    setTabNeedsAttention: jest.fn(),
     replyToQuestion: jest.fn().mockResolvedValue(undefined),
     rejectQuestion: jest.fn().mockResolvedValue(undefined),
   };
@@ -122,6 +123,13 @@ function createHost(options?: {
     refreshPendingQuestionsForTab: jest.fn().mockResolvedValue([] as QuestionRequest[]),
   };
   const dockRenderState = new QuestionDockRenderStateFacade(host);
+  const dockResolutionAction = new QuestionDockResolutionActionFacade(
+    {
+      getActiveTabId: () => host.getActiveTabId(),
+      getTabRuntimeState: (tabId) => (tabId ? runtimeByTab.get(tabId) ?? null : null),
+    },
+    dockRenderState,
+  );
   const postResolutionRuntime: jest.Mocked<Pick<
     QuestionPostResolutionRuntimeFacade,
     'followUpAfterResolution'
@@ -137,7 +145,7 @@ function createHost(options?: {
   const dockWriteback = new QuestionDockWritebackFacade({
     getActiveTabId: () => host.getActiveTabId(),
     setTabNeedsAttention: (tabId, needsAttention) => {
-      host.setTabNeedsAttention(tabId, needsAttention);
+      setTabNeedsAttention(tabId, needsAttention);
     },
     renderQuestionDock,
   });
@@ -172,10 +180,12 @@ function createHost(options?: {
     host,
     dockRefresh,
     dockRenderState,
+    dockResolutionAction,
     dockQueueRuntime,
     pendingRefreshRuntime,
     dockWriteback,
     renderQuestionDock,
+    setTabNeedsAttention,
     postResolutionRuntime,
     resolutionWriteback,
     applyResolvedQuestionState,
@@ -211,6 +221,7 @@ describe('QuestionDockCoordinator', () => {
       host,
       dockRefresh,
       dockRenderState,
+      dockResolutionAction,
       dockQueueRuntime,
       pendingRefreshRuntime,
       dockWriteback,
@@ -225,6 +236,7 @@ describe('QuestionDockCoordinator', () => {
     const coordinator = new QuestionDockCoordinator(
       host,
       dockRenderState,
+      dockResolutionAction,
       dockQueueRuntime,
       dockRefresh,
       dockWriteback,
@@ -267,6 +279,7 @@ describe('QuestionDockCoordinator', () => {
       dockRefresh,
       host,
       dockRenderState,
+      dockResolutionAction,
       dockQueueRuntime,
       dockWriteback,
       resolutionWriteback,
@@ -275,6 +288,7 @@ describe('QuestionDockCoordinator', () => {
     const coordinator = new QuestionDockCoordinator(
       host,
       dockRenderState,
+      dockResolutionAction,
       dockQueueRuntime,
       dockRefresh,
       dockWriteback,
@@ -296,6 +310,7 @@ describe('QuestionDockCoordinator', () => {
       dockRefresh,
       host,
       dockRenderState,
+      dockResolutionAction,
       dockQueueRuntime,
       dockWriteback,
       resolutionWriteback,
@@ -303,6 +318,7 @@ describe('QuestionDockCoordinator', () => {
     const coordinator = new QuestionDockCoordinator(
       host,
       dockRenderState,
+      dockResolutionAction,
       dockQueueRuntime,
       dockRefresh,
       dockWriteback,
@@ -322,6 +338,7 @@ describe('QuestionDockCoordinator', () => {
       host,
       dockRefresh,
       dockRenderState,
+      dockResolutionAction,
       dockQueueRuntime,
       dockWriteback,
       resolutionWriteback,
@@ -333,6 +350,7 @@ describe('QuestionDockCoordinator', () => {
     const coordinator = new QuestionDockCoordinator(
       host,
       dockRenderState,
+      dockResolutionAction,
       dockQueueRuntime,
       dockRefresh,
       dockWriteback,

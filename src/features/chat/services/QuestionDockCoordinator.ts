@@ -2,23 +2,23 @@ import { Notice } from 'obsidian';
 
 import type { QuestionDisplayMode, QuestionRequest, QuestionResolution } from '../../../core/types';
 import { t } from '../../../i18n';
+import { createLogger } from '../../../shared';
 import type { TabId } from '../tabs';
 import type { QuestionDock } from '../ui/QuestionDock';
 import type { QuestionDockRefreshFacade } from './QuestionDockRefreshFacade';
 import type {
+  QuestionDockResolutionAction,
+  QuestionDockResolutionActionFacade,
+  QuestionDockResolutionIntent,
+} from './QuestionDockResolutionActionFacade';
+import type {
   QuestionDockRenderStateFacade,
-  QuestionDockRenderStateRuntimeState,
 } from './QuestionDockRenderStateFacade';
 import type { QuestionDockWritebackFacade } from './QuestionDockWritebackFacade';
 import type {
   QuestionDockQueueRuntimeFacade,
 } from './QuestionDockQueueRuntimeFacade';
 import type { QuestionResolutionWritebackFacade } from './QuestionResolutionWritebackFacade';
-import { isQuestionAnswerComplete } from '../ui/questionDockState';
-import {
-  getQuestionDockDraftAnswers,
-  sanitizeQuestionDockAnswer,
-} from './QuestionDockInteractionState';
 import {
   createEmptyQuestionDockRenderPayload,
   createQuestionDockRenderPayload,
@@ -38,37 +38,35 @@ type QuestionDockRefreshPort = Pick<
 >;
 type QuestionDockRenderStatePort = Pick<
   QuestionDockRenderStateFacade,
-  'getActivePendingQuestionRequest' | 'resolveRenderState'
+  'resolveRenderState'
+>;
+type QuestionDockResolutionActionPort = Pick<
+  QuestionDockResolutionActionFacade,
+  'resolveAction'
 >;
 type QuestionDockWritebackPort = Pick<
   QuestionDockWritebackFacade,
-  | 'applyClearedPendingQuestions'
-  | 'applyEnqueuedPendingQuestionRequest'
-  | 'applyRefreshedPendingQuestions'
-  | 'applyRemovedPendingQuestionRequest'
+  'applyEnqueuedPendingQuestionRequest' | 'applyRemovedPendingQuestionRequest'
 >;
-
-export interface QuestionDockCoordinatorRuntimeState extends QuestionDockRenderStateRuntimeState {
-  isStreaming: boolean;
-}
 
 type QuestionDockPort = Pick<QuestionDock, 'render'>;
 
 export interface QuestionDockCoordinatorHost {
-  getTabRuntimeState(tabId: TabId | null): QuestionDockCoordinatorRuntimeState | null;
   getActiveTabId(): TabId | null;
   getQuestionDock(): QuestionDockPort | null;
   getQuestionDisplayMode(): QuestionDisplayMode;
   shouldUseAboveInputQuestionDock(): boolean;
-  setTabNeedsAttention(tabId: TabId | null, needsAttention: boolean): void;
   replyToQuestion(requestId: string, answers: string[][]): Promise<void>;
   rejectQuestion(requestId: string): Promise<void>;
 }
+
+const logger = createLogger('QuestionDockCoordinator');
 
 export class QuestionDockCoordinator {
   constructor(
     private readonly host: QuestionDockCoordinatorHost,
     private readonly dockRenderState: QuestionDockRenderStatePort,
+    private readonly dockResolutionAction: QuestionDockResolutionActionPort,
     private readonly dockQueueRuntime: QuestionDockQueueRuntimePort,
     private readonly dockRefresh: QuestionDockRefreshPort,
     private readonly dockWriteback: QuestionDockWritebackPort,
@@ -99,10 +97,10 @@ export class QuestionDockCoordinator {
           this.render();
         },
         submit: () => {
-          void this.handleQuestionDockSubmit(renderState.tabId);
+          void this.handleQuestionDockAction('submit', renderState.tabId);
         },
         reject: () => {
-          void this.handleQuestionDockReject(renderState.tabId);
+          void this.handleQuestionDockAction('reject', renderState.tabId);
         },
       },
     );
@@ -147,12 +145,6 @@ export class QuestionDockCoordinator {
     questionDock.render(renderPayload.state, renderPayload.callbacks);
   }
 
-  private getActivePendingQuestionRequest(
-    tabId: TabId | null = this.host.getActiveTabId(),
-  ): QuestionRequest | null {
-    return this.dockRenderState.getActivePendingQuestionRequest(tabId);
-  }
-
   private getOrCreateQuestionWaiter(
     requestId: string,
     tabId: TabId | null = this.host.getActiveTabId(),
@@ -180,57 +172,41 @@ export class QuestionDockCoordinator {
     this.dockWriteback.applyRemovedPendingQuestionRequest(tabId, remainingRequests);
   }
 
-  private async handleQuestionDockSubmit(
+  private async handleQuestionDockAction(
+    intent: QuestionDockResolutionIntent,
     tabId: TabId | null = this.host.getActiveTabId(),
   ): Promise<void> {
-    const request = this.getActivePendingQuestionRequest(tabId);
-    if (!request) {
+    const action = this.dockResolutionAction.resolveAction(intent, tabId);
+    if (action.type === 'skip') {
       return;
     }
 
-    const runtime = this.host.getTabRuntimeState(tabId);
-    const answers = getQuestionDockDraftAnswers(runtime, request).map((answer, index) =>
-      sanitizeQuestionDockAnswer(answer, request, index),
-    );
-    const hasEmptyAnswer = request.questions.some((question, index) =>
-      !isQuestionAnswerComplete(question, answers[index]),
-    );
-    if (hasEmptyAnswer) {
+    if (action.type === 'answer-required') {
       new Notice(t('chat.question.answerRequired'));
       return;
     }
 
     try {
-      await this.host.replyToQuestion(request.id, answers);
-      await this.applyQuestionDockResolution({
-        request,
-        status: 'answered',
-        answers,
-      }, tabId);
+      await this.executeQuestionDockResolutionAction(action);
+      await this.applyQuestionDockResolution(action.resolution, tabId);
     } catch (error) {
       logger.error('Failed to resolve question request:', error);
       new Notice(t('chat.question.notice.error'));
     }
   }
 
-  private async handleQuestionDockReject(
-    tabId: TabId | null = this.host.getActiveTabId(),
+  private async executeQuestionDockResolutionAction(
+    action: Exclude<
+      QuestionDockResolutionAction,
+      { type: 'answer-required' } | { type: 'skip' }
+    >,
   ): Promise<void> {
-    const request = this.getActivePendingQuestionRequest(tabId);
-    if (!request) {
+    if (action.type === 'reply') {
+      await this.host.replyToQuestion(action.request.id, action.answers);
       return;
     }
 
-    try {
-      await this.host.rejectQuestion(request.id);
-      await this.applyQuestionDockResolution({
-        request,
-        status: 'rejected',
-      }, tabId);
-    } catch (error) {
-      logger.error('Failed to resolve question request:', error);
-      new Notice(t('chat.question.notice.error'));
-    }
+    await this.host.rejectQuestion(action.request.id);
   }
 
   private async applyQuestionDockResolution(

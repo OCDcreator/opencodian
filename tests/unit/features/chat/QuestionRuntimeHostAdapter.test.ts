@@ -182,6 +182,10 @@ describe('QuestionRuntimeHostAdapter', () => {
     expect(dockRenderStateHost.getCurrentConversationSessionId()).toBe('session-1');
     expect(dockRenderStateHost.getQuestionDisplayMode()).toBe('single');
     expect(dockRenderStateHost.shouldUseAboveInputQuestionDock()).toBe(true);
+    expect(hosts.dockResolutionActionHost.getActiveTabId()).toBe('tab-active');
+    expect(hosts.dockResolutionActionHost.getTabRuntimeState('tab-active')).toBe(
+      runtimeByTab.get('tab-active'),
+    );
     const dockRefreshHost: QuestionDockRefreshFacadeHost = hosts.dockRefreshHost;
     expect(dockRefreshHost.getSessionIdForTab('tab-active')).toBe('session-1');
     await dockRefreshHost.getPendingQuestions();

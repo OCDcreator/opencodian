@@ -20,7 +20,12 @@ import {
   type QuestionDockRefreshFacadeHost,
 } from './QuestionDockRefreshFacade';
 import {
+  QuestionDockResolutionActionFacade,
+  type QuestionDockResolutionActionFacadeHost,
+} from './QuestionDockResolutionActionFacade';
+import {
   QuestionDockRenderStateFacade,
+  type QuestionDockRenderStateRuntimeState,
   type QuestionDockRenderStateFacadeHost,
 } from './QuestionDockRenderStateFacade';
 import {
@@ -31,7 +36,6 @@ import {
 import {
   QuestionDockCoordinator,
   type QuestionDockCoordinatorHost,
-  type QuestionDockCoordinatorRuntimeState,
 } from './QuestionDockCoordinator';
 import { QuestionDockWritebackFacade } from './QuestionDockWritebackFacade';
 import {
@@ -42,6 +46,7 @@ import {
 import {
   QuestionPostResolutionRuntimeFacade,
   type QuestionPostResolutionRuntimeFacadeHost,
+  type QuestionPostResolutionRuntimeState,
 } from './QuestionPostResolutionRuntimeFacade';
 import {
   QuestionResolutionFlowCoordinator,
@@ -52,11 +57,12 @@ import { QuestionResolutionWritebackFacade } from './QuestionResolutionWriteback
 type QuestionDockPort = Pick<QuestionDock, 'render'>;
 
 export interface QuestionRuntimeState
-  extends QuestionDockCoordinatorRuntimeState,
+  extends QuestionDockRenderStateRuntimeState,
     QuestionDockQueueRuntimeState,
     QuestionPendingRefreshRuntimeState,
     QuestionInlineCardRuntimeState,
-    QuestionResolutionCoordinatorRuntimeState {}
+    QuestionResolutionCoordinatorRuntimeState,
+    QuestionPostResolutionRuntimeState {}
 
 export interface QuestionRuntimeViewHost {
   getActiveTabId(): TabId | null;
@@ -88,6 +94,7 @@ export interface QuestionRuntimeHosts {
   dockCoordinatorHost: QuestionDockCoordinatorHost;
   dockRefreshHost: QuestionDockRefreshFacadeHost;
   dockRenderStateHost: QuestionDockRenderStateFacadeHost;
+  dockResolutionActionHost: QuestionDockResolutionActionFacadeHost;
   dockQueueRuntimeHost: QuestionDockQueueRuntimeFacadeHost;
   pendingRefreshRuntimeHost: QuestionPendingRefreshRuntimeFacadeHost;
   postResolutionRuntimeHost: QuestionPostResolutionRuntimeFacadeHost;
@@ -119,14 +126,10 @@ export function createQuestionRuntimeHosts(
       },
     },
     dockCoordinatorHost: {
-      getTabRuntimeState: (tabId: TabId | null) => viewHost.getTabRuntimeState(tabId),
       getActiveTabId: () => viewHost.getActiveTabId(),
       getQuestionDock: () => viewHost.getQuestionDock(),
       getQuestionDisplayMode: () => viewHost.getQuestionDisplayMode(),
       shouldUseAboveInputQuestionDock: () => viewHost.shouldUseAboveInputQuestionDock(),
-      setTabNeedsAttention: (tabId: TabId | null, needsAttention: boolean) => {
-        viewHost.setTabNeedsAttention(tabId, needsAttention);
-      },
       replyToQuestion: (requestId: string, answers: string[][]) =>
         viewHost.replyToQuestion(requestId, answers),
       rejectQuestion: (requestId: string) => viewHost.rejectQuestion(requestId),
@@ -141,6 +144,10 @@ export function createQuestionRuntimeHosts(
       getCurrentConversationSessionId: () => viewHost.getCurrentConversationSessionId(),
       getQuestionDisplayMode: () => viewHost.getQuestionDisplayMode(),
       shouldUseAboveInputQuestionDock: () => viewHost.shouldUseAboveInputQuestionDock(),
+      getTabRuntimeState: (tabId: TabId | null) => viewHost.getTabRuntimeState(tabId),
+    },
+    dockResolutionActionHost: {
+      getActiveTabId: () => viewHost.getActiveTabId(),
       getTabRuntimeState: (tabId: TabId | null) => viewHost.getTabRuntimeState(tabId),
     },
     dockQueueRuntimeHost: {
@@ -187,6 +194,10 @@ export function createQuestionRuntimeServices(
   const dockRenderStateFacade = new QuestionDockRenderStateFacade(
     hosts.dockRenderStateHost,
   );
+  const dockResolutionActionFacade = new QuestionDockResolutionActionFacade(
+    hosts.dockResolutionActionHost,
+    dockRenderStateFacade,
+  );
   const dockQueueRuntimeFacade = new QuestionDockQueueRuntimeFacade(
     hosts.dockQueueRuntimeHost,
   );
@@ -223,6 +234,7 @@ export function createQuestionRuntimeServices(
   dockCoordinator = new QuestionDockCoordinator(
     hosts.dockCoordinatorHost,
     dockRenderStateFacade,
+    dockResolutionActionFacade,
     dockQueueRuntimeFacade,
     dockRefreshFacade,
     dockWritebackFacade,
