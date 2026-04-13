@@ -210,8 +210,11 @@ import {
   ConversationSessionSignalRuntime,
 } from './services/ConversationSessionSignalRuntime';
 import {
+  createConversationSessionSignalRuntimeViewHostFactoryHost,
+  type ConversationSessionSignalRuntimeHostProviderHost,
+} from './services/ConversationSessionSignalRuntimeHostProvider';
+import {
   createConversationSessionSignalRuntimeViewHost,
-  type ConversationSessionSignalRuntimeViewHostFactoryHost,
 } from './services/ConversationSessionSignalRuntimeViewHostFactory';
 import {
   createConversationSyncLoadRuntimeViewHostFactoryHost,
@@ -1182,7 +1185,9 @@ export class OpenCodianView extends ItemView {
     this.conversationSyncBridge = conversationSyncServices.bridge;
     this.conversationSessionSignalRuntime = createConversationSessionSignalRuntime(
       createConversationSessionSignalRuntimeViewHost(
-        this.createConversationSessionSignalRuntimeViewHostFactoryHost(),
+        createConversationSessionSignalRuntimeViewHostFactoryHost(
+          this.createConversationSessionSignalRuntimeHostProviderHost(),
+        ),
       ),
       this.backgroundTaskLiveSignalCoordinator,
     );
@@ -1592,11 +1597,19 @@ export class OpenCodianView extends ItemView {
     };
   }
 
-  private createConversationSessionSignalRuntimeViewHostFactoryHost():
-  ConversationSessionSignalRuntimeViewHostFactoryHost {
+  private createConversationSessionSignalRuntimeHostProviderHost():
+  ConversationSessionSignalRuntimeHostProviderHost {
     return {
-      getSessionSignalSubscriptions: () => this.plugin.openCodeService,
-      getSessionSignalWriteback: () => this.sessionTodoRuntimeFacade,
+      subscribeToSessionSyncEvents: (listener) =>
+        this.plugin.openCodeService.subscribeToSessionSyncEvents(listener),
+      subscribeToSessionTodoUpdates: (listener) =>
+        this.plugin.openCodeService.subscribeToSessionTodoUpdates(listener),
+      subscribeToSessionStatusUpdates: (listener) =>
+        this.plugin.openCodeService.subscribeToSessionStatusUpdates(listener),
+      applySessionTodoUpdate: (tabId, sessionId, todos) =>
+        this.sessionTodoRuntimeFacade.applySessionTodoUpdate(tabId, sessionId, todos),
+      applySessionStatusUpdate: (tabId, sessionId, status) =>
+        this.sessionTodoRuntimeFacade.applySessionStatusUpdate(tabId, sessionId, status),
       getAllTabs: () => this.tabManager?.getAllTabs() ?? [],
       getConversations: () => this.plugin.getConversations(),
       getCurrentConversation: () => this.currentConversation,
