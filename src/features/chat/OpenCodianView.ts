@@ -1017,20 +1017,6 @@ export class OpenCodianView extends ItemView {
     this.sessionTodoDockCoordinator.render(tabId);
   }
 
-  private hasIncompleteTodos(todos: readonly SessionTodo[]): boolean {
-    return this.sessionTodoStateService.hasIncompleteTodos(todos);
-  }
-
-  private suppressStaleSessionTodosIfNeeded(
-    tabId: TabId | null = this.getActiveTabId(),
-  ): SessionTodo[] | null {
-    return this.sessionTodoStateService.suppressStaleSessionTodosIfNeeded(tabId);
-  }
-
-  private buildStaleSessionTodoNoticeContent(todos: SessionTodo[]): string {
-    return this.sessionTodoStateService.buildStaleSessionTodoNoticeContent(todos);
-  }
-
   private beginConversationHydration(tabId: TabId | null = this.getActiveTabId()): void {
     const runtime = this.getTabRuntimeState(tabId);
     if (!runtime) {
