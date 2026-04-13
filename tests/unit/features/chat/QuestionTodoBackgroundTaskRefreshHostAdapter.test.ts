@@ -404,16 +404,17 @@ describe('QuestionTodoBackgroundTaskRefreshHostAdapter', () => {
       'session-activation',
     );
 
-    const outcome = await services.backgroundTaskPostSyncCoordinator.handleVisibleConversationSyncComplete({
-      tabId: 'tab-active',
-      expectedConversationId: 'conversation-active',
-      questionSessionId: 'question-session',
-      syncResult: {
-        changed: true,
-        fingerprint: 'next-visible-fingerprint',
-        revertState: { messageID: 'assistant-visible' },
-      },
-    });
+    const outcome =
+      await services.visibleConversationPostSyncCoordinator.handleVisibleConversationSyncComplete({
+        tabId: 'tab-active',
+        expectedConversationId: 'conversation-active',
+        questionSessionId: 'question-session',
+        syncResult: {
+          changed: true,
+          fingerprint: 'next-visible-fingerprint',
+          revertState: { messageID: 'assistant-visible' },
+        },
+      });
 
     expect(viewHost.refreshPendingQuestionsForTab).toHaveBeenCalledWith(
       'tab-active',

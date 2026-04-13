@@ -8,10 +8,6 @@ import type {
 } from './ConversationSyncOrchestrationService';
 import type { ConversationSyncBackgroundPostSyncRouter } from './ConversationSyncBackgroundPostSyncRouter';
 import type {
-  ConversationSyncBackgroundPostSyncCoordinator,
-} from './ConversationSyncBackgroundPostSyncRouter';
-import type {
-  ConversationSyncVisiblePostSyncCoordinator,
   ConversationSyncVisiblePostSyncResult,
   ConversationSyncVisiblePostSyncRouter,
 } from './ConversationSyncVisiblePostSyncRouter';
@@ -68,10 +64,6 @@ export interface ConversationSyncBridgeOrchestration {
     callback: (context: TabConversationSyncContext) => Promise<void>,
   ): Promise<void>;
 }
-
-export interface ConversationSyncBridgePostSyncCoordinator
-  extends ConversationSyncVisiblePostSyncCoordinator,
-    ConversationSyncBackgroundPostSyncCoordinator {}
 
 export class ConversationSyncBridge {
   constructor(

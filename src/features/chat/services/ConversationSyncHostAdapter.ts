@@ -5,10 +5,10 @@ import type {
 import type { TabData, TabId } from '../tabs';
 import {
   ConversationSyncBackgroundPostSyncRouter,
+  type ConversationSyncBackgroundPostSyncCoordinator,
 } from './ConversationSyncBackgroundPostSyncRouter';
 import {
   type ConversationSyncBridgeHost,
-  type ConversationSyncBridgePostSyncCoordinator,
   type ConversationSyncBridgeSyncResult,
   ConversationSyncBridge,
 } from './ConversationSyncBridge';
@@ -24,6 +24,7 @@ import {
 import {
   ConversationSyncVisiblePostSyncRouter,
 } from './ConversationSyncVisiblePostSyncRouter';
+import type { VisibleConversationPostSyncCoordinator } from './VisibleConversationPostSyncCoordinator';
 
 export interface ConversationSyncViewHost {
   getCurrentConversation(): Conversation | null;
@@ -57,6 +58,11 @@ export interface ConversationSyncServices {
   orchestrationService: ConversationSyncOrchestrationService;
   bridge: ConversationSyncBridge;
 }
+
+type VisibleConversationPostSyncPort = Pick<
+  VisibleConversationPostSyncCoordinator,
+  'handleVisibleConversationSyncComplete'
+>;
 
 export function createConversationSyncHosts(
   viewHost: ConversationSyncViewHost,
@@ -97,7 +103,8 @@ export function createConversationSyncHosts(
 
 export function createConversationSyncServices(
   viewHost: ConversationSyncViewHost,
-  postSyncCoordinator: ConversationSyncBridgePostSyncCoordinator,
+  visiblePostSyncCoordinator: VisibleConversationPostSyncPort,
+  backgroundPostSyncCoordinator: ConversationSyncBackgroundPostSyncCoordinator,
 ): ConversationSyncServices {
   const hosts = createConversationSyncHosts(viewHost);
   const runtimeCoordinator = new ConversationSyncRuntimeCoordinator(hosts.runtimeCoordinatorHost);
@@ -107,11 +114,11 @@ export function createConversationSyncServices(
   );
   const visiblePostSyncRouter = new ConversationSyncVisiblePostSyncRouter(
     hosts.bridgeHost,
-    postSyncCoordinator,
+    visiblePostSyncCoordinator,
   );
   const backgroundPostSyncRouter = new ConversationSyncBackgroundPostSyncRouter(
     hosts.bridgeHost,
-    postSyncCoordinator,
+    backgroundPostSyncCoordinator,
   );
   const bridge = new ConversationSyncBridge(
     hosts.bridgeHost,

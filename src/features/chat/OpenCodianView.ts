@@ -183,9 +183,6 @@ import {
   type BackgroundTaskNoticeStateServiceHost,
 } from './services/BackgroundTaskNoticeStateService';
 import {
-  type BackgroundTaskPostSyncCoordinator,
-} from './services/BackgroundTaskPostSyncCoordinator';
-import {
   type BackgroundTaskLaunchInfo,
   type BackgroundTaskSegment,
   BackgroundTaskTimelineService,
@@ -721,7 +718,6 @@ export class OpenCodianView extends ItemView {
   private backgroundTaskCompletionNoticeService: BackgroundTaskCompletionNoticeService;
   private backgroundTaskNoticeStateService: BackgroundTaskNoticeStateService;
   private backgroundTaskLiveSignalCoordinator: BackgroundTaskLiveSignalCoordinator;
-  private backgroundTaskPostSyncCoordinator: BackgroundTaskPostSyncCoordinator;
   private conversationHydrationOutcomeBridge: ConversationHydrationOutcomeBridge;
   private conversationHydrationRenderBridge: ConversationHydrationRenderBridge;
   private conversationTransitionBridge: ConversationTransitionBridge;
@@ -1118,7 +1114,7 @@ export class OpenCodianView extends ItemView {
     );
     const {
       questionTodoActivationRefreshBridge,
-      questionTodoStatusRefreshCoordinator,
+      visibleConversationPostSyncCoordinator,
       backgroundTaskPostSyncCoordinator,
     } = createQuestionTodoBackgroundTaskRefreshServices(
       createQuestionTodoBackgroundTaskRefreshViewHostAdapter({
@@ -1131,7 +1127,6 @@ export class OpenCodianView extends ItemView {
         getTabRuntimeStateBridge: () => this.tabRuntimeStateBridge,
       }),
     );
-    this.backgroundTaskPostSyncCoordinator = backgroundTaskPostSyncCoordinator;
     const {
       questionTodoActivationRefreshCoordinator,
       backgroundTaskActivationIndicatorCoordinator,
@@ -1194,7 +1189,8 @@ export class OpenCodianView extends ItemView {
     this.tabRuntimeStateBridge = new TabRuntimeStateBridge(this.createTabRuntimeStateBridgeHost());
     const conversationSyncServices = createConversationSyncServices(
       this.createConversationSyncViewHost(),
-      this.backgroundTaskPostSyncCoordinator,
+      visibleConversationPostSyncCoordinator,
+      backgroundTaskPostSyncCoordinator,
     );
     this.conversationSyncRuntimeCoordinator = conversationSyncServices.runtimeCoordinator;
     this.conversationSyncOrchestrationService = conversationSyncServices.orchestrationService;

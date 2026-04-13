@@ -1,11 +1,10 @@
 import type { ChatMessage } from '../../../core/types';
 import type { TabId } from '../tabs';
 import type {
-  VisibleConversationPostSyncOptions,
-  VisibleConversationPostSyncOutcome,
-} from './BackgroundTaskPostSyncCoordinator';
+  VisibleConversationPostSyncCoordinator,
+  VisibleConversationPostSyncResult,
+} from './VisibleConversationPostSyncCoordinator';
 import type { VisibleConversationSyncContext } from './ConversationSyncRuntimeCoordinator';
-import type { VisibleConversationPostSyncResult } from './VisibleConversationPostSyncStateCoordinator';
 
 export interface ConversationSyncVisiblePostSyncResult
   extends VisibleConversationPostSyncResult {
@@ -20,11 +19,10 @@ export interface ConversationSyncVisiblePostSyncRouterHost {
   renderBackgroundTaskIndicatorIfNeeded(tabId?: TabId | null): Promise<void>;
 }
 
-export interface ConversationSyncVisiblePostSyncCoordinator {
-  handleVisibleConversationSyncComplete(
-    options: VisibleConversationPostSyncOptions,
-  ): Promise<VisibleConversationPostSyncOutcome>;
-}
+type VisibleConversationPostSyncPort = Pick<
+  VisibleConversationPostSyncCoordinator,
+  'handleVisibleConversationSyncComplete'
+>;
 
 export interface VisibleConversationPostSyncRouteOptions {
   syncContext: VisibleConversationSyncContext;
@@ -35,7 +33,7 @@ export interface VisibleConversationPostSyncRouteOptions {
 export class ConversationSyncVisiblePostSyncRouter {
   constructor(
     private readonly host: ConversationSyncVisiblePostSyncRouterHost,
-    private readonly postSyncCoordinator: ConversationSyncVisiblePostSyncCoordinator,
+    private readonly postSyncCoordinator: VisibleConversationPostSyncPort,
   ) {}
 
   async routeVisibleSyncComplete(

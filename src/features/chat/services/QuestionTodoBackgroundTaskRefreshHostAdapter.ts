@@ -204,6 +204,7 @@ export interface QuestionTodoBackgroundTaskRefreshServices {
   questionTodoActivationRefreshBridge: QuestionTodoActivationRefreshBridge;
   questionTodoStatusRefreshCoordinator: QuestionTodoStatusRefreshCoordinator;
   postSyncQuestionTodoRefreshFacade: PostSyncQuestionTodoRefreshFacade;
+  visibleConversationPostSyncCoordinator: VisibleConversationPostSyncCoordinator;
   backgroundTaskPostSyncCoordinator: BackgroundTaskPostSyncCoordinator;
 }
 
@@ -329,7 +330,6 @@ export function createQuestionTodoBackgroundTaskRefreshServices(
       backgroundConversationAttentionCoordinator,
     );
   const backgroundTaskPostSyncCoordinator = new BackgroundTaskPostSyncCoordinator(
-    visibleConversationPostSyncCoordinator,
     backgroundConversationPostSyncHandoffCoordinator,
   );
 
@@ -337,6 +337,7 @@ export function createQuestionTodoBackgroundTaskRefreshServices(
     questionTodoActivationRefreshBridge,
     questionTodoStatusRefreshCoordinator,
     postSyncQuestionTodoRefreshFacade,
+    visibleConversationPostSyncCoordinator,
     backgroundTaskPostSyncCoordinator,
   };
 }

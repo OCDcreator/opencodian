@@ -1,10 +1,10 @@
 import type { ChatMessage, Conversation } from '../../../../src/core/types';
 import {
   ConversationSyncVisiblePostSyncRouter,
-  type ConversationSyncVisiblePostSyncCoordinator,
   type ConversationSyncVisiblePostSyncResult,
   type ConversationSyncVisiblePostSyncRouterHost,
 } from '../../../../src/features/chat/services/ConversationSyncVisiblePostSyncRouter';
+import type { VisibleConversationPostSyncCoordinator } from '../../../../src/features/chat/services/VisibleConversationPostSyncCoordinator';
 
 type Mocked<T> = {
   [Key in keyof T]:
@@ -35,7 +35,12 @@ function createHost(): Mocked<ConversationSyncVisiblePostSyncRouterHost> {
   };
 }
 
-function createCoordinator(): Mocked<ConversationSyncVisiblePostSyncCoordinator> {
+type VisibleConversationPostSyncPort = Pick<
+  VisibleConversationPostSyncCoordinator,
+  'handleVisibleConversationSyncComplete'
+>;
+
+function createCoordinator(): Mocked<VisibleConversationPostSyncPort> {
   return {
     handleVisibleConversationSyncComplete: jest.fn().mockResolvedValue({
       shouldApplySyncedConversationUpdate: true,

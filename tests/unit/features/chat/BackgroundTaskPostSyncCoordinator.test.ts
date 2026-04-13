@@ -3,12 +3,7 @@ import type { BackgroundConversationPostSyncHandoffCoordinator } from '../../../
 import {
   BackgroundTaskPostSyncCoordinator,
 } from '../../../../src/features/chat/services/BackgroundTaskPostSyncCoordinator';
-import type { VisibleConversationPostSyncCoordinator } from '../../../../src/features/chat/services/VisibleConversationPostSyncCoordinator';
 
-type VisibleConversationPostSyncPort = Pick<
-  VisibleConversationPostSyncCoordinator,
-  'handleVisibleConversationSyncComplete'
->;
 type BackgroundConversationPostSyncHandoffPort = Pick<
   BackgroundConversationPostSyncHandoffCoordinator,
   | 'handleBackgroundTabSyncComplete'
@@ -26,15 +21,6 @@ function createConversation(): Conversation {
   };
 }
 
-function createVisiblePostSyncCoordinator(): jest.Mocked<VisibleConversationPostSyncPort> {
-  return {
-    handleVisibleConversationSyncComplete: jest.fn().mockResolvedValue({
-      shouldApplySyncedConversationUpdate: true,
-      shouldRenderBackgroundTaskIndicator: false,
-    }),
-  };
-}
-
 function createBackgroundPostSyncHandoff(): jest.Mocked<BackgroundConversationPostSyncHandoffPort> {
   return {
     handleSignalSyncComplete: jest.fn().mockResolvedValue(undefined),
@@ -47,49 +33,10 @@ describe('BackgroundTaskPostSyncCoordinator', () => {
     jest.clearAllMocks();
   });
 
-  it('delegates visible post-sync processing to the visible coordinator seam', async () => {
-    const visiblePostSyncCoordinator = createVisiblePostSyncCoordinator();
-    const backgroundPostSyncHandoff = createBackgroundPostSyncHandoff();
-    const coordinator = new BackgroundTaskPostSyncCoordinator(
-      visiblePostSyncCoordinator,
-      backgroundPostSyncHandoff,
-    );
-
-    const outcome = await coordinator.handleVisibleConversationSyncComplete({
-      tabId: 'tab-active',
-      expectedConversationId: 'conversation-1',
-      questionSessionId: 'session-1',
-      syncResult: {
-        changed: true,
-        fingerprint: 'new',
-        revertState: { messageID: 'assistant-1', partID: 'part-1' },
-      },
-    });
-
-    expect(visiblePostSyncCoordinator.handleVisibleConversationSyncComplete).toHaveBeenCalledWith({
-      tabId: 'tab-active',
-      expectedConversationId: 'conversation-1',
-      questionSessionId: 'session-1',
-      syncResult: {
-        changed: true,
-        fingerprint: 'new',
-        revertState: { messageID: 'assistant-1', partID: 'part-1' },
-      },
-    });
-    expect(outcome).toEqual({
-      shouldApplySyncedConversationUpdate: true,
-      shouldRenderBackgroundTaskIndicator: false,
-    });
-  });
-
   it('delegates signal-sync post-processing to the background handoff seam', async () => {
     const conversation = createConversation();
-    const visiblePostSyncCoordinator = createVisiblePostSyncCoordinator();
     const backgroundPostSyncHandoff = createBackgroundPostSyncHandoff();
-    const coordinator = new BackgroundTaskPostSyncCoordinator(
-      visiblePostSyncCoordinator,
-      backgroundPostSyncHandoff,
-    );
+    const coordinator = new BackgroundTaskPostSyncCoordinator(backgroundPostSyncHandoff);
 
     await coordinator.handleSignalSyncComplete({
       tabId: 'tab-bg',
@@ -114,12 +61,8 @@ describe('BackgroundTaskPostSyncCoordinator', () => {
 
   it('delegates background-tab post-processing to the background handoff seam', async () => {
     const conversation = createConversation();
-    const visiblePostSyncCoordinator = createVisiblePostSyncCoordinator();
     const backgroundPostSyncHandoff = createBackgroundPostSyncHandoff();
-    const coordinator = new BackgroundTaskPostSyncCoordinator(
-      visiblePostSyncCoordinator,
-      backgroundPostSyncHandoff,
-    );
+    const coordinator = new BackgroundTaskPostSyncCoordinator(backgroundPostSyncHandoff);
 
     await coordinator.handleBackgroundTabSyncComplete({
       tabId: 'tab-bg',
