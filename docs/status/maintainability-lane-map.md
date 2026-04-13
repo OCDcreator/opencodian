@@ -1,10 +1,11 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
+> **当前状态**: [REVIEW_REQUIRED] R12 checkpoint 已完成；当前没有可自动执行的 `[NEXT]`。
 
 ## 当前优先级
 
-- **Checkpoint**: maintainability checkpoint（R12 已提升为 roadmap 当前 `[NEXT]`）
+- **Checkpoint**: maintainability checkpoint（R12 已完成；autopilot 暂停，等待人工确认下一批 queue）
 - **Core config maintainability**: catalog state service（R11 已完成；后续只保留 settings/core catalog state regression watchpoints）
 - **P4**: message shell / notice / timestamp 组装边界（R8 已完成；后续只保留 renderer/finalizer regression watchpoints）
 - **P3**: context / composer / retained-selection 相关 ownership（R7 已完成；后续只保留 facade/focus runtime 回归 watchpoints）
@@ -13,7 +14,7 @@
 
 ## 当前热点首查入口
 
-- Checkpoint 首查 roadmap / master plan / 最近 phase 文档，再复核 `OpenCodianView.ts`、`OpenCodianSettings.ts` 与 `OpenCodeService.ts` 的 owner 体量变化
+- Checkpoint 已完成：`OpenCodianView.ts` / `OpenCodianSettings.ts` / `OpenCodeService.ts` 当前分别为 7732 / 4989 / 4733 行；下一步先等人工确认新 queue
 - Core config maintainability 首查 `ModelConfigService.ts` / `ModelCatalogStateService.ts` 的 catalog state 入口，再看 `OpenCodianSettings.ts` 与 `modelConfigWorkspace.ts` 现在只保留的 UI 消费缝
 - P4 regression-only 首查 `AssistantShellViewHostAdapter`、`PersistentAssistantNoticeService` 与 `ConversationRenderService` 的 persisted assistant body/footer seam
 - P3 regression-only 首查 composer-context facade 创建、context catalog ownership 与 retained-selection runtime
@@ -41,7 +42,7 @@
 
 - R8 已把 persisted assistant shell / notice / footer / timestamp 组装收束到 `AssistantShellViewHostAdapter`，并让 `PersistentAssistantNoticeService` 直接消费 assistant-message render seam
 - `OpenCodianView` 现在只保留 assistant 正文 block 渲染回调、pseudo-stream reveal 与少量本地错误/server-prompt UI 壳层；不要再把 persisted assistant 壳层组装搬回 view
-- 后续若不是回归或正确性问题，默认按 roadmap 转向 core catalog state service
+- 后续若不是回归或正确性问题，默认等待人工确认新 roadmap，不再自动转向其它 lane
 
 ## Settings maintainability 状态
 
@@ -49,7 +50,7 @@
 - R10 已把 provider/model accordion、search、bulk toggle 与 probe presentation 收束到 `SettingsModelCatalogPresenter`
 - `OpenCodianSettings` 现在负责 section composition、settings persistence 与 modal launch；不要把 model catalog UI 状态机或 probe badge/detail 逻辑搬回主类
 - R11 已把 `baseEffective` / `effective` / `currentEnabledProviderIds` availability API 从 settings presenter 侧抽回 `ModelCatalogStateService`
-- Settings/core 的下一步不再开新 UI 拆分，而是按 roadmap 进入 checkpoint，复盘 `OpenCodianSettings` 与 core config owner 的缩减效果
+- Settings/core 的下一步不再开新 UI 拆分；R12 已复盘 `OpenCodianSettings` 与 core config owner 的缩减效果，后续等待人工确认
 
 ## 可复用模式
 

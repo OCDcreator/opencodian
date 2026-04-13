@@ -1,7 +1,8 @@
 # Maintainability Master Plan
 
-> **状态**: [ACTIVE]
+> **状态**: [REVIEW_REQUIRED]
 > **作用**: 这是 maintainability 无人值守的战略文档。后续每一轮开始前，必须先读本文件，再读最近的 `docs/status/maintainability-phase-XXX.md`。
+> **自动推进状态**: R1-R12 受控队列已完成，下一批 roadmap 必须先由人工确认，不得由 autopilot 自动扩展。
 
 ## 1. 总体目标
 
@@ -18,15 +19,16 @@ maintainability 的目标是：
 
 ## 2. 当前阶段判断
 
-**当前判断：中期。**
+**当前判断：中期，但 R12 checkpoint 后暂停自动推进。**
 
 原因：
 
-- 发送、finalization、conversation state、conversation render 等几条主链路已经完成多轮拆分，说明基础模块化工作已经明显推进
-- 但 `src/features/chat/OpenCodianView.ts` 仍然是聊天域的绝对主集成热点，当前体量约 **11079 行**，依旧持有大量 runtime、UI、question、todo、background task、context、header、appearance 等 ownership
-- 与之相比，`src/features/chat/services/ConversationRenderService.ts` 当前约 **696 行**，且 trailing-assistant patch 周边已经衍生出 **40 个 `TrailingAssistantPatch*.ts` helper**；这说明最近工作的收益更偏向局部收口，而不是继续显著降低全局 ownership 集中度
+- R1-R12 已按受控 roadmap 完成 P2、P3、P4、Settings、Core config 与 checkpoint；本轮不再继续拆新的 owner
+- `src/features/chat/OpenCodianView.ts` 当前实测 **7732 行**，仍是聊天域最大集成热点；R1-R8 已把 question/todo/background-task、session signal、composer-context、persisted assistant shell 等链路迁到更明确 owner，但 tab activation / runtime bridge / header-appearance 等职责仍需下一批人工排序
+- `src/features/settings/OpenCodianSettings.ts` 当前实测 **4989 行**，较 R9 前 baseline **6756 行**明显收缩；section lifecycle、model catalog presenter、catalog state writeback 已迁出，但 settings tab 仍负责 section composition、settings persistence、modal launch 与多处分区业务装配
+- `src/core/opencode/OpenCodeService.ts` 当前实测 **4733 行**，本批 roadmap 未直接收缩；它仍集中 SDK facade consumption、legacy HTTP/SSE fallback、sync event normalization、question/tool/session/config API glue，后续若处理必须先设计高风险兼容边界
 
-结论：目前并不是“只剩收尾”的后期状态，更像是**完成了若干关键链路拆分后的中期阶段**：已经有可复用边界，但最大的集成点仍未被系统性瘦身。
+结论：本批队列已经证明“迁出完整 ownership”比继续粉碎 helper 更有效，但项目仍不是收尾阶段。下一批 roadmap 应由人工确认后再启动，且必须继续围绕大 owner 的完整生命周期边界，而不是自动追加同类小切片。
 
 ## 3. 高优先级方向
 
@@ -134,9 +136,9 @@ maintainability 的目标是：
 
 ## 7. 当前执行指令
 
-从本次战略复审开始：
+从第三百二十七阶段 checkpoint 开始：
 
-- 不再把 `ConversationRenderService` trailing-assistant helper 链作为默认延续方向
-- 下一轮起，优先从 `OpenCodianView` 仍然集中的 ownership 中选择一个高价值切口
-- 首选候选应落在：`question / todo / background task`、`context / composer`、`message shell / notice / timestamp`、或其它能直接削弱 `OpenCodianView` ownership 的链路
-- 执行顺序以 `docs/status/maintainability-round-roadmap.md` 的 queue 为准，不再允许按局部灵感自由扩散
+- R1-R12 受控队列已经完成，`docs/status/maintainability-round-roadmap.md` 不再保留可自动执行的 `[NEXT]`
+- Autopilot 必须暂停在 [REVIEW_REQUIRED]，等待人工确认下一批 queue；不得自行把候选方向扩展成新的 `[NEXT]`
+- 下一批人工 roadmap 建议先比较 `OpenCodianView` 的 tab activation / runtime bridge、header/appearance/model-permission，以及 `OpenCodeService` 的 SDK/legacy/sync-event boundary，再决定是否继续 settings 分区拆分
+- `ConversationRenderService` trailing-assistant helper 链仍保持降优先级；除非正确性、测试或构建阻塞，不要把它作为新 queue 的默认起点

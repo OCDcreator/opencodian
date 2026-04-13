@@ -2,6 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`。第 12 轮完成后必须暂停复盘，不得自动扩展新队列。
+> **当前状态**: [REVIEW_REQUIRED] R1-R12 已完成；当前没有可自动执行的 `[NEXT]`，下一批 queue 需要人工确认。
 
 ## 控制规则
 
@@ -20,6 +21,8 @@
 > **P2 状态（R6 完成后）**: R1-R6 已完成 question dock、todo refresh/status、background completion notice、post-sync handoff 与 session signal orchestration 的收束。剩余风险以回归为主：background tab 无 session 时的 dock 清理、post-sync todo/status gate、completion notice queue/fingerprint 去重，以及 live signal writeback 顺序。
 >
 > **P3 状态（R7 完成后）**: composer-context bundle 创建、`ContextAttachmentBuilder` 与 `ContextFileCatalogService` ownership 已收进 `ComposerContextViewFacade.create()`；`OpenCodianView` 只保留 view host seam、context row 挂载和按钮事件入口，后续 P3 风险以 facade / focus runtime 回归为主。
+>
+> **Checkpoint 状态（R12 完成后）**: 当前 `OpenCodianView.ts` / `OpenCodianSettings.ts` / `OpenCodeService.ts` 分别为 7732 / 4989 / 4733 行。本批明显收缩了 settings owner，并把 chat 侧多条链路迁出；`OpenCodeService` 未进入本批代码切口。Autopilot 必须等待人工确认下一批 roadmap。
 
 ## Queue
 
@@ -250,7 +253,7 @@
   - Settings presenter 或后续 UI 只消费 catalog state API。
   - 运行 targeted tests、全量 `npm test`、`npm run build`。
 
-### [NEXT] R12 - Maintainability checkpoint
+### [DONE] R12 - Maintainability checkpoint
 
 - **Lane**: Checkpoint
 - **目标**: 暂停自动推进，复盘 `OpenCodianView`、`OpenCodianSettings`、`OpenCodeService` 的体量变化和链路复杂度，决定下一批 roadmap。
@@ -270,3 +273,10 @@
   - 更新 master plan / roadmap。
   - phase 文档总结每个 hotspot 缩减了什么、哪些链路仍需处理。
   - 将 autopilot 状态设置为需要人工确认后再继续。
+
+## R12 Checkpoint Result
+
+- 本轮只做文档复盘、指标统计和 roadmap 状态调整，没有开启新代码重构。
+- 已完成的 owner 缩减：P2 question/todo/background-task 链路、P3 composer-context bundle、P4 persisted assistant shell、settings section/model catalog、core catalog state API。
+- 仍需人工排序的热点：`OpenCodianView` 的 tab activation / runtime bridge / header-appearance-model 边界，`OpenCodianSettings` 的剩余 section composition 与 modal launch，`OpenCodeService` 的 SDK/legacy/sync-event 边界。
+- 当前队列到此结束，不自动新增 `[QUEUED]` 或 `[NEXT]` 项；下一批 roadmap 必须由人工确认后再写入。
