@@ -2,8 +2,13 @@ import type { Conversation } from '../../../../src/core/types';
 import {
   type BackgroundTaskPostSyncRefreshPort,
   PostSyncQuestionTodoRefreshFacade,
-  type PostSyncQuestionTodoRefreshFacadeHost,
 } from '../../../../src/features/chat/services/PostSyncQuestionTodoRefreshFacade';
+import type {
+  BackgroundTabConversationRefreshPlanOptions,
+  PostSyncQuestionTodoRefreshPlanBuilder,
+  SignalSyncedBackgroundConversationRefreshPlanOptions,
+  VisibleConversationRefreshPlanOptions,
+} from '../../../../src/features/chat/services/PostSyncQuestionTodoRefreshPlanBuilder';
 import type {
   PostSyncQuestionTodoStatusRefreshOptions,
   QuestionTodoStatusRefreshCoordinator,
@@ -32,9 +37,38 @@ function createConversation(): Conversation {
   };
 }
 
-function createHost(): Mocked<PostSyncQuestionTodoRefreshFacadeHost> {
+type PostSyncQuestionTodoRefreshPlanPort = Pick<
+  PostSyncQuestionTodoRefreshPlanBuilder,
+  | 'createBackgroundTabConversationPlan'
+  | 'createSignalSyncedBackgroundConversationPlan'
+  | 'createVisibleConversationPlan'
+>;
+
+function createPlanBuilder(): jest.Mocked<PostSyncQuestionTodoRefreshPlanPort> {
   return {
-    getCurrentConversationSessionId: jest.fn().mockReturnValue('active-session'),
+    createVisibleConversationPlan: jest.fn(
+      (options: VisibleConversationRefreshPlanOptions) => ({
+        tabId: options.tabId,
+        questionSessionId: options.questionSessionId,
+        todoStatusSessionId: 'visible-todo-session',
+      }),
+    ),
+    createSignalSyncedBackgroundConversationPlan: jest.fn(
+      (options: SignalSyncedBackgroundConversationRefreshPlanOptions) => ({
+        tabId: options.tabId,
+        questionSessionId: options.conversation.openCodeSessionId,
+        todoStatusSessionId: options.conversation.openCodeSessionId,
+        forceTodoStatusRefresh: options.tabHasBackgroundTask,
+      }),
+    ),
+    createBackgroundTabConversationPlan: jest.fn(
+      (options: BackgroundTabConversationRefreshPlanOptions) => ({
+        tabId: options.tabId,
+        questionSessionId: options.conversation.openCodeSessionId,
+        todoStatusSessionId: options.conversation.openCodeSessionId,
+        forceTodoStatusRefresh: true,
+      }),
+    ),
   };
 }
 
@@ -66,11 +100,11 @@ describe('PostSyncQuestionTodoRefreshFacade', () => {
   });
 
   it('refreshes visible conversations against the current live session id', async () => {
-    const host = createHost();
+    const planBuilder = createPlanBuilder();
     const refreshCoordinator = createRefreshCoordinator();
     const writebackPort = createWritebackPort();
     const facade = new PostSyncQuestionTodoRefreshFacade(
-      host,
+      planBuilder,
       refreshCoordinator,
       writebackPort,
     );
@@ -80,39 +114,45 @@ describe('PostSyncQuestionTodoRefreshFacade', () => {
       questionSessionId: 'question-session',
     });
 
-    expect(host.getCurrentConversationSessionId).toHaveBeenCalledTimes(1);
+    expect(planBuilder.createVisibleConversationPlan).toHaveBeenCalledWith({
+      tabId: 'tab-active',
+      questionSessionId: 'question-session',
+    });
     expect(refreshCoordinator.refreshAfterPostSync).toHaveBeenCalledWith({
       tabId: 'tab-active',
       questionSessionId: 'question-session',
-      todoStatusSessionId: 'active-session',
+      todoStatusSessionId: 'visible-todo-session',
     });
   });
 
-  it('reuses the post-sync refresh order for background conversations before completion updates', async () => {
+  it('reuses the post-sync refresh order for signal-synced background conversations before completion updates', async () => {
     const callOrder: string[] = [];
     const conversation = createConversation();
-    const host = createHost();
+    const planBuilder = createPlanBuilder();
     const refreshCoordinator = createRefreshCoordinator(callOrder);
     const writebackPort = createWritebackPort(callOrder);
     const facade = new PostSyncQuestionTodoRefreshFacade(
-      host,
+      planBuilder,
       refreshCoordinator,
       writebackPort,
     );
 
-    await facade.refreshBackgroundConversation({
+    await facade.refreshSignalSyncedBackgroundConversation({
       tabId: 'tab-bg',
       conversation,
-      todoStatusRefreshPolicy: {
-        source: 'background-tab',
-      },
+      tabHasBackgroundTask: false,
     });
 
+    expect(planBuilder.createSignalSyncedBackgroundConversationPlan).toHaveBeenCalledWith({
+      tabId: 'tab-bg',
+      conversation,
+      tabHasBackgroundTask: false,
+    });
     expect(refreshCoordinator.refreshAfterPostSync).toHaveBeenCalledWith({
       tabId: 'tab-bg',
       questionSessionId: 'session-1',
       todoStatusSessionId: 'session-1',
-      forceTodoStatusRefresh: true,
+      forceTodoStatusRefresh: false,
       afterPendingQuestionRefresh: expect.any(Function),
     });
     expect(writebackPort.syncBackgroundTaskStateFromConversation).toHaveBeenCalledWith(
@@ -126,31 +166,31 @@ describe('PostSyncQuestionTodoRefreshFacade', () => {
     expect(callOrder).toEqual(['refresh', 'rebuild', 'writeback']);
   });
 
-  it('keeps signal refresh forcing behind the background refresh policy', async () => {
+  it('delegates background-tab forcing to the refresh-plan builder', async () => {
     const conversation = createConversation();
-    const host = createHost();
+    const planBuilder = createPlanBuilder();
     const refreshCoordinator = createRefreshCoordinator();
     const writebackPort = createWritebackPort();
     const facade = new PostSyncQuestionTodoRefreshFacade(
-      host,
+      planBuilder,
       refreshCoordinator,
       writebackPort,
     );
 
-    await facade.refreshBackgroundConversation({
+    await facade.refreshBackgroundTabConversation({
       tabId: 'tab-bg',
       conversation,
-      todoStatusRefreshPolicy: {
-        source: 'signal-sync',
-        tabHasBackgroundTask: false,
-      },
     });
 
+    expect(planBuilder.createBackgroundTabConversationPlan).toHaveBeenCalledWith({
+      tabId: 'tab-bg',
+      conversation,
+    });
     expect(refreshCoordinator.refreshAfterPostSync).toHaveBeenCalledWith({
       tabId: 'tab-bg',
       questionSessionId: 'session-1',
       todoStatusSessionId: 'session-1',
-      forceTodoStatusRefresh: false,
+      forceTodoStatusRefresh: true,
       afterPendingQuestionRefresh: expect.any(Function),
     });
   });

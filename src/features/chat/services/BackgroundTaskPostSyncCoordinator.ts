@@ -15,7 +15,9 @@ export type {
 
 type PostSyncQuestionTodoRefreshPort = Pick<
   PostSyncQuestionTodoRefreshFacade,
-  'refreshBackgroundConversation' | 'refreshVisibleConversation'
+  | 'refreshBackgroundTabConversation'
+  | 'refreshSignalSyncedBackgroundConversation'
+  | 'refreshVisibleConversation'
 >;
 type VisibleConversationPostSyncStatePort = Pick<
   VisibleConversationPostSyncStateCoordinator,
@@ -78,13 +80,10 @@ export class BackgroundTaskPostSyncCoordinator {
 
   async handleSignalSyncComplete(options: SignalBackgroundTaskPostSyncOptions): Promise<void> {
     this.host.markBackgroundTaskAuthoritativeSync(options.tabId, `sync-event:${options.reason}`);
-    await this.postSyncQuestionTodoRefreshFacade.refreshBackgroundConversation({
+    await this.postSyncQuestionTodoRefreshFacade.refreshSignalSyncedBackgroundConversation({
       tabId: options.tabId,
       conversation: options.conversation,
-      todoStatusRefreshPolicy: {
-        source: 'signal-sync',
-        tabHasBackgroundTask: options.tabHasBackgroundTask,
-      },
+      tabHasBackgroundTask: options.tabHasBackgroundTask,
     });
 
     if (this.didConversationChange(options.syncResult, options.previousFingerprint)) {
@@ -93,12 +92,9 @@ export class BackgroundTaskPostSyncCoordinator {
   }
 
   async handleBackgroundTabSyncComplete(options: BackgroundTabPostSyncOptions): Promise<void> {
-    await this.postSyncQuestionTodoRefreshFacade.refreshBackgroundConversation({
+    await this.postSyncQuestionTodoRefreshFacade.refreshBackgroundTabConversation({
       tabId: options.tabId,
       conversation: options.conversation,
-      todoStatusRefreshPolicy: {
-        source: 'background-tab',
-      },
     });
 
     if (this.didConversationChange(options.syncResult, options.previousFingerprint)) {

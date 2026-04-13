@@ -15,8 +15,11 @@ import type { BackgroundTaskLiveSignalCoordinator } from './BackgroundTaskLiveSi
 import {
   type BackgroundTaskPostSyncRefreshPort,
   PostSyncQuestionTodoRefreshFacade,
-  type PostSyncQuestionTodoRefreshFacadeHost,
 } from './PostSyncQuestionTodoRefreshFacade';
+import {
+  PostSyncQuestionTodoRefreshPlanBuilder,
+  type PostSyncQuestionTodoRefreshPlanBuilderHost,
+} from './PostSyncQuestionTodoRefreshPlanBuilder';
 import type { QuestionDockCoordinator } from './QuestionDockCoordinator';
 import {
   QuestionTodoStatusRefreshCoordinator,
@@ -170,7 +173,7 @@ export function createQuestionTodoBackgroundTaskRefreshViewHostAdapter(
 
 export interface QuestionTodoBackgroundTaskRefreshHosts {
   questionTodoStatusRefreshHost: QuestionTodoStatusRefreshCoordinatorHost;
-  postSyncQuestionTodoRefreshFacadeHost: PostSyncQuestionTodoRefreshFacadeHost;
+  postSyncQuestionTodoRefreshPlanBuilderHost: PostSyncQuestionTodoRefreshPlanBuilderHost;
   backgroundTaskPostSyncRefreshPort: BackgroundTaskPostSyncRefreshPort;
   visibleConversationPostSyncStateCoordinatorHost: VisibleConversationPostSyncStateCoordinatorHost;
   backgroundTaskPostSyncCoordinatorHost: BackgroundTaskPostSyncCoordinatorHost;
@@ -204,7 +207,7 @@ export function createQuestionTodoBackgroundTaskRefreshHosts(
         options: { suppressErrors?: boolean },
       ) => viewHost.refreshTabSessionTodos(tabId, sessionId, options),
     },
-    postSyncQuestionTodoRefreshFacadeHost: {
+    postSyncQuestionTodoRefreshPlanBuilderHost: {
       getCurrentConversationSessionId: () =>
         viewHost.getCurrentConversation()?.openCodeSessionId,
     },
@@ -246,8 +249,11 @@ export function createQuestionTodoBackgroundTaskRefreshServices(
   const questionTodoStatusRefreshCoordinator = new QuestionTodoStatusRefreshCoordinator(
     hosts.questionTodoStatusRefreshHost,
   );
+  const postSyncQuestionTodoRefreshPlanBuilder = new PostSyncQuestionTodoRefreshPlanBuilder(
+    hosts.postSyncQuestionTodoRefreshPlanBuilderHost,
+  );
   const postSyncQuestionTodoRefreshFacade = new PostSyncQuestionTodoRefreshFacade(
-    hosts.postSyncQuestionTodoRefreshFacadeHost,
+    postSyncQuestionTodoRefreshPlanBuilder,
     questionTodoStatusRefreshCoordinator,
     hosts.backgroundTaskPostSyncRefreshPort,
   );

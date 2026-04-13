@@ -272,7 +272,7 @@ describe('QuestionTodoBackgroundTaskRefreshHostAdapter', () => {
     const hosts = createQuestionTodoBackgroundTaskRefreshHosts(viewHost);
 
     expect(hosts.questionTodoStatusRefreshHost.getTabRuntimeState('tab-active')).toBe(runtime);
-    expect(hosts.postSyncQuestionTodoRefreshFacadeHost.getCurrentConversationSessionId()).toBe(
+    expect(hosts.postSyncQuestionTodoRefreshPlanBuilderHost.getCurrentConversationSessionId()).toBe(
       'session-conversation-active',
     );
     expect(hosts.visibleConversationPostSyncStateCoordinatorHost.getCurrentConversationId()).toBe(

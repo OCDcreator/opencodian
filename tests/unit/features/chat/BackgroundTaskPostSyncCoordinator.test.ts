@@ -15,7 +15,9 @@ type MockedBackgroundTaskPostSyncHost = {
 
 type PostSyncQuestionTodoRefreshPort = Pick<
   PostSyncQuestionTodoRefreshFacade,
-  'refreshBackgroundConversation' | 'refreshVisibleConversation'
+  | 'refreshBackgroundTabConversation'
+  | 'refreshSignalSyncedBackgroundConversation'
+  | 'refreshVisibleConversation'
 >;
 type VisibleConversationPostSyncStatePort = Pick<
   VisibleConversationPostSyncStateCoordinator,
@@ -43,7 +45,8 @@ function createHost(): MockedBackgroundTaskPostSyncHost {
 function createRefreshFacade(): jest.Mocked<PostSyncQuestionTodoRefreshPort> {
   return {
     refreshVisibleConversation: jest.fn().mockResolvedValue(undefined),
-    refreshBackgroundConversation: jest.fn().mockResolvedValue(undefined),
+    refreshSignalSyncedBackgroundConversation: jest.fn().mockResolvedValue(undefined),
+    refreshBackgroundTabConversation: jest.fn().mockResolvedValue(undefined),
   };
 }
 
@@ -205,13 +208,10 @@ describe('BackgroundTaskPostSyncCoordinator', () => {
       'tab-bg',
       'sync-event:message.updated',
     );
-    expect(refreshFacade.refreshBackgroundConversation).toHaveBeenCalledWith({
+    expect(refreshFacade.refreshSignalSyncedBackgroundConversation).toHaveBeenCalledWith({
       tabId: 'tab-bg',
       conversation,
-      todoStatusRefreshPolicy: {
-        source: 'signal-sync',
-        tabHasBackgroundTask: false,
-      },
+      tabHasBackgroundTask: false,
     });
     expect(host.setTabNeedsAttention).toHaveBeenCalledWith('tab-bg', true);
   });
@@ -237,13 +237,10 @@ describe('BackgroundTaskPostSyncCoordinator', () => {
       syncResult: { changed: false, fingerprint: 'same' },
     });
 
-    expect(refreshFacade.refreshBackgroundConversation).toHaveBeenCalledWith({
+    expect(refreshFacade.refreshSignalSyncedBackgroundConversation).toHaveBeenCalledWith({
       tabId: 'tab-bg',
       conversation,
-      todoStatusRefreshPolicy: {
-        source: 'signal-sync',
-        tabHasBackgroundTask: false,
-      },
+      tabHasBackgroundTask: false,
     });
     expect(host.setTabNeedsAttention).not.toHaveBeenCalled();
   });
@@ -267,12 +264,9 @@ describe('BackgroundTaskPostSyncCoordinator', () => {
     });
 
     expect(host.markBackgroundTaskAuthoritativeSync).not.toHaveBeenCalled();
-    expect(refreshFacade.refreshBackgroundConversation).toHaveBeenCalledWith({
+    expect(refreshFacade.refreshBackgroundTabConversation).toHaveBeenCalledWith({
       tabId: 'tab-bg',
       conversation,
-      todoStatusRefreshPolicy: {
-        source: 'background-tab',
-      },
     });
     expect(host.setTabNeedsAttention).toHaveBeenCalledWith('tab-bg', true);
   });

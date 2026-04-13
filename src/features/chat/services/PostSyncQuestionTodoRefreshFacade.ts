@@ -1,15 +1,26 @@
 import type { Conversation } from '../../../core/types';
 import type { TabId } from '../tabs';
-import type { QuestionTodoStatusRefreshCoordinator } from './QuestionTodoStatusRefreshCoordinator';
+import type {
+  BackgroundTabConversationRefreshPlanOptions,
+  PostSyncQuestionTodoRefreshPlanBuilder,
+  SignalSyncedBackgroundConversationRefreshPlanOptions,
+  VisibleConversationRefreshPlanOptions,
+} from './PostSyncQuestionTodoRefreshPlanBuilder';
+import type {
+  PostSyncQuestionTodoStatusRefreshOptions,
+  QuestionTodoStatusRefreshCoordinator,
+} from './QuestionTodoStatusRefreshCoordinator';
 
 type QuestionTodoStatusRefreshPort = Pick<
   QuestionTodoStatusRefreshCoordinator,
   'refreshAfterPostSync'
 >;
-
-export interface PostSyncQuestionTodoRefreshFacadeHost {
-  getCurrentConversationSessionId(): string | null | undefined;
-}
+type PostSyncQuestionTodoRefreshPlanPort = Pick<
+  PostSyncQuestionTodoRefreshPlanBuilder,
+  | 'createBackgroundTabConversationPlan'
+  | 'createSignalSyncedBackgroundConversationPlan'
+  | 'createVisibleConversationPlan'
+>;
 
 export interface BackgroundTaskPostSyncRefreshPort {
   syncBackgroundTaskStateFromConversation(
@@ -22,29 +33,15 @@ export interface BackgroundTaskPostSyncRefreshPort {
   ): Promise<void>;
 }
 
-export interface VisibleConversationRefreshOptions {
-  tabId: TabId;
-  questionSessionId: string | null | undefined;
-}
-
-export type BackgroundConversationTodoStatusRefreshPolicy =
-  | {
-      source: 'signal-sync';
-      tabHasBackgroundTask: boolean;
-    }
-  | {
-      source: 'background-tab';
-    };
-
-export interface BackgroundConversationRefreshOptions {
-  tabId: TabId;
-  conversation: Conversation;
-  todoStatusRefreshPolicy: BackgroundConversationTodoStatusRefreshPolicy;
-}
+export type VisibleConversationRefreshOptions = VisibleConversationRefreshPlanOptions;
+export type SignalSyncedBackgroundConversationRefreshOptions =
+  SignalSyncedBackgroundConversationRefreshPlanOptions;
+export type BackgroundTabConversationRefreshOptions =
+  BackgroundTabConversationRefreshPlanOptions;
 
 export class PostSyncQuestionTodoRefreshFacade {
   constructor(
-    private readonly host: PostSyncQuestionTodoRefreshFacadeHost,
+    private readonly refreshPlanBuilder: PostSyncQuestionTodoRefreshPlanPort,
     private readonly questionTodoStatusRefreshCoordinator: QuestionTodoStatusRefreshPort,
     private readonly backgroundTaskPostSyncRefresh: BackgroundTaskPostSyncRefreshPort,
   ) {}
@@ -52,44 +49,49 @@ export class PostSyncQuestionTodoRefreshFacade {
   async refreshVisibleConversation(
     options: VisibleConversationRefreshOptions,
   ): Promise<void> {
-    await this.questionTodoStatusRefreshCoordinator.refreshAfterPostSync({
-      tabId: options.tabId,
-      questionSessionId: options.questionSessionId,
-      todoStatusSessionId: this.host.getCurrentConversationSessionId(),
-    });
+    await this.questionTodoStatusRefreshCoordinator.refreshAfterPostSync(
+      this.refreshPlanBuilder.createVisibleConversationPlan(options),
+    );
   }
 
-  async refreshBackgroundConversation(
-    options: BackgroundConversationRefreshOptions,
+  async refreshSignalSyncedBackgroundConversation(
+    options: SignalSyncedBackgroundConversationRefreshOptions,
+  ): Promise<void> {
+    await this.refreshBackgroundConversation(
+      options.tabId,
+      options.conversation,
+      this.refreshPlanBuilder.createSignalSyncedBackgroundConversationPlan(options),
+    );
+  }
+
+  async refreshBackgroundTabConversation(
+    options: BackgroundTabConversationRefreshOptions,
+  ): Promise<void> {
+    await this.refreshBackgroundConversation(
+      options.tabId,
+      options.conversation,
+      this.refreshPlanBuilder.createBackgroundTabConversationPlan(options),
+    );
+  }
+
+  private async refreshBackgroundConversation(
+    tabId: TabId,
+    conversation: Conversation,
+    refreshPlan: PostSyncQuestionTodoStatusRefreshOptions,
   ): Promise<void> {
     await this.questionTodoStatusRefreshCoordinator.refreshAfterPostSync({
-      tabId: options.tabId,
-      questionSessionId: options.conversation.openCodeSessionId,
-      todoStatusSessionId: options.conversation.openCodeSessionId,
-      forceTodoStatusRefresh: this.shouldForceTodoStatusRefresh(
-        options.todoStatusRefreshPolicy,
-      ),
+      ...refreshPlan,
       afterPendingQuestionRefresh: () => {
         this.backgroundTaskPostSyncRefresh.syncBackgroundTaskStateFromConversation(
-          options.conversation,
-          options.tabId,
+          conversation,
+          tabId,
         );
       },
     });
 
     await this.backgroundTaskPostSyncRefresh.flushBackgroundTaskPostSyncWriteback(
-      options.tabId,
-      options.conversation,
+      tabId,
+      conversation,
     );
-  }
-
-  private shouldForceTodoStatusRefresh(
-    policy: BackgroundConversationTodoStatusRefreshPolicy,
-  ): boolean {
-    if (policy.source === 'background-tab') {
-      return true;
-    }
-
-    return policy.tabHasBackgroundTask;
   }
 }
