@@ -294,6 +294,11 @@ import {
   type TabActivationRuntimeHostProviderHost,
 } from './services/TabActivationRuntimeHostProvider';
 import {
+  createTabActivationConversationSyncRuntimePort,
+  type TabActivationConversationSyncPortProviderHost,
+  type TabActivationConversationSyncRuntimePort,
+} from './services/TabActivationConversationSyncPortProvider';
+import {
   isElementNearBottom,
   scrollElementToBottom,
 } from './services/ScrollManager';
@@ -750,6 +755,7 @@ export class OpenCodianView extends ItemView {
   private conversationSyncRuntimeCoordinator: ConversationSyncRuntimeCoordinator;
   private conversationSyncBridge: ConversationSyncBridge;
   private conversationSyncBridgePorts!: ConversationSyncBridgePorts;
+  private tabActivationConversationSyncRuntimePort!: TabActivationConversationSyncRuntimePort;
   private conversationSessionSignalRuntime: ConversationSessionSignalRuntime;
   private conversationTabOpenCoordinator: ConversationTabOpenCoordinator;
   private conversationTabLifecycleRecoveryCoordinator: ConversationTabLifecycleRecoveryCoordinator;
@@ -1202,6 +1208,10 @@ export class OpenCodianView extends ItemView {
     this.conversationSyncBridgePorts = createConversationSyncBridgePorts(
       this.createConversationSyncBridgePortProviderHost(),
     );
+    this.tabActivationConversationSyncRuntimePort =
+      createTabActivationConversationSyncRuntimePort(
+        this.createTabActivationConversationSyncPortProviderHost(),
+      );
     this.conversationSessionSignalRuntime = createConversationSessionSignalRuntime(
       createConversationSessionSignalRuntimeViewHost(
         createConversationSessionSignalRuntimeViewHostFactoryHost(
@@ -1469,17 +1479,7 @@ export class OpenCodianView extends ItemView {
       },
       hasBackgroundTaskIndicator: (tabId) =>
         Boolean(this.backgroundTaskLiveSignalCoordinator.hasIndicator(tabId)),
-      getConversationSyncFingerprint: (messages) =>
-        this.getConversationSyncFingerprint(messages),
-      setLastConversationSyncFingerprint: (fingerprint) => {
-        this.lastConversationSyncFingerprint = fingerprint;
-      },
-      startConversationSyncLoop: () => {
-        this.conversationSyncBridgePorts.getLoopControl().startConversationSyncLoop();
-      },
-      stopConversationSyncLoop: () => {
-        this.conversationSyncBridgePorts.getLoopControl().stopConversationSyncLoop();
-      },
+      getConversationSyncRuntime: () => this.tabActivationConversationSyncRuntimePort,
       updateSendButtonState: () => {
         this.updateSendButtonState();
       },
@@ -1634,6 +1634,23 @@ export class OpenCodianView extends ItemView {
       },
       syncVisibleConversationInBackground: () =>
         this.conversationSyncBridge.syncVisibleConversationInBackground(),
+    };
+  }
+
+  private createTabActivationConversationSyncPortProviderHost():
+  TabActivationConversationSyncPortProviderHost {
+    return {
+      getConversationSyncFingerprint: (messages) =>
+        this.getConversationSyncFingerprint(messages),
+      setLastConversationSyncFingerprint: (fingerprint) => {
+        this.lastConversationSyncFingerprint = fingerprint;
+      },
+      startConversationSyncLoop: () => {
+        this.conversationSyncBridgePorts.getLoopControl().startConversationSyncLoop();
+      },
+      stopConversationSyncLoop: () => {
+        this.conversationSyncBridgePorts.getLoopControl().stopConversationSyncLoop();
+      },
     };
   }
 

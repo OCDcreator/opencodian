@@ -39,14 +39,7 @@ export interface TabActivationRuntimeHostProviderHost {
     TabActivationBackgroundTaskPort['resetBackgroundTaskSuppressedFingerprint'];
   hasBackgroundTaskIndicator:
     TabActivationBackgroundTaskPort['hasBackgroundTaskIndicator'];
-  getConversationSyncFingerprint:
-    TabActivationConversationSyncPort['getConversationSyncFingerprint'];
-  setLastConversationSyncFingerprint:
-    TabActivationConversationSyncPort['setLastConversationSyncFingerprint'];
-  startConversationSyncLoop:
-    TabActivationConversationSyncPort['startConversationSyncLoop'];
-  stopConversationSyncLoop:
-    TabActivationConversationSyncPort['stopConversationSyncLoop'];
+  getConversationSyncRuntime(): TabActivationConversationSyncPort;
   updateSendButtonState: TabActivationViewWritebackPort['updateSendButtonState'];
   setActiveMessagesPane: TabActivationViewWritebackPort['setActiveMessagesPane'];
   scheduleComposerLayoutSync:
@@ -98,19 +91,7 @@ export function createTabActivationRuntimeViewHostFactoryHost(
       },
       hasBackgroundTaskIndicator: (tabId) => host.hasBackgroundTaskIndicator(tabId),
     }),
-    getConversationSyncRuntime: () => ({
-      getConversationSyncFingerprint: (messages) =>
-        host.getConversationSyncFingerprint(messages),
-      setLastConversationSyncFingerprint: (fingerprint) => {
-        host.setLastConversationSyncFingerprint(fingerprint);
-      },
-      startConversationSyncLoop: () => {
-        host.startConversationSyncLoop();
-      },
-      stopConversationSyncLoop: () => {
-        host.stopConversationSyncLoop();
-      },
-    }),
+    getConversationSyncRuntime: () => host.getConversationSyncRuntime(),
     getViewWriteback: () => ({
       updateSendButtonState: () => {
         host.updateSendButtonState();

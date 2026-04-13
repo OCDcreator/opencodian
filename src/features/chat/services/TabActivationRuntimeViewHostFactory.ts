@@ -3,6 +3,9 @@ import {
   type TabActivationRuntimeBridgeHosts,
   type TabActivationRuntimeHostAdapterHost,
 } from '../runtime/TabActivationRuntimeHostAdapter';
+import type {
+  TabActivationConversationSyncRuntimePort,
+} from './TabActivationConversationSyncPortProvider';
 
 type TabActivationRuntimeTabPort = Pick<
   TabActivationRuntimeHostAdapterHost,
@@ -33,13 +36,7 @@ type TabActivationBackgroundTaskPort = Pick<
   | 'hasBackgroundTaskIndicator'
 >;
 
-type TabActivationConversationSyncPort = Pick<
-  TabActivationRuntimeHostAdapterHost,
-  | 'getConversationSyncFingerprint'
-  | 'setLastConversationSyncFingerprint'
-  | 'startConversationSyncLoop'
-  | 'stopConversationSyncLoop'
->;
+type TabActivationConversationSyncPort = TabActivationConversationSyncRuntimePort;
 
 type TabActivationViewWritebackPort = Pick<
   TabActivationRuntimeHostAdapterHost,

@@ -13,6 +13,9 @@ type Mocked<T> = {
 
 type TabManager = ReturnType<TabActivationRuntimeHostProviderHost['getTabManager']>;
 type TabRuntimeState = ReturnType<TabActivationRuntimeHostProviderHost['getTabRuntimeState']>;
+type ConversationSyncRuntime = ReturnType<
+  TabActivationRuntimeHostProviderHost['getConversationSyncRuntime']
+>;
 
 function createConversation(id: string): Conversation {
   return {
@@ -35,6 +38,13 @@ function createFixture() {
   let activeTabId = 'tab-active';
   let tabRuntimeState: TabRuntimeState = { isStreaming: true };
   let messagesContainer = {} as ParentNode;
+  const initialConversationSyncRuntime: Mocked<ConversationSyncRuntime> = {
+    getConversationSyncFingerprint: jest.fn().mockReturnValue('fingerprint-active'),
+    setLastConversationSyncFingerprint: jest.fn(),
+    startConversationSyncLoop: jest.fn(),
+    stopConversationSyncLoop: jest.fn(),
+  };
+  let conversationSyncRuntime = initialConversationSyncRuntime;
   const host: Mocked<TabActivationRuntimeHostProviderHost> = {
     getTabManager: jest.fn(() => tabManager),
     getActiveTabId: jest.fn(() => activeTabId),
@@ -49,10 +59,7 @@ function createFixture() {
     clearTabSessionState: jest.fn(),
     resetBackgroundTaskSuppressedFingerprint: jest.fn(),
     hasBackgroundTaskIndicator: jest.fn().mockReturnValue(true),
-    getConversationSyncFingerprint: jest.fn().mockReturnValue('fingerprint-active'),
-    setLastConversationSyncFingerprint: jest.fn(),
-    startConversationSyncLoop: jest.fn(),
-    stopConversationSyncLoop: jest.fn(),
+    getConversationSyncRuntime: jest.fn(() => conversationSyncRuntime),
     updateSendButtonState: jest.fn(),
     setActiveMessagesPane: jest.fn(),
     scheduleComposerLayoutSync: jest.fn(),
@@ -64,6 +71,7 @@ function createFixture() {
 
   return {
     host,
+    initialConversationSyncRuntime,
     setTabManager: (next: TabManager) => {
       tabManager = next;
     },
@@ -75,6 +83,9 @@ function createFixture() {
     },
     setMessagesContainer: (next: ParentNode) => {
       messagesContainer = next;
+    },
+    setConversationSyncRuntime: (next: Mocked<ConversationSyncRuntime>) => {
+      conversationSyncRuntime = next;
     },
   };
 }
@@ -140,12 +151,15 @@ describe('TabActivationRuntimeHostProvider', () => {
       'tab-active',
     );
     expect(fixture.host.hasBackgroundTaskIndicator).toHaveBeenCalledWith('tab-active');
-    expect(fixture.host.getConversationSyncFingerprint).toHaveBeenCalledWith([]);
-    expect(fixture.host.setLastConversationSyncFingerprint).toHaveBeenCalledWith(
+    expect(fixture.host.getConversationSyncRuntime).toHaveBeenCalledTimes(1);
+    expect(fixture.initialConversationSyncRuntime.getConversationSyncFingerprint)
+      .toHaveBeenCalledWith([]);
+    expect(fixture.initialConversationSyncRuntime.setLastConversationSyncFingerprint)
+      .toHaveBeenCalledWith(
       'fingerprint-next',
     );
-    expect(fixture.host.startConversationSyncLoop).toHaveBeenCalledTimes(1);
-    expect(fixture.host.stopConversationSyncLoop).toHaveBeenCalledTimes(1);
+    expect(fixture.initialConversationSyncRuntime.startConversationSyncLoop).toHaveBeenCalledTimes(1);
+    expect(fixture.initialConversationSyncRuntime.stopConversationSyncLoop).toHaveBeenCalledTimes(1);
     expect(fixture.host.updateSendButtonState).toHaveBeenCalledTimes(1);
     expect(fixture.host.setActiveMessagesPane).toHaveBeenCalledWith('tab-active');
     expect(fixture.host.scheduleComposerLayoutSync).toHaveBeenCalledTimes(1);
@@ -160,6 +174,12 @@ describe('TabActivationRuntimeHostProvider', () => {
     const factoryHost = createTabActivationRuntimeViewHostFactoryHost(fixture.host);
     const tabRuntime = factoryHost.getTabRuntime();
     const viewWriteback = factoryHost.getViewWriteback();
+    const nextConversationSyncRuntime: Mocked<ConversationSyncRuntime> = {
+      getConversationSyncFingerprint: jest.fn().mockReturnValue('fingerprint-next'),
+      setLastConversationSyncFingerprint: jest.fn(),
+      startConversationSyncLoop: jest.fn(),
+      stopConversationSyncLoop: jest.fn(),
+    };
     const nextTabManager: TabManager = {
       setActiveTabConversation: jest.fn(),
       setTabStreaming: jest.fn(),
@@ -171,11 +191,13 @@ describe('TabActivationRuntimeHostProvider', () => {
     fixture.setActiveTabId('tab-next');
     fixture.setTabRuntimeState({ isStreaming: false });
     fixture.setMessagesContainer(document.createElement('div'));
+    fixture.setConversationSyncRuntime(nextConversationSyncRuntime);
 
     expect(tabRuntime.getTabManager()).toBe(nextTabManager);
     expect(tabRuntime.getActiveTabId()).toBe('tab-next');
     expect(tabRuntime.getTabRuntimeState('tab-next')).toEqual({ isStreaming: false });
     expect(tabRuntime.getTabMessagesContainer('tab-next')).toBeInstanceOf(HTMLDivElement);
+    expect(factoryHost.getConversationSyncRuntime()).toBe(nextConversationSyncRuntime);
 
     viewWriteback.updateSendButtonState();
 
@@ -183,6 +205,7 @@ describe('TabActivationRuntimeHostProvider', () => {
     expect(fixture.host.getActiveTabId).toHaveBeenCalledTimes(1);
     expect(fixture.host.getTabRuntimeState).toHaveBeenCalledWith('tab-next');
     expect(fixture.host.getTabMessagesContainer).toHaveBeenCalledWith('tab-next');
+    expect(fixture.host.getConversationSyncRuntime).toHaveBeenCalledTimes(1);
     expect(fixture.host.updateSendButtonState).toHaveBeenCalledTimes(1);
   });
 });
