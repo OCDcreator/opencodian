@@ -28,6 +28,7 @@
 - `../types/settings`
 - `./createSdkClient`
 - `./omoCompat`
+- `./OpenCodeCatalogStateStore`
 - `./OpenCodeEventSubscriptionCoordinator`
 - `./OpenCodeSyncEventRuntimeCoordinator`
 - `./sdkFeatureFlags`
@@ -51,15 +52,17 @@
 - `activeStreams: Map<string, ActiveStreamContext>`: 以 `sessionId` 为键保存当前流的 `AbortController` 和 part 类型映射。
 - `sdkFeatureFlags`: 由 `resolveSdkFeatureFlags()` 合并后的运行时 SDK 开关。
 - `syncEventRuntime`: `OpenCodeSyncEventRuntimeCoordinator` 实例，负责 session todo/status/message sync event 的监听集合、wanted state、SDK 订阅生命周期与 emit 路径。
-- `openCodeEventRuntime`: `OpenCodeEventSubscriptionCoordinator` 实例，负责 open-code event / catalog listener registry、`event` / `global` 订阅生命周期、catalog-relevant payload routing 与 catalog emit。
+- `catalogState`: `OpenCodeCatalogStateStore` 实例，负责 registry tool ids、tool schema cache、observed external tool names、MCP server status、catalog snapshot 构造与 catalog listener lifecycle。
+- `openCodeEventRuntime`: `OpenCodeEventSubscriptionCoordinator` 实例，负责 open-code event listener registry、`event` / `global` 订阅生命周期，以及 catalog-relevant payload 到 `catalogState` 的刷新/广播触发。
 - `vaultPath`: 用于 SDK `directory` 注入、上下文文件绝对路径解析，以及 `ServerManager` 工作目录设置；OpenCode directory scope 和 context file path 的跨平台规范化委托给 `shared/contextPath`。
 
 `responseHandlers` 字段虽然仍然存在，但当前公开的主流式接口已经是 `AsyncGenerator<StreamChunk>`。
 
-另外，服务层现在维护一份轻量的 `knownMcpToolNames` 集合：
+另外，tool/MCP 目录状态现在集中在 `catalogState`：
 
-- 优先从请求期可见的 `allowedTools` 中缓存外部工具键名
-- 流式 `tool_use` 与历史 `openCodeMessageToChatMessage()` 都会通过 `shared/toolIdentity` 写入结构化 `toolKind`
+- 运行时可见的外部工具键名会被记录到 observed external tools 集合
+- `refreshToolIds()` / `listTools()` / `refreshMcpServerStatus()` 都通过同一个 state store 更新 snapshot 与 listener 广播
+- 流式 `tool_use` 与历史 `openCodeMessageToChatMessage()` 继续通过 `shared/toolIdentity` 写入结构化 `toolKind`
 - 当没有稳定 MCP 目录时，OpenCode 风格外部工具也会按保守 `custom` 图标 `layers` 兜底，而不是回落成 `wrench`；一旦命中 MCP 目录则会切到 `opencodian-tool-mcp`
 
 ## 核心逻辑

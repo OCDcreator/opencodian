@@ -2,7 +2,6 @@ import {
   OpenCodeEventSubscriptionCoordinator,
   type OpenCodeEventSubscriptionCoordinatorHost,
 } from '../../../../src/core/opencode/OpenCodeEventSubscriptionCoordinator';
-import type { OpenCodeCapabilitySnapshot } from '../../../../src/core/opencode/types';
 
 async function flushAsync(): Promise<void> {
   await Promise.resolve();
@@ -25,32 +24,15 @@ async function* createSignalBoundStream(
   }
 }
 
-function createCapabilitySnapshot(
-  observedExternalTools: string[] = [],
-  mcpServers: OpenCodeCapabilitySnapshot['mcp']['servers'] = {},
-): OpenCodeCapabilitySnapshot {
-  return {
-    toolCatalog: {
-      registryToolIds: [],
-      toolSchemasByModel: {},
-      observedExternalTools: [...observedExternalTools].sort(),
-      updatedAt: null,
-    },
-    mcp: {
-      servers: mcpServers,
-      updatedAt: null,
-    },
-  };
-}
-
 function createHost(
   overrides: Partial<OpenCodeEventSubscriptionCoordinatorHost> = {},
 ): jest.Mocked<OpenCodeEventSubscriptionCoordinatorHost> {
   return {
     subscribeToEvents: jest.fn((_, signal) => Promise.resolve(createSignalBoundStream(signal))),
-    observeRuntimeToolNames: jest.fn(),
+    hasCatalogUpdateListeners: jest.fn(() => false),
+    observeRuntimeToolNames: jest.fn(() => false),
+    emitCatalogUpdate: jest.fn(),
     refreshMcpServerStatus: jest.fn().mockResolvedValue({}),
-    getCapabilitySnapshot: jest.fn(() => createCapabilitySnapshot()),
     logEventSubscriptionFailure: jest.fn(),
     delay: jest.fn().mockResolvedValue(undefined),
     ...overrides,
@@ -58,10 +40,8 @@ function createHost(
 }
 
 describe('OpenCodeEventSubscriptionCoordinator', () => {
-  it('routes open-code events and emits catalog snapshots for catalog-relevant payloads', async () => {
+  it('routes open-code events and triggers catalog host actions for catalog-relevant payloads', async () => {
     const observedToolNames = new Set<string>();
-    let snapshot = createCapabilitySnapshot();
-    let coordinator: OpenCodeEventSubscriptionCoordinator;
     const host = createHost({
       subscribeToEvents: jest.fn((source, signal) =>
         Promise.resolve(createSignalBoundStream(
@@ -108,40 +88,30 @@ describe('OpenCodeEventSubscriptionCoordinator', () => {
             ],
         ))),
       observeRuntimeToolNames: jest.fn((toolNames) => {
+        let changed = false;
         for (const toolName of toolNames) {
-          observedToolNames.add(toolName);
+          if (!observedToolNames.has(toolName)) {
+            observedToolNames.add(toolName);
+            changed = true;
+          }
         }
 
-        snapshot = createCapabilitySnapshot([...observedToolNames]);
+        return changed;
       }),
-      refreshMcpServerStatus: jest.fn(async () => {
-        snapshot = createCapabilitySnapshot(
-          [...observedToolNames],
-          { exa: { status: 'connected' } },
-        );
-        coordinator.emitCatalogUpdate();
-        return snapshot.mcp.servers;
-      }),
-      getCapabilitySnapshot: jest.fn(() => snapshot),
     });
-    coordinator = new OpenCodeEventSubscriptionCoordinator(host);
+    const coordinator = new OpenCodeEventSubscriptionCoordinator(host);
     const receivedEvents: string[] = [];
-    const catalogSnapshots: OpenCodeCapabilitySnapshot[] = [];
 
-    const disposeEvents = coordinator.subscribeToOpenCodeEvents((event) => {
+    const dispose = coordinator.subscribeToOpenCodeEvents((event) => {
       const payload = event.payload as { type?: string; payload?: { type?: string } };
       const type = payload.type ?? payload.payload?.type ?? 'unknown';
       receivedEvents.push(type);
     });
-    const disposeCatalog = coordinator.subscribeToCatalogUpdates((nextSnapshot) => {
-      catalogSnapshots.push(nextSnapshot);
-    });
 
     await flushAsync();
     await flushAsync();
 
-    disposeEvents();
-    disposeCatalog();
+    dispose();
 
     expect(receivedEvents).toEqual(expect.arrayContaining([
       'message.part.updated',
@@ -149,12 +119,9 @@ describe('OpenCodeEventSubscriptionCoordinator', () => {
       'message.updated',
       'mcp.tools.changed',
     ]));
+    expect([...observedToolNames].sort()).toEqual(['brave_search', 'exa_search', 'vault_write']);
+    expect(host.emitCatalogUpdate).toHaveBeenCalledTimes(3);
     expect(host.refreshMcpServerStatus).toHaveBeenCalledTimes(1);
-    expect(catalogSnapshots[0]).toEqual(createCapabilitySnapshot());
-    expect(catalogSnapshots.at(-1)).toEqual(createCapabilitySnapshot(
-      ['exa_search', 'vault_write', 'brave_search'],
-      { exa: { status: 'connected' } },
-    ));
   });
 
   it('aborts both SDK streams when the last listener unsubscribes', async () => {
@@ -178,20 +145,21 @@ describe('OpenCodeEventSubscriptionCoordinator', () => {
     expect(signals.every(({ signal }) => signal.aborted)).toBe(true);
   });
 
-  it('restarts both SDK streams when requested with active listeners', async () => {
+  it('restarts both SDK streams when active catalog listeners still need subscriptions', async () => {
     const signalsBySource = {
       event: [] as AbortSignal[],
       global: [] as AbortSignal[],
     };
     const host = createHost({
+      hasCatalogUpdateListeners: jest.fn(() => true),
       subscribeToEvents: jest.fn((source, signal) => {
         signalsBySource[source].push(signal);
         return Promise.resolve(createSignalBoundStream(signal));
       }),
     });
     const coordinator = new OpenCodeEventSubscriptionCoordinator(host);
-    const dispose = coordinator.subscribeToCatalogUpdates(jest.fn());
 
+    coordinator.ensureSubscriptions();
     await flushAsync();
     coordinator.restartSubscriptions();
     await flushAsync();
@@ -203,8 +171,6 @@ describe('OpenCodeEventSubscriptionCoordinator', () => {
     expect(signalsBySource.global[0].aborted).toBe(true);
     expect(signalsBySource.event[1].aborted).toBe(false);
     expect(signalsBySource.global[1].aborted).toBe(false);
-
-    dispose();
   });
 
   it('retries failed subscriptions without dropping active listeners', async () => {

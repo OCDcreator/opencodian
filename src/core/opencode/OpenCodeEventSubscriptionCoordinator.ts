@@ -1,6 +1,6 @@
 import { createLogger } from '../../shared';
 import type { SdkEvent } from './sdkTypes';
-import type { OpenCodeCapabilitySnapshot, SdkEventEnvelope } from './types';
+import type { SdkEventEnvelope } from './types';
 
 const logger = createLogger('OpenCodeEventSubscriptionCoordinator');
 const EVENT_RETRY_DELAY_MS = 1_000;
@@ -8,8 +8,6 @@ const EVENT_RESUBSCRIBE_DELAY_MS = 250;
 const EVENT_SOURCES: Array<Exclude<SdkEventEnvelope['source'], 'sync'>> = ['event', 'global'];
 
 export type OpenCodeEventListener = (update: SdkEventEnvelope) => void;
-
-export type CatalogUpdateListener = (snapshot: OpenCodeCapabilitySnapshot) => void;
 
 type OpenCodeEventSource = Exclude<SdkEventEnvelope['source'], 'sync'>;
 
@@ -34,16 +32,16 @@ type CatalogRelevantEventPayload = {
 
 export interface OpenCodeEventSubscriptionCoordinatorHost {
   subscribeToEvents(source: OpenCodeEventSource, signal: AbortSignal): Promise<AsyncIterable<unknown>>;
-  observeRuntimeToolNames(toolNames: Iterable<string>): void;
+  hasCatalogUpdateListeners(): boolean;
+  observeRuntimeToolNames(toolNames: Iterable<string>): boolean;
+  emitCatalogUpdate(): void;
   refreshMcpServerStatus(): Promise<unknown>;
-  getCapabilitySnapshot(): OpenCodeCapabilitySnapshot;
   logEventSubscriptionFailure(source: OpenCodeEventSource, error: unknown): void;
   delay(ms: number, signal?: AbortSignal): Promise<void>;
 }
 
 export class OpenCodeEventSubscriptionCoordinator {
   private readonly openCodeEventListeners = new Set<OpenCodeEventListener>();
-  private readonly catalogUpdateListeners = new Set<CatalogUpdateListener>();
   private readonly sourceStates: Record<OpenCodeEventSource, SourceState> = {
     event: {
       abortController: null,
@@ -71,22 +69,8 @@ export class OpenCodeEventSubscriptionCoordinator {
     };
   }
 
-  subscribeToCatalogUpdates(listener: CatalogUpdateListener): () => void {
-    this.catalogUpdateListeners.add(listener);
-    this.wanted = true;
-    this.ensureSubscriptions();
-    listener(this.host.getCapabilitySnapshot());
-
-    return () => {
-      this.catalogUpdateListeners.delete(listener);
-      if (!this.hasListeners()) {
-        this.stopSubscriptions();
-      }
-    };
-  }
-
   hasListeners(): boolean {
-    return this.openCodeEventListeners.size > 0 || this.catalogUpdateListeners.size > 0;
+    return this.openCodeEventListeners.size > 0 || this.host.hasCatalogUpdateListeners();
   }
 
   ensureSubscriptions(): void {
@@ -114,21 +98,6 @@ export class OpenCodeEventSubscriptionCoordinator {
 
     this.stopSubscriptions(true);
     this.ensureSubscriptions();
-  }
-
-  emitCatalogUpdate(): void {
-    if (this.catalogUpdateListeners.size === 0) {
-      return;
-    }
-
-    const snapshot = this.host.getCapabilitySnapshot();
-    for (const listener of [...this.catalogUpdateListeners]) {
-      try {
-        listener(snapshot);
-      } catch (error) {
-        logger.error('OpenCode catalog listener failed', error);
-      }
-    }
   }
 
   private ensureSourceSubscription(source: OpenCodeEventSource): void {
@@ -212,7 +181,9 @@ export class OpenCodeEventSubscriptionCoordinator {
     if (event.type === 'message.part.updated') {
       const part = event.properties?.part;
       if (part?.type === 'tool' && typeof part.tool === 'string') {
-        this.host.observeRuntimeToolNames([part.tool]);
+        if (this.host.observeRuntimeToolNames([part.tool])) {
+          this.host.emitCatalogUpdate();
+        }
       }
       return;
     }
@@ -220,13 +191,17 @@ export class OpenCodeEventSubscriptionCoordinator {
     if (event.type === 'message.updated') {
       const info = event.properties?.info;
       if (info?.tools && typeof info.tools === 'object') {
-        this.host.observeRuntimeToolNames(Object.keys(info.tools));
+        if (this.host.observeRuntimeToolNames(Object.keys(info.tools))) {
+          this.host.emitCatalogUpdate();
+        }
       }
       return;
     }
 
     if (event.type === 'permission.asked' && typeof event.properties?.permission === 'string') {
-      this.host.observeRuntimeToolNames([event.properties.permission]);
+      if (this.host.observeRuntimeToolNames([event.properties.permission])) {
+        this.host.emitCatalogUpdate();
+      }
     }
   }
 

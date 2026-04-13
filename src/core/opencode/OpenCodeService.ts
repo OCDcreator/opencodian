@@ -14,7 +14,6 @@ import {
   createLogger,
   formatContextLabel,
   getToolIdentity,
-  isBuiltinToolName,
   isInternalStructuredOutputTool,
   isTextLikeMime,
   parseLineRangeFromFileUrl,
@@ -53,8 +52,12 @@ import { getServerBaseUrl, isLocalServerMode } from '../types/settings';
 import { createSdkClient } from './createSdkClient';
 import { detectOmoMessageMeta } from './omoCompat';
 import {
-  OpenCodeEventSubscriptionCoordinator,
+  OpenCodeCatalogStateStore,
   type CatalogUpdateListener,
+  type OpenCodeCatalogToolIdentityContext,
+} from './OpenCodeCatalogStateStore';
+import {
+  OpenCodeEventSubscriptionCoordinator,
   type OpenCodeEventListener,
 } from './OpenCodeEventSubscriptionCoordinator';
 import {
@@ -437,12 +440,6 @@ interface ActiveStreamContext {
   partTypeMap: Map<string, string>;
 }
 
-interface OpenCodeToolIdentityContext {
-  knownMcpTools?: Iterable<string>;
-  registryTools?: Iterable<string>;
-  observedExternalTools?: Iterable<string>;
-}
-
 type PromptRequestPart =
   | {
       type: 'text';
@@ -494,14 +491,9 @@ export class OpenCodeService {
   private activeStreams = new Map<string, ActiveStreamContext>();
   private sdkFeatureFlags: SdkFeatureFlags;
   private syncEventRuntime: OpenCodeSyncEventRuntimeCoordinator;
+  private catalogState: OpenCodeCatalogStateStore;
   private openCodeEventRuntime: OpenCodeEventSubscriptionCoordinator;
   private vaultPath?: string;
-  private registryToolIds = new Set<string>();
-  private toolSchemasByModel = new Map<string, ToolCatalogEntry[]>();
-  private observedExternalToolNames = new Set<string>();
-  private mcpServerStatus = new Map<string, McpServerStatus>();
-  private toolCatalogUpdatedAt: number | null = null;
-  private mcpCatalogUpdatedAt: number | null = null;
   private transientConnectivityLogState: TransientConnectivityLogState | null = null;
 
   constructor(
@@ -532,6 +524,16 @@ export class OpenCodeService {
       checkHealth: () => this.checkHealth(),
       delay: (ms, signal) => this.delay(ms, signal),
     });
+    this.catalogState = new OpenCodeCatalogStateStore({
+      syncOpenCodeEventSubscriptions: () => {
+        if (this.openCodeEventRuntime.hasListeners()) {
+          this.openCodeEventRuntime.ensureSubscriptions();
+          return;
+        }
+
+        this.openCodeEventRuntime.stopSubscriptions();
+      },
+    });
     this.openCodeEventRuntime = new OpenCodeEventSubscriptionCoordinator({
       subscribeToEvents: async (source, signal) => {
         const subscription = source === 'event'
@@ -544,9 +546,10 @@ export class OpenCodeService {
 
         return (subscription as { stream: AsyncIterable<unknown> }).stream;
       },
+      hasCatalogUpdateListeners: () => this.catalogState.hasCatalogUpdateListeners(),
       observeRuntimeToolNames: (toolNames) => this.observeRuntimeToolNames(toolNames),
+      emitCatalogUpdate: () => this.catalogState.emitCatalogUpdate(),
       refreshMcpServerStatus: () => this.refreshMcpServerStatus(),
-      getCapabilitySnapshot: () => this.getCapabilitySnapshot(),
       logEventSubscriptionFailure: (source, error) =>
         this.logServiceWarning(`${source}.subscribe`, `SDK ${source} subscription failed, retrying`, error),
       delay: (ms, signal) => this.delay(ms, signal),
@@ -642,7 +645,7 @@ export class OpenCodeService {
     this.vaultPath = path;
     this.serverManager.setWorkingDirectory(path);
     if (previousDirectory !== this.getScopedDirectoryPath()) {
-      this.toolSchemasByModel.clear();
+      this.catalogState.clearToolSchemaCache();
     }
     this.syncEventRuntime.restartSubscription();
     this.openCodeEventRuntime.restartSubscriptions();
@@ -1983,23 +1986,12 @@ export class OpenCodeService {
     return Object.fromEntries(allowedTools.map((toolName) => [toolName, true]));
   }
 
-  private observeRuntimeToolNames(toolNames: Iterable<string>): void {
-    for (const toolName of toolNames) {
-      const normalizedName = typeof toolName === 'string' ? toolName.trim() : '';
-      if (!normalizedName || isBuiltinToolName(normalizedName)) {
-        continue;
-      }
-
-      this.observedExternalToolNames.add(normalizedName);
-    }
+  private observeRuntimeToolNames(toolNames: Iterable<string>): boolean {
+    return this.catalogState.observeRuntimeToolNames(toolNames);
   }
 
-  private buildOpenCodeToolIdentityContext(): OpenCodeToolIdentityContext {
-    return {
-      knownMcpTools: this.registryToolIds.size > 0 ? this.observedExternalToolNames : undefined,
-      registryTools: this.registryToolIds,
-      observedExternalTools: this.observedExternalToolNames,
-    };
+  private buildOpenCodeToolIdentityContext(): OpenCodeCatalogToolIdentityContext {
+    return this.catalogState.buildToolIdentityContext();
   }
 
   private getOpenCodeToolKind(toolName: string | undefined | null): ToolIdentityKind {
@@ -2008,7 +2000,7 @@ export class OpenCodeService {
 
   private static getOpenCodeToolKind(
     toolName: string | undefined | null,
-    context: OpenCodeToolIdentityContext = {},
+    context: OpenCodeCatalogToolIdentityContext = {},
   ): ToolIdentityKind {
     return getToolIdentity(toolName || 'unknown', {
       source: 'opencode',
@@ -2975,7 +2967,7 @@ export class OpenCodeService {
     this.baseUrl = getServerBaseUrl(nextSettings.server);
     this.serverManager.updateConfig(this.buildServerConfig(nextSettings));
     if (previousToolCatalogScope !== this.getToolCatalogScopeKey()) {
-      this.toolSchemasByModel.clear();
+      this.catalogState.clearToolSchemaCache();
     }
     this.syncEventRuntime.stopSubscription(shouldResumeSyncEvents);
     this.openCodeEventRuntime.stopSubscriptions(shouldResumeOpenCodeEvents);
@@ -2999,7 +2991,7 @@ export class OpenCodeService {
       this.baseUrl = previousBaseUrl;
       this.serverManager.updateConfig(this.buildServerConfig(previousSettings));
       if (previousToolCatalogScope !== this.getToolCatalogScopeKey()) {
-        this.toolSchemasByModel.clear();
+        this.catalogState.clearToolSchemaCache();
       }
       this.syncEventRuntime.stopSubscription(shouldResumeSyncEvents);
       this.openCodeEventRuntime.stopSubscriptions(shouldResumeOpenCodeEvents);
@@ -3472,7 +3464,7 @@ export class OpenCodeService {
     info: Message,
     parts: Part[],
     vaultPath?: string,
-    toolIdentityContext: OpenCodeToolIdentityContext = {},
+    toolIdentityContext: OpenCodeCatalogToolIdentityContext = {},
   ): ChatMessage {
     const role = info.role === 'assistant' ? 'assistant' : 'user';
 
@@ -3888,87 +3880,9 @@ export class OpenCodeService {
     return deduped;
   }
 
-  private normalizeMcpServerStatusMap(
-    input: unknown,
-  ): Record<string, McpServerStatus> {
-    if (!input || typeof input !== 'object') {
-      return {};
-    }
-
-    const result: Record<string, McpServerStatus> = {};
-    for (const [name, value] of Object.entries(input as Record<string, unknown>)) {
-      if (!value || typeof value !== 'object') {
-        continue;
-      }
-
-      const status = typeof (value as { status?: unknown }).status === 'string'
-        ? (value as { status: string }).status
-        : '';
-      if (status === 'connected' || status === 'disabled' || status === 'needs_auth') {
-        result[name] = { status };
-      } else if ((status === 'failed' || status === 'needs_client_registration')
-        && typeof (value as { error?: unknown }).error === 'string') {
-        result[name] = {
-          status,
-          error: (value as { error: string }).error,
-        };
-      }
-    }
-
-    return result;
-  }
-
-  private updateRegistryToolIds(toolIds: string[]): string[] {
-    this.registryToolIds = new Set(
-      toolIds
-        .filter((toolId) => typeof toolId === 'string')
-        .map((toolId) => toolId.trim())
-        .filter((toolId) => toolId.length > 0),
-    );
-    this.toolCatalogUpdatedAt = Date.now();
-    this.openCodeEventRuntime.emitCatalogUpdate();
-    return [...this.registryToolIds];
-  }
-
-  private updateToolSchemaCache(modelKey: string, tools: ToolCatalogEntry[]): ToolCatalogEntry[] {
-    this.toolSchemasByModel.set(modelKey, tools);
-    this.toolCatalogUpdatedAt = Date.now();
-    this.openCodeEventRuntime.emitCatalogUpdate();
-    return tools;
-  }
-
-  private updateMcpServerStatus(statusMap: Record<string, McpServerStatus>): Record<string, McpServerStatus> {
-    this.mcpServerStatus = new Map(Object.entries(statusMap));
-    this.mcpCatalogUpdatedAt = Date.now();
-    this.openCodeEventRuntime.emitCatalogUpdate();
-    return Object.fromEntries(this.mcpServerStatus.entries());
-  }
-
-  private createToolCatalogSnapshot(): ToolCatalogSnapshot {
-    return {
-      registryToolIds: [...this.registryToolIds].sort(),
-      toolSchemasByModel: Object.fromEntries(
-        [...this.toolSchemasByModel.entries()]
-          .sort(([left], [right]) => left.localeCompare(right))
-          .map(([key, value]) => [key, value.map((entry) => ({ ...entry }))]),
-      ),
-      observedExternalTools: [...this.observedExternalToolNames].sort(),
-      updatedAt: this.toolCatalogUpdatedAt,
-    };
-  }
-
-  private createMcpServerSnapshot(): McpServerSnapshot {
-    return {
-      servers: Object.fromEntries(
-        [...this.mcpServerStatus.entries()].sort(([left], [right]) => left.localeCompare(right)),
-      ),
-      updatedAt: this.mcpCatalogUpdatedAt,
-    };
-  }
-
   async refreshToolIds(): Promise<string[]> {
     const toolIds = await this.sdk.tool.ids();
-    return this.updateRegistryToolIds(Array.isArray(toolIds) ? toolIds : []);
+    return this.catalogState.updateRegistryToolIds(Array.isArray(toolIds) ? toolIds : []);
   }
 
   async listTools(
@@ -3980,8 +3894,8 @@ export class OpenCodeService {
     const normalizedModelID = modelID.trim();
     const modelKey = this.getToolSchemaCacheKey(normalizedProviderID, normalizedModelID);
 
-    if (!options.refresh && this.toolSchemasByModel.has(modelKey)) {
-      return (this.toolSchemasByModel.get(modelKey) ?? []).map((entry) => ({ ...entry }));
+    if (!options.refresh && this.catalogState.hasToolSchemaCache(modelKey)) {
+      return this.catalogState.getToolSchemaCache(modelKey);
     }
 
     const response = await this.sdk.tool.list({
@@ -4008,7 +3922,7 @@ export class OpenCodeService {
       }, [])
       : [];
 
-    return this.updateToolSchemaCache(modelKey, tools).map((entry) => ({ ...entry }));
+    return this.catalogState.updateToolSchemaCache(modelKey, tools);
   }
 
   private getToolCatalogScopeKey(): string {
@@ -4020,24 +3934,21 @@ export class OpenCodeService {
   }
 
   async refreshMcpServerStatus(): Promise<Record<string, McpServerStatus>> {
-    return this.updateMcpServerStatus(
-      this.normalizeMcpServerStatusMap(await this.sdk.mcp.status()),
+    return this.catalogState.updateMcpServerStatus(
+      this.catalogState.normalizeMcpServerStatusMap(await this.sdk.mcp.status()),
     );
   }
 
   getToolCatalogSnapshot(): ToolCatalogSnapshot {
-    return this.createToolCatalogSnapshot();
+    return this.catalogState.getToolCatalogSnapshot();
   }
 
   getMcpServerSnapshot(): McpServerSnapshot {
-    return this.createMcpServerSnapshot();
+    return this.catalogState.getMcpServerSnapshot();
   }
 
   getCapabilitySnapshot(): OpenCodeCapabilitySnapshot {
-    return {
-      toolCatalog: this.createToolCatalogSnapshot(),
-      mcp: this.createMcpServerSnapshot(),
-    };
+    return this.catalogState.getCapabilitySnapshot();
   }
 
   subscribeToOpenCodeEvents(listener: OpenCodeEventListener): () => void {
@@ -4045,7 +3956,7 @@ export class OpenCodeService {
   }
 
   subscribeToCatalogUpdates(listener: CatalogUpdateListener): () => void {
-    return this.openCodeEventRuntime.subscribeToCatalogUpdates(listener);
+    return this.catalogState.subscribeToCatalogUpdates(listener);
   }
 
   hydrateOpenCodeMessage(
@@ -4067,7 +3978,7 @@ export class OpenCodeService {
 
   async addMcpServer(name: string, config: Record<string, unknown>): Promise<Record<string, McpServerStatus>> {
     const response = await this.sdk.mcp.add({ name, config: config as never });
-    return this.updateMcpServerStatus(this.normalizeMcpServerStatusMap(response));
+    return this.catalogState.updateMcpServerStatus(this.catalogState.normalizeMcpServerStatusMap(response));
   }
 
   async connectMcpServer(name: string): Promise<boolean> {
@@ -4089,13 +4000,15 @@ export class OpenCodeService {
   async completeMcpAuth(name: string, code: string): Promise<McpServerStatus> {
     const response = await this.sdk.mcp.auth.callback({ name, code });
     await this.refreshMcpServerStatus();
-    return this.normalizeMcpServerStatusMap({ [name]: response })[name] ?? { status: 'failed', error: 'Unknown MCP auth result' };
+    return this.catalogState.normalizeMcpServerStatusMap({ [name]: response })[name]
+      ?? { status: 'failed', error: 'Unknown MCP auth result' };
   }
 
   async authenticateMcp(name: string): Promise<McpServerStatus> {
     const response = await this.sdk.mcp.auth.authenticate({ name });
     await this.refreshMcpServerStatus();
-    return this.normalizeMcpServerStatusMap({ [name]: response })[name] ?? { status: 'failed', error: 'Unknown MCP auth result' };
+    return this.catalogState.normalizeMcpServerStatusMap({ [name]: response })[name]
+      ?? { status: 'failed', error: 'Unknown MCP auth result' };
   }
 
   async removeMcpAuth(name: string): Promise<{ success: true }> {

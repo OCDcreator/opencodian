@@ -465,7 +465,7 @@
   - event payload routing 保持行为不变，并有 focused coverage。
   - 运行 targeted tests、全量 `npm test`、`npm run build`。
 
-### [NEXT] R21 - Tool and MCP catalog state store
+### [DONE] R21 - Tool and MCP catalog state store
 
 - **Lane**: OpenCodeService `catalog / MCP state`
 - **目标**: 把 registry tool ids、tool schema cache、MCP server status map、catalog snapshot 构造和 catalog update state 收束到一个 state store owner。
@@ -486,7 +486,7 @@
   - 新 owner 满足粒度规则并有 focused coverage。
   - 运行 targeted tests、全量 `npm test`、`npm run build`。
 
-### [QUEUED] R22 - Prompt request builder
+### [NEXT] R22 - Prompt request builder
 
 - **Lane**: OpenCodeService `prompt request assembly`
 - **目标**: 把 SDK prompt parameters、shared prompt options、allowed-tools / output-format / variant / reasoning 映射收束到较厚 request builder。
