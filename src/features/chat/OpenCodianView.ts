@@ -208,15 +208,17 @@ import {
 } from './services/ConversationRenderService';
 import {
   ConversationSessionLiveSignalAdapter,
-  type ConversationSessionLiveSignalAdapterHost,
 } from './services/ConversationSessionLiveSignalAdapter';
 import {
   ConversationSyncBridge,
 } from './services/ConversationSyncBridge';
 import {
   ConversationSyncEventAdapter,
-  type ConversationSyncEventAdapterHost,
 } from './services/ConversationSyncEventAdapter';
+import {
+  createConversationSyncEventLiveSignalHosts,
+  type ConversationSyncEventLiveSignalHostAdapterHost,
+} from './services/ConversationSyncEventLiveSignalHostAdapter';
 import {
   createConversationSyncServices,
 } from './services/ConversationSyncHostAdapter';
@@ -1207,14 +1209,17 @@ export class OpenCodianView extends ItemView {
       visibleConversationPostSyncCoordinator,
       backgroundConversationPostSyncHandoffCoordinator,
     );
+    const conversationSyncEventLiveSignalHosts = createConversationSyncEventLiveSignalHosts(
+      this.createConversationSyncEventLiveSignalHost(),
+    );
     this.conversationSyncRuntimeCoordinator = conversationSyncServices.runtimeCoordinator;
     this.conversationSyncOrchestrationService = conversationSyncServices.orchestrationService;
     this.conversationSyncBridge = conversationSyncServices.bridge;
     this.conversationSyncEventAdapter = new ConversationSyncEventAdapter(
-      this.createConversationSyncEventAdapterHost(),
+      conversationSyncEventLiveSignalHosts.conversationSyncEventAdapterHost,
     );
     this.conversationSessionLiveSignalAdapter = new ConversationSessionLiveSignalAdapter(
-      this.createConversationSessionLiveSignalAdapterHost(),
+      conversationSyncEventLiveSignalHosts.conversationSessionLiveSignalAdapterHost,
       this.backgroundTaskLiveSignalCoordinator,
     );
     this.backgroundTaskCompletionNoticeService = new BackgroundTaskCompletionNoticeService(
@@ -1626,22 +1631,10 @@ export class OpenCodianView extends ItemView {
     };
   }
 
-  private createConversationSyncEventAdapterHost(): ConversationSyncEventAdapterHost {
+  private createConversationSyncEventLiveSignalHost(): ConversationSyncEventLiveSignalHostAdapterHost {
     return {
       subscribeToSessionSyncEvents: (listener) =>
         this.plugin.openCodeService.subscribeToSessionSyncEvents(listener),
-      getAllTabs: () => this.tabManager?.getAllTabs() ?? [],
-      getConversations: () => this.plugin.getConversations(),
-      getCurrentConversation: () => this.currentConversation,
-      getActiveTabId: () => this.getActiveTabId(),
-      scheduleConversationSyncFromSignal: (tabId, reason) => {
-        this.scheduleConversationSyncFromSignal(tabId, reason);
-      },
-    };
-  }
-
-  private createConversationSessionLiveSignalAdapterHost(): ConversationSessionLiveSignalAdapterHost {
-    return {
       subscribeToSessionTodoUpdates: (listener) =>
         this.plugin.openCodeService.subscribeToSessionTodoUpdates(listener),
       subscribeToSessionStatusUpdates: (listener) =>
@@ -1650,6 +1643,9 @@ export class OpenCodianView extends ItemView {
       getConversations: () => this.plugin.getConversations(),
       getCurrentConversation: () => this.currentConversation,
       getActiveTabId: () => this.getActiveTabId(),
+      scheduleConversationSyncFromSignal: (tabId, reason) => {
+        this.scheduleConversationSyncFromSignal(tabId, reason);
+      },
       applySessionTodoUpdate: (tabId, sessionId, todos) => {
         this.sessionTodoRuntimeFacade.applySessionTodoUpdate(tabId, sessionId, todos);
       },

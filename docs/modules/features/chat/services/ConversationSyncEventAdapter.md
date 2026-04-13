@@ -48,7 +48,8 @@ export class ConversationSyncEventAdapter {
 
 ## 与相邻模块的边界
 
-- `OpenCodianView` 只负责提供 host 回调，不再直接拥有 session sync event 的订阅与匹配逻辑
+- `OpenCodianView` 现在通过 `ConversationSyncEventLiveSignalHostAdapter` 提供共享 host seam，不再直接维护单独的 sync-event host factory
+- `ConversationSyncEventLiveSignalHostAdapter` 负责把共享 lookup seam 装配成 `ConversationSyncEventAdapterHost`
 - `ConversationSyncEventAdapter` 负责 “事件从 OpenCodeService 进来后该落到哪些 tab”
 - `ConversationSyncOrchestrationService` 继续负责 “这些 tab signal 进来后如何 debounce、选 visible/hidden sync 路径、何时触发后台轮询”
 - 这次切片继续推进 master plan 的 P1 `OpenCodianView` 核心 ownership 迁移：减少 view 对 sync signal lifecycle 的直接 ownership，而不是继续回到已暂停的 trailing-assistant helper 链

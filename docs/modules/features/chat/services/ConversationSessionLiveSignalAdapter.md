@@ -50,6 +50,7 @@ export class ConversationSessionLiveSignalAdapter {
 
 ## 与 `OpenCodianView` 的边界
 
-- `OpenCodianView` 只保留 host bridge：把匹配后的 live update 交给 `SessionTodoRuntimeFacade.applySessionTodoUpdate()` / `applySessionStatusUpdate()`
+- `OpenCodianView` 现在通过 `ConversationSyncEventLiveSignalHostAdapter` 提供共享 live-signal seam，不再单独维护 todo/status host factory
+- `ConversationSyncEventLiveSignalHostAdapter` 负责把共享 lookup seam 装配成 `ConversationSessionLiveSignalAdapterHost`
 - `SessionTodoStateService` 继续负责 todo/status runtime state、stale suppression 与 persisted notice 协调
 - `ConversationSessionLiveSignalAdapter` 会在 runtime state 写入后直接调用 `BackgroundTaskLiveSignalCoordinator`，决定 indicator/stopped notice 是否需要变化
