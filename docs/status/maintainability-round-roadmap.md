@@ -1,7 +1,7 @@
 # Maintainability Round Roadmap
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
-> **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`。R18 完成后必须暂停复盘，不得自动扩展新队列。
+> **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`。R27 完成后必须暂停复盘，不得自动扩展新队列。
 > **当前状态**: [AWAITING_MANUAL_CONFIRMATION] R13-R18 已在 R18 checkpoint 完成；当前没有可自动执行的 `[NEXT]`，必须等待人工确认下一批队列。
 
 ## 控制规则
@@ -418,4 +418,188 @@
 - `OpenCodianView.ts` 已从 R12 checkpoint 的 **7732 行** 收缩到当前 **6203 行**，R13-R17 合计减少 **1529 行**（约 **19.8%**），tab pane、header/status、composer input、selection controls、input appearance/glass 五块 UI shell ownership 已迁出。
 - `OpenCodianSettings.ts` / `OpenCodeService.ts` 当前分别保持在 **4989** / **4733** 行；settings 不是本批默认下一站，而 `OpenCodeService` 仍保留 SDK facade consumption、legacy HTTP/SSE fallback、sync-event normalization、question/tool/session/config glue 的高集中 ownership。
 - 结论：本批 UI shell queue 已完成，`OpenCodianView` 剩余职责更偏向 runtime bridge、hydration/send pipeline seam 与少量实验路径，不再是下一轮无人值守的首选大块 DOM shell 切口。
-- 下一批建议：如需继续 maintainability，应先由人工确认一个专门针对 `OpenCodeService` 的新队列，明确 SDK-first、legacy fallback、sync-event boundary 的兼容规则；未经人工确认不得自动生成 R19+。
+- 下一批建议：夜间批次已确认转向 `OpenCodeService`，但只允许按兼容优先的 R19-R27 顺序执行；R27 后必须再次暂停，等待人工审查。
+
+
+## Confirmed Night Batch: R19-R27 `OpenCodeService` compatibility-first
+
+本批由人工确认：从 `OpenCodianView` 转向 `OpenCodeService`，但只允许处理仍成块存在、能形成较厚 owner 的兼容边界，不得把 session/config/query API 再拆成新的微碎片 facade。`OpenCodeService` 继续保持对外总门面；新 owner 只承接内部 lifecycle / state / mapping ownership。
+
+### [NEXT] R19 - Sync event runtime coordinator
+
+- **Lane**: OpenCodeService `sync event runtime`
+- **目标**: 把 session todo / status / sync-event listeners、订阅 wanted state、subscription lifecycle、emit 路径从 `OpenCodeService` 收束到一个较厚 coordinator。
+- **优先入口**:
+  - `src/core/opencode/OpenCodeService.ts` 中 `subscribeToSessionTodoUpdates` / `subscribeToSessionStatusUpdates` / `subscribeToSessionSyncEvents`
+  - `src/core/opencode/OpenCodeService.ts` 中 `hasSyncEventListeners` / `ensureSyncEventSubscription` / `stopSyncEventSubscription` / `restartSyncEventSubscription`
+  - `src/core/opencode/OpenCodeService.ts` 中 `handleSyncEvent` / `emitSessionTodoUpdate` / `emitSessionStatusUpdate` / `emitSessionSyncEventUpdate`
+  - `src/core/opencode/OpenCodeSdkFacade.ts`
+- **允许边界**:
+  - 可新增 `OpenCodeSyncEventRuntimeCoordinator` 或同等厚 owner，同时覆盖 listener registry、subscription lifecycle、event routing、emit。
+  - 可继续通过 host seam 调用 SDK facade、vault path / settings 更新与 logger。
+- **禁止项**:
+  - 不改 SDK-first / legacy fallback 语义。
+  - 不把每个 listener 类型拆成独立薄 service。
+  - 不改 tool/MCP catalog、prompt builder、streaming runtime。
+- **验收**:
+  - `OpenCodeService` 不再直接铺开 sync-event listener + subscription 状态机。
+  - 新 owner 满足粒度规则，且有 focused coverage。
+  - 运行 targeted tests、全量 `npm test`、`npm run build`。
+
+### [QUEUED] R20 - OpenCode event subscription coordinator
+
+- **Lane**: OpenCodeService `open-code event runtime`
+- **目标**: 把 OpenCode event listeners、event subscription lifecycle、catalog-relevant event routing 与 emit path 从 `OpenCodeService` 收束到单一 coordinator。
+- **优先入口**:
+  - `src/core/opencode/OpenCodeService.ts` 中 `hasOpenCodeEventListeners` / `ensureOpenCodeEventSubscriptions` / `stopOpenCodeEventSubscriptions` / `restartOpenCodeEventSubscriptions`
+  - `src/core/opencode/OpenCodeService.ts` 中 `getEventPayload` / `handleCatalogRelevantEvent` / `emitOpenCodeEvent` / `handleSdkEventEnvelope`
+  - `src/core/opencode/OpenCodeSdkFacade.ts`
+- **允许边界**:
+  - 可新增 `OpenCodeEventSubscriptionCoordinator`，前提是同时覆盖 listener registry、subscription lifecycle、payload routing、emit。
+  - 可暂时让 catalog state 仍留在 `OpenCodeService`，等 R21 再收束。
+- **禁止项**:
+  - 不和 R21 混做一个超大 owner；event lifecycle 与 catalog state 要分轮处理。
+  - 不改 MCP status API / tool list API 语义。
+- **验收**:
+  - `OpenCodeService` 不再直接持有 open-code event listener + subscription 状态机。
+  - event payload routing 保持行为不变，并有 focused coverage。
+  - 运行 targeted tests、全量 `npm test`、`npm run build`。
+
+### [QUEUED] R21 - Tool and MCP catalog state store
+
+- **Lane**: OpenCodeService `catalog / MCP state`
+- **目标**: 把 registry tool ids、tool schema cache、MCP server status map、catalog snapshot 构造和 catalog update state 收束到一个 state store owner。
+- **优先入口**:
+  - `src/core/opencode/OpenCodeService.ts` 中 `normalizeMcpServerStatusMap`
+  - `src/core/opencode/OpenCodeService.ts` 中 `updateRegistryToolIds` / `updateToolSchemaCache` / `updateMcpServerStatus`
+  - `src/core/opencode/OpenCodeService.ts` 中 `createToolCatalogSnapshot` / `createMcpServerSnapshot` / `emitCatalogUpdate`
+  - `src/core/opencode/OpenCodeService.ts` 中 `refreshToolIds` / `listTools` / `refreshMcpServerStatus`
+- **允许边界**:
+  - 可新增 `OpenCodeCatalogStateStore`，同时覆盖 cache + snapshot + update lifecycle。
+  - `OpenCodeService` 仍保留对外 API 门面。
+- **禁止项**:
+  - 不改 tool identity 规则、icon fallback 或 MCP summary 语义。
+  - 不拆成 `ToolCacheHelper` / `McpStatusHelper` 之类薄文件。
+- **验收**:
+  - `OpenCodeService` 只通过 state store 管理 catalog / MCP snapshots。
+  - 新 owner 满足粒度规则并有 focused coverage。
+  - 运行 targeted tests、全量 `npm test`、`npm run build`。
+
+### [QUEUED] R22 - Prompt request builder
+
+- **Lane**: OpenCodeService `prompt request assembly`
+- **目标**: 把 SDK prompt parameters、shared prompt options、allowed-tools / output-format / variant / reasoning 映射收束到较厚 request builder。
+- **优先入口**:
+  - `src/core/opencode/OpenCodeService.ts` 中 `buildSdkPromptParameters`
+  - `src/core/opencode/OpenCodeService.ts` 中 `buildAllowedToolsRecord` / `buildSharedPromptOptions`
+  - `src/core/opencode/OpenCodeService.ts` 中 `resolveLocalOutputFormat` / `resolveSdkOutputFormat` / `resolveSdkVariant`
+- **允许边界**:
+  - 可新增 `OpenCodePromptRequestBuilder`，同时覆盖 SDK / legacy prompt option assembly。
+  - `OpenCodeService` 继续决定走 SDK 还是 legacy transport。
+- **禁止项**:
+  - 不改 sendMessage / requestAssistantResponse 的 transport 分流。
+  - 不混入 context/image serialization；那留给 R23。
+- **验收**:
+  - `OpenCodeService` 不再直接铺开 prompt option assembly。
+  - 新 owner 有 focused coverage，并保持 SDK-first / legacy fallback 语义不变。
+  - 运行 targeted tests、全量 `npm test`、`npm run build`。
+
+### [QUEUED] R23 - Context part serializer
+
+- **Lane**: OpenCodeService `context / image request parts`
+- **目标**: 把 `buildPromptRequestParts()`、`createPromptContextPart()` 与本地/远程 context、image parts 序列化收束到独立 serializer。
+- **优先入口**:
+  - `src/core/opencode/OpenCodeService.ts` 中 `buildPromptRequestParts`
+  - `src/core/opencode/OpenCodeService.ts` 中 `createPromptContextPart`
+  - `src/shared/contextPath*`
+- **允许边界**:
+  - 可新增 `OpenCodeContextPartSerializer`，前提是同时覆盖 local file / remote synthetic text / image part serialization。
+  - 可继续通过 host seam 调用 vault path、logger 和 context path helpers。
+- **禁止项**:
+  - 不改 context tag 文本格式、Windows path normalization、remote text-size guard 语义。
+  - 不混入 prompt option builder；与 R22 保持边界。
+- **验收**:
+  - `OpenCodeService` 不再直接铺开 context/image request part 序列化。
+  - 新 owner 有 focused coverage，并保持跨平台行为稳定。
+  - 运行 targeted tests、全量 `npm test`、`npm run build`。
+
+### [QUEUED] R24 - Streaming runtime state coordinator
+
+- **Lane**: OpenCodeService `streaming runtime state`
+- **目标**: 把 active stream contexts、create/release/cancel/detach 的运行时状态 ownership 从 `OpenCodeService` 收束到 coordinator。
+- **优先入口**:
+  - `src/core/opencode/OpenCodeService.ts` 中 `createStreamingState` / `createActiveStreamContext` / `releaseActiveStreamContext`
+  - `src/core/opencode/OpenCodeService.ts` 中 `cancelStream` / `detachStream`
+  - `src/core/opencode/OpenCodeService.ts` 中与 `activeStreams` 相关的状态字段
+- **允许边界**:
+  - 可新增 `OpenCodeStreamingRuntimeCoordinator`，同时覆盖 runtime registry、abort controllers、session-scoped stream lifecycle。
+  - transport 仍留在 `OpenCodeService`，只迁出 runtime owner。
+- **禁止项**:
+  - 不改 server abort 语义。
+  - 不把 event→chunk transform 一起混入本轮；那留给 R25。
+- **验收**:
+  - `OpenCodeService` 不再直接持有 active stream runtime state。
+  - 新 owner 有 focused coverage，并保持多 session 并发语义不变。
+  - 运行 targeted tests、全量 `npm test`、`npm run build`。
+
+### [QUEUED] R25 - Stream event transformer
+
+- **Lane**: OpenCodeService `stream event transform`
+- **目标**: 把 SDK / legacy SSE event → chunk transform 与 SSE parser 从 `OpenCodeService` 收束到 transformer owner。
+- **优先入口**:
+  - `src/core/opencode/OpenCodeService.ts` 中 `handleStreamingEvent`
+  - `src/core/opencode/OpenCodeService.ts` 中 `transformEventToChunks` / `transformPartToChunks`
+  - `src/core/opencode/OpenCodeService.ts` 中 `parseSSEEvents`
+- **允许边界**:
+  - 可新增 `OpenCodeStreamEventTransformer`，同时覆盖 SDK event、legacy SSE event、part→chunk mapping 与 parser。
+  - `OpenCodeService` 仍负责 transport 调用与最终 chunk yield。
+- **禁止项**:
+  - 不改 SDK 首事件失败才 fallback 到 legacy 的现有策略。
+  - 不改 chunk schema / tool / permission / question 事件语义。
+- **验收**:
+  - `OpenCodeService` 不再直接铺开 event→chunk transform。
+  - focused coverage 证明 chunk 语义未回归。
+  - 运行 targeted tests、全量 `npm test`、`npm run build`。
+
+### [QUEUED] R26 - Message normalization mapper
+
+- **Lane**: OpenCodeService `message normalization`
+- **目标**: 把 message → `ChatMessage` 归一化、context attachment 提取、tool identity / OMO meta 处理收束到 mapper owner。
+- **优先入口**:
+  - `src/core/opencode/OpenCodeService.ts` 中 `openCodeMessageToChatMessage` 附近的标准化逻辑
+  - `src/core/opencode/OpenCodeService.ts` 中 question prompt normalization、tool identity helpers、OMO normalization 相关区段
+  - `src/core/opencode/omoCompat.ts`
+  - `src/shared/toolIdentity.ts`
+- **允许边界**:
+  - 可新增 `OpenCodeMessageNormalizationMapper`，同时覆盖 content blocks、attachments、model/tool metadata、OMO/system reminder normalization。
+  - `OpenCodeService` 继续提供对外 `hydrateOpenCodeMessage()` / message fetch API。
+- **禁止项**:
+  - 不改现有 `ChatMessage` 形状。
+  - 不把 tool icon / summary 规则迁回 UI 层。
+- **验收**:
+  - `OpenCodeService` 不再直接铺开主要消息归一化逻辑。
+  - focused coverage 证明 OMO / context attachments / tool metadata 行为稳定。
+  - 运行 targeted tests、全量 `npm test`、`npm run build`。
+
+### [QUEUED] R27 - OpenCodeService checkpoint
+
+- **Lane**: Checkpoint
+- **目标**: 暂停自动推进，复盘 R19-R26 对 `OpenCodeService` 的缩减幅度和兼容风险，并决定下一批是否继续处理 session/config/query gateway。
+- **优先入口**:
+  - `docs/status/maintainability-round-roadmap.md`
+  - `docs/status/maintainability-master-plan.md`
+  - `docs/status/maintainability-lane-map.md`
+  - R19-R26 phase 文档
+  - `src/core/opencode/OpenCodeService.ts`
+  - `src/core/opencode/OpenCodeSdkFacade.ts`
+  - `src/core/opencode/ServerManager.ts`
+- **允许边界**:
+  - 只做测试、文档、指标统计和下一批建议。
+- **禁止项**:
+  - 不开新代码重构。
+  - 不允许 autopilot 自动扩展 R28+。
+- **验收**:
+  - phase 文档总结 `OpenCodeService` 缩减了什么、哪些兼容边界仍需处理。
+  - 明确下一批是否继续做 session/config/query gateway，还是到此暂停。
+  - 将 roadmap 状态设置为需要人工确认后再继续。
+  - 运行全量 `npm test`、`npm run build`。

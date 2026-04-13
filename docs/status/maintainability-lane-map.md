@@ -1,7 +1,7 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [AWAITING_MANUAL_CONFIRMATION] R18 UI shell checkpoint 已完成；当前没有可自动执行的 `[NEXT]`。
+> **当前状态**: [CONFIRMED_NIGHT_BATCH] R19-R27 已确认；当前 `[NEXT]` 是 R19 sync event runtime coordinator。
 
 ## 当前优先级
 
@@ -14,13 +14,12 @@
 
 ## 当前热点首查入口
 
-- R16 已完成：model / permission selector dropdown/search/list/selection display 已收束到 `services/ChatSelectionControlsCoordinator.ts`
-- R15 已完成：input area DOM、textarea submit gate、高度同步与 composer stack metrics 已收束到 `services/ComposerInputShellCoordinator.ts`
-- R14 已完成：header DOM、server status loop/label、wordmark/settings button 已收束到 `services/ChatHeaderPresenter.ts`
-- R13 已完成：pane lifecycle / observer / scroll metrics / cleanup 已收束到 `services/TabMessagesPaneCoordinator.ts`
-- R17 已完成：input panel theme/action-button/filter/liquid-glass/diagnostics 已收束到 `services/InputPanelAppearanceCoordinator.ts`
-- 当前无自动执行入口；如需继续，先读 `docs/status/maintainability-phase-333.md`、roadmap 与 master plan，等待人工确认下一批
-- `OpenCodeService` 现在是优先候选，但只能在新的人工确认队列中处理，不能沿用 R13-R18 自动继续
+- R19 首查 `OpenCodeService.ts` 的 sync-event listener registry、wanted state、subscription lifecycle 与 emit path
+- R20 首查 open-code event listeners、catalog-relevant event routing 与 open-code event emit path
+- R21 首查 tool schema cache、registry tool ids、MCP server status snapshot 与 catalog update state
+- R22-R23 首查 prompt option assembly 与 context/image request-part serialization；不要混入 transport 分流
+- R24-R26 首查 active stream runtime、event→chunk transform、message normalization；严格保持 SDK-first / legacy fallback / ChatMessage 语义
+- `OpenCodianView` / settings / trailing-assistant 链本批都只保留 regression watchpoints，不再开新切口
 - P2 regression-only 首查顺序固定为：
   1. `tests/unit/features/chat/QuestionDockCoordinator.test.ts`
   2. `tests/unit/features/chat/QuestionTodoStatusRefreshCoordinator.test.ts`
@@ -73,3 +72,12 @@
 - 本批目标是迁出 `OpenCodianView` 中仍成块存在的 UI/runtime shell ownership，而不是继续制造 provider/factory/adapter 薄层。
 - 新 owner 默认要覆盖完整 lifecycle；如果低于约 100 行且少于 3 个公开 API，必须在 phase 文档里说明为何不是微碎片，否则应合并回调用方。
 - R18 已完成并已进入暂停态；是否转向 `OpenCodeService` 由下一次人工确认决定。
+
+
+## R19-R27 执行边界
+
+- 每轮必须先处理第一个 `[NEXT]`，不得自由切回 `OpenCodianView`、settings 或 `ServerManager`。
+- 本批目标是迁出 `OpenCodeService` 中仍成块存在的 runtime / state / builder / mapper ownership，而不是把对外 API facade 粉碎成更多小文件。
+- 新 owner 默认要覆盖完整 lifecycle；如果低于约 100 行且少于 3 个公开 API，必须在 phase 文档里说明为何不是微碎片，否则应合并回 `OpenCodeService`。
+- `OpenCodeService` 继续保持对外总门面；新 owner 通过 host seam 接入，不要把调用方改成直接依赖大量新模块。
+- R27 完成后必须暂停；是否继续 session/config/query gateway 由下一次人工确认决定。
