@@ -146,7 +146,6 @@ describe('OpenCodianView background task timeline', () => {
       backgroundTaskWaitingForFollowUp: false,
       backgroundTaskStaleNoticeFingerprint: null,
       backgroundTaskSuppressedFingerprint: null,
-      queuedBackgroundTaskCompletionNotices: new Map<string, unknown>(),
     };
     const conversation = {
       id: 'conversation-1',
@@ -206,7 +205,6 @@ describe('OpenCodianView background task timeline', () => {
 
     await coordinator.queueAndFlushCompletionNotices('tab-1', conversation as never);
 
-    expect(runtime.queuedBackgroundTaskCompletionNotices.size).toBe(1);
     expect(appendSpy).not.toHaveBeenCalled();
 
     runtime.isStreaming = false;
@@ -227,7 +225,6 @@ describe('OpenCodianView background task timeline', () => {
     });
 
     await coordinator.queueAndFlushCompletionNotices('tab-1', conversation as never);
-    expect(runtime.queuedBackgroundTaskCompletionNotices.size).toBe(0);
     expect(appendSpy).not.toHaveBeenCalled();
   });
 });

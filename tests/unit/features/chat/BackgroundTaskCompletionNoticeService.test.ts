@@ -21,7 +21,6 @@ describe('BackgroundTaskCompletionNoticeService', () => {
   } {
     const runtime: BackgroundTaskCompletionNoticeRuntime = {
       isStreaming: options?.isStreaming ?? false,
-      queuedBackgroundTaskCompletionNotices: new Map(),
     };
     const conversation = {
       id: 'conversation-1',
@@ -44,7 +43,7 @@ describe('BackgroundTaskCompletionNoticeService', () => {
   }
 
   it('persists sorted completion notices per anchor after flushing', async () => {
-    const { service, runtime, conversation, appendPersistentAssistantNoticeMessage } = createService();
+    const { service, conversation, appendPersistentAssistantNoticeMessage } = createService();
     const segments: BackgroundTaskCompletionNoticeSegment[] = [
       {
         anchorKey: 'msg-user-1',
@@ -66,8 +65,6 @@ describe('BackgroundTaskCompletionNoticeService', () => {
     ];
 
     service.queueNotices(segments, 'tab-1', conversation as never);
-    expect(runtime.queuedBackgroundTaskCompletionNotices.size).toBe(1);
-
     await service.flushQueuedNotices('tab-1', conversation as never);
 
     expect(appendPersistentAssistantNoticeMessage).toHaveBeenCalledWith({
@@ -92,11 +89,38 @@ describe('BackgroundTaskCompletionNoticeService', () => {
         taskIds: ['bg_1', 'bg_2'],
       },
     });
-    expect(runtime.queuedBackgroundTaskCompletionNotices.size).toBe(0);
+  });
+
+  it('keeps queued notices inside the service until streaming finishes', async () => {
+    const { service, runtime, conversation, appendPersistentAssistantNoticeMessage } = createService({
+      isStreaming: true,
+    });
+
+    service.queueNotices([
+      {
+        anchorKey: 'msg-user-1',
+        completionEvents: [
+          {
+            reminderMessageId: 'msg-reminder-1',
+            reminderType: 'background-task-completed',
+            timestamp: 10,
+            tasks: [{ taskId: 'bg_1', description: 'Search docs' }],
+          },
+        ],
+      },
+    ], 'tab-1', conversation as never);
+
+    await service.flushQueuedNotices('tab-1', conversation as never);
+    expect(appendPersistentAssistantNoticeMessage).not.toHaveBeenCalled();
+
+    runtime.isStreaming = false;
+    await service.flushQueuedNotices('tab-1', conversation as never);
+
+    expect(appendPersistentAssistantNoticeMessage).toHaveBeenCalledTimes(1);
   });
 
   it('skips reminder events already represented by persisted notices', async () => {
-    const { service, runtime, conversation, appendPersistentAssistantNoticeMessage } = createService({
+    const { service, conversation, appendPersistentAssistantNoticeMessage } = createService({
       conversationMessages: [
         {
           id: 'assistant-notice-1',
@@ -130,7 +154,49 @@ describe('BackgroundTaskCompletionNoticeService', () => {
       },
     ], 'tab-1', conversation as never);
 
-    expect(runtime.queuedBackgroundTaskCompletionNotices.size).toBe(0);
+    await service.flushQueuedNotices('tab-1', conversation as never);
+    expect(appendPersistentAssistantNoticeMessage).not.toHaveBeenCalled();
+  });
+
+  it('dedupes completion notices by sorted task fingerprint metadata', async () => {
+    const { service, conversation, appendPersistentAssistantNoticeMessage } = createService({
+      conversationMessages: [
+        {
+          id: 'assistant-notice-1',
+          role: 'assistant',
+          content: 'friendly completion',
+          timestamp: Date.now(),
+          displayStyle: 'notice',
+          noticeTitle: t('chat.omo.system.allCompleted'),
+          noticeTone: 'info',
+          noticeMeta: {
+            kind: 'background-task-completion',
+            anchorKey: 'msg-user-1',
+            sourceReminderIds: ['msg-reminder-older'],
+            allComplete: true,
+            taskIds: ['bg_2', 'bg_1'],
+          },
+        },
+      ],
+    });
+
+    service.queueNotices([
+      {
+        anchorKey: 'msg-user-1',
+        completionEvents: [
+          {
+            reminderMessageId: 'msg-reminder-new',
+            reminderType: 'all-background-tasks-complete',
+            timestamp: 20,
+            tasks: [
+              { taskId: 'bg_1', description: 'Search docs' },
+              { taskId: 'bg_2', description: 'Draft summary' },
+              { taskId: 'bg_1', description: 'Search docs' },
+            ],
+          },
+        ],
+      },
+    ], 'tab-1', conversation as never);
 
     await service.flushQueuedNotices('tab-1', conversation as never);
     expect(appendPersistentAssistantNoticeMessage).not.toHaveBeenCalled();

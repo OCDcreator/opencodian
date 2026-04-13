@@ -42,7 +42,6 @@ export interface QueuedBackgroundTaskCompletionNotice {
 
 export interface BackgroundTaskCompletionNoticeRuntime {
   isStreaming: boolean;
-  queuedBackgroundTaskCompletionNotices: Map<string, QueuedBackgroundTaskCompletionNotice>;
 }
 
 export interface BackgroundTaskCompletionNoticeServiceHost {
@@ -53,6 +52,11 @@ export interface BackgroundTaskCompletionNoticeServiceHost {
 }
 
 export class BackgroundTaskCompletionNoticeService {
+  private readonly queuedNoticesByRuntime = new WeakMap<
+    BackgroundTaskCompletionNoticeRuntime,
+    Map<string, QueuedBackgroundTaskCompletionNotice>
+  >();
+
   constructor(private readonly host: BackgroundTaskCompletionNoticeServiceHost) {}
 
   queueNotices(
@@ -65,6 +69,7 @@ export class BackgroundTaskCompletionNoticeService {
       return;
     }
 
+    const queuedNotices = this.getQueuedNotices(runtime);
     const persisted = this.getPersistedBackgroundTaskCompletionNoticeFingerprints(conversation);
 
     for (const segment of segments) {
@@ -74,7 +79,7 @@ export class BackgroundTaskCompletionNoticeService {
           continue;
         }
 
-        let queued = runtime.queuedBackgroundTaskCompletionNotices.get(segment.anchorKey);
+        let queued = queuedNotices.get(segment.anchorKey);
         if (!queued) {
           queued = {
             anchorKey: segment.anchorKey,
@@ -83,7 +88,7 @@ export class BackgroundTaskCompletionNoticeService {
             tasks: new Map(),
             latestTimestamp: event.timestamp,
           };
-          runtime.queuedBackgroundTaskCompletionNotices.set(segment.anchorKey, queued);
+          queuedNotices.set(segment.anchorKey, queued);
         }
 
         queued.latestTimestamp = Math.max(queued.latestTimestamp, event.timestamp);
@@ -105,9 +110,10 @@ export class BackgroundTaskCompletionNoticeService {
       return;
     }
 
+    const queuedNotices = this.getQueuedNotices(runtime);
     const persisted = this.getPersistedBackgroundTaskCompletionNoticeFingerprints(conversation);
 
-    for (const [anchorKey, queued] of [...runtime.queuedBackgroundTaskCompletionNotices.entries()]) {
+    for (const [anchorKey, queued] of [...queuedNotices.entries()]) {
       const taskIds = [...queued.tasks.keys()].sort();
       const fingerprint = this.getBackgroundTaskCompletionNoticeFingerprint({
         anchorKey,
@@ -115,7 +121,7 @@ export class BackgroundTaskCompletionNoticeService {
         taskIds,
       });
       if (persisted.has(fingerprint)) {
-        runtime.queuedBackgroundTaskCompletionNotices.delete(anchorKey);
+        queuedNotices.delete(anchorKey);
         continue;
       }
 
@@ -144,8 +150,21 @@ export class BackgroundTaskCompletionNoticeService {
         taskCount: taskIds.length,
         reminderCount: queued.sourceReminderIds.size,
       });
-      runtime.queuedBackgroundTaskCompletionNotices.delete(anchorKey);
+      queuedNotices.delete(anchorKey);
     }
+  }
+
+  private getQueuedNotices(
+    runtime: BackgroundTaskCompletionNoticeRuntime,
+  ): Map<string, QueuedBackgroundTaskCompletionNotice> {
+    const existing = this.queuedNoticesByRuntime.get(runtime);
+    if (existing) {
+      return existing;
+    }
+
+    const created = new Map<string, QueuedBackgroundTaskCompletionNotice>();
+    this.queuedNoticesByRuntime.set(runtime, created);
+    return created;
   }
 
   private getPersistedBackgroundTaskCompletionNoticeFingerprints(

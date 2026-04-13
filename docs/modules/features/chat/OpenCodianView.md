@@ -80,6 +80,8 @@ interface TabRuntimeState {
 
 background task 相关的 `backgroundTaskLaunches`、`backgroundTaskCompletedTasks`、active anchor / waiting-for-follow-up 等字段同样仍存放在 `TabRuntimeState`，但它们的 timeline 推导、conversation→runtime 重建、indicator reset runtime 清理，以及 inline copy 组装现在已经集中到 `services/BackgroundTaskTimelineService.ts`。
 
+background task completion notice 的 queued-state 则已经完全移出 `TabRuntimeState`，改由 `services/BackgroundTaskCompletionNoticeService.ts` 按 tab runtime 内部维护；view 这里只再保留 streaming / timeline 所需的运行态字段。
+
 ### 视图级状态
 
 除此之外，类里还维护若干跨 tab 的视图级状态：
@@ -414,7 +416,7 @@ background task notice 这条子链路现在的边界是：
 - `PostSyncQuestionTodoRefreshFacade`：hidden signal/background-tab sync 与 active visible-conversation background sync 后的 question/todo/background-task refresh 组合装配
 - `BackgroundConversationPostSyncHandoffCoordinator`：hidden signal/background-tab sync 后的 authoritative mark、background refresh 与 attention handoff 编排
 - `BackgroundTaskNoticeStateService`：stopped/stale notice content、fingerprint、persisted dedupe 与 suppression runtime 协调
-- `BackgroundTaskCompletionNoticeService`：completion notice queued state、content/fingerprint 与 persisted dedupe/append 协调
+- `BackgroundTaskCompletionNoticeService`：completion notice queued state、content/fingerprint 与 persisted dedupe/append 协调；queued state 已不再挂在 view runtime 上
 - `PersistentAssistantNoticeService`：session todo / background task / diff / model-unavailable 共享的 persisted notice append、conversation save、sync fingerprint 写回，以及 visible/hidden tab 后续动作
 
 ## 外观与控件

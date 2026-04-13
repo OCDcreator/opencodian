@@ -162,7 +162,6 @@ import {
   type BackgroundTaskCompletionInfo,
   BackgroundTaskCompletionNoticeService,
   type BackgroundTaskCompletionNoticeServiceHost,
-  type QueuedBackgroundTaskCompletionNotice,
 } from './services/BackgroundTaskCompletionNoticeService';
 import {
   BackgroundTaskLiveSignalCoordinator,
@@ -622,7 +621,6 @@ interface TabRuntimeState {
   backgroundTaskLastAuthoritativeSyncAt: number | null;
   backgroundTaskStaleNoticeFingerprint: string | null;
   backgroundTaskSuppressedFingerprint: string | null;
-  queuedBackgroundTaskCompletionNotices: Map<string, QueuedBackgroundTaskCompletionNotice>;
   isHydratingConversation: boolean;
   pendingLayoutMutations: number;
   pendingSignalConversationSyncReasons: Set<string>;
@@ -832,7 +830,6 @@ export class OpenCodianView extends ItemView {
       backgroundTaskLastAuthoritativeSyncAt: null,
       backgroundTaskStaleNoticeFingerprint: null,
       backgroundTaskSuppressedFingerprint: null,
-      queuedBackgroundTaskCompletionNotices: new Map(),
       isHydratingConversation: false,
       pendingLayoutMutations: 0,
       pendingSignalConversationSyncReasons: new Set(),
