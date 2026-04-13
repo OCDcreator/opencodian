@@ -12,6 +12,7 @@ import type {
   QuestionPendingRefreshRuntimeFacade,
   QuestionPendingRefreshRuntimeState,
 } from './QuestionPendingRefreshRuntimeFacade';
+import type { QuestionPendingRefreshWritebackFacade } from './QuestionPendingRefreshWritebackFacade';
 import type { QuestionResolutionWritebackFacade } from './QuestionResolutionWritebackFacade';
 import { isQuestionAnswerComplete } from '../ui/questionDockState';
 import {
@@ -39,6 +40,10 @@ type QuestionPendingRefreshRuntimePort = Pick<
   | 'applyRefreshedPendingQuestionRequests'
   | 'clearPendingQuestionState'
   | 'getPendingQuestionRequests'
+>;
+type QuestionPendingRefreshWritebackPort = Pick<
+  QuestionPendingRefreshWritebackFacade,
+  'applyClearedPendingQuestions' | 'applyRefreshedPendingQuestions'
 >;
 
 export interface QuestionDockCoordinatorRuntimeState {
@@ -70,6 +75,7 @@ export class QuestionDockCoordinator {
     private readonly host: QuestionDockCoordinatorHost,
     private readonly dockQueueRuntime: QuestionDockQueueRuntimePort,
     private readonly pendingRefreshRuntime: QuestionPendingRefreshRuntimePort,
+    private readonly pendingRefreshWriteback: QuestionPendingRefreshWritebackPort,
     private readonly resolutionWriteback: QuestionResolutionWritebackPort,
   ) {}
 
@@ -126,12 +132,7 @@ export class QuestionDockCoordinator {
     }
 
     this.pendingRefreshRuntime.clearPendingQuestionState(tabId);
-
-    this.host.setTabNeedsAttention(tabId, false);
-
-    if (tabId === this.host.getActiveTabId()) {
-      this.render();
-    }
+    this.pendingRefreshWriteback.applyClearedPendingQuestions(tabId);
   }
 
   async refreshPendingQuestionsForTab(
@@ -151,13 +152,7 @@ export class QuestionDockCoordinator {
         tabId,
         sessionRequests,
       );
-
-      if (tabId === this.host.getActiveTabId()) {
-        this.host.setTabNeedsAttention(tabId, false);
-        this.render();
-      } else {
-        this.host.setTabNeedsAttention(tabId, mergedRequests.length > 0);
-      }
+      this.pendingRefreshWriteback.applyRefreshedPendingQuestions(tabId, mergedRequests);
 
       return mergedRequests;
     } catch (error) {

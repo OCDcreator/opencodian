@@ -11,7 +11,7 @@
 - 在 dock 接管 request 时维护 `pendingQuestionRequests`、draft answers，以及首次入队时的 active group/index 初始值
 - 在 request 被回答或拒绝后清理 queue、draft/group/index，并统一 resolve 对应 waiter
 
-它不负责 pending question 的服务端拉取、按 session 过滤、dock attention/render 决策，或 resolve 后的 status/sync follow-up；这些仍分别留给 `QuestionDockCoordinator`、`QuestionPendingRefreshRuntimeFacade` 与 `QuestionPostResolutionRuntimeFacade`。
+它不负责 pending question 的服务端拉取、按 session 过滤、pending refresh attention/render writeback，或 resolve 后的 status/sync follow-up；这些仍分别留给 `QuestionDockCoordinator`、`QuestionPendingRefreshRuntimeFacade`、`QuestionPendingRefreshWritebackFacade` 与 `QuestionPostResolutionRuntimeFacade`。
 
 ## 公开接口
 

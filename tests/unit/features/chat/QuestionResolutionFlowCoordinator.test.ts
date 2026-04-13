@@ -52,9 +52,7 @@ function createCoordinator(options?: {
   const ports: {
     dockCoordinator: jest.Mocked<QuestionResolutionFlowCoordinatorPorts['dockCoordinator']>;
     inlineCardRenderer: jest.Mocked<QuestionResolutionFlowCoordinatorPorts['inlineCardRenderer']>;
-    resolutionCoordinator: jest.Mocked<QuestionResolutionFlowCoordinatorPorts['resolutionCoordinator']>;
-    resolvedRequestRuntime: jest.Mocked<QuestionResolutionFlowCoordinatorPorts['resolvedRequestRuntime']>;
-    postResolutionRuntime: jest.Mocked<QuestionResolutionFlowCoordinatorPorts['postResolutionRuntime']>;
+    resolutionWriteback: jest.Mocked<QuestionResolutionFlowCoordinatorPorts['resolutionWriteback']>;
   } = {
     dockCoordinator: {
       waitForDockResolutionIfEnabled: jest.fn().mockResolvedValue(options?.dockResolves ?? false),
@@ -62,14 +60,8 @@ function createCoordinator(options?: {
     inlineCardRenderer: {
       collectAction: jest.fn().mockResolvedValue(action),
     },
-    resolutionCoordinator: {
-      applyResolvedQuestionState: jest.fn(),
-    },
-    resolvedRequestRuntime: {
-      markQuestionRequestResolved: jest.fn(),
-    },
-    postResolutionRuntime: {
-      followUpAfterResolution: jest.fn().mockResolvedValue(undefined),
+    resolutionWriteback: {
+      applyResolution: jest.fn().mockResolvedValue(undefined),
     },
   };
 
@@ -99,8 +91,7 @@ describe('QuestionResolutionFlowCoordinator', () => {
     expect(ports.inlineCardRenderer.collectAction).not.toHaveBeenCalled();
     expect(host.replyToQuestion).not.toHaveBeenCalled();
     expect(host.rejectQuestion).not.toHaveBeenCalled();
-    expect(ports.resolutionCoordinator.applyResolvedQuestionState).not.toHaveBeenCalled();
-    expect(ports.postResolutionRuntime.followUpAfterResolution).not.toHaveBeenCalled();
+    expect(ports.resolutionWriteback.applyResolution).not.toHaveBeenCalled();
   });
 
   it('replies through the inline card fallback and applies answered state', async () => {
@@ -115,16 +106,11 @@ describe('QuestionResolutionFlowCoordinator', () => {
       'tab-active',
     );
     expect(host.replyToQuestion).toHaveBeenCalledWith(request.id, [['TypeScript']]);
-    expect(ports.resolvedRequestRuntime.markQuestionRequestResolved).toHaveBeenCalledWith(
-      request.id,
-      'tab-active',
-    );
-    expect(ports.resolutionCoordinator.applyResolvedQuestionState).toHaveBeenCalledWith({
+    expect(ports.resolutionWriteback.applyResolution).toHaveBeenCalledWith({
       request,
       status: 'answered',
       answers: [['TypeScript']],
     }, 'tab-active');
-    expect(ports.postResolutionRuntime.followUpAfterResolution).toHaveBeenCalledWith('tab-active');
   });
 
   it('rejects through the inline card fallback and applies rejected state', async () => {
@@ -137,15 +123,10 @@ describe('QuestionResolutionFlowCoordinator', () => {
 
     expect(host.rejectQuestion).toHaveBeenCalledWith(request.id);
     expect(host.replyToQuestion).not.toHaveBeenCalled();
-    expect(ports.resolvedRequestRuntime.markQuestionRequestResolved).toHaveBeenCalledWith(
-      request.id,
-      'tab-active',
-    );
-    expect(ports.resolutionCoordinator.applyResolvedQuestionState).toHaveBeenCalledWith({
+    expect(ports.resolutionWriteback.applyResolution).toHaveBeenCalledWith({
       request,
       status: 'rejected',
     }, 'tab-active');
-    expect(ports.postResolutionRuntime.followUpAfterResolution).toHaveBeenCalledWith('tab-active');
   });
 
   it('does not resolve when inline card rendering is unavailable', async () => {
@@ -156,9 +137,7 @@ describe('QuestionResolutionFlowCoordinator', () => {
 
     expect(host.replyToQuestion).not.toHaveBeenCalled();
     expect(host.rejectQuestion).not.toHaveBeenCalled();
-    expect(ports.resolvedRequestRuntime.markQuestionRequestResolved).not.toHaveBeenCalled();
-    expect(ports.resolutionCoordinator.applyResolvedQuestionState).not.toHaveBeenCalled();
-    expect(ports.postResolutionRuntime.followUpAfterResolution).not.toHaveBeenCalled();
+    expect(ports.resolutionWriteback.applyResolution).not.toHaveBeenCalled();
   });
 
   it('shows the existing error notice when inline resolution fails', async () => {
@@ -171,9 +150,7 @@ describe('QuestionResolutionFlowCoordinator', () => {
     await coordinator.showQuestionDialog(request, 'tab-active');
 
     expect(noticeSpy).toHaveBeenCalledWith('Failed to send the question response.');
-    expect(ports.resolvedRequestRuntime.markQuestionRequestResolved).not.toHaveBeenCalled();
-    expect(ports.resolutionCoordinator.applyResolvedQuestionState).not.toHaveBeenCalled();
-    expect(ports.postResolutionRuntime.followUpAfterResolution).not.toHaveBeenCalled();
+    expect(ports.resolutionWriteback.applyResolution).not.toHaveBeenCalled();
     errorSpy.mockRestore();
   });
 });

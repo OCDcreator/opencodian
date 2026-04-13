@@ -8,6 +8,7 @@ import {
   type QuestionDockCoordinatorHost,
 } from '../../../../src/features/chat/services/QuestionDockCoordinator';
 import { QuestionPendingRefreshRuntimeFacade } from '../../../../src/features/chat/services/QuestionPendingRefreshRuntimeFacade';
+import { QuestionPendingRefreshWritebackFacade } from '../../../../src/features/chat/services/QuestionPendingRefreshWritebackFacade';
 import type { QuestionPostResolutionRuntimeFacade } from '../../../../src/features/chat/services/QuestionPostResolutionRuntimeFacade';
 import { QuestionResolutionWritebackFacade } from '../../../../src/features/chat/services/QuestionResolutionWritebackFacade';
 import type { TabId } from '../../../../src/features/chat/tabs';
@@ -122,6 +123,14 @@ function createHost(options?: {
   const pendingRefreshRuntime = new QuestionPendingRefreshRuntimeFacade({
     getTabRuntimeState: (tabId) => (tabId ? runtimeByTab.get(tabId) ?? null : null),
   });
+  const renderQuestionDock = jest.fn();
+  const pendingRefreshWriteback = new QuestionPendingRefreshWritebackFacade({
+    getActiveTabId: () => host.getActiveTabId(),
+    setTabNeedsAttention: (tabId, needsAttention) => {
+      host.setTabNeedsAttention(tabId, needsAttention);
+    },
+    renderQuestionDock,
+  });
   const dockQueueRuntime = new QuestionDockQueueRuntimeFacade({
     getTabRuntimeState: (tabId) => (tabId ? runtimeByTab.get(tabId) ?? null : null),
     ensureTabRuntimeState: (tabId) => {
@@ -153,6 +162,8 @@ function createHost(options?: {
     host,
     dockQueueRuntime,
     pendingRefreshRuntime,
+    pendingRefreshWriteback,
+    renderQuestionDock,
     postResolutionRuntime,
     resolutionWriteback,
     applyResolvedQuestionState,
@@ -185,6 +196,7 @@ describe('QuestionDockCoordinator', () => {
       host,
       dockQueueRuntime,
       pendingRefreshRuntime,
+      pendingRefreshWriteback,
       postResolutionRuntime,
       resolutionWriteback,
       applyResolvedQuestionState,
@@ -196,6 +208,7 @@ describe('QuestionDockCoordinator', () => {
       host,
       dockQueueRuntime,
       pendingRefreshRuntime,
+      pendingRefreshWriteback,
       resolutionWriteback,
     );
 
@@ -232,6 +245,7 @@ describe('QuestionDockCoordinator', () => {
       host,
       dockQueueRuntime,
       pendingRefreshRuntime,
+      pendingRefreshWriteback,
       resolutionWriteback,
       runtimeByTab,
     } = createHost({
@@ -255,6 +269,7 @@ describe('QuestionDockCoordinator', () => {
       host,
       dockQueueRuntime,
       pendingRefreshRuntime,
+      pendingRefreshWriteback,
       resolutionWriteback,
     );
 
@@ -273,6 +288,7 @@ describe('QuestionDockCoordinator', () => {
       host,
       dockQueueRuntime,
       pendingRefreshRuntime,
+      pendingRefreshWriteback,
       resolutionWriteback,
     } = createHost({
       shouldUseAboveInputQuestionDock: false,
@@ -282,6 +298,7 @@ describe('QuestionDockCoordinator', () => {
       host,
       dockQueueRuntime,
       pendingRefreshRuntime,
+      pendingRefreshWriteback,
       resolutionWriteback,
     );
 

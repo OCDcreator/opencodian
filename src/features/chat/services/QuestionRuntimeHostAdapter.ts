@@ -30,6 +30,7 @@ import {
   type QuestionPendingRefreshRuntimeFacadeHost,
   type QuestionPendingRefreshRuntimeState,
 } from './QuestionPendingRefreshRuntimeFacade';
+import { QuestionPendingRefreshWritebackFacade } from './QuestionPendingRefreshWritebackFacade';
 import {
   QuestionPostResolutionRuntimeFacade,
   type QuestionPostResolutionRuntimeFacadeHost,
@@ -152,6 +153,7 @@ export function createQuestionRuntimeServices(
   streamingInlineCardRenderer: StreamingInlineCardRenderer,
 ): QuestionRuntimeServices {
   let resolutionCoordinator!: QuestionResolutionCoordinator;
+  let dockCoordinator!: QuestionDockCoordinator;
 
   const hosts = createQuestionRuntimeHosts(viewHost);
 
@@ -172,6 +174,15 @@ export function createQuestionRuntimeServices(
   const postResolutionRuntimeFacade = new QuestionPostResolutionRuntimeFacade(
     hosts.postResolutionRuntimeHost,
   );
+  const pendingRefreshWritebackFacade = new QuestionPendingRefreshWritebackFacade({
+    getActiveTabId: () => viewHost.getActiveTabId(),
+    setTabNeedsAttention: (tabId, needsAttention) => {
+      viewHost.setTabNeedsAttention(tabId, needsAttention);
+    },
+    renderQuestionDock: () => {
+      dockCoordinator.render();
+    },
+  });
   const resolutionWritebackFacade = new QuestionResolutionWritebackFacade({
     markQuestionRequestResolved: (requestId, tabId) => {
       pendingRefreshRuntimeFacade.markQuestionRequestResolved(requestId, tabId);
@@ -182,10 +193,11 @@ export function createQuestionRuntimeServices(
     followUpAfterResolution: (tabId) =>
       postResolutionRuntimeFacade.followUpAfterResolution(tabId),
   });
-  const dockCoordinator = new QuestionDockCoordinator(
+  dockCoordinator = new QuestionDockCoordinator(
     hosts.dockCoordinatorHost,
     dockQueueRuntimeFacade,
     pendingRefreshRuntimeFacade,
+    pendingRefreshWritebackFacade,
     resolutionWritebackFacade,
   );
   const resolutionFlowCoordinatorHost: QuestionResolutionFlowCoordinatorHost = {
