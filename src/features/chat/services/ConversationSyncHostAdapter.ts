@@ -4,6 +4,9 @@ import type {
 } from '../../../core/types';
 import type { TabData, TabId } from '../tabs';
 import {
+  ConversationSyncBackgroundPostSyncRouter,
+} from './ConversationSyncBackgroundPostSyncRouter';
+import {
   type ConversationSyncBridgeHost,
   type ConversationSyncBridgePostSyncCoordinator,
   type ConversationSyncBridgeSyncResult,
@@ -99,11 +102,16 @@ export function createConversationSyncServices(
     hosts.orchestrationHost,
     runtimeCoordinator,
   );
+  const backgroundPostSyncRouter = new ConversationSyncBackgroundPostSyncRouter(
+    hosts.bridgeHost,
+    postSyncCoordinator,
+  );
   const bridge = new ConversationSyncBridge(
     hosts.bridgeHost,
     runtimeCoordinator,
     orchestrationService,
     postSyncCoordinator,
+    backgroundPostSyncRouter,
   );
   return {
     runtimeCoordinator,

@@ -13,6 +13,7 @@ import type {
 import type {
   SignalConversationSyncContext,
 } from './ConversationSyncOrchestrationService';
+import type { ConversationSyncBackgroundPostSyncRouter } from './ConversationSyncBackgroundPostSyncRouter';
 import type {
   TabConversationSyncContext,
   VisibleConversationSyncContext,
@@ -83,6 +84,10 @@ export class ConversationSyncBridge {
     private readonly runtimeCoordinator: ConversationSyncBridgeRuntimeCoordinator,
     private readonly orchestrationService: ConversationSyncBridgeOrchestration,
     private readonly postSyncCoordinator: ConversationSyncBridgePostSyncCoordinator,
+    private readonly backgroundPostSyncRouter: Pick<
+      ConversationSyncBackgroundPostSyncRouter,
+      'routeBackgroundTabSyncComplete' | 'routeSignalSyncComplete'
+    >,
   ) {}
 
   startConversationSyncLoop(): void {
@@ -144,47 +149,32 @@ export class ConversationSyncBridge {
 
   async syncBackgroundTaskTabsInBackground(): Promise<void> {
     await this.orchestrationService.syncBackgroundTaskTabs(
-      async ({ tabId, conversation, previousFingerprint }) => {
+      async (syncContext: TabConversationSyncContext) => {
         const syncResult = await this.host.syncConversationMessagesFromServer(
-          conversation,
-          tabId,
+          syncContext.conversation,
+          syncContext.tabId,
           'background-tab-sync',
         );
-        await this.postSyncCoordinator.handleBackgroundTabSyncComplete({
-          tabId,
-          conversation,
-          previousFingerprint,
+        await this.backgroundPostSyncRouter.routeBackgroundTabSyncComplete({
+          syncContext,
           syncResult,
         });
       },
     );
   }
 
-  private async syncSignalTabConversation({
-    tabId,
-    conversation,
-    reason,
-    previousFingerprint,
-    activeTabId,
-    tabHasBackgroundTask,
-  }: SignalConversationSyncContext): Promise<void> {
+  private async syncSignalTabConversation(
+    syncContext: SignalConversationSyncContext,
+  ): Promise<void> {
     const syncResult = await this.host.syncConversationMessagesFromServer(
-      conversation,
-      tabId,
-      `sync-event:${reason}`,
+      syncContext.conversation,
+      syncContext.tabId,
+      `sync-event:${syncContext.reason}`,
       { suppressVerboseLogs: true },
     );
-    const runtime = this.host.getTabRuntimeState(tabId);
-    if (runtime) {
-      runtime.lastConversationSyncFingerprint = syncResult.fingerprint;
-    }
-    await this.postSyncCoordinator.handleSignalSyncComplete({
-      tabId,
-      conversation,
-      reason,
-      activeTabId,
-      tabHasBackgroundTask,
-      previousFingerprint,
+
+    await this.backgroundPostSyncRouter.routeSignalSyncComplete({
+      syncContext,
       syncResult,
     });
   }
