@@ -10,6 +10,11 @@ import { QuestionDockQueueRuntimeFacade } from '../../../../src/features/chat/se
 import { QuestionPendingRefreshRuntimeFacade } from '../../../../src/features/chat/services/QuestionPendingRefreshRuntimeFacade';
 import { QuestionPostResolutionRuntimeFacade } from '../../../../src/features/chat/services/QuestionPostResolutionRuntimeFacade';
 import {
+  createQuestionRejectExecutionAction,
+  createQuestionReplyExecutionAction,
+  QuestionResolutionExecutionFacade,
+} from '../../../../src/features/chat/services/QuestionResolutionExecutionFacade';
+import {
   createQuestionRuntimeHosts,
   createQuestionRuntimeServices,
   type QuestionRuntimeState,
@@ -189,8 +194,15 @@ describe('QuestionRuntimeHostAdapter', () => {
     const dockRefreshHost: QuestionDockRefreshFacadeHost = hosts.dockRefreshHost;
     expect(dockRefreshHost.getSessionIdForTab('tab-active')).toBe('session-1');
     await dockRefreshHost.getPendingQuestions();
-    await hosts.dockCoordinatorHost.replyToQuestion(request.id, [['TypeScript']]);
-    await hosts.dockCoordinatorHost.rejectQuestion(request.id);
+    const resolutionExecutionFacade = new QuestionResolutionExecutionFacade(
+      hosts.resolutionExecutionHost,
+    );
+    await resolutionExecutionFacade.execute(
+      createQuestionReplyExecutionAction(request, [['TypeScript']]),
+    );
+    await resolutionExecutionFacade.execute(
+      createQuestionRejectExecutionAction(request),
+    );
     const postResolutionRuntimeFacade = new QuestionPostResolutionRuntimeFacade(
       hosts.postResolutionRuntimeHost,
     );

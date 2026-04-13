@@ -1,6 +1,11 @@
-import type { QuestionRequest, QuestionResolution } from '../../../core/types';
+import type { QuestionRequest } from '../../../core/types';
 import type { TabId } from '../tabs';
 import { isQuestionAnswerComplete } from '../ui/questionDockState';
+import {
+  createQuestionRejectExecutionAction,
+  createQuestionReplyExecutionAction,
+  type QuestionResolutionExecutionAction,
+} from './QuestionResolutionExecutionFacade';
 import {
   getQuestionDockDraftAnswers,
   sanitizeQuestionDockAnswer,
@@ -25,17 +30,7 @@ export type QuestionDockResolutionAction =
       type: 'answer-required';
       request: QuestionRequest;
     }
-  | {
-      type: 'reply';
-      request: QuestionRequest;
-      answers: string[][];
-      resolution: QuestionResolution;
-    }
-  | {
-      type: 'reject';
-      request: QuestionRequest;
-      resolution: QuestionResolution;
-    };
+  | QuestionResolutionExecutionAction;
 
 export interface QuestionDockResolutionActionFacadeHost {
   getActiveTabId(): TabId | null;
@@ -60,14 +55,7 @@ export class QuestionDockResolutionActionFacade {
     }
 
     if (intent === 'reject') {
-      return {
-        type: 'reject',
-        request,
-        resolution: {
-          request,
-          status: 'rejected',
-        },
-      };
+      return createQuestionRejectExecutionAction(request);
     }
 
     const answers = this.collectDraftAnswers(request, tabId);
@@ -78,16 +66,7 @@ export class QuestionDockResolutionActionFacade {
       };
     }
 
-    return {
-      type: 'reply',
-      request,
-      answers,
-      resolution: {
-        request,
-        status: 'answered',
-        answers,
-      },
-    };
+    return createQuestionReplyExecutionAction(request, answers);
   }
 
   private collectDraftAnswers(

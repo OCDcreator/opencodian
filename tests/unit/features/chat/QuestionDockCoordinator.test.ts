@@ -17,6 +17,10 @@ import {
   type QuestionDockCoordinatorHost,
 } from '../../../../src/features/chat/services/QuestionDockCoordinator';
 import { QuestionPendingRefreshRuntimeFacade } from '../../../../src/features/chat/services/QuestionPendingRefreshRuntimeFacade';
+import {
+  QuestionResolutionExecutionFacade,
+  type QuestionResolutionExecutionFacadeHost,
+} from '../../../../src/features/chat/services/QuestionResolutionExecutionFacade';
 import type { QuestionPostResolutionRuntimeFacade } from '../../../../src/features/chat/services/QuestionPostResolutionRuntimeFacade';
 import { QuestionResolutionWritebackFacade } from '../../../../src/features/chat/services/QuestionResolutionWritebackFacade';
 import type { TabId } from '../../../../src/features/chat/tabs';
@@ -101,6 +105,7 @@ function createHost(options?: {
   const host: Mocked<
     QuestionDockCoordinatorHost
     & QuestionDockRenderStateFacadeHost
+    & QuestionResolutionExecutionFacadeHost
   > = {
     getTabRuntimeState: jest.fn((tabId) => (tabId ? runtimeByTab.get(tabId) ?? null : null)),
     getActiveTabId: jest.fn().mockReturnValue(activeTabId),
@@ -130,6 +135,7 @@ function createHost(options?: {
     },
     dockRenderState,
   );
+  const resolutionExecution = new QuestionResolutionExecutionFacade(host);
   const postResolutionRuntime: jest.Mocked<Pick<
     QuestionPostResolutionRuntimeFacade,
     'followUpAfterResolution'
@@ -181,6 +187,7 @@ function createHost(options?: {
     dockRefresh,
     dockRenderState,
     dockResolutionAction,
+    resolutionExecution,
     dockQueueRuntime,
     pendingRefreshRuntime,
     dockWriteback,
@@ -222,6 +229,7 @@ describe('QuestionDockCoordinator', () => {
       dockRefresh,
       dockRenderState,
       dockResolutionAction,
+      resolutionExecution,
       dockQueueRuntime,
       pendingRefreshRuntime,
       dockWriteback,
@@ -237,6 +245,7 @@ describe('QuestionDockCoordinator', () => {
       host,
       dockRenderState,
       dockResolutionAction,
+      resolutionExecution,
       dockQueueRuntime,
       dockRefresh,
       dockWriteback,
@@ -280,6 +289,7 @@ describe('QuestionDockCoordinator', () => {
       host,
       dockRenderState,
       dockResolutionAction,
+      resolutionExecution,
       dockQueueRuntime,
       dockWriteback,
       resolutionWriteback,
@@ -289,6 +299,7 @@ describe('QuestionDockCoordinator', () => {
       host,
       dockRenderState,
       dockResolutionAction,
+      resolutionExecution,
       dockQueueRuntime,
       dockRefresh,
       dockWriteback,
@@ -311,6 +322,7 @@ describe('QuestionDockCoordinator', () => {
       host,
       dockRenderState,
       dockResolutionAction,
+      resolutionExecution,
       dockQueueRuntime,
       dockWriteback,
       resolutionWriteback,
@@ -319,6 +331,7 @@ describe('QuestionDockCoordinator', () => {
       host,
       dockRenderState,
       dockResolutionAction,
+      resolutionExecution,
       dockQueueRuntime,
       dockRefresh,
       dockWriteback,
@@ -339,6 +352,7 @@ describe('QuestionDockCoordinator', () => {
       dockRefresh,
       dockRenderState,
       dockResolutionAction,
+      resolutionExecution,
       dockQueueRuntime,
       dockWriteback,
       resolutionWriteback,
@@ -351,6 +365,7 @@ describe('QuestionDockCoordinator', () => {
       host,
       dockRenderState,
       dockResolutionAction,
+      resolutionExecution,
       dockQueueRuntime,
       dockRefresh,
       dockWriteback,

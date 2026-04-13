@@ -1,11 +1,8 @@
-import { Notice } from 'obsidian';
-
 import type {
   QuestionDisplayMode,
   QuestionRequest,
   QuestionResolution,
 } from '../../../core/types';
-import { t } from '../../../i18n';
 import { createLogger } from '../../../shared';
 import type {
   QuestionInlineCardAction,
@@ -13,6 +10,12 @@ import type {
 } from '../runtime/QuestionInlineCardRenderer';
 import type { TabId } from '../tabs';
 import type { QuestionDockCoordinator } from './QuestionDockCoordinator';
+import {
+  createQuestionRejectExecutionAction,
+  createQuestionReplyExecutionAction,
+  type QuestionResolutionExecutionAction,
+  type QuestionResolutionExecutionFacade,
+} from './QuestionResolutionExecutionFacade';
 import type { QuestionResolutionWritebackFacade } from './QuestionResolutionWritebackFacade';
 
 const logger = createLogger('QuestionResolutionFlowCoordinator');
@@ -26,17 +29,20 @@ type QuestionResolutionWritebackPort = Pick<
   QuestionResolutionWritebackFacade,
   'applyResolution'
 >;
+type QuestionResolutionExecutionPort = Pick<
+  QuestionResolutionExecutionFacade,
+  'execute'
+>;
 
 export interface QuestionResolutionFlowCoordinatorHost {
   getActiveTabId(): TabId | null;
   getQuestionDisplayMode(): QuestionDisplayMode;
-  replyToQuestion(requestId: string, answers: string[][]): Promise<void>;
-  rejectQuestion(requestId: string): Promise<void>;
 }
 
 export interface QuestionResolutionFlowCoordinatorPorts {
   dockCoordinator: QuestionDockResolutionPort;
   inlineCardRenderer: QuestionInlineCardActionPort;
+  resolutionExecution: QuestionResolutionExecutionPort;
   resolutionWriteback: QuestionResolutionWritebackPort;
 }
 
@@ -73,26 +79,25 @@ export class QuestionResolutionFlowCoordinator {
     action: QuestionInlineCardAction,
     tabId: TabId | null,
   ): Promise<void> {
-    try {
-      if (action.type === 'reject') {
-        await this.host.rejectQuestion(request.id);
-        await this.applyResolvedQuestionState({
-          request,
-          status: 'rejected',
-        }, tabId);
-        return;
-      }
-
-      await this.host.replyToQuestion(request.id, action.answers);
-      await this.applyResolvedQuestionState({
-        request,
-        status: 'answered',
-        answers: action.answers,
-      }, tabId);
-    } catch (error) {
-      logger.error('Failed to resolve question request:', error);
-      new Notice(t('chat.question.notice.error'));
+    const resolution = await this.ports.resolutionExecution.execute(
+      this.createInlineResolutionExecutionAction(request, action),
+    );
+    if (!resolution) {
+      return;
     }
+
+    await this.applyResolvedQuestionState(resolution, tabId);
+  }
+
+  private createInlineResolutionExecutionAction(
+    request: QuestionRequest,
+    action: QuestionInlineCardAction,
+  ): QuestionResolutionExecutionAction {
+    if (action.type === 'reject') {
+      return createQuestionRejectExecutionAction(request);
+    }
+
+    return createQuestionReplyExecutionAction(request, action.answers);
   }
 
   private async applyResolvedQuestionState(
