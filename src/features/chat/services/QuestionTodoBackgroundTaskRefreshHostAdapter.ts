@@ -48,6 +48,9 @@ import {
   VisibleConversationPostSyncStateCoordinator,
   type VisibleConversationPostSyncStateCoordinatorHost,
 } from './VisibleConversationPostSyncStateCoordinator';
+import {
+  VisibleConversationPostSyncCoordinator,
+} from './VisibleConversationPostSyncCoordinator';
 
 type QuestionPendingRefreshPort = Pick<
   QuestionDockCoordinator,
@@ -306,6 +309,11 @@ export function createQuestionTodoBackgroundTaskRefreshServices(
     new VisibleConversationPostSyncStateCoordinator(
       hosts.visibleConversationPostSyncStateCoordinatorHost,
     );
+  const visibleConversationPostSyncCoordinator =
+    new VisibleConversationPostSyncCoordinator(
+      postSyncQuestionTodoRefreshFacade,
+      visibleConversationPostSyncStateCoordinator,
+    );
   const backgroundConversationAttentionCoordinator =
     new BackgroundConversationAttentionCoordinator(
       hosts.backgroundConversationAttentionCoordinatorHost,
@@ -321,8 +329,7 @@ export function createQuestionTodoBackgroundTaskRefreshServices(
       backgroundConversationAttentionCoordinator,
     );
   const backgroundTaskPostSyncCoordinator = new BackgroundTaskPostSyncCoordinator(
-    postSyncQuestionTodoRefreshFacade,
-    visibleConversationPostSyncStateCoordinator,
+    visibleConversationPostSyncCoordinator,
     backgroundConversationPostSyncHandoffCoordinator,
   );
 

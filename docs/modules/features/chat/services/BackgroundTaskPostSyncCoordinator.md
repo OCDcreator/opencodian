@@ -5,13 +5,12 @@
 
 ## 概述
 
-`BackgroundTaskPostSyncCoordinator` 把原本散落在 `OpenCodianView`、现在经由 `ConversationSyncBridge` 汇入的 hidden signal sync / background-tab sync / active visible-conversation background sync 收尾编排独立出来，专门负责：
+`BackgroundTaskPostSyncCoordinator` 把原本散落在 `OpenCodianView`、现在经由 `ConversationSyncBridge` 汇入的 hidden signal sync / background-tab sync / active visible-conversation background sync 收尾路由独立出来，专门负责：
 
-- 委托 `PostSyncQuestionTodoRefreshFacade` 执行 visible question/todo refresh，并把 background-only refresh 收尾交给 `BackgroundConversationPostSyncRefreshExecutor`
-- 在 visible background sync 完成后把 current-conversation state commit 判定委托给 `VisibleConversationPostSyncStateCoordinator`
+- 把 visible background sync 委托给 `VisibleConversationPostSyncCoordinator`
 - 把 signal/background-tab sync 的 source-specific handoff 委托给 `BackgroundConversationPostSyncHandoffCoordinator`
 
-它不负责 background task segment/timeline 推导，也不负责 inline panel DOM 渲染；这些现在分别由 `BackgroundTaskTimelineService` 和 `BackgroundTaskInlinePanelRenderer` 承接。completion notice 的 queue/flush 顺序也不再由本 coordinator 拆开编排，而是通过 `BackgroundConversationPostSyncRefreshExecutor` 统一接在 background 组合刷新之后。signal/background-tab 到 todo/status 强制刷新布尔值的映射交给 `PostSyncQuestionTodoRefreshPlanBuilder`，signal authoritative-sync state 与 attention outcome 则继续分别留在 dedicated seam 中；本 coordinator 只负责 visible current-conversation refresh/state-commit，并把 hidden/background source routing 委托给 `BackgroundConversationPostSyncHandoffCoordinator`。pending-question 与 todo/status 组合刷新顺序本身则继续委托给 `QuestionTodoStatusRefreshCoordinator`。它的 host 装配现在通常由 `QuestionTodoBackgroundTaskRefreshHostAdapter` 统一提供。
+它不负责 background task segment/timeline 推导，也不负责 inline panel DOM 渲染；这些现在分别由 `BackgroundTaskTimelineService` 和 `BackgroundTaskInlinePanelRenderer` 承接。completion notice 的 queue/flush 顺序也不再由本 coordinator 拆开编排，而是通过 `BackgroundConversationPostSyncRefreshExecutor` 统一接在 background 组合刷新之后。signal/background-tab 到 todo/status 强制刷新布尔值的映射交给 `PostSyncQuestionTodoRefreshPlanBuilder`，signal authoritative-sync state 与 attention outcome 则继续分别留在 dedicated seam 中；visible current-conversation refresh/state-commit 现在也继续前移到 `VisibleConversationPostSyncCoordinator`，因此本 coordinator 只保留 visible/background 两条 post-sync 路由。它的 host 装配现在通常由 `QuestionTodoBackgroundTaskRefreshHostAdapter` 统一提供。
 
 ## 公开接口
 
@@ -28,10 +27,10 @@ export class BackgroundTaskPostSyncCoordinator {
 
 ### visible active-conversation sync 收尾
 
-- `handleVisibleConversationSyncComplete()` 统一接手 `ConversationSyncBridge.syncVisibleConversationInBackground()` 里原本散落的 post-sync 收尾，并把 visible sync 的 question/todo refresh session 配对委托给 `PostSyncQuestionTodoRefreshFacade`
-- refresh 完成后，current-conversation match、`currentConversationRevertState` 写回、active-tab `lastConversationSyncFingerprint` 更新，以及 render outcome 判定全部委托给 `VisibleConversationPostSyncStateCoordinator`
-- coordinator 继续只把 render plan 回传给 view：是否还能继续 `applySyncedConversationUpdate()`，或者应回退到 `renderBackgroundTaskIndicatorIfNeeded()`；真正的 inline panel DOM 渲染则由 `BackgroundTaskInlinePanelRenderer` 执行
-- todo/status refresh 的 runtime gate 现在由 `QuestionTodoStatusRefreshCoordinator` 承接：只有存在 incomplete todos、pending background-task launch 或 waiting-for-follow-up 时才会主动刷新
+- `handleVisibleConversationSyncComplete()` 现在只把 active visible-conversation sync 委托给 `VisibleConversationPostSyncCoordinator.handleVisibleConversationSyncComplete()`
+- visible sync 的 question/todo refresh session 配对与 refresh 顺序继续由 `PostSyncQuestionTodoRefreshFacade`、`PostSyncQuestionTodoRefreshPlanBuilder` 与 `QuestionTodoStatusRefreshCoordinator` 组合承接
+- current-conversation match、`currentConversationRevertState` 写回、active-tab `lastConversationSyncFingerprint` 更新，以及 render outcome 判定继续由 `VisibleConversationPostSyncStateCoordinator` 承接
+- `BackgroundTaskPostSyncCoordinator` 只把 `VisibleConversationPostSyncOutcome` 回传给 view：是否还能继续 `applySyncedConversationUpdate()`，或者应回退到 `renderBackgroundTaskIndicatorIfNeeded()`
 
 ### signal sync 收尾
 
@@ -46,7 +45,8 @@ export class BackgroundTaskPostSyncCoordinator {
 ## 与 `OpenCodianView` 的边界
 
 - `OpenCodianView` 现在通过 `QuestionTodoBackgroundTaskRefreshHostAdapter` 把 authoritative mark host bridge 接到 `BackgroundConversationSignalSyncStateCoordinator`；attention writeback 则由 `BackgroundConversationAttentionCoordinator` 单独承接
-- `VisibleConversationPostSyncStateCoordinator` 负责 visible sync 的 current-conversation state-commit 判定，避免本 coordinator 同时拥有 refresh orchestration 和 current-conversation runtime bridge 规则
+- `VisibleConversationPostSyncCoordinator` 负责 visible sync 的 refresh + state-commit 调用顺序，避免本 coordinator 同时拥有 visible orchestration 与 hidden/background handoff policy
+- `VisibleConversationPostSyncStateCoordinator` 负责 visible sync 的 current-conversation state-commit 判定，避免 visible coordinator 再同时持有 current-conversation runtime bridge 规则
 - `BackgroundConversationPostSyncHandoffCoordinator` 负责 hidden/background source-specific post-sync routing，避免本 coordinator 同时拥有 visible sync orchestration 与 signal/background-tab handoff policy
 - `BackgroundConversationSignalSyncStateCoordinator` 负责 signal sync 的 authoritative-sync ready writeback 与 `sync-event:*` reason 规范化，避免 hidden signal state policy 回流到本 coordinator
 - `BackgroundConversationAttentionCoordinator` 负责 signal/background-tab sync 的 fingerprint 对比与 tab attention outcome，避免 background-specific state policy 回流到本 coordinator
@@ -54,10 +54,11 @@ export class BackgroundTaskPostSyncCoordinator {
 - `BackgroundTaskInlinePanelRenderer` 负责 inline panel DOM 渲染与 mounted panel 生命周期
 - `BackgroundTaskIndicatorCoordinator` 负责 inline render 场景和 post-sync 场景共用的 completion notice queue/flush 顺序
 - `PostSyncQuestionTodoRefreshFacade` 负责 visible-conversation 的 question/todo refresh 收尾
+- `VisibleConversationPostSyncCoordinator` 负责把 visible refresh 与 visible state-commit 组合成单一 seam
 - `BackgroundConversationPostSyncRefreshExecutor` 负责 signal/background-tab source 的 question/todo refresh、background-task rebuild 与 completion notice / stream-like follow-up 执行顺序
 - `BackgroundConversationPostSyncHandoffCoordinator` 负责把 signal/background-tab source-specific handoff 串到 signal state / background refresh / attention seams 上
 - `PostSyncQuestionTodoRefreshPlanBuilder` 负责 visible/background session-id 与 signal/background-tab todo/status force-refresh policy 选择
 - `QuestionTodoStatusRefreshCoordinator` 负责 post-sync 的 pending-question + todo/status refresh 顺序与 runtime gate，而 activation/open 侧 supplemental refresh 由 `QuestionTodoActivationRefreshBridge` 单独承接
 - `ConversationSyncBridge` 负责把 visible/signal/background sync 的 server-sync 结果统一路由到 post-sync coordinator 和 view render host
-- `BackgroundTaskPostSyncCoordinator` 负责 active visible-conversation background sync 之后的 visible refresh/state-commit，以及把 hidden/background path 交给 handoff seam
-- 这让本轮继续沿着 master plan 的 P2 `question / todo / background task` lane，把 visible refresh、background execution、background handoff、visible state-commit、background signal state 与 background attention 判定保持在六个稳定边界，而不是继续散落在 view 的多个 sync 入口中
+- `BackgroundTaskPostSyncCoordinator` 负责把 active visible-conversation background sync 交给 visible seam，并把 hidden/background path 交给 handoff seam
+- 这让本轮继续沿着 master plan 的 P2 `question / todo / background task` lane，把 visible refresh、visible commit、background execution、background handoff、background signal state 与 background attention 判定保持在六个稳定边界，而不是继续散落在 view 的多个 sync 入口中
