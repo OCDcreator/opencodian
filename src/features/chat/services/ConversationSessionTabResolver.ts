@@ -8,7 +8,11 @@ export interface ConversationSessionTabResolverHost {
   getActiveTabId(): TabId | null;
 }
 
-export class ConversationSessionTabResolver {
+export interface ConversationSessionTabResolutionPort {
+  resolveMatchedTabIds(sessionId: string): TabId[];
+}
+
+export class ConversationSessionTabResolver implements ConversationSessionTabResolutionPort {
   constructor(private readonly host: ConversationSessionTabResolverHost) {}
 
   resolveMatchedTabIds(sessionId: string): TabId[] {

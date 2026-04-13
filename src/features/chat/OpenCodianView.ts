@@ -207,16 +207,13 @@ import {
   type IncrementalRenderedMessageUpdate,
 } from './services/ConversationRenderService';
 import {
-  ConversationSessionLiveSignalAdapter,
-} from './services/ConversationSessionLiveSignalAdapter';
-import {
   ConversationSyncBridge,
 } from './services/ConversationSyncBridge';
 import {
-  ConversationSyncEventAdapter,
-} from './services/ConversationSyncEventAdapter';
+  createConversationSessionSignalRuntime,
+  ConversationSessionSignalRuntime,
+} from './services/ConversationSessionSignalRuntime';
 import {
-  createConversationSyncEventLiveSignalHosts,
   type ConversationSyncEventLiveSignalHostAdapterHost,
 } from './services/ConversationSyncEventLiveSignalHostAdapter';
 import {
@@ -745,8 +742,7 @@ export class OpenCodianView extends ItemView {
   private conversationSyncOrchestrationService: ConversationSyncOrchestrationService;
   private conversationSyncRuntimeCoordinator: ConversationSyncRuntimeCoordinator;
   private conversationSyncBridge: ConversationSyncBridge;
-  private conversationSyncEventAdapter: ConversationSyncEventAdapter;
-  private conversationSessionLiveSignalAdapter: ConversationSessionLiveSignalAdapter;
+  private conversationSessionSignalRuntime: ConversationSessionSignalRuntime;
   private conversationTabOpenCoordinator: ConversationTabOpenCoordinator;
   private conversationTabLifecycleRecoveryCoordinator: ConversationTabLifecycleRecoveryCoordinator;
   private conversationRestoreBootstrapCoordinator: ConversationRestoreBootstrapCoordinator;
@@ -1209,17 +1205,11 @@ export class OpenCodianView extends ItemView {
       visibleConversationPostSyncCoordinator,
       backgroundConversationPostSyncHandoffCoordinator,
     );
-    const conversationSyncEventLiveSignalHosts = createConversationSyncEventLiveSignalHosts(
-      this.createConversationSyncEventLiveSignalHost(),
-    );
     this.conversationSyncRuntimeCoordinator = conversationSyncServices.runtimeCoordinator;
     this.conversationSyncOrchestrationService = conversationSyncServices.orchestrationService;
     this.conversationSyncBridge = conversationSyncServices.bridge;
-    this.conversationSyncEventAdapter = new ConversationSyncEventAdapter(
-      conversationSyncEventLiveSignalHosts.conversationSyncEventAdapterHost,
-    );
-    this.conversationSessionLiveSignalAdapter = new ConversationSessionLiveSignalAdapter(
-      conversationSyncEventLiveSignalHosts.conversationSessionLiveSignalAdapterHost,
+    this.conversationSessionSignalRuntime = createConversationSessionSignalRuntime(
+      this.createConversationSyncEventLiveSignalHost(),
       this.backgroundTaskLiveSignalCoordinator,
     );
     this.backgroundTaskCompletionNoticeService = new BackgroundTaskCompletionNoticeService(
@@ -2116,8 +2106,7 @@ export class OpenCodianView extends ItemView {
 
     // Wire events
     this.wireEventHandlers();
-    this.conversationSessionLiveSignalAdapter.start();
-    this.conversationSyncEventAdapter.start();
+    this.conversationSessionSignalRuntime.start();
 
     await this.initializeFirstTab();
   }
@@ -2167,8 +2156,7 @@ export class OpenCodianView extends ItemView {
     this.inputTextarea = null;
     this.questionDockSlotCoordinator.destroy();
     this.sessionTodoDockCoordinator.destroy();
-    this.conversationSessionLiveSignalAdapter.stop();
-    this.conversationSyncEventAdapter.stop();
+    this.conversationSessionSignalRuntime.stop();
     this.tabManager = null;
 
     // Cleanup event refs

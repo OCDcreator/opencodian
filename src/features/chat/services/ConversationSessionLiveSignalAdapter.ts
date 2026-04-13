@@ -4,6 +4,7 @@ import type { TabId } from '../tabs';
 import type { BackgroundTaskLiveSignalCoordinator } from './BackgroundTaskLiveSignalCoordinator';
 import {
   ConversationSessionTabResolver,
+  type ConversationSessionTabResolutionPort,
   type ConversationSessionTabResolverHost,
 } from './ConversationSessionTabResolver';
 
@@ -34,13 +35,14 @@ export interface ConversationSessionLiveSignalAdapterHost extends ConversationSe
 export class ConversationSessionLiveSignalAdapter {
   private disposeTodoSubscription: (() => void) | null = null;
   private disposeStatusSubscription: (() => void) | null = null;
-  private readonly sessionTabResolver: ConversationSessionTabResolver;
+  private readonly sessionTabResolver: ConversationSessionTabResolutionPort;
 
   constructor(
     private readonly host: ConversationSessionLiveSignalAdapterHost,
     private readonly backgroundTaskLiveSignalCoordinator: ConversationSessionLiveSignalBackgroundTaskPort,
+    sessionTabResolver: ConversationSessionTabResolutionPort = new ConversationSessionTabResolver(host),
   ) {
-    this.sessionTabResolver = new ConversationSessionTabResolver(host);
+    this.sessionTabResolver = sessionTabResolver;
   }
 
   start(): void {

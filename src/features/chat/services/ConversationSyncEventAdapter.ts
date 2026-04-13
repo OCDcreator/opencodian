@@ -2,6 +2,7 @@ import type { SessionSyncEventUpdate } from '../../../core/opencode';
 import type { TabId } from '../tabs';
 import {
   ConversationSessionTabResolver,
+  type ConversationSessionTabResolutionPort,
   type ConversationSessionTabResolverHost,
 } from './ConversationSessionTabResolver';
 
@@ -12,10 +13,13 @@ export interface ConversationSyncEventAdapterHost extends ConversationSessionTab
 
 export class ConversationSyncEventAdapter {
   private disposeSubscription: (() => void) | null = null;
-  private readonly sessionTabResolver: ConversationSessionTabResolver;
+  private readonly sessionTabResolver: ConversationSessionTabResolutionPort;
 
-  constructor(private readonly host: ConversationSyncEventAdapterHost) {
-    this.sessionTabResolver = new ConversationSessionTabResolver(host);
+  constructor(
+    private readonly host: ConversationSyncEventAdapterHost,
+    sessionTabResolver: ConversationSessionTabResolutionPort = new ConversationSessionTabResolver(host),
+  ) {
+    this.sessionTabResolver = sessionTabResolver;
   }
 
   start(): void {

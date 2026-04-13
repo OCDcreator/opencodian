@@ -46,7 +46,8 @@ export class ConversationSyncEventAdapter {
 
 ## 与相邻模块的边界
 
-- `OpenCodianView` 现在通过 `ConversationSyncEventLiveSignalHostAdapter` 提供共享 host seam，不再直接维护单独的 sync-event host factory
+- `OpenCodianView` 现在只持有 `ConversationSessionSignalRuntime`，不再直接 start/stop 单独的 sync-event adapter
+- `ConversationSessionSignalRuntime` 负责装配共享 resolver、host seam 与 adapter 生命周期
 - `ConversationSessionTabResolver` 负责把共享 lookup seam 解释成当前 signal 应命中的 tab 集合
 - `ConversationSyncEventLiveSignalHostAdapter` 负责把共享 lookup seam 装配成 `ConversationSyncEventAdapterHost`
 - `ConversationSyncEventAdapter` 负责 “事件从 OpenCodeService 进来后该落到哪些 tab”

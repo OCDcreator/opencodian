@@ -48,7 +48,8 @@ export class ConversationSessionLiveSignalAdapter {
 
 ## 与 `OpenCodianView` 的边界
 
-- `OpenCodianView` 现在通过 `ConversationSyncEventLiveSignalHostAdapter` 提供共享 live-signal seam，不再单独维护 todo/status host factory
+- `OpenCodianView` 现在只持有 `ConversationSessionSignalRuntime`，不再直接 start/stop todo/status live-signal adapter
+- `ConversationSessionSignalRuntime` 负责装配共享 resolver、live-signal host seam 与 adapter 生命周期
 - `ConversationSessionTabResolver` 负责把共享 lookup seam 解释成 live signal 当前应命中的 tab 集合
 - `ConversationSyncEventLiveSignalHostAdapter` 负责把共享 lookup seam 装配成 `ConversationSessionLiveSignalAdapterHost`
 - `SessionTodoStateService` 继续负责 todo/status runtime state、stale suppression 与 persisted notice 协调

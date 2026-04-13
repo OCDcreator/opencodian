@@ -23,6 +23,10 @@ export interface ConversationSessionTabResolverHost {
   getActiveTabId(): TabId | null;
 }
 
+export interface ConversationSessionTabResolutionPort {
+  resolveMatchedTabIds(sessionId: string): TabId[];
+}
+
 export class ConversationSessionTabResolver {
   constructor(host: ConversationSessionTabResolverHost);
   resolveMatchedTabIds(sessionId: string): TabId[];
@@ -32,6 +36,7 @@ export class ConversationSessionTabResolver {
 ## 边界
 
 - `ConversationSyncEventLiveSignalHostAdapter` 继续提供共享 lookup seam
+- `ConversationSessionSignalRuntime` 负责创建并共享同一份 `ConversationSessionTabResolver`
 - `ConversationSessionTabResolver` 负责把 lookup seam 解释成 “这个 session 当前对应哪些 tab”
 - `ConversationSyncEventAdapter` 继续专注于 sync-event subscription 与调度
 - `ConversationSessionLiveSignalAdapter` 继续专注于 live-signal subscription、runtime writeback 与 background-task reconcile

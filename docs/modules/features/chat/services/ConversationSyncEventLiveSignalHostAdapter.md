@@ -10,9 +10,9 @@
 - 统一暴露 session→tab 匹配所需的只读 lookup 能力（tabs、conversations、current conversation、active tab）
 - 从同一份 view seam 派生 `ConversationSyncEventAdapterHost` 与 `ConversationSessionLiveSignalAdapterHost`
 - 让共享 lookup seam 直接可被 `ConversationSessionTabResolver` 复用，而不是把匹配规则散落到两个 adapter 内
-- 让 `OpenCodianView` 只保留一次 host assembly，而不是继续维护两段平行闭包
+- 让 `ConversationSessionSignalRuntime` 与 `OpenCodianView` 只保留一次 host assembly，而不是继续维护两段平行闭包
 
-它不负责 session signal 的订阅生命周期，也不负责具体的 todo/status 写回或 sync 调度；这些行为仍分别由 `ConversationSyncEventAdapter` 与 `ConversationSessionLiveSignalAdapter` 持有。
+它不负责 session signal 的订阅生命周期，也不负责具体的 todo/status 写回或 sync 调度；这些行为现在由 `ConversationSessionSignalRuntime` 统一装配给 `ConversationSyncEventAdapter` 与 `ConversationSessionLiveSignalAdapter` 持有。
 
 ## 公开接口
 
@@ -38,7 +38,8 @@ export function createConversationSyncEventLiveSignalHosts(...): {
 
 ## 边界
 
-- `OpenCodianView` 只提供一份 sync/live-signal seam，不再单独创建两个 host factory
+- `OpenCodianView` 只提供一份 sync/live-signal seam，并把它交给 `ConversationSessionSignalRuntime`
+- `ConversationSessionSignalRuntime` 负责把这份共享 seam 进一步装配成 resolver + adapter runtime
 - `ConversationSessionTabResolver` 通过这份共享 lookup seam 解析 session 当前命中的 tab 集合
 - `ConversationSyncEventAdapter` 继续专注于 session sync event 的 subscription + tab routing
 - `ConversationSessionLiveSignalAdapter` 继续专注于 todo/status live signal 的 subscription + runtime writeback
