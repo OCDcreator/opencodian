@@ -42,6 +42,6 @@ export interface ConversationLoadRuntimePort {
 
 ## 与 `OpenCodianView` / `ConversationViewStateService` 的边界
 
-- `OpenCodianView` 继续保留真实的 conversation 查询、server sync、interrupted-tail 判定与 revert-state 状态落点，但这些实现现在经由专门的 load-runtime host 暴露，而不再直接混在 `ConversationViewStateService` host surface 里
+- `OpenCodianView` 继续保留真实的 conversation 查询、server sync、interrupted-tail 判定与 revert-state 状态落点；`ConversationSyncLoadRuntimeViewHostFactory` 负责把这些输入组合成 load-runtime host 与 server-sync 判定 seam，不再让该 policy 直接混在 view host 闭包里
 - `ConversationViewStateService` 现在只负责 restore / activation / hydration 的 orchestration，不再自己决定是否 reload conversation、是否 server sync，或直接持有 `load-conversation` sync 的 revert-state 写回
 - 这条边界推进的是 master plan 的 P1 `OpenCodianView` 核心 ownership 迁移：把 loaded-conversation activation 的数据解析/sync 入口从 view-state service 继续收束到 dedicated runtime bridge

@@ -5,9 +5,9 @@
 
 ## 概述
 
-`ConversationSyncLoadRuntimeHostAdapter` 把 `OpenCodianView` 里原本分开的 conversation sync view-host 与 load-runtime host 装配收束到一个单独模块。view 现在只需要提供一份共享的 sync/load seam；真正分发给 `ConversationSyncHostAdapter` 与 `ConversationLoadRuntimeBridge` 的 host shape，则由本模块统一派生。
+`ConversationSyncLoadRuntimeHostAdapter` 把共享的 conversation sync/load seam，拆分成 `ConversationSyncHostAdapter` 与 `ConversationLoadRuntimeBridge` 各自需要的 host 形状。现在这份共享 seam 通常先由 `ConversationSyncLoadRuntimeViewHostFactory` 从 `OpenCodianView` 的更窄 port 装配出来，再交给本模块统一派生。
 
-它不负责 sync orchestration、server-sync 业务规则，或 loaded-conversation hydration 本身；这些仍分别留给 `ConversationSyncHostAdapter`、`ConversationLoadRuntimeBridge` 与现有 service/bridge。
+它不负责 sync orchestration，或 loaded-conversation hydration 本身；load-side server-sync 判定规则现在固定在 `ConversationSyncLoadRuntimeViewHostFactory`，其余职责仍分别留给 `ConversationSyncHostAdapter`、`ConversationLoadRuntimeBridge` 与现有 service/bridge。
 
 ## 公开接口
 
@@ -46,6 +46,6 @@ export function createConversationSyncLoadRuntimeHosts(
 
 ## 与 `OpenCodianView` 的边界
 
-- `OpenCodianView` 继续保留真实的 conversation 查询、sync 执行、fingerprint 计算、interrupted-tail 判定与 background-task indicator 写回
-- 本模块只负责把这些 view-level seam 映射成 sync/load 两侧需要的 host 形状
+- `OpenCodianView` 只保留更窄的 conversation store、tab/runtime、sync bridge 与 interrupted-tail 判定输入
+- `ConversationSyncLoadRuntimeViewHostFactory` 先把这些较窄 port 收束成共享 sync/load seam；本模块再把共享 seam 映射成 sync/load 两侧需要的 host 形状
 - 这条边界推进的是 master plan 的 P1 `activation / sync / runtime bridge ownership`：让 sync/load host assembly 不再分散滞留在主 view 内
