@@ -4,16 +4,17 @@ import type {
 } from '../../../core/types';
 import type { TabId } from '../tabs';
 import type {
-  BackgroundTabPostSyncOptions,
-  SignalBackgroundTaskPostSyncOptions,
-  VisibleConversationPostSyncOptions,
-  VisibleConversationPostSyncOutcome,
-  VisibleConversationPostSyncResult,
-} from './BackgroundTaskPostSyncCoordinator';
-import type {
   SignalConversationSyncContext,
 } from './ConversationSyncOrchestrationService';
 import type { ConversationSyncBackgroundPostSyncRouter } from './ConversationSyncBackgroundPostSyncRouter';
+import type {
+  ConversationSyncBackgroundPostSyncCoordinator,
+} from './ConversationSyncBackgroundPostSyncRouter';
+import type {
+  ConversationSyncVisiblePostSyncCoordinator,
+  ConversationSyncVisiblePostSyncResult,
+  ConversationSyncVisiblePostSyncRouter,
+} from './ConversationSyncVisiblePostSyncRouter';
 import type {
   TabConversationSyncContext,
   VisibleConversationSyncContext,
@@ -23,9 +24,7 @@ export interface ConversationSyncBridgeRuntime {
   lastConversationSyncFingerprint: string | null;
 }
 
-export interface ConversationSyncBridgeSyncResult extends VisibleConversationPostSyncResult {
-  messages: ChatMessage[];
-}
+export interface ConversationSyncBridgeSyncResult extends ConversationSyncVisiblePostSyncResult {}
 
 export interface ConversationSyncBridgeHost {
   getCurrentConversation(): Conversation | null;
@@ -70,20 +69,19 @@ export interface ConversationSyncBridgeOrchestration {
   ): Promise<void>;
 }
 
-export interface ConversationSyncBridgePostSyncCoordinator {
-  handleVisibleConversationSyncComplete(
-    options: VisibleConversationPostSyncOptions,
-  ): Promise<VisibleConversationPostSyncOutcome>;
-  handleSignalSyncComplete(options: SignalBackgroundTaskPostSyncOptions): Promise<void>;
-  handleBackgroundTabSyncComplete(options: BackgroundTabPostSyncOptions): Promise<void>;
-}
+export interface ConversationSyncBridgePostSyncCoordinator
+  extends ConversationSyncVisiblePostSyncCoordinator,
+    ConversationSyncBackgroundPostSyncCoordinator {}
 
 export class ConversationSyncBridge {
   constructor(
     private readonly host: ConversationSyncBridgeHost,
     private readonly runtimeCoordinator: ConversationSyncBridgeRuntimeCoordinator,
     private readonly orchestrationService: ConversationSyncBridgeOrchestration,
-    private readonly postSyncCoordinator: ConversationSyncBridgePostSyncCoordinator,
+    private readonly visiblePostSyncRouter: Pick<
+      ConversationSyncVisiblePostSyncRouter,
+      'routeVisibleSyncComplete'
+    >,
     private readonly backgroundPostSyncRouter: Pick<
       ConversationSyncBackgroundPostSyncRouter,
       'routeBackgroundTabSyncComplete' | 'routeSignalSyncComplete'
@@ -119,30 +117,21 @@ export class ConversationSyncBridge {
   async syncVisibleConversationInBackground(): Promise<void> {
     await this.runtimeCoordinator.runVisibleConversationSync(
       this.host.getCurrentConversation(),
-      async ({ tabId, conversation }) => {
-        const expectedConversationId = conversation.id;
-        const expectedSessionId = conversation.openCodeSessionId;
+      async (syncContext) => {
+        const { conversation } = syncContext;
         const previousMessages = [...conversation.messages];
         const syncResult = await this.host.syncConversationMessagesFromServer(
           conversation,
-          tabId,
+          syncContext.tabId,
           'visible-background-sync',
           { suppressVerboseLogs: true },
         );
-        const postSyncOutcome = await this.postSyncCoordinator.handleVisibleConversationSyncComplete({
-          tabId,
-          expectedConversationId,
-          questionSessionId: expectedSessionId,
+
+        await this.visiblePostSyncRouter.routeVisibleSyncComplete({
+          syncContext,
+          previousMessages,
           syncResult,
         });
-        if (postSyncOutcome.shouldApplySyncedConversationUpdate) {
-          await this.host.applySyncedConversationUpdate(previousMessages, conversation.messages);
-          return;
-        }
-
-        if (postSyncOutcome.shouldRenderBackgroundTaskIndicator) {
-          await this.host.renderBackgroundTaskIndicatorIfNeeded(tabId);
-        }
       },
     );
   }

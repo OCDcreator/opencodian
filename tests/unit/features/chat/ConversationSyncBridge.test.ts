@@ -3,17 +3,17 @@ import type {
   Conversation,
 } from '../../../../src/core/types';
 import {
-  ConversationSyncBackgroundPostSyncRouter,
   ConversationSyncBridge,
   type ConversationSyncBridgeHost,
   type ConversationSyncBridgeOrchestration,
-  type ConversationSyncBridgePostSyncCoordinator,
   type ConversationSyncBridgeRuntime,
   type ConversationSyncBridgeRuntimeCoordinator,
   type ConversationSyncBridgeSyncResult,
 } from '../../../../src/features/chat/services/ConversationSyncBridge';
+import type { ConversationSyncBackgroundPostSyncRouter } from '../../../../src/features/chat/services/ConversationSyncBackgroundPostSyncRouter';
 import type { SignalConversationSyncContext } from '../../../../src/features/chat/services/ConversationSyncOrchestrationService';
 import type { TabConversationSyncContext } from '../../../../src/features/chat/services/ConversationSyncRuntimeCoordinator';
+import type { ConversationSyncVisiblePostSyncRouter } from '../../../../src/features/chat/services/ConversationSyncVisiblePostSyncRouter';
 
 type Mocked<T> = {
   [Key in keyof T]:
@@ -102,14 +102,11 @@ function createOrchestration(): Mocked<ConversationSyncBridgeOrchestration> {
   };
 }
 
-function createPostSyncCoordinator(): Mocked<ConversationSyncBridgePostSyncCoordinator> {
+function createVisiblePostSyncRouter(): Mocked<
+  Pick<ConversationSyncVisiblePostSyncRouter, 'routeVisibleSyncComplete'>
+> {
   return {
-    handleVisibleConversationSyncComplete: jest.fn().mockResolvedValue({
-      shouldApplySyncedConversationUpdate: true,
-      shouldRenderBackgroundTaskIndicator: false,
-    }),
-    handleSignalSyncComplete: jest.fn().mockResolvedValue(undefined),
-    handleBackgroundTabSyncComplete: jest.fn().mockResolvedValue(undefined),
+    routeVisibleSyncComplete: jest.fn().mockResolvedValue(undefined),
   };
 }
 
@@ -130,7 +127,7 @@ describe('ConversationSyncBridge', () => {
     jest.clearAllMocks();
   });
 
-  it('applies visible synced updates through the view host only when post-sync requests it', async () => {
+  it('routes visible sync callbacks through the visible post-sync router', async () => {
     const conversation = createConversation('visible', {
       messages: [
         {
@@ -151,13 +148,13 @@ describe('ConversationSyncBridge', () => {
     });
     const runtimeCoordinator = createRuntimeCoordinator();
     const orchestration = createOrchestration();
-    const postSyncCoordinator = createPostSyncCoordinator();
+    const visiblePostSyncRouter = createVisiblePostSyncRouter();
     const backgroundPostSyncRouter = createBackgroundPostSyncRouter();
     const bridge = new ConversationSyncBridge(
       host,
       runtimeCoordinator,
       orchestration,
-      postSyncCoordinator,
+      visiblePostSyncRouter,
       backgroundPostSyncRouter,
     );
 
@@ -173,52 +170,20 @@ describe('ConversationSyncBridge', () => {
       'visible-background-sync',
       { suppressVerboseLogs: true },
     );
-    expect(postSyncCoordinator.handleVisibleConversationSyncComplete).toHaveBeenCalledWith({
-      tabId: 'tab-active',
-      expectedConversationId: 'visible',
-      questionSessionId: 'session-visible',
+    expect(visiblePostSyncRouter.routeVisibleSyncComplete).toHaveBeenCalledWith({
+      syncContext: {
+        tabId: 'tab-active',
+        conversation,
+      },
+      previousMessages: conversation.messages,
       syncResult: expect.objectContaining({
         changed: true,
         fingerprint: 'visible-new',
         revertState: { messageID: 'assistant-next' },
       }),
     });
-    expect(host.applySyncedConversationUpdate).toHaveBeenCalledWith(
-      conversation.messages,
-      conversation.messages,
-    );
-    expect(host.renderBackgroundTaskIndicatorIfNeeded).not.toHaveBeenCalled();
-  });
-
-  it('falls back to indicator rendering when visible post-sync skips DOM patching', async () => {
-    const conversation = createConversation('visible');
-    const host = createHost({
-      currentConversation: conversation,
-      syncResult: createSyncResult(conversation, {
-        changed: false,
-        fingerprint: 'visible-same',
-      }),
-    });
-    const runtimeCoordinator = createRuntimeCoordinator();
-    const orchestration = createOrchestration();
-    const postSyncCoordinator = createPostSyncCoordinator();
-    const backgroundPostSyncRouter = createBackgroundPostSyncRouter();
-    postSyncCoordinator.handleVisibleConversationSyncComplete.mockResolvedValue({
-      shouldApplySyncedConversationUpdate: false,
-      shouldRenderBackgroundTaskIndicator: true,
-    });
-    const bridge = new ConversationSyncBridge(
-      host,
-      runtimeCoordinator,
-      orchestration,
-      postSyncCoordinator,
-      backgroundPostSyncRouter,
-    );
-
-    await bridge.syncVisibleConversationInBackground();
-
     expect(host.applySyncedConversationUpdate).not.toHaveBeenCalled();
-    expect(host.renderBackgroundTaskIndicatorIfNeeded).toHaveBeenCalledWith('tab-active');
+    expect(host.renderBackgroundTaskIndicatorIfNeeded).not.toHaveBeenCalled();
   });
 
   it('routes signal sync callbacks through the background post-sync router', async () => {
@@ -232,13 +197,13 @@ describe('ConversationSyncBridge', () => {
     });
     const runtimeCoordinator = createRuntimeCoordinator();
     const orchestration = createOrchestration();
-    const postSyncCoordinator = createPostSyncCoordinator();
+    const visiblePostSyncRouter = createVisiblePostSyncRouter();
     const backgroundPostSyncRouter = createBackgroundPostSyncRouter();
     const bridge = new ConversationSyncBridge(
       host,
       runtimeCoordinator,
       orchestration,
-      postSyncCoordinator,
+      visiblePostSyncRouter,
       backgroundPostSyncRouter,
     );
     let capturedCallbacks:
@@ -283,7 +248,6 @@ describe('ConversationSyncBridge', () => {
         fingerprint: 'hidden-new',
       }),
     });
-    expect(postSyncCoordinator.handleSignalSyncComplete).not.toHaveBeenCalled();
   });
 
   it('routes background-tab polling callbacks through the background post-sync router', async () => {
@@ -297,13 +261,13 @@ describe('ConversationSyncBridge', () => {
     });
     const runtimeCoordinator = createRuntimeCoordinator();
     const orchestration = createOrchestration();
-    const postSyncCoordinator = createPostSyncCoordinator();
+    const visiblePostSyncRouter = createVisiblePostSyncRouter();
     const backgroundPostSyncRouter = createBackgroundPostSyncRouter();
     const bridge = new ConversationSyncBridge(
       host,
       runtimeCoordinator,
       orchestration,
-      postSyncCoordinator,
+      visiblePostSyncRouter,
       backgroundPostSyncRouter,
     );
     let backgroundCallback: ((context: TabConversationSyncContext) => Promise<void>) | null = null;
@@ -336,6 +300,5 @@ describe('ConversationSyncBridge', () => {
         fingerprint: 'background-new',
       }),
     });
-    expect(postSyncCoordinator.handleBackgroundTabSyncComplete).not.toHaveBeenCalled();
   });
 });

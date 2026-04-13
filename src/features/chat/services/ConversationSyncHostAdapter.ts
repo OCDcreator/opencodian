@@ -21,6 +21,9 @@ import {
   type ConversationSyncRuntimeCoordinatorHost,
   ConversationSyncRuntimeCoordinator,
 } from './ConversationSyncRuntimeCoordinator';
+import {
+  ConversationSyncVisiblePostSyncRouter,
+} from './ConversationSyncVisiblePostSyncRouter';
 
 export interface ConversationSyncViewHost {
   getCurrentConversation(): Conversation | null;
@@ -102,6 +105,10 @@ export function createConversationSyncServices(
     hosts.orchestrationHost,
     runtimeCoordinator,
   );
+  const visiblePostSyncRouter = new ConversationSyncVisiblePostSyncRouter(
+    hosts.bridgeHost,
+    postSyncCoordinator,
+  );
   const backgroundPostSyncRouter = new ConversationSyncBackgroundPostSyncRouter(
     hosts.bridgeHost,
     postSyncCoordinator,
@@ -110,7 +117,7 @@ export function createConversationSyncServices(
     hosts.bridgeHost,
     runtimeCoordinator,
     orchestrationService,
-    postSyncCoordinator,
+    visiblePostSyncRouter,
     backgroundPostSyncRouter,
   );
   return {
