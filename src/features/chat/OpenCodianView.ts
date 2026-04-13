@@ -270,6 +270,10 @@ import {
   type QuestionTodoBackgroundTaskRuntimeHostProviderHost,
 } from './services/QuestionTodoBackgroundTaskRuntimeHostProvider';
 import {
+  createTabActivationRuntimeViewHostFactoryHost,
+  type TabActivationRuntimeHostProviderHost,
+} from './services/TabActivationRuntimeHostProvider';
+import {
   isElementNearBottom,
   scrollElementToBottom,
 } from './services/ScrollManager';
@@ -280,7 +284,6 @@ import {
 } from './services/SessionTodoHostAdapter';
 import {
   createTabActivationRuntimeViewHosts,
-  type TabActivationRuntimeViewHostFactoryHost,
 } from './services/TabActivationRuntimeViewHostFactory';
 import { TitleGenerationService } from './services/TitleGenerationService';
 import { TabBar, type TabBarLayoutMode, type TabId, TabManager } from './tabs';
@@ -1126,7 +1129,9 @@ export class OpenCodianView extends ItemView {
       this.conversationHydrationRenderBridge,
     );
     const tabActivationRuntimeBridgeHosts = createTabActivationRuntimeViewHosts(
-      this.createTabActivationRuntimeViewHostFactoryHost(),
+      createTabActivationRuntimeViewHostFactoryHost(
+        this.createTabActivationRuntimeHostProviderHost(),
+      ),
     );
     this.tabConversationStateBridge = new TabConversationStateBridge(
       tabActivationRuntimeBridgeHosts.tabConversationStateBridgeHost,
@@ -1397,83 +1402,71 @@ export class OpenCodianView extends ItemView {
     };
   }
 
-  private createTabActivationRuntimeViewHostFactoryHost(): TabActivationRuntimeViewHostFactoryHost {
+  private createTabActivationRuntimeHostProviderHost(): TabActivationRuntimeHostProviderHost {
     return {
-      getTabRuntime: () => ({
-        getTabManager: () => this.tabManager,
-        getActiveTabId: () => this.getActiveTabId(),
-        getSessionIdForTab: (tabId) => this.getSessionIdForTab(tabId),
-        getTabRuntimeState: (tabId) => this.getTabRuntimeState(tabId),
-        getTabMessagesContainer: (tabId) => this.getTabPaneState(tabId)?.messagesEl ?? null,
-      }),
-      getConversationState: () => ({
-        setCurrentConversation: (conversation) => {
-          this.currentConversation = conversation;
-        },
-        setCurrentConversationRevertState: (revertState) => {
-          this.currentConversationRevertState = revertState;
-        },
-        setOpenCodeSessionId: (sessionId) => {
-          this.plugin.openCodeService.setSessionId(sessionId);
-        },
-      }),
-      getQuestionTodoRuntime: () => ({
-        clearPendingQuestionsForTab: (tabId) => {
-          this.questionDockCoordinator.clearPendingQuestionsForTab(tabId);
-        },
-        resetTabSessionState: (tabId, sessionId) => {
-          this.sessionTodoRuntimeFacade.resetTabSessionState(tabId, sessionId);
-        },
-        clearTabSessionState: (tabId) => {
-          this.sessionTodoRuntimeFacade.clearTabSessionState(tabId);
-        },
-      }),
-      getBackgroundTaskRuntime: () => ({
-        resetBackgroundTaskSuppressedFingerprint: (tabId) => {
-          const runtime = this.getTabRuntimeState(tabId);
-          if (runtime) {
-            runtime.backgroundTaskSuppressedFingerprint = null;
-          }
-        },
-        hasBackgroundTaskIndicator: (tabId) =>
-          Boolean(this.backgroundTaskLiveSignalCoordinator.hasIndicator(tabId)),
-      }),
-      getConversationSyncRuntime: () => ({
-        getConversationSyncFingerprint: (messages) =>
-          this.getConversationSyncFingerprint(messages),
-        setLastConversationSyncFingerprint: (fingerprint) => {
-          this.lastConversationSyncFingerprint = fingerprint;
-        },
-        startConversationSyncLoop: () => {
-          this.startConversationSyncLoop();
-        },
-        stopConversationSyncLoop: () => {
-          this.stopConversationSyncLoop();
-        },
-      }),
-      getViewWriteback: () => ({
-        updateSendButtonState: () => {
-          this.updateSendButtonState();
-        },
-        setActiveMessagesPane: (tabId) => {
-          this.setActiveMessagesPane(tabId);
-        },
-        scheduleComposerLayoutSync: () => {
-          this.scheduleComposerLayoutSync();
-        },
-        updateModelSelectorDisplay: () => {
-          this.updateModelSelectorDisplay();
-        },
-        clearMessagesContainer: () => {
-          this.messagesContainer?.empty();
-        },
-        resetTurnState: () => {
-          this.resetTurnState();
-        },
-        scheduleSettledScrollToBottom: (tabId) => {
-          this.scheduleSettledScrollToBottom(tabId);
-        },
-      }),
+      getTabManager: () => this.tabManager,
+      getActiveTabId: () => this.getActiveTabId(),
+      getSessionIdForTab: (tabId) => this.getSessionIdForTab(tabId),
+      getTabRuntimeState: (tabId) => this.getTabRuntimeState(tabId),
+      getTabMessagesContainer: (tabId) => this.getTabPaneState(tabId)?.messagesEl ?? null,
+      setCurrentConversation: (conversation) => {
+        this.currentConversation = conversation;
+      },
+      setCurrentConversationRevertState: (revertState) => {
+        this.currentConversationRevertState = revertState;
+      },
+      setOpenCodeSessionId: (sessionId) => {
+        this.plugin.openCodeService.setSessionId(sessionId);
+      },
+      clearPendingQuestionsForTab: (tabId) => {
+        this.questionDockCoordinator.clearPendingQuestionsForTab(tabId);
+      },
+      resetTabSessionState: (tabId, sessionId) => {
+        this.sessionTodoRuntimeFacade.resetTabSessionState(tabId, sessionId);
+      },
+      clearTabSessionState: (tabId) => {
+        this.sessionTodoRuntimeFacade.clearTabSessionState(tabId);
+      },
+      resetBackgroundTaskSuppressedFingerprint: (tabId) => {
+        const runtime = this.getTabRuntimeState(tabId);
+        if (runtime) {
+          runtime.backgroundTaskSuppressedFingerprint = null;
+        }
+      },
+      hasBackgroundTaskIndicator: (tabId) =>
+        Boolean(this.backgroundTaskLiveSignalCoordinator.hasIndicator(tabId)),
+      getConversationSyncFingerprint: (messages) =>
+        this.getConversationSyncFingerprint(messages),
+      setLastConversationSyncFingerprint: (fingerprint) => {
+        this.lastConversationSyncFingerprint = fingerprint;
+      },
+      startConversationSyncLoop: () => {
+        this.startConversationSyncLoop();
+      },
+      stopConversationSyncLoop: () => {
+        this.stopConversationSyncLoop();
+      },
+      updateSendButtonState: () => {
+        this.updateSendButtonState();
+      },
+      setActiveMessagesPane: (tabId) => {
+        this.setActiveMessagesPane(tabId);
+      },
+      scheduleComposerLayoutSync: () => {
+        this.scheduleComposerLayoutSync();
+      },
+      updateModelSelectorDisplay: () => {
+        this.updateModelSelectorDisplay();
+      },
+      clearMessagesContainer: () => {
+        this.messagesContainer?.empty();
+      },
+      resetTurnState: () => {
+        this.resetTurnState();
+      },
+      scheduleSettledScrollToBottom: (tabId) => {
+        this.scheduleSettledScrollToBottom(tabId);
+      },
     };
   }
 
