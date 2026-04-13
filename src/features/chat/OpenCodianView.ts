@@ -211,8 +211,11 @@ import {
   type ConversationSessionSignalRuntimeViewHostFactoryHost,
 } from './services/ConversationSessionSignalRuntimeViewHostFactory';
 import {
+  createConversationSyncLoadRuntimeViewHostFactoryHost,
+  type ConversationSyncLoadRuntimeHostProviderHost,
+} from './services/ConversationSyncLoadRuntimeHostProvider';
+import {
   createConversationSyncLoadRuntimeViewHosts,
-  type ConversationSyncLoadRuntimeViewHostFactoryHost,
 } from './services/ConversationSyncLoadRuntimeViewHostFactory';
 import {
   createConversationSyncServices,
@@ -1160,7 +1163,9 @@ export class OpenCodianView extends ItemView {
       tabActivationRuntimeBridgeHosts.tabRuntimeStateBridgeHost,
     );
     const conversationSyncLoadRuntimeHosts = createConversationSyncLoadRuntimeViewHosts(
-      this.createConversationSyncLoadRuntimeViewHostFactoryHost(),
+      createConversationSyncLoadRuntimeViewHostFactoryHost(
+        this.createConversationSyncLoadRuntimeHostProviderHost(),
+      ),
     );
     const conversationSyncServices = createConversationSyncServices(
       conversationSyncLoadRuntimeHosts.conversationSyncViewHost,
@@ -1558,32 +1563,26 @@ export class OpenCodianView extends ItemView {
     };
   }
 
-  private createConversationSyncLoadRuntimeViewHostFactoryHost():
-  ConversationSyncLoadRuntimeViewHostFactoryHost {
+  private createConversationSyncLoadRuntimeHostProviderHost():
+  ConversationSyncLoadRuntimeHostProviderHost {
     return {
-      getConversationStore: () => ({
-        loadConversations: () => this.plugin.loadConversations(),
-        getConversationById: async (id) => (await this.plugin.getConversationById(id)) ?? null,
-      }),
-      getTabRuntime: () => ({
-        getCurrentConversation: () => this.currentConversation,
-        getActiveTabId: () => this.getActiveTabId(),
-        getAllTabs: () => this.tabManager?.getAllTabs() ?? [],
-        getTab: (tabId) => this.tabManager?.getTab(tabId) ?? null,
-        getTabRuntimeState: (tabId: TabId | null) => this.getTabRuntimeState(tabId),
-      }),
-      getConversationSyncBridge: () => ({
-        getConversationSyncFingerprint: (messages) => this.getConversationSyncFingerprint(messages),
-        syncConversationMessagesFromServer: (conversation, tabId, reason, options) =>
-          this.syncConversationMessagesFromServer(conversation, tabId, reason, options),
-        setCurrentConversationRevertState: (revertState) => {
-          this.currentConversationRevertState = revertState;
-        },
-        applySyncedConversationUpdate: (previousMessages, nextMessages) =>
-          this.applySyncedConversationUpdate(previousMessages, nextMessages),
-        renderBackgroundTaskIndicatorIfNeeded: (tabId) =>
-          this.renderBackgroundTaskIndicatorIfNeeded(tabId),
-      }),
+      loadConversations: () => this.plugin.loadConversations(),
+      getConversationById: async (id) => (await this.plugin.getConversationById(id)) ?? null,
+      getCurrentConversation: () => this.currentConversation,
+      getActiveTabId: () => this.getActiveTabId(),
+      getAllTabs: () => this.tabManager?.getAllTabs() ?? [],
+      getTab: (tabId) => this.tabManager?.getTab(tabId) ?? null,
+      getTabRuntimeState: (tabId: TabId | null) => this.getTabRuntimeState(tabId),
+      getConversationSyncFingerprint: (messages) => this.getConversationSyncFingerprint(messages),
+      syncConversationMessagesFromServer: (conversation, tabId, reason, options) =>
+        this.syncConversationMessagesFromServer(conversation, tabId, reason, options),
+      setCurrentConversationRevertState: (revertState) => {
+        this.currentConversationRevertState = revertState;
+      },
+      applySyncedConversationUpdate: (previousMessages, nextMessages) =>
+        this.applySyncedConversationUpdate(previousMessages, nextMessages),
+      renderBackgroundTaskIndicatorIfNeeded: (tabId) =>
+        this.renderBackgroundTaskIndicatorIfNeeded(tabId),
       hasInterruptedLocalAssistantTail: (messages) => this.hasInterruptedLocalAssistantTail(messages),
     };
   }
