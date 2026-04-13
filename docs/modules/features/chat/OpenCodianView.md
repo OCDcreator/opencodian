@@ -29,7 +29,7 @@
 | `applyChatAppearanceSettings()` | 应用主题 preset、聊天外观变量、自定义 CSS、输入面板 glass 状态 |
 | `refreshCurrentConversationRendering()` | 重新渲染当前对话 |
 | `applyChatScrollMode()` | 把当前滚动模式应用到消息容器 |
-| `applyLocaleTexts()` | 委托 header presenter 刷新 header/status 文案，并刷新 placeholder、dock 和 tab 文案 |
+| `applyLocaleTexts()` | 委托 header presenter 与 composer input coordinator 刷新 header/status、placeholder、send/add-context tooltip、dock 和 tab 文案 |
 | `refreshQuestionUi()` | 重绘 question dock，并在需要时重绘当前对话 |
 | `toggleLiquidDiamondDemo()` | 切换 CPU 版 floating diamond demo |
 | `toggleLiquidDiamondWebGlDemo()` | 切换 WebGL2 版 floating diamond demo |
@@ -89,6 +89,7 @@ background task completion notice 的 queued-state 则已经完全移出 `TabRun
 - `currentConversation` / `currentConversationRevertState`
 - 模型目录缓存：`availableModels`、`availableProviders`
 - `services/ChatHeaderPresenter.ts` 的 host seam：server availability、settings/history/new-tab callbacks、status refresh 和 header tab-slot 写回
+- `services/ComposerInputShellCoordinator.ts` 的 host seam：input shell DOM 装配、submit gate、textarea 高度同步、composer stack height 与 toolbar slot mount
 - model selector sticky header cleanup
 - 由 `ComposerContextViewFacade.create()` 基于独立的 `createComposerContextViewHost()` / `createFocusContextViewHost()` seam 装配出的 `ComposerContextEventBridge`、`ComposerContextCoordinator`、`FocusContextRuntimeService`、`PersistentAssistantNoticeService` 等视图级运行时协作对象
 - theme background / liquid glass / diamond demo / glass octahedron 相关 DOM 引用
@@ -110,7 +111,7 @@ background task completion notice 的 queued-state 则已经完全移出 `TabRun
 `onClose()` 则会反向清理：
 
 - tab 持久化
-- header presenter / conversation sync / selection polling / layout / scroll 定时器
+- header presenter、composer input coordinator / conversation sync / selection polling / layout / scroll 定时器
 - title generation
 - effort selector、context ring、question dock、todo dock、navigation sidebar
 - liquid glass adapter、SVG filter layer、diamond demo
@@ -136,6 +137,17 @@ header DOM、server status badge、title logo/wordmark、new/current-tab、histo
 - header tab bar slot 写回给 tab bar layout
 
 server status loop、badge class、status label、本地/远端文案判定和 locale refresh 都在 presenter 内部完成；view 不再直接持有 header button refs 或 status interval 状态。
+
+### Composer input shell 抽离
+
+输入区的 tab slot、composer shell、textarea、自适应高度、send/stop affordance 与 composer stack height 现在由 `services/ComposerInputShellCoordinator.ts` 承接。`OpenCodianView` 只保留 coordinator host seam：
+
+- question/todo dock attach、context row writeback，以及 add-context / send message / foreground-busy notice 的回调
+- permission selector、model selector、context usage ring 与 effort selector 的既有 mount 入口
+- chat container 上 `--opencodian-composer-stack-height` 的写回，以及 settled scroll 调度
+- 供后续 glass/theme 逻辑读取的 composer shell / input wrapper DOM refs
+
+这样 view 不再直接维护 textarea Enter-submit、高度同步、`ResizeObserver` / RAF layout 节流或 send/stop button tooltip 状态；但 R15 刻意没有改动 model / permission selector 状态机，也没有碰 liquid-glass diagnostics，这些仍留给后续 lane。
 
 ### 对话装载与后台同步
 

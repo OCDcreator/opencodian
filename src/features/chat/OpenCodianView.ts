@@ -306,6 +306,10 @@ import {
   type ChatHeaderPresenterHost,
   type ChatServerAvailability,
 } from './services/ChatHeaderPresenter';
+import {
+  ComposerInputShellCoordinator,
+  type ComposerInputShellCoordinatorHost,
+} from './services/ComposerInputShellCoordinator';
 import { TitleGenerationService } from './services/TitleGenerationService';
 import { TabBar, type TabBarLayoutMode, type TabId, TabManager } from './tabs';
 import { ContextDetailModal, type ContextRawMessageItem } from './ui/ContextDetailModal';
@@ -360,7 +364,6 @@ const ASSISTANT_DEBUG_STAGE_ALLOWLIST = new Set([
 
 const OPENCODIAN_APP_ICON = 'opencodian-app-icon';
 
-const COMPOSER_TEXTAREA_MAX_HEIGHT = 240;
 const INPUT_PANEL_THEME_CLASS_BY_ID: Record<
   Exclude<
     InputPanelThemeId,
@@ -640,8 +643,6 @@ export class OpenCodianView extends ItemView {
   private themeBackgroundImageEl: HTMLDivElement | null = null;
   private messagesContainer: HTMLElement | null = null;
   private inputContainer: HTMLElement | null = null;
-  private inputWrapperEl: HTMLElement | null = null;
-  private composerShellEl: HTMLElement | null = null;
   private composerSvgFilterLayerEl: HTMLElement | null = null;
   private activeLiquidGlassAdapter: GlassEffectAdapter | null = null;
   private glassOctahedronDemoController: GlassOctahedronDemoController | null = null;
@@ -659,12 +660,12 @@ export class OpenCodianView extends ItemView {
   private belowHeaderTabBarSlotEl: HTMLElement | null = null;
   private outerVerticalTabBarHostEl: HTMLElement | null = null;
   private outerVerticalTabBarSlotEl: HTMLElement | null = null;
-  private inputTabBarSlotEl: HTMLElement | null = null;
   private tabBarMountEl: HTMLElement | null = null;
   private tabBar: TabBar | null = null;
   private tabManager: TabManager | null = null;
   private tabMessagesPaneCoordinator: TabMessagesPaneCoordinator<TabRuntimeState>;
   private chatHeaderPresenter: ChatHeaderPresenter;
+  private composerInputShellCoordinator: ComposerInputShellCoordinator;
 
   // Model selector state
   private modelSelectorContainer: HTMLElement | null = null;
@@ -694,14 +695,8 @@ export class OpenCodianView extends ItemView {
   private contextRing: ContextRing | null = null;
   private contextRingContainerEl: HTMLElement | null = null;
 
-  // Send/Stop button reference
-  private sendBtn: HTMLElement | null = null;
-  private addContextBtn: HTMLElement | null = null;
-  private inputTextarea: HTMLTextAreaElement | null = null;
   private chatSurfaceSyncFrameId: number | null = null;
   private chatSurfaceSyncTimeoutId: number | null = null;
-  private composerLayoutSyncFrameId: number | null = null;
-  private inputContainerResizeObserver: ResizeObserver | null = null;
   private scrollToBottomFrameId: number | null = null;
   private chatAppearanceStyleEl: HTMLStyleElement | null = null;
   private themeBackgroundRequestId = 0;
@@ -790,6 +785,77 @@ export class OpenCodianView extends ItemView {
       },
       openSettings: () => {
         this.openPluginSettingsPreservingScroll();
+      },
+    };
+  }
+
+  private createComposerInputShellCoordinatorHost(): ComposerInputShellCoordinatorHost {
+    return {
+      attachSessionTodo: (container) => {
+        this.sessionTodoCoordinator.attach(container);
+      },
+      attachQuestionDock: (container) => {
+        this.questionDockSlotCoordinator.attach(container);
+      },
+      setContextRowElement: (element) => {
+        this.composerContextViewFacade.setContextRowElement(element);
+      },
+      setTooltipLabel: (element, label, position) => {
+        this.setTooltipLabel(element, label, position);
+      },
+      getInputPlaceholder: () => this.getInputPlaceholder(),
+      addChosenFileContextToActiveTab: () =>
+        this.composerContextViewFacade.addChosenFileContextToActiveTab(),
+      initializePermissionSelector: (container) => {
+        this.initializePermissionSelector(container);
+      },
+      initializeModelSelector: (container) => {
+        this.modelSelectorContainer = container;
+        this.initializeModelSelector(container);
+      },
+      mountContextUsageIndicator: (container) => {
+        this.contextRingContainerEl = container;
+        this.contextRing = new ContextRing(container, () => {
+          this.openContextUsageDetails();
+        });
+        this.refreshContextUsageIndicator();
+      },
+      mountEffortSelector: (container) => {
+        this.effortContainerEl = container;
+        this.effortSelector = new EffortSelector(container, {
+          onEffortLevelChange: async (effort: EffortLevel) => {
+            this.currentEffortLevel = effort;
+            this.plugin.settings.effortLevel = effort;
+            await this.plugin.saveSettings();
+          },
+          onThinkingBudgetChange: async (budget: ThinkingBudget) => {
+            this.currentThinkingBudget = budget;
+            this.plugin.settings.thinkingBudget = budget;
+            await this.plugin.saveSettings();
+          },
+          getEffortLevel: () => this.currentEffortLevel,
+          getThinkingBudget: () => this.currentThinkingBudget,
+          getCurrentModel: () => {
+            const current = this.getCurrentSessionModel();
+            return current ? `${current.provider}/${current.model}` : '';
+          },
+        });
+        this.effortSelector.updateDisplay();
+      },
+      isActiveTabStreaming: () => this.isActiveTabStreaming(),
+      cancelStreaming: () => {
+        this.cancelStreaming();
+      },
+      isTabForegroundBusy: () => this.isTabForegroundBusy(),
+      showProcessingBlockedNotice: () => {
+        new Notice(t('chat.tab.processingBlocked'));
+      },
+      submitMessage: (message) => this.sendMessage(message),
+      setComposerStackHeight: (stackHeight) => {
+        this.chatContainerEl?.style.setProperty('--opencodian-composer-stack-height', `${stackHeight}px`);
+      },
+      scheduleSettledScrollToBottomIfNeeded: () => {
+        this.scheduleSettledScrollToBottomIfNeeded();
       },
     };
   }
@@ -1120,6 +1186,9 @@ export class OpenCodianView extends ItemView {
       this.createTabMessagesPaneCoordinatorHost(),
     );
     this.chatHeaderPresenter = new ChatHeaderPresenter(this.createChatHeaderPresenterHost());
+    this.composerInputShellCoordinator = new ComposerInputShellCoordinator(
+      this.createComposerInputShellCoordinatorHost(),
+    );
     this.composerContextViewFacade = ComposerContextViewFacade.create({
       app: this.app,
       getServerMode: () => this.plugin.settings.server.mode,
@@ -2168,14 +2237,13 @@ export class OpenCodianView extends ItemView {
     this.chatAppearanceStyleEl?.remove();
     this.chatAppearanceStyleEl = null;
     this.titleGenerationService.cancelAll();
+    this.composerInputShellCoordinator.destroy();
     this.effortSelector?.destroy();
     this.effortSelector = null;
     this.effortContainerEl = null;
     this.contextRing?.destroy();
     this.contextRing = null;
     this.contextRingContainerEl = null;
-    this.inputContainerResizeObserver?.disconnect();
-    this.inputContainerResizeObserver = null;
     this.destroyGlassOctahedronDemo();
     this.destroyLiquidDiamondDemo();
     this.unmountLiquidGlassAdapter();
@@ -2193,13 +2261,6 @@ export class OpenCodianView extends ItemView {
     this.outerVerticalTabBarSlotEl = null;
     this.outerVerticalTabBarHostEl?.remove();
     this.outerVerticalTabBarHostEl = null;
-    this.inputTabBarSlotEl = null;
-    this.inputWrapperEl = null;
-    this.composerShellEl = null;
-    this.composerContextViewFacade.setContextRowElement(null);
-    this.addContextBtn = null;
-    this.sendBtn = null;
-    this.inputTextarea = null;
     this.questionDockSlotCoordinator.destroy();
     this.sessionTodoCoordinator.destroy();
     this.conversationSessionSignalRuntime.stop();
@@ -2237,7 +2298,7 @@ export class OpenCodianView extends ItemView {
 
     // Input area
     this.inputContainer = this.chatContainerEl.createDiv({ cls: 'opencodian-input-area' });
-    this.buildInputArea(this.inputContainer);
+    this.composerInputShellCoordinator.build(this.inputContainer);
     this.applyChatAppearanceSettings();
 
     const outerMountEl = this.contentEl.closest('.workspace-leaf-content[data-type="opencodian-view"]')
@@ -2466,13 +2527,14 @@ export class OpenCodianView extends ItemView {
   }
 
   public applyTabBarLayout(): void {
+    const inputTabBarSlotEl = this.composerInputShellCoordinator.getTabBarSlotEl();
     if (
       !this.chatContainerEl
       || !this.tabBarMountEl
       || !this.headerTabBarSlotEl
       || !this.belowHeaderTabBarSlotEl
       || !this.outerVerticalTabBarSlotEl
-      || !this.inputTabBarSlotEl
+      || !inputTabBarSlotEl
     ) {
       return;
     }
@@ -2487,7 +2549,7 @@ export class OpenCodianView extends ItemView {
         ? this.outerVerticalTabBarSlotEl
         : isBelowHeader
           ? this.belowHeaderTabBarSlotEl
-          : this.inputTabBarSlotEl;
+          : inputTabBarSlotEl;
 
     if (this.tabBarMountEl.parentElement !== targetSlot) {
       this.tabBarMountEl.remove();
@@ -2508,7 +2570,7 @@ export class OpenCodianView extends ItemView {
     this.headerTabBarSlotEl.classList.toggle('is-active-slot', targetSlot === this.headerTabBarSlotEl);
     this.belowHeaderTabBarSlotEl.classList.toggle('is-active-slot', targetSlot === this.belowHeaderTabBarSlotEl);
     this.outerVerticalTabBarSlotEl.classList.toggle('is-active-slot', targetSlot === this.outerVerticalTabBarSlotEl);
-    this.inputTabBarSlotEl.classList.toggle('is-active-slot', targetSlot === this.inputTabBarSlotEl);
+    inputTabBarSlotEl.classList.toggle('is-active-slot', targetSlot === inputTabBarSlotEl);
     this.renderTabBar();
   }
 
@@ -2738,16 +2800,7 @@ export class OpenCodianView extends ItemView {
 
   public applyLocaleTexts(): void {
     this.chatHeaderPresenter.applyLocaleTexts();
-
-    if (this.addContextBtn) {
-      this.setTooltipLabel(this.addContextBtn, t('chat.context.addContext'), 'top');
-    }
-
-    if (this.sendBtn) {
-      this.updateSendButtonState();
-    }
-
-    this.inputTextarea?.setAttribute('placeholder', this.getInputPlaceholder());
+    this.composerInputShellCoordinator.applyLocaleTexts();
     this.renderSessionTodoDock();
     this.questionDockSlotCoordinator.render();
     this.renderTabBar();
@@ -2793,112 +2846,6 @@ export class OpenCodianView extends ItemView {
     }
 
     return 'offline';
-  }
-
-  /** Build input area */
-  private buildInputArea(container: HTMLElement) {
-    this.inputTabBarSlotEl = container.createDiv({ cls: 'opencodian-tab-bar-slot opencodian-tab-bar-slot--input' });
-    this.sessionTodoCoordinator.attach(container);
-
-    this.questionDockSlotCoordinator.attach(container);
-
-    const composerShellEl = container.createDiv({ cls: 'opencodian-composer-shell' });
-    this.composerShellEl = composerShellEl;
-
-    const inputWrapper = composerShellEl.createDiv({ cls: 'opencodian-input-wrapper' });
-    this.inputWrapperEl = inputWrapper;
-    const composerContentEl = inputWrapper.createDiv({ cls: 'opencodian-composer-content' });
-    this.composerContextViewFacade.setContextRowElement(
-      composerContentEl.createDiv({ cls: 'opencodian-composer-context-row is-empty' }),
-    );
-
-    this.inputTextarea = composerContentEl.createEl('textarea', {
-      cls: 'opencodian-input',
-      attr: { placeholder: this.getInputPlaceholder(), rows: '1' },
-    });
-
-    // Auto-resize textarea
-    this.inputTextarea.addEventListener('input', () => {
-      this.syncInputTextareaHeight();
-    });
-    this.syncInputTextareaHeight();
-
-    // Send on Enter (Shift+Enter for new line)
-    this.inputTextarea.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        this.trySubmitCurrentInput();
-      }
-    });
-
-    const composerFooterEl = composerContentEl.createDiv({ cls: 'opencodian-composer-footer' });
-    const addContextBtn = composerFooterEl.createEl('button', {
-      cls: 'opencodian-composer-add-btn opencodian-tooltip-trigger',
-      attr: {
-        type: 'button',
-        'aria-label': t('chat.context.addContext'),
-      },
-    });
-    this.addContextBtn = addContextBtn;
-    setIcon(addContextBtn, 'plus');
-    this.setTooltipLabel(addContextBtn, t('chat.context.addContext'), 'top');
-    addContextBtn.addEventListener('click', () => {
-      void this.composerContextViewFacade.addChosenFileContextToActiveTab();
-    });
-
-    this.sendBtn = composerFooterEl.createEl('button', {
-      cls: 'opencodian-send-btn opencodian-tooltip-trigger',
-      attr: {
-        type: 'button',
-      },
-    });
-    this.sendBtn.addEventListener('click', () => {
-      if (this.isActiveTabStreaming()) {
-        this.cancelStreaming();
-      } else {
-        this.trySubmitCurrentInput();
-      }
-    });
-    this.updateSendButtonState();
-
-    // Bottom toolbar: Permission mode | Model selector | Effort selector | Context usage
-    const toolbar = composerShellEl.createDiv({ cls: 'opencodian-input-toolbar' });
-
-    const permissionContainer = toolbar.createDiv({ cls: 'opencodian-permission-selector' });
-    this.initializePermissionSelector(permissionContainer);
-
-    this.modelSelectorContainer = toolbar.createDiv({ cls: 'opencodian-model-selector' });
-    this.initializeModelSelector(this.modelSelectorContainer);
-
-    this.contextRingContainerEl = toolbar.createDiv({ cls: 'opencodian-context-usage-slot' });
-    this.contextRing = new ContextRing(this.contextRingContainerEl, () => {
-      this.openContextUsageDetails();
-    });
-    this.refreshContextUsageIndicator();
-
-    this.effortContainerEl = toolbar.createDiv({ cls: 'opencodian-effort-slot' });
-    this.effortSelector = new EffortSelector(this.effortContainerEl, {
-      onEffortLevelChange: async (effort: EffortLevel) => {
-        this.currentEffortLevel = effort;
-        this.plugin.settings.effortLevel = effort;
-        await this.plugin.saveSettings();
-      },
-      onThinkingBudgetChange: async (budget: ThinkingBudget) => {
-        this.currentThinkingBudget = budget;
-        this.plugin.settings.thinkingBudget = budget;
-        await this.plugin.saveSettings();
-      },
-      getEffortLevel: () => this.currentEffortLevel,
-      getThinkingBudget: () => this.currentThinkingBudget,
-      getCurrentModel: () => {
-        const current = this.getCurrentSessionModel();
-        return current ? `${current.provider}/${current.model}` : '';
-      },
-    });
-    this.effortSelector.updateDisplay();
-
-    this.applyInputPanelThemeState();
-    this.initializeComposerLayoutMetrics();
   }
 
   public toggleLiquidDiamondDemo(): void {
@@ -3026,7 +2973,9 @@ export class OpenCodianView extends ItemView {
   }
 
   private buildLiquidGlassMountContext(): GlassMountContext | null {
-    if (!this.composerShellEl || !this.inputWrapperEl) {
+    const composerShellEl = this.composerInputShellCoordinator.getComposerShellEl();
+    const inputWrapperEl = this.composerInputShellCoordinator.getInputWrapperEl();
+    if (!composerShellEl || !inputWrapperEl) {
       return null;
     }
 
@@ -3036,8 +2985,8 @@ export class OpenCodianView extends ItemView {
     }
 
     return {
-      shellEl: this.composerShellEl,
-      contentEl: this.inputWrapperEl,
+      shellEl: composerShellEl,
+      contentEl: inputWrapperEl,
       svgRootEl: this.ensureComposerGlassSvgRoot(),
       filterLayerEl,
       resolveAssetUrl: (relativePath: string) => this.resolvePluginAssetUrl(relativePath),
@@ -3059,15 +3008,16 @@ export class OpenCodianView extends ItemView {
   }
 
   private applyInputPanelThemeState(): void {
-    if (!this.composerShellEl) {
+    const composerShellEl = this.composerInputShellCoordinator.getComposerShellEl();
+    if (!composerShellEl) {
       return;
     }
 
     for (const className of INPUT_PANEL_THEME_CLASS_NAMES) {
-      this.composerShellEl.removeClass(className);
+      composerShellEl.removeClass(className);
     }
     for (const className of INPUT_PANEL_SVG_FILTER_CLASS_NAMES) {
-      this.composerShellEl.removeClass(className);
+      composerShellEl.removeClass(className);
     }
 
     if (this.plugin.settings.inputPanelTheme === 'preset') {
@@ -3078,7 +3028,7 @@ export class OpenCodianView extends ItemView {
 
     const liquidGlassAdapterId = this.getLiquidGlassAdapterId(this.plugin.settings.inputPanelTheme);
     if (liquidGlassAdapterId) {
-      this.composerShellEl.addClass('opencodian-composer-shell--liquid-glass');
+      composerShellEl.addClass('opencodian-composer-shell--liquid-glass');
 
       const adapter = getGlassAdapter(liquidGlassAdapterId);
       const ctx = this.buildLiquidGlassMountContext();
@@ -3108,7 +3058,7 @@ export class OpenCodianView extends ItemView {
       return;
     }
 
-    this.composerShellEl.addClass(themeClassName);
+    composerShellEl.addClass(themeClassName);
 
     const svgFilterSettings = this.plugin.settings.inputPanelGlassRefractionSvgFilter;
     const activeSvgFilterPreset = svgFilterSettings.preset;
@@ -3120,7 +3070,7 @@ export class OpenCodianView extends ItemView {
 
     ensureComposerGlassSvgDefs(svgFilterSettings);
     this.ensureComposerSvgFilterLayer();
-    this.composerShellEl.addClass(INPUT_PANEL_SVG_FILTER_CLASS_BY_ID[activeSvgFilterPreset]);
+    composerShellEl.addClass(INPUT_PANEL_SVG_FILTER_CLASS_BY_ID[activeSvgFilterPreset]);
   }
 
   private scheduleLiquidGlassDiagnostics(adapterId: LiquidGlassAdapterId | null): void {
@@ -3308,7 +3258,8 @@ export class OpenCodianView extends ItemView {
   }
 
   private logLiquidGlassDiagnostics(adapterId: LiquidGlassAdapterId): void {
-    if (!this.composerShellEl || !this.composerSvgFilterLayerEl) {
+    const shellEl = this.composerInputShellCoordinator.getComposerShellEl();
+    if (!shellEl || !this.composerSvgFilterLayerEl) {
       this.logLiquidGlassDiagnosticsEntry('Liquid glass diagnostics skipped', {
         adapterId,
         reason: 'missing-shell-or-filter-layer',
@@ -3316,7 +3267,6 @@ export class OpenCodianView extends ItemView {
       return;
     }
 
-    const shellEl = this.composerShellEl;
     const filterLayerEl = this.composerSvgFilterLayerEl;
     const shellRect = shellEl.getBoundingClientRect();
     const filterRect = filterLayerEl.getBoundingClientRect();
@@ -3604,12 +3554,13 @@ export class OpenCodianView extends ItemView {
   }
 
   private applyInputActionButtonStyleState(): void {
-    if (!this.composerShellEl) {
+    const composerShellEl = this.composerInputShellCoordinator.getComposerShellEl();
+    if (!composerShellEl) {
       return;
     }
 
     for (const className of INPUT_PANEL_ACTION_BUTTON_STYLE_CLASS_NAMES) {
-      this.composerShellEl.removeClass(className);
+      composerShellEl.removeClass(className);
     }
 
     const actionButtonStyle = this.plugin.settings.chatAppearance.input.actionButtonStyle;
@@ -3617,7 +3568,7 @@ export class OpenCodianView extends ItemView {
       return;
     }
 
-    this.composerShellEl.addClass(INPUT_PANEL_ACTION_BUTTON_STYLE_CLASS_BY_ID[actionButtonStyle]);
+    composerShellEl.addClass(INPUT_PANEL_ACTION_BUTTON_STYLE_CLASS_BY_ID[actionButtonStyle]);
   }
 
   private getActiveInputPanelGlassRefractionSvgFilterScale(): number {
@@ -3632,7 +3583,8 @@ export class OpenCodianView extends ItemView {
   }
 
   private ensureComposerSvgFilterLayer(): HTMLElement | null {
-    if (!this.composerShellEl) {
+    const composerShellEl = this.composerInputShellCoordinator.getComposerShellEl();
+    if (!composerShellEl) {
       return null;
     }
 
@@ -3642,7 +3594,7 @@ export class OpenCodianView extends ItemView {
 
     const layerEl = document.createElement('div');
     layerEl.className = 'opencodian-composer-svg-filter-layer';
-    this.composerShellEl.insertBefore(layerEl, this.composerShellEl.firstChild);
+    composerShellEl.insertBefore(layerEl, composerShellEl.firstChild);
     this.composerSvgFilterLayerEl = layerEl;
     return layerEl;
   }
@@ -3665,50 +3617,12 @@ export class OpenCodianView extends ItemView {
     this.activeLiquidGlassAdapter = null;
   }
 
-  private initializeComposerLayoutMetrics(): void {
-    if (!this.chatContainerEl || !this.inputContainer) {
-      return;
-    }
-
-    this.inputContainerResizeObserver?.disconnect();
-    this.inputContainerResizeObserver = null;
-
-    if (typeof ResizeObserver !== 'undefined') {
-      this.inputContainerResizeObserver = new ResizeObserver(() => {
-        this.scheduleComposerLayoutSync();
-      });
-      this.inputContainerResizeObserver.observe(this.inputContainer);
-    }
-
-    this.scheduleComposerLayoutSync();
-  }
-
   private scheduleComposerLayoutSync(): void {
-    if (this.composerLayoutSyncFrameId !== null) {
-      return;
-    }
-
-    this.composerLayoutSyncFrameId = window.requestAnimationFrame(() => {
-      this.composerLayoutSyncFrameId = null;
-      this.syncComposerLayoutMetrics();
-    });
+    this.composerInputShellCoordinator.scheduleLayoutSync();
   }
 
   private clearScheduledComposerLayoutSync(): void {
-    if (this.composerLayoutSyncFrameId !== null) {
-      window.cancelAnimationFrame(this.composerLayoutSyncFrameId);
-      this.composerLayoutSyncFrameId = null;
-    }
-  }
-
-  private syncComposerLayoutMetrics(): void {
-    if (!this.chatContainerEl || !this.inputContainer) {
-      return;
-    }
-
-    const stackHeight = Math.ceil(this.inputContainer.offsetHeight);
-    this.chatContainerEl.style.setProperty('--opencodian-composer-stack-height', `${Math.max(0, stackHeight)}px`);
-    this.scheduleSettledScrollToBottomIfNeeded();
+    this.composerInputShellCoordinator.clearScheduledLayoutSync();
   }
 
   private shouldRenderQuestionResolutionCards(): boolean {
@@ -3739,40 +3653,6 @@ export class OpenCodianView extends ItemView {
     view?: MarkdownView | null,
   ): Promise<boolean> {
     return this.composerContextViewFacade.addSelectionContextFromActiveEditor(editor, view);
-  }
-
-  private trySubmitCurrentInput(): void {
-    if (!this.inputTextarea) {
-      return;
-    }
-
-    if (this.isTabForegroundBusy()) {
-      new Notice(t('chat.tab.processingBlocked'));
-      return;
-    }
-
-    const message = this.inputTextarea.value.trim();
-    if (!message) {
-      return;
-    }
-
-    void this.sendMessage(message);
-    this.inputTextarea.value = '';
-    this.syncInputTextareaHeight();
-  }
-
-  private syncInputTextareaHeight(): void {
-    if (!this.inputTextarea) {
-      return;
-    }
-
-    this.inputTextarea.style.height = 'auto';
-    const nextHeight = Math.min(this.inputTextarea.scrollHeight, COMPOSER_TEXTAREA_MAX_HEIGHT);
-    this.inputTextarea.style.height = `${nextHeight}px`;
-    this.inputTextarea.style.overflowY = this.inputTextarea.scrollHeight > COMPOSER_TEXTAREA_MAX_HEIGHT
-      ? 'auto'
-      : 'hidden';
-    this.scheduleComposerLayoutSync();
   }
 
   /** Wire event handlers */
@@ -4614,24 +4494,7 @@ export class OpenCodianView extends ItemView {
 
   /** Update send button icon based on streaming state */
   private updateSendButtonState() {
-    if (!this.sendBtn) return;
-
-    // Clear current icon
-    this.sendBtn.empty();
-
-    if (this.isActiveTabStreaming()) {
-      // Show stop icon (square)
-      setIcon(this.sendBtn, 'square');
-      this.sendBtn.addClass('opencodian-stop-btn');
-      this.sendBtn.removeClass('opencodian-send-btn');
-      this.setTooltipLabel(this.sendBtn, t('chat.input.stopStreaming'), 'top');
-    } else {
-      // Show send icon
-      setIcon(this.sendBtn, 'send');
-      this.sendBtn.addClass('opencodian-send-btn');
-      this.sendBtn.removeClass('opencodian-stop-btn');
-      this.setTooltipLabel(this.sendBtn, t('chat.input.sendMessage'), 'top');
-    }
+    this.composerInputShellCoordinator.updateSendButtonState();
   }
 
   /** Render a message */

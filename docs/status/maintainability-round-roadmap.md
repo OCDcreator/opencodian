@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`。R18 完成后必须暂停复盘，不得自动扩展新队列。
-> **当前状态**: [CONFIRMED_NEXT_BATCH] R13-R18 已确认；当前唯一可执行 `[NEXT]` 是 R15，R18 后必须再次暂停。
+> **当前状态**: [CONFIRMED_NEXT_BATCH] R13-R18 已确认；当前唯一可执行 `[NEXT]` 是 R16，R18 后必须再次暂停。
 
 ## 控制规则
 
@@ -328,7 +328,7 @@
   - Locale/status refresh 有 focused coverage 或稳定验证。
   - 运行 targeted tests、全量 `npm test`、`npm run build`。
 
-### [NEXT] R15 - Composer input shell coordinator
+### [DONE] R15 - Composer input shell coordinator
 
 - **Lane**: P1 `OpenCodianView composer input shell`
 - **目标**: 把 input area DOM、textarea 行为、submit gate、高度同步与 composer layout metrics 收束为较厚 input shell owner。
@@ -349,7 +349,7 @@
   - 新 owner 具备完整 lifecycle 或至少 3 个公开动作入口。
   - 运行 targeted tests、全量 `npm test`、`npm run build`。
 
-### [QUEUED] R16 - Model and permission selector ownership
+### [NEXT] R16 - Model and permission selector ownership
 
 - **Lane**: P1 `OpenCodianView selection controls`
 - **目标**: 把 chat 内 model selector 与 permission selector 的 dropdown/search/list/selection display ownership 从 `OpenCodianView` 迁出到一个 selection controls owner。

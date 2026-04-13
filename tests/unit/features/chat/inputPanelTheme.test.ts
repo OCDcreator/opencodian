@@ -19,10 +19,7 @@ import { registerBuiltinGlassAdapters } from '../../../../src/utils/glass/builti
 
 type InputPanelThemeViewHarness = {
   chatContainerEl: HTMLElement | null;
-  composerShellEl: HTMLElement | null;
   inputContainer: HTMLElement | null;
-  inputWrapperEl: HTMLElement | null;
-  sendBtn: HTMLElement | null;
   plugin: {
     settings: {
       chatAppearance: ReturnType<typeof getDefaultChatAppearanceSettings>;
@@ -85,10 +82,34 @@ describe('OpenCodianView input panel theme', () => {
     } as never) as unknown as InputPanelThemeViewHarness;
   }
 
+  function attachComposerShell(
+    view: InputPanelThemeViewHarness,
+    {
+      shellEl,
+      inputWrapperEl = null,
+      sendBtn = null,
+    }: {
+      shellEl: HTMLElement;
+      inputWrapperEl?: HTMLElement | null;
+      sendBtn?: HTMLElement | null;
+    },
+  ): void {
+    const coordinator = (view as unknown as {
+      composerInputShellCoordinator: {
+        composerShellEl: HTMLElement | null;
+        inputWrapperEl: HTMLElement | null;
+        sendBtnEl: HTMLElement | null;
+      };
+    }).composerInputShellCoordinator;
+    coordinator.composerShellEl = shellEl;
+    coordinator.inputWrapperEl = inputWrapperEl;
+    coordinator.sendBtnEl = sendBtn;
+  }
+
   it('keeps preset mode free of glass-refraction classes and extra glass nodes', () => {
     const view = createView('preset');
     const shellEl = document.body.createDiv({ cls: 'opencodian-composer-shell' });
-    view.composerShellEl = shellEl;
+    attachComposerShell(view, { shellEl });
 
     view.applyInputPanelThemeState();
 
@@ -107,7 +128,7 @@ describe('OpenCodianView input panel theme', () => {
   ] as const)('applies %s as %s', (theme, className) => {
     const view = createView(theme);
     const shellEl = document.body.createDiv({ cls: 'opencodian-composer-shell' });
-    view.composerShellEl = shellEl;
+    attachComposerShell(view, { shellEl });
 
     view.applyInputPanelThemeState();
 
@@ -117,7 +138,7 @@ describe('OpenCodianView input panel theme', () => {
   it('applies the glass class without mounting extra runtime nodes', () => {
     const view = createView('glass-refraction-glass');
     const shellEl = document.body.createDiv({ cls: 'opencodian-composer-shell' });
-    view.composerShellEl = shellEl;
+    attachComposerShell(view, { shellEl });
 
     view.applyInputPanelThemeState();
 
@@ -131,7 +152,7 @@ describe('OpenCodianView input panel theme', () => {
   it('mounts the subtle svg refraction filter layer and syncs project-default scales', () => {
     const view = createView('glass-refraction-glass');
     const shellEl = document.body.createDiv({ cls: 'opencodian-composer-shell' });
-    view.composerShellEl = shellEl;
+    attachComposerShell(view, { shellEl });
     view.plugin.settings.inputPanelGlassRefractionSvgFilter = {
       preset: 'subtle',
       subtleScale: 8,
@@ -154,7 +175,7 @@ describe('OpenCodianView input panel theme', () => {
   it('updates the strong svg refraction scale and removes the layer when disabled', () => {
     const view = createView('glass-refraction-card');
     const shellEl = document.body.createDiv({ cls: 'opencodian-composer-shell' });
-    view.composerShellEl = shellEl;
+    attachComposerShell(view, { shellEl });
     view.plugin.settings.inputPanelGlassRefractionSvgFilter = {
       preset: 'strong',
       subtleScale: 8,
@@ -182,7 +203,7 @@ describe('OpenCodianView input panel theme', () => {
   it('replaces existing glass-refraction classes when switching themes', () => {
     const view = createView('glass-refraction-glass');
     const shellEl = document.body.createDiv({ cls: 'opencodian-composer-shell' });
-    view.composerShellEl = shellEl;
+    attachComposerShell(view, { shellEl });
 
     view.applyInputPanelThemeState();
     expect(shellEl.classList.contains('opencodian-composer-shell--gr-glass')).toBe(true);
@@ -204,7 +225,7 @@ describe('OpenCodianView input panel theme', () => {
   it('toggles the etched action button class from chat appearance settings', () => {
     const view = createView('preset');
     const shellEl = document.body.createDiv({ cls: 'opencodian-composer-shell' });
-    view.composerShellEl = shellEl;
+    attachComposerShell(view, { shellEl });
 
     view.applyInputActionButtonStyleState();
     expect(shellEl.classList.contains('opencodian-composer-shell--action-buttons-etched')).toBe(false);
@@ -221,7 +242,11 @@ describe('OpenCodianView input panel theme', () => {
   it('localizes the send button tooltip label for both idle and streaming states', () => {
     setLocale('zh');
     const view = createView('preset');
-    view.sendBtn = document.body.createEl('button', { cls: 'opencodian-tooltip-trigger' });
+    const sendBtn = document.body.createEl('button', { cls: 'opencodian-tooltip-trigger' });
+    attachComposerShell(view, {
+      shellEl: document.body.createDiv({ cls: 'opencodian-composer-shell' }),
+      sendBtn,
+    });
     const streamingSpy = jest.spyOn(
       view as unknown as { isActiveTabStreaming: () => boolean },
       'isActiveTabStreaming',
@@ -229,11 +254,11 @@ describe('OpenCodianView input panel theme', () => {
 
     streamingSpy.mockReturnValue(false);
     view.updateSendButtonState();
-    expect(view.sendBtn?.getAttribute('data-tooltip')).toBe('发送消息');
+    expect(sendBtn.getAttribute('data-tooltip')).toBe('发送消息');
 
     streamingSpy.mockReturnValue(true);
     view.updateSendButtonState();
-    expect(view.sendBtn?.getAttribute('data-tooltip')).toBe('停止生成');
+    expect(sendBtn.getAttribute('data-tooltip')).toBe('停止生成');
   });
 
   it('mounts shuding liquid glass with upstream defaults and cleans it up on theme switch', () => {
@@ -278,8 +303,7 @@ describe('OpenCodianView input panel theme', () => {
         } as DOMRect),
       });
       const inputWrapperEl = shellEl.createDiv({ cls: 'opencodian-input-wrapper' });
-      view.composerShellEl = shellEl;
-      view.inputWrapperEl = inputWrapperEl;
+      attachComposerShell(view, { shellEl, inputWrapperEl });
 
       view.applyInputPanelThemeState();
 
