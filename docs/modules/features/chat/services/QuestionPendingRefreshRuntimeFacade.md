@@ -5,13 +5,13 @@
 
 ## 概述
 
-`QuestionPendingRefreshRuntimeFacade` 把 pending question refresh 期间的 **resolved-request suppression、waiter-owned request 保活，以及草稿/active-index runtime state 清理** 从 `QuestionDockCoordinator` 中收束到一个小型 runtime facade，专门负责：
+`QuestionPendingRefreshRuntimeFacade` 把 pending question refresh 期间的 **resolved-request suppression、waiter-owned request 保活，以及草稿/active-index runtime state 清理** 从 `QuestionDockCoordinator` 的旧 refresh 分支中收束到一个小型 runtime facade，专门负责：
 
 - 根据当前 tab runtime 的 `resolvedQuestionRequestIds` 压制刚被回答/拒绝、但服务端 pending 快照还没移除的 question request
 - 在 refresh 快照缺失时保留仍由上方 dock waiter 持有的 request，避免提交/拒绝中的 UI 被短暂服务端快照抹掉
-- 统一维护 `pendingQuestionRequests`、draft answers、active group/index 与 resolved-id pruning，避免 coordinator 在 refresh 分支里直接铺开多组 runtime map 操作
+- 统一维护 `pendingQuestionRequests`、draft answers、active group/index 与 resolved-id pruning，避免上层 refresh facade 在 refresh 分支里直接铺开多组 runtime map 操作
 
-它不负责向 OpenCode 拉取 pending question、按 session 过滤、queue enqueue/remove 与 refresh/clear 完成后的 attention/render writeback、dock DOM render、dock waiter 生命周期、回答/拒绝请求，或 resolve 后的 status/sync follow-up；这些仍分别留给 `QuestionDockCoordinator`、`QuestionDockWritebackFacade`、`QuestionDock`、`QuestionDockQueueRuntimeFacade`、question API 与 `QuestionPostResolutionRuntimeFacade`。
+它不负责向 OpenCode 拉取 pending question、按 session 过滤、queue enqueue/remove 与 refresh/clear 完成后的 attention/render writeback、dock DOM render、dock waiter 生命周期、回答/拒绝请求，或 resolve 后的 status/sync follow-up；这些仍分别留给 `QuestionDockRefreshFacade`、`QuestionDockWritebackFacade`、`QuestionDockCoordinator`、`QuestionDock`、`QuestionDockQueueRuntimeFacade`、question API 与 `QuestionPostResolutionRuntimeFacade`。
 
 ## 公开接口
 
@@ -40,5 +40,5 @@ export class QuestionPendingRefreshRuntimeFacade {
 ## 与 `OpenCodianView` 的边界
 
 - `QuestionRuntimeHostAdapter` 负责从共享 `QuestionRuntimeViewHost` 派生本 facade 所需的 runtime host；`OpenCodianView` 不需要暴露额外的 question-refresh 专属 helper
-- `QuestionDockCoordinator` 继续负责 question API fetch、session 过滤与 dock resolution flow；dock queue 的 waiter/enqueue/remove runtime 读写由 `QuestionDockQueueRuntimeFacade` 承接，pending refresh 期间的 resolved-state / stale-state 读写由本 facade 承接，queue enqueue/remove 与 refresh/clear 完成后的 attention/render writeback 由 `QuestionDockWritebackFacade` 承接
+- `QuestionDockRefreshFacade` 继续负责 question API fetch、session 过滤与 refresh/clear writeback；dock queue 的 waiter/enqueue/remove runtime 读写由 `QuestionDockQueueRuntimeFacade` 承接，pending refresh 期间的 resolved-state / stale-state 读写由本 facade 承接
 - `QuestionResolutionWritebackFacade` 现在经由本 facade 的 `markQuestionRequestResolved()` 小 port 标记 dock 与 inline fallback resolution，让两条 resolve path 写入同一份 suppression set

@@ -2,17 +2,13 @@ import { Notice } from 'obsidian';
 
 import type { QuestionDisplayMode, QuestionRequest, QuestionResolution } from '../../../core/types';
 import { t } from '../../../i18n';
-import { createLogger } from '../../../shared';
 import type { TabId } from '../tabs';
 import type { QuestionDock } from '../ui/QuestionDock';
+import type { QuestionDockRefreshFacade } from './QuestionDockRefreshFacade';
 import type { QuestionDockWritebackFacade } from './QuestionDockWritebackFacade';
 import type {
   QuestionDockQueueRuntimeFacade,
 } from './QuestionDockQueueRuntimeFacade';
-import type {
-  QuestionPendingRefreshRuntimeFacade,
-  QuestionPendingRefreshRuntimeState,
-} from './QuestionPendingRefreshRuntimeFacade';
 import type { QuestionResolutionWritebackFacade } from './QuestionResolutionWritebackFacade';
 import { isQuestionAnswerComplete } from '../ui/questionDockState';
 import {
@@ -25,8 +21,6 @@ import {
   createQuestionDockRenderPayload,
 } from './QuestionDockRenderAdapter';
 
-const logger = createLogger('QuestionDockCoordinator');
-
 type QuestionResolutionWritebackPort = Pick<
   QuestionResolutionWritebackFacade,
   'applyResolution'
@@ -35,11 +29,9 @@ type QuestionDockQueueRuntimePort = Pick<
   QuestionDockQueueRuntimeFacade,
   'enqueuePendingQuestionRequest' | 'getOrCreateQuestionWaiter' | 'removePendingQuestionRequest'
 >;
-type QuestionPendingRefreshRuntimePort = Pick<
-  QuestionPendingRefreshRuntimeFacade,
-  | 'applyRefreshedPendingQuestionRequests'
-  | 'clearPendingQuestionState'
-  | 'getPendingQuestionRequests'
+type QuestionDockRefreshPort = Pick<
+  QuestionDockRefreshFacade,
+  'clearPendingQuestionsForTab' | 'refreshPendingQuestionsForTab'
 >;
 type QuestionDockWritebackPort = Pick<
   QuestionDockWritebackFacade,
@@ -51,7 +43,7 @@ type QuestionDockWritebackPort = Pick<
 
 export interface QuestionDockCoordinatorRuntimeState {
   isStreaming: boolean;
-  pendingQuestionRequests: QuestionPendingRefreshRuntimeState['pendingQuestionRequests'];
+  pendingQuestionRequests: QuestionRequest[];
   questionDraftAnswers: QuestionDockInteractionRuntimeState['questionDraftAnswers'];
   questionActiveGroupKeys: QuestionDockInteractionRuntimeState['questionActiveGroupKeys'];
   questionActiveIndexes: QuestionDockInteractionRuntimeState['questionActiveIndexes'];
@@ -63,12 +55,10 @@ export interface QuestionDockCoordinatorHost {
   getTabRuntimeState(tabId: TabId | null): QuestionDockCoordinatorRuntimeState | null;
   getActiveTabId(): TabId | null;
   getCurrentConversationSessionId(): string | null | undefined;
-  getSessionIdForTab(tabId: TabId | null): string | null | undefined;
   getQuestionDock(): QuestionDockPort | null;
   getQuestionDisplayMode(): QuestionDisplayMode;
   shouldUseAboveInputQuestionDock(): boolean;
   setTabNeedsAttention(tabId: TabId | null, needsAttention: boolean): void;
-  getPendingQuestions(): Promise<QuestionRequest[]>;
   replyToQuestion(requestId: string, answers: string[][]): Promise<void>;
   rejectQuestion(requestId: string): Promise<void>;
 }
@@ -77,7 +67,7 @@ export class QuestionDockCoordinator {
   constructor(
     private readonly host: QuestionDockCoordinatorHost,
     private readonly dockQueueRuntime: QuestionDockQueueRuntimePort,
-    private readonly pendingRefreshRuntime: QuestionPendingRefreshRuntimePort,
+    private readonly dockRefresh: QuestionDockRefreshPort,
     private readonly dockWriteback: QuestionDockWritebackPort,
     private readonly resolutionWriteback: QuestionResolutionWritebackPort,
   ) {}
@@ -129,39 +119,14 @@ export class QuestionDockCoordinator {
   }
 
   clearPendingQuestionsForTab(tabId: TabId | null = this.host.getActiveTabId()): void {
-    const runtime = this.host.getTabRuntimeState(tabId);
-    if (!runtime) {
-      return;
-    }
-
-    this.pendingRefreshRuntime.clearPendingQuestionState(tabId);
-    this.dockWriteback.applyClearedPendingQuestions(tabId);
+    this.dockRefresh.clearPendingQuestionsForTab(tabId);
   }
 
   async refreshPendingQuestionsForTab(
     tabId: TabId | null,
-    sessionId: string | null | undefined = this.host.getSessionIdForTab(tabId),
+    sessionId?: string | null,
   ): Promise<QuestionRequest[]> {
-    const runtime = this.host.getTabRuntimeState(tabId);
-    if (!runtime || !sessionId) {
-      this.clearPendingQuestionsForTab(tabId);
-      return [];
-    }
-
-    try {
-      const pendingRequests = await this.host.getPendingQuestions();
-      const sessionRequests = pendingRequests.filter((request) => request.sessionId === sessionId);
-      const mergedRequests = this.pendingRefreshRuntime.applyRefreshedPendingQuestionRequests(
-        tabId,
-        sessionRequests,
-      );
-      this.dockWriteback.applyRefreshedPendingQuestions(tabId, mergedRequests);
-
-      return mergedRequests;
-    } catch (error) {
-      logger.debug('Failed to refresh pending questions', error);
-      return this.pendingRefreshRuntime.getPendingQuestionRequests(tabId);
-    }
+    return this.dockRefresh.refreshPendingQuestionsForTab(tabId, sessionId);
   }
 
   async waitForDockResolutionIfEnabled(

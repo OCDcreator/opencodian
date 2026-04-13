@@ -4,6 +4,7 @@ import type {
 } from '../../../../src/core/types';
 import { setLocale } from '../../../../src/i18n';
 import { StreamingInlineCardRenderer } from '../../../../src/features/chat/runtime/StreamingInlineCardRenderer';
+import type { QuestionDockRefreshFacadeHost } from '../../../../src/features/chat/services/QuestionDockRefreshFacade';
 import { QuestionDockQueueRuntimeFacade } from '../../../../src/features/chat/services/QuestionDockQueueRuntimeFacade';
 import { QuestionPendingRefreshRuntimeFacade } from '../../../../src/features/chat/services/QuestionPendingRefreshRuntimeFacade';
 import { QuestionPostResolutionRuntimeFacade } from '../../../../src/features/chat/services/QuestionPostResolutionRuntimeFacade';
@@ -176,7 +177,9 @@ describe('QuestionRuntimeHostAdapter', () => {
 
     expect(hosts.dockCoordinatorHost.getQuestionDisplayMode()).toBe('single');
     expect(hosts.dockCoordinatorHost.getCurrentConversationSessionId()).toBe('session-1');
-    await hosts.dockCoordinatorHost.getPendingQuestions();
+    const dockRefreshHost: QuestionDockRefreshFacadeHost = hosts.dockRefreshHost;
+    expect(dockRefreshHost.getSessionIdForTab('tab-active')).toBe('session-1');
+    await dockRefreshHost.getPendingQuestions();
     await hosts.dockCoordinatorHost.replyToQuestion(request.id, [['TypeScript']]);
     await hosts.dockCoordinatorHost.rejectQuestion(request.id);
     const postResolutionRuntimeFacade = new QuestionPostResolutionRuntimeFacade(

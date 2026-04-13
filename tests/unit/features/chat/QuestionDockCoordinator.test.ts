@@ -1,5 +1,6 @@
 import type { QuestionDisplayMode, QuestionRequest } from '../../../../src/core/types';
 import { setLocale } from '../../../../src/i18n';
+import type { QuestionDockRefreshFacade } from '../../../../src/features/chat/services/QuestionDockRefreshFacade';
 import {
   QuestionDockWritebackFacade,
 } from '../../../../src/features/chat/services/QuestionDockWritebackFacade';
@@ -75,25 +76,14 @@ function createHost(options?: {
   currentConversationSessionId?: string | null;
   questionDisplayMode?: QuestionDisplayMode;
   shouldUseAboveInputQuestionDock?: boolean;
-  sessionIdsByTab?: Record<string, string | null>;
 }) {
   const activeTabId = options?.activeTabId ?? 'tab-active';
   const runtimeByTab = new Map<TabId, TestRuntimeState>([
     ['tab-active', createRuntimeState()],
   ]);
-  const sessionIdsByTab = new Map<TabId, string | null>([
-    ['tab-active', options?.sessionIdsByTab?.['tab-active'] ?? 'session-1'],
-  ]);
   let latestRenderState: QuestionDockRenderState | null = null;
   let latestCallbacks: QuestionDockCallbacks | null = null;
   let renderQuestionDockImpl: (() => void) | null = null;
-
-  for (const [tabId, sessionId] of Object.entries(options?.sessionIdsByTab ?? {})) {
-    sessionIdsByTab.set(tabId, sessionId);
-    if (!runtimeByTab.has(tabId)) {
-      runtimeByTab.set(tabId, createRuntimeState());
-    }
-  }
 
   const questionDock = {
     render: jest.fn((state: QuestionDockRenderState, callbacks: QuestionDockCallbacks) => {
@@ -106,16 +96,23 @@ function createHost(options?: {
     getTabRuntimeState: jest.fn((tabId) => (tabId ? runtimeByTab.get(tabId) ?? null : null)),
     getActiveTabId: jest.fn().mockReturnValue(activeTabId),
     getCurrentConversationSessionId: jest.fn().mockReturnValue(
-      options?.currentConversationSessionId ?? sessionIdsByTab.get(activeTabId ?? '') ?? null,
+      options?.currentConversationSessionId ?? 'session-1',
     ),
-    getSessionIdForTab: jest.fn((tabId) => (tabId ? sessionIdsByTab.get(tabId) ?? null : null)),
     getQuestionDock: jest.fn().mockReturnValue(questionDock),
     getQuestionDisplayMode: jest.fn().mockReturnValue(options?.questionDisplayMode ?? 'all'),
-    shouldUseAboveInputQuestionDock: jest.fn().mockReturnValue(options?.shouldUseAboveInputQuestionDock ?? true),
+    shouldUseAboveInputQuestionDock: jest
+      .fn()
+      .mockReturnValue(options?.shouldUseAboveInputQuestionDock ?? true),
     setTabNeedsAttention: jest.fn(),
-    getPendingQuestions: jest.fn().mockResolvedValue([] as QuestionRequest[]),
     replyToQuestion: jest.fn().mockResolvedValue(undefined),
     rejectQuestion: jest.fn().mockResolvedValue(undefined),
+  };
+  const dockRefresh: Mocked<Pick<
+    QuestionDockRefreshFacade,
+    'clearPendingQuestionsForTab' | 'refreshPendingQuestionsForTab'
+  >> = {
+    clearPendingQuestionsForTab: jest.fn(),
+    refreshPendingQuestionsForTab: jest.fn().mockResolvedValue([] as QuestionRequest[]),
   };
   const postResolutionRuntime: jest.Mocked<Pick<
     QuestionPostResolutionRuntimeFacade,
@@ -165,6 +162,7 @@ function createHost(options?: {
 
   return {
     host,
+    dockRefresh,
     dockQueueRuntime,
     pendingRefreshRuntime,
     dockWriteback,
@@ -202,6 +200,7 @@ describe('QuestionDockCoordinator', () => {
     const request = createQuestionRequest();
     const {
       host,
+      dockRefresh,
       dockQueueRuntime,
       pendingRefreshRuntime,
       dockWriteback,
@@ -216,7 +215,7 @@ describe('QuestionDockCoordinator', () => {
     const coordinator = new QuestionDockCoordinator(
       host,
       dockQueueRuntime,
-      pendingRefreshRuntime,
+      dockRefresh,
       dockWriteback,
       resolutionWriteback,
     );
@@ -248,52 +247,56 @@ describe('QuestionDockCoordinator', () => {
     expect(runtimeByTab.get('tab-active')?.resolvedQuestionRequestIds.has(request.id)).toBe(true);
   });
 
-  it('preserves waiter-owned background requests across refresh and marks the tab as needing attention', async () => {
-    const waitingRequest = createQuestionRequest({
+  it('delegates pending refresh orchestration to the refresh facade', async () => {
+    const request = createQuestionRequest({
       id: 'request-background',
       sessionId: 'session-background',
     });
     const {
+      dockRefresh,
       host,
       dockQueueRuntime,
-      pendingRefreshRuntime,
       dockWriteback,
       resolutionWriteback,
-      runtimeByTab,
-      setRenderQuestionDockImpl,
-    } = createHost({
-      activeTabId: 'tab-active',
-      sessionIdsByTab: {
-        'tab-active': 'session-active',
-        'tab-background': 'session-background',
-      },
-    });
-    const backgroundRuntime = createRuntimeState({
-      pendingQuestionRequests: [waitingRequest],
-    });
-    let resolve = () => {};
-    const promise = new Promise<void>((resolver) => {
-      resolve = resolver;
-    });
-    backgroundRuntime.questionRequestWaiters.set(waitingRequest.id, { promise, resolve });
-    runtimeByTab.set('tab-background', backgroundRuntime);
-    host.getPendingQuestions.mockResolvedValueOnce([]);
+    } = createHost();
+    dockRefresh.refreshPendingQuestionsForTab.mockResolvedValueOnce([request]);
     const coordinator = new QuestionDockCoordinator(
       host,
       dockQueueRuntime,
-      pendingRefreshRuntime,
+      dockRefresh,
       dockWriteback,
       resolutionWriteback,
     );
-    setRenderQuestionDockImpl(() => {
-      coordinator.render();
-    });
 
-    const refreshed = await coordinator.refreshPendingQuestionsForTab('tab-background', 'session-background');
+    await expect(
+      coordinator.refreshPendingQuestionsForTab('tab-background', 'session-background'),
+    ).resolves.toEqual([request]);
 
-    expect(refreshed).toEqual([waitingRequest]);
-    expect(backgroundRuntime.pendingQuestionRequests).toEqual([waitingRequest]);
-    expect(host.setTabNeedsAttention).toHaveBeenCalledWith('tab-background', true);
+    expect(dockRefresh.refreshPendingQuestionsForTab).toHaveBeenCalledWith(
+      'tab-background',
+      'session-background',
+    );
+  });
+
+  it('delegates pending-question clearing to the refresh facade using the active tab by default', () => {
+    const {
+      dockRefresh,
+      host,
+      dockQueueRuntime,
+      dockWriteback,
+      resolutionWriteback,
+    } = createHost();
+    const coordinator = new QuestionDockCoordinator(
+      host,
+      dockQueueRuntime,
+      dockRefresh,
+      dockWriteback,
+      resolutionWriteback,
+    );
+
+    coordinator.clearPendingQuestionsForTab();
+
+    expect(dockRefresh.clearPendingQuestionsForTab).toHaveBeenCalledWith('tab-active');
   });
 
   it('renders an empty dock state when the above-input dock is disabled', () => {
@@ -302,8 +305,8 @@ describe('QuestionDockCoordinator', () => {
       runtimeByTab,
       getLatestRenderState,
       host,
+      dockRefresh,
       dockQueueRuntime,
-      pendingRefreshRuntime,
       dockWriteback,
       resolutionWriteback,
       setRenderQuestionDockImpl,
@@ -314,7 +317,7 @@ describe('QuestionDockCoordinator', () => {
     const coordinator = new QuestionDockCoordinator(
       host,
       dockQueueRuntime,
-      pendingRefreshRuntime,
+      dockRefresh,
       dockWriteback,
       resolutionWriteback,
     );

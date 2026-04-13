@@ -16,6 +16,10 @@ import type { StreamingInlineCardRenderer } from '../runtime/StreamingInlineCard
 import type { TabId } from '../tabs';
 import type { QuestionDock } from '../ui/QuestionDock';
 import {
+  QuestionDockRefreshFacade,
+  type QuestionDockRefreshFacadeHost,
+} from './QuestionDockRefreshFacade';
+import {
   QuestionDockQueueRuntimeFacade,
   type QuestionDockQueueRuntimeFacadeHost,
   type QuestionDockQueueRuntimeState,
@@ -78,6 +82,7 @@ export interface QuestionRuntimeHosts {
   inlineCardRendererHost: QuestionInlineCardRendererHost;
   resolutionCoordinatorHost: QuestionResolutionCoordinatorHost;
   dockCoordinatorHost: QuestionDockCoordinatorHost;
+  dockRefreshHost: QuestionDockRefreshFacadeHost;
   dockQueueRuntimeHost: QuestionDockQueueRuntimeFacadeHost;
   pendingRefreshRuntimeHost: QuestionPendingRefreshRuntimeFacadeHost;
   postResolutionRuntimeHost: QuestionPostResolutionRuntimeFacadeHost;
@@ -112,17 +117,20 @@ export function createQuestionRuntimeHosts(
       getTabRuntimeState: (tabId: TabId | null) => viewHost.getTabRuntimeState(tabId),
       getActiveTabId: () => viewHost.getActiveTabId(),
       getCurrentConversationSessionId: () => viewHost.getCurrentConversationSessionId(),
-      getSessionIdForTab: (tabId: TabId | null) => viewHost.getSessionIdForTab(tabId),
       getQuestionDock: () => viewHost.getQuestionDock(),
       getQuestionDisplayMode: () => viewHost.getQuestionDisplayMode(),
       shouldUseAboveInputQuestionDock: () => viewHost.shouldUseAboveInputQuestionDock(),
       setTabNeedsAttention: (tabId: TabId | null, needsAttention: boolean) => {
         viewHost.setTabNeedsAttention(tabId, needsAttention);
       },
-      getPendingQuestions: () => viewHost.getPendingQuestions(),
       replyToQuestion: (requestId: string, answers: string[][]) =>
         viewHost.replyToQuestion(requestId, answers),
       rejectQuestion: (requestId: string) => viewHost.rejectQuestion(requestId),
+    },
+    dockRefreshHost: {
+      getTabRuntimeState: (tabId: TabId | null) => viewHost.getTabRuntimeState(tabId),
+      getSessionIdForTab: (tabId: TabId | null) => viewHost.getSessionIdForTab(tabId),
+      getPendingQuestions: () => viewHost.getPendingQuestions(),
     },
     dockQueueRuntimeHost: {
       getTabRuntimeState: (tabId: TabId | null) => viewHost.getTabRuntimeState(tabId),
@@ -183,6 +191,11 @@ export function createQuestionRuntimeServices(
       dockCoordinator.render();
     },
   });
+  const dockRefreshFacade = new QuestionDockRefreshFacade(
+    hosts.dockRefreshHost,
+    pendingRefreshRuntimeFacade,
+    dockWritebackFacade,
+  );
   const resolutionWritebackFacade = new QuestionResolutionWritebackFacade({
     markQuestionRequestResolved: (requestId, tabId) => {
       pendingRefreshRuntimeFacade.markQuestionRequestResolved(requestId, tabId);
@@ -196,7 +209,7 @@ export function createQuestionRuntimeServices(
   dockCoordinator = new QuestionDockCoordinator(
     hosts.dockCoordinatorHost,
     dockQueueRuntimeFacade,
-    pendingRefreshRuntimeFacade,
+    dockRefreshFacade,
     dockWritebackFacade,
     resolutionWritebackFacade,
   );
