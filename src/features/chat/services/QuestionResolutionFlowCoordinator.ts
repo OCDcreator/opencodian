@@ -1,28 +1,17 @@
-import type {
-  QuestionDisplayMode,
-  QuestionRequest,
-} from '../../../core/types';
-import { createLogger } from '../../../shared';
-import type {
-  QuestionInlineCardAction,
-  QuestionInlineCardRenderer,
-} from '../runtime/QuestionInlineCardRenderer';
+import type { QuestionRequest } from '../../../core/types';
 import type { TabId } from '../tabs';
 import type { QuestionDockCoordinator } from './QuestionDockCoordinator';
+import type { QuestionInlineResolutionActionFacade } from './QuestionInlineResolutionActionFacade';
 import type { QuestionResolutionApplyFacade } from './QuestionResolutionApplyFacade';
-import {
-  createQuestionRejectExecutionAction,
-  createQuestionReplyExecutionAction,
-  type QuestionResolutionExecutionAction,
-} from './QuestionResolutionExecutionFacade';
-
-const logger = createLogger('QuestionResolutionFlowCoordinator');
 
 type QuestionDockResolutionPort = Pick<
   QuestionDockCoordinator,
   'waitForDockResolutionIfEnabled'
 >;
-type QuestionInlineCardActionPort = Pick<QuestionInlineCardRenderer, 'collectAction'>;
+type QuestionInlineResolutionActionPort = Pick<
+  QuestionInlineResolutionActionFacade,
+  'collectResolutionAction'
+>;
 type QuestionResolutionApplyPort = Pick<
   QuestionResolutionApplyFacade,
   'applyAction'
@@ -30,12 +19,11 @@ type QuestionResolutionApplyPort = Pick<
 
 export interface QuestionResolutionFlowCoordinatorHost {
   getActiveTabId(): TabId | null;
-  getQuestionDisplayMode(): QuestionDisplayMode;
 }
 
 export interface QuestionResolutionFlowCoordinatorPorts {
   dockCoordinator: QuestionDockResolutionPort;
-  inlineCardRenderer: QuestionInlineCardActionPort;
+  inlineResolutionAction: QuestionInlineResolutionActionPort;
   resolutionApply: QuestionResolutionApplyPort;
 }
 
@@ -53,39 +41,14 @@ export class QuestionResolutionFlowCoordinator {
       return;
     }
 
-    const action = await this.ports.inlineCardRenderer.collectAction(
+    const action = await this.ports.inlineResolutionAction.collectResolutionAction(
       request,
-      this.host.getQuestionDisplayMode(),
       tabId,
     );
-
     if (!action) {
-      logger.error('No streaming message element found for question card');
       return;
     }
 
-    await this.resolveInlineQuestionAction(request, action, tabId);
-  }
-
-  private async resolveInlineQuestionAction(
-    request: QuestionRequest,
-    action: QuestionInlineCardAction,
-    tabId: TabId | null,
-  ): Promise<void> {
-    await this.ports.resolutionApply.applyAction(
-      this.createInlineResolutionExecutionAction(request, action),
-      tabId,
-    );
-  }
-
-  private createInlineResolutionExecutionAction(
-    request: QuestionRequest,
-    action: QuestionInlineCardAction,
-  ): QuestionResolutionExecutionAction {
-    if (action.type === 'reject') {
-      return createQuestionRejectExecutionAction(request);
-    }
-
-    return createQuestionReplyExecutionAction(request, action.answers);
+    await this.ports.resolutionApply.applyAction(action, tabId);
   }
 }

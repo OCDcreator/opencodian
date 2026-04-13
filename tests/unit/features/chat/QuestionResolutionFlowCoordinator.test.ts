@@ -1,7 +1,4 @@
-import type {
-  QuestionDisplayMode,
-  QuestionRequest,
-} from '../../../../src/core/types';
+import type { QuestionRequest } from '../../../../src/core/types';
 import { setLocale } from '../../../../src/i18n';
 import {
   QuestionResolutionFlowCoordinator,
@@ -31,31 +28,35 @@ function createQuestionRequest(overrides?: Partial<QuestionRequest>): QuestionRe
 
 function createCoordinator(options?: {
   activeTabId?: TabId | null;
-  displayMode?: QuestionDisplayMode;
   dockResolves?: boolean;
-  action?: Awaited<ReturnType<QuestionResolutionFlowCoordinatorPorts['inlineCardRenderer']['collectAction']>>;
+  action?: Awaited<ReturnType<QuestionResolutionFlowCoordinatorPorts['inlineResolutionAction']['collectResolutionAction']>>;
   applyResult?: boolean;
 }) {
   const action = options && 'action' in options
     ? options.action
     : {
       type: 'reply' as const,
+      request: createQuestionRequest(),
       answers: [['TypeScript']],
+      resolution: {
+        request: createQuestionRequest(),
+        status: 'answered' as const,
+        answers: [['TypeScript']],
+      },
     };
   const host: jest.Mocked<QuestionResolutionFlowCoordinatorHost> = {
     getActiveTabId: jest.fn().mockReturnValue(options?.activeTabId ?? 'tab-active'),
-    getQuestionDisplayMode: jest.fn().mockReturnValue(options?.displayMode ?? 'all'),
   };
   const ports: {
     dockCoordinator: jest.Mocked<QuestionResolutionFlowCoordinatorPorts['dockCoordinator']>;
-    inlineCardRenderer: jest.Mocked<QuestionResolutionFlowCoordinatorPorts['inlineCardRenderer']>;
+    inlineResolutionAction: jest.Mocked<QuestionResolutionFlowCoordinatorPorts['inlineResolutionAction']>;
     resolutionApply: jest.Mocked<QuestionResolutionFlowCoordinatorPorts['resolutionApply']>;
   } = {
     dockCoordinator: {
       waitForDockResolutionIfEnabled: jest.fn().mockResolvedValue(options?.dockResolves ?? false),
     },
-    inlineCardRenderer: {
-      collectAction: jest.fn().mockResolvedValue(action),
+    inlineResolutionAction: {
+      collectResolutionAction: jest.fn().mockResolvedValue(action),
     },
     resolutionApply: {
       applyAction: jest.fn().mockResolvedValue(options?.applyResult ?? true),
@@ -85,49 +86,56 @@ describe('QuestionResolutionFlowCoordinator', () => {
       request,
       'tab-active',
     );
-    expect(ports.inlineCardRenderer.collectAction).not.toHaveBeenCalled();
+    expect(ports.inlineResolutionAction.collectResolutionAction).not.toHaveBeenCalled();
     expect(ports.resolutionApply.applyAction).not.toHaveBeenCalled();
   });
 
-  it('replies through the inline card fallback via the shared apply seam', async () => {
+  it('replays inline resolution actions through the shared apply seam', async () => {
     const request = createQuestionRequest();
-    const { coordinator, ports } = createCoordinator({ displayMode: 'single' });
-
-    await coordinator.showQuestionDialog(request, 'tab-active');
-
-    expect(ports.inlineCardRenderer.collectAction).toHaveBeenCalledWith(
-      request,
-      'single',
-      'tab-active',
-    );
-    expect(ports.resolutionApply.applyAction).toHaveBeenCalledWith({
-      type: 'reply',
+    const inlineAction = {
+      type: 'reply' as const,
       request,
       answers: [['TypeScript']],
       resolution: {
         request,
-        status: 'answered',
+        status: 'answered' as const,
         answers: [['TypeScript']],
       },
-    }, 'tab-active');
+    };
+    const { coordinator, ports } = createCoordinator({ action: inlineAction });
+
+    await coordinator.showQuestionDialog(request, 'tab-active');
+
+    expect(ports.inlineResolutionAction.collectResolutionAction).toHaveBeenCalledWith(
+      request,
+      'tab-active',
+    );
+    expect(ports.resolutionApply.applyAction).toHaveBeenCalledWith(
+      inlineAction,
+      'tab-active',
+    );
   });
 
-  it('rejects through the inline card fallback via the shared apply seam', async () => {
+  it('replays inline reject actions through the shared apply seam', async () => {
     const request = createQuestionRequest();
+    const inlineAction = {
+      type: 'reject' as const,
+      request,
+      resolution: {
+        request,
+        status: 'rejected' as const,
+      },
+    };
     const { coordinator, ports } = createCoordinator({
-      action: { type: 'reject' },
+      action: inlineAction,
     });
 
     await coordinator.showQuestionDialog(request, 'tab-active');
 
-    expect(ports.resolutionApply.applyAction).toHaveBeenCalledWith({
-      type: 'reject',
-      request,
-      resolution: {
-        request,
-        status: 'rejected',
-      },
-    }, 'tab-active');
+    expect(ports.resolutionApply.applyAction).toHaveBeenCalledWith(
+      inlineAction,
+      'tab-active',
+    );
   });
 
   it('does not resolve when inline card rendering is unavailable', async () => {

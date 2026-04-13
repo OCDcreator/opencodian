@@ -16,6 +16,10 @@ import type { StreamingInlineCardRenderer } from '../runtime/StreamingInlineCard
 import type { TabId } from '../tabs';
 import type { QuestionDock } from '../ui/QuestionDock';
 import {
+  QuestionInlineResolutionActionFacade,
+  type QuestionInlineResolutionActionFacadeHost,
+} from './QuestionInlineResolutionActionFacade';
+import {
   QuestionDockRefreshFacade,
   type QuestionDockRefreshFacadeHost,
 } from './QuestionDockRefreshFacade';
@@ -97,6 +101,7 @@ export interface QuestionRuntimeViewHost {
 
 export interface QuestionRuntimeHosts {
   inlineCardRendererHost: QuestionInlineCardRendererHost;
+  inlineResolutionActionHost: QuestionInlineResolutionActionFacadeHost;
   resolutionCoordinatorHost: QuestionResolutionCoordinatorHost;
   dockCoordinatorHost: QuestionDockCoordinatorHost;
   dockRefreshHost: QuestionDockRefreshFacadeHost;
@@ -125,6 +130,10 @@ export function createQuestionRuntimeHosts(
       keepQuestionCardPinnedToBottom: (tabId: TabId | null) => {
         viewHost.keepQuestionCardPinnedToBottom(tabId);
       },
+    },
+    inlineResolutionActionHost: {
+      getActiveTabId: () => viewHost.getActiveTabId(),
+      getQuestionDisplayMode: () => viewHost.getQuestionDisplayMode(),
     },
     resolutionCoordinatorHost: {
       getTabRuntimeState: (tabId: TabId | null) => viewHost.getTabRuntimeState(tabId),
@@ -197,6 +206,10 @@ export function createQuestionRuntimeServices(
     streamingInlineCardRenderer,
     hosts.inlineCardRendererHost,
   );
+  const inlineResolutionActionFacade = new QuestionInlineResolutionActionFacade(
+    hosts.inlineResolutionActionHost,
+    inlineCardRenderer,
+  );
   resolutionCoordinator = new QuestionResolutionCoordinator(
     inlineCardRenderer,
     hosts.resolutionCoordinatorHost,
@@ -265,7 +278,7 @@ export function createQuestionRuntimeServices(
     resolutionFlowCoordinatorHost,
     {
       dockCoordinator,
-      inlineCardRenderer,
+      inlineResolutionAction: inlineResolutionActionFacade,
       resolutionApply: resolutionApplyFacade,
     },
   );

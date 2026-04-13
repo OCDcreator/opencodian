@@ -7,6 +7,7 @@ import { StreamingInlineCardRenderer } from '../../../../src/features/chat/runti
 import type { QuestionDockRefreshFacadeHost } from '../../../../src/features/chat/services/QuestionDockRefreshFacade';
 import type { QuestionDockRenderStateFacadeHost } from '../../../../src/features/chat/services/QuestionDockRenderStateFacade';
 import { QuestionDockQueueRuntimeFacade } from '../../../../src/features/chat/services/QuestionDockQueueRuntimeFacade';
+import type { QuestionInlineResolutionActionFacadeHost } from '../../../../src/features/chat/services/QuestionInlineResolutionActionFacade';
 import { QuestionPendingRefreshRuntimeFacade } from '../../../../src/features/chat/services/QuestionPendingRefreshRuntimeFacade';
 import { QuestionPostResolutionRuntimeFacade } from '../../../../src/features/chat/services/QuestionPostResolutionRuntimeFacade';
 import {
@@ -175,6 +176,10 @@ describe('QuestionRuntimeHostAdapter', () => {
       runtimeByTab.get('tab-active'),
     );
     hosts.inlineCardRendererHost.keepQuestionCardPinnedToBottom('tab-active');
+    const inlineResolutionActionHost: QuestionInlineResolutionActionFacadeHost =
+      hosts.inlineResolutionActionHost;
+    expect(inlineResolutionActionHost.getActiveTabId()).toBe('tab-active');
+    expect(inlineResolutionActionHost.getQuestionDisplayMode()).toBe('single');
 
     expect(hosts.resolutionCoordinatorHost.getTabRuntimeState('tab-active')).toBe(
       runtimeByTab.get('tab-active'),
