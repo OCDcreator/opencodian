@@ -1,8 +1,9 @@
-import type { Conversation } from '../../../core/types';
 import type { TabId } from '../tabs';
-import type { BackgroundConversationAttentionCoordinator } from './BackgroundConversationAttentionCoordinator';
-import type { BackgroundConversationPostSyncRefreshExecutor } from './BackgroundConversationPostSyncRefreshExecutor';
-import type { BackgroundConversationSignalSyncStateCoordinator } from './BackgroundConversationSignalSyncStateCoordinator';
+import type {
+  BackgroundConversationPostSyncHandoffCoordinator,
+  BackgroundTabPostSyncOptions,
+  SignalBackgroundTaskPostSyncOptions,
+} from './BackgroundConversationPostSyncHandoffCoordinator';
 import type { PostSyncQuestionTodoRefreshFacade } from './PostSyncQuestionTodoRefreshFacade';
 import type {
   VisibleConversationPostSyncOutcome,
@@ -15,49 +16,25 @@ export type {
   VisibleConversationPostSyncOutcome,
   VisibleConversationPostSyncResult,
 } from './VisibleConversationPostSyncStateCoordinator';
+export type {
+  BackgroundTabPostSyncOptions,
+  BackgroundTaskPostSyncResult,
+  SignalBackgroundTaskPostSyncOptions,
+} from './BackgroundConversationPostSyncHandoffCoordinator';
 
 type PostSyncQuestionTodoRefreshPort = Pick<
   PostSyncQuestionTodoRefreshFacade,
   | 'refreshVisibleConversation'
 >;
-type BackgroundConversationPostSyncRefreshPort = Pick<
-  BackgroundConversationPostSyncRefreshExecutor,
-  | 'refreshBackgroundTabConversation'
-  | 'refreshSignalSyncedBackgroundConversation'
->;
-type BackgroundConversationAttentionPort = Pick<
-  BackgroundConversationAttentionCoordinator,
-  | 'commitBackgroundTabSyncAttention'
-  | 'commitSignalSyncAttention'
->;
-type BackgroundConversationSignalSyncStatePort = Pick<
-  BackgroundConversationSignalSyncStateCoordinator,
-  'commitSignalSyncState'
+type BackgroundConversationPostSyncHandoffPort = Pick<
+  BackgroundConversationPostSyncHandoffCoordinator,
+  | 'handleBackgroundTabSyncComplete'
+  | 'handleSignalSyncComplete'
 >;
 type VisibleConversationPostSyncStatePort = Pick<
   VisibleConversationPostSyncStateCoordinator,
   'commitPostSyncState'
 >;
-
-export interface BackgroundTaskPostSyncResult {
-  changed: boolean;
-  fingerprint: string;
-}
-
-interface BackgroundTaskPostSyncBaseOptions {
-  tabId: TabId;
-  conversation: Conversation;
-  previousFingerprint: string;
-  syncResult: BackgroundTaskPostSyncResult;
-}
-
-export interface SignalBackgroundTaskPostSyncOptions extends BackgroundTaskPostSyncBaseOptions {
-  reason: string;
-  activeTabId: TabId | null;
-  tabHasBackgroundTask: boolean;
-}
-
-export type BackgroundTabPostSyncOptions = BackgroundTaskPostSyncBaseOptions;
 
 export interface VisibleConversationPostSyncOptions {
   tabId: TabId;
@@ -69,12 +46,9 @@ export interface VisibleConversationPostSyncOptions {
 export class BackgroundTaskPostSyncCoordinator {
   constructor(
     private readonly postSyncQuestionTodoRefreshFacade: PostSyncQuestionTodoRefreshPort,
-    private readonly backgroundConversationPostSyncRefresh:
-      BackgroundConversationPostSyncRefreshPort,
     private readonly visibleConversationPostSyncState: VisibleConversationPostSyncStatePort,
-    private readonly backgroundConversationSignalSyncState:
-      BackgroundConversationSignalSyncStatePort,
-    private readonly backgroundConversationAttention: BackgroundConversationAttentionPort,
+    private readonly backgroundConversationPostSyncHandoff:
+      BackgroundConversationPostSyncHandoffPort,
   ) {}
 
   async handleVisibleConversationSyncComplete(
@@ -93,32 +67,10 @@ export class BackgroundTaskPostSyncCoordinator {
   }
 
   async handleSignalSyncComplete(options: SignalBackgroundTaskPostSyncOptions): Promise<void> {
-    this.backgroundConversationSignalSyncState.commitSignalSyncState({
-      tabId: options.tabId,
-      reason: options.reason,
-    });
-    await this.backgroundConversationPostSyncRefresh.refreshSignalSyncedBackgroundConversation({
-      tabId: options.tabId,
-      conversation: options.conversation,
-      tabHasBackgroundTask: options.tabHasBackgroundTask,
-    });
-    this.backgroundConversationAttention.commitSignalSyncAttention({
-      tabId: options.tabId,
-      activeTabId: options.activeTabId,
-      previousFingerprint: options.previousFingerprint,
-      syncResult: options.syncResult,
-    });
+    await this.backgroundConversationPostSyncHandoff.handleSignalSyncComplete(options);
   }
 
   async handleBackgroundTabSyncComplete(options: BackgroundTabPostSyncOptions): Promise<void> {
-    await this.backgroundConversationPostSyncRefresh.refreshBackgroundTabConversation({
-      tabId: options.tabId,
-      conversation: options.conversation,
-    });
-    this.backgroundConversationAttention.commitBackgroundTabSyncAttention({
-      tabId: options.tabId,
-      previousFingerprint: options.previousFingerprint,
-      syncResult: options.syncResult,
-    });
+    await this.backgroundConversationPostSyncHandoff.handleBackgroundTabSyncComplete(options);
   }
 }

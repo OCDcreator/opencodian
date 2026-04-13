@@ -12,6 +12,9 @@ import {
   type BackgroundConversationAttentionCoordinatorHost,
 } from './BackgroundConversationAttentionCoordinator';
 import {
+  BackgroundConversationPostSyncHandoffCoordinator,
+} from './BackgroundConversationPostSyncHandoffCoordinator';
+import {
   BackgroundConversationPostSyncRefreshExecutor,
   type BackgroundTaskPostSyncRefreshPort,
 } from './BackgroundConversationPostSyncRefreshExecutor';
@@ -311,12 +314,16 @@ export function createQuestionTodoBackgroundTaskRefreshServices(
     new BackgroundConversationSignalSyncStateCoordinator(
       hosts.backgroundConversationSignalSyncStateCoordinatorHost,
     );
+  const backgroundConversationPostSyncHandoffCoordinator =
+    new BackgroundConversationPostSyncHandoffCoordinator(
+      backgroundConversationPostSyncRefreshExecutor,
+      backgroundConversationSignalSyncStateCoordinator,
+      backgroundConversationAttentionCoordinator,
+    );
   const backgroundTaskPostSyncCoordinator = new BackgroundTaskPostSyncCoordinator(
     postSyncQuestionTodoRefreshFacade,
-    backgroundConversationPostSyncRefreshExecutor,
     visibleConversationPostSyncStateCoordinator,
-    backgroundConversationSignalSyncStateCoordinator,
-    backgroundConversationAttentionCoordinator,
+    backgroundConversationPostSyncHandoffCoordinator,
   );
 
   return {
