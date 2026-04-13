@@ -11,7 +11,7 @@
 - 在 signal sync 结束后，按 active-tab 关系决定是否把目标 tab 标记为需要关注
 - 在 background-tab sync 结束后，统一把有变化的后台 tab 标记为需要关注
 
-它不负责 question/todo refresh、background-task rebuild、completion notice flush，也不负责 authoritative-sync ready 标记；这些职责仍分别留在 `BackgroundConversationPostSyncRefreshExecutor` 与 `BackgroundTaskPostSyncCoordinator`。
+它不负责 question/todo refresh、background-task rebuild、completion notice flush，也不负责 authoritative-sync ready 标记；这些职责仍分别留在 `BackgroundConversationPostSyncRefreshExecutor` 与 `BackgroundConversationSignalSyncStateCoordinator`。
 
 ## 公开接口
 
@@ -36,5 +36,5 @@ export class BackgroundConversationAttentionCoordinator {
 ## 与 `OpenCodianView` 的边界
 
 - `OpenCodianView` 不直接依赖本模块；attention writeback 通过 `QuestionTodoBackgroundTaskRefreshHostAdapter` 间接桥接到 `TabRuntimeStateBridge`
-- `BackgroundTaskPostSyncCoordinator` 现在只保留 signal authoritative mark 与 visible/background refresh orchestration，再把 background attention outcome 委托给本模块
+- `BackgroundTaskPostSyncCoordinator` 现在只保留 visible/background refresh orchestration；signal authoritative mark 与 background attention outcome 分别委托给 `BackgroundConversationSignalSyncStateCoordinator` 与本模块
 - 这条边界继续推进 master plan 的 P2 `question / todo / background task` lane：把 background sync 的后置状态判定拆成独立、可单测的单一职责模块

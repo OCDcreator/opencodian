@@ -322,7 +322,7 @@ describe('QuestionTodoBackgroundTaskRefreshHostAdapter', () => {
       'tab-active',
       'next-fingerprint',
     );
-    hosts.backgroundTaskPostSyncCoordinatorHost.markBackgroundTaskAuthoritativeSync(
+    hosts.backgroundConversationSignalSyncStateCoordinatorHost.markBackgroundTaskAuthoritativeSync(
       'tab-active',
       'sync-event:message.updated',
     );

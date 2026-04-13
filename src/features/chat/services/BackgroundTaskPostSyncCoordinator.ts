@@ -2,6 +2,7 @@ import type { Conversation } from '../../../core/types';
 import type { TabId } from '../tabs';
 import type { BackgroundConversationAttentionCoordinator } from './BackgroundConversationAttentionCoordinator';
 import type { BackgroundConversationPostSyncRefreshExecutor } from './BackgroundConversationPostSyncRefreshExecutor';
+import type { BackgroundConversationSignalSyncStateCoordinator } from './BackgroundConversationSignalSyncStateCoordinator';
 import type { PostSyncQuestionTodoRefreshFacade } from './PostSyncQuestionTodoRefreshFacade';
 import type {
   VisibleConversationPostSyncOutcome,
@@ -29,6 +30,10 @@ type BackgroundConversationAttentionPort = Pick<
   | 'commitBackgroundTabSyncAttention'
   | 'commitSignalSyncAttention'
 >;
+type BackgroundConversationSignalSyncStatePort = Pick<
+  BackgroundConversationSignalSyncStateCoordinator,
+  'commitSignalSyncState'
+>;
 type VisibleConversationPostSyncStatePort = Pick<
   VisibleConversationPostSyncStateCoordinator,
   'commitPostSyncState'
@@ -37,10 +42,6 @@ type VisibleConversationPostSyncStatePort = Pick<
 export interface BackgroundTaskPostSyncResult {
   changed: boolean;
   fingerprint: string;
-}
-
-export interface BackgroundTaskPostSyncCoordinatorHost {
-  markBackgroundTaskAuthoritativeSync(tabId: TabId | null, reason: string): void;
 }
 
 interface BackgroundTaskPostSyncBaseOptions {
@@ -67,11 +68,12 @@ export interface VisibleConversationPostSyncOptions {
 
 export class BackgroundTaskPostSyncCoordinator {
   constructor(
-    private readonly host: BackgroundTaskPostSyncCoordinatorHost,
     private readonly postSyncQuestionTodoRefreshFacade: PostSyncQuestionTodoRefreshPort,
     private readonly backgroundConversationPostSyncRefresh:
       BackgroundConversationPostSyncRefreshPort,
     private readonly visibleConversationPostSyncState: VisibleConversationPostSyncStatePort,
+    private readonly backgroundConversationSignalSyncState:
+      BackgroundConversationSignalSyncStatePort,
     private readonly backgroundConversationAttention: BackgroundConversationAttentionPort,
   ) {}
 
@@ -91,7 +93,10 @@ export class BackgroundTaskPostSyncCoordinator {
   }
 
   async handleSignalSyncComplete(options: SignalBackgroundTaskPostSyncOptions): Promise<void> {
-    this.host.markBackgroundTaskAuthoritativeSync(options.tabId, `sync-event:${options.reason}`);
+    this.backgroundConversationSignalSyncState.commitSignalSyncState({
+      tabId: options.tabId,
+      reason: options.reason,
+    });
     await this.backgroundConversationPostSyncRefresh.refreshSignalSyncedBackgroundConversation({
       tabId: options.tabId,
       conversation: options.conversation,
