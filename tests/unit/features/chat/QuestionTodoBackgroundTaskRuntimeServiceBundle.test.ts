@@ -27,7 +27,9 @@ function createHost(): QuestionTodoBackgroundTaskRuntimeHostProviderHost {
   return {
     getCurrentConversation: jest.fn(),
     setCurrentConversationRevertState: jest.fn(),
-    setTabConversationSyncFingerprint: jest.fn(),
+    getConversationSyncRuntime: jest.fn(() => ({
+      setTabConversationSyncFingerprint: jest.fn(),
+    })),
     getTabRuntimeState: jest.fn(),
     renderSessionTodoDock: jest.fn(),
     getQuestionDockCoordinator: jest.fn(),

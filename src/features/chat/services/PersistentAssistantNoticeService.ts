@@ -1,5 +1,6 @@
 import type { ChatMessage, Conversation } from '../../../core/types';
 import type { TabId } from '../tabs';
+import type { TabConversationSyncFingerprintRuntimePort } from './TabConversationSyncFingerprintPortProvider';
 
 export interface PersistentAssistantNoticeMessageOptions {
   title: string;
@@ -15,10 +16,9 @@ export interface PersistentAssistantNoticeMessageOptions {
 export interface PersistentAssistantNoticeServiceHost {
   getCurrentConversation(): Conversation | null;
   getActiveTabId(): TabId | null;
-  getConversationSyncFingerprint(messages: ChatMessage[]): string;
+  getConversationSyncRuntime(): TabConversationSyncFingerprintRuntimePort;
   renderMessage(message: ChatMessage): Promise<void>;
   saveConversation(conversation: Conversation): Promise<void>;
-  setTabConversationSyncFingerprint(tabId: TabId | null, fingerprint: string): void;
   handleVisibleNoticeMessageAppended(): void;
   setTabNeedsAttention(tabId: TabId | null, needsAttention: boolean): void;
 }
@@ -61,7 +61,8 @@ export class PersistentAssistantNoticeService {
     }
 
     const targetTabId = options.tabId ?? this.host.getActiveTabId();
-    const fingerprint = this.host.getConversationSyncFingerprint([
+    const conversationSyncRuntime = this.host.getConversationSyncRuntime();
+    const fingerprint = conversationSyncRuntime.getConversationSyncFingerprint([
       ...targetConversation.messages,
       noticeMessage,
     ]);
@@ -75,7 +76,7 @@ export class PersistentAssistantNoticeService {
     targetConversation.messages.push(noticeMessage);
     targetConversation.updatedAt = timestamp;
     await this.host.saveConversation(targetConversation);
-    this.host.setTabConversationSyncFingerprint(targetTabId, fingerprint);
+    conversationSyncRuntime.setTabConversationSyncFingerprint(targetTabId, fingerprint);
 
     if (targetConversationIsVisible) {
       this.host.handleVisibleNoticeMessageAppended();

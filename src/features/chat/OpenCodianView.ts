@@ -290,6 +290,11 @@ import {
   type QuestionTodoBackgroundTaskRuntimeHostProviderHost,
 } from './services/QuestionTodoBackgroundTaskRuntimeHostProvider';
 import {
+  createTabConversationSyncFingerprintRuntimePort,
+  type TabConversationSyncFingerprintPortProviderHost,
+  type TabConversationSyncFingerprintRuntimePort,
+} from './services/TabConversationSyncFingerprintPortProvider';
+import {
   createTabActivationRuntimeViewHostFactoryHost,
   type TabActivationRuntimeHostProviderHost,
 } from './services/TabActivationRuntimeHostProvider';
@@ -755,6 +760,8 @@ export class OpenCodianView extends ItemView {
   private conversationSyncRuntimeCoordinator: ConversationSyncRuntimeCoordinator;
   private conversationSyncBridge: ConversationSyncBridge;
   private conversationSyncBridgePorts!: ConversationSyncBridgePorts;
+  private tabConversationSyncFingerprintRuntimePort!:
+    TabConversationSyncFingerprintRuntimePort;
   private tabActivationConversationSyncRuntimePort!: TabActivationConversationSyncRuntimePort;
   private conversationSessionSignalRuntime: ConversationSessionSignalRuntime;
   private conversationTabOpenCoordinator: ConversationTabOpenCoordinator;
@@ -1110,6 +1117,10 @@ export class OpenCodianView extends ItemView {
       focusPreviewWritebackHost: this.createFocusContextPreviewWritebackHost(),
     });
     this.composerContextViewFacade = composerContextServices.viewFacade;
+    this.tabConversationSyncFingerprintRuntimePort =
+      createTabConversationSyncFingerprintRuntimePort(
+        this.createTabConversationSyncFingerprintPortProviderHost(),
+      );
     this.persistentAssistantNoticeService = new PersistentAssistantNoticeService(
       this.createPersistentAssistantNoticeServiceHost(),
     );
@@ -1342,15 +1353,9 @@ export class OpenCodianView extends ItemView {
     return {
       getCurrentConversation: () => this.currentConversation,
       getActiveTabId: () => this.getActiveTabId(),
-      getConversationSyncFingerprint: (messages) => this.getConversationSyncFingerprint(messages),
+      getConversationSyncRuntime: () => this.tabConversationSyncFingerprintRuntimePort,
       renderMessage: (message) => this.renderMessage(message),
       saveConversation: (conversation) => this.plugin.saveConversation(conversation),
-      setTabConversationSyncFingerprint: (tabId, fingerprint) => {
-        const runtime = this.getTabRuntimeState(tabId);
-        if (runtime) {
-          runtime.lastConversationSyncFingerprint = fingerprint;
-        }
-      },
       handleVisibleNoticeMessageAppended: () => {
         const runtime = this.getActiveTabRuntimeState();
         if (runtime?.isHydratingConversation) {
@@ -1397,12 +1402,7 @@ export class OpenCodianView extends ItemView {
       setCurrentConversationRevertState: (revertState) => {
         this.currentConversationRevertState = revertState;
       },
-      setTabConversationSyncFingerprint: (tabId, fingerprint) => {
-        const runtime = this.getTabRuntimeState(tabId);
-        if (runtime) {
-          runtime.lastConversationSyncFingerprint = fingerprint;
-        }
-      },
+      getConversationSyncRuntime: () => this.tabConversationSyncFingerprintRuntimePort,
       getTabRuntimeState: (tabId: TabId | null) => this.getTabRuntimeState(tabId),
       renderSessionTodoDock: (tabId) => {
         this.renderSessionTodoDock(tabId);
@@ -1634,6 +1634,20 @@ export class OpenCodianView extends ItemView {
       },
       syncVisibleConversationInBackground: () =>
         this.conversationSyncBridge.syncVisibleConversationInBackground(),
+    };
+  }
+
+  private createTabConversationSyncFingerprintPortProviderHost():
+  TabConversationSyncFingerprintPortProviderHost {
+    return {
+      getConversationSyncFingerprint: (messages) =>
+        this.getConversationSyncFingerprint(messages),
+      setTabConversationSyncFingerprint: (tabId, fingerprint) => {
+        const runtime = this.getTabRuntimeState(tabId);
+        if (runtime) {
+          runtime.lastConversationSyncFingerprint = fingerprint;
+        }
+      },
     };
   }
 

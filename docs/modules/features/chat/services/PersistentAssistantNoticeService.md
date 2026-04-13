@@ -20,10 +20,9 @@
 export interface PersistentAssistantNoticeServiceHost {
   getCurrentConversation(): Conversation | null;
   getActiveTabId(): TabId | null;
-  getConversationSyncFingerprint(messages: ChatMessage[]): string;
+  getConversationSyncRuntime(): TabConversationSyncFingerprintRuntimePort;
   renderMessage(message: ChatMessage): Promise<void>;
   saveConversation(conversation: Conversation): Promise<void>;
-  setTabConversationSyncFingerprint(tabId: TabId | null, fingerprint: string): void;
   handleVisibleNoticeMessageAppended(): void;
   setTabNeedsAttention(tabId: TabId | null, needsAttention: boolean): void;
 }
@@ -44,11 +43,11 @@ export class PersistentAssistantNoticeService {
 ### visible / hidden append 路由
 
 - `appendMessage()` 对当前可见会话会先调用 host render，再把 notice 真正 push 进 conversation 并保存，保持现有 UI 出现顺序
-- 保存后统一写回 conversation sync fingerprint；可见会话走 hydration pending-layout / settled-scroll follow-up，隐藏 tab 走 attention 标记
+- 保存后统一通过 `TabConversationSyncFingerprintRuntimePort` 写回 conversation sync fingerprint；可见会话走 hydration pending-layout / settled-scroll follow-up，隐藏 tab 走 attention 标记
 - `noticeActions` 与 `noticeMeta` 会原样透传，供 model-unavailable notice 与 background-task completion notice 继续复用
 
 ## 与 `OpenCodianView` 的边界
 
 - `SessionTodoStateService`、`BackgroundTaskNoticeStateService`、`BackgroundTaskCompletionNoticeService` 仍负责各自 notice 的状态机、文案和 dedupe 时机
-- `OpenCodianView` 只提供 render/save/tab-runtime host bridge，不再内联持有持久化 assistant notice 的 append/dedupe 细节
+- `OpenCodianView` 只提供 render/save/tab-runtime host bridge，并通过 `TabConversationSyncFingerprintPortProvider` 复用 fingerprint 计算与 tab writeback seam
 - 这让 P2 `question / todo / background task` lane 继续把 session todo 与 background task 共用的 persisted-notice ownership 从主 view 迁到 dedicated service

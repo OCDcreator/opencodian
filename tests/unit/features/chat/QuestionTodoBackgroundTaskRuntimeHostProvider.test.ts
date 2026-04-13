@@ -11,6 +11,9 @@ import {
   createQuestionTodoBackgroundTaskRuntimeViewHostFactoryHost,
   type QuestionTodoBackgroundTaskRuntimeHostProviderHost,
 } from '../../../../src/features/chat/services/QuestionTodoBackgroundTaskRuntimeHostProvider';
+import type {
+  TabConversationSyncFingerprintRuntimePort,
+} from '../../../../src/features/chat/services/TabConversationSyncFingerprintPortProvider';
 
 type Mocked<T> = {
   [Key in keyof T]:
@@ -42,6 +45,9 @@ type BackgroundTaskLiveSignalCoordinator = ReturnType<
 >;
 type TabRuntimeStateBridge = ReturnType<
   QuestionTodoBackgroundTaskRuntimeHostProviderHost['getTabRuntimeStateBridge']
+>;
+type ConversationSyncRuntime = ReturnType<
+  QuestionTodoBackgroundTaskRuntimeHostProviderHost['getConversationSyncRuntime']
 >;
 
 function createConversation(id: string): Conversation {
@@ -121,9 +127,16 @@ function createTabRuntimeStateBridge(): TabRuntimeStateBridge {
   };
 }
 
+function createConversationSyncRuntime(): ConversationSyncRuntime {
+  return {
+    setTabConversationSyncFingerprint: jest.fn(),
+  } as jest.Mocked<Pick<TabConversationSyncFingerprintRuntimePort, 'setTabConversationSyncFingerprint'>>;
+}
+
 function createFixture() {
   let conversation = createConversation('conversation-active');
   let runtime = createRuntime();
+  let conversationSyncRuntime = createConversationSyncRuntime();
   let questionDockCoordinator = createQuestionDockCoordinator();
   let sessionTodoStateService = createSessionTodoStateService();
   let sessionTodoStatusRefreshService = createSessionTodoStatusRefreshService();
@@ -136,7 +149,7 @@ function createFixture() {
   const host: Mocked<QuestionTodoBackgroundTaskRuntimeHostProviderHost> = {
     getCurrentConversation: jest.fn(() => conversation),
     setCurrentConversationRevertState: jest.fn(),
-    setTabConversationSyncFingerprint: jest.fn(),
+    getConversationSyncRuntime: jest.fn(() => conversationSyncRuntime),
     getTabRuntimeState: jest.fn((tabId: string | null) => (tabId ? runtime : null)),
     renderSessionTodoDock: jest.fn(),
     getQuestionDockCoordinator: jest.fn(() => questionDockCoordinator),
@@ -159,6 +172,9 @@ function createFixture() {
     },
     setRuntime: (next: QuestionTodoStatusRefreshRuntime) => {
       runtime = next;
+    },
+    setConversationSyncRuntime: (next: ConversationSyncRuntime) => {
+      conversationSyncRuntime = next;
     },
     setQuestionDockCoordinator: (next: QuestionDockCoordinator) => {
       questionDockCoordinator = next;
@@ -241,7 +257,7 @@ describe('QuestionTodoBackgroundTaskRuntimeHostProvider', () => {
     expect(fixture.host.setCurrentConversationRevertState).toHaveBeenCalledWith({
       messageID: 'message-1',
     });
-    expect(fixture.host.setTabConversationSyncFingerprint)
+    expect(fixture.host.getConversationSyncRuntime().setTabConversationSyncFingerprint)
       .toHaveBeenCalledWith('tab-active', 'fingerprint-next');
     expect(fixture.host.getTabRuntimeState).toHaveBeenCalledWith('tab-active');
     expect(fixture.host.renderSessionTodoDock).toHaveBeenCalledWith('tab-active');
@@ -265,6 +281,7 @@ describe('QuestionTodoBackgroundTaskRuntimeHostProvider', () => {
     const nextRuntime = createRuntime({
       sessionTodos: [{ id: 'todo-2', content: 'Next', status: 'pending' }],
     });
+    const nextConversationSyncRuntime = createConversationSyncRuntime();
     const nextQuestionDockCoordinator = createQuestionDockCoordinator();
     const nextSessionTodoStateService = createSessionTodoStateService();
     const nextSessionTodoStatusRefreshService = createSessionTodoStatusRefreshService();
@@ -278,6 +295,7 @@ describe('QuestionTodoBackgroundTaskRuntimeHostProvider', () => {
 
     fixture.setConversation(nextConversation);
     fixture.setRuntime(nextRuntime);
+    fixture.setConversationSyncRuntime(nextConversationSyncRuntime);
     fixture.setQuestionDockCoordinator(nextQuestionDockCoordinator);
     fixture.setSessionTodoStateService(nextSessionTodoStateService);
     fixture.setSessionTodoStatusRefreshService(nextSessionTodoStatusRefreshService);
@@ -288,6 +306,7 @@ describe('QuestionTodoBackgroundTaskRuntimeHostProvider', () => {
     fixture.setTabRuntimeStateBridge(nextTabRuntimeStateBridge);
 
     expect(conversationState.getCurrentConversation()).toEqual(nextConversation);
+    conversationState.setTabConversationSyncFingerprint('tab-next', 'fingerprint-late');
     expect(refreshRuntime.getTabRuntimeState('tab-next')).toBe(nextRuntime);
     expect(refreshRuntime.getQuestionDockCoordinator()).toBe(nextQuestionDockCoordinator);
     expect(refreshRuntime.getSessionTodoStateService()).toBe(nextSessionTodoStateService);
@@ -302,5 +321,7 @@ describe('QuestionTodoBackgroundTaskRuntimeHostProvider', () => {
     expect(backgroundRuntime.getBackgroundTaskLiveSignalCoordinator())
       .toBe(nextBackgroundTaskLiveSignalCoordinator);
     expect(backgroundRuntime.getTabRuntimeStateBridge()).toBe(nextTabRuntimeStateBridge);
+    expect(nextConversationSyncRuntime.setTabConversationSyncFingerprint)
+      .toHaveBeenCalledWith('tab-next', 'fingerprint-late');
   });
 });

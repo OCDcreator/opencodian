@@ -1,6 +1,7 @@
 import type {
   QuestionTodoBackgroundTaskRuntimeViewHostFactoryHost,
 } from './QuestionTodoBackgroundTaskRuntimeViewHostFactory';
+import type { TabConversationSyncFingerprintRuntimePort } from './TabConversationSyncFingerprintPortProvider';
 
 type QuestionTodoBackgroundTaskConversationStatePort = ReturnType<
   QuestionTodoBackgroundTaskRuntimeViewHostFactoryHost['getConversationState']
@@ -14,14 +15,17 @@ type QuestionTodoBackgroundTaskActivationWritebackPort = ReturnType<
 type QuestionTodoBackgroundTaskBackgroundRuntimePort = ReturnType<
   QuestionTodoBackgroundTaskRuntimeViewHostFactoryHost['getBackgroundTaskRuntime']
 >;
+type QuestionTodoBackgroundTaskConversationSyncRuntimePort = Pick<
+  TabConversationSyncFingerprintRuntimePort,
+  'setTabConversationSyncFingerprint'
+>;
 
 export interface QuestionTodoBackgroundTaskRuntimeHostProviderHost {
   getCurrentConversation:
     QuestionTodoBackgroundTaskConversationStatePort['getCurrentConversation'];
   setCurrentConversationRevertState:
     QuestionTodoBackgroundTaskConversationStatePort['setCurrentConversationRevertState'];
-  setTabConversationSyncFingerprint:
-    QuestionTodoBackgroundTaskConversationStatePort['setTabConversationSyncFingerprint'];
+  getConversationSyncRuntime(): QuestionTodoBackgroundTaskConversationSyncRuntimePort;
   getTabRuntimeState:
     QuestionTodoBackgroundTaskRefreshRuntimePort['getTabRuntimeState'];
   renderSessionTodoDock:
@@ -60,7 +64,7 @@ export function createQuestionTodoBackgroundTaskRuntimeViewHostFactoryHost(
         host.setCurrentConversationRevertState(revertState);
       },
       setTabConversationSyncFingerprint: (tabId, fingerprint) => {
-        host.setTabConversationSyncFingerprint(tabId, fingerprint);
+        host.getConversationSyncRuntime().setTabConversationSyncFingerprint(tabId, fingerprint);
       },
     }),
     getQuestionTodoRefreshRuntime: () => ({

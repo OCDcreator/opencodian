@@ -2,27 +2,34 @@ import {
   PersistentAssistantNoticeService,
   type PersistentAssistantNoticeServiceHost,
 } from '../../../../src/features/chat/services/PersistentAssistantNoticeService';
+import type {
+  TabConversationSyncFingerprintRuntimePort,
+} from '../../../../src/features/chat/services/TabConversationSyncFingerprintPortProvider';
 
 describe('PersistentAssistantNoticeService', () => {
   function createHost(options?: {
     currentConversation?: Record<string, unknown> | null;
   }): PersistentAssistantNoticeServiceHost & {
+    getConversationSyncRuntime: jest.Mock<TabConversationSyncFingerprintRuntimePort, []>;
     renderMessage: jest.Mock;
     saveConversation: jest.Mock;
-    setTabConversationSyncFingerprint: jest.Mock;
     handleVisibleNoticeMessageAppended: jest.Mock;
     setTabNeedsAttention: jest.Mock;
   } {
-    return {
-      getCurrentConversation: jest.fn().mockReturnValue(options?.currentConversation ?? null),
-      getActiveTabId: jest.fn().mockReturnValue('tab-1'),
+    const conversationSyncRuntime: jest.Mocked<TabConversationSyncFingerprintRuntimePort> = {
       getConversationSyncFingerprint: jest.fn((messages: Array<Record<string, unknown>>) => {
         const lastMessage = messages[messages.length - 1];
         return `fingerprint:${messages.length}:${String(lastMessage?.id ?? 'missing')}`;
       }),
+      setTabConversationSyncFingerprint: jest.fn(),
+    };
+
+    return {
+      getCurrentConversation: jest.fn().mockReturnValue(options?.currentConversation ?? null),
+      getActiveTabId: jest.fn().mockReturnValue('tab-1'),
+      getConversationSyncRuntime: jest.fn(() => conversationSyncRuntime),
       renderMessage: jest.fn().mockResolvedValue(undefined),
       saveConversation: jest.fn().mockResolvedValue(undefined),
-      setTabConversationSyncFingerprint: jest.fn(),
       handleVisibleNoticeMessageAppended: jest.fn(),
       setTabNeedsAttention: jest.fn(),
     };
@@ -94,10 +101,12 @@ describe('PersistentAssistantNoticeService', () => {
         taskIds: ['task-1'],
       },
     });
-    expect(host.setTabConversationSyncFingerprint).toHaveBeenCalledWith(
+    expect(host.getConversationSyncRuntime).toHaveBeenCalledTimes(1);
+    expect(host.getConversationSyncRuntime().setTabConversationSyncFingerprint)
+      .toHaveBeenCalledWith(
       'tab-1',
       'fingerprint:1:assistant-notice-123',
-    );
+      );
     expect(host.handleVisibleNoticeMessageAppended).toHaveBeenCalledTimes(1);
     expect(host.setTabNeedsAttention).not.toHaveBeenCalled();
   });
@@ -127,10 +136,11 @@ describe('PersistentAssistantNoticeService', () => {
 
     expect(host.renderMessage).not.toHaveBeenCalled();
     expect(host.saveConversation).toHaveBeenCalledWith(backgroundConversation);
-    expect(host.setTabConversationSyncFingerprint).toHaveBeenCalledWith(
+    expect(host.getConversationSyncRuntime().setTabConversationSyncFingerprint)
+      .toHaveBeenCalledWith(
       'tab-2',
       'fingerprint:1:assistant-notice-456',
-    );
+      );
     expect(host.handleVisibleNoticeMessageAppended).not.toHaveBeenCalled();
     expect(host.setTabNeedsAttention).toHaveBeenCalledWith('tab-2', true);
   });

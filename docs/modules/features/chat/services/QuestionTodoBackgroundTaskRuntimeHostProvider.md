@@ -20,7 +20,10 @@
 export interface QuestionTodoBackgroundTaskRuntimeHostProviderHost {
   getCurrentConversation(): Conversation | null;
   setCurrentConversationRevertState(revertState: ConversationRevertStateSnapshot | null): void;
-  setTabConversationSyncFingerprint(tabId: TabId, fingerprint: string): void;
+  getConversationSyncRuntime(): Pick<
+    TabConversationSyncFingerprintRuntimePort,
+    'setTabConversationSyncFingerprint'
+  >;
   getTabRuntimeState(tabId: TabId | null): QuestionTodoStatusRefreshRuntime | null;
   renderSessionTodoDock(tabId: TabId | null): void;
   getQuestionDockCoordinator(): QuestionDockCoordinatorPort;
@@ -46,7 +49,7 @@ export function createQuestionTodoBackgroundTaskRuntimeViewHostFactoryHost(
 
 ## 边界
 
-- `OpenCodianView` 现在只提供扁平的 P2 runtime seam，不再直接拼四组 grouped port
+- `OpenCodianView` 现在只提供扁平的 P2 runtime seam，并把 tab-scoped fingerprint writeback 通过 `TabConversationSyncFingerprintPortProvider` 复用给该 provider
 - `QuestionTodoBackgroundTaskRuntimeHostProvider` 只负责重新分组，不新增业务逻辑
 - `QuestionTodoBackgroundTaskRuntimeViewHostFactory` 继续负责从 grouped port 派生 shared visible/refresh/background/activation view hosts
 - `QuestionTodoBackgroundTaskRuntimeServiceBundle` 继续掌握 visible-state、refresh、activation 三段 service-bundle 的实例化顺序
