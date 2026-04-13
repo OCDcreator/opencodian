@@ -41,4 +41,4 @@ export class QuestionPendingRefreshRuntimeFacade {
 
 - `QuestionRuntimeHostAdapter` 负责从共享 `QuestionRuntimeViewHost` 派生本 facade 所需的 runtime host；`OpenCodianView` 不需要暴露额外的 question-refresh 专属 helper
 - `QuestionDockCoordinator` 继续负责 question API fetch、session 过滤、attention/render 决策与 dock resolution flow；dock queue 的 waiter/enqueue/remove runtime 读写由 `QuestionDockQueueRuntimeFacade` 承接，pending refresh 期间的 resolved-state / stale-state 读写由本 facade 承接
-- `QuestionResolutionFlowCoordinator` 现在直接经由 `QuestionPendingRefreshRuntimeFacade.markQuestionRequestResolved()` 小 port 标记 inline fallback resolution；dock resolve 也仍委托本 facade 写入同一份 suppression set
+- `QuestionResolutionWritebackFacade` 现在经由本 facade 的 `markQuestionRequestResolved()` 小 port 标记 dock 与 inline fallback resolution，让两条 resolve path 写入同一份 suppression set

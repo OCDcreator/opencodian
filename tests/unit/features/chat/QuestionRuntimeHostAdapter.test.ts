@@ -1,7 +1,6 @@
 import type {
   QuestionDisplayMode,
   QuestionRequest,
-  QuestionResolution,
 } from '../../../../src/core/types';
 import { setLocale } from '../../../../src/i18n';
 import { StreamingInlineCardRenderer } from '../../../../src/features/chat/runtime/StreamingInlineCardRenderer';
@@ -157,15 +156,12 @@ describe('QuestionRuntimeHostAdapter', () => {
 
   it('derives inline-card, resolution, and dock hosts from one view host', async () => {
     const request = createQuestionRequest();
-    const resolutionPort = {
-      applyResolvedQuestionState: jest.fn<void, [QuestionResolution, TabId | null]>(),
-    };
     const { viewHost, runtimeByTab } = createViewHost({
       questionDisplayMode: 'single',
       shouldRenderQuestionResolutionCards: true,
     });
 
-    const hosts = createQuestionRuntimeHosts(viewHost, resolutionPort);
+    const hosts = createQuestionRuntimeHosts(viewHost);
 
     expect(hosts.inlineCardRendererHost.getActiveTabId()).toBe('tab-active');
     expect(hosts.inlineCardRendererHost.getTabRuntimeState('tab-active')).toBe(
@@ -183,14 +179,6 @@ describe('QuestionRuntimeHostAdapter', () => {
     await hosts.dockCoordinatorHost.getPendingQuestions();
     await hosts.dockCoordinatorHost.replyToQuestion(request.id, [['TypeScript']]);
     await hosts.dockCoordinatorHost.rejectQuestion(request.id);
-    hosts.dockCoordinatorHost.applyResolvedQuestionState(
-      {
-        request,
-        status: 'answered',
-        answers: [['TypeScript']],
-      },
-      'tab-active',
-    );
     const postResolutionRuntimeFacade = new QuestionPostResolutionRuntimeFacade(
       hosts.postResolutionRuntimeHost,
     );
@@ -214,14 +202,6 @@ describe('QuestionRuntimeHostAdapter', () => {
       'tab-active',
       'session-1',
       { suppressErrors: true },
-    );
-    expect(resolutionPort.applyResolvedQuestionState).toHaveBeenCalledWith(
-      {
-        request,
-        status: 'answered',
-        answers: [['TypeScript']],
-      },
-      'tab-active',
     );
     expect(runtimeByTab.get('tab-active')?.resolvedQuestionRequestIds.has(request.id)).toBe(true);
     expect(viewHost.startConversationSyncLoop).toHaveBeenCalledTimes(1);

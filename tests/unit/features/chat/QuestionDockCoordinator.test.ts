@@ -9,6 +9,7 @@ import {
 } from '../../../../src/features/chat/services/QuestionDockCoordinator';
 import { QuestionPendingRefreshRuntimeFacade } from '../../../../src/features/chat/services/QuestionPendingRefreshRuntimeFacade';
 import type { QuestionPostResolutionRuntimeFacade } from '../../../../src/features/chat/services/QuestionPostResolutionRuntimeFacade';
+import { QuestionResolutionWritebackFacade } from '../../../../src/features/chat/services/QuestionResolutionWritebackFacade';
 import type { TabId } from '../../../../src/features/chat/tabs';
 import type {
   QuestionDockCallbacks,
@@ -111,7 +112,6 @@ function createHost(options?: {
     getPendingQuestions: jest.fn().mockResolvedValue([] as QuestionRequest[]),
     replyToQuestion: jest.fn().mockResolvedValue(undefined),
     rejectQuestion: jest.fn().mockResolvedValue(undefined),
-    applyResolvedQuestionState: jest.fn(),
   };
   const postResolutionRuntime: jest.Mocked<Pick<
     QuestionPostResolutionRuntimeFacade,
@@ -137,12 +137,25 @@ function createHost(options?: {
       return created;
     },
   });
+  const applyResolvedQuestionState = jest.fn();
+  const resolutionWriteback = new QuestionResolutionWritebackFacade({
+    markQuestionRequestResolved: (requestId, tabId) => {
+      pendingRefreshRuntime.markQuestionRequestResolved(requestId, tabId);
+    },
+    applyResolvedQuestionState: (resolution, tabId) => {
+      applyResolvedQuestionState(resolution, tabId);
+    },
+    followUpAfterResolution: (tabId) =>
+      postResolutionRuntime.followUpAfterResolution(tabId),
+  });
 
   return {
     host,
     dockQueueRuntime,
     pendingRefreshRuntime,
     postResolutionRuntime,
+    resolutionWriteback,
+    applyResolvedQuestionState,
     runtimeByTab,
     questionDock,
     getLatestRenderState(): QuestionDockRenderState {
@@ -173,6 +186,8 @@ describe('QuestionDockCoordinator', () => {
       dockQueueRuntime,
       pendingRefreshRuntime,
       postResolutionRuntime,
+      resolutionWriteback,
+      applyResolvedQuestionState,
       runtimeByTab,
       getLatestCallbacks,
       getLatestRenderState,
@@ -181,7 +196,7 @@ describe('QuestionDockCoordinator', () => {
       host,
       dockQueueRuntime,
       pendingRefreshRuntime,
-      postResolutionRuntime,
+      resolutionWriteback,
     );
 
     const resolutionPromise = coordinator.waitForDockResolutionIfEnabled(request, 'tab-active');
@@ -195,7 +210,7 @@ describe('QuestionDockCoordinator', () => {
     await expect(resolutionPromise).resolves.toBe(true);
 
     expect(host.replyToQuestion).toHaveBeenCalledWith(request.id, [['TypeScript']]);
-    expect(host.applyResolvedQuestionState).toHaveBeenCalledWith(
+    expect(applyResolvedQuestionState).toHaveBeenCalledWith(
       expect.objectContaining({
         request,
         status: 'answered',
@@ -217,7 +232,7 @@ describe('QuestionDockCoordinator', () => {
       host,
       dockQueueRuntime,
       pendingRefreshRuntime,
-      postResolutionRuntime,
+      resolutionWriteback,
       runtimeByTab,
     } = createHost({
       activeTabId: 'tab-active',
@@ -240,7 +255,7 @@ describe('QuestionDockCoordinator', () => {
       host,
       dockQueueRuntime,
       pendingRefreshRuntime,
-      postResolutionRuntime,
+      resolutionWriteback,
     );
 
     const refreshed = await coordinator.refreshPendingQuestionsForTab('tab-background', 'session-background');
@@ -258,7 +273,7 @@ describe('QuestionDockCoordinator', () => {
       host,
       dockQueueRuntime,
       pendingRefreshRuntime,
-      postResolutionRuntime,
+      resolutionWriteback,
     } = createHost({
       shouldUseAboveInputQuestionDock: false,
     });
@@ -267,7 +282,7 @@ describe('QuestionDockCoordinator', () => {
       host,
       dockQueueRuntime,
       pendingRefreshRuntime,
-      postResolutionRuntime,
+      resolutionWriteback,
     );
 
     coordinator.render();

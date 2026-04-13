@@ -12,7 +12,7 @@ import type {
   QuestionPendingRefreshRuntimeFacade,
   QuestionPendingRefreshRuntimeState,
 } from './QuestionPendingRefreshRuntimeFacade';
-import type { QuestionPostResolutionRuntimeFacade } from './QuestionPostResolutionRuntimeFacade';
+import type { QuestionResolutionWritebackFacade } from './QuestionResolutionWritebackFacade';
 import { isQuestionAnswerComplete } from '../ui/questionDockState';
 import {
   getQuestionDockDraftAnswers,
@@ -26,9 +26,9 @@ import {
 
 const logger = createLogger('QuestionDockCoordinator');
 
-type QuestionPostResolutionRuntimePort = Pick<
-  QuestionPostResolutionRuntimeFacade,
-  'followUpAfterResolution'
+type QuestionResolutionWritebackPort = Pick<
+  QuestionResolutionWritebackFacade,
+  'applyResolution'
 >;
 type QuestionDockQueueRuntimePort = Pick<
   QuestionDockQueueRuntimeFacade,
@@ -39,7 +39,6 @@ type QuestionPendingRefreshRuntimePort = Pick<
   | 'applyRefreshedPendingQuestionRequests'
   | 'clearPendingQuestionState'
   | 'getPendingQuestionRequests'
-  | 'markQuestionRequestResolved'
 >;
 
 export interface QuestionDockCoordinatorRuntimeState {
@@ -64,7 +63,6 @@ export interface QuestionDockCoordinatorHost {
   getPendingQuestions(): Promise<QuestionRequest[]>;
   replyToQuestion(requestId: string, answers: string[][]): Promise<void>;
   rejectQuestion(requestId: string): Promise<void>;
-  applyResolvedQuestionState(resolution: QuestionResolution, tabId: TabId | null): void;
 }
 
 export class QuestionDockCoordinator {
@@ -72,7 +70,7 @@ export class QuestionDockCoordinator {
     private readonly host: QuestionDockCoordinatorHost,
     private readonly dockQueueRuntime: QuestionDockQueueRuntimePort,
     private readonly pendingRefreshRuntime: QuestionPendingRefreshRuntimePort,
-    private readonly postResolutionRuntime: QuestionPostResolutionRuntimePort,
+    private readonly resolutionWriteback: QuestionResolutionWritebackPort,
   ) {}
 
   render(): void {
@@ -168,13 +166,6 @@ export class QuestionDockCoordinator {
     }
   }
 
-  private markQuestionRequestResolved(
-    requestId: string,
-    tabId: TabId | null = this.host.getActiveTabId(),
-  ): void {
-    this.pendingRefreshRuntime.markQuestionRequestResolved(requestId, tabId);
-  }
-
   async waitForDockResolutionIfEnabled(
     request: QuestionRequest,
     tabId: TabId | null = this.host.getActiveTabId(),
@@ -267,14 +258,11 @@ export class QuestionDockCoordinator {
 
     try {
       await this.host.replyToQuestion(request.id, answers);
-      this.markQuestionRequestResolved(request.id, tabId);
-      this.host.applyResolvedQuestionState({
+      await this.applyQuestionDockResolution({
         request,
         status: 'answered',
         answers,
       }, tabId);
-      this.removePendingQuestionRequest(request.id, tabId);
-      await this.afterQuestionDockResolution(tabId);
     } catch (error) {
       logger.error('Failed to resolve question request:', error);
       new Notice(t('chat.question.notice.error'));
@@ -291,21 +279,25 @@ export class QuestionDockCoordinator {
 
     try {
       await this.host.rejectQuestion(request.id);
-      this.markQuestionRequestResolved(request.id, tabId);
-      this.host.applyResolvedQuestionState({
+      await this.applyQuestionDockResolution({
         request,
         status: 'rejected',
       }, tabId);
-      this.removePendingQuestionRequest(request.id, tabId);
-      await this.afterQuestionDockResolution(tabId);
     } catch (error) {
       logger.error('Failed to resolve question request:', error);
       new Notice(t('chat.question.notice.error'));
     }
   }
 
-  private async afterQuestionDockResolution(tabId: TabId | null): Promise<void> {
-    this.render();
-    await this.postResolutionRuntime.followUpAfterResolution(tabId);
+  private async applyQuestionDockResolution(
+    resolution: QuestionResolution,
+    tabId: TabId | null,
+  ): Promise<void> {
+    await this.resolutionWriteback.applyResolution(resolution, tabId, {
+      afterStateApplied: () => {
+        this.removePendingQuestionRequest(resolution.request.id, tabId);
+        this.render();
+      },
+    });
   }
 }

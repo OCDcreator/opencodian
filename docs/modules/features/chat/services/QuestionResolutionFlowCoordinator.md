@@ -9,7 +9,7 @@
 
 - 先把 question request 交给 `QuestionDockCoordinator`，在启用上方 dock 时复用现有 waiter / pending queue 流程
 - 当当前设置仍使用 inline question card 时，调用 `QuestionInlineCardRenderer.collectAction()` 收集 `reply` / `reject`
-- 在 inline fallback 成功后统一执行 `replyToQuestion()` / `rejectQuestion()`，再通过更小的 resolved-request runtime port 做 suppress、调用 `QuestionResolutionCoordinator` 的 resolved state bridge，以及共享的 post-resolution runtime follow-up
+- 在 inline fallback 成功后统一执行 `replyToQuestion()` / `rejectQuestion()`，再把 resolved-id suppression、resolved state bridge 与 post-resolution runtime follow-up 委托给共享的 `QuestionResolutionWritebackFacade`
 
 它不负责 grouped/sequential question card 的 DOM 构造，也不负责上方 dock 的 pending-question state、render callbacks 或回答后的 status refresh；这些仍分别由 `QuestionInlineCardRenderer` 与 `QuestionDockCoordinator` 负责。
 
@@ -26,9 +26,7 @@ export interface QuestionResolutionFlowCoordinatorHost {
 export interface QuestionResolutionFlowCoordinatorPorts {
   dockCoordinator: Pick<QuestionDockCoordinator, 'waitForDockResolutionIfEnabled'>;
   inlineCardRenderer: Pick<QuestionInlineCardRenderer, 'collectAction'>;
-  resolutionCoordinator: Pick<QuestionResolutionCoordinator, 'applyResolvedQuestionState'>;
-  resolvedRequestRuntime: Pick<QuestionPendingRefreshRuntimeFacade, 'markQuestionRequestResolved'>;
-  postResolutionRuntime: Pick<QuestionPostResolutionRuntimeFacade, 'followUpAfterResolution'>;
+  resolutionWriteback: Pick<QuestionResolutionWritebackFacade, 'applyResolution'>;
 }
 
 export class QuestionResolutionFlowCoordinator {
@@ -40,11 +38,11 @@ export class QuestionResolutionFlowCoordinator {
 
 - `showQuestionDialog()` 先调用 `QuestionDockCoordinator.waitForDockResolutionIfEnabled()`；如果当前 request 已被上方 dock 接管，就直接退出，不重复触发 inline fallback
 - 只有在 dock 未接管时，才会按 `questionDisplayMode` 调用 `QuestionInlineCardRenderer.collectAction()`，保持 grouped/sequential 行为不变
-- inline fallback 成功后，会先通过 `QuestionPendingRefreshRuntimeFacade.markQuestionRequestResolved()` 压制下一次 pending refresh 的回流，再把 answered/rejected 状态写给 `QuestionResolutionCoordinator`，最后复用 `QuestionPostResolutionRuntimeFacade` 执行与 dock 相同的 runtime 收尾
+- inline fallback 成功后，会调用 `QuestionResolutionWritebackFacade.applyResolution()`，由共享 writeback seam 先压制下一次 pending refresh 的回流，再把 answered/rejected 状态写给 `QuestionResolutionCoordinator`，最后复用 `QuestionPostResolutionRuntimeFacade` 执行与 dock 相同的 runtime 收尾
 - OpenCode `replyToQuestion()` / `rejectQuestion()` 失败时，会保留现有的 error logger 与 `chat.question.notice.error` 提示
 
 ## 与 `OpenCodianView` 的边界
 
 - `OpenCodianView` 现在不再直接实现 `showQuestionDialog()`；send pipeline 会直接复用这份 coordinator
-- `QuestionRuntimeHostAdapter` 负责装配本 coordinator，并把它与 `QuestionDockCoordinator`、`QuestionInlineCardRenderer`、`QuestionResolutionCoordinator`、`QuestionPendingRefreshRuntimeFacade`、`QuestionPostResolutionRuntimeFacade` 接到同一份 question runtime bundle
+- `QuestionRuntimeHostAdapter` 负责装配本 coordinator，并把它与 `QuestionDockCoordinator`、`QuestionInlineCardRenderer`、`QuestionResolutionCoordinator`、`QuestionResolutionWritebackFacade`、`QuestionPendingRefreshRuntimeFacade`、`QuestionPostResolutionRuntimeFacade` 接到同一份 question runtime bundle
 - 本模块只负责 resolve flow orchestration，不重新拥有 dock render、inline DOM、resolved card DOM 或 session status refresh / sync-loop 逻辑

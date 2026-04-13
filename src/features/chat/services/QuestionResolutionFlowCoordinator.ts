@@ -11,11 +11,9 @@ import type {
   QuestionInlineCardAction,
   QuestionInlineCardRenderer,
 } from '../runtime/QuestionInlineCardRenderer';
-import type { QuestionResolutionCoordinator } from '../runtime/QuestionResolutionCoordinator';
 import type { TabId } from '../tabs';
 import type { QuestionDockCoordinator } from './QuestionDockCoordinator';
-import type { QuestionPendingRefreshRuntimeFacade } from './QuestionPendingRefreshRuntimeFacade';
-import type { QuestionPostResolutionRuntimeFacade } from './QuestionPostResolutionRuntimeFacade';
+import type { QuestionResolutionWritebackFacade } from './QuestionResolutionWritebackFacade';
 
 const logger = createLogger('QuestionResolutionFlowCoordinator');
 
@@ -24,14 +22,9 @@ type QuestionDockResolutionPort = Pick<
   'waitForDockResolutionIfEnabled'
 >;
 type QuestionInlineCardActionPort = Pick<QuestionInlineCardRenderer, 'collectAction'>;
-type QuestionResolutionStatePort = Pick<QuestionResolutionCoordinator, 'applyResolvedQuestionState'>;
-type QuestionResolvedRequestRuntimePort = Pick<
-  QuestionPendingRefreshRuntimeFacade,
-  'markQuestionRequestResolved'
->;
-type QuestionPostResolutionRuntimePort = Pick<
-  QuestionPostResolutionRuntimeFacade,
-  'followUpAfterResolution'
+type QuestionResolutionWritebackPort = Pick<
+  QuestionResolutionWritebackFacade,
+  'applyResolution'
 >;
 
 export interface QuestionResolutionFlowCoordinatorHost {
@@ -44,9 +37,7 @@ export interface QuestionResolutionFlowCoordinatorHost {
 export interface QuestionResolutionFlowCoordinatorPorts {
   dockCoordinator: QuestionDockResolutionPort;
   inlineCardRenderer: QuestionInlineCardActionPort;
-  resolutionCoordinator: QuestionResolutionStatePort;
-  resolvedRequestRuntime: QuestionResolvedRequestRuntimePort;
-  postResolutionRuntime: QuestionPostResolutionRuntimePort;
+  resolutionWriteback: QuestionResolutionWritebackPort;
 }
 
 export class QuestionResolutionFlowCoordinator {
@@ -108,8 +99,6 @@ export class QuestionResolutionFlowCoordinator {
     resolution: QuestionResolution,
     tabId: TabId | null,
   ): Promise<void> {
-    this.ports.resolvedRequestRuntime.markQuestionRequestResolved(resolution.request.id, tabId);
-    this.ports.resolutionCoordinator.applyResolvedQuestionState(resolution, tabId);
-    await this.ports.postResolutionRuntime.followUpAfterResolution(tabId);
+    await this.ports.resolutionWriteback.applyResolution(resolution, tabId);
   }
 }

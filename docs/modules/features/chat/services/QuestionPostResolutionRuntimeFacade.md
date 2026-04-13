@@ -38,6 +38,6 @@ export class QuestionPostResolutionRuntimeFacade {
 
 ## 与 question bundle 的边界
 
-- `QuestionDockCoordinator` 与 `QuestionResolutionFlowCoordinator` 现在都只在 resolve 成功后调用本 facade，不再各自持有 sync/status follow-up 细节
+- `QuestionResolutionWritebackFacade` 现在在 dock 与 inline resolve 成功后统一调用本 facade；`QuestionDockCoordinator` 与 `QuestionResolutionFlowCoordinator` 不再各自持有 sync/status follow-up 细节
 - `QuestionRuntimeHostAdapter` 负责从共享 `QuestionRuntimeViewHost` 派生本 facade 所需的稳定 runtime host
 - `OpenCodianView` 不需要新增 question-specific callback；question resolve 后的 follow-up 继续经由已有 status refresh 与 conversation sync bridge 完成
