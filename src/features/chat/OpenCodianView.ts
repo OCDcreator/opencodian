@@ -166,8 +166,14 @@ import {
 } from './services/BackgroundTaskCompletionNoticeService';
 import {
   BackgroundTaskLiveSignalCoordinator,
-  type BackgroundTaskLiveSignalCoordinatorHost,
 } from './services/BackgroundTaskLiveSignalCoordinator';
+import {
+  createBackgroundTaskLiveSignalCoordinatorViewHostFactoryHost,
+  type BackgroundTaskLiveSignalCoordinatorHostProviderHost,
+} from './services/BackgroundTaskLiveSignalCoordinatorHostProvider';
+import {
+  createBackgroundTaskLiveSignalCoordinatorHost,
+} from './services/BackgroundTaskLiveSignalCoordinatorViewHostFactory';
 import {
   BackgroundTaskNoticeStateService,
   type BackgroundTaskNoticeStateServiceHost,
@@ -1125,7 +1131,11 @@ export class OpenCodianView extends ItemView {
       this.sessionTodoStateService,
       this.backgroundTaskTimelineService,
       this.backgroundTaskNoticeStateService,
-      this.createBackgroundTaskLiveSignalCoordinatorHost(),
+      createBackgroundTaskLiveSignalCoordinatorHost(
+        createBackgroundTaskLiveSignalCoordinatorViewHostFactoryHost(
+          this.createBackgroundTaskLiveSignalCoordinatorHostProviderHost(),
+        ),
+      ),
     );
     const conversationHydrationRuntimeViewHosts = createConversationHydrationRuntimeViewHosts(
       createConversationHydrationRuntimeViewHostFactoryHost(
@@ -1504,7 +1514,8 @@ export class OpenCodianView extends ItemView {
     };
   }
 
-  private createBackgroundTaskLiveSignalCoordinatorHost(): BackgroundTaskLiveSignalCoordinatorHost {
+  private createBackgroundTaskLiveSignalCoordinatorHostProviderHost():
+  BackgroundTaskLiveSignalCoordinatorHostProviderHost {
     return {
       getTabRuntimeState: (tabId: TabId | null) => this.getTabRuntimeState(tabId),
       getSessionIdForTab: (tabId: TabId | null) => this.getSessionIdForTab(tabId),
