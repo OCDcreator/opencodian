@@ -14,7 +14,7 @@
 
 ## 设计目的
 
-- 让 `OpenCodianView.renderAssistantMessageContent()` 不再直接循环 structured blocks 和处理 resolved-card 插入点
+- 让 `OpenCodianView.renderAssistantMessageBody()` 不再直接循环 structured blocks 和处理 resolved-card 插入点
 - 保留 `thinking` / `tool_use` / `text` 各块的具体 DOM 细节仍由调用方的 `renderContentBlock()` 负责
 - 让 structured assistant 的 resolved-card 顺序有独立单测，不必依赖 view 级测试覆盖
 

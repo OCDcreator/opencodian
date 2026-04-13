@@ -15,6 +15,12 @@ describe('AssistantShellViewHostAdapter', () => {
         text: `${message.noticeTitle ?? 'Notice'}:${message.content}`,
       });
     });
+    const renderPersistedAssistantMessageBody = jest.fn(async (container: HTMLElement, message: ChatMessage) => {
+      container.createDiv({
+        cls: 'persisted-assistant-body',
+        text: message.content,
+      });
+    });
     const initializeAssistantCopyButton = jest.fn((copyBtn: HTMLElement, content: string) => {
       copyBtn.setText(`copy:${content}`);
     });
@@ -29,12 +35,14 @@ describe('AssistantShellViewHostAdapter', () => {
       },
       initializeAssistantCopyButton,
       renderNoticeCard,
+      renderPersistedAssistantMessageBody,
     });
 
     return {
       adapter,
       initializeAssistantCopyButton,
       renderNoticeCard,
+      renderPersistedAssistantMessageBody,
       runtime,
       scrollSpy,
       turnBody,
@@ -94,6 +102,32 @@ describe('AssistantShellViewHostAdapter', () => {
     expect(messageEl.classList.contains('opencodian-message--assistant')).toBe(true);
     expect(messageEl.classList.contains('opencodian-message--notice')).toBe(true);
     expect(messageEl.querySelector('.opencodian-chat-notice-card')).not.toBeNull();
+    expect(messageEl.querySelector('.opencodian-message-time-row')?.textContent).toContain('gpt-5.4');
+  });
+
+  it('renders persisted assistant messages through the shared body and footer helpers', async () => {
+    const { adapter, renderPersistedAssistantMessageBody, initializeAssistantCopyButton, turnBody } = createAdapter();
+    const message: ChatMessage = {
+      id: 'assistant-persisted-1',
+      role: 'assistant',
+      content: 'Persisted assistant answer',
+      timestamp: 32345,
+      modelId: 'openai/gpt-5.4',
+    };
+
+    const messageEl = await adapter.renderPersistedAssistantMessage({ message });
+
+    expect(turnBody.contains(messageEl)).toBe(true);
+    expect(messageEl.dataset.messageId).toBe('assistant-persisted-1');
+    expect(renderPersistedAssistantMessageBody).toHaveBeenCalledWith(
+      expect.any(HTMLElement),
+      message,
+    );
+    expect(messageEl.querySelector('.persisted-assistant-body')?.textContent).toBe('Persisted assistant answer');
+    expect(initializeAssistantCopyButton).toHaveBeenCalledWith(
+      expect.any(HTMLElement),
+      'Persisted assistant answer',
+    );
     expect(messageEl.querySelector('.opencodian-message-time-row')?.textContent).toContain('gpt-5.4');
   });
 

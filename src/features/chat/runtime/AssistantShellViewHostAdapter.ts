@@ -22,6 +22,7 @@ import type {
 
 export interface AssistantShellViewHostAdapterHost extends AssistantShellRendererHost {
   renderNoticeCard(container: HTMLElement, message: ChatMessage): Promise<void>;
+  renderPersistedAssistantMessageBody(container: HTMLElement, message: ChatMessage): Promise<void>;
 }
 
 export class AssistantShellViewHostAdapter {
@@ -63,6 +64,28 @@ export class AssistantShellViewHostAdapter {
     message: Pick<ChatMessage, 'content' | 'timestamp' | 'modelId'>,
   ): void {
     this.footerRenderer.finalizePseudoStreamFooter(messageEl, message);
+  }
+
+  async renderPersistedAssistantMessage(options: {
+    message: ChatMessage;
+    tabId?: TabId | null;
+  }): Promise<HTMLElement> {
+    const { message, tabId } = options;
+    if (message.displayStyle === 'notice') {
+      return this.renderPersistedAssistantNoticeMessage({
+        noticeMessage: message,
+        tabId,
+      });
+    }
+
+    const { messageEl, contentEl } = this.shellRenderer.createPersistedAssistantMessageElement({
+      message,
+      tabId,
+    });
+
+    await this.host.renderPersistedAssistantMessageBody(contentEl, message);
+    this.footerRenderer.finalizePersistedFooter(messageEl, message);
+    return messageEl;
   }
 
   async renderPersistedAssistantNoticeMessage(options: {

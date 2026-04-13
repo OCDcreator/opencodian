@@ -208,7 +208,7 @@ question dock 与 pending-question refresh 的主要 runtime/UI ownership 现在
 
 否则回退到整段重渲。
 
-assistant notice card 的 tone / icon、OMO system-reminder 标题与 raw block、notice action label 等 DOM 细节现在由 `runtime/AssistantNoticeCardRenderer.ts` 承接；而 user message footer 的 copy / rewind / fork / timestamp 组装则由 `runtime/UserMessageFooterRenderer.ts` 承接。`OpenCodianView` 只保留 Markdown 渲染与 rewind/fork 等副作用的 host 回调，以及 assistant footer finalization。
+assistant notice card 的 tone / icon、OMO system-reminder 标题与 raw block、notice action label 等 DOM 细节现在由 `runtime/AssistantNoticeCardRenderer.ts` 承接；persisted assistant shell / notice / footer / timestamp 组装则进一步统一交给 `runtime/AssistantShellViewHostAdapter.ts`；而 user message footer 的 copy / rewind / fork / timestamp 组装由 `runtime/UserMessageFooterRenderer.ts` 承接。`OpenCodianView` 只保留 Markdown 渲染、assistant 正文 block 渲染与 rewind/fork 等副作用的 host 回调。
 
 ### 发送与流式渲染
 
@@ -302,17 +302,16 @@ assistant notice card 的 tone / icon、OMO system-reminder 标题与 raw block�
 
 ### 消息渲染分派
 
-`renderMessage()` 根据消息类型分成三路：
+`renderMessage()` 根据消息类型分成两路：
 
-- `displayStyle === 'notice'` -> `AssistantShellViewHostAdapter.renderPersistedAssistantNoticeMessage()`
+- `role === 'assistant'` -> `AssistantShellViewHostAdapter.renderPersistedAssistantMessage()`
 - `role === 'user'` -> `renderUserMessageContent()`
-- 其余 assistant -> `renderAssistantMessageContent()`
 
 assistant 渲染里：
 
 - `contentBlocks` 会按块类型渲染
 - structured assistant 分支由 `renderAssistantStructuredContent()` 消费 `buildQuestionResolutionCardRenderPlan()` 产出的 render plan
-- persisted assistant footer 收尾由 `PersistedAssistantFooterFinalizer.finalizeFooter()` 统一执行；notice / pseudo-stream / error footer 则由 `AssistantFooterRenderer` 统一执行。本地 stream-error assistant bubble 的错误块 DOM 由 `AssistantErrorRenderer` 统一执行。它们内部继续分别复用 `buildPersistedAssistantFooterPayload()` 与其它 footer payload helper 组装 timestamp/copy/model/status，而 view 侧 shell / notice / footer / error host 则通过 `AssistantShellViewHostAdapter.ts` 统一装配
+- persisted assistant 的 shell / footer / notice 分派由 `AssistantShellViewHostAdapter` 统一执行；其中 persisted footer 收尾继续由 `PersistedAssistantFooterFinalizer.finalizeFooter()` 统一处理，notice / pseudo-stream / error footer 则由 `AssistantFooterRenderer` 统一执行。本地 stream-error assistant bubble 的错误块 DOM 由 `AssistantErrorRenderer` 统一执行。它们内部继续分别复用 `buildPersistedAssistantFooterPayload()` 与其它 footer payload helper 组装 timestamp/copy/model/status，而 view 侧 host 装配则通过 `AssistantShellViewHostAdapter.ts` 统一收口
 - `ConversationRenderService` 需要 patch 尾部 assistant 时，不再直接抓整块 view host 上的多个独立 callback，而是通过 `ConversationAssistantTailRenderPort` 回到这组 assistant-tail bridge
 - `thinking` 块走 `ThinkingBlockRenderer`
 - `tool_use` 块走 `ToolCallRenderer`

@@ -89,8 +89,7 @@ export interface ConversationRenderRuntimeState {
 
 export interface ConversationAssistantTailRenderPort {
   getBodySignature(message: ChatMessage): string;
-  renderMessageContent(
-    messageEl: HTMLElement,
+  renderMessageBody(
     contentEl: HTMLElement,
     message: ChatMessage,
   ): Promise<void>;
@@ -636,8 +635,7 @@ export class ConversationRenderService {
     }
 
     executionPlan.contentEl.replaceChildren();
-    await this.host.assistantTailRender.renderMessageContent(
-      executionPlan.messageEl,
+    await this.host.assistantTailRender.renderMessageBody(
       executionPlan.contentEl,
       executionPlan.nextTailMessage,
     );

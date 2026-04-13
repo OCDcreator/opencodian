@@ -17,7 +17,7 @@ export interface PersistentAssistantNoticeServiceHost {
   getCurrentConversation(): Conversation | null;
   getActiveTabId(): TabId | null;
   getConversationSyncRuntime(): TabConversationSyncFingerprintRuntimePort;
-  renderMessage(message: ChatMessage): Promise<void>;
+  renderAssistantMessage(message: ChatMessage): Promise<void>;
   saveConversation(conversation: Conversation): Promise<void>;
   handleVisibleNoticeMessageAppended(): void;
   setTabNeedsAttention(tabId: TabId | null, needsAttention: boolean): void;
@@ -70,7 +70,7 @@ export class PersistentAssistantNoticeService {
       this.host.getCurrentConversation()?.id === targetConversation.id;
 
     if (targetConversationIsVisible) {
-      await this.host.renderMessage(noticeMessage);
+      await this.host.renderAssistantMessage(noticeMessage);
     }
 
     targetConversation.messages.push(noticeMessage);

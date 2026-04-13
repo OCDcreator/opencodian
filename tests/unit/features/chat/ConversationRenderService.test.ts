@@ -106,8 +106,8 @@ function createHost(
       displayStyle: message.displayStyle ?? null,
       contentBlocks: message.contentBlocks ?? null,
     })),
-    renderMessageContent: jest.fn().mockImplementation(
-      async (_messageEl: HTMLElement, contentEl: HTMLElement, message: ChatMessage) => {
+    renderMessageBody: jest.fn().mockImplementation(
+      async (contentEl: HTMLElement, message: ChatMessage) => {
         contentEl.textContent = message.content;
       },
     ),
@@ -264,7 +264,7 @@ describe('ConversationRenderService', () => {
     await service.applySyncedConversationUpdate(previousMessages, nextMessages);
 
     expect(host.assistantTailRender.finalizePersistedFooter).toHaveBeenCalledWith(tailEl, nextMessages[0]);
-    expect(host.assistantTailRender.renderMessageContent).not.toHaveBeenCalled();
+    expect(host.assistantTailRender.renderMessageBody).not.toHaveBeenCalled();
     expect(host.renderMessages).not.toHaveBeenCalled();
     expect(tailEl.dataset.messageId).toBe('assistant-2');
   });
@@ -287,8 +287,7 @@ describe('ConversationRenderService', () => {
     const patched = await service.patchTrailingAssistantRender(previousMessages, nextMessages, 'tab-1');
 
     expect(patched).toBe(true);
-    expect(host.assistantTailRender.renderMessageContent).toHaveBeenCalledWith(
-      tailEl,
+    expect(host.assistantTailRender.renderMessageBody).toHaveBeenCalledWith(
       contentEl,
       nextMessages[0],
     );
@@ -304,15 +303,15 @@ describe('ConversationRenderService', () => {
       createMessage({ id: 'assistant-2', content: 'Updated answer', timestamp: 2 }),
     ];
     let host: ReturnType<typeof createHost>;
-    const renderMessageContent = jest.fn().mockImplementation(
-      async (_messageEl: HTMLElement, contentEl: HTMLElement, message: ChatMessage) => {
+    const renderMessageBody = jest.fn().mockImplementation(
+      async (contentEl: HTMLElement, message: ChatMessage) => {
         expect(host.renderRuntime.currentTurnBodyEl).toBe(host.messagesEl);
         contentEl.textContent = message.content;
       },
     );
     host = createHost({
       assistantTailRender: {
-        renderMessageContent,
+        renderMessageBody,
       },
     });
     const previousTurnBodyEl = document.createElement('div');
@@ -335,8 +334,8 @@ describe('ConversationRenderService', () => {
     ];
     const transientTurnBodyEl = document.createElement('div');
     let host: ReturnType<typeof createHost>;
-    const renderMessageContent = jest.fn().mockImplementation(
-      async (_messageEl: HTMLElement, contentEl: HTMLElement, message: ChatMessage) => {
+    const renderMessageBody = jest.fn().mockImplementation(
+      async (contentEl: HTMLElement, message: ChatMessage) => {
         expect(host.renderRuntime.currentTurnBodyEl).toBe(host.messagesEl);
         host.renderRuntime.currentTurnBodyEl = transientTurnBodyEl;
         contentEl.textContent = message.content;
@@ -344,7 +343,7 @@ describe('ConversationRenderService', () => {
     );
     host = createHost({
       assistantTailRender: {
-        renderMessageContent,
+        renderMessageBody,
       },
     });
     appendAssistantTail(host.messagesEl, 'Stable answer');
@@ -365,13 +364,13 @@ describe('ConversationRenderService', () => {
     ];
     const renderError = new Error('render failed');
     let host: ReturnType<typeof createHost>;
-    const renderMessageContent = jest.fn().mockImplementation(async () => {
+    const renderMessageBody = jest.fn().mockImplementation(async () => {
       expect(host.renderRuntime.currentTurnBodyEl).toBe(host.messagesEl);
       throw renderError;
     });
     host = createHost({
       assistantTailRender: {
-        renderMessageContent,
+        renderMessageBody,
       },
     });
     const previousTurnBodyEl = document.createElement('div');
@@ -393,8 +392,8 @@ describe('ConversationRenderService', () => {
       createMessage({ id: 'assistant-2', content: 'Updated answer', timestamp: 2 }),
     ];
     let host: ReturnType<typeof createHost>;
-    const renderMessageContent = jest.fn().mockImplementation(
-      async (_messageEl: HTMLElement, contentEl: HTMLElement, message: ChatMessage) => {
+    const renderMessageBody = jest.fn().mockImplementation(
+      async (contentEl: HTMLElement, message: ChatMessage) => {
         expect(host.summarizeChatMessageForDebug).toHaveBeenCalledTimes(2);
         expect(host.summarizeChatMessageForDebug).toHaveBeenNthCalledWith(1, previousMessages[0]);
         expect(host.summarizeChatMessageForDebug).toHaveBeenNthCalledWith(2, nextMessages[0]);
@@ -403,7 +402,7 @@ describe('ConversationRenderService', () => {
     );
     host = createHost({
       assistantTailRender: {
-        renderMessageContent,
+        renderMessageBody,
       },
     });
     appendAssistantTail(host.messagesEl, 'Stable answer');
@@ -519,7 +518,7 @@ describe('ConversationRenderService', () => {
 
     expect(patched).toBe(false);
     expect(host.assistantTailRender.finalizePersistedFooter).not.toHaveBeenCalled();
-    expect(host.assistantTailRender.renderMessageContent).not.toHaveBeenCalled();
+    expect(host.assistantTailRender.renderMessageBody).not.toHaveBeenCalled();
   });
 
   it('logs skipped trailing assistant patch payloads when the messages container is missing', async () => {
@@ -547,7 +546,7 @@ describe('ConversationRenderService', () => {
       },
     );
     expect(host.assistantTailRender.finalizePersistedFooter).not.toHaveBeenCalled();
-    expect(host.assistantTailRender.renderMessageContent).not.toHaveBeenCalled();
+    expect(host.assistantTailRender.renderMessageBody).not.toHaveBeenCalled();
   });
 
   it('logs skipped trailing assistant patch payloads when rendered message counts mismatch', async () => {

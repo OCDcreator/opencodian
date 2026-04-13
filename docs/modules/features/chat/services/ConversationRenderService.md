@@ -28,8 +28,7 @@ export function getIncrementalRenderedMessageUpdate(
 
 export interface ConversationAssistantTailRenderPort {
   getBodySignature(message: ChatMessage): string;
-  renderMessageContent(
-    messageEl: HTMLElement,
+  renderMessageBody(
     contentEl: HTMLElement,
     message: ChatMessage,
   ): Promise<void>;
@@ -93,7 +92,8 @@ export class ConversationRenderService {
 
 ## 与 `OpenCodianView` 的边界
 
-- `OpenCodianView` 仍保留 `renderMessage()`、`renderMessages()`、`renderAssistantMessageContent()`、pseudo-stream reveal 和 tab runtime 所有权
+- `OpenCodianView` 仍保留 `renderMessage()`、`renderMessages()`、`renderAssistantMessageBody()`、pseudo-stream reveal 和 tab runtime 所有权
 - `OpenCodianView` 会先组装 `ConversationAssistantTailRenderPort`，再把它作为 `ConversationRenderHost` 的 assistant-tail 子边界传给 service
 - `ConversationRenderService` 只负责决定“何时整段重渲、何时 patch 尾部、何时仅追加”
+- persisted assistant shell / notice / footer 装配已经下沉到 `AssistantShellViewHostAdapter`，所以这里的 tail port 只关心正文重渲与 footer finalization
 - 这样消息区编排逻辑首次拥有独立单测边界，而不用把 assistant renderer 一起打散

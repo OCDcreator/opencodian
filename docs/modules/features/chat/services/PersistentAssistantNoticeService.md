@@ -21,7 +21,7 @@ export interface PersistentAssistantNoticeServiceHost {
   getCurrentConversation(): Conversation | null;
   getActiveTabId(): TabId | null;
   getConversationSyncRuntime(): TabConversationSyncFingerprintRuntimePort;
-  renderMessage(message: ChatMessage): Promise<void>;
+  renderAssistantMessage(message: ChatMessage): Promise<void>;
   saveConversation(conversation: Conversation): Promise<void>;
   handleVisibleNoticeMessageAppended(): void;
   setTabNeedsAttention(tabId: TabId | null, needsAttention: boolean): void;
@@ -49,5 +49,5 @@ export class PersistentAssistantNoticeService {
 ## 与 `OpenCodianView` 的边界
 
 - `SessionTodoStateService`、`BackgroundTaskNoticeStateService`、`BackgroundTaskCompletionNoticeService` 仍负责各自 notice 的状态机、文案和 dedupe 时机
-- `OpenCodianView` 只提供 render/save/tab-runtime host bridge，并通过 `TabConversationSyncFingerprintPortProvider` 复用 fingerprint 计算与 tab writeback seam
+- `OpenCodianView` 只提供 assistant-message render/save/tab-runtime host bridge，并通过 `TabConversationSyncFingerprintPortProvider` 复用 fingerprint 计算与 tab writeback seam
 - 这让 P2 `question / todo / background task` lane 继续把 session todo 与 background task 共用的 persisted-notice ownership 从主 view 迁到 dedicated service

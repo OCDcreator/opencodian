@@ -1311,7 +1311,8 @@ export class OpenCodianView extends ItemView {
       getCurrentConversation: () => this.currentConversation,
       getActiveTabId: () => this.getActiveTabId(),
       getConversationSyncRuntime: () => this.tabConversationSyncFingerprintRuntimePort,
-      renderMessage: (message) => this.renderMessage(message),
+      renderAssistantMessage: (message) =>
+        this.assistantShellViewHostAdapter.renderPersistedAssistantMessage({ message }),
       saveConversation: (conversation) => this.plugin.saveConversation(conversation),
       handleVisibleNoticeMessageAppended: () => {
         const runtime = this.getActiveTabRuntimeState();
@@ -1814,8 +1815,8 @@ export class OpenCodianView extends ItemView {
   private createConversationAssistantTailRenderPort(): ConversationAssistantTailRenderPort {
     return {
       getBodySignature: (message) => this.getAssistantBodySignature(message),
-      renderMessageContent: (messageEl, contentEl, message) =>
-        this.renderAssistantMessageContent(messageEl, contentEl, message),
+      renderMessageBody: (contentEl, message) =>
+        this.renderAssistantMessageBody(contentEl, message),
       finalizePersistedFooter: (messageEl, message) => {
         this.assistantShellViewHostAdapter.finalizePersistedFooter(messageEl, message);
       },
@@ -2042,6 +2043,8 @@ export class OpenCodianView extends ItemView {
       },
       renderNoticeCard: (container, message) =>
         this.assistantNoticeCardRenderer.render(container, message),
+      renderPersistedAssistantMessageBody: (container, message) =>
+        this.renderAssistantMessageBody(container, message),
     };
   }
 
@@ -4944,27 +4947,21 @@ export class OpenCodianView extends ItemView {
 
   /** Render a message */
   private async renderMessage(message: ChatMessage) {
-    if (message.displayStyle === 'notice') {
-      return this.assistantShellViewHostAdapter.renderPersistedAssistantNoticeMessage({
-        noticeMessage: message,
+    if (message.role === 'assistant') {
+      return this.assistantShellViewHostAdapter.renderPersistedAssistantMessage({
+        message,
       });
     }
 
-    const turn = message.role === 'user'
-      ? this.createTurn()
-      : null;
-    const parentEl = message.role === 'user'
-      ? turn?.headerEl
-      : this.ensureTurnBody();
+    const turn = this.createTurn();
+    const parentEl = turn?.headerEl;
     const messageEl = parentEl?.createDiv({
       cls: `opencodian-message opencodian-message--${message.role}`,
     });
 
     if (!messageEl) return;
-    if (turn && message.role === 'user') {
-      const runtime = this.getTabRuntimeState();
-      runtime?.turnBodyByAnchorKey.set(this.getMessageAnchorKey(message), turn.bodyEl);
-    }
+    const runtime = this.getTabRuntimeState();
+    runtime?.turnBodyByAnchorKey.set(this.getMessageAnchorKey(message), turn.bodyEl);
     messageEl.dataset.messageId = message.id;
     if (message.sourceMessageId) {
       messageEl.dataset.sourceMessageId = message.sourceMessageId;
@@ -4973,18 +4970,13 @@ export class OpenCodianView extends ItemView {
     // Content container
     const content = messageEl.createDiv({ cls: 'opencodian-message-content' });
 
-    if (message.role === 'user') {
-      const copyContent = await this.renderUserMessageContent(content, message);
-      this.addUserMessageFooter(messageEl, message, copyContent);
-    } else {
-      await this.renderAssistantMessageContent(messageEl, content, message);
-    }
+    const copyContent = await this.renderUserMessageContent(content, message);
+    this.addUserMessageFooter(messageEl, message, copyContent);
 
     return messageEl;
   }
 
-  private async renderAssistantMessageContent(
-    messageEl: HTMLElement,
+  private async renderAssistantMessageBody(
     content: HTMLElement,
     message: ChatMessage,
   ): Promise<void> {
@@ -5010,8 +5002,6 @@ export class OpenCodianView extends ItemView {
         questionResolutionRenderPlan,
       });
     }
-
-    this.assistantShellViewHostAdapter.finalizePersistedFooter(messageEl, message);
   }
 
   private getAssistantBodySignature(message: ChatMessage): string {

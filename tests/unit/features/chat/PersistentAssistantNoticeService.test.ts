@@ -11,7 +11,7 @@ describe('PersistentAssistantNoticeService', () => {
     currentConversation?: Record<string, unknown> | null;
   }): PersistentAssistantNoticeServiceHost & {
     getConversationSyncRuntime: jest.Mock<TabConversationSyncFingerprintRuntimePort, []>;
-    renderMessage: jest.Mock;
+    renderAssistantMessage: jest.Mock;
     saveConversation: jest.Mock;
     handleVisibleNoticeMessageAppended: jest.Mock;
     setTabNeedsAttention: jest.Mock;
@@ -28,7 +28,7 @@ describe('PersistentAssistantNoticeService', () => {
       getCurrentConversation: jest.fn().mockReturnValue(options?.currentConversation ?? null),
       getActiveTabId: jest.fn().mockReturnValue('tab-1'),
       getConversationSyncRuntime: jest.fn(() => conversationSyncRuntime),
-      renderMessage: jest.fn().mockResolvedValue(undefined),
+      renderAssistantMessage: jest.fn().mockResolvedValue(undefined),
       saveConversation: jest.fn().mockResolvedValue(undefined),
       handleVisibleNoticeMessageAppended: jest.fn(),
       setTabNeedsAttention: jest.fn(),
@@ -80,7 +80,7 @@ describe('PersistentAssistantNoticeService', () => {
       },
     });
 
-    expect(host.renderMessage).toHaveBeenCalledTimes(1);
+    expect(host.renderAssistantMessage).toHaveBeenCalledTimes(1);
     expect(host.saveConversation).toHaveBeenCalledWith(conversation);
     expect(conversation.updatedAt).toBe(123);
     expect(conversation.messages).toHaveLength(1);
@@ -134,7 +134,7 @@ describe('PersistentAssistantNoticeService', () => {
       timestamp: 456,
     });
 
-    expect(host.renderMessage).not.toHaveBeenCalled();
+    expect(host.renderAssistantMessage).not.toHaveBeenCalled();
     expect(host.saveConversation).toHaveBeenCalledWith(backgroundConversation);
     expect(host.getConversationSyncRuntime().setTabConversationSyncFingerprint)
       .toHaveBeenCalledWith(

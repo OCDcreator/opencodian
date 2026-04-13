@@ -168,7 +168,7 @@
   - 新 owner 有 focused tests。
   - 运行 targeted tests、全量 `npm test`、`npm run build`。
 
-### [NEXT] R8 - P4 message shell / notice / timestamp ownership
+### [DONE] R8 - P4 message shell / notice / timestamp ownership
 
 - **Lane**: P4 `message shell / notice / timestamp`
 - **目标**: 把 assistant shell、notice、footer/timestamp 组装迁到更厚的 render/finalizer service，减少 `OpenCodianView` 的消息级 DOM 细节。
@@ -190,7 +190,7 @@
   - `OpenCodianView` 不再直接持有主要消息级 DOM 组装流程。
   - 运行 targeted tests、全量 `npm test`、`npm run build`。
 
-### [QUEUED] R9 - Settings panel scaffolding split
+### [NEXT] R9 - Settings panel scaffolding split
 
 - **Lane**: Settings maintainability
 - **目标**: 从 `OpenCodianSettings.ts` 抽出 section lifecycle、quick-nav、scroll restoration，让 settings tab 专注 section composition。
