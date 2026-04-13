@@ -91,8 +91,9 @@ background task completion notice 的 queued-state 则已经完全移出 `TabRun
 - `services/ChatHeaderPresenter.ts` 的 host seam：server availability、settings/history/new-tab callbacks、status refresh 和 header tab-slot 写回
 - `services/ChatSelectionControlsCoordinator.ts` 的 host seam：model catalog reload、current selection resolution、provider icon lookup、permission mode writeback 和 effort selector 联动
 - `services/ComposerInputShellCoordinator.ts` 的 host seam：input shell DOM 装配、submit gate、textarea 高度同步、composer stack height 与 toolbar slot mount
+- `services/InputPanelAppearanceCoordinator.ts` 的 host seam：input panel theme class、action button style、SVG filter layer、liquid-glass mount/unmount 与 diagnostics log 去重
 - 由 `ComposerContextViewFacade.create()` 基于独立的 `createComposerContextViewHost()` / `createFocusContextViewHost()` seam 装配出的 `ComposerContextEventBridge`、`ComposerContextCoordinator`、`FocusContextRuntimeService`、`PersistentAssistantNoticeService` 等视图级运行时协作对象
-- theme background / liquid glass / diamond demo / glass octahedron 相关 DOM 引用
+- theme background 与 experimental demo / glass octahedron 相关 DOM 引用
 
 ## 主链路
 
@@ -111,10 +112,10 @@ background task completion notice 的 queued-state 则已经完全移出 `TabRun
 `onClose()` 则会反向清理：
 
 - tab 持久化
-- header presenter、composer input coordinator / conversation sync / selection polling / layout / scroll 定时器
+- header presenter、input appearance coordinator、composer input coordinator / conversation sync / selection polling / layout / scroll 定时器
 - title generation
 - effort selector、context ring、question dock、todo dock、navigation sidebar
-- liquid glass adapter、SVG filter layer、diamond demo
+- liquid glass adapter cleanup、diamond demo
 - tab panes、tab bar、dropdown、markdown component 等
 
 ### 滚动辅助抽离
@@ -158,6 +159,17 @@ server status loop、badge class、status label、本地/远端文案判定和 l
 - effort selector display 刷新，以及共用的 Escape scope 注册
 
 因此 view 不再直接铺开 model dropdown search/list/sticky-header cleanup、provider icon trigger 刷新，或 permission dropdown selected-state / open-close 状态机；这些 UI lifecycle 已集中到 coordinator，而 send options、`ModelCatalogStateService` 语义与 provider icon fallback 顺序保持不变。
+
+### Input appearance / glass ownership
+
+输入面板的 theme class、action button style、SVG filter layer、liquid-glass adapter mount/unmount 与 diagnostics log 现在由 `services/InputPanelAppearanceCoordinator.ts` 承接。`OpenCodianView` 只保留该 coordinator 的 host seam：
+
+- composer shell / input wrapper / chat container / messages shell 的 DOM 读取入口
+- plugin settings 里的 input panel theme、action button style、SVG filter 与 liquid-glass adapter settings
+- plugin asset URL 解析，以及现有的 log preview / payload stringify helper
+- experimental diamond / octahedron demo 的显式 toggle 入口
+
+这样 view 不再直接维护 filter-layer DOM ref、active liquid-glass adapter、diagnostics fingerprint 或 refraction helper；但 theme preset、settings normalization、CSS token 语义与 experimental demo 的 opt-in 边界保持不变。
 
 ### 对话装载与后台同步
 
@@ -455,7 +467,7 @@ background task notice 这条子链路现在的边界是：
 - header：logo、server badge、新建对话、新建当前 tab 对话、历史、设置
 - toolbar：permission selector、model selector、context ring、effort selector
 - appearance：theme preset、chat appearance CSS variables、自定义 CSS、背景图
-- input panel glass：SVG filter layer、adapter mount/unmount、诊断日志
+- input panel glass：`InputPanelAppearanceCoordinator` 负责 SVG filter layer、adapter mount/unmount、action button class 与诊断日志
 - experimental demo：`LiquidDiamondDemoController`（CPU / WebGL）与 `GlassOctahedronDemoController`
 
 模型选择器本身支持：

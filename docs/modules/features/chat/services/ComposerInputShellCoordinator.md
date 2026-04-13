@@ -60,8 +60,8 @@ export class ComposerInputShellCoordinator {
 
 ## 与 `OpenCodianView` 的边界
 
-- `OpenCodianView` 只创建 coordinator、提供 host callbacks，并在外观 / glass 逻辑需要时读取 shell DOM refs
+- `OpenCodianView` 只创建 coordinator、提供 host callbacks，并把 shell DOM refs 暴露给相邻的 `InputPanelAppearanceCoordinator`
 - 既有 send pipeline、question/todo runtime 没有迁入本模块；model / permission selector 状态机 已进一步交给 `ChatSelectionControlsCoordinator`
-- liquid-glass adapter mount、SVG filter 和 diagnostics 仍留在 view，等后续 R17 input appearance/glass lane 处理
+- liquid-glass adapter mount、SVG filter 与 diagnostics 已进一步交给 `InputPanelAppearanceCoordinator`，本模块继续只负责 shell/layout lifecycle
 
 本模块推进 master plan 的 P1 `OpenCodianView composer input shell` lane：把输入区 DOM、textarea 行为、submit gate 与 layout metrics 从主 view 迁出，并把 selector toolbar 区域留给后续 dedicated owner 接管。

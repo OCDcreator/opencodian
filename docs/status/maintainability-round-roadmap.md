@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`。R18 完成后必须暂停复盘，不得自动扩展新队列。
-> **当前状态**: [CONFIRMED_NEXT_BATCH] R13-R18 已确认；当前唯一可执行 `[NEXT]` 是 R17，R18 后必须再次暂停。
+> **当前状态**: [CONFIRMED_NEXT_BATCH] R13-R18 已确认；当前唯一可执行 `[NEXT]` 是 R18，完成后必须暂停并等待人工确认。
 
 ## 控制规则
 
@@ -370,7 +370,7 @@
   - Send options 与 permission display 有 focused coverage 或稳定验证。
   - 运行 targeted tests、全量 `npm test`、`npm run build`。
 
-### [NEXT] R17 - Input appearance and glass state coordinator
+### [DONE] R17 - Input appearance and glass state coordinator
 
 - **Lane**: P5 `appearance / glass / input panel state`
 - **目标**: 把 input panel theme class、action button style、SVG filter layer、liquid-glass adapter mount 与 diagnostics state 从 `OpenCodianView` 收束到 appearance/glass coordinator。
@@ -391,7 +391,7 @@
   - 变更若命中 deploy-relevant runtime/style 路径，按 AGENTS 规则 build 后部署 Test Vault 并验证 BUILD_ID。
   - 运行 targeted tests、全量 `npm test`、`npm run build`。
 
-### [QUEUED] R18 - UI shell checkpoint and next-lane decision
+### [NEXT] R18 - UI shell checkpoint and next-lane decision
 
 - **Lane**: Checkpoint
 - **目标**: 暂停自动推进，复盘 R13-R17 对 `OpenCodianView` 的体量和调用链影响，并决定下一批是否转向 `OpenCodeService`。
