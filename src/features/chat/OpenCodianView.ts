@@ -212,6 +212,11 @@ import {
   ConversationSyncBridge,
 } from './services/ConversationSyncBridge';
 import {
+  createConversationSyncBridgePorts,
+  type ConversationSyncBridgePortProviderHost,
+  type ConversationSyncBridgePorts,
+} from './services/ConversationSyncBridgePortProvider';
+import {
   createConversationSessionSignalRuntime,
   ConversationSessionSignalRuntime,
 } from './services/ConversationSessionSignalRuntime';
@@ -744,6 +749,7 @@ export class OpenCodianView extends ItemView {
   private conversationSyncOrchestrationService: ConversationSyncOrchestrationService;
   private conversationSyncRuntimeCoordinator: ConversationSyncRuntimeCoordinator;
   private conversationSyncBridge: ConversationSyncBridge;
+  private conversationSyncBridgePorts!: ConversationSyncBridgePorts;
   private conversationSessionSignalRuntime: ConversationSessionSignalRuntime;
   private conversationTabOpenCoordinator: ConversationTabOpenCoordinator;
   private conversationTabLifecycleRecoveryCoordinator: ConversationTabLifecycleRecoveryCoordinator;
@@ -1039,7 +1045,7 @@ export class OpenCodianView extends ItemView {
     runtime.isHydratingConversation = true;
     runtime.pendingLayoutMutations = 0;
     this.backgroundTaskLiveSignalCoordinator.armAuthoritativeSyncGate(tabId);
-    this.clearScheduledSignalConversationSync(tabId);
+    this.conversationSyncBridgePorts.getSignalScheduler().clearScheduledSignalConversationSync(tabId);
   }
 
   private endConversationHydration(tabId: TabId | null = this.getActiveTabId()): void {
@@ -1193,6 +1199,9 @@ export class OpenCodianView extends ItemView {
     this.conversationSyncRuntimeCoordinator = conversationSyncServices.runtimeCoordinator;
     this.conversationSyncOrchestrationService = conversationSyncServices.orchestrationService;
     this.conversationSyncBridge = conversationSyncServices.bridge;
+    this.conversationSyncBridgePorts = createConversationSyncBridgePorts(
+      this.createConversationSyncBridgePortProviderHost(),
+    );
     this.conversationSessionSignalRuntime = createConversationSessionSignalRuntime(
       createConversationSessionSignalRuntimeViewHost(
         createConversationSessionSignalRuntimeViewHostFactoryHost(
@@ -1275,7 +1284,7 @@ export class OpenCodianView extends ItemView {
       createQuestionRuntimeViewHost(questionRuntimeViewHostFactoryHost),
       createQuestionPostResolutionRuntimeHostAdapter({
         viewHost: questionRuntimeViewHostFactoryHost,
-        conversationSync: this.conversationSyncBridge,
+        conversationSync: this.conversationSyncBridgePorts.getVisibleSyncFollowUp(),
         statusRefresh: this.sessionTodoStatusRefreshService,
       }),
       this.streamingInlineCardRenderer,
@@ -1466,10 +1475,10 @@ export class OpenCodianView extends ItemView {
         this.lastConversationSyncFingerprint = fingerprint;
       },
       startConversationSyncLoop: () => {
-        this.startConversationSyncLoop();
+        this.conversationSyncBridgePorts.getLoopControl().startConversationSyncLoop();
       },
       stopConversationSyncLoop: () => {
-        this.stopConversationSyncLoop();
+        this.conversationSyncBridgePorts.getLoopControl().stopConversationSyncLoop();
       },
       updateSendButtonState: () => {
         this.updateSendButtonState();
@@ -1608,6 +1617,26 @@ export class OpenCodianView extends ItemView {
     };
   }
 
+  private createConversationSyncBridgePortProviderHost():
+  ConversationSyncBridgePortProviderHost {
+    return {
+      startConversationSyncLoop: () => {
+        this.conversationSyncBridge.startConversationSyncLoop();
+      },
+      stopConversationSyncLoop: () => {
+        this.conversationSyncBridge.stopConversationSyncLoop();
+      },
+      clearScheduledSignalConversationSync: (tabId) => {
+        this.conversationSyncBridge.clearScheduledSignalConversationSync(tabId);
+      },
+      scheduleConversationSyncFromSignal: (tabId, reason) => {
+        this.conversationSyncBridge.scheduleConversationSyncFromSignal(tabId, reason);
+      },
+      syncVisibleConversationInBackground: () =>
+        this.conversationSyncBridge.syncVisibleConversationInBackground(),
+    };
+  }
+
   private createConversationSessionSignalRuntimeHostProviderHost():
   ConversationSessionSignalRuntimeHostProviderHost {
     return {
@@ -1626,7 +1655,10 @@ export class OpenCodianView extends ItemView {
       getCurrentConversation: () => this.currentConversation,
       getActiveTabId: () => this.getActiveTabId(),
       scheduleConversationSyncFromSignal: (tabId, reason) =>
-        this.scheduleConversationSyncFromSignal(tabId, reason),
+        this.conversationSyncBridgePorts.getSignalScheduler().scheduleConversationSyncFromSignal(
+          tabId,
+          reason,
+        ),
     };
   }
 
@@ -1881,7 +1913,7 @@ export class OpenCodianView extends ItemView {
         this.armBackgroundTaskIndicatorForUserMessage(message, tabId);
       },
       startConversationSyncLoop: () => {
-        this.startConversationSyncLoop();
+        this.conversationSyncBridgePorts.getLoopControl().startConversationSyncLoop();
       },
       saveConversation: (conversation) => this.plugin.saveConversation(conversation),
       setAutoScrollEnabled: (tabId, enabled) => {
@@ -2090,7 +2122,7 @@ export class OpenCodianView extends ItemView {
   async onClose() {
     this.persistTabState({ flush: true });
     this.stopServerStatusLoop();
-    this.stopConversationSyncLoop();
+    this.conversationSyncBridgePorts.getLoopControl().stopConversationSyncLoop();
     this.composerContextViewFacade.dispose();
     this.clearChatSurfaceSyncTimers();
     this.clearScheduledComposerLayoutSync();
@@ -2345,7 +2377,7 @@ export class OpenCodianView extends ItemView {
     }
 
     paneState.runtime.streamController?.cancelStream();
-    this.clearScheduledSignalConversationSync(tabId);
+    this.conversationSyncBridgePorts.getSignalScheduler().clearScheduledSignalConversationSync(tabId);
     paneState.messagesEl.removeEventListener('scroll', paneState.scrollHandler);
     paneState.mutationObserver?.disconnect();
     paneState.resizeObserver?.disconnect();
@@ -2356,7 +2388,9 @@ export class OpenCodianView extends ItemView {
   private clearTabMessagesPanes(): void {
     for (const paneState of this.tabPaneStates.values()) {
       paneState.runtime.streamController?.cancelStream();
-      this.clearScheduledSignalConversationSync(paneState.tabId);
+      this.conversationSyncBridgePorts.getSignalScheduler().clearScheduledSignalConversationSync(
+        paneState.tabId,
+      );
       paneState.messagesEl.removeEventListener('scroll', paneState.scrollHandler);
       paneState.mutationObserver?.disconnect();
       paneState.resizeObserver?.disconnect();
@@ -4093,33 +4127,6 @@ export class OpenCodianView extends ItemView {
     options: { forceServerSync?: boolean; preserveScrollPosition?: boolean } = {},
   ): Promise<void> {
     await this.conversationViewStateService.loadConversation(id, options);
-  }
-
-  private startConversationSyncLoop(): void {
-    this.conversationSyncBridge.startConversationSyncLoop();
-  }
-
-  private clearScheduledSignalConversationSync(tabId: TabId | null): void {
-    this.conversationSyncBridge.clearScheduledSignalConversationSync(tabId);
-  }
-
-  private scheduleConversationSyncFromSignal(
-    tabId: TabId | null,
-    reason: SessionSyncEventUpdate['type'],
-  ): void {
-    this.conversationSyncBridge.scheduleConversationSyncFromSignal(tabId, reason);
-  }
-
-  private stopConversationSyncLoop(): void {
-    this.conversationSyncBridge.stopConversationSyncLoop();
-  }
-
-  private async syncVisibleConversationInBackground(): Promise<void> {
-    await this.conversationSyncBridge.syncVisibleConversationInBackground();
-  }
-
-  private async syncBackgroundTaskTabsInBackground(): Promise<void> {
-    await this.conversationSyncBridge.syncBackgroundTaskTabsInBackground();
   }
 
   private getConversationSyncFingerprint(messages: ChatMessage[]): string {
