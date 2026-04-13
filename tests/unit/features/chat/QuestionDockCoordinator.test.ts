@@ -280,6 +280,47 @@ describe('QuestionDockCoordinator', () => {
     expect(host.setTabNeedsAttention).toHaveBeenCalledWith('tab-background', true);
   });
 
+  it('clears stale background-tab question state when no session remains', async () => {
+    const staleRequest = createQuestionRequest({
+      id: 'request-stale',
+      sessionId: 'session-stale',
+    });
+    const {
+      coordinator,
+      host,
+      runtimeByTab,
+    } = createCoordinator({
+      sessionIdsByTab: {
+        'tab-background': null,
+      },
+    });
+    const backgroundRuntime = runtimeByTab.get('tab-background');
+    if (!backgroundRuntime) {
+      throw new Error('Expected background runtime');
+    }
+
+    backgroundRuntime.pendingQuestionRequests = [staleRequest];
+    backgroundRuntime.resolvedQuestionRequestIds.add(staleRequest.id);
+    backgroundRuntime.questionDraftAnswers.set(staleRequest.id, [['draft']]);
+    backgroundRuntime.questionActiveGroupKeys.set(staleRequest.id, 'Programming');
+    backgroundRuntime.questionActiveIndexes.set(staleRequest.id, 0);
+    backgroundRuntime.questionRequestWaiters.set(staleRequest.id, {
+      promise: Promise.resolve(),
+      resolve: jest.fn(),
+    });
+
+    await expect(coordinator.refreshPendingQuestionsForTab('tab-background')).resolves.toEqual([]);
+
+    expect(host.getPendingQuestions).not.toHaveBeenCalled();
+    expect(backgroundRuntime.pendingQuestionRequests).toEqual([]);
+    expect(backgroundRuntime.resolvedQuestionRequestIds.size).toBe(0);
+    expect(backgroundRuntime.questionDraftAnswers.size).toBe(0);
+    expect(backgroundRuntime.questionActiveGroupKeys.size).toBe(0);
+    expect(backgroundRuntime.questionActiveIndexes.size).toBe(0);
+    expect(backgroundRuntime.questionRequestWaiters.size).toBe(0);
+    expect(host.setTabNeedsAttention).toHaveBeenCalledWith('tab-background', false);
+  });
+
   it('clears the active-tab lifecycle state and rerenders an empty dock', () => {
     const request = createQuestionRequest();
     const {

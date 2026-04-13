@@ -119,6 +119,62 @@ describe('BackgroundTaskCompletionNoticeService', () => {
     expect(appendPersistentAssistantNoticeMessage).toHaveBeenCalledTimes(1);
   });
 
+  it('merges repeated queue passes for the same anchor before flush', async () => {
+    const { service, conversation, appendPersistentAssistantNoticeMessage } = createService();
+
+    service.queueNotices([
+      {
+        anchorKey: 'msg-user-1',
+        completionEvents: [
+          {
+            reminderMessageId: 'msg-reminder-2',
+            reminderType: 'background-task-completed',
+            timestamp: 30,
+            tasks: [{ taskId: 'bg_2', description: 'Draft summary' }],
+          },
+        ],
+      },
+    ], 'tab-1', conversation as never);
+    service.queueNotices([
+      {
+        anchorKey: 'msg-user-1',
+        completionEvents: [
+          {
+            reminderMessageId: 'msg-reminder-1',
+            reminderType: 'background-task-completed',
+            timestamp: 10,
+            tasks: [{ taskId: 'bg_1', description: 'Search docs' }],
+          },
+        ],
+      },
+    ], 'tab-1', conversation as never);
+
+    await service.flushQueuedNotices('tab-1', conversation as never);
+
+    expect(appendPersistentAssistantNoticeMessage).toHaveBeenCalledWith({
+      title: t('chat.omo.system.backgroundCompleted'),
+      content: [
+        t('chat.omo.system.backgroundCompletedSummary'),
+        '',
+        `**${t('chat.backgroundTask.taskListLabel')}**`,
+        '- `bg_1`: Search docs',
+        '- `bg_2`: Draft summary',
+      ].join('\n'),
+      tone: 'info',
+      conversation,
+      tabId: 'tab-1',
+      timestamp: 30,
+      noticeMeta: {
+        kind: 'background-task-completion',
+        conversationId: 'conversation-1',
+        anchorKey: 'msg-user-1',
+        sourceReminderIds: ['msg-reminder-1', 'msg-reminder-2'],
+        allComplete: false,
+        taskIds: ['bg_1', 'bg_2'],
+      },
+    });
+  });
+
   it('skips reminder events already represented by persisted notices', async () => {
     const { service, conversation, appendPersistentAssistantNoticeMessage } = createService({
       conversationMessages: [

@@ -4,22 +4,28 @@
 
 ## 当前优先级
 
-- **P1**: `OpenCodianView` 里剩余的 activation / sync / runtime bridge ownership
-- **P2**: question / todo / background task wiring 与 post-sync/activation 协调
-- **P3**: context / composer / retained-selection 相关 ownership
+- **P3**: context / composer / retained-selection 相关 ownership（roadmap 当前 `[NEXT]`）
 - **P4**: message shell / notice / timestamp 组装边界
+- **P1**: `OpenCodianView` 里剩余的 activation / sync / runtime bridge ownership
+- **P2**: question / todo / background task queue 已完成 R1-R6；后续只保留 regression watchpoints，不再继续拆新 owner
 
 ## 当前热点首查入口
 
-- P2 首查顺序固定为：
-  1. `src/features/chat/OpenCodianView.ts` 中 question/todo/background-task 的 host factory 与 wiring 片段
-  2. `src/features/chat/services/QuestionTodoStatusRefreshCoordinator.ts`
-  3. `src/features/chat/services/PostSyncQuestionTodoRefreshFacade.ts`
-  4. `src/features/chat/services/BackgroundConversationPostSyncHandoffCoordinator.ts`
-  5. 参考模式：`src/features/chat/services/SessionTodoHostAdapter.ts`、`src/features/chat/services/ConversationSyncHostAdapter.ts`
-- P1 首查 `OpenCodianView` 里 activation / sync host 与 runtime bridge 创建区段，再看对应 bridge/service
 - P3 首查 composer/context builder、context catalog 与 retained-selection runtime
 - P4 首查 assistant shell / notice / footer / timestamp 组装入口，再看现有 renderer/finalizer/service
+- P1 首查 `OpenCodianView` 里 activation / sync host 与 runtime bridge 创建区段，再看对应 bridge/service
+- P2 regression-only 首查顺序固定为：
+  1. `tests/unit/features/chat/QuestionDockCoordinator.test.ts`
+  2. `tests/unit/features/chat/QuestionTodoStatusRefreshCoordinator.test.ts`
+  3. `tests/unit/features/chat/SessionTodoCoordinator.test.ts`
+  4. `tests/unit/features/chat/BackgroundTaskCompletionNoticeService.test.ts`
+  5. `tests/unit/features/chat/ConversationSessionSignalRuntime.test.ts`
+
+## P2 收束状态
+
+- R1-R6 已把 question dock lifecycle、todo refresh/status、background completion notice、post-sync handoff 与 session signal orchestration 收束到稳定 owner
+- 当前剩余风险以回归为主：background tab 无 session 时的 dock 清理、post-sync todo/status gate、completion notice queue/fingerprint 去重，以及 live signal 进入 `SessionTodoCoordinator` 后的 writeback 顺序
+- 后续若不是测试、构建或正确性问题，默认不要再回到 P2 开新拆分切口
 
 ## 可复用模式
 

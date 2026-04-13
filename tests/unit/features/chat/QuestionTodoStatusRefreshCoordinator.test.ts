@@ -139,4 +139,34 @@ describe('QuestionTodoStatusRefreshCoordinator', () => {
     );
     expect(callOrder).toEqual(['pending-question', 'status', 'todo']);
   });
+
+  it('refreshes todo/status when background-task launches keep the runtime active', async () => {
+    const callOrder: string[] = [];
+    const host = createHost({
+      runtime: createRuntime({
+        backgroundTaskLaunches: new Map([['launch-1', { source: 'sync' }]]),
+      }),
+      callOrder,
+    });
+    const coordinator = new QuestionTodoStatusRefreshCoordinator(host);
+
+    await coordinator.refreshAfterPostSync({
+      tabId: 'tab-1',
+      questionSessionId: 'session-1',
+      todoStatusSessionId: 'session-1',
+    });
+
+    expect(host.hasIncompleteTodos).toHaveBeenCalledWith([]);
+    expect(host.refreshTabSessionStatus).toHaveBeenCalledWith(
+      'tab-1',
+      'session-1',
+      { suppressErrors: true },
+    );
+    expect(host.refreshTabSessionTodos).toHaveBeenCalledWith(
+      'tab-1',
+      'session-1',
+      { suppressErrors: true },
+    );
+    expect(callOrder).toEqual(['pending-question', 'status', 'todo']);
+  });
 });

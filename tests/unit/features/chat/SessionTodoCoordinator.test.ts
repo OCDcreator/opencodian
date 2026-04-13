@@ -189,6 +189,25 @@ describe('SessionTodoCoordinator', () => {
     expect(host.reconcileBackgroundTaskLiveSignals).toHaveBeenCalledWith('tab-1');
   });
 
+  it('returns the current session status when a refresh result becomes stale', async () => {
+    const currentStatus = { type: 'busy' as const };
+    const runtime = createRuntime({
+      sessionStatus: currentStatus,
+      sessionStatusSessionId: 'session-1',
+    });
+    const { coordinator, host } = createFixture({ runtime });
+    host.getSessionStatuses.mockImplementation(async () => {
+      runtime.statusRequestId = 99;
+      return { 'session-1': { type: 'idle' as const } };
+    });
+
+    const result = await coordinator.refreshTabSessionStatus('tab-1', 'session-1');
+
+    expect(result).toEqual(currentStatus);
+    expect(runtime.sessionStatus).toEqual(currentStatus);
+    expect(host.reconcileBackgroundTaskLiveSignals).not.toHaveBeenCalled();
+  });
+
   it('clears session status when the tab has no active session', async () => {
     const runtime = createRuntime({ sessionStatus: { type: 'busy' } });
     const { coordinator, host } = createFixture({ runtime });
