@@ -229,7 +229,7 @@
   - Presenter 有 focused coverage 或稳定验证。
   - 运行 targeted tests、全量 `npm test`、`npm run build`。
 
-### [NEXT] R11 - Core catalog state service
+### [DONE] R11 - Core catalog state service
 
 - **Lane**: Core config maintainability
 - **目标**: 围绕 `ModelConfigService` + `OpencodeConfigManager` 提供明确 catalog state API，集中 `baseEffective` / `effective` / `currentEnabledProviderIds` 与 provider/model availability 操作。
@@ -250,7 +250,7 @@
   - Settings presenter 或后续 UI 只消费 catalog state API。
   - 运行 targeted tests、全量 `npm test`、`npm run build`。
 
-### [QUEUED] R12 - Maintainability checkpoint
+### [NEXT] R12 - Maintainability checkpoint
 
 - **Lane**: Checkpoint
 - **目标**: 暂停自动推进，复盘 `OpenCodianView`、`OpenCodianSettings`、`OpenCodeService` 的体量变化和链路复杂度，决定下一批 roadmap。

@@ -10,7 +10,7 @@
 这个 presenter 的职责边界刻意偏向 **presentation state + semantic events**：
 
 - 持有当前激活的 catalog tab、provider 展开态、搜索词、`仅看已禁用` / `仅看已启用` 过滤状态
-- 根据 `ModelConfigService` 提供的 `local/server/baseEffective/effective/currentEnabledProviderIds` 渲染 provider/model availability 视图
+- 根据 `ModelCatalogStateService` 提供的 `ModelCatalogState` 渲染 provider/model availability 视图
 - 展示 provider probe loading / success / error / catalog-only 等 badge 与 detail
 - 发出 provider/model availability semantic toggle 事件，真正的 settings 写回仍由 `OpenCodianSettings` 提供 callback
 
@@ -30,13 +30,12 @@
 
 ### provider / model availability 表达
 
-presenter 会把几层 availability 信号叠加到 UI 上：
+presenter 会把 `ModelCatalogState` 里的几层 availability 信号叠加到 UI 上：
 
+- `displayCatalogs` / `providerStatusCatalogs` 对 provider 当前目录、disabled placeholder 与 disabled scope 的表达
 - `currentEnabledProviderIds` 对 provider 当前是否真的进入有效目录的判断
-- 项目本地 `enabled_providers` / `disabled_providers` 对 provider 的 project-disabled 表达
-- 服务器 / 继承配置对 provider 的 global-disabled 表达
-- 插件侧 `disabledModelRefs` 对 model 级禁用的表达
-- `ModelConfigService.testProviderAvailability()` 结果对 provider probe badge/detail 的表达
+- `disabledModelRefs` 对 model 级禁用的表达
+- `ModelCatalogStateService.probeProvider()` 结果对 provider probe badge/detail 的表达
 
 它只负责**呈现**这些状态；并不改 `ModelConfigService` 的 merge 规则，也不改变 provider availability 语义。
 
@@ -45,14 +44,14 @@ presenter 会把几层 availability 信号叠加到 UI 上：
 | 方法 | 说明 |
 |------|------|
 | `setPreferredCatalogTab()` | 按当前 `modelSourceMode` 选择默认 catalog tab |
-| `render()` | 根据当前 catalogs、本地 config 与 presenter state 重建 model catalog 管理区 |
-| `getDisplayCatalogForMode()` | 生成 local / server / effective / disabled 目录的展示视图 |
+| `render()` | 根据当前 `ModelCatalogState` 与 presenter state 重建 model catalog 管理区 |
+| `getDisplayCatalogForMode()` | 从 `ModelCatalogState.displayCatalogs` 读取 local / server / effective / disabled 展示视图 |
 | `getCatalogModelCount()` | 统计某个 catalog 中 provider 下 model 总数 |
 
 ## 与其他模块的交互
 
 - `OpenCodianSettings.ts`: 提供 host seam，包括 inline-code 文案、provider icon 渲染、provider/model toggle 写回 callback，以及 refresh orchestration
-- `ModelConfigService.ts`: 提供目录数据、`currentEnabledProviderIds` 语义和 provider probe
+- `ModelCatalogStateService.ts`: 提供目录状态、provider/model availability 写回和 provider probe
 - `searchInputEnhancer.ts`: 为 model availability search 输入框提供历史记录与清空按钮
 - `ProviderIconService`: 通过 host callback 复用现有 provider icon fallback 顺序，不在 presenter 内重新实现图标解析
 
@@ -60,4 +59,4 @@ presenter 会把几层 availability 信号叠加到 UI 上：
 
 - 这个 presenter 只发出 semantic toggle 事件；不要把 `.opencode` 写回、插件 settings 保存或 modal launch 逻辑塞进来。
 - provider probe 结果缓存属于 UI state，可以随着 settings tab 生命周期存在，但不应写回持久化配置。
-- 如果后续要继续推进该 lane，优先往 core 提供更明确的 catalog state API，而不是把新的 merge/filter 规则继续堆进 presenter。
+- 如果后续要继续推进该 lane，优先继续扩展 `ModelCatalogStateService` 这类 core catalog state API，而不是把新的 merge/filter 规则继续堆进 presenter。

@@ -11,17 +11,17 @@ import * as path from 'path';
 
 import {
   type ModelCatalogBundle,
+  type ModelCatalogState,
+  ModelCatalogStateService,
   OpencodeConfigManager,
   PluginManagementService,
 } from '../../core/config';
 import {
-  collectConfiguredProviderIds,
   formatModelReference,
   isProviderEnabled,
   type ModelCatalog,
   parseModelReference,
   resolveModelSelection,
-  setProviderEnabled,
 } from '../../core/config/modelConfig';
 import type { PluginEntry, PluginEnvironmentSnapshot } from '../../core/config/PluginManagementService';
 import { getBuiltinThemePresets, hasThemeAppearanceOverrides } from '../../core/theme';
@@ -783,13 +783,13 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       return headingEl;
     }
 
+    const modelCatalogStateService = new ModelCatalogStateService(modelConfigService);
     const modelCatalogPresenter = this.modelCatalogPresenter ??= new SettingsModelCatalogPresenter({
-      modelConfigService,
+      catalogStateService: modelCatalogStateService,
       applyInlineCodeText: (targetEl, text) => {
         this.applyInlineCodeText(targetEl, text);
       },
       applyProviderIcon: (targetEl, providerId, label) => this.applyProviderIcon(targetEl, providerId, label),
-      getDisabledModelRefs: () => this.plugin.settings.disabledModelRefs,
       onProviderAvailabilityChange: async (providerIds, enabled) => {
         await applyProviderAvailabilityChange(providerIds, enabled);
       },
@@ -799,6 +799,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     });
     modelCatalogPresenter.setPreferredCatalogTab(this.plugin.settings.modelSourceMode);
 
+    let catalogState: ModelCatalogState | null = null;
     let catalogs: ModelCatalogBundle | null = null;
     let localModelConfig: OpencodeModelConfigSubset | null = null;
     let modelPickerGroups: ModelPickerGroup[] = [];
@@ -1002,35 +1003,19 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       providerIds: Iterable<string>,
       enabled: boolean,
     ): Promise<void> => {
-      const normalizedProviderIds = Array.from(new Set(
-        Array.from(providerIds)
-          .map((providerId) => providerId.trim())
-          .filter((providerId) => providerId.length > 0),
-      ));
-      if (normalizedProviderIds.length === 0) {
-        return;
-      }
-
       try {
-        const currentConfig = await modelConfigService.readLocalModelConfig();
-        const knownProviderIds = Array.from(new Set([
-          ...(catalogs?.server.providers.map((entry) => entry.id) ?? []),
-          ...(catalogs?.local.providers.map((entry) => entry.id) ?? []),
-          ...collectConfiguredProviderIds(catalogs?.serverConfig ?? {}),
-          ...collectConfiguredProviderIds(currentConfig),
-          ...normalizedProviderIds,
-        ]));
-        let nextConfig = currentConfig;
-        for (const providerId of normalizedProviderIds) {
-          nextConfig = setProviderEnabled({
-            subset: nextConfig,
-            providerId,
-            enabled,
-            knownProviderIds,
-            inherited: catalogs?.serverConfig,
-          });
+        const state = catalogState ?? await modelCatalogStateService.getCatalogState(
+          this.plugin.settings.modelSourceMode,
+          this.plugin.settings.disabledModelRefs,
+        );
+        const changed = await modelCatalogStateService.applyProviderAvailabilityChange({
+          state,
+          providerIds,
+          enabled,
+        });
+        if (!changed) {
+          return;
         }
-        await modelConfigService.writeLocalModelConfig(nextConfig);
         await refreshModelSettings({ forceViewReload: true });
         await refreshIconCacheOverview();
       } catch (error) {
@@ -1044,31 +1029,15 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       modelRefs: Iterable<string>,
       enabled: boolean,
     ): Promise<void> => {
-      const normalizedModelRefs = Array.from(new Set(
-        Array.from(modelRefs)
-          .map((modelRef) => {
-            const parsedRef = parseModelReference(modelRef);
-            return parsedRef
-              ? formatModelReference(parsedRef.provider, parsedRef.model)
-              : '';
-          })
-          .filter((modelRef) => modelRef.length > 0),
-      ));
-      if (normalizedModelRefs.length === 0) {
+      const previousDisabledModelRefs = [...this.plugin.settings.disabledModelRefs];
+      this.plugin.settings.disabledModelRefs = modelCatalogStateService.applyModelAvailabilityChange({
+        disabledModelRefs: previousDisabledModelRefs,
+        modelRefs,
+        enabled,
+      });
+      if (this.plugin.settings.disabledModelRefs.join('\u0000') === previousDisabledModelRefs.join('\u0000')) {
         return;
       }
-
-      const previousDisabledModelRefs = [...this.plugin.settings.disabledModelRefs];
-      const nextDisabledModelRefs = new Set(previousDisabledModelRefs);
-      for (const modelRef of normalizedModelRefs) {
-        if (enabled) {
-          nextDisabledModelRefs.delete(modelRef);
-        } else {
-          nextDisabledModelRefs.add(modelRef);
-        }
-      }
-      this.plugin.settings.disabledModelRefs = [...nextDisabledModelRefs]
-        .sort((left, right) => left.localeCompare(right));
 
       try {
         await refreshModelSettings({ forceViewReload: true });
@@ -1106,25 +1075,25 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     const renderAvailabilityManagement = (): void => {
       modelCatalogPresenter.render({
         containerEl: availabilityManagementEl,
-        catalogs,
-        localModelConfig,
+        catalogState,
       });
     };
 
     const refreshModelSettings = async (
       options: { showNotice?: boolean; forceViewReload?: boolean } = {},
-    ): Promise<ModelCatalogBundle | null> => {
+    ): Promise<ModelCatalogState | null> => {
       const {
         showNotice = false,
         forceViewReload = false,
       } = options;
 
       try {
-        localModelConfig = await modelConfigService.readLocalModelConfig();
-        catalogs = await modelConfigService.getCatalogs(
+        catalogState = await modelCatalogStateService.getCatalogState(
           this.plugin.settings.modelSourceMode,
           this.plugin.settings.disabledModelRefs,
         );
+        localModelConfig = catalogState.localModelConfig;
+        catalogs = catalogState.catalogs;
         modelPickerGroups = buildModelPickerGroups(catalogs.effective);
         const dirty = syncSettingsWithCatalogs(catalogs);
 
@@ -1165,11 +1134,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         }
 
         if (showNotice) {
-          const serverDisplayCatalog = modelCatalogPresenter.getDisplayCatalogForMode(
-            'server',
-            catalogs,
-            localModelConfig,
-          );
+          const serverDisplayCatalog = catalogState.displayCatalogs.server;
           logger.debug('Manual model refresh snapshot', {
             modelSourceMode: this.plugin.settings.modelSourceMode,
             vaultPath: getVaultBasePath(this.app) ?? null,
@@ -1183,9 +1148,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
             server: serializeCatalog(catalogs.server),
             baseEffective: serializeCatalog(catalogs.baseEffective),
             effective: serializeCatalog(catalogs.effective),
-            disabled: serializeCatalog(
-              modelCatalogPresenter.getDisplayCatalogForMode('disabled', catalogs, localModelConfig),
-            ),
+            disabled: serializeCatalog(catalogState.displayCatalogs.disabled),
           });
           new Notice(t('settings.model.refresh.success', {
             serverCount: String(serverDisplayCatalog.providers.length),
@@ -1193,7 +1156,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
           }));
         }
 
-        return catalogs;
+        return catalogState;
       } catch (error) {
         logger.error('Failed to load models:', error);
         if (showNotice) {

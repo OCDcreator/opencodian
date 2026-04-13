@@ -11,7 +11,7 @@
 - OpenCode 服务端返回的当前项目运行时 provider 列表、当前作用域解析配置，以及继承层配置
 - 插件侧的可用性过滤条件，例如 `disabledModelRefs`
 
-它不直接维护 UI，也不直接写整个配置文件，而是负责给上层返回一个既能表达“基础事实”，又能表达“当前可选状态”的模型 catalog bundle。
+它不直接维护 UI，也不直接写整个配置文件，而是负责给上层返回一个既能表达“基础事实”，又能表达“当前可选状态”的模型 catalog bundle。自 R11 起，settings 侧围绕这些 bundle 再做 `displayCatalogs` / `providerStatusCatalogs` 的组合语义，已经下沉到 `ModelCatalogStateService`，因此 `ModelConfigService` 继续专注“事实目录 + 继承可用性 + probe”。
 
 ## 核心类型
 
@@ -194,6 +194,7 @@ baseEffective + disabledModelRefs + currentEnabledProviderIds
 ## 与其他模块的交互
 
 - `OpenCodianSettings.ts`：同时消费 `baseEffective` 和 `effective`，以便区分“存在但被禁用/不可用”和“完全不存在”。
+- `ModelCatalogStateService.ts`：把 `local/server/baseEffective/effective/currentEnabledProviderIds` 组合成 settings 侧稳定可消费的 catalog state API。
 - `OpenCodianView.ts`：使用 `effective` 约束聊天发送，但需要 `baseEffective` 保留展示元数据。
 - `TitleGenerationService.ts`：解析 `aiTitleModel` 时会先在 `baseEffective/effective` 上做 availability-aware 校验；显式配置的标题模型一旦不可用，会直接阻止标题生效。
 - `ModelConfigModal.ts` / `ModelConfigJsonModal.ts`：通过它读写本地模型配置。

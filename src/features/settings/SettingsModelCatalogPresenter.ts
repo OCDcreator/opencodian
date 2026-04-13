@@ -1,26 +1,22 @@
 import { setIcon } from 'obsidian';
 
 import {
-  type ModelCatalogBundle,
-  type ModelConfigService,
+  type ModelCatalogState,
+  type ModelCatalogStateMode,
+  type ModelCatalogStateService,
   type ProviderAvailabilityProbe,
 } from '../../core/config';
 import {
-  collectConfiguredProviderIds,
   formatModelReference,
-  isProviderEnabled,
-  mergeCatalogs,
   type ModelCatalog,
   type ModelCatalogProvider,
 } from '../../core/config/modelConfig';
-import type { ModelSourceMode, OpencodeModelConfigSubset } from '../../core/types';
+import type { ModelSourceMode } from '../../core/types';
 import { t } from '../../i18n';
 import { createLogger } from '../../shared';
 import { enhanceSearchInput } from './searchInputEnhancer';
 
 const logger = createLogger('SettingsModelCatalogPresenter');
-
-type ModelCatalogTab = 'local' | 'server' | 'effective' | 'disabled';
 
 interface ProviderAvailabilityCheckState {
   status: 'idle' | 'loading' | 'ready' | 'error';
@@ -29,28 +25,25 @@ interface ProviderAvailabilityCheckState {
 }
 
 interface SettingsModelCatalogPresenterOptions {
-  modelConfigService: ModelConfigService;
+  catalogStateService: ModelCatalogStateService;
   applyInlineCodeText: (targetEl: HTMLElement, text: string) => void;
   applyProviderIcon: (targetEl: HTMLElement, providerId: string, label?: string) => Promise<void> | void;
-  getDisabledModelRefs: () => string[];
   onProviderAvailabilityChange: (providerIds: Iterable<string>, enabled: boolean) => Promise<void>;
   onModelAvailabilityChange: (modelRefs: Iterable<string>, enabled: boolean) => Promise<void>;
 }
 
 interface SettingsModelCatalogPresenterRenderState {
   containerEl: HTMLElement;
-  catalogs: ModelCatalogBundle | null;
-  localModelConfig: OpencodeModelConfigSubset | null;
+  catalogState: ModelCatalogState | null;
 }
 
 export class SettingsModelCatalogPresenter {
-  private readonly modelConfigService: ModelConfigService;
+  private readonly catalogStateService: ModelCatalogStateService;
   private readonly applyInlineCodeText: (targetEl: HTMLElement, text: string) => void;
   private readonly applyProviderIcon: (targetEl: HTMLElement, providerId: string, label?: string) => Promise<void> | void;
-  private readonly getDisabledModelRefs: () => string[];
   private readonly onProviderAvailabilityChange: (providerIds: Iterable<string>, enabled: boolean) => Promise<void>;
   private readonly onModelAvailabilityChange: (modelRefs: Iterable<string>, enabled: boolean) => Promise<void>;
-  private activeCatalogTab: ModelCatalogTab = 'effective';
+  private activeCatalogTab: ModelCatalogStateMode = 'effective';
   private expandedProviderIds = new Set<string>();
   private modelAvailabilityQuery = '';
   private modelAvailabilityOnlyDisabled = false;
@@ -60,10 +53,9 @@ export class SettingsModelCatalogPresenter {
   private lastRenderState: SettingsModelCatalogPresenterRenderState | null = null;
 
   constructor(options: SettingsModelCatalogPresenterOptions) {
-    this.modelConfigService = options.modelConfigService;
+    this.catalogStateService = options.catalogStateService;
     this.applyInlineCodeText = options.applyInlineCodeText;
     this.applyProviderIcon = options.applyProviderIcon;
-    this.getDisabledModelRefs = options.getDisabledModelRefs;
     this.onProviderAvailabilityChange = options.onProviderAvailabilityChange;
     this.onModelAvailabilityChange = options.onModelAvailabilityChange;
   }
@@ -100,8 +92,9 @@ export class SettingsModelCatalogPresenter {
       this.providerListScrollTop = existingProviderListEl.scrollTop;
     }
 
-    const { containerEl, catalogs, localModelConfig } = state;
-    const disabledModelRefs = new Set(this.getDisabledModelRefs());
+    const { containerEl, catalogState } = state;
+    const catalogs = catalogState?.catalogs ?? null;
+    const disabledModelRefs = new Set(catalogState?.disabledModelRefs ?? []);
 
     containerEl.empty();
 
@@ -188,14 +181,14 @@ export class SettingsModelCatalogPresenter {
     if (catalogs) {
       catalogSectionEl = blockEl.createDiv({ cls: 'opencodian-model-toggle-catalogs' });
       const summaryEl = catalogSectionEl.createDiv({ cls: 'opencodian-model-catalog-summary-grid' });
-      this.renderModelCatalogSummaryCards(summaryEl, catalogs, localModelConfig);
+      this.renderModelCatalogSummaryCards(summaryEl, catalogState);
     }
 
-    const selectedCatalog = catalogs
-      ? this.getDisplayCatalogForMode(this.activeCatalogTab, catalogs, localModelConfig)
+    const selectedCatalog = catalogState
+      ? this.getDisplayCatalogForMode(this.activeCatalogTab, catalogState)
       : null;
-    const providerStatusCatalog = catalogs
-      ? this.getProviderStatusCatalogForMode(this.activeCatalogTab, catalogs, localModelConfig)
+    const providerStatusCatalog = catalogState
+      ? this.getProviderStatusCatalogForMode(this.activeCatalogTab, catalogState)
       : null;
     const providerStatusById = new Map(
       providerStatusCatalog?.providers.map((provider) => [provider.id, provider]) ?? [],
@@ -211,6 +204,7 @@ export class SettingsModelCatalogPresenter {
 
     if (
       catalogSectionEl
+      && catalogState
       && catalogs
       && selectedCatalog
       && this.activeCatalogTab !== 'disabled'
@@ -239,14 +233,14 @@ export class SettingsModelCatalogPresenter {
       });
       enableCatalogProvidersButton.type = 'button';
       enableCatalogProvidersButton.disabled = catalogScopedProviderIds.length === 0
-        || catalogScopedProviderIds.every((providerId) => this.isProviderCurrentlyEnabled(providerId, catalogs));
+        || catalogScopedProviderIds.every((providerId) => this.isProviderCurrentlyEnabled(providerId, catalogState));
       const disableCatalogProvidersButton = catalogActionsButtonsEl.createEl('button', {
         cls: 'opencodian-model-toggle-provider-test-button opencodian-model-toggle-action-button',
         text: t('settings.model.availability.disableAllProviders'),
       });
       disableCatalogProvidersButton.type = 'button';
       disableCatalogProvidersButton.disabled = catalogScopedProviderIds.length === 0
-        || catalogScopedProviderIds.every((providerId) => !this.isProviderCurrentlyEnabled(providerId, catalogs));
+        || catalogScopedProviderIds.every((providerId) => !this.isProviderCurrentlyEnabled(providerId, catalogState));
 
       enableCatalogProvidersButton.addEventListener('click', async () => {
         enableCatalogProvidersButton.disabled = true;
@@ -300,12 +294,11 @@ export class SettingsModelCatalogPresenter {
 
     for (const provider of providers) {
       const providerStatusSource = providerStatusById.get(provider.id) ?? provider;
-      const providerEnabled = catalogs
-        ? this.isProviderCurrentlyEnabled(provider.id, catalogs)
-        : isProviderEnabled(localModelConfig ?? {}, provider.id);
+      const providerEnabled = catalogState
+        ? this.isProviderCurrentlyEnabled(provider.id, catalogState)
+        : false;
       const primaryDisabledReason = this.getProviderPrimaryDisabledReason(
         providerStatusSource,
-        localModelConfig,
         providerEnabled,
       );
       const providerServerDisabled = primaryDisabledReason === 'server';
@@ -495,7 +488,7 @@ export class SettingsModelCatalogPresenter {
           text: this.describeProviderModels(
             provider,
             (this.activeCatalogTab === 'server' || this.activeCatalogTab === 'disabled') && !providerEnabled
-              ? this.getCatalogPlaceholderReason(provider, this.activeCatalogTab, localModelConfig)
+              ? this.getCatalogPlaceholderReason(provider, this.activeCatalogTab)
               : null,
           ) || t('settings.model.toggle.emptyModels'),
         });
@@ -631,21 +624,10 @@ export class SettingsModelCatalogPresenter {
   }
 
   getDisplayCatalogForMode(
-    mode: ModelCatalogTab,
-    catalogs: ModelCatalogBundle,
-    localModelConfig: OpencodeModelConfigSubset | null,
+    mode: ModelCatalogStateMode,
+    catalogState: ModelCatalogState,
   ): ModelCatalog {
-    switch (mode) {
-      case 'local':
-        return catalogs.local;
-      case 'server':
-        return this.buildServerDisplayCatalog(catalogs.server);
-      case 'disabled':
-        return this.buildDisabledCatalog(catalogs, localModelConfig);
-      case 'effective':
-      default:
-        return catalogs.effective;
-    }
+    return catalogState.displayCatalogs[mode];
   }
 
   getCatalogModelCount(catalog: ModelCatalog): number {
@@ -668,7 +650,7 @@ export class SettingsModelCatalogPresenter {
     this.render(this.lastRenderState, options);
   }
 
-  private getCatalogTabTitle(mode: ModelCatalogTab): string {
+  private getCatalogTabTitle(mode: ModelCatalogStateMode): string {
     switch (mode) {
       case 'local':
         return t('settings.model.catalog.localTitle');
@@ -684,35 +666,34 @@ export class SettingsModelCatalogPresenter {
 
   private renderModelCatalogSummaryCards(
     containerEl: HTMLElement,
-    catalogs: ModelCatalogBundle,
-    localModelConfig: OpencodeModelConfigSubset | null,
+    catalogState: ModelCatalogState,
   ): void {
     containerEl.empty();
 
     const cards: Array<{
-      mode: ModelCatalogTab;
+      mode: ModelCatalogStateMode;
       title: string;
       catalog: ModelCatalog;
     }> = [
       {
         mode: 'local',
         title: t('settings.model.catalog.localTitle'),
-        catalog: this.getDisplayCatalogForMode('local', catalogs, localModelConfig),
+        catalog: this.getDisplayCatalogForMode('local', catalogState),
       },
       {
         mode: 'server',
         title: t('settings.model.catalog.serverTitle'),
-        catalog: this.getDisplayCatalogForMode('server', catalogs, localModelConfig),
+        catalog: this.getDisplayCatalogForMode('server', catalogState),
       },
       {
         mode: 'effective',
         title: t('settings.model.catalog.effectiveTitle'),
-        catalog: this.getDisplayCatalogForMode('effective', catalogs, localModelConfig),
+        catalog: this.getDisplayCatalogForMode('effective', catalogState),
       },
       {
         mode: 'disabled',
         title: t('settings.model.catalog.disabledTitle'),
-        catalog: this.getDisplayCatalogForMode('disabled', catalogs, localModelConfig),
+        catalog: this.getDisplayCatalogForMode('disabled', catalogState),
       },
     ];
 
@@ -756,7 +737,7 @@ export class SettingsModelCatalogPresenter {
     this.rerender();
 
     try {
-      const probe = await this.modelConfigService.testProviderAvailability(providerId);
+      const probe = await this.catalogStateService.probeProvider(providerId);
       this.providerAvailabilityChecks.set(providerId, {
         status: 'ready',
         probe,
@@ -777,7 +758,7 @@ export class SettingsModelCatalogPresenter {
     providerEnabled: boolean,
     disabledCount: number,
     primaryDisabledReason: 'project' | 'server' | null,
-    mode: ModelCatalogTab,
+    mode: ModelCatalogStateMode,
   ): string {
     if (mode === 'server' && this.isProviderDisabledByScope(provider, 'global')) {
       return t('settings.model.availability.summary.serverDisabled', {
@@ -830,14 +811,13 @@ export class SettingsModelCatalogPresenter {
 
   private getProviderPrimaryDisabledReason(
     provider: ModelCatalogProvider,
-    localModelConfig: OpencodeModelConfigSubset | null,
     providerEnabled: boolean,
   ): 'project' | 'server' | null {
     if (providerEnabled) {
       return null;
     }
 
-    if (this.isProviderProjectDisabled(localModelConfig, provider.id)) {
+    if (this.isProviderDisabledByScope(provider, 'project')) {
       return 'project';
     }
 
@@ -852,7 +832,7 @@ export class SettingsModelCatalogPresenter {
     provider: ModelCatalogProvider,
     providerEnabled: boolean,
     disabledCount: number,
-    mode: ModelCatalogTab,
+    mode: ModelCatalogStateMode,
   ): 'is-disabled' | 'is-partial' | 'is-available' {
     if (mode === 'server' && this.isProviderDisabledByScope(provider, 'global')) {
       return 'is-disabled';
@@ -874,7 +854,7 @@ export class SettingsModelCatalogPresenter {
     providerEnabled: boolean,
     disabledCount: number,
     primaryDisabledReason: 'project' | 'server' | null,
-    mode: ModelCatalogTab,
+    mode: ModelCatalogStateMode,
   ): string {
     if (mode === 'server' && this.isProviderDisabledByScope(provider, 'global')) {
       return t('settings.model.availability.status.serverDisabled');
@@ -901,7 +881,7 @@ export class SettingsModelCatalogPresenter {
     provider: ModelCatalogProvider,
     providerEnabled: boolean,
     primaryDisabledReason: 'project' | 'server' | null,
-    mode: ModelCatalogTab,
+    mode: ModelCatalogStateMode,
   ): { text: string; className: 'is-disabled' | 'is-partial' } | null {
     if (!this.isProviderDisabledByScope(provider, 'global')) {
       return null;
@@ -1048,191 +1028,18 @@ export class SettingsModelCatalogPresenter {
   }
 
   private getProviderStatusCatalogForMode(
-    mode: ModelCatalogTab,
-    catalogs: ModelCatalogBundle,
-    localModelConfig: OpencodeModelConfigSubset | null,
+    mode: ModelCatalogStateMode,
+    catalogState: ModelCatalogState,
   ): ModelCatalog {
-    switch (mode) {
-      case 'local':
-        return this.decorateCatalogWithCurrentDisabledScopes(catalogs.local, catalogs, localModelConfig);
-      case 'server':
-        return this.decorateCatalogWithCurrentDisabledScopes(catalogs.server, catalogs, localModelConfig);
-      case 'disabled':
-        return this.withConfiguredDisabledProviderPlaceholders(
-          this.decorateCatalogWithCurrentDisabledScopes(
-            mergeCatalogs(catalogs.server, catalogs.local),
-            catalogs,
-            localModelConfig,
-          ),
-          catalogs,
-          localModelConfig,
-          'merge',
-        );
-      case 'effective':
-      default:
-        return this.decorateCatalogWithCurrentDisabledScopes(catalogs.baseEffective, catalogs, localModelConfig);
-    }
-  }
-
-  private buildDisabledCatalog(
-    catalogs: ModelCatalogBundle,
-    localModelConfig: OpencodeModelConfigSubset | null,
-  ): ModelCatalog {
-    const baseCatalog = this.withConfiguredDisabledProviderPlaceholders(
-      this.decorateCatalogWithCurrentDisabledScopes(
-        mergeCatalogs(catalogs.server, catalogs.local),
-        catalogs,
-        localModelConfig,
-      ),
-      catalogs,
-      localModelConfig,
-      'merge',
-    );
-    const disabledModelRefs = new Set(this.getDisabledModelRefs());
-    const providers: ModelCatalogProvider[] = [];
-
-    for (const provider of baseCatalog.providers) {
-      const providerProjectDisabled = this.isProviderProjectDisabled(localModelConfig, provider.id);
-      const providerEnabled = this.isProviderCurrentlyEnabled(provider.id, catalogs);
-      if (!providerEnabled) {
-        providers.push({
-          ...provider,
-          disabledScopes: this.mergeDisabledScopes(
-            provider.disabledScopes,
-            providerProjectDisabled ? ['project'] : undefined,
-          ),
-          models: provider.models.map((model) => ({ ...model })),
-        });
-        continue;
-      }
-
-      const disabledModels = provider.models
-        .filter((model) => disabledModelRefs.has(formatModelReference(provider.id, model.id)))
-        .map((model) => ({ ...model }));
-      if (disabledModels.length === 0) {
-        continue;
-      }
-
-      providers.push({
-        ...provider,
-        models: disabledModels,
-      });
-    }
-
-    return {
-      providers: providers.sort((left, right) => left.name.localeCompare(right.name)),
-      defaults: {},
-    };
-  }
-
-  private buildServerDisplayCatalog(catalog: ModelCatalog): ModelCatalog {
-    const providers = catalog.providers.map((provider) => ({
-      ...provider,
-      models: provider.models.map((model) => ({ ...model })),
-    }));
-
-    return {
-      providers,
-      defaults: Object.fromEntries(
-        Object.entries(catalog.defaults).filter(([providerId]) => providers.some((provider) => provider.id === providerId)),
-      ),
-    };
-  }
-
-  private decorateCatalogWithCurrentDisabledScopes(
-    catalog: ModelCatalog,
-    catalogs: ModelCatalogBundle,
-    localModelConfig: OpencodeModelConfigSubset | null,
-  ): ModelCatalog {
-    const providers = catalog.providers.map((provider) => {
-      const providerEnabled = this.isProviderCurrentlyEnabled(provider.id, catalogs);
-      const projectDisabled = this.isProviderProjectDisabled(localModelConfig, provider.id);
-      const disabledScopes = this.mergeDisabledScopes(
-        provider.disabledScopes,
-        !providerEnabled
-          ? [
-            ...(projectDisabled ? ['project' as const] : []),
-            ...(!projectDisabled ? ['global' as const] : []),
-          ]
-          : undefined,
-      );
-
-      return {
-        ...provider,
-        disabledScopes,
-        models: provider.models.map((model) => ({
-          ...model,
-          disabledScopes,
-        })),
-      };
-    });
-
-    return {
-      ...catalog,
-      providers,
-    };
-  }
-
-  private withConfiguredDisabledProviderPlaceholders(
-    catalog: ModelCatalog,
-    catalogs: ModelCatalogBundle,
-    localModelConfig: OpencodeModelConfigSubset | null,
-    source: 'server' | 'merge',
-  ): ModelCatalog {
-    const existingProviderIds = new Set(catalog.providers.map((provider) => provider.id));
-    const configuredProviderIds = new Set<string>([
-      ...collectConfiguredProviderIds(catalogs.serverConfig),
-      ...collectConfiguredProviderIds(localModelConfig ?? {}),
-      ...(catalogs.effectiveProviderConfig.enabled_providers ?? []),
-      ...(catalogs.effectiveProviderConfig.disabled_providers ?? []),
-    ]);
-    const placeholderProviders = [...configuredProviderIds]
-      .filter((providerId) => !this.isProviderEnabledInEffectiveAvailability(providerId, catalogs))
-      .filter((providerId) => !existingProviderIds.has(providerId))
-      .map<ModelCatalogProvider>((providerId) => ({
-        id: providerId,
-        name: providerId,
-        models: [],
-        source,
-        existsInLocal: false,
-        existsInServer: false,
-        disabledScopes: this.isProviderProjectDisabled(localModelConfig, providerId)
-          ? ['project']
-          : ['global'],
-      }));
-
-    if (placeholderProviders.length === 0) {
-      return catalog;
-    }
-
-    return {
-      ...catalog,
-      providers: [...catalog.providers, ...placeholderProviders]
-        .sort((left, right) => left.name.localeCompare(right.name)),
-    };
-  }
-
-  private isProviderEnabledInEffectiveAvailability(providerId: string, catalogs: ModelCatalogBundle): boolean {
-    return isProviderEnabled(catalogs.effectiveProviderConfig, providerId);
+    return catalogState.providerStatusCatalogs[mode];
   }
 
   private isProviderDisabledByScope(provider: ModelCatalogProvider, scope: 'global' | 'project'): boolean {
     return provider.disabledScopes?.includes(scope) ?? false;
   }
 
-  private isProviderProjectDisabled(
-    localModelConfig: OpencodeModelConfigSubset | null,
-    providerId: string,
-  ): boolean {
-    if (!localModelConfig || !this.hasProviderAvailabilityConfig(localModelConfig)) {
-      return false;
-    }
-
-    return !isProviderEnabled(localModelConfig, providerId);
-  }
-
-  private isProviderCurrentlyEnabled(providerId: string, catalogs: ModelCatalogBundle): boolean {
-    return catalogs.currentEnabledProviderIds.includes(providerId);
+  private isProviderCurrentlyEnabled(providerId: string, catalogState: ModelCatalogState): boolean {
+    return catalogState.catalogs.currentEnabledProviderIds.includes(providerId);
   }
 
   private describeProviderModels(
@@ -1256,16 +1063,9 @@ export class SettingsModelCatalogPresenter {
     return `${preview} · +${modelNames.length - 6}`;
   }
 
-  private hasProviderAvailabilityConfig(
-    config: Pick<OpencodeModelConfigSubset, 'enabled_providers' | 'disabled_providers'> | null | undefined,
-  ): boolean {
-    return Array.isArray(config?.enabled_providers) || Array.isArray(config?.disabled_providers);
-  }
-
   private getCatalogPlaceholderReason(
     provider: ModelCatalogProvider,
-    mode: ModelCatalogTab,
-    localModelConfig: OpencodeModelConfigSubset | null,
+    mode: ModelCatalogStateMode,
   ): 'project' | 'server' | null {
     if (provider.models.length > 0) {
       return null;
@@ -1276,7 +1076,7 @@ export class SettingsModelCatalogPresenter {
     }
 
     if (mode === 'disabled') {
-      if (this.isProviderProjectDisabled(localModelConfig, provider.id)) {
+      if (this.isProviderDisabledByScope(provider, 'project')) {
         return 'project';
       }
       if (this.isProviderDisabledByScope(provider, 'global')) {
@@ -1285,13 +1085,5 @@ export class SettingsModelCatalogPresenter {
     }
 
     return null;
-  }
-
-  private mergeDisabledScopes(
-    left: Array<'global' | 'project'> | undefined,
-    right: Array<'global' | 'project'> | undefined,
-  ): Array<'global' | 'project'> | undefined {
-    const merged = Array.from(new Set([...(left ?? []), ...(right ?? [])]));
-    return merged.length > 0 ? merged : undefined;
   }
 }

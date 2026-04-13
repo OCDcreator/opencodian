@@ -4,7 +4,8 @@
 
 ## 当前优先级
 
-- **Core config maintainability**: catalog state service（R10 已完成；roadmap 当前 `[NEXT]`）
+- **Checkpoint**: maintainability checkpoint（R12 已提升为 roadmap 当前 `[NEXT]`）
+- **Core config maintainability**: catalog state service（R11 已完成；后续只保留 settings/core catalog state regression watchpoints）
 - **P4**: message shell / notice / timestamp 组装边界（R8 已完成；后续只保留 renderer/finalizer regression watchpoints）
 - **P3**: context / composer / retained-selection 相关 ownership（R7 已完成；后续只保留 facade/focus runtime 回归 watchpoints）
 - **P1**: `OpenCodianView` 里剩余的 activation / sync / runtime bridge ownership
@@ -12,7 +13,8 @@
 
 ## 当前热点首查入口
 
-- Core config maintainability 首查 `ModelConfigService.ts` / `OpencodeConfigManager.ts` 的 catalog state 入口，再看 `OpenCodianSettings.ts` 与 `modelConfigWorkspace.ts` 现在只保留的 UI 消费缝
+- Checkpoint 首查 roadmap / master plan / 最近 phase 文档，再复核 `OpenCodianView.ts`、`OpenCodianSettings.ts` 与 `OpenCodeService.ts` 的 owner 体量变化
+- Core config maintainability 首查 `ModelConfigService.ts` / `ModelCatalogStateService.ts` 的 catalog state 入口，再看 `OpenCodianSettings.ts` 与 `modelConfigWorkspace.ts` 现在只保留的 UI 消费缝
 - P4 regression-only 首查 `AssistantShellViewHostAdapter`、`PersistentAssistantNoticeService` 与 `ConversationRenderService` 的 persisted assistant body/footer seam
 - P3 regression-only 首查 composer-context facade 创建、context catalog ownership 与 retained-selection runtime
 - P1 首查 `OpenCodianView` 里 activation / sync host 与 runtime bridge 创建区段，再看对应 bridge/service
@@ -46,7 +48,8 @@
 - R9 已把 settings section lifecycle、quick-nav 与 scroll restoration 收束到 `SettingsSectionCoordinator`
 - R10 已把 provider/model accordion、search、bulk toggle 与 probe presentation 收束到 `SettingsModelCatalogPresenter`
 - `OpenCodianSettings` 现在负责 section composition、settings persistence 与 modal launch；不要把 model catalog UI 状态机或 probe badge/detail 逻辑搬回主类
-- Settings lane 的下一步不再继续拆 UI，而是按 roadmap 转向 core catalog state service，把 `baseEffective` / `effective` / `currentEnabledProviderIds` availability API 从 settings presenter 侧抽回 core
+- R11 已把 `baseEffective` / `effective` / `currentEnabledProviderIds` availability API 从 settings presenter 侧抽回 `ModelCatalogStateService`
+- Settings/core 的下一步不再开新 UI 拆分，而是按 roadmap 进入 checkpoint，复盘 `OpenCodianSettings` 与 core config owner 的缩减效果
 
 ## 可复用模式
 

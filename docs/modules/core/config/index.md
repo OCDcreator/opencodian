@@ -5,9 +5,10 @@
 
 ## 概述
 
-`src/core/config/index.ts` 是 `core/config` 目录的 barrel。它只聚合 3 个服务类导出：
+`src/core/config/index.ts` 是 `core/config` 目录的 barrel。它现在聚合 4 个配置层 service / state owner 导出：
 
 - `ModelConfigService`
+- `ModelCatalogStateService`
 - `OpencodeConfigManager`
 - `PluginManagementService`
 
@@ -16,7 +17,7 @@
 ## 导入关系
 
 ```text
-上游: ./ModelConfigService, ./OpencodeConfigManager, ./PluginManagementService
+上游: ./ModelConfigService, ./ModelCatalogStateService, ./OpencodeConfigManager, ./PluginManagementService
 下游: src/main.ts, src/features/settings/OpenCodianSettings.ts, src/features/settings/OpencodeConfigModal.ts
 ```
 
@@ -24,6 +25,7 @@
 
 ```typescript
 export { ModelConfigService } from './ModelConfigService';
+export { ModelCatalogStateService } from './ModelCatalogStateService';
 export { OpencodeConfigManager } from './OpencodeConfigManager';
 export { PluginManagementService } from './PluginManagementService';
 ```
@@ -42,7 +44,7 @@ barrel 没有转发 `modelConfig.ts` 中的 `ModelCatalog`、`parseOpencodeConfi
 运行时装配主要通过这个 barrel 完成：
 
 - `src/main.ts` 通过它创建 `OpencodeConfigManager` 和 `ModelConfigService`
-- `src/features/settings/OpenCodianSettings.ts` 通过它创建 `OpencodeConfigManager` 与 `PluginManagementService`
+- `src/features/settings/OpenCodianSettings.ts` 通过它创建 `ModelCatalogStateService`、`OpencodeConfigManager` 与 `PluginManagementService`
 - `src/features/settings/OpencodeConfigModal.ts` 通过它接收 `OpencodeConfigManager`
 
 ## 注意事项
