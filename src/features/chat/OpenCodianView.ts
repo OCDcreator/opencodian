@@ -130,9 +130,9 @@ import {
   TabConversationActivationBridge,
 } from './runtime/TabConversationActivationBridge';
 import {
-  createTabActivationBridgeHosts,
-  type TabActivationBridgeHostFactoryHost,
-} from './runtime/TabActivationBridgeHostFactory';
+  createTabActivationRuntimeBridgeHosts,
+  type TabActivationRuntimeHostAdapterHost,
+} from './runtime/TabActivationRuntimeHostAdapter';
 import {
   PermissionInlineCardRenderer,
 } from './runtime/PermissionInlineCardRenderer';
@@ -155,11 +155,9 @@ import {
 } from './runtime/StreamingInlineCardRenderer';
 import {
   TabConversationStateBridge,
-  type TabConversationStateBridgeHost,
 } from './runtime/TabConversationStateBridge';
 import {
   TabRuntimeStateBridge,
-  type TabRuntimeStateBridgeHost,
 } from './runtime/TabRuntimeStateBridge';
 import {
   TabViewActivationBridge,
@@ -1170,14 +1168,14 @@ export class OpenCodianView extends ItemView {
       this.createConversationTransitionBridgeHost(),
       this.conversationHydrationRenderBridge,
     );
-    this.tabConversationStateBridge = new TabConversationStateBridge(
-      this.createTabConversationStateBridgeHost(),
+    const tabActivationRuntimeBridgeHosts = createTabActivationRuntimeBridgeHosts(
+      this.createTabActivationRuntimeHost(),
     );
-    const tabActivationBridgeHosts = createTabActivationBridgeHosts(
-      this.createTabActivationBridgeHostFactoryHost(),
+    this.tabConversationStateBridge = new TabConversationStateBridge(
+      tabActivationRuntimeBridgeHosts.tabConversationStateBridgeHost,
     );
     this.tabViewActivationBridge = new TabViewActivationBridge(
-      tabActivationBridgeHosts.tabViewActivationBridgeHost,
+      tabActivationRuntimeBridgeHosts.tabActivationBridgeHosts.tabViewActivationBridgeHost,
       this.composerContextViewFacade,
       questionTodoActivationRefreshCoordinator,
       backgroundTaskActivationIndicatorCoordinator,
@@ -1189,14 +1187,16 @@ export class OpenCodianView extends ItemView {
       this.tabViewActivationBridge,
     );
     this.tabConversationActivationBridge = new TabConversationActivationBridge(
-      tabActivationBridgeHosts.tabConversationActivationBridgeHost,
+      tabActivationRuntimeBridgeHosts.tabActivationBridgeHosts.tabConversationActivationBridgeHost,
       this.tabConversationStateBridge,
       this.tabViewActivationBridge,
       questionTodoActivationRefreshCoordinator,
       backgroundTaskActivationIndicatorCoordinator,
       this.activeTabContextUsageCoordinator,
     );
-    this.tabRuntimeStateBridge = new TabRuntimeStateBridge(this.createTabRuntimeStateBridgeHost());
+    this.tabRuntimeStateBridge = new TabRuntimeStateBridge(
+      tabActivationRuntimeBridgeHosts.tabRuntimeStateBridgeHost,
+    );
     const conversationSyncServices = createConversationSyncServices(
       this.createConversationSyncViewHost(),
       visibleConversationPostSyncCoordinator,
@@ -1432,22 +1432,10 @@ export class OpenCodianView extends ItemView {
     };
   }
 
-  private createTabRuntimeStateBridgeHost(): TabRuntimeStateBridgeHost {
+  private createTabActivationRuntimeHost(): TabActivationRuntimeHostAdapterHost {
     return {
       getTabManager: () => this.tabManager,
       getActiveTabId: () => this.getActiveTabId(),
-      getTabRuntimeState: (tabId) => this.getTabRuntimeState(tabId),
-      getTabMessagesContainer: (tabId) => this.getTabPaneState(tabId)?.messagesEl ?? null,
-      hasBackgroundTaskIndicator: (tabId) => Boolean(this.backgroundTaskLiveSignalCoordinator.hasIndicator(tabId)),
-      updateSendButtonState: () => {
-        this.updateSendButtonState();
-      },
-    };
-  }
-
-  private createTabConversationStateBridgeHost(): TabConversationStateBridgeHost {
-    return {
-      getTabManager: () => this.tabManager,
       getSessionIdForTab: (tabId) => this.getSessionIdForTab(tabId),
       setCurrentConversation: (conversation) => {
         this.currentConversation = conversation;
@@ -1483,6 +1471,30 @@ export class OpenCodianView extends ItemView {
       stopConversationSyncLoop: () => {
         this.stopConversationSyncLoop();
       },
+      getTabRuntimeState: (tabId) => this.getTabRuntimeState(tabId),
+      getTabMessagesContainer: (tabId) => this.getTabPaneState(tabId)?.messagesEl ?? null,
+      hasBackgroundTaskIndicator: (tabId) => Boolean(this.backgroundTaskLiveSignalCoordinator.hasIndicator(tabId)),
+      updateSendButtonState: () => {
+        this.updateSendButtonState();
+      },
+      setActiveMessagesPane: (tabId) => {
+        this.setActiveMessagesPane(tabId);
+      },
+      scheduleComposerLayoutSync: () => {
+        this.scheduleComposerLayoutSync();
+      },
+      updateModelSelectorDisplay: () => {
+        this.updateModelSelectorDisplay();
+      },
+      clearMessagesContainer: () => {
+        this.messagesContainer?.empty();
+      },
+      resetTurnState: () => {
+        this.resetTurnState();
+      },
+      scheduleSettledScrollToBottom: (tabId) => {
+        this.scheduleSettledScrollToBottom(tabId);
+      },
     };
   }
 
@@ -1502,33 +1514,6 @@ export class OpenCodianView extends ItemView {
       },
       getSessionContextUsageSnapshot: (sessionId) =>
         this.plugin.openCodeService.getSessionContextUsageSnapshot(sessionId),
-    };
-  }
-
-  private createTabActivationBridgeHostFactoryHost(): TabActivationBridgeHostFactoryHost {
-    return {
-      getActiveTabId: () => this.getActiveTabId(),
-      setActiveMessagesPane: (tabId) => {
-        this.setActiveMessagesPane(tabId);
-      },
-      scheduleComposerLayoutSync: () => {
-        this.scheduleComposerLayoutSync();
-      },
-      updateModelSelectorDisplay: () => {
-        this.updateModelSelectorDisplay();
-      },
-      updateSendButtonState: () => {
-        this.updateSendButtonState();
-      },
-      clearMessagesContainer: () => {
-        this.messagesContainer?.empty();
-      },
-      resetTurnState: () => {
-        this.resetTurnState();
-      },
-      scheduleSettledScrollToBottom: (tabId) => {
-        this.scheduleSettledScrollToBottom(tabId);
-      },
     };
   }
 
