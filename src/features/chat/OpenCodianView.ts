@@ -214,8 +214,9 @@ import {
   ConversationSessionSignalRuntime,
 } from './services/ConversationSessionSignalRuntime';
 import {
-  type ConversationSyncEventLiveSignalHostAdapterHost,
-} from './services/ConversationSyncEventLiveSignalHostAdapter';
+  createConversationSessionSignalRuntimeViewHost,
+  type ConversationSessionSignalRuntimeViewHostFactoryHost,
+} from './services/ConversationSessionSignalRuntimeViewHostFactory';
 import {
   createConversationSyncServices,
 } from './services/ConversationSyncHostAdapter';
@@ -1209,7 +1210,9 @@ export class OpenCodianView extends ItemView {
     this.conversationSyncOrchestrationService = conversationSyncServices.orchestrationService;
     this.conversationSyncBridge = conversationSyncServices.bridge;
     this.conversationSessionSignalRuntime = createConversationSessionSignalRuntime(
-      this.createConversationSyncEventLiveSignalHost(),
+      createConversationSessionSignalRuntimeViewHost(
+        this.createConversationSessionSignalRuntimeViewHostFactoryHost(),
+      ),
       this.backgroundTaskLiveSignalCoordinator,
     );
     this.backgroundTaskCompletionNoticeService = new BackgroundTaskCompletionNoticeService(
@@ -1621,27 +1624,17 @@ export class OpenCodianView extends ItemView {
     };
   }
 
-  private createConversationSyncEventLiveSignalHost(): ConversationSyncEventLiveSignalHostAdapterHost {
+  private createConversationSessionSignalRuntimeViewHostFactoryHost():
+  ConversationSessionSignalRuntimeViewHostFactoryHost {
     return {
-      subscribeToSessionSyncEvents: (listener) =>
-        this.plugin.openCodeService.subscribeToSessionSyncEvents(listener),
-      subscribeToSessionTodoUpdates: (listener) =>
-        this.plugin.openCodeService.subscribeToSessionTodoUpdates(listener),
-      subscribeToSessionStatusUpdates: (listener) =>
-        this.plugin.openCodeService.subscribeToSessionStatusUpdates(listener),
+      getSessionSignalSubscriptions: () => this.plugin.openCodeService,
+      getSessionSignalWriteback: () => this.sessionTodoRuntimeFacade,
       getAllTabs: () => this.tabManager?.getAllTabs() ?? [],
       getConversations: () => this.plugin.getConversations(),
       getCurrentConversation: () => this.currentConversation,
       getActiveTabId: () => this.getActiveTabId(),
-      scheduleConversationSyncFromSignal: (tabId, reason) => {
-        this.scheduleConversationSyncFromSignal(tabId, reason);
-      },
-      applySessionTodoUpdate: (tabId, sessionId, todos) => {
-        this.sessionTodoRuntimeFacade.applySessionTodoUpdate(tabId, sessionId, todos);
-      },
-      applySessionStatusUpdate: (tabId, sessionId, status) => {
-        this.sessionTodoRuntimeFacade.applySessionStatusUpdate(tabId, sessionId, status);
-      },
+      scheduleConversationSyncFromSignal: (tabId, reason) =>
+        this.scheduleConversationSyncFromSignal(tabId, reason),
     };
   }
 
