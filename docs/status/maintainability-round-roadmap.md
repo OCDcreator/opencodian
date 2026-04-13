@@ -1,7 +1,6 @@
 # Maintainability Round Roadmap
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
-> **当前状态**: [PAUSED_FOR_PLANNING]
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`。第 12 轮完成后必须暂停复盘，不得自动扩展新队列。
 
 ## 控制规则
