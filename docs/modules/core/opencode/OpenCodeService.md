@@ -30,6 +30,7 @@
 - `./omoCompat`
 - `./OpenCodeCatalogStateStore`
 - `./OpenCodeEventSubscriptionCoordinator`
+- `./OpenCodePromptRequestBuilder`
 - `./OpenCodeSyncEventRuntimeCoordinator`
 - `./sdkFeatureFlags`
 - `./sdkTypes`
@@ -53,6 +54,7 @@
 - `sdkFeatureFlags`: 由 `resolveSdkFeatureFlags()` 合并后的运行时 SDK 开关。
 - `syncEventRuntime`: `OpenCodeSyncEventRuntimeCoordinator` 实例，负责 session todo/status/message sync event 的监听集合、wanted state、SDK 订阅生命周期与 emit 路径。
 - `catalogState`: `OpenCodeCatalogStateStore` 实例，负责 registry tool ids、tool schema cache、observed external tool names、MCP server status、catalog snapshot 构造与 catalog listener lifecycle。
+- `promptRequestBuilder`: `OpenCodePromptRequestBuilder` 实例，负责 SDK prompt parameters、legacy request body 与 shared prompt options/variant/output-format/model defaults 的组装。
 - `openCodeEventRuntime`: `OpenCodeEventSubscriptionCoordinator` 实例，负责 open-code event listener registry、`event` / `global` 订阅生命周期，以及 catalog-relevant payload 到 `catalogState` 的刷新/广播触发。
 - `vaultPath`: 用于 SDK `directory` 注入、上下文文件绝对路径解析，以及 `ServerManager` 工作目录设置；OpenCode directory scope 和 context file path 的跨平台规范化委托给 `shared/contextPath`。
 
@@ -143,6 +145,22 @@
 
 图片会被追加成 data URL `file` part。
 
+#### Prompt option builder
+
+`OpenCodePromptRequestBuilder` 现在统一负责：
+
+- SDK `session.prompt()` / `promptAsync()` 的参数组装
+- legacy `/session/:id/message` 与 `/session/:id/prompt_async` 的 shared prompt options 拼装
+- `allowedTools`、`output-format`、`variant`、默认 `provider/model` 的映射
+
+兼容边界保持不变：
+
+- SDK 路径仍不会写入 `thinkingBudget`，只记录 debug log
+- legacy `/prompt_async` 仍会把 `reasoningEffort` / `thinkingBudget` 写进 `model.options`
+- legacy `/message` 仍保持不写 `model.options`
+
+`OpenCodeService` 现在只保留 transport 分流与 request-part 序列化；R23 之前不会把 context/image parts 也混进这个 builder。
+
 #### 非流式请求
 
 `requestAssistantResponse()`：
@@ -170,17 +188,7 @@
 - `sdkStream` 开启时调用 `sendMessageWithSdk()`
 - 否则先 POST `/session/:id/prompt_async`，再连接 legacy SSE `/event`
 
-`buildSdkPromptParameters()` 只在 SDK 路径上生效，并且：
-
-- `allowedTools` 会被转换成 `{ [toolName]: true }`
-- `reasoningEffort` 会映射到 SDK `variant`
-- `system` 会透传
-- `thinkingBudget` 当前不会写进 SDK v2 payload，只会记录 debug log
-
-legacy 流式路径则会把：
-
-- `reasoningEffort` 写进 `model.options.reasoningEffort`
-- `thinkingBudget` 写进 `model.options.thinking`
+对应的 prompt option assembly 现在全部委托给 `OpenCodePromptRequestBuilder`；`sendMessage()` 只保留 legacy transport 入口、SSE 生命周期和错误处理。
 
 ### 流式事件处理与取消
 

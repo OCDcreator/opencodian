@@ -1,7 +1,7 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [CONFIRMED_NIGHT_BATCH] R19-R27 已确认；当前 `[NEXT]` 是 R22 Prompt request builder。
+> **当前状态**: [CONFIRMED_NIGHT_BATCH] R19-R27 已确认；当前 `[NEXT]` 是 R23 Context part serializer。
 
 ## 当前优先级
 
@@ -17,8 +17,8 @@
 - R19 已完成 sync-event listener registry、wanted state、subscription lifecycle 与 emit path 收束
 - R20 已完成 open-code event listener registry、event/global 订阅生命周期、catalog-relevant payload routing 与 emit path 收束
 - R21 已完成 tool schema cache、registry tool ids、MCP server status snapshot、catalog listener lifecycle 与 snapshot 构造到 `OpenCodeCatalogStateStore`
-- R22 首查 SDK prompt parameters、shared prompt options、allowed-tools / output-format / variant / reasoning 映射；不要混入 transport 分流
-- R23 首查 context/image request-part serialization；继续和 R22 保持边界
+- R22 已完成 SDK prompt parameters、shared prompt options、allowed-tools / output-format / variant / reasoning 映射到 `OpenCodePromptRequestBuilder`
+- R23 首查 context/image request-part serialization；继续保持与 prompt option builder 的边界
 - R24-R26 首查 active stream runtime、event→chunk transform、message normalization；严格保持 SDK-first / legacy fallback / ChatMessage 语义
 - `OpenCodianView` / settings / trailing-assistant 链本批都只保留 regression watchpoints，不再开新切口
 - P2 regression-only 首查顺序固定为：

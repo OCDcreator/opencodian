@@ -61,6 +61,10 @@ import {
   type OpenCodeEventListener,
 } from './OpenCodeEventSubscriptionCoordinator';
 import {
+  OpenCodePromptRequestBuilder,
+  type PromptRequestPart,
+} from './OpenCodePromptRequestBuilder';
+import {
   OpenCodeSyncEventRuntimeCoordinator,
   type SessionActivityStatus,
   type SessionSyncEventUpdate,
@@ -68,10 +72,9 @@ import {
 import { OpenCodeSdkFacade } from './OpenCodeSdkFacade';
 import type { SdkFeatureFlags } from './sdkFeatureFlags';
 import { resolveSdkFeatureFlags } from './sdkFeatureFlags';
-import type { SdkEvent, SdkOpencodeClient, SdkOutputFormat } from './sdkTypes';
+import type { SdkEvent, SdkOpencodeClient } from './sdkTypes';
 import { ServerManager } from './ServerManager';
 import type {
-  LocalOutputFormat,
   ManagedServerState,
   McpServerSnapshot,
   McpServerStatus,
@@ -440,30 +443,6 @@ interface ActiveStreamContext {
   partTypeMap: Map<string, string>;
 }
 
-type PromptRequestPart =
-  | {
-      type: 'text';
-      text: string;
-      synthetic?: boolean;
-      ignored?: boolean;
-      metadata?: Record<string, unknown>;
-    }
-  | {
-      type: 'file';
-      mime: string;
-      filename?: string;
-      url: string;
-      source?: {
-        type: 'file';
-        path: string;
-        text: {
-          value: string;
-          start: number;
-          end: number;
-        };
-      };
-    };
-
 type SessionTodoUpdate = {
   sessionId: string;
   todos: SessionTodo[];
@@ -492,6 +471,7 @@ export class OpenCodeService {
   private sdkFeatureFlags: SdkFeatureFlags;
   private syncEventRuntime: OpenCodeSyncEventRuntimeCoordinator;
   private catalogState: OpenCodeCatalogStateStore;
+  private promptRequestBuilder: OpenCodePromptRequestBuilder;
   private openCodeEventRuntime: OpenCodeEventSubscriptionCoordinator;
   private vaultPath?: string;
   private transientConnectivityLogState: TransientConnectivityLogState | null = null;
@@ -533,6 +513,13 @@ export class OpenCodeService {
 
         this.openCodeEventRuntime.stopSubscriptions();
       },
+    });
+    this.promptRequestBuilder = new OpenCodePromptRequestBuilder({
+      getDefaultModelSelection: () => ({
+        providerID: this.settings.defaultProvider,
+        modelID: this.settings.defaultModel,
+      }),
+      observeRuntimeToolNames: (toolNames) => this.observeRuntimeToolNames(toolNames),
     });
     this.openCodeEventRuntime = new OpenCodeEventSubscriptionCoordinator({
       subscribeToEvents: async (source, signal) => {
@@ -1091,11 +1078,10 @@ export class OpenCodeService {
     }
 
     const parts = this.buildPromptRequestParts(message, options);
-    const sharedOptions = this.buildSharedPromptOptions(options);
 
     if (this.shouldUseSdk('sdkPrompt')) {
       const response = await this.getSdkClient().session.prompt(
-        this.buildSdkPromptParameters(sessionId, parts, options),
+        this.promptRequestBuilder.buildSdkPromptParameters(sessionId, parts, options),
       );
       if (response && typeof response === 'object' && 'info' in response && 'parts' in response) {
         const typedResponse = response as AssistantMessageResponse;
@@ -1114,34 +1100,7 @@ export class OpenCodeService {
       throw new Error('Invalid assistant response payload');
     }
 
-    const providerID = options.provider ?? this.settings.defaultProvider;
-    const modelID = options.model ?? this.settings.defaultModel;
-    const requestBody: Record<string, unknown> = {
-      parts,
-      model: {
-        providerID,
-        modelID,
-      },
-    };
-
-    if (sharedOptions.system) {
-      requestBody.system = sharedOptions.system;
-    }
-    if (sharedOptions.tools) {
-      requestBody.tools = sharedOptions.tools;
-    }
-    if (sharedOptions.variant) {
-      requestBody.variant = sharedOptions.variant;
-    }
-    if (sharedOptions.agent) {
-      requestBody.agent = sharedOptions.agent;
-    }
-    if (typeof sharedOptions.noReply === 'boolean') {
-      requestBody.noReply = sharedOptions.noReply;
-    }
-    if (sharedOptions.format) {
-      requestBody.format = sharedOptions.format;
-    }
+    const requestBody = this.promptRequestBuilder.buildLegacyMessageRequestBody(parts, options);
 
     const response = await this.post<unknown>(`/session/${sessionId}/message`, requestBody);
     if (
@@ -1226,56 +1185,9 @@ export class OpenCodeService {
     }
 
     const parts = this.buildPromptRequestParts(message, options);
-    const sharedOptions = this.buildSharedPromptOptions(options);
-
-    // Build model config
-    const providerID = options.provider ?? this.settings.defaultProvider;
-    const modelID = options.model ?? this.settings.defaultModel;
-    const modelOptions: Record<string, unknown> = {};
-
-    if (options.reasoningEffort) {
-      modelOptions.reasoningEffort = options.reasoningEffort;
-    }
-
-    if (options.thinkingBudget !== undefined) {
-      modelOptions.thinking = options.thinkingBudget > 0
-        ? {
-            type: 'enabled',
-            budgetTokens: options.thinkingBudget,
-          }
-        : {
-            type: 'disabled',
-          };
-    }
 
     try {
-      // Send the prompt using async endpoint
-      const requestBody: Record<string, unknown> = { 
-        parts,
-        model: {
-          providerID,
-          modelID,
-          ...(Object.keys(modelOptions).length > 0 ? { options: modelOptions } : {}),
-        },
-      };
-      if (sharedOptions.system) {
-        requestBody.system = sharedOptions.system;
-      }
-      if (sharedOptions.tools) {
-        requestBody.tools = sharedOptions.tools;
-      }
-      if (sharedOptions.variant) {
-        requestBody.variant = sharedOptions.variant;
-      }
-      if (sharedOptions.agent) {
-        requestBody.agent = sharedOptions.agent;
-      }
-      if (typeof sharedOptions.noReply === 'boolean') {
-        requestBody.noReply = sharedOptions.noReply;
-      }
-      if (sharedOptions.format) {
-        requestBody.format = sharedOptions.format;
-      }
+      const requestBody = this.promptRequestBuilder.buildLegacyStreamRequestBody(parts, options);
 
       await this.post<void>(`/session/${sessionId}/prompt_async`, requestBody);
 
@@ -1732,75 +1644,6 @@ export class OpenCodeService {
     };
   }
 
-  private buildSdkPromptParameters(
-    sessionId: string,
-    parts: PromptRequestPart[],
-    options: QueryOptions & { system?: string },
-  ): {
-    sessionID: string;
-    model: {
-      providerID: string;
-      modelID: string;
-    };
-    parts: PromptRequestPart[];
-    system?: string;
-    tools?: Record<string, boolean>;
-    variant?: string;
-    agent?: string;
-    noReply?: boolean;
-    format?: SdkOutputFormat;
-  } {
-    if (options.thinkingBudget !== undefined) {
-      logger.debug('thinkingBudget is not currently mapped to the SDK v2 prompt payload and is being omitted', {
-        thinkingBudget: options.thinkingBudget,
-      });
-    }
-
-    const parameters: {
-      sessionID: string;
-      model: {
-        providerID: string;
-        modelID: string;
-      };
-      parts: PromptRequestPart[];
-      system?: string;
-      tools?: Record<string, boolean>;
-      variant?: string;
-      agent?: string;
-      noReply?: boolean;
-      format?: SdkOutputFormat;
-    } = {
-      sessionID: sessionId,
-      model: {
-        providerID: options.provider ?? this.settings.defaultProvider,
-        modelID: options.model ?? this.settings.defaultModel,
-      },
-      parts,
-    };
-
-    const sharedOptions = this.buildSharedPromptOptions(options);
-    if (sharedOptions.system) {
-      parameters.system = sharedOptions.system;
-    }
-    if (sharedOptions.tools) {
-      parameters.tools = sharedOptions.tools;
-    }
-    if (sharedOptions.variant) {
-      parameters.variant = sharedOptions.variant;
-    }
-    if (sharedOptions.agent) {
-      parameters.agent = sharedOptions.agent;
-    }
-    if (typeof sharedOptions.noReply === 'boolean') {
-      parameters.noReply = sharedOptions.noReply;
-    }
-    if (sharedOptions.format) {
-      parameters.format = this.resolveSdkOutputFormat(sharedOptions.format);
-    }
-
-    return parameters;
-  }
-
   private buildPromptRequestParts(
     message: string,
     options: QueryOptions,
@@ -1977,15 +1820,6 @@ export class OpenCodeService {
     };
   }
 
-  private buildAllowedToolsRecord(allowedTools?: string[]): Record<string, boolean> | undefined {
-    if (!allowedTools || allowedTools.length === 0) {
-      return undefined;
-    }
-
-    this.observeRuntimeToolNames(allowedTools);
-    return Object.fromEntries(allowedTools.map((toolName) => [toolName, true]));
-  }
-
   private observeRuntimeToolNames(toolNames: Iterable<string>): boolean {
     return this.catalogState.observeRuntimeToolNames(toolNames);
   }
@@ -2008,87 +1842,6 @@ export class OpenCodeService {
       registryTools: context.registryTools,
       observedExternalTools: context.observedExternalTools,
     }).kind;
-  }
-
-  private buildSharedPromptOptions(
-    options: QueryOptions & { system?: string },
-  ): {
-    system?: string;
-    tools?: Record<string, boolean>;
-    variant?: string;
-    agent?: string;
-    noReply?: boolean;
-    format?: LocalOutputFormat;
-  } {
-    const sharedOptions: {
-      system?: string;
-      tools?: Record<string, boolean>;
-      variant?: string;
-      agent?: string;
-      noReply?: boolean;
-      format?: LocalOutputFormat;
-    } = {};
-
-    const tools = this.buildAllowedToolsRecord(options.allowedTools);
-    if (tools) {
-      sharedOptions.tools = tools;
-    }
-
-    const variant = this.resolveSdkVariant(options);
-    if (variant) {
-      sharedOptions.variant = variant;
-    }
-
-    if (options.system?.trim()) {
-      sharedOptions.system = options.system.trim();
-    }
-
-    if (typeof options.agent === 'string' && options.agent.trim()) {
-      sharedOptions.agent = options.agent.trim();
-    }
-
-    if (typeof options.noReply === 'boolean') {
-      sharedOptions.noReply = options.noReply;
-    }
-
-    const format = this.resolveLocalOutputFormat(options.format);
-    if (format) {
-      sharedOptions.format = format;
-    }
-
-    return sharedOptions;
-  }
-
-  private resolveLocalOutputFormat(format?: LocalOutputFormat): LocalOutputFormat | undefined {
-    if (!format) {
-      return undefined;
-    }
-
-    if (format.type === 'text') {
-      return { type: 'text' };
-    }
-
-    return {
-      type: 'json_schema',
-      schema: format.schema,
-      ...(typeof format.retryCount === 'number' ? { retryCount: format.retryCount } : {}),
-    };
-  }
-
-  private resolveSdkOutputFormat(format: LocalOutputFormat): SdkOutputFormat {
-    if (format.type === 'text') {
-      return { type: 'text' };
-    }
-
-    return {
-      type: 'json_schema',
-      schema: format.schema,
-      ...(typeof format.retryCount === 'number' ? { retryCount: format.retryCount } : {}),
-    };
-  }
-
-  private resolveSdkVariant(options: QueryOptions): string | undefined {
-    return options.reasoningEffort;
   }
 
   private handleStreamingEvent(
@@ -2353,7 +2106,9 @@ export class OpenCodeService {
     const parts = this.buildPromptRequestParts(message, options);
 
     try {
-      await client.session.promptAsync(this.buildSdkPromptParameters(sessionId, parts, options));
+      await client.session.promptAsync(
+        this.promptRequestBuilder.buildSdkPromptParameters(sessionId, parts, options),
+      );
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Unknown error';
       yield { type: 'error', content: msg };

@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`。R27 完成后必须暂停复盘，不得自动扩展新队列。
-> **当前状态**: [CONFIRMED_NIGHT_BATCH] R19-R27 已确认；当前 `[NEXT]` 是 R21 Tool and MCP catalog state store。
+> **当前状态**: [CONFIRMED_NIGHT_BATCH] R19-R27 已确认；当前 `[NEXT]` 是 R23 Context part serializer。
 
 ## 控制规则
 
@@ -486,7 +486,7 @@
   - 新 owner 满足粒度规则并有 focused coverage。
   - 运行 targeted tests、全量 `npm test`、`npm run build`。
 
-### [NEXT] R22 - Prompt request builder
+### [DONE] R22 - Prompt request builder
 
 - **Lane**: OpenCodeService `prompt request assembly`
 - **目标**: 把 SDK prompt parameters、shared prompt options、allowed-tools / output-format / variant / reasoning 映射收束到较厚 request builder。
@@ -505,7 +505,7 @@
   - 新 owner 有 focused coverage，并保持 SDK-first / legacy fallback 语义不变。
   - 运行 targeted tests、全量 `npm test`、`npm run build`。
 
-### [QUEUED] R23 - Context part serializer
+### [NEXT] R23 - Context part serializer
 
 - **Lane**: OpenCodeService `context / image request parts`
 - **目标**: 把 `buildPromptRequestParts()`、`createPromptContextPart()` 与本地/远程 context、image parts 序列化收束到独立 serializer。
