@@ -216,16 +216,9 @@ import {
   type ConversationSyncBridgePorts,
 } from './services/ConversationSyncBridgePortProvider';
 import {
-  createConversationSessionSignalRuntime,
   ConversationSessionSignalRuntime,
+  type ConversationSessionSignalRuntimeHost,
 } from './services/ConversationSessionSignalRuntime';
-import {
-  createConversationSessionSignalRuntimeViewHostFactoryHost,
-  type ConversationSessionSignalRuntimeHostProviderHost,
-} from './services/ConversationSessionSignalRuntimeHostProvider';
-import {
-  createConversationSessionSignalRuntimeViewHost,
-} from './services/ConversationSessionSignalRuntimeViewHostFactory';
 import {
   createConversationSyncLoadRuntimeViewHostFactoryHost,
   type ConversationSyncLoadRuntimeHostProviderHost,
@@ -1202,12 +1195,8 @@ export class OpenCodianView extends ItemView {
       createTabActivationConversationSyncRuntimePort(
         this.createTabActivationConversationSyncPortProviderHost(),
       );
-    this.conversationSessionSignalRuntime = createConversationSessionSignalRuntime(
-      createConversationSessionSignalRuntimeViewHost(
-        createConversationSessionSignalRuntimeViewHostFactoryHost(
-          this.createConversationSessionSignalRuntimeHostProviderHost(),
-        ),
-      ),
+    this.conversationSessionSignalRuntime = new ConversationSessionSignalRuntime(
+      this.createConversationSessionSignalRuntimeHost(),
       this.backgroundTaskLiveSignalCoordinator,
     );
     this.backgroundTaskCompletionNoticeService = new BackgroundTaskCompletionNoticeService(
@@ -1645,8 +1634,8 @@ export class OpenCodianView extends ItemView {
     };
   }
 
-  private createConversationSessionSignalRuntimeHostProviderHost():
-  ConversationSessionSignalRuntimeHostProviderHost {
+  private createConversationSessionSignalRuntimeHost():
+  ConversationSessionSignalRuntimeHost {
     return {
       subscribeToSessionSyncEvents: (listener) =>
         this.plugin.openCodeService.subscribeToSessionSyncEvents(listener),

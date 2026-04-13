@@ -9,11 +9,8 @@ import {
 } from '../../../../src/core/types';
 import {
   ConversationSessionSignalRuntime,
-  createConversationSessionSignalRuntime,
+  type ConversationSessionSignalRuntimeHost,
 } from '../../../../src/features/chat/services/ConversationSessionSignalRuntime';
-import type {
-  ConversationSyncEventLiveSignalHostAdapterHost,
-} from '../../../../src/features/chat/services/ConversationSyncEventLiveSignalHostAdapter';
 import type { TabData } from '../../../../src/features/chat/tabs';
 
 type Mocked<T> = {
@@ -58,7 +55,7 @@ function createHost(): {
   emitSessionStatusUpdate: (sessionId: string, status: SessionActivityStatus) => void;
   emitSessionSyncEvent: (update: SessionSyncEventUpdate) => void;
   emitSessionTodoUpdate: (sessionId: string, todos: SessionTodo[]) => void;
-  host: Mocked<ConversationSyncEventLiveSignalHostAdapterHost>;
+  host: Mocked<ConversationSessionSignalRuntimeHost>;
 } {
   const currentConversation = createConversation('conversation-active', {
     openCodeSessionId: 'session-shared',
@@ -134,27 +131,29 @@ describe('ConversationSessionSignalRuntime', () => {
     jest.clearAllMocks();
   });
 
-  it('starts and stops live-signal before sync-event adapters', () => {
-    const liveSignalAdapter = { start: jest.fn(), stop: jest.fn() };
-    const syncEventAdapter = { start: jest.fn(), stop: jest.fn() };
-    const runtime = new ConversationSessionSignalRuntime(liveSignalAdapter, syncEventAdapter);
+  it('owns all session-signal subscription cleanup across restarts', () => {
+    const {
+      backgroundTaskLiveSignalCoordinator,
+      disposeSessionSyncEvents,
+      disposeSessionStatusUpdates,
+      disposeSessionTodoUpdates,
+      host,
+    } = createHost();
+    const runtime = new ConversationSessionSignalRuntime(host, backgroundTaskLiveSignalCoordinator);
 
+    runtime.start();
     runtime.start();
     runtime.stop();
 
-    expect(liveSignalAdapter.start).toHaveBeenCalledTimes(1);
-    expect(syncEventAdapter.start).toHaveBeenCalledTimes(1);
-    expect(liveSignalAdapter.stop).toHaveBeenCalledTimes(1);
-    expect(syncEventAdapter.stop).toHaveBeenCalledTimes(1);
-    expect(liveSignalAdapter.start.mock.invocationCallOrder[0]).toBeLessThan(
-      syncEventAdapter.start.mock.invocationCallOrder[0],
-    );
-    expect(liveSignalAdapter.stop.mock.invocationCallOrder[0]).toBeLessThan(
-      syncEventAdapter.stop.mock.invocationCallOrder[0],
-    );
+    expect(host.subscribeToSessionTodoUpdates).toHaveBeenCalledTimes(2);
+    expect(host.subscribeToSessionStatusUpdates).toHaveBeenCalledTimes(2);
+    expect(host.subscribeToSessionSyncEvents).toHaveBeenCalledTimes(2);
+    expect(disposeSessionTodoUpdates).toHaveBeenCalledTimes(2);
+    expect(disposeSessionStatusUpdates).toHaveBeenCalledTimes(2);
+    expect(disposeSessionSyncEvents).toHaveBeenCalledTimes(2);
   });
 
-  it('assembles sync-event and live-signal routing behind one runtime seam', () => {
+  it('routes sync, todo, and status signals through one runtime owner', () => {
     const {
       backgroundTaskLiveSignalCoordinator,
       disposeSessionSyncEvents,
@@ -166,7 +165,7 @@ describe('ConversationSessionSignalRuntime', () => {
       host,
     } = createHost();
     const todos: SessionTodo[] = [{ id: 'todo-1', content: 'Finish task', status: 'in_progress' }];
-    const runtime = createConversationSessionSignalRuntime(host, backgroundTaskLiveSignalCoordinator);
+    const runtime = new ConversationSessionSignalRuntime(host, backgroundTaskLiveSignalCoordinator);
 
     runtime.start();
     emitSessionSyncEvent({ sessionId: 'session-shared', type: 'session.diff' });
@@ -200,5 +199,49 @@ describe('ConversationSessionSignalRuntime', () => {
     expect(disposeSessionSyncEvents).toHaveBeenCalledTimes(1);
     expect(disposeSessionTodoUpdates).toHaveBeenCalledTimes(1);
     expect(disposeSessionStatusUpdates).toHaveBeenCalledTimes(1);
+  });
+
+  it('falls back to the active tab when the current conversation still matches the session', () => {
+    const currentConversation = createConversation('conversation-active', {
+      openCodeSessionId: 'session-active-only',
+    });
+    const { backgroundTaskLiveSignalCoordinator, emitSessionStatusUpdate, emitSessionSyncEvent, host } = createHost();
+    host.getCurrentConversation.mockReturnValue(currentConversation);
+    host.getConversations.mockReturnValue([
+      createConversation('conversation-other', { openCodeSessionId: 'session-other' }),
+    ]);
+    host.getAllTabs.mockReturnValue([
+      createTab({
+        id: 'tab-other',
+        conversationId: 'conversation-other',
+        title: 'Other tab',
+        isActive: false,
+      }),
+    ]);
+    host.getActiveTabId.mockReturnValue('tab-active');
+    const runtime = new ConversationSessionSignalRuntime(host, backgroundTaskLiveSignalCoordinator);
+
+    runtime.start();
+    emitSessionSyncEvent({
+      sessionId: 'session-active-only',
+      type: 'message.updated',
+      messageId: null,
+    });
+    emitSessionStatusUpdate('session-active-only', { type: 'busy' });
+
+    expect(host.scheduleConversationSyncFromSignal).toHaveBeenCalledTimes(1);
+    expect(host.scheduleConversationSyncFromSignal).toHaveBeenCalledWith(
+      'tab-active',
+      'message.updated',
+    );
+    expect(host.applySessionStatusUpdate).toHaveBeenCalledTimes(1);
+    expect(host.applySessionStatusUpdate).toHaveBeenCalledWith(
+      'tab-active',
+      'session-active-only',
+      { type: 'busy' },
+    );
+    expect(backgroundTaskLiveSignalCoordinator.reconcileStateFromLiveSignals).toHaveBeenCalledWith(
+      'tab-active',
+    );
   });
 });

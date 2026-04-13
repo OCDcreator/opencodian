@@ -42,4 +42,4 @@ export interface ConversationSyncBridgePorts {
 - `OpenCodianView`：只保留扁平的 conversation-sync lifecycle / signal / visible-follow-up seam
 - `ConversationSyncBridge`：继续负责 loop 启停、signal dispatch、visible/background sync transport 与 post-sync router 对接
 - `ConversationSyncOrchestrationService`：继续负责 signal debounce timer、tab/conversation 选择与 dispatch
-- `TabActivationRuntimeHostProvider`、`ConversationSessionSignalRuntimeHostProvider`、`MessageSendPreparationService`、`QuestionPostResolutionRuntimeHostAdapter`：按需消费 regrouped ports，而不是各自从 view 重新索取 bridge forwarding callback
+- `TabActivationRuntimeHostProvider`、`ConversationSessionSignalRuntime`、`MessageSendPreparationService`、`QuestionPostResolutionRuntimeHostAdapter`：按需消费 regrouped ports，而不是各自从 view 重新索取 bridge forwarding callback

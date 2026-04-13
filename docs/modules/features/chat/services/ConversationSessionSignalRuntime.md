@@ -5,34 +5,38 @@
 
 ## 概述
 
-`ConversationSessionSignalRuntime` 把 `OpenCodianView` 里 session sync event 与 todo/status live-signal 的 **adapter 装配、共享 resolver 注入，以及统一 start/stop 生命周期** 收束到一个独立模块，专门负责：
+`ConversationSessionSignalRuntime` 把 `OpenCodianView` 里 session sync event 与 todo/status live-signal 的 **订阅生命周期、session→tab 路由、sync 调度，以及 live writeback/reconcile** 收束到一个独立模块，专门负责：
 
-- 接收 `ConversationSessionSignalRuntimeViewHostFactory` 生成的共享 `ConversationSyncEventLiveSignalHostAdapterHost`
-- 以同一份共享 session-signal host 派生 sync-event host 与 live-signal host
-- 创建并共享一份 `ConversationSessionTabResolver`，避免两个 adapter 各自重新装配同类 lookup 依赖
-- 把 `ConversationSyncEventAdapter` 与 `ConversationSessionLiveSignalAdapter` 收束到单一 runtime lifecycle，减少 view 级 start/stop wiring
+- 统一订阅 `subscribeToSessionSyncEvents()`、`subscribeToSessionTodoUpdates()` 与 `subscribeToSessionStatusUpdates()`
+- 共享一份 `ConversationSessionTabResolver`，把每个 session signal 解释成当前应命中的 tab 列表
+- 把 session sync signal 交给 `ConversationSyncOrchestrationService` 的 schedule 入口
+- 把 todo/status live signal 写回 `SessionTodoCoordinator`，并在每次 live update 后继续触发 `BackgroundTaskLiveSignalCoordinator`
 
-它不负责 session signal 的具体订阅逻辑，也不负责 todo/status 写回或 sync 调度；这些职责仍由两个 adapter 与下游 runtime/service 持有。
+它不负责 session→conversation lookup 本身，也不负责 sync debounce / dispatch 或 todo 状态机；这些职责仍分别由 `ConversationSessionTabResolver`、`ConversationSyncOrchestrationService`、`SessionTodoCoordinator` 与 `BackgroundTaskLiveSignalCoordinator` 持有。
 
 ## 公开接口
 
 ```typescript
+export interface ConversationSessionSignalRuntimeHost {
+  subscribeToSessionSyncEvents(...): () => void;
+  subscribeToSessionTodoUpdates(...): () => void;
+  subscribeToSessionStatusUpdates(...): () => void;
+  scheduleConversationSyncFromSignal(...): void;
+  applySessionTodoUpdate(...): void;
+  applySessionStatusUpdate(...): void;
+}
+
 export class ConversationSessionSignalRuntime {
+  constructor(host: ConversationSessionSignalRuntimeHost, backgroundTaskLiveSignalCoordinator);
   start(): void;
   stop(): void;
 }
-
-export function createConversationSessionSignalRuntime(
-  host: ConversationSyncEventLiveSignalHostAdapterHost,
-  backgroundTaskLiveSignalCoordinator,
-): ConversationSessionSignalRuntime;
 ```
 
 ## 边界
 
-- `OpenCodianView` 只负责提供更窄的 runtime host factory 输入，并持有 runtime 生命周期
-- `ConversationSessionSignalRuntimeViewHostFactory` 负责从 view / service 端口创建共享 session-signal host seam
-- `ConversationSyncEventLiveSignalHostAdapter` 负责把 view seam 派生为两个 adapter host
-- `ConversationSessionTabResolver` 负责被 runtime 共享的 session→tab 匹配逻辑
-- `ConversationSyncEventAdapter` 继续处理 session sync event 订阅与 sync 调度入口
-- `ConversationSessionLiveSignalAdapter` 继续处理 todo/status live signal 写回与 background-task reconcile
+- `OpenCodianView` 只保留 host assembly 与 runtime lifecycle，不再串联多层 session-signal provider / factory / adapter seam
+- `ConversationSessionTabResolver` 负责被 runtime 共享的 session→tab 匹配规则与 active-tab fallback
+- `ConversationSyncOrchestrationService` 继续负责 signal debounce、tab/conversation 选择与 dispatch
+- `SessionTodoCoordinator` 继续负责 todo/status runtime 写回语义与后续 refresh 入口
+- `BackgroundTaskLiveSignalCoordinator` 继续负责 live update 之后的 indicator/stale reconcile 判定

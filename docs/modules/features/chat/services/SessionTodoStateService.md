@@ -58,7 +58,7 @@ export class SessionTodoStateService {
 
 ## 与 `OpenCodianView` 的边界
 
-- `ConversationSessionLiveSignalAdapter` 负责 session todo/status live listener 的生命周期、session→tab 路由与 active-tab fallback
+- `ConversationSessionSignalRuntime` 负责 session todo/status live listener 的生命周期、session→tab 路由与 active-tab fallback
 - `SessionTodoCoordinator` 负责主动调用 OpenCode todo/status API、维护 request-id stale guard，并把 stream/live-signal/reset/refresh 入口统一回落到本服务
 - `PersistentAssistantNoticeService` 负责 persisted stale notice 的历史匹配、追加落盘，以及可见/隐藏 tab 的后续动作
 - `BackgroundTaskLiveSignalCoordinator` 现在会直接调用 `reconcileStaleSessionTodoState()` 参与 live-signal settle；view 不再转发这条 stale follow-up callback

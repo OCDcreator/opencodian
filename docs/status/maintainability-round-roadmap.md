@@ -105,7 +105,7 @@
   - Completion notice fingerprinting 有 focused coverage。
   - 运行 targeted tests、全量 `npm test`、`npm run build`。
 
-### [NEXT] R5 - P2 event orchestrator
+### [DONE] R5 - P2 event orchestrator
 
 - **Lane**: P2 `question / todo / background task`
 - **目标**: 集中 `subscribeToSessionTodoUpdates`、`subscribeToSessionStatusUpdates`、`subscribeToSessionSyncEvents` 以及 signal routing / scheduling。
@@ -125,7 +125,7 @@
   - Reconcile/schedule 逻辑离开 view。
   - 运行 targeted tests、全量 `npm test`、`npm run build`。
 
-### [QUEUED] R6 - P2 集成测试与文档回收
+### [NEXT] R6 - P2 集成测试与文档回收
 
 - **Lane**: P2 `question / todo / background task`
 - **目标**: 补齐 question dock、todo refresh、background notice 的 focused tests，并同步 docs/modules 与 roadmap。

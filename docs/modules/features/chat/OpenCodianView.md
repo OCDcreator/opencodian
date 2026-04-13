@@ -104,7 +104,7 @@ background task completion notice 的 queued-state 则已经完全移出 `TabRun
 3. `startServerStatusLoop()`
 4. 在 `messagesShellEl` 上创建 `MarkdownRenderService`
 5. `wireEventHandlers()`，其中 composer/context 相关的 workspace / vault / DOM 事件注册与 retained-selection polling 启动都会转交给 `ComposerContextEventBridge`
-6. 通过 `ConversationSessionLiveSignalAdapter` / `ConversationSyncEventAdapter` 订阅 session live signal 与 sync-event 更新
+6. 通过 `ConversationSessionSignalRuntime` 统一订阅 session sync event 与 todo/status live signal 更新
 7. `initializeFirstTab()`
 
 `onClose()` 则会反向清理：
@@ -136,8 +136,7 @@ background task completion notice 的 queued-state 则已经完全移出 `TabRun
 - 在必要时调用 `syncConversationMessagesFromServer()`
 - 装载阶段进入 hydration：先重建历史 turn / inline background task，再等待后续 authoritative message sync 决定是否允许 stale 降级
 - 重新渲染消息、背景任务指示器、todo dock、question dock
-- 通过 `ConversationSyncHostAdapter` 组装 `ConversationSyncRuntimeCoordinator` / `ConversationSyncOrchestrationService` / `ConversationSyncBridge`，并通过 `ConversationSyncEventAdapter` 接入 session sync event 订阅与 cleanup 生命周期
-- 通过 `ConversationSessionLiveSignalAdapter` 接入 session todo/status live signal 的订阅、session→tab 匹配与 cleanup 生命周期
+- 通过 `ConversationSyncHostAdapter` 组装 `ConversationSyncRuntimeCoordinator` / `ConversationSyncOrchestrationService` / `ConversationSyncBridge`，并通过 `ConversationSessionSignalRuntime` 接入 session sync event + todo/status live signal 的订阅、session→tab 匹配与 cleanup 生命周期
 - 更新模型显示和 context usage
 
 后台同步分两路：
@@ -147,9 +146,7 @@ background task completion notice 的 queued-state 则已经完全移出 `TabRun
 
 `OpenCodianView` 现在只提供一份 `ConversationSyncViewHost`；真正把这份 view-state / render bridge 适配成 runtime/orchestration/bridge 三组 host 的层，是 `ConversationSyncHostAdapter`。这样 sync service bundle 的 wiring 不再散落在 view 构造函数里。
 
-session sync event 的入口也不再由 view 自己持有 `subscribeToSessionSyncEvents()` / dispose 状态：`ConversationSyncEventAdapter` 会接管 OpenCodeService listener 生命周期、session→tab 匹配，以及 active-tab fallback，然后再把真正的 signal sync 调度交回 `ConversationSyncOrchestrationService`。
-
-session todo/status 的 live signal 入口同样不再由 view 自己持有 `subscribeToSessionTodoUpdates()` / `subscribeToSessionStatusUpdates()`：`ConversationSessionLiveSignalAdapter` 会接管两条 listener 的生命周期、session→tab 匹配，以及 active-tab fallback，然后只把命中的 tab update 交回 view host 写入 `SessionTodoCoordinator`；background-task reconcile 则仍由 adapter 直接调用 `BackgroundTaskLiveSignalCoordinator`。
+session sync event 与 session todo/status 的 live signal 入口都不再由 view 自己持有 `subscribeToSessionSyncEvents()` / `subscribeToSessionTodoUpdates()` / `subscribeToSessionStatusUpdates()` 及其 dispose 状态：`ConversationSessionSignalRuntime` 会统一接管三条 listener 的生命周期、session→tab 匹配与 active-tab fallback，再把 signal sync 调度交回 `ConversationSyncOrchestrationService`，把命中的 todo/status update 交回 `SessionTodoCoordinator`，并在每次 live update 后继续调用 `BackgroundTaskLiveSignalCoordinator`。
 
 signal sync 与后台轮询里的 loop lifecycle、signal debounce、tab / conversation 选择、conversation 加载和 dispatch 编排现在先交给 `ConversationSyncOrchestrationService`。它会判断 signal 是否应回到当前可见会话，或转向 hidden tab sync；会把同一 tab 上短时间内连续到达的 signal reason 合并；轮询时也只会在确实存在 visible/background sync 目标时持有 interval，并只枚举非活动、仍有 background task、且 runtime 当前允许同步的 tab。
 
@@ -179,7 +176,7 @@ loaded-conversation 在消息拿到之后那段 `syncBackgroundTaskStateFromConv
 
 tab stream-like badge、background-task badge、rewind/fork 按钮禁用态，以及 attention 标记写回现在也不再由 view 自己散落地直接操作 `TabManager` 或消息区 DOM：这些 runtime→UI 写回统一交给 `runtime/TabRuntimeStateBridge.ts`，view 只保留 wrapper 方法与 host bridge。
 
-除此之外，`ConversationSyncEventAdapter` 现在会接入 `message.updated`、`message.part.updated` 和 `session.diff`，先按 session 匹配 tab，再交给 `ConversationSyncOrchestrationService` 做 debounce/dispatch，用于提前触发当前会话或后台 tab 的 authoritative sync，而不是只能等 2 秒轮询。
+除此之外，`ConversationSessionSignalRuntime` 现在会接入 `message.updated`、`message.part.updated` 和 `session.diff`，先按 session 匹配 tab，再交给 `ConversationSyncOrchestrationService` 做 debounce/dispatch，用于提前触发当前会话或后台 tab 的 authoritative sync，而不是只能等 2 秒轮询。
 
 ### question dock / pending question 编排
 
@@ -372,7 +369,7 @@ model selector 现在拆成了几层协作：
 
 这三个辅助子系统都由 view 负责路由：
 
-- session todo/status：OpenCode live listener 生命周期、session→tab 路由和 active-tab fallback 已下沉到 `services/ConversationSessionLiveSignalAdapter.ts`；主动拉取刷新、request-id stale guard、stream/live-signal/tab-reset/runtime writeback，以及 dock render 入口现在统一由 `services/SessionTodoCoordinator.ts` 承接，并经由 `services/SessionTodoHostAdapter.ts` 从 view host 装配出来；activation/open 和 post-sync 场景里 status + pending-question + todo 的组合刷新顺序已下沉到 `services/QuestionTodoStatusRefreshCoordinator.ts`，activation/open 侧残留的 dock writeback 与 supplemental refresh 又进一步下沉到 `services/QuestionTodoActivationRefreshCoordinator.ts`，而 post-sync + background-task follow-up 的剩余 host wiring 现在再由 `services/QuestionTodoBackgroundTaskRefreshHostAdapter.ts` 统一装配；normalized snapshot、status fingerprint、stale suppression 与 persisted notice 恢复继续由 `services/SessionTodoStateService.ts` 负责，session todo dock 的挂载/销毁与 active-vs-runtime session 选择则继续由 `services/SessionTodoDockCoordinator.ts` 负责，而真正的 persisted assistant notice append/dedupe 则进一步收束到 `services/PersistentAssistantNoticeService.ts`
+- session todo/status：OpenCode live listener 生命周期、session→tab 路由、active-tab fallback，以及 live update 后的 background-task reconcile 已收束到 `services/ConversationSessionSignalRuntime.ts`；主动拉取刷新、request-id stale guard、stream/live-signal/tab-reset/runtime writeback，以及 dock render 入口现在统一由 `services/SessionTodoCoordinator.ts` 承接，并经由 `services/SessionTodoHostAdapter.ts` 从 view host 装配出来；activation/open 和 post-sync 场景里 status + pending-question + todo 的组合刷新顺序已下沉到 `services/QuestionTodoStatusRefreshCoordinator.ts`，activation/open 侧残留的 dock writeback 与 supplemental refresh 又进一步下沉到 `services/QuestionTodoActivationRefreshCoordinator.ts`，而 post-sync + background-task follow-up 的剩余 host wiring 现在再由 `services/QuestionTodoBackgroundTaskRefreshHostAdapter.ts` 统一装配；normalized snapshot、status fingerprint、stale suppression 与 persisted notice 恢复继续由 `services/SessionTodoStateService.ts` 负责，session todo dock 的挂载/销毁与 active-vs-runtime session 选择则继续由 `services/SessionTodoDockCoordinator.ts` 负责，而真正的 persisted assistant notice append/dedupe 则进一步收束到 `services/PersistentAssistantNoticeService.ts`
 - question：既支持输入区上方的 `QuestionDock`，也支持由 `QuestionRuntimeHostAdapter.ts` 装配的 `QuestionInlineCardRenderer` 管理内联待回答卡片，再由 `QuestionResolutionFlowCoordinator` 统一承接 dock-or-inline resolve flow，以及由 `QuestionResolutionCoordinator` + `QuestionResolutionCardRenderer` 协作管理的已回答/已拒绝回顾卡片；pending-question refresh / clear 的共享路由也继续留在这份 bundle 内，而相邻的 dock/API/attention/sync/status late-bound wiring 现在先经由 `services/QuestionRuntimeViewHostFactory.ts` 收束，再交给 `QuestionRuntimeViewHostAdapter.ts`
 - background task：从 OMO 注入、`toolName === 'task'` 的 tool block、以及后续 system reminder 回写推导任务进度；运行态以内联状态条挂在对应 assistant turn 下，完成态则延迟落成持久化 notice；其中 timeline segment 推导、launch/completion runtime 重建、pending matching，以及 inline notice copy 组装已下沉到 `services/BackgroundTaskTimelineService.ts`，inline panel 的 DOM 创建、挂载、复用/清理已下沉到 `runtime/BackgroundTaskInlinePanelRenderer.ts`，indicator render 与 completion notice queue/flush 顺序已下沉到 `runtime/BackgroundTaskIndicatorCoordinator.ts`，streaming tool-call start/end 与 primary-stream finalize 触发已下沉到 `runtime/BackgroundTaskStreamTriggerCoordinator.ts`，live-signal reconciliation、authoritative-sync gate，以及 tab badge / finalize 共用的 live/grace-period running predicate 已下沉到 `services/BackgroundTaskLiveSignalCoordinator.ts`，而 tab stream-like/background-task badge 与 rewind-fork 按钮禁用态写回则进一步下沉到 `runtime/TabRuntimeStateBridge.ts`；hidden signal/background-tab sync 以及 active visible-conversation background sync 后的 question/todo/background-task refresh 组合装配已继续下沉到 `services/QuestionTodoBackgroundTaskRefreshHostAdapter.ts` 装配的 `services/PostSyncQuestionTodoRefreshFacade.ts` + `services/VisibleConversationPostSyncCoordinator.ts` + `services/BackgroundConversationPostSyncHandoffCoordinator.ts`，其中 facade 负责 question/todo refresh request，visible coordinator 负责 active-conversation state commit，handoff coordinator 负责 signal authoritative mark 与 background attention handoff；stopped/stale warning notice 的 content、fingerprint、suppression runtime 已下沉到 `services/BackgroundTaskNoticeStateService.ts`，completion notice 的 queued-state、fingerprint/content 则下沉到 `services/BackgroundTaskCompletionNoticeService.ts`，而两条链路共用的 persisted assistant notice append/dedupe 与 visible/hidden tab 后续动作已进一步下沉到 `services/PersistentAssistantNoticeService.ts`
 - background task 的 stale 判定现在额外受 `backgroundTaskAwaitingAuthoritativeSync` / hydration 保护：reload 或首次装载后，只有在至少一次权威消息同步完成后，才允许把“仍在运行”降级成 stopped/stale notice；这段 gate + live-signal 决策现在集中在 `BackgroundTaskLiveSignalCoordinator`
@@ -380,7 +377,7 @@ model selector 现在拆成了几层协作：
 session todo 这条子链路现在的边界是：
 
 - `OpenCodianView`：tab runtime/state host，以及更薄的 session 选择与 bridge 装配
-- `ConversationSessionLiveSignalAdapter`：session todo/status live listener 生命周期、session→tab 路由、active-tab fallback，以及 live update 后的 background-task reconcile 触发
+- `ConversationSessionSignalRuntime`：session sync/todo/status listener 生命周期、session→tab 路由、active-tab fallback、signal sync 调度，以及 live update 后的 background-task reconcile 触发
 - `SessionTodoHostAdapter`：session todo state/dock/refresh 三段 host factory 与 service bundle 装配
 - `SessionTodoCoordinator`：streaming todowrite snapshot、live-signal todo/status 写回、主动 refresh、dock render，以及 activation/empty-tab session reset 的统一入口
 - `SessionTodoDockCoordinator`：session todo dock 的 slot 生命周期，以及 active/background tab 的 session→dock 渲染选择
