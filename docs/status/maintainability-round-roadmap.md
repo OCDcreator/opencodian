@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`。R27 完成后必须暂停复盘，不得自动扩展新队列。
-> **当前状态**: [CONFIRMED_NIGHT_BATCH] R19-R27 已确认；当前 `[NEXT]` 是 R27 OpenCodeService checkpoint。
+> **当前状态**: [REVIEW_REQUIRED] R19-R27 已完成；当前没有可自动执行的 `[NEXT]`，等待人工确认是否定义后续 queue。
 
 ## 控制规则
 
@@ -582,7 +582,7 @@
   - focused coverage 证明 OMO / context attachments / tool metadata 行为稳定。
   - 运行 targeted tests、全量 `npm test`、`npm run build`。
 
-### [NEXT] R27 - OpenCodeService checkpoint
+### [DONE] R27 - OpenCodeService checkpoint
 
 - **Lane**: Checkpoint
 - **目标**: 暂停自动推进，复盘 R19-R26 对 `OpenCodeService` 的缩减幅度和兼容风险，并决定下一批是否继续处理 session/config/query gateway。
@@ -604,3 +604,10 @@
   - 明确下一批是否继续做 session/config/query gateway，还是到此暂停。
   - 将 roadmap 状态设置为需要人工确认后再继续。
   - 运行全量 `npm test`、`npm run build`。
+
+## R27 Checkpoint Result
+
+- `OpenCodeService.ts` 已从 R18 checkpoint 的 **4733** 行收缩到当前 **2858** 行，R19-R26 合计减少 **1875** 行（约 **39.6%**）；sync-event runtime、open-code event runtime、catalog state、prompt builder、context/image serializer、streaming runtime、stream event transform、message normalization 八块 ownership 已迁出。
+- `OpenCodeSdkFacade.ts` / `ServerManager.ts` 当前分别保持在 **257** / **1171** 行；本批刻意没有把 session/config/project/file/permission API 再拆成新的薄 facade，也没有改 SDK-first / legacy fallback 的公共语义。
+- `OpenCodeService` 剩余的高风险集中点主要是：SDK/HTTP transport fallback、session CRUD/fork/revert/finish orchestration、config/provider directory normalization，以及 MCP / permission / project / file / find / path / vcs / formatter / lsp 等广域 gateway wrapper；这些更适合先人工界定边界，再决定是否继续。
+- 结论：当前 queue 到此结束，不自动新增 `[QUEUED]` 或 `[NEXT]` 项，也不允许 autopilot 自动扩展 `R28+`；若后续继续 maintainability，必须先由人工确认是否为 session/config/query gateway 设计新的受控批次。

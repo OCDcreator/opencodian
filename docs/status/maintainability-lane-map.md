@@ -1,7 +1,7 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [CONFIRMED_NIGHT_BATCH] R19-R27 已确认；当前 `[NEXT]` 是 R27 OpenCodeService checkpoint。
+> **当前状态**: [REVIEW_REQUIRED] R19-R27 已完成；当前没有可自动执行的 `[NEXT]`，等待人工确认。
 
 ## 当前优先级
 
@@ -10,7 +10,7 @@
 - **P1 / R14**: 已完成 header / server status shell（header DOM、status label/action、wordmark/settings button）
 - **P1 / R13**: 已完成 tab messages pane surface（messages pane lifecycle、active pane、scroll metrics、pane observer）
 - **P5 / R17**: 已完成 input appearance / glass state（theme class、SVG filter、liquid-glass mount/diagnostics）
-- **Checkpoint / R18**: 已完成 UI shell checkpoint；autopilot 现在暂停，等待人工确认下一批是否转向 `OpenCodeService`
+- **Checkpoint / R27**: 已完成 OpenCodeService checkpoint；autopilot 现在暂停，等待人工确认是否还要设计 session/config/query gateway 队列
 
 ## 当前热点首查入口
 
@@ -22,7 +22,8 @@
 - R24 已完成 active stream runtime、session-scoped abort controller、cancel/detach lifecycle 与 part type tracking 收束到 `OpenCodeStreamingRuntimeCoordinator`
 - R25 已完成 SDK / legacy stream event → chunk transform、SSE parser 与 part-aware delta routing 收束到 `OpenCodeStreamEventTransformer`
 - R26 已完成 message → `ChatMessage` hydration、question normalization、tool identity / OMO metadata 收束到 `OpenCodeMessageNormalizationMapper`
-- R27 只做 checkpoint，复盘 `OpenCodeService` 在 R19-R26 的 owner 收缩与兼容风险
+- R27 已完成 checkpoint，确认 `OpenCodeService` 在 R19-R26 期间从 **4733** 行降到 **2858** 行，并把后续自动推进切换回人工确认态
+- 当前没有自动下一切片；若要继续，必须先人工确认 session/config/query gateway 是否还能按较厚 owner 设计新 queue
 - `OpenCodianView` / settings / trailing-assistant 链本批都只保留 regression watchpoints，不再开新切口
 - P2 regression-only 首查顺序固定为：
   1. `tests/unit/features/chat/QuestionDockCoordinator.test.ts`
@@ -84,4 +85,4 @@
 - 本批目标是迁出 `OpenCodeService` 中仍成块存在的 runtime / state / builder / mapper ownership，而不是把对外 API facade 粉碎成更多小文件。
 - 新 owner 默认要覆盖完整 lifecycle；如果低于约 100 行且少于 3 个公开 API，必须在 phase 文档里说明为何不是微碎片，否则应合并回 `OpenCodeService`。
 - `OpenCodeService` 继续保持对外总门面；新 owner 通过 host seam 接入，不要把调用方改成直接依赖大量新模块。
-- R27 完成后必须暂停；是否继续 session/config/query gateway 由下一次人工确认决定。
+- R27 已完成并进入暂停态；是否继续 session/config/query gateway 由下一次人工确认决定。

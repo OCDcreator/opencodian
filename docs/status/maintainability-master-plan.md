@@ -1,8 +1,8 @@
 # Maintainability Master Plan
 
-> **状态**: [CONFIRMED_NIGHT_BATCH]
+> **状态**: [REVIEW_REQUIRED]
 > **作用**: 这是 maintainability 无人值守的战略文档。后续每一轮开始前，必须先读本文件，再读最近的 `docs/status/maintainability-phase-XXX.md`。
-> **自动推进状态**: R19-R27 夜间批次已确认；autopilot 只能按 `docs/status/maintainability-round-roadmap.md` 的 `[NEXT]` 顺序执行，R27 完成后必须再次暂停并等待人工确认。
+> **自动推进状态**: R19-R27 夜间批次已完成；autopilot 必须暂停，等待人工确认下一批 roadmap，禁止自动扩展 `R28+`。
 
 ## 1. 总体目标
 
@@ -19,24 +19,25 @@ maintainability 的目标是：
 
 ## 2. 当前阶段判断
 
-**当前判断：中期，R19-R27 夜间批次已确认。**
+**当前判断：中后期 checkpoint，R19-R27 夜间批次已完成并进入人工复盘。**
 
 原因：
 
 - R1-R12 已按受控 roadmap 完成 P2、P3、P4、Settings、Core config 与 checkpoint；本轮不再继续拆新的 owner
 - `src/features/chat/OpenCodianView.ts` 已从 R12 checkpoint 的 **7732 行** 收缩到当前 **6203 行**；R13-R17 已把 tab/pane、header/status、composer input、selection controls、input appearance/glass 等 UI/runtime shell 收束到独立 owner，剩余职责更偏向运行时桥接、hydration/send pipeline seam 与少量实验特性
 - `src/features/settings/OpenCodianSettings.ts` 当前实测 **4989 行**，较 R9 前 baseline **6756 行**明显收缩；section lifecycle、model catalog presenter、catalog state writeback 已迁出，但 settings tab 仍负责 section composition、settings persistence、modal launch 与多处分区业务装配
-- `src/core/opencode/OpenCodeService.ts` 当前实测 **4733 行**，在 R13-R18 期间没有直接收缩；它仍集中 SDK facade consumption、legacy HTTP/SSE fallback、sync event normalization、question/tool/session/config API glue，已经成为下一批最需要人工确认边界的候选 hotspot
+- `src/core/opencode/OpenCodeService.ts` 当前实测 **2858 行**，较 R18 checkpoint 的 **4733 行**减少 **1875 行**（约 **39.6%**）；R19-R26 已把 sync/open-code event runtime、catalog state、prompt builder、context/image serializer、streaming runtime、stream event transform、message normalization 八块 ownership 迁出，但 service 仍集中 SDK-first / legacy HTTP fallback transport、session/config/provider gateway、MCP/project/file/find/permission API glue 与 finish/fetch orchestration
+- `src/core/opencode/OpenCodeSdkFacade.ts` / `src/core/opencode/ServerManager.ts` 当前分别为 **257** / **1171** 行；它们继续作为高风险相邻 owner 保持稳定，没有在本批被拆成新的薄 facade
 
-结论：R13-R18 已证明“迁出完整 ownership”比继续粉碎 helper 更有效，并且 `OpenCodianView` 的本批 UI shell 大块 ownership 已按计划完成。项目仍不是收尾阶段；下一批已确认转向 `OpenCodeService`，但必须以兼容优先的较厚 owner 为单位推进，严格避免把 session/config/query API 再拆成新的微碎片 facade。
+结论：R19-R26 已证明“兼容优先的较厚 owner 下沉”能够显著削弱 `OpenCodeService`，但剩余的 session/config/query gateway 更接近高风险广域门面，而不是适合继续无人值守细拆的低风险块。当前应暂停 autopilot，由人工先确认是否继续这条 lane，以及如何避免把剩余 gateway 再拆成新的微碎片 facade。
 
 ## 2.1 已完成批次（R13-R18）
 
 R13-R18 已完成 `OpenCodianView` 的 UI/runtime shell 收束：tab/messages pane、header/server status、composer input、selection controls、input appearance/glass，以及 checkpoint 复盘。该批次证明了“沿完整 ownership 下沉”比继续粉碎 helper 更有效，也为 `OpenCodeService` 新批次腾出了主关注点。
 
-## 2.2 夜间批次（R19-R27）
+## 2.2 已完成夜间批次（R19-R27）
 
-R19-R27 的目标是把 `OpenCodeService` 里仍然成块存在的高集中 ownership 按“兼容优先、总门面不散开”的方式迁出，但不把它拆成大量低价值 facade。执行顺序固定如下：
+R19-R27 的目标是把 `OpenCodeService` 里仍然成块存在的高集中 ownership 按“兼容优先、总门面不散开”的方式迁出，但不把它拆成大量低价值 facade。该批次现已按既定顺序完成：
 
 1. **R19 sync event runtime coordinator**：迁出 session todo / session status / sync-event listeners、订阅生命周期、emit 路径。
 2. **R20 OpenCode event subscription coordinator**：迁出 OpenCode event listeners、catalog-relevant event routing、open-code event lifecycle。
@@ -50,10 +51,12 @@ R19-R27 的目标是把 `OpenCodeService` 里仍然成块存在的高集中 owne
 
 本批刻意**不**处理 `ServerManager`、`OpenCodeSdkFacade`，也不把 session CRUD / permission / project / file API 包装拆成薄 gateway。`OpenCodeService` 继续保持对外总门面；新 owner 只承接内部成块 lifecycle，不改变 SDK-first 与 legacy fallback 的公共语义。
 
+R27 checkpoint 的结论是：本批 queue 到此结束，当前 roadmap 没有可自动执行的 `[NEXT]`。如果后续还要继续处理 session/config/query gateway，必须先由人工定义新的受控队列和兼容边界；autopilot 不得自行扩展 `R28+`。
+
 
 ## 3. 高优先级方向
 
-R19-R27 中，后续无人值守必须优先执行 roadmap 的 `[NEXT]`，每轮只做一个切口。下面保留各 lane 的长期定位，但本批执行顺序以 R19-R27 为准：
+R19-R27 已完成；当前无人值守没有可自动执行的 `[NEXT]`。下面保留各 lane 的长期定位，仅供人工设计下一批 roadmap 时参考，不构成新的自动执行许可：
 
 ### P1. `OpenCodianView` 中剩余的核心 ownership 迁移
 
@@ -135,9 +138,9 @@ R8 已完成 persisted assistant shell / notice / footer / timestamp 的主要�
 
 ## 7. 当前执行指令
 
-从第三百三十三阶段 checkpoint 之后：
+R27 checkpoint 之后：
 
-- R19-R27 夜间受控队列已经确认，`docs/status/maintainability-round-roadmap.md` 的 `R19` 是唯一可自动执行的 `[NEXT]`
-- Autopilot 可以按 R19-R27 顺序运行，但不得越过 R27 自动扩展新队列
-- 本批明确优先 `OpenCodeService` 的 sync-event / open-code-event / catalog / prompt / streaming / normalization ownership；未经人工确认不得提前创建 R28+
+- R19-R27 夜间受控队列已全部完成，`docs/status/maintainability-round-roadmap.md` 当前没有可自动执行的 `[NEXT]`
+- Autopilot 必须暂停；未经人工确认不得创建或推进 `R28+`
+- 若人工确认继续，下一批必须先明确 session/config/query gateway 是否还能按较厚 owner 推进，或是否保持 checkpoint 停止态
 - `ConversationRenderService` trailing-assistant helper 链仍保持降优先级；除非正确性、测试或构建阻塞，不要把它作为新 queue 的默认起点
