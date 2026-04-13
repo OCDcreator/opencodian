@@ -190,7 +190,7 @@
   - `OpenCodianView` 不再直接持有主要消息级 DOM 组装流程。
   - 运行 targeted tests、全量 `npm test`、`npm run build`。
 
-### [NEXT] R9 - Settings panel scaffolding split
+### [DONE] R9 - Settings panel scaffolding split
 
 - **Lane**: Settings maintainability
 - **目标**: 从 `OpenCodianSettings.ts` 抽出 section lifecycle、quick-nav、scroll restoration，让 settings tab 专注 section composition。
@@ -208,7 +208,7 @@
   - 新 owner 满足粒度规则并有 tests 或可验证覆盖。
   - 运行 targeted tests、全量 `npm test`、`npm run build`。
 
-### [QUEUED] R10 - Settings model catalog presenter
+### [NEXT] R10 - Settings model catalog presenter
 
 - **Lane**: Settings maintainability
 - **目标**: 把 provider/model accordion、search、bulk toggle、probe presentation 从 `OpenCodianSettings.ts` 收束为 presenter。

@@ -5,12 +5,10 @@
 
 ## 概述
 
-`OpenCodianSettings.ts` 是插件的主设置面板。它继承 `PluginSettingTab`，负责把大量设置项组织成可导航、可恢复滚动位置、可实时刷新的 Obsidian UI。
+`OpenCodianSettings.ts` 是插件的主设置面板。它继承 `PluginSettingTab`，负责组合各个设置分区，并把模型、样式、调试与 modal 编排挂到 Obsidian 的 settings UI 上。
 
 当前文件的重点不只是“渲染设置项”，还包括：
 
-- 设置分区导航与重建
-- 设置面板滚动位置恢复
 - 模型目录和可用性状态展示
 - 主题预设与样式控件联动
 - 服务器状态轮询
@@ -64,8 +62,9 @@
 `display()` 不是局部 patch，而是清空容器后整体重建。这让语言切换、主题预设同步和复杂控件刷新更容易保持一致，但也意味着：
 
 - DOM 引用会失效
-- 滚动位置需要显式恢复
-- 所有 section anchor 都要重新注册
+- section heading / quick-nav / scroll restore 需要在重建后重新接线
+
+从 R9 开始，这部分壳层生命周期已委托给 `SettingsSectionCoordinator`：`OpenCodianSettings` 只负责按顺序挂载 Language / Server / Model / Conversation / Plugins / Security / UI / Style / Debug / User 各 section，本身不再直接持有 quick-nav DOM 组装或滚动恢复定时器细节。
 
 ### 模型目录与可用性控制
 
@@ -100,10 +99,10 @@ provider 开关写回仍遵循 `ModelConfigService` 返回的 `effectiveProvider
 
 ### 设置面板滚动恢复
 
-这个文件维护了一套较完整的恢复链路：
+滚动恢复与 quick-nav 现在由 `SettingsSectionCoordinator` 持有；`OpenCodianSettings` 只保留“下一次打开前记录意图”的公开入口。当前恢复链路仍然包括：
 
 - `settingsPanelScrollTop` 持久化到插件设置
-- `prepareRestoreScrollOnNextOpen()` / `prepareScrollToServerOnNextOpen()` / `prepareScrollToModelOnNextOpen()` 在下次打开前注册意图
+- `prepareRestoreScrollOnNextOpen()` / `prepareScrollToServerOnNextOpen()` 在下次打开前注册意图
 - `MutationObserver` + 多次延迟重试用于等待 DOM 稳定
 
 这是最近文档里最容易漏掉的行为之一，因为它已经不只是简单的“记住 scrollTop”。
@@ -118,8 +117,8 @@ provider 开关写回仍遵循 `ModelConfigService` 返回的 `effectiveProvider
 
 | 方法 | 说明 |
 |------|------|
-| `display()` | 重建完整设置面板 |
-| `hide()` | 记录滚动位置并清理轮询/恢复任务 |
+| `display()` | 重建完整设置面板，并委托 `SettingsSectionCoordinator` 收口 section scaffolding |
+| `hide()` | 清理轮询、样式绑定，并让 `SettingsSectionCoordinator` 收尾滚动状态 |
 | `onModelsLoaded()` | 模型目录刷新后合并 UI 更新 |
 | `scrollToServerSection()` / `scrollToModelSection()` | 跳转到指定分区 |
 | `prepareRestoreScrollOnNextOpen()` | 记录下次打开时的滚动恢复目标 |
@@ -129,6 +128,7 @@ provider 开关写回仍遵循 `ModelConfigService` 返回的 `effectiveProvider
 
 ## 与其他模块的交互
 
+- `SettingsSectionCoordinator`: 管理 section heading 注册、quick-nav 构建、post-render setup 与 scroll restoration，避免这些 DOM/runtime 细节继续堆在设置页主类里
 - `ModelConfigService`: 读取 `local/server/baseEffective/effective` 目录，以及 `serverConfig` / `effectiveProviderConfig` / `currentEnabledProviderIds`，并提供逐 provider 的真实发送 probe
 - `OpencodeConfigManager`: 读写 `.opencode` 配置
 - `PluginManagementService`: 构建插件环境快照
@@ -143,6 +143,7 @@ provider 开关写回仍遵循 `ModelConfigService` 返回的 `effectiveProvider
 ## 注意事项
 
 - `display()` 每次都会重建 DOM，因此不要长期持有 section 内部元素引用。
+- 如果只是调整 settings panel scaffolding，优先改 `SettingsSectionCoordinator`，不要再把 quick-nav/scroll 定时器塞回 `OpenCodianSettings`。
 - 样式分组和默认值最终都以 `core/types/settings.ts` 的归一化逻辑为准。
 - 这个文件同时处理“运行时 UI 状态”和“持久化设置”，两者不要混淆。
 - 任何新增设置如果涉及 i18n、默认值、迁移或视图刷新，通常都不只改这一处。

@@ -1,6 +1,7 @@
 import type { App } from 'obsidian';
 
 import { OpenCodianSettingTab } from '../../../../src/features/settings/OpenCodianSettings';
+import { SettingsSectionCoordinator } from '../../../../src/features/settings/SettingsSectionCoordinator';
 import { setDebugLoggingEnabled } from '../../../../src/shared';
 
 class MutationObserverMock {
@@ -54,10 +55,33 @@ function installClampedScrollState(element: HTMLElement, options: { clientHeight
   };
 }
 
-describe('OpenCodianSettingTab scroll restore logging', () => {
+describe('SettingsSectionCoordinator scroll restore logging', () => {
   const originalMutationObserver = globalThis.MutationObserver;
   const originalRequestAnimationFrame = window.requestAnimationFrame;
   const originalCancelAnimationFrame = window.cancelAnimationFrame;
+
+  function createCoordinator(savedScrollTop = 0) {
+    const state = {
+      settingsPanelScrollTop: savedScrollTop,
+    };
+    const containerEl = document.createElement('div');
+    const scheduleScrollStateSave = jest.fn();
+    const coordinator = new SettingsSectionCoordinator({
+      containerEl,
+      getSavedScrollTop: () => state.settingsPanelScrollTop,
+      setSavedScrollTop: (scrollTop) => {
+        state.settingsPanelScrollTop = scrollTop;
+      },
+      scheduleScrollStateSave,
+    });
+
+    return {
+      coordinator,
+      containerEl,
+      scheduleScrollStateSave,
+      state,
+    };
+  }
 
   beforeEach(() => {
     jest.useFakeTimers();
@@ -104,13 +128,7 @@ describe('OpenCodianSettingTab scroll restore logging', () => {
 
   it('logs a single restore success and clears pending work after mutation succeeds', () => {
     const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
-    const plugin = {
-      settings: {
-        settingsPanelScrollTop: 0,
-      },
-      scheduleSettingsUiStateSave: jest.fn(),
-    } as unknown as ConstructorParameters<typeof OpenCodianSettingTab>[1];
-    const tab = new OpenCodianSettingTab({} as App, plugin);
+    const { coordinator, containerEl } = createCoordinator();
     const scrollContainer = document.createElement('div');
     const scrollState = installClampedScrollState(scrollContainer, {
       clientHeight: 200,
@@ -118,13 +136,13 @@ describe('OpenCodianSettingTab scroll restore logging', () => {
     });
 
     document.body.appendChild(scrollContainer);
-    scrollContainer.appendChild(tab.containerEl);
+    scrollContainer.appendChild(containerEl);
 
-    (tab as unknown as {
-      restoreSettingsPanelScrollPosition: (scrollTop: number, scrollContainer: HTMLElement) => void;
+    (coordinator as unknown as {
+      restoreScrollPosition: (scrollTop: number, scrollContainer: HTMLElement) => void;
       settingsPanelRestoreObserver: MutationObserver | null;
       settingsPanelRestoreTimeoutIds: number[];
-    }).restoreSettingsPanelScrollPosition(400, scrollContainer);
+    }).restoreScrollPosition(400, scrollContainer);
 
     jest.advanceTimersByTime(1);
     expect(logSpy).not.toHaveBeenCalled();
@@ -150,13 +168,13 @@ describe('OpenCodianSettingTab scroll restore logging', () => {
     });
 
     expect(
-      (tab as unknown as {
+      (coordinator as unknown as {
         settingsPanelRestoreObserver: MutationObserver | null;
         settingsPanelRestoreTimeoutIds: number[];
       }).settingsPanelRestoreObserver,
     ).toBeNull();
     expect(
-      (tab as unknown as {
+      (coordinator as unknown as {
         settingsPanelRestoreTimeoutIds: number[];
       }).settingsPanelRestoreTimeoutIds,
     ).toHaveLength(0);
@@ -168,13 +186,7 @@ describe('OpenCodianSettingTab scroll restore logging', () => {
 
   it('skips restore observers and timers when the requested scroll position is already at the top', () => {
     const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
-    const plugin = {
-      settings: {
-        settingsPanelScrollTop: 0,
-      },
-      scheduleSettingsUiStateSave: jest.fn(),
-    } as unknown as ConstructorParameters<typeof OpenCodianSettingTab>[1];
-    const tab = new OpenCodianSettingTab({} as App, plugin);
+    const { coordinator, containerEl } = createCoordinator();
     const scrollContainer = document.createElement('div');
 
     installClampedScrollState(scrollContainer, {
@@ -184,13 +196,13 @@ describe('OpenCodianSettingTab scroll restore logging', () => {
     scrollContainer.scrollTop = 160;
 
     document.body.appendChild(scrollContainer);
-    scrollContainer.appendChild(tab.containerEl);
+    scrollContainer.appendChild(containerEl);
 
-    (tab as unknown as {
-      restoreSettingsPanelScrollPosition: (scrollTop: number, scrollContainer: HTMLElement) => void;
+    (coordinator as unknown as {
+      restoreScrollPosition: (scrollTop: number, scrollContainer: HTMLElement) => void;
       settingsPanelRestoreObserver: MutationObserver | null;
       settingsPanelRestoreTimeoutIds: number[];
-    }).restoreSettingsPanelScrollPosition(0, scrollContainer);
+    }).restoreScrollPosition(0, scrollContainer);
 
     expect(scrollContainer.scrollTop).toBe(0);
     expect(logSpy).toHaveBeenCalledTimes(1);
@@ -202,13 +214,13 @@ describe('OpenCodianSettingTab scroll restore logging', () => {
     });
     expect(MutationObserverMock.instances).toHaveLength(0);
     expect(
-      (tab as unknown as {
+      (coordinator as unknown as {
         settingsPanelRestoreObserver: MutationObserver | null;
         settingsPanelRestoreTimeoutIds: number[];
       }).settingsPanelRestoreObserver,
     ).toBeNull();
     expect(
-      (tab as unknown as {
+      (coordinator as unknown as {
         settingsPanelRestoreTimeoutIds: number[];
       }).settingsPanelRestoreTimeoutIds,
     ).toHaveLength(0);
@@ -217,13 +229,7 @@ describe('OpenCodianSettingTab scroll restore logging', () => {
 
   it('skips deferred DOM tracking when the initial restore reaches the target immediately', () => {
     const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
-    const plugin = {
-      settings: {
-        settingsPanelScrollTop: 0,
-      },
-      scheduleSettingsUiStateSave: jest.fn(),
-    } as unknown as ConstructorParameters<typeof OpenCodianSettingTab>[1];
-    const tab = new OpenCodianSettingTab({} as App, plugin);
+    const { coordinator, containerEl } = createCoordinator();
     const scrollContainer = document.createElement('div');
 
     installClampedScrollState(scrollContainer, {
@@ -232,25 +238,25 @@ describe('OpenCodianSettingTab scroll restore logging', () => {
     });
 
     document.body.appendChild(scrollContainer);
-    scrollContainer.appendChild(tab.containerEl);
+    scrollContainer.appendChild(containerEl);
 
-    (tab as unknown as {
-      restoreSettingsPanelScrollPosition: (scrollTop: number, scrollContainer: HTMLElement) => void;
+    (coordinator as unknown as {
+      restoreScrollPosition: (scrollTop: number, scrollContainer: HTMLElement) => void;
       settingsPanelRestoreObserver: MutationObserver | null;
       settingsPanelRestoreTimeoutIds: number[];
-    }).restoreSettingsPanelScrollPosition(400, scrollContainer);
+    }).restoreScrollPosition(400, scrollContainer);
 
     jest.advanceTimersByTime(1);
     expect(scrollContainer.scrollTop).toBe(400);
     expect(MutationObserverMock.instances).toHaveLength(0);
     expect(
-      (tab as unknown as {
+      (coordinator as unknown as {
         settingsPanelRestoreObserver: MutationObserver | null;
         settingsPanelRestoreTimeoutIds: number[];
       }).settingsPanelRestoreObserver,
     ).toBeNull();
     expect(
-      (tab as unknown as {
+      (coordinator as unknown as {
         settingsPanelRestoreTimeoutIds: number[];
       }).settingsPanelRestoreTimeoutIds,
     ).toHaveLength(0);
@@ -268,13 +274,7 @@ describe('OpenCodianSettingTab scroll restore logging', () => {
 
   it('reapplies the target scroll position when the panel drifts before settling', () => {
     const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
-    const plugin = {
-      settings: {
-        settingsPanelScrollTop: 0,
-      },
-      scheduleSettingsUiStateSave: jest.fn(),
-    } as unknown as ConstructorParameters<typeof OpenCodianSettingTab>[1];
-    const tab = new OpenCodianSettingTab({} as App, plugin);
+    const { coordinator, containerEl } = createCoordinator();
     const scrollContainer = document.createElement('div');
 
     installClampedScrollState(scrollContainer, {
@@ -283,11 +283,11 @@ describe('OpenCodianSettingTab scroll restore logging', () => {
     });
 
     document.body.appendChild(scrollContainer);
-    scrollContainer.appendChild(tab.containerEl);
+    scrollContainer.appendChild(containerEl);
 
-    (tab as unknown as {
-      restoreSettingsPanelScrollPosition: (scrollTop: number, scrollContainer: HTMLElement) => void;
-    }).restoreSettingsPanelScrollPosition(400, scrollContainer);
+    (coordinator as unknown as {
+      restoreScrollPosition: (scrollTop: number, scrollContainer: HTMLElement) => void;
+    }).restoreScrollPosition(400, scrollContainer);
 
     jest.advanceTimersByTime(1);
     expect(scrollContainer.scrollTop).toBe(400);
@@ -308,6 +308,42 @@ describe('OpenCodianSettingTab scroll restore logging', () => {
       attempts: 2,
       targetScrollTop: 400,
       restoredScrollTop: 400,
+    });
+  });
+
+  it('builds quick-nav buttons from registered section headings', () => {
+    const { coordinator, containerEl } = createCoordinator();
+    document.body.appendChild(containerEl);
+
+    coordinator.beginDisplay('Settings');
+    const serverHeadingEl = coordinator.createSectionHeading(containerEl, {
+      title: 'Server',
+      tooltip: 'Server settings',
+    });
+    const modelHeadingEl = coordinator.createSectionHeading(containerEl, {
+      title: 'Model',
+      tooltip: 'Model settings',
+    });
+    const serverScrollIntoView = jest.fn();
+    const modelScrollIntoView = jest.fn();
+    serverHeadingEl.scrollIntoView = serverScrollIntoView as typeof serverHeadingEl.scrollIntoView;
+    modelHeadingEl.scrollIntoView = modelScrollIntoView as typeof modelHeadingEl.scrollIntoView;
+
+    coordinator.finishDisplay();
+
+    const buttons = Array.from(
+      containerEl.querySelectorAll<HTMLButtonElement>('.opencodian-settings-quick-nav-btn'),
+    );
+    expect(buttons.map((button) => button.textContent)).toEqual(['Server', 'Model']);
+    expect(buttons[0]?.dataset.tooltipAlign).toBe('left');
+    expect(buttons[1]?.dataset.tooltipAlign).toBe('left');
+
+    buttons[1]?.click();
+
+    expect(serverScrollIntoView).not.toHaveBeenCalled();
+    expect(modelScrollIntoView).toHaveBeenCalledWith({
+      behavior: 'smooth',
+      block: 'start',
     });
   });
 });

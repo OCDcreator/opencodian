@@ -72,6 +72,7 @@ import { OpencodeConfigModal } from './OpencodeConfigModal';
 import { ProviderIconCacheModal } from './ProviderIconCacheModal';
 import { enhanceSearchInput } from './searchInputEnhancer';
 import { type ServerHelpTopic, ServerSettingHelpModal } from './ServerSettingHelpModal';
+import { SettingsSectionCoordinator } from './SettingsSectionCoordinator';
 
 const logger = createLogger('OpenCodianSettings');
 
@@ -146,18 +147,6 @@ interface ElectronDialogModule {
   }) => Promise<{ canceled: boolean; filePaths: string[] }>;
 }
 
-const SETTINGS_SCROLL_CONTAINER_SELECTORS = [
-  '.vertical-tab-content-container',
-  '.vertical-tab-content',
-  '.modal-content',
-] as const;
-const SETTINGS_SCROLL_CONTAINER_SELECTOR = SETTINGS_SCROLL_CONTAINER_SELECTORS.join(', ');
-const SETTINGS_SCROLL_RESTORE_RETRY_DELAYS = [24, 80, 160, 320] as const;
-const SETTINGS_SCROLL_RESTORE_OBSERVER_WINDOW_MS = 1200;
-const SETTINGS_SCROLL_RESTORE_SUCCESS_TOLERANCE_PX = 1;
-const SETTINGS_SCROLL_RESTORE_IDLE_SETTLE_MS = 96;
-const SETTINGS_SCROLL_RESTORE_MIN_STABLE_MS = 180;
-
 function getElectronDialog(): ElectronDialogModule | null {
   const globalWithRequire = globalThis as typeof globalThis & {
     require?: (module: string) => unknown;
@@ -205,19 +194,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
   private modelAvailabilityQuery = '';
   private modelAvailabilityOnlyDisabled = false;
   private modelAvailabilityOnlyEnabled = false;
-  private settingsScrollHandler?: () => void;
-  private settingsScrollContainerEl: HTMLElement | null = null;
-  private lastObservedSettingsScrollTop = 0;
-  private pendingOpenScrollTop: number | null = null;
-  private pendingOpenSectionTitle: string | null = null;
-  private settingsPanelPostRenderFrameId: number | null = null;
-  private settingsPanelRestoreFrameId: number | null = null;
-  private settingsPanelRestoreTimeoutIds: number[] = [];
-  private settingsPanelRestoreObserver: MutationObserver | null = null;
-  private settingsPanelRestoreScrollContainerEl: HTMLElement | null = null;
-  private settingsPanelRestoreScrollListener?: () => void;
-  private settingsPanelRestoreSettleTimeoutId: number | null = null;
-  private settingsScrollPersistenceSuspended = false;
+  private readonly sectionCoordinator: SettingsSectionCoordinator;
   private styleControlBindings: StyleControlBinding[] = [];
   private stylePresetUiRefresh?: () => void;
   private conversationHeadingEl: HTMLHeadingElement | null = null;
@@ -229,6 +206,14 @@ export class OpenCodianSettingTab extends PluginSettingTab {
   constructor(app: App, plugin: OpenCodianPlugin) {
     super(app, plugin);
     this.plugin = plugin;
+    this.sectionCoordinator = new SettingsSectionCoordinator({
+      containerEl: this.containerEl,
+      getSavedScrollTop: () => this.plugin.settings.settingsPanelScrollTop,
+      setSavedScrollTop: (scrollTop) => {
+        this.plugin.settings.settingsPanelScrollTop = scrollTop;
+      },
+      scheduleScrollStateSave: () => this.plugin.scheduleSettingsUiStateSave(),
+    });
     this.modelAvailabilitySectionOpen = plugin.settings.modelAvailabilitySectionOpen;
     this.modelToolsSectionOpen = plugin.settings.modelToolsSectionOpen;
   }
@@ -302,131 +287,61 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     this.applyInlineCodeText(descEl, text);
   }
 
-  private scrollToSectionByTitle(sectionTitle: string): void {
-    const headingEl = this.containerEl.querySelector<HTMLHeadingElement>(
-      `.opencodian-settings-section-heading[data-section-title="${sectionTitle}"]`,
-    );
-    headingEl?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'start',
-    });
-  }
-
   scrollToServerSection(): void {
-    this.scrollToSectionByTitle(t('settings.server.title'));
+    this.sectionCoordinator.scrollToSectionByTitle(t('settings.server.title'));
   }
 
   scrollToModelSection(): void {
-    this.scrollToSectionByTitle(t('settings.model.title'));
+    this.sectionCoordinator.scrollToSectionByTitle(t('settings.model.title'));
   }
 
   prepareRestoreScrollOnNextOpen(scrollTop = this.plugin.settings.settingsPanelScrollTop): void {
-    this.pendingOpenScrollTop = scrollTop;
-    this.pendingOpenSectionTitle = null;
+    this.sectionCoordinator.prepareRestoreScrollOnNextOpen(scrollTop);
   }
 
   prepareScrollToServerOnNextOpen(): void {
-    this.pendingOpenSectionTitle = t('settings.server.title');
-    this.pendingOpenScrollTop = null;
+    this.sectionCoordinator.prepareScrollToSectionOnNextOpen(t('settings.server.title'));
   }
 
   display(): void {
     const { containerEl } = this;
-    const pendingOpenScrollTop = this.pendingOpenScrollTop;
-    const pendingOpenSectionTitle = this.pendingOpenSectionTitle;
     this.modelAvailabilitySectionOpen = this.plugin.settings.modelAvailabilitySectionOpen;
     this.modelToolsSectionOpen = this.plugin.settings.modelToolsSectionOpen;
 
-    this.clearSettingsPanelRestoreWork();
     if (this.serverStatusIntervalId) {
       window.clearInterval(this.serverStatusIntervalId);
       this.serverStatusIntervalId = null;
     }
     this.refreshServerStatusCallback = undefined;
-    if (this.settingsPanelPostRenderFrameId !== null) {
-      window.cancelAnimationFrame(this.settingsPanelPostRenderFrameId);
-      this.settingsPanelPostRenderFrameId = null;
-    }
     this.styleControlBindings = [];
     this.stylePresetUiRefresh = undefined;
     this.conversationHeadingEl = null;
     this.backgroundStyleGroupHostEl = null;
     this.backgroundPreviewRequestId = 0;
     this.inputStyleGroupHostEl = null;
-    containerEl.empty();
-    containerEl.addClass('opencodian-settings');
-    containerEl.style.setProperty('overflow-anchor', 'none');
-    if (pendingOpenScrollTop !== null || pendingOpenSectionTitle !== null) {
-      containerEl.style.visibility = 'hidden';
-    } else {
-      containerEl.style.removeProperty('visibility');
-    }
+    this.sectionCoordinator.beginDisplay(t('settings.title'));
 
-    const quickNavEl = containerEl.createDiv({ cls: 'opencodian-settings-quick-nav' });
-    containerEl.createEl('h2', { text: t('settings.title') });
+    this.addLanguageSettings(containerEl);
+    this.addServerSettings(containerEl);
+    this.addModelSettings(containerEl);
+    this.addConversationSettings(containerEl);
+    this.addPluginSettings(containerEl);
+    this.addSecuritySettings(containerEl);
+    this.addUISettings(containerEl);
+    this.addStyleSettings(containerEl);
+    this.addDebugSettings(containerEl);
+    this.addUserSettings(containerEl);
 
-    const languageHeadingEl = this.addLanguageSettings(containerEl);
-    const serverHeadingEl = this.addServerSettings(containerEl);
-    const modelHeadingEl = this.addModelSettings(containerEl);
-    const conversationHeadingEl = this.addConversationSettings(containerEl);
-    const pluginHeadingEl = this.addPluginSettings(containerEl);
-    const securityHeadingEl = this.addSecuritySettings(containerEl);
-    const uiHeadingEl = this.addUISettings(containerEl);
-    const styleHeadingEl = this.addStyleSettings(containerEl);
-    const debugHeadingEl = this.addDebugSettings(containerEl);
-    const userHeadingEl = this.addUserSettings(containerEl);
-
-    const sections = [
-      {
-        headingEl: languageHeadingEl,
-        tooltip: t('settings.quickNav.languageDesc'),
-      },
-      {
-        headingEl: serverHeadingEl,
-        tooltip: t('settings.quickNav.serverDesc'),
-      },
-      {
-        headingEl: modelHeadingEl,
-        tooltip: t('settings.quickNav.modelDesc'),
-      },
-      {
-        headingEl: conversationHeadingEl,
-        tooltip: t('settings.quickNav.conversationDesc'),
-      },
-      {
-        headingEl: pluginHeadingEl,
-        tooltip: t('settings.quickNav.pluginsDesc'),
-      },
-      {
-        headingEl: securityHeadingEl,
-        tooltip: t('settings.quickNav.securityDesc'),
-      },
-      {
-        headingEl: uiHeadingEl,
-        tooltip: t('settings.quickNav.uiDesc'),
-      },
-      {
-        headingEl: styleHeadingEl,
-        tooltip: t('settings.quickNav.styleDesc'),
-      },
-      {
-        headingEl: debugHeadingEl,
-        tooltip: t('settings.quickNav.debugDesc'),
-      },
-      {
-        headingEl: userHeadingEl,
-        tooltip: t('settings.quickNav.userDesc'),
-      },
-    ];
-
-    this.buildQuickNav(quickNavEl, sections);
-    this.scheduleSettingsPanelPostRenderSetup(pendingOpenScrollTop, pendingOpenSectionTitle);
-    this.clearInitialQuickNavFocus();
+    this.sectionCoordinator.finishDisplay();
   }
 
   /** Language settings section */
   private addLanguageSettings(containerEl: HTMLElement): HTMLHeadingElement {
-    const headingEl = this.createSectionHeading(containerEl, t('settings.language.title'));
+    const headingEl = this.createSectionHeading(
+      containerEl,
+      t('settings.language.title'),
+      t('settings.quickNav.languageDesc'),
+    );
 
     new Setting(containerEl)
       .setName(t('settings.language.select.name'))
@@ -450,7 +365,11 @@ export class OpenCodianSettingTab extends PluginSettingTab {
 
   /** Server settings section */
   private addServerSettings(containerEl: HTMLElement): HTMLHeadingElement {
-    const headingEl = this.createSectionHeading(containerEl, t('settings.server.title'));
+    const headingEl = this.createSectionHeading(
+      containerEl,
+      t('settings.server.title'),
+      t('settings.quickNav.serverDesc'),
+    );
     const isLocalMode = this.plugin.settings.server.mode === 'local';
 
     const modeSetting = new Setting(containerEl)
@@ -864,7 +783,11 @@ export class OpenCodianSettingTab extends PluginSettingTab {
 
   /** Model settings section */
   private addModelSettings(containerEl: HTMLElement): HTMLHeadingElement {
-    const headingEl = this.createSectionHeading(containerEl, t('settings.model.title'));
+    const headingEl = this.createSectionHeading(
+      containerEl,
+      t('settings.model.title'),
+      t('settings.quickNav.modelDesc'),
+    );
     const modelConfigService = this.plugin.modelConfigService;
 
     if (!modelConfigService) {
@@ -2156,7 +2079,11 @@ export class OpenCodianSettingTab extends PluginSettingTab {
   }
 
   private addConversationSettings(containerEl: HTMLElement): HTMLHeadingElement {
-    const headingEl = this.createSectionHeading(containerEl, t('settings.conversation.title'));
+    const headingEl = this.createSectionHeading(
+      containerEl,
+      t('settings.conversation.title'),
+      t('settings.quickNav.conversationDesc'),
+    );
     this.conversationHeadingEl = headingEl;
 
     let titleModelSetting: Setting | null = null;
@@ -2340,7 +2267,11 @@ export class OpenCodianSettingTab extends PluginSettingTab {
   }
 
   private addPluginSettings(containerEl: HTMLElement): HTMLHeadingElement {
-    const headingEl = this.createSectionHeading(containerEl, t('settings.plugins.title'));
+    const headingEl = this.createSectionHeading(
+      containerEl,
+      t('settings.plugins.title'),
+      t('settings.quickNav.pluginsDesc'),
+    );
     const vaultPath = getVaultBasePath(this.plugin.app);
 
     if (!vaultPath) {
@@ -2519,20 +2450,10 @@ export class OpenCodianSettingTab extends PluginSettingTab {
 
   /** Clean up when settings tab is closed */
   hide(): void {
-    this.clearSettingsPanelRestoreWork();
-    this.captureSettingsPanelScrollPosition();
-    if (this.settingsScrollHandler) {
-      this.settingsScrollContainerEl?.removeEventListener('scroll', this.settingsScrollHandler);
-      this.settingsScrollHandler = undefined;
-    }
-    this.settingsScrollContainerEl = null;
+    this.sectionCoordinator.hide();
     if (this.modelRefreshFrameId !== null) {
       window.cancelAnimationFrame(this.modelRefreshFrameId);
       this.modelRefreshFrameId = null;
-    }
-    if (this.settingsPanelPostRenderFrameId !== null) {
-      window.cancelAnimationFrame(this.settingsPanelPostRenderFrameId);
-      this.settingsPanelPostRenderFrameId = null;
     }
     this.styleControlBindings = [];
     this.refreshModelsCallback = undefined;
@@ -2542,7 +2463,11 @@ export class OpenCodianSettingTab extends PluginSettingTab {
 
   /** Security settings section */
   private addSecuritySettings(containerEl: HTMLElement): HTMLHeadingElement {
-    const headingEl = this.createSectionHeading(containerEl, t('settings.security.title'));
+    const headingEl = this.createSectionHeading(
+      containerEl,
+      t('settings.security.title'),
+      t('settings.quickNav.securityDesc'),
+    );
 
     // Initialize config manager
     const vaultPath = getVaultBasePath(this.plugin.app);
@@ -2812,7 +2737,11 @@ export class OpenCodianSettingTab extends PluginSettingTab {
 
   /** UI settings section */
   private addUISettings(containerEl: HTMLElement): HTMLHeadingElement {
-    const headingEl = this.createSectionHeading(containerEl, t('settings.ui.title'));
+    const headingEl = this.createSectionHeading(
+      containerEl,
+      t('settings.ui.title'),
+      t('settings.quickNav.uiDesc'),
+    );
 
     new Setting(containerEl)
       .setName(t('settings.ui.maxTabs.name'))
@@ -2901,7 +2830,11 @@ export class OpenCodianSettingTab extends PluginSettingTab {
 
   /** Style settings section */
   private addStyleSettings(containerEl: HTMLElement): HTMLHeadingElement {
-    const headingEl = this.createSectionHeading(containerEl, t('settings.style.title'));
+    const headingEl = this.createSectionHeading(
+      containerEl,
+      t('settings.style.title'),
+      t('settings.quickNav.styleDesc'),
+    );
     this.addThemePresetSection(containerEl);
 
     new Setting(containerEl)
@@ -5058,354 +4991,13 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     }
   }
 
-  private scheduleSettingsPanelPostRenderSetup(
-    pendingOpenScrollTop: number | null,
-    pendingOpenSectionTitle: string | null,
-  ): void {
-    this.settingsPanelPostRenderFrameId = window.requestAnimationFrame(() => {
-      this.settingsPanelPostRenderFrameId = null;
-      const scrollContainer = this.getSettingsScrollContainer();
-      this.bindSettingsPanelScrollPersistence(scrollContainer);
-
-      if (pendingOpenSectionTitle) {
-        this.scrollToSectionByTitle(pendingOpenSectionTitle);
-        this.finishPendingOpenVisibility();
-        return;
-      }
-
-      const targetScrollTop = pendingOpenScrollTop ?? this.plugin.settings.settingsPanelScrollTop;
-      if (Math.abs(targetScrollTop) <= SETTINGS_SCROLL_RESTORE_SUCCESS_TOLERANCE_PX) {
-        if (Math.abs(scrollContainer.scrollTop) > SETTINGS_SCROLL_RESTORE_SUCCESS_TOLERANCE_PX) {
-          scrollContainer.scrollTop = 0;
-        }
-        this.plugin.settings.settingsPanelScrollTop = 0;
-        this.lastObservedSettingsScrollTop = 0;
-        if (pendingOpenScrollTop !== null) {
-          this.finishPendingOpenVisibility();
-        }
-        return;
-      }
-
-      this.restoreSettingsPanelScrollPosition(
-        targetScrollTop,
-        scrollContainer,
-        pendingOpenScrollTop !== null ? () => this.finishPendingOpenVisibility() : undefined,
-      );
-    });
-  }
-
-  private bindSettingsPanelScrollPersistence(scrollContainer?: HTMLElement): void {
-    if (this.settingsScrollHandler) {
-      this.settingsScrollContainerEl?.removeEventListener('scroll', this.settingsScrollHandler);
-    }
-
-    const resolvedScrollContainer = scrollContainer ?? this.getSettingsScrollContainer();
-    this.settingsScrollContainerEl = resolvedScrollContainer;
-
-    this.settingsScrollHandler = () => {
-      if (this.settingsScrollPersistenceSuspended) {
-        return;
-      }
-
-      if (!this.containerEl.isConnected || !resolvedScrollContainer.contains(this.containerEl)) {
-        return;
-      }
-
-      this.plugin.settings.settingsPanelScrollTop = resolvedScrollContainer.scrollTop;
-      this.lastObservedSettingsScrollTop = resolvedScrollContainer.scrollTop;
-      this.plugin.scheduleSettingsUiStateSave();
-    };
-
-    resolvedScrollContainer.addEventListener('scroll', this.settingsScrollHandler, { passive: true });
-  }
-
-  private restoreSettingsPanelScrollPosition(
-    scrollTop = this.plugin.settings.settingsPanelScrollTop,
-    scrollContainer?: HTMLElement,
-    onSettled?: () => void,
-  ): void {
-    const resolvedScrollContainer = scrollContainer ?? this.settingsScrollContainerEl ?? this.getSettingsScrollContainer();
-    this.settingsScrollContainerEl = resolvedScrollContainer;
-    this.clearSettingsPanelRestoreWork();
-    this.settingsScrollPersistenceSuspended = true;
-    this.settingsPanelRestoreScrollContainerEl = resolvedScrollContainer;
-
-    const normalizedScrollTop = Math.max(0, scrollTop);
-    const restoreStartedAt = Date.now();
-    const minimumSettleAt = restoreStartedAt + SETTINGS_SCROLL_RESTORE_MIN_STABLE_MS;
-    let restoreAttempts = 0;
-    let restoreSettled = false;
-    let restoreQueued = false;
-    let deferredRestoreTrackingStarted = false;
-
-    const finishRestore = (reason: string, restoredScrollTop: number): void => {
-      if (restoreSettled) {
-        return;
-      }
-
-      restoreSettled = true;
-      this.plugin.settings.settingsPanelScrollTop = restoredScrollTop;
-      this.lastObservedSettingsScrollTop = restoredScrollTop;
-      this.clearSettingsPanelRestoreWork();
-      logger.debug('Settings scroll restored', {
-        reason,
-        attempts: restoreAttempts,
-        elapsedMs: Date.now() - restoreStartedAt,
-        targetScrollTop: normalizedScrollTop,
-        restoredScrollTop,
-      });
-      onSettled?.();
-    };
-
-    if (Math.abs(normalizedScrollTop) <= SETTINGS_SCROLL_RESTORE_SUCCESS_TOLERANCE_PX) {
-      if (Math.abs(resolvedScrollContainer.scrollTop) > SETTINGS_SCROLL_RESTORE_SUCCESS_TOLERANCE_PX) {
-        resolvedScrollContainer.scrollTop = 0;
-      }
-      finishRestore('already-at-top', resolvedScrollContainer.scrollTop);
-      return;
-    }
-
-    const scheduleRestoreSettle = (reason: string): void => {
-      if (restoreSettled) {
-        return;
-      }
-
-      if (this.settingsPanelRestoreSettleTimeoutId !== null) {
-        window.clearTimeout(this.settingsPanelRestoreSettleTimeoutId);
-      }
-
-      const settleDelay = Math.max(
-        SETTINGS_SCROLL_RESTORE_IDLE_SETTLE_MS,
-        minimumSettleAt - Date.now(),
-        0,
-      );
-      this.settingsPanelRestoreSettleTimeoutId = window.setTimeout(() => {
-        this.settingsPanelRestoreSettleTimeoutId = null;
-        finishRestore(reason, resolvedScrollContainer.scrollTop);
-      }, settleDelay);
-    };
-
-    const startDeferredRestoreTracking = (): void => {
-      if (restoreSettled || deferredRestoreTrackingStarted) {
-        return;
-      }
-
-      deferredRestoreTrackingStarted = true;
-
-      for (const delay of SETTINGS_SCROLL_RESTORE_RETRY_DELAYS) {
-        const timeoutId = window.setTimeout(() => {
-          this.settingsPanelRestoreTimeoutIds = this.settingsPanelRestoreTimeoutIds.filter(
-            (id) => id !== timeoutId,
-          );
-          applyRestore(`timeout-${delay}`);
-        }, delay);
-        this.settingsPanelRestoreTimeoutIds.push(timeoutId);
-      }
-
-      if (typeof MutationObserver !== 'undefined') {
-        this.settingsPanelRestoreObserver = new MutationObserver(() => {
-          queueRestore('mutation');
-        });
-        this.settingsPanelRestoreObserver.observe(this.containerEl, {
-          childList: true,
-          subtree: true,
-          characterData: true,
-        });
-
-        const observerTimeoutId = window.setTimeout(() => {
-          this.settingsPanelRestoreTimeoutIds = this.settingsPanelRestoreTimeoutIds.filter(
-            (id) => id !== observerTimeoutId,
-          );
-          if (restoreSettled) {
-            return;
-          }
-          this.settingsPanelRestoreObserver?.disconnect();
-          this.settingsPanelRestoreObserver = null;
-          applyRestore('observer-timeout');
-          scheduleRestoreSettle('observer-timeout');
-        }, SETTINGS_SCROLL_RESTORE_OBSERVER_WINDOW_MS);
-        this.settingsPanelRestoreTimeoutIds.push(observerTimeoutId);
-      }
-    };
-
-    const applyRestore = (reason: string): void => {
-      if (restoreSettled) {
-        return;
-      }
-
-      if (!resolvedScrollContainer.isConnected) {
-        finishRestore('disconnected', this.lastObservedSettingsScrollTop || normalizedScrollTop);
-        return;
-      }
-
-      const currentScrollTop = resolvedScrollContainer.scrollTop;
-      const alreadyAtTarget =
-        Math.abs(currentScrollTop - normalizedScrollTop) <= SETTINGS_SCROLL_RESTORE_SUCCESS_TOLERANCE_PX;
-      if (alreadyAtTarget) {
-        if (!reason.startsWith('timeout-')) {
-          scheduleRestoreSettle(reason);
-        }
-        return;
-      }
-
-      restoreAttempts += 1;
-      resolvedScrollContainer.scrollTop = normalizedScrollTop;
-      const restoredScrollTop = resolvedScrollContainer.scrollTop;
-      if (Math.abs(restoredScrollTop - normalizedScrollTop) <= SETTINGS_SCROLL_RESTORE_SUCCESS_TOLERANCE_PX) {
-        scheduleRestoreSettle(reason);
-        return;
-      }
-
-      startDeferredRestoreTracking();
-    };
-
-    const queueRestore = (reason: string): void => {
-      if (restoreSettled || restoreQueued || !resolvedScrollContainer.isConnected) {
-        return;
-      }
-
-      restoreQueued = true;
-      const frameId = window.requestAnimationFrame(() => {
-        restoreQueued = false;
-        if (this.settingsPanelRestoreFrameId === frameId) {
-          this.settingsPanelRestoreFrameId = null;
-        }
-        applyRestore(reason);
-      });
-      this.settingsPanelRestoreFrameId = frameId;
-    };
-
-    this.settingsPanelRestoreScrollListener = () => {
-      if (restoreSettled) {
-        return;
-      }
-
-      const currentScrollTop = resolvedScrollContainer.scrollTop;
-      if (Math.abs(currentScrollTop - normalizedScrollTop) <= SETTINGS_SCROLL_RESTORE_SUCCESS_TOLERANCE_PX) {
-        scheduleRestoreSettle('scroll');
-        return;
-      }
-
-      queueRestore('scroll');
-    };
-    resolvedScrollContainer.addEventListener('scroll', this.settingsPanelRestoreScrollListener, { passive: true });
-
-    this.settingsPanelRestoreFrameId = window.requestAnimationFrame(() => {
-      this.settingsPanelRestoreFrameId = null;
-      applyRestore('animation-frame');
-    });
-  }
-
-  private captureSettingsPanelScrollPosition(): void {
-    const scrollContainer = this.settingsScrollContainerEl ?? this.getSettingsScrollContainer();
-    const nextScrollTop =
-      scrollContainer.isConnected
-        ? scrollContainer.scrollTop
-        : this.lastObservedSettingsScrollTop;
-
-    this.plugin.settings.settingsPanelScrollTop = nextScrollTop;
-    this.plugin.scheduleSettingsUiStateSave();
-  }
-
-  private finishPendingOpenVisibility(): void {
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => {
-        this.pendingOpenScrollTop = null;
-        this.pendingOpenSectionTitle = null;
-        this.containerEl.style.removeProperty('visibility');
-      });
-    });
-  }
-
-  private clearInitialQuickNavFocus(): void {
-    window.requestAnimationFrame(() => {
-      const activeEl = document.activeElement;
-      if (!(activeEl instanceof HTMLElement)) {
-        return;
-      }
-
-      if (!activeEl.hasClass('opencodian-settings-quick-nav-btn')) {
-        return;
-      }
-
-      activeEl.blur();
-    });
-  }
-
-  private getSettingsScrollContainer(): HTMLElement {
-    if (
-      this.settingsScrollContainerEl
-      && this.settingsScrollContainerEl.isConnected
-      && this.settingsScrollContainerEl.contains(this.containerEl)
-    ) {
-      return this.settingsScrollContainerEl;
-    }
-
-    const containerEl = this.containerEl;
-
-    const matchedContainer = containerEl.closest<HTMLElement>(SETTINGS_SCROLL_CONTAINER_SELECTOR);
-    if (matchedContainer) {
-      this.settingsScrollContainerEl = matchedContainer;
-      return matchedContainer;
-    }
-
-    let currentEl: HTMLElement | null = containerEl.parentElement;
-    while (currentEl) {
-      if (this.looksLikeSettingsScrollContainer(currentEl)) {
-        this.settingsScrollContainerEl = currentEl;
-        return currentEl;
-      }
-      currentEl = currentEl.parentElement;
-    }
-
-    this.settingsScrollContainerEl = containerEl;
-    return containerEl;
-  }
-
-  private looksLikeSettingsScrollContainer(element: HTMLElement): boolean {
-    if (
-      SETTINGS_SCROLL_CONTAINER_SELECTORS.some((selector) => element.matches(selector))
-    ) {
-      return true;
-    }
-
-    const classNames = Array.from(element.classList);
-    return classNames.some((className) =>
-      className.includes('vertical-tab-content')
-      || className.includes('modal-content'),
-    );
-  }
-
-  private clearSettingsPanelRestoreWork(): void {
-    if (this.settingsPanelRestoreFrameId !== null) {
-      window.cancelAnimationFrame(this.settingsPanelRestoreFrameId);
-      this.settingsPanelRestoreFrameId = null;
-    }
-
-    for (const timeoutId of this.settingsPanelRestoreTimeoutIds) {
-      window.clearTimeout(timeoutId);
-    }
-    this.settingsPanelRestoreTimeoutIds = [];
-
-    if (this.settingsPanelRestoreSettleTimeoutId !== null) {
-      window.clearTimeout(this.settingsPanelRestoreSettleTimeoutId);
-      this.settingsPanelRestoreSettleTimeoutId = null;
-    }
-
-    this.settingsPanelRestoreObserver?.disconnect();
-    this.settingsPanelRestoreObserver = null;
-
-    if (this.settingsPanelRestoreScrollListener && this.settingsPanelRestoreScrollContainerEl) {
-      this.settingsPanelRestoreScrollContainerEl.removeEventListener('scroll', this.settingsPanelRestoreScrollListener);
-    }
-    this.settingsPanelRestoreScrollListener = undefined;
-    this.settingsPanelRestoreScrollContainerEl = null;
-    this.settingsScrollPersistenceSuspended = false;
-  }
-
   /** Debug settings section */
   private addDebugSettings(containerEl: HTMLElement): HTMLHeadingElement {
-    const headingEl = this.createSectionHeading(containerEl, t('settings.debug.title'));
+    const headingEl = this.createSectionHeading(
+      containerEl,
+      t('settings.debug.title'),
+      t('settings.quickNav.debugDesc'),
+    );
     const platformKey = getCurrentPlatformKey();
     const platformLabel = this.getDebugPathPlatformLabel(platformKey);
     let logPathText: import('obsidian').TextComponent;
@@ -5651,7 +5243,11 @@ export class OpenCodianSettingTab extends PluginSettingTab {
 
   /** User settings section */
   private addUserSettings(containerEl: HTMLElement): HTMLHeadingElement {
-    const headingEl = this.createSectionHeading(containerEl, t('settings.user.title'));
+    const headingEl = this.createSectionHeading(
+      containerEl,
+      t('settings.user.title'),
+      t('settings.quickNav.userDesc'),
+    );
 
     new Setting(containerEl)
       .setName(t('settings.user.name.name'))
@@ -5944,49 +5540,15 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     }
   }
 
-  private createSectionHeading(containerEl: HTMLElement, title: string): HTMLHeadingElement {
-    const headingEl = containerEl.createEl('h3', {
-      text: title,
-      cls: 'opencodian-settings-section-heading',
+  private createSectionHeading(
+    containerEl: HTMLElement,
+    title: string,
+    tooltip = title,
+  ): HTMLHeadingElement {
+    return this.sectionCoordinator.createSectionHeading(containerEl, {
+      title,
+      tooltip,
     });
-    headingEl.dataset.sectionTitle = title;
-    return headingEl;
-  }
-
-  private buildQuickNav(
-    quickNavEl: HTMLElement,
-    sections: Array<{ headingEl: HTMLHeadingElement; tooltip: string }>
-  ): void {
-    quickNavEl.empty();
-    quickNavEl.createDiv({
-      cls: 'opencodian-settings-quick-nav-label',
-      text: t('settings.quickNav.title'),
-    });
-
-    const chipsEl = quickNavEl.createDiv({ cls: 'opencodian-settings-quick-nav-chips' });
-
-    for (const [index, { headingEl: sectionEl, tooltip }] of sections.entries()) {
-      const title = sectionEl.dataset.sectionTitle ?? sectionEl.textContent ?? '';
-      const buttonEl = chipsEl.createEl('button', {
-        cls: 'opencodian-settings-quick-nav-btn',
-        text: title,
-      });
-      buttonEl.type = 'button';
-      buttonEl.dataset.tooltip = tooltip;
-      if (sections.length > 1) {
-        if (index <= 1) {
-          buttonEl.dataset.tooltipAlign = 'left';
-        } else if (index >= sections.length - 2) {
-          buttonEl.dataset.tooltipAlign = 'right';
-        }
-      }
-      buttonEl.addEventListener('click', () => {
-        sectionEl.scrollIntoView({
-          behavior: 'smooth',
-          block: 'start',
-        });
-      });
-    }
   }
 
   private async applyProviderIcon(targetEl: HTMLElement, providerId: string, label: string): Promise<void> {

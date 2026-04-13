@@ -4,7 +4,7 @@
 
 ## 当前优先级
 
-- **Settings maintainability**: settings panel scaffolding split（roadmap 当前 `[NEXT]`）
+- **Settings maintainability**: settings model catalog presenter（R9 已完成；roadmap 当前 `[NEXT]`）
 - **P4**: message shell / notice / timestamp 组装边界（R8 已完成；后续只保留 renderer/finalizer regression watchpoints）
 - **P3**: context / composer / retained-selection 相关 ownership（R7 已完成；后续只保留 facade/focus runtime 回归 watchpoints）
 - **P1**: `OpenCodianView` 里剩余的 activation / sync / runtime bridge ownership
@@ -12,7 +12,7 @@
 
 ## 当前热点首查入口
 
-- Settings maintainability 首查 `OpenCodianSettings.ts` 的 section lifecycle、quick-nav 与 scroll restoration 入口，再看相关 module docs
+- Settings maintainability 首查 `OpenCodianSettings.ts` 的 provider/model accordion、search、bulk toggle 与 probe presentation 入口，再看 `SettingsSectionCoordinator.ts` 已收口的 scaffolding 边界和相关 module docs
 - P4 regression-only 首查 `AssistantShellViewHostAdapter`、`PersistentAssistantNoticeService` 与 `ConversationRenderService` 的 persisted assistant body/footer seam
 - P3 regression-only 首查 composer-context facade 创建、context catalog ownership 与 retained-selection runtime
 - P1 首查 `OpenCodianView` 里 activation / sync host 与 runtime bridge 创建区段，再看对应 bridge/service
@@ -39,7 +39,13 @@
 
 - R8 已把 persisted assistant shell / notice / footer / timestamp 组装收束到 `AssistantShellViewHostAdapter`，并让 `PersistentAssistantNoticeService` 直接消费 assistant-message render seam
 - `OpenCodianView` 现在只保留 assistant 正文 block 渲染回调、pseudo-stream reveal 与少量本地错误/server-prompt UI 壳层；不要再把 persisted assistant 壳层组装搬回 view
-- 后续若不是回归或正确性问题，默认按 roadmap 转向 settings panel scaffolding split
+- 后续若不是回归或正确性问题，默认按 roadmap 转向 settings model catalog presenter
+
+## Settings maintainability 状态
+
+- R9 已把 settings section lifecycle、quick-nav 与 scroll restoration 收束到 `SettingsSectionCoordinator`
+- `OpenCodianSettings` 现在只负责 section composition 和业务设置装配；不要再把 quick-nav DOM、scroll restore timers/listeners 塞回主类
+- 下一步按 roadmap 转向 provider/model accordion、search、bulk toggle 与 probe presentation presenter
 
 ## 可复用模式
 
