@@ -120,8 +120,11 @@ import {
 } from './runtime/ConversationHydrationRenderBridge';
 import {
   ConversationLoadRuntimeBridge,
-  type ConversationLoadRuntimeBridgeHost,
 } from './runtime/ConversationLoadRuntimeBridge';
+import {
+  createConversationSyncLoadRuntimeHosts,
+  type ConversationSyncLoadRuntimeHostAdapterHost,
+} from './runtime/ConversationSyncLoadRuntimeHostAdapter';
 import {
   ConversationTransitionBridge,
   type ConversationTransitionBridgeHost,
@@ -215,7 +218,6 @@ import {
   type ConversationSyncEventAdapterHost,
 } from './services/ConversationSyncEventAdapter';
 import {
-  type ConversationSyncViewHost,
   createConversationSyncServices,
 } from './services/ConversationSyncHostAdapter';
 import {
@@ -1197,8 +1199,11 @@ export class OpenCodianView extends ItemView {
     this.tabRuntimeStateBridge = new TabRuntimeStateBridge(
       tabActivationRuntimeBridgeHosts.tabRuntimeStateBridgeHost,
     );
+    const conversationSyncLoadRuntimeHosts = createConversationSyncLoadRuntimeHosts(
+      this.createConversationSyncLoadRuntimeHost(),
+    );
     const conversationSyncServices = createConversationSyncServices(
-      this.createConversationSyncViewHost(),
+      conversationSyncLoadRuntimeHosts.conversationSyncViewHost,
       visibleConversationPostSyncCoordinator,
       backgroundConversationPostSyncHandoffCoordinator,
     );
@@ -1234,7 +1239,7 @@ export class OpenCodianView extends ItemView {
       this.createBackgroundTaskStreamTriggerCoordinatorHost(),
     );
     const conversationLoadRuntimeBridge = new ConversationLoadRuntimeBridge(
-      this.createConversationLoadRuntimeBridgeHost(),
+      conversationSyncLoadRuntimeHosts.conversationLoadRuntimeBridgeHost,
     );
     this.conversationViewStateService = new ConversationViewStateService(
       this.createConversationViewStateHost(),
@@ -1586,17 +1591,34 @@ export class OpenCodianView extends ItemView {
     };
   }
 
-  private createConversationSyncViewHost(): ConversationSyncViewHost {
+  private createConversationSyncLoadRuntimeHost(): ConversationSyncLoadRuntimeHostAdapterHost {
     return {
       getCurrentConversation: () => this.currentConversation,
       getActiveTabId: () => this.getActiveTabId(),
       getAllTabs: () => this.tabManager?.getAllTabs() ?? [],
       getTab: (tabId) => this.tabManager?.getTab(tabId) ?? null,
       getTabRuntimeState: (tabId: TabId | null) => this.getTabRuntimeState(tabId),
+      loadConversations: () => this.plugin.loadConversations(),
       getConversationById: async (id) => (await this.plugin.getConversationById(id)) ?? null,
+      shouldSyncConversationFromServer: (conversation, options) => {
+        const shouldSyncInterrupted = !this.hasInterruptedLocalAssistantTail(conversation.messages)
+          && conversation.messages.some((message) =>
+            message.displayStyle !== 'notice'
+            && !message.sourceMessageId
+          );
+        return Boolean(
+          options.forceServerSync
+          || !conversation.messages
+          || conversation.messages.length === 0
+          || shouldSyncInterrupted,
+        );
+      },
       getConversationSyncFingerprint: (messages) => this.getConversationSyncFingerprint(messages),
       syncConversationMessagesFromServer: (conversation, tabId, reason, options) =>
         this.syncConversationMessagesFromServer(conversation, tabId, reason, options),
+      setCurrentConversationRevertState: (revertState) => {
+        this.currentConversationRevertState = revertState;
+      },
       applySyncedConversationUpdate: (previousMessages, nextMessages) =>
         this.applySyncedConversationUpdate(previousMessages, nextMessages),
       renderBackgroundTaskIndicatorIfNeeded: (tabId) =>
@@ -1752,36 +1774,6 @@ export class OpenCodianView extends ItemView {
       loadConversations: () => this.plugin.loadConversations(),
       getConversations: () => this.plugin.getConversations(),
       createConversation: () => this.plugin.createConversation(),
-    };
-  }
-
-  private createConversationLoadRuntimeBridgeHost(): ConversationLoadRuntimeBridgeHost {
-    return {
-      loadConversations: () => this.plugin.loadConversations(),
-      getConversationById: async (id) => (await this.plugin.getConversationById(id)) ?? null,
-      shouldSyncConversationFromServer: (conversation, options) => {
-        const shouldSyncInterrupted = !this.hasInterruptedLocalAssistantTail(conversation.messages)
-          && conversation.messages.some((message) =>
-            message.displayStyle !== 'notice'
-            && !message.sourceMessageId
-          );
-        return Boolean(
-          options.forceServerSync
-          || !conversation.messages
-          || conversation.messages.length === 0
-          || shouldSyncInterrupted,
-        );
-      },
-      syncConversationMessagesFromServer: async (conversation, tabId, reason) => {
-        const syncResult = await this.syncConversationMessagesFromServer(conversation, tabId, reason);
-        return {
-          messages: syncResult.messages,
-          revertState: syncResult.revertState,
-        };
-      },
-      setCurrentConversationRevertState: (revertState) => {
-        this.currentConversationRevertState = revertState;
-      },
     };
   }
 

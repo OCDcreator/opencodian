@@ -51,7 +51,7 @@ export function createConversationSyncServices(...): ConversationSyncServices;
 
 ## 与 `OpenCodianView` 的边界
 
-- `OpenCodianView` 现在只需要提供一份 `ConversationSyncViewHost`，不再直接持有三段 sync host factory 与 service wiring
+- `OpenCodianView` 现在经由 `ConversationSyncLoadRuntimeHostAdapter` 提供共享的 sync/load seam，不再直接持有分散的 sync host factory 闭包
 - `ConversationSyncHostAdapter` 只负责把 view-state / render callback 映射成 sync 服务能消费的 host 形状
 - `ConversationSyncRuntimeCoordinator`、`ConversationSyncOrchestrationService`、`ConversationSyncBridge` 的行为边界保持不变
 - 这次切片继续推进高优先级 sync/post-sync ownership 收窄：让 visible/background router 与各自 coordinator 的装配继续留在 host adapter，而不是回流到主 view
