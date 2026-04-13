@@ -112,18 +112,15 @@ import {
 } from './runtime/BackgroundTaskStreamTriggerCoordinator';
 import {
   ConversationHydrationOutcomeBridge,
-  type ConversationHydrationOutcomeBridgeHost,
 } from './runtime/ConversationHydrationOutcomeBridge';
 import {
   ConversationHydrationRenderBridge,
-  type ConversationHydrationRenderBridgeHost,
 } from './runtime/ConversationHydrationRenderBridge';
 import {
   ConversationLoadRuntimeBridge,
 } from './runtime/ConversationLoadRuntimeBridge';
 import {
   ConversationTransitionBridge,
-  type ConversationTransitionBridgeHost,
 } from './runtime/ConversationTransitionBridge';
 import {
   TabConversationActivationBridge,
@@ -191,6 +188,10 @@ import type { ComposerContextViewFacade } from './services/ComposerContextViewFa
 import { ContextAttachmentBuilder } from './services/ContextAttachmentBuilder';
 import { ContextFileCatalogService } from './services/ContextFileCatalogService';
 import { ContextUsageService } from './services/ContextUsageService';
+import {
+  createConversationHydrationRuntimeViewHosts,
+  type ConversationHydrationRuntimeViewHostFactoryHost,
+} from './services/ConversationHydrationRuntimeViewHostFactory';
 import {
   type ConversationAssistantTailRenderPort,
   type ConversationRenderHost,
@@ -1162,11 +1163,14 @@ export class OpenCodianView extends ItemView {
       this.backgroundTaskNoticeStateService,
       this.createBackgroundTaskLiveSignalCoordinatorHost(),
     );
+    const conversationHydrationRuntimeViewHosts = createConversationHydrationRuntimeViewHosts(
+      this.createConversationHydrationRuntimeViewHostFactoryHost(),
+    );
     this.conversationHydrationRenderBridge = new ConversationHydrationRenderBridge(
-      this.createConversationHydrationRenderBridgeHost(),
+      conversationHydrationRuntimeViewHosts.conversationHydrationRenderBridgeHost,
     );
     this.conversationTransitionBridge = new ConversationTransitionBridge(
-      this.createConversationTransitionBridgeHost(),
+      conversationHydrationRuntimeViewHosts.conversationTransitionBridgeHost,
       this.conversationHydrationRenderBridge,
     );
     const tabActivationRuntimeBridgeHosts = createTabActivationRuntimeViewHosts(
@@ -1183,7 +1187,7 @@ export class OpenCodianView extends ItemView {
       this.activeTabContextUsageCoordinator,
     );
     this.conversationHydrationOutcomeBridge = new ConversationHydrationOutcomeBridge(
-      this.createConversationHydrationOutcomeBridgeHost(),
+      conversationHydrationRuntimeViewHosts.conversationHydrationOutcomeBridgeHost,
       this.tabConversationStateBridge,
       this.tabViewActivationBridge,
     );
@@ -1654,58 +1658,57 @@ export class OpenCodianView extends ItemView {
     };
   }
 
-  private createConversationHydrationRenderBridgeHost(): ConversationHydrationRenderBridgeHost {
+  private createConversationHydrationRuntimeViewHostFactoryHost():
+  ConversationHydrationRuntimeViewHostFactoryHost {
     return {
-      getMessagesContainer: () => this.messagesContainer,
-      getActiveTabId: () => this.getActiveTabId(),
-      getScrollRuntimeForTab: (tabId) => this.getTabRuntimeState(tabId),
-      scrollToBottom: ({ tabId }) => {
-        this.scrollToBottom({ tabId });
-      },
-      syncPaneScrollMetrics: (tabId, messagesEl) => {
-        this.syncPaneScrollMetrics(tabId, messagesEl);
-      },
-      requestAnimationFrame: (callback) => window.requestAnimationFrame(callback),
-    };
-  }
-
-  private createConversationHydrationOutcomeBridgeHost(): ConversationHydrationOutcomeBridgeHost {
-    return {
-      syncBackgroundTaskStateFromConversation: (conversation) => {
-        this.syncBackgroundTaskStateFromConversation(conversation);
-      },
-      renderMessages: (messages) => this.renderMessages(messages),
-    };
-  }
-
-  private createConversationTransitionBridgeHost(): ConversationTransitionBridgeHost {
-    return {
-      getCurrentConversation: () => this.currentConversation,
-      cancelTitleGeneration: (conversationId) => {
-        this.titleGenerationService.cancelConversation(conversationId);
-      },
-      resetBackgroundTaskIndicator: () => {
-        this.resetBackgroundTaskIndicator();
-      },
-      clearPendingTitleGenerationStatus: (conversationId) =>
-        this.updateConversationTitleState(conversationId, {
-          titleGenerationStatus: undefined,
-        }),
-      clearScheduledScrollToBottom: () => {
-        this.clearScheduledScrollToBottom();
-      },
-      beginConversationHydration: (tabId) => {
-        this.beginConversationHydration(tabId);
-      },
-      clearMessagesContainer: () => {
-        this.messagesContainer?.empty();
-      },
-      resetTurnState: () => {
-        this.resetTurnState();
-      },
-      endConversationHydration: (tabId) => {
-        this.endConversationHydration(tabId);
-      },
+      getHydrationRenderRuntime: () => ({
+        getMessagesContainer: () => this.messagesContainer,
+        getActiveTabId: () => this.getActiveTabId(),
+        getScrollRuntimeForTab: (tabId) => this.getTabRuntimeState(tabId),
+        scrollToBottom: ({ tabId }) => {
+          this.scrollToBottom({ tabId });
+        },
+        syncPaneScrollMetrics: (tabId, messagesEl) => {
+          this.syncPaneScrollMetrics(tabId, messagesEl);
+        },
+        requestAnimationFrame: (callback) => window.requestAnimationFrame(callback),
+      }),
+      getHydrationOutcomeRuntime: () => ({
+        syncBackgroundTaskStateFromConversation: (conversation) => {
+          this.syncBackgroundTaskStateFromConversation(conversation);
+        },
+        renderMessages: (messages) => this.renderMessages(messages),
+      }),
+      getConversationTransitionState: () => ({
+        getCurrentConversation: () => this.currentConversation,
+        cancelTitleGeneration: (conversationId) => {
+          this.titleGenerationService.cancelConversation(conversationId);
+        },
+        clearPendingTitleGenerationStatus: (conversationId) =>
+          this.updateConversationTitleState(conversationId, {
+            titleGenerationStatus: undefined,
+          }),
+      }),
+      getConversationTransitionWriteback: () => ({
+        resetBackgroundTaskIndicator: () => {
+          this.resetBackgroundTaskIndicator();
+        },
+        clearScheduledScrollToBottom: () => {
+          this.clearScheduledScrollToBottom();
+        },
+        beginConversationHydration: (tabId) => {
+          this.beginConversationHydration(tabId);
+        },
+        clearMessagesContainer: () => {
+          this.messagesContainer?.empty();
+        },
+        resetTurnState: () => {
+          this.resetTurnState();
+        },
+        endConversationHydration: (tabId) => {
+          this.endConversationHydration(tabId);
+        },
+      }),
     };
   }
 
