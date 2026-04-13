@@ -23,20 +23,19 @@ import {
   type BackgroundConversationSignalSyncStateCoordinatorHost,
 } from './BackgroundConversationSignalSyncStateCoordinator';
 import type { BackgroundTaskLiveSignalCoordinator } from './BackgroundTaskLiveSignalCoordinator';
-import { PostSyncQuestionTodoRefreshFacade } from './PostSyncQuestionTodoRefreshFacade';
+import type { PostSyncQuestionTodoRefreshFacade } from './PostSyncQuestionTodoRefreshFacade';
 import {
-  PostSyncQuestionTodoRefreshPlanBuilder,
-  type PostSyncQuestionTodoRefreshPlanBuilderHost,
-} from './PostSyncQuestionTodoRefreshPlanBuilder';
+  createPostSyncQuestionTodoRefreshServices,
+  type PostSyncQuestionTodoRefreshViewHost,
+} from './PostSyncQuestionTodoRefreshHostAdapter';
 import {
   QuestionTodoActivationRefreshBridge,
   type QuestionTodoActivationRefreshBridgeHost,
 } from './QuestionTodoActivationRefreshBridge';
 import type { QuestionDockCoordinator } from './QuestionDockCoordinator';
-import {
+import type {
   QuestionTodoStatusRefreshCoordinator,
-  type QuestionTodoStatusRefreshCoordinatorHost,
-  type QuestionTodoStatusRefreshRuntime,
+  QuestionTodoStatusRefreshRuntime,
 } from './QuestionTodoStatusRefreshCoordinator';
 import type { SessionTodoStateService } from './SessionTodoStateService';
 import type { SessionTodoStatusRefreshService } from './SessionTodoStatusRefreshService';
@@ -92,24 +91,8 @@ export interface QuestionTodoBackgroundTaskRefreshViewHostAdapterDependencies {
   getTabRuntimeStateBridge(): TabRuntimeStateBridgePort;
 }
 
-export interface QuestionTodoBackgroundTaskRefreshViewHost {
-  getCurrentConversation(): Conversation | null;
-  getTabRuntimeState(tabId: TabId | null): QuestionTodoStatusRefreshRuntime | null;
-  hasIncompleteTodos(todos: readonly SessionTodo[]): boolean;
-  refreshPendingQuestionsForTab(
-    tabId: TabId | null,
-    sessionId: string | null | undefined,
-  ): Promise<QuestionRequest[]>;
-  refreshTabSessionStatus(
-    tabId: TabId | null,
-    sessionId: string | null | undefined,
-    options: { suppressErrors?: boolean },
-  ): Promise<SessionActivityStatus | null>;
-  refreshTabSessionTodos(
-    tabId: TabId | null,
-    sessionId: string | null | undefined,
-    options: { suppressErrors?: boolean },
-  ): Promise<SessionTodo[]>;
+export interface QuestionTodoBackgroundTaskRefreshViewHost
+  extends PostSyncQuestionTodoRefreshViewHost {
   syncBackgroundTaskStateFromConversation(
     conversation: Conversation,
     tabId?: TabId | null,
@@ -188,8 +171,6 @@ export function createQuestionTodoBackgroundTaskRefreshViewHostAdapter(
 
 export interface QuestionTodoBackgroundTaskRefreshHosts {
   questionTodoActivationRefreshHost: QuestionTodoActivationRefreshBridgeHost;
-  questionTodoStatusRefreshHost: QuestionTodoStatusRefreshCoordinatorHost;
-  postSyncQuestionTodoRefreshPlanBuilderHost: PostSyncQuestionTodoRefreshPlanBuilderHost;
   backgroundTaskPostSyncRefreshPort: BackgroundTaskPostSyncRefreshPort;
   visibleConversationPostSyncStateCoordinatorHost: VisibleConversationPostSyncStateCoordinatorHost;
   backgroundConversationAttentionCoordinatorHost: BackgroundConversationAttentionCoordinatorHost;
@@ -225,28 +206,6 @@ export function createQuestionTodoBackgroundTaskRefreshHosts(
         sessionId: string | null | undefined,
         options: { suppressErrors?: boolean },
       ) => viewHost.refreshTabSessionTodos(tabId, sessionId, options),
-    },
-    questionTodoStatusRefreshHost: {
-      getTabRuntimeState: (tabId: TabId | null) => viewHost.getTabRuntimeState(tabId),
-      hasIncompleteTodos: (todos: readonly SessionTodo[]) => viewHost.hasIncompleteTodos(todos),
-      refreshPendingQuestionsForTab: (
-        tabId: TabId | null,
-        sessionId: string | null | undefined,
-      ) => viewHost.refreshPendingQuestionsForTab(tabId, sessionId),
-      refreshTabSessionStatus: (
-        tabId: TabId | null,
-        sessionId: string | null | undefined,
-        options: { suppressErrors?: boolean },
-      ) => viewHost.refreshTabSessionStatus(tabId, sessionId, options),
-      refreshTabSessionTodos: (
-        tabId: TabId | null,
-        sessionId: string | null | undefined,
-        options: { suppressErrors?: boolean },
-      ) => viewHost.refreshTabSessionTodos(tabId, sessionId, options),
-    },
-    postSyncQuestionTodoRefreshPlanBuilderHost: {
-      getCurrentConversationSessionId: () =>
-        viewHost.getCurrentConversation()?.openCodeSessionId,
     },
     backgroundTaskPostSyncRefreshPort: {
       syncBackgroundTaskStateFromConversation: (
@@ -285,18 +244,13 @@ export function createQuestionTodoBackgroundTaskRefreshServices(
   viewHost: QuestionTodoBackgroundTaskRefreshViewHost,
 ): QuestionTodoBackgroundTaskRefreshServices {
   const hosts = createQuestionTodoBackgroundTaskRefreshHosts(viewHost);
+  const {
+    questionTodoStatusRefreshCoordinator,
+    postSyncQuestionTodoRefreshPlanBuilder,
+    postSyncQuestionTodoRefreshFacade,
+  } = createPostSyncQuestionTodoRefreshServices(viewHost);
   const questionTodoActivationRefreshBridge = new QuestionTodoActivationRefreshBridge(
     hosts.questionTodoActivationRefreshHost,
-  );
-  const questionTodoStatusRefreshCoordinator = new QuestionTodoStatusRefreshCoordinator(
-    hosts.questionTodoStatusRefreshHost,
-  );
-  const postSyncQuestionTodoRefreshPlanBuilder = new PostSyncQuestionTodoRefreshPlanBuilder(
-    hosts.postSyncQuestionTodoRefreshPlanBuilderHost,
-  );
-  const postSyncQuestionTodoRefreshFacade = new PostSyncQuestionTodoRefreshFacade(
-    postSyncQuestionTodoRefreshPlanBuilder,
-    questionTodoStatusRefreshCoordinator,
   );
   const backgroundConversationPostSyncRefreshExecutor =
     new BackgroundConversationPostSyncRefreshExecutor(

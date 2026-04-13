@@ -259,7 +259,7 @@ describe('QuestionTodoBackgroundTaskRefreshHostAdapter', () => {
     );
   });
 
-  it('derives activation and post-sync host shapes from one shared view host', async () => {
+  it('derives activation and background handoff hosts from one shared view host', async () => {
     const runtime = createRuntime();
     const currentConversation = createConversation('conversation-active');
     const viewHost = createViewHost({
@@ -285,28 +285,10 @@ describe('QuestionTodoBackgroundTaskRefreshHostAdapter', () => {
       'session-activation',
       { suppressErrors: true },
     );
-    expect(hosts.questionTodoStatusRefreshHost.getTabRuntimeState('tab-active')).toBe(runtime);
-    expect(hosts.postSyncQuestionTodoRefreshPlanBuilderHost.getCurrentConversationSessionId()).toBe(
-      'session-conversation-active',
-    );
     expect(hosts.visibleConversationPostSyncStateCoordinatorHost.getCurrentConversationId()).toBe(
       'conversation-active',
     );
 
-    await hosts.questionTodoStatusRefreshHost.refreshPendingQuestionsForTab(
-      'tab-active',
-      'session-question',
-    );
-    await hosts.questionTodoStatusRefreshHost.refreshTabSessionStatus(
-      'tab-active',
-      'session-status',
-      { suppressErrors: true },
-    );
-    await hosts.questionTodoStatusRefreshHost.refreshTabSessionTodos(
-      'tab-active',
-      'session-todo',
-      { suppressErrors: true },
-    );
     hosts.backgroundTaskPostSyncRefreshPort.syncBackgroundTaskStateFromConversation(
       currentConversation,
       'tab-active',
@@ -345,22 +327,6 @@ describe('QuestionTodoBackgroundTaskRefreshHostAdapter', () => {
       1,
       'tab-active',
       'session-activation',
-      { suppressErrors: true },
-    );
-    expect(viewHost.refreshPendingQuestionsForTab).toHaveBeenCalledWith(
-      'tab-active',
-      'session-question',
-    );
-    expect(viewHost.refreshTabSessionStatus).toHaveBeenNthCalledWith(
-      2,
-      'tab-active',
-      'session-status',
-      { suppressErrors: true },
-    );
-    expect(viewHost.refreshTabSessionTodos).toHaveBeenNthCalledWith(
-      2,
-      'tab-active',
-      'session-todo',
       { suppressErrors: true },
     );
     expect(viewHost.syncBackgroundTaskStateFromConversation).toHaveBeenCalledWith(
