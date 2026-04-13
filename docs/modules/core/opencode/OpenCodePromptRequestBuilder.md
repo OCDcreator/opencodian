@@ -7,7 +7,7 @@
 
 `OpenCodePromptRequestBuilder` 是 `OpenCodeService` 内部的 prompt option assembly owner。它把 SDK prompt parameters、legacy request body、allowed-tools / output-format / variant / reasoning 映射，以及默认 provider/model 选择收束到同一个 builder，避免这些请求拼装细节继续散落在主服务里。
 
-builder 不负责 transport 分流，也不负责 context/image request part 序列化；`OpenCodeService` 仍决定走 SDK 还是 legacy，而 `buildPromptRequestParts()` / `createPromptContextPart()` 仍留在服务里，等待后续 R23 处理。
+builder 不负责 transport 分流，也不负责 context/image request part 序列化；`OpenCodeService` 仍决定走 SDK 还是 legacy，而 request-part assembly 现在由相邻的 `OpenCodeContextPartSerializer` 负责。
 
 ## 导入关系
 
@@ -24,7 +24,7 @@ builder 不负责 transport 分流，也不负责 context/image request part 序
 
 ## 核心类型 / 状态
 
-- `PromptRequestPart`: prompt 请求里的 text/file part 结构，供 `OpenCodeService` 的 request-part serialization 与 builder 共享。
+- `PromptRequestPart`: prompt 请求里的 text/file part 结构，供 `OpenCodeContextPartSerializer` 与 builder 共享。
 - `PromptRequestOptions`: `QueryOptions` 加上可选 `system` 的 prompt 组装输入。
 - `host.getDefaultModelSelection()`: 提供当前默认 `providerID` / `modelID`，让 builder 不直接持有 settings 副本。
 - `host.observeRuntimeToolNames()`: 在 allowed-tools 装配阶段把 runtime 外部工具名交回 `OpenCodeService` / `OpenCodeCatalogStateStore` 观察。
@@ -70,7 +70,7 @@ builder 统一处理 `provider` / `model` 覆盖与 settings 默认值回退：
 ```mermaid
 graph TD
     A[OpenCodeService] --> B[OpenCodePromptRequestBuilder]
-    A --> C[buildPromptRequestParts]
+    A --> C[OpenCodeContextPartSerializer]
     B --> D[SDK prompt parameters]
     B --> E[legacy message body]
     B --> F[legacy prompt_async body]
@@ -81,7 +81,7 @@ graph TD
 
 - `OpenCodeService` 仍持有对外 `requestAssistantResponse()` / `sendMessage()` / `sendMessageWithSdk()` 门面，但 prompt option assembly 已统一委托给 builder。
 - `OpenCodeCatalogStateStore` 继续通过 `observeRuntimeToolNames()` 收集 runtime 外部工具名；builder 只负责在 allowed-tools 组装时触发观察。
-- R23 计划处理的 context/image request-part serialization 仍留在 `OpenCodeService`，避免本轮把 prompt option assembly 与 part serialization 混成一个超大 owner。
+- `OpenCodeContextPartSerializer` 负责 request parts；builder 与它共享 `PromptRequestPart`，但仍保持“options vs parts”两条清晰边界。
 
 ## 配置项
 

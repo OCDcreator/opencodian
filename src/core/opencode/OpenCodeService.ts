@@ -7,28 +7,23 @@
  */
 
 import { requestUrl } from 'obsidian';
-import * as path from 'path';
 
 import {
-  buildObsidianContextTag,
   createLogger,
   formatContextLabel,
   getToolIdentity,
   isInternalStructuredOutputTool,
-  isTextLikeMime,
   parseLineRangeFromFileUrl,
   parseObsidianContextTag,
   resolveContextMimeFromPath,
   resolveToolExecutionStatus,
   resolveToolResultText,
-  toFileContextUrl,
   type ToolIdentityKind,
 } from '../../shared';
 import {
   contextPathFromFileUrl,
   normalizeContextAttachmentPath,
   normalizeContextPath,
-  resolveContextPath,
 } from '../../shared/contextPath';
 import type {
   ChatMessage,
@@ -38,7 +33,6 @@ import type {
   OpencodeModelConfigSubset,
   PermissionReply,
   PermissionRequest,
-  PromptContextItem,
   PromptContextLineRange,
   QuestionOption,
   QuestionPrompt,
@@ -61,8 +55,10 @@ import {
   type OpenCodeEventListener,
 } from './OpenCodeEventSubscriptionCoordinator';
 import {
+  OpenCodeContextPartSerializer,
+} from './OpenCodeContextPartSerializer';
+import {
   OpenCodePromptRequestBuilder,
-  type PromptRequestPart,
 } from './OpenCodePromptRequestBuilder';
 import {
   OpenCodeSyncEventRuntimeCoordinator,
@@ -453,8 +449,6 @@ type SessionStatusUpdate = {
   status: SessionActivityStatus;
 };
 
-const REMOTE_CONTEXT_TEXT_LIMIT_BYTES = 64 * 1024;
-
 interface TransientConnectivityLogState {
   suppressedCount: number;
 }
@@ -471,6 +465,7 @@ export class OpenCodeService {
   private sdkFeatureFlags: SdkFeatureFlags;
   private syncEventRuntime: OpenCodeSyncEventRuntimeCoordinator;
   private catalogState: OpenCodeCatalogStateStore;
+  private contextPartSerializer: OpenCodeContextPartSerializer;
   private promptRequestBuilder: OpenCodePromptRequestBuilder;
   private openCodeEventRuntime: OpenCodeEventSubscriptionCoordinator;
   private vaultPath?: string;
@@ -513,6 +508,10 @@ export class OpenCodeService {
 
         this.openCodeEventRuntime.stopSubscriptions();
       },
+    });
+    this.contextPartSerializer = new OpenCodeContextPartSerializer({
+      isLocalServerMode: () => this.settings.server.mode === 'local',
+      getVaultPath: () => this.vaultPath,
     });
     this.promptRequestBuilder = new OpenCodePromptRequestBuilder({
       getDefaultModelSelection: () => ({
@@ -1077,7 +1076,7 @@ export class OpenCodeService {
       throw new Error('No active session');
     }
 
-    const parts = this.buildPromptRequestParts(message, options);
+    const parts = this.contextPartSerializer.buildPromptRequestParts(message, options);
 
     if (this.shouldUseSdk('sdkPrompt')) {
       const response = await this.getSdkClient().session.prompt(
@@ -1184,7 +1183,7 @@ export class OpenCodeService {
       return;
     }
 
-    const parts = this.buildPromptRequestParts(message, options);
+    const parts = this.contextPartSerializer.buildPromptRequestParts(message, options);
 
     try {
       const requestBody = this.promptRequestBuilder.buildLegacyStreamRequestBody(parts, options);
@@ -1644,94 +1643,6 @@ export class OpenCodeService {
     };
   }
 
-  private buildPromptRequestParts(
-    message: string,
-    options: QueryOptions,
-  ): PromptRequestPart[] {
-    const parts: PromptRequestPart[] = [{ type: 'text', text: message }];
-
-    for (const item of options.contextItems ?? []) {
-      parts.push(this.createPromptContextPart(item));
-    }
-
-    for (const image of options.images ?? []) {
-      parts.push({
-        type: 'file',
-        mime: image.mediaType,
-        filename: image.filename,
-        url: `data:${image.mediaType};base64,${image.data}`,
-      });
-    }
-
-    if (options.externalContextPaths?.length) {
-      logger.debug('externalContextPaths are deprecated for sendMessage/requestAssistantResponse and are being omitted', {
-        count: options.externalContextPaths.length,
-      });
-    }
-
-    return parts;
-  }
-
-  private createPromptContextPart(item: PromptContextItem): PromptRequestPart {
-    if (this.settings.server.mode === 'local') {
-      const absolutePath = resolveContextPath(item.path, this.vaultPath);
-      const normalizedMime = isTextLikeMime(item.mime) ? 'text/plain' : item.mime;
-      const part: Extract<PromptRequestPart, { type: 'file' }> = {
-        type: 'file',
-        mime: normalizedMime,
-        filename: path.basename(item.path.replace(/\\/g, '/')),
-        url: toFileContextUrl(absolutePath, item.lineRange),
-      };
-
-      logger.debug('Preparing local Obsidian context part', {
-        kind: item.kind,
-        path: item.path,
-        requestedMime: item.mime,
-        normalizedMime,
-        hasLineRange: Boolean(item.lineRange),
-        hasTextSnapshot: Boolean(item.textSnapshot),
-      });
-
-      if (item.kind === 'selection' && item.textSnapshot) {
-        part.source = {
-          type: 'file',
-          path: item.path,
-          text: {
-            value: item.textSnapshot,
-            start: 0,
-            end: item.textSnapshot.length,
-          },
-        };
-      }
-
-      return part;
-    }
-
-    if (!isTextLikeMime(item.mime)) {
-      throw new Error(`Only text context is supported in remote mode: ${item.label}`);
-    }
-
-    if (!item.textSnapshot) {
-      throw new Error(`Missing text snapshot for remote context: ${item.label}`);
-    }
-
-    const byteLength = new TextEncoder().encode(item.textSnapshot).length;
-    if (byteLength > REMOTE_CONTEXT_TEXT_LIMIT_BYTES) {
-      throw new Error(`Context exceeds remote size limit: ${item.label}`);
-    }
-
-    return {
-      type: 'text',
-      text: buildObsidianContextTag(item),
-      synthetic: true,
-      metadata: {
-        kind: item.kind,
-        path: item.path,
-        lines: item.lineRange ? `${item.lineRange.startLine}-${item.lineRange.endLine}` : undefined,
-      },
-    };
-  }
-
   private normalizeQuestionRequest(raw: unknown): ChatQuestionRequest | null {
     if (!raw || typeof raw !== 'object') {
       return null;
@@ -2103,7 +2014,7 @@ export class OpenCodeService {
     sessionId: string,
   ): AsyncGenerator<StreamChunk> {
     const client = this.getSdkClient();
-    const parts = this.buildPromptRequestParts(message, options);
+    const parts = this.contextPartSerializer.buildPromptRequestParts(message, options);
 
     try {
       await client.session.promptAsync(

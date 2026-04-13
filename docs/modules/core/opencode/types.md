@@ -137,6 +137,6 @@ settings/chat types -> core/opencode/types.ts -> OpenCodeService / ServerManager
 
 ## 注意事项
 
-- `QueryOptions.externalContextPaths` 仍在类型里，但 `OpenCodeService.buildPromptRequestParts()` 当前会忽略它。
+- `QueryOptions.externalContextPaths` 仍在类型里，但 `OpenCodeContextPartSerializer.buildPromptRequestParts()` 当前会忽略它。
 - `reasoningEffort` / `thinkingBudget` 的实际下发方式由 `OpenCodeService` 决定，不由此文件约束。
 - `ServerStatus` 在 `ServerManager.ts` 里也定义了一份同形联合类型；修改状态集合时需要同步。

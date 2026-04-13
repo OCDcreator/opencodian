@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`。R27 完成后必须暂停复盘，不得自动扩展新队列。
-> **当前状态**: [CONFIRMED_NIGHT_BATCH] R19-R27 已确认；当前 `[NEXT]` 是 R23 Context part serializer。
+> **当前状态**: [CONFIRMED_NIGHT_BATCH] R19-R27 已确认；当前 `[NEXT]` 是 R24 Streaming runtime state coordinator。
 
 ## 控制规则
 
@@ -505,7 +505,7 @@
   - 新 owner 有 focused coverage，并保持 SDK-first / legacy fallback 语义不变。
   - 运行 targeted tests、全量 `npm test`、`npm run build`。
 
-### [NEXT] R23 - Context part serializer
+### [DONE] R23 - Context part serializer
 
 - **Lane**: OpenCodeService `context / image request parts`
 - **目标**: 把 `buildPromptRequestParts()`、`createPromptContextPart()` 与本地/远程 context、image parts 序列化收束到独立 serializer。
@@ -524,7 +524,7 @@
   - 新 owner 有 focused coverage，并保持跨平台行为稳定。
   - 运行 targeted tests、全量 `npm test`、`npm run build`。
 
-### [QUEUED] R24 - Streaming runtime state coordinator
+### [NEXT] R24 - Streaming runtime state coordinator
 
 - **Lane**: OpenCodeService `streaming runtime state`
 - **目标**: 把 active stream contexts、create/release/cancel/detach 的运行时状态 ownership 从 `OpenCodeService` 收束到 coordinator。

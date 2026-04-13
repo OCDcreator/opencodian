@@ -29,6 +29,7 @@
 - `./createSdkClient`
 - `./omoCompat`
 - `./OpenCodeCatalogStateStore`
+- `./OpenCodeContextPartSerializer`
 - `./OpenCodeEventSubscriptionCoordinator`
 - `./OpenCodePromptRequestBuilder`
 - `./OpenCodeSyncEventRuntimeCoordinator`
@@ -54,6 +55,7 @@
 - `sdkFeatureFlags`: 由 `resolveSdkFeatureFlags()` 合并后的运行时 SDK 开关。
 - `syncEventRuntime`: `OpenCodeSyncEventRuntimeCoordinator` 实例，负责 session todo/status/message sync event 的监听集合、wanted state、SDK 订阅生命周期与 emit 路径。
 - `catalogState`: `OpenCodeCatalogStateStore` 实例，负责 registry tool ids、tool schema cache、observed external tool names、MCP server status、catalog snapshot 构造与 catalog listener lifecycle。
+- `contextPartSerializer`: `OpenCodeContextPartSerializer` 实例，负责 prompt 输入文本、本地/远程 context item 与 image part 的 request-part 序列化。
 - `promptRequestBuilder`: `OpenCodePromptRequestBuilder` 实例，负责 SDK prompt parameters、legacy request body 与 shared prompt options/variant/output-format/model defaults 的组装。
 - `openCodeEventRuntime`: `OpenCodeEventSubscriptionCoordinator` 实例，负责 open-code event listener registry、`event` / `global` 订阅生命周期，以及 catalog-relevant payload 到 `catalogState` 的刷新/广播触发。
 - `vaultPath`: 用于 SDK `directory` 注入、上下文文件绝对路径解析，以及 `ServerManager` 工作目录设置；OpenCode directory scope 和 context file path 的跨平台规范化委托给 `shared/contextPath`。
@@ -121,29 +123,21 @@
 
 ### Prompt 组装与 SDK/legacy 分流
 
-#### `buildPromptRequestParts()`
+#### Request-part serializer
 
-请求 parts 的组装顺序固定为：
+`OpenCodeContextPartSerializer` 现在统一负责：
 
-1. 当前输入文本
-2. `contextItems`
-3. `images`
+- prompt parts 的顺序组装（输入文本 → `contextItems` → `images`）
+- 本地模式下的 `file://` context URL、selection `source.text`、text MIME 归一化
+- 远程模式下的 synthetic `<obsidian_context>` text part、metadata 与 64 KiB size guard
+- image attachment 的 data URL `file` part
 
-`externalContextPaths` 仍保留在 `QueryOptions` 里，但这里会直接记一条 debug log 后忽略，不再序列化。
+兼容边界保持不变：
 
-#### 上下文 item 的序列化
-
-- 本地模式：
-  - 序列化为 `file` part
-  - `url` 使用 `resolveContextPath()` + `toFileContextUrl()`，Windows vault path 在 macOS/Linux 上也会稳定输出 `file:///C:/vault/...`
-  - 如果是 `selection` 且带 `textSnapshot`，会把选中文本放进 `source.text`
-- 远程模式：
-  - 只允许 text-like MIME
-  - 必须有 `textSnapshot`
-  - 文本大小上限是 `64 * 1024` 字节
-  - 序列化为带 `synthetic: true` 的 `text` part，内容由 `buildObsidianContextTag()` 生成
-
-图片会被追加成 data URL `file` part。
+- `externalContextPaths` 仍只写 debug log 后忽略
+- context tag 文本格式仍由 `buildObsidianContextTag()` 生成
+- Windows vault path normalization 仍通过 `shared/contextPath` 保持跨平台稳定
+- remote mode 继续拒绝 binary context 和超限文本
 
 #### Prompt option builder
 
@@ -159,7 +153,7 @@
 - legacy `/prompt_async` 仍会把 `reasoningEffort` / `thinkingBudget` 写进 `model.options`
 - legacy `/message` 仍保持不写 `model.options`
 
-`OpenCodeService` 现在只保留 transport 分流与 request-part 序列化；R23 之前不会把 context/image parts 也混进这个 builder。
+`OpenCodeService` 现在只保留 transport 分流；request-part serialization 与 prompt option assembly 分别委托给 `OpenCodeContextPartSerializer` 和 `OpenCodePromptRequestBuilder`。
 
 #### 非流式请求
 

@@ -25,9 +25,9 @@
 
 ### 当前基线
 
-- `src/**/*.ts`: 当前共有 306 个 TypeScript 源码模块
+- `src/**/*.ts`: 当前共有 307 个 TypeScript 源码模块
 - `src/style/**/*.css`: 当前共有 17 个样式模块（不含 `src/style/index.css` 聚合入口）
-- `docs/modules/**/*.md`: 当前共有 322 篇模块与基础设施文档
+- `docs/modules/**/*.md`: 当前共有 323 篇模块与基础设施文档
 
 ## 文档结构
 
@@ -48,6 +48,7 @@ docs/modules/
 │   ├── opencode/
 │   │   ├── index.md
 │   │   ├── OpenCodeCatalogStateStore.md
+│   │   ├── OpenCodeContextPartSerializer.md
 │   │   ├── OpenCodeEventSubscriptionCoordinator.md
 │   │   ├── OpenCodePromptRequestBuilder.md
 │   │   ├── OpenCodeService.md
