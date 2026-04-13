@@ -8,7 +8,7 @@
 `QuestionTodoBackgroundTaskRefreshHostAdapter` 把 `OpenCodianView` 里剩余的 question / todo / background-task post-sync host factory 与 service bundle 装配集中到一个模块，专门负责：
 
 - 从更窄的 `QuestionTodoBackgroundTaskRefreshViewHostAdapterHost` 加上 late-bound coordinator / service / bridge ports 组合出完整 `QuestionTodoBackgroundTaskRefreshViewHost`
-- 从单一 `QuestionTodoBackgroundTaskRefreshViewHost` 派生 `QuestionTodoActivationRefreshBridge`、`QuestionTodoStatusRefreshCoordinator`、`PostSyncQuestionTodoRefreshPlanBuilder`、`PostSyncQuestionTodoRefreshFacade`、`VisibleConversationPostSyncStateCoordinator`、`BackgroundTaskPostSyncCoordinator` 六段链路需要的 host 回调，以及 dedicated background-task post-sync refresh port
+- 从单一 `QuestionTodoBackgroundTaskRefreshViewHost` 派生 `QuestionTodoActivationRefreshBridge`、`QuestionTodoStatusRefreshCoordinator`、`PostSyncQuestionTodoRefreshPlanBuilder`、`PostSyncQuestionTodoRefreshFacade`、`BackgroundConversationPostSyncRefreshExecutor`、`VisibleConversationPostSyncStateCoordinator`、`BackgroundTaskPostSyncCoordinator` 七段链路需要的 host 回调，以及 dedicated background-task post-sync refresh port
 - 让 activation-side supplemental refresh 与 post-sync question/todo refresh、background-task rebuild/completion follow-up、visible sync state-commit 与 attention 判定复用同一份 view bridge
 - 在不改变既有 post-sync 语义的前提下，把这组三段 P2 wiring 从 `OpenCodianView` 构造函数与分散 host factory 中迁走
 
@@ -59,16 +59,16 @@ export function createQuestionTodoBackgroundTaskRefreshServices(...): QuestionTo
 
 ### shared service bundle
 
-- `createQuestionTodoBackgroundTaskRefreshServices()` 顺序实例化 `QuestionTodoActivationRefreshBridge` → `QuestionTodoStatusRefreshCoordinator` → `PostSyncQuestionTodoRefreshPlanBuilder` → `PostSyncQuestionTodoRefreshFacade` → `VisibleConversationPostSyncStateCoordinator` → `BackgroundTaskPostSyncCoordinator`
-- `PostSyncQuestionTodoRefreshFacade` 额外接收 dedicated background-task post-sync refresh port，进一步收窄 facade host surface
+- `createQuestionTodoBackgroundTaskRefreshServices()` 顺序实例化 `QuestionTodoActivationRefreshBridge` → `QuestionTodoStatusRefreshCoordinator` → `PostSyncQuestionTodoRefreshPlanBuilder` → `PostSyncQuestionTodoRefreshFacade` → `BackgroundConversationPostSyncRefreshExecutor` → `VisibleConversationPostSyncStateCoordinator` → `BackgroundTaskPostSyncCoordinator`
+- dedicated background-task post-sync refresh port 现在交给 `BackgroundConversationPostSyncRefreshExecutor`，让 visible facade 与 background execution seam 分离
 - `PostSyncQuestionTodoRefreshPlanBuilder` 持有 visible/background session-id 与 signal/background-tab force-refresh policy 选择，避免 facade/coordinator 继续共享低层 policy 组装
 - visible sync 的 current-conversation state commit 现在由 `VisibleConversationPostSyncStateCoordinator` 独立拥有，`BackgroundTaskPostSyncCoordinator` 只接收它的窄 port
-- activation bridge 与五个 post-sync 对象仍保持原有职责边界，但它们的 host wiring 不再散落在 view 构造函数
+- activation bridge 与六个 post-sync 对象仍保持原有职责边界，但它们的 host wiring 不再散落在 view 构造函数
 - 返回值保留 activation bridge、post-sync refresh coordinator、facade 与 post-sync coordinator，方便 `OpenCodianView` 分别把 activation refresh handoff 交给 activation-side wiring，并把 `BackgroundTaskPostSyncCoordinator` 传给 sync bridge
 
 ## 与 `OpenCodianView` 的边界
 
 - `OpenCodianView` 现在只提供更窄的 `QuestionTodoBackgroundTaskRefreshViewHostAdapterHost` 与 collaborator getters，不再直接组装完整 `QuestionTodoBackgroundTaskRefreshViewHost`
 - activation/post-sync 共用的 conversation/runtime writeback host 现在先由 `QuestionTodoBackgroundTaskViewHostFactory` 收束，再交给本模块继续扩成 refresh-side host
-- `QuestionTodoActivationRefreshBridge`、`QuestionTodoStatusRefreshCoordinator`、`PostSyncQuestionTodoRefreshPlanBuilder`、`PostSyncQuestionTodoRefreshFacade`、`VisibleConversationPostSyncStateCoordinator` 与 `BackgroundTaskPostSyncCoordinator` 的业务边界保持分离
+- `QuestionTodoActivationRefreshBridge`、`QuestionTodoStatusRefreshCoordinator`、`PostSyncQuestionTodoRefreshPlanBuilder`、`PostSyncQuestionTodoRefreshFacade`、`BackgroundConversationPostSyncRefreshExecutor`、`VisibleConversationPostSyncStateCoordinator` 与 `BackgroundTaskPostSyncCoordinator` 的业务边界保持分离
 - 这次切片推进的是 master plan 的 P2 `question / todo / background task` lane：继续削弱 `OpenCodianView` 对 question/todo/background-task post-sync wiring 和 visible sync state-commit bridge 的直接 ownership

@@ -8,14 +8,15 @@ import type { BackgroundTaskIndicatorCoordinator } from '../runtime/BackgroundTa
 import type { TabRuntimeStateBridge } from '../runtime/TabRuntimeStateBridge';
 import type { TabId } from '../tabs';
 import {
+  BackgroundConversationPostSyncRefreshExecutor,
+  type BackgroundTaskPostSyncRefreshPort,
+} from './BackgroundConversationPostSyncRefreshExecutor';
+import {
   BackgroundTaskPostSyncCoordinator,
   type BackgroundTaskPostSyncCoordinatorHost,
 } from './BackgroundTaskPostSyncCoordinator';
 import type { BackgroundTaskLiveSignalCoordinator } from './BackgroundTaskLiveSignalCoordinator';
-import {
-  type BackgroundTaskPostSyncRefreshPort,
-  PostSyncQuestionTodoRefreshFacade,
-} from './PostSyncQuestionTodoRefreshFacade';
+import { PostSyncQuestionTodoRefreshFacade } from './PostSyncQuestionTodoRefreshFacade';
 import {
   PostSyncQuestionTodoRefreshPlanBuilder,
   type PostSyncQuestionTodoRefreshPlanBuilderHost,
@@ -280,8 +281,13 @@ export function createQuestionTodoBackgroundTaskRefreshServices(
   const postSyncQuestionTodoRefreshFacade = new PostSyncQuestionTodoRefreshFacade(
     postSyncQuestionTodoRefreshPlanBuilder,
     questionTodoStatusRefreshCoordinator,
-    hosts.backgroundTaskPostSyncRefreshPort,
   );
+  const backgroundConversationPostSyncRefreshExecutor =
+    new BackgroundConversationPostSyncRefreshExecutor(
+      postSyncQuestionTodoRefreshPlanBuilder,
+      questionTodoStatusRefreshCoordinator,
+      hosts.backgroundTaskPostSyncRefreshPort,
+    );
   const visibleConversationPostSyncStateCoordinator =
     new VisibleConversationPostSyncStateCoordinator(
       hosts.visibleConversationPostSyncStateCoordinatorHost,
@@ -289,6 +295,7 @@ export function createQuestionTodoBackgroundTaskRefreshServices(
   const backgroundTaskPostSyncCoordinator = new BackgroundTaskPostSyncCoordinator(
     hosts.backgroundTaskPostSyncCoordinatorHost,
     postSyncQuestionTodoRefreshFacade,
+    backgroundConversationPostSyncRefreshExecutor,
     visibleConversationPostSyncStateCoordinator,
   );
 

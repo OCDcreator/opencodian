@@ -1,5 +1,6 @@
 import type { Conversation } from '../../../core/types';
 import type { TabId } from '../tabs';
+import type { BackgroundConversationPostSyncRefreshExecutor } from './BackgroundConversationPostSyncRefreshExecutor';
 import type { PostSyncQuestionTodoRefreshFacade } from './PostSyncQuestionTodoRefreshFacade';
 import type {
   VisibleConversationPostSyncOutcome,
@@ -15,9 +16,12 @@ export type {
 
 type PostSyncQuestionTodoRefreshPort = Pick<
   PostSyncQuestionTodoRefreshFacade,
+  | 'refreshVisibleConversation'
+>;
+type BackgroundConversationPostSyncRefreshPort = Pick<
+  BackgroundConversationPostSyncRefreshExecutor,
   | 'refreshBackgroundTabConversation'
   | 'refreshSignalSyncedBackgroundConversation'
-  | 'refreshVisibleConversation'
 >;
 type VisibleConversationPostSyncStatePort = Pick<
   VisibleConversationPostSyncStateCoordinator,
@@ -60,6 +64,8 @@ export class BackgroundTaskPostSyncCoordinator {
   constructor(
     private readonly host: BackgroundTaskPostSyncCoordinatorHost,
     private readonly postSyncQuestionTodoRefreshFacade: PostSyncQuestionTodoRefreshPort,
+    private readonly backgroundConversationPostSyncRefresh:
+      BackgroundConversationPostSyncRefreshPort,
     private readonly visibleConversationPostSyncState: VisibleConversationPostSyncStatePort,
   ) {}
 
@@ -80,7 +86,7 @@ export class BackgroundTaskPostSyncCoordinator {
 
   async handleSignalSyncComplete(options: SignalBackgroundTaskPostSyncOptions): Promise<void> {
     this.host.markBackgroundTaskAuthoritativeSync(options.tabId, `sync-event:${options.reason}`);
-    await this.postSyncQuestionTodoRefreshFacade.refreshSignalSyncedBackgroundConversation({
+    await this.backgroundConversationPostSyncRefresh.refreshSignalSyncedBackgroundConversation({
       tabId: options.tabId,
       conversation: options.conversation,
       tabHasBackgroundTask: options.tabHasBackgroundTask,
@@ -92,7 +98,7 @@ export class BackgroundTaskPostSyncCoordinator {
   }
 
   async handleBackgroundTabSyncComplete(options: BackgroundTabPostSyncOptions): Promise<void> {
-    await this.postSyncQuestionTodoRefreshFacade.refreshBackgroundTabConversation({
+    await this.backgroundConversationPostSyncRefresh.refreshBackgroundTabConversation({
       tabId: options.tabId,
       conversation: options.conversation,
     });
