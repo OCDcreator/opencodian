@@ -33,5 +33,5 @@ export function createVisibleConversationPostSyncStateServices(...): VisibleConv
 
 ## 与 `OpenCodianView` 的边界
 
-- `OpenCodianView` 现在只提供 `QuestionTodoBackgroundTaskRuntimeViewHostFactoryHost` 的 grouped ports；共享的 question/todo/background-task view host 先由 `QuestionTodoBackgroundTaskRuntimeViewHostFactory` 组装，再把 visible current-conversation writeback 交给本模块装配
+- `OpenCodianView` 现在只提供 `QuestionTodoBackgroundTaskRuntimeServiceBundleHost` 的扁平 runtime seam；共享的 question/todo/background-task view host 先由 `QuestionTodoBackgroundTaskRuntimeServiceBundle` 组装，再把 visible current-conversation writeback 交给本模块装配
 - 这次切片继续推进 master plan 的 P2 `question / todo / background task` lane，减少 generic refresh adapter 对 visible state writeback 的 ownership

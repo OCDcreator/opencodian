@@ -7,7 +7,7 @@
 
 `BackgroundConversationPostSyncHandoffHostAdapter` 把 background-task post-sync handoff 所需的 host assembly 从 `QuestionTodoBackgroundTaskRefreshHostAdapter` 中拆出，专门负责：
 
-- 从 `QuestionTodoBackgroundTaskRuntimeViewHostFactory` 提供的窄 `syncBackgroundTaskStateFromConversation()` seam 与 late-bound background indicator / live-signal / tab-runtime bridge ports 组合出 dedicated background handoff view host
+- 从 `QuestionTodoBackgroundTaskRuntimeServiceBundle` 组装的窄 `syncBackgroundTaskStateFromConversation()` seam 与 late-bound background indicator / live-signal / tab-runtime bridge ports 组合出 dedicated background handoff view host
 - 为 `BackgroundConversationPostSyncRefreshExecutor`、`BackgroundConversationSignalSyncStateCoordinator` 与 `BackgroundConversationAttentionCoordinator` 派生各自需要的 host 回调
 - 统一装配 `BackgroundConversationPostSyncHandoffCoordinator`，让 signal/background-tab post-sync handoff 的 host wiring 留在 single-purpose 模块里
 

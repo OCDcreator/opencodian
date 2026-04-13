@@ -285,10 +285,8 @@ import {
 } from './services/QuestionRuntimeViewHostFactory';
 import {
   createQuestionTodoBackgroundTaskRuntimeServiceBundle,
+  type QuestionTodoBackgroundTaskRuntimeServiceBundleHost,
 } from './services/QuestionTodoBackgroundTaskRuntimeServiceBundle';
-import {
-  type QuestionTodoBackgroundTaskRuntimeHostProviderHost,
-} from './services/QuestionTodoBackgroundTaskRuntimeHostProvider';
 import {
   createTabConversationSyncFingerprintRuntimePort,
   type TabConversationSyncFingerprintPortProviderHost,
@@ -1139,7 +1137,7 @@ export class OpenCodianView extends ItemView {
       questionTodoActivationRefreshCoordinator,
       backgroundTaskActivationIndicatorCoordinator,
     } = createQuestionTodoBackgroundTaskRuntimeServiceBundle(
-      this.createQuestionTodoBackgroundTaskRuntimeHostProviderHost(),
+      this.createQuestionTodoBackgroundTaskRuntimeServiceBundleHost(),
     );
     this.activeTabContextUsageCoordinator = new ActiveTabContextUsageCoordinator(
       this.createActiveTabContextUsageCoordinatorHost(),
@@ -1395,8 +1393,8 @@ export class OpenCodianView extends ItemView {
     };
   }
 
-  private createQuestionTodoBackgroundTaskRuntimeHostProviderHost():
-    QuestionTodoBackgroundTaskRuntimeHostProviderHost {
+  private createQuestionTodoBackgroundTaskRuntimeServiceBundleHost():
+    QuestionTodoBackgroundTaskRuntimeServiceBundleHost {
     return {
       getCurrentConversation: () => this.currentConversation,
       setCurrentConversationRevertState: (revertState) => {

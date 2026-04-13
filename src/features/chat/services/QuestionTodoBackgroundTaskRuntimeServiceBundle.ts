@@ -1,20 +1,29 @@
 import {
+  createQuestionTodoBackgroundTaskActivationViewHostAdapter,
   createQuestionTodoBackgroundTaskActivationServices,
+  type QuestionTodoBackgroundTaskActivationViewHost,
+  type QuestionTodoBackgroundTaskActivationViewHostAdapterDependencies,
+  type QuestionTodoBackgroundTaskActivationViewHostAdapterHost,
   type QuestionTodoBackgroundTaskActivationServices,
 } from './QuestionTodoBackgroundTaskActivationHostAdapter';
 import {
+  createQuestionTodoBackgroundTaskRefreshViewHostAdapter,
   createQuestionTodoBackgroundTaskRefreshServices,
+  type QuestionTodoBackgroundTaskRefreshViewHost,
+  type QuestionTodoBackgroundTaskRefreshViewHostAdapterDependencies,
+  type QuestionTodoBackgroundTaskRefreshViewHostAdapterHost,
   type QuestionTodoBackgroundTaskRefreshServices,
 } from './QuestionTodoBackgroundTaskRefreshHostAdapter';
 import {
-  createQuestionTodoBackgroundTaskRuntimeViewHostFactoryHost,
-  type QuestionTodoBackgroundTaskRuntimeHostProviderHost,
-} from './QuestionTodoBackgroundTaskRuntimeHostProvider';
-import {
-  createQuestionTodoBackgroundTaskRuntimeViewHosts,
-} from './QuestionTodoBackgroundTaskRuntimeViewHostFactory';
+  createBackgroundConversationPostSyncHandoffViewHostAdapter,
+  type BackgroundConversationPostSyncHandoffViewHost,
+  type BackgroundConversationPostSyncHandoffViewHostAdapterDependencies,
+  type BackgroundConversationPostSyncHandoffViewHostAdapterHost,
+} from './BackgroundConversationPostSyncHandoffHostAdapter';
+import type { TabConversationSyncFingerprintRuntimePort } from './TabConversationSyncFingerprintPortProvider';
 import {
   createVisibleConversationPostSyncStateServices,
+  type VisibleConversationPostSyncStateViewHost,
 } from './VisibleConversationPostSyncStateHostAdapter';
 
 export interface QuestionTodoBackgroundTaskRuntimeServiceBundle
@@ -29,12 +38,153 @@ export interface QuestionTodoBackgroundTaskRuntimeServiceBundle
       | 'backgroundTaskActivationIndicatorCoordinator'
     > {}
 
+type QuestionTodoBackgroundTaskConversationSyncRuntimePort = Pick<
+  TabConversationSyncFingerprintRuntimePort,
+  'setTabConversationSyncFingerprint'
+>;
+type QuestionTodoBackgroundTaskRefreshRuntimePort =
+  Pick<QuestionTodoBackgroundTaskRefreshViewHostAdapterHost, 'getTabRuntimeState'>
+  & Pick<QuestionTodoBackgroundTaskActivationViewHostAdapterHost, 'renderSessionTodoDock'>
+  & {
+    getQuestionDockCoordinator(): ReturnType<
+      QuestionTodoBackgroundTaskRefreshViewHostAdapterDependencies['getQuestionDockCoordinator']
+    >;
+    getSessionTodoStateService(): ReturnType<
+      QuestionTodoBackgroundTaskRefreshViewHostAdapterDependencies['getSessionTodoStateService']
+    >;
+    getSessionTodoStatusRefreshService(): ReturnType<
+      QuestionTodoBackgroundTaskRefreshViewHostAdapterDependencies['getSessionTodoStatusRefreshService']
+    >;
+  };
+type QuestionTodoBackgroundTaskActivationWritebackPort = {
+  getQuestionDockSlotCoordinator(): ReturnType<
+    QuestionTodoBackgroundTaskActivationViewHostAdapterDependencies['getQuestionDockSlotCoordinator']
+  >;
+  getSessionTodoDockCoordinator(): ReturnType<
+    QuestionTodoBackgroundTaskActivationViewHostAdapterDependencies['getSessionTodoDockCoordinator']
+  >;
+};
+type QuestionTodoBackgroundTaskBackgroundRuntimePort = Pick<
+  QuestionTodoBackgroundTaskActivationViewHostAdapterHost,
+  | 'resetBackgroundTaskIndicator'
+  | 'syncBackgroundTaskStateFromConversation'
+  | 'renderBackgroundTaskIndicatorIfNeeded'
+> & {
+  getBackgroundTaskIndicatorCoordinator(): ReturnType<
+    BackgroundConversationPostSyncHandoffViewHostAdapterDependencies['getBackgroundTaskIndicatorCoordinator']
+  >;
+  getBackgroundTaskLiveSignalCoordinator(): ReturnType<
+    BackgroundConversationPostSyncHandoffViewHostAdapterDependencies['getBackgroundTaskLiveSignalCoordinator']
+  >;
+  getTabRuntimeStateBridge(): ReturnType<
+    BackgroundConversationPostSyncHandoffViewHostAdapterDependencies['getTabRuntimeStateBridge']
+  >;
+};
+type SharedQuestionTodoBackgroundTaskViewHost =
+  VisibleConversationPostSyncStateViewHost
+  & QuestionTodoBackgroundTaskRefreshViewHostAdapterHost
+  & QuestionTodoBackgroundTaskActivationViewHostAdapterHost
+  & BackgroundConversationPostSyncHandoffViewHostAdapterHost;
+
+export interface QuestionTodoBackgroundTaskRuntimeServiceBundleHost {
+  getCurrentConversation: VisibleConversationPostSyncStateViewHost['getCurrentConversation'];
+  setCurrentConversationRevertState:
+    VisibleConversationPostSyncStateViewHost['setCurrentConversationRevertState'];
+  getConversationSyncRuntime(): QuestionTodoBackgroundTaskConversationSyncRuntimePort;
+  getTabRuntimeState:
+    QuestionTodoBackgroundTaskRefreshRuntimePort['getTabRuntimeState'];
+  renderSessionTodoDock:
+    QuestionTodoBackgroundTaskRefreshRuntimePort['renderSessionTodoDock'];
+  getQuestionDockCoordinator:
+    QuestionTodoBackgroundTaskRefreshRuntimePort['getQuestionDockCoordinator'];
+  getSessionTodoStateService:
+    QuestionTodoBackgroundTaskRefreshRuntimePort['getSessionTodoStateService'];
+  getSessionTodoStatusRefreshService:
+    QuestionTodoBackgroundTaskRefreshRuntimePort['getSessionTodoStatusRefreshService'];
+  getQuestionDockSlotCoordinator:
+    QuestionTodoBackgroundTaskActivationWritebackPort['getQuestionDockSlotCoordinator'];
+  getSessionTodoDockCoordinator:
+    QuestionTodoBackgroundTaskActivationWritebackPort['getSessionTodoDockCoordinator'];
+  resetBackgroundTaskIndicator:
+    QuestionTodoBackgroundTaskBackgroundRuntimePort['resetBackgroundTaskIndicator'];
+  syncBackgroundTaskStateFromConversation:
+    QuestionTodoBackgroundTaskBackgroundRuntimePort['syncBackgroundTaskStateFromConversation'];
+  renderBackgroundTaskIndicatorIfNeeded:
+    QuestionTodoBackgroundTaskBackgroundRuntimePort['renderBackgroundTaskIndicatorIfNeeded'];
+  getBackgroundTaskIndicatorCoordinator:
+    QuestionTodoBackgroundTaskBackgroundRuntimePort['getBackgroundTaskIndicatorCoordinator'];
+  getBackgroundTaskLiveSignalCoordinator:
+    QuestionTodoBackgroundTaskBackgroundRuntimePort['getBackgroundTaskLiveSignalCoordinator'];
+  getTabRuntimeStateBridge:
+    QuestionTodoBackgroundTaskBackgroundRuntimePort['getTabRuntimeStateBridge'];
+}
+
+export interface QuestionTodoBackgroundTaskRuntimeViewHosts {
+  visibleConversationPostSyncStateViewHost: VisibleConversationPostSyncStateViewHost;
+  questionTodoBackgroundTaskRefreshViewHost: QuestionTodoBackgroundTaskRefreshViewHost;
+  backgroundConversationPostSyncHandoffViewHost:
+    BackgroundConversationPostSyncHandoffViewHost;
+  questionTodoBackgroundTaskActivationViewHost:
+    QuestionTodoBackgroundTaskActivationViewHost;
+}
+
+export function createQuestionTodoBackgroundTaskRuntimeViewHosts(
+  host: QuestionTodoBackgroundTaskRuntimeServiceBundleHost,
+): QuestionTodoBackgroundTaskRuntimeViewHosts {
+  const sharedViewHost: SharedQuestionTodoBackgroundTaskViewHost = {
+    getCurrentConversation: () => host.getCurrentConversation(),
+    getTabRuntimeState: (tabId) => host.getTabRuntimeState(tabId),
+    setCurrentConversationRevertState: (revertState) => {
+      host.setCurrentConversationRevertState(revertState);
+    },
+    setTabConversationSyncFingerprint: (tabId, fingerprint) => {
+      host.getConversationSyncRuntime().setTabConversationSyncFingerprint(tabId, fingerprint);
+    },
+    renderSessionTodoDock: (tabId) => {
+      host.renderSessionTodoDock(tabId);
+    },
+    resetBackgroundTaskIndicator: () => {
+      host.resetBackgroundTaskIndicator();
+    },
+    syncBackgroundTaskStateFromConversation: (conversation, tabId) => {
+      host.syncBackgroundTaskStateFromConversation(conversation, tabId);
+    },
+    renderBackgroundTaskIndicatorIfNeeded: (tabId) =>
+      host.renderBackgroundTaskIndicatorIfNeeded(tabId),
+  };
+
+  return {
+    visibleConversationPostSyncStateViewHost: sharedViewHost,
+    questionTodoBackgroundTaskRefreshViewHost:
+      createQuestionTodoBackgroundTaskRefreshViewHostAdapter({
+        viewHost: sharedViewHost,
+        getQuestionDockCoordinator: () => host.getQuestionDockCoordinator(),
+        getSessionTodoStateService: () => host.getSessionTodoStateService(),
+        getSessionTodoStatusRefreshService: () =>
+          host.getSessionTodoStatusRefreshService(),
+      }),
+    backgroundConversationPostSyncHandoffViewHost:
+      createBackgroundConversationPostSyncHandoffViewHostAdapter({
+        viewHost: sharedViewHost,
+        getBackgroundTaskIndicatorCoordinator: () =>
+          host.getBackgroundTaskIndicatorCoordinator(),
+        getBackgroundTaskLiveSignalCoordinator: () =>
+          host.getBackgroundTaskLiveSignalCoordinator(),
+        getTabRuntimeStateBridge: () => host.getTabRuntimeStateBridge(),
+      }),
+    questionTodoBackgroundTaskActivationViewHost:
+      createQuestionTodoBackgroundTaskActivationViewHostAdapter({
+        viewHost: sharedViewHost,
+        getQuestionDockSlotCoordinator: () => host.getQuestionDockSlotCoordinator(),
+        getSessionTodoDockCoordinator: () => host.getSessionTodoDockCoordinator(),
+      }),
+  };
+}
+
 export function createQuestionTodoBackgroundTaskRuntimeServiceBundle(
-  host: QuestionTodoBackgroundTaskRuntimeHostProviderHost,
+  host: QuestionTodoBackgroundTaskRuntimeServiceBundleHost,
 ): QuestionTodoBackgroundTaskRuntimeServiceBundle {
-  const runtimeViewHosts = createQuestionTodoBackgroundTaskRuntimeViewHosts(
-    createQuestionTodoBackgroundTaskRuntimeViewHostFactoryHost(host),
-  );
+  const runtimeViewHosts = createQuestionTodoBackgroundTaskRuntimeViewHosts(host);
   const {
     visibleConversationPostSyncStateCoordinator,
   } = createVisibleConversationPostSyncStateServices(

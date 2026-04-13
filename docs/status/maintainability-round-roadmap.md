@@ -20,7 +20,7 @@
 
 ## Queue
 
-### [NEXT] R1 - 收束 P2 runtime provider 链
+### [DONE] R1 - 收束 P2 runtime provider 链
 
 - **Lane**: P2 `question / todo / background task`
 - **目标**: 收束 `QuestionTodoBackgroundTaskRuntimeServiceBundle.ts`、`QuestionTodoBackgroundTaskRuntimeHostProvider.ts`、`QuestionTodoBackgroundTaskRuntimeViewHostFactory.ts` 这条过长转发链，减少 question/todo/background-task 的跨文件跳转层级。
@@ -41,7 +41,7 @@
   - phase 文档说明主调用链少跨了哪些文件。
   - 运行 targeted tests、全量 `npm test`、`npm run build`。
 
-### [QUEUED] R2 - Question dock 生命周期协调
+### [NEXT] R2 - Question dock 生命周期协调
 
 - **Lane**: P2 `question / todo / background task`
 - **目标**: 把 pending requests、draft answers、active indexes、submit/reject 后处理收进一个较厚的 question lifecycle coordinator。

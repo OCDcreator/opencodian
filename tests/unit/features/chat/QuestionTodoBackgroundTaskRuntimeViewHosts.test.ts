@@ -1,16 +1,12 @@
 import type { SessionActivityStatus } from '../../../../src/core/opencode';
-import type {
-  Conversation,
-  QuestionRequest,
-  SessionTodo,
-} from '../../../../src/core/types';
+import type { Conversation, QuestionRequest, SessionTodo } from '../../../../src/core/types';
 import type {
   QuestionTodoStatusRefreshRuntime,
 } from '../../../../src/features/chat/services/QuestionTodoStatusRefreshCoordinator';
 import {
-  createQuestionTodoBackgroundTaskRuntimeViewHostFactoryHost,
-  type QuestionTodoBackgroundTaskRuntimeHostProviderHost,
-} from '../../../../src/features/chat/services/QuestionTodoBackgroundTaskRuntimeHostProvider';
+  createQuestionTodoBackgroundTaskRuntimeViewHosts,
+  type QuestionTodoBackgroundTaskRuntimeServiceBundleHost,
+} from '../../../../src/features/chat/services/QuestionTodoBackgroundTaskRuntimeServiceBundle';
 import type {
   TabConversationSyncFingerprintRuntimePort,
 } from '../../../../src/features/chat/services/TabConversationSyncFingerprintPortProvider';
@@ -23,31 +19,31 @@ type Mocked<T> = {
 };
 
 type QuestionDockCoordinator = ReturnType<
-  QuestionTodoBackgroundTaskRuntimeHostProviderHost['getQuestionDockCoordinator']
+  QuestionTodoBackgroundTaskRuntimeServiceBundleHost['getQuestionDockCoordinator']
 >;
 type SessionTodoStateService = ReturnType<
-  QuestionTodoBackgroundTaskRuntimeHostProviderHost['getSessionTodoStateService']
+  QuestionTodoBackgroundTaskRuntimeServiceBundleHost['getSessionTodoStateService']
 >;
 type SessionTodoStatusRefreshService = ReturnType<
-  QuestionTodoBackgroundTaskRuntimeHostProviderHost['getSessionTodoStatusRefreshService']
+  QuestionTodoBackgroundTaskRuntimeServiceBundleHost['getSessionTodoStatusRefreshService']
 >;
 type QuestionDockSlotCoordinator = ReturnType<
-  QuestionTodoBackgroundTaskRuntimeHostProviderHost['getQuestionDockSlotCoordinator']
+  QuestionTodoBackgroundTaskRuntimeServiceBundleHost['getQuestionDockSlotCoordinator']
 >;
 type SessionTodoDockCoordinator = ReturnType<
-  QuestionTodoBackgroundTaskRuntimeHostProviderHost['getSessionTodoDockCoordinator']
+  QuestionTodoBackgroundTaskRuntimeServiceBundleHost['getSessionTodoDockCoordinator']
 >;
 type BackgroundTaskIndicatorCoordinator = ReturnType<
-  QuestionTodoBackgroundTaskRuntimeHostProviderHost['getBackgroundTaskIndicatorCoordinator']
+  QuestionTodoBackgroundTaskRuntimeServiceBundleHost['getBackgroundTaskIndicatorCoordinator']
 >;
 type BackgroundTaskLiveSignalCoordinator = ReturnType<
-  QuestionTodoBackgroundTaskRuntimeHostProviderHost['getBackgroundTaskLiveSignalCoordinator']
+  QuestionTodoBackgroundTaskRuntimeServiceBundleHost['getBackgroundTaskLiveSignalCoordinator']
 >;
 type TabRuntimeStateBridge = ReturnType<
-  QuestionTodoBackgroundTaskRuntimeHostProviderHost['getTabRuntimeStateBridge']
+  QuestionTodoBackgroundTaskRuntimeServiceBundleHost['getTabRuntimeStateBridge']
 >;
 type ConversationSyncRuntime = ReturnType<
-  QuestionTodoBackgroundTaskRuntimeHostProviderHost['getConversationSyncRuntime']
+  QuestionTodoBackgroundTaskRuntimeServiceBundleHost['getConversationSyncRuntime']
 >;
 
 function createConversation(id: string): Conversation {
@@ -146,7 +142,7 @@ function createFixture() {
   let backgroundTaskLiveSignalCoordinator = createBackgroundTaskLiveSignalCoordinator();
   let tabRuntimeStateBridge = createTabRuntimeStateBridge();
 
-  const host: Mocked<QuestionTodoBackgroundTaskRuntimeHostProviderHost> = {
+  const host: Mocked<QuestionTodoBackgroundTaskRuntimeServiceBundleHost> = {
     getCurrentConversation: jest.fn(() => conversation),
     setCurrentConversationRevertState: jest.fn(),
     getConversationSyncRuntime: jest.fn(() => conversationSyncRuntime),
@@ -205,78 +201,144 @@ function createFixture() {
   };
 }
 
-describe('QuestionTodoBackgroundTaskRuntimeHostProvider', () => {
+describe('QuestionTodoBackgroundTaskRuntimeViewHosts', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
-  it('groups the thin runtime seam into the existing factory host ports', () => {
+  it('derives the shared P2 view hosts directly from the service-bundle host', async () => {
     const fixture = createFixture();
-    const factoryHost = createQuestionTodoBackgroundTaskRuntimeViewHostFactoryHost(
-      fixture.host,
-    );
-    const conversationState = factoryHost.getConversationState();
-    const refreshRuntime = factoryHost.getQuestionTodoRefreshRuntime();
-    const activationWriteback = factoryHost.getQuestionTodoActivationWriteback();
-    const backgroundRuntime = factoryHost.getBackgroundTaskRuntime();
+    const {
+      visibleConversationPostSyncStateViewHost,
+      questionTodoBackgroundTaskRefreshViewHost,
+      backgroundConversationPostSyncHandoffViewHost,
+      questionTodoBackgroundTaskActivationViewHost,
+    } = createQuestionTodoBackgroundTaskRuntimeViewHosts(fixture.host);
     const conversation = createConversation('conversation-next');
 
-    expect(conversationState.getCurrentConversation()).toEqual(
+    expect(visibleConversationPostSyncStateViewHost.getCurrentConversation()).toEqual(
       createConversation('conversation-active'),
     );
-    conversationState.setCurrentConversationRevertState({ messageID: 'message-1' });
-    conversationState.setTabConversationSyncFingerprint('tab-active', 'fingerprint-next');
+    visibleConversationPostSyncStateViewHost.setCurrentConversationRevertState({
+      messageID: 'message-1',
+    });
+    visibleConversationPostSyncStateViewHost.setTabConversationSyncFingerprint(
+      'tab-active',
+      'fingerprint-next',
+    );
 
-    expect(refreshRuntime.getTabRuntimeState('tab-active')).toBe(
+    expect(questionTodoBackgroundTaskRefreshViewHost.getCurrentConversation()).toEqual(
+      createConversation('conversation-active'),
+    );
+    expect(questionTodoBackgroundTaskRefreshViewHost.getTabRuntimeState('tab-active')).toBe(
       fixture.host.getTabRuntimeState.mock.results[0].value,
     );
-    refreshRuntime.renderSessionTodoDock('tab-active');
-    expect(refreshRuntime.getQuestionDockCoordinator())
-      .toBe(fixture.host.getQuestionDockCoordinator.mock.results[0].value);
-    expect(refreshRuntime.getSessionTodoStateService())
-      .toBe(fixture.host.getSessionTodoStateService.mock.results[0].value);
-    expect(refreshRuntime.getSessionTodoStatusRefreshService())
-      .toBe(fixture.host.getSessionTodoStatusRefreshService.mock.results[0].value);
+    expect(
+      questionTodoBackgroundTaskRefreshViewHost.hasIncompleteTodos([
+        { id: 'todo-1', content: 'Todo', status: 'pending' },
+      ]),
+    ).toBe(true);
+    await questionTodoBackgroundTaskRefreshViewHost.refreshPendingQuestionsForTab(
+      'tab-active',
+      'session-question',
+    );
+    await questionTodoBackgroundTaskRefreshViewHost.refreshTabSessionStatus(
+      'tab-active',
+      'session-status',
+      { suppressErrors: true },
+    );
+    await questionTodoBackgroundTaskRefreshViewHost.refreshTabSessionTodos(
+      'tab-active',
+      'session-status',
+      { suppressErrors: true },
+    );
 
-    expect(activationWriteback.getQuestionDockSlotCoordinator())
-      .toBe(fixture.host.getQuestionDockSlotCoordinator.mock.results[0].value);
-    expect(activationWriteback.getSessionTodoDockCoordinator())
-      .toBe(fixture.host.getSessionTodoDockCoordinator.mock.results[0].value);
+    backgroundConversationPostSyncHandoffViewHost.syncBackgroundTaskStateFromConversation(
+      conversation,
+      'tab-active',
+    );
+    await backgroundConversationPostSyncHandoffViewHost.flushBackgroundTaskPostSyncWriteback(
+      'tab-active',
+      conversation,
+    );
+    backgroundConversationPostSyncHandoffViewHost.markBackgroundTaskAuthoritativeSync(
+      'tab-active',
+      'session.diff',
+    );
+    backgroundConversationPostSyncHandoffViewHost.setTabNeedsAttention('tab-active', true);
 
-    backgroundRuntime.resetBackgroundTaskIndicator();
-    backgroundRuntime.syncBackgroundTaskStateFromConversation(conversation, 'tab-active');
-    void backgroundRuntime.renderBackgroundTaskIndicatorIfNeeded('tab-active');
-    expect(backgroundRuntime.getBackgroundTaskIndicatorCoordinator())
-      .toBe(fixture.host.getBackgroundTaskIndicatorCoordinator.mock.results[0].value);
-    expect(backgroundRuntime.getBackgroundTaskLiveSignalCoordinator())
-      .toBe(fixture.host.getBackgroundTaskLiveSignalCoordinator.mock.results[0].value);
-    expect(backgroundRuntime.getTabRuntimeStateBridge())
-      .toBe(fixture.host.getTabRuntimeStateBridge.mock.results[0].value);
+    expect(questionTodoBackgroundTaskActivationViewHost.getCurrentConversation()).toEqual(
+      createConversation('conversation-active'),
+    );
+    questionTodoBackgroundTaskActivationViewHost.renderQuestionDock();
+    questionTodoBackgroundTaskActivationViewHost.updateSessionTodoDockForTab('tab-active');
+    questionTodoBackgroundTaskActivationViewHost.renderSessionTodoDock('tab-active');
+    questionTodoBackgroundTaskActivationViewHost.resetBackgroundTaskIndicator();
+    questionTodoBackgroundTaskActivationViewHost.syncBackgroundTaskStateFromConversation(
+      conversation,
+      'tab-active',
+    );
+    await questionTodoBackgroundTaskActivationViewHost.renderBackgroundTaskIndicatorIfNeeded(
+      'tab-active',
+    );
 
-    expect(fixture.host.getCurrentConversation).toHaveBeenCalledTimes(1);
     expect(fixture.host.setCurrentConversationRevertState).toHaveBeenCalledWith({
       messageID: 'message-1',
     });
     expect(fixture.host.getConversationSyncRuntime().setTabConversationSyncFingerprint)
       .toHaveBeenCalledWith('tab-active', 'fingerprint-next');
     expect(fixture.host.getTabRuntimeState).toHaveBeenCalledWith('tab-active');
+    expect(
+      fixture.host.getQuestionDockCoordinator.mock.results[0].value.refreshPendingQuestionsForTab,
+    ).toHaveBeenCalledWith('tab-active', 'session-question');
+    expect(
+      fixture.host.getSessionTodoStateService.mock.results[0].value.hasIncompleteTodos,
+    ).toHaveBeenCalledWith([
+      { id: 'todo-1', content: 'Todo', status: 'pending' },
+    ]);
+    expect(
+      fixture.host.getSessionTodoStatusRefreshService.mock.results[0].value.refreshTabSessionStatus,
+    ).toHaveBeenCalledWith('tab-active', 'session-status', { suppressErrors: true });
+    expect(
+      fixture.host.getSessionTodoStatusRefreshService.mock.results[1].value.refreshTabSessionTodos,
+    ).toHaveBeenCalledWith('tab-active', 'session-status', { suppressErrors: true });
+    expect(fixture.host.syncBackgroundTaskStateFromConversation)
+      .toHaveBeenNthCalledWith(1, conversation, 'tab-active');
+    expect(
+      fixture
+        .host
+        .getBackgroundTaskIndicatorCoordinator
+        .mock
+        .results[0]
+        .value
+        .flushCompletionNoticesAndSyncStreamLikeState,
+    ).toHaveBeenCalledWith('tab-active', conversation);
+    expect(
+      fixture.host.getBackgroundTaskLiveSignalCoordinator.mock.results[0].value.markAuthoritativeSync,
+    ).toHaveBeenCalledWith('tab-active', 'session.diff');
+    expect(
+      fixture.host.getTabRuntimeStateBridge.mock.results[0].value.setNeedsAttention,
+    ).toHaveBeenCalledWith('tab-active', true);
+    expect(fixture.host.getQuestionDockSlotCoordinator.mock.results[0].value.render)
+      .toHaveBeenCalledTimes(1);
+    expect(fixture.host.getSessionTodoDockCoordinator.mock.results[0].value.updateForTab)
+      .toHaveBeenCalledWith('tab-active');
     expect(fixture.host.renderSessionTodoDock).toHaveBeenCalledWith('tab-active');
     expect(fixture.host.resetBackgroundTaskIndicator).toHaveBeenCalledTimes(1);
     expect(fixture.host.syncBackgroundTaskStateFromConversation)
-      .toHaveBeenCalledWith(conversation, 'tab-active');
+      .toHaveBeenNthCalledWith(2, conversation, 'tab-active');
     expect(fixture.host.renderBackgroundTaskIndicatorIfNeeded)
       .toHaveBeenCalledWith('tab-active');
   });
 
-  it('keeps the grouped ports late-bound to the latest runtime collaborators', () => {
+  it('keeps the shared view hosts late-bound to the latest runtime collaborators', async () => {
     const fixture = createFixture();
-    const factoryHost = createQuestionTodoBackgroundTaskRuntimeViewHostFactoryHost(
-      fixture.host,
-    );
-    const conversationState = factoryHost.getConversationState();
-    const refreshRuntime = factoryHost.getQuestionTodoRefreshRuntime();
-    const activationWriteback = factoryHost.getQuestionTodoActivationWriteback();
-    const backgroundRuntime = factoryHost.getBackgroundTaskRuntime();
+    const {
+      visibleConversationPostSyncStateViewHost,
+      questionTodoBackgroundTaskRefreshViewHost,
+      backgroundConversationPostSyncHandoffViewHost,
+      questionTodoBackgroundTaskActivationViewHost,
+    } = createQuestionTodoBackgroundTaskRuntimeViewHosts(fixture.host);
     const nextConversation = createConversation('conversation-next');
     const nextRuntime = createRuntime({
       sessionTodos: [{ id: 'todo-2', content: 'Next', status: 'pending' }],
@@ -305,23 +367,48 @@ describe('QuestionTodoBackgroundTaskRuntimeHostProvider', () => {
     fixture.setBackgroundTaskLiveSignalCoordinator(nextBackgroundTaskLiveSignalCoordinator);
     fixture.setTabRuntimeStateBridge(nextTabRuntimeStateBridge);
 
-    expect(conversationState.getCurrentConversation()).toEqual(nextConversation);
-    conversationState.setTabConversationSyncFingerprint('tab-next', 'fingerprint-late');
-    expect(refreshRuntime.getTabRuntimeState('tab-next')).toBe(nextRuntime);
-    expect(refreshRuntime.getQuestionDockCoordinator()).toBe(nextQuestionDockCoordinator);
-    expect(refreshRuntime.getSessionTodoStateService()).toBe(nextSessionTodoStateService);
-    expect(refreshRuntime.getSessionTodoStatusRefreshService())
-      .toBe(nextSessionTodoStatusRefreshService);
-    expect(activationWriteback.getQuestionDockSlotCoordinator())
-      .toBe(nextQuestionDockSlotCoordinator);
-    expect(activationWriteback.getSessionTodoDockCoordinator())
-      .toBe(nextSessionTodoDockCoordinator);
-    expect(backgroundRuntime.getBackgroundTaskIndicatorCoordinator())
-      .toBe(nextBackgroundTaskIndicatorCoordinator);
-    expect(backgroundRuntime.getBackgroundTaskLiveSignalCoordinator())
-      .toBe(nextBackgroundTaskLiveSignalCoordinator);
-    expect(backgroundRuntime.getTabRuntimeStateBridge()).toBe(nextTabRuntimeStateBridge);
+    expect(visibleConversationPostSyncStateViewHost.getCurrentConversation()).toEqual(
+      nextConversation,
+    );
+    visibleConversationPostSyncStateViewHost.setTabConversationSyncFingerprint(
+      'tab-next',
+      'fingerprint-late',
+    );
+    expect(questionTodoBackgroundTaskRefreshViewHost.getTabRuntimeState('tab-next')).toBe(
+      nextRuntime,
+    );
+    expect(questionTodoBackgroundTaskRefreshViewHost.getCurrentConversation()).toEqual(
+      nextConversation,
+    );
+    expect(
+      questionTodoBackgroundTaskRefreshViewHost.hasIncompleteTodos([
+        { id: 'todo-2', content: 'Next', status: 'pending' },
+      ]),
+    ).toBe(true);
+    await questionTodoBackgroundTaskRefreshViewHost.refreshPendingQuestionsForTab(
+      'tab-next',
+      'session-question-next',
+    );
+    await questionTodoBackgroundTaskRefreshViewHost.refreshTabSessionTodos(
+      'tab-next',
+      'session-next',
+      { suppressErrors: true },
+    );
+    questionTodoBackgroundTaskActivationViewHost.renderQuestionDock();
+    backgroundConversationPostSyncHandoffViewHost.markBackgroundTaskAuthoritativeSync(
+      'tab-next',
+      'message.updated',
+    );
+
     expect(nextConversationSyncRuntime.setTabConversationSyncFingerprint)
       .toHaveBeenCalledWith('tab-next', 'fingerprint-late');
+    expect(nextQuestionDockCoordinator.refreshPendingQuestionsForTab)
+      .toHaveBeenCalledWith('tab-next', 'session-question-next');
+    expect(fixture.host.getSessionTodoStateService).toHaveBeenCalledTimes(1);
+    expect(nextSessionTodoStatusRefreshService.refreshTabSessionTodos)
+      .toHaveBeenCalledWith('tab-next', 'session-next', { suppressErrors: true });
+    expect(nextQuestionDockSlotCoordinator.render).toHaveBeenCalledTimes(1);
+    expect(nextBackgroundTaskLiveSignalCoordinator.markAuthoritativeSync)
+      .toHaveBeenCalledWith('tab-next', 'message.updated');
   });
 });

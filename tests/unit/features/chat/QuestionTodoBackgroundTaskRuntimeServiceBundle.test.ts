@@ -8,22 +8,14 @@ import {
 import * as QuestionTodoBackgroundTaskRefreshHostAdapterModule from '../../../../src/features/chat/services/QuestionTodoBackgroundTaskRefreshHostAdapter';
 import {
   createQuestionTodoBackgroundTaskRuntimeServiceBundle,
+  type QuestionTodoBackgroundTaskRuntimeServiceBundleHost,
 } from '../../../../src/features/chat/services/QuestionTodoBackgroundTaskRuntimeServiceBundle';
-import type {
-  QuestionTodoBackgroundTaskRuntimeHostProviderHost,
-} from '../../../../src/features/chat/services/QuestionTodoBackgroundTaskRuntimeHostProvider';
-import * as QuestionTodoBackgroundTaskRuntimeHostProviderModule from '../../../../src/features/chat/services/QuestionTodoBackgroundTaskRuntimeHostProvider';
-import type {
-  QuestionTodoBackgroundTaskRuntimeViewHostFactoryHost,
-  QuestionTodoBackgroundTaskRuntimeViewHosts,
-} from '../../../../src/features/chat/services/QuestionTodoBackgroundTaskRuntimeViewHostFactory';
-import * as QuestionTodoBackgroundTaskRuntimeViewHostFactoryModule from '../../../../src/features/chat/services/QuestionTodoBackgroundTaskRuntimeViewHostFactory';
 import {
   type VisibleConversationPostSyncStateServices,
 } from '../../../../src/features/chat/services/VisibleConversationPostSyncStateHostAdapter';
 import * as VisibleConversationPostSyncStateHostAdapterModule from '../../../../src/features/chat/services/VisibleConversationPostSyncStateHostAdapter';
 
-function createHost(): QuestionTodoBackgroundTaskRuntimeHostProviderHost {
+function createHost(): QuestionTodoBackgroundTaskRuntimeServiceBundleHost {
   return {
     getCurrentConversation: jest.fn(),
     setCurrentConversationRevertState: jest.fn(),
@@ -43,15 +35,6 @@ function createHost(): QuestionTodoBackgroundTaskRuntimeHostProviderHost {
     getBackgroundTaskIndicatorCoordinator: jest.fn(),
     getBackgroundTaskLiveSignalCoordinator: jest.fn(),
     getTabRuntimeStateBridge: jest.fn(),
-  };
-}
-
-function createRuntimeViewHosts(): QuestionTodoBackgroundTaskRuntimeViewHosts {
-  return {
-    visibleConversationPostSyncStateViewHost: {} as QuestionTodoBackgroundTaskRuntimeViewHosts['visibleConversationPostSyncStateViewHost'],
-    questionTodoBackgroundTaskRefreshViewHost: {} as QuestionTodoBackgroundTaskRuntimeViewHosts['questionTodoBackgroundTaskRefreshViewHost'],
-    backgroundConversationPostSyncHandoffViewHost: {} as QuestionTodoBackgroundTaskRuntimeViewHosts['backgroundConversationPostSyncHandoffViewHost'],
-    questionTodoBackgroundTaskActivationViewHost: {} as QuestionTodoBackgroundTaskRuntimeViewHosts['questionTodoBackgroundTaskActivationViewHost'],
   };
 }
 
@@ -88,27 +71,12 @@ describe('QuestionTodoBackgroundTaskRuntimeServiceBundle', () => {
 
   it('assembles the runtime view-host and service layers behind one P2 seam', () => {
     const host = createHost();
-    const factoryHost = {} as QuestionTodoBackgroundTaskRuntimeViewHostFactoryHost;
-    const runtimeViewHosts = createRuntimeViewHosts();
     const visibleConversationPostSyncStateServices =
       createVisibleConversationPostSyncStateServices();
     const questionTodoBackgroundTaskRefreshServices =
       createQuestionTodoBackgroundTaskRefreshServices();
     const questionTodoBackgroundTaskActivationServices =
       createQuestionTodoBackgroundTaskActivationServices();
-    const createRuntimeViewHostFactoryHostSpy = jest
-      .spyOn(
-        QuestionTodoBackgroundTaskRuntimeHostProviderModule,
-        'createQuestionTodoBackgroundTaskRuntimeViewHostFactoryHost',
-      )
-      .mockReturnValue(factoryHost);
-
-    const createRuntimeViewHostsSpy = jest
-      .spyOn(
-        QuestionTodoBackgroundTaskRuntimeViewHostFactoryModule,
-        'createQuestionTodoBackgroundTaskRuntimeViewHosts',
-      )
-      .mockReturnValue(runtimeViewHosts);
     const createVisibleConversationPostSyncStateServicesSpy = jest
       .spyOn(
         VisibleConversationPostSyncStateHostAdapterModule,
@@ -130,18 +98,15 @@ describe('QuestionTodoBackgroundTaskRuntimeServiceBundle', () => {
 
     const bundle = createQuestionTodoBackgroundTaskRuntimeServiceBundle(host);
 
-    expect(createRuntimeViewHostFactoryHostSpy).toHaveBeenCalledWith(host);
-    expect(createRuntimeViewHostsSpy).toHaveBeenCalledWith(factoryHost);
-    expect(createVisibleConversationPostSyncStateServicesSpy).toHaveBeenCalledWith(
-      runtimeViewHosts.visibleConversationPostSyncStateViewHost,
-    );
+    expect(createVisibleConversationPostSyncStateServicesSpy)
+      .toHaveBeenCalledWith(expect.any(Object));
     expect(createQuestionTodoBackgroundTaskRefreshServicesSpy).toHaveBeenCalledWith(
-      runtimeViewHosts.questionTodoBackgroundTaskRefreshViewHost,
-      runtimeViewHosts.backgroundConversationPostSyncHandoffViewHost,
+      expect.any(Object),
+      expect.any(Object),
       visibleConversationPostSyncStateServices.visibleConversationPostSyncStateCoordinator,
     );
     expect(createQuestionTodoBackgroundTaskActivationServicesSpy).toHaveBeenCalledWith(
-      runtimeViewHosts.questionTodoBackgroundTaskActivationViewHost,
+      expect.any(Object),
       questionTodoBackgroundTaskRefreshServices.questionTodoActivationRefreshBridge,
     );
     expect(bundle).toEqual({

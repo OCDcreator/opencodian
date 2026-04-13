@@ -32,13 +32,13 @@ export function createQuestionTodoBackgroundTaskActivationServices(...): Questio
 ## 关键行为
 
 - `createQuestionTodoBackgroundTaskActivationViewHostAdapter()` 把 view-local activation writeback 与 question dock / session todo dock 的 late-bound ports 收敛成单一 activation view host
-- activation-side 现在通常消费 `QuestionTodoBackgroundTaskRuntimeViewHostFactory` 提供的 shared question/todo/background-task view host，这样 current-conversation/background-task rebuild seam 仍能与 post-sync side 共用同一份 view-level host 装配，但不再让 `OpenCodianView` 内联 shared host + adapter 依赖 wiring
+- activation-side 现在通常消费 `QuestionTodoBackgroundTaskRuntimeServiceBundle` 在模块内组装的 shared question/todo/background-task view host，这样 current-conversation/background-task rebuild seam 仍能与 post-sync side 共用同一份 view-level host 装配，但不再让 `OpenCodianView` 内联 shared host + adapter 依赖 wiring
 - `createQuestionTodoBackgroundTaskActivationHosts()` 从同一份 view host 派生 question/todo activation host 与 background-task indicator activation host，避免 `OpenCodianView` 继续维护两段闭包工厂
 - `createQuestionTodoBackgroundTaskActivationServices()` 顺序实例化 `QuestionTodoActivationRefreshCoordinator` 与 `BackgroundTaskActivationIndicatorCoordinator`，同时接收 `QuestionTodoActivationRefreshBridge` 作为独立 activation refresh port
 
 ## 与 `OpenCodianView` 的边界
 
-- `OpenCodianView` 现在只提供 `QuestionTodoBackgroundTaskRuntimeViewHostFactoryHost` 的 grouped ports；shared activation view host 先由 `QuestionTodoBackgroundTaskRuntimeViewHostFactory` 组装，再交给本模块补齐 activation 专属 dock ports
+- `OpenCodianView` 现在只提供 `QuestionTodoBackgroundTaskRuntimeServiceBundleHost` 的扁平 runtime seam；shared activation view host 先由 `QuestionTodoBackgroundTaskRuntimeServiceBundle` 组装，再交给本模块补齐 activation 专属 dock ports
 - activation 与 post-sync 共享的 state writeback seam 不再由 `OpenCodianView` 直接拼接
 - `QuestionTodoActivationRefreshCoordinator` 与 `BackgroundTaskActivationIndicatorCoordinator` 的业务边界保持不变
 - 这次切片推进的是 master plan 的 P2 `question / todo / background task` lane：继续削弱 `OpenCodianView` 对 activation-side wiring 的直接 ownership
