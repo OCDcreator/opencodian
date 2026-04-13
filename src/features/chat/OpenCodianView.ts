@@ -1115,7 +1115,7 @@ export class OpenCodianView extends ItemView {
     const {
       questionTodoActivationRefreshBridge,
       visibleConversationPostSyncCoordinator,
-      backgroundTaskPostSyncCoordinator,
+      backgroundConversationPostSyncHandoffCoordinator,
     } = createQuestionTodoBackgroundTaskRefreshServices(
       createQuestionTodoBackgroundTaskRefreshViewHostAdapter({
         viewHost: questionTodoBackgroundTaskViewHosts.refreshViewHostAdapterHost,
@@ -1190,7 +1190,7 @@ export class OpenCodianView extends ItemView {
     const conversationSyncServices = createConversationSyncServices(
       this.createConversationSyncViewHost(),
       visibleConversationPostSyncCoordinator,
-      backgroundTaskPostSyncCoordinator,
+      backgroundConversationPostSyncHandoffCoordinator,
     );
     this.conversationSyncRuntimeCoordinator = conversationSyncServices.runtimeCoordinator;
     this.conversationSyncOrchestrationService = conversationSyncServices.orchestrationService;

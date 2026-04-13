@@ -14,7 +14,7 @@
 - 轮询时只枚举非活动、仍有 background task、且 runtime 允许发起同步的 tab
 - 把真正的 per-tab runtime lock / fingerprint baseline 继续委托给 `ConversationSyncRuntimeCoordinator`
 
-它不负责 OpenCodeService session sync listener 的生命周期，也不负责 session→tab 匹配；这些入口装配现在交给 `ConversationSyncEventAdapter`。它同样不负责具体的服务端拉取，也不负责 post-sync question/todo/background-task 收尾；这些能力现在分别留在 `ConversationSyncBridge` 与 `BackgroundTaskPostSyncCoordinator`。view-state host 的装配也不再由 `OpenCodianView` 分散维护，而是交给 `ConversationSyncHostAdapter`。
+它不负责 OpenCodeService session sync listener 的生命周期，也不负责 session→tab 匹配；这些入口装配现在交给 `ConversationSyncEventAdapter`。它同样不负责具体的服务端拉取，也不负责 post-sync question/todo/background-task 收尾；这些能力现在分别留在 `ConversationSyncBridge`、`ConversationSyncVisiblePostSyncRouter` 与 `ConversationSyncBackgroundPostSyncRouter`。view-state host 的装配也不再由 `OpenCodianView` 分散维护，而是交给 `ConversationSyncHostAdapter`。
 
 ## 公开接口
 

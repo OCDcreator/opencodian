@@ -7,7 +7,7 @@
 
 `ConversationSyncBackgroundPostSyncRouter` 把 `ConversationSyncBridge` 里 signal/background-tab sync 完成后的 **post-sync option shaping、hidden-tab fingerprint writeback 与 coordinator 路由** 收敛到一个独立模块，专门负责：
 
-- 把 `SignalConversationSyncContext` 组装成 `BackgroundTaskPostSyncCoordinator.handleSignalSyncComplete()` 需要的参数
+- 把 `SignalConversationSyncContext` 组装成 `BackgroundConversationPostSyncHandoffCoordinator.handleSignalSyncComplete()` 需要的参数
 - 在 signal sync 成功后，统一提交 hidden/background tab 的 `lastConversationSyncFingerprint`
 - 把 background-tab polling context 组装成 `handleBackgroundTabSyncComplete()` 所需参数
 
@@ -34,7 +34,7 @@ export class ConversationSyncBackgroundPostSyncRouter {
 
 - 读取目标 tab runtime，并在 sync 成功后写回最新 fingerprint
 - 保留 orchestration/runtime 已经确定好的 `reason`、`activeTabId`、`tabHasBackgroundTask` 与 `previousFingerprint`
-- 再统一转发给 `BackgroundTaskPostSyncCoordinator`
+- 再统一转发给 `BackgroundConversationPostSyncHandoffCoordinator`
 
 ### background-tab polling routing
 
@@ -44,5 +44,5 @@ export class ConversationSyncBackgroundPostSyncRouter {
 ## 与相邻模块的边界
 
 - `ConversationSyncBridge`：负责发起 sync、绑定 server-sync reason，并把 background/signal post-sync 委托给 router
-- `BackgroundTaskPostSyncCoordinator`：负责 question/todo/background-task 的 post-sync 收尾
+- `BackgroundConversationPostSyncHandoffCoordinator`：负责 hidden/background sync 完成后的 signal state、question/todo/background-task refresh 与 attention handoff
 - `ConversationSyncRuntimeCoordinator` / `ConversationSyncOrchestrationService`：继续负责 sync guard、tab 选择与 signal dispatch

@@ -461,7 +461,7 @@ describe('QuestionTodoBackgroundTaskRefreshHostAdapter', () => {
     });
   });
 
-  it('wires signal-sync refresh through the shared post-sync bundle', async () => {
+  it('wires signal-sync refresh through the shared handoff bundle', async () => {
     const conversation = createConversation('conversation-bg');
     const viewHost = createViewHost({
       currentConversation: createConversation('conversation-active'),
@@ -472,7 +472,7 @@ describe('QuestionTodoBackgroundTaskRefreshHostAdapter', () => {
 
     const services = createQuestionTodoBackgroundTaskRefreshServices(viewHost);
 
-    await services.backgroundTaskPostSyncCoordinator.handleSignalSyncComplete({
+    await services.backgroundConversationPostSyncHandoffCoordinator.handleSignalSyncComplete({
       tabId: 'tab-bg',
       conversation,
       reason: 'session.diff',

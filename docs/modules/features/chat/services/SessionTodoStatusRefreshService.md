@@ -12,7 +12,7 @@
 - 在刷新成功后统一写回 `SessionTodoStateService` 持有的 snapshot/status runtime
 - 把刷新后的 foreground reconcile 直接交给 `BackgroundTaskLiveSignalCoordinator`
 
-它不拥有 dock state、stale notice 规则或 question/background-task activation/post-sync 编排；这些仍分别留给 `SessionTodoStateService`、`QuestionDockCoordinator`、`QuestionTodoActivationRefreshBridge`、`QuestionTodoStatusRefreshCoordinator`、`BackgroundTaskPostSyncCoordinator` 与相关 bridge/coordinator。它只承接“主动刷新一次 session todo/status”的稳定边界。
+它不拥有 dock state、stale notice 规则或 question/background-task activation/post-sync 编排；这些仍分别留给 `SessionTodoStateService`、`QuestionDockCoordinator`、`QuestionTodoActivationRefreshBridge`、`QuestionTodoStatusRefreshCoordinator`、`VisibleConversationPostSyncCoordinator`、`BackgroundConversationPostSyncRefreshExecutor` 与相关 bridge/coordinator。它只承接“主动刷新一次 session todo/status”的稳定边界。
 
 ## 公开接口
 
@@ -47,6 +47,6 @@ export class SessionTodoStatusRefreshService {
 - `SessionTodoHostAdapter` 现在负责把 `OpenCodianView` 的单一 session todo host 装配成 refresh service 需要的 host 形状，并复用同一份 `SessionTodoStateService` / `SessionTodoDockCoordinator`
 - `OpenCodianView` 现在只负责提供 tab runtime、session 选择、OpenCode API 与 background-task reconcile 这份 shared host
 - `QuestionTodoActivationRefreshBridge` 与 `QuestionTodoStatusRefreshCoordinator` 会把本 service 与 `QuestionDockCoordinator` 组合起来，分别承接 activation/open 与 post-sync 场景的 status + pending-question + todo 刷新顺序
-- `TabViewActivationBridge`、`BackgroundTaskPostSyncCoordinator`、`BackgroundTaskStreamTriggerCoordinator`、`QuestionDockCoordinator`、`MessageFinalizationService` 与 view 自身的 open-conversation fast path，都会复用同一份 refresh service，而不是继续各自回调 view 内联实现
+- `TabViewActivationBridge`、`VisibleConversationPostSyncCoordinator`、`BackgroundConversationPostSyncRefreshExecutor`、`BackgroundTaskStreamTriggerCoordinator`、`QuestionDockCoordinator`、`MessageFinalizationService` 与 view 自身的 open-conversation fast path，都会复用同一份 refresh service，而不是继续各自回调 view 内联实现
 - `SessionTodoStateService` 继续负责 todo/status runtime 的纯状态机、stale suppression 与 persisted notice 协调；refresh service 不接管这些规则
 - 这条边界推进的是 master plan 的 P2 `question / todo / background task` lane：把 `OpenCodianView` 里仍然耦合在一起的 todo/status refresh ownership 迁到可复用 service

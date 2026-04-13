@@ -1,11 +1,11 @@
 import type { Conversation } from '../../../../src/core/types';
 import {
   ConversationSyncBackgroundPostSyncRouter,
-  type ConversationSyncBackgroundPostSyncCoordinator,
+  type ConversationSyncBackgroundPostSyncHandoffPort,
   type ConversationSyncBackgroundPostSyncRouterHost,
   type ConversationSyncBackgroundPostSyncRouterRuntime,
 } from '../../../../src/features/chat/services/ConversationSyncBackgroundPostSyncRouter';
-import type { BackgroundTaskPostSyncResult } from '../../../../src/features/chat/services/BackgroundTaskPostSyncCoordinator';
+import type { BackgroundTaskPostSyncResult } from '../../../../src/features/chat/services/BackgroundConversationPostSyncHandoffCoordinator';
 
 type Mocked<T> = {
   [Key in keyof T]:
@@ -55,7 +55,7 @@ function createHost(options?: {
   };
 }
 
-function createCoordinator(): Mocked<ConversationSyncBackgroundPostSyncCoordinator> {
+function createCoordinator(): Mocked<ConversationSyncBackgroundPostSyncHandoffPort> {
   return {
     handleSignalSyncComplete: jest.fn().mockResolvedValue(undefined),
     handleBackgroundTabSyncComplete: jest.fn().mockResolvedValue(undefined),

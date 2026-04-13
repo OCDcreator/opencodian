@@ -22,9 +22,6 @@ import {
   BackgroundConversationSignalSyncStateCoordinator,
   type BackgroundConversationSignalSyncStateCoordinatorHost,
 } from './BackgroundConversationSignalSyncStateCoordinator';
-import {
-  BackgroundTaskPostSyncCoordinator,
-} from './BackgroundTaskPostSyncCoordinator';
 import type { BackgroundTaskLiveSignalCoordinator } from './BackgroundTaskLiveSignalCoordinator';
 import { PostSyncQuestionTodoRefreshFacade } from './PostSyncQuestionTodoRefreshFacade';
 import {
@@ -205,7 +202,8 @@ export interface QuestionTodoBackgroundTaskRefreshServices {
   questionTodoStatusRefreshCoordinator: QuestionTodoStatusRefreshCoordinator;
   postSyncQuestionTodoRefreshFacade: PostSyncQuestionTodoRefreshFacade;
   visibleConversationPostSyncCoordinator: VisibleConversationPostSyncCoordinator;
-  backgroundTaskPostSyncCoordinator: BackgroundTaskPostSyncCoordinator;
+  backgroundConversationPostSyncHandoffCoordinator:
+    BackgroundConversationPostSyncHandoffCoordinator;
 }
 
 export function createQuestionTodoBackgroundTaskRefreshHosts(
@@ -329,15 +327,11 @@ export function createQuestionTodoBackgroundTaskRefreshServices(
       backgroundConversationSignalSyncStateCoordinator,
       backgroundConversationAttentionCoordinator,
     );
-  const backgroundTaskPostSyncCoordinator = new BackgroundTaskPostSyncCoordinator(
-    backgroundConversationPostSyncHandoffCoordinator,
-  );
-
   return {
     questionTodoActivationRefreshBridge,
     questionTodoStatusRefreshCoordinator,
     postSyncQuestionTodoRefreshFacade,
     visibleConversationPostSyncCoordinator,
-    backgroundTaskPostSyncCoordinator,
+    backgroundConversationPostSyncHandoffCoordinator,
   };
 }

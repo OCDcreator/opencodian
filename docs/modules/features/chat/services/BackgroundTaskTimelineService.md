@@ -61,5 +61,5 @@ export class BackgroundTaskTimelineService {
 - `BackgroundTaskInlinePanelRenderer` 负责 inline panel 的真实 DOM 创建、位置挂载、Markdown 渲染与 mount 复用
 - `BackgroundTaskTimelineService` 负责 timeline 数据、runtime 重建、inline copy，以及 completion segment / diagnostics 快照
 - `BackgroundTaskIndicatorCoordinator` 负责 indicator render 场景和 post-sync 场景共用的 completion notice queue/flush 顺序
-- `BackgroundTaskLiveSignalCoordinator`、`BackgroundTaskPostSyncCoordinator`、`BackgroundTaskNoticeStateService` 和 `BackgroundTaskCompletionNoticeService` 继续分别负责 live-signal gate、post-sync orchestration、stale notice state、completion notice queue state
+- `BackgroundTaskLiveSignalCoordinator`、`BackgroundConversationPostSyncHandoffCoordinator`、`BackgroundTaskNoticeStateService` 和 `BackgroundTaskCompletionNoticeService` 继续分别负责 live-signal gate、hidden/background post-sync handoff、stale notice state、completion notice queue state
 - 这让 P2 `question / todo / background task` lane 继续把 background-task 的核心 runtime ownership 从 `OpenCodianView` 迁到可单测服务，而不是继续把 timeline 逻辑留在主视图里

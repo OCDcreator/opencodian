@@ -1,9 +1,10 @@
 import type { TabId } from '../tabs';
 import type {
+  BackgroundConversationPostSyncHandoffCoordinator,
   BackgroundTabPostSyncOptions,
   BackgroundTaskPostSyncResult,
   SignalBackgroundTaskPostSyncOptions,
-} from './BackgroundTaskPostSyncCoordinator';
+} from './BackgroundConversationPostSyncHandoffCoordinator';
 import type { SignalConversationSyncContext } from './ConversationSyncOrchestrationService';
 import type { TabConversationSyncContext } from './ConversationSyncRuntimeCoordinator';
 
@@ -17,10 +18,10 @@ export interface ConversationSyncBackgroundPostSyncRouterHost {
   ): ConversationSyncBackgroundPostSyncRouterRuntime | null;
 }
 
-export interface ConversationSyncBackgroundPostSyncCoordinator {
-  handleSignalSyncComplete(options: SignalBackgroundTaskPostSyncOptions): Promise<void>;
-  handleBackgroundTabSyncComplete(options: BackgroundTabPostSyncOptions): Promise<void>;
-}
+export type ConversationSyncBackgroundPostSyncHandoffPort = Pick<
+  BackgroundConversationPostSyncHandoffCoordinator,
+  'handleSignalSyncComplete' | 'handleBackgroundTabSyncComplete'
+>;
 
 export interface SignalConversationPostSyncRouteOptions {
   syncContext: SignalConversationSyncContext;
@@ -35,7 +36,7 @@ export interface BackgroundTabConversationPostSyncRouteOptions {
 export class ConversationSyncBackgroundPostSyncRouter {
   constructor(
     private readonly host: ConversationSyncBackgroundPostSyncRouterHost,
-    private readonly postSyncCoordinator: ConversationSyncBackgroundPostSyncCoordinator,
+    private readonly postSyncCoordinator: ConversationSyncBackgroundPostSyncHandoffPort,
   ) {}
 
   async routeSignalSyncComplete(

@@ -15,7 +15,7 @@
   1. `src/features/chat/OpenCodianView.ts` 中 question/todo/background-task 的 host factory 与 wiring 片段
   2. `src/features/chat/services/QuestionTodoStatusRefreshCoordinator.ts`
   3. `src/features/chat/services/PostSyncQuestionTodoRefreshFacade.ts`
-  4. `src/features/chat/services/BackgroundTaskPostSyncCoordinator.ts`
+  4. `src/features/chat/services/BackgroundConversationPostSyncHandoffCoordinator.ts`
   5. 参考模式：`src/features/chat/services/SessionTodoHostAdapter.ts`、`src/features/chat/services/ConversationSyncHostAdapter.ts`
 - P1 首查 `OpenCodianView` 里 activation / sync host 与 runtime bridge 创建区段，再看对应 bridge/service
 - P3 首查 composer/context builder、context catalog 与 retained-selection runtime
@@ -32,4 +32,3 @@
 - 不要在成功轮次里反复广扫同一大片 `OpenCodianView` 上下文
 - `docs/modules/**` 只在模块边界真实变化时再读、再改
 - 不要继续深挖 trailing-assistant helper 碎片化链路，除非正确性或构建失败直接阻塞
-

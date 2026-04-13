@@ -48,7 +48,7 @@ export class BackgroundTaskCompletionNoticeService {
 - `BackgroundTaskInlinePanelRenderer` 负责 inline panel DOM 渲染
 - `OpenCodianView` 负责 hydration / authoritative-sync gate host bridge
 - `BackgroundTaskIndicatorCoordinator` 负责 completion notice queue/flush 的调用顺序，并供 hidden signal/background-tab sync 复用
-- `BackgroundTaskPostSyncCoordinator` 负责 hidden signal/background-tab sync 后触发 completion notice refresh
+- `BackgroundConversationPostSyncHandoffCoordinator` 负责 hidden signal/background-tab sync 后触发 completion notice refresh
 - `PersistentAssistantNoticeService` 负责 completion notice 的持久化 append、sync fingerprint 写回，以及 hidden-tab attention/visible scroll follow-up
 - `BackgroundTaskCompletionNoticeService` 负责 completion notice queued state、content/fingerprint 和 persisted dedupe/append 协调
 - 这让 P2 `question / todo / background task` lane 继续把 background-task completion ownership 从主 view 迁到 dedicated service，而不是继续把 notice 细节留在 `OpenCodianView`

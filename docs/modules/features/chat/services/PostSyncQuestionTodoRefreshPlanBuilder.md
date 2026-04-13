@@ -11,7 +11,7 @@
 - 为 signal sync 的 background conversation refresh 选择 conversation session，并把 `tabHasBackgroundTask` 映射成 todo/status force-refresh 标记
 - 为 background-tab sync 的 background conversation refresh 选择 conversation session，并固定强制刷新 todo/status live state
 - 让 `PostSyncQuestionTodoRefreshFacade` 专注执行 refresh/writeback 顺序，而不再同时持有 session-id 与 policy 选择规则
-- 让 `BackgroundTaskPostSyncCoordinator` 只按 sync 来源调用 source-specific refresh method，而不再构造低层 todo/status refresh policy
+- 让 `BackgroundConversationPostSyncRefreshExecutor` 只按 sync 来源调用 source-specific refresh method，而不再构造低层 todo/status refresh policy
 
 它不执行任何异步刷新，不触碰 background-task runtime，也不写回 UI 状态；这些仍由 `PostSyncQuestionTodoRefreshFacade`、`QuestionTodoStatusRefreshCoordinator` 与 background-task post-sync refresh port 承接。
 
@@ -40,5 +40,5 @@ export class PostSyncQuestionTodoRefreshPlanBuilder {
 
 - `QuestionTodoBackgroundTaskRefreshHostAdapter` 从共享 refresh view host 派生 builder host，并在 service bundle 中装配 builder
 - `PostSyncQuestionTodoRefreshFacade` 消费 builder 的 plan，只负责调用 `QuestionTodoStatusRefreshCoordinator` 与 background-task writeback port
-- `BackgroundTaskPostSyncCoordinator` 只选择 source-specific refresh method，session-id 与 force-refresh policy 由 builder 统一决定
+- `BackgroundConversationPostSyncRefreshExecutor` 只选择 source-specific refresh method，session-id 与 force-refresh policy 由 builder 统一决定
 - 这条边界推进 master plan 的 P2 `question / todo / background task` lane：把 post-sync session/policy 选择从 sync coordinator 与 facade 中拆成独立可测 seam

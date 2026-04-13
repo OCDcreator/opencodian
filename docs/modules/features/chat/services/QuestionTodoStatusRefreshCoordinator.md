@@ -39,6 +39,6 @@ export class QuestionTodoStatusRefreshCoordinator {
 - `OpenCodianView` 现在通过 `QuestionTodoBackgroundTaskRefreshHostAdapter` 提供 host：adapter 继续映射 tab runtime、`QuestionDockCoordinator` pending-question refresh、`SessionTodoStatusRefreshService` todo/status refresh，以及 `SessionTodoStateService` 的 incomplete-todo 判断
 - `QuestionTodoActivationRefreshBridge` 现在负责 activation/open 侧的 status/question/todo lazy refresh，避免本 coordinator 同时承接 activation 与 post-sync 两条路径
 - `PostSyncQuestionTodoRefreshFacade` 会在 signal/background sync 后复用本 coordinator，再串起 background-task rebuild、completion notice refresh 与 stream-like follow-up
-- `BackgroundTaskPostSyncCoordinator` 现在只负责 authoritative mark、attention 与 state-commit 判定；pending-question + todo/status refresh order 继续由本 coordinator 承接
+- visible/background post-sync 的 state commit、authoritative mark 与 attention 判定分别由 `VisibleConversationPostSyncCoordinator`、`BackgroundConversationSignalSyncStateCoordinator` 与 `BackgroundConversationAttentionCoordinator` 承接；pending-question + todo/status refresh order 继续由本 coordinator 承接
 - current-tab conversation open fast path 通过 activation bridge 复用同一条 supplemental refresh，而 post-sync gate 则继续保留在本 coordinator
 - 这条边界推进的是 master plan 的 P2 `question / todo / background task` lane：把 post-sync 的组合刷新 ownership 从 view/bridge host surface 中继续下沉

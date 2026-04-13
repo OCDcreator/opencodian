@@ -12,7 +12,7 @@
 - 复用 `QuestionTodoStatusRefreshCoordinator` 的 pending-question → conditional todo/status refresh 顺序
 - 在 pending-question refresh 之后、todo/status refresh gate 之前插入 background-task runtime rebuild，并在最后 flush completion notice / stream-like writeback
 
-它不负责 visible conversation 的 refresh 入口，也不负责 authoritative mark、attention 或 visible sync 的 state-commit；这些职责仍分别留在 `PostSyncQuestionTodoRefreshFacade` 与 `BackgroundTaskPostSyncCoordinator`。
+它不负责 visible conversation 的 refresh 入口，也不负责 authoritative mark、attention 或 visible sync 的 state-commit；这些职责仍分别留在 `PostSyncQuestionTodoRefreshFacade`、`BackgroundConversationSignalSyncStateCoordinator`、`BackgroundConversationAttentionCoordinator` 与 `VisibleConversationPostSyncCoordinator`。
 
 ## 公开接口
 
@@ -39,4 +39,4 @@ export class BackgroundConversationPostSyncRefreshExecutor {
 
 - `OpenCodianView` 不直接接触本模块；它通过 `QuestionTodoBackgroundTaskRefreshHostAdapter` 间接提供 background-task rebuild / writeback host
 - `QuestionTodoStatusRefreshCoordinator` 继续拥有 runtime gate，与本模块共享的只是一个窄 `refreshAfterPostSync()` port
-- `BackgroundTaskPostSyncCoordinator` 现在把 visible refresh 与 background refresh 分别委托给不同对象，避免 signal/background-tab source routing 继续和 visible source 共享一个 facade entry surface
+- `BackgroundConversationPostSyncHandoffCoordinator` 现在直接调用 background refresh executor，visible refresh 继续经由 `VisibleConversationPostSyncCoordinator`，避免 signal/background-tab source routing 继续和 visible source 共享一个 facade entry surface

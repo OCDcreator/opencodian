@@ -5,7 +5,7 @@
 
 ## 概述
 
-`BackgroundConversationSignalSyncStateCoordinator` 把 signal sync 完成后的 background-task authoritative-sync ready 标记从 `BackgroundTaskPostSyncCoordinator` 中抽出，专门负责：
+`BackgroundConversationSignalSyncStateCoordinator` 把 signal sync 完成后的 background-task authoritative-sync ready 标记从 hidden/background post-sync handoff 中抽出，专门负责：
 
 - 将 OpenCode sync event reason 规范化为 background-task live signal 使用的 `sync-event:*` reason
 - 把 signal-synced tab 的 authoritative-sync ready 写回委托给 host
@@ -34,5 +34,5 @@ export class BackgroundConversationSignalSyncStateCoordinator {
 ## 与 `OpenCodianView` 的边界
 
 - `OpenCodianView` 不直接依赖本模块；host wiring 由 `QuestionTodoBackgroundTaskRefreshHostAdapter` 统一装配
-- `BackgroundTaskPostSyncCoordinator` 只调用 `commitSignalSyncState()`，不再直接格式化 signal reason 或写回 authoritative-sync mark
+- `BackgroundConversationPostSyncHandoffCoordinator` 只调用 `commitSignalSyncState()`，不再直接格式化 signal reason 或写回 authoritative-sync mark
 - 这条边界继续推进 master plan 的 P2 `question / todo / background task` lane：把 signal post-sync state writeback 拆成独立、可单测的单一职责模块

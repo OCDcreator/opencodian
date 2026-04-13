@@ -57,7 +57,7 @@ export class ConversationSyncBridge {
 - `ConversationSyncVisiblePostSyncRouter`：负责 visible sync 的 post-sync option shaping、`VisibleConversationPostSyncCoordinator` 调用与 DOM patch / indicator outcome dispatch
 - `ConversationSyncBackgroundPostSyncRouter`：负责 signal/background-tab sync 的 option shaping、hidden-tab fingerprint writeback 与 post-sync coordinator 路由
 - `VisibleConversationPostSyncCoordinator`：负责 visible sync 完成后的 question/todo refresh 与 current-conversation state-commit
-- `BackgroundTaskPostSyncCoordinator`：负责 hidden/background sync 完成后的 question/todo/background-task handoff 收尾
+- `BackgroundConversationPostSyncHandoffCoordinator`：负责 hidden/background sync 完成后的 signal state、question/todo/background-task refresh 与 attention handoff
 - `ConversationSyncHostAdapter`：负责把 `OpenCodianView` 的单一 sync host 适配成 bridge 所需的 host 形状
 - `OpenCodianView`：只保留 host bridge 与真正依赖 DOM 的 `applySyncedConversationUpdate()` / `renderBackgroundTaskIndicatorIfNeeded()`
 - 这次切片继续推进高优先级 sync/post-sync ownership 收窄：bridge 更接近纯粹的 sync transport，而 visible/background 两类 post-sync 细节都下沉到 dedicated router

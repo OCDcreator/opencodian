@@ -41,5 +41,5 @@ export class BackgroundTaskIndicatorCoordinator {
 - `BackgroundTaskLiveSignalCoordinator` 负责 foreground live-signal reconcile 决策，供本 coordinator 直接复用
 - `TabRuntimeStateBridge` 负责 foreground render 结束后的 tab badge / send-button / rewind-fork 状态写回
 - `BackgroundTaskStreamTriggerCoordinator` 负责把 stream-side tool-call / finalize 触发折叠成对本 coordinator 的 `renderIfNeeded()` 调用
-- `BackgroundTaskPostSyncCoordinator` 现在通过 `PostSyncQuestionTodoRefreshFacade` 间接复用本 coordinator 的 `flushCompletionNoticesAndSyncStreamLikeState()`，避免 post-sync host 继续暴露分散的 completion/writeback 回调
+- `BackgroundConversationPostSyncRefreshExecutor` 现在通过 dedicated post-sync refresh port 复用本 coordinator 的 `flushCompletionNoticesAndSyncStreamLikeState()`，避免 post-sync host 继续暴露分散的 completion/writeback 回调
 - 这让 P2 `question / todo / background task` lane 继续把 background-task runtime/UI orchestration 从主 view 下沉到可单测边界，而不是回到 paused trailing-assistant helper chain

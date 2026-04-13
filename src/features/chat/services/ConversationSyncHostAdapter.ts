@@ -5,7 +5,7 @@ import type {
 import type { TabData, TabId } from '../tabs';
 import {
   ConversationSyncBackgroundPostSyncRouter,
-  type ConversationSyncBackgroundPostSyncCoordinator,
+  type ConversationSyncBackgroundPostSyncHandoffPort,
 } from './ConversationSyncBackgroundPostSyncRouter';
 import {
   type ConversationSyncBridgeHost,
@@ -104,7 +104,7 @@ export function createConversationSyncHosts(
 export function createConversationSyncServices(
   viewHost: ConversationSyncViewHost,
   visiblePostSyncCoordinator: VisibleConversationPostSyncPort,
-  backgroundPostSyncCoordinator: ConversationSyncBackgroundPostSyncCoordinator,
+  backgroundPostSyncHandoffCoordinator: ConversationSyncBackgroundPostSyncHandoffPort,
 ): ConversationSyncServices {
   const hosts = createConversationSyncHosts(viewHost);
   const runtimeCoordinator = new ConversationSyncRuntimeCoordinator(hosts.runtimeCoordinatorHost);
@@ -118,7 +118,7 @@ export function createConversationSyncServices(
   );
   const backgroundPostSyncRouter = new ConversationSyncBackgroundPostSyncRouter(
     hosts.bridgeHost,
-    backgroundPostSyncCoordinator,
+    backgroundPostSyncHandoffCoordinator,
   );
   const bridge = new ConversationSyncBridge(
     hosts.bridgeHost,

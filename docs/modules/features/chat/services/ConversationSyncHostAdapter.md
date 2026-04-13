@@ -46,7 +46,7 @@ export function createConversationSyncServices(...): ConversationSyncServices;
 
 - `createConversationSyncServices()` 先创建 shared hosts，再顺序实例化 `ConversationSyncRuntimeCoordinator`
 - `ConversationSyncOrchestrationService` 继续复用同一个 runtime coordinator 作为 runtime gate
-- `createConversationSyncServices()` 会把 `VisibleConversationPostSyncCoordinator` 接到 `ConversationSyncVisiblePostSyncRouter`，再把 `BackgroundTaskPostSyncCoordinator` 接到 `ConversationSyncBackgroundPostSyncRouter`
+- `createConversationSyncServices()` 会把 `VisibleConversationPostSyncCoordinator` 接到 `ConversationSyncVisiblePostSyncRouter`，再把 `BackgroundConversationPostSyncHandoffCoordinator` 直接接到 `ConversationSyncBackgroundPostSyncRouter`
 - `ConversationSyncBridge` 继续复用同一个 runtime coordinator、orchestration service，并把 visible/background post-sync 分别委托给两个 router
 
 ## 与 `OpenCodianView` 的边界
