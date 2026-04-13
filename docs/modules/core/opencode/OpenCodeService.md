@@ -33,6 +33,7 @@
 - `./OpenCodeEventSubscriptionCoordinator`
 - `./OpenCodePromptRequestBuilder`
 - `./OpenCodeStreamingRuntimeCoordinator`
+- `./OpenCodeStreamEventTransformer`
 - `./OpenCodeSyncEventRuntimeCoordinator`
 - `./sdkFeatureFlags`
 - `./sdkTypes`
@@ -57,6 +58,7 @@
 - `catalogState`: `OpenCodeCatalogStateStore` 实例，负责 registry tool ids、tool schema cache、observed external tool names、MCP server status、catalog snapshot 构造与 catalog listener lifecycle。
 - `contextPartSerializer`: `OpenCodeContextPartSerializer` 实例，负责 prompt 输入文本、本地/远程 context item 与 image part 的 request-part 序列化。
 - `promptRequestBuilder`: `OpenCodePromptRequestBuilder` 实例，负责 SDK prompt parameters、legacy request body 与 shared prompt options/variant/output-format/model defaults 的组装。
+- `streamEventTransformer`: `OpenCodeStreamEventTransformer` 实例，负责 SDK / legacy stream event → `StreamChunk` 的转换、tool/question/file/permission 事件映射，以及 SSE parser。
 - `streamingRuntime`: `OpenCodeStreamingRuntimeCoordinator` 实例，负责 active stream registry、session-scoped abort controller、part type tracking 与 cancel/detach lifecycle。
 - `openCodeEventRuntime`: `OpenCodeEventSubscriptionCoordinator` 实例，负责 open-code event listener registry、`event` / `global` 订阅生命周期，以及 catalog-relevant payload 到 `catalogState` 的刷新/广播触发。
 - `vaultPath`: 用于 SDK `directory` 注入、上下文文件绝对路径解析，以及 `ServerManager` 工作目录设置；OpenCode directory scope 和 context file path 的跨平台规范化委托给 `shared/contextPath`。
@@ -192,7 +194,12 @@
 - `streamingRuntime.createActiveStreamContext()` 会为 `sessionId` 分配独立 `OpenCodeStreamingRuntimeContext`
 - 如果同一 session 已有旧流，coordinator 会先中断旧 context 再替换
 - `releaseActiveStreamContext()` 只释放仍然是当前注册实例的 context，避免旧流 finally 清掉新流
-- `handleStreamingEvent()` 负责把 OpenCode event 归一化成 `StreamChunk`
+
+与之配套的 event→chunk transform 现在由 `OpenCodeStreamEventTransformer` 持有：
+
+- `handleStreamingEvent()` 负责 session guard、tool_use/tool_result 去重、thinking delta、question/file/permission 事件映射，以及 `session.error` / `session.idle` 的 stop 判断
+- `parseSSEEvents()` 负责把 legacy `/event` buffer 解析成完整 SSE event，并保留 incomplete tail
+- `transformEventToChunks()` / `transformPartToChunks()` 继续作为较薄的通用 payload→chunk helper，供 focused coverage 和后续局部调用复用
 
 当前会产出的 chunk 类型包括：
 
@@ -218,6 +225,8 @@
 
 - 普通 provider/API 错误会立刻转成 `error` chunk
 - `MessageAbortedError` 只会结束流，不会误报成发送失败
+
+换句话说，`OpenCodeService` 现在只保留 transport 分流、流收尾和 final message 补拉；SDK / legacy 事件的解析与 chunk 归一化已经收束到 `OpenCodeStreamEventTransformer`。
 
 除此之外，`finishStreamingResponse()` 在收尾重新拉取 assistant message 时，也会再检查一次 `assistant.info.error`。如果流里没收到 `session.error`，但最终持久化消息里已经带了结构化错误，服务层仍会补发 `error` chunk，避免 UI 再次把它误判成“空回复”。
 
@@ -338,6 +347,7 @@ graph TD
 - `OpenCodeSyncEventRuntimeCoordinator`: 负责 `global.syncEvent.subscribe()` 的 session todo/status/message sync event listener registry、订阅重启和 transient connectivity recovery 循环。
 - `OpenCodeEventSubscriptionCoordinator`: 负责 `event.subscribe()` / `global.event()` 的 open-code event listener registry、catalog-relevant payload routing、双路订阅重启与 catalog listener emit。
 - `OpenCodeStreamingRuntimeCoordinator`: 负责 active stream registry、session-scoped abort controllers、part type tracking，以及 cancel/detach 的 runtime lifecycle。
+- `OpenCodeStreamEventTransformer`: 负责 SDK / legacy stream event → `StreamChunk` 的转换、part-type-aware delta routing，以及 SSE parser。
 - `createSdkClient`: 为每次 SDK 调用创建客户端实例。
 - `sdkFeatureFlags`: 定义 SDK 与 legacy 的路由开关。
 - `omoCompat`: 负责 OMO 文本检测与元数据提取。

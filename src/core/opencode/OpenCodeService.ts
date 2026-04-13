@@ -61,6 +61,12 @@ import {
   OpenCodePromptRequestBuilder,
 } from './OpenCodePromptRequestBuilder';
 import {
+  OpenCodeStreamEventTransformer,
+  type OpenCodeSSEEvent,
+  type OpenCodeStreamEvent,
+  type OpenCodeStreamEventState,
+} from './OpenCodeStreamEventTransformer';
+import {
   OpenCodeStreamingRuntimeCoordinator,
   OpenCodeStreamingRuntimeContext,
 } from './OpenCodeStreamingRuntimeCoordinator';
@@ -101,75 +107,6 @@ export type { SessionActivityStatus, SessionSyncEventUpdate } from './OpenCodeSy
 
 function cloneSettings(settings: OpenCodianSettings): OpenCodianSettings {
   return JSON.parse(JSON.stringify(settings)) as OpenCodianSettings;
-}
-
-/** SSE Event types from OpenCode server */
-interface SSEEvent {
-  event: string;
-  data: string;
-}
-
-/** OpenCode event data structure (nested in data field) */
-interface OpenCodeEvent {
-  type: string;
-  properties: {
-    sessionID?: string;
-    messageID?: string;
-    id?: string;
-    permission?: string;
-    patterns?: string[];
-    metadata?: Record<string, unknown>;
-    message?: {
-      id: string;
-      role: string;
-      parts?: Array<{
-        type: string;
-        text?: string;
-        callID?: string;
-        tool?: string;
-        state?: {
-          status: string;
-          input?: Record<string, unknown>;
-          output?: string;
-          error?: string;
-          metadata?: Record<string, unknown>;
-        };
-      }>;
-    };
-    part?: {
-      id: string;
-      sessionID?: string;
-      type: string;
-      text?: string;
-      callID?: string;
-      tool?: string;
-      state?: {
-        status: string;
-        input?: Record<string, unknown>;
-        output?: string;
-        error?: string;
-        metadata?: Record<string, unknown>;
-      };
-    };
-    delta?: string;
-    field?: string;
-    partID?: string;
-    toolID?: string;
-    result?: string;
-    error?: string;
-    usage?: {
-      input?: number;
-      output?: number;
-    };
-    file?: string;
-    questions?: Array<{
-      question?: string;
-      header?: string;
-      options?: Array<{ label?: string; description?: string }>;
-      multiple?: boolean;
-      custom?: boolean;
-    }>;
-  };
 }
 
 /** Service events */
@@ -278,16 +215,6 @@ function formatModelIdentifier(providerID?: string, modelID?: string): string | 
   }
 
   return undefined;
-}
-
-interface StreamingTextDeltaDebugState {
-  sequence: number;
-  source: 'event' | 'finalize';
-  partId: string | null;
-  partType: string;
-  length: number;
-  totalLength: number;
-  preview: string;
 }
 
 function getDebugTextPreview(text: string, maxLength = 160): string {
@@ -428,18 +355,7 @@ interface SessionContextUsageSnapshot {
   totalCost: number;
 }
 
-interface StreamingState {
-  lastContent: string;
-  lastErrorMessage: string | null;
-  processedToolIds: Set<string>;
-  toolInputSnapshots: Map<string, string>;
-  debugChunkSequence: number;
-  lastTextDelta: StreamingTextDeltaDebugState | null;
-}
-
-type StreamPartTypeState = OpenCodeStreamingRuntimeContext | {
-  partTypeMap?: Map<string, string>;
-};
+type StreamingState = OpenCodeStreamEventState;
 
 type SessionTodoUpdate = {
   sessionId: string;
@@ -468,6 +384,7 @@ export class OpenCodeService {
   private catalogState: OpenCodeCatalogStateStore;
   private contextPartSerializer: OpenCodeContextPartSerializer;
   private promptRequestBuilder: OpenCodePromptRequestBuilder;
+  private streamEventTransformer: OpenCodeStreamEventTransformer;
   private streamingRuntime: OpenCodeStreamingRuntimeCoordinator;
   private openCodeEventRuntime: OpenCodeEventSubscriptionCoordinator;
   private vaultPath?: string;
@@ -521,6 +438,12 @@ export class OpenCodeService {
         modelID: this.settings.defaultModel,
       }),
       observeRuntimeToolNames: (toolNames) => this.observeRuntimeToolNames(toolNames),
+    });
+    this.streamEventTransformer = new OpenCodeStreamEventTransformer({
+      observeRuntimeToolNames: (toolNames) => this.observeRuntimeToolNames(toolNames),
+      getOpenCodeToolKind: (toolName) => this.getOpenCodeToolKind(toolName),
+      normalizeQuestionRequest: (raw) => this.normalizeQuestionRequest(raw),
+      logStreamingDebug: (label, payload) => logAssistantFinalizationDebug(label, payload),
     });
     this.streamingRuntime = new OpenCodeStreamingRuntimeCoordinator({
       abortSessionOnServer: (sessionId) => this.abortSessionOnServer(sessionId),
@@ -1233,47 +1156,6 @@ export class OpenCodeService {
     }
   }
 
-  private getToolInputSnapshot(input: Record<string, unknown> | undefined): string {
-    if (!input || Object.keys(input).length === 0) {
-      return '';
-    }
-
-    try {
-      return JSON.stringify(input);
-    } catch {
-      return '[unserializable-tool-input]';
-    }
-  }
-
-  private setStreamPartType(streamContext: StreamPartTypeState, partId: string, partType: string): void {
-    if (streamContext instanceof OpenCodeStreamingRuntimeContext) {
-      streamContext.setPartType(partId, partType);
-      return;
-    }
-
-    if (!partId || !partType) {
-      return;
-    }
-
-    streamContext.partTypeMap?.set(partId, partType);
-  }
-
-  private hasStreamPartType(streamContext: StreamPartTypeState, partId: string): boolean {
-    if (streamContext instanceof OpenCodeStreamingRuntimeContext) {
-      return streamContext.hasPartType(partId);
-    }
-
-    return streamContext.partTypeMap?.has(partId) ?? false;
-  }
-
-  private getStreamPartType(streamContext: StreamPartTypeState, partId: string): string | undefined {
-    if (streamContext instanceof OpenCodeStreamingRuntimeContext) {
-      return streamContext.getPartType(partId);
-    }
-
-    return streamContext.partTypeMap?.get(partId);
-  }
-
   private normalizeHealthResponse(response: unknown): boolean {
     if (typeof response === 'boolean') {
       return response;
@@ -1737,219 +1619,6 @@ export class OpenCodeService {
     }).kind;
   }
 
-  private handleStreamingEvent(
-    eventData: OpenCodeEvent,
-    sessionId: string,
-    state: StreamingState,
-    streamContext: StreamPartTypeState,
-  ): { chunks: StreamChunk[]; stop: boolean } {
-    if (eventData.properties?.sessionID && eventData.properties.sessionID !== sessionId) {
-      return { chunks: [], stop: false };
-    }
-
-    const partSessionId = eventData.properties?.part?.sessionID;
-    if (partSessionId && partSessionId !== sessionId) {
-      return { chunks: [], stop: false };
-    }
-
-    const chunks: StreamChunk[] = [];
-
-    if (eventData.properties?.usage) {
-      chunks.push({
-        type: 'usage',
-        inputTokens: eventData.properties.usage.input ?? 0,
-        outputTokens: eventData.properties.usage.output ?? 0,
-        sessionId,
-      });
-    }
-
-    if (eventData.type === 'message.part.updated') {
-      const part = eventData.properties?.part as Part | undefined;
-      if (part?.id && part?.type) {
-        this.setStreamPartType(streamContext, part.id, part.type);
-
-        if (part.type === 'tool') {
-          const toolPart = part as ToolPartData;
-          const toolId = toolPart.callID || toolPart.id;
-          const toolName = toolPart.tool || 'unknown';
-          if (isInternalStructuredOutputTool(toolName)) {
-            return { chunks, stop: false };
-          }
-
-          this.observeRuntimeToolNames([toolName]);
-
-          if (toolId) {
-            const toolKind = this.getOpenCodeToolKind(toolName);
-            const toolInput = toolPart.state?.input || {};
-            const nextSnapshot = this.getToolInputSnapshot(toolInput);
-            const previousSnapshot = state.toolInputSnapshots.get(toolId);
-            const shouldEmitToolUse =
-              !state.processedToolIds.has(toolId)
-              || nextSnapshot !== previousSnapshot;
-
-            if (shouldEmitToolUse) {
-              state.processedToolIds.add(toolId);
-              state.toolInputSnapshots.set(toolId, nextSnapshot);
-              chunks.push({
-                type: 'tool_use',
-                id: toolId,
-                name: toolName,
-                kind: toolKind,
-                input: toolInput,
-              });
-            }
-
-            const toolStatus = resolveToolExecutionStatus({
-              toolName,
-              state: toolPart.state,
-            });
-            const toolResult = resolveToolResultText(toolPart.state);
-            if ((toolStatus === 'completed' || toolStatus === 'error') && toolResult !== undefined) {
-              const resultKey = `${toolId}_result`;
-              if (!state.processedToolIds.has(resultKey)) {
-                state.processedToolIds.add(resultKey);
-                chunks.push({
-                  type: 'tool_result',
-                  toolUseId: toolId,
-                  content: toolResult,
-                  isError: toolStatus === 'error',
-                });
-              }
-            }
-          }
-        }
-
-        if (part.type === 'reasoning' || part.type === 'thinking') {
-          const durationSeconds = resolveReasoningDurationSeconds(part);
-          if (durationSeconds !== undefined) {
-            chunks.push({
-              type: 'thinking',
-              content: '',
-              partId: part.id,
-              durationSeconds,
-            });
-          }
-        }
-      }
-
-      return { chunks, stop: false };
-    }
-
-    if (eventData.type === 'message.part.delta') {
-      const delta = eventData.properties?.delta;
-      const field = eventData.properties?.field;
-      const partID = eventData.properties?.partID;
-
-      if (!delta || !field) {
-        return { chunks, stop: false };
-      }
-
-      if (partID && !this.hasStreamPartType(streamContext, partID)) {
-        const partType = eventData.properties?.part?.type;
-        this.setStreamPartType(streamContext, partID, partType || 'text');
-      }
-
-      const partType = partID ? (this.getStreamPartType(streamContext, partID) || 'text') : 'text';
-
-      if (field === 'text') {
-        if (partType === 'reasoning' || partType === 'thinking') {
-          chunks.push({ type: 'thinking', content: delta, partId: partID });
-        } else {
-          chunks.push({ type: 'text', content: delta });
-          state.lastContent += delta;
-          state.debugChunkSequence += 1;
-          state.lastTextDelta = {
-            sequence: state.debugChunkSequence,
-            source: 'event',
-            partId: partID ?? null,
-            partType,
-            length: delta.length,
-            totalLength: state.lastContent.length,
-            preview: getDebugTextPreview(delta, 120),
-          };
-          logAssistantFinalizationDebug('service-text-delta', {
-            sessionId,
-            chunkSequence: state.debugChunkSequence,
-            partId: partID ?? null,
-            partType,
-            deltaLength: delta.length,
-            totalLength: state.lastContent.length,
-            deltaPreview: getDebugTextPreview(delta, 120),
-          });
-        }
-      }
-
-      return { chunks, stop: false };
-    }
-
-    if (eventData.type === 'permission.asked') {
-      const permission = eventData.properties;
-      if (permission?.id) {
-        chunks.push({
-          type: 'permission_request',
-          id: permission.id,
-          permission: permission.permission || 'unknown',
-          patterns: permission.patterns || [],
-          metadata: permission.metadata || {},
-        });
-      }
-
-      return { chunks, stop: false };
-    }
-
-    if (eventData.type === 'file.edited') {
-      const file = eventData.properties?.file;
-      if (typeof file === 'string' && file.trim()) {
-        chunks.push({ type: 'file_edited', file: file.trim() });
-      }
-
-      return { chunks, stop: false };
-    }
-
-    if (eventData.type === 'session.error') {
-      const errorName = extractStructuredErrorName(eventData.properties?.error);
-      const errorMessage = extractStructuredErrorMessage(eventData.properties?.error) ?? 'Unknown error';
-      state.lastErrorMessage = errorMessage;
-      logAssistantFinalizationDebug('service-session-error', {
-        sessionId,
-        errorName,
-        errorMessage,
-      });
-      if (errorName === 'MessageAbortedError') {
-        return { chunks, stop: true };
-      }
-
-      chunks.push({
-        type: 'error',
-        content: errorMessage,
-      });
-      return { chunks, stop: true };
-    }
-
-    if (eventData.type === 'session.idle') {
-      logAssistantFinalizationDebug('service-session-idle', {
-        sessionId,
-        accumulatedTextLength: state.lastContent.length,
-        lastTextDelta: state.lastTextDelta,
-      });
-      return { chunks, stop: true };
-    }
-
-    if (eventData.type === 'question.asked') {
-      const request = this.normalizeQuestionRequest(eventData.properties);
-      if (request) {
-        chunks.push({
-          type: 'question_request',
-          request,
-        });
-      }
-
-      return { chunks, stop: false };
-    }
-
-    return { chunks, stop: false };
-  }
-
   private async *consumeLegacyEventStream(
     sessionId: string,
     streamContext: OpenCodeStreamingRuntimeContext,
@@ -1964,14 +1633,19 @@ export class OpenCodeService {
         break;
       }
 
-      let eventData: OpenCodeEvent;
+      let eventData: OpenCodeStreamEvent;
       try {
-        eventData = JSON.parse(event.data) as OpenCodeEvent;
+        eventData = JSON.parse(event.data) as OpenCodeStreamEvent;
       } catch {
         continue;
       }
 
-      const outcome = this.handleStreamingEvent(eventData, sessionId, state, streamContext);
+      const outcome = this.streamEventTransformer.handleStreamingEvent(
+        eventData,
+        sessionId,
+        state,
+        streamContext,
+      );
       for (const chunk of outcome.chunks) {
         yield chunk;
       }
@@ -2043,8 +1717,8 @@ export class OpenCodeService {
           yieldedMessageStart = true;
         }
 
-        const outcome = this.handleStreamingEvent(
-          result.value as unknown as OpenCodeEvent,
+        const outcome = this.streamEventTransformer.handleStreamingEvent(
+          result.value as unknown as OpenCodeStreamEvent,
           sessionId,
           state,
           streamContext,
@@ -2199,7 +1873,7 @@ export class OpenCodeService {
   }
 
   /** Connect to SSE endpoint and yield events */
-  private async *connectSSE(url: string, signal?: AbortSignal): AsyncGenerator<SSEEvent> {
+  private async *connectSSE(url: string, signal?: AbortSignal): AsyncGenerator<OpenCodeSSEEvent> {
     this.ensureBaseUrl();
 
     
@@ -2288,7 +1962,7 @@ export class OpenCodeService {
         buffer += chunk;
         
         // Process complete events in buffer
-        const events = this.parseSSEEvents(buffer);
+        const events = this.streamEventTransformer.parseSSEEvents(buffer);
         buffer = events.remaining;
         
 /*         if (events.events.length > 0) {
@@ -2302,7 +1976,7 @@ export class OpenCodeService {
 
       // Process any remaining data
       if (buffer.trim() && !aborted && !signal?.aborted) {
-        const events = this.parseSSEEvents(buffer + '\n\n');
+        const events = this.streamEventTransformer.parseSSEEvents(buffer + '\n\n');
         for (const event of events.events) {
           yield event;
         }
@@ -2319,47 +1993,6 @@ export class OpenCodeService {
       reader.releaseLock();
 
     }
-  }
-
-  /** Parse SSE event data from buffer */
-  private parseSSEEvents(buffer: string): { events: SSEEvent[]; remaining: string } {
-    const events: SSEEvent[] = [];
-    const lines = buffer.split('\n');
-    let currentEvent: Partial<SSEEvent> = {};
-    let remaining = '';
-    
-    // Check if buffer ends with incomplete event
-    const lastDoubleNewline = buffer.lastIndexOf('\n\n');
-    if (lastDoubleNewline === -1 || lastDoubleNewline !== buffer.length - 2) {
-      remaining = lines.pop() || '';
-    }
-
-    for (const line of lines) {
-      if (line.startsWith('event:')) {
-        currentEvent.event = line.slice(6).trim();
-      } else if (line.startsWith('data:')) {
-        currentEvent.data = line.slice(5).trim();
-      } else if (line === '') {
-        // Empty line marks end of event
-        // OpenCode SSE only has 'data:' lines, no 'event:' lines
-        // Extract event type from JSON data if needed
-        if (currentEvent.data !== undefined) {
-          if (!currentEvent.event) {
-            // Try to extract type from JSON data
-            try {
-              const parsed = JSON.parse(currentEvent.data) as { type?: string };
-              currentEvent.event = parsed.type || 'unknown';
-            } catch {
-              currentEvent.event = 'unknown';
-            }
-          }
-          events.push(currentEvent as SSEEvent);
-        }
-        currentEvent = {};
-      }
-    }
-
-    return { events, remaining };
   }
 
   /** Get available models - Handles both string array and object formats */
@@ -2998,113 +2631,6 @@ export class OpenCodeService {
     }
 
     return null;
-  }
-
-  /** Transform SDK event to StreamChunks */
-  private transformEventToChunks(event: unknown): StreamChunk[] {
-    const chunks: StreamChunk[] = [];
-
-    if (typeof event !== 'object' || event === null) {
-      return chunks;
-    }
-
-    const evt = event as { type?: string; properties?: Record<string, unknown> };
-    const props = evt.properties;
-
-    if (!props) {
-      return chunks;
-    }
-
-    // Handle parts from message stream events
-    if (props.parts && Array.isArray(props.parts)) {
-      for (const part of props.parts) {
-        const partChunks = this.transformPartToChunks(part as Part);
-        chunks.push(...partChunks);
-      }
-    }
-
-    // Handle direct part properties
-    if (props.part) {
-      const partChunks = this.transformPartToChunks(props.part as Part);
-      chunks.push(...partChunks);
-    }
-
-    // Text content from properties
-    if (props.text && typeof props.text === 'string') {
-      chunks.push({ type: 'text', content: props.text });
-    }
-
-    // Usage information
-    if (props.usage && typeof props.usage === 'object') {
-      const usage = props.usage as { input?: number; output?: number };
-      chunks.push({
-        type: 'usage',
-        inputTokens: usage.input ?? 0,
-        outputTokens: usage.output ?? 0,
-      });
-    }
-
-    return chunks;
-  }
-
-  /** Transform a single Part to StreamChunks */
-  private transformPartToChunks(part: Part): StreamChunk[] {
-    const chunks: StreamChunk[] = [];
-
-    switch (part.type) {
-      case 'text': {
-        if (part.text) {
-          chunks.push({ type: 'text', content: part.text });
-        }
-        break;
-      }
-      case 'reasoning': {
-        if (part.text) {
-          chunks.push({
-            type: 'thinking',
-            content: part.text,
-            partId: part.id,
-            durationSeconds: resolveReasoningDurationSeconds(part),
-          });
-        }
-        break;
-      }
-      case 'tool': {
-        const toolPart = part as ToolPartData;
-        if (isInternalStructuredOutputTool(toolPart.tool)) {
-          break;
-        }
-
-        if (toolPart.state) {
-          const toolStatus = resolveToolExecutionStatus({
-            toolName: toolPart.tool,
-            state: toolPart.state,
-          });
-          const toolName = toolPart.tool ?? '';
-          if (toolStatus === 'pending' || toolStatus === 'running') {
-            chunks.push({
-              type: 'tool_use',
-              id: toolPart.callID ?? '',
-              name: toolName,
-              kind: this.getOpenCodeToolKind(toolName),
-              input: toolPart.state.input ?? {},
-            });
-          } else if (toolStatus === 'completed' || toolStatus === 'error') {
-            const result = resolveToolResultText(toolPart.state)
-              ?? (toolStatus === 'error' ? 'Error: Tool execution failed' : '');
-            chunks.push({
-              type: 'tool_result',
-              toolUseId: toolPart.callID ?? '',
-              content: result,
-              isError: toolStatus === 'error',
-            });
-          }
-        }
-        break;
-      }
-    }
-
-    return chunks;
   }
 
   /** Convert OpenCode message to ChatMessage */

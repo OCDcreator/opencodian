@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`。R27 完成后必须暂停复盘，不得自动扩展新队列。
-> **当前状态**: [CONFIRMED_NIGHT_BATCH] R19-R27 已确认；当前 `[NEXT]` 是 R25 Stream event transformer。
+> **当前状态**: [CONFIRMED_NIGHT_BATCH] R19-R27 已确认；当前 `[NEXT]` 是 R26 Message normalization mapper。
 
 ## 控制规则
 
@@ -543,7 +543,7 @@
   - 新 owner 有 focused coverage，并保持多 session 并发语义不变。
   - 运行 targeted tests、全量 `npm test`、`npm run build`。
 
-### [NEXT] R25 - Stream event transformer
+### [DONE] R25 - Stream event transformer
 
 - **Lane**: OpenCodeService `stream event transform`
 - **目标**: 把 SDK / legacy SSE event → chunk transform 与 SSE parser 从 `OpenCodeService` 收束到 transformer owner。
@@ -562,7 +562,7 @@
   - focused coverage 证明 chunk 语义未回归。
   - 运行 targeted tests、全量 `npm test`、`npm run build`。
 
-### [QUEUED] R26 - Message normalization mapper
+### [NEXT] R26 - Message normalization mapper
 
 - **Lane**: OpenCodeService `message normalization`
 - **目标**: 把 message → `ChatMessage` 归一化、context attachment 提取、tool identity / OMO meta 处理收束到 mapper owner。

@@ -665,84 +665,6 @@ describe('OpenCodeService', () => {
       ]);
     });
 
-    it('turns question.asked events into question_request chunks', () => {
-      const outcome = (service as unknown as {
-        handleStreamingEvent: (
-          eventData: unknown,
-          sessionId: string,
-          state: unknown,
-          streamContext: unknown,
-        ) => { chunks: unknown[]; stop: boolean };
-      }).handleStreamingEvent(
-        {
-          type: 'question.asked',
-          properties: {
-            id: 'question-1',
-            sessionID: 'test-session',
-            questions: [
-              {
-                header: 'Mode',
-                question: 'Pick a mode',
-                options: [{ label: 'Fast', description: 'Quick answer' }],
-                multiple: false,
-                custom: true,
-              },
-            ],
-          },
-        },
-        'test-session',
-        { lastContent: '', processedToolIds: new Set(), toolInputSnapshots: new Map() },
-        { partTypeMap: new Map() },
-      );
-
-      expect(outcome.chunks).toEqual([
-        {
-          type: 'question_request',
-          request: {
-            id: 'question-1',
-            sessionId: 'test-session',
-            questions: [
-              {
-                header: 'Mode',
-                question: 'Pick a mode',
-                options: [{ label: 'Fast', description: 'Quick answer' }],
-                multiple: false,
-                custom: true,
-              },
-            ],
-          },
-        },
-      ]);
-    });
-
-    it('turns file.edited events into file_edited chunks', () => {
-      const outcome = (service as unknown as {
-        handleStreamingEvent: (
-          eventData: unknown,
-          sessionId: string,
-          state: unknown,
-          streamContext: unknown,
-        ) => { chunks: unknown[]; stop: boolean };
-      }).handleStreamingEvent(
-        {
-          type: 'file.edited',
-          properties: {
-            file: 'notes/today.md',
-          },
-        },
-        'test-session',
-        { lastContent: '', processedToolIds: new Set(), toolInputSnapshots: new Map() },
-        { partTypeMap: new Map() },
-      );
-
-      expect(outcome.chunks).toEqual([
-        {
-          type: 'file_edited',
-          file: 'notes/today.md',
-        },
-      ]);
-    });
-
     it('replies to and rejects question requests via HTTP', async () => {
       mockRequestUrl.mockResolvedValue({ status: 200, json: true, text: 'true' });
 
@@ -1870,49 +1792,6 @@ describe('OpenCodeService', () => {
           },
         }),
       ]));
-    });
-
-    it('classifies known OpenCode MCP stream tool parts as MCP tools', () => {
-      (service as unknown as { observeRuntimeToolNames: (tools: string[]) => void }).observeRuntimeToolNames(['exa_search']);
-
-      const outcome = (service as unknown as {
-        handleStreamingEvent: (
-          eventData: unknown,
-          sessionId: string,
-          state: unknown,
-          streamContext: unknown,
-        ) => { chunks: unknown[]; stop: boolean };
-      }).handleStreamingEvent(
-        {
-          type: 'message.part.updated',
-          properties: {
-            sessionID: 'test-session',
-            part: {
-              id: 'part-tool-mcp',
-              type: 'tool',
-              callID: 'call-tool-mcp',
-              tool: 'exa_search',
-              state: {
-                status: 'running',
-                input: { query: 'latest docs' },
-              },
-            },
-          },
-        },
-        'test-session',
-        { lastContent: '', processedToolIds: new Set(), toolInputSnapshots: new Map() },
-        { partTypeMap: new Map() },
-      );
-
-      expect(outcome.chunks).toEqual([
-        {
-          type: 'tool_use',
-          id: 'call-tool-mcp',
-          name: 'exa_search',
-          kind: 'mcp',
-          input: { query: 'latest docs' },
-        },
-      ]);
     });
 
     it('ignores internal StructuredOutput tool events from the SDK stream', async () => {
