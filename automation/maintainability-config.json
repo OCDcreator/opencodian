@@ -1,14 +1,14 @@
 {
-  "objective": "Continue the maintainability program by decomposing large responsibilities into smaller single-purpose modules with one verified refactor slice per round.",
+  "objective": "Execute the supervised maintainability roadmap queue one round at a time until the queued ownership-reduction program is complete.",
   "starting_phase_doc": "docs/status/maintainability-phase-7.md",
   "next_phase_number": 8,
-  "focus_hint": "Follow `docs/status/maintainability-master-plan.md` first. Prioritize `OpenCodianView` ownership extraction around question/todo/background task, context/composer, message-shell/notice, or activation/runtime bridge boundaries.",
+  "focus_hint": "Follow `docs/status/maintainability-round-roadmap.md` and execute its first `[NEXT]` item; roadmap order overrides local inspiration.",
   "max_rounds": 1000,
   "max_consecutive_failures": 3,
   "test_command": "npm test",
   "targeted_test_required": true,
   "full_test_command": "npm test",
-  "full_test_cadence_rounds": 5,
+  "full_test_cadence_rounds": 1,
   "full_test_required_paths": [
     "src/main.ts",
     "src/core/",

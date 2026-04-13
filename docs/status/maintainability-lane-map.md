@@ -1,6 +1,6 @@
 # Maintainability Lane Map
 
-> **用途**: 这是每轮开始时的快速定位图。先看这里，再决定是否做广域搜索。
+> **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
 
 ## 当前优先级
 

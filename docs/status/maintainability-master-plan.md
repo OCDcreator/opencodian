@@ -115,8 +115,10 @@ maintainability 的目标是：
 3. **如果 10 轮内没有明显降低主集成文件体量，或没有迁出新的 ownership 边界，则必须切换方向。**
 4. **如果候选改动只是继续抽一个很小的 `SourceContract` / `Inputs` / `Shape` / `PlanParts` / `ChildPlans` helper，而没有减少主 owner 的职责，就视为低收益切片，禁止优先选择。**
 5. **除非被测试、构建或正确性阻塞，否则禁止继续在已暂停链路上做低收益 helper 粉碎。**
-6. **每轮 phase 文档必须明确写出自己推进的是哪条 master-plan lane。**
-7. **如果上一轮 `next_focus` 与本文件冲突，以本文件为准。**
+6. **拆出的模块若同时低于“约 100 行”且“少于 3 个公开 API / 导出”，默认视为过碎；除非它隔离了高风险依赖或跨 3 处以上复用，否则应优先并回调用方或相邻 owner。**
+7. **每轮必须优先执行 `docs/status/maintainability-round-roadmap.md` 里第一个 `[NEXT]` 任务；只有该任务已在仓库中自然完成或被明确阻塞时，才允许推进后续项，并在 phase 文档里说明原因。**
+8. **每轮 phase 文档必须明确写出自己推进的是哪条 master-plan lane，以及完成了 roadmap 的哪一个 queue item。**
+9. **如果上一轮 `next_focus` 与本文件或 roadmap 冲突，以本文件和 roadmap 为准。**
 
 ## 6. 文档协作关系
 
@@ -127,7 +129,8 @@ maintainability 的目标是：
 
 1. `AGENTS.md`
 2. `docs/status/maintainability-master-plan.md`
-3. 最近的 `docs/status/maintainability-phase-XXX.md`
+3. `docs/status/maintainability-round-roadmap.md`
+4. 最近的 `docs/status/maintainability-phase-XXX.md`
 
 ## 7. 当前执行指令
 
@@ -136,3 +139,4 @@ maintainability 的目标是：
 - 不再把 `ConversationRenderService` trailing-assistant helper 链作为默认延续方向
 - 下一轮起，优先从 `OpenCodianView` 仍然集中的 ownership 中选择一个高价值切口
 - 首选候选应落在：`question / todo / background task`、`context / composer`、`message shell / notice / timestamp`、或其它能直接削弱 `OpenCodianView` ownership 的链路
+- 执行顺序以 `docs/status/maintainability-round-roadmap.md` 的 queue 为准，不再允许按局部灵感自由扩散
