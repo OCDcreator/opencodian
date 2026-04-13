@@ -49,6 +49,9 @@ import {
   type QuestionPostResolutionRuntimeState,
 } from './QuestionPostResolutionRuntimeFacade';
 import {
+  QuestionResolutionApplyFacade,
+} from './QuestionResolutionApplyFacade';
+import {
   QuestionResolutionFlowCoordinator,
   type QuestionResolutionFlowCoordinatorHost,
 } from './QuestionResolutionFlowCoordinator';
@@ -241,15 +244,18 @@ export function createQuestionRuntimeServices(
     followUpAfterResolution: (tabId) =>
       postResolutionRuntimeFacade.followUpAfterResolution(tabId),
   });
+  const resolutionApplyFacade = new QuestionResolutionApplyFacade(
+    resolutionExecutionFacade,
+    resolutionWritebackFacade,
+  );
   dockCoordinator = new QuestionDockCoordinator(
     hosts.dockCoordinatorHost,
     dockRenderStateFacade,
     dockResolutionActionFacade,
-    resolutionExecutionFacade,
+    resolutionApplyFacade,
     dockQueueRuntimeFacade,
     dockRefreshFacade,
     dockWritebackFacade,
-    resolutionWritebackFacade,
   );
   const resolutionFlowCoordinatorHost: QuestionResolutionFlowCoordinatorHost = {
     getActiveTabId: () => viewHost.getActiveTabId(),
@@ -260,8 +266,7 @@ export function createQuestionRuntimeServices(
     {
       dockCoordinator,
       inlineCardRenderer,
-      resolutionExecution: resolutionExecutionFacade,
-      resolutionWriteback: resolutionWritebackFacade,
+      resolutionApply: resolutionApplyFacade,
     },
   );
 

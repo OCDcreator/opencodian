@@ -12,7 +12,7 @@
 - 支持 dock 在 resolved state 写回后、follow-up 前插入自己的 pending queue 移除与 dock rerender callback
 - 最后统一触发 `QuestionPostResolutionRuntimeFacade.followUpAfterResolution()`，避免两个 coordinator 分别持有 status/sync 收尾细节
 
-它不负责调用 OpenCode 的 `replyToQuestion()` / `rejectQuestion()`、pending-question API refresh、dock DOM render 或 inline card DOM；这些仍分别留给 `QuestionResolutionFlowCoordinator`、`QuestionDockCoordinator`、`QuestionDock` 与 `QuestionInlineCardRenderer`。
+它不负责调用 OpenCode 的 `replyToQuestion()` / `rejectQuestion()`、共享 execute-then-writeback 骨架、pending-question API refresh、dock DOM render 或 inline card DOM；这些仍分别留给 `QuestionResolutionExecutionFacade`、`QuestionResolutionApplyFacade`、`QuestionResolutionFlowCoordinator`、`QuestionDockCoordinator`、`QuestionDock` 与 `QuestionInlineCardRenderer`。
 
 ## 公开接口
 
@@ -43,5 +43,6 @@ export class QuestionResolutionWritebackFacade {
 ## 与 question bundle 的边界
 
 - `QuestionRuntimeHostAdapter` 负责装配本 facade，把 `QuestionPendingRefreshRuntimeFacade`、`QuestionResolutionCoordinator` 与 `QuestionPostResolutionRuntimeFacade` 串成一条共享 writeback seam
-- `QuestionDockCoordinator` 与 `QuestionResolutionFlowCoordinator` 现在只依赖本 facade 的窄口，不再分别持有 resolved-id suppression、resolved-state bridge 与 post-resolution follow-up 三个独立 port
+- `QuestionResolutionApplyFacade` 现在直接依赖本 facade 的窄口，把 execute 成功后的共享 writeback 顺序收束到一个更稳定的 apply seam
+- `QuestionDockCoordinator` 与 `QuestionResolutionFlowCoordinator` 不再分别持有 resolved-id suppression、resolved-state bridge 与 post-resolution follow-up 三个独立 port
 - `OpenCodianView` 不需要新增 question writeback helper；view 仍只提供 question runtime 的 view host，具体 post-resolution 写回顺序留在服务层

@@ -1,6 +1,7 @@
 import type { QuestionDisplayMode, QuestionRequest } from '../../../../src/core/types';
 import { setLocale } from '../../../../src/i18n';
 import type { QuestionDockRefreshFacade } from '../../../../src/features/chat/services/QuestionDockRefreshFacade';
+import { QuestionResolutionApplyFacade } from '../../../../src/features/chat/services/QuestionResolutionApplyFacade';
 import { QuestionDockResolutionActionFacade } from '../../../../src/features/chat/services/QuestionDockResolutionActionFacade';
 import {
   QuestionDockRenderStateFacade,
@@ -181,6 +182,10 @@ function createHost(options?: {
     followUpAfterResolution: (tabId) =>
       postResolutionRuntime.followUpAfterResolution(tabId),
   });
+  const resolutionApply = new QuestionResolutionApplyFacade(
+    resolutionExecution,
+    resolutionWriteback,
+  );
 
   return {
     host,
@@ -191,6 +196,7 @@ function createHost(options?: {
     dockQueueRuntime,
     pendingRefreshRuntime,
     dockWriteback,
+    resolutionApply,
     renderQuestionDock,
     setTabNeedsAttention,
     postResolutionRuntime,
@@ -229,12 +235,11 @@ describe('QuestionDockCoordinator', () => {
       dockRefresh,
       dockRenderState,
       dockResolutionAction,
-      resolutionExecution,
+      resolutionApply,
       dockQueueRuntime,
       pendingRefreshRuntime,
       dockWriteback,
       postResolutionRuntime,
-      resolutionWriteback,
       applyResolvedQuestionState,
       runtimeByTab,
       setRenderQuestionDockImpl,
@@ -245,11 +250,10 @@ describe('QuestionDockCoordinator', () => {
       host,
       dockRenderState,
       dockResolutionAction,
-      resolutionExecution,
+      resolutionApply,
       dockQueueRuntime,
       dockRefresh,
       dockWriteback,
-      resolutionWriteback,
     );
     setRenderQuestionDockImpl(() => {
       coordinator.render();
@@ -289,21 +293,19 @@ describe('QuestionDockCoordinator', () => {
       host,
       dockRenderState,
       dockResolutionAction,
-      resolutionExecution,
+      resolutionApply,
       dockQueueRuntime,
       dockWriteback,
-      resolutionWriteback,
     } = createHost();
     dockRefresh.refreshPendingQuestionsForTab.mockResolvedValueOnce([request]);
     const coordinator = new QuestionDockCoordinator(
       host,
       dockRenderState,
       dockResolutionAction,
-      resolutionExecution,
+      resolutionApply,
       dockQueueRuntime,
       dockRefresh,
       dockWriteback,
-      resolutionWriteback,
     );
 
     await expect(
@@ -322,20 +324,18 @@ describe('QuestionDockCoordinator', () => {
       host,
       dockRenderState,
       dockResolutionAction,
-      resolutionExecution,
+      resolutionApply,
       dockQueueRuntime,
       dockWriteback,
-      resolutionWriteback,
     } = createHost();
     const coordinator = new QuestionDockCoordinator(
       host,
       dockRenderState,
       dockResolutionAction,
-      resolutionExecution,
+      resolutionApply,
       dockQueueRuntime,
       dockRefresh,
       dockWriteback,
-      resolutionWriteback,
     );
 
     coordinator.clearPendingQuestionsForTab();
@@ -352,10 +352,9 @@ describe('QuestionDockCoordinator', () => {
       dockRefresh,
       dockRenderState,
       dockResolutionAction,
-      resolutionExecution,
+      resolutionApply,
       dockQueueRuntime,
       dockWriteback,
-      resolutionWriteback,
       setRenderQuestionDockImpl,
     } = createHost({
       shouldUseAboveInputQuestionDock: false,
@@ -365,11 +364,10 @@ describe('QuestionDockCoordinator', () => {
       host,
       dockRenderState,
       dockResolutionAction,
-      resolutionExecution,
+      resolutionApply,
       dockQueueRuntime,
       dockRefresh,
       dockWriteback,
-      resolutionWriteback,
     );
     setRenderQuestionDockImpl(() => {
       coordinator.render();

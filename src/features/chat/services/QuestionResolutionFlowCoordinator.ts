@@ -1,7 +1,6 @@
 import type {
   QuestionDisplayMode,
   QuestionRequest,
-  QuestionResolution,
 } from '../../../core/types';
 import { createLogger } from '../../../shared';
 import type {
@@ -10,13 +9,12 @@ import type {
 } from '../runtime/QuestionInlineCardRenderer';
 import type { TabId } from '../tabs';
 import type { QuestionDockCoordinator } from './QuestionDockCoordinator';
+import type { QuestionResolutionApplyFacade } from './QuestionResolutionApplyFacade';
 import {
   createQuestionRejectExecutionAction,
   createQuestionReplyExecutionAction,
   type QuestionResolutionExecutionAction,
-  type QuestionResolutionExecutionFacade,
 } from './QuestionResolutionExecutionFacade';
-import type { QuestionResolutionWritebackFacade } from './QuestionResolutionWritebackFacade';
 
 const logger = createLogger('QuestionResolutionFlowCoordinator');
 
@@ -25,13 +23,9 @@ type QuestionDockResolutionPort = Pick<
   'waitForDockResolutionIfEnabled'
 >;
 type QuestionInlineCardActionPort = Pick<QuestionInlineCardRenderer, 'collectAction'>;
-type QuestionResolutionWritebackPort = Pick<
-  QuestionResolutionWritebackFacade,
-  'applyResolution'
->;
-type QuestionResolutionExecutionPort = Pick<
-  QuestionResolutionExecutionFacade,
-  'execute'
+type QuestionResolutionApplyPort = Pick<
+  QuestionResolutionApplyFacade,
+  'applyAction'
 >;
 
 export interface QuestionResolutionFlowCoordinatorHost {
@@ -42,8 +36,7 @@ export interface QuestionResolutionFlowCoordinatorHost {
 export interface QuestionResolutionFlowCoordinatorPorts {
   dockCoordinator: QuestionDockResolutionPort;
   inlineCardRenderer: QuestionInlineCardActionPort;
-  resolutionExecution: QuestionResolutionExecutionPort;
-  resolutionWriteback: QuestionResolutionWritebackPort;
+  resolutionApply: QuestionResolutionApplyPort;
 }
 
 export class QuestionResolutionFlowCoordinator {
@@ -79,14 +72,10 @@ export class QuestionResolutionFlowCoordinator {
     action: QuestionInlineCardAction,
     tabId: TabId | null,
   ): Promise<void> {
-    const resolution = await this.ports.resolutionExecution.execute(
+    await this.ports.resolutionApply.applyAction(
       this.createInlineResolutionExecutionAction(request, action),
+      tabId,
     );
-    if (!resolution) {
-      return;
-    }
-
-    await this.applyResolvedQuestionState(resolution, tabId);
   }
 
   private createInlineResolutionExecutionAction(
@@ -98,12 +87,5 @@ export class QuestionResolutionFlowCoordinator {
     }
 
     return createQuestionReplyExecutionAction(request, action.answers);
-  }
-
-  private async applyResolvedQuestionState(
-    resolution: QuestionResolution,
-    tabId: TabId | null,
-  ): Promise<void> {
-    await this.ports.resolutionWriteback.applyResolution(resolution, tabId);
   }
 }

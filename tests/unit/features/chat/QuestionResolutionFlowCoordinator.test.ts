@@ -1,7 +1,6 @@
 import type {
   QuestionDisplayMode,
   QuestionRequest,
-  QuestionResolution,
 } from '../../../../src/core/types';
 import { setLocale } from '../../../../src/i18n';
 import {
@@ -35,7 +34,7 @@ function createCoordinator(options?: {
   displayMode?: QuestionDisplayMode;
   dockResolves?: boolean;
   action?: Awaited<ReturnType<QuestionResolutionFlowCoordinatorPorts['inlineCardRenderer']['collectAction']>>;
-  executionResult?: QuestionResolution | null;
+  applyResult?: boolean;
 }) {
   const action = options && 'action' in options
     ? options.action
@@ -50,8 +49,7 @@ function createCoordinator(options?: {
   const ports: {
     dockCoordinator: jest.Mocked<QuestionResolutionFlowCoordinatorPorts['dockCoordinator']>;
     inlineCardRenderer: jest.Mocked<QuestionResolutionFlowCoordinatorPorts['inlineCardRenderer']>;
-    resolutionExecution: jest.Mocked<QuestionResolutionFlowCoordinatorPorts['resolutionExecution']>;
-    resolutionWriteback: jest.Mocked<QuestionResolutionFlowCoordinatorPorts['resolutionWriteback']>;
+    resolutionApply: jest.Mocked<QuestionResolutionFlowCoordinatorPorts['resolutionApply']>;
   } = {
     dockCoordinator: {
       waitForDockResolutionIfEnabled: jest.fn().mockResolvedValue(options?.dockResolves ?? false),
@@ -59,17 +57,8 @@ function createCoordinator(options?: {
     inlineCardRenderer: {
       collectAction: jest.fn().mockResolvedValue(action),
     },
-    resolutionExecution: {
-      execute: jest.fn().mockImplementation((executionAction) =>
-        Promise.resolve(
-          options && 'executionResult' in options
-            ? options.executionResult
-            : executionAction.resolution,
-        ),
-      ),
-    },
-    resolutionWriteback: {
-      applyResolution: jest.fn().mockResolvedValue(undefined),
+    resolutionApply: {
+      applyAction: jest.fn().mockResolvedValue(options?.applyResult ?? true),
     },
   };
 
@@ -97,11 +86,10 @@ describe('QuestionResolutionFlowCoordinator', () => {
       'tab-active',
     );
     expect(ports.inlineCardRenderer.collectAction).not.toHaveBeenCalled();
-    expect(ports.resolutionExecution.execute).not.toHaveBeenCalled();
-    expect(ports.resolutionWriteback.applyResolution).not.toHaveBeenCalled();
+    expect(ports.resolutionApply.applyAction).not.toHaveBeenCalled();
   });
 
-  it('replies through the inline card fallback and applies answered state', async () => {
+  it('replies through the inline card fallback via the shared apply seam', async () => {
     const request = createQuestionRequest();
     const { coordinator, ports } = createCoordinator({ displayMode: 'single' });
 
@@ -112,7 +100,7 @@ describe('QuestionResolutionFlowCoordinator', () => {
       'single',
       'tab-active',
     );
-    expect(ports.resolutionExecution.execute).toHaveBeenCalledWith({
+    expect(ports.resolutionApply.applyAction).toHaveBeenCalledWith({
       type: 'reply',
       request,
       answers: [['TypeScript']],
@@ -121,15 +109,10 @@ describe('QuestionResolutionFlowCoordinator', () => {
         status: 'answered',
         answers: [['TypeScript']],
       },
-    });
-    expect(ports.resolutionWriteback.applyResolution).toHaveBeenCalledWith({
-      request,
-      status: 'answered',
-      answers: [['TypeScript']],
     }, 'tab-active');
   });
 
-  it('rejects through the inline card fallback and applies rejected state', async () => {
+  it('rejects through the inline card fallback via the shared apply seam', async () => {
     const request = createQuestionRequest();
     const { coordinator, ports } = createCoordinator({
       action: { type: 'reject' },
@@ -137,17 +120,13 @@ describe('QuestionResolutionFlowCoordinator', () => {
 
     await coordinator.showQuestionDialog(request, 'tab-active');
 
-    expect(ports.resolutionExecution.execute).toHaveBeenCalledWith({
+    expect(ports.resolutionApply.applyAction).toHaveBeenCalledWith({
       type: 'reject',
       request,
       resolution: {
         request,
         status: 'rejected',
       },
-    });
-    expect(ports.resolutionWriteback.applyResolution).toHaveBeenCalledWith({
-      request,
-      status: 'rejected',
     }, 'tab-active');
   });
 
@@ -157,17 +136,15 @@ describe('QuestionResolutionFlowCoordinator', () => {
 
     await coordinator.showQuestionDialog(request, 'tab-active');
 
-    expect(ports.resolutionExecution.execute).not.toHaveBeenCalled();
-    expect(ports.resolutionWriteback.applyResolution).not.toHaveBeenCalled();
+    expect(ports.resolutionApply.applyAction).not.toHaveBeenCalled();
   });
 
-  it('skips writeback when shared inline execution fails', async () => {
+  it('still delegates inline failures to the shared apply seam', async () => {
     const request = createQuestionRequest();
-    const { coordinator, ports } = createCoordinator({ executionResult: null });
+    const { coordinator, ports } = createCoordinator({ applyResult: false });
 
     await coordinator.showQuestionDialog(request, 'tab-active');
 
-    expect(ports.resolutionExecution.execute).toHaveBeenCalledTimes(1);
-    expect(ports.resolutionWriteback.applyResolution).not.toHaveBeenCalled();
+    expect(ports.resolutionApply.applyAction).toHaveBeenCalledTimes(1);
   });
 });
