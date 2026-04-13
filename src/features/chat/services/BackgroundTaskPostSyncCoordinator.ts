@@ -1,5 +1,6 @@
 import type { Conversation } from '../../../core/types';
 import type { TabId } from '../tabs';
+import type { BackgroundConversationAttentionCoordinator } from './BackgroundConversationAttentionCoordinator';
 import type { BackgroundConversationPostSyncRefreshExecutor } from './BackgroundConversationPostSyncRefreshExecutor';
 import type { PostSyncQuestionTodoRefreshFacade } from './PostSyncQuestionTodoRefreshFacade';
 import type {
@@ -23,6 +24,11 @@ type BackgroundConversationPostSyncRefreshPort = Pick<
   | 'refreshBackgroundTabConversation'
   | 'refreshSignalSyncedBackgroundConversation'
 >;
+type BackgroundConversationAttentionPort = Pick<
+  BackgroundConversationAttentionCoordinator,
+  | 'commitBackgroundTabSyncAttention'
+  | 'commitSignalSyncAttention'
+>;
 type VisibleConversationPostSyncStatePort = Pick<
   VisibleConversationPostSyncStateCoordinator,
   'commitPostSyncState'
@@ -35,7 +41,6 @@ export interface BackgroundTaskPostSyncResult {
 
 export interface BackgroundTaskPostSyncCoordinatorHost {
   markBackgroundTaskAuthoritativeSync(tabId: TabId | null, reason: string): void;
-  setTabNeedsAttention(tabId: TabId | null, needsAttention: boolean): void;
 }
 
 interface BackgroundTaskPostSyncBaseOptions {
@@ -67,6 +72,7 @@ export class BackgroundTaskPostSyncCoordinator {
     private readonly backgroundConversationPostSyncRefresh:
       BackgroundConversationPostSyncRefreshPort,
     private readonly visibleConversationPostSyncState: VisibleConversationPostSyncStatePort,
+    private readonly backgroundConversationAttention: BackgroundConversationAttentionPort,
   ) {}
 
   async handleVisibleConversationSyncComplete(
@@ -91,10 +97,12 @@ export class BackgroundTaskPostSyncCoordinator {
       conversation: options.conversation,
       tabHasBackgroundTask: options.tabHasBackgroundTask,
     });
-
-    if (this.didConversationChange(options.syncResult, options.previousFingerprint)) {
-      this.host.setTabNeedsAttention(options.tabId, options.tabId !== options.activeTabId);
-    }
+    this.backgroundConversationAttention.commitSignalSyncAttention({
+      tabId: options.tabId,
+      activeTabId: options.activeTabId,
+      previousFingerprint: options.previousFingerprint,
+      syncResult: options.syncResult,
+    });
   }
 
   async handleBackgroundTabSyncComplete(options: BackgroundTabPostSyncOptions): Promise<void> {
@@ -102,16 +110,10 @@ export class BackgroundTaskPostSyncCoordinator {
       tabId: options.tabId,
       conversation: options.conversation,
     });
-
-    if (this.didConversationChange(options.syncResult, options.previousFingerprint)) {
-      this.host.setTabNeedsAttention(options.tabId, true);
-    }
-  }
-
-  private didConversationChange(
-    syncResult: BackgroundTaskPostSyncResult,
-    previousFingerprint: string,
-  ): boolean {
-    return syncResult.changed || syncResult.fingerprint !== previousFingerprint;
+    this.backgroundConversationAttention.commitBackgroundTabSyncAttention({
+      tabId: options.tabId,
+      previousFingerprint: options.previousFingerprint,
+      syncResult: options.syncResult,
+    });
   }
 }

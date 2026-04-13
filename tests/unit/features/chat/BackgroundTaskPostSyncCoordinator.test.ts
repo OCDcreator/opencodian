@@ -1,4 +1,5 @@
 import type { Conversation } from '../../../../src/core/types';
+import type { BackgroundConversationAttentionCoordinator } from '../../../../src/features/chat/services/BackgroundConversationAttentionCoordinator';
 import type { BackgroundConversationPostSyncRefreshExecutor } from '../../../../src/features/chat/services/BackgroundConversationPostSyncRefreshExecutor';
 import {
   BackgroundTaskPostSyncCoordinator,
@@ -23,6 +24,11 @@ type BackgroundConversationRefreshPort = Pick<
   | 'refreshBackgroundTabConversation'
   | 'refreshSignalSyncedBackgroundConversation'
 >;
+type BackgroundConversationAttentionPort = Pick<
+  BackgroundConversationAttentionCoordinator,
+  | 'commitBackgroundTabSyncAttention'
+  | 'commitSignalSyncAttention'
+>;
 type VisibleConversationPostSyncStatePort = Pick<
   VisibleConversationPostSyncStateCoordinator,
   'commitPostSyncState'
@@ -42,7 +48,6 @@ function createConversation(): Conversation {
 function createHost(): MockedBackgroundTaskPostSyncHost {
   return {
     markBackgroundTaskAuthoritativeSync: jest.fn(),
-    setTabNeedsAttention: jest.fn(),
   };
 }
 
@@ -68,6 +73,13 @@ function createVisibleStateCoordinator(): jest.Mocked<VisibleConversationPostSyn
   };
 }
 
+function createBackgroundAttentionCoordinator(): jest.Mocked<BackgroundConversationAttentionPort> {
+  return {
+    commitSignalSyncAttention: jest.fn(),
+    commitBackgroundTabSyncAttention: jest.fn(),
+  };
+}
+
 describe('BackgroundTaskPostSyncCoordinator', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -78,11 +90,13 @@ describe('BackgroundTaskPostSyncCoordinator', () => {
     const refreshFacade = createVisibleRefreshFacade();
     const backgroundRefreshExecutor = createBackgroundRefreshExecutor();
     const visibleStateCoordinator = createVisibleStateCoordinator();
+    const backgroundAttentionCoordinator = createBackgroundAttentionCoordinator();
     const coordinator = new BackgroundTaskPostSyncCoordinator(
       host,
       refreshFacade,
       backgroundRefreshExecutor,
       visibleStateCoordinator,
+      backgroundAttentionCoordinator,
     );
 
     const outcome = await coordinator.handleVisibleConversationSyncComplete({
@@ -120,6 +134,7 @@ describe('BackgroundTaskPostSyncCoordinator', () => {
     const refreshFacade = createVisibleRefreshFacade();
     const backgroundRefreshExecutor = createBackgroundRefreshExecutor();
     const visibleStateCoordinator = createVisibleStateCoordinator();
+    const backgroundAttentionCoordinator = createBackgroundAttentionCoordinator();
     visibleStateCoordinator.commitPostSyncState.mockReturnValue({
       shouldApplySyncedConversationUpdate: false,
       shouldRenderBackgroundTaskIndicator: true,
@@ -129,6 +144,7 @@ describe('BackgroundTaskPostSyncCoordinator', () => {
       refreshFacade,
       backgroundRefreshExecutor,
       visibleStateCoordinator,
+      backgroundAttentionCoordinator,
     );
 
     const outcome = await coordinator.handleVisibleConversationSyncComplete({
@@ -157,6 +173,7 @@ describe('BackgroundTaskPostSyncCoordinator', () => {
     const refreshFacade = createVisibleRefreshFacade();
     const backgroundRefreshExecutor = createBackgroundRefreshExecutor();
     const visibleStateCoordinator = createVisibleStateCoordinator();
+    const backgroundAttentionCoordinator = createBackgroundAttentionCoordinator();
     visibleStateCoordinator.commitPostSyncState.mockReturnValue({
       shouldApplySyncedConversationUpdate: false,
       shouldRenderBackgroundTaskIndicator: true,
@@ -166,6 +183,7 @@ describe('BackgroundTaskPostSyncCoordinator', () => {
       refreshFacade,
       backgroundRefreshExecutor,
       visibleStateCoordinator,
+      backgroundAttentionCoordinator,
     );
 
     const outcome = await coordinator.handleVisibleConversationSyncComplete({
@@ -204,11 +222,13 @@ describe('BackgroundTaskPostSyncCoordinator', () => {
     const refreshFacade = createVisibleRefreshFacade();
     const backgroundRefreshExecutor = createBackgroundRefreshExecutor();
     const visibleStateCoordinator = createVisibleStateCoordinator();
+    const backgroundAttentionCoordinator = createBackgroundAttentionCoordinator();
     const coordinator = new BackgroundTaskPostSyncCoordinator(
       host,
       refreshFacade,
       backgroundRefreshExecutor,
       visibleStateCoordinator,
+      backgroundAttentionCoordinator,
     );
 
     await coordinator.handleSignalSyncComplete({
@@ -230,7 +250,12 @@ describe('BackgroundTaskPostSyncCoordinator', () => {
       conversation,
       tabHasBackgroundTask: false,
     });
-    expect(host.setTabNeedsAttention).toHaveBeenCalledWith('tab-bg', true);
+    expect(backgroundAttentionCoordinator.commitSignalSyncAttention).toHaveBeenCalledWith({
+      tabId: 'tab-bg',
+      activeTabId: 'tab-active',
+      previousFingerprint: 'old',
+      syncResult: { changed: true, fingerprint: 'new' },
+    });
   });
 
   it('skips attention changes when a signal sync is unchanged', async () => {
@@ -239,11 +264,13 @@ describe('BackgroundTaskPostSyncCoordinator', () => {
     const refreshFacade = createVisibleRefreshFacade();
     const backgroundRefreshExecutor = createBackgroundRefreshExecutor();
     const visibleStateCoordinator = createVisibleStateCoordinator();
+    const backgroundAttentionCoordinator = createBackgroundAttentionCoordinator();
     const coordinator = new BackgroundTaskPostSyncCoordinator(
       host,
       refreshFacade,
       backgroundRefreshExecutor,
       visibleStateCoordinator,
+      backgroundAttentionCoordinator,
     );
 
     await coordinator.handleSignalSyncComplete({
@@ -261,7 +288,12 @@ describe('BackgroundTaskPostSyncCoordinator', () => {
       conversation,
       tabHasBackgroundTask: false,
     });
-    expect(host.setTabNeedsAttention).not.toHaveBeenCalled();
+    expect(backgroundAttentionCoordinator.commitSignalSyncAttention).toHaveBeenCalledWith({
+      tabId: 'tab-bg',
+      activeTabId: 'tab-active',
+      previousFingerprint: 'same',
+      syncResult: { changed: false, fingerprint: 'same' },
+    });
   });
 
   it('forces todo/status refresh and marks attention after background-tab sync changes', async () => {
@@ -270,11 +302,13 @@ describe('BackgroundTaskPostSyncCoordinator', () => {
     const refreshFacade = createVisibleRefreshFacade();
     const backgroundRefreshExecutor = createBackgroundRefreshExecutor();
     const visibleStateCoordinator = createVisibleStateCoordinator();
+    const backgroundAttentionCoordinator = createBackgroundAttentionCoordinator();
     const coordinator = new BackgroundTaskPostSyncCoordinator(
       host,
       refreshFacade,
       backgroundRefreshExecutor,
       visibleStateCoordinator,
+      backgroundAttentionCoordinator,
     );
 
     await coordinator.handleBackgroundTabSyncComplete({
@@ -289,6 +323,10 @@ describe('BackgroundTaskPostSyncCoordinator', () => {
       tabId: 'tab-bg',
       conversation,
     });
-    expect(host.setTabNeedsAttention).toHaveBeenCalledWith('tab-bg', true);
+    expect(backgroundAttentionCoordinator.commitBackgroundTabSyncAttention).toHaveBeenCalledWith({
+      tabId: 'tab-bg',
+      previousFingerprint: 'old',
+      syncResult: { changed: false, fingerprint: 'new' },
+    });
   });
 });

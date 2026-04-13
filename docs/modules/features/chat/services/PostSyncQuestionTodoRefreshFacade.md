@@ -11,7 +11,7 @@
 - 保持 visible source 的窄 refresh 入口，不再同时承接 signal/background-tab 的 source routing
 - 把 background-only 的 execution seam 让给 `BackgroundConversationPostSyncRefreshExecutor`，避免 visible/background 继续共享一个 facade surface
 
-它不负责 authoritative mark、attention、visible sync 的 state-commit 判定，也不自己决定 todo/status runtime gate；这些职责仍分别留在 `BackgroundTaskPostSyncCoordinator` 与 `QuestionTodoStatusRefreshCoordinator`。visible session-id 配对仍由 `PostSyncQuestionTodoRefreshPlanBuilder` 持有；signal/background-tab source 到 force-refresh policy 的映射与执行则下沉到 `BackgroundConversationPostSyncRefreshExecutor`。它的 host 装配现在通常由 `QuestionTodoBackgroundTaskRefreshHostAdapter` 统一提供。
+它不负责 authoritative mark、background attention、visible sync 的 state-commit 判定，也不自己决定 todo/status runtime gate；这些职责仍分别留在 `BackgroundTaskPostSyncCoordinator`、`BackgroundConversationAttentionCoordinator` 与 `QuestionTodoStatusRefreshCoordinator`。visible session-id 配对仍由 `PostSyncQuestionTodoRefreshPlanBuilder` 持有；signal/background-tab source 到 force-refresh policy 的映射与执行则下沉到 `BackgroundConversationPostSyncRefreshExecutor`。它的 host 装配现在通常由 `QuestionTodoBackgroundTaskRefreshHostAdapter` 统一提供。
 
 ## 公开接口
 
@@ -31,6 +31,7 @@ export class PostSyncQuestionTodoRefreshFacade {
 
 - `OpenCodianView` 现在通过 `QuestionTodoBackgroundTaskRefreshHostAdapter` 间接装配 `PostSyncQuestionTodoRefreshPlanBuilder` 的当前 conversation session host
 - `QuestionTodoStatusRefreshCoordinator` 继续拥有 pending-question + todo/status 的组合刷新顺序与 runtime gate
-- `BackgroundTaskPostSyncCoordinator` 继续拥有 authoritative mark、attention、visible sync apply/indicator outcome 与 state-commit 判定，但它现在把 background execution 委托给 `BackgroundConversationPostSyncRefreshExecutor`
+- `BackgroundTaskPostSyncCoordinator` 继续拥有 signal authoritative mark，以及 visible sync apply/indicator outcome 与 refresh routing，但它现在把 background execution 委托给 `BackgroundConversationPostSyncRefreshExecutor`
+- `BackgroundConversationAttentionCoordinator` 负责 signal/background-tab sync 的 fingerprint/attention outcome，避免 visible facade 再耦合 background tab state policy
 - signal/background-tab 的 todo/status 强制刷新策略仍由 `PostSyncQuestionTodoRefreshPlanBuilder` 持有，只是执行入口不再和 visible source 共享同一个 facade
 - 这条边界推进的是 master plan 的 P2 `question / todo / background task` lane：让 visible refresh 与 background refresh 进入不同模块，同时继续把 session/policy 选择留在 builder、runtime gate 留在 coordinator

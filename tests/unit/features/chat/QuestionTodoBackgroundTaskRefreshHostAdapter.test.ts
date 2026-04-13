@@ -326,7 +326,10 @@ describe('QuestionTodoBackgroundTaskRefreshHostAdapter', () => {
       'tab-active',
       'sync-event:message.updated',
     );
-    hosts.backgroundTaskPostSyncCoordinatorHost.setTabNeedsAttention('tab-active', true);
+    hosts.backgroundConversationAttentionCoordinatorHost.setTabNeedsAttention(
+      'tab-active',
+      true,
+    );
 
     expect(viewHost.refreshPendingQuestionsForTab).toHaveBeenCalledWith(
       'tab-active',

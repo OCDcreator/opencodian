@@ -8,6 +8,10 @@ import type { BackgroundTaskIndicatorCoordinator } from '../runtime/BackgroundTa
 import type { TabRuntimeStateBridge } from '../runtime/TabRuntimeStateBridge';
 import type { TabId } from '../tabs';
 import {
+  BackgroundConversationAttentionCoordinator,
+  type BackgroundConversationAttentionCoordinatorHost,
+} from './BackgroundConversationAttentionCoordinator';
+import {
   BackgroundConversationPostSyncRefreshExecutor,
   type BackgroundTaskPostSyncRefreshPort,
 } from './BackgroundConversationPostSyncRefreshExecutor';
@@ -182,6 +186,7 @@ export interface QuestionTodoBackgroundTaskRefreshHosts {
   postSyncQuestionTodoRefreshPlanBuilderHost: PostSyncQuestionTodoRefreshPlanBuilderHost;
   backgroundTaskPostSyncRefreshPort: BackgroundTaskPostSyncRefreshPort;
   visibleConversationPostSyncStateCoordinatorHost: VisibleConversationPostSyncStateCoordinatorHost;
+  backgroundConversationAttentionCoordinatorHost: BackgroundConversationAttentionCoordinatorHost;
   backgroundTaskPostSyncCoordinatorHost: BackgroundTaskPostSyncCoordinatorHost;
 }
 
@@ -255,12 +260,14 @@ export function createQuestionTodoBackgroundTaskRefreshHosts(
         viewHost.setTabConversationSyncFingerprint(tabId, fingerprint);
       },
     },
+    backgroundConversationAttentionCoordinatorHost: {
+      setTabNeedsAttention: (tabId: TabId | null, needsAttention: boolean) =>
+        viewHost.setTabNeedsAttention(tabId, needsAttention),
+    },
     backgroundTaskPostSyncCoordinatorHost: {
       markBackgroundTaskAuthoritativeSync: (tabId: TabId | null, reason: string) => {
         viewHost.markBackgroundTaskAuthoritativeSync(tabId, reason);
       },
-      setTabNeedsAttention: (tabId: TabId | null, needsAttention: boolean) =>
-        viewHost.setTabNeedsAttention(tabId, needsAttention),
     },
   };
 }
@@ -292,11 +299,16 @@ export function createQuestionTodoBackgroundTaskRefreshServices(
     new VisibleConversationPostSyncStateCoordinator(
       hosts.visibleConversationPostSyncStateCoordinatorHost,
     );
+  const backgroundConversationAttentionCoordinator =
+    new BackgroundConversationAttentionCoordinator(
+      hosts.backgroundConversationAttentionCoordinatorHost,
+    );
   const backgroundTaskPostSyncCoordinator = new BackgroundTaskPostSyncCoordinator(
     hosts.backgroundTaskPostSyncCoordinatorHost,
     postSyncQuestionTodoRefreshFacade,
     backgroundConversationPostSyncRefreshExecutor,
     visibleConversationPostSyncStateCoordinator,
+    backgroundConversationAttentionCoordinator,
   );
 
   return {
