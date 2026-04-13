@@ -264,18 +264,11 @@ import {
   type QuestionRuntimeViewHostFactoryHost,
 } from './services/QuestionRuntimeViewHostFactory';
 import {
-  createQuestionTodoBackgroundTaskActivationServices,
-} from './services/QuestionTodoBackgroundTaskActivationHostAdapter';
-import {
-  createQuestionTodoBackgroundTaskRuntimeViewHosts,
   type QuestionTodoBackgroundTaskRuntimeViewHostFactoryHost,
 } from './services/QuestionTodoBackgroundTaskRuntimeViewHostFactory';
 import {
-  createQuestionTodoBackgroundTaskRefreshServices,
-} from './services/QuestionTodoBackgroundTaskRefreshHostAdapter';
-import {
-  createVisibleConversationPostSyncStateServices,
-} from './services/VisibleConversationPostSyncStateHostAdapter';
+  createQuestionTodoBackgroundTaskRuntimeServiceBundle,
+} from './services/QuestionTodoBackgroundTaskRuntimeServiceBundle';
 import {
   isElementNearBottom,
   scrollElementToBottom,
@@ -1099,30 +1092,13 @@ export class OpenCodianView extends ItemView {
         this.questionDockCoordinator.render();
       },
     );
-    const questionTodoBackgroundTaskRuntimeViewHosts =
-      createQuestionTodoBackgroundTaskRuntimeViewHosts(
-        this.createQuestionTodoBackgroundTaskRuntimeViewHostFactoryHost(),
-      );
     const {
-      visibleConversationPostSyncStateCoordinator,
-    } = createVisibleConversationPostSyncStateServices(
-      questionTodoBackgroundTaskRuntimeViewHosts.visibleConversationPostSyncStateViewHost,
-    );
-    const {
-      questionTodoActivationRefreshBridge,
       visibleConversationPostSyncCoordinator,
       backgroundConversationPostSyncHandoffCoordinator,
-    } = createQuestionTodoBackgroundTaskRefreshServices(
-      questionTodoBackgroundTaskRuntimeViewHosts.questionTodoBackgroundTaskRefreshViewHost,
-      questionTodoBackgroundTaskRuntimeViewHosts.backgroundConversationPostSyncHandoffViewHost,
-      visibleConversationPostSyncStateCoordinator,
-    );
-    const {
       questionTodoActivationRefreshCoordinator,
       backgroundTaskActivationIndicatorCoordinator,
-    } = createQuestionTodoBackgroundTaskActivationServices(
-      questionTodoBackgroundTaskRuntimeViewHosts.questionTodoBackgroundTaskActivationViewHost,
-      questionTodoActivationRefreshBridge,
+    } = createQuestionTodoBackgroundTaskRuntimeServiceBundle(
+      this.createQuestionTodoBackgroundTaskRuntimeViewHostFactoryHost(),
     );
     this.activeTabContextUsageCoordinator = new ActiveTabContextUsageCoordinator(
       this.createActiveTabContextUsageCoordinatorHost(),

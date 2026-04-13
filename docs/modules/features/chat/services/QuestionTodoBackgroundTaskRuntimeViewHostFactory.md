@@ -11,7 +11,7 @@
 - 再派生 `QuestionTodoBackgroundTaskRefreshHostAdapter`、`BackgroundConversationPostSyncHandoffHostAdapter` 与 `QuestionTodoBackgroundTaskActivationHostAdapter` 需要的三个 view host
 - 让 `OpenCodianView` 不再内联 shared host 与三段 adapter 依赖装配
 
-它不负责实例化 `VisibleConversationPostSyncCoordinator`、`QuestionTodoActivationRefreshBridge`、`BackgroundConversationPostSyncHandoffCoordinator` 或 activation-side coordinator；这些仍分别留在既有 adapter / service 模块。这个 factory 只负责 question/todo/background-task 共享 runtime seam 的 host assembly。
+它不负责实例化 `VisibleConversationPostSyncCoordinator`、`QuestionTodoActivationRefreshBridge`、`BackgroundConversationPostSyncHandoffCoordinator` 或 activation-side coordinator；这些现在由 `QuestionTodoBackgroundTaskRuntimeServiceBundle` 按既有顺序继续装配。这个 factory 只负责 question/todo/background-task 共享 runtime seam 的 host assembly。
 
 ## 公开接口
 
@@ -30,7 +30,7 @@ export function createQuestionTodoBackgroundTaskRuntimeViewHosts(
 
 ## 边界
 
-- `OpenCodianView` 只保留 grouped port 提供与后续 service 实例化顺序
+- `OpenCodianView` 只保留 grouped port 提供，并把后续 service 实例化顺序交给 `QuestionTodoBackgroundTaskRuntimeServiceBundle`
 - `QuestionTodoBackgroundTaskRuntimeViewHostFactory` 负责把 grouped port 重新组合成 visible-state、refresh、background handoff、activation 四条共享 host seam
 - `QuestionTodoBackgroundTaskRefreshHostAdapter`、`BackgroundConversationPostSyncHandoffHostAdapter`、`QuestionTodoBackgroundTaskActivationHostAdapter` 的业务边界保持不变
-- 这次切片推进的是 master plan 的 P2 `question / todo / background task` lane：把 grouped host assembly 从 `OpenCodianView` 继续迁到单一职责模块
+- 这次切片推进的是 master plan 的 P2 `question / todo / background task` lane：让 grouped host assembly 与后续 service-bundle instantiation 分别落到各自的单一职责模块
