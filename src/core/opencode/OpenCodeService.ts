@@ -52,6 +52,11 @@ import type { OpenCodianSettings } from '../types/settings';
 import { getServerBaseUrl, isLocalServerMode } from '../types/settings';
 import { createSdkClient } from './createSdkClient';
 import { detectOmoMessageMeta } from './omoCompat';
+import {
+  OpenCodeSyncEventRuntimeCoordinator,
+  type SessionActivityStatus,
+  type SessionSyncEventUpdate,
+} from './OpenCodeSyncEventRuntimeCoordinator';
 import { OpenCodeSdkFacade } from './OpenCodeSdkFacade';
 import type { SdkFeatureFlags } from './sdkFeatureFlags';
 import { resolveSdkFeatureFlags } from './sdkFeatureFlags';
@@ -75,13 +80,14 @@ import type {
 
 const logger = createLogger('OpenCodeService');
 const INLINE_READ_TOOL_PREFIX = 'Called the Read tool with the following input:';
-const TRANSIENT_CONNECTIVITY_RECOVERY_POLL_MS = 3_000;
 const TRANSIENT_CONNECTIVITY_ERROR_PATTERNS = [
   /net::ERR_CONNECTION_REFUSED/i,
   /net::ERR_CONNECTION_RESET/i,
   /\bECONNREFUSED\b/i,
   /\bECONNRESET\b/i,
 ];
+
+export type { SessionActivityStatus, SessionSyncEventUpdate } from './OpenCodeSyncEventRuntimeCoordinator';
 
 function cloneSettings(settings: OpenCodianSettings): OpenCodianSettings {
   return JSON.parse(JSON.stringify(settings)) as OpenCodianSettings;
@@ -462,49 +468,10 @@ type SessionTodoUpdate = {
   todos: SessionTodo[];
 };
 
-type SessionTodoListener = (update: SessionTodoUpdate) => void;
-
-export type SessionActivityStatus =
-  | {
-      type: 'idle';
-    }
-  | {
-      type: 'busy';
-    }
-  | {
-      type: 'retry';
-      attempt: number;
-      message: string;
-      next: number;
-    };
-
 type SessionStatusUpdate = {
   sessionId: string;
   status: SessionActivityStatus;
 };
-
-type SessionStatusListener = (update: SessionStatusUpdate) => void;
-
-export type SessionSyncEventUpdate =
-  | {
-      sessionId: string;
-      type: 'message.updated';
-      messageId: string | null;
-    }
-  | {
-      sessionId: string;
-      type: 'message.part.updated';
-      messageId: string | null;
-      partId: string | null;
-      partType: string | null;
-      time: number | null;
-    }
-  | {
-      sessionId: string;
-      type: 'session.diff';
-    };
-
-type SessionSyncEventListener = (update: SessionSyncEventUpdate) => void;
 
 type OpenCodeEventListener = (update: SdkEventEnvelope) => void;
 
@@ -526,12 +493,7 @@ export class OpenCodeService {
   private baseUrl: string;
   private activeStreams = new Map<string, ActiveStreamContext>();
   private sdkFeatureFlags: SdkFeatureFlags;
-  private sessionTodoListeners = new Set<SessionTodoListener>();
-  private sessionStatusListeners = new Set<SessionStatusListener>();
-  private sessionSyncEventListeners = new Set<SessionSyncEventListener>();
-  private syncEventAbortController: AbortController | null = null;
-  private syncEventPromise: Promise<void> | null = null;
-  private syncEventWanted = false;
+  private syncEventRuntime: OpenCodeSyncEventRuntimeCoordinator;
   private openCodeEventListeners = new Set<OpenCodeEventListener>();
   private catalogUpdateListeners = new Set<CatalogUpdateListener>();
   private eventAbortController: AbortController | null = null;
@@ -562,6 +524,20 @@ export class OpenCodeService {
       authHeaders: this.getAuthHeaders(),
       directory: this.getScopedDirectoryPath(),
     }));
+    this.syncEventRuntime = new OpenCodeSyncEventRuntimeCoordinator({
+      shouldUseSdkSync: () => this.shouldUseSdk('sdkSync'),
+      subscribeToSyncEvents: async (signal) => {
+        const response = await this.sdk.global.syncEvent.subscribe({ signal });
+        return (response as { stream: AsyncIterable<unknown> }).stream;
+      },
+      normalizeSessionTodos: (response) => this.normalizeSessionTodos(response),
+      normalizeSessionStatus: (status) => this.normalizeSessionStatus(status),
+      isTransientConnectivityError: (error) => this.isTransientConnectivityError(error),
+      logSyncEventStreamFailure: (error) =>
+        this.logServiceWarning('global.sync-event', 'SDK sync event stream failed', error),
+      checkHealth: () => this.checkHealth(),
+      delay: (ms, signal) => this.delay(ms, signal),
+    });
 
     this.serverManager = new ServerManager(
       this.buildServerConfig(settings),
@@ -640,17 +616,6 @@ export class OpenCodeService {
     this.transientConnectivityLogState = null;
   }
 
-  private async waitForTransientConnectivityRecovery(signal: AbortSignal): Promise<void> {
-    while (!signal.aborted && this.syncEventWanted && this.hasSyncEventListeners()) {
-      const healthy = await this.checkHealth().catch(() => false);
-      if (healthy) {
-        return;
-      }
-
-      await this.delay(TRANSIENT_CONNECTIVITY_RECOVERY_POLL_MS, signal).catch(() => {});
-    }
-  }
-
   /** Initialize the service */
   async initialize(): Promise<void> {
     if (isLocalServerMode(this.settings.server) && this.settings.server.local.autoStart) {
@@ -666,7 +631,7 @@ export class OpenCodeService {
     if (previousDirectory !== this.getScopedDirectoryPath()) {
       this.toolSchemasByModel.clear();
     }
-    this.restartSyncEventSubscription();
+    this.syncEventRuntime.restartSubscription();
     this.restartOpenCodeEventSubscriptions();
   }
 
@@ -701,19 +666,19 @@ export class OpenCodeService {
     }
 
     await this.serverManager.start();
-    this.ensureSyncEventSubscription();
+    this.syncEventRuntime.ensureSubscription();
     this.ensureOpenCodeEventSubscriptions();
   }
 
   /** Stop the service */
   async stop(): Promise<void> {
-    this.stopSyncEventSubscription();
+    this.syncEventRuntime.stopSubscription();
     this.stopOpenCodeEventSubscriptions();
     await this.serverManager.stop();
   }
 
   dispose(): void {
-    this.stopSyncEventSubscription();
+    this.syncEventRuntime.stopSubscription();
     this.stopOpenCodeEventSubscriptions();
     this.serverManager.dispose();
   }
@@ -1055,43 +1020,22 @@ export class OpenCodeService {
     }
   }
 
-  subscribeToSessionTodoUpdates(listener: SessionTodoListener): () => void {
-    this.sessionTodoListeners.add(listener);
-    this.syncEventWanted = true;
-    this.ensureSyncEventSubscription();
-
-    return () => {
-      this.sessionTodoListeners.delete(listener);
-      if (!this.hasSyncEventListeners()) {
-        this.stopSyncEventSubscription();
-      }
-    };
+  subscribeToSessionTodoUpdates(
+    listener: (update: SessionTodoUpdate) => void,
+  ): () => void {
+    return this.syncEventRuntime.subscribeToSessionTodoUpdates(listener);
   }
 
-  subscribeToSessionStatusUpdates(listener: SessionStatusListener): () => void {
-    this.sessionStatusListeners.add(listener);
-    this.syncEventWanted = true;
-    this.ensureSyncEventSubscription();
-
-    return () => {
-      this.sessionStatusListeners.delete(listener);
-      if (!this.hasSyncEventListeners()) {
-        this.stopSyncEventSubscription();
-      }
-    };
+  subscribeToSessionStatusUpdates(
+    listener: (update: SessionStatusUpdate) => void,
+  ): () => void {
+    return this.syncEventRuntime.subscribeToSessionStatusUpdates(listener);
   }
 
-  subscribeToSessionSyncEvents(listener: SessionSyncEventListener): () => void {
-    this.sessionSyncEventListeners.add(listener);
-    this.syncEventWanted = true;
-    this.ensureSyncEventSubscription();
-
-    return () => {
-      this.sessionSyncEventListeners.delete(listener);
-      if (!this.hasSyncEventListeners()) {
-        this.stopSyncEventSubscription();
-      }
-    };
+  subscribeToSessionSyncEvents(
+    listener: (update: SessionSyncEventUpdate) => void,
+  ): () => void {
+    return this.syncEventRuntime.subscribeToSessionSyncEvents(listener);
   }
 
   /** Delete a session */
@@ -1545,199 +1489,6 @@ export class OpenCodeService {
     }
 
     return response as T | undefined;
-  }
-
-  private hasSyncEventListeners(): boolean {
-    return this.sessionTodoListeners.size > 0
-      || this.sessionStatusListeners.size > 0
-      || this.sessionSyncEventListeners.size > 0;
-  }
-
-  private ensureSyncEventSubscription(): void {
-    if (!this.shouldUseSdk('sdkSync')) {
-      return;
-    }
-
-    if (!this.syncEventWanted || !this.hasSyncEventListeners() || this.syncEventPromise) {
-      return;
-    }
-
-    const abortController = new AbortController();
-    this.syncEventAbortController = abortController;
-    this.syncEventPromise = this.runSyncEventLoop(abortController).finally(() => {
-      if (this.syncEventAbortController === abortController) {
-        this.syncEventAbortController = null;
-      }
-      this.syncEventPromise = null;
-      if (this.syncEventWanted && this.hasSyncEventListeners() && this.shouldUseSdk('sdkSync')) {
-        this.ensureSyncEventSubscription();
-      }
-    });
-  }
-
-  private stopSyncEventSubscription(keepWanted = false): void {
-    this.syncEventWanted = keepWanted;
-    this.syncEventAbortController?.abort();
-    this.syncEventAbortController = null;
-  }
-
-  private restartSyncEventSubscription(): void {
-    if (!this.shouldUseSdk('sdkSync') || !this.hasSyncEventListeners()) {
-      return;
-    }
-
-    this.stopSyncEventSubscription(true);
-    if (!this.syncEventPromise) {
-      this.ensureSyncEventSubscription();
-    }
-  }
-
-  private async runSyncEventLoop(abortController: AbortController): Promise<void> {
-    while (!abortController.signal.aborted && this.hasSyncEventListeners()) {
-      try {
-        const events = await this.getSdkClient().global.syncEvent.subscribe({
-          signal: abortController.signal,
-        });
-
-        for await (const event of events.stream as AsyncIterable<unknown>) {
-          if (abortController.signal.aborted) {
-            break;
-          }
-          this.handleSyncEvent(event);
-        }
-      } catch (error) {
-        if (abortController.signal.aborted) {
-          break;
-        }
-        const isTransientConnectivity = this.isTransientConnectivityError(error);
-        this.logServiceWarning('global.sync-event', 'SDK sync event stream failed', error);
-        if (isTransientConnectivity) {
-          await this.waitForTransientConnectivityRecovery(abortController.signal);
-          continue;
-        }
-      }
-
-      if (abortController.signal.aborted) {
-        break;
-      }
-
-      await this.delay(1000, abortController.signal).catch(() => {});
-    }
-  }
-
-  private handleSyncEvent(event: unknown): void {
-    if (!event || typeof event !== 'object') {
-      return;
-    }
-
-    const value = event as {
-      type?: string;
-      properties?: {
-        sessionID?: unknown;
-        todos?: unknown;
-        status?: unknown;
-        info?: {
-          id?: unknown;
-          sessionID?: unknown;
-        };
-        part?: {
-          id?: unknown;
-          type?: unknown;
-          messageID?: unknown;
-          sessionID?: unknown;
-        };
-        time?: unknown;
-      };
-    };
-
-    const sessionId = typeof value.properties?.sessionID === 'string'
-      ? value.properties.sessionID
-      : typeof value.properties?.info?.sessionID === 'string'
-        ? value.properties.info.sessionID
-        : typeof value.properties?.part?.sessionID === 'string'
-          ? value.properties.part.sessionID
-          : '';
-    if (!sessionId) {
-      return;
-    }
-
-    if (value.type === 'todo.updated') {
-      const todos = this.normalizeSessionTodos(value.properties?.todos);
-      this.emitSessionTodoUpdate({ sessionId, todos });
-      return;
-    }
-
-    if (value.type !== 'session.status') {
-      if (value.type === 'message.updated') {
-        this.emitSessionSyncEventUpdate({
-          sessionId,
-          type: 'message.updated',
-          messageId: typeof value.properties?.info?.id === 'string'
-            ? value.properties.info.id
-            : null,
-        });
-      } else if (value.type === 'message.part.updated') {
-        this.emitSessionSyncEventUpdate({
-          sessionId,
-          type: 'message.part.updated',
-          messageId: typeof value.properties?.part?.messageID === 'string'
-            ? value.properties.part.messageID
-            : null,
-          partId: typeof value.properties?.part?.id === 'string'
-            ? value.properties.part.id
-            : null,
-          partType: typeof value.properties?.part?.type === 'string'
-            ? value.properties.part.type
-            : null,
-          time: typeof value.properties?.time === 'number'
-            ? value.properties.time
-            : null,
-        });
-      } else if (value.type === 'session.diff') {
-        this.emitSessionSyncEventUpdate({
-          sessionId,
-          type: 'session.diff',
-        });
-      }
-      return;
-    }
-
-    const status = this.normalizeSessionStatus(value.properties?.status);
-    if (!status) {
-      return;
-    }
-
-    this.emitSessionStatusUpdate({ sessionId, status });
-  }
-
-  private emitSessionTodoUpdate(update: SessionTodoUpdate): void {
-    for (const listener of this.sessionTodoListeners) {
-      try {
-        listener(update);
-      } catch (error) {
-        logger.error('Session todo listener failed', error);
-      }
-    }
-  }
-
-  private emitSessionStatusUpdate(update: SessionStatusUpdate): void {
-    for (const listener of this.sessionStatusListeners) {
-      try {
-        listener(update);
-      } catch (error) {
-        logger.error('Session status listener failed', error);
-      }
-    }
-  }
-
-  private emitSessionSyncEventUpdate(update: SessionSyncEventUpdate): void {
-    for (const listener of this.sessionSyncEventListeners) {
-      try {
-        listener(update);
-      } catch (error) {
-        logger.error('Session sync-event listener failed', error);
-      }
-    }
   }
 
   private async delay(ms: number, signal?: AbortSignal): Promise<void> {
@@ -3205,7 +2956,7 @@ export class OpenCodeService {
 
     const nextSettings = cloneSettings(settings);
     const previousBaseUrl = this.baseUrl;
-    const shouldResumeSyncEvents = this.hasSyncEventListeners();
+    const shouldResumeSyncEvents = this.syncEventRuntime.hasListeners();
     const shouldResumeOpenCodeEvents = this.hasOpenCodeEventListeners();
     this.settings = nextSettings;
     this.baseUrl = getServerBaseUrl(nextSettings.server);
@@ -3213,13 +2964,13 @@ export class OpenCodeService {
     if (previousToolCatalogScope !== this.getToolCatalogScopeKey()) {
       this.toolSchemasByModel.clear();
     }
-    this.stopSyncEventSubscription(shouldResumeSyncEvents);
+    this.syncEventRuntime.stopSubscription(shouldResumeSyncEvents);
     this.stopOpenCodeEventSubscriptions(shouldResumeOpenCodeEvents);
 
     try {
       if (shouldStopManagedServer) {
         await this.serverManager.stop();
-        this.ensureSyncEventSubscription();
+        this.syncEventRuntime.ensureSubscription();
         this.ensureOpenCodeEventSubscriptions();
         return;
       }
@@ -3228,7 +2979,7 @@ export class OpenCodeService {
         await this.serverManager.restart();
       }
 
-      this.ensureSyncEventSubscription();
+      this.syncEventRuntime.ensureSubscription();
       this.ensureOpenCodeEventSubscriptions();
     } catch (error) {
       this.settings = previousSettings;
@@ -3237,7 +2988,7 @@ export class OpenCodeService {
       if (previousToolCatalogScope !== this.getToolCatalogScopeKey()) {
         this.toolSchemasByModel.clear();
       }
-      this.stopSyncEventSubscription(shouldResumeSyncEvents);
+      this.syncEventRuntime.stopSubscription(shouldResumeSyncEvents);
       this.stopOpenCodeEventSubscriptions(shouldResumeOpenCodeEvents);
       if (previousMode === 'local' && (shouldRestartManagedServer || shouldStopManagedServer)) {
         try {
@@ -3246,7 +2997,7 @@ export class OpenCodeService {
           logger.error('Failed to restore previous OpenCode server after settings update failure:', restoreError);
         }
       }
-      this.ensureSyncEventSubscription();
+      this.syncEventRuntime.ensureSubscription();
       this.ensureOpenCodeEventSubscriptions();
       throw error;
     }

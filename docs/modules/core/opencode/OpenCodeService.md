@@ -28,6 +28,7 @@
 - `../types/settings`
 - `./createSdkClient`
 - `./omoCompat`
+- `./OpenCodeSyncEventRuntimeCoordinator`
 - `./sdkFeatureFlags`
 - `./sdkTypes`
 - `./ServerManager`
@@ -48,8 +49,7 @@
 - `SessionActivityStatus`: session 的 `idle` / `busy` / `retry` 状态。
 - `activeStreams: Map<string, ActiveStreamContext>`: 以 `sessionId` 为键保存当前流的 `AbortController` 和 part 类型映射。
 - `sdkFeatureFlags`: 由 `resolveSdkFeatureFlags()` 合并后的运行时 SDK 开关。
-- `sessionTodoListeners` / `sessionStatusListeners`: 订阅 `global.syncEvent.subscribe()` 的本地监听集合。
-- `syncEventAbortController` / `syncEventPromise` / `syncEventWanted`: 同步事件循环的生命周期状态。
+- `syncEventRuntime`: `OpenCodeSyncEventRuntimeCoordinator` 实例，负责 session todo/status/message sync event 的监听集合、wanted state、SDK 订阅生命周期与 emit 路径。
 - `vaultPath`: 用于 SDK `directory` 注入、上下文文件绝对路径解析，以及 `ServerManager` 工作目录设置；OpenCode directory scope 和 context file path 的跨平台规范化委托给 `shared/contextPath`。
 
 `responseHandlers` 字段虽然仍然存在，但当前公开的主流式接口已经是 `AsyncGenerator<StreamChunk>`。
@@ -326,6 +326,7 @@ graph TD
 ## 与其他模块的交互
 
 - `ServerManager`: 负责本地/远程服务生命周期与健康检查。
+- `OpenCodeSyncEventRuntimeCoordinator`: 负责 `global.syncEvent.subscribe()` 的 session todo/status/message sync event listener registry、订阅重启和 transient connectivity recovery 循环。
 - `createSdkClient`: 为每次 SDK 调用创建客户端实例。
 - `sdkFeatureFlags`: 定义 SDK 与 legacy 的路由开关。
 - `omoCompat`: 负责 OMO 文本检测与元数据提取。

@@ -48,6 +48,7 @@ docs/modules/
 │   ├── opencode/
 │   │   ├── index.md
 │   │   ├── OpenCodeService.md
+│   │   ├── OpenCodeSyncEventRuntimeCoordinator.md
 │   │   ├── ServerManager.md
 │   │   ├── createSdkClient.md
 │   │   ├── sdkFetch.md

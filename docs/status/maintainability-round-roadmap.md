@@ -425,7 +425,7 @@
 
 本批由人工确认：从 `OpenCodianView` 转向 `OpenCodeService`，但只允许处理仍成块存在、能形成较厚 owner 的兼容边界，不得把 session/config/query API 再拆成新的微碎片 facade。`OpenCodeService` 继续保持对外总门面；新 owner 只承接内部 lifecycle / state / mapping ownership。
 
-### [NEXT] R19 - Sync event runtime coordinator
+### [DONE] R19 - Sync event runtime coordinator
 
 - **Lane**: OpenCodeService `sync event runtime`
 - **目标**: 把 session todo / status / sync-event listeners、订阅 wanted state、subscription lifecycle、emit 路径从 `OpenCodeService` 收束到一个较厚 coordinator。
@@ -446,7 +446,7 @@
   - 新 owner 满足粒度规则，且有 focused coverage。
   - 运行 targeted tests、全量 `npm test`、`npm run build`。
 
-### [QUEUED] R20 - OpenCode event subscription coordinator
+### [NEXT] R20 - OpenCode event subscription coordinator
 
 - **Lane**: OpenCodeService `open-code event runtime`
 - **目标**: 把 OpenCode event listeners、event subscription lifecycle、catalog-relevant event routing 与 emit path 从 `OpenCodeService` 收束到单一 coordinator。
