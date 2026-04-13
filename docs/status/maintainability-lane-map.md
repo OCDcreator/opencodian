@@ -1,7 +1,7 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [CONFIRMED_NIGHT_BATCH] R19-R27 已确认；当前 `[NEXT]` 是 R24 Streaming runtime state coordinator。
+> **当前状态**: [CONFIRMED_NIGHT_BATCH] R19-R27 已确认；当前 `[NEXT]` 是 R25 Stream event transformer。
 
 ## 当前优先级
 
@@ -19,7 +19,8 @@
 - R21 已完成 tool schema cache、registry tool ids、MCP server status snapshot、catalog listener lifecycle 与 snapshot 构造到 `OpenCodeCatalogStateStore`
 - R22 已完成 SDK prompt parameters、shared prompt options、allowed-tools / output-format / variant / reasoning 映射到 `OpenCodePromptRequestBuilder`
 - R23 已完成 context/image request-part serialization 到 `OpenCodeContextPartSerializer`，并保持与 prompt option builder 的边界
-- R24 首查 active stream runtime；R25-R26 继续关注 event→chunk transform、message normalization，严格保持 SDK-first / legacy fallback / ChatMessage 语义
+- R24 已完成 active stream runtime、session-scoped abort controller、cancel/detach lifecycle 与 part type tracking 收束到 `OpenCodeStreamingRuntimeCoordinator`
+- R25 首查 event→chunk transform；R26 继续关注 message normalization，严格保持 SDK-first / legacy fallback / ChatMessage 语义
 - `OpenCodianView` / settings / trailing-assistant 链本批都只保留 regression watchpoints，不再开新切口
 - P2 regression-only 首查顺序固定为：
   1. `tests/unit/features/chat/QuestionDockCoordinator.test.ts`

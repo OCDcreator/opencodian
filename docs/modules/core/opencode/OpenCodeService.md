@@ -32,6 +32,7 @@
 - `./OpenCodeContextPartSerializer`
 - `./OpenCodeEventSubscriptionCoordinator`
 - `./OpenCodePromptRequestBuilder`
+- `./OpenCodeStreamingRuntimeCoordinator`
 - `./OpenCodeSyncEventRuntimeCoordinator`
 - `./sdkFeatureFlags`
 - `./sdkTypes`
@@ -51,12 +52,12 @@
 - `OpenCodeServiceEvents`: server status、错误、模型加载事件回调。
 - `OpenCodeServiceRuntimeOptions`: 初始 managed pid、state 持久化回调、SDK feature flag 覆盖。
 - `SessionActivityStatus`: session 的 `idle` / `busy` / `retry` 状态。
-- `activeStreams: Map<string, ActiveStreamContext>`: 以 `sessionId` 为键保存当前流的 `AbortController` 和 part 类型映射。
 - `sdkFeatureFlags`: 由 `resolveSdkFeatureFlags()` 合并后的运行时 SDK 开关。
 - `syncEventRuntime`: `OpenCodeSyncEventRuntimeCoordinator` 实例，负责 session todo/status/message sync event 的监听集合、wanted state、SDK 订阅生命周期与 emit 路径。
 - `catalogState`: `OpenCodeCatalogStateStore` 实例，负责 registry tool ids、tool schema cache、observed external tool names、MCP server status、catalog snapshot 构造与 catalog listener lifecycle。
 - `contextPartSerializer`: `OpenCodeContextPartSerializer` 实例，负责 prompt 输入文本、本地/远程 context item 与 image part 的 request-part 序列化。
 - `promptRequestBuilder`: `OpenCodePromptRequestBuilder` 实例，负责 SDK prompt parameters、legacy request body 与 shared prompt options/variant/output-format/model defaults 的组装。
+- `streamingRuntime`: `OpenCodeStreamingRuntimeCoordinator` 实例，负责 active stream registry、session-scoped abort controller、part type tracking 与 cancel/detach lifecycle。
 - `openCodeEventRuntime`: `OpenCodeEventSubscriptionCoordinator` 实例，负责 open-code event listener registry、`event` / `global` 订阅生命周期，以及 catalog-relevant payload 到 `catalogState` 的刷新/广播触发。
 - `vaultPath`: 用于 SDK `directory` 注入、上下文文件绝对路径解析，以及 `ServerManager` 工作目录设置；OpenCode directory scope 和 context file path 的跨平台规范化委托给 `shared/contextPath`。
 
@@ -186,10 +187,11 @@
 
 ### 流式事件处理与取消
 
-服务层的并发模型是“每个 session 一条活动流”：
+服务层的并发模型仍然是“每个 session 一条活动流”，但 active stream runtime state 现在由 `OpenCodeStreamingRuntimeCoordinator` 持有：
 
-- `createActiveStreamContext()` 会为 `sessionId` 分配独立 `AbortController`
-- 如果同一 session 已有旧流，会先中断旧流再替换
+- `streamingRuntime.createActiveStreamContext()` 会为 `sessionId` 分配独立 `OpenCodeStreamingRuntimeContext`
+- 如果同一 session 已有旧流，coordinator 会先中断旧 context 再替换
+- `releaseActiveStreamContext()` 只释放仍然是当前注册实例的 context，避免旧流 finally 清掉新流
 - `handleStreamingEvent()` 负责把 OpenCode event 归一化成 `StreamChunk`
 
 当前会产出的 chunk 类型包括：
@@ -223,8 +225,8 @@
 
 取消分两种：
 
-- `cancelStream(sessionId?)`: 先中断本地流，再 best-effort 调用 `abortSessionOnServer()`
-- `detachStream(sessionId?)`: 只中断本地观察，不请求服务端 abort
+- `cancelStream(sessionId?)`: 委托给 `streamingRuntime.cancelStream()`，先中断本地流，再 best-effort 调用 `abortSessionOnServer()`
+- `detachStream(sessionId?)`: 委托给 `streamingRuntime.detachStream()`，只中断本地观察，不请求服务端 abort
 
 ### Todo / status 的 sync 事件循环
 
@@ -335,6 +337,7 @@ graph TD
 - `ServerManager`: 负责本地/远程服务生命周期与健康检查。
 - `OpenCodeSyncEventRuntimeCoordinator`: 负责 `global.syncEvent.subscribe()` 的 session todo/status/message sync event listener registry、订阅重启和 transient connectivity recovery 循环。
 - `OpenCodeEventSubscriptionCoordinator`: 负责 `event.subscribe()` / `global.event()` 的 open-code event listener registry、catalog-relevant payload routing、双路订阅重启与 catalog listener emit。
+- `OpenCodeStreamingRuntimeCoordinator`: 负责 active stream registry、session-scoped abort controllers、part type tracking，以及 cancel/detach 的 runtime lifecycle。
 - `createSdkClient`: 为每次 SDK 调用创建客户端实例。
 - `sdkFeatureFlags`: 定义 SDK 与 legacy 的路由开关。
 - `omoCompat`: 负责 OMO 文本检测与元数据提取。

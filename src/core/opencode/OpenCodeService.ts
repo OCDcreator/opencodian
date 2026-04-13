@@ -61,6 +61,10 @@ import {
   OpenCodePromptRequestBuilder,
 } from './OpenCodePromptRequestBuilder';
 import {
+  OpenCodeStreamingRuntimeCoordinator,
+  OpenCodeStreamingRuntimeContext,
+} from './OpenCodeStreamingRuntimeCoordinator';
+import {
   OpenCodeSyncEventRuntimeCoordinator,
   type SessionActivityStatus,
   type SessionSyncEventUpdate,
@@ -433,11 +437,9 @@ interface StreamingState {
   lastTextDelta: StreamingTextDeltaDebugState | null;
 }
 
-interface ActiveStreamContext {
-  sessionId: string;
-  abortController: AbortController;
-  partTypeMap: Map<string, string>;
-}
+type StreamPartTypeState = OpenCodeStreamingRuntimeContext | {
+  partTypeMap?: Map<string, string>;
+};
 
 type SessionTodoUpdate = {
   sessionId: string;
@@ -461,12 +463,12 @@ export class OpenCodeService {
   private currentSessionId: string | null = null;
   private responseHandlers: ResponseHandler[] = [];
   private baseUrl: string;
-  private activeStreams = new Map<string, ActiveStreamContext>();
   private sdkFeatureFlags: SdkFeatureFlags;
   private syncEventRuntime: OpenCodeSyncEventRuntimeCoordinator;
   private catalogState: OpenCodeCatalogStateStore;
   private contextPartSerializer: OpenCodeContextPartSerializer;
   private promptRequestBuilder: OpenCodePromptRequestBuilder;
+  private streamingRuntime: OpenCodeStreamingRuntimeCoordinator;
   private openCodeEventRuntime: OpenCodeEventSubscriptionCoordinator;
   private vaultPath?: string;
   private transientConnectivityLogState: TransientConnectivityLogState | null = null;
@@ -519,6 +521,9 @@ export class OpenCodeService {
         modelID: this.settings.defaultModel,
       }),
       observeRuntimeToolNames: (toolNames) => this.observeRuntimeToolNames(toolNames),
+    });
+    this.streamingRuntime = new OpenCodeStreamingRuntimeCoordinator({
+      abortSessionOnServer: (sessionId) => this.abortSessionOnServer(sessionId),
     });
     this.openCodeEventRuntime = new OpenCodeEventSubscriptionCoordinator({
       subscribeToEvents: async (source, signal) => {
@@ -882,41 +887,12 @@ export class OpenCodeService {
 
   /** Cancel the current streaming response */
   cancelStream(sessionId?: string): void {
-    const targetSessionId = sessionId ?? this.currentSessionId;
-    if (!targetSessionId) {
-      logger.debug('No session specified for stream cancellation');
-      return;
-    }
-
-    const streamContext = this.activeStreams.get(targetSessionId);
-    if (!streamContext) {
-      logger.debug(`No active stream to cancel for session ${targetSessionId}`);
-      return;
-    }
-
-    logger.debug(`Cancelling stream for session ${targetSessionId}...`);
-    streamContext.abortController.abort();
-    logger.debug('Abort signal sent');
-    void this.abortSessionOnServer(targetSessionId);
+    this.streamingRuntime.cancelStream(sessionId ?? this.currentSessionId);
   }
 
   /** Stop watching the current stream locally without aborting the server-side session */
   detachStream(sessionId?: string): void {
-    const targetSessionId = sessionId ?? this.currentSessionId;
-    if (!targetSessionId) {
-      logger.debug('No session specified for local stream detach');
-      return;
-    }
-
-    const streamContext = this.activeStreams.get(targetSessionId);
-    if (!streamContext) {
-      logger.debug(`No active stream to detach for session ${targetSessionId}`);
-      return;
-    }
-
-    logger.debug(`Detaching local stream listener for session ${targetSessionId}...`);
-    streamContext.abortController.abort();
-    logger.debug('Local stream detach signal sent');
+    this.streamingRuntime.detachStream(sessionId ?? this.currentSessionId);
   }
 
   /** List all sessions */
@@ -1190,12 +1166,12 @@ export class OpenCodeService {
 
       await this.post<void>(`/session/${sessionId}/prompt_async`, requestBody);
 
-      const streamContext = this.createActiveStreamContext(sessionId);
+      const streamContext = this.streamingRuntime.createActiveStreamContext(sessionId);
       yield { type: 'message_start' };
       try {
         yield* this.consumeLegacyEventStream(sessionId, streamContext);
       } finally {
-        this.releaseActiveStreamContext(streamContext);
+        this.streamingRuntime.releaseActiveStreamContext(streamContext);
         logger.debug(`Legacy stream ended for session ${sessionId}`);
       }
     } catch (error) {
@@ -1269,27 +1245,33 @@ export class OpenCodeService {
     }
   }
 
-  private createActiveStreamContext(sessionId: string): ActiveStreamContext {
-    const existing = this.activeStreams.get(sessionId);
-    if (existing) {
-      logger.warn(`Replacing existing active stream context for session ${sessionId}`);
-      existing.abortController.abort();
+  private setStreamPartType(streamContext: StreamPartTypeState, partId: string, partType: string): void {
+    if (streamContext instanceof OpenCodeStreamingRuntimeContext) {
+      streamContext.setPartType(partId, partType);
+      return;
     }
 
-    const context: ActiveStreamContext = {
-      sessionId,
-      abortController: new AbortController(),
-      partTypeMap: new Map(),
-    };
-    this.activeStreams.set(sessionId, context);
-    return context;
+    if (!partId || !partType) {
+      return;
+    }
+
+    streamContext.partTypeMap?.set(partId, partType);
   }
 
-  private releaseActiveStreamContext(streamContext: ActiveStreamContext): void {
-    const current = this.activeStreams.get(streamContext.sessionId);
-    if (current === streamContext) {
-      this.activeStreams.delete(streamContext.sessionId);
+  private hasStreamPartType(streamContext: StreamPartTypeState, partId: string): boolean {
+    if (streamContext instanceof OpenCodeStreamingRuntimeContext) {
+      return streamContext.hasPartType(partId);
     }
+
+    return streamContext.partTypeMap?.has(partId) ?? false;
+  }
+
+  private getStreamPartType(streamContext: StreamPartTypeState, partId: string): string | undefined {
+    if (streamContext instanceof OpenCodeStreamingRuntimeContext) {
+      return streamContext.getPartType(partId);
+    }
+
+    return streamContext.partTypeMap?.get(partId);
   }
 
   private normalizeHealthResponse(response: unknown): boolean {
@@ -1759,7 +1741,7 @@ export class OpenCodeService {
     eventData: OpenCodeEvent,
     sessionId: string,
     state: StreamingState,
-    streamContext: ActiveStreamContext,
+    streamContext: StreamPartTypeState,
   ): { chunks: StreamChunk[]; stop: boolean } {
     if (eventData.properties?.sessionID && eventData.properties.sessionID !== sessionId) {
       return { chunks: [], stop: false };
@@ -1784,7 +1766,7 @@ export class OpenCodeService {
     if (eventData.type === 'message.part.updated') {
       const part = eventData.properties?.part as Part | undefined;
       if (part?.id && part?.type) {
-        streamContext.partTypeMap.set(part.id, part.type);
+        this.setStreamPartType(streamContext, part.id, part.type);
 
         if (part.type === 'tool') {
           const toolPart = part as ToolPartData;
@@ -1862,12 +1844,12 @@ export class OpenCodeService {
         return { chunks, stop: false };
       }
 
-      if (partID && !streamContext.partTypeMap.has(partID)) {
+      if (partID && !this.hasStreamPartType(streamContext, partID)) {
         const partType = eventData.properties?.part?.type;
-        streamContext.partTypeMap.set(partID, partType || 'text');
+        this.setStreamPartType(streamContext, partID, partType || 'text');
       }
 
-      const partType = partID ? (streamContext.partTypeMap.get(partID) || 'text') : 'text';
+      const partType = partID ? (this.getStreamPartType(streamContext, partID) || 'text') : 'text';
 
       if (field === 'text') {
         if (partType === 'reasoning' || partType === 'thinking') {
@@ -1970,9 +1952,9 @@ export class OpenCodeService {
 
   private async *consumeLegacyEventStream(
     sessionId: string,
-    streamContext: ActiveStreamContext,
+    streamContext: OpenCodeStreamingRuntimeContext,
   ): AsyncGenerator<StreamChunk> {
-    const signal = streamContext.abortController.signal;
+    const signal = streamContext.signal;
     const eventStream = this.connectSSE(`${this.baseUrl}/event`, signal);
     const state = this.createStreamingState();
 
@@ -1995,7 +1977,7 @@ export class OpenCodeService {
       }
 
       if (outcome.stop) {
-        streamContext.abortController.abort();
+        streamContext.abort();
         break;
       }
     }
@@ -2026,13 +2008,13 @@ export class OpenCodeService {
       return;
     }
 
-    const streamContext = this.createActiveStreamContext(sessionId);
+    const streamContext = this.streamingRuntime.createActiveStreamContext(sessionId);
     const state = this.createStreamingState();
     let yieldedMessageStart = false;
 
     try {
       const subscription = await client.event.subscribe(undefined, {
-        signal: streamContext.abortController.signal,
+        signal: streamContext.signal,
       });
       const iterator = subscription.stream[Symbol.asyncIterator]();
 
@@ -2072,7 +2054,7 @@ export class OpenCodeService {
         }
 
         if (outcome.stop) {
-          streamContext.abortController.abort();
+          streamContext.abort();
           break;
         }
       }
@@ -2091,7 +2073,7 @@ export class OpenCodeService {
       const msg = error instanceof Error ? error.message : 'Unknown error';
       yield { type: 'error', content: msg };
     } finally {
-      this.releaseActiveStreamContext(streamContext);
+      this.streamingRuntime.releaseActiveStreamContext(streamContext);
       logger.debug(`SDK stream ended for session ${sessionId}`);
     }
   }
