@@ -277,6 +277,10 @@ import {
   type QuestionTodoBackgroundTaskRefreshViewHostAdapterHost,
 } from './services/QuestionTodoBackgroundTaskRefreshHostAdapter';
 import {
+  createVisibleConversationPostSyncStateServices,
+  type VisibleConversationPostSyncStateViewHost,
+} from './services/VisibleConversationPostSyncStateHostAdapter';
+import {
   isElementNearBottom,
   scrollElementToBottom,
 } from './services/ScrollManager';
@@ -560,7 +564,8 @@ interface DeferredQuestionRequest {
 
 type QuestionTodoBackgroundTaskViewHost =
   QuestionTodoBackgroundTaskRefreshViewHostAdapterHost
-  & QuestionTodoBackgroundTaskActivationViewHostAdapterHost;
+  & QuestionTodoBackgroundTaskActivationViewHostAdapterHost
+  & VisibleConversationPostSyncStateViewHost;
 
 interface TabRuntimeState {
   isStreaming: boolean;
@@ -1102,6 +1107,9 @@ export class OpenCodianView extends ItemView {
     );
     const questionTodoBackgroundTaskViewHost = this.createQuestionTodoBackgroundTaskViewHost();
     const {
+      visibleConversationPostSyncStateCoordinator,
+    } = createVisibleConversationPostSyncStateServices(questionTodoBackgroundTaskViewHost);
+    const {
       questionTodoActivationRefreshBridge,
       visibleConversationPostSyncCoordinator,
       backgroundConversationPostSyncHandoffCoordinator,
@@ -1115,6 +1123,7 @@ export class OpenCodianView extends ItemView {
         getBackgroundTaskLiveSignalCoordinator: () => this.backgroundTaskLiveSignalCoordinator,
         getTabRuntimeStateBridge: () => this.tabRuntimeStateBridge,
       }),
+      visibleConversationPostSyncStateCoordinator,
     );
     const {
       questionTodoActivationRefreshCoordinator,

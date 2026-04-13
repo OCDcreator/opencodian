@@ -12,6 +12,10 @@ import {
   type QuestionTodoBackgroundTaskRefreshViewHost,
 } from '../../../../src/features/chat/services/QuestionTodoBackgroundTaskRefreshHostAdapter';
 import type { QuestionTodoStatusRefreshRuntime } from '../../../../src/features/chat/services/QuestionTodoStatusRefreshCoordinator';
+import type {
+  VisibleConversationPostSyncOutcome,
+  VisibleConversationPostSyncStateCoordinator,
+} from '../../../../src/features/chat/services/VisibleConversationPostSyncStateCoordinator';
 
 type Mocked<T> = {
   [Key in keyof T]:
@@ -73,8 +77,6 @@ function createViewHost(options?: {
     refreshTabSessionTodos: jest.fn().mockResolvedValue([] as SessionTodo[]),
     syncBackgroundTaskStateFromConversation: jest.fn(),
     flushBackgroundTaskPostSyncWriteback: jest.fn().mockResolvedValue(undefined),
-    setCurrentConversationRevertState: jest.fn(),
-    setTabConversationSyncFingerprint: jest.fn(),
     markBackgroundTaskAuthoritativeSync: jest.fn(),
     setTabNeedsAttention: jest.fn(),
   };
@@ -98,8 +100,22 @@ function createViewHostAdapterHost(options?: {
       tabId ? (runtimes.get(tabId) ?? null) : null,
     ),
     syncBackgroundTaskStateFromConversation: jest.fn(),
-    setCurrentConversationRevertState: jest.fn(),
-    setTabConversationSyncFingerprint: jest.fn(),
+  };
+}
+
+type VisibleConversationPostSyncStatePort = Pick<
+  VisibleConversationPostSyncStateCoordinator,
+  'commitPostSyncState'
+>;
+
+function createVisibleConversationPostSyncStateCoordinator(
+  outcome: VisibleConversationPostSyncOutcome = {
+    shouldApplySyncedConversationUpdate: true,
+    shouldRenderBackgroundTaskIndicator: false,
+  },
+): jest.Mocked<VisibleConversationPostSyncStatePort> {
+  return {
+    commitPostSyncState: jest.fn().mockReturnValue(outcome),
   };
 }
 
@@ -207,8 +223,6 @@ describe('QuestionTodoBackgroundTaskRefreshHostAdapter', () => {
       'tab-active',
       currentConversation,
     );
-    adaptedViewHost.setCurrentConversationRevertState({ messageID: 'assistant-1' });
-    adaptedViewHost.setTabConversationSyncFingerprint('tab-active', 'next-fingerprint');
     adaptedViewHost.markBackgroundTaskAuthoritativeSync(
       'tab-active',
       'sync-event:message.updated',
@@ -241,13 +255,6 @@ describe('QuestionTodoBackgroundTaskRefreshHostAdapter', () => {
     ).toHaveBeenCalledWith(
       'tab-active',
       currentConversation,
-    );
-    expect(viewHost.setCurrentConversationRevertState).toHaveBeenCalledWith({
-      messageID: 'assistant-1',
-    });
-    expect(viewHost.setTabConversationSyncFingerprint).toHaveBeenCalledWith(
-      'tab-active',
-      'next-fingerprint',
     );
     expect(backgroundTaskLiveSignalCoordinator.markAuthoritativeSync).toHaveBeenCalledWith(
       'tab-active',
@@ -285,9 +292,6 @@ describe('QuestionTodoBackgroundTaskRefreshHostAdapter', () => {
       'session-activation',
       { suppressErrors: true },
     );
-    expect(hosts.visibleConversationPostSyncStateCoordinatorHost.getCurrentConversationId()).toBe(
-      'conversation-active',
-    );
 
     hosts.backgroundTaskPostSyncRefreshPort.syncBackgroundTaskStateFromConversation(
       currentConversation,
@@ -296,13 +300,6 @@ describe('QuestionTodoBackgroundTaskRefreshHostAdapter', () => {
     await hosts.backgroundTaskPostSyncRefreshPort.flushBackgroundTaskPostSyncWriteback(
       'tab-active',
       currentConversation,
-    );
-    hosts.visibleConversationPostSyncStateCoordinatorHost.setCurrentConversationRevertState({
-      messageID: 'assistant-1',
-    });
-    hosts.visibleConversationPostSyncStateCoordinatorHost.setTabConversationSyncFingerprint(
-      'tab-active',
-      'next-fingerprint',
     );
     hosts.backgroundConversationSignalSyncStateCoordinatorHost.markBackgroundTaskAuthoritativeSync(
       'tab-active',
@@ -337,13 +334,6 @@ describe('QuestionTodoBackgroundTaskRefreshHostAdapter', () => {
       'tab-active',
       currentConversation,
     );
-    expect(viewHost.setCurrentConversationRevertState).toHaveBeenCalledWith({
-      messageID: 'assistant-1',
-    });
-    expect(viewHost.setTabConversationSyncFingerprint).toHaveBeenCalledWith(
-      'tab-active',
-      'next-fingerprint',
-    );
     expect(viewHost.markBackgroundTaskAuthoritativeSync).toHaveBeenCalledWith(
       'tab-active',
       'sync-event:message.updated',
@@ -362,8 +352,13 @@ describe('QuestionTodoBackgroundTaskRefreshHostAdapter', () => {
         'tab-active': runtime,
       },
     });
+    const visibleConversationPostSyncStateCoordinator =
+      createVisibleConversationPostSyncStateCoordinator();
 
-    const services = createQuestionTodoBackgroundTaskRefreshServices(viewHost);
+    const services = createQuestionTodoBackgroundTaskRefreshServices(
+      viewHost,
+      visibleConversationPostSyncStateCoordinator,
+    );
 
     await services.questionTodoActivationRefreshBridge.refreshAfterActivation(
       'tab-active',
@@ -414,13 +409,17 @@ describe('QuestionTodoBackgroundTaskRefreshHostAdapter', () => {
       'session-conversation-active',
       { suppressErrors: true },
     );
-    expect(viewHost.setCurrentConversationRevertState).toHaveBeenCalledWith({
-      messageID: 'assistant-visible',
+    expect(
+      visibleConversationPostSyncStateCoordinator.commitPostSyncState,
+    ).toHaveBeenCalledWith({
+      tabId: 'tab-active',
+      expectedConversationId: 'conversation-active',
+      syncResult: {
+        changed: true,
+        fingerprint: 'next-visible-fingerprint',
+        revertState: { messageID: 'assistant-visible' },
+      },
     });
-    expect(viewHost.setTabConversationSyncFingerprint).toHaveBeenCalledWith(
-      'tab-active',
-      'next-visible-fingerprint',
-    );
     expect(outcome).toEqual({
       shouldApplySyncedConversationUpdate: true,
       shouldRenderBackgroundTaskIndicator: false,
@@ -435,8 +434,13 @@ describe('QuestionTodoBackgroundTaskRefreshHostAdapter', () => {
         'tab-bg': createRuntime(),
       },
     });
+    const visibleConversationPostSyncStateCoordinator =
+      createVisibleConversationPostSyncStateCoordinator();
 
-    const services = createQuestionTodoBackgroundTaskRefreshServices(viewHost);
+    const services = createQuestionTodoBackgroundTaskRefreshServices(
+      viewHost,
+      visibleConversationPostSyncStateCoordinator,
+    );
 
     await services.backgroundConversationPostSyncHandoffCoordinator.handleSignalSyncComplete({
       tabId: 'tab-bg',

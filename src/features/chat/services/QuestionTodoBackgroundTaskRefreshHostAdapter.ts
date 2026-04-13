@@ -40,9 +40,7 @@ import type {
 import type { SessionTodoStateService } from './SessionTodoStateService';
 import type { SessionTodoStatusRefreshService } from './SessionTodoStatusRefreshService';
 import {
-  type ConversationRevertStateSnapshot,
-  VisibleConversationPostSyncStateCoordinator,
-  type VisibleConversationPostSyncStateCoordinatorHost,
+  type VisibleConversationPostSyncStateCoordinator,
 } from './VisibleConversationPostSyncStateCoordinator';
 import {
   VisibleConversationPostSyncCoordinator,
@@ -67,7 +65,11 @@ type BackgroundTaskLiveSignalPort = Pick<
 >;
 type TabRuntimeStateBridgePort = Pick<
   TabRuntimeStateBridge,
-  'setNeedsAttention' | 'syncStreamLikeState'
+  'setNeedsAttention'
+>;
+type VisibleConversationPostSyncStatePort = Pick<
+  VisibleConversationPostSyncStateCoordinator,
+  'commitPostSyncState'
 >;
 
 export interface QuestionTodoBackgroundTaskRefreshViewHostAdapterHost {
@@ -77,8 +79,6 @@ export interface QuestionTodoBackgroundTaskRefreshViewHostAdapterHost {
     conversation: Conversation,
     tabId?: TabId | null,
   ): void;
-  setCurrentConversationRevertState(revertState: ConversationRevertStateSnapshot | null): void;
-  setTabConversationSyncFingerprint(tabId: TabId, fingerprint: string): void;
 }
 
 export interface QuestionTodoBackgroundTaskRefreshViewHostAdapterDependencies {
@@ -101,8 +101,6 @@ export interface QuestionTodoBackgroundTaskRefreshViewHost
     tabId: TabId | null,
     conversation: Conversation | null,
   ): Promise<void>;
-  setCurrentConversationRevertState(revertState: ConversationRevertStateSnapshot | null): void;
-  setTabConversationSyncFingerprint(tabId: TabId, fingerprint: string): void;
   markBackgroundTaskAuthoritativeSync(tabId: TabId | null, reason: string): void;
   setTabNeedsAttention(tabId: TabId | null, needsAttention: boolean): void;
 }
@@ -150,14 +148,6 @@ export function createQuestionTodoBackgroundTaskRefreshViewHostAdapter(
       dependencies
         .getBackgroundTaskIndicatorCoordinator()
         .flushCompletionNoticesAndSyncStreamLikeState(tabId, conversation),
-    setCurrentConversationRevertState: (
-      revertState: ConversationRevertStateSnapshot | null,
-    ) => {
-      dependencies.viewHost.setCurrentConversationRevertState(revertState);
-    },
-    setTabConversationSyncFingerprint: (tabId: TabId, fingerprint: string) => {
-      dependencies.viewHost.setTabConversationSyncFingerprint(tabId, fingerprint);
-    },
     markBackgroundTaskAuthoritativeSync: (tabId: TabId | null, reason: string) => {
       dependencies
         .getBackgroundTaskLiveSignalCoordinator()
@@ -172,7 +162,6 @@ export function createQuestionTodoBackgroundTaskRefreshViewHostAdapter(
 export interface QuestionTodoBackgroundTaskRefreshHosts {
   questionTodoActivationRefreshHost: QuestionTodoActivationRefreshBridgeHost;
   backgroundTaskPostSyncRefreshPort: BackgroundTaskPostSyncRefreshPort;
-  visibleConversationPostSyncStateCoordinatorHost: VisibleConversationPostSyncStateCoordinatorHost;
   backgroundConversationAttentionCoordinatorHost: BackgroundConversationAttentionCoordinatorHost;
   backgroundConversationSignalSyncStateCoordinatorHost:
     BackgroundConversationSignalSyncStateCoordinatorHost;
@@ -217,17 +206,6 @@ export function createQuestionTodoBackgroundTaskRefreshHosts(
         conversation: Conversation | null,
       ) => viewHost.flushBackgroundTaskPostSyncWriteback(tabId, conversation),
     },
-    visibleConversationPostSyncStateCoordinatorHost: {
-      getCurrentConversationId: () => viewHost.getCurrentConversation()?.id ?? null,
-      setCurrentConversationRevertState: (
-        revertState: ConversationRevertStateSnapshot | null,
-      ) => {
-        viewHost.setCurrentConversationRevertState(revertState);
-      },
-      setTabConversationSyncFingerprint: (tabId: TabId, fingerprint: string) => {
-        viewHost.setTabConversationSyncFingerprint(tabId, fingerprint);
-      },
-    },
     backgroundConversationAttentionCoordinatorHost: {
       setTabNeedsAttention: (tabId: TabId | null, needsAttention: boolean) =>
         viewHost.setTabNeedsAttention(tabId, needsAttention),
@@ -242,6 +220,7 @@ export function createQuestionTodoBackgroundTaskRefreshHosts(
 
 export function createQuestionTodoBackgroundTaskRefreshServices(
   viewHost: QuestionTodoBackgroundTaskRefreshViewHost,
+  visibleConversationPostSyncStateCoordinator: VisibleConversationPostSyncStatePort,
 ): QuestionTodoBackgroundTaskRefreshServices {
   const hosts = createQuestionTodoBackgroundTaskRefreshHosts(viewHost);
   const {
@@ -257,10 +236,6 @@ export function createQuestionTodoBackgroundTaskRefreshServices(
       postSyncQuestionTodoRefreshPlanBuilder,
       questionTodoStatusRefreshCoordinator,
       hosts.backgroundTaskPostSyncRefreshPort,
-    );
-  const visibleConversationPostSyncStateCoordinator =
-    new VisibleConversationPostSyncStateCoordinator(
-      hosts.visibleConversationPostSyncStateCoordinatorHost,
     );
   const visibleConversationPostSyncCoordinator =
     new VisibleConversationPostSyncCoordinator(

@@ -36,7 +36,7 @@ export class VisibleConversationPostSyncCoordinator {
 
 ## 与 `OpenCodianView` 的边界
 
-- `QuestionTodoBackgroundTaskRefreshHostAdapter` 统一装配本 coordinator 所需的 visible refresh seam 与 visible state-commit seam
+- `QuestionTodoBackgroundTaskRefreshHostAdapter` 统一装配本 coordinator 所需的 visible refresh seam，`VisibleConversationPostSyncStateHostAdapter` 单独装配 visible state-commit seam
 - `ConversationSyncVisiblePostSyncRouter` 现在直接依赖本 coordinator，避免 visible post-sync 再绕经 hidden/background coordinator
 - `ConversationSyncBackgroundPostSyncRouter` 现在把 hidden/background path 直接路由到 `BackgroundConversationPostSyncHandoffCoordinator`
 - 这次切片继续推进 master plan 的 P2 `question / todo / background task` lane，把 active visible-conversation sync 的 refresh/commit 组合也迁到 dedicated single-purpose module

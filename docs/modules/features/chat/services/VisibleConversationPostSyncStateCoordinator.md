@@ -49,6 +49,6 @@ export class VisibleConversationPostSyncStateCoordinator {
 
 ## 与 `OpenCodianView` 的边界
 
-- `QuestionTodoBackgroundTaskRefreshHostAdapter` 从同一份 P2 refresh view host 派生本 coordinator 的 host，并把 view-local current-conversation/revert-state/fingerprint 写回封装在 adapter 边界内
+- `VisibleConversationPostSyncStateHostAdapter` 从共享的 question/todo/background-task view host 派生本 coordinator 的 host，并把 view-local current-conversation/revert-state/fingerprint 写回封装在独立 adapter 边界内
 - `VisibleConversationPostSyncCoordinator` 只在 visible sync 完成 refresh 后调用本 coordinator，不再自己持有 current-conversation state-commit 规则
 - 这次切片推进 master plan 的 P2 `question / todo / background task` lane，把 visible sync 的 current-conversation runtime bridge 从 background-task post-sync 编排中拆成单一职责模块
