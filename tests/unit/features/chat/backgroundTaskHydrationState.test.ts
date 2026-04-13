@@ -65,33 +65,4 @@ describe('OpenCodianView background task hydration state', () => {
     expect(staleSpy).not.toHaveBeenCalled();
     expect(resetSpy).not.toHaveBeenCalled();
   });
-
-  it('defers layout-driven auto-scroll while the conversation is hydrating', () => {
-    const view = createView() as unknown as {
-      handleMessagesPaneLayoutChange: (tabId: string) => void;
-      getTabPaneState: () => Record<string, unknown> | null;
-      syncPaneScrollMetrics: () => boolean;
-      scheduleSettledScrollToBottomIfNeeded: () => void;
-    };
-
-    const messagesEl = document.createElement('div');
-    const runtime = {
-      isHydratingConversation: true,
-      pendingLayoutMutations: 0,
-    };
-
-    jest.spyOn(view, 'getTabPaneState').mockReturnValue({
-      tabId: 'tab-1',
-      messagesEl,
-      runtime,
-    });
-    const syncSpy = jest.spyOn(view, 'syncPaneScrollMetrics').mockReturnValue(false);
-    const scheduleSpy = jest.spyOn(view, 'scheduleSettledScrollToBottomIfNeeded').mockImplementation(() => {});
-
-    view.handleMessagesPaneLayoutChange('tab-1');
-
-    expect(syncSpy).toHaveBeenCalledWith('tab-1', messagesEl);
-    expect(runtime.pendingLayoutMutations).toBe(1);
-    expect(scheduleSpy).not.toHaveBeenCalled();
-  });
 });

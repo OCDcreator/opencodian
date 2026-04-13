@@ -67,7 +67,7 @@ interface TabRuntimeState {
 }
 ```
 
-这些状态通过 `tabPaneStates: Map<TabId, TabPaneState>` 和实际消息 pane 绑定。每个 tab 都有自己的：
+这些状态现在通过 `services/TabMessagesPaneCoordinator.ts` 持有的 pane state map 和实际消息 pane 绑定。`OpenCodianView` 仍定义 `TabRuntimeState` 的 shape，并把 runtime factory / navigation/sidebar writeback / scroll policy 作为 host seam 提供给 coordinator。每个 tab 都有自己的：
 
 - streaming 控制器
 - DOM pane
@@ -118,11 +118,11 @@ background task completion notice 的 queued-state 则已经完全移出 `TabRun
 
 ### 滚动辅助抽离
 
-消息区的底部检测、scroll snapshot、重渲后恢复，现在由 `services/ScrollManager.ts` 提供纯 helper；`OpenCodianView` 只保留：
+消息区的 pane lifecycle 与 pane 级 scroll metrics 现在先由 `services/TabMessagesPaneCoordinator.ts` 承接，而底部检测、scroll snapshot、重渲后恢复仍由 `services/ScrollManager.ts` 提供纯 helper；`OpenCodianView` 只保留：
 
-- 当前 tab / pane 的查找
+- `TabMessagesPaneCoordinator` 的 host wiring
 - 是否应 auto-scroll 的业务判断
-- restore 后刷新 navigation sidebar 可见性和 pane metrics
+- restore 后的高层 render / hydration / bridge 调度
 
 这次没有改变原有 bottom / preserve-anchor / preserve-distance 三种恢复语义，只是把算法从 view 内联实现挪到了可单测模块。
 
@@ -158,7 +158,7 @@ background task 的 conversation-derived timeline rebuild 现在也不再由 vie
 
 tab conversation/session activation 写回现在也不再由 view 自己在 load / streaming activation / current-tab open / fork 等路径里逐项改 `currentConversation`、tab conversation 与 session reset：这些 active-tab state writeback 统一交给 `runtime/TabConversationStateBridge.ts`，view 只保留 activation/render orchestration。
 
-tab 激活入口里剩余的 pane-activation UI preflight（`setActiveMessagesPane()`、focus preview、question dock、todo dock）现在也不再由 `ConversationViewStateService` 直接通过四个分散 host 回调驱动，而是统一交给 `runtime/TabViewActivationBridge.ts`；其中 activation/open 侧的 question dock + todo dock writeback 与 supplemental refresh 又进一步收束到 `services/QuestionTodoActivationRefreshCoordinator.ts`，相邻的 loaded/open-side background-task indicator writeback 则进一步收束到 `services/BackgroundTaskActivationIndicatorCoordinator.ts`，而 selector/model 相邻的 active-tab context usage identity / snapshot writeback 则进一步收束到 `services/ActiveTabContextUsageCoordinator.ts`，这样 bridge 只保留 pane、selector、send-button 与 hydration-tail 编排。loaded-conversation 的消息装载后壳层现在先由 `runtime/ConversationHydrationOutcomeBridge.ts` 统一串起 background-task rebuild、message rerender 与 post-render outcome，再复用 `TabViewActivationBridge`；status / pending question / session todo lazy refresh 仍由 `QuestionTodoStatusRefreshCoordinator` 共享给 activation/open 与 post-sync 入口，view 只保留 state writeback 与 host 装配。与此同时，streaming fast-path activation、empty-tab activation 本体与 current-tab new conversation open 的消息区清空 / turn reset 壳层，也进一步统一下沉到 `runtime/TabConversationActivationBridge.ts`。这两个 activation bridge 所需的 late-bound host shape 现在再由 `runtime/TabActivationBridgeHostFactory.ts` 从同一份 activation writeback seam 派生，因此 `OpenCodianView` 不再分别维护两段平行的 activation host factory。
+tab 激活入口里剩余的 pane-activation UI preflight（`setActiveMessagesPane()`、focus preview、question dock、todo dock）现在也不再由 `OpenCodianView` 自己直接维护 pane DOM map；`services/TabMessagesPaneCoordinator.ts` 已承接 messages pane 的 create / activate / remove / clear / scroll metrics lifecycle，`runtime/TabViewActivationBridge.ts` 只再通过 view host 触发 active-pane 切换与相邻 UI preflight。与此同时，activation/open 侧的 question dock + todo dock writeback 与 supplemental refresh 又进一步收束到 `services/QuestionTodoActivationRefreshCoordinator.ts`，相邻的 loaded/open-side background-task indicator writeback 则进一步收束到 `services/BackgroundTaskActivationIndicatorCoordinator.ts`，而 selector/model 相邻的 active-tab context usage identity / snapshot writeback 则进一步收束到 `services/ActiveTabContextUsageCoordinator.ts`，这样 bridge 只保留 pane、selector、send-button 与 hydration-tail 编排。loaded-conversation 的消息装载后壳层现在先由 `runtime/ConversationHydrationOutcomeBridge.ts` 统一串起 background-task rebuild、message rerender 与 post-render outcome，再复用 `TabViewActivationBridge`；status / pending question / session todo lazy refresh 仍由 `QuestionTodoStatusRefreshCoordinator` 共享给 activation/open 与 post-sync 入口，view 只保留 state writeback 与 host 装配。与此同时，streaming fast-path activation、empty-tab activation 本体与 current-tab new conversation open 的消息区清空 / turn reset 壳层，也进一步统一下沉到 `runtime/TabConversationActivationBridge.ts`。这两个 activation bridge 所需的 late-bound host shape 现在再由 `runtime/TabActivationBridgeHostFactory.ts` 从同一份 activation writeback seam 派生，因此 `OpenCodianView` 不再分别维护两段平行的 activation host factory。
 
 streaming tab 激活时那条 active-conversation/session 写回 + baseline + selector/context/send-button outcome，loaded-conversation hydration 前的 activation state writeback，current-tab 新建会话后的 open shell，以及 empty-tab 激活时相邻的 active-pane reset shell，现在也不再由 view 自己分散内联；这些步骤已统一交给 `runtime/TabConversationActivationBridge.ts`，并继续复用 `TabConversationStateBridge`、`TabViewActivationBridge`、`QuestionTodoActivationRefreshCoordinator`、`BackgroundTaskActivationIndicatorCoordinator` 与 `ActiveTabContextUsageCoordinator`。不同的是，current-tab / new-tab 新建入口本身的“该不该创建、该显示什么 notice、该走 activate 还是 open”的分支，已经进一步前移到 `ConversationTabOpenCoordinator`；因此 `TabConversationActivationBridge` 只保留 shell/outcome 编排，不再兼管按钮入口的阻塞或提示决策。
 

@@ -60,11 +60,6 @@ import {
   ToolCallRenderer,
 } from '../../utils/streaming';
 import {
-  applyPassiveScrollMeasurement,
-  applyUserScrollIntent,
-  hasProgrammaticScrollGuard,
-} from './autoScrollState';
-import {
   buildChatAppearanceCustomCss,
   getChatAppearanceCssVariables,
   getInputPanelGlassRefractionCssVariables,
@@ -292,13 +287,17 @@ import {
 } from './services/TabActivationConversationSyncPortProvider';
 import {
   isElementNearBottom,
-  scrollElementToBottom,
 } from './services/ScrollManager';
 import {
   createSessionTodoCoordinator,
   type SessionTodoCoordinator,
   type SessionTodoViewHost,
 } from './services/SessionTodoHostAdapter';
+import {
+  TabMessagesPaneCoordinator,
+  type TabMessagesPaneCoordinatorHost,
+  type TabMessagesPaneState,
+} from './services/TabMessagesPaneCoordinator';
 import {
   createTabActivationRuntimeViewHosts,
 } from './services/TabActivationRuntimeViewHostFactory';
@@ -628,14 +627,7 @@ interface TabRuntimeState {
   questionRequestWaiters: Map<string, DeferredQuestionRequest>;
 }
 
-interface TabPaneState {
-  tabId: TabId;
-  messagesEl: HTMLElement;
-  runtime: TabRuntimeState;
-  scrollHandler: () => void;
-  mutationObserver: MutationObserver | null;
-  resizeObserver: ResizeObserver | null;
-}
+type TabPaneState = TabMessagesPaneState<TabRuntimeState>;
 
 /** Clipboard icon SVG for copy button */
 const COPY_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`;
@@ -676,7 +668,7 @@ export class OpenCodianView extends ItemView {
   private tabBarMountEl: HTMLElement | null = null;
   private tabBar: TabBar | null = null;
   private tabManager: TabManager | null = null;
-  private tabPaneStates = new Map<TabId, TabPaneState>();
+  private tabMessagesPaneCoordinator: TabMessagesPaneCoordinator<TabRuntimeState>;
 
   // Model selector state
   private modelSelectorContainer: HTMLElement | null = null;
@@ -836,24 +828,56 @@ export class OpenCodianView extends ItemView {
     };
   }
 
-  private getTabPaneState(tabId: TabId | null): TabPaneState | null {
-    if (!tabId) {
-      return null;
-    }
+  private createTabMessagesPaneCoordinatorHost(): TabMessagesPaneCoordinatorHost<TabRuntimeState> {
+    return {
+      getMessagesShellEl: () => this.messagesShellEl,
+      getMessagesContainer: () => this.messagesContainer,
+      setMessagesContainer: (messagesEl) => {
+        this.messagesContainer = messagesEl;
+      },
+      getActiveTabId: () => this.getActiveTabId(),
+      createRuntimeState: () => this.createTabRuntimeState(),
+      applyChatScrollModeToMessagesEl: (messagesEl) => {
+        this.applyChatScrollModeToMessagesEl(messagesEl);
+      },
+      resetTurnState: () => {
+        this.resetTurnState();
+      },
+      restoreTurnStateFromActivePane: () => {
+        this.restoreTurnStateFromActivePane();
+      },
+      rebuildNavigationSidebar: () => {
+        this.rebuildNavigationSidebar();
+      },
+      destroyNavigationSidebar: () => {
+        this.navigationSidebar?.destroy();
+        this.navigationSidebar = null;
+      },
+      updateNavigationSidebarVisibility: () => {
+        this.navigationSidebar?.updateVisibility();
+      },
+      clearScheduledSignalConversationSync: (tabId) => {
+        this.conversationSyncBridgePorts.getSignalScheduler().clearScheduledSignalConversationSync(
+          tabId,
+        );
+      },
+      shouldAutoScroll: (tabId) => this.shouldAutoScroll(tabId),
+      scheduleSettledScrollToBottomIfNeeded: (shouldScroll, tabId) => {
+        this.scheduleSettledScrollToBottomIfNeeded(shouldScroll, tabId);
+      },
+    };
+  }
 
-    return this.tabPaneStates.get(tabId) ?? null;
+  private getTabPaneState(tabId: TabId | null): TabPaneState | null {
+    return this.tabMessagesPaneCoordinator.getPaneState(tabId);
   }
 
   private getTabRuntimeState(tabId: TabId | null = this.getActiveTabId()): TabRuntimeState | null {
-    return this.getTabPaneState(tabId)?.runtime ?? null;
+    return this.tabMessagesPaneCoordinator.getRuntimeState(tabId);
   }
 
   private ensureTabRuntimeState(tabId: TabId | null = this.getActiveTabId()): TabRuntimeState | null {
-    if (!tabId) {
-      return null;
-    }
-
-    return this.ensureTabMessagesPane(tabId)?.runtime ?? null;
+    return this.tabMessagesPaneCoordinator.ensureRuntimeState(tabId);
   }
 
   private getActiveTabRuntimeState(): TabRuntimeState | null {
@@ -1071,6 +1095,9 @@ export class OpenCodianView extends ItemView {
     this.currentEffortLevel = this.plugin.settings.effortLevel;
     this.currentThinkingBudget = this.plugin.settings.thinkingBudget;
     this.titleGenerationService = new TitleGenerationService(this.plugin);
+    this.tabMessagesPaneCoordinator = new TabMessagesPaneCoordinator(
+      this.createTabMessagesPaneCoordinatorHost(),
+    );
     this.composerContextViewFacade = ComposerContextViewFacade.create({
       app: this.app,
       getServerMode: () => this.plugin.settings.server.mode,
@@ -2202,194 +2229,27 @@ export class OpenCodianView extends ItemView {
     // Navigation sidebar is attached after the active tab pane is created.
   }
 
-  private observeMessagesPaneChildren(paneState: TabPaneState): void {
-    paneState.resizeObserver?.observe(paneState.messagesEl);
-    for (const child of Array.from(paneState.messagesEl.children)) {
-      if (child instanceof HTMLElement) {
-        paneState.resizeObserver?.observe(child);
-      }
-    }
-  }
-
   private syncPaneScrollMetrics(
     tabId: TabId | null,
     messagesEl: HTMLElement | null = this.getTabPaneState(tabId)?.messagesEl ?? null,
   ): boolean {
-    if (!tabId || !messagesEl) {
-      return true;
-    }
-
-    const runtime = this.getTabRuntimeState(tabId);
-    if (!runtime) {
-      return true;
-    }
-
-    const nearBottom = isElementNearBottom(messagesEl);
-    const nextState = applyPassiveScrollMeasurement(runtime, nearBottom);
-    runtime.isNearBottom = nextState.isNearBottom;
-    if (this.getActiveTabId() === tabId) {
-      this.navigationSidebar?.updateVisibility();
-    }
-    return nearBottom;
-  }
-
-  private handleMessagesPaneScroll(tabId: TabId): void {
-    const paneState = this.getTabPaneState(tabId);
-    if (!paneState) {
-      return;
-    }
-
-    const nearBottom = this.syncPaneScrollMetrics(tabId, paneState.messagesEl);
-    if (hasProgrammaticScrollGuard(paneState.runtime)) {
-      if (nearBottom) {
-        paneState.runtime.programmaticScrollGuardUntil = 0;
-      }
-      return;
-    }
-
-    const nextState = applyUserScrollIntent(paneState.runtime, nearBottom);
-    paneState.runtime.autoScrollEnabled = nextState.autoScrollEnabled;
-    paneState.runtime.isNearBottom = nextState.isNearBottom;
-  }
-
-  private handleMessagesPaneLayoutChange(tabId: TabId): void {
-    const paneState = this.getTabPaneState(tabId);
-    if (!paneState) {
-      return;
-    }
-
-    if (paneState.runtime.isHydratingConversation) {
-      paneState.runtime.pendingLayoutMutations += 1;
-      this.syncPaneScrollMetrics(tabId, paneState.messagesEl);
-      return;
-    }
-
-    const nearBottom = this.syncPaneScrollMetrics(tabId, paneState.messagesEl);
-    if (hasProgrammaticScrollGuard(paneState.runtime) && nearBottom) {
-      paneState.runtime.programmaticScrollGuardUntil = 0;
-    }
-
-    if (this.getActiveTabId() === tabId) {
-      if (paneState.runtime.isStreaming) {
-        return;
-      }
-      this.scheduleSettledScrollToBottomIfNeeded(this.shouldAutoScroll(tabId), tabId);
-    }
+    return this.tabMessagesPaneCoordinator.syncScrollMetrics(tabId, messagesEl);
   }
 
   private ensureTabMessagesPane(tabId: TabId): TabPaneState | null {
-    const existing = this.tabPaneStates.get(tabId);
-    if (existing?.messagesEl?.isConnected) {
-      return existing;
-    }
-
-    if (!this.messagesShellEl) {
-      return null;
-    }
-
-    const messagesEl = this.messagesShellEl.createDiv({ cls: 'opencodian-messages opencodian-messages-pane' });
-    messagesEl.dataset.tabId = tabId;
-    this.applyChatScrollModeToMessagesEl(messagesEl);
-    const scrollHandler = () => {
-      this.handleMessagesPaneScroll(tabId);
-    };
-    messagesEl.addEventListener('scroll', scrollHandler, { passive: true });
-
-    const resizeObserver = typeof ResizeObserver !== 'undefined'
-      ? new ResizeObserver(() => {
-        this.handleMessagesPaneLayoutChange(tabId);
-      })
-      : null;
-    const mutationObserver = new MutationObserver((mutations) => {
-      for (const mutation of mutations) {
-        mutation.addedNodes.forEach((node) => {
-          if (node instanceof HTMLElement) {
-            resizeObserver?.observe(node);
-          }
-        });
-        mutation.removedNodes.forEach((node) => {
-          if (node instanceof HTMLElement) {
-            resizeObserver?.unobserve(node);
-          }
-        });
-      }
-      this.handleMessagesPaneLayoutChange(tabId);
-    });
-    mutationObserver.observe(messagesEl, { childList: true });
-    const paneState: TabPaneState = {
-      tabId,
-      messagesEl,
-      runtime: this.createTabRuntimeState(),
-      scrollHandler,
-      mutationObserver,
-      resizeObserver,
-    };
-    this.observeMessagesPaneChildren(paneState);
-    this.tabPaneStates.set(tabId, paneState);
-    return paneState;
+    return this.tabMessagesPaneCoordinator.ensurePane(tabId);
   }
 
   private setActiveMessagesPane(tabId: TabId): void {
-    const activePaneState = this.ensureTabMessagesPane(tabId);
-    if (!activePaneState) {
-      this.messagesContainer = null;
-      this.resetTurnState();
-      this.navigationSidebar?.destroy();
-      this.navigationSidebar = null;
-      return;
-    }
-
-    for (const [paneTabId, paneState] of this.tabPaneStates) {
-      paneState.messagesEl.classList.toggle('is-active', paneTabId === tabId);
-    }
-
-    this.messagesContainer = activePaneState.messagesEl;
-    this.restoreTurnStateFromActivePane();
-    this.rebuildNavigationSidebar();
-    this.syncPaneScrollMetrics(tabId, activePaneState.messagesEl);
-    if (activePaneState.runtime.autoScrollEnabled) {
-      this.scheduleSettledScrollToBottomIfNeeded(this.shouldAutoScroll(tabId), tabId);
-    }
+    this.tabMessagesPaneCoordinator.setActivePane(tabId);
   }
 
   private removeTabMessagesPane(tabId: TabId): void {
-    const paneState = this.tabPaneStates.get(tabId);
-    if (!paneState) {
-      return;
-    }
-
-    if (this.messagesContainer === paneState.messagesEl) {
-      this.messagesContainer = null;
-      this.resetTurnState();
-      this.navigationSidebar?.destroy();
-      this.navigationSidebar = null;
-    }
-
-    paneState.runtime.streamController?.cancelStream();
-    this.conversationSyncBridgePorts.getSignalScheduler().clearScheduledSignalConversationSync(tabId);
-    paneState.messagesEl.removeEventListener('scroll', paneState.scrollHandler);
-    paneState.mutationObserver?.disconnect();
-    paneState.resizeObserver?.disconnect();
-    paneState.messagesEl.remove();
-    this.tabPaneStates.delete(tabId);
+    this.tabMessagesPaneCoordinator.removePane(tabId);
   }
 
   private clearTabMessagesPanes(): void {
-    for (const paneState of this.tabPaneStates.values()) {
-      paneState.runtime.streamController?.cancelStream();
-      this.conversationSyncBridgePorts.getSignalScheduler().clearScheduledSignalConversationSync(
-        paneState.tabId,
-      );
-      paneState.messagesEl.removeEventListener('scroll', paneState.scrollHandler);
-      paneState.mutationObserver?.disconnect();
-      paneState.resizeObserver?.disconnect();
-      paneState.messagesEl.remove();
-    }
-    this.tabPaneStates.clear();
-    this.messagesContainer = null;
-    this.resetTurnState();
-    this.navigationSidebar?.destroy();
-    this.navigationSidebar = null;
+    this.tabMessagesPaneCoordinator.clearPanes();
   }
 
   private rebuildNavigationSidebar(): void {
@@ -2718,10 +2578,7 @@ export class OpenCodianView extends ItemView {
   public applyChatScrollMode(): void {
     this.syncChatSurfaceColor();
 
-    if (this.tabPaneStates.size > 0) {
-      for (const paneState of this.tabPaneStates.values()) {
-        this.applyChatScrollModeToMessagesEl(paneState.messagesEl);
-      }
+    if (this.tabMessagesPaneCoordinator.applyScrollModeToPanes()) {
       return;
     }
 
@@ -6579,14 +6436,7 @@ export class OpenCodianView extends ItemView {
       return;
     }
 
-    const paneState = this.getTabPaneState(tabId);
-    if (!paneState) {
-      return;
-    }
-
-    scrollElementToBottom(paneState.messagesEl, paneState.runtime, options);
-
-    this.syncPaneScrollMetrics(tabId, paneState.messagesEl);
+    this.tabMessagesPaneCoordinator.scrollToBottom(tabId, options);
   }
 
   private shouldAutoScroll(tabId: TabId | null = this.getActiveTabId()): boolean {
