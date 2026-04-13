@@ -29,14 +29,14 @@
 
 ## Host seam
 
-`OpenCodeService` 通过 host seam 把仍然属于 service owner 的能力注入进来：
+`OpenCodeService` 通过 host seam 把相邻 owner 的能力注入进来：
 
 - `observeRuntimeToolNames()`：把流中出现的新工具写回 catalog runtime
-- `getOpenCodeToolKind()`：沿用现有 builtin / MCP / custom 身份判断
-- `normalizeQuestionRequest()`：继续由 service 维护问题请求的结构化归一化
+- `getOpenCodeToolKind()`：复用 `OpenCodeMessageNormalizationMapper` 的 builtin / MCP / custom 身份判断
+- `normalizeQuestionRequest()`：复用 `OpenCodeMessageNormalizationMapper` 的问题请求结构化归一化
 - `logStreamingDebug()`：复用原本的 assistant stream debug log
 
-这样 transformer 可以收束事件→chunk 逻辑，同时避免把 tool catalog 或 question normalization 重新拆散。
+这样 transformer 可以收束事件→chunk 逻辑，同时避免把 tool catalog 或消息/问题 normalization 重新拆散。
 
 ## 核心类型 / 状态
 

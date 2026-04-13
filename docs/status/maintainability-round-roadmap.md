@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`。R27 完成后必须暂停复盘，不得自动扩展新队列。
-> **当前状态**: [CONFIRMED_NIGHT_BATCH] R19-R27 已确认；当前 `[NEXT]` 是 R26 Message normalization mapper。
+> **当前状态**: [CONFIRMED_NIGHT_BATCH] R19-R27 已确认；当前 `[NEXT]` 是 R27 OpenCodeService checkpoint。
 
 ## 控制规则
 
@@ -562,7 +562,7 @@
   - focused coverage 证明 chunk 语义未回归。
   - 运行 targeted tests、全量 `npm test`、`npm run build`。
 
-### [NEXT] R26 - Message normalization mapper
+### [DONE] R26 - Message normalization mapper
 
 - **Lane**: OpenCodeService `message normalization`
 - **目标**: 把 message → `ChatMessage` 归一化、context attachment 提取、tool identity / OMO meta 处理收束到 mapper owner。
@@ -582,7 +582,7 @@
   - focused coverage 证明 OMO / context attachments / tool metadata 行为稳定。
   - 运行 targeted tests、全量 `npm test`、`npm run build`。
 
-### [QUEUED] R27 - OpenCodeService checkpoint
+### [NEXT] R27 - OpenCodeService checkpoint
 
 - **Lane**: Checkpoint
 - **目标**: 暂停自动推进，复盘 R19-R26 对 `OpenCodeService` 的缩减幅度和兼容风险，并决定下一批是否继续处理 session/config/query gateway。

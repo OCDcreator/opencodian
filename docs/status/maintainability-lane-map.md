@@ -1,7 +1,7 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [CONFIRMED_NIGHT_BATCH] R19-R27 已确认；当前 `[NEXT]` 是 R26 Message normalization mapper。
+> **当前状态**: [CONFIRMED_NIGHT_BATCH] R19-R27 已确认；当前 `[NEXT]` 是 R27 OpenCodeService checkpoint。
 
 ## 当前优先级
 
@@ -21,7 +21,8 @@
 - R23 已完成 context/image request-part serialization 到 `OpenCodeContextPartSerializer`，并保持与 prompt option builder 的边界
 - R24 已完成 active stream runtime、session-scoped abort controller、cancel/detach lifecycle 与 part type tracking 收束到 `OpenCodeStreamingRuntimeCoordinator`
 - R25 已完成 SDK / legacy stream event → chunk transform、SSE parser 与 part-aware delta routing 收束到 `OpenCodeStreamEventTransformer`
-- R26 首查 message normalization，严格保持 SDK-first / legacy fallback / ChatMessage 语义
+- R26 已完成 message → `ChatMessage` hydration、question normalization、tool identity / OMO metadata 收束到 `OpenCodeMessageNormalizationMapper`
+- R27 只做 checkpoint，复盘 `OpenCodeService` 在 R19-R26 的 owner 收缩与兼容风险
 - `OpenCodianView` / settings / trailing-assistant 链本批都只保留 regression watchpoints，不再开新切口
 - P2 regression-only 首查顺序固定为：
   1. `tests/unit/features/chat/QuestionDockCoordinator.test.ts`

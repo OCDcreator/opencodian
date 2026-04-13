@@ -10,32 +10,15 @@ import { requestUrl } from 'obsidian';
 
 import {
   createLogger,
-  formatContextLabel,
-  getToolIdentity,
   isInternalStructuredOutputTool,
-  parseLineRangeFromFileUrl,
-  parseObsidianContextTag,
-  resolveContextMimeFromPath,
-  resolveToolExecutionStatus,
-  resolveToolResultText,
-  type ToolIdentityKind,
 } from '../../shared';
-import {
-  contextPathFromFileUrl,
-  normalizeContextAttachmentPath,
-  normalizeContextPath,
-} from '../../shared/contextPath';
+import { normalizeContextPath } from '../../shared/contextPath';
 import type {
   ChatMessage,
-  ContentBlock,
   ImageAttachment,
-  MessageContextAttachment,
   OpencodeModelConfigSubset,
   PermissionReply,
   PermissionRequest,
-  PromptContextLineRange,
-  QuestionOption,
-  QuestionPrompt,
   QuestionRequest as ChatQuestionRequest,
   SessionDiffEntry,
   SessionTodo,
@@ -44,7 +27,6 @@ import type {
 import type { OpenCodianSettings } from '../types/settings';
 import { getServerBaseUrl, isLocalServerMode } from '../types/settings';
 import { createSdkClient } from './createSdkClient';
-import { detectOmoMessageMeta } from './omoCompat';
 import {
   OpenCodeCatalogStateStore,
   type CatalogUpdateListener,
@@ -57,6 +39,7 @@ import {
 import {
   OpenCodeContextPartSerializer,
 } from './OpenCodeContextPartSerializer';
+import { OpenCodeMessageNormalizationMapper } from './OpenCodeMessageNormalizationMapper';
 import {
   OpenCodePromptRequestBuilder,
 } from './OpenCodePromptRequestBuilder';
@@ -95,7 +78,6 @@ import type {
 } from './types';
 
 const logger = createLogger('OpenCodeService');
-const INLINE_READ_TOOL_PREFIX = 'Called the Read tool with the following input:';
 const TRANSIENT_CONNECTIVITY_ERROR_PATTERNS = [
   /net::ERR_CONNECTION_REFUSED/i,
   /net::ERR_CONNECTION_RESET/i,
@@ -189,32 +171,6 @@ interface ToolPartData extends Part {
   callID?: string;
   tool?: string;
   state?: ToolStateData;
-}
-
-function resolveReasoningDurationSeconds(part: Pick<Part, 'duration' | 'time'>): number | undefined {
-  const start = part.time?.start;
-  const end = part.time?.end;
-  if (typeof start === 'number' && typeof end === 'number' && end >= start) {
-    return Math.max(0, end - start) / 1000;
-  }
-
-  if (typeof part.duration === 'number' && part.duration > 0) {
-    return part.duration;
-  }
-
-  return undefined;
-}
-
-function formatModelIdentifier(providerID?: string, modelID?: string): string | undefined {
-  if (providerID && modelID) {
-    return `${providerID}/${modelID}`;
-  }
-
-  if (typeof modelID === 'string' && modelID.trim()) {
-    return modelID.trim();
-  }
-
-  return undefined;
 }
 
 function getDebugTextPreview(text: string, maxLength = 160): string {
@@ -372,6 +328,7 @@ interface TransientConnectivityLogState {
 }
 
 export class OpenCodeService {
+  private static readonly messageNormalizationMapper = new OpenCodeMessageNormalizationMapper();
   readonly sdk: OpenCodeSdkFacade;
   private settings: OpenCodianSettings;
   private events: OpenCodeServiceEvents;
@@ -441,8 +398,13 @@ export class OpenCodeService {
     });
     this.streamEventTransformer = new OpenCodeStreamEventTransformer({
       observeRuntimeToolNames: (toolNames) => this.observeRuntimeToolNames(toolNames),
-      getOpenCodeToolKind: (toolName) => this.getOpenCodeToolKind(toolName),
-      normalizeQuestionRequest: (raw) => this.normalizeQuestionRequest(raw),
+      getOpenCodeToolKind: (toolName) =>
+        OpenCodeService.messageNormalizationMapper.getOpenCodeToolKind(
+          toolName,
+          this.buildOpenCodeToolIdentityContext(),
+        ),
+      normalizeQuestionRequest: (raw) =>
+        OpenCodeService.messageNormalizationMapper.normalizeQuestionRequest(raw),
       logStreamingDebug: (label, payload) => logAssistantFinalizationDebug(label, payload),
     });
     this.streamingRuntime = new OpenCodeStreamingRuntimeCoordinator({
@@ -1507,116 +1469,12 @@ export class OpenCodeService {
     };
   }
 
-  private normalizeQuestionRequest(raw: unknown): ChatQuestionRequest | null {
-    if (!raw || typeof raw !== 'object') {
-      return null;
-    }
-
-    const request = raw as {
-      id?: unknown;
-      sessionID?: unknown;
-      questions?: unknown;
-    };
-
-    if (typeof request.id !== 'string' || typeof request.sessionID !== 'string') {
-      return null;
-    }
-
-    const questions = Array.isArray(request.questions)
-      ? request.questions.reduce<QuestionPrompt[]>((items, question) => {
-          const normalized = this.normalizeQuestionPrompt(question);
-          if (normalized) {
-            items.push(normalized);
-          }
-          return items;
-        }, [])
-      : [];
-
-    if (questions.length === 0) {
-      return null;
-    }
-
-    return {
-      id: request.id,
-      sessionId: request.sessionID,
-      questions,
-    };
-  }
-
-  private normalizeQuestionPrompt(raw: unknown): QuestionPrompt | null {
-    if (!raw || typeof raw !== 'object') {
-      return null;
-    }
-
-    const prompt = raw as {
-      question?: unknown;
-      header?: unknown;
-      options?: unknown;
-      multiple?: unknown;
-      custom?: unknown;
-    };
-
-    const questionText = typeof prompt.question === 'string' ? prompt.question.trim() : '';
-    const header = typeof prompt.header === 'string' && prompt.header.trim()
-      ? prompt.header.trim()
-      : questionText;
-    if (!questionText || !header) {
-      return null;
-    }
-
-    const options = Array.isArray(prompt.options)
-      ? prompt.options.reduce<QuestionOption[]>((items, option) => {
-          if (!option || typeof option !== 'object') {
-            return items;
-          }
-
-          const normalizedOption = option as { label?: unknown; description?: unknown };
-          const label = typeof normalizedOption.label === 'string' ? normalizedOption.label.trim() : '';
-          if (!label) {
-            return items;
-          }
-
-          items.push({
-            label,
-            description: typeof normalizedOption.description === 'string'
-              ? normalizedOption.description.trim()
-              : '',
-          });
-          return items;
-        }, [])
-      : [];
-
-    return {
-      question: questionText,
-      header,
-      options,
-      multiple: prompt.multiple === true,
-      custom: prompt.custom !== false,
-    };
-  }
-
   private observeRuntimeToolNames(toolNames: Iterable<string>): boolean {
     return this.catalogState.observeRuntimeToolNames(toolNames);
   }
 
   private buildOpenCodeToolIdentityContext(): OpenCodeCatalogToolIdentityContext {
     return this.catalogState.buildToolIdentityContext();
-  }
-
-  private getOpenCodeToolKind(toolName: string | undefined | null): ToolIdentityKind {
-    return OpenCodeService.getOpenCodeToolKind(toolName, this.buildOpenCodeToolIdentityContext());
-  }
-
-  private static getOpenCodeToolKind(
-    toolName: string | undefined | null,
-    context: OpenCodeCatalogToolIdentityContext = {},
-  ): ToolIdentityKind {
-    return getToolIdentity(toolName || 'unknown', {
-      source: 'opencode',
-      knownMcpTools: context.knownMcpTools,
-      registryTools: context.registryTools,
-      observedExternalTools: context.observedExternalTools,
-    }).kind;
   }
 
   private async *consumeLegacyEventStream(
@@ -1775,7 +1633,10 @@ export class OpenCodeService {
           messageCount: messages.length,
           assistantMessageId,
           messageCreatedAt: assistantMsg.info.time.created,
-          modelId: formatModelIdentifier(assistantMsg.info.providerID, assistantMsg.info.modelID) ?? null,
+          modelId: OpenCodeMessageNormalizationMapper.formatModelIdentifier(
+            assistantMsg.info.providerID,
+            assistantMsg.info.modelID,
+          ) ?? null,
           structuredPresent: assistantMsg.info.structured !== undefined,
           assistantError: extractStructuredErrorMessage(assistantMsg.info.error),
           partSummary: summarizeAssistantParts(assistantMsg.parts),
@@ -1821,14 +1682,20 @@ export class OpenCodeService {
           sessionId,
           assistantMessageId,
           timestamp: assistantMsg.info.time.created,
-          modelId: formatModelIdentifier(assistantMsg.info.providerID, assistantMsg.info.modelID) ?? null,
+          modelId: OpenCodeMessageNormalizationMapper.formatModelIdentifier(
+            assistantMsg.info.providerID,
+            assistantMsg.info.modelID,
+          ) ?? null,
           finalTextLength: lastContent.length,
         });
         yield {
           type: 'message_metadata',
           messageId: assistantMsg.info.id,
           timestamp: assistantMsg.info.time.created,
-          modelId: formatModelIdentifier(assistantMsg.info.providerID, assistantMsg.info.modelID),
+          modelId: OpenCodeMessageNormalizationMapper.formatModelIdentifier(
+            assistantMsg.info.providerID,
+            assistantMsg.info.modelID,
+          ),
         };
       } else {
         logger.warn('No assistant message found when finalizing stream response', {
@@ -2414,7 +2281,7 @@ export class OpenCodeService {
           : [];
 
       return rawRequests.reduce<ChatQuestionRequest[]>((requests, rawRequest) => {
-        const normalized = this.normalizeQuestionRequest(rawRequest);
+        const normalized = OpenCodeService.messageNormalizationMapper.normalizeQuestionRequest(rawRequest);
         if (normalized) {
           requests.push(normalized);
         }
@@ -2640,418 +2507,12 @@ export class OpenCodeService {
     vaultPath?: string,
     toolIdentityContext: OpenCodeCatalogToolIdentityContext = {},
   ): ChatMessage {
-    const role = info.role === 'assistant' ? 'assistant' : 'user';
-
-    const textParts = parts.filter((p): p is Part & { text: string } =>
-      p.type === 'text' && typeof p.text === 'string'
-    );
-    const visibleTextParts: string[] = [];
-    const contextAttachments: MessageContextAttachment[] = [];
-
-    for (const part of textParts) {
-      if (role === 'user') {
-        const contextAttachment = parseObsidianContextTag(part.text);
-        if (contextAttachment) {
-          contextAttachments.push(contextAttachment);
-          continue;
-        }
-
-        if ((part as Part & { synthetic?: boolean }).synthetic === true) {
-          const inlineReadContext = OpenCodeService.extractInlineReadToolContext(part.text, vaultPath);
-          if (inlineReadContext.attachments.length > 0) {
-            contextAttachments.push(...inlineReadContext.attachments);
-          }
-          continue;
-        }
-      }
-
-      visibleTextParts.push(part.text);
-    }
-
-    let content = visibleTextParts.join('');
-
-    if (role === 'user') {
-      for (const part of parts) {
-        const contextAttachment = OpenCodeService.parseFileContextAttachment(part, vaultPath);
-        if (contextAttachment) {
-          contextAttachments.push(contextAttachment);
-        }
-      }
-
-      const inlineReadContext = OpenCodeService.extractInlineReadToolContext(content, vaultPath);
-      content = inlineReadContext.content;
-      contextAttachments.push(...inlineReadContext.attachments);
-    }
-
-    const thinkingParts = parts.filter((p): p is Part & { text: string } =>
-      p.type === 'reasoning' && typeof p.text === 'string'
-    );
-
-    const toolParts = parts.filter((p) =>
-      p.type === 'tool' && !isInternalStructuredOutputTool((p as ToolPartData).tool),
-    ) as ToolPartData[];
-    const toolCalls = toolParts
-      .filter((p) => {
-        const toolStatus = resolveToolExecutionStatus({
-          toolName: p.tool,
-          state: p.state,
-        });
-        return toolStatus === 'pending' || toolStatus === 'running';
-      })
-      .map((p) => ({
-        id: p.callID ?? '',
-        name: p.tool ?? '',
-        toolSourceKey: p.tool ?? undefined,
-        kind: OpenCodeService.getOpenCodeToolKind(p.tool, toolIdentityContext),
-        input: p.state?.input ?? {},
-        status: 'pending' as const,
-      }));
-
-    const contentBlocks: ContentBlock[] = [];
-
-    for (const part of thinkingParts) {
-      contentBlocks.push({
-        type: 'thinking',
-        thinking: part.text,
-        durationSeconds: resolveReasoningDurationSeconds(part),
-      });
-    }
-
-    const processedToolIds = new Set<string>();
-    for (const part of toolParts) {
-      const toolId = part.callID || part.id;
-      if (!toolId || processedToolIds.has(toolId)) {
-        continue;
-      }
-
-      processedToolIds.add(toolId);
-
-      const resultPart = toolParts.find((candidate) => {
-        if ((candidate.callID || candidate.id) !== toolId) {
-          return false;
-        }
-
-        const toolStatus = resolveToolExecutionStatus({
-          toolName: candidate.tool,
-          state: candidate.state,
-        });
-        return toolStatus === 'completed' || toolStatus === 'error';
-      });
-      const toolStatus = resolveToolExecutionStatus({
-        toolName: part.tool,
-        state: resultPart?.state ?? part.state,
-      });
-
-      contentBlocks.push({
-        type: 'tool_use',
-        toolId,
-        toolName: part.tool || 'unknown',
-        toolSourceKey: part.tool || undefined,
-        toolKind: OpenCodeService.getOpenCodeToolKind(part.tool, toolIdentityContext),
-        toolInput: part.state?.input || {},
-        toolStatus,
-        toolResult: resolveToolResultText(resultPart?.state),
-      });
-    }
-
-    if (content) {
-      contentBlocks.push({ type: 'text', text: content });
-    }
-
-    const timestamp = 'time' in info && info.time
-      ? info.time.created
-      : Date.now();
-
-    const omo = detectOmoMessageMeta(role, content);
-    const normalizedContent = omo?.kind === 'user-injection'
-      ? omo.originalText
-      : omo?.kind === 'system-reminder'
-        ? omo.reminderText
-        : content;
-    const structured = role === 'assistant' ? info.structured : undefined;
-
-    return {
-      id: info.id,
-      role,
-      content: normalizedContent,
-      timestamp,
-      modelId: role === 'assistant'
-        ? formatModelIdentifier(info.providerID, info.modelID)
-        : undefined,
-      sourceMessageId: info.id,
-      toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
-      contentBlocks: contentBlocks.length > 0 ? contentBlocks : undefined,
-      contextAttachments: contextAttachments.length > 0
-        ? OpenCodeService.dedupeContextAttachments(contextAttachments)
-        : undefined,
-      displayStyle: omo?.kind === 'system-reminder' ? 'notice' : undefined,
-      noticeTone: omo?.kind === 'system-reminder' ? 'info' : undefined,
-      omo: omo ?? undefined,
-      structured,
+    return OpenCodeService.messageNormalizationMapper.openCodeMessageToChatMessage(
+      info,
       parts,
-    };
-  }
-
-  private static parseFileContextAttachment(
-    part: Part,
-    vaultPath?: string,
-  ): MessageContextAttachment | null {
-    if (part.type !== 'file') {
-      return null;
-    }
-
-    const filePart = part as Part & {
-      mime?: string;
-      url?: string;
-      source?: {
-        type?: string;
-        path?: string;
-        text?: {
-          value?: string;
-        };
-      };
-    };
-
-    const sourcePath = typeof filePart.source?.path === 'string'
-      ? normalizeContextAttachmentPath(filePart.source.path, vaultPath)
-      : undefined;
-    const rawUrlPath = typeof filePart.url === 'string'
-      ? contextPathFromFileUrl(filePart.url)
-      : null;
-    const urlPath = rawUrlPath
-      ? normalizeContextAttachmentPath(rawUrlPath, vaultPath)
-      : null;
-    const contextPath = sourcePath ?? urlPath;
-    if (!contextPath) {
-      return null;
-    }
-
-    const lineRange = typeof filePart.url === 'string'
-      ? parseLineRangeFromFileUrl(filePart.url) ?? undefined
-      : undefined;
-    const textSnapshot = typeof filePart.source?.text?.value === 'string'
-      ? filePart.source.text.value
-      : undefined;
-
-    return {
-      kind: lineRange ? 'selection' : 'file',
-      path: contextPath,
-      label: formatContextLabel(contextPath, lineRange),
-      mime: typeof filePart.mime === 'string' && filePart.mime.trim()
-        ? filePart.mime
-        : resolveContextMimeFromPath(contextPath),
-      lineRange,
-      textSnapshot,
-    };
-  }
-
-  private static extractInlineReadToolContext(
-    text: string,
-    vaultPath?: string,
-  ): { content: string; attachments: MessageContextAttachment[] } {
-    if (!text.includes(INLINE_READ_TOOL_PREFIX)) {
-      return {
-        content: text,
-        attachments: [],
-      };
-    }
-
-    const attachments: MessageContextAttachment[] = [];
-    const visibleSegments: string[] = [];
-    let cursor = 0;
-
-    while (cursor < text.length) {
-      const markerIndex = text.indexOf(INLINE_READ_TOOL_PREFIX, cursor);
-      if (markerIndex < 0) {
-        visibleSegments.push(text.slice(cursor));
-        break;
-      }
-
-      const parsedInvocation = OpenCodeService.parseInlineReadToolInvocation(text, markerIndex, vaultPath);
-      if (!parsedInvocation) {
-        visibleSegments.push(text.slice(cursor, markerIndex + INLINE_READ_TOOL_PREFIX.length));
-        cursor = markerIndex + INLINE_READ_TOOL_PREFIX.length;
-        continue;
-      }
-
-      visibleSegments.push(text.slice(cursor, markerIndex));
-      attachments.push(parsedInvocation.attachment);
-      cursor = parsedInvocation.nextIndex;
-    }
-
-    return {
-      content: visibleSegments.join('').trim(),
-      attachments,
-    };
-  }
-
-  private static parseInlineReadToolInvocation(
-    text: string,
-    markerIndex: number,
-    vaultPath?: string,
-  ): { attachment: MessageContextAttachment; nextIndex: number } | null {
-    let cursor = markerIndex + INLINE_READ_TOOL_PREFIX.length;
-    while (cursor < text.length && /\s/.test(text[cursor])) {
-      cursor += 1;
-    }
-
-    if (text[cursor] !== '{') {
-      return null;
-    }
-
-    const jsonEnd = OpenCodeService.findBalancedJsonObjectEnd(text, cursor);
-    if (jsonEnd < 0) {
-      return null;
-    }
-
-    const parsedInput = OpenCodeService.safeParseJsonRecord(text.slice(cursor, jsonEnd + 1));
-    const inputPath = OpenCodeService.extractPathFromToolInput(parsedInput);
-    if (!inputPath) {
-      return null;
-    }
-
-    const contextPath = normalizeContextAttachmentPath(inputPath, vaultPath);
-    const lineRange = OpenCodeService.extractLineRangeFromToolInput(parsedInput);
-
-    return {
-      attachment: {
-        kind: lineRange ? 'selection' : 'file',
-        path: contextPath,
-        label: formatContextLabel(contextPath, lineRange),
-        mime: resolveContextMimeFromPath(contextPath),
-        lineRange,
-      },
-      nextIndex: jsonEnd + 1,
-    };
-  }
-
-  private static findBalancedJsonObjectEnd(text: string, startIndex: number): number {
-    let depth = 0;
-    let inString = false;
-    let escaped = false;
-
-    for (let index = startIndex; index < text.length; index++) {
-      const char = text[index];
-
-      if (escaped) {
-        escaped = false;
-        continue;
-      }
-
-      if (char === '\\') {
-        escaped = true;
-        continue;
-      }
-
-      if (char === '"') {
-        inString = !inString;
-        continue;
-      }
-
-      if (inString) {
-        continue;
-      }
-
-      if (char === '{') {
-        depth += 1;
-      } else if (char === '}') {
-        depth -= 1;
-        if (depth === 0) {
-          return index;
-        }
-      }
-    }
-
-    return -1;
-  }
-
-  private static safeParseJsonRecord(value: string): Record<string, unknown> | null {
-    try {
-      const parsed = JSON.parse(value);
-      return parsed && typeof parsed === 'object'
-        ? parsed as Record<string, unknown>
-        : null;
-    } catch {
-      return null;
-    }
-  }
-
-  private static extractPathFromToolInput(input: Record<string, unknown> | null): string | null {
-    if (!input) {
-      return null;
-    }
-
-    const candidates = [
-      input.filePath,
-      input.file_path,
-      input.path,
-      input.notebook_path,
-    ];
-
-    for (const candidate of candidates) {
-      if (typeof candidate === 'string' && candidate.trim()) {
-        return candidate.trim();
-      }
-    }
-
-    return null;
-  }
-
-  private static extractLineRangeFromToolInput(
-    input: Record<string, unknown> | null,
-  ): PromptContextLineRange | undefined {
-    if (!input) {
-      return undefined;
-    }
-
-    const offset = OpenCodeService.parsePositiveInteger(input.offset);
-    const limit = OpenCodeService.parsePositiveInteger(input.limit);
-    if (offset === null || limit === null) {
-      return undefined;
-    }
-
-    return {
-      startLine: offset,
-      endLine: offset + limit - 1,
-    };
-  }
-
-  private static parsePositiveInteger(value: unknown): number | null {
-    if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
-      return Math.floor(value);
-    }
-
-    if (typeof value === 'string' && /^\d+$/.test(value.trim())) {
-      const parsed = Number(value.trim());
-      return parsed > 0 ? parsed : null;
-    }
-
-    return null;
-  }
-
-  private static dedupeContextAttachments(
-    attachments: MessageContextAttachment[],
-  ): MessageContextAttachment[] {
-    const seen = new Set<string>();
-    const deduped: MessageContextAttachment[] = [];
-
-    for (const attachment of attachments) {
-      const key = [
-        attachment.kind,
-        attachment.path,
-        attachment.lineRange?.startLine ?? '',
-        attachment.lineRange?.endLine ?? '',
-      ].join(':');
-
-      if (seen.has(key)) {
-        continue;
-      }
-
-      seen.add(key);
-      deduped.push(attachment);
-    }
-
-    return deduped;
+      vaultPath,
+      toolIdentityContext,
+    );
   }
 
   async refreshToolIds(): Promise<string[]> {

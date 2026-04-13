@@ -10,9 +10,8 @@
 - 通过 `ServerManager` 管理本地或远程 OpenCode 服务状态
 - 在 SDK v2 与 legacy HTTP/SSE 两条链路之间按 feature flag 路由
 - 维护按 session 隔离的流式状态，支持多标签并发流式响应
-- 归一化 session、message、todo、question、diff、permission 等返回值
-- 归一化 OpenCode 工具身份（builtin / MCP / custom），避免流式与历史恢复出现不同图标判断
-- 把 OpenCode 持久化消息转换成 UI 可直接消费的 `ChatMessage`
+- 归一化 session、todo、question、diff、permission 等返回值
+- 通过 `OpenCodeMessageNormalizationMapper` 统一 question prompt、工具身份、持久化消息 hydration、上下文附件与 OMO metadata
 
 当前实现是“混合外观层”：SDK v2 已覆盖大部分 CRUD、非流式 prompt、流式主链路、abort、questions 与 sync 事件；legacy HTTP/SSE 仍完整保留作为回滚路径。
 
@@ -27,10 +26,10 @@
 - `../types/*`
 - `../types/settings`
 - `./createSdkClient`
-- `./omoCompat`
 - `./OpenCodeCatalogStateStore`
 - `./OpenCodeContextPartSerializer`
 - `./OpenCodeEventSubscriptionCoordinator`
+- `./OpenCodeMessageNormalizationMapper`
 - `./OpenCodePromptRequestBuilder`
 - `./OpenCodeStreamingRuntimeCoordinator`
 - `./OpenCodeStreamEventTransformer`
@@ -57,6 +56,7 @@
 - `syncEventRuntime`: `OpenCodeSyncEventRuntimeCoordinator` 实例，负责 session todo/status/message sync event 的监听集合、wanted state、SDK 订阅生命周期与 emit 路径。
 - `catalogState`: `OpenCodeCatalogStateStore` 实例，负责 registry tool ids、tool schema cache、observed external tool names、MCP server status、catalog snapshot 构造与 catalog listener lifecycle。
 - `contextPartSerializer`: `OpenCodeContextPartSerializer` 实例，负责 prompt 输入文本、本地/远程 context item 与 image part 的 request-part 序列化。
+- `messageNormalizationMapper`: `OpenCodeMessageNormalizationMapper` singleton，负责 question request normalization、历史 message → `ChatMessage` hydration、tool kind 归类、context attachment 提取与 OMO/system reminder 归一化。
 - `promptRequestBuilder`: `OpenCodePromptRequestBuilder` 实例，负责 SDK prompt parameters、legacy request body 与 shared prompt options/variant/output-format/model defaults 的组装。
 - `streamEventTransformer`: `OpenCodeStreamEventTransformer` 实例，负责 SDK / legacy stream event → `StreamChunk` 的转换、tool/question/file/permission 事件映射，以及 SSE parser。
 - `streamingRuntime`: `OpenCodeStreamingRuntimeCoordinator` 实例，负责 active stream registry、session-scoped abort controller、part type tracking 与 cancel/detach lifecycle。
@@ -69,7 +69,7 @@
 
 - 运行时可见的外部工具键名会被记录到 observed external tools 集合
 - `refreshToolIds()` / `listTools()` / `refreshMcpServerStatus()` 都通过同一个 state store 更新 snapshot 与 listener 广播
-- 流式 `tool_use` 与历史 `openCodeMessageToChatMessage()` 继续通过 `shared/toolIdentity` 写入结构化 `toolKind`
+- 流式 `tool_use` 与历史 message hydration 继续复用同一套 `shared/toolIdentity` 规则写入结构化 `toolKind`
 - 当没有稳定 MCP 目录时，OpenCode 风格外部工具也会按保守 `custom` 图标 `layers` 兜底，而不是回落成 `wrench`；一旦命中 MCP 目录则会切到 `opencodian-tool-mcp`
 
 ## 核心逻辑
@@ -255,7 +255,7 @@
 
 ### 消息标准化、上下文附件与 OMO
 
-`openCodeMessageToChatMessage()` 是服务层和 UI 之间的重要桥：
+`OpenCodeMessageNormalizationMapper` 现在是服务层和 UI 之间的消息 hydration owner；`OpenCodeService` 只保留 `openCodeMessageToChatMessage()` / `hydrateOpenCodeMessage()` 这层门面：
 
 - 把 `text` / `reasoning` / `tool` parts 组装成 `contentBlocks`
 - 为 assistant message 生成 `modelId`
@@ -275,7 +275,7 @@ inline Read tool 解析成功后：
 - 会把对应的文件/行号转成 `MessageContextAttachment`
 - 同时把这段工具调用 JSON 从可见正文里剥离出去
 
-OMO 处理则基于 `detectOmoMessageMeta()`：
+OMO 处理则继续基于 `detectOmoMessageMeta()`，但解析逻辑已经与 question prompt normalization、tool identity 判断一起收束到 mapper：
 
 - 用户注入消息最终显示 `originalText`
 - system reminder 最终显示 `reminderText`
