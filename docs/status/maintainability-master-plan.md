@@ -1,8 +1,8 @@
 # Maintainability Master Plan
 
-> **状态**: [REVIEW_REQUIRED]
+> **状态**: [CONFIRMED_NEXT_BATCH]
 > **作用**: 这是 maintainability 无人值守的战略文档。后续每一轮开始前，必须先读本文件，再读最近的 `docs/status/maintainability-phase-XXX.md`。
-> **自动推进状态**: R1-R12 受控队列已完成，下一批 roadmap 必须先由人工确认，不得由 autopilot 自动扩展。
+> **自动推进状态**: R13-R18 下一批 roadmap 已确认；autopilot 只能按 `docs/status/maintainability-round-roadmap.md` 的 `[NEXT]` 顺序执行，R18 完成后必须再次暂停复盘。
 
 ## 1. 总体目标
 
@@ -19,7 +19,7 @@ maintainability 的目标是：
 
 ## 2. 当前阶段判断
 
-**当前判断：中期，但 R12 checkpoint 后暂停自动推进。**
+**当前判断：中期，R13-R18 已确认为下一批受控队列。**
 
 原因：
 
@@ -28,58 +28,55 @@ maintainability 的目标是：
 - `src/features/settings/OpenCodianSettings.ts` 当前实测 **4989 行**，较 R9 前 baseline **6756 行**明显收缩；section lifecycle、model catalog presenter、catalog state writeback 已迁出，但 settings tab 仍负责 section composition、settings persistence、modal launch 与多处分区业务装配
 - `src/core/opencode/OpenCodeService.ts` 当前实测 **4733 行**，本批 roadmap 未直接收缩；它仍集中 SDK facade consumption、legacy HTTP/SSE fallback、sync event normalization、question/tool/session/config API glue，后续若处理必须先设计高风险兼容边界
 
-结论：本批队列已经证明“迁出完整 ownership”比继续粉碎 helper 更有效，但项目仍不是收尾阶段。下一批 roadmap 应由人工确认后再启动，且必须继续围绕大 owner 的完整生命周期边界，而不是自动追加同类小切片。
+结论：本批队列已经证明“迁出完整 ownership”比继续粉碎 helper 更有效，但项目仍不是收尾阶段。下一批已确认优先处理 `OpenCodianView` 的 tab/pane、header/input、selector/appearance 等 UI/runtime shell 大块 ownership；`OpenCodeService` 的 SDK/legacy/sync-event 边界先保留为下一次 checkpoint 后的高风险候选，不在 R13-R18 中贸然改动。
+
+## 2.1 下一批确认方向（R13-R18）
+
+下一批目标是继续削弱 `OpenCodianView`，但不再回到已完成的 P2 question/todo/background-task、P3 composer-context、P4 persisted assistant shell 细节链路。优先选择仍在 view 内成块存在、可以形成较厚 owner 的 UI/runtime shell：
+
+1. **R13 tab/messages pane surface**：迁出 messages pane lifecycle、active pane 切换、scroll metrics 和 pane observer，让 view 不再直接管理 pane DOM map 的主要生命周期。
+2. **R14 header/server status shell**：迁出 header DOM、server status label/action、wordmark/settings button 组装，让 view 只提供 plugin/service 回调。
+3. **R15 composer input shell**：迁出 input area DOM、textarea 行为、高度同步和 composer layout metrics；暂不碰 liquid-glass diagnostics。
+4. **R16 model/permission selection controls**：迁出 chat 内 model selector 与 permission selector 的 dropdown/search/selection ownership；不改 core model catalog 或 settings catalog 规则。
+5. **R17 input appearance/glass state**：迁出 input panel theme class、SVG filter layer、liquid-glass adapter mount/diagnostic state；保持 experimental demos opt-in。
+6. **R18 checkpoint**：只做回归、指标和文档复盘，决定是否下一批转向 `OpenCodeService`。
+
+本批不处理 `OpenCodeService` 的原因：它的 SDK-first 与 legacy HTTP/SSE fallback 双路径风险更高，必须先在 R18 checkpoint 后单独定义兼容边界；不要把 core service 与 chat UI shell 重构混在同一批里。
+
 
 ## 3. 高优先级方向
 
-后续无人值守应优先从以下方向中选题，每轮只做一个切口：
+R13-R18 中，后续无人值守必须优先执行 roadmap 的 `[NEXT]`，每轮只做一个切口。下面保留各 lane 的长期定位，但本批执行顺序以 R13-R18 为准：
 
 ### P1. `OpenCodianView` 中剩余的核心 ownership 迁移
 
-优先把仍然明显集中在 view 内的大块职责迁到 dedicated module / service / runtime helper，尤其是：
+本批优先把仍然明显集中在 view 内的大块 UI/runtime shell 职责迁到 dedicated module / coordinator：
 
-- tab / pane / conversation activation 与 sync orchestration
-- 会话级 runtime 状态桥接
-- 仍然明显耦合在 view 内的渲染编排桥
+- tab / messages pane lifecycle、active pane、scroll metrics、pane observer
+- header / server status shell 与 composer input shell
+- chat 内 model / permission selector ownership
+- input panel appearance / glass state lifecycle
 
 ### P2. question / todo / background task 链路
 
-优先处理仍集中在 `OpenCodianView` 的以下职责：
-
-- session todo 更新、fingerprint、stale notice、dock 协调
-- background task launch / completion / stale follow-up / inline notice 协调
-- question resolution、question dock、follow-up 行为与状态桥接
-
-这是当前最值得继续搬迁的 ownership 群，因为它们既影响运行时状态，也影响 UI 行为，并且仍在 view 中形成大段耦合逻辑。
+R1-R6 已完成本 lane 的主要收束。本批 R13-R18 不再开新的 question / todo / background-task 拆分切口；除非测试、构建或正确性阻塞，只保留 regression watchpoints。
 
 ### P3. context / composer / retained-selection 链路
 
-优先抽离：
-
-- context file catalog 构建与缓存
-- composer context chips / focus context preview / retained selection 协调
-- context 附件与 editor 交互桥接
-
-这条链路仍然跨 UI、editor、state 三层，是明显的 ownership 集中点。
+R7 已把主要 composer-context bundle / builder / catalog ownership 收进 `ComposerContextViewFacade.create()`。本批 R13-R18 不回到这条链路做低收益细拆；只在回归阻塞时修正。
 
 ### P4. message shell / notice / timestamp ownership
 
-优先审查并继续搬迁仍滞留在 `OpenCodianView` 的：
-
-- assistant shell / notice card / persistent notice 组装
-- timestamp / footer / notice action bridge
-- assistant render bridge 中仍可稳定下沉的通用渲染职责
-
-目标是让 view 更接近 host/assembly，而不是继续保留大量消息级 DOM 细节。
+R8 已完成 persisted assistant shell / notice / footer / timestamp 的主要收束。本批 R13-R18 不继续拆 assistant shell 细节；只保留 pseudo-stream reveal、本地错误/server-prompt UI 壳层作为后续候选。
 
 ### P5. header / appearance / model-permission / experimental demo
 
-这一组属于次一级但仍然有价值的方向，适合在上面几组没有更高价值切口时再推进：
+这一组在 R13-R18 中被提升为本批后半段重点，但必须保持较厚 owner 与 opt-in demo 边界：
 
 - header / input area 组装
 - appearance / theme / glass / layout 状态同步
 - model / permission selector ownership
-- demo / experimental visual feature 的装配边界
+- demo / experimental visual feature 只保留 opt-in，不进入稳定 UI 路径
 
 ## 4. 暂停 / 降优先级方向
 
@@ -136,9 +133,9 @@ maintainability 的目标是：
 
 ## 7. 当前执行指令
 
-从第三百二十七阶段 checkpoint 开始：
+从第三百二十七阶段 checkpoint 之后：
 
-- R1-R12 受控队列已经完成，`docs/status/maintainability-round-roadmap.md` 不再保留可自动执行的 `[NEXT]`
-- Autopilot 必须暂停在 [REVIEW_REQUIRED]，等待人工确认下一批 queue；不得自行把候选方向扩展成新的 `[NEXT]`
-- 下一批人工 roadmap 建议先比较 `OpenCodianView` 的 tab activation / runtime bridge、header/appearance/model-permission，以及 `OpenCodeService` 的 SDK/legacy/sync-event boundary，再决定是否继续 settings 分区拆分
+- R13-R18 受控队列已经确认，`docs/status/maintainability-round-roadmap.md` 的 `R13` 是唯一可自动执行的 `[NEXT]`
+- Autopilot 可以按 R13-R18 顺序运行，但不得越过 R18 自动扩展新队列
+- 下一批人工 roadmap 明确优先 `OpenCodianView` 的 tab/messages pane、header/server status、composer input、model/permission selector、input appearance/glass state；`OpenCodeService` 暂不进入 R13-R18
 - `ConversationRenderService` trailing-assistant helper 链仍保持降优先级；除非正确性、测试或构建阻塞，不要把它作为新 queue 的默认起点

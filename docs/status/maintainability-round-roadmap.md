@@ -1,8 +1,8 @@
 # Maintainability Round Roadmap
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
-> **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`。第 12 轮完成后必须暂停复盘，不得自动扩展新队列。
-> **当前状态**: [REVIEW_REQUIRED] R1-R12 已完成；当前没有可自动执行的 `[NEXT]`，下一批 queue 需要人工确认。
+> **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`。R18 完成后必须暂停复盘，不得自动扩展新队列。
+> **当前状态**: [CONFIRMED_NEXT_BATCH] R13-R18 已确认；当前唯一可执行 `[NEXT]` 是 R13，R18 后必须再次暂停。
 
 ## 控制规则
 
@@ -16,13 +16,13 @@
 
 ## 总体路线
 
-本轮规划目标是提升整体可维护性，降低单一文件复杂度，同时避免把“大单体”拆成“微碎片”。优先顺序是：先收束已经过碎的 P2 question/todo/background-task 链，再迁出 `OpenCodianView` 中仍然成块的 context 与 message ownership，最后处理 settings/core 的大 owner。
+本轮规划目标是提升整体可维护性，降低单一文件复杂度，同时避免把“大单体”拆成“微碎片”。R1-R12 已完成 P2/P3/P4/settings/core-config 的首批收束；R13-R18 下一批已确认转向 `OpenCodianView` 中仍然成块的 UI/runtime shell ownership，按 tab pane → header → input → selector → appearance/glass → checkpoint 的顺序推进。
 
 > **P2 状态（R6 完成后）**: R1-R6 已完成 question dock、todo refresh/status、background completion notice、post-sync handoff 与 session signal orchestration 的收束。剩余风险以回归为主：background tab 无 session 时的 dock 清理、post-sync todo/status gate、completion notice queue/fingerprint 去重，以及 live signal writeback 顺序。
 >
 > **P3 状态（R7 完成后）**: composer-context bundle 创建、`ContextAttachmentBuilder` 与 `ContextFileCatalogService` ownership 已收进 `ComposerContextViewFacade.create()`；`OpenCodianView` 只保留 view host seam、context row 挂载和按钮事件入口，后续 P3 风险以 facade / focus runtime 回归为主。
 >
-> **Checkpoint 状态（R12 完成后）**: 当前 `OpenCodianView.ts` / `OpenCodianSettings.ts` / `OpenCodeService.ts` 分别为 7732 / 4989 / 4733 行。本批明显收缩了 settings owner，并把 chat 侧多条链路迁出；`OpenCodeService` 未进入本批代码切口。Autopilot 必须等待人工确认下一批 roadmap。
+> **Checkpoint 状态（R12 完成后）**: 当前 `OpenCodianView.ts` / `OpenCodianSettings.ts` / `OpenCodeService.ts` 分别为 7732 / 4989 / 4733 行。本批明显收缩了 settings owner，并把 chat 侧多条链路迁出；`OpenCodeService` 未进入本批代码切口。下一批 R13-R18 已确认转向 `OpenCodianView` 的 tab/messages pane、header/input、selector/appearance UI/runtime shell；R18 后再判断是否转向 `OpenCodeService`。
 
 ## Queue
 
@@ -280,3 +280,135 @@
 - 已完成的 owner 缩减：P2 question/todo/background-task 链路、P3 composer-context bundle、P4 persisted assistant shell、settings section/model catalog、core catalog state API。
 - 仍需人工排序的热点：`OpenCodianView` 的 tab activation / runtime bridge / header-appearance-model 边界，`OpenCodianSettings` 的剩余 section composition 与 modal launch，`OpenCodeService` 的 SDK/legacy/sync-event 边界。
 - 当前队列到此结束，不自动新增 `[QUEUED]` 或 `[NEXT]` 项；下一批 roadmap 必须由人工确认后再写入。
+
+
+## Confirmed Next Batch: R13-R18 `OpenCodianView` UI/runtime shell
+
+本批由人工确认：继续降低 `OpenCodianView` 的 ownership 集中度，但不回到已完成的 P2/P3/P4 细碎链路。`OpenCodeService` 暂不进入本批，等 R18 checkpoint 后再单独设计 SDK-first / legacy fallback / sync-event 兼容边界。
+
+### [NEXT] R13 - Tab messages pane surface coordinator
+
+- **Lane**: P1 `OpenCodianView tab / pane surface`
+- **目标**: 把 messages pane lifecycle、active pane 切换、scroll metrics、pane observer 和 pane cleanup 从 `OpenCodianView` 收束到一个较厚 owner，让 view 不再直接管理 pane DOM map 的主要生命周期。
+- **优先入口**:
+  - `src/features/chat/OpenCodianView.ts` 中 `observeMessagesPaneChildren`、`syncPaneScrollMetrics`、`handleMessagesPaneScroll`、`handleMessagesPaneLayoutChange`
+  - `src/features/chat/OpenCodianView.ts` 中 `ensureTabMessagesPane`、`setActiveMessagesPane`、`removeTabMessagesPane`、`clearTabMessagesPanes`
+  - `src/features/chat/tabs/`
+  - `src/features/chat/services/ScrollManager.ts`
+- **允许边界**:
+  - 可新增 `TabMessagesPaneCoordinator` 或同等厚 owner，前提是同时覆盖 create / activate / remove / clear / scroll metrics。
+  - 可保留 `OpenCodianView` 的 host callbacks、必要 DOM root 和 `TabManager` 调用入口。
+- **禁止项**:
+  - 不新增只转发一个 map getter 的 provider / factory / adapter。
+  - 不改 P2 question/todo/background-task、P3 composer-context、P4 persisted assistant shell。
+  - 不回退 `ConversationViewStateService`、`ScrollManager` 或已有 tab bridge 边界。
+- **验收**:
+  - `OpenCodianView` 通过 coordinator API 管理 tab messages pane lifecycle。
+  - 新 owner 满足粒度规则，且不是单方法 wrapper。
+  - 运行 targeted tests、全量 `npm test`、`npm run build`。
+
+### [QUEUED] R14 - Header and server status shell presenter
+
+- **Lane**: P1 `OpenCodianView header / server status shell`
+- **目标**: 把 header DOM、server status label/action、wordmark/settings button 组装迁到 `ChatHeaderPresenter` 或同等厚 owner，让 view 只提供 server/status/settings 回调。
+- **优先入口**:
+  - `src/features/chat/OpenCodianView.ts` 中 `buildHeader`
+  - `src/features/chat/OpenCodianView.ts` 中 `applyLocaleTexts` 与 header 文案相关片段
+  - `src/features/chat/OpenCodianView.ts` 中 `startServerStatusLoop`、`stopServerStatusLoop`、`getServerStatusLabel`
+  - `src/features/chat/OpenCodianView.ts` 中 `getLogoSvg`、`getTitleWordmarkSrc`、`syncTitleWordmarkSrc`
+- **允许边界**:
+  - Presenter 可拥有 header refs、status render/update、settings/open-server-section actions。
+  - 可保留 server lifecycle service 与 plugin settings API 在 view / plugin 层。
+- **禁止项**:
+  - 不混入 model selector、permission selector 或 input composer。
+  - 不改变 server manager / OpenCode service 行为。
+  - 不新增仅包 `buildHeader()` 一次调用的薄 adapter。
+- **验收**:
+  - Header/status DOM 细节离开 `OpenCodianView`，view 只负责创建 presenter 和提供回调。
+  - Locale/status refresh 有 focused coverage 或稳定验证。
+  - 运行 targeted tests、全量 `npm test`、`npm run build`。
+
+### [QUEUED] R15 - Composer input shell coordinator
+
+- **Lane**: P1 `OpenCodianView composer input shell`
+- **目标**: 把 input area DOM、textarea 行为、submit gate、高度同步与 composer layout metrics 收束为较厚 input shell owner。
+- **优先入口**:
+  - `src/features/chat/OpenCodianView.ts` 中 `buildInputArea`
+  - `src/features/chat/OpenCodianView.ts` 中 `trySubmitCurrentInput`、`syncInputTextareaHeight`
+  - `src/features/chat/OpenCodianView.ts` 中 `initializeComposerLayoutMetrics`、`scheduleComposerLayoutSync`、`clearScheduledComposerLayoutSync`、`syncComposerLayoutMetrics`
+  - `src/features/chat/OpenCodianView.ts` 中 input/composer 相关 event wiring
+- **允许边界**:
+  - 可新增 `ComposerInputShellCoordinator` 或同等厚 owner，拥有 textarea refs、layout sync 和 submit affordance。
+  - 可继续调用已有 send pipeline、context facade、question dock positioning。
+- **禁止项**:
+  - 不处理 liquid-glass diagnostics / adapter mount；这留给 R17。
+  - 不改 send pipeline runtime、streaming parser 或 question/todo runtime。
+  - 不新增只转发 `trySubmitCurrentInput()` 的薄 helper。
+- **验收**:
+  - Input area DOM 与 layout sync 主要逻辑离开 `OpenCodianView`。
+  - 新 owner 具备完整 lifecycle 或至少 3 个公开动作入口。
+  - 运行 targeted tests、全量 `npm test`、`npm run build`。
+
+### [QUEUED] R16 - Model and permission selector ownership
+
+- **Lane**: P1 `OpenCodianView selection controls`
+- **目标**: 把 chat 内 model selector 与 permission selector 的 dropdown/search/list/selection display ownership 从 `OpenCodianView` 迁出到一个 selection controls owner。
+- **优先入口**:
+  - `src/features/chat/OpenCodianView.ts` 中 `initializeModelSelector` 到 `getSendMessageOptions` 的 model selector 区段
+  - `src/features/chat/OpenCodianView.ts` 中 `initializePermissionSelector` 到 `closePermissionDropdown` 的 permission selector 区段
+  - `src/features/chat/ui/modelSelector/`
+  - `src/features/chat/runtime/PermissionInlineCardRenderer.ts`
+- **允许边界**:
+  - 可新增一个 `ChatSelectionControlsCoordinator`，同时覆盖 model 与 permission 的 dropdown lifecycle。
+  - 可保留 model catalog data source、provider icon service 与 plugin settings writeback 在 host 回调中。
+- **禁止项**:
+  - 不改 settings model catalog、`ModelCatalogStateService`、provider availability 语义或 icon fallback 顺序。
+  - 不改 send pipeline options 语义。
+  - 不把 model 与 permission 再拆成两个低价值薄 presenter，除非每个 owner 都明显超过粒度规则并有独立 lifecycle。
+- **验收**:
+  - `OpenCodianView` 不再直接铺开 model/permission dropdown 状态机。
+  - Send options 与 permission display 有 focused coverage 或稳定验证。
+  - 运行 targeted tests、全量 `npm test`、`npm run build`。
+
+### [QUEUED] R17 - Input appearance and glass state coordinator
+
+- **Lane**: P5 `appearance / glass / input panel state`
+- **目标**: 把 input panel theme class、action button style、SVG filter layer、liquid-glass adapter mount 与 diagnostics state 从 `OpenCodianView` 收束到 appearance/glass coordinator。
+- **优先入口**:
+  - `src/features/chat/OpenCodianView.ts` 中 `applyInputPanelThemeState`、`applyInputActionButtonStyleState`
+  - `src/features/chat/OpenCodianView.ts` 中 `ensureComposerGlassSvgRoot`、`buildLiquidGlassMountContext`、`unmountLiquidGlassAdapter`
+  - `src/features/chat/OpenCodianView.ts` 中 `ensureComposerSvgFilterLayer`、`removeComposerSvgFilterLayer`
+  - `src/features/chat/OpenCodianView.ts` 中 `scheduleLiquidGlassDiagnostics`、`logLiquidGlassDiagnostics` 及 diagnostics helpers
+- **允许边界**:
+  - 可新增 `InputPanelAppearanceCoordinator`，拥有 mount/unmount、class sync、filter layer 与 diagnostics lifecycle。
+  - 可保留 experimental demo toggle 入口在 view，但不得把 demo 暴露到 stable UI。
+- **禁止项**:
+  - 不改 theme preset / settings normalization / CSS token 语义。
+  - 不混入 composer input textarea 或 model selector 行为。
+  - 不让 experimental visual demo 进入稳定 UI 路径。
+- **验收**:
+  - Input panel appearance/glass state 主要逻辑离开 `OpenCodianView`。
+  - 变更若命中 deploy-relevant runtime/style 路径，按 AGENTS 规则 build 后部署 Test Vault 并验证 BUILD_ID。
+  - 运行 targeted tests、全量 `npm test`、`npm run build`。
+
+### [QUEUED] R18 - UI shell checkpoint and next-lane decision
+
+- **Lane**: Checkpoint
+- **目标**: 暂停自动推进，复盘 R13-R17 对 `OpenCodianView` 的体量和调用链影响，并决定下一批是否转向 `OpenCodeService`。
+- **优先入口**:
+  - `docs/status/maintainability-round-roadmap.md`
+  - `docs/status/maintainability-master-plan.md`
+  - `docs/status/maintainability-lane-map.md`
+  - R13-R17 phase 文档
+  - `src/features/chat/OpenCodianView.ts`
+  - `src/core/opencode/OpenCodeService.ts`
+- **允许边界**:
+  - 只做测试、文档、指标统计和下一批建议。
+- **禁止项**:
+  - 不开新代码重构。
+  - 不允许 autopilot 自动扩展 R19+。
+- **验收**:
+  - phase 文档总结 `OpenCodianView` 缩减了什么、哪些 UI/runtime shell 边界仍需处理。
+  - 明确下一批是否进入 `OpenCodeService` SDK/legacy/sync-event boundary。
+  - 将 roadmap 状态设置为需要人工确认后再继续。
+  - 运行全量 `npm test`、`npm run build`。
