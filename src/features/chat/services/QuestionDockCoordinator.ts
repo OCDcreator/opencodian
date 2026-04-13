@@ -5,6 +5,7 @@ import { t } from '../../../i18n';
 import { createLogger } from '../../../shared';
 import type { TabId } from '../tabs';
 import type { QuestionDock } from '../ui/QuestionDock';
+import type { QuestionDockWritebackFacade } from './QuestionDockWritebackFacade';
 import type {
   QuestionDockQueueRuntimeFacade,
 } from './QuestionDockQueueRuntimeFacade';
@@ -12,7 +13,6 @@ import type {
   QuestionPendingRefreshRuntimeFacade,
   QuestionPendingRefreshRuntimeState,
 } from './QuestionPendingRefreshRuntimeFacade';
-import type { QuestionPendingRefreshWritebackFacade } from './QuestionPendingRefreshWritebackFacade';
 import type { QuestionResolutionWritebackFacade } from './QuestionResolutionWritebackFacade';
 import { isQuestionAnswerComplete } from '../ui/questionDockState';
 import {
@@ -41,9 +41,12 @@ type QuestionPendingRefreshRuntimePort = Pick<
   | 'clearPendingQuestionState'
   | 'getPendingQuestionRequests'
 >;
-type QuestionPendingRefreshWritebackPort = Pick<
-  QuestionPendingRefreshWritebackFacade,
-  'applyClearedPendingQuestions' | 'applyRefreshedPendingQuestions'
+type QuestionDockWritebackPort = Pick<
+  QuestionDockWritebackFacade,
+  | 'applyClearedPendingQuestions'
+  | 'applyEnqueuedPendingQuestionRequest'
+  | 'applyRefreshedPendingQuestions'
+  | 'applyRemovedPendingQuestionRequest'
 >;
 
 export interface QuestionDockCoordinatorRuntimeState {
@@ -75,7 +78,7 @@ export class QuestionDockCoordinator {
     private readonly host: QuestionDockCoordinatorHost,
     private readonly dockQueueRuntime: QuestionDockQueueRuntimePort,
     private readonly pendingRefreshRuntime: QuestionPendingRefreshRuntimePort,
-    private readonly pendingRefreshWriteback: QuestionPendingRefreshWritebackPort,
+    private readonly dockWriteback: QuestionDockWritebackPort,
     private readonly resolutionWriteback: QuestionResolutionWritebackPort,
   ) {}
 
@@ -132,7 +135,7 @@ export class QuestionDockCoordinator {
     }
 
     this.pendingRefreshRuntime.clearPendingQuestionState(tabId);
-    this.pendingRefreshWriteback.applyClearedPendingQuestions(tabId);
+    this.dockWriteback.applyClearedPendingQuestions(tabId);
   }
 
   async refreshPendingQuestionsForTab(
@@ -152,7 +155,7 @@ export class QuestionDockCoordinator {
         tabId,
         sessionRequests,
       );
-      this.pendingRefreshWriteback.applyRefreshedPendingQuestions(tabId, mergedRequests);
+      this.dockWriteback.applyRefreshedPendingQuestions(tabId, mergedRequests);
 
       return mergedRequests;
     } catch (error) {
@@ -206,14 +209,7 @@ export class QuestionDockCoordinator {
       tabId,
       this.host.getQuestionDisplayMode(),
     );
-
-    if (tabId !== this.host.getActiveTabId()) {
-      this.host.setTabNeedsAttention(tabId, true);
-      return;
-    }
-
-    this.host.setTabNeedsAttention(tabId, false);
-    this.render();
+    this.dockWriteback.applyEnqueuedPendingQuestionRequest(tabId);
   }
 
   private removePendingQuestionRequest(
@@ -221,14 +217,7 @@ export class QuestionDockCoordinator {
     tabId: TabId | null = this.host.getActiveTabId(),
   ): void {
     const remainingRequests = this.dockQueueRuntime.removePendingQuestionRequest(requestId, tabId);
-
-    if (tabId === this.host.getActiveTabId()) {
-      this.host.setTabNeedsAttention(tabId, false);
-      this.render();
-      return;
-    }
-
-    this.host.setTabNeedsAttention(tabId, remainingRequests.length > 0);
+    this.dockWriteback.applyRemovedPendingQuestionRequest(tabId, remainingRequests);
   }
 
   private async handleQuestionDockSubmit(
@@ -291,7 +280,6 @@ export class QuestionDockCoordinator {
     await this.resolutionWriteback.applyResolution(resolution, tabId, {
       afterStateApplied: () => {
         this.removePendingQuestionRequest(resolution.request.id, tabId);
-        this.render();
       },
     });
   }

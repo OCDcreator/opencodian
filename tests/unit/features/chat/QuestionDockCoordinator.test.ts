@@ -1,6 +1,9 @@
 import type { QuestionDisplayMode, QuestionRequest } from '../../../../src/core/types';
 import { setLocale } from '../../../../src/i18n';
 import {
+  QuestionDockWritebackFacade,
+} from '../../../../src/features/chat/services/QuestionDockWritebackFacade';
+import {
   QuestionDockQueueRuntimeFacade,
 } from '../../../../src/features/chat/services/QuestionDockQueueRuntimeFacade';
 import {
@@ -8,7 +11,6 @@ import {
   type QuestionDockCoordinatorHost,
 } from '../../../../src/features/chat/services/QuestionDockCoordinator';
 import { QuestionPendingRefreshRuntimeFacade } from '../../../../src/features/chat/services/QuestionPendingRefreshRuntimeFacade';
-import { QuestionPendingRefreshWritebackFacade } from '../../../../src/features/chat/services/QuestionPendingRefreshWritebackFacade';
 import type { QuestionPostResolutionRuntimeFacade } from '../../../../src/features/chat/services/QuestionPostResolutionRuntimeFacade';
 import { QuestionResolutionWritebackFacade } from '../../../../src/features/chat/services/QuestionResolutionWritebackFacade';
 import type { TabId } from '../../../../src/features/chat/tabs';
@@ -84,6 +86,7 @@ function createHost(options?: {
   ]);
   let latestRenderState: QuestionDockRenderState | null = null;
   let latestCallbacks: QuestionDockCallbacks | null = null;
+  let renderQuestionDockImpl: (() => void) | null = null;
 
   for (const [tabId, sessionId] of Object.entries(options?.sessionIdsByTab ?? {})) {
     sessionIdsByTab.set(tabId, sessionId);
@@ -123,8 +126,10 @@ function createHost(options?: {
   const pendingRefreshRuntime = new QuestionPendingRefreshRuntimeFacade({
     getTabRuntimeState: (tabId) => (tabId ? runtimeByTab.get(tabId) ?? null : null),
   });
-  const renderQuestionDock = jest.fn();
-  const pendingRefreshWriteback = new QuestionPendingRefreshWritebackFacade({
+  const renderQuestionDock = jest.fn(() => {
+    renderQuestionDockImpl?.();
+  });
+  const dockWriteback = new QuestionDockWritebackFacade({
     getActiveTabId: () => host.getActiveTabId(),
     setTabNeedsAttention: (tabId, needsAttention) => {
       host.setTabNeedsAttention(tabId, needsAttention);
@@ -162,13 +167,16 @@ function createHost(options?: {
     host,
     dockQueueRuntime,
     pendingRefreshRuntime,
-    pendingRefreshWriteback,
+    dockWriteback,
     renderQuestionDock,
     postResolutionRuntime,
     resolutionWriteback,
     applyResolvedQuestionState,
     runtimeByTab,
     questionDock,
+    setRenderQuestionDockImpl(callback: (() => void) | null): void {
+      renderQuestionDockImpl = callback;
+    },
     getLatestRenderState(): QuestionDockRenderState {
       if (!latestRenderState) {
         throw new Error('Question dock was not rendered');
@@ -196,11 +204,12 @@ describe('QuestionDockCoordinator', () => {
       host,
       dockQueueRuntime,
       pendingRefreshRuntime,
-      pendingRefreshWriteback,
+      dockWriteback,
       postResolutionRuntime,
       resolutionWriteback,
       applyResolvedQuestionState,
       runtimeByTab,
+      setRenderQuestionDockImpl,
       getLatestCallbacks,
       getLatestRenderState,
     } = createHost();
@@ -208,9 +217,12 @@ describe('QuestionDockCoordinator', () => {
       host,
       dockQueueRuntime,
       pendingRefreshRuntime,
-      pendingRefreshWriteback,
+      dockWriteback,
       resolutionWriteback,
     );
+    setRenderQuestionDockImpl(() => {
+      coordinator.render();
+    });
 
     const resolutionPromise = coordinator.waitForDockResolutionIfEnabled(request, 'tab-active');
 
@@ -245,9 +257,10 @@ describe('QuestionDockCoordinator', () => {
       host,
       dockQueueRuntime,
       pendingRefreshRuntime,
-      pendingRefreshWriteback,
+      dockWriteback,
       resolutionWriteback,
       runtimeByTab,
+      setRenderQuestionDockImpl,
     } = createHost({
       activeTabId: 'tab-active',
       sessionIdsByTab: {
@@ -269,9 +282,12 @@ describe('QuestionDockCoordinator', () => {
       host,
       dockQueueRuntime,
       pendingRefreshRuntime,
-      pendingRefreshWriteback,
+      dockWriteback,
       resolutionWriteback,
     );
+    setRenderQuestionDockImpl(() => {
+      coordinator.render();
+    });
 
     const refreshed = await coordinator.refreshPendingQuestionsForTab('tab-background', 'session-background');
 
@@ -288,8 +304,9 @@ describe('QuestionDockCoordinator', () => {
       host,
       dockQueueRuntime,
       pendingRefreshRuntime,
-      pendingRefreshWriteback,
+      dockWriteback,
       resolutionWriteback,
+      setRenderQuestionDockImpl,
     } = createHost({
       shouldUseAboveInputQuestionDock: false,
     });
@@ -298,9 +315,12 @@ describe('QuestionDockCoordinator', () => {
       host,
       dockQueueRuntime,
       pendingRefreshRuntime,
-      pendingRefreshWriteback,
+      dockWriteback,
       resolutionWriteback,
     );
+    setRenderQuestionDockImpl(() => {
+      coordinator.render();
+    });
 
     coordinator.render();
 

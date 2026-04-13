@@ -11,7 +11,7 @@
 - 在 dock 接管 request 时维护 `pendingQuestionRequests`、draft answers，以及首次入队时的 active group/index 初始值
 - 在 request 被回答或拒绝后清理 queue、draft/group/index，并统一 resolve 对应 waiter
 
-它不负责 pending question 的服务端拉取、按 session 过滤、pending refresh attention/render writeback，或 resolve 后的 status/sync follow-up；这些仍分别留给 `QuestionDockCoordinator`、`QuestionPendingRefreshRuntimeFacade`、`QuestionPendingRefreshWritebackFacade` 与 `QuestionPostResolutionRuntimeFacade`。
+它不负责 pending question 的服务端拉取、按 session 过滤、queue enqueue/remove 与 refresh/clear 完成后的 attention/render writeback，或 resolve 后的 status/sync follow-up；这些仍分别留给 `QuestionDockCoordinator`、`QuestionPendingRefreshRuntimeFacade`、`QuestionDockWritebackFacade` 与 `QuestionPostResolutionRuntimeFacade`。
 
 ## 公开接口
 
@@ -47,5 +47,5 @@ export class QuestionDockQueueRuntimeFacade {
 ## 与 `OpenCodianView` 的边界
 
 - `QuestionRuntimeHostAdapter` 负责从共享 `QuestionRuntimeViewHost` 派生本 facade 所需的 runtime host；`OpenCodianView` 不再需要单独暴露 dock queue helper
-- `QuestionDockCoordinator` 继续负责 dock render callbacks、pending refresh fetch/session filter 与 attention/render 决策，但 waiter/enqueue/remove 的 runtime map 读写现在委托给本 facade
+- `QuestionDockCoordinator` 继续负责 dock render callbacks 与 pending refresh fetch/session filter，但 waiter/enqueue/remove 的 runtime map 读写现在委托给本 facade，对应 attention/render 决策则统一交给 `QuestionDockWritebackFacade`
 - `QuestionPendingRefreshRuntimeFacade` 仍负责 resolved-request suppression 与 refresh 期间的 stale state pruning，只把 waiter map 当作“哪些 request 仍在等待”的 runtime 信号
