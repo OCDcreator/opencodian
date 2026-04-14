@@ -1,8 +1,8 @@
 # Maintainability Round Roadmap
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
-> **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`。R32 完成后必须暂停复盘，不得自动扩展新队列。
-> **当前状态**: [CONFIRMED_NEXT_BATCH] R28-R32 已确认；当前可自动执行的 `[NEXT]` 是 `R32 - Gateway checkpoint`。
+> **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的 `[NEXT]`”。R32 完成后必须暂停复盘，不得自动扩展新队列。
+> **当前状态**: [REVIEW_REQUIRED] R28-R32 已完成；当前没有可自动执行的 `[NEXT]`，必须等待人工确认后再写入新队列。
 
 ## 控制规则
 
@@ -16,7 +16,7 @@
 
 ## 总体路线
 
-当前受控批次的目标仍然是提升整体可维护性、降低单一文件复杂度，并避免把“大单体”拆成“微碎片”。R1-R27 已完成 question/todo、composer/message shell、settings/core-config 与 `OpenCodeService` 第一批 runtime/builder/mapper ownership 收束；本次人工确认的 R28-R32 将继续沿 `OpenCodeService` lane 推进，顺序固定为 session lifecycle → session control/message orchestration → question/permission hub → conditional query gateway → checkpoint。
+当前受控批次的目标仍然是提升整体可维护性、降低单一文件复杂度，并避免把“大单体”拆成“微碎片”。R1-R27 已完成 question/todo、composer/message shell、settings/core-config 与 `OpenCodeService` 第一批 runtime/builder/mapper ownership 收束；本次人工确认的 R28-R32 已沿 `OpenCodeService` lane 完成推进，顺序为 session lifecycle → session control/message orchestration → question/permission hub → conditional query gateway → checkpoint。
 
 > **P2 状态（R6 完成后）**: R1-R6 已完成 question dock、todo refresh/status、background completion notice、post-sync handoff 与 session signal orchestration 的收束。剩余风险以回归为主：background tab 无 session 时的 dock 清理、post-sync todo/status gate、completion notice queue/fingerprint 去重，以及 live signal writeback 顺序。
 >
@@ -687,7 +687,7 @@
   - 仅当形成较厚 owner 时才提交代码重构；否则在 phase 文档中明确说明跳过原因。
   - 运行 targeted tests（如有代码变更）、全量 `npm test`、`npm run build`。
 
-### [NEXT] R32 - Gateway checkpoint
+### [DONE] R32 - Gateway checkpoint
 
 - **Lane**: Checkpoint
 - **目标**: 暂停自动推进，复盘 R28-R31 对 `OpenCodeService` 剩余 session/config/query gateway 的影响，并决定是否还有继续重构的价值。
@@ -706,3 +706,10 @@
   - phase 文档总结 `OpenCodeService` 剩余 gateway 是否仍值得继续拆。
   - 将 roadmap 状态设置为需要人工确认后再继续。
   - 运行全量 `npm test`、`npm run build`。
+
+## R32 Checkpoint Result
+
+- `src/core/opencode/OpenCodeService.ts` 当前 **2397** 行；较 R18 checkpoint 的 **4733** 行累计减少 **2336** 行（约 **49.4%**），较 R27 checkpoint 的 **2858** 行再减少 **461** 行（约 **16.1%**）。
+- R28-R31 已形成四个较厚 owner：`OpenCodeSessionLifecycleCoordinator`（**278** 行）、`OpenCodeSessionControlOrchestrator`（**398** 行）、`OpenCodeQuestionPermissionHub`（**236** 行）、`OpenCodeQueryGateway`（**200** 行）；`OpenCodeService` 保持对外 façade，不需要把调用方改成直接依赖这些内部 owner。
+- 当前剩余高风险集中点主要是：SDK-first / legacy fallback transport、assistant response 与 finish/fetch orchestration、server lifecycle / `updateSettings()` / scoped-directory wiring、provider/model/config lookup，以及 tool catalog/listing 与 open-code event bridge hydration。
+- 结论：这些剩余职责更接近跨域兼容 seam，而不是适合继续无人值守拆分的清晰厚 owner。当前 queue 到此结束，不自动新增 `[QUEUED]` 或 `[NEXT]` 项，也不允许 autopilot 自动扩展 `R33+`；若后续继续 maintainability，必须先人工确认并写入新的受控 queue。

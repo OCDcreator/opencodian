@@ -1,8 +1,8 @@
 # Maintainability Master Plan
 
-> **状态**: [CONFIRMED_NEXT_BATCH]
+> **状态**: [REVIEW_REQUIRED]
 > **作用**: 这是 maintainability 无人值守的战略文档。后续每一轮开始前，必须先读本文件，再读最近的 `docs/status/maintainability-phase-XXX.md`。
-> **自动推进状态**: R28-R32 受控队列已确认；autopilot 只能按 `docs/status/maintainability-round-roadmap.md` 的 `[NEXT]` 顺序执行，R32 完成后必须再次暂停并等待人工确认。
+> **自动推进状态**: R28-R32 受控队列已完成；autopilot 必须暂停，只有在人工确认并写入新 queue 后才能继续。
 
 ## 1. 总体目标
 
@@ -19,17 +19,17 @@ maintainability 的目标是：
 
 ## 2. 当前阶段判断
 
-**当前判断：中后期，R28-R32 已确认为下一批受控队列。**
+**当前判断：中后期，R28-R32 已完成并回到人工确认态。**
 
 原因：
 
 - R1-R12 已按受控 roadmap 完成 P2、P3、P4、Settings、Core config 与 checkpoint；本轮不再继续拆新的 owner
 - `src/features/chat/OpenCodianView.ts` 已从 R12 checkpoint 的 **7732 行** 收缩到当前 **6203 行**；R13-R17 已把 tab/pane、header/status、composer input、selection controls、input appearance/glass 等 UI/runtime shell 收束到独立 owner，剩余职责更偏向运行时桥接、hydration/send pipeline seam 与少量实验特性
 - `src/features/settings/OpenCodianSettings.ts` 当前实测 **4989 行**，较 R9 前 baseline **6756 行**明显收缩；section lifecycle、model catalog presenter、catalog state writeback 已迁出，但 settings tab 仍负责 section composition、settings persistence、modal launch 与多处分区业务装配
-- `src/core/opencode/OpenCodeService.ts` 当前实测 **2858 行**，较 R18 checkpoint 的 **4733 行**减少 **1875 行**（约 **39.6%**）；R19-R26 已把 sync/open-code event runtime、catalog state、prompt builder、context/image serializer、streaming runtime、stream event transform、message normalization 八块 ownership 迁出，但 service 仍集中 SDK-first / legacy HTTP fallback transport、session/config/provider gateway、MCP/project/file/find/permission API glue 与 finish/fetch orchestration
+- `src/core/opencode/OpenCodeService.ts` 当前实测 **2397 行**，较 R18 checkpoint 的 **4733 行**减少 **2336 行**（约 **49.4%**），较 R27 checkpoint 的 **2858 行**再减少 **461 行**（约 **16.1%**）；R28-R31 已把 session lifecycle、session control/message orchestration、question/permission negotiation 与 broad query gateway 四块 ownership 迁出，但 service 仍集中 SDK-first / legacy HTTP fallback transport、assistant response + finish/fetch orchestration、server lifecycle / settings update / scoped-directory wiring、provider/model/config lookup 与 tool catalog/event bridge 等跨域兼容 seam
 - `src/core/opencode/OpenCodeSdkFacade.ts` / `src/core/opencode/ServerManager.ts` 当前分别为 **257** / **1171** 行；它们继续作为高风险相邻 owner 保持稳定，没有在本批被拆成新的薄 facade
 
-结论：R19-R26 已证明“兼容优先的较厚 owner 下沉”能够显著削弱 `OpenCodeService`。下一批已确认继续推进，但范围只限于仍然成块存在、能够形成较厚 owner 的 session lifecycle、session control、question/permission hub 与条件性的 query gateway；必须继续避免把剩余 gateway 再拆成新的微碎片 facade。
+结论：R28-R31 继续证明“兼容优先的较厚 owner 下沉”能够显著削弱 `OpenCodeService`，但 R32 checkpoint 之后，剩余热点更多是跨域兼容 seam，而不是适合无人值守继续拆分的清晰厚 owner。后续若仍要继续 maintainability，必须先人工确认新 queue；未经确认不得自动扩展 `R33+`。
 
 ## 2.1 已完成批次（R13-R18）
 
@@ -39,26 +39,26 @@ R13-R18 已完成 `OpenCodianView` 的 UI/runtime shell 收束：tab/messages pa
 
 R19-R27 已完成 `OpenCodeService` 的第一批兼容优先收束：sync-event runtime、open-code event runtime、catalog state、prompt request builder、context/image serializer、streaming runtime、stream event transformer、message normalization，以及 checkpoint 复盘。该批次证明了在不破坏 SDK-first / legacy fallback 语义的前提下，`OpenCodeService` 仍然可以继续按较厚 owner 下沉。
 
-## 2.3 下一批确认方向（R28-R32）
+## 2.3 已完成受控批次（R28-R32）
 
-R28-R32 的目标是在保持 `OpenCodeService` 对外总门面不散开的前提下，继续处理仍然成块存在的 session lifecycle、session control、question/permission 与条件性的 query gateway ownership，但必须把“避免微碎片 facade”放在第一优先级：
+R28-R32 已在保持 `OpenCodeService` 对外总门面不散开的前提下完成 session lifecycle、session control、question/permission 与条件性的 query gateway ownership 收束，同时继续把“避免微碎片 facade”放在第一优先级：
 
-1. **R28 session lifecycle coordinator**：迁出 session create/list/messages/todos/statuses/delete/update/current-session tracking/subscription 共用逻辑。
-2. **R29 session control and messaging orchestrator**：迁出 fork/revert/unrevert/diff/context snapshot、message commands、shell / message-part operations 的共用控制流。
-3. **R30 question + permission hub**：迁出 pending questions/replies/reject 与 pending/session permissions/responders，集中交互式 negotiation API。
-4. **R31 conditional query gateway**：仅在能形成较厚 owner 的前提下，收束 provider/project/file/find/path/VCS/formatter/LSP/MCP auth 这组广域 gateway；如果落地后会退化成薄 wrapper，必须跳过并在 phase 文档中说明原因。
-5. **R32 checkpoint**：只做复盘，不开新重构；决定 session/config/query gateway 是否还有继续拆分的价值。
+1. **R28 session lifecycle coordinator**：已迁出 session create/list/messages/todos/statuses/delete/update/current-session tracking/subscription 共用逻辑。
+2. **R29 session control and messaging orchestrator**：已迁出 fork/revert/unrevert/diff/context snapshot、message commands、shell / message-part operations 的共用控制流。
+3. **R30 question + permission hub**：已迁出 pending questions/replies/reject 与 pending/session permissions/responders，集中交互式 negotiation API。
+4. **R31 conditional query gateway**：已在形成较厚 owner 的前提下，收束 provider/project/file/find/path/VCS/formatter/LSP/MCP auth 这组广域 gateway。
+5. **R32 checkpoint**：已完成复盘，不开新重构；结论是当前剩余的 transport/config/finalize/tool-catalog seam 需要人工确认后再决定是否继续。
 
-本批仍然**不**处理 `ServerManager`、`OpenCodeSdkFacade`，也不允许把调用方改成直接依赖一堆新 service。`OpenCodeService` 继续作为对外总门面；新 owner 只能承接内部成块 lifecycle，并通过 host seam 接入。
+本批仍然**没有**处理 `ServerManager`、`OpenCodeSdkFacade`，也没有把调用方改成直接依赖一堆新 service。`OpenCodeService` 继续作为对外总门面；新增 owner 只承接内部成块 lifecycle，并通过 host seam 接入。R32 完成后，当前 queue 已结束，autopilot 必须回到人工确认态。
 
 
 ## 3. 高优先级方向
 
-R28-R32 中，后续无人值守必须优先执行 roadmap 的 `[NEXT]`，每轮只做一个切口。下面保留各 lane 的长期定位，但本批执行顺序以 R28-R32 为准：
+当前没有可自动执行的 `[NEXT]`。如果人工确认继续 maintainability，必须先写入新的 queue；下面保留各 lane 的长期定位，供下一批设计时参考：
 
 ### P1. `OpenCodianView` 中剩余的核心 ownership 迁移
 
-本批继续以 `OpenCodeService` 为主，但只处理仍然成块存在的 session lifecycle、session control、question/permission 与条件性的 query gateway ownership。`OpenCodianView` 仅保留 regression watchpoints。
+R28-R32 已完成 `OpenCodeService` 的 session/control/negotiation/gateway 收束；在新的人工确认 queue 写入前，`OpenCodianView` 仅保留 regression watchpoints。若后续继续，应先确认 `OpenCodeService` 剩余 transport/config/finalize seam 是否还能形成新的厚 owner。
 
 ### P2. question / todo / background task 链路
 
@@ -131,9 +131,10 @@ R13-R18 已完成这组 UI/runtime shell 的主要收束。本批 R28-R32 不继
 
 ## 7. 当前执行指令
 
-R31 完成之后：
+R32 完成之后：
 
-- R28-R32 受控队列已经确认，`docs/status/maintainability-round-roadmap.md` 的 `R32` 是唯一可自动执行的 `[NEXT]`
-- Autopilot 可以按 R28-R32 顺序运行，但不得越过 R32 自动扩展新队列
-- 本批已完成 `OpenCodeService` 的 session lifecycle、session control、question/permission hub 与条件性的 query gateway；`R32` 只允许 checkpoint 复盘，不得开新代码重构
+- 当前受控队列已经执行完毕，`docs/status/maintainability-round-roadmap.md` 当前没有可自动执行的 `[NEXT]`
+- Autopilot 必须暂停；只有在人工确认是否继续、并写入新的 queue 后才能恢复
+- 本批已完成 `OpenCodeService` 的 session lifecycle、session control、question/permission hub、conditional query gateway 与 checkpoint；未经人工确认不得自动扩展 `R33+`
+- 如继续 maintainability，优先人工评估 `OpenCodeService` 剩余的 transport/finalize/config/tool-catalog seam 是否还能形成明显厚 owner
 - `ConversationRenderService` trailing-assistant helper 链仍保持降优先级；除非正确性、测试或构建阻塞，不要把它作为新 queue 的默认起点

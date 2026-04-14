@@ -1,16 +1,16 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [CONFIRMED_NEXT_BATCH] R28-R32 已确认；当前 `[NEXT]` 是 R32 gateway checkpoint。
+> **当前状态**: [REVIEW_REQUIRED] R28-R32 已完成；当前没有可自动执行的 `[NEXT]`，必须等待人工确认。
 
 ## 当前优先级
 
-- **R32**: gateway checkpoint；跑完必须暂停
-- **R31**: conditional query gateway 已完成；provider/project/file/find/path/VCS/formatter/LSP/MCP auth 已收束到 broad query owner
+- **当前没有自动下一轮**：R32 gateway checkpoint 已完成，autopilot 必须暂停
+- **如继续 maintainability**：先人工确认是否围绕 `OpenCodeService` 剩余 transport/config/finalize seam 设计新 queue
 
 ## 当前热点首查入口
 
-- R32 首查 roadmap / master plan / lane map、R28-R31 phase 文档与 `src/core/opencode/OpenCodeService.ts` 指标；只做复盘，不开新代码重构
+- 恢复 autopilot 前，首查 roadmap / master plan / lane map、`docs/status/maintainability-phase-347.md` 与 `src/core/opencode/OpenCodeService.ts` 指标
 - `OpenCodianView` / settings / trailing-assistant 链本批都只保留 regression watchpoints，不再开新切口
 - P2 regression-only 首查顺序固定为：
   1. `tests/unit/features/chat/QuestionDockCoordinator.test.ts`
