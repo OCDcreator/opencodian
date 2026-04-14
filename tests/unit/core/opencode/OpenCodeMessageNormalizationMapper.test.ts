@@ -1,8 +1,8 @@
 import { OpenCodeMessageNormalizationMapper } from '../../../../src/core/opencode/OpenCodeMessageNormalizationMapper';
 
-describe('OpenCodeMessageNormalizationMapper', () => {
-  const mapper = new OpenCodeMessageNormalizationMapper();
+const mapper = new OpenCodeMessageNormalizationMapper();
 
+describe('OpenCodeMessageNormalizationMapper question normalization', () => {
   it('normalizes question requests with trimmed prompts and options', () => {
     expect(mapper.normalizeQuestionRequest({
       id: 'question-1',
@@ -40,7 +40,9 @@ describe('OpenCodeMessageNormalizationMapper', () => {
       ],
     });
   });
+});
 
+describe('OpenCodeMessageNormalizationMapper context hydration', () => {
   it('restores inline read-tool context attachments for hydrated user messages', () => {
     const message = mapper.openCodeMessageToChatMessage(
       {
@@ -116,7 +118,9 @@ describe('OpenCodeMessageNormalizationMapper', () => {
       }),
     ]);
   });
+});
 
+describe('OpenCodeMessageNormalizationMapper tool content', () => {
   it('hydrates historical tool metadata using the catalog identity context', () => {
     const message = mapper.openCodeMessageToChatMessage(
       {
@@ -312,7 +316,9 @@ describe('OpenCodeMessageNormalizationMapper', () => {
       },
     ]);
   });
+});
 
+describe('OpenCodeMessageNormalizationMapper OMO metadata', () => {
   it('extracts OMO user-injection metadata into normalized content', () => {
     const message = mapper.openCodeMessageToChatMessage(
       {

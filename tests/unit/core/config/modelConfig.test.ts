@@ -15,28 +15,28 @@ import {
 } from '../../../../src/core/config/modelConfig';
 import type { OpencodeModelConfigSubset } from '../../../../src/core/types';
 
-describe('modelConfig helpers', () => {
-  const localConfig: OpencodeModelConfigSubset = {
-    model: 'openai/gpt-4o',
-    provider: {
-      openai: {
-        name: 'OpenAI',
-        models: {
-          'gpt-4o': { name: 'GPT-4o' },
-          'gpt-4.1': { name: 'GPT-4.1' },
-        },
-      },
-      anthropic: {
-        name: 'Anthropic',
-        models: {
-          'claude-3-5-sonnet': { name: 'Claude 3.5 Sonnet' },
-        },
+const localConfig: OpencodeModelConfigSubset = {
+  model: 'openai/gpt-4o',
+  provider: {
+    openai: {
+      name: 'OpenAI',
+      models: {
+        'gpt-4o': { name: 'GPT-4o' },
+        'gpt-4.1': { name: 'GPT-4.1' },
       },
     },
-    enabled_providers: ['openai', 'anthropic'],
-    disabled_providers: ['anthropic'],
-  };
+    anthropic: {
+      name: 'Anthropic',
+      models: {
+        'claude-3-5-sonnet': { name: 'Claude 3.5 Sonnet' },
+      },
+    },
+  },
+  enabled_providers: ['openai', 'anthropic'],
+  disabled_providers: ['anthropic'],
+};
 
+describe('modelConfig provider availability helpers', () => {
   it('resolves provider visibility by whitelist first and blacklist second', () => {
     expect(isProviderEnabled(localConfig, 'openai')).toBe(true);
     expect(isProviderEnabled(localConfig, 'anthropic')).toBe(false);
@@ -90,7 +90,9 @@ describe('modelConfig helpers', () => {
       disabled_providers: ['alibaba-cn'],
     });
   });
+});
 
+describe('modelConfig inherited availability helpers', () => {
   it('resolves local inherited config layering from disk, scoped runtime, and project overrides', () => {
     const resolution = resolveInheritedModelConfigResolution({
       localServerMode: true,
@@ -211,7 +213,9 @@ describe('modelConfig helpers', () => {
     });
     expect(restored).toEqual({});
   });
+});
 
+describe('modelConfig catalog assembly helpers', () => {
   it('preserves server disabled scopes when local and server catalogs merge', () => {
     const merged = mergeCatalogs(
       {
@@ -389,7 +393,9 @@ describe('modelConfig helpers', () => {
       serverDisabled: false,
     });
   });
+});
 
+describe('modelConfig model selection helpers', () => {
   it('resolves model selections as available, unconfigured, or unavailable', () => {
     const baseCatalog = buildCatalogFromConfig(localConfig, 'local');
     const effectiveCatalog = filterCatalog(baseCatalog, {

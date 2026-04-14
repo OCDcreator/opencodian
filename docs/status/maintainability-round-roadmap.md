@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的 `[NEXT]`”。
-> **当前状态**: [READY] `R64` Warning cleanup batch A (settings residuals) 已完成，当前首个 `[NEXT]` 为 `R65 - Warning cleanup batch B (config and opencode core)`；必须继续按 `R65-R67` 顺序执行。
+> **当前状态**: [READY] `R65` Warning cleanup batch B (config and opencode core) 已完成，当前首个 `[NEXT]` 为 `R66 - Warning cleanup batch C (server, icons, and heavy tests)`；必须继续按 `R66-R67` 顺序执行。
 
 ## 控制规则
 
@@ -16,9 +16,9 @@
 ## 当前背景
 
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
-- 最近成功 phase：`docs/status/maintainability-phase-398.md`
-- 当前 live lint 基线：`0 errors / 87 warnings`
-- 当前路线判断：provider icon 热点已收尾，继续显式 warning cleanup
+- 最近成功 phase：`docs/status/maintainability-phase-400.md`
+- 当前 live lint 基线：`0 errors / 84 warnings`
+- 当前路线判断：config/opencode core warning cleanup 已完成，继续显式推进 server/icons/heavy-tests warning cleanup
 
 ## Queue
 
@@ -366,7 +366,7 @@
   - `npm run lint` 维持 `0 errors`
   - focused validation、全量 `npm test`、`npm run build` 通过
 
-### [NEXT] R65 - Warning cleanup batch B (config and opencode core)
+### [DONE] R65 - Warning cleanup batch B (config and opencode core)
 
 - **Lane**: Warning cleanup / config-core
 - **目标**: 受控削减 config/opencode core warning，优先命中 `ModelConfigService.ts`、`modelConfig.ts`、`OpenCodeMessageNormalizationMapper.ts` 与直接相关 tests 的 `max-lines` / `complexity` 残余。
@@ -386,7 +386,7 @@
   - `npm run lint` 维持 `0 errors`
   - focused validation、全量 `npm test`、`npm run build` 通过
 
-### [QUEUED] R66 - Warning cleanup batch C (server, icons, and heavy tests)
+### [NEXT] R66 - Warning cleanup batch C (server, icons, and heavy tests)
 
 - **Lane**: Warning cleanup / runtime and tests
 - **目标**: 继续削减 `ServerManager.ts`、`ProviderIconService.ts` 及其直接相关 heavy tests 的 warning，优先处理 file-size / complexity / max-lines-per-function 残余。
