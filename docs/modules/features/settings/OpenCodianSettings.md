@@ -12,6 +12,7 @@
 - 模型中心的 host 装配与持久化写回
 - 主题预设与样式控件联动
 - 通过 `SettingsServerSection` 协调 server section 的 mode/auth/status lifecycle
+- 通过 `SettingsSecuritySection` 协调 security section 的 config-status/permission/restart/blocklist lifecycle
 - 通过 `SettingsStyleBackgroundSection` 协调聊天背景图子区块 lifecycle
 - 对多个 modal 与辅助服务的编排
 
@@ -51,6 +52,9 @@
   - 聊天背景图上传/调参/预览拖拽现已委托给 `SettingsStyleBackgroundSection`
   - assistant metadata / time / provider-model 独立样式控制
   - 输入面板 glass refraction / liquid glass 参数
+- **Security**
+  - config file status / permission mode / restart action 现已委托给 `SettingsSecuritySection`
+  - blocklist、external access、export path 与平台 blocked commands 的 section 组装同样收口到专属 owner
 - **Debug**
   - `enableDebugLogging`
   - `inlineSerializedDebugLogArgs`
@@ -111,6 +115,7 @@ provider 开关写回仍遵循 `ModelConfigService` 返回的 `effectiveProvider
 ### 实时状态与节流刷新
 
 - server section 的 mode/auth/status DOM/state 现在由 `SettingsServerSection` 持有，并继续通过固定轮询刷新
+- security section 的 config-status、permission mode、restart flow 与 blocklist/export-path 输入现在由 `SettingsSecuritySection` 持有
 - 模型加载后的 UI 刷新走 `requestAnimationFrame`
 - 样式控件通过 `styleControlBindings` 统一同步，避免 theme preset 切换后控件显示滞后
 - 聊天背景图 subsection 现在由 `SettingsStyleBackgroundSection` 持有自己的 host、preview request guard 与 reset/upload lifecycle，`OpenCodianSettings` 只负责装配 owner 与复用通用 style control seam
@@ -125,6 +130,7 @@ provider 开关写回仍遵循 `ModelConfigService` 返回的 `effectiveProvider
 | `scrollToServerSection()` / `scrollToModelSection()` | 跳转到指定分区 |
 | `prepareRestoreScrollOnNextOpen()` | 记录下次打开时的滚动恢复目标 |
 | `addServerSettings()` | 创建并挂载 `SettingsServerSection` owner，把 server section lifecycle 从主类中收口出去 |
+| `addSecuritySettings()` | 创建并挂载 `SettingsSecuritySection` owner，把 security section lifecycle 从主类中收口出去 |
 | `addModelSettings()` | 装配模型中心 host，包括默认模型 picker、`SettingsModelCatalogPresenter`、provider workspace 卡片，以及高级工具区 |
 | `addConversationSettings()` | 渲染标题、question 和回答回顾相关设置 |
 | `addStyleSettings()` | 渲染 theme preset、挂载 `SettingsStyleBackgroundSection`，并装配其余 chat appearance / glass / liquid glass 控件 |
@@ -133,6 +139,7 @@ provider 开关写回仍遵循 `ModelConfigService` 返回的 `effectiveProvider
 
 - `SettingsSectionCoordinator`: 管理 section heading 注册、quick-nav 构建、post-render setup 与 scroll restoration，避免这些 DOM/runtime 细节继续堆在设置页主类里
 - `SettingsServerSection`: 管理 server section 的 mode 切换、host/port/remote URL、auth 输入、状态轮询与 start/stop/test/refresh action；`OpenCodianSettings` 只保留 owner 装配与跨 section server-state 同步
+- `SettingsSecuritySection`: 管理 security section 的 config status、permission mode 写回、restart action 与 blocklist/export-path 输入；`OpenCodianSettings` 只保留 owner 装配
 - `ModelCatalogStateService`: 提供 settings/model 分区使用的 catalog state API，并集中 provider/model availability 的 core 写回操作
 - `SettingsModelCatalogPresenter`: 管理 provider/model accordion、search、bulk toggle、catalog summary 卡片与 provider probe presentation；`OpenCodianSettings` 只向它提供 settings writeback 与 icon/inline-code host seam
 - `SettingsStyleBackgroundSection`: 管理聊天背景图 subsection 的上传、预览、fit mode / numeric controls、drag focus 与 reset lifecycle；`OpenCodianSettings` 只向它提供通用 style-group scaffolding、binding 清理与 apply/save seam
@@ -152,6 +159,7 @@ provider 开关写回仍遵循 `ModelConfigService` 返回的 `effectiveProvider
 - `display()` 每次都会重建 DOM，因此不要长期持有 section 内部元素引用。
 - 如果只是调整 settings panel scaffolding，优先改 `SettingsSectionCoordinator`，不要再把 quick-nav/scroll 定时器塞回 `OpenCodianSettings`。
 - 如果只是调整 server mode/host/auth/status/action 组装，优先改 `SettingsServerSection`，不要再把这一整块 lifecycle 塞回主设置类。
+- 如果只是调整 security config-status/permission/restart/blocklist/export-path 组装，优先改 `SettingsSecuritySection`，不要再把这一整块 lifecycle 塞回主设置类。
 - 如果只是调整模型目录 UI 状态、provider probe badge/detail、accordion/filter 行为，优先改 `SettingsModelCatalogPresenter`，不要再把这套状态机塞回 `OpenCodianSettings`。
 - 如果只是调整聊天背景图 subsection，优先改 `SettingsStyleBackgroundSection`，不要再把 background preview / upload / drag / reset 逻辑塞回主设置类。
 - 样式分组和默认值最终都以 `core/types/settings.ts` 的归一化逻辑为准。

@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的 `[NEXT]`”。
-> **当前状态**: [QUEUED] `R40-R41` 已人工确认并排队；恢复 autopilot 时从 `R40` 开始。
+> **当前状态**: [QUEUED] `R40` 已完成，当前待执行队列为 `R41`；恢复 autopilot 时从 `R41` 开始。
 
 ## 控制规则
 
@@ -17,8 +17,8 @@
 
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
 - 最近 checkpoint：`docs/status/maintainability-phase-372.md`
-- 当前 lint 基线：`0 errors / 87 warnings`
-- 当前路线判断：`R39` 已把 server section lifecycle 收口到 `SettingsServerSection`；下一步继续 `OpenCodianSettings` 的 security 厚切口
+- 当前 lint 基线：`0 errors / 86 warnings`
+- 当前路线判断：`R40` 已把 security section lifecycle 收口到 `SettingsSecuritySection`；下一步进入 checkpoint 复盘 `R38-R40`
 
 ## Queue
 
@@ -57,7 +57,7 @@
   - focused validation、全量 `npm test`、`npm run build` 通过
   - 执行 Test Vault 部署并校验 `BUILD_ID`
 
-### [NEXT] R40 - OpenCodianSettings security section lifecycle seam
+### [DONE] R40 - OpenCodianSettings security section lifecycle seam
 
 - **Lane**: Maintainability / settings security section
 - **目标**: 从 `src/features/settings/OpenCodianSettings.ts:1865` 的 `addSecuritySettings` 中收束完整 security/config lifecycle，优先整理 config status、permission mode、restart flow、blocklist / export path 配置
@@ -76,7 +76,7 @@
   - focused validation、全量 `npm test`、`npm run build` 通过
   - 执行 Test Vault 部署并校验 `BUILD_ID`
 
-### [QUEUED] R41 - Maintainability checkpoint
+### [NEXT] R41 - Maintainability checkpoint
 
 - **Lane**: Checkpoint
 - **目标**: 复盘 `R38-R40` 的 lint/owner 收益，并明确下一批是继续 settings 残余 section，还是切回 chat / opencode 主热点
