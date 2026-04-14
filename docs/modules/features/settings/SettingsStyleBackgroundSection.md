@@ -5,7 +5,7 @@
 
 ## 概述
 
-`SettingsStyleBackgroundSection.ts` 是设置页 Style 分区里“聊天背景图”子区块的专属 owner。它从 `OpenCodianSettings` 主类中接管了这块 subsection 的完整生命周期，包括：
+`SettingsStyleBackgroundSection.ts` 是设置页 Style 分区里“聊天背景图”子区块的专属 owner。它从 `SettingsStyleSection` 接管了这块 subsection 的完整生命周期，包括：
 
 - 背景卡片与上传 / 替换 / 移除按钮装配
 - fit mode 与九个背景数值控件的渲染
@@ -13,7 +13,7 @@
 - 预览拖拽时的 focusX / focusY 写回
 - 背景分组 reset 后的刷新与提示
 
-目标不是抽出薄 helper，而是把一个完整、可独立演进的 settings subsection lifecycle 收口到单独 owner，避免 `OpenCodianSettings` 继续直接持有大段 background DOM/state 组装。
+目标不是抽出薄 helper，而是把一个完整、可独立演进的 settings subsection lifecycle 收口到单独 owner，避免 style 主 owner 继续直接持有大段 background DOM/state 组装。
 
 ## 核心逻辑
 
@@ -33,7 +33,7 @@
 ### 设置写回
 
 - fit mode dropdown 直接更新 `appearance.background.fitMode`，然后触发 style apply/save，并重渲染 subsection
-- 数值控件仍复用 `OpenCodianSettings` 现有的 `addNumericStyleControl()` 与统一 binding 同步机制
+- 数值控件仍复用 `SettingsStyleSection` 提供的 `addNumericStyleControl()` 与统一 binding 同步机制
 - reset 动作走 `plugin.resetChatAppearanceGroupAndSave('background')`，随后同步控件值、刷新 subsection 并给出 Notice
 
 ## 关键方法
@@ -47,7 +47,7 @@
 
 ## 与其他模块的交互
 
-- `OpenCodianSettings`: 负责创建该 owner，并提供 style-group scaffolding、数值控件 host seam、binding 清理与统一 apply/save 回调
+- `SettingsStyleSection`: 负责创建该 owner，并提供 style-group scaffolding、数值控件 host seam、binding 清理与统一 apply/save 回调
 - `OpenCodianPlugin`: 提供背景资源导入/清理、baseline reset、主题背景 data URL 解析与 chat appearance 写回
 - `core/types/settings.ts`: 定义 background 设置结构、默认值与归一化边界
 - `src/features/chat/chatAppearance.ts`: 提供 `fitMode -> background-size` 映射
@@ -56,4 +56,4 @@
 
 - `background` 组控件的 binding 必须在每次重渲染前先清理，否则 theme preset / reset 后会残留失效的 sync handler
 - preview 的异步回填必须继续保留 request-id + `isConnected` 双重保护，避免设置页重建后回写到旧节点
-- 如果只是调整聊天背景子区块，优先改这里；不要再把 upload / preview / drag / reset 逻辑塞回 `OpenCodianSettings`
+- 如果只是调整聊天背景子区块，优先改这里；不要再把 upload / preview / drag / reset 逻辑塞回 `SettingsStyleSection` 或 `OpenCodianSettings`

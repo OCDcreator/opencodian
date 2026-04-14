@@ -192,6 +192,7 @@ docs/modules/
 │       ├── SettingsSectionCoordinator.md
 │       ├── SettingsSecuritySection.md
 │       ├── SettingsServerSection.md
+│       ├── SettingsStyleSection.md
 │       └── SettingsStyleBackgroundSection.md
 ├── i18n/
 │   ├── index.md

@@ -9,7 +9,7 @@ Liquid Glass（液态玻璃）效果设置的帮助 Modal。接收标题和正�
 
 ## 导入关系
 上游: `obsidian`（App、Modal）、`i18n`
-下游: 被 `OpenCodianSettings` 的输入面板玻璃效果设置的帮助按钮打开
+下游: 被 `SettingsStyleSection` 的 liquid glass 参数帮助按钮打开
 
 ## 核心类型 / 接口
 
@@ -51,7 +51,7 @@ onOpen() → h2(titleText) + h5(i18n heading) + p[] (分段 bodyText)
 
 ## 与其他模块的交互
 
-- **OpenCodianSettings**: 在 `addGlassRefractionInputControls()` 中创建帮助按钮，传入动态标题和正文
+- **SettingsStyleSection**: 在 liquid glass 参数装配过程中创建帮助按钮，传入动态标题和正文
 - **i18n**: 仅使用 `settings.style.input.help.plainLanguageHeading`
 
 ## 配置项

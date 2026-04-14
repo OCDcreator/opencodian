@@ -2,11 +2,11 @@
 
 > **状态**: [READY]
 > **作用**: 这是 maintainability 无人值守的战略文档。每轮开始前，先读本文件，再读 `docs/status/maintainability-round-roadmap.md` 与最近的 `docs/status/maintainability-phase-XXX.md`。
-> **自动推进状态**: `W6-W15`、`R33-R41` 与 `R42-R48` 已归档；`R48` 已完成 model section owner seam，当前 queue 顺序推进到 `R49-R50`。
+> **自动推进状态**: `W6-W15`、`R33-R41` 与 `R42-R49` 已归档；`R49` 已完成 style section owner seam，当前 queue 顺序推进到 `R50` checkpoint。
 
 ## 1. 当前判断
 
-**当前分支已完成 `R48`，并把 `OpenCodianSettings` 的 model section lifecycle 收束到独立厚 owner。** 当前基线继续保持 `0 errors / 90 warnings`，并已重新确认 focused settings tests、全量 `npm test`、`npm run build` 与 Test Vault 部署校验。按照既定 queue，下一批继续顺序推进 `R49 -> R50`，先做 `OpenCodianSettings` 的 style section lifecycle seam，再做 checkpoint。
+**当前分支已完成 `R49`，并把 `OpenCodianSettings` 的 style section lifecycle 收束到独立厚 owner。** 当前基线继续保持 `0 errors / 90 warnings`，并已重新确认 focused settings tests、全量 `npm test`、`npm run build` 与 Test Vault 部署校验。按照既定 queue，下一步进入 `R50` checkpoint，复盘 `R46-R49` 的 owner 收益与后续方向。
 
 ## 2. 当前基线
 
@@ -14,10 +14,9 @@
 - **验证**:
   - `npm run lint` 已恢复通过，`0 errors / 90 warnings`
   - 最近一次已确认的全量验证为：`npm test` 通过，`258 passed, 258 total` suites；`1094 passed, 1094 total` tests
-  - 最近一次已确认的构建通过：`npm run build`，`BUILD_ID` `autopilot-maintainability.202604150230`
+  - 最近一次已确认的构建通过：`npm run build`，`BUILD_ID` `autopilot-maintainability.202604150253`
 - **下一批高确定性切口**:
-  - `R49`: `OpenCodianSettings` style section lifecycle seam
-  - `R50`: checkpoint
+  - `R50`: maintainability checkpoint
 - **历史摘要**: 见 `docs/status/maintainability-completed-batches.md`
 
 ## 3. 最近完成摘要
@@ -32,13 +31,14 @@
 - **R46**: 完成 post-R43/R44/R45 的 import-sort / unused import housekeeping，把 live lint 恢复到 `0 errors / 90 warnings`
 - **R47**: `OpenCodeSettingsReconfigurationCoordinator` 接管 `updateSettings()` 的 plan/restart-stop/subscription/rollback lifecycle，并补齐直接相关测试与模块文档
 - **R48**: `SettingsModelSection` 接管 `OpenCodianSettings.addModelSettings()` 的 source mode、availability refresh、workspace 卡片、catalog host 与 icon cache lifecycle，并补齐直接相关测试与模块文档
+- **R49**: `SettingsStyleSection` 接管 `OpenCodianSettings.addStyleSettings()` 的 theme preset、background owner 装配、input panel appearance、glass/liquid glass 参数与 custom CSS lifecycle，并补齐直接相关测试与模块文档
 
 ## 4. 本批结论
 
-1. **`OpenCodianSettings` model seam 已收口**：`addModelSettings()` 不再直接铺开 source mode、availability refresh、workspace 卡片、catalog host 与 icon cache lifecycle，相关装配现已集中到 `SettingsModelSection`。
-2. **切口顺序**：下一刀按 queue 进入 `OpenCodianSettings.addStyleSettings()` 的完整 style section lifecycle seam，然后做 checkpoint。
+1. **`OpenCodianSettings` style seam 已收口**：`addStyleSettings()` 不再直接铺开 theme preset、background owner、input appearance、glass/liquid glass 参数与 custom CSS lifecycle，相关装配现已集中到 `SettingsStyleSection`。
+2. **切口顺序**：下一刀按 queue 进入 `R50` checkpoint，只做 `R46-R49` 复盘与下一批建议。
 3. **策略边界**：继续优先完整 lifecycle / runtime seam，不回到 warning-only cleanup，也不回到 logging-only / helper-only 的碎片拆分。
-4. **执行状态**：本轮已完成 `R48`；下一轮应直接进入 `R49`，不要插入新的 freestyle 清理轮。
+4. **执行状态**：本轮已完成 `R49`；下一轮应直接进入 `R50` checkpoint，不要插入新的 freestyle 清理轮。
 
 ## 5. 长期边界
 
