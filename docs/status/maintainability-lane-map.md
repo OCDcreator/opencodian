@@ -1,19 +1,20 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [CHECKPOINT_COMPLETE] `W9 - Warning cleanup checkpoint` 已完成；当前没有可自动执行的 `[NEXT]`。
+> **当前状态**: [CONFIRMED_NEXT_BATCH] `W10 - ToolCallRenderer summary complexity trim` 已完成；当前 `[NEXT]` 是 `W11 - Warning cleanup checkpoint`。
 
 ## 当前优先级
 
-- **当前 `[NEXT]`**：当前没有可自动执行的 `[NEXT]`
-- **本批目标**：`W9` 已复盘 `W6-W8` 的 warning cleanup 收益，并建议下一批方向
-- **当前 lint 基线**：`0 errors / 95 warnings`
-- **下一批建议**：继续受控 warning cleanup，但必须先由人工确认新的 queue item；不要自动恢复 `R33+`
+- **当前 `[NEXT]`**：`W11 - Warning cleanup checkpoint`
+- **本批目标**：复盘 `W10` 已收掉的 `ToolCallRenderer` summary complexity warning，并在 `W11` 完成后再次暂停
+- **当前 lint 基线**：`0 errors / 94 warnings`
 - **本批热点顺序**：
-  1. `docs/status/maintainability-master-plan.md`
-  2. `docs/status/maintainability-round-roadmap.md`
-  3. `docs/status/maintainability-lane-map.md`
-  4. 最新 phase 文档与 lint 输出
+  1. `docs/status/maintainability-phase-362.md`
+  2. `docs/status/maintainability-master-plan.md`
+  3. `docs/status/maintainability-round-roadmap.md`
+  4. `docs/status/maintainability-lane-map.md`
+  5. 最新 lint 输出
+- **下一暂停点**：`W11` 完成后若无人工追加 queue item，则重新停回无 `[NEXT]` 状态
 - **观察但暂不自动切入**：`src/features/settings/OpenCodianSettings.ts`、`tests/unit/core/opencode/OpenCodeService.test.ts`
 
 ## 本批边界

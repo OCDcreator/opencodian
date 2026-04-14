@@ -36,6 +36,37 @@ addIcon(MCP_TOOL_ICON_ID, MCP_TOOL_ICON_SVG);
 export class ToolCallRenderer {
   private options: ToolRendererOptions;
 
+  private readonly summaryResolvers: Record<string, (input: Record<string, unknown>) => string> = {
+    read: (input) => this.getReadSummary(input),
+    write: (input) => this.fileNameOnly(this.getToolFilePath(input)),
+    edit: (input) => this.fileNameOnly(this.getToolFilePath(input)),
+    multiedit: (input) => this.getMultiEditSummary(input),
+    apply_patch: (input) => this.getApplyPatchSummary(input),
+    patch: (input) => this.getApplyPatchSummary(input),
+    bash: (input) => this.truncateText((input.command as string) || '', 60),
+    list: (input) => this.directoryNameOnly((input.path as string) || ''),
+    glob: (input) => this.getGlobSummary(input),
+    grep: (input) => this.getGrepSummary(input),
+    lsp: (input) => this.getLspSummary(input),
+    web_search: (input) => this.truncateText((input.query as string) || '', 60),
+    codesearch: (input) => this.truncateText((input.query as string) || '', 60),
+    web_fetch: (input) => this.truncateText((input.url as string) || '', 60),
+    task: (input) => this.getTaskSummary(input),
+    question: (input) => this.getQuestionSummary(input),
+    skill: (input) => this.truncateText(
+      (input.name as string)
+      || (input.skill as string)
+      || '',
+      80,
+    ),
+    plan_enter: () => 'Switch to plan mode',
+    enter_plan_mode: () => 'Switch to plan mode',
+    plan_exit: () => 'Switch to build mode',
+    exit_plan_mode: () => 'Switch to build mode',
+    todoread: (input) => this.getTodoSummary(input) || 'Current tasks',
+    todowrite: (input) => this.getTodoSummary(input),
+  };
+
   constructor(options?: Partial<ToolRendererOptions>) {
     this.options = {
       iconMap: {},
@@ -59,60 +90,9 @@ export class ToolCallRenderer {
       return this.getMcpSummary(name, input);
     }
 
-    switch (getToolIdentity(name).normalizedName) {
-      case 'read':
-        return this.getReadSummary(input);
-      case 'write':
-      case 'edit':
-        return this.fileNameOnly(this.getToolFilePath(input));
-      case 'multiedit':
-        return this.getMultiEditSummary(input);
-      case 'apply_patch':
-      case 'patch':
-        return this.getApplyPatchSummary(input);
-      case 'bash':
-        return this.truncateText((input.command as string) || '', 60);
-      case 'list':
-        return this.directoryNameOnly((input.path as string) || '');
-      case 'glob':
-        return this.getGlobSummary(input);
-      case 'grep':
-        return this.getGrepSummary(input);
-      case 'lsp':
-        return this.getLspSummary(input);
-      case 'web_search':
-      case 'websearch':
-      case 'codesearch':
-        return this.truncateText((input.query as string) || '', 60);
-      case 'web_fetch':
-      case 'webfetch':
-        return this.truncateText((input.url as string) || '', 60);
-      case 'task':
-        return this.getTaskSummary(input);
-      case 'question':
-        return this.getQuestionSummary(input);
-      case 'skill':
-        return this.truncateText(
-          (input.name as string)
-          || (input.skill as string)
-          || '',
-          80,
-        );
-      case 'plan_enter':
-      case 'enter_plan_mode':
-        return 'Switch to plan mode';
-      case 'plan_exit':
-      case 'exit_plan_mode':
-        return 'Switch to build mode';
-      case 'todoread': {
-        return this.getTodoSummary(input) || 'Current tasks';
-      }
-      case 'todowrite': {
-        return this.getTodoSummary(input);
-      }
-      default:
-        return '';
-    }
+    const normalizedName = getToolIdentity(name).normalizedName;
+    const resolveSummary = this.summaryResolvers[normalizedName];
+    return resolveSummary ? resolveSummary(input) : '';
   };
 
   private getMcpSummary(name: string, input: Record<string, unknown>): string {

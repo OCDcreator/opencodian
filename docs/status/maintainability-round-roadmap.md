@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的 `[NEXT]`”。
-> **当前状态**: [CHECKPOINT_COMPLETE] `W9 - Warning cleanup checkpoint` 已完成；当前没有可自动执行的 `[NEXT]`，下一批需要人工确认后再追加到本队列。
+> **当前状态**: [CONFIRMED_NEXT_BATCH] `W10 - ToolCallRenderer summary complexity trim` 已完成；当前可自动执行的 `[NEXT]` 是 `W11 - Warning cleanup checkpoint`。`W11` 完成后必须再次暂停并等待人工确认。
 
 ## 控制规则
 
@@ -16,9 +16,11 @@
 ## 当前背景
 
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
-- 当前 lint 基线：`0 errors / 95 warnings`
+- 当前 lint 基线：`0 errors / 94 warnings`
 - checkpoint 建议：下一批继续一小批现有 owner 内的 warning cleanup，而不是自动恢复 `R33+`
-- 当前没有可自动执行的 `[NEXT]`
+- 当前可自动执行的 `[NEXT]`：`W11 - Warning cleanup checkpoint`
+- `W10` 已收掉 `ToolCallRenderer` 的 1 条 `complexity` warning，当前 lint 基线为 `0 errors / 94 warnings`
+- `W11` 完成后若无人追加 queue item，则必须重新写回“当前没有可自动执行的 `[NEXT]`”
 
 ## Queue
 
@@ -90,6 +92,40 @@
 - **验收**:
   - phase 文档明确记录 `W6-W8` 的 warning 收益与下一批建议
 
+### [DONE] W10 - ToolCallRenderer summary complexity trim
+
+- **Lane**: Warning cleanup / tool streaming hotspot
+- **目标**: 只处理 `src/utils/streaming/ToolCallRenderer.ts` 中 `defaultGetToolSummary` 的 `complexity` warning；优先通过同文件内的局部 helper、guard clause 或 typed dispatch 收束分支，保持 MCP summary 分类、`custom` 工具行为，以及只检查顶层 input fields 的现有规则不变。
+- **优先入口**:
+  - `src/utils/streaming/ToolCallRenderer.ts`
+  - `tests/unit/utils/streaming/ToolCallRenderer.test.ts`
+- **允许边界**:
+  - 允许在 `ToolCallRenderer` 现有 owner 内提取同文件私有 helper
+  - 允许更新直接相关 tests
+- **禁止项**:
+  - 不新增新的 streaming / tool-summary 子文件
+  - 不改 `toolIdentity`、`mcpSummaryConfig`、tool kind/icon fallback 或 `custom` tool 语义
+  - 不把本轮扩展到 `StreamController`、`OpenCodianView` 或新的 maintainability 拆分
+- **验收**:
+  - `defaultGetToolSummary` 的 `complexity` warning 消失
+  - 运行 focused validation、全量 `npm test`、`npm run build`
+
+### [NEXT] W11 - Warning cleanup checkpoint
+
+- **Lane**: Checkpoint
+- **目标**: 复盘 `W10` 的 warning cleanup 收益，并判断下一批是否继续 warning cleanup，还是回到新的 maintainability queue 提案准备。
+- **优先入口**:
+  - `docs/status/maintainability-master-plan.md`
+  - `docs/status/maintainability-round-roadmap.md`
+  - `docs/status/maintainability-lane-map.md`
+  - 最新 `phase` 文档与 lint 输出
+- **允许边界**:
+  - 只做文档、指标和下一批建议
+- **禁止项**:
+  - 不自动扩展 `W12+` 或恢复 `R33+`
+- **验收**:
+  - phase 文档明确记录 `W10` 的 warning 收益与下一批建议
+
 ## 当前自动队列状态
 
-当前没有可自动执行的 `[NEXT]`。`W9` 的 checkpoint 建议是下一批继续受控 warning cleanup，优先选择边界清晰、能在现有 owner 内消化的热点；不要在没有人工追加 queue item 的情况下自动扩展 `W10+` 或恢复 `R33+`。
+当前可自动执行的 `[NEXT]` 是 `W11 - Warning cleanup checkpoint`。`W11` 完成后若没有新的人工追加 queue item，则必须重新写明“当前没有可自动执行的 `[NEXT]`”。
