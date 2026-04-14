@@ -1,8 +1,8 @@
 # Maintainability Master Plan
 
-> **状态**: [CONFIRMED_NEXT_BATCH]
+> **状态**: [REVIEW_REQUIRED]
 > **作用**: 这是 maintainability 无人值守的战略文档。后续每一轮开始前，必须先读本文件，再读最近的 `docs/status/maintainability-phase-XXX.md`。
-> **自动推进状态**: 下一批先执行 L1-L5 ESLint cleanup 队列；autopilot 只能按 `docs/status/maintainability-round-roadmap.md` 的 `[NEXT]` 顺序推进，L5 完成后必须再次暂停并等待人工确认。
+> **自动推进状态**: L1-L5 ESLint cleanup 队列已完成；当前没有可自动执行的 `[NEXT]`。autopilot 必须暂停，等待人工确认下一批是继续 warning cleanup，还是恢复新的 maintainability queue。
 
 ## 1. 总体目标
 
@@ -19,7 +19,7 @@ maintainability 的目标是：
 
 ## 2. 当前阶段判断
 
-**当前判断：中后期，R28-R32 已完成；下一批先执行 L1-L5 的 ESLint cleanup 队列，再决定是否恢复新的 maintainability 重构。**
+**当前判断：中后期，R28-R32 与 L1-L5 均已完成；lint 已恢复到 `0 errors / 116 warnings`，但高价值 warning 仍集中在少数大 owner 与相关 tests。当前应暂停自动推进，等待人工确认下一批；倾向先继续一小批 warning cleanup，再考虑恢复新的 maintainability 重构。**
 
 原因：
 
@@ -28,8 +28,9 @@ maintainability 的目标是：
 - `src/features/settings/OpenCodianSettings.ts` 当前实测 **4989 行**，较 R9 前 baseline **6756 行**明显收缩；section lifecycle、model catalog presenter、catalog state writeback 已迁出，但 settings tab 仍负责 section composition、settings persistence、modal launch 与多处分区业务装配
 - `src/core/opencode/OpenCodeService.ts` 当前实测 **2397 行**，较 R18 checkpoint 的 **4733 行**减少 **2336 行**（约 **49.4%**），较 R27 checkpoint 的 **2858 行**再减少 **461 行**（约 **16.1%**）；R28-R31 已把 session lifecycle、session control/message orchestration、question/permission negotiation 与 broad query gateway 四块 ownership 迁出，但 service 仍集中 SDK-first / legacy HTTP fallback transport、assistant response + finish/fetch orchestration、server lifecycle / settings update / scoped-directory wiring、provider/model/config lookup 与 tool catalog/event bridge 等跨域兼容 seam
 - `src/core/opencode/OpenCodeSdkFacade.ts` / `src/core/opencode/ServerManager.ts` 当前分别为 **257** / **1171** 行；它们继续作为高风险相邻 owner 保持稳定，没有在本批被拆成新的薄 facade
+- L1-L5 已把 `npm run lint` 从 post-L1 baseline 的 **44 errors / 119 warnings** 收敛到当前 **0 errors / 116 warnings**；剩余 **116** 条 warning 中，`max-lines-per-function` / `max-lines` / `complexity` / `max-params` 合计 **110** 条，主要集中在 `src/features/settings/ModelConfigModal.ts`、`src/features/settings/OpenCodianSettings.ts`、`src/features/chat/OpenCodianView.ts`、`src/core/opencode/OpenCodeService.ts` 与相关测试热点
 
-结论：R28-R31 继续证明“兼容优先的较厚 owner 下沉”能够显著削弱 `OpenCodeService`，但在恢复新的 maintainability 重构前，当前仓库首先被 ESLint debt 阻塞。下一批必须先执行 L1-L5，把 `npm run lint` 从红灯拉回可控状态；L5 完成前，不得自动恢复新的 `R33+` maintainability queue。
+结论：L1-L5 已完成“先把 lint 拉回可控状态”的批次目标，errors 已清零；但 warnings 仍然高度集中在大 owner 与相关 tests。后续如果继续 autopilot，优先建议先由人工确认一批新的 warning cleanup queue，再决定是否恢复新的 `R33+` maintainability queue；在新的受控 queue 写入前，不得自动恢复 maintainability 重构。
 
 ## 2.1 已完成批次（R13-R18）
 
@@ -51,7 +52,7 @@ R28-R32 已在保持 `OpenCodeService` 对外总门面不散开的前提下完�
 
 本批仍然**没有**处理 `ServerManager`、`OpenCodeSdkFacade`，也没有把调用方改成直接依赖一堆新 service。`OpenCodeService` 继续作为对外总门面；新增 owner 只承接内部成块 lifecycle，并通过 host seam 接入。R32 完成后，当前 queue 已结束，autopilot 必须回到人工确认态。
 
-## 2.4 下一批确认方向（L1-L5）
+## 2.4 已完成 lint cleanup 批次（L1-L5）
 
 L1-L5 的目标不是继续拆 owner，而是先把当前仓库的 ESLint debt 拉回到可维护状态，避免后续架构轮次继续叠加 lint 噪音：
 
@@ -63,10 +64,12 @@ L1-L5 的目标不是继续拆 owner，而是先把当前仓库的 ESLint debt �
 
 本批不允许借 lint cleanup 之名顺手启动新的大规模重构；只允许做让 lint 通过或明显降噪所需的最小结构调整。
 
+L1-L5 已全部完成。L5 checkpoint 的结论是：若后续继续 autopilot，应先人工确认一批新的 warning cleanup queue，优先处理生产代码热点内的 `max-lines-per-function` / `max-lines` / `complexity` / `max-params`；暂不直接恢复新的 `R33+` maintainability owner queue。
+
 
 ## 3. 高优先级方向
 
-L1-L5 中，后续无人值守必须优先执行 roadmap 的 `[NEXT]`，先完成 lint cleanup。下面保留各 lane 的长期定位，供 L5 checkpoint 之后设计下一批 maintainability queue 时参考：
+L1-L5 已完成，当前 autopilot 处于暂停待确认状态。下面保留各 lane 的长期定位，供人工设计下一批 queue 时参考：
 
 ### P1. `OpenCodianView` 中剩余的核心 ownership 迁移
 
@@ -143,10 +146,10 @@ R13-R18 已完成这组 UI/runtime shell 的主要收束。本批 R28-R32 不继
 
 ## 7. 当前执行指令
 
-R32 完成之后：
+L5 完成之后：
 
-- 下一批先执行 `docs/status/maintainability-round-roadmap.md` 已确认的 `L1 - ESLint autofix sweep`
-- Autopilot 只允许按 L1→L5 顺序推进 lint cleanup；L5 完成后必须再次暂停
-- 本批不允许借 lint cleanup 顺手启动新的 `R33+` maintainability 重构
-- 如 L5 之后继续 maintainability，再人工评估 `OpenCodeService` 剩余的 transport/finalize/config/tool-catalog seam 或更大的 `OpenCodianView` owner 是否值得开新 queue
+- 当前没有可自动执行的 `[NEXT]`
+- Autopilot 必须暂停，不得自动扩展 `L6+` 或 `R33+`
+- 如人工决定继续，优先手工设计新的 warning cleanup queue，先聚焦 `src/features/settings/ModelConfigModal.ts`、`src/features/settings/OpenCodianSettings.ts`、`src/features/chat/OpenCodianView.ts`、`src/core/opencode/OpenCodeService.ts` 等生产代码热点中的 `max-lines-per-function` / `max-lines` / `complexity` / `max-params`
+- 只有在新的受控 queue 写入 roadmap 后，才允许恢复自动推进；否则保持 `[REVIEW_REQUIRED]` 暂停态
 - `ConversationRenderService` trailing-assistant helper 链仍保持降优先级；除非正确性、测试或构建阻塞，不要把它作为新 queue 的默认起点

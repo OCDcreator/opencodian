@@ -1,21 +1,26 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [CONFIRMED_NEXT_BATCH] L1-L5 已确认；`L1`、`L2`、`L3` 与 `L4` 已完成，当前 `[NEXT]` 是 `L5 - Lint checkpoint`。
+> **当前状态**: [REVIEW_REQUIRED] L1-L5 已全部完成；当前没有可自动执行的 `[NEXT]`。autopilot 必须暂停，等待人工确认下一批 queue。
 
 ## 当前优先级
 
-- **L5**: lint checkpoint；跑完必须暂停
-- **L4**: 已完成 high-value warning trim；当前 lint 基线收敛到 `0 errors / 116 warnings`
-- **L3**: 已完成 lint green checkpoint（上一轮基线为 `0 errors / 119 warnings`）
-- **L2**: 已完成 non-autofix error cleanup（当前 lint errors = 0）
-- **L1**: 已完成 autofix sweep；剩余基线为 `44 errors / 119 warnings`
+- **当前无自动 `[NEXT]`**：L5 checkpoint 已完成；本批必须暂停，等待人工确认
+- **推荐方向**：如继续 autopilot，先设计新的 warning cleanup queue，再决定是否恢复新的 maintainability owner queue
+- **当前 lint 基线**：`0 errors / 116 warnings`
+- **主要 warning 类型**：`max-lines-per-function` 41、`max-lines` 36、`complexity` 17、`max-params` 16、`@typescript-eslint/no-explicit-any` 6
+- **主要生产热点**：`src/features/settings/ModelConfigModal.ts`、`src/features/settings/OpenCodianSettings.ts`、`src/features/chat/OpenCodianView.ts`、`src/utils/icons/ProviderIconService.ts`、`src/core/opencode/OpenCodeService.ts`
 
 ## 当前热点首查入口
 
-- L5 首查 `docs/status/maintainability-master-plan.md`、`docs/status/maintainability-round-roadmap.md`、`docs/status/maintainability-lane-map.md` 与 `docs/status/maintainability-phase-351.md`
-- L4 已优先收掉 settings 热点内的 `max-params` warnings：`SettingsModelCatalogPresenter.ts` 2 条、`OpenCodianSettings.ts` 1 条；当前基线为 `0 errors / 116 warnings`
-- `OpenCodianView` / settings / trailing-assistant 链本批都只保留 regression watchpoints，不借 lint cleanup 新开 maintainability 切口
+- 下一批若继续 warning cleanup，首查 `docs/status/maintainability-master-plan.md`、`docs/status/maintainability-round-roadmap.md`、`docs/status/maintainability-lane-map.md` 与 `docs/status/maintainability-phase-352.md`
+- 生产代码热点优先顺序建议为：
+  1. `src/features/settings/ModelConfigModal.ts`
+  2. `src/features/settings/OpenCodianSettings.ts`
+  3. `src/features/chat/OpenCodianView.ts`
+  4. `src/utils/icons/ProviderIconService.ts`
+  5. `src/core/opencode/OpenCodeService.ts`
+- `OpenCodianView` / settings / trailing-assistant 链当前都只保留 regression watchpoints；在新的受控 queue 写入前，不自动恢复新的 maintainability 切口
 - P2 regression-only 首查顺序固定为：
   1. `tests/unit/features/chat/QuestionDockCoordinator.test.ts`
   2. `tests/unit/features/chat/QuestionTodoStatusRefreshCoordinator.test.ts`
@@ -93,4 +98,4 @@
 - 每轮必须先处理第一个 `[NEXT]`，不得自由切回新的 maintainability 重构。
 - 本批目标是先让 `npm run lint` 通过，再决定后续架构 queue；不是借 lint 名义顺手拆新 owner。
 - 允许最小结构调整来消除 lint error，但不允许为清 warning 新增薄 facade / adapter。
-- L5 完成后必须暂停；是否继续由下一次人工确认决定。
+- L5 已完成并已进入暂停态；是否继续 warning cleanup 或恢复新的 maintainability queue，由下一次人工确认决定。

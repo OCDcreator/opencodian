@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的 `[NEXT]`”。L5 完成后必须暂停复盘，不得自动扩展新队列。
-> **当前状态**: [CONFIRMED_NEXT_BATCH] L1-L5 已确认；`L1 - ESLint autofix sweep`、`L2 - Non-autofix error cleanup`、`L3 - Lint green checkpoint` 与 `L4 - High-value warning trim` 已完成，当前可自动执行的 `[NEXT]` 是 `L5 - Lint checkpoint`。
+> **当前状态**: [REVIEW_REQUIRED] L1-L5 已全部完成；当前没有可自动执行的 `[NEXT]`。建议人工先确认是否继续一批 warning cleanup queue，再决定是否恢复新的 maintainability owner queue。
 
 ## 控制规则
 
@@ -16,7 +16,7 @@
 
 ## 总体路线
 
-当前受控批次的目标先切换到 ESLint cleanup：在继续新的 maintainability owner 拆分之前，先让仓库从当前 lint 红灯状态恢复到可控状态，避免后续每轮都叠加 import sort、unused vars、prefer-const 与高噪音 rule debt。R1-R32 已完成前两批 maintainability 收束；本次人工确认的 L1-L5 将按 autofix sweep → non-autofix error cleanup → lint green checkpoint → high-value warning trim → checkpoint 的顺序推进。
+当前受控批次 L1-L5 已完成：仓库已从 lint 红灯恢复到 `0 errors / 116 warnings` 的可控状态。R1-R32 已完成前两批 maintainability 收束；后续是否继续 warning cleanup，或恢复新的 maintainability owner queue，必须先由人工确认并写入新的受控队列。
 
 > **P2 状态（R6 完成后）**: R1-R6 已完成 question dock、todo refresh/status、background completion notice、post-sync handoff 与 session signal orchestration 的收束。剩余风险以回归为主：background tab 无 session 时的 dock 清理、post-sync todo/status gate、completion notice queue/fingerprint 去重，以及 live signal writeback 顺序。
 >
@@ -790,7 +790,7 @@
   - 至少收掉一批高噪音 warning，并在 phase 文档中说明为何这些 warning 值得优先处理。
   - 运行 `npm run lint`、`npm test`、`npm run build`。
 
-### [NEXT] L5 - Lint checkpoint
+### [DONE] L5 - Lint checkpoint
 
 - **Lane**: Checkpoint
 - **目标**: 复盘 L1-L4 的 lint cleanup 效果，决定下一批是继续 warning cleanup，还是恢复新的 maintainability owner queue。
@@ -805,3 +805,10 @@
 - **验收**:
   - phase 文档明确建议下一批该继续 lint 还是恢复 maintainability 重构。
   - 运行 `npm run lint`、`npm test`、`npm run build`。
+
+## L5 Checkpoint Result
+
+- L1-L5 已把 `npm run lint` 从 post-L1 baseline 的 **44 errors / 119 warnings** 收敛到当前 **0 errors / 116 warnings**；本批累计清掉 **44** 条 error，并额外收掉 **3** 条 warning。
+- 当前 warning 分布为：`max-lines-per-function` **41**、`max-lines` **36**、`complexity` **17**、`max-params` **16**、`@typescript-eslint/no-explicit-any` **6**；其中生产代码 **75** 条、tests **41** 条。
+- 当前最热的生产代码热点为：`src/features/settings/ModelConfigModal.ts`（**7**）、`src/features/settings/OpenCodianSettings.ts`（**7**）、`src/features/chat/OpenCodianView.ts`（**5**）、`src/utils/icons/ProviderIconService.ts`（**4**）、`src/core/opencode/OpenCodeService.ts`（**3**）；最热的测试热点为 `tests/unit/core/opencode/OpenCodeService.test.ts`（**5**）。
+- 结论：lint 红灯已经解除，但剩余 warning 仍然集中在少数大 owner 与相关 tests。若后续继续 autopilot，建议先由人工确认一批新的 warning cleanup queue，优先处理生产代码热点内的 `max-lines-per-function` / `max-lines` / `complexity` / `max-params`；在新的受控 queue 写入前，不自动扩展 `L6+` 或恢复 `R33+`。
