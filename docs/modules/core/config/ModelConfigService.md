@@ -13,7 +13,7 @@
 
 它不直接维护 UI，也不直接写整个配置文件，而是负责给上层返回一个既能表达“基础事实”，又能表达“当前可选状态”的模型 catalog bundle。自 R11 起，settings 侧围绕这些 bundle 再做 `displayCatalogs` / `providerStatusCatalogs` 的组合语义，已经下沉到 `ModelCatalogStateService`，因此 `ModelConfigService` 继续专注“事实目录 + 继承可用性 + probe”。
 
-自 `R58` 起，继承层配置来源选择、local/scoped/default-scope provider layering，以及 `effectiveProviderConfig` / `currentEnabledProviderIds` 所依赖的 enablement 判定，已统一收口到 `modelConfig.ts` 的 `resolveInheritedModelConfigResolution()` seam；`ModelConfigService` 主要消费这个 resolution 产物再组装 catalog bundle 与 probe 结果。
+自 `R58` 起，继承层配置来源选择、local/scoped/default-scope provider layering，以及 `effectiveProviderConfig` / `currentEnabledProviderIds` 所依赖的 enablement 判定，已统一收口到 `modelConfig.ts` 的 `resolveInheritedModelConfigResolution()` seam。自 `R59` 起，runtime result 转 catalog、server catalog merge、`baseEffective` / `effective` 组装、provider probe planning 与默认测试模型选择也由 `modelConfig.ts` 的 catalog seam 维护；`ModelConfigService` 主要保留 IO 编排、日志与真实 send probe 调用。
 
 ## 核心类型
 
@@ -55,7 +55,7 @@ export interface ModelCatalogBundle {
 ### 构建 catalog
 
 - `getLocalCatalog()`：调用 `buildCatalogFromConfig(..., 'local')`
-- `getServerCatalog()`：并发读取 `getAvailableModels({ includeDirectory: true })`、`getResolvedModelConfig({ includeDirectory: true })` 与默认作用域 `getResolvedModelConfig({ includeDirectory: false })`。其中：
+- `getServerCatalog()`：并发读取 `getAvailableModels({ includeDirectory: true })`、`getResolvedModelConfig({ includeDirectory: true })` 与默认作用域 `getResolvedModelConfig({ includeDirectory: false })`，再交给 `catalogFromRuntimeResult()` 与 `buildServerCatalog()` 组装 server 目录。其中：
   - 目录作用域下的 runtime provider/model 列表直接来自 `config.providers()`
   - 不再把 `provider.list()` 当成 `opencode models` / 设置页服务器目录的等价数据源
   - 不再把 `config.get().provider` 整包当成“服务器目录”
@@ -65,7 +65,7 @@ export interface ModelCatalogBundle {
 
 ### 解析“基础目录”与“最终目录”
 
-`getCatalogs(mode, disabledModelRefs = [])` 的核心逻辑是：
+`getCatalogs(mode, disabledModelRefs = [])` 的核心逻辑现在由 `assembleModelCatalog()` 负责：
 
 1. 并发读取当前项目模型子集、当前项目作用域下的运行时 provider 列表、当前作用域解析配置，以及继承层配置
 2. 生成 `local` 与 `server`
@@ -103,6 +103,8 @@ provider 开关继承规则依然保留在 `effectiveProviderConfig` 里，按�
 - 合并后的 server catalog
 
 如果当前 provider 在“最终可用 provider 配置”里仍然允许使用，并且还能选出一个测试模型，服务还会额外调用 `OpenCodeService.probeProviderResponse(providerId, modelId)` 发起一次最小真实请求。也就是说，这个探针现在不再只是“看目录里有没有 / runtime 里有没有”，而是尽量回答“这个 provider 现在到底能不能真发出去”。
+
+自 `R59` 起，project-disabled/server-disabled 优先级、runtime/server model 计数、默认测试模型选择与“是否需要真实发送”的决策由 `resolveProviderAvailabilityProbePlan()` 统一产出；服务层只在 plan 要求时调用真实 send probe，并把成功 / 失败结果写回返回结构。
 
 然后把结果归类成：
 
@@ -164,7 +166,9 @@ OpencodeConfigManager.read()
 
 OpenCodeService.getAvailableModels(includeDirectory=true)
   -> current project runtime catalog
-  -> defaults supplement
+  -> catalogFromRuntimeResult()
+  -> buildServerCatalog()
+  -> server
 
 OpenCodeService.getResolvedModelConfig(includeDirectory=true)
   -> scoped current project config
@@ -181,12 +185,13 @@ local-mode disk inherited config or remote default-scope config
   -> serverConfig + effectiveProviderConfig + currentEnabledProviderIds predicates
 
 local + server + modelSourceMode
-  -> resolveCatalog()
-  -> baseEffective
+  -> assembleModelCatalog()
+  -> baseEffective + currentEnabledProviderIds + effective
 
-baseEffective + disabledModelRefs + currentEnabledProviderIds
-  -> filterCatalog() + provider ID filter
-  -> effective
+providerId + localConfig + runtime/server catalog + inherited resolution
+  -> resolveProviderAvailabilityProbePlan()
+  -> optional OpenCodeService.probeProviderResponse()
+  -> ProviderAvailabilityProbe
 ```
 
 ## 与其他模块的交互

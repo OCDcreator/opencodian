@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的 `[NEXT]`”。
-> **当前状态**: [READY] `R58` ModelConfigService inherited config resolution seam 已完成，当前首个 `[NEXT]` 为 `R59 - ModelConfigService server catalog assembly seam`；必须继续按 `R59-R67` 顺序执行。
+> **当前状态**: [READY] `R59` ModelConfigService server catalog assembly seam 已完成，当前首个 `[NEXT]` 为 `R60 - OpenCodeMessageNormalizationMapper tool/content seam`；必须继续按 `R60-R67` 顺序执行。
 
 ## 控制规则
 
@@ -16,7 +16,7 @@
 ## 当前背景
 
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
-- 最近成功 phase：`docs/status/maintainability-phase-393.md`
+- 最近成功 phase：`docs/status/maintainability-phase-394.md`
 - 当前 live lint 基线：`0 errors / 92 warnings`
 - 当前路线判断：继续 server/config/icon 热点与显式 warning cleanup
 
@@ -259,7 +259,7 @@
   - `ModelConfigService` 对 inherited-config merge / scope layering 的直接装配明显减少
   - focused validation、全量 `npm test`、`npm run build` 通过
 
-### [NEXT] R59 - ModelConfigService server catalog assembly seam
+### [DONE] R59 - ModelConfigService server catalog assembly seam
 
 - **Lane**: Maintainability / model catalog assembly
 - **目标**: 从 `src/core/config/ModelConfigService.ts` 收束 runtime/server catalog merge、provider availability probe、default model resolution 与 filtered effective catalog assembly 的完整 catalog seam。
@@ -276,7 +276,7 @@
   - `ModelConfigService` 对 catalog assembly / probe / default resolution 的直接铺开明显减少
   - focused validation、全量 `npm test`、`npm run build` 通过
 
-### [QUEUED] R60 - OpenCodeMessageNormalizationMapper tool/content seam
+### [NEXT] R60 - OpenCodeMessageNormalizationMapper tool/content seam
 
 - **Lane**: Maintainability / message normalization tool mapping
 - **目标**: 从 `src/core/opencode/OpenCodeMessageNormalizationMapper.ts` 收束 tool part collection、pending tool calls、tool-use content block 构造与 renderable content assembly 的完整 seam。

@@ -1,4 +1,5 @@
 import type {
+  ModelSourceMode,
   OpencodeConfig,
   OpencodeModelConfigSubset,
   OpencodeProviderConfig,
@@ -67,6 +68,45 @@ export interface InheritedModelConfigResolution {
   isProviderEnabledInCurrentScope(providerId: string): boolean;
   isProviderEffectivelyEnabled(providerId: string): boolean;
   getCurrentEnabledProviderIds(providerIds: Iterable<string>): string[];
+}
+
+export interface ModelCatalogRuntimeResult {
+  providers: Array<{
+    id: string;
+    name: string;
+    models: Array<{
+      id: string;
+      name: string;
+      contextWindow?: number;
+    }>;
+  }>;
+  defaults: Record<string, string>;
+}
+
+export interface ModelCatalogAssemblyResult {
+  baseEffective: ModelCatalog;
+  effective: ModelCatalog;
+  currentEnabledProviderIds: string[];
+  effectiveProviderConfig: ProviderAvailabilityConfig;
+}
+
+export type ProviderAvailabilityProbePlanStatus =
+  | 'available'
+  | 'project_disabled'
+  | 'server_disabled'
+  | 'catalog_only'
+  | 'missing';
+
+export interface ProviderAvailabilityProbePlan {
+  providerId: string;
+  status: ProviderAvailabilityProbePlanStatus;
+  effectiveEnabled: boolean;
+  projectDisabled: boolean;
+  serverDisabled: boolean;
+  runtimeModelCount: number;
+  catalogModelCount: number;
+  testedModelId?: string;
+  shouldSendProbe: boolean;
 }
 
 const MODEL_KEYS: Array<keyof OpencodeModelConfigSubset> = [
@@ -315,6 +355,60 @@ export function buildCatalogFromConfig(
   };
 }
 
+export function catalogFromRuntimeResult(result: ModelCatalogRuntimeResult): ModelCatalog {
+  return {
+    providers: result.providers.map((provider) => ({
+      id: provider.id,
+      name: provider.name || provider.id,
+      source: 'server',
+      existsInLocal: false,
+      existsInServer: true,
+      models: provider.models.map((model) => ({
+        id: model.id,
+        name: model.name || model.id,
+        contextWindow: model.contextWindow,
+        source: 'server',
+        existsInLocal: false,
+        existsInServer: true,
+      })),
+    })),
+    defaults: result.defaults,
+  };
+}
+
+export function buildServerCatalog(
+  runtimeCatalog: ModelCatalog,
+  metadataConfig: OpencodeModelConfigSubset,
+): ModelCatalog {
+  const resolvedCatalog = buildCatalogFromConfig(metadataConfig, 'server');
+  const providers = new Map<string, ModelCatalogProvider>();
+  const resolvedProviders = new Map(
+    resolvedCatalog.providers.map((provider) => [provider.id, provider] as const),
+  );
+
+  for (const provider of runtimeCatalog.providers) {
+    mergeServerCatalogProvider(providers, provider);
+  }
+
+  for (const [providerId, provider] of resolvedProviders) {
+    if (!providers.has(providerId)) {
+      continue;
+    }
+
+    mergeServerCatalogProvider(providers, provider);
+  }
+
+  return {
+    providers: [...providers.values()]
+      .filter((provider) => provider.models.length > 0)
+      .sort((left, right) => left.name.localeCompare(right.name)),
+    defaults: {
+      ...resolvedCatalog.defaults,
+      ...runtimeCatalog.defaults,
+    },
+  };
+}
+
 export function mergeCatalogs(server: ModelCatalog, local: ModelCatalog): ModelCatalog {
   const providers = new Map<string, ModelCatalogProvider>();
 
@@ -390,6 +484,50 @@ function mergeCatalogDisableScopes(
 ): ModelCatalogDisableScope[] | undefined {
   const merged = Array.from(new Set([...(left ?? []), ...(right ?? [])]));
   return merged.length > 0 ? merged : undefined;
+}
+
+export function resolveCatalogForMode(
+  local: ModelCatalog,
+  server: ModelCatalog,
+  mode: ModelSourceMode,
+): ModelCatalog {
+  if (mode === 'local') {
+    return local;
+  }
+
+  if (mode === 'server') {
+    return server;
+  }
+
+  return mergeCatalogs(server, local);
+}
+
+export function assembleModelCatalog(
+  options: {
+    local: ModelCatalog;
+    server: ModelCatalog;
+    mode: ModelSourceMode;
+    disabledModelRefs?: string[];
+    configResolution: Pick<InheritedModelConfigResolution, 'effectiveProviderConfig' | 'getCurrentEnabledProviderIds'>;
+  },
+): ModelCatalogAssemblyResult {
+  const baseEffective = resolveCatalogForMode(options.local, options.server, options.mode);
+  const currentEnabledProviderIds = options.configResolution.getCurrentEnabledProviderIds(
+    baseEffective.providers.map((provider) => provider.id),
+  );
+  const effective = filterCatalogToProviderIds(
+    filterCatalog(baseEffective, {
+      disabledModelRefs: options.disabledModelRefs,
+    }),
+    new Set(currentEnabledProviderIds),
+  );
+
+  return {
+    baseEffective,
+    effective,
+    currentEnabledProviderIds,
+    effectiveProviderConfig: options.configResolution.effectiveProviderConfig,
+  };
 }
 
 export function parseModelReference(value: string | undefined): { provider: string; model: string } | null {
@@ -538,6 +676,76 @@ export function resolveInheritedModelConfigResolution(options: {
       providerIds,
       isProviderEnabledInCurrentScope,
     ),
+  };
+}
+
+export function resolveProviderAvailabilityProbePlan(
+  options: {
+    providerId: string;
+    localConfig: OpencodeModelConfigSubset;
+    runtimeCatalog: ModelCatalog;
+    serverCatalog: ModelCatalog;
+    configResolution: Pick<InheritedModelConfigResolution, 'isProviderEnabledInServerScope' | 'isProviderEffectivelyEnabled'>;
+  },
+): ProviderAvailabilityProbePlan {
+  const providerId = options.providerId.trim();
+  if (!providerId) {
+    return {
+      providerId: '',
+      status: 'missing',
+      effectiveEnabled: false,
+      projectDisabled: false,
+      serverDisabled: false,
+      runtimeModelCount: 0,
+      catalogModelCount: 0,
+      shouldSendProbe: false,
+    };
+  }
+
+  const runtimeProvider = options.runtimeCatalog.providers.find((provider) => provider.id === providerId);
+  const serverProvider = options.serverCatalog.providers.find((provider) => provider.id === providerId);
+  const projectDisabled = !isProviderEnabled(options.localConfig, providerId);
+  const serverDisabled = !projectDisabled
+    && !options.configResolution.isProviderEnabledInServerScope(providerId);
+  const effectiveEnabled = options.configResolution.isProviderEffectivelyEnabled(providerId);
+  const runtimeModelCount = runtimeProvider?.models.length ?? 0;
+  const catalogModelCount = serverProvider?.models.length ?? 0;
+  const testedModelId = selectProviderProbeModelId({
+    providerId,
+    localConfig: options.localConfig,
+    runtimeProvider,
+    serverProvider,
+    serverCatalog: options.serverCatalog,
+  });
+
+  let status: ProviderAvailabilityProbePlanStatus = 'missing';
+  let shouldSendProbe = false;
+
+  if (!effectiveEnabled && projectDisabled) {
+    status = 'project_disabled';
+  } else if (!effectiveEnabled && serverDisabled) {
+    status = 'server_disabled';
+  } else if (!testedModelId && serverProvider) {
+    status = 'catalog_only';
+  } else if (testedModelId) {
+    status = 'available';
+    shouldSendProbe = true;
+  } else if (runtimeModelCount > 0) {
+    status = 'available';
+  } else if (serverProvider) {
+    status = 'catalog_only';
+  }
+
+  return {
+    providerId,
+    status,
+    effectiveEnabled,
+    projectDisabled,
+    serverDisabled,
+    runtimeModelCount,
+    catalogModelCount,
+    testedModelId,
+    shouldSendProbe,
   };
 }
 
@@ -696,6 +904,25 @@ export function filterCatalog(
   return {
     providers: filteredProviders,
     defaults: filteredDefaults,
+  };
+}
+
+function filterCatalogToProviderIds(
+  catalog: ModelCatalog,
+  allowedProviderIds: ReadonlySet<string>,
+): ModelCatalog {
+  const providers = catalog.providers
+    .filter((provider) => allowedProviderIds.has(provider.id))
+    .map((provider) => ({
+      ...provider,
+      models: provider.models.map((model) => ({ ...model })),
+    }));
+
+  return {
+    providers,
+    defaults: Object.fromEntries(
+      Object.entries(catalog.defaults).filter(([providerId]) => allowedProviderIds.has(providerId)),
+    ),
   };
 }
 
@@ -987,4 +1214,89 @@ function pickFirstCatalogModel(
   }
 
   return null;
+}
+
+function mergeServerCatalogProvider(
+  providers: Map<string, ModelCatalogProvider>,
+  provider: ModelCatalogProvider,
+): void {
+  const existing = providers.get(provider.id);
+  if (!existing) {
+    providers.set(provider.id, {
+      ...provider,
+      source: 'server',
+      existsInLocal: false,
+      existsInServer: true,
+      models: provider.models.map((model) => ({
+        ...model,
+        source: 'server',
+        existsInLocal: false,
+        existsInServer: true,
+      })),
+    });
+    return;
+  }
+
+  const models = new Map(existing.models.map((model) => [model.id, { ...model }]));
+  for (const model of provider.models) {
+    const existingModel = models.get(model.id);
+    if (!existingModel) {
+      models.set(model.id, {
+        ...model,
+        source: 'server',
+        existsInLocal: false,
+        existsInServer: true,
+      });
+      continue;
+    }
+
+    models.set(model.id, {
+      ...existingModel,
+      ...model,
+      name: model.name || existingModel.name,
+      contextWindow: model.contextWindow ?? existingModel.contextWindow,
+      source: 'server',
+      existsInLocal: false,
+      existsInServer: true,
+      disabledScopes: mergeCatalogDisableScopes(existingModel.disabledScopes, model.disabledScopes),
+    });
+  }
+
+  providers.set(provider.id, {
+    ...existing,
+    ...provider,
+    name: provider.name || existing.name,
+    source: 'server',
+    existsInLocal: false,
+    existsInServer: true,
+    disabledScopes: mergeCatalogDisableScopes(existing.disabledScopes, provider.disabledScopes),
+    models: [...models.values()].sort((left, right) => left.name.localeCompare(right.name)),
+  });
+}
+
+function selectProviderProbeModelId(options: {
+  providerId: string;
+  localConfig: OpencodeModelConfigSubset;
+  runtimeProvider: ModelCatalogProvider | undefined;
+  serverProvider: ModelCatalogProvider | undefined;
+  serverCatalog: ModelCatalog;
+}): string | undefined {
+  const configuredDefault = parseModelReference(options.localConfig.model);
+  if (configuredDefault?.provider === options.providerId && configuredDefault.model) {
+    return configuredDefault.model;
+  }
+
+  const serverDefault = options.serverCatalog.defaults[options.providerId];
+  if (typeof serverDefault === 'string' && serverDefault.trim()) {
+    return serverDefault.trim();
+  }
+
+  for (const provider of [options.runtimeProvider, options.serverProvider]) {
+    const modelId = provider?.models.find((model) => model.id.trim())?.id;
+    if (modelId) {
+      return modelId;
+    }
+  }
+
+  return undefined;
 }

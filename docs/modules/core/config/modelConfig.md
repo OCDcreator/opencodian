@@ -5,12 +5,13 @@
 
 ## 概述
 
-`modelConfig.ts` 是 Worker 2 范围里最底层的配置辅助模块。它同时承担 4 类职责：
+`modelConfig.ts` 是 Worker 2 范围里最底层的配置辅助模块。它同时承担 5 类职责：
 
 - 解析带注释的 OpenCode 配置文本
 - 清洗 / 提取 / 回写模型相关字段子集
 - 把模型配置映射成 `ModelCatalog`，并与服务端目录做合并
 - 统一 inherited server config resolution、provider availability layering 与 current-scope enablement 判定
+- 统一 runtime/server catalog assembly、filtered effective catalog assembly 与 provider probe planning
 
 它被多个模块复用：
 
@@ -113,6 +114,13 @@ export interface ModelCatalog {
 - provider 和 model 最终都按 `name.localeCompare()` 排序
 - `defaults` 采用 `{ ...server.defaults, ...local.defaults }`，项目默认值覆盖同 provider 的服务端默认值
 
+`catalogFromRuntimeResult(result)` 与 `buildServerCatalog(runtimeCatalog, metadataConfig)` 是 `R59` 后的 server catalog assembly seam：
+
+- `catalogFromRuntimeResult()` 把 `config.providers(includeDirectory=true)` 风格返回值统一映射成 server-source `ModelCatalog`
+- `buildServerCatalog()` 以 runtime provider 集合作为服务器目录真值，只给当前 runtime 中存在的 provider 覆盖 scoped/default metadata 与 defaults
+- 只存在于 `config.get().provider` 或 connect-provider directory 的 provider 不会被补进 server catalog
+- `assembleModelCatalog()` 再负责按 `ModelSourceMode` 生成 `baseEffective`，叠加 `disabledModelRefs` 与 `currentEnabledProviderIds` 得到 `effective`
+
 ### 模型引用解析
 
 `parseModelReference(value)` 只识别 `provider/model` 这种最简单的格式：
@@ -153,6 +161,13 @@ export interface ModelCatalog {
 
 `setProviderEnabled(subset, providerId, enabled, knownProviderIds, inherited?)` 写回项目配置时会以 `inherited` 为基线生成最小本地覆盖。例如继承层当前禁用 `alibaba` / `alibaba-cn`，项目如果只想重新启用 `alibaba`，本地可以写成 `disabled_providers: ['alibaba-cn']`；如果想把继承禁用全部清空，也可以显式写 `disabled_providers: []`。这里的重点是“本地字段替换继承字段”，而不是把继承禁用当成不可覆盖的硬限制。
 
+`resolveProviderAvailabilityProbePlan(...)` 是 `R59` 后的 provider probe planning seam。它统一计算：
+
+- project-disabled / server-disabled / effective-enabled 三组可用性标记
+- runtime catalog 与 server catalog 中的 model 计数
+- 探针应使用的默认模型，优先顺序为项目默认模型、server defaults、runtime/server catalog 首个有效模型
+- 是否需要调用真实 `probeProviderResponse()`，以及无需发送时的稳定状态分类
+
 ## 关键导出
 
 | 导出 | 说明 |
@@ -167,11 +182,16 @@ export interface ModelCatalog {
 | `mergeModelConfigSubsets(base, override)` | 按 OpenCode 语义合并模型子集 |
 | `buildCatalogFromConfig(subset, source)` | 从本地 / 服务端风格数据构建 catalog |
 | `mergeCatalogs(server, local)` | 合并 catalog 并标记存在性 |
+| `catalogFromRuntimeResult(result)` | 把 OpenCode runtime provider 返回值映射为 server-source catalog |
+| `buildServerCatalog(runtimeCatalog, metadataConfig)` | 以 runtime provider 集合为真值组装 server catalog |
+| `resolveCatalogForMode(local, server, mode)` | 按 `ModelSourceMode` 选择 local/server/merge 基础目录 |
+| `assembleModelCatalog(options)` | 统一组装 `baseEffective`、`effectiveProviderConfig`、`currentEnabledProviderIds` 与 `effective` |
 | `parseModelReference(value)` | 解析 `provider/model` 引用字符串 |
 | `resolveModelSelection(base, effective, provider, model)` | 判断当前选择是可用、未配置还是不可用 |
 | `resolvePreferredAvailableModel(effective, provider, model)` | 从 `effective` catalog 里挑出当前应使用的可用模型 |
 | `mergeProviderAvailabilityConfig(inherited, local)` | 按字段继承或替换 provider 白名单 / 黑名单 |
 | `resolveInheritedModelConfigResolution(options)` | 统一继承配置来源、scope merge 与 provider enablement 判定 seam |
+| `resolveProviderAvailabilityProbePlan(options)` | 统一 provider availability probe 的状态、默认模型与真实发送计划 |
 | `setProviderEnabled(subset, providerId, enabled, knownProviderIds, inherited?)` | 写入最小 provider 开关覆盖 |
 
 ## 与其他模块的交互
