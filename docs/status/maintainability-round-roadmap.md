@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的 `[NEXT]`”。
-> **当前状态**: [READY] `R55` ServerManager managed adoption/conflict seam 已完成，当前首个 `[NEXT]` 为 `R56 - ServerManager launch diagnostics seam`；必须继续按 `R56-R67` 顺序执行。
+> **当前状态**: [READY] `R56` ServerManager launch diagnostics seam 已完成，当前首个 `[NEXT]` 为 `R57 - ServerManager stop/restart lifecycle seam`；必须继续按 `R57-R67` 顺序执行。
 
 ## 控制规则
 
@@ -16,7 +16,7 @@
 ## 当前背景
 
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
-- 最近成功 phase：`docs/status/maintainability-phase-390.md`
+- 最近成功 phase：`docs/status/maintainability-phase-391.md`
 - 当前 live lint 基线：`0 errors / 92 warnings`
 - 当前路线判断：继续 server/config/icon 热点与显式 warning cleanup
 
@@ -207,7 +207,7 @@
   - `ServerManager` 对 adoption/restart conflict 细节的直接铺开明显减少
   - focused validation、全量 `npm test`、`npm run build` 通过
 
-### [NEXT] R56 - ServerManager launch diagnostics seam
+### [DONE] R56 - ServerManager launch diagnostics seam
 
 - **Lane**: Maintainability / server launch runtime
 - **目标**: 从 `src/core/opencode/ServerManager.ts` 收束 local launch、stdout/stderr tail、launch snapshot、health wait 与 launch failure reporting 的完整 runtime seam，降低 `doStart()` 的复杂度压力。
@@ -224,7 +224,7 @@
   - `ServerManager.doStart()` / launch diagnostics 直接分支明显减少
   - focused validation、全量 `npm test`、`npm run build` 通过
 
-### [QUEUED] R57 - ServerManager stop/restart lifecycle seam
+### [NEXT] R57 - ServerManager stop/restart lifecycle seam
 
 - **Lane**: Maintainability / server shutdown lifecycle
 - **目标**: 从 `src/core/opencode/ServerManager.ts` 收束 adopted pid terminate、process tree kill、restart / reset 与 managed state cleanup 的完整 shutdown lifecycle，优先形成单一厚 seam。

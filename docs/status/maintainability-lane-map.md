@@ -1,11 +1,11 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [READY] `R55` ServerManager managed adoption/conflict seam 已完成；当前首个 `[NEXT]` 为 `R56 - ServerManager launch diagnostics seam`。
+> **当前状态**: [READY] `R56` ServerManager launch diagnostics seam 已完成；当前首个 `[NEXT]` 为 `R57 - ServerManager stop/restart lifecycle seam`。
 
 ## 当前优先级
 
-- **当前 `[NEXT]`**：`R56 - ServerManager launch diagnostics seam`
+- **当前 `[NEXT]`**：`R57 - ServerManager stop/restart lifecycle seam`
 - **本批目标**：保持 `0 errors`，settings residual seams 已完成，继续推进 server/config/icon 厚切口，最后连跑三轮 warning cleanup 与 checkpoint
 - **当前 lint 基线**：`0 errors / 92 warnings`
 - **热点顺序**：
@@ -38,5 +38,5 @@
 ## 历史入口
 
 - 批次归档：`docs/status/maintainability-completed-batches.md`
-- 最近成功 phase：`docs/status/maintainability-phase-390.md`
+- 最近成功 phase：`docs/status/maintainability-phase-391.md`
 - 停机线索：`automation/runtime/stop-after-next-commit.log` 与 `automation/runtime/history.jsonl` 中 round `398` 记录

@@ -59,6 +59,14 @@ interface LocalServerLaunch {
   cleanup: () => void;
 }
 
+interface LocalServerLaunchSnapshot {
+  outputTail: string[];
+  exited: boolean;
+  exitCode: number | null;
+  signal: NodeJS.Signals | null;
+  error: Error | null;
+}
+
 interface ExistingServerProcessInfo {
   pid: number | null;
   commandLine: string | null;
@@ -202,11 +210,7 @@ export class ServerManager {
         throw new Error(`Port ${this.config.local.port} is already in use by another process`);
       }
 
-      await this.spawnServer();
-      await this.waitForHealthy(this.config.timeout ?? 30000);
-
-      this.setStatus('running');
-      new Notice('OpenCode server started');
+      await this.launchLocalServerRuntime();
     } catch (error) {
       if (this.config.mode === 'local' && (this.process || this.managedServerState)) {
         try {
@@ -409,26 +413,33 @@ export class ServerManager {
     this.attachLaunchTracking(this.process);
   }
 
+  private async launchLocalServerRuntime(successDiagnostics?: ServerDiagnostics): Promise<void> {
+    await this.spawnServer();
+    await this.waitForHealthy(this.config.timeout ?? 30000);
+
+    if (successDiagnostics) {
+      this.setDiagnostics(successDiagnostics);
+    }
+
+    this.setStatus('running');
+    new Notice('OpenCode server started');
+  }
+
   private attachLaunchTracking(proc: ChildProcess): void {
     this.clearLaunchState();
 
-    const handleStdout = (data: unknown) => {
-      const text = String(data);
-      this.pushLaunchOutput(launch, text);
-      const trimmed = text.trim();
-      if (trimmed) {
-        logger.debug(trimmed);
-      }
+    const launch: LocalServerLaunch = {
+      proc,
+      outputTail: [],
+      exited: false,
+      exitCode: null,
+      signal: null,
+      error: null,
+      cleanup: () => undefined,
     };
 
-    const handleStderr = (data: unknown) => {
-      const text = String(data);
-      this.pushLaunchOutput(launch, text);
-      const trimmed = text.trim();
-      if (trimmed) {
-        logger.error(trimmed);
-      }
-    };
+    const handleStdout = this.createLaunchOutputHandler(launch, (text) => logger.debug(text));
+    const handleStderr = this.createLaunchOutputHandler(launch, (text) => logger.error(text));
 
     const handleError = (error: Error) => {
       launch.error = error;
@@ -448,19 +459,11 @@ export class ServerManager {
       this.cleanup();
     };
 
-    const launch: LocalServerLaunch = {
-      proc,
-      outputTail: [],
-      exited: false,
-      exitCode: null,
-      signal: null,
-      error: null,
-      cleanup: () => {
-        proc.removeListener('error', handleError);
-        proc.removeListener('exit', handleExit);
-        proc.stdout?.removeListener('data', handleStdout);
-        proc.stderr?.removeListener('data', handleStderr);
-      },
+    launch.cleanup = () => {
+      proc.removeListener('error', handleError);
+      proc.removeListener('exit', handleExit);
+      proc.stdout?.removeListener('data', handleStdout);
+      proc.stderr?.removeListener('data', handleStderr);
     };
 
     proc.stdout?.on('data', handleStdout);
@@ -469,6 +472,20 @@ export class ServerManager {
     proc.on('exit', handleExit);
 
     this.activeLaunch = launch;
+  }
+
+  private createLaunchOutputHandler(
+    launch: LocalServerLaunch,
+    logOutput: (message: string) => void,
+  ): (data: unknown) => void {
+    return (data: unknown) => {
+      const text = String(data);
+      this.pushLaunchOutput(launch, text);
+      const trimmed = text.trim();
+      if (trimmed) {
+        logOutput(trimmed);
+      }
+    };
   }
 
   private pushLaunchOutput(launch: LocalServerLaunch, chunk: string): void {
@@ -609,26 +626,51 @@ export class ServerManager {
   }
 
   private throwIfLaunchFailed(prefix: string): void {
-    if (!this.activeLaunch) {
+    const launch = this.getActiveLaunchSnapshot();
+    if (!launch) {
       return;
     }
 
-    if (this.activeLaunch.error) {
-      throw this.buildLaunchFailureError(`${prefix}: ${this.activeLaunch.error.message}`);
+    if (launch.error) {
+      throw this.buildLaunchFailureError(`${prefix}: ${launch.error.message}`, launch);
     }
 
-    if (this.activeLaunch.exited) {
-      const suffix = this.activeLaunch.exitCode !== null
-        ? ` (exit code ${this.activeLaunch.exitCode})`
-        : this.activeLaunch.signal
-          ? ` (signal ${this.activeLaunch.signal})`
-          : '';
-      throw this.buildLaunchFailureError(`${prefix}${suffix}`);
+    if (launch.exited) {
+      throw this.buildLaunchFailureError(`${prefix}${this.getLaunchExitSuffix(launch)}`, launch);
     }
   }
 
-  private buildLaunchFailureError(message: string): Error {
-    const output = this.formatLaunchOutputTail();
+  private getActiveLaunchSnapshot(): LocalServerLaunchSnapshot | null {
+    if (!this.activeLaunch) {
+      return null;
+    }
+
+    return {
+      outputTail: [...this.activeLaunch.outputTail],
+      exited: this.activeLaunch.exited,
+      exitCode: this.activeLaunch.exitCode,
+      signal: this.activeLaunch.signal,
+      error: this.activeLaunch.error,
+    };
+  }
+
+  private getLaunchExitSuffix(launch: LocalServerLaunchSnapshot): string {
+    if (launch.exitCode !== null) {
+      return ` (exit code ${launch.exitCode})`;
+    }
+
+    if (launch.signal) {
+      return ` (signal ${launch.signal})`;
+    }
+
+    return '';
+  }
+
+  private buildLaunchFailureError(
+    message: string,
+    launch: LocalServerLaunchSnapshot | null = this.getActiveLaunchSnapshot(),
+  ): Error {
+    const output = this.formatLaunchOutputTail(launch);
     if (!output) {
       return new Error(message);
     }
@@ -636,8 +678,8 @@ export class ServerManager {
     return new Error(`${message}\nServer output:\n${output}`);
   }
 
-  private formatLaunchOutputTail(): string {
-    const output = this.activeLaunch?.outputTail.join('').trim() ?? '';
+  private formatLaunchOutputTail(launch: LocalServerLaunchSnapshot | null = this.getActiveLaunchSnapshot()): string {
+    const output = launch?.outputTail.join('').trim() ?? '';
     if (!output) {
       return '';
     }
@@ -709,10 +751,7 @@ export class ServerManager {
       case 'restart-managed':
         logger.debug('Restarting stale managed OpenCode server on port', this.config.local.port);
         await this.restartManagedServer();
-        await this.spawnServer();
-        await this.waitForHealthy(this.config.timeout ?? 30000);
-        this.setStatus('running');
-        new Notice('OpenCode server started');
+        await this.launchLocalServerRuntime();
         return;
       case 'recycle-orphan':
         logger.warn('Recycling orphaned OpenCode sidecar on default plugin endpoint', {
@@ -721,11 +760,7 @@ export class ServerManager {
           pid: resolution.existingServer.pid,
         });
         await this.recycleUnknownLocalServer(resolution.existingServer);
-        await this.spawnServer();
-        await this.waitForHealthy(this.config.timeout ?? 30000);
-        this.setDiagnostics(this.buildOrphanRestartDiagnostics(resolution.existingServer));
-        this.setStatus('running');
-        new Notice('OpenCode server started');
+        await this.launchLocalServerRuntime(this.buildOrphanRestartDiagnostics(resolution.existingServer));
         return;
       case 'conflict':
         this.setDiagnostics(resolution.diagnostics);

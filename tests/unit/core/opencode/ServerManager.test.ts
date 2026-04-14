@@ -14,7 +14,11 @@ jest.mock('obsidian', () => ({
 }));
 
 const { requestUrl: mockRequestUrl } = jest.requireMock('obsidian') as {
+  Notice: jest.Mock;
   requestUrl: jest.Mock;
+};
+const { Notice: mockNotice } = jest.requireMock('obsidian') as {
+  Notice: jest.Mock;
 };
 const { spawn: mockSpawn } = jest.requireMock('child_process') as {
   spawn: jest.Mock;
@@ -472,6 +476,53 @@ describe('ServerManager', () => {
 
       expect(terminateManagedPidSync).toHaveBeenCalledWith(2468);
       expect(manager.getStatus()).toBe('stopped');
+    });
+  });
+
+  describe('launch runtime seam', () => {
+    it('centralizes successful local launch completion and optional diagnostics', async () => {
+      const successDiagnostics = {
+        reason: 'local-orphan-restarted' as const,
+        host: '127.0.0.1',
+        port: 4196,
+        pid: 5678,
+        message: 'Detected and restarted an orphaned plugin sidecar.',
+      };
+      const spawnServer = jest.spyOn(manager as never, 'spawnServer').mockResolvedValue(undefined);
+      const waitForHealthy = jest.spyOn(manager as never, 'waitForHealthy').mockResolvedValue(undefined);
+
+      await expect((manager as never).launchLocalServerRuntime(successDiagnostics)).resolves.toBeUndefined();
+
+      expect(spawnServer).toHaveBeenCalled();
+      expect(waitForHealthy).toHaveBeenCalledWith(30000);
+      expect(manager.getServerDiagnosticsSnapshot()).toMatchObject(successDiagnostics);
+      expect(manager.getStatus()).toBe('running');
+      expect(mockNotice).toHaveBeenCalledWith('OpenCode server started');
+    });
+
+    it('formats launch failures from an immutable launch snapshot', () => {
+      const activeLaunch = {
+        outputTail: ['boot log\n'],
+        exited: true,
+        exitCode: 1,
+        signal: null,
+        error: null,
+        cleanup: jest.fn(),
+      };
+      (manager as unknown as { activeLaunch: typeof activeLaunch }).activeLaunch = activeLaunch;
+
+      const snapshot = (manager as never).getActiveLaunchSnapshot() as { outputTail: string[] } | null;
+      expect(snapshot).not.toBeNull();
+      if (!snapshot) {
+        return;
+      }
+
+      activeLaunch.outputTail.push('mutated later\n');
+
+      const error = (manager as never).buildLaunchFailureError('Launch failed', snapshot) as Error;
+
+      expect(error.message).toContain('boot log');
+      expect(error.message).not.toContain('mutated later');
     });
   });
 
