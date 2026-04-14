@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的 `[NEXT]`”。L5 完成后必须暂停复盘，不得自动扩展新队列。
-> **当前状态**: [CONFIRMED_NEXT_BATCH] L1-L5 已确认；`L1 - ESLint autofix sweep` 与 `L2 - Non-autofix error cleanup` 已完成，当前可自动执行的 `[NEXT]` 是 `L3 - Lint green checkpoint`。
+> **当前状态**: [CONFIRMED_NEXT_BATCH] L1-L5 已确认；`L1 - ESLint autofix sweep`、`L2 - Non-autofix error cleanup` 与 `L3 - Lint green checkpoint` 已完成，当前可自动执行的 `[NEXT]` 是 `L4 - High-value warning trim`。
 
 ## 控制规则
 
@@ -755,7 +755,7 @@
   - `npm run lint` 不再包含 error。
   - 运行 `npm test`、`npm run build`。
 
-### [NEXT] L3 - Lint green checkpoint
+### [DONE] L3 - Lint green checkpoint
 
 - **Lane**: Checkpoint
 - **目标**: 确认 `npm run lint` 已至少 errors 为 0，并记录剩余 warning 的真实分布。
@@ -771,7 +771,7 @@
   - phase 文档给出 lint 绿灯证据和 warning 热点清单。
   - 运行 `npm run lint`、`npm test`、`npm run build`。
 
-### [QUEUED] L4 - High-value warning trim
+### [NEXT] L4 - High-value warning trim
 
 - **Lane**: Lint cleanup / maintainability prep
 - **目标**: 只处理高价值 warnings，优先明显干扰可维护性的 complexity / no-empty-object-type / no-unused-vars / max-params；避免为清 warning 制造微碎片。
