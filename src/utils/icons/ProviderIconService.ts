@@ -108,6 +108,26 @@ interface ResolvedProviderIconAsset {
   sourceLabel: string;
 }
 
+interface ProviderIconEntryResolution {
+  defaultEntry: ProviderIconEntry | null;
+  editableEntries: ProviderIconEntry[];
+  effectiveEntries: ProviderIconEntry[];
+  requestedProviderId: string;
+  resolvedProviderId: string | null;
+  selectedEntry: ProviderIconEntry | null;
+  storageProviderId: string;
+}
+
+interface ProviderIconEntryPreviewMetadata {
+  fallbackUsed: boolean;
+  iconId: string | null;
+  iconUrl: string | null;
+  requestedVariant?: LobehubIconVariant;
+  resolvedFormat?: ProviderIconResolvedFormat;
+  resolvedVariant?: ResolvedLobehubVariant;
+  sourceLabel: string;
+}
+
 interface NormalizedCustomSource {
   type: 'url' | 'file';
   source: string;
@@ -183,7 +203,7 @@ export class ProviderIconService {
     library: ProviderIconLibrary = {},
     options: ResolveIconUrlOptions = {},
   ): Promise<string | null> {
-    const entry = this.getEffectiveEntries(providerId, library)[0] ?? null;
+    const entry = this.resolveProviderEntryResolution(providerId, library)?.selectedEntry ?? null;
     if (!entry) {
       if (loggedIconUrls.get(providerId) !== null) {
         logger.debug(`No icon found for: ${providerId}`);
@@ -318,18 +338,16 @@ export class ProviderIconService {
     library,
     variant = 'auto',
   }: SelectBuiltinIconRequest): ProviderIconLibrary {
-    const trimmedProviderId = providerId.trim();
-    if (!trimmedProviderId) {
-      return library;
-    }
-
     const builtinDefinition = getBuiltinIcon(libraryId, iconId);
     if (!builtinDefinition) {
       return library;
     }
 
-    const resolvedProviderId = this.resolveLibraryProviderId(trimmedProviderId, library) ?? trimmedProviderId;
-    const existingEntries = this.getEditableEntriesForProvider(resolvedProviderId, library);
+    const resolution = this.resolveProviderEntryResolution(providerId, library);
+    if (!resolution) {
+      return library;
+    }
+
     const selectedEntry = this.createBuiltinEntry(
       libraryId,
       iconId,
@@ -337,16 +355,18 @@ export class ProviderIconService {
       libraryId === 'lobehub' ? variant : 'auto',
     );
 
-    const dedupedEntries = existingEntries.filter((entry) => !this.areEquivalentEntries(entry, selectedEntry));
+    const dedupedEntries = resolution.editableEntries.filter(
+      (entry) => !this.areEquivalentEntries(entry, selectedEntry),
+    );
     return this.updateProviderEntries(
-      resolvedProviderId,
+      resolution.storageProviderId,
       [selectedEntry, ...dedupedEntries],
       library,
     );
   }
 
   static getSelectedBuiltinSource(providerId: string, library: ProviderIconLibrary = {}): string | null {
-    const selectedEntry = this.getEffectiveEntries(providerId, library)[0] ?? null;
+    const selectedEntry = this.resolveProviderEntryResolution(providerId, library)?.selectedEntry ?? null;
     if (!selectedEntry) {
       return null;
     }
@@ -363,7 +383,7 @@ export class ProviderIconService {
   }
 
   static getSelectedBuiltinVariant(providerId: string, library: ProviderIconLibrary = {}): LobehubIconVariant {
-    const selectedEntry = this.getEffectiveEntries(providerId, library)[0] ?? null;
+    const selectedEntry = this.resolveProviderEntryResolution(providerId, library)?.selectedEntry ?? null;
     if (!selectedEntry) {
       return this.getActiveDefaultVariant();
     }
@@ -427,18 +447,14 @@ export class ProviderIconService {
     let nextLibrary = { ...library };
 
     for (const providerId of this.uniqueProviderIds(providerIds)) {
-      if (this.resolveLibraryProviderId(providerId, nextLibrary)) {
-        continue;
-      }
-
-      const defaultEntry = this.getDefaultEntry(providerId);
-      if (!defaultEntry) {
+      const resolution = this.resolveProviderEntryResolution(providerId, nextLibrary);
+      if (!resolution || resolution.resolvedProviderId || !resolution.defaultEntry) {
         continue;
       }
 
       nextLibrary = {
         ...nextLibrary,
-        [providerId]: [defaultEntry],
+        [resolution.storageProviderId]: [resolution.defaultEntry],
       };
     }
 
@@ -451,20 +467,19 @@ export class ProviderIconService {
     sourceInput: string,
     library: ProviderIconLibrary,
   ): Promise<ProviderIconLibrary> {
-    const normalizedProviderId = providerId.trim();
-    if (!normalizedProviderId) {
+    const resolution = this.resolveProviderEntryResolution(providerId, library);
+    if (!resolution) {
       throw new Error('Provider ID is required.');
     }
 
-    const storedProviderId = this.resolveLibraryProviderId(normalizedProviderId, library) ?? normalizedProviderId;
     const normalizedSource = this.normalizeCustomSource(sourceInput);
-    const existingEntries = this.getEffectiveEntries(storedProviderId, library);
+    const existingEntries = this.getEffectiveEntries(resolution.storageProviderId, library);
     if (existingEntries.some((entry) => entry.type !== 'mapped' && entry.source === normalizedSource.source)) {
       throw new Error('This icon source has already been added for the provider.');
     }
 
     const asset = await this.loadCustomSourceAsset(normalizedSource);
-    const cacheFileName = this.buildCustomCacheFileName(normalizedProviderId, asset.mimeType);
+    const cacheFileName = this.buildCustomCacheFileName(resolution.requestedProviderId, asset.mimeType);
     const entry: ProviderIconEntry = {
       id: this.createEntryId(),
       type: normalizedSource.type,
@@ -476,11 +491,11 @@ export class ProviderIconService {
     };
 
     await this.writeCachedAsset(app, normalizePath(`${ICON_CACHE_DIR}/${cacheFileName}`), asset.data);
-    failedIconIds.delete(this.getEntryRuntimeKey(normalizedProviderId, entry));
+    failedIconIds.delete(this.getEntryRuntimeKey(resolution.requestedProviderId, entry));
 
     return {
       ...library,
-      [storedProviderId]: [...existingEntries, entry],
+      [resolution.storageProviderId]: [...existingEntries, entry],
     };
   }
 
@@ -503,11 +518,10 @@ export class ProviderIconService {
     entries: ProviderIconEntry[],
     library: ProviderIconLibrary,
   ): ProviderIconLibrary {
-    const requestedProviderId = providerId.trim();
-    if (!requestedProviderId) {
+    const resolution = this.resolveProviderEntryResolution(providerId, library);
+    if (!resolution) {
       return library;
     }
-    const normalizedProviderId = this.resolveLibraryProviderId(requestedProviderId, library) ?? requestedProviderId;
 
     const sanitizedEntries = entries.filter((entry, index, collection) =>
       Boolean(entry.id)
@@ -517,13 +531,13 @@ export class ProviderIconService {
 
     if (sanitizedEntries.length === 0) {
       const nextLibrary = { ...library };
-      delete nextLibrary[normalizedProviderId];
+      delete nextLibrary[resolution.storageProviderId];
       return nextLibrary;
     }
 
     return {
       ...library,
-      [normalizedProviderId]: sanitizedEntries,
+      [resolution.storageProviderId]: sanitizedEntries,
     };
   }
 
@@ -532,8 +546,12 @@ export class ProviderIconService {
     entryId: string,
     library: ProviderIconLibrary,
   ): ProviderIconLibrary {
-    const resolvedProviderId = this.resolveLibraryProviderId(providerId, library) ?? providerId;
-    const nextEntries = (library[resolvedProviderId] ?? []).filter((entry) => entry.id !== entryId);
+    const resolution = this.resolveProviderEntryResolution(providerId, library);
+    if (!resolution) {
+      return library;
+    }
+
+    const nextEntries = (library[resolution.storageProviderId] ?? []).filter((entry) => entry.id !== entryId);
     return this.updateProviderEntries(providerId, nextEntries, library);
   }
 
@@ -587,8 +605,8 @@ export class ProviderIconService {
     let failed = 0;
 
     for (const providerId of uniqueProviderIds) {
-      const entries = this.getEffectiveEntries(providerId, library);
-      if (entries.length === 0) {
+      const resolution = this.resolveProviderEntryResolution(providerId, library);
+      if (!resolution?.selectedEntry) {
         continue;
       }
 
@@ -645,29 +663,24 @@ export class ProviderIconService {
     library: ProviderIconLibrary,
     isCurrentProvider: boolean,
   ): Promise<ProviderIconCacheEntry[]> {
-    const entries = this.getEffectiveEntries(providerId, library);
+    const entries = this.resolveProviderEntryResolution(providerId, library)?.effectiveEntries ?? [];
     return Promise.all(entries.map(async (entry, index) => {
       const asset = await this.resolveEntryAsset(app, providerId, entry, { cacheOnly: true });
+      const preview = this.resolveEntryPreviewMetadata(app, entry, asset);
       return {
         providerId,
         entry,
-        iconId: asset?.iconId ?? (
-          entry.type === 'mapped'
-            ? entry.source
-            : entry.type === 'builtin'
-              ? (parseBuiltinSource(entry.source)?.iconId ?? null)
-              : null
-        ),
+        iconId: preview.iconId,
         cached: asset?.cached ?? false,
         cachePath: asset?.cachePath ?? this.getCachePathForEntry(entry),
-        iconUrl: asset?.iconUrl ?? this.getPreviewUrlForEntry(app, entry),
+        iconUrl: preview.iconUrl,
         isCurrentProvider,
         isSelected: index === 0,
-        requestedVariant: asset?.requestedVariant ?? entry.variant,
-        resolvedVariant: asset?.resolvedVariant,
-        resolvedFormat: asset?.resolvedFormat,
-        fallbackUsed: asset?.fallbackUsed ?? false,
-        sourceLabel: asset?.sourceLabel ?? this.getEntrySourceLabel(entry),
+        requestedVariant: preview.requestedVariant,
+        resolvedVariant: preview.resolvedVariant,
+        resolvedFormat: preview.resolvedFormat,
+        fallbackUsed: preview.fallbackUsed,
+        sourceLabel: preview.sourceLabel,
       } satisfies ProviderIconCacheEntry;
     }));
   }
@@ -676,22 +689,7 @@ export class ProviderIconService {
     providerId: string,
     library: ProviderIconLibrary,
   ): ProviderIconEntry[] {
-    const resolvedProviderId = this.resolveLibraryProviderId(providerId, library);
-    const savedEntries = resolvedProviderId ? (library[resolvedProviderId] ?? []) : [];
-    if (savedEntries.length === 0) {
-      const defaultEntry = this.getDefaultEntry(providerId);
-      return defaultEntry ? [defaultEntry] : [];
-    }
-
-    const defaultEntry = this.getDefaultEntry(providerId);
-    const hasEquivalentDefaultEntry = defaultEntry
-      ? savedEntries.some((entry) => this.areEquivalentEntries(entry, defaultEntry))
-      : false;
-    if (!defaultEntry || hasEquivalentDefaultEntry) {
-      return [...savedEntries];
-    }
-
-    return [...savedEntries, defaultEntry];
+    return this.resolveProviderEntryResolution(providerId, library)?.effectiveEntries ?? [];
   }
 
   private static getDefaultEntry(providerId: string): ProviderIconEntry | null {
@@ -1413,6 +1411,34 @@ export class ProviderIconService {
     return entry.source;
   }
 
+  private static resolveEntryPreviewMetadata(
+    app: App,
+    entry: ProviderIconEntry,
+    asset: ResolvedProviderIconAsset | null,
+  ): ProviderIconEntryPreviewMetadata {
+    return {
+      fallbackUsed: asset?.fallbackUsed ?? false,
+      iconId: asset?.iconId ?? this.getEntryIconId(entry),
+      iconUrl: asset?.iconUrl ?? this.getPreviewUrlForEntry(app, entry),
+      requestedVariant: asset?.requestedVariant ?? entry.variant,
+      resolvedFormat: asset?.resolvedFormat,
+      resolvedVariant: asset?.resolvedVariant,
+      sourceLabel: asset?.sourceLabel ?? this.getEntrySourceLabel(entry),
+    };
+  }
+
+  private static getEntryIconId(entry: ProviderIconEntry): string | null {
+    if (entry.type === 'mapped') {
+      return entry.source;
+    }
+
+    if (entry.type === 'builtin') {
+      return parseBuiltinSource(entry.source)?.iconId ?? null;
+    }
+
+    return null;
+  }
+
   private static getPreviewUrlForEntry(app: App, entry: ProviderIconEntry): string | null {
     if (entry.type === 'mapped') {
       return this.getPreviewUrlForLobehubIcon(entry.source, entry.variant ?? 'auto')?.previewUrl ?? null;
@@ -1813,19 +1839,6 @@ export class ProviderIconService {
     );
   }
 
-  private static getEditableEntriesForProvider(
-    providerId: string,
-    library: ProviderIconLibrary,
-  ): ProviderIconEntry[] {
-    const currentEntries = library[providerId];
-    if (currentEntries?.length) {
-      return [...currentEntries];
-    }
-
-    const defaultEntry = this.getDefaultEntry(providerId);
-    return defaultEntry ? [defaultEntry] : [];
-  }
-
   private static getRecommendedBuiltinIcons(
     providerId: string,
     libraryId?: BuiltinIconLibraryId,
@@ -1899,6 +1912,47 @@ export class ProviderIconService {
     }
 
     return null;
+  }
+
+  private static resolveProviderEntryResolution(
+    providerId: string,
+    library: ProviderIconLibrary,
+  ): ProviderIconEntryResolution | null {
+    const requestedProviderId = providerId.trim();
+    if (!requestedProviderId) {
+      return null;
+    }
+
+    const resolvedProviderId = this.resolveLibraryProviderId(requestedProviderId, library);
+    const storageProviderId = resolvedProviderId ?? requestedProviderId;
+    const savedEntries = resolvedProviderId ? [...(library[resolvedProviderId] ?? [])] : [];
+    const defaultEntry = this.getDefaultEntry(requestedProviderId);
+    const effectiveEntries = this.mergeDefaultEntry(savedEntries, defaultEntry);
+
+    return {
+      defaultEntry,
+      editableEntries: savedEntries.length > 0 ? savedEntries : (defaultEntry ? [defaultEntry] : []),
+      effectiveEntries,
+      requestedProviderId,
+      resolvedProviderId,
+      selectedEntry: effectiveEntries[0] ?? null,
+      storageProviderId,
+    };
+  }
+
+  private static mergeDefaultEntry(
+    entries: ProviderIconEntry[],
+    defaultEntry: ProviderIconEntry | null,
+  ): ProviderIconEntry[] {
+    if (!defaultEntry) {
+      return [...entries];
+    }
+
+    if (entries.some((entry) => this.areEquivalentEntries(entry, defaultEntry))) {
+      return [...entries];
+    }
+
+    return [...entries, defaultEntry];
   }
 
   private static getCanonicalProviderKey(providerId: string): string {

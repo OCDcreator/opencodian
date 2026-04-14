@@ -2,11 +2,11 @@
 
 > **状态**: [READY]
 > **作用**: 这是 maintainability 无人值守的战略文档。每轮开始前，先读本文件，再读 `docs/status/maintainability-round-roadmap.md` 与最近的 `docs/status/maintainability-phase-XXX.md`。
-> **自动推进状态**: `R61` 已完成 OpenCodeMessageNormalizationMapper context attachment and OMO seam；当前首个 `[NEXT]` 为 `R62 - ProviderIconService default and effective entry resolution seam`，恢复运行时必须继续按 roadmap 队列顺序执行，不允许 freestyle。
+> **自动推进状态**: `R62` 已完成 ProviderIconService default and effective entry resolution seam；当前首个 `[NEXT]` 为 `R63 - ProviderIconService asset loading and custom cache seam`，恢复运行时必须继续按 roadmap 队列顺序执行，不允许 freestyle。
 
 ## 1. 当前判断
 
-**当前分支已完成 `R61`，把 `OpenCodeMessageNormalizationMapper` 的 text-part normalization、file/context attachment、inline Read parsing 与 OMO content normalization 收口到同文件内的 context/OMO seam。** 当前 lint 基线保持在 `0 errors / 92 warnings`，settings 残余 seam、`ServerManager` shutdown 热点、`ModelConfigService` 两个 config/catalog 切口与 mapper 两个高确定性 seam 已收尾；接下来应继续按 queue 推进 `ProviderIconService` 热点，再推进显式 warning reduction。
+**当前分支已完成 `R62`，把 `ProviderIconService` 的 default/editable/effective entry 决策、library provider-id 映射与 preview metadata 装配收口到同文件内的 entry-resolution seam。** 当前 lint 基线保持在 `0 errors / 92 warnings`，settings 残余 seam、`ServerManager` shutdown 热点、`ModelConfigService` 两个 config/catalog 切口、mapper seam 与 icon entry seam 已收尾；接下来应继续按 queue 推进 `ProviderIconService` 的 asset/cache 热点，再推进显式 warning reduction。
 
 这批夜间队列的主线是：
 
@@ -19,15 +19,15 @@
 
 - **lint**: `0 errors / 92 warnings`
 - **验证**:
-  - 最近一次已确认的全量测试为 `R61`：`npm test` 通过，`262 passed, 262 total` suites；`1123 passed, 1123 total` tests
-  - 最近一次已确认的构建通过为 `R61`：`npm run build`，`BUILD_ID` `autopilot-maintainability.202604150526`
-  - 最近一次 Test Vault 部署仍来自 `R54`；`R61` 仅触及 `src/core/opencode/OpenCodeMessageNormalizationMapper.ts`、直接相关测试与状态/模块文档，不属于强制部署范围
+  - 最近一次已确认的全量测试为 `R62`：`npm test` 通过，`262 passed, 262 total` suites；`1125 passed, 1125 total` tests
+  - 最近一次已确认的构建通过为 `R62`：`npm run build`，`BUILD_ID` `autopilot-maintainability.202604150536`
+  - 最近一次 Test Vault 部署仍来自 `R54`；`R62` 仅触及 `src/utils/icons/ProviderIconService.ts`、直接相关测试与状态/模块文档，不属于强制部署范围
 - **本批目标**:
   - 保持 `0 errors`
   - 在保持受控 queue 的前提下继续做高确定性 maintainability seam
   - 把 warning baseline 从当前 `92` 继续往低八十区间推进；若未达成，`R67` checkpoint 必须明确说明剩余高成本阻塞
 - **下一批高确定性切口**:
-  - `R62-R63`: `ProviderIconService` 热点
+  - `R63`: `ProviderIconService` asset/cache 热点
   - `R64-R66`: warning cleanup batches
   - `R67`: checkpoint
 - **历史摘要**: 见 `docs/status/maintainability-completed-batches.md`
@@ -57,6 +57,7 @@
 - **R59**: `ModelConfigService` 现在通过 `modelConfig.ts` 的 runtime/server catalog assembly、effective catalog assembly 与 provider probe planning seam 统一处理 server catalog merge、default model resolution 与 probe 状态计划，并补齐直接相关测试与模块文档
 - **R60**: `OpenCodeMessageNormalizationMapper` 现在通过同文件内的 tool/content seam 统一处理 renderable tool part collection、pending tool-call assembly、historical `tool_use` block 构造与 renderable content assembly，并补齐直接相关测试与模块文档
 - **R61**: `OpenCodeMessageNormalizationMapper` 现在通过同文件内的 context/OMO seam 统一处理 text-part normalization、file/context attachment、inline Read parsing、attachment dedupe 与 OMO metadata 归一化，并补齐直接相关测试与模块文档
+- **R62**: `ProviderIconService` 现在通过同文件内的 entry-resolution seam 统一处理 default/editable/effective entry 决策、canonical provider-id 映射与 cache preview metadata 装配，并补齐直接相关测试与模块文档
 
 ## 4. 本批结论
 

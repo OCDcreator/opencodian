@@ -222,6 +222,41 @@ describe('ProviderIconService', () => {
     });
   });
 
+  it('keeps effective default mapped entries alongside saved custom entries', async () => {
+    const adapter = createMockAdapter();
+    const app = createMockApp(adapter);
+    const { ProviderIconService } = await import('../../../../src/utils/icons/ProviderIconService');
+
+    const state = await ProviderIconService.getProviderCacheState(app as never, ['deepseek'], {
+      deepseek: [
+        {
+          id: 'custom-1',
+          type: 'url',
+          source: 'https://example.com/deepseek.svg',
+          mimeType: 'image/svg+xml',
+          addedAt: 1,
+        },
+      ],
+    });
+
+    expect(state.providers).toHaveLength(1);
+    expect(state.providers[0].entries).toHaveLength(2);
+    expect(state.providers[0].entries[0]).toMatchObject({
+      iconId: null,
+      iconUrl: 'https://example.com/deepseek.svg',
+      isSelected: true,
+    });
+    expect(state.providers[0].entries[1]).toMatchObject({
+      iconId: 'deepseek',
+      isSelected: false,
+    });
+    expect(state.providers[0].entries[1].entry).toMatchObject({
+      type: 'mapped',
+      source: 'deepseek',
+    });
+    expect(state.providers[0].entries[1].iconUrl).toContain('/deepseek.svg');
+  });
+
   it('accepts builtin provider icon entries during normalization', () => {
     const normalized = normalizeProviderIconLibrary({
       requesty: [
@@ -460,6 +495,39 @@ describe('ProviderIconService', () => {
       source: 'lobehub:deepseek',
     });
     expect(twice.deepseek).toHaveLength(1);
+  });
+
+  it('updates the canonical saved provider entry when builtin selection uses an alias id', async () => {
+    const { ProviderIconService } = await import('../../../../src/utils/icons/ProviderIconService');
+
+    const nextLibrary = ProviderIconService.selectBuiltinIcon({
+      providerId: 'code xzh',
+      libraryId: 'opencode',
+      iconId: 'requesty',
+      library: {
+        codexzh: [
+          {
+            id: 'custom-1',
+            type: 'file',
+            source: 'C:\\Users\\lt\\Downloads\\codex.svg',
+            mimeType: 'image/svg+xml',
+            cacheFileName: 'codexzh-custom.svg',
+            addedAt: 1,
+          },
+        ],
+      },
+    });
+
+    expect(Object.keys(nextLibrary)).toEqual(['codexzh']);
+    expect(nextLibrary.codexzh).toHaveLength(2);
+    expect(nextLibrary.codexzh?.[0]).toMatchObject({
+      type: 'builtin',
+      source: 'opencode:requesty',
+    });
+    expect(nextLibrary.codexzh?.[1]).toMatchObject({
+      type: 'file',
+      source: 'C:\\Users\\lt\\Downloads\\codex.svg',
+    });
   });
 
   it('clears cached files without deleting provider library metadata', async () => {

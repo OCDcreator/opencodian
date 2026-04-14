@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的 `[NEXT]`”。
-> **当前状态**: [READY] `R61` OpenCodeMessageNormalizationMapper context attachment and OMO seam 已完成，当前首个 `[NEXT]` 为 `R62 - ProviderIconService default and effective entry resolution seam`；必须继续按 `R62-R67` 顺序执行。
+> **当前状态**: [READY] `R62` ProviderIconService default and effective entry resolution seam 已完成，当前首个 `[NEXT]` 为 `R63 - ProviderIconService asset loading and custom cache seam`；必须继续按 `R63-R67` 顺序执行。
 
 ## 控制规则
 
@@ -16,7 +16,7 @@
 ## 当前背景
 
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
-- 最近成功 phase：`docs/status/maintainability-phase-396.md`
+- 最近成功 phase：`docs/status/maintainability-phase-397.md`
 - 当前 live lint 基线：`0 errors / 92 warnings`
 - 当前路线判断：继续 provider icon 热点与显式 warning cleanup
 
@@ -311,7 +311,7 @@
   - mapper 对 context attachment / OMO normalization 的直接铺开明显减少
   - focused validation、全量 `npm test`、`npm run build` 通过
 
-### [NEXT] R62 - ProviderIconService default and effective entry resolution seam
+### [DONE] R62 - ProviderIconService default and effective entry resolution seam
 
 - **Lane**: Maintainability / provider icon entry resolution
 - **目标**: 从 `src/utils/icons/ProviderIconService.ts` 收束 default entry、editable entries、library provider id 映射、effective entry list 与 preview metadata 解析的完整 resolution seam。
@@ -329,7 +329,7 @@
   - `ProviderIconService` 对 default/effective entry resolution 的直接分支明显减少
   - focused validation、全量 `npm test`、`npm run build` 通过
 
-### [QUEUED] R63 - ProviderIconService asset loading and custom cache seam
+### [NEXT] R63 - ProviderIconService asset loading and custom cache seam
 
 - **Lane**: Maintainability / provider icon asset runtime
 - **目标**: 从 `src/utils/icons/ProviderIconService.ts` 收束 cached asset 读取、LobeHub / builtin / custom source asset loading、cache write/read 与 preview fallback 的完整 asset-runtime seam。

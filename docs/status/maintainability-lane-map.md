@@ -1,18 +1,17 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [READY] `R61` OpenCodeMessageNormalizationMapper context attachment and OMO seam 已完成；当前首个 `[NEXT]` 为 `R62 - ProviderIconService default and effective entry resolution seam`。
+> **当前状态**: [READY] `R62` ProviderIconService default and effective entry resolution seam 已完成；当前首个 `[NEXT]` 为 `R63 - ProviderIconService asset loading and custom cache seam`。
 
 ## 当前优先级
 
-- **当前 `[NEXT]`**：`R62 - ProviderIconService default and effective entry resolution seam`
+- **当前 `[NEXT]`**：`R63 - ProviderIconService asset loading and custom cache seam`
 - **本批目标**：保持 `0 errors`，settings residual seams 已完成，继续推进 server/config/icon 厚切口，最后连跑三轮 warning cleanup 与 checkpoint
 - **当前 lint 基线**：`0 errors / 92 warnings`
 - **热点顺序**：
   1. `src/utils/icons/ProviderIconService.ts`
-  2. `src/utils/icons/builtinIconRegistry.ts`
-  3. 直接相关 provider icon tests
-  4. 直接相关模块文档
+  2. 直接相关 provider icon tests
+  3. 直接相关模块文档
 
 ## 本批边界
 
@@ -36,5 +35,5 @@
 ## 历史入口
 
 - 批次归档：`docs/status/maintainability-completed-batches.md`
-- 最近成功 phase：`docs/status/maintainability-phase-396.md`
+- 最近成功 phase：`docs/status/maintainability-phase-397.md`
 - 停机线索：`automation/runtime/stop-after-next-commit.log` 与 `automation/runtime/history.jsonl` 中 round `398` 记录

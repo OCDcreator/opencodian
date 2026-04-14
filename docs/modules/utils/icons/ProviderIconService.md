@@ -7,6 +7,8 @@
 
 AI 模型提供商图标管理服务。运行时继续使用原生 `<img>`，但 LobeHub 图标的可用 variant/静态资源 URL 不再靠文件名猜测，而是读取构建期生成的 `lobehubIconManifest.ts`。服务统一管理 LobeHub CDN、插件内置 OpenCode provider 图标，以及自定义 URL/文件图标，并把解析结果缓存到本地。
 
+`R62` 后，provider library 的 default/editable/effective entry 决策、canonical provider-id 映射，以及缓存视图所需的 preview metadata 都先经过文件内的 entry-resolution seam，再交给后续 asset/cache runtime。
+
 ## 导入关系
 上游: `fs`, `path`, `obsidian` (App, normalizePath, requestUrl), `../../core/types` (ProviderIconEntry, ProviderIconLibrary), `../../shared` (createLogger)
 下游: `OpenCodianView` (图标显示), `OpenCodianSettings` / `ProviderIconCacheModal` (缓存管理)
@@ -40,6 +42,11 @@ AI 模型提供商图标管理服务。运行时继续使用原生 `<img>`，但
 2. `OpenCode` alias 命中的 `builtin`
 3. 双图库搜索命中的首个 `builtin`（同分优先 `LobeHub`）
 
+`resolveProviderEntryResolution()` 负责把上述 default entry 与已保存 library entries 合并成：
+- `editableEntries`：供设置页排序/替换时直接编辑的显式条目集
+- `effectiveEntries`：运行时实际可消费的条目集，会在需要时追加默认映射兜底
+- `storageProviderId`：沿用 library 中已有的 canonical provider key，避免 `code xzh` / `codexzh` 这类别名写出重复条目
+
 ### Manifest 驱动 variant 决策
 
 - 构建期脚本 `sync:lobehub-icons` 会把 `@lobehub/icons` 的 `toc` 与 CDN 规则固化成 `lobehubIconManifest.ts`
@@ -68,6 +75,14 @@ AI 模型提供商图标管理服务。运行时继续使用原生 `<img>`，但
 - `listBuiltinIconOptions()`：为单个 provider 生成可浏览的内置图标数据，并给出 `requestedVariant / resolvedVariant / resolvedFormat`
 - `selectBuiltinIcon()`：将选中的内置图标置顶并去重；LobeHub 条目会同时持久化显式 `variant`
 - `getSelectedBuiltinSource()`：把当前 effective 条目归一成 `libraryId:iconId`
+
+### Preview 元数据装配
+
+`resolveEntryPreviewMetadata()` 统一处理 cache state 里的：
+- `iconId` 解析（mapped/builtin/custom）
+- `iconUrl` 预览来源（缓存未命中时回退到 builtin/LobeHub preview URL）
+- `requestedVariant / resolvedVariant / resolvedFormat`
+- `fallbackUsed / sourceLabel`
 
 ### 缓存管理
 
@@ -104,12 +119,13 @@ AI 模型提供商图标管理服务。运行时继续使用原生 `<img>`，但
 getProviderCacheState(app, currentProviderIds, library)
   → mergeProviderIds() → 合并当前和历史 provider
   → 对每个 provider:
-    → getEffectiveEntries() → library entries + default entry
+    → resolveProviderEntryResolution() → canonical provider key + editable/effective entries
     → readCachedAsset() → 检查本地缓存
+    → resolveEntryPreviewMetadata() → 组装 iconId / preview / variant metadata
     → 构建 ProviderIconCacheEntry[]
 
 resolveIconUrl(app, providerId, library)
-  → getEffectiveEntries() → 取第一个 entry
+  → resolveProviderEntryResolution() → 取 selected entry
   → resolveEntryUrl()
     → 内存缓存命中? → 返回
     → readCachedAsset() → 本地文件缓存命中? → 返回 data URL
