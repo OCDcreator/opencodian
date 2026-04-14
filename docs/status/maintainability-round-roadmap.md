@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的 `[NEXT]`”。
-> **当前状态**: [QUEUED] `R40` 已完成，当前待执行队列为 `R41`；恢复 autopilot 时从 `R41` 开始。
+> **当前状态**: [DONE] `R41` 已完成；当前没有可自动执行的 `[NEXT]`。如需恢复 autopilot，必须先人工补充新的 queue。
 
 ## 控制规则
 
@@ -16,9 +16,9 @@
 ## 当前背景
 
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
-- 最近 checkpoint：`docs/status/maintainability-phase-372.md`
+- 最近 checkpoint：`docs/status/maintainability-phase-376.md`
 - 当前 lint 基线：`0 errors / 86 warnings`
-- 当前路线判断：`R40` 已把 security section lifecycle 收口到 `SettingsSecuritySection`；下一步进入 checkpoint 复盘 `R38-R40`
+- 当前路线判断：`R41` 已完成 checkpoint，当前没有可自动执行的 `[NEXT]`；继续前需人工确认新的 queue
 
 ## Queue
 
@@ -76,7 +76,7 @@
   - focused validation、全量 `npm test`、`npm run build` 通过
   - 执行 Test Vault 部署并校验 `BUILD_ID`
 
-### [NEXT] R41 - Maintainability checkpoint
+### [DONE] R41 - Maintainability checkpoint
 
 - **Lane**: Checkpoint
 - **目标**: 复盘 `R38-R40` 的 lint/owner 收益，并明确下一批是继续 settings 残余 section，还是切回 chat / opencode 主热点
@@ -91,3 +91,7 @@
   - 不自动扩展 `R42+` 或回切长串 warning cleanup
 - **验收**:
   - phase 文档明确记录 `R38-R40` 收益、当前 lint 基线与下一批建议
+
+当前没有可自动执行的 `[NEXT]`。
+
+- **人工建议方向**: 优先为 `src/features/chat/OpenCodianView.ts` 设计新的厚 owner seam queue，其次再评估 `src/core/opencode/OpenCodeService.ts`；不建议在没有新 queue 的前提下继续 freestyle 拆 settings。
