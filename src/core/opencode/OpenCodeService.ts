@@ -32,6 +32,7 @@ import {
   OpenCodeCatalogStateStore,
   type OpenCodeCatalogToolIdentityContext,
 } from './OpenCodeCatalogStateStore';
+import { OpenCodeCatalogQueryCoordinator } from './OpenCodeCatalogQueryCoordinator';
 import {
   OpenCodeContextPartSerializer,
 } from './OpenCodeContextPartSerializer';
@@ -309,6 +310,7 @@ export class OpenCodeService {
   private sdkFeatureFlags: SdkFeatureFlags;
   private syncEventRuntime: OpenCodeSyncEventRuntimeCoordinator;
   private catalogState: OpenCodeCatalogStateStore;
+  private catalogQueries: OpenCodeCatalogQueryCoordinator;
   private contextPartSerializer: OpenCodeContextPartSerializer;
   private promptRequestBuilder: OpenCodePromptRequestBuilder;
   private streamEventTransformer: OpenCodeStreamEventTransformer;
@@ -395,6 +397,23 @@ export class OpenCodeService {
         this.openCodeEventRuntime.stopSubscriptions();
       },
     });
+    this.catalogQueries = new OpenCodeCatalogQueryCoordinator(this.catalogState, {
+      shouldUseSdkCrud: () => this.shouldUseSdk('sdkCrud'),
+      getSdkFacade: (options = {}) => options.includeDirectory === false
+        ? this.getSdkFacade(options)
+        : this.sdk,
+      getLegacy: <T>(path: string, options?: { includeDirectory?: boolean }) => this.get<T>(path, options),
+      logServiceWarning: (key, message, error) => this.logServiceWarning(key, message, error),
+      logServiceError: (key, message, error) => this.logServiceError(key, message, error),
+      getDebugMetadata: () => ({
+        baseUrl: this.baseUrl,
+        vaultPath: this.vaultPath ?? null,
+        serverStatus: this.serverManager.getStatus(),
+        isManagedServerRunning: this.serverManager.isRunning(),
+        managedServerState: this.serverManager.getManagedServerStateSnapshot(),
+      }),
+      getToolCatalogScopeKey: () => `${this.baseUrl}::${this.getScopedDirectoryPath() ?? ''}`,
+    });
     this.queryGateway = new OpenCodeQueryGateway({
       getMcpSdk: () => this.sdk.mcp,
       getProviderSdk: () => this.sdk.provider,
@@ -417,14 +436,14 @@ export class OpenCodeService {
         providerID: this.settings.defaultProvider,
         modelID: this.settings.defaultModel,
       }),
-      observeRuntimeToolNames: (toolNames) => this.observeRuntimeToolNames(toolNames),
+      observeRuntimeToolNames: (toolNames) => this.catalogQueries.observeRuntimeToolNames(toolNames),
     });
     this.streamEventTransformer = new OpenCodeStreamEventTransformer({
-      observeRuntimeToolNames: (toolNames) => this.observeRuntimeToolNames(toolNames),
+      observeRuntimeToolNames: (toolNames) => this.catalogQueries.observeRuntimeToolNames(toolNames),
       getOpenCodeToolKind: (toolName) =>
         OpenCodeService.messageNormalizationMapper.getOpenCodeToolKind(
           toolName,
-          this.buildOpenCodeToolIdentityContext(),
+          this.catalogQueries.buildOpenCodeToolIdentityContext(),
         ),
       normalizeQuestionRequest: (raw) =>
         OpenCodeService.messageNormalizationMapper.normalizeQuestionRequest(raw),
@@ -446,7 +465,7 @@ export class OpenCodeService {
         return (subscription as { stream: AsyncIterable<unknown> }).stream;
       },
       hasCatalogUpdateListeners: () => this.catalogState.hasCatalogUpdateListeners(),
-      observeRuntimeToolNames: (toolNames) => this.observeRuntimeToolNames(toolNames),
+      observeRuntimeToolNames: (toolNames) => this.catalogQueries.observeRuntimeToolNames(toolNames),
       emitCatalogUpdate: () => this.catalogState.emitCatalogUpdate(),
       refreshMcpServerStatus: () => this.refreshMcpServerStatus(),
       logEventSubscriptionFailure: (source, error) =>
@@ -540,12 +559,10 @@ export class OpenCodeService {
 
   /** Set the vault path for OpenCode server to use project config */
   setVaultPath(path: string): void {
-    const previousDirectory = this.getScopedDirectoryPath();
+    const previousToolCatalogScope = this.catalogQueries.getToolCatalogScopeKey();
     this.vaultPath = path;
     this.serverManager.setWorkingDirectory(path);
-    if (previousDirectory !== this.getScopedDirectoryPath()) {
-      this.catalogState.clearToolSchemaCache();
-    }
+    this.catalogQueries.clearToolSchemaCacheIfScopeChanged(previousToolCatalogScope);
     this.syncEventRuntime.restartSubscription();
     this.openCodeEventRuntime.restartSubscriptions();
   }
@@ -844,7 +861,7 @@ export class OpenCodeService {
           typedResponse.info,
           typedResponse.parts,
           this.vaultPath,
-          this.buildOpenCodeToolIdentityContext(),
+          this.catalogQueries.buildOpenCodeToolIdentityContext(),
         );
       }
 
@@ -869,7 +886,7 @@ export class OpenCodeService {
         typedResponse.info,
         typedResponse.parts,
         this.vaultPath,
-        this.buildOpenCodeToolIdentityContext(),
+        this.catalogQueries.buildOpenCodeToolIdentityContext(),
       );
     }
 
@@ -1004,7 +1021,7 @@ export class OpenCodeService {
           continue;
         }
 
-        this.observeRuntimeToolNames([toolName]);
+        this.catalogQueries.observeRuntimeToolNames([toolName]);
       }
     }
   }
@@ -1127,14 +1144,6 @@ export class OpenCodeService {
     return null;
   }
 
-  private unwrapSdkData<T>(response: unknown): T | undefined {
-    if (response && typeof response === 'object' && 'data' in response) {
-      return (response as { data?: T }).data;
-    }
-
-    return response as T | undefined;
-  }
-
   private async delay(ms: number, signal?: AbortSignal): Promise<void> {
     if (!signal) {
       await new Promise((resolve) => setTimeout(resolve, ms));
@@ -1222,119 +1231,8 @@ export class OpenCodeService {
     return filteredMessages;
   }
 
-  private normalizeAvailableModels(
-    data: unknown,
-  ): {
-    providers: Array<{ id: string; name: string; models: Array<{ id: string; name: string; contextWindow?: number }> }>;
-    defaults: Record<string, string>;
-  } {
-    const source = this.unwrapSdkData(data) as {
-      providers?: Array<{ id: string; name?: string; models: unknown }>;
-      all?: Array<{ id: string; name?: string; models: unknown }>;
-      default?: Record<string, string>;
-    } | undefined;
-    const providers = Array.isArray(source?.providers)
-      ? source.providers
-      : Array.isArray(source?.all)
-        ? source.all
-        : [];
-
-    return {
-      providers: providers.map((provider) => {
-        let models: Array<{ id: string; name: string; contextWindow?: number }> = [];
-
-        if (Array.isArray(provider.models)) {
-          models = provider.models.map((modelId) => ({
-            id: String(modelId),
-            name: String(modelId),
-          }));
-        } else if (provider.models && typeof provider.models === 'object') {
-          models = Object.entries(
-            provider.models as Record<string, { name?: string; limit?: { context?: number } }>,
-          ).map(([id, info]) => ({
-            id,
-            name: info.name ?? id,
-            contextWindow: typeof info.limit?.context === 'number' ? info.limit.context : undefined,
-          }));
-        }
-
-        return {
-          id: provider.id,
-          name: provider.name ?? provider.id,
-          models,
-        };
-      }),
-      defaults: this.normalizeProviderDefaults(source?.default),
-    };
-  }
-
-  private normalizeProviderDefaults(source: unknown): Record<string, string> {
-    if (!source || typeof source !== 'object') {
-      return {};
-    }
-
-    const defaultRecord = source as Record<string, unknown>;
-    if (typeof defaultRecord.provider === 'string' && typeof defaultRecord.model === 'string') {
-      const providerId = defaultRecord.provider.trim();
-      const modelId = defaultRecord.model.trim();
-      return providerId && modelId
-        ? { [providerId]: modelId }
-        : {};
-    }
-
-    return Object.fromEntries(
-      Object.entries(defaultRecord)
-        .map(([providerId, modelId]) => [providerId.trim(), typeof modelId === 'string' ? modelId.trim() : ''] as const)
-        .filter(([providerId, modelId]) => providerId.length > 0 && modelId.length > 0),
-    );
-  }
-
-  private normalizeProviderDirectory(
-    data: unknown,
-  ): {
-    providers: Array<{ id: string; name: string; models: Array<{ id: string; name: string; contextWindow?: number }> }>;
-    defaults: Record<string, string>;
-    connected: string[];
-  } {
-    const source = this.unwrapSdkData(data) as {
-      connected?: unknown;
-    } | undefined;
-
-    return {
-      ...this.normalizeAvailableModels(data),
-      connected: Array.isArray(source?.connected)
-        ? source.connected.filter((item): item is string => typeof item === 'string')
-        : [],
-    };
-  }
-
-  private normalizeResolvedModelConfigData(data: unknown): OpencodeModelConfigSubset {
-    if (!data || typeof data !== 'object' || Array.isArray(data)) {
-      return {};
-    }
-
-    const record = data as Record<string, unknown>;
-    return {
-      model: typeof record.model === 'string' ? record.model : undefined,
-      small_model: typeof record.small_model === 'string' ? record.small_model : undefined,
-      provider: typeof record.provider === 'object' && record.provider !== null
-        ? record.provider as OpencodeModelConfigSubset['provider']
-        : undefined,
-      enabled_providers: Array.isArray(record.enabled_providers)
-        ? record.enabled_providers.filter((item): item is string => typeof item === 'string')
-        : undefined,
-      disabled_providers: Array.isArray(record.disabled_providers)
-        ? record.disabled_providers.filter((item): item is string => typeof item === 'string')
-        : undefined,
-    };
-  }
-
   private observeRuntimeToolNames(toolNames: Iterable<string>): boolean {
-    return this.catalogState.observeRuntimeToolNames(toolNames);
-  }
-
-  private buildOpenCodeToolIdentityContext(): OpenCodeCatalogToolIdentityContext {
-    return this.catalogState.buildToolIdentityContext();
+    return this.catalogQueries.observeRuntimeToolNames(toolNames);
   }
 
   private async *consumeLegacyEventStream(
@@ -1728,73 +1626,7 @@ export class OpenCodeService {
   async getAvailableModels(
     options: { includeDirectory?: boolean; debugReason?: string | null } = {},
   ): Promise<{ providers: Array<{ id: string; name: string; models: Array<{ id: string; name: string; contextWindow?: number }> }>; defaults: Record<string, string> }> {
-    const { includeDirectory = true, debugReason = null } = options;
-    const shouldLogDebug = typeof debugReason === 'string' && debugReason.trim().length > 0;
-    if (shouldLogDebug) {
-      logger.debug('getAvailableModels request', {
-        debugReason,
-        includeDirectory,
-        baseUrl: this.baseUrl,
-        vaultPath: this.vaultPath ?? null,
-        serverStatus: this.serverManager.getStatus(),
-        isManagedServerRunning: this.serverManager.isRunning(),
-        managedServerState: this.serverManager.getManagedServerStateSnapshot(),
-        sdkCrudEnabled: this.shouldUseSdk('sdkCrud'),
-      });
-    }
-    if (this.shouldUseSdk('sdkCrud')) {
-      try {
-        const data = await this.getSdkClient({ includeDirectory }).config.providers();
-        const normalized = this.normalizeAvailableModels(data);
-        if (shouldLogDebug) {
-          logger.debug('getAvailableModels sdk response', {
-            debugReason,
-            includeDirectory,
-            providerIds: normalized.providers.map((provider) => provider.id),
-            providerModelCounts: normalized.providers.map((provider) => ({
-              id: provider.id,
-              modelCount: provider.models.length,
-            })),
-            defaults: normalized.defaults,
-          });
-        }
-        return normalized;
-      } catch (error) {
-        this.logServiceWarning('config.providers', 'SDK config.providers failed, falling back to legacy HTTP', error);
-      }
-    }
-
-    try {
-      const data = await this.get<{ providers: Array<{ id: string; name: string; models: unknown }>; default: { provider?: string; model?: string } }>(
-        '/config/providers',
-        { includeDirectory },
-      );
-      
-
-      
-      const normalized = this.normalizeAvailableModels({
-        providers: data.providers,
-        default: data.default?.provider && data.default?.model
-          ? { [data.default.provider]: data.default.model }
-          : {},
-      });
-      if (shouldLogDebug) {
-        logger.debug('getAvailableModels legacy response', {
-          debugReason,
-          includeDirectory,
-          providerIds: normalized.providers.map((provider) => provider.id),
-          providerModelCounts: normalized.providers.map((provider) => ({
-            id: provider.id,
-            modelCount: provider.models.length,
-          })),
-          defaults: normalized.defaults,
-        });
-      }
-      return normalized;
-    } catch (error) {
-      this.logServiceError('config.providers', 'Failed to get models:', error);
-      return { providers: [], defaults: {} };
-    }
+    return this.catalogQueries.getAvailableModels(options);
   }
 
   async getProviderDirectory(
@@ -1804,125 +1636,13 @@ export class OpenCodeService {
     defaults: Record<string, string>;
     connected: string[];
   }> {
-    const { includeDirectory = true, debugReason = null } = options;
-    const shouldLogDebug = typeof debugReason === 'string' && debugReason.trim().length > 0;
-    if (shouldLogDebug) {
-      logger.debug('getProviderDirectory request', {
-        debugReason,
-        includeDirectory,
-        baseUrl: this.baseUrl,
-        vaultPath: this.vaultPath ?? null,
-        serverStatus: this.serverManager.getStatus(),
-        isManagedServerRunning: this.serverManager.isRunning(),
-        managedServerState: this.serverManager.getManagedServerStateSnapshot(),
-        sdkCrudEnabled: this.shouldUseSdk('sdkCrud'),
-      });
-    }
-
-    if (this.shouldUseSdk('sdkCrud')) {
-      try {
-        const data = await this.getSdkClient({ includeDirectory }).provider.list();
-        const normalized = this.normalizeProviderDirectory(data);
-        if (shouldLogDebug) {
-          logger.debug('getProviderDirectory sdk response', {
-            debugReason,
-            includeDirectory,
-            providerIds: normalized.providers.map((provider) => provider.id),
-            providerModelCounts: normalized.providers.map((provider) => ({
-              id: provider.id,
-              modelCount: provider.models.length,
-            })),
-            connected: normalized.connected,
-            defaults: normalized.defaults,
-          });
-        }
-        return normalized;
-      } catch (error) {
-        this.logServiceWarning('provider.list', 'SDK provider.list failed, falling back to legacy HTTP', error);
-      }
-    }
-
-    try {
-      const data = await this.get<{
-        all: Array<{ id: string; name: string; models: unknown }>;
-        default: Record<string, string>;
-        connected?: string[];
-      }>('/provider', { includeDirectory });
-      const normalized = this.normalizeProviderDirectory(data);
-      if (shouldLogDebug) {
-        logger.debug('getProviderDirectory legacy response', {
-          debugReason,
-          includeDirectory,
-          providerIds: normalized.providers.map((provider) => provider.id),
-          providerModelCounts: normalized.providers.map((provider) => ({
-            id: provider.id,
-            modelCount: provider.models.length,
-          })),
-          connected: normalized.connected,
-          defaults: normalized.defaults,
-        });
-      }
-      return normalized;
-    } catch (error) {
-      this.logServiceError('provider.list', 'Failed to get provider directory:', error);
-      return { providers: [], defaults: {}, connected: [] };
-    }
+    return this.catalogQueries.getProviderDirectory(options);
   }
 
   async getResolvedModelConfig(
     options: { includeDirectory?: boolean; debugReason?: string | null } = {},
   ): Promise<OpencodeModelConfigSubset> {
-    const { includeDirectory = true, debugReason = null } = options;
-    const shouldLogDebug = typeof debugReason === 'string' && debugReason.trim().length > 0;
-    if (shouldLogDebug) {
-      logger.debug('getResolvedModelConfig request', {
-        debugReason,
-        includeDirectory,
-        baseUrl: this.baseUrl,
-        vaultPath: this.vaultPath ?? null,
-        serverStatus: this.serverManager.getStatus(),
-        isManagedServerRunning: this.serverManager.isRunning(),
-        managedServerState: this.serverManager.getManagedServerStateSnapshot(),
-        sdkCrudEnabled: this.shouldUseSdk('sdkCrud'),
-      });
-    }
-
-    if (this.shouldUseSdk('sdkCrud')) {
-      try {
-        const data = await this.getSdkClient({ includeDirectory }).config.get();
-        const resolved = this.normalizeResolvedModelConfigData(this.unwrapSdkData(data));
-        if (shouldLogDebug) {
-          logger.debug('getResolvedModelConfig sdk response', {
-            debugReason,
-            includeDirectory,
-            providerIds: Object.keys(resolved.provider ?? {}),
-            enabledProviders: [...(resolved.enabled_providers ?? [])],
-            disabledProviders: [...(resolved.disabled_providers ?? [])],
-          });
-        }
-        return resolved;
-      } catch (error) {
-        this.logServiceWarning('config.get', 'SDK config.get failed, falling back to legacy HTTP', error);
-      }
-    }
-
-    try {
-      const data = await this.get<Record<string, unknown>>('/config', { includeDirectory });
-      const resolved = this.normalizeResolvedModelConfigData(data);
-      if (shouldLogDebug) {
-        logger.debug('getResolvedModelConfig legacy response', {
-          debugReason,
-          includeDirectory,
-          providerIds: Object.keys(resolved.provider ?? {}),
-          enabledProviders: [...(resolved.enabled_providers ?? [])],
-          disabledProviders: [...(resolved.disabled_providers ?? [])],
-        });
-      }
-      return resolved;
-    } catch (error) {
-      this.logServiceError('config.get', 'Failed to get resolved model config:', error);
-      return {};
-    }
+    return this.catalogQueries.getResolvedModelConfig(options);
   }
 
   /** Update settings */
@@ -2012,7 +1732,7 @@ export class OpenCodeService {
       nextSettings: cloneSettings(settings),
       previousMode,
       nextMode,
-      previousToolCatalogScope: this.getToolCatalogScopeKey(),
+      previousToolCatalogScope: this.catalogQueries.getToolCatalogScopeKey(),
       previousBaseUrl: this.baseUrl,
       shouldResumeSyncEvents: this.syncEventRuntime.hasListeners(),
       shouldResumeOpenCodeEvents: this.openCodeEventRuntime.hasListeners(),
@@ -2099,7 +1819,7 @@ export class OpenCodeService {
     this.settings = plan.nextSettings;
     this.baseUrl = getServerBaseUrl(plan.nextSettings.server);
     this.serverManager.updateConfig(this.buildServerConfig(plan.nextSettings));
-    this.clearToolSchemaCacheIfScopeChanged(plan.previousToolCatalogScope);
+    this.catalogQueries.clearToolSchemaCacheIfScopeChanged(plan.previousToolCatalogScope);
     this.pauseSettingsUpdateSubscriptions(plan);
   }
 
@@ -2121,16 +1841,10 @@ export class OpenCodeService {
     this.settings = plan.previousSettings;
     this.baseUrl = plan.previousBaseUrl;
     this.serverManager.updateConfig(this.buildServerConfig(plan.previousSettings));
-    this.clearToolSchemaCacheIfScopeChanged(plan.previousToolCatalogScope);
+    this.catalogQueries.clearToolSchemaCacheIfScopeChanged(plan.previousToolCatalogScope);
     this.pauseSettingsUpdateSubscriptions(plan);
     await this.restorePreviousManagedServerAfterFailedUpdate(plan);
     this.resumeSettingsUpdateSubscriptions();
-  }
-
-  private clearToolSchemaCacheIfScopeChanged(previousToolCatalogScope: string): void {
-    if (previousToolCatalogScope !== this.getToolCatalogScopeKey()) {
-      this.catalogState.clearToolSchemaCache();
-    }
   }
 
   private pauseSettingsUpdateSubscriptions(plan: OpenCodeSettingsUpdatePlan): void {
@@ -2223,8 +1937,7 @@ export class OpenCodeService {
   }
 
   async refreshToolIds(): Promise<string[]> {
-    const toolIds = await this.sdk.tool.ids();
-    return this.catalogState.updateRegistryToolIds(Array.isArray(toolIds) ? toolIds : []);
+    return this.catalogQueries.refreshToolIds();
   }
 
   async listTools(
@@ -2232,47 +1945,7 @@ export class OpenCodeService {
     modelID: string,
     options: { refresh?: boolean } = {},
   ): Promise<ToolCatalogEntry[]> {
-    const normalizedProviderID = providerID.trim();
-    const normalizedModelID = modelID.trim();
-    const modelKey = this.getToolSchemaCacheKey(normalizedProviderID, normalizedModelID);
-
-    if (!options.refresh && this.catalogState.hasToolSchemaCache(modelKey)) {
-      return this.catalogState.getToolSchemaCache(modelKey);
-    }
-
-    const response = await this.sdk.tool.list({
-      provider: normalizedProviderID,
-      model: normalizedModelID,
-    });
-    const tools = Array.isArray(response)
-      ? response.reduce<ToolCatalogEntry[]>((items, item) => {
-        if (!item || typeof item !== 'object') {
-          return items;
-        }
-
-        const candidate = item as { id?: unknown; description?: unknown; parameters?: unknown };
-        if (typeof candidate.id !== 'string' || typeof candidate.description !== 'string') {
-          return items;
-        }
-
-        items.push({
-          id: candidate.id,
-          description: candidate.description,
-          parameters: candidate.parameters,
-        });
-        return items;
-      }, [])
-      : [];
-
-    return this.catalogState.updateToolSchemaCache(modelKey, tools);
-  }
-
-  private getToolCatalogScopeKey(): string {
-    return `${this.baseUrl}::${this.getScopedDirectoryPath() ?? ''}`;
-  }
-
-  private getToolSchemaCacheKey(providerID: string, modelID: string): string {
-    return `${this.getToolCatalogScopeKey()}::${providerID}::${modelID}`;
+    return this.catalogQueries.listTools(providerID, modelID, options);
   }
 
   async refreshMcpServerStatus(): Promise<Record<string, McpServerStatus>> {
@@ -2280,7 +1953,7 @@ export class OpenCodeService {
   }
 
   getToolCatalogSnapshot(): ToolCatalogSnapshot {
-    return this.catalogState.getToolCatalogSnapshot();
+    return this.catalogQueries.getToolCatalogSnapshot();
   }
 
   getMcpServerSnapshot(): McpServerSnapshot {
@@ -2308,7 +1981,7 @@ export class OpenCodeService {
       info,
       parts,
       vaultPath,
-      this.buildOpenCodeToolIdentityContext(),
+      this.catalogQueries.buildOpenCodeToolIdentityContext(),
     );
   }
 
