@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的 `[NEXT]`”。
-> **当前状态**: [CONFIRMED_NEXT_BATCH] `W14 - BackgroundTaskTimelineService collectSegments trim` 已完成；当前可自动执行的 `[NEXT]` 是 `W15 - Warning cleanup checkpoint`。`W15` 完成后必须再次暂停并等待人工确认。
+> **当前状态**: [PAUSED_PENDING_CONFIRMATION] `W15 - Warning cleanup checkpoint` 已完成；当前没有可自动执行的 `[NEXT]`。如需继续，必须人工追加新的 queue item 并重新确认路线。
 
 ## 控制规则
 
@@ -18,10 +18,10 @@
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
 - 当前 lint 基线：`0 errors / 91 warnings`
 - checkpoint 建议：下一批继续一小批现有 owner 内的 warning cleanup，而不是自动恢复 `R33+`
-- 当前可自动执行的 `[NEXT]`：`W15 - Warning cleanup checkpoint`
+- 当前可自动执行的 `[NEXT]`：无（`W15 - Warning cleanup checkpoint` 已完成）
 - `W13` 已在 `OpenCodeMessageNormalizationMapper` 现有 owner 内收掉 `openCodeMessageToChatMessage` 的 1 条 `complexity` warning，当前 lint 基线更新为 `0 errors / 92 warnings`
 - `W14` 已在 `BackgroundTaskTimelineService` 现有 owner 内收掉 `collectSegments` 的 1 条 `complexity` warning，当前 lint 基线更新为 `0 errors / 91 warnings`
-- 当前没有后续 `[QUEUED]`；`W15` 完成后若无人追加 queue item，则必须重新写回“当前没有可自动执行的 `[NEXT]`”
+- 当前没有后续 `[QUEUED]`；本轮已按规则重新写回“当前没有可自动执行的 `[NEXT]`”
 
 ## Queue
 
@@ -182,7 +182,7 @@
   - `collectSegments` 的 `complexity` warning 消失
   - 运行 focused validation、全量 `npm test`、`npm run build`
 
-### [NEXT] W15 - Warning cleanup checkpoint
+### [DONE] W15 - Warning cleanup checkpoint
 
 - **Lane**: Checkpoint
 - **目标**: 复盘 `W12-W14` 的 warning cleanup 收益，并决定下一批是继续 warning cleanup，还是恢复新的 maintainability queue 提案准备。
@@ -200,4 +200,4 @@
 
 ## 当前自动队列状态
 
-当前可自动执行的 `[NEXT]` 是 `W15 - Warning cleanup checkpoint`。当前没有后续 `[QUEUED]`；`W15` 完成后若没有新的人工追加 queue item，则必须重新写明“当前没有可自动执行的 `[NEXT]`”。
+当前没有可自动执行的 `[NEXT]`。`W15 - Warning cleanup checkpoint` 已完成，且当前没有后续 `[QUEUED]`；如需继续，必须先由人工追加新的 queue item，再重新指定 `[NEXT]`。

@@ -1,12 +1,12 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [CONFIRMED_NEXT_BATCH] `W14 - BackgroundTaskTimelineService collectSegments trim` 已完成；当前 `[NEXT]` 是 `W15 - Warning cleanup checkpoint`。`W15` 完成后若无人工追加队列，则再次暂停。
+> **当前状态**: [PAUSED_PENDING_CONFIRMATION] `W15 - Warning cleanup checkpoint` 已完成；当前没有可自动执行的 `[NEXT]`，等待人工追加队列后再继续。
 
 ## 当前优先级
 
-- **当前 `[NEXT]`**：`W15 - Warning cleanup checkpoint`
-- **本批目标**：复盘 `W12-W14` 的 warning cleanup 收益，并决定下一批是否继续 warning cleanup 或准备新的 maintainability queue 提案
+- **当前 `[NEXT]`**：无（`W15 - Warning cleanup checkpoint` 已完成）
+- **本批目标**：`W12-W14` 的 warning cleanup 收益已完成复盘；自动推进当前暂停，等待人工决定是继续 warning cleanup 还是准备新的 maintainability queue 提案
 - **当前 lint 基线**：`0 errors / 91 warnings`
 - **本批热点顺序**：
   1. `docs/status/maintainability-master-plan.md`
@@ -14,7 +14,7 @@
   3. `docs/status/maintainability-lane-map.md`
   4. `docs/status/maintainability-phase-366.md`
   5. 最新 lint 输出
-- **下一暂停点**：`W15 - Warning cleanup checkpoint`；完成后若无人工追加 queue item，则重新停回无 `[NEXT]` 状态
+- **下一暂停点**：已到达 `W15 - Warning cleanup checkpoint`；当前已重新停回无 `[NEXT]` 状态
 - **观察但暂不自动切入**：`src/features/settings/OpenCodianSettings.ts`、`tests/unit/core/opencode/OpenCodeService.test.ts`
 
 ## 本批边界
