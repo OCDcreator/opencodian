@@ -416,13 +416,13 @@ export class ProviderIconCacheModal extends Modal {
       providerId,
       library: this.plugin.settings.providerIconLibrary,
       onChoose: async ({ libraryId, iconId, variant }) => {
-        this.plugin.settings.providerIconLibrary = ProviderIconService.selectBuiltinIcon(
+        this.plugin.settings.providerIconLibrary = ProviderIconService.selectBuiltinIcon({
           providerId,
           libraryId,
           iconId,
-          this.plugin.settings.providerIconLibrary,
+          library: this.plugin.settings.providerIconLibrary,
           variant,
-        );
+        });
         const restoreState = this.captureScrollRestoreState(providerId);
         await this.persistLibrary();
         await this.render(restoreState);

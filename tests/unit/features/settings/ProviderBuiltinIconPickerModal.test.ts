@@ -63,7 +63,13 @@ describe('ProviderBuiltinIconPickerModal', () => {
   it('filters LobeHub cards by requested variant and emits that variant', async () => {
     const onChoose = jest.fn().mockResolvedValue(undefined);
     const app = createApp();
-    const library = ProviderIconService.selectBuiltinIcon('adobe', 'lobehub', 'adobe', {}, 'color');
+    const library = ProviderIconService.selectBuiltinIcon({
+      providerId: 'adobe',
+      libraryId: 'lobehub',
+      iconId: 'adobe',
+      library: {},
+      variant: 'color',
+    });
     const modal = new ProviderBuiltinIconPickerModal(app as never, {
       providerId: 'adobe',
       library,

@@ -441,8 +441,18 @@ describe('ProviderIconService', () => {
   it('deduplicates builtin selections when the same icon is chosen repeatedly', async () => {
     const { ProviderIconService } = await import('../../../../src/utils/icons/ProviderIconService');
 
-    const once = ProviderIconService.selectBuiltinIcon('deepseek', 'lobehub', 'deepseek', {});
-    const twice = ProviderIconService.selectBuiltinIcon('deepseek', 'lobehub', 'deepseek', once);
+    const once = ProviderIconService.selectBuiltinIcon({
+      providerId: 'deepseek',
+      libraryId: 'lobehub',
+      iconId: 'deepseek',
+      library: {},
+    });
+    const twice = ProviderIconService.selectBuiltinIcon({
+      providerId: 'deepseek',
+      libraryId: 'lobehub',
+      iconId: 'deepseek',
+      library: once,
+    });
 
     expect(once.deepseek).toHaveLength(1);
     expect(once.deepseek?.[0]).toMatchObject({

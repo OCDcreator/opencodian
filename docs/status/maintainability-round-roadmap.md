@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的 `[NEXT]`”。L5 完成后必须暂停复盘，不得自动扩展新队列。
-> **当前状态**: [CONFIRMED_NEXT_BATCH] L1-L5 已全部完成；人工已确认继续一小批 warning cleanup queue。当前可自动执行的 `[NEXT]` 是 `W2 - ProviderIconService signature cleanup`。
+> **当前状态**: [CONFIRMED_NEXT_BATCH] L1-L5 已全部完成；人工已确认继续一小批 warning cleanup queue。当前可自动执行的 `[NEXT]` 是 `W3 - OpenCodeService complexity trim`。
 
 ## 控制规则
 
@@ -16,7 +16,7 @@
 
 ## 总体路线
 
-当前受控批次 L1-L5 已完成：仓库已从 lint 红灯恢复到 `0 errors / 116 warnings` 的可控状态。人工现已确认继续 `W1-W5` 这一小批 warning cleanup queue，优先处理低风险且收益明确的 `max-params` / `complexity` / `@typescript-eslint/no-explicit-any` 热点；在 `W5` checkpoint 完成前，不恢复 `R33+` maintainability owner queue。
+当前受控批次 L1-L5 已完成：仓库已从 lint 红灯恢复到 `0 errors / 111 warnings` 的可控状态。人工现已确认继续 `W1-W5` 这一小批 warning cleanup queue，优先处理低风险且收益明确的 `max-params` / `complexity` / `@typescript-eslint/no-explicit-any` 热点；在 `W5` checkpoint 完成前，不恢复 `R33+` maintainability owner queue。
 
 > **P2 状态（R6 完成后）**: R1-R6 已完成 question dock、todo refresh/status、background completion notice、post-sync handoff 与 session signal orchestration 的收束。剩余风险以回归为主：background tab 无 session 时的 dock 清理、post-sync todo/status gate、completion notice queue/fingerprint 去重，以及 live signal writeback 顺序。
 >
@@ -832,7 +832,7 @@
   - 上述三个方法的 `max-params` warning 消失，行为保持不变。
   - 运行 focused tests、全量 `npm test`、`npm run build`；若命中 deploy 规则则执行部署验证。
 
-### [NEXT] W2 - ProviderIconService signature cleanup
+### [DONE] W2 - ProviderIconService signature cleanup
 
 - **Lane**: Warning cleanup
 - **目标**: 只处理 `src/utils/icons/ProviderIconService.ts` 中 `selectBuiltinIcon`、`getLobehubCachePath` 的 `max-params`。
@@ -849,7 +849,7 @@
   - 两个目标方法的 `max-params` warning 消失。
   - 运行 focused tests、全量 `npm test`、`npm run build`。
 
-### [QUEUED] W3 - OpenCodeService complexity trim
+### [NEXT] W3 - OpenCodeService complexity trim
 
 - **Lane**: Warning cleanup
 - **目标**: 只处理 `src/core/opencode/OpenCodeService.ts` 中 `connectSSE` 与 `updateSettings` 的 `complexity`。
@@ -897,89 +897,3 @@
 - **验收**:
   - phase 文档明确记录 `W1-W4` 的 warning 收益与下一批建议。
   - 运行全量 `npm test`、`npm run build`。
-
-## Confirmed Next Batch
-
-### [NEXT] W1 - ModelConfigModal max-params cleanup
-
-- **Lane**: Warning cleanup / settings hotspot
-- **目标**: 只清 `src/features/settings/ModelConfigModal.ts` 中剩余的 `max-params` warnings，优先通过现有 owner 内的 options/state object 收束 `renderKeyValueEditor`、`createTextField`、`createSelectField` 的参数表。
-- **优先入口**:
-  - `src/features/settings/ModelConfigModal.ts`
-- **允许边界**:
-  - 允许在 `ModelConfigModal` 现有 owner 内做局部参数打包与调用点收束。
-  - 允许更新直接相关 tests。
-- **禁止项**:
-  - 不新增 settings 子文件或新的薄 helper / adapter。
-  - 不借机处理 file-size / long-method warnings。
-- **验收**:
-  - 至少移除这 3 条 `max-params` warnings。
-  - 运行 `npx eslint src/features/settings/ModelConfigModal.ts`、`npm test`、`npm run build`。
-
-### [QUEUED] W2 - ProviderIconService signature cleanup
-
-- **Lane**: Warning cleanup / icon infrastructure
-- **目标**: 清掉 `src/utils/icons/ProviderIconService.ts` 中剩余的 `max-params` warnings，优先收束 `selectBuiltinIcon` 与 `getLobehubCachePath` 的参数表。
-- **优先入口**:
-  - `src/utils/icons/ProviderIconService.ts`
-  - `tests/unit/utils/icons/ProviderIconService.test.ts`
-- **允许边界**:
-  - 允许在 `ProviderIconService` 现有静态 helper 内改用参数对象或更窄的局部 shape。
-  - 允许更新直接相关 tests。
-- **禁止项**:
-  - 不改变 provider icon fallback 顺序。
-  - 不新增新的 icon resolver / cache helper 文件。
-- **验收**:
-  - 至少移除这 2 条 `max-params` warnings。
-  - 运行 `npx eslint src/utils/icons/ProviderIconService.ts`、`npm test`、`npm run build`。
-
-### [QUEUED] W3 - OpenCodeService complexity trim
-
-- **Lane**: Warning cleanup / opencode hotspot
-- **目标**: 只处理 `src/core/opencode/OpenCodeService.ts` 当前剩余的 2 条 `complexity` warnings，优先在现有方法内通过 guard clause、局部 helper 或已有 seam 收束 `connectSSE` 与 `updateSettings` 的分支噪音。
-- **优先入口**:
-  - `src/core/opencode/OpenCodeService.ts`
-  - 直接相关 unit tests
-- **允许边界**:
-  - 允许做不改变对外 API 的最小结构调整。
-  - 允许更新直接相关 tests。
-- **禁止项**:
-  - 不开启新的 transport / config / finalize owner queue。
-  - 不破坏 SDK-first / legacy HTTP fallback、settings update 与 scoped-directory 兼容语义。
-- **验收**:
-  - 至少移除这 2 条 `complexity` warnings。
-  - 运行 `npx eslint src/core/opencode/OpenCodeService.ts`、`npm test`、`npm run build`。
-
-### [QUEUED] W4 - Chat bridge test typing cleanup
-
-- **Lane**: Warning cleanup / test typing
-- **目标**: 清掉 chat bridge 测试中的 6 条 `@typescript-eslint/no-explicit-any` warnings，优先通过更准确的 mock shape / helper typing 收束测试输入。
-- **优先入口**:
-  - `tests/unit/features/chat/ContextFileCatalogEventBridge.test.ts`
-  - `tests/unit/features/chat/FocusContextEventBridge.test.ts`
-- **允许边界**:
-  - 允许只改 tests。
-  - 若测试 typing 调整需要最小生产类型导出，可改直接相关 type 定义。
-- **禁止项**:
-  - 不借机扩展到不相关 chat runtime / view 重构。
-  - 不新增与 production 无关的测试工具碎片。
-- **验收**:
-  - 移除这 6 条 `@typescript-eslint/no-explicit-any` warnings。
-  - 运行 `npx eslint tests/unit/features/chat/ContextFileCatalogEventBridge.test.ts tests/unit/features/chat/FocusContextEventBridge.test.ts`、`npm test`、`npm run build`。
-
-### [QUEUED] W5 - Warning checkpoint
-
-- **Lane**: Checkpoint
-- **目标**: 复盘 `W1-W4` 的 warning cleanup 收益，记录剩余生产热点，决定下一批是继续 warning cleanup，还是再回到新的 maintainability owner queue。
-- **优先入口**:
-  - `docs/status/maintainability-master-plan.md`
-  - `docs/status/maintainability-round-roadmap.md`
-  - `docs/status/maintainability-lane-map.md`
-  - 最新 `phase` 文档与 lint 输出
-- **允许边界**:
-  - 只做文档、指标与下一批建议更新。
-- **禁止项**:
-  - 不自动扩展 `W6+` 或恢复 `R33+`。
-- **验收**:
-  - phase 文档明确说明 warning 净减少量、剩余热点与下一批建议。
-  - 运行 `npm run lint`、`npm test`、`npm run build`。

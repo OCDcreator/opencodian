@@ -114,6 +114,22 @@ interface NormalizedCustomSource {
   localPath?: string;
 }
 
+interface SelectBuiltinIconRequest {
+  providerId: string;
+  libraryId: BuiltinIconLibraryId;
+  iconId: string;
+  library: ProviderIconLibrary;
+  variant?: LobehubIconVariant;
+}
+
+interface LobehubCachePathOptions {
+  iconId: string;
+  requestedVariant: LobehubIconVariant;
+  resolvedVariant: ResolvedLobehubVariant;
+  format: ProviderIconResolvedFormat;
+  themeKey: 'light' | 'dark';
+}
+
 type ResolvedLobehubVariant = Exclude<LobehubIconVariant, 'auto' | 'combine'>;
 
 // CDN base URL for Lobehub icons
@@ -295,13 +311,13 @@ export class ProviderIconService {
       });
   }
 
-  static selectBuiltinIcon(
-    providerId: string,
-    libraryId: BuiltinIconLibraryId,
-    iconId: string,
-    library: ProviderIconLibrary,
-    variant: LobehubIconVariant = 'auto',
-  ): ProviderIconLibrary {
+  static selectBuiltinIcon({
+    providerId,
+    libraryId,
+    iconId,
+    library,
+    variant = 'auto',
+  }: SelectBuiltinIconRequest): ProviderIconLibrary {
     const trimmedProviderId = providerId.trim();
     if (!trimmedProviderId) {
       return library;
@@ -1532,7 +1548,13 @@ export class ProviderIconService {
       }
 
       return [{
-        cachePath: this.getLobehubCachePath(iconId, requestedVariant, variant, format, themeKey),
+        cachePath: this.getLobehubCachePath({
+          iconId,
+          requestedVariant,
+          resolvedVariant: variant,
+          format,
+          themeKey,
+        }),
         fallbackUsed: index > 0,
         format,
         remoteUrl,
@@ -1652,13 +1674,13 @@ export class ProviderIconService {
     }
   }
 
-  private static getLobehubCachePath(
-    iconId: string,
-    requestedVariant: LobehubIconVariant,
-    resolvedVariant: ResolvedLobehubVariant,
-    format: ProviderIconResolvedFormat,
-    themeKey: 'light' | 'dark',
-  ): string {
+  private static getLobehubCachePath({
+    iconId,
+    requestedVariant,
+    resolvedVariant,
+    format,
+    themeKey,
+  }: LobehubCachePathOptions): string {
     const safeIconId = iconId.replace(/[^a-z0-9_-]/gi, '-');
     const extension = format === 'avatar' ? 'webp' : format;
     return normalizePath(
