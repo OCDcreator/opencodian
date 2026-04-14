@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的 `[NEXT]`”。L5 完成后必须暂停复盘，不得自动扩展新队列。
-> **当前状态**: [CONFIRMED_NEXT_BATCH] L1-L5 已全部完成；人工已确认继续一小批 warning cleanup queue。当前可自动执行的 `[NEXT]` 是 `W1 - ModelConfigModal max-params cleanup`。
+> **当前状态**: [CONFIRMED_NEXT_BATCH] L1-L5 已全部完成；人工已确认继续一小批 warning cleanup queue。当前可自动执行的 `[NEXT]` 是 `W2 - ProviderIconService signature cleanup`。
 
 ## 控制规则
 
@@ -813,6 +813,91 @@
 - 当前最热的生产代码热点为：`src/features/settings/ModelConfigModal.ts`（**7**）、`src/features/settings/OpenCodianSettings.ts`（**7**）、`src/features/chat/OpenCodianView.ts`（**5**）、`src/utils/icons/ProviderIconService.ts`（**4**）、`src/core/opencode/OpenCodeService.ts`（**3**）；最热的测试热点为 `tests/unit/core/opencode/OpenCodeService.test.ts`（**5**）。
 - 结论：lint 红灯已经解除，但剩余 warning 仍然集中在少数大 owner 与相关 tests。人工现已确认继续一批新的 warning cleanup queue：先顺序执行 `W1-W5`，优先清掉低风险且收益明确的 `max-params` / `complexity` / `@typescript-eslint/no-explicit-any` 热点；在 `W5` checkpoint 完成前，不恢复 `R33+` maintainability owner queue。
 
+## Confirmed Next Batch: W1-W5 warning cleanup
+
+### [DONE] W1 - ModelConfigModal max-params cleanup
+
+- **Lane**: Warning cleanup
+- **目标**: 只处理 `src/features/settings/ModelConfigModal.ts` 中 `renderKeyValueEditor`、`createTextField`、`createSelectField` 的参数收束。
+- **优先入口**:
+  - `src/features/settings/ModelConfigModal.ts`
+  - `tests/unit/features/settings/ModelConfigModal.test.ts`
+- **允许边界**:
+  - 允许在 `ModelConfigModal` owner 内用局部配置对象/类型收束参数。
+  - 允许更新直接相关的 focused test。
+- **禁止项**:
+  - 不开启新的 settings owner 拆分。
+  - 不新增薄 facade / adapter / factory 文件。
+- **验收**:
+  - 上述三个方法的 `max-params` warning 消失，行为保持不变。
+  - 运行 focused tests、全量 `npm test`、`npm run build`；若命中 deploy 规则则执行部署验证。
+
+### [NEXT] W2 - ProviderIconService signature cleanup
+
+- **Lane**: Warning cleanup
+- **目标**: 只处理 `src/utils/icons/ProviderIconService.ts` 中 `selectBuiltinIcon`、`getLobehubCachePath` 的 `max-params`。
+- **优先入口**:
+  - `src/utils/icons/ProviderIconService.ts`
+  - `tests/unit/utils/icons/ProviderIconService.test.ts`
+- **允许边界**:
+  - 允许在现有 owner 内做参数对象收束或相邻 helper 合并。
+  - 允许更新直接相关 tests。
+- **禁止项**:
+  - 不新增 provider icon 相关薄层。
+  - 不扩展成 provider icon 全链路重构。
+- **验收**:
+  - 两个目标方法的 `max-params` warning 消失。
+  - 运行 focused tests、全量 `npm test`、`npm run build`。
+
+### [QUEUED] W3 - OpenCodeService complexity trim
+
+- **Lane**: Warning cleanup
+- **目标**: 只处理 `src/core/opencode/OpenCodeService.ts` 中 `connectSSE` 与 `updateSettings` 的 `complexity`。
+- **优先入口**:
+  - `src/core/opencode/OpenCodeService.ts`
+  - `tests/unit/core/opencode/OpenCodeService.test.ts`
+- **允许边界**:
+  - 允许在 `OpenCodeService` 内做 guard clause / 局部流程收束。
+  - 允许更新直接相关 tests。
+- **禁止项**:
+  - 不改 SDK-first / legacy fallback 行为。
+  - 不借机开启新的 `OpenCodeService` owner 拆分。
+- **验收**:
+  - 两个目标方法的 `complexity` warning 降到阈值内。
+  - 运行 focused tests、全量 `npm test`、`npm run build`。
+
+### [QUEUED] W4 - Chat bridge test typing cleanup
+
+- **Lane**: Warning cleanup
+- **目标**: 清掉 `ContextFileCatalogEventBridge` / `FocusContextEventBridge` tests 中的 `@typescript-eslint/no-explicit-any`。
+- **优先入口**:
+  - `tests/unit/features/chat/ContextFileCatalogEventBridge.test.ts`
+  - `tests/unit/features/chat/FocusContextEventBridge.test.ts`
+- **允许边界**:
+  - 允许只为 mock typing 做最小调整。
+- **禁止项**:
+  - 不改生产 runtime 行为。
+  - 不把 test cleanup 扩展成 chat lane 新重构。
+- **验收**:
+  - 目标 tests 的 `@typescript-eslint/no-explicit-any` warning 消失。
+  - 运行 focused tests、全量 `npm test`、`npm run build`。
+
+### [QUEUED] W5 - Warning cleanup checkpoint
+
+- **Lane**: Checkpoint
+- **目标**: 复盘 `W1-W4` 的 warning cleanup 收益，并决定是否继续 warning cleanup 或恢复新的 maintainability queue。
+- **优先入口**:
+  - `docs/status/maintainability-master-plan.md`
+  - `docs/status/maintainability-round-roadmap.md`
+  - `docs/status/maintainability-lane-map.md`
+- **允许边界**:
+  - 只做文档、指标和下一批建议。
+- **禁止项**:
+  - 不自动扩展 `W6+` 或恢复 `R33+`。
+- **验收**:
+  - phase 文档明确记录 `W1-W4` 的 warning 收益与下一批建议。
+  - 运行全量 `npm test`、`npm run build`。
+
 ## Confirmed Next Batch
 
 ### [NEXT] W1 - ModelConfigModal max-params cleanup
@@ -898,4 +983,3 @@
 - **验收**:
   - phase 文档明确说明 warning 净减少量、剩余热点与下一批建议。
   - 运行 `npm run lint`、`npm test`、`npm run build`。
-

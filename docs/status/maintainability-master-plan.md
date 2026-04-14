@@ -2,7 +2,7 @@
 
 > **状态**: [CONFIRMED_NEXT_BATCH]
 > **作用**: 这是 maintainability 无人值守的战略文档。后续每一轮开始前，必须先读本文件，再读最近的 `docs/status/maintainability-phase-XXX.md`。
-> **自动推进状态**: 人工已确认继续 `W1-W5` warning cleanup 队列；当前可自动执行的 `[NEXT]` 是 `W1 - ModelConfigModal max-params cleanup`。在 `W5` checkpoint 完成前，不恢复 `R33+` maintainability queue。
+> **自动推进状态**: 人工已确认继续 `W1-W5` warning cleanup 队列；当前可自动执行的 `[NEXT]` 是 `W2 - ProviderIconService signature cleanup`。在 `W5` checkpoint 完成前，不恢复 `R33+` maintainability queue。
 
 ## 1. 总体目标
 
@@ -160,7 +160,7 @@ R13-R18 已完成这组 UI/runtime shell 的主要收束。本批 R28-R32 不继
 
 当前执行阶段（W1-W5）要求：
 
-- 当前可自动执行的 `[NEXT]` 是 `W1 - ModelConfigModal max-params cleanup`
+- 当前可自动执行的 `[NEXT]` 是 `W2 - ProviderIconService signature cleanup`
 - Autopilot 只允许按 `W1 → W5` 顺序推进，不得自动扩展 `W6+` 或恢复 `R33+`
 - 本批只处理低风险 warning：`max-params`、少量 `complexity`，以及 tests 内的 `@typescript-eslint/no-explicit-any`
 - `OpenCodianView` / `OpenCodianSettings` 的大型 `max-lines*` / `complexity` 热点继续保持人工复盘后再决定

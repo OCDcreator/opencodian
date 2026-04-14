@@ -61,6 +61,44 @@ interface ModelConfigModalOpenOptions {
   onSaved?: () => Promise<void> | void;
 }
 
+interface KeyValueEditorConfig {
+  title: string;
+  description: string;
+  values: KeyValueFieldState[];
+  onAdd: () => void;
+  onRemove: (uid: string) => void;
+  onKeyChange: (uid: string, value: string) => void;
+  onValueChange: (uid: string, value: string) => void;
+  showColumnHeaders?: boolean;
+  stackedLabels?: boolean;
+  iconRemoveButton?: boolean;
+  emptyState?: string;
+  keyPlaceholder?: string;
+  valuePlaceholder?: string;
+}
+
+interface TextFieldConfig {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  description?: string;
+  secret?: boolean;
+}
+
+interface SelectFieldOption {
+  value: string;
+  label: string;
+}
+
+interface SelectFieldConfig {
+  label: string;
+  value: string;
+  options: SelectFieldOption[];
+  onChange: (value: string) => void;
+  description?: string;
+}
+
 export class ModelConfigModal extends Modal {
   private modelValue = '';
   private smallModelValue = '';
@@ -372,27 +410,25 @@ export class ModelConfigModal extends Modal {
       t('settings.model.visualEditor.identitySectionDesc'),
     );
     const identityGridEl = identitySectionEl.createDiv({ cls: 'opencodian-model-workspace-grid is-identity-grid' });
-    const providerIdField = this.createTextField(
-      identityGridEl,
-      `${t('settings.model.visualEditor.providerId')} *`,
-      provider.id,
-      (value) => {
+    const providerIdField = this.createTextField(identityGridEl, {
+      label: `${t('settings.model.visualEditor.providerId')} *`,
+      value: provider.id,
+      onChange: (value) => {
         provider.id = value;
       },
-      'my-provider',
-      t('settings.model.visualEditor.providerIdDesc'),
-    );
+      placeholder: 'my-provider',
+      description: t('settings.model.visualEditor.providerIdDesc'),
+    });
     providerIdField.addClass('is-full-span');
 
-    const providerNameField = this.createTextField(
-      identityGridEl,
-      `${t('settings.model.visualEditor.providerName')} *`,
-      provider.name,
-      (value) => {
+    const providerNameField = this.createTextField(identityGridEl, {
+      label: `${t('settings.model.visualEditor.providerName')} *`,
+      value: provider.name,
+      onChange: (value) => {
         provider.name = value;
       },
-      'My Provider',
-    );
+      placeholder: 'My Provider',
+    });
     providerNameField.addClass('is-full-span');
 
     const connectionSectionEl = sectionsEl.createDiv({ cls: 'opencodian-model-workspace-section is-flow-section' });
@@ -402,15 +438,14 @@ export class ModelConfigModal extends Modal {
       t('settings.model.visualEditor.providerSectionDesc'),
     );
     const connectionGridEl = connectionSectionEl.createDiv({ cls: 'opencodian-model-workspace-grid is-connection-grid' });
-    const interfaceField = this.createSelectField(
-      connectionGridEl,
-      t('settings.model.visualEditor.interfaceFormat'),
-      provider.interfaceFormat,
-      PROVIDER_INTERFACE_FORMAT_OPTIONS.map((entry) => ({
+    const interfaceField = this.createSelectField(connectionGridEl, {
+      label: t('settings.model.visualEditor.interfaceFormat'),
+      value: provider.interfaceFormat,
+      options: PROVIDER_INTERFACE_FORMAT_OPTIONS.map((entry) => ({
         value: entry.id,
         label: t(entry.labelKey as never),
       })),
-      (value) => {
+      onChange: (value) => {
         const previous = PROVIDER_INTERFACE_FORMAT_OPTIONS.find((entry) => entry.id === provider.interfaceFormat)
           ?? PROVIDER_INTERFACE_FORMAT_OPTIONS[1];
         const next = PROVIDER_INTERFACE_FORMAT_OPTIONS.find((entry) => entry.id === value)
@@ -423,48 +458,43 @@ export class ModelConfigModal extends Modal {
         this.updatePreview();
         this.render();
       },
-      t((PROVIDER_INTERFACE_FORMAT_OPTIONS.find((entry) => entry.id === provider.interfaceFormat)?.descriptionKey
+      description: t((PROVIDER_INTERFACE_FORMAT_OPTIONS.find((entry) => entry.id === provider.interfaceFormat)?.descriptionKey
         ?? PROVIDER_INTERFACE_FORMAT_OPTIONS[1].descriptionKey) as never),
-    );
+    });
     interfaceField.addClass('is-full-span');
 
     if (provider.interfaceFormat === 'custom') {
-      const customNpmField = this.createTextField(
-        connectionGridEl,
-        t('settings.model.visualEditor.customNpm'),
-        provider.customNpm,
-        (value) => {
+      const customNpmField = this.createTextField(connectionGridEl, {
+        label: t('settings.model.visualEditor.customNpm'),
+        value: provider.customNpm,
+        onChange: (value) => {
           provider.customNpm = value;
         },
-        '@scope/custom-adapter',
-      );
+        placeholder: '@scope/custom-adapter',
+      });
       customNpmField.addClass('is-full-span');
     }
 
     const formatMeta = PROVIDER_INTERFACE_FORMAT_OPTIONS.find((entry) => entry.id === provider.interfaceFormat)
       ?? PROVIDER_INTERFACE_FORMAT_OPTIONS[1];
-    const baseUrlField = this.createTextField(
-      connectionGridEl,
-      `${t('settings.model.visualEditor.baseURL')} *`,
-      provider.baseURL,
-      (value) => {
+    const baseUrlField = this.createTextField(connectionGridEl, {
+      label: `${t('settings.model.visualEditor.baseURL')} *`,
+      value: provider.baseURL,
+      onChange: (value) => {
         provider.baseURL = value;
       },
-      formatMeta.baseUrlPlaceholder,
-    );
+      placeholder: formatMeta.baseUrlPlaceholder,
+    });
     baseUrlField.addClass('is-full-span');
-    const apiKeyField = this.createTextField(
-      connectionGridEl,
-      t('settings.model.visualEditor.apiKey'),
-      provider.apiKey,
-      (value) => {
+    const apiKeyField = this.createTextField(connectionGridEl, {
+      label: t('settings.model.visualEditor.apiKey'),
+      value: provider.apiKey,
+      onChange: (value) => {
         provider.apiKey = value;
       },
-      formatMeta.apiKeyPlaceholder,
-      undefined,
-      false,
-      true,
-    );
+      placeholder: formatMeta.apiKeyPlaceholder,
+      secret: true,
+    });
     apiKeyField.addClass('is-full-span');
 
     const providerCheckState = this.providerChecks.get(provider.uid);
@@ -476,22 +506,21 @@ export class ModelConfigModal extends Modal {
     }
 
     const extraOptionsSectionEl = sectionsEl.createDiv({ cls: 'opencodian-model-workspace-section is-flow-section' });
-    this.renderKeyValueEditor(
-      extraOptionsSectionEl,
-      t('settings.model.visualEditor.extraOptionsTitle'),
-      t('settings.model.visualEditor.extraOptionsDesc'),
-      provider.extraOptions,
-      () => {
+    this.renderKeyValueEditor(extraOptionsSectionEl, {
+      title: t('settings.model.visualEditor.extraOptionsTitle'),
+      description: t('settings.model.visualEditor.extraOptionsDesc'),
+      values: provider.extraOptions,
+      onAdd: () => {
         provider.extraOptions.push(this.createKeyValueState());
         this.updatePreview();
         this.render();
       },
-      (uid) => {
+      onRemove: (uid) => {
         provider.extraOptions = provider.extraOptions.filter((entry) => entry.uid !== uid);
         this.updatePreview();
         this.render();
       },
-      (uid, value) => {
+      onKeyChange: (uid, value) => {
         const field = provider.extraOptions.find((entry) => entry.uid === uid);
         if (!field) {
           return;
@@ -499,7 +528,7 @@ export class ModelConfigModal extends Modal {
         field.key = value;
         this.updatePreview();
       },
-      (uid, value) => {
+      onValueChange: (uid, value) => {
         const field = provider.extraOptions.find((entry) => entry.uid === uid);
         if (!field) {
           return;
@@ -507,11 +536,8 @@ export class ModelConfigModal extends Modal {
         field.value = value;
         this.updatePreview();
       },
-      false,
-      {
-        stackedLabels: true,
-      },
-    );
+      stackedLabels: true,
+    });
 
     const modelsSectionEl = sectionsEl.createDiv({ cls: 'opencodian-model-workspace-section' });
     this.createSectionHeader(
@@ -594,26 +620,24 @@ export class ModelConfigModal extends Modal {
       t('settings.model.visualEditor.defaultsDesc'),
     );
     const defaultsGridEl = defaultsSectionEl.createDiv({ cls: 'opencodian-model-workspace-grid' });
-    this.createTextField(
-      defaultsGridEl,
-      t('settings.model.visualEditor.defaultModel'),
-      this.modelValue,
-      (value) => {
+    this.createTextField(defaultsGridEl, {
+      label: t('settings.model.visualEditor.defaultModel'),
+      value: this.modelValue,
+      onChange: (value) => {
         this.modelValue = value;
       },
-      'provider/model',
-      t('settings.model.visualEditor.defaultModelDesc'),
-    );
-    this.createTextField(
-      defaultsGridEl,
-      t('settings.model.visualEditor.smallModel'),
-      this.smallModelValue,
-      (value) => {
+      placeholder: 'provider/model',
+      description: t('settings.model.visualEditor.defaultModelDesc'),
+    });
+    this.createTextField(defaultsGridEl, {
+      label: t('settings.model.visualEditor.smallModel'),
+      value: this.smallModelValue,
+      onChange: (value) => {
         this.smallModelValue = value;
       },
-      'provider/model',
-      t('settings.model.visualEditor.smallModelDesc'),
-    );
+      placeholder: 'provider/model',
+      description: t('settings.model.visualEditor.smallModelDesc'),
+    });
 
     const previewSectionEl = sectionsEl.createDiv({ cls: 'opencodian-model-workspace-section' });
     this.createSectionHeader(
@@ -657,40 +681,37 @@ export class ModelConfigModal extends Modal {
 
     const identitySectionEl = sectionsEl.createDiv({ cls: 'opencodian-model-workspace-section is-flow-section' });
     const identityGridEl = identitySectionEl.createDiv({ cls: 'opencodian-model-workspace-grid is-identity-grid' });
-    const providerIdField = this.createTextField(
-      identityGridEl,
-      `${t('settings.model.visualEditor.providerId')} *`,
-      provider.id,
-      (value) => {
+    const providerIdField = this.createTextField(identityGridEl, {
+      label: `${t('settings.model.visualEditor.providerId')} *`,
+      value: provider.id,
+      onChange: (value) => {
         provider.id = value.toLowerCase().replace(/[^a-z0-9-]/g, '');
       },
-      'my-provider',
-      t('settings.model.visualEditor.providerIdDesc'),
-    );
+      placeholder: 'my-provider',
+      description: t('settings.model.visualEditor.providerIdDesc'),
+    });
     providerIdField.addClass('is-full-span');
 
-    const providerNameField = this.createTextField(
-      identityGridEl,
-      `${t('settings.model.visualEditor.providerName')} *`,
-      provider.name,
-      (value) => {
+    const providerNameField = this.createTextField(identityGridEl, {
+      label: `${t('settings.model.visualEditor.providerName')} *`,
+      value: provider.name,
+      onChange: (value) => {
         provider.name = value;
       },
-      t('settings.model.visualEditor.providerNamePlaceholder'),
-    );
+      placeholder: t('settings.model.visualEditor.providerNamePlaceholder'),
+    });
     providerNameField.addClass('is-full-span');
 
     const connectionSectionEl = sectionsEl.createDiv({ cls: 'opencodian-model-workspace-section is-flow-section' });
     const connectionGridEl = connectionSectionEl.createDiv({ cls: 'opencodian-model-workspace-grid is-connection-grid' });
-    const interfaceField = this.createSelectField(
-      connectionGridEl,
-      t('settings.model.visualEditor.interfaceFormat'),
-      provider.interfaceFormat,
-      PROVIDER_INTERFACE_FORMAT_OPTIONS.map((entry) => ({
+    const interfaceField = this.createSelectField(connectionGridEl, {
+      label: t('settings.model.visualEditor.interfaceFormat'),
+      value: provider.interfaceFormat,
+      options: PROVIDER_INTERFACE_FORMAT_OPTIONS.map((entry) => ({
         value: entry.id,
         label: t(entry.labelKey as never),
       })),
-      (value) => {
+      onChange: (value) => {
         const previous = PROVIDER_INTERFACE_FORMAT_OPTIONS.find((entry) => entry.id === provider.interfaceFormat)
           ?? PROVIDER_INTERFACE_FORMAT_OPTIONS[1];
         const next = PROVIDER_INTERFACE_FORMAT_OPTIONS.find((entry) => entry.id === value)
@@ -703,69 +724,64 @@ export class ModelConfigModal extends Modal {
         this.updatePreview();
         this.render();
       },
-      t((PROVIDER_INTERFACE_FORMAT_OPTIONS.find((entry) => entry.id === provider.interfaceFormat)?.descriptionKey
+      description: t((PROVIDER_INTERFACE_FORMAT_OPTIONS.find((entry) => entry.id === provider.interfaceFormat)?.descriptionKey
         ?? PROVIDER_INTERFACE_FORMAT_OPTIONS[1].descriptionKey) as never),
-    );
+    });
     interfaceField.addClass('is-full-span');
 
     if (provider.interfaceFormat === 'custom') {
-      const customNpmField = this.createTextField(
-        connectionGridEl,
-        t('settings.model.visualEditor.customNpm'),
-        provider.customNpm,
-        (value) => {
+      const customNpmField = this.createTextField(connectionGridEl, {
+        label: t('settings.model.visualEditor.customNpm'),
+        value: provider.customNpm,
+        onChange: (value) => {
           provider.customNpm = value;
         },
-        '@scope/custom-adapter',
-      );
+        placeholder: '@scope/custom-adapter',
+      });
       customNpmField.addClass('is-full-span');
     }
 
     const formatMeta = PROVIDER_INTERFACE_FORMAT_OPTIONS.find((entry) => entry.id === provider.interfaceFormat)
       ?? PROVIDER_INTERFACE_FORMAT_OPTIONS[1];
     const baseUrlPlaceholder = this.getProviderBaseUrlPlaceholder(provider, formatMeta.baseUrlPlaceholder);
-    const apiKeyField = this.createTextField(
-      connectionGridEl,
-      t('settings.model.visualEditor.apiKey'),
-      provider.apiKey,
-      (value) => {
+    const apiKeyField = this.createTextField(connectionGridEl, {
+      label: t('settings.model.visualEditor.apiKey'),
+      value: provider.apiKey,
+      onChange: (value) => {
         provider.apiKey = value;
       },
-      formatMeta.apiKeyPlaceholder || t('settings.model.visualEditor.apiKeyPlaceholder'),
-      t('settings.model.visualEditor.apiKeyAutoFill'),
-      false,
-      true,
-    );
+      placeholder: formatMeta.apiKeyPlaceholder || t('settings.model.visualEditor.apiKeyPlaceholder'),
+      description: t('settings.model.visualEditor.apiKeyAutoFill'),
+      secret: true,
+    });
     apiKeyField.addClass('is-full-span');
 
-    const baseUrlField = this.createTextField(
-      connectionGridEl,
-      `${t('settings.model.visualEditor.baseURL')} *`,
-      provider.baseURL,
-      (value) => {
+    const baseUrlField = this.createTextField(connectionGridEl, {
+      label: `${t('settings.model.visualEditor.baseURL')} *`,
+      value: provider.baseURL,
+      onChange: (value) => {
         provider.baseURL = value;
       },
-      baseUrlPlaceholder,
-    );
+      placeholder: baseUrlPlaceholder,
+    });
     baseUrlField.addClass('is-full-span');
 
     const extraOptionsSectionEl = sectionsEl.createDiv({ cls: 'opencodian-model-workspace-section is-flow-section' });
-    this.renderKeyValueEditor(
-      extraOptionsSectionEl,
-      t('settings.model.visualEditor.extraOptionsTitle'),
-      t('settings.model.visualEditor.addProviderExtraOptionsDesc'),
-      provider.extraOptions,
-      () => {
+    this.renderKeyValueEditor(extraOptionsSectionEl, {
+      title: t('settings.model.visualEditor.extraOptionsTitle'),
+      description: t('settings.model.visualEditor.addProviderExtraOptionsDesc'),
+      values: provider.extraOptions,
+      onAdd: () => {
         provider.extraOptions.push(this.createKeyValueState());
         this.updatePreview();
         this.render();
       },
-      (uid) => {
+      onRemove: (uid) => {
         provider.extraOptions = provider.extraOptions.filter((entry) => entry.uid !== uid);
         this.updatePreview();
         this.render();
       },
-      (uid, value) => {
+      onKeyChange: (uid, value) => {
         const field = provider.extraOptions.find((entry) => entry.uid === uid);
         if (!field) {
           return;
@@ -773,7 +789,7 @@ export class ModelConfigModal extends Modal {
         field.key = value;
         this.updatePreview();
       },
-      (uid, value) => {
+      onValueChange: (uid, value) => {
         const field = provider.extraOptions.find((entry) => entry.uid === uid);
         if (!field) {
           return;
@@ -781,12 +797,9 @@ export class ModelConfigModal extends Modal {
         field.value = value;
         this.updatePreview();
       },
-      false,
-      {
-        stackedLabels: true,
-        iconRemoveButton: true,
-      },
-    );
+      stackedLabels: true,
+      iconRemoveButton: true,
+    });
 
     const modelsSectionEl = sectionsEl.createDiv({ cls: 'opencodian-model-workspace-section is-flow-section' });
     const modelHeaderEl = modelsSectionEl.createDiv({ cls: 'opencodian-model-workspace-section-header is-with-actions' });
@@ -976,43 +989,40 @@ export class ModelConfigModal extends Modal {
       t('settings.model.visualEditor.modelLimitsDesc'),
     );
     const limitsGridEl = limitsSectionEl.createDiv({ cls: 'opencodian-model-workspace-grid is-model-limits-grid' });
-    this.createTextField(
-      limitsGridEl,
-      t('settings.model.visualEditor.contextLimit'),
-      model.context,
-      (value) => {
+    this.createTextField(limitsGridEl, {
+      label: t('settings.model.visualEditor.contextLimit'),
+      value: model.context,
+      onChange: (value) => {
         model.context = value;
       },
-      '200000',
-      t('settings.model.visualEditor.contextLimitDesc'),
-    );
-    this.createTextField(
-      limitsGridEl,
-      t('settings.model.visualEditor.outputLimit'),
-      model.output,
-      (value) => {
+      placeholder: '200000',
+      description: t('settings.model.visualEditor.contextLimitDesc'),
+    });
+    this.createTextField(limitsGridEl, {
+      label: t('settings.model.visualEditor.outputLimit'),
+      value: model.output,
+      onChange: (value) => {
         model.output = value;
       },
-      '65536',
-      t('settings.model.visualEditor.outputLimitDesc'),
-    );
+      placeholder: '65536',
+      description: t('settings.model.visualEditor.outputLimitDesc'),
+    });
 
-    this.renderKeyValueEditor(
-      detailsEl,
-      t('settings.model.visualEditor.modelOptionsTitle'),
-      t('settings.model.visualEditor.modelOptionsDesc'),
-      model.options,
-      () => {
+    this.renderKeyValueEditor(detailsEl, {
+      title: t('settings.model.visualEditor.modelOptionsTitle'),
+      description: t('settings.model.visualEditor.modelOptionsDesc'),
+      values: model.options,
+      onAdd: () => {
         model.options.push(this.createKeyValueState());
         this.updatePreview();
         this.render();
       },
-      (uid) => {
+      onRemove: (uid) => {
         model.options = model.options.filter((entry) => entry.uid !== uid);
         this.updatePreview();
         this.render();
       },
-      (uid, value) => {
+      onKeyChange: (uid, value) => {
         const target = model.options.find((entry) => entry.uid === uid);
         if (!target) {
           return;
@@ -1020,7 +1030,7 @@ export class ModelConfigModal extends Modal {
         target.key = value;
         this.updatePreview();
       },
-      (uid, value) => {
+      onValueChange: (uid, value) => {
         const target = model.options.find((entry) => entry.uid === uid);
         if (!target) {
           return;
@@ -1028,30 +1038,26 @@ export class ModelConfigModal extends Modal {
         target.value = value;
         this.updatePreview();
       },
-      false,
-      {
-        emptyState: t('settings.model.visualEditor.modelOptionsEmpty'),
-        keyPlaceholder: t('settings.model.visualEditor.modelOptionsKeyPlaceholder'),
-        valuePlaceholder: t('settings.model.visualEditor.modelOptionsValuePlaceholder'),
-      },
-    );
+      emptyState: t('settings.model.visualEditor.modelOptionsEmpty'),
+      keyPlaceholder: t('settings.model.visualEditor.modelOptionsKeyPlaceholder'),
+      valuePlaceholder: t('settings.model.visualEditor.modelOptionsValuePlaceholder'),
+    });
 
-    this.renderKeyValueEditor(
-      detailsEl,
-      t('settings.model.visualEditor.modelVariantsTitle'),
-      t('settings.model.visualEditor.modelVariantsDesc'),
-      model.variants,
-      () => {
+    this.renderKeyValueEditor(detailsEl, {
+      title: t('settings.model.visualEditor.modelVariantsTitle'),
+      description: t('settings.model.visualEditor.modelVariantsDesc'),
+      values: model.variants,
+      onAdd: () => {
         model.variants.push(this.createKeyValueState());
         this.updatePreview();
         this.render();
       },
-      (uid) => {
+      onRemove: (uid) => {
         model.variants = model.variants.filter((entry) => entry.uid !== uid);
         this.updatePreview();
         this.render();
       },
-      (uid, value) => {
+      onKeyChange: (uid, value) => {
         const target = model.variants.find((entry) => entry.uid === uid);
         if (!target) {
           return;
@@ -1059,7 +1065,7 @@ export class ModelConfigModal extends Modal {
         target.key = value;
         this.updatePreview();
       },
-      (uid, value) => {
+      onValueChange: (uid, value) => {
         const target = model.variants.find((entry) => entry.uid === uid);
         if (!target) {
           return;
@@ -1067,30 +1073,26 @@ export class ModelConfigModal extends Modal {
         target.value = value;
         this.updatePreview();
       },
-      false,
-      {
-        emptyState: t('settings.model.visualEditor.modelVariantsEmpty'),
-        keyPlaceholder: t('settings.model.visualEditor.modelVariantsKeyPlaceholder'),
-        valuePlaceholder: t('settings.model.visualEditor.modelVariantsValuePlaceholder'),
-      },
-    );
+      emptyState: t('settings.model.visualEditor.modelVariantsEmpty'),
+      keyPlaceholder: t('settings.model.visualEditor.modelVariantsKeyPlaceholder'),
+      valuePlaceholder: t('settings.model.visualEditor.modelVariantsValuePlaceholder'),
+    });
 
-    this.renderKeyValueEditor(
-      detailsEl,
-      t('settings.model.visualEditor.modelExtraFieldsTitle'),
-      t('settings.model.visualEditor.modelExtraFieldsDesc'),
-      model.extraFields,
-      () => {
+    this.renderKeyValueEditor(detailsEl, {
+      title: t('settings.model.visualEditor.modelExtraFieldsTitle'),
+      description: t('settings.model.visualEditor.modelExtraFieldsDesc'),
+      values: model.extraFields,
+      onAdd: () => {
         model.extraFields.push(this.createKeyValueState());
         this.updatePreview();
         this.render();
       },
-      (uid) => {
+      onRemove: (uid) => {
         model.extraFields = model.extraFields.filter((entry) => entry.uid !== uid);
         this.updatePreview();
         this.render();
       },
-      (uid, value) => {
+      onKeyChange: (uid, value) => {
         const target = model.extraFields.find((entry) => entry.uid === uid);
         if (!target) {
           return;
@@ -1098,7 +1100,7 @@ export class ModelConfigModal extends Modal {
         target.key = value;
         this.updatePreview();
       },
-      (uid, value) => {
+      onValueChange: (uid, value) => {
         const target = model.extraFields.find((entry) => entry.uid === uid);
         if (!target) {
           return;
@@ -1106,34 +1108,30 @@ export class ModelConfigModal extends Modal {
         target.value = value;
         this.updatePreview();
       },
-      false,
-      {
-        emptyState: t('settings.model.visualEditor.modelAdvancedFieldsEmpty'),
-        keyPlaceholder: t('settings.model.visualEditor.modelAdvancedFieldsKeyPlaceholder'),
-        valuePlaceholder: t('settings.model.visualEditor.modelAdvancedFieldsValuePlaceholder'),
-      },
-    );
+      emptyState: t('settings.model.visualEditor.modelAdvancedFieldsEmpty'),
+      keyPlaceholder: t('settings.model.visualEditor.modelAdvancedFieldsKeyPlaceholder'),
+      valuePlaceholder: t('settings.model.visualEditor.modelAdvancedFieldsValuePlaceholder'),
+    });
   }
 
   private renderKeyValueEditor(
     containerEl: HTMLElement,
-    title: string,
-    description: string,
-    values: KeyValueFieldState[],
-    onAdd: () => void,
-    onRemove: (uid: string) => void,
-    onKeyChange: (uid: string, value: string) => void,
-    onValueChange: (uid: string, value: string) => void,
-    showColumnHeaders = false,
-    options: {
-      stackedLabels?: boolean;
-      iconRemoveButton?: boolean;
-      emptyState?: string;
-      keyPlaceholder?: string;
-      valuePlaceholder?: string;
-    } = {},
+    {
+      title,
+      description,
+      values,
+      onAdd,
+      onRemove,
+      onKeyChange,
+      onValueChange,
+      showColumnHeaders = false,
+      stackedLabels = false,
+      iconRemoveButton = true,
+      emptyState,
+      keyPlaceholder,
+      valuePlaceholder,
+    }: KeyValueEditorConfig,
   ): void {
-    const useIconRemoveButton = options.iconRemoveButton ?? true;
     const sectionEl = containerEl.createDiv({ cls: 'opencodian-model-workspace-subsection' });
     const headerEl = this.createSubsectionHeader(sectionEl, title, description);
     const addButton = headerEl.createEl('button', {
@@ -1145,7 +1143,7 @@ export class ModelConfigModal extends Modal {
     if (values.length === 0) {
       sectionEl.createDiv({
         cls: 'opencodian-model-workspace-empty small',
-        text: options.emptyState ?? t('settings.model.visualEditor.noExtraFields'),
+        text: emptyState ?? t('settings.model.visualEditor.noExtraFields'),
       });
       return;
     }
@@ -1159,12 +1157,12 @@ export class ModelConfigModal extends Modal {
     }
     for (const field of values) {
       const rowEl = listEl.createDiv({
-        cls: `opencodian-model-workspace-keyvalue-row${options.stackedLabels ? ' is-stacked-labels' : ''}`,
+        cls: `opencodian-model-workspace-keyvalue-row${stackedLabels ? ' is-stacked-labels' : ''}`,
       });
-      const keyFieldEl = options.stackedLabels
+      const keyFieldEl = stackedLabels
         ? rowEl.createDiv({ cls: 'opencodian-model-workspace-keyvalue-cell' })
         : rowEl;
-      if (options.stackedLabels) {
+      if (stackedLabels) {
         keyFieldEl.createDiv({
           cls: 'opencodian-model-workspace-keyvalue-cell-label',
           text: t('settings.model.visualEditor.fieldKeyLabel'),
@@ -1174,7 +1172,7 @@ export class ModelConfigModal extends Modal {
         cls: 'opencodian-model-workspace-keyvalue-input',
         attr: {
           type: 'text',
-          placeholder: options.keyPlaceholder ?? t('settings.model.visualEditor.fieldKeyPlaceholder'),
+          placeholder: keyPlaceholder ?? t('settings.model.visualEditor.fieldKeyPlaceholder'),
         },
       });
       this.bindEditableControl(keyInput);
@@ -1182,10 +1180,10 @@ export class ModelConfigModal extends Modal {
       keyInput.addEventListener('input', () => {
         onKeyChange(field.uid, keyInput.value);
       });
-      const valueFieldEl = options.stackedLabels
+      const valueFieldEl = stackedLabels
         ? rowEl.createDiv({ cls: 'opencodian-model-workspace-keyvalue-cell' })
         : rowEl;
-      if (options.stackedLabels) {
+      if (stackedLabels) {
         valueFieldEl.createDiv({
           cls: 'opencodian-model-workspace-keyvalue-cell-label',
           text: t('settings.model.visualEditor.fieldValueLabel'),
@@ -1195,7 +1193,7 @@ export class ModelConfigModal extends Modal {
         cls: 'opencodian-model-workspace-keyvalue-textarea',
         attr: {
           rows: '2',
-          placeholder: options.valuePlaceholder ?? t('settings.model.visualEditor.fieldValuePlaceholder'),
+          placeholder: valuePlaceholder ?? t('settings.model.visualEditor.fieldValuePlaceholder'),
         },
       });
       this.bindEditableControl(valueInput);
@@ -1204,14 +1202,14 @@ export class ModelConfigModal extends Modal {
         onValueChange(field.uid, valueInput.value);
       });
       const removeButton = rowEl.createEl('button', {
-        cls: `opencodian-model-workspace-danger-button${useIconRemoveButton ? ' is-icon-only' : ''}`,
-        text: useIconRemoveButton ? '' : t('settings.model.visualEditor.removeField'),
-        attr: useIconRemoveButton
+        cls: `opencodian-model-workspace-danger-button${iconRemoveButton ? ' is-icon-only' : ''}`,
+        text: iconRemoveButton ? '' : t('settings.model.visualEditor.removeField'),
+        attr: iconRemoveButton
           ? { 'aria-label': t('settings.model.visualEditor.removeField') }
           : undefined,
       });
       removeButton.type = 'button';
-      if (useIconRemoveButton) {
+      if (iconRemoveButton) {
         setIcon(removeButton, 'trash-2');
       }
       removeButton.addEventListener('click', () => onRemove(field.uid));
@@ -1220,13 +1218,14 @@ export class ModelConfigModal extends Modal {
 
   private createTextField(
     containerEl: HTMLElement,
-    label: string,
-    value: string,
-    onChange: (value: string) => void,
-    placeholder = '',
-    description?: string,
-    _rerenderOnBlur = false,
-    secret = false,
+    {
+      label,
+      value,
+      onChange,
+      placeholder = '',
+      description,
+      secret = false,
+    }: TextFieldConfig,
   ): HTMLElement {
     const fieldEl = containerEl.createDiv({ cls: 'opencodian-model-workspace-field' });
     fieldEl.createEl('label', { text: label });
@@ -1263,11 +1262,13 @@ export class ModelConfigModal extends Modal {
 
   private createSelectField(
     containerEl: HTMLElement,
-    label: string,
-    value: string,
-    options: Array<{ value: string; label: string }>,
-    onChange: (value: string) => void,
-    description?: string,
+    {
+      label,
+      value,
+      options,
+      onChange,
+      description,
+    }: SelectFieldConfig,
   ): HTMLElement {
     const fieldEl = containerEl.createDiv({ cls: 'opencodian-model-workspace-field' });
     fieldEl.createEl('label', { text: label });
