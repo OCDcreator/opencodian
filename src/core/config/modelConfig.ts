@@ -54,6 +54,20 @@ export interface ResolvedModelSelection {
 }
 
 export type ProviderAvailabilityConfig = Pick<OpencodeModelConfigSubset, 'enabled_providers' | 'disabled_providers'>;
+export type InheritedModelConfigSource = 'local_disk' | 'server_default_scope';
+
+export interface InheritedModelConfigResolution {
+  scopedConfig: OpencodeModelConfigSubset;
+  defaultScopeConfig: OpencodeModelConfigSubset;
+  inheritedConfig: OpencodeModelConfigSubset;
+  inheritedConfigSource: InheritedModelConfigSource;
+  mergedScopedConfig: OpencodeModelConfigSubset;
+  effectiveProviderConfig: ProviderAvailabilityConfig;
+  isProviderEnabledInServerScope(providerId: string): boolean;
+  isProviderEnabledInCurrentScope(providerId: string): boolean;
+  isProviderEffectivelyEnabled(providerId: string): boolean;
+  getCurrentEnabledProviderIds(providerIds: Iterable<string>): string[];
+}
 
 const MODEL_KEYS: Array<keyof OpencodeModelConfigSubset> = [
   'model',
@@ -484,6 +498,96 @@ export function mergeProviderAvailabilityConfig(
         ? uniqueStrings(inherited.disabled_providers)
         : undefined,
   };
+}
+
+export function resolveInheritedModelConfigResolution(options: {
+  localServerMode: boolean;
+  localConfig: OpencodeModelConfigSubset;
+  scopedConfig: OpencodeModelConfigSubset;
+  defaultScopeConfig: OpencodeModelConfigSubset;
+  diskInheritedConfig?: OpencodeModelConfigSubset | null;
+}): InheritedModelConfigResolution {
+  const inheritedConfig = options.localServerMode
+    ? supplementInheritedConfigFromScopedConfig(
+      options.diskInheritedConfig ?? {},
+      options.scopedConfig,
+      options.localConfig,
+    )
+    : mergeModelConfigSubsets({}, options.defaultScopeConfig);
+  const effectiveProviderConfig = mergeProviderAvailabilityConfig(inheritedConfig, options.localConfig);
+  const isProviderEnabledInServerScope = (providerId: string) => isProviderEnabled(options.scopedConfig, providerId);
+  const isProviderEnabledInCurrentScope = (providerId: string) => (
+    isProviderEnabledInServerScope(providerId)
+    && isProviderEnabled(options.localConfig, providerId)
+  );
+
+  return {
+    scopedConfig: options.scopedConfig,
+    defaultScopeConfig: options.defaultScopeConfig,
+    inheritedConfig,
+    inheritedConfigSource: options.localServerMode ? 'local_disk' : 'server_default_scope',
+    mergedScopedConfig: mergeModelConfigSubsets(inheritedConfig, options.scopedConfig),
+    effectiveProviderConfig,
+    isProviderEnabledInServerScope,
+    isProviderEnabledInCurrentScope,
+    isProviderEffectivelyEnabled: (providerId: string) => (
+      isProviderEnabledInCurrentScope(providerId)
+      && isProviderEnabled(effectiveProviderConfig, providerId)
+    ),
+    getCurrentEnabledProviderIds: (providerIds: Iterable<string>) => collectCurrentEnabledProviderIds(
+      providerIds,
+      isProviderEnabledInCurrentScope,
+    ),
+  };
+}
+
+function supplementInheritedConfigFromScopedConfig(
+  inheritedConfig: OpencodeModelConfigSubset,
+  scopedConfig: OpencodeModelConfigSubset,
+  localConfig: OpencodeModelConfigSubset,
+): OpencodeModelConfigSubset {
+  let next = mergeModelConfigSubsets({}, inheritedConfig);
+
+  if (
+    !Array.isArray(localConfig.enabled_providers)
+    && !Array.isArray(next.enabled_providers)
+    && Array.isArray(scopedConfig.enabled_providers)
+  ) {
+    next = mergeModelConfigSubsets(next, {
+      enabled_providers: scopedConfig.enabled_providers,
+    });
+  }
+
+  if (!Array.isArray(localConfig.disabled_providers) && Array.isArray(scopedConfig.disabled_providers)) {
+    next = mergeModelConfigSubsets(next, {
+      disabled_providers: [
+        ...(next.disabled_providers ?? []),
+        ...scopedConfig.disabled_providers,
+      ],
+    });
+  }
+
+  return next;
+}
+
+function collectCurrentEnabledProviderIds(
+  providerIds: Iterable<string>,
+  isProviderEnabledInCurrentScope: (providerId: string) => boolean,
+): string[] {
+  const seenProviderIds = new Set<string>();
+  const enabledProviderIds: string[] = [];
+
+  for (const candidate of providerIds) {
+    const providerId = candidate.trim();
+    if (!providerId || seenProviderIds.has(providerId) || !isProviderEnabledInCurrentScope(providerId)) {
+      continue;
+    }
+
+    seenProviderIds.add(providerId);
+    enabledProviderIds.push(providerId);
+  }
+
+  return enabledProviderIds;
 }
 
 export function setProviderEnabled(options: {

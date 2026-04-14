@@ -13,6 +13,8 @@
 
 它不直接维护 UI，也不直接写整个配置文件，而是负责给上层返回一个既能表达“基础事实”，又能表达“当前可选状态”的模型 catalog bundle。自 R11 起，settings 侧围绕这些 bundle 再做 `displayCatalogs` / `providerStatusCatalogs` 的组合语义，已经下沉到 `ModelCatalogStateService`，因此 `ModelConfigService` 继续专注“事实目录 + 继承可用性 + probe”。
 
+自 `R58` 起，继承层配置来源选择、local/scoped/default-scope provider layering，以及 `effectiveProviderConfig` / `currentEnabledProviderIds` 所依赖的 enablement 判定，已统一收口到 `modelConfig.ts` 的 `resolveInheritedModelConfigResolution()` seam；`ModelConfigService` 主要消费这个 resolution 产物再组装 catalog bundle 与 probe 结果。
+
 ## 核心类型
 
 ```typescript
@@ -34,6 +36,7 @@ export interface ModelCatalogBundle {
 - `currentEnabledProviderIds`: 当前作用域下真正视为“provider 已启用”的 provider ID 列表；设置页用它避免把服务端当前不可用的 provider 误显示成绿色启用。
 - `serverConfig`: 插件使用的“继承层 provider 配置”。本地模式优先来自本机磁盘配置，远程模式回退到服务端默认作用域 `config.get()`；它用于标注服务端禁用状态和 provider 开关继承值。
 - `effectiveProviderConfig`: 以 `serverConfig` 为继承基线，再叠加当前项目 `.opencode/opencode.json` 的 provider 可用性覆盖；本地数组按字段替换继承数组。
+- `serverConfig`、`effectiveProviderConfig` 与 `currentEnabledProviderIds` 现在来自同一个 inherited-config resolution seam，避免服务层重复手写 scope merge / enablement 条件。
 
 ## 关键行为
 
@@ -173,18 +176,13 @@ OpenCodeService.getResolvedModelConfig(includeDirectory=false)
 local disk config (XDG config / ~/.opencode / managed)
   -> local-mode inherited serverConfig
 
-local-mode inherited serverConfig or remote default-scope serverConfig
-  -> serverConfig
+local-mode disk inherited config or remote default-scope config
+  -> resolveInheritedModelConfigResolution()
+  -> serverConfig + effectiveProviderConfig + currentEnabledProviderIds predicates
 
 local + server + modelSourceMode
   -> resolveCatalog()
   -> baseEffective
-
-serverConfig + local provider arrays
-  -> effectiveProviderConfig
-
-scopedConfig + local provider arrays
-  -> currentEnabledProviderIds
 
 baseEffective + disabledModelRefs + currentEnabledProviderIds
   -> filterCatalog() + provider ID filter

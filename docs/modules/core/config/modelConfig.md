@@ -5,11 +5,12 @@
 
 ## 概述
 
-`modelConfig.ts` 是 Worker 2 范围里最底层的配置辅助模块。它同时承担 3 类职责：
+`modelConfig.ts` 是 Worker 2 范围里最底层的配置辅助模块。它同时承担 4 类职责：
 
 - 解析带注释的 OpenCode 配置文本
 - 清洗 / 提取 / 回写模型相关字段子集
 - 把模型配置映射成 `ModelCatalog`，并与服务端目录做合并
+- 统一 inherited server config resolution、provider availability layering 与 current-scope enablement 判定
 
 它被多个模块复用：
 
@@ -144,6 +145,12 @@ export interface ModelCatalog {
 
 `mergeProviderAvailabilityConfig(inherited, local)` 用于把服务器配置与当前项目配置合并。数组不是追加合并，而是本地字段存在就替换继承字段；本地字段不存在才继承服务器字段。
 
+`resolveInheritedModelConfigResolution(...)` 则把 `ModelConfigService` 需要的继承层决策集中起来：
+
+- 远程模式直接采用默认作用域 `config.get()` 结果
+- 本地模式优先使用磁盘继承配置，并只在项目未显式覆盖时补入当前 scoped runtime 的 provider 白名单 / 黑名单
+- 同时产出 `inheritedConfig`、`mergedScopedConfig`、`effectiveProviderConfig`，以及 `isProviderEnabledInServerScope()` / `isProviderEnabledInCurrentScope()` / `isProviderEffectivelyEnabled()` / `getCurrentEnabledProviderIds()` 等判定入口
+
 `setProviderEnabled(subset, providerId, enabled, knownProviderIds, inherited?)` 写回项目配置时会以 `inherited` 为基线生成最小本地覆盖。例如继承层当前禁用 `alibaba` / `alibaba-cn`，项目如果只想重新启用 `alibaba`，本地可以写成 `disabled_providers: ['alibaba-cn']`；如果想把继承禁用全部清空，也可以显式写 `disabled_providers: []`。这里的重点是“本地字段替换继承字段”，而不是把继承禁用当成不可覆盖的硬限制。
 
 ## 关键导出
@@ -164,6 +171,7 @@ export interface ModelCatalog {
 | `resolveModelSelection(base, effective, provider, model)` | 判断当前选择是可用、未配置还是不可用 |
 | `resolvePreferredAvailableModel(effective, provider, model)` | 从 `effective` catalog 里挑出当前应使用的可用模型 |
 | `mergeProviderAvailabilityConfig(inherited, local)` | 按字段继承或替换 provider 白名单 / 黑名单 |
+| `resolveInheritedModelConfigResolution(options)` | 统一继承配置来源、scope merge 与 provider enablement 判定 seam |
 | `setProviderEnabled(subset, providerId, enabled, knownProviderIds, inherited?)` | 写入最小 provider 开关覆盖 |
 
 ## 与其他模块的交互

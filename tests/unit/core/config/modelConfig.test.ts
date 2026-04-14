@@ -4,6 +4,7 @@ import {
   isProviderEnabled,
   mergeCatalogs,
   mergeProviderAvailabilityConfig,
+  resolveInheritedModelConfigResolution,
   resolveModelSelection,
   resolvePreferredAvailableModel,
   setProviderEnabled,
@@ -84,6 +85,74 @@ describe('modelConfig helpers', () => {
       enabled_providers: ['deepseek'],
       disabled_providers: ['alibaba-cn'],
     });
+  });
+
+  it('resolves local inherited config layering from disk, scoped runtime, and project overrides', () => {
+    const resolution = resolveInheritedModelConfigResolution({
+      localServerMode: true,
+      diskInheritedConfig: {
+        disabled_providers: ['alibaba'],
+      },
+      scopedConfig: {
+        enabled_providers: ['deepseek'],
+        disabled_providers: ['opencode'],
+      },
+      defaultScopeConfig: {
+        disabled_providers: ['should-not-apply'],
+      },
+      localConfig: {},
+    });
+
+    expect(resolution.inheritedConfigSource).toBe('local_disk');
+    expect(resolution.inheritedConfig).toEqual({
+      enabled_providers: ['deepseek'],
+      disabled_providers: ['alibaba', 'opencode'],
+    });
+    expect(resolution.mergedScopedConfig).toEqual({
+      enabled_providers: ['deepseek'],
+      disabled_providers: ['opencode'],
+    });
+    expect(resolution.effectiveProviderConfig).toEqual({
+      enabled_providers: ['deepseek'],
+      disabled_providers: ['alibaba', 'opencode'],
+    });
+    expect(resolution.getCurrentEnabledProviderIds(['deepseek', 'alibaba', 'deepseek'])).toEqual(['deepseek']);
+    expect(resolution.isProviderEnabledInServerScope('deepseek')).toBe(true);
+    expect(resolution.isProviderEnabledInCurrentScope('alibaba')).toBe(false);
+    expect(resolution.isProviderEffectivelyEnabled('opencode')).toBe(false);
+  });
+
+  it('lets remote inherited availability come from server default scope while project overrides clear it', () => {
+    const resolution = resolveInheritedModelConfigResolution({
+      localServerMode: false,
+      diskInheritedConfig: {
+        disabled_providers: ['should-not-apply'],
+      },
+      scopedConfig: {
+        enabled_providers: ['deepseek'],
+        disabled_providers: [],
+      },
+      defaultScopeConfig: {
+        enabled_providers: ['deepseek'],
+        disabled_providers: ['alibaba'],
+      },
+      localConfig: {
+        disabled_providers: [],
+      },
+    });
+
+    expect(resolution.inheritedConfigSource).toBe('server_default_scope');
+    expect(resolution.inheritedConfig).toEqual({
+      enabled_providers: ['deepseek'],
+      disabled_providers: ['alibaba'],
+    });
+    expect(resolution.effectiveProviderConfig).toEqual({
+      enabled_providers: ['deepseek'],
+      disabled_providers: [],
+    });
+    expect(resolution.isProviderEnabledInCurrentScope('deepseek')).toBe(true);
+    expect(resolution.isProviderEffectivelyEnabled('deepseek')).toBe(true);
+    expect(resolution.isProviderEffectivelyEnabled('alibaba')).toBe(false);
   });
 
   it('preserves inherited blacklist diff when locally re-enabling one provider', () => {
