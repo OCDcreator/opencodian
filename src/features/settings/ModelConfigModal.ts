@@ -55,6 +55,9 @@ type ProviderCheckState =
   | { status: 'warning'; message: string }
   | { status: 'error'; message: string };
 
+type ProviderInterfaceFormatOption = (typeof PROVIDER_INTERFACE_FORMAT_OPTIONS)[number];
+type ModelKeyValueCollectionKey = 'options' | 'variants' | 'extraFields';
+
 interface ModelConfigModalOpenOptions {
   initialProviderId?: string;
   initialView?: 'preset-selector' | 'editor';
@@ -334,6 +337,17 @@ export class ModelConfigModal extends Modal {
       return;
     }
 
+    this.renderProviderToolbar(containerEl, provider);
+    const sectionsEl = containerEl.createDiv({ cls: 'opencodian-model-workspace-editor-panel' });
+    this.renderProviderIdentitySection(sectionsEl, provider);
+    const formatMeta = this.renderProviderConnectionSection(sectionsEl, provider);
+    this.renderProviderExtraOptionsSection(sectionsEl, provider);
+    this.renderProviderModelsSection(sectionsEl, provider, formatMeta);
+    this.renderProviderDefaultsSection(sectionsEl);
+    this.renderEditorPreviewSection(sectionsEl);
+  }
+
+  private renderProviderToolbar(containerEl: HTMLElement, provider: ProviderFormState): void {
     const toolbarEl = containerEl.createDiv({ cls: 'opencodian-model-workspace-toolbar is-cc-switch' });
     const toolbarCopyEl = toolbarEl.createDiv({ cls: 'opencodian-model-workspace-toolbar-copy' });
     toolbarCopyEl.createDiv({
@@ -369,13 +383,14 @@ export class ModelConfigModal extends Modal {
     });
 
     const utilityActionsEl = actionsEl.createDiv({ cls: 'opencodian-model-workspace-editor-actions-group' });
+    const providerCheckState = this.providerChecks.get(provider.uid);
     const providerTestButton = utilityActionsEl.createEl('button', {
-      text: this.providerChecks.get(provider.uid)?.status === 'loading'
+      text: providerCheckState?.status === 'loading'
         ? t('settings.model.availability.check.loading')
         : t('settings.model.visualEditor.testProvider'),
     });
     providerTestButton.type = 'button';
-    providerTestButton.disabled = this.providerChecks.get(provider.uid)?.status === 'loading' || !provider.id.trim();
+    providerTestButton.disabled = providerCheckState?.status === 'loading' || !provider.id.trim();
     providerTestButton.addEventListener('click', () => {
       void this.runProviderCheck(provider);
     });
@@ -400,10 +415,10 @@ export class ModelConfigModal extends Modal {
     deleteButton.addEventListener('click', () => {
       this.deleteSelectedProvider();
     });
+  }
 
-    const sectionsEl = containerEl.createDiv({ cls: 'opencodian-model-workspace-editor-panel' });
-
-    const identitySectionEl = sectionsEl.createDiv({ cls: 'opencodian-model-workspace-section is-flow-section' });
+  private renderProviderIdentitySection(containerEl: HTMLElement, provider: ProviderFormState): void {
+    const identitySectionEl = containerEl.createDiv({ cls: 'opencodian-model-workspace-section is-flow-section' });
     this.createSectionHeader(
       identitySectionEl,
       t('settings.model.visualEditor.identitySectionTitle'),
@@ -430,14 +445,20 @@ export class ModelConfigModal extends Modal {
       placeholder: 'My Provider',
     });
     providerNameField.addClass('is-full-span');
+  }
 
-    const connectionSectionEl = sectionsEl.createDiv({ cls: 'opencodian-model-workspace-section is-flow-section' });
+  private renderProviderConnectionSection(
+    containerEl: HTMLElement,
+    provider: ProviderFormState,
+  ): ProviderInterfaceFormatOption {
+    const connectionSectionEl = containerEl.createDiv({ cls: 'opencodian-model-workspace-section is-flow-section' });
     this.createSectionHeader(
       connectionSectionEl,
       t('settings.model.visualEditor.providerSectionTitle'),
       t('settings.model.visualEditor.providerSectionDesc'),
     );
     const connectionGridEl = connectionSectionEl.createDiv({ cls: 'opencodian-model-workspace-grid is-connection-grid' });
+    const formatMeta = this.getProviderInterfaceFormatMeta(provider.interfaceFormat);
     const interfaceField = this.createSelectField(connectionGridEl, {
       label: t('settings.model.visualEditor.interfaceFormat'),
       value: provider.interfaceFormat,
@@ -446,10 +467,8 @@ export class ModelConfigModal extends Modal {
         label: t(entry.labelKey as never),
       })),
       onChange: (value) => {
-        const previous = PROVIDER_INTERFACE_FORMAT_OPTIONS.find((entry) => entry.id === provider.interfaceFormat)
-          ?? PROVIDER_INTERFACE_FORMAT_OPTIONS[1];
-        const next = PROVIDER_INTERFACE_FORMAT_OPTIONS.find((entry) => entry.id === value)
-          ?? PROVIDER_INTERFACE_FORMAT_OPTIONS[1];
+        const previous = this.getProviderInterfaceFormatMeta(provider.interfaceFormat);
+        const next = this.getProviderInterfaceFormatMeta(value as ProviderInterfaceFormatId);
         provider.interfaceFormat = value as ProviderInterfaceFormatId;
         if (!provider.baseURL.trim() || provider.baseURL.trim() === previous.defaultBaseUrl) {
           provider.baseURL = '';
@@ -458,8 +477,7 @@ export class ModelConfigModal extends Modal {
         this.updatePreview();
         this.render();
       },
-      description: t((PROVIDER_INTERFACE_FORMAT_OPTIONS.find((entry) => entry.id === provider.interfaceFormat)?.descriptionKey
-        ?? PROVIDER_INTERFACE_FORMAT_OPTIONS[1].descriptionKey) as never),
+      description: t(formatMeta.descriptionKey as never),
     });
     interfaceField.addClass('is-full-span');
 
@@ -475,8 +493,6 @@ export class ModelConfigModal extends Modal {
       customNpmField.addClass('is-full-span');
     }
 
-    const formatMeta = PROVIDER_INTERFACE_FORMAT_OPTIONS.find((entry) => entry.id === provider.interfaceFormat)
-      ?? PROVIDER_INTERFACE_FORMAT_OPTIONS[1];
     const baseUrlField = this.createTextField(connectionGridEl, {
       label: `${t('settings.model.visualEditor.baseURL')} *`,
       value: provider.baseURL,
@@ -505,7 +521,11 @@ export class ModelConfigModal extends Modal {
       });
     }
 
-    const extraOptionsSectionEl = sectionsEl.createDiv({ cls: 'opencodian-model-workspace-section is-flow-section' });
+    return formatMeta;
+  }
+
+  private renderProviderExtraOptionsSection(containerEl: HTMLElement, provider: ProviderFormState): void {
+    const extraOptionsSectionEl = containerEl.createDiv({ cls: 'opencodian-model-workspace-section is-flow-section' });
     this.renderKeyValueEditor(extraOptionsSectionEl, {
       title: t('settings.model.visualEditor.extraOptionsTitle'),
       description: t('settings.model.visualEditor.extraOptionsDesc'),
@@ -538,8 +558,14 @@ export class ModelConfigModal extends Modal {
       },
       stackedLabels: true,
     });
+  }
 
-    const modelsSectionEl = sectionsEl.createDiv({ cls: 'opencodian-model-workspace-section' });
+  private renderProviderModelsSection(
+    containerEl: HTMLElement,
+    provider: ProviderFormState,
+    formatMeta: ProviderInterfaceFormatOption,
+  ): void {
+    const modelsSectionEl = containerEl.createDiv({ cls: 'opencodian-model-workspace-section' });
     this.createSectionHeader(
       modelsSectionEl,
       t('settings.model.visualEditor.modelsTitle'),
@@ -572,48 +598,57 @@ export class ModelConfigModal extends Modal {
       this.render();
     });
 
-    const fetchedCandidates = this.fetchedModelCandidates.get(provider.uid) ?? [];
-    if (fetchedCandidates.length > 0) {
-      const importPanelEl = modelsSectionEl.createDiv({ cls: 'opencodian-model-workspace-import-panel is-inline' });
-      const importHeaderEl = importPanelEl.createDiv({ cls: 'opencodian-model-workspace-import-header' });
-      importHeaderEl.createDiv({
-        cls: 'opencodian-model-workspace-import-title',
-        text: t('settings.model.visualEditor.fetchResultTitle', {
-          count: String(fetchedCandidates.length),
-        }),
-      });
-      const importButton = importHeaderEl.createEl('button', {
-        cls: 'mod-cta',
-        text: t('settings.model.visualEditor.importMissingModels'),
-      });
-      importButton.type = 'button';
-      importButton.addEventListener('click', () => {
-        this.importFetchedModels(provider, fetchedCandidates);
-      });
-      const importListEl = importPanelEl.createDiv({ cls: 'opencodian-model-workspace-import-list' });
-      for (const candidate of fetchedCandidates.slice(0, 12)) {
-        importListEl.createDiv({
-          cls: 'opencodian-model-workspace-import-item',
-          text: candidate.name && candidate.name !== candidate.id
-            ? `${candidate.name} · ${candidate.id}`
-            : candidate.id,
-        });
-      }
-    }
+    this.renderFetchedModelCandidates(modelsSectionEl, provider);
 
     if (provider.models.length === 0) {
       modelsSectionEl.createDiv({
         cls: 'opencodian-model-workspace-empty',
         text: t('settings.model.visualEditor.noModels'),
       });
-    } else {
-      const modelsListEl = modelsSectionEl.createDiv({ cls: 'opencodian-model-workspace-model-list' });
-      for (const model of provider.models) {
-        this.renderModelCard(modelsListEl, provider, model);
-      }
+      return;
     }
 
-    const defaultsSectionEl = sectionsEl.createDiv({ cls: 'opencodian-model-workspace-section' });
+    const modelsListEl = modelsSectionEl.createDiv({ cls: 'opencodian-model-workspace-model-list' });
+    for (const model of provider.models) {
+      this.renderModelCard(modelsListEl, provider, model);
+    }
+  }
+
+  private renderFetchedModelCandidates(containerEl: HTMLElement, provider: ProviderFormState): void {
+    const fetchedCandidates = this.fetchedModelCandidates.get(provider.uid) ?? [];
+    if (fetchedCandidates.length === 0) {
+      return;
+    }
+
+    const importPanelEl = containerEl.createDiv({ cls: 'opencodian-model-workspace-import-panel is-inline' });
+    const importHeaderEl = importPanelEl.createDiv({ cls: 'opencodian-model-workspace-import-header' });
+    importHeaderEl.createDiv({
+      cls: 'opencodian-model-workspace-import-title',
+      text: t('settings.model.visualEditor.fetchResultTitle', {
+        count: String(fetchedCandidates.length),
+      }),
+    });
+    const importButton = importHeaderEl.createEl('button', {
+      cls: 'mod-cta',
+      text: t('settings.model.visualEditor.importMissingModels'),
+    });
+    importButton.type = 'button';
+    importButton.addEventListener('click', () => {
+      this.importFetchedModels(provider, fetchedCandidates);
+    });
+    const importListEl = importPanelEl.createDiv({ cls: 'opencodian-model-workspace-import-list' });
+    for (const candidate of fetchedCandidates.slice(0, 12)) {
+      importListEl.createDiv({
+        cls: 'opencodian-model-workspace-import-item',
+        text: candidate.name && candidate.name !== candidate.id
+          ? `${candidate.name} · ${candidate.id}`
+          : candidate.id,
+      });
+    }
+  }
+
+  private renderProviderDefaultsSection(containerEl: HTMLElement): void {
+    const defaultsSectionEl = containerEl.createDiv({ cls: 'opencodian-model-workspace-section' });
     this.createSectionHeader(
       defaultsSectionEl,
       t('settings.model.visualEditor.defaultsTitle'),
@@ -638,16 +673,14 @@ export class ModelConfigModal extends Modal {
       placeholder: 'provider/model',
       description: t('settings.model.visualEditor.smallModelDesc'),
     });
+  }
 
-    const previewSectionEl = sectionsEl.createDiv({ cls: 'opencodian-model-workspace-section' });
+  private renderEditorPreviewSection(containerEl: HTMLElement): void {
+    const previewSectionEl = containerEl.createDiv({ cls: 'opencodian-model-workspace-section' });
     this.createSectionHeader(
       previewSectionEl,
-      this.isAddProviderFlow()
-        ? t('settings.model.visualEditor.addProviderPreviewTitle')
-        : t('settings.model.visualEditor.previewTitle'),
-      this.isAddProviderFlow()
-        ? t('settings.model.visualEditor.addProviderPreviewDesc')
-        : t('settings.model.visualEditor.previewDesc'),
+      t('settings.model.visualEditor.previewTitle'),
+      t('settings.model.visualEditor.previewDesc'),
     );
 
     const previewToolbarEl = previewSectionEl.createDiv({ cls: 'opencodian-model-workspace-preview-toolbar' });
@@ -672,6 +705,11 @@ export class ModelConfigModal extends Modal {
       },
     });
     this.updatePreview();
+  }
+
+  private getProviderInterfaceFormatMeta(value: ProviderInterfaceFormatId): ProviderInterfaceFormatOption {
+    return PROVIDER_INTERFACE_FORMAT_OPTIONS.find((entry) => entry.id === value)
+      ?? PROVIDER_INTERFACE_FORMAT_OPTIONS[1];
   }
 
   private renderAddProviderEditor(containerEl: HTMLElement, provider: ProviderFormState): void {
@@ -896,6 +934,20 @@ export class ModelConfigModal extends Modal {
     const expanded = this.expandedModelUids.has(model.uid);
     const modelEl = containerEl.createDiv({ cls: `opencodian-model-workspace-model-card${model.enabled ? '' : ' is-disabled'}` });
     const headerEl = modelEl.createDiv({ cls: 'opencodian-model-workspace-model-header' });
+    this.renderModelCardHeader(headerEl, provider, model, expanded);
+    if (!expanded) {
+      return;
+    }
+
+    this.renderExpandedModelCardDetails(modelEl, model);
+  }
+
+  private renderModelCardHeader(
+    headerEl: HTMLElement,
+    provider: ProviderFormState,
+    model: ModelFormState,
+    expanded: boolean,
+  ): void {
     const expandButton = headerEl.createEl('button', { cls: 'opencodian-model-workspace-model-expand' });
     expandButton.type = 'button';
     setIcon(expandButton, expanded ? 'chevron-down' : 'chevron-right');
@@ -974,11 +1026,9 @@ export class ModelConfigModal extends Modal {
       this.updatePreview();
       this.render();
     });
+  }
 
-    if (!expanded) {
-      return;
-    }
-
+  private renderExpandedModelCardDetails(modelEl: HTMLElement, model: ModelFormState): void {
     const detailsEl = modelEl.createDiv({ cls: 'opencodian-model-workspace-model-details' });
     const limitsSectionEl = detailsEl.createDiv({
       cls: 'opencodian-model-workspace-subsection opencodian-model-workspace-model-limit-section',
@@ -1008,92 +1058,59 @@ export class ModelConfigModal extends Modal {
       description: t('settings.model.visualEditor.outputLimitDesc'),
     });
 
-    this.renderKeyValueEditor(detailsEl, {
+    this.renderModelCollectionEditor(detailsEl, model, 'options', {
       title: t('settings.model.visualEditor.modelOptionsTitle'),
       description: t('settings.model.visualEditor.modelOptionsDesc'),
-      values: model.options,
-      onAdd: () => {
-        model.options.push(this.createKeyValueState());
-        this.updatePreview();
-        this.render();
-      },
-      onRemove: (uid) => {
-        model.options = model.options.filter((entry) => entry.uid !== uid);
-        this.updatePreview();
-        this.render();
-      },
-      onKeyChange: (uid, value) => {
-        const target = model.options.find((entry) => entry.uid === uid);
-        if (!target) {
-          return;
-        }
-        target.key = value;
-        this.updatePreview();
-      },
-      onValueChange: (uid, value) => {
-        const target = model.options.find((entry) => entry.uid === uid);
-        if (!target) {
-          return;
-        }
-        target.value = value;
-        this.updatePreview();
-      },
       emptyState: t('settings.model.visualEditor.modelOptionsEmpty'),
       keyPlaceholder: t('settings.model.visualEditor.modelOptionsKeyPlaceholder'),
       valuePlaceholder: t('settings.model.visualEditor.modelOptionsValuePlaceholder'),
     });
 
-    this.renderKeyValueEditor(detailsEl, {
+    this.renderModelCollectionEditor(detailsEl, model, 'variants', {
       title: t('settings.model.visualEditor.modelVariantsTitle'),
       description: t('settings.model.visualEditor.modelVariantsDesc'),
-      values: model.variants,
-      onAdd: () => {
-        model.variants.push(this.createKeyValueState());
-        this.updatePreview();
-        this.render();
-      },
-      onRemove: (uid) => {
-        model.variants = model.variants.filter((entry) => entry.uid !== uid);
-        this.updatePreview();
-        this.render();
-      },
-      onKeyChange: (uid, value) => {
-        const target = model.variants.find((entry) => entry.uid === uid);
-        if (!target) {
-          return;
-        }
-        target.key = value;
-        this.updatePreview();
-      },
-      onValueChange: (uid, value) => {
-        const target = model.variants.find((entry) => entry.uid === uid);
-        if (!target) {
-          return;
-        }
-        target.value = value;
-        this.updatePreview();
-      },
       emptyState: t('settings.model.visualEditor.modelVariantsEmpty'),
       keyPlaceholder: t('settings.model.visualEditor.modelVariantsKeyPlaceholder'),
       valuePlaceholder: t('settings.model.visualEditor.modelVariantsValuePlaceholder'),
     });
 
-    this.renderKeyValueEditor(detailsEl, {
+    this.renderModelCollectionEditor(detailsEl, model, 'extraFields', {
       title: t('settings.model.visualEditor.modelExtraFieldsTitle'),
       description: t('settings.model.visualEditor.modelExtraFieldsDesc'),
-      values: model.extraFields,
+      emptyState: t('settings.model.visualEditor.modelAdvancedFieldsEmpty'),
+      keyPlaceholder: t('settings.model.visualEditor.modelAdvancedFieldsKeyPlaceholder'),
+      valuePlaceholder: t('settings.model.visualEditor.modelAdvancedFieldsValuePlaceholder'),
+    });
+  }
+
+  private renderModelCollectionEditor(
+    containerEl: HTMLElement,
+    model: ModelFormState,
+    field: ModelKeyValueCollectionKey,
+    {
+      title,
+      description,
+      emptyState,
+      keyPlaceholder,
+      valuePlaceholder,
+    }: Pick<KeyValueEditorConfig, 'title' | 'description' | 'emptyState' | 'keyPlaceholder' | 'valuePlaceholder'>,
+  ): void {
+    this.renderKeyValueEditor(containerEl, {
+      title,
+      description,
+      values: model[field],
       onAdd: () => {
-        model.extraFields.push(this.createKeyValueState());
+        model[field].push(this.createKeyValueState());
         this.updatePreview();
         this.render();
       },
       onRemove: (uid) => {
-        model.extraFields = model.extraFields.filter((entry) => entry.uid !== uid);
+        model[field] = model[field].filter((entry) => entry.uid !== uid);
         this.updatePreview();
         this.render();
       },
       onKeyChange: (uid, value) => {
-        const target = model.extraFields.find((entry) => entry.uid === uid);
+        const target = model[field].find((entry) => entry.uid === uid);
         if (!target) {
           return;
         }
@@ -1101,16 +1118,16 @@ export class ModelConfigModal extends Modal {
         this.updatePreview();
       },
       onValueChange: (uid, value) => {
-        const target = model.extraFields.find((entry) => entry.uid === uid);
+        const target = model[field].find((entry) => entry.uid === uid);
         if (!target) {
           return;
         }
         target.value = value;
         this.updatePreview();
       },
-      emptyState: t('settings.model.visualEditor.modelAdvancedFieldsEmpty'),
-      keyPlaceholder: t('settings.model.visualEditor.modelAdvancedFieldsKeyPlaceholder'),
-      valuePlaceholder: t('settings.model.visualEditor.modelAdvancedFieldsValuePlaceholder'),
+      emptyState,
+      keyPlaceholder,
+      valuePlaceholder,
     });
   }
 

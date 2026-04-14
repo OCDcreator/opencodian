@@ -2,11 +2,11 @@
 
 > **状态**: [CONFIRMED_NEXT_BATCH]
 > **作用**: 这是 maintainability 无人值守的战略文档。每轮开始前，先读本文件，再读 `docs/status/maintainability-round-roadmap.md` 与最近的 `docs/status/maintainability-phase-XXX.md`。
-> **自动推进状态**: 文档已做人工压缩归档；当前可自动执行的 `[NEXT]` 是 `W6 - ModelConfigModal render trim`。本批只继续受控 warning cleanup，不自动恢复 `R33+` maintainability queue。
+> **自动推进状态**: 文档已做人工压缩归档；当前可自动执行的 `[NEXT]` 是 `W7 - main.ts loadSettings trim`。本批只继续受控 warning cleanup，不自动恢复 `R33+` maintainability queue。
 
 ## 1. 当前判断
 
-**当前判断：R28-R32、L1-L5 与 W1-W5 均已完成，文档主入口已压缩。仓库当前 lint 基线是 `0 errors / 103 warnings`；后续应继续一小批受控 warning cleanup，优先清理仍能在现有 owner 内稳定收束的热点，再决定是否恢复新的 maintainability 重构。**
+**当前判断：R28-R32、L1-L5 与 W1-W6 均已完成，文档主入口已压缩。仓库当前 lint 基线是 `0 errors / 100 warnings`；后续应继续一小批受控 warning cleanup，优先清理仍能在现有 owner 内稳定收束的热点，再决定是否恢复新的 maintainability 重构。**
 
 当前最重要的事实：
 
@@ -16,23 +16,22 @@
 
 ## 2. 当前基线
 
-- **Lint 基线**: `0 errors / 103 warnings`
+- **Lint 基线**: `0 errors / 100 warnings`
 - **当前热点**:
-  - `src/features/settings/OpenCodianSettings.ts`
-  - `src/features/chat/OpenCodianView.ts`
   - `src/main.ts`
+  - `src/features/chat/OpenCodianView.ts`
+  - `src/features/settings/OpenCodianSettings.ts`
   - `tests/unit/core/opencode/OpenCodeService.test.ts`
   - `src/features/settings/ModelConfigModal.ts`
 - **已完成历史摘要**: 见 `docs/status/maintainability-completed-batches.md`
 
-## 3. 当前批次（W6-W9）
+## 3. 当前批次（W7-W9）
 
-本批只做 warning cleanup，不恢复 `R33+`：
+本批只做 warning cleanup，不恢复 `R33+`。`W6` 已完成并把 lint 基线从 `103` 收敛到 `100` warnings，当前继续推进剩余 queue：
 
-1. **W6 `ModelConfigModal` render trim**：只处理 `renderEditor` / `renderModelCard` 的长度与复杂度热点
-2. **W7 `main.ts` loadSettings trim**：只处理 `loadSettings` 的长度与复杂度热点
-3. **W8 `OpenCodianView` sync complexity trim**：只处理三处消息同步相关复杂度热点
-4. **W9 checkpoint**：复盘 `W6-W8` 的 warning 收益，并决定下一批是继续 warning cleanup，还是恢复新的 maintainability queue
+1. **W7 `main.ts` loadSettings trim**：只处理 `loadSettings` 的长度与复杂度热点
+2. **W8 `OpenCodianView` sync complexity trim**：只处理三处消息同步相关复杂度热点
+3. **W9 checkpoint**：复盘 `W6-W8` 的 warning 收益，并决定下一批是继续 warning cleanup，还是恢复新的 maintainability queue
 
 ## 4. 长期边界
 

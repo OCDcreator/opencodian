@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的 `[NEXT]`”。
-> **当前状态**: [CONFIRMED_NEXT_BATCH] 文档压缩已人工完成；当前可自动执行的 `[NEXT]` 是 `W6 - ModelConfigModal render trim`。
+> **当前状态**: [CONFIRMED_NEXT_BATCH] 文档压缩已人工完成；当前可自动执行的 `[NEXT]` 是 `W7 - main.ts loadSettings trim`。
 
 ## 控制规则
 
@@ -16,12 +16,12 @@
 ## 当前背景
 
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
-- 当前 lint 基线：`0 errors / 103 warnings`
+- 当前 lint 基线：`0 errors / 100 warnings`
 - 当前最适合继续 autopilot 的方向：继续一小批现有 owner 内的 warning cleanup，而不是自动恢复 `R33+`
 
 ## Queue
 
-### [NEXT] W6 - ModelConfigModal render trim
+### [DONE] W6 - ModelConfigModal render trim
 
 - **Lane**: Warning cleanup / settings hotspot
 - **目标**: 只处理 `src/features/settings/ModelConfigModal.ts` 中 `renderEditor` 与 `renderModelCard` 的长度 / 复杂度热点；优先通过同文件内的局部 helper、片段提取或条件分支收束，把 warning 控制在现有 owner 内消化。
@@ -38,7 +38,7 @@
   - 至少收掉 `renderEditor` 的 `max-lines-per-function` / `complexity`，并尽量收掉 `renderModelCard` 的 `max-lines-per-function`
   - 运行 focused validation、全量 `npm test`、`npm run build`
 
-### [QUEUED] W7 - main.ts loadSettings trim
+### [NEXT] W7 - main.ts loadSettings trim
 
 - **Lane**: Warning cleanup / bootstrap hotspot
 - **目标**: 只处理 `src/main.ts` 中 `loadSettings` 的 `max-lines-per-function` 与 `complexity` warning，优先通过初始化步骤分段、guard clause 与同文件私有 helper 收束流程。
