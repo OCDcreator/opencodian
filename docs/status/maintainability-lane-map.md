@@ -1,20 +1,20 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [CONFIRMED_NEXT_BATCH] L1-L5 已确认；`L1`、`L2` 与 `L3` 已完成，当前 `[NEXT]` 是 `L4 - High-value warning trim`。
+> **当前状态**: [CONFIRMED_NEXT_BATCH] L1-L5 已确认；`L1`、`L2`、`L3` 与 `L4` 已完成，当前 `[NEXT]` 是 `L5 - Lint checkpoint`。
 
 ## 当前优先级
 
-- **L4**: high-value warning trim（只收高价值 warning，不制造微碎片）
 - **L5**: lint checkpoint；跑完必须暂停
-- **L3**: 已完成 lint green checkpoint（当前 lint 基线维持 `0 errors / 119 warnings`）
+- **L4**: 已完成 high-value warning trim；当前 lint 基线收敛到 `0 errors / 116 warnings`
+- **L3**: 已完成 lint green checkpoint（上一轮基线为 `0 errors / 119 warnings`）
 - **L2**: 已完成 non-autofix error cleanup（当前 lint errors = 0）
 - **L1**: 已完成 autofix sweep；剩余基线为 `44 errors / 119 warnings`
 
 ## 当前热点首查入口
 
-- L4 首查 `src/features/settings/OpenCodianSettings.ts`、`src/features/settings/ModelConfigModal.ts`、`src/features/chat/OpenCodianView.ts`、`src/features/settings/SettingsModelCatalogPresenter.ts` 与 `tests/unit/core/opencode/OpenCodeService.test.ts`
-- L3 已确认 lint 绿灯：当前基线维持 `0 errors / 119 warnings`；warning 主要集中在 `max-lines-per-function`、`max-lines`、`max-params` 与 `complexity`
+- L5 首查 `docs/status/maintainability-master-plan.md`、`docs/status/maintainability-round-roadmap.md`、`docs/status/maintainability-lane-map.md` 与 `docs/status/maintainability-phase-351.md`
+- L4 已优先收掉 settings 热点内的 `max-params` warnings：`SettingsModelCatalogPresenter.ts` 2 条、`OpenCodianSettings.ts` 1 条；当前基线为 `0 errors / 116 warnings`
 - `OpenCodianView` / settings / trailing-assistant 链本批都只保留 regression watchpoints，不借 lint cleanup 新开 maintainability 切口
 - P2 regression-only 首查顺序固定为：
   1. `tests/unit/features/chat/QuestionDockCoordinator.test.ts`

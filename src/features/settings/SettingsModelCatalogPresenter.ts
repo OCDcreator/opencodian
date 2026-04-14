@@ -24,6 +24,16 @@ interface ProviderAvailabilityCheckState {
   error?: string;
 }
 
+type ProviderDisabledReason = 'project' | 'server' | null;
+
+interface ProviderAvailabilityDisplayState {
+  provider: ModelCatalogProvider;
+  providerEnabled: boolean;
+  disabledCount: number;
+  primaryDisabledReason: ProviderDisabledReason;
+  mode: ModelCatalogStateMode;
+}
+
 interface SettingsModelCatalogPresenterOptions {
   catalogStateService: ModelCatalogStateService;
   applyInlineCodeText: (targetEl: HTMLElement, text: string) => void;
@@ -309,6 +319,13 @@ export class SettingsModelCatalogPresenter {
       const disabledCount = providerEnabled
         ? providerStatusSource.models.filter((model) => disabledModelRefs.has(formatModelReference(provider.id, model.id))).length
         : providerStatusSource.models.length;
+      const availabilityDisplayState: ProviderAvailabilityDisplayState = {
+        provider: providerStatusSource,
+        providerEnabled,
+        disabledCount,
+        primaryDisabledReason,
+        mode: this.activeCatalogTab,
+      };
       const hasDisabledState = !providerEnabled || disabledCount > 0;
       const hasEnabledState = providerEnabled && disabledCount < providerStatusSource.models.length;
       if (this.modelAvailabilityOnlyDisabled && !hasDisabledState) {
@@ -375,13 +392,7 @@ export class SettingsModelCatalogPresenter {
       });
       providerInfoEl.createDiv({
         cls: 'opencodian-model-toggle-provider-meta',
-        text: this.describeModelAvailabilitySummary(
-          providerStatusSource,
-          providerEnabled,
-          disabledCount,
-          primaryDisabledReason,
-          this.activeCatalogTab,
-        ),
+        text: this.describeModelAvailabilitySummary(availabilityDisplayState),
       });
       const badgesEl = providerInfoEl.createDiv({ cls: 'opencodian-model-toggle-provider-badges' });
       badgesEl.createSpan({
@@ -389,26 +400,10 @@ export class SettingsModelCatalogPresenter {
         text: t(`settings.model.sourceBadge.${provider.source}` as const),
       });
       badgesEl.createSpan({
-        cls: `opencodian-model-status-badge ${this.getProviderAvailabilityStatusClass(
-          providerStatusSource,
-          providerEnabled,
-          disabledCount,
-          this.activeCatalogTab,
-        )}`,
-        text: this.getProviderAvailabilityStatusLabel(
-          providerStatusSource,
-          providerEnabled,
-          disabledCount,
-          primaryDisabledReason,
-          this.activeCatalogTab,
-        ),
+        cls: `opencodian-model-status-badge ${this.getProviderAvailabilityStatusClass(availabilityDisplayState)}`,
+        text: this.getProviderAvailabilityStatusLabel(availabilityDisplayState),
       });
-      const serverDisabledBadge = this.getProviderServerConstraintBadge(
-        providerStatusSource,
-        providerEnabled,
-        primaryDisabledReason,
-        this.activeCatalogTab,
-      );
+      const serverDisabledBadge = this.getProviderServerConstraintBadge(availabilityDisplayState);
       if (serverDisabledBadge) {
         badgesEl.createSpan({
           cls: `opencodian-model-status-badge ${serverDisabledBadge.className}`,
@@ -754,12 +749,10 @@ export class SettingsModelCatalogPresenter {
   }
 
   private describeModelAvailabilitySummary(
-    provider: ModelCatalogProvider,
-    providerEnabled: boolean,
-    disabledCount: number,
-    primaryDisabledReason: 'project' | 'server' | null,
-    mode: ModelCatalogStateMode,
+    state: ProviderAvailabilityDisplayState,
   ): string {
+    const { provider, providerEnabled, disabledCount, primaryDisabledReason, mode } = state;
+
     if (mode === 'server' && this.isProviderDisabledByScope(provider, 'global')) {
       return t('settings.model.availability.summary.serverDisabled', {
         id: provider.id,
@@ -812,7 +805,7 @@ export class SettingsModelCatalogPresenter {
   private getProviderPrimaryDisabledReason(
     provider: ModelCatalogProvider,
     providerEnabled: boolean,
-  ): 'project' | 'server' | null {
+  ): ProviderDisabledReason {
     if (providerEnabled) {
       return null;
     }
@@ -829,11 +822,10 @@ export class SettingsModelCatalogPresenter {
   }
 
   private getProviderAvailabilityStatusClass(
-    provider: ModelCatalogProvider,
-    providerEnabled: boolean,
-    disabledCount: number,
-    mode: ModelCatalogStateMode,
+    state: ProviderAvailabilityDisplayState,
   ): 'is-disabled' | 'is-partial' | 'is-available' {
+    const { provider, providerEnabled, disabledCount, mode } = state;
+
     if (mode === 'server' && this.isProviderDisabledByScope(provider, 'global')) {
       return 'is-disabled';
     }
@@ -850,12 +842,10 @@ export class SettingsModelCatalogPresenter {
   }
 
   private getProviderAvailabilityStatusLabel(
-    provider: ModelCatalogProvider,
-    providerEnabled: boolean,
-    disabledCount: number,
-    primaryDisabledReason: 'project' | 'server' | null,
-    mode: ModelCatalogStateMode,
+    state: ProviderAvailabilityDisplayState,
   ): string {
+    const { provider, providerEnabled, disabledCount, primaryDisabledReason, mode } = state;
+
     if (mode === 'server' && this.isProviderDisabledByScope(provider, 'global')) {
       return t('settings.model.availability.status.serverDisabled');
     }
@@ -878,11 +868,10 @@ export class SettingsModelCatalogPresenter {
   }
 
   private getProviderServerConstraintBadge(
-    provider: ModelCatalogProvider,
-    providerEnabled: boolean,
-    primaryDisabledReason: 'project' | 'server' | null,
-    mode: ModelCatalogStateMode,
+    state: ProviderAvailabilityDisplayState,
   ): { text: string; className: 'is-disabled' | 'is-partial' } | null {
+    const { provider, providerEnabled, primaryDisabledReason, mode } = state;
+
     if (!this.isProviderDisabledByScope(provider, 'global')) {
       return null;
     }

@@ -122,6 +122,14 @@ interface SettingsBlockOptions {
   onToggle?: (isOpen: boolean) => void;
 }
 
+interface PluginEntryGroupRenderOptions {
+  containerEl: HTMLElement;
+  title: string;
+  pathLabel: string;
+  entries: PluginEntry[];
+  emptyText: string;
+}
+
 type ChatAppearanceStyleGroup = 'layout' | 'background' | 'user' | 'assistant' | 'input' | 'scrollbar' | 'advanced';
 
 interface StyleControlBinding {
@@ -4778,38 +4786,38 @@ export class OpenCodianSettingTab extends PluginSettingTab {
   private renderPluginSources(containerEl: HTMLElement, snapshot: PluginEnvironmentSnapshot): void {
     containerEl.empty();
 
-    this.renderPluginEntryGroup(
+    this.renderPluginEntryGroup({
       containerEl,
-      t('settings.plugins.global.configTitle'),
-      snapshot.globalConfigPath,
-      snapshot.globalConfigPlugins,
-      t('settings.plugins.none'),
-    );
-    this.renderPluginEntryGroup(
+      title: t('settings.plugins.global.configTitle'),
+      pathLabel: snapshot.globalConfigPath,
+      entries: snapshot.globalConfigPlugins,
+      emptyText: t('settings.plugins.none'),
+    });
+    this.renderPluginEntryGroup({
       containerEl,
-      t('settings.plugins.global.directoryTitle'),
-      this.describePluginDirectories(snapshot.globalDirectories),
-      snapshot.globalDirectoryPlugins,
-      t('settings.plugins.none'),
-    );
-    this.renderPluginEntryGroup(
+      title: t('settings.plugins.global.directoryTitle'),
+      pathLabel: this.describePluginDirectories(snapshot.globalDirectories),
+      entries: snapshot.globalDirectoryPlugins,
+      emptyText: t('settings.plugins.none'),
+    });
+    this.renderPluginEntryGroup({
       containerEl,
-      t('settings.plugins.projectConfig.title'),
-      snapshot.projectConfigPath,
-      snapshot.projectConfigPlugins,
-      t('settings.plugins.none'),
-    );
+      title: t('settings.plugins.projectConfig.title'),
+      pathLabel: snapshot.projectConfigPath,
+      entries: snapshot.projectConfigPlugins,
+      emptyText: t('settings.plugins.none'),
+    });
   }
 
   private renderPluginProjectDirectory(containerEl: HTMLElement, snapshot: PluginEnvironmentSnapshot): void {
     containerEl.empty();
-    this.renderPluginEntryGroup(
+    this.renderPluginEntryGroup({
       containerEl,
-      t('settings.plugins.projectDirectory.filesTitle'),
-      this.describePluginDirectories(snapshot.projectDirectories),
-      snapshot.projectDirectoryPlugins,
-      t('settings.plugins.projectDirectory.empty'),
-    );
+      title: t('settings.plugins.projectDirectory.filesTitle'),
+      pathLabel: this.describePluginDirectories(snapshot.projectDirectories),
+      entries: snapshot.projectDirectoryPlugins,
+      emptyText: t('settings.plugins.projectDirectory.empty'),
+    });
   }
 
   private renderPluginOmoSection(containerEl: HTMLElement, snapshot: PluginEnvironmentSnapshot): void {
@@ -4850,13 +4858,8 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     }
   }
 
-  private renderPluginEntryGroup(
-    containerEl: HTMLElement,
-    title: string,
-    pathLabel: string,
-    entries: PluginEntry[],
-    emptyText: string,
-  ): void {
+  private renderPluginEntryGroup(options: PluginEntryGroupRenderOptions): void {
+    const { containerEl, title, pathLabel, entries, emptyText } = options;
     const groupEl = containerEl.createDiv({ cls: 'opencodian-plugin-source-group' });
     const titleEl = groupEl.createDiv({
       cls: 'opencodian-plugin-source-title',
