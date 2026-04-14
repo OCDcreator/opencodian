@@ -2,7 +2,7 @@
 
 > **状态**: [CONFIRMED_NEXT_BATCH]
 > **作用**: 这是 maintainability 无人值守的战略文档。后续每一轮开始前，必须先读本文件，再读最近的 `docs/status/maintainability-phase-XXX.md`。
-> **自动推进状态**: 人工已确认继续 `W1-W5` warning cleanup 队列；当前可自动执行的 `[NEXT]` 是 `W4 - Chat bridge test typing cleanup`。在 `W5` checkpoint 完成前，不恢复 `R33+` maintainability queue。
+> **自动推进状态**: 人工已确认继续 `W1-W5` warning cleanup 队列；当前可自动执行的 `[NEXT]` 是 `W5 - Warning cleanup checkpoint`。在 `W5` checkpoint 完成前，不恢复 `R33+` maintainability queue。
 
 ## 1. 总体目标
 
@@ -19,7 +19,7 @@ maintainability 的目标是：
 
 ## 2. 当前阶段判断
 
-**当前判断：中后期，R28-R32 与 L1-L5 均已完成；`W1-W3` 已顺序完成，lint 当前为 `0 errors / 109 warnings`，人工现已确认继续 `W1-W5` 这一小批 warning cleanup。当前应先顺序清掉低风险且收益明确的 warning 热点，再在 `W5` checkpoint 后决定是否恢复新的 maintainability 重构。**
+**当前判断：中后期，R28-R32 与 L1-L5 均已完成；`W1-W4` 已顺序完成，lint 当前为 `0 errors / 103 warnings`，人工现已确认继续 `W1-W5` 这一小批 warning cleanup。当前应先执行 `W5` checkpoint，复盘这一批低风险 warning cleanup 的收益，再决定是否恢复新的 maintainability 重构。**
 
 原因：
 
@@ -28,9 +28,9 @@ maintainability 的目标是：
 - `src/features/settings/OpenCodianSettings.ts` 当前实测 **4989 行**，较 R9 前 baseline **6756 行**明显收缩；section lifecycle、model catalog presenter、catalog state writeback 已迁出，但 settings tab 仍负责 section composition、settings persistence、modal launch 与多处分区业务装配
 - `src/core/opencode/OpenCodeService.ts` 当前实测 **2397 行**，较 R18 checkpoint 的 **4733 行**减少 **2336 行**（约 **49.4%**），较 R27 checkpoint 的 **2858 行**再减少 **461 行**（约 **16.1%**）；R28-R31 已把 session lifecycle、session control/message orchestration、question/permission negotiation 与 broad query gateway 四块 ownership 迁出，但 service 仍集中 SDK-first / legacy HTTP fallback transport、assistant response + finish/fetch orchestration、server lifecycle / settings update / scoped-directory wiring、provider/model/config lookup 与 tool catalog/event bridge 等跨域兼容 seam
 - `src/core/opencode/OpenCodeSdkFacade.ts` / `src/core/opencode/ServerManager.ts` 当前分别为 **257** / **1171** 行；它们继续作为高风险相邻 owner 保持稳定，没有在本批被拆成新的薄 facade
-- L1-L5 加上已完成的 `W1-W3` 已把 `npm run lint` 从 post-L1 baseline 的 **44 errors / 119 warnings** 收敛到当前 **0 errors / 109 warnings**；剩余 **109** 条 warning 中，`max-lines-per-function` / `max-lines` / `complexity` / `max-params` 合计 **103** 条，主要集中在 `src/features/settings/OpenCodianSettings.ts`、`src/features/chat/OpenCodianView.ts`、`src/features/settings/ModelConfigModal.ts`、`tests/unit/features/chat/ContextFileCatalogEventBridge.test.ts` 与 `tests/unit/features/chat/FocusContextEventBridge.test.ts`
+- L1-L5 加上已完成的 `W1-W4` 已把 `npm run lint` 从 post-L1 baseline 的 **44 errors / 119 warnings** 收敛到当前 **0 errors / 103 warnings**；剩余 **103** 条 warning 全部来自 `max-lines-per-function` / `max-lines` / `complexity` / `max-params`，主要集中在 `src/features/settings/OpenCodianSettings.ts`、`src/features/chat/OpenCodianView.ts`、`src/features/settings/ModelConfigModal.ts`、`tests/unit/core/opencode/OpenCodeService.test.ts` 与 `src/main.ts`
 
-结论：L1-L5 已完成“先把 lint 拉回可控状态”的批次目标，errors 已清零；但 warnings 仍然高度集中在大 owner 与相关 tests。人工现已确认继续 `W1-W5` 这一批新的 warning cleanup queue，先处理低风险的 `max-params` / `complexity` / `@typescript-eslint/no-explicit-any` 热点；在 `W5` checkpoint 完成前，不得恢复 `R33+` maintainability 重构。
+结论：L1-L5 已完成“先把 lint 拉回可控状态”的批次目标，errors 已清零；但 warnings 仍然高度集中在大 owner 与长测试文件。人工现已确认继续 `W1-W5` 这一批新的 warning cleanup queue；当前应执行 `W5` checkpoint，先复盘 `W1-W4` 的实际收益，再决定是否继续 warning cleanup 或恢复 `R33+` maintainability 重构。
 
 ## 2.1 已完成批次（R13-R18）
 
@@ -160,7 +160,7 @@ R13-R18 已完成这组 UI/runtime shell 的主要收束。本批 R28-R32 不继
 
 当前执行阶段（W1-W5）要求：
 
-- 当前可自动执行的 `[NEXT]` 是 `W3 - OpenCodeService complexity trim`
+- 当前可自动执行的 `[NEXT]` 是 `W5 - Warning cleanup checkpoint`
 - Autopilot 只允许按 `W1 → W5` 顺序推进，不得自动扩展 `W6+` 或恢复 `R33+`
 - 本批只处理低风险 warning：`max-params`、少量 `complexity`，以及 tests 内的 `@typescript-eslint/no-explicit-any`
 - `OpenCodianView` / `OpenCodianSettings` 的大型 `max-lines*` / `complexity` 热点继续保持人工复盘后再决定

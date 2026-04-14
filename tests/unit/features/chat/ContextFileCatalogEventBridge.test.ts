@@ -13,8 +13,8 @@ type Mocked<T> = {
 };
 
 function createHarness() {
-  const vaultListeners = new Map<string, (...args: any[]) => void>();
-  const vaultOn = jest.fn((name: string, listener: (...args: any[]) => void) => {
+  const vaultListeners = new Map<string, (...args: unknown[]) => void>();
+  const vaultOn = jest.fn((name: string, listener: (...args: unknown[]) => void) => {
     vaultListeners.set(name, listener);
     return { name } as EventRef;
   });
@@ -38,7 +38,7 @@ function createHarness() {
     contextFileCatalogService,
     host,
     vaultOn,
-    emitVault: (name: string, ...args: any[]) => {
+    emitVault: (name: string, ...args: unknown[]) => {
       const listener = vaultListeners.get(name);
       if (!listener) {
         throw new Error(`Missing vault listener for ${name}`);

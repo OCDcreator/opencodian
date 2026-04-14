@@ -1,23 +1,24 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [CONFIRMED_NEXT_BATCH] W1-W5 warning cleanup 队列已人工确认；当前可自动执行的 `[NEXT]` 是 `W4 - Chat bridge test typing cleanup`。
+> **当前状态**: [CONFIRMED_NEXT_BATCH] W1-W5 warning cleanup 队列已人工确认；当前可自动执行的 `[NEXT]` 是 `W5 - Warning cleanup checkpoint`。
 
 ## 当前优先级
 
-- **当前 `[NEXT]`**：`W4 - Chat bridge test typing cleanup`
+- **当前 `[NEXT]`**：`W5 - Warning cleanup checkpoint`
 - **本批目标**：继续一小批低风险 warning cleanup，优先清掉 `max-params` / 少量 `complexity` / `@typescript-eslint/no-explicit-any`，不恢复 `R33+` maintainability owner queue
-- **当前 lint 基线**：`0 errors / 109 warnings`
-- **本批首要热点**：`tests/unit/features/chat/ContextFileCatalogEventBridge.test.ts`、`tests/unit/features/chat/FocusContextEventBridge.test.ts`
+- **当前 lint 基线**：`0 errors / 103 warnings`
+- **本批首要热点**：`docs/status/maintainability-master-plan.md`、`docs/status/maintainability-round-roadmap.md`、`docs/status/maintainability-lane-map.md`
 - **暂缓热点**：`src/features/chat/OpenCodianView.ts` 与 `src/features/settings/OpenCodianSettings.ts` 的 `max-lines*` / 大型 `complexity` 问题先不进入本批
 
 ## 当前热点首查入口
 
 - 当前批次首查 `docs/status/maintainability-master-plan.md`、`docs/status/maintainability-round-roadmap.md`、`docs/status/maintainability-lane-map.md` 与 `docs/status/maintainability-phase-355.md`
-- W4 的剩余执行顺序固定为：
-  1. `tests/unit/features/chat/ContextFileCatalogEventBridge.test.ts`
-  2. `tests/unit/features/chat/FocusContextEventBridge.test.ts`
-- `OpenCodianView` / `OpenCodianSettings` / trailing-assistant 链当前都只保留 regression watchpoints；在 `W5` checkpoint 前，不自动恢复新的 maintainability 切口
+- W5 的剩余执行顺序固定为：
+  1. `docs/status/maintainability-master-plan.md`
+  2. `docs/status/maintainability-round-roadmap.md`
+  3. `docs/status/maintainability-lane-map.md`
+- `OpenCodianView` / `OpenCodianSettings` / trailing-assistant 链当前都只保留 regression watchpoints；W5 只允许做 checkpoint 文档复盘，不自动恢复新的 maintainability 切口
 - P2 regression-only 首查顺序固定为：
   1. `tests/unit/features/chat/QuestionDockCoordinator.test.ts`
   2. `tests/unit/features/chat/QuestionTodoStatusRefreshCoordinator.test.ts`

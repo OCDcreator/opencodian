@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的 `[NEXT]`”。L5 完成后必须暂停复盘，不得自动扩展新队列。
-> **当前状态**: [CONFIRMED_NEXT_BATCH] L1-L5 已全部完成；人工已确认继续一小批 warning cleanup queue。当前可自动执行的 `[NEXT]` 是 `W3 - OpenCodeService complexity trim`。
+> **当前状态**: [CONFIRMED_NEXT_BATCH] L1-L5 已全部完成；人工已确认继续一小批 warning cleanup queue。当前可自动执行的 `[NEXT]` 是 `W5 - Warning cleanup checkpoint`。
 
 ## 控制规则
 
@@ -16,7 +16,7 @@
 
 ## 总体路线
 
-当前受控批次 L1-L5 已完成：仓库已从 lint 红灯恢复到 `0 errors / 111 warnings` 的可控状态。人工现已确认继续 `W1-W5` 这一小批 warning cleanup queue，优先处理低风险且收益明确的 `max-params` / `complexity` / `@typescript-eslint/no-explicit-any` 热点；在 `W5` checkpoint 完成前，不恢复 `R33+` maintainability owner queue。
+当前受控批次 L1-L5 已完成：仓库已从 lint 红灯恢复到 `0 errors / 103 warnings` 的可控状态。人工现已确认继续 `W1-W5` 这一小批 warning cleanup queue，优先处理低风险且收益明确的 `max-params` / `complexity` / `@typescript-eslint/no-explicit-any` 热点；在 `W5` checkpoint 完成前，不恢复 `R33+` maintainability owner queue。
 
 > **P2 状态（R6 完成后）**: R1-R6 已完成 question dock、todo refresh/status、background completion notice、post-sync handoff 与 session signal orchestration 的收束。剩余风险以回归为主：background tab 无 session 时的 dock 清理、post-sync todo/status gate、completion notice queue/fingerprint 去重，以及 live signal writeback 顺序。
 >
@@ -866,7 +866,7 @@
   - 两个目标方法的 `complexity` warning 降到阈值内。
   - 运行 focused tests、全量 `npm test`、`npm run build`。
 
-### [NEXT] W4 - Chat bridge test typing cleanup
+### [DONE] W4 - Chat bridge test typing cleanup
 
 - **Lane**: Warning cleanup
 - **目标**: 清掉 `ContextFileCatalogEventBridge` / `FocusContextEventBridge` tests 中的 `@typescript-eslint/no-explicit-any`。
@@ -882,7 +882,7 @@
   - 目标 tests 的 `@typescript-eslint/no-explicit-any` warning 消失。
   - 运行 focused tests、全量 `npm test`、`npm run build`。
 
-### [QUEUED] W5 - Warning cleanup checkpoint
+### [NEXT] W5 - Warning cleanup checkpoint
 
 - **Lane**: Checkpoint
 - **目标**: 复盘 `W1-W4` 的 warning cleanup 收益，并决定是否继续 warning cleanup 或恢复新的 maintainability queue。

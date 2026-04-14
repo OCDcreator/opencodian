@@ -20,9 +20,9 @@ type RegisteredDomEvent = {
 };
 
 function createHarness(options: { inputContainer?: HTMLElement | null } = {}) {
-  const workspaceListeners = new Map<string, (...args: any[]) => void>();
+  const workspaceListeners = new Map<string, (...args: unknown[]) => void>();
   const domEvents: RegisteredDomEvent[] = [];
-  const workspaceOn = jest.fn((name: string, listener: (...args: any[]) => void) => {
+  const workspaceOn = jest.fn((name: string, listener: (...args: unknown[]) => void) => {
     workspaceListeners.set(name, listener);
     return { name } as EventRef;
   });
@@ -64,7 +64,7 @@ function createHarness(options: { inputContainer?: HTMLElement | null } = {}) {
     focusContextRuntimeService,
     focusContextPreviewCoordinator,
     workspaceOn,
-    emitWorkspace: (name: string, ...args: any[]) => {
+    emitWorkspace: (name: string, ...args: unknown[]) => {
       const listener = workspaceListeners.get(name);
       if (!listener) {
         throw new Error(`Missing workspace listener for ${name}`);
