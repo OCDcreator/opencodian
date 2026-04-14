@@ -1,22 +1,22 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [READY] `R42-R46` queue 已写入；当前首个 `[NEXT]` 为 `R42`。
+> **当前状态**: [READY] `R42` 已完成；当前首个 `[NEXT]` 为 `R43`。
 
 ## 当前优先级
 
-- **当前 `[NEXT]`**：`R42 - OpenCodianView conversation history/actions seam`
-- **本批目标**：先收 `OpenCodianView` 的 conversation-management / authoritative-sync / model-selection 三个厚切口，再收 `OpenCodeService` streaming transport seam，最后 checkpoint
+- **当前 `[NEXT]`**：`R43 - OpenCodianView authoritative sync merge seam`
+- **本批目标**：继续收 `OpenCodianView` 的 authoritative-sync / model-selection 两个厚切口，再收 `OpenCodeService` streaming transport seam，最后 checkpoint
 - **当前 lint 基线**：`0 errors / 86 warnings`
 - **热点顺序**：
-  1. `src/features/chat/OpenCodianView.ts` conversation history/actions
-  2. `src/features/chat/OpenCodianView.ts` authoritative sync merge
-  3. `src/features/chat/OpenCodianView.ts` model catalog/selection
-  4. `src/core/opencode/OpenCodeService.ts` streaming transport
+  1. `src/features/chat/OpenCodianView.ts` authoritative sync merge
+  2. `src/features/chat/OpenCodianView.ts` model catalog/selection
+  3. `src/core/opencode/OpenCodeService.ts` streaming transport
+  4. `R46` checkpoint / next-batch decision
 
 ## 本批边界
 
-- 本次已完成 queue 文档化，但未直接恢复 autopilot freestyle 执行
+- `R42` 已完成 history dropdown / rename-delete confirm / cleanup lifecycle seam，本轮后直接顺延到 `R43`
 - 不新增薄 helper / adapter / provider / factory 文件；新 owner 必须覆盖完整 section / lifecycle
 - 不在本批内继续 settings residual seam，除非前四项被正确性或验证成本阻塞
 - 命中 deploy-relevant paths 时，继续严格执行 build → Test Vault deploy → `BUILD_ID` 校验

@@ -89,6 +89,7 @@ background task completion notice 的 queued-state 则已经完全移出 `TabRun
 - `currentConversation` / `currentConversationRevertState`
 - 模型目录缓存：`availableModels`、`availableProviders`
 - `services/ChatHeaderPresenter.ts` 的 host seam：server availability、settings/history/new-tab callbacks、status refresh 和 header tab-slot 写回
+- `services/ConversationHistoryActionsCoordinator.ts` 的 host seam：conversation list/current selection、rename title writeback、delete recovery/reset 与 notice 回调
 - `services/ChatSelectionControlsCoordinator.ts` 的 host seam：model catalog reload、current selection resolution、provider icon lookup、permission mode writeback 和 effort selector 联动
 - `services/ComposerInputShellCoordinator.ts` 的 host seam：input shell DOM 装配、submit gate、textarea 高度同步、composer stack height 与 toolbar slot mount
 - `services/InputPanelAppearanceCoordinator.ts` 的 host seam：input panel theme class、action button style、SVG filter layer、liquid-glass mount/unmount 与 diagnostics log 去重
@@ -112,7 +113,7 @@ background task completion notice 的 queued-state 则已经完全移出 `TabRun
 `onClose()` 则会反向清理：
 
 - tab 持久化
-- header presenter、input appearance coordinator、composer input coordinator / conversation sync / selection polling / layout / scroll 定时器
+- header presenter、conversation history/actions coordinator、input appearance coordinator、composer input coordinator / conversation sync / selection polling / layout / scroll 定时器
 - title generation
 - effort selector、context ring、question dock、todo dock、navigation sidebar
 - liquid glass adapter cleanup、diamond demo
@@ -138,6 +139,16 @@ header DOM、server status badge、title logo/wordmark、new/current-tab、histo
 - header tab bar slot 写回给 tab bar layout
 
 server status loop、badge class、status label、本地/远端文案判定和 locale refresh 都在 presenter 内部完成；view 不再直接持有 header button refs 或 status interval 状态。
+
+### Conversation history / actions ownership
+
+header 上 history 按钮触发的 conversation history dropdown、rename dialog、delete confirm countdown、dropdown 定位，以及 click-outside / destroy cleanup 现在由 `services/ConversationHistoryActionsCoordinator.ts` 承接。`OpenCodianView` 只保留 coordinator host seam：
+
+- conversation list、current conversation 与 foreground-busy 状态读取
+- `loadConversation()`、`updateConversationTitleState()` 与 `ConversationTabLifecycleRecoveryCoordinator` delete/reset 入口
+- title generation cancel 与 notice 回调
+
+因此 view 不再直接持有 history dropdown DOM/state、rename/delete confirm overlay 或 dropdown positioning RAF；delete fallback、rename title sync 到 session，以及 tab cleanup/reset 语义保持不变。
 
 ### Composer input shell 抽离
 
