@@ -1,29 +1,22 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [REVIEW_REQUIRED] R19-R27 已完成；当前没有可自动执行的 `[NEXT]`，等待人工确认。
+> **当前状态**: [CONFIRMED_NEXT_BATCH] R28-R32 已确认；当前 `[NEXT]` 是 R28 session lifecycle coordinator。
 
 ## 当前优先级
 
-- **P1 / R16**: 已完成 model / permission selection controls（chat 内 dropdown/search/list/selection display）
-- **P1 / R15**: 已完成 composer input shell（input area DOM、textarea、高度同步、layout metrics）
-- **P1 / R14**: 已完成 header / server status shell（header DOM、status label/action、wordmark/settings button）
-- **P1 / R13**: 已完成 tab messages pane surface（messages pane lifecycle、active pane、scroll metrics、pane observer）
-- **P5 / R17**: 已完成 input appearance / glass state（theme class、SVG filter、liquid-glass mount/diagnostics）
-- **Checkpoint / R27**: 已完成 OpenCodeService checkpoint；autopilot 现在暂停，等待人工确认是否还要设计 session/config/query gateway 队列
+- **R28**: session lifecycle coordinator（create/list/messages/todos/statuses/delete/update/current-session/subscriptions）
+- **R29**: session control and messaging orchestrator（fork/revert/diff/context usage/message commands/message parts）
+- **R30**: question and permission hub（pending/reply/reject/respond/session permission）
+- **R31**: conditional query gateway（provider/project/file/find/path/VCS/formatter/LSP/MCP auth；仅在能形成厚 owner 时执行）
+- **R32**: gateway checkpoint；跑完必须暂停
 
 ## 当前热点首查入口
 
-- R19 已完成 sync-event listener registry、wanted state、subscription lifecycle 与 emit path 收束
-- R20 已完成 open-code event listener registry、event/global 订阅生命周期、catalog-relevant payload routing 与 emit path 收束
-- R21 已完成 tool schema cache、registry tool ids、MCP server status snapshot、catalog listener lifecycle 与 snapshot 构造到 `OpenCodeCatalogStateStore`
-- R22 已完成 SDK prompt parameters、shared prompt options、allowed-tools / output-format / variant / reasoning 映射到 `OpenCodePromptRequestBuilder`
-- R23 已完成 context/image request-part serialization 到 `OpenCodeContextPartSerializer`，并保持与 prompt option builder 的边界
-- R24 已完成 active stream runtime、session-scoped abort controller、cancel/detach lifecycle 与 part type tracking 收束到 `OpenCodeStreamingRuntimeCoordinator`
-- R25 已完成 SDK / legacy stream event → chunk transform、SSE parser 与 part-aware delta routing 收束到 `OpenCodeStreamEventTransformer`
-- R26 已完成 message → `ChatMessage` hydration、question normalization、tool identity / OMO metadata 收束到 `OpenCodeMessageNormalizationMapper`
-- R27 已完成 checkpoint，确认 `OpenCodeService` 在 R19-R26 期间从 **4733** 行降到 **2858** 行，并把后续自动推进切换回人工确认态
-- 当前没有自动下一切片；若要继续，必须先人工确认 session/config/query gateway 是否还能按较厚 owner 设计新 queue
+- R28 首查 `OpenCodeService.ts` 中 `createSession()` 到 `subscribeToSessionSyncEvents()` 的 session lifecycle 区段
+- R29 首查 `forkSession()` 到 `updateMessagePart()` 的 session control / message operations 区段
+- R30 首查 `getPendingQuestions()` 到 `respondToPermission()` 的 question/permission negotiation 区段
+- R31 首查 provider auth / project / file / find / path / VCS / formatter / LSP / MCP auth 区段；如果只能形成薄 wrapper，就在该轮说明并跳过到 R32
 - `OpenCodianView` / settings / trailing-assistant 链本批都只保留 regression watchpoints，不再开新切口
 - P2 regression-only 首查顺序固定为：
   1. `tests/unit/features/chat/QuestionDockCoordinator.test.ts`
@@ -42,13 +35,13 @@
 
 - R7 已把 composer-context bundle 创建、`ContextAttachmentBuilder` 与 `ContextFileCatalogService` ownership 收进 `ComposerContextViewFacade.create()`
 - `OpenCodianView` 只保留 view host seam、context row DOM 挂载、add-context 按钮和公开的 editor context 入口；不要再把 builder/catalog/service fan-out 放回 view
-- 后续若不是回归或正确性问题，不再默认回到 P3；按 R13-R18 的 UI/runtime shell queue 执行
+- 后续若不是回归或正确性问题，不再默认回到 P3；当前按 R28-R32 的 `OpenCodeService` queue 执行
 
 ## P4 收束状态
 
 - R8 已把 persisted assistant shell / notice / footer / timestamp 组装收束到 `AssistantShellViewHostAdapter`，并让 `PersistentAssistantNoticeService` 直接消费 assistant-message render seam
 - `OpenCodianView` 现在只保留 assistant 正文 block 渲染回调、pseudo-stream reveal 与少量本地错误/server-prompt UI 壳层；不要再把 persisted assistant 壳层组装搬回 view
-- 后续若不是回归或正确性问题，不再自动扩展 P4；按 R13-R18 的 UI/runtime shell queue 执行
+- 后续若不是回归或正确性问题，不再自动扩展 P4；当前按 R28-R32 的 `OpenCodeService` queue 执行
 
 ## Settings maintainability 状态
 
@@ -56,7 +49,7 @@
 - R10 已把 provider/model accordion、search、bulk toggle 与 probe presentation 收束到 `SettingsModelCatalogPresenter`
 - `OpenCodianSettings` 现在负责 section composition、settings persistence 与 modal launch；不要把 model catalog UI 状态机或 probe badge/detail 逻辑搬回主类
 - R11 已把 `baseEffective` / `effective` / `currentEnabledProviderIds` availability API 从 settings presenter 侧抽回 `ModelCatalogStateService`
-- Settings/core 的下一步不再开新 UI 拆分；R13-R18 已确认优先 `OpenCodianView`，`OpenCodeService` 留到 R18 后再决定
+- Settings/core 的下一步不再开新 UI 拆分；当前 R28-R32 已确认优先 `OpenCodeService`，settings 仅保留 regression watchpoints
 
 ## 可复用模式
 
@@ -86,3 +79,12 @@
 - 新 owner 默认要覆盖完整 lifecycle；如果低于约 100 行且少于 3 个公开 API，必须在 phase 文档里说明为何不是微碎片，否则应合并回 `OpenCodeService`。
 - `OpenCodeService` 继续保持对外总门面；新 owner 通过 host seam 接入，不要把调用方改成直接依赖大量新模块。
 - R27 已完成并进入暂停态；是否继续 session/config/query gateway 由下一次人工确认决定。
+
+
+## R28-R32 执行边界
+
+- 每轮必须先处理第一个 `[NEXT]`，不得自由切回 `OpenCodianView`、settings 或 `ServerManager`。
+- 本批目标是迁出 `OpenCodeService` 中仍成块存在的 session / control / negotiation ownership，而不是把 gateway façade 再粉碎成更多小文件。
+- 新 owner 默认要覆盖完整 lifecycle；如果低于约 100 行且少于 3 个公开 API，必须在 phase 文档里说明为何不是微碎片，否则应合并回 `OpenCodeService`。
+- `R31` 是条件执行项：只有当 query/admin APIs 能形成明显厚 owner 时才允许提交代码重构；否则必须记录跳过原因后直接推进 `R32`。
+- R32 完成后必须暂停；是否继续由下一次人工确认决定。

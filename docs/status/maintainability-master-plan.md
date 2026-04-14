@@ -1,8 +1,8 @@
 # Maintainability Master Plan
 
-> **状态**: [REVIEW_REQUIRED]
+> **状态**: [CONFIRMED_NEXT_BATCH]
 > **作用**: 这是 maintainability 无人值守的战略文档。后续每一轮开始前，必须先读本文件，再读最近的 `docs/status/maintainability-phase-XXX.md`。
-> **自动推进状态**: R19-R27 夜间批次已完成；autopilot 必须暂停，等待人工确认下一批 roadmap，禁止自动扩展 `R28+`。
+> **自动推进状态**: R28-R32 受控队列已确认；autopilot 只能按 `docs/status/maintainability-round-roadmap.md` 的 `[NEXT]` 顺序执行，R32 完成后必须再次暂停并等待人工确认。
 
 ## 1. 总体目标
 
@@ -19,7 +19,7 @@ maintainability 的目标是：
 
 ## 2. 当前阶段判断
 
-**当前判断：中后期 checkpoint，R19-R27 夜间批次已完成并进入人工复盘。**
+**当前判断：中后期，R28-R32 已确认为下一批受控队列。**
 
 原因：
 
@@ -29,7 +29,7 @@ maintainability 的目标是：
 - `src/core/opencode/OpenCodeService.ts` 当前实测 **2858 行**，较 R18 checkpoint 的 **4733 行**减少 **1875 行**（约 **39.6%**）；R19-R26 已把 sync/open-code event runtime、catalog state、prompt builder、context/image serializer、streaming runtime、stream event transform、message normalization 八块 ownership 迁出，但 service 仍集中 SDK-first / legacy HTTP fallback transport、session/config/provider gateway、MCP/project/file/find/permission API glue 与 finish/fetch orchestration
 - `src/core/opencode/OpenCodeSdkFacade.ts` / `src/core/opencode/ServerManager.ts` 当前分别为 **257** / **1171** 行；它们继续作为高风险相邻 owner 保持稳定，没有在本批被拆成新的薄 facade
 
-结论：R19-R26 已证明“兼容优先的较厚 owner 下沉”能够显著削弱 `OpenCodeService`，但剩余的 session/config/query gateway 更接近高风险广域门面，而不是适合继续无人值守细拆的低风险块。当前应暂停 autopilot，由人工先确认是否继续这条 lane，以及如何避免把剩余 gateway 再拆成新的微碎片 facade。
+结论：R19-R26 已证明“兼容优先的较厚 owner 下沉”能够显著削弱 `OpenCodeService`。下一批已确认继续推进，但范围只限于仍然成块存在、能够形成较厚 owner 的 session lifecycle、session control、question/permission hub 与条件性的 query gateway；必须继续避免把剩余 gateway 再拆成新的微碎片 facade。
 
 ## 2.1 已完成批次（R13-R18）
 
@@ -37,51 +37,44 @@ R13-R18 已完成 `OpenCodianView` 的 UI/runtime shell 收束：tab/messages pa
 
 ## 2.2 已完成夜间批次（R19-R27）
 
-R19-R27 的目标是把 `OpenCodeService` 里仍然成块存在的高集中 ownership 按“兼容优先、总门面不散开”的方式迁出，但不把它拆成大量低价值 facade。该批次现已按既定顺序完成：
+R19-R27 已完成 `OpenCodeService` 的第一批兼容优先收束：sync-event runtime、open-code event runtime、catalog state、prompt request builder、context/image serializer、streaming runtime、stream event transformer、message normalization，以及 checkpoint 复盘。该批次证明了在不破坏 SDK-first / legacy fallback 语义的前提下，`OpenCodeService` 仍然可以继续按较厚 owner 下沉。
 
-1. **R19 sync event runtime coordinator**：迁出 session todo / session status / sync-event listeners、订阅生命周期、emit 路径。
-2. **R20 OpenCode event subscription coordinator**：迁出 OpenCode event listeners、catalog-relevant event routing、open-code event lifecycle。
-3. **R21 tool and MCP catalog state store**：迁出 tool schema cache、registry tool ids、MCP server status snapshot 与 catalog update state。
-4. **R22 prompt request builder**：迁出 SDK prompt parameters、shared prompt options、allowed-tools / output-format / variant 构造。
-5. **R23 context part serializer**：迁出 `buildPromptRequestParts()`、`createPromptContextPart()` 与本地/远程 context / image 序列化。
-6. **R24 streaming runtime state coordinator**：迁出 active stream contexts、create/release/cancel/detach 的运行时状态 owner。
-7. **R25 stream event transformer**：迁出 SDK / legacy SSE event → chunk transform 与 SSE parser；保持 fallback 语义不变。
-8. **R26 message normalization mapper**：迁出 message → `ChatMessage` 归一化、context attachment 提取、tool identity / OMO meta 处理。
-9. **R27 checkpoint**：只做复盘，不开新重构；决定下一批是否继续处理 session/config/query gateway。
+## 2.3 下一批确认方向（R28-R32）
 
-本批刻意**不**处理 `ServerManager`、`OpenCodeSdkFacade`，也不把 session CRUD / permission / project / file API 包装拆成薄 gateway。`OpenCodeService` 继续保持对外总门面；新 owner 只承接内部成块 lifecycle，不改变 SDK-first 与 legacy fallback 的公共语义。
+R28-R32 的目标是在保持 `OpenCodeService` 对外总门面不散开的前提下，继续处理仍然成块存在的 session lifecycle、session control、question/permission 与条件性的 query gateway ownership，但必须把“避免微碎片 facade”放在第一优先级：
 
-R27 checkpoint 的结论是：本批 queue 到此结束，当前 roadmap 没有可自动执行的 `[NEXT]`。如果后续还要继续处理 session/config/query gateway，必须先由人工定义新的受控队列和兼容边界；autopilot 不得自行扩展 `R28+`。
+1. **R28 session lifecycle coordinator**：迁出 session create/list/messages/todos/statuses/delete/update/current-session tracking/subscription 共用逻辑。
+2. **R29 session control and messaging orchestrator**：迁出 fork/revert/unrevert/diff/context snapshot、message commands、shell / message-part operations 的共用控制流。
+3. **R30 question + permission hub**：迁出 pending questions/replies/reject 与 pending/session permissions/responders，集中交互式 negotiation API。
+4. **R31 conditional query gateway**：仅在能形成较厚 owner 的前提下，收束 provider/project/file/find/path/VCS/formatter/LSP/MCP auth 这组广域 gateway；如果落地后会退化成薄 wrapper，必须跳过并在 phase 文档中说明原因。
+5. **R32 checkpoint**：只做复盘，不开新重构；决定 session/config/query gateway 是否还有继续拆分的价值。
+
+本批仍然**不**处理 `ServerManager`、`OpenCodeSdkFacade`，也不允许把调用方改成直接依赖一堆新 service。`OpenCodeService` 继续作为对外总门面；新 owner 只能承接内部成块 lifecycle，并通过 host seam 接入。
 
 
 ## 3. 高优先级方向
 
-R19-R27 已完成；当前无人值守没有可自动执行的 `[NEXT]`。下面保留各 lane 的长期定位，仅供人工设计下一批 roadmap 时参考，不构成新的自动执行许可：
+R28-R32 中，后续无人值守必须优先执行 roadmap 的 `[NEXT]`，每轮只做一个切口。下面保留各 lane 的长期定位，但本批执行顺序以 R28-R32 为准：
 
 ### P1. `OpenCodianView` 中剩余的核心 ownership 迁移
 
-本批不再优先处理 `OpenCodianView`。chat 侧只保留 regression watchpoints；新的高优先级 lane 转向 `OpenCodeService` 的 sync / catalog / prompt / streaming / normalization ownership。
+本批继续以 `OpenCodeService` 为主，但只处理仍然成块存在的 session lifecycle、session control、question/permission 与条件性的 query gateway ownership。`OpenCodianView` 仅保留 regression watchpoints。
 
 ### P2. question / todo / background task 链路
 
-R1-R6 已完成本 lane 的主要收束。本批 R13-R18 不再开新的 question / todo / background-task 拆分切口；除非测试、构建或正确性阻塞，只保留 regression watchpoints。
+R1-R6 已完成本 lane 的主要收束。本批 R28-R32 不再开新的 question / todo / background-task 拆分切口；除非测试、构建或正确性阻塞，只保留 regression watchpoints。
 
 ### P3. context / composer / retained-selection 链路
 
-R7 已把主要 composer-context bundle / builder / catalog ownership 收进 `ComposerContextViewFacade.create()`。本批 R13-R18 不回到这条链路做低收益细拆；只在回归阻塞时修正。
+R7 已把主要 composer-context bundle / builder / catalog ownership 收进 `ComposerContextViewFacade.create()`。本批 R28-R32 不回到这条链路做低收益细拆；只在回归阻塞时修正。
 
 ### P4. message shell / notice / timestamp ownership
 
-R8 已完成 persisted assistant shell / notice / footer / timestamp 的主要收束。本批 R13-R18 不继续拆 assistant shell 细节；只保留 pseudo-stream reveal、本地错误/server-prompt UI 壳层作为后续候选。
+R8 已完成 persisted assistant shell / notice / footer / timestamp 的主要收束。本批 R28-R32 不继续拆 assistant shell 细节；只保留 pseudo-stream reveal、本地错误/server-prompt UI 壳层作为 regression watchpoints。
 
 ### P5. header / appearance / model-permission / experimental demo
 
-这一组在 R13-R18 中被提升为本批后半段重点，但必须保持较厚 owner 与 opt-in demo 边界：
-
-- header / input area 组装
-- appearance / theme / glass / layout 状态同步
-- model / permission selector ownership
-- demo / experimental visual feature 只保留 opt-in，不进入稳定 UI 路径
+R13-R18 已完成这组 UI/runtime shell 的主要收束。本批 R28-R32 不继续沿这条 lane 新开切口；只保留 regression watchpoints，并继续确保 demo / experimental visual feature 保持 opt-in，不进入稳定 UI 路径。
 
 ## 4. 暂停 / 降优先级方向
 
@@ -140,7 +133,7 @@ R8 已完成 persisted assistant shell / notice / footer / timestamp 的主要�
 
 R27 checkpoint 之后：
 
-- R19-R27 夜间受控队列已全部完成，`docs/status/maintainability-round-roadmap.md` 当前没有可自动执行的 `[NEXT]`
-- Autopilot 必须暂停；未经人工确认不得创建或推进 `R28+`
-- 若人工确认继续，下一批必须先明确 session/config/query gateway 是否还能按较厚 owner 推进，或是否保持 checkpoint 停止态
+- R28-R32 受控队列已经确认，`docs/status/maintainability-round-roadmap.md` 的 `R28` 是唯一可自动执行的 `[NEXT]`
+- Autopilot 可以按 R28-R32 顺序运行，但不得越过 R32 自动扩展新队列
+- 本批明确优先 `OpenCodeService` 的 session lifecycle、session control、question/permission hub 与条件性的 query gateway；如果 `R31` 无法避免微碎片，必须在该轮说明原因后直接推进 `R32`
 - `ConversationRenderService` trailing-assistant helper 链仍保持降优先级；除非正确性、测试或构建阻塞，不要把它作为新 queue 的默认起点

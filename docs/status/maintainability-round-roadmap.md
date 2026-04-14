@@ -1,8 +1,8 @@
 # Maintainability Round Roadmap
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
-> **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`。R27 完成后必须暂停复盘，不得自动扩展新队列。
-> **当前状态**: [REVIEW_REQUIRED] R19-R27 已完成；当前没有可自动执行的 `[NEXT]`，等待人工确认是否定义后续 queue。
+> **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`。R32 完成后必须暂停复盘，不得自动扩展新队列。
+> **当前状态**: [CONFIRMED_NEXT_BATCH] R28-R32 已确认；当前可自动执行的 `[NEXT]` 是 `R28 - Session lifecycle coordinator`。
 
 ## 控制规则
 
@@ -16,7 +16,7 @@
 
 ## 总体路线
 
-本轮规划目标是提升整体可维护性，降低单一文件复杂度，同时避免把“大单体”拆成“微碎片”。R1-R12 已完成 P2/P3/P4/settings/core-config 的首批收束；R13-R18 下一批已确认转向 `OpenCodianView` 中仍然成块的 UI/runtime shell ownership，按 tab pane → header → input → selector → appearance/glass → checkpoint 的顺序推进。
+当前受控批次的目标仍然是提升整体可维护性、降低单一文件复杂度，并避免把“大单体”拆成“微碎片”。R1-R27 已完成 question/todo、composer/message shell、settings/core-config 与 `OpenCodeService` 第一批 runtime/builder/mapper ownership 收束；本次人工确认的 R28-R32 将继续沿 `OpenCodeService` lane 推进，顺序固定为 session lifecycle → session control/message orchestration → question/permission hub → conditional query gateway → checkpoint。
 
 > **P2 状态（R6 完成后）**: R1-R6 已完成 question dock、todo refresh/status、background completion notice、post-sync handoff 与 session signal orchestration 的收束。剩余风险以回归为主：background tab 无 session 时的 dock 清理、post-sync todo/status gate、completion notice queue/fingerprint 去重，以及 live signal writeback 顺序。
 >
@@ -611,3 +611,98 @@
 - `OpenCodeSdkFacade.ts` / `ServerManager.ts` 当前分别保持在 **257** / **1171** 行；本批刻意没有把 session/config/project/file/permission API 再拆成新的薄 facade，也没有改 SDK-first / legacy fallback 的公共语义。
 - `OpenCodeService` 剩余的高风险集中点主要是：SDK/HTTP transport fallback、session CRUD/fork/revert/finish orchestration、config/provider directory normalization，以及 MCP / permission / project / file / find / path / vcs / formatter / lsp 等广域 gateway wrapper；这些更适合先人工界定边界，再决定是否继续。
 - 结论：当前 queue 到此结束，不自动新增 `[QUEUED]` 或 `[NEXT]` 项，也不允许 autopilot 自动扩展 `R28+`；若后续继续 maintainability，必须先由人工确认是否为 session/config/query gateway 设计新的受控批次。
+
+
+## Confirmed Next Batch: R28-R32 `OpenCodeService` session/control/gateway
+
+本批由人工确认：继续收束 `OpenCodeService`，但范围仅限于仍然成块存在、可形成较厚 owner 的 session lifecycle、session control、question/permission 与条件性的 query gateway。`OpenCodeService` 继续保持对外总门面；如果某个候选只会生成薄 wrapper/facade，必须跳过而不是硬拆。
+
+### [NEXT] R28 - Session lifecycle coordinator
+
+- **Lane**: OpenCodeService `session lifecycle`
+- **目标**: 把 session create/list/messages/todos/statuses/delete/update/current-session tracking/subscriptions 的共用逻辑从 `OpenCodeService` 收束到一个较厚 coordinator。
+- **优先入口**:
+  - `src/core/opencode/OpenCodeService.ts` 中 `createSession()` 到 `subscribeToSessionSyncEvents()` 的 session lifecycle 区段
+  - `src/core/opencode/OpenCodeSdkFacade.ts`
+- **允许边界**:
+  - 可新增 `OpenCodeSessionLifecycleCoordinator` 或同等厚 owner，同时覆盖 create/list/read/delete/update/current-session/subscription 的共享流程。
+  - `OpenCodeService` 继续作为对外 API 门面。
+- **禁止项**:
+  - 不把每个 CRUD 方法拆成独立 gateway。
+  - 不改 SDK-first / legacy fallback 行为。
+  - 不改 question/permission、query gateway、streaming runtime。
+- **验收**:
+  - `OpenCodeService` 不再直接铺开主要 session lifecycle 逻辑。
+  - 新 owner 满足粒度规则，并有 focused coverage。
+  - 运行 targeted tests、全量 `npm test`、`npm run build`。
+
+### [QUEUED] R29 - Session control and messaging orchestrator
+
+- **Lane**: OpenCodeService `session control / message operations`
+- **目标**: 把 fork/revert/unrevert/diff/context usage、message commands、shell / message-part operations 收束到一个较厚 orchestrator。
+- **优先入口**:
+  - `src/core/opencode/OpenCodeService.ts` 中 `forkSession()` 到 `updateMessagePart()` 的 control/message 区段
+- **允许边界**:
+  - 可新增 `OpenCodeSessionControlOrchestrator`，同时覆盖 session control 与 message-operation 的共用控制流。
+  - `OpenCodeService` 继续作为 transport + façade 入口。
+- **禁止项**:
+  - 不把每个命令 API 再拆成多个薄层。
+  - 不改 transport fallback 语义。
+  - 不混入 query gateway 或 question/permission hub。
+- **验收**:
+  - `OpenCodeService` 不再直接持有这块主要 control/message orchestration。
+  - 新 owner 满足粒度规则，并有 focused coverage。
+  - 运行 targeted tests、全量 `npm test`、`npm run build`。
+
+### [QUEUED] R30 - Question and permission hub
+
+- **Lane**: OpenCodeService `question / permission negotiation`
+- **目标**: 把 pending questions/reply/reject 与 pending/session permissions/responders 收束到交互式 negotiation hub。
+- **优先入口**:
+  - `src/core/opencode/OpenCodeService.ts` 中 `getPendingQuestions()` 到 `respondToPermission()` 的 negotiation 区段
+- **允许边界**:
+  - 可新增 `OpenCodeQuestionPermissionHub`，前提是同时覆盖 question + permission 两组协商接口。
+  - 可继续通过 host seam 调用 mapper、logger 与 SDK facade。
+- **禁止项**:
+  - 不把 question 和 permission 拆成两个过薄模块，除非每个 owner 都明显满足粒度规则。
+  - 不改交互式 provider/API 语义。
+- **验收**:
+  - `OpenCodeService` 不再直接铺开主要 question/permission 协商逻辑。
+  - 新 owner 满足粒度规则，并有 focused coverage。
+  - 运行 targeted tests、全量 `npm test`、`npm run build`。
+
+### [QUEUED] R31 - Conditional query gateway
+
+- **Lane**: OpenCodeService `broad query gateway`
+- **目标**: 仅在能够形成较厚 owner 的前提下，把 provider auth、project/file/find/path/VCS/formatter/LSP/MCP auth 这组广域 gateway 收束到单一 gateway owner。
+- **优先入口**:
+  - `src/core/opencode/OpenCodeService.ts` 中 provider auth / project / file / find / path / vcs / formatter / lsp / MCP auth 区段
+- **允许边界**:
+  - 可新增 `OpenCodeQueryGateway`，但必须同时覆盖多组 query/admin API，并形成明显厚 owner。
+  - 如果评估后只能得到薄 wrapper，允许本轮只写 phase 文档说明“跳过 R31，直接推进 R32”。
+- **禁止项**:
+  - 不为“完成队列”而硬拆薄 façade。
+  - 不动 `ServerManager`、`OpenCodeSdkFacade`。
+- **验收**:
+  - 仅当形成较厚 owner 时才提交代码重构；否则在 phase 文档中明确说明跳过原因。
+  - 运行 targeted tests（如有代码变更）、全量 `npm test`、`npm run build`。
+
+### [QUEUED] R32 - Gateway checkpoint
+
+- **Lane**: Checkpoint
+- **目标**: 暂停自动推进，复盘 R28-R31 对 `OpenCodeService` 剩余 session/config/query gateway 的影响，并决定是否还有继续重构的价值。
+- **优先入口**:
+  - `docs/status/maintainability-round-roadmap.md`
+  - `docs/status/maintainability-master-plan.md`
+  - `docs/status/maintainability-lane-map.md`
+  - R28-R31 phase 文档
+  - `src/core/opencode/OpenCodeService.ts`
+- **允许边界**:
+  - 只做测试、文档、指标统计和下一批建议。
+- **禁止项**:
+  - 不开新代码重构。
+  - 不允许 autopilot 自动扩展 R33+。
+- **验收**:
+  - phase 文档总结 `OpenCodeService` 剩余 gateway 是否仍值得继续拆。
+  - 将 roadmap 状态设置为需要人工确认后再继续。
+  - 运行全量 `npm test`、`npm run build`。
