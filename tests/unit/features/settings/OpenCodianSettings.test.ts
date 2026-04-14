@@ -52,34 +52,34 @@ function installClampedScrollState(element: HTMLElement, options: { clientHeight
   };
 }
 
-describe('SettingsSectionCoordinator scroll restore logging', () => {
-  const originalMutationObserver = globalThis.MutationObserver;
-  const originalRequestAnimationFrame = window.requestAnimationFrame;
-  const originalCancelAnimationFrame = window.cancelAnimationFrame;
+const originalMutationObserver = globalThis.MutationObserver;
+const originalRequestAnimationFrame = window.requestAnimationFrame;
+const originalCancelAnimationFrame = window.cancelAnimationFrame;
 
-  function createCoordinator(savedScrollTop = 0) {
-    const state = {
-      settingsPanelScrollTop: savedScrollTop,
-    };
-    const containerEl = document.createElement('div');
-    const scheduleScrollStateSave = jest.fn();
-    const coordinator = new SettingsSectionCoordinator({
-      containerEl,
-      getSavedScrollTop: () => state.settingsPanelScrollTop,
-      setSavedScrollTop: (scrollTop) => {
-        state.settingsPanelScrollTop = scrollTop;
-      },
-      scheduleScrollStateSave,
-    });
+function createCoordinator(savedScrollTop = 0) {
+  const state = {
+    settingsPanelScrollTop: savedScrollTop,
+  };
+  const containerEl = document.createElement('div');
+  const scheduleScrollStateSave = jest.fn();
+  const coordinator = new SettingsSectionCoordinator({
+    containerEl,
+    getSavedScrollTop: () => state.settingsPanelScrollTop,
+    setSavedScrollTop: (scrollTop) => {
+      state.settingsPanelScrollTop = scrollTop;
+    },
+    scheduleScrollStateSave,
+  });
 
-    return {
-      coordinator,
-      containerEl,
-      scheduleScrollStateSave,
-      state,
-    };
-  }
+  return {
+    coordinator,
+    containerEl,
+    scheduleScrollStateSave,
+    state,
+  };
+}
 
+function registerScrollRestoreSuiteHooks() {
   beforeEach(() => {
     jest.useFakeTimers();
     MutationObserverMock.reset();
@@ -122,6 +122,10 @@ describe('SettingsSectionCoordinator scroll restore logging', () => {
     window.cancelAnimationFrame = originalCancelAnimationFrame;
     document.body.innerHTML = '';
   });
+}
+
+describe('SettingsSectionCoordinator scroll restore logging', () => {
+  registerScrollRestoreSuiteHooks();
 
   it('logs a single restore success and clears pending work after mutation succeeds', () => {
     const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
@@ -307,7 +311,9 @@ describe('SettingsSectionCoordinator scroll restore logging', () => {
       restoredScrollTop: 400,
     });
   });
+});
 
+describe('SettingsSectionCoordinator quick nav', () => {
   it('builds quick-nav buttons from registered section headings', () => {
     const { coordinator, containerEl } = createCoordinator();
     document.body.appendChild(containerEl);

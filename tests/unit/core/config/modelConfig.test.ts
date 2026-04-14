@@ -8,9 +8,9 @@ import {
   mergeCatalogs,
   mergeProviderAvailabilityConfig,
   resolveInheritedModelConfigResolution,
-  resolveProviderAvailabilityProbePlan,
   resolveModelSelection,
   resolvePreferredAvailableModel,
+  resolveProviderAvailabilityProbePlan,
   setProviderEnabled,
 } from '../../../../src/core/config/modelConfig';
 import type { OpencodeModelConfigSubset } from '../../../../src/core/types';

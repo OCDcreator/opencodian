@@ -115,7 +115,32 @@ export class SettingsStyleSection {
       t('settings.quickNav.styleDesc'),
     );
     this.addThemePresetSection(containerEl);
+    this.addResetAllSetting(containerEl);
 
+    this.backgroundStyleSection = this.createBackgroundStyleSection();
+    this.backgroundStyleSection.attach(containerEl);
+    this.addLayoutStyleGroup(containerEl);
+    this.addUserStyleGroup(containerEl);
+    this.addAssistantStyleGroup(containerEl);
+
+    const inputGroupHostEl = containerEl.createDiv({ cls: 'opencodian-style-input-group-host' });
+    this.renderInputStyleGroup(inputGroupHostEl);
+
+    this.addScrollbarStyleGroup(containerEl);
+    this.addAdvancedStyleGroup(containerEl);
+
+    return headingEl;
+  }
+
+  dispose(): void {
+    this.styleControlBindings = [];
+    this.stylePresetUiRefresh = undefined;
+    this.backgroundStyleSection?.dispose();
+    this.backgroundStyleSection = null;
+    this.inputStyleGroupHostEl = null;
+  }
+
+  private addResetAllSetting(containerEl: HTMLElement): void {
     new Setting(containerEl)
       .setName(t('settings.style.resetAll.name'))
       .setDesc(t('settings.style.resetAll.desc'))
@@ -126,10 +151,9 @@ export class SettingsStyleSection {
             void this.resetAllChatStyles();
           });
       });
+  }
 
-    this.backgroundStyleSection = this.createBackgroundStyleSection();
-    this.backgroundStyleSection.attach(containerEl);
-
+  private addLayoutStyleGroup(containerEl: HTMLElement): void {
     const layoutGroupEl = this.createStyleGroupSection(
       containerEl,
       t('settings.style.groups.layout.title'),
@@ -206,7 +230,9 @@ export class SettingsStyleSection {
       },
     });
     this.createStyleResetSetting(layoutGroupEl, 'layout');
+  }
 
+  private addUserStyleGroup(containerEl: HTMLElement): void {
     const userGroupEl = this.createStyleGroupSection(
       containerEl,
       t('settings.style.groups.user.title'),
@@ -307,7 +333,9 @@ export class SettingsStyleSection {
       },
     });
     this.createStyleResetSetting(userGroupEl, 'user');
+  }
 
+  private addAssistantStyleGroup(containerEl: HTMLElement): void {
     const assistantGroupEl = this.createStyleGroupSection(
       containerEl,
       t('settings.style.groups.assistant.title'),
@@ -470,10 +498,9 @@ export class SettingsStyleSection {
       },
     });
     this.createStyleResetSetting(assistantGroupEl, 'assistant');
+  }
 
-    const inputGroupHostEl = containerEl.createDiv({ cls: 'opencodian-style-input-group-host' });
-    this.renderInputStyleGroup(inputGroupHostEl);
-
+  private addScrollbarStyleGroup(containerEl: HTMLElement): void {
     const scrollbarGroupEl = this.createStyleGroupSection(
       containerEl,
       t('settings.style.groups.scrollbar.title'),
@@ -578,7 +605,9 @@ export class SettingsStyleSection {
       },
     });
     this.createStyleResetSetting(scrollbarGroupEl, 'scrollbar');
+  }
 
+  private addAdvancedStyleGroup(containerEl: HTMLElement): void {
     const advancedGroupEl = this.createStyleGroupSection(
       containerEl,
       t('settings.style.groups.advanced.title'),
@@ -637,16 +666,6 @@ export class SettingsStyleSection {
     });
 
     this.createStyleResetSetting(advancedGroupEl, 'advanced');
-
-    return headingEl;
-  }
-
-  dispose(): void {
-    this.styleControlBindings = [];
-    this.stylePresetUiRefresh = undefined;
-    this.backgroundStyleSection?.dispose();
-    this.backgroundStyleSection = null;
-    this.inputStyleGroupHostEl = null;
   }
 
   private addThemePresetSection(containerEl: HTMLElement): void {

@@ -1,7 +1,7 @@
-import { getCurrentPlatformKey, DEFAULT_SETTINGS } from '../../../../src/core/types';
 import * as obsidian from 'obsidian';
 import { Setting } from 'obsidian';
 
+import { DEFAULT_SETTINGS, getCurrentPlatformKey } from '../../../../src/core/types';
 import { SettingsDebugSection } from '../../../../src/features/settings/SettingsDebugSection';
 import { setLocale, t } from '../../../../src/i18n';
 import type OpenCodianPlugin from '../../../../src/main';

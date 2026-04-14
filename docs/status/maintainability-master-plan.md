@@ -2,11 +2,11 @@
 
 > **状态**: [READY]
 > **作用**: 这是 maintainability 无人值守的战略文档。每轮开始前，先读本文件，再读 `docs/status/maintainability-round-roadmap.md` 与最近的 `docs/status/maintainability-phase-XXX.md`。
-> **自动推进状态**: `R63` 已完成 ProviderIconService asset loading and custom cache seam；当前首个 `[NEXT]` 为 `R64 - Warning cleanup batch A (settings residuals)`，恢复运行时必须继续按 roadmap 队列顺序执行，不允许 freestyle。
+> **自动推进状态**: `R64` 已完成 Warning cleanup batch A (settings residuals)；当前首个 `[NEXT]` 为 `R65 - Warning cleanup batch B (config and opencode core)`，恢复运行时必须继续按 roadmap 队列顺序执行，不允许 freestyle。
 
 ## 1. 当前判断
 
-**当前分支已完成 `R63`，把 `ProviderIconService` 的 cached asset 读取、LobeHub/builtin/custom source asset loading、cache write/read 与 custom cache entry 装配收口到同文件内的 asset-runtime seam。** 当前 lint 基线保持在 `0 errors / 92 warnings`，settings 残余 seam、`ServerManager` shutdown 热点、`ModelConfigService` 两个 config/catalog 切口、mapper seam 与 provider icon 两个 seam 已收尾；接下来应继续按 queue 推进显式 warning reduction。
+**当前分支已完成 `R64`，在 settings 邻域完成 warning cleanup batch A：`SettingsStyleSection.attach()` 改为委托给按 section 分组的同文件 owner、settings focused tests 改成更窄的 describe/顶层 test scope，并用最小 import-sort 修复恢复 live lint `0 errors`。** 当前 lint 基线保持在 `0 errors / 87 warnings`，settings residual batch A 已收尾；接下来应继续按 queue 推进 `config/opencode core` warning reduction。
 
 这批夜间队列的主线是：
 
@@ -17,17 +17,17 @@
 
 ## 2. 当前基线
 
-- **lint**: `0 errors / 92 warnings`
+- **lint**: `0 errors / 87 warnings`
 - **验证**:
-  - 最近一次已确认的全量测试为 `R63`：`npm test` 通过，`262 passed, 262 total` suites；`1126 passed, 1126 total` tests
-  - 最近一次已确认的构建通过为 `R63`：`npm run build`，`BUILD_ID` `autopilot-maintainability.202604150546`
-  - 最近一次 Test Vault 部署仍来自 `R54`；`R63` 仅触及 `src/utils/icons/ProviderIconService.ts`、直接相关测试与状态/模块文档，不属于强制部署范围
+  - 最近一次已确认的全量测试为 `R64`：`npm test` 通过，`262 passed, 262 total` suites；`1126 passed, 1126 total` tests
+  - 最近一次已确认的构建通过为 `R64`：`npm run build`，`BUILD_ID` `autopilot-maintainability.202604150602`
+  - 最近一次 Test Vault 部署为 `R64`：已复制 `dist/main.js`、`dist/manifest.json` 与 `dist/styles.css` 到 Test Vault，并确认部署后的 `main.js` 含最新 `BUILD_ID`
 - **本批目标**:
   - 保持 `0 errors`
   - 在保持受控 queue 的前提下继续做高确定性 maintainability seam
-  - 把 warning baseline 从当前 `92` 继续往低八十区间推进；若未达成，`R67` checkpoint 必须明确说明剩余高成本阻塞
+  - 把 warning baseline 从当前 `87` 继续往低八十区间推进；若未达成，`R67` checkpoint 必须明确说明剩余高成本阻塞
 - **下一批高确定性切口**:
-  - `R64-R66`: warning cleanup batches
+  - `R65-R66`: warning cleanup batches
   - `R67`: checkpoint
 - **历史摘要**: 见 `docs/status/maintainability-completed-batches.md`
 
@@ -58,6 +58,7 @@
 - **R61**: `OpenCodeMessageNormalizationMapper` 现在通过同文件内的 context/OMO seam 统一处理 text-part normalization、file/context attachment、inline Read parsing、attachment dedupe 与 OMO metadata 归一化，并补齐直接相关测试与模块文档
 - **R62**: `ProviderIconService` 现在通过同文件内的 entry-resolution seam 统一处理 default/editable/effective entry 决策、canonical provider-id 映射与 cache preview metadata 装配，并补齐直接相关测试与模块文档
 - **R63**: `ProviderIconService` 现在通过同文件内的 asset-runtime seam 统一处理 cached asset 读取、LobeHub/builtin/custom candidate loading、cache write/read、cache-only preview fallback 与 custom cache entry 装配，并补齐直接相关测试与模块文档
+- **R64**: 在 settings 邻域完成 warning cleanup batch A，把 `SettingsStyleSection.attach()` 收束为 section-level 同文件 owner 调度、缩小 `OpenCodianSettings` / `OpenCodianStyleSettings` / `modelConfigWorkspace` focused tests 的单函数范围、吸收两个 import-sort lint blocker，并把 live lint 基线压到 `0 errors / 87 warnings`
 
 ## 4. 本批结论
 

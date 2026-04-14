@@ -1,18 +1,18 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [READY] `R63` ProviderIconService asset loading and custom cache seam 已完成；当前首个 `[NEXT]` 为 `R64 - Warning cleanup batch A (settings residuals)`。
+> **当前状态**: [READY] `R64` Warning cleanup batch A (settings residuals) 已完成；当前首个 `[NEXT]` 为 `R65 - Warning cleanup batch B (config and opencode core)`。
 
 ## 当前优先级
 
-- **当前 `[NEXT]`**：`R64 - Warning cleanup batch A (settings residuals)`
-- **本批目标**：保持 `0 errors`，provider icon 热点已收尾，继续推进显式 warning cleanup 三连与 checkpoint
-- **当前 lint 基线**：`0 errors / 92 warnings`
+- **当前 `[NEXT]`**：`R65 - Warning cleanup batch B (config and opencode core)`
+- **本批目标**：保持 `0 errors`，settings residual warning batch A 已完成，继续推进 config/opencode core warning cleanup 与 checkpoint
+- **当前 lint 基线**：`0 errors / 87 warnings`
 - **热点顺序**：
-  1. `src/features/settings/OpenCodianSettings.ts`
-  2. `src/features/settings/SettingsStyleSection.ts`
-  3. `src/features/settings/SettingsModelSection.ts`
-  4. 直接相关 settings tests
+  1. `src/core/config/ModelConfigService.ts`
+  2. `src/core/config/modelConfig.ts`
+  3. `src/core/opencode/OpenCodeMessageNormalizationMapper.ts`
+  4. 直接相关 tests
 
 ## 本批边界
 

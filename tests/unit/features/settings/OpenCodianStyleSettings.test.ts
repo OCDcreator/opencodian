@@ -47,9 +47,9 @@ function createStyleSection(plugin: ConstructorParameters<typeof SettingsStyleSe
   });
 }
 
-describe('OpenCodian style settings', () => {
-  const dropdownRecords: DropdownRecord[] = [];
+const dropdownRecords: DropdownRecord[] = [];
 
+function registerDropdownRecordHooks() {
   beforeEach(() => {
     setLocale('zh');
     document.body.innerHTML = '';
@@ -77,6 +77,10 @@ describe('OpenCodian style settings', () => {
   afterEach(() => {
     jest.restoreAllMocks();
   });
+}
+
+describe('OpenCodian style settings attach wiring', () => {
+  registerDropdownRecordHooks();
 
   it('does not add a separate input theme dropdown anymore', () => {
     const plugin = {
@@ -166,6 +170,10 @@ describe('OpenCodian style settings', () => {
     expect(actionButtonsDropdown?.control.addOption).toHaveBeenCalledWith('default', '独立按钮');
     expect(actionButtonsDropdown?.control.addOption).toHaveBeenCalledWith('etched', '刻入玻璃');
   });
+});
+
+describe('OpenCodian style settings helpers', () => {
+  registerDropdownRecordHooks();
 
   it('does not expose the standalone diamond input theme in the liquid glass adapter dropdown', () => {
     registerBuiltinGlassAdapters();
@@ -278,7 +286,9 @@ describe('OpenCodian style settings', () => {
     shudingHelp?.onClick();
     expect(openSpy).toHaveBeenCalledTimes(1);
   });
+});
 
+describe('OpenCodian style settings color and number controls', () => {
   it('commits color picker changes only after the picker confirms a value', () => {
     const chatAppearance = getDefaultChatAppearanceSettings();
     let createdSettingEl: HTMLElement | null = null;
@@ -409,7 +419,9 @@ describe('OpenCodian style settings', () => {
 
     expect(numberInput!.value).toBe('8.35');
   });
+});
 
+describe('OpenCodian style settings slider and draft controls', () => {
   it('preserves unfinished decimal drafts until the number input is complete', () => {
     let currentValue = 5;
     let createdSettingEl: HTMLElement | null = null;
