@@ -2,11 +2,11 @@
 
 > **状态**: [CONFIRMED_NEXT_BATCH]
 > **作用**: 这是 maintainability 无人值守的战略文档。每轮开始前，先读本文件，再读 `docs/status/maintainability-round-roadmap.md` 与最近的 `docs/status/maintainability-phase-XXX.md`。
-> **自动推进状态**: 文档已做人工压缩归档；当前可自动执行的 `[NEXT]` 是 `W8 - OpenCodianView sync complexity trim`。本批只继续受控 warning cleanup，不自动恢复 `R33+` maintainability queue。
+> **自动推进状态**: 文档已做人工压缩归档；当前可自动执行的 `[NEXT]` 是 `W9 - Warning cleanup checkpoint`。本批只继续受控 warning cleanup，不自动恢复 `R33+` maintainability queue。
 
 ## 1. 当前判断
 
-**当前判断：R28-R32、L1-L5 与 W1-W7 均已完成，文档主入口已压缩。仓库当前 lint 基线是 `0 errors / 98 warnings`；后续应继续一小批受控 warning cleanup，优先清理仍能在现有 owner 内稳定收束的热点，再决定是否恢复新的 maintainability 重构。**
+**当前判断：R28-R32、L1-L5 与 W1-W8 均已完成，文档主入口已压缩。仓库当前 lint 基线是 `0 errors / 95 warnings`；下一轮应执行 checkpoint，复盘 `W6-W8` 的 warning 收益并决定是否继续受控 warning cleanup，或恢复新的 maintainability 重构。**
 
 当前最重要的事实：
 
@@ -16,7 +16,7 @@
 
 ## 2. 当前基线
 
-- **Lint 基线**: `0 errors / 98 warnings`
+- **Lint 基线**: `0 errors / 95 warnings`
 - **当前热点**:
   - `src/features/chat/OpenCodianView.ts`
   - `src/features/settings/OpenCodianSettings.ts`
@@ -27,9 +27,9 @@
 
 ## 3. 当前批次（W8-W9）
 
-本批只做 warning cleanup，不恢复 `R33+`。`W6-W7` 已完成并把 lint 基线从 `103` 收敛到 `98` warnings，当前继续推进剩余 queue：
+本批只做 warning cleanup，不恢复 `R33+`。`W6-W8` 已完成并把 lint 基线从 `103` 收敛到 `95` warnings，当前只剩 checkpoint：
 
-1. **W8 `OpenCodianView` sync complexity trim**：只处理三处消息同步相关复杂度热点
+1. **W8 `OpenCodianView` sync complexity trim**：已完成，三处消息同步复杂度 warning 已收掉
 2. **W9 checkpoint**：复盘 `W6-W8` 的 warning 收益，并决定下一批是继续 warning cleanup，还是恢复新的 maintainability queue
 
 ## 4. 长期边界

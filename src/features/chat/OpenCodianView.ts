@@ -369,6 +369,47 @@ interface ConversationRevertState {
   partID?: string;
 }
 
+type OpenCodeSessionMessages = Awaited<ReturnType<OpenCodianPlugin['openCodeService']['getSessionMessages']>>;
+
+interface LatestServerUserMessageHydration {
+  hydratedMessage: ChatMessage;
+  rawServerUserText: string;
+}
+
+interface ConversationServerSyncSnapshot {
+  serverMessages: OpenCodeSessionMessages;
+  convertedServerMessages: ChatMessage[];
+  revertState: ConversationRevertState | null;
+}
+
+interface ConversationServerSyncMergeResult {
+  merged: ChatMessage[];
+  preservedClientOnlyMessages: ChatMessage[];
+  fingerprint: string;
+  changed: boolean;
+}
+
+interface HydratedUserMessageMismatchContext {
+  sessionId: string;
+  optimisticMessageId: string;
+  rawServerUserText: string;
+}
+
+interface HydratedOptimisticUserMessageUpdate {
+  conversation: Conversation;
+  optimisticIndex: number;
+  optimisticMessage: ChatMessage;
+  mergedHydratedMessage: ChatMessage;
+  tabId: TabId | null;
+}
+
+interface ConversationServerSyncContext {
+  conversation: Conversation;
+  tabId: TabId | null;
+  reason: string;
+  verbose: boolean;
+}
+
 interface DeferredQuestionRequest {
   promise: Promise<void>;
   resolve: () => void;
@@ -4606,52 +4647,16 @@ export class OpenCodianView extends ItemView {
   }
 
   private mergeClientOnlyMessageFields(existingMessage: ChatMessage, syncedMessage: ChatMessage, verbose = true): ChatMessage {
-    let contextAttachments = syncedMessage.contextAttachments;
-    if (existingMessage.contextAttachments && existingMessage.contextAttachments.length > 0) {
-      if (!contextAttachments || contextAttachments.length === 0) {
-        contextAttachments = existingMessage.contextAttachments;
-      } else {
-        contextAttachments = contextAttachments.map((attachment) => {
-          const existingAttachment = existingMessage.contextAttachments?.find((candidate) =>
-            candidate.path === attachment.path
-            && candidate.lineRange?.startLine === attachment.lineRange?.startLine
-            && candidate.lineRange?.endLine === attachment.lineRange?.endLine,
-          );
-
-          return existingAttachment ?? attachment;
-        });
-      }
-    }
-
-    let content = syncedMessage.content;
-    if (!content?.trim() && existingMessage.content?.trim()) {
-      content = existingMessage.content;
-    }
-
-    let contentBlocks = syncedMessage.contentBlocks;
-    if (this.shouldPreserveExistingAssistantContentBlocks(existingMessage, syncedMessage)) {
-      contentBlocks = existingMessage.contentBlocks;
-    }
-
-    let toolCalls = syncedMessage.toolCalls;
-    if ((!toolCalls || toolCalls.length === 0) && existingMessage.toolCalls?.length) {
-      toolCalls = existingMessage.toolCalls;
-    }
-
-    const preservedFlags = {
-      preservedExistingContent: content === existingMessage.content && content !== syncedMessage.content,
-      preservedExistingContentBlocks: contentBlocks === existingMessage.contentBlocks,
-      preservedExistingToolCalls: toolCalls === existingMessage.toolCalls && toolCalls !== syncedMessage.toolCalls,
-      preservedExistingStructured: syncedMessage.structured === undefined && existingMessage.structured !== undefined,
-      preservedExistingParts: syncedMessage.parts === undefined && existingMessage.parts !== undefined,
-    };
-    if (verbose && Object.values(preservedFlags).some(Boolean)) {
-      this.logAssistantFinalizationDebug('merge-client-only-message-fields', {
-        existingMessage: this.summarizeChatMessageForDebug(existingMessage),
-        syncedMessage: this.summarizeChatMessageForDebug(syncedMessage),
-        preservedFlags,
-      });
-    }
+    const contextAttachments = this.mergeSyncedMessageContextAttachments(existingMessage, syncedMessage);
+    const content = this.mergeSyncedMessageContent(existingMessage, syncedMessage);
+    const contentBlocks = this.mergeSyncedMessageContentBlocks(existingMessage, syncedMessage);
+    const toolCalls = this.mergeSyncedMessageToolCalls(existingMessage, syncedMessage);
+    const preservedFlags = this.getClientOnlyMessagePreservationFlags(
+      existingMessage,
+      syncedMessage,
+      { content, contentBlocks, toolCalls },
+    );
+    this.logClientOnlyMessageFieldPreservation(existingMessage, syncedMessage, preservedFlags, verbose);
 
     return {
       ...syncedMessage,
@@ -4664,6 +4669,100 @@ export class OpenCodianView extends ItemView {
       structured: syncedMessage.structured ?? existingMessage.structured,
       parts: syncedMessage.parts ?? existingMessage.parts,
     };
+  }
+
+  private mergeSyncedMessageContextAttachments(
+    existingMessage: ChatMessage,
+    syncedMessage: ChatMessage,
+  ): ChatMessage['contextAttachments'] {
+    const existingAttachments = existingMessage.contextAttachments;
+    const syncedAttachments = syncedMessage.contextAttachments;
+    if (!existingAttachments?.length) {
+      return syncedAttachments;
+    }
+
+    if (!syncedAttachments?.length) {
+      return existingAttachments;
+    }
+
+    return syncedAttachments.map((attachment) =>
+      existingAttachments.find((candidate) => this.isMatchingMessageContextAttachment(candidate, attachment))
+      ?? attachment,
+    );
+  }
+
+  private isMatchingMessageContextAttachment(
+    left: NonNullable<ChatMessage['contextAttachments']>[number],
+    right: NonNullable<ChatMessage['contextAttachments']>[number],
+  ): boolean {
+    return left.path === right.path
+      && left.lineRange?.startLine === right.lineRange?.startLine
+      && left.lineRange?.endLine === right.lineRange?.endLine;
+  }
+
+  private mergeSyncedMessageContent(existingMessage: ChatMessage, syncedMessage: ChatMessage): string {
+    if (!syncedMessage.content?.trim() && existingMessage.content?.trim()) {
+      return existingMessage.content;
+    }
+
+    return syncedMessage.content;
+  }
+
+  private mergeSyncedMessageContentBlocks(
+    existingMessage: ChatMessage,
+    syncedMessage: ChatMessage,
+  ): ChatMessage['contentBlocks'] {
+    return this.shouldPreserveExistingAssistantContentBlocks(existingMessage, syncedMessage)
+      ? existingMessage.contentBlocks
+      : syncedMessage.contentBlocks;
+  }
+
+  private mergeSyncedMessageToolCalls(
+    existingMessage: ChatMessage,
+    syncedMessage: ChatMessage,
+  ): ChatMessage['toolCalls'] {
+    if (syncedMessage.toolCalls?.length) {
+      return syncedMessage.toolCalls;
+    }
+
+    if (existingMessage.toolCalls?.length) {
+      return existingMessage.toolCalls;
+    }
+
+    return syncedMessage.toolCalls;
+  }
+
+  private getClientOnlyMessagePreservationFlags(
+    existingMessage: ChatMessage,
+    syncedMessage: ChatMessage,
+    mergedFields: Pick<ChatMessage, 'content' | 'contentBlocks' | 'toolCalls'>,
+  ): Record<string, boolean> {
+    return {
+      preservedExistingContent:
+        mergedFields.content === existingMessage.content && mergedFields.content !== syncedMessage.content,
+      preservedExistingContentBlocks: mergedFields.contentBlocks === existingMessage.contentBlocks,
+      preservedExistingToolCalls:
+        mergedFields.toolCalls === existingMessage.toolCalls && mergedFields.toolCalls !== syncedMessage.toolCalls,
+      preservedExistingStructured: syncedMessage.structured === undefined && existingMessage.structured !== undefined,
+      preservedExistingParts: syncedMessage.parts === undefined && existingMessage.parts !== undefined,
+    };
+  }
+
+  private logClientOnlyMessageFieldPreservation(
+    existingMessage: ChatMessage,
+    syncedMessage: ChatMessage,
+    preservedFlags: Record<string, boolean>,
+    verbose: boolean,
+  ): void {
+    if (!verbose || !Object.values(preservedFlags).some(Boolean)) {
+      return;
+    }
+
+    this.logAssistantFinalizationDebug('merge-client-only-message-fields', {
+      existingMessage: this.summarizeChatMessageForDebug(existingMessage),
+      syncedMessage: this.summarizeChatMessageForDebug(syncedMessage),
+      preservedFlags,
+    });
   }
 
   private shouldPreserveExistingAssistantContentBlocks(
@@ -4726,33 +4825,12 @@ export class OpenCodianView extends ItemView {
     }
 
     try {
-      const serverMessages = await this.plugin.openCodeService.getSessionMessages(sessionId);
-      const latestServerUser = [...serverMessages]
-        .reverse()
-        .find(({ info }) => info.role === 'user');
-      if (!latestServerUser) {
+      const hydration = await this.getLatestServerUserMessageHydration(sessionId);
+      if (!hydration) {
         return;
       }
 
-      const hydratedMessage = this.plugin.openCodeService.hydrateOpenCodeMessage(
-        latestServerUser.info,
-        latestServerUser.parts,
-        getVaultBasePath(this.app) ?? undefined,
-      );
-      const rawServerUserText = latestServerUser.parts
-        .filter((part) => typeof part.text === 'string')
-        .map((part) => part.text as string)
-        .join('');
-      logger.debug(`Hydrated latest server user message: ${this.stringifyLogPayload({
-        sessionId,
-        optimisticMessageId,
-        sourceMessageId: hydratedMessage.sourceMessageId ?? null,
-        rawTextPreview: this.getLogPreview(rawServerUserText),
-        visibleTextPreview: this.getLogPreview(this.getVisibleUserMessageText(hydratedMessage)),
-        omoDetected: Boolean(hydratedMessage.omo),
-        omoKind: hydratedMessage.omo?.kind ?? null,
-        omoModeTag: hydratedMessage.omo?.kind === 'user-injection' ? hydratedMessage.omo.modeTag : null,
-      })}`);
+      this.logLatestServerUserMessageHydration(sessionId, optimisticMessageId, hydration);
       const optimisticIndex = conversation.messages.findIndex(
         (message) => message.id === optimisticMessageId,
       );
@@ -4761,61 +4839,32 @@ export class OpenCodianView extends ItemView {
       }
 
       const optimisticMessage = conversation.messages[optimisticIndex];
-      const optimisticVisibleText = this.getVisibleUserMessageText(optimisticMessage).trim();
-      const hydratedVisibleText = this.getVisibleUserMessageText(hydratedMessage).trim();
-      if (
-        optimisticVisibleText
-        && hydratedVisibleText
-        && optimisticVisibleText !== hydratedVisibleText
-      ) {
-        logger.debug(`Skipped optimistic user message hydration due to visible text mismatch: ${this.stringifyLogPayload({
+      const hydratedMessage = hydration.hydratedMessage;
+      if (this.hasVisibleTextMismatchForHydratedUserMessage(
+        optimisticMessage,
+        hydratedMessage,
+        {
           sessionId,
           optimisticMessageId,
-          optimisticVisibleTextPreview: this.getLogPreview(optimisticVisibleText),
-          hydratedVisibleTextPreview: this.getLogPreview(hydratedVisibleText),
-          rawTextPreview: this.getLogPreview(rawServerUserText),
-          omoDetected: Boolean(hydratedMessage.omo),
-          omoKind: hydratedMessage.omo?.kind ?? null,
-        })}`);
+          rawServerUserText: hydration.rawServerUserText,
+        },
+      )) {
         return;
       }
 
       const mergedHydratedMessage = this.mergeClientOnlyMessageFields(optimisticMessage, hydratedMessage);
-
-      if (
-        optimisticMessage.sourceMessageId === mergedHydratedMessage.sourceMessageId
-        && optimisticMessage.content === mergedHydratedMessage.content
-        && JSON.stringify(optimisticMessage.omo ?? null) === JSON.stringify(mergedHydratedMessage.omo ?? null)
-        && JSON.stringify(optimisticMessage.contextAttachments ?? null) === JSON.stringify(mergedHydratedMessage.contextAttachments ?? null)
-      ) {
-        logger.debug(`Skipped optimistic user message hydration because nothing changed: ${this.stringifyLogPayload({
-          sessionId,
-          optimisticMessageId,
-          sourceMessageId: hydratedMessage.sourceMessageId ?? null,
-          omoDetected: Boolean(hydratedMessage.omo),
-          omoKind: hydratedMessage.omo?.kind ?? null,
-        })}`);
+      if (!this.hasHydratedOptimisticUserMessageChanged(optimisticMessage, mergedHydratedMessage)) {
+        this.logSkippedUnchangedHydratedUserMessage(sessionId, optimisticMessageId, hydratedMessage);
         return;
       }
 
-      conversation.messages.splice(optimisticIndex, 1, mergedHydratedMessage);
-      this.armBackgroundTaskIndicatorForUserMessage(mergedHydratedMessage, tabId);
-      const runtime = this.getTabRuntimeState(tabId);
-      if (runtime) {
-        const previousAnchorKey = this.getMessageAnchorKey(optimisticMessage);
-        const nextAnchorKey = this.getMessageAnchorKey(mergedHydratedMessage);
-        const bodyEl = runtime.turnBodyByAnchorKey.get(previousAnchorKey);
-        if (bodyEl) {
-          runtime.turnBodyByAnchorKey.delete(previousAnchorKey);
-          runtime.turnBodyByAnchorKey.set(nextAnchorKey, bodyEl);
-        }
-        runtime.lastConversationSyncFingerprint = this.getConversationSyncFingerprint(conversation.messages);
-      }
-      await this.plugin.saveConversation(conversation);
-      if (this.currentConversation?.id === conversation.id && this.getActiveTabId() === tabId) {
-        await this.rerenderSingleUserMessage(optimisticMessageId, mergedHydratedMessage);
-        await this.renderBackgroundTaskIndicatorIfNeeded(tabId);
-      }
+      await this.applyHydratedOptimisticUserMessage({
+        conversation,
+        optimisticIndex,
+        optimisticMessage,
+        mergedHydratedMessage,
+        tabId,
+      });
       logger.debug(`Applied hydrated server user message to optimistic bubble: ${this.stringifyLogPayload({
         sessionId,
         optimisticMessageId,
@@ -4826,6 +4875,134 @@ export class OpenCodianView extends ItemView {
     } catch (error) {
       logger.debug('Failed to hydrate optimistic user message from server', error);
     }
+  }
+
+  private async getLatestServerUserMessageHydration(
+    sessionId: string,
+  ): Promise<LatestServerUserMessageHydration | null> {
+    const serverMessages = await this.plugin.openCodeService.getSessionMessages(sessionId);
+    const latestServerUser = [...serverMessages]
+      .reverse()
+      .find(({ info }) => info.role === 'user');
+    if (!latestServerUser) {
+      return null;
+    }
+
+    const hydratedMessage = this.plugin.openCodeService.hydrateOpenCodeMessage(
+      latestServerUser.info,
+      latestServerUser.parts,
+      getVaultBasePath(this.app) ?? undefined,
+    );
+    const rawServerUserText = latestServerUser.parts
+      .filter((part) => typeof part.text === 'string')
+      .map((part) => part.text as string)
+      .join('');
+
+    return { hydratedMessage, rawServerUserText };
+  }
+
+  private logLatestServerUserMessageHydration(
+    sessionId: string,
+    optimisticMessageId: string,
+    hydration: LatestServerUserMessageHydration,
+  ): void {
+    const { hydratedMessage, rawServerUserText } = hydration;
+    logger.debug(`Hydrated latest server user message: ${this.stringifyLogPayload({
+      sessionId,
+      optimisticMessageId,
+      sourceMessageId: hydratedMessage.sourceMessageId ?? null,
+      rawTextPreview: this.getLogPreview(rawServerUserText),
+      visibleTextPreview: this.getLogPreview(this.getVisibleUserMessageText(hydratedMessage)),
+      omoDetected: Boolean(hydratedMessage.omo),
+      omoKind: hydratedMessage.omo?.kind ?? null,
+      omoModeTag: hydratedMessage.omo?.kind === 'user-injection' ? hydratedMessage.omo.modeTag : null,
+    })}`);
+  }
+
+  private hasVisibleTextMismatchForHydratedUserMessage(
+    optimisticMessage: ChatMessage,
+    hydratedMessage: ChatMessage,
+    context: HydratedUserMessageMismatchContext,
+  ): boolean {
+    const optimisticVisibleText = this.getVisibleUserMessageText(optimisticMessage).trim();
+    const hydratedVisibleText = this.getVisibleUserMessageText(hydratedMessage).trim();
+    if (!optimisticVisibleText || !hydratedVisibleText || optimisticVisibleText === hydratedVisibleText) {
+      return false;
+    }
+
+    logger.debug(`Skipped optimistic user message hydration due to visible text mismatch: ${this.stringifyLogPayload({
+      sessionId: context.sessionId,
+      optimisticMessageId: context.optimisticMessageId,
+      optimisticVisibleTextPreview: this.getLogPreview(optimisticVisibleText),
+      hydratedVisibleTextPreview: this.getLogPreview(hydratedVisibleText),
+      rawTextPreview: this.getLogPreview(context.rawServerUserText),
+      omoDetected: Boolean(hydratedMessage.omo),
+      omoKind: hydratedMessage.omo?.kind ?? null,
+    })}`);
+    return true;
+  }
+
+  private hasHydratedOptimisticUserMessageChanged(
+    optimisticMessage: ChatMessage,
+    mergedHydratedMessage: ChatMessage,
+  ): boolean {
+    return optimisticMessage.sourceMessageId !== mergedHydratedMessage.sourceMessageId
+      || optimisticMessage.content !== mergedHydratedMessage.content
+      || JSON.stringify(optimisticMessage.omo ?? null) !== JSON.stringify(mergedHydratedMessage.omo ?? null)
+      || JSON.stringify(optimisticMessage.contextAttachments ?? null)
+        !== JSON.stringify(mergedHydratedMessage.contextAttachments ?? null);
+  }
+
+  private logSkippedUnchangedHydratedUserMessage(
+    sessionId: string,
+    optimisticMessageId: string,
+    hydratedMessage: ChatMessage,
+  ): void {
+    logger.debug(`Skipped optimistic user message hydration because nothing changed: ${this.stringifyLogPayload({
+      sessionId,
+      optimisticMessageId,
+      sourceMessageId: hydratedMessage.sourceMessageId ?? null,
+      omoDetected: Boolean(hydratedMessage.omo),
+      omoKind: hydratedMessage.omo?.kind ?? null,
+    })}`);
+  }
+
+  private async applyHydratedOptimisticUserMessage(
+    update: HydratedOptimisticUserMessageUpdate,
+  ): Promise<void> {
+    const { conversation, optimisticIndex, optimisticMessage, mergedHydratedMessage, tabId } = update;
+    conversation.messages.splice(optimisticIndex, 1, mergedHydratedMessage);
+    this.armBackgroundTaskIndicatorForUserMessage(mergedHydratedMessage, tabId);
+    this.updateHydratedUserMessageRuntimeAnchors(conversation, optimisticMessage, mergedHydratedMessage, tabId);
+    await this.plugin.saveConversation(conversation);
+
+    if (this.currentConversation?.id !== conversation.id || this.getActiveTabId() !== tabId) {
+      return;
+    }
+
+    await this.rerenderSingleUserMessage(optimisticMessage.id, mergedHydratedMessage);
+    await this.renderBackgroundTaskIndicatorIfNeeded(tabId);
+  }
+
+  private updateHydratedUserMessageRuntimeAnchors(
+    conversation: Conversation,
+    optimisticMessage: ChatMessage,
+    mergedHydratedMessage: ChatMessage,
+    tabId: TabId | null,
+  ): void {
+    const runtime = this.getTabRuntimeState(tabId);
+    if (!runtime) {
+      return;
+    }
+
+    const previousAnchorKey = this.getMessageAnchorKey(optimisticMessage);
+    const nextAnchorKey = this.getMessageAnchorKey(mergedHydratedMessage);
+    const bodyEl = runtime.turnBodyByAnchorKey.get(previousAnchorKey);
+    if (bodyEl) {
+      runtime.turnBodyByAnchorKey.delete(previousAnchorKey);
+      runtime.turnBodyByAnchorKey.set(nextAnchorKey, bodyEl);
+    }
+    runtime.lastConversationSyncFingerprint = this.getConversationSyncFingerprint(conversation.messages);
   }
 
   private getLogPreview(text: string, maxLength = 180): string {
@@ -5062,127 +5239,26 @@ export class OpenCodianView extends ItemView {
   }> {
     const verbose = !options?.suppressVerboseLogs;
     try {
-      if (verbose) this.logAssistantFinalizationDebug('server-sync-begin', {
-        reason,
-        conversationId: conversation.id,
-        sessionId: conversation.openCodeSessionId,
-        tabId,
-        existingMessageCount: conversation.messages.length,
-        localTailAssistant: this.summarizeChatMessageForDebug(
-          [...conversation.messages].reverse().find((message) => message.role === 'assistant'),
-        ),
-      });
-      const serverMessages = await this.plugin.openCodeService.getSessionMessages(conversation.openCodeSessionId);
-      const revertState = serverMessages.length === 0
-        ? await this.plugin.openCodeService.getSessionRevertState(conversation.openCodeSessionId)
-        : null;
-      const convertedServerMessages = serverMessages
-        .map(({ info, parts }) =>
-          this.plugin.openCodeService.hydrateOpenCodeMessage(info, parts, getVaultBasePath(this.app) ?? undefined),
-        )
-        .filter((message) => this.shouldRenderConversationMessage(message));
-      if (verbose) this.logAssistantFinalizationDebug('server-sync-fetched', {
-        reason,
-        conversationId: conversation.id,
-        sessionId: conversation.openCodeSessionId,
-        tabId,
-        serverMessageCount: serverMessages.length,
-        convertedMessageCount: convertedServerMessages.length,
-        serverTailAssistant: this.summarizeChatMessageForDebug(
-          [...convertedServerMessages].reverse().find((message) => message.role === 'assistant'),
-        ),
-      });
-      this.logOmoBackgroundTaskDiagnostics(conversation, conversation.messages, convertedServerMessages);
-      const converted = this.mergeSyncedMessageModelIds(
-        conversation.messages,
-        convertedServerMessages,
-        verbose,
-      );
-      const preservedClientOnlyMessages = this.getClientOnlyMessagesToPreserveOnSync(
-        conversation.messages,
-        converted,
-      );
-      const preservedInterruptedMessages = preservedClientOnlyMessages.filter(
-        (message) => message.streamState === 'interrupted',
-      );
-      const runtime = this.getTabRuntimeState(tabId);
-      const preservedInterruptedLogFingerprint = preservedInterruptedMessages.length > 0
-        ? this.getInterruptedSyncPreservationLogFingerprint(conversation, preservedInterruptedMessages)
-        : null;
-      if (
-        preservedInterruptedMessages.length > 0
-        && (!runtime || runtime.lastInterruptedSyncPreservationLogFingerprint !== preservedInterruptedLogFingerprint)
-      ) {
-        logger.debug(`Preserving local interrupted assistant message(s) during conversation sync: ${this.stringifyLogPayload({
-          conversationId: conversation.id,
-          sessionId: conversation.openCodeSessionId,
-          count: preservedInterruptedMessages.length,
-          messages: preservedInterruptedMessages.map((message) => ({
-            id: message.id,
-            sourceMessageId: message.sourceMessageId ?? null,
-            contentPreview: this.getLogPreview(message.content, 120),
-            contentBlockCount: message.contentBlocks?.length ?? 0,
-          })),
-        })}`);
-      }
-      if (runtime) {
-        runtime.lastInterruptedSyncPreservationLogFingerprint = preservedInterruptedLogFingerprint;
-      }
-      const merged = [...converted, ...preservedClientOnlyMessages]
-        .sort((left, right) => left.timestamp - right.timestamp);
-      if (verbose) this.logAssistantFinalizationDebug('server-sync-merged', {
-        reason,
-        conversationId: conversation.id,
-        sessionId: conversation.openCodeSessionId,
-        tabId,
-        mergedMessageCount: merged.length,
-        preservedClientOnlyMessageCount: preservedClientOnlyMessages.length,
-        mergedTailAssistant: this.summarizeChatMessageForDebug(
-          [...merged].reverse().find((message) => message.role === 'assistant'),
-        ),
-      });
-      const fingerprint = this.getConversationSyncFingerprint(merged);
-      const previousFingerprint = this.getTabRuntimeState(tabId)?.lastConversationSyncFingerprint
-        ?? this.getConversationSyncFingerprint(conversation.messages);
-      const changed = fingerprint !== previousFingerprint;
+      const syncContext = { conversation, tabId, reason, verbose };
+      this.logConversationServerSyncBegin(syncContext);
+      const snapshot = await this.getConversationServerSyncSnapshot(conversation);
+      this.logConversationServerSyncFetched(syncContext, snapshot);
+      this.logOmoBackgroundTaskDiagnostics(conversation, conversation.messages, snapshot.convertedServerMessages);
+      const syncMerge = this.getConversationServerSyncMerge(syncContext, snapshot);
 
-      if (changed) {
-        conversation.messages = merged;
-        conversation.updatedAt = Date.now();
-        await this.plugin.saveConversation(conversation);
-      } else {
-        conversation.messages = merged;
-      }
+      await this.applyConversationServerSyncMessages(conversation, syncMerge.merged, syncMerge.changed);
 
       this.markBackgroundTaskAuthoritativeSync(tabId, reason);
 
-      if (this.currentConversation?.id === conversation.id && this.getActiveTabId() === tabId) {
-        await this.activeTabContextUsageCoordinator.refreshFromServer();
-      }
-      if (changed) {
-        logger.debug('Conversation sync complete', {
-          conversationId: conversation.id,
-          sessionId: conversation.openCodeSessionId,
-          reason,
-          serverMessageCount: serverMessages.length,
-          mergedMessageCount: merged.length,
-          preservedClientOnlyMessageCount: preservedClientOnlyMessages.length,
-          revertApplied: Boolean(revertState),
-          revertMessageId: revertState?.messageID ?? null,
-          changed,
-        });
-      }
-      if (verbose || changed) this.logAssistantFinalizationDebug('server-sync-finished', {
-        reason,
-        conversationId: conversation.id,
-        sessionId: conversation.openCodeSessionId,
-        tabId,
-        changed,
-        fingerprint,
-        revertApplied: Boolean(revertState),
-        revertMessageId: revertState?.messageID ?? null,
-      });
-      return { messages: merged, changed, fingerprint, revertState };
+      await this.refreshContextUsageAfterActiveConversationSync(conversation, tabId);
+      this.logConversationServerSyncComplete(conversation, reason, snapshot, syncMerge);
+      this.logConversationServerSyncFinished(syncContext, snapshot, syncMerge);
+      return {
+        messages: syncMerge.merged,
+        changed: syncMerge.changed,
+        fingerprint: syncMerge.fingerprint,
+        revertState: snapshot.revertState,
+      };
     } catch (error) {
       logger.error('Failed to sync conversation messages from server:', error);
       const fingerprint = this.getConversationSyncFingerprint(conversation.messages);
@@ -5202,6 +5278,247 @@ export class OpenCodianView extends ItemView {
           : null,
       };
     }
+  }
+
+  private logConversationServerSyncBegin(context: ConversationServerSyncContext): void {
+    if (!context.verbose) {
+      return;
+    }
+
+    const { conversation, tabId, reason } = context;
+    this.logAssistantFinalizationDebug('server-sync-begin', {
+      reason,
+      conversationId: conversation.id,
+      sessionId: conversation.openCodeSessionId,
+      tabId,
+      existingMessageCount: conversation.messages.length,
+      localTailAssistant: this.summarizeChatMessageForDebug(
+        [...conversation.messages].reverse().find((message) => message.role === 'assistant'),
+      ),
+    });
+  }
+
+  private async getConversationServerSyncSnapshot(
+    conversation: Conversation,
+  ): Promise<ConversationServerSyncSnapshot> {
+    const serverMessages = await this.plugin.openCodeService.getSessionMessages(conversation.openCodeSessionId);
+    const revertState = await this.getConversationServerSyncRevertState(conversation, serverMessages);
+    const convertedServerMessages = serverMessages
+      .map(({ info, parts }) =>
+        this.plugin.openCodeService.hydrateOpenCodeMessage(info, parts, getVaultBasePath(this.app) ?? undefined),
+      )
+      .filter((message) => this.shouldRenderConversationMessage(message));
+
+    return { serverMessages, convertedServerMessages, revertState };
+  }
+
+  private async getConversationServerSyncRevertState(
+    conversation: Conversation,
+    serverMessages: OpenCodeSessionMessages,
+  ): Promise<ConversationRevertState | null> {
+    if (serverMessages.length > 0) {
+      return null;
+    }
+
+    return this.plugin.openCodeService.getSessionRevertState(conversation.openCodeSessionId);
+  }
+
+  private logConversationServerSyncFetched(
+    context: ConversationServerSyncContext,
+    snapshot: ConversationServerSyncSnapshot,
+  ): void {
+    if (!context.verbose) {
+      return;
+    }
+
+    const { conversation, tabId, reason } = context;
+    this.logAssistantFinalizationDebug('server-sync-fetched', {
+      reason,
+      conversationId: conversation.id,
+      sessionId: conversation.openCodeSessionId,
+      tabId,
+      serverMessageCount: snapshot.serverMessages.length,
+      convertedMessageCount: snapshot.convertedServerMessages.length,
+      serverTailAssistant: this.summarizeChatMessageForDebug(
+        [...snapshot.convertedServerMessages].reverse().find((message) => message.role === 'assistant'),
+      ),
+    });
+  }
+
+  private getConversationServerSyncMerge(
+    context: ConversationServerSyncContext,
+    snapshot: ConversationServerSyncSnapshot,
+  ): ConversationServerSyncMergeResult {
+    const { conversation, tabId, verbose } = context;
+    const converted = this.mergeSyncedMessageModelIds(
+      conversation.messages,
+      snapshot.convertedServerMessages,
+      verbose,
+    );
+    const preservedClientOnlyMessages = this.getClientOnlyMessagesToPreserveOnSync(
+      conversation.messages,
+      converted,
+    );
+    this.logPreservedInterruptedMessagesDuringSync(conversation, tabId, preservedClientOnlyMessages);
+
+    const merged = [...converted, ...preservedClientOnlyMessages]
+      .sort((left, right) => left.timestamp - right.timestamp);
+    this.logConversationServerSyncMerged(context, merged, preservedClientOnlyMessages);
+
+    const fingerprint = this.getConversationSyncFingerprint(merged);
+    const previousFingerprint = this.getTabRuntimeState(tabId)?.lastConversationSyncFingerprint
+      ?? this.getConversationSyncFingerprint(conversation.messages);
+
+    return {
+      merged,
+      preservedClientOnlyMessages,
+      fingerprint,
+      changed: fingerprint !== previousFingerprint,
+    };
+  }
+
+  private logPreservedInterruptedMessagesDuringSync(
+    conversation: Conversation,
+    tabId: TabId | null,
+    preservedClientOnlyMessages: ChatMessage[],
+  ): void {
+    const preservedInterruptedMessages = preservedClientOnlyMessages.filter(
+      (message) => message.streamState === 'interrupted',
+    );
+    const runtime = this.getTabRuntimeState(tabId);
+    const preservedInterruptedLogFingerprint = preservedInterruptedMessages.length > 0
+      ? this.getInterruptedSyncPreservationLogFingerprint(conversation, preservedInterruptedMessages)
+      : null;
+
+    this.logPreservedInterruptedMessagesIfNeeded(
+      conversation,
+      preservedInterruptedMessages,
+      runtime,
+      preservedInterruptedLogFingerprint,
+    );
+    if (runtime) {
+      runtime.lastInterruptedSyncPreservationLogFingerprint = preservedInterruptedLogFingerprint;
+    }
+  }
+
+  private logPreservedInterruptedMessagesIfNeeded(
+    conversation: Conversation,
+    preservedInterruptedMessages: ChatMessage[],
+    runtime: TabRuntimeState | null,
+    preservedInterruptedLogFingerprint: string | null,
+  ): void {
+    if (preservedInterruptedMessages.length === 0) {
+      return;
+    }
+
+    if (runtime?.lastInterruptedSyncPreservationLogFingerprint === preservedInterruptedLogFingerprint) {
+      return;
+    }
+
+    logger.debug(`Preserving local interrupted assistant message(s) during conversation sync: ${this.stringifyLogPayload({
+      conversationId: conversation.id,
+      sessionId: conversation.openCodeSessionId,
+      count: preservedInterruptedMessages.length,
+      messages: preservedInterruptedMessages.map((message) => ({
+        id: message.id,
+        sourceMessageId: message.sourceMessageId ?? null,
+        contentPreview: this.getLogPreview(message.content, 120),
+        contentBlockCount: message.contentBlocks?.length ?? 0,
+      })),
+    })}`);
+  }
+
+  private logConversationServerSyncMerged(
+    context: ConversationServerSyncContext,
+    merged: ChatMessage[],
+    preservedClientOnlyMessages: ChatMessage[],
+  ): void {
+    if (!context.verbose) {
+      return;
+    }
+
+    const { conversation, tabId, reason } = context;
+    this.logAssistantFinalizationDebug('server-sync-merged', {
+      reason,
+      conversationId: conversation.id,
+      sessionId: conversation.openCodeSessionId,
+      tabId,
+      mergedMessageCount: merged.length,
+      preservedClientOnlyMessageCount: preservedClientOnlyMessages.length,
+      mergedTailAssistant: this.summarizeChatMessageForDebug(
+        [...merged].reverse().find((message) => message.role === 'assistant'),
+      ),
+    });
+  }
+
+  private async applyConversationServerSyncMessages(
+    conversation: Conversation,
+    merged: ChatMessage[],
+    changed: boolean,
+  ): Promise<void> {
+    conversation.messages = merged;
+    if (!changed) {
+      return;
+    }
+
+    conversation.updatedAt = Date.now();
+    await this.plugin.saveConversation(conversation);
+  }
+
+  private async refreshContextUsageAfterActiveConversationSync(
+    conversation: Conversation,
+    tabId: TabId | null,
+  ): Promise<void> {
+    if (this.currentConversation?.id !== conversation.id || this.getActiveTabId() !== tabId) {
+      return;
+    }
+
+    await this.activeTabContextUsageCoordinator.refreshFromServer();
+  }
+
+  private logConversationServerSyncComplete(
+    conversation: Conversation,
+    reason: string,
+    snapshot: ConversationServerSyncSnapshot,
+    syncMerge: ConversationServerSyncMergeResult,
+  ): void {
+    if (!syncMerge.changed) {
+      return;
+    }
+
+    logger.debug('Conversation sync complete', {
+      conversationId: conversation.id,
+      sessionId: conversation.openCodeSessionId,
+      reason,
+      serverMessageCount: snapshot.serverMessages.length,
+      mergedMessageCount: syncMerge.merged.length,
+      preservedClientOnlyMessageCount: syncMerge.preservedClientOnlyMessages.length,
+      revertApplied: Boolean(snapshot.revertState),
+      revertMessageId: snapshot.revertState?.messageID ?? null,
+      changed: syncMerge.changed,
+    });
+  }
+
+  private logConversationServerSyncFinished(
+    context: ConversationServerSyncContext,
+    snapshot: ConversationServerSyncSnapshot,
+    syncMerge: ConversationServerSyncMergeResult,
+  ): void {
+    if (!context.verbose && !syncMerge.changed) {
+      return;
+    }
+
+    const { conversation, tabId, reason } = context;
+    this.logAssistantFinalizationDebug('server-sync-finished', {
+      reason,
+      conversationId: conversation.id,
+      sessionId: conversation.openCodeSessionId,
+      tabId,
+      changed: syncMerge.changed,
+      fingerprint: syncMerge.fingerprint,
+      revertApplied: Boolean(snapshot.revertState),
+      revertMessageId: snapshot.revertState?.messageID ?? null,
+    });
   }
 
   private async rerenderConversationMessages(conversation: Conversation): Promise<void> {
