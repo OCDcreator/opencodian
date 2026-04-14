@@ -193,12 +193,15 @@ export class ComposerContextViewFacade {
 export function createComposerContextServices(
   dependencies: ComposerContextServiceDependencies,
 ): ComposerContextServices {
-  let coordinator!: ComposerContextCoordinator;
+  let coordinator: ComposerContextCoordinator | null = null;
 
   const runtimeStore = new ComposerContextRuntimeStore({
     getActiveTabId: () => dependencies.viewHost.getActiveTabId(),
     getTabRuntimeState: (tabId) => dependencies.viewHost.getTabRuntimeState(tabId),
     renderComposerContext: () => {
+      if (!coordinator) {
+        throw new Error('Composer context coordinator not initialized');
+      }
       coordinator.render();
     },
   });

@@ -8,13 +8,6 @@ import type {
   QuestionTodoStatusRefreshCoordinator,
 } from '../../../../src/features/chat/services/QuestionTodoStatusRefreshCoordinator';
 
-type Mocked<T> = {
-  [Key in keyof T]:
-    T[Key] extends (...args: infer Args) => infer Result
-      ? jest.Mock<Result, Args>
-      : T[Key];
-};
-
 type QuestionTodoStatusRefreshPort = Pick<
   QuestionTodoStatusRefreshCoordinator,
   'refreshAfterPostSync'

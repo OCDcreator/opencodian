@@ -142,31 +142,36 @@ describe('QuestionTodoBackgroundTaskRefreshHostAdapter', () => {
       },
     });
 
-    let questionDockCoordinator!: {
-      refreshPendingQuestionsForTab: jest.Mock<Promise<QuestionRequest[]>, [string | null, string | null | undefined]>;
-    };
-    let sessionTodoCoordinator!: {
-      hasIncompleteTodos: jest.Mock<boolean, [readonly SessionTodo[]]>;
-      refreshTabSessionStatus: jest.Mock<
-        Promise<SessionActivityStatus | null>,
-        [string | null, string | null | undefined, { suppressErrors?: boolean }]
-      >;
-      refreshTabSessionTodos: jest.Mock<
-        Promise<SessionTodo[]>,
-        [string | null, string | null | undefined, { suppressErrors?: boolean }]
-      >;
-    };
+    const lateBoundPorts: {
+      questionDockCoordinator?: {
+        refreshPendingQuestionsForTab: jest.Mock<
+          Promise<QuestionRequest[]>,
+          [string | null, string | null | undefined]
+        >;
+      };
+      sessionTodoCoordinator?: {
+        hasIncompleteTodos: jest.Mock<boolean, [readonly SessionTodo[]]>;
+        refreshTabSessionStatus: jest.Mock<
+          Promise<SessionActivityStatus | null>,
+          [string | null, string | null | undefined, { suppressErrors?: boolean }]
+        >;
+        refreshTabSessionTodos: jest.Mock<
+          Promise<SessionTodo[]>,
+          [string | null, string | null | undefined, { suppressErrors?: boolean }]
+        >;
+      };
+    } = {};
 
     const adaptedViewHost = createQuestionTodoBackgroundTaskRefreshViewHostAdapter({
       viewHost,
-      getQuestionDockCoordinator: () => questionDockCoordinator,
-      getSessionTodoCoordinator: () => sessionTodoCoordinator,
+      getQuestionDockCoordinator: () => lateBoundPorts.questionDockCoordinator!,
+      getSessionTodoCoordinator: () => lateBoundPorts.sessionTodoCoordinator!,
     });
 
-    questionDockCoordinator = {
+    lateBoundPorts.questionDockCoordinator = {
       refreshPendingQuestionsForTab: jest.fn().mockResolvedValue([] as QuestionRequest[]),
     };
-    sessionTodoCoordinator = {
+    lateBoundPorts.sessionTodoCoordinator = {
       hasIncompleteTodos: jest.fn().mockImplementation((todos: readonly SessionTodo[]) =>
         todos.some((todo) => todo.status !== 'completed'),
       ),
@@ -196,19 +201,19 @@ describe('QuestionTodoBackgroundTaskRefreshHostAdapter', () => {
       { suppressErrors: true },
     );
 
-    expect(questionDockCoordinator.refreshPendingQuestionsForTab).toHaveBeenCalledWith(
+    expect(lateBoundPorts.questionDockCoordinator.refreshPendingQuestionsForTab).toHaveBeenCalledWith(
       'tab-active',
       'session-question',
     );
-    expect(sessionTodoCoordinator.hasIncompleteTodos).toHaveBeenCalledWith([
+    expect(lateBoundPorts.sessionTodoCoordinator.hasIncompleteTodos).toHaveBeenCalledWith([
       { id: 'todo-1', content: 'Answer', status: 'pending' },
     ]);
-    expect(sessionTodoCoordinator.refreshTabSessionStatus).toHaveBeenCalledWith(
+    expect(lateBoundPorts.sessionTodoCoordinator.refreshTabSessionStatus).toHaveBeenCalledWith(
       'tab-active',
       'session-status',
       { suppressErrors: true },
     );
-    expect(sessionTodoCoordinator.refreshTabSessionTodos).toHaveBeenCalledWith(
+    expect(lateBoundPorts.sessionTodoCoordinator.refreshTabSessionTodos).toHaveBeenCalledWith(
       'tab-active',
       'session-status',
       { suppressErrors: true },

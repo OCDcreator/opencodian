@@ -20,7 +20,7 @@ export interface ConversationSyncBridgeRuntime {
   lastConversationSyncFingerprint: string | null;
 }
 
-export interface ConversationSyncBridgeSyncResult extends ConversationSyncVisiblePostSyncResult {}
+export type ConversationSyncBridgeSyncResult = ConversationSyncVisiblePostSyncResult;
 
 export interface ConversationSyncBridgeHost {
   getCurrentConversation(): Conversation | null;

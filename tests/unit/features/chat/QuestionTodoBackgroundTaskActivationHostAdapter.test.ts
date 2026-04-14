@@ -72,23 +72,25 @@ describe('QuestionTodoBackgroundTaskActivationHostAdapter', () => {
     const currentConversation = createConversation('conversation-active');
     const viewHost = createViewHostAdapterHost(currentConversation);
 
-    let questionDockSlotCoordinator!: {
-      render: jest.Mock<void, []>;
-    };
-    let sessionTodoCoordinator!: {
-      updateForTab: jest.Mock<void, [string]>;
-    };
+    const lateBoundPorts: {
+      questionDockSlotCoordinator?: {
+        render: jest.Mock<void, []>;
+      };
+      sessionTodoCoordinator?: {
+        updateForTab: jest.Mock<void, [string]>;
+      };
+    } = {};
 
     const adaptedViewHost = createQuestionTodoBackgroundTaskActivationViewHostAdapter({
       viewHost,
-      getQuestionDockSlotCoordinator: () => questionDockSlotCoordinator,
-      getSessionTodoCoordinator: () => sessionTodoCoordinator,
+      getQuestionDockSlotCoordinator: () => lateBoundPorts.questionDockSlotCoordinator!,
+      getSessionTodoCoordinator: () => lateBoundPorts.sessionTodoCoordinator!,
     });
 
-    questionDockSlotCoordinator = {
+    lateBoundPorts.questionDockSlotCoordinator = {
       render: jest.fn(),
     };
-    sessionTodoCoordinator = {
+    lateBoundPorts.sessionTodoCoordinator = {
       updateForTab: jest.fn(),
     };
 
@@ -102,8 +104,8 @@ describe('QuestionTodoBackgroundTaskActivationHostAdapter', () => {
     adaptedViewHost.syncBackgroundTaskStateFromConversation(nextConversation, 'tab-1');
     await adaptedViewHost.renderBackgroundTaskIndicatorIfNeeded('tab-1');
 
-    expect(questionDockSlotCoordinator.render).toHaveBeenCalledTimes(1);
-    expect(sessionTodoCoordinator.updateForTab).toHaveBeenCalledWith('tab-1');
+    expect(lateBoundPorts.questionDockSlotCoordinator.render).toHaveBeenCalledTimes(1);
+    expect(lateBoundPorts.sessionTodoCoordinator.updateForTab).toHaveBeenCalledWith('tab-1');
     expect(viewHost.renderSessionTodoDock).toHaveBeenCalledWith('tab-1');
     expect(viewHost.resetBackgroundTaskIndicator).toHaveBeenCalledTimes(1);
     expect(viewHost.syncBackgroundTaskStateFromConversation).toHaveBeenCalledWith(

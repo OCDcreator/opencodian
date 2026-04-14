@@ -1,7 +1,5 @@
-import type { SessionActivityStatus } from '../../../core/opencode';
 import type {
   Conversation,
-  QuestionRequest,
   SessionTodo,
 } from '../../../core/types';
 import type { TabId } from '../tabs';
@@ -58,8 +56,7 @@ export interface QuestionTodoBackgroundTaskRefreshViewHostAdapterDependencies {
   getSessionTodoCoordinator(): SessionTodoCoordinatorPort;
 }
 
-export interface QuestionTodoBackgroundTaskRefreshViewHost
-  extends PostSyncQuestionTodoRefreshViewHost {}
+export type QuestionTodoBackgroundTaskRefreshViewHost = PostSyncQuestionTodoRefreshViewHost;
 
 export function createQuestionTodoBackgroundTaskRefreshViewHostAdapter(
   dependencies: QuestionTodoBackgroundTaskRefreshViewHostAdapterDependencies,

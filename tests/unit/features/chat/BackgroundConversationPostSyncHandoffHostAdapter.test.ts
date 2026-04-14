@@ -54,33 +54,35 @@ describe('BackgroundConversationPostSyncHandoffHostAdapter', () => {
     const conversation = createConversation();
     const viewHost = createViewHostAdapterHost();
 
-    let backgroundTaskIndicatorCoordinator!: {
-      flushCompletionNoticesAndSyncStreamLikeState: jest.Mock<
-        Promise<void>,
-        [string | null, Conversation | null]
-      >;
-    };
-    let backgroundTaskLiveSignalCoordinator!: {
-      markAuthoritativeSync: jest.Mock<void, [string | null, string]>;
-    };
-    let tabRuntimeStateBridge!: {
-      setNeedsAttention: jest.Mock<void, [string | null, boolean]>;
-    };
+    const lateBoundPorts: {
+      backgroundTaskIndicatorCoordinator?: {
+        flushCompletionNoticesAndSyncStreamLikeState: jest.Mock<
+          Promise<void>,
+          [string | null, Conversation | null]
+        >;
+      };
+      backgroundTaskLiveSignalCoordinator?: {
+        markAuthoritativeSync: jest.Mock<void, [string | null, string]>;
+      };
+      tabRuntimeStateBridge?: {
+        setNeedsAttention: jest.Mock<void, [string | null, boolean]>;
+      };
+    } = {};
 
     const adaptedViewHost = createBackgroundConversationPostSyncHandoffViewHostAdapter({
       viewHost,
-      getBackgroundTaskIndicatorCoordinator: () => backgroundTaskIndicatorCoordinator,
-      getBackgroundTaskLiveSignalCoordinator: () => backgroundTaskLiveSignalCoordinator,
-      getTabRuntimeStateBridge: () => tabRuntimeStateBridge,
+      getBackgroundTaskIndicatorCoordinator: () => lateBoundPorts.backgroundTaskIndicatorCoordinator!,
+      getBackgroundTaskLiveSignalCoordinator: () => lateBoundPorts.backgroundTaskLiveSignalCoordinator!,
+      getTabRuntimeStateBridge: () => lateBoundPorts.tabRuntimeStateBridge!,
     });
 
-    backgroundTaskIndicatorCoordinator = {
+    lateBoundPorts.backgroundTaskIndicatorCoordinator = {
       flushCompletionNoticesAndSyncStreamLikeState: jest.fn().mockResolvedValue(undefined),
     };
-    backgroundTaskLiveSignalCoordinator = {
+    lateBoundPorts.backgroundTaskLiveSignalCoordinator = {
       markAuthoritativeSync: jest.fn(),
     };
-    tabRuntimeStateBridge = {
+    lateBoundPorts.tabRuntimeStateBridge = {
       setNeedsAttention: jest.fn(),
     };
 
@@ -97,13 +99,13 @@ describe('BackgroundConversationPostSyncHandoffHostAdapter', () => {
       'tab-bg',
     );
     expect(
-      backgroundTaskIndicatorCoordinator.flushCompletionNoticesAndSyncStreamLikeState,
+      lateBoundPorts.backgroundTaskIndicatorCoordinator.flushCompletionNoticesAndSyncStreamLikeState,
     ).toHaveBeenCalledWith('tab-bg', conversation);
-    expect(backgroundTaskLiveSignalCoordinator.markAuthoritativeSync).toHaveBeenCalledWith(
+    expect(lateBoundPorts.backgroundTaskLiveSignalCoordinator.markAuthoritativeSync).toHaveBeenCalledWith(
       'tab-bg',
       'sync-event:message.updated',
     );
-    expect(tabRuntimeStateBridge.setNeedsAttention).toHaveBeenCalledWith('tab-bg', true);
+    expect(lateBoundPorts.tabRuntimeStateBridge.setNeedsAttention).toHaveBeenCalledWith('tab-bg', true);
   });
 
   it('derives background handoff hosts from one shared view host', async () => {

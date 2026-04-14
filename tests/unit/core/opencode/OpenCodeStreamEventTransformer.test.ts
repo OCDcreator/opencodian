@@ -295,10 +295,10 @@ describe('OpenCodeStreamEventTransformer', () => {
     const transformer = new OpenCodeStreamEventTransformer(createHost());
 
     const parsed = transformer.parseSSEEvents(
-      'data: {\"type\":\"message.part.delta\",\"properties\":{\"delta\":\"Hi\"}}\n\n' +
+      'data: {"type":"message.part.delta","properties":{"delta":"Hi"}}\n\n' +
       'event: custom\n' +
-      'data: {\"type\":\"session.idle\"}\n\n' +
-      'data: {\"type\":\"message.part.updated\"}',
+      'data: {"type":"session.idle"}\n\n' +
+      'data: {"type":"message.part.updated"}',
     );
 
     expect(parsed).toEqual({

@@ -205,17 +205,6 @@ interface ProviderSendProbeResult {
   error?: string;
 }
 
-function extractStructuredErrorName(errorLike: unknown): string | null {
-  if (!errorLike || typeof errorLike !== 'object') {
-    return null;
-  }
-
-  const errorRecord = errorLike as { name?: unknown };
-  return typeof errorRecord.name === 'string' && errorRecord.name.trim()
-    ? errorRecord.name.trim()
-    : null;
-}
-
 function extractStructuredErrorMessage(errorLike: unknown): string | null {
   if (!errorLike || typeof errorLike !== 'object') {
     return null;

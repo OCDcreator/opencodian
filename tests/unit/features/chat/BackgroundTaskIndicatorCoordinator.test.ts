@@ -82,7 +82,6 @@ describe('BackgroundTaskIndicatorCoordinator', () => {
     const {
       coordinator,
       conversation,
-      host,
       inlinePanelRenderer,
       timelineService,
       completionNoticeService,
@@ -130,7 +129,6 @@ describe('BackgroundTaskIndicatorCoordinator', () => {
   it('skips rendering and notice work when the tab runtime is missing', async () => {
     const {
       coordinator,
-      host,
       inlinePanelRenderer,
       timelineService,
       completionNoticeService,

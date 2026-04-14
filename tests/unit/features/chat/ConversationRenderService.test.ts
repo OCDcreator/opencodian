@@ -114,10 +114,8 @@ function createHost(
     finalizePersistedFooter: jest.fn(),
     ...overrides.assistantTailRender,
   };
-  const {
-    assistantTailRender: _assistantTailRenderOverrides,
-    ...hostOverrides
-  } = overrides;
+  const hostOverrides = { ...overrides };
+  delete hostOverrides.assistantTailRender;
 
   return {
     messagesEl,
@@ -302,14 +300,13 @@ describe('ConversationRenderService', () => {
     const nextMessages = [
       createMessage({ id: 'assistant-2', content: 'Updated answer', timestamp: 2 }),
     ];
-    let host: ReturnType<typeof createHost>;
     const renderMessageBody = jest.fn().mockImplementation(
       async (contentEl: HTMLElement, message: ChatMessage) => {
         expect(host.renderRuntime.currentTurnBodyEl).toBe(host.messagesEl);
         contentEl.textContent = message.content;
       },
     );
-    host = createHost({
+    const host = createHost({
       assistantTailRender: {
         renderMessageBody,
       },
@@ -333,7 +330,6 @@ describe('ConversationRenderService', () => {
       createMessage({ id: 'assistant-2', content: 'Updated answer', timestamp: 2 }),
     ];
     const transientTurnBodyEl = document.createElement('div');
-    let host: ReturnType<typeof createHost>;
     const renderMessageBody = jest.fn().mockImplementation(
       async (contentEl: HTMLElement, message: ChatMessage) => {
         expect(host.renderRuntime.currentTurnBodyEl).toBe(host.messagesEl);
@@ -341,7 +337,7 @@ describe('ConversationRenderService', () => {
         contentEl.textContent = message.content;
       },
     );
-    host = createHost({
+    const host = createHost({
       assistantTailRender: {
         renderMessageBody,
       },
@@ -363,12 +359,11 @@ describe('ConversationRenderService', () => {
       createMessage({ id: 'assistant-2', content: 'Updated answer', timestamp: 2 }),
     ];
     const renderError = new Error('render failed');
-    let host: ReturnType<typeof createHost>;
     const renderMessageBody = jest.fn().mockImplementation(async () => {
       expect(host.renderRuntime.currentTurnBodyEl).toBe(host.messagesEl);
       throw renderError;
     });
-    host = createHost({
+    const host = createHost({
       assistantTailRender: {
         renderMessageBody,
       },
@@ -391,7 +386,6 @@ describe('ConversationRenderService', () => {
     const nextMessages = [
       createMessage({ id: 'assistant-2', content: 'Updated answer', timestamp: 2 }),
     ];
-    let host: ReturnType<typeof createHost>;
     const renderMessageBody = jest.fn().mockImplementation(
       async (contentEl: HTMLElement, message: ChatMessage) => {
         expect(host.summarizeChatMessageForDebug).toHaveBeenCalledTimes(2);
@@ -400,7 +394,7 @@ describe('ConversationRenderService', () => {
         contentEl.textContent = message.content;
       },
     );
-    host = createHost({
+    const host = createHost({
       assistantTailRender: {
         renderMessageBody,
       },

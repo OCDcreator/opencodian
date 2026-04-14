@@ -1,9 +1,7 @@
 import type { TabId } from '../tabs';
 import type {
   BackgroundConversationPostSyncHandoffCoordinator,
-  BackgroundTabPostSyncOptions,
   BackgroundTaskPostSyncResult,
-  SignalBackgroundTaskPostSyncOptions,
 } from './BackgroundConversationPostSyncHandoffCoordinator';
 import type { SignalConversationSyncContext } from './ConversationSyncOrchestrationService';
 import type { TabConversationSyncContext } from './ConversationSyncRuntimeCoordinator';

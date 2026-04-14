@@ -10,7 +10,6 @@ import {
   type QuestionRuntimeTabAttentionPort,
   type QuestionRuntimeViewHostAdapterHost,
 } from '../../../../src/features/chat/services/QuestionRuntimeViewHostAdapter';
-import type { TabId } from '../../../../src/features/chat/tabs';
 import type { QuestionDockRenderState } from '../../../../src/features/chat/ui/QuestionDock';
 
 type Mocked<T> = {
