@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的 `[NEXT]`”。
-> **当前状态**: [READY] `R45` 已完成；当前首个可执行项为 `R46`。
+> **当前状态**: [READY] 已人工补入新的 `R46-R50` queue；恢复无人值守时必须从新的 `R46` 顺序推进。
 
 ## 控制规则
 
@@ -16,88 +16,92 @@
 ## 当前背景
 
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
-- 最近 checkpoint：`docs/status/maintainability-phase-376.md`
-- 当前 lint 基线：`0 errors / 86 warnings`
-- 当前路线判断：`R45` 已完成 streaming transport seam；下一步顺序进入 `R46` checkpoint
+- 最近成功 phase：`docs/status/maintainability-phase-380.md`
+- 当前 live lint 基线：`5 errors / 90 warnings`
+- 当前路线判断：上一条 queue 已在 `R45` 结束；`R46` checkpoint 连续重试后没有留下新提交，因此恢复无人值守前先补入新的顺序 queue
 
 ## Queue
 
-### [DONE] R42 - OpenCodianView conversation history/actions seam
+### [NEXT] R46 - Lint blocker housekeeping after R43-R45
 
-- **Lane**: Maintainability / chat conversation management UI
-- **目标**: 从 `src/features/chat/OpenCodianView.ts:3452` 一带收束 conversation history dropdown、rename/delete confirm、history positioning 与 cleanup lifecycle，减少 view 直接持有的会话管理 UI 状态与分支。
-- **优先入口**:
-  - `src/features/chat/OpenCodianView.ts`
-  - 直接相关 chat tests
-- **允许边界**:
-  - 允许在现有 chat owner 下提取覆盖完整 history/actions lifecycle 的较厚 owner
-  - 允许同步更新直接相关 docs / tests
-- **禁止项**:
-  - 不改变 tab cleanup、delete fallback、新建会话触发条件、rename/delete 交互语义
-  - 不混入 message sync、model selector、settings UI 或 send pipeline 改动
-- **验收**:
-  - `OpenCodianView` 对 conversation history/actions UI 细节的直接装配明显减少
-  - focused validation、全量 `npm test`、`npm run build` 通过
-
-### [DONE] R43 - OpenCodianView authoritative sync merge seam
-
-- **Lane**: Maintainability / chat conversation sync
-- **目标**: 从 `src/features/chat/OpenCodianView.ts:5441` 一带收束 authoritative sync merge、latest user hydration、client-only preservation、fingerprint/logging 组装，优先把完整 sync-merge lifecycle 收口到单一厚 owner。
-- **优先入口**:
-  - `src/features/chat/OpenCodianView.ts`
-  - `src/features/chat/services/ConversationSyncOrchestrationService.ts`
-  - 直接相关 chat sync tests
-- **允许边界**:
-  - 允许扩展现有 conversation sync/render owner，或新增覆盖完整 sync merge lifecycle 的较厚 chat owner
-  - 允许同步更新直接相关 docs / tests
-- **禁止项**:
-  - 不改变 hydration/auth-sync gate、scroll restore、background-task authoritative sync、interrupted message preservation 语义
-  - 不把 history dropdown、model catalog、settings 或 OpenCode transport 混入本轮
-- **验收**:
-  - `OpenCodianView` 内 authoritative sync merge / hydration 写回责任明显收缩
-  - focused validation、全量 `npm test`、`npm run build` 通过
-
-### [DONE] R44 - OpenCodianView model catalog/selection seam
-
-- **Lane**: Maintainability / chat model selection
-- **目标**: 从 `src/features/chat/OpenCodianView.ts:6140` 一带收束 model catalog load、current/requested/resolved selection、switch model 与 unavailable notice follow-up，减少 view 直接维护的 catalog/selection 分支。
-- **优先入口**:
-  - `src/features/chat/OpenCodianView.ts`
-  - `src/features/chat/services/ChatSelectionControlsCoordinator.ts`
-  - 直接相关 selector/model tests
-- **允许边界**:
-  - 允许继续扩展现有 selection coordinator/runtime owner
-  - 允许同步更新直接相关 docs / tests
-- **禁止项**:
-  - 不改变 provider icon fallback、disabled model filtering、session model override、title-generation fallback 语义
-  - 不把 settings model catalog、OpenCode provider lookup 或 send pipeline 混入本轮
-- **验收**:
-  - `OpenCodianView` 对 model catalog/selection resolution 的直接持有明显减少
-  - focused validation、全量 `npm test`、`npm run build` 通过
-
-### [DONE] R45 - OpenCodeService streaming transport seam
-
-- **Lane**: Maintainability / opencode streaming transport
-- **目标**: 从 `src/core/opencode/OpenCodeService.ts:1283` 一带收束 SDK stream、legacy SSE fallback、reader lifecycle 与 final response completion，优先形成完整 transport owner seam。
+- **Lane**: Lint housekeeping / unblocker
+- **目标**: 只吸收当前 live lint error，恢复 lint error 为零，解除无人值守 queue 的继续执行阻塞；本轮不做新的 owner seam。
 - **优先入口**:
   - `src/core/opencode/OpenCodeService.ts`
-  - `src/core/opencode/OpenCodeStreamingRuntimeCoordinator.ts`
-  - `src/core/opencode/OpenCodeStreamEventTransformer.ts`
-  - 直接相关 opencode tests
+  - `src/features/chat/OpenCodianView.ts`
+  - `src/features/chat/services/ChatSelectionControlsCoordinator.ts`
+  - `src/features/chat/services/ConversationAuthoritativeSyncCoordinator.ts`
+  - `tests/unit/core/opencode/OpenCodeStreamingRuntimeCoordinator.test.ts`
 - **允许边界**:
-  - 允许新增覆盖完整 streaming transport lifecycle 的较厚 owner
-  - 允许同步更新直接相关 docs / tests
+  - 允许仅为 import-sort、unused import/unused symbol 进行最小修复
+  - 允许同步更新直接相关测试 import 与 type-only import 形式
 - **禁止项**:
-  - 不改变 SDK-first / legacy fallback 策略、per-session stream registry、abort/detach 语义、tool/question event transform 结果
-  - 不把 settings update plan、catalog query、session control 或 server lifecycle 混入本轮
+  - 不展开新的 `OpenCodeService` / `OpenCodianView` / `OpenCodianSettings` maintainability 拆分
+  - 不借机修改 runtime 语义、验证基线口径或 queue 顺序
 - **验收**:
-  - `OpenCodeService` 不再直接铺开整段 streaming transport/fallback/read/finalize 细节
+  - `npm run lint` 至少恢复到 `0 errors / 90 warnings`
   - focused validation、全量 `npm test`、`npm run build` 通过
 
-### [NEXT] R46 - Maintainability checkpoint
+### [QUEUED] R47 - OpenCodeService settings reconfiguration seam
+
+- **Lane**: Maintainability / opencode settings reconfiguration
+- **目标**: 从 `src/core/opencode/OpenCodeService.ts:1231` 一带收束 `updateSettings()`、settings update plan、managed server restart/stop 决策、subscription pause/resume 与 rollback/restore lifecycle，优先形成单一厚 owner。
+- **优先入口**:
+  - `src/core/opencode/OpenCodeService.ts`
+  - `src/core/opencode/ServerManager.ts`
+  - 直接相关 opencode tests
+- **允许边界**:
+  - 允许新增覆盖完整 settings reconfiguration lifecycle 的较厚 owner
+  - 允许同步更新直接相关 docs / tests
+- **禁止项**:
+  - 不改变 managed server adoption/restart 规则、auth fallback、directory scope、sync/open-code event restart 条件或 public API shape
+  - 不混入 catalog query、session control、streaming transport 或 settings UI 改动
+- **验收**:
+  - `OpenCodeService` 不再直接铺开 settings reconfiguration / rollback / subscription lifecycle 细节
+  - focused validation、全量 `npm test`、`npm run build` 通过
+
+### [QUEUED] R48 - OpenCodianSettings model section owner seam
+
+- **Lane**: Maintainability / settings model section
+- **目标**: 从 `src/features/settings/OpenCodianSettings.ts:385` 的 `addModelSettings()` 中收束完整 model section lifecycle，优先整理 source mode、provider/model disable、refresh/test action、catalog presenter 与 workspace 关联装配。
+- **优先入口**:
+  - `src/features/settings/OpenCodianSettings.ts`
+  - `src/features/settings/SettingsModelCatalogPresenter.ts`
+  - 直接相关 settings tests
+- **允许边界**:
+  - 允许在现有 owner 内提取完整 model section owner，或新增覆盖完整 model section lifecycle 的较厚 owner
+  - 允许同步更新直接相关 docs / tests / locale
+- **禁止项**:
+  - 不改变 model availability layering、disabled model filtering、provider icon fallback、title-generation fallback 或 project-local override 语义
+  - 不把 style/security/server 或 opencode transport 混入本轮
+- **验收**:
+  - `OpenCodianSettings` 对 model section DOM/state/catalog 细节的直接装配明显减少
+  - focused validation、全量 `npm test`、`npm run build` 通过
+  - 执行 Test Vault 部署并校验 `BUILD_ID`
+
+### [QUEUED] R49 - OpenCodianSettings style section lifecycle seam
+
+- **Lane**: Maintainability / settings style section
+- **目标**: 从 `src/features/settings/OpenCodianSettings.ts:1575` 的 `addStyleSettings()` 中收束完整 style/theme lifecycle，优先整理 preset、background、glass / input panel appearance、custom CSS 与 preview/reload 相关装配。
+- **优先入口**:
+  - `src/features/settings/OpenCodianSettings.ts`
+  - `src/core/theme/`
+  - 直接相关 settings tests
+- **允许边界**:
+  - 允许在现有 owner 内提取完整 style section owner，或新增覆盖完整 style lifecycle 的较厚 owner
+  - 允许同步更新直接相关 docs / tests / locale
+- **禁止项**:
+  - 不改变 theme preset 语义、background persistence、glass adapter fallback、input panel appearance normalization 或 preview 行为
+  - 不把 model/security/server 或 chat runtime seam 混入本轮
+- **验收**:
+  - `OpenCodianSettings` 对 style section 的 DOM/state/theme wiring 明显收缩
+  - focused validation、全量 `npm test`、`npm run build` 通过
+  - 执行 Test Vault 部署并校验 `BUILD_ID`
+
+### [QUEUED] R50 - Maintainability checkpoint
 
 - **Lane**: Checkpoint
-- **目标**: 复盘 `R42-R45` 的 owner 收益、lint 变化与验证成本，判断下一批优先继续 `OpenCodeService` settings reconfiguration seam，还是回切 residual settings/model UI seam。
+- **目标**: 复盘 `R46-R49` 的 lint/owner 收益、验证成本与后续方向，判断下一批优先继续 `OpenCodeService` residual seam，还是回到 residual settings/model UI warning trim。
 - **优先入口**:
   - `docs/status/maintainability-master-plan.md`
   - `docs/status/maintainability-round-roadmap.md`
@@ -106,7 +110,7 @@
 - **允许边界**:
   - 只做文档、指标与下一批建议
 - **禁止项**:
-  - 不自动扩展 `R47+`
-  - 不回切长串 warning cleanup
+  - 不自动扩展 `R51+`
+  - 不回切长串 warning cleanup，除非 checkpoint 证据明确显示只有 unblocker 价值
 - **验收**:
-  - phase 文档明确记录 `R42-R45` 收益、最新 lint 基线与后续建议
+  - phase 文档明确记录 `R46-R49` 收益、最新 lint 基线与后续建议
