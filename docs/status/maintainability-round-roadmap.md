@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的 `[NEXT]`”。
-> **当前状态**: [CONFIRMED_NEXT_BATCH] `R33-R37` maintainability queue 已确认；`R33-R36` 已完成，当前可自动执行的 `[NEXT]` 是 `R37 - Maintainability checkpoint`。`R37` 完成后必须再次暂停并等待人工确认。
+> **当前状态**: [REVIEW_REQUIRED] `R33-R37` maintainability queue 已完成；`R37 - Maintainability checkpoint` 已复盘 `R33-R36` 的收益与验证成本。当前没有可自动执行的 `[NEXT]`，等待人工确认是否追加新的 queue item。
 
 ## 控制规则
 
@@ -16,11 +16,11 @@
 ## 当前背景
 
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
-- 当前 lint 基线：`0 errors / 91 warnings`
-- checkpoint 建议：`W12-W14` 的逐条 warning cleanup 收益已确认；下一批人工确认切回较厚 maintainability owner 收束
-- 当前可自动执行的 `[NEXT]`：`R37 - Maintainability checkpoint`
-- 本批按 `R33 -> R34 -> R35 -> R36 -> R37` 顺序推进，不允许跳过当前 `[NEXT]`
-- `R37` 完成后若无人追加 queue item，则必须重新写回“当前没有可自动执行的 `[NEXT]`”
+- 当前 lint 基线：`2 errors / 89 warnings`
+- checkpoint 建议：`R33-R36` 的较厚 owner 收束收益已确认；是否继续新的 maintainability queue，或先把 R36 引入的 import-sort lint 回归单列成受控切片，需要人工确认
+- 当前可自动执行的 `[NEXT]`：无
+- `R33 -> R34 -> R35 -> R36 -> R37` 已按顺序完成
+- 当前没有后续 `[QUEUED]`，因此必须保持“当前没有可自动执行的 `[NEXT]`”
 
 ## Queue
 
@@ -277,7 +277,7 @@
   - 代码路径：明确削弱一个 residual seam，并通过 focused tests、全量 `npm test`、`npm run build`
   - 跳过路径：phase 文档说明为何当前 seam 不适合拆分，并推进 R37
 
-### [NEXT] R37 - Maintainability checkpoint
+### [DONE] R37 - Maintainability checkpoint
 
 - **Lane**: Checkpoint
 - **目标**: 复盘 `R33-R36` 的 owner 收束收益、验证成本与下一批方向，判断是否继续 `R38+`、回到 warning cleanup，或暂停等待人工新路线。
@@ -296,4 +296,4 @@
 
 ## 当前自动队列状态
 
-当前可自动执行的 `[NEXT]` 是 `R37 - Maintainability checkpoint`。`R37` 完成后若没有新的人工追加 queue item，则必须重新写明“当前没有可自动执行的 `[NEXT]`”。
+当前没有可自动执行的 `[NEXT]`。如需继续 maintainability autopilot，必须先由人工追加新的 queue item，并确认是继续新的厚 owner 收束，还是先处理当前 lint import-sort 回归。

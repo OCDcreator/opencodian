@@ -1,24 +1,24 @@
 # Maintainability Master Plan
 
-> **状态**: [CONFIRMED_NEXT_BATCH]
+> **状态**: [REVIEW_REQUIRED]
 > **作用**: 这是 maintainability 无人值守的战略文档。每轮开始前，先读本文件，再读 `docs/status/maintainability-round-roadmap.md` 与最近的 `docs/status/maintainability-phase-XXX.md`。
-> **自动推进状态**: `R33-R37` maintainability queue 已确认；`R33-R36` 已完成，其中 `R36` 已把 `OpenCodeService` 的 directory-scoped config/tool-catalog residual seam 收束到 `OpenCodeCatalogQueryCoordinator`，当前 `[NEXT]` 是 `R37 - Maintainability checkpoint`。本批目标已经进入 checkpoint 复盘，`R37` 后必须再次暂停等待人工确认。
+> **自动推进状态**: `R33-R37` maintainability queue 已完成；`R37` 已复盘 `R33-R36` 的 owner 收束收益、验证成本与后续方向。当前没有可自动执行的 `[NEXT]`，如需继续必须由人工追加新的 queue item 并重新确认路线。
 
 ## 1. 当前判断
 
-**当前判断：R28-R32、L1-L5、W1-W15 与 R33-R36 均已完成，warning cleanup 已把 lint 基线稳定到 `0 errors / 91 warnings`。本批已重新进入较厚 maintainability owner 收束：`OpenCodianSettings` 的 style/background subsection lifecycle 已迁入 `SettingsStyleBackgroundSection`，`SettingsModelCatalogPresenter` 的 render lifecycle 已在同 owner 内完成分段收束，`OpenCodianView` constructor/runtime wiring 也已收束为同文件 lifecycle helpers，`OpenCodeService` 的 directory-scoped config/tool-catalog residual seam 现已迁入 `OpenCodeCatalogQueryCoordinator`，当前自动推进项转到 `R37 - Maintainability checkpoint`。**
+**当前判断：R28-R32、L1-L5、W1-W15 与 R33-R37 均已完成。最近一批较厚 maintainability owner 收束已经落地：`OpenCodianSettings` 的 style/background subsection lifecycle 已迁入 `SettingsStyleBackgroundSection`，`SettingsModelCatalogPresenter` 的 render lifecycle 已在同 owner 内完成分段收束，`OpenCodianView` constructor/runtime wiring 已收束为同文件 lifecycle helpers，`OpenCodeService` 的 directory-scoped config/tool-catalog residual seam 也已迁入 `OpenCodeCatalogQueryCoordinator`。本轮 checkpoint 之后，autopilot 已重新停回等待人工确认态；当前 live lint 输出为 `2 errors / 89 warnings`，其中两条 error 都是 R36 相关文件中的 import sort 回归，`npm test` 与 `npm run build` 仍保持通过。**
 
 当前最重要的事实：
 
-- `OpenCodeService`、`OpenCodianView`、`OpenCodianSettings` 仍是长期 maintainability 热点；本批已人工确认恢复 `R33+` owner 收束，且 `OpenCodianSettings` 的聊天背景子区块已完成一次较厚 owner 抽离
-- 剩余 warnings 仍主要集中在大型 owner 与长测试文件，但本批不再以逐条 warning cleanup 为目标
-- `R33-R37` 必须按 roadmap 顺序执行，不允许跳过当前 `[NEXT]` 或自由切回 `W16+`
-- 新增 owner 必须足够厚：覆盖完整 lifecycle / section / runtime seam；不要新增只包一层的 provider / factory / adapter
-- 当前 `[NEXT]` 是 `R37 - Maintainability checkpoint`；完成后必须重新停回等待人工确认
+- `OpenCodeService`、`OpenCodianView`、`OpenCodianSettings` 仍是长期 maintainability 热点，但 `R33-R36` 已分别削弱 settings subsection、settings presenter、chat constructor wiring 与 opencode catalog seam 的 ownership 集中度
+- 当前 live lint 基线是 `2 errors / 89 warnings`；新增 error 来自 `src/core/opencode/OpenCodeCatalogQueryCoordinator.ts` 与 `src/core/opencode/OpenCodeService.ts` 的 import order，说明下一批如果恢复自动推进，需先人工确认是否把 lint housekeeping 单列成受控 queue
+- 当前没有可自动执行的 `[NEXT]`；在人工追加新 queue 之前，不得自动扩展 `R38+` 或回切 `W16+`
+- 新增 owner 仍必须足够厚：覆盖完整 lifecycle / section / runtime seam；不要新增只包一层的 provider / factory / adapter
+- 下一步建议是先人工确认：是先修复 lint 基线中的 import-sort 回归，还是重新设计新的厚 owner 收束批次
 
 ## 2. 当前基线
 
-- **Lint 基线**: `0 errors / 91 warnings`
+- **Lint 基线**: `2 errors / 89 warnings`
 - **当前热点**:
   - `src/features/chat/OpenCodianView.ts`
   - `src/features/settings/OpenCodianSettings.ts`
@@ -59,8 +59,8 @@
 - 每轮只执行当前 `[NEXT]`，不得自由切回 warning cleanup 或新增 `W16+`
 - `OpenCodianSettings` 的 settings UI 变化必须同步默认值 / normalization / locale / style / tests 中直接相关部分
 - `OpenCodianView` constructor/runtime wiring 只能收束初始化与 service wiring，不改 streaming/concurrent tab 语义
-- `OpenCodeService` 的 R36 已通过 `OpenCodeCatalogQueryCoordinator` 收束 directory-scoped config/tool-catalog seam；`R37` 只做 checkpoint 复盘，不再继续自动扩展新的 `OpenCodeService` 拆分
-- `R37` checkpoint 完成后必须暂停；是否继续 `R38+` 由下一次人工确认决定
+- `OpenCodeService` 的 R36 已通过 `OpenCodeCatalogQueryCoordinator` 收束 directory-scoped config/tool-catalog seam；`R37` 只做 checkpoint 复盘，没有继续自动扩展新的 `OpenCodeService` 拆分
+- `R37` checkpoint 已完成；是否继续 `R38+`、是否先处理 lint import-sort 回归，均由下一次人工确认决定
 
 ## 6. 阅读顺序
 
