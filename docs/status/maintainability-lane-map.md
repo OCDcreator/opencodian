@@ -1,17 +1,17 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [READY] `R49` style section owner seam 已完成，stop sentinel 已停稳；当前首个 `[NEXT]` 为 `R50 - Lint error restore after R49`。
+> **当前状态**: [READY] `R50` lint error restore 已完成；当前首个 `[NEXT]` 为 `R51 - OpenCodianSettings conversation section owner seam`。
 
 ## 当前优先级
 
-- **当前 `[NEXT]`**：`R50 - Lint error restore after R49`
-- **本批目标**：先恢复 `0 errors`，再连续推进 settings residual seams、server/config/icon 厚切口，最后连跑三轮 warning cleanup 与 checkpoint
-- **当前 lint 基线**：`2 errors / 92 warnings`
+- **当前 `[NEXT]`**：`R51 - OpenCodianSettings conversation section owner seam`
+- **本批目标**：保持 `0 errors`，连续推进 settings residual seams、server/config/icon 厚切口，最后连跑三轮 warning cleanup 与 checkpoint
+- **当前 lint 基线**：`0 errors / 92 warnings`
 - **热点顺序**：
-  1. `src/features/settings/SettingsStyleSection.ts`
-  2. `tests/unit/features/settings/SettingsModelSection.test.ts`
-  3. `src/features/settings/OpenCodianSettings.ts` conversation / plugin / UI / debug sections
+  1. `src/features/settings/OpenCodianSettings.ts` conversation section
+  2. 直接相关 settings / model picker tests
+  3. `src/features/settings/OpenCodianSettings.ts` plugin / UI / debug sections
   4. `src/core/opencode/ServerManager.ts`
   5. `src/core/config/ModelConfigService.ts`
   6. `src/core/opencode/OpenCodeMessageNormalizationMapper.ts`
@@ -35,10 +35,10 @@
 - `ModelConfigService`：`baseEffective` / `effective` 区分、provider enable/disable layering、default model resolution 不回归
 - `OpenCodeMessageNormalizationMapper`：tool status / result transform、context attachment path normalization、OMO normalization 语义不回归
 - `ProviderIconService`：builtin/LobeHub/custom fallback、cache path、mime detection、preview fallback 语义不变
-- lint：`R50` 必须先把基线恢复到 `0 errors`，后续所有轮次都不得重新引入 error
+- lint：`R50` 已把基线恢复到 `0 errors`，后续所有轮次都不得重新引入 error
 
 ## 历史入口
 
 - 批次归档：`docs/status/maintainability-completed-batches.md`
-- 最近成功 phase：`docs/status/maintainability-phase-384.md`
+- 最近成功 phase：`docs/status/maintainability-phase-385.md`
 - 停机线索：`automation/runtime/stop-after-next-commit.log` 与 `automation/runtime/history.jsonl` 中 round `398` 记录

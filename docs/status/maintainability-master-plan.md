@@ -2,32 +2,31 @@
 
 > **状态**: [READY]
 > **作用**: 这是 maintainability 无人值守的战略文档。每轮开始前，先读本文件，再读 `docs/status/maintainability-round-roadmap.md` 与最近的 `docs/status/maintainability-phase-XXX.md`。
-> **自动推进状态**: `R49` 已完成且 stop sentinel 已在下一次成功提交后暂停 autopilot；当前已人工写入新的 `R50-R67` overnight queue，恢复运行时必须从 roadmap 首个 `[NEXT]` 顺序执行，不允许 freestyle。
+> **自动推进状态**: `R50` 已恢复 lint 到 `0 errors`；当前已人工写入新的 `R51-R67` overnight queue，恢复运行时必须从 roadmap 首个 `[NEXT]` 顺序执行，不允许 freestyle。
 
 ## 1. 当前判断
 
-**当前分支已完成 `R49`，并把 `OpenCodianSettings` 的 style section lifecycle 收束到独立厚 owner。** 但 stop sentinel 停机后，live repo 仍带着 `R49` 收尾留下的两个 lint error，因此新的长队列必须先以 `R50` 吸收当前错误，再继续后续厚切口与 warning reduction。
+**当前分支已完成 `R50`，并把 `R49` 收尾留下的两个 live lint error 吸收完毕。** 当前 lint 基线恢复到 `0 errors / 92 warnings`，后续应继续按 queue 推进 settings residual seams、基础服务热点与显式 warning reduction。
 
 这批夜间队列的主线是：
 
-- 先用 `R50` 恢复 lint 到 `0 errors`
-- 再继续 `OpenCodianSettings` 残余的大 section owner seam：conversation、plugin、UI、debug
+- 已用 `R50` 恢复 lint 到 `0 errors`
+- 继续 `OpenCodianSettings` 残余的大 section owner seam：conversation、plugin、UI、debug
 - 再推进基础热点：`ServerManager`、`ModelConfigService`、`OpenCodeMessageNormalizationMapper`、`ProviderIconService`
 - 最后显式跑三轮 warning cleanup，再做 checkpoint
 
 ## 2. 当前基线
 
-- **lint**: `2 errors / 92 warnings`
+- **lint**: `0 errors / 92 warnings`
 - **验证**:
-  - 最近一次已确认的全量测试为 `R49`：`npm test` 通过，`258 passed, 258 total` suites；`1094 passed, 1094 total` tests
-  - 最近一次已确认的构建通过为 `R49`：`npm run build`，`BUILD_ID` `autopilot-maintainability.202604150253`
-  - 最近一次已确认的 Test Vault 部署也来自 `R49`
+  - 最近一次已确认的全量测试为 `R50`：`npm test` 通过，`258 passed, 258 total` suites；`1094 passed, 1094 total` tests
+  - 最近一次已确认的构建通过为 `R50`：`npm run build`，`BUILD_ID` `autopilot-maintainability.202604150324`
+  - 最近一次已确认的 Test Vault 部署也来自 `R50`
 - **本批目标**:
-  - 先恢复 `0 errors`
+  - 保持 `0 errors`
   - 在保持受控 queue 的前提下继续做高确定性 maintainability seam
   - 把 warning baseline 从当前 `92` 继续往低八十区间推进；若未达成，`R67` checkpoint 必须明确说明剩余高成本阻塞
 - **下一批高确定性切口**:
-  - `R50`: lint error restore after `R49`
   - `R51-R54`: `OpenCodianSettings` residual thick section seams
   - `R55-R63`: `ServerManager` / `ModelConfigService` / `OpenCodeMessageNormalizationMapper` / `ProviderIconService` 热点
   - `R64-R66`: warning cleanup batches
@@ -47,6 +46,7 @@
 - **R47**: `OpenCodeSettingsReconfigurationCoordinator` 接管 `updateSettings()` 的 plan/restart-stop/subscription/rollback lifecycle，并补齐直接相关测试与模块文档
 - **R48**: `SettingsModelSection` 接管 `OpenCodianSettings.addModelSettings()` 的 source mode、availability refresh、workspace 卡片、catalog host 与 icon cache lifecycle，并补齐直接相关测试与模块文档
 - **R49**: `SettingsStyleSection` 接管 `OpenCodianSettings.addStyleSettings()` 的 theme preset、background owner 装配、input panel appearance、glass/liquid glass 参数与 custom CSS lifecycle，并补齐直接相关测试与模块文档
+- **R50**: 吸收 `R49` 收尾留下的 `SettingsStyleSection` unused symbol 与 `SettingsModelSection` test import-sort lint error，把 live lint 恢复到 `0 errors / 92 warnings`
 
 ## 4. 本批结论
 

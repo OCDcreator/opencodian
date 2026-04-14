@@ -1,7 +1,7 @@
 import { Setting } from 'obsidian';
 
-import { t } from '../../../../src/i18n';
 import { SettingsModelSection } from '../../../../src/features/settings/SettingsModelSection';
+import { t } from '../../../../src/i18n';
 
 describe('SettingsModelSection', () => {
   beforeEach(() => {

@@ -1286,7 +1286,7 @@ export class SettingsStyleSection {
     const activeSvgFilterPreset = this.plugin.settings.inputPanelGlassRefractionSvgFilter.preset;
     if (activeSvgFilterPreset !== 'none') {
       const scaleKey = this.getInputPanelGlassRefractionSvgFilterScaleKey(activeSvgFilterPreset);
-      const scaleDefault = getDefaultInputPanelGlassRefractionSvgFilterSettings()[scaleKey];
+      const scaleDefault = svgFilterDefaults[scaleKey];
 
       this.addNumericControl(containerEl, {
         name: t('settings.style.input.glassRefraction.svgFilter.scale.name'),
