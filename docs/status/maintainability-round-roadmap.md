@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的 `[NEXT]`”。
-> **当前状态**: [QUEUED] `R38-R41` 已人工确认并排队；恢复 autopilot 时从 `R38` 开始。
+> **当前状态**: [QUEUED] `R39-R41` 已人工确认并排队；恢复 autopilot 时从 `R39` 开始。
 
 ## 控制规则
 
@@ -17,12 +17,12 @@
 
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
 - 最近 checkpoint：`docs/status/maintainability-phase-372.md`
-- 当前 lint 基线：`2 errors / 89 warnings`
-- 当前路线判断：先用一次性 lint housekeeping 解锁，再回到 `OpenCodianSettings` 的较厚 section seam
+- 当前 lint 基线：`0 errors / 89 warnings`
+- 当前路线判断：lint housekeeping 已完成，继续回到 `OpenCodianSettings` 的较厚 section seam
 
 ## Queue
 
-### [NEXT] R38 - Import-sort lint housekeeping
+### [DONE] R38 - Import-sort lint housekeeping
 
 - **Lane**: Lint housekeeping / unblocker
 - **目标**: 只修复 `src/core/opencode/OpenCodeCatalogQueryCoordinator.ts` 与 `src/core/opencode/OpenCodeService.ts` 的 `simple-import-sort/imports` error，恢复 lint error 为零
@@ -38,7 +38,7 @@
   - `npm run lint` 至少回到 `0 errors / 89 warnings`
   - 全量 `npm test`、`npm run build` 通过
 
-### [QUEUED] R39 - OpenCodianSettings server section owner seam
+### [NEXT] R39 - OpenCodianSettings server section owner seam
 
 - **Lane**: Maintainability / settings server section
 - **目标**: 从 `src/features/settings/OpenCodianSettings.ts:359` 的 `addServerSettings` 中收束完整 server section lifecycle，优先削弱 mode、host/port、remote URL、auth、status/action 的直接 DOM/state 装配

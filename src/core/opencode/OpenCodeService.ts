@@ -27,12 +27,12 @@ import type {
 import type { OpenCodianSettings } from '../types/settings';
 import { getServerBaseUrl, isLocalServerMode } from '../types/settings';
 import { createSdkClient } from './createSdkClient';
+import { OpenCodeCatalogQueryCoordinator } from './OpenCodeCatalogQueryCoordinator';
 import {
   type CatalogUpdateListener,
   OpenCodeCatalogStateStore,
   type OpenCodeCatalogToolIdentityContext,
 } from './OpenCodeCatalogStateStore';
-import { OpenCodeCatalogQueryCoordinator } from './OpenCodeCatalogQueryCoordinator';
 import {
   OpenCodeContextPartSerializer,
 } from './OpenCodeContextPartSerializer';

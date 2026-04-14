@@ -1,8 +1,8 @@
 import { createLogger } from '../../shared';
 import type { OpencodeModelConfigSubset } from '../types';
 import type {
-  OpenCodeCatalogToolIdentityContext,
   OpenCodeCatalogStateStore,
+  OpenCodeCatalogToolIdentityContext,
 } from './OpenCodeCatalogStateStore';
 import type { OpenCodeSdkFacade } from './OpenCodeSdkFacade';
 import type {
