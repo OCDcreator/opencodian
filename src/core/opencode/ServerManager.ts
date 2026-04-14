@@ -65,6 +65,18 @@ interface ExistingServerProcessInfo {
   looksLikeOpenCodeServe: boolean;
 }
 
+type ManagedServerAdoptionOutcome = 'adopted' | 'restart' | 'skip';
+
+type OccupiedLocalEndpointResolution =
+  | { action: 'adopt-managed' }
+  | { action: 'restart-managed' }
+  | { action: 'recycle-orphan'; existingServer: ExistingServerProcessInfo }
+  | {
+      action: 'conflict';
+      existingServer: ExistingServerProcessInfo;
+      diagnostics: ServerDiagnostics;
+    };
+
 export class ServerManager {
   private config: OpenCodeServerConfig;
   private events: ServerManagerEvents;
@@ -177,55 +189,8 @@ export class ServerManager {
       if (!portAvailable) {
         const healthy = await this.checkHealth(5000);
         if (healthy) {
-          const adoption = await this.tryAdoptManagedServer();
-          if (adoption === 'adopted') {
-            logger.debug('Adopted previously managed OpenCode server on port', this.config.local.port);
-            this.setStatus('running');
-            return;
-          }
-          if (adoption === 'restart') {
-            logger.debug('Restarting stale managed OpenCode server on port', this.config.local.port);
-            await this.restartManagedServer();
-            await this.spawnServer();
-            await this.waitForHealthy(this.config.timeout ?? 30000);
-            this.setStatus('running');
-            new Notice('OpenCode server started');
-            return;
-          }
-
-          const existingServer = await this.inspectExistingHealthyServer();
-          if (await this.shouldRecycleUnknownLocalServer(existingServer)) {
-            logger.warn('Recycling orphaned OpenCode sidecar on default plugin endpoint', {
-              host: this.config.local.host,
-              port: this.config.local.port,
-              pid: existingServer.pid,
-            });
-            await this.recycleUnknownLocalServer(existingServer);
-            await this.spawnServer();
-            await this.waitForHealthy(this.config.timeout ?? 30000);
-            this.setDiagnostics({
-              reason: 'local-orphan-restarted',
-              host: this.config.local.host,
-              port: this.config.local.port,
-              pid: existingServer.pid ?? undefined,
-              commandLine: existingServer.commandLine ?? undefined,
-              message: 'Detected and restarted an orphaned plugin sidecar.',
-            });
-            this.setStatus('running');
-            new Notice('OpenCode server started');
-            return;
-          }
-
-          this.setDiagnostics({
-            reason: 'local-conflict',
-            host: this.config.local.host,
-            port: this.config.local.port,
-            pid: existingServer.pid ?? undefined,
-            commandLine: existingServer.commandLine ?? undefined,
-            message: 'Another healthy OpenCode server already occupies the configured local endpoint.',
-          });
-          this.setStatus('conflict');
-          throw new Error(this.buildConflictMessage(existingServer, true));
+          await this.handleHealthyOccupiedLocalEndpoint();
+          return;
         }
         this.setDiagnostics({
           reason: 'local-conflict',
@@ -733,25 +698,92 @@ export class ServerManager {
     this.onManagedServerStateChange?.(null);
   }
 
-  private async tryAdoptManagedServer(): Promise<'adopted' | 'restart' | 'skip'> {
-    const state = this.managedServerState;
+  private async handleHealthyOccupiedLocalEndpoint(): Promise<void> {
+    const resolution = await this.resolveOccupiedHealthyLocalEndpoint();
+
+    switch (resolution.action) {
+      case 'adopt-managed':
+        logger.debug('Adopted previously managed OpenCode server on port', this.config.local.port);
+        this.setStatus('running');
+        return;
+      case 'restart-managed':
+        logger.debug('Restarting stale managed OpenCode server on port', this.config.local.port);
+        await this.restartManagedServer();
+        await this.spawnServer();
+        await this.waitForHealthy(this.config.timeout ?? 30000);
+        this.setStatus('running');
+        new Notice('OpenCode server started');
+        return;
+      case 'recycle-orphan':
+        logger.warn('Recycling orphaned OpenCode sidecar on default plugin endpoint', {
+          host: this.config.local.host,
+          port: this.config.local.port,
+          pid: resolution.existingServer.pid,
+        });
+        await this.recycleUnknownLocalServer(resolution.existingServer);
+        await this.spawnServer();
+        await this.waitForHealthy(this.config.timeout ?? 30000);
+        this.setDiagnostics(this.buildOrphanRestartDiagnostics(resolution.existingServer));
+        this.setStatus('running');
+        new Notice('OpenCode server started');
+        return;
+      case 'conflict':
+        this.setDiagnostics(resolution.diagnostics);
+        this.setStatus('conflict');
+        throw new Error(this.buildConflictMessage(resolution.existingServer, true));
+    }
+  }
+
+  private async resolveOccupiedHealthyLocalEndpoint(): Promise<OccupiedLocalEndpointResolution> {
+    const adoption = await this.tryAdoptManagedServer();
+    if (adoption === 'adopted') {
+      return { action: 'adopt-managed' };
+    }
+
+    if (adoption === 'restart') {
+      return { action: 'restart-managed' };
+    }
+
+    const existingServer = await this.inspectExistingHealthyServer();
+    if (await this.shouldRecycleUnknownLocalServer(existingServer)) {
+      return {
+        action: 'recycle-orphan',
+        existingServer,
+      };
+    }
+
+    return {
+      action: 'conflict',
+      existingServer,
+      diagnostics: this.buildHealthyLocalConflictDiagnostics(existingServer),
+    };
+  }
+
+  private buildOrphanRestartDiagnostics(existingServer: ExistingServerProcessInfo): ServerDiagnostics {
+    return {
+      reason: 'local-orphan-restarted',
+      host: this.config.local.host,
+      port: this.config.local.port,
+      pid: existingServer.pid ?? undefined,
+      commandLine: existingServer.commandLine ?? undefined,
+      message: 'Detected and restarted an orphaned plugin sidecar.',
+    };
+  }
+
+  private buildHealthyLocalConflictDiagnostics(existingServer: ExistingServerProcessInfo): ServerDiagnostics {
+    return {
+      reason: 'local-conflict',
+      host: this.config.local.host,
+      port: this.config.local.port,
+      pid: existingServer.pid ?? undefined,
+      commandLine: existingServer.commandLine ?? undefined,
+      message: 'Another healthy OpenCode server already occupies the configured local endpoint.',
+    };
+  }
+
+  private async tryAdoptManagedServer(): Promise<ManagedServerAdoptionOutcome> {
+    const state = await this.getAdoptableManagedServerState();
     if (!state) {
-      return 'skip';
-    }
-
-    if (state.port !== this.config.local.port || state.host !== this.config.local.host) {
-      this.clearManagedServerState();
-      return 'skip';
-    }
-
-    const commandLine = await this.getProcessCommandLine(state.pid);
-    if (!commandLine) {
-      this.clearManagedServerState();
-      return 'skip';
-    }
-
-    if (!this.looksLikeOpenCodeServeCommand(commandLine)) {
-      this.clearManagedServerState();
       return 'skip';
     }
 
@@ -761,6 +793,31 @@ export class ServerManager {
 
     this.onManagedServerStateChange?.(state);
     return 'adopted';
+  }
+
+  private async getAdoptableManagedServerState(): Promise<ManagedServerState | null> {
+    const state = this.managedServerState;
+    if (!state) {
+      return null;
+    }
+
+    if (state.port !== this.config.local.port || state.host !== this.config.local.host) {
+      this.clearManagedServerState();
+      return null;
+    }
+
+    const commandLine = await this.getProcessCommandLine(state.pid);
+    if (!commandLine) {
+      this.clearManagedServerState();
+      return null;
+    }
+
+    if (!this.looksLikeOpenCodeServeCommand(commandLine)) {
+      this.clearManagedServerState();
+      return null;
+    }
+
+    return state;
   }
 
   private async inspectExistingHealthyServer(): Promise<ExistingServerProcessInfo> {

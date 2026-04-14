@@ -366,6 +366,14 @@ describe('ServerManager', () => {
       expect(manager.getStatus()).toBe('running');
     });
 
+    it('centralizes healthy occupied local endpoint resolution for stale managed servers', async () => {
+      jest.spyOn(manager as never, 'tryAdoptManagedServer').mockResolvedValue('restart');
+
+      await expect((manager as never).resolveOccupiedHealthyLocalEndpoint()).resolves.toEqual({
+        action: 'restart-managed',
+      });
+    });
+
     it('marks a custom-port healthy server as conflict instead of silently reusing it', async () => {
       manager = new ServerManager({
         ...defaultConfig,
@@ -393,6 +401,37 @@ describe('ServerManager', () => {
         host: '127.0.0.1',
         port: 5000,
         pid: 4321,
+      });
+    });
+
+    it('builds conflict diagnostics from the occupied local endpoint resolution seam', async () => {
+      manager = new ServerManager({
+        ...defaultConfig,
+        baseUrl: 'http://127.0.0.1:5000',
+        local: {
+          host: '127.0.0.1',
+          port: 5000,
+          autoStart: true,
+        },
+      });
+
+      jest.spyOn(manager as never, 'tryAdoptManagedServer').mockResolvedValue('skip');
+      jest.spyOn(manager as never, 'inspectExistingHealthyServer').mockResolvedValue({
+        pid: 4321,
+        commandLine: 'opencode serve --port 5000 --hostname 127.0.0.1',
+        looksLikeOpenCodeServe: true,
+      });
+      jest.spyOn(manager as never, 'shouldRecycleUnknownLocalServer').mockResolvedValue(false);
+
+      await expect((manager as never).resolveOccupiedHealthyLocalEndpoint()).resolves.toMatchObject({
+        action: 'conflict',
+        diagnostics: {
+          reason: 'local-conflict',
+          host: '127.0.0.1',
+          port: 5000,
+          pid: 4321,
+          commandLine: 'opencode serve --port 5000 --hostname 127.0.0.1',
+        },
       });
     });
 
