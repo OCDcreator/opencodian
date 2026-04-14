@@ -44,6 +44,10 @@ import {
   OpenCodePromptRequestBuilder,
 } from './OpenCodePromptRequestBuilder';
 import {
+  OpenCodeSessionControlOrchestrator,
+  type SessionContextUsageSnapshot,
+} from './OpenCodeSessionControlOrchestrator';
+import {
   OpenCodeSessionLifecycleCoordinator,
   type Message,
   type Part,
@@ -244,24 +248,6 @@ function extractStructuredErrorMessage(errorLike: unknown): string | null {
   return `${baseMessage} (HTTP ${statusCode})`;
 }
 
-interface SessionContextUsageSnapshot {
-  sessionId: string;
-  sessionTitle: string;
-  createdAt: number;
-  updatedAt: number;
-  providerId: string | null;
-  providerName: string | null;
-  modelId: string | null;
-  modelName: string | null;
-  contextWindow: number;
-  inputTokens: number;
-  outputTokens: number;
-  reasoningTokens: number;
-  cacheReadTokens: number;
-  cacheWriteTokens: number;
-  totalCost: number;
-}
-
 type StreamingState = OpenCodeStreamEventState;
 
 type SessionTodoUpdate = {
@@ -285,6 +271,7 @@ export class OpenCodeService {
   private events: OpenCodeServiceEvents;
   private serverManager: ServerManager;
   private sessionLifecycle: OpenCodeSessionLifecycleCoordinator;
+  private sessionControl: OpenCodeSessionControlOrchestrator;
   private responseHandlers: ResponseHandler[] = [];
   private baseUrl: string;
   private sdkFeatureFlags: SdkFeatureFlags;
@@ -342,6 +329,18 @@ export class OpenCodeService {
       logServiceWarning: (key, message, error) => this.logServiceWarning(key, message, error),
       logServiceError: (key, message, error) => this.logServiceError(key, message, error),
     }, this.syncEventRuntime);
+    this.sessionControl = new OpenCodeSessionControlOrchestrator({
+      shouldUseSdkCrud: () => this.shouldUseSdk('sdkCrud'),
+      getSdkSession: () => this.sdk.session,
+      getSdkPart: () => this.sdk.part,
+      postLegacy: (path, body) => this.post(path, body),
+      getLegacy: (path) => this.get(path),
+      getSessionInfo: (sessionId) => this.getSessionInfo(sessionId),
+      getSessionMessages: (sessionId) => this.sessionLifecycle.getSessionMessages(sessionId),
+      getAvailableModels: () => this.getAvailableModels(),
+      logServiceWarning: (key, message, error) => this.logServiceWarning(key, message, error),
+      logServiceError: (key, message, error) => this.logServiceError(key, message, error),
+    });
     this.catalogState = new OpenCodeCatalogStateStore({
       syncOpenCodeEventSubscriptions: () => {
         if (this.openCodeEventRuntime.hasListeners()) {
@@ -1166,37 +1165,6 @@ export class OpenCodeService {
     return filteredMessages;
   }
 
-  private normalizeForkResponse(response: unknown): { id: string; title: string } {
-    if (typeof response === 'object' && response !== null && 'id' in response) {
-      const typedResponse = response as { id: unknown; title?: unknown };
-      return {
-        id: String(typedResponse.id),
-        title: typeof typedResponse.title === 'string'
-          ? typedResponse.title
-          : '',
-      };
-    }
-
-    throw new Error('Invalid fork session response');
-  }
-
-  private normalizeRevertResponse(response: unknown): boolean {
-    if (response === false) {
-      return false;
-    }
-
-    if (typeof response === 'object' && response !== null && Object.keys(response).length === 0) {
-      return true;
-    }
-
-    if (typeof response === 'object' && response !== null && 'id' in response) {
-      const responseId = String((response as { id: unknown }).id);
-      return responseId.length > 0;
-    }
-
-    return response === true;
-  }
-
   private normalizeAvailableModels(
     data: unknown,
   ): {
@@ -1992,119 +1960,25 @@ export class OpenCodeService {
   }
 
   async getSessionContextUsageSnapshot(sessionId: string): Promise<SessionContextUsageSnapshot | null> {
-    if (!sessionId) {
-      return null;
-    }
-
-    try {
-      const [session, messages, providersResult] = await Promise.all([
-        this.getSessionInfo(sessionId),
-        this.getSessionMessages(sessionId),
-        this.getAvailableModels(),
-      ]);
-
-      const totalCost = messages.reduce(
-        (sum, message) => sum + (message.info.role === 'assistant' ? (message.info.cost ?? 0) : 0),
-        0,
-      );
-
-      const latestAssistantWithTokens = OpenCodeService.findLatestAssistantWithTokens(messages);
-
-      const providerId = latestAssistantWithTokens?.info.providerID ?? null;
-      const modelId = latestAssistantWithTokens?.info.modelID ?? null;
-      const provider = providerId
-        ? providersResult.providers.find((item) => item.id === providerId)
-        : undefined;
-      const model = provider && modelId
-        ? provider.models.find((item) => item.id === modelId)
-        : undefined;
-      const tokens = latestAssistantWithTokens?.info.tokens;
-
-      return {
-        sessionId,
-        sessionTitle: session.title,
-        createdAt: session.time.created,
-        updatedAt: latestAssistantWithTokens?.info.time.created ?? session.time.updated,
-        providerId,
-        providerName: provider?.name ?? providerId,
-        modelId,
-        modelName: model?.name ?? modelId,
-        contextWindow: model?.contextWindow ?? 0,
-        inputTokens: tokens?.input ?? 0,
-        outputTokens: tokens?.output ?? 0,
-        reasoningTokens: tokens?.reasoning ?? 0,
-        cacheReadTokens: tokens?.cache?.read ?? 0,
-        cacheWriteTokens: tokens?.cache?.write ?? 0,
-        totalCost,
-      };
-    } catch (error) {
-      this.logServiceError('session.context-usage', `Failed to get session context usage snapshot for ${sessionId}:`, error);
-      return null;
-    }
+    return this.sessionControl.getSessionContextUsageSnapshot(sessionId);
   }
 
   async forkSession(sessionId: string, messageID?: string): Promise<{ id: string; title: string }> {
-    if (this.shouldUseSdk('sdkCrud')) {
-      const response = await this.getSdkClient().session.fork({
-        sessionID: sessionId,
-        messageID,
-      });
-      return this.normalizeForkResponse(response);
-    }
-
-    const response = await this.post<unknown>(`/session/${sessionId}/fork`, messageID ? { messageID } : {});
-    return this.normalizeForkResponse(response);
+    return this.sessionControl.forkSession(sessionId, messageID);
   }
 
   async revertSession(sessionId: string, messageID: string, partID?: string): Promise<boolean> {
-    const payload: Record<string, string> = { messageID };
-    if (partID) {
-      payload.partID = partID;
-    }
-
-    logger.debug('Revert session request', {
-      sessionId,
-      messageID,
-      partID: partID ?? null,
-    });
-
-    const response = this.shouldUseSdk('sdkCrud')
-      ? await this.getSdkClient().session.revert({
-          sessionID: sessionId,
-          messageID,
-          partID,
-        })
-      : await this.post<unknown>(`/session/${sessionId}/revert`, payload);
-    logger.debug('Revert session raw response', {
-      sessionId,
-      messageID,
-      response,
-    });
-
-    const normalized = this.normalizeRevertResponse(response);
-    logger.debug('Revert session normalized boolean result', {
-      sessionId,
-      messageID,
-      normalized,
-    });
-    return normalized;
+    return this.sessionControl.revertSession(sessionId, messageID, partID);
   }
 
   async unrevertSession(sessionId: string): Promise<boolean> {
-    const response = this.shouldUseSdk('sdkCrud')
-      ? await this.getSdkClient().session.unrevert({
-          sessionID: sessionId,
-        })
-      : await this.post<unknown>(`/session/${sessionId}/unrevert`, {});
-
-    return this.normalizeRevertResponse(response);
+    return this.sessionControl.unrevertSession(sessionId);
   }
 
   async getSessionRevertState(
     sessionId: string,
   ): Promise<{ messageID: string; partID?: string } | null> {
-    const session = await this.getSessionInfo(sessionId);
-    return session.revert?.messageID ? session.revert : null;
+    return this.sessionControl.getSessionRevertState(sessionId);
   }
 
   async getPendingQuestions(): Promise<ChatQuestionRequest[]> {
@@ -2174,63 +2048,7 @@ export class OpenCodeService {
   }
 
   async getSessionDiff(sessionId: string, messageID?: string): Promise<SessionDiffEntry[]> {
-    const normalizeResponse = (response: unknown): SessionDiffEntry[] => {
-      const rawEntries = this.unwrapSdkData<unknown[]>(response);
-      const normalizedEntries = Array.isArray(rawEntries) ? rawEntries : [];
-
-      return normalizedEntries.reduce<SessionDiffEntry[]>((entries, rawEntry) => {
-        if (!rawEntry || typeof rawEntry !== 'object') {
-          return entries;
-        }
-
-        const entry = rawEntry as {
-          file?: unknown;
-          patch?: unknown;
-          before?: unknown;
-          after?: unknown;
-          additions?: unknown;
-          deletions?: unknown;
-          status?: unknown;
-        };
-        if (typeof entry.file !== 'string' || !entry.file.trim()) {
-          return entries;
-        }
-
-        entries.push({
-          file: entry.file,
-          patch: typeof entry.patch === 'string' ? entry.patch : undefined,
-          before: typeof entry.before === 'string' ? entry.before : undefined,
-          after: typeof entry.after === 'string' ? entry.after : undefined,
-          additions: typeof entry.additions === 'number' ? entry.additions : 0,
-          deletions: typeof entry.deletions === 'number' ? entry.deletions : 0,
-          status: entry.status === 'added' || entry.status === 'deleted' || entry.status === 'modified'
-            ? entry.status
-            : undefined,
-        });
-        return entries;
-      }, []);
-    };
-
-    if (this.shouldUseSdk('sdkCrud')) {
-      try {
-        const response = await this.getSdkClient().session.diff({
-          sessionID: sessionId,
-          messageID,
-        });
-        return normalizeResponse(response);
-      } catch (error) {
-        this.logServiceWarning('session.diff', `SDK session.diff failed for ${sessionId}, falling back to legacy HTTP`, error);
-      }
-    }
-
-    const query = messageID ? `?messageID=${encodeURIComponent(messageID)}` : '';
-    try {
-      const response = await this.get<unknown>(`/session/${sessionId}/diff${query}`);
-      return normalizeResponse(response);
-    } catch (error) {
-      this.logServiceError('session.diff', `Failed to get session diff for ${sessionId}:`, error);
-      return [];
-    }
+    return this.sessionControl.getSessionDiff(sessionId, messageID);
   }
 
   private async getSessionInfo(sessionId: string): Promise<Session> {
@@ -2304,35 +2122,6 @@ export class OpenCodeService {
     }
 
     return {};
-  }
-
-  private static findLatestAssistantWithTokens(
-    messages: Array<{ info: Message; parts: Part[] }>,
-  ): { info: Message; parts: Part[] } | null {
-    for (let index = messages.length - 1; index >= 0; index -= 1) {
-      const message = messages[index];
-      if (message.info.role !== 'assistant') {
-        continue;
-      }
-
-      const tokens = message.info.tokens;
-      if (!tokens) {
-        continue;
-      }
-
-      const total = (tokens.input ?? 0)
-        + (tokens.output ?? 0)
-        + (tokens.reasoning ?? 0)
-        + (tokens.cache?.read ?? 0)
-        + (tokens.cache?.write ?? 0);
-      if (total <= 0) {
-        continue;
-      }
-
-      return message;
-    }
-
-    return null;
   }
 
   /** Convert OpenCode message to ChatMessage */
@@ -2489,69 +2278,53 @@ export class OpenCodeService {
   }
 
   async initializeSession(sessionId: string, providerID: string, modelID: string, messageID: string): Promise<boolean> {
-    return (await this.sdk.session.init({ sessionID: sessionId, providerID, modelID, messageID })) === true;
+    return this.sessionControl.initializeSession(sessionId, providerID, modelID, messageID);
   }
 
   async getSessionChildren(sessionId: string): Promise<Session[]> {
-    const response = await this.sdk.session.children({ sessionID: sessionId });
-    return Array.isArray(response) ? response as Session[] : [];
+    return this.sessionControl.getSessionChildren(sessionId);
   }
 
   async shareSession(sessionId: string): Promise<Session> {
-    return await this.sdk.session.share({ sessionID: sessionId }) as unknown as Session;
+    return this.sessionControl.shareSession(sessionId);
   }
 
   async unshareSession(sessionId: string): Promise<Session> {
-    return await this.sdk.session.unshare({ sessionID: sessionId }) as unknown as Session;
+    return this.sessionControl.unshareSession(sessionId);
   }
 
   async summarizeSession(sessionId: string, providerID: string, modelID: string, auto = false): Promise<boolean> {
-    return (await this.sdk.session.summarize({ sessionID: sessionId, providerID, modelID, auto })) === true;
+    return this.sessionControl.summarizeSession(sessionId, providerID, modelID, auto);
   }
 
   async getSessionMessage(sessionId: string, messageId: string): Promise<{ info: Message; parts: Part[] }> {
-    return this.sdk.session.message({ sessionID: sessionId, messageID: messageId }) as Promise<{ info: Message; parts: Part[] }>;
+    return this.sessionControl.getSessionMessage(sessionId, messageId);
   }
 
   async deleteSessionMessage(sessionId: string, messageId: string): Promise<boolean> {
-    return (await this.sdk.session.deleteMessage({ sessionID: sessionId, messageID: messageId })) === true;
+    return this.sessionControl.deleteSessionMessage(sessionId, messageId);
   }
 
   async runSessionCommand(
     sessionId: string,
     input: { command: string; arguments: string; agent?: string; model?: string; messageID?: string; variant?: string; parts?: unknown[] },
   ): Promise<{ info: Message; parts: Part[] }> {
-    return this.sdk.session.command({
-      sessionID: sessionId,
-      ...input,
-    } as never) as Promise<{ info: Message; parts: Part[] }>;
+    return this.sessionControl.runSessionCommand(sessionId, input);
   }
 
   async runSessionShell(
     sessionId: string,
     input: { agent: string; command: string; model?: { providerID: string; modelID: string }; messageID?: string },
   ): Promise<{ info: Message; parts: Part[] }> {
-    return this.sdk.session.shell({
-      sessionID: sessionId,
-      ...input,
-    }) as Promise<{ info: Message; parts: Part[] }>;
+    return this.sessionControl.runSessionShell(sessionId, input);
   }
 
   async updateMessagePart(sessionId: string, messageId: string, partId: string, part: Part): Promise<Part> {
-    return await this.sdk.part.update({
-      sessionID: sessionId,
-      messageID: messageId,
-      partID: partId,
-      body: part as never,
-    } as never) as Part;
+    return this.sessionControl.updateMessagePart(sessionId, messageId, partId, part);
   }
 
   async deleteMessagePart(sessionId: string, messageId: string, partId: string): Promise<boolean> {
-    return (await this.sdk.part.delete({
-      sessionID: sessionId,
-      messageID: messageId,
-      partID: partId,
-    })) === true;
+    return this.sessionControl.deleteMessagePart(sessionId, messageId, partId);
   }
 
   async getProviderAuthMethods(): Promise<unknown> {

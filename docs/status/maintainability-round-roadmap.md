@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`。R32 完成后必须暂停复盘，不得自动扩展新队列。
-> **当前状态**: [CONFIRMED_NEXT_BATCH] R28-R32 已确认；当前可自动执行的 `[NEXT]` 是 `R29 - Session control and messaging orchestrator`。
+> **当前状态**: [CONFIRMED_NEXT_BATCH] R28-R32 已确认；当前可自动执行的 `[NEXT]` 是 `R30 - Question and permission hub`。
 
 ## 控制规则
 
@@ -636,7 +636,7 @@
   - 新 owner 满足粒度规则，并有 focused coverage。
   - 运行 targeted tests、全量 `npm test`、`npm run build`。
 
-### [NEXT] R29 - Session control and messaging orchestrator
+### [DONE] R29 - Session control and messaging orchestrator
 
 - **Lane**: OpenCodeService `session control / message operations`
 - **目标**: 把 fork/revert/unrevert/diff/context usage、message commands、shell / message-part operations 收束到一个较厚 orchestrator。
@@ -654,7 +654,7 @@
   - 新 owner 满足粒度规则，并有 focused coverage。
   - 运行 targeted tests、全量 `npm test`、`npm run build`。
 
-### [QUEUED] R30 - Question and permission hub
+### [NEXT] R30 - Question and permission hub
 
 - **Lane**: OpenCodeService `question / permission negotiation`
 - **目标**: 把 pending questions/reply/reject 与 pending/session permissions/responders 收束到交互式 negotiation hub。

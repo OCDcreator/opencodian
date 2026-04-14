@@ -131,9 +131,9 @@ R13-R18 已完成这组 UI/runtime shell 的主要收束。本批 R28-R32 不继
 
 ## 7. 当前执行指令
 
-R28 完成之后：
+R29 完成之后：
 
-- R28-R32 受控队列已经确认，`docs/status/maintainability-round-roadmap.md` 的 `R29` 是唯一可自动执行的 `[NEXT]`
+- R28-R32 受控队列已经确认，`docs/status/maintainability-round-roadmap.md` 的 `R30` 是唯一可自动执行的 `[NEXT]`
 - Autopilot 可以按 R28-R32 顺序运行，但不得越过 R32 自动扩展新队列
 - 本批明确优先 `OpenCodeService` 的 session lifecycle、session control、question/permission hub 与条件性的 query gateway；如果 `R31` 无法避免微碎片，必须在该轮说明原因后直接推进 `R32`
 - `ConversationRenderService` trailing-assistant helper 链仍保持降优先级；除非正确性、测试或构建阻塞，不要把它作为新 queue 的默认起点

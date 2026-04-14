@@ -1,11 +1,10 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [CONFIRMED_NEXT_BATCH] R28-R32 已确认；当前 `[NEXT]` 是 R29 session control and messaging orchestrator。
+> **当前状态**: [CONFIRMED_NEXT_BATCH] R28-R32 已确认；当前 `[NEXT]` 是 R30 question and permission hub。
 
 ## 当前优先级
 
-- **R29**: session control and messaging orchestrator（fork/revert/diff/context usage/message commands/message parts）
 - **R30**: question and permission hub（pending/reply/reject/respond/session permission）
 - **R31**: conditional query gateway（provider/project/file/find/path/VCS/formatter/LSP/MCP auth；仅在能形成厚 owner 时执行）
 - **R32**: gateway checkpoint；跑完必须暂停
@@ -13,7 +12,6 @@
 ## 当前热点首查入口
 
 - R28 首查 `OpenCodeService.ts` 中 `createSession()` 到 `subscribeToSessionSyncEvents()` 的 session lifecycle 区段
-- R29 首查 `forkSession()` 到 `updateMessagePart()` 的 session control / message operations 区段
 - R30 首查 `getPendingQuestions()` 到 `respondToPermission()` 的 question/permission negotiation 区段
 - R31 首查 provider auth / project / file / find / path / VCS / formatter / LSP / MCP auth 区段；如果只能形成薄 wrapper，就在该轮说明并跳过到 R32
 - `OpenCodianView` / settings / trailing-assistant 链本批都只保留 regression watchpoints，不再开新切口
