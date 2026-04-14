@@ -1,18 +1,19 @@
 # Maintainability Master Plan
 
-> **状态**: [CONFIRMED_NEXT_BATCH]
+> **状态**: [CHECKPOINT_COMPLETE]
 > **作用**: 这是 maintainability 无人值守的战略文档。每轮开始前，先读本文件，再读 `docs/status/maintainability-round-roadmap.md` 与最近的 `docs/status/maintainability-phase-XXX.md`。
-> **自动推进状态**: 文档已做人工压缩归档；当前可自动执行的 `[NEXT]` 是 `W9 - Warning cleanup checkpoint`。本批只继续受控 warning cleanup，不自动恢复 `R33+` maintainability queue。
+> **自动推进状态**: `W9 - Warning cleanup checkpoint` 已完成；当前没有可自动执行的 `[NEXT]`。建议下一批由人工确认后再继续，优先继续受控 warning cleanup，而不是自动恢复 `R33+` maintainability queue。
 
 ## 1. 当前判断
 
-**当前判断：R28-R32、L1-L5 与 W1-W8 均已完成，文档主入口已压缩。仓库当前 lint 基线是 `0 errors / 95 warnings`；下一轮应执行 checkpoint，复盘 `W6-W8` 的 warning 收益并决定是否继续受控 warning cleanup，或恢复新的 maintainability 重构。**
+**当前判断：R28-R32、L1-L5 与 W1-W9 均已完成，文档主入口已压缩。仓库当前 lint 基线是 `0 errors / 95 warnings`；`W6-W8` 已把 warning 基线从 `103` 收敛到 `95`，checkpoint 建议继续受控 warning cleanup，但下一批需要人工确认新的 queue item 后再让 autopilot 执行。**
 
 当前最重要的事实：
 
 - `OpenCodeService`、`OpenCodianView`、`OpenCodianSettings` 仍是长期 maintainability 热点，但是否继续 owner 收束仍需人工判断
 - 剩余 warnings 主要集中在大型 owner 与长测试文件的 `max-lines-per-function` / `max-lines` / `complexity` / `max-params`
 - 这意味着后续 autopilot 仍应优先做“受控小批次”，而不是自动切回大规模结构重构
+- 当前没有可自动执行的 `[NEXT]`；不要在没有人工追加 queue item 的情况下自动扩展 `W10+` 或恢复 `R33+`
 
 ## 2. 当前基线
 
@@ -25,12 +26,14 @@
   - `src/main.ts`（仅剩文件级 `max-lines`）
 - **已完成历史摘要**: 见 `docs/status/maintainability-completed-batches.md`
 
-## 3. 当前批次（W8-W9）
+## 3. 当前批次结论（W6-W9）
 
-本批只做 warning cleanup，不恢复 `R33+`。`W6-W8` 已完成并把 lint 基线从 `103` 收敛到 `95` warnings，当前只剩 checkpoint：
+本批只做 warning cleanup 与 checkpoint，不恢复 `R33+`。`W6-W9` 已完成：
 
-1. **W8 `OpenCodianView` sync complexity trim**：已完成，三处消息同步复杂度 warning 已收掉
-2. **W9 checkpoint**：复盘 `W6-W8` 的 warning 收益，并决定下一批是继续 warning cleanup，还是恢复新的 maintainability queue
+1. **W6 `ModelConfigModal` render trim**：收掉 `renderEditor` / `renderModelCard` 的 3 条 warning，lint 基线 `103 -> 100`
+2. **W7 `main.ts` loadSettings trim**：收掉 `loadSettings` 的 2 条 warning，lint 基线 `100 -> 98`
+3. **W8 `OpenCodianView` sync complexity trim**：收掉三处消息同步复杂度 warning，lint 基线 `98 -> 95`
+4. **W9 checkpoint**：确认 `W6-W8` 的 8-warning 收益；建议下一批继续受控 warning cleanup，但当前没有可自动执行的 `[NEXT]`
 
 ## 4. 长期边界
 

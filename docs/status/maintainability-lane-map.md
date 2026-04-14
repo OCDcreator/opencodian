@@ -1,13 +1,14 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [CONFIRMED_NEXT_BATCH] 文档压缩已完成；当前可自动执行的 `[NEXT]` 是 `W9 - Warning cleanup checkpoint`。
+> **当前状态**: [CHECKPOINT_COMPLETE] `W9 - Warning cleanup checkpoint` 已完成；当前没有可自动执行的 `[NEXT]`。
 
 ## 当前优先级
 
-- **当前 `[NEXT]`**：`W9 - Warning cleanup checkpoint`
-- **本批目标**：复盘 `W6-W8` 的 warning cleanup 收益，并决定下一批方向
+- **当前 `[NEXT]`**：当前没有可自动执行的 `[NEXT]`
+- **本批目标**：`W9` 已复盘 `W6-W8` 的 warning cleanup 收益，并建议下一批方向
 - **当前 lint 基线**：`0 errors / 95 warnings`
+- **下一批建议**：继续受控 warning cleanup，但必须先由人工确认新的 queue item；不要自动恢复 `R33+`
 - **本批热点顺序**：
   1. `docs/status/maintainability-master-plan.md`
   2. `docs/status/maintainability-round-roadmap.md`
@@ -32,4 +33,4 @@
 ## 历史入口
 
 - 批次归档：`docs/status/maintainability-completed-batches.md`
-- 最近 checkpoint：`docs/status/maintainability-phase-357.md`
+- 最近 checkpoint：`docs/status/maintainability-phase-361.md`

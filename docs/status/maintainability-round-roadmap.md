@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的 `[NEXT]`”。
-> **当前状态**: [CONFIRMED_NEXT_BATCH] 文档压缩已人工完成；当前可自动执行的 `[NEXT]` 是 `W9 - Warning cleanup checkpoint`。
+> **当前状态**: [CHECKPOINT_COMPLETE] `W9 - Warning cleanup checkpoint` 已完成；当前没有可自动执行的 `[NEXT]`，下一批需要人工确认后再追加到本队列。
 
 ## 控制规则
 
@@ -17,7 +17,8 @@
 
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
 - 当前 lint 基线：`0 errors / 95 warnings`
-- 当前最适合继续 autopilot 的方向：继续一小批现有 owner 内的 warning cleanup，而不是自动恢复 `R33+`
+- checkpoint 建议：下一批继续一小批现有 owner 内的 warning cleanup，而不是自动恢复 `R33+`
+- 当前没有可自动执行的 `[NEXT]`
 
 ## Queue
 
@@ -73,7 +74,7 @@
   - 至少收掉上述三处 `complexity` warning
   - 运行 focused validation、全量 `npm test`、`npm run build`
 
-### [NEXT] W9 - Warning cleanup checkpoint
+### [DONE] W9 - Warning cleanup checkpoint
 
 - **Lane**: Checkpoint
 - **目标**: 复盘 `W6-W8` 的 warning cleanup 收益，并决定下一批是继续 warning cleanup，还是恢复新的 maintainability queue。
@@ -88,3 +89,7 @@
   - 不自动扩展 `W10+` 或恢复 `R33+`
 - **验收**:
   - phase 文档明确记录 `W6-W8` 的 warning 收益与下一批建议
+
+## 当前自动队列状态
+
+当前没有可自动执行的 `[NEXT]`。`W9` 的 checkpoint 建议是下一批继续受控 warning cleanup，优先选择边界清晰、能在现有 owner 内消化的热点；不要在没有人工追加 queue item 的情况下自动扩展 `W10+` 或恢复 `R33+`。
