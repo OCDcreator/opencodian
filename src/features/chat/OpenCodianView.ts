@@ -211,6 +211,10 @@ import {
   type IncrementalRenderedMessageUpdate,
 } from './services/ConversationRenderService';
 import {
+  ConversationAuthoritativeSyncCoordinator,
+  type ConversationAuthoritativeSyncHost,
+} from './services/ConversationAuthoritativeSyncCoordinator';
+import {
   ConversationRestoreBootstrapCoordinator,
   type ConversationRestoreBootstrapHost,
 } from './services/ConversationRestoreBootstrapCoordinator';
@@ -373,47 +377,6 @@ interface ConversationRevertState {
   partID?: string;
 }
 
-type OpenCodeSessionMessages = Awaited<ReturnType<OpenCodianPlugin['openCodeService']['getSessionMessages']>>;
-
-interface LatestServerUserMessageHydration {
-  hydratedMessage: ChatMessage;
-  rawServerUserText: string;
-}
-
-interface ConversationServerSyncSnapshot {
-  serverMessages: OpenCodeSessionMessages;
-  convertedServerMessages: ChatMessage[];
-  revertState: ConversationRevertState | null;
-}
-
-interface ConversationServerSyncMergeResult {
-  merged: ChatMessage[];
-  preservedClientOnlyMessages: ChatMessage[];
-  fingerprint: string;
-  changed: boolean;
-}
-
-interface HydratedUserMessageMismatchContext {
-  sessionId: string;
-  optimisticMessageId: string;
-  rawServerUserText: string;
-}
-
-interface HydratedOptimisticUserMessageUpdate {
-  conversation: Conversation;
-  optimisticIndex: number;
-  optimisticMessage: ChatMessage;
-  mergedHydratedMessage: ChatMessage;
-  tabId: TabId | null;
-}
-
-interface ConversationServerSyncContext {
-  conversation: Conversation;
-  tabId: TabId | null;
-  reason: string;
-  verbose: boolean;
-}
-
 interface DeferredQuestionRequest {
   promise: Promise<void>;
   resolve: () => void;
@@ -455,6 +418,7 @@ interface OpenCodianViewBackgroundTaskRuntimeWiring {
 }
 
 interface OpenCodianViewConversationRuntimeWiring {
+  conversationAuthoritativeSyncCoordinator: ConversationAuthoritativeSyncCoordinator;
   conversationHydrationRenderBridge: ConversationHydrationRenderBridge;
   conversationTransitionBridge: ConversationTransitionBridge;
   tabConversationStateBridge: TabConversationStateBridge;
@@ -620,6 +584,7 @@ export class OpenCodianView extends ItemView {
   private conversationHydrationOutcomeBridge: ConversationHydrationOutcomeBridge;
   private conversationHydrationRenderBridge: ConversationHydrationRenderBridge;
   private conversationTransitionBridge: ConversationTransitionBridge;
+  private conversationAuthoritativeSyncCoordinator!: ConversationAuthoritativeSyncCoordinator;
   private tabConversationStateBridge: TabConversationStateBridge;
   private tabConversationActivationBridge: TabConversationActivationBridge;
   private tabViewActivationBridge: TabViewActivationBridge;
@@ -1192,6 +1157,8 @@ export class OpenCodianView extends ItemView {
       backgroundTaskRuntime.backgroundTaskLiveSignalCoordinator;
 
     const conversationRuntime = this.createConversationRuntimeWiring(backgroundTaskRuntime);
+    this.conversationAuthoritativeSyncCoordinator =
+      conversationRuntime.conversationAuthoritativeSyncCoordinator;
     this.conversationHydrationRenderBridge =
       conversationRuntime.conversationHydrationRenderBridge;
     this.conversationTransitionBridge = conversationRuntime.conversationTransitionBridge;
@@ -1331,6 +1298,10 @@ export class OpenCodianView extends ItemView {
   private createConversationRuntimeWiring(
     backgroundTaskRuntime: OpenCodianViewBackgroundTaskRuntimeWiring,
   ): OpenCodianViewConversationRuntimeWiring {
+    const conversationAuthoritativeSyncCoordinator = new ConversationAuthoritativeSyncCoordinator(
+      this.createConversationAuthoritativeSyncHost(),
+    );
+    this.conversationAuthoritativeSyncCoordinator = conversationAuthoritativeSyncCoordinator;
     const conversationHydrationRuntimeViewHosts = createConversationHydrationRuntimeViewHosts(
       createConversationHydrationRuntimeViewHostFactoryHost(
         this.createConversationHydrationRuntimeHostProviderHost(),
@@ -1453,6 +1424,7 @@ export class OpenCodianView extends ItemView {
     );
 
     return {
+      conversationAuthoritativeSyncCoordinator,
       conversationHydrationRenderBridge,
       conversationTransitionBridge,
       tabConversationStateBridge,
@@ -1826,6 +1798,60 @@ export class OpenCodianView extends ItemView {
       renderBackgroundTaskIndicatorIfNeeded: (tabId) =>
         this.renderBackgroundTaskIndicatorIfNeeded(tabId),
       hasInterruptedLocalAssistantTail: (messages) => this.hasInterruptedLocalAssistantTail(messages),
+    };
+  }
+
+  private createConversationAuthoritativeSyncHost():
+  ConversationAuthoritativeSyncHost {
+    return {
+      getVaultBasePath: () => getVaultBasePath(this.app) ?? undefined,
+      getTabRuntimeState: (tabId) => this.getTabRuntimeState(tabId),
+      getCurrentConversationId: () => this.currentConversation?.id ?? null,
+      getCurrentConversationRevertState: () => this.currentConversationRevertState,
+      getActiveTabId: () => this.getActiveTabId(),
+      getSessionMessages: (sessionId) => this.plugin.openCodeService.getSessionMessages(sessionId),
+      getSessionRevertState: (sessionId) => this.plugin.openCodeService.getSessionRevertState(sessionId),
+      hydrateOpenCodeMessage: (info, parts, vaultBasePath) =>
+        this.plugin.openCodeService.hydrateOpenCodeMessage(info, parts, vaultBasePath),
+      shouldRenderConversationMessage: (message) => this.shouldRenderConversationMessage(message),
+      getConversationSyncFingerprint: (messages) => this.getConversationSyncFingerprint(messages),
+      getInterruptedSyncPreservationLogFingerprint: (conversation, messages) =>
+        this.getInterruptedSyncPreservationLogFingerprint(conversation, messages),
+      saveConversation: (conversation) => this.plugin.saveConversation(conversation),
+      logOmoBackgroundTaskDiagnostics: (conversation, previousMessages, nextMessages) => {
+        this.logOmoBackgroundTaskDiagnostics(conversation, previousMessages, nextMessages);
+      },
+      markBackgroundTaskAuthoritativeSync: (tabId, reason) => {
+        this.markBackgroundTaskAuthoritativeSync(tabId, reason);
+      },
+      refreshContextUsageAfterActiveConversationSync: (conversation, tabId) =>
+        this.refreshContextUsageAfterActiveConversationSync(conversation, tabId),
+      armBackgroundTaskIndicatorForUserMessage: (message, tabId) => {
+        this.armBackgroundTaskIndicatorForUserMessage(message, tabId);
+      },
+      updateHydratedUserMessageRuntimeAnchors: (
+        conversation,
+        optimisticMessage,
+        mergedHydratedMessage,
+        tabId,
+      ) => {
+        this.updateHydratedUserMessageRuntimeAnchors(
+          conversation,
+          optimisticMessage,
+          mergedHydratedMessage,
+          tabId,
+        );
+      },
+      rerenderSingleUserMessage: (previousMessageId, message) =>
+        this.rerenderSingleUserMessage(previousMessageId, message),
+      renderBackgroundTaskIndicatorIfNeeded: (tabId) =>
+        this.renderBackgroundTaskIndicatorIfNeeded(tabId),
+      summarizeChatMessageForDebug: (message) => this.summarizeChatMessageForDebug(message),
+      logAssistantFinalizationDebug: (label, payload) => {
+        this.logAssistantFinalizationDebug(label, payload);
+      },
+      stringifyLogPayload: (payload) => this.stringifyLogPayload(payload),
+      getLogPreview: (text, maxLength) => this.getLogPreview(text, maxLength),
     };
   }
 
@@ -4145,42 +4171,6 @@ export class OpenCodianView extends ItemView {
     );
   }
 
-  private getClientOnlyMessagesToPreserveOnSync(
-    existingMessages: ChatMessage[],
-    syncedMessages: ChatMessage[],
-  ): ChatMessage[] {
-    return existingMessages.filter((message) => {
-      if (message.displayStyle === 'notice') {
-        if (!message.sourceMessageId) {
-          return true;
-        }
-
-        return !syncedMessages.some((candidate) => candidate.sourceMessageId === message.sourceMessageId);
-      }
-
-      if (
-        message.role !== 'assistant'
-        || message.streamState !== 'interrupted'
-      ) {
-        return false;
-      }
-
-      const hasVisibleContent = Boolean(
-        message.content?.trim()
-        || (message.contentBlocks?.length ?? 0) > 0,
-      );
-      if (!hasVisibleContent) {
-        return false;
-      }
-
-      if (message.sourceMessageId) {
-        return !syncedMessages.some((candidate) => candidate.sourceMessageId === message.sourceMessageId);
-      }
-
-      return true;
-    });
-  }
-
   private shouldRenderConversationMessage(message: ChatMessage): boolean {
     if (this.isBackgroundTaskCompletionReminder(message)) {
       return false;
@@ -4354,254 +4344,16 @@ export class OpenCodianView extends ItemView {
     }
   }
 
-  private mergeSyncedMessageModelIds(
-    existingMessages: ChatMessage[],
-    syncedMessages: ChatMessage[],
+  private mergeClientOnlyMessageFields(
+    existingMessage: ChatMessage,
+    syncedMessage: ChatMessage,
     verbose = true,
-  ): ChatMessage[] {
-    const modelIdBySourceMessageId = new Map<string, string>();
-    const messageBySourceMessageId = new Map<string, ChatMessage>();
-    const fallbackAssistantMessages = existingMessages.filter(
-      (message) => message.role === 'assistant' && message.modelId && !message.sourceMessageId,
-    );
-
-    for (const message of existingMessages) {
-      if (message.role !== 'assistant' || !message.modelId || !message.sourceMessageId) {
-        if (message.sourceMessageId) {
-          messageBySourceMessageId.set(message.sourceMessageId, message);
-        }
-        continue;
-      }
-
-      modelIdBySourceMessageId.set(message.sourceMessageId, message.modelId);
-      messageBySourceMessageId.set(message.sourceMessageId, message);
-    }
-
-    const mergedMessages = syncedMessages.map((message) => {
-      const existingMessage = message.sourceMessageId
-        ? messageBySourceMessageId.get(message.sourceMessageId)
-        : undefined;
-      const mergedMessage = existingMessage
-        ? this.mergeClientOnlyMessageFields(existingMessage, message, verbose)
-        : message;
-
-      if (mergedMessage.role !== 'assistant') {
-        return mergedMessage;
-      }
-
-      const persistedModelId = mergedMessage.sourceMessageId
-        ? modelIdBySourceMessageId.get(mergedMessage.sourceMessageId)
-        : undefined;
-
-      return persistedModelId
-        ? { ...mergedMessage, modelId: persistedModelId }
-        : mergedMessage;
-    });
-
-    const unmatchedSyncedIndexes = mergedMessages.reduce<number[]>((indexes, message, index) => {
-      if (message.role === 'assistant' && !message.modelId) {
-        indexes.push(index);
-      }
-
-      return indexes;
-    }, []);
-
-    for (let fallbackIndex = fallbackAssistantMessages.length - 1; fallbackIndex >= 0; fallbackIndex--) {
-      if (unmatchedSyncedIndexes.length === 0) {
-        break;
-      }
-
-      const fallbackMessage = fallbackAssistantMessages[fallbackIndex];
-      let preferredMatchPosition = -1;
-      if (fallbackMessage.content) {
-        for (let indexPosition = unmatchedSyncedIndexes.length - 1; indexPosition >= 0; indexPosition--) {
-          const unmatchedIndex = unmatchedSyncedIndexes[indexPosition];
-          if (mergedMessages[unmatchedIndex].content === fallbackMessage.content) {
-            preferredMatchPosition = indexPosition;
-            break;
-          }
-        }
-      }
-      const targetPosition = preferredMatchPosition >= 0
-        ? preferredMatchPosition
-        : unmatchedSyncedIndexes.length - 1;
-      const targetIndex = unmatchedSyncedIndexes.splice(targetPosition, 1)[0];
-
-      mergedMessages[targetIndex] = {
-        ...mergedMessages[targetIndex],
-        modelId: fallbackMessage.modelId,
-      };
-    }
-
-    return mergedMessages;
-  }
-
-  private mergeClientOnlyMessageFields(existingMessage: ChatMessage, syncedMessage: ChatMessage, verbose = true): ChatMessage {
-    const contextAttachments = this.mergeSyncedMessageContextAttachments(existingMessage, syncedMessage);
-    const content = this.mergeSyncedMessageContent(existingMessage, syncedMessage);
-    const contentBlocks = this.mergeSyncedMessageContentBlocks(existingMessage, syncedMessage);
-    const toolCalls = this.mergeSyncedMessageToolCalls(existingMessage, syncedMessage);
-    const preservedFlags = this.getClientOnlyMessagePreservationFlags(
+  ): ChatMessage {
+    return this.conversationAuthoritativeSyncCoordinator.mergeClientOnlyMessageFields(
       existingMessage,
       syncedMessage,
-      { content, contentBlocks, toolCalls },
+      verbose,
     );
-    this.logClientOnlyMessageFieldPreservation(existingMessage, syncedMessage, preservedFlags, verbose);
-
-    return {
-      ...syncedMessage,
-      content,
-      contentBlocks,
-      toolCalls,
-      contextAttachments,
-      questionResolution: syncedMessage.questionResolution ?? existingMessage.questionResolution,
-      streamState: syncedMessage.streamState ?? existingMessage.streamState,
-      structured: syncedMessage.structured ?? existingMessage.structured,
-      parts: syncedMessage.parts ?? existingMessage.parts,
-    };
-  }
-
-  private mergeSyncedMessageContextAttachments(
-    existingMessage: ChatMessage,
-    syncedMessage: ChatMessage,
-  ): ChatMessage['contextAttachments'] {
-    const existingAttachments = existingMessage.contextAttachments;
-    const syncedAttachments = syncedMessage.contextAttachments;
-    if (!existingAttachments?.length) {
-      return syncedAttachments;
-    }
-
-    if (!syncedAttachments?.length) {
-      return existingAttachments;
-    }
-
-    return syncedAttachments.map((attachment) =>
-      existingAttachments.find((candidate) => this.isMatchingMessageContextAttachment(candidate, attachment))
-      ?? attachment,
-    );
-  }
-
-  private isMatchingMessageContextAttachment(
-    left: NonNullable<ChatMessage['contextAttachments']>[number],
-    right: NonNullable<ChatMessage['contextAttachments']>[number],
-  ): boolean {
-    return left.path === right.path
-      && left.lineRange?.startLine === right.lineRange?.startLine
-      && left.lineRange?.endLine === right.lineRange?.endLine;
-  }
-
-  private mergeSyncedMessageContent(existingMessage: ChatMessage, syncedMessage: ChatMessage): string {
-    if (!syncedMessage.content?.trim() && existingMessage.content?.trim()) {
-      return existingMessage.content;
-    }
-
-    return syncedMessage.content;
-  }
-
-  private mergeSyncedMessageContentBlocks(
-    existingMessage: ChatMessage,
-    syncedMessage: ChatMessage,
-  ): ChatMessage['contentBlocks'] {
-    return this.shouldPreserveExistingAssistantContentBlocks(existingMessage, syncedMessage)
-      ? existingMessage.contentBlocks
-      : syncedMessage.contentBlocks;
-  }
-
-  private mergeSyncedMessageToolCalls(
-    existingMessage: ChatMessage,
-    syncedMessage: ChatMessage,
-  ): ChatMessage['toolCalls'] {
-    if (syncedMessage.toolCalls?.length) {
-      return syncedMessage.toolCalls;
-    }
-
-    if (existingMessage.toolCalls?.length) {
-      return existingMessage.toolCalls;
-    }
-
-    return syncedMessage.toolCalls;
-  }
-
-  private getClientOnlyMessagePreservationFlags(
-    existingMessage: ChatMessage,
-    syncedMessage: ChatMessage,
-    mergedFields: Pick<ChatMessage, 'content' | 'contentBlocks' | 'toolCalls'>,
-  ): Record<string, boolean> {
-    return {
-      preservedExistingContent:
-        mergedFields.content === existingMessage.content && mergedFields.content !== syncedMessage.content,
-      preservedExistingContentBlocks: mergedFields.contentBlocks === existingMessage.contentBlocks,
-      preservedExistingToolCalls:
-        mergedFields.toolCalls === existingMessage.toolCalls && mergedFields.toolCalls !== syncedMessage.toolCalls,
-      preservedExistingStructured: syncedMessage.structured === undefined && existingMessage.structured !== undefined,
-      preservedExistingParts: syncedMessage.parts === undefined && existingMessage.parts !== undefined,
-    };
-  }
-
-  private logClientOnlyMessageFieldPreservation(
-    existingMessage: ChatMessage,
-    syncedMessage: ChatMessage,
-    preservedFlags: Record<string, boolean>,
-    verbose: boolean,
-  ): void {
-    if (!verbose || !Object.values(preservedFlags).some(Boolean)) {
-      return;
-    }
-
-    this.logAssistantFinalizationDebug('merge-client-only-message-fields', {
-      existingMessage: this.summarizeChatMessageForDebug(existingMessage),
-      syncedMessage: this.summarizeChatMessageForDebug(syncedMessage),
-      preservedFlags,
-    });
-  }
-
-  private shouldPreserveExistingAssistantContentBlocks(
-    existingMessage: ChatMessage,
-    syncedMessage: ChatMessage,
-  ): boolean {
-    if (existingMessage.role !== 'assistant') {
-      return false;
-    }
-
-    const existingBlocks = existingMessage.contentBlocks;
-    if (!existingBlocks || existingBlocks.length === 0) {
-      return false;
-    }
-
-    const syncedBlocks = syncedMessage.contentBlocks;
-    if (!syncedBlocks || syncedBlocks.length === 0) {
-      return true;
-    }
-
-    const existingHasRichBlocks = this.hasRichAssistantContentBlocks(existingBlocks);
-    const syncedHasRichBlocks = this.hasRichAssistantContentBlocks(syncedBlocks);
-    if (existingHasRichBlocks && !syncedHasRichBlocks) {
-      return this.getAssistantTextBlockSignature(existingBlocks, existingMessage.content)
-        === this.getAssistantTextBlockSignature(syncedBlocks, syncedMessage.content);
-    }
-
-    if (existingBlocks.length <= syncedBlocks.length) {
-      return false;
-    }
-
-    return this.getAssistantTextBlockSignature(existingBlocks, existingMessage.content)
-      === this.getAssistantTextBlockSignature(syncedBlocks, syncedMessage.content);
-  }
-
-  private hasRichAssistantContentBlocks(blocks: ContentBlock[]): boolean {
-    return blocks.some((block) => block.type !== 'text');
-  }
-
-  private getAssistantTextBlockSignature(blocks: ContentBlock[] | undefined, fallbackContent: string): string {
-    if (!blocks || blocks.length === 0) {
-      return fallbackContent.trim();
-    }
-
-    return blocks
-      .filter((block) => block.type === 'text' && typeof block.text === 'string')
-      .map((block) => block.text?.trim())
-      .filter((text): text is string => Boolean(text))
-      .join('\n\n');
   }
 
   private async syncLatestUserMessageFromServer(
@@ -4609,169 +4361,11 @@ export class OpenCodianView extends ItemView {
     optimisticMessageId: string,
     tabId: TabId | null = this.getActiveTabId(),
   ): Promise<void> {
-    const sessionId = conversation.openCodeSessionId;
-    if (!sessionId) {
-      return;
-    }
-
-    try {
-      const hydration = await this.getLatestServerUserMessageHydration(sessionId);
-      if (!hydration) {
-        return;
-      }
-
-      this.logLatestServerUserMessageHydration(sessionId, optimisticMessageId, hydration);
-      const optimisticIndex = conversation.messages.findIndex(
-        (message) => message.id === optimisticMessageId,
-      );
-      if (optimisticIndex < 0) {
-        return;
-      }
-
-      const optimisticMessage = conversation.messages[optimisticIndex];
-      const hydratedMessage = hydration.hydratedMessage;
-      if (this.hasVisibleTextMismatchForHydratedUserMessage(
-        optimisticMessage,
-        hydratedMessage,
-        {
-          sessionId,
-          optimisticMessageId,
-          rawServerUserText: hydration.rawServerUserText,
-        },
-      )) {
-        return;
-      }
-
-      const mergedHydratedMessage = this.mergeClientOnlyMessageFields(optimisticMessage, hydratedMessage);
-      if (!this.hasHydratedOptimisticUserMessageChanged(optimisticMessage, mergedHydratedMessage)) {
-        this.logSkippedUnchangedHydratedUserMessage(sessionId, optimisticMessageId, hydratedMessage);
-        return;
-      }
-
-      await this.applyHydratedOptimisticUserMessage({
-        conversation,
-        optimisticIndex,
-        optimisticMessage,
-        mergedHydratedMessage,
-        tabId,
-      });
-      logger.debug(`Applied hydrated server user message to optimistic bubble: ${this.stringifyLogPayload({
-        sessionId,
-        optimisticMessageId,
-        sourceMessageId: mergedHydratedMessage.sourceMessageId ?? null,
-        omoDetected: Boolean(mergedHydratedMessage.omo),
-        omoKind: mergedHydratedMessage.omo?.kind ?? null,
-      })}`);
-    } catch (error) {
-      logger.debug('Failed to hydrate optimistic user message from server', error);
-    }
-  }
-
-  private async getLatestServerUserMessageHydration(
-    sessionId: string,
-  ): Promise<LatestServerUserMessageHydration | null> {
-    const serverMessages = await this.plugin.openCodeService.getSessionMessages(sessionId);
-    const latestServerUser = [...serverMessages]
-      .reverse()
-      .find(({ info }) => info.role === 'user');
-    if (!latestServerUser) {
-      return null;
-    }
-
-    const hydratedMessage = this.plugin.openCodeService.hydrateOpenCodeMessage(
-      latestServerUser.info,
-      latestServerUser.parts,
-      getVaultBasePath(this.app) ?? undefined,
+    await this.conversationAuthoritativeSyncCoordinator.syncLatestUserMessageFromServer(
+      conversation,
+      optimisticMessageId,
+      tabId,
     );
-    const rawServerUserText = latestServerUser.parts
-      .filter((part) => typeof part.text === 'string')
-      .map((part) => part.text as string)
-      .join('');
-
-    return { hydratedMessage, rawServerUserText };
-  }
-
-  private logLatestServerUserMessageHydration(
-    sessionId: string,
-    optimisticMessageId: string,
-    hydration: LatestServerUserMessageHydration,
-  ): void {
-    const { hydratedMessage, rawServerUserText } = hydration;
-    logger.debug(`Hydrated latest server user message: ${this.stringifyLogPayload({
-      sessionId,
-      optimisticMessageId,
-      sourceMessageId: hydratedMessage.sourceMessageId ?? null,
-      rawTextPreview: this.getLogPreview(rawServerUserText),
-      visibleTextPreview: this.getLogPreview(this.getVisibleUserMessageText(hydratedMessage)),
-      omoDetected: Boolean(hydratedMessage.omo),
-      omoKind: hydratedMessage.omo?.kind ?? null,
-      omoModeTag: hydratedMessage.omo?.kind === 'user-injection' ? hydratedMessage.omo.modeTag : null,
-    })}`);
-  }
-
-  private hasVisibleTextMismatchForHydratedUserMessage(
-    optimisticMessage: ChatMessage,
-    hydratedMessage: ChatMessage,
-    context: HydratedUserMessageMismatchContext,
-  ): boolean {
-    const optimisticVisibleText = this.getVisibleUserMessageText(optimisticMessage).trim();
-    const hydratedVisibleText = this.getVisibleUserMessageText(hydratedMessage).trim();
-    if (!optimisticVisibleText || !hydratedVisibleText || optimisticVisibleText === hydratedVisibleText) {
-      return false;
-    }
-
-    logger.debug(`Skipped optimistic user message hydration due to visible text mismatch: ${this.stringifyLogPayload({
-      sessionId: context.sessionId,
-      optimisticMessageId: context.optimisticMessageId,
-      optimisticVisibleTextPreview: this.getLogPreview(optimisticVisibleText),
-      hydratedVisibleTextPreview: this.getLogPreview(hydratedVisibleText),
-      rawTextPreview: this.getLogPreview(context.rawServerUserText),
-      omoDetected: Boolean(hydratedMessage.omo),
-      omoKind: hydratedMessage.omo?.kind ?? null,
-    })}`);
-    return true;
-  }
-
-  private hasHydratedOptimisticUserMessageChanged(
-    optimisticMessage: ChatMessage,
-    mergedHydratedMessage: ChatMessage,
-  ): boolean {
-    return optimisticMessage.sourceMessageId !== mergedHydratedMessage.sourceMessageId
-      || optimisticMessage.content !== mergedHydratedMessage.content
-      || JSON.stringify(optimisticMessage.omo ?? null) !== JSON.stringify(mergedHydratedMessage.omo ?? null)
-      || JSON.stringify(optimisticMessage.contextAttachments ?? null)
-        !== JSON.stringify(mergedHydratedMessage.contextAttachments ?? null);
-  }
-
-  private logSkippedUnchangedHydratedUserMessage(
-    sessionId: string,
-    optimisticMessageId: string,
-    hydratedMessage: ChatMessage,
-  ): void {
-    logger.debug(`Skipped optimistic user message hydration because nothing changed: ${this.stringifyLogPayload({
-      sessionId,
-      optimisticMessageId,
-      sourceMessageId: hydratedMessage.sourceMessageId ?? null,
-      omoDetected: Boolean(hydratedMessage.omo),
-      omoKind: hydratedMessage.omo?.kind ?? null,
-    })}`);
-  }
-
-  private async applyHydratedOptimisticUserMessage(
-    update: HydratedOptimisticUserMessageUpdate,
-  ): Promise<void> {
-    const { conversation, optimisticIndex, optimisticMessage, mergedHydratedMessage, tabId } = update;
-    conversation.messages.splice(optimisticIndex, 1, mergedHydratedMessage);
-    this.armBackgroundTaskIndicatorForUserMessage(mergedHydratedMessage, tabId);
-    this.updateHydratedUserMessageRuntimeAnchors(conversation, optimisticMessage, mergedHydratedMessage, tabId);
-    await this.plugin.saveConversation(conversation);
-
-    if (this.currentConversation?.id !== conversation.id || this.getActiveTabId() !== tabId) {
-      return;
-    }
-
-    await this.rerenderSingleUserMessage(optimisticMessage.id, mergedHydratedMessage);
-    await this.renderBackgroundTaskIndicatorIfNeeded(tabId);
   }
 
   private updateHydratedUserMessageRuntimeAnchors(
@@ -5027,232 +4621,12 @@ export class OpenCodianView extends ItemView {
     fingerprint: string;
     revertState: ConversationRevertState | null;
   }> {
-    const verbose = !options?.suppressVerboseLogs;
-    try {
-      const syncContext = { conversation, tabId, reason, verbose };
-      this.logConversationServerSyncBegin(syncContext);
-      const snapshot = await this.getConversationServerSyncSnapshot(conversation);
-      this.logConversationServerSyncFetched(syncContext, snapshot);
-      this.logOmoBackgroundTaskDiagnostics(conversation, conversation.messages, snapshot.convertedServerMessages);
-      const syncMerge = this.getConversationServerSyncMerge(syncContext, snapshot);
-
-      await this.applyConversationServerSyncMessages(conversation, syncMerge.merged, syncMerge.changed);
-
-      this.markBackgroundTaskAuthoritativeSync(tabId, reason);
-
-      await this.refreshContextUsageAfterActiveConversationSync(conversation, tabId);
-      this.logConversationServerSyncComplete(conversation, reason, snapshot, syncMerge);
-      this.logConversationServerSyncFinished(syncContext, snapshot, syncMerge);
-      return {
-        messages: syncMerge.merged,
-        changed: syncMerge.changed,
-        fingerprint: syncMerge.fingerprint,
-        revertState: snapshot.revertState,
-      };
-    } catch (error) {
-      logger.error('Failed to sync conversation messages from server:', error);
-      const fingerprint = this.getConversationSyncFingerprint(conversation.messages);
-      this.logAssistantFinalizationDebug('server-sync-failed', {
-        reason,
-        conversationId: conversation.id,
-        sessionId: conversation.openCodeSessionId,
-        tabId,
-        errorMessage: error instanceof Error ? error.message : String(error),
-      });
-      return {
-        messages: conversation.messages,
-        changed: false,
-        fingerprint,
-        revertState: this.currentConversation?.id === conversation.id
-          ? this.currentConversationRevertState
-          : null,
-      };
-    }
-  }
-
-  private logConversationServerSyncBegin(context: ConversationServerSyncContext): void {
-    if (!context.verbose) {
-      return;
-    }
-
-    const { conversation, tabId, reason } = context;
-    this.logAssistantFinalizationDebug('server-sync-begin', {
-      reason,
-      conversationId: conversation.id,
-      sessionId: conversation.openCodeSessionId,
-      tabId,
-      existingMessageCount: conversation.messages.length,
-      localTailAssistant: this.summarizeChatMessageForDebug(
-        [...conversation.messages].reverse().find((message) => message.role === 'assistant'),
-      ),
-    });
-  }
-
-  private async getConversationServerSyncSnapshot(
-    conversation: Conversation,
-  ): Promise<ConversationServerSyncSnapshot> {
-    const serverMessages = await this.plugin.openCodeService.getSessionMessages(conversation.openCodeSessionId);
-    const revertState = await this.getConversationServerSyncRevertState(conversation, serverMessages);
-    const convertedServerMessages = serverMessages
-      .map(({ info, parts }) =>
-        this.plugin.openCodeService.hydrateOpenCodeMessage(info, parts, getVaultBasePath(this.app) ?? undefined),
-      )
-      .filter((message) => this.shouldRenderConversationMessage(message));
-
-    return { serverMessages, convertedServerMessages, revertState };
-  }
-
-  private async getConversationServerSyncRevertState(
-    conversation: Conversation,
-    serverMessages: OpenCodeSessionMessages,
-  ): Promise<ConversationRevertState | null> {
-    if (serverMessages.length > 0) {
-      return null;
-    }
-
-    return this.plugin.openCodeService.getSessionRevertState(conversation.openCodeSessionId);
-  }
-
-  private logConversationServerSyncFetched(
-    context: ConversationServerSyncContext,
-    snapshot: ConversationServerSyncSnapshot,
-  ): void {
-    if (!context.verbose) {
-      return;
-    }
-
-    const { conversation, tabId, reason } = context;
-    this.logAssistantFinalizationDebug('server-sync-fetched', {
-      reason,
-      conversationId: conversation.id,
-      sessionId: conversation.openCodeSessionId,
-      tabId,
-      serverMessageCount: snapshot.serverMessages.length,
-      convertedMessageCount: snapshot.convertedServerMessages.length,
-      serverTailAssistant: this.summarizeChatMessageForDebug(
-        [...snapshot.convertedServerMessages].reverse().find((message) => message.role === 'assistant'),
-      ),
-    });
-  }
-
-  private getConversationServerSyncMerge(
-    context: ConversationServerSyncContext,
-    snapshot: ConversationServerSyncSnapshot,
-  ): ConversationServerSyncMergeResult {
-    const { conversation, tabId, verbose } = context;
-    const converted = this.mergeSyncedMessageModelIds(
-      conversation.messages,
-      snapshot.convertedServerMessages,
-      verbose,
-    );
-    const preservedClientOnlyMessages = this.getClientOnlyMessagesToPreserveOnSync(
-      conversation.messages,
-      converted,
-    );
-    this.logPreservedInterruptedMessagesDuringSync(conversation, tabId, preservedClientOnlyMessages);
-
-    const merged = [...converted, ...preservedClientOnlyMessages]
-      .sort((left, right) => left.timestamp - right.timestamp);
-    this.logConversationServerSyncMerged(context, merged, preservedClientOnlyMessages);
-
-    const fingerprint = this.getConversationSyncFingerprint(merged);
-    const previousFingerprint = this.getTabRuntimeState(tabId)?.lastConversationSyncFingerprint
-      ?? this.getConversationSyncFingerprint(conversation.messages);
-
-    return {
-      merged,
-      preservedClientOnlyMessages,
-      fingerprint,
-      changed: fingerprint !== previousFingerprint,
-    };
-  }
-
-  private logPreservedInterruptedMessagesDuringSync(
-    conversation: Conversation,
-    tabId: TabId | null,
-    preservedClientOnlyMessages: ChatMessage[],
-  ): void {
-    const preservedInterruptedMessages = preservedClientOnlyMessages.filter(
-      (message) => message.streamState === 'interrupted',
-    );
-    const runtime = this.getTabRuntimeState(tabId);
-    const preservedInterruptedLogFingerprint = preservedInterruptedMessages.length > 0
-      ? this.getInterruptedSyncPreservationLogFingerprint(conversation, preservedInterruptedMessages)
-      : null;
-
-    this.logPreservedInterruptedMessagesIfNeeded(
+    return this.conversationAuthoritativeSyncCoordinator.syncConversationMessagesFromServer(
       conversation,
-      preservedInterruptedMessages,
-      runtime,
-      preservedInterruptedLogFingerprint,
-    );
-    if (runtime) {
-      runtime.lastInterruptedSyncPreservationLogFingerprint = preservedInterruptedLogFingerprint;
-    }
-  }
-
-  private logPreservedInterruptedMessagesIfNeeded(
-    conversation: Conversation,
-    preservedInterruptedMessages: ChatMessage[],
-    runtime: TabRuntimeState | null,
-    preservedInterruptedLogFingerprint: string | null,
-  ): void {
-    if (preservedInterruptedMessages.length === 0) {
-      return;
-    }
-
-    if (runtime?.lastInterruptedSyncPreservationLogFingerprint === preservedInterruptedLogFingerprint) {
-      return;
-    }
-
-    logger.debug(`Preserving local interrupted assistant message(s) during conversation sync: ${this.stringifyLogPayload({
-      conversationId: conversation.id,
-      sessionId: conversation.openCodeSessionId,
-      count: preservedInterruptedMessages.length,
-      messages: preservedInterruptedMessages.map((message) => ({
-        id: message.id,
-        sourceMessageId: message.sourceMessageId ?? null,
-        contentPreview: this.getLogPreview(message.content, 120),
-        contentBlockCount: message.contentBlocks?.length ?? 0,
-      })),
-    })}`);
-  }
-
-  private logConversationServerSyncMerged(
-    context: ConversationServerSyncContext,
-    merged: ChatMessage[],
-    preservedClientOnlyMessages: ChatMessage[],
-  ): void {
-    if (!context.verbose) {
-      return;
-    }
-
-    const { conversation, tabId, reason } = context;
-    this.logAssistantFinalizationDebug('server-sync-merged', {
-      reason,
-      conversationId: conversation.id,
-      sessionId: conversation.openCodeSessionId,
       tabId,
-      mergedMessageCount: merged.length,
-      preservedClientOnlyMessageCount: preservedClientOnlyMessages.length,
-      mergedTailAssistant: this.summarizeChatMessageForDebug(
-        [...merged].reverse().find((message) => message.role === 'assistant'),
-      ),
-    });
-  }
-
-  private async applyConversationServerSyncMessages(
-    conversation: Conversation,
-    merged: ChatMessage[],
-    changed: boolean,
-  ): Promise<void> {
-    conversation.messages = merged;
-    if (!changed) {
-      return;
-    }
-
-    conversation.updatedAt = Date.now();
-    await this.plugin.saveConversation(conversation);
+      reason,
+      options,
+    );
   }
 
   private async refreshContextUsageAfterActiveConversationSync(
@@ -5264,51 +4638,6 @@ export class OpenCodianView extends ItemView {
     }
 
     await this.activeTabContextUsageCoordinator.refreshFromServer();
-  }
-
-  private logConversationServerSyncComplete(
-    conversation: Conversation,
-    reason: string,
-    snapshot: ConversationServerSyncSnapshot,
-    syncMerge: ConversationServerSyncMergeResult,
-  ): void {
-    if (!syncMerge.changed) {
-      return;
-    }
-
-    logger.debug('Conversation sync complete', {
-      conversationId: conversation.id,
-      sessionId: conversation.openCodeSessionId,
-      reason,
-      serverMessageCount: snapshot.serverMessages.length,
-      mergedMessageCount: syncMerge.merged.length,
-      preservedClientOnlyMessageCount: syncMerge.preservedClientOnlyMessages.length,
-      revertApplied: Boolean(snapshot.revertState),
-      revertMessageId: snapshot.revertState?.messageID ?? null,
-      changed: syncMerge.changed,
-    });
-  }
-
-  private logConversationServerSyncFinished(
-    context: ConversationServerSyncContext,
-    snapshot: ConversationServerSyncSnapshot,
-    syncMerge: ConversationServerSyncMergeResult,
-  ): void {
-    if (!context.verbose && !syncMerge.changed) {
-      return;
-    }
-
-    const { conversation, tabId, reason } = context;
-    this.logAssistantFinalizationDebug('server-sync-finished', {
-      reason,
-      conversationId: conversation.id,
-      sessionId: conversation.openCodeSessionId,
-      tabId,
-      changed: syncMerge.changed,
-      fingerprint: syncMerge.fingerprint,
-      revertApplied: Boolean(snapshot.revertState),
-      revertMessageId: snapshot.revertState?.messageID ?? null,
-    });
   }
 
   private async rerenderConversationMessages(conversation: Conversation): Promise<void> {
