@@ -1,8 +1,8 @@
 # Maintainability Master Plan
 
-> **状态**: [REVIEW_REQUIRED]
+> **状态**: [CONFIRMED_NEXT_BATCH]
 > **作用**: 这是 maintainability 无人值守的战略文档。后续每一轮开始前，必须先读本文件，再读最近的 `docs/status/maintainability-phase-XXX.md`。
-> **自动推进状态**: R28-R32 受控队列已完成；autopilot 必须暂停，只有在人工确认并写入新 queue 后才能继续。
+> **自动推进状态**: 下一批先执行 L1-L5 ESLint cleanup 队列；autopilot 只能按 `docs/status/maintainability-round-roadmap.md` 的 `[NEXT]` 顺序推进，L5 完成后必须再次暂停并等待人工确认。
 
 ## 1. 总体目标
 
@@ -19,7 +19,7 @@ maintainability 的目标是：
 
 ## 2. 当前阶段判断
 
-**当前判断：中后期，R28-R32 已完成并回到人工确认态。**
+**当前判断：中后期，R28-R32 已完成；下一批先执行 L1-L5 的 ESLint cleanup 队列，再决定是否恢复新的 maintainability 重构。**
 
 原因：
 
@@ -29,7 +29,7 @@ maintainability 的目标是：
 - `src/core/opencode/OpenCodeService.ts` 当前实测 **2397 行**，较 R18 checkpoint 的 **4733 行**减少 **2336 行**（约 **49.4%**），较 R27 checkpoint 的 **2858 行**再减少 **461 行**（约 **16.1%**）；R28-R31 已把 session lifecycle、session control/message orchestration、question/permission negotiation 与 broad query gateway 四块 ownership 迁出，但 service 仍集中 SDK-first / legacy HTTP fallback transport、assistant response + finish/fetch orchestration、server lifecycle / settings update / scoped-directory wiring、provider/model/config lookup 与 tool catalog/event bridge 等跨域兼容 seam
 - `src/core/opencode/OpenCodeSdkFacade.ts` / `src/core/opencode/ServerManager.ts` 当前分别为 **257** / **1171** 行；它们继续作为高风险相邻 owner 保持稳定，没有在本批被拆成新的薄 facade
 
-结论：R28-R31 继续证明“兼容优先的较厚 owner 下沉”能够显著削弱 `OpenCodeService`，但 R32 checkpoint 之后，剩余热点更多是跨域兼容 seam，而不是适合无人值守继续拆分的清晰厚 owner。后续若仍要继续 maintainability，必须先人工确认新 queue；未经确认不得自动扩展 `R33+`。
+结论：R28-R31 继续证明“兼容优先的较厚 owner 下沉”能够显著削弱 `OpenCodeService`，但在恢复新的 maintainability 重构前，当前仓库首先被 ESLint debt 阻塞。下一批必须先执行 L1-L5，把 `npm run lint` 从红灯拉回可控状态；L5 完成前，不得自动恢复新的 `R33+` maintainability queue。
 
 ## 2.1 已完成批次（R13-R18）
 
@@ -51,10 +51,22 @@ R28-R32 已在保持 `OpenCodeService` 对外总门面不散开的前提下完�
 
 本批仍然**没有**处理 `ServerManager`、`OpenCodeSdkFacade`，也没有把调用方改成直接依赖一堆新 service。`OpenCodeService` 继续作为对外总门面；新增 owner 只承接内部成块 lifecycle，并通过 host seam 接入。R32 完成后，当前 queue 已结束，autopilot 必须回到人工确认态。
 
+## 2.4 下一批确认方向（L1-L5）
+
+L1-L5 的目标不是继续拆 owner，而是先把当前仓库的 ESLint debt 拉回到可维护状态，避免后续架构轮次继续叠加 lint 噪音：
+
+1. **L1 autofix sweep**：先运行 lint autofix，统一 import/export sort、`prefer-const` 等自动可修项，并记录剩余 errors/warnings 基线。
+2. **L2 non-autofix error cleanup**：清掉所有非自动修的 ESLint errors，优先 `src/core/opencode/**`、最近 touched 的 chat/services/tests，以及当前会阻塞新重构提交的文件。
+3. **L3 lint green checkpoint**：确认 `npm run lint` 至少 errors 为 0；如仍失败，只允许做解除 lint 失败所需的最小修改。
+4. **L4 high-value warning trim**：只处理高价值 warnings，优先当前主热点的 complexity / max-params / no-empty-object-type / no-unused-vars，不为清空低收益 warning 而制造微碎片。
+5. **L5 checkpoint**：复盘 lint cleanup 的实际收益，决定下一批是继续 warning cleanup，还是恢复新的 maintainability owner queue。
+
+本批不允许借 lint cleanup 之名顺手启动新的大规模重构；只允许做让 lint 通过或明显降噪所需的最小结构调整。
+
 
 ## 3. 高优先级方向
 
-当前没有可自动执行的 `[NEXT]`。如果人工确认继续 maintainability，必须先写入新的 queue；下面保留各 lane 的长期定位，供下一批设计时参考：
+L1-L5 中，后续无人值守必须优先执行 roadmap 的 `[NEXT]`，先完成 lint cleanup。下面保留各 lane 的长期定位，供 L5 checkpoint 之后设计下一批 maintainability queue 时参考：
 
 ### P1. `OpenCodianView` 中剩余的核心 ownership 迁移
 
@@ -133,8 +145,8 @@ R13-R18 已完成这组 UI/runtime shell 的主要收束。本批 R28-R32 不继
 
 R32 完成之后：
 
-- 当前受控队列已经执行完毕，`docs/status/maintainability-round-roadmap.md` 当前没有可自动执行的 `[NEXT]`
-- Autopilot 必须暂停；只有在人工确认是否继续、并写入新的 queue 后才能恢复
-- 本批已完成 `OpenCodeService` 的 session lifecycle、session control、question/permission hub、conditional query gateway 与 checkpoint；未经人工确认不得自动扩展 `R33+`
-- 如继续 maintainability，优先人工评估 `OpenCodeService` 剩余的 transport/finalize/config/tool-catalog seam 是否还能形成明显厚 owner
+- 下一批先执行 `docs/status/maintainability-round-roadmap.md` 已确认的 `L1 - ESLint autofix sweep`
+- Autopilot 只允许按 L1→L5 顺序推进 lint cleanup；L5 完成后必须再次暂停
+- 本批不允许借 lint cleanup 顺手启动新的 `R33+` maintainability 重构
+- 如 L5 之后继续 maintainability，再人工评估 `OpenCodeService` 剩余的 transport/finalize/config/tool-catalog seam 或更大的 `OpenCodianView` owner 是否值得开新 queue
 - `ConversationRenderService` trailing-assistant helper 链仍保持降优先级；除非正确性、测试或构建阻塞，不要把它作为新 queue 的默认起点

@@ -1,17 +1,21 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [REVIEW_REQUIRED] R28-R32 已完成；当前没有可自动执行的 `[NEXT]`，必须等待人工确认。
+> **当前状态**: [CONFIRMED_NEXT_BATCH] L1-L5 已确认；当前 `[NEXT]` 是 L1 ESLint autofix sweep。
 
 ## 当前优先级
 
-- **当前没有自动下一轮**：R32 gateway checkpoint 已完成，autopilot 必须暂停
-- **如继续 maintainability**：先人工确认是否围绕 `OpenCodeService` 剩余 transport/config/finalize seam 设计新 queue
+- **L1**: ESLint autofix sweep（先收 import/export sort、`prefer-const` 等自动可修项）
+- **L2**: non-autofix error cleanup（清掉 repo 当前 lint errors）
+- **L3**: lint green checkpoint（确认 `npm run lint` 至少 errors=0）
+- **L4**: high-value warning trim（只收高价值 warning，不制造微碎片）
+- **L5**: lint checkpoint；跑完必须暂停
 
 ## 当前热点首查入口
 
-- 恢复 autopilot 前，首查 roadmap / master plan / lane map、`docs/status/maintainability-phase-347.md` 与 `src/core/opencode/OpenCodeService.ts` 指标
-- `OpenCodianView` / settings / trailing-assistant 链本批都只保留 regression watchpoints，不再开新切口
+- L1/L2 首查 `npm run lint` 输出里的 import sort / unused vars / prefer-const / no-empty-object-type / no-useless-escape errors
+- 重点先看 `src/core/opencode/**`、`src/features/chat/services/**`、`tests/unit/features/chat/**`
+- `OpenCodianView` / settings / trailing-assistant 链本批都只保留 regression watchpoints，不借 lint cleanup 新开 maintainability 切口
 - P2 regression-only 首查顺序固定为：
   1. `tests/unit/features/chat/QuestionDockCoordinator.test.ts`
   2. `tests/unit/features/chat/QuestionTodoStatusRefreshCoordinator.test.ts`
@@ -82,3 +86,11 @@
 - 新 owner 默认要覆盖完整 lifecycle；如果低于约 100 行且少于 3 个公开 API，必须在 phase 文档里说明为何不是微碎片，否则应合并回 `OpenCodeService`。
 - `R31` 是条件执行项：只有当 query/admin APIs 能形成明显厚 owner 时才允许提交代码重构；否则必须记录跳过原因后直接推进 `R32`。
 - R32 完成后必须暂停；是否继续由下一次人工确认决定。
+
+
+## L1-L5 执行边界
+
+- 每轮必须先处理第一个 `[NEXT]`，不得自由切回新的 maintainability 重构。
+- 本批目标是先让 `npm run lint` 通过，再决定后续架构 queue；不是借 lint 名义顺手拆新 owner。
+- 允许最小结构调整来消除 lint error，但不允许为清 warning 新增薄 facade / adapter。
+- L5 完成后必须暂停；是否继续由下一次人工确认决定。

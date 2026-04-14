@@ -1,8 +1,8 @@
 # Maintainability Round Roadmap
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
-> **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的 `[NEXT]`”。R32 完成后必须暂停复盘，不得自动扩展新队列。
-> **当前状态**: [REVIEW_REQUIRED] R28-R32 已完成；当前没有可自动执行的 `[NEXT]`，必须等待人工确认后再写入新队列。
+> **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的 `[NEXT]`”。L5 完成后必须暂停复盘，不得自动扩展新队列。
+> **当前状态**: [CONFIRMED_NEXT_BATCH] L1-L5 已确认；当前可自动执行的 `[NEXT]` 是 `L1 - ESLint autofix sweep`。
 
 ## 控制规则
 
@@ -16,7 +16,7 @@
 
 ## 总体路线
 
-当前受控批次的目标仍然是提升整体可维护性、降低单一文件复杂度，并避免把“大单体”拆成“微碎片”。R1-R27 已完成 question/todo、composer/message shell、settings/core-config 与 `OpenCodeService` 第一批 runtime/builder/mapper ownership 收束；本次人工确认的 R28-R32 已沿 `OpenCodeService` lane 完成推进，顺序为 session lifecycle → session control/message orchestration → question/permission hub → conditional query gateway → checkpoint。
+当前受控批次的目标先切换到 ESLint cleanup：在继续新的 maintainability owner 拆分之前，先让仓库从当前 lint 红灯状态恢复到可控状态，避免后续每轮都叠加 import sort、unused vars、prefer-const 与高噪音 rule debt。R1-R32 已完成前两批 maintainability 收束；本次人工确认的 L1-L5 将按 autofix sweep → non-autofix error cleanup → lint green checkpoint → high-value warning trim → checkpoint 的顺序推进。
 
 > **P2 状态（R6 完成后）**: R1-R6 已完成 question dock、todo refresh/status、background completion notice、post-sync handoff 与 session signal orchestration 的收束。剩余风险以回归为主：background tab 无 session 时的 dock 清理、post-sync todo/status gate、completion notice queue/fingerprint 去重，以及 live signal writeback 顺序。
 >
@@ -713,3 +713,95 @@
 - R28-R31 已形成四个较厚 owner：`OpenCodeSessionLifecycleCoordinator`（**278** 行）、`OpenCodeSessionControlOrchestrator`（**398** 行）、`OpenCodeQuestionPermissionHub`（**236** 行）、`OpenCodeQueryGateway`（**200** 行）；`OpenCodeService` 保持对外 façade，不需要把调用方改成直接依赖这些内部 owner。
 - 当前剩余高风险集中点主要是：SDK-first / legacy fallback transport、assistant response 与 finish/fetch orchestration、server lifecycle / `updateSettings()` / scoped-directory wiring、provider/model/config lookup，以及 tool catalog/listing 与 open-code event bridge hydration。
 - 结论：这些剩余职责更接近跨域兼容 seam，而不是适合继续无人值守拆分的清晰厚 owner。当前 queue 到此结束，不自动新增 `[QUEUED]` 或 `[NEXT]` 项，也不允许 autopilot 自动扩展 `R33+`；若后续继续 maintainability，必须先人工确认并写入新的受控 queue。
+
+
+## Confirmed Next Batch: L1-L5 ESLint cleanup
+
+本批由人工确认：在继续新的 maintainability 重构前，先清当前仓库的 ESLint debt。目标不是借机大拆文件，而是优先把 `npm run lint` 的 errors 清到 0，并控制 warnings 的噪音水平。
+
+### [NEXT] L1 - ESLint autofix sweep
+
+- **Lane**: Lint cleanup
+- **目标**: 先运行 `eslint --fix` 或等价 autofix，把 import/export sort、`prefer-const` 等自动可修项统一收掉，并记录剩余 lint 基线。
+- **优先入口**:
+  - `src/core/opencode/**`
+  - `src/features/chat/**`
+  - `tests/unit/features/chat/**`
+- **允许边界**:
+  - 允许纯 autofix 级别改动。
+  - 允许同步修复少量与 autofix 同源的明显语法级 lint error。
+- **禁止项**:
+  - 不借机发起新的 owner 拆分。
+  - 不为清 warning 而新增薄 helper。
+- **验收**:
+  - phase 文档明确记录 autofix 后剩余的 errors/warnings 数量与主要热点。
+  - 运行 `npm run lint`、`npm test`、`npm run build`。
+
+### [QUEUED] L2 - Non-autofix error cleanup
+
+- **Lane**: Lint cleanup
+- **目标**: 清掉所有非自动修的 ESLint errors，优先最近 touched 的 `src/core/opencode/**`、chat services 与相关 tests。
+- **优先入口**:
+  - `src/core/opencode/OpenCodeService.ts`
+  - `src/features/chat/services/**`
+  - `tests/unit/features/chat/**`
+- **允许边界**:
+  - 允许为解除 lint error 做最小结构调整。
+  - 允许删除 unused imports/vars、修空接口、去掉无意义 escape。
+- **禁止项**:
+  - 不因为 `max-lines` / `complexity` warning 立刻开大规模重构。
+  - 不把 lint 清理扩展成新的架构赛道。
+- **验收**:
+  - `npm run lint` 不再包含 error。
+  - 运行 `npm test`、`npm run build`。
+
+### [QUEUED] L3 - Lint green checkpoint
+
+- **Lane**: Checkpoint
+- **目标**: 确认 `npm run lint` 已至少 errors 为 0，并记录剩余 warning 的真实分布。
+- **优先入口**:
+  - `docs/status/maintainability-round-roadmap.md`
+  - `docs/status/maintainability-lane-map.md`
+  - `automation/runtime/history.jsonl`
+- **允许边界**:
+  - 只做使 lint 通过所需的最小补漏。
+- **禁止项**:
+  - 不在本轮启动新的 owner 拆分。
+- **验收**:
+  - phase 文档给出 lint 绿灯证据和 warning 热点清单。
+  - 运行 `npm run lint`、`npm test`、`npm run build`。
+
+### [QUEUED] L4 - High-value warning trim
+
+- **Lane**: Lint cleanup / maintainability prep
+- **目标**: 只处理高价值 warnings，优先明显干扰可维护性的 complexity / no-empty-object-type / no-unused-vars / max-params；避免为清 warning 制造微碎片。
+- **优先入口**:
+  - `src/core/opencode/OpenCodeService.ts`
+  - `src/features/chat/OpenCodianView.ts`
+  - `src/features/settings/OpenCodianSettings.ts`
+  - 当前 warnings 最集中的直接相关 tests/files
+- **允许边界**:
+  - 允许较厚 owner 内部的局部收束。
+  - 允许对显然过长的 helper 做小范围整理。
+- **禁止项**:
+  - 不追求 warning 全清。
+  - 不回到 trailing-assistant 微碎片链路。
+- **验收**:
+  - 至少收掉一批高噪音 warning，并在 phase 文档中说明为何这些 warning 值得优先处理。
+  - 运行 `npm run lint`、`npm test`、`npm run build`。
+
+### [QUEUED] L5 - Lint checkpoint
+
+- **Lane**: Checkpoint
+- **目标**: 复盘 L1-L4 的 lint cleanup 效果，决定下一批是继续 warning cleanup，还是恢复新的 maintainability owner queue。
+- **优先入口**:
+  - `docs/status/maintainability-master-plan.md`
+  - `docs/status/maintainability-round-roadmap.md`
+  - `docs/status/maintainability-lane-map.md`
+- **允许边界**:
+  - 只做文档、指标和下一批建议。
+- **禁止项**:
+  - 不自动扩展 `L6+` 或 `R33+`。
+- **验收**:
+  - phase 文档明确建议下一批该继续 lint 还是恢复 maintainability 重构。
+  - 运行 `npm run lint`、`npm test`、`npm run build`。
