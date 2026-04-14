@@ -2,11 +2,11 @@
 
 > **状态**: [READY]
 > **作用**: 这是 maintainability 无人值守的战略文档。每轮开始前，先读本文件，再读 `docs/status/maintainability-round-roadmap.md` 与最近的 `docs/status/maintainability-phase-XXX.md`。
-> **自动推进状态**: `R56` 已完成 ServerManager launch diagnostics seam；当前首个 `[NEXT]` 为 `R57 - ServerManager stop/restart lifecycle seam`，恢复运行时必须继续按 roadmap 队列顺序执行，不允许 freestyle。
+> **自动推进状态**: `R57` 已完成 ServerManager stop/restart lifecycle seam；当前首个 `[NEXT]` 为 `R58 - ModelConfigService inherited config resolution seam`，恢复运行时必须继续按 roadmap 队列顺序执行，不允许 freestyle。
 
 ## 1. 当前判断
 
-**当前分支已完成 `R56`，把 `ServerManager` 的 local launch/runtime diagnostics seam 收口到专属 helper。** 当前 lint 基线保持在 `0 errors / 92 warnings`，settings 残余 seam 已收尾，后续应继续按 queue 推进 `ServerManager` stop/restart lifecycle、`ModelConfigService`、`OpenCodeMessageNormalizationMapper` 与 `ProviderIconService` 热点，再推进显式 warning reduction。
+**当前分支已完成 `R57`，把 `ServerManager` 的 stop/restart shutdown lifecycle 收口到统一 seam。** 当前 lint 基线保持在 `0 errors / 92 warnings`，settings 残余 seam 与 `ServerManager` shutdown 热点已收尾，后续应继续按 queue 推进 `ModelConfigService`、`OpenCodeMessageNormalizationMapper` 与 `ProviderIconService` 热点，再推进显式 warning reduction。
 
 这批夜间队列的主线是：
 
@@ -19,15 +19,15 @@
 
 - **lint**: `0 errors / 92 warnings`
 - **验证**:
-  - 最近一次已确认的全量测试为 `R56`：`npm test` 通过，`262 passed, 262 total` suites；`1112 passed, 1112 total` tests
-  - 最近一次已确认的构建通过为 `R56`：`npm run build`，`BUILD_ID` `autopilot-maintainability.202604150432`
-  - 最近一次 Test Vault 部署仍来自 `R54`；`R56` 仅触及 `src/core/opencode/**` 与直接相关测试/状态文档，不属于强制部署范围
+  - 最近一次已确认的全量测试为 `R57`：`npm test` 通过，`262 passed, 262 total` suites；`1116 passed, 1116 total` tests
+  - 最近一次已确认的构建通过为 `R57`：`npm run build`，`BUILD_ID` `autopilot-maintainability.202604150441`
+  - 最近一次 Test Vault 部署仍来自 `R54`；`R57` 仅触及 `src/core/opencode/**` 与直接相关测试/状态文档，不属于强制部署范围
 - **本批目标**:
   - 保持 `0 errors`
   - 在保持受控 queue 的前提下继续做高确定性 maintainability seam
   - 把 warning baseline 从当前 `92` 继续往低八十区间推进；若未达成，`R67` checkpoint 必须明确说明剩余高成本阻塞
 - **下一批高确定性切口**:
-  - `R57-R63`: `ServerManager` / `ModelConfigService` / `OpenCodeMessageNormalizationMapper` / `ProviderIconService` 热点
+  - `R58-R63`: `ModelConfigService` / `OpenCodeMessageNormalizationMapper` / `ProviderIconService` 热点
   - `R64-R66`: warning cleanup batches
   - `R67`: checkpoint
 - **历史摘要**: 见 `docs/status/maintainability-completed-batches.md`
@@ -52,6 +52,7 @@
 - **R54**: `SettingsDebugSection` 接管 `OpenCodianSettings.addDebugSettings()` 的 debug logging、inline serialized args、log path picker、diagnostic copy/generate action 与 console help lifecycle，并补齐直接相关测试与模块文档
 - **R55**: `ServerManager` 现在通过 occupied-local-endpoint resolution seam 统一处理 managed adoption、signature drift restart、orphan recycle 与 conflict diagnostics 决策，并补齐直接相关测试
 - **R56**: `ServerManager` 现在通过 launch runtime seam 统一处理 local launch、stdout/stderr tail、launch snapshot、health wait 与 launch failure reporting，并补齐直接相关测试
+- **R57**: `ServerManager` 现在通过统一 shutdown lifecycle seam 处理 spawned/adopted stop、restart-managed port release、dispose sync teardown 与 managed state cleanup，并补齐直接相关测试
 
 ## 4. 本批结论
 

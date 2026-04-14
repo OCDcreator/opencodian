@@ -129,6 +129,40 @@ describe('ServerManager', () => {
     it('should handle stop when not running', async () => {
       await expect(manager.stop()).resolves.not.toThrow();
     });
+
+    it('routes child-process teardown through the shutdown lifecycle seam', async () => {
+      const managedProcess = { pid: 2468 } as unknown;
+      (manager as unknown as { process: unknown; status: string }).process = managedProcess;
+      (manager as unknown as { status: string }).status = 'running';
+      const terminateManagedProcess = jest.spyOn(manager as never, 'terminateManagedProcess').mockResolvedValue(undefined);
+
+      await expect(manager.stop()).resolves.toBeUndefined();
+
+      expect(terminateManagedProcess).toHaveBeenCalledWith(managedProcess);
+      expect(manager.getStatus()).toBe('stopped');
+    });
+
+    it('terminates an adopted pid and clears managed state during stop', async () => {
+      manager = new ServerManager(
+        defaultConfig,
+        {},
+        {
+          initialManagedServerState: {
+            pid: 1357,
+            host: '127.0.0.1',
+            port: 4196,
+          },
+        },
+      );
+      (manager as unknown as { status: string }).status = 'running';
+      const terminateManagedPid = jest.spyOn(manager as never, 'terminateManagedPid').mockResolvedValue(undefined);
+
+      await expect(manager.stop()).resolves.toBeUndefined();
+
+      expect(terminateManagedPid).toHaveBeenCalledWith(1357);
+      expect(manager.getManagedServerStateSnapshot()).toBeNull();
+      expect(manager.getStatus()).toBe('stopped');
+    });
   });
 
   describe('restart', () => {
@@ -476,6 +510,51 @@ describe('ServerManager', () => {
 
       expect(terminateManagedPidSync).toHaveBeenCalledWith(2468);
       expect(manager.getStatus()).toBe('stopped');
+    });
+
+    it('synchronously clears an adopted pid when no child process is attached', () => {
+      manager = new ServerManager(
+        defaultConfig,
+        {},
+        {
+          initialManagedServerState: {
+            pid: 1357,
+            host: '127.0.0.1',
+            port: 4196,
+          },
+        },
+      );
+      const terminateManagedPidSync = jest.spyOn(manager as never, 'terminateManagedPidSync').mockImplementation(() => {});
+
+      manager.dispose();
+
+      expect(terminateManagedPidSync).toHaveBeenCalledWith(1357);
+      expect(manager.getManagedServerStateSnapshot()).toBeNull();
+      expect(manager.getStatus()).toBe('stopped');
+    });
+  });
+
+  describe('shutdown lifecycle seam', () => {
+    it('centralizes stale managed restart teardown and port-release waiting', async () => {
+      manager = new ServerManager(
+        defaultConfig,
+        {},
+        {
+          initialManagedServerState: {
+            pid: 1234,
+            host: '127.0.0.1',
+            port: 4196,
+          },
+        },
+      );
+      const terminateManagedPid = jest.spyOn(manager as never, 'terminateManagedPid').mockResolvedValue(undefined);
+      const waitForPortAvailability = jest.spyOn(manager as never, 'waitForPortAvailability').mockResolvedValue(true);
+
+      await expect((manager as never).restartManagedServer()).resolves.toBeUndefined();
+
+      expect(terminateManagedPid).toHaveBeenCalledWith(1234);
+      expect(waitForPortAvailability).toHaveBeenCalledWith(5000);
+      expect(manager.getManagedServerStateSnapshot()).toBeNull();
     });
   });
 

@@ -73,6 +73,14 @@ interface ExistingServerProcessInfo {
   looksLikeOpenCodeServe: boolean;
 }
 
+interface ManagedServerShutdownPlan {
+  process: ChildProcess | null;
+  pid: number | null;
+  clearManagedState: boolean;
+  cleanup: boolean;
+  waitForPortReleaseMessage?: string;
+}
+
 type ManagedServerAdoptionOutcome = 'adopted' | 'restart' | 'skip';
 
 type OccupiedLocalEndpointResolution =
@@ -231,7 +239,8 @@ export class ServerManager {
 
   /** Stop the OpenCode server */
   async stop(): Promise<void> {
-    if (!this.process && !this.managedServerState) {
+    const shutdownPlan = this.createCurrentManagedShutdownPlan();
+    if (!shutdownPlan.process && !shutdownPlan.pid) {
       this.clearLaunchState();
       this.setDiagnostics({ reason: 'none' });
       this.setStatus('stopped');
@@ -245,30 +254,75 @@ export class ServerManager {
     this.setStatus('stopped');
     this.setDiagnostics({ reason: 'none' });
 
-    const managedProcess = this.process;
-    const managedPid = this.managedServerState?.pid;
+    await this.runManagedShutdownLifecycle(shutdownPlan);
+  }
 
-    if (!managedProcess && managedPid) {
-      await this.terminateManagedPid(managedPid);
-      this.clearManagedServerState();
-      this.cleanup();
-      return;
+  dispose(): void {
+    this.setDiagnostics({ reason: 'none' });
+    this.runManagedShutdownLifecycleSync(this.createCurrentManagedShutdownPlan());
+  }
+
+  /** Restart the server */
+  async restart(): Promise<void> {
+    this.setStatus('restarting');
+    await this.stop();
+    await this.start();
+  }
+
+  private createCurrentManagedShutdownPlan(): ManagedServerShutdownPlan {
+    return {
+      process: this.process,
+      pid: this.managedServerState?.pid ?? this.process?.pid ?? null,
+      clearManagedState: true,
+      cleanup: true,
+    };
+  }
+
+  private async runManagedShutdownLifecycle(plan: ManagedServerShutdownPlan): Promise<void> {
+    if (plan.process) {
+      await this.terminateManagedProcess(plan.process);
+    } else if (plan.pid) {
+      await this.terminateManagedPid(plan.pid);
     }
 
-    if (!managedProcess) {
+    if (plan.clearManagedState) {
       this.clearManagedServerState();
-      this.cleanup();
-      return;
     }
 
-    return new Promise((resolve) => {
+    if (plan.waitForPortReleaseMessage) {
+      const released = await this.waitForPortAvailability(PORT_RELEASE_TIMEOUT_MS);
+      if (!released) {
+        throw new Error(plan.waitForPortReleaseMessage);
+      }
+    }
+
+    if (plan.cleanup) {
+      this.cleanup();
+    }
+  }
+
+  private runManagedShutdownLifecycleSync(plan: ManagedServerShutdownPlan): void {
+    const pid = plan.process?.pid ?? plan.pid;
+    if (pid) {
+      this.terminateManagedPidSync(pid);
+    }
+
+    if (plan.clearManagedState) {
+      this.clearManagedServerState();
+    }
+
+    if (plan.cleanup) {
+      this.cleanup();
+    }
+  }
+
+  private async terminateManagedProcess(managedProcess: ChildProcess): Promise<void> {
+    await new Promise<void>((resolve) => {
       let resolved = false;
 
       const doResolve = () => {
         if (!resolved) {
           resolved = true;
-          this.clearManagedServerState();
-          this.cleanup();
           resolve();
         }
       };
@@ -317,29 +371,6 @@ export class ServerManager {
         doResolve();
       }
     });
-  }
-
-  dispose(): void {
-    this.setDiagnostics({ reason: 'none' });
-
-    const managedProcess = this.process;
-    const managedPid = this.managedServerState?.pid;
-
-    if (managedProcess?.pid) {
-      this.terminateManagedPidSync(managedProcess.pid);
-    } else if (managedPid) {
-      this.terminateManagedPidSync(managedPid);
-    }
-
-    this.clearManagedServerState();
-    this.cleanup();
-  }
-
-  /** Restart the server */
-  async restart(): Promise<void> {
-    this.setStatus('restarting');
-    await this.stop();
-    await this.start();
   }
 
   /** Check if server is healthy using Obsidian's requestUrl (bypasses CORS) */
@@ -908,11 +939,13 @@ export class ServerManager {
       );
     }
 
-    await this.terminateManagedPid(existingServer.pid);
-    const released = await this.waitForPortAvailability(PORT_RELEASE_TIMEOUT_MS);
-    if (!released) {
-      throw new Error(`Port ${this.config.local.port} stayed busy after stopping the orphaned OpenCode sidecar`);
-    }
+    await this.runManagedShutdownLifecycle({
+      process: null,
+      pid: existingServer.pid,
+      clearManagedState: false,
+      cleanup: false,
+      waitForPortReleaseMessage: `Port ${this.config.local.port} stayed busy after stopping the orphaned OpenCode sidecar`,
+    });
   }
 
   private buildConflictMessage(existingServer: ExistingServerProcessInfo, healthy: boolean): string {
@@ -935,13 +968,13 @@ export class ServerManager {
       return;
     }
 
-    await this.terminateManagedPid(state.pid);
-    this.clearManagedServerState();
-
-    const released = await this.waitForPortAvailability(PORT_RELEASE_TIMEOUT_MS);
-    if (!released) {
-      throw new Error(`Port ${this.config.local.port} stayed busy after stopping the stale OpenCode server`);
-    }
+    await this.runManagedShutdownLifecycle({
+      process: null,
+      pid: state.pid,
+      clearManagedState: true,
+      cleanup: false,
+      waitForPortReleaseMessage: `Port ${this.config.local.port} stayed busy after stopping the stale OpenCode server`,
+    });
   }
 
   private async waitForPortAvailability(timeout: number): Promise<boolean> {
