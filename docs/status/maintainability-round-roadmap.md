@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的 `[NEXT]`”。
-> **当前状态**: [CONFIRMED_NEXT_BATCH] `R33-R37` maintainability queue 已确认；当前可自动执行的 `[NEXT]` 是 `R33 - Settings style/background owner seam`。`R37` 完成后必须再次暂停并等待人工确认。
+> **当前状态**: [CONFIRMED_NEXT_BATCH] `R33-R37` maintainability queue 已确认；`R33-R34` 已完成，当前可自动执行的 `[NEXT]` 是 `R35 - OpenCodianView constructor runtime wiring`。`R37` 完成后必须再次暂停并等待人工确认。
 
 ## 控制规则
 
@@ -18,7 +18,7 @@
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
 - 当前 lint 基线：`0 errors / 91 warnings`
 - checkpoint 建议：`W12-W14` 的逐条 warning cleanup 收益已确认；下一批人工确认切回较厚 maintainability owner 收束
-- 当前可自动执行的 `[NEXT]`：`R33 - Settings style/background owner seam`
+- 当前可自动执行的 `[NEXT]`：`R35 - OpenCodianView constructor runtime wiring`
 - 本批按 `R33 -> R34 -> R35 -> R36 -> R37` 顺序推进，不允许跳过当前 `[NEXT]`
 - `R37` 完成后若无人追加 queue item，则必须重新写回“当前没有可自动执行的 `[NEXT]`”
 
@@ -218,7 +218,7 @@
   - `OpenCodianSettings` 对 style/background section 的直接 DOM/state 组装明显减少，或一个完整 subsection lifecycle 迁入较厚 owner
   - 相关 focused tests、全量 `npm test`、`npm run build` 通过
 
-### [NEXT] R34 - Settings model catalog presenter render lifecycle
+### [DONE] R34 - Settings model catalog presenter render lifecycle
 
 - **Lane**: Maintainability / settings model catalog owner
 - **目标**: 加厚或重组 `src/features/settings/SettingsModelCatalogPresenter.ts` 内的 render lifecycle，把 provider/model accordion、search/filter、bulk-toggle/probe presentation 中仍缠在 `render` 的成块逻辑收束到同 owner 的明确生命周期 helper 或较厚子组件边界。
@@ -237,7 +237,7 @@
   - `SettingsModelCatalogPresenter.render` 的直接复杂度/长度明显下降，且调用方 API 保持稳定
   - focused tests、全量 `npm test`、`npm run build` 通过
 
-### [QUEUED] R35 - OpenCodianView constructor runtime wiring
+### [NEXT] R35 - OpenCodianView constructor runtime wiring
 
 - **Lane**: Maintainability / chat runtime wiring
 - **目标**: 只处理 `src/features/chat/OpenCodianView.ts` constructor 与 service/runtime wiring 的 ownership 集中问题，把初始化步骤或相关 runtime host assembly 收束到现有较厚 owner 或同文件私有 lifecycle helper，减少 constructor 对 service fan-out 的直接持有。
@@ -296,4 +296,4 @@
 
 ## 当前自动队列状态
 
-当前可自动执行的 `[NEXT]` 是 `R33 - Settings style/background owner seam`。后续已排队 `R34-R37`；`R37` 完成后若没有新的人工追加 queue item，则必须重新写明“当前没有可自动执行的 `[NEXT]`”。
+当前可自动执行的 `[NEXT]` 是 `R35 - OpenCodianView constructor runtime wiring`。后续已排队 `R36-R37`；`R37` 完成后若没有新的人工追加 queue item，则必须重新写明“当前没有可自动执行的 `[NEXT]`”。

@@ -1,19 +1,18 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [CONFIRMED_NEXT_BATCH] `R33-R37` maintainability queue 已确认；`R33` 已完成，当前 `[NEXT]` 是 `R34 - Settings model catalog presenter render lifecycle`。
+> **当前状态**: [CONFIRMED_NEXT_BATCH] `R33-R37` maintainability queue 已确认；`R33-R34` 已完成，当前 `[NEXT]` 是 `R35 - OpenCodianView constructor runtime wiring`。
 
 ## 当前优先级
 
-- **当前 `[NEXT]`**：`R34 - Settings model catalog presenter render lifecycle`
-- **本批目标**：继续沿较厚 owner 收束推进 settings 热点，然后再处理 chat constructor/runtime wiring，最后条件性评估 OpenCodeService
+- **当前 `[NEXT]`**：`R35 - OpenCodianView constructor runtime wiring`
+- **本批目标**：继续沿较厚 owner 收束推进 chat runtime wiring，然后条件性评估 OpenCodeService，最后进入 `R37` checkpoint
 - **当前 lint 基线**：`0 errors / 91 warnings`
 - **本批热点顺序**：
-  1. `src/features/settings/SettingsModelCatalogPresenter.ts` render lifecycle
-  2. `src/features/chat/OpenCodianView.ts` constructor/runtime wiring
-  3. `src/core/opencode/OpenCodeService.ts` residual seam feasibility
-  4. `src/features/settings/OpenCodianSettings.ts` remaining style/settings host responsibilities（观察项，不自动回退 background owner）
-  5. `docs/status/maintainability-master-plan.md` / `docs/status/maintainability-round-roadmap.md` / `docs/status/maintainability-lane-map.md`
+  1. `src/features/chat/OpenCodianView.ts` constructor/runtime wiring
+  2. `src/core/opencode/OpenCodeService.ts` residual seam feasibility
+  3. `src/features/settings/OpenCodianSettings.ts` remaining style/settings host responsibilities（观察项，不自动回退 background owner）
+  4. `docs/status/maintainability-master-plan.md` / `docs/status/maintainability-round-roadmap.md` / `docs/status/maintainability-lane-map.md`
 - **下一暂停点**：`R37 - Maintainability checkpoint`；完成后若无人工追加 queue item，则重新停回无 `[NEXT]` 状态
 - **观察但暂不自动切入**：`tests/unit/core/opencode/OpenCodeService.test.ts`、remaining warning-only file-size cleanup
 

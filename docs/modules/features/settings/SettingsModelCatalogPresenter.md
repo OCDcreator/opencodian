@@ -28,6 +28,8 @@
 
 这样 `OpenCodianSettings` 不再直接持有大段 catalog UI DOM 组装和状态切换分支。
 
+当前 owner 内部又按 render lifecycle 拆成了几段稳定阶段：block shell / controls、catalog summary + bulk provider actions、provider accordion header/actions，以及 expanded model list + bulk model toggles。这样后续继续收束时，优先在 presenter 内沿这些生命周期 helper 延伸，而不是把 catalog availability 语义重新摊回调用方。
+
 ### provider / model availability 表达
 
 presenter 会把 `ModelCatalogState` 里的几层 availability 信号叠加到 UI 上：

@@ -47,6 +47,48 @@ interface SettingsModelCatalogPresenterRenderState {
   catalogState: ModelCatalogState | null;
 }
 
+interface ModelAvailabilitySearchSelection {
+  start: number | null;
+  end: number | null;
+  direction?: 'forward' | 'backward' | 'none' | null;
+}
+
+interface SettingsModelCatalogPresenterRenderOptions {
+  restoreSearchSelection?: ModelAvailabilitySearchSelection;
+}
+
+interface ModelCatalogRenderContext {
+  catalogState: ModelCatalogState;
+  selectedCatalog: ModelCatalog;
+  providerStatusById: Map<string, ModelCatalogProvider>;
+  selectedCatalogTitle: string;
+  selectedCatalogProviderIds: string[];
+  catalogScopedProviderIds: string[];
+}
+
+type ModelCatalogProviderModel = ModelCatalogProvider['models'][number];
+
+interface ProviderModelVisibilityOptions {
+  provider: ModelCatalogProvider;
+  model: ModelCatalogProviderModel;
+  providerEnabled: boolean;
+  providerMatchesQuery: boolean;
+  disabledModelRefs: Set<string>;
+  normalizedQuery: string;
+}
+
+interface ProviderRenderState {
+  provider: ModelCatalogProvider;
+  providerStatusSource: ModelCatalogProvider;
+  providerEnabled: boolean;
+  providerServerDisabled: boolean;
+  providerProjectDisabled: boolean;
+  providerCheckState: ProviderAvailabilityCheckState;
+  availabilityDisplayState: ProviderAvailabilityDisplayState;
+  isExpanded: boolean;
+  modelsToRender: ModelCatalogProviderModel[];
+}
+
 export class SettingsModelCatalogPresenter {
   private readonly catalogStateService: ModelCatalogStateService;
   private readonly applyInlineCodeText: (targetEl: HTMLElement, text: string) => void;
@@ -87,32 +129,63 @@ export class SettingsModelCatalogPresenter {
 
   render(
     state: SettingsModelCatalogPresenterRenderState,
-    options: {
-      restoreSearchSelection?: {
-        start: number | null;
-        end: number | null;
-        direction?: 'forward' | 'backward' | 'none' | null;
-      };
-    } = {},
+    options: SettingsModelCatalogPresenterRenderOptions = {},
   ): void {
     this.lastRenderState = state;
-
-    const existingProviderListEl = state.containerEl.querySelector('.opencodian-model-toggle-provider-list');
-    if (existingProviderListEl instanceof HTMLElement) {
-      this.providerListScrollTop = existingProviderListEl.scrollTop;
-    }
+    this.captureProviderListScrollPosition(state.containerEl);
 
     const { containerEl, catalogState } = state;
-    const catalogs = catalogState?.catalogs ?? null;
     const disabledModelRefs = new Set(catalogState?.disabledModelRefs ?? []);
 
     containerEl.empty();
 
+    const blockEl = this.renderModelToggleBlock(containerEl, options);
+    const catalogSectionEl = catalogState
+      ? this.renderCatalogOverview(blockEl, catalogState)
+      : null;
+    const catalogContext = catalogState
+      ? this.createCatalogRenderContext(catalogState)
+      : null;
+
+    if (catalogSectionEl && catalogContext) {
+      this.renderCatalogActions(catalogSectionEl, catalogContext);
+    }
+
+    this.renderProviderList(blockEl, catalogContext, disabledModelRefs);
+  }
+
+  private captureProviderListScrollPosition(containerEl: HTMLElement): void {
+    const existingProviderListEl = containerEl.querySelector('.opencodian-model-toggle-provider-list');
+    if (existingProviderListEl instanceof HTMLElement) {
+      this.providerListScrollTop = existingProviderListEl.scrollTop;
+    }
+  }
+
+  private renderModelToggleBlock(
+    containerEl: HTMLElement,
+    options: SettingsModelCatalogPresenterRenderOptions,
+  ): HTMLElement {
     const blockEl = containerEl.createDiv({ cls: 'opencodian-model-toggle-block' });
     const descEl = blockEl.createDiv({ cls: 'opencodian-model-toggle-desc' });
     this.applyInlineCodeText(descEl, t('settings.model.toggle.desc'));
 
     const controlsEl = blockEl.createDiv({ cls: 'opencodian-model-availability-controls' });
+    this.renderAvailabilityControls(controlsEl, options);
+
+    return blockEl;
+  }
+
+  private renderAvailabilityControls(
+    controlsEl: HTMLElement,
+    options: SettingsModelCatalogPresenterRenderOptions,
+  ): void {
+    const searchInputEl = this.renderAvailabilitySearchInput(controlsEl);
+    this.restoreAvailabilitySearchSelection(searchInputEl, options.restoreSearchSelection);
+    this.renderAvailabilityFilterToggle(controlsEl, 'disabled');
+    this.renderAvailabilityFilterToggle(controlsEl, 'enabled');
+  }
+
+  private renderAvailabilitySearchInput(controlsEl: HTMLElement): HTMLInputElement {
     const searchWrapperEl = controlsEl.createDiv({ cls: 'opencodian-model-availability-search' });
     const searchContainerEl = searchWrapperEl.createDiv({ cls: 'opencodian-model-availability-search-container' });
     const searchIconEl = searchContainerEl.createSpan({ cls: 'opencodian-model-availability-search-icon' });
@@ -131,7 +204,7 @@ export class SettingsModelCatalogPresenter {
       containerEl: searchContainerEl,
     });
     searchInputEl.addEventListener('input', () => {
-      const restoreSearchSelection = {
+      const restoreSearchSelection: ModelAvailabilitySearchSelection = {
         start: searchInputEl.selectionStart,
         end: searchInputEl.selectionEnd,
         direction: searchInputEl.selectionDirection,
@@ -140,154 +213,198 @@ export class SettingsModelCatalogPresenter {
       this.rerender({ restoreSearchSelection });
     });
 
-    const restoreSearchSelection = options.restoreSearchSelection;
-    if (restoreSearchSelection) {
-      window.requestAnimationFrame(() => {
-        if (!searchInputEl.isConnected) {
-          return;
-        }
+    return searchInputEl;
+  }
 
-        searchInputEl.focus();
-        const { start, end, direction } = restoreSearchSelection;
-        if (start !== null && end !== null) {
-          searchInputEl.setSelectionRange(start, end, direction ?? 'none');
-        }
-      });
+  private restoreAvailabilitySearchSelection(
+    searchInputEl: HTMLInputElement,
+    restoreSearchSelection: ModelAvailabilitySearchSelection | undefined,
+  ): void {
+    if (!restoreSearchSelection) {
+      return;
     }
 
-    const disabledToggleLabel = controlsEl.createEl('label', {
+    window.requestAnimationFrame(() => {
+      if (!searchInputEl.isConnected) {
+        return;
+      }
+
+      searchInputEl.focus();
+      const { start, end, direction } = restoreSearchSelection;
+      if (start !== null && end !== null) {
+        searchInputEl.setSelectionRange(start, end, direction ?? 'none');
+      }
+    });
+  }
+
+  private renderAvailabilityFilterToggle(
+    controlsEl: HTMLElement,
+    filter: 'disabled' | 'enabled',
+  ): void {
+    const toggleLabel = controlsEl.createEl('label', {
       cls: 'opencodian-model-availability-filter-toggle',
     });
-    const disabledToggleEl = disabledToggleLabel.createEl('input', {
+    const toggleEl = toggleLabel.createEl('input', {
       attr: { type: 'checkbox' },
     });
-    disabledToggleEl.checked = this.modelAvailabilityOnlyDisabled;
-    disabledToggleEl.addEventListener('change', () => {
-      this.modelAvailabilityOnlyDisabled = disabledToggleEl.checked;
-      if (disabledToggleEl.checked) {
+    toggleEl.checked = filter === 'disabled'
+      ? this.modelAvailabilityOnlyDisabled
+      : this.modelAvailabilityOnlyEnabled;
+    toggleEl.addEventListener('change', () => {
+      this.updateAvailabilityFilter(filter, toggleEl.checked);
+      this.rerender();
+    });
+    toggleLabel.createSpan({
+      text: filter === 'disabled'
+        ? t('settings.model.availability.onlyDisabled')
+        : t('settings.model.availability.onlyEnabled'),
+    });
+  }
+
+  private updateAvailabilityFilter(filter: 'disabled' | 'enabled', checked: boolean): void {
+    if (filter === 'disabled') {
+      this.modelAvailabilityOnlyDisabled = checked;
+      if (checked) {
         this.modelAvailabilityOnlyEnabled = false;
       }
-      this.rerender();
-    });
-    disabledToggleLabel.createSpan({ text: t('settings.model.availability.onlyDisabled') });
-
-    const enabledToggleLabel = controlsEl.createEl('label', {
-      cls: 'opencodian-model-availability-filter-toggle',
-    });
-    const enabledToggleEl = enabledToggleLabel.createEl('input', {
-      attr: { type: 'checkbox' },
-    });
-    enabledToggleEl.checked = this.modelAvailabilityOnlyEnabled;
-    enabledToggleEl.addEventListener('change', () => {
-      this.modelAvailabilityOnlyEnabled = enabledToggleEl.checked;
-      if (enabledToggleEl.checked) {
-        this.modelAvailabilityOnlyDisabled = false;
-      }
-      this.rerender();
-    });
-    enabledToggleLabel.createSpan({ text: t('settings.model.availability.onlyEnabled') });
-
-    let catalogSectionEl: HTMLElement | null = null;
-    if (catalogs) {
-      catalogSectionEl = blockEl.createDiv({ cls: 'opencodian-model-toggle-catalogs' });
-      const summaryEl = catalogSectionEl.createDiv({ cls: 'opencodian-model-catalog-summary-grid' });
-      this.renderModelCatalogSummaryCards(summaryEl, catalogState);
+      return;
     }
 
-    const selectedCatalog = catalogState
-      ? this.getDisplayCatalogForMode(this.activeCatalogTab, catalogState)
-      : null;
-    const providerStatusCatalog = catalogState
-      ? this.getProviderStatusCatalogForMode(this.activeCatalogTab, catalogState)
-      : null;
+    this.modelAvailabilityOnlyEnabled = checked;
+    if (checked) {
+      this.modelAvailabilityOnlyDisabled = false;
+    }
+  }
+
+  private renderCatalogOverview(
+    blockEl: HTMLElement,
+    catalogState: ModelCatalogState,
+  ): HTMLElement {
+    const catalogSectionEl = blockEl.createDiv({ cls: 'opencodian-model-toggle-catalogs' });
+    const summaryEl = catalogSectionEl.createDiv({ cls: 'opencodian-model-catalog-summary-grid' });
+    this.renderModelCatalogSummaryCards(summaryEl, catalogState);
+    return catalogSectionEl;
+  }
+
+  private createCatalogRenderContext(catalogState: ModelCatalogState): ModelCatalogRenderContext {
+    const selectedCatalog = this.getDisplayCatalogForMode(this.activeCatalogTab, catalogState);
+    const providerStatusCatalog = this.getProviderStatusCatalogForMode(this.activeCatalogTab, catalogState);
     const providerStatusById = new Map(
-      providerStatusCatalog?.providers.map((provider) => [provider.id, provider]) ?? [],
+      providerStatusCatalog.providers.map((provider) => [provider.id, provider]),
     );
-    const selectedCatalogTitle = this.getCatalogTabTitle(this.activeCatalogTab);
     const selectedCatalogProviderIds = Array.from(new Set(
-      selectedCatalog?.providers.map((provider) => provider.id) ?? [],
+      selectedCatalog.providers.map((provider) => provider.id),
     ));
     const catalogScopedProviderIds = selectedCatalogProviderIds.filter((providerId) => {
       const provider = providerStatusById.get(providerId);
       return provider ? !this.isProviderDisabledByScope(provider, 'global') : true;
     });
 
-    if (
-      catalogSectionEl
-      && catalogState
-      && catalogs
-      && selectedCatalog
-      && this.activeCatalogTab !== 'disabled'
-      && selectedCatalogProviderIds.length > 0
-    ) {
-      const catalogActionsEl = catalogSectionEl.createDiv({ cls: 'opencodian-model-catalog-actions' });
-      const catalogActionsInfoEl = catalogActionsEl.createDiv({ cls: 'opencodian-model-catalog-actions-info' });
-      catalogActionsInfoEl.createDiv({
-        cls: 'opencodian-model-catalog-actions-title',
-        text: selectedCatalogTitle,
-      });
-      catalogActionsInfoEl.createDiv({
-        cls: 'opencodian-model-catalog-actions-meta',
-        text: t('settings.model.catalog.summary', {
-          providers: String(selectedCatalog.providers.length),
-          models: String(this.getCatalogModelCount(selectedCatalog)),
-        }),
-      });
+    return {
+      catalogState,
+      selectedCatalog,
+      providerStatusById,
+      selectedCatalogTitle: this.getCatalogTabTitle(this.activeCatalogTab),
+      selectedCatalogProviderIds,
+      catalogScopedProviderIds,
+    };
+  }
 
-      const catalogActionsButtonsEl = catalogActionsEl.createDiv({
-        cls: 'opencodian-model-catalog-actions-buttons',
-      });
-      const enableCatalogProvidersButton = catalogActionsButtonsEl.createEl('button', {
-        cls: 'opencodian-model-toggle-provider-test-button opencodian-model-toggle-action-button',
-        text: t('settings.model.availability.enableAllProviders'),
-      });
-      enableCatalogProvidersButton.type = 'button';
-      enableCatalogProvidersButton.disabled = catalogScopedProviderIds.length === 0
-        || catalogScopedProviderIds.every((providerId) => this.isProviderCurrentlyEnabled(providerId, catalogState));
-      const disableCatalogProvidersButton = catalogActionsButtonsEl.createEl('button', {
-        cls: 'opencodian-model-toggle-provider-test-button opencodian-model-toggle-action-button',
-        text: t('settings.model.availability.disableAllProviders'),
-      });
-      disableCatalogProvidersButton.type = 'button';
-      disableCatalogProvidersButton.disabled = catalogScopedProviderIds.length === 0
-        || catalogScopedProviderIds.every((providerId) => !this.isProviderCurrentlyEnabled(providerId, catalogState));
-
-      enableCatalogProvidersButton.addEventListener('click', async () => {
-        enableCatalogProvidersButton.disabled = true;
-        disableCatalogProvidersButton.disabled = true;
-        try {
-          await this.onProviderAvailabilityChange(catalogScopedProviderIds, true);
-        } catch {
-          // host already handled notice/logging
-        } finally {
-          if (enableCatalogProvidersButton.isConnected) {
-            enableCatalogProvidersButton.disabled = false;
-          }
-          if (disableCatalogProvidersButton.isConnected) {
-            disableCatalogProvidersButton.disabled = false;
-          }
-        }
-      });
-      disableCatalogProvidersButton.addEventListener('click', async () => {
-        enableCatalogProvidersButton.disabled = true;
-        disableCatalogProvidersButton.disabled = true;
-        try {
-          await this.onProviderAvailabilityChange(catalogScopedProviderIds, false);
-        } catch {
-          // host already handled notice/logging
-        } finally {
-          if (enableCatalogProvidersButton.isConnected) {
-            enableCatalogProvidersButton.disabled = false;
-          }
-          if (disableCatalogProvidersButton.isConnected) {
-            disableCatalogProvidersButton.disabled = false;
-          }
-        }
-      });
+  private renderCatalogActions(
+    catalogSectionEl: HTMLElement,
+    context: ModelCatalogRenderContext,
+  ): void {
+    if (this.activeCatalogTab === 'disabled' || context.selectedCatalogProviderIds.length === 0) {
+      return;
     }
 
-    const providers = selectedCatalog?.providers ?? [];
-    if (providers.length === 0) {
+    const catalogActionsEl = catalogSectionEl.createDiv({ cls: 'opencodian-model-catalog-actions' });
+    const catalogActionsInfoEl = catalogActionsEl.createDiv({ cls: 'opencodian-model-catalog-actions-info' });
+    catalogActionsInfoEl.createDiv({
+      cls: 'opencodian-model-catalog-actions-title',
+      text: context.selectedCatalogTitle,
+    });
+    catalogActionsInfoEl.createDiv({
+      cls: 'opencodian-model-catalog-actions-meta',
+      text: t('settings.model.catalog.summary', {
+        providers: String(context.selectedCatalog.providers.length),
+        models: String(this.getCatalogModelCount(context.selectedCatalog)),
+      }),
+    });
+
+    const catalogActionsButtonsEl = catalogActionsEl.createDiv({
+      cls: 'opencodian-model-catalog-actions-buttons',
+    });
+    const enableCatalogProvidersButton = this.createActionButton(
+      catalogActionsButtonsEl,
+      t('settings.model.availability.enableAllProviders'),
+    );
+    enableCatalogProvidersButton.disabled = context.catalogScopedProviderIds.length === 0
+      || context.catalogScopedProviderIds.every((providerId) => this.isProviderCurrentlyEnabled(
+        providerId,
+        context.catalogState,
+      ));
+    const disableCatalogProvidersButton = this.createActionButton(
+      catalogActionsButtonsEl,
+      t('settings.model.availability.disableAllProviders'),
+    );
+    disableCatalogProvidersButton.disabled = context.catalogScopedProviderIds.length === 0
+      || context.catalogScopedProviderIds.every((providerId) => !this.isProviderCurrentlyEnabled(
+        providerId,
+        context.catalogState,
+      ));
+
+    enableCatalogProvidersButton.addEventListener('click', () => {
+      void this.runPairedButtonAction(
+        [enableCatalogProvidersButton, disableCatalogProvidersButton],
+        () => this.onProviderAvailabilityChange(context.catalogScopedProviderIds, true),
+      );
+    });
+    disableCatalogProvidersButton.addEventListener('click', () => {
+      void this.runPairedButtonAction(
+        [enableCatalogProvidersButton, disableCatalogProvidersButton],
+        () => this.onProviderAvailabilityChange(context.catalogScopedProviderIds, false),
+      );
+    });
+  }
+
+  private createActionButton(containerEl: HTMLElement, text: string): HTMLButtonElement {
+    const buttonEl = containerEl.createEl('button', {
+      cls: 'opencodian-model-toggle-provider-test-button opencodian-model-toggle-action-button',
+      text,
+    });
+    buttonEl.type = 'button';
+    return buttonEl;
+  }
+
+  private async runPairedButtonAction(
+    buttonEls: [HTMLButtonElement, HTMLButtonElement],
+    action: () => Promise<void>,
+  ): Promise<void> {
+    for (const buttonEl of buttonEls) {
+      buttonEl.disabled = true;
+    }
+
+    try {
+      await action();
+    } catch {
+      // host already handled notice/logging
+    } finally {
+      for (const buttonEl of buttonEls) {
+        if (buttonEl.isConnected) {
+          buttonEl.disabled = false;
+        }
+      }
+    }
+  }
+
+  private renderProviderList(
+    blockEl: HTMLElement,
+    catalogContext: ModelCatalogRenderContext | null,
+    disabledModelRefs: Set<string>,
+  ): void {
+    const providers = catalogContext?.selectedCatalog.providers ?? [];
+    if (providers.length === 0 || !catalogContext) {
       blockEl.createDiv({
         cls: 'opencodian-model-toggle-empty',
         text: t('settings.model.toggle.empty'),
@@ -296,319 +413,440 @@ export class SettingsModelCatalogPresenter {
     }
 
     const normalizedQuery = this.modelAvailabilityQuery.trim().toLowerCase();
+    const providerListEl = this.createProviderList(blockEl);
+    for (const provider of providers) {
+      const providerRenderState = this.createProviderRenderState(
+        provider,
+        catalogContext,
+        disabledModelRefs,
+        normalizedQuery,
+      );
+      if (providerRenderState) {
+        this.renderProviderAccordion(providerListEl, providerRenderState, disabledModelRefs);
+      }
+    }
+
+    this.restoreProviderListScrollPosition(providerListEl);
+  }
+
+  private createProviderList(blockEl: HTMLElement): HTMLElement {
     const providerListEl = blockEl.createDiv({ cls: 'opencodian-model-toggle-provider-list' });
     providerListEl.scrollTop = this.providerListScrollTop;
     providerListEl.addEventListener('scroll', () => {
       this.providerListScrollTop = providerListEl.scrollTop;
     });
+    return providerListEl;
+  }
 
-    for (const provider of providers) {
-      const providerStatusSource = providerStatusById.get(provider.id) ?? provider;
-      const providerEnabled = catalogState
-        ? this.isProviderCurrentlyEnabled(provider.id, catalogState)
-        : false;
-      const primaryDisabledReason = this.getProviderPrimaryDisabledReason(
-        providerStatusSource,
-        providerEnabled,
-      );
-      const providerServerDisabled = primaryDisabledReason === 'server';
-      const providerProjectDisabled = primaryDisabledReason === 'project';
-      const providerCheckState = this.providerAvailabilityChecks.get(provider.id) ?? { status: 'idle' };
-      const providerSearchText = `${provider.name || provider.id} ${provider.id}`.toLowerCase();
-      const providerMatchesQuery = normalizedQuery.length > 0 && providerSearchText.includes(normalizedQuery);
-      const disabledCount = providerEnabled
-        ? providerStatusSource.models.filter((model) => disabledModelRefs.has(formatModelReference(provider.id, model.id))).length
-        : providerStatusSource.models.length;
-      const availabilityDisplayState: ProviderAvailabilityDisplayState = {
-        provider: providerStatusSource,
-        providerEnabled,
-        disabledCount,
-        primaryDisabledReason,
-        mode: this.activeCatalogTab,
-      };
-      const hasDisabledState = !providerEnabled || disabledCount > 0;
-      const hasEnabledState = providerEnabled && disabledCount < providerStatusSource.models.length;
-      if (this.modelAvailabilityOnlyDisabled && !hasDisabledState) {
-        continue;
-      }
-      if (this.modelAvailabilityOnlyEnabled && !hasEnabledState) {
-        continue;
-      }
-
-      const visibleModels = provider.models.filter((model) => {
-        const modelRef = formatModelReference(provider.id, model.id);
-        const modelSearchText = `${provider.name || provider.id} ${provider.id} ${model.name || model.id} ${model.id}`.toLowerCase();
-        const matchesQuery = normalizedQuery.length === 0
-          ? true
-          : providerMatchesQuery || modelSearchText.includes(normalizedQuery);
-        if (!matchesQuery) {
-          return false;
-        }
-
-        if (this.modelAvailabilityOnlyDisabled && providerEnabled && !disabledModelRefs.has(modelRef)) {
-          return false;
-        }
-        if (this.modelAvailabilityOnlyEnabled && (!providerEnabled || disabledModelRefs.has(modelRef))) {
-          return false;
-        }
-
-        return true;
-      });
-
-      if (normalizedQuery.length > 0 && !providerMatchesQuery && visibleModels.length === 0) {
-        continue;
-      }
-
-      const isAutoExpanded = normalizedQuery.length > 0 && (providerMatchesQuery || visibleModels.length > 0);
-      const isExpanded = isAutoExpanded || this.expandedProviderIds.has(provider.id);
-      const providerEl = providerListEl.createDiv({
-        cls: `opencodian-model-toggle-provider${providerEnabled ? '' : ' is-provider-disabled'}`,
-      });
-
-      const providerHeaderEl = providerEl.createDiv({ cls: 'opencodian-model-toggle-provider-header' });
-      const expandButtonEl = providerHeaderEl.createEl('button', {
-        cls: 'opencodian-model-toggle-provider-expand',
-      });
-      expandButtonEl.type = 'button';
-      expandButtonEl.addEventListener('click', () => {
-        if (this.expandedProviderIds.has(provider.id)) {
-          this.expandedProviderIds.delete(provider.id);
-        } else {
-          this.expandedProviderIds.add(provider.id);
-        }
-        this.rerender();
-      });
-
-      const chevronEl = expandButtonEl.createSpan({ cls: 'opencodian-model-toggle-provider-chevron' });
-      setIcon(chevronEl, isExpanded ? 'chevron-down' : 'chevron-right');
-      const iconEl = expandButtonEl.createSpan({ cls: 'opencodian-model-toggle-provider-icon' });
-      setIcon(iconEl, 'bot');
-      void this.applyProviderIcon(iconEl, provider.id, provider.name || provider.id);
-
-      const providerInfoEl = expandButtonEl.createDiv({ cls: 'opencodian-model-toggle-provider-info' });
-      providerInfoEl.createDiv({
-        cls: 'opencodian-model-toggle-provider-name',
-        text: provider.name || provider.id,
-      });
-      providerInfoEl.createDiv({
-        cls: 'opencodian-model-toggle-provider-meta',
-        text: this.describeModelAvailabilitySummary(availabilityDisplayState),
-      });
-      const badgesEl = providerInfoEl.createDiv({ cls: 'opencodian-model-toggle-provider-badges' });
-      badgesEl.createSpan({
-        cls: `opencodian-model-source-badge is-${provider.source}`,
-        text: t(`settings.model.sourceBadge.${provider.source}` as const),
-      });
-      badgesEl.createSpan({
-        cls: `opencodian-model-status-badge ${this.getProviderAvailabilityStatusClass(availabilityDisplayState)}`,
-        text: this.getProviderAvailabilityStatusLabel(availabilityDisplayState),
-      });
-      const serverDisabledBadge = this.getProviderServerConstraintBadge(availabilityDisplayState);
-      if (serverDisabledBadge) {
-        badgesEl.createSpan({
-          cls: `opencodian-model-status-badge ${serverDisabledBadge.className}`,
-          text: serverDisabledBadge.text,
-        });
-      }
-      const probeBadge = this.getProviderAvailabilityProbeBadge(providerCheckState);
-      if (probeBadge) {
-        badgesEl.createSpan({
-          cls: `opencodian-model-status-badge ${probeBadge.className}`,
-          text: probeBadge.text,
-        });
-      }
-      const probeDetail = this.describeProviderAvailabilityProbe(providerCheckState);
-      if (probeDetail) {
-        providerInfoEl.createDiv({
-          cls: `opencodian-model-toggle-provider-probe ${probeDetail.className}`,
-          text: probeDetail.text,
-        });
-      }
-
-      const providerActionsEl = providerHeaderEl.createDiv({ cls: 'opencodian-model-toggle-provider-actions' });
-      const providerTestButton = providerActionsEl.createEl('button', {
-        cls: 'opencodian-model-toggle-provider-test-button',
-        text: providerCheckState.status === 'loading'
-          ? t('settings.model.availability.check.loading')
-          : t('settings.model.availability.check.button'),
-      });
-      providerTestButton.type = 'button';
-      providerTestButton.disabled = providerCheckState.status === 'loading' || providerServerDisabled;
-      providerTestButton.addEventListener('click', (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        void this.runProviderAvailabilityCheck(provider.id);
-      });
-
-      const providerToggleLabel = providerActionsEl.createEl('label', {
-        cls: 'opencodian-model-toggle-switch',
-      });
-      const providerToggle = providerToggleLabel.createEl('input', {
-        attr: { type: 'checkbox' },
-      });
-      providerToggle.checked = providerEnabled;
-      providerToggle.disabled = providerServerDisabled;
-      providerToggleLabel.createSpan({
-        cls: 'opencodian-model-toggle-switch-label',
-        text: providerProjectDisabled
-          ? t('settings.model.toggle.providerProjectDisabled')
-          : providerServerDisabled
-            ? t('settings.model.toggle.providerServerDisabled')
-            : t('settings.model.toggle.providerEnabled'),
-      });
-      providerToggle.addEventListener('change', () => {
-        if (providerServerDisabled) {
-          providerToggle.checked = false;
-          return;
-        }
-
-        const requestedEnabled = providerToggle.checked;
-        providerToggle.disabled = true;
-        void (async () => {
-          try {
-            await this.onProviderAvailabilityChange([provider.id], requestedEnabled);
-          } catch {
-            providerToggle.checked = !requestedEnabled;
-          } finally {
-            if (providerToggle.isConnected) {
-              providerToggle.disabled = false;
-            }
-          }
-        })();
-      });
-
-      if (provider.models.length === 0) {
-        providerEl.createDiv({
-          cls: 'opencodian-model-toggle-empty',
-          text: this.describeProviderModels(
-            provider,
-            (this.activeCatalogTab === 'server' || this.activeCatalogTab === 'disabled') && !providerEnabled
-              ? this.getCatalogPlaceholderReason(provider, this.activeCatalogTab)
-              : null,
-          ) || t('settings.model.toggle.emptyModels'),
-        });
-        continue;
-      }
-
-      if (!isExpanded) {
-        continue;
-      }
-
-      const modelsEl = providerEl.createDiv({ cls: 'opencodian-model-toggle-models' });
-      const providerModelRefs = providerStatusSource.models.map((model) => formatModelReference(provider.id, model.id));
-      if (providerModelRefs.length > 0) {
-        const modelToolbarEl = modelsEl.createDiv({ cls: 'opencodian-model-toggle-model-toolbar' });
-        modelToolbarEl.createDiv({
-          cls: 'opencodian-model-toggle-model-toolbar-summary',
-          text: t('settings.model.toggle.allModelsSummary', {
-            count: String(providerModelRefs.length),
-          }),
-        });
-        const modelBulkActionsEl = modelToolbarEl.createDiv({ cls: 'opencodian-model-toggle-model-bulk-actions' });
-        const enableAllModelsButton = modelBulkActionsEl.createEl('button', {
-          cls: 'opencodian-model-toggle-provider-test-button opencodian-model-toggle-action-button',
-          text: t('settings.model.toggle.enableAllModels'),
-        });
-        enableAllModelsButton.type = 'button';
-        const disableAllModelsButton = modelBulkActionsEl.createEl('button', {
-          cls: 'opencodian-model-toggle-provider-test-button opencodian-model-toggle-action-button',
-          text: t('settings.model.toggle.disableAllModels'),
-        });
-        disableAllModelsButton.type = 'button';
-        enableAllModelsButton.addEventListener('click', async () => {
-          enableAllModelsButton.disabled = true;
-          disableAllModelsButton.disabled = true;
-          try {
-            await this.onModelAvailabilityChange(providerModelRefs, true);
-          } catch {
-            // host already handled notice/logging
-          } finally {
-            if (enableAllModelsButton.isConnected) {
-              enableAllModelsButton.disabled = false;
-            }
-            if (disableAllModelsButton.isConnected) {
-              disableAllModelsButton.disabled = false;
-            }
-          }
-        });
-        disableAllModelsButton.addEventListener('click', async () => {
-          enableAllModelsButton.disabled = true;
-          disableAllModelsButton.disabled = true;
-          try {
-            await this.onModelAvailabilityChange(providerModelRefs, false);
-          } catch {
-            // host already handled notice/logging
-          } finally {
-            if (enableAllModelsButton.isConnected) {
-              enableAllModelsButton.disabled = false;
-            }
-            if (disableAllModelsButton.isConnected) {
-              disableAllModelsButton.disabled = false;
-            }
-          }
-        });
-      }
-
-      const modelsToRender = normalizedQuery.length > 0 || this.modelAvailabilityOnlyDisabled || this.modelAvailabilityOnlyEnabled
-        ? visibleModels
-        : provider.models;
-      if (modelsToRender.length === 0) {
-        modelsEl.createDiv({
-          cls: 'opencodian-model-toggle-empty',
-          text: t('settings.model.availability.noMatchingModels'),
-        });
-        continue;
-      }
-
-      for (const model of modelsToRender) {
-        const modelRef = formatModelReference(provider.id, model.id);
-        const modelEnabled = !disabledModelRefs.has(modelRef);
-        const modelEl = modelsEl.createDiv({
-          cls: `opencodian-model-toggle-model${modelEnabled ? '' : ' is-model-disabled'}${providerEnabled ? '' : ' is-provider-disabled'}`,
-        });
-        const modelInfoEl = modelEl.createDiv({ cls: 'opencodian-model-toggle-model-info' });
-        modelInfoEl.createDiv({
-          cls: 'opencodian-model-toggle-model-name',
-          text: model.name || model.id,
-        });
-        modelInfoEl.createDiv({
-          cls: 'opencodian-model-toggle-model-meta',
-          text: model.id,
-        });
-
-        const modelToggleLabel = modelEl.createEl('label', {
-          cls: 'opencodian-model-toggle-switch',
-        });
-        const modelToggle = modelToggleLabel.createEl('input', {
-          attr: { type: 'checkbox' },
-        });
-        modelToggle.checked = modelEnabled;
-        modelToggleLabel.createSpan({
-          cls: 'opencodian-model-toggle-switch-label',
-          text: !providerEnabled
-            ? t('settings.model.toggle.providerDisabledPriority')
-            : modelEnabled
-              ? t('settings.model.toggle.modelEnabled')
-              : t('settings.model.toggle.modelDisabled'),
-        });
-        modelToggle.addEventListener('change', () => {
-          const requestedEnabled = modelToggle.checked;
-          modelToggle.disabled = true;
-          void (async () => {
-            try {
-              await this.onModelAvailabilityChange([modelRef], requestedEnabled);
-            } catch {
-              modelToggle.checked = !requestedEnabled;
-            } finally {
-              if (modelToggle.isConnected) {
-                modelToggle.disabled = false;
-              }
-            }
-          })();
-        });
-      }
+  private createProviderRenderState(
+    provider: ModelCatalogProvider,
+    catalogContext: ModelCatalogRenderContext,
+    disabledModelRefs: Set<string>,
+    normalizedQuery: string,
+  ): ProviderRenderState | null {
+    const providerStatusSource = catalogContext.providerStatusById.get(provider.id) ?? provider;
+    const providerEnabled = this.isProviderCurrentlyEnabled(provider.id, catalogContext.catalogState);
+    const primaryDisabledReason = this.getProviderPrimaryDisabledReason(providerStatusSource, providerEnabled);
+    const providerSearchText = `${provider.name || provider.id} ${provider.id}`.toLowerCase();
+    const providerMatchesQuery = normalizedQuery.length > 0 && providerSearchText.includes(normalizedQuery);
+    const disabledCount = providerEnabled
+      ? providerStatusSource.models.filter((model) => disabledModelRefs.has(formatModelReference(provider.id, model.id))).length
+      : providerStatusSource.models.length;
+    const availabilityDisplayState: ProviderAvailabilityDisplayState = {
+      provider: providerStatusSource,
+      providerEnabled,
+      disabledCount,
+      primaryDisabledReason,
+      mode: this.activeCatalogTab,
+    };
+    const hasDisabledState = !providerEnabled || disabledCount > 0;
+    const hasEnabledState = providerEnabled && disabledCount < providerStatusSource.models.length;
+    if (this.modelAvailabilityOnlyDisabled && !hasDisabledState) {
+      return null;
+    }
+    if (this.modelAvailabilityOnlyEnabled && !hasEnabledState) {
+      return null;
     }
 
+    const visibleModels = provider.models.filter((model) => this.isProviderModelVisible({
+      provider,
+      model,
+      providerEnabled,
+      providerMatchesQuery,
+      disabledModelRefs,
+      normalizedQuery,
+    }));
+    if (normalizedQuery.length > 0 && !providerMatchesQuery && visibleModels.length === 0) {
+      return null;
+    }
+
+    const isAutoExpanded = normalizedQuery.length > 0 && (providerMatchesQuery || visibleModels.length > 0);
+    const modelsToRender = this.shouldUseFilteredModels(normalizedQuery)
+      ? visibleModels
+      : provider.models;
+
+    return {
+      provider,
+      providerStatusSource,
+      providerEnabled,
+      providerServerDisabled: primaryDisabledReason === 'server',
+      providerProjectDisabled: primaryDisabledReason === 'project',
+      providerCheckState: this.providerAvailabilityChecks.get(provider.id) ?? { status: 'idle' },
+      availabilityDisplayState,
+      isExpanded: isAutoExpanded || this.expandedProviderIds.has(provider.id),
+      modelsToRender,
+    };
+  }
+
+  private isProviderModelVisible(options: ProviderModelVisibilityOptions): boolean {
+    const {
+      provider,
+      model,
+      providerEnabled,
+      providerMatchesQuery,
+      disabledModelRefs,
+      normalizedQuery,
+    } = options;
+    const modelRef = formatModelReference(provider.id, model.id);
+    const modelSearchText = `${provider.name || provider.id} ${provider.id} ${model.name || model.id} ${model.id}`
+      .toLowerCase();
+    const matchesQuery = normalizedQuery.length === 0
+      ? true
+      : providerMatchesQuery || modelSearchText.includes(normalizedQuery);
+    if (!matchesQuery) {
+      return false;
+    }
+
+    if (this.modelAvailabilityOnlyDisabled && providerEnabled && !disabledModelRefs.has(modelRef)) {
+      return false;
+    }
+    if (this.modelAvailabilityOnlyEnabled && (!providerEnabled || disabledModelRefs.has(modelRef))) {
+      return false;
+    }
+
+    return true;
+  }
+
+  private shouldUseFilteredModels(normalizedQuery: string): boolean {
+    return normalizedQuery.length > 0
+      || this.modelAvailabilityOnlyDisabled
+      || this.modelAvailabilityOnlyEnabled;
+  }
+
+  private renderProviderAccordion(
+    providerListEl: HTMLElement,
+    providerRenderState: ProviderRenderState,
+    disabledModelRefs: Set<string>,
+  ): void {
+    const providerEl = providerListEl.createDiv({
+      cls: `opencodian-model-toggle-provider${providerRenderState.providerEnabled ? '' : ' is-provider-disabled'}`,
+    });
+    const providerHeaderEl = providerEl.createDiv({ cls: 'opencodian-model-toggle-provider-header' });
+    this.renderProviderExpandButton(providerHeaderEl, providerRenderState);
+    this.renderProviderActions(providerHeaderEl, providerRenderState);
+
+    if (providerRenderState.provider.models.length === 0) {
+      this.renderProviderEmptyModels(providerEl, providerRenderState);
+      return;
+    }
+
+    if (!providerRenderState.isExpanded) {
+      return;
+    }
+
+    this.renderProviderModels(providerEl, providerRenderState, disabledModelRefs);
+  }
+
+  private renderProviderExpandButton(
+    providerHeaderEl: HTMLElement,
+    state: ProviderRenderState,
+  ): void {
+    const { provider, availabilityDisplayState, providerCheckState } = state;
+    const expandButtonEl = providerHeaderEl.createEl('button', {
+      cls: 'opencodian-model-toggle-provider-expand',
+    });
+    expandButtonEl.type = 'button';
+    expandButtonEl.addEventListener('click', () => {
+      this.toggleProviderExpanded(provider.id);
+    });
+
+    const chevronEl = expandButtonEl.createSpan({ cls: 'opencodian-model-toggle-provider-chevron' });
+    setIcon(chevronEl, state.isExpanded ? 'chevron-down' : 'chevron-right');
+    const iconEl = expandButtonEl.createSpan({ cls: 'opencodian-model-toggle-provider-icon' });
+    setIcon(iconEl, 'bot');
+    void this.applyProviderIcon(iconEl, provider.id, provider.name || provider.id);
+
+    const providerInfoEl = expandButtonEl.createDiv({ cls: 'opencodian-model-toggle-provider-info' });
+    providerInfoEl.createDiv({
+      cls: 'opencodian-model-toggle-provider-name',
+      text: provider.name || provider.id,
+    });
+    providerInfoEl.createDiv({
+      cls: 'opencodian-model-toggle-provider-meta',
+      text: this.describeModelAvailabilitySummary(availabilityDisplayState),
+    });
+    this.renderProviderBadges(providerInfoEl, provider, availabilityDisplayState, providerCheckState);
+  }
+
+  private toggleProviderExpanded(providerId: string): void {
+    if (this.expandedProviderIds.has(providerId)) {
+      this.expandedProviderIds.delete(providerId);
+    } else {
+      this.expandedProviderIds.add(providerId);
+    }
+    this.rerender();
+  }
+
+  private renderProviderBadges(
+    providerInfoEl: HTMLElement,
+    provider: ModelCatalogProvider,
+    availabilityDisplayState: ProviderAvailabilityDisplayState,
+    providerCheckState: ProviderAvailabilityCheckState,
+  ): void {
+    const badgesEl = providerInfoEl.createDiv({ cls: 'opencodian-model-toggle-provider-badges' });
+    badgesEl.createSpan({
+      cls: `opencodian-model-source-badge is-${provider.source}`,
+      text: t(`settings.model.sourceBadge.${provider.source}` as const),
+    });
+    badgesEl.createSpan({
+      cls: `opencodian-model-status-badge ${this.getProviderAvailabilityStatusClass(availabilityDisplayState)}`,
+      text: this.getProviderAvailabilityStatusLabel(availabilityDisplayState),
+    });
+
+    const serverDisabledBadge = this.getProviderServerConstraintBadge(availabilityDisplayState);
+    if (serverDisabledBadge) {
+      badgesEl.createSpan({
+        cls: `opencodian-model-status-badge ${serverDisabledBadge.className}`,
+        text: serverDisabledBadge.text,
+      });
+    }
+    const probeBadge = this.getProviderAvailabilityProbeBadge(providerCheckState);
+    if (probeBadge) {
+      badgesEl.createSpan({
+        cls: `opencodian-model-status-badge ${probeBadge.className}`,
+        text: probeBadge.text,
+      });
+    }
+
+    const probeDetail = this.describeProviderAvailabilityProbe(providerCheckState);
+    if (probeDetail) {
+      providerInfoEl.createDiv({
+        cls: `opencodian-model-toggle-provider-probe ${probeDetail.className}`,
+        text: probeDetail.text,
+      });
+    }
+  }
+
+  private renderProviderActions(
+    providerHeaderEl: HTMLElement,
+    state: ProviderRenderState,
+  ): void {
+    const providerActionsEl = providerHeaderEl.createDiv({ cls: 'opencodian-model-toggle-provider-actions' });
+    const providerTestButton = providerActionsEl.createEl('button', {
+      cls: 'opencodian-model-toggle-provider-test-button',
+      text: state.providerCheckState.status === 'loading'
+        ? t('settings.model.availability.check.loading')
+        : t('settings.model.availability.check.button'),
+    });
+    providerTestButton.type = 'button';
+    providerTestButton.disabled = state.providerCheckState.status === 'loading' || state.providerServerDisabled;
+    providerTestButton.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      void this.runProviderAvailabilityCheck(state.provider.id);
+    });
+
+    this.renderProviderToggle(providerActionsEl, state);
+  }
+
+  private renderProviderToggle(providerActionsEl: HTMLElement, state: ProviderRenderState): void {
+    const providerToggleLabel = providerActionsEl.createEl('label', {
+      cls: 'opencodian-model-toggle-switch',
+    });
+    const providerToggle = providerToggleLabel.createEl('input', {
+      attr: { type: 'checkbox' },
+    });
+    providerToggle.checked = state.providerEnabled;
+    providerToggle.disabled = state.providerServerDisabled;
+    providerToggleLabel.createSpan({
+      cls: 'opencodian-model-toggle-switch-label',
+      text: this.getProviderToggleLabel(state),
+    });
+    providerToggle.addEventListener('change', () => {
+      this.handleProviderToggleChange(providerToggle, state);
+    });
+  }
+
+  private getProviderToggleLabel(state: ProviderRenderState): string {
+    if (state.providerProjectDisabled) {
+      return t('settings.model.toggle.providerProjectDisabled');
+    }
+
+    return state.providerServerDisabled
+      ? t('settings.model.toggle.providerServerDisabled')
+      : t('settings.model.toggle.providerEnabled');
+  }
+
+  private handleProviderToggleChange(
+    providerToggle: HTMLInputElement,
+    state: ProviderRenderState,
+  ): void {
+    if (state.providerServerDisabled) {
+      providerToggle.checked = false;
+      return;
+    }
+
+    const requestedEnabled = providerToggle.checked;
+    providerToggle.disabled = true;
+    void (async () => {
+      try {
+        await this.onProviderAvailabilityChange([state.provider.id], requestedEnabled);
+      } catch {
+        providerToggle.checked = !requestedEnabled;
+      } finally {
+        if (providerToggle.isConnected) {
+          providerToggle.disabled = false;
+        }
+      }
+    })();
+  }
+
+  private renderProviderEmptyModels(providerEl: HTMLElement, state: ProviderRenderState): void {
+    providerEl.createDiv({
+      cls: 'opencodian-model-toggle-empty',
+      text: this.describeProviderModels(
+        state.provider,
+        (this.activeCatalogTab === 'server' || this.activeCatalogTab === 'disabled') && !state.providerEnabled
+          ? this.getCatalogPlaceholderReason(state.provider, this.activeCatalogTab)
+          : null,
+      ) || t('settings.model.toggle.emptyModels'),
+    });
+  }
+
+  private renderProviderModels(
+    providerEl: HTMLElement,
+    state: ProviderRenderState,
+    disabledModelRefs: Set<string>,
+  ): void {
+    const modelsEl = providerEl.createDiv({ cls: 'opencodian-model-toggle-models' });
+    this.renderProviderModelBulkToolbar(modelsEl, state);
+
+    if (state.modelsToRender.length === 0) {
+      modelsEl.createDiv({
+        cls: 'opencodian-model-toggle-empty',
+        text: t('settings.model.availability.noMatchingModels'),
+      });
+      return;
+    }
+
+    for (const model of state.modelsToRender) {
+      this.renderProviderModelRow(modelsEl, state, model, disabledModelRefs);
+    }
+  }
+
+  private renderProviderModelBulkToolbar(modelsEl: HTMLElement, state: ProviderRenderState): void {
+    const providerModelRefs = state.providerStatusSource.models.map((model) => formatModelReference(
+      state.provider.id,
+      model.id,
+    ));
+    if (providerModelRefs.length === 0) {
+      return;
+    }
+
+    const modelToolbarEl = modelsEl.createDiv({ cls: 'opencodian-model-toggle-model-toolbar' });
+    modelToolbarEl.createDiv({
+      cls: 'opencodian-model-toggle-model-toolbar-summary',
+      text: t('settings.model.toggle.allModelsSummary', {
+        count: String(providerModelRefs.length),
+      }),
+    });
+    const modelBulkActionsEl = modelToolbarEl.createDiv({ cls: 'opencodian-model-toggle-model-bulk-actions' });
+    const enableAllModelsButton = this.createActionButton(
+      modelBulkActionsEl,
+      t('settings.model.toggle.enableAllModels'),
+    );
+    const disableAllModelsButton = this.createActionButton(
+      modelBulkActionsEl,
+      t('settings.model.toggle.disableAllModels'),
+    );
+    enableAllModelsButton.addEventListener('click', () => {
+      void this.runPairedButtonAction(
+        [enableAllModelsButton, disableAllModelsButton],
+        () => this.onModelAvailabilityChange(providerModelRefs, true),
+      );
+    });
+    disableAllModelsButton.addEventListener('click', () => {
+      void this.runPairedButtonAction(
+        [enableAllModelsButton, disableAllModelsButton],
+        () => this.onModelAvailabilityChange(providerModelRefs, false),
+      );
+    });
+  }
+
+  private renderProviderModelRow(
+    modelsEl: HTMLElement,
+    state: ProviderRenderState,
+    model: ModelCatalogProviderModel,
+    disabledModelRefs: Set<string>,
+  ): void {
+    const modelRef = formatModelReference(state.provider.id, model.id);
+    const modelEnabled = !disabledModelRefs.has(modelRef);
+    const modelEl = modelsEl.createDiv({
+      cls: `opencodian-model-toggle-model${modelEnabled ? '' : ' is-model-disabled'}${state.providerEnabled ? '' : ' is-provider-disabled'}`,
+    });
+    const modelInfoEl = modelEl.createDiv({ cls: 'opencodian-model-toggle-model-info' });
+    modelInfoEl.createDiv({
+      cls: 'opencodian-model-toggle-model-name',
+      text: model.name || model.id,
+    });
+    modelInfoEl.createDiv({
+      cls: 'opencodian-model-toggle-model-meta',
+      text: model.id,
+    });
+
+    const modelToggleLabel = modelEl.createEl('label', {
+      cls: 'opencodian-model-toggle-switch',
+    });
+    const modelToggle = modelToggleLabel.createEl('input', {
+      attr: { type: 'checkbox' },
+    });
+    modelToggle.checked = modelEnabled;
+    modelToggleLabel.createSpan({
+      cls: 'opencodian-model-toggle-switch-label',
+      text: this.getModelToggleLabel(state.providerEnabled, modelEnabled),
+    });
+    modelToggle.addEventListener('change', () => {
+      this.handleModelToggleChange(modelToggle, modelRef);
+    });
+  }
+
+  private getModelToggleLabel(providerEnabled: boolean, modelEnabled: boolean): string {
+    if (!providerEnabled) {
+      return t('settings.model.toggle.providerDisabledPriority');
+    }
+
+    return modelEnabled
+      ? t('settings.model.toggle.modelEnabled')
+      : t('settings.model.toggle.modelDisabled');
+  }
+
+  private handleModelToggleChange(modelToggle: HTMLInputElement, modelRef: string): void {
+    const requestedEnabled = modelToggle.checked;
+    modelToggle.disabled = true;
+    void (async () => {
+      try {
+        await this.onModelAvailabilityChange([modelRef], requestedEnabled);
+      } catch {
+        modelToggle.checked = !requestedEnabled;
+      } finally {
+        if (modelToggle.isConnected) {
+          modelToggle.disabled = false;
+        }
+      }
+    })();
+  }
+
+  private restoreProviderListScrollPosition(providerListEl: HTMLElement): void {
     window.requestAnimationFrame(() => {
       if (!providerListEl.isConnected) {
         return;
@@ -630,13 +868,7 @@ export class SettingsModelCatalogPresenter {
   }
 
   private rerender(
-    options: {
-      restoreSearchSelection?: {
-        start: number | null;
-        end: number | null;
-        direction?: 'forward' | 'backward' | 'none' | null;
-      };
-    } = {},
+    options: SettingsModelCatalogPresenterRenderOptions = {},
   ): void {
     if (!this.lastRenderState) {
       return;

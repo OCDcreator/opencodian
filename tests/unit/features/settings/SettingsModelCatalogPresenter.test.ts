@@ -61,6 +61,7 @@ function createCatalogState() {
 
 describe('SettingsModelCatalogPresenter', () => {
   function createPresenter() {
+    const onProviderAvailabilityChange = jest.fn().mockResolvedValue(undefined);
     const presenter = new SettingsModelCatalogPresenter({
       catalogStateService: {
         probeProvider: jest.fn().mockResolvedValue({
@@ -81,12 +82,13 @@ describe('SettingsModelCatalogPresenter', () => {
         targetEl.textContent = text;
       },
       applyProviderIcon: async () => {},
-      onProviderAvailabilityChange: async () => {},
+      onProviderAvailabilityChange,
       onModelAvailabilityChange: async () => {},
     });
 
     return {
       presenter,
+      onProviderAvailabilityChange,
     };
   }
 
@@ -150,5 +152,27 @@ describe('SettingsModelCatalogPresenter', () => {
       containerEl.querySelectorAll<HTMLElement>('.opencodian-model-toggle-provider-name'),
     ).map((element) => element.textContent);
     expect(filteredProviders).toEqual(['OpenAI']);
+  });
+
+  it('keeps catalog bulk provider actions wired through presenter callbacks', async () => {
+    const { presenter, onProviderAvailabilityChange } = createPresenter();
+    const containerEl = document.createElement('div');
+    document.body.appendChild(containerEl);
+    presenter.setPreferredCatalogTab('merge');
+
+    presenter.render({
+      containerEl,
+      catalogState: createCatalogState() as never,
+    });
+
+    const actionButtons = Array.from(
+      containerEl.querySelectorAll<HTMLButtonElement>('.opencodian-model-catalog-actions-buttons button'),
+    );
+    expect(actionButtons).toHaveLength(2);
+
+    actionButtons[1].click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(onProviderAvailabilityChange).toHaveBeenCalledWith(['openai'], false);
   });
 });
