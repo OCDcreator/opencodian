@@ -10,29 +10,17 @@ import * as os from 'os';
 import * as path from 'path';
 
 import { OpencodeConfigManager, PluginManagementService } from '../../core/config';
-import {
-  parseModelReference,
-  resolveModelSelection,
-} from '../../core/config/modelConfig';
 import type { PluginEntry, PluginEnvironmentSnapshot } from '../../core/config/PluginManagementService';
 import {
   getCurrentPlatformDebugLogPath,
   getCurrentPlatformKey,
   type PluginIsolationMode,
-  type QuestionCardPosition,
-  type QuestionDisplayMode,
-  type TitleMode,
 } from '../../core/types';
 import { setLocale, t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { createLogger, getVaultBasePath } from '../../shared';
-import {
-  buildModelPickerGroups,
-  findModelPickerOptionByRef,
-  type ModelPickerGroup,
-} from './modelPicker';
-import { ModelPickerModal } from './ModelPickerModal';
 import { OpencodeConfigModal } from './OpencodeConfigModal';
+import { SettingsConversationSection } from './SettingsConversationSection';
 import { SettingsModelSection } from './SettingsModelSection';
 import { SettingsSectionCoordinator } from './SettingsSectionCoordinator';
 import { SettingsSecuritySection } from './SettingsSecuritySection';
@@ -110,9 +98,9 @@ export class OpenCodianSettingTab extends PluginSettingTab {
   private lastKnownServerHealthy = false;
   private lastKnownServerStatus = 'stopped';
   private readonly sectionCoordinator: SettingsSectionCoordinator;
+  private conversationSection: SettingsConversationSection | null = null;
   private modelSection: SettingsModelSection | null = null;
   private styleSection: SettingsStyleSection | null = null;
-  private conversationHeadingEl: HTMLHeadingElement | null = null;
   private serverSection: SettingsServerSection | null = null;
 
   constructor(app: App, plugin: OpenCodianPlugin) {
@@ -215,12 +203,12 @@ export class OpenCodianSettingTab extends PluginSettingTab {
 
   display(): void {
     const { containerEl } = this;
+    this.conversationSection?.dispose();
     this.modelSection?.dispose();
     this.styleSection?.dispose();
     this.serverSection?.dispose();
     this.serverSection = null;
     this.refreshModelCatalogStatusCallback = undefined;
-    this.conversationHeadingEl = null;
     this.sectionCoordinator.beginDisplay(t('settings.title'));
 
     this.addLanguageSettings(containerEl);
@@ -324,191 +312,15 @@ export class OpenCodianSettingTab extends PluginSettingTab {
   }
 
   private addConversationSettings(containerEl: HTMLElement): HTMLHeadingElement {
-    const headingEl = this.createSectionHeading(
-      containerEl,
-      t('settings.conversation.title'),
-      t('settings.quickNav.conversationDesc'),
-    );
-    this.conversationHeadingEl = headingEl;
-
-    let titleModelSetting: Setting | null = null;
-    let titleModelButton: import('obsidian').ButtonComponent | null = null;
-    let titleModelWarningButton: import('obsidian').ExtraButtonComponent | null = null;
-    let titleModelGroups: ModelPickerGroup[] = [];
-
-    const updateTitleModelSettingVisibility = () => {
-      if (!titleModelSetting) {
-        return;
-      }
-      titleModelSetting.settingEl.style.display = this.plugin.settings.titleMode === 'ai' ? '' : 'none';
-    };
-
-    const loadTitleModels = async () => {
-      const selectedValue = this.plugin.settings.aiTitleModel;
-      const normalizedSelectedValue = selectedValue.trim();
-      let selectedLabel = normalizedSelectedValue;
-      let showUnavailableWarning = false;
-
-      try {
-        if (this.plugin.modelConfigService) {
-          const catalogs = await this.plugin.modelConfigService.getCatalogs(
-            this.plugin.settings.modelSourceMode,
-            this.plugin.settings.disabledModelRefs,
-          );
-          titleModelGroups = buildModelPickerGroups(catalogs.effective);
-
-          const selectedOption = findModelPickerOptionByRef(titleModelGroups, normalizedSelectedValue);
-          if (selectedOption) {
-            selectedLabel = `${selectedOption.providerName} / ${selectedOption.modelName}`;
-          } else if (normalizedSelectedValue) {
-            const parsedRef = parseModelReference(normalizedSelectedValue);
-            if (parsedRef) {
-              const resolution = resolveModelSelection(
-                catalogs.baseEffective,
-                catalogs.effective,
-                parsedRef.provider,
-                parsedRef.model,
-              );
-              selectedLabel = `${resolution.providerName || parsedRef.provider} / ${resolution.modelName || parsedRef.model}`;
-              showUnavailableWarning = resolution.status === 'unavailable';
-            } else {
-              selectedLabel = normalizedSelectedValue;
-            }
-          }
-        }
-      } catch (error) {
-        logger.error('Failed to load AI title models:', error);
-        titleModelGroups = [];
-        selectedLabel = normalizedSelectedValue;
-      }
-
-      if (titleModelButton) {
-        titleModelButton.setButtonText(
-          selectedLabel || t('settings.titleGeneration.model.followCurrent'),
-        );
-        titleModelButton.setDisabled(titleModelGroups.length === 0 && !normalizedSelectedValue);
-      }
-
-      if (titleModelWarningButton) {
-        titleModelWarningButton.extraSettingsEl.style.display = showUnavailableWarning ? '' : 'none';
-        titleModelWarningButton.setTooltip(t('settings.titleGeneration.model.unavailableNotice'));
-      }
-
-      updateTitleModelSettingVisibility();
-    };
-    this.refreshTitleModelsCallback = () => {
-      void loadTitleModels();
-    };
-
-    new Setting(containerEl)
-      .setName(t('settings.titleGeneration.mode.name'))
-      .setDesc(t('settings.titleGeneration.mode.desc'))
-      .addDropdown((dropdown) => {
-        dropdown
-          .addOption('default', t('settings.titleGeneration.mode.default'))
-          .addOption('ai', t('settings.titleGeneration.mode.ai'))
-          .setValue(this.plugin.settings.titleMode)
-          .onChange(async (value) => {
-            this.plugin.settings.titleMode = value as TitleMode;
-            await this.plugin.saveSettings();
-            updateTitleModelSettingVisibility();
-          });
-      });
-
-    new Setting(containerEl)
-      .setName(t('settings.conversation.questionDisplayMode.name'))
-      .setDesc(t('settings.conversation.questionDisplayMode.desc'))
-      .addDropdown((dropdown) => {
-        dropdown
-          .addOption('all', t('settings.conversation.questionDisplayMode.all'))
-          .addOption('single', t('settings.conversation.questionDisplayMode.single'))
-          .setValue(this.plugin.settings.questionDisplayMode)
-          .onChange(async (value) => {
-            this.plugin.settings.questionDisplayMode = value as QuestionDisplayMode;
-            await this.plugin.saveSettings();
-            this.plugin.refreshQuestionUi();
-          });
-      });
-
-    new Setting(containerEl)
-      .setName(t('settings.conversation.questionCardPosition.name'))
-      .setDesc(t('settings.conversation.questionCardPosition.desc'))
-      .addDropdown((dropdown) => {
-        dropdown
-          .addOption('inline', t('settings.conversation.questionCardPosition.inline'))
-          .addOption('above_input', t('settings.conversation.questionCardPosition.aboveInput'))
-          .setValue(this.plugin.settings.questionCardPosition)
-          .onChange(async (value) => {
-            this.plugin.settings.questionCardPosition = value as QuestionCardPosition;
-            await this.plugin.saveSettings();
-            this.plugin.refreshConversationRendering();
-            this.plugin.refreshQuestionUi();
-          });
-      });
-
-    new Setting(containerEl)
-      .setName(t('settings.conversation.showAnsweredQuestionCards.name'))
-      .setDesc(t('settings.conversation.showAnsweredQuestionCards.desc'))
-      .addToggle((toggle) => {
-        toggle
-          .setValue(this.plugin.settings.showAnsweredQuestionCards)
-          .onChange(async (value) => {
-            this.plugin.settings.showAnsweredQuestionCards = value;
-            await this.plugin.saveSettings();
-            this.plugin.refreshConversationRendering();
-            this.plugin.refreshQuestionUi();
-          });
-      });
-
-    titleModelSetting = new Setting(containerEl)
-      .setName(t('settings.titleGeneration.model.name'))
-      .setDesc(t('settings.titleGeneration.model.desc'))
-      .addButton((btn) => {
-        titleModelButton = btn;
-        btn.onClick(() => {
-          new ModelPickerModal(this.app, {
-            title: t('settings.titleGeneration.model.pickerTitle'),
-            description: t('settings.titleGeneration.model.pickerDesc'),
-            groups: titleModelGroups,
-            selectedRef: this.plugin.settings.aiTitleModel,
-            emptySelectionLabel: t('settings.titleGeneration.model.followCurrent'),
-            onChoose: async (option) => {
-              this.plugin.settings.aiTitleModel = option?.ref ?? '';
-              await this.plugin.saveSettings();
-              await loadTitleModels();
-            },
-          }).open();
-        });
-      })
-      .addExtraButton((button) => {
-        titleModelWarningButton = button;
-        button
-          .setIcon('alert-triangle')
-          .setTooltip(t('settings.titleGeneration.model.unavailableNotice'))
-          .onClick(() => {
-            new Notice(t('settings.titleGeneration.model.unavailableNotice'));
-          });
-        titleModelWarningButton.extraSettingsEl.addClass('opencodian-title-model-warning-button');
-        titleModelWarningButton.extraSettingsEl.style.display = 'none';
-      });
-
-    updateTitleModelSettingVisibility();
-    void loadTitleModels();
-
-    new Setting(containerEl)
-      .setName(t('settings.conversation.userMarkupAsCodeBlocks.name'))
-      .setDesc(t('settings.conversation.userMarkupAsCodeBlocks.desc'))
-      .addToggle((toggle) =>
-        toggle
-          .setValue(this.plugin.settings.renderUserMarkupAsCodeBlocks)
-          .onChange(async (value) => {
-            this.plugin.settings.renderUserMarkupAsCodeBlocks = value;
-            await this.plugin.saveSettings();
-            this.plugin.refreshConversationRendering();
-          })
-      );
-
-    return headingEl;
+    this.conversationSection ??= new SettingsConversationSection({
+      app: this.app,
+      plugin: this.plugin,
+      createSectionHeading: (hostEl, title, tooltip) => this.createSectionHeading(hostEl, title, tooltip),
+      setRefreshTitleModelsCallback: (callback) => {
+        this.refreshTitleModelsCallback = callback;
+      },
+    });
+    return this.conversationSection.attach(containerEl);
   }
 
   private addPluginSettings(containerEl: HTMLElement): HTMLHeadingElement {
@@ -700,6 +512,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       window.cancelAnimationFrame(this.modelRefreshFrameId);
       this.modelRefreshFrameId = null;
     }
+    this.conversationSection?.dispose();
     this.styleSection?.dispose();
     this.modelSection?.dispose();
     this.refreshModelsCallback = undefined;

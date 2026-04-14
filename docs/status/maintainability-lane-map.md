@@ -1,22 +1,23 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [READY] `R50` lint error restore 已完成；当前首个 `[NEXT]` 为 `R51 - OpenCodianSettings conversation section owner seam`。
+> **当前状态**: [READY] `R51` conversation section owner seam 已完成；当前首个 `[NEXT]` 为 `R52 - OpenCodianSettings plugin section owner seam`。
 
 ## 当前优先级
 
-- **当前 `[NEXT]`**：`R51 - OpenCodianSettings conversation section owner seam`
+- **当前 `[NEXT]`**：`R52 - OpenCodianSettings plugin section owner seam`
 - **本批目标**：保持 `0 errors`，连续推进 settings residual seams、server/config/icon 厚切口，最后连跑三轮 warning cleanup 与 checkpoint
 - **当前 lint 基线**：`0 errors / 92 warnings`
 - **热点顺序**：
-  1. `src/features/settings/OpenCodianSettings.ts` conversation section
-  2. 直接相关 settings / model picker tests
-  3. `src/features/settings/OpenCodianSettings.ts` plugin / UI / debug sections
-  4. `src/core/opencode/ServerManager.ts`
-  5. `src/core/config/ModelConfigService.ts`
-  6. `src/core/opencode/OpenCodeMessageNormalizationMapper.ts`
-  7. `src/utils/icons/ProviderIconService.ts`
-  8. 直接相关 tests 与模块文档
+  1. `src/features/settings/OpenCodianSettings.ts` plugin section
+  2. `src/features/settings/PluginManagementService.ts` / `src/core/config/OpencodeConfigManager.ts`
+  3. 直接相关 settings tests
+  4. `src/features/settings/OpenCodianSettings.ts` UI / debug sections
+  5. `src/core/opencode/ServerManager.ts`
+  6. `src/core/config/ModelConfigService.ts`
+  7. `src/core/opencode/OpenCodeMessageNormalizationMapper.ts`
+  8. `src/utils/icons/ProviderIconService.ts`
+  9. 直接相关 tests 与模块文档
 
 ## 本批边界
 

@@ -10,6 +10,7 @@
 当前文件的重点不只是“渲染设置项”，还包括：
 
 - 模型 / 样式 / server / security owner 的装配与跨 section 桥接
+- 通过 `SettingsConversationSection` 协调 conversation section 的 title model / question card / user-markup lifecycle
 - 通过 `SettingsStyleSection` 协调 style section 的 preset / background / input appearance / custom CSS lifecycle
 - 通过 `SettingsServerSection` 协调 server section 的 mode/auth/status lifecycle
 - 通过 `SettingsModelSection` 协调 model section 的 source mode / refresh / workspace / icon cache lifecycle
@@ -45,10 +46,8 @@
   - provider / model 的项目级配置与图标缓存管理收拢进 `ModelConfigModal`；该弹窗现按 `CC Switch` 风格重组为顶部预设条 + 横向 provider 切换 + 单列表单流，配置 JSON 与重启选项固定放在底部预览区
   - provider 图标缓存工具区新增全局 `providerIconColorMode` 与 `providerIconDefaultVariant`：前者控制运行时颜色策略（跟随系统 / 单色 / 彩色），后者控制 `auto` 条目优先尝试的 LobeHub 静态 variant；内置图标选择器会实时预览当前模式并允许显式保存 variant
 - **Conversation**
-  - `questionDisplayMode`
-  - `questionCardPosition`
-  - `showAnsweredQuestionCards`
-  - `aiTitleModel` 的 availability-aware 选项解析与可搜索 picker
+  - `SettingsConversationSection` 现在接管 title mode、`aiTitleModel` picker、question card display/position、answered-card toggle 与 user-markup render toggle
+  - `OpenCodianSettings` 不再直接铺开 conversation section 的 DOM/state/model-picker wiring，只保留 owner 装配
 - **Style**
   - `SettingsStyleSection` 现在接管 theme preset、layout/user/assistant/scrollbar/input/advanced 分组、custom CSS 与 reset / refresh 编排
   - 聊天背景图上传/调参/预览拖拽继续由 `SettingsStyleBackgroundSection` 作为 style owner 的子区块 owner 处理
@@ -119,6 +118,7 @@ provider 开关写回仍遵循 `ModelConfigService` 返回的 `effectiveProvider
 - server section 的 mode/auth/status DOM/state 现在由 `SettingsServerSection` 持有，并继续通过固定轮询刷新
 - security section 的 config-status、permission mode、restart flow 与 blocklist/export-path 输入现在由 `SettingsSecuritySection` 持有
 - model section 的 source mode、workspace 卡片、手动 refresh、icon cache 和 callback wiring 现在由 `SettingsModelSection` 持有
+- conversation section 的 title model、question card 与 user-markup toggle 现在由 `SettingsConversationSection` 持有
 - 模型加载后的 UI 刷新走 `requestAnimationFrame`
 - style section 的 preset/status、binding 同步、input theme rerender 与 reset/apply/save orchestration 现在由 `SettingsStyleSection` 持有
 - 聊天背景图 subsection 继续由 `SettingsStyleBackgroundSection` 持有自己的 host、preview request guard 与 reset/upload lifecycle，`OpenCodianSettings` 只负责装配 `SettingsStyleSection`
@@ -135,7 +135,7 @@ provider 开关写回仍遵循 `ModelConfigService` 返回的 `effectiveProvider
 | `addServerSettings()` | 创建并挂载 `SettingsServerSection` owner，把 server section lifecycle 从主类中收口出去 |
 | `addSecuritySettings()` | 创建并挂载 `SettingsSecuritySection` owner，把 security section lifecycle 从主类中收口出去 |
 | `addModelSettings()` | 创建并挂载 `SettingsModelSection` owner，把模型 section lifecycle 从主类中收口出去 |
-| `addConversationSettings()` | 渲染标题、question 和回答回顾相关设置 |
+| `addConversationSettings()` | 创建并挂载 `SettingsConversationSection` owner，把 conversation section lifecycle 从主类中收口出去 |
 | `addStyleSettings()` | 创建并挂载 `SettingsStyleSection` owner，把完整 style section lifecycle 从主类中收口出去 |
 
 ## 与其他模块的交互
@@ -143,6 +143,7 @@ provider 开关写回仍遵循 `ModelConfigService` 返回的 `effectiveProvider
 - `SettingsSectionCoordinator`: 管理 section heading 注册、quick-nav 构建、post-render setup 与 scroll restoration，避免这些 DOM/runtime 细节继续堆在设置页主类里
 - `SettingsServerSection`: 管理 server section 的 mode 切换、host/port/remote URL、auth 输入、状态轮询与 start/stop/test/refresh action；`OpenCodianSettings` 只保留 owner 装配与跨 section server-state 同步
 - `SettingsModelSection`: 管理模型 section 的 source mode、refresh 链路、workspace 卡片、icon cache 工具区与 `SettingsModelCatalogPresenter` host；`OpenCodianSettings` 只保留 owner 装配与 callback/state bridge
+- `SettingsConversationSection`: 管理 conversation section 的 title mode、AI title model picker、question card display/position、answered-card toggle 与 user-markup render toggle；`OpenCodianSettings` 只保留 owner 装配与 title-model refresh callback bridge
 - `SettingsSecuritySection`: 管理 security section 的 config status、permission mode 写回、restart action 与 blocklist/export-path 输入；`OpenCodianSettings` 只保留 owner 装配
 - `SettingsStyleSection`: 管理 style section 的 theme preset、binding sync、background owner 装配、input panel theme family 切换、glass/liquid glass 参数与 custom CSS；`OpenCodianSettings` 只保留 owner 装配
 - `ModelCatalogStateService`: 提供 settings/model 分区使用的 catalog state API，并集中 provider/model availability 的 core 写回操作
@@ -165,6 +166,7 @@ provider 开关写回仍遵循 `ModelConfigService` 返回的 `effectiveProvider
 - 如果只是调整 settings panel scaffolding，优先改 `SettingsSectionCoordinator`，不要再把 quick-nav/scroll 定时器塞回 `OpenCodianSettings`。
 - 如果只是调整 server mode/host/auth/status/action 组装，优先改 `SettingsServerSection`，不要再把这一整块 lifecycle 塞回主设置类。
 - 如果只是调整模型 section 的 source mode、workspace 卡片、icon cache 或 refresh orchestration，优先改 `SettingsModelSection`，不要再把这条 lifecycle 塞回主设置类。
+- 如果只是调整 conversation section 的 title model、question card 或 user-markup render 组装，优先改 `SettingsConversationSection`，不要再把这条 lifecycle 塞回主设置类。
 - 如果只是调整 security config-status/permission/restart/blocklist/export-path 组装，优先改 `SettingsSecuritySection`，不要再把这一整块 lifecycle 塞回主设置类。
 - 如果只是调整模型目录 UI 状态、provider probe badge/detail、accordion/filter 行为，优先改 `SettingsModelCatalogPresenter`，不要再把这套状态机塞回 `OpenCodianSettings`。
 - 如果只是调整完整 style section（theme preset、input appearance、custom CSS、glass/liquid glass 参数），优先改 `SettingsStyleSection`，不要再把这条 lifecycle 塞回主设置类。

@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的 `[NEXT]`”。
-> **当前状态**: [READY] `R50` lint error restore 已完成，当前首个 `[NEXT]` 为 `R51 - OpenCodianSettings conversation section owner seam`；必须继续按 `R51-R67` 顺序执行。
+> **当前状态**: [READY] `R51` conversation section owner seam 已完成，当前首个 `[NEXT]` 为 `R52 - OpenCodianSettings plugin section owner seam`；必须继续按 `R52-R67` 顺序执行。
 
 ## 控制规则
 
@@ -116,7 +116,7 @@
   - `npm run lint` 恢复到 `0 errors / 92 warnings`
   - focused validation、全量 `npm test`、`npm run build` 通过
 
-### [NEXT] R51 - OpenCodianSettings conversation section owner seam
+### [DONE] R51 - OpenCodianSettings conversation section owner seam
 
 - **Lane**: Maintainability / settings conversation section
 - **目标**: 从 `src/features/settings/OpenCodianSettings.ts:addConversationSettings()` 收束 title mode/model picker、question card display/position、answered-card toggle 与 user-markup render toggle 的完整 section lifecycle，减少主类直接持有的 conversation settings wiring。
@@ -134,7 +134,7 @@
   - focused validation、全量 `npm test`、`npm run build` 通过
   - 执行 Test Vault 部署并校验 `BUILD_ID`
 
-### [QUEUED] R52 - OpenCodianSettings plugin section owner seam
+### [NEXT] R52 - OpenCodianSettings plugin section owner seam
 
 - **Lane**: Maintainability / settings plugin management
 - **目标**: 从 `src/features/settings/OpenCodianSettings.ts:addPluginSettings()` 收束 snapshot refresh、project config editor、isolation mode、project directory 与 OMO 管理的完整 plugin section lifecycle，优先形成单一厚 owner。
