@@ -1,33 +1,34 @@
 # Maintainability Master Plan
 
-> **状态**: [READY]
+> **状态**: [PAUSED]
 > **作用**: 这是 maintainability 无人值守的战略文档。每轮开始前，先读本文件，再读 `docs/status/maintainability-round-roadmap.md` 与最近的 `docs/status/maintainability-phase-XXX.md`。
-> **自动推进状态**: `R66` 已完成 Warning cleanup batch C (server, icons, and heavy tests)；当前首个 `[NEXT]` 为 `R67 - Maintainability and warning checkpoint`，恢复运行时必须继续按 roadmap 队列顺序执行，不允许 freestyle。
+> **自动推进状态**: `R67` 已完成 Maintainability and warning checkpoint；当前没有可自动执行的 `[NEXT]`，需要人工根据 checkpoint 结论补充后续 queue 后才能恢复 autopilot。
 
 ## 1. 当前判断
 
-**当前分支已完成 `R66`，在 server/icons/heavy-tests 邻域完成 warning cleanup batch C：`ProviderIconService` 的 mime-type 判定现在通过更窄的 header/svg/signature helpers 收束复杂度，`ServerManager` 与 `ProviderIconService` 的 heavy tests 也按 lifecycle/runtime 与 cache/custom-source 责任拆成更窄 suite。** 当前 lint 基线保持在 `0 errors / 79 warnings`；下一轮应执行 `R67` checkpoint，复盘 `R50-R66` 的收益、剩余高成本 warning 与后续路线。
+**当前分支已完成 `R50-R67` 的整批受控 queue，并在 `R67` checkpoint 中确认：owner seam 与 warning cleanup 已把 live lint 从 `0 errors / 92 warnings` 压到 `0 errors / 79 warnings`。** 其中 `R51-R63` 完成 settings / server / config / mapper / icon 服务的单一职责收束，`R64-R66` 再把 warning 从 `87 -> 84 -> 79`；当前不应自动扩展 `R68+`，而应基于剩余 warning 分布人工确定下一批路线。
 
 这批夜间队列的主线是：
 
 - 已用 `R50` 恢复 lint 到 `0 errors`
 - 继续 `OpenCodianSettings` 残余的大 section owner seam：UI、debug
 - 再推进基础热点：`ServerManager`、`ModelConfigService`、`OpenCodeMessageNormalizationMapper`、`ProviderIconService`
-- 最后显式跑三轮 warning cleanup，再做 checkpoint
+- 最后显式跑三轮 warning cleanup，再做 checkpoint（现已完成）
 
 ## 2. 当前基线
 
 - **lint**: `0 errors / 79 warnings`
 - **验证**:
-  - 最近一次已确认的全量测试为 `R66`：`npm test` 通过，`264 passed, 264 total` suites；`1126 passed, 1126 total` tests
-  - 最近一次已确认的构建通过为 `R66`：`npm run build`，`BUILD_ID` `autopilot-maintainability.202604150634`
+  - 最近一次已确认的全量测试为 `R67` checkpoint：`npm test` 通过，`264 passed, 264 total` suites；`1126 passed, 1126 total` tests
+  - 最近一次已确认的构建通过为 `R67` checkpoint：`npm run build`，`BUILD_ID` `autopilot-maintainability.202604150638`
   - 最近一次 Test Vault 部署仍为 `R64`：已复制 `dist/main.js`、`dist/manifest.json` 与 `dist/styles.css` 到 Test Vault，并确认部署后的 `main.js` 含 `BUILD_ID` `autopilot-maintainability.202604150602`
-- **本批目标**:
-  - 保持 `0 errors`
-  - 在保持受控 queue 的前提下继续做高确定性 maintainability seam
-  - 在 `R67` checkpoint 中复盘从 `92 -> 79` 的 warning 下降轨迹，并明确剩余高成本阻塞与下一批入口
+- **本批结论**:
+  - `R50-R66` 的 owner seam 与 warning cleanup 已完成 checkpoint 收口，warning 基线稳定在 `79`
+  - 剩余 warning 仍以 `max-lines` / `max-lines-per-function` 为主（分别 `39` 与 `25`），说明下一批仍应优先挑选完整 owner seam，而不是零碎规则修补
+  - warning 最大聚集区已经转到 chat runtime / services，其次才是 opencode core；settings residual 与 glass demos 维持次级优先级
 - **下一批高确定性切口**:
-  - `R67`: checkpoint
+  - 当前没有可自动执行的 `[NEXT]`
+  - 若人工恢复 queue，优先考虑 `src/features/chat/**` 与 `src/core/opencode/**` 的高密度 warning 热点
 - **历史摘要**: 见 `docs/status/maintainability-completed-batches.md`
 
 ## 3. 最近完成摘要
@@ -60,14 +61,16 @@
 - **R64**: 在 settings 邻域完成 warning cleanup batch A，把 `SettingsStyleSection.attach()` 收束为 section-level 同文件 owner 调度、缩小 `OpenCodianSettings` / `OpenCodianStyleSettings` / `modelConfigWorkspace` focused tests 的单函数范围、吸收两个 import-sort lint blocker，并把 live lint 基线压到 `0 errors / 87 warnings`
 - **R65**: 在 config/opencode core 邻域完成 warning cleanup batch B，把 `OpenCodeMessageNormalizationMapper` 的 context/OMO hydration 收口到邻近 owner `OpenCodeMessageContextOmoAssembler`，将 `modelConfig` / mapper focused tests 拆成更窄 suite scope，并把 live lint 基线继续压到 `0 errors / 84 warnings`
 - **R66**: 在 server/icons/heavy-tests 邻域完成 warning cleanup batch C，把 `ProviderIconService` 的 mime detection 拆成更窄 helper flow，并把 `ServerManager` / `ProviderIconService` heavy tests 按 lifecycle/runtime 与 cache/custom-source 责任拆成更窄 suite file，继续把 live lint 基线压到 `0 errors / 79 warnings`
+- **R67**: 完成 checkpoint，确认 `R50-R66` 已把 live lint 从 `0 errors / 92 warnings` 稳定降到 `0 errors / 79 warnings`，剩余 warning 以 chat runtime / opencode core 的 file-size seam 为主，queue 现已耗尽并转入人工续排态
 
 ## 4. 本批结论
 
 1. **停机态已经确认**：`R49` 已提交，stop sentinel 已将 runtime state 标记为 `stopped_after_next_commit`，当前 `lock: none`，可以安全重排后续长队列。
 2. **settings residual 阶段已结束**：`OpenCodianSettings` 的高确定性 section seam 已收尾，当前夜间队列正式转入 `ServerManager` / config / mapper / icon 服务热点。
 3. **warning reduction 不再隐含进行**：本批把 lint/error 恢复与 warning cleanup 明确写成 `R50`、`R64-R66`，避免 checkpoint 轮再次因为基线口径不清而卡住。
-4. **本批长度故意拉长**：`R50-R67` 共 18 轮，目标就是支持夜间连续无人值守，而不是跑完 3-5 轮就回到人工确认态。
-5. **当前不单列 user section seam**：`OpenCodianSettings` 的 user section 规模偏小，暂不单独拆成薄 owner；若后续仍有收益，应优先与更完整 lifecycle 一起处理，而不是为了凑轮次制造碎片模块。
+4. **本批长度故意拉长且已完整收口**：`R50-R67` 共 18 轮，checkpoint 已验证本批目标达成；当前应回到人工续排，而不是自动捏造下一轮。
+5. **下一批建议优先级已明确**：chat runtime / services 是最大的剩余 warning 聚集区，其次才是 opencode core；settings residual 只在能形成完整 owner seam 时再继续推进。
+6. **当前不单列 user section seam**：`OpenCodianSettings` 的 user section 规模偏小，暂不单独拆成薄 owner；若后续仍有收益，应优先与更完整 lifecycle 一起处理，而不是为了凑轮次制造碎片模块。
 
 ## 5. 长期边界
 

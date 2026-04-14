@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的 `[NEXT]`”。
-> **当前状态**: [READY] `R66` Warning cleanup batch C (server, icons, and heavy tests) 已完成，当前首个 `[NEXT]` 为 `R67 - Maintainability and warning checkpoint`；必须继续按 queue 顺序执行。
+> **当前状态**: [PAUSED] `R67` Maintainability and warning checkpoint 已完成；当前没有可自动执行的 `[NEXT]`，后续 queue 需人工续排后才能恢复 autopilot。
 
 ## 控制规则
 
@@ -16,9 +16,9 @@
 ## 当前背景
 
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
-- 最近成功 phase：`docs/status/maintainability-phase-400.md`
-- 当前 live lint 基线：`0 errors / 84 warnings`
-- 当前路线判断：config/opencode core warning cleanup 已完成，继续显式推进 server/icons/heavy-tests warning cleanup
+- 最近成功 phase：`docs/status/maintainability-phase-402.md`
+- 当前 live lint 基线：`0 errors / 79 warnings`
+- 当前路线判断：`R50-R66` 的 owner seam 与 warning cleanup 已在 `R67` checkpoint 中收口；后续若恢复 queue，建议优先转向 chat runtime / opencode service seams，但本文件不自动扩展 `R68+`
 
 ## Queue
 
@@ -406,7 +406,7 @@
   - `npm run lint` 维持 `0 errors`
   - focused validation、全量 `npm test`、`npm run build` 通过
 
-### [NEXT] R67 - Maintainability and warning checkpoint
+### [DONE] R67 - Maintainability and warning checkpoint
 
 - **Lane**: Checkpoint
 - **目标**: 复盘 `R50-R66` 的 owner 收益、warning 减少量、验证成本与剩余高成本热点，决定下一批是继续深挖 settings residuals / service seams，还是转入新的 warning route。
@@ -423,3 +423,5 @@
 - **验收**:
   - phase 文档明确记录 `R50-R66` 收益、最新 lint 基线、warning 下降量与后续建议
   - 如果 warning 未进入低八十区间，需要明确说明原因与后续优先级
+
+当前没有可自动执行的 `[NEXT]`。如需继续 maintainability autopilot，必须先依据本次 checkpoint 结论人工补充新的 `[QUEUED]` 项。
