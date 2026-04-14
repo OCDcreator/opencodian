@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的 `[NEXT]`”。
-> **当前状态**: [QUEUED] `R39-R41` 已人工确认并排队；恢复 autopilot 时从 `R39` 开始。
+> **当前状态**: [QUEUED] `R40-R41` 已人工确认并排队；恢复 autopilot 时从 `R40` 开始。
 
 ## 控制规则
 
@@ -17,8 +17,8 @@
 
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
 - 最近 checkpoint：`docs/status/maintainability-phase-372.md`
-- 当前 lint 基线：`0 errors / 89 warnings`
-- 当前路线判断：lint housekeeping 已完成，继续回到 `OpenCodianSettings` 的较厚 section seam
+- 当前 lint 基线：`0 errors / 87 warnings`
+- 当前路线判断：`R39` 已把 server section lifecycle 收口到 `SettingsServerSection`；下一步继续 `OpenCodianSettings` 的 security 厚切口
 
 ## Queue
 
@@ -38,7 +38,7 @@
   - `npm run lint` 至少回到 `0 errors / 89 warnings`
   - 全量 `npm test`、`npm run build` 通过
 
-### [NEXT] R39 - OpenCodianSettings server section owner seam
+### [DONE] R39 - OpenCodianSettings server section owner seam
 
 - **Lane**: Maintainability / settings server section
 - **目标**: 从 `src/features/settings/OpenCodianSettings.ts:359` 的 `addServerSettings` 中收束完整 server section lifecycle，优先削弱 mode、host/port、remote URL、auth、status/action 的直接 DOM/state 装配
@@ -57,7 +57,7 @@
   - focused validation、全量 `npm test`、`npm run build` 通过
   - 执行 Test Vault 部署并校验 `BUILD_ID`
 
-### [QUEUED] R40 - OpenCodianSettings security section lifecycle seam
+### [NEXT] R40 - OpenCodianSettings security section lifecycle seam
 
 - **Lane**: Maintainability / settings security section
 - **目标**: 从 `src/features/settings/OpenCodianSettings.ts:1865` 的 `addSecuritySettings` 中收束完整 security/config lifecycle，优先整理 config status、permission mode、restart flow、blocklist / export path 配置

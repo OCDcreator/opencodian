@@ -65,9 +65,9 @@ import {
 import { ModelPickerModal } from './ModelPickerModal';
 import { OpencodeConfigModal } from './OpencodeConfigModal';
 import { ProviderIconCacheModal } from './ProviderIconCacheModal';
-import { type ServerHelpTopic, ServerSettingHelpModal } from './ServerSettingHelpModal';
 import { SettingsModelCatalogPresenter } from './SettingsModelCatalogPresenter';
 import { SettingsSectionCoordinator } from './SettingsSectionCoordinator';
+import { SettingsServerSection } from './SettingsServerSection';
 import { SettingsStyleBackgroundSection } from './SettingsStyleBackgroundSection';
 
 const logger = createLogger('OpenCodianSettings');
@@ -179,9 +179,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
   plugin: OpenCodianPlugin;
   private refreshModelsCallback?: () => void;
   private refreshTitleModelsCallback?: () => void;
-  private refreshServerStatusCallback?: () => Promise<void>;
   private refreshModelCatalogStatusCallback?: () => void;
-  private serverStatusIntervalId: number | null = null;
   private modelRefreshFrameId: number | null = null;
   private lastKnownServerHealthy = false;
   private lastKnownServerStatus = 'stopped';
@@ -192,6 +190,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
   private styleControlBindings: StyleControlBinding[] = [];
   private stylePresetUiRefresh?: () => void;
   private conversationHeadingEl: HTMLHeadingElement | null = null;
+  private serverSection: SettingsServerSection | null = null;
   private backgroundStyleSection: SettingsStyleBackgroundSection | null = null;
   private inputStyleGroupHostEl: HTMLElement | null = null;
 
@@ -224,7 +223,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
   }
 
   refreshServerStatusDisplay(): void {
-    void this.refreshServerStatusCallback?.();
+    void this.serverSection?.refreshStatus();
     this.refreshModelCatalogStatusCallback?.();
   }
 
@@ -300,11 +299,9 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     this.modelAvailabilitySectionOpen = this.plugin.settings.modelAvailabilitySectionOpen;
     this.modelToolsSectionOpen = this.plugin.settings.modelToolsSectionOpen;
 
-    if (this.serverStatusIntervalId) {
-      window.clearInterval(this.serverStatusIntervalId);
-      this.serverStatusIntervalId = null;
-    }
-    this.refreshServerStatusCallback = undefined;
+    this.serverSection?.dispose();
+    this.serverSection = null;
+    this.refreshModelCatalogStatusCallback = undefined;
     this.styleControlBindings = [];
     this.stylePresetUiRefresh = undefined;
     this.conversationHeadingEl = null;
@@ -357,420 +354,30 @@ export class OpenCodianSettingTab extends PluginSettingTab {
 
   /** Server settings section */
   private addServerSettings(containerEl: HTMLElement): HTMLHeadingElement {
-    const headingEl = this.createSectionHeading(
-      containerEl,
-      t('settings.server.title'),
-      t('settings.quickNav.serverDesc'),
-    );
-    const isLocalMode = this.plugin.settings.server.mode === 'local';
-
-    const modeSetting = new Setting(containerEl)
-      .setName(t('settings.server.mode.name'))
-      .setDesc(t('settings.server.mode.desc'))
-      .addDropdown((dropdown) => {
-        dropdown
-          .addOption('local', t('settings.server.mode.local'))
-          .addOption('remote', t('settings.server.mode.remote'))
-          .setValue(this.plugin.settings.server.mode)
-          .onChange(async (value) => {
-            this.plugin.settings.server.mode = value as 'local' | 'remote';
-            if (value === 'local' && this.plugin.settings.server.auth.type === 'bearer') {
-              this.plugin.settings.server.auth.type = 'none';
-            }
-            if (
-              value === 'remote'
-              && !this.plugin.settings.server.remote.baseUrl.trim()
-            ) {
-              this.plugin.settings.server.remote.baseUrl =
-                `http://${this.plugin.settings.server.local.host}:${this.plugin.settings.server.local.port}`;
-            }
-            await this.plugin.saveSettings();
-            this.display();
-          })
-      });
-    this.addServerHelpButton(modeSetting, 'mode');
-
-    if (isLocalMode) {
-      const autoStartSetting = new Setting(containerEl)
-        .setName(t('settings.server.autoStart.name'))
-        .setDesc(t('settings.server.autoStart.desc'))
-        .addToggle((toggle) =>
-          toggle
-            .setValue(this.plugin.settings.server.local.autoStart)
-            .onChange(async (value) => {
-              this.plugin.settings.server.local.autoStart = value;
-              await this.plugin.saveSettings();
-            })
-        );
-      this.addServerHelpButton(autoStartSetting, 'autoStart');
-
-      const hostSetting = new Setting(containerEl)
-        .setName(t('settings.server.host.name'))
-        .setDesc(t('settings.server.host.desc'))
-        .addText((text) => {
-          const commitHostChange = async () => {
-            const nextHost = text.inputEl.value.trim() || '127.0.0.1';
-            if (nextHost === this.plugin.settings.server.local.host) {
-              text.setValue(nextHost);
-              return;
-            }
-
-            this.plugin.settings.server.local.host = nextHost;
-            try {
-              await this.plugin.saveSettings();
-              text.setValue(this.plugin.settings.server.local.host);
-            } catch (error) {
-              text.setValue(this.plugin.settings.server.local.host);
-              new Notice(error instanceof Error ? error.message : t('settings.server.startFailed'));
-            }
-          };
-
-          text
-            .setPlaceholder('127.0.0.1')
-            .setValue(this.plugin.settings.server.local.host);
-          text.inputEl.addEventListener('change', () => {
-            void commitHostChange();
-          });
-          text.inputEl.addEventListener('blur', () => {
-            void commitHostChange();
-          });
-          text.inputEl.addEventListener('keydown', (event) => {
-            if (event.key === 'Enter') {
-              event.preventDefault();
-              text.inputEl.blur();
-            }
-          });
-        });
-      this.addServerHelpButton(hostSetting, 'host');
-
-      const portSetting = new Setting(containerEl)
-        .setName(t('settings.server.port.name'))
-        .setDesc(t('settings.server.port.desc'))
-        .addText((text) => {
-          const commitPortChange = async () => {
-            const value = text.inputEl.value.trim();
-            const port = parseInt(value, 10);
-            if (Number.isNaN(port) || port <= 0 || port >= 65536) {
-              text.setValue(String(this.plugin.settings.server.local.port));
-              new Notice(t('settings.server.port.invalid'));
-              return;
-            }
-
-            if (port === this.plugin.settings.server.local.port) {
-              text.setValue(String(port));
-              return;
-            }
-
-            this.plugin.settings.server.local.port = port;
-            try {
-              await this.plugin.saveSettings();
-              text.setValue(String(this.plugin.settings.server.local.port));
-              new Notice(t('settings.server.port.updated', { port: String(port) }));
-            } catch (error) {
-              text.setValue(String(this.plugin.settings.server.local.port));
-              new Notice(error instanceof Error ? error.message : t('settings.server.startFailed'));
-            }
-          };
-
-          text
-            .setPlaceholder('4196')
-            .setValue(String(this.plugin.settings.server.local.port));
-          text.inputEl.addEventListener('change', () => {
-            void commitPortChange();
-          });
-          text.inputEl.addEventListener('blur', () => {
-            void commitPortChange();
-          });
-          text.inputEl.addEventListener('keydown', (event) => {
-            if (event.key === 'Enter') {
-              event.preventDefault();
-              text.inputEl.blur();
-            }
-          });
-        });
-      this.addServerHelpButton(portSetting, 'port');
-    } else {
-      const remoteUrlSetting = new Setting(containerEl)
-        .setName(t('settings.server.remoteUrl.name'))
-        .setDesc(t('settings.server.remoteUrl.desc'))
-        .addText((text) =>
-          text
-            .setPlaceholder('https://ai.example.com')
-            .setValue(this.plugin.settings.server.remote.baseUrl)
-            .onChange(async (value) => {
-              this.plugin.settings.server.remote.baseUrl = value.trim();
-              await this.plugin.saveSettings();
-            })
-        );
-      this.addServerHelpButton(remoteUrlSetting, 'remoteUrl');
-    }
-
-    const authSetting = new Setting(containerEl)
-      .setName(t('settings.server.auth.name'))
-      .setDesc(t('settings.server.auth.desc'))
-      .addDropdown((dropdown) => {
-        dropdown.addOption('none', t('settings.server.auth.none'));
-        dropdown.addOption('basic', t('settings.server.auth.basic'));
-        if (!isLocalMode) {
-          dropdown.addOption('bearer', t('settings.server.auth.bearer'));
+    let serverSection: SettingsServerSection | null = null;
+    serverSection = new SettingsServerSection({
+      app: this.app,
+      plugin: this.plugin,
+      createSectionHeading: (hostEl, title, tooltip) => this.createSectionHeading(hostEl, title, tooltip),
+      notifyModelCatalogStatus: () => {
+        this.refreshModelCatalogStatusCallback?.();
+      },
+      onDispose: () => {
+        if (this.serverSection === serverSection) {
+          this.serverSection = null;
         }
-
-        const authType = isLocalMode && this.plugin.settings.server.auth.type === 'bearer'
-          ? 'none'
-          : this.plugin.settings.server.auth.type;
-
-        dropdown
-          .setValue(authType)
-          .onChange(async (value) => {
-            this.plugin.settings.server.auth.type = value as 'none' | 'basic' | 'bearer';
-            await this.plugin.saveSettings();
-            this.display();
-          });
-      });
-    this.addServerHelpButton(authSetting, 'auth');
-
-    if (this.plugin.settings.server.auth.type === 'basic') {
-      const usernameSetting = new Setting(containerEl)
-        .setName(t('settings.server.auth.username.name'))
-        .setDesc(t('settings.server.auth.username.desc'))
-        .addText((text) =>
-          text
-            .setPlaceholder('opencode')
-            .setValue(this.plugin.settings.server.auth.username)
-            .onChange(async (value) => {
-              this.plugin.settings.server.auth.username = value.trim() || 'opencode';
-              await this.plugin.saveSettings();
-            })
-        );
-      this.addServerHelpButton(usernameSetting, 'username');
-
-      const passwordSetting = new Setting(containerEl)
-        .setName(t('settings.server.auth.password.name'))
-        .setDesc(t('settings.server.auth.password.desc'))
-        .addText((text) => {
-          text
-            .setPlaceholder('••••••••')
-            .setValue(this.plugin.settings.server.auth.password)
-            .onChange(async (value) => {
-              this.plugin.settings.server.auth.password = value;
-              await this.plugin.saveSettings();
-            });
-          text.inputEl.type = 'password';
-        });
-      this.addServerHelpButton(passwordSetting, 'password');
-    }
-
-    if (!isLocalMode && this.plugin.settings.server.auth.type === 'bearer') {
-      const tokenSetting = new Setting(containerEl)
-        .setName(t('settings.server.auth.token.name'))
-        .setDesc(t('settings.server.auth.token.desc'))
-        .addText((text) => {
-          text
-            .setPlaceholder('Bearer token')
-            .setValue(this.plugin.settings.server.auth.token)
-            .onChange(async (value) => {
-              this.plugin.settings.server.auth.token = value.trim();
-              await this.plugin.saveSettings();
-            });
-          text.inputEl.type = 'password';
-        });
-      this.addServerHelpButton(tokenSetting, 'token');
-    }
-
-    // Server status display with refresh
-    const statusSetting = new Setting(containerEl)
-      .setName(t('settings.server.status.name'))
-      .setDesc(t('settings.server.status.desc'));
-    this.addServerHelpButton(statusSetting, 'status');
-
-    let actionBtn: import('obsidian').ButtonComponent;
-    let stopBtn: import('obsidian').ButtonComponent;
-    let refreshBtn: import('obsidian').ButtonComponent;
-
-    // Track server state
-    let isExternalServer = false;
-
-    const updateStatus = async () => {
-      // Check actual server health
-      const isHealthy = await this.plugin.openCodeService.checkHealth();
-      const diagnostics = this.plugin.openCodeService.getServerDiagnostics();
-
-      // Get internal status
-      const internalStatus = this.plugin.openCodeService.getServerStatus();
-      this.lastKnownServerHealthy = isHealthy;
-      this.lastKnownServerStatus = internalStatus;
-
-      isExternalServer = isHealthy
-        && internalStatus !== 'conflict'
-        && (internalStatus === 'stopped' || !this.plugin.openCodeService.isServerProcessRunning());
-
-      const statusText = (() => {
-        if (isLocalMode) {
-          if (internalStatus === 'conflict') {
-            return t('settings.server.status.localConflict');
-          }
-          if (isHealthy && diagnostics.reason === 'local-orphan-restarted') {
-            return t('settings.server.status.localRecovered');
-          }
-          if (isHealthy && isExternalServer) {
-            return t('settings.server.status.localExternal');
-          }
-          if (isHealthy) {
-            return t('settings.server.status.localManaged');
-          }
-          if (internalStatus === 'starting' || internalStatus === 'restarting') {
-            return t('settings.server.status.starting');
-          }
-          return t('settings.server.status.stopped');
-        }
-
-        if (isHealthy) {
-          return t('settings.server.status.remoteConnected');
-        }
-
-        if (internalStatus === 'starting' || internalStatus === 'restarting') {
-          return t('settings.server.status.starting');
-        }
-
-        return t('settings.server.status.stopped');
-      })();
-
-      // Update description with status and external warning if applicable
-      const healthIndicator = isHealthy ? '🟢' : '🔴';
-      let descText = `${t('settings.server.status.desc')} - ${healthIndicator} ${statusText}`;
-      if (isLocalMode && isExternalServer) {
-        descText += ` (${t('settings.server.external.title')})`;
-      } else if (isLocalMode && diagnostics.reason === 'local-orphan-restarted') {
-        descText += ` (${t('settings.server.orphanRestarted.title')})`;
-      } else if (isLocalMode && internalStatus === 'conflict') {
-        descText += ` (${t('settings.server.conflict.title')})`;
-      }
-      if (diagnostics.message) {
-        descText += ` — ${diagnostics.message}`;
-      }
-      statusSetting.setDesc(descText);
-
-      if (actionBtn) {
-        actionBtn.setButtonText(
-          isLocalMode ? t('settings.server.status.start') : t('settings.server.status.test')
-        );
-        actionBtn.setDisabled(
-          isLocalMode
-            ? (isHealthy && !isExternalServer) || internalStatus === 'starting' || internalStatus === 'restarting'
-            : internalStatus === 'starting'
-        );
-      }
-
-      if (stopBtn) {
-        stopBtn.buttonEl.style.display = isLocalMode ? '' : 'none';
-        stopBtn.setButtonText(t('settings.server.status.stop'));
-        stopBtn.setDisabled(!isHealthy || isExternalServer || internalStatus === 'conflict');
-      }
-
-      if (refreshBtn) {
-        refreshBtn.setButtonText(t('settings.server.status.refresh'));
-      }
-
-      this.refreshModelCatalogStatusCallback?.();
-    };
-
-    this.refreshServerStatusCallback = updateStatus;
-
-    statusSetting
-      .addButton((btn) => {
-        actionBtn = btn;
-        btn
-          .setButtonText(isLocalMode ? t('settings.server.status.start') : t('settings.server.status.test'))
-          .setCta()
-          .onClick(async () => {
-            btn.setDisabled(true);
-            try {
-              if (isLocalMode) {
-                await this.plugin.openCodeService.start();
-                new Notice(t('settings.server.started'));
-              } else {
-                const isHealthy = await this.plugin.openCodeService.checkHealth();
-                new Notice(
-                  isHealthy ? t('settings.server.testSuccess') : t('settings.server.testFailed')
-                );
-              }
-            } catch (error) {
-              const msg = error instanceof Error ? error.message : t('settings.server.startFailed');
-              new Notice(msg);
-            }
-            await updateStatus();
-          });
-      })
-      .addButton((btn) => {
-        stopBtn = btn;
-        btn
-          .setButtonText(t('settings.server.status.stop'))
-          .onClick(async () => {
-            btn.setDisabled(true);
-            await this.plugin.openCodeService.stop();
-            new Notice(t('settings.server.stopped'));
-            await updateStatus();
-          });
-      })
-      .addButton((btn) => {
-        refreshBtn = btn;
-        btn
-          .setButtonText(t('settings.server.status.refresh'))
-          .onClick(async () => {
-            btn.setDisabled(true);
-            const isHealthy = await this.plugin.openCodeService.checkHealth();
-            const internalStatus = this.plugin.openCodeService.getServerStatus();
-            const diagnostics = this.plugin.openCodeService.getServerDiagnostics();
-            const isExternal = isHealthy
-              && internalStatus !== 'conflict'
-              && (internalStatus === 'stopped' || !this.plugin.openCodeService.isServerProcessRunning());
-
-            await updateStatus();
-
-            const statusText = (() => {
-              if (!isLocalMode) {
-                return isHealthy ? t('settings.server.status.remoteConnected') : t('settings.server.status.stopped');
-              }
-
-              if (internalStatus === 'conflict') {
-                return t('settings.server.status.localConflict');
-              }
-
-              if (isHealthy) {
-                if (diagnostics.reason === 'local-orphan-restarted') {
-                  return t('settings.server.status.localRecovered');
-                }
-                return isExternal ? t('settings.server.status.localExternal') : t('settings.server.status.localManaged');
-              }
-
-              if (internalStatus === 'starting' || internalStatus === 'restarting') {
-                return t('settings.server.status.starting');
-              }
-
-              return t('settings.server.status.stopped');
-            })();
-            new Notice(`Health: ${isHealthy ? 'OK' : 'FAIL'} | Status: ${statusText}`);
-            btn.setDisabled(false);
-          });
-      });
-
-    // Initial status update
-    void updateStatus();
-
-    // Set up interval to refresh status while settings tab is open
-    this.serverStatusIntervalId = window.setInterval(() => void updateStatus(), 2000);
-
-    // Clean up interval when settings tab is closed
-    this.containerEl.addEventListener('unload', () => {
-      if (this.serverStatusIntervalId) {
-        window.clearInterval(this.serverStatusIntervalId);
-        this.serverStatusIntervalId = null;
-      }
-      this.refreshServerStatusCallback = undefined;
-      this.refreshModelCatalogStatusCallback = undefined;
-    }, { once: true });
-
-    return headingEl;
+        this.refreshModelCatalogStatusCallback = undefined;
+      },
+      onServerStateChange: ({ healthy, status }) => {
+        this.lastKnownServerHealthy = healthy;
+        this.lastKnownServerStatus = status;
+      },
+      requestDisplayRefresh: () => {
+        this.display();
+      },
+    });
+    this.serverSection = serverSection;
+    return serverSection.attach(containerEl);
   }
 
   /** Model settings section */
@@ -4581,17 +4188,6 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     }
 
     setIcon(targetEl, 'bot');
-  }
-
-  private addServerHelpButton(setting: Setting, topic: ServerHelpTopic): void {
-    setting.addExtraButton((button) => {
-      button
-        .setIcon('help-circle')
-        .setTooltip(t('settings.server.help.openDoc'))
-        .onClick(() => {
-          new ServerSettingHelpModal(this.app, topic).open();
-      });
-    });
   }
 
   private addSettingHelpButton(setting: Setting, helpButton: SettingHelpButtonConfig): void {
