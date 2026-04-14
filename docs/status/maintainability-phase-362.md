@@ -21,9 +21,9 @@
 
 ## 3. 控制文档更新
 
-- `docs/status/maintainability-round-roadmap.md` 已将 `W10` 标记为 `[DONE]`，并把 `W11 - Warning cleanup checkpoint` 提升为新的 `[NEXT]`。
+- `docs/status/maintainability-round-roadmap.md` 已将 `W10` 标记为 `[DONE]`，并把 `W11 - Warning cleanup route checkpoint` 提升为新的 `[NEXT]`。
 - `docs/status/maintainability-master-plan.md` 与 `docs/status/maintainability-lane-map.md` 已同步当前基线 `0 errors / 94 warnings`，并将当前 `[NEXT]` 更新为 `W11`。
-- 本轮没有追加 `W12+`，也没有恢复 `R33+`。
+- 在人工授权“由我设定路线”后，后续受控 queue 已扩展为 `W11-W15`：先 checkpoint，再处理 StorageService、OpenCodeMessageNormalizationMapper、BackgroundTaskTimelineService 三个现有 owner 内的 complexity warning，最后 `W15` checkpoint 后暂停；本轮没有恢复 `R33+`。
 
 ## 4. 验证
 
@@ -50,9 +50,9 @@
 
 ## 7. 下一步
 
-- 当前可自动执行的 `[NEXT]` 是 `W11 - Warning cleanup checkpoint`。
-- `W11` 完成后若没有新的人工追加 queue item，必须重新停回“当前没有可自动执行的 `[NEXT]`”。
+- 当前可自动执行的 `[NEXT]` 是 `W11 - Warning cleanup route checkpoint`。
+- 后续已排队 `W12-W15`；`W15` 完成后若没有新的人工追加 queue item，必须重新停回“当前没有可自动执行的 `[NEXT]`”。
 
 一句话总结第三百六十二阶段本轮：
 
-> 第三百六十二阶段在 `ToolCallRenderer` 现有 owner 内收掉了 `defaultGetToolSummary` 的 `complexity` warning，把 lint 基线从 `0 errors / 95 warnings` 推进到 `0 errors / 94 warnings`，并将自动队列推进到 `W11 - Warning cleanup checkpoint`。
+> 第三百六十二阶段在 `ToolCallRenderer` 现有 owner 内收掉了 `defaultGetToolSummary` 的 `complexity` warning，把 lint 基线从 `0 errors / 95 warnings` 推进到 `0 errors / 94 warnings`，并将自动队列推进到 `W11 - Warning cleanup route checkpoint`，后续受控队列为 `W12-W15`。

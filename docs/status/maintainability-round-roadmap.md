@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的 `[NEXT]`”。
-> **当前状态**: [CONFIRMED_NEXT_BATCH] `W10 - ToolCallRenderer summary complexity trim` 已完成；当前可自动执行的 `[NEXT]` 是 `W11 - Warning cleanup checkpoint`。`W11` 完成后必须再次暂停并等待人工确认。
+> **当前状态**: [CONFIRMED_NEXT_BATCH] `W10 - ToolCallRenderer summary complexity trim` 已完成；当前可自动执行的 `[NEXT]` 是 `W11 - Warning cleanup route checkpoint`。后续已排队 `W12-W15`，`W15` 完成后必须再次暂停并等待人工确认。
 
 ## 控制规则
 
@@ -18,9 +18,9 @@
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
 - 当前 lint 基线：`0 errors / 94 warnings`
 - checkpoint 建议：下一批继续一小批现有 owner 内的 warning cleanup，而不是自动恢复 `R33+`
-- 当前可自动执行的 `[NEXT]`：`W11 - Warning cleanup checkpoint`
+- 当前可自动执行的 `[NEXT]`：`W11 - Warning cleanup route checkpoint`
 - `W10` 已收掉 `ToolCallRenderer` 的 1 条 `complexity` warning，当前 lint 基线为 `0 errors / 94 warnings`
-- `W11` 完成后若无人追加 queue item，则必须重新写回“当前没有可自动执行的 `[NEXT]`”
+- 后续已排队 `W12-W15`；`W15` 完成后若无人追加 queue item，则必须重新写回“当前没有可自动执行的 `[NEXT]`”
 
 ## Queue
 
@@ -110,10 +110,81 @@
   - `defaultGetToolSummary` 的 `complexity` warning 消失
   - 运行 focused validation、全量 `npm test`、`npm run build`
 
-### [NEXT] W11 - Warning cleanup checkpoint
+### [NEXT] W11 - Warning cleanup route checkpoint
 
 - **Lane**: Checkpoint
-- **目标**: 复盘 `W10` 的 warning cleanup 收益，并判断下一批是否继续 warning cleanup，还是回到新的 maintainability queue 提案准备。
+- **目标**: 复盘 `W10` 的 warning cleanup 收益，并确认后续 `W12-W15` 仍沿受控 warning cleanup 小批次推进，而不是恢复 `R33+`。
+- **优先入口**:
+  - `docs/status/maintainability-master-plan.md`
+  - `docs/status/maintainability-round-roadmap.md`
+  - `docs/status/maintainability-lane-map.md`
+  - 最新 `phase` 文档与 lint 输出
+- **允许边界**:
+  - 只做文档、指标和路线确认
+- **禁止项**:
+  - 不自动扩展 `W16+` 或恢复 `R33+`
+- **验收**:
+  - phase 文档明确记录 `W10` 的 warning 收益，并把 `W12 - StorageService theme background mime trim` 提升为 `[NEXT]`
+
+### [QUEUED] W12 - StorageService theme background mime trim
+
+- **Lane**: Warning cleanup / storage hotspot
+- **目标**: 只处理 `src/core/storage/StorageService.ts` 中 `detectThemeBackgroundMimeType` 的 `complexity` warning；优先通过同文件内的局部 helper、guard clause 或 small classifier 收束分支，保持 theme background MIME detection 与 persisted storage 语义不变。
+- **优先入口**:
+  - `src/core/storage/StorageService.ts`
+  - `tests/unit/core/storage/StorageService.test.ts`
+- **允许边界**:
+  - 允许在 `StorageService` 现有 owner 内提取同文件私有 helper
+  - 允许更新直接相关 storage tests
+- **禁止项**:
+  - 不新增 storage 子文件
+  - 不把本轮扩展到 `loadSettingsFile` 的 `max-params` 或 theme/background 设置重构
+  - 不改变 theme background asset persistence 或 MIME fallback 顺序
+- **验收**:
+  - `detectThemeBackgroundMimeType` 的 `complexity` warning 消失
+  - 运行 focused validation、全量 `npm test`、`npm run build`
+
+### [QUEUED] W13 - OpenCodeMessageNormalizationMapper complexity trim
+
+- **Lane**: Warning cleanup / opencode normalization hotspot
+- **目标**: 只处理 `src/core/opencode/OpenCodeMessageNormalizationMapper.ts` 中 `openCodeMessageToChatMessage` 的 `complexity` warning；优先通过同文件内的局部 helper 或 guard clause 收束角色/part/metadata 分支，保持 OMO compatibility 与 message normalization 输出语义不变。
+- **优先入口**:
+  - `src/core/opencode/OpenCodeMessageNormalizationMapper.ts`
+  - `tests/unit/core/opencode/OpenCodeMessageNormalizationMapper.test.ts`
+- **允许边界**:
+  - 允许在 mapper 现有 owner 内提取同文件私有 helper
+  - 允许更新直接相关 normalization tests
+- **禁止项**:
+  - 不新增 mapper 子文件
+  - 不改 `OpenCodeService`、OMO compat、stream event transformer 或 SDK facade 行为
+  - 不把本轮扩展成新的 opencode maintainability owner 拆分
+- **验收**:
+  - `openCodeMessageToChatMessage` 的 `complexity` warning 消失
+  - 运行 focused validation、全量 `npm test`、`npm run build`
+
+### [QUEUED] W14 - BackgroundTaskTimelineService collectSegments trim
+
+- **Lane**: Warning cleanup / chat background-task hotspot
+- **目标**: 只处理 `src/features/chat/services/BackgroundTaskTimelineService.ts` 中 `collectSegments` 的 `complexity` warning；优先通过同文件内的局部 helper 或 guard clause 收束 segment creation、tool launch collection 与 completion reminder matching，保持 hydration、suppression 与 background-task timeline 语义不变。
+- **优先入口**:
+  - `src/features/chat/services/BackgroundTaskTimelineService.ts`
+  - `tests/unit/features/chat/BackgroundTaskTimelineService.test.ts`
+  - `tests/unit/features/chat/backgroundTaskTimeline.test.ts`
+- **允许边界**:
+  - 允许在 `BackgroundTaskTimelineService` 现有 owner 内提取同文件私有 helper
+  - 允许更新直接相关 background-task timeline tests
+- **禁止项**:
+  - 不新增 chat runtime / background-task service 薄文件
+  - 不改 `OpenCodianView`、completion notice queue、live signal routing 或 question/todo runtime ownership
+  - 不改变 conversation hydration 的 authoritative sync gate 行为
+- **验收**:
+  - `collectSegments` 的 `complexity` warning 消失
+  - 运行 focused validation、全量 `npm test`、`npm run build`
+
+### [QUEUED] W15 - Warning cleanup checkpoint
+
+- **Lane**: Checkpoint
+- **目标**: 复盘 `W12-W14` 的 warning cleanup 收益，并决定下一批是继续 warning cleanup，还是恢复新的 maintainability queue 提案准备。
 - **优先入口**:
   - `docs/status/maintainability-master-plan.md`
   - `docs/status/maintainability-round-roadmap.md`
@@ -122,10 +193,10 @@
 - **允许边界**:
   - 只做文档、指标和下一批建议
 - **禁止项**:
-  - 不自动扩展 `W12+` 或恢复 `R33+`
+  - 不自动扩展 `W16+` 或恢复 `R33+`
 - **验收**:
-  - phase 文档明确记录 `W10` 的 warning 收益与下一批建议
+  - phase 文档明确记录 `W12-W14` 的 warning 收益与下一批建议
 
 ## 当前自动队列状态
 
-当前可自动执行的 `[NEXT]` 是 `W11 - Warning cleanup checkpoint`。`W11` 完成后若没有新的人工追加 queue item，则必须重新写明“当前没有可自动执行的 `[NEXT]`”。
+当前可自动执行的 `[NEXT]` 是 `W11 - Warning cleanup route checkpoint`。后续已排队 `W12-W15`；`W15` 完成后若没有新的人工追加 queue item，则必须重新写明“当前没有可自动执行的 `[NEXT]`”。
