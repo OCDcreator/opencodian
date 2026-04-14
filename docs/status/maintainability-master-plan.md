@@ -2,11 +2,11 @@
 
 > **状态**: [CONFIRMED_NEXT_BATCH]
 > **作用**: 这是 maintainability 无人值守的战略文档。每轮开始前，先读本文件，再读 `docs/status/maintainability-round-roadmap.md` 与最近的 `docs/status/maintainability-phase-XXX.md`。
-> **自动推进状态**: `R33-R37` maintainability queue 已确认；`R33-R34` 已完成，其中 `R34` 已将 `SettingsModelCatalogPresenter` 的 render lifecycle 收束到同 owner 的 lifecycle helpers，当前 `[NEXT]` 是 `R35 - OpenCodianView constructor runtime wiring`。本批目标是继续推进较厚 owner 收束，`R37` checkpoint 后必须再次暂停等待人工确认。
+> **自动推进状态**: `R33-R37` maintainability queue 已确认；`R33-R35` 已完成，其中 `R35` 已将 `OpenCodianView` 的 constructor/runtime wiring 收束到同文件 lifecycle helpers，当前 `[NEXT]` 是 `R36 - OpenCodeService residual seam feasibility`。本批目标是继续推进较厚 owner 收束，`R37` checkpoint 后必须再次暂停等待人工确认。
 
 ## 1. 当前判断
 
-**当前判断：R28-R32、L1-L5、W1-W15 与 R33-R34 均已完成，warning cleanup 已把 lint 基线稳定到 `0 errors / 91 warnings`。本批已重新进入较厚 maintainability owner 收束：`OpenCodianSettings` 的 style/background subsection lifecycle 已迁入 `SettingsStyleBackgroundSection`，`SettingsModelCatalogPresenter` 的 render lifecycle 也已在同 owner 内完成分段收束，当前自动推进项转到 `R35 - OpenCodianView constructor runtime wiring`，随后再处理 `OpenCodeService` 条件性 residual seam 评估，并在 `R37` checkpoint 暂停。**
+**当前判断：R28-R32、L1-L5、W1-W15 与 R33-R35 均已完成，warning cleanup 已把 lint 基线稳定到 `0 errors / 91 warnings`。本批已重新进入较厚 maintainability owner 收束：`OpenCodianSettings` 的 style/background subsection lifecycle 已迁入 `SettingsStyleBackgroundSection`，`SettingsModelCatalogPresenter` 的 render lifecycle 已在同 owner 内完成分段收束，`OpenCodianView` constructor/runtime wiring 也已收束为同文件 lifecycle helpers，当前自动推进项转到 `R36 - OpenCodeService residual seam feasibility`，并在 `R37` checkpoint 暂停。**
 
 当前最重要的事实：
 
@@ -14,7 +14,7 @@
 - 剩余 warnings 仍主要集中在大型 owner 与长测试文件，但本批不再以逐条 warning cleanup 为目标
 - `R33-R37` 必须按 roadmap 顺序执行，不允许跳过当前 `[NEXT]` 或自由切回 `W16+`
 - 新增 owner 必须足够厚：覆盖完整 lifecycle / section / runtime seam；不要新增只包一层的 provider / factory / adapter
-- 当前 `[NEXT]` 是 `R35 - OpenCodianView constructor runtime wiring`；`R37` 完成后必须重新停回等待人工确认
+- 当前 `[NEXT]` 是 `R36 - OpenCodeService residual seam feasibility`；`R37` 完成后必须重新停回等待人工确认
 
 ## 2. 当前基线
 

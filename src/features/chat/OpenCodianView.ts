@@ -415,6 +415,76 @@ interface DeferredQuestionRequest {
   resolve: () => void;
 }
 
+type QuestionTodoBackgroundTaskRuntimeCoordinators = ReturnType<
+  typeof createQuestionTodoBackgroundTaskRuntimeServiceBundle
+>;
+
+interface OpenCodianViewSurfaceRuntimeWiring {
+  titleGenerationService: TitleGenerationService;
+  tabMessagesPaneCoordinator: TabMessagesPaneCoordinator<TabRuntimeState>;
+  chatHeaderPresenter: ChatHeaderPresenter;
+  chatSelectionControlsCoordinator: ChatSelectionControlsCoordinator;
+  composerInputShellCoordinator: ComposerInputShellCoordinator;
+  inputPanelAppearanceCoordinator: InputPanelAppearanceCoordinator;
+  composerContextViewFacade: ComposerContextViewFacade;
+  tabConversationSyncFingerprintRuntimePort: TabConversationSyncFingerprintRuntimePort;
+  persistentAssistantNoticeService: PersistentAssistantNoticeService;
+  sessionTodoCoordinator: SessionTodoCoordinator;
+  questionDockSlotCoordinator: QuestionDockSlotCoordinator;
+  assistantShellViewHostAdapter: AssistantShellViewHostAdapter;
+}
+
+interface OpenCodianViewBackgroundTaskRuntimeWiring {
+  visibleConversationPostSyncCoordinator:
+    QuestionTodoBackgroundTaskRuntimeCoordinators['visibleConversationPostSyncCoordinator'];
+  backgroundConversationPostSyncHandoffCoordinator:
+    QuestionTodoBackgroundTaskRuntimeCoordinators['backgroundConversationPostSyncHandoffCoordinator'];
+  questionTodoActivationRefreshCoordinator:
+    QuestionTodoBackgroundTaskRuntimeCoordinators['questionTodoActivationRefreshCoordinator'];
+  backgroundTaskActivationIndicatorCoordinator:
+    QuestionTodoBackgroundTaskRuntimeCoordinators['backgroundTaskActivationIndicatorCoordinator'];
+  activeTabContextUsageCoordinator: ActiveTabContextUsageCoordinator;
+  backgroundTaskNoticeStateService: BackgroundTaskNoticeStateService;
+  backgroundTaskTimelineService: BackgroundTaskTimelineService;
+  backgroundTaskLiveSignalCoordinator: BackgroundTaskLiveSignalCoordinator;
+}
+
+interface OpenCodianViewConversationRuntimeWiring {
+  conversationHydrationRenderBridge: ConversationHydrationRenderBridge;
+  conversationTransitionBridge: ConversationTransitionBridge;
+  tabConversationStateBridge: TabConversationStateBridge;
+  tabViewActivationBridge: TabViewActivationBridge;
+  conversationHydrationOutcomeBridge: ConversationHydrationOutcomeBridge;
+  tabConversationActivationBridge: TabConversationActivationBridge;
+  tabRuntimeStateBridge: TabRuntimeStateBridge;
+  conversationSyncRuntimeCoordinator: ConversationSyncRuntimeCoordinator;
+  conversationSyncOrchestrationService: ConversationSyncOrchestrationService;
+  conversationSyncBridge: ConversationSyncBridge;
+  conversationSyncBridgePorts: ConversationSyncBridgePorts;
+  tabActivationConversationSyncRuntimePort: TabActivationConversationSyncRuntimePort;
+  conversationSessionSignalRuntime: ConversationSessionSignalRuntime;
+  backgroundTaskCompletionNoticeService: BackgroundTaskCompletionNoticeService;
+  backgroundTaskInlinePanelRenderer: BackgroundTaskInlinePanelRenderer;
+  backgroundTaskIndicatorCoordinator: BackgroundTaskIndicatorCoordinator;
+  backgroundTaskStreamTriggerCoordinator: BackgroundTaskStreamTriggerCoordinator;
+  conversationViewStateService: ConversationViewStateService;
+  conversationTabOpenCoordinator: ConversationTabOpenCoordinator;
+  conversationTabLifecycleRecoveryCoordinator: ConversationTabLifecycleRecoveryCoordinator;
+  conversationRestoreBootstrapCoordinator: ConversationRestoreBootstrapCoordinator;
+}
+
+interface OpenCodianViewInteractionRuntimeWiring {
+  conversationRenderService: ConversationRenderService;
+  messageSendPreparationService: MessageSendPreparationService;
+  messageFinalizationService: MessageFinalizationService;
+  assistantNoticeCardRenderer: AssistantNoticeCardRenderer;
+  userMessageFooterRenderer: UserMessageFooterRenderer;
+  streamingInlineCardRenderer: StreamingInlineCardRenderer;
+  permissionInlineCardRenderer: PermissionInlineCardRenderer;
+  questionRuntimeServices: QuestionRuntimeServices;
+  sendPipelineRuntime: SendPipelineRuntime;
+}
+
 interface TabRuntimeState {
   isStreaming: boolean;
   streamController: StreamController | null;
@@ -1056,36 +1126,90 @@ export class OpenCodianView extends ItemView {
     this.messageComponent = new Component();
     this.currentEffortLevel = this.plugin.settings.effortLevel;
     this.currentThinkingBudget = this.plugin.settings.thinkingBudget;
-    this.titleGenerationService = new TitleGenerationService(this.plugin);
-    this.tabMessagesPaneCoordinator = new TabMessagesPaneCoordinator(
-      this.createTabMessagesPaneCoordinatorHost(),
+
+    const surfaceRuntime = this.createSurfaceRuntimeWiring();
+    this.titleGenerationService = surfaceRuntime.titleGenerationService;
+    this.tabMessagesPaneCoordinator = surfaceRuntime.tabMessagesPaneCoordinator;
+    this.chatHeaderPresenter = surfaceRuntime.chatHeaderPresenter;
+    this.chatSelectionControlsCoordinator = surfaceRuntime.chatSelectionControlsCoordinator;
+    this.composerInputShellCoordinator = surfaceRuntime.composerInputShellCoordinator;
+    this.inputPanelAppearanceCoordinator = surfaceRuntime.inputPanelAppearanceCoordinator;
+    this.composerContextViewFacade = surfaceRuntime.composerContextViewFacade;
+    this.tabConversationSyncFingerprintRuntimePort =
+      surfaceRuntime.tabConversationSyncFingerprintRuntimePort;
+    this.persistentAssistantNoticeService = surfaceRuntime.persistentAssistantNoticeService;
+    this.sessionTodoCoordinator = surfaceRuntime.sessionTodoCoordinator;
+    this.questionDockSlotCoordinator = surfaceRuntime.questionDockSlotCoordinator;
+    this.assistantShellViewHostAdapter = surfaceRuntime.assistantShellViewHostAdapter;
+
+    const backgroundTaskRuntime = this.createBackgroundTaskRuntimeWiring();
+    this.activeTabContextUsageCoordinator =
+      backgroundTaskRuntime.activeTabContextUsageCoordinator;
+    this.backgroundTaskNoticeStateService =
+      backgroundTaskRuntime.backgroundTaskNoticeStateService;
+    this.backgroundTaskTimelineService = backgroundTaskRuntime.backgroundTaskTimelineService;
+    this.backgroundTaskLiveSignalCoordinator =
+      backgroundTaskRuntime.backgroundTaskLiveSignalCoordinator;
+
+    const conversationRuntime = this.createConversationRuntimeWiring(backgroundTaskRuntime);
+    this.conversationHydrationRenderBridge =
+      conversationRuntime.conversationHydrationRenderBridge;
+    this.conversationTransitionBridge = conversationRuntime.conversationTransitionBridge;
+    this.tabConversationStateBridge = conversationRuntime.tabConversationStateBridge;
+    this.tabViewActivationBridge = conversationRuntime.tabViewActivationBridge;
+    this.conversationHydrationOutcomeBridge =
+      conversationRuntime.conversationHydrationOutcomeBridge;
+    this.tabConversationActivationBridge =
+      conversationRuntime.tabConversationActivationBridge;
+    this.tabRuntimeStateBridge = conversationRuntime.tabRuntimeStateBridge;
+    this.conversationSyncRuntimeCoordinator =
+      conversationRuntime.conversationSyncRuntimeCoordinator;
+    this.conversationSyncOrchestrationService =
+      conversationRuntime.conversationSyncOrchestrationService;
+    this.conversationSyncBridge = conversationRuntime.conversationSyncBridge;
+    this.conversationSyncBridgePorts = conversationRuntime.conversationSyncBridgePorts;
+    this.tabActivationConversationSyncRuntimePort =
+      conversationRuntime.tabActivationConversationSyncRuntimePort;
+    this.conversationSessionSignalRuntime =
+      conversationRuntime.conversationSessionSignalRuntime;
+    this.backgroundTaskCompletionNoticeService =
+      conversationRuntime.backgroundTaskCompletionNoticeService;
+    this.backgroundTaskInlinePanelRenderer =
+      conversationRuntime.backgroundTaskInlinePanelRenderer;
+    this.backgroundTaskIndicatorCoordinator =
+      conversationRuntime.backgroundTaskIndicatorCoordinator;
+    this.backgroundTaskStreamTriggerCoordinator =
+      conversationRuntime.backgroundTaskStreamTriggerCoordinator;
+    this.conversationViewStateService = conversationRuntime.conversationViewStateService;
+    this.conversationTabOpenCoordinator = conversationRuntime.conversationTabOpenCoordinator;
+    this.conversationTabLifecycleRecoveryCoordinator =
+      conversationRuntime.conversationTabLifecycleRecoveryCoordinator;
+    this.conversationRestoreBootstrapCoordinator =
+      conversationRuntime.conversationRestoreBootstrapCoordinator;
+
+    const interactionRuntime = this.createInteractionRuntimeWiring(
+      conversationRuntime.conversationSyncBridgePorts,
     );
-    this.chatHeaderPresenter = new ChatHeaderPresenter(this.createChatHeaderPresenterHost());
-    this.chatSelectionControlsCoordinator = new ChatSelectionControlsCoordinator(
-      this.createChatSelectionControlsCoordinatorHost(),
-    );
-    this.composerInputShellCoordinator = new ComposerInputShellCoordinator(
-      this.createComposerInputShellCoordinatorHost(),
-    );
-    this.inputPanelAppearanceCoordinator = new InputPanelAppearanceCoordinator(
-      this.createInputPanelAppearanceCoordinatorHost(),
-    );
-    this.composerContextViewFacade = ComposerContextViewFacade.create({
+    this.conversationRenderService = interactionRuntime.conversationRenderService;
+    this.messageSendPreparationService = interactionRuntime.messageSendPreparationService;
+    this.messageFinalizationService = interactionRuntime.messageFinalizationService;
+    this.assistantNoticeCardRenderer = interactionRuntime.assistantNoticeCardRenderer;
+    this.userMessageFooterRenderer = interactionRuntime.userMessageFooterRenderer;
+    this.streamingInlineCardRenderer = interactionRuntime.streamingInlineCardRenderer;
+    this.permissionInlineCardRenderer = interactionRuntime.permissionInlineCardRenderer;
+    this.questionRuntimeServices = interactionRuntime.questionRuntimeServices;
+    this.sendPipelineRuntime = interactionRuntime.sendPipelineRuntime;
+  }
+
+  private createSurfaceRuntimeWiring(): OpenCodianViewSurfaceRuntimeWiring {
+    const composerContextViewFacade = ComposerContextViewFacade.create({
       app: this.app,
       getServerMode: () => this.plugin.settings.server.mode,
       viewHost: this.createComposerContextViewHost(),
       focusRuntimeViewHost: this.createFocusContextRuntimeViewHost(),
       focusPreviewWritebackHost: this.createFocusContextPreviewWritebackHost(),
     });
-    this.tabConversationSyncFingerprintRuntimePort =
-      createTabConversationSyncFingerprintRuntimePort(
-        this.createTabConversationSyncFingerprintPortProviderHost(),
-      );
-    this.persistentAssistantNoticeService = new PersistentAssistantNoticeService(
-      this.createPersistentAssistantNoticeServiceHost(),
-    );
-    this.sessionTodoCoordinator = createSessionTodoCoordinator(this.createSessionTodoViewHost());
-    this.questionDockSlotCoordinator = new QuestionDockSlotCoordinator(
+    const questionDockSlotCoordinator = new QuestionDockSlotCoordinator(
       {
         shouldUseAboveInputQuestionDock: () => this.plugin.settings.questionCardPosition === 'above_input',
       },
@@ -1093,74 +1217,116 @@ export class OpenCodianView extends ItemView {
         this.questionDockCoordinator.render();
       },
     );
-    const {
-      visibleConversationPostSyncCoordinator,
-      backgroundConversationPostSyncHandoffCoordinator,
-      questionTodoActivationRefreshCoordinator,
-      backgroundTaskActivationIndicatorCoordinator,
-    } = createQuestionTodoBackgroundTaskRuntimeServiceBundle(
-      this.createQuestionTodoBackgroundTaskRuntimeServiceBundleHost(),
-    );
-    this.activeTabContextUsageCoordinator = new ActiveTabContextUsageCoordinator(
+
+    return {
+      titleGenerationService: new TitleGenerationService(this.plugin),
+      tabMessagesPaneCoordinator: new TabMessagesPaneCoordinator(
+        this.createTabMessagesPaneCoordinatorHost(),
+      ),
+      chatHeaderPresenter: new ChatHeaderPresenter(this.createChatHeaderPresenterHost()),
+      chatSelectionControlsCoordinator: new ChatSelectionControlsCoordinator(
+        this.createChatSelectionControlsCoordinatorHost(),
+      ),
+      composerInputShellCoordinator: new ComposerInputShellCoordinator(
+        this.createComposerInputShellCoordinatorHost(),
+      ),
+      inputPanelAppearanceCoordinator: new InputPanelAppearanceCoordinator(
+        this.createInputPanelAppearanceCoordinatorHost(),
+      ),
+      composerContextViewFacade,
+      tabConversationSyncFingerprintRuntimePort:
+        createTabConversationSyncFingerprintRuntimePort(
+          this.createTabConversationSyncFingerprintPortProviderHost(),
+        ),
+      persistentAssistantNoticeService: new PersistentAssistantNoticeService(
+        this.createPersistentAssistantNoticeServiceHost(),
+      ),
+      sessionTodoCoordinator: createSessionTodoCoordinator(this.createSessionTodoViewHost()),
+      questionDockSlotCoordinator,
+      assistantShellViewHostAdapter: new AssistantShellViewHostAdapter(
+        this.createAssistantShellViewHostAdapterHost(),
+      ),
+    };
+  }
+
+  private createBackgroundTaskRuntimeWiring(): OpenCodianViewBackgroundTaskRuntimeWiring {
+    const questionTodoBackgroundTaskRuntime =
+      createQuestionTodoBackgroundTaskRuntimeServiceBundle(
+        this.createQuestionTodoBackgroundTaskRuntimeServiceBundleHost(),
+      );
+    const activeTabContextUsageCoordinator = new ActiveTabContextUsageCoordinator(
       this.createActiveTabContextUsageCoordinatorHost(),
     );
-    this.backgroundTaskNoticeStateService = new BackgroundTaskNoticeStateService(
+    const backgroundTaskNoticeStateService = new BackgroundTaskNoticeStateService(
       this.createBackgroundTaskNoticeStateServiceHost(),
     );
-    this.backgroundTaskTimelineService = new BackgroundTaskTimelineService(
+    const backgroundTaskTimelineService = new BackgroundTaskTimelineService(
       this.createBackgroundTaskTimelineServiceHost(),
     );
-    this.backgroundTaskLiveSignalCoordinator = new BackgroundTaskLiveSignalCoordinator(
+    const backgroundTaskLiveSignalCoordinator = new BackgroundTaskLiveSignalCoordinator(
       this.sessionTodoCoordinator,
-      this.backgroundTaskTimelineService,
-      this.backgroundTaskNoticeStateService,
+      backgroundTaskTimelineService,
+      backgroundTaskNoticeStateService,
       createBackgroundTaskLiveSignalCoordinatorHost(
         createBackgroundTaskLiveSignalCoordinatorViewHostFactoryHost(
           this.createBackgroundTaskLiveSignalCoordinatorHostProviderHost(),
         ),
       ),
     );
+
+    return {
+      ...questionTodoBackgroundTaskRuntime,
+      activeTabContextUsageCoordinator,
+      backgroundTaskNoticeStateService,
+      backgroundTaskTimelineService,
+      backgroundTaskLiveSignalCoordinator,
+    };
+  }
+
+  private createConversationRuntimeWiring(
+    backgroundTaskRuntime: OpenCodianViewBackgroundTaskRuntimeWiring,
+  ): OpenCodianViewConversationRuntimeWiring {
     const conversationHydrationRuntimeViewHosts = createConversationHydrationRuntimeViewHosts(
       createConversationHydrationRuntimeViewHostFactoryHost(
         this.createConversationHydrationRuntimeHostProviderHost(),
       ),
     );
-    this.conversationHydrationRenderBridge = new ConversationHydrationRenderBridge(
+    const conversationHydrationRenderBridge = new ConversationHydrationRenderBridge(
       conversationHydrationRuntimeViewHosts.conversationHydrationRenderBridgeHost,
     );
-    this.conversationTransitionBridge = new ConversationTransitionBridge(
+    const conversationTransitionBridge = new ConversationTransitionBridge(
       conversationHydrationRuntimeViewHosts.conversationTransitionBridgeHost,
-      this.conversationHydrationRenderBridge,
+      conversationHydrationRenderBridge,
     );
     const tabActivationRuntimeBridgeHosts = createTabActivationRuntimeViewHosts(
       createTabActivationRuntimeViewHostFactoryHost(
         this.createTabActivationRuntimeHostProviderHost(),
       ),
     );
-    this.tabConversationStateBridge = new TabConversationStateBridge(
+    const tabConversationStateBridge = new TabConversationStateBridge(
       tabActivationRuntimeBridgeHosts.tabConversationStateBridgeHost,
     );
-    this.tabViewActivationBridge = new TabViewActivationBridge(
+    const tabViewActivationBridge = new TabViewActivationBridge(
       tabActivationRuntimeBridgeHosts.tabActivationBridgeHosts.tabViewActivationBridgeHost,
       this.composerContextViewFacade,
-      questionTodoActivationRefreshCoordinator,
-      backgroundTaskActivationIndicatorCoordinator,
-      this.activeTabContextUsageCoordinator,
+      backgroundTaskRuntime.questionTodoActivationRefreshCoordinator,
+      backgroundTaskRuntime.backgroundTaskActivationIndicatorCoordinator,
+      backgroundTaskRuntime.activeTabContextUsageCoordinator,
     );
-    this.conversationHydrationOutcomeBridge = new ConversationHydrationOutcomeBridge(
+    const conversationHydrationOutcomeBridge = new ConversationHydrationOutcomeBridge(
       conversationHydrationRuntimeViewHosts.conversationHydrationOutcomeBridgeHost,
-      this.tabConversationStateBridge,
-      this.tabViewActivationBridge,
+      tabConversationStateBridge,
+      tabViewActivationBridge,
     );
-    this.tabConversationActivationBridge = new TabConversationActivationBridge(
+    const tabConversationActivationBridge = new TabConversationActivationBridge(
       tabActivationRuntimeBridgeHosts.tabActivationBridgeHosts.tabConversationActivationBridgeHost,
-      this.tabConversationStateBridge,
-      this.tabViewActivationBridge,
-      questionTodoActivationRefreshCoordinator,
-      backgroundTaskActivationIndicatorCoordinator,
-      this.activeTabContextUsageCoordinator,
+      tabConversationStateBridge,
+      tabViewActivationBridge,
+      backgroundTaskRuntime.questionTodoActivationRefreshCoordinator,
+      backgroundTaskRuntime.backgroundTaskActivationIndicatorCoordinator,
+      backgroundTaskRuntime.activeTabContextUsageCoordinator,
     );
-    this.tabRuntimeStateBridge = new TabRuntimeStateBridge(
+    const tabRuntimeStateBridge = new TabRuntimeStateBridge(
       tabActivationRuntimeBridgeHosts.tabRuntimeStateBridgeHost,
     );
     const conversationSyncLoadRuntimeHosts = createConversationSyncLoadRuntimeViewHosts(
@@ -1170,107 +1336,153 @@ export class OpenCodianView extends ItemView {
     );
     const conversationSyncServices = createConversationSyncServices(
       conversationSyncLoadRuntimeHosts.conversationSyncViewHost,
-      visibleConversationPostSyncCoordinator,
-      backgroundConversationPostSyncHandoffCoordinator,
+      backgroundTaskRuntime.visibleConversationPostSyncCoordinator,
+      backgroundTaskRuntime.backgroundConversationPostSyncHandoffCoordinator,
     );
-    this.conversationSyncRuntimeCoordinator = conversationSyncServices.runtimeCoordinator;
-    this.conversationSyncOrchestrationService = conversationSyncServices.orchestrationService;
-    this.conversationSyncBridge = conversationSyncServices.bridge;
-    this.conversationSyncBridgePorts = createConversationSyncBridgePorts(
+    const conversationSyncBridgePorts = createConversationSyncBridgePorts(
       this.createConversationSyncBridgePortProviderHost(),
     );
-    this.tabActivationConversationSyncRuntimePort =
+    const tabActivationConversationSyncRuntimePort =
       createTabActivationConversationSyncRuntimePort(
         this.createTabActivationConversationSyncPortProviderHost(),
       );
-    this.conversationSessionSignalRuntime = new ConversationSessionSignalRuntime(
+    const conversationSessionSignalRuntime = new ConversationSessionSignalRuntime(
       this.createConversationSessionSignalRuntimeHost(),
-      this.backgroundTaskLiveSignalCoordinator,
+      backgroundTaskRuntime.backgroundTaskLiveSignalCoordinator,
     );
-    this.backgroundTaskCompletionNoticeService = new BackgroundTaskCompletionNoticeService(
+    const backgroundTaskCompletionNoticeService = new BackgroundTaskCompletionNoticeService(
       this.createBackgroundTaskCompletionNoticeServiceHost(),
     );
-    this.backgroundTaskInlinePanelRenderer = new BackgroundTaskInlinePanelRenderer(
-      this.backgroundTaskTimelineService,
+    const backgroundTaskInlinePanelRenderer = new BackgroundTaskInlinePanelRenderer(
+      backgroundTaskRuntime.backgroundTaskTimelineService,
       this.createBackgroundTaskInlinePanelRendererHost(),
     );
-    this.backgroundTaskIndicatorCoordinator = new BackgroundTaskIndicatorCoordinator(
-      this.backgroundTaskInlinePanelRenderer,
-      this.backgroundTaskTimelineService,
-      this.backgroundTaskCompletionNoticeService,
-      this.backgroundTaskLiveSignalCoordinator,
-      this.tabRuntimeStateBridge,
+    const backgroundTaskIndicatorCoordinator = new BackgroundTaskIndicatorCoordinator(
+      backgroundTaskInlinePanelRenderer,
+      backgroundTaskRuntime.backgroundTaskTimelineService,
+      backgroundTaskCompletionNoticeService,
+      backgroundTaskRuntime.backgroundTaskLiveSignalCoordinator,
+      tabRuntimeStateBridge,
       this.createBackgroundTaskIndicatorCoordinatorHost(),
     );
-    this.backgroundTaskStreamTriggerCoordinator = new BackgroundTaskStreamTriggerCoordinator(
-      this.backgroundTaskIndicatorCoordinator,
-      this.backgroundTaskTimelineService,
-      this.backgroundTaskLiveSignalCoordinator,
+    const backgroundTaskStreamTriggerCoordinator = new BackgroundTaskStreamTriggerCoordinator(
+      backgroundTaskIndicatorCoordinator,
+      backgroundTaskRuntime.backgroundTaskTimelineService,
+      backgroundTaskRuntime.backgroundTaskLiveSignalCoordinator,
       this.createBackgroundTaskStreamTriggerCoordinatorHost(),
     );
     const conversationLoadRuntimeBridge = new ConversationLoadRuntimeBridge(
       conversationSyncLoadRuntimeHosts.conversationLoadRuntimeBridgeHost,
     );
-    this.conversationViewStateService = new ConversationViewStateService(
+    const conversationViewStateService = new ConversationViewStateService(
       this.createConversationViewStateHost(),
-      this.tabConversationActivationBridge,
-      this.tabViewActivationBridge,
-      this.conversationHydrationOutcomeBridge,
-      this.conversationTransitionBridge,
+      tabConversationActivationBridge,
+      tabViewActivationBridge,
+      conversationHydrationOutcomeBridge,
+      conversationTransitionBridge,
       conversationLoadRuntimeBridge,
     );
-    this.conversationTabOpenCoordinator = new ConversationTabOpenCoordinator(
+    const conversationTabOpenCoordinator = new ConversationTabOpenCoordinator(
       this.createConversationTabOpenHost(),
       {
-        activateTab: (tabId) => this.conversationViewStateService.activateTab(tabId),
+        activateTab: (tabId) => conversationViewStateService.activateTab(tabId),
         openConversationInCurrentTab: (conversation) => {
-          this.tabConversationActivationBridge.openConversation(conversation);
+          tabConversationActivationBridge.openConversation(conversation);
         },
       },
     );
-    this.conversationTabLifecycleRecoveryCoordinator = new ConversationTabLifecycleRecoveryCoordinator(
-      this.createConversationTabLifecycleRecoveryHost(),
-      {
-        activateTab: (tabId) => this.conversationViewStateService.activateTab(tabId),
-        createConversationInNewTab: () =>
-          this.conversationTabOpenCoordinator.createConversationInNewTab(),
-      },
-    );
-    this.conversationRestoreBootstrapCoordinator = new ConversationRestoreBootstrapCoordinator(
+    const conversationTabLifecycleRecoveryCoordinator =
+      new ConversationTabLifecycleRecoveryCoordinator(
+        this.createConversationTabLifecycleRecoveryHost(),
+        {
+          activateTab: (tabId) => conversationViewStateService.activateTab(tabId),
+          createConversationInNewTab: () =>
+            conversationTabOpenCoordinator.createConversationInNewTab(),
+        },
+      );
+    const conversationRestoreBootstrapCoordinator = new ConversationRestoreBootstrapCoordinator(
       this.createConversationRestoreBootstrapHost(),
       {
-        activateTab: (tabId) => this.conversationViewStateService.activateTab(tabId),
+        activateTab: (tabId) => conversationViewStateService.activateTab(tabId),
       },
     );
-    this.conversationRenderService = new ConversationRenderService(this.createConversationRenderHost());
-    this.messageSendPreparationService = new MessageSendPreparationService(this.createMessageSendPreparationHost());
-    this.messageFinalizationService = new MessageFinalizationService(this.createMessageFinalizationHost());
-    this.assistantNoticeCardRenderer = new AssistantNoticeCardRenderer(
+
+    return {
+      conversationHydrationRenderBridge,
+      conversationTransitionBridge,
+      tabConversationStateBridge,
+      tabViewActivationBridge,
+      conversationHydrationOutcomeBridge,
+      tabConversationActivationBridge,
+      tabRuntimeStateBridge,
+      conversationSyncRuntimeCoordinator: conversationSyncServices.runtimeCoordinator,
+      conversationSyncOrchestrationService: conversationSyncServices.orchestrationService,
+      conversationSyncBridge: conversationSyncServices.bridge,
+      conversationSyncBridgePorts,
+      tabActivationConversationSyncRuntimePort,
+      conversationSessionSignalRuntime,
+      backgroundTaskCompletionNoticeService,
+      backgroundTaskInlinePanelRenderer,
+      backgroundTaskIndicatorCoordinator,
+      backgroundTaskStreamTriggerCoordinator,
+      conversationViewStateService,
+      conversationTabOpenCoordinator,
+      conversationTabLifecycleRecoveryCoordinator,
+      conversationRestoreBootstrapCoordinator,
+    };
+  }
+
+  private createInteractionRuntimeWiring(
+    conversationSyncBridgePorts: ConversationSyncBridgePorts,
+  ): OpenCodianViewInteractionRuntimeWiring {
+    const conversationRenderService = new ConversationRenderService(
+      this.createConversationRenderHost(),
+    );
+    const messageSendPreparationService = new MessageSendPreparationService(
+      this.createMessageSendPreparationHost(),
+    );
+    const messageFinalizationService = new MessageFinalizationService(
+      this.createMessageFinalizationHost(),
+    );
+    const assistantNoticeCardRenderer = new AssistantNoticeCardRenderer(
       this.createAssistantNoticeCardRendererHost(),
     );
-    this.userMessageFooterRenderer = new UserMessageFooterRenderer(
+    const userMessageFooterRenderer = new UserMessageFooterRenderer(
       this.createUserMessageFooterRendererHost(),
     );
-    this.assistantShellViewHostAdapter = new AssistantShellViewHostAdapter(
-      this.createAssistantShellViewHostAdapterHost(),
+    const streamingInlineCardRenderer = new StreamingInlineCardRenderer(
+      this.createStreamingInlineCardRendererHost(),
     );
-    this.streamingInlineCardRenderer = new StreamingInlineCardRenderer(this.createStreamingInlineCardRendererHost());
-    this.permissionInlineCardRenderer = new PermissionInlineCardRenderer(this.streamingInlineCardRenderer);
+    const permissionInlineCardRenderer = new PermissionInlineCardRenderer(
+      streamingInlineCardRenderer,
+    );
     const questionRuntimeViewHostFactoryHost = this.createQuestionRuntimeViewHostFactoryHost();
-    this.questionRuntimeServices = createQuestionRuntimeServices(
+    const questionRuntimeServices = createQuestionRuntimeServices(
       createQuestionRuntimeViewHost(questionRuntimeViewHostFactoryHost),
       createQuestionPostResolutionRuntimeHostAdapter({
         viewHost: questionRuntimeViewHostFactoryHost,
-        conversationSync: this.conversationSyncBridgePorts.getVisibleSyncFollowUp(),
+        conversationSync: conversationSyncBridgePorts.getVisibleSyncFollowUp(),
         statusRefresh: this.sessionTodoCoordinator,
       }),
-      this.streamingInlineCardRenderer,
+      streamingInlineCardRenderer,
     );
-    this.sendPipelineRuntime = new SendPipelineRuntime(
+    const sendPipelineRuntime = new SendPipelineRuntime(
       this.createSendPipelineRuntimeHost(),
-      this.messageSendPreparationService,
-      this.messageFinalizationService,
+      messageSendPreparationService,
+      messageFinalizationService,
     );
+
+    return {
+      conversationRenderService,
+      messageSendPreparationService,
+      messageFinalizationService,
+      assistantNoticeCardRenderer,
+      userMessageFooterRenderer,
+      streamingInlineCardRenderer,
+      permissionInlineCardRenderer,
+      questionRuntimeServices,
+      sendPipelineRuntime,
+    };
   }
 
   private createComposerContextViewHost(): ComposerContextViewHost {
