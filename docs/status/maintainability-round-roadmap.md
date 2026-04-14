@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的 `[NEXT]`”。
-> **当前状态**: [READY] `R53` UI section lifecycle seam 已完成，当前首个 `[NEXT]` 为 `R54 - OpenCodianSettings debug section lifecycle seam`；必须继续按 `R54-R67` 顺序执行。
+> **当前状态**: [READY] `R54` debug section lifecycle seam 已完成，当前首个 `[NEXT]` 为 `R55 - ServerManager managed adoption/conflict seam`；必须继续按 `R55-R67` 顺序执行。
 
 ## 控制规则
 
@@ -172,7 +172,7 @@
   - focused validation、全量 `npm test`、`npm run build` 通过
   - 执行 Test Vault 部署并校验 `BUILD_ID`
 
-### [NEXT] R54 - OpenCodianSettings debug section lifecycle seam
+### [DONE] R54 - OpenCodianSettings debug section lifecycle seam
 
 - **Lane**: Maintainability / settings debug section
 - **目标**: 从 `src/features/settings/OpenCodianSettings.ts:addDebugSettings()` 收束 debug toggles、log path picker、diagnostic copy/generate 与 console help block 的完整 debug lifecycle，优先把路径/导出/帮助说明装配集中到单一厚 owner。
@@ -190,7 +190,7 @@
   - focused validation、全量 `npm test`、`npm run build` 通过
   - 执行 Test Vault 部署并校验 `BUILD_ID`
 
-### [QUEUED] R55 - ServerManager managed adoption/conflict seam
+### [NEXT] R55 - ServerManager managed adoption/conflict seam
 
 - **Lane**: Maintainability / server lifecycle adoption
 - **目标**: 从 `src/core/opencode/ServerManager.ts` 收束 previously managed local server adoption、signature drift 判定、stale managed restart 与 orphan reporting 一整段 lifecycle，先把“接管还是重启”的决策收口。

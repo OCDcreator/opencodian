@@ -16,6 +16,7 @@
 - 通过 `SettingsServerSection` 协调 server section 的 mode/auth/status lifecycle
 - 通过 `SettingsModelSection` 协调 model section 的 source mode / refresh / workspace / icon cache lifecycle
 - 通过 `SettingsSecuritySection` 协调 security section 的 config-status/permission/restart/blocklist lifecycle
+- 通过 `SettingsDebugSection` 协调 debug logging、log path picker、diagnostic action 与 console help lifecycle
 - 通过 `SettingsStyleBackgroundSection` 协调 style owner 下的聊天背景图子区块 lifecycle
 - 对多个 modal 与辅助服务的编排
 
@@ -64,9 +65,8 @@
   - config file status / permission mode / restart action 现已委托给 `SettingsSecuritySection`
   - blocklist、external access、export path 与平台 blocked commands 的 section 组装同样收口到专属 owner
 - **Debug**
-  - `enableDebugLogging`
-  - `inlineSerializedDebugLogArgs`
-  - 诊断导出路径、复制最近诊断、生成日志文件
+  - `SettingsDebugSection` 现在接管 `enableDebugLogging`、`inlineSerializedDebugLogArgs`、log path picker、diagnostic copy/generate action 与 console help block
+  - `OpenCodianSettings` 不再直接铺开 debug section 的路径/导出/帮助说明 UI 细节，只保留 owner 装配
 
 ## 核心逻辑
 
@@ -128,6 +128,7 @@ provider 开关写回仍遵循 `ModelConfigService` 返回的 `effectiveProvider
 - conversation section 的 title model、question card 与 user-markup toggle 现在由 `SettingsConversationSection` 持有
 - plugin section 的 snapshot refresh、project config editor、isolation mode、project directory 与 OMO config 管理现在由 `SettingsPluginSection` 持有
 - UI section 的 max tabs、tab position/layout、auto scroll、chat scroll mode 与 open-in-main-tab 写回现在由 `SettingsUiSection` 持有
+- debug section 的 logging toggle、log path picker、diagnostic export/action 与 console help block 现在由 `SettingsDebugSection` 持有
 - 模型加载后的 UI 刷新走 `requestAnimationFrame`
 - style section 的 preset/status、binding 同步、input theme rerender 与 reset/apply/save orchestration 现在由 `SettingsStyleSection` 持有
 - 聊天背景图 subsection 继续由 `SettingsStyleBackgroundSection` 持有自己的 host、preview request guard 与 reset/upload lifecycle，`OpenCodianSettings` 只负责装配 `SettingsStyleSection`
@@ -148,6 +149,7 @@ provider 开关写回仍遵循 `ModelConfigService` 返回的 `effectiveProvider
 | `addPluginSettings()` | 创建并挂载 `SettingsPluginSection` owner，把 plugin management lifecycle 从主类中收口出去 |
 | `addUISettings()` | 创建并挂载 `SettingsUiSection` owner，把 UI section lifecycle 从主类中收口出去 |
 | `addStyleSettings()` | 创建并挂载 `SettingsStyleSection` owner，把完整 style section lifecycle 从主类中收口出去 |
+| `addDebugSettings()` | 创建并挂载 `SettingsDebugSection` owner，把 debug log path / export / help lifecycle 从主类中收口出去 |
 
 ## 与其他模块的交互
 
@@ -157,6 +159,7 @@ provider 开关写回仍遵循 `ModelConfigService` 返回的 `effectiveProvider
 - `SettingsConversationSection`: 管理 conversation section 的 title mode、AI title model picker、question card display/position、answered-card toggle 与 user-markup render toggle；`OpenCodianSettings` 只保留 owner 装配与 title-model refresh callback bridge
 - `SettingsPluginSection`: 管理 plugin section 的 environment snapshot、project config plugin editor、isolation mode、project plugin directory 与 OMO config open/create action；`OpenCodianSettings` 只保留 owner 装配与 formatting bridge
 - `SettingsUiSection`: 管理 UI section 的 max tabs、tab position/layout、auto scroll、chat scroll mode 与 open-in-main-tab 保存逻辑；`OpenCodianSettings` 只保留 owner 装配
+- `SettingsDebugSection`: 管理 debug section 的 logging toggle、inline serialized args、log path picker、diagnostic copy/generate action 与 console help；`OpenCodianSettings` 只保留 owner 装配
 - `SettingsSecuritySection`: 管理 security section 的 config status、permission mode 写回、restart action 与 blocklist/export-path 输入；`OpenCodianSettings` 只保留 owner 装配
 - `SettingsStyleSection`: 管理 style section 的 theme preset、binding sync、background owner 装配、input panel theme family 切换、glass/liquid glass 参数与 custom CSS；`OpenCodianSettings` 只保留 owner 装配
 - `ModelCatalogStateService`: 提供 settings/model 分区使用的 catalog state API，并集中 provider/model availability 的 core 写回操作
@@ -182,6 +185,7 @@ provider 开关写回仍遵循 `ModelConfigService` 返回的 `effectiveProvider
 - 如果只是调整 conversation section 的 title model、question card 或 user-markup render 组装，优先改 `SettingsConversationSection`，不要再把这条 lifecycle 塞回主设置类。
 - 如果只是调整 plugin snapshot、project config plugin editor、isolation mode、project directory 或 OMO config 组装，优先改 `SettingsPluginSection`，不要再把这条 lifecycle 塞回主设置类。
 - 如果只是调整 UI section 的 tab layout、auto scroll、scroll mode 或 open-in-main-tab 组装，优先改 `SettingsUiSection`，不要再把这条 lifecycle 塞回主设置类。
+- 如果只是调整 debug logging、log path picker、diagnostic export 或 console help 组装，优先改 `SettingsDebugSection`，不要再把这条 lifecycle 塞回主设置类。
 - 如果只是调整 security config-status/permission/restart/blocklist/export-path 组装，优先改 `SettingsSecuritySection`，不要再把这一整块 lifecycle 塞回主设置类。
 - 如果只是调整模型目录 UI 状态、provider probe badge/detail、accordion/filter 行为，优先改 `SettingsModelCatalogPresenter`，不要再把这套状态机塞回 `OpenCodianSettings`。
 - 如果只是调整完整 style section（theme preset、input appearance、custom CSS、glass/liquid glass 参数），优先改 `SettingsStyleSection`，不要再把这条 lifecycle 塞回主设置类。

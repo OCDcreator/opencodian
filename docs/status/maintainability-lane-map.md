@@ -1,28 +1,27 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [READY] `R53` UI section lifecycle seam 已完成；当前首个 `[NEXT]` 为 `R54 - OpenCodianSettings debug section lifecycle seam`。
+> **当前状态**: [READY] `R54` debug section lifecycle seam 已完成；当前首个 `[NEXT]` 为 `R55 - ServerManager managed adoption/conflict seam`。
 
 ## 当前优先级
 
-- **当前 `[NEXT]`**：`R54 - OpenCodianSettings debug section lifecycle seam`
-- **本批目标**：保持 `0 errors`，连续推进 settings residual seams、server/config/icon 厚切口，最后连跑三轮 warning cleanup 与 checkpoint
+- **当前 `[NEXT]`**：`R55 - ServerManager managed adoption/conflict seam`
+- **本批目标**：保持 `0 errors`，settings residual seams 已完成，继续推进 server/config/icon 厚切口，最后连跑三轮 warning cleanup 与 checkpoint
 - **当前 lint 基线**：`0 errors / 92 warnings`
 - **热点顺序**：
-  1. `src/features/settings/OpenCodianSettings.ts` debug section
-  2. 直接相关 settings tests
-  3. `src/core/opencode/ServerManager.ts`
-  4. `src/core/config/ModelConfigService.ts`
-  5. `src/core/opencode/OpenCodeMessageNormalizationMapper.ts`
-  6. `src/utils/icons/ProviderIconService.ts`
-  7. 直接相关 tests 与模块文档
+  1. `src/core/opencode/ServerManager.ts`
+  2. 直接相关 server manager tests
+  3. `src/core/config/ModelConfigService.ts`
+  4. `src/core/opencode/OpenCodeMessageNormalizationMapper.ts`
+  5. `src/utils/icons/ProviderIconService.ts`
+  6. 直接相关 tests 与模块文档
 
 ## 本批边界
 
 - 不直接恢复 freestyle；autopilot 只能按 `R50 -> R67` 顺序推进
 - 不新增薄 helper / adapter / provider / factory；新 owner 必须覆盖完整 section / lifecycle / runtime seam
 - 抽出的独立模块如果明显过薄，优先并回调用方，不为了“看起来更模块化”保留碎片
-- `OpenCodianSettings` 本批优先只拆 UI、debug 两块残余 section；user section 暂不单独拆成薄 owner
+- `OpenCodianSettings` 的 UI/debug 残余 section 已完成；user section 暂不单独拆成薄 owner
 - `OpenCodeService` / `OpenCodianView` 本批不再自由回切；只有 roadmap 明确写出的服务热点允许继续推进
 - 命中 deploy-relevant paths 时，继续严格执行 build → Test Vault deploy → `BUILD_ID` 校验
 - 恢复运行必须使用外部 profile `/Users/dht/.config/opencodian/mac-autopilot-profile.json`
