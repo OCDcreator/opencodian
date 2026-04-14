@@ -1,19 +1,19 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [CONFIRMED_NEXT_BATCH] `W10 - ToolCallRenderer summary complexity trim` 已完成；当前 `[NEXT]` 是 `W11 - Warning cleanup route checkpoint`，后续已排队 `W12-W15`。
+> **当前状态**: [CONFIRMED_NEXT_BATCH] `W11 - Warning cleanup route checkpoint` 已完成；当前 `[NEXT]` 是 `W12 - StorageService theme background mime trim`，后续已排队 `W13-W15`。
 
 ## 当前优先级
 
-- **当前 `[NEXT]`**：`W11 - Warning cleanup route checkpoint`
-- **本批目标**：先复盘 `W10`，再按 `W12-W14` 依次处理三个现有 owner 内的 complexity warning，最后 `W15` checkpoint 后暂停
+- **当前 `[NEXT]`**：`W12 - StorageService theme background mime trim`
+- **本批目标**：先在 `StorageService` 现有 owner 内收掉 theme background MIME detection 的 complexity warning，再按 `W13-W14` 继续两个现有 owner 内的 complexity trim，最后 `W15` checkpoint 后暂停
 - **当前 lint 基线**：`0 errors / 94 warnings`
 - **本批热点顺序**：
-  1. `docs/status/maintainability-phase-362.md`
-  2. `src/core/storage/StorageService.ts`
+  1. `src/core/storage/StorageService.ts`
+  2. `tests/unit/core/storage/StorageService.test.ts`
   3. `src/core/opencode/OpenCodeMessageNormalizationMapper.ts`
   4. `src/features/chat/services/BackgroundTaskTimelineService.ts`
-  5. `docs/status/maintainability-master-plan.md` / `docs/status/maintainability-round-roadmap.md` / `docs/status/maintainability-lane-map.md`
+  5. `docs/status/maintainability-phase-363.md`
 - **下一暂停点**：`W15 - Warning cleanup checkpoint`；完成后若无人工追加 queue item，则重新停回无 `[NEXT]` 状态
 - **观察但暂不自动切入**：`src/features/settings/OpenCodianSettings.ts`、`tests/unit/core/opencode/OpenCodeService.test.ts`
 
@@ -34,4 +34,4 @@
 ## 历史入口
 
 - 批次归档：`docs/status/maintainability-completed-batches.md`
-- 最近 checkpoint：`docs/status/maintainability-phase-361.md`
+- 最近 checkpoint：`docs/status/maintainability-phase-363.md`

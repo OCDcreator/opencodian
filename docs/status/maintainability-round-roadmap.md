@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的 `[NEXT]`”。
-> **当前状态**: [CONFIRMED_NEXT_BATCH] `W10 - ToolCallRenderer summary complexity trim` 已完成；当前可自动执行的 `[NEXT]` 是 `W11 - Warning cleanup route checkpoint`。后续已排队 `W12-W15`，`W15` 完成后必须再次暂停并等待人工确认。
+> **当前状态**: [CONFIRMED_NEXT_BATCH] `W11 - Warning cleanup route checkpoint` 已完成；当前可自动执行的 `[NEXT]` 是 `W12 - StorageService theme background mime trim`。后续已排队 `W13-W15`，`W15` 完成后必须再次暂停并等待人工确认。
 
 ## 控制规则
 
@@ -18,9 +18,9 @@
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
 - 当前 lint 基线：`0 errors / 94 warnings`
 - checkpoint 建议：下一批继续一小批现有 owner 内的 warning cleanup，而不是自动恢复 `R33+`
-- 当前可自动执行的 `[NEXT]`：`W11 - Warning cleanup route checkpoint`
-- `W10` 已收掉 `ToolCallRenderer` 的 1 条 `complexity` warning，当前 lint 基线为 `0 errors / 94 warnings`
-- 后续已排队 `W12-W15`；`W15` 完成后若无人追加 queue item，则必须重新写回“当前没有可自动执行的 `[NEXT]`”
+- 当前可自动执行的 `[NEXT]`：`W12 - StorageService theme background mime trim`
+- `W11` 已确认 `W10` 收掉 `ToolCallRenderer` 的 1 条 `complexity` warning，当前 lint 基线保持 `0 errors / 94 warnings`
+- 后续已排队 `W13-W15`；`W15` 完成后若无人追加 queue item，则必须重新写回“当前没有可自动执行的 `[NEXT]`”
 
 ## Queue
 
@@ -110,7 +110,7 @@
   - `defaultGetToolSummary` 的 `complexity` warning 消失
   - 运行 focused validation、全量 `npm test`、`npm run build`
 
-### [NEXT] W11 - Warning cleanup route checkpoint
+### [DONE] W11 - Warning cleanup route checkpoint
 
 - **Lane**: Checkpoint
 - **目标**: 复盘 `W10` 的 warning cleanup 收益，并确认后续 `W12-W15` 仍沿受控 warning cleanup 小批次推进，而不是恢复 `R33+`。
@@ -126,7 +126,7 @@
 - **验收**:
   - phase 文档明确记录 `W10` 的 warning 收益，并把 `W12 - StorageService theme background mime trim` 提升为 `[NEXT]`
 
-### [QUEUED] W12 - StorageService theme background mime trim
+### [NEXT] W12 - StorageService theme background mime trim
 
 - **Lane**: Warning cleanup / storage hotspot
 - **目标**: 只处理 `src/core/storage/StorageService.ts` 中 `detectThemeBackgroundMimeType` 的 `complexity` warning；优先通过同文件内的局部 helper、guard clause 或 small classifier 收束分支，保持 theme background MIME detection 与 persisted storage 语义不变。
@@ -199,4 +199,4 @@
 
 ## 当前自动队列状态
 
-当前可自动执行的 `[NEXT]` 是 `W11 - Warning cleanup route checkpoint`。后续已排队 `W12-W15`；`W15` 完成后若没有新的人工追加 queue item，则必须重新写明“当前没有可自动执行的 `[NEXT]`”。
+当前可自动执行的 `[NEXT]` 是 `W12 - StorageService theme background mime trim`。后续已排队 `W13-W15`；`W15` 完成后若没有新的人工追加 queue item，则必须重新写明“当前没有可自动执行的 `[NEXT]`”。
