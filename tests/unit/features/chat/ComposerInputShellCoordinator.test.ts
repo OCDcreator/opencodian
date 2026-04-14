@@ -1,8 +1,8 @@
-import { t } from '../../../../src/i18n';
 import {
   ComposerInputShellCoordinator,
   type ComposerInputShellCoordinatorHost,
 } from '../../../../src/features/chat/services/ComposerInputShellCoordinator';
+import { t } from '../../../../src/i18n';
 
 class ResizeObserverMock {
   static instances: ResizeObserverMock[] = [];

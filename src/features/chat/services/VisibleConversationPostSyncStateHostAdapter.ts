@@ -1,8 +1,8 @@
 import type { Conversation } from '../../../core/types';
 import type { TabId } from '../tabs';
 import {
-  VisibleConversationPostSyncStateCoordinator,
   type ConversationRevertStateSnapshot,
+  VisibleConversationPostSyncStateCoordinator,
   type VisibleConversationPostSyncStateCoordinatorHost,
 } from './VisibleConversationPostSyncStateCoordinator';
 

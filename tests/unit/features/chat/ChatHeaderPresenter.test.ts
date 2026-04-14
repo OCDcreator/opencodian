@@ -1,9 +1,9 @@
-import { t } from '../../../../src/i18n';
 import {
   ChatHeaderPresenter,
   type ChatHeaderPresenterHost,
   type ChatServerAvailability,
 } from '../../../../src/features/chat/services/ChatHeaderPresenter';
+import { t } from '../../../../src/i18n';
 
 function createFixture() {
   let cssChangeListener: (() => void) | null = null;

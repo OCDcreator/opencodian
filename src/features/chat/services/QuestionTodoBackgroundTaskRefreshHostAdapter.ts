@@ -6,33 +6,33 @@ import type {
 } from '../../../core/types';
 import type { TabId } from '../tabs';
 import {
-  createBackgroundConversationPostSyncHandoffServices,
-  type BackgroundConversationPostSyncHandoffViewHost,
-} from './BackgroundConversationPostSyncHandoffHostAdapter';
-import {
   BackgroundConversationPostSyncHandoffCoordinator,
 } from './BackgroundConversationPostSyncHandoffCoordinator';
+import {
+  type BackgroundConversationPostSyncHandoffViewHost,
+  createBackgroundConversationPostSyncHandoffServices,
+} from './BackgroundConversationPostSyncHandoffHostAdapter';
 import type { PostSyncQuestionTodoRefreshFacade } from './PostSyncQuestionTodoRefreshFacade';
 import {
   createPostSyncQuestionTodoRefreshServices,
   type PostSyncQuestionTodoRefreshViewHost,
 } from './PostSyncQuestionTodoRefreshHostAdapter';
+import type { QuestionDockCoordinator } from './QuestionDockCoordinator';
 import {
   QuestionTodoActivationRefreshBridge,
   type QuestionTodoActivationRefreshBridgeHost,
 } from './QuestionTodoActivationRefreshBridge';
-import type { QuestionDockCoordinator } from './QuestionDockCoordinator';
 import type {
   QuestionTodoStatusRefreshCoordinator,
   QuestionTodoStatusRefreshRuntime,
 } from './QuestionTodoStatusRefreshCoordinator';
 import type { SessionTodoCoordinator } from './SessionTodoCoordinator';
 import {
-  type VisibleConversationPostSyncStateCoordinator,
-} from './VisibleConversationPostSyncStateCoordinator';
-import {
   VisibleConversationPostSyncCoordinator,
 } from './VisibleConversationPostSyncCoordinator';
+import {
+  type VisibleConversationPostSyncStateCoordinator,
+} from './VisibleConversationPostSyncStateCoordinator';
 
 type QuestionPendingRefreshPort = Pick<
   QuestionDockCoordinator,

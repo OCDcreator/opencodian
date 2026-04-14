@@ -1,10 +1,10 @@
-import { t } from '../../../../src/i18n';
 import {
   ConversationTabLifecycleRecoveryCoordinator,
   type ConversationTabLifecycleRecoveryHost,
   type ConversationTabLifecycleRecoveryPort,
 } from '../../../../src/features/chat/services/ConversationTabLifecycleRecoveryCoordinator';
 import { TabManager } from '../../../../src/features/chat/tabs/TabManager';
+import { t } from '../../../../src/i18n';
 
 function createConversation(id: string, title = `Chat ${id}`) {
   return {

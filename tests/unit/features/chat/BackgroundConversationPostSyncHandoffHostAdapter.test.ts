@@ -1,10 +1,10 @@
 import type { Conversation } from '../../../../src/core/types';
 import {
+  type BackgroundConversationPostSyncHandoffViewHost,
+  type BackgroundConversationPostSyncHandoffViewHostAdapterHost,
   createBackgroundConversationPostSyncHandoffHosts,
   createBackgroundConversationPostSyncHandoffServices,
   createBackgroundConversationPostSyncHandoffViewHostAdapter,
-  type BackgroundConversationPostSyncHandoffViewHost,
-  type BackgroundConversationPostSyncHandoffViewHostAdapterHost,
 } from '../../../../src/features/chat/services/BackgroundConversationPostSyncHandoffHostAdapter';
 
 type Mocked<T> = {

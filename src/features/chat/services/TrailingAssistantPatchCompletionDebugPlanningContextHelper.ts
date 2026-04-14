@@ -1,10 +1,10 @@
 import {
+  buildTrailingAssistantPatchCompletionDebugPlanningContextInputs,
+} from './TrailingAssistantPatchCompletionDebugPlanningContextInputsHelper';
+import {
   buildTrailingAssistantPatchCompletionDebugPlanningContextShape,
   type TrailingAssistantPatchCompletionDebugPlanningContext,
 } from './TrailingAssistantPatchCompletionDebugPlanningContextShapeHelper';
-import {
-  buildTrailingAssistantPatchCompletionDebugPlanningContextInputs,
-} from './TrailingAssistantPatchCompletionDebugPlanningContextInputsHelper';
 import type { TrailingAssistantPatchCompletionDebugPlanningContextSource } from './TrailingAssistantPatchCompletionDebugPlanningContextSourceContractHelper';
 import {
   buildTrailingAssistantPatchCompletionDebugSummaryPlan,

@@ -1,9 +1,9 @@
 import type { Conversation } from '../../../../src/core/types';
 import type { BackgroundConversationAttentionCoordinator } from '../../../../src/features/chat/services/BackgroundConversationAttentionCoordinator';
-import type { BackgroundConversationPostSyncRefreshExecutor } from '../../../../src/features/chat/services/BackgroundConversationPostSyncRefreshExecutor';
 import {
   BackgroundConversationPostSyncHandoffCoordinator,
 } from '../../../../src/features/chat/services/BackgroundConversationPostSyncHandoffCoordinator';
+import type { BackgroundConversationPostSyncRefreshExecutor } from '../../../../src/features/chat/services/BackgroundConversationPostSyncRefreshExecutor';
 import type { BackgroundConversationSignalSyncStateCoordinator } from '../../../../src/features/chat/services/BackgroundConversationSignalSyncStateCoordinator';
 
 type BackgroundConversationRefreshPort = Pick<

@@ -8,8 +8,8 @@ import {
 } from '../../shared';
 import { resolveContextPath } from '../../shared/contextPath';
 import type { PromptContextItem } from '../types';
-import type { QueryOptions } from './types';
 import type { PromptRequestPart } from './OpenCodePromptRequestBuilder';
+import type { QueryOptions } from './types';
 
 const logger = createLogger('OpenCodeContextPartSerializer');
 const REMOTE_CONTEXT_TEXT_LIMIT_BYTES = 64 * 1024;

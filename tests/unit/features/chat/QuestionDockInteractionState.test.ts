@@ -1,11 +1,11 @@
 import type { QuestionRequest } from '../../../../src/core/types';
 import {
   getQuestionDockActiveInteractionState,
+  type QuestionDockInteractionRuntimeState,
   sanitizeQuestionDockAnswer,
   selectQuestionDockGroup,
   selectQuestionDockQuestion,
   setQuestionDockDraftAnswer,
-  type QuestionDockInteractionRuntimeState,
 } from '../../../../src/features/chat/services/QuestionDockInteractionState';
 
 const request: QuestionRequest = {

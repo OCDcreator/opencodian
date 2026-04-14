@@ -2,16 +2,16 @@ import type { QuestionRequest } from '../../../core/types';
 import type { TabId } from '../tabs';
 import { isQuestionAnswerComplete } from '../ui/questionDockState';
 import {
+  getQuestionDockDraftAnswers,
+  type QuestionDockInteractionRuntimeState,
+  sanitizeQuestionDockAnswer,
+} from './QuestionDockInteractionState';
+import type { QuestionDockRenderStateFacade } from './QuestionDockRenderStateFacade';
+import {
   createQuestionRejectExecutionAction,
   createQuestionReplyExecutionAction,
   type QuestionResolutionExecutionAction,
 } from './QuestionResolutionExecutionFacade';
-import {
-  getQuestionDockDraftAnswers,
-  sanitizeQuestionDockAnswer,
-  type QuestionDockInteractionRuntimeState,
-} from './QuestionDockInteractionState';
-import type { QuestionDockRenderStateFacade } from './QuestionDockRenderStateFacade';
 
 type QuestionDockActiveRequestPort = Pick<
   QuestionDockRenderStateFacade,

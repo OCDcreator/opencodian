@@ -1,6 +1,6 @@
 import {
-  buildTrailingAssistantPatchSuccessPlanFromChildPlanSource,
   buildTrailingAssistantPatchSuccessPlanFromChildPlans,
+  buildTrailingAssistantPatchSuccessPlanFromChildPlanSource,
 } from '../../../../src/features/chat/services/TrailingAssistantPatchSuccessChildPlansHelper';
 
 describe('TrailingAssistantPatchSuccessChildPlansHelper', () => {

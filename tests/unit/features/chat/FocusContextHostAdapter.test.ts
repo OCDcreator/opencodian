@@ -4,12 +4,12 @@ import {
   createFocusContextPreview,
 } from '../../../../src/features/chat/composerContext';
 import { ComposerContextRuntimeStore } from '../../../../src/features/chat/services/ComposerContextRuntimeStore';
+import type { ComposerContextRuntimeState } from '../../../../src/features/chat/services/ComposerContextViewHostAdapter';
 import {
   createFocusContextServices,
   type FocusContextPreviewWritebackHost,
   type FocusContextRuntimeViewHost,
 } from '../../../../src/features/chat/services/FocusContextHostAdapter';
-import type { ComposerContextRuntimeState } from '../../../../src/features/chat/services/ComposerContextViewHostAdapter';
 import type { TabId } from '../../../../src/features/chat/tabs';
 
 type Mocked<T> = {

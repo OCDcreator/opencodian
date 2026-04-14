@@ -1,8 +1,8 @@
 import type { PromptContextItem } from '../../../core/types';
 import {
-  getContextTargetKey,
   type ComposerContextChipState,
   type FocusContextPreview,
+  getContextTargetKey,
 } from '../composerContext';
 import type { ContextAttachmentBuilder } from './ContextAttachmentBuilder';
 

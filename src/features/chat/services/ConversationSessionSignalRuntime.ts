@@ -6,8 +6,8 @@ import type { SessionTodo } from '../../../core/types';
 import type { TabId } from '../tabs';
 import type { BackgroundTaskLiveSignalCoordinator } from './BackgroundTaskLiveSignalCoordinator';
 import {
-  ConversationSessionTabResolver,
   type ConversationSessionTabResolutionPort,
+  ConversationSessionTabResolver,
   type ConversationSessionTabResolverHost,
 } from './ConversationSessionTabResolver';
 

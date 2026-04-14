@@ -1,7 +1,7 @@
 import { OpenCodeMessageNormalizationMapper } from '../../../../src/core/opencode/OpenCodeMessageNormalizationMapper';
 import {
-  OpenCodeQuestionPermissionHub,
   type OpenCodePermissionSdk,
+  OpenCodeQuestionPermissionHub,
   type OpenCodeQuestionPermissionHubHost,
   type OpenCodeQuestionSdk,
 } from '../../../../src/core/opencode/OpenCodeQuestionPermissionHub';

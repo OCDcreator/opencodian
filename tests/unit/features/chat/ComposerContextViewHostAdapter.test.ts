@@ -2,8 +2,8 @@ import type { PromptContextItem } from '../../../../src/core/types';
 import type { FocusContextPreview } from '../../../../src/features/chat/composerContext';
 import { ComposerContextRuntimeStore } from '../../../../src/features/chat/services/ComposerContextRuntimeStore';
 import {
-  ComposerContextViewHostAdapter,
   type ComposerContextRuntimeState,
+  ComposerContextViewHostAdapter,
 } from '../../../../src/features/chat/services/ComposerContextViewHostAdapter';
 import type { TabId } from '../../../../src/features/chat/tabs';
 

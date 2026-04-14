@@ -16,35 +16,35 @@ import type { StreamingInlineCardRenderer } from '../runtime/StreamingInlineCard
 import type { TabId } from '../tabs';
 import type { QuestionDock } from '../ui/QuestionDock';
 import {
-  QuestionInlineResolutionActionFacade,
-  type QuestionInlineResolutionActionFacadeHost,
-} from './QuestionInlineResolutionActionFacade';
-import {
-  QuestionDockResolutionActionFacade,
-  type QuestionDockResolutionActionFacadeHost,
-} from './QuestionDockResolutionActionFacade';
+  QuestionDockCoordinator,
+  type QuestionDockCoordinatorHost,
+  type QuestionDockRuntimeState,
+} from './QuestionDockCoordinator';
 import {
   QuestionDockRenderStateFacade,
   type QuestionDockRenderStateFacadeHost,
 } from './QuestionDockRenderStateFacade';
 import {
-  QuestionDockCoordinator,
-  type QuestionDockCoordinatorHost,
-  type QuestionDockRuntimeState,
-} from './QuestionDockCoordinator';
+  QuestionDockResolutionActionFacade,
+  type QuestionDockResolutionActionFacadeHost,
+} from './QuestionDockResolutionActionFacade';
+import {
+  QuestionInlineResolutionActionFacade,
+  type QuestionInlineResolutionActionFacadeHost,
+} from './QuestionInlineResolutionActionFacade';
 import {
   QuestionPostResolutionRuntimeFacade,
   type QuestionPostResolutionRuntimeFacadeHost,
   type QuestionPostResolutionRuntimeState,
 } from './QuestionPostResolutionRuntimeFacade';
 import {
-  QuestionResolutionFlowCoordinator,
-  type QuestionResolutionFlowCoordinatorHost,
-} from './QuestionResolutionFlowCoordinator';
-import {
   QuestionResolutionExecutionFacade,
   type QuestionResolutionExecutionFacadeHost,
 } from './QuestionResolutionExecutionFacade';
+import {
+  QuestionResolutionFlowCoordinator,
+  type QuestionResolutionFlowCoordinatorHost,
+} from './QuestionResolutionFlowCoordinator';
 
 type QuestionDockPort = Pick<QuestionDock, 'render'>;
 

@@ -1,13 +1,13 @@
 import * as obsidian from 'obsidian';
 
 import type { QuestionRequest } from '../../../../src/core/types';
-import { setLocale } from '../../../../src/i18n';
 import {
   createQuestionRejectExecutionAction,
   createQuestionReplyExecutionAction,
   QuestionResolutionExecutionFacade,
   type QuestionResolutionExecutionFacadeHost,
 } from '../../../../src/features/chat/services/QuestionResolutionExecutionFacade';
+import { setLocale } from '../../../../src/i18n';
 
 function createQuestionRequest(overrides?: Partial<QuestionRequest>): QuestionRequest {
   return {

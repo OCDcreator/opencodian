@@ -1,6 +1,6 @@
 import type { QuestionRequest, QuestionResolution } from '../../../../src/core/types';
-import { t } from '../../../../src/i18n';
 import { QuestionResolutionCoordinator } from '../../../../src/features/chat/runtime/QuestionResolutionCoordinator';
+import { t } from '../../../../src/i18n';
 
 function createQuestionRequest(): QuestionRequest {
   return {

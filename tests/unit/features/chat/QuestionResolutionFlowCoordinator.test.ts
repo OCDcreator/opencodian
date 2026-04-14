@@ -1,11 +1,11 @@
 import type { QuestionRequest } from '../../../../src/core/types';
-import { setLocale } from '../../../../src/i18n';
 import {
   QuestionResolutionFlowCoordinator,
   type QuestionResolutionFlowCoordinatorHost,
   type QuestionResolutionFlowCoordinatorPorts,
 } from '../../../../src/features/chat/services/QuestionResolutionFlowCoordinator';
 import type { TabId } from '../../../../src/features/chat/tabs';
+import { setLocale } from '../../../../src/i18n';
 
 function createQuestionRequest(overrides?: Partial<QuestionRequest>): QuestionRequest {
   return {

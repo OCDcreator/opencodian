@@ -1,11 +1,11 @@
-import type {
-  ConversationLoadRuntimePort,
-  ConversationLoadRuntimeOptions,
-} from '../runtime/ConversationLoadRuntimeBridge';
 import type { ConversationHydrationOutcomePort } from '../runtime/ConversationHydrationOutcomeBridge';
+import type {
+  ConversationLoadRuntimeOptions,
+  ConversationLoadRuntimePort,
+} from '../runtime/ConversationLoadRuntimeBridge';
+import type { ConversationTransitionPort } from '../runtime/ConversationTransitionBridge';
 import type { TabConversationActivationBridge } from '../runtime/TabConversationActivationBridge';
 import type { TabViewActivationBridge } from '../runtime/TabViewActivationBridge';
-import type { ConversationTransitionPort } from '../runtime/ConversationTransitionBridge';
 import type { TabData, TabId } from '../tabs';
 
 export interface LoadConversationOptions {

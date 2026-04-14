@@ -1,13 +1,13 @@
 import {
-  createEmptyTabContextState,
   type ChatMessage,
   type Conversation,
+  createEmptyTabContextState,
 } from '../../../../src/core/types';
-import {
-  createConversationSyncHosts,
-  type ConversationSyncViewHost,
-} from '../../../../src/features/chat/services/ConversationSyncHostAdapter';
 import type { ConversationSyncBridgeSyncResult } from '../../../../src/features/chat/services/ConversationSyncBridge';
+import {
+  type ConversationSyncViewHost,
+  createConversationSyncHosts,
+} from '../../../../src/features/chat/services/ConversationSyncHostAdapter';
 import type { ConversationSyncSignalRuntime } from '../../../../src/features/chat/services/ConversationSyncOrchestrationService';
 import type { TabData } from '../../../../src/features/chat/tabs';
 

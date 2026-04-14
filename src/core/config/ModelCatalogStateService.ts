@@ -1,20 +1,20 @@
 import type { ModelSourceMode, OpencodeModelConfigSubset } from '../types';
-import type {
-  ModelCatalogBundle,
-  ModelConfigService,
-  ProviderAvailabilityProbe,
-} from './ModelConfigService';
 import {
   collectConfiguredProviderIds,
   formatModelReference,
   isProviderEnabled,
   mergeCatalogs,
-  parseModelReference,
-  setProviderEnabled,
   type ModelCatalog,
   type ModelCatalogDisableScope,
   type ModelCatalogProvider,
+  parseModelReference,
+  setProviderEnabled,
 } from './modelConfig';
+import type {
+  ModelCatalogBundle,
+  ModelConfigService,
+  ProviderAvailabilityProbe,
+} from './ModelConfigService';
 
 export type ModelCatalogStateMode = 'local' | 'server' | 'effective' | 'disabled';
 

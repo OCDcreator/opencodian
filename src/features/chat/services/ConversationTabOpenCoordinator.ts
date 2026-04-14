@@ -1,5 +1,5 @@
-import { t } from '../../../i18n';
 import type { Conversation } from '../../../core/types';
+import { t } from '../../../i18n';
 import type { TabData, TabId } from '../tabs';
 
 interface ConversationTabOpenTabManager {

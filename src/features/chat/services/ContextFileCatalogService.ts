@@ -3,8 +3,8 @@ import { TFile } from 'obsidian';
 
 import { ContextFileCatalogBuildRunner } from './ContextFileCatalogBuildRunner';
 import {
-  ContextFileCatalogIndex,
   type ContextFileCatalog,
+  ContextFileCatalogIndex,
 } from './ContextFileCatalogIndex';
 export type {
   ContextFileCatalog,

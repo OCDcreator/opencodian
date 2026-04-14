@@ -3,11 +3,11 @@ import {
   TabConversationActivationBridge,
   type TabConversationActivationBridgeHost,
 } from '../../../../src/features/chat/runtime/TabConversationActivationBridge';
+import type { TabConversationStateBridge } from '../../../../src/features/chat/runtime/TabConversationStateBridge';
+import type { TabViewActivationBridge } from '../../../../src/features/chat/runtime/TabViewActivationBridge';
 import type { ActiveTabContextUsageCoordinator } from '../../../../src/features/chat/services/ActiveTabContextUsageCoordinator';
 import type { BackgroundTaskActivationIndicatorCoordinator } from '../../../../src/features/chat/services/BackgroundTaskActivationIndicatorCoordinator';
 import type { QuestionTodoActivationRefreshCoordinator } from '../../../../src/features/chat/services/QuestionTodoActivationRefreshCoordinator';
-import type { TabConversationStateBridge } from '../../../../src/features/chat/runtime/TabConversationStateBridge';
-import type { TabViewActivationBridge } from '../../../../src/features/chat/runtime/TabViewActivationBridge';
 
 type TabConversationStatePort = Pick<
   TabConversationStateBridge,

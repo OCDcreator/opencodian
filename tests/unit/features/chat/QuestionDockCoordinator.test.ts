@@ -1,6 +1,4 @@
 import type { QuestionDisplayMode, QuestionRequest } from '../../../../src/core/types';
-import { setLocale } from '../../../../src/i18n';
-import { QuestionDockResolutionActionFacade } from '../../../../src/features/chat/services/QuestionDockResolutionActionFacade';
 import {
   QuestionDockCoordinator,
   type QuestionDockCoordinatorHost,
@@ -10,6 +8,7 @@ import {
   QuestionDockRenderStateFacade,
   type QuestionDockRenderStateFacadeHost,
 } from '../../../../src/features/chat/services/QuestionDockRenderStateFacade';
+import { QuestionDockResolutionActionFacade } from '../../../../src/features/chat/services/QuestionDockResolutionActionFacade';
 import type { QuestionPostResolutionRuntimeFacade } from '../../../../src/features/chat/services/QuestionPostResolutionRuntimeFacade';
 import {
   QuestionResolutionExecutionFacade,
@@ -20,6 +19,7 @@ import type {
   QuestionDockCallbacks,
   QuestionDockRenderState,
 } from '../../../../src/features/chat/ui/QuestionDock';
+import { setLocale } from '../../../../src/i18n';
 
 type Mocked<T> = {
   [Key in keyof T]:

@@ -3,9 +3,9 @@ import type { StreamChunk as StreamingChunk } from '../../../utils/streaming';
 import type { PreparedMessageSend } from '../services/MessageSendPreparationService';
 import type {
   SendPipelineDebugContentBlock,
-  SendPipelineTraceHost,
   SendPipelineStreamController,
   SendPipelineTabRuntime,
+  SendPipelineTraceHost,
   SendPipelineTraceState,
 } from './SendPipelineTypes';
 

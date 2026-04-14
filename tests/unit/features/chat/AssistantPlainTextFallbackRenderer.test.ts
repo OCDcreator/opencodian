@@ -1,7 +1,7 @@
 import type { QuestionRequest, QuestionResolution } from '../../../../src/core/types';
-import type { MarkdownRenderService } from '../../../../src/utils/markdown';
 import { renderAssistantPlainTextFallbackContent } from '../../../../src/features/chat/runtime/AssistantPlainTextFallbackRenderer';
 import { buildQuestionResolutionCardRenderPlan } from '../../../../src/features/chat/runtime/QuestionResolutionCardRenderer';
+import type { MarkdownRenderService } from '../../../../src/utils/markdown';
 
 function createQuestionRequest(): QuestionRequest {
   return {

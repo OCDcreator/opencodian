@@ -1,7 +1,7 @@
 import {
+  type OpenCodeStreamEventState,
   OpenCodeStreamEventTransformer,
   type OpenCodeStreamEventTransformerHost,
-  type OpenCodeStreamEventState,
 } from '../../../../src/core/opencode/OpenCodeStreamEventTransformer';
 
 function createHost(

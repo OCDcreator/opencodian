@@ -2,10 +2,10 @@ import type { QuestionDisplayMode, QuestionRequest } from '../../../core/types';
 import type { QuestionDockCallbacks, QuestionDockRenderState } from '../ui/QuestionDock';
 import {
   getQuestionDockActiveInteractionState,
+  type QuestionDockInteractionRuntimeState,
   selectQuestionDockGroup,
   selectQuestionDockQuestion,
   setQuestionDockDraftAnswer,
-  type QuestionDockInteractionRuntimeState,
 } from './QuestionDockInteractionState';
 
 export interface QuestionDockRenderActions {

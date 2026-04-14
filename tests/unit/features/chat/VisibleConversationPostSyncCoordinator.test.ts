@@ -1,7 +1,7 @@
+import type { PostSyncQuestionTodoRefreshFacade } from '../../../../src/features/chat/services/PostSyncQuestionTodoRefreshFacade';
 import {
   VisibleConversationPostSyncCoordinator,
 } from '../../../../src/features/chat/services/VisibleConversationPostSyncCoordinator';
-import type { PostSyncQuestionTodoRefreshFacade } from '../../../../src/features/chat/services/PostSyncQuestionTodoRefreshFacade';
 import type {
   VisibleConversationPostSyncOutcome,
   VisibleConversationPostSyncStateCoordinator,

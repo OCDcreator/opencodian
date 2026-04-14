@@ -1,8 +1,8 @@
 import type { Conversation } from '../../../../src/core/types';
 import {
   type SessionTodoStateRuntime,
-  type SessionTodoStateServiceHost,
   SessionTodoStateService,
+  type SessionTodoStateServiceHost,
 } from '../../../../src/features/chat/services/SessionTodoStateService';
 import { t } from '../../../../src/i18n';
 

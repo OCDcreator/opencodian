@@ -3,8 +3,8 @@ import { createLogger } from '../../../shared';
 import type { PreparedMessageSend } from '../services/MessageSendPreparationService';
 import { mapStreamingContentBlocksToMessageContentBlocks } from './sendPipelineContent';
 import type {
-  LocalStreamPersistenceHost,
   LocalStreamOutcome,
+  LocalStreamPersistenceHost,
   SendPipelineTabRuntime,
 } from './SendPipelineTypes';
 

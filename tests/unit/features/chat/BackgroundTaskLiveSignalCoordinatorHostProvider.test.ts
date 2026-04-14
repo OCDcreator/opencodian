@@ -3,8 +3,8 @@ import {
   type BackgroundTaskLiveSignalRuntime,
 } from '../../../../src/features/chat/services/BackgroundTaskLiveSignalCoordinator';
 import {
-  createBackgroundTaskLiveSignalCoordinatorViewHostFactoryHost,
   type BackgroundTaskLiveSignalCoordinatorHostProviderHost,
+  createBackgroundTaskLiveSignalCoordinatorViewHostFactoryHost,
 } from '../../../../src/features/chat/services/BackgroundTaskLiveSignalCoordinatorHostProvider';
 import {
   createBackgroundTaskLiveSignalCoordinatorHost,

@@ -1,6 +1,6 @@
 import {
-  ConversationRestoreBootstrapCoordinator,
   type ConversationRestoreBootstrapActivationPort,
+  ConversationRestoreBootstrapCoordinator,
   type ConversationRestoreBootstrapHost,
 } from '../../../../src/features/chat/services/ConversationRestoreBootstrapCoordinator';
 import { TabManager } from '../../../../src/features/chat/tabs/TabManager';

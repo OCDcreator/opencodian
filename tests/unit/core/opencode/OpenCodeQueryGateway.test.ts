@@ -1,5 +1,4 @@
 import {
-  OpenCodeQueryGateway,
   type OpenCodeFileSdk,
   type OpenCodeFindSdk,
   type OpenCodeFormatterSdk,
@@ -8,6 +7,7 @@ import {
   type OpenCodePathSdk,
   type OpenCodeProjectSdk,
   type OpenCodeProviderSdk,
+  OpenCodeQueryGateway,
   type OpenCodeQueryGatewayHost,
   type OpenCodeVcsSdk,
 } from '../../../../src/core/opencode/OpenCodeQueryGateway';

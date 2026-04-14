@@ -1,13 +1,13 @@
 import type { QuestionRequest, QuestionResolution } from '../../../../src/core/types';
-import { t } from '../../../../src/i18n';
 import {
   appendQuestionResolutionCard,
   appendQuestionResolutionCardFromRenderPlan,
-  buildQuestionResolutionCardRenderPlan,
   buildQuestionAnswerMarkdown,
   buildQuestionRejectedMarkdown,
+  buildQuestionResolutionCardRenderPlan,
   populateQuestionResolutionCard,
 } from '../../../../src/features/chat/runtime/QuestionResolutionCardRenderer';
+import { t } from '../../../../src/i18n';
 
 function createQuestionRequest(): QuestionRequest {
   return {

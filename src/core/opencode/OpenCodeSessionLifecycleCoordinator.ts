@@ -1,9 +1,9 @@
 import { createLogger } from '../../shared';
 import type { SessionTodo } from '../types';
 import {
+  OpenCodeSyncEventRuntimeCoordinator,
   type SessionActivityStatus,
   type SessionSyncEventUpdate,
-  OpenCodeSyncEventRuntimeCoordinator,
 } from './OpenCodeSyncEventRuntimeCoordinator';
 
 const logger = createLogger('OpenCodeSessionLifecycleCoordinator');

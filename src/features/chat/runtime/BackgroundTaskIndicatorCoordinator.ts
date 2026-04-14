@@ -1,10 +1,10 @@
 import type { Conversation } from '../../../core/types';
+import type { BackgroundTaskCompletionNoticeService } from '../services/BackgroundTaskCompletionNoticeService';
 import type { BackgroundTaskLiveSignalCoordinator } from '../services/BackgroundTaskLiveSignalCoordinator';
+import type { BackgroundTaskTimelineService } from '../services/BackgroundTaskTimelineService';
 import type { TabId } from '../tabs';
 import type { BackgroundTaskInlinePanelRenderer } from './BackgroundTaskInlinePanelRenderer';
 import type { TabRuntimeStateBridge } from './TabRuntimeStateBridge';
-import type { BackgroundTaskCompletionNoticeService } from '../services/BackgroundTaskCompletionNoticeService';
-import type { BackgroundTaskTimelineService } from '../services/BackgroundTaskTimelineService';
 
 type BackgroundTaskIndicatorInlinePanelPort = Pick<BackgroundTaskInlinePanelRenderer, 'render'>;
 type BackgroundTaskIndicatorTimelinePort = Pick<BackgroundTaskTimelineService, 'collectSegments'>;

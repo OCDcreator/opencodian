@@ -9,19 +9,19 @@ import { ComposerContextCoordinator } from './ComposerContextCoordinator';
 import { ComposerContextEventBridge } from './ComposerContextEventBridge';
 import { ComposerContextPickerActionService } from './ComposerContextPickerActionService';
 import {
-  ComposerContextRuntimeStore,
   type ComposerContextRuntimeState,
+  ComposerContextRuntimeStore,
 } from './ComposerContextRuntimeStore';
 import { ComposerContextViewHostAdapter } from './ComposerContextViewHostAdapter';
 import { ContextAttachmentBuilder } from './ContextAttachmentBuilder';
 import { ContextFileCatalogEventBridge } from './ContextFileCatalogEventBridge';
 import { ContextFileCatalogService } from './ContextFileCatalogService';
+import { FocusContextEventBridge } from './FocusContextEventBridge';
 import {
   createFocusContextServices,
   type FocusContextPreviewWritebackHost,
   type FocusContextRuntimeViewHost,
 } from './FocusContextHostAdapter';
-import { FocusContextEventBridge } from './FocusContextEventBridge';
 import type { FocusContextPreviewCoordinator } from './FocusContextPreviewCoordinator';
 import type { FocusContextRuntimeService } from './FocusContextRuntimeService';
 

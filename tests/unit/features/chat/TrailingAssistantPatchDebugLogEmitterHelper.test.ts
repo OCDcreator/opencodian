@@ -1,13 +1,13 @@
 import type { ChatMessage } from '../../../../src/core/types';
 import {
+  emitTrailingAssistantPatchCompletionDebugLog,
+  emitTrailingAssistantPatchSkippedDebugLog,
+} from '../../../../src/features/chat/services/TrailingAssistantPatchDebugLogEmitterHelper';
+import {
   buildTrailingAssistantPatchCompletionDebugLoggingContext,
   buildTrailingAssistantPatchSkippedDebugLoggingContext,
   buildTrailingAssistantPatchSkippedDebugPlanningContext,
 } from '../../../../src/features/chat/services/TrailingAssistantPatchDebugLoggingContextHelper';
-import {
-  emitTrailingAssistantPatchCompletionDebugLog,
-  emitTrailingAssistantPatchSkippedDebugLog,
-} from '../../../../src/features/chat/services/TrailingAssistantPatchDebugLogEmitterHelper';
 
 function createMessage(
   overrides: Partial<ChatMessage> & Pick<ChatMessage, 'id'>,

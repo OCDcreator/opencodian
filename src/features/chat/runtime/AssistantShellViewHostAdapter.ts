@@ -1,14 +1,14 @@
+import type { ChatMessage } from '../../../core/types';
+import type { TabId } from '../tabs';
 import {
   AssistantErrorRenderer,
   type AssistantStreamErrorRenderOptions,
 } from './AssistantErrorRenderer';
-import type { ChatMessage } from '../../../core/types';
-import type { TabId } from '../tabs';
 import { AssistantFooterRenderer } from './AssistantFooterRenderer';
 import {
   type AssistantNoticeRenderHost,
-  renderPersistedAssistantNotice,
   renderAssistantPlaceholderAsNotice,
+  renderPersistedAssistantNotice,
 } from './AssistantNoticeRenderer';
 import {
   AssistantShellRenderer,

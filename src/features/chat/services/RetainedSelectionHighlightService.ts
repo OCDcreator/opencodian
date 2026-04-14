@@ -1,5 +1,5 @@
 import type { EditorView } from '@codemirror/view';
-import { MarkdownView, type Editor } from 'obsidian';
+import { type Editor,MarkdownView } from 'obsidian';
 
 import { createLogger } from '../../../shared';
 import { hideSelectionHighlight, showSelectionHighlight } from '../../../utils/editorSelectionHighlight';

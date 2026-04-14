@@ -1,8 +1,8 @@
+import { shouldFinalizeTrailingAssistantFooterOnly } from './TrailingAssistantPatchFooterFinalizationDecisionHelper';
 import {
   buildTrailingAssistantPatchFooterFinalizationDecisionSourceContract,
   type TrailingAssistantPatchFooterFinalizationDecisionSourceContractParts,
 } from './TrailingAssistantPatchFooterFinalizationDecisionSourceContractHelper';
-import { shouldFinalizeTrailingAssistantFooterOnly } from './TrailingAssistantPatchFooterFinalizationDecisionHelper';
 
 export type TrailingAssistantPatchFooterFinalizationExecutionTailDecisionSource =
   TrailingAssistantPatchFooterFinalizationDecisionSourceContractParts;

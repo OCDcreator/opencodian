@@ -1,16 +1,15 @@
-import { TextEncoder } from 'util';
-
 import type { App, Editor } from 'obsidian';
 import * as obsidian from 'obsidian';
 import { MarkdownView, TFile } from 'obsidian';
+import { TextEncoder } from 'util';
 
 import type { ServerMode } from '../../../../src/core/types/settings';
-import { t } from '../../../../src/i18n';
 import type { FocusContextPreview } from '../../../../src/features/chat/composerContext';
 import {
   ContextAttachmentBuilder,
   REMOTE_CONTEXT_TEXT_LIMIT_BYTES,
 } from '../../../../src/features/chat/services/ContextAttachmentBuilder';
+import { t } from '../../../../src/i18n';
 
 global.TextEncoder = TextEncoder as unknown as typeof global.TextEncoder;
 

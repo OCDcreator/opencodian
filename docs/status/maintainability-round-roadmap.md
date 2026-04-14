@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的 `[NEXT]`”。L5 完成后必须暂停复盘，不得自动扩展新队列。
-> **当前状态**: [CONFIRMED_NEXT_BATCH] L1-L5 已确认；当前可自动执行的 `[NEXT]` 是 `L1 - ESLint autofix sweep`。
+> **当前状态**: [CONFIRMED_NEXT_BATCH] L1-L5 已确认；`L1 - ESLint autofix sweep` 已完成，当前可自动执行的 `[NEXT]` 是 `L2 - Non-autofix error cleanup`。
 
 ## 控制规则
 
@@ -719,7 +719,7 @@
 
 本批由人工确认：在继续新的 maintainability 重构前，先清当前仓库的 ESLint debt。目标不是借机大拆文件，而是优先把 `npm run lint` 的 errors 清到 0，并控制 warnings 的噪音水平。
 
-### [NEXT] L1 - ESLint autofix sweep
+### [DONE] L1 - ESLint autofix sweep
 
 - **Lane**: Lint cleanup
 - **目标**: 先运行 `eslint --fix` 或等价 autofix，把 import/export sort、`prefer-const` 等自动可修项统一收掉，并记录剩余 lint 基线。
@@ -737,7 +737,7 @@
   - phase 文档明确记录 autofix 后剩余的 errors/warnings 数量与主要热点。
   - 运行 `npm run lint`、`npm test`、`npm run build`。
 
-### [QUEUED] L2 - Non-autofix error cleanup
+### [NEXT] L2 - Non-autofix error cleanup
 
 - **Lane**: Lint cleanup
 - **目标**: 清掉所有非自动修的 ESLint errors，优先最近 touched 的 `src/core/opencode/**`、chat services 与相关 tests。

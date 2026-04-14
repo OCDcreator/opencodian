@@ -4,11 +4,11 @@ import {
 import {
   buildTrailingAssistantPatchExecutionTailPlanningContext,
 } from './TrailingAssistantPatchExecutionTailPlanningContextHelper';
-import type { TrailingAssistantPatchSuccessPlanningContextPlanSource } from './TrailingAssistantPatchSuccessPlanningContextPlanSourceContractHelper';
 import {
   buildTrailingAssistantPatchSuccessPlanFromChildPlanSource,
 } from './TrailingAssistantPatchSuccessChildPlansHelper';
 import type { TrailingAssistantPatchSuccessPlan } from './TrailingAssistantPatchSuccessPlanHelper';
+import type { TrailingAssistantPatchSuccessPlanningContextPlanSource } from './TrailingAssistantPatchSuccessPlanningContextPlanSourceContractHelper';
 
 export function buildTrailingAssistantPatchSuccessPlanFromPlanningContext(
   source: TrailingAssistantPatchSuccessPlanningContextPlanSource,

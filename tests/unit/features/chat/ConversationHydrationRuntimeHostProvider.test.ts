@@ -1,6 +1,6 @@
 import {
-  createConversationHydrationRuntimeViewHostFactoryHost,
   type ConversationHydrationRuntimeHostProviderHost,
+  createConversationHydrationRuntimeViewHostFactoryHost,
 } from '../../../../src/features/chat/services/ConversationHydrationRuntimeHostProvider';
 
 type Mocked<T> = {

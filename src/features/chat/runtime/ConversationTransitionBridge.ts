@@ -1,9 +1,9 @@
 import type { Conversation } from '../../../core/types';
+import type { TabId } from '../tabs';
 import type {
   ConversationHydrationRenderContext,
   ConversationHydrationRenderPort,
 } from './ConversationHydrationRenderBridge';
-import type { TabId } from '../tabs';
 
 type ConversationTransitionSnapshot = Pick<Conversation, 'id' | 'titleGenerationStatus'>;
 

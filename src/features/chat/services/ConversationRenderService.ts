@@ -21,13 +21,13 @@ import {
 import {
   type TrailingAssistantPatchExecutionPlan,
 } from './TrailingAssistantPatchExecutionPlanHelper';
+import { type TrailingAssistantPatchSuccessPlan } from './TrailingAssistantPatchSuccessPlanHelper';
 import {
   buildTrailingAssistantPatchSuccessPlanFromPlanningContext,
 } from './TrailingAssistantPatchSuccessPlanningContextPlanHelper';
 import {
   buildTrailingAssistantPatchSuccessPlanningContextPlanSourceContract,
 } from './TrailingAssistantPatchSuccessPlanningContextPlanSourceContractHelper';
-import { type TrailingAssistantPatchSuccessPlan } from './TrailingAssistantPatchSuccessPlanHelper';
 import {
   applyTrailingAssistantPatchTailState,
 } from './TrailingAssistantPatchTailStateApplierHelper';

@@ -5,10 +5,10 @@ import type {
 import type { QuestionRuntimeState } from '../../../../src/features/chat/services/QuestionRuntimeHostAdapter';
 import {
   createQuestionRuntimeViewHostAdapter,
-  type QuestionRuntimeViewHostAdapterHost,
   type QuestionRuntimeQuestionApiPort,
   type QuestionRuntimeSettingsPort,
   type QuestionRuntimeTabAttentionPort,
+  type QuestionRuntimeViewHostAdapterHost,
 } from '../../../../src/features/chat/services/QuestionRuntimeViewHostAdapter';
 import type { TabId } from '../../../../src/features/chat/tabs';
 import type { QuestionDockRenderState } from '../../../../src/features/chat/ui/QuestionDock';

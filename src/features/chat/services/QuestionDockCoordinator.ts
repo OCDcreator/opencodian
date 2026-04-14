@@ -14,20 +14,20 @@ import {
   buildQuestionDockViewModel,
   normalizeQuestionDraftAnswers,
 } from '../ui/questionDockState';
+import {
+  createEmptyQuestionDockRenderPayload,
+  createQuestionDockRenderPayload,
+} from './QuestionDockRenderAdapter';
+import type { QuestionDockRenderStateFacade } from './QuestionDockRenderStateFacade';
 import type {
   QuestionDockResolutionActionFacade,
   QuestionDockResolutionIntent,
 } from './QuestionDockResolutionActionFacade';
-import type { QuestionDockRenderStateFacade } from './QuestionDockRenderStateFacade';
 import type { QuestionPostResolutionRuntimeFacade } from './QuestionPostResolutionRuntimeFacade';
 import type {
   QuestionResolutionExecutionAction,
   QuestionResolutionExecutionFacade,
 } from './QuestionResolutionExecutionFacade';
-import {
-  createEmptyQuestionDockRenderPayload,
-  createQuestionDockRenderPayload,
-} from './QuestionDockRenderAdapter';
 
 const logger = createLogger('QuestionDockCoordinator');
 

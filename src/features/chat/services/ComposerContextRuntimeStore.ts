@@ -1,11 +1,11 @@
 import type { PromptContextItem } from '../../../core/types';
-import type { TabId } from '../tabs';
 import {
+  type FocusContextPreview,
   getContextTargetKey,
   removeDraftContextItemsByTarget,
   upsertDraftContextItem,
-  type FocusContextPreview,
 } from '../composerContext';
+import type { TabId } from '../tabs';
 
 export interface ComposerContextRuntimeState {
   focusContextPreview: FocusContextPreview | null;

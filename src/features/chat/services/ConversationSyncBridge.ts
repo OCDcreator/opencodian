@@ -3,18 +3,18 @@ import type {
   Conversation,
 } from '../../../core/types';
 import type { TabId } from '../tabs';
+import type { ConversationSyncBackgroundPostSyncRouter } from './ConversationSyncBackgroundPostSyncRouter';
 import type {
   SignalConversationSyncContext,
 } from './ConversationSyncOrchestrationService';
-import type { ConversationSyncBackgroundPostSyncRouter } from './ConversationSyncBackgroundPostSyncRouter';
-import type {
-  ConversationSyncVisiblePostSyncResult,
-  ConversationSyncVisiblePostSyncRouter,
-} from './ConversationSyncVisiblePostSyncRouter';
 import type {
   TabConversationSyncContext,
   VisibleConversationSyncContext,
 } from './ConversationSyncRuntimeCoordinator';
+import type {
+  ConversationSyncVisiblePostSyncResult,
+  ConversationSyncVisiblePostSyncRouter,
+} from './ConversationSyncVisiblePostSyncRouter';
 
 export interface ConversationSyncBridgeRuntime {
   lastConversationSyncFingerprint: string | null;

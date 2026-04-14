@@ -3,11 +3,11 @@ import type {
   QuestionRequest,
 } from '../../../core/types';
 import type { TabId } from '../tabs';
+import type { QuestionDockSlotCoordinator } from './QuestionDockSlotCoordinator';
 import type {
   QuestionRuntimeState,
   QuestionRuntimeViewHost,
 } from './QuestionRuntimeHostAdapter';
-import type { QuestionDockSlotCoordinator } from './QuestionDockSlotCoordinator';
 
 type QuestionDockSlotCoordinatorPort = Pick<
   QuestionDockSlotCoordinator,

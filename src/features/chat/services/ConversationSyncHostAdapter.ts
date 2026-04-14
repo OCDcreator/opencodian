@@ -4,22 +4,22 @@ import type {
 } from '../../../core/types';
 import type { TabData, TabId } from '../tabs';
 import {
-  ConversationSyncBackgroundPostSyncRouter,
   type ConversationSyncBackgroundPostSyncHandoffPort,
+  ConversationSyncBackgroundPostSyncRouter,
 } from './ConversationSyncBackgroundPostSyncRouter';
 import {
+  ConversationSyncBridge,
   type ConversationSyncBridgeHost,
   type ConversationSyncBridgeSyncResult,
-  ConversationSyncBridge,
 } from './ConversationSyncBridge';
 import {
   type ConversationSyncOrchestrationHost,
-  type ConversationSyncSignalRuntime,
   ConversationSyncOrchestrationService,
+  type ConversationSyncSignalRuntime,
 } from './ConversationSyncOrchestrationService';
 import {
-  type ConversationSyncRuntimeCoordinatorHost,
   ConversationSyncRuntimeCoordinator,
+  type ConversationSyncRuntimeCoordinatorHost,
 } from './ConversationSyncRuntimeCoordinator';
 import {
   ConversationSyncVisiblePostSyncRouter,

@@ -1,7 +1,7 @@
 import type { ChatMessage, Conversation } from '../../../../src/core/types';
 import {
-  BackgroundTaskTimelineService,
   type BackgroundTaskTimelineRuntime,
+  BackgroundTaskTimelineService,
   type BackgroundTaskTimelineServiceHost,
 } from '../../../../src/features/chat/services/BackgroundTaskTimelineService';
 

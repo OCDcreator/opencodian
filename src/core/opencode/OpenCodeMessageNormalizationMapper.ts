@@ -22,8 +22,8 @@ import type {
   QuestionPrompt,
   QuestionRequest as ChatQuestionRequest,
 } from '../types';
-import type { OpenCodeCatalogToolIdentityContext } from './OpenCodeCatalogStateStore';
 import { detectOmoMessageMeta } from './omoCompat';
+import type { OpenCodeCatalogToolIdentityContext } from './OpenCodeCatalogStateStore';
 
 const INLINE_READ_TOOL_PREFIX = 'Called the Read tool with the following input:';
 

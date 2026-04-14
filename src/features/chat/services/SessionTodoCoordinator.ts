@@ -15,8 +15,8 @@ import {
   type SessionTodoDockCoordinatorRuntimeState,
 } from './SessionTodoDockCoordinator';
 import {
-  SessionTodoStateService,
   type SessionTodoStateRuntime,
+  SessionTodoStateService,
 } from './SessionTodoStateService';
 
 const logger = createLogger('SessionTodoCoordinator');

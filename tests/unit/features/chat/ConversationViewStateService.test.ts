@@ -1,17 +1,17 @@
-import {
-  type ConversationLoadRuntimePort,
-} from '../../../../src/features/chat/runtime/ConversationLoadRuntimeBridge';
 import type {
   ConversationHydrationOutcomePort,
 } from '../../../../src/features/chat/runtime/ConversationHydrationOutcomeBridge';
+import {
+  type ConversationLoadRuntimePort,
+} from '../../../../src/features/chat/runtime/ConversationLoadRuntimeBridge';
+import type { ConversationTransitionPort, LoadedConversationTransitionContext } from '../../../../src/features/chat/runtime/ConversationTransitionBridge';
+import type { TabConversationActivationBridge } from '../../../../src/features/chat/runtime/TabConversationActivationBridge';
 import {
   TabViewActivationBridge,
   type TabViewActivationBridgeHost,
 } from '../../../../src/features/chat/runtime/TabViewActivationBridge';
 import type { ActiveTabContextUsageCoordinator } from '../../../../src/features/chat/services/ActiveTabContextUsageCoordinator';
 import type { BackgroundTaskActivationIndicatorCoordinator } from '../../../../src/features/chat/services/BackgroundTaskActivationIndicatorCoordinator';
-import type { TabConversationActivationBridge } from '../../../../src/features/chat/runtime/TabConversationActivationBridge';
-import type { ConversationTransitionPort, LoadedConversationTransitionContext } from '../../../../src/features/chat/runtime/ConversationTransitionBridge';
 import {
   type ConversationViewStateHost,
   ConversationViewStateService,

@@ -1,6 +1,6 @@
 import type { Conversation } from '../../../../src/core/types';
-import type { BackgroundTaskSegment } from '../../../../src/features/chat/services/BackgroundTaskTimelineService';
 import { BackgroundTaskInlinePanelRenderer } from '../../../../src/features/chat/runtime/BackgroundTaskInlinePanelRenderer';
+import type { BackgroundTaskSegment } from '../../../../src/features/chat/services/BackgroundTaskTimelineService';
 
 function createSegment(anchorKey: string): BackgroundTaskSegment {
   return {

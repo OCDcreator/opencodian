@@ -1,5 +1,5 @@
-import type { ConversationLoadRuntimeBridgeHost } from './ConversationLoadRuntimeBridge';
 import type { ConversationSyncViewHost } from '../services/ConversationSyncHostAdapter';
+import type { ConversationLoadRuntimeBridgeHost } from './ConversationLoadRuntimeBridge';
 
 export interface ConversationSyncLoadRuntimeHostAdapterHost {
   getCurrentConversation: ConversationSyncViewHost['getCurrentConversation'];

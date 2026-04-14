@@ -1,8 +1,8 @@
+import type { QuestionTodoActivationRefreshBridge } from '../../../../src/features/chat/services/QuestionTodoActivationRefreshBridge';
 import {
   QuestionTodoActivationRefreshCoordinator,
   type QuestionTodoActivationRefreshCoordinatorHost,
 } from '../../../../src/features/chat/services/QuestionTodoActivationRefreshCoordinator';
-import type { QuestionTodoActivationRefreshBridge } from '../../../../src/features/chat/services/QuestionTodoActivationRefreshBridge';
 
 type QuestionTodoActivationRefreshPort = Pick<
   QuestionTodoActivationRefreshBridge,

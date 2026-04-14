@@ -2,8 +2,8 @@ import type {
   SessionSyncEventUpdate,
 } from '../../../../src/core/opencode';
 import {
-  createConversationSyncBridgePorts,
   type ConversationSyncBridgePortProviderHost,
+  createConversationSyncBridgePorts,
 } from '../../../../src/features/chat/services/ConversationSyncBridgePortProvider';
 
 type Mocked<T> = {

@@ -1,4 +1,4 @@
-import { MarkdownView, type App, type Editor } from 'obsidian';
+import { type App, type Editor,MarkdownView } from 'obsidian';
 
 import {
   createFocusContextPreview,

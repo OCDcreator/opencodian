@@ -3,8 +3,8 @@ import type {
   SessionSyncEventUpdate,
 } from '../../../../src/core/opencode';
 import {
-  createEmptyTabContextState,
   type Conversation,
+  createEmptyTabContextState,
   type SessionTodo,
 } from '../../../../src/core/types';
 import {

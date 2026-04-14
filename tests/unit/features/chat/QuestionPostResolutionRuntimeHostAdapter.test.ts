@@ -1,8 +1,8 @@
+import type { QuestionPostResolutionRuntimeState } from '../../../../src/features/chat/services/QuestionPostResolutionRuntimeFacade';
 import {
   createQuestionPostResolutionRuntimeHostAdapter,
   type QuestionPostResolutionRuntimeViewHost,
 } from '../../../../src/features/chat/services/QuestionPostResolutionRuntimeHostAdapter';
-import type { QuestionPostResolutionRuntimeState } from '../../../../src/features/chat/services/QuestionPostResolutionRuntimeFacade';
 import type {
   QuestionRuntimeConversationSyncPort,
   QuestionRuntimeStatusRefreshPort,

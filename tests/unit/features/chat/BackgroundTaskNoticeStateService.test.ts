@@ -1,6 +1,6 @@
 import {
-  BackgroundTaskNoticeStateService,
   type BackgroundTaskNoticeStateRuntime,
+  BackgroundTaskNoticeStateService,
 } from '../../../../src/features/chat/services/BackgroundTaskNoticeStateService';
 import { t } from '../../../../src/i18n';
 

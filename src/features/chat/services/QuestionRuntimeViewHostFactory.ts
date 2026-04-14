@@ -1,5 +1,5 @@
-import type { QuestionRuntimeViewHost } from './QuestionRuntimeHostAdapter';
 import type { QuestionDockSlotCoordinator } from './QuestionDockSlotCoordinator';
+import type { QuestionRuntimeViewHost } from './QuestionRuntimeHostAdapter';
 import {
   createQuestionRuntimeViewHostAdapter,
   type QuestionRuntimeQuestionApiPort,

@@ -1,12 +1,12 @@
 import { buildTrailingAssistantPatchCompletionDebugPlanFromTailOutcomePlanningContext } from './TrailingAssistantPatchCompletionDebugTailOutcomePlanHelper';
 import { buildTrailingAssistantPatchTailOutcomePlansFromChildPlans } from './TrailingAssistantPatchTailOutcomeChildPlansHelper';
 import {
-  type TrailingAssistantPatchTailOutcomePlans,
-} from './TrailingAssistantPatchTailOutcomePlanHelper';
-import {
   buildTrailingAssistantPatchTailOutcomeExecutionTailPlanSourceContract,
   type TrailingAssistantPatchTailOutcomeExecutionTailPlanSourceContractParts,
 } from './TrailingAssistantPatchTailOutcomeExecutionTailPlanSourceContractHelper';
+import {
+  type TrailingAssistantPatchTailOutcomePlans,
+} from './TrailingAssistantPatchTailOutcomePlanHelper';
 import { buildTrailingAssistantPatchTailStatePlanFromTailOutcomePlanningContext } from './TrailingAssistantPatchTailStateTailOutcomePlanHelper';
 
 export type TrailingAssistantPatchTailOutcomeExecutionTailPlanSource =

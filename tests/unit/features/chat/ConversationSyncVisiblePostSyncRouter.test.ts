@@ -1,7 +1,7 @@
 import type { ChatMessage, Conversation } from '../../../../src/core/types';
 import {
-  ConversationSyncVisiblePostSyncRouter,
   type ConversationSyncVisiblePostSyncResult,
+  ConversationSyncVisiblePostSyncRouter,
   type ConversationSyncVisiblePostSyncRouterHost,
 } from '../../../../src/features/chat/services/ConversationSyncVisiblePostSyncRouter';
 import type { VisibleConversationPostSyncCoordinator } from '../../../../src/features/chat/services/VisibleConversationPostSyncCoordinator';

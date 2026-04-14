@@ -1,7 +1,7 @@
 import {
-  BackgroundTaskCompletionNoticeService,
   type BackgroundTaskCompletionNoticeRuntime,
   type BackgroundTaskCompletionNoticeSegment,
+  BackgroundTaskCompletionNoticeService,
 } from '../../../../src/features/chat/services/BackgroundTaskCompletionNoticeService';
 import { t } from '../../../../src/i18n';
 

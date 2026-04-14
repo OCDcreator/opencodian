@@ -1,10 +1,10 @@
 import type { QuestionRequest } from '../../../../src/core/types';
+import type { QuestionDockInteractionRuntimeState } from '../../../../src/features/chat/services/QuestionDockInteractionState';
 import {
   createEmptyQuestionDockRenderPayload,
   createQuestionDockRenderPayload,
   type QuestionDockRenderActions,
 } from '../../../../src/features/chat/services/QuestionDockRenderAdapter';
-import type { QuestionDockInteractionRuntimeState } from '../../../../src/features/chat/services/QuestionDockInteractionState';
 
 function createQuestionRequest(overrides?: Partial<QuestionRequest>): QuestionRequest {
   return {

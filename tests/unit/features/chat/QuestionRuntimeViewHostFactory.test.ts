@@ -3,15 +3,15 @@ import type {
   QuestionRequest,
 } from '../../../../src/core/types';
 import type { QuestionRuntimeState } from '../../../../src/features/chat/services/QuestionRuntimeHostAdapter';
-import {
-  createQuestionRuntimeViewHost,
-  type QuestionRuntimeViewHostFactoryHost,
-} from '../../../../src/features/chat/services/QuestionRuntimeViewHostFactory';
 import type {
   QuestionRuntimeQuestionApiPort,
   QuestionRuntimeSettingsPort,
   QuestionRuntimeTabAttentionPort,
 } from '../../../../src/features/chat/services/QuestionRuntimeViewHostAdapter';
+import {
+  createQuestionRuntimeViewHost,
+  type QuestionRuntimeViewHostFactoryHost,
+} from '../../../../src/features/chat/services/QuestionRuntimeViewHostFactory';
 import type { QuestionDockRenderState } from '../../../../src/features/chat/ui/QuestionDock';
 
 type Mocked<T> = {

@@ -1,13 +1,13 @@
 import { buildTrailingAssistantPatchExecutionTailPlanParts } from './TrailingAssistantPatchExecutionTailPlanPartsHelper';
 import {
-  buildTrailingAssistantPatchTurnBodyScopePlan,
-  type TrailingAssistantPatchTurnBodyScopePlanSource,
-} from './TrailingAssistantPatchTurnBodyScopePlanHelper';
-import {
   buildTrailingAssistantPatchSuccessPlanFromParts,
   type TrailingAssistantPatchSuccessPlan,
   type TrailingAssistantPatchSuccessPlanParts,
 } from './TrailingAssistantPatchSuccessPlanHelper';
+import {
+  buildTrailingAssistantPatchTurnBodyScopePlan,
+  type TrailingAssistantPatchTurnBodyScopePlanSource,
+} from './TrailingAssistantPatchTurnBodyScopePlanHelper';
 
 export type TrailingAssistantPatchSuccessChildPlans =
   TrailingAssistantPatchSuccessPlanParts;

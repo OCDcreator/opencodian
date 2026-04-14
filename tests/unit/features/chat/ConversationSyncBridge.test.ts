@@ -2,6 +2,7 @@ import type {
   ChatMessage,
   Conversation,
 } from '../../../../src/core/types';
+import type { ConversationSyncBackgroundPostSyncRouter } from '../../../../src/features/chat/services/ConversationSyncBackgroundPostSyncRouter';
 import {
   ConversationSyncBridge,
   type ConversationSyncBridgeHost,
@@ -10,7 +11,6 @@ import {
   type ConversationSyncBridgeRuntimeCoordinator,
   type ConversationSyncBridgeSyncResult,
 } from '../../../../src/features/chat/services/ConversationSyncBridge';
-import type { ConversationSyncBackgroundPostSyncRouter } from '../../../../src/features/chat/services/ConversationSyncBackgroundPostSyncRouter';
 import type { SignalConversationSyncContext } from '../../../../src/features/chat/services/ConversationSyncOrchestrationService';
 import type { TabConversationSyncContext } from '../../../../src/features/chat/services/ConversationSyncRuntimeCoordinator';
 import type { ConversationSyncVisiblePostSyncRouter } from '../../../../src/features/chat/services/ConversationSyncVisiblePostSyncRouter';

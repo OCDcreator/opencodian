@@ -1,10 +1,10 @@
 import type { ChatMessage } from '../../../core/types';
 import type { TabId } from '../tabs';
+import type { VisibleConversationSyncContext } from './ConversationSyncRuntimeCoordinator';
 import type {
   VisibleConversationPostSyncCoordinator,
   VisibleConversationPostSyncResult,
 } from './VisibleConversationPostSyncCoordinator';
-import type { VisibleConversationSyncContext } from './ConversationSyncRuntimeCoordinator';
 
 export interface ConversationSyncVisiblePostSyncResult
   extends VisibleConversationPostSyncResult {

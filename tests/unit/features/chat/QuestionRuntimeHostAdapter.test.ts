@@ -2,7 +2,6 @@ import type {
   QuestionDisplayMode,
   QuestionRequest,
 } from '../../../../src/core/types';
-import { setLocale } from '../../../../src/i18n';
 import { StreamingInlineCardRenderer } from '../../../../src/features/chat/runtime/StreamingInlineCardRenderer';
 import type { QuestionDockRenderStateFacadeHost } from '../../../../src/features/chat/services/QuestionDockRenderStateFacade';
 import type { QuestionInlineResolutionActionFacadeHost } from '../../../../src/features/chat/services/QuestionInlineResolutionActionFacade';
@@ -26,6 +25,7 @@ import type {
   QuestionDockCallbacks,
   QuestionDockRenderState,
 } from '../../../../src/features/chat/ui/QuestionDock';
+import { setLocale } from '../../../../src/i18n';
 
 type Mocked<T> = {
   [Key in keyof T]:

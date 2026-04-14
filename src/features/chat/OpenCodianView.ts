@@ -77,10 +77,6 @@ import {
   renderAssistantPlainTextFallbackContent,
 } from './runtime/AssistantPlainTextFallbackRenderer';
 import {
-  UserMessageFooterRenderer,
-  type UserMessageFooterRendererHost,
-} from './runtime/UserMessageFooterRenderer';
-import {
   AssistantShellViewHostAdapter,
   type AssistantShellViewHostAdapterHost,
 } from './runtime/AssistantShellViewHostAdapter';
@@ -112,9 +108,6 @@ import {
   ConversationTransitionBridge,
 } from './runtime/ConversationTransitionBridge';
 import {
-  TabConversationActivationBridge,
-} from './runtime/TabConversationActivationBridge';
-import {
   PermissionInlineCardRenderer,
 } from './runtime/PermissionInlineCardRenderer';
 import {
@@ -135,6 +128,9 @@ import {
   type StreamingInlineCardRendererHost,
 } from './runtime/StreamingInlineCardRenderer';
 import {
+  TabConversationActivationBridge,
+} from './runtime/TabConversationActivationBridge';
+import {
   TabConversationStateBridge,
 } from './runtime/TabConversationStateBridge';
 import {
@@ -143,6 +139,10 @@ import {
 import {
   TabViewActivationBridge,
 } from './runtime/TabViewActivationBridge';
+import {
+  UserMessageFooterRenderer,
+  type UserMessageFooterRendererHost,
+} from './runtime/UserMessageFooterRenderer';
 import {
   ActiveTabContextUsageCoordinator,
   type ActiveTabContextUsageCoordinatorHost,
@@ -156,8 +156,8 @@ import {
   BackgroundTaskLiveSignalCoordinator,
 } from './services/BackgroundTaskLiveSignalCoordinator';
 import {
-  createBackgroundTaskLiveSignalCoordinatorViewHostFactoryHost,
   type BackgroundTaskLiveSignalCoordinatorHostProviderHost,
+  createBackgroundTaskLiveSignalCoordinatorViewHostFactoryHost,
 } from './services/BackgroundTaskLiveSignalCoordinatorHostProvider';
 import {
   createBackgroundTaskLiveSignalCoordinatorHost,
@@ -173,15 +173,28 @@ import {
   type BackgroundTaskTimelineServiceHost,
 } from './services/BackgroundTaskTimelineService';
 import {
+  ChatHeaderPresenter,
+  type ChatHeaderPresenterHost,
+  type ChatServerAvailability,
+} from './services/ChatHeaderPresenter';
+import {
+  ChatSelectionControlsCoordinator,
+  type ChatSelectionControlsCoordinatorHost,
+} from './services/ChatSelectionControlsCoordinator';
+import {
   ComposerContextViewFacade,
   type ComposerContextViewHost,
   type FocusContextPreviewWritebackHost,
   type FocusContextRuntimeViewHost,
 } from './services/ComposerContextViewFacade';
+import {
+  ComposerInputShellCoordinator,
+  type ComposerInputShellCoordinatorHost,
+} from './services/ComposerInputShellCoordinator';
 import { ContextUsageService } from './services/ContextUsageService';
 import {
-  createConversationHydrationRuntimeViewHostFactoryHost,
   type ConversationHydrationRuntimeHostProviderHost,
+  createConversationHydrationRuntimeViewHostFactoryHost,
 } from './services/ConversationHydrationRuntimeHostProvider';
 import {
   createConversationHydrationRuntimeViewHosts,
@@ -194,27 +207,31 @@ import {
   type IncrementalRenderedMessageUpdate,
 } from './services/ConversationRenderService';
 import {
-  ConversationSyncBridge,
-} from './services/ConversationSyncBridge';
-import {
-  createConversationSyncBridgePorts,
-  type ConversationSyncBridgePortProviderHost,
-  type ConversationSyncBridgePorts,
-} from './services/ConversationSyncBridgePortProvider';
+  ConversationRestoreBootstrapCoordinator,
+  type ConversationRestoreBootstrapHost,
+} from './services/ConversationRestoreBootstrapCoordinator';
 import {
   ConversationSessionSignalRuntime,
   type ConversationSessionSignalRuntimeHost,
 } from './services/ConversationSessionSignalRuntime';
 import {
-  createConversationSyncLoadRuntimeViewHostFactoryHost,
+  ConversationSyncBridge,
+} from './services/ConversationSyncBridge';
+import {
+  type ConversationSyncBridgePortProviderHost,
+  type ConversationSyncBridgePorts,
+  createConversationSyncBridgePorts,
+} from './services/ConversationSyncBridgePortProvider';
+import {
+  createConversationSyncServices,
+} from './services/ConversationSyncHostAdapter';
+import {
   type ConversationSyncLoadRuntimeHostProviderHost,
+  createConversationSyncLoadRuntimeViewHostFactoryHost,
 } from './services/ConversationSyncLoadRuntimeHostProvider';
 import {
   createConversationSyncLoadRuntimeViewHosts,
 } from './services/ConversationSyncLoadRuntimeViewHostFactory';
-import {
-  createConversationSyncServices,
-} from './services/ConversationSyncHostAdapter';
 import {
   ConversationSyncOrchestrationService,
 } from './services/ConversationSyncOrchestrationService';
@@ -222,21 +239,21 @@ import {
   ConversationSyncRuntimeCoordinator,
 } from './services/ConversationSyncRuntimeCoordinator';
 import {
-  ConversationRestoreBootstrapCoordinator,
-  type ConversationRestoreBootstrapHost,
-} from './services/ConversationRestoreBootstrapCoordinator';
+  ConversationTabLifecycleRecoveryCoordinator,
+  type ConversationTabLifecycleRecoveryHost,
+} from './services/ConversationTabLifecycleRecoveryCoordinator';
 import {
   ConversationTabOpenCoordinator,
   type ConversationTabOpenHost,
 } from './services/ConversationTabOpenCoordinator';
 import {
-  ConversationTabLifecycleRecoveryCoordinator,
-  type ConversationTabLifecycleRecoveryHost,
-} from './services/ConversationTabLifecycleRecoveryCoordinator';
-import {
   type ConversationViewStateHost,
   ConversationViewStateService,
 } from './services/ConversationViewStateService';
+import {
+  InputPanelAppearanceCoordinator,
+  type InputPanelAppearanceCoordinatorHost,
+} from './services/InputPanelAppearanceCoordinator';
 import {
   type MessageFinalizationHost,
   MessageFinalizationService,
@@ -266,20 +283,6 @@ import {
   type QuestionTodoBackgroundTaskRuntimeServiceBundleHost,
 } from './services/QuestionTodoBackgroundTaskRuntimeServiceBundle';
 import {
-  createTabConversationSyncFingerprintRuntimePort,
-  type TabConversationSyncFingerprintPortProviderHost,
-  type TabConversationSyncFingerprintRuntimePort,
-} from './services/TabConversationSyncFingerprintPortProvider';
-import {
-  createTabActivationRuntimeViewHostFactoryHost,
-  type TabActivationRuntimeHostProviderHost,
-} from './services/TabActivationRuntimeHostProvider';
-import {
-  createTabActivationConversationSyncRuntimePort,
-  type TabActivationConversationSyncPortProviderHost,
-  type TabActivationConversationSyncRuntimePort,
-} from './services/TabActivationConversationSyncPortProvider';
-import {
   isElementNearBottom,
 } from './services/ScrollManager';
 import {
@@ -288,30 +291,27 @@ import {
   type SessionTodoViewHost,
 } from './services/SessionTodoHostAdapter';
 import {
-  TabMessagesPaneCoordinator,
-  type TabMessagesPaneCoordinatorHost,
-  type TabMessagesPaneState,
-} from './services/TabMessagesPaneCoordinator';
+  createTabActivationConversationSyncRuntimePort,
+  type TabActivationConversationSyncPortProviderHost,
+  type TabActivationConversationSyncRuntimePort,
+} from './services/TabActivationConversationSyncPortProvider';
+import {
+  createTabActivationRuntimeViewHostFactoryHost,
+  type TabActivationRuntimeHostProviderHost,
+} from './services/TabActivationRuntimeHostProvider';
 import {
   createTabActivationRuntimeViewHosts,
 } from './services/TabActivationRuntimeViewHostFactory';
 import {
-  ChatHeaderPresenter,
-  type ChatHeaderPresenterHost,
-  type ChatServerAvailability,
-} from './services/ChatHeaderPresenter';
+  createTabConversationSyncFingerprintRuntimePort,
+  type TabConversationSyncFingerprintPortProviderHost,
+  type TabConversationSyncFingerprintRuntimePort,
+} from './services/TabConversationSyncFingerprintPortProvider';
 import {
-  ChatSelectionControlsCoordinator,
-  type ChatSelectionControlsCoordinatorHost,
-} from './services/ChatSelectionControlsCoordinator';
-import {
-  ComposerInputShellCoordinator,
-  type ComposerInputShellCoordinatorHost,
-} from './services/ComposerInputShellCoordinator';
-import {
-  InputPanelAppearanceCoordinator,
-  type InputPanelAppearanceCoordinatorHost,
-} from './services/InputPanelAppearanceCoordinator';
+  TabMessagesPaneCoordinator,
+  type TabMessagesPaneCoordinatorHost,
+  type TabMessagesPaneState,
+} from './services/TabMessagesPaneCoordinator';
 import { TitleGenerationService } from './services/TitleGenerationService';
 import { TabBar, type TabBarLayoutMode, type TabId, TabManager } from './tabs';
 import { ContextDetailModal, type ContextRawMessageItem } from './ui/ContextDetailModal';

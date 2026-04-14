@@ -1,5 +1,5 @@
-import { t } from '../../../i18n';
 import type { ChatMessage } from '../../../core/types';
+import { t } from '../../../i18n';
 import { resolveAssistantCopyContent } from './AssistantCopyContent';
 import type { AssistantShellTimestampOptions } from './AssistantShellRenderer';
 

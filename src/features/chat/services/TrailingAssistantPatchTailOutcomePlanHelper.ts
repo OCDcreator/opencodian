@@ -1,6 +1,6 @@
 import type { TrailingAssistantPatchCompletionDebugPlan } from './TrailingAssistantPatchCompletionDebugPlanHelper';
-import type { TrailingAssistantPatchTailStatePlan } from './TrailingAssistantPatchTailStateApplierHelper';
 import type { TrailingAssistantPatchTailOutcomePlanParts } from './TrailingAssistantPatchTailOutcomePlanPartsHelper';
+import type { TrailingAssistantPatchTailStatePlan } from './TrailingAssistantPatchTailStateApplierHelper';
 
 export type TrailingAssistantPatchTailOutcomePlans = {
   tailStatePlan: TrailingAssistantPatchTailStatePlan;

@@ -1,10 +1,10 @@
 import type { MarkdownView } from 'obsidian';
 
-import type { ComposerContextRuntimeStore } from './ComposerContextRuntimeStore';
 import type { ComposerContextActionServiceHost } from './ComposerContextActionService';
 import type { ComposerContextChipActionServiceHost } from './ComposerContextChipActionService';
 import type { ComposerContextCoordinatorHost } from './ComposerContextCoordinator';
 import type { ComposerContextPickerActionServiceHost } from './ComposerContextPickerActionService';
+import type { ComposerContextRuntimeStore } from './ComposerContextRuntimeStore';
 export type { ComposerContextRuntimeState } from './ComposerContextRuntimeStore';
 
 export interface ComposerContextChipActionHostOptions {

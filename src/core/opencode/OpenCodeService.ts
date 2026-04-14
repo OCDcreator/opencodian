@@ -28,53 +28,53 @@ import type { OpenCodianSettings } from '../types/settings';
 import { getServerBaseUrl, isLocalServerMode } from '../types/settings';
 import { createSdkClient } from './createSdkClient';
 import {
-  OpenCodeCatalogStateStore,
   type CatalogUpdateListener,
+  OpenCodeCatalogStateStore,
   type OpenCodeCatalogToolIdentityContext,
 } from './OpenCodeCatalogStateStore';
 import {
-  OpenCodeEventSubscriptionCoordinator,
-  type OpenCodeEventListener,
-} from './OpenCodeEventSubscriptionCoordinator';
-import {
   OpenCodeContextPartSerializer,
 } from './OpenCodeContextPartSerializer';
+import {
+  type OpenCodeEventListener,
+  OpenCodeEventSubscriptionCoordinator,
+} from './OpenCodeEventSubscriptionCoordinator';
 import { OpenCodeMessageNormalizationMapper } from './OpenCodeMessageNormalizationMapper';
 import {
   OpenCodePromptRequestBuilder,
 } from './OpenCodePromptRequestBuilder';
 import {
+  OpenCodeQueryGateway,
+} from './OpenCodeQueryGateway';
+import {
+  OpenCodeQuestionPermissionHub,
+} from './OpenCodeQuestionPermissionHub';
+import { OpenCodeSdkFacade } from './OpenCodeSdkFacade';
+import {
   OpenCodeSessionControlOrchestrator,
   type SessionContextUsageSnapshot,
 } from './OpenCodeSessionControlOrchestrator';
 import {
-  OpenCodeSessionLifecycleCoordinator,
   type Message,
+  OpenCodeSessionLifecycleCoordinator,
   type Part,
   type Session,
 } from './OpenCodeSessionLifecycleCoordinator';
 import {
-  OpenCodeQuestionPermissionHub,
-} from './OpenCodeQuestionPermissionHub';
-import {
-  OpenCodeQueryGateway,
-} from './OpenCodeQueryGateway';
-import {
-  OpenCodeStreamEventTransformer,
   type OpenCodeSSEEvent,
   type OpenCodeStreamEvent,
   type OpenCodeStreamEventState,
+  OpenCodeStreamEventTransformer,
 } from './OpenCodeStreamEventTransformer';
 import {
-  OpenCodeStreamingRuntimeCoordinator,
   OpenCodeStreamingRuntimeContext,
+  OpenCodeStreamingRuntimeCoordinator,
 } from './OpenCodeStreamingRuntimeCoordinator';
 import {
   OpenCodeSyncEventRuntimeCoordinator,
   type SessionActivityStatus,
   type SessionSyncEventUpdate,
 } from './OpenCodeSyncEventRuntimeCoordinator';
-import { OpenCodeSdkFacade } from './OpenCodeSdkFacade';
 import type { SdkFeatureFlags } from './sdkFeatureFlags';
 import { resolveSdkFeatureFlags } from './sdkFeatureFlags';
 import type { SdkEvent, SdkOpencodeClient } from './sdkTypes';

@@ -1,4 +1,4 @@
-import { MarkdownView, type App } from 'obsidian';
+import { type App,MarkdownView } from 'obsidian';
 
 export interface FocusContextMarkdownViewLocatorHost {
   getCurrentConversationNotePath(): string | null;

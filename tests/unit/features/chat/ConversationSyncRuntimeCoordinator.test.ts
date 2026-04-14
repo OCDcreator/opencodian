@@ -3,8 +3,8 @@ import type {
   Conversation,
 } from '../../../../src/core/types';
 import {
-  ConversationSyncRuntimeCoordinator,
   type ConversationSyncRuntime,
+  ConversationSyncRuntimeCoordinator,
 } from '../../../../src/features/chat/services/ConversationSyncRuntimeCoordinator';
 
 describe('ConversationSyncRuntimeCoordinator', () => {
