@@ -1,16 +1,16 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [CONFIRMED_NEXT_BATCH] 文档压缩已完成；当前可自动执行的 `[NEXT]` 是 `W7 - main.ts loadSettings trim`。
+> **当前状态**: [CONFIRMED_NEXT_BATCH] 文档压缩已完成；当前可自动执行的 `[NEXT]` 是 `W8 - OpenCodianView sync complexity trim`。
 
 ## 当前优先级
 
-- **当前 `[NEXT]`**：`W7 - main.ts loadSettings trim`
+- **当前 `[NEXT]`**：`W8 - OpenCodianView sync complexity trim`
 - **本批目标**：继续受控 warning cleanup，优先处理现有 owner 内可稳定收束的长度 / 复杂度热点
-- **当前 lint 基线**：`0 errors / 100 warnings`
+- **当前 lint 基线**：`0 errors / 98 warnings`
 - **本批热点顺序**：
-  1. `src/main.ts`
-  2. `src/features/chat/OpenCodianView.ts`
+  1. `src/features/chat/OpenCodianView.ts`
+  2. `src/main.ts`（本批只观察剩余文件级 `max-lines`）
 - **观察但暂不自动切入**：`src/features/settings/OpenCodianSettings.ts`、`tests/unit/core/opencode/OpenCodeService.test.ts`
 
 ## 本批边界

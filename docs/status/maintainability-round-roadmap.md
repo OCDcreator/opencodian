@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的 `[NEXT]`”。
-> **当前状态**: [CONFIRMED_NEXT_BATCH] 文档压缩已人工完成；当前可自动执行的 `[NEXT]` 是 `W7 - main.ts loadSettings trim`。
+> **当前状态**: [CONFIRMED_NEXT_BATCH] 文档压缩已人工完成；当前可自动执行的 `[NEXT]` 是 `W8 - OpenCodianView sync complexity trim`。
 
 ## 控制规则
 
@@ -16,7 +16,7 @@
 ## 当前背景
 
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
-- 当前 lint 基线：`0 errors / 100 warnings`
+- 当前 lint 基线：`0 errors / 98 warnings`
 - 当前最适合继续 autopilot 的方向：继续一小批现有 owner 内的 warning cleanup，而不是自动恢复 `R33+`
 
 ## Queue
@@ -38,7 +38,7 @@
   - 至少收掉 `renderEditor` 的 `max-lines-per-function` / `complexity`，并尽量收掉 `renderModelCard` 的 `max-lines-per-function`
   - 运行 focused validation、全量 `npm test`、`npm run build`
 
-### [NEXT] W7 - main.ts loadSettings trim
+### [DONE] W7 - main.ts loadSettings trim
 
 - **Lane**: Warning cleanup / bootstrap hotspot
 - **目标**: 只处理 `src/main.ts` 中 `loadSettings` 的 `max-lines-per-function` 与 `complexity` warning，优先通过初始化步骤分段、guard clause 与同文件私有 helper 收束流程。
@@ -56,7 +56,7 @@
   - 运行 focused validation、全量 `npm test`、`npm run build`
   - 若命中 deploy 规则，执行 Test Vault 部署验证
 
-### [QUEUED] W8 - OpenCodianView sync complexity trim
+### [NEXT] W8 - OpenCodianView sync complexity trim
 
 - **Lane**: Warning cleanup / chat hotspot
 - **目标**: 只处理 `src/features/chat/OpenCodianView.ts` 中三处消息同步复杂度热点：`mergeClientOnlyMessageFields`、`syncLatestUserMessageFromServer`、`syncConversationMessagesFromServer`。

@@ -137,6 +137,407 @@ function isLegacyNikdelvinDefaultProfile(value: unknown): boolean {
   return matchesLegacyProfile || matchesTransitionalProfile;
 }
 
+type LoadedPersistedSettings = Awaited<ReturnType<StorageService['loadPersistedSettings']>>;
+type LegacyFlatServerSettings = {
+  host?: string;
+  port?: number;
+  autoStart?: boolean;
+};
+type LoadedSettingsSnapshot = Partial<OpenCodianSettings> & {
+  debugLogPath?: unknown;
+  server?: Partial<OpenCodianSettings['server']> | LegacyFlatServerSettings;
+  experimentalComposerGlassRefractionEnabled?: unknown;
+  inputPanelLiquidGlassMode?: unknown;
+};
+
+type LoadSettingsNormalizationContext = {
+  normalizedChatAppearance: OpenCodianSettings['chatAppearance'];
+  normalizedDebugLogPaths: PlatformDebugLogPaths;
+  normalizedInputPanelGlassRefraction: OpenCodianSettings['inputPanelGlassRefraction'];
+  normalizedInputPanelGlassRefractionSvgFilter: OpenCodianSettings['inputPanelGlassRefractionSvgFilter'];
+  normalizedInputPanelLiquidGlass: OpenCodianSettings['inputPanelLiquidGlass'];
+  normalizedProviderIconLibrary: OpenCodianSettings['providerIconLibrary'];
+  normalizedServer: OpenCodianSettings['server'];
+  normalizedTabState: OpenCodianSettings['tabState'];
+  normalizedTheme: OpenCodianSettings['theme'];
+};
+
+type LoadSettingsNormalizationResult = {
+  settings: OpenCodianSettings;
+  shouldMigrateLegacyLocalDefaultPort: boolean;
+  shouldResetGlassRefractionGlassDefaults: boolean;
+};
+
+function mergeLoadedSettingsSnapshot(persistedSettings: LoadedPersistedSettings): LoadedSettingsSnapshot | null {
+  if (!persistedSettings.core.data && !persistedSettings.ui.data) {
+    return null;
+  }
+
+  return {
+    ...(persistedSettings.core.data ?? {}),
+    ...(persistedSettings.ui.data ?? {}),
+  } as LoadedSettingsSnapshot;
+}
+
+function normalizeDebugLogPathsOnLoad(savedSettings: LoadedSettingsSnapshot | null): PlatformDebugLogPaths {
+  const normalizedDebugLogPaths: PlatformDebugLogPaths = {
+    ...DEFAULT_SETTINGS.debugLogPaths,
+    ...(savedSettings?.debugLogPaths ?? {}),
+  };
+  const legacyDebugLogPath = typeof savedSettings?.debugLogPath === 'string'
+    ? savedSettings.debugLogPath.trim()
+    : '';
+
+  if (legacyDebugLogPath.length > 0 && !normalizedDebugLogPaths[getCurrentPlatformKey()]) {
+    normalizedDebugLogPaths[getCurrentPlatformKey()] = legacyDebugLogPath;
+  }
+
+  return normalizedDebugLogPaths;
+}
+
+function normalizeServerSettingsOnLoad(savedSettings: LoadedSettingsSnapshot | null): {
+  normalizedServer: OpenCodianSettings['server'];
+  shouldMigrateLegacyLocalDefaultPort: boolean;
+} {
+  const defaultServer = DEFAULT_SETTINGS.server;
+  const legacyServer = savedSettings?.server;
+
+  if (!legacyServer || typeof legacyServer !== 'object') {
+    return {
+      normalizedServer: defaultServer,
+      shouldMigrateLegacyLocalDefaultPort: false,
+    };
+  }
+
+  const hasNestedServer =
+    'mode' in legacyServer || 'local' in legacyServer || 'remote' in legacyServer || 'auth' in legacyServer;
+  const normalizedServer = hasNestedServer
+    ? (() => {
+        const nestedServer = legacyServer as Partial<OpenCodianSettings['server']>;
+        return {
+          ...defaultServer,
+          ...nestedServer,
+          local: {
+            ...defaultServer.local,
+            ...(nestedServer.local ?? {}),
+          },
+          remote: {
+            ...defaultServer.remote,
+            ...(nestedServer.remote ?? {}),
+          },
+          auth: {
+            ...defaultServer.auth,
+            ...(nestedServer.auth ?? {}),
+          },
+        };
+      })()
+    : (() => {
+        const flatServer = legacyServer as LegacyFlatServerSettings;
+        const legacyHost = typeof flatServer.host === 'string' && flatServer.host.trim()
+          ? flatServer.host.trim()
+          : defaultServer.local.host;
+        const legacyPort = typeof flatServer.port === 'number' ? flatServer.port : defaultServer.local.port;
+        const legacyAutoStart = typeof flatServer.autoStart === 'boolean'
+          ? flatServer.autoStart
+          : defaultServer.local.autoStart;
+
+        return {
+          ...defaultServer,
+          mode: 'local' as const,
+          local: {
+            host: legacyHost,
+            port: legacyPort,
+            autoStart: legacyAutoStart,
+          },
+          remote: {
+            baseUrl: `http://${legacyHost}:${legacyPort}`,
+          },
+        };
+      })();
+
+  const shouldMigrateLegacyLocalDefaultPort = Boolean(
+    savedSettings
+    && normalizedServer.mode === 'local'
+    && normalizedServer.local.host === OPENCODIAN_LOCAL_SIDECAR_DEFAULT_HOST
+    && normalizedServer.local.port === OPENCODE_LEGACY_LOCAL_DEFAULT_PORT
+    && normalizedServer.local.autoStart === DEFAULT_SETTINGS.server.local.autoStart
+    && normalizedServer.remote.baseUrl === `http://${OPENCODIAN_LOCAL_SIDECAR_DEFAULT_HOST}:${OPENCODE_LEGACY_LOCAL_DEFAULT_PORT}`,
+  );
+
+  if (!shouldMigrateLegacyLocalDefaultPort) {
+    return {
+      normalizedServer,
+      shouldMigrateLegacyLocalDefaultPort,
+    };
+  }
+
+  return {
+    normalizedServer: {
+      ...normalizedServer,
+      local: {
+        ...normalizedServer.local,
+        port: OPENCODIAN_LOCAL_SIDECAR_DEFAULT_PORT,
+      },
+    },
+    shouldMigrateLegacyLocalDefaultPort,
+  };
+}
+
+function normalizeThemeSettingsOnLoad(
+  savedSettings: LoadedSettingsSnapshot | null,
+  normalizedSavedChatAppearance: OpenCodianSettings['chatAppearance'],
+  hasSavedChatAppearance: boolean,
+): OpenCodianSettings['theme'] {
+  const savedTheme = savedSettings?.theme;
+  const hasSavedTheme = savedTheme !== undefined;
+
+  if (!savedSettings) {
+    return getDefaultThemeSettings();
+  }
+
+  if (!hasSavedTheme) {
+    if (
+      hasSavedChatAppearance
+      && !areChatAppearanceSettingsEqual(normalizedSavedChatAppearance, getDefaultChatAppearanceSettings())
+    ) {
+      return {
+        activePresetId: null,
+        customAppearanceOverrides: {},
+      } satisfies OpenCodianSettings['theme'];
+    }
+
+    return getDefaultThemeSettings();
+  }
+
+  const baseTheme = normalizeThemeSettings(savedTheme);
+  if (!baseTheme.activePresetId) {
+    return {
+      activePresetId: null,
+      customAppearanceOverrides: {},
+    } satisfies OpenCodianSettings['theme'];
+  }
+
+  const preset = getThemePresetDefinition(baseTheme.activePresetId);
+  if (!preset) {
+    return {
+      activePresetId: null,
+      customAppearanceOverrides: {},
+    } satisfies OpenCodianSettings['theme'];
+  }
+
+  const effectiveAppearance = hasSavedChatAppearance
+    ? normalizedSavedChatAppearance
+    : resolveThemeChatAppearance(baseTheme);
+
+  return {
+    activePresetId: preset.id,
+    customAppearanceOverrides: getThemeAppearanceOverridesFromBase(preset.appearance, effectiveAppearance),
+  } satisfies OpenCodianSettings['theme'];
+}
+
+function normalizeThemeAndChatAppearanceOnLoad(savedSettings: LoadedSettingsSnapshot | null): {
+  normalizedChatAppearance: OpenCodianSettings['chatAppearance'];
+  normalizedTheme: OpenCodianSettings['theme'];
+} {
+  const hasSavedChatAppearance = savedSettings?.chatAppearance !== undefined;
+  const normalizedSavedChatAppearance = normalizeChatAppearanceSettings(savedSettings?.chatAppearance);
+  const normalizedTheme = normalizeThemeSettingsOnLoad(
+    savedSettings,
+    normalizedSavedChatAppearance,
+    hasSavedChatAppearance,
+  );
+  const themeResolvedAppearance = normalizedTheme.activePresetId
+    ? resolveThemeChatAppearance(normalizedTheme)
+    : normalizedSavedChatAppearance;
+  const normalizedChatAppearance = hasSavedChatAppearance
+    ? normalizeChatAppearanceSettings({
+        ...themeResolvedAppearance,
+        background: normalizedSavedChatAppearance.background,
+      })
+    : themeResolvedAppearance;
+
+  return {
+    normalizedTheme,
+    normalizedChatAppearance,
+  };
+}
+
+function normalizeInputPanelSettingsOnLoad(savedSettings: LoadedSettingsSnapshot | null): {
+  normalizedInputPanelGlassRefraction: OpenCodianSettings['inputPanelGlassRefraction'];
+  normalizedInputPanelGlassRefractionSvgFilter: OpenCodianSettings['inputPanelGlassRefractionSvgFilter'];
+  normalizedInputPanelLiquidGlass: OpenCodianSettings['inputPanelLiquidGlass'];
+  shouldResetGlassRefractionGlassDefaults: boolean;
+} {
+  const savedGlassDefaultsVersion = Number.isFinite(savedSettings?.inputPanelGlassRefractionGlassDefaultsVersion)
+    ? Number(savedSettings?.inputPanelGlassRefractionGlassDefaultsVersion)
+    : 0;
+  const shouldResetGlassTierDefaults = savedGlassDefaultsVersion < 1;
+  const shouldResetCardAndPillTierDefaults =
+    savedGlassDefaultsVersion < INPUT_PANEL_GLASS_REFRACTION_GLASS_DEFAULTS_VERSION;
+  const shouldResetGlassRefractionGlassDefaults =
+    shouldResetGlassTierDefaults || shouldResetCardAndPillTierDefaults;
+  const defaultInputPanelGlassRefraction = getDefaultInputPanelGlassRefractionSettings();
+  const normalizedInputPanelGlassRefractionBase = normalizeInputPanelGlassRefractionSettings(
+    savedSettings?.inputPanelGlassRefraction,
+  );
+  const normalizedInputPanelGlassRefraction = shouldResetGlassRefractionGlassDefaults
+    ? {
+        ...normalizedInputPanelGlassRefractionBase,
+        ...(shouldResetGlassTierDefaults
+          ? {
+              glass: { ...defaultInputPanelGlassRefraction.glass },
+            }
+          : {}),
+        ...(shouldResetCardAndPillTierDefaults
+          ? {
+              card: { ...defaultInputPanelGlassRefraction.card },
+              pill: { ...defaultInputPanelGlassRefraction.pill },
+            }
+          : {}),
+      }
+    : normalizedInputPanelGlassRefractionBase;
+  const normalizedInputPanelGlassRefractionSvgFilter = normalizeInputPanelGlassRefractionSvgFilterSettings(
+    savedSettings?.inputPanelGlassRefractionSvgFilter,
+  );
+  const normalizedInputPanelLiquidGlassBase = normalizeInputPanelLiquidGlassSettings(
+    savedSettings?.inputPanelLiquidGlass,
+  );
+  const defaultInputPanelLiquidGlass = getDefaultInputPanelLiquidGlassSettings();
+  const normalizedInputPanelLiquidGlass = isLegacyNikdelvinDefaultProfile(savedSettings?.inputPanelLiquidGlass?.nikdelvin)
+    ? {
+        ...normalizedInputPanelLiquidGlassBase,
+        nikdelvin: { ...defaultInputPanelLiquidGlass.nikdelvin },
+      }
+    : normalizedInputPanelLiquidGlassBase;
+
+  return {
+    normalizedInputPanelGlassRefraction,
+    normalizedInputPanelGlassRefractionSvgFilter,
+    normalizedInputPanelLiquidGlass,
+    shouldResetGlassRefractionGlassDefaults,
+  };
+}
+
+function buildNormalizedLoadedSettings(
+  savedSettings: LoadedSettingsSnapshot | null,
+  context: LoadSettingsNormalizationContext,
+): Partial<OpenCodianSettings> | null {
+  if (!savedSettings) {
+    return null;
+  }
+
+  const remainingSavedSettings = {
+    ...savedSettings,
+  };
+  delete remainingSavedSettings.experimentalComposerGlassRefractionEnabled;
+  delete remainingSavedSettings.inputPanelLiquidGlassMode;
+
+  return {
+    ...remainingSavedSettings,
+    server: context.normalizedServer,
+    chatScrollMode:
+      (savedSettings.chatScrollMode as OpenCodianSettings['chatScrollMode'] | 'sticky' | undefined) === 'sticky'
+        ? 'sticky-mask'
+        : savedSettings.chatScrollMode,
+    effortLevel: normalizeEffortLevel(savedSettings.effortLevel),
+    thinkingBudget: normalizeThinkingBudget(savedSettings.thinkingBudget),
+    tabBarPosition: normalizeTabBarPosition(savedSettings.tabBarPosition),
+    belowHeaderTabBarLayout: normalizeBelowHeaderTabBarLayout(savedSettings.belowHeaderTabBarLayout),
+    titleMode: normalizeTitleMode(savedSettings.titleMode),
+    questionDisplayMode: normalizeQuestionDisplayMode(savedSettings.questionDisplayMode),
+    questionCardPosition: normalizeQuestionCardPosition(savedSettings.questionCardPosition),
+    showAnsweredQuestionCards:
+      typeof savedSettings.showAnsweredQuestionCards === 'boolean'
+        ? savedSettings.showAnsweredQuestionCards
+        : DEFAULT_SETTINGS.showAnsweredQuestionCards,
+    aiTitleModel: typeof savedSettings.aiTitleModel === 'string' ? savedSettings.aiTitleModel.trim() : '',
+    disabledModelRefs: normalizeDisabledModelRefs(savedSettings.disabledModelRefs),
+    renderUserMarkupAsCodeBlocks:
+      typeof savedSettings.renderUserMarkupAsCodeBlocks === 'boolean'
+        ? savedSettings.renderUserMarkupAsCodeBlocks
+        : DEFAULT_SETTINGS.renderUserMarkupAsCodeBlocks,
+    pluginIsolationMode: normalizePluginIsolationMode(savedSettings.pluginIsolationMode),
+    inputPanelTheme: normalizeInputPanelThemeId(savedSettings.inputPanelTheme),
+    inputPanelGlassRefraction: context.normalizedInputPanelGlassRefraction,
+    inputPanelGlassRefractionSvgFilter: context.normalizedInputPanelGlassRefractionSvgFilter,
+    inputPanelGlassRefractionGlassDefaultsVersion: INPUT_PANEL_GLASS_REFRACTION_GLASS_DEFAULTS_VERSION,
+    inputPanelLiquidGlass: context.normalizedInputPanelLiquidGlass,
+    debugLogPaths: context.normalizedDebugLogPaths,
+    chatAppearance: context.normalizedChatAppearance,
+    theme: context.normalizedTheme,
+    tabState: context.normalizedTabState,
+    modelAvailabilitySectionOpen:
+      typeof savedSettings.modelAvailabilitySectionOpen === 'boolean'
+        ? savedSettings.modelAvailabilitySectionOpen
+        : DEFAULT_SETTINGS.modelAvailabilitySectionOpen,
+    modelToolsSectionOpen:
+      typeof savedSettings.modelToolsSectionOpen === 'boolean'
+        ? savedSettings.modelToolsSectionOpen
+        : DEFAULT_SETTINGS.modelToolsSectionOpen,
+    inlineSerializedDebugLogArgs:
+      typeof savedSettings.inlineSerializedDebugLogArgs === 'boolean'
+        ? savedSettings.inlineSerializedDebugLogArgs
+        : DEFAULT_SETTINGS.inlineSerializedDebugLogArgs,
+    providerIconLibrary: context.normalizedProviderIconLibrary,
+    providerIconColorMode: normalizeProviderIconColorMode(savedSettings.providerIconColorMode),
+    providerIconDefaultVariant: normalizeLobehubIconVariant(savedSettings.providerIconDefaultVariant),
+  };
+}
+
+function normalizeLoadedPluginSettings(savedSettings: LoadedSettingsSnapshot | null): LoadSettingsNormalizationResult {
+  const normalizedDebugLogPaths = normalizeDebugLogPathsOnLoad(savedSettings);
+  const { normalizedServer, shouldMigrateLegacyLocalDefaultPort } = normalizeServerSettingsOnLoad(savedSettings);
+  const { normalizedTheme, normalizedChatAppearance } = normalizeThemeAndChatAppearanceOnLoad(savedSettings);
+  const {
+    normalizedInputPanelGlassRefraction,
+    normalizedInputPanelGlassRefractionSvgFilter,
+    normalizedInputPanelLiquidGlass,
+    shouldResetGlassRefractionGlassDefaults,
+  } = normalizeInputPanelSettingsOnLoad(savedSettings);
+  const context: LoadSettingsNormalizationContext = {
+    normalizedChatAppearance,
+    normalizedDebugLogPaths,
+    normalizedInputPanelGlassRefraction,
+    normalizedInputPanelGlassRefractionSvgFilter,
+    normalizedInputPanelLiquidGlass,
+    normalizedProviderIconLibrary: normalizeProviderIconLibrary(savedSettings?.providerIconLibrary),
+    normalizedServer,
+    normalizedTabState: normalizePersistedTabState(savedSettings?.tabState),
+    normalizedTheme,
+  };
+  const normalizedSettings = buildNormalizedLoadedSettings(savedSettings, context);
+
+  return {
+    settings: {
+      ...DEFAULT_SETTINGS,
+      ...normalizedSettings,
+      server: context.normalizedServer,
+      tabBarPosition: normalizeTabBarPosition(normalizedSettings?.tabBarPosition),
+      belowHeaderTabBarLayout: normalizeBelowHeaderTabBarLayout(normalizedSettings?.belowHeaderTabBarLayout),
+      inputPanelTheme: normalizeInputPanelThemeId(normalizedSettings?.inputPanelTheme),
+      inputPanelGlassRefraction: normalizedSettings?.inputPanelGlassRefraction
+        ?? getDefaultInputPanelGlassRefractionSettings(),
+      inputPanelGlassRefractionSvgFilter: normalizedSettings?.inputPanelGlassRefractionSvgFilter
+        ?? getDefaultInputPanelGlassRefractionSvgFilterSettings(),
+      inputPanelGlassRefractionGlassDefaultsVersion:
+        normalizedSettings?.inputPanelGlassRefractionGlassDefaultsVersion
+        ?? INPUT_PANEL_GLASS_REFRACTION_GLASS_DEFAULTS_VERSION,
+      inputPanelLiquidGlass: normalizedSettings?.inputPanelLiquidGlass
+        ?? getDefaultInputPanelLiquidGlassSettings(),
+      debugLogPaths: normalizedDebugLogPaths,
+      disabledModelRefs: normalizedSettings?.disabledModelRefs ?? [],
+      chatAppearance: normalizedChatAppearance,
+      theme: normalizedTheme,
+      tabState: normalizedSettings?.tabState ?? getDefaultPersistedTabState(),
+      providerIconLibrary: context.normalizedProviderIconLibrary,
+      providerIconColorMode: normalizeProviderIconColorMode(normalizedSettings?.providerIconColorMode),
+      providerIconDefaultVariant: normalizeLobehubIconVariant(normalizedSettings?.providerIconDefaultVariant),
+    },
+    shouldMigrateLegacyLocalDefaultPort,
+    shouldResetGlassRefractionGlassDefaults,
+  };
+}
+
 // BUILD_ID is injected at build time via esbuild define
 declare const BUILD_ID: string;
 
@@ -389,327 +790,14 @@ export default class OpenCodianPlugin extends Plugin {
   /** Load settings from storage */
   async loadSettings() {
     const persistedSettings = await this.storage.loadPersistedSettings();
-    const savedSettings =
-      persistedSettings.core.data || persistedSettings.ui.data
-        ? ({
-            ...(persistedSettings.core.data ?? {}),
-            ...(persistedSettings.ui.data ?? {}),
-          } as Partial<OpenCodianSettings>)
-        : null;
+    const savedSettings = mergeLoadedSettingsSnapshot(persistedSettings);
     this.settingsPersistenceWritable = persistedSettings.writable;
-    const savedDebugLogPaths =
-      savedSettings && typeof savedSettings === 'object' && 'debugLogPaths' in savedSettings
-        ? (savedSettings as { debugLogPaths?: Partial<PlatformDebugLogPaths> }).debugLogPaths
-        : undefined;
-    const legacyDebugLogPath =
-      savedSettings && typeof savedSettings === 'object' && 'debugLogPath' in savedSettings
-        ? (savedSettings as { debugLogPath?: unknown }).debugLogPath
-        : undefined;
-    const normalizedDebugLogPaths: PlatformDebugLogPaths = {
-      ...DEFAULT_SETTINGS.debugLogPaths,
-      ...savedDebugLogPaths,
-    };
-
-    if (
-      typeof legacyDebugLogPath === 'string' &&
-      legacyDebugLogPath.trim().length > 0 &&
-      !normalizedDebugLogPaths[getCurrentPlatformKey()]
-    ) {
-      normalizedDebugLogPaths[getCurrentPlatformKey()] = legacyDebugLogPath.trim();
-    }
-
-    const legacyServer =
-      savedSettings && typeof savedSettings === 'object' && 'server' in savedSettings
-        ? (savedSettings as {
-            server?:
-              | Partial<OpenCodianSettings['server']>
-              | { host?: string; port?: number; autoStart?: boolean };
-          }).server
-        : undefined;
-    const normalizedServer = (() => {
-      const defaultServer = DEFAULT_SETTINGS.server;
-
-      if (!legacyServer || typeof legacyServer !== 'object') {
-        return defaultServer;
-      }
-
-      const hasNestedServer =
-        'mode' in legacyServer || 'local' in legacyServer || 'remote' in legacyServer || 'auth' in legacyServer;
-
-      if (hasNestedServer) {
-        const nestedServer = legacyServer as Partial<OpenCodianSettings['server']>;
-        return {
-          ...defaultServer,
-          ...nestedServer,
-          local: {
-            ...defaultServer.local,
-            ...(nestedServer.local ?? {}),
-          },
-          remote: {
-            ...defaultServer.remote,
-            ...(nestedServer.remote ?? {}),
-          },
-          auth: {
-            ...defaultServer.auth,
-            ...(nestedServer.auth ?? {}),
-          },
-        };
-      }
-
-      const flatServer = legacyServer as { host?: string; port?: number; autoStart?: boolean };
-      const legacyHost = typeof flatServer.host === 'string' && flatServer.host.trim()
-        ? flatServer.host.trim()
-        : defaultServer.local.host;
-      const legacyPort = typeof flatServer.port === 'number' ? flatServer.port : defaultServer.local.port;
-      const legacyAutoStart = typeof flatServer.autoStart === 'boolean'
-        ? flatServer.autoStart
-        : defaultServer.local.autoStart;
-
-      return {
-        ...defaultServer,
-        mode: 'local' as const,
-        local: {
-          host: legacyHost,
-          port: legacyPort,
-          autoStart: legacyAutoStart,
-        },
-        remote: {
-          baseUrl: `http://${legacyHost}:${legacyPort}`,
-        },
-      };
-    })();
-    const shouldMigrateLegacyLocalDefaultPort = Boolean(
-      savedSettings
-      && normalizedServer.mode === 'local'
-      && normalizedServer.local.host === OPENCODIAN_LOCAL_SIDECAR_DEFAULT_HOST
-      && normalizedServer.local.port === OPENCODE_LEGACY_LOCAL_DEFAULT_PORT
-      && normalizedServer.local.autoStart === DEFAULT_SETTINGS.server.local.autoStart
-      && normalizedServer.remote.baseUrl === `http://${OPENCODIAN_LOCAL_SIDECAR_DEFAULT_HOST}:${OPENCODE_LEGACY_LOCAL_DEFAULT_PORT}`,
-    );
-    if (shouldMigrateLegacyLocalDefaultPort) {
-      normalizedServer.local = {
-        ...normalizedServer.local,
-        port: OPENCODIAN_LOCAL_SIDECAR_DEFAULT_PORT,
-      };
-    }
-    const hasSavedChatAppearance =
-      Boolean(savedSettings && typeof savedSettings === 'object' && 'chatAppearance' in savedSettings);
-    const savedChatAppearance =
-      hasSavedChatAppearance
-        ? (savedSettings as { chatAppearance?: Partial<OpenCodianSettings['chatAppearance']> }).chatAppearance
-        : undefined;
-    const normalizedSavedChatAppearance = normalizeChatAppearanceSettings(savedChatAppearance);
-    const hasSavedTheme =
-      Boolean(savedSettings && typeof savedSettings === 'object' && 'theme' in savedSettings);
-    const savedTheme =
-      hasSavedTheme
-        ? (savedSettings as { theme?: Partial<OpenCodianSettings['theme']> }).theme
-        : undefined;
-    const normalizedTheme = (() => {
-      if (!savedSettings) {
-        return getDefaultThemeSettings();
-      }
-
-      if (!hasSavedTheme) {
-        if (
-          hasSavedChatAppearance
-          && !areChatAppearanceSettingsEqual(normalizedSavedChatAppearance, getDefaultChatAppearanceSettings())
-        ) {
-          return {
-            activePresetId: null,
-            customAppearanceOverrides: {},
-          } satisfies OpenCodianSettings['theme'];
-        }
-
-        return getDefaultThemeSettings();
-      }
-
-      const baseTheme = normalizeThemeSettings(savedTheme);
-      if (!baseTheme.activePresetId) {
-        return {
-          activePresetId: null,
-          customAppearanceOverrides: {},
-        } satisfies OpenCodianSettings['theme'];
-      }
-
-      const preset = getThemePresetDefinition(baseTheme.activePresetId);
-      if (!preset) {
-        return {
-          activePresetId: null,
-          customAppearanceOverrides: {},
-        } satisfies OpenCodianSettings['theme'];
-      }
-
-      const effectiveAppearance = hasSavedChatAppearance
-        ? normalizedSavedChatAppearance
-        : resolveThemeChatAppearance(baseTheme);
-
-      return {
-        activePresetId: preset.id,
-        customAppearanceOverrides: getThemeAppearanceOverridesFromBase(preset.appearance, effectiveAppearance),
-      } satisfies OpenCodianSettings['theme'];
-    })();
-    const normalizedChatAppearance = (() => {
-      const themeResolvedAppearance = normalizedTheme.activePresetId
-        ? resolveThemeChatAppearance(normalizedTheme)
-        : normalizedSavedChatAppearance;
-
-      if (!hasSavedChatAppearance) {
-        return themeResolvedAppearance;
-      }
-
-      return normalizeChatAppearanceSettings({
-        ...themeResolvedAppearance,
-        background: normalizedSavedChatAppearance.background,
-      });
-    })();
-    const savedTabState =
-      savedSettings && typeof savedSettings === 'object' && 'tabState' in savedSettings
-        ? (savedSettings as { tabState?: Partial<OpenCodianSettings['tabState']> }).tabState
-        : undefined;
-    const normalizedTabState = normalizePersistedTabState(savedTabState);
-    const savedProviderIconLibrary =
-      savedSettings && typeof savedSettings === 'object' && 'providerIconLibrary' in savedSettings
-        ? (savedSettings as { providerIconLibrary?: OpenCodianSettings['providerIconLibrary'] }).providerIconLibrary
-        : undefined;
-    const normalizedProviderIconLibrary = normalizeProviderIconLibrary(savedProviderIconLibrary);
-    const savedGlassDefaultsVersion =
-      savedSettings
-      && typeof savedSettings === 'object'
-      && 'inputPanelGlassRefractionGlassDefaultsVersion' in savedSettings
-      && Number.isFinite(savedSettings.inputPanelGlassRefractionGlassDefaultsVersion)
-        ? Number(savedSettings.inputPanelGlassRefractionGlassDefaultsVersion)
-        : 0;
-    const shouldResetGlassTierDefaults = savedGlassDefaultsVersion < 1;
-    const shouldResetCardAndPillTierDefaults =
-      savedGlassDefaultsVersion < INPUT_PANEL_GLASS_REFRACTION_GLASS_DEFAULTS_VERSION;
-    const shouldResetGlassRefractionGlassDefaults =
-      shouldResetGlassTierDefaults || shouldResetCardAndPillTierDefaults;
-    const defaultInputPanelGlassRefraction = getDefaultInputPanelGlassRefractionSettings();
-    const normalizedInputPanelGlassRefractionBase = normalizeInputPanelGlassRefractionSettings(
-      savedSettings?.inputPanelGlassRefraction,
-    );
-    const normalizedInputPanelGlassRefraction = shouldResetGlassRefractionGlassDefaults
-      ? {
-          ...normalizedInputPanelGlassRefractionBase,
-          ...(shouldResetGlassTierDefaults
-            ? {
-                glass: { ...defaultInputPanelGlassRefraction.glass },
-              }
-            : {}),
-          ...(shouldResetCardAndPillTierDefaults
-            ? {
-                card: { ...defaultInputPanelGlassRefraction.card },
-                pill: { ...defaultInputPanelGlassRefraction.pill },
-              }
-            : {}),
-        }
-      : normalizedInputPanelGlassRefractionBase;
-    const normalizedInputPanelGlassRefractionSvgFilter = normalizeInputPanelGlassRefractionSvgFilterSettings(
-      savedSettings?.inputPanelGlassRefractionSvgFilter,
-    );
-    const normalizedInputPanelLiquidGlassBase = normalizeInputPanelLiquidGlassSettings(
-      savedSettings?.inputPanelLiquidGlass,
-    );
-    const defaultInputPanelLiquidGlass = getDefaultInputPanelLiquidGlassSettings();
-    const shouldResetNikdelvinDefaults = isLegacyNikdelvinDefaultProfile(
-      savedSettings?.inputPanelLiquidGlass?.nikdelvin,
-    );
-    const normalizedInputPanelLiquidGlass = shouldResetNikdelvinDefaults
-      ? {
-          ...normalizedInputPanelLiquidGlassBase,
-          nikdelvin: { ...defaultInputPanelLiquidGlass.nikdelvin },
-        }
-      : normalizedInputPanelLiquidGlassBase;
-
-    const normalizedSettings = savedSettings
-      ? (() => {
-          const remainingSavedSettings = {
-            ...(savedSettings as Partial<OpenCodianSettings> & {
-              experimentalComposerGlassRefractionEnabled?: unknown;
-              inputPanelLiquidGlassMode?: unknown;
-            }),
-          };
-          delete remainingSavedSettings.experimentalComposerGlassRefractionEnabled;
-          delete remainingSavedSettings.inputPanelLiquidGlassMode;
-
-          return {
-            ...remainingSavedSettings,
-            server: normalizedServer,
-            chatScrollMode:
-              (savedSettings.chatScrollMode as OpenCodianSettings['chatScrollMode'] | 'sticky' | undefined) === 'sticky'
-                ? 'sticky-mask'
-                : savedSettings.chatScrollMode,
-            effortLevel: normalizeEffortLevel(savedSettings.effortLevel),
-            thinkingBudget: normalizeThinkingBudget(savedSettings.thinkingBudget),
-            tabBarPosition: normalizeTabBarPosition(savedSettings.tabBarPosition),
-            belowHeaderTabBarLayout: normalizeBelowHeaderTabBarLayout(savedSettings.belowHeaderTabBarLayout),
-            titleMode: normalizeTitleMode(savedSettings.titleMode),
-            questionDisplayMode: normalizeQuestionDisplayMode(savedSettings.questionDisplayMode),
-            questionCardPosition: normalizeQuestionCardPosition(savedSettings.questionCardPosition),
-            showAnsweredQuestionCards:
-              typeof savedSettings.showAnsweredQuestionCards === 'boolean'
-                ? savedSettings.showAnsweredQuestionCards
-                : DEFAULT_SETTINGS.showAnsweredQuestionCards,
-            aiTitleModel: typeof savedSettings.aiTitleModel === 'string' ? savedSettings.aiTitleModel.trim() : '',
-            disabledModelRefs: normalizeDisabledModelRefs(savedSettings.disabledModelRefs),
-            renderUserMarkupAsCodeBlocks:
-              typeof savedSettings.renderUserMarkupAsCodeBlocks === 'boolean'
-                ? savedSettings.renderUserMarkupAsCodeBlocks
-                : DEFAULT_SETTINGS.renderUserMarkupAsCodeBlocks,
-            pluginIsolationMode: normalizePluginIsolationMode(savedSettings.pluginIsolationMode),
-            inputPanelTheme: normalizeInputPanelThemeId(savedSettings.inputPanelTheme),
-            inputPanelGlassRefraction: normalizedInputPanelGlassRefraction,
-            inputPanelGlassRefractionSvgFilter: normalizedInputPanelGlassRefractionSvgFilter,
-            inputPanelGlassRefractionGlassDefaultsVersion: INPUT_PANEL_GLASS_REFRACTION_GLASS_DEFAULTS_VERSION,
-            inputPanelLiquidGlass: normalizedInputPanelLiquidGlass,
-            debugLogPaths: normalizedDebugLogPaths,
-            chatAppearance: normalizedChatAppearance,
-            theme: normalizedTheme,
-            tabState: normalizedTabState,
-            modelAvailabilitySectionOpen:
-              typeof savedSettings.modelAvailabilitySectionOpen === 'boolean'
-                ? savedSettings.modelAvailabilitySectionOpen
-                : DEFAULT_SETTINGS.modelAvailabilitySectionOpen,
-            modelToolsSectionOpen:
-              typeof savedSettings.modelToolsSectionOpen === 'boolean'
-                ? savedSettings.modelToolsSectionOpen
-                : DEFAULT_SETTINGS.modelToolsSectionOpen,
-            inlineSerializedDebugLogArgs:
-              typeof savedSettings.inlineSerializedDebugLogArgs === 'boolean'
-                ? savedSettings.inlineSerializedDebugLogArgs
-                : DEFAULT_SETTINGS.inlineSerializedDebugLogArgs,
-            providerIconLibrary: normalizedProviderIconLibrary,
-            providerIconColorMode: normalizeProviderIconColorMode(savedSettings.providerIconColorMode),
-            providerIconDefaultVariant: normalizeLobehubIconVariant(savedSettings.providerIconDefaultVariant),
-          };
-        })()
-      : null;
-    this.settings = {
-      ...DEFAULT_SETTINGS,
-      ...normalizedSettings,
-      server: normalizedServer,
-      tabBarPosition: normalizeTabBarPosition(normalizedSettings?.tabBarPosition),
-      belowHeaderTabBarLayout: normalizeBelowHeaderTabBarLayout(normalizedSettings?.belowHeaderTabBarLayout),
-      inputPanelTheme: normalizeInputPanelThemeId(normalizedSettings?.inputPanelTheme),
-      inputPanelGlassRefraction: normalizedSettings?.inputPanelGlassRefraction
-        ?? getDefaultInputPanelGlassRefractionSettings(),
-      inputPanelGlassRefractionSvgFilter: normalizedSettings?.inputPanelGlassRefractionSvgFilter
-        ?? getDefaultInputPanelGlassRefractionSvgFilterSettings(),
-      inputPanelGlassRefractionGlassDefaultsVersion:
-        normalizedSettings?.inputPanelGlassRefractionGlassDefaultsVersion
-        ?? INPUT_PANEL_GLASS_REFRACTION_GLASS_DEFAULTS_VERSION,
-      inputPanelLiquidGlass: normalizedSettings?.inputPanelLiquidGlass
-        ?? getDefaultInputPanelLiquidGlassSettings(),
-      debugLogPaths: normalizedDebugLogPaths,
-      disabledModelRefs: normalizedSettings?.disabledModelRefs ?? [],
-      chatAppearance: normalizedChatAppearance,
-      theme: normalizedTheme,
-      tabState: normalizedTabState ?? getDefaultPersistedTabState(),
-      providerIconLibrary: normalizedProviderIconLibrary,
-      providerIconColorMode: normalizeProviderIconColorMode(normalizedSettings?.providerIconColorMode),
-      providerIconDefaultVariant: normalizeLobehubIconVariant(normalizedSettings?.providerIconDefaultVariant),
-    };
+    const {
+      settings,
+      shouldMigrateLegacyLocalDefaultPort,
+      shouldResetGlassRefractionGlassDefaults,
+    } = normalizeLoadedPluginSettings(savedSettings);
+    this.settings = settings;
 
     this.reportSettingsLoadState(persistedSettings);
 
