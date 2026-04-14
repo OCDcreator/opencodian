@@ -1,19 +1,19 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [READY] `R59` ModelConfigService server catalog assembly seam 已完成；当前首个 `[NEXT]` 为 `R60 - OpenCodeMessageNormalizationMapper tool/content seam`。
+> **当前状态**: [READY] `R60` OpenCodeMessageNormalizationMapper tool/content seam 已完成；当前首个 `[NEXT]` 为 `R61 - OpenCodeMessageNormalizationMapper context attachment and OMO seam`。
 
 ## 当前优先级
 
-- **当前 `[NEXT]`**：`R60 - OpenCodeMessageNormalizationMapper tool/content seam`
+- **当前 `[NEXT]`**：`R61 - OpenCodeMessageNormalizationMapper context attachment and OMO seam`
 - **本批目标**：保持 `0 errors`，settings residual seams 已完成，继续推进 server/config/icon 厚切口，最后连跑三轮 warning cleanup 与 checkpoint
 - **当前 lint 基线**：`0 errors / 92 warnings`
 - **热点顺序**：
   1. `src/core/opencode/OpenCodeMessageNormalizationMapper.ts`
-  2. 直接相关 mapper tests
-  3. `src/utils/icons/ProviderIconService.ts`
-  4. 直接相关 tests 与模块文档
-  5. warning cleanup checkpoint prep
+  2. `src/shared/contextPath.ts`
+  3. 直接相关 mapper tests
+  4. `src/utils/icons/ProviderIconService.ts`
+  5. 直接相关 tests 与模块文档
 
 ## 本批边界
 

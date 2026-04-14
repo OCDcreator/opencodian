@@ -40,7 +40,7 @@
 
 ### `openCodeMessageToChatMessage()`
 
-- 汇总 `text` / `reasoning` / `tool` parts 到 `contentBlocks`
+- 先通过文件内的 tool/content seam 收束 renderable `tool` parts、pending `toolCalls`、历史 `tool_use` block 与 `contentBlocks` 装配
 - 为 assistant message 生成 `modelId`
 - 用 `shared/toolExecution` + `shared/toolIdentity` 归一化 `toolCalls` 与历史 `tool_use`
 - 过滤内部 `structured_output` tool，同时保留 assistant `structured` payload
@@ -67,6 +67,7 @@ graph LR
 - `OpenCodeService` 继续保留 `openCodeMessageToChatMessage()` / `hydrateOpenCodeMessage()` 的公共入口，但实现委托给 mapper。
 - `OpenCodeStreamEventTransformer` 通过 service host seam 复用同一个 question normalization 与 tool kind 规则，避免流式/历史路径分叉。
 - `OpenCodeCatalogStateStore` 提供 `OpenCodeCatalogToolIdentityContext`，让历史 hydration 在 catalog 可用时准确区分 custom / MCP。
+- tool/content seam 只负责 renderable tool part collection、pending tool-call assembly、thinking/tool/text content block 拼装；context attachment 与 OMO 归一化仍留在 mapper 主 owner。
 
 ## 注意事项
 

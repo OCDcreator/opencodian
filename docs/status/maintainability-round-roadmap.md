@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的 `[NEXT]`”。
-> **当前状态**: [READY] `R59` ModelConfigService server catalog assembly seam 已完成，当前首个 `[NEXT]` 为 `R60 - OpenCodeMessageNormalizationMapper tool/content seam`；必须继续按 `R60-R67` 顺序执行。
+> **当前状态**: [READY] `R60` OpenCodeMessageNormalizationMapper tool/content seam 已完成，当前首个 `[NEXT]` 为 `R61 - OpenCodeMessageNormalizationMapper context attachment and OMO seam`；必须继续按 `R61-R67` 顺序执行。
 
 ## 控制规则
 
@@ -276,7 +276,7 @@
   - `ModelConfigService` 对 catalog assembly / probe / default resolution 的直接铺开明显减少
   - focused validation、全量 `npm test`、`npm run build` 通过
 
-### [NEXT] R60 - OpenCodeMessageNormalizationMapper tool/content seam
+### [DONE] R60 - OpenCodeMessageNormalizationMapper tool/content seam
 
 - **Lane**: Maintainability / message normalization tool mapping
 - **目标**: 从 `src/core/opencode/OpenCodeMessageNormalizationMapper.ts` 收束 tool part collection、pending tool calls、tool-use content block 构造与 renderable content assembly 的完整 seam。
@@ -293,7 +293,7 @@
   - mapper 对 tool/content assembly 的直接分支明显减少
   - focused validation、全量 `npm test`、`npm run build` 通过
 
-### [QUEUED] R61 - OpenCodeMessageNormalizationMapper context attachment and OMO seam
+### [NEXT] R61 - OpenCodeMessageNormalizationMapper context attachment and OMO seam
 
 - **Lane**: Maintainability / message normalization context
 - **目标**: 从 `src/core/opencode/OpenCodeMessageNormalizationMapper.ts` 收束 text-part normalization、file/context attachment、inline read parsing 与 OMO content normalization 的完整 lifecycle。

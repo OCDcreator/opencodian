@@ -131,6 +131,97 @@ describe('OpenCodeMessageNormalizationMapper', () => {
     }));
   });
 
+  it('deduplicates renderable tool content while preserving pending tool calls', () => {
+    const message = mapper.openCodeMessageToChatMessage(
+      {
+        id: 'msg-tool-assembly',
+        sessionID: 'session-1',
+        role: 'assistant',
+        providerID: 'openai',
+        modelID: 'gpt-5',
+        time: { created: 123 },
+      } as never,
+      [
+        {
+          type: 'reasoning',
+          id: 'part-reasoning',
+          sessionID: 'session-1',
+          messageID: 'msg-tool-assembly',
+          text: 'Planning steps',
+          time: {
+            start: 1000,
+            end: 3000,
+          },
+        },
+        {
+          type: 'tool',
+          id: 'part-tool-running',
+          sessionID: 'session-1',
+          messageID: 'msg-tool-assembly',
+          callID: 'call-1',
+          tool: 'vault_tool',
+          state: {
+            status: 'running',
+            input: { path: '/vault/file.md' },
+          },
+        },
+        {
+          type: 'tool',
+          id: 'part-tool-complete',
+          sessionID: 'session-1',
+          messageID: 'msg-tool-assembly',
+          callID: 'call-1',
+          tool: 'vault_tool',
+          state: {
+            status: 'completed',
+            input: { path: '/vault/file.md' },
+            output: 'done',
+          },
+        },
+        {
+          type: 'text',
+          id: 'part-tool-text',
+          sessionID: 'session-1',
+          messageID: 'msg-tool-assembly',
+          text: 'Final response',
+        },
+      ] as never,
+      undefined,
+      {
+        registryTools: ['vault_tool'],
+      },
+    );
+
+    expect(message.toolCalls).toEqual([
+      expect.objectContaining({
+        id: 'call-1',
+        name: 'vault_tool',
+        kind: 'custom',
+        status: 'pending',
+      }),
+    ]);
+    expect(message.contentBlocks).toEqual([
+      {
+        type: 'thinking',
+        thinking: 'Planning steps',
+        durationSeconds: 2,
+      },
+      expect.objectContaining({
+        type: 'tool_use',
+        toolId: 'call-1',
+        toolName: 'vault_tool',
+        toolKind: 'custom',
+        toolInput: { path: '/vault/file.md' },
+        toolStatus: 'completed',
+        toolResult: 'done',
+      }),
+      {
+        type: 'text',
+        text: 'Final response',
+      },
+    ]);
+  });
+
   it('filters internal structured-output tools while preserving structured payloads', () => {
     const message = mapper.openCodeMessageToChatMessage(
       {

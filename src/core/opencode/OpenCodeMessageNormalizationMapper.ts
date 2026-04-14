@@ -21,6 +21,7 @@ import type {
   QuestionOption,
   QuestionPrompt,
   QuestionRequest as ChatQuestionRequest,
+  ToolCallInfo,
 } from '../types';
 import { detectOmoMessageMeta } from './omoCompat';
 import type { OpenCodeCatalogToolIdentityContext } from './OpenCodeCatalogStateStore';
@@ -69,6 +70,11 @@ interface OpenCodeToolPartData extends OpenCodeMessagePart {
 type OpenCodeChatRole = ChatMessage['role'];
 type OpenCodeTextPart = OpenCodeMessagePart & { text: string };
 
+interface OpenCodeToolContentAssembly {
+  toolCalls: ToolCallInfo[];
+  contentBlocks: ContentBlock[];
+}
+
 function resolveReasoningDurationSeconds(
   part: Pick<OpenCodeMessagePart, 'duration' | 'time'>,
 ): number | undefined {
@@ -85,7 +91,146 @@ function resolveReasoningDurationSeconds(
   return undefined;
 }
 
+function resolveOpenCodeToolKind(
+  toolName: string | undefined | null,
+  context: OpenCodeCatalogToolIdentityContext = {},
+): ToolIdentityKind {
+  return getToolIdentity(toolName || 'unknown', {
+    source: 'opencode',
+    knownMcpTools: context.knownMcpTools,
+    registryTools: context.registryTools,
+    observedExternalTools: context.observedExternalTools,
+  }).kind;
+}
+
+class OpenCodeToolContentAssembler {
+  assemble(
+    parts: OpenCodeMessagePart[],
+    content: string,
+    toolIdentityContext: OpenCodeCatalogToolIdentityContext,
+  ): OpenCodeToolContentAssembly {
+    const toolParts = this.collectRenderableToolParts(parts);
+
+    return {
+      toolCalls: this.buildPendingToolCalls(toolParts, toolIdentityContext),
+      contentBlocks: this.buildContentBlocks(parts, toolParts, content, toolIdentityContext),
+    };
+  }
+
+  private collectRenderableToolParts(parts: OpenCodeMessagePart[]): OpenCodeToolPartData[] {
+    return parts.filter((part) =>
+      part.type === 'tool' && !isInternalStructuredOutputTool((part as OpenCodeToolPartData).tool),
+    ) as OpenCodeToolPartData[];
+  }
+
+  private buildPendingToolCalls(
+    toolParts: OpenCodeToolPartData[],
+    toolIdentityContext: OpenCodeCatalogToolIdentityContext,
+  ): ToolCallInfo[] {
+    return toolParts
+      .filter((part) => {
+        const toolStatus = resolveToolExecutionStatus({
+          toolName: part.tool,
+          state: part.state,
+        });
+        return toolStatus === 'pending' || toolStatus === 'running';
+      })
+      .map((part) => ({
+        id: part.callID ?? '',
+        name: part.tool ?? '',
+        toolSourceKey: part.tool ?? undefined,
+        kind: resolveOpenCodeToolKind(part.tool, toolIdentityContext),
+        input: part.state?.input ?? {},
+        status: 'pending' as const,
+      }));
+  }
+
+  private buildContentBlocks(
+    parts: OpenCodeMessagePart[],
+    toolParts: OpenCodeToolPartData[],
+    content: string,
+    toolIdentityContext: OpenCodeCatalogToolIdentityContext,
+  ): ContentBlock[] {
+    const contentBlocks = [
+      ...this.buildThinkingContentBlocks(parts),
+      ...this.buildToolUseContentBlocks(toolParts, toolIdentityContext),
+    ];
+
+    if (content) {
+      contentBlocks.push({ type: 'text', text: content });
+    }
+
+    return contentBlocks;
+  }
+
+  private buildThinkingContentBlocks(parts: OpenCodeMessagePart[]): ContentBlock[] {
+    return parts
+      .filter((part): part is OpenCodeTextPart =>
+        part.type === 'reasoning' && typeof part.text === 'string'
+      )
+      .map((part) => ({
+        type: 'thinking' as const,
+        thinking: part.text,
+        durationSeconds: resolveReasoningDurationSeconds(part),
+      }));
+  }
+
+  private buildToolUseContentBlocks(
+    toolParts: OpenCodeToolPartData[],
+    toolIdentityContext: OpenCodeCatalogToolIdentityContext,
+  ): ContentBlock[] {
+    const contentBlocks: ContentBlock[] = [];
+    const processedToolIds = new Set<string>();
+
+    for (const part of toolParts) {
+      const toolId = part.callID || part.id;
+      if (!toolId || processedToolIds.has(toolId)) {
+        continue;
+      }
+
+      processedToolIds.add(toolId);
+      const resultPart = this.findResolvedToolResultPart(toolParts, toolId);
+      const toolStatus = resolveToolExecutionStatus({
+        toolName: part.tool,
+        state: resultPart?.state ?? part.state,
+      });
+
+      contentBlocks.push({
+        type: 'tool_use',
+        toolId,
+        toolName: part.tool || 'unknown',
+        toolSourceKey: part.tool || undefined,
+        toolKind: resolveOpenCodeToolKind(part.tool, toolIdentityContext),
+        toolInput: part.state?.input || {},
+        toolStatus,
+        toolResult: resolveToolResultText(resultPart?.state),
+      });
+    }
+
+    return contentBlocks;
+  }
+
+  private findResolvedToolResultPart(
+    toolParts: OpenCodeToolPartData[],
+    toolId: string,
+  ): OpenCodeToolPartData | undefined {
+    return toolParts.find((candidate) => {
+      if ((candidate.callID || candidate.id) !== toolId) {
+        return false;
+      }
+
+      const toolStatus = resolveToolExecutionStatus({
+        toolName: candidate.tool,
+        state: candidate.state,
+      });
+      return toolStatus === 'completed' || toolStatus === 'error';
+    });
+  }
+}
+
 export class OpenCodeMessageNormalizationMapper {
+  private readonly toolContentAssembler = new OpenCodeToolContentAssembler();
+
   normalizeQuestionRequest(raw: unknown): ChatQuestionRequest | null {
     if (!raw || typeof raw !== 'object') {
       return null;
@@ -126,12 +271,7 @@ export class OpenCodeMessageNormalizationMapper {
     toolName: string | undefined | null,
     context: OpenCodeCatalogToolIdentityContext = {},
   ): ToolIdentityKind {
-    return getToolIdentity(toolName || 'unknown', {
-      source: 'opencode',
-      knownMcpTools: context.knownMcpTools,
-      registryTools: context.registryTools,
-      observedExternalTools: context.observedExternalTools,
-    }).kind;
+    return resolveOpenCodeToolKind(toolName, context);
   }
 
   openCodeMessageToChatMessage(
@@ -142,9 +282,11 @@ export class OpenCodeMessageNormalizationMapper {
   ): ChatMessage {
     const role: OpenCodeChatRole = info.role === 'assistant' ? 'assistant' : 'user';
     const { content, contextAttachments } = this.collectMessageTextState(role, parts, vaultPath);
-    const toolParts = this.collectRenderableToolParts(parts);
-    const toolCalls = this.buildPendingToolCalls(toolParts, toolIdentityContext);
-    const contentBlocks = this.buildContentBlocks(parts, toolParts, content, toolIdentityContext);
+    const toolContent = this.toolContentAssembler.assemble(
+      parts,
+      content,
+      toolIdentityContext,
+    );
     const timestamp = typeof info.time?.created === 'number'
       ? info.time.created
       : Date.now();
@@ -160,8 +302,8 @@ export class OpenCodeMessageNormalizationMapper {
         ? OpenCodeMessageNormalizationMapper.formatModelIdentifier(info.providerID, info.modelID)
         : undefined,
       sourceMessageId: info.id,
-      toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
-      contentBlocks: contentBlocks.length > 0 ? contentBlocks : undefined,
+      toolCalls: toolContent.toolCalls.length > 0 ? toolContent.toolCalls : undefined,
+      contentBlocks: toolContent.contentBlocks.length > 0 ? toolContent.contentBlocks : undefined,
       contextAttachments: contextAttachments.length > 0
         ? this.dedupeContextAttachments(contextAttachments)
         : undefined,
@@ -311,116 +453,6 @@ export class OpenCodeMessageNormalizationMapper {
       }
       return attachments;
     }, []);
-  }
-
-  private collectRenderableToolParts(parts: OpenCodeMessagePart[]): OpenCodeToolPartData[] {
-    return parts.filter((part) =>
-      part.type === 'tool' && !isInternalStructuredOutputTool((part as OpenCodeToolPartData).tool),
-    ) as OpenCodeToolPartData[];
-  }
-
-  private buildPendingToolCalls(
-    toolParts: OpenCodeToolPartData[],
-    toolIdentityContext: OpenCodeCatalogToolIdentityContext,
-  ) {
-    return toolParts
-      .filter((part) => {
-        const toolStatus = resolveToolExecutionStatus({
-          toolName: part.tool,
-          state: part.state,
-        });
-        return toolStatus === 'pending' || toolStatus === 'running';
-      })
-      .map((part) => ({
-        id: part.callID ?? '',
-        name: part.tool ?? '',
-        toolSourceKey: part.tool ?? undefined,
-        kind: this.getOpenCodeToolKind(part.tool, toolIdentityContext),
-        input: part.state?.input ?? {},
-        status: 'pending' as const,
-      }));
-  }
-
-  private buildContentBlocks(
-    parts: OpenCodeMessagePart[],
-    toolParts: OpenCodeToolPartData[],
-    content: string,
-    toolIdentityContext: OpenCodeCatalogToolIdentityContext,
-  ): ContentBlock[] {
-    const contentBlocks = [
-      ...this.buildThinkingContentBlocks(parts),
-      ...this.buildToolUseContentBlocks(toolParts, toolIdentityContext),
-    ];
-
-    if (content) {
-      contentBlocks.push({ type: 'text', text: content });
-    }
-
-    return contentBlocks;
-  }
-
-  private buildThinkingContentBlocks(parts: OpenCodeMessagePart[]): ContentBlock[] {
-    return parts
-      .filter((part): part is OpenCodeTextPart =>
-        part.type === 'reasoning' && typeof part.text === 'string'
-      )
-      .map((part) => ({
-        type: 'thinking' as const,
-        thinking: part.text,
-        durationSeconds: resolveReasoningDurationSeconds(part),
-      }));
-  }
-
-  private buildToolUseContentBlocks(
-    toolParts: OpenCodeToolPartData[],
-    toolIdentityContext: OpenCodeCatalogToolIdentityContext,
-  ): ContentBlock[] {
-    const contentBlocks: ContentBlock[] = [];
-    const processedToolIds = new Set<string>();
-
-    for (const part of toolParts) {
-      const toolId = part.callID || part.id;
-      if (!toolId || processedToolIds.has(toolId)) {
-        continue;
-      }
-
-      processedToolIds.add(toolId);
-      const resultPart = this.findResolvedToolResultPart(toolParts, toolId);
-      const toolStatus = resolveToolExecutionStatus({
-        toolName: part.tool,
-        state: resultPart?.state ?? part.state,
-      });
-
-      contentBlocks.push({
-        type: 'tool_use',
-        toolId,
-        toolName: part.tool || 'unknown',
-        toolSourceKey: part.tool || undefined,
-        toolKind: this.getOpenCodeToolKind(part.tool, toolIdentityContext),
-        toolInput: part.state?.input || {},
-        toolStatus,
-        toolResult: resolveToolResultText(resultPart?.state),
-      });
-    }
-
-    return contentBlocks;
-  }
-
-  private findResolvedToolResultPart(
-    toolParts: OpenCodeToolPartData[],
-    toolId: string,
-  ): OpenCodeToolPartData | undefined {
-    return toolParts.find((candidate) => {
-      if ((candidate.callID || candidate.id) !== toolId) {
-        return false;
-      }
-
-      const toolStatus = resolveToolExecutionStatus({
-        toolName: candidate.tool,
-        state: candidate.state,
-      });
-      return toolStatus === 'completed' || toolStatus === 'error';
-    });
   }
 
   private normalizeOmoContent(
