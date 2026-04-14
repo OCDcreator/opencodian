@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的 `[NEXT]`”。L5 完成后必须暂停复盘，不得自动扩展新队列。
-> **当前状态**: [CONFIRMED_NEXT_BATCH] L1-L5 已全部完成；人工已确认继续一小批 warning cleanup queue。当前可自动执行的 `[NEXT]` 是 `W5 - Warning cleanup checkpoint`。
+> **当前状态**: [REVIEW_REQUIRED] `W1-W5` warning cleanup 队列已全部完成；当前没有可自动执行的 `[NEXT]`。如需继续，必须先人工确认新的 warning-cleanup 或 maintainability queue。
 
 ## 控制规则
 
@@ -16,7 +16,7 @@
 
 ## 总体路线
 
-当前受控批次 L1-L5 已完成：仓库已从 lint 红灯恢复到 `0 errors / 103 warnings` 的可控状态。人工现已确认继续 `W1-W5` 这一小批 warning cleanup queue，优先处理低风险且收益明确的 `max-params` / `complexity` / `@typescript-eslint/no-explicit-any` 热点；在 `W5` checkpoint 完成前，不恢复 `R33+` maintainability owner queue。
+当前受控批次 `W1-W5` 已完成：仓库已从 L5 checkpoint 的 `0 errors / 116 warnings` 进一步收敛到当前 `0 errors / 103 warnings`。本批顺序处理了低风险且收益明确的 `max-params` / `complexity` / `@typescript-eslint/no-explicit-any` 热点；`W5` checkpoint 完成后，不自动新增 `W6+`，也不自动恢复 `R33+` maintainability owner queue。
 
 > **P2 状态（R6 完成后）**: R1-R6 已完成 question dock、todo refresh/status、background completion notice、post-sync handoff 与 session signal orchestration 的收束。剩余风险以回归为主：background tab 无 session 时的 dock 清理、post-sync todo/status gate、completion notice queue/fingerprint 去重，以及 live signal writeback 顺序。
 >
@@ -882,7 +882,7 @@
   - 目标 tests 的 `@typescript-eslint/no-explicit-any` warning 消失。
   - 运行 focused tests、全量 `npm test`、`npm run build`。
 
-### [NEXT] W5 - Warning cleanup checkpoint
+### [DONE] W5 - Warning cleanup checkpoint
 
 - **Lane**: Checkpoint
 - **目标**: 复盘 `W1-W4` 的 warning cleanup 收益，并决定是否继续 warning cleanup 或恢复新的 maintainability queue。
@@ -897,3 +897,10 @@
 - **验收**:
   - phase 文档明确记录 `W1-W4` 的 warning 收益与下一批建议。
   - 运行全量 `npm test`、`npm run build`。
+
+## W5 Checkpoint Result
+
+- W1-W4 合计收掉 **13** 条 warnings，把 lint 基线从 L5 checkpoint 的 **0 errors / 116 warnings** 降到当前 **0 errors / 103 warnings**。
+- 其中生产代码热点减少 **7** 条 warning：`src/features/settings/ModelConfigModal.ts` 收掉 **3** 条 `max-params`、`src/utils/icons/ProviderIconService.ts` 收掉 **2** 条 `max-params`、`src/core/opencode/OpenCodeService.ts` 收掉 **2** 条 `complexity`；测试热点减少 **6** 条 warning，并清空了现存的 `@typescript-eslint/no-explicit-any`。
+- 当前剩余 warning 继续集中在大型 owner 的 `max-lines-per-function` / `max-lines` / `complexity` / `max-params`；最需要人工确认是否继续的热点仍是 `src/features/settings/OpenCodianSettings.ts`、`src/features/chat/OpenCodianView.ts`、`src/main.ts`、`tests/unit/core/opencode/OpenCodeService.test.ts` 与余下的 `src/features/settings/ModelConfigModal.ts`。
+- 结论：`W1-W5` 已完成其“低风险降噪”目标，但剩余 warning 更偏结构性大 owner 热点，不适合在未确认的情况下继续 autopilot。当前 queue 到此结束，不自动新增 `[QUEUED]` 或 `[NEXT]`，也不自动恢复 `R33+`；若后续继续，应先人工确认下一批受控 warning cleanup，再决定是否恢复新的 maintainability queue。

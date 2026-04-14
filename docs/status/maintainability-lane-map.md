@@ -1,24 +1,21 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [CONFIRMED_NEXT_BATCH] W1-W5 warning cleanup 队列已人工确认；当前可自动执行的 `[NEXT]` 是 `W5 - Warning cleanup checkpoint`。
+> **当前状态**: [REVIEW_REQUIRED] W1-W5 warning cleanup 队列已全部完成；当前没有可自动执行的 `[NEXT]`，需等待人工确认下一批 queue。
 
 ## 当前优先级
 
-- **当前 `[NEXT]`**：`W5 - Warning cleanup checkpoint`
-- **本批目标**：继续一小批低风险 warning cleanup，优先清掉 `max-params` / 少量 `complexity` / `@typescript-eslint/no-explicit-any`，不恢复 `R33+` maintainability owner queue
+- **当前 `[NEXT]`**：当前没有可自动执行的 `[NEXT]`
+- **当前建议**：优先等待人工确认下一批受控 warning cleanup；在明确新 queue 前不恢复 `R33+` maintainability owner queue
 - **当前 lint 基线**：`0 errors / 103 warnings`
-- **本批首要热点**：`docs/status/maintainability-master-plan.md`、`docs/status/maintainability-round-roadmap.md`、`docs/status/maintainability-lane-map.md`
+- **当前复盘热点**：`src/features/settings/OpenCodianSettings.ts`、`src/features/chat/OpenCodianView.ts`、`src/main.ts`、`tests/unit/core/opencode/OpenCodeService.test.ts`、`src/features/settings/ModelConfigModal.ts`
 - **暂缓热点**：`src/features/chat/OpenCodianView.ts` 与 `src/features/settings/OpenCodianSettings.ts` 的 `max-lines*` / 大型 `complexity` 问题先不进入本批
 
 ## 当前热点首查入口
 
-- 当前批次首查 `docs/status/maintainability-master-plan.md`、`docs/status/maintainability-round-roadmap.md`、`docs/status/maintainability-lane-map.md` 与 `docs/status/maintainability-phase-355.md`
-- W5 的剩余执行顺序固定为：
-  1. `docs/status/maintainability-master-plan.md`
-  2. `docs/status/maintainability-round-roadmap.md`
-  3. `docs/status/maintainability-lane-map.md`
-- `OpenCodianView` / `OpenCodianSettings` / trailing-assistant 链当前都只保留 regression watchpoints；W5 只允许做 checkpoint 文档复盘，不自动恢复新的 maintainability 切口
+- 当前 checkpoint 已完成；若后续人工决定继续，首查 `docs/status/maintainability-master-plan.md`、`docs/status/maintainability-round-roadmap.md`、`docs/status/maintainability-lane-map.md` 与最近的 `docs/status/maintainability-phase-352.md` 至 `docs/status/maintainability-phase-357.md`
+- W5 已完成；当前 batch 没有剩余自动执行顺序
+- `OpenCodianView` / `OpenCodianSettings` / trailing-assistant 链当前都只保留 regression watchpoints；在新的人工确认前，不自动恢复新的 maintainability 切口
 - P2 regression-only 首查顺序固定为：
   1. `tests/unit/features/chat/QuestionDockCoordinator.test.ts`
   2. `tests/unit/features/chat/QuestionTodoStatusRefreshCoordinator.test.ts`
@@ -104,4 +101,4 @@
 - 本批只允许做低风险 warning cleanup：优先 `max-params`、少量 `complexity`，以及 tests 内的 `@typescript-eslint/no-explicit-any`。
 - 不允许为清 warning 新增薄 facade / adapter / provider / factory；优先在现有 owner 内做参数收束、guard clause 或 mock typing 修正。
 - `OpenCodianView` 与 `OpenCodianSettings` 的大型 `max-lines*` / `complexity` 热点本批暂缓；除非测试、构建或正确性直接阻塞，否则不提前开启。
-- `W5` 完成后必须再次暂停，由人工决定是继续 warning cleanup，还是恢复新的 maintainability queue。
+- `W5` 已完成并已再次进入暂停态；是否继续 warning cleanup，还是恢复新的 maintainability queue，由下一次人工确认决定。
