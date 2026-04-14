@@ -2,21 +2,36 @@
 
 > **状态**: [READY]
 > **作用**: 这是 maintainability 无人值守的战略文档。每轮开始前，先读本文件，再读 `docs/status/maintainability-round-roadmap.md` 与最近的 `docs/status/maintainability-phase-XXX.md`。
-> **自动推进状态**: `W6-W15`、`R33-R41` 与 `R42-R49` 已归档；`R49` 已完成 style section owner seam，当前 queue 顺序推进到 `R50` checkpoint。
+> **自动推进状态**: `R49` 已完成且 stop sentinel 已在下一次成功提交后暂停 autopilot；当前已人工写入新的 `R50-R67` overnight queue，恢复运行时必须从 roadmap 首个 `[NEXT]` 顺序执行，不允许 freestyle。
 
 ## 1. 当前判断
 
-**当前分支已完成 `R49`，并把 `OpenCodianSettings` 的 style section lifecycle 收束到独立厚 owner。** 当前基线继续保持 `0 errors / 90 warnings`，并已重新确认 focused settings tests、全量 `npm test`、`npm run build` 与 Test Vault 部署校验。按照既定 queue，下一步进入 `R50` checkpoint，复盘 `R46-R49` 的 owner 收益与后续方向。
+**当前分支已完成 `R49`，并把 `OpenCodianSettings` 的 style section lifecycle 收束到独立厚 owner。** 但 stop sentinel 停机后，live repo 仍带着 `R49` 收尾留下的两个 lint error，因此新的长队列必须先以 `R50` 吸收当前错误，再继续后续厚切口与 warning reduction。
+
+这批夜间队列的主线是：
+
+- 先用 `R50` 恢复 lint 到 `0 errors`
+- 再继续 `OpenCodianSettings` 残余的大 section owner seam：conversation、plugin、UI、debug
+- 再推进基础热点：`ServerManager`、`ModelConfigService`、`OpenCodeMessageNormalizationMapper`、`ProviderIconService`
+- 最后显式跑三轮 warning cleanup，再做 checkpoint
 
 ## 2. 当前基线
 
-- **lint**: `0 errors / 90 warnings`
+- **lint**: `2 errors / 92 warnings`
 - **验证**:
-  - `npm run lint` 已恢复通过，`0 errors / 90 warnings`
-  - 最近一次已确认的全量验证为：`npm test` 通过，`258 passed, 258 total` suites；`1094 passed, 1094 total` tests
-  - 最近一次已确认的构建通过：`npm run build`，`BUILD_ID` `autopilot-maintainability.202604150253`
+  - 最近一次已确认的全量测试为 `R49`：`npm test` 通过，`258 passed, 258 total` suites；`1094 passed, 1094 total` tests
+  - 最近一次已确认的构建通过为 `R49`：`npm run build`，`BUILD_ID` `autopilot-maintainability.202604150253`
+  - 最近一次已确认的 Test Vault 部署也来自 `R49`
+- **本批目标**:
+  - 先恢复 `0 errors`
+  - 在保持受控 queue 的前提下继续做高确定性 maintainability seam
+  - 把 warning baseline 从当前 `92` 继续往低八十区间推进；若未达成，`R67` checkpoint 必须明确说明剩余高成本阻塞
 - **下一批高确定性切口**:
-  - `R50`: maintainability checkpoint
+  - `R50`: lint error restore after `R49`
+  - `R51-R54`: `OpenCodianSettings` residual thick section seams
+  - `R55-R63`: `ServerManager` / `ModelConfigService` / `OpenCodeMessageNormalizationMapper` / `ProviderIconService` 热点
+  - `R64-R66`: warning cleanup batches
+  - `R67`: checkpoint
 - **历史摘要**: 见 `docs/status/maintainability-completed-batches.md`
 
 ## 3. 最近完成摘要
@@ -35,18 +50,21 @@
 
 ## 4. 本批结论
 
-1. **`OpenCodianSettings` style seam 已收口**：`addStyleSettings()` 不再直接铺开 theme preset、background owner、input appearance、glass/liquid glass 参数与 custom CSS lifecycle，相关装配现已集中到 `SettingsStyleSection`。
-2. **切口顺序**：下一刀按 queue 进入 `R50` checkpoint，只做 `R46-R49` 复盘与下一批建议。
-3. **策略边界**：继续优先完整 lifecycle / runtime seam，不回到 warning-only cleanup，也不回到 logging-only / helper-only 的碎片拆分。
-4. **执行状态**：本轮已完成 `R49`；下一轮应直接进入 `R50` checkpoint，不要插入新的 freestyle 清理轮。
+1. **停机态已经确认**：`R49` 已提交，stop sentinel 已将 runtime state 标记为 `stopped_after_next_commit`，当前 `lock: none`，可以安全重排后续长队列。
+2. **settings 残余热点仍然足够厚**：`OpenCodianSettings` 目前仍保留 conversation、plugin、UI、debug 几块高确定性 section，可以继续按完整 lifecycle seam 收口。
+3. **warning reduction 不再隐含进行**：本批把 lint/error 恢复与 warning cleanup 明确写成 `R50`、`R64-R66`，避免 checkpoint 轮再次因为基线口径不清而卡住。
+4. **本批长度故意拉长**：`R50-R67` 共 18 轮，目标就是支持夜间连续无人值守，而不是跑完 3-5 轮就回到人工确认态。
+5. **当前不单列 user section seam**：`OpenCodianSettings` 的 user section 规模偏小，暂不单独拆成薄 owner；若后续仍有收益，应优先与更完整 lifecycle 一起处理，而不是为了凑轮次制造碎片模块。
 
 ## 5. 长期边界
 
 - 不为清 warning 或“看起来更模块化”而新增薄 facade / adapter / provider / factory 文件
+- 新抽出的独立 owner / module 通常至少应覆盖约 `100` 行以上的真实责任，或暴露 `3+` 个稳定 public APIs；若只是很薄的桥接层，应优先并回调用方
 - `OpenCodeService`、`OpenCodianView`、`OpenCodianSettings` 只有在 roadmap 明确写出后才允许继续 maintainability 拆分
-- 优先选择完整 section / lifecycle / runtime seam；避免再回到长串低收益 warning-only 队列
-- `OpenCodianView` / `OpenCodeService` 的后续 maintainability 拆分，只允许围绕完整 lifecycle/runtime seam，不允许回退成 logging-only、helper-only、或局部小函数粉碎
+- 优先选择完整 section / lifecycle / runtime seam；避免回到 logging-only、helper-only、warning-only 的低收益碎片化拆分
+- 对 question / todo / background-task runtime provider chain 的后续处理，默认先复查是否已经过薄，再决定是继续收束还是回并
 - 命中 deploy-relevant paths 时，继续严格遵守 build → Test Vault deploy → `BUILD_ID` 校验顺序
+- 恢复 autopilot 时必须使用外部 profile `/Users/dht/.config/opencodian/mac-autopilot-profile.json`
 
 ## 6. 阅读顺序
 

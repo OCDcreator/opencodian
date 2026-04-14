@@ -1,34 +1,44 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [READY] `R49` style section owner seam 已完成；当前首个 `[NEXT]` 为 `R50` checkpoint。
+> **当前状态**: [READY] `R49` style section owner seam 已完成，stop sentinel 已停稳；当前首个 `[NEXT]` 为 `R50 - Lint error restore after R49`。
 
 ## 当前优先级
 
-- **当前 `[NEXT]`**：`R50 - Maintainability checkpoint`
-- **本批目标**：复盘 `R46-R49` 的 lint / owner 收益、验证成本与下一批方向
-- **当前 lint 基线**：`0 errors / 90 warnings`
+- **当前 `[NEXT]`**：`R50 - Lint error restore after R49`
+- **本批目标**：先恢复 `0 errors`，再连续推进 settings residual seams、server/config/icon 厚切口，最后连跑三轮 warning cleanup 与 checkpoint
+- **当前 lint 基线**：`2 errors / 92 warnings`
 - **热点顺序**：
-  1. `docs/status/maintainability-master-plan.md`
-  2. `docs/status/maintainability-round-roadmap.md`
-  3. `docs/status/maintainability-lane-map.md`
+  1. `src/features/settings/SettingsStyleSection.ts`
+  2. `tests/unit/features/settings/SettingsModelSection.test.ts`
+  3. `src/features/settings/OpenCodianSettings.ts` conversation / plugin / UI / debug sections
+  4. `src/core/opencode/ServerManager.ts`
+  5. `src/core/config/ModelConfigService.ts`
+  6. `src/core/opencode/OpenCodeMessageNormalizationMapper.ts`
+  7. `src/utils/icons/ProviderIconService.ts`
+  8. 直接相关 tests 与模块文档
 
 ## 本批边界
 
-- `R48-R49` 已完成 `OpenCodianSettings` 的 model/style owner seam；后续 queue 不允许把 source mode / refresh / workspace / icon cache / style lifecycle 搬回主类
-- 不新增薄 helper / adapter / provider / factory 文件；新 owner 必须覆盖完整 section / lifecycle
-- 不回到 freestyle settings 拆分；settings checkpoint 之后是否继续推进必须以文档证据为准
+- 不直接恢复 freestyle；autopilot 只能按 `R50 -> R67` 顺序推进
+- 不新增薄 helper / adapter / provider / factory；新 owner 必须覆盖完整 section / lifecycle / runtime seam
+- 抽出的独立模块如果明显过薄，优先并回调用方，不为了“看起来更模块化”保留碎片
+- `OpenCodianSettings` 本批优先只拆 conversation、plugin、UI、debug 四块；user section 暂不单独拆成薄 owner
+- `OpenCodeService` / `OpenCodianView` 本批不再自由回切；只有 roadmap 明确写出的服务热点允许继续推进
 - 命中 deploy-relevant paths 时，继续严格执行 build → Test Vault deploy → `BUILD_ID` 校验
+- 恢复运行必须使用外部 profile `/Users/dht/.config/opencodian/mac-autopilot-profile.json`
 
 ## 回归观察点
 
-- `OpenCodeService`：保持新的 settings reconfiguration owner 边界，同时继续维持 SDK-first / legacy fallback、managed server adoption/restart 与 directory scope 语义不变
-- `OpenCodianView`：不要把 history/sync/model-selection 已收出的 owner 搬回主 view
-- `OpenCodianSettings`：不要把已迁出的 model/style/server/security section 责任搬回主类；style 内部继续优先扩展 `SettingsStyleSection`
-- lint：当前已恢复到 `0 errors / 90 warnings`；若再次出现 error，先解除阻塞再继续 queue
+- `OpenCodianSettings`：title model follow-current、question card refresh、plugin snapshot/OMO 管理、tab layout、debug export/path picker 语义不回归
+- `ServerManager`：managed local `4096` adoption/restart、launch tail、shutdown / restart / adopted pid teardown 语义不变
+- `ModelConfigService`：`baseEffective` / `effective` 区分、provider enable/disable layering、default model resolution 不回归
+- `OpenCodeMessageNormalizationMapper`：tool status / result transform、context attachment path normalization、OMO normalization 语义不回归
+- `ProviderIconService`：builtin/LobeHub/custom fallback、cache path、mime detection、preview fallback 语义不变
+- lint：`R50` 必须先把基线恢复到 `0 errors`，后续所有轮次都不得重新引入 error
 
 ## 历史入口
 
 - 批次归档：`docs/status/maintainability-completed-batches.md`
-- 最近成功 phase：`docs/status/maintainability-phase-383.md`
-- 停机线索：`automation/runtime/history.jsonl` 中 round `392-393` 的 failure 记录
+- 最近成功 phase：`docs/status/maintainability-phase-384.md`
+- 停机线索：`automation/runtime/stop-after-next-commit.log` 与 `automation/runtime/history.jsonl` 中 round `398` 记录
