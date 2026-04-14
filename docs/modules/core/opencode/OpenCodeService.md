@@ -36,6 +36,7 @@
 - `./OpenCodeQueryGateway`
 - `./OpenCodeSessionControlOrchestrator`
 - `./OpenCodeSessionLifecycleCoordinator`
+- `./OpenCodeSettingsReconfigurationCoordinator`
 - `./OpenCodeStreamingRuntimeCoordinator`
 - `./OpenCodeStreamEventTransformer`
 - `./OpenCodeSyncEventRuntimeCoordinator`
@@ -70,6 +71,7 @@
 - `sessionControl`: `OpenCodeSessionControlOrchestrator` 实例，负责 fork/revert/unrevert/diff、context usage snapshot、session message control、command/shell 与 message-part operations。
 - `questionPermissionHub`: `OpenCodeQuestionPermissionHub` 实例，负责 pending questions/reply/reject、pending permissions/respond，以及 session permission responder 的 negotiation lifecycle。
 - `queryGateway`: `OpenCodeQueryGateway` 实例，负责 provider auth、project/file/find/path/VCS/formatter/LSP 查询，以及 MCP status/server/auth 的 catalog 写回。
+- `settingsReconfiguration`: `OpenCodeSettingsReconfigurationCoordinator` 实例，负责 settings update plan、managed server stop/restart 决策、subscription pause/resume 与 rollback/restore lifecycle。
 - `openCodeEventRuntime`: `OpenCodeEventSubscriptionCoordinator` 实例，负责 open-code event listener registry、`event` / `global` 订阅生命周期，以及 catalog-relevant payload 到 `catalogState` 的刷新/广播触发。
 - `vaultPath`: 用于 SDK `directory` 注入、上下文文件绝对路径解析，以及 `ServerManager` 工作目录设置；OpenCode directory scope 和 context file path 的跨平台规范化委托给 `shared/contextPath`。
 
@@ -100,7 +102,7 @@
 
 - `setVaultPath(path)`: 更新 vault 路径、把工作目录传给 `ServerManager`，并重启 sync / open-code 两类 event runtime。
 - `checkHealth()`: 优先走 SDK `global.health()`，失败时回退到 `ServerManager.checkHealth()`。
-- `updateSettings(settings)`: 根据新旧设置差异决定是否需要重启/停止 managed server；失败时会回滚内存设置、`baseUrl`、`ServerManager` 配置，并尽力恢复原服务。
+- `updateSettings(settings)`: 公开入口仍保留在服务层，但完整 settings reconfiguration lifecycle 已委托给 `OpenCodeSettingsReconfigurationCoordinator`；失败时仍会回滚内存设置、`baseUrl`、`ServerManager` 配置，并尽力恢复原服务。
 
 补充一个运行时细节：
 

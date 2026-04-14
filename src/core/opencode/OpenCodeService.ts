@@ -62,6 +62,9 @@ import {
   type Session,
 } from './OpenCodeSessionLifecycleCoordinator';
 import {
+  OpenCodeSettingsReconfigurationCoordinator,
+} from './OpenCodeSettingsReconfigurationCoordinator';
+import {
   OpenCodeStreamEventTransformer,
 } from './OpenCodeStreamEventTransformer';
 import {
@@ -81,7 +84,6 @@ import type {
   McpServerSnapshot,
   McpServerStatus,
   OpenCodeCapabilitySnapshot,
-  OpenCodeServerConfig,
   QueryOptions,
   ResponseHandler,
   ServerDiagnostics,
@@ -115,29 +117,6 @@ interface OpenCodeServiceRuntimeOptions {
   initialManagedServerState?: ManagedServerState | null;
   onManagedServerStateChange?: (state: ManagedServerState | null) => void;
   sdkFeatureFlags?: Partial<SdkFeatureFlags>;
-}
-
-interface OpenCodeSettingsUpdatePlan {
-  previousSettings: OpenCodianSettings;
-  nextSettings: OpenCodianSettings;
-  previousMode: OpenCodianSettings['server']['mode'];
-  nextMode: OpenCodianSettings['server']['mode'];
-  previousToolCatalogScope: string;
-  previousBaseUrl: string;
-  shouldResumeSyncEvents: boolean;
-  shouldResumeOpenCodeEvents: boolean;
-  serverConfigChanged: boolean;
-  shouldRestartManagedServer: boolean;
-  shouldStopManagedServer: boolean;
-}
-
-interface OpenCodeSettingsRestartDecision {
-  previousSettings: OpenCodianSettings;
-  nextSettings: OpenCodianSettings;
-  previousMode: OpenCodianSettings['server']['mode'];
-  nextMode: OpenCodianSettings['server']['mode'];
-  serverConfigChanged: boolean;
-  authChanged: boolean;
 }
 
 interface ToolStateData {
@@ -261,6 +240,7 @@ export class OpenCodeService {
   private streamEventTransformer: OpenCodeStreamEventTransformer;
   private streamingRuntime: OpenCodeStreamingRuntimeCoordinator;
   private openCodeEventRuntime: OpenCodeEventSubscriptionCoordinator;
+  private settingsReconfiguration: OpenCodeSettingsReconfigurationCoordinator;
   private vaultPath?: string;
   private transientConnectivityLogState: TransientConnectivityLogState | null = null;
 
@@ -431,7 +411,7 @@ export class OpenCodeService {
     });
 
     this.serverManager = new ServerManager(
-      this.buildServerConfig(settings),
+      OpenCodeSettingsReconfigurationCoordinator.createServerConfig(settings),
       {
         onStatusChange: (status) => {
           events.onServerStatusChange?.(status);
@@ -450,6 +430,22 @@ export class OpenCodeService {
         onManagedServerStateChange: runtimeOptions.onManagedServerStateChange,
       },
     );
+    this.settingsReconfiguration = new OpenCodeSettingsReconfigurationCoordinator({
+      getCurrentSettings: () => this.settings,
+      setCurrentSettings: (nextSettings) => {
+        this.settings = nextSettings;
+      },
+      getCurrentBaseUrl: () => this.baseUrl,
+      setCurrentBaseUrl: (nextBaseUrl) => {
+        this.baseUrl = nextBaseUrl;
+      },
+      getToolCatalogScopeKey: () => this.catalogQueries.getToolCatalogScopeKey(),
+      clearToolSchemaCacheIfScopeChanged: (previousScope) =>
+        this.catalogQueries.clearToolSchemaCacheIfScopeChanged(previousScope),
+      serverManager: this.serverManager,
+      syncEvents: this.syncEventRuntime,
+      openCodeEvents: this.openCodeEventRuntime,
+    });
   }
 
   private static describeError(error: unknown): string {
@@ -1229,16 +1225,7 @@ export class OpenCodeService {
 
   /** Update settings */
   async updateSettings(settings: OpenCodianSettings): Promise<void> {
-    const plan = this.createSettingsUpdatePlan(settings);
-    await this.validateSettingsUpdatePlan(plan);
-    this.applySettingsUpdatePlan(plan);
-
-    try {
-      await this.completeSettingsUpdatePlan(plan);
-    } catch (error) {
-      await this.rollbackSettingsUpdatePlan(plan);
-      throw error;
-    }
+    await this.settingsReconfiguration.updateSettings(settings);
   }
 
   async getSessionContextUsageSnapshot(sessionId: string): Promise<SessionContextUsageSnapshot | null> {
@@ -1289,168 +1276,6 @@ export class OpenCodeService {
     }
 
     return this.get<Session>(`/session/${sessionId}`);
-  }
-
-  private buildServerConfig(settings: OpenCodianSettings): OpenCodeServerConfig {
-    return {
-      mode: settings.server.mode,
-      baseUrl: getServerBaseUrl(settings.server),
-      local: settings.server.local,
-      auth: settings.server.auth,
-      modelSourceMode: settings.modelSourceMode,
-      pluginIsolationMode: settings.pluginIsolationMode,
-    };
-  }
-
-  private createSettingsUpdatePlan(settings: OpenCodianSettings): OpenCodeSettingsUpdatePlan {
-    const previousSettings = this.settings;
-    const previousMode = previousSettings.server.mode;
-    const nextMode = settings.server.mode;
-    const serverConfigChanged = this.hasLocalServerConfigChanged(previousSettings, settings);
-    const authChanged = this.hasServerAuthChanged(previousSettings, settings);
-
-    return {
-      previousSettings,
-      nextSettings: cloneSettings(settings),
-      previousMode,
-      nextMode,
-      previousToolCatalogScope: this.catalogQueries.getToolCatalogScopeKey(),
-      previousBaseUrl: this.baseUrl,
-      shouldResumeSyncEvents: this.syncEventRuntime.hasListeners(),
-      shouldResumeOpenCodeEvents: this.openCodeEventRuntime.hasListeners(),
-      serverConfigChanged,
-      shouldRestartManagedServer: this.shouldRestartManagedServerForSettingsUpdate({
-        previousSettings,
-        nextSettings: settings,
-        previousMode,
-        nextMode,
-        serverConfigChanged,
-        authChanged,
-      }),
-      shouldStopManagedServer: this.shouldStopManagedServerForSettingsUpdate(previousMode, nextMode),
-    };
-  }
-
-  private hasLocalServerConfigChanged(
-    previousSettings: OpenCodianSettings,
-    nextSettings: OpenCodianSettings,
-  ): boolean {
-    return (
-      previousSettings.server.local.host !== nextSettings.server.local.host
-      || previousSettings.server.local.port !== nextSettings.server.local.port
-    );
-  }
-
-  private hasServerAuthChanged(
-    previousSettings: OpenCodianSettings,
-    nextSettings: OpenCodianSettings,
-  ): boolean {
-    return (
-      previousSettings.server.auth.type !== nextSettings.server.auth.type
-      || previousSettings.server.auth.username !== nextSettings.server.auth.username
-      || previousSettings.server.auth.password !== nextSettings.server.auth.password
-      || previousSettings.server.auth.token !== nextSettings.server.auth.token
-    );
-  }
-
-  private shouldRestartManagedServerForSettingsUpdate(
-    decision: OpenCodeSettingsRestartDecision,
-  ): boolean {
-    if (!this.serverManager.isRunning() || decision.nextMode !== 'local') {
-      return false;
-    }
-
-    return (
-      decision.previousMode !== decision.nextMode
-      || decision.serverConfigChanged
-      || decision.authChanged
-      || decision.previousSettings.modelSourceMode !== decision.nextSettings.modelSourceMode
-      || decision.previousSettings.pluginIsolationMode !== decision.nextSettings.pluginIsolationMode
-    );
-  }
-
-  private shouldStopManagedServerForSettingsUpdate(
-    previousMode: OpenCodianSettings['server']['mode'],
-    nextMode: OpenCodianSettings['server']['mode'],
-  ): boolean {
-    return this.serverManager.isRunning() && previousMode === 'local' && nextMode !== 'local';
-  }
-
-  private async validateSettingsUpdatePlan(plan: OpenCodeSettingsUpdatePlan): Promise<void> {
-    if (
-      !this.serverManager.isRunning()
-      || plan.previousMode !== 'local'
-      || plan.nextMode !== 'local'
-      || !plan.serverConfigChanged
-    ) {
-      return;
-    }
-
-    const endpointAvailable = await this.serverManager.canBindLocalEndpoint(
-      plan.nextSettings.server.local.host,
-      plan.nextSettings.server.local.port,
-    );
-    if (!endpointAvailable) {
-      throw new Error(
-        `Cannot switch to ${plan.nextSettings.server.local.host}:${plan.nextSettings.server.local.port}. The target port is already in use.`,
-      );
-    }
-  }
-
-  private applySettingsUpdatePlan(plan: OpenCodeSettingsUpdatePlan): void {
-    this.settings = plan.nextSettings;
-    this.baseUrl = getServerBaseUrl(plan.nextSettings.server);
-    this.serverManager.updateConfig(this.buildServerConfig(plan.nextSettings));
-    this.catalogQueries.clearToolSchemaCacheIfScopeChanged(plan.previousToolCatalogScope);
-    this.pauseSettingsUpdateSubscriptions(plan);
-  }
-
-  private async completeSettingsUpdatePlan(plan: OpenCodeSettingsUpdatePlan): Promise<void> {
-    if (plan.shouldStopManagedServer) {
-      await this.serverManager.stop();
-      this.resumeSettingsUpdateSubscriptions();
-      return;
-    }
-
-    if (plan.shouldRestartManagedServer) {
-      await this.serverManager.restart();
-    }
-
-    this.resumeSettingsUpdateSubscriptions();
-  }
-
-  private async rollbackSettingsUpdatePlan(plan: OpenCodeSettingsUpdatePlan): Promise<void> {
-    this.settings = plan.previousSettings;
-    this.baseUrl = plan.previousBaseUrl;
-    this.serverManager.updateConfig(this.buildServerConfig(plan.previousSettings));
-    this.catalogQueries.clearToolSchemaCacheIfScopeChanged(plan.previousToolCatalogScope);
-    this.pauseSettingsUpdateSubscriptions(plan);
-    await this.restorePreviousManagedServerAfterFailedUpdate(plan);
-    this.resumeSettingsUpdateSubscriptions();
-  }
-
-  private pauseSettingsUpdateSubscriptions(plan: OpenCodeSettingsUpdatePlan): void {
-    this.syncEventRuntime.stopSubscription(plan.shouldResumeSyncEvents);
-    this.openCodeEventRuntime.stopSubscriptions(plan.shouldResumeOpenCodeEvents);
-  }
-
-  private resumeSettingsUpdateSubscriptions(): void {
-    this.syncEventRuntime.ensureSubscription();
-    this.openCodeEventRuntime.ensureSubscriptions();
-  }
-
-  private async restorePreviousManagedServerAfterFailedUpdate(
-    plan: OpenCodeSettingsUpdatePlan,
-  ): Promise<void> {
-    if (plan.previousMode !== 'local' || (!plan.shouldRestartManagedServer && !plan.shouldStopManagedServer)) {
-      return;
-    }
-
-    try {
-      await this.serverManager.start();
-    } catch (restoreError) {
-      logger.error('Failed to restore previous OpenCode server after settings update failure:', restoreError);
-    }
   }
 
   private ensureBaseUrl(): void {

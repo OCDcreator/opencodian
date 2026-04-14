@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的 `[NEXT]`”。
-> **当前状态**: [READY] `R46` lint unblocker 已完成；当前顺序推进到 `R47-R50` queue。
+> **当前状态**: [READY] `R47` settings reconfiguration seam 已完成；当前顺序推进到 `R48-R50` queue。
 
 ## 控制规则
 
@@ -18,7 +18,7 @@
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
 - 最近成功 phase：`docs/status/maintainability-phase-381.md`
 - 当前 live lint 基线：`0 errors / 90 warnings`
-- 当前路线判断：`R46` 已完成最小 lint unblocker；无人值守 queue 继续回到 `OpenCodeService` settings reconfiguration 厚切口
+- 当前路线判断：`R47` 已完成 `OpenCodeService` settings reconfiguration 厚切口；无人值守 queue 顺延到 `OpenCodianSettings` model section owner seam
 
 ## Queue
 
@@ -42,7 +42,7 @@
   - `npm run lint` 至少恢复到 `0 errors / 90 warnings`
   - focused validation、全量 `npm test`、`npm run build` 通过
 
-### [NEXT] R47 - OpenCodeService settings reconfiguration seam
+### [DONE] R47 - OpenCodeService settings reconfiguration seam
 
 - **Lane**: Maintainability / opencode settings reconfiguration
 - **目标**: 从 `src/core/opencode/OpenCodeService.ts:1231` 一带收束 `updateSettings()`、settings update plan、managed server restart/stop 决策、subscription pause/resume 与 rollback/restore lifecycle，优先形成单一厚 owner。
@@ -60,7 +60,7 @@
   - `OpenCodeService` 不再直接铺开 settings reconfiguration / rollback / subscription lifecycle 细节
   - focused validation、全量 `npm test`、`npm run build` 通过
 
-### [QUEUED] R48 - OpenCodianSettings model section owner seam
+### [NEXT] R48 - OpenCodianSettings model section owner seam
 
 - **Lane**: Maintainability / settings model section
 - **目标**: 从 `src/features/settings/OpenCodianSettings.ts:385` 的 `addModelSettings()` 中收束完整 model section lifecycle，优先整理 source mode、provider/model disable、refresh/test action、catalog presenter 与 workspace 关联装配。
