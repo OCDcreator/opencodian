@@ -54,6 +54,9 @@ import {
   type Session,
 } from './OpenCodeSessionLifecycleCoordinator';
 import {
+  OpenCodeQuestionPermissionHub,
+} from './OpenCodeQuestionPermissionHub';
+import {
   OpenCodeStreamEventTransformer,
   type OpenCodeSSEEvent,
   type OpenCodeStreamEvent,
@@ -272,6 +275,7 @@ export class OpenCodeService {
   private serverManager: ServerManager;
   private sessionLifecycle: OpenCodeSessionLifecycleCoordinator;
   private sessionControl: OpenCodeSessionControlOrchestrator;
+  private questionPermissionHub: OpenCodeQuestionPermissionHub;
   private responseHandlers: ResponseHandler[] = [];
   private baseUrl: string;
   private sdkFeatureFlags: SdkFeatureFlags;
@@ -338,6 +342,18 @@ export class OpenCodeService {
       getSessionInfo: (sessionId) => this.getSessionInfo(sessionId),
       getSessionMessages: (sessionId) => this.sessionLifecycle.getSessionMessages(sessionId),
       getAvailableModels: () => this.getAvailableModels(),
+      logServiceWarning: (key, message, error) => this.logServiceWarning(key, message, error),
+      logServiceError: (key, message, error) => this.logServiceError(key, message, error),
+    });
+    this.questionPermissionHub = new OpenCodeQuestionPermissionHub({
+      shouldUseSdkQuestions: () => this.shouldUseSdk('sdkQuestions'),
+      shouldUseSdkCrud: () => this.shouldUseSdk('sdkCrud'),
+      getSdkQuestion: () => this.sdk.question,
+      getSdkPermission: () => this.sdk.permission,
+      getLegacy: (path) => this.get(path),
+      postLegacy: (path, body) => this.post(path, body),
+      normalizeQuestionRequest: (raw) =>
+        OpenCodeService.messageNormalizationMapper.normalizeQuestionRequest(raw),
       logServiceWarning: (key, message, error) => this.logServiceWarning(key, message, error),
       logServiceError: (key, message, error) => this.logServiceError(key, message, error),
     });
@@ -1982,69 +1998,15 @@ export class OpenCodeService {
   }
 
   async getPendingQuestions(): Promise<ChatQuestionRequest[]> {
-    const normalizeResponse = (response: unknown): ChatQuestionRequest[] => {
-      const rawRequests = Array.isArray(response)
-        ? response
-        : response && typeof response === 'object' && 'data' in response && Array.isArray((response as { data?: unknown }).data)
-          ? (response as { data: unknown[] }).data
-          : [];
-
-      return rawRequests.reduce<ChatQuestionRequest[]>((requests, rawRequest) => {
-        const normalized = OpenCodeService.messageNormalizationMapper.normalizeQuestionRequest(rawRequest);
-        if (normalized) {
-          requests.push(normalized);
-        }
-        return requests;
-      }, []);
-    };
-
-    if (this.shouldUseSdk('sdkQuestions')) {
-      try {
-        const response = await this.getSdkClient().question.list();
-        return normalizeResponse(response);
-      } catch (error) {
-        this.logServiceWarning('question.list', 'SDK question.list failed, falling back to legacy HTTP', error);
-      }
-    }
-
-    try {
-      const response = await this.get<unknown>('/question');
-      return normalizeResponse(response);
-    } catch (error) {
-      this.logServiceError('question.list', 'Failed to get pending questions:', error);
-      return [];
-    }
+    return this.questionPermissionHub.getPendingQuestions();
   }
 
   async replyToQuestion(requestID: string, answers: string[][]): Promise<void> {
-    if (this.shouldUseSdk('sdkQuestions')) {
-      try {
-        await this.getSdkClient().question.reply({
-          requestID,
-          answers,
-        });
-        return;
-      } catch (error) {
-        this.logServiceWarning('question.reply', 'SDK question.reply failed, falling back to legacy HTTP', error);
-      }
-    }
-
-    await this.post(`/question/${requestID}/reply`, { answers });
+    return this.questionPermissionHub.replyToQuestion(requestID, answers);
   }
 
   async rejectQuestion(requestID: string): Promise<void> {
-    if (this.shouldUseSdk('sdkQuestions')) {
-      try {
-        await this.getSdkClient().question.reject({
-          requestID,
-        });
-        return;
-      } catch (error) {
-        this.logServiceWarning('question.reject', 'SDK question.reject failed, falling back to legacy HTTP', error);
-      }
-    }
-
-    await this.post(`/question/${requestID}/reject`, {});
+    return this.questionPermissionHub.rejectQuestion(requestID);
   }
 
   async getSessionDiff(sessionId: string, messageID?: string): Promise<SessionDiffEntry[]> {
@@ -2404,32 +2366,14 @@ export class OpenCodeService {
     permissionId: string,
     reply: PermissionReply,
   ): Promise<void> {
-    await this.sdk.permission.respond({
-      sessionID: sessionId,
-      permissionID: permissionId,
-      response: reply,
-    });
+    return this.questionPermissionHub.respondToSessionPermission(sessionId, permissionId, reply);
   }
 
   // ==================== Permission API Methods ====================
 
   /** Get pending permission requests */
   async getPendingPermissions(): Promise<PermissionRequest[]> {
-    if (this.shouldUseSdk('sdkCrud')) {
-      try {
-        const response = await this.getSdkClient().permission.list();
-        return Array.isArray(response) ? response as PermissionRequest[] : [];
-      } catch (error) {
-        this.logServiceWarning('permission.list', 'SDK permission.list failed, falling back to legacy HTTP', error);
-      }
-    }
-
-    try {
-      return await this.get<PermissionRequest[]>('/permission');
-    } catch (error) {
-      this.logServiceError('permission.list', 'Failed to get pending permissions:', error);
-      return [];
-    }
+    return this.questionPermissionHub.getPendingPermissions();
   }
 
   /** Respond to a permission request */
@@ -2438,21 +2382,7 @@ export class OpenCodeService {
     reply: PermissionReply,
     message?: string
   ): Promise<void> {
-    try {
-      if (this.shouldUseSdk('sdkCrud')) {
-        await this.getSdkClient().permission.reply({
-          requestID,
-          reply,
-          message,
-        });
-        return;
-      }
-
-      await this.post(`/permission/${requestID}/reply`, { reply, message });
-    } catch (error) {
-      logger.error('Failed to respond to permission:', error);
-      throw error;
-    }
+    return this.questionPermissionHub.respondToPermission(requestID, reply, message);
   }
 
 }

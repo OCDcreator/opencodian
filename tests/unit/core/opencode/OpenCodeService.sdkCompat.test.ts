@@ -1,6 +1,7 @@
 import { TextDecoder, TextEncoder } from 'util';
 
 import { OpenCodeService } from '../../../../src/core/opencode/OpenCodeService';
+import { SDK_FEATURE_FLAG_ROLLOUT_DEFAULTS } from '../../../../src/core/opencode/sdkFeatureFlags';
 import { DEFAULT_SETTINGS } from '../../../../src/core/types';
 
 global.TextDecoder = TextDecoder as unknown as typeof global.TextDecoder;
@@ -126,6 +127,25 @@ describe('OpenCodeService SDK compatibility', () => {
         callback: jest.fn().mockResolvedValue({ success: true }),
       },
     },
+    permission: {
+      list: jest.fn().mockResolvedValue([
+        {
+          id: 'permission-1',
+          sessionID: 'session-1',
+          permission: 'bash',
+          patterns: ['npm test'],
+          metadata: {},
+          always: [],
+        },
+      ]),
+      reply: jest.fn().mockResolvedValue(undefined),
+      respond: jest.fn().mockResolvedValue(undefined),
+    },
+    question: {
+      list: jest.fn().mockResolvedValue([]),
+      reply: jest.fn().mockResolvedValue(undefined),
+      reject: jest.fn().mockResolvedValue(undefined),
+    },
   });
 
   beforeEach(() => {
@@ -135,7 +155,11 @@ describe('OpenCodeService SDK compatibility', () => {
   it('exposes MCP, tool catalog, session, part, and provider oauth wrappers', async () => {
     const mockSdkClient = createMockSdkClient();
     mockCreateSdkClient.mockReturnValue(mockSdkClient);
-    const service = new OpenCodeService(DEFAULT_SETTINGS);
+    const service = new OpenCodeService(
+      DEFAULT_SETTINGS,
+      {},
+      { sdkFeatureFlags: SDK_FEATURE_FLAG_ROLLOUT_DEFAULTS },
+    );
 
     await expect(service.refreshToolIds()).resolves.toEqual(['read', 'bash', 'vault_tool']);
     await expect(service.listTools('openai', 'gpt-5')).resolves.toHaveLength(2);
@@ -182,6 +206,18 @@ describe('OpenCodeService SDK compatibility', () => {
       url: 'https://example.com/provider-auth',
     });
     await expect(service.completeProviderOAuth('openai', 'code-2')).resolves.toEqual({ success: true });
+    await expect(service.getPendingPermissions()).resolves.toEqual([
+      {
+        id: 'permission-1',
+        sessionID: 'session-1',
+        permission: 'bash',
+        patterns: ['npm test'],
+        metadata: {},
+        always: [],
+      },
+    ]);
+    await expect(service.respondToPermission('permission-1', 'once', 'Allow once')).resolves.toBeUndefined();
+    await expect(service.respondToSessionPermission('session-1', 'permission-1', 'always')).resolves.toBeUndefined();
   });
 
   it('hydrates registry tools as custom and observed external tools as MCP', async () => {
