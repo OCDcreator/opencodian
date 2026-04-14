@@ -812,3 +812,90 @@
 - 当前 warning 分布为：`max-lines-per-function` **41**、`max-lines` **36**、`complexity` **17**、`max-params` **16**、`@typescript-eslint/no-explicit-any` **6**；其中生产代码 **75** 条、tests **41** 条。
 - 当前最热的生产代码热点为：`src/features/settings/ModelConfigModal.ts`（**7**）、`src/features/settings/OpenCodianSettings.ts`（**7**）、`src/features/chat/OpenCodianView.ts`（**5**）、`src/utils/icons/ProviderIconService.ts`（**4**）、`src/core/opencode/OpenCodeService.ts`（**3**）；最热的测试热点为 `tests/unit/core/opencode/OpenCodeService.test.ts`（**5**）。
 - 结论：lint 红灯已经解除，但剩余 warning 仍然集中在少数大 owner 与相关 tests。人工现已确认继续一批新的 warning cleanup queue：先顺序执行 `W1-W5`，优先清掉低风险且收益明确的 `max-params` / `complexity` / `@typescript-eslint/no-explicit-any` 热点；在 `W5` checkpoint 完成前，不恢复 `R33+` maintainability owner queue。
+
+## Confirmed Next Batch
+
+### [NEXT] W1 - ModelConfigModal max-params cleanup
+
+- **Lane**: Warning cleanup / settings hotspot
+- **目标**: 只清 `src/features/settings/ModelConfigModal.ts` 中剩余的 `max-params` warnings，优先通过现有 owner 内的 options/state object 收束 `renderKeyValueEditor`、`createTextField`、`createSelectField` 的参数表。
+- **优先入口**:
+  - `src/features/settings/ModelConfigModal.ts`
+- **允许边界**:
+  - 允许在 `ModelConfigModal` 现有 owner 内做局部参数打包与调用点收束。
+  - 允许更新直接相关 tests。
+- **禁止项**:
+  - 不新增 settings 子文件或新的薄 helper / adapter。
+  - 不借机处理 file-size / long-method warnings。
+- **验收**:
+  - 至少移除这 3 条 `max-params` warnings。
+  - 运行 `npx eslint src/features/settings/ModelConfigModal.ts`、`npm test`、`npm run build`。
+
+### [QUEUED] W2 - ProviderIconService signature cleanup
+
+- **Lane**: Warning cleanup / icon infrastructure
+- **目标**: 清掉 `src/utils/icons/ProviderIconService.ts` 中剩余的 `max-params` warnings，优先收束 `selectBuiltinIcon` 与 `getLobehubCachePath` 的参数表。
+- **优先入口**:
+  - `src/utils/icons/ProviderIconService.ts`
+  - `tests/unit/utils/icons/ProviderIconService.test.ts`
+- **允许边界**:
+  - 允许在 `ProviderIconService` 现有静态 helper 内改用参数对象或更窄的局部 shape。
+  - 允许更新直接相关 tests。
+- **禁止项**:
+  - 不改变 provider icon fallback 顺序。
+  - 不新增新的 icon resolver / cache helper 文件。
+- **验收**:
+  - 至少移除这 2 条 `max-params` warnings。
+  - 运行 `npx eslint src/utils/icons/ProviderIconService.ts`、`npm test`、`npm run build`。
+
+### [QUEUED] W3 - OpenCodeService complexity trim
+
+- **Lane**: Warning cleanup / opencode hotspot
+- **目标**: 只处理 `src/core/opencode/OpenCodeService.ts` 当前剩余的 2 条 `complexity` warnings，优先在现有方法内通过 guard clause、局部 helper 或已有 seam 收束 `connectSSE` 与 `updateSettings` 的分支噪音。
+- **优先入口**:
+  - `src/core/opencode/OpenCodeService.ts`
+  - 直接相关 unit tests
+- **允许边界**:
+  - 允许做不改变对外 API 的最小结构调整。
+  - 允许更新直接相关 tests。
+- **禁止项**:
+  - 不开启新的 transport / config / finalize owner queue。
+  - 不破坏 SDK-first / legacy HTTP fallback、settings update 与 scoped-directory 兼容语义。
+- **验收**:
+  - 至少移除这 2 条 `complexity` warnings。
+  - 运行 `npx eslint src/core/opencode/OpenCodeService.ts`、`npm test`、`npm run build`。
+
+### [QUEUED] W4 - Chat bridge test typing cleanup
+
+- **Lane**: Warning cleanup / test typing
+- **目标**: 清掉 chat bridge 测试中的 6 条 `@typescript-eslint/no-explicit-any` warnings，优先通过更准确的 mock shape / helper typing 收束测试输入。
+- **优先入口**:
+  - `tests/unit/features/chat/ContextFileCatalogEventBridge.test.ts`
+  - `tests/unit/features/chat/FocusContextEventBridge.test.ts`
+- **允许边界**:
+  - 允许只改 tests。
+  - 若测试 typing 调整需要最小生产类型导出，可改直接相关 type 定义。
+- **禁止项**:
+  - 不借机扩展到不相关 chat runtime / view 重构。
+  - 不新增与 production 无关的测试工具碎片。
+- **验收**:
+  - 移除这 6 条 `@typescript-eslint/no-explicit-any` warnings。
+  - 运行 `npx eslint tests/unit/features/chat/ContextFileCatalogEventBridge.test.ts tests/unit/features/chat/FocusContextEventBridge.test.ts`、`npm test`、`npm run build`。
+
+### [QUEUED] W5 - Warning checkpoint
+
+- **Lane**: Checkpoint
+- **目标**: 复盘 `W1-W4` 的 warning cleanup 收益，记录剩余生产热点，决定下一批是继续 warning cleanup，还是再回到新的 maintainability owner queue。
+- **优先入口**:
+  - `docs/status/maintainability-master-plan.md`
+  - `docs/status/maintainability-round-roadmap.md`
+  - `docs/status/maintainability-lane-map.md`
+  - 最新 `phase` 文档与 lint 输出
+- **允许边界**:
+  - 只做文档、指标与下一批建议更新。
+- **禁止项**:
+  - 不自动扩展 `W6+` 或恢复 `R33+`。
+- **验收**:
+  - phase 文档明确说明 warning 净减少量、剩余热点与下一批建议。
+  - 运行 `npm run lint`、`npm test`、`npm run build`。
+
