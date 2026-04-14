@@ -11,6 +11,7 @@
 
 - 模型中心的 host 装配与持久化写回
 - 主题预设与样式控件联动
+- 通过 `SettingsStyleBackgroundSection` 协调聊天背景图子区块 lifecycle
 - 服务器状态轮询
 - 对多个 modal 与辅助服务的编排
 
@@ -47,7 +48,7 @@
   - `aiTitleModel` 的 availability-aware 选项解析与可搜索 picker
 - **Style**
   - theme preset + custom overrides
-  - 聊天背景图上传/调参
+  - 聊天背景图上传/调参/预览拖拽现已委托给 `SettingsStyleBackgroundSection`
   - assistant metadata / time / provider-model 独立样式控制
   - 输入面板 glass refraction / liquid glass 参数
 - **Debug**
@@ -112,6 +113,7 @@ provider 开关写回仍遵循 `ModelConfigService` 返回的 `effectiveProvider
 - 服务器状态通过固定轮询刷新
 - 模型加载后的 UI 刷新走 `requestAnimationFrame`
 - 样式控件通过 `styleControlBindings` 统一同步，避免 theme preset 切换后控件显示滞后
+- 聊天背景图 subsection 现在由 `SettingsStyleBackgroundSection` 持有自己的 host、preview request guard 与 reset/upload lifecycle，`OpenCodianSettings` 只负责装配 owner 与复用通用 style control seam
 
 ## 关键方法
 
@@ -124,13 +126,14 @@ provider 开关写回仍遵循 `ModelConfigService` 返回的 `effectiveProvider
 | `prepareRestoreScrollOnNextOpen()` | 记录下次打开时的滚动恢复目标 |
 | `addModelSettings()` | 装配模型中心 host，包括默认模型 picker、`SettingsModelCatalogPresenter`、provider workspace 卡片，以及高级工具区 |
 | `addConversationSettings()` | 渲染标题、question 和回答回顾相关设置 |
-| `addStyleSettings()` | 渲染 theme preset、chat appearance、glass/liquid glass 控件 |
+| `addStyleSettings()` | 渲染 theme preset、挂载 `SettingsStyleBackgroundSection`，并装配其余 chat appearance / glass / liquid glass 控件 |
 
 ## 与其他模块的交互
 
 - `SettingsSectionCoordinator`: 管理 section heading 注册、quick-nav 构建、post-render setup 与 scroll restoration，避免这些 DOM/runtime 细节继续堆在设置页主类里
 - `ModelCatalogStateService`: 提供 settings/model 分区使用的 catalog state API，并集中 provider/model availability 的 core 写回操作
 - `SettingsModelCatalogPresenter`: 管理 provider/model accordion、search、bulk toggle、catalog summary 卡片与 provider probe presentation；`OpenCodianSettings` 只向它提供 settings writeback 与 icon/inline-code host seam
+- `SettingsStyleBackgroundSection`: 管理聊天背景图 subsection 的上传、预览、fit mode / numeric controls、drag focus 与 reset lifecycle；`OpenCodianSettings` 只向它提供通用 style-group scaffolding、binding 清理与 apply/save seam
 - `ModelConfigService`: 读取 `local/server/baseEffective/effective` 目录，以及 `serverConfig` / `effectiveProviderConfig` / `currentEnabledProviderIds`，并提供逐 provider 的真实发送 probe
 - `OpencodeConfigManager`: 读写 `.opencode` 配置
 - `PluginManagementService`: 构建插件环境快照
@@ -147,6 +150,7 @@ provider 开关写回仍遵循 `ModelConfigService` 返回的 `effectiveProvider
 - `display()` 每次都会重建 DOM，因此不要长期持有 section 内部元素引用。
 - 如果只是调整 settings panel scaffolding，优先改 `SettingsSectionCoordinator`，不要再把 quick-nav/scroll 定时器塞回 `OpenCodianSettings`。
 - 如果只是调整模型目录 UI 状态、provider probe badge/detail、accordion/filter 行为，优先改 `SettingsModelCatalogPresenter`，不要再把这套状态机塞回 `OpenCodianSettings`。
+- 如果只是调整聊天背景图 subsection，优先改 `SettingsStyleBackgroundSection`，不要再把 background preview / upload / drag / reset 逻辑塞回主设置类。
 - 样式分组和默认值最终都以 `core/types/settings.ts` 的归一化逻辑为准。
 - 这个文件同时处理“运行时 UI 状态”和“持久化设置”，两者不要混淆。
 - 任何新增设置如果涉及 i18n、默认值、迁移或视图刷新，通常都不只改这一处。

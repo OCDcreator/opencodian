@@ -75,6 +75,7 @@ describe('OpenCodian style settings', () => {
         chatAppearance: getDefaultChatAppearanceSettings(),
       },
       saveSettings: jest.fn(),
+      getChatAppearanceBaseline: jest.fn(() => getDefaultChatAppearanceSettings()),
     } as unknown as ConstructorParameters<typeof OpenCodianSettingTab>[1];
     const tab = new OpenCodianSettingTab({} as App, plugin);
     const containerEl = document.createElement('div');
@@ -117,6 +118,7 @@ describe('OpenCodian style settings', () => {
         chatAppearance: getDefaultChatAppearanceSettings(),
       },
       saveSettings: jest.fn(),
+      getChatAppearanceBaseline: jest.fn(() => getDefaultChatAppearanceSettings()),
     } as unknown as ConstructorParameters<typeof OpenCodianSettingTab>[1];
     const tab = new OpenCodianSettingTab({} as App, plugin);
     const containerEl = document.createElement('div');

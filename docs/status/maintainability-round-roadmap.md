@@ -197,7 +197,7 @@
 - **验收**:
   - phase 文档明确记录 `W12-W14` 的 warning 收益与下一批建议
 
-### [NEXT] R33 - Settings style/background owner seam
+### [DONE] R33 - Settings style/background owner seam
 
 - **Lane**: Maintainability / settings style-background owner
 - **目标**: 从 `src/features/settings/OpenCodianSettings.ts` 的 style/background section 中挑出一个完整、较厚的 owner seam，优先削弱 `addStyleSettings` / `renderBackgroundStyleGroup` 周边的大段 UI 组装与状态写回；目标是降低 settings 主类职责集中度，而不是只为清单条 warning。
@@ -218,7 +218,7 @@
   - `OpenCodianSettings` 对 style/background section 的直接 DOM/state 组装明显减少，或一个完整 subsection lifecycle 迁入较厚 owner
   - 相关 focused tests、全量 `npm test`、`npm run build` 通过
 
-### [QUEUED] R34 - Settings model catalog presenter render lifecycle
+### [NEXT] R34 - Settings model catalog presenter render lifecycle
 
 - **Lane**: Maintainability / settings model catalog owner
 - **目标**: 加厚或重组 `src/features/settings/SettingsModelCatalogPresenter.ts` 内的 render lifecycle，把 provider/model accordion、search/filter、bulk-toggle/probe presentation 中仍缠在 `render` 的成块逻辑收束到同 owner 的明确生命周期 helper 或较厚子组件边界。
