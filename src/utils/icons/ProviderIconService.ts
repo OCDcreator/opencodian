@@ -1207,41 +1207,19 @@ export class ProviderIconService {
   }
 
   private static detectMimeType(buffer: ArrayBuffer, headerValue?: string, sourceHint?: string): string {
-    const normalizedHeader = headerValue?.split(';')[0]?.trim().toLowerCase();
-    if (normalizedHeader && ALLOWED_IMAGE_MIME_TYPES.has(normalizedHeader)) {
-      return normalizedHeader;
+    const bytes = new Uint8Array(buffer);
+    const fromHeader = this.getMimeTypeFromHeader(headerValue);
+    if (fromHeader) {
+      return fromHeader;
     }
 
-    const bytes = new Uint8Array(buffer);
-    const prefix = Buffer.from(bytes.slice(0, Math.min(bytes.length, 2048)))
-      .toString('utf-8')
-      .replace(/^\uFEFF/, '')
-      .trimStart();
-    if (/<svg[\s>]/i.test(prefix) || (/^<\?xml/i.test(prefix) && /\.svg$/i.test(sourceHint ?? ''))) {
+    if (this.isSvgAsset(bytes, sourceHint)) {
       return 'image/svg+xml';
     }
 
-    if (bytes.length >= 4 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) {
-      return 'image/png';
-    }
-
-    if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
-      return 'image/jpeg';
-    }
-
-    if (bytes.length >= 6) {
-      const signature = Buffer.from(bytes.slice(0, 6)).toString('ascii');
-      if (signature === 'GIF87a' || signature === 'GIF89a') {
-        return 'image/gif';
-      }
-    }
-
-    if (bytes.length >= 12) {
-      const riff = Buffer.from(bytes.slice(0, 4)).toString('ascii');
-      const webp = Buffer.from(bytes.slice(8, 12)).toString('ascii');
-      if (riff === 'RIFF' && webp === 'WEBP') {
-        return 'image/webp';
-      }
+    const fromSignature = this.getMimeTypeFromSignature(bytes);
+    if (fromSignature) {
+      return fromSignature;
     }
 
     const fromPath = this.getMimeTypeFromPath(sourceHint);
@@ -1250,6 +1228,76 @@ export class ProviderIconService {
     }
 
     throw new Error('Only SVG, PNG, JPEG, WEBP, and GIF icon files are supported.');
+  }
+
+  private static getMimeTypeFromHeader(headerValue?: string): string | null {
+    const normalizedHeader = headerValue?.split(';')[0]?.trim().toLowerCase();
+    return normalizedHeader && ALLOWED_IMAGE_MIME_TYPES.has(normalizedHeader)
+      ? normalizedHeader
+      : null;
+  }
+
+  private static isSvgAsset(bytes: Uint8Array, sourceHint?: string): boolean {
+    const prefix = Buffer.from(bytes.slice(0, Math.min(bytes.length, 2048)))
+      .toString('utf-8')
+      .replace(/^\uFEFF/, '')
+      .trimStart();
+
+    return /<svg[\s>]/i.test(prefix) || (/^<\?xml/i.test(prefix) && /\.svg$/i.test(sourceHint ?? ''));
+  }
+
+  private static getMimeTypeFromSignature(bytes: Uint8Array): string | null {
+    if (this.hasPngSignature(bytes)) {
+      return 'image/png';
+    }
+
+    if (this.hasJpegSignature(bytes)) {
+      return 'image/jpeg';
+    }
+
+    if (this.hasGifSignature(bytes)) {
+      return 'image/gif';
+    }
+
+    if (this.hasWebpSignature(bytes)) {
+      return 'image/webp';
+    }
+
+    return null;
+  }
+
+  private static hasPngSignature(bytes: Uint8Array): boolean {
+    return bytes.length >= 4
+      && bytes[0] === 0x89
+      && bytes[1] === 0x50
+      && bytes[2] === 0x4e
+      && bytes[3] === 0x47;
+  }
+
+  private static hasJpegSignature(bytes: Uint8Array): boolean {
+    return bytes.length >= 3
+      && bytes[0] === 0xff
+      && bytes[1] === 0xd8
+      && bytes[2] === 0xff;
+  }
+
+  private static hasGifSignature(bytes: Uint8Array): boolean {
+    if (bytes.length < 6) {
+      return false;
+    }
+
+    const signature = Buffer.from(bytes.slice(0, 6)).toString('ascii');
+    return signature === 'GIF87a' || signature === 'GIF89a';
+  }
+
+  private static hasWebpSignature(bytes: Uint8Array): boolean {
+    if (bytes.length < 12) {
+      return false;
+    }
+
+    const riff = Buffer.from(bytes.slice(0, 4)).toString('ascii');
+    const webp = Buffer.from(bytes.slice(8, 12)).toString('ascii');
+    return riff === 'RIFF' && webp === 'WEBP';
   }
 
   private static getMimeTypeFromPath(sourceHint?: string): string | null {

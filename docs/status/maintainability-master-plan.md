@@ -2,11 +2,11 @@
 
 > **状态**: [READY]
 > **作用**: 这是 maintainability 无人值守的战略文档。每轮开始前，先读本文件，再读 `docs/status/maintainability-round-roadmap.md` 与最近的 `docs/status/maintainability-phase-XXX.md`。
-> **自动推进状态**: `R65` 已完成 Warning cleanup batch B (config and opencode core)；当前首个 `[NEXT]` 为 `R66 - Warning cleanup batch C (server, icons, and heavy tests)`，恢复运行时必须继续按 roadmap 队列顺序执行，不允许 freestyle。
+> **自动推进状态**: `R66` 已完成 Warning cleanup batch C (server, icons, and heavy tests)；当前首个 `[NEXT]` 为 `R67 - Maintainability and warning checkpoint`，恢复运行时必须继续按 roadmap 队列顺序执行，不允许 freestyle。
 
 ## 1. 当前判断
 
-**当前分支已完成 `R65`，在 config/opencode core 邻域完成 warning cleanup batch B：`OpenCodeMessageNormalizationMapper` 现在把 context/OMO hydration 委托给邻近 owner `OpenCodeMessageContextOmoAssembler`，并把 `modelConfig` / mapper focused tests 缩成更窄 suite scope，保持 live lint `0 errors` 的同时把 warning 基线继续压低。** 当前 lint 基线保持在 `0 errors / 84 warnings`；接下来应继续按 queue 推进 `server/icons/heavy tests` warning reduction。
+**当前分支已完成 `R66`，在 server/icons/heavy-tests 邻域完成 warning cleanup batch C：`ProviderIconService` 的 mime-type 判定现在通过更窄的 header/svg/signature helpers 收束复杂度，`ServerManager` 与 `ProviderIconService` 的 heavy tests 也按 lifecycle/runtime 与 cache/custom-source 责任拆成更窄 suite。** 当前 lint 基线保持在 `0 errors / 79 warnings`；下一轮应执行 `R67` checkpoint，复盘 `R50-R66` 的收益、剩余高成本 warning 与后续路线。
 
 这批夜间队列的主线是：
 
@@ -17,17 +17,16 @@
 
 ## 2. 当前基线
 
-- **lint**: `0 errors / 84 warnings`
+- **lint**: `0 errors / 79 warnings`
 - **验证**:
-  - 最近一次已确认的全量测试为 `R65`：`npm test` 通过，`262 passed, 262 total` suites；`1126 passed, 1126 total` tests
-  - 最近一次已确认的构建通过为 `R65`：`npm run build`，`BUILD_ID` `autopilot-maintainability.202604150615`
+  - 最近一次已确认的全量测试为 `R66`：`npm test` 通过，`264 passed, 264 total` suites；`1126 passed, 1126 total` tests
+  - 最近一次已确认的构建通过为 `R66`：`npm run build`，`BUILD_ID` `autopilot-maintainability.202604150634`
   - 最近一次 Test Vault 部署仍为 `R64`：已复制 `dist/main.js`、`dist/manifest.json` 与 `dist/styles.css` 到 Test Vault，并确认部署后的 `main.js` 含 `BUILD_ID` `autopilot-maintainability.202604150602`
 - **本批目标**:
   - 保持 `0 errors`
   - 在保持受控 queue 的前提下继续做高确定性 maintainability seam
-  - 把 warning baseline 从当前 `84` 继续往更低区间推进；若未进一步下降，`R67` checkpoint 必须明确说明剩余高成本阻塞
+  - 在 `R67` checkpoint 中复盘从 `92 -> 79` 的 warning 下降轨迹，并明确剩余高成本阻塞与下一批入口
 - **下一批高确定性切口**:
-  - `R66`: warning cleanup batch C
   - `R67`: checkpoint
 - **历史摘要**: 见 `docs/status/maintainability-completed-batches.md`
 
@@ -60,6 +59,7 @@
 - **R63**: `ProviderIconService` 现在通过同文件内的 asset-runtime seam 统一处理 cached asset 读取、LobeHub/builtin/custom candidate loading、cache write/read、cache-only preview fallback 与 custom cache entry 装配，并补齐直接相关测试与模块文档
 - **R64**: 在 settings 邻域完成 warning cleanup batch A，把 `SettingsStyleSection.attach()` 收束为 section-level 同文件 owner 调度、缩小 `OpenCodianSettings` / `OpenCodianStyleSettings` / `modelConfigWorkspace` focused tests 的单函数范围、吸收两个 import-sort lint blocker，并把 live lint 基线压到 `0 errors / 87 warnings`
 - **R65**: 在 config/opencode core 邻域完成 warning cleanup batch B，把 `OpenCodeMessageNormalizationMapper` 的 context/OMO hydration 收口到邻近 owner `OpenCodeMessageContextOmoAssembler`，将 `modelConfig` / mapper focused tests 拆成更窄 suite scope，并把 live lint 基线继续压到 `0 errors / 84 warnings`
+- **R66**: 在 server/icons/heavy-tests 邻域完成 warning cleanup batch C，把 `ProviderIconService` 的 mime detection 拆成更窄 helper flow，并把 `ServerManager` / `ProviderIconService` heavy tests 按 lifecycle/runtime 与 cache/custom-source 责任拆成更窄 suite file，继续把 live lint 基线压到 `0 errors / 79 warnings`
 
 ## 4. 本批结论
 

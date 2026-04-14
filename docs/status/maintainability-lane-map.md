@@ -1,18 +1,18 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [READY] `R65` Warning cleanup batch B (config and opencode core) 已完成；当前首个 `[NEXT]` 为 `R66 - Warning cleanup batch C (server, icons, and heavy tests)`。
+> **当前状态**: [READY] `R66` Warning cleanup batch C (server, icons, and heavy tests) 已完成；当前首个 `[NEXT]` 为 `R67 - Maintainability and warning checkpoint`。
 
 ## 当前优先级
 
-- **当前 `[NEXT]`**：`R66 - Warning cleanup batch C (server, icons, and heavy tests)`
-- **本批目标**：保持 `0 errors`，config/opencode core warning batch B 已完成，继续推进 server/icon/heavy-tests warning cleanup 与 checkpoint
-- **当前 lint 基线**：`0 errors / 84 warnings`
+- **当前 `[NEXT]`**：`R67 - Maintainability and warning checkpoint`
+- **本批目标**：保持 `0 errors`，复盘 `R50-R66` 的 owner 收益、warning 下降量、验证成本与剩余高成本热点
+- **当前 lint 基线**：`0 errors / 79 warnings`
 - **热点顺序**：
-  1. `src/core/opencode/ServerManager.ts`
-  2. `src/utils/icons/ProviderIconService.ts`
-  3. `tests/unit/core/opencode/ServerManager.test.ts`
-  4. `tests/unit/utils/icons/ProviderIconService.test.ts`
+  1. `docs/status/maintainability-master-plan.md`
+  2. `docs/status/maintainability-round-roadmap.md`
+  3. `docs/status/maintainability-lane-map.md`
+  4. 最新 lint / test / build 输出与 `docs/status/maintainability-phase-401.md`
 
 ## 本批边界
 
@@ -36,5 +36,5 @@
 ## 历史入口
 
 - 批次归档：`docs/status/maintainability-completed-batches.md`
-- 最近成功 phase：`docs/status/maintainability-phase-400.md`
+- 最近成功 phase：`docs/status/maintainability-phase-401.md`
 - 停机线索：`automation/runtime/stop-after-next-commit.log` 与 `automation/runtime/history.jsonl` 中 round `398` 记录

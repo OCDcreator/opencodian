@@ -1,8 +1,6 @@
 /**
- * ProviderIconService unit tests
+ * ProviderIconService cache and builtin icon unit tests
  */
-
-import * as fs from 'fs';
 
 import { normalizeProviderIconLibrary, type ProviderIconLibrary } from '../../../../src/core/types';
 
@@ -50,12 +48,7 @@ function toArrayBuffer(text: string): ArrayBuffer {
   return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
 }
 
-describe('ProviderIconService', () => {
-  beforeEach(() => {
-    jest.resetModules();
-    jest.clearAllMocks();
-  });
-
+function registerMappedFetchTests(): void {
   it('reads a mapped icon from the local cache before hitting the network', async () => {
     const adapter = createMockAdapter();
     adapter.exists.mockResolvedValue(true);
@@ -206,7 +199,9 @@ describe('ProviderIconService', () => {
       failed: 0,
     });
   });
+}
 
+function registerMappedStateTests(): void {
   it('persists default mapped entries for current providers', async () => {
     const { ProviderIconService } = await import('../../../../src/utils/icons/ProviderIconService');
 
@@ -257,164 +252,6 @@ describe('ProviderIconService', () => {
     expect(state.providers[0].entries[1].iconUrl).toContain('/deepseek.svg');
   });
 
-  it('uses custom preview fallback during cache inspection without refetching', async () => {
-    const adapter = createMockAdapter();
-    const app = createMockApp(adapter);
-    const { requestUrl } = jest.requireMock('obsidian') as { requestUrl: jest.Mock };
-    const { ProviderIconService } = await import('../../../../src/utils/icons/ProviderIconService');
-
-    const state = await ProviderIconService.getProviderCacheState(app as never, ['proxy-provider'], {
-      'proxy-provider': [
-        {
-          id: 'custom-1',
-          type: 'url',
-          source: 'https://example.com/proxy.svg',
-          mimeType: 'image/svg+xml',
-          addedAt: 1,
-        },
-      ],
-    });
-
-    expect(requestUrl).not.toHaveBeenCalled();
-    expect(adapter.writeBinary).not.toHaveBeenCalled();
-    expect(state.providers[0].entries[0]).toMatchObject({
-      cachePath: null,
-      cached: false,
-      iconUrl: 'https://example.com/proxy.svg',
-      resolvedFormat: 'svg',
-    });
-  });
-
-  it('accepts builtin provider icon entries during normalization', () => {
-    const normalized = normalizeProviderIconLibrary({
-      requesty: [
-        {
-          id: 'builtin:opencode:requesty',
-          type: 'builtin',
-          source: 'opencode:requesty',
-          addedAt: 1,
-        },
-      ],
-      invalid: [
-        {
-          id: 'bad',
-          type: 'builtin',
-          source: 'bad-source',
-          addedAt: 1,
-        },
-      ],
-    });
-
-    expect(normalized.requesty?.[0]).toMatchObject({
-      type: 'builtin',
-      source: 'opencode:requesty',
-      variant: 'auto',
-    });
-    expect(normalized.invalid).toBeUndefined();
-  });
-
-  it('adds a custom URL icon source and caches it', async () => {
-    const adapter = createMockAdapter();
-    const app = createMockApp(adapter);
-    const library: ProviderIconLibrary = {};
-    const { requestUrl } = jest.requireMock('obsidian') as { requestUrl: jest.Mock };
-    requestUrl.mockResolvedValue({
-      status: 200,
-      headers: { 'content-type': 'image/png' },
-      arrayBuffer: Uint8Array.from([0x89, 0x50, 0x4e, 0x47]).buffer,
-    });
-    const { ProviderIconService } = await import('../../../../src/utils/icons/ProviderIconService');
-
-    const nextLibrary = await ProviderIconService.addCustomIconSource(
-      app as never,
-      'proxy-provider',
-      'https://example.com/proxy.png',
-      library,
-    );
-
-    expect(requestUrl).toHaveBeenCalledWith({
-      method: 'GET',
-      throw: false,
-      url: 'https://example.com/proxy.png',
-    });
-    expect(nextLibrary['proxy-provider']).toHaveLength(1);
-    expect(nextLibrary['proxy-provider'][0]).toMatchObject({
-      type: 'url',
-      source: 'https://example.com/proxy.png',
-      mimeType: 'image/png',
-    });
-    expect(adapter.writeBinary).toHaveBeenCalledWith(
-      expect.stringContaining('.opencodian/provider-icons/proxy-provider-'),
-      expect.anything(),
-    );
-  });
-
-  it('supports quoted Windows local paths for custom icons', async () => {
-    const adapter = createMockAdapter();
-    const app = createMockApp(adapter);
-    const { promises } = jest.requireMock('fs') as {
-      promises: { stat: jest.Mock; readFile: jest.Mock };
-    };
-    promises.stat.mockResolvedValue({
-      isFile: () => true,
-      size: 128,
-    } as fs.Stats);
-    promises.readFile.mockResolvedValue(Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"></svg>', 'utf-8'));
-    const { ProviderIconService } = await import('../../../../src/utils/icons/ProviderIconService');
-
-    const nextLibrary = await ProviderIconService.addCustomIconSource(
-      app as never,
-      'codexzh',
-      '"C:\\Users\\lt\\Downloads\\codex.svg"',
-      {},
-    );
-
-    expect(promises.stat).toHaveBeenCalledWith('C:\\Users\\lt\\Downloads\\codex.svg');
-    expect(promises.readFile).toHaveBeenCalledWith('C:\\Users\\lt\\Downloads\\codex.svg');
-    expect(nextLibrary.codexzh?.[0]).toMatchObject({
-      type: 'file',
-      source: 'C:\\Users\\lt\\Downloads\\codex.svg',
-      mimeType: 'image/svg+xml',
-    });
-  });
-
-  it('splits batch custom icon input across spaces commas and new lines', async () => {
-    const { ProviderIconService } = await import('../../../../src/utils/icons/ProviderIconService');
-
-    const sources = ProviderIconService.splitCustomIconSourcesInput(
-      'https://example.com/a.png https://example.com/b.png,\nhttps://example.com/c.png',
-    );
-
-    expect(sources).toEqual([
-      'https://example.com/a.png',
-      'https://example.com/b.png',
-      'https://example.com/c.png',
-    ]);
-  });
-
-  it('keeps local paths with spaces intact when splitting batch input', async () => {
-    const { ProviderIconService } = await import('../../../../src/utils/icons/ProviderIconService');
-
-    const sources = ProviderIconService.splitCustomIconSourcesInput(
-      'C:\\Users\\lt\\My Icons\\codex.svg, C:\\Users\\lt\\More Icons\\openai.svg',
-    );
-
-    expect(sources).toEqual([
-      'C:\\Users\\lt\\My Icons\\codex.svg',
-      'C:\\Users\\lt\\More Icons\\openai.svg',
-    ]);
-  });
-
-  it('does not split a single URL just because it contains commas', async () => {
-    const { ProviderIconService } = await import('../../../../src/utils/icons/ProviderIconService');
-
-    const sources = ProviderIconService.splitCustomIconSourcesInput(
-      'https://example.com/icons/a,b.svg',
-    );
-
-    expect(sources).toEqual(['https://example.com/icons/a,b.svg']);
-  });
-
   it('reads local cache state for current and saved-only providers', async () => {
     const adapter = createMockAdapter();
     adapter.exists.mockImplementation(async (targetPath: string) =>
@@ -446,6 +283,36 @@ describe('ProviderIconService', () => {
     expect(state.summary.totalProviders).toBe(3);
     expect(state.providers[0].providerId).toBe('deepseek');
     expect(state.providers.find((provider) => provider.providerId === 'savedProvider')?.isCurrentProvider).toBe(false);
+  });
+}
+
+function registerBuiltinAndLibraryTests(): void {
+  it('accepts builtin provider icon entries during normalization', () => {
+    const normalized = normalizeProviderIconLibrary({
+      requesty: [
+        {
+          id: 'builtin:opencode:requesty',
+          type: 'builtin',
+          source: 'opencode:requesty',
+          addedAt: 1,
+        },
+      ],
+      invalid: [
+        {
+          id: 'bad',
+          type: 'builtin',
+          source: 'bad-source',
+          addedAt: 1,
+        },
+      ],
+    });
+
+    expect(normalized.requesty?.[0]).toMatchObject({
+      type: 'builtin',
+      source: 'opencode:requesty',
+      variant: 'auto',
+    });
+    expect(normalized.invalid).toBeUndefined();
   });
 
   it('reuses cached custom icons when provider names differ only by spacing', async () => {
@@ -576,26 +443,15 @@ describe('ProviderIconService', () => {
     expect(adapter.remove).toHaveBeenCalledTimes(2);
     expect(removedCount).toBe(2);
   });
+}
 
-  it('validates local file custom sources defensively', async () => {
-    const adapter = createMockAdapter();
-    const app = createMockApp(adapter);
-    const { promises } = jest.requireMock('fs') as {
-      promises: { stat: jest.Mock; readFile: jest.Mock };
-    };
-    promises.stat.mockResolvedValue({
-      isFile: () => true,
-      size: 2 * 1024 * 1024,
-    } as fs.Stats);
-    const { ProviderIconService } = await import('../../../../src/utils/icons/ProviderIconService');
-
-    await expect(
-      ProviderIconService.addCustomIconSource(
-        app as never,
-        'proxy-provider',
-        'C:\\icons\\too-large.png',
-        {},
-      ),
-    ).rejects.toThrow('The icon file is too large');
+describe('ProviderIconService cache and builtin handling', () => {
+  beforeEach(() => {
+    jest.resetModules();
+    jest.clearAllMocks();
   });
+
+  registerMappedFetchTests();
+  registerMappedStateTests();
+  registerBuiltinAndLibraryTests();
 });
