@@ -1,20 +1,20 @@
 # Maintainability Master Plan
 
-> **状态**: [PAUSED_PENDING_CONFIRMATION]
+> **状态**: [CONFIRMED_NEXT_BATCH]
 > **作用**: 这是 maintainability 无人值守的战略文档。每轮开始前，先读本文件，再读 `docs/status/maintainability-round-roadmap.md` 与最近的 `docs/status/maintainability-phase-XXX.md`。
-> **自动推进状态**: `W15 - Warning cleanup checkpoint` 已完成；当前没有可自动执行的 `[NEXT]`。如需继续，必须先由人工追加新的 maintainability queue item 并重新确认路线。
+> **自动推进状态**: `R33-R37` maintainability queue 已确认；当前 `[NEXT]` 是 `R33 - Settings style/background owner seam`。本批目标是恢复较厚 owner 收束，`R37` checkpoint 后必须再次暂停等待人工确认。
 
 ## 1. 当前判断
 
-**当前判断：R28-R32、L1-L5 与 W1-W15 均已完成，文档主入口已确认 `W12-W14` 的 warning cleanup 收益并在 `W15` checkpoint 处重新暂停。仓库当前 lint 基线保持 `0 errors / 91 warnings`；`W6-W10` 已把 warning 基线从 `103` 收敛到 `94`，`W12-W14` 再将其收敛到 `91`，而 `W15` 已确认该收益仍稳定。当前没有可自动执行的 `[NEXT]`，必须等待人工确认后再决定是否继续 warning cleanup 或准备新的 maintainability queue 提案。**
+**当前判断：R28-R32、L1-L5 与 W1-W15 均已完成，warning cleanup 已把 lint 基线稳定到 `0 errors / 91 warnings`，继续逐条清 warning 的收益开始下降。下一批 `R33-R37` 恢复 maintainability owner 收束：优先处理 `OpenCodianSettings` 的 style/background 与 model catalog presenter 两个 settings 热点，再处理 `OpenCodianView` constructor/runtime wiring，随后对 `OpenCodeService` 剩余 seam 做条件性厚 owner 评估，最后在 `R37` checkpoint 暂停。**
 
 当前最重要的事实：
 
-- `OpenCodeService`、`OpenCodianView`、`OpenCodianSettings` 仍是长期 maintainability 热点，但是否继续 owner 收束仍需人工判断
-- 剩余 warnings 主要集中在大型 owner 与长测试文件的 `max-lines-per-function` / `max-lines` / `complexity` / `max-params`
-- 这意味着后续 autopilot 仍应优先做“受控小批次”，而不是自动切回大规模结构重构
-- `W15` 已完成 checkpoint：确认 `W12-W14` 已把 lint 基线稳定在 `0 errors / 91 warnings`，且自动推进已重新停回等待人工确认
-- 当前没有可自动执行的 `[NEXT]`；只有人工追加新的 queue item 后，autopilot 才能继续下一轮
+- `OpenCodeService`、`OpenCodianView`、`OpenCodianSettings` 仍是长期 maintainability 热点；本批已人工确认恢复 `R33+` owner 收束
+- 剩余 warnings 仍主要集中在大型 owner 与长测试文件，但本批不再以逐条 warning cleanup 为目标
+- `R33-R37` 必须按 roadmap 顺序执行，不允许跳过当前 `[NEXT]` 或自由切回 `W16+`
+- 新增 owner 必须足够厚：覆盖完整 lifecycle / section / runtime seam；不要新增只包一层的 provider / factory / adapter
+- 当前 `[NEXT]` 是 `R33 - Settings style/background owner seam`；`R37` 完成后必须重新停回等待人工确认
 
 ## 2. 当前基线
 
@@ -52,13 +52,15 @@
 - `OpenCodianView`、`OpenCodianSettings`、`OpenCodeService` 的大型 owner 拆分仍需人工确认，不因 warning cleanup 自动触发
 - `ConversationRenderService` trailing-assistant helper 链继续保持降优先级；除非正确性、测试或构建直接阻塞，否则不作为默认切口
 
-## 5. 何时恢复 maintainability 重构
+## 5. R33-R37 执行边界
 
-只有满足以下任一条件，才考虑恢复 `R33+`：
+本批已满足恢复 `R33+` 的条件：warning cleanup 继续推进已进入低收益区，且人工明确要求切回 maintainability 提升。执行边界如下：
 
-- 当前 warning cleanup 再继续已明显进入低收益区
-- 某个剩余 hotspot 已形成清晰、较厚的 owner 收束机会
-- 人工明确要求从 warning cleanup 切回 maintainability 提升
+- 每轮只执行当前 `[NEXT]`，不得自由切回 warning cleanup 或新增 `W16+`
+- `OpenCodianSettings` 的 settings UI 变化必须同步默认值 / normalization / locale / style / tests 中直接相关部分
+- `OpenCodianView` constructor/runtime wiring 只能收束初始化与 service wiring，不改 streaming/concurrent tab 语义
+- `OpenCodeService` 的 R36 是条件项：只有能形成较厚 owner 才提交代码重构，否则记录跳过原因并推进 R37
+- `R37` checkpoint 完成后必须暂停；是否继续 `R38+` 由下一次人工确认决定
 
 ## 6. 阅读顺序
 

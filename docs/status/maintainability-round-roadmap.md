@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的 `[NEXT]`”。
-> **当前状态**: [PAUSED_PENDING_CONFIRMATION] `W15 - Warning cleanup checkpoint` 已完成；当前没有可自动执行的 `[NEXT]`。如需继续，必须人工追加新的 queue item 并重新确认路线。
+> **当前状态**: [CONFIRMED_NEXT_BATCH] `R33-R37` maintainability queue 已确认；当前可自动执行的 `[NEXT]` 是 `R33 - Settings style/background owner seam`。`R37` 完成后必须再次暂停并等待人工确认。
 
 ## 控制规则
 
@@ -17,11 +17,10 @@
 
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
 - 当前 lint 基线：`0 errors / 91 warnings`
-- checkpoint 建议：下一批继续一小批现有 owner 内的 warning cleanup，而不是自动恢复 `R33+`
-- 当前可自动执行的 `[NEXT]`：无（`W15 - Warning cleanup checkpoint` 已完成）
-- `W13` 已在 `OpenCodeMessageNormalizationMapper` 现有 owner 内收掉 `openCodeMessageToChatMessage` 的 1 条 `complexity` warning，当前 lint 基线更新为 `0 errors / 92 warnings`
-- `W14` 已在 `BackgroundTaskTimelineService` 现有 owner 内收掉 `collectSegments` 的 1 条 `complexity` warning，当前 lint 基线更新为 `0 errors / 91 warnings`
-- 当前没有后续 `[QUEUED]`；本轮已按规则重新写回“当前没有可自动执行的 `[NEXT]`”
+- checkpoint 建议：`W12-W14` 的逐条 warning cleanup 收益已确认；下一批人工确认切回较厚 maintainability owner 收束
+- 当前可自动执行的 `[NEXT]`：`R33 - Settings style/background owner seam`
+- 本批按 `R33 -> R34 -> R35 -> R36 -> R37` 顺序推进，不允许跳过当前 `[NEXT]`
+- `R37` 完成后若无人追加 queue item，则必须重新写回“当前没有可自动执行的 `[NEXT]`”
 
 ## Queue
 
@@ -198,6 +197,103 @@
 - **验收**:
   - phase 文档明确记录 `W12-W14` 的 warning 收益与下一批建议
 
+### [NEXT] R33 - Settings style/background owner seam
+
+- **Lane**: Maintainability / settings style-background owner
+- **目标**: 从 `src/features/settings/OpenCodianSettings.ts` 的 style/background section 中挑出一个完整、较厚的 owner seam，优先削弱 `addStyleSettings` / `renderBackgroundStyleGroup` 周边的大段 UI 组装与状态写回；目标是降低 settings 主类职责集中度，而不是只为清单条 warning。
+- **优先入口**:
+  - `src/features/settings/OpenCodianSettings.ts`
+  - `src/core/types/settings.ts`
+  - `src/style/` 与生成的 `styles.css`（仅当行为/变量需要同步）
+  - `tests/unit/features/settings/OpenCodianStyleSettings.test.ts`
+  - 相关 locale 文件（仅当 UI 文案变化）
+- **允许边界**:
+  - 允许新增或加厚一个覆盖完整 style/background subsection lifecycle 的 settings owner
+  - 允许更新直接相关 tests、module docs、locale/default/normalization/style 同步项
+- **禁止项**:
+  - 不新增只包一层的 settings adapter/provider/factory
+  - 不把 model catalog、server settings、安全 settings 或 unrelated style preset 重构混入本轮
+  - 不改变 Test Vault 部署规则；若命中 deploy-relevant paths，按 AGENTS 执行 build 后部署验证
+- **验收**:
+  - `OpenCodianSettings` 对 style/background section 的直接 DOM/state 组装明显减少，或一个完整 subsection lifecycle 迁入较厚 owner
+  - 相关 focused tests、全量 `npm test`、`npm run build` 通过
+
+### [QUEUED] R34 - Settings model catalog presenter render lifecycle
+
+- **Lane**: Maintainability / settings model catalog owner
+- **目标**: 加厚或重组 `src/features/settings/SettingsModelCatalogPresenter.ts` 内的 render lifecycle，把 provider/model accordion、search/filter、bulk-toggle/probe presentation 中仍缠在 `render` 的成块逻辑收束到同 owner 的明确生命周期 helper 或较厚子组件边界。
+- **优先入口**:
+  - `src/features/settings/SettingsModelCatalogPresenter.ts`
+  - `tests/unit/features/settings/SettingsModelCatalogPresenter.test.ts`
+  - `docs/modules/features/settings/SettingsModelCatalogPresenter.md`
+- **允许边界**:
+  - 允许在现有 presenter 内提取同文件私有 helper 或加厚现有 presenter-owned structure
+  - 只有形成完整 lifecycle 时才允许新增子文件；否则保持同文件收束
+- **禁止项**:
+  - 不把 catalog state availability 逻辑从 `ModelCatalogStateService` 搬回 UI
+  - 不修改 provider/model availability 语义、`baseEffective` vs `effective` 区分或 icon fallback
+  - 不扩展到 `OpenCodianSettings` 其他 section
+- **验收**:
+  - `SettingsModelCatalogPresenter.render` 的直接复杂度/长度明显下降，且调用方 API 保持稳定
+  - focused tests、全量 `npm test`、`npm run build` 通过
+
+### [QUEUED] R35 - OpenCodianView constructor runtime wiring
+
+- **Lane**: Maintainability / chat runtime wiring
+- **目标**: 只处理 `src/features/chat/OpenCodianView.ts` constructor 与 service/runtime wiring 的 ownership 集中问题，把初始化步骤或相关 runtime host assembly 收束到现有较厚 owner 或同文件私有 lifecycle helper，减少 constructor 对 service fan-out 的直接持有。
+- **优先入口**:
+  - `src/features/chat/OpenCodianView.ts`
+  - 已存在的 chat runtime/coordinator owner（优先加厚而不是新增薄层）
+  - 直接相关 chat tests
+- **允许边界**:
+  - 允许同文件 helper、加厚现有 coordinator/facade，或把完整 initialization lifecycle 迁入已有 owner
+  - 允许更新直接相关 tests 与 module docs
+- **禁止项**:
+  - 不改变 concurrent tab/session streaming、hydration/auth-sync、scroll restore 或 background-task completion notice 语义
+  - 不新增只转发 constructor 参数的 provider/factory/adapter
+  - 不混入 message rendering、send pipeline 或 settings UI 重构
+- **验收**:
+  - `OpenCodianView` constructor/runtime wiring 更薄，service initialization responsibility 明确落到较厚 owner/helper
+  - focused tests、全量 `npm test`、`npm run build` 通过
+
+### [QUEUED] R36 - OpenCodeService residual seam feasibility
+
+- **Lane**: Maintainability / OpenCodeService residual seam
+- **目标**: 评估 `src/core/opencode/OpenCodeService.ts` 剩余 transport/config/finalize/tool-catalog seam 是否还能形成一个较厚 owner；只有当候选覆盖完整 lifecycle 且不会粉碎对外 façade 时才做代码收束，否则只记录跳过原因并推进 R37。
+- **优先入口**:
+  - `src/core/opencode/OpenCodeService.ts`
+  - `src/core/opencode/OpenCodeSdkFacade.ts`
+  - `src/core/opencode/ServerManager.ts`（只读/边界确认，非默认修改对象）
+  - 直接相关 opencode tests
+- **允许边界**:
+  - 允许在 `OpenCodeService` 内做同文件 helper/host seam 收束
+  - 允许新增较厚 owner，但必须覆盖完整 lifecycle 且保持 `OpenCodeService` 作为对外 façade
+  - 若无法形成厚 owner，允许 docs-only skip checkpoint 并推进 R37
+- **禁止项**:
+  - 不移除 SDK-first / legacy HTTP/SSE fallback
+  - 不改变 scoped-directory config semantics、managed server adoption/restart rules 或 public API shape
+  - 不新增一组只转发到 SDK facade 的薄 wrapper
+- **验收**:
+  - 代码路径：明确削弱一个 residual seam，并通过 focused tests、全量 `npm test`、`npm run build`
+  - 跳过路径：phase 文档说明为何当前 seam 不适合拆分，并推进 R37
+
+### [QUEUED] R37 - Maintainability checkpoint
+
+- **Lane**: Checkpoint
+- **目标**: 复盘 `R33-R36` 的 owner 收束收益、验证成本与下一批方向，判断是否继续 `R38+`、回到 warning cleanup，或暂停等待人工新路线。
+- **优先入口**:
+  - `docs/status/maintainability-master-plan.md`
+  - `docs/status/maintainability-round-roadmap.md`
+  - `docs/status/maintainability-lane-map.md`
+  - 最新 phase 文档与 lint/build/test 输出
+- **允许边界**:
+  - 只做文档、指标和下一批建议
+- **禁止项**:
+  - 不自动扩展 `R38+` 或 `W16+`
+- **验收**:
+  - phase 文档明确记录 `R33-R36` 的收益与下一批建议
+  - 若无人工追加 queue item，明确写回“当前没有可自动执行的 `[NEXT]`”
+
 ## 当前自动队列状态
 
-当前没有可自动执行的 `[NEXT]`。`W15 - Warning cleanup checkpoint` 已完成，且当前没有后续 `[QUEUED]`；如需继续，必须先由人工追加新的 queue item，再重新指定 `[NEXT]`。
+当前可自动执行的 `[NEXT]` 是 `R33 - Settings style/background owner seam`。后续已排队 `R34-R37`；`R37` 完成后若没有新的人工追加 queue item，则必须重新写明“当前没有可自动执行的 `[NEXT]`”。

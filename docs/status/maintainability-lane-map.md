@@ -1,28 +1,28 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [PAUSED_PENDING_CONFIRMATION] `W15 - Warning cleanup checkpoint` 已完成；当前没有可自动执行的 `[NEXT]`，等待人工追加队列后再继续。
+> **当前状态**: [CONFIRMED_NEXT_BATCH] `R33-R37` maintainability queue 已确认；当前 `[NEXT]` 是 `R33 - Settings style/background owner seam`。
 
 ## 当前优先级
 
-- **当前 `[NEXT]`**：无（`W15 - Warning cleanup checkpoint` 已完成）
-- **本批目标**：`W12-W14` 的 warning cleanup 收益已完成复盘；自动推进当前暂停，等待人工决定是继续 warning cleanup 还是准备新的 maintainability queue 提案
+- **当前 `[NEXT]`**：`R33 - Settings style/background owner seam`
+- **本批目标**：从逐条 warning cleanup 切回较厚 owner 收束，优先 settings，再 chat constructor/runtime wiring，再条件性评估 OpenCodeService
 - **当前 lint 基线**：`0 errors / 91 warnings`
 - **本批热点顺序**：
-  1. `docs/status/maintainability-master-plan.md`
-  2. `docs/status/maintainability-round-roadmap.md`
-  3. `docs/status/maintainability-lane-map.md`
-  4. `docs/status/maintainability-phase-366.md`
-  5. 最新 lint 输出
-- **下一暂停点**：已到达 `W15 - Warning cleanup checkpoint`；当前已重新停回无 `[NEXT]` 状态
-- **观察但暂不自动切入**：`src/features/settings/OpenCodianSettings.ts`、`tests/unit/core/opencode/OpenCodeService.test.ts`
+  1. `src/features/settings/OpenCodianSettings.ts` style/background section
+  2. `src/features/settings/SettingsModelCatalogPresenter.ts` render lifecycle
+  3. `src/features/chat/OpenCodianView.ts` constructor/runtime wiring
+  4. `src/core/opencode/OpenCodeService.ts` residual seam feasibility
+  5. `docs/status/maintainability-master-plan.md` / `docs/status/maintainability-round-roadmap.md` / `docs/status/maintainability-lane-map.md`
+- **下一暂停点**：`R37 - Maintainability checkpoint`；完成后若无人工追加 queue item，则重新停回无 `[NEXT]` 状态
+- **观察但暂不自动切入**：`tests/unit/core/opencode/OpenCodeService.test.ts`、remaining warning-only file-size cleanup
 
 ## 本批边界
 
-- 不自动恢复 `R33+` maintainability queue
-- 不新增薄 helper / adapter / factory 文件
-- 允许在现有 owner 内做局部 helper、guard clause、参数收束、条件分支整理
-- 如遇到必须扩大为 owner 拆分的大改动，立即停止并在 phase 文档里说明原因
+- 已恢复 `R33-R37` maintainability queue，但不得自动扩展 `R38+`
+- 不新增薄 helper / adapter / factory 文件；新 owner 必须覆盖完整 lifecycle / section / runtime seam
+- 允许在现有 owner 内做同文件私有 helper、较厚 coordinator/presenter 加厚、参数收束和条件分支整理
+- 如遇到必须扩大到跨域大改动，立即停止并在 phase 文档里说明原因
 
 ## 回归观察点
 
