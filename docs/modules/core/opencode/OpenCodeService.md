@@ -10,7 +10,7 @@
 - 通过 `ServerManager` 管理本地或远程 OpenCode 服务状态
 - 在 SDK v2 与 legacy HTTP/SSE 两条链路之间按 feature flag 路由
 - 维护按 session 隔离的流式状态，支持多标签并发流式响应
-- 归一化 session、todo、diff 等返回值，并通过专门 owner 收束 question / permission negotiation
+- 归一化 session、todo、diff 等返回值，并通过专门 owner 收束 question / permission negotiation 与 broad query/admin gateway
 - 通过 `OpenCodeMessageNormalizationMapper` 统一 question prompt、工具身份、持久化消息 hydration、上下文附件与 OMO metadata
 
 当前实现是“混合外观层”：SDK v2 已覆盖大部分 CRUD、非流式 prompt、流式主链路、abort、questions 与 sync 事件；legacy HTTP/SSE 仍完整保留作为回滚路径。
@@ -32,6 +32,7 @@
 - `./OpenCodeMessageNormalizationMapper`
 - `./OpenCodePromptRequestBuilder`
 - `./OpenCodeQuestionPermissionHub`
+- `./OpenCodeQueryGateway`
 - `./OpenCodeSessionControlOrchestrator`
 - `./OpenCodeSessionLifecycleCoordinator`
 - `./OpenCodeStreamingRuntimeCoordinator`
@@ -66,6 +67,7 @@
 - `sessionLifecycle`: `OpenCodeSessionLifecycleCoordinator` 实例，负责 session create/list/messages/todos/statuses/delete/update、默认 current session 指针，以及公开 session sync 订阅 API 到 `syncEventRuntime` 的委托。
 - `sessionControl`: `OpenCodeSessionControlOrchestrator` 实例，负责 fork/revert/unrevert/diff、context usage snapshot、session message control、command/shell 与 message-part operations。
 - `questionPermissionHub`: `OpenCodeQuestionPermissionHub` 实例，负责 pending questions/reply/reject、pending permissions/respond，以及 session permission responder 的 negotiation lifecycle。
+- `queryGateway`: `OpenCodeQueryGateway` 实例，负责 provider auth、project/file/find/path/VCS/formatter/LSP 查询，以及 MCP status/server/auth 的 catalog 写回。
 - `openCodeEventRuntime`: `OpenCodeEventSubscriptionCoordinator` 实例，负责 open-code event listener registry、`event` / `global` 订阅生命周期，以及 catalog-relevant payload 到 `catalogState` 的刷新/广播触发。
 - `vaultPath`: 用于 SDK `directory` 注入、上下文文件绝对路径解析，以及 `ServerManager` 工作目录设置；OpenCode directory scope 和 context file path 的跨平台规范化委托给 `shared/contextPath`。
 
@@ -74,7 +76,7 @@
 另外，tool/MCP 目录状态现在集中在 `catalogState`：
 
 - 运行时可见的外部工具键名会被记录到 observed external tools 集合
-- `refreshToolIds()` / `listTools()` / `refreshMcpServerStatus()` 都通过同一个 state store 更新 snapshot 与 listener 广播
+- `refreshToolIds()` / `listTools()` 通过同一个 state store 更新 tool snapshot；`refreshMcpServerStatus()` 与 MCP server/auth mutation 现在经由 `OpenCodeQueryGateway` 写回 MCP snapshot 与 listener 广播
 - 流式 `tool_use` 与历史 message hydration 继续复用同一套 `shared/toolIdentity` 规则写入结构化 `toolKind`
 - 当没有稳定 MCP 目录时，OpenCode 风格外部工具也会按保守 `custom` 图标 `layers` 兜底，而不是回落成 `wrench`；一旦命中 MCP 目录则会切到 `opencodian-tool-mcp`
 
@@ -297,7 +299,7 @@ OMO 处理则继续基于 `detectOmoMessageMeta()`，但解析逻辑已经与 qu
 - system reminder 最终显示 `reminderText`
 - system reminder 会把 `displayStyle` 设为 `notice`，`noticeTone` 设为 `info`
 
-### 模型、权限、问题与上下文使用快照
+### 模型、权限、问题、query gateway 与上下文使用快照
 
 除了聊天主链路，服务层还负责一组周边接口：
 
@@ -306,6 +308,7 @@ OMO 处理则继续基于 `detectOmoMessageMeta()`，但解析逻辑已经与 qu
 - `getResolvedModelConfig()`: 读取 SDK `config.get()` 或 legacy `/config`，只提取模型相关配置字段。开启 `includeDirectory` 时返回当前项目作用域的解析结果；关闭时返回服务端“默认工作目录作用域”的解析结果，不能把它简单等同于纯全局配置文件。
 - `getSessionContextUsageSnapshot()`: 现在委托给 `OpenCodeSessionControlOrchestrator`，并发读取 session、messages、providers，计算 provider/model 名称、上下文窗口、token 统计和总 cost。
 - `getPendingPermissions()` / `respondToPermission()` / `respondToSessionPermission()` / `getPendingQuestions()` / `replyToQuestion()` / `rejectQuestion()`: 现在统一委托给 `OpenCodeQuestionPermissionHub`，由它处理 SDK flag、legacy fallback、question prompt normalization 与 permission request filtering。
+- `getMcpStatus()` / `addMcpServer()` / provider auth / project / file / find / path / VCS / formatter / LSP 查询：现在统一委托给 `OpenCodeQueryGateway`，由它集中处理 SDK-only query/admin surface 与 MCP status normalization/writeback。
 
 额外要记住一个容易混淆的点：
 
@@ -338,6 +341,7 @@ OMO 处理则继续基于 `detectOmoMessageMeta()`，但解析逻辑已经与 qu
 | `respondToSessionPermission()` | 回传 session-scoped permission 决策 |
 | `getPendingPermissions()` / `respondToPermission()` | 处理权限请求 |
 | `getPendingQuestions()` / `replyToQuestion()` / `rejectQuestion()` | 处理 OpenCode question 请求 |
+| `getMcpStatus()` / `getProviderAuthMethods()` / `listProjects()` / `listFiles()` / `findText()` / `getVcsDiff()` | 委托 broad query/admin gateway |
 | `getSessionDiff()` | 拉取 session diff 元数据，并兼容 legacy `before/after` 与 SDK `1.4.x` `patch` 形状 |
 | `openCodeMessageToChatMessage()` | 把 OpenCode persisted message 归一化为 UI message |
 
@@ -364,6 +368,7 @@ graph TD
 - `OpenCodeEventSubscriptionCoordinator`: 负责 `event.subscribe()` / `global.event()` 的 open-code event listener registry、catalog-relevant payload routing、双路订阅重启与 catalog listener emit。
 - `OpenCodeStreamingRuntimeCoordinator`: 负责 active stream registry、session-scoped abort controllers、part type tracking，以及 cancel/detach 的 runtime lifecycle。
 - `OpenCodeStreamEventTransformer`: 负责 SDK / legacy stream event → `StreamChunk` 的转换、part-type-aware delta routing，以及 SSE parser。
+- `OpenCodeQueryGateway`: 负责 provider auth、project/file/find/path/VCS/formatter/LSP 查询，以及 MCP status/server/auth 写回。
 - `createSdkClient`: 为每次 SDK 调用创建客户端实例。
 - `sdkFeatureFlags`: 定义 SDK 与 legacy 的路由开关。
 - `omoCompat`: 负责 OMO 文本检测与元数据提取。
@@ -389,6 +394,7 @@ graph TD
 
 - `OpenCodeService.initialize()` 仍然存在，但运行时入口 `main.ts` 并不调用它；主要使用方是测试。
 - `OpenCodeQuestionPermissionHub` 现在拥有 question / permission negotiation owner；`OpenCodeService` 只保留 host seam 与对外 façade。
+- `OpenCodeQueryGateway` 现在拥有 broad query/admin owner；不要把 provider/file/find/MCP auth 再拆成多个薄 wrapper，也不要把 `OpenCodeSdkFacade` 的 request option injection 逻辑复制进来。
 - `getPendingPermissions()` / `respondToPermission()` 当前仍跟随 `sdkCrud`，不是单独的 permission flag；`respondToSessionPermission()` 继续直接走 SDK permission responder。
 - `checkHealth()`、`getAvailableModels()`、`getProviderDirectory()` 和 `getResolvedModelConfig()` 都跟随 `sdkCrud`，而不是独立的 health/models flag。
 - `getAvailableModels()` 是运行时可用列表，也是最接近 OpenCode 主界面当前 provider 列表的数据源。

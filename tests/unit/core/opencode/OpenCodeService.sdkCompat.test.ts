@@ -127,6 +127,35 @@ describe('OpenCodeService SDK compatibility', () => {
         callback: jest.fn().mockResolvedValue({ success: true }),
       },
     },
+    project: {
+      list: jest.fn().mockResolvedValue([{ id: 'project-1' }]),
+      current: jest.fn().mockResolvedValue({ id: 'project-1' }),
+      initGit: jest.fn().mockResolvedValue({ success: true }),
+      update: jest.fn().mockResolvedValue({ id: 'project-1', name: 'Vault' }),
+    },
+    file: {
+      list: jest.fn().mockResolvedValue([{ path: 'README.md' }]),
+      read: jest.fn().mockResolvedValue({ path: 'README.md', content: '# docs' }),
+      status: jest.fn().mockResolvedValue({ modified: [] }),
+    },
+    find: {
+      text: jest.fn().mockResolvedValue([{ path: 'README.md' }]),
+      files: jest.fn().mockResolvedValue([{ path: 'src/main.ts' }]),
+      symbols: jest.fn().mockResolvedValue([{ name: 'OpenCodeService' }]),
+    },
+    path: {
+      get: jest.fn().mockResolvedValue({ cwd: '/vault' }),
+    },
+    vcs: {
+      get: jest.fn().mockResolvedValue({ branch: 'main' }),
+      diff: jest.fn().mockResolvedValue({ patch: 'diff --git' }),
+    },
+    formatter: {
+      status: jest.fn().mockResolvedValue({ prettier: 'ready' }),
+    },
+    lsp: {
+      status: jest.fn().mockResolvedValue({ tsserver: 'ready' }),
+    },
     permission: {
       list: jest.fn().mockResolvedValue([
         {
@@ -206,6 +235,27 @@ describe('OpenCodeService SDK compatibility', () => {
       url: 'https://example.com/provider-auth',
     });
     await expect(service.completeProviderOAuth('openai', 'code-2')).resolves.toEqual({ success: true });
+    await expect(service.listProjects()).resolves.toEqual([{ id: 'project-1' }]);
+    await expect(service.getCurrentProject()).resolves.toEqual({ id: 'project-1' });
+    await expect(service.initializeProjectGit()).resolves.toEqual({ success: true });
+    await expect(service.updateProject('project-1', { name: 'Vault' })).resolves.toEqual({
+      id: 'project-1',
+      name: 'Vault',
+    });
+    await expect(service.listFiles({ recursive: true })).resolves.toEqual([{ path: 'README.md' }]);
+    await expect(service.readFile({ path: 'README.md' })).resolves.toEqual({
+      path: 'README.md',
+      content: '# docs',
+    });
+    await expect(service.getFileStatus({ path: 'README.md' })).resolves.toEqual({ modified: [] });
+    await expect(service.findText({ query: 'docs' })).resolves.toEqual([{ path: 'README.md' }]);
+    await expect(service.findFiles({ query: 'main' })).resolves.toEqual([{ path: 'src/main.ts' }]);
+    await expect(service.findSymbols({ query: 'OpenCode' })).resolves.toEqual([{ name: 'OpenCodeService' }]);
+    await expect(service.getPaths()).resolves.toEqual({ cwd: '/vault' });
+    await expect(service.getVcsInfo({ cwd: '/vault' })).resolves.toEqual({ branch: 'main' });
+    await expect(service.getVcsDiff({ staged: true })).resolves.toEqual({ patch: 'diff --git' });
+    await expect(service.getFormatterStatus()).resolves.toEqual({ prettier: 'ready' });
+    await expect(service.getLspStatus()).resolves.toEqual({ tsserver: 'ready' });
     await expect(service.getPendingPermissions()).resolves.toEqual([
       {
         id: 'permission-1',

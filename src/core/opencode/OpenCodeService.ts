@@ -57,6 +57,9 @@ import {
   OpenCodeQuestionPermissionHub,
 } from './OpenCodeQuestionPermissionHub';
 import {
+  OpenCodeQueryGateway,
+} from './OpenCodeQueryGateway';
+import {
   OpenCodeStreamEventTransformer,
   type OpenCodeSSEEvent,
   type OpenCodeStreamEvent,
@@ -276,6 +279,7 @@ export class OpenCodeService {
   private sessionLifecycle: OpenCodeSessionLifecycleCoordinator;
   private sessionControl: OpenCodeSessionControlOrchestrator;
   private questionPermissionHub: OpenCodeQuestionPermissionHub;
+  private queryGateway: OpenCodeQueryGateway;
   private responseHandlers: ResponseHandler[] = [];
   private baseUrl: string;
   private sdkFeatureFlags: SdkFeatureFlags;
@@ -366,6 +370,19 @@ export class OpenCodeService {
 
         this.openCodeEventRuntime.stopSubscriptions();
       },
+    });
+    this.queryGateway = new OpenCodeQueryGateway({
+      getMcpSdk: () => this.sdk.mcp,
+      getProviderSdk: () => this.sdk.provider,
+      getProjectSdk: () => this.sdk.project,
+      getFileSdk: () => this.sdk.file,
+      getFindSdk: () => this.sdk.find,
+      getPathSdk: () => this.sdk.path,
+      getVcsSdk: () => this.sdk.vcs,
+      getFormatterSdk: () => this.sdk.formatter,
+      getLspSdk: () => this.sdk.lsp,
+      normalizeMcpServerStatusMap: (input) => this.catalogState.normalizeMcpServerStatusMap(input),
+      updateMcpServerStatus: (statusMap) => this.catalogState.updateMcpServerStatus(statusMap),
     });
     this.contextPartSerializer = new OpenCodeContextPartSerializer({
       isLocalServerMode: () => this.settings.server.mode === 'local',
@@ -2155,9 +2172,7 @@ export class OpenCodeService {
   }
 
   async refreshMcpServerStatus(): Promise<Record<string, McpServerStatus>> {
-    return this.catalogState.updateMcpServerStatus(
-      this.catalogState.normalizeMcpServerStatusMap(await this.sdk.mcp.status()),
-    );
+    return this.queryGateway.refreshMcpServerStatus();
   }
 
   getToolCatalogSnapshot(): ToolCatalogSnapshot {
@@ -2194,49 +2209,35 @@ export class OpenCodeService {
   }
 
   async getMcpStatus(): Promise<Record<string, McpServerStatus>> {
-    return this.refreshMcpServerStatus();
+    return this.queryGateway.refreshMcpServerStatus();
   }
 
   async addMcpServer(name: string, config: Record<string, unknown>): Promise<Record<string, McpServerStatus>> {
-    const response = await this.sdk.mcp.add({ name, config: config as never });
-    return this.catalogState.updateMcpServerStatus(this.catalogState.normalizeMcpServerStatusMap(response));
+    return this.queryGateway.addMcpServer(name, config);
   }
 
   async connectMcpServer(name: string): Promise<boolean> {
-    const response = await this.sdk.mcp.connect({ name });
-    await this.refreshMcpServerStatus();
-    return response === true;
+    return this.queryGateway.connectMcpServer(name);
   }
 
   async disconnectMcpServer(name: string): Promise<boolean> {
-    const response = await this.sdk.mcp.disconnect({ name });
-    await this.refreshMcpServerStatus();
-    return response === true;
+    return this.queryGateway.disconnectMcpServer(name);
   }
 
   async startMcpAuth(name: string): Promise<unknown> {
-    return this.sdk.mcp.auth.start({ name });
+    return this.queryGateway.startMcpAuth(name);
   }
 
   async completeMcpAuth(name: string, code: string): Promise<McpServerStatus> {
-    const response = await this.sdk.mcp.auth.callback({ name, code });
-    await this.refreshMcpServerStatus();
-    return this.catalogState.normalizeMcpServerStatusMap({ [name]: response })[name]
-      ?? { status: 'failed', error: 'Unknown MCP auth result' };
+    return this.queryGateway.completeMcpAuth(name, code);
   }
 
   async authenticateMcp(name: string): Promise<McpServerStatus> {
-    const response = await this.sdk.mcp.auth.authenticate({ name });
-    await this.refreshMcpServerStatus();
-    return this.catalogState.normalizeMcpServerStatusMap({ [name]: response })[name]
-      ?? { status: 'failed', error: 'Unknown MCP auth result' };
+    return this.queryGateway.authenticateMcp(name);
   }
 
   async removeMcpAuth(name: string): Promise<{ success: true }> {
-    const response = await this.sdk.mcp.auth.remove({ name });
-    return response && typeof response === 'object' && 'success' in (response as Record<string, unknown>)
-      ? (response as unknown as { success: true })
-      : { success: true };
+    return this.queryGateway.removeMcpAuth(name);
   }
 
   async initializeSession(sessionId: string, providerID: string, modelID: string, messageID: string): Promise<boolean> {
@@ -2290,75 +2291,75 @@ export class OpenCodeService {
   }
 
   async getProviderAuthMethods(): Promise<unknown> {
-    return this.sdk.provider.auth();
+    return this.queryGateway.getProviderAuthMethods();
   }
 
   async authorizeProviderOAuth(providerID: string): Promise<unknown> {
-    return this.sdk.provider.oauth.authorize({ providerID });
+    return this.queryGateway.authorizeProviderOAuth(providerID);
   }
 
   async completeProviderOAuth(providerID: string, code: string, method?: number): Promise<unknown> {
-    return this.sdk.provider.oauth.callback({ providerID, code, method });
+    return this.queryGateway.completeProviderOAuth(providerID, code, method);
   }
 
   async listProjects(): Promise<unknown> {
-    return this.sdk.project.list();
+    return this.queryGateway.listProjects();
   }
 
   async getCurrentProject(): Promise<unknown> {
-    return this.sdk.project.current();
+    return this.queryGateway.getCurrentProject();
   }
 
   async initializeProjectGit(): Promise<unknown> {
-    return this.sdk.project.initGit();
+    return this.queryGateway.initializeProjectGit();
   }
 
   async updateProject(projectID: string, input: Record<string, unknown>): Promise<unknown> {
-    return this.sdk.project.update({ projectID, ...input });
+    return this.queryGateway.updateProject(projectID, input);
   }
 
   async listFiles(input: Record<string, unknown> = {}): Promise<unknown> {
-    return this.sdk.file.list(input as never);
+    return this.queryGateway.listFiles(input);
   }
 
   async readFile(input: Record<string, unknown>): Promise<unknown> {
-    return this.sdk.file.read(input as never);
+    return this.queryGateway.readFile(input);
   }
 
   async getFileStatus(input: Record<string, unknown> = {}): Promise<unknown> {
-    return this.sdk.file.status(input as never);
+    return this.queryGateway.getFileStatus(input);
   }
 
   async findText(input: Record<string, unknown>): Promise<unknown> {
-    return this.sdk.find.text(input as never);
+    return this.queryGateway.findText(input);
   }
 
   async findFiles(input: Record<string, unknown>): Promise<unknown> {
-    return this.sdk.find.files(input as never);
+    return this.queryGateway.findFiles(input);
   }
 
   async findSymbols(input: Record<string, unknown>): Promise<unknown> {
-    return this.sdk.find.symbols(input as never);
+    return this.queryGateway.findSymbols(input);
   }
 
   async getPaths(): Promise<unknown> {
-    return this.sdk.path.get();
+    return this.queryGateway.getPaths();
   }
 
   async getVcsInfo(input: Record<string, unknown> = {}): Promise<unknown> {
-    return this.sdk.vcs.get(input as never);
+    return this.queryGateway.getVcsInfo(input);
   }
 
   async getVcsDiff(input: Record<string, unknown> = {}): Promise<unknown> {
-    return this.sdk.vcs.diff(input as never);
+    return this.queryGateway.getVcsDiff(input);
   }
 
   async getFormatterStatus(): Promise<unknown> {
-    return this.sdk.formatter.status();
+    return this.queryGateway.getFormatterStatus();
   }
 
   async getLspStatus(): Promise<unknown> {
-    return this.sdk.lsp.status();
+    return this.queryGateway.getLspStatus();
   }
 
   async respondToSessionPermission(

@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`。R32 完成后必须暂停复盘，不得自动扩展新队列。
-> **当前状态**: [CONFIRMED_NEXT_BATCH] R28-R32 已确认；当前可自动执行的 `[NEXT]` 是 `R31 - Conditional query gateway`。
+> **当前状态**: [CONFIRMED_NEXT_BATCH] R28-R32 已确认；当前可自动执行的 `[NEXT]` 是 `R32 - Gateway checkpoint`。
 
 ## 控制规则
 
@@ -671,7 +671,7 @@
   - 新 owner 满足粒度规则，并有 focused coverage。
   - 运行 targeted tests、全量 `npm test`、`npm run build`。
 
-### [NEXT] R31 - Conditional query gateway
+### [DONE] R31 - Conditional query gateway
 
 - **Lane**: OpenCodeService `broad query gateway`
 - **目标**: 仅在能够形成较厚 owner 的前提下，把 provider auth、project/file/find/path/VCS/formatter/LSP/MCP auth 这组广域 gateway 收束到单一 gateway owner。
@@ -687,7 +687,7 @@
   - 仅当形成较厚 owner 时才提交代码重构；否则在 phase 文档中明确说明跳过原因。
   - 运行 targeted tests（如有代码变更）、全量 `npm test`、`npm run build`。
 
-### [QUEUED] R32 - Gateway checkpoint
+### [NEXT] R32 - Gateway checkpoint
 
 - **Lane**: Checkpoint
 - **目标**: 暂停自动推进，复盘 R28-R31 对 `OpenCodeService` 剩余 session/config/query gateway 的影响，并决定是否还有继续重构的价值。

@@ -1,16 +1,16 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [CONFIRMED_NEXT_BATCH] R28-R32 已确认；当前 `[NEXT]` 是 R31 conditional query gateway。
+> **当前状态**: [CONFIRMED_NEXT_BATCH] R28-R32 已确认；当前 `[NEXT]` 是 R32 gateway checkpoint。
 
 ## 当前优先级
 
-- **R31**: conditional query gateway（provider/project/file/find/path/VCS/formatter/LSP/MCP auth；仅在能形成厚 owner 时执行）
 - **R32**: gateway checkpoint；跑完必须暂停
+- **R31**: conditional query gateway 已完成；provider/project/file/find/path/VCS/formatter/LSP/MCP auth 已收束到 broad query owner
 
 ## 当前热点首查入口
 
-- R31 首查 provider auth / project / file / find / path / VCS / formatter / LSP / MCP auth 区段；如果只能形成薄 wrapper，就在该轮说明并跳过到 R32
+- R32 首查 roadmap / master plan / lane map、R28-R31 phase 文档与 `src/core/opencode/OpenCodeService.ts` 指标；只做复盘，不开新代码重构
 - `OpenCodianView` / settings / trailing-assistant 链本批都只保留 regression watchpoints，不再开新切口
 - P2 regression-only 首查顺序固定为：
   1. `tests/unit/features/chat/QuestionDockCoordinator.test.ts`
