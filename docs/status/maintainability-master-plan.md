@@ -2,23 +2,23 @@
 
 > **状态**: [CONFIRMED_NEXT_BATCH]
 > **作用**: 这是 maintainability 无人值守的战略文档。每轮开始前，先读本文件，再读 `docs/status/maintainability-round-roadmap.md` 与最近的 `docs/status/maintainability-phase-XXX.md`。
-> **自动推进状态**: `W11 - Warning cleanup route checkpoint` 已完成；当前 `[NEXT]` 是 `W12 - StorageService theme background mime trim`，后续已排队 `W13-W15`。`W15` 完成后必须再次暂停并等待人工确认，不得自动恢复 `R33+` maintainability queue。
+> **自动推进状态**: `W12 - StorageService theme background mime trim` 已完成；当前 `[NEXT]` 是 `W13 - OpenCodeMessageNormalizationMapper complexity trim`，后续已排队 `W14-W15`。`W15` 完成后必须再次暂停并等待人工确认，不得自动恢复 `R33+` maintainability queue。
 
 ## 1. 当前判断
 
-**当前判断：R28-R32、L1-L5 与 W1-W11 均已完成，文档主入口已确认 `W10` 收益并锁定后续路线。仓库当前 lint 基线保持 `0 errors / 94 warnings`；`W6-W10` 已把 warning 基线从 `103` 收敛到 `94`，`W11` 则确认继续沿受控 warning cleanup 小批次推进。当前进入 `W12-W15`：依次处理 StorageService、OpenCodeMessageNormalizationMapper、BackgroundTaskTimelineService 三个边界清晰的现有 owner warning，最后在 `W15` checkpoint 后重新停住等待下一次人工确认。**
+**当前判断：R28-R32、L1-L5 与 W1-W12 均已完成，文档主入口已确认 `W12` 收益并继续锁定后续路线。仓库当前 lint 基线保持 `0 errors / 93 warnings`；`W6-W10` 已把 warning 基线从 `103` 收敛到 `94`，`W12` 再将其收敛到 `93`。当前继续沿 `W13-W15` 的受控 warning cleanup 小批次推进：依次处理 OpenCodeMessageNormalizationMapper、BackgroundTaskTimelineService 两个边界清晰的现有 owner warning，最后在 `W15` checkpoint 后重新停住等待下一次人工确认。**
 
 当前最重要的事实：
 
 - `OpenCodeService`、`OpenCodianView`、`OpenCodianSettings` 仍是长期 maintainability 热点，但是否继续 owner 收束仍需人工判断
 - 剩余 warnings 主要集中在大型 owner 与长测试文件的 `max-lines-per-function` / `max-lines` / `complexity` / `max-params`
 - 这意味着后续 autopilot 仍应优先做“受控小批次”，而不是自动切回大规模结构重构
-- `W11` 已确认不恢复 `R33+`；当前 `[NEXT]` 是 `W12 - StorageService theme background mime trim`
-- 后续只允许推进已排队的 `W12-W15`，完成后若无人追加 queue item，必须重新停回“当前没有可自动执行的 `[NEXT]`”
+- `W12` 已在 `StorageService` 现有 owner 内收掉 theme background MIME detection 的 complexity warning；当前 `[NEXT]` 是 `W13 - OpenCodeMessageNormalizationMapper complexity trim`
+- 后续只允许推进已排队的 `W13-W15`，完成后若无人追加 queue item，必须重新停回“当前没有可自动执行的 `[NEXT]`”
 
 ## 2. 当前基线
 
-- **Lint 基线**: `0 errors / 94 warnings`
+- **Lint 基线**: `0 errors / 93 warnings`
 - **当前热点**:
   - `src/features/chat/OpenCodianView.ts`
   - `src/features/settings/OpenCodianSettings.ts`
@@ -32,7 +32,7 @@
 
 ## 3. 当前批次结论（W6-W15）
 
-当前 warning-cleanup 主批次仍不恢复 `R33+`。`W6-W11` 已完成，且当前受控小批次为 `W12-W15`：
+当前 warning-cleanup 主批次仍不恢复 `R33+`。`W6-W12` 已完成，且当前受控小批次余下 `W13-W15`：
 
 1. **W6 `ModelConfigModal` render trim**：收掉 `renderEditor` / `renderModelCard` 的 3 条 warning，lint 基线 `103 -> 100`
 2. **W7 `main.ts` loadSettings trim**：收掉 `loadSettings` 的 2 条 warning，lint 基线 `100 -> 98`
@@ -40,7 +40,7 @@
 4. **W9 checkpoint**：确认 `W6-W8` 的 8-warning 收益；建议下一批继续受控 warning cleanup
 5. **W10 `ToolCallRenderer` summary complexity trim**：已通过同文件内 summary resolver dispatch 收掉 `defaultGetToolSummary` 的 `complexity` warning，lint 基线 `95 -> 94`，并保持 MCP summary、`custom` 工具行为与顶层输入字段规则不变
 6. **W11 route checkpoint**：已复盘 `W10` 的 warning 收益，并确认 `W12-W15` 继续沿受控 warning cleanup 小批次推进，不恢复 `R33+`
-7. **W12 `StorageService` theme background mime trim**：只处理 `detectThemeBackgroundMimeType` 的复杂度 warning，不混入 settings file 参数收束或 theme/background 大改
+7. **W12 `StorageService` theme background mime trim**：已在 `StorageService` 现有 owner 内通过 hint / SVG sniff / binary signature / extension fallback 的同文件私有 helper 收掉 `detectThemeBackgroundMimeType` 的 `complexity` warning，lint 基线 `94 -> 93`，同时保持 theme background MIME detection、持久化语义与 fallback 顺序不变
 8. **W13 `OpenCodeMessageNormalizationMapper` complexity trim**：只处理 `openCodeMessageToChatMessage` 的复杂度 warning，保持 OMO/message normalization 语义不变
 9. **W14 `BackgroundTaskTimelineService` collectSegments trim**：只处理 `collectSegments` 的复杂度 warning，保持 background-task timeline / hydration / suppression 语义不变
 10. **W15 checkpoint**：复盘 `W12-W14` 的 warning 收益，并在完成后再次停回人工确认态

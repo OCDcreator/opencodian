@@ -559,12 +559,25 @@ export class StorageService {
     hintedMimeType?: string,
     sourceHint?: string,
   ): string {
+    const bytes = new Uint8Array(data);
+    return (
+      this.normalizeThemeBackgroundMimeHint(hintedMimeType)
+      ?? this.detectSvgThemeBackgroundMimeType(bytes, sourceHint)
+      ?? this.detectBinaryThemeBackgroundMimeType(bytes)
+      ?? this.detectThemeBackgroundMimeTypeFromExtension(sourceHint)
+      ?? this.throwUnsupportedThemeBackgroundMimeType()
+    );
+  }
+
+  private normalizeThemeBackgroundMimeHint(hintedMimeType?: string): string | null {
     const normalizedHint = hintedMimeType?.split(';')[0]?.trim().toLowerCase();
     if (normalizedHint && Object.prototype.hasOwnProperty.call(THEME_BACKGROUND_MIME_TO_EXTENSION, normalizedHint)) {
       return normalizedHint;
     }
+    return null;
+  }
 
-    const bytes = new Uint8Array(data);
+  private detectSvgThemeBackgroundMimeType(bytes: Uint8Array, sourceHint?: string): string | null {
     const textPrefix = Buffer.from(bytes.slice(0, Math.min(bytes.length, 2048)))
       .toString('utf-8')
       .replace(/^\uFEFF/, '')
@@ -572,12 +585,15 @@ export class StorageService {
     if (/<svg[\s>]/i.test(textPrefix) || (/^<\?xml/i.test(textPrefix) && /\.svg$/i.test(sourceHint ?? ''))) {
       return 'image/svg+xml';
     }
+    return null;
+  }
 
-    if (bytes.length >= 4 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) {
+  private detectBinaryThemeBackgroundMimeType(bytes: Uint8Array): string | null {
+    if (this.matchesThemeBackgroundSignature(bytes, [0x89, 0x50, 0x4e, 0x47])) {
       return 'image/png';
     }
 
-    if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
+    if (this.matchesThemeBackgroundSignature(bytes, [0xff, 0xd8, 0xff])) {
       return 'image/jpeg';
     }
 
@@ -596,6 +612,14 @@ export class StorageService {
       }
     }
 
+    return null;
+  }
+
+  private matchesThemeBackgroundSignature(bytes: Uint8Array, signature: number[]): boolean {
+    return signature.every((value, index) => bytes.length > index && bytes[index] === value);
+  }
+
+  private detectThemeBackgroundMimeTypeFromExtension(sourceHint?: string): string | null {
     const extension = path.extname(sourceHint ?? '').toLowerCase();
     switch (extension) {
       case '.svg':
@@ -610,7 +634,11 @@ export class StorageService {
       case '.gif':
         return 'image/gif';
       default:
-        throw new Error('Only SVG, PNG, JPEG, WEBP, and GIF background images are supported.');
+        return null;
     }
+  }
+
+  private throwUnsupportedThemeBackgroundMimeType(): never {
+    throw new Error('Only SVG, PNG, JPEG, WEBP, and GIF background images are supported.');
   }
 }
