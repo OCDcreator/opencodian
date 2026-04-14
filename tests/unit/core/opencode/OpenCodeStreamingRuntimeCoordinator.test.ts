@@ -1,10 +1,10 @@
 import { TextDecoder } from 'util';
 
+import { OpenCodeStreamEventTransformer } from '../../../../src/core/opencode/OpenCodeStreamEventTransformer';
 import {
   OpenCodeStreamingRuntimeCoordinator,
   type OpenCodeStreamingRuntimeCoordinatorHost,
 } from '../../../../src/core/opencode/OpenCodeStreamingRuntimeCoordinator';
-import { OpenCodeStreamEventTransformer } from '../../../../src/core/opencode/OpenCodeStreamEventTransformer';
 
 const originalFetch = global.fetch;
 

@@ -1,9 +1,9 @@
+import type { OpenCodeService } from '../../../core/opencode';
 import type {
   ChatMessage,
   ContentBlock,
   Conversation,
 } from '../../../core/types';
-import type { OpenCodeService } from '../../../core/opencode';
 import { createLogger } from '../../../shared';
 import type { TabId } from '../tabs';
 

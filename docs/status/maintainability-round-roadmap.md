@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的 `[NEXT]`”。
-> **当前状态**: [READY] 已人工补入新的 `R46-R50` queue；恢复无人值守时必须从新的 `R46` 顺序推进。
+> **当前状态**: [READY] `R46` lint unblocker 已完成；当前顺序推进到 `R47-R50` queue。
 
 ## 控制规则
 
@@ -16,13 +16,13 @@
 ## 当前背景
 
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
-- 最近成功 phase：`docs/status/maintainability-phase-380.md`
-- 当前 live lint 基线：`5 errors / 90 warnings`
-- 当前路线判断：上一条 queue 已在 `R45` 结束；`R46` checkpoint 连续重试后没有留下新提交，因此恢复无人值守前先补入新的顺序 queue
+- 最近成功 phase：`docs/status/maintainability-phase-381.md`
+- 当前 live lint 基线：`0 errors / 90 warnings`
+- 当前路线判断：`R46` 已完成最小 lint unblocker；无人值守 queue 继续回到 `OpenCodeService` settings reconfiguration 厚切口
 
 ## Queue
 
-### [NEXT] R46 - Lint blocker housekeeping after R43-R45
+### [DONE] R46 - Lint blocker housekeeping after R43-R45
 
 - **Lane**: Lint housekeeping / unblocker
 - **目标**: 只吸收当前 live lint error，恢复 lint error 为零，解除无人值守 queue 的继续执行阻塞；本轮不做新的 owner seam。
@@ -42,7 +42,7 @@
   - `npm run lint` 至少恢复到 `0 errors / 90 warnings`
   - focused validation、全量 `npm test`、`npm run build` 通过
 
-### [QUEUED] R47 - OpenCodeService settings reconfiguration seam
+### [NEXT] R47 - OpenCodeService settings reconfiguration seam
 
 - **Lane**: Maintainability / opencode settings reconfiguration
 - **目标**: 从 `src/core/opencode/OpenCodeService.ts:1231` 一带收束 `updateSettings()`、settings update plan、managed server restart/stop 决策、subscription pause/resume 与 rollback/restore lifecycle，优先形成单一厚 owner。

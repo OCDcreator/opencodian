@@ -174,10 +174,6 @@ import {
   type ChatServerAvailability,
 } from './services/ChatHeaderPresenter';
 import {
-  ConversationHistoryActionsCoordinator,
-  type ConversationHistoryActionsHost,
-} from './services/ConversationHistoryActionsCoordinator';
-import {
   ChatSelectionControlsCoordinator,
   type ChatSelectionControlsCoordinatorHost,
 } from './services/ChatSelectionControlsCoordinator';
@@ -193,6 +189,14 @@ import {
 } from './services/ComposerInputShellCoordinator';
 import { ContextUsageService } from './services/ContextUsageService';
 import {
+  ConversationAuthoritativeSyncCoordinator,
+  type ConversationAuthoritativeSyncHost,
+} from './services/ConversationAuthoritativeSyncCoordinator';
+import {
+  ConversationHistoryActionsCoordinator,
+  type ConversationHistoryActionsHost,
+} from './services/ConversationHistoryActionsCoordinator';
+import {
   type ConversationHydrationRuntimeHostProviderHost,
   createConversationHydrationRuntimeViewHostFactoryHost,
 } from './services/ConversationHydrationRuntimeHostProvider';
@@ -206,10 +210,6 @@ import {
   getIncrementalRenderedMessageUpdate as getConversationIncrementalRenderedMessageUpdate,
   type IncrementalRenderedMessageUpdate,
 } from './services/ConversationRenderService';
-import {
-  ConversationAuthoritativeSyncCoordinator,
-  type ConversationAuthoritativeSyncHost,
-} from './services/ConversationAuthoritativeSyncCoordinator';
 import {
   ConversationRestoreBootstrapCoordinator,
   type ConversationRestoreBootstrapHost,

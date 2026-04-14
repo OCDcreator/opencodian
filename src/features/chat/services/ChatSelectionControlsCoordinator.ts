@@ -20,7 +20,6 @@ import {
 import { renderModelList as renderModelSelectorList } from '../ui/modelSelector/ModelSelectorRenderer';
 import type {
   ModelSelectorAvailableModelInfo,
-  ModelSelectorDisplayResolution,
   ModelSelectorKnownModelInfo,
   ModelSelectorProvider,
   ModelSelectorSelection,
