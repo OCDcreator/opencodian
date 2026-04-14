@@ -257,6 +257,34 @@ describe('ProviderIconService', () => {
     expect(state.providers[0].entries[1].iconUrl).toContain('/deepseek.svg');
   });
 
+  it('uses custom preview fallback during cache inspection without refetching', async () => {
+    const adapter = createMockAdapter();
+    const app = createMockApp(adapter);
+    const { requestUrl } = jest.requireMock('obsidian') as { requestUrl: jest.Mock };
+    const { ProviderIconService } = await import('../../../../src/utils/icons/ProviderIconService');
+
+    const state = await ProviderIconService.getProviderCacheState(app as never, ['proxy-provider'], {
+      'proxy-provider': [
+        {
+          id: 'custom-1',
+          type: 'url',
+          source: 'https://example.com/proxy.svg',
+          mimeType: 'image/svg+xml',
+          addedAt: 1,
+        },
+      ],
+    });
+
+    expect(requestUrl).not.toHaveBeenCalled();
+    expect(adapter.writeBinary).not.toHaveBeenCalled();
+    expect(state.providers[0].entries[0]).toMatchObject({
+      cachePath: null,
+      cached: false,
+      iconUrl: 'https://example.com/proxy.svg',
+      resolvedFormat: 'svg',
+    });
+  });
+
   it('accepts builtin provider icon entries during normalization', () => {
     const normalized = normalizeProviderIconLibrary({
       requesty: [
