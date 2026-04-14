@@ -1,11 +1,10 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [CONFIRMED_NEXT_BATCH] R28-R32 已确认；当前 `[NEXT]` 是 R28 session lifecycle coordinator。
+> **当前状态**: [CONFIRMED_NEXT_BATCH] R28-R32 已确认；当前 `[NEXT]` 是 R29 session control and messaging orchestrator。
 
 ## 当前优先级
 
-- **R28**: session lifecycle coordinator（create/list/messages/todos/statuses/delete/update/current-session/subscriptions）
 - **R29**: session control and messaging orchestrator（fork/revert/diff/context usage/message commands/message parts）
 - **R30**: question and permission hub（pending/reply/reject/respond/session permission）
 - **R31**: conditional query gateway（provider/project/file/find/path/VCS/formatter/LSP/MCP auth；仅在能形成厚 owner 时执行）

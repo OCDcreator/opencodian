@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`。R32 完成后必须暂停复盘，不得自动扩展新队列。
-> **当前状态**: [CONFIRMED_NEXT_BATCH] R28-R32 已确认；当前可自动执行的 `[NEXT]` 是 `R28 - Session lifecycle coordinator`。
+> **当前状态**: [CONFIRMED_NEXT_BATCH] R28-R32 已确认；当前可自动执行的 `[NEXT]` 是 `R29 - Session control and messaging orchestrator`。
 
 ## 控制规则
 
@@ -617,7 +617,7 @@
 
 本批由人工确认：继续收束 `OpenCodeService`，但范围仅限于仍然成块存在、可形成较厚 owner 的 session lifecycle、session control、question/permission 与条件性的 query gateway。`OpenCodeService` 继续保持对外总门面；如果某个候选只会生成薄 wrapper/facade，必须跳过而不是硬拆。
 
-### [NEXT] R28 - Session lifecycle coordinator
+### [DONE] R28 - Session lifecycle coordinator
 
 - **Lane**: OpenCodeService `session lifecycle`
 - **目标**: 把 session create/list/messages/todos/statuses/delete/update/current-session tracking/subscriptions 的共用逻辑从 `OpenCodeService` 收束到一个较厚 coordinator。
@@ -636,7 +636,7 @@
   - 新 owner 满足粒度规则，并有 focused coverage。
   - 运行 targeted tests、全量 `npm test`、`npm run build`。
 
-### [QUEUED] R29 - Session control and messaging orchestrator
+### [NEXT] R29 - Session control and messaging orchestrator
 
 - **Lane**: OpenCodeService `session control / message operations`
 - **目标**: 把 fork/revert/unrevert/diff/context usage、message commands、shell / message-part operations 收束到一个较厚 orchestrator。

@@ -44,6 +44,12 @@ import {
   OpenCodePromptRequestBuilder,
 } from './OpenCodePromptRequestBuilder';
 import {
+  OpenCodeSessionLifecycleCoordinator,
+  type Message,
+  type Part,
+  type Session,
+} from './OpenCodeSessionLifecycleCoordinator';
+import {
   OpenCodeStreamEventTransformer,
   type OpenCodeSSEEvent,
   type OpenCodeStreamEvent,
@@ -102,61 +108,6 @@ interface OpenCodeServiceRuntimeOptions {
   initialManagedServerState?: ManagedServerState | null;
   onManagedServerStateChange?: (state: ManagedServerState | null) => void;
   sdkFeatureFlags?: Partial<SdkFeatureFlags>;
-}
-
-/** Session data structure */
-interface Session {
-  id: string;
-  title: string;
-  revert?: {
-    messageID: string;
-    partID?: string;
-  } | null;
-  time: {
-    created: number;
-    updated: number;
-  };
-}
-
-/** Message data structure */
-interface Message {
-  id: string;
-  sessionID: string;
-  role: 'user' | 'assistant';
-  providerID?: string;
-  modelID?: string;
-  structured?: unknown;
-  error?: unknown;
-  cost?: number;
-  tokens?: {
-    total?: number;
-    input: number;
-    output: number;
-    reasoning: number;
-    cache: {
-      read: number;
-      write: number;
-    };
-  };
-  time: {
-    created: number;
-    updated?: number;
-  };
-}
-
-/** Part data structure */
-interface Part {
-  id: string;
-  sessionID: string;
-  messageID: string;
-  type: string;
-  text?: string;
-  duration?: number;
-  time?: {
-    start?: number;
-    end?: number;
-  };
-  [key: string]: unknown;
 }
 
 interface ToolStateData {
@@ -333,7 +284,7 @@ export class OpenCodeService {
   private settings: OpenCodianSettings;
   private events: OpenCodeServiceEvents;
   private serverManager: ServerManager;
-  private currentSessionId: string | null = null;
+  private sessionLifecycle: OpenCodeSessionLifecycleCoordinator;
   private responseHandlers: ResponseHandler[] = [];
   private baseUrl: string;
   private sdkFeatureFlags: SdkFeatureFlags;
@@ -375,6 +326,22 @@ export class OpenCodeService {
       checkHealth: () => this.checkHealth(),
       delay: (ms, signal) => this.delay(ms, signal),
     });
+    this.sessionLifecycle = new OpenCodeSessionLifecycleCoordinator({
+      shouldUseSdkCrud: () => this.shouldUseSdk('sdkCrud'),
+      getSdkSession: () => this.sdk.session,
+      postLegacy: (path, body) => this.post(path, body),
+      getLegacy: (path) => this.get(path),
+      patchLegacy: (path, body) => this.patch(path, body),
+      deleteLegacy: (path) => this.delete(path),
+      normalizeSessionId: (response) => this.normalizeSessionId(response),
+      normalizeSessionMessages: (response) => this.normalizeSessionMessages(response),
+      normalizeSessionTodos: (response) => this.normalizeSessionTodos(response),
+      normalizeSessionStatuses: (response) => this.normalizeSessionStatuses(response),
+      applySessionRevertState: (sessionId, messages) => this.applySessionRevertState(sessionId, messages),
+      observeToolNamesInMessages: (messages) => this.observeToolNamesInMessages(messages),
+      logServiceWarning: (key, message, error) => this.logServiceWarning(key, message, error),
+      logServiceError: (key, message, error) => this.logServiceError(key, message, error),
+    }, this.syncEventRuntime);
     this.catalogState = new OpenCodeCatalogStateStore({
       syncOpenCodeEventSubscriptions: () => {
         if (this.openCodeEventRuntime.hasListeners()) {
@@ -726,205 +693,73 @@ export class OpenCodeService {
 
   /** Create a new session - returns Session object with id property */
   async createSession(title?: string, options: { setCurrent?: boolean } = {}): Promise<string> {
-    if (this.shouldUseSdk('sdkCrud')) {
-      const response = await this.getSdkClient().session.create({
-        title: title ?? 'New Conversation',
-      });
-      const sessionId = this.normalizeSessionId(response);
-
-      if (options.setCurrent ?? true) {
-        this.currentSessionId = sessionId;
-      }
-      return sessionId;
-    }
-
-    
-    const response = await this.post<unknown>('/session', {
-      title: title ?? 'New Conversation',
-    });
-    
-
-    
-    // Handle different response formats
-    let sessionId: string;
-    if (typeof response === 'object' && response !== null) {
-      sessionId = (response as { id: string }).id;
-    } else {
-      throw new Error('Invalid session response: ' + JSON.stringify(response));
-    }
-    
-
-    if (options.setCurrent ?? true) {
-      this.currentSessionId = sessionId;
-    }
-    return sessionId;
+    return this.sessionLifecycle.createSession(title, options);
   }
 
   /** Set current session */
   setSessionId(sessionId: string): void {
-    this.currentSessionId = sessionId;
+    this.sessionLifecycle.setSessionId(sessionId);
   }
 
   /** Get current session ID */
   getSessionId(): string | null {
-    return this.currentSessionId;
+    return this.sessionLifecycle.getSessionId();
   }
 
   /** Cancel the current streaming response */
   cancelStream(sessionId?: string): void {
-    this.streamingRuntime.cancelStream(sessionId ?? this.currentSessionId);
+    this.streamingRuntime.cancelStream(sessionId ?? this.sessionLifecycle.getSessionId());
   }
 
   /** Stop watching the current stream locally without aborting the server-side session */
   detachStream(sessionId?: string): void {
-    this.streamingRuntime.detachStream(sessionId ?? this.currentSessionId);
+    this.streamingRuntime.detachStream(sessionId ?? this.sessionLifecycle.getSessionId());
   }
 
   /** List all sessions */
   async listSessions(): Promise<Session[]> {
-    if (this.shouldUseSdk('sdkCrud')) {
-      try {
-        const response = await this.getSdkClient().session.list();
-        return Array.isArray(response) ? response as Session[] : [];
-      } catch (error) {
-        this.logServiceWarning('session.list', 'SDK session.list failed, falling back to legacy HTTP', error);
-      }
-    }
-
-    try {
-      return await this.get<Session[]>('/session');
-    } catch {
-      return [];
-    }
+    return this.sessionLifecycle.listSessions();
   }
 
   /** Get session messages - OpenCode API returns {info: Message, parts: Part[]}[] */
   async getSessionMessages(sessionId: string): Promise<{ info: Message; parts: Part[] }[]> {
-    if (!sessionId) {
-      logger.warn('getSessionMessages called with empty sessionId');
-      return [];
-    }
-
-    if (this.shouldUseSdk('sdkCrud')) {
-      try {
-        const response = await this.getSdkClient().session.messages({ sessionID: sessionId });
-        const messages = await this.applySessionRevertState(
-          sessionId,
-          this.normalizeSessionMessages(response),
-        );
-        this.observeToolNamesInMessages(messages);
-        return messages;
-      } catch (error) {
-        this.logServiceWarning('session.messages', `SDK session.messages failed for ${sessionId}, falling back to legacy HTTP`, error);
-      }
-    }
-
-    
-    try {
-      // Note: The correct endpoint is /session/:id/message (singular, not plural)
-      const path = `/session/${sessionId}/message`;
-
-      
-      const response = await this.get<unknown>(path);
-
-      const messages = await this.applySessionRevertState(
-        sessionId,
-        Array.isArray(response) ? response : [],
-      );
-      this.observeToolNamesInMessages(messages);
-      return messages;
-    } catch (error) {
-      this.logServiceError('session.messages', `Failed to get messages for session ${sessionId}:`, error);
-      // Return empty array instead of throwing to prevent UI crash
-      return [];
-    }
+    return this.sessionLifecycle.getSessionMessages(sessionId);
   }
 
   async getSessionTodos(sessionId: string): Promise<SessionTodo[]> {
-    if (!sessionId) {
-      logger.warn('getSessionTodos called with empty sessionId');
-      return [];
-    }
-
-    if (this.shouldUseSdk('sdkCrud')) {
-      try {
-        const response = await this.getSdkClient().session.todo({ sessionID: sessionId });
-        return this.normalizeSessionTodos(response);
-      } catch (error) {
-        this.logServiceWarning('session.todo', `SDK session.todo failed for ${sessionId}, falling back to legacy HTTP`, error);
-      }
-    }
-
-    try {
-      const response = await this.get<unknown>(`/session/${sessionId}/todo`);
-      return this.normalizeSessionTodos(response);
-    } catch (error) {
-      this.logServiceError('session.todo', `Failed to get todos for session ${sessionId}:`, error);
-      return [];
-    }
+    return this.sessionLifecycle.getSessionTodos(sessionId);
   }
 
   async getSessionStatuses(): Promise<Record<string, SessionActivityStatus>> {
-    if (this.shouldUseSdk('sdkCrud')) {
-      try {
-        const response = await this.getSdkClient().session.status();
-        return this.normalizeSessionStatuses(response);
-      } catch (error) {
-        this.logServiceWarning('session.status', 'SDK session.status failed, falling back to legacy HTTP', error);
-      }
-    }
-
-    try {
-      const response = await this.get<unknown>('/session/status');
-      return this.normalizeSessionStatuses(response);
-    } catch (error) {
-      this.logServiceError('session.status', 'Failed to get session statuses:', error);
-      return {};
-    }
+    return this.sessionLifecycle.getSessionStatuses();
   }
 
   subscribeToSessionTodoUpdates(
     listener: (update: SessionTodoUpdate) => void,
   ): () => void {
-    return this.syncEventRuntime.subscribeToSessionTodoUpdates(listener);
+    return this.sessionLifecycle.subscribeToSessionTodoUpdates(listener);
   }
 
   subscribeToSessionStatusUpdates(
     listener: (update: SessionStatusUpdate) => void,
   ): () => void {
-    return this.syncEventRuntime.subscribeToSessionStatusUpdates(listener);
+    return this.sessionLifecycle.subscribeToSessionStatusUpdates(listener);
   }
 
   subscribeToSessionSyncEvents(
     listener: (update: SessionSyncEventUpdate) => void,
   ): () => void {
-    return this.syncEventRuntime.subscribeToSessionSyncEvents(listener);
+    return this.sessionLifecycle.subscribeToSessionSyncEvents(listener);
   }
 
   /** Delete a session */
   async deleteSession(sessionId: string): Promise<void> {
-    if (this.shouldUseSdk('sdkCrud')) {
-      await this.getSdkClient().session.delete({ sessionID: sessionId });
-    } else {
-      await this.delete(`/session/${sessionId}`);
-    }
-
-    if (this.currentSessionId === sessionId) {
-      this.currentSessionId = null;
-    }
+    return this.sessionLifecycle.deleteSession(sessionId);
   }
 
   /** Update a session title */
   async updateSessionTitle(sessionId: string, title: string): Promise<void> {
-    if (this.shouldUseSdk('sdkCrud')) {
-      await this.getSdkClient().session.update({
-        sessionID: sessionId,
-        title,
-      });
-      return;
-    }
-
-    await this.patch<Session>(`/session/${sessionId}`, { title });
+    return this.sessionLifecycle.updateSessionTitle(sessionId, title);
   }
 
   /** Send a message and wait for the full assistant response */
@@ -932,7 +767,7 @@ export class OpenCodeService {
     message: string,
     options: QueryOptions & { sessionId?: string; system?: string },
   ): Promise<ChatMessage | null> {
-    const sessionId = options.sessionId ?? this.currentSessionId;
+    const sessionId = options.sessionId ?? this.sessionLifecycle.getSessionId();
     if (!sessionId) {
       throw new Error('No active session');
     }
@@ -1033,7 +868,7 @@ export class OpenCodeService {
 
   /** Send a message and get streaming response using SSE */
   async *sendMessage(message: string, options: QueryOptions = {}): AsyncGenerator<StreamChunk> {
-    const sessionId = options.sessionId ?? this.currentSessionId;
+    const sessionId = options.sessionId ?? this.sessionLifecycle.getSessionId();
     if (!sessionId) {
       yield { type: 'error', content: 'No active session' };
       return;

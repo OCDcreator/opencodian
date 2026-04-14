@@ -31,6 +31,7 @@
 - `./OpenCodeEventSubscriptionCoordinator`
 - `./OpenCodeMessageNormalizationMapper`
 - `./OpenCodePromptRequestBuilder`
+- `./OpenCodeSessionLifecycleCoordinator`
 - `./OpenCodeStreamingRuntimeCoordinator`
 - `./OpenCodeStreamEventTransformer`
 - `./OpenCodeSyncEventRuntimeCoordinator`
@@ -60,6 +61,7 @@
 - `promptRequestBuilder`: `OpenCodePromptRequestBuilder` 实例，负责 SDK prompt parameters、legacy request body 与 shared prompt options/variant/output-format/model defaults 的组装。
 - `streamEventTransformer`: `OpenCodeStreamEventTransformer` 实例，负责 SDK / legacy stream event → `StreamChunk` 的转换、tool/question/file/permission 事件映射，以及 SSE parser。
 - `streamingRuntime`: `OpenCodeStreamingRuntimeCoordinator` 实例，负责 active stream registry、session-scoped abort controller、part type tracking 与 cancel/detach lifecycle。
+- `sessionLifecycle`: `OpenCodeSessionLifecycleCoordinator` 实例，负责 session create/list/messages/todos/statuses/delete/update、默认 current session 指针，以及公开 session sync 订阅 API 到 `syncEventRuntime` 的委托。
 - `openCodeEventRuntime`: `OpenCodeEventSubscriptionCoordinator` 实例，负责 open-code event listener registry、`event` / `global` 订阅生命周期，以及 catalog-relevant payload 到 `catalogState` 的刷新/广播触发。
 - `vaultPath`: 用于 SDK `directory` 注入、上下文文件绝对路径解析，以及 `ServerManager` 工作目录设置；OpenCode directory scope 和 context file path 的跨平台规范化委托给 `shared/contextPath`。
 
@@ -102,7 +104,7 @@
 
 ### 会话 CRUD 与回退态过滤
 
-会话读写接口几乎都支持 SDK / legacy 双路径：
+`OpenCodeService` 的 session lifecycle 公开接口现在由 `OpenCodeSessionLifecycleCoordinator` 承担主要 owner；服务层保留 host seam、transport helper、normalizer 与 revert/tool-observation 依赖，并继续作为对外 façade。被 coordinator 收束的公开接口包括：
 
 - `createSession()`
 - `listSessions()`
@@ -117,12 +119,12 @@
 - `getSessionRevertState()`
 - `getSessionDiff()`
 
-其中 `getSessionMessages()` 有两个实现细节需要注意：
+其中 `getSessionMessages()` 的共享细节仍然由 `OpenCodeService` 通过 host seam 提供给 coordinator：
 
 - legacy 路径使用的是 `/session/:id/message`，不是 `messages`。
 - 无论 SDK 还是 legacy，读到消息后都会调用 `applySessionRevertState()`，按 session 的 `revert.messageID` / `revert.partID` 过滤被回滚掉的消息或消息尾部 parts。
 
-`currentSessionId` 是默认会话指针；调用方如果不显式传 `options.sessionId`，多数接口会落回它。
+默认会话指针现在由 `sessionLifecycle` 持有；调用方如果不显式传 `options.sessionId`，多数接口仍会落回当前 session，只是状态所有权不再直接留在 `OpenCodeService` 主类里。
 
 ### Prompt 组装与 SDK/legacy 分流
 
