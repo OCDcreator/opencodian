@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的 `[NEXT]`”。
-> **当前状态**: [READY] `R44` 已完成；当前首个可执行项为 `R45`。
+> **当前状态**: [READY] `R45` 已完成；当前首个可执行项为 `R46`。
 
 ## 控制规则
 
@@ -18,7 +18,7 @@
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
 - 最近 checkpoint：`docs/status/maintainability-phase-376.md`
 - 当前 lint 基线：`0 errors / 86 warnings`
-- 当前路线判断：`R44` 已完成 model catalog / selection seam；下一步继续从 `R45` 顺序推进
+- 当前路线判断：`R45` 已完成 streaming transport seam；下一步顺序进入 `R46` checkpoint
 
 ## Queue
 
@@ -75,7 +75,7 @@
   - `OpenCodianView` 对 model catalog/selection resolution 的直接持有明显减少
   - focused validation、全量 `npm test`、`npm run build` 通过
 
-### [NEXT] R45 - OpenCodeService streaming transport seam
+### [DONE] R45 - OpenCodeService streaming transport seam
 
 - **Lane**: Maintainability / opencode streaming transport
 - **目标**: 从 `src/core/opencode/OpenCodeService.ts:1283` 一带收束 SDK stream、legacy SSE fallback、reader lifecycle 与 final response completion，优先形成完整 transport owner seam。
@@ -94,7 +94,7 @@
   - `OpenCodeService` 不再直接铺开整段 streaming transport/fallback/read/finalize 细节
   - focused validation、全量 `npm test`、`npm run build` 通过
 
-### [QUEUED] R46 - Maintainability checkpoint
+### [NEXT] R46 - Maintainability checkpoint
 
 - **Lane**: Checkpoint
 - **目标**: 复盘 `R42-R45` 的 owner 收益、lint 变化与验证成本，判断下一批优先继续 `OpenCodeService` settings reconfiguration seam，还是回切 residual settings/model UI seam。

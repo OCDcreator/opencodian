@@ -62,13 +62,9 @@ import {
   type Session,
 } from './OpenCodeSessionLifecycleCoordinator';
 import {
-  type OpenCodeSSEEvent,
-  type OpenCodeStreamEvent,
-  type OpenCodeStreamEventState,
   OpenCodeStreamEventTransformer,
 } from './OpenCodeStreamEventTransformer';
 import {
-  OpenCodeStreamingRuntimeContext,
   OpenCodeStreamingRuntimeCoordinator,
 } from './OpenCodeStreamingRuntimeCoordinator';
 import {
@@ -119,18 +115,6 @@ interface OpenCodeServiceRuntimeOptions {
   initialManagedServerState?: ManagedServerState | null;
   onManagedServerStateChange?: (state: ManagedServerState | null) => void;
   sdkFeatureFlags?: Partial<SdkFeatureFlags>;
-}
-
-interface OpenCodeSseReadState {
-  aborted: boolean;
-  buffer: string;
-}
-
-interface OpenCodeSseStreamContext {
-  reader: ReadableStreamDefaultReader<Uint8Array>;
-  decoder: TextDecoder;
-  signal?: AbortSignal;
-  state: OpenCodeSseReadState;
 }
 
 interface OpenCodeSettingsUpdatePlan {
@@ -191,43 +175,6 @@ function logAssistantFinalizationDebug(label: string, payload: unknown): void {
   logger.debug(`Assistant stream finalization [${label}]: ${stringifyDebugPayload(payload)}`);
 }
 
-function summarizeAssistantParts(parts: Part[]): {
-  totalParts: number;
-  textPartCount: number;
-  textLength: number;
-  toolPartCount: number;
-  reasoningPartCount: number;
-  filePartCount: number;
-} {
-  let textPartCount = 0;
-  let textLength = 0;
-  let toolPartCount = 0;
-  let reasoningPartCount = 0;
-  let filePartCount = 0;
-
-  for (const part of parts) {
-    if (part.type === 'text' && typeof part.text === 'string') {
-      textPartCount += 1;
-      textLength += part.text.length;
-    } else if (part.type === 'tool') {
-      toolPartCount += 1;
-    } else if (part.type === 'reasoning' || part.type === 'thinking') {
-      reasoningPartCount += 1;
-    } else if (part.type === 'file') {
-      filePartCount += 1;
-    }
-  }
-
-  return {
-    totalParts: parts.length,
-    textPartCount,
-    textLength,
-    toolPartCount,
-    reasoningPartCount,
-    filePartCount,
-  };
-}
-
 interface AssistantMessageResponse {
   info: Message;
   parts: Part[];
@@ -278,8 +225,6 @@ function extractStructuredErrorMessage(errorLike: unknown): string | null {
 
   return `${baseMessage} (HTTP ${statusCode})`;
 }
-
-type StreamingState = OpenCodeStreamEventState;
 
 type SessionTodoUpdate = {
   sessionId: string;
@@ -451,6 +396,18 @@ export class OpenCodeService {
     });
     this.streamingRuntime = new OpenCodeStreamingRuntimeCoordinator({
       abortSessionOnServer: (sessionId) => this.abortSessionOnServer(sessionId),
+      getLegacyEventStreamRequest: () => {
+        this.ensureBaseUrl();
+        return {
+          url: `${this.baseUrl}/event`,
+          headers: this.getRequestHeaders({
+            'Accept': 'text/event-stream',
+          }),
+        };
+      },
+      getSessionMessages: (sessionId) => this.getSessionMessages(sessionId),
+      logServiceWarning: (key, message, error) => this.logServiceWarning(key, message, error),
+      streamEventTransformer: this.streamEventTransformer,
     });
     this.openCodeEventRuntime = new OpenCodeEventSubscriptionCoordinator({
       subscribeToEvents: async (source, signal) => {
@@ -947,30 +904,32 @@ export class OpenCodeService {
       return;
     }
 
+    const parts = this.contextPartSerializer.buildPromptRequestParts(message, options);
+
     if (this.shouldUseSdk('sdkStream')) {
-      yield* this.sendMessageWithSdk(message, options, sessionId);
+      const client = this.getSdkClient();
+      yield* this.streamingRuntime.streamSdkResponse({
+        sessionId,
+        startPrompt: async () => {
+          await client.session.promptAsync(
+            this.promptRequestBuilder.buildSdkPromptParameters(sessionId, parts, options),
+          );
+        },
+        subscribe: async (signal) => {
+          const subscription = await client.event.subscribe(undefined, { signal });
+          return subscription.stream as AsyncIterable<SdkEvent>;
+        },
+      });
       return;
     }
 
-    const parts = this.contextPartSerializer.buildPromptRequestParts(message, options);
-
-    try {
-      const requestBody = this.promptRequestBuilder.buildLegacyStreamRequestBody(parts, options);
-
-      await this.post<void>(`/session/${sessionId}/prompt_async`, requestBody);
-
-      const streamContext = this.streamingRuntime.createActiveStreamContext(sessionId);
-      yield { type: 'message_start' };
-      try {
-        yield* this.consumeLegacyEventStream(sessionId, streamContext);
-      } finally {
-        this.streamingRuntime.releaseActiveStreamContext(streamContext);
-        logger.debug(`Legacy stream ended for session ${sessionId}`);
-      }
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : 'Unknown error';
-      yield { type: 'error', content: msg };
-    }
+    const requestBody = this.promptRequestBuilder.buildLegacyStreamRequestBody(parts, options);
+    yield* this.streamingRuntime.streamLegacyResponse({
+      sessionId,
+      startPrompt: async () => {
+        await this.post<void>(`/session/${sessionId}/prompt_async`, requestBody);
+      },
+    });
   }
 
   private shouldUseSdk(flag: keyof SdkFeatureFlags): boolean {
@@ -994,17 +953,6 @@ export class OpenCodeService {
       authHeaders: this.getAuthHeaders(),
       directory: includeDirectory ? this.getScopedDirectoryPath() : undefined,
     });
-  }
-
-  private createStreamingState(): StreamingState {
-    return {
-      lastContent: '',
-      lastErrorMessage: null,
-      processedToolIds: new Set<string>(),
-      toolInputSnapshots: new Map(),
-      debugChunkSequence: 0,
-      lastTextDelta: null,
-    };
   }
 
   private observeToolNamesInMessages(messages: Array<{ info: Message; parts: Part[] }>): void {
@@ -1235,247 +1183,6 @@ export class OpenCodeService {
     return this.catalogQueries.observeRuntimeToolNames(toolNames);
   }
 
-  private async *consumeLegacyEventStream(
-    sessionId: string,
-    streamContext: OpenCodeStreamingRuntimeContext,
-  ): AsyncGenerator<StreamChunk> {
-    const signal = streamContext.signal;
-    const eventStream = this.connectSSE(`${this.baseUrl}/event`, signal);
-    const state = this.createStreamingState();
-
-    for await (const event of eventStream) {
-      if (signal?.aborted) {
-        logger.debug('Stream aborted, breaking loop');
-        break;
-      }
-
-      let eventData: OpenCodeStreamEvent;
-      try {
-        eventData = JSON.parse(event.data) as OpenCodeStreamEvent;
-      } catch {
-        continue;
-      }
-
-      const outcome = this.streamEventTransformer.handleStreamingEvent(
-        eventData,
-        sessionId,
-        state,
-        streamContext,
-      );
-      for (const chunk of outcome.chunks) {
-        yield chunk;
-      }
-
-      if (outcome.stop) {
-        streamContext.abort();
-        break;
-      }
-    }
-
-    logAssistantFinalizationDebug('service-legacy-event-stream-ended', {
-      sessionId,
-      accumulatedTextLength: state.lastContent.length,
-      lastTextDelta: state.lastTextDelta,
-    });
-    yield* this.finishStreamingResponse(sessionId, state.lastContent, state.lastErrorMessage);
-  }
-
-  private async *sendMessageWithSdk(
-    message: string,
-    options: QueryOptions,
-    sessionId: string,
-  ): AsyncGenerator<StreamChunk> {
-    const client = this.getSdkClient();
-    const parts = this.contextPartSerializer.buildPromptRequestParts(message, options);
-
-    try {
-      await client.session.promptAsync(
-        this.promptRequestBuilder.buildSdkPromptParameters(sessionId, parts, options),
-      );
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : 'Unknown error';
-      yield { type: 'error', content: msg };
-      return;
-    }
-
-    const streamContext = this.streamingRuntime.createActiveStreamContext(sessionId);
-    const state = this.createStreamingState();
-    let yieldedMessageStart = false;
-
-    try {
-      const subscription = await client.event.subscribe(undefined, {
-        signal: streamContext.signal,
-      });
-      const iterator = subscription.stream[Symbol.asyncIterator]();
-
-      while (true) {
-        let result: IteratorResult<SdkEvent>;
-        try {
-          result = await iterator.next() as IteratorResult<SdkEvent>;
-        } catch (error) {
-          if (!yieldedMessageStart) {
-            this.logServiceWarning('session.event-stream', 'SDK event stream failed before first event, falling back to legacy SSE', error);
-            yield { type: 'message_start' };
-            yieldedMessageStart = true;
-            yield* this.consumeLegacyEventStream(sessionId, streamContext);
-            return;
-          }
-
-          throw error;
-        }
-
-        if (result.done) {
-          break;
-        }
-
-        if (!yieldedMessageStart) {
-          yield { type: 'message_start' };
-          yieldedMessageStart = true;
-        }
-
-        const outcome = this.streamEventTransformer.handleStreamingEvent(
-          result.value as unknown as OpenCodeStreamEvent,
-          sessionId,
-          state,
-          streamContext,
-        );
-        for (const chunk of outcome.chunks) {
-          yield chunk;
-        }
-
-        if (outcome.stop) {
-          streamContext.abort();
-          break;
-        }
-      }
-
-      if (!yieldedMessageStart) {
-        yield { type: 'message_start' };
-      }
-
-      logAssistantFinalizationDebug('service-sdk-event-stream-ended', {
-        sessionId,
-        accumulatedTextLength: state.lastContent.length,
-        lastTextDelta: state.lastTextDelta,
-      });
-      yield* this.finishStreamingResponse(sessionId, state.lastContent, state.lastErrorMessage);
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : 'Unknown error';
-      yield { type: 'error', content: msg };
-    } finally {
-      this.streamingRuntime.releaseActiveStreamContext(streamContext);
-      logger.debug(`SDK stream ended for session ${sessionId}`);
-    }
-  }
-
-  private async *finishStreamingResponse(
-    sessionId: string,
-    lastContent: string,
-    priorErrorMessage: string | null = null,
-  ): AsyncGenerator<StreamChunk> {
-    logAssistantFinalizationDebug('service-finish-start', {
-      sessionId,
-      lastContentLength: lastContent.length,
-      lastContentPreview: getDebugTextPreview(lastContent, 120),
-      priorErrorMessage,
-    });
-
-    let assistantMessageId: string | null = null;
-    try {
-      const messages = await this.getSessionMessages(sessionId);
-      const assistantMsg = messages.reverse().find((item) => item.info.role === 'assistant');
-      if (assistantMsg) {
-        assistantMessageId = assistantMsg.info.id;
-        logAssistantFinalizationDebug('service-finish-loaded-assistant', {
-          sessionId,
-          messageCount: messages.length,
-          assistantMessageId,
-          messageCreatedAt: assistantMsg.info.time.created,
-          modelId: OpenCodeMessageNormalizationMapper.formatModelIdentifier(
-            assistantMsg.info.providerID,
-            assistantMsg.info.modelID,
-          ) ?? null,
-          structuredPresent: assistantMsg.info.structured !== undefined,
-          assistantError: extractStructuredErrorMessage(assistantMsg.info.error),
-          partSummary: summarizeAssistantParts(assistantMsg.parts),
-        });
-        const assistantError = extractStructuredErrorMessage(assistantMsg.info.error);
-        if (assistantError && !priorErrorMessage && !lastContent.trim()) {
-          logAssistantFinalizationDebug('service-finish-emitting-assistant-error', {
-            sessionId,
-            assistantMessageId,
-            assistantError,
-          });
-          yield {
-            type: 'error',
-            content: assistantError,
-          };
-          priorErrorMessage = assistantError;
-        }
-        for (const part of assistantMsg.parts) {
-          if (part.type !== 'text' || typeof part.text !== 'string') {
-            continue;
-          }
-
-          const currentText = part.text;
-          if (currentText.length <= lastContent.length) {
-            continue;
-          }
-
-          const delta = currentText.slice(lastContent.length);
-          logAssistantFinalizationDebug('service-finish-emitting-trailing-text', {
-            sessionId,
-            assistantMessageId,
-            partId: part.id,
-            deltaLength: delta.length,
-            previousLength: lastContent.length,
-            nextLength: currentText.length,
-            deltaPreview: getDebugTextPreview(delta, 120),
-          });
-          yield { type: 'text', content: delta };
-          lastContent = currentText;
-        }
-
-        logAssistantFinalizationDebug('service-finish-emitting-message-metadata', {
-          sessionId,
-          assistantMessageId,
-          timestamp: assistantMsg.info.time.created,
-          modelId: OpenCodeMessageNormalizationMapper.formatModelIdentifier(
-            assistantMsg.info.providerID,
-            assistantMsg.info.modelID,
-          ) ?? null,
-          finalTextLength: lastContent.length,
-        });
-        yield {
-          type: 'message_metadata',
-          messageId: assistantMsg.info.id,
-          timestamp: assistantMsg.info.time.created,
-          modelId: OpenCodeMessageNormalizationMapper.formatModelIdentifier(
-            assistantMsg.info.providerID,
-            assistantMsg.info.modelID,
-          ),
-        };
-      } else {
-        logger.warn('No assistant message found when finalizing stream response', {
-          sessionId,
-          messageCount: messages.length,
-          roles: messages.map((item) => item.info.role),
-          lastUserId: messages.filter((item) => item.info.role === 'user').at(-1)?.info.id ?? null,
-        });
-      }
-    } catch (error) {
-      logger.error('Final message check failed:', error);
-    }
-
-    logAssistantFinalizationDebug('service-finish-emitting-message-stop', {
-      sessionId,
-      assistantMessageId,
-      finalTextLength: lastContent.length,
-      finalTextPreview: getDebugTextPreview(lastContent, 120),
-    });
-    yield { type: 'message_stop' };
-  }
-
   private async abortSessionOnServer(sessionId: string): Promise<void> {
     if (!sessionId) {
       return;
@@ -1495,131 +1202,6 @@ export class OpenCodeService {
     } catch (error) {
       this.logServiceWarning('session.abort', `Failed to abort session ${sessionId} via legacy HTTP`, error);
     }
-  }
-
-  /** Connect to SSE endpoint and yield events */
-  private async *connectSSE(url: string, signal?: AbortSignal): AsyncGenerator<OpenCodeSSEEvent> {
-    this.ensureBaseUrl();
-
-    if (signal?.aborted) {
-      return;
-    }
-
-    const reader = await this.openSseReader(url, signal);
-    const context: OpenCodeSseStreamContext = {
-      reader,
-      decoder: new TextDecoder(),
-      signal,
-      state: {
-        aborted: false,
-        buffer: '',
-      },
-    };
-    const abortHandler = this.createSseAbortHandler(reader, context.state);
-    signal?.addEventListener('abort', abortHandler);
-
-    try {
-      yield* this.readSseStream(context);
-    } catch (error) {
-      if (this.isAbortedSseRead(error, context)) {
-        return;
-      }
-      throw error;
-    } finally {
-      signal?.removeEventListener('abort', abortHandler);
-      reader.releaseLock();
-    }
-  }
-
-  private async openSseReader(
-    url: string,
-    signal?: AbortSignal,
-  ): Promise<ReadableStreamDefaultReader<Uint8Array>> {
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: this.getRequestHeaders({
-        'Accept': 'text/event-stream',
-      }),
-      signal,
-    });
-
-    if (!response.ok) {
-      throw new Error(`SSE connection failed: ${response.status} ${response.statusText}`);
-    }
-
-    if (!response.body) {
-      throw new Error('SSE response has no body');
-    }
-
-    return response.body.getReader();
-  }
-
-  private createSseAbortHandler(
-    reader: ReadableStreamDefaultReader<Uint8Array>,
-    state: OpenCodeSseReadState,
-  ): () => void {
-    return () => {
-      state.aborted = true;
-      void reader.cancel();
-    };
-  }
-
-  private async *readSseStream(context: OpenCodeSseStreamContext): AsyncGenerator<OpenCodeSSEEvent> {
-    while (!this.shouldStopSseStream(context)) {
-      const readResult = await this.readSseChunk(context);
-      if (!readResult) {
-        break;
-      }
-
-      const { done, value } = readResult;
-      if (done || this.shouldStopSseStream(context)) {
-        break;
-      }
-
-      context.state.buffer += context.decoder.decode(value, { stream: true });
-      yield* this.emitParsedSseEvents(context.state);
-    }
-
-    if (context.state.buffer.trim() && !this.shouldStopSseStream(context)) {
-      yield* this.emitRemainingSseEvents(context.state.buffer);
-    }
-  }
-
-  private async readSseChunk(
-    context: Pick<OpenCodeSseStreamContext, 'reader' | 'signal' | 'state'>,
-  ): Promise<ReadableStreamReadResult<Uint8Array> | null> {
-    try {
-      return await context.reader.read();
-    } catch (error) {
-      if (this.isAbortedSseRead(error, context)) {
-        return null;
-      }
-      throw error;
-    }
-  }
-
-  private shouldStopSseStream(
-    context: Pick<OpenCodeSseStreamContext, 'signal' | 'state'>,
-  ): boolean {
-    return context.state.aborted || context.signal?.aborted === true;
-  }
-
-  private isAbortedSseRead(
-    error: unknown,
-    context: Pick<OpenCodeSseStreamContext, 'signal' | 'state'>,
-  ): boolean {
-    return this.shouldStopSseStream(context) || (error instanceof Error && error.name === 'AbortError');
-  }
-
-  private *emitParsedSseEvents(state: OpenCodeSseReadState): Generator<OpenCodeSSEEvent, void, void> {
-    const events = this.streamEventTransformer.parseSSEEvents(state.buffer);
-    state.buffer = events.remaining;
-    yield* events.events;
-  }
-
-  private *emitRemainingSseEvents(buffer: string): Generator<OpenCodeSSEEvent, void, void> {
-    const events = this.streamEventTransformer.parseSSEEvents(buffer + '\n\n');
-    yield* events.events;
   }
 
   /** Get available models - Handles both string array and object formats */

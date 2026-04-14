@@ -1,9 +1,158 @@
 import { createLogger } from '../../shared';
+import type { StreamChunk } from '../types';
+import { OpenCodeMessageNormalizationMapper } from './OpenCodeMessageNormalizationMapper';
+import type { Message, Part } from './OpenCodeSessionLifecycleCoordinator';
+import type {
+  OpenCodeSSEEvent,
+  OpenCodeStreamEvent,
+  OpenCodeStreamEventState,
+} from './OpenCodeStreamEventTransformer';
+import type { SdkEvent } from './sdkTypes';
 
 const logger = createLogger('OpenCodeStreamingRuntimeCoordinator');
 
+interface OpenCodeSseReadState {
+  aborted: boolean;
+  buffer: string;
+}
+
+interface OpenCodeSseStreamContext {
+  reader: ReadableStreamDefaultReader<Uint8Array>;
+  decoder: TextDecoder;
+  signal?: AbortSignal;
+  state: OpenCodeSseReadState;
+}
+
+interface OpenCodeStreamingAssistantSummary {
+  totalParts: number;
+  textPartCount: number;
+  textLength: number;
+  toolPartCount: number;
+  reasoningPartCount: number;
+  filePartCount: number;
+}
+
+export interface OpenCodeStreamingRuntimeEventTransformer {
+  handleStreamingEvent(
+    eventData: OpenCodeStreamEvent,
+    sessionId: string,
+    state: OpenCodeStreamEventState,
+    streamContext: OpenCodeStreamingRuntimeContext,
+  ): { chunks: StreamChunk[]; stop: boolean };
+  parseSSEEvents(buffer: string): { events: OpenCodeSSEEvent[]; remaining: string };
+}
+
 export interface OpenCodeStreamingRuntimeCoordinatorHost {
   abortSessionOnServer(sessionId: string): Promise<void> | void;
+  getLegacyEventStreamRequest(): {
+    url: string;
+    headers: Record<string, string>;
+  };
+  getSessionMessages(sessionId: string): Promise<Array<{ info: Message; parts: Part[] }>>;
+  logServiceWarning(key: string, message: string, error: unknown): void;
+  streamEventTransformer: OpenCodeStreamingRuntimeEventTransformer;
+}
+
+export interface OpenCodeStreamingLegacyStreamRequest {
+  sessionId: string;
+  startPrompt?: () => Promise<void>;
+}
+
+export interface OpenCodeStreamingSdkStreamRequest {
+  sessionId: string;
+  startPrompt: () => Promise<void>;
+  subscribe: (signal: AbortSignal) => Promise<AsyncIterable<SdkEvent>>;
+}
+
+type StreamingState = OpenCodeStreamEventState;
+
+function getDebugTextPreview(text: string, maxLength = 160): string {
+  const normalized = text.replace(/\s+/g, ' ').trim();
+  if (normalized.length <= maxLength) {
+    return normalized;
+  }
+
+  return `${normalized.slice(0, maxLength)}...`;
+}
+
+function stringifyDebugPayload(payload: unknown): string {
+  try {
+    return JSON.stringify(payload);
+  } catch {
+    return '[unserializable]';
+  }
+}
+
+function logAssistantFinalizationDebug(label: string, payload: unknown): void {
+  logger.debug(`Assistant stream finalization [${label}]: ${stringifyDebugPayload(payload)}`);
+}
+
+function summarizeAssistantParts(parts: Part[]): OpenCodeStreamingAssistantSummary {
+  let textPartCount = 0;
+  let textLength = 0;
+  let toolPartCount = 0;
+  let reasoningPartCount = 0;
+  let filePartCount = 0;
+
+  for (const part of parts) {
+    if (part.type === 'text' && typeof part.text === 'string') {
+      textPartCount += 1;
+      textLength += part.text.length;
+    } else if (part.type === 'tool') {
+      toolPartCount += 1;
+    } else if (part.type === 'reasoning' || part.type === 'thinking') {
+      reasoningPartCount += 1;
+    } else if (part.type === 'file') {
+      filePartCount += 1;
+    }
+  }
+
+  return {
+    totalParts: parts.length,
+    textPartCount,
+    textLength,
+    toolPartCount,
+    reasoningPartCount,
+    filePartCount,
+  };
+}
+
+function extractStructuredErrorMessage(errorLike: unknown): string | null {
+  if (!errorLike || typeof errorLike !== 'object') {
+    return null;
+  }
+
+  const errorRecord = errorLike as {
+    message?: unknown;
+    data?: {
+      message?: unknown;
+      statusCode?: unknown;
+      responseBody?: unknown;
+    };
+    name?: unknown;
+  };
+
+  const baseMessage = typeof errorRecord.data?.message === 'string' && errorRecord.data.message.trim()
+    ? errorRecord.data.message.trim()
+    : typeof errorRecord.message === 'string' && errorRecord.message.trim()
+      ? errorRecord.message.trim()
+      : typeof errorRecord.name === 'string' && errorRecord.name.trim()
+        ? errorRecord.name.trim()
+        : null;
+
+  if (!baseMessage) {
+    return null;
+  }
+
+  const statusCode = typeof errorRecord.data?.statusCode === 'number'
+    ? errorRecord.data.statusCode
+    : null;
+
+  if (statusCode === null || baseMessage.toLowerCase().includes(`http ${statusCode}`)) {
+    return baseMessage;
+  }
+
+  return `${baseMessage} (HTTP ${statusCode})`;
 }
 
 export class OpenCodeStreamingRuntimeContext {
@@ -64,6 +213,106 @@ export class OpenCodeStreamingRuntimeCoordinator {
     }
   }
 
+  async *streamLegacyResponse(
+    request: OpenCodeStreamingLegacyStreamRequest,
+  ): AsyncGenerator<StreamChunk> {
+    try {
+      await request.startPrompt?.();
+
+      const streamContext = this.createActiveStreamContext(request.sessionId);
+      yield { type: 'message_start' };
+      try {
+        yield* this.consumeLegacyEventStream(request.sessionId, streamContext);
+      } finally {
+        this.releaseActiveStreamContext(streamContext);
+        logger.debug(`Legacy stream ended for session ${request.sessionId}`);
+      }
+    } catch (error) {
+      yield this.buildErrorChunk(error);
+    }
+  }
+
+  async *streamSdkResponse(
+    request: OpenCodeStreamingSdkStreamRequest,
+  ): AsyncGenerator<StreamChunk> {
+    try {
+      await request.startPrompt();
+    } catch (error) {
+      yield this.buildErrorChunk(error);
+      return;
+    }
+
+    const streamContext = this.createActiveStreamContext(request.sessionId);
+    const state = this.createStreamingState();
+    let yieldedMessageStart = false;
+
+    try {
+      const stream = await request.subscribe(streamContext.signal);
+      const iterator = stream[Symbol.asyncIterator]();
+
+      while (true) {
+        let result: IteratorResult<SdkEvent>;
+        try {
+          result = await iterator.next() as IteratorResult<SdkEvent>;
+        } catch (error) {
+          if (!yieldedMessageStart) {
+            this.host.logServiceWarning(
+              'session.event-stream',
+              'SDK event stream failed before first event, falling back to legacy SSE',
+              error,
+            );
+            yield { type: 'message_start' };
+            yieldedMessageStart = true;
+            yield* this.consumeLegacyEventStream(request.sessionId, streamContext);
+            return;
+          }
+
+          throw error;
+        }
+
+        if (result.done) {
+          break;
+        }
+
+        if (!yieldedMessageStart) {
+          yield { type: 'message_start' };
+          yieldedMessageStart = true;
+        }
+
+        const outcome = this.host.streamEventTransformer.handleStreamingEvent(
+          result.value as unknown as OpenCodeStreamEvent,
+          request.sessionId,
+          state,
+          streamContext,
+        );
+        for (const chunk of outcome.chunks) {
+          yield chunk;
+        }
+
+        if (outcome.stop) {
+          streamContext.abort();
+          break;
+        }
+      }
+
+      if (!yieldedMessageStart) {
+        yield { type: 'message_start' };
+      }
+
+      logAssistantFinalizationDebug('service-sdk-event-stream-ended', {
+        sessionId: request.sessionId,
+        accumulatedTextLength: state.lastContent.length,
+        lastTextDelta: state.lastTextDelta,
+      });
+      yield* this.finishStreamingResponse(request.sessionId, state.lastContent, state.lastErrorMessage);
+    } catch (error) {
+      yield this.buildErrorChunk(error);
+    } finally {
+      this.releaseActiveStreamContext(streamContext);
+      logger.debug(`SDK stream ended for session ${request.sessionId}`);
+    }
+  }
+
   cancelStream(sessionId?: string | null): void {
     const targetSessionId = this.normalizeSessionId(sessionId);
     if (!targetSessionId) {
@@ -99,6 +348,297 @@ export class OpenCodeStreamingRuntimeCoordinator {
     logger.debug(`Detaching local stream listener for session ${targetSessionId}...`);
     streamContext.abort();
     logger.debug('Local stream detach signal sent');
+  }
+
+  private createStreamingState(): StreamingState {
+    return {
+      lastContent: '',
+      lastErrorMessage: null,
+      processedToolIds: new Set<string>(),
+      toolInputSnapshots: new Map(),
+      debugChunkSequence: 0,
+      lastTextDelta: null,
+    };
+  }
+
+  private async *consumeLegacyEventStream(
+    sessionId: string,
+    streamContext: OpenCodeStreamingRuntimeContext,
+  ): AsyncGenerator<StreamChunk> {
+    const signal = streamContext.signal;
+    const eventStream = this.connectSSE(signal);
+    const state = this.createStreamingState();
+
+    for await (const event of eventStream) {
+      if (signal?.aborted) {
+        logger.debug('Stream aborted, breaking loop');
+        break;
+      }
+
+      let eventData: OpenCodeStreamEvent;
+      try {
+        eventData = JSON.parse(event.data) as OpenCodeStreamEvent;
+      } catch {
+        continue;
+      }
+
+      const outcome = this.host.streamEventTransformer.handleStreamingEvent(
+        eventData,
+        sessionId,
+        state,
+        streamContext,
+      );
+      for (const chunk of outcome.chunks) {
+        yield chunk;
+      }
+
+      if (outcome.stop) {
+        streamContext.abort();
+        break;
+      }
+    }
+
+    logAssistantFinalizationDebug('service-legacy-event-stream-ended', {
+      sessionId,
+      accumulatedTextLength: state.lastContent.length,
+      lastTextDelta: state.lastTextDelta,
+    });
+    yield* this.finishStreamingResponse(sessionId, state.lastContent, state.lastErrorMessage);
+  }
+
+  private async *finishStreamingResponse(
+    sessionId: string,
+    lastContent: string,
+    priorErrorMessage: string | null = null,
+  ): AsyncGenerator<StreamChunk> {
+    logAssistantFinalizationDebug('service-finish-start', {
+      sessionId,
+      lastContentLength: lastContent.length,
+      lastContentPreview: getDebugTextPreview(lastContent, 120),
+      priorErrorMessage,
+    });
+
+    let assistantMessageId: string | null = null;
+    try {
+      const messages = await this.host.getSessionMessages(sessionId);
+      const assistantMsg = messages.reverse().find((item) => item.info.role === 'assistant');
+      if (assistantMsg) {
+        assistantMessageId = assistantMsg.info.id;
+        logAssistantFinalizationDebug('service-finish-loaded-assistant', {
+          sessionId,
+          messageCount: messages.length,
+          assistantMessageId,
+          messageCreatedAt: assistantMsg.info.time.created,
+          modelId: OpenCodeMessageNormalizationMapper.formatModelIdentifier(
+            assistantMsg.info.providerID,
+            assistantMsg.info.modelID,
+          ) ?? null,
+          structuredPresent: assistantMsg.info.structured !== undefined,
+          assistantError: extractStructuredErrorMessage(assistantMsg.info.error),
+          partSummary: summarizeAssistantParts(assistantMsg.parts),
+        });
+        const assistantError = extractStructuredErrorMessage(assistantMsg.info.error);
+        if (assistantError && !priorErrorMessage && !lastContent.trim()) {
+          logAssistantFinalizationDebug('service-finish-emitting-assistant-error', {
+            sessionId,
+            assistantMessageId,
+            assistantError,
+          });
+          yield {
+            type: 'error',
+            content: assistantError,
+          };
+          priorErrorMessage = assistantError;
+        }
+        for (const part of assistantMsg.parts) {
+          if (part.type !== 'text' || typeof part.text !== 'string') {
+            continue;
+          }
+
+          const currentText = part.text;
+          if (currentText.length <= lastContent.length) {
+            continue;
+          }
+
+          const delta = currentText.slice(lastContent.length);
+          logAssistantFinalizationDebug('service-finish-emitting-trailing-text', {
+            sessionId,
+            assistantMessageId,
+            partId: part.id,
+            deltaLength: delta.length,
+            previousLength: lastContent.length,
+            nextLength: currentText.length,
+            deltaPreview: getDebugTextPreview(delta, 120),
+          });
+          yield { type: 'text', content: delta };
+          lastContent = currentText;
+        }
+
+        logAssistantFinalizationDebug('service-finish-emitting-message-metadata', {
+          sessionId,
+          assistantMessageId,
+          timestamp: assistantMsg.info.time.created,
+          modelId: OpenCodeMessageNormalizationMapper.formatModelIdentifier(
+            assistantMsg.info.providerID,
+            assistantMsg.info.modelID,
+          ) ?? null,
+          finalTextLength: lastContent.length,
+        });
+        yield {
+          type: 'message_metadata',
+          messageId: assistantMsg.info.id,
+          timestamp: assistantMsg.info.time.created,
+          modelId: OpenCodeMessageNormalizationMapper.formatModelIdentifier(
+            assistantMsg.info.providerID,
+            assistantMsg.info.modelID,
+          ),
+        };
+      } else {
+        logger.warn('No assistant message found when finalizing stream response', {
+          sessionId,
+          messageCount: messages.length,
+          roles: messages.map((item) => item.info.role),
+          lastUserId: messages.filter((item) => item.info.role === 'user').at(-1)?.info.id ?? null,
+        });
+      }
+    } catch (error) {
+      logger.error('Final message check failed:', error);
+    }
+
+    logAssistantFinalizationDebug('service-finish-emitting-message-stop', {
+      sessionId,
+      assistantMessageId,
+      finalTextLength: lastContent.length,
+      finalTextPreview: getDebugTextPreview(lastContent, 120),
+    });
+    yield { type: 'message_stop' };
+  }
+
+  private buildErrorChunk(error: unknown): StreamChunk {
+    return {
+      type: 'error',
+      content: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+
+  private async *connectSSE(signal?: AbortSignal): AsyncGenerator<OpenCodeSSEEvent> {
+    if (signal?.aborted) {
+      return;
+    }
+
+    const reader = await this.openSseReader(signal);
+    const context: OpenCodeSseStreamContext = {
+      reader,
+      decoder: new TextDecoder(),
+      signal,
+      state: {
+        aborted: false,
+        buffer: '',
+      },
+    };
+    const abortHandler = this.createSseAbortHandler(reader, context.state);
+    signal?.addEventListener('abort', abortHandler);
+
+    try {
+      yield* this.readSseStream(context);
+    } catch (error) {
+      if (this.isAbortedSseRead(error, context)) {
+        return;
+      }
+      throw error;
+    } finally {
+      signal?.removeEventListener('abort', abortHandler);
+      reader.releaseLock();
+    }
+  }
+
+  private async openSseReader(
+    signal?: AbortSignal,
+  ): Promise<ReadableStreamDefaultReader<Uint8Array>> {
+    const request = this.host.getLegacyEventStreamRequest();
+    const response = await fetch(request.url, {
+      method: 'GET',
+      headers: request.headers,
+      signal,
+    });
+
+    if (!response.ok) {
+      throw new Error(`SSE connection failed: ${response.status} ${response.statusText}`);
+    }
+
+    if (!response.body) {
+      throw new Error('SSE response has no body');
+    }
+
+    return response.body.getReader();
+  }
+
+  private createSseAbortHandler(
+    reader: ReadableStreamDefaultReader<Uint8Array>,
+    state: OpenCodeSseReadState,
+  ): () => void {
+    return () => {
+      state.aborted = true;
+      void reader.cancel();
+    };
+  }
+
+  private async *readSseStream(context: OpenCodeSseStreamContext): AsyncGenerator<OpenCodeSSEEvent> {
+    while (!this.shouldStopSseStream(context)) {
+      const readResult = await this.readSseChunk(context);
+      if (!readResult) {
+        break;
+      }
+
+      const { done, value } = readResult;
+      if (done || this.shouldStopSseStream(context)) {
+        break;
+      }
+
+      context.state.buffer += context.decoder.decode(value, { stream: true });
+      yield* this.emitParsedSseEvents(context.state);
+    }
+
+    if (context.state.buffer.trim() && !this.shouldStopSseStream(context)) {
+      yield* this.emitRemainingSseEvents(context.state.buffer);
+    }
+  }
+
+  private async readSseChunk(
+    context: Pick<OpenCodeSseStreamContext, 'reader' | 'signal' | 'state'>,
+  ): Promise<ReadableStreamReadResult<Uint8Array> | null> {
+    try {
+      return await context.reader.read();
+    } catch (error) {
+      if (this.isAbortedSseRead(error, context)) {
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  private shouldStopSseStream(
+    context: Pick<OpenCodeSseStreamContext, 'signal' | 'state'>,
+  ): boolean {
+    return context.state.aborted || context.signal?.aborted === true;
+  }
+
+  private isAbortedSseRead(
+    error: unknown,
+    context: Pick<OpenCodeSseStreamContext, 'signal' | 'state'>,
+  ): boolean {
+    return this.shouldStopSseStream(context) || (error instanceof Error && error.name === 'AbortError');
+  }
+
+  private *emitParsedSseEvents(state: OpenCodeSseReadState): Generator<OpenCodeSSEEvent, void, void> {
+    const events = this.host.streamEventTransformer.parseSSEEvents(state.buffer);
+    state.buffer = events.remaining;
+    yield* events.events;
+  }
+
+  private *emitRemainingSseEvents(buffer: string): Generator<OpenCodeSSEEvent, void, void> {
+    const events = this.host.streamEventTransformer.parseSSEEvents(buffer + '\n\n');
+    yield* events.events;
   }
 
   private normalizeSessionId(sessionId?: string | null): string {

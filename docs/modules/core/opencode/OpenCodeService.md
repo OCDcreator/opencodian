@@ -65,7 +65,7 @@
 - `messageNormalizationMapper`: `OpenCodeMessageNormalizationMapper` singleton，负责 question request normalization、历史 message → `ChatMessage` hydration、tool kind 归类、context attachment 提取与 OMO/system reminder 归一化。
 - `promptRequestBuilder`: `OpenCodePromptRequestBuilder` 实例，负责 SDK prompt parameters、legacy request body 与 shared prompt options/variant/output-format/model defaults 的组装。
 - `streamEventTransformer`: `OpenCodeStreamEventTransformer` 实例，负责 SDK / legacy stream event → `StreamChunk` 的转换、tool/question/file/permission 事件映射，以及 SSE parser。
-- `streamingRuntime`: `OpenCodeStreamingRuntimeCoordinator` 实例，负责 active stream registry、session-scoped abort controller、part type tracking 与 cancel/detach lifecycle。
+- `streamingRuntime`: `OpenCodeStreamingRuntimeCoordinator` 实例，负责 SDK/legacy streaming transport、legacy SSE reader lifecycle、final response completion，以及 active stream registry、session-scoped abort controller、part type tracking、cancel/detach lifecycle。
 - `sessionLifecycle`: `OpenCodeSessionLifecycleCoordinator` 实例，负责 session create/list/messages/todos/statuses/delete/update、默认 current session 指针，以及公开 session sync 订阅 API 到 `syncEventRuntime` 的委托。
 - `sessionControl`: `OpenCodeSessionControlOrchestrator` 实例，负责 fork/revert/unrevert/diff、context usage snapshot、session message control、command/shell 与 message-part operations。
 - `questionPermissionHub`: `OpenCodeQuestionPermissionHub` 实例，负责 pending questions/reply/reject、pending permissions/respond，以及 session permission responder 的 negotiation lifecycle。
@@ -203,18 +203,21 @@
 
 `sendMessage()`：
 
-- `sdkStream` 开启时调用 `sendMessageWithSdk()`
-- 否则先 POST `/session/:id/prompt_async`，再连接 legacy SSE `/event`
+- 先通过 `OpenCodeContextPartSerializer` + `OpenCodePromptRequestBuilder` 组装 prompt parts / transport payload
+- `sdkStream` 开启时委托 `streamingRuntime.streamSdkResponse()`：coordinator 负责 SDK `event.subscribe()` 读取、首事件前失败时的 legacy SSE fallback，以及最终 assistant message completion
+- 否则委托 `streamingRuntime.streamLegacyResponse()`：coordinator 负责 `/event` SSE 读取、reader abort/detach 生命周期，以及最终 assistant message completion
 
-对应的 prompt option assembly 现在全部委托给 `OpenCodePromptRequestBuilder`；`sendMessage()` 只保留 legacy transport 入口、SSE 生命周期和错误处理。
+对应的 prompt option assembly 仍全部委托给 `OpenCodePromptRequestBuilder`；`sendMessage()` 现在只保留 session 选择、payload 组装与 SDK/legacy 入口分流，不再直接铺开 transport/fallback/read/finalize 细节。
 
 ### 流式事件处理与取消
 
-服务层的并发模型仍然是“每个 session 一条活动流”，但 active stream runtime state 现在由 `OpenCodeStreamingRuntimeCoordinator` 持有：
+服务层的并发模型仍然是“每个 session 一条活动流”，而完整 transport runtime seam 现在由 `OpenCodeStreamingRuntimeCoordinator` 持有：
 
 - `streamingRuntime.createActiveStreamContext()` 会为 `sessionId` 分配独立 `OpenCodeStreamingRuntimeContext`
 - 如果同一 session 已有旧流，coordinator 会先中断旧 context 再替换
 - `releaseActiveStreamContext()` 只释放仍然是当前注册实例的 context，避免旧流 finally 清掉新流
+- `streamSdkResponse()` 负责 SDK stream 订阅、首事件前失败时的 legacy SSE fallback，以及最终 assistant message completion
+- `streamLegacyResponse()` 负责 legacy `/event` 连接、reader abort/detach 生命周期、event loop 与最终 assistant message completion
 
 与之配套的 event→chunk transform 现在由 `OpenCodeStreamEventTransformer` 持有：
 
@@ -237,7 +240,7 @@
 - `message_metadata`
 - `error`
 
-`sendMessageWithSdk()` 有一个很具体的降级策略：
+`OpenCodeStreamingRuntimeCoordinator.streamSdkResponse()` 有一个很具体的降级策略：
 
 - 如果 SDK `event.subscribe()` 在第一条事件之前就失败，会回退到 legacy SSE
 - 一旦已经开始收到 SDK 事件，后续异常不会再切回 legacy，而是直接产出 `error` chunk
@@ -247,11 +250,11 @@
 - 普通 provider/API 错误会立刻转成 `error` chunk
 - `MessageAbortedError` 只会结束流，不会误报成发送失败
 
-换句话说，`OpenCodeService` 现在只保留 transport 分流、流收尾和 final message 补拉；SDK / legacy 事件的解析与 chunk 归一化已经收束到 `OpenCodeStreamEventTransformer`。
+换句话说，`OpenCodeService` 现在只保留 payload 组装与入口分流；SDK / legacy transport/fallback/read/finalize 细节已经收束到 `OpenCodeStreamingRuntimeCoordinator`，事件解析与 chunk 归一化则收束到 `OpenCodeStreamEventTransformer`。
 
-除此之外，`finishStreamingResponse()` 在收尾重新拉取 assistant message 时，也会再检查一次 `assistant.info.error`。如果流里没收到 `session.error`，但最终持久化消息里已经带了结构化错误，服务层仍会补发 `error` chunk，避免 UI 再次把它误判成“空回复”。
+除此之外，`OpenCodeStreamingRuntimeCoordinator.finishStreamingResponse()` 在收尾重新拉取 assistant message 时，也会再检查一次 `assistant.info.error`。如果流里没收到 `session.error`，但最终持久化消息里已经带了结构化错误，coordinator 仍会补发 `error` chunk，避免 UI 再次把它误判成“空回复”。
 
-流结束后，`finishStreamingResponse()` 还会重新拉一次 session messages，补发任何未在流里出现的尾部文本，并补一条 `message_metadata`，最后统一输出 `message_stop`。
+流结束后，`OpenCodeStreamingRuntimeCoordinator.finishStreamingResponse()` 还会重新拉一次 session messages，补发任何未在流里出现的尾部文本，并补一条 `message_metadata`，最后统一输出 `message_stop`。
 
 取消分两种：
 
