@@ -2337,13 +2337,13 @@ describe('OpenCodeService', () => {
   });
 
   describe('updateSettings', () => {
-    it('should update settings without restarting if server config unchanged', () => {
+    it('should update settings without restarting if server config unchanged', async () => {
       const newSettings = { ...DEFAULT_SETTINGS, userName: 'Test User' };
 
-      expect(() => service.updateSettings(newSettings)).not.toThrow();
+      await expect(service.updateSettings(newSettings)).resolves.toBeUndefined();
     });
 
-    it('should handle server config changes', () => {
+    it('should handle server config changes', async () => {
       const newSettings = {
         ...DEFAULT_SETTINGS,
         server: {
@@ -2352,7 +2352,7 @@ describe('OpenCodeService', () => {
         },
       };
 
-      expect(() => service.updateSettings(newSettings)).not.toThrow();
+      await expect(service.updateSettings(newSettings)).resolves.toBeUndefined();
     });
   });
 

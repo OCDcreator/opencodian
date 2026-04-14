@@ -849,7 +849,7 @@
   - 两个目标方法的 `max-params` warning 消失。
   - 运行 focused tests、全量 `npm test`、`npm run build`。
 
-### [NEXT] W3 - OpenCodeService complexity trim
+### [DONE] W3 - OpenCodeService complexity trim
 
 - **Lane**: Warning cleanup
 - **目标**: 只处理 `src/core/opencode/OpenCodeService.ts` 中 `connectSSE` 与 `updateSettings` 的 `complexity`。
@@ -866,7 +866,7 @@
   - 两个目标方法的 `complexity` warning 降到阈值内。
   - 运行 focused tests、全量 `npm test`、`npm run build`。
 
-### [QUEUED] W4 - Chat bridge test typing cleanup
+### [NEXT] W4 - Chat bridge test typing cleanup
 
 - **Lane**: Warning cleanup
 - **目标**: 清掉 `ContextFileCatalogEventBridge` / `FocusContextEventBridge` tests 中的 `@typescript-eslint/no-explicit-any`。

@@ -120,6 +120,41 @@ interface OpenCodeServiceRuntimeOptions {
   sdkFeatureFlags?: Partial<SdkFeatureFlags>;
 }
 
+interface OpenCodeSseReadState {
+  aborted: boolean;
+  buffer: string;
+}
+
+interface OpenCodeSseStreamContext {
+  reader: ReadableStreamDefaultReader<Uint8Array>;
+  decoder: TextDecoder;
+  signal?: AbortSignal;
+  state: OpenCodeSseReadState;
+}
+
+interface OpenCodeSettingsUpdatePlan {
+  previousSettings: OpenCodianSettings;
+  nextSettings: OpenCodianSettings;
+  previousMode: OpenCodianSettings['server']['mode'];
+  nextMode: OpenCodianSettings['server']['mode'];
+  previousToolCatalogScope: string;
+  previousBaseUrl: string;
+  shouldResumeSyncEvents: boolean;
+  shouldResumeOpenCodeEvents: boolean;
+  serverConfigChanged: boolean;
+  shouldRestartManagedServer: boolean;
+  shouldStopManagedServer: boolean;
+}
+
+interface OpenCodeSettingsRestartDecision {
+  previousSettings: OpenCodianSettings;
+  nextSettings: OpenCodianSettings;
+  previousMode: OpenCodianSettings['server']['mode'];
+  nextMode: OpenCodianSettings['server']['mode'];
+  serverConfigChanged: boolean;
+  authChanged: boolean;
+}
+
 interface ToolStateData {
   status: string;
   input?: Record<string, unknown>;
@@ -1568,25 +1603,48 @@ export class OpenCodeService {
   private async *connectSSE(url: string, signal?: AbortSignal): AsyncGenerator<OpenCodeSSEEvent> {
     this.ensureBaseUrl();
 
-    
-    // Check if already aborted
     if (signal?.aborted) {
-
       return;
     }
-    
-    // Use native fetch for streaming support
 
+    const reader = await this.openSseReader(url, signal);
+    const context: OpenCodeSseStreamContext = {
+      reader,
+      decoder: new TextDecoder(),
+      signal,
+      state: {
+        aborted: false,
+        buffer: '',
+      },
+    };
+    const abortHandler = this.createSseAbortHandler(reader, context.state);
+    signal?.addEventListener('abort', abortHandler);
+
+    try {
+      yield* this.readSseStream(context);
+    } catch (error) {
+      if (this.isAbortedSseRead(error, context)) {
+        return;
+      }
+      throw error;
+    } finally {
+      signal?.removeEventListener('abort', abortHandler);
+      reader.releaseLock();
+    }
+  }
+
+  private async openSseReader(
+    url: string,
+    signal?: AbortSignal,
+  ): Promise<ReadableStreamDefaultReader<Uint8Array>> {
     const response = await fetch(url, {
       method: 'GET',
       headers: this.getRequestHeaders({
         'Accept': 'text/event-stream',
       }),
-      signal, // Pass signal to fetch to allow cancellation
+      signal,
     });
 
-
-    
     if (!response.ok) {
       throw new Error(`SSE connection failed: ${response.status} ${response.statusText}`);
     }
@@ -1595,96 +1653,75 @@ export class OpenCodeService {
       throw new Error('SSE response has no body');
     }
 
+    return response.body.getReader();
+  }
 
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-    let aborted = false;
-
-    // Handle abort signal
-    const abortHandler = () => {
-
-      aborted = true;
+  private createSseAbortHandler(
+    reader: ReadableStreamDefaultReader<Uint8Array>,
+    state: OpenCodeSseReadState,
+  ): () => void {
+    return () => {
+      state.aborted = true;
       void reader.cancel();
     };
-    
-    signal?.addEventListener('abort', abortHandler);
+  }
 
+  private async *readSseStream(context: OpenCodeSseStreamContext): AsyncGenerator<OpenCodeSSEEvent> {
+    while (!this.shouldStopSseStream(context)) {
+      const readResult = await this.readSseChunk(context);
+      if (!readResult) {
+        break;
+      }
+
+      const { done, value } = readResult;
+      if (done || this.shouldStopSseStream(context)) {
+        break;
+      }
+
+      context.state.buffer += context.decoder.decode(value, { stream: true });
+      yield* this.emitParsedSseEvents(context.state);
+    }
+
+    if (context.state.buffer.trim() && !this.shouldStopSseStream(context)) {
+      yield* this.emitRemainingSseEvents(context.state.buffer);
+    }
+  }
+
+  private async readSseChunk(
+    context: Pick<OpenCodeSseStreamContext, 'reader' | 'signal' | 'state'>,
+  ): Promise<ReadableStreamReadResult<Uint8Array> | null> {
     try {
-      while (true) {
-        // Check if aborted before reading
-        if (aborted || signal?.aborted) {
-  
-          break;
-        }
-
-        let readResult: ReadableStreamReadResult<Uint8Array>;
-        try {
-          readResult = await reader.read();
-        } catch (readError) {
-          // Handle abort error gracefully
-          if (signal?.aborted || aborted) {
-
-            break;
-          }
-          // Re-throw other errors
-          throw readError;
-        }
-        
-        const { done, value } = readResult;
-        
-        if (done) {
-
-          break;
-        }
-
-        // Check abort again after read
-        if (aborted || signal?.aborted) {
-
-          break;
-        }
-
-        const chunk = decoder.decode(value, { stream: true });
-        // Print full chunk if it contains message.part.delta
-/*         if (chunk.includes('message.part.delta')) {
-
-        } else {
-
-        } */
-        buffer += chunk;
-        
-        // Process complete events in buffer
-        const events = this.streamEventTransformer.parseSSEEvents(buffer);
-        buffer = events.remaining;
-        
-/*         if (events.events.length > 0) {
-
-        } */
-        
-        for (const event of events.events) {
-          yield event;
-        }
-      }
-
-      // Process any remaining data
-      if (buffer.trim() && !aborted && !signal?.aborted) {
-        const events = this.streamEventTransformer.parseSSEEvents(buffer + '\n\n');
-        for (const event of events.events) {
-          yield event;
-        }
-      }
+      return await context.reader.read();
     } catch (error) {
-      // Handle abort errors gracefully - don't throw when aborted
-      if (signal?.aborted || (error instanceof Error && error.name === 'AbortError')) {
-
-        return;
+      if (this.isAbortedSseRead(error, context)) {
+        return null;
       }
       throw error;
-    } finally {
-      signal?.removeEventListener('abort', abortHandler);
-      reader.releaseLock();
-
     }
+  }
+
+  private shouldStopSseStream(
+    context: Pick<OpenCodeSseStreamContext, 'signal' | 'state'>,
+  ): boolean {
+    return context.state.aborted || context.signal?.aborted === true;
+  }
+
+  private isAbortedSseRead(
+    error: unknown,
+    context: Pick<OpenCodeSseStreamContext, 'signal' | 'state'>,
+  ): boolean {
+    return this.shouldStopSseStream(context) || (error instanceof Error && error.name === 'AbortError');
+  }
+
+  private *emitParsedSseEvents(state: OpenCodeSseReadState): Generator<OpenCodeSSEEvent, void, void> {
+    const events = this.streamEventTransformer.parseSSEEvents(state.buffer);
+    state.buffer = events.remaining;
+    yield* events.events;
+  }
+
+  private *emitRemainingSseEvents(buffer: string): Generator<OpenCodeSSEEvent, void, void> {
+    const events = this.streamEventTransformer.parseSSEEvents(buffer + '\n\n');
+    yield* events.events;
   }
 
   /** Get available models - Handles both string array and object formats */
@@ -1890,93 +1927,14 @@ export class OpenCodeService {
 
   /** Update settings */
   async updateSettings(settings: OpenCodianSettings): Promise<void> {
-    const previousSettings = this.settings;
-    const previousMode = previousSettings.server.mode;
-    const nextMode = settings.server.mode;
-    const previousToolCatalogScope = this.getToolCatalogScopeKey();
-    const serverConfigChanged =
-      previousSettings.server.local.host !== settings.server.local.host ||
-      previousSettings.server.local.port !== settings.server.local.port;
-    const authChanged =
-      previousSettings.server.auth.type !== settings.server.auth.type ||
-      previousSettings.server.auth.username !== settings.server.auth.username ||
-      previousSettings.server.auth.password !== settings.server.auth.password ||
-      previousSettings.server.auth.token !== settings.server.auth.token;
-    const shouldRestartManagedServer =
-      this.serverManager.isRunning() &&
-      nextMode === 'local' &&
-      (
-        previousMode !== nextMode
-        || serverConfigChanged
-        || authChanged
-        || previousSettings.modelSourceMode !== settings.modelSourceMode
-        || previousSettings.pluginIsolationMode !== settings.pluginIsolationMode
-      );
-    const shouldStopManagedServer =
-      this.serverManager.isRunning() &&
-      previousMode === 'local' &&
-      nextMode !== 'local';
-
-    if (
-      this.serverManager.isRunning() &&
-      previousMode === 'local' &&
-      nextMode === 'local' &&
-      serverConfigChanged
-    ) {
-      const endpointAvailable = await this.serverManager.canBindLocalEndpoint(
-        settings.server.local.host,
-        settings.server.local.port,
-      );
-      if (!endpointAvailable) {
-        throw new Error(`Cannot switch to ${settings.server.local.host}:${settings.server.local.port}. The target port is already in use.`);
-      }
-    }
-
-    const nextSettings = cloneSettings(settings);
-    const previousBaseUrl = this.baseUrl;
-    const shouldResumeSyncEvents = this.syncEventRuntime.hasListeners();
-    const shouldResumeOpenCodeEvents = this.openCodeEventRuntime.hasListeners();
-    this.settings = nextSettings;
-    this.baseUrl = getServerBaseUrl(nextSettings.server);
-    this.serverManager.updateConfig(this.buildServerConfig(nextSettings));
-    if (previousToolCatalogScope !== this.getToolCatalogScopeKey()) {
-      this.catalogState.clearToolSchemaCache();
-    }
-    this.syncEventRuntime.stopSubscription(shouldResumeSyncEvents);
-    this.openCodeEventRuntime.stopSubscriptions(shouldResumeOpenCodeEvents);
+    const plan = this.createSettingsUpdatePlan(settings);
+    await this.validateSettingsUpdatePlan(plan);
+    this.applySettingsUpdatePlan(plan);
 
     try {
-      if (shouldStopManagedServer) {
-        await this.serverManager.stop();
-        this.syncEventRuntime.ensureSubscription();
-        this.openCodeEventRuntime.ensureSubscriptions();
-        return;
-      }
-
-      if (shouldRestartManagedServer) {
-        await this.serverManager.restart();
-      }
-
-      this.syncEventRuntime.ensureSubscription();
-      this.openCodeEventRuntime.ensureSubscriptions();
+      await this.completeSettingsUpdatePlan(plan);
     } catch (error) {
-      this.settings = previousSettings;
-      this.baseUrl = previousBaseUrl;
-      this.serverManager.updateConfig(this.buildServerConfig(previousSettings));
-      if (previousToolCatalogScope !== this.getToolCatalogScopeKey()) {
-        this.catalogState.clearToolSchemaCache();
-      }
-      this.syncEventRuntime.stopSubscription(shouldResumeSyncEvents);
-      this.openCodeEventRuntime.stopSubscriptions(shouldResumeOpenCodeEvents);
-      if (previousMode === 'local' && (shouldRestartManagedServer || shouldStopManagedServer)) {
-        try {
-          await this.serverManager.start();
-        } catch (restoreError) {
-          logger.error('Failed to restore previous OpenCode server after settings update failure:', restoreError);
-        }
-      }
-      this.syncEventRuntime.ensureSubscription();
-      this.openCodeEventRuntime.ensureSubscriptions();
+      await this.rollbackSettingsUpdatePlan(plan);
       throw error;
     }
   }
@@ -2040,6 +1998,163 @@ export class OpenCodeService {
       modelSourceMode: settings.modelSourceMode,
       pluginIsolationMode: settings.pluginIsolationMode,
     };
+  }
+
+  private createSettingsUpdatePlan(settings: OpenCodianSettings): OpenCodeSettingsUpdatePlan {
+    const previousSettings = this.settings;
+    const previousMode = previousSettings.server.mode;
+    const nextMode = settings.server.mode;
+    const serverConfigChanged = this.hasLocalServerConfigChanged(previousSettings, settings);
+    const authChanged = this.hasServerAuthChanged(previousSettings, settings);
+
+    return {
+      previousSettings,
+      nextSettings: cloneSettings(settings),
+      previousMode,
+      nextMode,
+      previousToolCatalogScope: this.getToolCatalogScopeKey(),
+      previousBaseUrl: this.baseUrl,
+      shouldResumeSyncEvents: this.syncEventRuntime.hasListeners(),
+      shouldResumeOpenCodeEvents: this.openCodeEventRuntime.hasListeners(),
+      serverConfigChanged,
+      shouldRestartManagedServer: this.shouldRestartManagedServerForSettingsUpdate({
+        previousSettings,
+        nextSettings: settings,
+        previousMode,
+        nextMode,
+        serverConfigChanged,
+        authChanged,
+      }),
+      shouldStopManagedServer: this.shouldStopManagedServerForSettingsUpdate(previousMode, nextMode),
+    };
+  }
+
+  private hasLocalServerConfigChanged(
+    previousSettings: OpenCodianSettings,
+    nextSettings: OpenCodianSettings,
+  ): boolean {
+    return (
+      previousSettings.server.local.host !== nextSettings.server.local.host
+      || previousSettings.server.local.port !== nextSettings.server.local.port
+    );
+  }
+
+  private hasServerAuthChanged(
+    previousSettings: OpenCodianSettings,
+    nextSettings: OpenCodianSettings,
+  ): boolean {
+    return (
+      previousSettings.server.auth.type !== nextSettings.server.auth.type
+      || previousSettings.server.auth.username !== nextSettings.server.auth.username
+      || previousSettings.server.auth.password !== nextSettings.server.auth.password
+      || previousSettings.server.auth.token !== nextSettings.server.auth.token
+    );
+  }
+
+  private shouldRestartManagedServerForSettingsUpdate(
+    decision: OpenCodeSettingsRestartDecision,
+  ): boolean {
+    if (!this.serverManager.isRunning() || decision.nextMode !== 'local') {
+      return false;
+    }
+
+    return (
+      decision.previousMode !== decision.nextMode
+      || decision.serverConfigChanged
+      || decision.authChanged
+      || decision.previousSettings.modelSourceMode !== decision.nextSettings.modelSourceMode
+      || decision.previousSettings.pluginIsolationMode !== decision.nextSettings.pluginIsolationMode
+    );
+  }
+
+  private shouldStopManagedServerForSettingsUpdate(
+    previousMode: OpenCodianSettings['server']['mode'],
+    nextMode: OpenCodianSettings['server']['mode'],
+  ): boolean {
+    return this.serverManager.isRunning() && previousMode === 'local' && nextMode !== 'local';
+  }
+
+  private async validateSettingsUpdatePlan(plan: OpenCodeSettingsUpdatePlan): Promise<void> {
+    if (
+      !this.serverManager.isRunning()
+      || plan.previousMode !== 'local'
+      || plan.nextMode !== 'local'
+      || !plan.serverConfigChanged
+    ) {
+      return;
+    }
+
+    const endpointAvailable = await this.serverManager.canBindLocalEndpoint(
+      plan.nextSettings.server.local.host,
+      plan.nextSettings.server.local.port,
+    );
+    if (!endpointAvailable) {
+      throw new Error(
+        `Cannot switch to ${plan.nextSettings.server.local.host}:${plan.nextSettings.server.local.port}. The target port is already in use.`,
+      );
+    }
+  }
+
+  private applySettingsUpdatePlan(plan: OpenCodeSettingsUpdatePlan): void {
+    this.settings = plan.nextSettings;
+    this.baseUrl = getServerBaseUrl(plan.nextSettings.server);
+    this.serverManager.updateConfig(this.buildServerConfig(plan.nextSettings));
+    this.clearToolSchemaCacheIfScopeChanged(plan.previousToolCatalogScope);
+    this.pauseSettingsUpdateSubscriptions(plan);
+  }
+
+  private async completeSettingsUpdatePlan(plan: OpenCodeSettingsUpdatePlan): Promise<void> {
+    if (plan.shouldStopManagedServer) {
+      await this.serverManager.stop();
+      this.resumeSettingsUpdateSubscriptions();
+      return;
+    }
+
+    if (plan.shouldRestartManagedServer) {
+      await this.serverManager.restart();
+    }
+
+    this.resumeSettingsUpdateSubscriptions();
+  }
+
+  private async rollbackSettingsUpdatePlan(plan: OpenCodeSettingsUpdatePlan): Promise<void> {
+    this.settings = plan.previousSettings;
+    this.baseUrl = plan.previousBaseUrl;
+    this.serverManager.updateConfig(this.buildServerConfig(plan.previousSettings));
+    this.clearToolSchemaCacheIfScopeChanged(plan.previousToolCatalogScope);
+    this.pauseSettingsUpdateSubscriptions(plan);
+    await this.restorePreviousManagedServerAfterFailedUpdate(plan);
+    this.resumeSettingsUpdateSubscriptions();
+  }
+
+  private clearToolSchemaCacheIfScopeChanged(previousToolCatalogScope: string): void {
+    if (previousToolCatalogScope !== this.getToolCatalogScopeKey()) {
+      this.catalogState.clearToolSchemaCache();
+    }
+  }
+
+  private pauseSettingsUpdateSubscriptions(plan: OpenCodeSettingsUpdatePlan): void {
+    this.syncEventRuntime.stopSubscription(plan.shouldResumeSyncEvents);
+    this.openCodeEventRuntime.stopSubscriptions(plan.shouldResumeOpenCodeEvents);
+  }
+
+  private resumeSettingsUpdateSubscriptions(): void {
+    this.syncEventRuntime.ensureSubscription();
+    this.openCodeEventRuntime.ensureSubscriptions();
+  }
+
+  private async restorePreviousManagedServerAfterFailedUpdate(
+    plan: OpenCodeSettingsUpdatePlan,
+  ): Promise<void> {
+    if (plan.previousMode !== 'local' || (!plan.shouldRestartManagedServer && !plan.shouldStopManagedServer)) {
+      return;
+    }
+
+    try {
+      await this.serverManager.start();
+    } catch (restoreError) {
+      logger.error('Failed to restore previous OpenCode server after settings update failure:', restoreError);
+    }
   }
 
   private ensureBaseUrl(): void {
