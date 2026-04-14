@@ -23,6 +23,7 @@ import { SettingsSectionCoordinator } from './SettingsSectionCoordinator';
 import { SettingsSecuritySection } from './SettingsSecuritySection';
 import { SettingsServerSection } from './SettingsServerSection';
 import { SettingsStyleSection } from './SettingsStyleSection';
+import { SettingsUiSection } from './SettingsUiSection';
 
 const logger = createLogger('OpenCodianSettings');
 
@@ -91,6 +92,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
   private modelSection: SettingsModelSection | null = null;
   private pluginSection: SettingsPluginSection | null = null;
   private styleSection: SettingsStyleSection | null = null;
+  private uiSection: SettingsUiSection | null = null;
   private serverSection: SettingsServerSection | null = null;
 
   constructor(app: App, plugin: OpenCodianPlugin) {
@@ -197,6 +199,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     this.modelSection?.dispose();
     this.pluginSection?.dispose();
     this.styleSection?.dispose();
+    this.uiSection?.dispose();
     this.serverSection?.dispose();
     this.serverSection = null;
     this.refreshModelCatalogStatusCallback = undefined;
@@ -343,6 +346,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     this.styleSection?.dispose();
     this.modelSection?.dispose();
     this.pluginSection?.dispose();
+    this.uiSection?.dispose();
     this.refreshModelsCallback = undefined;
     this.refreshTitleModelsCallback = undefined;
     super.hide();
@@ -359,95 +363,11 @@ export class OpenCodianSettingTab extends PluginSettingTab {
 
   /** UI settings section */
   private addUISettings(containerEl: HTMLElement): HTMLHeadingElement {
-    const headingEl = this.createSectionHeading(
-      containerEl,
-      t('settings.ui.title'),
-      t('settings.quickNav.uiDesc'),
-    );
-
-    new Setting(containerEl)
-      .setName(t('settings.ui.maxTabs.name'))
-      .setDesc(t('settings.ui.maxTabs.desc'))
-      .addSlider((slider) =>
-        slider
-          .setLimits(3, 10, 1)
-          .setValue(this.plugin.settings.maxTabs)
-          .setDynamicTooltip()
-          .onChange(async (value) => {
-            this.plugin.settings.maxTabs = value;
-            await this.plugin.saveSettings();
-          })
-      );
-
-    new Setting(containerEl)
-      .setName(t('settings.ui.tabPosition.name'))
-      .setDesc(t('settings.ui.tabPosition.desc'))
-      .addDropdown((dropdown) => {
-        dropdown.addOption('input', t('settings.ui.tabPosition.input'));
-        dropdown.addOption('header', t('settings.ui.tabPosition.header'));
-        dropdown.addOption('below-header', t('settings.ui.tabPosition.belowHeader'));
-        dropdown
-          .setValue(this.plugin.settings.tabBarPosition)
-          .onChange(async (value) => {
-            this.plugin.settings.tabBarPosition = value as 'input' | 'header' | 'below-header';
-            await this.plugin.saveSettings();
-          });
-      });
-
-    new Setting(containerEl)
-      .setName(t('settings.ui.belowHeaderTabLayout.name'))
-      .setDesc(t('settings.ui.belowHeaderTabLayout.desc'))
-      .addDropdown((dropdown) => {
-        dropdown.addOption('grid', t('settings.ui.belowHeaderTabLayout.grid'));
-        dropdown.addOption('vertical', t('settings.ui.belowHeaderTabLayout.vertical'));
-        dropdown
-          .setValue(this.plugin.settings.belowHeaderTabBarLayout)
-          .onChange(async (value) => {
-            this.plugin.settings.belowHeaderTabBarLayout = value as 'grid' | 'vertical';
-            await this.plugin.saveSettings();
-          });
-      });
-
-    new Setting(containerEl)
-      .setName(t('settings.ui.autoScroll.name'))
-      .setDesc(t('settings.ui.autoScroll.desc'))
-      .addToggle((toggle) =>
-        toggle
-          .setValue(this.plugin.settings.enableAutoScroll)
-          .onChange(async (value) => {
-            this.plugin.settings.enableAutoScroll = value;
-            await this.plugin.saveSettings();
-          })
-      );
-
-    new Setting(containerEl)
-      .setName(t('settings.ui.chatScrollMode.name'))
-      .setDesc(t('settings.ui.chatScrollMode.desc'))
-      .addDropdown((dropdown) => {
-        dropdown.addOption('natural', t('settings.ui.chatScrollMode.natural'));
-        dropdown.addOption('sticky-basic', t('settings.ui.chatScrollMode.stickyBasic'));
-        dropdown.addOption('sticky-mask', t('settings.ui.chatScrollMode.stickyMask'));
-        dropdown
-          .setValue(this.plugin.settings.chatScrollMode)
-          .onChange(async (value) => {
-            this.plugin.settings.chatScrollMode = value as 'natural' | 'sticky-basic' | 'sticky-mask';
-            await this.plugin.saveSettings();
-          });
-      });
-
-    new Setting(containerEl)
-      .setName(t('settings.ui.openInMainTab.name'))
-      .setDesc(t('settings.ui.openInMainTab.desc'))
-      .addToggle((toggle) =>
-        toggle
-          .setValue(this.plugin.settings.openInMainTab)
-          .onChange(async (value) => {
-            this.plugin.settings.openInMainTab = value;
-            await this.plugin.saveSettings();
-          })
-      );
-
-    return headingEl;
+    this.uiSection ??= new SettingsUiSection({
+      plugin: this.plugin,
+      createSectionHeading: (hostEl, title, tooltip) => this.createSectionHeading(hostEl, title, tooltip),
+    });
+    return this.uiSection.attach(containerEl);
   }
 
   /** Style settings section */

@@ -2,11 +2,11 @@
 
 > **状态**: [READY]
 > **作用**: 这是 maintainability 无人值守的战略文档。每轮开始前，先读本文件，再读 `docs/status/maintainability-round-roadmap.md` 与最近的 `docs/status/maintainability-phase-XXX.md`。
-> **自动推进状态**: `R52` 已完成 plugin section owner seam；当前首个 `[NEXT]` 为 `R53 - OpenCodianSettings UI section lifecycle seam`，恢复运行时必须继续按 roadmap 队列顺序执行，不允许 freestyle。
+> **自动推进状态**: `R53` 已完成 UI section lifecycle seam；当前首个 `[NEXT]` 为 `R54 - OpenCodianSettings debug section lifecycle seam`，恢复运行时必须继续按 roadmap 队列顺序执行，不允许 freestyle。
 
 ## 1. 当前判断
 
-**当前分支已完成 `R52`，把 `OpenCodianSettings` 的 plugin section owner seam 收口到专属 owner。** 当前 lint 基线保持在 `0 errors / 92 warnings`，后续应继续按 queue 推进 settings residual seams、基础服务热点与显式 warning reduction。
+**当前分支已完成 `R53`，把 `OpenCodianSettings` 的 UI section lifecycle 收口到专属 owner。** 当前 lint 基线保持在 `0 errors / 92 warnings`，后续应继续按 queue 推进 debug 残余 seam、基础服务热点与显式 warning reduction。
 
 这批夜间队列的主线是：
 
@@ -19,15 +19,15 @@
 
 - **lint**: `0 errors / 92 warnings`
 - **验证**:
-  - 最近一次已确认的全量测试为 `R52`：`npm test` 通过，`260 passed, 260 total` suites；`1102 passed, 1102 total` tests
-  - 最近一次已确认的构建通过为 `R52`：`npm run build`，`BUILD_ID` `autopilot-maintainability.202604150350`
-  - 最近一次已确认的 Test Vault 部署也来自 `R52`
+  - 最近一次已确认的全量测试为 `R53`：`npm test` 通过，`261 passed, 261 total` suites；`1105 passed, 1105 total` tests
+  - 最近一次已确认的构建通过为 `R53`：`npm run build`，`BUILD_ID` `autopilot-maintainability.202604150402`
+  - 最近一次已确认的 Test Vault 部署也来自 `R53`
 - **本批目标**:
   - 保持 `0 errors`
   - 在保持受控 queue 的前提下继续做高确定性 maintainability seam
   - 把 warning baseline 从当前 `92` 继续往低八十区间推进；若未达成，`R67` checkpoint 必须明确说明剩余高成本阻塞
 - **下一批高确定性切口**:
-  - `R53-R54`: `OpenCodianSettings` residual thick section seams
+  - `R54`: `OpenCodianSettings` debug thick section seam
   - `R55-R63`: `ServerManager` / `ModelConfigService` / `OpenCodeMessageNormalizationMapper` / `ProviderIconService` 热点
   - `R64-R66`: warning cleanup batches
   - `R67`: checkpoint
@@ -49,6 +49,7 @@
 - **R50**: 吸收 `R49` 收尾留下的 `SettingsStyleSection` unused symbol 与 `SettingsModelSection` test import-sort lint error，把 live lint 恢复到 `0 errors / 92 warnings`
 - **R51**: `SettingsConversationSection` 接管 `OpenCodianSettings.addConversationSettings()` 的 title mode/model picker、question card display/position、answered-card toggle 与 user-markup render lifecycle，并补齐直接相关测试与模块文档
 - **R52**: `SettingsPluginSection` 接管 `OpenCodianSettings.addPluginSettings()` 的 plugin environment snapshot、project config plugin editor、isolation mode、project plugin directory 与 OMO config lifecycle，并补齐直接相关测试与模块文档
+- **R53**: `SettingsUiSection` 接管 `OpenCodianSettings.addUISettings()` 的 max tabs、tab position/layout、auto scroll、chat scroll mode 与 open-in-main-tab lifecycle，并补齐直接相关测试与模块文档
 
 ## 4. 本批结论
 
