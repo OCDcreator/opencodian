@@ -1,19 +1,19 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [CONFIRMED_NEXT_BATCH] `W12 - StorageService theme background mime trim` 已完成；当前 `[NEXT]` 是 `W13 - OpenCodeMessageNormalizationMapper complexity trim`，后续已排队 `W14-W15`。
+> **当前状态**: [CONFIRMED_NEXT_BATCH] `W13 - OpenCodeMessageNormalizationMapper complexity trim` 已完成；当前 `[NEXT]` 是 `W14 - BackgroundTaskTimelineService collectSegments trim`，后续已排队 `W15`。
 
 ## 当前优先级
 
-- **当前 `[NEXT]`**：`W13 - OpenCodeMessageNormalizationMapper complexity trim`
-- **本批目标**：先在 `OpenCodeMessageNormalizationMapper` 现有 owner 内收掉 message normalization 的 complexity warning，再按 `W14` 继续 background-task timeline complexity trim，最后 `W15` checkpoint 后暂停
-- **当前 lint 基线**：`0 errors / 93 warnings`
+- **当前 `[NEXT]`**：`W14 - BackgroundTaskTimelineService collectSegments trim`
+- **本批目标**：先在 `BackgroundTaskTimelineService` 现有 owner 内收掉 background-task timeline 的 complexity warning，再按 `W15` 完成 checkpoint 后暂停
+- **当前 lint 基线**：`0 errors / 92 warnings`
 - **本批热点顺序**：
-  1. `src/core/opencode/OpenCodeMessageNormalizationMapper.ts`
-  2. `tests/unit/core/opencode/OpenCodeMessageNormalizationMapper.test.ts`
-  3. `src/features/chat/services/BackgroundTaskTimelineService.ts`
-  4. `tests/unit/features/chat/BackgroundTaskTimelineService.test.ts`
-  5. `docs/status/maintainability-phase-364.md`
+  1. `src/features/chat/services/BackgroundTaskTimelineService.ts`
+  2. `tests/unit/features/chat/BackgroundTaskTimelineService.test.ts`
+  3. `tests/unit/features/chat/backgroundTaskTimeline.test.ts`
+  4. `docs/status/maintainability-phase-365.md`
+  5. `src/core/opencode/OpenCodeMessageNormalizationMapper.ts`
 - **下一暂停点**：`W15 - Warning cleanup checkpoint`；完成后若无人工追加 queue item，则重新停回无 `[NEXT]` 状态
 - **观察但暂不自动切入**：`src/features/settings/OpenCodianSettings.ts`、`tests/unit/core/opencode/OpenCodeService.test.ts`
 
@@ -34,4 +34,4 @@
 ## 历史入口
 
 - 批次归档：`docs/status/maintainability-completed-batches.md`
-- 最近 checkpoint：`docs/status/maintainability-phase-364.md`
+- 最近 checkpoint：`docs/status/maintainability-phase-365.md`

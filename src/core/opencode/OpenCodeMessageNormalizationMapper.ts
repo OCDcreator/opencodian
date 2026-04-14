@@ -66,6 +66,9 @@ interface OpenCodeToolPartData extends OpenCodeMessagePart {
   state?: OpenCodeToolStateData;
 }
 
+type OpenCodeChatRole = ChatMessage['role'];
+type OpenCodeTextPart = OpenCodeMessagePart & { text: string };
+
 function resolveReasoningDurationSeconds(
   part: Pick<OpenCodeMessagePart, 'duration' | 'time'>,
 ): number | undefined {
@@ -137,139 +140,21 @@ export class OpenCodeMessageNormalizationMapper {
     vaultPath?: string,
     toolIdentityContext: OpenCodeCatalogToolIdentityContext = {},
   ): ChatMessage {
-    const role = info.role === 'assistant' ? 'assistant' : 'user';
-
-    const textParts = parts.filter((part): part is OpenCodeMessagePart & { text: string } =>
-      part.type === 'text' && typeof part.text === 'string'
-    );
-    const visibleTextParts: string[] = [];
-    const contextAttachments: MessageContextAttachment[] = [];
-
-    for (const part of textParts) {
-      if (role === 'user') {
-        const contextAttachment = parseObsidianContextTag(part.text);
-        if (contextAttachment) {
-          contextAttachments.push(contextAttachment);
-          continue;
-        }
-
-        if ((part as OpenCodeMessagePart & { synthetic?: boolean }).synthetic === true) {
-          const inlineReadContext = this.extractInlineReadToolContext(part.text, vaultPath);
-          if (inlineReadContext.attachments.length > 0) {
-            contextAttachments.push(...inlineReadContext.attachments);
-          }
-          continue;
-        }
-      }
-
-      visibleTextParts.push(part.text);
-    }
-
-    let content = visibleTextParts.join('');
-
-    if (role === 'user') {
-      for (const part of parts) {
-        const contextAttachment = this.parseFileContextAttachment(part, vaultPath);
-        if (contextAttachment) {
-          contextAttachments.push(contextAttachment);
-        }
-      }
-
-      const inlineReadContext = this.extractInlineReadToolContext(content, vaultPath);
-      content = inlineReadContext.content;
-      contextAttachments.push(...inlineReadContext.attachments);
-    }
-
-    const thinkingParts = parts.filter((part): part is OpenCodeMessagePart & { text: string } =>
-      part.type === 'reasoning' && typeof part.text === 'string'
-    );
-
-    const toolParts = parts.filter((part) =>
-      part.type === 'tool' && !isInternalStructuredOutputTool((part as OpenCodeToolPartData).tool),
-    ) as OpenCodeToolPartData[];
-    const toolCalls = toolParts
-      .filter((part) => {
-        const toolStatus = resolveToolExecutionStatus({
-          toolName: part.tool,
-          state: part.state,
-        });
-        return toolStatus === 'pending' || toolStatus === 'running';
-      })
-      .map((part) => ({
-        id: part.callID ?? '',
-        name: part.tool ?? '',
-        toolSourceKey: part.tool ?? undefined,
-        kind: this.getOpenCodeToolKind(part.tool, toolIdentityContext),
-        input: part.state?.input ?? {},
-        status: 'pending' as const,
-      }));
-
-    const contentBlocks: ContentBlock[] = [];
-
-    for (const part of thinkingParts) {
-      contentBlocks.push({
-        type: 'thinking',
-        thinking: part.text,
-        durationSeconds: resolveReasoningDurationSeconds(part),
-      });
-    }
-
-    const processedToolIds = new Set<string>();
-    for (const part of toolParts) {
-      const toolId = part.callID || part.id;
-      if (!toolId || processedToolIds.has(toolId)) {
-        continue;
-      }
-
-      processedToolIds.add(toolId);
-
-      const resultPart = toolParts.find((candidate) => {
-        if ((candidate.callID || candidate.id) !== toolId) {
-          return false;
-        }
-
-        const toolStatus = resolveToolExecutionStatus({
-          toolName: candidate.tool,
-          state: candidate.state,
-        });
-        return toolStatus === 'completed' || toolStatus === 'error';
-      });
-      const toolStatus = resolveToolExecutionStatus({
-        toolName: part.tool,
-        state: resultPart?.state ?? part.state,
-      });
-
-      contentBlocks.push({
-        type: 'tool_use',
-        toolId,
-        toolName: part.tool || 'unknown',
-        toolSourceKey: part.tool || undefined,
-        toolKind: this.getOpenCodeToolKind(part.tool, toolIdentityContext),
-        toolInput: part.state?.input || {},
-        toolStatus,
-        toolResult: resolveToolResultText(resultPart?.state),
-      });
-    }
-
-    if (content) {
-      contentBlocks.push({ type: 'text', text: content });
-    }
-
+    const role: OpenCodeChatRole = info.role === 'assistant' ? 'assistant' : 'user';
+    const { content, contextAttachments } = this.collectMessageTextState(role, parts, vaultPath);
+    const toolParts = this.collectRenderableToolParts(parts);
+    const toolCalls = this.buildPendingToolCalls(toolParts, toolIdentityContext);
+    const contentBlocks = this.buildContentBlocks(parts, toolParts, content, toolIdentityContext);
     const timestamp = typeof info.time?.created === 'number'
       ? info.time.created
       : Date.now();
-    const omo = detectOmoMessageMeta(role, content);
-    const normalizedContent = omo?.kind === 'user-injection'
-      ? omo.originalText
-      : omo?.kind === 'system-reminder'
-        ? omo.reminderText
-        : content;
+    const normalizedContent = this.normalizeOmoContent(role, content);
     const structured = role === 'assistant' ? info.structured : undefined;
 
     return {
       id: info.id,
       role,
-      content: normalizedContent,
+      content: normalizedContent.content,
       timestamp,
       modelId: role === 'assistant'
         ? OpenCodeMessageNormalizationMapper.formatModelIdentifier(info.providerID, info.modelID)
@@ -280,9 +165,9 @@ export class OpenCodeMessageNormalizationMapper {
       contextAttachments: contextAttachments.length > 0
         ? this.dedupeContextAttachments(contextAttachments)
         : undefined,
-      displayStyle: omo?.kind === 'system-reminder' ? 'notice' : undefined,
-      noticeTone: omo?.kind === 'system-reminder' ? 'info' : undefined,
-      omo: omo ?? undefined,
+      displayStyle: normalizedContent.displayStyle,
+      noticeTone: normalizedContent.noticeTone,
+      omo: normalizedContent.omo,
       structured,
       parts,
     };
@@ -349,6 +234,209 @@ export class OpenCodeMessageNormalizationMapper {
       options,
       multiple: prompt.multiple === true,
       custom: prompt.custom !== false,
+    };
+  }
+
+  private collectMessageTextState(
+    role: OpenCodeChatRole,
+    parts: OpenCodeMessagePart[],
+    vaultPath?: string,
+  ): { content: string; contextAttachments: MessageContextAttachment[] } {
+    const visibleTextParts: string[] = [];
+    const contextAttachments: MessageContextAttachment[] = [];
+
+    for (const part of parts) {
+      if (part.type !== 'text' || typeof part.text !== 'string') {
+        continue;
+      }
+
+      const normalizedPart = this.normalizeTextPart(role, part, vaultPath);
+      if (normalizedPart.visibleText) {
+        visibleTextParts.push(normalizedPart.visibleText);
+      }
+      if (normalizedPart.attachments.length > 0) {
+        contextAttachments.push(...normalizedPart.attachments);
+      }
+    }
+
+    const content = visibleTextParts.join('');
+    if (role !== 'user') {
+      return { content, contextAttachments };
+    }
+
+    contextAttachments.push(...this.collectFileContextAttachments(parts, vaultPath));
+
+    const inlineReadContext = this.extractInlineReadToolContext(content, vaultPath);
+    return {
+      content: inlineReadContext.content,
+      contextAttachments: contextAttachments.concat(inlineReadContext.attachments),
+    };
+  }
+
+  private normalizeTextPart(
+    role: OpenCodeChatRole,
+    part: OpenCodeTextPart,
+    vaultPath?: string,
+  ): { visibleText?: string; attachments: MessageContextAttachment[] } {
+    if (role !== 'user') {
+      return {
+        visibleText: part.text,
+        attachments: [],
+      };
+    }
+
+    const contextAttachment = parseObsidianContextTag(part.text);
+    if (contextAttachment) {
+      return { attachments: [contextAttachment] };
+    }
+
+    if ((part as OpenCodeMessagePart & { synthetic?: boolean }).synthetic === true) {
+      return this.extractInlineReadToolContext(part.text, vaultPath);
+    }
+
+    return {
+      visibleText: part.text,
+      attachments: [],
+    };
+  }
+
+  private collectFileContextAttachments(
+    parts: OpenCodeMessagePart[],
+    vaultPath?: string,
+  ): MessageContextAttachment[] {
+    return parts.reduce<MessageContextAttachment[]>((attachments, part) => {
+      const contextAttachment = this.parseFileContextAttachment(part, vaultPath);
+      if (contextAttachment) {
+        attachments.push(contextAttachment);
+      }
+      return attachments;
+    }, []);
+  }
+
+  private collectRenderableToolParts(parts: OpenCodeMessagePart[]): OpenCodeToolPartData[] {
+    return parts.filter((part) =>
+      part.type === 'tool' && !isInternalStructuredOutputTool((part as OpenCodeToolPartData).tool),
+    ) as OpenCodeToolPartData[];
+  }
+
+  private buildPendingToolCalls(
+    toolParts: OpenCodeToolPartData[],
+    toolIdentityContext: OpenCodeCatalogToolIdentityContext,
+  ) {
+    return toolParts
+      .filter((part) => {
+        const toolStatus = resolveToolExecutionStatus({
+          toolName: part.tool,
+          state: part.state,
+        });
+        return toolStatus === 'pending' || toolStatus === 'running';
+      })
+      .map((part) => ({
+        id: part.callID ?? '',
+        name: part.tool ?? '',
+        toolSourceKey: part.tool ?? undefined,
+        kind: this.getOpenCodeToolKind(part.tool, toolIdentityContext),
+        input: part.state?.input ?? {},
+        status: 'pending' as const,
+      }));
+  }
+
+  private buildContentBlocks(
+    parts: OpenCodeMessagePart[],
+    toolParts: OpenCodeToolPartData[],
+    content: string,
+    toolIdentityContext: OpenCodeCatalogToolIdentityContext,
+  ): ContentBlock[] {
+    const contentBlocks = [
+      ...this.buildThinkingContentBlocks(parts),
+      ...this.buildToolUseContentBlocks(toolParts, toolIdentityContext),
+    ];
+
+    if (content) {
+      contentBlocks.push({ type: 'text', text: content });
+    }
+
+    return contentBlocks;
+  }
+
+  private buildThinkingContentBlocks(parts: OpenCodeMessagePart[]): ContentBlock[] {
+    return parts
+      .filter((part): part is OpenCodeTextPart =>
+        part.type === 'reasoning' && typeof part.text === 'string'
+      )
+      .map((part) => ({
+        type: 'thinking' as const,
+        thinking: part.text,
+        durationSeconds: resolveReasoningDurationSeconds(part),
+      }));
+  }
+
+  private buildToolUseContentBlocks(
+    toolParts: OpenCodeToolPartData[],
+    toolIdentityContext: OpenCodeCatalogToolIdentityContext,
+  ): ContentBlock[] {
+    const contentBlocks: ContentBlock[] = [];
+    const processedToolIds = new Set<string>();
+
+    for (const part of toolParts) {
+      const toolId = part.callID || part.id;
+      if (!toolId || processedToolIds.has(toolId)) {
+        continue;
+      }
+
+      processedToolIds.add(toolId);
+      const resultPart = this.findResolvedToolResultPart(toolParts, toolId);
+      const toolStatus = resolveToolExecutionStatus({
+        toolName: part.tool,
+        state: resultPart?.state ?? part.state,
+      });
+
+      contentBlocks.push({
+        type: 'tool_use',
+        toolId,
+        toolName: part.tool || 'unknown',
+        toolSourceKey: part.tool || undefined,
+        toolKind: this.getOpenCodeToolKind(part.tool, toolIdentityContext),
+        toolInput: part.state?.input || {},
+        toolStatus,
+        toolResult: resolveToolResultText(resultPart?.state),
+      });
+    }
+
+    return contentBlocks;
+  }
+
+  private findResolvedToolResultPart(
+    toolParts: OpenCodeToolPartData[],
+    toolId: string,
+  ): OpenCodeToolPartData | undefined {
+    return toolParts.find((candidate) => {
+      if ((candidate.callID || candidate.id) !== toolId) {
+        return false;
+      }
+
+      const toolStatus = resolveToolExecutionStatus({
+        toolName: candidate.tool,
+        state: candidate.state,
+      });
+      return toolStatus === 'completed' || toolStatus === 'error';
+    });
+  }
+
+  private normalizeOmoContent(
+    role: OpenCodeChatRole,
+    content: string,
+  ): Pick<ChatMessage, 'content' | 'displayStyle' | 'noticeTone' | 'omo'> {
+    const omo = detectOmoMessageMeta(role, content);
+    return {
+      content: omo?.kind === 'user-injection'
+        ? omo.originalText
+        : omo?.kind === 'system-reminder'
+          ? omo.reminderText
+          : content,
+      displayStyle: omo?.kind === 'system-reminder' ? 'notice' : undefined,
+      noticeTone: omo?.kind === 'system-reminder' ? 'info' : undefined,
+      omo: omo ?? undefined,
     };
   }
 

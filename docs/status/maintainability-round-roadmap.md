@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的 `[NEXT]`”。
-> **当前状态**: [CONFIRMED_NEXT_BATCH] `W12 - StorageService theme background mime trim` 已完成；当前可自动执行的 `[NEXT]` 是 `W13 - OpenCodeMessageNormalizationMapper complexity trim`。后续已排队 `W14-W15`，`W15` 完成后必须再次暂停并等待人工确认。
+> **当前状态**: [CONFIRMED_NEXT_BATCH] `W13 - OpenCodeMessageNormalizationMapper complexity trim` 已完成；当前可自动执行的 `[NEXT]` 是 `W14 - BackgroundTaskTimelineService collectSegments trim`。后续已排队 `W15`，`W15` 完成后必须再次暂停并等待人工确认。
 
 ## 控制规则
 
@@ -16,11 +16,11 @@
 ## 当前背景
 
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
-- 当前 lint 基线：`0 errors / 93 warnings`
+- 当前 lint 基线：`0 errors / 92 warnings`
 - checkpoint 建议：下一批继续一小批现有 owner 内的 warning cleanup，而不是自动恢复 `R33+`
-- 当前可自动执行的 `[NEXT]`：`W13 - OpenCodeMessageNormalizationMapper complexity trim`
-- `W12` 已在 `StorageService` 现有 owner 内收掉 `detectThemeBackgroundMimeType` 的 1 条 `complexity` warning，当前 lint 基线更新为 `0 errors / 93 warnings`
-- 后续已排队 `W14-W15`；`W15` 完成后若无人追加 queue item，则必须重新写回“当前没有可自动执行的 `[NEXT]`”
+- 当前可自动执行的 `[NEXT]`：`W14 - BackgroundTaskTimelineService collectSegments trim`
+- `W13` 已在 `OpenCodeMessageNormalizationMapper` 现有 owner 内收掉 `openCodeMessageToChatMessage` 的 1 条 `complexity` warning，当前 lint 基线更新为 `0 errors / 92 warnings`
+- 后续已排队 `W15`；`W15` 完成后若无人追加 queue item，则必须重新写回“当前没有可自动执行的 `[NEXT]`”
 
 ## Queue
 
@@ -144,7 +144,7 @@
   - `detectThemeBackgroundMimeType` 的 `complexity` warning 消失
   - 运行 focused validation、全量 `npm test`、`npm run build`
 
-### [NEXT] W13 - OpenCodeMessageNormalizationMapper complexity trim
+### [DONE] W13 - OpenCodeMessageNormalizationMapper complexity trim
 
 - **Lane**: Warning cleanup / opencode normalization hotspot
 - **目标**: 只处理 `src/core/opencode/OpenCodeMessageNormalizationMapper.ts` 中 `openCodeMessageToChatMessage` 的 `complexity` warning；优先通过同文件内的局部 helper 或 guard clause 收束角色/part/metadata 分支，保持 OMO compatibility 与 message normalization 输出语义不变。
@@ -162,7 +162,7 @@
   - `openCodeMessageToChatMessage` 的 `complexity` warning 消失
   - 运行 focused validation、全量 `npm test`、`npm run build`
 
-### [QUEUED] W14 - BackgroundTaskTimelineService collectSegments trim
+### [NEXT] W14 - BackgroundTaskTimelineService collectSegments trim
 
 - **Lane**: Warning cleanup / chat background-task hotspot
 - **目标**: 只处理 `src/features/chat/services/BackgroundTaskTimelineService.ts` 中 `collectSegments` 的 `complexity` warning；优先通过同文件内的局部 helper 或 guard clause 收束 segment creation、tool launch collection 与 completion reminder matching，保持 hydration、suppression 与 background-task timeline 语义不变。
@@ -199,4 +199,4 @@
 
 ## 当前自动队列状态
 
-当前可自动执行的 `[NEXT]` 是 `W13 - OpenCodeMessageNormalizationMapper complexity trim`。后续已排队 `W14-W15`；`W15` 完成后若没有新的人工追加 queue item，则必须重新写明“当前没有可自动执行的 `[NEXT]`”。
+当前可自动执行的 `[NEXT]` 是 `W14 - BackgroundTaskTimelineService collectSegments trim`。后续已排队 `W15`；`W15` 完成后若没有新的人工追加 queue item，则必须重新写明“当前没有可自动执行的 `[NEXT]`”。
