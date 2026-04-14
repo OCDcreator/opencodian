@@ -71,6 +71,52 @@ describe('OpenCodeMessageNormalizationMapper', () => {
     ]);
   });
 
+  it('deduplicates context attachments from Obsidian tags and file parts', () => {
+    const message = mapper.openCodeMessageToChatMessage(
+      {
+        id: 'msg-user-context',
+        sessionID: 'session-1',
+        role: 'user',
+        time: { created: 123 },
+      } as never,
+      [
+        {
+          type: 'text',
+          id: 'part-user-text',
+          sessionID: 'session-1',
+          messageID: 'msg-user-context',
+          text: '处理这个文件',
+        },
+        {
+          type: 'text',
+          id: 'part-user-context-tag',
+          sessionID: 'session-1',
+          messageID: 'msg-user-context',
+          text: '<obsidian_context kind="selection" path="docs/note.md" lines="3-4">摘录</obsidian_context>',
+        },
+        {
+          type: 'file',
+          id: 'part-user-file',
+          sessionID: 'session-1',
+          messageID: 'msg-user-context',
+          url: 'file:///vault/docs/note.md?start=3&end=4',
+        },
+      ] as never,
+      '/vault',
+    );
+
+    expect(message.content).toBe('处理这个文件');
+    expect(message.contextAttachments).toEqual([
+      expect.objectContaining({
+        kind: 'selection',
+        path: 'docs/note.md',
+        label: 'note.md:3-4',
+        lineRange: { startLine: 3, endLine: 4 },
+        textSnapshot: '摘录',
+      }),
+    ]);
+  });
+
   it('hydrates historical tool metadata using the catalog identity context', () => {
     const message = mapper.openCodeMessageToChatMessage(
       {
@@ -296,6 +342,7 @@ describe('OpenCodeMessageNormalizationMapper', () => {
   });
 
   it('maps OMO system reminders to notice messages', () => {
+    const reminderText = '<system-reminder>\n[BACKGROUND TASK COMPLETED]\n**ID:** `bg_8f454ac6`\n**Description:** 探索系统进程和文件管理\n</system-reminder>\n<!-- OMO_INTERNAL_INITIATOR -->';
     const message = mapper.openCodeMessageToChatMessage(
       {
         id: 'msg-omo-reminder',
@@ -311,7 +358,7 @@ describe('OpenCodeMessageNormalizationMapper', () => {
           id: 'part-omo-reminder',
           sessionID: 'session-1',
           messageID: 'msg-omo-reminder',
-          text: '<system-reminder>\n[BACKGROUND TASK COMPLETED]\n**ID:** `bg_8f454ac6`\n**Description:** 探索系统进程和文件管理\n</system-reminder>\n<!-- OMO_INTERNAL_INITIATOR -->',
+          text: reminderText,
         },
       ] as never,
     );
@@ -319,6 +366,10 @@ describe('OpenCodeMessageNormalizationMapper', () => {
     expect(message.displayStyle).toBe('notice');
     expect(message.noticeTone).toBe('info');
     expect(message.content).toContain('[BACKGROUND TASK COMPLETED]');
+    expect(message.contentBlocks).toContainEqual({
+      type: 'text',
+      text: reminderText,
+    });
     expect(message.omo).toMatchObject({
       kind: 'system-reminder',
       reminderType: 'background-task-completed',
