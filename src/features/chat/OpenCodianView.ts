@@ -7,12 +7,8 @@
 import type { Editor, EventRef, WorkspaceLeaf } from 'obsidian';
 import { addIcon, Component, ItemView, MarkdownView, normalizePath, Notice, Scope, setIcon } from 'obsidian';
 
-import type { ModelCatalogBundle } from '../../core/config';
 import {
-  formatModelReference,
   type ResolvedModelSelection,
-  resolveModelSelection,
-  resolvePreferredAvailableModel,
 } from '../../core/config/modelConfig';
 import {
   type SessionActivityStatus,
@@ -326,9 +322,7 @@ import { ContextDetailModal, type ContextRawMessageItem } from './ui/ContextDeta
 import { ContextRing } from './ui/ContextRing';
 import { EffortSelector } from './ui/EffortSelector';
 import type {
-  ModelSelectorAvailableModelInfo,
   ModelSelectorKnownModelInfo,
-  ModelSelectorProvider,
   ModelSelectorSelection,
 } from './ui/modelSelector/types';
 import { NavigationSidebar } from './ui/NavigationSidebar';
@@ -549,12 +543,6 @@ export class OpenCodianView extends ItemView {
   private chatSelectionControlsCoordinator: ChatSelectionControlsCoordinator;
   private composerInputShellCoordinator: ComposerInputShellCoordinator;
   private inputPanelAppearanceCoordinator: InputPanelAppearanceCoordinator;
-
-  // Model catalog state
-  private availableModels: ModelSelectorAvailableModelInfo[] = [];
-  private availableProviders: ModelSelectorProvider[] = [];
-  private modelCatalogBundle: ModelCatalogBundle | null = null;
-  private hasLoadedModelCatalog = false;
 
   // Navigation sidebar
   private navigationSidebar: NavigationSidebar | null = null;
@@ -784,22 +772,55 @@ export class OpenCodianView extends ItemView {
       registerEscapeHandler: (handler) => {
         this.scope?.register([], 'Escape', handler);
       },
-      loadModelCatalog: () => this.loadAvailableModels(),
-      getAvailableProviders: () => this.availableProviders,
-      hasLoadedModelCatalog: () => this.hasLoadedModelCatalog,
-      getCurrentSessionModel: () => this.getCurrentSessionModel(),
-      getCurrentSessionModelResolution: () => this.getCurrentSessionModelResolution(),
-      findKnownModelInfo: (selection) => this.findKnownModelInfo(selection),
-      getModelUnavailableTitle: () => this.getModelUnavailableNoticeContent().message,
+      loadModelCatalogData: async () => {
+        const catalogBundle = this.plugin.modelConfigService
+          ? await this.plugin.modelConfigService.getCatalogs(
+              this.plugin.settings.modelSourceMode,
+              this.plugin.settings.disabledModelRefs,
+            )
+          : null;
+        const providers = catalogBundle
+          ? catalogBundle.effective.providers
+          : (await this.plugin.openCodeService.getAvailableModels()).providers;
+        return {
+          catalogBundle,
+          providers,
+        };
+      },
+      getActiveTabModelOverride: () => this.tabManager?.getActiveTabModelOverride() ?? null,
+      setActiveTabModelOverride: (selection) => {
+        if (!this.tabManager?.getActiveTab()) {
+          return false;
+        }
+
+        this.tabManager.setActiveTabModelOverride(selection);
+        return true;
+      },
+      getDefaultModelSelection: () => {
+        if (!this.plugin.settings.defaultProvider || !this.plugin.settings.defaultModel) {
+          return null;
+        }
+
+        return {
+          provider: this.plugin.settings.defaultProvider,
+          model: this.plugin.settings.defaultModel,
+        };
+      },
+      syncActiveTabContextUsageIdentity: () => {
+        this.activeTabContextUsageCoordinator.syncIdentity();
+      },
+      getModelSourceMode: () => this.plugin.settings.modelSourceMode,
+      isModelAvailableOnServer: async (provider, model) => (
+        this.plugin.modelConfigService
+          ? this.plugin.modelConfigService.isModelAvailableOnServer(provider, model)
+          : true
+      ),
       resolveProviderIconUrl: (providerId) =>
         ProviderIconService.resolveIconUrl(
           this.app,
           providerId,
           this.plugin.settings.providerIconLibrary,
         ),
-      switchModel: (provider, model) => {
-        this.switchModel(provider, model);
-      },
       updateEffortSelectorDisplay: () => {
         this.effortSelector?.updateDisplay();
       },
@@ -2169,11 +2190,12 @@ export class OpenCodianView extends ItemView {
       getServerAvailability: () => this.getServerAvailability(),
       refreshServerStatusBadge: () => this.chatHeaderPresenter.refreshServerStatusBadge(),
       ensureServerReadyForChat: (availability) => this.ensureServerReadyForChat(availability),
-      hasLoadedModelCatalog: () => this.hasLoadedModelCatalog,
+      hasLoadedModelCatalog: () => this.chatSelectionControlsCoordinator.hasLoadedModelCatalog(),
       loadAvailableModels: () => this.reloadModelCatalog(),
       getSendMessageOptions: () => this.getSendMessageOptions(),
-      formatModelId: (model) => this.formatModelId(model),
-      ensureSelectedModelAvailable: (provider, model) => this.ensureSelectedModelAvailable(provider, model),
+      formatModelId: (model) => this.chatSelectionControlsCoordinator.formatModelId(model),
+      ensureSelectedModelAvailable: (provider, model) =>
+        this.chatSelectionControlsCoordinator.ensureSelectedModelAvailable(provider, model),
       appendModelUnavailableNoticeMessage: () => this.appendModelUnavailableNoticeMessage(),
       resetBackgroundTaskIndicator: (tabId) => {
         this.resetBackgroundTaskIndicator(tabId);
@@ -4929,175 +4951,29 @@ export class OpenCodianView extends ItemView {
     await this.chatSelectionControlsCoordinator.reloadModelCatalog();
   }
 
-  /** Load available models from OpenCode service */
-  private async loadAvailableModels(): Promise<void> {
-    try {
-      const catalogBundle = this.plugin.modelConfigService
-        ? await this.plugin.modelConfigService.getCatalogs(
-            this.plugin.settings.modelSourceMode,
-            this.plugin.settings.disabledModelRefs,
-          )
-        : null;
-      const providers = catalogBundle
-        ? catalogBundle.effective.providers
-        : (await this.plugin.openCodeService.getAvailableModels()).providers;
-      this.hasLoadedModelCatalog = true;
-      this.modelCatalogBundle = catalogBundle;
-      this.availableModels = [];
-      this.availableProviders = [];
-
-      for (const provider of providers) {
-        const providerModels = [];
-        for (const model of provider.models) {
-          this.availableModels.push({
-            provider: provider.id,
-            model: model.id,
-            label: `${provider.name}/${model.name}`,
-            providerName: provider.name,
-            modelName: model.name,
-            contextWindow: 'contextWindow' in model ? model.contextWindow : undefined,
-          });
-          providerModels.push({
-            id: model.id,
-            name: model.name,
-            contextWindow: 'contextWindow' in model ? model.contextWindow : undefined,
-          });
-        }
-        this.availableProviders.push({
-          id: provider.id,
-          name: provider.name,
-          models: providerModels,
-        });
-      }
-
-      this.activeTabContextUsageCoordinator.syncIdentity();
-    } catch (error) {
-      logger.error('Failed to load models:', error);
-    }
-  }
-
   private updateModelSelectorDisplay(): void {
     this.chatSelectionControlsCoordinator.updateModelSelectorDisplay();
   }
 
   /** Get current model for this session */
   private getCurrentSessionModel(): ModelSelectorSelection | null {
-    const requestedModel = this.getRequestedSessionModel();
-    if (!this.hasLoadedModelCatalog || !this.modelCatalogBundle) {
-      return requestedModel;
-    }
-
-    const resolvedModel = resolvePreferredAvailableModel(
-      this.modelCatalogBundle.effective,
-      requestedModel?.provider,
-      requestedModel?.model,
-    );
-    if (!resolvedModel) {
-      return null;
-    }
-
-    return {
-      provider: resolvedModel.provider,
-      model: resolvedModel.model,
-    };
-  }
-
-  private getRequestedSessionModel(): ModelSelectorSelection | null {
-    const override = this.tabManager?.getActiveTabModelOverride() ?? null;
-    if (override) {
-      return override;
-    }
-
-    if (!this.plugin.settings.defaultProvider || !this.plugin.settings.defaultModel) {
-      return null;
-    }
-
-    return {
-      provider: this.plugin.settings.defaultProvider,
-      model: this.plugin.settings.defaultModel,
-    };
+    return this.chatSelectionControlsCoordinator.getCurrentSessionModel();
   }
 
   private getCurrentSessionModelResolution(): ResolvedModelSelection {
-    const currentModel = this.getCurrentSessionModel();
-    if (!currentModel) {
-      return {
-        status: 'unconfigured',
-        provider: '',
-        model: '',
-        ref: '',
-      };
-    }
-
-    if (!this.hasLoadedModelCatalog || !this.modelCatalogBundle) {
-      return {
-        status: 'available',
-        provider: currentModel.provider,
-        model: currentModel.model,
-        ref: formatModelReference(currentModel.provider, currentModel.model),
-      };
-    }
-
-    return resolveModelSelection(
-      this.modelCatalogBundle.baseEffective,
-      this.modelCatalogBundle.effective,
-      currentModel.provider,
-      currentModel.model,
-    );
+    return this.chatSelectionControlsCoordinator.getCurrentSessionModelResolution();
   }
 
   private findKnownModelInfo(
     selection: ModelSelectorSelection | null,
   ): ModelSelectorKnownModelInfo | null {
-    if (!selection) {
-      return null;
-    }
-
-    const availableModel = this.availableModels.find(
-      (item) => item.provider === selection.provider && item.model === selection.model,
-    );
-    if (availableModel) {
-      return availableModel;
-    }
-
-    const baseProvider = this.modelCatalogBundle?.baseEffective.providers.find(
-      (provider) => provider.id === selection.provider,
-    );
-    const baseModel = baseProvider?.models.find((model) => model.id === selection.model);
-    if (!baseProvider || !baseModel) {
-      return null;
-    }
-
-    return {
-      providerName: baseProvider.name,
-      modelName: baseModel.name,
-      contextWindow: baseModel.contextWindow,
-    };
+    return this.chatSelectionControlsCoordinator.findKnownModelInfo(selection);
   }
 
   private formatModelId(
     model: Partial<ModelSelectorSelection> | null | undefined,
   ): string | undefined {
-    if (!model?.provider || !model.model) {
-      return undefined;
-    }
-
-    return `${model.provider}/${model.model}`;
-  }
-
-  /** Switch model for current session */
-  private switchModel(provider: string, model: string): void {
-    if (!this.tabManager?.getActiveTab()) return;
-
-    this.tabManager.setActiveTabModelOverride({ provider, model });
-    this.activeTabContextUsageCoordinator.syncIdentity();
-
-    // Show notification with model name only
-    const modelInfo = this.availableModels.find(
-      m => m.provider === provider && m.model === model
-    );
-    const modelName = modelInfo?.modelName || model;
-    new Notice(`Model switched to: ${modelName}`);
+    return this.chatSelectionControlsCoordinator.formatModelId(model);
   }
 
   /** Get model options for sendMessage */
@@ -5139,35 +5015,7 @@ export class OpenCodianView extends ItemView {
     provider: string | undefined,
     model: string | undefined,
   ): Promise<boolean> {
-    if (!this.hasLoadedModelCatalog) {
-      await this.reloadModelCatalog();
-    }
-
-    const resolution = this.modelCatalogBundle
-      ? resolveModelSelection(this.modelCatalogBundle.baseEffective, this.modelCatalogBundle.effective, provider, model)
-      : this.getCurrentSessionModelResolution();
-    if (resolution.status !== 'available') {
-      return false;
-    }
-
-    if (!provider || !model) {
-      return false;
-    }
-
-    if (!this.plugin.modelConfigService) {
-      return true;
-    }
-
-    try {
-      const available = await this.plugin.modelConfigService.isModelAvailableOnServer(provider, model);
-      if (available) {
-        return true;
-      }
-    } catch (error) {
-      logger.warn('Failed to verify model availability on server', error);
-    }
-
-    return false;
+    return this.chatSelectionControlsCoordinator.ensureSelectedModelAvailable(provider, model);
   }
 
   private getOmoModeBadgeLabel(modeTag: string): string {
@@ -5261,38 +5109,7 @@ export class OpenCodianView extends ItemView {
   }
 
   private getModelUnavailableNoticeContent(): { title: string; message: string } {
-    const resolution = this.getCurrentSessionModelResolution();
-    if (resolution.status === 'unconfigured') {
-      return {
-        title: t('chat.notice.modelUnavailable.unconfiguredTitle'),
-        message: t('chat.notice.modelUnavailable.unconfiguredBody'),
-      };
-    }
-
-    if (this.availableProviders.length === 0) {
-      switch (this.plugin.settings.modelSourceMode) {
-        case 'local':
-          return {
-            title: t('chat.notice.modelUnavailable.localTitle'),
-            message: t('chat.notice.modelUnavailable.localBody'),
-          };
-        case 'server':
-          return {
-            title: t('chat.notice.modelUnavailable.serverTitle'),
-            message: t('chat.notice.modelUnavailable.serverBody'),
-          };
-        default:
-          return {
-            title: t('chat.notice.modelUnavailable.mergeTitle'),
-            message: t('chat.notice.modelUnavailable.mergeBody'),
-          };
-      }
-    }
-
-    return {
-      title: t('chat.notice.modelUnavailable.selectedTitle'),
-      message: t('chat.notice.modelUnavailable.selectedBody'),
-    };
+    return this.chatSelectionControlsCoordinator.getModelUnavailableNoticeContent();
   }
 
   private async handleNoticeAction(

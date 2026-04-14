@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的 `[NEXT]`”。
-> **当前状态**: [READY] `R43` 已完成；当前首个可执行项为 `R44`。
+> **当前状态**: [READY] `R44` 已完成；当前首个可执行项为 `R45`。
 
 ## 控制规则
 
@@ -18,7 +18,7 @@
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
 - 最近 checkpoint：`docs/status/maintainability-phase-376.md`
 - 当前 lint 基线：`0 errors / 86 warnings`
-- 当前路线判断：`R43` 已完成 authoritative sync merge seam；下一步继续从 `R44` 顺序推进
+- 当前路线判断：`R44` 已完成 model catalog / selection seam；下一步继续从 `R45` 顺序推进
 
 ## Queue
 
@@ -57,7 +57,7 @@
   - `OpenCodianView` 内 authoritative sync merge / hydration 写回责任明显收缩
   - focused validation、全量 `npm test`、`npm run build` 通过
 
-### [NEXT] R44 - OpenCodianView model catalog/selection seam
+### [DONE] R44 - OpenCodianView model catalog/selection seam
 
 - **Lane**: Maintainability / chat model selection
 - **目标**: 从 `src/features/chat/OpenCodianView.ts:6140` 一带收束 model catalog load、current/requested/resolved selection、switch model 与 unavailable notice follow-up，减少 view 直接维护的 catalog/selection 分支。
@@ -75,7 +75,7 @@
   - `OpenCodianView` 对 model catalog/selection resolution 的直接持有明显减少
   - focused validation、全量 `npm test`、`npm run build` 通过
 
-### [QUEUED] R45 - OpenCodeService streaming transport seam
+### [NEXT] R45 - OpenCodeService streaming transport seam
 
 - **Lane**: Maintainability / opencode streaming transport
 - **目标**: 从 `src/core/opencode/OpenCodeService.ts:1283` 一带收束 SDK stream、legacy SSE fallback、reader lifecycle 与 final response completion，优先形成完整 transport owner seam。

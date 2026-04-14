@@ -87,11 +87,10 @@ background task completion notice 的 queued-state 则已经完全移出 `TabRun
 除此之外，类里还维护若干跨 tab 的视图级状态：
 
 - `currentConversation` / `currentConversationRevertState`
-- 模型目录缓存：`availableModels`、`availableProviders`
 - `services/ChatHeaderPresenter.ts` 的 host seam：server availability、settings/history/new-tab callbacks、status refresh 和 header tab-slot 写回
 - `services/ConversationHistoryActionsCoordinator.ts` 的 host seam：conversation list/current selection、rename title writeback、delete recovery/reset 与 notice 回调
 - `services/ConversationAuthoritativeSyncCoordinator.ts` 的 host seam：authoritative server sync、latest-user hydration、client-only message preservation、fingerprint/logging 与 hydrated writeback
-- `services/ChatSelectionControlsCoordinator.ts` 的 host seam：model catalog reload、current selection resolution、provider icon lookup、permission mode writeback 和 effort selector 联动
+- `services/ChatSelectionControlsCoordinator.ts` 的 host seam：model catalog data source、tab model override/default selection、model-source/server availability 查询、provider icon lookup、permission mode writeback 和 effort selector 联动
 - `services/ComposerInputShellCoordinator.ts` 的 host seam：input shell DOM 装配、submit gate、textarea 高度同步、composer stack height 与 toolbar slot mount
 - `services/InputPanelAppearanceCoordinator.ts` 的 host seam：input panel theme class、action button style、SVG filter layer、liquid-glass mount/unmount 与 diagnostics log 去重
 - 由 `ComposerContextViewFacade.create()` 基于独立的 `createComposerContextViewHost()` / `createFocusContextViewHost()` seam 装配出的 `ComposerContextEventBridge`、`ComposerContextCoordinator`、`FocusContextRuntimeService`、`PersistentAssistantNoticeService` 等视图级运行时协作对象
@@ -166,11 +165,11 @@ header 上 history 按钮触发的 conversation history dropdown、rename dialog
 
 聊天工具栏里的 model selector 与 permission selector 现在由 `services/ChatSelectionControlsCoordinator.ts` 承接。`OpenCodianView` 只保留 selection host seam：
 
-- model catalog reload、current selection / resolution 与 unavailable notice 文案
-- provider icon URL lookup、model override writeback、permission mode settings writeback
+- model catalog data source，以及 tab override/default model 读写
+- model-source mode / server availability 查询、provider icon URL lookup、permission mode settings writeback
 - effort selector display 刷新，以及共用的 Escape scope 注册
 
-因此 view 不再直接铺开 model dropdown search/list/sticky-header cleanup、provider icon trigger 刷新，或 permission dropdown selected-state / open-close 状态机；这些 UI lifecycle 已集中到 coordinator，而 send options、`ModelCatalogStateService` 语义与 provider icon fallback 顺序保持不变。
+因此 view 不再直接铺开 requested/current/resolved model selection、model catalog cache、switch-model notice / unavailable follow-up，或 model dropdown search/list/sticky-header cleanup、provider icon trigger 刷新、permission dropdown selected-state / open-close 状态机；这些 model-selection 与 selector UI lifecycle 已集中到 coordinator，而 send options、`ModelCatalogStateService` 语义与 provider icon fallback 顺序保持不变。
 
 ### Input appearance / glass ownership
 

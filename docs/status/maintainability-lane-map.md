@@ -1,21 +1,20 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [READY] `R43` 已完成；当前首个 `[NEXT]` 为 `R44`。
+> **当前状态**: [READY] `R44` 已完成；当前首个 `[NEXT]` 为 `R45`。
 
 ## 当前优先级
 
-- **当前 `[NEXT]`**：`R44 - OpenCodianView model catalog/selection seam`
-- **本批目标**：继续收 `OpenCodianView` 的 model-selection 厚切口，再收 `OpenCodeService` streaming transport seam，最后 checkpoint
+- **当前 `[NEXT]`**：`R45 - OpenCodeService streaming transport seam`
+- **本批目标**：继续收 `OpenCodeService` streaming transport seam，再做 checkpoint
 - **当前 lint 基线**：`0 errors / 86 warnings`
 - **热点顺序**：
-  1. `src/features/chat/OpenCodianView.ts` model catalog/selection
-  2. `src/core/opencode/OpenCodeService.ts` streaming transport
-  3. `R46` checkpoint / next-batch decision
+  1. `src/core/opencode/OpenCodeService.ts` streaming transport
+  2. `R46` checkpoint / next-batch decision
 
 ## 本批边界
 
-- `R42-R43` 已完成 history/actions 与 authoritative sync merge seam，本轮后直接顺延到 `R44`
+- `R42-R44` 已完成 history/actions、authoritative sync merge 与 model catalog/selection seam，本轮后直接顺延到 `R45`
 - 不新增薄 helper / adapter / provider / factory 文件；新 owner 必须覆盖完整 section / lifecycle
 - 不在本批内继续 settings residual seam，除非前四项被正确性或验证成本阻塞
 - 命中 deploy-relevant paths 时，继续严格执行 build → Test Vault deploy → `BUILD_ID` 校验

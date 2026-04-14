@@ -1,7 +1,15 @@
-import { setIcon } from 'obsidian';
+import { Notice, setIcon } from 'obsidian';
 
-import type { PermissionMode } from '../../../core/types/settings';
+import type { ModelCatalogBundle } from '../../../core/config';
+import {
+  formatModelReference,
+  type ResolvedModelSelection,
+  resolveModelSelection,
+  resolvePreferredAvailableModel,
+} from '../../../core/config/modelConfig';
+import type { ModelSourceMode, PermissionMode } from '../../../core/types/settings';
 import { t } from '../../../i18n';
+import { createLogger } from '../../../shared';
 import { buildModelSelectorDisplayState } from '../ui/modelSelector/ModelSelectorDisplay';
 import {
   highlightModelOption as highlightRenderedModelOption,
@@ -11,23 +19,28 @@ import {
 } from '../ui/modelSelector/ModelSelectorInteractions';
 import { renderModelList as renderModelSelectorList } from '../ui/modelSelector/ModelSelectorRenderer';
 import type {
+  ModelSelectorAvailableModelInfo,
   ModelSelectorDisplayResolution,
   ModelSelectorKnownModelInfo,
   ModelSelectorProvider,
   ModelSelectorSelection,
 } from '../ui/modelSelector/types';
 
+const logger = createLogger('ChatSelectionControlsCoordinator');
+
 export interface ChatSelectionControlsCoordinatorHost {
   registerEscapeHandler(handler: () => boolean): void;
-  loadModelCatalog(): Promise<void>;
-  getAvailableProviders(): readonly ModelSelectorProvider[];
-  hasLoadedModelCatalog(): boolean;
-  getCurrentSessionModel(): ModelSelectorSelection | null;
-  getCurrentSessionModelResolution(): ModelSelectorDisplayResolution;
-  findKnownModelInfo(selection: ModelSelectorSelection | null): ModelSelectorKnownModelInfo | null;
-  getModelUnavailableTitle(): string;
+  loadModelCatalogData(): Promise<{
+    catalogBundle: ModelCatalogBundle | null;
+    providers: readonly ModelSelectorProvider[];
+  }>;
+  getActiveTabModelOverride(): ModelSelectorSelection | null;
+  setActiveTabModelOverride(selection: ModelSelectorSelection): boolean;
+  getDefaultModelSelection(): ModelSelectorSelection | null;
+  syncActiveTabContextUsageIdentity(): void;
+  getModelSourceMode(): ModelSourceMode;
+  isModelAvailableOnServer(provider: string, model: string): Promise<boolean>;
   resolveProviderIconUrl(providerId: string): Promise<string | null>;
-  switchModel(provider: string, model: string): void;
   updateEffortSelectorDisplay(): void;
   getPermissionMode(): PermissionMode;
   switchPermissionMode(mode: PermissionMode): Promise<void>;
@@ -49,6 +62,10 @@ const PERMISSION_MODE_DISPLAY: Record<PermissionMode, string> = {
 
 export class ChatSelectionControlsCoordinator {
   private toolbarEl: HTMLElement | null = null;
+  private availableModels: ModelSelectorAvailableModelInfo[] = [];
+  private availableProviders: ModelSelectorProvider[] = [];
+  private modelCatalogBundle: ModelCatalogBundle | null = null;
+  private hasLoadedCatalog = false;
 
   private modelSelectorContainer: HTMLElement | null = null;
   private modelSelectorTrigger: HTMLElement | null = null;
@@ -82,9 +99,210 @@ export class ChatSelectionControlsCoordinator {
   }
 
   async reloadModelCatalog(): Promise<void> {
-    await this.host.loadModelCatalog();
+    try {
+      const { catalogBundle, providers } = await this.host.loadModelCatalogData();
+      this.hasLoadedCatalog = true;
+      this.modelCatalogBundle = catalogBundle;
+      this.availableModels = [];
+      this.availableProviders = [];
+
+      for (const provider of providers) {
+        const providerModels = provider.models.map((model) => ({
+          id: model.id,
+          name: model.name,
+          contextWindow: model.contextWindow,
+        }));
+
+        for (const model of providerModels) {
+          this.availableModels.push({
+            provider: provider.id,
+            model: model.id,
+            label: `${provider.name}/${model.name}`,
+            providerName: provider.name,
+            modelName: model.name,
+            contextWindow: model.contextWindow,
+          });
+        }
+
+        this.availableProviders.push({
+          id: provider.id,
+          name: provider.name,
+          models: providerModels,
+        });
+      }
+
+      this.host.syncActiveTabContextUsageIdentity();
+    } catch (error) {
+      logger.error('Failed to load models:', error);
+    }
+
     this.refreshModelOptions();
     this.updateModelSelectorDisplay();
+  }
+
+  hasLoadedModelCatalog(): boolean {
+    return this.hasLoadedCatalog;
+  }
+
+  getAvailableProviders(): readonly ModelSelectorProvider[] {
+    return this.availableProviders;
+  }
+
+  getCurrentSessionModel(): ModelSelectorSelection | null {
+    const requestedModel = this.getRequestedSessionModel();
+    if (!this.hasLoadedCatalog || !this.modelCatalogBundle) {
+      return requestedModel;
+    }
+
+    const resolvedModel = resolvePreferredAvailableModel(
+      this.modelCatalogBundle.effective,
+      requestedModel?.provider,
+      requestedModel?.model,
+    );
+    if (!resolvedModel) {
+      return null;
+    }
+
+    return {
+      provider: resolvedModel.provider,
+      model: resolvedModel.model,
+    };
+  }
+
+  getCurrentSessionModelResolution(): ResolvedModelSelection {
+    const currentModel = this.getCurrentSessionModel();
+    if (!currentModel) {
+      return {
+        status: 'unconfigured',
+        provider: '',
+        model: '',
+        ref: '',
+      };
+    }
+
+    if (!this.hasLoadedCatalog || !this.modelCatalogBundle) {
+      return {
+        status: 'available',
+        provider: currentModel.provider,
+        model: currentModel.model,
+        ref: formatModelReference(currentModel.provider, currentModel.model),
+      };
+    }
+
+    return resolveModelSelection(
+      this.modelCatalogBundle.baseEffective,
+      this.modelCatalogBundle.effective,
+      currentModel.provider,
+      currentModel.model,
+    );
+  }
+
+  findKnownModelInfo(selection: ModelSelectorSelection | null): ModelSelectorKnownModelInfo | null {
+    if (!selection) {
+      return null;
+    }
+
+    const availableModel = this.availableModels.find(
+      (item) => item.provider === selection.provider && item.model === selection.model,
+    );
+    if (availableModel) {
+      return availableModel;
+    }
+
+    const baseProvider = this.modelCatalogBundle?.baseEffective.providers.find(
+      (provider) => provider.id === selection.provider,
+    );
+    const baseModel = baseProvider?.models.find((model) => model.id === selection.model);
+    if (!baseProvider || !baseModel) {
+      return null;
+    }
+
+    return {
+      providerName: baseProvider.name,
+      modelName: baseModel.name,
+      contextWindow: baseModel.contextWindow,
+    };
+  }
+
+  formatModelId(
+    model: Partial<ModelSelectorSelection> | null | undefined,
+  ): string | undefined {
+    if (!model?.provider || !model.model) {
+      return undefined;
+    }
+
+    return `${model.provider}/${model.model}`;
+  }
+
+  async ensureSelectedModelAvailable(
+    provider: string | undefined,
+    model: string | undefined,
+  ): Promise<boolean> {
+    if (!this.hasLoadedCatalog) {
+      await this.reloadModelCatalog();
+    }
+
+    const resolution = this.modelCatalogBundle
+      ? resolveModelSelection(
+          this.modelCatalogBundle.baseEffective,
+          this.modelCatalogBundle.effective,
+          provider,
+          model,
+        )
+      : this.getCurrentSessionModelResolution();
+    if (resolution.status !== 'available') {
+      return false;
+    }
+
+    if (!provider || !model) {
+      return false;
+    }
+
+    try {
+      const available = await this.host.isModelAvailableOnServer(provider, model);
+      if (available) {
+        return true;
+      }
+    } catch (error) {
+      logger.warn('Failed to verify model availability on server', error);
+    }
+
+    return false;
+  }
+
+  getModelUnavailableNoticeContent(): { title: string; message: string } {
+    const resolution = this.getCurrentSessionModelResolution();
+    if (resolution.status === 'unconfigured') {
+      return {
+        title: t('chat.notice.modelUnavailable.unconfiguredTitle'),
+        message: t('chat.notice.modelUnavailable.unconfiguredBody'),
+      };
+    }
+
+    if (this.availableProviders.length === 0) {
+      switch (this.host.getModelSourceMode()) {
+        case 'local':
+          return {
+            title: t('chat.notice.modelUnavailable.localTitle'),
+            message: t('chat.notice.modelUnavailable.localBody'),
+          };
+        case 'server':
+          return {
+            title: t('chat.notice.modelUnavailable.serverTitle'),
+            message: t('chat.notice.modelUnavailable.serverBody'),
+          };
+        default:
+          return {
+            title: t('chat.notice.modelUnavailable.mergeTitle'),
+            message: t('chat.notice.modelUnavailable.mergeBody'),
+          };
+      }
+    }
+
+    return {
+      title: t('chat.notice.modelUnavailable.selectedTitle'),
+      message: t('chat.notice.modelUnavailable.selectedBody'),
+    };
   }
 
   refreshModelOptions(): void {
@@ -96,16 +314,16 @@ export class ChatSelectionControlsCoordinator {
       return;
     }
 
-    const current = this.host.getCurrentSessionModel();
-    const resolution = this.host.getCurrentSessionModelResolution();
-    const modelInfo = this.host.findKnownModelInfo(current);
+    const current = this.getCurrentSessionModel();
+    const resolution = this.getCurrentSessionModelResolution();
+    const modelInfo = this.findKnownModelInfo(current);
     const displayState = buildModelSelectorDisplayState({
       currentSelection: current,
       resolution,
       knownModelInfo: modelInfo,
-      hasLoadedModelCatalog: this.host.hasLoadedModelCatalog(),
-      availableProviderCount: this.host.getAvailableProviders().length,
-      unavailableTitle: this.host.getModelUnavailableTitle(),
+      hasLoadedModelCatalog: this.hasLoadedModelCatalog(),
+      availableProviderCount: this.availableProviders.length,
+      unavailableTitle: this.getModelUnavailableNoticeContent().message,
       unconfiguredLabel: t('settings.model.unconfigured'),
     });
 
@@ -158,6 +376,10 @@ export class ChatSelectionControlsCoordinator {
     this.modelSelectorSearchInput = null;
     this.modelSelectorScrollContainer = null;
     this.modelFilterQuery = '';
+    this.availableModels = [];
+    this.availableProviders = [];
+    this.modelCatalogBundle = null;
+    this.hasLoadedCatalog = false;
     this.currentModelTriggerIconUrl = null;
     this.modelSelectorIconRequestId += 1;
     this.permissionSelectorContainer = null;
@@ -311,10 +533,10 @@ export class ChatSelectionControlsCoordinator {
 
     const renderResult = renderModelSelectorList({
       scrollContainer: this.modelSelectorScrollContainer,
-      providers: this.host.getAvailableProviders(),
-      hasLoadedModelCatalog: this.host.hasLoadedModelCatalog(),
+      providers: this.availableProviders,
+      hasLoadedModelCatalog: this.hasLoadedModelCatalog(),
       filterQuery: this.modelFilterQuery,
-      currentSelection: this.host.getCurrentSessionModel(),
+      currentSelection: this.getCurrentSessionModel(),
       highlightedValue,
       previousStickyHeadersCleanup: this.disposeModelSelectorStickyHeaders,
       texts: {
@@ -372,11 +594,11 @@ export class ChatSelectionControlsCoordinator {
       return;
     }
 
-    scrollRenderedCurrentModel(this.modelSelectorScrollContainer, this.host.getCurrentSessionModel());
+    scrollRenderedCurrentModel(this.modelSelectorScrollContainer, this.getCurrentSessionModel());
   }
 
   private selectModel(provider: string, model: string): void {
-    this.host.switchModel(provider, model);
+    this.switchModel(provider, model);
     this.updateModelSelectorDisplay();
   }
 
@@ -563,5 +785,29 @@ export class ChatSelectionControlsCoordinator {
     await this.host.switchPermissionMode(mode);
     this.updatePermissionTriggerDisplay();
     this.closePermissionDropdown();
+  }
+
+  private getRequestedSessionModel(): ModelSelectorSelection | null {
+    const override = this.host.getActiveTabModelOverride();
+    if (override) {
+      return override;
+    }
+
+    return this.host.getDefaultModelSelection();
+  }
+
+  private switchModel(provider: string, model: string): void {
+    const didSetOverride = this.host.setActiveTabModelOverride({ provider, model });
+    if (!didSetOverride) {
+      return;
+    }
+
+    this.host.syncActiveTabContextUsageIdentity();
+
+    const modelInfo = this.availableModels.find(
+      (item) => item.provider === provider && item.model === model,
+    );
+    const modelName = modelInfo?.modelName || model;
+    new Notice(`Model switched to: ${modelName}`);
   }
 }
