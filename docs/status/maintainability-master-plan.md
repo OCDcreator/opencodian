@@ -1,8 +1,8 @@
 # Maintainability Master Plan
 
-> **状态**: [REVIEW_REQUIRED]
+> **状态**: [CONFIRMED_NEXT_BATCH]
 > **作用**: 这是 maintainability 无人值守的战略文档。后续每一轮开始前，必须先读本文件，再读最近的 `docs/status/maintainability-phase-XXX.md`。
-> **自动推进状态**: L1-L5 ESLint cleanup 队列已完成；当前没有可自动执行的 `[NEXT]`。autopilot 必须暂停，等待人工确认下一批是继续 warning cleanup，还是恢复新的 maintainability queue。
+> **自动推进状态**: 人工已确认继续 `W1-W5` warning cleanup 队列；当前可自动执行的 `[NEXT]` 是 `W1 - ModelConfigModal max-params cleanup`。在 `W5` checkpoint 完成前，不恢复 `R33+` maintainability queue。
 
 ## 1. 总体目标
 
@@ -19,7 +19,7 @@ maintainability 的目标是：
 
 ## 2. 当前阶段判断
 
-**当前判断：中后期，R28-R32 与 L1-L5 均已完成；lint 已恢复到 `0 errors / 116 warnings`，但高价值 warning 仍集中在少数大 owner 与相关 tests。当前应暂停自动推进，等待人工确认下一批；倾向先继续一小批 warning cleanup，再考虑恢复新的 maintainability 重构。**
+**当前判断：中后期，R28-R32 与 L1-L5 均已完成；lint 已恢复到 `0 errors / 116 warnings`，人工现已确认继续 `W1-W5` 这一小批 warning cleanup。当前应先顺序清掉低风险且收益明确的 warning 热点，再在 `W5` checkpoint 后决定是否恢复新的 maintainability 重构。**
 
 原因：
 
@@ -30,7 +30,7 @@ maintainability 的目标是：
 - `src/core/opencode/OpenCodeSdkFacade.ts` / `src/core/opencode/ServerManager.ts` 当前分别为 **257** / **1171** 行；它们继续作为高风险相邻 owner 保持稳定，没有在本批被拆成新的薄 facade
 - L1-L5 已把 `npm run lint` 从 post-L1 baseline 的 **44 errors / 119 warnings** 收敛到当前 **0 errors / 116 warnings**；剩余 **116** 条 warning 中，`max-lines-per-function` / `max-lines` / `complexity` / `max-params` 合计 **110** 条，主要集中在 `src/features/settings/ModelConfigModal.ts`、`src/features/settings/OpenCodianSettings.ts`、`src/features/chat/OpenCodianView.ts`、`src/core/opencode/OpenCodeService.ts` 与相关测试热点
 
-结论：L1-L5 已完成“先把 lint 拉回可控状态”的批次目标，errors 已清零；但 warnings 仍然高度集中在大 owner 与相关 tests。后续如果继续 autopilot，优先建议先由人工确认一批新的 warning cleanup queue，再决定是否恢复新的 `R33+` maintainability queue；在新的受控 queue 写入前，不得自动恢复 maintainability 重构。
+结论：L1-L5 已完成“先把 lint 拉回可控状态”的批次目标，errors 已清零；但 warnings 仍然高度集中在大 owner 与相关 tests。人工现已确认继续 `W1-W5` 这一批新的 warning cleanup queue，先处理低风险的 `max-params` / `complexity` / `@typescript-eslint/no-explicit-any` 热点；在 `W5` checkpoint 完成前，不得恢复 `R33+` maintainability 重构。
 
 ## 2.1 已完成批次（R13-R18）
 
@@ -67,9 +67,21 @@ L1-L5 的目标不是继续拆 owner，而是先把当前仓库的 ESLint debt �
 L1-L5 已全部完成。L5 checkpoint 的结论是：若后续继续 autopilot，应先人工确认一批新的 warning cleanup queue，优先处理生产代码热点内的 `max-lines-per-function` / `max-lines` / `complexity` / `max-params`；暂不直接恢复新的 `R33+` maintainability owner queue。
 
 
+## 2.5 已确认下一批 warning cleanup 队列（W1-W5）
+
+人工现已确认继续一小批新的 warning cleanup queue，目标是在不重新打开大规模 owner 重构的前提下，进一步降低高噪音 warning：
+
+1. **W1 `ModelConfigModal` max-params cleanup**：只处理 `renderKeyValueEditor`、`createTextField`、`createSelectField` 的参数收束。
+2. **W2 `ProviderIconService` signature cleanup**：只处理 `selectBuiltinIcon`、`getLobehubCachePath` 的 `max-params`。
+3. **W3 `OpenCodeService` complexity trim**：只处理 `connectSSE` 与 `updateSettings` 的 `complexity`。
+4. **W4 chat bridge test typing cleanup**：清掉 `ContextFileCatalogEventBridge` / `FocusContextEventBridge` tests 中的 `@typescript-eslint/no-explicit-any`。
+5. **W5 checkpoint**：复盘 `W1-W4` 收益，决定是否继续 warning cleanup，还是恢复新的 maintainability queue。
+
+这批 queue 刻意**不**把 `OpenCodianView` / `OpenCodianSettings` 的大型 `max-lines*` / `complexity` 热点直接拉进无人值守执行，也不恢复 `R33+` ownership-reduction queue；它们保留到 `W5` 之后再人工复盘。
+
 ## 3. 高优先级方向
 
-L1-L5 已完成，当前 autopilot 处于暂停待确认状态。下面保留各 lane 的长期定位，供人工设计下一批 queue 时参考：
+当前 autopilot 已切到 `W1-W5` warning cleanup 队列。下面保留各 lane 的长期定位，供 `W5` checkpoint 之后再决定是否恢复新的 maintainability queue：
 
 ### P1. `OpenCodianView` 中剩余的核心 ownership 迁移
 
@@ -146,10 +158,10 @@ R13-R18 已完成这组 UI/runtime shell 的主要收束。本批 R28-R32 不继
 
 ## 7. 当前执行指令
 
-L5 完成之后：
+当前执行阶段（W1-W5）要求：
 
-- 当前没有可自动执行的 `[NEXT]`
-- Autopilot 必须暂停，不得自动扩展 `L6+` 或 `R33+`
-- 如人工决定继续，优先手工设计新的 warning cleanup queue，先聚焦 `src/features/settings/ModelConfigModal.ts`、`src/features/settings/OpenCodianSettings.ts`、`src/features/chat/OpenCodianView.ts`、`src/core/opencode/OpenCodeService.ts` 等生产代码热点中的 `max-lines-per-function` / `max-lines` / `complexity` / `max-params`
-- 只有在新的受控 queue 写入 roadmap 后，才允许恢复自动推进；否则保持 `[REVIEW_REQUIRED]` 暂停态
-- `ConversationRenderService` trailing-assistant helper 链仍保持降优先级；除非正确性、测试或构建阻塞，不要把它作为新 queue 的默认起点
+- 当前可自动执行的 `[NEXT]` 是 `W1 - ModelConfigModal max-params cleanup`
+- Autopilot 只允许按 `W1 → W5` 顺序推进，不得自动扩展 `W6+` 或恢复 `R33+`
+- 本批只处理低风险 warning：`max-params`、少量 `complexity`，以及 tests 内的 `@typescript-eslint/no-explicit-any`
+- `OpenCodianView` / `OpenCodianSettings` 的大型 `max-lines*` / `complexity` 热点继续保持人工复盘后再决定
+- `ConversationRenderService` trailing-assistant helper 链仍保持降优先级；除非正确性、测试或构建阻塞，不要把它作为本批 queue 的默认起点

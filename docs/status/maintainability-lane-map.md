@@ -1,26 +1,26 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [REVIEW_REQUIRED] L1-L5 已全部完成；当前没有可自动执行的 `[NEXT]`。autopilot 必须暂停，等待人工确认下一批 queue。
+> **当前状态**: [CONFIRMED_NEXT_BATCH] W1-W5 warning cleanup 队列已人工确认；当前可自动执行的 `[NEXT]` 是 `W1 - ModelConfigModal max-params cleanup`。
 
 ## 当前优先级
 
-- **当前无自动 `[NEXT]`**：L5 checkpoint 已完成；本批必须暂停，等待人工确认
-- **推荐方向**：如继续 autopilot，先设计新的 warning cleanup queue，再决定是否恢复新的 maintainability owner queue
+- **当前 `[NEXT]`**：`W1 - ModelConfigModal max-params cleanup`
+- **本批目标**：继续一小批低风险 warning cleanup，优先清掉 `max-params` / 少量 `complexity` / `@typescript-eslint/no-explicit-any`，不恢复 `R33+` maintainability owner queue
 - **当前 lint 基线**：`0 errors / 116 warnings`
-- **主要 warning 类型**：`max-lines-per-function` 41、`max-lines` 36、`complexity` 17、`max-params` 16、`@typescript-eslint/no-explicit-any` 6
-- **主要生产热点**：`src/features/settings/ModelConfigModal.ts`、`src/features/settings/OpenCodianSettings.ts`、`src/features/chat/OpenCodianView.ts`、`src/utils/icons/ProviderIconService.ts`、`src/core/opencode/OpenCodeService.ts`
+- **本批首要热点**：`src/features/settings/ModelConfigModal.ts`、`src/utils/icons/ProviderIconService.ts`、`src/core/opencode/OpenCodeService.ts`、`tests/unit/features/chat/ContextFileCatalogEventBridge.test.ts`、`tests/unit/features/chat/FocusContextEventBridge.test.ts`
+- **暂缓热点**：`src/features/chat/OpenCodianView.ts` 与 `src/features/settings/OpenCodianSettings.ts` 的 `max-lines*` / 大型 `complexity` 问题先不进入本批
 
 ## 当前热点首查入口
 
-- 下一批若继续 warning cleanup，首查 `docs/status/maintainability-master-plan.md`、`docs/status/maintainability-round-roadmap.md`、`docs/status/maintainability-lane-map.md` 与 `docs/status/maintainability-phase-352.md`
-- 生产代码热点优先顺序建议为：
+- 当前批次首查 `docs/status/maintainability-master-plan.md`、`docs/status/maintainability-round-roadmap.md`、`docs/status/maintainability-lane-map.md` 与 `docs/status/maintainability-phase-352.md`
+- W1-W4 的执行顺序固定为：
   1. `src/features/settings/ModelConfigModal.ts`
-  2. `src/features/settings/OpenCodianSettings.ts`
-  3. `src/features/chat/OpenCodianView.ts`
-  4. `src/utils/icons/ProviderIconService.ts`
-  5. `src/core/opencode/OpenCodeService.ts`
-- `OpenCodianView` / settings / trailing-assistant 链当前都只保留 regression watchpoints；在新的受控 queue 写入前，不自动恢复新的 maintainability 切口
+  2. `src/utils/icons/ProviderIconService.ts`
+  3. `src/core/opencode/OpenCodeService.ts`
+  4. `tests/unit/features/chat/ContextFileCatalogEventBridge.test.ts`
+  5. `tests/unit/features/chat/FocusContextEventBridge.test.ts`
+- `OpenCodianView` / `OpenCodianSettings` / trailing-assistant 链当前都只保留 regression watchpoints；在 `W5` checkpoint 前，不自动恢复新的 maintainability 切口
 - P2 regression-only 首查顺序固定为：
   1. `tests/unit/features/chat/QuestionDockCoordinator.test.ts`
   2. `tests/unit/features/chat/QuestionTodoStatusRefreshCoordinator.test.ts`
@@ -99,3 +99,11 @@
 - 本批目标是先让 `npm run lint` 通过，再决定后续架构 queue；不是借 lint 名义顺手拆新 owner。
 - 允许最小结构调整来消除 lint error，但不允许为清 warning 新增薄 facade / adapter。
 - L5 已完成并已进入暂停态；是否继续 warning cleanup 或恢复新的 maintainability queue，由下一次人工确认决定。
+
+## W1-W5 执行边界
+
+- 每轮必须先处理第一个 `[NEXT]`，按 `W1 → W5` 顺序执行，不得跳项。
+- 本批只允许做低风险 warning cleanup：优先 `max-params`、少量 `complexity`，以及 tests 内的 `@typescript-eslint/no-explicit-any`。
+- 不允许为清 warning 新增薄 facade / adapter / provider / factory；优先在现有 owner 内做参数收束、guard clause 或 mock typing 修正。
+- `OpenCodianView` 与 `OpenCodianSettings` 的大型 `max-lines*` / `complexity` 热点本批暂缓；除非测试、构建或正确性直接阻塞，否则不提前开启。
+- `W5` 完成后必须再次暂停，由人工决定是继续 warning cleanup，还是恢复新的 maintainability queue。
