@@ -63,6 +63,14 @@ export interface BackgroundTaskTimelineServiceHost {
   ): boolean;
 }
 
+type ChatContentBlock = NonNullable<ChatMessage['contentBlocks']>[number];
+
+interface BackgroundTaskSegmentCollectionState {
+  segments: BackgroundTaskSegment[];
+  segmentByAnchorKey: Map<string, BackgroundTaskSegment>;
+  latestUserMessage: ChatMessage | null;
+}
+
 export class BackgroundTaskTimelineService {
   constructor(private readonly host: BackgroundTaskTimelineServiceHost) {}
 
@@ -134,160 +142,31 @@ export class BackgroundTaskTimelineService {
       return [];
     }
 
-    const segments: BackgroundTaskSegment[] = [];
-    const segmentByAnchorKey = new Map<string, BackgroundTaskSegment>();
-    let latestUserMessage: ChatMessage | null = null;
-
-    const getOrCreateSegment = (anchorMessage: ChatMessage | null): BackgroundTaskSegment | null => {
-      if (!anchorMessage) {
-        return null;
-      }
-
-      const anchorKey = this.host.getMessageAnchorKey(anchorMessage);
-      const existing = segmentByAnchorKey.get(anchorKey);
-      if (existing) {
-        return existing;
-      }
-
-      const created = this.createSegment(anchorMessage);
-      segmentByAnchorKey.set(anchorKey, created);
-      segments.push(created);
-      return created;
-    };
-
-    const applyReminderToSegment = (
-      segment: BackgroundTaskSegment | null,
-      message: ChatMessage,
-    ): void => {
-      if (!segment || message.omo?.kind !== 'system-reminder') {
-        return;
-      }
-
-      const tasks = (message.omo.tasks ?? [])
-        .filter((task) => task.id || task.description)
-        .map((task) => ({
-          taskId: task.id || task.description,
-          description: task.description || t('chat.backgroundTask.noDescription'),
-        }));
-
-      for (const completion of tasks) {
-        this.addCompletionToSegment(segment, completion);
-      }
-
-      segment.completionEvents.push({
-        reminderMessageId: message.sourceMessageId ?? message.id,
-        reminderType: message.omo.reminderType === 'all-background-tasks-complete'
-          ? 'all-background-tasks-complete'
-          : 'background-task-completed',
-        tasks,
-        timestamp: message.timestamp,
-      });
-
-      if (message.omo.reminderType === 'all-background-tasks-complete') {
-        segment.sawAllTasksComplete = true;
-      }
+    const state: BackgroundTaskSegmentCollectionState = {
+      segments: [],
+      segmentByAnchorKey: new Map(),
+      latestUserMessage: null,
     };
 
     for (const message of messages) {
       if (message.role === 'user') {
-        latestUserMessage = message;
+        state.latestUserMessage = message;
         if (message.omo?.kind === 'user-injection' && message.omo.modeTag === 'search-mode') {
-          getOrCreateSegment(message);
+          this.getOrCreateSegment(state, message);
         }
         continue;
       }
 
       for (const block of message.contentBlocks ?? []) {
-        if (block.type !== 'tool_use' || block.toolName !== 'task' || !block.toolId) {
-          continue;
-        }
-
-        const segment = getOrCreateSegment(latestUserMessage);
-        if (!segment) {
-          continue;
-        }
-
-        const launches = new Map(segment.launches.map((launch) => [launch.launchId, launch] as const));
-        this.upsertLaunch({
-          id: block.toolId,
-          input: block.toolInput ?? {},
-          result: block.toolResult,
-        }, launches);
-        segment.launches = Array.from(launches.values());
+        this.collectTaskLaunchBlock(state, block);
       }
 
-      if (!this.isBackgroundTaskCompletionReminder(message) || message.omo?.kind !== 'system-reminder') {
-        continue;
-      }
-
-      const matched = new Set<BackgroundTaskSegment>();
-      for (const task of message.omo.tasks ?? []) {
-        if (!task.id) {
-          continue;
-        }
-        const segment = this.findSegmentByTaskId(segments, task.id);
-        if (segment) {
-          matched.add(segment);
-        }
-      }
-
-      if (matched.size === 0) {
-        const fallback = this.getLatestPendingSegment(segments) ?? getOrCreateSegment(latestUserMessage);
-        if (fallback) {
-          matched.add(fallback);
-        }
-      }
-
-      for (const segment of matched) {
-        applyReminderToSegment(segment, message);
-      }
+      this.collectCompletionReminderSegments(state, message);
     }
 
-    const runtime = this.host.getTabRuntimeState(tabId);
-    if (runtime?.backgroundTaskActiveAnchorKey && runtime.backgroundTaskStartedAt) {
-      const existing = segmentByAnchorKey.get(runtime.backgroundTaskActiveAnchorKey);
-      const segment = existing ?? {
-        anchorKey: runtime.backgroundTaskActiveAnchorKey,
-        anchorTimestamp: runtime.backgroundTaskStartedAt,
-        modeTag: runtime.backgroundTaskModeTag,
-        launches: [],
-        completed: [],
-        pending: [],
-        sawAllTasksComplete: false,
-        waitingForFollowUp: false,
-        completionEvents: [],
-      };
-
-      if (!existing) {
-        segmentByAnchorKey.set(segment.anchorKey, segment);
-        segments.push(segment);
-      }
-
-      const launches = new Map(segment.launches.map((launch) => [launch.launchId, launch] as const));
-      for (const launch of runtime.backgroundTaskLaunches.values()) {
-        launches.set(launch.launchId, launch);
-      }
-      segment.launches = Array.from(launches.values());
-
-      const completed = new Map(segment.completed.map((item) => [item.taskId, item] as const));
-      for (const item of runtime.backgroundTaskCompletedTasks.values()) {
-        completed.set(item.taskId, item);
-      }
-      segment.completed = Array.from(completed.values());
-      segment.modeTag = segment.modeTag ?? runtime.backgroundTaskModeTag;
-      segment.waitingForFollowUp = runtime.backgroundTaskWaitingForFollowUp;
-    }
-
-    for (const segment of segments) {
-      segment.pending = this.filterPendingLaunches(segment.launches, segment.completed);
-      segment.waitingForFollowUp = segment.waitingForFollowUp || segment.pending.length > 0;
-      if (segment.sawAllTasksComplete) {
-        segment.pending = [];
-        segment.waitingForFollowUp = false;
-      }
-    }
-
-    return segments.sort((left, right) => left.anchorTimestamp - right.anchorTimestamp);
+    this.mergeRuntimeSegmentState(state, tabId);
+    this.finalizeSegments(state.segments);
+    return state.segments.sort((left, right) => left.anchorTimestamp - right.anchorTimestamp);
   }
 
   collectInlineSegments(
@@ -463,6 +342,169 @@ export class BackgroundTaskTimelineService {
     }
 
     return `launch_${launch.launchId.slice(-8)}`;
+  }
+
+  private collectTaskLaunchBlock(
+    state: BackgroundTaskSegmentCollectionState,
+    block: ChatContentBlock,
+  ): void {
+    if (block.type !== 'tool_use' || block.toolName !== 'task' || !block.toolId) {
+      return;
+    }
+
+    const segment = this.getOrCreateSegment(state, state.latestUserMessage);
+    if (!segment) {
+      return;
+    }
+
+    const launches = new Map(segment.launches.map((launch) => [launch.launchId, launch] as const));
+    this.upsertLaunch({
+      id: block.toolId,
+      input: block.toolInput ?? {},
+      result: block.toolResult,
+    }, launches);
+    segment.launches = Array.from(launches.values());
+  }
+
+  private collectCompletionReminderSegments(
+    state: BackgroundTaskSegmentCollectionState,
+    message: ChatMessage,
+  ): void {
+    if (!this.isBackgroundTaskCompletionReminder(message)) {
+      return;
+    }
+
+    if (message.omo?.kind !== 'system-reminder') {
+      return;
+    }
+
+    const matched = new Set<BackgroundTaskSegment>();
+    for (const task of message.omo.tasks ?? []) {
+      if (!task.id) {
+        continue;
+      }
+      const segment = this.findSegmentByTaskId(state.segments, task.id);
+      if (segment) {
+        matched.add(segment);
+      }
+    }
+
+    if (matched.size === 0) {
+      const fallback = this.getLatestPendingSegment(state.segments)
+        ?? this.getOrCreateSegment(state, state.latestUserMessage);
+      if (fallback) {
+        matched.add(fallback);
+      }
+    }
+
+    for (const segment of matched) {
+      this.applyReminderToSegment(segment, message);
+    }
+  }
+
+  private applyReminderToSegment(
+    segment: BackgroundTaskSegment,
+    message: ChatMessage,
+  ): void {
+    if (message.omo?.kind !== 'system-reminder') {
+      return;
+    }
+
+    const tasks = (message.omo.tasks ?? [])
+      .filter((task) => task.id || task.description)
+      .map((task) => ({
+        taskId: task.id || task.description,
+        description: task.description || t('chat.backgroundTask.noDescription'),
+      }));
+
+    for (const completion of tasks) {
+      this.addCompletionToSegment(segment, completion);
+    }
+
+    segment.completionEvents.push({
+      reminderMessageId: message.sourceMessageId ?? message.id,
+      reminderType: message.omo.reminderType === 'all-background-tasks-complete'
+        ? 'all-background-tasks-complete'
+        : 'background-task-completed',
+      tasks,
+      timestamp: message.timestamp,
+    });
+
+    if (message.omo.reminderType === 'all-background-tasks-complete') {
+      segment.sawAllTasksComplete = true;
+    }
+  }
+
+  private mergeRuntimeSegmentState(
+    state: BackgroundTaskSegmentCollectionState,
+    tabId: TabId | null,
+  ): void {
+    const runtime = this.host.getTabRuntimeState(tabId);
+    if (!runtime?.backgroundTaskActiveAnchorKey || !runtime.backgroundTaskStartedAt) {
+      return;
+    }
+
+    const existing = state.segmentByAnchorKey.get(runtime.backgroundTaskActiveAnchorKey);
+    const segment = existing ?? {
+      anchorKey: runtime.backgroundTaskActiveAnchorKey,
+      anchorTimestamp: runtime.backgroundTaskStartedAt,
+      modeTag: runtime.backgroundTaskModeTag,
+      launches: [],
+      completed: [],
+      pending: [],
+      sawAllTasksComplete: false,
+      waitingForFollowUp: false,
+      completionEvents: [],
+    };
+    if (!existing) {
+      state.segmentByAnchorKey.set(segment.anchorKey, segment);
+      state.segments.push(segment);
+    }
+
+    const launches = new Map(segment.launches.map((launch) => [launch.launchId, launch] as const));
+    for (const launch of runtime.backgroundTaskLaunches.values()) {
+      launches.set(launch.launchId, launch);
+    }
+    segment.launches = Array.from(launches.values());
+
+    const completed = new Map(segment.completed.map((item) => [item.taskId, item] as const));
+    for (const item of runtime.backgroundTaskCompletedTasks.values()) {
+      completed.set(item.taskId, item);
+    }
+    segment.completed = Array.from(completed.values());
+    segment.modeTag = segment.modeTag ?? runtime.backgroundTaskModeTag;
+    segment.waitingForFollowUp = runtime.backgroundTaskWaitingForFollowUp;
+  }
+
+  private finalizeSegments(segments: BackgroundTaskSegment[]): void {
+    for (const segment of segments) {
+      segment.pending = this.filterPendingLaunches(segment.launches, segment.completed);
+      segment.waitingForFollowUp = segment.waitingForFollowUp || segment.pending.length > 0;
+      if (segment.sawAllTasksComplete) {
+        segment.pending = [];
+        segment.waitingForFollowUp = false;
+      }
+    }
+  }
+
+  private getOrCreateSegment(
+    state: BackgroundTaskSegmentCollectionState,
+    anchorMessage: ChatMessage | null,
+  ): BackgroundTaskSegment | null {
+    if (!anchorMessage) {
+      return null;
+    }
+
+    const anchorKey = this.host.getMessageAnchorKey(anchorMessage);
+    const existing = state.segmentByAnchorKey.get(anchorKey);
+    if (existing) {
+      return existing;
+    }
+
+    const created = this.createSegment(anchorMessage);
+    state.segmentByAnchorKey.set(anchorKey, created);
+    state.segments.push(created);
+    return created;
   }
 
   private getBackgroundTaskDescription(
