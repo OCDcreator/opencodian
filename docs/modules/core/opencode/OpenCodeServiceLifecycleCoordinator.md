@@ -5,7 +5,7 @@
 
 ## 概述
 
-`OpenCodeServiceLifecycleCoordinator` 是 `OpenCodeService` 内部的 service bootstrap / subscription lifecycle owner。它把服务初始化、server start/stop/dispose、server running 后的 model/catalog bootstrap、health probe fallback，以及 sync / open-code event subscription 的启动停止顺序收束到一个 coordinator 中。
+`OpenCodeServiceLifecycleCoordinator` 是 `OpenCodeService` 内部的 service bootstrap / subscription lifecycle owner。它把服务初始化、server start/stop/dispose、server running 后的 model/catalog bootstrap、health probe fallback，以及 vault path scope refresh 与 sync / open-code event subscription 的启动停止顺序收束到一个 coordinator 中。
 
 它不改变 `OpenCodeService` 的公开 API；上层仍然调用 `initialize()`、`start()`、`stop()`、`dispose()`、`checkHealth()` 和 `setVaultPath()`，只是这些入口的 runtime 编排不再直接铺在主门面里。
 
@@ -25,7 +25,7 @@
 ## 核心类型 / 接口
 
 - `OpenCodeServiceLifecycleCoordinatorHost`: host seam，提供 settings/baseUrl、SDK health probe、server manager、sync/open-code event subscription ports、model/catalog bootstrap hooks 与对外通知回调。
-- `OpenCodeServiceLifecycleCoordinator`: 持有初始化、start/stop/dispose、health fallback、server-running bootstrap 与 event subscription restart 的编排逻辑。
+- `OpenCodeServiceLifecycleCoordinator`: 持有初始化、start/stop/dispose、vault path scope refresh、health fallback、server-running bootstrap 与 event subscription restart 的编排逻辑。
 
 ## 核心逻辑
 
@@ -48,7 +48,7 @@
 
 ### Subscription restarts
 
-`restartEventSubscriptions()` 是 vault path / directory scope 改变时的统一入口；它同时重启 sync event runtime 与 open-code event runtime，避免 `OpenCodeService.setVaultPath()` 继续直接铺开两套 subscription owner。
+`setVaultPath(path)` 现在承担 vault path / directory scope 改变时的完整 lifecycle：它先记录旧的 tool catalog scope，再写回 `vaultPath`、同步 `ServerManager` 工作目录、按 scope 变化清理 tool schema cache，最后统一重启 sync event runtime 与 open-code event runtime。`restartEventSubscriptions()` 则继续作为共享的 subscription restart primitive，供 vault path 变更与其他 lifecycle follow-up 复用。
 
 ## 关键方法
 
@@ -59,6 +59,7 @@
 | `start()` | 启动 server，并恢复 sync/open-code subscriptions |
 | `stop()` | 停止 subscriptions，再停止 server |
 | `dispose()` | 停止 subscriptions，并释放 server manager |
+| `setVaultPath(path)` | 更新 vault scope、刷新 ServerManager 工作目录、清理 scope-sensitive tool cache 并重启 subscriptions |
 | `restartEventSubscriptions()` | 统一重启 sync/open-code subscriptions |
 | `checkHealth()` | 执行 SDK-first health probe 与 ServerManager fallback |
 

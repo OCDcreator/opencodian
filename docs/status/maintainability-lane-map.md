@@ -1,21 +1,21 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [READY] `R108-R137` 长队列继续推进；当前 `[NEXT]` 为 `R108 - OpenCodeService sync/bootstrap residual lifecycle seam`。
+> **当前状态**: [READY] `R109-R137` 长队列继续推进；当前 `[NEXT]` 为 `R109 - OpenCodeService health / legacy fallback seam`。
 
 ## 当前优先级
 
-- **当前 `[NEXT]`**：`R108 - OpenCodeService sync/bootstrap residual lifecycle seam`
-- **本批目标**：`R107` checkpoint 已复盘 `R103-R106` 的 question / todo / background-task seams；现在顺序回到 opencode core residual，再推进 secondary core / settings / startup
+- **当前 `[NEXT]`**：`R109 - OpenCodeService health / legacy fallback seam`
+- **本批目标**：`R108` 已把 vault path scope refresh lifecycle 收回 `OpenCodeServiceLifecycleCoordinator`；现在顺序继续处理 opencode fallback residual，再推进 secondary core / settings / startup
 - **当前 lint 基线**：`0 errors / 65 warnings`
 - **热点顺序**：
   1. `src/core/opencode/OpenCodeService.ts`
-  2. `src/core/opencode/OpenCodeServiceLifecycleCoordinator.ts`
-  3. `tests/unit/core/opencode/OpenCodeServiceLifecycleCoordinator.test.ts`
-  4. `tests/unit/core/opencode/OpenCodeService.test.ts`
+  2. `tests/unit/core/opencode/OpenCodeService.httpRuntime.test.ts`
+  3. `tests/unit/core/opencode/OpenCodeService.test.ts`
+  4. `src/core/opencode/OpenCodeServiceLifecycleCoordinator.ts`
   5. `docs/status/maintainability-master-plan.md`
   6. `docs/status/maintainability-round-roadmap.md`
-  7. `docs/status/maintainability-phase-442.md`
+  7. `docs/status/maintainability-phase-443.md`
 
 ## 本批边界
 
@@ -37,5 +37,5 @@
 ## 历史入口
 
 - 批次归档：`docs/status/maintainability-completed-batches.md`
-- 最近成功 phase：`docs/status/maintainability-phase-441.md`
-- 最近 checkpoint：`docs/status/maintainability-phase-437.md`
+- 最近成功 phase：`docs/status/maintainability-phase-443.md`
+- 最近 checkpoint：`docs/status/maintainability-phase-442.md`

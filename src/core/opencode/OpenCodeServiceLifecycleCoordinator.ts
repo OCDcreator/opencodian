@@ -25,6 +25,7 @@ interface OpenCodeServiceLifecycleServerManagerPort {
   stop(): Promise<void>;
   dispose(): void;
   checkHealth(timeout: number): Promise<boolean>;
+  setWorkingDirectory(path: string): void;
 }
 
 interface OpenCodeServiceLifecycleSyncSubscriptionPort {
@@ -42,11 +43,14 @@ interface OpenCodeServiceLifecycleEventSubscriptionPort {
 export interface OpenCodeServiceLifecycleCoordinatorHost {
   getSettings(): OpenCodianSettings;
   getBaseUrl(): string;
+  getToolCatalogScopeKey(): string;
   shouldUseSdkCrud(): boolean;
   checkSdkHealth(): Promise<boolean>;
   logHealthProbeFallback(error: unknown): void;
   resetTransientConnectivityLogState(): void;
   notifyServerStatusChange(status: ServerStatus): void;
+  setVaultPath(path: string): void;
+  clearToolSchemaCacheIfScopeChanged(previousToolCatalogScope: string): void;
   fetchAvailableModels(): Promise<AvailableModelsResult>;
   refreshToolIds(): Promise<unknown>;
   refreshMcpServerStatus(): Promise<unknown>;
@@ -95,6 +99,14 @@ export class OpenCodeServiceLifecycleCoordinator {
   restartEventSubscriptions(): void {
     this.host.syncEvents.restartSubscription();
     this.host.openCodeEvents.restartSubscriptions();
+  }
+
+  setVaultPath(path: string): void {
+    const previousToolCatalogScope = this.host.getToolCatalogScopeKey();
+    this.host.setVaultPath(path);
+    this.host.serverManager.setWorkingDirectory(path);
+    this.host.clearToolSchemaCacheIfScopeChanged(previousToolCatalogScope);
+    this.restartEventSubscriptions();
   }
 
   async checkHealth(): Promise<boolean> {

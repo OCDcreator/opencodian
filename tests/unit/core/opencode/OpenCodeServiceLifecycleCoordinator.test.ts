@@ -15,11 +15,14 @@ function createHost(
   const host = {
     getSettings: jest.fn(() => DEFAULT_SETTINGS),
     getBaseUrl: jest.fn(() => 'http://127.0.0.1:4096'),
+    getToolCatalogScopeKey: jest.fn(() => 'http://127.0.0.1:4096::'),
     shouldUseSdkCrud: jest.fn(() => true),
     checkSdkHealth: jest.fn().mockResolvedValue(true),
     logHealthProbeFallback: jest.fn(),
     resetTransientConnectivityLogState: jest.fn(),
     notifyServerStatusChange: jest.fn(),
+    setVaultPath: jest.fn(),
+    clearToolSchemaCacheIfScopeChanged: jest.fn(),
     fetchAvailableModels: jest.fn().mockResolvedValue({
       providers: [
         {
@@ -37,6 +40,7 @@ function createHost(
       stop: jest.fn().mockResolvedValue(undefined),
       dispose: jest.fn(),
       checkHealth: jest.fn().mockResolvedValue(true),
+      setWorkingDirectory: jest.fn(),
     },
     syncEvents: {
       ensureSubscription: jest.fn(),
@@ -104,6 +108,23 @@ describe('OpenCodeServiceLifecycleCoordinator', () => {
     expect(host.serverManager.dispose).toHaveBeenCalledTimes(1);
   });
 
+  it('owns vault-path scope refresh before restarting subscriptions', () => {
+    const host = createHost();
+    const coordinator = new OpenCodeServiceLifecycleCoordinator(host);
+
+    coordinator.setVaultPath('/tmp/test-vault');
+
+    expect(host.getToolCatalogScopeKey).toHaveBeenCalledTimes(1);
+    expect(host.setVaultPath).toHaveBeenCalledWith('/tmp/test-vault');
+    expect(host.serverManager.setWorkingDirectory).toHaveBeenCalledWith('/tmp/test-vault');
+    expect(host.clearToolSchemaCacheIfScopeChanged).toHaveBeenCalledWith('http://127.0.0.1:4096::');
+    expect(host.syncEvents.restartSubscription).toHaveBeenCalledTimes(1);
+    expect(host.openCodeEvents.restartSubscriptions).toHaveBeenCalledTimes(1);
+    expect(host.setVaultPath.mock.invocationCallOrder[0]).toBeLessThan(
+      host.syncEvents.restartSubscription.mock.invocationCallOrder[0],
+    );
+  });
+
   it('runs model and catalog bootstrap after the server reports running', async () => {
     const host = createHost();
     const coordinator = new OpenCodeServiceLifecycleCoordinator(host);
@@ -134,6 +155,7 @@ describe('OpenCodeServiceLifecycleCoordinator', () => {
         stop: jest.fn().mockResolvedValue(undefined),
         dispose: jest.fn(),
         checkHealth: jest.fn().mockResolvedValue(true),
+        setWorkingDirectory: jest.fn(),
       },
     });
     const coordinator = new OpenCodeServiceLifecycleCoordinator(host);

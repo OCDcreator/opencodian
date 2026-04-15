@@ -70,7 +70,7 @@
 - `streamingRuntime`: `OpenCodeStreamingRuntimeCoordinator` 实例，负责 SDK/legacy streaming transport、legacy SSE reader lifecycle、final response completion，以及 active stream registry、session-scoped abort controller、part type tracking、cancel/detach lifecycle。
 - `sessionLifecycle`: `OpenCodeSessionLifecycleCoordinator` 实例，负责 session create/list/messages/todos/statuses/delete/update、默认 current session 指针，以及公开 session sync 订阅 API 到 `syncEventRuntime` 的委托。
 - `sessionControl`: `OpenCodeSessionControlOrchestrator` 实例，负责 fork/revert/unrevert/diff、context usage snapshot、session message control、command/shell 与 message-part operations。
-- `serviceLifecycle`: `OpenCodeServiceLifecycleCoordinator` 实例，负责 initialize/start/stop/dispose、server running 后的 model/catalog bootstrap、health probe fallback，以及 sync/open-code event subscription 的 lifecycle 编排。
+- `serviceLifecycle`: `OpenCodeServiceLifecycleCoordinator` 实例，负责 initialize/start/stop/dispose、server running 后的 model/catalog bootstrap、health probe fallback，以及 vault path scope refresh 与 sync/open-code event subscription 的 lifecycle 编排。
 - `questionPermissionHub`: `OpenCodeQuestionPermissionHub` 实例，负责 pending questions/reply/reject、pending permissions/respond，以及 session permission responder 的 negotiation lifecycle。
 - `queryGateway`: `OpenCodeQueryGateway` 实例，负责 provider auth、project/file/find/path/VCS/formatter/LSP 查询，以及 MCP status/server/auth 的 catalog 写回。
 - `settingsReconfiguration`: `OpenCodeSettingsReconfigurationCoordinator` 实例，负责 settings update plan、managed server stop/restart 决策、subscription pause/resume 与 rollback/restore lifecycle。
@@ -103,7 +103,7 @@
 
 运行时还有三条重要的配置通道：
 
-- `setVaultPath(path)`: 更新 vault 路径、把工作目录传给 `ServerManager`，并通过 service lifecycle coordinator 重启 sync / open-code 两类 event runtime。
+- `setVaultPath(path)`: 公开入口仍保留在服务层，但 vault path 写回、`ServerManager` 工作目录更新、tool schema cache scope invalidation 与 sync/open-code event restart 已委托给 `OpenCodeServiceLifecycleCoordinator`。
 - `checkHealth()`: 公开入口仍保留在服务层，但 SDK-first health probe 与 `ServerManager.checkHealth()` fallback 已委托给 `OpenCodeServiceLifecycleCoordinator`。
 - `updateSettings(settings)`: 公开入口仍保留在服务层，但完整 settings reconfiguration lifecycle 已委托给 `OpenCodeSettingsReconfigurationCoordinator`；失败时仍会回滚内存设置、`baseUrl`、`ServerManager` 配置，并尽力恢复原服务。
 

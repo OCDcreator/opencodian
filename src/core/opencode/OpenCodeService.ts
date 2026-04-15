@@ -432,6 +432,7 @@ export class OpenCodeService {
     this.serviceLifecycle = new OpenCodeServiceLifecycleCoordinator({
       getSettings: () => this.settings,
       getBaseUrl: () => this.baseUrl,
+      getToolCatalogScopeKey: () => this.catalogQueries.getToolCatalogScopeKey(),
       shouldUseSdkCrud: () => this.shouldUseSdk('sdkCrud'),
       checkSdkHealth: async () => {
         const response = await this.getSdkClient().global.health();
@@ -441,6 +442,11 @@ export class OpenCodeService {
         this.logServiceWarning('health', 'SDK health check failed, falling back to ServerManager health probe', error),
       resetTransientConnectivityLogState: () => this.resetTransientConnectivityLogState(),
       notifyServerStatusChange: (status) => events.onServerStatusChange?.(status),
+      setVaultPath: (path) => {
+        this.vaultPath = path;
+      },
+      clearToolSchemaCacheIfScopeChanged: (previousScope) =>
+        this.catalogQueries.clearToolSchemaCacheIfScopeChanged(previousScope),
       fetchAvailableModels: () => this.getAvailableModels(),
       refreshToolIds: () => this.refreshToolIds(),
       refreshMcpServerStatus: () => this.refreshMcpServerStatus(),
@@ -529,11 +535,7 @@ export class OpenCodeService {
 
   /** Set the vault path for OpenCode server to use project config */
   setVaultPath(path: string): void {
-    const previousToolCatalogScope = this.catalogQueries.getToolCatalogScopeKey();
-    this.vaultPath = path;
-    this.serverManager.setWorkingDirectory(path);
-    this.catalogQueries.clearToolSchemaCacheIfScopeChanged(previousToolCatalogScope);
-    this.serviceLifecycle.restartEventSubscriptions();
+    this.serviceLifecycle.setVaultPath(path);
   }
 
   getSettingsSnapshot(): OpenCodianSettings {
