@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的 `[NEXT]`”。
-> **当前状态**: [READY] `R127` 已完成；`R128-R137` 长队列继续排队，当前首个 `[NEXT]` 为 `R128 - OpenCodeService heavy suite split follow-up A`。
+> **当前状态**: [READY] `R128` 已完成；`R129-R137` 长队列继续排队，当前首个 `[NEXT]` 为 `R129 - OpenCodeService heavy suite split follow-up B`。
 
 ## 控制规则
 
@@ -18,7 +18,7 @@
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
 - 当前 live lint 基线：`0 errors / 65 warnings`
 - 最近成功 phase：`docs/status/maintainability-phase-462.md`
-- 当前路线判断：`R127` 已完成 settings/main residual checkpoint，确认 `R123-R126` 的 settings attach、modal editor/render 与 `main.ts` startup residual 收益；当前必须先执行 `R128` 的 OpenCodeService heavy suite split follow-up A，不得 freestyle。
+- 当前路线判断：`R128` 已完成 OpenCodeService heavy suite split follow-up A，把 session HTTP runtime coverage 从 baseline suite 拆出；当前必须先执行 `R129` 的 OpenCodeService heavy suite split follow-up B，不得 freestyle。
 
 ## Queue
 ## Queue
@@ -1220,7 +1220,7 @@
 
 - **批次目标**: 只按责任拆重型测试，不删断言、不弱化场景。
 
-### [NEXT] R128 - OpenCodeService heavy suite split follow-up A
+### [DONE] R128 - OpenCodeService heavy suite split follow-up A
 
 - **Lane**: Warning cleanup / opencode tests
 - **目标**: 继续把 OpenCodeService residual heavy suites 按 bootstrap/lifecycle/session runtime 责任拆细。
@@ -1230,7 +1230,7 @@
 - **禁止项**: 不改变 production runtime 语义；不删断言、不减覆盖。
 - **验收**: opencode heavy suite residual warning 有可量化下降。；并通过全量 `npm test` 与 `npm run build`。
 
-### [QUEUED] R129 - OpenCodeService heavy suite split follow-up B
+### [NEXT] R129 - OpenCodeService heavy suite split follow-up B
 
 - **Lane**: Warning cleanup / opencode tests
 - **目标**: 继续把 compat/stream/fallback 邻域重型 tests 按责任域拆分收口。

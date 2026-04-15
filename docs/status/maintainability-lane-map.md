@@ -1,16 +1,16 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [READY] `R127` 已完成；`R128-R137` 长队列继续推进，当前 `[NEXT]` 为 `R128 - OpenCodeService heavy suite split follow-up A`。
+> **当前状态**: [READY] `R128` 已完成；`R129-R137` 长队列继续推进，当前 `[NEXT]` 为 `R129 - OpenCodeService heavy suite split follow-up B`。
 
 ## 当前优先级
 
-- **当前 `[NEXT]`**：`R128 - OpenCodeService heavy suite split follow-up A`
-- **本批目标**：`R127` 已完成 Batch 8 settings/main residual checkpoint；当前切入 Batch 9 heavy tests，并从 OpenCodeService bootstrap/lifecycle/session runtime tests 开始
+- **当前 `[NEXT]`**：`R129 - OpenCodeService heavy suite split follow-up B`
+- **本批目标**：`R128` 已完成 Batch 9 的 OpenCodeService bootstrap/session runtime test split；当前继续 compat/stream/fallback heavy tests follow-up
 - **当前 lint 基线**：`0 errors / 65 warnings`
 - **热点顺序**：
-  1. `tests/unit/core/opencode/OpenCodeService.test.ts`
-  2. `tests/unit/core/opencode/OpenCodeServiceLifecycleCoordinator.test.ts`
+  1. `tests/unit/core/opencode/OpenCodeService.sdkCompat.test.ts`
+  2. `tests/unit/core/opencode/OpenCodeService.sdkStreamEvents.test.ts`
   3. `docs/status/maintainability-round-roadmap.md`
 
 ## 本批边界
