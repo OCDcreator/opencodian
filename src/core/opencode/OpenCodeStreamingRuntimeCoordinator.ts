@@ -53,6 +53,7 @@ export interface OpenCodeStreamingRuntimeEventTransformer {
     state: OpenCodeStreamEventState,
     streamContext: OpenCodeStreamingRuntimeContext,
   ): { chunks: StreamChunk[]; stop: boolean };
+  parseSSEEventPayload(event: OpenCodeSSEEvent): OpenCodeStreamEvent | null;
   parseSSEEvents(buffer: string): { events: OpenCodeSSEEvent[]; remaining: string };
 }
 
@@ -413,10 +414,8 @@ export class OpenCodeStreamingRuntimeCoordinator {
         break;
       }
 
-      let eventData: OpenCodeStreamEvent;
-      try {
-        eventData = JSON.parse(event.data) as OpenCodeStreamEvent;
-      } catch {
+      const eventData = this.host.streamEventTransformer.parseSSEEventPayload(event);
+      if (!eventData) {
         continue;
       }
 

@@ -150,6 +150,25 @@ interface OpenCodeClassifiedToolPart {
   toolResult: string | undefined;
 }
 
+function parseJsonRecord(payload: string): Record<string, unknown> | null {
+  try {
+    const parsed = JSON.parse(payload) as unknown;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return null;
+    }
+
+    return parsed as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+function inferSseEventName(data: string): string {
+  const parsed = parseJsonRecord(data);
+  const eventType = parsed?.type;
+  return typeof eventType === 'string' && eventType.trim() ? eventType : 'unknown';
+}
+
 function resolveReasoningDurationSeconds(
   part: Pick<OpenCodeStreamPart, 'duration' | 'time'>,
 ): number | undefined {
@@ -283,6 +302,11 @@ export class OpenCodeStreamEventTransformer {
     return { chunks, stop: false };
   }
 
+  parseSSEEventPayload(event: OpenCodeSSEEvent): OpenCodeStreamEvent | null {
+    const parsed = parseJsonRecord(event.data);
+    return parsed ? (parsed as unknown as OpenCodeStreamEvent) : null;
+  }
+
   parseSSEEvents(buffer: string): { events: OpenCodeSSEEvent[]; remaining: string } {
     const events: OpenCodeSSEEvent[] = [];
     const lines = buffer.split('\n');
@@ -302,12 +326,7 @@ export class OpenCodeStreamEventTransformer {
       } else if (line === '') {
         if (currentEvent.data !== undefined) {
           if (!currentEvent.event) {
-            try {
-              const parsed = JSON.parse(currentEvent.data) as { type?: string };
-              currentEvent.event = parsed.type || 'unknown';
-            } catch {
-              currentEvent.event = 'unknown';
-            }
+            currentEvent.event = inferSseEventName(currentEvent.data);
           }
           events.push(currentEvent as OpenCodeSSEEvent);
         }

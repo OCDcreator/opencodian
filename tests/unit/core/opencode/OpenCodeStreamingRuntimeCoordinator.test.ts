@@ -333,6 +333,7 @@ describe('OpenCodeStreamingRuntimeCoordinator', () => {
     });
     const coordinator = new OpenCodeStreamingRuntimeCoordinator(host);
     global.fetch = createRawSseFetchMock([
+      'data: not-json\n\n',
       'data: {"type":"message.part.delta","properties":{"sessionID":"legacy-buffer","delta":',
       '"Hi"}}\n\n',
       'data: {"type":"session.idle","properties":{"sessionID":"legacy-buffer"}}',
@@ -390,6 +391,7 @@ describe('OpenCodeStreamingRuntimeCoordinator', () => {
             stop: false,
           };
         }),
+        parseSSEEventPayload: jest.fn().mockReturnValue(null),
         parseSSEEvents: jest.fn().mockReturnValue({ events: [], remaining: '' }),
       },
     });

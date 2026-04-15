@@ -359,6 +359,7 @@ describe('OpenCodeStreamEventTransformer parsing helpers', () => {
       'data: {"type":"message.part.delta","properties":{"delta":"Hi"}}\n\n' +
       'event: custom\n' +
       'data: {"type":"session.idle"}\n\n' +
+      'data: not-json\n\n' +
       'data: {"type":"message.part.updated"}',
     );
 
@@ -372,9 +373,35 @@ describe('OpenCodeStreamEventTransformer parsing helpers', () => {
           event: 'custom',
           data: '{"type":"session.idle"}',
         },
+        {
+          event: 'unknown',
+          data: 'not-json',
+        },
       ],
       remaining: 'data: {"type":"message.part.updated"}',
     });
+  });
+
+  it('parses valid SSE payloads and shields invalid payload chunks', () => {
+    const transformer = new OpenCodeStreamEventTransformer(createHost());
+
+    expect(transformer.parseSSEEventPayload({
+      event: 'message.part.delta',
+      data: '{"type":"message.part.delta","properties":{"delta":"Hi"}}',
+    })).toEqual({
+      type: 'message.part.delta',
+      properties: {
+        delta: 'Hi',
+      },
+    });
+    expect(transformer.parseSSEEventPayload({
+      event: 'unknown',
+      data: 'not-json',
+    })).toBeNull();
+    expect(transformer.parseSSEEventPayload({
+      event: 'unknown',
+      data: 'null',
+    })).toBeNull();
   });
 
   it('transforms generic event and part payloads into text, thinking, tool, and usage chunks', () => {
