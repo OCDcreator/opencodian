@@ -1,11 +1,11 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [READY] `R89-R137` 长队列继续推进；当前 `[NEXT]` 为 `R89 - OpenCodianView conversation load/recovery residual seam`。
+> **当前状态**: [READY] `R90-R137` 长队列继续推进；当前 `[NEXT]` 为 `R90 - OpenCodianView message render/update residual seam`。
 
 ## 当前优先级
 
-- **当前 `[NEXT]`**：`R89 - OpenCodianView conversation load/recovery residual seam`
+- **当前 `[NEXT]`**：`R90 - OpenCodianView message render/update residual seam`
 - **本批目标**：继续 residual chat runtime / services 与 opencode core，再转 secondary core / settings / startup，最后做 heavy tests follow-up、warning closeout 与最终 checkpoint
 - **当前 lint 基线**：`0 errors / 64 warnings`
 - **热点顺序**：
@@ -24,7 +24,7 @@
 
 ## 本批边界
 
-- autopilot 只能按 `R89 -> R137` 顺序推进
+- autopilot 只能按 `R90 -> R137` 顺序推进
 - 不新增薄 helper / adapter / provider / factory；新 owner 必须覆盖完整 lifecycle / runtime seam
 - `OpenCodeService`、`OpenCodianView`、`OpenCodianSettings` 的 maintainability 仅允许在 queue 明示项内继续推进
 - heavy tests follow-up 只允许按责任域收口，不允许为了降 warning 去篡改覆盖语义
@@ -42,5 +42,5 @@
 ## 历史入口
 
 - 批次归档：`docs/status/maintainability-completed-batches.md`
-- 最近成功 phase：`docs/status/maintainability-phase-423.md`
-- 最近 checkpoint：`docs/status/maintainability-phase-422.md`
+- 最近成功 phase：`docs/status/maintainability-phase-424.md`
+- 最近 checkpoint：`docs/status/maintainability-phase-423.md`

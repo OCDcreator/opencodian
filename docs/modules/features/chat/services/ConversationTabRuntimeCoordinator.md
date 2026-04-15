@@ -10,7 +10,7 @@
 - `TabMessagesPaneCoordinator`：messages pane DOM、pane runtime state、scroll metrics 与 pane cleanup
 - `ConversationViewStateService`：tab activation 后的 conversation load / empty / streaming 分支
 - `ConversationTabLifecycleRecoveryCoordinator`：close/delete 后的 active-tab recovery
-- `ConversationRestoreBootstrapCoordinator`：first-open load、persisted restore 与 fallback conversation 创建
+- `ConversationLoadRecoveryCoordinator`：first-open load、persisted restore 与 fallback conversation 创建
 - `TabRuntimeStateBridge`：stream-like tab badge、background-task badge、attention 状态与 send-button writeback
 
 这样 `OpenCodianView` 只保留 DOM/settings/state host wiring，tab manager、tab bar、active pane、persist/restore 与 stream-like state 的编排不再散落在 view 方法里。
@@ -92,4 +92,4 @@ export class ConversationTabRuntimeCoordinator<Runtime extends TabMessagesPaneRu
 
 - `OpenCodianView` 仍定义完整 `TabRuntimeState` shape，并保留真实 DOM slots、settings、plugin save、session status 与 pane host wiring
 - `ConversationTabRuntimeCoordinator` 只负责 tab runtime lifecycle 的编排，不接管 message render、send pipeline、opencode transport、question dock 或 todo runtime 语义
-- `ConversationRestoreBootstrapCoordinator`、`ConversationTabLifecycleRecoveryCoordinator` 与 `ConversationViewStateService` 继续拥有各自 conversation/recovery/load 细节；本模块只是把 tab-facing lifecycle 入口收束成单一 coordinator surface
+- `ConversationLoadRecoveryCoordinator`、`ConversationTabLifecycleRecoveryCoordinator` 与 `ConversationViewStateService` 继续拥有各自 conversation/recovery/load 细节；本模块只是把 tab-facing lifecycle 入口收束成单一 coordinator surface

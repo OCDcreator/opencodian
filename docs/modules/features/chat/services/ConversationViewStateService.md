@@ -11,7 +11,7 @@
 
 - tab/pane activation 分支所需的 tab 数据入口
 
-首开 tab bootstrap / persisted restore 决策现在已经转交给 `services/ConversationRestoreBootstrapCoordinator.ts`；loaded-conversation 切换前的 cleanup 与 hydration preflight shell，则继续通过 `runtime/ConversationTransitionBridge.ts` 单独承接；其中消息容器的 rehydrating class / scroll-restore shell 由 `runtime/ConversationHydrationRenderBridge.ts` 提供底层 scroll/class bridge，conversation resolve / server-sync 判定进一步交给 `runtime/ConversationLoadRuntimeBridge.ts`，而消息装载完成后的 background-task rebuild / rerender / post-render outcome / baseline 则再下沉到 `runtime/ConversationHydrationOutcomeBridge.ts`。
+首开 tab bootstrap / persisted restore 决策现在已经转交给 `services/ConversationLoadRecoveryCoordinator.ts`；loaded-conversation 切换前的 cleanup 与 hydration preflight shell，则继续通过 `runtime/ConversationTransitionBridge.ts` 单独承接；其中消息容器的 rehydrating class / scroll-restore shell 由 `runtime/ConversationHydrationRenderBridge.ts` 提供底层 scroll/class bridge，conversation resolve / server-sync 判定进一步交给 `runtime/ConversationLoadRuntimeBridge.ts`，而消息装载完成后的 background-task rebuild / rerender / post-render outcome / baseline 则再下沉到 `runtime/ConversationHydrationOutcomeBridge.ts`。
 
 ## 公开接口
 
@@ -55,6 +55,6 @@ export class ConversationViewStateService {
 ## 与 `OpenCodianView` 的边界
 
 - `OpenCodianView` 仍保留真实 UI render、插件服务装配、tab runtime 状态、scroll metrics 和后台同步实现
-- `ConversationRestoreBootstrapCoordinator` 现在负责 first-open 的 load / restore / fallback 决策，以及 persisted restore 失败时的 state reset/flush
+- `ConversationLoadRecoveryCoordinator` 现在负责 first-open 的 load / restore / fallback 决策，以及 persisted restore 失败时的 state reset/flush
 - `ConversationViewStateService` 只负责决定“何时激活 / hydrate / 刷新”，不再逐项写入 active-tab conversation/session state，也不再直接触发 streaming/empty-tab activation shell、loaded-conversation activation state writeback、pane activation 预刷新、loaded-conversation 的 conversation resolve / server-sync 判定、preflight cleanup / hydration shell、消息装载后的 background-task rebuild / rerender / baseline commit、post-render background-task indicator / dock/status/question/todo outcome，或 hydration 尾段的 composer/model/context usage 写回
 - 这样后续继续拆 model selector 或消息区重渲时，可以沿着更清晰的 host 边界继续推进，而不必再把装载主链路塞回 view

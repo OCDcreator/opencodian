@@ -214,10 +214,6 @@ import {
   type ConversationUserMessageRenderFrame,
 } from './services/ConversationRenderService';
 import {
-  ConversationRestoreBootstrapCoordinator,
-  type ConversationRestoreBootstrapHost,
-} from './services/ConversationRestoreBootstrapCoordinator';
-import {
   ConversationSessionSignalRuntime,
   type ConversationSessionSignalRuntimeHost,
 } from './services/ConversationSessionSignalRuntime';
@@ -1442,12 +1438,6 @@ export class OpenCodianView extends ItemView {
             conversationTabOpenCoordinator.createConversationInNewTab(),
         },
       );
-    const conversationRestoreBootstrapCoordinator = new ConversationRestoreBootstrapCoordinator(
-      this.createConversationRestoreBootstrapHost(),
-      {
-        activateTab: (tabId) => conversationViewStateService.activateTab(tabId),
-      },
-    );
     const conversationLoadRecoveryCoordinator = new ConversationLoadRecoveryCoordinator(
       this.createConversationLoadRecoveryHost(),
       {
@@ -1466,8 +1456,6 @@ export class OpenCodianView extends ItemView {
           conversationTabLifecycleRecoveryCoordinator.deleteAllConversationsAndReset(
             conversationIds,
           ),
-        initializeFirstTab: () => conversationRestoreBootstrapCoordinator.initializeFirstTab(),
-        restorePersistedTabs: () => conversationRestoreBootstrapCoordinator.restorePersistedTabs(),
       },
     );
     const conversationTabRuntimeCoordinator = new ConversationTabRuntimeCoordinator(
@@ -2085,9 +2073,12 @@ export class OpenCodianView extends ItemView {
     };
   }
 
-  private createConversationRestoreBootstrapHost(): ConversationRestoreBootstrapHost {
+  private createConversationLoadRecoveryHost(): ConversationLoadRecoveryHost {
     return {
+      isActiveTabStreaming: () => this.isActiveTabStreaming(),
+      getCurrentConversation: () => this.currentConversation,
       getTabManager: () => this.tabManager,
+      getMaxTabs: () => this.plugin.settings.maxTabs,
       getPersistedTabState: () => this.plugin.settings.tabState,
       resetPersistedTabState: () => {
         this.plugin.settings.tabState = getDefaultPersistedTabState();
@@ -2098,15 +2089,6 @@ export class OpenCodianView extends ItemView {
       loadConversations: () => this.plugin.loadConversations(),
       getConversations: () => this.plugin.getConversations(),
       createConversation: () => this.plugin.createConversation(),
-    };
-  }
-
-  private createConversationLoadRecoveryHost(): ConversationLoadRecoveryHost {
-    return {
-      isActiveTabStreaming: () => this.isActiveTabStreaming(),
-      getCurrentConversation: () => this.currentConversation,
-      getTabManager: () => this.tabManager,
-      getMaxTabs: () => this.plugin.settings.maxTabs,
       chooseForkTarget: () => chooseForkTarget(this.app),
       confirmRewind: () => window.confirm(t('chat.rewind.confirm')),
       revertSession: (sessionId, messageId) =>

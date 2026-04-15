@@ -152,7 +152,6 @@ docs/modules/
 │   │   │   ├── ContextUsageService.md
 │   │   │   ├── ConversationRenderService.md
 │   │   │   ├── ConversationLoadRecoveryCoordinator.md
-│   │   │   ├── ConversationRestoreBootstrapCoordinator.md
 │   │   │   ├── ConversationTabLifecycleRecoveryCoordinator.md
 │   │   │   ├── ConversationTabOpenCoordinator.md
 │   │   │   ├── ConversationTabRuntimeCoordinator.md

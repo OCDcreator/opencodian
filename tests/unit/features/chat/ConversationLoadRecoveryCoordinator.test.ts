@@ -58,6 +58,15 @@ function createHost(
     getCurrentConversation: jest.fn(() => conversation),
     getTabManager: jest.fn(() => null),
     getMaxTabs: jest.fn(() => 4),
+    getPersistedTabState: jest.fn().mockReturnValue({
+      tabs: [],
+      activeTabIndex: 0,
+    }),
+    resetPersistedTabState: jest.fn(),
+    persistTabState: jest.fn(),
+    loadConversations: jest.fn().mockResolvedValue(undefined),
+    getConversations: jest.fn().mockReturnValue([]),
+    createConversation: jest.fn().mockResolvedValue(createConversation('created')),
     chooseForkTarget: jest.fn().mockResolvedValue('current-tab'),
     confirmRewind: jest.fn(() => true),
     revertSession: jest.fn().mockResolvedValue(true),
@@ -82,8 +91,6 @@ function createPort(
     loadConversation: jest.fn().mockResolvedValue(undefined),
     deleteConversationsAndRecover: jest.fn().mockResolvedValue(undefined),
     deleteAllConversationsAndReset: jest.fn().mockResolvedValue(undefined),
-    initializeFirstTab: jest.fn().mockResolvedValue(undefined),
-    restorePersistedTabs: jest.fn().mockReturnValue(null),
     ...overrides,
   };
 }
@@ -93,12 +100,10 @@ describe('ConversationLoadRecoveryCoordinator', () => {
     jest.clearAllMocks();
   });
 
-  it('delegates bootstrap methods to the existing load/recovery ports', async () => {
+  it('delegates create/load/delete methods to the existing load/recovery ports', async () => {
     const conversation = createConversation('bootstrap');
     const host = createHost(conversation);
-    const port = createPort({
-      restorePersistedTabs: jest.fn().mockReturnValue('tab-restored'),
-    });
+    const port = createPort();
     const coordinator = new ConversationLoadRecoveryCoordinator(host, port);
 
     await coordinator.createConversationInNewTab();
@@ -106,8 +111,6 @@ describe('ConversationLoadRecoveryCoordinator', () => {
     await coordinator.loadConversation(conversation.id, { preserveScrollPosition: true });
     await coordinator.deleteConversationsAndRecover([conversation.id]);
     await coordinator.deleteAllConversationsAndReset([conversation.id]);
-    await coordinator.initializeFirstTab();
-    const restoredTabId = coordinator.restorePersistedTabs();
 
     expect(port.createConversationInNewTab).toHaveBeenCalledTimes(1);
     expect(port.createConversationInCurrentTab).toHaveBeenCalledTimes(1);
@@ -116,8 +119,102 @@ describe('ConversationLoadRecoveryCoordinator', () => {
     });
     expect(port.deleteConversationsAndRecover).toHaveBeenCalledWith([conversation.id]);
     expect(port.deleteAllConversationsAndReset).toHaveBeenCalledWith([conversation.id]);
-    expect(port.initializeFirstTab).toHaveBeenCalledTimes(1);
-    expect(restoredTabId).toBe('tab-restored');
+  });
+
+  it('loads conversations before restoring persisted tabs during first open', async () => {
+    const conversation = createConversation('restored');
+    const tabManager = new TabManager('New chat', {
+      getMaxTabs: () => 4,
+    });
+    const host = createHost(conversation, {
+      getTabManager: jest.fn().mockReturnValue(tabManager),
+      getPersistedTabState: jest.fn().mockReturnValue({
+        tabs: [{ conversationId: conversation.id, title: conversation.title, modelOverride: null }],
+        activeTabIndex: 0,
+      }),
+      getConversations: jest.fn().mockReturnValue([conversation]),
+    });
+    const port = createPort();
+    const coordinator = new ConversationLoadRecoveryCoordinator(host, port);
+
+    await coordinator.initializeFirstTab();
+
+    expect(host.loadConversations).toHaveBeenCalledTimes(1);
+    expect(host.getPersistedTabState).toHaveBeenCalledTimes(1);
+    expect(port.activateTab).toHaveBeenCalledWith(tabManager.getActiveTab()!.id);
+    expect(host.loadConversations.mock.invocationCallOrder[0]).toBeLessThan(
+      host.getPersistedTabState.mock.invocationCallOrder[0]!,
+    );
+  });
+
+  it('reuses the first existing conversation when no persisted tabs are available', async () => {
+    const conversation = createConversation('existing');
+    const tabManager = new TabManager('New chat', {
+      getMaxTabs: () => 4,
+    });
+    const host = createHost(conversation, {
+      getTabManager: jest.fn().mockReturnValue(tabManager),
+      getConversations: jest.fn().mockReturnValue([conversation]),
+    });
+    const port = createPort();
+    const coordinator = new ConversationLoadRecoveryCoordinator(host, port);
+
+    await coordinator.initializeFirstTab();
+
+    const tabs = tabManager.getAllTabs();
+    expect(host.createConversation).not.toHaveBeenCalled();
+    expect(tabs).toHaveLength(1);
+    expect(tabs[0]?.conversationId).toBe(conversation.id);
+    expect(port.activateTab).toHaveBeenCalledWith(tabs[0]!.id);
+  });
+
+  it('creates a new conversation when first open has no persisted tabs or existing conversations', async () => {
+    const conversation = createConversation('load-created');
+    const createdConversation = createConversation('created-conversation');
+    const tabManager = new TabManager('New chat', {
+      getMaxTabs: () => 4,
+    });
+    const host = createHost(conversation, {
+      getTabManager: jest.fn().mockReturnValue(tabManager),
+      getConversations: jest.fn().mockReturnValue([]),
+      createConversation: jest.fn().mockResolvedValue(createdConversation),
+    });
+    const port = createPort();
+    const coordinator = new ConversationLoadRecoveryCoordinator(host, port);
+
+    await coordinator.initializeFirstTab();
+
+    const tabs = tabManager.getAllTabs();
+    expect(host.createConversation).toHaveBeenCalledTimes(1);
+    expect(tabs).toHaveLength(1);
+    expect(tabs[0]?.conversationId).toBe(createdConversation.id);
+    expect(port.activateTab).toHaveBeenCalledWith(tabs[0]!.id);
+  });
+
+  it('resets persisted tab state when restore returns no tabs', () => {
+    const conversation = createConversation('missing');
+    const tabManager = {
+      canCreateTab: jest.fn(),
+      createTab: jest.fn(),
+      getActiveTabModelOverride: jest.fn(),
+      setActiveTabModelOverride: jest.fn(),
+      restoreTabs: jest.fn().mockReturnValue(null),
+    };
+    const host = createHost(conversation, {
+      getTabManager: jest.fn().mockReturnValue(tabManager),
+      getPersistedTabState: jest.fn().mockReturnValue({
+        tabs: [{ conversationId: 'missing', title: 'Missing', modelOverride: null }],
+        activeTabIndex: 0,
+      }),
+    });
+    const port = createPort();
+    const coordinator = new ConversationLoadRecoveryCoordinator(host, port);
+
+    const restoredTabId = coordinator.restorePersistedTabs();
+
+    expect(restoredTabId).toBeNull();
+    expect(host.resetPersistedTabState).toHaveBeenCalledTimes(1);
+    expect(host.persistTabState).toHaveBeenCalledWith({ flush: true });
   });
 
   it('rewinds a conversation through the service port and reloads with force sync', async () => {

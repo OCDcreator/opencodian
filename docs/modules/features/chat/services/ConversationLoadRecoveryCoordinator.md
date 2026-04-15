@@ -7,14 +7,13 @@
 
 `ConversationLoadRecoveryCoordinator` 把 `OpenCodianView` 里残留的 conversation load / recovery 入口收成单一 coordinator surface。
 
-它本身不重写 activation、bootstrap、tab-open 或 delete-recovery 的底层实现，而是组合已有 owner：
+它现在直接拥有首开 bootstrap / persisted-restore 决策，同时继续组合已有 owner：
 
 - `ConversationViewStateService`：tab 激活与 loaded-conversation hydration
-- `ConversationRestoreBootstrapCoordinator`：首开 load / persisted restore / fallback-create
 - `ConversationTabOpenCoordinator`：new-tab / current-tab 创建入口
 - `ConversationTabLifecycleRecoveryCoordinator`：delete/delete-all recovery
 
-在这些现有 owner 之上，它再直接承接先前仍留在 `OpenCodianView` 里的 rewind / restore-rewind / fork 分支，以及 create/load/delete/bootstrap 的统一入口转发。
+在这些现有 owner 之上，它再直接承接 rewind / restore-rewind / fork 分支，以及 create/load/delete/bootstrap 的统一入口编排。
 
 ## 公开接口
 
@@ -24,6 +23,12 @@ export interface ConversationLoadRecoveryHost {
   getCurrentConversation(): Conversation | null;
   getTabManager(): ConversationLoadRecoveryTabManager | null;
   getMaxTabs(): number;
+  getPersistedTabState(): PersistedTabState;
+  resetPersistedTabState(): void;
+  persistTabState(options?: { flush?: boolean }): void;
+  loadConversations(): Promise<void>;
+  getConversations(): Conversation[];
+  createConversation(): Promise<Conversation>;
   chooseForkTarget(): Promise<ForkTarget | null>;
   confirmRewind(): boolean;
   revertSession(sessionId: string, messageId: string): Promise<boolean>;
@@ -43,8 +48,6 @@ export interface ConversationLoadRecoveryPort {
   loadConversation(id: string, options?: LoadConversationOptions): Promise<void>;
   deleteConversationsAndRecover(conversationIds: readonly string[]): Promise<void>;
   deleteAllConversationsAndReset(conversationIds: readonly string[]): Promise<void>;
-  initializeFirstTab(): Promise<void>;
-  restorePersistedTabs(): TabId | null;
 }
 
 export class ConversationLoadRecoveryCoordinator {
@@ -56,7 +59,9 @@ export class ConversationLoadRecoveryCoordinator {
 
 ### lifecycle 入口收束
 
-- `createConversationInNewTab()` / `createConversationInCurrentTab()` / `loadConversation()` / `initializeFirstTab()` / `restorePersistedTabs()` / delete recovery 入口现在都先经过这个 coordinator，再下沉到既有 service/coordinator
+- `createConversationInNewTab()` / `createConversationInCurrentTab()` / `loadConversation()` / `initializeFirstTab()` / `restorePersistedTabs()` / delete recovery 入口现在都先经过这个 coordinator
+- 首开 bootstrap 会先 `loadConversations()`，再处理 persisted tab restore；restore 失败时仍会 reset tab state 并立即 `persistTabState({ flush: true })`
+- 没有 persisted tabs 时，仍优先复用第一条已有 conversation；只有完全没有会话时才调用 `createConversation()`
 - 这样 `OpenCodianView` 不再分别直连 create/load/bootstrap/delete 的多组 owner，只保留一条 conversation-lifecycle seam
 
 ### rewind / restore-rewind
@@ -75,6 +80,6 @@ export class ConversationLoadRecoveryCoordinator {
 ## 与 `OpenCodianView` 的边界
 
 - `OpenCodianView` 现在只提供当前 conversation、tab manager、notice、modal/confirm、OpenCode session API 与 tab-state writeback 这些 host seam
-- `ConversationLoadRecoveryCoordinator` 负责把 create/load/bootstrap/delete-recovery/fork/rewind 入口拼成一条可读的 lifecycle surface
-- `ConversationViewStateService`、`ConversationRestoreBootstrapCoordinator`、`ConversationTabOpenCoordinator` 与 `ConversationTabLifecycleRecoveryCoordinator` 继续各自保有更细的 activation / bootstrap / open / delete 语义
-- 因此后续若继续推进 `R69` 相邻 residual，只需要沿这个 coordinator surface 往下收，而不必重新回到 `OpenCodianView` 里寻找分散入口
+- `ConversationLoadRecoveryCoordinator` 负责把 create/load/bootstrap/delete-recovery/fork/rewind 入口拼成一条可读的 lifecycle surface，并直接承接 first-open / persisted-restore 决策
+- `ConversationViewStateService`、`ConversationTabOpenCoordinator` 与 `ConversationTabLifecycleRecoveryCoordinator` 继续各自保有更细的 activation / open / delete 语义
+- 因此后续若继续推进相邻 residual，只需要沿这个 coordinator surface 往下收，而不必重新回到 `OpenCodianView` 里寻找分散入口

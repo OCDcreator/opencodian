@@ -1,12 +1,18 @@
 import type {
   ChatMessage,
   Conversation,
+  PersistedTabState,
 } from '../../../core/types';
 import { t } from '../../../i18n';
 import { createLogger } from '../../../shared';
 import type { ForkTarget } from '../../../shared/modals';
 import { cloneMessagesBeforeForkTarget } from '../forkMessages';
-import type { TabData, TabId, TabModelOverride } from '../tabs';
+import type {
+  RestoredTabState,
+  TabData,
+  TabId,
+  TabModelOverride,
+} from '../tabs';
 import type { LoadConversationOptions } from './ConversationViewStateService';
 
 const logger = createLogger('ConversationLoadRecoveryCoordinator');
@@ -16,6 +22,11 @@ interface ConversationLoadRecoveryTabManager {
   createTab(conversation?: Pick<Conversation, 'id' | 'title'> | null): TabData | null;
   getActiveTabModelOverride(): TabModelOverride | null;
   setActiveTabModelOverride(modelOverride: TabModelOverride | null): void;
+  restoreTabs(
+    items: RestoredTabState[],
+    activeTabIndex: number,
+    conversations: ReadonlyMap<string, Pick<Conversation, 'id' | 'title'>>,
+  ): TabData | null;
 }
 
 interface ForkConversationInitialState {
@@ -30,6 +41,12 @@ export interface ConversationLoadRecoveryHost {
   getCurrentConversation(): Conversation | null;
   getTabManager(): ConversationLoadRecoveryTabManager | null;
   getMaxTabs(): number;
+  getPersistedTabState(): PersistedTabState;
+  resetPersistedTabState(): void;
+  persistTabState(options?: { flush?: boolean }): void;
+  loadConversations(): Promise<void>;
+  getConversations(): Conversation[];
+  createConversation(): Promise<Conversation>;
   chooseForkTarget(): Promise<ForkTarget | null>;
   confirmRewind(): boolean;
   revertSession(sessionId: string, messageId: string): Promise<boolean>;
@@ -52,8 +69,6 @@ export interface ConversationLoadRecoveryPort {
   loadConversation(id: string, options?: LoadConversationOptions): Promise<void>;
   deleteConversationsAndRecover(conversationIds: readonly string[]): Promise<void>;
   deleteAllConversationsAndReset(conversationIds: readonly string[]): Promise<void>;
-  initializeFirstTab(): Promise<void>;
-  restorePersistedTabs(): TabId | null;
 }
 
 export class ConversationLoadRecoveryCoordinator {
@@ -90,11 +105,57 @@ export class ConversationLoadRecoveryCoordinator {
   }
 
   async initializeFirstTab(): Promise<void> {
-    await this.port.initializeFirstTab();
+    const tabManager = this.host.getTabManager();
+    if (!tabManager) {
+      return;
+    }
+
+    await this.host.loadConversations();
+
+    const restoredTabId = this.restorePersistedTabs();
+    if (restoredTabId) {
+      await this.port.activateTab(restoredTabId);
+      return;
+    }
+
+    let initialConversation = this.host.getConversations()[0];
+    if (!initialConversation) {
+      initialConversation = await this.host.createConversation();
+    }
+
+    const tab = tabManager.createTab(initialConversation);
+    if (tab) {
+      await this.port.activateTab(tab.id);
+    }
   }
 
   restorePersistedTabs(): TabId | null {
-    return this.port.restorePersistedTabs();
+    const tabManager = this.host.getTabManager();
+    if (!tabManager) {
+      return null;
+    }
+
+    const savedState = this.host.getPersistedTabState();
+    if (!savedState.tabs.length) {
+      return null;
+    }
+
+    const conversationMap = new Map(
+      this.host.getConversations().map((conversation) => [conversation.id, conversation] as const),
+    );
+    const restoredTab = tabManager.restoreTabs(
+      savedState.tabs as RestoredTabState[],
+      savedState.activeTabIndex,
+      conversationMap,
+    );
+
+    if (!restoredTab) {
+      this.host.resetPersistedTabState();
+      this.host.persistTabState({ flush: true });
+      return null;
+    }
+
+    return restoredTab.id;
   }
 
   async handleRewindRequest(message: ChatMessage): Promise<void> {
