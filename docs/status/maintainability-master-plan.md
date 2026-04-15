@@ -2,19 +2,19 @@
 
 > **状态**: [READY]
 > **作用**: 这是 maintainability 无人值守的战略文档。每轮开始前，先读本文件，再读 `docs/status/maintainability-round-roadmap.md` 与最近的 `docs/status/maintainability-phase-XXX.md`。
-> **自动推进状态**: `R128` 已完成 OpenCodeService heavy suite split follow-up A；当前继续按 `R129-R137` 长队列顺序推进。恢复 autopilot 后只能从首个 `[NEXT]`（`R129`）顺序执行，不允许 freestyle。
+> **自动推进状态**: `R129` 已完成 OpenCodeService heavy suite split follow-up B；当前继续按 `R130-R137` 长队列顺序推进。恢复 autopilot 后只能从首个 `[NEXT]`（`R130`）顺序执行，不允许 freestyle。
 
 ## 1. 当前判断
 
-**当前分支已完成 `R68-R128` 并把 live lint 记录基线保持在 `0 errors / 65 warnings`；`R128` 已把 `OpenCodeService.test.ts` 中的 session HTTP runtime coverage 拆到独立 suite，保留 bootstrap/lifecycle/status baseline 与 `OpenCodeServiceLifecycleCoordinator` 现有单一 owner。** 接下来进入 `R129` 的 compat/stream/fallback heavy tests follow-up，再按 chat heavy tests、warning closeout 与最终 checkpoint 顺序推进。
+**当前分支已完成 `R68-R129` 并把 live lint 记录基线保持在 `0 errors / 65 warnings`；`R129` 已把 OpenCodeService 的 compat catalog/event forwarding 与 SDK stream completion/fallback coverage 从原重型 suites 中拆出，保留 wrappers 与 tool/session stream owners。** 接下来进入 `R130` 的 chat heavy tests follow-up，再按后续 heavy split checkpoint、warning closeout 与最终 checkpoint 顺序推进。
 
 ## 2. 当前基线
 
 - **lint**: `0 errors / 65 warnings`
-- **最近验证**: `R128` 已确认 focused lint、focused tests、全量 `npm test` 与 `npm run build` 通过，`BUILD_ID` 为 `autopilot-maintainability.202604160313`
+- **最近验证**: `R129` 已确认 focused lint、focused tests、全量 `npm test` 与 `npm run build` 通过，`BUILD_ID` 为 `autopilot-maintainability.202604160324`
 - **最近 Test Vault 部署**: `R126`，`BUILD_ID` `autopilot-maintainability.202604160258`（`R127` 仅改 checkpoint 文档，未触发部署）
-- **当前 `[NEXT]`**: `R129 - OpenCodeService heavy suite split follow-up B`
-- **主热点**: `R128` 已完成 OpenCodeService bootstrap/session runtime test split；下一步继续 Batch 9，从 compat/stream/fallback heavy tests follow-up 开始
+- **当前 `[NEXT]`**: `R130 - Chat heavy suite split follow-up A`
+- **主热点**: `R129` 已完成 OpenCodeService compat/stream/fallback heavy suite split；下一步继续 Batch 9，从 chat runtime/render/sync heavy tests follow-up 开始
 
 ## 3. 本批执行规则
 
