@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的 `[NEXT]`”。
-> **当前状态**: [READY] `R129` 已完成；`R130-R137` 长队列继续排队，当前首个 `[NEXT]` 为 `R130 - Chat heavy suite split follow-up A`。
+> **当前状态**: [READY] `R130` 已完成；`R131-R137` 长队列继续排队，当前首个 `[NEXT]` 为 `R131 - Chat heavy suite split follow-up B`。
 
 ## 控制规则
 
@@ -17,8 +17,8 @@
 
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
 - 当前 live lint 基线：`0 errors / 65 warnings`
-- 最近成功 phase：`docs/status/maintainability-phase-464.md`
-- 当前路线判断：`R129` 已完成 OpenCodeService heavy suite split follow-up B，把 compat catalog/event forwarding 与 SDK stream completion/fallback coverage 从原 heavy suites 中拆出；当前必须先执行 `R130` 的 Chat heavy suite split follow-up A，不得 freestyle。
+- 最近成功 phase：`docs/status/maintainability-phase-465.md`
+- 当前路线判断：`R130` 已完成 Chat heavy suite split follow-up A，把 chat render/sync 邻域拆成 render flows、incremental updates、signal routing 与 background loop 四个责任域；当前必须先执行 `R131` 的 Chat heavy suite split follow-up B，不得 freestyle。
 
 ## Queue
 ## Queue
@@ -1240,7 +1240,7 @@
 - **禁止项**: 不改变 production runtime 语义；不弱化 compatibility/fallback 覆盖。
 - **验收**: compat/stream heavy tests 的 residual warning 继续下降。；并通过全量 `npm test` 与 `npm run build`。
 
-### [NEXT] R130 - Chat heavy suite split follow-up A
+### [DONE] R130 - Chat heavy suite split follow-up A
 
 - **Lane**: Warning cleanup / chat tests
 - **目标**: 继续把 chat runtime/render/sync 邻域的残余大测试按责任拆分。
@@ -1250,7 +1250,7 @@
 - **禁止项**: 不改变 production runtime 语义；不删断言、不弱化场景。
 - **验收**: chat render/sync heavy suites 的 residual warning 有可量化下降。；并通过全量 `npm test` 与 `npm run build`。
 
-### [QUEUED] R131 - Chat heavy suite split follow-up B
+### [NEXT] R131 - Chat heavy suite split follow-up B
 
 - **Lane**: Warning cleanup / chat tests
 - **目标**: 继续把 question/todo/composer/background-task 邻域的残余大测试按责任拆分。

@@ -1,16 +1,16 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [READY] `R129` 已完成；`R130-R137` 长队列继续推进，当前 `[NEXT]` 为 `R130 - Chat heavy suite split follow-up A`。
+> **当前状态**: [READY] `R130` 已完成；`R131-R137` 长队列继续推进，当前 `[NEXT]` 为 `R131 - Chat heavy suite split follow-up B`。
 
 ## 当前优先级
 
-- **当前 `[NEXT]`**：`R130 - Chat heavy suite split follow-up A`
-- **本批目标**：`R129` 已完成 Batch 9 的 OpenCodeService compat/stream/fallback heavy test split；当前继续 chat runtime/render/sync heavy tests follow-up
+- **当前 `[NEXT]`**：`R131 - Chat heavy suite split follow-up B`
+- **本批目标**：`R130` 已完成 chat render/sync heavy test split；当前继续 question/todo/composer/background-task heavy tests follow-up
 - **当前 lint 基线**：`0 errors / 65 warnings`
 - **热点顺序**：
-  1. `tests/unit/features/chat/ConversationRenderService.test.ts`
-  2. `tests/unit/features/chat/ConversationSyncOrchestrationService.test.ts`
+  1. `tests/unit/features/chat/QuestionDockCoordinator.test.ts`
+  2. `tests/unit/features/chat/ComposerContextCoordinator.test.ts`
   3. `docs/status/maintainability-round-roadmap.md`
 
 ## 本批边界
@@ -33,5 +33,5 @@
 ## 历史入口
 
 - 批次归档：`docs/status/maintainability-completed-batches.md`
-- 最近成功 phase：`docs/status/maintainability-phase-464.md`
+- 最近成功 phase：`docs/status/maintainability-phase-465.md`
 - 最近 checkpoint：`docs/status/maintainability-phase-462.md`
