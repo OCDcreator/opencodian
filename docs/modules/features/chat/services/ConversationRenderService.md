@@ -17,6 +17,8 @@
 
 它不持有聊天视图的 DOM 根状态，也不直接依赖插件实例；所有真实渲染、scroll runtime、background-task UI 和调试日志都通过 `ConversationRenderHost` 回调回到 `OpenCodianView`。其中 persisted assistant shell / pseudo-stream footer / streaming-shell state 收尾由嵌套的 `ConversationAssistantShellRenderPort` 提供，assistant tail 相关的正文签名、正文重渲与 persisted footer 收尾则进一步收束在 `ConversationAssistantTailRenderPort`。
 
+当前实现里，service 内部还把“基础消息/伪流式 assistant 渲染”与“synced update apply/fallback”分别收进两个私有 delegate，让 `ConversationRenderService` 本身更接近只保留 full rerender 与 trailing-assistant patch 这两条高层控制流。
+
 ## 公开接口
 
 ```typescript
@@ -78,6 +80,7 @@ export class ConversationRenderService {
 - assistant persisted shell 直接复用 `AssistantShellViewHostAdapter`，避免 view 再持有顶层 assistant render/update 分支
 - user message shell / footer 仍通过 host callback 回到 view，但 render service 现在统一掌握“何时创建 frame、何时重绘 content/footer”
 - 空 conversation 且存在 revert state 时，会通过 host 提供的 notice message source 渲染空白 rewind notice
+- persisted user/assistant render、single-user rerender、以及 synced assistant pseudo-stream reveal 现在先经由 service 内部的 message-render delegate，再落回 host ports 执行真实 DOM 更新
 
 ### 全量重渲
 
@@ -90,6 +93,7 @@ export class ConversationRenderService {
 - `getIncrementalRenderedMessageUpdate()` 先判断是否还能沿用现有 rendered message 前缀
 - append-only 时只渲染新增消息，不重跑整段历史
 - 纯文本 assistant append 继续直接在 service 内走 pseudo-stream reveal，而不是回到 view 再分支
+- synced update 的“增量判断 → optional tail patch → append render → indicator/scroll follow-up”现在先由私有 apply delegate 串起来，service 公开入口只保留高层委托与 full-rerender fallback
 
 ### 尾部 assistant patch
 

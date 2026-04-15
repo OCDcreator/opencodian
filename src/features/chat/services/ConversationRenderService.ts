@@ -263,7 +263,22 @@ type SuccessfulTrailingAssistantPatchTailMessages = Extract<
   { ok: true }
 >;
 
-export class ConversationRenderService {
+type ConversationSyncedUpdatePatchPort = {
+  patchTrailingAssistantRender(
+    previousMessages: ChatMessage[],
+    nextMessages: ChatMessage[],
+  ): Promise<boolean>;
+  rerenderConversationMessages(conversation: Conversation): Promise<void>;
+};
+
+type ConversationSyncedUpdateApplyContext = {
+  currentConversation: Conversation;
+  incrementalUpdate: IncrementalRenderedMessageUpdate;
+  nextMessages: ChatMessage[];
+  previousMessages: ChatMessage[];
+};
+
+class ConversationMessageRenderDelegate {
   constructor(private readonly host: ConversationRenderHost) {}
 
   async renderMessage(message: ChatMessage): Promise<HTMLElement | void | undefined> {
@@ -284,9 +299,7 @@ export class ConversationRenderService {
 
   async renderMessages(messages: ChatMessage[]): Promise<void> {
     if (messages.length === 0) {
-      if (this.host.shouldRenderEmptyConversationNotice()) {
-        await this.renderMessage(this.host.createEmptyConversationNoticeMessage());
-      }
+      await this.renderEmptyConversationNoticeIfNeeded();
       return;
     }
 
@@ -318,6 +331,220 @@ export class ConversationRenderService {
     messageEl.appendChild(contentEl);
     const copyContent = await this.host.renderUserMessageContent(contentEl, message);
     this.host.addUserMessageFooter(messageEl, message, copyContent);
+  }
+
+  async renderSyncedMessages(messages: ChatMessage[]): Promise<void> {
+    for (const message of messages) {
+      await this.renderSyncedMessage(message);
+    }
+  }
+
+  private async renderEmptyConversationNoticeIfNeeded(): Promise<void> {
+    if (this.host.shouldRenderEmptyConversationNotice()) {
+      await this.renderMessage(this.host.createEmptyConversationNoticeMessage());
+    }
+  }
+
+  private async renderSyncedMessage(message: ChatMessage): Promise<void> {
+    if (this.shouldPseudoStreamSyncedAssistantMessage(message)) {
+      await this.renderSyncedAssistantMessageWithReveal(message);
+      return;
+    }
+
+    await this.renderMessage(message);
+  }
+
+  private shouldPseudoStreamSyncedAssistantMessage(message: ChatMessage): boolean {
+    if (message.role !== 'assistant' || message.displayStyle === 'notice') {
+      return false;
+    }
+
+    if (message.questionResolution) {
+      return false;
+    }
+
+    if (!message.content?.trim()) {
+      return false;
+    }
+
+    if (!message.contentBlocks || message.contentBlocks.length === 0) {
+      return true;
+    }
+
+    return message.contentBlocks.every((block) => block.type === 'text' && Boolean(block.text));
+  }
+
+  private async renderSyncedAssistantMessageWithReveal(message: ChatMessage): Promise<void> {
+    const { messageEl, contentEl } = this.host.assistantShellRender.createAssistantMessageElement();
+    const textEl = document.createElement('div');
+    textEl.className = 'streaming-text-block';
+    contentEl.appendChild(textEl);
+    const chunks = this.splitPseudoStreamChunks(message.content);
+    const delayMs = this.getPseudoStreamDelay(chunks.length);
+
+    messageEl.style.visibility = 'hidden';
+
+    let rendered = '';
+    for (const chunk of chunks) {
+      rendered += chunk;
+      await this.host.renderMarkdownInto(textEl, rendered);
+      if (messageEl.style.visibility === 'hidden') {
+        messageEl.style.visibility = '';
+      }
+      if (delayMs > 0) {
+        await this.sleep(delayMs);
+      }
+    }
+
+    if (messageEl.style.visibility === 'hidden') {
+      messageEl.style.visibility = '';
+    }
+    this.host.assistantShellRender.finalizePseudoStreamFooter(messageEl, message);
+    this.host.assistantShellRender.clearStreamingMessageState();
+  }
+
+  private splitPseudoStreamChunks(text: string): string[] {
+    const normalized = text.replace(/\r\n/g, '\n');
+    const chunks: string[] = [];
+    let buffer = '';
+
+    for (const char of normalized) {
+      buffer += char;
+      if (buffer.length >= 12 || /[\n，。！？；：,.!?;:]/u.test(char)) {
+        chunks.push(buffer);
+        buffer = '';
+      }
+    }
+
+    if (buffer) {
+      chunks.push(buffer);
+    }
+
+    return chunks.length > 0 ? chunks : [text];
+  }
+
+  private getPseudoStreamDelay(chunkCount: number): number {
+    if (chunkCount <= 1) {
+      return 0;
+    }
+
+    const targetDurationMs = 900;
+    return Math.max(12, Math.min(36, Math.round(targetDurationMs / chunkCount)));
+  }
+
+  private sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => {
+      window.setTimeout(resolve, ms);
+    });
+  }
+}
+
+class ConversationSyncedUpdateApplyDelegate {
+  constructor(
+    private readonly host: ConversationRenderHost,
+    private readonly messageRenderer: ConversationMessageRenderDelegate,
+    private readonly patchPort: ConversationSyncedUpdatePatchPort,
+  ) {}
+
+  async apply(
+    previousMessages: ChatMessage[],
+    nextMessages: ChatMessage[],
+  ): Promise<void> {
+    const currentConversation = this.host.getCurrentConversation();
+    if (!currentConversation) {
+      return;
+    }
+
+    const incrementalUpdate = getIncrementalRenderedMessageUpdate({
+      previousMessages,
+      nextMessages,
+      getMessagesForRender: (messages) => this.host.getMessagesForRender(messages),
+      getMessageVisualSignature: (message) => this.host.getMessageVisualSignature(message),
+    });
+    if (!incrementalUpdate) {
+      await this.patchPort.rerenderConversationMessages(currentConversation);
+      return;
+    }
+
+    await this.applyIncrementalUpdate({
+      currentConversation,
+      incrementalUpdate,
+      nextMessages,
+      previousMessages,
+    });
+  }
+
+  private async applyIncrementalUpdate({
+    currentConversation,
+    incrementalUpdate,
+    nextMessages,
+    previousMessages,
+  }: ConversationSyncedUpdateApplyContext): Promise<void> {
+    const shouldStickToBottom = this.host.shouldAutoScroll();
+    this.host.syncBackgroundTaskStateFromConversation(currentConversation);
+
+    const patchedTail = await this.patchTrailingAssistantIfNeeded(
+      incrementalUpdate,
+      previousMessages,
+      nextMessages,
+    );
+    if (!patchedTail) {
+      await this.patchPort.rerenderConversationMessages(currentConversation);
+      return;
+    }
+
+    await this.messageRenderer.renderSyncedMessages(incrementalUpdate.appendedRenderedMessages);
+    await this.host.renderBackgroundTaskIndicatorIfNeeded();
+
+    if (shouldStickToBottom) {
+      this.host.scrollToBottom();
+    }
+  }
+
+  private patchTrailingAssistantIfNeeded(
+    incrementalUpdate: IncrementalRenderedMessageUpdate,
+    previousMessages: ChatMessage[],
+    nextMessages: ChatMessage[],
+  ): Promise<boolean> {
+    if (!incrementalUpdate.patchTrailingAssistant) {
+      return Promise.resolve(true);
+    }
+
+    return this.patchPort.patchTrailingAssistantRender(previousMessages, nextMessages);
+  }
+}
+
+export class ConversationRenderService {
+  private readonly messageRenderer: ConversationMessageRenderDelegate;
+  private readonly syncedUpdateApplier: ConversationSyncedUpdateApplyDelegate;
+
+  constructor(private readonly host: ConversationRenderHost) {
+    this.messageRenderer = new ConversationMessageRenderDelegate(host);
+    this.syncedUpdateApplier = new ConversationSyncedUpdateApplyDelegate(
+      host,
+      this.messageRenderer,
+      {
+        patchTrailingAssistantRender: (previousMessages, nextMessages) =>
+          this.patchTrailingAssistantRender(previousMessages, nextMessages),
+        rerenderConversationMessages: (conversation) =>
+          this.rerenderConversationMessages(conversation),
+      },
+    );
+  }
+
+  async renderMessage(message: ChatMessage): Promise<HTMLElement | void | undefined> {
+    return this.messageRenderer.renderMessage(message);
+  }
+
+  async renderMessages(messages: ChatMessage[]): Promise<void> {
+    await this.messageRenderer.renderMessages(messages);
+  }
+
+  async rerenderSingleUserMessage(
+    previousMessageId: string,
+    message: ChatMessage,
+  ): Promise<void> {
+    await this.messageRenderer.rerenderSingleUserMessage(previousMessageId, message);
   }
 
   async rerenderConversationMessages(conversation: Conversation): Promise<void> {
@@ -385,95 +612,7 @@ export class ConversationRenderService {
     previousMessages: ChatMessage[],
     nextMessages: ChatMessage[],
   ): Promise<void> {
-    const currentConversation = this.host.getCurrentConversation();
-    if (!currentConversation) {
-      return;
-    }
-
-    const incrementalUpdate = getIncrementalRenderedMessageUpdate({
-      previousMessages,
-      nextMessages,
-      getMessagesForRender: (messages) => this.host.getMessagesForRender(messages),
-      getMessageVisualSignature: (message) => this.host.getMessageVisualSignature(message),
-    });
-    if (!incrementalUpdate) {
-      await this.rerenderConversationMessages(currentConversation);
-      return;
-    }
-
-    const shouldStickToBottom = this.host.shouldAutoScroll();
-    this.host.syncBackgroundTaskStateFromConversation(currentConversation);
-
-    if (incrementalUpdate.patchTrailingAssistant) {
-      const patchedTail = await this.patchTrailingAssistantRender(previousMessages, nextMessages);
-      if (!patchedTail) {
-        await this.rerenderConversationMessages(currentConversation);
-        return;
-      }
-    }
-
-    for (const messageToRender of incrementalUpdate.appendedRenderedMessages) {
-      if (this.shouldPseudoStreamSyncedAssistantMessage(messageToRender)) {
-        await this.renderSyncedAssistantMessageWithReveal(messageToRender);
-      } else {
-        await this.renderMessage(messageToRender);
-      }
-    }
-
-    await this.host.renderBackgroundTaskIndicatorIfNeeded();
-
-    if (shouldStickToBottom) {
-      this.host.scrollToBottom();
-    }
-  }
-
-  shouldPseudoStreamSyncedAssistantMessage(message: ChatMessage): boolean {
-    if (message.role !== 'assistant' || message.displayStyle === 'notice') {
-      return false;
-    }
-
-    if (message.questionResolution) {
-      return false;
-    }
-
-    if (!message.content?.trim()) {
-      return false;
-    }
-
-    if (!message.contentBlocks || message.contentBlocks.length === 0) {
-      return true;
-    }
-
-    return message.contentBlocks.every((block) => block.type === 'text' && Boolean(block.text));
-  }
-
-  async renderSyncedAssistantMessageWithReveal(message: ChatMessage): Promise<void> {
-    const { messageEl, contentEl } = this.host.assistantShellRender.createAssistantMessageElement();
-    const textEl = document.createElement('div');
-    textEl.className = 'streaming-text-block';
-    contentEl.appendChild(textEl);
-    const chunks = this.splitPseudoStreamChunks(message.content);
-    const delayMs = this.getPseudoStreamDelay(chunks.length);
-
-    messageEl.style.visibility = 'hidden';
-
-    let rendered = '';
-    for (const chunk of chunks) {
-      rendered += chunk;
-      await this.host.renderMarkdownInto(textEl, rendered);
-      if (messageEl.style.visibility === 'hidden') {
-        messageEl.style.visibility = '';
-      }
-      if (delayMs > 0) {
-        await this.sleep(delayMs);
-      }
-    }
-
-    if (messageEl.style.visibility === 'hidden') {
-      messageEl.style.visibility = '';
-    }
-    this.host.assistantShellRender.finalizePseudoStreamFooter(messageEl, message);
-    this.host.assistantShellRender.clearStreamingMessageState();
+    await this.syncedUpdateApplier.apply(previousMessages, nextMessages);
   }
 
   async patchTrailingAssistantRender(
@@ -820,38 +959,4 @@ export class ConversationRenderService {
       .pop() ?? null;
   }
 
-  private splitPseudoStreamChunks(text: string): string[] {
-    const normalized = text.replace(/\r\n/g, '\n');
-    const chunks: string[] = [];
-    let buffer = '';
-
-    for (const char of normalized) {
-      buffer += char;
-      if (buffer.length >= 12 || /[\n，。！？；：,.!?;:]/u.test(char)) {
-        chunks.push(buffer);
-        buffer = '';
-      }
-    }
-
-    if (buffer) {
-      chunks.push(buffer);
-    }
-
-    return chunks.length > 0 ? chunks : [text];
-  }
-
-  private getPseudoStreamDelay(chunkCount: number): number {
-    if (chunkCount <= 1) {
-      return 0;
-    }
-
-    const targetDurationMs = 900;
-    return Math.max(12, Math.min(36, Math.round(targetDurationMs / chunkCount)));
-  }
-
-  private sleep(ms: number): Promise<void> {
-    return new Promise((resolve) => {
-      window.setTimeout(resolve, ms);
-    });
-  }
 }
