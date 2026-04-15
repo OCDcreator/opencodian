@@ -2,19 +2,19 @@
 
 > **状态**: [READY]
 > **作用**: 这是 maintainability 无人值守的战略文档。每轮开始前，先读本文件，再读 `docs/status/maintainability-round-roadmap.md` 与最近的 `docs/status/maintainability-phase-XXX.md`。
-> **自动推进状态**: `R133` 已完成 warning cleanup batch F；当前继续按 `R134-R137` 长队列顺序推进。恢复 autopilot 后只能从首个 `[NEXT]`（`R134`）顺序执行，不允许 freestyle。
+> **自动推进状态**: `R134` 已完成 warning cleanup batch G；当前继续按 `R135-R137` 长队列顺序推进。恢复 autopilot 后只能从首个 `[NEXT]`（`R135`）顺序执行，不允许 freestyle。
 
 ## 1. 当前判断
 
-**当前分支已完成 `R68-R133` 并把 live lint 记录基线刷新为 `0 errors / 68 warnings`；`R133` 已沿现有 opencode/chat owners 收束第一批 runtime residual warnings，把 `src/features/chat` + `src/core/opencode` 邻域从 `27 warnings + 3 errors` 降到 `23 warnings + 0 errors`，并用最小 import-sort repair 恢复全仓 `lint` 为 `0 errors`。** 接下来按 `R134-R137` 顺序推进 secondary residual warning closeout 与最终 checkpoint，不允许 freestyle。
+**当前分支已完成 `R68-R134` 并把 live lint 记录基线刷新为 `0 errors / 67 warnings`；`R134` 已沿 `src/core/types/settings.ts` 的既有 normalization seam 收束 provider icon library residual complexity warning，在不改变 settings normalization 语义的前提下把 focused lint 从 `2 warnings` 降到 `1 warning`，并把全仓 `lint` 从 `0 errors / 68 warnings` 收敛到 `0 errors / 67 warnings`。** 接下来按 `R135-R137` 顺序推进 tests residual warning closeout 与最终 checkpoint，不允许 freestyle。
 
 ## 2. 当前基线
 
-- **lint**: `0 errors / 68 warnings`
-- **最近验证**: `R133` 已确认 focused tests、全量 `npm run lint`、全量 `npm test` 与 `npm run build` 通过，`BUILD_ID` 为 `autopilot-maintainability.202604160412`
+- **lint**: `0 errors / 67 warnings`
+- **最近验证**: `R134` 已确认 focused lint、focused tests、全量 `npm run lint`、全量 `npm test` 与 `npm run build` 通过，`BUILD_ID` 为 `autopilot-maintainability.202604160419`
 - **最近 Test Vault 部署**: `R133`，`BUILD_ID` `autopilot-maintainability.202604160412`
-- **当前 `[NEXT]`**: `R134 - Warning cleanup batch G (core/types/settings residuals)`
-- **主热点**: Batch 10 已完成 chat/opencode residual 首批收尾；下一步沿 `src/core/storage/StorageService.ts`、`src/core/types/settings.ts`、settings sections 与 `src/main.ts` 继续清 secondary residual warnings
+- **当前 `[NEXT]`**: `R135 - Warning cleanup batch H (tests residuals)`
+- **主热点**: Batch 10 已完成 secondary core/settings residual 首批收尾；下一步沿 `tests/unit/core/opencode/`、`tests/unit/features/chat/` 与相邻 heavy suites 继续清 tests residual warnings
 
 ## 3. 本批执行规则
 

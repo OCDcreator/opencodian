@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的 `[NEXT]`”。
-> **当前状态**: [READY] `R133` 已完成；`R134-R137` 长队列继续排队，当前首个 `[NEXT]` 为 `R134 - Warning cleanup batch G (core/types/settings residuals)`。
+> **当前状态**: [READY] `R134` 已完成；`R135-R137` 长队列继续排队，当前首个 `[NEXT]` 为 `R135 - Warning cleanup batch H (tests residuals)`。
 
 ## 控制规则
 
@@ -16,9 +16,9 @@
 ## 当前背景
 
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
-- 当前 live lint 基线：`0 errors / 65 warnings`
-- 最近成功 phase：`docs/status/maintainability-phase-467.md`
-- 当前路线判断：`R133` 已完成 chat/opencode residual warning 首批 closeout，并把该邻域 lint 从 `27 warnings + 3 errors` 降到 `23 warnings + 0 errors`；当前必须从 `R134` 开始继续处理 core/types/settings secondary residuals，不得 freestyle。
+- 当前 live lint 基线：`0 errors / 67 warnings`
+- 最近成功 phase：`docs/status/maintainability-phase-469.md`
+- 当前路线判断：`R134` 已完成 core/types/settings secondary residual 首批 closeout，在 `settings.ts` 内收束 provider icon library normalization complexity，并把 live lint 从 `0 errors / 68 warnings` 降到 `0 errors / 67 warnings`；当前必须从 `R135` 开始继续处理 tests residuals，不得 freestyle。
 
 ## Queue
 ## Queue
@@ -1284,7 +1284,7 @@
 - **禁止项**: 不新增薄 helper/adapter/provider/factory；不改变 chat/opencode runtime 语义。
 - **验收**: chat/opencode 邻域 warning 至少有可量化下降且 lint 维持 0 errors。；并通过全量 `npm test` 与 `npm run build`。
 
-### [NEXT] R134 - Warning cleanup batch G (core/types/settings residuals)
+### [DONE] R134 - Warning cleanup batch G (core/types/settings residuals)
 
 - **Lane**: Warning cleanup / secondary residuals
 - **目标**: 沿 storage、settings normalization、settings sections 与 main.ts 继续受控收尾 residual warnings。
@@ -1294,7 +1294,7 @@
 - **禁止项**: 不为了清 warning 回切大规模 settings/startup 重构；不新增薄 normalize/provider 文件。
 - **验收**: secondary residual warning 有可量化下降且 lint 维持 0 errors。；并通过全量 `npm test` 与 `npm run build`。
 
-### [QUEUED] R135 - Warning cleanup batch H (tests residuals)
+### [NEXT] R135 - Warning cleanup batch H (tests residuals)
 
 - **Lane**: Warning cleanup / tests residuals
 - **目标**: 继续清理剩余 tests lint 热点，仅允许按责任重排与最小 typing/import 收口。

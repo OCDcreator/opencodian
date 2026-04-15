@@ -458,6 +458,74 @@ export function getCurrentPlatformDebugLogPath(paths: PlatformDebugLogPaths): st
   return paths[getCurrentPlatformKey()];
 }
 
+function normalizeTrimmedString(value: unknown): string | undefined {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+
+  const normalizedValue = value.trim();
+  return normalizedValue.length > 0 ? normalizedValue : undefined;
+}
+
+function normalizeProviderIconEntryType(value: unknown): ProviderIconEntryType | null {
+  switch (value) {
+    case 'mapped':
+    case 'builtin':
+    case 'url':
+    case 'file':
+      return value;
+    default:
+      return null;
+  }
+}
+
+function normalizeProviderIconResolvedVariantValue(
+  value: unknown,
+): Exclude<LobehubIconVariant, 'auto'> | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const normalizedVariant = normalizeLobehubIconVariant(value);
+  return normalizedVariant === 'auto' ? undefined : normalizedVariant;
+}
+
+function normalizeProviderIconEntry(value: unknown): ProviderIconEntry | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+
+  const candidate = value as Partial<ProviderIconEntry>;
+  const id = normalizeTrimmedString(candidate.id);
+  const type = normalizeProviderIconEntryType(candidate.type);
+  const source = normalizeTrimmedString(candidate.source);
+
+  if (!id || !type || !source) {
+    return null;
+  }
+
+  if (type === 'builtin' && !/^(lobehub|opencode):[^:\s]+$/i.test(source)) {
+    return null;
+  }
+
+  return {
+    id,
+    type,
+    source,
+    variant: normalizeLobehubIconVariant(candidate.variant),
+    resolvedVariant: normalizeProviderIconResolvedVariantValue(candidate.resolvedVariant),
+    resolvedFormat: normalizeProviderIconResolvedFormat(candidate.resolvedFormat),
+    mimeType: normalizeTrimmedString(candidate.mimeType),
+    cacheFileName: normalizeTrimmedString(candidate.cacheFileName),
+    addedAt: typeof candidate.addedAt === 'number' && Number.isFinite(candidate.addedAt)
+      ? candidate.addedAt
+      : Date.now(),
+    updatedAt: typeof candidate.updatedAt === 'number' && Number.isFinite(candidate.updatedAt)
+      ? candidate.updatedAt
+      : undefined,
+  };
+}
+
 export function normalizeProviderIconLibrary(value: unknown): ProviderIconLibrary {
   if (!value || typeof value !== 'object') {
     return {};
@@ -466,68 +534,18 @@ export function normalizeProviderIconLibrary(value: unknown): ProviderIconLibrar
   const normalizedLibrary: ProviderIconLibrary = {};
 
   for (const [providerId, entries] of Object.entries(value as Record<string, unknown>)) {
-    if (!providerId.trim() || !Array.isArray(entries)) {
+    const normalizedProviderId = normalizeTrimmedString(providerId);
+    if (!normalizedProviderId || !Array.isArray(entries)) {
       continue;
     }
 
     const normalizedEntries = entries.flatMap((entry) => {
-      if (!entry || typeof entry !== 'object') {
-        return [];
-      }
-
-      const candidate = entry as Partial<ProviderIconEntry>;
-      const id = typeof candidate.id === 'string' && candidate.id.trim()
-        ? candidate.id.trim()
-        : '';
-      const source = typeof candidate.source === 'string' && candidate.source.trim()
-        ? candidate.source.trim()
-        : '';
-
-      if (!id || !source) {
-        return [];
-      }
-
-      if (
-        candidate.type !== 'mapped'
-        && candidate.type !== 'builtin'
-        && candidate.type !== 'url'
-        && candidate.type !== 'file'
-      ) {
-        return [];
-      }
-
-      if (candidate.type === 'builtin' && !/^(lobehub|opencode):[^:\s]+$/i.test(source)) {
-        return [];
-      }
-
-      return [{
-        id,
-        type: candidate.type,
-        source,
-        variant: normalizeLobehubIconVariant(candidate.variant),
-        resolvedVariant: candidate.resolvedVariant === undefined
-          ? undefined
-          : normalizeLobehubIconVariant(candidate.resolvedVariant) === 'auto'
-            ? undefined
-            : normalizeLobehubIconVariant(candidate.resolvedVariant) as Exclude<LobehubIconVariant, 'auto'>,
-        resolvedFormat: normalizeProviderIconResolvedFormat(candidate.resolvedFormat),
-        mimeType: typeof candidate.mimeType === 'string' && candidate.mimeType.trim()
-          ? candidate.mimeType.trim()
-          : undefined,
-        cacheFileName: typeof candidate.cacheFileName === 'string' && candidate.cacheFileName.trim()
-          ? candidate.cacheFileName.trim()
-          : undefined,
-        addedAt: typeof candidate.addedAt === 'number' && Number.isFinite(candidate.addedAt)
-          ? candidate.addedAt
-          : Date.now(),
-        updatedAt: typeof candidate.updatedAt === 'number' && Number.isFinite(candidate.updatedAt)
-          ? candidate.updatedAt
-          : undefined,
-      } satisfies ProviderIconEntry];
+      const normalizedEntry = normalizeProviderIconEntry(entry);
+      return normalizedEntry ? [normalizedEntry] : [];
     });
 
     if (normalizedEntries.length > 0) {
-      normalizedLibrary[providerId.trim()] = normalizedEntries;
+      normalizedLibrary[normalizedProviderId] = normalizedEntries;
     }
   }
 

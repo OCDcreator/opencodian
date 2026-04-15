@@ -76,6 +76,48 @@ describe('Settings', () => {
         resolvedFormat: 'svg',
       });
     });
+
+    it('filters invalid provider icon entries while trimming persisted fields', () => {
+      const normalized = normalizeProviderIconLibrary({
+        ' openai ': [
+          {
+            id: ' builtin:lobehub:openai ',
+            type: 'builtin',
+            source: ' lobehub:openai ',
+            mimeType: ' image/svg+xml ',
+            cacheFileName: ' openai.svg ',
+            resolvedVariant: 'auto',
+            addedAt: 1,
+          },
+          {
+            id: 'builtin:bad:openai',
+            type: 'builtin',
+            source: 'bad:openai',
+            addedAt: 2,
+          },
+          {
+            id: 'mapped:openai',
+            type: 'invalid',
+            source: 'openai',
+            addedAt: 3,
+          },
+        ],
+      });
+
+      expect(normalized).toEqual({
+        openai: [
+          expect.objectContaining({
+            id: 'builtin:lobehub:openai',
+            type: 'builtin',
+            source: 'lobehub:openai',
+            mimeType: 'image/svg+xml',
+            cacheFileName: 'openai.svg',
+            resolvedVariant: undefined,
+            addedAt: 1,
+          }),
+        ],
+      });
+    });
   });
 
   describe('getDefaultBlockedCommands', () => {
