@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的 `[NEXT]`”。
-> **当前状态**: [READY] `R91` 已完成；`R92-R137` 长队列继续排队，当前首个 `[NEXT]` 为 `R92 - Checkpoint after OpenCodianView residual seams`。
+> **当前状态**: [READY] `R92` 已完成；`R93-R137` 长队列继续排队，当前首个 `[NEXT]` 为 `R93 - ConversationRenderService assistant/body residual seam`。
 
 ## 控制规则
 
@@ -16,9 +16,9 @@
 ## 当前背景
 
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
-- 当前 live lint 基线：`0 errors / 64 warnings`
-- 最近成功 phase：`docs/status/maintainability-phase-425.md`
-- 当前路线判断：`R91` 已完成并把 composer draft context 直接注入 `MessageSendPreparationService`、让 composer submit 直连 `SendPipelineRuntime`；当前已明确续排 `R92-R137`，必须从 `R92` 顺序执行，不得 freestyle。
+- 当前 live lint 基线：`0 errors / 65 warnings`
+- 最近成功 phase：`docs/status/maintainability-phase-427.md`
+- 当前路线判断：`R92` 已完成并复盘 `R88-R91` 的 `OpenCodianView` residual 收益、lint 变化与验证成本；当前已明确续排 `R93-R137`，必须从 `R93` 顺序执行，不得 freestyle。
 
 ## Queue
 ## Queue
@@ -828,7 +828,7 @@
 - **禁止项**: 不改变 model selection、input panel theme、question/todo 附着语义。
 - **验收**: send/composer interaction 责任更集中。；并通过全量 `npm test` 与 `npm run build`。
 
-### [NEXT] R92 - Checkpoint after OpenCodianView residual seams
+### [DONE] R92 - Checkpoint after OpenCodianView residual seams
 
 - **Lane**: Checkpoint
 - **目标**: 复盘 R88-R91 的 residual 收益、lint 变化与验证成本。
@@ -842,7 +842,7 @@
 
 - **批次目标**: 继续处理 render、tail patch、post-sync 与 finalization residual。
 
-### [QUEUED] R93 - ConversationRenderService assistant/body residual seam
+### [NEXT] R93 - ConversationRenderService assistant/body residual seam
 
 - **Lane**: Maintainability / chat rendering
 - **目标**: 继续收束 assistant/body render path、persisted/user branching 与 tail-patch 前置组装 residual。

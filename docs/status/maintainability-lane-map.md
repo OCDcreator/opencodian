@@ -1,16 +1,16 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [READY] `R92-R137` 长队列继续推进；当前 `[NEXT]` 为 `R92 - Checkpoint after OpenCodianView residual seams`。
+> **当前状态**: [READY] `R93-R137` 长队列继续推进；当前 `[NEXT]` 为 `R93 - ConversationRenderService assistant/body residual seam`。
 
 ## 当前优先级
 
-- **当前 `[NEXT]`**：`R92 - Checkpoint after OpenCodianView residual seams`
+- **当前 `[NEXT]`**：`R93 - ConversationRenderService assistant/body residual seam`
 - **本批目标**：继续 residual chat runtime / services 与 opencode core，再转 secondary core / settings / startup，最后做 heavy tests follow-up、warning closeout 与最终 checkpoint
-- **当前 lint 基线**：`0 errors / 64 warnings`
+- **当前 lint 基线**：`0 errors / 65 warnings`
 - **热点顺序**：
-  1. `src/features/chat/OpenCodianView.ts`
-  2. `src/features/chat/services/ConversationRenderService.ts`
+  1. `src/features/chat/services/ConversationRenderService.ts`
+  2. `src/features/chat/OpenCodianView.ts`
   3. `src/features/chat/services/MessageFinalizationService.ts`
   4. `src/features/chat/services/ConversationSyncBridge.ts`
   5. `src/features/chat/services/ContextUsageService.ts`
@@ -42,5 +42,5 @@
 ## 历史入口
 
 - 批次归档：`docs/status/maintainability-completed-batches.md`
-- 最近成功 phase：`docs/status/maintainability-phase-425.md`
-- 最近 checkpoint：`docs/status/maintainability-phase-423.md`
+- 最近成功 phase：`docs/status/maintainability-phase-427.md`
+- 最近 checkpoint：`docs/status/maintainability-phase-427.md`

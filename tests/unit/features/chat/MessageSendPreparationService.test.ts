@@ -3,12 +3,12 @@ import type {
   Conversation,
   PromptContextItem,
 } from '../../../../src/core/types';
+import type { ComposerSendContextPort } from '../../../../src/features/chat/services/ComposerContextViewFacade';
 import {
   buildOptimisticUserMessage,
   type MessageSendPreparationHost,
   MessageSendPreparationService,
 } from '../../../../src/features/chat/services/MessageSendPreparationService';
-import type { ComposerSendContextPort } from '../../../../src/features/chat/services/ComposerContextViewFacade';
 
 function createConversation(messages: ChatMessage[] = []): Conversation {
   return {
