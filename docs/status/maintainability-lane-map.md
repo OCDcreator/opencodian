@@ -1,19 +1,19 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [READY] `R113-R137` 长队列继续推进；当前 `[NEXT]` 为 `R113 - OpenCodeStreamEventTransformer event-classification residual seam`。
+> **当前状态**: [READY] `R114-R137` 长队列继续推进；当前 `[NEXT]` 为 `R114 - OpenCodeStreamEventTransformer payload/SSE-parse seam`。
 
 ## 当前优先级
 
-- **当前 `[NEXT]`**：`R113 - OpenCodeStreamEventTransformer event-classification residual seam`
-- **本批目标**：`R112` 已确认 `R108-R111` 的 OpenCodeService residual owner seams 已收口到既有 lifecycle / session / diagnostics 边界；现在进入 batch 6，从 event classification residual 开始推进 streaming transform / runtime
+- **当前 `[NEXT]`**：`R114 - OpenCodeStreamEventTransformer payload/SSE-parse seam`
+- **本批目标**：`R113` 已把 OpenCodeStreamEventTransformer 的 event-classification residual 继续收口到既有 handler / classifier seam；现在继续 batch 6，推进 payload decode / SSE parse / invalid-chunk shielding residual
 - **当前 lint 基线**：`0 errors / 65 warnings`
 - **热点顺序**：
   1. `src/core/opencode/OpenCodeStreamEventTransformer.ts`
-  2. `tests/unit/core/opencode/OpenCodeStreamEventTransformer.test.ts`
-  3. `src/core/opencode/OpenCodeStreamingRuntimeCoordinator.ts`
+  2. `src/core/opencode/OpenCodeStreamingRuntimeCoordinator.ts`
+  3. `tests/unit/core/opencode/OpenCodeStreamEventTransformer.test.ts`
   4. `docs/status/maintainability-round-roadmap.md`
-  5. `docs/status/maintainability-phase-447.md`
+  5. `docs/status/maintainability-phase-448.md`
 
 ## 本批边界
 

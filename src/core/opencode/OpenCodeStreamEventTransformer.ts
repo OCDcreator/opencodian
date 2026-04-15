@@ -117,6 +117,21 @@ type OpenCodeStreamingEventHandler = (
   context: OpenCodeStreamingEventHandlerContext,
 ) => OpenCodeStreamEventOutcome;
 
+interface OpenCodeStreamingPartUpdatedHandlerContext {
+  part: OpenCodeStreamPart;
+  state: OpenCodeStreamEventState;
+  chunks: StreamChunk[];
+}
+
+type OpenCodeStreamingPartUpdatedHandler = (
+  context: OpenCodeStreamingPartUpdatedHandlerContext,
+) => void;
+
+type OpenCodeStreamPartChunkTransformer = (
+  part: OpenCodeStreamPart,
+  chunks: StreamChunk[],
+) => void;
+
 interface OpenCodeTextDeltaChunkContext {
   chunks: StreamChunk[];
   delta: string;
@@ -124,6 +139,15 @@ interface OpenCodeTextDeltaChunkContext {
   partType: string;
   sessionId: string;
   state: OpenCodeStreamEventState;
+}
+
+interface OpenCodeClassifiedToolPart {
+  toolId: string | null;
+  toolName: string;
+  toolKind: ToolIdentityKind;
+  toolInput: Record<string, unknown>;
+  toolStatus: ReturnType<typeof resolveToolExecutionStatus>;
+  toolResult: string | undefined;
 }
 
 function resolveReasoningDurationSeconds(
@@ -203,6 +227,10 @@ function extractStructuredErrorMessage(errorLike: unknown): string | null {
 export class OpenCodeStreamEventTransformer {
   private readonly streamingEventHandlers: Record<string, OpenCodeStreamingEventHandler>;
 
+  private readonly streamingPartUpdatedHandlers: Record<string, OpenCodeStreamingPartUpdatedHandler>;
+
+  private readonly streamPartChunkTransformers: Record<string, OpenCodeStreamPartChunkTransformer>;
+
   constructor(private readonly host: OpenCodeStreamEventTransformerHost) {
     this.streamingEventHandlers = {
       'message.part.updated': this.handleMessagePartUpdated.bind(this),
@@ -212,6 +240,16 @@ export class OpenCodeStreamEventTransformer {
       'session.error': this.handleSessionError.bind(this),
       'session.idle': this.handleSessionIdle.bind(this),
       'question.asked': this.handleQuestionAsked.bind(this),
+    };
+    this.streamingPartUpdatedHandlers = {
+      tool: this.handleToolPartUpdated.bind(this),
+      reasoning: this.handleReasoningPartUpdated.bind(this),
+      thinking: this.handleReasoningPartUpdated.bind(this),
+    };
+    this.streamPartChunkTransformers = {
+      text: this.appendTextPartChunks.bind(this),
+      reasoning: this.appendReasoningPartChunks.bind(this),
+      tool: this.appendToolPartChunks.bind(this),
     };
   }
 
@@ -324,58 +362,8 @@ export class OpenCodeStreamEventTransformer {
 
   transformPartToChunks(part: OpenCodeStreamPart): StreamChunk[] {
     const chunks: StreamChunk[] = [];
-
-    switch (part.type) {
-      case 'text': {
-        if (part.text) {
-          chunks.push({ type: 'text', content: part.text });
-        }
-        break;
-      }
-      case 'reasoning': {
-        if (part.text) {
-          chunks.push({
-            type: 'thinking',
-            content: part.text,
-            partId: part.id,
-            durationSeconds: resolveReasoningDurationSeconds(part),
-          });
-        }
-        break;
-      }
-      case 'tool': {
-        if (isInternalStructuredOutputTool(part.tool)) {
-          break;
-        }
-
-        if (part.state) {
-          const toolStatus = resolveToolExecutionStatus({
-            toolName: part.tool,
-            state: part.state,
-          });
-          const toolName = part.tool ?? '';
-          if (toolStatus === 'pending' || toolStatus === 'running') {
-            chunks.push({
-              type: 'tool_use',
-              id: part.callID ?? '',
-              name: toolName,
-              kind: this.host.getOpenCodeToolKind(toolName),
-              input: part.state.input ?? {},
-            });
-          } else if (toolStatus === 'completed' || toolStatus === 'error') {
-            const result = resolveToolResultText(part.state)
-              ?? (toolStatus === 'error' ? 'Error: Tool execution failed' : '');
-            chunks.push({
-              type: 'tool_result',
-              toolUseId: part.callID ?? '',
-              content: result,
-              isError: toolStatus === 'error',
-            });
-          }
-        }
-        break;
-      }
-    }
+    const chunkTransformer = this.streamPartChunkTransformers[part.type];
+    chunkTransformer?.(part, chunks);
 
     return chunks;
   }
@@ -421,34 +409,30 @@ export class OpenCodeStreamEventTransformer {
     }
 
     this.setStreamPartType(streamContext, part.id, part.type);
-
-    if (part.type === 'tool') {
-      return this.handleToolPartUpdated(part, state, chunks);
-    }
-
-    this.appendReasoningPartUpdatedChunk(part, chunks);
+    const partHandler = this.streamingPartUpdatedHandlers[part.type];
+    partHandler?.({ part, state, chunks });
     return { chunks, stop: false };
   }
 
   private handleToolPartUpdated(
-    toolPart: OpenCodeStreamPart,
-    state: OpenCodeStreamEventState,
-    chunks: StreamChunk[],
-  ): OpenCodeStreamEventOutcome {
-    const toolId = toolPart.callID || toolPart.id;
-    const toolName = toolPart.tool || 'unknown';
-    if (isInternalStructuredOutputTool(toolName)) {
-      return { chunks, stop: false };
+    {
+      part: toolPart,
+      state,
+      chunks,
+    }: OpenCodeStreamingPartUpdatedHandlerContext,
+  ): void {
+    const classifiedToolPart = this.resolveToolPartClassification(toolPart);
+    if (!classifiedToolPart) {
+      return;
     }
 
-    this.host.observeRuntimeToolNames([toolName]);
+    this.host.observeRuntimeToolNames([classifiedToolPart.toolName]);
 
+    const { toolId, toolName, toolKind, toolInput, toolStatus, toolResult } = classifiedToolPart;
     if (!toolId) {
-      return { chunks, stop: false };
+      return;
     }
 
-    const toolKind = this.host.getOpenCodeToolKind(toolName);
-    const toolInput = toolPart.state?.input || {};
     const nextSnapshot = this.getToolInputSnapshot(toolInput);
     const previousSnapshot = state.toolInputSnapshots.get(toolId);
     const shouldEmitToolUse =
@@ -467,11 +451,6 @@ export class OpenCodeStreamEventTransformer {
       });
     }
 
-    const toolStatus = resolveToolExecutionStatus({
-      toolName,
-      state: toolPart.state,
-    });
-    const toolResult = resolveToolResultText(toolPart.state);
     if ((toolStatus === 'completed' || toolStatus === 'error') && toolResult !== undefined) {
       const resultKey = `${toolId}_result`;
       if (!state.processedToolIds.has(resultKey)) {
@@ -484,14 +463,12 @@ export class OpenCodeStreamEventTransformer {
         });
       }
     }
-
-    return { chunks, stop: false };
   }
 
-  private appendReasoningPartUpdatedChunk(
-    part: OpenCodeStreamPart,
-    chunks: StreamChunk[],
-  ): void {
+  private handleReasoningPartUpdated({
+    part,
+    chunks,
+  }: OpenCodeStreamingPartUpdatedHandlerContext): void {
     if (!this.isReasoningPartType(part.type)) {
       return;
     }
@@ -503,6 +480,70 @@ export class OpenCodeStreamEventTransformer {
         content: '',
         partId: part.id,
         durationSeconds,
+      });
+    }
+  }
+
+  private appendTextPartChunks(
+    part: OpenCodeStreamPart,
+    chunks: StreamChunk[],
+  ): void {
+    if (part.text) {
+      chunks.push({ type: 'text', content: part.text });
+    }
+  }
+
+  private appendReasoningPartChunks(
+    part: OpenCodeStreamPart,
+    chunks: StreamChunk[],
+  ): void {
+    if (part.text) {
+      chunks.push({
+        type: 'thinking',
+        content: part.text,
+        partId: part.id,
+        durationSeconds: resolveReasoningDurationSeconds(part),
+      });
+    }
+  }
+
+  private appendToolPartChunks(
+    part: OpenCodeStreamPart,
+    chunks: StreamChunk[],
+  ): void {
+    const classifiedToolPart = this.resolveToolPartClassification(part, {
+      requireState: true,
+    });
+    if (!classifiedToolPart) {
+      return;
+    }
+
+    const {
+      toolId,
+      toolName,
+      toolKind,
+      toolInput,
+      toolStatus,
+      toolResult,
+    } = classifiedToolPart;
+
+    if (toolStatus === 'pending' || toolStatus === 'running') {
+      chunks.push({
+        type: 'tool_use',
+        id: toolId ?? '',
+        name: toolName,
+        kind: toolKind,
+        input: toolInput,
+      });
+      return;
+    }
+
+    if (toolStatus === 'completed' || toolStatus === 'error') {
+      chunks.push({
+        type: 'tool_result',
+        toolUseId: toolId ?? '',
+        content: toolResult ?? (toolStatus === 'error' ? 'Error: Tool execution failed' : ''),
+        isError: toolStatus === 'error',
       });
     }
   }
@@ -676,6 +717,32 @@ export class OpenCodeStreamEventTransformer {
 
   private isReasoningPartType(partType: string): boolean {
     return partType === 'reasoning' || partType === 'thinking';
+  }
+
+  private resolveToolPartClassification(
+    toolPart: OpenCodeStreamPart,
+    options: { requireState?: boolean } = {},
+  ): OpenCodeClassifiedToolPart | null {
+    if (options.requireState && !toolPart.state) {
+      return null;
+    }
+
+    const toolName = toolPart.tool || 'unknown';
+    if (isInternalStructuredOutputTool(toolName)) {
+      return null;
+    }
+
+    return {
+      toolId: toolPart.callID || toolPart.id || null,
+      toolName,
+      toolKind: this.host.getOpenCodeToolKind(toolName),
+      toolInput: toolPart.state?.input || {},
+      toolStatus: resolveToolExecutionStatus({
+        toolName,
+        state: toolPart.state,
+      }),
+      toolResult: resolveToolResultText(toolPart.state),
+    };
   }
 
   private setStreamPartType(

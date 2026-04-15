@@ -99,6 +99,63 @@ describe('OpenCodeStreamEventTransformer event routing', () => {
       stop: false,
     });
   });
+
+  it('keeps permission requests and aborted session errors classified correctly', () => {
+    const host = createHost();
+    const transformer = new OpenCodeStreamEventTransformer(host);
+    const state = createState();
+
+    const permissionOutcome = transformer.handleStreamingEvent(
+      {
+        type: 'permission.asked',
+        properties: {
+          id: 'permission-1',
+          sessionID: 'test-session',
+          permission: 'write',
+          patterns: ['notes/**'],
+          metadata: { source: 'tool' },
+        },
+      },
+      'test-session',
+      state,
+      { partTypeMap: new Map() },
+    );
+    const abortOutcome = transformer.handleStreamingEvent(
+      {
+        type: 'session.error',
+        properties: {
+          sessionID: 'test-session',
+          error: {
+            name: 'MessageAbortedError',
+            message: 'Aborted',
+          },
+        },
+      },
+      'test-session',
+      state,
+      { partTypeMap: new Map() },
+    );
+
+    expect(permissionOutcome).toEqual({
+      chunks: [
+        {
+          type: 'permission_request',
+          id: 'permission-1',
+          permission: 'write',
+          patterns: ['notes/**'],
+          metadata: { source: 'tool' },
+        },
+      ],
+      stop: false,
+    });
+    expect(abortOutcome).toEqual({ chunks: [], stop: true });
+    expect(state.lastErrorMessage).toBe('Aborted');
+    expect(host.logStreamingDebug).toHaveBeenCalledWith('service-session-error', {
+      sessionId: 'test-session',
+      errorName: 'MessageAbortedError',
+      errorMessage: 'Aborted',
+    });
+  });
 });
 
 describe('OpenCodeStreamEventTransformer stream part handling', () => {
@@ -379,6 +436,54 @@ describe('OpenCodeStreamEventTransformer parsing helpers', () => {
       },
       { type: 'text', content: 'Tail' },
       { type: 'usage', inputTokens: 2, outputTokens: 4 },
+    ]);
+  });
+
+  it('classifies text, reasoning, and tool parts when transforming chunks', () => {
+    const transformer = new OpenCodeStreamEventTransformer(createHost());
+
+    expect(transformer.transformPartToChunks({
+      id: 'part-text',
+      sessionID: 'test-session',
+      messageID: 'assistant-1',
+      type: 'text',
+      text: 'Hello',
+    })).toEqual([{ type: 'text', content: 'Hello' }]);
+
+    expect(transformer.transformPartToChunks({
+      id: 'part-reasoning',
+      sessionID: 'test-session',
+      messageID: 'assistant-1',
+      type: 'reasoning',
+      text: 'Thinking',
+      duration: 3,
+    })).toEqual([
+      {
+        type: 'thinking',
+        content: 'Thinking',
+        partId: 'part-reasoning',
+        durationSeconds: 3,
+      },
+    ]);
+
+    expect(transformer.transformPartToChunks({
+      id: 'part-tool',
+      sessionID: 'test-session',
+      messageID: 'assistant-1',
+      type: 'tool',
+      callID: 'call-tool',
+      tool: 'exa_search',
+      state: {
+        status: 'completed',
+        output: 'Done',
+      },
+    })).toEqual([
+      {
+        type: 'tool_result',
+        toolUseId: 'call-tool',
+        content: 'Done',
+        isError: false,
+      },
     ]);
   });
 });
