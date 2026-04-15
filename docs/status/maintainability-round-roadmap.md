@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的 `[NEXT]`”。
-> **当前状态**: [READY] `R96` 已完成；`R97-R137` 长队列继续排队，当前首个 `[NEXT]` 为 `R97 - Checkpoint after chat render/sync seams`。
+> **当前状态**: [READY] `R97` 已完成；`R98-R137` 长队列继续排队，当前首个 `[NEXT]` 为 `R98 - ContextUsageService usage-breakdown seam`。
 
 ## 控制规则
 
@@ -17,8 +17,8 @@
 
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
 - 当前 live lint 基线：`0 errors / 65 warnings`
-- 最近成功 phase：`docs/status/maintainability-phase-431.md`
-- 当前路线判断：`R96` 已完成并把 ConversationSyncBridge 的 sync-request owner 与 visible/background post-sync host dispatch 拆回各自 router；当前已明确续排 `R97-R137`，必须从 `R97` 顺序执行，不得 freestyle。
+- 最近成功 phase：`docs/status/maintainability-phase-432.md`
+- 当前路线判断：`R97` checkpoint 已完成并复盘 R93-R96 的 render/sync/finalization 收益；当前已明确续排 `R98-R137`，必须从 `R98` 顺序执行，不得 freestyle。
 
 ## Queue
 ## Queue
@@ -882,7 +882,7 @@
 - **禁止项**: 不改变 foreground/background sync route、question/todo refresh、active-tab writeback 语义。
 - **验收**: post-sync routing 更清晰集中。；并通过全量 `npm test` 与 `npm run build`。
 
-### [NEXT] R97 - Checkpoint after chat render/sync seams
+### [DONE] R97 - Checkpoint after chat render/sync seams
 
 - **Lane**: Checkpoint
 - **目标**: 复盘 R93-R96 的 render/sync/finalization residual 收益。
@@ -896,7 +896,7 @@
 
 - **批次目标**: 继续处理 ContextUsage、composer context、background post-sync 与 background-task trigger residual。
 
-### [QUEUED] R98 - ContextUsageService usage-breakdown seam
+### [NEXT] R98 - ContextUsageService usage-breakdown seam
 
 - **Lane**: Maintainability / chat services
 - **目标**: 收束 usage snapshot、breakdown assembly、display-state merge 与 refresh follow-up lifecycle。
