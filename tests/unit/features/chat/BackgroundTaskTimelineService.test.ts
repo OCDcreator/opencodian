@@ -56,7 +56,7 @@ function createConversation(messages: ChatMessage[]): Conversation {
   };
 }
 
-describe('BackgroundTaskTimelineService', () => {
+describe('BackgroundTaskTimelineService timeline assembly from persisted messages', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
@@ -206,6 +206,12 @@ describe('BackgroundTaskTimelineService', () => {
       })],
     }));
   });
+});
+
+describe('BackgroundTaskTimelineService timeline assembly with runtime state', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
 
   it('merges active runtime launches and completions into the assembled timeline', () => {
     const runtime = createRuntime({
@@ -313,6 +319,12 @@ describe('BackgroundTaskTimelineService', () => {
       launches: [],
       pending: [],
     }));
+  });
+});
+
+describe('BackgroundTaskTimelineService runtime state synchronization', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
   });
 
   it('clears inline panel and follow-up runtime when resetting indicator state', () => {

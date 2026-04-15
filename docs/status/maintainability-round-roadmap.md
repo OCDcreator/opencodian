@@ -688,7 +688,7 @@
   - opencode heavy test 邻域 warning 有可量化下降
   - focused validation、全量 `npm test`、`npm run build` 通过
 
-### [NEXT] R83 - Chat heavy suite split A
+### [DONE] R83 - Chat heavy suite split A
 
 - **Lane**: Warning cleanup / chat tests
 - **目标**: 把 `tests/unit/features/chat/ConversationRenderService.test.ts`、`tests/unit/features/chat/ConversationSyncOrchestrationService.test.ts` 与 `tests/unit/features/chat/BackgroundTaskTimelineService.test.ts` 的大块断言按责任拆分。
@@ -706,7 +706,7 @@
   - chat heavy suite 邻域 warning 有可量化下降
   - focused validation、全量 `npm test`、`npm run build` 通过
 
-### [QUEUED] R84 - Chat heavy suite split B
+### [NEXT] R84 - Chat heavy suite split B
 
 - **Lane**: Warning cleanup / chat tests
 - **目标**: 继续把 `tests/unit/features/chat/QuestionTodoBackgroundTaskRefreshHostAdapter.test.ts`、`tests/unit/features/chat/inputPanelTheme.test.ts` 与相关 question/todo runtime suites 按责任拆分收口。
