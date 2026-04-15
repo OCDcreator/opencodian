@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的 `[NEXT]`”。
-> **当前状态**: [READY] `R117` checkpoint 已完成；`R118-R137` 长队列继续排队，当前首个 `[NEXT]` 为 `R118 - StorageService settings-file lifecycle seam`。
+> **当前状态**: [READY] `R118` 已完成；`R119-R137` 长队列继续排队，当前首个 `[NEXT]` 为 `R119 - core types settings normalization seam A`。
 
 ## 控制规则
 
@@ -17,8 +17,8 @@
 
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
 - 当前 live lint 基线：`0 errors / 65 warnings`
-- 最近成功 phase：`docs/status/maintainability-phase-451.md`
-- 当前路线判断：`R117` 已完成 streaming residual checkpoint，确认 `R113-R116` 的 event classification、payload/SSE parse、finalization 与 active-context / cancel-detach lifecycle 收益；当前必须从 `R118` StorageService settings-file lifecycle seam 顺序执行，不得 freestyle。
+- 最近成功 phase：`docs/status/maintainability-phase-453.md`
+- 当前路线判断：`R118` 已完成 `StorageService` settings-file lifecycle seam，已把 split settings file profile、fallback recovery resolution 与 aggregate load-state assembly 收束到更集中的 owner path；当前必须从 `R119` settings normalization seam A 顺序执行，不得 freestyle。
 
 ## Queue
 ## Queue
@@ -1112,7 +1112,7 @@
 
 - **批次目标**: 处理 StorageService、settings.ts 与 modelConfig residual。
 
-### [NEXT] R118 - StorageService settings-file lifecycle seam
+### [DONE] R118 - StorageService settings-file lifecycle seam
 
 - **Lane**: Maintainability / secondary core
 - **目标**: 收束 settings-file load/save/merge、fallback path、error report 与 migration follow-up residual。
@@ -1122,7 +1122,7 @@
 - **禁止项**: 不改变 local-first persistence、settings-file 路径、migration 语义。
 - **验收**: settings-file lifecycle 更集中。；并通过全量 `npm test` 与 `npm run build`。
 
-### [QUEUED] R119 - core types settings normalization seam A
+### [NEXT] R119 - core types settings normalization seam A
 
 - **Lane**: Maintainability / settings normalization
 - **目标**: 优先收束 chat appearance、question/todo、input panel 相关 normalization residual。

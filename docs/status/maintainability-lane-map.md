@@ -1,19 +1,19 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [READY] `R117` checkpoint 已完成；`R118-R137` 长队列继续推进，当前 `[NEXT]` 为 `R118 - StorageService settings-file lifecycle seam`。
+> **当前状态**: [READY] `R118` 已完成；`R119-R137` 长队列继续推进，当前 `[NEXT]` 为 `R119 - core types settings normalization seam A`。
 
 ## 当前优先级
 
-- **当前 `[NEXT]`**：`R118 - StorageService settings-file lifecycle seam`
-- **本批目标**：`R117` 已完成 streaming residual checkpoint；现在进入 Batch 7 secondary core seams，先收束 `StorageService` settings-file load/save/merge、fallback path、error report 与 migration follow-up residual
+- **当前 `[NEXT]`**：`R119 - core types settings normalization seam A`
+- **本批目标**：`R118` 已完成 `StorageService` settings-file lifecycle seam；现在继续 Batch 7 secondary core seams，优先收束 chat appearance、question/todo、input panel 相关 settings normalization residual
 - **当前 lint 基线**：`0 errors / 65 warnings`
 - **热点顺序**：
-  1. `src/core/storage/StorageService.ts`
-  2. `tests/unit/core/storage/StorageService.test.ts`
+  1. `src/core/types/settings.ts`
+  2. `src/features/settings/SettingsStyleSection.ts`
   3. `docs/status/maintainability-round-roadmap.md`
   4. `docs/status/maintainability-master-plan.md`
-  5. `docs/status/maintainability-phase-452.md`
+  5. `docs/status/maintainability-phase-453.md`
 
 ## 本批边界
 
@@ -35,5 +35,5 @@
 ## 历史入口
 
 - 批次归档：`docs/status/maintainability-completed-batches.md`
-- 最近成功 phase：`docs/status/maintainability-phase-452.md`
+- 最近成功 phase：`docs/status/maintainability-phase-453.md`
 - 最近 checkpoint：`docs/status/maintainability-phase-452.md`

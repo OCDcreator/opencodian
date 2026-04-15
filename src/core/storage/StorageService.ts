@@ -73,6 +73,13 @@ interface LoadSettingsFileOptions<T extends Record<string, unknown>> {
   extractLegacyData: (settings: Partial<OpenCodianSettings>) => Partial<T>;
 }
 
+interface PersistedSettingsFileProfile<T extends Record<string, unknown>> {
+  filePath: string;
+  backupPath: string;
+  source: SettingsEnvelopeSource;
+  extractLegacyData: (settings: Partial<OpenCodianSettings>) => Partial<T>;
+}
+
 export interface SettingsFileLoadResult<T> {
   data: T | null;
   filePath: string;
@@ -88,26 +95,55 @@ export interface SettingsLoadResult {
   shouldPersist: boolean;
 }
 
+const PERSISTED_UI_SETTINGS_KEYS = [
+  'tabState',
+  'settingsPanelScrollTop',
+  'modelAvailabilitySectionOpen',
+  'modelToolsSectionOpen',
+] as const satisfies readonly PersistedUiSettingsKey[];
+
+function extractPersistedUiSettings(
+  settings: Partial<OpenCodianSettings>,
+): Partial<PersistedUiSettings> {
+  return {
+    tabState: settings.tabState,
+    settingsPanelScrollTop: settings.settingsPanelScrollTop,
+    modelAvailabilitySectionOpen: settings.modelAvailabilitySectionOpen,
+    modelToolsSectionOpen: settings.modelToolsSectionOpen,
+  };
+}
+
+function extractPersistedCoreSettings(
+  settings: Partial<OpenCodianSettings>,
+): Partial<PersistedCoreSettings> {
+  const persistedCore = { ...settings } as Partial<OpenCodianSettings>;
+  for (const key of PERSISTED_UI_SETTINGS_KEYS) {
+    delete persistedCore[key];
+  }
+  return persistedCore as Partial<PersistedCoreSettings>;
+}
+
+const CORE_SETTINGS_PROFILE: PersistedSettingsFileProfile<PersistedCoreSettings> = {
+  filePath: CORE_SETTINGS_FILE,
+  backupPath: CORE_SETTINGS_BACKUP_FILE,
+  source: 'settings.core',
+  extractLegacyData: extractPersistedCoreSettings,
+};
+
+const UI_SETTINGS_PROFILE: PersistedSettingsFileProfile<PersistedUiSettings> = {
+  filePath: UI_SETTINGS_FILE,
+  backupPath: UI_SETTINGS_BACKUP_FILE,
+  source: 'settings.ui',
+  extractLegacyData: extractPersistedUiSettings,
+};
+
 export function splitPersistedSettings(settings: OpenCodianSettings): {
   core: PersistedCoreSettings;
   ui: PersistedUiSettings;
 } {
-  const {
-    tabState,
-    settingsPanelScrollTop,
-    modelAvailabilitySectionOpen,
-    modelToolsSectionOpen,
-    ...core
-  } = settings;
-
   return {
-    core,
-    ui: {
-      tabState,
-      settingsPanelScrollTop,
-      modelAvailabilitySectionOpen,
-      modelToolsSectionOpen,
-    },
+    core: extractPersistedCoreSettings(settings) as PersistedCoreSettings,
+    ui: extractPersistedUiSettings(settings) as PersistedUiSettings,
   };
 }
 
@@ -227,58 +263,19 @@ export class StorageService {
   }
 
   async saveCoreSettings(settings: PersistedCoreSettings): Promise<void> {
-    await this.enqueueSettingsWrite(() => this.writeSettingsFile(
-      CORE_SETTINGS_FILE,
-      CORE_SETTINGS_BACKUP_FILE,
-      'settings.core',
-      settings,
-    ));
+    await this.saveSettingsProfile(CORE_SETTINGS_PROFILE, settings);
   }
 
   async saveUiSettings(settings: PersistedUiSettings): Promise<void> {
-    await this.enqueueSettingsWrite(() => this.writeSettingsFile(
-      UI_SETTINGS_FILE,
-      UI_SETTINGS_BACKUP_FILE,
-      'settings.ui',
-      settings,
-    ));
+    await this.saveSettingsProfile(UI_SETTINGS_PROFILE, settings);
   }
 
   async loadPersistedSettings(): Promise<SettingsLoadResult> {
     const legacySettings = await this.readLegacySettings();
-    const core = await this.loadSettingsFile({
-      filePath: CORE_SETTINGS_FILE,
-      backupPath: CORE_SETTINGS_BACKUP_FILE,
-      source: 'settings.core',
-      legacySettings,
-      extractLegacyData: (settings) => {
-        const persistedCore = { ...settings };
-        delete persistedCore.tabState;
-        delete persistedCore.settingsPanelScrollTop;
-        delete persistedCore.modelAvailabilitySectionOpen;
-        delete persistedCore.modelToolsSectionOpen;
-        return persistedCore;
-      },
-    });
-    const ui = await this.loadSettingsFile({
-      filePath: UI_SETTINGS_FILE,
-      backupPath: UI_SETTINGS_BACKUP_FILE,
-      source: 'settings.ui',
-      legacySettings,
-      extractLegacyData: (settings) => ({
-        tabState: settings.tabState,
-        settingsPanelScrollTop: settings.settingsPanelScrollTop,
-        modelAvailabilitySectionOpen: settings.modelAvailabilitySectionOpen,
-        modelToolsSectionOpen: settings.modelToolsSectionOpen,
-      }),
-    });
+    const core = await this.loadSettingsProfile(CORE_SETTINGS_PROFILE, legacySettings);
+    const ui = await this.loadSettingsProfile(UI_SETTINGS_PROFILE, legacySettings);
 
-    return {
-      core,
-      ui,
-      writable: core.source !== 'blocked' && ui.source !== 'blocked',
-      shouldPersist: core.shouldPersist || ui.shouldPersist,
-    };
+    return this.buildSettingsLoadResult(core, ui);
   }
 
   async saveManagedServerState(state: ManagedServerState | null): Promise<void> {
@@ -373,6 +370,40 @@ export class StorageService {
     return next;
   }
 
+  private saveSettingsProfile<T extends Record<string, unknown>>(
+    profile: PersistedSettingsFileProfile<T>,
+    data: T,
+  ): Promise<void> {
+    return this.enqueueSettingsWrite(() => this.writeSettingsFile(
+      profile.filePath,
+      profile.backupPath,
+      profile.source,
+      data,
+    ));
+  }
+
+  private loadSettingsProfile<T extends Record<string, unknown>>(
+    profile: PersistedSettingsFileProfile<T>,
+    legacySettings: SettingsReadResult<Partial<OpenCodianSettings>>,
+  ): Promise<SettingsFileLoadResult<Partial<T>>> {
+    return this.loadSettingsFile({
+      ...profile,
+      legacySettings,
+    });
+  }
+
+  private buildSettingsLoadResult(
+    core: SettingsFileLoadResult<Partial<PersistedCoreSettings>>,
+    ui: SettingsFileLoadResult<Partial<PersistedUiSettings>>,
+  ): SettingsLoadResult {
+    return {
+      core,
+      ui,
+      writable: core.source !== 'blocked' && ui.source !== 'blocked',
+      shouldPersist: core.shouldPersist || ui.shouldPersist,
+    };
+  }
+
   private async writeSettingsFile<T extends Record<string, unknown>>(
     filePath: string,
     backupPath: string,
@@ -426,6 +457,31 @@ export class StorageService {
       extractLegacyData,
     } = options;
     const primary = await this.readEnvelopeFile<T>(filePath, source);
+    const backup = await this.readEnvelopeFile<T>(backupPath, source);
+    return this.resolveSettingsFileLoad({
+      filePath,
+      primary,
+      backup,
+      legacySettings,
+      extractLegacyData,
+    });
+  }
+
+  private resolveSettingsFileLoad<T extends Record<string, unknown>>(options: {
+    filePath: string;
+    primary: SettingsReadResult<Partial<T>>;
+    backup: SettingsReadResult<Partial<T>>;
+    legacySettings: SettingsReadResult<Partial<OpenCodianSettings>>;
+    extractLegacyData: (settings: Partial<OpenCodianSettings>) => Partial<T>;
+  }): SettingsFileLoadResult<Partial<T>> {
+    const {
+      filePath,
+      primary,
+      backup,
+      legacySettings,
+      extractLegacyData,
+    } = options;
+
     if (primary.kind === 'ok') {
       return {
         data: primary.data,
@@ -435,7 +491,6 @@ export class StorageService {
       };
     }
 
-    const backup = await this.readEnvelopeFile<T>(backupPath, source);
     if (backup.kind === 'ok') {
       return {
         data: backup.data,
