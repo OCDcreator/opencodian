@@ -2,19 +2,19 @@
 
 > **状态**: [READY]
 > **作用**: 这是 maintainability 无人值守的战略文档。每轮开始前，先读本文件，再读 `docs/status/maintainability-round-roadmap.md` 与最近的 `docs/status/maintainability-phase-XXX.md`。
-> **自动推进状态**: `R124` 已完成 settings runtime residual 第二项；当前继续按 `R125-R137` 长队列顺序推进。恢复 autopilot 后只能从首个 `[NEXT]`（`R125`）顺序执行，不允许 freestyle。
+> **自动推进状态**: `R125` 已完成 settings modal residual 项；当前继续按 `R126-R137` 长队列顺序推进。恢复 autopilot 后只能从首个 `[NEXT]`（`R126`）顺序执行，不允许 freestyle。
 
 ## 1. 当前判断
 
-**当前分支已完成 `R68-R124` 并把 live lint 稳定在 `0 errors / 65 warnings`；`R124` 已把 `SettingsStyleSection.attach` 的 runtime 初始化、preset/background/input follow-up 与 custom CSS / preview wiring 进一步收束回 section owner。** 接下来继续 Batch 8 settings / main residual，从 `R125` 的 `ModelConfigModal` editor/render seam 开始，再继续 heavy tests follow-up、warning closeout 与最终 checkpoint。
+**当前分支已完成 `R68-R125` 并把 live lint 稳定在 `0 errors / 65 warnings`；`R125` 已把 `ModelConfigModal` 的 selected editor state、workspace/add-provider render branching 与 save/apply follow-up / validation feedback 收束回 modal owner。** 接下来继续 Batch 8 settings / main residual，从 `R126` 的 `main.ts` startup normalization seam 开始，再继续 heavy tests follow-up、warning closeout 与最终 checkpoint。
 
 ## 2. 当前基线
 
 - **lint**: `0 errors / 65 warnings`
-- **最近验证**: `R124` 已确认 focused `OpenCodianStyleSettings`、全量 `npm test` 与 `npm run build` 通过，`BUILD_ID` 为 `autopilot-maintainability.202604160238`
-- **最近 Test Vault 部署**: `R124`，`BUILD_ID` `autopilot-maintainability.202604160238`
-- **当前 `[NEXT]`**: `R125 - ModelConfigModal editor/render seam`
-- **主热点**: `R124` 已完成 style section attach residual 收束；下一步聚焦 `ModelConfigModal` 的 editor state、render branching、save/apply follow-up 与 validation feedback seam
+- **最近验证**: `R125` 已确认 focused `ModelConfigModal`、全量 `npm test` 与 `npm run build` 通过，`BUILD_ID` 为 `autopilot-maintainability.202604160249`
+- **最近 Test Vault 部署**: `R125`，`BUILD_ID` `autopilot-maintainability.202604160249`
+- **当前 `[NEXT]`**: `R126 - main.ts residual startup normalization seam`
+- **主热点**: `R125` 已完成 modal editor/render residual 收束；下一步聚焦 `main.ts` 的 settings normalize、storage preload、locale/theme/bootstrap follow-up residual
 
 ## 3. 本批执行规则
 

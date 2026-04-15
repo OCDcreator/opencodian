@@ -57,6 +57,20 @@ type ProviderCheckState =
 
 type ProviderInterfaceFormatOption = (typeof PROVIDER_INTERFACE_FORMAT_OPTIONS)[number];
 type ModelKeyValueCollectionKey = 'options' | 'variants' | 'extraFields';
+type ModelConfigModalFlow = 'workspace' | 'add-provider';
+
+interface SelectedProviderEditorState {
+  flow: ModelConfigModalFlow;
+  provider: ProviderFormState;
+  formatMeta: ProviderInterfaceFormatOption;
+  providerCheckState: ProviderCheckState;
+}
+
+interface ModelConfigSavePlan {
+  nextConfig: OpencodeModelConfigSubset;
+  nextDisabledModelRefs: string[];
+  restartServerAfterWrite: boolean;
+}
 
 interface ModelConfigModalOpenOptions {
   initialProviderId?: string;
@@ -321,28 +335,54 @@ export class ModelConfigModal extends Modal {
   }
 
   private renderEditor(containerEl: HTMLElement): void {
+    const editorState = this.getSelectedProviderEditorState();
+    if (!editorState) {
+      this.renderNoProviderSelectedState(containerEl);
+      return;
+    }
+
+    if (editorState.flow === 'add-provider') {
+      this.renderAddProviderEditor(containerEl, editorState);
+      return;
+    }
+
+    this.renderWorkspaceEditor(containerEl, editorState);
+  }
+
+  private renderNoProviderSelectedState(containerEl: HTMLElement): void {
+    this.previewEl = null;
+    this.restartToggleEl = null;
+    containerEl.createDiv({
+      cls: 'opencodian-model-workspace-empty',
+      text: t('settings.model.visualEditor.noProviderSelected'),
+    });
+  }
+
+  private getSelectedProviderEditorState(): SelectedProviderEditorState | null {
     const provider = this.getSelectedProvider();
     if (!provider) {
-      this.previewEl = null;
-      this.restartToggleEl = null;
-      containerEl.createDiv({
-        cls: 'opencodian-model-workspace-empty',
-        text: t('settings.model.visualEditor.noProviderSelected'),
-      });
-      return;
+      return null;
     }
 
-    if (this.isAddProviderFlow()) {
-      this.renderAddProviderEditor(containerEl, provider);
-      return;
-    }
+    return {
+      flow: this.isAddProviderFlow() ? 'add-provider' : 'workspace',
+      provider,
+      formatMeta: this.getProviderInterfaceFormatMeta(provider.interfaceFormat),
+      providerCheckState: this.providerChecks.get(provider.uid) ?? { status: 'idle' },
+    };
+  }
 
+  private renderWorkspaceEditor(
+    containerEl: HTMLElement,
+    editorState: SelectedProviderEditorState,
+  ): void {
+    const { provider } = editorState;
     this.renderProviderToolbar(containerEl, provider);
     const sectionsEl = containerEl.createDiv({ cls: 'opencodian-model-workspace-editor-panel' });
     this.renderProviderIdentitySection(sectionsEl, provider);
-    const formatMeta = this.renderProviderConnectionSection(sectionsEl, provider);
+    this.renderProviderConnectionSection(sectionsEl, editorState);
     this.renderProviderExtraOptionsSection(sectionsEl, provider);
-    this.renderProviderModelsSection(sectionsEl, provider, formatMeta);
+    this.renderProviderModelsSection(sectionsEl, editorState);
     this.renderProviderDefaultsSection(sectionsEl);
     this.renderEditorPreviewSection(sectionsEl);
   }
@@ -449,8 +489,9 @@ export class ModelConfigModal extends Modal {
 
   private renderProviderConnectionSection(
     containerEl: HTMLElement,
-    provider: ProviderFormState,
-  ): ProviderInterfaceFormatOption {
+    editorState: SelectedProviderEditorState,
+  ): void {
+    const { provider, formatMeta, providerCheckState } = editorState;
     const connectionSectionEl = containerEl.createDiv({ cls: 'opencodian-model-workspace-section is-flow-section' });
     this.createSectionHeader(
       connectionSectionEl,
@@ -458,7 +499,6 @@ export class ModelConfigModal extends Modal {
       t('settings.model.visualEditor.providerSectionDesc'),
     );
     const connectionGridEl = connectionSectionEl.createDiv({ cls: 'opencodian-model-workspace-grid is-connection-grid' });
-    const formatMeta = this.getProviderInterfaceFormatMeta(provider.interfaceFormat);
     const interfaceField = this.createSelectField(connectionGridEl, {
       label: t('settings.model.visualEditor.interfaceFormat'),
       value: provider.interfaceFormat,
@@ -513,15 +553,12 @@ export class ModelConfigModal extends Modal {
     });
     apiKeyField.addClass('is-full-span');
 
-    const providerCheckState = this.providerChecks.get(provider.uid);
-    if (providerCheckState && providerCheckState.status !== 'idle' && providerCheckState.status !== 'loading') {
+    if (providerCheckState.status !== 'idle' && providerCheckState.status !== 'loading') {
       connectionSectionEl.createDiv({
         cls: `opencodian-model-workspace-inline-status ${this.getProviderCheckClass(providerCheckState)}`,
         text: providerCheckState.message,
       });
     }
-
-    return formatMeta;
   }
 
   private renderProviderExtraOptionsSection(containerEl: HTMLElement, provider: ProviderFormState): void {
@@ -562,9 +599,9 @@ export class ModelConfigModal extends Modal {
 
   private renderProviderModelsSection(
     containerEl: HTMLElement,
-    provider: ProviderFormState,
-    formatMeta: ProviderInterfaceFormatOption,
+    editorState: SelectedProviderEditorState,
   ): void {
+    const { provider, formatMeta } = editorState;
     const modelsSectionEl = containerEl.createDiv({ cls: 'opencodian-model-workspace-section' });
     this.createSectionHeader(
       modelsSectionEl,
@@ -712,7 +749,11 @@ export class ModelConfigModal extends Modal {
       ?? PROVIDER_INTERFACE_FORMAT_OPTIONS[1];
   }
 
-  private renderAddProviderEditor(containerEl: HTMLElement, provider: ProviderFormState): void {
+  private renderAddProviderEditor(
+    containerEl: HTMLElement,
+    editorState: SelectedProviderEditorState,
+  ): void {
+    const { provider, formatMeta } = editorState;
     containerEl.addClass('is-add-provider-flow');
 
     const sectionsEl = containerEl.createDiv({ cls: 'opencodian-model-workspace-editor-panel is-add-provider-flow' });
@@ -750,10 +791,8 @@ export class ModelConfigModal extends Modal {
         label: t(entry.labelKey as never),
       })),
       onChange: (value) => {
-        const previous = PROVIDER_INTERFACE_FORMAT_OPTIONS.find((entry) => entry.id === provider.interfaceFormat)
-          ?? PROVIDER_INTERFACE_FORMAT_OPTIONS[1];
-        const next = PROVIDER_INTERFACE_FORMAT_OPTIONS.find((entry) => entry.id === value)
-          ?? PROVIDER_INTERFACE_FORMAT_OPTIONS[1];
+        const previous = this.getProviderInterfaceFormatMeta(provider.interfaceFormat);
+        const next = this.getProviderInterfaceFormatMeta(value as ProviderInterfaceFormatId);
         provider.interfaceFormat = value as ProviderInterfaceFormatId;
         if (!provider.baseURL.trim() || provider.baseURL.trim() === previous.defaultBaseUrl) {
           provider.baseURL = '';
@@ -762,8 +801,7 @@ export class ModelConfigModal extends Modal {
         this.updatePreview();
         this.render();
       },
-      description: t((PROVIDER_INTERFACE_FORMAT_OPTIONS.find((entry) => entry.id === provider.interfaceFormat)?.descriptionKey
-        ?? PROVIDER_INTERFACE_FORMAT_OPTIONS[1].descriptionKey) as never),
+      description: t(formatMeta.descriptionKey as never),
     });
     interfaceField.addClass('is-full-span');
 
@@ -779,8 +817,6 @@ export class ModelConfigModal extends Modal {
       customNpmField.addClass('is-full-span');
     }
 
-    const formatMeta = PROVIDER_INTERFACE_FORMAT_OPTIONS.find((entry) => entry.id === provider.interfaceFormat)
-      ?? PROVIDER_INTERFACE_FORMAT_OPTIONS[1];
     const baseUrlPlaceholder = this.getProviderBaseUrlPlaceholder(provider, formatMeta.baseUrlPlaceholder);
     const apiKeyField = this.createTextField(connectionGridEl, {
       label: t('settings.model.visualEditor.apiKey'),
@@ -1685,41 +1721,29 @@ export class ModelConfigModal extends Modal {
     }
 
     try {
-      if (this.isAddProviderFlow()) {
-        await this.saveAddProvider();
-        return;
-      }
-
-      const modelConfig = this.toModelConfig();
-      this.plugin.settings.disabledModelRefs = this.buildNextDisabledModelRefs();
-      await this.plugin.modelConfigService.writeLocalModelConfig(modelConfig);
-      await this.maybeRestartServer();
-      await this.plugin.saveSettings({
-        syncConfig: false,
-        reloadModels: true,
-        applyUi: true,
-      });
-      this.initialDisabledModelRefs = [...this.plugin.settings.disabledModelRefs];
-      this.localConfigAtOpen = modelConfig;
-      this.initialSnapshot = this.createSnapshot();
-      try {
-        await this.openOptions.onSaved?.();
-      } catch (error) {
-        logger.error('Failed to run model workspace save callback:', error);
-      }
-      new Notice(t('settings.model.visualEditor.saveSuccess'));
-      this.close();
+      const savePlan = this.buildSavePlan();
+      await this.applySavePlan(savePlan);
+      await this.finalizeSavePlan(savePlan);
     } catch (error) {
-      logger.error('Failed to save visual model config:', error);
-      new Notice(`${t('settings.model.visualEditor.saveFailed')}: ${(error as Error).message}`);
+      this.handleSaveFailure(error);
     }
   }
 
-  private async saveAddProvider(): Promise<void> {
-    if (!this.plugin.modelConfigService) {
-      return;
-    }
+  private buildSavePlan(): ModelConfigSavePlan {
+    return this.isAddProviderFlow()
+      ? this.buildAddProviderSavePlan()
+      : this.buildWorkspaceSavePlan();
+  }
 
+  private buildWorkspaceSavePlan(): ModelConfigSavePlan {
+    return {
+      nextConfig: this.toModelConfig(),
+      nextDisabledModelRefs: this.buildNextDisabledModelRefs(),
+      restartServerAfterWrite: true,
+    };
+  }
+
+  private buildAddProviderSavePlan(): ModelConfigSavePlan {
     const provider = this.getSelectedProvider();
     if (!provider) {
       throw new Error(t('settings.model.visualEditor.noProviderSelected'));
@@ -1744,33 +1768,55 @@ export class ModelConfigModal extends Modal {
     parsedConfig.name = providerName;
 
     const availabilitySubset = this.buildAvailabilitySubset();
-    const nextConfig: OpencodeModelConfigSubset = {
-      ...this.localConfigAtOpen,
-      provider: {
-        ...(this.localConfigAtOpen.provider ?? {}),
-        [providerId]: parsedConfig,
+    return {
+      nextConfig: {
+        ...this.localConfigAtOpen,
+        provider: {
+          ...(this.localConfigAtOpen.provider ?? {}),
+          [providerId]: parsedConfig,
+        },
+        enabled_providers: availabilitySubset.enabled_providers,
+        disabled_providers: availabilitySubset.disabled_providers,
       },
-      enabled_providers: availabilitySubset.enabled_providers,
-      disabled_providers: availabilitySubset.disabled_providers,
+      nextDisabledModelRefs: [...this.initialDisabledModelRefs],
+      restartServerAfterWrite: false,
     };
+  }
 
-    this.plugin.settings.disabledModelRefs = [...this.initialDisabledModelRefs];
-    await this.plugin.modelConfigService.writeLocalModelConfig(nextConfig);
+  private async applySavePlan(savePlan: ModelConfigSavePlan): Promise<void> {
+    this.plugin.settings.disabledModelRefs = [...savePlan.nextDisabledModelRefs];
+    await this.plugin.modelConfigService!.writeLocalModelConfig(savePlan.nextConfig);
+    if (savePlan.restartServerAfterWrite) {
+      await this.maybeRestartServer();
+    }
     await this.plugin.saveSettings({
       syncConfig: false,
       reloadModels: true,
       applyUi: true,
     });
-    this.localConfigAtOpen = nextConfig;
+  }
+
+  private async finalizeSavePlan(savePlan: ModelConfigSavePlan): Promise<void> {
+    this.localConfigAtOpen = savePlan.nextConfig;
     this.initialDisabledModelRefs = [...this.plugin.settings.disabledModelRefs];
     this.initialSnapshot = this.createSnapshot();
+    await this.runOnSavedCallback();
+    new Notice(t('settings.model.visualEditor.saveSuccess'));
+    this.close();
+  }
+
+  private async runOnSavedCallback(): Promise<void> {
     try {
       await this.openOptions.onSaved?.();
     } catch (error) {
       logger.error('Failed to run model workspace save callback:', error);
     }
-    new Notice(t('settings.model.visualEditor.saveSuccess'));
-    this.close();
+  }
+
+  private handleSaveFailure(error: unknown): void {
+    logger.error('Failed to save visual model config:', error);
+    const message = error instanceof Error ? error.message : String(error);
+    new Notice(`${t('settings.model.visualEditor.saveFailed')}: ${message}`);
   }
 
   private async maybeRestartServer(): Promise<void> {

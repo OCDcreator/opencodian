@@ -1,3 +1,4 @@
+import * as obsidian from 'obsidian';
 import type { App } from 'obsidian';
 import { Modal } from 'obsidian';
 
@@ -29,6 +30,27 @@ function createPlugin(overrides: Record<string, unknown> = {}) {
     },
     ...overrides,
   };
+}
+
+function getModalState(modal: ModelConfigModal) {
+  return modal as unknown as {
+    providers: Array<{
+      uid: string;
+      id: string;
+      name: string;
+      baseURL: string;
+      enabled: boolean;
+      extraOptions: Array<{ key: string; value: string }>;
+      models: Array<{ id: string; enabled: boolean }>;
+    }>;
+    selectedProviderUid: string | null;
+    previewEl: HTMLTextAreaElement | null;
+  };
+}
+
+function getSelectedProviderState(modal: ModelConfigModal) {
+  const state = getModalState(modal);
+  return state.providers.find((provider) => provider.uid === state.selectedProviderUid) ?? null;
 }
 
 describe('ModelConfigModal', () => {
@@ -128,5 +150,162 @@ describe('ModelConfigModal', () => {
     confirmSpy.mockReturnValueOnce(true);
     modal.close();
     expect(closeSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('persists workspace saves through the shared save plan', async () => {
+    const writeLocalModelConfig = jest.fn().mockResolvedValue(undefined);
+    const plugin = createPlugin({
+      modelConfigService: {
+        readLocalModelConfig: jest.fn().mockResolvedValue({
+          provider: {
+            openai: {
+              name: 'OpenAI',
+              npm: '@ai-sdk/openai',
+              options: {
+                baseURL: 'https://api.openai.com/v1',
+              },
+              models: {
+                'gpt-4o': {},
+              },
+            },
+          },
+        }),
+        getCatalogs: jest.fn().mockResolvedValue({ serverConfig: {} }),
+        getConfigPath: jest.fn().mockReturnValue('.opencode/opencode.json'),
+        writeLocalModelConfig,
+      },
+    });
+    const closeSpy = jest.spyOn(Modal.prototype, 'close');
+    const noticeSpy = jest.spyOn(obsidian, 'Notice').mockImplementation(() => undefined as never);
+    const onSaved = jest.fn().mockResolvedValue(undefined);
+    const modal = new ModelConfigModal({} as App, plugin as never, { onSaved });
+
+    await modal.onOpen();
+
+    const state = getModalState(modal);
+    state.providers[0]!.models[0]!.enabled = false;
+
+    await (modal as unknown as { save: () => Promise<void> }).save();
+
+    expect(writeLocalModelConfig).toHaveBeenCalledWith(expect.objectContaining({
+      provider: expect.objectContaining({
+        openai: expect.objectContaining({
+          name: 'OpenAI',
+        }),
+      }),
+    }));
+    expect(plugin.saveSettings).toHaveBeenCalledWith({
+      syncConfig: false,
+      reloadModels: true,
+      applyUi: true,
+    });
+    expect(plugin.settings.disabledModelRefs).toEqual(['openai/gpt-4o']);
+    expect(onSaved).toHaveBeenCalledTimes(1);
+    expect(noticeSpy).toHaveBeenCalledWith(t('settings.model.visualEditor.saveSuccess'));
+    expect(closeSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('persists add-provider saves through the shared save plan', async () => {
+    const writeLocalModelConfig = jest.fn().mockResolvedValue(undefined);
+    const plugin = createPlugin({
+      modelConfigService: {
+        readLocalModelConfig: jest.fn().mockResolvedValue({
+          provider: {
+            openai: {
+              name: 'OpenAI',
+              npm: '@ai-sdk/openai',
+            },
+          },
+        }),
+        getCatalogs: jest.fn().mockResolvedValue({ serverConfig: {} }),
+        getConfigPath: jest.fn().mockReturnValue('.opencode/opencode.json'),
+        writeLocalModelConfig,
+      },
+      settings: {
+        modelSourceMode: 'local',
+        disabledModelRefs: ['openai/legacy'],
+        providerIconLibrary: 'lobehub',
+        server: {
+          mode: 'local',
+        },
+      },
+    });
+    const closeSpy = jest.spyOn(Modal.prototype, 'close');
+    const noticeSpy = jest.spyOn(obsidian, 'Notice').mockImplementation(() => undefined as never);
+    const onSaved = jest.fn().mockResolvedValue(undefined);
+    const modal = new ModelConfigModal({} as App, plugin as never, {
+      initialView: 'preset-selector',
+      onSaved,
+    });
+
+    await modal.onOpen();
+
+    const state = getModalState(modal);
+    const selectedProvider = getSelectedProviderState(modal);
+    expect(selectedProvider).not.toBeNull();
+    selectedProvider!.id = 'anthropic';
+    selectedProvider!.name = 'Anthropic';
+    state.previewEl!.value = JSON.stringify({
+      npm: '@ai-sdk/anthropic',
+      options: {
+        baseURL: 'https://api.anthropic.com',
+      },
+      models: {
+        'claude-3-7-sonnet': {},
+      },
+    }, null, 2);
+
+    await (modal as unknown as { save: () => Promise<void> }).save();
+
+    expect(writeLocalModelConfig).toHaveBeenCalledWith(expect.objectContaining({
+      provider: expect.objectContaining({
+        openai: expect.any(Object),
+        anthropic: expect.objectContaining({
+          name: 'Anthropic',
+        }),
+      }),
+    }));
+    expect(plugin.openCodeService.stop).not.toHaveBeenCalled();
+    expect(plugin.settings.disabledModelRefs).toEqual(['openai/legacy']);
+    expect(onSaved).toHaveBeenCalledTimes(1);
+    expect(noticeSpy).toHaveBeenCalledWith(t('settings.model.visualEditor.saveSuccess'));
+    expect(closeSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports validation failures through the shared save error handler', async () => {
+    const writeLocalModelConfig = jest.fn().mockResolvedValue(undefined);
+    const plugin = createPlugin({
+      modelConfigService: {
+        readLocalModelConfig: jest.fn().mockResolvedValue({
+          provider: {
+            openai: {
+              name: 'OpenAI',
+              npm: '@ai-sdk/openai',
+              options: {
+                baseURL: 'https://api.openai.com/v1',
+              },
+            },
+          },
+        }),
+        getCatalogs: jest.fn().mockResolvedValue({ serverConfig: {} }),
+        getConfigPath: jest.fn().mockReturnValue('.opencode/opencode.json'),
+        writeLocalModelConfig,
+      },
+    });
+    const noticeSpy = jest.spyOn(obsidian, 'Notice').mockImplementation(() => undefined as never);
+    jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    const modal = new ModelConfigModal({} as App, plugin as never);
+
+    await modal.onOpen();
+
+    const state = getModalState(modal);
+    state.providers[0]!.id = '';
+
+    await (modal as unknown as { save: () => Promise<void> }).save();
+
+    expect(writeLocalModelConfig).not.toHaveBeenCalled();
+    expect(noticeSpy).toHaveBeenCalledWith(
+      `${t('settings.model.visualEditor.saveFailed')}: ${t('settings.model.visualEditor.errorProviderId')}`,
+    );
   });
 });

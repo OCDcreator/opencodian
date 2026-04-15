@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的 `[NEXT]`”。
-> **当前状态**: [READY] `R124` 已完成；`R125-R137` 长队列继续排队，当前首个 `[NEXT]` 为 `R125 - ModelConfigModal editor/render seam`。
+> **当前状态**: [READY] `R125` 已完成；`R126-R137` 长队列继续排队，当前首个 `[NEXT]` 为 `R126 - main.ts residual startup normalization seam`。
 
 ## 控制规则
 
@@ -17,8 +17,8 @@
 
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
 - 当前 live lint 基线：`0 errors / 65 warnings`
-- 最近成功 phase：`docs/status/maintainability-phase-459.md`
-- 当前路线判断：`R124` 已完成 `SettingsStyleSection.attach` residual seam，确认 style section attach runtime、preset/background/input follow-up 与 custom CSS / preview residual 已继续收束；当前必须从 `R125` 的 `ModelConfigModal` editor/render seam 顺序执行，不得 freestyle。
+- 最近成功 phase：`docs/status/maintainability-phase-460.md`
+- 当前路线判断：`R125` 已完成 `ModelConfigModal` editor/render seam，确认 selected editor state、workspace/add-provider render branching 与 shared save/apply follow-up / validation feedback 已继续收束；当前必须从 `R126` 的 `main.ts` residual startup normalization seam 顺序执行，不得 freestyle。
 
 ## Queue
 ## Queue
@@ -1186,7 +1186,7 @@
 - **禁止项**: 不改变 theme preset、background persistence、glass/input panel appearance normalization 或 preview 行为。
 - **验收**: style section attach residual 装配继续减少。；并通过全量 `npm test` 与 `npm run build`。
 
-### [NEXT] R125 - ModelConfigModal editor/render seam
+### [DONE] R125 - ModelConfigModal editor/render seam
 
 - **Lane**: Maintainability / settings modal
 - **目标**: 从 ModelConfigModal 收束 editor state、render branching、save/apply follow-up 与 validation feedback seam。
@@ -1196,7 +1196,7 @@
 - **禁止项**: 不改变 modal 编辑语义、validation 反馈、provider/model 保存逻辑。
 - **验收**: modal editor/render seam 更集中。；并通过全量 `npm test` 与 `npm run build`。
 
-### [QUEUED] R126 - main.ts residual startup normalization seam
+### [NEXT] R126 - main.ts residual startup normalization seam
 
 - **Lane**: Maintainability / plugin startup
 - **目标**: 继续收束 main.ts 中 settings normalize、storage preload、locale/theme/bootstrap follow-up residual。
