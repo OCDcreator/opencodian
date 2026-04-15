@@ -331,6 +331,24 @@ describe('OpenCodeService SDK promptAsync transport', () => {
 });
 
 describe('OpenCodeService SDK stream control', () => {
+  it('disposes the streaming runtime before service lifecycle teardown', () => {
+    service = createServiceWithSdkFlags();
+    const internals = service as unknown as {
+      serviceLifecycle: { dispose: () => void };
+      streamingRuntime: { dispose: () => void };
+    };
+    const runtimeDisposeSpy = jest.spyOn(internals.streamingRuntime, 'dispose');
+    const lifecycleDisposeSpy = jest.spyOn(internals.serviceLifecycle, 'dispose');
+
+    service.dispose();
+
+    expect(runtimeDisposeSpy).toHaveBeenCalledTimes(1);
+    expect(lifecycleDisposeSpy).toHaveBeenCalledTimes(1);
+    expect(runtimeDisposeSpy.mock.invocationCallOrder[0]).toBeLessThan(
+      lifecycleDisposeSpy.mock.invocationCallOrder[0],
+    );
+  });
+
   it('calls session.abort when cancelStream is invoked during an SDK stream', async () => {
     service = createServiceWithSdkFlags();
     service.setSessionId('test-session');

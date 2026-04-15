@@ -160,6 +160,21 @@ describe('OpenCodeStreamingRuntimeCoordinator', () => {
     expect(host.abortSessionOnServer).not.toHaveBeenCalled();
   });
 
+  it('aborts and clears all active contexts during runtime disposal', () => {
+    const host = createHost();
+    const coordinator = new OpenCodeStreamingRuntimeCoordinator(host);
+    const left = coordinator.createActiveStreamContext('session-left');
+    const right = coordinator.createActiveStreamContext('session-right');
+
+    coordinator.dispose();
+    coordinator.cancelStream('session-left');
+    coordinator.detachStream('session-right');
+
+    expect(left.signal.aborted).toBe(true);
+    expect(right.signal.aborted).toBe(true);
+    expect(host.abortSessionOnServer).not.toHaveBeenCalled();
+  });
+
   it('selects SDK or legacy transport from one runtime entrypoint', async () => {
     const host = createHost();
     const coordinator = new OpenCodeStreamingRuntimeCoordinator(host);

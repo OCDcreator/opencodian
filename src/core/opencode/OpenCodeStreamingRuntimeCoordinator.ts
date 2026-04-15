@@ -52,6 +52,15 @@ interface OpenCodeStreamingFinalizationOutcome {
   finalContent: string;
 }
 
+interface OpenCodeStreamingRuntimeAbortRequest {
+  sessionId?: string | null;
+  missingSessionMessage: string;
+  missingContextMessage: (sessionId: string) => string;
+  startMessage: (sessionId: string) => string;
+  completionMessage: string;
+  abortFollowUp?: (sessionId: string) => void;
+}
+
 export interface OpenCodeStreamingRuntimeEventTransformer {
   handleStreamingEvent(
     eventData: OpenCodeStreamEvent,
@@ -258,6 +267,22 @@ export class OpenCodeStreamingRuntimeCoordinator {
     }
   }
 
+  dispose(): void {
+    const activeContexts = [...this.activeStreams.values()];
+    if (activeContexts.length === 0) {
+      return;
+    }
+
+    logger.debug(`Disposing ${activeContexts.length} active stream context(s)`);
+    this.activeStreams.clear();
+    for (const streamContext of activeContexts) {
+      this.abortActiveStreamContext(streamContext, {
+        startMessage: (sessionId) => `Disposing local stream context for session ${sessionId}...`,
+        completionMessage: 'Local stream disposal signal sent',
+      });
+    }
+  }
+
   async *streamLegacyResponse(
     request: OpenCodeStreamingLegacyStreamRequest,
   ): AsyncGenerator<StreamChunk> {
@@ -269,8 +294,10 @@ export class OpenCodeStreamingRuntimeCoordinator {
       try {
         yield* this.consumeLegacyEventStream(request.sessionId, streamContext);
       } finally {
-        this.releaseActiveStreamContext(streamContext);
-        logger.debug(`Legacy stream ended for session ${request.sessionId}`);
+        this.finalizeActiveStreamContext(
+          streamContext,
+          `Legacy stream ended for session ${request.sessionId}`,
+        );
       }
     } catch (error) {
       yield this.buildErrorChunk(error);
@@ -353,46 +380,37 @@ export class OpenCodeStreamingRuntimeCoordinator {
     } catch (error) {
       yield this.buildErrorChunk(error);
     } finally {
-      this.releaseActiveStreamContext(streamContext);
-      logger.debug(`SDK stream ended for session ${request.sessionId}`);
+      this.finalizeActiveStreamContext(
+        streamContext,
+        `SDK stream ended for session ${request.sessionId}`,
+      );
     }
   }
 
   cancelStream(sessionId?: string | null): void {
-    const targetSessionId = this.normalizeSessionId(sessionId);
-    if (!targetSessionId) {
-      logger.debug('No session specified for stream cancellation');
-      return;
-    }
-
-    const streamContext = this.activeStreams.get(targetSessionId);
-    if (!streamContext) {
-      logger.debug(`No active stream to cancel for session ${targetSessionId}`);
-      return;
-    }
-
-    logger.debug(`Cancelling stream for session ${targetSessionId}...`);
-    streamContext.abort();
-    logger.debug('Abort signal sent');
-    void this.host.abortSessionOnServer(targetSessionId);
+    this.controlActiveStream({
+      sessionId,
+      missingSessionMessage: 'No session specified for stream cancellation',
+      missingContextMessage: (targetSessionId) =>
+        `No active stream to cancel for session ${targetSessionId}`,
+      startMessage: (targetSessionId) => `Cancelling stream for session ${targetSessionId}...`,
+      completionMessage: 'Abort signal sent',
+      abortFollowUp: (targetSessionId) => {
+        void this.host.abortSessionOnServer(targetSessionId);
+      },
+    });
   }
 
   detachStream(sessionId?: string | null): void {
-    const targetSessionId = this.normalizeSessionId(sessionId);
-    if (!targetSessionId) {
-      logger.debug('No session specified for local stream detach');
-      return;
-    }
-
-    const streamContext = this.activeStreams.get(targetSessionId);
-    if (!streamContext) {
-      logger.debug(`No active stream to detach for session ${targetSessionId}`);
-      return;
-    }
-
-    logger.debug(`Detaching local stream listener for session ${targetSessionId}...`);
-    streamContext.abort();
-    logger.debug('Local stream detach signal sent');
+    this.controlActiveStream({
+      sessionId,
+      missingSessionMessage: 'No session specified for local stream detach',
+      missingContextMessage: (targetSessionId) =>
+        `No active stream to detach for session ${targetSessionId}`,
+      startMessage: (targetSessionId) =>
+        `Detaching local stream listener for session ${targetSessionId}...`,
+      completionMessage: 'Local stream detach signal sent',
+    });
   }
 
   private createStreamingState(): StreamingState {
@@ -483,6 +501,60 @@ export class OpenCodeStreamingRuntimeCoordinator {
     } finally {
       this.disposeSseStreamContext(context);
     }
+  }
+
+  private finalizeActiveStreamContext(
+    streamContext: OpenCodeStreamingRuntimeContext,
+    completionMessage: string,
+  ): void {
+    this.releaseActiveStreamContext(streamContext);
+    logger.debug(completionMessage);
+  }
+
+  private controlActiveStream(request: OpenCodeStreamingRuntimeAbortRequest): void {
+    const streamContext = this.resolveActiveStreamContext(
+      request.sessionId,
+      request.missingSessionMessage,
+      request.missingContextMessage,
+    );
+    if (!streamContext) {
+      return;
+    }
+
+    this.abortActiveStreamContext(streamContext, request);
+  }
+
+  private resolveActiveStreamContext(
+    sessionId: string | null | undefined,
+    missingSessionMessage: string,
+    missingContextMessage: (sessionId: string) => string,
+  ): OpenCodeStreamingRuntimeContext | null {
+    const targetSessionId = this.normalizeSessionId(sessionId);
+    if (!targetSessionId) {
+      logger.debug(missingSessionMessage);
+      return null;
+    }
+
+    const streamContext = this.activeStreams.get(targetSessionId);
+    if (!streamContext) {
+      logger.debug(missingContextMessage(targetSessionId));
+      return null;
+    }
+
+    return streamContext;
+  }
+
+  private abortActiveStreamContext(
+    streamContext: OpenCodeStreamingRuntimeContext,
+    request: Pick<
+      OpenCodeStreamingRuntimeAbortRequest,
+      'startMessage' | 'completionMessage' | 'abortFollowUp'
+    >,
+  ): void {
+    logger.debug(request.startMessage(streamContext.sessionId));
+    streamContext.abort();
+    logger.debug(request.completionMessage);
+    request.abortFollowUp?.(streamContext.sessionId);
   }
 
   private async createSseStreamContext(

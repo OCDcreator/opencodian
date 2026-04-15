@@ -537,6 +537,7 @@ export class OpenCodeService {
   }
 
   dispose(): void {
+    this.streamingRuntime.dispose();
     this.serviceLifecycle.dispose();
   }
 

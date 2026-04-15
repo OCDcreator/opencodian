@@ -1,19 +1,19 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [READY] `R116-R137` 长队列继续推进；当前 `[NEXT]` 为 `R116 - OpenCodeStreamingRuntimeCoordinator active-context / cancel-detach seam`。
+> **当前状态**: [READY] `R117-R137` 长队列继续推进；当前 `[NEXT]` 为 `R117 - Checkpoint after streaming residual seams`。
 
 ## 当前优先级
 
-- **当前 `[NEXT]`**：`R116 - OpenCodeStreamingRuntimeCoordinator active-context / cancel-detach seam`
-- **本批目标**：`R115` 已把 finalization start logging、assistant tail completion planning 与 post-finish stop payload 收口到 outcome seam；现在继续 batch 6，推进 active-context register/cleanup、cancel-detach、abort follow-up 与 runtime disposal residual
+- **当前 `[NEXT]`**：`R117 - Checkpoint after streaming residual seams`
+- **本批目标**：`R116` 已完成 batch 6 的 active-context register/cleanup、cancel-detach、abort follow-up 与 runtime disposal 收口；现在先做 streaming residual checkpoint，复盘 `R113-R116` 的整体收益与 secondary core 入口
 - **当前 lint 基线**：`0 errors / 65 warnings`
 - **热点顺序**：
-  1. `src/core/opencode/OpenCodeStreamingRuntimeCoordinator.ts`
-  2. `src/core/opencode/OpenCodeService.ts`
-  3. `tests/unit/core/opencode/OpenCodeStreamingRuntimeCoordinator.test.ts`
-  4. `docs/status/maintainability-round-roadmap.md`
-  5. `docs/status/maintainability-phase-450.md`
+  1. `docs/status/maintainability-master-plan.md`
+  2. `docs/status/maintainability-round-roadmap.md`
+  3. `docs/status/maintainability-phase-451.md`
+  4. `docs/status/maintainability-lane-map.md`
+  5. `docs/status/maintainability-completed-batches.md`
 
 ## 本批边界
 
@@ -35,5 +35,5 @@
 ## 历史入口
 
 - 批次归档：`docs/status/maintainability-completed-batches.md`
-- 最近成功 phase：`docs/status/maintainability-phase-449.md`
+- 最近成功 phase：`docs/status/maintainability-phase-451.md`
 - 最近 checkpoint：`docs/status/maintainability-phase-447.md`
