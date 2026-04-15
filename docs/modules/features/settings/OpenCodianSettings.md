@@ -130,7 +130,7 @@ provider 开关写回仍遵循 `ModelConfigService` 返回的 `effectiveProvider
 - UI section 的 max tabs、tab position/layout、auto scroll、chat scroll mode 与 open-in-main-tab 写回现在由 `SettingsUiSection` 持有
 - debug section 的 logging toggle、log path picker、diagnostic export/action 与 console help block 现在由 `SettingsDebugSection` 持有
 - 模型加载后的 UI 刷新走 `requestAnimationFrame`
-- style section 的 preset/status、binding 同步、input theme rerender 与 reset/apply/save orchestration 现在由 `SettingsStyleSection` 持有
+- style section 的 preset/status、binding 同步与 reset/apply/save orchestration 现在由 `SettingsStyleSection` 持有；input subsection rerender 继续委托给 `SettingsStyleInputPanelSection`
 - 聊天背景图 subsection 继续由 `SettingsStyleBackgroundSection` 持有自己的 host、preview request guard 与 reset/upload lifecycle，`OpenCodianSettings` 只负责装配 `SettingsStyleSection`
 
 ## 关键方法
@@ -161,10 +161,12 @@ provider 开关写回仍遵循 `ModelConfigService` 返回的 `effectiveProvider
 - `SettingsUiSection`: 管理 UI section 的 max tabs、tab position/layout、auto scroll、chat scroll mode 与 open-in-main-tab 保存逻辑；`OpenCodianSettings` 只保留 owner 装配
 - `SettingsDebugSection`: 管理 debug section 的 logging toggle、inline serialized args、log path picker、diagnostic copy/generate action 与 console help；`OpenCodianSettings` 只保留 owner 装配
 - `SettingsSecuritySection`: 管理 security section 的 config status、permission mode 写回、restart action 与 blocklist/export-path 输入；`OpenCodianSettings` 只保留 owner 装配
-- `SettingsStyleSection`: 管理 style section 的 theme preset、binding sync、background owner 装配、input panel theme family 切换、glass/liquid glass 参数与 custom CSS；`OpenCodianSettings` 只保留 owner 装配
+- `SettingsStyleSection`: 管理 style section 的 theme preset、binding sync、background/input 子 owner 装配与 custom CSS；`OpenCodianSettings` 只保留 owner 装配
+- `SettingsStyleInputPanelSection`: 管理 input panel theme family/variant、glass-refraction 参数与 input subsection rerender；`SettingsStyleSection` 只向它提供通用 style-control seam
 - `ModelCatalogStateService`: 提供 settings/model 分区使用的 catalog state API，并集中 provider/model availability 的 core 写回操作
 - `SettingsModelCatalogPresenter`: 管理 provider/model accordion、search、bulk toggle、catalog summary 卡片与 provider probe presentation；`SettingsModelSection` 只向它提供 settings writeback 与 icon/inline-code host seam
 - `SettingsStyleBackgroundSection`: 管理聊天背景图 subsection 的上传、预览、fit mode / numeric controls、drag focus 与 reset lifecycle；`SettingsStyleSection` 向它提供通用 style-group scaffolding、binding 清理与 apply/save seam
+- `SettingsStyleLiquidGlassInputControls`: 管理 liquid glass adapter 参数表单与 plain-language help button；`SettingsStyleInputPanelSection` 向它提供 numeric-control/save seam
 - `ModelConfigService`: 读取 `local/server/baseEffective/effective` 目录，以及 `serverConfig` / `effectiveProviderConfig` / `currentEnabledProviderIds`，并提供逐 provider 的真实发送 probe
 - `OpencodeConfigManager`: 读写 `.opencode` 配置
 - `PluginManagementService`: 由 `SettingsPluginSection` 用于构建插件环境快照与写回 project plugin config

@@ -2,10 +2,8 @@ import type { App } from 'obsidian';
 import { Setting } from 'obsidian';
 
 import { DEFAULT_SETTINGS, getDefaultChatAppearanceSettings } from '../../../../src/core/types';
-import { LiquidGlassSettingHelpModal } from '../../../../src/features/settings/LiquidGlassSettingHelpModal';
 import { SettingsStyleSection } from '../../../../src/features/settings/SettingsStyleSection';
 import { setLocale } from '../../../../src/i18n';
-import { registerBuiltinGlassAdapters } from '../../../../src/utils/glass/builtin-adapters';
 
 interface MockDropdownControl {
   addOption: jest.MockedFunction<(value: string, label: string) => MockDropdownControl>;
@@ -17,21 +15,6 @@ interface MockDropdownControl {
 interface DropdownRecord {
   name: string;
   control: MockDropdownControl;
-}
-
-function createDeferred<T>() {
-  let resolve!: (value: T | PromiseLike<T>) => void;
-  let reject!: (reason?: unknown) => void;
-  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
-    resolve = resolvePromise;
-    reject = rejectPromise;
-  });
-
-  return {
-    promise,
-    resolve,
-    reject,
-  };
 }
 
 function createDropdownRecord(name: string): DropdownRecord {
@@ -190,43 +173,6 @@ describe('OpenCodian style settings attach wiring', () => {
 describe('OpenCodian style settings helpers', () => {
   registerDropdownRecordHooks();
 
-  it('does not expose the standalone diamond input theme in the liquid glass adapter dropdown', () => {
-    registerBuiltinGlassAdapters();
-
-    const plugin = {
-      settings: {
-        ...DEFAULT_SETTINGS,
-        inputPanelTheme: 'liquid-glass-shuding',
-        chatAppearance: getDefaultChatAppearanceSettings(),
-      },
-      getChatAppearanceBaseline: jest.fn(() => getDefaultChatAppearanceSettings()),
-    } as unknown as ConstructorParameters<typeof SettingsStyleSection>[0]['plugin'];
-    const styleSection = createStyleSection(plugin);
-    const containerEl = document.createElement('div');
-    const privateSection = styleSection as unknown as {
-      renderInputStyleGroup: (containerEl?: HTMLElement) => void;
-      createStyleGroupSection: (containerEl: HTMLElement, title: string, desc: string) => HTMLElement;
-      addNumericStyleControl: (containerEl: HTMLElement, config: unknown) => void;
-      addLiquidGlassInputControls: (containerEl: HTMLElement) => void;
-      createStyleResetSetting: (containerEl: HTMLElement, group: unknown) => void;
-      registerStyleControlBinding: (group: unknown, callback: () => void) => void;
-    };
-
-    jest.spyOn(privateSection, 'createStyleGroupSection').mockImplementation((parent) => parent.createDiv());
-    jest.spyOn(privateSection, 'addNumericStyleControl').mockImplementation(() => {});
-    jest.spyOn(privateSection, 'addLiquidGlassInputControls').mockImplementation(() => {});
-    jest.spyOn(privateSection, 'createStyleResetSetting').mockImplementation(() => {});
-    jest.spyOn(privateSection, 'registerStyleControlBinding').mockImplementation(() => {});
-
-    privateSection.renderInputStyleGroup(containerEl);
-
-    const liquidAdapterDropdown = dropdownRecords.find((record) => record.name === 'Liquid Glass 适配器');
-    expect(liquidAdapterDropdown).toBeDefined();
-    expect(liquidAdapterDropdown?.control.addOption).not.toHaveBeenCalledWith('liquid-diamond-shuding', 'Shuding Diamond');
-    expect(liquidAdapterDropdown?.control.addOption).toHaveBeenCalledWith('liquid-glass-shuding', 'Shuding Liquid Glass');
-    expect(liquidAdapterDropdown?.control.addOption).toHaveBeenCalledWith('liquid-glass-nikdelvin', 'Nikdelvin Liquid Glass');
-  });
-
   it('sizes numeric inputs to fit the configured value range', () => {
     const plugin = {
       settings: {
@@ -246,115 +192,6 @@ describe('OpenCodian style settings helpers', () => {
     });
 
     expect(inputChars).toBe(5);
-  });
-
-  it('switches input panel theme by rerendering only the input subsection', async () => {
-    const plugin = {
-      settings: {
-        ...DEFAULT_SETTINGS,
-        chatAppearance: getDefaultChatAppearanceSettings(),
-      },
-      saveSettings: jest.fn().mockResolvedValue(undefined),
-      getChatAppearanceBaseline: jest.fn(() => getDefaultChatAppearanceSettings()),
-    } as unknown as ConstructorParameters<typeof SettingsStyleSection>[0]['plugin'];
-    const styleSection = createStyleSection(plugin);
-    const privateSection = styleSection as unknown as {
-      renderInputStyleGroup: (containerEl?: HTMLElement) => void;
-      applyInputPanelThemeChange: (themeId: 'preset' | 'glass-refraction-card') => Promise<void>;
-    };
-
-    const renderInputStyleGroupSpy = jest
-      .spyOn(privateSection, 'renderInputStyleGroup')
-      .mockImplementation(() => {});
-
-    await privateSection.applyInputPanelThemeChange('glass-refraction-card');
-
-    expect(plugin.saveSettings).toHaveBeenCalledTimes(1);
-    expect(renderInputStyleGroupSpy).toHaveBeenCalledWith();
-    expect(plugin.settings.inputPanelTheme).toBe('glass-refraction-card');
-  });
-
-  it('skips stale input rerenders after the attached style runtime is disposed', async () => {
-    const saveDeferred = createDeferred<void>();
-    const plugin = {
-      settings: {
-        ...DEFAULT_SETTINGS,
-        chatAppearance: getDefaultChatAppearanceSettings(),
-      },
-      saveSettings: jest.fn().mockImplementation(() => saveDeferred.promise),
-      getChatAppearanceBaseline: jest.fn(() => getDefaultChatAppearanceSettings()),
-    } as unknown as ConstructorParameters<typeof SettingsStyleSection>[0]['plugin'];
-    const styleSection = createStyleSection(plugin);
-    const backgroundStyleSection = {
-      attach: jest.fn(),
-      refresh: jest.fn(),
-      dispose: jest.fn(),
-    };
-    const containerEl = document.createElement('div');
-    const privateSection = styleSection as unknown as {
-      attach: (containerEl: HTMLElement) => void;
-      dispose: () => void;
-      renderInputStyleGroup: (containerEl?: HTMLElement) => void;
-      applyInputPanelThemeChange: (themeId: 'glass-refraction-card') => Promise<void>;
-      addThemePresetSection: (containerEl: HTMLElement) => void;
-      addNumericStyleControl: (containerEl: HTMLElement, config: unknown) => void;
-      addColorStyleControl: (containerEl: HTMLElement, config: unknown) => void;
-      createStyleResetSetting: (containerEl: HTMLElement, group: unknown) => void;
-      createStyleGroupSection: (containerEl: HTMLElement, title: string, desc: string) => HTMLElement;
-      registerStyleControlBinding: (group: unknown, callback: () => void) => void;
-      createBackgroundStyleSection: () => typeof backgroundStyleSection;
-    };
-
-    jest.spyOn(privateSection, 'addThemePresetSection').mockImplementation(() => {});
-    jest.spyOn(privateSection, 'addNumericStyleControl').mockImplementation(() => {});
-    jest.spyOn(privateSection, 'addColorStyleControl').mockImplementation(() => {});
-    jest.spyOn(privateSection, 'createStyleResetSetting').mockImplementation(() => {});
-    jest.spyOn(privateSection, 'createStyleGroupSection').mockImplementation((parent) => parent.createDiv());
-    jest.spyOn(privateSection, 'registerStyleControlBinding').mockImplementation(() => {});
-    const renderInputStyleGroupSpy = jest
-      .spyOn(privateSection, 'renderInputStyleGroup')
-      .mockImplementation(() => {});
-    jest.spyOn(privateSection, 'createBackgroundStyleSection').mockReturnValue(backgroundStyleSection);
-
-    privateSection.attach(containerEl);
-    renderInputStyleGroupSpy.mockClear();
-
-    const changePromise = privateSection.applyInputPanelThemeChange('glass-refraction-card');
-    privateSection.dispose();
-    saveDeferred.resolve();
-    await changePromise;
-
-    expect(plugin.saveSettings).toHaveBeenCalledTimes(1);
-    expect(renderInputStyleGroupSpy).not.toHaveBeenCalled();
-    expect(backgroundStyleSection.dispose).toHaveBeenCalledTimes(1);
-  });
-
-  it('creates a plain-language help button config for shuding settings only', () => {
-    const plugin = {
-      settings: {
-        ...DEFAULT_SETTINGS,
-        inputPanelTheme: 'liquid-glass-shuding',
-        chatAppearance: getDefaultChatAppearanceSettings(),
-      },
-    } as unknown as ConstructorParameters<typeof SettingsStyleSection>[0]['plugin'];
-    const styleSection = createStyleSection(plugin);
-    const privateSection = styleSection as unknown as {
-      getLiquidGlassSettingHelpButtonConfig: (
-        adapterId: 'shuding' | 'nikdelvin',
-        paramKey: string,
-        title: string,
-      ) => { tooltip: string; onClick: () => void } | undefined;
-    };
-    const openSpy = jest.spyOn(LiquidGlassSettingHelpModal.prototype, 'open').mockImplementation(() => {});
-
-    const shudingHelp = privateSection.getLiquidGlassSettingHelpButtonConfig('shuding', 'displacementScale', '位移强度');
-    const nikdelvinHelp = privateSection.getLiquidGlassSettingHelpButtonConfig('nikdelvin', 'depth', '景深');
-
-    expect(shudingHelp?.tooltip).toBe('用大白话解释这项');
-    expect(nikdelvinHelp).toBeUndefined();
-
-    shudingHelp?.onClick();
-    expect(openSpy).toHaveBeenCalledTimes(1);
   });
 });
 

@@ -4,29 +4,15 @@ import { Notice, Setting } from 'obsidian';
 import { getBuiltinThemePresets, hasThemeAppearanceOverrides } from '../../core/theme';
 import {
   type ChatAppearanceSettings,
-  getDefaultInputPanelGlassRefractionSettings,
-  getDefaultInputPanelGlassRefractionSvgFilterSettings,
-  getInputPanelGlassRefractionVariantId,
-  getInputPanelThemeFamily,
-  getInputPanelThemeIdForLiquidGlassAdapter,
-  getLiquidGlassAdapterIdForInputPanelTheme,
-  type InputPanelActionButtonStyleId,
-  type InputPanelGlassRefractionSvgFilterPresetId,
-  type InputPanelGlassRefractionVariantId,
-  type InputPanelThemeId,
   isValidChatAppearanceCustomCssDeclarations,
-  type LiquidGlassAdapterId,
-  normalizeGlassRefractionInputPanelThemeId,
-  normalizeLiquidGlassInputPanelThemeId,
   type ThemePresetDefinition,
   type ThemeStyleId,
 } from '../../core/types';
 import { t, type TranslationKey } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { createLogger } from '../../shared';
-import { getAllGlassAdapters } from '../../utils/glass';
-import { LiquidGlassSettingHelpModal } from './LiquidGlassSettingHelpModal';
 import { SettingsStyleBackgroundSection } from './SettingsStyleBackgroundSection';
+import { SettingsStyleInputPanelSection } from './SettingsStyleInputPanelSection';
 
 const logger = createLogger('SettingsStyleSection');
 
@@ -85,6 +71,14 @@ interface StyleControlBinding {
   syncFromSettings: () => void;
 }
 
+interface ColorStyleControlElements {
+  settingEl: HTMLElement;
+  previewBtn: HTMLButtonElement;
+  valueEl: HTMLSpanElement;
+  followThemeBtn: HTMLButtonElement;
+  colorInput: HTMLInputElement;
+}
+
 interface SettingsStyleSectionOptions {
   app: App;
   plugin: OpenCodianPlugin;
@@ -95,7 +89,7 @@ interface SettingsStyleSectionOptions {
 
 interface SettingsStyleSectionRuntimeState {
   backgroundStyleSection: SettingsStyleBackgroundSection;
-  inputStyleGroupHostEl: HTMLElement | null;
+  inputPanelSection: SettingsStyleInputPanelSection;
   stylePresetUiRefresh?: () => void;
 }
 
@@ -126,7 +120,7 @@ export class SettingsStyleSection {
     );
     const runtime = this.initializeRuntime();
     this.attachPresetAndBackgroundSettings(containerEl, runtime);
-    this.attachPrimaryStyleGroups(containerEl);
+    this.attachPrimaryStyleGroups(containerEl, runtime);
     this.attachTrailingStyleGroups(containerEl);
 
     return headingEl;
@@ -137,12 +131,13 @@ export class SettingsStyleSection {
     const runtime = this.runtime;
     this.runtime = null;
     runtime?.backgroundStyleSection.dispose();
+    runtime?.inputPanelSection.dispose();
   }
 
   private initializeRuntime(): SettingsStyleSectionRuntimeState {
     const runtime: SettingsStyleSectionRuntimeState = {
       backgroundStyleSection: this.createBackgroundStyleSection(),
-      inputStyleGroupHostEl: null,
+      inputPanelSection: this.createInputPanelSection(),
       stylePresetUiRefresh: undefined,
     };
     this.runtime = runtime;
@@ -158,16 +153,14 @@ export class SettingsStyleSection {
     runtime.backgroundStyleSection.attach(containerEl);
   }
 
-  private attachPrimaryStyleGroups(containerEl: HTMLElement): void {
+  private attachPrimaryStyleGroups(
+    containerEl: HTMLElement,
+    runtime: SettingsStyleSectionRuntimeState,
+  ): void {
     this.addLayoutStyleGroup(containerEl);
     this.addUserStyleGroup(containerEl);
     this.addAssistantStyleGroup(containerEl);
-    this.attachInputStyleGroup(containerEl);
-  }
-
-  private attachInputStyleGroup(containerEl: HTMLElement): void {
-    const inputGroupHostEl = containerEl.createDiv({ cls: 'opencodian-style-input-group-host' });
-    this.renderInputStyleGroup(inputGroupHostEl);
+    runtime.inputPanelSection.attach(containerEl);
   }
 
   private attachTrailingStyleGroups(containerEl: HTMLElement): void {
@@ -861,7 +854,7 @@ export class SettingsStyleSection {
     updateSelectedStyleId(styleId);
     const nextPreset = presetsByStyle.get(styleId)?.[0];
     if (!nextPreset) {
-      this.refreshStylePresetUi(runtime);
+      this.refreshThemePresetUi(runtime);
       return;
     }
 
@@ -1172,8 +1165,16 @@ export class SettingsStyleSection {
     colorInput.tabIndex = -1;
     colorInput.setAttribute('aria-hidden', 'true');
 
+    const elements: ColorStyleControlElements = {
+      settingEl: setting.settingEl,
+      previewBtn,
+      valueEl,
+      followThemeBtn,
+      colorInput,
+    };
+
     const renderValue = (value: string) => {
-      this.renderColorStyleControlValue(config, setting.settingEl, previewBtn, valueEl, followThemeBtn, colorInput, value);
+      this.renderColorStyleControlValue(config, elements, value);
     };
 
     const commitValue = (value: string) => {
@@ -1202,13 +1203,10 @@ export class SettingsStyleSection {
 
   private renderColorStyleControlValue(
     config: ColorStyleControlConfig,
-    settingEl: HTMLElement,
-    previewBtn: HTMLButtonElement,
-    valueEl: HTMLSpanElement,
-    followThemeBtn: HTMLButtonElement,
-    colorInput: HTMLInputElement,
+    elements: ColorStyleControlElements,
     value: string,
   ): void {
+    const { settingEl, previewBtn, valueEl, followThemeBtn, colorInput } = elements;
     const normalizedValue = value.trim();
     const resetValue = config.resetValue().trim();
     const pickerHex = this.resolveStyleColorPickerHex(normalizedValue || resetValue, resetValue, settingEl);
@@ -1277,163 +1275,6 @@ export class SettingsStyleSection {
 
     const toHex = (value: string) => Number.parseInt(value, 10).toString(16).padStart(2, '0');
     return `#${toHex(match[1])}${toHex(match[2])}${toHex(match[3])}`;
-  }
-
-  private addGlassRefractionInputControls(containerEl: HTMLElement): void {
-    const variantId = getInputPanelGlassRefractionVariantId(this.plugin.settings.inputPanelTheme);
-    const defaults = getDefaultInputPanelGlassRefractionSettings()[variantId];
-    const svgFilterDefaults = getDefaultInputPanelGlassRefractionSvgFilterSettings();
-    const syncHandlers: Array<() => void> = [];
-    const registerSync = (syncFromSettings: () => void) => {
-      syncHandlers.push(syncFromSettings);
-    };
-
-    this.addNumericControl(containerEl, {
-      name: t('settings.style.input.glassRefraction.backgroundOpacity.name'),
-      desc: t('settings.style.input.glassRefraction.backgroundOpacity.desc'),
-      min: 0,
-      max: 100,
-      step: 1,
-      unit: '%',
-      value: () => this.plugin.settings.inputPanelGlassRefraction[variantId].backgroundOpacity,
-      resetValue: () => defaults.backgroundOpacity,
-      commitValue: (value) => {
-        this.updateInputPanelGlassRefractionVariant(variantId, (settings) => {
-          settings.backgroundOpacity = value;
-        });
-        this.applyAndScheduleStyleUpdate();
-      },
-      registerSync,
-    });
-    this.addNumericControl(containerEl, {
-      name: t('settings.style.input.glassRefraction.blur.name'),
-      desc: t('settings.style.input.glassRefraction.blur.desc'),
-      min: 0,
-      max: 40,
-      step: 1,
-      unit: 'px',
-      value: () => this.plugin.settings.inputPanelGlassRefraction[variantId].blur,
-      resetValue: () => defaults.blur,
-      commitValue: (value) => {
-        this.updateInputPanelGlassRefractionVariant(variantId, (settings) => {
-          settings.blur = value;
-        });
-        this.applyAndScheduleStyleUpdate();
-      },
-      registerSync,
-    });
-    this.addNumericControl(containerEl, {
-      name: t('settings.style.input.glassRefraction.saturation.name'),
-      desc: t('settings.style.input.glassRefraction.saturation.desc'),
-      min: 50,
-      max: 250,
-      step: 5,
-      unit: '%',
-      value: () => this.plugin.settings.inputPanelGlassRefraction[variantId].saturation,
-      resetValue: () => defaults.saturation,
-      commitValue: (value) => {
-        this.updateInputPanelGlassRefractionVariant(variantId, (settings) => {
-          settings.saturation = value;
-        });
-        this.applyAndScheduleStyleUpdate();
-      },
-      registerSync,
-    });
-    this.addNumericControl(containerEl, {
-      name: t('settings.style.input.glassRefraction.brightness.name'),
-      desc: t('settings.style.input.glassRefraction.brightness.desc'),
-      min: 50,
-      max: 150,
-      step: 1,
-      unit: '%',
-      value: () => this.plugin.settings.inputPanelGlassRefraction[variantId].brightness,
-      resetValue: () => defaults.brightness,
-      commitValue: (value) => {
-        this.updateInputPanelGlassRefractionVariant(variantId, (settings) => {
-          settings.brightness = value;
-        });
-        this.applyAndScheduleStyleUpdate();
-      },
-      registerSync,
-    });
-
-    new Setting(containerEl)
-      .setName(t('settings.style.input.glassRefraction.svgFilter.name'))
-      .setDesc(t('settings.style.input.glassRefraction.svgFilter.desc'))
-      .addDropdown((dropdown) => {
-        dropdown
-          .addOption('none', t('settings.style.input.glassRefraction.svgFilter.option.none'))
-          .addOption('subtle', t('settings.style.input.glassRefraction.svgFilter.option.subtle'))
-          .addOption('strong', t('settings.style.input.glassRefraction.svgFilter.option.strong'))
-          .setValue(this.plugin.settings.inputPanelGlassRefractionSvgFilter.preset)
-          .onChange((value) => {
-            this.plugin.settings.inputPanelGlassRefractionSvgFilter = {
-              ...this.plugin.settings.inputPanelGlassRefractionSvgFilter,
-              preset: value as InputPanelGlassRefractionSvgFilterPresetId,
-            };
-            this.applyAndScheduleStyleUpdate();
-            this.renderInputStyleGroup();
-          });
-      });
-
-    const activeSvgFilterPreset = this.plugin.settings.inputPanelGlassRefractionSvgFilter.preset;
-    if (activeSvgFilterPreset !== 'none') {
-      const scaleKey = this.getInputPanelGlassRefractionSvgFilterScaleKey(activeSvgFilterPreset);
-      const scaleDefault = svgFilterDefaults[scaleKey];
-
-      this.addNumericControl(containerEl, {
-        name: t('settings.style.input.glassRefraction.svgFilter.scale.name'),
-        desc: t('settings.style.input.glassRefraction.svgFilter.scale.desc'),
-        min: 0,
-        max: 32,
-        step: 1,
-        unit: '',
-        value: () => this.plugin.settings.inputPanelGlassRefractionSvgFilter[scaleKey],
-        resetValue: () => scaleDefault,
-        commitValue: (value) => {
-          this.plugin.settings.inputPanelGlassRefractionSvgFilter = {
-            ...this.plugin.settings.inputPanelGlassRefractionSvgFilter,
-            [scaleKey]: value,
-          };
-          this.applyAndScheduleStyleUpdate();
-        },
-        registerSync,
-      });
-
-      new Setting(containerEl)
-        .setName(t('settings.style.input.glassRefraction.svgFilter.reset.name'))
-        .setDesc(t('settings.style.input.glassRefraction.svgFilter.reset.desc'))
-        .setClass('opencodian-style-reset-setting')
-        .addButton((btn) => {
-          btn
-            .setButtonText(t('settings.style.input.glassRefraction.svgFilter.reset.button'))
-            .onClick(() => {
-              this.plugin.settings.inputPanelGlassRefractionSvgFilter = {
-                ...this.plugin.settings.inputPanelGlassRefractionSvgFilter,
-                [scaleKey]: scaleDefault,
-              };
-              this.applyAndScheduleStyleUpdate();
-              syncHandlers.forEach((syncFromSettings) => syncFromSettings());
-            });
-        });
-    }
-
-    new Setting(containerEl)
-      .setName(t('settings.style.input.glassRefraction.reset.name'))
-      .setDesc(t('settings.style.input.glassRefraction.reset.desc'))
-      .setClass('opencodian-style-reset-setting')
-      .addButton((btn) => {
-        btn
-          .setButtonText(t('settings.style.input.glassRefraction.reset.button'))
-          .onClick(() => {
-            this.plugin.settings.inputPanelGlassRefraction = {
-              ...this.plugin.settings.inputPanelGlassRefraction,
-              [variantId]: { ...defaults },
-            };
-            this.applyAndScheduleStyleUpdate();
-            syncHandlers.forEach((syncFromSettings) => syncFromSettings());
-          });
-      });
   }
 
   private createStyleResetSetting(
@@ -1507,24 +1348,19 @@ export class SettingsStyleSection {
     });
   }
 
-  private getInputPanelGlassRefractionSvgFilterScaleKey(
-    preset: Exclude<InputPanelGlassRefractionSvgFilterPresetId, 'none'>,
-  ): 'subtleScale' | 'strongScale' {
-    return preset === 'subtle' ? 'subtleScale' : 'strongScale';
-  }
-
-  private updateInputPanelGlassRefractionVariant(
-    variantId: InputPanelGlassRefractionVariantId,
-    mutator: (settings: OpenCodianPlugin['settings']['inputPanelGlassRefraction'][InputPanelGlassRefractionVariantId]) => void,
-  ): void {
-    const nextVariantSettings = {
-      ...this.plugin.settings.inputPanelGlassRefraction[variantId],
-    };
-    mutator(nextVariantSettings);
-    this.plugin.settings.inputPanelGlassRefraction = {
-      ...this.plugin.settings.inputPanelGlassRefraction,
-      [variantId]: nextVariantSettings,
-    };
+  private createInputPanelSection(): SettingsStyleInputPanelSection {
+    return new SettingsStyleInputPanelSection({
+      app: this.app,
+      plugin: this.plugin,
+      createStyleGroupSection: (containerEl, title, desc) => this.createStyleGroupSection(containerEl, title, desc),
+      addNumericControl: (containerEl, config) => this.addNumericControl(containerEl, config),
+      addNumericStyleControl: (containerEl, config) => this.addNumericStyleControl(containerEl, config),
+      createStyleResetSetting: (containerEl, group) => this.createStyleResetSetting(containerEl, group),
+      registerStyleControlBinding: (group, syncFromSettings) => this.registerStyleControlBinding(group, syncFromSettings),
+      clearStyleControlBindings: (group) => this.clearStyleControlBindings(group),
+      applyAndScheduleStyleUpdate: () => this.applyAndScheduleStyleUpdate(),
+      addSettingHelpButton: (setting, helpButton) => this.addSettingHelpButton(setting, helpButton),
+    });
   }
 
   private async resetAllChatStyles(): Promise<void> {
@@ -1538,372 +1374,6 @@ export class SettingsStyleSection {
       new Notice(t('settings.style.resetAll.failed'));
     }
   }
-
-  private renderInputStyleGroup(containerEl?: HTMLElement): void {
-    const hostEl = containerEl ?? this.runtime?.inputStyleGroupHostEl;
-    if (!hostEl) {
-      return;
-    }
-
-    if (this.runtime) {
-      this.runtime.inputStyleGroupHostEl = hostEl;
-    }
-    this.clearStyleControlBindings('input');
-    hostEl.empty();
-
-    const inputGroupEl = this.createStyleGroupSection(
-      hostEl,
-      t('settings.style.groups.input.title'),
-      t('settings.style.groups.input.desc'),
-    );
-    const themeFamily = getInputPanelThemeFamily(this.plugin.settings.inputPanelTheme);
-    const isPresetInputPanelTheme = themeFamily === 'preset';
-    new Setting(inputGroupEl)
-      .setName(t('settings.style.input.theme.name'))
-      .setDesc(t('settings.style.input.theme.desc'))
-      .addDropdown((dropdown) => {
-        dropdown
-          .addOption('preset', t('settings.style.input.theme.option.preset'))
-          .addOption('glass-refraction', t('settings.style.input.theme.option.glassRefraction'))
-          .addOption('liquid-glass', t('settings.style.input.theme.option.liquidGlass'))
-          .setValue(themeFamily)
-          .onChange(async (value) => {
-            const nextTheme: InputPanelThemeId =
-              value === 'preset'
-                ? 'preset'
-                : value === 'glass-refraction'
-                  ? (
-                    themeFamily === 'glass-refraction'
-                      ? normalizeGlassRefractionInputPanelThemeId(this.plugin.settings.inputPanelTheme)
-                      : 'glass-refraction-glass'
-                  )
-                  : (
-                    themeFamily === 'liquid-glass'
-                      ? normalizeLiquidGlassInputPanelThemeId(this.plugin.settings.inputPanelTheme)
-                      : 'liquid-glass-shuding'
-                  );
-            await this.applyInputPanelThemeChange(nextTheme);
-          });
-      });
-
-    new Setting(inputGroupEl)
-      .setName(t('settings.style.input.actionButtons.name'))
-      .setDesc(t('settings.style.input.actionButtons.desc'))
-      .addDropdown((dropdown) => {
-        const syncFromSettings = () => {
-          dropdown.setValue(this.plugin.settings.chatAppearance.input.actionButtonStyle);
-        };
-        this.registerStyleControlBinding('input', syncFromSettings);
-        dropdown
-          .addOption('default', t('settings.style.input.actionButtons.option.default'))
-          .addOption('etched', t('settings.style.input.actionButtons.option.etched'))
-          .setValue(this.plugin.settings.chatAppearance.input.actionButtonStyle)
-          .onChange((value) => {
-            this.plugin.updateChatAppearance((appearance) => {
-              appearance.input.actionButtonStyle = value as InputPanelActionButtonStyleId;
-            });
-            this.applyAndScheduleStyleUpdate();
-          });
-      });
-
-    if (themeFamily === 'glass-refraction') {
-      new Setting(inputGroupEl)
-        .setName(t('settings.style.input.variant.name'))
-        .setDesc(t('settings.style.input.variant.desc'))
-        .addDropdown((dropdown) => {
-          dropdown
-            .addOption('glass-refraction-glass', t('settings.style.input.variant.option.glass'))
-            .addOption('glass-refraction-card', t('settings.style.input.variant.option.card'))
-            .addOption('glass-refraction-pill', t('settings.style.input.variant.option.pill'))
-            .setValue(normalizeGlassRefractionInputPanelThemeId(this.plugin.settings.inputPanelTheme))
-            .onChange(async (value) => {
-              await this.applyInputPanelThemeChange(value as InputPanelThemeId);
-            });
-        });
-    }
-
-    if (themeFamily === 'liquid-glass') {
-      new Setting(inputGroupEl)
-        .setName(t('settings.style.input.liquidGlass.variant.name'))
-        .setDesc(t('settings.style.input.liquidGlass.variant.desc'))
-        .addDropdown((dropdown) => {
-          for (const adapter of getAllGlassAdapters()) {
-            dropdown.addOption(getInputPanelThemeIdForLiquidGlassAdapter(adapter.id), adapter.displayName);
-          }
-
-          dropdown
-            .setValue(normalizeLiquidGlassInputPanelThemeId(this.plugin.settings.inputPanelTheme))
-            .onChange(async (value) => {
-              await this.applyInputPanelThemeChange(value as InputPanelThemeId);
-            });
-        });
-    }
-
-    const inputControlsEl = inputGroupEl.createDiv({ cls: 'opencodian-style-input-controls' });
-    this.addNumericStyleControl(inputControlsEl, {
-      group: 'input',
-      name: t('settings.style.input.radius.name'),
-      desc: t('settings.style.input.radius.desc'),
-      min: 8,
-      max: 24,
-      step: 1,
-      unit: 'px',
-      value: () => this.plugin.settings.chatAppearance.input.radius,
-      resetValue: () => this.plugin.getChatAppearanceBaseline().input.radius,
-      setValue: (appearance, value) => {
-        appearance.input.radius = value;
-      },
-    });
-
-    if (isPresetInputPanelTheme) {
-      this.addNumericStyleControl(inputControlsEl, {
-        group: 'input',
-        name: t('settings.style.input.backgroundOpacity.name'),
-        desc: t('settings.style.input.backgroundOpacity.desc'),
-        min: 0,
-        max: 100,
-        step: 1,
-        unit: '%',
-        value: () => this.plugin.settings.chatAppearance.input.backgroundOpacity,
-        resetValue: () => this.plugin.getChatAppearanceBaseline().input.backgroundOpacity,
-        setValue: (appearance, value) => {
-          appearance.input.backgroundOpacity = value;
-        },
-      });
-      this.addNumericStyleControl(inputControlsEl, {
-        group: 'input',
-        name: t('settings.style.input.blur.name'),
-        desc: t('settings.style.input.blur.desc'),
-        min: 0,
-        max: 24,
-        step: 1,
-        unit: 'px',
-        value: () => this.plugin.settings.chatAppearance.input.blur,
-        resetValue: () => this.plugin.getChatAppearanceBaseline().input.blur,
-        setValue: (appearance, value) => {
-          appearance.input.blur = value;
-        },
-      });
-      this.addNumericStyleControl(inputControlsEl, {
-        group: 'input',
-        name: t('settings.style.input.shadowBlur.name'),
-        desc: t('settings.style.input.shadowBlur.desc'),
-        min: 0,
-        max: 36,
-        step: 1,
-        unit: 'px',
-        value: () => this.plugin.settings.chatAppearance.input.shadowBlur,
-        resetValue: () => this.plugin.getChatAppearanceBaseline().input.shadowBlur,
-        setValue: (appearance, value) => {
-          appearance.input.shadowBlur = value;
-        },
-      });
-      this.createStyleResetSetting(inputControlsEl, 'input');
-      return;
-    }
-
-    if (themeFamily === 'liquid-glass') {
-      this.addLiquidGlassInputControls(inputControlsEl);
-      return;
-    }
-
-    inputControlsEl.createDiv({
-      cls: 'opencodian-style-input-lock-note',
-      text: t('settings.style.input.glassRefractionNotice'),
-    });
-    this.addGlassRefractionInputControls(inputControlsEl);
-  }
-
-  private addLiquidGlassInputControls(containerEl: HTMLElement): void {
-    const adapterId = getLiquidGlassAdapterIdForInputPanelTheme(this.plugin.settings.inputPanelTheme);
-    if (!adapterId) {
-      return;
-    }
-
-    const adapter = getAllGlassAdapters().find((item) => item.id === adapterId);
-    if (!adapter) {
-      return;
-    }
-
-    const adapterSettings = this.plugin.settings.inputPanelLiquidGlass[adapterId];
-    let activeSectionLabelKey: TranslationKey | null = null;
-    for (const paramDef of adapter.paramDefs) {
-      if (paramDef.sectionLabelKey && paramDef.sectionLabelKey !== activeSectionLabelKey) {
-        activeSectionLabelKey = paramDef.sectionLabelKey as TranslationKey;
-        containerEl.createEl('h5', {
-          cls: 'opencodian-style-subgroup-title',
-          text: t(activeSectionLabelKey),
-        });
-      }
-
-      const label = t(paramDef.labelKey as TranslationKey);
-      const desc = paramDef.descKey ? t(paramDef.descKey as TranslationKey) : '';
-      const helpButton = this.getLiquidGlassSettingHelpButtonConfig(adapterId, paramDef.key, label);
-
-      if (paramDef.type === 'toggle') {
-        const setting = new Setting(containerEl)
-          .setName(label)
-          .setDesc(desc)
-          .setClass('opencodian-style-setting');
-        setting.addToggle((toggle) => {
-          toggle
-            .setValue(Boolean(adapterSettings[paramDef.key] ?? paramDef.defaultValue))
-            .onChange((value) => {
-              this.updateLiquidGlassAdapterSetting(adapterId, paramDef.key, value);
-              void this.plugin.saveSettings({
-                syncService: false,
-                reloadModels: false,
-                syncConfig: false,
-                applyUi: true,
-              });
-            });
-        });
-        if (helpButton) {
-          this.addSettingHelpButton(setting, helpButton);
-        }
-        continue;
-      }
-
-      if (paramDef.type === 'select') {
-        const setting = new Setting(containerEl)
-          .setName(label)
-          .setDesc(desc);
-        setting.addDropdown((dropdown) => {
-          for (const option of paramDef.options ?? []) {
-            dropdown.addOption(
-              option.value,
-              option.labelKey ? t(option.labelKey as TranslationKey) : (option.label ?? option.value),
-            );
-          }
-
-          dropdown
-            .setValue(String(adapterSettings[paramDef.key] ?? paramDef.defaultValue))
-            .onChange((value) => {
-              this.updateLiquidGlassAdapterSetting(adapterId, paramDef.key, value);
-              void this.plugin.saveSettings({
-                syncService: false,
-                reloadModels: false,
-                syncConfig: false,
-                applyUi: true,
-              });
-            });
-        });
-        if (helpButton) {
-          this.addSettingHelpButton(setting, helpButton);
-        }
-        continue;
-      }
-
-      if (paramDef.type === 'text') {
-        const setting = new Setting(containerEl)
-          .setName(label)
-          .setDesc(desc);
-        setting.addText((text) => {
-          text
-            .setValue(String(adapterSettings[paramDef.key] ?? paramDef.defaultValue ?? ''))
-            .onChange((value) => {
-              this.updateLiquidGlassAdapterSetting(adapterId, paramDef.key, value.trim());
-              void this.plugin.saveSettings({
-                syncService: false,
-                reloadModels: false,
-                syncConfig: false,
-                applyUi: true,
-              });
-            });
-        });
-        if (helpButton) {
-          this.addSettingHelpButton(setting, helpButton);
-        }
-        continue;
-      }
-
-      this.addNumericControl(containerEl, {
-        name: label,
-        desc,
-        min: paramDef.min ?? 0,
-        max: paramDef.max ?? 100,
-        step: paramDef.step ?? 1,
-        unit: paramDef.unit ?? '',
-        value: () => Number(
-          this.plugin.settings.inputPanelLiquidGlass[adapterId][paramDef.key] ?? paramDef.defaultValue,
-        ),
-        resetValue: () => Number(paramDef.defaultValue),
-        commitValue: (value) => {
-          this.updateLiquidGlassAdapterSetting(adapterId, paramDef.key, value);
-          void this.plugin.saveSettings({
-            syncService: false,
-            reloadModels: false,
-            syncConfig: false,
-            applyUi: true,
-          });
-        },
-        helpButton,
-      });
-    }
-  }
-
-  private getLiquidGlassSettingHelpButtonConfig(
-    adapterId: LiquidGlassAdapterId,
-    paramKey: string,
-    title: string,
-  ): SettingHelpButtonConfig | undefined {
-    const helpText = this.getLiquidGlassSettingHelpText(adapterId, paramKey);
-    if (!helpText) {
-      return undefined;
-    }
-
-    return {
-      tooltip: t('settings.style.input.help.buttonTooltip'),
-      onClick: () => {
-        new LiquidGlassSettingHelpModal(this.app, title, helpText).open();
-      },
-    };
-  }
-
-  private getLiquidGlassSettingHelpText(
-    adapterId: LiquidGlassAdapterId,
-    paramKey: string,
-  ): string | null {
-    if (adapterId !== 'shuding') {
-      return null;
-    }
-
-    const helpKey = `settings.style.input.liquidGlass.shuding.help.${paramKey}` as TranslationKey;
-    const helpText = t(helpKey);
-
-    return helpText === helpKey ? null : helpText;
-  }
-
-  private updateLiquidGlassAdapterSetting(
-    adapterId: LiquidGlassAdapterId,
-    key: string,
-    value: number | string | boolean,
-  ): void {
-    this.plugin.settings.inputPanelLiquidGlass = {
-      ...this.plugin.settings.inputPanelLiquidGlass,
-      [adapterId]: {
-        ...this.plugin.settings.inputPanelLiquidGlass[adapterId],
-        [key]: value,
-      },
-    };
-  }
-
-  private async applyInputPanelThemeChange(themeId: InputPanelThemeId): Promise<void> {
-    const runtime = this.runtime;
-    if (this.plugin.settings.inputPanelTheme === themeId) {
-      return;
-    }
-
-    this.plugin.settings.inputPanelTheme = themeId;
-    await this.plugin.saveSettings({
-      syncService: false,
-      reloadModels: false,
-      syncConfig: false,
-      applyUi: true,
-    });
-    this.rerenderInputStyleGroup(runtime);
-  }
-
   private refreshThemePresetUi(runtime?: SettingsStyleSectionRuntimeState | null): void {
     if (runtime && !this.isRuntimeActive(runtime)) {
       return;
@@ -1912,14 +1382,6 @@ export class SettingsStyleSection {
     this.refreshStyleControlValues();
     this.runtime?.backgroundStyleSection.refresh();
     this.runtime?.stylePresetUiRefresh?.();
-  }
-
-  private rerenderInputStyleGroup(runtime?: SettingsStyleSectionRuntimeState | null): void {
-    if (runtime && !this.isRuntimeActive(runtime)) {
-      return;
-    }
-
-    this.renderInputStyleGroup();
   }
 
   private isRuntimeActive(runtime: SettingsStyleSectionRuntimeState): boolean {

@@ -203,6 +203,8 @@ docs/modules/
 │       ├── SettingsSectionCoordinator.md
 │       ├── SettingsSecuritySection.md
 │       ├── SettingsServerSection.md
+│       ├── SettingsStyleInputPanelSection.md
+│       ├── SettingsStyleLiquidGlassInputControls.md
 │       ├── SettingsStyleSection.md
 │       └── SettingsStyleBackgroundSection.md
 ├── i18n/

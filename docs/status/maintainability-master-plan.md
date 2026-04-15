@@ -2,19 +2,19 @@
 
 > **状态**: [ACTIVE]
 > **作用**: 这是 maintainability 无人值守的战略文档。每轮开始前，先读本文件，再读 `docs/status/maintainability-round-roadmap.md` 与最近的 `docs/status/maintainability-phase-XXX.md`。
-> **自动推进状态**: 已人工续排 `R138-R152`；当前唯一可自动执行的 `[NEXT]` 是 `R144`。
+> **自动推进状态**: 已人工续排 `R138-R152`；当前唯一可自动执行的 `[NEXT]` 是 `R145`。
 
 ## 1. 当前判断
 
-**当前分支已完成 `R88-R143` 并已人工续排 `R144-R152`。`R143` 已把 settings model section 的 catalog refresh/workspace cards 与 provider icon cache controls 从 `SettingsModelSection` shell 中压回相邻 owner，live lint 从 `0 errors / 51 warnings` 收敛到 `0 errors / 50 warnings`；当前 queue 进入 `R144` settings style control residual，再继续按 settings/model/startup residual → opencode/streaming/persistence/glass-test residual 两批推进，并只在 `R147`、`R152` 设置后续 checkpoint。**
+**当前分支已完成 `R88-R144` 并已人工续排 `R145-R152`。`R144` 已把 input-panel theme family/glass-refraction 控制与 liquid-glass adapter 参数表单从 `SettingsStyleSection` 主 owner 压回相邻 owner，并收束 color control 参数 seam，live lint 从 `0 errors / 50 warnings` 收敛到 `0 errors / 48 warnings`；当前 queue 进入 `R145` model config layering residual，再继续按 settings/model/startup residual → opencode/streaming/persistence/glass-test residual 两批推进，并只在 `R147`、`R152` 设置后续 checkpoint。**
 
 ## 2. 当前基线
 
-- **lint**: `0 errors / 50 warnings`
-- **最近验证**: `R143` 运行 focused `npm test -- SettingsModelSection.test.ts SettingsModelCatalogPresenter.test.ts`、全量 `npm run lint -- --format unix`、全量 `npm test` 与 `npm run build`；lint 维持 `0 errors / 50 warnings`，`npm test` 为 `282 passed, 282 total` suites / `1189 passed, 1189 total` tests，最新 `BUILD_ID` 为 `autopilot-maintainability.202604160652`
-- **最近 Test Vault 部署**: `R143`，`BUILD_ID` `autopilot-maintainability.202604160652`
-- **当前 `[NEXT]`**: `R144 - Settings style control residual seam`
-- **主热点**: live lint 仍为 `50` warnings，其中 `tests/**` 约 `17`、`src/features/chat/**` 约 `7`、`src/utils/glass/**` 约 `6`、`src/features/settings/**` 约 `5`、`src/core/opencode/**` 约 `5`，另有 provider icons / streaming utils / startup / locale / settings types residual；`R144` 先处理 settings style control residual，然后继续 `R145-R146` 的 model config/startup seam
+- **lint**: `0 errors / 48 warnings`
+- **最近验证**: `R144` 运行 focused `npm test -- OpenCodianStyleSettings.test.ts SettingsStyleInputPanelSection.test.ts`、全量 `npm run lint -- --format unix`、全量 `npm test` 与 `npm run build`；lint 维持 `0 errors / 48 warnings`，`npm test` 为 `283 passed, 283 total` suites / `1189 passed, 1189 total` tests，最新 `BUILD_ID` 为 `autopilot-maintainability.202604160711`
+- **最近 Test Vault 部署**: `R144`，`BUILD_ID` `autopilot-maintainability.202604160711`
+- **当前 `[NEXT]`**: `R145 - Model config layering residual seam`
+- **主热点**: live lint 仍为 `48` warnings，其中 `tests/**` 约 `16`、`src/features/chat/**` 约 `7`、`src/utils/glass/**` 约 `6`、`src/features/settings/**` 约 `4`、`src/core/opencode/**` 约 `5`，另有 provider icons / streaming utils / startup / locale / settings types residual；`R145` 先处理 model config layering residual，然后继续 `R146` 的 startup normalization seam
 
 ## 3. 本批执行规则
 
