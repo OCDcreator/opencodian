@@ -583,7 +583,7 @@
   - question dock coordinator 的直接 runtime 分支明显减少
   - focused validation、全量 `npm test`、`npm run build` 通过
 
-### [NEXT] R77 - OpenCodeService sync subscription lifecycle seam
+### [DONE] R77 - OpenCodeService sync subscription lifecycle seam
 
 - **Lane**: Maintainability / opencode sync runtime
 - **目标**: 从 `src/core/opencode/OpenCodeService.ts:235` 一带收束 sync event subscription、initialize/start/stop、autoFetchModels 与 health/bootstrap follow-up 的完整 service lifecycle。
@@ -601,7 +601,7 @@
   - `OpenCodeService` 对 sync/bootstrap lifecycle 的直接铺开明显减少
   - focused validation、全量 `npm test`、`npm run build` 通过
 
-### [QUEUED] R78 - OpenCodeStreamEventTransformer event classification seam
+### [NEXT] R78 - OpenCodeStreamEventTransformer event classification seam
 
 - **Lane**: Maintainability / opencode stream transform
 - **目标**: 从 `src/core/opencode/OpenCodeStreamEventTransformer.ts:183` 一带收束 session event、question event、tool event、usage update 与 part-type tracking 的完整 event-classification seam。

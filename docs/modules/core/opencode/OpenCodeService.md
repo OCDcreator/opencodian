@@ -36,6 +36,7 @@
 - `./OpenCodeQueryGateway`
 - `./OpenCodeSessionControlOrchestrator`
 - `./OpenCodeSessionLifecycleCoordinator`
+- `./OpenCodeServiceLifecycleCoordinator`
 - `./OpenCodeSettingsReconfigurationCoordinator`
 - `./OpenCodeStreamingRuntimeCoordinator`
 - `./OpenCodeStreamEventTransformer`
@@ -69,6 +70,7 @@
 - `streamingRuntime`: `OpenCodeStreamingRuntimeCoordinator` 实例，负责 SDK/legacy streaming transport、legacy SSE reader lifecycle、final response completion，以及 active stream registry、session-scoped abort controller、part type tracking、cancel/detach lifecycle。
 - `sessionLifecycle`: `OpenCodeSessionLifecycleCoordinator` 实例，负责 session create/list/messages/todos/statuses/delete/update、默认 current session 指针，以及公开 session sync 订阅 API 到 `syncEventRuntime` 的委托。
 - `sessionControl`: `OpenCodeSessionControlOrchestrator` 实例，负责 fork/revert/unrevert/diff、context usage snapshot、session message control、command/shell 与 message-part operations。
+- `serviceLifecycle`: `OpenCodeServiceLifecycleCoordinator` 实例，负责 initialize/start/stop/dispose、server running 后的 model/catalog bootstrap、health probe fallback，以及 sync/open-code event subscription 的 lifecycle 编排。
 - `questionPermissionHub`: `OpenCodeQuestionPermissionHub` 实例，负责 pending questions/reply/reject、pending permissions/respond，以及 session permission responder 的 negotiation lifecycle。
 - `queryGateway`: `OpenCodeQueryGateway` 实例，负责 provider auth、project/file/find/path/VCS/formatter/LSP 查询，以及 MCP status/server/auth 的 catalog 写回。
 - `settingsReconfiguration`: `OpenCodeSettingsReconfigurationCoordinator` 实例，负责 settings update plan、managed server stop/restart 决策、subscription pause/resume 与 rollback/restore lifecycle。
@@ -95,13 +97,14 @@
 2. 由 `getServerBaseUrl()` 生成 `baseUrl`
 3. 以“全关闭”为基线解析 `sdkFeatureFlags`
 4. 创建 `ServerManager`
+5. 创建 `OpenCodeServiceLifecycleCoordinator`
 
-`ServerManager` 的回调被接上后，服务层会在 server 进入 `running` 时自动执行 `autoFetchModels()`，并把错误与状态变化向上传递。
+`ServerManager` 的回调被接上后，服务层会把 status 交给 `OpenCodeServiceLifecycleCoordinator`；coordinator 会在 server 进入 `running` 时自动执行 model/catalog bootstrap，并把错误与状态变化向上传递。
 
 运行时还有三条重要的配置通道：
 
-- `setVaultPath(path)`: 更新 vault 路径、把工作目录传给 `ServerManager`，并重启 sync / open-code 两类 event runtime。
-- `checkHealth()`: 优先走 SDK `global.health()`，失败时回退到 `ServerManager.checkHealth()`。
+- `setVaultPath(path)`: 更新 vault 路径、把工作目录传给 `ServerManager`，并通过 service lifecycle coordinator 重启 sync / open-code 两类 event runtime。
+- `checkHealth()`: 公开入口仍保留在服务层，但 SDK-first health probe 与 `ServerManager.checkHealth()` fallback 已委托给 `OpenCodeServiceLifecycleCoordinator`。
 - `updateSettings(settings)`: 公开入口仍保留在服务层，但完整 settings reconfiguration lifecycle 已委托给 `OpenCodeSettingsReconfigurationCoordinator`；失败时仍会回滚内存设置、`baseUrl`、`ServerManager` 配置，并尽力恢复原服务。
 
 补充一个运行时细节：

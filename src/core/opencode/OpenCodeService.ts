@@ -25,7 +25,7 @@ import type {
   StreamChunk,
 } from '../types';
 import type { OpenCodianSettings } from '../types/settings';
-import { getServerBaseUrl, isLocalServerMode } from '../types/settings';
+import { getServerBaseUrl } from '../types/settings';
 import { createSdkClient } from './createSdkClient';
 import { OpenCodeCatalogQueryCoordinator } from './OpenCodeCatalogQueryCoordinator';
 import {
@@ -61,6 +61,9 @@ import {
   type Part,
   type Session,
 } from './OpenCodeSessionLifecycleCoordinator';
+import {
+  OpenCodeServiceLifecycleCoordinator,
+} from './OpenCodeServiceLifecycleCoordinator';
 import {
   OpenCodeSettingsReconfigurationCoordinator,
 } from './OpenCodeSettingsReconfigurationCoordinator';
@@ -241,6 +244,7 @@ export class OpenCodeService {
   private streamingRuntime: OpenCodeStreamingRuntimeCoordinator;
   private openCodeEventRuntime: OpenCodeEventSubscriptionCoordinator;
   private settingsReconfiguration: OpenCodeSettingsReconfigurationCoordinator;
+  private serviceLifecycle: OpenCodeServiceLifecycleCoordinator;
   private vaultPath?: string;
   private transientConnectivityLogState: TransientConnectivityLogState | null = null;
 
@@ -414,12 +418,7 @@ export class OpenCodeService {
       OpenCodeSettingsReconfigurationCoordinator.createServerConfig(settings),
       {
         onStatusChange: (status) => {
-          events.onServerStatusChange?.(status);
-          // Auto-fetch models when server starts running
-          if (status === 'running') {
-            this.resetTransientConnectivityLogState();
-            void this.autoFetchModels();
-          }
+          this.serviceLifecycle.handleServerStatusChange(status);
         },
         onError: (error) => {
           events.onError?.(error);
@@ -430,6 +429,26 @@ export class OpenCodeService {
         onManagedServerStateChange: runtimeOptions.onManagedServerStateChange,
       },
     );
+    this.serviceLifecycle = new OpenCodeServiceLifecycleCoordinator({
+      getSettings: () => this.settings,
+      getBaseUrl: () => this.baseUrl,
+      shouldUseSdkCrud: () => this.shouldUseSdk('sdkCrud'),
+      checkSdkHealth: async () => {
+        const response = await this.getSdkClient().global.health();
+        return this.normalizeHealthResponse(response);
+      },
+      logHealthProbeFallback: (error) =>
+        this.logServiceWarning('health', 'SDK health check failed, falling back to ServerManager health probe', error),
+      resetTransientConnectivityLogState: () => this.resetTransientConnectivityLogState(),
+      notifyServerStatusChange: (status) => events.onServerStatusChange?.(status),
+      fetchAvailableModels: () => this.getAvailableModels(),
+      refreshToolIds: () => this.refreshToolIds(),
+      refreshMcpServerStatus: () => this.refreshMcpServerStatus(),
+      notifyModelsLoaded: (providers) => this.events.onModelsLoaded?.(providers),
+      serverManager: this.serverManager,
+      syncEvents: this.syncEventRuntime,
+      openCodeEvents: this.openCodeEventRuntime,
+    });
     this.settingsReconfiguration = new OpenCodeSettingsReconfigurationCoordinator({
       getCurrentSettings: () => this.settings,
       setCurrentSettings: (nextSettings) => {
@@ -505,9 +524,7 @@ export class OpenCodeService {
 
   /** Initialize the service */
   async initialize(): Promise<void> {
-    if (isLocalServerMode(this.settings.server) && this.settings.server.local.autoStart) {
-      await this.start();
-    }
+    await this.serviceLifecycle.initialize();
   }
 
   /** Set the vault path for OpenCode server to use project config */
@@ -516,56 +533,25 @@ export class OpenCodeService {
     this.vaultPath = path;
     this.serverManager.setWorkingDirectory(path);
     this.catalogQueries.clearToolSchemaCacheIfScopeChanged(previousToolCatalogScope);
-    this.syncEventRuntime.restartSubscription();
-    this.openCodeEventRuntime.restartSubscriptions();
+    this.serviceLifecycle.restartEventSubscriptions();
   }
 
   getSettingsSnapshot(): OpenCodianSettings {
     return cloneSettings(this.settings);
   }
 
-  /** Auto-fetch models when server starts and notify listeners */
-  private async autoFetchModels(): Promise<void> {
-    try {
-      const result = await this.getAvailableModels();
-      await Promise.allSettled([
-        this.refreshToolIds(),
-        this.refreshMcpServerStatus(),
-      ]);
-
-      if (result.providers.length === 0) {
-        logger.warn('No providers available from server');
-      }
-
-      // Notify listeners that models are loaded
-      this.events.onModelsLoaded?.(result.providers);
-    } catch (error) {
-      logger.error('Failed to auto-fetch models:', error);
-    }
-  }
-
   /** Start the service and server */
   async start(): Promise<void> {
-    if (!this.baseUrl) {
-      throw new Error('OpenCode server URL is not configured');
-    }
-
-    await this.serverManager.start();
-    this.syncEventRuntime.ensureSubscription();
-    this.openCodeEventRuntime.ensureSubscriptions();
+    await this.serviceLifecycle.start();
   }
 
   /** Stop the service */
   async stop(): Promise<void> {
-    this.syncEventRuntime.stopSubscription();
-    this.openCodeEventRuntime.stopSubscriptions();
-    await this.serverManager.stop();
+    await this.serviceLifecycle.stop();
   }
 
   dispose(): void {
-    this.syncEventRuntime.stopSubscription();
-    this.openCodeEventRuntime.stopSubscriptions();
-    this.serverManager.dispose();
+    this.serviceLifecycle.dispose();
   }
 
   /** Check if service is ready */
@@ -584,28 +570,7 @@ export class OpenCodeService {
 
   /** Check server health directly */
   async checkHealth(): Promise<boolean> {
-    if (!this.baseUrl) {
-      return false;
-    }
-
-    if (this.shouldUseSdk('sdkCrud')) {
-      try {
-        const response = await this.getSdkClient().global.health();
-        const healthy = this.normalizeHealthResponse(response);
-        if (healthy) {
-          this.resetTransientConnectivityLogState();
-        }
-        return healthy;
-      } catch (error) {
-        this.logServiceWarning('health', 'SDK health check failed, falling back to ServerManager health probe', error);
-      }
-    }
-
-    const healthy = await this.serverManager.checkHealth(3000);
-    if (healthy) {
-      this.resetTransientConnectivityLogState();
-    }
-    return healthy;
+    return this.serviceLifecycle.checkHealth();
   }
 
   /** Check if plugin has a server process running */

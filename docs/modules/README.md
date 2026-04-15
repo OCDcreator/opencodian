@@ -53,6 +53,7 @@ docs/modules/
 │   │   ├── OpenCodeMessageContextOmoAssembler.md
 │   │   ├── OpenCodeMessageNormalizationMapper.md
 │   │   ├── OpenCodePromptRequestBuilder.md
+│   │   ├── OpenCodeServiceLifecycleCoordinator.md
 │   │   ├── OpenCodeSettingsReconfigurationCoordinator.md
 │   │   ├── OpenCodeService.md
 │   │   ├── OpenCodeStreamEventTransformer.md
