@@ -41,6 +41,6 @@ export function createBackgroundConversationPostSyncHandoffServices(...):
 
 ## 与 `QuestionTodoBackgroundTaskRefreshHostAdapter` 的边界
 
-- `QuestionTodoBackgroundTaskRefreshHostAdapter` 现在只保留 question/todo refresh host、activation refresh bridge 与 visible post-sync coordinator 装配
+- `QuestionTodoBackgroundTaskRefreshHostAdapter` 现在只保留 question/todo refresh host 与 visible post-sync coordinator 装配
 - 本模块独立拥有 signal/background-tab follow-up 所需的 host pass-through，不再要求 refresh-side adapter 继续暴露 background-only writeback surface
 - 这次切片继续推进 master plan 的 P2 `question / todo / background task` lane：把 background handoff 的 late-bound writeback seam 从 shared refresh adapter 中迁走，让 `OpenCodianView` 更接近 host assembly 入口而不是 mixed post-sync wiring owner

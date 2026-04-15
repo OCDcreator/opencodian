@@ -34,7 +34,7 @@ export function createQuestionTodoBackgroundTaskActivationServices(...): Questio
 - `createQuestionTodoBackgroundTaskActivationViewHostAdapter()` 把 view-local activation writeback 与 question dock / session todo dock 的 late-bound ports 收敛成单一 activation view host
 - activation-side 现在通常消费 `QuestionTodoBackgroundTaskRuntimeServiceBundle` 在模块内组装的 shared question/todo/background-task view host，这样 current-conversation/background-task rebuild seam 仍能与 post-sync side 共用同一份 view-level host 装配，但不再让 `OpenCodianView` 内联 shared host + adapter 依赖 wiring
 - `createQuestionTodoBackgroundTaskActivationHosts()` 从同一份 view host 派生 question/todo activation host 与 background-task indicator activation host，避免 `OpenCodianView` 继续维护两段闭包工厂
-- `createQuestionTodoBackgroundTaskActivationServices()` 顺序实例化 `QuestionTodoActivationRefreshCoordinator` 与 `BackgroundTaskActivationIndicatorCoordinator`，同时接收 `QuestionTodoActivationRefreshBridge` 作为独立 activation refresh port
+- `createQuestionTodoBackgroundTaskActivationServices()` 顺序实例化 `QuestionTodoActivationRefreshCoordinator` 与 `BackgroundTaskActivationIndicatorCoordinator`，同时接收 `QuestionTodoStatusRefreshCoordinator.refreshAfterActivation()` 作为 activation refresh port
 
 ## 与 `OpenCodianView` 的边界
 

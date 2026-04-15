@@ -8,7 +8,6 @@ import type {
   BackgroundConversationPostSyncHandoffViewHost,
 } from '../../../../src/features/chat/services/BackgroundConversationPostSyncHandoffHostAdapter';
 import {
-  createQuestionTodoBackgroundTaskRefreshHosts,
   createQuestionTodoBackgroundTaskRefreshServices,
   createQuestionTodoBackgroundTaskRefreshViewHostAdapter,
   type QuestionTodoBackgroundTaskRefreshViewHost,
@@ -220,48 +219,6 @@ describe('QuestionTodoBackgroundTaskRefreshHostAdapter view host wiring', () => 
     );
   });
 
-  it('derives activation refresh host from one shared view host', async () => {
-    const runtime = createRuntime();
-    const viewHost = createViewHost({
-      runtimes: {
-        'tab-active': runtime,
-      },
-    });
-
-    const hosts = createQuestionTodoBackgroundTaskRefreshHosts(viewHost);
-
-    await hosts.questionTodoActivationRefreshHost.refreshPendingQuestionsForTab(
-      'tab-active',
-      'session-activation',
-    );
-    await hosts.questionTodoActivationRefreshHost.refreshTabSessionStatus(
-      'tab-active',
-      'session-activation',
-      { suppressErrors: true },
-    );
-    await hosts.questionTodoActivationRefreshHost.refreshTabSessionTodos(
-      'tab-active',
-      'session-activation',
-      { suppressErrors: true },
-    );
-
-    expect(viewHost.refreshPendingQuestionsForTab).toHaveBeenCalledWith(
-      'tab-active',
-      'session-activation',
-    );
-    expect(viewHost.refreshTabSessionStatus).toHaveBeenNthCalledWith(
-      1,
-      'tab-active',
-      'session-activation',
-      { suppressErrors: true },
-    );
-    expect(viewHost.refreshTabSessionTodos).toHaveBeenNthCalledWith(
-      1,
-      'tab-active',
-      'session-activation',
-      { suppressErrors: true },
-    );
-  });
 });
 
 describe('QuestionTodoBackgroundTaskRefreshHostAdapter visible sync bridge', () => {
@@ -287,7 +244,7 @@ describe('QuestionTodoBackgroundTaskRefreshHostAdapter visible sync bridge', () 
       visibleConversationPostSyncStateCoordinator,
     );
 
-    await services.questionTodoActivationRefreshBridge.refreshAfterActivation(
+    await services.questionTodoStatusRefreshCoordinator.refreshAfterActivation(
       'tab-active',
       'session-activation',
     );

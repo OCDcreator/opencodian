@@ -1,8 +1,8 @@
 import type { TabId } from '../tabs';
-import type { QuestionTodoActivationRefreshBridge } from './QuestionTodoActivationRefreshBridge';
+import type { QuestionTodoStatusRefreshCoordinator } from './QuestionTodoStatusRefreshCoordinator';
 
 type QuestionTodoActivationRefreshPort = Pick<
-  QuestionTodoActivationRefreshBridge,
+  QuestionTodoStatusRefreshCoordinator,
   'refreshAfterActivation'
 >;
 
@@ -15,7 +15,7 @@ export interface QuestionTodoActivationRefreshCoordinatorHost {
 export class QuestionTodoActivationRefreshCoordinator {
   constructor(
     private readonly host: QuestionTodoActivationRefreshCoordinatorHost,
-    private readonly questionTodoActivationRefreshBridge: QuestionTodoActivationRefreshPort,
+    private readonly questionTodoStatusRefresh: QuestionTodoActivationRefreshPort,
   ) {}
 
   applyActivationPreflight(tabId: TabId): void {
@@ -29,7 +29,7 @@ export class QuestionTodoActivationRefreshCoordinator {
   ): void {
     this.host.renderSessionTodoDock(tabId);
     this.host.renderQuestionDock();
-    void this.questionTodoActivationRefreshBridge.refreshAfterActivation(tabId, sessionId);
+    void this.questionTodoStatusRefresh.refreshAfterActivation(tabId, sessionId);
   }
 
   applyEmptyActivation(tabId: TabId): void {

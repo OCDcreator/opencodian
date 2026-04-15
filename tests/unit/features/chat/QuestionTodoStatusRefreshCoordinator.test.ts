@@ -62,6 +62,27 @@ describe('QuestionTodoStatusRefreshCoordinator', () => {
     jest.clearAllMocks();
   });
 
+  it('starts activation status, question, and todo refreshes in the existing order', async () => {
+    const callOrder: string[] = [];
+    const host = createHost({ callOrder });
+    const coordinator = new QuestionTodoStatusRefreshCoordinator(host);
+
+    await coordinator.refreshAfterActivation('tab-1', 'session-1');
+
+    expect(host.refreshTabSessionStatus).toHaveBeenCalledWith(
+      'tab-1',
+      'session-1',
+      { suppressErrors: true },
+    );
+    expect(host.refreshPendingQuestionsForTab).toHaveBeenCalledWith('tab-1', 'session-1');
+    expect(host.refreshTabSessionTodos).toHaveBeenCalledWith(
+      'tab-1',
+      'session-1',
+      { suppressErrors: true },
+    );
+    expect(callOrder).toEqual(['status', 'pending-question', 'todo']);
+  });
+
   it('runs post-sync pending questions before background reconciliation and todo/status refresh', async () => {
     const callOrder: string[] = [];
     const host = createHost({

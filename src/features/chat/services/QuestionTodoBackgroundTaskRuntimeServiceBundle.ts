@@ -210,7 +210,7 @@ export function createQuestionTodoBackgroundTaskRuntimeServiceBundle(
     runtimeViewHosts.visibleConversationPostSyncStateViewHost,
   );
   const {
-    questionTodoActivationRefreshBridge,
+    questionTodoStatusRefreshCoordinator,
     visibleConversationPostSyncCoordinator,
     backgroundConversationPostSyncHandoffCoordinator,
   } = createQuestionTodoBackgroundTaskRefreshServices(
@@ -223,7 +223,7 @@ export function createQuestionTodoBackgroundTaskRuntimeServiceBundle(
     backgroundTaskActivationIndicatorCoordinator,
   } = createQuestionTodoBackgroundTaskActivationServices(
     runtimeViewHosts.questionTodoBackgroundTaskActivationViewHost,
-    questionTodoActivationRefreshBridge,
+    questionTodoStatusRefreshCoordinator,
   );
 
   return {

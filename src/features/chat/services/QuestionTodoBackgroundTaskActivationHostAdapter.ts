@@ -5,17 +5,17 @@ import {
   type BackgroundTaskActivationIndicatorCoordinatorHost,
 } from './BackgroundTaskActivationIndicatorCoordinator';
 import type { QuestionDockSlotCoordinator } from './QuestionDockSlotCoordinator';
-import type { QuestionTodoActivationRefreshBridge } from './QuestionTodoActivationRefreshBridge';
 import {
   QuestionTodoActivationRefreshCoordinator,
   type QuestionTodoActivationRefreshCoordinatorHost,
 } from './QuestionTodoActivationRefreshCoordinator';
+import type { QuestionTodoStatusRefreshCoordinator } from './QuestionTodoStatusRefreshCoordinator';
 import type { SessionTodoCoordinator } from './SessionTodoCoordinator';
 
 type QuestionDockRenderPort = Pick<QuestionDockSlotCoordinator, 'render'>;
 type SessionTodoDockPort = Pick<SessionTodoCoordinator, 'updateForTab'>;
 type QuestionTodoActivationRefreshPort = Pick<
-  QuestionTodoActivationRefreshBridge,
+  QuestionTodoStatusRefreshCoordinator,
   'refreshAfterActivation'
 >;
 
@@ -112,12 +112,12 @@ export function createQuestionTodoBackgroundTaskActivationHosts(
 
 export function createQuestionTodoBackgroundTaskActivationServices(
   viewHost: QuestionTodoBackgroundTaskActivationViewHost,
-  questionTodoActivationRefreshBridge: QuestionTodoActivationRefreshPort,
+  questionTodoStatusRefreshCoordinator: QuestionTodoActivationRefreshPort,
 ): QuestionTodoBackgroundTaskActivationServices {
   const hosts = createQuestionTodoBackgroundTaskActivationHosts(viewHost);
   const questionTodoActivationRefreshCoordinator = new QuestionTodoActivationRefreshCoordinator(
     hosts.questionTodoActivationRefreshCoordinatorHost,
-    questionTodoActivationRefreshBridge,
+    questionTodoStatusRefreshCoordinator,
   );
   const backgroundTaskActivationIndicatorCoordinator =
     new BackgroundTaskActivationIndicatorCoordinator(

@@ -38,6 +38,17 @@ export interface PostSyncQuestionTodoStatusRefreshOptions {
 export class QuestionTodoStatusRefreshCoordinator {
   constructor(private readonly host: QuestionTodoStatusRefreshCoordinatorHost) {}
 
+  async refreshAfterActivation(
+    tabId: TabId | null,
+    sessionId: string | null | undefined,
+  ): Promise<void> {
+    await Promise.allSettled([
+      this.host.refreshTabSessionStatus(tabId, sessionId, { suppressErrors: true }),
+      this.host.refreshPendingQuestionsForTab(tabId, sessionId),
+      this.host.refreshTabSessionTodos(tabId, sessionId, { suppressErrors: true }),
+    ]);
+  }
+
   async refreshAfterPostSync(
     options: PostSyncQuestionTodoStatusRefreshOptions,
   ): Promise<void> {

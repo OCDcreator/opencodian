@@ -48,7 +48,6 @@ function createVisibleConversationPostSyncStateServices():
 function createQuestionTodoBackgroundTaskRefreshServices():
   QuestionTodoBackgroundTaskRefreshServices {
   return {
-    questionTodoActivationRefreshBridge: {} as QuestionTodoBackgroundTaskRefreshServices['questionTodoActivationRefreshBridge'],
     questionTodoStatusRefreshCoordinator: {} as QuestionTodoBackgroundTaskRefreshServices['questionTodoStatusRefreshCoordinator'],
     postSyncQuestionTodoRefreshFacade: {} as QuestionTodoBackgroundTaskRefreshServices['postSyncQuestionTodoRefreshFacade'],
     visibleConversationPostSyncCoordinator: {} as QuestionTodoBackgroundTaskRefreshServices['visibleConversationPostSyncCoordinator'],
@@ -107,7 +106,7 @@ describe('QuestionTodoBackgroundTaskRuntimeServiceBundle', () => {
     );
     expect(createQuestionTodoBackgroundTaskActivationServicesSpy).toHaveBeenCalledWith(
       expect.any(Object),
-      questionTodoBackgroundTaskRefreshServices.questionTodoActivationRefreshBridge,
+      questionTodoBackgroundTaskRefreshServices.questionTodoStatusRefreshCoordinator,
     );
     expect(bundle).toMatchObject({
       visibleConversationPostSyncCoordinator:

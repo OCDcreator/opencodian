@@ -1,5 +1,4 @@
 import type { Conversation } from '../../../../src/core/types';
-import type { QuestionTodoActivationRefreshBridge } from '../../../../src/features/chat/services/QuestionTodoActivationRefreshBridge';
 import {
   createQuestionTodoBackgroundTaskActivationHosts,
   createQuestionTodoBackgroundTaskActivationServices,
@@ -7,9 +6,10 @@ import {
   type QuestionTodoBackgroundTaskActivationViewHost,
   type QuestionTodoBackgroundTaskActivationViewHostAdapterHost,
 } from '../../../../src/features/chat/services/QuestionTodoBackgroundTaskActivationHostAdapter';
+import type { QuestionTodoStatusRefreshCoordinator } from '../../../../src/features/chat/services/QuestionTodoStatusRefreshCoordinator';
 
 type QuestionTodoActivationRefreshPort = Pick<
-  QuestionTodoActivationRefreshBridge,
+  QuestionTodoStatusRefreshCoordinator,
   'refreshAfterActivation'
 >;
 

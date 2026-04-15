@@ -9,7 +9,7 @@
 
 - 从共享的 question/todo/background-task view host 派生 `VisibleConversationPostSyncStateCoordinator` 所需的 current-conversation id、revert-state 写回与 fingerprint 写回回调
 - 在不引入新业务规则的前提下，把 visible post-sync state writeback 装配收敛为独立 single-purpose module
-- 让 `QuestionTodoBackgroundTaskRefreshHostAdapter` 只保留 question/todo refresh、activation refresh bridge、background handoff 相关的 host 组装
+- 让 `QuestionTodoBackgroundTaskRefreshHostAdapter` 只保留 question/todo refresh、background handoff 相关的 host 组装
 
 它不负责 visible question/todo refresh 顺序，也不负责 background handoff、authoritative sync state 或 tab attention；这些仍分别留给 `PostSyncQuestionTodoRefreshFacade`、`VisibleConversationPostSyncCoordinator` 与 background-task 相关 coordinator。
 

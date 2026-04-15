@@ -16,10 +16,6 @@ import {
   type PostSyncQuestionTodoRefreshViewHost,
 } from './PostSyncQuestionTodoRefreshHostAdapter';
 import type { QuestionDockCoordinator } from './QuestionDockCoordinator';
-import {
-  QuestionTodoActivationRefreshBridge,
-  type QuestionTodoActivationRefreshBridgeHost,
-} from './QuestionTodoActivationRefreshBridge';
 import type {
   QuestionTodoStatusRefreshCoordinator,
   QuestionTodoStatusRefreshRuntime,
@@ -93,40 +89,12 @@ export function createQuestionTodoBackgroundTaskRefreshViewHostAdapter(
   };
 }
 
-export interface QuestionTodoBackgroundTaskRefreshHosts {
-  questionTodoActivationRefreshHost: QuestionTodoActivationRefreshBridgeHost;
-}
-
 export interface QuestionTodoBackgroundTaskRefreshServices {
-  questionTodoActivationRefreshBridge: QuestionTodoActivationRefreshBridge;
   questionTodoStatusRefreshCoordinator: QuestionTodoStatusRefreshCoordinator;
   postSyncQuestionTodoRefreshFacade: PostSyncQuestionTodoRefreshFacade;
   visibleConversationPostSyncCoordinator: VisibleConversationPostSyncCoordinator;
   backgroundConversationPostSyncHandoffCoordinator:
     BackgroundConversationPostSyncHandoffCoordinator;
-}
-
-export function createQuestionTodoBackgroundTaskRefreshHosts(
-  viewHost: QuestionTodoBackgroundTaskRefreshViewHost,
-): QuestionTodoBackgroundTaskRefreshHosts {
-  return {
-    questionTodoActivationRefreshHost: {
-      refreshPendingQuestionsForTab: (
-        tabId: TabId | null,
-        sessionId: string | null | undefined,
-      ) => viewHost.refreshPendingQuestionsForTab(tabId, sessionId),
-      refreshTabSessionStatus: (
-        tabId: TabId | null,
-        sessionId: string | null | undefined,
-        options: { suppressErrors?: boolean },
-      ) => viewHost.refreshTabSessionStatus(tabId, sessionId, options),
-      refreshTabSessionTodos: (
-        tabId: TabId | null,
-        sessionId: string | null | undefined,
-        options: { suppressErrors?: boolean },
-      ) => viewHost.refreshTabSessionTodos(tabId, sessionId, options),
-    },
-  };
 }
 
 export function createQuestionTodoBackgroundTaskRefreshServices(
@@ -135,15 +103,11 @@ export function createQuestionTodoBackgroundTaskRefreshServices(
     BackgroundConversationPostSyncHandoffViewHost,
   visibleConversationPostSyncStateCoordinator: VisibleConversationPostSyncStatePort,
 ): QuestionTodoBackgroundTaskRefreshServices {
-  const hosts = createQuestionTodoBackgroundTaskRefreshHosts(viewHost);
   const {
     questionTodoStatusRefreshCoordinator,
     postSyncQuestionTodoRefreshPlanBuilder,
     postSyncQuestionTodoRefreshFacade,
   } = createPostSyncQuestionTodoRefreshServices(viewHost);
-  const questionTodoActivationRefreshBridge = new QuestionTodoActivationRefreshBridge(
-    hosts.questionTodoActivationRefreshHost,
-  );
   const visibleConversationPostSyncCoordinator =
     new VisibleConversationPostSyncCoordinator(
       postSyncQuestionTodoRefreshFacade,
@@ -156,7 +120,6 @@ export function createQuestionTodoBackgroundTaskRefreshServices(
       questionTodoStatusRefreshCoordinator,
     );
   return {
-    questionTodoActivationRefreshBridge,
     questionTodoStatusRefreshCoordinator,
     postSyncQuestionTodoRefreshFacade,
     visibleConversationPostSyncCoordinator,

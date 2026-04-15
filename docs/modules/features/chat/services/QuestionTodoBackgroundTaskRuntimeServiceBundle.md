@@ -60,7 +60,7 @@ export function createQuestionTodoBackgroundTaskRuntimeServiceBundle(
 
 - `createQuestionTodoBackgroundTaskRuntimeViewHosts()` 直接从扁平 runtime seam 组装 visible-state、refresh、background handoff、activation 共用的 host，并额外把 active-tab / session lookup + session todo bridge 收束成 `backgroundTaskStreamTriggerViewHost`
 - `createQuestionTodoBackgroundTaskRuntimeServiceBundle()` 复用这份 shared host，再创建 visible-state services、refresh services、activation services，保留原有依赖顺序，并把 stream-trigger host 一并回传
-- `VisibleConversationPostSyncStateCoordinator` 与 `QuestionTodoActivationRefreshBridge` 继续作为 bundle 内部依赖存在，不再由 `OpenCodianView` 直接持有
+- `VisibleConversationPostSyncStateCoordinator` 继续作为 bundle 内部依赖存在，而 activation/open 与 post-sync 共用的 supplemental refresh 则直接复用 bundle 内部的 `QuestionTodoStatusRefreshCoordinator`
 - 返回值只暴露 visible/background post-sync、activation 两侧真正需要的 coordinator，以及 stream-trigger runtime host，缩小 view 构造函数对中间 wiring 细节的感知面
 
 ## 与 `OpenCodianView` 的边界

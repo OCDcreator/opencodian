@@ -2,19 +2,19 @@
 
 > **状态**: [READY]
 > **作用**: 这是 maintainability 无人值守的战略文档。每轮开始前，先读本文件，再读 `docs/status/maintainability-round-roadmap.md` 与最近的 `docs/status/maintainability-phase-XXX.md`。
-> **自动推进状态**: `R103` question runtime seam 已完成；当前继续按 `R104-R137` 长队列顺序推进。恢复 autopilot 后只能从首个 `[NEXT]`（`R104`）顺序执行，不允许 freestyle。
+> **自动推进状态**: `R104` question todo runtime seam 已完成；当前继续按 `R105-R137` 长队列顺序推进。恢复 autopilot 后只能从首个 `[NEXT]`（`R105`）顺序执行，不允许 freestyle。
 
 ## 1. 当前判断
 
-**当前分支已完成 `R68-R103` 并把 live lint 稳定在 `0 errors / 65 warnings`；`R103` 已把 question resolution 的 execute/apply/follow-up skeleton 收束到共享 `QuestionResolutionExecutionFacade`，让 `QuestionResolutionFlowCoordinator` 与 `QuestionDockCoordinator` 复用同一条 post-resolution lifecycle。** 接下来的高收益 residual 将按 queue 顺序先处理 `R104-R106` 的 todo refresh、stale notice 与 question dock pending-resolution，再进入 `OpenCodeService`/streaming residual、secondary core / settings / startup，最后做 heavy tests follow-up、warning closeout 与最终 checkpoint。
+**当前分支已完成 `R68-R104` 并把 live lint 稳定在 `0 errors / 65 warnings`；`R104` 已把 activation/open 与 post-sync 共用的 question/todo supplemental refresh 回并到共享 `QuestionTodoStatusRefreshCoordinator`，移除额外的 activation bridge，并让 background-task runtime bundle 直接复用同一条 status/refresh seam。** 接下来的高收益 residual 将按 queue 顺序先处理 `R105-R106` 的 stale notice 与 question dock pending-resolution，再进入 `OpenCodeService`/streaming residual、secondary core / settings / startup，最后做 heavy tests follow-up、warning closeout 与最终 checkpoint。
 
 ## 2. 当前基线
 
 - **lint**: `0 errors / 65 warnings`
-- **最近验证**: `R103` queue item 已确认全量 `npm test` 与 `npm run build` 通过，`BUILD_ID` 为 `autopilot-maintainability.202604152236`
+- **最近验证**: `R104` queue item 已确认全量 `npm test` 与 `npm run build` 通过，`BUILD_ID` 为 `autopilot-maintainability.202604152308`
 - **最近 Test Vault 部署**: `R64`，`BUILD_ID` `autopilot-maintainability.202604150602`
-- **当前 `[NEXT]`**: `R104 - QuestionTodo status/refresh runtime seam`
-- **主热点**: `src/features/chat/services/QuestionTodoStatusRefreshCoordinator.ts`、`src/features/chat/services/QuestionTodoActivationRefreshCoordinator.ts`、`src/features/chat/services/SessionTodoStateService.ts` 与 `src/features/chat/services/QuestionDockCoordinator.ts` 构成当前 batch 4 的剩余首要入口；其后再回到 `OpenCodeService` / streaming residual
+- **当前 `[NEXT]`**: `R105 - SessionTodoStateService stale-notice residual seam`
+- **主热点**: `src/features/chat/services/SessionTodoStateService.ts`、`src/features/chat/services/QuestionDockCoordinator.ts`、`src/features/chat/services/QuestionTodoStatusRefreshCoordinator.ts` 与 `src/core/opencode/OpenCodeService.ts` 构成当前 batch 4 的剩余首要入口；其后再回到 `OpenCodeService` / streaming residual
 
 ## 3. 本批执行规则
 
