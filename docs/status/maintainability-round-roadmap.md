@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的 `[NEXT]`”。
-> **当前状态**: [READY] `R136` 已完成；当前长队列只剩 `R137`，首个 `[NEXT]` 为 `R137 - Final beautiful-version checkpoint / queue closeout`。
+> **当前状态**: [REVIEW_REQUIRED] `R137` 已完成；当前没有可自动执行的 `[NEXT]`。
 
 ## 控制规则
 
@@ -17,8 +17,8 @@
 
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
 - 当前 live lint 基线：`0 errors / 57 warnings`
-- 最近成功 phase：`docs/status/maintainability-phase-471.md`
-- 当前路线判断：`R136` 已沿 chat activation/sync bridge 既有 seam 把 5 个 non-demo `max-params` residual warnings 收口到 dependency-object 注入，live lint 从 `0 errors / 62 warnings` 降到 `0 errors / 57 warnings`；当前必须执行 `R137` checkpoint / queue closeout，不得 freestyle。
+- 最近成功 phase：`docs/status/maintainability-phase-472.md`
+- 当前路线判断：`R137` 已确认 `R88-R136` 完成 owner seam、heavy suite split、final warning closeout 与 queue closeout 的完整闭环；当前 queue 已自然耗尽，不得自动扩展 `R138+`。
 
 ## Queue
 ## Queue
@@ -1314,7 +1314,7 @@
 - **禁止项**: 不回切 demo/experimental visual 邻域；不制造薄碎片模块。
 - **验收**: final non-demo residual warning 继续下降且仍维持 0 errors。；并通过全量 `npm test` 与 `npm run build`。
 
-### [NEXT] R137 - Final beautiful-version checkpoint / queue closeout
+### [DONE] R137 - Final beautiful-version checkpoint / queue closeout
 
 - **Lane**: Checkpoint
 - **目标**: 复盘 R88-R136 的完整收益、warning 轨迹、验证成本与剩余热点，决定是否结束本批 maintainability autopilot。
@@ -1324,4 +1324,5 @@
 - **禁止项**: 只做 checkpoint 文档与关闭队列；不自动扩展 R138+。
 - **验收**: phase 文档明确记录 R88-R136 收益与是否仍需人工续排。；并通过全量 `npm test` 与 `npm run build`。
 
-当 `R137` 完成且没有新的 `[QUEUED]` 时，必须明确写回“当前没有可自动执行的 `[NEXT]`”。
+当前没有可自动执行的 `[NEXT]`。
+如需继续 maintainability autopilot，必须先人工补写新的 `[QUEUED]` 项；禁止自动扩展 `R138+`。

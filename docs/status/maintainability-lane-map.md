@@ -1,26 +1,26 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [READY] `R136` 已完成；当前队列进入最终 checkpoint，当前 `[NEXT]` 为 `R137 - Final beautiful-version checkpoint / queue closeout`。
+> **当前状态**: [REVIEW_REQUIRED] `R137` 已完成；当前没有可自动执行的 `[NEXT]`。
 
 ## 当前优先级
 
-- **当前 `[NEXT]`**：`R137 - Final beautiful-version checkpoint / queue closeout`
-- **本批目标**：`R136` 已完成 final non-demo residual closeout；当前只复盘 `R88-R136` 收益、warning 轨迹与 queue closeout 条件
+- **当前 `[NEXT]`**：当前没有可自动执行的 `[NEXT]`
+- **本批目标**：`R137` 已完成 final checkpoint / queue closeout；当前停回人工确认态，等待是否续排新 queue
 - **当前 lint 基线**：`0 errors / 57 warnings`
 - **热点顺序**：
-  1. `docs/status/maintainability-master-plan.md`
-  2. `docs/status/maintainability-round-roadmap.md`
-  3. `docs/status/maintainability-phase-471.md`
+  1. `docs/status/maintainability-phase-472.md`
+  2. `docs/status/maintainability-master-plan.md`
+  3. `docs/status/maintainability-round-roadmap.md`
 
 ## 本批边界
 
-- autopilot 只能按 `R128 -> R137` 顺序推进
+- `R128 -> R137` 已全部完成；恢复 autopilot 前必须先人工补写新的 `[QUEUED]` 项
 - 不新增薄 helper / adapter / provider / factory；新 owner 必须覆盖完整 lifecycle / runtime seam
 - `OpenCodeService`、`OpenCodianView`、`OpenCodianSettings` 的 maintainability 仅允许在 queue 明示项内继续推进
 - warning closeout 只允许沿现有厚 seam 收口，不允许为了降 warning 去篡改覆盖语义或制造薄碎片模块
 - 命中 deploy-relevant paths 时，继续严格执行 build → Test Vault deploy → `BUILD_ID` 校验
-- 恢复运行必须使用外部 profile `/Users/dht/.config/opencodian/mac-autopilot-profile.json`
+- 恢复运行必须使用外部 profile `/Users/dht/.config/opencodian/mac-autopilot-profile.json`，且不得自动生成 `R138+`
 
 ## 回归观察点
 
@@ -33,5 +33,5 @@
 ## 历史入口
 
 - 批次归档：`docs/status/maintainability-completed-batches.md`
-- 最近成功 phase：`docs/status/maintainability-phase-471.md`
-- 最近 checkpoint：`docs/status/maintainability-phase-467.md`
+- 最近成功 phase：`docs/status/maintainability-phase-472.md`
+- 最近 checkpoint：`docs/status/maintainability-phase-472.md`

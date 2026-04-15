@@ -1,20 +1,20 @@
 # Maintainability Master Plan
 
-> **状态**: [READY]
+> **状态**: [REVIEW_REQUIRED]
 > **作用**: 这是 maintainability 无人值守的战略文档。每轮开始前，先读本文件，再读 `docs/status/maintainability-round-roadmap.md` 与最近的 `docs/status/maintainability-phase-XXX.md`。
-> **自动推进状态**: `R136` 已完成 warning cleanup batch I；当前继续按 `R137` 顺序推进最终 checkpoint。恢复 autopilot 后只能从首个 `[NEXT]`（`R137`）顺序执行，不允许 freestyle。
+> **自动推进状态**: `R137` 已完成 final checkpoint / queue closeout；当前没有可自动执行的 `[NEXT]`。如需继续 maintainability autopilot，必须先人工续排新的 queue。
 
 ## 1. 当前判断
 
-**当前分支已完成 `R68-R136` 并把 live lint 记录基线刷新为 `0 errors / 57 warnings`；`R136` 已沿 chat activation/sync bridge 既有 owner seam，把 `BackgroundTaskIndicatorCoordinator`、`TabConversationActivationBridge`、`TabViewActivationBridge`、`ConversationSyncBridge` 与 `ConversationViewStateService` 的依赖注入改为单一 dependency object，在不改变 runtime 语义或测试覆盖的前提下移除 `5` 个 non-demo `max-params` residual warnings，并把全仓 `lint` 从 `0 errors / 62 warnings` 收敛到 `0 errors / 57 warnings`。** 接下来只按 `R137` 执行最终 checkpoint / queue closeout，不允许 freestyle。
+**当前分支已完成 `R88-R137`。`R88-R132` 依次收束了 `OpenCodianView` residual、chat services、question/todo runtime、`OpenCodeService` / streaming residual、secondary core、settings/main residual 与 heavy suite split；`R133-R136` 又把 final warning closeout 从首轮 repair 后显露的 `0 errors / 68 warnings` 收敛到 `0 errors / 57 warnings`。warning 轨迹可追溯为：`R88` 起步时 `0 errors / 64 warnings`，`R92-R132` 各 checkpoint 长时间稳定在 `0 errors / 65 warnings`，`R133` 暂时重置到 `0 errors / 68 warnings` 后，经 `R134-R136` 逐步回落到 `0 errors / 57 warnings`。`R137` checkpoint 已确认本批 queue 按 “existing thick owner seam → heavy suite split → final warning cleanup → queue closeout” 的原计划闭环完成；当前 queue 自然耗尽，后续如需继续只能人工补写新的 `[QUEUED]` 项。**
 
 ## 2. 当前基线
 
 - **lint**: `0 errors / 57 warnings`
-- **最近验证**: `R136` 已确认 focused lint、focused tests、全量 `npm run lint`、全量 `npm test` 与 `npm run build` 通过，`BUILD_ID` 为 `autopilot-maintainability.202604160441`
+- **最近验证**: `R137` 已确认全量 `npm run lint -- --format unix`、`npm test` 与 `npm run build` 通过，`BUILD_ID` 为 `autopilot-maintainability.202604160449`
 - **最近 Test Vault 部署**: `R133`，`BUILD_ID` `autopilot-maintainability.202604160412`
-- **当前 `[NEXT]`**: `R137 - Final beautiful-version checkpoint / queue closeout`
-- **主热点**: final non-demo residual warnings 已收尾；下一步只复盘 `R88-R136` 收益、warning 轨迹与 queue closeout 决策
+- **当前 `[NEXT]`**: 当前没有可自动执行的 `[NEXT]`
+- **主热点**: remaining warnings 仍主要集中在 `src/features/chat/**`，其次是 `src/features/settings/**`、`src/utils/glass/**`、`src/core/opencode/**` 与若干 large tests；是否继续收束需人工续排，而不是自动生成 `R138+`
 
 ## 3. 本批执行规则
 
