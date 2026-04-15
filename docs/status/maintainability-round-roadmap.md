@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个活动任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成活动任务；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的后续任务”。
-> **当前状态**: [ACTIVE] 已人工续排 `R138-R152`；当前唯一活动任务是 `R141`。
+> **当前状态**: [ACTIVE] 已人工续排 `R138-R152`；当前唯一活动任务是 `R142`。
 
 ## 控制规则
 
@@ -16,9 +16,9 @@
 ## 当前背景
 
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
-- 当前 live lint 基线：`0 errors / 54 warnings`
-- 最近成功 phase：`docs/status/maintainability-phase-475.md`
-- 当前路线判断：`R137` 已确认 `R88-R136` 完成 owner seam、heavy suite split、final warning closeout 与 queue closeout 的完整闭环；`R140` 已把 background-task timeline assembly / launch matching 与 context usage display / breakdown 规则继续压回相邻厚 owner，当前 queue 继续按 chat residual、settings/model/startup residual、opencode/streaming/persistence residual 与 justified heavy test cleanup 三段推进。
+- 当前 live lint 基线：`0 errors / 51 warnings`
+- 最近成功 phase：`docs/status/maintainability-phase-476.md`
+- 当前路线判断：`R137` 已确认 `R88-R136` 完成 owner seam、heavy suite split、final warning closeout 与 queue closeout 的完整闭环；`R141` 已把 chat render/history/control residual 继续压回 `ConversationRenderRuntime`、`ConversationTrailingAssistantPatchPlanner`、`ConversationHistoryDialogService` 与 `PermissionModeSelectorCoordinator`，当前 queue 先做 chat checkpoint，再进入 settings/model/startup residual、opencode/streaming/persistence residual 与 justified heavy test cleanup 三段推进。
 
 ## Queue
 ## Queue
@@ -1365,7 +1365,7 @@
 - **禁止项**: 不改变 background-task persisted completion notice、context usage threshold/formatting、session todo stale notice 或 model selection 语义。
 - **验收**: background/context service residual warning 有可量化下降且 lint 维持 `0 errors`；并通过全量 `npm test` 与 `npm run build`。
 
-### [NEXT] R141 - Conversation render/history controls residual seam
+### [DONE] R141 - Conversation render/history controls residual seam
 
 - **Lane**: Maintainability / chat render
 - **目标**: 沿 `ConversationRenderService`、history actions 与 selection controls 收束 render/history/control residual，把 DOM render flow、history command state 与 selection controls 的边界继续压回既有 owner。
@@ -1378,7 +1378,7 @@
 - **禁止项**: 不改变 message render ordering、trailing assistant patch、selection state、history action enablement 或 user markup rendering 语义。
 - **验收**: render/history/control residual warning 有可量化下降且 lint 维持 `0 errors`；并通过全量 `npm test` 与 `npm run build`。
 
-### [QUEUED] R142 - Checkpoint after chat residual seams
+### [NEXT] R142 - Checkpoint after chat residual seams
 
 - **Lane**: Checkpoint
 - **目标**: 复盘 `R138-R141` 的 chat residual 收益、warning 变化、验证成本与下一批 settings/model/startup 入口。
