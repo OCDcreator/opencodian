@@ -19,6 +19,21 @@ interface DropdownRecord {
   control: MockDropdownControl;
 }
 
+function createDeferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+
+  return {
+    promise,
+    resolve,
+    reject,
+  };
+}
+
 function createDropdownRecord(name: string): DropdownRecord {
   const record: DropdownRecord = {
     name,
@@ -257,6 +272,61 @@ describe('OpenCodian style settings helpers', () => {
     expect(plugin.saveSettings).toHaveBeenCalledTimes(1);
     expect(renderInputStyleGroupSpy).toHaveBeenCalledWith();
     expect(plugin.settings.inputPanelTheme).toBe('glass-refraction-card');
+  });
+
+  it('skips stale input rerenders after the attached style runtime is disposed', async () => {
+    const saveDeferred = createDeferred<void>();
+    const plugin = {
+      settings: {
+        ...DEFAULT_SETTINGS,
+        chatAppearance: getDefaultChatAppearanceSettings(),
+      },
+      saveSettings: jest.fn().mockImplementation(() => saveDeferred.promise),
+      getChatAppearanceBaseline: jest.fn(() => getDefaultChatAppearanceSettings()),
+    } as unknown as ConstructorParameters<typeof SettingsStyleSection>[0]['plugin'];
+    const styleSection = createStyleSection(plugin);
+    const backgroundStyleSection = {
+      attach: jest.fn(),
+      refresh: jest.fn(),
+      dispose: jest.fn(),
+    };
+    const containerEl = document.createElement('div');
+    const privateSection = styleSection as unknown as {
+      attach: (containerEl: HTMLElement) => void;
+      dispose: () => void;
+      renderInputStyleGroup: (containerEl?: HTMLElement) => void;
+      applyInputPanelThemeChange: (themeId: 'glass-refraction-card') => Promise<void>;
+      addThemePresetSection: (containerEl: HTMLElement) => void;
+      addNumericStyleControl: (containerEl: HTMLElement, config: unknown) => void;
+      addColorStyleControl: (containerEl: HTMLElement, config: unknown) => void;
+      createStyleResetSetting: (containerEl: HTMLElement, group: unknown) => void;
+      createStyleGroupSection: (containerEl: HTMLElement, title: string, desc: string) => HTMLElement;
+      registerStyleControlBinding: (group: unknown, callback: () => void) => void;
+      createBackgroundStyleSection: () => typeof backgroundStyleSection;
+    };
+
+    jest.spyOn(privateSection, 'addThemePresetSection').mockImplementation(() => {});
+    jest.spyOn(privateSection, 'addNumericStyleControl').mockImplementation(() => {});
+    jest.spyOn(privateSection, 'addColorStyleControl').mockImplementation(() => {});
+    jest.spyOn(privateSection, 'createStyleResetSetting').mockImplementation(() => {});
+    jest.spyOn(privateSection, 'createStyleGroupSection').mockImplementation((parent) => parent.createDiv());
+    jest.spyOn(privateSection, 'registerStyleControlBinding').mockImplementation(() => {});
+    const renderInputStyleGroupSpy = jest
+      .spyOn(privateSection, 'renderInputStyleGroup')
+      .mockImplementation(() => {});
+    jest.spyOn(privateSection, 'createBackgroundStyleSection').mockReturnValue(backgroundStyleSection);
+
+    privateSection.attach(containerEl);
+    renderInputStyleGroupSpy.mockClear();
+
+    const changePromise = privateSection.applyInputPanelThemeChange('glass-refraction-card');
+    privateSection.dispose();
+    saveDeferred.resolve();
+    await changePromise;
+
+    expect(plugin.saveSettings).toHaveBeenCalledTimes(1);
+    expect(renderInputStyleGroupSpy).not.toHaveBeenCalled();
+    expect(backgroundStyleSection.dispose).toHaveBeenCalledTimes(1);
   });
 
   it('creates a plain-language help button config for shuding settings only', () => {

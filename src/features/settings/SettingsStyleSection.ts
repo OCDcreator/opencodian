@@ -93,6 +93,12 @@ interface SettingsStyleSectionOptions {
   addSettingHelpButton: (setting: Setting, helpButton: SettingHelpButtonConfig) => void;
 }
 
+interface SettingsStyleSectionRuntimeState {
+  backgroundStyleSection: SettingsStyleBackgroundSection;
+  inputStyleGroupHostEl: HTMLElement | null;
+  stylePresetUiRefresh?: () => void;
+}
+
 export class SettingsStyleSection {
   private readonly app: App;
   private readonly plugin: OpenCodianPlugin;
@@ -100,9 +106,7 @@ export class SettingsStyleSection {
   private readonly setSettingDescWithFormatting: (setting: Setting, text: string) => void;
   private readonly addSettingHelpButton: (setting: Setting, helpButton: SettingHelpButtonConfig) => void;
   private styleControlBindings: StyleControlBinding[] = [];
-  private stylePresetUiRefresh?: () => void;
-  private backgroundStyleSection: SettingsStyleBackgroundSection | null = null;
-  private inputStyleGroupHostEl: HTMLElement | null = null;
+  private runtime: SettingsStyleSectionRuntimeState | null = null;
 
   constructor(options: SettingsStyleSectionOptions) {
     this.app = options.app;
@@ -120,30 +124,55 @@ export class SettingsStyleSection {
       t('settings.style.title'),
       t('settings.quickNav.styleDesc'),
     );
-    this.addThemePresetSection(containerEl);
-    this.addResetAllSetting(containerEl);
-
-    this.backgroundStyleSection = this.createBackgroundStyleSection();
-    this.backgroundStyleSection.attach(containerEl);
-    this.addLayoutStyleGroup(containerEl);
-    this.addUserStyleGroup(containerEl);
-    this.addAssistantStyleGroup(containerEl);
-
-    const inputGroupHostEl = containerEl.createDiv({ cls: 'opencodian-style-input-group-host' });
-    this.renderInputStyleGroup(inputGroupHostEl);
-
-    this.addScrollbarStyleGroup(containerEl);
-    this.addAdvancedStyleGroup(containerEl);
+    const runtime = this.initializeRuntime();
+    this.attachPresetAndBackgroundSettings(containerEl, runtime);
+    this.attachPrimaryStyleGroups(containerEl);
+    this.attachTrailingStyleGroups(containerEl);
 
     return headingEl;
   }
 
   dispose(): void {
     this.styleControlBindings = [];
-    this.stylePresetUiRefresh = undefined;
-    this.backgroundStyleSection?.dispose();
-    this.backgroundStyleSection = null;
-    this.inputStyleGroupHostEl = null;
+    const runtime = this.runtime;
+    this.runtime = null;
+    runtime?.backgroundStyleSection.dispose();
+  }
+
+  private initializeRuntime(): SettingsStyleSectionRuntimeState {
+    const runtime: SettingsStyleSectionRuntimeState = {
+      backgroundStyleSection: this.createBackgroundStyleSection(),
+      inputStyleGroupHostEl: null,
+      stylePresetUiRefresh: undefined,
+    };
+    this.runtime = runtime;
+    return runtime;
+  }
+
+  private attachPresetAndBackgroundSettings(
+    containerEl: HTMLElement,
+    runtime: SettingsStyleSectionRuntimeState,
+  ): void {
+    this.addThemePresetSection(containerEl, runtime);
+    this.addResetAllSetting(containerEl);
+    runtime.backgroundStyleSection.attach(containerEl);
+  }
+
+  private attachPrimaryStyleGroups(containerEl: HTMLElement): void {
+    this.addLayoutStyleGroup(containerEl);
+    this.addUserStyleGroup(containerEl);
+    this.addAssistantStyleGroup(containerEl);
+    this.attachInputStyleGroup(containerEl);
+  }
+
+  private attachInputStyleGroup(containerEl: HTMLElement): void {
+    const inputGroupHostEl = containerEl.createDiv({ cls: 'opencodian-style-input-group-host' });
+    this.renderInputStyleGroup(inputGroupHostEl);
+  }
+
+  private attachTrailingStyleGroups(containerEl: HTMLElement): void {
+    this.addScrollbarStyleGroup(containerEl);
+    this.addAdvancedStyleGroup(containerEl);
   }
 
   private addResetAllSetting(containerEl: HTMLElement): void {
@@ -634,34 +663,14 @@ export class SettingsStyleSection {
 
     advancedSetting.addTextArea((text) => {
       const syncFromSettings = () => {
-        const currentValue = this.plugin.settings.chatAppearance.advanced.customCssDeclarations;
-        text.setValue(currentValue);
-        if (isValidChatAppearanceCustomCssDeclarations(currentValue)) {
-          text.inputEl.removeClass('is-invalid');
-          validationEl.empty();
-          return;
-        }
-
-        text.inputEl.addClass('is-invalid');
-        validationEl.setText(t('settings.style.advanced.customCssDeclarations.invalid'));
+        this.syncCustomCssDeclarationsInput(text, validationEl);
       };
 
       text
         .setPlaceholder(t('settings.style.advanced.customCssDeclarations.placeholder'))
         .setValue(this.plugin.settings.chatAppearance.advanced.customCssDeclarations)
         .onChange((value) => {
-          if (!isValidChatAppearanceCustomCssDeclarations(value)) {
-            text.inputEl.addClass('is-invalid');
-            validationEl.setText(t('settings.style.advanced.customCssDeclarations.invalid'));
-            return;
-          }
-
-          text.inputEl.removeClass('is-invalid');
-          validationEl.empty();
-          this.plugin.updateChatAppearance((appearance) => {
-            appearance.advanced.customCssDeclarations = value;
-          });
-          this.applyAndScheduleStyleUpdate();
+          this.applyCustomCssDeclarations(value, text, validationEl);
         });
 
       text.inputEl.rows = 6;
@@ -674,7 +683,50 @@ export class SettingsStyleSection {
     this.createStyleResetSetting(advancedGroupEl, 'advanced');
   }
 
-  private addThemePresetSection(containerEl: HTMLElement): void {
+  private syncCustomCssDeclarationsInput(
+    text: { setValue: (value: string) => unknown; inputEl: HTMLTextAreaElement },
+    validationEl: HTMLElement,
+  ): void {
+    const currentValue = this.plugin.settings.chatAppearance.advanced.customCssDeclarations;
+    text.setValue(currentValue);
+    this.updateCustomCssValidationState(text.inputEl, validationEl, currentValue);
+  }
+
+  private applyCustomCssDeclarations(
+    value: string,
+    text: { inputEl: HTMLTextAreaElement },
+    validationEl: HTMLElement,
+  ): void {
+    if (!this.updateCustomCssValidationState(text.inputEl, validationEl, value)) {
+      return;
+    }
+
+    this.plugin.updateChatAppearance((appearance) => {
+      appearance.advanced.customCssDeclarations = value;
+    });
+    this.applyAndScheduleStyleUpdate();
+  }
+
+  private updateCustomCssValidationState(
+    inputEl: HTMLTextAreaElement,
+    validationEl: HTMLElement,
+    value: string,
+  ): boolean {
+    if (isValidChatAppearanceCustomCssDeclarations(value)) {
+      inputEl.removeClass('is-invalid');
+      validationEl.empty();
+      return true;
+    }
+
+    inputEl.addClass('is-invalid');
+    validationEl.setText(t('settings.style.advanced.customCssDeclarations.invalid'));
+    return false;
+  }
+
+  private addThemePresetSection(
+    containerEl: HTMLElement,
+    runtime: SettingsStyleSectionRuntimeState,
+  ): void {
     const presetGroupEl = this.createStyleGroupSection(
       containerEl,
       t('settings.style.presets.title'),
@@ -732,7 +784,7 @@ export class SettingsStyleSection {
         schemeButtonEl.type = 'button';
         schemeButtonEl.toggleClass('is-active', activePreset?.id === preset.id);
         schemeButtonEl.addEventListener('click', () => {
-          void this.applyThemePresetSelection(preset.id, renderPresetUi);
+          void this.applyThemePresetSelection(preset.id, runtime);
         });
       }
       schemeSectionEl.toggleClass('is-empty', schemeChipsEl.childElementCount === 0);
@@ -747,7 +799,7 @@ export class SettingsStyleSection {
         resetBtn.type = 'button';
         resetBtn.disabled = !hasOverrides;
         resetBtn.addEventListener('click', () => {
-          void this.resetThemePresetAppearance(renderPresetUi);
+          void this.resetThemePresetAppearance(runtime);
         });
       }
     };
@@ -766,38 +818,34 @@ export class SettingsStyleSection {
         text: this.getThemeStyleDescription(styleId),
       });
       buttonEl.addEventListener('click', () => {
-        void this.applyThemeStyleSelection(styleId, presetsByStyle, renderPresetUi, (nextStyleId) => {
+        void this.applyThemeStyleSelection(styleId, presetsByStyle, runtime, (nextStyleId) => {
           selectedStyleId = nextStyleId;
         });
       });
       styleButtons.set(styleId, buttonEl);
     }
 
-    this.stylePresetUiRefresh = renderPresetUi;
+    runtime.stylePresetUiRefresh = renderPresetUi;
     renderPresetUi();
   }
 
   private async applyThemePresetSelection(
     presetId: ThemePresetDefinition['id'],
-    renderPresetUi: () => void,
+    runtime: SettingsStyleSectionRuntimeState,
   ): Promise<void> {
     try {
       await this.plugin.selectThemePresetAndSave(presetId);
-      this.refreshStyleControlValues();
-      this.backgroundStyleSection?.refresh();
-      renderPresetUi();
+      this.refreshThemePresetUi(runtime);
     } catch (error) {
       logger.warn('Failed to apply theme preset selection', error);
       new Notice(t('settings.style.presets.applyFailed'));
     }
   }
 
-  private async resetThemePresetAppearance(renderPresetUi: () => void): Promise<void> {
+  private async resetThemePresetAppearance(runtime: SettingsStyleSectionRuntimeState): Promise<void> {
     try {
       await this.plugin.resetThemePresetAppearanceAndSave();
-      this.refreshStyleControlValues();
-      this.backgroundStyleSection?.refresh();
-      renderPresetUi();
+      this.refreshThemePresetUi(runtime);
     } catch (error) {
       logger.warn('Failed to reset preset appearance', error);
       new Notice(t('settings.style.presets.reset.failed'));
@@ -807,17 +855,17 @@ export class SettingsStyleSection {
   private async applyThemeStyleSelection(
     styleId: ThemeStyleId,
     presetsByStyle: Map<ThemeStyleId, ThemePresetDefinition[]>,
-    renderPresetUi: () => void,
+    runtime: SettingsStyleSectionRuntimeState,
     updateSelectedStyleId: (styleId: ThemeStyleId) => void,
   ): Promise<void> {
     updateSelectedStyleId(styleId);
     const nextPreset = presetsByStyle.get(styleId)?.[0];
     if (!nextPreset) {
-      renderPresetUi();
+      this.refreshStylePresetUi(runtime);
       return;
     }
 
-    await this.applyThemePresetSelection(nextPreset.id, renderPresetUi);
+    await this.applyThemePresetSelection(nextPreset.id, runtime);
   }
 
   private getThemeStyleTitle(styleId: ThemeStyleId): string {
@@ -1125,39 +1173,20 @@ export class SettingsStyleSection {
     colorInput.setAttribute('aria-hidden', 'true');
 
     const renderValue = (value: string) => {
-      const normalizedValue = value.trim();
-      const resetValue = config.resetValue().trim();
-      const pickerHex = this.resolveStyleColorPickerHex(normalizedValue || resetValue, resetValue, setting.settingEl);
-      const followsTheme = normalizedValue === resetValue;
-
-      colorInput.value = pickerHex;
-      previewBtn.style.background = normalizedValue || resetValue;
-      previewBtn.setAttribute('title', followsTheme ? t('settings.style.colorPicker.followThemeValue') : normalizedValue);
-      valueEl.setText(followsTheme ? t('settings.style.colorPicker.followThemeValue') : pickerHex.toUpperCase());
-      valueEl.setAttribute('title', normalizedValue || resetValue);
-      followThemeBtn.disabled = followsTheme;
+      this.renderColorStyleControlValue(config, setting.settingEl, previewBtn, valueEl, followThemeBtn, colorInput, value);
     };
 
     const commitValue = (value: string) => {
-      this.plugin.updateChatAppearance((appearance) => {
-        config.setValue(appearance, value.trim());
-      });
-      this.applyAndScheduleStyleUpdate();
+      this.commitColorStyleControlValue(config, value);
       renderValue(config.value());
     };
 
-    const openColorPicker = () => {
-      const inputWithPicker = colorInput as HTMLInputElement & { showPicker?: () => void };
-      if (typeof inputWithPicker.showPicker === 'function') {
-        inputWithPicker.showPicker();
-        return;
-      }
-
-      colorInput.click();
-    };
-
-    previewBtn.addEventListener('click', openColorPicker);
-    pickBtn.addEventListener('click', openColorPicker);
+    previewBtn.addEventListener('click', () => {
+      this.openStyleColorPicker(colorInput);
+    });
+    pickBtn.addEventListener('click', () => {
+      this.openStyleColorPicker(colorInput);
+    });
     followThemeBtn.addEventListener('click', () => {
       commitValue(config.resetValue());
     });
@@ -1169,6 +1198,45 @@ export class SettingsStyleSection {
     this.registerStyleControlBinding(config.group, () => {
       renderValue(config.value());
     });
+  }
+
+  private renderColorStyleControlValue(
+    config: ColorStyleControlConfig,
+    settingEl: HTMLElement,
+    previewBtn: HTMLButtonElement,
+    valueEl: HTMLSpanElement,
+    followThemeBtn: HTMLButtonElement,
+    colorInput: HTMLInputElement,
+    value: string,
+  ): void {
+    const normalizedValue = value.trim();
+    const resetValue = config.resetValue().trim();
+    const pickerHex = this.resolveStyleColorPickerHex(normalizedValue || resetValue, resetValue, settingEl);
+    const followsTheme = normalizedValue === resetValue;
+
+    colorInput.value = pickerHex;
+    previewBtn.style.background = normalizedValue || resetValue;
+    previewBtn.setAttribute('title', followsTheme ? t('settings.style.colorPicker.followThemeValue') : normalizedValue);
+    valueEl.setText(followsTheme ? t('settings.style.colorPicker.followThemeValue') : pickerHex.toUpperCase());
+    valueEl.setAttribute('title', normalizedValue || resetValue);
+    followThemeBtn.disabled = followsTheme;
+  }
+
+  private commitColorStyleControlValue(config: ColorStyleControlConfig, value: string): void {
+    this.plugin.updateChatAppearance((appearance) => {
+      config.setValue(appearance, value.trim());
+    });
+    this.applyAndScheduleStyleUpdate();
+  }
+
+  private openStyleColorPicker(colorInput: HTMLInputElement): void {
+    const inputWithPicker = colorInput as HTMLInputElement & { showPicker?: () => void };
+    if (typeof inputWithPicker.showPicker === 'function') {
+      inputWithPicker.showPicker();
+      return;
+    }
+
+    colorInput.click();
   }
 
   private resolveStyleColorPickerHex(
@@ -1460,11 +1528,10 @@ export class SettingsStyleSection {
   }
 
   private async resetAllChatStyles(): Promise<void> {
+    const runtime = this.runtime;
     try {
       await this.plugin.resetChatAppearanceToBaselineAndSave();
-      this.refreshStyleControlValues();
-      this.backgroundStyleSection?.refresh();
-      this.stylePresetUiRefresh?.();
+      this.refreshThemePresetUi(runtime);
       new Notice(t('settings.style.resetAll.success'));
     } catch (error) {
       logger.warn('Failed to reset chat styles', error);
@@ -1473,12 +1540,14 @@ export class SettingsStyleSection {
   }
 
   private renderInputStyleGroup(containerEl?: HTMLElement): void {
-    const hostEl = containerEl ?? this.inputStyleGroupHostEl;
+    const hostEl = containerEl ?? this.runtime?.inputStyleGroupHostEl;
     if (!hostEl) {
       return;
     }
 
-    this.inputStyleGroupHostEl = hostEl;
+    if (this.runtime) {
+      this.runtime.inputStyleGroupHostEl = hostEl;
+    }
     this.clearStyleControlBindings('input');
     hostEl.empty();
 
@@ -1820,6 +1889,7 @@ export class SettingsStyleSection {
   }
 
   private async applyInputPanelThemeChange(themeId: InputPanelThemeId): Promise<void> {
+    const runtime = this.runtime;
     if (this.plugin.settings.inputPanelTheme === themeId) {
       return;
     }
@@ -1831,6 +1901,28 @@ export class SettingsStyleSection {
       syncConfig: false,
       applyUi: true,
     });
+    this.rerenderInputStyleGroup(runtime);
+  }
+
+  private refreshThemePresetUi(runtime?: SettingsStyleSectionRuntimeState | null): void {
+    if (runtime && !this.isRuntimeActive(runtime)) {
+      return;
+    }
+
+    this.refreshStyleControlValues();
+    this.runtime?.backgroundStyleSection.refresh();
+    this.runtime?.stylePresetUiRefresh?.();
+  }
+
+  private rerenderInputStyleGroup(runtime?: SettingsStyleSectionRuntimeState | null): void {
+    if (runtime && !this.isRuntimeActive(runtime)) {
+      return;
+    }
+
     this.renderInputStyleGroup();
+  }
+
+  private isRuntimeActive(runtime: SettingsStyleSectionRuntimeState): boolean {
+    return this.runtime === runtime;
   }
 }

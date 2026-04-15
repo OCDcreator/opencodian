@@ -2,19 +2,19 @@
 
 > **状态**: [READY]
 > **作用**: 这是 maintainability 无人值守的战略文档。每轮开始前，先读本文件，再读 `docs/status/maintainability-round-roadmap.md` 与最近的 `docs/status/maintainability-phase-XXX.md`。
-> **自动推进状态**: `R123` 已完成 settings runtime residual 第一项；当前继续按 `R124-R137` 长队列顺序推进。恢复 autopilot 后只能从首个 `[NEXT]`（`R124`）顺序执行，不允许 freestyle。
+> **自动推进状态**: `R124` 已完成 settings runtime residual 第二项；当前继续按 `R125-R137` 长队列顺序推进。恢复 autopilot 后只能从首个 `[NEXT]`（`R125`）顺序执行，不允许 freestyle。
 
 ## 1. 当前判断
 
-**当前分支已完成 `R68-R123` 并把 live lint 稳定在 `0 errors / 65 warnings`；`R123` 已把 `SettingsModelSection.attach` 的 runtime 初始化、refresh wiring、icon-cache action follow-up 与 presenter follow-up 进一步收束回 section owner。** 接下来继续 Batch 8 settings / main residual，从 `R124` 的 `SettingsStyleSection.attach` residual seam 开始，再继续 heavy tests follow-up、warning closeout 与最终 checkpoint。
+**当前分支已完成 `R68-R124` 并把 live lint 稳定在 `0 errors / 65 warnings`；`R124` 已把 `SettingsStyleSection.attach` 的 runtime 初始化、preset/background/input follow-up 与 custom CSS / preview wiring 进一步收束回 section owner。** 接下来继续 Batch 8 settings / main residual，从 `R125` 的 `ModelConfigModal` editor/render seam 开始，再继续 heavy tests follow-up、warning closeout 与最终 checkpoint。
 
 ## 2. 当前基线
 
 - **lint**: `0 errors / 65 warnings`
-- **最近验证**: `R123` 已确认全量 `npm test` 与 `npm run build` 通过，`BUILD_ID` 为 `autopilot-maintainability.202604160228`
-- **最近 Test Vault 部署**: `R123`，`BUILD_ID` `autopilot-maintainability.202604160228`
-- **当前 `[NEXT]`**: `R124 - SettingsStyleSection attach residual seam`
-- **主热点**: `R123` 已完成 model section attach residual 收束；下一步聚焦 `SettingsStyleSection.attach` 的 preset/background/glass/custom CSS/preview wiring residual
+- **最近验证**: `R124` 已确认 focused `OpenCodianStyleSettings`、全量 `npm test` 与 `npm run build` 通过，`BUILD_ID` 为 `autopilot-maintainability.202604160238`
+- **最近 Test Vault 部署**: `R124`，`BUILD_ID` `autopilot-maintainability.202604160238`
+- **当前 `[NEXT]`**: `R125 - ModelConfigModal editor/render seam`
+- **主热点**: `R124` 已完成 style section attach residual 收束；下一步聚焦 `ModelConfigModal` 的 editor state、render branching、save/apply follow-up 与 validation feedback seam
 
 ## 3. 本批执行规则
 
