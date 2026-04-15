@@ -33,6 +33,13 @@ export interface FinalizeMessageOptions {
   logStage(stage: string, payload?: Record<string, unknown>): void;
 }
 
+interface MessageFinalizationSyncAfterStreamState {
+  previousMessagesBeforeSync: ChatMessage[];
+  syncResult: MessageFinalizationSyncResult;
+  isForegroundConversation: boolean;
+  needsForegroundRenderSync: boolean;
+}
+
 export interface MessageFinalizationHost {
   getCurrentConversation(): Conversation | null;
   getActiveTabId(): TabId | null;
@@ -83,7 +90,18 @@ export class MessageFinalizationService {
 
     try {
       if (shouldSyncFromServer) {
-        await this.syncConversationAfterStream(conversation, tabId, editedFiles, logStage);
+        const syncAfterStreamState = await this.requestConversationSyncAfterStream(
+          conversation,
+          tabId,
+          logStage,
+        );
+        await this.applySyncAfterStreamFollowUp(
+          conversation,
+          tabId,
+          editedFiles,
+          syncAfterStreamState,
+          logStage,
+        );
       }
 
       await this.host.refreshTabSessionTodos(tabId, conversation.openCodeSessionId, { suppressErrors: true });
@@ -127,12 +145,11 @@ export class MessageFinalizationService {
     }
   }
 
-  private async syncConversationAfterStream(
+  private async requestConversationSyncAfterStream(
     conversation: Conversation,
     tabId: TabId | null,
-    editedFiles: string[],
     logStage: FinalizeMessageOptions['logStage'],
-  ): Promise<void> {
+  ): Promise<MessageFinalizationSyncAfterStreamState> {
     const previousMessagesBeforeSync = [...conversation.messages];
     const previousVisualFingerprint = this.host.getConversationVisualFingerprint(conversation.messages);
     logStage('server-sync-requested', {
@@ -156,17 +173,33 @@ export class MessageFinalizationService {
     });
 
     const isForegroundConversation = this.isForegroundConversation(conversation, tabId);
-    const needsForegroundRenderSync = isForegroundConversation
-      && previousVisualFingerprint !== this.host.getConversationVisualFingerprint(syncResult.messages);
+    return {
+      previousMessagesBeforeSync,
+      syncResult,
+      isForegroundConversation,
+      needsForegroundRenderSync: isForegroundConversation
+        && previousVisualFingerprint !== this.host.getConversationVisualFingerprint(syncResult.messages),
+    };
+  }
 
-    if (isForegroundConversation) {
-      this.host.setLastConversationSyncFingerprint(tabId, syncResult.fingerprint);
+  private async applySyncAfterStreamFollowUp(
+    conversation: Conversation,
+    tabId: TabId | null,
+    editedFiles: string[],
+    syncAfterStreamState: MessageFinalizationSyncAfterStreamState,
+    logStage: FinalizeMessageOptions['logStage'],
+  ): Promise<void> {
+    if (syncAfterStreamState.isForegroundConversation) {
+      this.host.setLastConversationSyncFingerprint(
+        tabId,
+        syncAfterStreamState.syncResult.fingerprint,
+      );
     }
 
-    if (needsForegroundRenderSync) {
+    if (syncAfterStreamState.needsForegroundRenderSync) {
       await this.host.applySyncedConversationUpdate(
-        previousMessagesBeforeSync,
-        syncResult.messages,
+        syncAfterStreamState.previousMessagesBeforeSync,
+        syncAfterStreamState.syncResult.messages,
       );
       logStage('post-sync-render-apply-complete');
     } else {

@@ -1,19 +1,19 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [READY] `R95-R137` 长队列继续推进；当前 `[NEXT]` 为 `R95 - MessageFinalizationService sync-after-stream seam`。
+> **当前状态**: [READY] `R96-R137` 长队列继续推进；当前 `[NEXT]` 为 `R96 - ConversationSyncBridge post-sync routing seam`。
 
 ## 当前优先级
 
-- **当前 `[NEXT]`**：`R95 - MessageFinalizationService sync-after-stream seam`
+- **当前 `[NEXT]`**：`R96 - ConversationSyncBridge post-sync routing seam`
 - **本批目标**：继续 residual chat runtime / services 与 opencode core，再转 secondary core / settings / startup，最后做 heavy tests follow-up、warning closeout 与最终 checkpoint
 - **当前 lint 基线**：`0 errors / 65 warnings`
 - **热点顺序**：
   1. `src/features/chat/OpenCodianView.ts`
   2. `src/features/chat/services/ConversationRenderService.ts`
-  3. `src/features/chat/services/MessageFinalizationService.ts`
-  4. `src/features/chat/services/ConversationSyncBridge.ts`
-  5. `src/features/chat/services/ContextUsageService.ts`
+  3. `src/features/chat/services/ConversationSyncBridge.ts`
+  4. `src/features/chat/services/ConversationSyncVisiblePostSyncRouter.ts`
+  5. `src/features/chat/services/MessageFinalizationService.ts`
   6. `src/core/opencode/OpenCodeService.ts`
   7. `src/core/opencode/OpenCodeStreamEventTransformer.ts`
   8. `src/core/opencode/OpenCodeStreamingRuntimeCoordinator.ts`
@@ -42,5 +42,5 @@
 ## 历史入口
 
 - 批次归档：`docs/status/maintainability-completed-batches.md`
-- 最近成功 phase：`docs/status/maintainability-phase-429.md`
+- 最近成功 phase：`docs/status/maintainability-phase-430.md`
 - 最近 checkpoint：`docs/status/maintainability-phase-427.md`
