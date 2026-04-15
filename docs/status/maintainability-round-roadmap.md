@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的 `[NEXT]`”。
-> **当前状态**: [READY] `R120` 已完成；`R121-R137` 长队列继续排队，当前首个 `[NEXT]` 为 `R121 - modelConfig residual merge/assembly seam`。
+> **当前状态**: [READY] `R121` 已完成；`R122-R137` 长队列继续排队，当前首个 `[NEXT]` 为 `R122 - Checkpoint after secondary core seams`。
 
 ## 控制规则
 
@@ -17,8 +17,8 @@
 
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
 - 当前 live lint 基线：`0 errors / 65 warnings`
-- 最近成功 phase：`docs/status/maintainability-phase-455.md`
-- 当前路线判断：`R120` 已完成 core types settings normalization seam B，已把 provider/model/plugin/debug load-time normalization residual 收束到更集中的 owner path；当前必须从 `R121` modelConfig residual merge/assembly seam 顺序执行，不得 freestyle。
+- 最近成功 phase：`docs/status/maintainability-phase-456.md`
+- 当前路线判断：`R121` 已完成 modelConfig residual merge/assembly seam，已把 server catalog state assembly、inherited provider resolution follow-up 与 effective projection residual 继续收束到 `modelConfig.ts` owner path；当前必须从 `R122` secondary core checkpoint 顺序执行，不得 freestyle。
 
 ## Queue
 ## Queue
@@ -1142,7 +1142,7 @@
 - **禁止项**: 不改变 disabled model refs、provider toggle、project/global override 或 debug/export 语义。
 - **验收**: settings normalization 第二组 residual 规则继续收敛。；并通过全量 `npm test` 与 `npm run build`。
 
-### [NEXT] R121 - modelConfig residual merge/assembly seam
+### [DONE] R121 - modelConfig residual merge/assembly seam
 
 - **Lane**: Maintainability / config assembly
 - **目标**: 继续在 modelConfig 内收束 merge/assembly residual，包括 supplement、effective projection 与 provider resolution follow-up。
@@ -1152,7 +1152,7 @@
 - **禁止项**: 不改变 baseEffective/effective 区分、provider layering、default model fallback 语义。
 - **验收**: modelConfig merge/assembly residual 继续下降。；并通过全量 `npm test` 与 `npm run build`。
 
-### [QUEUED] R122 - Checkpoint after secondary core seams
+### [NEXT] R122 - Checkpoint after secondary core seams
 
 - **Lane**: Checkpoint
 - **目标**: 复盘 R118-R121 的 secondary core residual 收益与 settings/main lane 准备度。

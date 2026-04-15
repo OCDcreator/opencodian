@@ -13,7 +13,7 @@
 
 它不直接维护 UI，也不直接写整个配置文件，而是负责给上层返回一个既能表达“基础事实”，又能表达“当前可选状态”的模型 catalog bundle。自 R11 起，settings 侧围绕这些 bundle 再做 `displayCatalogs` / `providerStatusCatalogs` 的组合语义，已经下沉到 `ModelCatalogStateService`，因此 `ModelConfigService` 继续专注“事实目录 + 继承可用性 + probe”。
 
-自 `R58` 起，继承层配置来源选择、local/scoped/default-scope provider layering，以及 `effectiveProviderConfig` / `currentEnabledProviderIds` 所依赖的 enablement 判定，已统一收口到 `modelConfig.ts` 的 `resolveInheritedModelConfigResolution()` seam。自 `R59` 起，runtime result 转 catalog、server catalog merge、`baseEffective` / `effective` 组装、provider probe planning 与默认测试模型选择也由 `modelConfig.ts` 的 catalog seam 维护；`ModelConfigService` 主要保留 IO 编排、日志与真实 send probe 调用。
+自 `R58` 起，继承层配置来源选择、local/scoped/default-scope provider layering，以及 `effectiveProviderConfig` / `currentEnabledProviderIds` 所依赖的 enablement 判定，已统一收口到 `modelConfig.ts` 的 `resolveInheritedModelConfigResolution()` seam。自 `R121` 起，runtime result 转 catalog、server catalog merge、`baseEffective` / `effective` 组装、provider probe planning 与默认测试模型选择也由 `modelConfig.ts` 的 catalog seam 维护；`ModelConfigService` 主要保留 IO 编排、日志与真实 send probe 调用。
 
 ## 核心类型
 
@@ -55,7 +55,7 @@ export interface ModelCatalogBundle {
 ### 构建 catalog
 
 - `getLocalCatalog()`：调用 `buildCatalogFromConfig(..., 'local')`
-- `getServerCatalog()`：并发读取 `getAvailableModels({ includeDirectory: true })`、`getResolvedModelConfig({ includeDirectory: true })` 与默认作用域 `getResolvedModelConfig({ includeDirectory: false })`，再交给 `catalogFromRuntimeResult()` 与 `buildServerCatalog()` 组装 server 目录。其中：
+- `getServerCatalog()`：并发读取 `getAvailableModels({ includeDirectory: true })`、`getResolvedModelConfig({ includeDirectory: true })` 与默认作用域 `getResolvedModelConfig({ includeDirectory: false })`，再交给 `assembleServerModelCatalog()` 组装 runtime catalog、继承配置解析与 server 目录。其中：
   - 目录作用域下的 runtime provider/model 列表直接来自 `config.providers()`
   - 不再把 `provider.list()` 当成 `opencode models` / 设置页服务器目录的等价数据源
   - 不再把 `config.get().provider` 整包当成“服务器目录”

@@ -1,5 +1,6 @@
 import {
   assembleModelCatalog,
+  assembleServerModelCatalog,
   buildCatalogFromConfig,
   buildServerCatalog,
   catalogFromRuntimeResult,
@@ -308,6 +309,69 @@ describe('modelConfig catalog assembly helpers', () => {
     expect(serverCatalog.defaults).toEqual({
       deepseek: 'deepseek-chat',
       openai: 'gpt-4.1',
+    });
+  });
+
+  it('assembles server catalog state through the inherited config resolution seam', () => {
+    const assembled = assembleServerModelCatalog({
+      runtimeResult: {
+        defaults: {
+          deepseek: 'deepseek-chat',
+        },
+        providers: [
+          {
+            id: 'deepseek',
+            name: 'DeepSeek Runtime',
+            models: [{ id: 'deepseek-chat', name: 'DeepSeek Chat Runtime', contextWindow: 128000 }],
+          },
+        ],
+      },
+      localServerMode: true,
+      diskInheritedConfig: {
+        disabled_providers: ['alibaba'],
+      },
+      scopedConfig: {
+        enabled_providers: ['deepseek'],
+        disabled_providers: ['opencode'],
+        provider: {
+          deepseek: {
+            name: 'DeepSeek Metadata',
+            models: {
+              'deepseek-chat': { name: 'DeepSeek Chat Metadata' },
+            },
+          },
+          opencode: {
+            name: 'OpenCode Metadata',
+            models: {
+              'big-pickle': { name: 'Big Pickle' },
+            },
+          },
+        },
+      },
+      defaultScopeConfig: {
+        disabled_providers: ['should-not-apply'],
+      },
+      localConfig: {},
+    });
+
+    expect(assembled.runtime.providers.map((provider) => provider.id)).toEqual(['deepseek']);
+    expect(assembled.configResolution.inheritedConfig).toEqual({
+      enabled_providers: ['deepseek'],
+      disabled_providers: ['alibaba', 'opencode'],
+    });
+    expect(assembled.configResolution.getCurrentEnabledProviderIds(['deepseek', 'opencode'])).toEqual(['deepseek']);
+    expect(assembled.server.providers.map((provider) => provider.id)).toEqual(['deepseek']);
+    expect(assembled.server.providers[0]).toMatchObject({
+      id: 'deepseek',
+      name: 'DeepSeek Metadata',
+      models: [{
+        id: 'deepseek-chat',
+        name: 'DeepSeek Chat Metadata',
+        contextWindow: 128000,
+      }],
+    });
+    expect(assembled.server.defaults).toEqual({
+      deepseek: 'deepseek-chat',
     });
   });
 

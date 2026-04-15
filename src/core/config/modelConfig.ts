@@ -90,6 +90,12 @@ export interface ModelCatalogAssemblyResult {
   effectiveProviderConfig: ProviderAvailabilityConfig;
 }
 
+export interface ModelServerCatalogAssemblyResult {
+  runtime: ModelCatalog;
+  configResolution: InheritedModelConfigResolution;
+  server: ModelCatalog;
+}
+
 export type ProviderAvailabilityProbePlanStatus =
   | 'available'
   | 'project_disabled'
@@ -409,6 +415,33 @@ export function buildServerCatalog(
   };
 }
 
+export function assembleServerModelCatalog(options: {
+  runtimeResult: ModelCatalogRuntimeResult;
+  localServerMode: boolean;
+  localConfig: OpencodeModelConfigSubset;
+  scopedConfig: OpencodeModelConfigSubset;
+  defaultScopeConfig: OpencodeModelConfigSubset;
+  diskInheritedConfig?: OpencodeModelConfigSubset | null;
+}): ModelServerCatalogAssemblyResult {
+  const configResolution = resolveInheritedModelConfigResolution({
+    localServerMode: options.localServerMode,
+    scopedConfig: options.scopedConfig,
+    defaultScopeConfig: options.defaultScopeConfig,
+    localConfig: options.localConfig,
+    diskInheritedConfig: options.diskInheritedConfig,
+  });
+  const runtime = catalogFromRuntimeResult(options.runtimeResult);
+
+  return {
+    runtime,
+    configResolution,
+    server: buildServerCatalog(
+      runtime,
+      configResolution.mergedScopedConfig,
+    ),
+  };
+}
+
 export function mergeCatalogs(server: ModelCatalog, local: ModelCatalog): ModelCatalog {
   const providers = new Map<string, ModelCatalogProvider>();
 
@@ -512,20 +545,16 @@ export function assembleModelCatalog(
   },
 ): ModelCatalogAssemblyResult {
   const baseEffective = resolveCatalogForMode(options.local, options.server, options.mode);
-  const currentEnabledProviderIds = options.configResolution.getCurrentEnabledProviderIds(
-    baseEffective.providers.map((provider) => provider.id),
-  );
-  const effective = filterCatalogToProviderIds(
-    filterCatalog(baseEffective, {
-      disabledModelRefs: options.disabledModelRefs,
-    }),
-    new Set(currentEnabledProviderIds),
-  );
+  const effectiveProjection = projectEffectiveCatalog({
+    baseEffective,
+    disabledModelRefs: options.disabledModelRefs,
+    getCurrentEnabledProviderIds: options.configResolution.getCurrentEnabledProviderIds,
+  });
 
   return {
     baseEffective,
-    effective,
-    currentEnabledProviderIds,
+    effective: effectiveProjection.effective,
+    currentEnabledProviderIds: effectiveProjection.currentEnabledProviderIds,
     effectiveProviderConfig: options.configResolution.effectiveProviderConfig,
   };
 }
@@ -645,37 +674,20 @@ export function resolveInheritedModelConfigResolution(options: {
   defaultScopeConfig: OpencodeModelConfigSubset;
   diskInheritedConfig?: OpencodeModelConfigSubset | null;
 }): InheritedModelConfigResolution {
-  const inheritedConfig = options.localServerMode
-    ? supplementInheritedConfigFromScopedConfig(
-      options.diskInheritedConfig ?? {},
-      options.scopedConfig,
-      options.localConfig,
-    )
-    : mergeModelConfigSubsets({}, options.defaultScopeConfig);
-  const effectiveProviderConfig = mergeProviderAvailabilityConfig(inheritedConfig, options.localConfig);
-  const isProviderEnabledInServerScope = (providerId: string) => isProviderEnabled(options.scopedConfig, providerId);
-  const isProviderEnabledInCurrentScope = (providerId: string) => (
-    isProviderEnabledInServerScope(providerId)
-    && isProviderEnabled(options.localConfig, providerId)
-  );
+  const inheritedResolution = resolveInheritedConfig(options);
+  const providerResolution = resolveProviderAvailabilityLayer({
+    inheritedConfig: inheritedResolution.inheritedConfig,
+    localConfig: options.localConfig,
+    scopedConfig: options.scopedConfig,
+  });
 
   return {
     scopedConfig: options.scopedConfig,
     defaultScopeConfig: options.defaultScopeConfig,
-    inheritedConfig,
-    inheritedConfigSource: options.localServerMode ? 'local_disk' : 'server_default_scope',
-    mergedScopedConfig: mergeModelConfigSubsets(inheritedConfig, options.scopedConfig),
-    effectiveProviderConfig,
-    isProviderEnabledInServerScope,
-    isProviderEnabledInCurrentScope,
-    isProviderEffectivelyEnabled: (providerId: string) => (
-      isProviderEnabledInCurrentScope(providerId)
-      && isProviderEnabled(effectiveProviderConfig, providerId)
-    ),
-    getCurrentEnabledProviderIds: (providerIds: Iterable<string>) => collectCurrentEnabledProviderIds(
-      providerIds,
-      isProviderEnabledInCurrentScope,
-    ),
+    inheritedConfig: inheritedResolution.inheritedConfig,
+    inheritedConfigSource: inheritedResolution.inheritedConfigSource,
+    mergedScopedConfig: mergeModelConfigSubsets(inheritedResolution.inheritedConfig, options.scopedConfig),
+    ...providerResolution,
   };
 }
 
@@ -746,6 +758,70 @@ export function resolveProviderAvailabilityProbePlan(
     catalogModelCount,
     testedModelId,
     shouldSendProbe,
+  };
+}
+
+function resolveInheritedConfig(options: {
+  localServerMode: boolean;
+  localConfig: OpencodeModelConfigSubset;
+  scopedConfig: OpencodeModelConfigSubset;
+  defaultScopeConfig: OpencodeModelConfigSubset;
+  diskInheritedConfig?: OpencodeModelConfigSubset | null;
+}): Pick<InheritedModelConfigResolution, 'inheritedConfig' | 'inheritedConfigSource'> {
+  if (!options.localServerMode) {
+    return {
+      inheritedConfig: mergeModelConfigSubsets({}, options.defaultScopeConfig),
+      inheritedConfigSource: 'server_default_scope',
+    };
+  }
+
+  return {
+    inheritedConfig: supplementInheritedConfigFromScopedConfig(
+      options.diskInheritedConfig ?? {},
+      options.scopedConfig,
+      options.localConfig,
+    ),
+    inheritedConfigSource: 'local_disk',
+  };
+}
+
+function resolveProviderAvailabilityLayer(options: {
+  inheritedConfig: OpencodeModelConfigSubset;
+  localConfig: OpencodeModelConfigSubset;
+  scopedConfig: OpencodeModelConfigSubset;
+}): Pick<
+  InheritedModelConfigResolution,
+  | 'effectiveProviderConfig'
+  | 'isProviderEnabledInServerScope'
+  | 'isProviderEnabledInCurrentScope'
+  | 'isProviderEffectivelyEnabled'
+  | 'getCurrentEnabledProviderIds'
+> {
+  const effectiveProviderConfig = mergeProviderAvailabilityConfig(
+    options.inheritedConfig,
+    options.localConfig,
+  );
+  const isProviderEnabledInServerScope = (providerId: string) => isProviderEnabled(
+    options.scopedConfig,
+    providerId,
+  );
+  const isProviderEnabledInCurrentScope = (providerId: string) => (
+    isProviderEnabledInServerScope(providerId)
+    && isProviderEnabled(options.localConfig, providerId)
+  );
+
+  return {
+    effectiveProviderConfig,
+    isProviderEnabledInServerScope,
+    isProviderEnabledInCurrentScope,
+    isProviderEffectivelyEnabled: (providerId: string) => (
+      isProviderEnabledInCurrentScope(providerId)
+      && isProviderEnabled(effectiveProviderConfig, providerId)
+    ),
+    getCurrentEnabledProviderIds: (providerIds: Iterable<string>) => collectCurrentEnabledProviderIds(
+      providerIds,
+      isProviderEnabledInCurrentScope,
+    ),
   };
 }
 
@@ -904,6 +980,27 @@ export function filterCatalog(
   return {
     providers: filteredProviders,
     defaults: filteredDefaults,
+  };
+}
+
+function projectEffectiveCatalog(options: {
+  baseEffective: ModelCatalog;
+  disabledModelRefs?: string[];
+  getCurrentEnabledProviderIds(providerIds: Iterable<string>): string[];
+}): Pick<ModelCatalogAssemblyResult, 'effective' | 'currentEnabledProviderIds'> {
+  const currentEnabledProviderIds = options.getCurrentEnabledProviderIds(
+    options.baseEffective.providers.map((provider) => provider.id),
+  );
+  const modelFilteredCatalog = filterCatalog(options.baseEffective, {
+    disabledModelRefs: options.disabledModelRefs,
+  });
+
+  return {
+    currentEnabledProviderIds,
+    effective: filterCatalogToProviderIds(
+      modelFilteredCatalog,
+      new Set(currentEnabledProviderIds),
+    ),
   };
 }
 

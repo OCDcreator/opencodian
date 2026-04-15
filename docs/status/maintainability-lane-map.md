@@ -1,19 +1,19 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [READY] `R120` 已完成；`R121-R137` 长队列继续推进，当前 `[NEXT]` 为 `R121 - modelConfig residual merge/assembly seam`。
+> **当前状态**: [READY] `R121` 已完成；`R122-R137` 长队列继续推进，当前 `[NEXT]` 为 `R122 - Checkpoint after secondary core seams`。
 
 ## 当前优先级
 
-- **当前 `[NEXT]`**：`R121 - modelConfig residual merge/assembly seam`
-- **本批目标**：`R120` 已完成 provider/model/plugin/debug settings normalization seam；现在继续 Batch 7 secondary core seams，优先收束 modelConfig merge/assembly residual、supplement、effective projection 与 provider resolution follow-up
+- **当前 `[NEXT]`**：`R122 - Checkpoint after secondary core seams`
+- **本批目标**：`R121` 已完成 modelConfig merge/assembly seam；现在完成 Batch 7 secondary core checkpoint，复盘 StorageService、settings normalization 与 modelConfig residual 收益
 - **当前 lint 基线**：`0 errors / 65 warnings`
 - **热点顺序**：
-  1. `src/core/config/modelConfig.ts`
-  2. `src/core/config/ModelConfigService.ts`
-  3. `docs/status/maintainability-round-roadmap.md`
-  4. `docs/status/maintainability-master-plan.md`
-  5. `docs/status/maintainability-phase-455.md`
+  1. `docs/status/maintainability-master-plan.md`
+  2. `docs/status/maintainability-round-roadmap.md`
+  3. `docs/status/maintainability-phase-456.md`
+  4. `docs/status/maintainability-completed-batches.md`
+  5. `docs/status/maintainability-phase-452.md`
 
 ## 本批边界
 
@@ -35,5 +35,5 @@
 ## 历史入口
 
 - 批次归档：`docs/status/maintainability-completed-batches.md`
-- 最近成功 phase：`docs/status/maintainability-phase-455.md`
+- 最近成功 phase：`docs/status/maintainability-phase-456.md`
 - 最近 checkpoint：`docs/status/maintainability-phase-452.md`

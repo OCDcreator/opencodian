@@ -2,19 +2,19 @@
 
 > **状态**: [READY]
 > **作用**: 这是 maintainability 无人值守的战略文档。每轮开始前，先读本文件，再读 `docs/status/maintainability-round-roadmap.md` 与最近的 `docs/status/maintainability-phase-XXX.md`。
-> **自动推进状态**: `R120` 已完成 `core types settings normalization seam B`；当前继续按 `R121-R137` 长队列顺序推进。恢复 autopilot 后只能从首个 `[NEXT]`（`R121`）顺序执行，不允许 freestyle。
+> **自动推进状态**: `R121` 已完成 `modelConfig residual merge/assembly seam`；当前继续按 `R122-R137` 长队列顺序推进。恢复 autopilot 后只能从首个 `[NEXT]`（`R122`）顺序执行，不允许 freestyle。
 
 ## 1. 当前判断
 
-**当前分支已完成 `R68-R120` 并把 live lint 稳定在 `0 errors / 65 warnings`；`R120` 已把 provider/model/plugin/debug load-time normalization residual 收束到更集中的 settings owner path。** 接下来继续 secondary core / settings / startup，先执行 `R121` 的 modelConfig residual，再做 heavy tests follow-up、warning closeout 与最终 checkpoint。
+**当前分支已完成 `R68-R121` 并把 live lint 稳定在 `0 errors / 65 warnings`；`R121` 已把 modelConfig server catalog state assembly、inherited provider resolution follow-up 与 effective projection residual 继续收束到 `modelConfig.ts` owner path。** 接下来先执行 `R122` 的 secondary core checkpoint，再进入 settings / main residual、heavy tests follow-up、warning closeout 与最终 checkpoint。
 
 ## 2. 当前基线
 
 - **lint**: `0 errors / 65 warnings`
-- **最近验证**: `R120` 已确认 focused `tests/unit/core/types/settings.test.ts`、`tests/unit/main/themeSettingsMigration.test.ts`、全量 `npm test` 与 `npm run build` 通过，`BUILD_ID` 为 `autopilot-maintainability.202604160156`
+- **最近验证**: `R121` 已确认 focused `tests/unit/core/config/modelConfig.test.ts`、`tests/unit/core/config/ModelConfigService.test.ts`、全量 `npm test` 与 `npm run build` 通过，`BUILD_ID` 为 `autopilot-maintainability.202604160208`
 - **最近 Test Vault 部署**: `R120`，`BUILD_ID` `autopilot-maintainability.202604160156`
-- **当前 `[NEXT]`**: `R121 - modelConfig residual merge/assembly seam`
-- **主热点**: `R120` 已完成 settings normalization seam B；下一步聚焦 `src/core/config/modelConfig.ts` 与 `src/core/config/ModelConfigService.ts`，继续收束 merge/assembly residual、supplement、effective projection 与 provider resolution follow-up
+- **当前 `[NEXT]`**: `R122 - Checkpoint after secondary core seams`
+- **主热点**: `R121` 已完成 modelConfig seam；下一步聚焦 secondary core checkpoint 文档，复盘 `R118-R121` 的 StorageService、settings normalization 与 modelConfig residual 收益
 
 ## 3. 本批执行规则
 

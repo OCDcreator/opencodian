@@ -8,19 +8,16 @@ import type { ModelSourceMode, OpencodeModelConfigSubset } from '../types';
 import {
   applyModelConfig,
   assembleModelCatalog,
+  assembleServerModelCatalog,
   buildCatalogFromConfig,
-  buildServerCatalog,
-  catalogFromRuntimeResult,
   collectConfiguredProviderIds,
   extractModelConfig,
   getEnabledProviderIds,
-  type InheritedModelConfigResolution,
   mergeModelConfigSubsets,
   type ModelCatalog,
-  parseModelReference,
+  type ModelServerCatalogAssemblyResult,
   parseOpencodeConfigText,
   type ProviderAvailabilityConfig,
-  resolveInheritedModelConfigResolution,
   resolveProviderAvailabilityProbePlan,
 } from './modelConfig';
 import type { OpencodeConfigManager } from './OpencodeConfigManager';
@@ -206,11 +203,9 @@ export class ModelConfigService {
     return getEnabledProviderIds(config, collectConfiguredProviderIds(config));
   }
 
-  private async loadServerState(localConfig: OpencodeModelConfigSubset | null = null): Promise<{
-    runtime: ModelCatalog;
-    configResolution: InheritedModelConfigResolution;
-    server: ModelCatalog;
-  }> {
+  private async loadServerState(
+    localConfig: OpencodeModelConfigSubset | null = null,
+  ): Promise<ModelServerCatalogAssemblyResult> {
     const resolvedLocalConfig = localConfig ?? await this.readLocalModelConfig();
     const localServerMode = this.isLocalServerMode();
     const [runtimeResult, scopedConfig, defaultScopeConfig, diskInheritedConfig] = await Promise.all([
@@ -219,22 +214,15 @@ export class ModelConfigService {
       this.openCodeService.getResolvedModelConfig({ includeDirectory: false }),
       localServerMode ? this.readLocalInheritedModelConfig() : Promise.resolve(undefined),
     ]);
-    const configResolution = resolveInheritedModelConfigResolution({
+
+    return assembleServerModelCatalog({
+      runtimeResult,
       localServerMode,
+      localConfig: resolvedLocalConfig,
       scopedConfig,
       defaultScopeConfig,
-      localConfig: resolvedLocalConfig,
       diskInheritedConfig,
     });
-    const runtime = catalogFromRuntimeResult(runtimeResult);
-    return {
-      runtime,
-      configResolution,
-      server: buildServerCatalog(
-        runtime,
-        configResolution.mergedScopedConfig,
-      ),
-    };
   }
 
   private isLocalServerMode(): boolean {
@@ -315,33 +303,5 @@ export class ModelConfigService {
       default:
         return '/etc/opencode';
     }
-  }
-
-  private collectKnownProviderIds(config: OpencodeModelConfigSubset): string[] {
-    const providerIds = new Set<string>();
-
-    if (config.provider) {
-      for (const providerId of Object.keys(config.provider)) {
-        const trimmed = providerId.trim();
-        if (trimmed) {
-          providerIds.add(trimmed);
-        }
-      }
-    }
-
-    for (const parsed of [parseModelReference(config.model), parseModelReference(config.small_model)]) {
-      if (parsed?.provider) {
-        providerIds.add(parsed.provider);
-      }
-    }
-
-    for (const providerId of config.disabled_providers ?? []) {
-      const trimmed = providerId.trim();
-      if (trimmed) {
-        providerIds.add(trimmed);
-      }
-    }
-
-    return [...providerIds];
   }
 }

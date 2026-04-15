@@ -114,10 +114,11 @@ export interface ModelCatalog {
 - provider 和 model 最终都按 `name.localeCompare()` 排序
 - `defaults` 采用 `{ ...server.defaults, ...local.defaults }`，项目默认值覆盖同 provider 的服务端默认值
 
-`catalogFromRuntimeResult(result)` 与 `buildServerCatalog(runtimeCatalog, metadataConfig)` 是 `R59` 后的 server catalog assembly seam：
+`catalogFromRuntimeResult(result)`、`buildServerCatalog(runtimeCatalog, metadataConfig)` 与 `assembleServerModelCatalog(options)` 是 server catalog assembly seam：
 
 - `catalogFromRuntimeResult()` 把 `config.providers(includeDirectory=true)` 风格返回值统一映射成 server-source `ModelCatalog`
 - `buildServerCatalog()` 以 runtime provider 集合作为服务器目录真值，只给当前 runtime 中存在的 provider 覆盖 scoped/default metadata 与 defaults
+- `assembleServerModelCatalog()` 把 runtime result、scoped/default/disk inherited config resolution 与 server catalog merge 收束到同一个 owner，服务层只负责读取这些输入
 - 只存在于 `config.get().provider` 或 connect-provider directory 的 provider 不会被补进 server catalog
 - `assembleModelCatalog()` 再负责按 `ModelSourceMode` 生成 `baseEffective`，叠加 `disabledModelRefs` 与 `currentEnabledProviderIds` 得到 `effective`
 
