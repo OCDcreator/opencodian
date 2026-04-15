@@ -7,13 +7,13 @@
 
 `main.ts` 定义 `OpenCodianPlugin`，是 Obsidian 侧的总装配点。它负责：
 
-- 初始化 `StorageService` 并加载/迁移持久化设置
+- 初始化 `StorageService`，并通过 `src/core/types/settingsLoadNormalization.ts` 加载/迁移持久化设置
 - 创建 `OpenCodeService`、`OpencodeConfigManager`、`ModelConfigService`
 - 在 `OpenCodianView` 注册前预加载会话元数据
 - 注册 ribbon、明暗主题自适应品牌图标、命令、设置页与视图
 - 协调主题外观、日志、诊断导出和本地 `.opencode` 权限配置同步
 
-它不是单纯的“入口壳”，还承担了插件级状态缓存、设置归一化、UI 刷新调度和诊断导出。
+它不是单纯的“入口壳”，还承担了插件级状态缓存、UI 刷新调度和诊断导出；但启动期的 persisted-settings merge / normalization 已收束到相邻 bootstrap owner。
 
 ## 导入关系
 
@@ -195,6 +195,7 @@ graph TD
 ## 与其他模块的交互
 
 - `StorageService`: 读写分层设置、会话、managed server state、主题背景资源。
+- `settingsLoadNormalization.ts`: 收束启动期 core/ui settings snapshot merge、历史 server/theme/input-panel 迁移与“是否需要回写归一化结果”的判定。
 - `OpenCodeService`: 承担 OpenCode 侧运行时；插件把设置、vault 路径和 managed PID 状态注入进去。
 - `OpencodeConfigManager`: 用于首次创建或后续同步 `.opencode` 权限配置。
 - `ModelConfigService`: 在拿到 vault 路径后构建，供设置页和视图读取模型目录。

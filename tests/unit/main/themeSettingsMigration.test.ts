@@ -42,7 +42,6 @@ function createPluginWithSavedSettings(savedSettings: Record<string, unknown>): 
   return plugin;
 }
 
-describe('OpenCodianPlugin.loadSettings theme migration', () => {
   it('binds legacy default chat appearance to the built-in current style preset', async () => {
     const plugin = createPluginWithSavedSettings({
       chatAppearance: getDefaultChatAppearanceSettings(),
@@ -418,4 +417,3 @@ describe('OpenCodianPlugin.loadSettings theme migration', () => {
       (plugin.settings as unknown as Record<string, unknown>).experimentalComposerGlassRefractionEnabled,
     ).toBeUndefined();
   });
-});

@@ -2,19 +2,19 @@
 
 > **状态**: [ACTIVE]
 > **作用**: 这是 maintainability 无人值守的战略文档。每轮开始前，先读本文件，再读 `docs/status/maintainability-round-roadmap.md` 与最近的 `docs/status/maintainability-phase-XXX.md`。
-> **自动推进状态**: 已人工续排 `R138-R152`；当前唯一可自动执行的 `[NEXT]` 是 `R146`。
+> **自动推进状态**: 已人工续排 `R138-R152`；当前唯一可自动执行的 `[NEXT]` 是 `R147`。
 
 ## 1. 当前判断
 
-**当前分支已完成 `R88-R145` 并已人工续排 `R146-R152`。`R145` 已把原 `modelConfig.ts` 大文件收束为 shared/catalog/availability/assembly/selection 相邻 owner，并拆分 model config focused suites，live lint 从 `0 errors / 48 warnings` 收敛到 `0 errors / 44 warnings`；当前 queue 进入 `R146` startup locale/settings normalization residual，再继续按 startup residual → opencode/streaming/persistence/glass-test residual 两批推进，并只在 `R147`、`R152` 设置后续 checkpoint。**
+**当前分支已完成 `R88-R146` 并已人工续排 `R147-R152`。`R146` 已把 `main.ts` 的 persisted-settings bootstrap normalization 收束到相邻 owner `settingsLoadNormalization.ts`，并把 startup/settings focused suites 拆开，live lint 从 `0 errors / 44 warnings` 收敛到 `0 errors / 41 warnings`；当前 queue 进入 `R147` checkpoint，随后继续按 opencode/streaming/persistence residual → justified heavy cleanup 推进，并只在 `R152` 保留本批 continuation checkpoint。**
 
 ## 2. 当前基线
 
-- **lint**: `0 errors / 44 warnings`
-- **最近验证**: `R145` 运行 focused `npm test -- modelConfig.test.ts modelConfigCatalog.test.ts ModelConfigService.test.ts ModelConfigServiceRuntimeScope.test.ts`、全量 `npm run lint -- --format unix`、全量 `npm test` 与 `npm run build`；lint 维持 `0 errors / 44 warnings`，`npm test` 为 `285 passed, 285 total` suites / `1189 passed, 1189 total` tests，最新 `BUILD_ID` 为 `autopilot-maintainability.202604160734`
-- **最近 Test Vault 部署**: `R144`，`BUILD_ID` `autopilot-maintainability.202604160711`
-- **当前 `[NEXT]`**: `R146 - Startup locale/settings normalization residual seam`
-- **主热点**: live lint 仍为 `44` warnings，其中 `tests/**` 约 `12`、`src/features/chat/**` 约 `7`、`src/utils/glass/**` 约 `6`、`src/core/opencode/**` 约 `5`，另有 settings modal/startup/locale/settings-types/provider-icon residual；`R146` 先处理 startup normalization seam，然后继续 `R148-R150` 的 opencode/streaming/persistence residual
+- **lint**: `0 errors / 41 warnings`
+- **最近验证**: `R146` 运行 focused `npm test -- themeSettingsMigration.test.ts settings.test.ts settingsAppearance.test.ts`、全量 `npm run lint -- --format unix`、全量 `npm test` 与 `npm run build`；lint 维持 `0 errors / 41 warnings`，`npm test` 为 `286 passed, 286 total` suites / `1189 passed, 1189 total` tests，最新 `BUILD_ID` 为 `autopilot-maintainability.202604160757`
+- **最近 Test Vault 部署**: `R146`，`BUILD_ID` `autopilot-maintainability.202604160757`
+- **当前 `[NEXT]`**: `R147 - Checkpoint after settings/startup seams`
+- **主热点**: live lint 仍为 `41` warnings，其中 `tests/**` 约 `9`、`src/features/chat/**` 约 `7`、`src/utils/glass/**` 约 `6`、`src/core/opencode/**` 约 `5`，另有 settings modal/provider-icon/persistence residual；`R147` 先做 settings/startup checkpoint，再继续 `R148-R150` 的 opencode/streaming/persistence residual
 
 ## 3. 本批执行规则
 
