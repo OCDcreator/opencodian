@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的 `[NEXT]`”。
-> **当前状态**: [READY] `R106` 已完成；`R107-R137` 长队列继续排队，当前首个 `[NEXT]` 为 `R107 - Checkpoint after question/todo seams`。
+> **当前状态**: [READY] `R107` 已完成；`R108-R137` 长队列继续排队，当前首个 `[NEXT]` 为 `R108 - OpenCodeService sync/bootstrap residual lifecycle seam`。
 
 ## 控制规则
 
@@ -17,8 +17,8 @@
 
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
 - 当前 live lint 基线：`0 errors / 65 warnings`
-- 最近成功 phase：`docs/status/maintainability-phase-440.md`
-- 当前路线判断：`R106` 已完成 question dock pending-resolution residual seam，当前必须从 `R107` 顺序执行，不得 freestyle。
+- 最近成功 phase：`docs/status/maintainability-phase-442.md`
+- 当前路线判断：`R107` 已完成 question/todo/background-task checkpoint，当前必须从 `R108` 顺序执行，不得 freestyle。
 
 ## Queue
 ## Queue
@@ -990,7 +990,7 @@
 - **禁止项**: 不改变 pending dock visibility、resolution semantics、draft answer persistence 或 active-tab gating。
 - **验收**: question dock pending-resolution residual 继续减少。；并通过全量 `npm test` 与 `npm run build`。
 
-### [NEXT] R107 - Checkpoint after question/todo seams
+### [DONE] R107 - Checkpoint after question/todo seams
 
 - **Lane**: Checkpoint
 - **目标**: 复盘 R103-R106 的 question/todo/background-task residual 收益。
@@ -1004,7 +1004,7 @@
 
 - **批次目标**: 继续处理 OpenCodeService lifecycle / fallback / diagnostics residual。
 
-### [QUEUED] R108 - OpenCodeService sync/bootstrap residual lifecycle seam
+### [NEXT] R108 - OpenCodeService sync/bootstrap residual lifecycle seam
 
 - **Lane**: Maintainability / opencode service lifecycle
 - **目标**: 沿现有 lifecycle owner 继续收束 sync restart、bootstrap follow-up、catalog/model refresh residual。

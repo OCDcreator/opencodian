@@ -1,21 +1,21 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [READY] `R107-R137` 长队列继续推进；当前 `[NEXT]` 为 `R107 - Checkpoint after question/todo seams`。
+> **当前状态**: [READY] `R108-R137` 长队列继续推进；当前 `[NEXT]` 为 `R108 - OpenCodeService sync/bootstrap residual lifecycle seam`。
 
 ## 当前优先级
 
-- **当前 `[NEXT]`**：`R107 - Checkpoint after question/todo seams`
-- **本批目标**：先复盘 `R103-R106` 的 question / todo / background-task seams 收益与剩余热点，再顺序回到 opencode core、secondary core / settings / startup
+- **当前 `[NEXT]`**：`R108 - OpenCodeService sync/bootstrap residual lifecycle seam`
+- **本批目标**：`R107` checkpoint 已复盘 `R103-R106` 的 question / todo / background-task seams；现在顺序回到 opencode core residual，再推进 secondary core / settings / startup
 - **当前 lint 基线**：`0 errors / 65 warnings`
 - **热点顺序**：
-  1. `docs/status/maintainability-master-plan.md`
-  2. `docs/status/maintainability-round-roadmap.md`
-  3. `docs/status/maintainability-phase-441.md`
-  4. `docs/status/maintainability-lane-map.md`
-  5. `src/core/opencode/OpenCodeService.ts`
-  6. `src/core/opencode/OpenCodeStreamingRuntimeCoordinator.ts`
-  7. `src/features/chat/services/QuestionDockCoordinator.ts`
+  1. `src/core/opencode/OpenCodeService.ts`
+  2. `src/core/opencode/OpenCodeServiceLifecycleCoordinator.ts`
+  3. `tests/unit/core/opencode/OpenCodeServiceLifecycleCoordinator.test.ts`
+  4. `tests/unit/core/opencode/OpenCodeService.test.ts`
+  5. `docs/status/maintainability-master-plan.md`
+  6. `docs/status/maintainability-round-roadmap.md`
+  7. `docs/status/maintainability-phase-442.md`
 
 ## 本批边界
 
