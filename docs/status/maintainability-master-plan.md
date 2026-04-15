@@ -2,19 +2,19 @@
 
 > **状态**: [READY]
 > **作用**: 这是 maintainability 无人值守的战略文档。每轮开始前，先读本文件，再读 `docs/status/maintainability-round-roadmap.md` 与最近的 `docs/status/maintainability-phase-XXX.md`。
-> **自动推进状态**: `R121` 已完成 `modelConfig residual merge/assembly seam`；当前继续按 `R122-R137` 长队列顺序推进。恢复 autopilot 后只能从首个 `[NEXT]`（`R122`）顺序执行，不允许 freestyle。
+> **自动推进状态**: `R122` 已完成 secondary core checkpoint；当前继续按 `R123-R137` 长队列顺序推进。恢复 autopilot 后只能从首个 `[NEXT]`（`R123`）顺序执行，不允许 freestyle。
 
 ## 1. 当前判断
 
-**当前分支已完成 `R68-R121` 并把 live lint 稳定在 `0 errors / 65 warnings`；`R121` 已把 modelConfig server catalog state assembly、inherited provider resolution follow-up 与 effective projection residual 继续收束到 `modelConfig.ts` owner path。** 接下来先执行 `R122` 的 secondary core checkpoint，再进入 settings / main residual、heavy tests follow-up、warning closeout 与最终 checkpoint。
+**当前分支已完成 `R68-R122` 并把 live lint 稳定在 `0 errors / 65 warnings`；`R122` 已复盘 secondary core residual：`StorageService` settings-file lifecycle、settings normalization A/B 与 modelConfig merge/assembly seam 均已收束到各自 owner path。** 接下来进入 Batch 8 settings / main residual，从 `R123` 的 `SettingsModelSection.attach` residual seam 开始，再继续 heavy tests follow-up、warning closeout 与最终 checkpoint。
 
 ## 2. 当前基线
 
 - **lint**: `0 errors / 65 warnings`
-- **最近验证**: `R121` 已确认 focused `tests/unit/core/config/modelConfig.test.ts`、`tests/unit/core/config/ModelConfigService.test.ts`、全量 `npm test` 与 `npm run build` 通过，`BUILD_ID` 为 `autopilot-maintainability.202604160208`
+- **最近验证**: `R122` 已确认全量 `npm test` 与 `npm run build` 通过，`BUILD_ID` 为 `autopilot-maintainability.202604160213`
 - **最近 Test Vault 部署**: `R120`，`BUILD_ID` `autopilot-maintainability.202604160156`
-- **当前 `[NEXT]`**: `R122 - Checkpoint after secondary core seams`
-- **主热点**: `R121` 已完成 modelConfig seam；下一步聚焦 secondary core checkpoint 文档，复盘 `R118-R121` 的 StorageService、settings normalization 与 modelConfig residual 收益
+- **当前 `[NEXT]`**: `R123 - SettingsModelSection attach residual seam`
+- **主热点**: `R122` 已完成 secondary core checkpoint；下一步聚焦 `SettingsModelSection.attach` 的 attach、refresh wiring、action follow-up 与 presenter residual
 
 ## 3. 本批执行规则
 
