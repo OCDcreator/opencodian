@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个活动任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成活动任务；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的后续任务”。
-> **当前状态**: [ACTIVE] 已人工续排 `R138-R152`；当前唯一活动任务是 `R139`。
+> **当前状态**: [ACTIVE] 已人工续排 `R138-R152`；当前唯一活动任务是 `R140`。
 
 ## 控制规则
 
@@ -17,8 +17,8 @@
 
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
 - 当前 live lint 基线：`0 errors / 57 warnings`
-- 最近成功 phase：`docs/status/maintainability-phase-473.md`
-- 当前路线判断：`R137` 已确认 `R88-R136` 完成 owner seam、heavy suite split、final warning closeout 与 queue closeout 的完整闭环；`R138` 已把 `OpenCodianView` 的 turn lifecycle runtime writeback 继续压回 `ConversationTabRuntimeCoordinator`，当前 queue 继续按 chat residual、settings/model/startup residual、opencode/streaming/persistence residual 与 justified heavy test cleanup 三段推进。
+- 最近成功 phase：`docs/status/maintainability-phase-474.md`
+- 当前路线判断：`R137` 已确认 `R88-R136` 完成 owner seam、heavy suite split、final warning closeout 与 queue closeout 的完整闭环；`R139` 已把 authoritative conversation reload/auth-sync lifecycle 与 client-only message merge 规则继续压回相邻厚 owner，当前 queue 继续按 chat residual、settings/model/startup residual、opencode/streaming/persistence residual 与 justified heavy test cleanup 三段推进。
 
 ## Queue
 ## Queue
@@ -1341,7 +1341,7 @@
 - **禁止项**: 不改变并发 tab/session streaming、background-task completion notice、hydration/auth-sync gate、scroll restore 或 question card resolution 语义；不新增薄 helper / adapter / provider / factory。
 - **验收**: `OpenCodianView` 直接持有的 turn lifecycle wiring 有可量化收缩，lint 维持 `0 errors`；并通过全量 `npm test` 与 `npm run build`。
 
-### [NEXT] R139 - Conversation authoritative sync residual seam
+### [DONE] R139 - Conversation authoritative sync residual seam
 
 - **Lane**: Maintainability / chat sync
 - **目标**: 沿 `ConversationAuthoritativeSyncCoordinator` 与 sync bridge 处理 hydration/reload/auth-sync residual，减少大文件内部混杂的 sync decision、stale guard 与 message refresh 细节。
@@ -1353,7 +1353,7 @@
 - **禁止项**: 不提前降级 background tasks 为 stale，不改变 authoritative message sync 完成门槛，不弱化 reload/scroll restore 场景覆盖。
 - **验收**: authoritative sync owner 的职责边界更清晰，相关 warning 有可量化下降且 lint 维持 `0 errors`；并通过全量 `npm test` 与 `npm run build`。
 
-### [QUEUED] R140 - Background timeline/context usage residual seam
+### [NEXT] R140 - Background timeline/context usage residual seam
 
 - **Lane**: Maintainability / chat services
 - **目标**: 沿 `BackgroundTaskTimelineService`、`ContextUsageService` 与相邻 tests 收束 background-task timeline、context usage render/update residual，保持已有 service owner 厚度。

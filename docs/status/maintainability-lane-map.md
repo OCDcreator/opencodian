@@ -1,15 +1,15 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [ACTIVE] 已人工续排 `R138-R152`；当前唯一 `[NEXT]` 是 `R139`。
+> **当前状态**: [ACTIVE] 已人工续排 `R138-R152`；当前唯一 `[NEXT]` 是 `R140`。
 
 ## 当前优先级
 
-- **当前 `[NEXT]`**：`R139 - Conversation authoritative sync residual seam`
+- **当前 `[NEXT]`**：`R140 - Background timeline/context usage residual seam`
 - **本批目标**：`R138-R152` 分三批继续收束 live residual：chat runtime/service → settings/model/startup → opencode/streaming/persistence/glass-test cleanup
-- **当前 lint 基线**：`0 errors / 57 warnings`
+- **当前 lint 基线**：`0 errors / 56 warnings`
 - **热点顺序**：
-  1. `R139-R141`: `src/features/chat/OpenCodianView.ts` 与 chat service residual（当前 chat 约 `13` warnings）
+  1. `R140-R141`: `src/features/chat/OpenCodianView.ts` 与 chat service residual（当前 chat 约 `12` warnings）
   2. `R143-R146`: `src/features/settings/**`、`src/core/config/**`、`src/main.ts`、locale/settings normalization residual
   3. `R148-R150`: `src/core/opencode/**`、streaming utils、storage/provider-icon persistence residual
   4. `R151`: 仅在 live hotspot 仍支撑时处理 heavy tests / opt-in glass warning cleanup
@@ -35,5 +35,5 @@
 ## 历史入口
 
 - 批次归档：`docs/status/maintainability-completed-batches.md`
-- 最近成功 phase：`docs/status/maintainability-phase-473.md`
+- 最近成功 phase：`docs/status/maintainability-phase-474.md`
 - 最近 checkpoint：`docs/status/maintainability-phase-472.md`
