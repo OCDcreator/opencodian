@@ -1,8 +1,8 @@
 import type { PromptContextItem } from '../../../../src/core/types';
 import {
   buildComposerContextChipStates,
-  createFocusContextPreview,
   type ComposerContextChipState,
+  createFocusContextPreview,
 } from '../../../../src/features/chat/composerContext';
 import {
   ComposerContextCoordinator,

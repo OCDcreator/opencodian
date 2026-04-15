@@ -1,17 +1,17 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [READY] `R130` 已完成；`R131-R137` 长队列继续推进，当前 `[NEXT]` 为 `R131 - Chat heavy suite split follow-up B`。
+> **当前状态**: [READY] `R131` 已完成；`R132-R137` 长队列继续推进，当前 `[NEXT]` 为 `R132 - Checkpoint after heavy test split wave`。
 
 ## 当前优先级
 
-- **当前 `[NEXT]`**：`R131 - Chat heavy suite split follow-up B`
-- **本批目标**：`R130` 已完成 chat render/sync heavy test split；当前继续 question/todo/composer/background-task heavy tests follow-up
+- **当前 `[NEXT]`**：`R132 - Checkpoint after heavy test split wave`
+- **本批目标**：`R131` 已完成 question/todo/composer/background-task heavy test follow-up；当前先复盘 `R128-R131` 的 heavy suite split 收益并确认 final warning lane 入口
 - **当前 lint 基线**：`0 errors / 65 warnings`
 - **热点顺序**：
-  1. `tests/unit/features/chat/QuestionDockCoordinator.test.ts`
-  2. `tests/unit/features/chat/ComposerContextCoordinator.test.ts`
-  3. `docs/status/maintainability-round-roadmap.md`
+  1. `docs/status/maintainability-master-plan.md`
+  2. `docs/status/maintainability-round-roadmap.md`
+  3. `docs/status/maintainability-lane-map.md`
 
 ## 本批边界
 

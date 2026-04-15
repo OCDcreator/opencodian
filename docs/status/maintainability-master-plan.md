@@ -2,19 +2,19 @@
 
 > **状态**: [READY]
 > **作用**: 这是 maintainability 无人值守的战略文档。每轮开始前，先读本文件，再读 `docs/status/maintainability-round-roadmap.md` 与最近的 `docs/status/maintainability-phase-XXX.md`。
-> **自动推进状态**: `R130` 已完成 Chat heavy suite split follow-up A；当前继续按 `R131-R137` 长队列顺序推进。恢复 autopilot 后只能从首个 `[NEXT]`（`R131`）顺序执行，不允许 freestyle。
+> **自动推进状态**: `R131` 已完成 Chat heavy suite split follow-up B；当前继续按 `R132-R137` 长队列顺序推进。恢复 autopilot 后只能从首个 `[NEXT]`（`R132`）顺序执行，不允许 freestyle。
 
 ## 1. 当前判断
 
-**当前分支已完成 `R68-R130` 并把 live lint 记录基线保持在 `0 errors / 65 warnings`；`R130` 已把 chat render/sync 邻域的 residual heavy suites 按 render flows、incremental updates、signal routing、background loop 四个责任域拆开。** 接下来进入 `R131` 的 question/todo/composer/background-task heavy tests follow-up，再按后续 heavy split checkpoint、warning closeout 与最终 checkpoint 顺序推进。
+**当前分支已完成 `R68-R131` 并把 live lint 记录基线保持在 `0 errors / 65 warnings`；`R131` 已把 question/todo/background-task runtime view host 邻域的 residual heavy suite 按 forwarding 与 late-binding 两个责任域拆开，并清掉 composer 入口的 import-sort 残留。** 接下来先执行 `R132` checkpoint，复盘 `R128-R131` 的 heavy test split 收益，再按 warning closeout 与最终 checkpoint 顺序推进。
 
 ## 2. 当前基线
 
 - **lint**: `0 errors / 65 warnings`
-- **最近验证**: `R130` 已确认 focused lint、focused tests、全量 `npm test` 与 `npm run build` 通过，`BUILD_ID` 为 `autopilot-maintainability.202604160334`
+- **最近验证**: `R131` 已确认 focused lint、focused tests、全量 `npm test` 与 `npm run build` 通过，`BUILD_ID` 为 `autopilot-maintainability.202604160346`
 - **最近 Test Vault 部署**: `R126`，`BUILD_ID` `autopilot-maintainability.202604160258`（`R127` 仅改 checkpoint 文档，未触发部署）
-- **当前 `[NEXT]`**: `R131 - Chat heavy suite split follow-up B`
-- **主热点**: `R130` 已完成 chat render/sync heavy suite split；下一步继续 Batch 9，把 question/todo/composer/background-task 邻域 residual heavy tests 按责任域继续拆开
+- **当前 `[NEXT]`**: `R132 - Checkpoint after heavy test split wave`
+- **主热点**: Batch 9 heavy suite split wave 已完成；下一步先复盘 `R128-R131` 的 heavy-suite ownership 收益，并确认 Batch 10 warning closeout 的入口顺序
 
 ## 3. 本批执行规则
 
