@@ -162,10 +162,10 @@ describe('ConversationSyncHostAdapter', () => {
     expect(hosts.orchestrationHost.getTab('tab-hidden')).toEqual(viewHost.getTab('tab-hidden'));
     expect(await hosts.orchestrationHost.getConversationById('conversation-hidden')).toBe(hiddenConversation);
     expect(hosts.runtimeCoordinatorHost.getTabRuntimeState('tab-hidden')).toBe(hiddenRuntime);
-    expect(hosts.bridgeHost.getTabRuntimeState('tab-hidden')).toBe(hiddenRuntime);
+    expect(hosts.backgroundPostSyncRouterHost.getTabRuntimeState('tab-hidden')).toBe(hiddenRuntime);
   });
 
-  it('routes bridge host work back through the view adapter callbacks', async () => {
+  it('routes bridge and post-sync host work back through the view adapter callbacks', async () => {
     const currentConversation = createConversation('conversation-active');
     const syncResult: ConversationSyncBridgeSyncResult = {
       changed: true,
@@ -188,8 +188,11 @@ describe('ConversationSyncHostAdapter', () => {
       ),
     ).resolves.toEqual(syncResult);
 
-    await hosts.bridgeHost.applySyncedConversationUpdate(currentConversation.messages, currentConversation.messages);
-    await hosts.bridgeHost.renderBackgroundTaskIndicatorIfNeeded('tab-active');
+    await hosts.visiblePostSyncRouterHost.applySyncedConversationUpdate(
+      currentConversation.messages,
+      currentConversation.messages,
+    );
+    await hosts.visiblePostSyncRouterHost.renderBackgroundTaskIndicatorIfNeeded('tab-active');
 
     expect(viewHost.syncConversationMessagesFromServer).toHaveBeenCalledWith(
       currentConversation,

@@ -7,7 +7,6 @@ import {
   ConversationSyncBridge,
   type ConversationSyncBridgeHost,
   type ConversationSyncBridgeOrchestration,
-  type ConversationSyncBridgeRuntime,
   type ConversationSyncBridgeRuntimeCoordinator,
   type ConversationSyncBridgeSyncResult,
 } from '../../../../src/features/chat/services/ConversationSyncBridge';
@@ -52,27 +51,15 @@ function createSyncResult(
 
 function createHost(options?: {
   currentConversation?: Conversation | null;
-  runtimes?: Record<string, ConversationSyncBridgeRuntime | null>;
   syncResult?: ConversationSyncBridgeSyncResult;
 }): Mocked<ConversationSyncBridgeHost> {
-  const runtimes = new Map<string, ConversationSyncBridgeRuntime | null>(
-    Object.entries(options?.runtimes ?? {
-      'tab-active': { lastConversationSyncFingerprint: 'initial-active' },
-      'tab-bg': { lastConversationSyncFingerprint: 'initial-bg' },
-    }),
-  );
   const conversation = options?.currentConversation ?? createConversation('active');
 
   return {
     getCurrentConversation: jest.fn().mockReturnValue(conversation),
-    getTabRuntimeState: jest.fn().mockImplementation((tabId: string | null) =>
-      tabId ? (runtimes.get(tabId) ?? null) : null,
-    ),
     syncConversationMessagesFromServer: jest.fn().mockResolvedValue(
       options?.syncResult ?? createSyncResult(conversation),
     ),
-    applySyncedConversationUpdate: jest.fn().mockResolvedValue(undefined),
-    renderBackgroundTaskIndicatorIfNeeded: jest.fn().mockResolvedValue(undefined),
   };
 }
 
@@ -182,8 +169,6 @@ describe('ConversationSyncBridge', () => {
         revertState: { messageID: 'assistant-next' },
       }),
     });
-    expect(host.applySyncedConversationUpdate).not.toHaveBeenCalled();
-    expect(host.renderBackgroundTaskIndicatorIfNeeded).not.toHaveBeenCalled();
   });
 
   it('routes signal sync callbacks through the background post-sync router', async () => {

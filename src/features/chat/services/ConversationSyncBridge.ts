@@ -1,7 +1,4 @@
-import type {
-  ChatMessage,
-  Conversation,
-} from '../../../core/types';
+import type { Conversation } from '../../../core/types';
 import type { TabId } from '../tabs';
 import type { ConversationSyncBackgroundPostSyncRouter } from './ConversationSyncBackgroundPostSyncRouter';
 import type {
@@ -16,26 +13,16 @@ import type {
   ConversationSyncVisiblePostSyncRouter,
 } from './ConversationSyncVisiblePostSyncRouter';
 
-export interface ConversationSyncBridgeRuntime {
-  lastConversationSyncFingerprint: string | null;
-}
-
 export type ConversationSyncBridgeSyncResult = ConversationSyncVisiblePostSyncResult;
 
 export interface ConversationSyncBridgeHost {
   getCurrentConversation(): Conversation | null;
-  getTabRuntimeState(tabId: TabId | null): ConversationSyncBridgeRuntime | null;
   syncConversationMessagesFromServer(
     conversation: Conversation,
     tabId: TabId | null,
     reason: string,
     options?: { suppressVerboseLogs?: boolean },
   ): Promise<ConversationSyncBridgeSyncResult>;
-  applySyncedConversationUpdate(
-    previousMessages: ChatMessage[],
-    nextMessages: ChatMessage[],
-  ): Promise<void>;
-  renderBackgroundTaskIndicatorIfNeeded(tabId?: TabId | null): Promise<void>;
 }
 
 export interface ConversationSyncBridgeRuntimeCoordinator {

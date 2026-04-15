@@ -2,18 +2,18 @@
 
 > **状态**: [READY]
 > **作用**: 这是 maintainability 无人值守的战略文档。每轮开始前，先读本文件，再读 `docs/status/maintainability-round-roadmap.md` 与最近的 `docs/status/maintainability-phase-XXX.md`。
-> **自动推进状态**: `R95` 已完成；当前已人工续排 `R96-R137` 长队列。恢复 autopilot 后只能从首个 `[NEXT]`（`R96`）顺序执行，不允许 freestyle。
+> **自动推进状态**: `R96` 已完成；当前已人工续排 `R97-R137` 长队列。恢复 autopilot 后只能从首个 `[NEXT]`（`R97`）顺序执行，不允许 freestyle。
 
 ## 1. 当前判断
 
-**当前分支已完成 `R68-R95` 并把 live lint 稳定在 `0 errors / 65 warnings`；现在已完成 `MessageFinalizationService` sync-after-stream seam，准备进入 `R96` 的 post-sync routing seam。** 新批次不重复已完成 seam，而是继续围绕最新 checkpoint 仍然高收益的 residual seams：先吃 chat render/sync/services 残余，再吃 `OpenCodeService`/streaming residual，再转 secondary core / settings / startup，最后做 heavy tests follow-up、warning closeout 与最终 checkpoint。
+**当前分支已完成 `R68-R96` 并把 live lint 稳定在 `0 errors / 65 warnings`；现在已完成 `ConversationSyncBridge` 的 post-sync routing seam，准备进入 `R97` 的 chat render/sync checkpoint。** 新批次不重复已完成 seam，而是继续围绕最新 checkpoint 仍然高收益的 residual seams：先吃 chat render/sync/services 残余，再吃 `OpenCodeService`/streaming residual，再转 secondary core / settings / startup，最后做 heavy tests follow-up、warning closeout 与最终 checkpoint。
 
 ## 2. 当前基线
 
 - **lint**: `0 errors / 65 warnings`
-- **最近验证**: `R95` 已确认 focused `npm test -- MessageFinalizationService`、全量 `npm test` 与 `npm run build` 通过，`BUILD_ID` 为 `autopilot-maintainability.202604152108`
+- **最近验证**: `R96` 已确认 focused `npm test -- ConversationSync`、全量 `npm test` 与 `npm run build` 通过，`BUILD_ID` 为 `autopilot-maintainability.202604152116`
 - **最近 Test Vault 部署**: `R64`，`BUILD_ID` `autopilot-maintainability.202604150602`
-- **当前 `[NEXT]`**: `R96 - ConversationSyncBridge post-sync routing seam`
+- **当前 `[NEXT]`**: `R97 - Checkpoint after chat render/sync seams`
 - **主热点**: `src/features/chat/**` 仍是最大生产热点，`src/core/opencode/**` 仍是第二梯队热点
 
 ## 3. 本批执行规则

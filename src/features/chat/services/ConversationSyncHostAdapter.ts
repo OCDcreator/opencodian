@@ -6,6 +6,7 @@ import type { TabData, TabId } from '../tabs';
 import {
   type ConversationSyncBackgroundPostSyncHandoffPort,
   ConversationSyncBackgroundPostSyncRouter,
+  type ConversationSyncBackgroundPostSyncRouterHost,
 } from './ConversationSyncBackgroundPostSyncRouter';
 import {
   ConversationSyncBridge,
@@ -23,6 +24,7 @@ import {
 } from './ConversationSyncRuntimeCoordinator';
 import {
   ConversationSyncVisiblePostSyncRouter,
+  type ConversationSyncVisiblePostSyncRouterHost,
 } from './ConversationSyncVisiblePostSyncRouter';
 import type { VisibleConversationPostSyncCoordinator } from './VisibleConversationPostSyncCoordinator';
 
@@ -51,6 +53,8 @@ export interface ConversationSyncHosts {
   runtimeCoordinatorHost: ConversationSyncRuntimeCoordinatorHost;
   orchestrationHost: ConversationSyncOrchestrationHost;
   bridgeHost: ConversationSyncBridgeHost;
+  visiblePostSyncRouterHost: ConversationSyncVisiblePostSyncRouterHost;
+  backgroundPostSyncRouterHost: ConversationSyncBackgroundPostSyncRouterHost;
 }
 
 export interface ConversationSyncServices {
@@ -84,19 +88,23 @@ export function createConversationSyncHosts(
     },
     bridgeHost: {
       getCurrentConversation: () => viewHost.getCurrentConversation(),
-      getTabRuntimeState: (tabId: TabId | null) => viewHost.getTabRuntimeState(tabId),
       syncConversationMessagesFromServer: (
         conversation: Conversation,
         tabId: TabId | null,
         reason: string,
         options?: { suppressVerboseLogs?: boolean },
       ) => viewHost.syncConversationMessagesFromServer(conversation, tabId, reason, options),
+    },
+    visiblePostSyncRouterHost: {
       applySyncedConversationUpdate: (
         previousMessages: ChatMessage[],
         nextMessages: ChatMessage[],
       ) => viewHost.applySyncedConversationUpdate(previousMessages, nextMessages),
       renderBackgroundTaskIndicatorIfNeeded: (tabId?: TabId | null) =>
         viewHost.renderBackgroundTaskIndicatorIfNeeded(tabId),
+    },
+    backgroundPostSyncRouterHost: {
+      getTabRuntimeState: (tabId: TabId | null) => viewHost.getTabRuntimeState(tabId),
     },
   };
 }
@@ -113,11 +121,11 @@ export function createConversationSyncServices(
     runtimeCoordinator,
   );
   const visiblePostSyncRouter = new ConversationSyncVisiblePostSyncRouter(
-    hosts.bridgeHost,
+    hosts.visiblePostSyncRouterHost,
     visiblePostSyncCoordinator,
   );
   const backgroundPostSyncRouter = new ConversationSyncBackgroundPostSyncRouter(
-    hosts.bridgeHost,
+    hosts.backgroundPostSyncRouterHost,
     backgroundPostSyncHandoffCoordinator,
   );
   const bridge = new ConversationSyncBridge(
