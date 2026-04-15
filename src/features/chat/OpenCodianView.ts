@@ -251,6 +251,7 @@ import {
 import {
   ConversationTabRuntimeCoordinator,
   type ConversationTabRuntimeCoordinatorHost,
+  type ConversationTabRuntimeState,
 } from './services/ConversationTabRuntimeCoordinator';
 import {
   type ConversationViewStateHost,
@@ -449,17 +450,10 @@ interface OpenCodianViewInteractionRuntimeWiring {
   sendPipelineRuntime: SendPipelineRuntime;
 }
 
-interface TabRuntimeState {
-  isStreaming: boolean;
+interface TabRuntimeState extends ConversationTabRuntimeState {
   streamController: StreamController | null;
   streamingMessageEl: HTMLElement | null;
   streamingContentEl: HTMLElement | null;
-  currentTurnBodyEl: HTMLElement | null;
-  autoScrollEnabled: boolean;
-  isNearBottom: boolean;
-  programmaticScrollGuardUntil: number;
-  isConversationSyncInFlight: boolean;
-  lastConversationSyncFingerprint: string | null;
   lastInterruptedSyncPreservationLogFingerprint: string | null;
   sessionTodoSessionId: string | null;
   sessionTodos: SessionTodo[];
@@ -472,9 +466,6 @@ interface TabRuntimeState {
   sessionStatus: SessionActivityStatus | null;
   sessionStatusLastChangedAt: number | null;
   statusRequestId: number;
-  backgroundTaskIndicatorEl: HTMLElement | null;
-  backgroundTaskInlineEls: Map<string, HTMLElement>;
-  turnBodyByAnchorKey: Map<string, HTMLElement>;
   backgroundTaskStartedAt: number | null;
   backgroundTaskActiveAnchorKey: string | null;
   backgroundTaskModeTag: string | null;
@@ -485,13 +476,10 @@ interface TabRuntimeState {
   backgroundTaskLastAuthoritativeSyncAt: number | null;
   backgroundTaskStaleNoticeFingerprint: string | null;
   backgroundTaskSuppressedFingerprint: string | null;
-  isHydratingConversation: boolean;
-  pendingLayoutMutations: number;
   pendingSignalConversationSyncReasons: Set<string>;
   signalConversationSyncTimerId: number | null;
   focusContextPreview: FocusContextPreview | null;
   draftContextItems: PromptContextItem[];
-  pendingEditedFiles: Set<string>;
   questionInlineCardEl: HTMLElement | null;
   pendingQuestionResolution: QuestionResolution | null;
   pendingQuestionRequests: QuestionRequest[];
@@ -980,13 +968,6 @@ export class OpenCodianView extends ItemView {
     return this.getActiveTabRuntimeState()?.isStreaming ?? false;
   }
 
-  private set isStreaming(value: boolean) {
-    const runtime = this.ensureTabRuntimeState();
-    if (runtime) {
-      runtime.isStreaming = value;
-    }
-  }
-
   private get streamController(): StreamController | null {
     return this.getActiveTabRuntimeState()?.streamController ?? null;
   }
@@ -1010,46 +991,6 @@ export class OpenCodianView extends ItemView {
     const runtime = this.ensureTabRuntimeState();
     if (runtime) {
       runtime.streamingContentEl = value;
-    }
-  }
-
-  private get currentTurnBodyEl(): HTMLElement | null {
-    return this.getActiveTabRuntimeState()?.currentTurnBodyEl ?? null;
-  }
-
-  private set currentTurnBodyEl(value: HTMLElement | null) {
-    const runtime = this.ensureTabRuntimeState();
-    if (runtime) {
-      runtime.currentTurnBodyEl = value;
-    }
-  }
-
-  private get isConversationSyncInFlight(): boolean {
-    return this.getActiveTabRuntimeState()?.isConversationSyncInFlight ?? false;
-  }
-
-  private set isConversationSyncInFlight(value: boolean) {
-    const runtime = this.ensureTabRuntimeState();
-    if (runtime) {
-      runtime.isConversationSyncInFlight = value;
-    }
-  }
-
-  private get lastConversationSyncFingerprint(): string | null {
-    return this.getActiveTabRuntimeState()?.lastConversationSyncFingerprint ?? null;
-  }
-
-  private set lastConversationSyncFingerprint(value: string | null) {
-    const runtime = this.ensureTabRuntimeState();
-    if (runtime) {
-      runtime.lastConversationSyncFingerprint = value;
-    }
-  }
-
-  private set backgroundTaskIndicatorEl(value: HTMLElement | null) {
-    const runtime = this.ensureTabRuntimeState();
-    if (runtime) {
-      runtime.backgroundTaskIndicatorEl = value;
     }
   }
 
@@ -1100,26 +1041,19 @@ export class OpenCodianView extends ItemView {
   }
 
   private beginConversationHydration(tabId: TabId | null = this.getActiveTabId()): void {
-    const runtime = this.getTabRuntimeState(tabId);
-    if (!runtime) {
+    const isTrackingHydration = this.conversationTabRuntimeCoordinator.beginConversationHydration(tabId);
+    if (!isTrackingHydration) {
       return;
     }
 
-    runtime.isHydratingConversation = true;
-    runtime.pendingLayoutMutations = 0;
     this.backgroundTaskLiveSignalCoordinator.armAuthoritativeSyncGate(tabId);
     this.conversationSyncBridgePorts.getSignalScheduler().clearScheduledSignalConversationSync(tabId);
   }
 
   private endConversationHydration(tabId: TabId | null = this.getActiveTabId()): void {
-    const runtime = this.getTabRuntimeState(tabId);
-    if (!runtime) {
-      return;
-    }
-
-    runtime.isHydratingConversation = false;
-    if (runtime.pendingLayoutMutations > 0) {
-      runtime.pendingLayoutMutations = 0;
+    const hadPendingLayoutMutations =
+      this.conversationTabRuntimeCoordinator.endConversationHydration(tabId);
+    if (hadPendingLayoutMutations) {
       this.scheduleSettledScrollToBottomIfNeeded(this.shouldAutoScroll(tabId), tabId);
     }
   }
@@ -1605,9 +1539,7 @@ export class OpenCodianView extends ItemView {
         this.assistantShellViewHostAdapter.renderPersistedAssistantMessage({ message }),
       saveConversation: (conversation) => this.plugin.saveConversation(conversation),
       handleVisibleNoticeMessageAppended: () => {
-        const runtime = this.getActiveTabRuntimeState();
-        if (runtime?.isHydratingConversation) {
-          runtime.pendingLayoutMutations += 1;
+        if (this.conversationTabRuntimeCoordinator.recordHydrationLayoutMutation()) {
           return;
         }
 
@@ -1933,10 +1865,9 @@ export class OpenCodianView extends ItemView {
       getConversationSyncFingerprint: (messages) =>
         this.getConversationSyncFingerprint(messages),
       setTabConversationSyncFingerprint: (tabId, fingerprint) => {
-        const runtime = this.getTabRuntimeState(tabId);
-        if (runtime) {
-          runtime.lastConversationSyncFingerprint = fingerprint;
-        }
+        this.conversationTabRuntimeCoordinator.updateConversationSyncRuntime(tabId, {
+          fingerprint,
+        });
       },
     };
   }
@@ -1947,7 +1878,10 @@ export class OpenCodianView extends ItemView {
       getConversationSyncFingerprint: (messages) =>
         this.getConversationSyncFingerprint(messages),
       setLastConversationSyncFingerprint: (fingerprint) => {
-        this.lastConversationSyncFingerprint = fingerprint;
+        this.conversationTabRuntimeCoordinator.updateConversationSyncRuntime(
+          this.getActiveTabId(),
+          { fingerprint },
+        );
       },
       startConversationSyncLoop: () => {
         this.conversationSyncBridgePorts.getLoopControl().startConversationSyncLoop();
@@ -2269,19 +2203,17 @@ export class OpenCodianView extends ItemView {
         this.sessionTodoCoordinator.refreshTabSessionTodos(tabId, sessionId, options),
       saveConversation: (conversation) => this.plugin.saveConversation(conversation),
       setConversationSyncInFlight: (tabId, value) => {
-        const runtime = this.getTabRuntimeState(tabId);
-        if (runtime) {
-          runtime.isConversationSyncInFlight = value;
-        }
+        this.conversationTabRuntimeCoordinator.updateConversationSyncRuntime(tabId, {
+          inFlight: value,
+        });
       },
       setLastConversationSyncFingerprint: (tabId, fingerprint) => {
-        const runtime = this.getTabRuntimeState(tabId);
-        if (runtime) {
-          runtime.lastConversationSyncFingerprint = fingerprint;
-        }
+        this.conversationTabRuntimeCoordinator.updateConversationSyncRuntime(tabId, {
+          fingerprint,
+        });
       },
       clearPendingEditedFiles: (tabId) => {
-        this.getTabRuntimeState(tabId)?.pendingEditedFiles.clear();
+        this.conversationTabRuntimeCoordinator.clearPendingEditedFiles(tabId);
       },
       setTabNeedsAttention: (tabId, needsAttention) => this.setTabNeedsAttention(tabId, needsAttention),
       setActiveTabConversation: (conversation) => {
@@ -2334,10 +2266,7 @@ export class OpenCodianView extends ItemView {
       },
       saveConversation: (conversation) => this.plugin.saveConversation(conversation),
       setAutoScrollEnabled: (tabId, enabled) => {
-        const runtime = this.getTabRuntimeState(tabId);
-        if (runtime) {
-          runtime.autoScrollEnabled = enabled;
-        }
+        this.conversationTabRuntimeCoordinator.setAutoScrollEnabled(tabId, enabled);
       },
       renderMessage: (message) => conversationRenderService.renderMessage(message),
       scrollToBottom: (options) => {
@@ -2350,10 +2279,7 @@ export class OpenCodianView extends ItemView {
         void this.startAiConversationTitleGeneration(conversationId, firstMessage, modelOptions);
       },
       setStreaming: (tabId, value) => {
-        const runtime = this.getTabRuntimeState(tabId);
-        if (runtime) {
-          runtime.isStreaming = value;
-        }
+        this.conversationTabRuntimeCoordinator.setStreaming(tabId, value);
       },
       syncTabStreamLikeState: (tabId) => {
         this.syncTabStreamLikeState(tabId);
@@ -2362,7 +2288,7 @@ export class OpenCodianView extends ItemView {
         this.beginTabContextUsageStream(tabId);
       },
       clearPendingEditedFiles: (tabId) => {
-        this.getTabRuntimeState(tabId)?.pendingEditedFiles.clear();
+        this.conversationTabRuntimeCoordinator.clearPendingEditedFiles(tabId);
       },
     };
   }
@@ -2664,10 +2590,7 @@ export class OpenCodianView extends ItemView {
             return;
           }
 
-          const runtime = this.getTabRuntimeState(tabId);
-          if (runtime) {
-            runtime.autoScrollEnabled = true;
-          }
+          this.conversationTabRuntimeCoordinator.setAutoScrollEnabled(tabId, true);
           this.scrollToBottom({ tabId, behavior: 'smooth', enableAutoScroll: true });
         },
       },
@@ -2675,14 +2598,7 @@ export class OpenCodianView extends ItemView {
   }
 
   private restoreTurnStateFromActivePane(): void {
-    if (!this.messagesContainer) {
-      this.resetTurnState();
-      return;
-    }
-
-    const turnBodies = Array.from(this.messagesContainer.querySelectorAll('.opencodian-turn-body'));
-    this.currentTurnBodyEl = (turnBodies[turnBodies.length - 1] as HTMLElement | undefined) ?? null;
-    this.backgroundTaskIndicatorEl = null;
+    this.conversationTabRuntimeCoordinator.restoreTurnStateFromPane();
   }
 
   private initializeTabSystem(): void {
@@ -3639,7 +3555,12 @@ export class OpenCodianView extends ItemView {
       });
       this.currentConversation.updatedAt = Date.now();
       await this.plugin.storage.saveConversation(this.currentConversation);
-      this.lastConversationSyncFingerprint = this.getConversationSyncFingerprint(this.currentConversation.messages);
+      this.conversationTabRuntimeCoordinator.updateConversationSyncRuntime(
+        this.getActiveTabId(),
+        {
+          fingerprint: this.getConversationSyncFingerprint(this.currentConversation.messages),
+        },
+      );
     }
 
     this.scrollToBottom({ enableAutoScroll: true });
@@ -3739,7 +3660,7 @@ export class OpenCodianView extends ItemView {
     }
 
     // Update local state
-    this.isStreaming = false;
+    this.conversationTabRuntimeCoordinator.setStreaming(this.getActiveTabId(), false);
     this.streamController?.cancelStream();
     this.syncActiveTabStreamLikeState();
     logger.debug('isStreaming set to false');
@@ -3753,15 +3674,19 @@ export class OpenCodianView extends ItemView {
   }
 
   private createUserMessageRenderFrame(message: ChatMessage): ConversationUserMessageRenderFrame | null {
-    const turn = this.createTurn();
+    const tabId = this.getActiveTabId();
+    const turn = this.createTurn(tabId);
     const parentEl = turn?.headerEl;
     const messageEl = parentEl?.createDiv({
       cls: `opencodian-message opencodian-message--${message.role}`,
     });
 
     if (!messageEl || !turn) return null;
-    const runtime = this.getTabRuntimeState();
-    runtime?.turnBodyByAnchorKey.set(this.getMessageAnchorKey(message), turn.bodyEl);
+    this.conversationTabRuntimeCoordinator.registerTurnBodyAnchor(
+      tabId,
+      this.getMessageAnchorKey(message),
+      turn.bodyEl,
+    );
     messageEl.dataset.messageId = message.id;
     if (message.sourceMessageId) {
       messageEl.dataset.sourceMessageId = message.sourceMessageId;
@@ -4303,19 +4228,14 @@ export class OpenCodianView extends ItemView {
     mergedHydratedMessage: ChatMessage,
     tabId: TabId | null,
   ): void {
-    const runtime = this.getTabRuntimeState(tabId);
-    if (!runtime) {
-      return;
-    }
-
-    const previousAnchorKey = this.getMessageAnchorKey(optimisticMessage);
-    const nextAnchorKey = this.getMessageAnchorKey(mergedHydratedMessage);
-    const bodyEl = runtime.turnBodyByAnchorKey.get(previousAnchorKey);
-    if (bodyEl) {
-      runtime.turnBodyByAnchorKey.delete(previousAnchorKey);
-      runtime.turnBodyByAnchorKey.set(nextAnchorKey, bodyEl);
-    }
-    runtime.lastConversationSyncFingerprint = this.getConversationSyncFingerprint(conversation.messages);
+    this.conversationTabRuntimeCoordinator.rekeyTurnBodyAnchor(
+      tabId,
+      this.getMessageAnchorKey(optimisticMessage),
+      this.getMessageAnchorKey(mergedHydratedMessage),
+    );
+    this.conversationTabRuntimeCoordinator.updateConversationSyncRuntime(tabId, {
+      fingerprint: this.getConversationSyncFingerprint(conversation.messages),
+    });
   }
 
   private getLogPreview(text: string, maxLength = 180): string {

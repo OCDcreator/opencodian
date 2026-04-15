@@ -19,9 +19,12 @@ import {
 
 export interface ConversationTabRuntimeState extends TabMessagesPaneRuntimeState {
   currentTurnBodyEl: HTMLElement | null;
+  isConversationSyncInFlight: boolean;
+  lastConversationSyncFingerprint: string | null;
   backgroundTaskIndicatorEl: HTMLElement | null;
   backgroundTaskInlineEls: Map<string, HTMLElement>;
   turnBodyByAnchorKey: Map<string, HTMLElement>;
+  pendingEditedFiles: Set<string>;
 }
 
 export interface ConversationTabRuntimeCoordinatorHost {
@@ -194,6 +197,111 @@ export class ConversationTabRuntimeCoordinator<
     runtime.backgroundTaskIndicatorEl = null;
     runtime.turnBodyByAnchorKey.clear();
     runtime.backgroundTaskInlineEls.clear();
+  }
+
+  restoreTurnStateFromPane(tabId: TabId | null = this.getActiveTabId()): void {
+    const paneState = this.getPaneState(tabId);
+    if (!paneState) {
+      this.resetTurnState(tabId);
+      return;
+    }
+
+    const turnBodies = Array.from(paneState.messagesEl.querySelectorAll('.opencodian-turn-body'));
+    paneState.runtime.currentTurnBodyEl =
+      (turnBodies[turnBodies.length - 1] as HTMLElement | undefined) ?? null;
+    paneState.runtime.backgroundTaskIndicatorEl = null;
+  }
+
+  beginConversationHydration(tabId: TabId | null = this.getActiveTabId()): boolean {
+    const runtime = this.getRuntimeState(tabId);
+    if (!runtime) {
+      return false;
+    }
+
+    runtime.isHydratingConversation = true;
+    runtime.pendingLayoutMutations = 0;
+    return true;
+  }
+
+  recordHydrationLayoutMutation(tabId: TabId | null = this.getActiveTabId()): boolean {
+    const runtime = this.getRuntimeState(tabId);
+    if (!runtime?.isHydratingConversation) {
+      return false;
+    }
+
+    runtime.pendingLayoutMutations += 1;
+    return true;
+  }
+
+  endConversationHydration(tabId: TabId | null = this.getActiveTabId()): boolean {
+    const runtime = this.getRuntimeState(tabId);
+    if (!runtime) {
+      return false;
+    }
+
+    runtime.isHydratingConversation = false;
+    const hadPendingLayoutMutations = runtime.pendingLayoutMutations > 0;
+    runtime.pendingLayoutMutations = 0;
+    return hadPendingLayoutMutations;
+  }
+
+  setAutoScrollEnabled(tabId: TabId | null, enabled: boolean): void {
+    const runtime = this.getRuntimeState(tabId);
+    if (runtime) {
+      runtime.autoScrollEnabled = enabled;
+    }
+  }
+
+  setStreaming(tabId: TabId | null, isStreaming: boolean): void {
+    const runtime = this.getRuntimeState(tabId);
+    if (runtime) {
+      runtime.isStreaming = isStreaming;
+    }
+  }
+
+  clearPendingEditedFiles(tabId: TabId | null): void {
+    this.getRuntimeState(tabId)?.pendingEditedFiles.clear();
+  }
+
+  updateConversationSyncRuntime(
+    tabId: TabId | null,
+    update: { inFlight?: boolean; fingerprint?: string | null },
+  ): void {
+    const runtime = this.getRuntimeState(tabId);
+    if (!runtime) {
+      return;
+    }
+
+    if (update.inFlight !== undefined) {
+      runtime.isConversationSyncInFlight = update.inFlight;
+    }
+    if ('fingerprint' in update) {
+      runtime.lastConversationSyncFingerprint = update.fingerprint ?? null;
+    }
+  }
+
+  registerTurnBodyAnchor(
+    tabId: TabId | null,
+    anchorKey: string,
+    bodyEl: HTMLElement,
+  ): void {
+    this.getRuntimeState(tabId)?.turnBodyByAnchorKey.set(anchorKey, bodyEl);
+  }
+
+  rekeyTurnBodyAnchor(
+    tabId: TabId | null,
+    previousAnchorKey: string,
+    nextAnchorKey: string,
+  ): boolean {
+    const runtime = this.getRuntimeState(tabId);
+    const bodyEl = runtime?.turnBodyByAnchorKey.get(previousAnchorKey);
+    if (!runtime || !bodyEl) {
+      return false;
+    }
+
+    runtime.turnBodyByAnchorKey.delete(previousAnchorKey);
+    runtime.turnBodyByAnchorKey.set(nextAnchorKey, bodyEl);
+    return true;
   }
 
   createTurn(

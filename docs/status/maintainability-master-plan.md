@@ -2,18 +2,18 @@
 
 > **状态**: [ACTIVE]
 > **作用**: 这是 maintainability 无人值守的战略文档。每轮开始前，先读本文件，再读 `docs/status/maintainability-round-roadmap.md` 与最近的 `docs/status/maintainability-phase-XXX.md`。
-> **自动推进状态**: 已人工续排 `R138-R152`；当前唯一可自动执行的 `[NEXT]` 是 `R138`。
+> **自动推进状态**: 已人工续排 `R138-R152`；当前唯一可自动执行的 `[NEXT]` 是 `R139`。
 
 ## 1. 当前判断
 
-**当前分支已完成 `R88-R137` 并已人工续排 `R138-R152`。`R137` checkpoint 确认上一批已按 “existing thick owner seam → heavy suite split → final warning cleanup → queue closeout” 闭环完成；本次续排基于当前实测 lint `0 errors / 57 warnings`，先处理仍有高收益的 production residual seam，再进入少量由 live hotspot 支撑的 heavy test / warning cleanup。新队列分三批推进：`R138-R142` 聚焦 chat runtime/service residual，`R143-R147` 聚焦 settings / model catalog / startup residual，`R148-R152` 聚焦 opencode / streaming / persistence / glass-test residual，并只在 `R142`、`R147`、`R152` 设置 checkpoint。**
+**当前分支已完成 `R88-R138` 并已人工续排 `R139-R152`。`R138` 已把 `OpenCodianView` 里残留的 foreground turn / hydration / sync fingerprint runtime writeback 继续收回 `ConversationTabRuntimeCoordinator`，让 view 不再直接铺开这批 tab runtime 细节；当前 queue 继续按 chat residual → settings/model/startup residual → opencode/streaming/persistence/glass-test residual 三批推进，并只在 `R142`、`R147`、`R152` 设置 checkpoint。**
 
 ## 2. 当前基线
 
 - **lint**: `0 errors / 57 warnings`
-- **最近验证**: 本次 queue authoring 重新运行 `npm run lint -- --format unix`，维持 `0 errors / 57 warnings`；最近全量 `npm test` 与 `npm run build` 仍为 `R137` 的通过结果，`BUILD_ID` 为 `autopilot-maintainability.202604160449`
+- **最近验证**: `R138` 重新运行 focused chat tests、`npm run lint -- --format unix`、全量 `npm test` 与 `npm run build`；lint 维持 `0 errors / 57 warnings`，最新 `BUILD_ID` 为 `autopilot-maintainability.202604160525`
 - **最近 Test Vault 部署**: `R133`，`BUILD_ID` `autopilot-maintainability.202604160412`
-- **当前 `[NEXT]`**: `R138 - OpenCodianView turn lifecycle residual seam`
+- **当前 `[NEXT]`**: `R139 - Conversation authoritative sync residual seam`
 - **主热点**: live lint 仍为 `57` warnings，其中 `tests/**` 约 `17`、`src/features/chat/**` 约 `13`、`src/features/settings/**` 约 `6`、`src/utils/glass/**` 约 `6`、`src/core/opencode/**` 约 `5`，另有 provider icons / streaming utils / startup / locale / settings types residual；新 queue 因此先排 production seam，再排测试与 warning cleanup
 
 ## 3. 本批执行规则

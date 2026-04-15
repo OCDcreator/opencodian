@@ -24,10 +24,13 @@ function createRuntimeState(overrides: Partial<TestRuntimeState> = {}): TestRunt
     isHydratingConversation: false,
     pendingLayoutMutations: 0,
     isStreaming: false,
+    isConversationSyncInFlight: false,
+    lastConversationSyncFingerprint: null,
     currentTurnBodyEl: null,
     backgroundTaskIndicatorEl: null,
     backgroundTaskInlineEls: new Map(),
     turnBodyByAnchorKey: new Map(),
+    pendingEditedFiles: new Set(),
     ...overrides,
   };
 }
@@ -240,6 +243,10 @@ describe('ConversationTabRuntimeCoordinator', () => {
     expect(reusedBody).toBe(turn?.bodyEl);
     expect(paneState.runtime.currentTurnBodyEl).toBe(turn?.bodyEl);
 
+    fixture.coordinator.registerTurnBodyAnchor('tab-1', 'anchor-before', turn!.bodyEl);
+    expect(fixture.coordinator.rekeyTurnBodyAnchor('tab-1', 'anchor-before', 'anchor-after')).toBe(true);
+    expect(paneState.runtime.turnBodyByAnchorKey.get('anchor-after')).toBe(turn?.bodyEl);
+
     turn?.turnEl.remove();
     const assistantOnlyBody = fixture.coordinator.ensureTurnBody('tab-1');
 
@@ -249,11 +256,45 @@ describe('ConversationTabRuntimeCoordinator', () => {
       'opencodian-turn--assistant-only',
     )).toBe(true);
 
+    paneState.runtime.currentTurnBodyEl = null;
+    paneState.runtime.backgroundTaskIndicatorEl = document.createElement('div');
+    fixture.coordinator.restoreTurnStateFromPane('tab-1');
+
+    expect(paneState.runtime.currentTurnBodyEl).toBe(assistantOnlyBody);
+    expect(paneState.runtime.backgroundTaskIndicatorEl).toBeNull();
+
     fixture.coordinator.resetTurnState('tab-1');
 
     expect(paneState.runtime.currentTurnBodyEl).toBeNull();
     expect(paneState.runtime.backgroundTaskIndicatorEl).toBeNull();
     expect(paneState.runtime.backgroundTaskInlineEls.size).toBe(0);
     expect(paneState.runtime.turnBodyByAnchorKey.size).toBe(0);
+  });
+
+  it('centralizes foreground streaming, sync, edited files, and hydration runtime writes', () => {
+    const fixture = createFixture();
+    const runtime = createRuntimeState({
+      pendingEditedFiles: new Set(['notes.md']),
+    });
+    fixture.pane.runtimeByTab.set('tab-1', runtime);
+
+    fixture.coordinator.setAutoScrollEnabled('tab-1', false);
+    fixture.coordinator.setStreaming('tab-1', true);
+    fixture.coordinator.updateConversationSyncRuntime('tab-1', {
+      inFlight: true,
+      fingerprint: 'fingerprint-1',
+    });
+    fixture.coordinator.clearPendingEditedFiles('tab-1');
+    expect(fixture.coordinator.beginConversationHydration('tab-1')).toBe(true);
+    expect(fixture.coordinator.recordHydrationLayoutMutation('tab-1')).toBe(true);
+    expect(fixture.coordinator.endConversationHydration('tab-1')).toBe(true);
+
+    expect(runtime.autoScrollEnabled).toBe(false);
+    expect(runtime.isStreaming).toBe(true);
+    expect(runtime.isConversationSyncInFlight).toBe(true);
+    expect(runtime.lastConversationSyncFingerprint).toBe('fingerprint-1');
+    expect(runtime.pendingEditedFiles.size).toBe(0);
+    expect(runtime.isHydratingConversation).toBe(false);
+    expect(runtime.pendingLayoutMutations).toBe(0);
   });
 });

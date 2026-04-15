@@ -49,7 +49,12 @@ describe('OpenCodianView turn diff notice routing', () => {
         tabId: string,
       ) => Promise<void>;
       getActiveTabId: () => string;
-      getTabRuntimeState: (tabId?: string | null) => { lastConversationSyncFingerprint: string | null } | null;
+      conversationTabRuntimeCoordinator: {
+        updateConversationSyncRuntime: (
+          tabId: string | null,
+          update: { fingerprint?: string | null },
+        ) => void;
+      };
       assistantShellViewHostAdapter: {
         renderPersistedAssistantMessage: (options: unknown) => Promise<HTMLElement>;
       };
@@ -76,14 +81,14 @@ describe('OpenCodianView turn diff notice routing', () => {
       updatedAt: 0,
       messages: [],
     };
-    const oldTabRuntime = { lastConversationSyncFingerprint: null as string | null };
 
     view.currentConversation = currentConversation;
     view.tabManager = { setTabNeedsAttention: jest.fn() };
     jest.spyOn(view, 'getActiveTabId').mockReturnValue('tab-new');
-    jest.spyOn(view, 'getTabRuntimeState').mockImplementation((tabId?: string | null) => (
-      tabId === 'tab-old' ? oldTabRuntime : null
-    ));
+    const syncRuntimeSpy = jest.spyOn(
+      view.conversationTabRuntimeCoordinator,
+      'updateConversationSyncRuntime',
+    );
     const renderSpy = jest.spyOn(
       view.assistantShellViewHostAdapter,
       'renderPersistedAssistantMessage',
@@ -103,7 +108,9 @@ describe('OpenCodianView turn diff notice routing', () => {
     expect(currentConversation.messages).toHaveLength(0);
     expect(saveConversation).toHaveBeenCalledWith(sendingConversation);
     expect(view.tabManager.setTabNeedsAttention).toHaveBeenCalledWith('tab-old', true);
-    expect(oldTabRuntime.lastConversationSyncFingerprint).toBeTruthy();
+    expect(syncRuntimeSpy).toHaveBeenCalledWith('tab-old', {
+      fingerprint: expect.any(String),
+    });
     expect(renderSpy).not.toHaveBeenCalled();
     expect(scrollSpy).not.toHaveBeenCalled();
   });

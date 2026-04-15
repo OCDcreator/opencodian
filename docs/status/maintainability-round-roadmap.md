@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个活动任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成活动任务；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的后续任务”。
-> **当前状态**: [ACTIVE] 已人工续排 `R138-R152`；当前唯一活动任务是 `R138`。
+> **当前状态**: [ACTIVE] 已人工续排 `R138-R152`；当前唯一活动任务是 `R139`。
 
 ## 控制规则
 
@@ -17,8 +17,8 @@
 
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
 - 当前 live lint 基线：`0 errors / 57 warnings`
-- 最近成功 phase：`docs/status/maintainability-phase-472.md`
-- 当前路线判断：`R137` 已确认 `R88-R136` 完成 owner seam、heavy suite split、final warning closeout 与 queue closeout 的完整闭环；本次人工续排 `R138-R152`，按 chat residual、settings/model/startup residual、opencode/streaming/persistence residual 与 justified heavy test cleanup 三段推进。
+- 最近成功 phase：`docs/status/maintainability-phase-473.md`
+- 当前路线判断：`R137` 已确认 `R88-R136` 完成 owner seam、heavy suite split、final warning closeout 与 queue closeout 的完整闭环；`R138` 已把 `OpenCodianView` 的 turn lifecycle runtime writeback 继续压回 `ConversationTabRuntimeCoordinator`，当前 queue 继续按 chat residual、settings/model/startup residual、opencode/streaming/persistence residual 与 justified heavy test cleanup 三段推进。
 
 ## Queue
 ## Queue
@@ -1328,7 +1328,7 @@
 
 - **批次目标**: 先处理当前 production residual 中收益最高的 chat runtime/service seams；只沿既有厚 owner 收束，不制造薄 helper / adapter / provider / factory。
 
-### [NEXT] R138 - OpenCodianView turn lifecycle residual seam
+### [DONE] R138 - OpenCodianView turn lifecycle residual seam
 
 - **Lane**: Maintainability / chat runtime
 - **目标**: 从 `OpenCodianView` 的 foreground turn、background status、hydration/auth-sync 边界中收束仍直接铺开的 turn lifecycle residual，优先复用既有 runtime/service owner。
@@ -1341,7 +1341,7 @@
 - **禁止项**: 不改变并发 tab/session streaming、background-task completion notice、hydration/auth-sync gate、scroll restore 或 question card resolution 语义；不新增薄 helper / adapter / provider / factory。
 - **验收**: `OpenCodianView` 直接持有的 turn lifecycle wiring 有可量化收缩，lint 维持 `0 errors`；并通过全量 `npm test` 与 `npm run build`。
 
-### [QUEUED] R139 - Conversation authoritative sync residual seam
+### [NEXT] R139 - Conversation authoritative sync residual seam
 
 - **Lane**: Maintainability / chat sync
 - **目标**: 沿 `ConversationAuthoritativeSyncCoordinator` 与 sync bridge 处理 hydration/reload/auth-sync residual，减少大文件内部混杂的 sync decision、stale guard 与 message refresh 细节。
