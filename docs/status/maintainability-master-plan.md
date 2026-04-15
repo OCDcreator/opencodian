@@ -2,19 +2,19 @@
 
 > **状态**: [ACTIVE]
 > **作用**: 这是 maintainability 无人值守的战略文档。每轮开始前，先读本文件，再读 `docs/status/maintainability-round-roadmap.md` 与最近的 `docs/status/maintainability-phase-XXX.md`。
-> **自动推进状态**: 已人工续排 `R138-R152`；当前唯一可自动执行的 `[NEXT]` 是 `R142`。
+> **自动推进状态**: 已人工续排 `R138-R152`；当前唯一可自动执行的 `[NEXT]` 是 `R143`。
 
 ## 1. 当前判断
 
-**当前分支已完成 `R88-R141` 并已人工续排 `R142-R152`。`R141` 已把 chat render/history/control residual 中仍然挤在单文件内的厚 owner 下沉到 `ConversationRenderRuntime`、`ConversationTrailingAssistantPatchPlanner`、`ConversationHistoryDialogService` 与 `PermissionModeSelectorCoordinator`，让 `ConversationRenderService`、`ConversationHistoryActionsCoordinator` 与 `ChatSelectionControlsCoordinator` 回到更清晰的 orchestration 边界；当前 queue 进入 `R142` checkpoint，再继续按 settings/model/startup residual → opencode/streaming/persistence/glass-test residual 两批推进，并只在 `R147`、`R152` 设置后续 checkpoint。**
+**当前分支已完成 `R88-R142` 并已人工续排 `R143-R152`。`R142` checkpoint 已复盘 `R138-R141` 的 chat residual 收益：`OpenCodianView` turn lifecycle、authoritative sync、background/context usage 与 render/history/control 四段 residual 已继续压回相邻厚 owner，live lint 从 `0 errors / 57 warnings` 收敛到 `0 errors / 51 warnings`；当前 queue 进入 `R143` settings model catalog/provider icon residual，再继续按 settings/model/startup residual → opencode/streaming/persistence/glass-test residual 两批推进，并只在 `R147`、`R152` 设置后续 checkpoint。**
 
 ## 2. 当前基线
 
 - **lint**: `0 errors / 51 warnings`
-- **最近验证**: `R141` 重新运行 focused chat render/history/control tests、focused eslint、全量 `npm run lint -- --format unix`、全量 `npm test` 与 `npm run build`；lint 由 `0 errors / 54 warnings` 降至 `0 errors / 51 warnings`，最新 `BUILD_ID` 为 `autopilot-maintainability.202604160625`
+- **最近验证**: `R142` checkpoint 重新运行全量 `npm run lint -- --format unix`、全量 `npm test` 与 `npm run build`；lint 维持 `0 errors / 51 warnings`，`npm test` 为 `282 passed, 282 total` suites / `1189 passed, 1189 total` tests，最新 `BUILD_ID` 为 `autopilot-maintainability.202604160632`
 - **最近 Test Vault 部署**: `R133`，`BUILD_ID` `autopilot-maintainability.202604160412`
-- **当前 `[NEXT]`**: `R142 - Checkpoint after chat residual seams`
-- **主热点**: live lint 仍为 `51` warnings，其中 `tests/**` 约 `17`、`src/features/chat/**` 约 `7`、`src/features/settings/**` 约 `6`、`src/utils/glass/**` 约 `6`、`src/core/opencode/**` 约 `5`，另有 provider icons / streaming utils / startup / locale / settings types residual；当前 queue 先做 chat checkpoint，再转入 settings/model/startup production seam
+- **当前 `[NEXT]`**: `R143 - Settings model catalog/provider icon residual seam`
+- **主热点**: live lint 仍为 `51` warnings，其中 `tests/**` 约 `17`、`src/features/chat/**` 约 `7`、`src/features/settings/**` 约 `6`、`src/utils/glass/**` 约 `6`、`src/core/opencode/**` 约 `5`，另有 provider icons / streaming utils / startup / locale / settings types residual；`R143` 先处理 settings model catalog / provider icon residual，然后继续 `R144-R146` 的 settings/style/startup seam
 
 ## 3. 本批执行规则
 

@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个活动任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成活动任务；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的后续任务”。
-> **当前状态**: [ACTIVE] 已人工续排 `R138-R152`；当前唯一活动任务是 `R142`。
+> **当前状态**: [ACTIVE] 已人工续排 `R138-R152`；当前唯一活动任务是 `R143`。
 
 ## 控制规则
 
@@ -18,7 +18,7 @@
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
 - 当前 live lint 基线：`0 errors / 51 warnings`
 - 最近成功 phase：`docs/status/maintainability-phase-476.md`
-- 当前路线判断：`R137` 已确认 `R88-R136` 完成 owner seam、heavy suite split、final warning closeout 与 queue closeout 的完整闭环；`R141` 已把 chat render/history/control residual 继续压回 `ConversationRenderRuntime`、`ConversationTrailingAssistantPatchPlanner`、`ConversationHistoryDialogService` 与 `PermissionModeSelectorCoordinator`，当前 queue 先做 chat checkpoint，再进入 settings/model/startup residual、opencode/streaming/persistence residual 与 justified heavy test cleanup 三段推进。
+- 当前路线判断：`R137` 已确认 `R88-R136` 完成 owner seam、heavy suite split、final warning closeout 与 queue closeout 的完整闭环；`R142` 已复盘 `R138-R141` 的 chat residual 收益、warning 变化、验证成本与剩余热点，当前 queue 进入 settings/model/startup residual、opencode/streaming/persistence residual 与 justified heavy test cleanup 三段推进。
 
 ## Queue
 ## Queue
@@ -1378,7 +1378,7 @@
 - **禁止项**: 不改变 message render ordering、trailing assistant patch、selection state、history action enablement 或 user markup rendering 语义。
 - **验收**: render/history/control residual warning 有可量化下降且 lint 维持 `0 errors`；并通过全量 `npm test` 与 `npm run build`。
 
-### [NEXT] R142 - Checkpoint after chat residual seams
+### [DONE] R142 - Checkpoint after chat residual seams
 
 - **Lane**: Checkpoint
 - **目标**: 复盘 `R138-R141` 的 chat residual 收益、warning 变化、验证成本与下一批 settings/model/startup 入口。
@@ -1393,7 +1393,7 @@
 
 - **批次目标**: 在 chat checkpoint 后处理 settings/model/startup production residual；命中 deploy-relevant paths 时严格执行 build → Test Vault deploy → `BUILD_ID` 校验。
 
-### [QUEUED] R143 - Settings model catalog/provider icon residual seam
+### [NEXT] R143 - Settings model catalog/provider icon residual seam
 
 - **Lane**: Maintainability / settings model catalog
 - **目标**: 沿 model settings/catalog/picker 既有 owner 收束 `ModelConfigModal`、`SettingsModelCatalogPresenter`、provider icon refresh 与 workspace residual；`OpenCodianSettings` 只允许做必要的 section wiring 对齐。
