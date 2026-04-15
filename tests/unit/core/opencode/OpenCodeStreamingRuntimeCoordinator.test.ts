@@ -3,8 +3,13 @@ import { TextDecoder } from 'util';
 import { OpenCodeStreamEventTransformer } from '../../../../src/core/opencode/OpenCodeStreamEventTransformer';
 import {
   OpenCodeStreamingRuntimeCoordinator,
+  type OpenCodeStreamingRuntimeContext,
   type OpenCodeStreamingRuntimeCoordinatorHost,
 } from '../../../../src/core/opencode/OpenCodeStreamingRuntimeCoordinator';
+import type {
+  OpenCodeStreamEvent,
+  OpenCodeStreamEventState,
+} from '../../../../src/core/opencode/OpenCodeStreamEventTransformer';
 
 const originalFetch = global.fetch;
 
@@ -213,5 +218,119 @@ describe('OpenCodeStreamingRuntimeCoordinator', () => {
       modelId: 'openai/gpt-5',
     });
     expect(chunks[chunks.length - 1]).toEqual({ type: 'message_stop' });
+  });
+
+  it('emits only the assistant tail delta during SDK finalization', async () => {
+    const host = createHost({
+      getSessionMessages: jest.fn().mockResolvedValue([
+        {
+          info: {
+            id: 'assistant-tail',
+            sessionID: 'sdk-tail',
+            role: 'assistant',
+            providerID: 'openai',
+            modelID: 'gpt-5',
+            time: { created: 1234567891 },
+          },
+          parts: [
+            {
+              id: 'part-tail',
+              sessionID: 'sdk-tail',
+              messageID: 'assistant-tail',
+              type: 'text',
+              text: 'Hello from SDK',
+            },
+          ],
+        },
+      ]),
+      streamEventTransformer: {
+        handleStreamingEvent: jest.fn().mockImplementation((
+          _event: OpenCodeStreamEvent,
+          _sessionId: string,
+          state: OpenCodeStreamEventState,
+          _streamContext: OpenCodeStreamingRuntimeContext,
+        ) => {
+          state.lastContent = 'Hello';
+          return {
+            chunks: [{ type: 'text', content: 'Hello' }],
+            stop: false,
+          };
+        }),
+        parseSSEEvents: jest.fn().mockReturnValue({ events: [], remaining: '' }),
+      },
+    });
+    const coordinator = new OpenCodeStreamingRuntimeCoordinator(host);
+    const chunks: unknown[] = [];
+
+    for await (const chunk of coordinator.streamSdkResponse({
+      sessionId: 'sdk-tail',
+      startPrompt: jest.fn().mockResolvedValue(undefined),
+      subscribe: jest.fn().mockResolvedValue((async function* () {
+        yield { type: 'ignored' } as never;
+      })()),
+    })) {
+      chunks.push(chunk);
+    }
+
+    expect(chunks).toEqual([
+      { type: 'message_start' },
+      { type: 'text', content: 'Hello' },
+      { type: 'text', content: ' from SDK' },
+      {
+        type: 'message_metadata',
+        messageId: 'assistant-tail',
+        timestamp: 1234567891,
+        modelId: 'openai/gpt-5',
+      },
+      { type: 'message_stop' },
+    ]);
+  });
+
+  it('emits assistant error fallback when finalization finds a structured assistant error', async () => {
+    const host = createHost({
+      getSessionMessages: jest.fn().mockResolvedValue([
+        {
+          info: {
+            id: 'assistant-error',
+            sessionID: 'sdk-error',
+            role: 'assistant',
+            providerID: 'openai',
+            modelID: 'gpt-5',
+            time: { created: 1234567892 },
+            error: {
+              data: {
+                message: 'Rate limit hit',
+                statusCode: 429,
+              },
+            },
+          },
+          parts: [],
+        },
+      ]),
+    });
+    const coordinator = new OpenCodeStreamingRuntimeCoordinator(host);
+    const chunks: unknown[] = [];
+
+    for await (const chunk of coordinator.streamSdkResponse({
+      sessionId: 'sdk-error',
+      startPrompt: jest.fn().mockResolvedValue(undefined),
+      subscribe: jest.fn().mockResolvedValue((async function* () {
+        return;
+      })()),
+    })) {
+      chunks.push(chunk);
+    }
+
+    expect(chunks).toEqual([
+      { type: 'message_start' },
+      { type: 'error', content: 'Rate limit hit (HTTP 429)' },
+      {
+        type: 'message_metadata',
+        messageId: 'assistant-error',
+        timestamp: 1234567892,
+        modelId: 'openai/gpt-5',
+      },
+      { type: 'message_stop' },
+    ]);
   });
 });

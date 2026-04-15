@@ -16,7 +16,7 @@
 ## 当前背景
 
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
-- 最近成功 phase：`docs/status/maintainability-phase-413.md`
+- 最近成功 phase：`docs/status/maintainability-phase-414.md`
 - 当前 live lint 基线：`0 errors / 79 warnings`
 - 当前路线判断：上一批已在 `R67` checkpoint 收口；当前新 batch 直接转向 chat runtime / services 与 opencode core，并把 heavy tests / warning cleanup 明确写成 `R81-R86`。
 
@@ -618,7 +618,7 @@
   - stream transformer 的直接 event 分支明显减少
   - focused validation、全量 `npm test`、`npm run build` 通过
 
-### [NEXT] R79 - OpenCodeStreamingRuntimeCoordinator finalization seam
+### [DONE] R79 - OpenCodeStreamingRuntimeCoordinator finalization seam
 
 - **Lane**: Maintainability / opencode stream finalization
 - **目标**: 从 `src/core/opencode/OpenCodeStreamingRuntimeCoordinator.ts:409` 一带收束 finishStreamingResponse、assistant tail lookup、fallback final content/error completion 与 final debug logging 的完整 finalization seam。
@@ -635,7 +635,7 @@
   - streaming runtime coordinator 的 finalization 分支明显减少
   - focused validation、全量 `npm test`、`npm run build` 通过
 
-### [QUEUED] R80 - OpenCodeStreamingRuntimeCoordinator SSE reader seam
+### [NEXT] R80 - OpenCodeStreamingRuntimeCoordinator SSE reader seam
 
 - **Lane**: Maintainability / opencode SSE reader
 - **目标**: 从 `src/core/opencode/OpenCodeStreamingRuntimeCoordinator.ts:524` 一带收束 connectSSE、reader open/abort、chunk read、buffer parse 与 remaining-event flush 的完整 SSE lifecycle。

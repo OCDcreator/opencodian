@@ -32,6 +32,19 @@ interface OpenCodeStreamingAssistantSummary {
   filePartCount: number;
 }
 
+interface OpenCodeStreamingFinalizationCursor {
+  lastContent: string;
+  priorErrorMessage: string | null;
+}
+
+interface OpenCodeStreamingAssistantTail {
+  assistantError: string | null;
+  info: Message;
+  messageCount: number;
+  modelId?: string;
+  parts: Part[];
+}
+
 export interface OpenCodeStreamingRuntimeEventTransformer {
   handleStreamingEvent(
     eventData: OpenCodeStreamEvent,
@@ -411,106 +424,24 @@ export class OpenCodeStreamingRuntimeCoordinator {
     lastContent: string,
     priorErrorMessage: string | null = null,
   ): AsyncGenerator<StreamChunk> {
+    const cursor: OpenCodeStreamingFinalizationCursor = {
+      lastContent,
+      priorErrorMessage,
+    };
+
     logAssistantFinalizationDebug('service-finish-start', {
       sessionId,
-      lastContentLength: lastContent.length,
-      lastContentPreview: getDebugTextPreview(lastContent, 120),
-      priorErrorMessage,
+      lastContentLength: cursor.lastContent.length,
+      lastContentPreview: getDebugTextPreview(cursor.lastContent, 120),
+      priorErrorMessage: cursor.priorErrorMessage,
     });
 
-    let assistantMessageId: string | null = null;
-    try {
-      const messages = await this.host.getSessionMessages(sessionId);
-      const assistantMsg = messages.reverse().find((item) => item.info.role === 'assistant');
-      if (assistantMsg) {
-        assistantMessageId = assistantMsg.info.id;
-        logAssistantFinalizationDebug('service-finish-loaded-assistant', {
-          sessionId,
-          messageCount: messages.length,
-          assistantMessageId,
-          messageCreatedAt: assistantMsg.info.time.created,
-          modelId: OpenCodeMessageNormalizationMapper.formatModelIdentifier(
-            assistantMsg.info.providerID,
-            assistantMsg.info.modelID,
-          ) ?? null,
-          structuredPresent: assistantMsg.info.structured !== undefined,
-          assistantError: extractStructuredErrorMessage(assistantMsg.info.error),
-          partSummary: summarizeAssistantParts(assistantMsg.parts),
-        });
-        const assistantError = extractStructuredErrorMessage(assistantMsg.info.error);
-        if (assistantError && !priorErrorMessage && !lastContent.trim()) {
-          logAssistantFinalizationDebug('service-finish-emitting-assistant-error', {
-            sessionId,
-            assistantMessageId,
-            assistantError,
-          });
-          yield {
-            type: 'error',
-            content: assistantError,
-          };
-          priorErrorMessage = assistantError;
-        }
-        for (const part of assistantMsg.parts) {
-          if (part.type !== 'text' || typeof part.text !== 'string') {
-            continue;
-          }
-
-          const currentText = part.text;
-          if (currentText.length <= lastContent.length) {
-            continue;
-          }
-
-          const delta = currentText.slice(lastContent.length);
-          logAssistantFinalizationDebug('service-finish-emitting-trailing-text', {
-            sessionId,
-            assistantMessageId,
-            partId: part.id,
-            deltaLength: delta.length,
-            previousLength: lastContent.length,
-            nextLength: currentText.length,
-            deltaPreview: getDebugTextPreview(delta, 120),
-          });
-          yield { type: 'text', content: delta };
-          lastContent = currentText;
-        }
-
-        logAssistantFinalizationDebug('service-finish-emitting-message-metadata', {
-          sessionId,
-          assistantMessageId,
-          timestamp: assistantMsg.info.time.created,
-          modelId: OpenCodeMessageNormalizationMapper.formatModelIdentifier(
-            assistantMsg.info.providerID,
-            assistantMsg.info.modelID,
-          ) ?? null,
-          finalTextLength: lastContent.length,
-        });
-        yield {
-          type: 'message_metadata',
-          messageId: assistantMsg.info.id,
-          timestamp: assistantMsg.info.time.created,
-          modelId: OpenCodeMessageNormalizationMapper.formatModelIdentifier(
-            assistantMsg.info.providerID,
-            assistantMsg.info.modelID,
-          ),
-        };
-      } else {
-        logger.warn('No assistant message found when finalizing stream response', {
-          sessionId,
-          messageCount: messages.length,
-          roles: messages.map((item) => item.info.role),
-          lastUserId: messages.filter((item) => item.info.role === 'user').at(-1)?.info.id ?? null,
-        });
-      }
-    } catch (error) {
-      logger.error('Final message check failed:', error);
+    const assistantTail = await this.loadAssistantTail(sessionId);
+    if (assistantTail) {
+      yield* this.emitAssistantFinalization(sessionId, assistantTail, cursor);
     }
 
-    logAssistantFinalizationDebug('service-finish-emitting-message-stop', {
-      sessionId,
-      assistantMessageId,
-      finalTextLength: lastContent.length,
-      finalTextPreview: getDebugTextPreview(lastContent, 120),
-    });
+    this.logFinalizationStop(sessionId, assistantTail?.info.id ?? null, cursor.lastContent);
     yield { type: 'message_stop' };
   }
 
@@ -639,6 +570,161 @@ export class OpenCodeStreamingRuntimeCoordinator {
   private *emitRemainingSseEvents(buffer: string): Generator<OpenCodeSSEEvent, void, void> {
     const events = this.host.streamEventTransformer.parseSSEEvents(buffer + '\n\n');
     yield* events.events;
+  }
+
+  private async loadAssistantTail(sessionId: string): Promise<OpenCodeStreamingAssistantTail | null> {
+    try {
+      const messages = await this.host.getSessionMessages(sessionId);
+      const assistantMessage = this.findLatestAssistantMessage(messages);
+      if (!assistantMessage) {
+        logger.warn('No assistant message found when finalizing stream response', {
+          sessionId,
+          messageCount: messages.length,
+          roles: messages.map((item) => item.info.role),
+          lastUserId: messages.filter((item) => item.info.role === 'user').at(-1)?.info.id ?? null,
+        });
+        return null;
+      }
+
+      const modelId = OpenCodeMessageNormalizationMapper.formatModelIdentifier(
+        assistantMessage.info.providerID,
+        assistantMessage.info.modelID,
+      );
+      const assistantError = extractStructuredErrorMessage(assistantMessage.info.error);
+
+      logAssistantFinalizationDebug('service-finish-loaded-assistant', {
+        sessionId,
+        messageCount: messages.length,
+        assistantMessageId: assistantMessage.info.id,
+        messageCreatedAt: assistantMessage.info.time.created,
+        modelId: modelId ?? null,
+        structuredPresent: assistantMessage.info.structured !== undefined,
+        assistantError,
+        partSummary: summarizeAssistantParts(assistantMessage.parts),
+      });
+
+      return {
+        assistantError,
+        info: assistantMessage.info,
+        messageCount: messages.length,
+        modelId,
+        parts: assistantMessage.parts,
+      };
+    } catch (error) {
+      logger.error('Final message check failed:', error);
+      return null;
+    }
+  }
+
+  private findLatestAssistantMessage(
+    messages: Array<{ info: Message; parts: Part[] }>,
+  ): { info: Message; parts: Part[] } | null {
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      const candidate = messages[index];
+      if (candidate && candidate.info.role === 'assistant') {
+        return candidate;
+      }
+    }
+
+    return null;
+  }
+
+  private *emitAssistantFinalization(
+    sessionId: string,
+    assistantTail: OpenCodeStreamingAssistantTail,
+    cursor: OpenCodeStreamingFinalizationCursor,
+  ): Generator<StreamChunk, void, void> {
+    if (this.shouldEmitAssistantError(assistantTail, cursor)) {
+      logAssistantFinalizationDebug('service-finish-emitting-assistant-error', {
+        sessionId,
+        assistantMessageId: assistantTail.info.id,
+        assistantError: assistantTail.assistantError,
+      });
+      yield {
+        type: 'error',
+        content: assistantTail.assistantError ?? '',
+      };
+      cursor.priorErrorMessage = assistantTail.assistantError;
+    }
+
+    yield* this.emitAssistantTrailingText(sessionId, assistantTail, cursor);
+    yield this.buildAssistantMetadataChunk(sessionId, assistantTail, cursor.lastContent.length);
+  }
+
+  private shouldEmitAssistantError(
+    assistantTail: OpenCodeStreamingAssistantTail,
+    cursor: OpenCodeStreamingFinalizationCursor,
+  ): boolean {
+    return Boolean(
+      assistantTail.assistantError
+        && !cursor.priorErrorMessage
+        && !cursor.lastContent.trim(),
+    );
+  }
+
+  private *emitAssistantTrailingText(
+    sessionId: string,
+    assistantTail: OpenCodeStreamingAssistantTail,
+    cursor: OpenCodeStreamingFinalizationCursor,
+  ): Generator<StreamChunk, void, void> {
+    for (const part of assistantTail.parts) {
+      if (part.type !== 'text' || typeof part.text !== 'string') {
+        continue;
+      }
+
+      const currentText = part.text;
+      if (currentText.length <= cursor.lastContent.length) {
+        continue;
+      }
+
+      const delta = currentText.slice(cursor.lastContent.length);
+      logAssistantFinalizationDebug('service-finish-emitting-trailing-text', {
+        sessionId,
+        assistantMessageId: assistantTail.info.id,
+        partId: part.id,
+        deltaLength: delta.length,
+        previousLength: cursor.lastContent.length,
+        nextLength: currentText.length,
+        deltaPreview: getDebugTextPreview(delta, 120),
+      });
+      yield { type: 'text', content: delta };
+      cursor.lastContent = currentText;
+    }
+  }
+
+  private buildAssistantMetadataChunk(
+    sessionId: string,
+    assistantTail: OpenCodeStreamingAssistantTail,
+    finalTextLength: number,
+  ): StreamChunk {
+    logAssistantFinalizationDebug('service-finish-emitting-message-metadata', {
+      sessionId,
+      assistantMessageId: assistantTail.info.id,
+      messageCount: assistantTail.messageCount,
+      timestamp: assistantTail.info.time.created,
+      modelId: assistantTail.modelId ?? null,
+      finalTextLength,
+    });
+
+    return {
+      type: 'message_metadata',
+      messageId: assistantTail.info.id,
+      timestamp: assistantTail.info.time.created,
+      modelId: assistantTail.modelId,
+    };
+  }
+
+  private logFinalizationStop(
+    sessionId: string,
+    assistantMessageId: string | null,
+    lastContent: string,
+  ): void {
+    logAssistantFinalizationDebug('service-finish-emitting-message-stop', {
+      sessionId,
+      assistantMessageId,
+      finalTextLength: lastContent.length,
+      finalTextPreview: getDebugTextPreview(lastContent, 120),
+    });
   }
 
   private normalizeSessionId(sessionId?: string | null): string {
