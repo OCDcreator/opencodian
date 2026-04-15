@@ -88,7 +88,6 @@ import {
 } from './runtime/BackgroundTaskInlinePanelRenderer';
 import {
   BackgroundTaskStreamTriggerCoordinator,
-  type BackgroundTaskStreamTriggerCoordinatorHost,
 } from './runtime/BackgroundTaskStreamTriggerCoordinator';
 import {
   ConversationHydrationOutcomeBridge,
@@ -408,6 +407,8 @@ interface OpenCodianViewBackgroundTaskRuntimeWiring {
     QuestionTodoBackgroundTaskRuntimeCoordinators['questionTodoActivationRefreshCoordinator'];
   backgroundTaskActivationIndicatorCoordinator:
     QuestionTodoBackgroundTaskRuntimeCoordinators['backgroundTaskActivationIndicatorCoordinator'];
+  backgroundTaskStreamTriggerViewHost:
+    QuestionTodoBackgroundTaskRuntimeCoordinators['backgroundTaskStreamTriggerViewHost'];
   activeTabContextUsageCoordinator: ActiveTabContextUsageCoordinator;
   backgroundTaskNoticeStateService: BackgroundTaskNoticeStateService;
   backgroundTaskTimelineService: BackgroundTaskTimelineService;
@@ -1415,7 +1416,7 @@ export class OpenCodianView extends ItemView {
       backgroundTaskIndicatorCoordinator,
       backgroundTaskRuntime.backgroundTaskTimelineService,
       backgroundTaskRuntime.backgroundTaskLiveSignalCoordinator,
-      this.createBackgroundTaskStreamTriggerCoordinatorHost(),
+      backgroundTaskRuntime.backgroundTaskStreamTriggerViewHost,
     );
     const conversationLoadRuntimeBridge = new ConversationLoadRuntimeBridge(
       conversationSyncLoadRuntimeHosts.conversationLoadRuntimeBridgeHost,
@@ -1639,20 +1640,22 @@ export class OpenCodianView extends ItemView {
   private createQuestionTodoBackgroundTaskRuntimeServiceBundleHost():
     QuestionTodoBackgroundTaskRuntimeServiceBundleHost {
     return {
+      getActiveTabId: () => this.getActiveTabId(),
       getCurrentConversation: () => this.currentConversation,
       setCurrentConversationRevertState: (revertState) => {
         this.currentConversationRevertState = revertState;
       },
       getConversationSyncRuntime: () => this.tabConversationSyncFingerprintRuntimePort,
       getTabRuntimeState: (tabId: TabId | null) => this.getTabRuntimeState(tabId),
+      getSessionIdForTab: (tabId: TabId | null) => this.getSessionIdForTab(tabId),
       renderSessionTodoDock: (tabId) => {
         this.renderSessionTodoDock(tabId);
       },
       getQuestionDockCoordinator: () => this.questionDockCoordinator,
       getSessionTodoCoordinator: () => this.sessionTodoCoordinator,
       getQuestionDockSlotCoordinator: () => this.questionDockSlotCoordinator,
-      resetBackgroundTaskIndicator: () => {
-        this.resetBackgroundTaskIndicator();
+      resetBackgroundTaskIndicator: (tabId) => {
+        this.resetBackgroundTaskIndicator(tabId);
       },
       syncBackgroundTaskStateFromConversation: (conversation, tabId?: TabId | null) => {
         this.syncBackgroundTaskStateFromConversation(conversation, tabId);
@@ -1813,22 +1816,6 @@ export class OpenCodianView extends ItemView {
       getActiveTabId: () => this.getActiveTabId(),
       getCurrentConversation: () => this.currentConversation,
       hasTabRuntime: (tabId: TabId | null) => Boolean(this.getTabRuntimeState(tabId)),
-    };
-  }
-
-  private createBackgroundTaskStreamTriggerCoordinatorHost(): BackgroundTaskStreamTriggerCoordinatorHost {
-    return {
-      getActiveTabId: () => this.getActiveTabId(),
-      getTabRuntimeState: (tabId: TabId | null) => this.getTabRuntimeState(tabId),
-      applyStreamingTodoSnapshotFromTool: (toolCall, tabId) => {
-        this.sessionTodoCoordinator.applyStreamingTodoSnapshotFromTool(toolCall, tabId);
-      },
-      getSessionIdForTab: (tabId: TabId | null) => this.getSessionIdForTab(tabId),
-      refreshTabSessionTodos: (tabId, sessionId, options) =>
-        this.sessionTodoCoordinator.refreshTabSessionTodos(tabId, sessionId, options),
-      resetBackgroundTaskIndicator: (tabId) => {
-        this.resetBackgroundTaskIndicator(tabId);
-      },
     };
   }
 

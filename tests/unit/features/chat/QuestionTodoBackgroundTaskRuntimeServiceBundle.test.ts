@@ -17,12 +17,14 @@ import * as VisibleConversationPostSyncStateHostAdapterModule from '../../../../
 
 function createHost(): QuestionTodoBackgroundTaskRuntimeServiceBundleHost {
   return {
+    getActiveTabId: jest.fn().mockReturnValue('tab-active'),
     getCurrentConversation: jest.fn(),
     setCurrentConversationRevertState: jest.fn(),
     getConversationSyncRuntime: jest.fn(() => ({
       setTabConversationSyncFingerprint: jest.fn(),
     })),
     getTabRuntimeState: jest.fn(),
+    getSessionIdForTab: jest.fn().mockReturnValue('session-active'),
     renderSessionTodoDock: jest.fn(),
     getQuestionDockCoordinator: jest.fn(),
     getSessionTodoCoordinator: jest.fn(),
@@ -107,7 +109,7 @@ describe('QuestionTodoBackgroundTaskRuntimeServiceBundle', () => {
       expect.any(Object),
       questionTodoBackgroundTaskRefreshServices.questionTodoActivationRefreshBridge,
     );
-    expect(bundle).toEqual({
+    expect(bundle).toMatchObject({
       visibleConversationPostSyncCoordinator:
         questionTodoBackgroundTaskRefreshServices.visibleConversationPostSyncCoordinator,
       backgroundConversationPostSyncHandoffCoordinator:
@@ -116,6 +118,10 @@ describe('QuestionTodoBackgroundTaskRuntimeServiceBundle', () => {
         questionTodoBackgroundTaskActivationServices.questionTodoActivationRefreshCoordinator,
       backgroundTaskActivationIndicatorCoordinator:
         questionTodoBackgroundTaskActivationServices.backgroundTaskActivationIndicatorCoordinator,
+      backgroundTaskStreamTriggerViewHost: expect.any(Object),
     });
+    expect(bundle.backgroundTaskStreamTriggerViewHost.getActiveTabId()).toBe('tab-active');
+    expect(bundle.backgroundTaskStreamTriggerViewHost.getSessionIdForTab('tab-active'))
+      .toBe('session-active');
   });
 });

@@ -25,6 +25,11 @@ import {
   createVisibleConversationPostSyncStateServices,
   type VisibleConversationPostSyncStateViewHost,
 } from './VisibleConversationPostSyncStateHostAdapter';
+import type {
+  BackgroundTaskStreamTriggerCoordinatorHost,
+  BackgroundTaskStreamTriggerRuntime,
+} from '../runtime/BackgroundTaskStreamTriggerCoordinator';
+import type { SessionTodoCoordinator } from './SessionTodoCoordinator';
 
 export interface QuestionTodoBackgroundTaskRuntimeServiceBundle
   extends Pick<
@@ -36,7 +41,9 @@ export interface QuestionTodoBackgroundTaskRuntimeServiceBundle
       QuestionTodoBackgroundTaskActivationServices,
       | 'questionTodoActivationRefreshCoordinator'
       | 'backgroundTaskActivationIndicatorCoordinator'
-    > {}
+    > {
+  backgroundTaskStreamTriggerViewHost: BackgroundTaskStreamTriggerCoordinatorHost;
+}
 
 type QuestionTodoBackgroundTaskConversationSyncRuntimePort = Pick<
   TabConversationSyncFingerprintRuntimePort,
@@ -46,6 +53,9 @@ type QuestionTodoBackgroundTaskSessionTodoPort = ReturnType<
   QuestionTodoBackgroundTaskRefreshViewHostAdapterDependencies['getSessionTodoCoordinator']
 > & ReturnType<
   QuestionTodoBackgroundTaskActivationViewHostAdapterDependencies['getSessionTodoCoordinator']
+> & Pick<
+  SessionTodoCoordinator,
+  'applyStreamingTodoSnapshotFromTool'
 >;
 type QuestionTodoBackgroundTaskRefreshRuntimePort =
   Pick<QuestionTodoBackgroundTaskRefreshViewHostAdapterHost, 'getTabRuntimeState'>
@@ -85,12 +95,14 @@ type SharedQuestionTodoBackgroundTaskViewHost =
   & BackgroundConversationPostSyncHandoffViewHostAdapterHost;
 
 export interface QuestionTodoBackgroundTaskRuntimeServiceBundleHost {
+  getActiveTabId: BackgroundTaskStreamTriggerCoordinatorHost['getActiveTabId'];
   getCurrentConversation: VisibleConversationPostSyncStateViewHost['getCurrentConversation'];
   setCurrentConversationRevertState:
     VisibleConversationPostSyncStateViewHost['setCurrentConversationRevertState'];
   getConversationSyncRuntime(): QuestionTodoBackgroundTaskConversationSyncRuntimePort;
   getTabRuntimeState:
     QuestionTodoBackgroundTaskRefreshRuntimePort['getTabRuntimeState'];
+  getSessionIdForTab: BackgroundTaskStreamTriggerCoordinatorHost['getSessionIdForTab'];
   renderSessionTodoDock:
     QuestionTodoBackgroundTaskRefreshRuntimePort['renderSessionTodoDock'];
   getQuestionDockCoordinator:
@@ -99,8 +111,7 @@ export interface QuestionTodoBackgroundTaskRuntimeServiceBundleHost {
     QuestionTodoBackgroundTaskRefreshRuntimePort['getSessionTodoCoordinator'];
   getQuestionDockSlotCoordinator:
     QuestionTodoBackgroundTaskActivationWritebackPort['getQuestionDockSlotCoordinator'];
-  resetBackgroundTaskIndicator:
-    QuestionTodoBackgroundTaskBackgroundRuntimePort['resetBackgroundTaskIndicator'];
+  resetBackgroundTaskIndicator: BackgroundTaskStreamTriggerCoordinatorHost['resetBackgroundTaskIndicator'];
   syncBackgroundTaskStateFromConversation:
     QuestionTodoBackgroundTaskBackgroundRuntimePort['syncBackgroundTaskStateFromConversation'];
   renderBackgroundTaskIndicatorIfNeeded:
@@ -120,6 +131,7 @@ export interface QuestionTodoBackgroundTaskRuntimeViewHosts {
     BackgroundConversationPostSyncHandoffViewHost;
   questionTodoBackgroundTaskActivationViewHost:
     QuestionTodoBackgroundTaskActivationViewHost;
+  backgroundTaskStreamTriggerViewHost: BackgroundTaskStreamTriggerCoordinatorHost;
 }
 
 export function createQuestionTodoBackgroundTaskRuntimeViewHosts(
@@ -138,13 +150,27 @@ export function createQuestionTodoBackgroundTaskRuntimeViewHosts(
       host.renderSessionTodoDock(tabId);
     },
     resetBackgroundTaskIndicator: () => {
-      host.resetBackgroundTaskIndicator();
+      host.resetBackgroundTaskIndicator(host.getActiveTabId());
     },
     syncBackgroundTaskStateFromConversation: (conversation, tabId) => {
       host.syncBackgroundTaskStateFromConversation(conversation, tabId);
     },
     renderBackgroundTaskIndicatorIfNeeded: (tabId) =>
       host.renderBackgroundTaskIndicatorIfNeeded(tabId),
+  };
+  const backgroundTaskStreamTriggerViewHost: BackgroundTaskStreamTriggerCoordinatorHost = {
+    getActiveTabId: () => host.getActiveTabId(),
+    getTabRuntimeState: (tabId) =>
+      host.getTabRuntimeState(tabId) as BackgroundTaskStreamTriggerRuntime | null,
+    applyStreamingTodoSnapshotFromTool: (toolCall, tabId) => {
+      host.getSessionTodoCoordinator().applyStreamingTodoSnapshotFromTool(toolCall, tabId);
+    },
+    getSessionIdForTab: (tabId) => host.getSessionIdForTab(tabId),
+    refreshTabSessionTodos: (tabId, sessionId, options) =>
+      host.getSessionTodoCoordinator().refreshTabSessionTodos(tabId, sessionId, options),
+    resetBackgroundTaskIndicator: (tabId) => {
+      host.resetBackgroundTaskIndicator(tabId);
+    },
   };
 
   return {
@@ -170,6 +196,7 @@ export function createQuestionTodoBackgroundTaskRuntimeViewHosts(
         getQuestionDockSlotCoordinator: () => host.getQuestionDockSlotCoordinator(),
         getSessionTodoCoordinator: () => host.getSessionTodoCoordinator(),
       }),
+    backgroundTaskStreamTriggerViewHost,
   };
 }
 
@@ -204,5 +231,6 @@ export function createQuestionTodoBackgroundTaskRuntimeServiceBundle(
     backgroundConversationPostSyncHandoffCoordinator,
     questionTodoActivationRefreshCoordinator,
     backgroundTaskActivationIndicatorCoordinator,
+    backgroundTaskStreamTriggerViewHost: runtimeViewHosts.backgroundTaskStreamTriggerViewHost,
   };
 }

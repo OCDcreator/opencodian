@@ -2,19 +2,19 @@
 
 > **状态**: [READY]
 > **作用**: 这是 maintainability 无人值守的战略文档。每轮开始前，先读本文件，再读 `docs/status/maintainability-round-roadmap.md` 与最近的 `docs/status/maintainability-phase-XXX.md`。
-> **自动推进状态**: `R100` handoff seam 已完成；当前已人工续排 `R101-R137` 长队列。恢复 autopilot 后只能从首个 `[NEXT]`（`R101`）顺序执行，不允许 freestyle。
+> **自动推进状态**: `R101` stream-trigger seam 已完成；当前已人工续排 `R102-R137` 长队列。恢复 autopilot 后只能从首个 `[NEXT]`（`R102`）顺序执行，不允许 freestyle。
 
 ## 1. 当前判断
 
-**当前分支已完成 `R68-R100` 并把 live lint 稳定在 `0 errors / 65 warnings`；现在已完成 background conversation post-sync handoff seam，准备进入 `R101` 的 background task stream trigger runtime seam。** 新批次不重复已完成 seam，而是继续围绕最新 checkpoint 仍然高收益的 residual seams：先吃 chat services 残余，再吃 `OpenCodeService`/streaming residual，再转 secondary core / settings / startup，最后做 heavy tests follow-up、warning closeout 与最终 checkpoint。
+**当前分支已完成 `R68-R101` 并把 live lint 稳定在 `0 errors / 65 warnings`；现在已完成 background task stream trigger runtime seam，下一步先执行 `R102` 的 chat services checkpoint，再转入 batch 4 的 question / todo / background-task residual。** 新批次不重复已完成 seam，而是继续围绕最新 checkpoint 仍然高收益的 residual seams：先做 chat services checkpoint，再吃 question/todo residual，随后进入 `OpenCodeService`/streaming residual、secondary core / settings / startup，最后做 heavy tests follow-up、warning closeout 与最终 checkpoint。
 
 ## 2. 当前基线
 
 - **lint**: `0 errors / 65 warnings`
-- **最近验证**: `R100` 已确认 targeted `npm test -- --runTestsByPath tests/unit/features/chat/BackgroundConversationPostSyncHandoffHostAdapter.test.ts tests/unit/features/chat/BackgroundConversationPostSyncHandoffCoordinator.test.ts tests/unit/features/chat/QuestionTodoBackgroundTaskRuntimeViewHosts.test.ts tests/unit/features/chat/QuestionTodoBackgroundTaskRefreshHostAdapter.test.ts`、全量 `npm test` 与 `npm run build` 通过，`BUILD_ID` 为 `autopilot-maintainability.202604152152`
+- **最近验证**: `R101` 已确认 targeted `npm test -- --runTestsByPath tests/unit/features/chat/BackgroundTaskStreamTriggerCoordinator.test.ts tests/unit/features/chat/QuestionTodoBackgroundTaskRuntimeServiceBundle.test.ts tests/unit/features/chat/QuestionTodoBackgroundTaskRuntimeViewHosts.test.ts`、全量 `npm test` 与 `npm run build` 通过，`BUILD_ID` 为 `autopilot-maintainability.202604152206`
 - **最近 Test Vault 部署**: `R64`，`BUILD_ID` `autopilot-maintainability.202604150602`
-- **当前 `[NEXT]`**: `R101 - BackgroundTaskStreamTriggerCoordinator runtime seam`
-- **主热点**: `src/features/chat/runtime/BackgroundTaskStreamTriggerCoordinator.ts` 与 `src/features/chat/services/QuestionTodoBackgroundTaskRuntimeServiceBundle.ts` 进入当前首要 seam，`src/features/chat/**` 仍是最大生产热点，`src/core/opencode/**` 仍是第二梯队热点
+- **当前 `[NEXT]`**: `R102 - Checkpoint after chat services seams`
+- **主热点**: `docs/status/maintainability-master-plan.md` 与 `docs/status/maintainability-round-roadmap.md` 进入当前 checkpoint seam；其后首个生产热点切到 `src/features/chat/services/QuestionResolutionFlowCoordinator.ts` 与 `src/features/chat/services/QuestionResolutionExecutionFacade.ts`
 
 ## 3. 本批执行规则
 

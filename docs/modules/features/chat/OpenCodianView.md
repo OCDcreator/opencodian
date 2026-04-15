@@ -448,7 +448,7 @@ session todo 这条子链路现在的边界是：
 
 background task notice 这条子链路现在的边界是：
 
-- `OpenCodianView`：background-task service bundle、indicator / stream-trigger coordinator 的最薄 host bridge，以及上层触发入口
+- `OpenCodianView`：background-task service bundle 返回值消费、indicator coordinator 的最薄 host bridge，以及上层触发入口
 - `BackgroundTaskTimelineService`：launch/completion timeline segment 推导、conversation→runtime rebuild、pending matching、completion segment 收集，与 inline copy 组装
 - `BackgroundTaskInlinePanelRenderer`：inline panel DOM 创建、位置挂载、Markdown 渲染、mount 复用与 active indicator element 清理
 - `BackgroundTaskIndicatorCoordinator`：直接组合 live-signal reconcile、inline render、completion notice queue/flush 与 stream-like sync 编排

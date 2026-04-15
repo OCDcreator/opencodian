@@ -70,6 +70,7 @@ function createQuestionDockCoordinator(): QuestionDockCoordinator {
 
 function createSessionTodoCoordinator(): SessionTodoCoordinator {
   return {
+    applyStreamingTodoSnapshotFromTool: jest.fn(),
     hasIncompleteTodos: jest.fn((todos: readonly SessionTodo[]) =>
       todos.some((todo) => todo.status !== 'completed'),
     ),
@@ -114,8 +115,12 @@ function createConversationSyncRuntime(): ConversationSyncRuntime {
 }
 
 function createFixture() {
+  let activeTabId: string | null = 'tab-active';
   let conversation = createConversation('conversation-active');
   let runtime = createRuntime();
+  let sessionIdsByTab = new Map<string, string | null>([
+    ['tab-active', 'session-active'],
+  ]);
   let conversationSyncRuntime = createConversationSyncRuntime();
   let questionDockCoordinator = createQuestionDockCoordinator();
   let sessionTodoCoordinator = createSessionTodoCoordinator();
@@ -125,10 +130,14 @@ function createFixture() {
   let tabRuntimeStateBridge = createTabRuntimeStateBridge();
 
   const host: Mocked<QuestionTodoBackgroundTaskRuntimeServiceBundleHost> = {
+    getActiveTabId: jest.fn(() => activeTabId),
     getCurrentConversation: jest.fn(() => conversation),
     setCurrentConversationRevertState: jest.fn(),
     getConversationSyncRuntime: jest.fn(() => conversationSyncRuntime),
     getTabRuntimeState: jest.fn((tabId: string | null) => (tabId ? runtime : null)),
+    getSessionIdForTab: jest.fn((tabId: string | null) =>
+      tabId ? sessionIdsByTab.get(tabId) ?? null : null,
+    ),
     renderSessionTodoDock: jest.fn(),
     getQuestionDockCoordinator: jest.fn(() => questionDockCoordinator),
     getSessionTodoCoordinator: jest.fn(() => sessionTodoCoordinator),
@@ -143,11 +152,17 @@ function createFixture() {
 
   return {
     host,
+    setActiveTabId: (next: string | null) => {
+      activeTabId = next;
+    },
     setConversation: (next: Conversation) => {
       conversation = next;
     },
     setRuntime: (next: QuestionTodoStatusRefreshRuntime) => {
       runtime = next;
+    },
+    setSessionIdForTab: (tabId: string, sessionId: string | null) => {
+      sessionIdsByTab.set(tabId, sessionId);
     },
     setConversationSyncRuntime: (next: ConversationSyncRuntime) => {
       conversationSyncRuntime = next;
@@ -187,6 +202,7 @@ describe('QuestionTodoBackgroundTaskRuntimeViewHosts', () => {
       questionTodoBackgroundTaskRefreshViewHost,
       backgroundConversationPostSyncHandoffViewHost,
       questionTodoBackgroundTaskActivationViewHost,
+      backgroundTaskStreamTriggerViewHost,
     } = createQuestionTodoBackgroundTaskRuntimeViewHosts(fixture.host);
     const conversation = createConversation('conversation-next');
 
@@ -255,6 +271,27 @@ describe('QuestionTodoBackgroundTaskRuntimeViewHosts', () => {
     await questionTodoBackgroundTaskActivationViewHost.renderBackgroundTaskIndicatorIfNeeded(
       'tab-active',
     );
+    expect(backgroundTaskStreamTriggerViewHost.getActiveTabId()).toBe('tab-active');
+    expect(backgroundTaskStreamTriggerViewHost.getTabRuntimeState('tab-active')).toBe(
+      fixture.host.getTabRuntimeState.mock.results[1].value,
+    );
+    backgroundTaskStreamTriggerViewHost.applyStreamingTodoSnapshotFromTool(
+      {
+        id: 'tool-call-1',
+        name: 'todowrite',
+        status: 'running',
+        input: { todos: [{ content: 'streaming todo' }] },
+      },
+      'tab-active',
+    );
+    expect(backgroundTaskStreamTriggerViewHost.getSessionIdForTab('tab-active'))
+      .toBe('session-active');
+    await backgroundTaskStreamTriggerViewHost.refreshTabSessionTodos(
+      'tab-active',
+      'session-active',
+      { suppressErrors: true },
+    );
+    backgroundTaskStreamTriggerViewHost.resetBackgroundTaskIndicator('tab-active');
 
     expect(fixture.host.setCurrentConversationRevertState).toHaveBeenCalledWith({
       messageID: 'message-1',
@@ -297,8 +334,18 @@ describe('QuestionTodoBackgroundTaskRuntimeViewHosts', () => {
       .toHaveBeenCalledTimes(1);
     expect(fixture.host.getSessionTodoCoordinator.mock.results[3].value.updateForTab)
       .toHaveBeenCalledWith('tab-active');
+    expect(fixture.host.getSessionTodoCoordinator.mock.results[4].value.applyStreamingTodoSnapshotFromTool)
+      .toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'tool-call-1', name: 'todowrite' }),
+        'tab-active',
+      );
+    expect(fixture.host.getSessionTodoCoordinator.mock.results[5].value.refreshTabSessionTodos)
+      .toHaveBeenCalledWith('tab-active', 'session-active', { suppressErrors: true });
     expect(fixture.host.renderSessionTodoDock).toHaveBeenCalledWith('tab-active');
-    expect(fixture.host.resetBackgroundTaskIndicator).toHaveBeenCalledTimes(1);
+    expect(fixture.host.resetBackgroundTaskIndicator)
+      .toHaveBeenNthCalledWith(1, 'tab-active');
+    expect(fixture.host.resetBackgroundTaskIndicator)
+      .toHaveBeenNthCalledWith(2, 'tab-active');
     expect(fixture.host.syncBackgroundTaskStateFromConversation)
       .toHaveBeenNthCalledWith(2, conversation, 'tab-active');
     expect(fixture.host.renderBackgroundTaskIndicatorIfNeeded)
@@ -312,6 +359,7 @@ describe('QuestionTodoBackgroundTaskRuntimeViewHosts', () => {
       questionTodoBackgroundTaskRefreshViewHost,
       backgroundConversationPostSyncHandoffViewHost,
       questionTodoBackgroundTaskActivationViewHost,
+      backgroundTaskStreamTriggerViewHost,
     } = createQuestionTodoBackgroundTaskRuntimeViewHosts(fixture.host);
     const nextConversation = createConversation('conversation-next');
     const nextRuntime = createRuntime({
@@ -327,8 +375,10 @@ describe('QuestionTodoBackgroundTaskRuntimeViewHosts', () => {
       createBackgroundTaskLiveSignalCoordinator();
     const nextTabRuntimeStateBridge = createTabRuntimeStateBridge();
 
+    fixture.setActiveTabId('tab-next');
     fixture.setConversation(nextConversation);
     fixture.setRuntime(nextRuntime);
+    fixture.setSessionIdForTab('tab-next', 'session-next-trigger');
     fixture.setConversationSyncRuntime(nextConversationSyncRuntime);
     fixture.setQuestionDockCoordinator(nextQuestionDockCoordinator);
     fixture.setSessionTodoCoordinator(nextSessionTodoCoordinator);
@@ -365,18 +415,35 @@ describe('QuestionTodoBackgroundTaskRuntimeViewHosts', () => {
       { suppressErrors: true },
     );
     questionTodoBackgroundTaskActivationViewHost.renderQuestionDock();
+    backgroundTaskStreamTriggerViewHost.applyStreamingTodoSnapshotFromTool(
+      {
+        id: 'tool-call-next',
+        name: 'todowrite',
+        status: 'running',
+        input: { todos: [{ content: 'Next snapshot' }] },
+      },
+      'tab-next',
+    );
     backgroundConversationPostSyncHandoffViewHost.markBackgroundTaskAuthoritativeSync(
       'tab-next',
       'message.updated',
     );
 
+    expect(backgroundTaskStreamTriggerViewHost.getActiveTabId()).toBe('tab-next');
+    expect(backgroundTaskStreamTriggerViewHost.getSessionIdForTab('tab-next'))
+      .toBe('session-next-trigger');
     expect(nextConversationSyncRuntime.setTabConversationSyncFingerprint)
       .toHaveBeenCalledWith('tab-next', 'fingerprint-late');
     expect(nextQuestionDockCoordinator.refreshPendingQuestionsForTab)
       .toHaveBeenCalledWith('tab-next', 'session-question-next');
-    expect(fixture.host.getSessionTodoCoordinator).toHaveBeenCalledTimes(2);
+    expect(fixture.host.getSessionTodoCoordinator).toHaveBeenCalledTimes(3);
     expect(nextSessionTodoCoordinator.refreshTabSessionTodos)
       .toHaveBeenCalledWith('tab-next', 'session-next', { suppressErrors: true });
+    expect(nextSessionTodoCoordinator.applyStreamingTodoSnapshotFromTool)
+      .toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'tool-call-next', name: 'todowrite' }),
+        'tab-next',
+      );
     expect(nextQuestionDockSlotCoordinator.render).toHaveBeenCalledTimes(1);
     expect(nextBackgroundTaskLiveSignalCoordinator.markAuthoritativeSync)
       .toHaveBeenCalledWith('tab-next', 'message.updated');
