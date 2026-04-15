@@ -64,6 +64,7 @@
 - `catalogState`: `OpenCodeCatalogStateStore` 实例，负责 registry tool ids、tool schema cache、observed external tool names、MCP server status、catalog snapshot 构造与 catalog listener lifecycle。
 - `catalogQueries`: `OpenCodeCatalogQueryCoordinator` 实例，负责 directory-scoped provider/model/config lookup、tool registry/schema cache 与 tool identity context 的 transport/scope 生命周期。
 - `contextPartSerializer`: `OpenCodeContextPartSerializer` 实例，负责 prompt 输入文本、本地/远程 context item 与 image part 的 request-part 序列化。
+- `diagnostics`: service-local diagnostics owner，负责 transient connectivity suppression、assistant/probe 错误文本整形，以及 assistant finalization debug payload 日志。
 - `messageNormalizationMapper`: `OpenCodeMessageNormalizationMapper` singleton，负责 question request normalization、历史 message → `ChatMessage` hydration、tool kind 归类、context attachment 提取与 OMO/system reminder 归一化。
 - `promptRequestBuilder`: `OpenCodePromptRequestBuilder` 实例，负责 SDK prompt parameters、legacy request body 与 shared prompt options/variant/output-format/model defaults 的组装。
 - `streamEventTransformer`: `OpenCodeStreamEventTransformer` 实例，负责 SDK / legacy stream event → `StreamChunk` 的转换、tool/question/file/permission 事件映射，以及 SSE parser。
@@ -105,6 +106,7 @@
 
 - `setVaultPath(path)`: 公开入口仍保留在服务层，但 vault path 写回、`ServerManager` 工作目录更新、tool schema cache scope invalidation 与 sync/open-code event restart 已委托给 `OpenCodeServiceLifecycleCoordinator`。
 - `checkHealth()`: 公开入口仍保留在服务层，但 SDK-first health probe、SDK health payload normalization 与 `ServerManager.checkHealth()` fallback 已委托给 `OpenCodeServiceLifecycleCoordinator`。
+- health 路径命中 SDK 时，现在通过 `OpenCodeSdkFacade` 统一承接 transport error normalization，而不是让 raw SDK rejection shape 直接泄漏给 lifecycle owner。
 - `updateSettings(settings)`: 公开入口仍保留在服务层，但完整 settings reconfiguration lifecycle 已委托给 `OpenCodeSettingsReconfigurationCoordinator`；失败时仍会回滚内存设置、`baseUrl`、`ServerManager` 配置，并尽力恢复原服务。
 
 补充一个运行时细节：
@@ -193,6 +195,7 @@
 - `sdkPrompt` 开启时调用 `client.session.prompt(...)`
 - 否则 POST 到 `/session/:id/message`
 - 如果服务端返回的是“assistant message + structured error”而不是直接 throw，服务层也会优先把 `info.error` 提取成异常抛出，而不是默默返回一个空 assistant
+- SDK prompt transport 自身如果返回非 `Error` rejection，也会先经过 façade/exported diagnostics helper 归一化，再进入 assistant / probe follow-up 逻辑
 
 返回值不是原始 OpenCode message，而是已经过 `openCodeMessageToChatMessage()` 归一化后的 `ChatMessage`。
 

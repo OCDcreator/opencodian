@@ -50,6 +50,39 @@ export type OpenCodeSdkFacadeClient = {
 
 export type OpenCodeSdkFacadeClientFactory = (options: CreateSdkClientOptions) => SdkOpencodeClient;
 
+export interface OpenCodeSdkErrorMessageOptions {
+  fallbackMessage?: string | null;
+  includeName?: boolean;
+  includeTopLevelError?: boolean;
+  includeTopLevelStatus?: boolean;
+  trimMessage?: boolean;
+}
+
+type OpenCodeSdkErrorRecord = {
+  message?: unknown;
+  error?: unknown;
+  data?: { message?: unknown; statusCode?: unknown };
+  name?: unknown;
+  status?: unknown;
+};
+
+function getSdkErrorText(value: unknown, trimMessage = false): string | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const normalized = trimMessage ? value.trim() : value;
+  return normalized ? normalized : null;
+}
+
+function appendSdkErrorStatus(message: string, statusCode: number | null): string {
+  if (statusCode === null || message.toLowerCase().includes(`http ${statusCode}`)) {
+    return message;
+  }
+
+  return `${message} (HTTP ${statusCode})`;
+}
+
 function unwrapSdkResponse<TValue>(value: TValue): SdkDataShape<TValue> {
   if (value && typeof value === 'object' && 'data' in (value as Record<string, unknown>)) {
     return ((value as unknown) as { data: SdkDataShape<TValue> }).data;
@@ -58,42 +91,69 @@ function unwrapSdkResponse<TValue>(value: TValue): SdkDataShape<TValue> {
   return value as SdkDataShape<TValue>;
 }
 
-function normalizeSdkError(error: unknown): Error {
+export function extractSdkErrorMessage(
+  error: unknown,
+  options: OpenCodeSdkErrorMessageOptions = {},
+): string | null {
   if (error instanceof Error) {
-    return error;
+    return getSdkErrorText(error.message, options.trimMessage)
+      ?? (options.includeName ? getSdkErrorText(error.name, options.trimMessage) : null)
+      ?? options.fallbackMessage
+      ?? null;
   }
 
   if (typeof error === 'string') {
-    return new Error(error);
+    return getSdkErrorText(error, options.trimMessage);
   }
 
-  if (error && typeof error === 'object') {
-    const record = error as {
-      message?: unknown;
-      error?: unknown;
-      data?: { message?: unknown; statusCode?: unknown };
-      status?: unknown;
-    };
-    const message = typeof record.data?.message === 'string'
-      ? record.data.message
-      : typeof record.message === 'string'
-        ? record.message
-        : typeof record.error === 'string'
-          ? record.error
-          : 'OpenCode SDK request failed';
+  if (!error || typeof error !== 'object') {
+    return options.fallbackMessage ?? null;
+  }
 
-    const statusCode = typeof record.data?.statusCode === 'number'
-      ? record.data.statusCode
+  const record = error as OpenCodeSdkErrorRecord;
+  const baseMessage = getSdkErrorText(record.data?.message, options.trimMessage)
+    ?? getSdkErrorText(record.message, options.trimMessage)
+    ?? (options.includeTopLevelError === false ? null : getSdkErrorText(record.error, options.trimMessage))
+    ?? (options.includeName ? getSdkErrorText(record.name, options.trimMessage) : null)
+    ?? options.fallbackMessage
+    ?? null;
+
+  if (!baseMessage) {
+    return null;
+  }
+
+  const statusCode = typeof record.data?.statusCode === 'number'
+    ? record.data.statusCode
+    : options.includeTopLevelStatus === false
+      ? null
       : typeof record.status === 'number'
         ? record.status
         : null;
 
-    return statusCode === null
-      ? new Error(message)
-      : new Error(`${message} (HTTP ${statusCode})`);
+  return appendSdkErrorStatus(baseMessage, statusCode);
+}
+
+export function describeSdkError(
+  error: unknown,
+  fallbackMessage = 'OpenCode SDK request failed',
+): string {
+  if (error instanceof Error) {
+    return error.message;
   }
 
-  return new Error('OpenCode SDK request failed');
+  if (typeof error === 'string') {
+    return error;
+  }
+
+  return extractSdkErrorMessage(error, { fallbackMessage }) ?? fallbackMessage;
+}
+
+export function normalizeSdkError(error: unknown): Error {
+  if (error instanceof Error) {
+    return error;
+  }
+
+  return new Error(describeSdkError(error));
 }
 
 export interface OpenCodeSdkFacadeOptionsProvider {

@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的 `[NEXT]`”。
-> **当前状态**: [READY] `R110` 已完成；`R111-R137` 长队列继续排队，当前首个 `[NEXT]` 为 `R111 - OpenCodeService transient logging/error normalization seam`。
+> **当前状态**: [READY] `R111` 已完成；`R112-R137` 长队列继续排队，当前首个 `[NEXT]` 为 `R112 - Checkpoint after OpenCodeService residual seams`。
 
 ## 控制规则
 
@@ -17,8 +17,8 @@
 
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
 - 当前 live lint 基线：`0 errors / 65 warnings`
-- 最近成功 phase：`docs/status/maintainability-phase-444.md`
-- 当前路线判断：`R110` 已完成 session abort/get fallback seam，当前必须从 `R111` 顺序执行，不得 freestyle。
+- 最近成功 phase：`docs/status/maintainability-phase-446.md`
+- 当前路线判断：`R111` 已完成 transient logging/error normalization seam，当前必须从 `R112` 顺序执行，不得 freestyle。
 
 ## Queue
 ## Queue
@@ -1034,7 +1034,7 @@
 - **禁止项**: 不改变 session-scoped abort/detach、get fallback、conversation reload 语义。
 - **验收**: session abort/get fallback 残余控制流继续收敛。；并通过全量 `npm test` 与 `npm run build`。
 
-### [NEXT] R111 - OpenCodeService transient logging/error normalization seam
+### [DONE] R111 - OpenCodeService transient logging/error normalization seam
 
 - **Lane**: Maintainability / opencode diagnostics
 - **目标**: 把 transient debug logging、error shaping 与 normalize follow-up 继续收束到集中点。
@@ -1044,7 +1044,7 @@
 - **禁止项**: 不改变错误归一化口径、logging 开关、SDK facade 注入规则。
 - **验收**: logging/error normalization 更集中。；并通过全量 `npm test` 与 `npm run build`。
 
-### [QUEUED] R112 - Checkpoint after OpenCodeService residual seams
+### [NEXT] R112 - Checkpoint after OpenCodeService residual seams
 
 - **Lane**: Checkpoint
 - **目标**: 复盘 R108-R111 的 residual service 收益与 streaming lane 准备度。

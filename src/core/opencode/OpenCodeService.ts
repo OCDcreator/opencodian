@@ -26,7 +26,6 @@ import type {
 } from '../types';
 import type { OpenCodianSettings } from '../types/settings';
 import { getServerBaseUrl } from '../types/settings';
-import { createSdkClient } from './createSdkClient';
 import { OpenCodeCatalogQueryCoordinator } from './OpenCodeCatalogQueryCoordinator';
 import {
   type CatalogUpdateListener,
@@ -50,7 +49,11 @@ import {
 import {
   OpenCodeQuestionPermissionHub,
 } from './OpenCodeQuestionPermissionHub';
-import { OpenCodeSdkFacade } from './OpenCodeSdkFacade';
+import {
+  describeSdkError,
+  extractSdkErrorMessage,
+  OpenCodeSdkFacade,
+} from './OpenCodeSdkFacade';
 import {
   OpenCodeServiceLifecycleCoordinator,
 } from './OpenCodeServiceLifecycleCoordinator';
@@ -80,7 +83,7 @@ import {
 } from './OpenCodeSyncEventRuntimeCoordinator';
 import type { SdkFeatureFlags } from './sdkFeatureFlags';
 import { resolveSdkFeatureFlags } from './sdkFeatureFlags';
-import type { SdkEvent, SdkOpencodeClient } from './sdkTypes';
+import type { SdkEvent } from './sdkTypes';
 import { ServerManager } from './ServerManager';
 import type {
   ManagedServerState,
@@ -145,18 +148,6 @@ function getDebugTextPreview(text: string, maxLength = 160): string {
   return `${normalized.slice(0, maxLength)}...`;
 }
 
-function stringifyDebugPayload(payload: unknown): string {
-  try {
-    return JSON.stringify(payload);
-  } catch {
-    return '[unserializable]';
-  }
-}
-
-function logAssistantFinalizationDebug(label: string, payload: unknown): void {
-  logger.debug(`Assistant stream finalization [${label}]: ${stringifyDebugPayload(payload)}`);
-}
-
 interface AssistantMessageResponse {
   info: Message;
   parts: Part[];
@@ -168,44 +159,6 @@ interface ProviderSendProbeResult {
   success: boolean;
   responsePreview?: string;
   error?: string;
-}
-
-function extractStructuredErrorMessage(errorLike: unknown): string | null {
-  if (!errorLike || typeof errorLike !== 'object') {
-    return null;
-  }
-
-  const errorRecord = errorLike as {
-    message?: unknown;
-    data?: {
-      message?: unknown;
-      statusCode?: unknown;
-      responseBody?: unknown;
-    };
-    name?: unknown;
-  };
-
-  const baseMessage = typeof errorRecord.data?.message === 'string' && errorRecord.data.message.trim()
-    ? errorRecord.data.message.trim()
-    : typeof errorRecord.message === 'string' && errorRecord.message.trim()
-      ? errorRecord.message.trim()
-      : typeof errorRecord.name === 'string' && errorRecord.name.trim()
-        ? errorRecord.name.trim()
-        : null;
-
-  if (!baseMessage) {
-    return null;
-  }
-
-  const statusCode = typeof errorRecord.data?.statusCode === 'number'
-    ? errorRecord.data.statusCode
-    : null;
-
-  if (statusCode === null || baseMessage.toLowerCase().includes(`http ${statusCode}`)) {
-    return baseMessage;
-  }
-
-  return `${baseMessage} (HTTP ${statusCode})`;
 }
 
 type SessionTodoUpdate = {
@@ -222,9 +175,93 @@ interface TransientConnectivityLogState {
   suppressedCount: number;
 }
 
+type ServiceLogLevel = 'warn' | 'error';
+
+class OpenCodeServiceDiagnostics {
+  private transientConnectivityLogState: TransientConnectivityLogState | null = null;
+
+  extractAssistantErrorMessage(errorLike: unknown): string | null {
+    return extractSdkErrorMessage(errorLike, {
+      fallbackMessage: null,
+      includeName: true,
+      includeTopLevelError: false,
+      includeTopLevelStatus: false,
+      trimMessage: true,
+    });
+  }
+
+  describeError(error: unknown): string {
+    return describeSdkError(
+      error,
+      error instanceof Error ? error.message : String(error),
+    );
+  }
+
+  isTransientConnectivityError(error: unknown): boolean {
+    const message = error instanceof Error ? error.message : String(error);
+    return TRANSIENT_CONNECTIVITY_ERROR_PATTERNS.some((pattern) => pattern.test(message));
+  }
+
+  logAssistantFinalizationDebug(label: string, payload: unknown): void {
+    logger.debug(`Assistant stream finalization [${label}]: ${this.stringifyDebugPayload(payload)}`);
+  }
+
+  logServiceWarning(_key: string, message: string, error: unknown): void {
+    this.logServiceIssue('warn', message, error);
+  }
+
+  logServiceError(_key: string, message: string, error: unknown): void {
+    this.logServiceIssue('error', message, error);
+  }
+
+  resetTransientConnectivityLogState(): void {
+    this.transientConnectivityLogState = null;
+  }
+
+  private logServiceIssue(level: ServiceLogLevel, message: string, error: unknown): void {
+    if (this.isTransientConnectivityError(error)) {
+      this.logTransientConnectivityIssue(level, message, error);
+      return;
+    }
+
+    this.emit(level, message, error);
+  }
+
+  private logTransientConnectivityIssue(level: ServiceLogLevel, message: string, error: unknown): void {
+    if (this.transientConnectivityLogState) {
+      this.transientConnectivityLogState.suppressedCount += 1;
+      return;
+    }
+
+    this.transientConnectivityLogState = {
+      suppressedCount: 0,
+    };
+
+    this.emit(level, `${message} (subsequent offline logs suppressed until the server recovers)`, error);
+  }
+
+  private emit(level: ServiceLogLevel, message: string, error: unknown): void {
+    if (level === 'warn') {
+      logger.warn(message, error);
+      return;
+    }
+
+    logger.error(message, error);
+  }
+
+  private stringifyDebugPayload(payload: unknown): string {
+    try {
+      return JSON.stringify(payload);
+    } catch {
+      return '[unserializable]';
+    }
+  }
+}
+
 export class OpenCodeService {
   private static readonly messageNormalizationMapper = new OpenCodeMessageNormalizationMapper();
   readonly sdk: OpenCodeSdkFacade;
+  private diagnostics: OpenCodeServiceDiagnostics;
   private settings: OpenCodianSettings;
   private events: OpenCodeServiceEvents;
   private serverManager: ServerManager;
@@ -246,7 +283,6 @@ export class OpenCodeService {
   private settingsReconfiguration: OpenCodeSettingsReconfigurationCoordinator;
   private serviceLifecycle: OpenCodeServiceLifecycleCoordinator;
   private vaultPath?: string;
-  private transientConnectivityLogState: TransientConnectivityLogState | null = null;
 
   constructor(
     settings: OpenCodianSettings,
@@ -257,6 +293,11 @@ export class OpenCodeService {
     this.events = events;
     this.baseUrl = getServerBaseUrl(settings.server);
     this.sdkFeatureFlags = resolveSdkFeatureFlags(runtimeOptions.sdkFeatureFlags);
+    this.diagnostics = new OpenCodeServiceDiagnostics();
+    const logServiceWarning = (key: string, message: string, error: unknown) =>
+      this.diagnostics.logServiceWarning(key, message, error);
+    const logServiceError = (key: string, message: string, error: unknown) =>
+      this.diagnostics.logServiceError(key, message, error);
     this.sdk = new OpenCodeSdkFacade(() => ({
       baseUrl: this.baseUrl,
       authHeaders: this.getAuthHeaders(),
@@ -270,9 +311,9 @@ export class OpenCodeService {
       },
       normalizeSessionTodos: (response) => this.normalizeSessionTodos(response),
       normalizeSessionStatus: (status) => this.normalizeSessionStatus(status),
-      isTransientConnectivityError: (error) => this.isTransientConnectivityError(error),
+      isTransientConnectivityError: (error) => this.diagnostics.isTransientConnectivityError(error),
       logSyncEventStreamFailure: (error) =>
-        this.logServiceWarning('global.sync-event', 'SDK sync event stream failed', error),
+        logServiceWarning('global.sync-event', 'SDK sync event stream failed', error),
       checkHealth: () => this.checkHealth(),
       delay: (ms, signal) => this.delay(ms, signal),
     });
@@ -290,8 +331,8 @@ export class OpenCodeService {
       normalizeSessionStatuses: (response) => this.normalizeSessionStatuses(response),
       applySessionRevertState: (sessionId, messages) => this.applySessionRevertState(sessionId, messages),
       observeToolNamesInMessages: (messages) => this.observeToolNamesInMessages(messages),
-      logServiceWarning: (key, message, error) => this.logServiceWarning(key, message, error),
-      logServiceError: (key, message, error) => this.logServiceError(key, message, error),
+      logServiceWarning,
+      logServiceError,
     }, this.syncEventRuntime);
     this.sessionControl = new OpenCodeSessionControlOrchestrator({
       shouldUseSdkCrud: () => this.shouldUseSdk('sdkCrud'),
@@ -302,8 +343,8 @@ export class OpenCodeService {
       getSessionInfo: (sessionId) => this.sessionLifecycle.getSessionInfo(sessionId),
       getSessionMessages: (sessionId) => this.sessionLifecycle.getSessionMessages(sessionId),
       getAvailableModels: () => this.getAvailableModels(),
-      logServiceWarning: (key, message, error) => this.logServiceWarning(key, message, error),
-      logServiceError: (key, message, error) => this.logServiceError(key, message, error),
+      logServiceWarning,
+      logServiceError,
     });
     this.questionPermissionHub = new OpenCodeQuestionPermissionHub({
       shouldUseSdkQuestions: () => this.shouldUseSdk('sdkQuestions'),
@@ -314,8 +355,8 @@ export class OpenCodeService {
       postLegacy: (path, body) => this.post(path, body),
       normalizeQuestionRequest: (raw) =>
         OpenCodeService.messageNormalizationMapper.normalizeQuestionRequest(raw),
-      logServiceWarning: (key, message, error) => this.logServiceWarning(key, message, error),
-      logServiceError: (key, message, error) => this.logServiceError(key, message, error),
+      logServiceWarning,
+      logServiceError,
     });
     this.catalogState = new OpenCodeCatalogStateStore({
       syncOpenCodeEventSubscriptions: () => {
@@ -333,8 +374,8 @@ export class OpenCodeService {
         ? this.getSdkFacade(options)
         : this.sdk,
       getLegacy: <T>(path: string, options?: { includeDirectory?: boolean }) => this.get<T>(path, options),
-      logServiceWarning: (key, message, error) => this.logServiceWarning(key, message, error),
-      logServiceError: (key, message, error) => this.logServiceError(key, message, error),
+      logServiceWarning,
+      logServiceError,
       getDebugMetadata: () => ({
         baseUrl: this.baseUrl,
         vaultPath: this.vaultPath ?? null,
@@ -377,7 +418,7 @@ export class OpenCodeService {
         ),
       normalizeQuestionRequest: (raw) =>
         OpenCodeService.messageNormalizationMapper.normalizeQuestionRequest(raw),
-      logStreamingDebug: (label, payload) => logAssistantFinalizationDebug(label, payload),
+      logStreamingDebug: (label, payload) => this.diagnostics.logAssistantFinalizationDebug(label, payload),
     });
     this.streamingRuntime = new OpenCodeStreamingRuntimeCoordinator({
       abortSessionOnServer: (sessionId) => this.sessionLifecycle.abortSession(sessionId),
@@ -391,7 +432,7 @@ export class OpenCodeService {
         };
       },
       getSessionMessages: (sessionId) => this.getSessionMessages(sessionId),
-      logServiceWarning: (key, message, error) => this.logServiceWarning(key, message, error),
+      logServiceWarning,
       streamEventTransformer: this.streamEventTransformer,
     });
     this.openCodeEventRuntime = new OpenCodeEventSubscriptionCoordinator({
@@ -411,7 +452,7 @@ export class OpenCodeService {
       emitCatalogUpdate: () => this.catalogState.emitCatalogUpdate(),
       refreshMcpServerStatus: () => this.refreshMcpServerStatus(),
       logEventSubscriptionFailure: (source, error) =>
-        this.logServiceWarning(`${source}.subscribe`, `SDK ${source} subscription failed, retrying`, error),
+        logServiceWarning(`${source}.subscribe`, `SDK ${source} subscription failed, retrying`, error),
       delay: (ms, signal) => this.delay(ms, signal),
     });
 
@@ -435,10 +476,10 @@ export class OpenCodeService {
       getBaseUrl: () => this.baseUrl,
       getToolCatalogScopeKey: () => this.catalogQueries.getToolCatalogScopeKey(),
       shouldUseSdkCrud: () => this.shouldUseSdk('sdkCrud'),
-      checkSdkHealth: async () => this.getSdkClient().global.health(),
+      checkSdkHealth: async () => this.getSdkFacade({ includeDirectory: false }).global.health(),
       logHealthProbeFallback: (error) =>
-        this.logServiceWarning('health', 'SDK health check failed, falling back to ServerManager health probe', error),
-      resetTransientConnectivityLogState: () => this.resetTransientConnectivityLogState(),
+        logServiceWarning('health', 'SDK health check failed, falling back to ServerManager health probe', error),
+      resetTransientConnectivityLogState: () => this.diagnostics.resetTransientConnectivityLogState(),
       notifyServerStatusChange: (status) => events.onServerStatusChange?.(status),
       setVaultPath: (path) => {
         this.vaultPath = path;
@@ -469,61 +510,6 @@ export class OpenCodeService {
       syncEvents: this.syncEventRuntime,
       openCodeEvents: this.openCodeEventRuntime,
     });
-  }
-
-  private static describeError(error: unknown): string {
-    if (error instanceof Error) {
-      return error.message;
-    }
-
-    return String(error);
-  }
-
-  private isTransientConnectivityError(error: unknown): boolean {
-    const message = OpenCodeService.describeError(error);
-    return TRANSIENT_CONNECTIVITY_ERROR_PATTERNS.some((pattern) => pattern.test(message));
-  }
-
-  private logTransientConnectivityIssue(level: 'warn' | 'error', message: string, error: unknown): void {
-    if (this.transientConnectivityLogState) {
-      this.transientConnectivityLogState.suppressedCount += 1;
-      return;
-    }
-
-    this.transientConnectivityLogState = {
-      suppressedCount: 0,
-    };
-
-    const nextMessage = `${message} (subsequent offline logs suppressed until the server recovers)`;
-
-    if (level === 'warn') {
-      logger.warn(nextMessage, error);
-      return;
-    }
-
-    logger.error(nextMessage, error);
-  }
-
-  private logServiceWarning(key: string, message: string, error: unknown): void {
-    if (this.isTransientConnectivityError(error)) {
-      this.logTransientConnectivityIssue('warn', message, error);
-      return;
-    }
-
-    logger.warn(message, error);
-  }
-
-  private logServiceError(key: string, message: string, error: unknown): void {
-    if (this.isTransientConnectivityError(error)) {
-      this.logTransientConnectivityIssue('error', message, error);
-      return;
-    }
-
-    logger.error(message, error);
-  }
-
-  private resetTransientConnectivityLogState(): void {
-    this.transientConnectivityLogState = null;
   }
 
   /** Initialize the service */
@@ -766,12 +752,12 @@ export class OpenCodeService {
     const parts = this.contextPartSerializer.buildPromptRequestParts(message, options);
 
     if (this.shouldUseSdk('sdkPrompt')) {
-      const response = await this.getSdkClient().session.prompt(
+      const response = await this.sdk.session.prompt(
         this.promptRequestBuilder.buildSdkPromptParameters(sessionId, parts, options),
       );
       if (response && typeof response === 'object' && 'info' in response && 'parts' in response) {
         const typedResponse = response as AssistantMessageResponse;
-        const assistantError = extractStructuredErrorMessage(typedResponse.info.error);
+        const assistantError = this.diagnostics.extractAssistantErrorMessage(typedResponse.info.error);
         if (assistantError) {
           throw new Error(assistantError);
         }
@@ -796,7 +782,7 @@ export class OpenCodeService {
       && 'parts' in response
     ) {
       const typedResponse = response as AssistantMessageResponse;
-      const assistantError = extractStructuredErrorMessage(typedResponse.info.error);
+      const assistantError = this.diagnostics.extractAssistantErrorMessage(typedResponse.info.error);
       if (assistantError) {
         throw new Error(assistantError);
       }
@@ -846,7 +832,7 @@ export class OpenCodeService {
         providerId: normalizedProviderId,
         modelId: normalizedModelId,
         success: false,
-        error: error instanceof Error ? error.message : String(error),
+        error: this.diagnostics.describeError(error),
       };
     } finally {
       try {
@@ -866,23 +852,18 @@ export class OpenCodeService {
     }
 
     const parts = this.contextPartSerializer.buildPromptRequestParts(message, options);
-    let sdkClient: SdkOpencodeClient | null = null;
-    const getStreamingSdkClient = (): SdkOpencodeClient => {
-      sdkClient ??= this.getSdkClient();
-      return sdkClient;
-    };
 
     yield* this.streamingRuntime.streamResponse({
       sessionId,
       useSdkStream: this.shouldUseSdk('sdkStream'),
       sdk: {
         startPrompt: async () => {
-          await getStreamingSdkClient().session.promptAsync(
+          await this.sdk.session.promptAsync(
             this.promptRequestBuilder.buildSdkPromptParameters(sessionId, parts, options),
           );
         },
         subscribe: async (signal) => {
-          const subscription = await getStreamingSdkClient().event.subscribe(undefined, { signal });
+          const subscription = await this.sdk.event.subscribe(undefined, { signal } as never);
           return subscription.stream as AsyncIterable<SdkEvent>;
         },
       },
@@ -906,16 +887,6 @@ export class OpenCodeService {
       authHeaders: this.getAuthHeaders(),
       directory: includeDirectory ? this.getScopedDirectoryPath() : undefined,
     }));
-  }
-
-  private getSdkClient(options: { includeDirectory?: boolean } = {}): SdkOpencodeClient {
-    const { includeDirectory = true } = options;
-    this.ensureBaseUrl();
-    return createSdkClient({
-      baseUrl: this.baseUrl,
-      authHeaders: this.getAuthHeaders(),
-      directory: includeDirectory ? this.getScopedDirectoryPath() : undefined,
-    });
   }
 
   private observeToolNamesInMessages(messages: Array<{ info: Message; parts: Part[] }>): void {
@@ -1087,7 +1058,11 @@ export class OpenCodeService {
       }
       return filtered;
     } catch (error) {
-      this.logServiceWarning('session.get', `Failed to load session info for ${sessionId} while applying revert state`, error);
+      this.diagnostics.logServiceWarning(
+        'session.get',
+        `Failed to load session info for ${sessionId} while applying revert state`,
+        error,
+      );
       return messages;
     }
   }

@@ -118,6 +118,23 @@ describe('OpenCodeService SDK prompt requests', () => {
     })).rejects.toThrow('Incorrect API key provided. (HTTP 401)');
   });
 
+  it('normalizes raw SDK prompt transport failures through the shared facade seam', async () => {
+    service = createServiceWithSdkFlags();
+    service.setSessionId('sdk-session');
+    mockSdkClient.session.prompt.mockRejectedValue({
+      data: {
+        message: 'Rate limit hit',
+        statusCode: 429,
+      },
+    });
+
+    await expect(service.requestAssistantResponse('Create a title', {
+      sessionId: 'sdk-session',
+      provider: 'alibaba',
+      model: 'qwen-plus',
+    })).rejects.toThrow('Rate limit hit (HTTP 429)');
+  });
+
   it('runs a real provider probe in a temporary session and cleans it up', async () => {
     service = createServiceWithSdkFlags();
     mockSdkClient.session.create.mockResolvedValue({
@@ -161,6 +178,32 @@ describe('OpenCodeService SDK prompt requests', () => {
       },
       system: 'Connectivity probe. Reply with the single word OK.',
     }));
+    expect(mockSdkClient.session.delete).toHaveBeenCalledWith({
+      sessionID: 'probe-session',
+    });
+  });
+
+  it('returns normalized provider probe failures from the shared diagnostics seam', async () => {
+    service = createServiceWithSdkFlags();
+    mockSdkClient.session.create.mockResolvedValue({
+      id: 'probe-session',
+      title: 'Provider probe: alibaba',
+      time: { created: 1, updated: 1 },
+    });
+    mockSdkClient.session.prompt.mockRejectedValue({
+      data: {
+        message: 'Rate limit hit',
+        statusCode: 429,
+      },
+    });
+    mockSdkClient.session.delete.mockResolvedValue(undefined);
+
+    await expect(service.probeProviderResponse('alibaba', 'qwen-plus')).resolves.toEqual({
+      providerId: 'alibaba',
+      modelId: 'qwen-plus',
+      success: false,
+      error: 'Rate limit hit (HTTP 429)',
+    });
     expect(mockSdkClient.session.delete).toHaveBeenCalledWith({
       sessionID: 'probe-session',
     });

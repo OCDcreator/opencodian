@@ -10,6 +10,7 @@
 - 以当前 `baseUrl` / 认证头 / `directory` 作用域创建客户端
 - 兼容 unwrap 直接数据与 `{ data }` 形状
 - 把非标准错误统一归一化成 `Error`
+- 对外导出共享的 structured-error message helper，供 `OpenCodeService` 的 prompt/health/probe follow-up 复用同一套错误整形口径
 
 当前 façade 覆盖的 namespace 与 OpenCode OpenAPI 对齐，包括 `app`、`auth`、`command`、`config`、`event`、`experimental`、`file`、`find`、`formatter`、`global`、`instance`、`lsp`、`mcp`、`part`、`path`、`permission`、`project`、`provider`、`pty`、`question`、`session`、`tool`、`tui`、`vcs`、`worktree`。
 
@@ -17,6 +18,7 @@
 
 - 顶层与嵌套 namespace 都通过递归 `Proxy` 暴露，例如 `global.syncEvent.subscribe()`、`mcp.auth.start()`、`provider.oauth.callback()`。
 - 每次方法调用都会重新解析当前客户端实例，因此 `OpenCodeService` 更新 `baseUrl`、认证或 `directory` 后不需要重建整个 façade。
+- `extractSdkErrorMessage()` / `describeSdkError()` 与 `normalizeSdkError()` 共用同一套 message/status 解析规则；service-local follow-up 现在也通过这组 helper 复用相同口径，而不是各自手写一份。
 - façade 本身不承担产品语义；像工具目录缓存、MCP 状态缓存、事件总线和 legacy fallback 仍由 `OpenCodeService` 负责。
 
 ## 与其他模块的交互

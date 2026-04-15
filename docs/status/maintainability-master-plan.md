@@ -2,19 +2,19 @@
 
 > **状态**: [READY]
 > **作用**: 这是 maintainability 无人值守的战略文档。每轮开始前，先读本文件，再读 `docs/status/maintainability-round-roadmap.md` 与最近的 `docs/status/maintainability-phase-XXX.md`。
-> **自动推进状态**: `R110` 已完成 session abort/get fallback seam；当前继续按 `R111-R137` 长队列顺序推进。恢复 autopilot 后只能从首个 `[NEXT]`（`R111`）顺序执行，不允许 freestyle。
+> **自动推进状态**: `R111` 已完成 transient logging/error normalization seam；当前继续按 `R112-R137` 长队列顺序推进。恢复 autopilot 后只能从首个 `[NEXT]`（`R112`）顺序执行，不允许 freestyle。
 
 ## 1. 当前判断
 
-**当前分支已完成 `R68-R110` 并把 live lint 稳定在 `0 errors / 65 warnings`；`R110` 已把 session get/abort fallback control flow 继续收进既有 session lifecycle owner。** 接下来的高收益 residual 将按 queue 继续推进 `OpenCodeService` diagnostics residual、secondary core / settings / startup，最后做 heavy tests follow-up、warning closeout 与最终 checkpoint。
+**当前分支已完成 `R68-R111` 并把 live lint 稳定在 `0 errors / 65 warnings`；`R111` 已把 transient logging/error normalization 收束到 service-local diagnostics seam 与 shared SDK error helpers。** 接下来的高收益 residual 将先执行 `R112` checkpoint 复盘 `OpenCodeService` residual 收益，再进入 streaming / secondary core / settings / startup，最后做 heavy tests follow-up、warning closeout 与最终 checkpoint。
 
 ## 2. 当前基线
 
 - **lint**: `0 errors / 65 warnings`
-- **最近验证**: `R110` 已确认 targeted `npm test -- OpenCodeSessionLifecycleCoordinator OpenCodeService.sdkCrudSync OpenCodeService.sdkPromptTransport OpenCodeStreamingRuntimeCoordinator`、全量 `npm test` 与 `npm run build` 通过，`BUILD_ID` 为 `autopilot-maintainability.202604160015`
+- **最近验证**: `R111` 已确认 targeted `npm test -- OpenCodeSdkFacade OpenCodeService.sdkPromptTransport`、全量 `npm test` 与 `npm run build` 通过，`BUILD_ID` 为 `autopilot-maintainability.202604160031`
 - **最近 Test Vault 部署**: `R64`，`BUILD_ID` `autopilot-maintainability.202604150602`
-- **当前 `[NEXT]`**: `R111 - OpenCodeService transient logging/error normalization seam`
-- **主热点**: `src/core/opencode/OpenCodeService.ts` 与 `src/core/opencode/OpenCodeSdkFacade.ts` 构成 batch 5 的当前入口；继续收束 transient debug logging、error shaping 与 normalize follow-up residual，同时保持错误归一化口径、logging 开关与 SDK facade 注入规则不变
+- **当前 `[NEXT]`**: `R112 - Checkpoint after OpenCodeService residual seams`
+- **主热点**: `docs/status/maintainability-master-plan.md` 与 `docs/status/maintainability-round-roadmap.md` 构成当前 checkpoint 入口；复盘 `R108-R111` 的 service residual 收益、验证成本与 streaming lane 准备度
 
 ## 3. 本批执行规则
 
