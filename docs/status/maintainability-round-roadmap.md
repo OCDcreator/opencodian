@@ -444,7 +444,7 @@
   - `OpenCodianView` 对 tab pane/runtime state 的直接装配明显减少
   - focused validation、全量 `npm test`、`npm run build` 通过
 
-### [NEXT] R69 - OpenCodianView conversation load and recovery lifecycle seam
+### [DONE] R69 - OpenCodianView conversation load and recovery lifecycle seam
 
 - **Lane**: Maintainability / chat conversation load
 - **目标**: 从 `src/features/chat/OpenCodianView.ts:3445` 一带收束 create/load/fork/rewind、restore bootstrap、missing-conversation recovery 与 activation follow-up 的完整 conversation lifecycle。
@@ -463,7 +463,7 @@
   - `OpenCodianView` 对 conversation load/recovery 分支的直接持有明显减少
   - focused validation、全量 `npm test`、`npm run build` 通过
 
-### [QUEUED] R70 - OpenCodianView message render/update seam
+### [NEXT] R70 - OpenCodianView message render/update seam
 
 - **Lane**: Maintainability / chat render update
 - **目标**: 从 `src/features/chat/OpenCodianView.ts:3805` 一带收束 renderMessage/renderMessages/renderContentBlock、user/assistant body update、tail patch 与 pseudo-stream update 的残余 render lifecycle。
@@ -782,4 +782,3 @@
   - 不回切 freestyle cleanup
 - **验收**:
   - phase 文档明确记录 `R68-R86` 收益、最新 lint 基线、warning 下降量与后续建议
-

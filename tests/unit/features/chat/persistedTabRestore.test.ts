@@ -5,8 +5,6 @@ jest.mock('../../../../src/core/opencode', () => ({
 }));
 
 import { OpenCodianView } from '../../../../src/features/chat/OpenCodianView';
-import { ConversationRestoreBootstrapCoordinator } from '../../../../src/features/chat/services/ConversationRestoreBootstrapCoordinator';
-import { ConversationViewStateService } from '../../../../src/features/chat/services/ConversationViewStateService';
 import { TabManager } from '../../../../src/features/chat/tabs/TabManager';
 
 function createConversation(id: string, title: string) {
@@ -16,7 +14,15 @@ function createConversation(id: string, title: string) {
     createdAt: 1,
     updatedAt: 1,
     openCodeSessionId: `${id}-session`,
-    messages: [],
+    messages: [
+      {
+        id: `${id}-message`,
+        role: 'assistant',
+        content: `Message for ${id}`,
+        timestamp: 1,
+        sourceMessageId: `${id}-source`,
+      },
+    ],
   };
 }
 
@@ -32,7 +38,12 @@ function createView(overrides: Record<string, unknown> = {}): OpenCodianView {
         activeTabIndex: 0,
       },
     },
-    openCodeService: {},
+    openCodeService: {
+      setSessionId: jest.fn(),
+      getSessionContextUsageSnapshot: jest.fn().mockResolvedValue(null),
+      getSessionTodos: jest.fn().mockResolvedValue([]),
+      getSessionStatuses: jest.fn().mockResolvedValue({}),
+    },
     storage: {},
     loadConversations: jest.fn().mockResolvedValue(undefined),
     getConversations: jest.fn().mockReturnValue([]),
@@ -44,48 +55,47 @@ function createView(overrides: Record<string, unknown> = {}): OpenCodianView {
   } as never);
 }
 
-function getConversationViewStateService(view: OpenCodianView): ConversationViewStateService {
-  return (view as unknown as {
-    conversationViewStateService: ConversationViewStateService;
-  }).conversationViewStateService;
-}
-
-function getConversationRestoreBootstrapCoordinator(
-  view: OpenCodianView,
-): ConversationRestoreBootstrapCoordinator {
-  return (view as unknown as {
-    conversationRestoreBootstrapCoordinator: ConversationRestoreBootstrapCoordinator;
-  }).conversationRestoreBootstrapCoordinator;
-}
-
 describe('OpenCodianView persisted tab restore', () => {
   it('loads conversations before attempting to restore tabs during first open', async () => {
+    const conversation = createConversation('conv-restored', 'Restored chat');
     const plugin = {
       loadConversations: jest.fn().mockResolvedValue(undefined),
+      getConversations: jest.fn().mockReturnValue([conversation]),
+      getConversationById: jest.fn().mockResolvedValue(conversation),
+      settings: {
+        effortLevel: 'medium',
+        thinkingBudget: 0,
+        locale: 'en',
+        enableAutoScroll: true,
+        tabState: {
+          tabs: [
+            {
+              conversationId: conversation.id,
+              title: conversation.title,
+              modelOverride: null,
+            },
+          ],
+          activeTabIndex: 0,
+        },
+      },
     };
     const view = createView(plugin) as OpenCodianView & {
       tabManager: TabManager | null;
       initializeFirstTab: () => Promise<void>;
-      restorePersistedTabs: () => string | null;
-      activateTab: (tabId: string) => Promise<void>;
     };
 
     view.tabManager = new TabManager('New chat', {
       getMaxTabs: () => 4,
     });
-
-    const coordinator = getConversationRestoreBootstrapCoordinator(view);
-    const service = getConversationViewStateService(view);
-    const restoreSpy = jest.spyOn(coordinator, 'restorePersistedTabs').mockReturnValue('restored-tab');
-    const activateSpy = jest.spyOn(service, 'activateTab').mockResolvedValue(undefined);
+    const restoreTabsSpy = jest.spyOn(view.tabManager, 'restoreTabs');
 
     await view.initializeFirstTab();
 
     expect(plugin.loadConversations).toHaveBeenCalledTimes(1);
-    expect(restoreSpy).toHaveBeenCalledTimes(1);
-    expect(activateSpy).toHaveBeenCalledWith('restored-tab');
+    expect(restoreTabsSpy).toHaveBeenCalledTimes(1);
+    expect(view.tabManager.getActiveTab()?.conversationId).toBe(conversation.id);
     expect(plugin.loadConversations.mock.invocationCallOrder[0]).toBeLessThan(
-      restoreSpy.mock.invocationCallOrder[0]!,
+      restoreTabsSpy.mock.invocationCallOrder[0]!,
     );
   });
 
@@ -103,14 +113,12 @@ describe('OpenCodianView persisted tab restore', () => {
       getMaxTabs: () => 4,
     });
 
-    const activateSpy = jest.spyOn(getConversationViewStateService(view), 'activateTab').mockResolvedValue(undefined);
-
     await view.initializeFirstTab();
 
     const tabs = view.tabManager.getAllTabs();
     expect(tabs).toHaveLength(1);
     expect(tabs[0]?.conversationId).toBe(conversation.id);
-    expect(activateSpy).toHaveBeenCalledWith(tabs[0]!.id);
+    expect(view.tabManager.getActiveTab()?.id).toBe(tabs[0]?.id ?? null);
   });
 
   it('creates a new conversation when the first open has no persisted tabs or existing conversations', async () => {
@@ -129,15 +137,13 @@ describe('OpenCodianView persisted tab restore', () => {
       getMaxTabs: () => 4,
     });
 
-    const activateSpy = jest.spyOn(getConversationViewStateService(view), 'activateTab').mockResolvedValue(undefined);
-
     await view.initializeFirstTab();
 
     const tabs = view.tabManager.getAllTabs();
     expect(plugin.createConversation).toHaveBeenCalledTimes(1);
     expect(tabs).toHaveLength(1);
     expect(tabs[0]?.conversationId).toBe(createdConversation.id);
-    expect(activateSpy).toHaveBeenCalledWith(tabs[0]!.id);
+    expect(view.tabManager.getActiveTab()?.id).toBe(tabs[0]?.id ?? null);
   });
 
   it('restores per-tab model overrides without leaking them across tab activation', () => {

@@ -5,7 +5,7 @@ jest.mock('../../../../src/core/opencode', () => ({
 }));
 
 import { OpenCodianView } from '../../../../src/features/chat/OpenCodianView';
-import { ConversationTabOpenCoordinator } from '../../../../src/features/chat/services/ConversationTabOpenCoordinator';
+import { ConversationLoadRecoveryCoordinator } from '../../../../src/features/chat/services/ConversationLoadRecoveryCoordinator';
 
 function createView(overrides: Record<string, unknown> = {}): OpenCodianView {
   return new OpenCodianView(new WorkspaceLeaf(), {
@@ -29,12 +29,12 @@ function createView(overrides: Record<string, unknown> = {}): OpenCodianView {
   } as never);
 }
 
-function getConversationTabOpenCoordinator(
+function getConversationLoadRecoveryCoordinator(
   view: OpenCodianView,
-): ConversationTabOpenCoordinator {
+): ConversationLoadRecoveryCoordinator {
   return (view as unknown as {
-    conversationTabOpenCoordinator: ConversationTabOpenCoordinator;
-  }).conversationTabOpenCoordinator;
+    conversationLoadRecoveryCoordinator: ConversationLoadRecoveryCoordinator;
+  }).conversationLoadRecoveryCoordinator;
 }
 
 describe('OpenCodianView new conversation delegation', () => {
@@ -42,7 +42,7 @@ describe('OpenCodianView new conversation delegation', () => {
     const view = createView() as OpenCodianView & {
       createNewConversation: () => Promise<void>;
     };
-    const coordinator = getConversationTabOpenCoordinator(view);
+    const coordinator = getConversationLoadRecoveryCoordinator(view);
     const spy = jest.spyOn(coordinator, 'createConversationInNewTab').mockResolvedValue(undefined);
 
     await view.createNewConversation();
@@ -54,7 +54,7 @@ describe('OpenCodianView new conversation delegation', () => {
     const view = createView() as OpenCodianView & {
       createNewConversationInCurrentTab: () => Promise<void>;
     };
-    const coordinator = getConversationTabOpenCoordinator(view);
+    const coordinator = getConversationLoadRecoveryCoordinator(view);
     const spy = jest.spyOn(coordinator, 'createConversationInCurrentTab').mockResolvedValue(undefined);
 
     await view.createNewConversationInCurrentTab();

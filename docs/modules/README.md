@@ -148,6 +148,7 @@ docs/modules/
 │   │   │   ├── FocusContextRuntimeService.md
 │   │   │   ├── ContextUsageService.md
 │   │   │   ├── ConversationRenderService.md
+│   │   │   ├── ConversationLoadRecoveryCoordinator.md
 │   │   │   ├── ConversationRestoreBootstrapCoordinator.md
 │   │   │   ├── ConversationTabLifecycleRecoveryCoordinator.md
 │   │   │   ├── ConversationTabOpenCoordinator.md

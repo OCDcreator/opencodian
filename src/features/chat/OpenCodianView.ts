@@ -57,7 +57,6 @@ import {
 import {
   type FocusContextPreview,
 } from './composerContext';
-import { cloneMessagesBeforeForkTarget } from './forkMessages';
 import { GlassOctahedronDemoController } from './glassOctahedronDemo';
 import { LiquidDiamondDemoController } from './liquidDiamondDemo';
 import { buildMessageRenderGroups, mergeAssistantMessagesForRender } from './renderGroups';
@@ -196,6 +195,10 @@ import {
   ConversationHistoryActionsCoordinator,
   type ConversationHistoryActionsHost,
 } from './services/ConversationHistoryActionsCoordinator';
+import {
+  ConversationLoadRecoveryCoordinator,
+  type ConversationLoadRecoveryHost,
+} from './services/ConversationLoadRecoveryCoordinator';
 import {
   type ConversationHydrationRuntimeHostProviderHost,
   createConversationHydrationRuntimeViewHostFactoryHost,
@@ -434,10 +437,7 @@ interface OpenCodianViewConversationRuntimeWiring {
   backgroundTaskInlinePanelRenderer: BackgroundTaskInlinePanelRenderer;
   backgroundTaskIndicatorCoordinator: BackgroundTaskIndicatorCoordinator;
   backgroundTaskStreamTriggerCoordinator: BackgroundTaskStreamTriggerCoordinator;
-  conversationViewStateService: ConversationViewStateService;
-  conversationTabOpenCoordinator: ConversationTabOpenCoordinator;
-  conversationTabLifecycleRecoveryCoordinator: ConversationTabLifecycleRecoveryCoordinator;
-  conversationRestoreBootstrapCoordinator: ConversationRestoreBootstrapCoordinator;
+  conversationLoadRecoveryCoordinator: ConversationLoadRecoveryCoordinator;
   conversationTabRuntimeCoordinator: ConversationTabRuntimeCoordinator<TabRuntimeState>;
 }
 
@@ -590,11 +590,8 @@ export class OpenCodianView extends ItemView {
     TabConversationSyncFingerprintRuntimePort;
   private tabActivationConversationSyncRuntimePort!: TabActivationConversationSyncRuntimePort;
   private conversationSessionSignalRuntime: ConversationSessionSignalRuntime;
-  private conversationTabOpenCoordinator: ConversationTabOpenCoordinator;
-  private conversationTabLifecycleRecoveryCoordinator: ConversationTabLifecycleRecoveryCoordinator;
-  private conversationRestoreBootstrapCoordinator: ConversationRestoreBootstrapCoordinator;
+  private conversationLoadRecoveryCoordinator: ConversationLoadRecoveryCoordinator;
   private conversationTabRuntimeCoordinator: ConversationTabRuntimeCoordinator<TabRuntimeState>;
-  private conversationViewStateService: ConversationViewStateService;
   private conversationRenderService: ConversationRenderService;
   private messageSendPreparationService: MessageSendPreparationService;
   private messageFinalizationService: MessageFinalizationService;
@@ -678,9 +675,7 @@ export class OpenCodianView extends ItemView {
       deleteConversationsAndCleanupTabs: (conversationIds) =>
         this.deleteConversationsAndCleanupTabs(conversationIds),
       deleteAllConversationsAndReset: (conversationIds) =>
-        this.conversationTabLifecycleRecoveryCoordinator.deleteAllConversationsAndReset(
-          conversationIds,
-        ),
+        this.conversationLoadRecoveryCoordinator.deleteAllConversationsAndReset(conversationIds),
       showNotice: (message) => {
         new Notice(message);
       },
@@ -1214,12 +1209,8 @@ export class OpenCodianView extends ItemView {
       conversationRuntime.backgroundTaskIndicatorCoordinator;
     this.backgroundTaskStreamTriggerCoordinator =
       conversationRuntime.backgroundTaskStreamTriggerCoordinator;
-    this.conversationViewStateService = conversationRuntime.conversationViewStateService;
-    this.conversationTabOpenCoordinator = conversationRuntime.conversationTabOpenCoordinator;
-    this.conversationTabLifecycleRecoveryCoordinator =
-      conversationRuntime.conversationTabLifecycleRecoveryCoordinator;
-    this.conversationRestoreBootstrapCoordinator =
-      conversationRuntime.conversationRestoreBootstrapCoordinator;
+    this.conversationLoadRecoveryCoordinator =
+      conversationRuntime.conversationLoadRecoveryCoordinator;
     this.conversationTabRuntimeCoordinator =
       conversationRuntime.conversationTabRuntimeCoordinator;
 
@@ -1451,15 +1442,37 @@ export class OpenCodianView extends ItemView {
         activateTab: (tabId) => conversationViewStateService.activateTab(tabId),
       },
     );
+    const conversationLoadRecoveryCoordinator = new ConversationLoadRecoveryCoordinator(
+      this.createConversationLoadRecoveryHost(),
+      {
+        activateTab: (tabId) => conversationViewStateService.activateTab(tabId),
+        createConversationInNewTab: () =>
+          conversationTabOpenCoordinator.createConversationInNewTab(),
+        createConversationInCurrentTab: () =>
+          conversationTabOpenCoordinator.createConversationInCurrentTab(),
+        loadConversation: (id, options) =>
+          conversationViewStateService.loadConversation(id, options),
+        deleteConversationsAndRecover: (conversationIds) =>
+          conversationTabLifecycleRecoveryCoordinator.deleteConversationsAndRecover(
+            conversationIds,
+          ),
+        deleteAllConversationsAndReset: (conversationIds) =>
+          conversationTabLifecycleRecoveryCoordinator.deleteAllConversationsAndReset(
+            conversationIds,
+          ),
+        initializeFirstTab: () => conversationRestoreBootstrapCoordinator.initializeFirstTab(),
+        restorePersistedTabs: () => conversationRestoreBootstrapCoordinator.restorePersistedTabs(),
+      },
+    );
     const conversationTabRuntimeCoordinator = new ConversationTabRuntimeCoordinator(
       this.createConversationTabRuntimeCoordinatorHost(),
       this.tabMessagesPaneCoordinator,
       {
-        activateTab: (tabId) => conversationViewStateService.activateTab(tabId),
+        activateTab: (tabId) => conversationLoadRecoveryCoordinator.activateTab(tabId),
         closeTabAndRecover: (tabId) =>
           conversationTabLifecycleRecoveryCoordinator.closeTabAndRecover(tabId),
-        initializeFirstTab: () => conversationRestoreBootstrapCoordinator.initializeFirstTab(),
-        restorePersistedTabs: () => conversationRestoreBootstrapCoordinator.restorePersistedTabs(),
+        initializeFirstTab: () => conversationLoadRecoveryCoordinator.initializeFirstTab(),
+        restorePersistedTabs: () => conversationLoadRecoveryCoordinator.restorePersistedTabs(),
         syncTabStreamLikeState: (tabId) => tabRuntimeStateBridge.syncStreamLikeState(tabId),
         syncActiveTabStreamLikeState: () => tabRuntimeStateBridge.syncActiveStreamLikeState(),
         setTabNeedsAttention: (tabId, needsAttention) =>
@@ -1486,10 +1499,7 @@ export class OpenCodianView extends ItemView {
       backgroundTaskInlinePanelRenderer,
       backgroundTaskIndicatorCoordinator,
       backgroundTaskStreamTriggerCoordinator,
-      conversationViewStateService,
-      conversationTabOpenCoordinator,
-      conversationTabLifecycleRecoveryCoordinator,
-      conversationRestoreBootstrapCoordinator,
+      conversationLoadRecoveryCoordinator,
       conversationTabRuntimeCoordinator,
     };
   }
@@ -2082,6 +2092,36 @@ export class OpenCodianView extends ItemView {
       loadConversations: () => this.plugin.loadConversations(),
       getConversations: () => this.plugin.getConversations(),
       createConversation: () => this.plugin.createConversation(),
+    };
+  }
+
+  private createConversationLoadRecoveryHost(): ConversationLoadRecoveryHost {
+    return {
+      isActiveTabStreaming: () => this.isActiveTabStreaming(),
+      getCurrentConversation: () => this.currentConversation,
+      getTabManager: () => this.tabManager,
+      getMaxTabs: () => this.plugin.settings.maxTabs,
+      chooseForkTarget: () => chooseForkTarget(this.app),
+      confirmRewind: () => window.confirm(t('chat.rewind.confirm')),
+      revertSession: (sessionId, messageId) =>
+        this.plugin.openCodeService.revertSession(sessionId, messageId),
+      unrevertSession: (sessionId) =>
+        this.plugin.openCodeService.unrevertSession(sessionId),
+      forkSession: (sessionId, messageId) =>
+        this.plugin.openCodeService.forkSession(sessionId, messageId),
+      createConversationFromSession: (sessionId, initial) =>
+        this.plugin.createConversationFromSession(sessionId, initial),
+      deleteConversation: (conversationId) =>
+        this.plugin.deleteConversation(conversationId),
+      syncActiveTabConversation: (conversation) => {
+        this.tabConversationStateBridge.syncActiveTabConversation(conversation);
+      },
+      updateModelSelectorDisplay: () => {
+        this.updateModelSelectorDisplay();
+      },
+      showNotice: (message) => {
+        new Notice(message);
+      },
     };
   }
 
@@ -3370,12 +3410,12 @@ export class OpenCodianView extends ItemView {
 
   /** Create a new conversation */
   private async createNewConversation() {
-    await this.conversationTabOpenCoordinator.createConversationInNewTab();
+    await this.conversationLoadRecoveryCoordinator.createConversationInNewTab();
   }
 
   /** Create a new conversation in the current tab */
   private async createNewConversationInCurrentTab(): Promise<void> {
-    await this.conversationTabOpenCoordinator.createConversationInCurrentTab();
+    await this.conversationLoadRecoveryCoordinator.createConversationInCurrentTab();
   }
 
   /** Load a conversation */
@@ -3383,7 +3423,7 @@ export class OpenCodianView extends ItemView {
     id: string,
     options: { forceServerSync?: boolean; preserveScrollPosition?: boolean } = {},
   ): Promise<void> {
-    await this.conversationViewStateService.loadConversation(id, options);
+    await this.conversationLoadRecoveryCoordinator.loadConversation(id, options);
   }
 
   private getConversationSyncFingerprint(messages: ChatMessage[]): string {
@@ -3465,7 +3505,7 @@ export class OpenCodianView extends ItemView {
   }
 
   private async deleteConversationsAndCleanupTabs(conversationIds: string[]): Promise<void> {
-    await this.conversationTabLifecycleRecoveryCoordinator.deleteConversationsAndRecover(conversationIds);
+    await this.conversationLoadRecoveryCoordinator.deleteConversationsAndRecover(conversationIds);
   }
 
   /** Send a message */
@@ -4383,69 +4423,7 @@ export class OpenCodianView extends ItemView {
   }
 
   private async handleRewindRequest(message: ChatMessage): Promise<void> {
-    if (this.isActiveTabStreaming()) {
-      new Notice(t('chat.rewind.streamingBlocked'));
-      return;
-    }
-
-    if (!this.currentConversation?.openCodeSessionId || !message.sourceMessageId) {
-      logger.debug('Rewind unavailable due to missing identifiers', {
-        conversationId: this.currentConversation?.id ?? null,
-        sessionId: this.currentConversation?.openCodeSessionId ?? null,
-        messageId: message.id,
-        sourceMessageId: message.sourceMessageId ?? null,
-      });
-      new Notice(t('chat.rewind.unavailable'));
-      return;
-    }
-
-    const confirmed = window.confirm(t('chat.rewind.confirm'));
-    if (!confirmed) {
-      return;
-    }
-
-    try {
-      logger.debug('Attempting rewind', {
-        conversationId: this.currentConversation.id,
-        sessionId: this.currentConversation.openCodeSessionId,
-        messageId: message.id,
-        sourceMessageId: message.sourceMessageId,
-        messagePreview: message.content.slice(0, 120),
-      });
-
-      const reverted = await this.plugin.openCodeService.revertSession(
-        this.currentConversation.openCodeSessionId,
-        message.sourceMessageId,
-      );
-
-      logger.debug('Rewind API result', {
-        conversationId: this.currentConversation.id,
-        sessionId: this.currentConversation.openCodeSessionId,
-        sourceMessageId: message.sourceMessageId,
-        reverted,
-      });
-
-      if (!reverted) {
-        logger.warn('Rewind API returned false', {
-          conversationId: this.currentConversation.id,
-          sessionId: this.currentConversation.openCodeSessionId,
-          sourceMessageId: message.sourceMessageId,
-        });
-        new Notice(t('chat.rewind.failed'));
-        return;
-      }
-
-      await this.loadConversation(this.currentConversation.id, { forceServerSync: true });
-      logger.debug('Rewind reload complete', {
-        conversationId: this.currentConversation.id,
-        sessionId: this.currentConversation.openCodeSessionId,
-        messagesAfterReload: this.currentConversation.messages.length,
-      });
-      new Notice(t('chat.rewind.success'));
-    } catch (error) {
-      logger.error('Failed to rewind conversation:', error);
-      new Notice(t('chat.rewind.failed'));
-    }
+    await this.conversationLoadRecoveryCoordinator.handleRewindRequest(message);
   }
 
   private createEmptyConversationNoticeMessage(): ChatMessage {
@@ -4472,91 +4450,11 @@ export class OpenCodianView extends ItemView {
   }
 
   private async handleRestoreRewindRequest(): Promise<void> {
-    if (this.isActiveTabStreaming()) {
-      new Notice(t('chat.rewind.streamingBlocked'));
-      return;
-    }
-
-    if (!this.currentConversation?.openCodeSessionId) {
-      new Notice(t('chat.rewind.restoreFailed'));
-      return;
-    }
-
-    try {
-      const restored = await this.plugin.openCodeService.unrevertSession(
-        this.currentConversation.openCodeSessionId,
-      );
-      if (!restored) {
-        new Notice(t('chat.rewind.restoreFailed'));
-        return;
-      }
-
-      await this.loadConversation(this.currentConversation.id, { forceServerSync: true });
-      new Notice(t('chat.rewind.restoreSuccess'));
-    } catch (error) {
-      logger.error('Failed to restore rewound conversation:', error);
-      new Notice(t('chat.rewind.restoreFailed'));
-    }
+    await this.conversationLoadRecoveryCoordinator.handleRestoreRewindRequest();
   }
 
   private async handleForkRequest(message: ChatMessage): Promise<void> {
-    if (this.isActiveTabStreaming()) {
-      new Notice(t('chat.fork.streamingBlocked'));
-      return;
-    }
-
-    if (!this.currentConversation?.openCodeSessionId || !message.sourceMessageId || !this.tabManager) {
-      new Notice(t('chat.fork.unavailable'));
-      return;
-    }
-
-    const target = await chooseForkTarget(this.app);
-    if (!target) {
-      return;
-    }
-
-    try {
-      const activeModelOverride = this.tabManager.getActiveTabModelOverride();
-      const forkedSession = await this.plugin.openCodeService.forkSession(
-        this.currentConversation.openCodeSessionId,
-        message.sourceMessageId,
-      );
-
-      const forkMessages = this.cloneMessagesBefore(message);
-      const title = this.buildForkTitle(this.currentConversation.title);
-      const forkConversation = await this.plugin.createConversationFromSession(forkedSession.id, {
-        title,
-        messages: forkMessages,
-        currentNote: this.currentConversation.currentNote,
-        externalContextPaths: this.currentConversation.externalContextPaths,
-      });
-
-      if (target === 'new-tab') {
-        if (!this.tabManager.canCreateTab()) {
-          await this.plugin.deleteConversation(forkConversation.id);
-          new Notice(t('chat.fork.maxTabsReached', { count: String(this.plugin.settings.maxTabs) }));
-          return;
-        }
-
-        const tab = this.tabManager.createTab(forkConversation);
-        if (tab) {
-          await this.activateTab(tab.id);
-          if (activeModelOverride) {
-            this.tabManager.setActiveTabModelOverride(activeModelOverride);
-            this.updateModelSelectorDisplay();
-          }
-        }
-        new Notice(t('chat.fork.successNewTab'));
-        return;
-      }
-
-      this.tabConversationStateBridge.syncActiveTabConversation(forkConversation);
-      await this.loadConversation(forkConversation.id, { forceServerSync: false });
-      new Notice(t('chat.fork.successCurrentTab'));
-    } catch (error) {
-      logger.error('Failed to fork conversation:', error);
-      new Notice(t('chat.fork.failed'));
-    }
+    await this.conversationLoadRecoveryCoordinator.handleForkRequest(message);
   }
 
   private async syncConversationMessagesFromServer(
@@ -4717,19 +4615,6 @@ export class OpenCodianView extends ItemView {
     }
 
     return isElementNearBottom(this.messagesContainer, threshold);
-  }
-
-  private cloneMessagesBefore(targetMessage: ChatMessage): ChatMessage[] {
-    if (!this.currentConversation) {
-      return [];
-    }
-
-    return cloneMessagesBeforeForkTarget(this.currentConversation.messages, targetMessage);
-  }
-
-  private buildForkTitle(sourceTitle: string): string {
-    const baseTitle = sourceTitle?.trim() || t('chat.tab.new');
-    return `Fork: ${baseTitle}`;
   }
 
   private async applyFallbackConversationTitle(conversationId: string, firstMessage: string): Promise<void> {

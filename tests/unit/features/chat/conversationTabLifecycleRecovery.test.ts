@@ -5,7 +5,8 @@ jest.mock('../../../../src/core/opencode', () => ({
 }));
 
 import { OpenCodianView } from '../../../../src/features/chat/OpenCodianView';
-import { ConversationTabLifecycleRecoveryCoordinator } from '../../../../src/features/chat/services/ConversationTabLifecycleRecoveryCoordinator';
+import { ConversationLoadRecoveryCoordinator } from '../../../../src/features/chat/services/ConversationLoadRecoveryCoordinator';
+import { ConversationTabRuntimeCoordinator } from '../../../../src/features/chat/services/ConversationTabRuntimeCoordinator';
 
 function createView(overrides: Record<string, unknown> = {}): OpenCodianView {
   return new OpenCodianView(new WorkspaceLeaf(), {
@@ -31,12 +32,20 @@ function createView(overrides: Record<string, unknown> = {}): OpenCodianView {
   } as never);
 }
 
-function getConversationTabLifecycleRecoveryCoordinator(
+function getConversationLoadRecoveryCoordinator(
   view: OpenCodianView,
-): ConversationTabLifecycleRecoveryCoordinator {
+): ConversationLoadRecoveryCoordinator {
   return (view as unknown as {
-    conversationTabLifecycleRecoveryCoordinator: ConversationTabLifecycleRecoveryCoordinator;
-  }).conversationTabLifecycleRecoveryCoordinator;
+    conversationLoadRecoveryCoordinator: ConversationLoadRecoveryCoordinator;
+  }).conversationLoadRecoveryCoordinator;
+}
+
+function getConversationTabRuntimeCoordinator(
+  view: OpenCodianView,
+): ConversationTabRuntimeCoordinator<unknown> {
+  return (view as unknown as {
+    conversationTabRuntimeCoordinator: ConversationTabRuntimeCoordinator<unknown>;
+  }).conversationTabRuntimeCoordinator;
 }
 
 describe('OpenCodianView tab lifecycle recovery delegation', () => {
@@ -44,8 +53,8 @@ describe('OpenCodianView tab lifecycle recovery delegation', () => {
     const view = createView() as OpenCodianView & {
       handleTabClose: (tabId: string) => Promise<void>;
     };
-    const coordinator = getConversationTabLifecycleRecoveryCoordinator(view);
-    const spy = jest.spyOn(coordinator, 'closeTabAndRecover').mockResolvedValue(undefined);
+    const coordinator = getConversationTabRuntimeCoordinator(view);
+    const spy = jest.spyOn(coordinator, 'handleTabClose').mockResolvedValue(undefined);
 
     await view.handleTabClose('tab-1');
 
@@ -56,7 +65,7 @@ describe('OpenCodianView tab lifecycle recovery delegation', () => {
     const view = createView() as OpenCodianView & {
       deleteConversationsAndCleanupTabs: (conversationIds: string[]) => Promise<void>;
     };
-    const coordinator = getConversationTabLifecycleRecoveryCoordinator(view);
+    const coordinator = getConversationLoadRecoveryCoordinator(view);
     const spy = jest
       .spyOn(coordinator, 'deleteConversationsAndRecover')
       .mockResolvedValue(undefined);
