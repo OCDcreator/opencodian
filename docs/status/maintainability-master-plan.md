@@ -2,19 +2,19 @@
 
 > **状态**: [READY]
 > **作用**: 这是 maintainability 无人值守的战略文档。每轮开始前，先读本文件，再读 `docs/status/maintainability-round-roadmap.md` 与最近的 `docs/status/maintainability-phase-XXX.md`。
-> **自动推进状态**: `R116` 已完成 OpenCodeStreamingRuntimeCoordinator active-context / cancel-detach seam；当前继续按 `R117-R137` 长队列顺序推进。恢复 autopilot 后只能从首个 `[NEXT]`（`R117`）顺序执行，不允许 freestyle。
+> **自动推进状态**: `R117` 已完成 streaming residual checkpoint；当前继续按 `R118-R137` 长队列顺序推进。恢复 autopilot 后只能从首个 `[NEXT]`（`R118`）顺序执行，不允许 freestyle。
 
 ## 1. 当前判断
 
-**当前分支已完成 `R68-R116` 并把 live lint 稳定在 `0 errors / 65 warnings`；`R116` 已把 `OpenCodeStreamingRuntimeCoordinator` 的 active-context cleanup、cancel/detach abort follow-up 与 runtime disposal residual 收束到集中 lifecycle seam，并让 `OpenCodeService.dispose()` 在 teardown 前显式释放 streaming runtime。** 接下来先执行 `R117` checkpoint，复盘 `R113-R116` 的 streaming residual 收益，再进入 secondary core / settings / startup，最后做 heavy tests follow-up、warning closeout 与最终 checkpoint。
+**当前分支已完成 `R68-R117` 并把 live lint 稳定在 `0 errors / 65 warnings`；`R117` 已复盘 `R113-R116` 的 streaming residual 收益：event classification、payload/SSE parse、finalization outcome 与 active-context / cancel-detach lifecycle 已分别收束到更集中的 transformer / runtime seams。** 接下来进入 secondary core / settings / startup，先执行 `R118` 的 `StorageService` settings-file lifecycle seam，最后做 heavy tests follow-up、warning closeout 与最终 checkpoint。
 
 ## 2. 当前基线
 
 - **lint**: `0 errors / 65 warnings`
-- **最近验证**: `R116` 已确认 focused `OpenCodeStreamingRuntimeCoordinator.test.ts` + `OpenCodeService.sdkPromptTransport.test.ts`、全量 `npm test` 与 `npm run build` 通过，`BUILD_ID` 为 `autopilot-maintainability.202604160112`
+- **最近验证**: `R117` 为 checkpoint-only round，无 focused code suite；已确认全量 `npm test` 与 `npm run build` 通过，`BUILD_ID` 为 `autopilot-maintainability.202604160118`
 - **最近 Test Vault 部署**: `R64`，`BUILD_ID` `autopilot-maintainability.202604150602`
-- **当前 `[NEXT]`**: `R117 - Checkpoint after streaming residual seams`
-- **主热点**: `R113-R116` 的 streaming residual seam 已完成 event classification、payload/SSE parse、finalization 与 active-context / cancel-detach 生命周期收口；下一步聚焦 `docs/status/maintainability-master-plan.md` 与 `docs/status/maintainability-round-roadmap.md` 的 checkpoint 复盘
+- **当前 `[NEXT]`**: `R118 - StorageService settings-file lifecycle seam`
+- **主热点**: `R117` 已完成 streaming residual checkpoint；下一步聚焦 `src/core/storage/StorageService.ts` 与 `tests/unit/core/storage/StorageService.test.ts`，收束 settings-file load/save/merge、fallback path、error report 与 migration follow-up residual
 
 ## 3. 本批执行规则
 

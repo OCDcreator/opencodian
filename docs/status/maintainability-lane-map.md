@@ -1,19 +1,19 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [READY] `R117-R137` 长队列继续推进；当前 `[NEXT]` 为 `R117 - Checkpoint after streaming residual seams`。
+> **当前状态**: [READY] `R117` checkpoint 已完成；`R118-R137` 长队列继续推进，当前 `[NEXT]` 为 `R118 - StorageService settings-file lifecycle seam`。
 
 ## 当前优先级
 
-- **当前 `[NEXT]`**：`R117 - Checkpoint after streaming residual seams`
-- **本批目标**：`R116` 已完成 batch 6 的 active-context register/cleanup、cancel-detach、abort follow-up 与 runtime disposal 收口；现在先做 streaming residual checkpoint，复盘 `R113-R116` 的整体收益与 secondary core 入口
+- **当前 `[NEXT]`**：`R118 - StorageService settings-file lifecycle seam`
+- **本批目标**：`R117` 已完成 streaming residual checkpoint；现在进入 Batch 7 secondary core seams，先收束 `StorageService` settings-file load/save/merge、fallback path、error report 与 migration follow-up residual
 - **当前 lint 基线**：`0 errors / 65 warnings`
 - **热点顺序**：
-  1. `docs/status/maintainability-master-plan.md`
-  2. `docs/status/maintainability-round-roadmap.md`
-  3. `docs/status/maintainability-phase-451.md`
-  4. `docs/status/maintainability-lane-map.md`
-  5. `docs/status/maintainability-completed-batches.md`
+  1. `src/core/storage/StorageService.ts`
+  2. `tests/unit/core/storage/StorageService.test.ts`
+  3. `docs/status/maintainability-round-roadmap.md`
+  4. `docs/status/maintainability-master-plan.md`
+  5. `docs/status/maintainability-phase-452.md`
 
 ## 本批边界
 
@@ -35,5 +35,5 @@
 ## 历史入口
 
 - 批次归档：`docs/status/maintainability-completed-batches.md`
-- 最近成功 phase：`docs/status/maintainability-phase-451.md`
-- 最近 checkpoint：`docs/status/maintainability-phase-447.md`
+- 最近成功 phase：`docs/status/maintainability-phase-452.md`
+- 最近 checkpoint：`docs/status/maintainability-phase-452.md`

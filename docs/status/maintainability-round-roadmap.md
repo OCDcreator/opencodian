@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的 `[NEXT]`”。
-> **当前状态**: [READY] `R116` 已完成；`R117-R137` 长队列继续排队，当前首个 `[NEXT]` 为 `R117 - Checkpoint after streaming residual seams`。
+> **当前状态**: [READY] `R117` checkpoint 已完成；`R118-R137` 长队列继续排队，当前首个 `[NEXT]` 为 `R118 - StorageService settings-file lifecycle seam`。
 
 ## 控制规则
 
@@ -18,7 +18,7 @@
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
 - 当前 live lint 基线：`0 errors / 65 warnings`
 - 最近成功 phase：`docs/status/maintainability-phase-451.md`
-- 当前路线判断：`R116` 已完成 OpenCodeStreamingRuntimeCoordinator active-context / cancel-detach seam，确认 active-context cleanup、cancel/detach abort follow-up 与 runtime disposal 已回收进集中 lifecycle seam；当前必须从 `R117` checkpoint 顺序执行，不得 freestyle。
+- 当前路线判断：`R117` 已完成 streaming residual checkpoint，确认 `R113-R116` 的 event classification、payload/SSE parse、finalization 与 active-context / cancel-detach lifecycle 收益；当前必须从 `R118` StorageService settings-file lifecycle seam 顺序执行，不得 freestyle。
 
 ## Queue
 ## Queue
@@ -1098,7 +1098,7 @@
 - **禁止项**: 不改变 session-scoped cancel/detach、abort ordering、active-context cleanup 语义。
 - **验收**: active-context / cancel-detach 生命周期更集中。；并通过全量 `npm test` 与 `npm run build`。
 
-### [NEXT] R117 - Checkpoint after streaming residual seams
+### [DONE] R117 - Checkpoint after streaming residual seams
 
 - **Lane**: Checkpoint
 - **目标**: 复盘 R113-R116 的 streaming residual 收益与 secondary core 入口。
@@ -1112,7 +1112,7 @@
 
 - **批次目标**: 处理 StorageService、settings.ts 与 modelConfig residual。
 
-### [QUEUED] R118 - StorageService settings-file lifecycle seam
+### [NEXT] R118 - StorageService settings-file lifecycle seam
 
 - **Lane**: Maintainability / secondary core
 - **目标**: 收束 settings-file load/save/merge、fallback path、error report 与 migration follow-up residual。
