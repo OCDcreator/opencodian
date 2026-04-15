@@ -1,20 +1,20 @@
 # Maintainability Master Plan
 
-> **状态**: [REVIEW_REQUIRED]
+> **状态**: [ACTIVE]
 > **作用**: 这是 maintainability 无人值守的战略文档。每轮开始前，先读本文件，再读 `docs/status/maintainability-round-roadmap.md` 与最近的 `docs/status/maintainability-phase-XXX.md`。
-> **自动推进状态**: `R137` 已完成 final checkpoint / queue closeout；当前没有可自动执行的 `[NEXT]`。如需继续 maintainability autopilot，必须先人工续排新的 queue。
+> **自动推进状态**: 已人工续排 `R138-R152`；当前唯一可自动执行的 `[NEXT]` 是 `R138`。
 
 ## 1. 当前判断
 
-**当前分支已完成 `R88-R137`。`R88-R132` 依次收束了 `OpenCodianView` residual、chat services、question/todo runtime、`OpenCodeService` / streaming residual、secondary core、settings/main residual 与 heavy suite split；`R133-R136` 又把 final warning closeout 从首轮 repair 后显露的 `0 errors / 68 warnings` 收敛到 `0 errors / 57 warnings`。warning 轨迹可追溯为：`R88` 起步时 `0 errors / 64 warnings`，`R92-R132` 各 checkpoint 长时间稳定在 `0 errors / 65 warnings`，`R133` 暂时重置到 `0 errors / 68 warnings` 后，经 `R134-R136` 逐步回落到 `0 errors / 57 warnings`。`R137` checkpoint 已确认本批 queue 按 “existing thick owner seam → heavy suite split → final warning cleanup → queue closeout” 的原计划闭环完成；当前 queue 自然耗尽，后续如需继续只能人工补写新的 `[QUEUED]` 项。**
+**当前分支已完成 `R88-R137` 并已人工续排 `R138-R152`。`R137` checkpoint 确认上一批已按 “existing thick owner seam → heavy suite split → final warning cleanup → queue closeout” 闭环完成；本次续排基于当前实测 lint `0 errors / 57 warnings`，先处理仍有高收益的 production residual seam，再进入少量由 live hotspot 支撑的 heavy test / warning cleanup。新队列分三批推进：`R138-R142` 聚焦 chat runtime/service residual，`R143-R147` 聚焦 settings / model catalog / startup residual，`R148-R152` 聚焦 opencode / streaming / persistence / glass-test residual，并只在 `R142`、`R147`、`R152` 设置 checkpoint。**
 
 ## 2. 当前基线
 
 - **lint**: `0 errors / 57 warnings`
-- **最近验证**: `R137` 已确认全量 `npm run lint -- --format unix`、`npm test` 与 `npm run build` 通过，`BUILD_ID` 为 `autopilot-maintainability.202604160449`
+- **最近验证**: 本次 queue authoring 重新运行 `npm run lint -- --format unix`，维持 `0 errors / 57 warnings`；最近全量 `npm test` 与 `npm run build` 仍为 `R137` 的通过结果，`BUILD_ID` 为 `autopilot-maintainability.202604160449`
 - **最近 Test Vault 部署**: `R133`，`BUILD_ID` `autopilot-maintainability.202604160412`
-- **当前 `[NEXT]`**: 当前没有可自动执行的 `[NEXT]`
-- **主热点**: remaining warnings 仍主要集中在 `src/features/chat/**`，其次是 `src/features/settings/**`、`src/utils/glass/**`、`src/core/opencode/**` 与若干 large tests；是否继续收束需人工续排，而不是自动生成 `R138+`
+- **当前 `[NEXT]`**: `R138 - OpenCodianView turn lifecycle residual seam`
+- **主热点**: live lint 仍为 `57` warnings，其中 `tests/**` 约 `17`、`src/features/chat/**` 约 `13`、`src/features/settings/**` 约 `6`、`src/utils/glass/**` 约 `6`、`src/core/opencode/**` 约 `5`，另有 provider icons / streaming utils / startup / locale / settings types residual；新 queue 因此先排 production seam，再排测试与 warning cleanup
 
 ## 3. 本批执行规则
 

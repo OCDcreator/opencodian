@@ -1,26 +1,28 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [REVIEW_REQUIRED] `R137` 已完成；当前没有可自动执行的 `[NEXT]`。
+> **当前状态**: [ACTIVE] 已人工续排 `R138-R152`；当前唯一 `[NEXT]` 是 `R138`。
 
 ## 当前优先级
 
-- **当前 `[NEXT]`**：当前没有可自动执行的 `[NEXT]`
-- **本批目标**：`R137` 已完成 final checkpoint / queue closeout；当前停回人工确认态，等待是否续排新 queue
+- **当前 `[NEXT]`**：`R138 - OpenCodianView turn lifecycle residual seam`
+- **本批目标**：`R138-R152` 分三批继续收束 live residual：chat runtime/service → settings/model/startup → opencode/streaming/persistence/glass-test cleanup
 - **当前 lint 基线**：`0 errors / 57 warnings`
 - **热点顺序**：
-  1. `docs/status/maintainability-phase-472.md`
-  2. `docs/status/maintainability-master-plan.md`
-  3. `docs/status/maintainability-round-roadmap.md`
+  1. `R138-R141`: `src/features/chat/OpenCodianView.ts` 与 chat service residual（当前 chat 约 `13` warnings）
+  2. `R143-R146`: `src/features/settings/**`、`src/core/config/**`、`src/main.ts`、locale/settings normalization residual
+  3. `R148-R150`: `src/core/opencode/**`、streaming utils、storage/provider-icon persistence residual
+  4. `R151`: 仅在 live hotspot 仍支撑时处理 heavy tests / opt-in glass warning cleanup
+  5. `R142`、`R147`、`R152`: 批次边界 checkpoint
 
 ## 本批边界
 
-- `R128 -> R137` 已全部完成；恢复 autopilot 前必须先人工补写新的 `[QUEUED]` 项
+- `R138 -> R152` 是唯一新续排 queue；不得自动扩展 `R153+`
 - 不新增薄 helper / adapter / provider / factory；新 owner 必须覆盖完整 lifecycle / runtime seam
 - `OpenCodeService`、`OpenCodianView`、`OpenCodianSettings` 的 maintainability 仅允许在 queue 明示项内继续推进
 - warning closeout 只允许沿现有厚 seam 收口，不允许为了降 warning 去篡改覆盖语义或制造薄碎片模块
 - 命中 deploy-relevant paths 时，继续严格执行 build → Test Vault deploy → `BUILD_ID` 校验
-- 恢复运行必须使用外部 profile `/Users/dht/.config/opencodian/mac-autopilot-profile.json`，且不得自动生成 `R138+`
+- 恢复运行必须使用外部 profile `/Users/dht/.config/opencodian/mac-autopilot-profile.json`
 
 ## 回归观察点
 
