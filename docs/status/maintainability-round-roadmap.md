@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的 `[NEXT]`”。
-> **当前状态**: [PAUSED] `R67` Maintainability and warning checkpoint 已完成；当前没有可自动执行的 `[NEXT]`，后续 queue 需人工续排后才能恢复 autopilot。
+> **当前状态**: [READY] `R67` checkpoint 已完成，新的 `R68-R87` 长队列已人工续排；恢复 autopilot 后必须从 `R68` 开始顺序执行。
 
 ## 控制规则
 
@@ -18,7 +18,7 @@
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
 - 最近成功 phase：`docs/status/maintainability-phase-402.md`
 - 当前 live lint 基线：`0 errors / 79 warnings`
-- 当前路线判断：`R50-R66` 的 owner seam 与 warning cleanup 已在 `R67` checkpoint 中收口；后续若恢复 queue，建议优先转向 chat runtime / opencode service seams，但本文件不自动扩展 `R68+`
+- 当前路线判断：上一批已在 `R67` checkpoint 收口；当前新 batch 直接转向 chat runtime / services 与 opencode core，并把 heavy tests / warning cleanup 明确写成 `R81-R86`。
 
 ## Queue
 
@@ -424,4 +424,362 @@
   - phase 文档明确记录 `R50-R66` 收益、最新 lint 基线、warning 下降量与后续建议
   - 如果 warning 未进入低八十区间，需要明确说明原因与后续优先级
 
-当前没有可自动执行的 `[NEXT]`。如需继续 maintainability autopilot，必须先依据本次 checkpoint 结论人工补充新的 `[QUEUED]` 项。
+
+### [NEXT] R68 - OpenCodianView tab pane/runtime lifecycle seam
+
+- **Lane**: Maintainability / chat tab runtime
+- **目标**: 从 `src/features/chat/OpenCodianView.ts:2566` 一带收束 tab pane state、active pane switching、tab manager wiring、stream-like tab state sync 与 persist/restore lifecycle，优先把 tab runtime 责任继续压回现有 coordinator/owner，而不是留在 view 内散落。
+- **优先入口**:
+  - `src/features/chat/OpenCodianView.ts`
+  - `src/features/chat/services/ConversationViewStateService.ts`
+  - `src/features/chat/services/TabMessagesPaneCoordinator.ts`
+  - 直接相关 chat tab tests
+- **允许边界**:
+  - 允许扩展现有 tab/runtime owner，或新增覆盖完整 tab pane lifecycle 的较厚 owner
+  - 允许同步更新直接相关 docs / tests
+- **禁止项**:
+  - 不改变并发 tabs、foreground busy gating、stream-like state、persisted tab restore 或 tab-attention 语义
+  - 不混入 message render、send pipeline 或 opencode transport 改动
+- **验收**:
+  - `OpenCodianView` 对 tab pane/runtime state 的直接装配明显减少
+  - focused validation、全量 `npm test`、`npm run build` 通过
+
+### [QUEUED] R69 - OpenCodianView conversation load and recovery lifecycle seam
+
+- **Lane**: Maintainability / chat conversation load
+- **目标**: 从 `src/features/chat/OpenCodianView.ts:3445` 一带收束 create/load/fork/rewind、restore bootstrap、missing-conversation recovery 与 activation follow-up 的完整 conversation lifecycle。
+- **优先入口**:
+  - `src/features/chat/OpenCodianView.ts`
+  - `src/features/chat/services/ConversationViewStateService.ts`
+  - `src/features/chat/services/ConversationTabLifecycleRecoveryCoordinator.ts`
+  - 直接相关 chat load/recovery tests
+- **允许边界**:
+  - 允许继续扩展现有 conversation load/recovery owner
+  - 允许同步更新直接相关 docs / tests
+- **禁止项**:
+  - 不改变 restore bootstrap 顺序、rewind/fork 语义、fallback tab recovery 或 forceServerSync 触发条件
+  - 不混入 render seam、question dock 或 settings UI 改动
+- **验收**:
+  - `OpenCodianView` 对 conversation load/recovery 分支的直接持有明显减少
+  - focused validation、全量 `npm test`、`npm run build` 通过
+
+### [QUEUED] R70 - OpenCodianView message render/update seam
+
+- **Lane**: Maintainability / chat render update
+- **目标**: 从 `src/features/chat/OpenCodianView.ts:3805` 一带收束 renderMessage/renderMessages/renderContentBlock、user/assistant body update、tail patch 与 pseudo-stream update 的残余 render lifecycle。
+- **优先入口**:
+  - `src/features/chat/OpenCodianView.ts`
+  - `src/features/chat/services/ConversationRenderService.ts`
+  - 直接相关 chat render tests
+- **允许边界**:
+  - 允许继续扩展现有 render owner，或新增覆盖完整 render/update lifecycle 的较厚 owner
+  - 允许同步更新直接相关 docs / tests
+- **禁止项**:
+  - 不改变 structured content blocks、assistant footer、copy content、pseudo-stream reveal 或 empty-conversation notice 语义
+  - 不混入 send pipeline、tab lifecycle 或 opencode stream transform 改动
+- **验收**:
+  - `OpenCodianView` 对 message render/update 细节的直接铺开明显减少
+  - focused validation、全量 `npm test`、`npm run build` 通过
+
+### [QUEUED] R71 - ConversationRenderService assistant/body render seam
+
+- **Lane**: Maintainability / chat render service
+- **目标**: 从 `src/features/chat/services/ConversationRenderService.ts` 收束 assistant shell/body patch、content-block dispatch、tail rerender 与 synced update apply 的完整 render-service seam。
+- **优先入口**:
+  - `src/features/chat/services/ConversationRenderService.ts`
+  - 直接相关 render tests
+- **允许边界**:
+  - 允许在现有 service 内继续收口，或新增覆盖完整 render-service lifecycle 的较厚 owner
+  - 允许同步更新直接相关 docs / tests
+- **禁止项**:
+  - 不改变 synced visual fingerprint、tail patch fallback、assistant shell 或 structured renderer 语义
+  - 不混入 background-task timeline 或 question dock 改动
+- **验收**:
+  - `ConversationRenderService` 的直接 render/update 分支明显减少
+  - focused validation、全量 `npm test`、`npm run build` 通过
+
+### [QUEUED] R72 - BackgroundTaskTimelineService segment assembly seam
+
+- **Lane**: Maintainability / background task timeline
+- **目标**: 从 `src/features/chat/services/BackgroundTaskTimelineService.ts:347` 一带收束 launch collection、completion reminder matching、runtime merge、segment finalize 与 pending-filter lifecycle。
+- **优先入口**:
+  - `src/features/chat/services/BackgroundTaskTimelineService.ts`
+  - 直接相关 background-task timeline tests
+- **允许边界**:
+  - 允许在现有 service 内继续收口完整 timeline assembly seam
+  - 允许同步更新直接相关 docs / tests
+- **禁止项**:
+  - 不改变 hydration anchor、suppressed inline segments、search-mode placeholder 或 completion reminder 语义
+  - 不混入 indicator rendering 或 send pipeline 改动
+- **验收**:
+  - timeline service 的 segment assembly 分支明显减少
+  - focused validation、全量 `npm test`、`npm run build` 通过
+
+### [QUEUED] R73 - ChatSelectionControlsCoordinator selection runtime seam
+
+- **Lane**: Maintainability / chat model selection
+- **目标**: 从 `src/features/chat/services/ChatSelectionControlsCoordinator.ts` 收束 active-tab selection state、requested/current/resolved model writeback、permission display 与 unavailable follow-up lifecycle。
+- **优先入口**:
+  - `src/features/chat/services/ChatSelectionControlsCoordinator.ts`
+  - 直接相关 selector/model tests
+- **允许边界**:
+  - 允许继续扩展现有 selection coordinator/runtime seam
+  - 允许同步更新直接相关 docs / tests
+- **禁止项**:
+  - 不改变 provider icon fallback、disabled model filtering、session override 或 unavailable follow-up 语义
+  - 不混入 settings model catalog 或 send pipeline 改动
+- **验收**:
+  - selection coordinator 的直接状态分支明显减少
+  - focused validation、全量 `npm test`、`npm run build` 通过
+
+### [QUEUED] R74 - InputPanelAppearanceCoordinator theme/runtime seam
+
+- **Lane**: Maintainability / chat input appearance
+- **目标**: 从 `src/features/chat/services/InputPanelAppearanceCoordinator.ts` 收束 input panel theme selection、appearance sync、layout refresh 与 sticky UI follow-up 的完整 runtime seam。
+- **优先入口**:
+  - `src/features/chat/services/InputPanelAppearanceCoordinator.ts`
+  - 直接相关 input-panel/theme tests
+- **允许边界**:
+  - 允许在现有 coordinator 内继续收口完整 theme/runtime lifecycle
+  - 允许同步更新直接相关 docs / tests
+- **禁止项**:
+  - 不改变 input panel theme normalization、liquid glass / refraction state、sticky layout 或 rerender 语义
+  - 不混入 settings style section 改动
+- **验收**:
+  - input panel appearance coordinator 的直接状态分支明显减少
+  - focused validation、全量 `npm test`、`npm run build` 通过
+
+### [QUEUED] R75 - SessionTodoStateService stale notice seam
+
+- **Lane**: Maintainability / session todo runtime
+- **目标**: 从 `src/features/chat/services/SessionTodoStateService.ts` 收束 todo normalization、stale-age/suppression、persisted stale restore 与 stale-notice append lifecycle。
+- **优先入口**:
+  - `src/features/chat/services/SessionTodoStateService.ts`
+  - 直接相关 session todo tests
+- **允许边界**:
+  - 允许在现有 service 内继续收口完整 stale-notice/runtime seam
+  - 允许同步更新直接相关 docs / tests
+- **禁止项**:
+  - 不改变 stale suppression、pending snapshot hide、persisted stale restore 或 notice append 语义
+  - 不混入 question dock 或 background-task indicator 改动
+- **验收**:
+  - session todo service 的 stale-state 分支明显减少
+  - focused validation、全量 `npm test`、`npm run build` 通过
+
+### [QUEUED] R76 - QuestionDockCoordinator pending runtime seam
+
+- **Lane**: Maintainability / question dock runtime
+- **目标**: 从 `src/features/chat/services/QuestionDockCoordinator.ts:137` 一带收束 pending question refresh、draft answer merge、resolution action apply 与 active-tab writeback lifecycle。
+- **优先入口**:
+  - `src/features/chat/services/QuestionDockCoordinator.ts`
+  - 直接相关 question dock tests
+- **允许边界**:
+  - 允许在现有 coordinator 内继续收口完整 pending-question lifecycle
+  - 允许同步更新直接相关 docs / tests
+- **禁止项**:
+  - 不改变 dock wait behavior、resolution action semantics、draft answer persistence 或 active-tab gating
+  - 不混入 inline question card renderer 或 session todo runtime 改动
+- **验收**:
+  - question dock coordinator 的直接 runtime 分支明显减少
+  - focused validation、全量 `npm test`、`npm run build` 通过
+
+### [QUEUED] R77 - OpenCodeService sync subscription lifecycle seam
+
+- **Lane**: Maintainability / opencode sync runtime
+- **目标**: 从 `src/core/opencode/OpenCodeService.ts:235` 一带收束 sync event subscription、initialize/start/stop、autoFetchModels 与 health/bootstrap follow-up 的完整 service lifecycle。
+- **优先入口**:
+  - `src/core/opencode/OpenCodeService.ts`
+  - `src/core/opencode/OpenCodeSyncEventRuntimeCoordinator.ts`
+  - 直接相关 opencode tests
+- **允许边界**:
+  - 允许继续扩展现有 sync/runtime owner，或新增覆盖完整 subscription lifecycle 的较厚 owner
+  - 允许同步更新直接相关 docs / tests
+- **禁止项**:
+  - 不改变 SDK sync-event fallback、health probe fallback、server start/stop ordering 或 model auto-fetch 语义
+  - 不混入 streaming transport / settings reconfiguration 改动
+- **验收**:
+  - `OpenCodeService` 对 sync/bootstrap lifecycle 的直接铺开明显减少
+  - focused validation、全量 `npm test`、`npm run build` 通过
+
+### [QUEUED] R78 - OpenCodeStreamEventTransformer event classification seam
+
+- **Lane**: Maintainability / opencode stream transform
+- **目标**: 从 `src/core/opencode/OpenCodeStreamEventTransformer.ts:183` 一带收束 session event、question event、tool event、usage update 与 part-type tracking 的完整 event-classification seam。
+- **优先入口**:
+  - `src/core/opencode/OpenCodeStreamEventTransformer.ts`
+  - 直接相关 stream transformer tests
+- **允许边界**:
+  - 允许在现有 transformer 内继续收口完整 event-classification lifecycle
+  - 允许同步更新直接相关 docs / tests
+- **禁止项**:
+  - 不改变 tool-call chunk shape、question request transform、session idle/error handling 或 part-type tracking 语义
+  - 不混入 SSE reader 或 OpenCodeService sync bootstrap 改动
+- **验收**:
+  - stream transformer 的直接 event 分支明显减少
+  - focused validation、全量 `npm test`、`npm run build` 通过
+
+### [QUEUED] R79 - OpenCodeStreamingRuntimeCoordinator finalization seam
+
+- **Lane**: Maintainability / opencode stream finalization
+- **目标**: 从 `src/core/opencode/OpenCodeStreamingRuntimeCoordinator.ts:409` 一带收束 finishStreamingResponse、assistant tail lookup、fallback final content/error completion 与 final debug logging 的完整 finalization seam。
+- **优先入口**:
+  - `src/core/opencode/OpenCodeStreamingRuntimeCoordinator.ts`
+  - 直接相关 streaming runtime tests
+- **允许边界**:
+  - 允许在现有 runtime coordinator 内继续收口完整 finalization lifecycle
+  - 允许同步更新直接相关 docs / tests
+- **禁止项**:
+  - 不改变 final assistant lookup、stream error fallback、session message completion 或 final chunk shape
+  - 不混入 SSE reader parsing 改动
+- **验收**:
+  - streaming runtime coordinator 的 finalization 分支明显减少
+  - focused validation、全量 `npm test`、`npm run build` 通过
+
+### [QUEUED] R80 - OpenCodeStreamingRuntimeCoordinator SSE reader seam
+
+- **Lane**: Maintainability / opencode SSE reader
+- **目标**: 从 `src/core/opencode/OpenCodeStreamingRuntimeCoordinator.ts:524` 一带收束 connectSSE、reader open/abort、chunk read、buffer parse 与 remaining-event flush 的完整 SSE lifecycle。
+- **优先入口**:
+  - `src/core/opencode/OpenCodeStreamingRuntimeCoordinator.ts`
+  - `src/core/opencode/OpenCodeStreamEventTransformer.ts`
+  - 直接相关 streaming runtime tests
+- **允许边界**:
+  - 允许在现有 runtime coordinator 内继续收口完整 SSE reader lifecycle
+  - 允许同步更新直接相关 docs / tests
+- **禁止项**:
+  - 不改变 legacy SSE fallback、abort/detach 语义、buffer parse 顺序或 remaining-event flush 语义
+  - 不混入 finalization 或 sync bootstrap 改动
+- **验收**:
+  - streaming runtime coordinator 的 SSE reader 分支明显减少
+  - focused validation、全量 `npm test`、`npm run build` 通过
+
+### [QUEUED] R81 - OpenCodeService heavy suite split A
+
+- **Lane**: Warning cleanup / opencode tests
+- **目标**: 把 `tests/unit/core/opencode/OpenCodeService.test.ts` 的 session/control/runtime 相关大块断言按责任拆成更窄 suite files，优先降低单文件与单 describe 规模。
+- **优先入口**:
+  - `tests/unit/core/opencode/OpenCodeService.test.ts`
+  - `tests/unit/core/opencode/OpenCodeSessionControlOrchestrator.test.ts`
+- **允许边界**:
+  - 允许按 session lifecycle、question/runtime、catalog/sync 等责任拆分 tests
+  - 允许同步更新直接相关 test helpers / docs
+- **禁止项**:
+  - 不改变 production runtime 语义
+  - 不通过删除断言、降低覆盖或改写验证口径来换取 warning 下降
+- **验收**:
+  - `OpenCodeService` heavy suite 的 warning 有可量化下降
+  - focused validation、全量 `npm test`、`npm run build` 通过
+
+### [QUEUED] R82 - OpenCodeService heavy suite split B
+
+- **Lane**: Warning cleanup / opencode tests
+- **目标**: 继续把 `tests/unit/core/opencode/OpenCodeService.test.ts` 与 `tests/unit/core/opencode/OpenCodeService.sdkCompat.test.ts` 的 streaming / compatibility / fallback 大块断言按责任拆开。
+- **优先入口**:
+  - `tests/unit/core/opencode/OpenCodeService.test.ts`
+  - `tests/unit/core/opencode/OpenCodeService.sdkCompat.test.ts`
+  - `tests/unit/core/opencode/OpenCodeStreamEventTransformer.test.ts`
+- **允许边界**:
+  - 允许按 transport、fallback、compatibility、stream finalization 责任拆分 suites
+  - 允许同步更新直接相关 test helpers / docs
+- **禁止项**:
+  - 不改变 production runtime 语义
+  - 不用弱化断言或减少场景覆盖来清 warning
+- **验收**:
+  - opencode heavy test 邻域 warning 有可量化下降
+  - focused validation、全量 `npm test`、`npm run build` 通过
+
+### [QUEUED] R83 - Chat heavy suite split A
+
+- **Lane**: Warning cleanup / chat tests
+- **目标**: 把 `tests/unit/features/chat/ConversationRenderService.test.ts`、`tests/unit/features/chat/ConversationSyncOrchestrationService.test.ts` 与 `tests/unit/features/chat/BackgroundTaskTimelineService.test.ts` 的大块断言按责任拆分。
+- **优先入口**:
+  - `tests/unit/features/chat/ConversationRenderService.test.ts`
+  - `tests/unit/features/chat/ConversationSyncOrchestrationService.test.ts`
+  - `tests/unit/features/chat/BackgroundTaskTimelineService.test.ts`
+- **允许边界**:
+  - 允许按 render/update、sync routing、timeline assembly 等责任拆分 suites
+  - 允许同步更新直接相关 test helpers / docs
+- **禁止项**:
+  - 不改变 production runtime 语义
+  - 不通过删除断言、合并场景或降覆盖来清 warning
+- **验收**:
+  - chat heavy suite 邻域 warning 有可量化下降
+  - focused validation、全量 `npm test`、`npm run build` 通过
+
+### [QUEUED] R84 - Chat heavy suite split B
+
+- **Lane**: Warning cleanup / chat tests
+- **目标**: 继续把 `tests/unit/features/chat/QuestionTodoBackgroundTaskRefreshHostAdapter.test.ts`、`tests/unit/features/chat/inputPanelTheme.test.ts` 与相关 question/todo runtime suites 按责任拆分收口。
+- **优先入口**:
+  - `tests/unit/features/chat/QuestionTodoBackgroundTaskRefreshHostAdapter.test.ts`
+  - `tests/unit/features/chat/inputPanelTheme.test.ts`
+  - `tests/unit/features/chat/QuestionDockCoordinator.test.ts`
+- **允许边界**:
+  - 允许按 refresh host、input theme、question resolution/runtime bridge 责任拆分 suites
+  - 允许同步更新直接相关 test helpers / docs
+- **禁止项**:
+  - 不改变 production runtime 语义
+  - 不通过降低覆盖或删场景来清 warning
+- **验收**:
+  - question/todo/input chat tests 的 warning 有可量化下降
+  - focused validation、全量 `npm test`、`npm run build` 通过
+
+### [QUEUED] R85 - Warning cleanup batch D (chat and opencode residuals)
+
+- **Lane**: Warning cleanup / runtime residuals
+- **目标**: 受控削减 chat 与 opencode 剩余 warning，优先命中 `OpenCodianView.ts`、chat services、`OpenCodeService.ts`、`OpenCodeStreamEventTransformer.ts`、`OpenCodeStreamingRuntimeCoordinator.ts` 的 file-size / complexity / max-params 残余。
+- **优先入口**:
+  - `src/features/chat/OpenCodianView.ts`
+  - `src/features/chat/services/`
+  - `src/core/opencode/OpenCodeService.ts`
+  - `src/core/opencode/OpenCodeStreamEventTransformer.ts`
+  - `src/core/opencode/OpenCodeStreamingRuntimeCoordinator.ts`
+- **允许边界**:
+  - 允许沿本批已建立的厚 seam 继续收口
+  - 允许同步更新直接相关 docs / tests
+- **禁止项**:
+  - 不新增薄 helper / adapter / provider
+  - 不改变 chat runtime、stream transform 或 transport 语义
+- **验收**:
+  - chat/opencode 邻域 warning 至少有可量化下降
+  - `npm run lint` 维持 `0 errors`
+  - focused validation、全量 `npm test`、`npm run build` 通过
+
+### [QUEUED] R86 - Warning cleanup batch E (secondary residuals)
+
+- **Lane**: Warning cleanup / secondary residuals
+- **目标**: 继续削减 secondary residual warnings，优先命中 `src/core/types/settings.ts`、`src/core/storage/StorageService.ts`、`src/core/config/modelConfig.ts`、`src/features/settings/SettingsStyleSection.ts`、`src/features/settings/SettingsModelSection.ts` 与直接相关 tests。
+- **优先入口**:
+  - `src/core/types/settings.ts`
+  - `src/core/storage/StorageService.ts`
+  - `src/core/config/modelConfig.ts`
+  - `src/features/settings/SettingsStyleSection.ts`
+  - `src/features/settings/SettingsModelSection.ts`
+- **允许边界**:
+  - 允许在现有 owner 内做同文件 regrouping，或沿既有厚 seam 继续收口
+  - 允许同步更新直接相关 docs / tests
+- **禁止项**:
+  - 不回切 glass demo 邻域
+  - 不为清 warning 而制造新的薄 owner
+- **验收**:
+  - secondary residual warning 至少有可量化下降
+  - `npm run lint` 维持 `0 errors`
+  - focused validation、全量 `npm test`、`npm run build` 通过
+
+### [QUEUED] R87 - Maintainability checkpoint
+
+- **Lane**: Checkpoint
+- **目标**: 复盘 `R68-R86` 的 owner 收益、warning 变化、验证成本与剩余热点，决定下一批是否继续深挖 chat/opencode residuals，还是转入 secondary residual / opt-in demo route。
+- **优先入口**:
+  - `docs/status/maintainability-master-plan.md`
+  - `docs/status/maintainability-round-roadmap.md`
+  - `docs/status/maintainability-lane-map.md`
+  - 最新 lint / test / build 输出与 phase 文档
+- **允许边界**:
+  - 只做文档、指标与下一批建议
+- **禁止项**:
+  - 不自动扩展 `R88+`
+  - 不回切 freestyle cleanup
+- **验收**:
+  - phase 文档明确记录 `R68-R86` 收益、最新 lint 基线、warning 下降量与后续建议
+
