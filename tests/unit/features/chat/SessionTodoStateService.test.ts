@@ -161,6 +161,25 @@ describe('SessionTodoStateService', () => {
     expect(runtime.sessionTodoStaleNoticeFingerprint).toBe(content);
   });
 
+  it('reuses an existing persisted stale notice instead of appending a duplicate', async () => {
+    const runtime = createStaleIncompleteRuntime();
+    const previewFixture = createFixture({ runtime });
+    const content = previewFixture.service.buildStaleSessionTodoNoticeContent([
+      { content: 'Investigate sync issue', status: 'in_progress' },
+    ]);
+    const { service, appendPersistentAssistantNoticeMessage } = createFixture({
+      runtime,
+      conversation: createConversation(content),
+    });
+
+    service.reconcileStaleSessionTodoState('tab-1');
+    await flushPendingNoticeTasks();
+
+    expect(appendPersistentAssistantNoticeMessage).not.toHaveBeenCalled();
+    expect(runtime.sessionTodoSuppressedFingerprint).toBe(runtime.sessionTodoFingerprint);
+    expect(runtime.sessionTodoStaleNoticeFingerprint).toBe(content);
+  });
+
   it('restores a previously hidden snapshot when the stale notice already exists in conversation history', () => {
     const runtime = createRuntime({
       sessionTodoSessionId: null,

@@ -95,13 +95,7 @@ export class SessionTodoStateService {
 
     runtime.sessionTodoSessionId = sessionId;
     const snapshot = this.createSessionTodoSnapshot(todos);
-    this.syncSessionTodoSnapshotState(tabId, sessionId, runtime, snapshot);
-    runtime.sessionTodos = this.resolveVisibleSessionTodoSnapshot(
-      tabId,
-      sessionId,
-      runtime,
-      snapshot,
-    );
+    runtime.sessionTodos = this.applySessionTodoSnapshotState(tabId, sessionId, runtime, snapshot);
 
     if (this.isActiveTab(tabId)) {
       this.host.renderSessionTodoDock(tabId);
@@ -307,24 +301,27 @@ export class SessionTodoStateService {
     return status?.type === 'busy' || status?.type === 'retry';
   }
 
-  private syncSessionTodoSnapshotState(
+  private applySessionTodoSnapshotState(
     tabId: TabId | null,
     sessionId: string | null,
     runtime: SessionTodoStateRuntime,
     snapshot: SessionTodoSnapshot,
-  ): void {
+  ): SessionTodo[] {
     this.syncSessionTodoFingerprint(tabId, sessionId, runtime, snapshot.fingerprint);
     if (!snapshot.hasIncompleteTodos) {
       this.clearStaleSessionTodoSuppression(runtime);
-      return;
+      return snapshot.todos;
     }
 
     this.restorePersistedStaleSessionTodoSuppressionIfNeeded(
       tabId,
       sessionId,
-      snapshot.todos,
-      snapshot.fingerprint,
+      snapshot,
     );
+
+    return this.shouldHideSuppressedTodoSnapshot(tabId, sessionId, runtime, snapshot.fingerprint)
+      ? []
+      : snapshot.todos;
   }
 
   private syncSessionTodoFingerprint(
@@ -356,42 +353,37 @@ export class SessionTodoStateService {
   private restorePersistedStaleSessionTodoSuppressionIfNeeded(
     tabId: TabId | null,
     sessionId: string | null,
-    todos: SessionTodo[],
-    fingerprint: string,
+    snapshot: SessionTodoSnapshot,
   ): void {
-    const runtime = this.host.getTabRuntimeState(tabId);
+    if (!sessionId || !snapshot.hasIncompleteTodos) {
+      return;
+    }
+
+    const target = this.getStaleSessionTodoNoticeTarget(tabId, sessionId, snapshot.todos);
     if (
-      !runtime
-      || !sessionId
-      || runtime.isStreaming
-      || runtime.sessionTodoSuppressedFingerprint
-      || !this.hasIncompleteTodos(todos)
+      !target
+      || target.runtime.isStreaming
+      || target.runtime.sessionTodoSuppressedFingerprint
       || this.isSessionStatusLive(this.getTabSessionStatus(tabId, sessionId))
     ) {
       return;
     }
 
-    const conversation = this.host.getConversationForTab(tabId);
-    if (!conversation || conversation.openCodeSessionId !== sessionId) {
-      return;
-    }
-
-    const content = this.buildStaleSessionTodoNoticeContent(todos);
     if (!this.host.hasMatchingPersistentAssistantNoticeMessage(
-      t('chat.todo.staleTitle'),
-      content,
+      target.title,
+      target.content,
       'warning',
-      conversation,
+      target.conversation,
     )) {
       return;
     }
 
-    runtime.sessionTodoSuppressedFingerprint = fingerprint;
-    runtime.sessionTodoStaleNoticeFingerprint = content;
+    target.runtime.sessionTodoSuppressedFingerprint = snapshot.fingerprint;
+    target.runtime.sessionTodoStaleNoticeFingerprint = target.content;
     logger.debug(`Restored stale session todo suppression from persisted notice: ${this.stringifyLogPayload({
       tabId,
       sessionId,
-      fingerprint,
+      fingerprint: snapshot.fingerprint,
     })}`);
   }
 
@@ -407,17 +399,6 @@ export class SessionTodoStateService {
 
     const status = this.getTabSessionStatus(tabId, sessionId);
     return !runtime.isStreaming && !this.isSessionStatusLive(status);
-  }
-
-  private resolveVisibleSessionTodoSnapshot(
-    tabId: TabId | null,
-    sessionId: string | null,
-    runtime: SessionTodoStateRuntime,
-    snapshot: SessionTodoSnapshot,
-  ): SessionTodo[] {
-    return this.shouldHideSuppressedTodoSnapshot(tabId, sessionId, runtime, snapshot.fingerprint)
-      ? []
-      : snapshot.todos;
   }
 
   private getStaleSessionTodoSuppressionCandidate(
@@ -505,7 +486,12 @@ export class SessionTodoStateService {
     tabId: TabId | null,
     todos: SessionTodo[],
   ): Promise<void> {
-    const target = this.getStaleSessionTodoNoticeTarget(tabId, todos);
+    const target = this.getStaleSessionTodoNoticeTarget(
+      tabId,
+      this.host.getSessionIdForTab(tabId),
+      todos,
+      true,
+    );
     if (!target || target.runtime.sessionTodoStaleNoticeFingerprint === target.content) {
       return;
     }
@@ -537,20 +523,21 @@ export class SessionTodoStateService {
 
   private getStaleSessionTodoNoticeTarget(
     tabId: TabId | null,
+    sessionId: string | null,
     todos: readonly SessionTodo[],
+    requireActiveTab = false,
   ): StaleSessionTodoNoticeTarget | null {
+    if (!sessionId) {
+      return null;
+    }
+
     const runtime = this.host.getTabRuntimeState(tabId);
-    if (!runtime || !this.isActiveTab(tabId)) {
+    if (!runtime || (requireActiveTab && !this.isActiveTab(tabId))) {
       return null;
     }
 
     const conversation = this.host.getConversationForTab(tabId);
-    if (!conversation) {
-      return null;
-    }
-
-    const sessionId = this.host.getSessionIdForTab(tabId);
-    if (!sessionId || sessionId !== conversation.openCodeSessionId) {
+    if (!conversation || sessionId !== conversation.openCodeSessionId) {
       return null;
     }
 
