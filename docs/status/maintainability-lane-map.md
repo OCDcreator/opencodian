@@ -1,19 +1,18 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [ACTIVE] 已人工续排 `R138-R152`；当前唯一 `[NEXT]` 是 `R145`。
+> **当前状态**: [ACTIVE] 已人工续排 `R138-R152`；当前唯一 `[NEXT]` 是 `R146`。
 
 ## 当前优先级
 
-- **当前 `[NEXT]`**：`R145 - Model config layering residual seam`
+- **当前 `[NEXT]`**：`R146 - Startup locale/settings normalization residual seam`
 - **本批目标**：`R138-R152` 分三批继续收束 live residual：chat runtime/service → settings/model/startup → opencode/streaming/persistence/glass-test cleanup
-- **当前 lint 基线**：`0 errors / 48 warnings`
+- **当前 lint 基线**：`0 errors / 44 warnings`
 - **热点顺序**：
-  1. `R145`: model config layering、provider disable 与 `baseEffective` / filtered `effective` residual
-  2. `R146`: settings normalization 与 startup/main residual
-  3. `R148-R150`: `src/core/opencode/**`、streaming utils、storage/provider-icon persistence residual
-  4. `R151`: 仅在 live hotspot 仍支撑时处理 heavy tests / opt-in glass warning cleanup
-  5. `R147`、`R152`: 批次边界 checkpoint
+  1. `R146`: settings normalization 与 startup/main residual
+  2. `R148-R150`: `src/core/opencode/**`、streaming utils、storage/provider-icon persistence residual
+  3. `R151`: 仅在 live hotspot 仍支撑时处理 heavy tests / opt-in glass warning cleanup
+  4. `R147`、`R152`: 批次边界 checkpoint
 
 ## 本批边界
 
@@ -35,5 +34,5 @@
 ## 历史入口
 
 - 批次归档：`docs/status/maintainability-completed-batches.md`
-- 最近成功 phase：`docs/status/maintainability-phase-478.md`
+- 最近成功 phase：`docs/status/maintainability-phase-480.md`
 - 最近 checkpoint：`docs/status/maintainability-phase-477.md`

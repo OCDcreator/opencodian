@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个活动任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成活动任务；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的后续任务”。
-> **当前状态**: [ACTIVE] 已人工续排 `R138-R152`；当前唯一活动任务是 `R145`。
+> **当前状态**: [ACTIVE] 已人工续排 `R138-R152`；当前唯一活动任务是 `R146`。
 
 ## 控制规则
 
@@ -16,9 +16,9 @@
 ## 当前背景
 
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
-- 当前 live lint 基线：`0 errors / 48 warnings`
-- 最近成功 phase：`docs/status/maintainability-phase-479.md`
-- 当前路线判断：`R137` 已确认 `R88-R136` 完成 owner seam、heavy suite split、final warning closeout 与 queue closeout 的完整闭环；`R142` 已复盘 `R138-R141` 的 chat residual 收益；`R143-R144` 已收束 settings model catalog/provider icon 与 settings style/input panel residual，当前 queue 继续推进 model config、startup residual，再进入 opencode/streaming/persistence residual 与 justified heavy test cleanup。
+- 当前 live lint 基线：`0 errors / 44 warnings`
+- 最近成功 phase：`docs/status/maintainability-phase-480.md`
+- 当前路线判断：`R137` 已确认 `R88-R136` 完成 owner seam、heavy suite split、final warning closeout 与 queue closeout 的完整闭环；`R142` 已复盘 `R138-R141` 的 chat residual 收益；`R143-R145` 已收束 settings model catalog/provider icon、settings style/input panel 与 model config layering residual，当前 queue 继续推进 startup residual，再进入 opencode/streaming/persistence residual 与 justified heavy test cleanup。
 
 ## Queue
 ## Queue
@@ -1420,7 +1420,7 @@
 - **禁止项**: 不改变 theme preset、background persistence、glass adapter fallback、input panel appearance normalization、preview/reload 或 locale 文案语义；不新增薄 renderer/helper。
 - **验收**: style section residual warning 有可量化下降且 lint 维持 `0 errors`；并通过全量 `npm test` 与 `npm run build`；执行 Test Vault 部署并校验 `BUILD_ID`。
 
-### [NEXT] R145 - Model config layering residual seam
+### [DONE] R145 - Model config layering residual seam
 
 - **Lane**: Maintainability / model config
 - **目标**: 沿 `modelConfig`、`ModelConfigService` 与 `OpencodeConfigManager` 收束 catalog merge、provider disable、`baseEffective` / filtered `effective` residual，优先保持既有 config owner。
@@ -1433,7 +1433,7 @@
 - **禁止项**: 不改变 local/server catalog precedence、disabled provider/model layering、directory-scoped config lookup、Windows directory normalization 或 title-generation catalog filtering。
 - **验收**: model config residual warning 有可量化下降且 lint 维持 `0 errors`；并通过全量 `npm test` 与 `npm run build`。
 
-### [QUEUED] R146 - Startup locale/settings normalization residual seam
+### [NEXT] R146 - Startup locale/settings normalization residual seam
 
 - **Lane**: Maintainability / startup normalization
 - **目标**: 沿 `main.ts` startup、settings normalization、locale/theme startup residual 收束仍混杂的 bootstrap wiring，同时保持 conversation preload 与 theme initialization 顺序。
