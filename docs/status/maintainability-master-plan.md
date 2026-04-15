@@ -2,19 +2,19 @@
 
 > **状态**: [READY]
 > **作用**: 这是 maintainability 无人值守的战略文档。每轮开始前，先读本文件，再读 `docs/status/maintainability-round-roadmap.md` 与最近的 `docs/status/maintainability-phase-XXX.md`。
-> **自动推进状态**: `R125` 已完成 settings modal residual 项；当前继续按 `R126-R137` 长队列顺序推进。恢复 autopilot 后只能从首个 `[NEXT]`（`R126`）顺序执行，不允许 freestyle。
+> **自动推进状态**: `R126` 已完成 plugin startup residual 项；当前继续按 `R127-R137` 长队列顺序推进。恢复 autopilot 后只能从首个 `[NEXT]`（`R127`）顺序执行，不允许 freestyle。
 
 ## 1. 当前判断
 
-**当前分支已完成 `R68-R125` 并把 live lint 稳定在 `0 errors / 65 warnings`；`R125` 已把 `ModelConfigModal` 的 selected editor state、workspace/add-provider render branching 与 save/apply follow-up / validation feedback 收束回 modal owner。** 接下来继续 Batch 8 settings / main residual，从 `R126` 的 `main.ts` startup normalization seam 开始，再继续 heavy tests follow-up、warning closeout 与最终 checkpoint。
+**当前分支已完成 `R68-R126` 并把 live lint 稳定在 `0 errors / 65 warnings`；`R126` 已把 `main.ts` 的 startup orchestration 收束到更清晰的 preload/runtime/registration owner seam，并把 loaded-settings persist 判定集中到单一 bootstrap state。** 接下来先执行 `R127` checkpoint，复盘 Batch 8 settings/main residual 收益，再进入 heavy tests follow-up、warning closeout 与最终 checkpoint。
 
 ## 2. 当前基线
 
 - **lint**: `0 errors / 65 warnings`
-- **最近验证**: `R125` 已确认 focused `ModelConfigModal`、全量 `npm test` 与 `npm run build` 通过，`BUILD_ID` 为 `autopilot-maintainability.202604160249`
-- **最近 Test Vault 部署**: `R125`，`BUILD_ID` `autopilot-maintainability.202604160249`
-- **当前 `[NEXT]`**: `R126 - main.ts residual startup normalization seam`
-- **主热点**: `R125` 已完成 modal editor/render residual 收束；下一步聚焦 `main.ts` 的 settings normalize、storage preload、locale/theme/bootstrap follow-up residual
+- **最近验证**: `R126` 已确认 focused `main` startup suites、全量 `npm test` 与 `npm run build` 通过，`BUILD_ID` 为 `autopilot-maintainability.202604160258`
+- **最近 Test Vault 部署**: `R126`，`BUILD_ID` `autopilot-maintainability.202604160258`
+- **当前 `[NEXT]`**: `R127 - Checkpoint after settings/main seams`
+- **主热点**: `R126` 已完成 `main.ts` startup normalization seam；下一步先做 settings/main residual checkpoint，再进入 Batch 9 heavy test split wave
 
 ## 3. 本批执行规则
 

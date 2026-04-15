@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的 `[NEXT]`”。
-> **当前状态**: [READY] `R125` 已完成；`R126-R137` 长队列继续排队，当前首个 `[NEXT]` 为 `R126 - main.ts residual startup normalization seam`。
+> **当前状态**: [READY] `R126` 已完成；`R127-R137` 长队列继续排队，当前首个 `[NEXT]` 为 `R127 - Checkpoint after settings/main seams`。
 
 ## 控制规则
 
@@ -17,8 +17,8 @@
 
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
 - 当前 live lint 基线：`0 errors / 65 warnings`
-- 最近成功 phase：`docs/status/maintainability-phase-460.md`
-- 当前路线判断：`R125` 已完成 `ModelConfigModal` editor/render seam，确认 selected editor state、workspace/add-provider render branching 与 shared save/apply follow-up / validation feedback 已继续收束；当前必须从 `R126` 的 `main.ts` residual startup normalization seam 顺序执行，不得 freestyle。
+- 最近成功 phase：`docs/status/maintainability-phase-461.md`
+- 当前路线判断：`R126` 已完成 `main.ts` startup normalization seam，确认 settings preload/runtime bootstrap/registration orchestration 与 loaded-settings persist 判定已进一步收束；当前必须先执行 `R127` checkpoint，不得 freestyle。
 
 ## Queue
 ## Queue
@@ -1196,7 +1196,7 @@
 - **禁止项**: 不改变 modal 编辑语义、validation 反馈、provider/model 保存逻辑。
 - **验收**: modal editor/render seam 更集中。；并通过全量 `npm test` 与 `npm run build`。
 
-### [NEXT] R126 - main.ts residual startup normalization seam
+### [DONE] R126 - main.ts residual startup normalization seam
 
 - **Lane**: Maintainability / plugin startup
 - **目标**: 继续收束 main.ts 中 settings normalize、storage preload、locale/theme/bootstrap follow-up residual。
@@ -1206,7 +1206,7 @@
 - **禁止项**: 不改变 preload 顺序、conversation restore 前置条件、locale/theme startup 或 command/view registration 语义。
 - **验收**: main.ts startup residual orchestration 进一步减少。；并通过全量 `npm test` 与 `npm run build`。
 
-### [QUEUED] R127 - Checkpoint after settings/main seams
+### [NEXT] R127 - Checkpoint after settings/main seams
 
 - **Lane**: Checkpoint
 - **目标**: 复盘 R123-R126 的 settings/main residual 收益与 heavy test lane 入口。

@@ -134,6 +134,7 @@ function isLegacyNikdelvinDefaultProfile(value: unknown): boolean {
 }
 
 type LoadedPersistedSettings = Awaited<ReturnType<StorageService['loadPersistedSettings']>>;
+type LoadedManagedServerState = Awaited<ReturnType<StorageService['loadManagedServerState']>>;
 type LegacyFlatServerSettings = {
   host?: string;
   port?: number;
@@ -160,6 +161,11 @@ type LoadSettingsNormalizationResult = {
   settings: OpenCodianSettings;
   shouldMigrateLegacyLocalDefaultPort: boolean;
   shouldResetGlassRefractionGlassDefaults: boolean;
+};
+
+type LoadSettingsBootstrapState = LoadSettingsNormalizationResult & {
+  persistedSettings: LoadedPersistedSettings;
+  shouldPersistNormalizedSettings: boolean;
 };
 
 function mergeLoadedSettingsSnapshot(persistedSettings: LoadedPersistedSettings): LoadedSettingsSnapshot | null {
@@ -495,6 +501,25 @@ function normalizeLoadedPluginSettings(savedSettings: LoadedSettingsSnapshot | n
   };
 }
 
+function prepareLoadedSettingsBootstrapState(
+  persistedSettings: LoadedPersistedSettings,
+): LoadSettingsBootstrapState {
+  const savedSettings = mergeLoadedSettingsSnapshot(persistedSettings);
+  const normalizedSettings = normalizeLoadedPluginSettings(savedSettings);
+
+  return {
+    persistedSettings,
+    ...normalizedSettings,
+    shouldPersistNormalizedSettings:
+      persistedSettings.writable
+      && (
+        persistedSettings.shouldPersist
+        || normalizedSettings.shouldResetGlassRefractionGlassDefaults
+        || normalizedSettings.shouldMigrateLegacyLocalDefaultPort
+      ),
+  };
+}
+
 // BUILD_ID is injected at build time via esbuild define
 declare const BUILD_ID: string;
 
@@ -523,25 +548,30 @@ export default class OpenCodianPlugin extends Plugin {
     logger.info(`OpenCodian BUILD_ID: ${BUILD_ID}`);
     addIcon(OPENCODIAN_APP_ICON, OPENCODIAN_APP_ICON_SVG);
 
-    // Initialize storage
+    const initialManagedServerState = await this.prepareStartupState();
+    await this.bootstrapOpenCodeRuntime(initialManagedServerState);
+    this.registerWorkspaceIntegration();
+  }
+
+  private async prepareStartupState(): Promise<LoadedManagedServerState> {
     this.storage = new StorageService(this);
     await this.storage.initialize();
-
-    // Load settings
     await this.loadSettings();
+    this.applyLoadedSettingsStartupEffects();
+    return this.storage.loadManagedServerState();
+  }
+
+  private applyLoadedSettingsStartupEffects(): void {
     registerBuiltinGlassAdapters();
     this.applyLoggerSettings();
     this.applyProviderIconColorMode();
-
-    // Initialize locale
     setLocale(this.settings.locale as 'en' | 'zh');
+  }
 
-    const initialManagedServerState = await this.storage.loadManagedServerState();
-
-    // Auto-create OpenCode config file based on permission mode
+  private async bootstrapOpenCodeRuntime(
+    initialManagedServerState: LoadedManagedServerState,
+  ): Promise<void> {
     await this.initializeOpencodeConfig();
-
-    // Initialize OpenCode service
     this.openCodeService = new OpenCodeService(
       this.settings,
       {
@@ -564,9 +594,13 @@ export default class OpenCodianPlugin extends Plugin {
         },
       },
     );
+    this.configureVaultScopedServices();
+    await this.startConfiguredLocalServerIfNeeded();
+    await this.logServerStatusSnapshot('onload');
+    await this.loadConversations();
+  }
 
-    // Set vault path so OpenCode reads project config from .opencode/
-    // This automatically adapts to Windows (C:\path) and macOS (/Users/path)
+  private configureVaultScopedServices(): void {
     const vaultPath = getVaultBasePath(this.app);
     if (vaultPath) {
       this.opencodeConfigManager = new OpencodeConfigManager(vaultPath);
@@ -579,34 +613,38 @@ export default class OpenCodianPlugin extends Plugin {
       this.modelConfigService = null;
       logger.warn('Could not get vault path, OpenCode will use global config');
     }
+  }
 
-    // Start server if auto-start is enabled
-    if (isLocalServerMode(this.settings.server) && this.settings.server.local.autoStart) {
-      try {
-        await this.openCodeService.start();
-      } catch (error) {
-        const msg = error instanceof Error ? error.message : 'Failed to start server';
-        new Notice(`OpenCode: ${msg}`);
-      }
+  private async startConfiguredLocalServerIfNeeded(): Promise<void> {
+    if (!isLocalServerMode(this.settings.server) || !this.settings.server.local.autoStart) {
+      return;
     }
 
-    await this.logServerStatusSnapshot('onload');
+    try {
+      await this.openCodeService.start();
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Failed to start server';
+      new Notice(`OpenCode: ${msg}`);
+    }
+  }
 
-    // Load conversations before restoring any existing OpenCodian view.
-    await this.loadConversations();
-
-    // Register view
+  private registerWorkspaceIntegration(): void {
     this.registerView(
       VIEW_TYPE_OPENCODIAN,
       (leaf) => new OpenCodianView(leaf, this)
     );
 
-    // Add ribbon icon
     this.addRibbonIcon(OPENCODIAN_APP_ICON, '打开 OpenCodian', () => {
       this.activateView();
     });
 
-    // Register commands
+    this.registerPluginCommands();
+
+    this.settingsTab = new OpenCodianSettingTab(this.app, this);
+    this.addSettingTab(this.settingsTab);
+  }
+
+  private registerPluginCommands(): void {
     this.addCommand({
       id: 'open-view',
       name: '打开聊天视图',
@@ -681,11 +719,6 @@ export default class OpenCodianPlugin extends Plugin {
         await this.getOpenCodianView()?.addSelectionContextFromActiveEditor(editor, view);
       },
     });
-
-    // Add settings tab
-    this.settingsTab = new OpenCodianSettingTab(this.app, this);
-    this.addSettingTab(this.settingsTab);
-
   }
 
   onunload() {
@@ -746,26 +779,13 @@ export default class OpenCodianPlugin extends Plugin {
 
   /** Load settings from storage */
   async loadSettings() {
-    const persistedSettings = await this.storage.loadPersistedSettings();
-    const savedSettings = mergeLoadedSettingsSnapshot(persistedSettings);
-    this.settingsPersistenceWritable = persistedSettings.writable;
-    const {
-      settings,
-      shouldMigrateLegacyLocalDefaultPort,
-      shouldResetGlassRefractionGlassDefaults,
-    } = normalizeLoadedPluginSettings(savedSettings);
-    this.settings = settings;
+    const loadState = prepareLoadedSettingsBootstrapState(await this.storage.loadPersistedSettings());
+    this.settingsPersistenceWritable = loadState.persistedSettings.writable;
+    this.settings = loadState.settings;
 
-    this.reportSettingsLoadState(persistedSettings);
+    this.reportSettingsLoadState(loadState.persistedSettings);
 
-    if (
-      persistedSettings.writable
-      && (
-        persistedSettings.shouldPersist
-        || shouldResetGlassRefractionGlassDefaults
-        || shouldMigrateLegacyLocalDefaultPort
-      )
-    ) {
+    if (loadState.shouldPersistNormalizedSettings) {
       await this.persistSettingsDomains({ core: true, ui: true });
     }
   }

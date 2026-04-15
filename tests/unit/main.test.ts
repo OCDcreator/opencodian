@@ -6,6 +6,8 @@ jest.mock('@opencode-ai/sdk/v2/client', () => ({
   createOpencodeClient: jest.fn(() => ({ client: 'mock-sdk-client' })),
 }), { virtual: true });
 
+(globalThis as { BUILD_ID?: string }).BUILD_ID = 'test-build';
+
 describe('OpenCodianPlugin.getConversationById', () => {
   it('returns the in-memory conversation when preferCache is enabled', async () => {
     const plugin = new OpenCodianPlugin() as OpenCodianPlugin & {
@@ -175,6 +177,56 @@ describe('OpenCodianPlugin.toggleGlassOctahedronForCurrentView', () => {
 
     expect(plugin.activateView).toHaveBeenCalledTimes(1);
     expect(view.toggleGlassOctahedron).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('OpenCodianPlugin.onload', () => {
+  it('runs startup preparation before runtime bootstrap and workspace registration', async () => {
+    const plugin = new OpenCodianPlugin() as OpenCodianPlugin;
+    const initialManagedServerState = { pid: 4196 };
+    const callOrder: string[] = [];
+
+    jest
+      .spyOn(
+        plugin as unknown as {
+          prepareStartupState: () => Promise<typeof initialManagedServerState>;
+        },
+        'prepareStartupState',
+      )
+      .mockImplementation(async () => {
+        callOrder.push('prepare');
+        return initialManagedServerState;
+      });
+
+    jest
+      .spyOn(
+        plugin as unknown as {
+          bootstrapOpenCodeRuntime: (state: typeof initialManagedServerState) => Promise<void>;
+        },
+        'bootstrapOpenCodeRuntime',
+      )
+      .mockImplementation(async (state) => {
+        callOrder.push(`bootstrap:${state === initialManagedServerState}`);
+      });
+
+    jest
+      .spyOn(
+        plugin as unknown as {
+          registerWorkspaceIntegration: () => void;
+        },
+        'registerWorkspaceIntegration',
+      )
+      .mockImplementation(() => {
+        callOrder.push('register');
+      });
+
+    await plugin.onload();
+
+    expect(callOrder).toEqual([
+      'prepare',
+      'bootstrap:true',
+      'register',
+    ]);
   });
 });
 
