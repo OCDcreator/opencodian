@@ -1,18 +1,18 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [READY] `R100-R137` 长队列继续推进；当前 `[NEXT]` 为 `R100 - BackgroundConversation post-sync handoff seam`。
+> **当前状态**: [READY] `R101-R137` 长队列继续推进；当前 `[NEXT]` 为 `R101 - BackgroundTaskStreamTriggerCoordinator runtime seam`。
 
 ## 当前优先级
 
-- **当前 `[NEXT]`**：`R100 - BackgroundConversation post-sync handoff seam`
+- **当前 `[NEXT]`**：`R101 - BackgroundTaskStreamTriggerCoordinator runtime seam`
 - **本批目标**：继续 residual chat services runtime，再转 opencode core、secondary core / settings / startup，最后做 heavy tests follow-up、warning closeout 与最终 checkpoint
 - **当前 lint 基线**：`0 errors / 65 warnings`
 - **热点顺序**：
-  1. `src/features/chat/services/BackgroundConversationPostSyncHandoffCoordinator.ts`
-  2. `src/features/chat/services/BackgroundConversationPostSyncHandoffHostAdapter.ts`
-  3. `src/features/chat/runtime/BackgroundTaskStreamTriggerCoordinator.ts`
-  4. `src/features/chat/services/QuestionTodoBackgroundTaskRuntimeServiceBundle.ts`
+  1. `src/features/chat/runtime/BackgroundTaskStreamTriggerCoordinator.ts`
+  2. `src/features/chat/services/QuestionTodoBackgroundTaskRuntimeServiceBundle.ts`
+  3. `src/features/chat/services/BackgroundConversationPostSyncHandoffCoordinator.ts`
+  4. `src/features/chat/services/BackgroundConversationPostSyncHandoffHostAdapter.ts`
   5. `src/core/opencode/OpenCodeService.ts`
   6. `src/core/opencode/OpenCodeStreamEventTransformer.ts`
   7. `src/core/storage/StorageService.ts`

@@ -39,7 +39,7 @@ export class BackgroundConversationPostSyncHandoffCoordinator {
 ## 与 post-sync router 的边界
 
 - `ConversationSyncBackgroundPostSyncRouter` 现在直接调用本 coordinator，hidden/background pass-through layer 不再单独存在
-- `BackgroundConversationPostSyncHandoffHostAdapter` 负责为本 coordinator 组合 refresh executor、signal-state 与 attention host wiring；本模块继续只拥有 signal/background-tab 的 handoff 调度顺序
+- `BackgroundConversationPostSyncHandoffHostAdapter` 现在以同一个 shared handoff view host 同时承接 refresh executor、signal-state 与 attention coordinator 的 writeback 需求；本模块继续只拥有 signal/background-tab 的 handoff 调度顺序
 - `VisibleConversationPostSyncCoordinator` 继续拥有 visible-conversation post-sync refresh 与 visible state-commit 协调
 - `BackgroundConversationSignalSyncStateCoordinator` 继续拥有 signal-specific authoritative-sync state policy
 - `BackgroundConversationPostSyncRefreshExecutor` 继续拥有 signal/background-tab question/todo refresh 与 background-task writeback 执行顺序

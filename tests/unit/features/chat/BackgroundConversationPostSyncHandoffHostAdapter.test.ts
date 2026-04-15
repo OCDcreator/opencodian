@@ -2,7 +2,6 @@ import type { Conversation } from '../../../../src/core/types';
 import {
   type BackgroundConversationPostSyncHandoffViewHost,
   type BackgroundConversationPostSyncHandoffViewHostAdapterHost,
-  createBackgroundConversationPostSyncHandoffHosts,
   createBackgroundConversationPostSyncHandoffServices,
   createBackgroundConversationPostSyncHandoffViewHostAdapter,
 } from '../../../../src/features/chat/services/BackgroundConversationPostSyncHandoffHostAdapter';
@@ -108,41 +107,68 @@ describe('BackgroundConversationPostSyncHandoffHostAdapter', () => {
     expect(lateBoundPorts.tabRuntimeStateBridge.setNeedsAttention).toHaveBeenCalledWith('tab-bg', true);
   });
 
-  it('derives background handoff hosts from one shared view host', async () => {
+  it('wires background-tab refresh and attention through the shared handoff view host', async () => {
     const conversation = createConversation();
     const viewHost = createViewHost();
+    const postSyncQuestionTodoRefreshPlanBuilder = {
+      createBackgroundTabConversationPlan: jest.fn().mockReturnValue({
+        tabId: 'tab-bg',
+        questionSessionId: 'session-conversation-bg',
+        todoStatusSessionId: 'session-conversation-bg',
+        forceTodoStatusRefresh: false,
+      }),
+      createSignalSyncedBackgroundConversationPlan: jest.fn(),
+    };
+    const questionTodoStatusRefreshCoordinator = {
+      refreshAfterPostSync: jest.fn().mockImplementation(
+        async (
+          options: {
+            afterPendingQuestionRefresh?: (() => void | Promise<void>) | null;
+          },
+        ) => {
+          await options.afterPendingQuestionRefresh?.();
+        },
+      ),
+    };
 
-    const hosts = createBackgroundConversationPostSyncHandoffHosts(viewHost);
+    const { backgroundConversationPostSyncHandoffCoordinator } =
+      createBackgroundConversationPostSyncHandoffServices(
+        viewHost,
+        postSyncQuestionTodoRefreshPlanBuilder,
+        questionTodoStatusRefreshCoordinator,
+      );
 
-    hosts.backgroundTaskPostSyncRefreshPort.syncBackgroundTaskStateFromConversation(
+    await backgroundConversationPostSyncHandoffCoordinator.handleBackgroundTabSyncComplete({
+      tabId: 'tab-bg',
       conversation,
-      'tab-bg',
-    );
-    await hosts.backgroundTaskPostSyncRefreshPort.flushBackgroundTaskPostSyncWriteback(
-      'tab-bg',
-      conversation,
-    );
-    hosts.backgroundConversationSignalSyncStateCoordinatorHost.markBackgroundTaskAuthoritativeSync(
-      'tab-bg',
-      'sync-event:message.updated',
-    );
-    hosts.backgroundConversationAttentionCoordinatorHost.setTabNeedsAttention(
-      'tab-bg',
-      true,
-    );
+      previousFingerprint: 'old-fingerprint',
+      syncResult: {
+        changed: false,
+        fingerprint: 'next-fingerprint',
+      },
+    });
 
+    expect(
+      postSyncQuestionTodoRefreshPlanBuilder.createBackgroundTabConversationPlan,
+    ).toHaveBeenCalledWith({
+      tabId: 'tab-bg',
+      conversation,
+    });
+    expect(questionTodoStatusRefreshCoordinator.refreshAfterPostSync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tabId: 'tab-bg',
+        questionSessionId: 'session-conversation-bg',
+        todoStatusSessionId: 'session-conversation-bg',
+        forceTodoStatusRefresh: false,
+        afterPendingQuestionRefresh: expect.any(Function),
+      }),
+    );
     expect(viewHost.syncBackgroundTaskStateFromConversation).toHaveBeenCalledWith(
       conversation,
       'tab-bg',
     );
-    expect(viewHost.flushBackgroundTaskPostSyncWriteback).toHaveBeenCalledWith(
-      'tab-bg',
-      conversation,
-    );
-    expect(viewHost.markBackgroundTaskAuthoritativeSync).toHaveBeenCalledWith(
-      'tab-bg',
-      'sync-event:message.updated',
-    );
+    expect(viewHost.flushBackgroundTaskPostSyncWriteback).toHaveBeenCalledWith('tab-bg', conversation);
+    expect(viewHost.markBackgroundTaskAuthoritativeSync).not.toHaveBeenCalled();
     expect(viewHost.setTabNeedsAttention).toHaveBeenCalledWith('tab-bg', true);
   });
 

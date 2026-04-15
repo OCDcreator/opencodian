@@ -57,25 +57,10 @@ export interface BackgroundConversationPostSyncHandoffViewHostAdapterDependencie
   getTabRuntimeStateBridge(): TabRuntimeStateBridgePort;
 }
 
-export interface BackgroundConversationPostSyncHandoffViewHost {
-  syncBackgroundTaskStateFromConversation(
-    conversation: Conversation,
-    tabId?: TabId | null,
-  ): void;
-  flushBackgroundTaskPostSyncWriteback(
-    tabId: TabId | null,
-    conversation: Conversation | null,
-  ): Promise<void>;
-  markBackgroundTaskAuthoritativeSync(tabId: TabId | null, reason: string): void;
-  setTabNeedsAttention(tabId: TabId | null, needsAttention: boolean): void;
-}
-
-export interface BackgroundConversationPostSyncHandoffHosts {
-  backgroundTaskPostSyncRefreshPort: BackgroundTaskPostSyncRefreshPort;
-  backgroundConversationAttentionCoordinatorHost: BackgroundConversationAttentionCoordinatorHost;
-  backgroundConversationSignalSyncStateCoordinatorHost:
-    BackgroundConversationSignalSyncStateCoordinatorHost;
-}
+export interface BackgroundConversationPostSyncHandoffViewHost
+  extends BackgroundTaskPostSyncRefreshPort,
+    BackgroundConversationAttentionCoordinatorHost,
+    BackgroundConversationSignalSyncStateCoordinatorHost {}
 
 export interface BackgroundConversationPostSyncHandoffServices {
   backgroundConversationPostSyncHandoffCoordinator:
@@ -108,52 +93,21 @@ export function createBackgroundConversationPostSyncHandoffViewHostAdapter(
   };
 }
 
-export function createBackgroundConversationPostSyncHandoffHosts(
-  viewHost: BackgroundConversationPostSyncHandoffViewHost,
-): BackgroundConversationPostSyncHandoffHosts {
-  return {
-    backgroundTaskPostSyncRefreshPort: {
-      syncBackgroundTaskStateFromConversation: (
-        conversation: Conversation,
-        tabId?: TabId | null,
-      ) => viewHost.syncBackgroundTaskStateFromConversation(conversation, tabId),
-      flushBackgroundTaskPostSyncWriteback: (
-        tabId: TabId | null,
-        conversation: Conversation | null,
-      ) => viewHost.flushBackgroundTaskPostSyncWriteback(tabId, conversation),
-    },
-    backgroundConversationAttentionCoordinatorHost: {
-      setTabNeedsAttention: (tabId: TabId | null, needsAttention: boolean) =>
-        viewHost.setTabNeedsAttention(tabId, needsAttention),
-    },
-    backgroundConversationSignalSyncStateCoordinatorHost: {
-      markBackgroundTaskAuthoritativeSync: (tabId: TabId | null, reason: string) => {
-        viewHost.markBackgroundTaskAuthoritativeSync(tabId, reason);
-      },
-    },
-  };
-}
-
 export function createBackgroundConversationPostSyncHandoffServices(
   viewHost: BackgroundConversationPostSyncHandoffViewHost,
   postSyncQuestionTodoRefreshPlanBuilder: BackgroundConversationRefreshPlanPort,
   questionTodoStatusRefreshCoordinator: QuestionTodoStatusRefreshPort,
 ): BackgroundConversationPostSyncHandoffServices {
-  const hosts = createBackgroundConversationPostSyncHandoffHosts(viewHost);
   const backgroundConversationPostSyncRefreshExecutor =
     new BackgroundConversationPostSyncRefreshExecutor(
       postSyncQuestionTodoRefreshPlanBuilder,
       questionTodoStatusRefreshCoordinator,
-      hosts.backgroundTaskPostSyncRefreshPort,
+      viewHost,
     );
   const backgroundConversationAttentionCoordinator =
-    new BackgroundConversationAttentionCoordinator(
-      hosts.backgroundConversationAttentionCoordinatorHost,
-    );
+    new BackgroundConversationAttentionCoordinator(viewHost);
   const backgroundConversationSignalSyncStateCoordinator =
-    new BackgroundConversationSignalSyncStateCoordinator(
-      hosts.backgroundConversationSignalSyncStateCoordinatorHost,
-    );
+    new BackgroundConversationSignalSyncStateCoordinator(viewHost);
 
   return {
     backgroundConversationPostSyncHandoffCoordinator:
