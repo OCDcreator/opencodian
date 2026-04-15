@@ -83,6 +83,33 @@ function appendSdkErrorStatus(message: string, statusCode: number | null): strin
   return `${message} (HTTP ${statusCode})`;
 }
 
+function getSdkErrorRecordBaseMessage(
+  record: OpenCodeSdkErrorRecord,
+  options: OpenCodeSdkErrorMessageOptions,
+): string | null {
+  return getSdkErrorText(record.data?.message, options.trimMessage)
+    ?? getSdkErrorText(record.message, options.trimMessage)
+    ?? (options.includeTopLevelError === false ? null : getSdkErrorText(record.error, options.trimMessage))
+    ?? (options.includeName ? getSdkErrorText(record.name, options.trimMessage) : null)
+    ?? options.fallbackMessage
+    ?? null;
+}
+
+function getSdkErrorRecordStatusCode(
+  record: OpenCodeSdkErrorRecord,
+  includeTopLevelStatus: boolean,
+): number | null {
+  if (typeof record.data?.statusCode === 'number') {
+    return record.data.statusCode;
+  }
+
+  if (!includeTopLevelStatus || typeof record.status !== 'number') {
+    return null;
+  }
+
+  return record.status;
+}
+
 function unwrapSdkResponse<TValue>(value: TValue): SdkDataShape<TValue> {
   if (value && typeof value === 'object' && 'data' in (value as Record<string, unknown>)) {
     return ((value as unknown) as { data: SdkDataShape<TValue> }).data;
@@ -111,24 +138,16 @@ export function extractSdkErrorMessage(
   }
 
   const record = error as OpenCodeSdkErrorRecord;
-  const baseMessage = getSdkErrorText(record.data?.message, options.trimMessage)
-    ?? getSdkErrorText(record.message, options.trimMessage)
-    ?? (options.includeTopLevelError === false ? null : getSdkErrorText(record.error, options.trimMessage))
-    ?? (options.includeName ? getSdkErrorText(record.name, options.trimMessage) : null)
-    ?? options.fallbackMessage
-    ?? null;
+  const baseMessage = getSdkErrorRecordBaseMessage(record, options);
 
   if (!baseMessage) {
     return null;
   }
 
-  const statusCode = typeof record.data?.statusCode === 'number'
-    ? record.data.statusCode
-    : options.includeTopLevelStatus === false
-      ? null
-      : typeof record.status === 'number'
-        ? record.status
-        : null;
+  const statusCode = getSdkErrorRecordStatusCode(
+    record,
+    options.includeTopLevelStatus !== false,
+  );
 
   return appendSdkErrorStatus(baseMessage, statusCode);
 }

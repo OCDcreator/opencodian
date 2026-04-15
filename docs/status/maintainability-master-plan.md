@@ -2,19 +2,19 @@
 
 > **状态**: [READY]
 > **作用**: 这是 maintainability 无人值守的战略文档。每轮开始前，先读本文件，再读 `docs/status/maintainability-round-roadmap.md` 与最近的 `docs/status/maintainability-phase-XXX.md`。
-> **自动推进状态**: `R132` 已完成 heavy test split wave checkpoint；当前继续按 `R133-R137` 长队列顺序推进。恢复 autopilot 后只能从首个 `[NEXT]`（`R133`）顺序执行，不允许 freestyle。
+> **自动推进状态**: `R133` 已完成 warning cleanup batch F；当前继续按 `R134-R137` 长队列顺序推进。恢复 autopilot 后只能从首个 `[NEXT]`（`R134`）顺序执行，不允许 freestyle。
 
 ## 1. 当前判断
 
-**当前分支已完成 `R68-R132` 并把 live lint 记录基线保持在 `0 errors / 65 warnings`；`R132` 已复盘 `R128-R131` 的 heavy suite split wave，确认 OpenCodeService 与 chat heavy suites 已按 session runtime、compat catalog/events、stream fallback、render flows、background loop、late binding 等责任域拆开，并把收尾入口固定到 `R133` 的 chat/opencode residual warning closeout。** 接下来按 `R133-R137` 顺序推进 final warning closeout 与最终 checkpoint，不允许 freestyle。
+**当前分支已完成 `R68-R133` 并把 live lint 记录基线刷新为 `0 errors / 68 warnings`；`R133` 已沿现有 opencode/chat owners 收束第一批 runtime residual warnings，把 `src/features/chat` + `src/core/opencode` 邻域从 `27 warnings + 3 errors` 降到 `23 warnings + 0 errors`，并用最小 import-sort repair 恢复全仓 `lint` 为 `0 errors`。** 接下来按 `R134-R137` 顺序推进 secondary residual warning closeout 与最终 checkpoint，不允许 freestyle。
 
 ## 2. 当前基线
 
-- **lint**: `0 errors / 65 warnings`
-- **最近验证**: `R132` 已确认全量 `npm test` 与 `npm run build` 通过，`BUILD_ID` 为 `autopilot-maintainability.202604160352`
-- **最近 Test Vault 部署**: `R126`，`BUILD_ID` `autopilot-maintainability.202604160258`（`R127` 仅改 checkpoint 文档，未触发部署）
-- **当前 `[NEXT]`**: `R133 - Warning cleanup batch F (chat/opencode residuals)`
-- **主热点**: Batch 9 heavy suite split wave 已完成并完成 checkpoint；下一步沿 `OpenCodianView`、chat services、`OpenCodeService` 与 streaming owners 收尾 Batch 10 的首批 residual warnings
+- **lint**: `0 errors / 68 warnings`
+- **最近验证**: `R133` 已确认 focused tests、全量 `npm run lint`、全量 `npm test` 与 `npm run build` 通过，`BUILD_ID` 为 `autopilot-maintainability.202604160412`
+- **最近 Test Vault 部署**: `R133`，`BUILD_ID` `autopilot-maintainability.202604160412`
+- **当前 `[NEXT]`**: `R134 - Warning cleanup batch G (core/types/settings residuals)`
+- **主热点**: Batch 10 已完成 chat/opencode residual 首批收尾；下一步沿 `src/core/storage/StorageService.ts`、`src/core/types/settings.ts`、settings sections 与 `src/main.ts` 继续清 secondary residual warnings
 
 ## 3. 本批执行规则
 

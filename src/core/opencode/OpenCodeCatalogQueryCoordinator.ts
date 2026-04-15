@@ -34,6 +34,13 @@ type OpenCodeProviderDirectoryResult = OpenCodeAvailableModelsResult & {
   connected: string[];
 };
 
+type OpenCodeCatalogResponseLogContext = {
+  operation: string;
+  source: 'sdk' | 'legacy';
+  includeDirectory: boolean;
+  debugReason: string | null;
+};
+
 export interface OpenCodeCatalogQueryCoordinatorDebugMetadata {
   baseUrl: string;
   vaultPath: string | null;
@@ -69,7 +76,12 @@ export class OpenCodeCatalogQueryCoordinator {
         const data = await this.host.getSdkFacade({ includeDirectory }).config.providers();
         const normalized = this.normalizeAvailableModels(data);
         if (shouldLogDebug) {
-          this.logProviderCatalogResponse('getAvailableModels', 'sdk', includeDirectory, debugReason, normalized);
+          this.logProviderCatalogResponse({
+            operation: 'getAvailableModels',
+            source: 'sdk',
+            includeDirectory,
+            debugReason,
+          }, normalized);
         }
         return normalized;
       } catch (error) {
@@ -93,7 +105,12 @@ export class OpenCodeCatalogQueryCoordinator {
           : {},
       });
       if (shouldLogDebug) {
-        this.logProviderCatalogResponse('getAvailableModels', 'legacy', includeDirectory, debugReason, normalized);
+        this.logProviderCatalogResponse({
+          operation: 'getAvailableModels',
+          source: 'legacy',
+          includeDirectory,
+          debugReason,
+        }, normalized);
       }
       return normalized;
     } catch (error) {
@@ -113,7 +130,12 @@ export class OpenCodeCatalogQueryCoordinator {
         const data = await this.host.getSdkFacade({ includeDirectory }).provider.list();
         const normalized = this.normalizeProviderDirectory(data);
         if (shouldLogDebug) {
-          this.logProviderCatalogResponse('getProviderDirectory', 'sdk', includeDirectory, debugReason, normalized);
+          this.logProviderCatalogResponse({
+            operation: 'getProviderDirectory',
+            source: 'sdk',
+            includeDirectory,
+            debugReason,
+          }, normalized);
         }
         return normalized;
       } catch (error) {
@@ -133,7 +155,12 @@ export class OpenCodeCatalogQueryCoordinator {
       }>('/provider', { includeDirectory });
       const normalized = this.normalizeProviderDirectory(data);
       if (shouldLogDebug) {
-        this.logProviderCatalogResponse('getProviderDirectory', 'legacy', includeDirectory, debugReason, normalized);
+        this.logProviderCatalogResponse({
+          operation: 'getProviderDirectory',
+          source: 'legacy',
+          includeDirectory,
+          debugReason,
+        }, normalized);
       }
       return normalized;
     } catch (error) {
@@ -154,7 +181,12 @@ export class OpenCodeCatalogQueryCoordinator {
           await this.host.getSdkFacade({ includeDirectory }).config.get(),
         );
         if (shouldLogDebug) {
-          this.logResolvedModelConfigResponse('getResolvedModelConfig', 'sdk', includeDirectory, debugReason, resolved);
+          this.logResolvedModelConfigResponse({
+            operation: 'getResolvedModelConfig',
+            source: 'sdk',
+            includeDirectory,
+            debugReason,
+          }, resolved);
         }
         return resolved;
       } catch (error) {
@@ -171,7 +203,12 @@ export class OpenCodeCatalogQueryCoordinator {
         await this.host.getLegacy<Record<string, unknown>>('/config', { includeDirectory }),
       );
       if (shouldLogDebug) {
-        this.logResolvedModelConfigResponse('getResolvedModelConfig', 'legacy', includeDirectory, debugReason, resolved);
+        this.logResolvedModelConfigResponse({
+          operation: 'getResolvedModelConfig',
+          source: 'legacy',
+          includeDirectory,
+          debugReason,
+        }, resolved);
       }
       return resolved;
     } catch (error) {
@@ -249,12 +286,10 @@ export class OpenCodeCatalogQueryCoordinator {
   }
 
   private logProviderCatalogResponse(
-    operation: string,
-    source: 'sdk' | 'legacy',
-    includeDirectory: boolean,
-    debugReason: string | null,
+    context: OpenCodeCatalogResponseLogContext,
     normalized: OpenCodeAvailableModelsResult | OpenCodeProviderDirectoryResult,
   ): void {
+    const { operation, source, includeDirectory, debugReason } = context;
     const normalizedDebugReason = this.normalizeDebugReason(debugReason);
     if (!normalizedDebugReason) {
       return;
@@ -274,12 +309,10 @@ export class OpenCodeCatalogQueryCoordinator {
   }
 
   private logResolvedModelConfigResponse(
-    operation: string,
-    source: 'sdk' | 'legacy',
-    includeDirectory: boolean,
-    debugReason: string | null,
+    context: OpenCodeCatalogResponseLogContext,
     resolved: OpencodeModelConfigSubset,
   ): void {
+    const { operation, source, includeDirectory, debugReason } = context;
     const normalizedDebugReason = this.normalizeDebugReason(debugReason);
     if (!normalizedDebugReason) {
       return;

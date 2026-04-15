@@ -1,3 +1,7 @@
+import type {
+  BackgroundTaskStreamTriggerCoordinatorHost,
+  BackgroundTaskStreamTriggerRuntime,
+} from '../runtime/BackgroundTaskStreamTriggerCoordinator';
 import {
   type BackgroundConversationPostSyncHandoffViewHost,
   type BackgroundConversationPostSyncHandoffViewHostAdapterDependencies,
@@ -20,16 +24,12 @@ import {
   type QuestionTodoBackgroundTaskRefreshViewHostAdapterDependencies,
   type QuestionTodoBackgroundTaskRefreshViewHostAdapterHost,
 } from './QuestionTodoBackgroundTaskRefreshHostAdapter';
+import type { SessionTodoCoordinator } from './SessionTodoCoordinator';
 import type { TabConversationSyncFingerprintRuntimePort } from './TabConversationSyncFingerprintPortProvider';
 import {
   createVisibleConversationPostSyncStateServices,
   type VisibleConversationPostSyncStateViewHost,
 } from './VisibleConversationPostSyncStateHostAdapter';
-import type {
-  BackgroundTaskStreamTriggerCoordinatorHost,
-  BackgroundTaskStreamTriggerRuntime,
-} from '../runtime/BackgroundTaskStreamTriggerCoordinator';
-import type { SessionTodoCoordinator } from './SessionTodoCoordinator';
 
 export interface QuestionTodoBackgroundTaskRuntimeServiceBundle
   extends Pick<

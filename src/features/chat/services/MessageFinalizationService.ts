@@ -40,6 +40,14 @@ interface MessageFinalizationSyncAfterStreamState {
   needsForegroundRenderSync: boolean;
 }
 
+interface MessageFinalizationSyncAfterStreamFollowUpContext {
+  conversation: Conversation;
+  tabId: TabId | null;
+  editedFiles: string[];
+  syncAfterStreamState: MessageFinalizationSyncAfterStreamState;
+  logStage: FinalizeMessageOptions['logStage'];
+}
+
 export interface MessageFinalizationHost {
   getCurrentConversation(): Conversation | null;
   getActiveTabId(): TabId | null;
@@ -95,13 +103,13 @@ export class MessageFinalizationService {
           tabId,
           logStage,
         );
-        await this.applySyncAfterStreamFollowUp(
+        await this.applySyncAfterStreamFollowUp({
           conversation,
           tabId,
           editedFiles,
           syncAfterStreamState,
           logStage,
-        );
+        });
       }
 
       await this.host.refreshTabSessionTodos(tabId, conversation.openCodeSessionId, { suppressErrors: true });
@@ -183,12 +191,16 @@ export class MessageFinalizationService {
   }
 
   private async applySyncAfterStreamFollowUp(
-    conversation: Conversation,
-    tabId: TabId | null,
-    editedFiles: string[],
-    syncAfterStreamState: MessageFinalizationSyncAfterStreamState,
-    logStage: FinalizeMessageOptions['logStage'],
+    context: MessageFinalizationSyncAfterStreamFollowUpContext,
   ): Promise<void> {
+    const {
+      conversation,
+      tabId,
+      editedFiles,
+      syncAfterStreamState,
+      logStage,
+    } = context;
+
     if (syncAfterStreamState.isForegroundConversation) {
       this.host.setLastConversationSyncFingerprint(
         tabId,

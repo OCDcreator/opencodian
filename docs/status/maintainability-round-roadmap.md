@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的 `[NEXT]`”。
-> **当前状态**: [READY] `R132` 已完成；`R133-R137` 长队列继续排队，当前首个 `[NEXT]` 为 `R133 - Warning cleanup batch F (chat/opencode residuals)`。
+> **当前状态**: [READY] `R133` 已完成；`R134-R137` 长队列继续排队，当前首个 `[NEXT]` 为 `R134 - Warning cleanup batch G (core/types/settings residuals)`。
 
 ## 控制规则
 
@@ -18,7 +18,7 @@
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
 - 当前 live lint 基线：`0 errors / 65 warnings`
 - 最近成功 phase：`docs/status/maintainability-phase-467.md`
-- 当前路线判断：`R132` 已完成 heavy test split checkpoint，确认 `R128-R131` 已把 OpenCodeService 与 chat heavy suites 收束到更稳定的单责测试 owner；当前必须从 `R133` 开始进入 Batch 10 warning closeout，不得 freestyle。
+- 当前路线判断：`R133` 已完成 chat/opencode residual warning 首批 closeout，并把该邻域 lint 从 `27 warnings + 3 errors` 降到 `23 warnings + 0 errors`；当前必须从 `R134` 开始继续处理 core/types/settings secondary residuals，不得 freestyle。
 
 ## Queue
 ## Queue
@@ -1274,7 +1274,7 @@
 
 - **批次目标**: 只沿已有厚 seam 收尾 warning，并以最终 checkpoint 收口。
 
-### [NEXT] R133 - Warning cleanup batch F (chat/opencode residuals)
+### [DONE] R133 - Warning cleanup batch F (chat/opencode residuals)
 
 - **Lane**: Warning cleanup / runtime residuals
 - **目标**: 沿 OpenCodianView、chat services、OpenCodeService 与 streaming owners 继续收尾 residual warnings。
@@ -1284,7 +1284,7 @@
 - **禁止项**: 不新增薄 helper/adapter/provider/factory；不改变 chat/opencode runtime 语义。
 - **验收**: chat/opencode 邻域 warning 至少有可量化下降且 lint 维持 0 errors。；并通过全量 `npm test` 与 `npm run build`。
 
-### [QUEUED] R134 - Warning cleanup batch G (core/types/settings residuals)
+### [NEXT] R134 - Warning cleanup batch G (core/types/settings residuals)
 
 - **Lane**: Warning cleanup / secondary residuals
 - **目标**: 沿 storage、settings normalization、settings sections 与 main.ts 继续受控收尾 residual warnings。

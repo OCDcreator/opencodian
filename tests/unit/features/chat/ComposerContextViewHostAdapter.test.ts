@@ -1,6 +1,6 @@
 import type { PromptContextItem } from '../../../../src/core/types';
-import { buildComposerContextChipStates } from '../../../../src/features/chat/composerContext';
 import type { FocusContextPreview } from '../../../../src/features/chat/composerContext';
+import { buildComposerContextChipStates } from '../../../../src/features/chat/composerContext';
 import { ComposerContextRuntimeStore } from '../../../../src/features/chat/services/ComposerContextRuntimeStore';
 import {
   type ComposerContextRuntimeState,

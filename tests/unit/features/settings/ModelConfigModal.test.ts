@@ -1,5 +1,5 @@
-import * as obsidian from 'obsidian';
 import type { App } from 'obsidian';
+import * as obsidian from 'obsidian';
 import { Modal } from 'obsidian';
 
 import { ModelConfigModal } from '../../../../src/features/settings/ModelConfigModal';

@@ -1,9 +1,9 @@
 import { Notice } from 'obsidian';
 
 import type { QuestionRequest, QuestionResolution } from '../../../core/types';
-import type { TabId } from '../tabs';
 import { t } from '../../../i18n';
 import { createLogger } from '../../../shared';
+import type { TabId } from '../tabs';
 
 export type QuestionResolutionExecutionAction =
   | {
