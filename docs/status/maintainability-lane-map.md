@@ -1,24 +1,24 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [READY] `R131` 已完成；`R132-R137` 长队列继续推进，当前 `[NEXT]` 为 `R132 - Checkpoint after heavy test split wave`。
+> **当前状态**: [READY] `R132` 已完成；`R133-R137` 长队列继续推进，当前 `[NEXT]` 为 `R133 - Warning cleanup batch F (chat/opencode residuals)`。
 
 ## 当前优先级
 
-- **当前 `[NEXT]`**：`R132 - Checkpoint after heavy test split wave`
-- **本批目标**：`R131` 已完成 question/todo/composer/background-task heavy test follow-up；当前先复盘 `R128-R131` 的 heavy suite split 收益并确认 final warning lane 入口
+- **当前 `[NEXT]`**：`R133 - Warning cleanup batch F (chat/opencode residuals)`
+- **本批目标**：`R132` 已完成 heavy suite split checkpoint；当前转入 Batch 10，先沿 chat/opencode 既有厚 seam 收尾第一批 residual warnings
 - **当前 lint 基线**：`0 errors / 65 warnings`
 - **热点顺序**：
-  1. `docs/status/maintainability-master-plan.md`
-  2. `docs/status/maintainability-round-roadmap.md`
-  3. `docs/status/maintainability-lane-map.md`
+  1. `src/features/chat/OpenCodianView.ts`
+  2. `src/core/opencode/OpenCodeService.ts`
+  3. `docs/status/maintainability-round-roadmap.md`
 
 ## 本批边界
 
 - autopilot 只能按 `R128 -> R137` 顺序推进
 - 不新增薄 helper / adapter / provider / factory；新 owner 必须覆盖完整 lifecycle / runtime seam
 - `OpenCodeService`、`OpenCodianView`、`OpenCodianSettings` 的 maintainability 仅允许在 queue 明示项内继续推进
-- heavy tests follow-up 只允许按责任域收口，不允许为了降 warning 去篡改覆盖语义
+- warning closeout 只允许沿现有厚 seam 收口，不允许为了降 warning 去篡改覆盖语义或制造薄碎片模块
 - 命中 deploy-relevant paths 时，继续严格执行 build → Test Vault deploy → `BUILD_ID` 校验
 - 恢复运行必须使用外部 profile `/Users/dht/.config/opencodian/mac-autopilot-profile.json`
 
@@ -33,5 +33,5 @@
 ## 历史入口
 
 - 批次归档：`docs/status/maintainability-completed-batches.md`
-- 最近成功 phase：`docs/status/maintainability-phase-465.md`
-- 最近 checkpoint：`docs/status/maintainability-phase-462.md`
+- 最近成功 phase：`docs/status/maintainability-phase-467.md`
+- 最近 checkpoint：`docs/status/maintainability-phase-467.md`

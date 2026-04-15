@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的 `[NEXT]`”。
-> **当前状态**: [READY] `R131` 已完成；`R132-R137` 长队列继续排队，当前首个 `[NEXT]` 为 `R132 - Checkpoint after heavy test split wave`。
+> **当前状态**: [READY] `R132` 已完成；`R133-R137` 长队列继续排队，当前首个 `[NEXT]` 为 `R133 - Warning cleanup batch F (chat/opencode residuals)`。
 
 ## 控制规则
 
@@ -17,8 +17,8 @@
 
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
 - 当前 live lint 基线：`0 errors / 65 warnings`
-- 最近成功 phase：`docs/status/maintainability-phase-466.md`
-- 当前路线判断：`R131` 已完成 Chat heavy suite split follow-up B，把 question/todo/background-task runtime view host 邻域拆成 forwarding 与 late-binding 两个责任域，并清掉 composer 入口的 import-sort 残留；当前必须先执行 `R132` 的 checkpoint，不得 freestyle。
+- 最近成功 phase：`docs/status/maintainability-phase-467.md`
+- 当前路线判断：`R132` 已完成 heavy test split checkpoint，确认 `R128-R131` 已把 OpenCodeService 与 chat heavy suites 收束到更稳定的单责测试 owner；当前必须从 `R133` 开始进入 Batch 10 warning closeout，不得 freestyle。
 
 ## Queue
 ## Queue
@@ -1260,7 +1260,7 @@
 - **禁止项**: 不改变 production runtime 语义；不通过降覆盖换低 warning。
 - **验收**: question/todo/composer heavy tests residual warning 继续下降。；并通过全量 `npm test` 与 `npm run build`。
 
-### [NEXT] R132 - Checkpoint after heavy test split wave
+### [DONE] R132 - Checkpoint after heavy test split wave
 
 - **Lane**: Checkpoint
 - **目标**: 复盘 R128-R131 的 heavy suite split 收益与 final warning lane 入口。
@@ -1274,7 +1274,7 @@
 
 - **批次目标**: 只沿已有厚 seam 收尾 warning，并以最终 checkpoint 收口。
 
-### [QUEUED] R133 - Warning cleanup batch F (chat/opencode residuals)
+### [NEXT] R133 - Warning cleanup batch F (chat/opencode residuals)
 
 - **Lane**: Warning cleanup / runtime residuals
 - **目标**: 沿 OpenCodianView、chat services、OpenCodeService 与 streaming owners 继续收尾 residual warnings。
