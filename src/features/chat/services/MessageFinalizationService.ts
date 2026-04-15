@@ -43,12 +43,10 @@ export interface MessageFinalizationHost {
   ): Promise<MessageFinalizationSyncResult>;
   getConversationVisualFingerprint(messages: ChatMessage[]): string;
   getConversationSyncFingerprint(messages: ChatMessage[]): string;
-  patchTrailingAssistantRender(
+  applySyncedConversationUpdate(
     previousMessages: ChatMessage[],
     nextMessages: ChatMessage[],
-    tabId?: TabId | null,
-  ): Promise<boolean>;
-  rerenderConversationMessages(conversation: Conversation): Promise<void>;
+  ): Promise<void>;
   renderBackgroundTaskIndicatorIfNeeded(tabId?: TabId | null): Promise<void>;
   appendTurnDiffNoticeIfNeeded(
     conversation: Conversation,
@@ -157,25 +155,24 @@ export class MessageFinalizationService {
       ),
     });
 
-    if (this.isForegroundConversation(conversation, tabId)) {
+    const isForegroundConversation = this.isForegroundConversation(conversation, tabId);
+    const needsForegroundRenderSync = isForegroundConversation
+      && previousVisualFingerprint !== this.host.getConversationVisualFingerprint(syncResult.messages);
+
+    if (isForegroundConversation) {
       this.host.setLastConversationSyncFingerprint(tabId, syncResult.fingerprint);
-      if (previousVisualFingerprint !== this.host.getConversationVisualFingerprint(syncResult.messages)) {
-        const patchedTail = await this.host.patchTrailingAssistantRender(
-          previousMessagesBeforeSync,
-          syncResult.messages,
-          tabId,
-        );
-        logStage('post-sync-tail-render-attempt', {
-          patchedTail,
-        });
-        if (!patchedTail) {
-          await this.host.rerenderConversationMessages(conversation);
-          logStage('post-sync-full-rerender-complete');
-        }
-      }
     }
 
-    await this.host.renderBackgroundTaskIndicatorIfNeeded(tabId);
+    if (needsForegroundRenderSync) {
+      await this.host.applySyncedConversationUpdate(
+        previousMessagesBeforeSync,
+        syncResult.messages,
+      );
+      logStage('post-sync-render-apply-complete');
+    } else {
+      await this.host.renderBackgroundTaskIndicatorIfNeeded(tabId);
+    }
+
     await this.host.appendTurnDiffNoticeIfNeeded(conversation, editedFiles, tabId);
     logStage('turn-diff-processed', {
       pendingEditedFileCount: editedFiles.length,

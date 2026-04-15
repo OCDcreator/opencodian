@@ -2267,10 +2267,8 @@ export class OpenCodianView extends ItemView {
         this.syncConversationMessagesFromServer(conversation, tabId, reason),
       getConversationVisualFingerprint: (messages) => this.getConversationVisualFingerprint(messages),
       getConversationSyncFingerprint: (messages) => this.getConversationSyncFingerprint(messages),
-      patchTrailingAssistantRender: (previousMessages, nextMessages, tabId) =>
-        conversationRenderService.patchTrailingAssistantRender(previousMessages, nextMessages, tabId),
-      rerenderConversationMessages: (conversation) =>
-        conversationRenderService.rerenderConversationMessages(conversation),
+      applySyncedConversationUpdate: (previousMessages, nextMessages) =>
+        conversationRenderService.applySyncedConversationUpdate(previousMessages, nextMessages),
       renderBackgroundTaskIndicatorIfNeeded: (tabId) => this.renderBackgroundTaskIndicatorIfNeeded(tabId),
       appendTurnDiffNoticeIfNeeded: (conversation, editedFiles, tabId) =>
         this.appendTurnDiffNoticeIfNeeded(conversation, editedFiles, tabId),
