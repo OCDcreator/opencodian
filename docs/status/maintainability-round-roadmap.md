@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的 `[NEXT]`”。
-> **当前状态**: [READY] `R67` checkpoint 已完成，新的 `R68-R87` 长队列已人工续排；恢复 autopilot 后必须从 `R68` 开始顺序执行。
+> **当前状态**: [PAUSED] `R87` checkpoint 已完成；`R68-R87` 长队列已全部执行，当前没有可自动执行的 `[NEXT]`。
 
 ## 控制规则
 
@@ -16,9 +16,9 @@
 ## 当前背景
 
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
-- 最近成功 phase：`docs/status/maintainability-phase-421.md`
 - 当前 live lint 基线：`0 errors / 64 warnings`
-- 当前路线判断：`R86` 已完成 secondary residual warning cleanup；下一轮进入 `R87` checkpoint，复盘 `R68-R86` 收益与下一批建议。
+- 最近成功 phase：`docs/status/maintainability-phase-422.md`
+- 当前路线判断：`R87` checkpoint 已完成；当前没有可自动执行的 `[NEXT]`，等待人工续排下一批 queue。
 
 ## Queue
 
@@ -766,7 +766,7 @@
   - `npm run lint` 维持 `0 errors`
   - focused validation、全量 `npm test`、`npm run build` 通过
 
-### [NEXT] R87 - Maintainability checkpoint
+### [DONE] R87 - Maintainability checkpoint
 
 - **Lane**: Checkpoint
 - **目标**: 复盘 `R68-R86` 的 owner 收益、warning 变化、验证成本与剩余热点，决定下一批是否继续深挖 chat/opencode residuals，还是转入 secondary residual / opt-in demo route。
@@ -782,3 +782,5 @@
   - 不回切 freestyle cleanup
 - **验收**:
   - phase 文档明确记录 `R68-R86` 收益、最新 lint 基线、warning 下降量与后续建议
+
+当前没有可自动执行的 `[NEXT]`。

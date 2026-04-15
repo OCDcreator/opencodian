@@ -1,22 +1,22 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [READY] `R86` 已完成，当前首个 `[NEXT]` 为 `R87 - Maintainability checkpoint`。
+> **当前状态**: [PAUSED] `R87` checkpoint 已完成，当前没有可自动执行的 `[NEXT]`。
 
 ## 当前优先级
 
-- **当前 `[NEXT]`**：`R87 - Maintainability checkpoint`
-- **本批目标**：复盘 `R68-R86` 的 owner 收益、warning 变化、验证成本与后续建议
+- **当前 `[NEXT]`**：当前没有可自动执行的 `[NEXT]`
+- **本批结论**：`R68-R87` 受控 queue 已完成，下一批需人工续排
 - **当前 lint 基线**：`0 errors / 64 warnings`
 - **热点顺序**：
-  1. `docs/status/maintainability-master-plan.md`
-  2. `docs/status/maintainability-round-roadmap.md`
-  3. `docs/status/maintainability-lane-map.md`
-  4. 最新 lint / test / build 输出与 phase 文档
+  1. `docs/status/maintainability-phase-422.md`
+  2. `docs/status/maintainability-master-plan.md`
+  3. `docs/status/maintainability-round-roadmap.md`
+  4. 最新 lint / test / build 输出
 
 ## 本批边界
 
-- 不自动 freestyle；autopilot 只能按 `R68 -> R87` 顺序推进
+- 不自动 freestyle；当前没有 `[NEXT]` 时必须先人工续排，再恢复 autopilot
 - 不新增薄 helper / adapter / provider / factory；新 owner 必须覆盖完整 section / lifecycle / runtime seam
 - 抽出的独立模块如果明显过薄，优先并回调用方，不为了“看起来更模块化”保留碎片
 - 不回切 settings residual，除非后续 checkpoint 明确显示 chat / opencode 被正确性或验证成本阻塞
@@ -35,5 +35,5 @@
 ## 历史入口
 
 - 批次归档：`docs/status/maintainability-completed-batches.md`
-- 最近成功 phase：`docs/status/maintainability-phase-420.md`
-- 最近 checkpoint：`docs/status/maintainability-phase-402.md`
+- 最近成功 phase：`docs/status/maintainability-phase-422.md`
+- 最近 checkpoint：`docs/status/maintainability-phase-422.md`
