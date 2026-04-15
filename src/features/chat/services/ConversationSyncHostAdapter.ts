@@ -128,13 +128,13 @@ export function createConversationSyncServices(
     hosts.backgroundPostSyncRouterHost,
     backgroundPostSyncHandoffCoordinator,
   );
-  const bridge = new ConversationSyncBridge(
-    hosts.bridgeHost,
+  const bridge = new ConversationSyncBridge({
+    host: hosts.bridgeHost,
     runtimeCoordinator,
     orchestrationService,
     visiblePostSyncRouter,
     backgroundPostSyncRouter,
-  );
+  });
   return {
     runtimeCoordinator,
     orchestrationService,

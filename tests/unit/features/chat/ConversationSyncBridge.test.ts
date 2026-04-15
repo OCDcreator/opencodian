@@ -137,13 +137,13 @@ describe('ConversationSyncBridge', () => {
     const orchestration = createOrchestration();
     const visiblePostSyncRouter = createVisiblePostSyncRouter();
     const backgroundPostSyncRouter = createBackgroundPostSyncRouter();
-    const bridge = new ConversationSyncBridge(
+    const bridge = new ConversationSyncBridge({
       host,
       runtimeCoordinator,
-      orchestration,
+      orchestrationService: orchestration,
       visiblePostSyncRouter,
       backgroundPostSyncRouter,
-    );
+    });
 
     await bridge.syncVisibleConversationInBackground();
 
@@ -184,13 +184,13 @@ describe('ConversationSyncBridge', () => {
     const orchestration = createOrchestration();
     const visiblePostSyncRouter = createVisiblePostSyncRouter();
     const backgroundPostSyncRouter = createBackgroundPostSyncRouter();
-    const bridge = new ConversationSyncBridge(
+    const bridge = new ConversationSyncBridge({
       host,
       runtimeCoordinator,
-      orchestration,
+      orchestrationService: orchestration,
       visiblePostSyncRouter,
       backgroundPostSyncRouter,
-    );
+    });
     let capturedCallbacks:
       | {
         syncVisibleConversation: () => Promise<void>;
@@ -248,13 +248,13 @@ describe('ConversationSyncBridge', () => {
     const orchestration = createOrchestration();
     const visiblePostSyncRouter = createVisiblePostSyncRouter();
     const backgroundPostSyncRouter = createBackgroundPostSyncRouter();
-    const bridge = new ConversationSyncBridge(
+    const bridge = new ConversationSyncBridge({
       host,
       runtimeCoordinator,
-      orchestration,
+      orchestrationService: orchestration,
       visiblePostSyncRouter,
       backgroundPostSyncRouter,
-    );
+    });
     let backgroundCallback: ((context: TabConversationSyncContext) => Promise<void>) | null = null;
 
     orchestration.syncBackgroundTaskTabs.mockImplementation(async (callback) => {

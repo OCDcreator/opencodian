@@ -186,22 +186,22 @@ describe('OpenCodianView background task timeline', () => {
       getTabRuntimeState: jest.fn().mockReturnValue(runtime),
       appendPersistentAssistantNoticeMessage: appendSpy,
     });
-    const coordinator = new BackgroundTaskIndicatorCoordinator(
-      { render: jest.fn().mockResolvedValue(undefined) },
+    const coordinator = new BackgroundTaskIndicatorCoordinator({
+      inlinePanelRenderer: { render: jest.fn().mockResolvedValue(undefined) },
       timelineService,
       completionNoticeService,
-      {
+      liveSignalCoordinator: {
         reconcileStateFromLiveSignals: jest.fn(),
       },
-      {
+      tabRuntimeStateBridge: {
         syncStreamLikeState: jest.fn(),
       },
-      {
+      host: {
         getActiveTabId: jest.fn().mockReturnValue('tab-1'),
         getCurrentConversation: jest.fn().mockReturnValue(conversation),
         hasTabRuntime: jest.fn().mockReturnValue(true),
       },
-    );
+    });
 
     await coordinator.queueAndFlushCompletionNotices('tab-1', conversation as never);
 

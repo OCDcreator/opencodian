@@ -52,20 +52,46 @@ export interface ConversationSyncBridgeOrchestration {
   ): Promise<void>;
 }
 
+interface ConversationSyncBridgeDependencies {
+  host: ConversationSyncBridgeHost;
+  runtimeCoordinator: ConversationSyncBridgeRuntimeCoordinator;
+  orchestrationService: ConversationSyncBridgeOrchestration;
+  visiblePostSyncRouter: Pick<
+    ConversationSyncVisiblePostSyncRouter,
+    'routeVisibleSyncComplete'
+  >;
+  backgroundPostSyncRouter: Pick<
+    ConversationSyncBackgroundPostSyncRouter,
+    'routeBackgroundTabSyncComplete' | 'routeSignalSyncComplete'
+  >;
+}
+
 export class ConversationSyncBridge {
-  constructor(
-    private readonly host: ConversationSyncBridgeHost,
-    private readonly runtimeCoordinator: ConversationSyncBridgeRuntimeCoordinator,
-    private readonly orchestrationService: ConversationSyncBridgeOrchestration,
-    private readonly visiblePostSyncRouter: Pick<
-      ConversationSyncVisiblePostSyncRouter,
-      'routeVisibleSyncComplete'
-    >,
-    private readonly backgroundPostSyncRouter: Pick<
-      ConversationSyncBackgroundPostSyncRouter,
-      'routeBackgroundTabSyncComplete' | 'routeSignalSyncComplete'
-    >,
-  ) {}
+  private readonly host: ConversationSyncBridgeHost;
+  private readonly runtimeCoordinator: ConversationSyncBridgeRuntimeCoordinator;
+  private readonly orchestrationService: ConversationSyncBridgeOrchestration;
+  private readonly visiblePostSyncRouter: Pick<
+    ConversationSyncVisiblePostSyncRouter,
+    'routeVisibleSyncComplete'
+  >;
+  private readonly backgroundPostSyncRouter: Pick<
+    ConversationSyncBackgroundPostSyncRouter,
+    'routeBackgroundTabSyncComplete' | 'routeSignalSyncComplete'
+  >;
+
+  constructor({
+    host,
+    runtimeCoordinator,
+    orchestrationService,
+    visiblePostSyncRouter,
+    backgroundPostSyncRouter,
+  }: ConversationSyncBridgeDependencies) {
+    this.host = host;
+    this.runtimeCoordinator = runtimeCoordinator;
+    this.orchestrationService = orchestrationService;
+    this.visiblePostSyncRouter = visiblePostSyncRouter;
+    this.backgroundPostSyncRouter = backgroundPostSyncRouter;
+  }
 
   startConversationSyncLoop(): void {
     this.orchestrationService.startConversationSyncLoop({

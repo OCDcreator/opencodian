@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的 `[NEXT]`”。
-> **当前状态**: [READY] `R135` 已完成；`R136-R137` 长队列继续排队，当前首个 `[NEXT]` 为 `R136 - Warning cleanup batch I (final non-demo residuals)`。
+> **当前状态**: [READY] `R136` 已完成；当前长队列只剩 `R137`，首个 `[NEXT]` 为 `R137 - Final beautiful-version checkpoint / queue closeout`。
 
 ## 控制规则
 
@@ -16,9 +16,9 @@
 ## 当前背景
 
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
-- 当前 live lint 基线：`0 errors / 62 warnings`
-- 最近成功 phase：`docs/status/maintainability-phase-470.md`
-- 当前路线判断：`R135` 已完成 tests residuals 首批 closeout，在 `tests/unit/core/opencode/OpenCodeStreamingRuntimeCoordinator.test.ts` 与四个 chat service suites 内按责任重排顶层 `describe`，把 live lint 从 `0 errors / 67 warnings` 降到 `0 errors / 62 warnings`；当前必须从 `R136` 开始继续处理 final non-demo residuals，不得 freestyle。
+- 当前 live lint 基线：`0 errors / 57 warnings`
+- 最近成功 phase：`docs/status/maintainability-phase-471.md`
+- 当前路线判断：`R136` 已沿 chat activation/sync bridge 既有 seam 把 5 个 non-demo `max-params` residual warnings 收口到 dependency-object 注入，live lint 从 `0 errors / 62 warnings` 降到 `0 errors / 57 warnings`；当前必须执行 `R137` checkpoint / queue closeout，不得 freestyle。
 
 ## Queue
 ## Queue
@@ -1304,7 +1304,7 @@
 - **禁止项**: 不删除断言、不降低覆盖、不改变验证口径。
 - **验收**: tests residual warning 有可量化下降且 coverage 语义保持不变。；并通过全量 `npm test` 与 `npm run build`。
 
-### [NEXT] R136 - Warning cleanup batch I (final non-demo residuals)
+### [DONE] R136 - Warning cleanup batch I (final non-demo residuals)
 
 - **Lane**: Warning cleanup / final residuals
 - **目标**: 只在非 demo 路径内处理最后一批 residual warnings，优先命中仍偏厚的 owner 与 root-level files。
@@ -1314,7 +1314,7 @@
 - **禁止项**: 不回切 demo/experimental visual 邻域；不制造薄碎片模块。
 - **验收**: final non-demo residual warning 继续下降且仍维持 0 errors。；并通过全量 `npm test` 与 `npm run build`。
 
-### [QUEUED] R137 - Final beautiful-version checkpoint / queue closeout
+### [NEXT] R137 - Final beautiful-version checkpoint / queue closeout
 
 - **Lane**: Checkpoint
 - **目标**: 复盘 R88-R136 的完整收益、warning 轨迹、验证成本与剩余热点，决定是否结束本批 maintainability autopilot。

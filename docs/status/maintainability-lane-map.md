@@ -1,17 +1,17 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [READY] `R135` 已完成；`R136-R137` 长队列继续推进，当前 `[NEXT]` 为 `R136 - Warning cleanup batch I (final non-demo residuals)`。
+> **当前状态**: [READY] `R136` 已完成；当前队列进入最终 checkpoint，当前 `[NEXT]` 为 `R137 - Final beautiful-version checkpoint / queue closeout`。
 
 ## 当前优先级
 
-- **当前 `[NEXT]`**：`R136 - Warning cleanup batch I (final non-demo residuals)`
-- **本批目标**：`R135` 已完成 tests residual 首批 closeout；当前继续沿非 demo `src/` owner 与必要的 `docs/modules/` 收尾 final residual warnings
-- **当前 lint 基线**：`0 errors / 62 warnings`
+- **当前 `[NEXT]`**：`R137 - Final beautiful-version checkpoint / queue closeout`
+- **本批目标**：`R136` 已完成 final non-demo residual closeout；当前只复盘 `R88-R136` 收益、warning 轨迹与 queue closeout 条件
+- **当前 lint 基线**：`0 errors / 57 warnings`
 - **热点顺序**：
-  1. `src/`
-  2. `docs/modules/`
-  3. `docs/status/maintainability-round-roadmap.md`
+  1. `docs/status/maintainability-master-plan.md`
+  2. `docs/status/maintainability-round-roadmap.md`
+  3. `docs/status/maintainability-phase-471.md`
 
 ## 本批边界
 
@@ -33,5 +33,5 @@
 ## 历史入口
 
 - 批次归档：`docs/status/maintainability-completed-batches.md`
-- 最近成功 phase：`docs/status/maintainability-phase-470.md`
+- 最近成功 phase：`docs/status/maintainability-phase-471.md`
 - 最近 checkpoint：`docs/status/maintainability-phase-467.md`

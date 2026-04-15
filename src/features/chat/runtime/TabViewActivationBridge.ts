@@ -31,14 +31,35 @@ export interface TabViewActivationBridgeHost {
   updateSendButtonState(): void;
 }
 
+interface TabViewActivationBridgeDependencies {
+  host: TabViewActivationBridgeHost;
+  focusContextPreviewCoordinator: FocusContextPreviewRefreshPort;
+  questionTodoActivationRefreshCoordinator: QuestionTodoActivationRefreshPort;
+  backgroundTaskActivationIndicatorCoordinator: BackgroundTaskActivationIndicatorPort;
+  activeTabContextUsageCoordinator: ActiveTabContextUsagePort;
+}
+
 export class TabViewActivationBridge {
-  constructor(
-    private readonly host: TabViewActivationBridgeHost,
-    private readonly focusContextPreviewCoordinator: FocusContextPreviewRefreshPort,
-    private readonly questionTodoActivationRefreshCoordinator: QuestionTodoActivationRefreshPort,
-    private readonly backgroundTaskActivationIndicatorCoordinator: BackgroundTaskActivationIndicatorPort,
-    private readonly activeTabContextUsageCoordinator: ActiveTabContextUsagePort,
-  ) {}
+  private readonly host: TabViewActivationBridgeHost;
+  private readonly focusContextPreviewCoordinator: FocusContextPreviewRefreshPort;
+  private readonly questionTodoActivationRefreshCoordinator: QuestionTodoActivationRefreshPort;
+  private readonly backgroundTaskActivationIndicatorCoordinator: BackgroundTaskActivationIndicatorPort;
+  private readonly activeTabContextUsageCoordinator: ActiveTabContextUsagePort;
+
+  constructor({
+    host,
+    focusContextPreviewCoordinator,
+    questionTodoActivationRefreshCoordinator,
+    backgroundTaskActivationIndicatorCoordinator,
+    activeTabContextUsageCoordinator,
+  }: TabViewActivationBridgeDependencies) {
+    this.host = host;
+    this.focusContextPreviewCoordinator = focusContextPreviewCoordinator;
+    this.questionTodoActivationRefreshCoordinator = questionTodoActivationRefreshCoordinator;
+    this.backgroundTaskActivationIndicatorCoordinator =
+      backgroundTaskActivationIndicatorCoordinator;
+    this.activeTabContextUsageCoordinator = activeTabContextUsageCoordinator;
+  }
 
   applyActivationPreflight(tabId: TabId): void {
     this.host.setActiveMessagesPane(tabId);

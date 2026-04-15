@@ -154,14 +154,14 @@ describe('TabConversationActivationBridge', () => {
     const refreshCoordinator = createRefreshCoordinator(callOrder);
     const backgroundTaskCoordinator = createBackgroundTaskCoordinator(callOrder);
     const contextUsageCoordinator = createContextUsageCoordinator(callOrder);
-    const bridge = new TabConversationActivationBridge(
+    const bridge = new TabConversationActivationBridge({
       host,
       tabConversationStateBridge,
       tabViewActivationBridge,
-      refreshCoordinator,
-      backgroundTaskCoordinator,
-      contextUsageCoordinator,
-    );
+      questionTodoActivationRefreshCoordinator: refreshCoordinator,
+      backgroundTaskActivationIndicatorCoordinator: backgroundTaskCoordinator,
+      activeTabContextUsageCoordinator: contextUsageCoordinator,
+    });
 
     bridge.applyEmptyTabActivation('tab-1');
 
@@ -185,14 +185,14 @@ describe('TabConversationActivationBridge', () => {
     const refreshCoordinator = createRefreshCoordinator(callOrder);
     const backgroundTaskCoordinator = createBackgroundTaskCoordinator(callOrder);
     const contextUsageCoordinator = createContextUsageCoordinator(callOrder);
-    const bridge = new TabConversationActivationBridge(
+    const bridge = new TabConversationActivationBridge({
       host,
       tabConversationStateBridge,
       tabViewActivationBridge,
-      refreshCoordinator,
-      backgroundTaskCoordinator,
-      contextUsageCoordinator,
-    );
+      questionTodoActivationRefreshCoordinator: refreshCoordinator,
+      backgroundTaskActivationIndicatorCoordinator: backgroundTaskCoordinator,
+      activeTabContextUsageCoordinator: contextUsageCoordinator,
+    });
 
     bridge.applyStreamingConversationActivation('tab-1', conversation);
 
@@ -228,14 +228,14 @@ describe('TabConversationActivationBridge', () => {
     const refreshCoordinator = createRefreshCoordinator(callOrder);
     const backgroundTaskCoordinator = createBackgroundTaskCoordinator(callOrder);
     const contextUsageCoordinator = createContextUsageCoordinator(callOrder);
-    const bridge = new TabConversationActivationBridge(
+    const bridge = new TabConversationActivationBridge({
       host,
       tabConversationStateBridge,
       tabViewActivationBridge,
-      refreshCoordinator,
-      backgroundTaskCoordinator,
-      contextUsageCoordinator,
-    );
+      questionTodoActivationRefreshCoordinator: refreshCoordinator,
+      backgroundTaskActivationIndicatorCoordinator: backgroundTaskCoordinator,
+      activeTabContextUsageCoordinator: contextUsageCoordinator,
+    });
 
     bridge.applyLoadedConversationActivation('tab-1', conversation);
 
@@ -264,14 +264,14 @@ describe('TabConversationActivationBridge', () => {
     const refreshCoordinator = createRefreshCoordinator(callOrder);
     const backgroundTaskCoordinator = createBackgroundTaskCoordinator(callOrder);
     const contextUsageCoordinator = createContextUsageCoordinator(callOrder);
-    const bridge = new TabConversationActivationBridge(
+    const bridge = new TabConversationActivationBridge({
       host,
       tabConversationStateBridge,
       tabViewActivationBridge,
-      refreshCoordinator,
-      backgroundTaskCoordinator,
-      contextUsageCoordinator,
-    );
+      questionTodoActivationRefreshCoordinator: refreshCoordinator,
+      backgroundTaskActivationIndicatorCoordinator: backgroundTaskCoordinator,
+      activeTabContextUsageCoordinator: contextUsageCoordinator,
+    });
 
     bridge.openConversation(conversation);
 
@@ -317,14 +317,14 @@ describe('TabConversationActivationBridge', () => {
     const refreshCoordinator = createRefreshCoordinator(callOrder);
     const backgroundTaskCoordinator = createBackgroundTaskCoordinator(callOrder);
     const contextUsageCoordinator = createContextUsageCoordinator(callOrder);
-    const bridge = new TabConversationActivationBridge(
+    const bridge = new TabConversationActivationBridge({
       host,
       tabConversationStateBridge,
       tabViewActivationBridge,
-      refreshCoordinator,
-      backgroundTaskCoordinator,
-      contextUsageCoordinator,
-    );
+      questionTodoActivationRefreshCoordinator: refreshCoordinator,
+      backgroundTaskActivationIndicatorCoordinator: backgroundTaskCoordinator,
+      activeTabContextUsageCoordinator: contextUsageCoordinator,
+    });
 
     bridge.openConversation(conversation);
 

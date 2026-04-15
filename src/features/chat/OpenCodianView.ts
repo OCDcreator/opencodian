@@ -1353,26 +1353,32 @@ export class OpenCodianView extends ItemView {
     const tabConversationStateBridge = new TabConversationStateBridge(
       tabActivationRuntimeBridgeHosts.tabConversationStateBridgeHost,
     );
-    const tabViewActivationBridge = new TabViewActivationBridge(
-      tabActivationRuntimeBridgeHosts.tabActivationBridgeHosts.tabViewActivationBridgeHost,
-      this.composerContextViewFacade,
-      backgroundTaskRuntime.questionTodoActivationRefreshCoordinator,
-      backgroundTaskRuntime.backgroundTaskActivationIndicatorCoordinator,
-      backgroundTaskRuntime.activeTabContextUsageCoordinator,
-    );
+    const tabViewActivationBridge = new TabViewActivationBridge({
+      host: tabActivationRuntimeBridgeHosts.tabActivationBridgeHosts.tabViewActivationBridgeHost,
+      focusContextPreviewCoordinator: this.composerContextViewFacade,
+      questionTodoActivationRefreshCoordinator:
+        backgroundTaskRuntime.questionTodoActivationRefreshCoordinator,
+      backgroundTaskActivationIndicatorCoordinator:
+        backgroundTaskRuntime.backgroundTaskActivationIndicatorCoordinator,
+      activeTabContextUsageCoordinator: backgroundTaskRuntime.activeTabContextUsageCoordinator,
+    });
     const conversationHydrationOutcomeBridge = new ConversationHydrationOutcomeBridge(
       conversationHydrationRuntimeViewHosts.conversationHydrationOutcomeBridgeHost,
       tabConversationStateBridge,
       tabViewActivationBridge,
     );
-    const tabConversationActivationBridge = new TabConversationActivationBridge(
-      tabActivationRuntimeBridgeHosts.tabActivationBridgeHosts.tabConversationActivationBridgeHost,
+    const tabConversationActivationBridge = new TabConversationActivationBridge({
+      host:
+        tabActivationRuntimeBridgeHosts.tabActivationBridgeHosts
+          .tabConversationActivationBridgeHost,
       tabConversationStateBridge,
       tabViewActivationBridge,
-      backgroundTaskRuntime.questionTodoActivationRefreshCoordinator,
-      backgroundTaskRuntime.backgroundTaskActivationIndicatorCoordinator,
-      backgroundTaskRuntime.activeTabContextUsageCoordinator,
-    );
+      questionTodoActivationRefreshCoordinator:
+        backgroundTaskRuntime.questionTodoActivationRefreshCoordinator,
+      backgroundTaskActivationIndicatorCoordinator:
+        backgroundTaskRuntime.backgroundTaskActivationIndicatorCoordinator,
+      activeTabContextUsageCoordinator: backgroundTaskRuntime.activeTabContextUsageCoordinator,
+    });
     const tabRuntimeStateBridge = new TabRuntimeStateBridge(
       tabActivationRuntimeBridgeHosts.tabRuntimeStateBridgeHost,
     );
@@ -1404,14 +1410,14 @@ export class OpenCodianView extends ItemView {
       backgroundTaskRuntime.backgroundTaskTimelineService,
       this.createBackgroundTaskInlinePanelRendererHost(),
     );
-    const backgroundTaskIndicatorCoordinator = new BackgroundTaskIndicatorCoordinator(
-      backgroundTaskInlinePanelRenderer,
-      backgroundTaskRuntime.backgroundTaskTimelineService,
-      backgroundTaskCompletionNoticeService,
-      backgroundTaskRuntime.backgroundTaskLiveSignalCoordinator,
+    const backgroundTaskIndicatorCoordinator = new BackgroundTaskIndicatorCoordinator({
+      inlinePanelRenderer: backgroundTaskInlinePanelRenderer,
+      timelineService: backgroundTaskRuntime.backgroundTaskTimelineService,
+      completionNoticeService: backgroundTaskCompletionNoticeService,
+      liveSignalCoordinator: backgroundTaskRuntime.backgroundTaskLiveSignalCoordinator,
       tabRuntimeStateBridge,
-      this.createBackgroundTaskIndicatorCoordinatorHost(),
-    );
+      host: this.createBackgroundTaskIndicatorCoordinatorHost(),
+    });
     const backgroundTaskStreamTriggerCoordinator = new BackgroundTaskStreamTriggerCoordinator(
       backgroundTaskIndicatorCoordinator,
       backgroundTaskRuntime.backgroundTaskTimelineService,
@@ -1421,14 +1427,14 @@ export class OpenCodianView extends ItemView {
     const conversationLoadRuntimeBridge = new ConversationLoadRuntimeBridge(
       conversationSyncLoadRuntimeHosts.conversationLoadRuntimeBridgeHost,
     );
-    const conversationViewStateService = new ConversationViewStateService(
-      this.createConversationViewStateHost(),
+    const conversationViewStateService = new ConversationViewStateService({
+      host: this.createConversationViewStateHost(),
       tabConversationActivationBridge,
       tabViewActivationBridge,
       conversationHydrationOutcomeBridge,
       conversationTransitionBridge,
       conversationLoadRuntimeBridge,
-    );
+    });
     const conversationTabOpenCoordinator = new ConversationTabOpenCoordinator(
       this.createConversationTabOpenHost(),
       {

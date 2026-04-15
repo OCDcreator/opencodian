@@ -24,15 +24,38 @@ export interface BackgroundTaskIndicatorCoordinatorHost {
   hasTabRuntime(tabId: TabId | null): boolean;
 }
 
+interface BackgroundTaskIndicatorCoordinatorDependencies {
+  inlinePanelRenderer: BackgroundTaskIndicatorInlinePanelPort;
+  timelineService: BackgroundTaskIndicatorTimelinePort;
+  completionNoticeService: BackgroundTaskIndicatorCompletionNoticePort;
+  liveSignalCoordinator: BackgroundTaskIndicatorLiveSignalPort;
+  tabRuntimeStateBridge: BackgroundTaskIndicatorTabRuntimePort;
+  host: BackgroundTaskIndicatorCoordinatorHost;
+}
+
 export class BackgroundTaskIndicatorCoordinator {
-  constructor(
-    private readonly inlinePanelRenderer: BackgroundTaskIndicatorInlinePanelPort,
-    private readonly timelineService: BackgroundTaskIndicatorTimelinePort,
-    private readonly completionNoticeService: BackgroundTaskIndicatorCompletionNoticePort,
-    private readonly liveSignalCoordinator: BackgroundTaskIndicatorLiveSignalPort,
-    private readonly tabRuntimeStateBridge: BackgroundTaskIndicatorTabRuntimePort,
-    private readonly host: BackgroundTaskIndicatorCoordinatorHost,
-  ) {}
+  private readonly inlinePanelRenderer: BackgroundTaskIndicatorInlinePanelPort;
+  private readonly timelineService: BackgroundTaskIndicatorTimelinePort;
+  private readonly completionNoticeService: BackgroundTaskIndicatorCompletionNoticePort;
+  private readonly liveSignalCoordinator: BackgroundTaskIndicatorLiveSignalPort;
+  private readonly tabRuntimeStateBridge: BackgroundTaskIndicatorTabRuntimePort;
+  private readonly host: BackgroundTaskIndicatorCoordinatorHost;
+
+  constructor({
+    inlinePanelRenderer,
+    timelineService,
+    completionNoticeService,
+    liveSignalCoordinator,
+    tabRuntimeStateBridge,
+    host,
+  }: BackgroundTaskIndicatorCoordinatorDependencies) {
+    this.inlinePanelRenderer = inlinePanelRenderer;
+    this.timelineService = timelineService;
+    this.completionNoticeService = completionNoticeService;
+    this.liveSignalCoordinator = liveSignalCoordinator;
+    this.tabRuntimeStateBridge = tabRuntimeStateBridge;
+    this.host = host;
+  }
 
   async renderIfNeeded(
     tabId: TabId | null = this.host.getActiveTabId(),

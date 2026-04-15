@@ -56,14 +56,14 @@ describe('BackgroundTaskIndicatorCoordinator', () => {
       getCurrentConversation: jest.fn().mockReturnValue(conversation),
       hasTabRuntime: jest.fn().mockReturnValue(Boolean(runtime)),
     };
-    const coordinator = new BackgroundTaskIndicatorCoordinator(
+    const coordinator = new BackgroundTaskIndicatorCoordinator({
       inlinePanelRenderer,
       timelineService,
       completionNoticeService,
       liveSignalCoordinator,
       tabRuntimeStateBridge,
       host,
-    );
+    });
 
     return {
       coordinator,

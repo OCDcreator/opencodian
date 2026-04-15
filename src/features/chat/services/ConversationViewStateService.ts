@@ -34,15 +34,38 @@ type TabViewActivationPort =
     'applyActivationPreflight' | 'applyLoadedConversationHydrationTail'
   >;
 
+interface ConversationViewStateServiceDependencies {
+  host: ConversationViewStateHost;
+  tabConversationActivationBridge: TabConversationActivationPort;
+  tabViewActivationBridge: TabViewActivationPort;
+  conversationHydrationOutcomeBridge: ConversationHydrationOutcomePort;
+  conversationTransitionBridge: ConversationTransitionPort;
+  conversationLoadRuntimeBridge: ConversationLoadRuntimePort;
+}
+
 export class ConversationViewStateService {
-  constructor(
-    private readonly host: ConversationViewStateHost,
-    private readonly tabConversationActivationBridge: TabConversationActivationPort,
-    private readonly tabViewActivationBridge: TabViewActivationPort,
-    private readonly conversationHydrationOutcomeBridge: ConversationHydrationOutcomePort,
-    private readonly conversationTransitionBridge: ConversationTransitionPort,
-    private readonly conversationLoadRuntimeBridge: ConversationLoadRuntimePort,
-  ) {}
+  private readonly host: ConversationViewStateHost;
+  private readonly tabConversationActivationBridge: TabConversationActivationPort;
+  private readonly tabViewActivationBridge: TabViewActivationPort;
+  private readonly conversationHydrationOutcomeBridge: ConversationHydrationOutcomePort;
+  private readonly conversationTransitionBridge: ConversationTransitionPort;
+  private readonly conversationLoadRuntimeBridge: ConversationLoadRuntimePort;
+
+  constructor({
+    host,
+    tabConversationActivationBridge,
+    tabViewActivationBridge,
+    conversationHydrationOutcomeBridge,
+    conversationTransitionBridge,
+    conversationLoadRuntimeBridge,
+  }: ConversationViewStateServiceDependencies) {
+    this.host = host;
+    this.tabConversationActivationBridge = tabConversationActivationBridge;
+    this.tabViewActivationBridge = tabViewActivationBridge;
+    this.conversationHydrationOutcomeBridge = conversationHydrationOutcomeBridge;
+    this.conversationTransitionBridge = conversationTransitionBridge;
+    this.conversationLoadRuntimeBridge = conversationLoadRuntimeBridge;
+  }
 
   async activateTab(tabId: TabId): Promise<void> {
     const tabManager = this.host.getTabManager();

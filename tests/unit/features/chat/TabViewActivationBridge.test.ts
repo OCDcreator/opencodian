@@ -103,13 +103,13 @@ describe('TabViewActivationBridge', () => {
     const refreshCoordinator = createRefreshCoordinator(callOrder);
     const backgroundTaskCoordinator = createBackgroundTaskCoordinator(callOrder);
     const contextUsageCoordinator = createContextUsageCoordinator(callOrder);
-    const bridge = new TabViewActivationBridge(
+    const bridge = new TabViewActivationBridge({
       host,
       focusContextPreviewCoordinator,
-      refreshCoordinator,
-      backgroundTaskCoordinator,
-      contextUsageCoordinator,
-    );
+      questionTodoActivationRefreshCoordinator: refreshCoordinator,
+      backgroundTaskActivationIndicatorCoordinator: backgroundTaskCoordinator,
+      activeTabContextUsageCoordinator: contextUsageCoordinator,
+    });
 
     bridge.applyActivationPreflight('tab-1');
 
@@ -127,13 +127,13 @@ describe('TabViewActivationBridge', () => {
     const refreshCoordinator = createRefreshCoordinator(callOrder);
     const backgroundTaskCoordinator = createBackgroundTaskCoordinator(callOrder);
     const contextUsageCoordinator = createContextUsageCoordinator(callOrder);
-    const bridge = new TabViewActivationBridge(
+    const bridge = new TabViewActivationBridge({
       host,
       focusContextPreviewCoordinator,
-      refreshCoordinator,
-      backgroundTaskCoordinator,
-      contextUsageCoordinator,
-    );
+      questionTodoActivationRefreshCoordinator: refreshCoordinator,
+      backgroundTaskActivationIndicatorCoordinator: backgroundTaskCoordinator,
+      activeTabContextUsageCoordinator: contextUsageCoordinator,
+    });
 
     bridge.applyStreamingActivationOutcome('tab-1', 'session-1');
 
@@ -156,13 +156,13 @@ describe('TabViewActivationBridge', () => {
     const refreshCoordinator = createRefreshCoordinator(callOrder);
     const backgroundTaskCoordinator = createBackgroundTaskCoordinator(callOrder);
     const contextUsageCoordinator = createContextUsageCoordinator(callOrder);
-    const bridge = new TabViewActivationBridge(
+    const bridge = new TabViewActivationBridge({
       host,
       focusContextPreviewCoordinator,
-      refreshCoordinator,
-      backgroundTaskCoordinator,
-      contextUsageCoordinator,
-    );
+      questionTodoActivationRefreshCoordinator: refreshCoordinator,
+      backgroundTaskActivationIndicatorCoordinator: backgroundTaskCoordinator,
+      activeTabContextUsageCoordinator: contextUsageCoordinator,
+    });
 
     bridge.applyEmptyActivationOutcome('tab-1');
 
@@ -178,13 +178,13 @@ describe('TabViewActivationBridge', () => {
     const refreshCoordinator = createRefreshCoordinator(callOrder);
     const backgroundTaskCoordinator = createBackgroundTaskCoordinator(callOrder);
     const contextUsageCoordinator = createContextUsageCoordinator(callOrder);
-    const bridge = new TabViewActivationBridge(
+    const bridge = new TabViewActivationBridge({
       host,
       focusContextPreviewCoordinator,
-      refreshCoordinator,
-      backgroundTaskCoordinator,
-      contextUsageCoordinator,
-    );
+      questionTodoActivationRefreshCoordinator: refreshCoordinator,
+      backgroundTaskActivationIndicatorCoordinator: backgroundTaskCoordinator,
+      activeTabContextUsageCoordinator: contextUsageCoordinator,
+    });
 
     await bridge.applyLoadedConversationPostRenderOutcome('tab-1', 'session-1');
 
@@ -205,13 +205,13 @@ describe('TabViewActivationBridge', () => {
     const refreshCoordinator = createRefreshCoordinator(callOrder);
     const backgroundTaskCoordinator = createBackgroundTaskCoordinator(callOrder);
     const contextUsageCoordinator = createContextUsageCoordinator(callOrder);
-    const bridge = new TabViewActivationBridge(
+    const bridge = new TabViewActivationBridge({
       host,
       focusContextPreviewCoordinator,
-      refreshCoordinator,
-      backgroundTaskCoordinator,
-      contextUsageCoordinator,
-    );
+      questionTodoActivationRefreshCoordinator: refreshCoordinator,
+      backgroundTaskActivationIndicatorCoordinator: backgroundTaskCoordinator,
+      activeTabContextUsageCoordinator: contextUsageCoordinator,
+    });
 
     await bridge.applyLoadedConversationHydrationTail();
 

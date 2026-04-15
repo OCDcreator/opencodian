@@ -41,15 +41,39 @@ export interface TabConversationActivationBridgeHost {
   scheduleSettledScrollToBottom(tabId: TabId | null): void;
 }
 
+interface TabConversationActivationBridgeDependencies {
+  host: TabConversationActivationBridgeHost;
+  tabConversationStateBridge: TabConversationStatePort;
+  tabViewActivationBridge: TabViewActivationPort;
+  questionTodoActivationRefreshCoordinator: QuestionTodoActivationRefreshPort;
+  backgroundTaskActivationIndicatorCoordinator: BackgroundTaskActivationIndicatorPort;
+  activeTabContextUsageCoordinator: ActiveTabContextUsagePort;
+}
+
 export class TabConversationActivationBridge {
-  constructor(
-    private readonly host: TabConversationActivationBridgeHost,
-    private readonly tabConversationStateBridge: TabConversationStatePort,
-    private readonly tabViewActivationBridge: TabViewActivationPort,
-    private readonly questionTodoActivationRefreshCoordinator: QuestionTodoActivationRefreshPort,
-    private readonly backgroundTaskActivationIndicatorCoordinator: BackgroundTaskActivationIndicatorPort,
-    private readonly activeTabContextUsageCoordinator: ActiveTabContextUsagePort,
-  ) {}
+  private readonly host: TabConversationActivationBridgeHost;
+  private readonly tabConversationStateBridge: TabConversationStatePort;
+  private readonly tabViewActivationBridge: TabViewActivationPort;
+  private readonly questionTodoActivationRefreshCoordinator: QuestionTodoActivationRefreshPort;
+  private readonly backgroundTaskActivationIndicatorCoordinator: BackgroundTaskActivationIndicatorPort;
+  private readonly activeTabContextUsageCoordinator: ActiveTabContextUsagePort;
+
+  constructor({
+    host,
+    tabConversationStateBridge,
+    tabViewActivationBridge,
+    questionTodoActivationRefreshCoordinator,
+    backgroundTaskActivationIndicatorCoordinator,
+    activeTabContextUsageCoordinator,
+  }: TabConversationActivationBridgeDependencies) {
+    this.host = host;
+    this.tabConversationStateBridge = tabConversationStateBridge;
+    this.tabViewActivationBridge = tabViewActivationBridge;
+    this.questionTodoActivationRefreshCoordinator = questionTodoActivationRefreshCoordinator;
+    this.backgroundTaskActivationIndicatorCoordinator =
+      backgroundTaskActivationIndicatorCoordinator;
+    this.activeTabContextUsageCoordinator = activeTabContextUsageCoordinator;
+  }
 
   applyEmptyTabActivation(tabId: TabId): void {
     this.tabConversationStateBridge.clearActiveConversation(tabId);
