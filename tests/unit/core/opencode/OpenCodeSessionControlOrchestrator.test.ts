@@ -76,8 +76,7 @@ function createHost(
   } as MockHost;
 }
 
-describe('OpenCodeSessionControlOrchestrator', () => {
-  it('builds context usage from session info, messages, and model catalog', async () => {
+it('builds context usage from session info, messages, and model catalog', async () => {
     const sessionSdk = createSessionSdk();
     const host = createHost(sessionSdk, createPartSdk(), {
       getSessionInfo: jest.fn().mockResolvedValue({
@@ -177,7 +176,7 @@ describe('OpenCodeSessionControlOrchestrator', () => {
     expect(snapshot?.totalCost).toBeCloseTo(0.6, 6);
   });
 
-  it('uses configured SDK and legacy transports for control mutations', async () => {
+it('uses configured SDK and legacy transports for control mutations', async () => {
     const sessionSdk = createSessionSdk({
       fork: jest.fn().mockResolvedValue({ id: 'sdk-fork', title: 'Fork Session' }),
       revert: jest.fn().mockResolvedValue({}),
@@ -215,7 +214,7 @@ describe('OpenCodeSessionControlOrchestrator', () => {
     expect(host.postLegacy).toHaveBeenNthCalledWith(3, '/session/legacy-session/unrevert', {});
   });
 
-  it('falls back to legacy session diff reads when SDK diff fails', async () => {
+it('falls back to legacy session diff reads when SDK diff fails', async () => {
     const sessionSdk = createSessionSdk({
       diff: jest.fn().mockRejectedValue(new Error('sdk diff failed')),
     });
@@ -250,7 +249,7 @@ describe('OpenCodeSessionControlOrchestrator', () => {
     expect(host.getLegacy).toHaveBeenCalledWith('/session/session-1/diff?messageID=message-1');
   });
 
-  it('owns session messaging and part SDK wrappers', async () => {
+it('owns session messaging and part SDK wrappers', async () => {
     const sessionMessage: SessionMessage = {
       info: {
         id: 'message-1',
@@ -315,5 +314,4 @@ describe('OpenCodeSessionControlOrchestrator', () => {
     })).resolves.toEqual(sessionMessage);
     await expect(orchestrator.updateMessagePart('session-1', 'message-1', 'part-1', updatedPart)).resolves.toEqual(updatedPart);
     await expect(orchestrator.deleteMessagePart('session-1', 'message-1', 'part-1')).resolves.toBe(true);
-  });
 });

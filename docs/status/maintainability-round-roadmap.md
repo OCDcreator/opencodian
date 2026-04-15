@@ -16,7 +16,7 @@
 ## 当前背景
 
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
-- 最近成功 phase：`docs/status/maintainability-phase-414.md`
+- 最近成功 phase：`docs/status/maintainability-phase-416.md`
 - 当前 live lint 基线：`0 errors / 79 warnings`
 - 当前路线判断：上一批已在 `R67` checkpoint 收口；当前新 batch 直接转向 chat runtime / services 与 opencode core，并把 heavy tests / warning cleanup 明确写成 `R81-R86`。
 
@@ -653,7 +653,7 @@
   - streaming runtime coordinator 的 SSE reader 分支明显减少
   - focused validation、全量 `npm test`、`npm run build` 通过
 
-### [NEXT] R81 - OpenCodeService heavy suite split A
+### [DONE] R81 - OpenCodeService heavy suite split A
 
 - **Lane**: Warning cleanup / opencode tests
 - **目标**: 把 `tests/unit/core/opencode/OpenCodeService.test.ts` 的 session/control/runtime 相关大块断言按责任拆成更窄 suite files，优先降低单文件与单 describe 规模。
@@ -670,7 +670,7 @@
   - `OpenCodeService` heavy suite 的 warning 有可量化下降
   - focused validation、全量 `npm test`、`npm run build` 通过
 
-### [QUEUED] R82 - OpenCodeService heavy suite split B
+### [NEXT] R82 - OpenCodeService heavy suite split B
 
 - **Lane**: Warning cleanup / opencode tests
 - **目标**: 继续把 `tests/unit/core/opencode/OpenCodeService.test.ts` 与 `tests/unit/core/opencode/OpenCodeService.sdkCompat.test.ts` 的 streaming / compatibility / fallback 大块断言按责任拆开。
