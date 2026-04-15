@@ -45,7 +45,7 @@ export interface OpenCodeServiceLifecycleCoordinatorHost {
   getBaseUrl(): string;
   getToolCatalogScopeKey(): string;
   shouldUseSdkCrud(): boolean;
-  checkSdkHealth(): Promise<boolean>;
+  checkSdkHealth(): Promise<unknown>;
   logHealthProbeFallback(error: unknown): void;
   resetTransientConnectivityLogState(): void;
   notifyServerStatusChange(status: ServerStatus): void;
@@ -116,7 +116,7 @@ export class OpenCodeServiceLifecycleCoordinator {
 
     if (this.host.shouldUseSdkCrud()) {
       try {
-        const healthy = await this.host.checkSdkHealth();
+        const healthy = this.normalizeHealthResponse(await this.host.checkSdkHealth());
         if (healthy) {
           this.host.resetTransientConnectivityLogState();
         }
@@ -131,6 +131,18 @@ export class OpenCodeServiceLifecycleCoordinator {
       this.host.resetTransientConnectivityLogState();
     }
     return healthy;
+  }
+
+  private normalizeHealthResponse(response: unknown): boolean {
+    if (typeof response === 'boolean') {
+      return response;
+    }
+
+    if (response && typeof response === 'object' && 'healthy' in response) {
+      return Boolean((response as { healthy?: unknown }).healthy);
+    }
+
+    return false;
   }
 
   private ensureBaseUrl(): void {

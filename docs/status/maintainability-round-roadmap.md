@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的 `[NEXT]`”。
-> **当前状态**: [READY] `R108` 已完成；`R109-R137` 长队列继续排队，当前首个 `[NEXT]` 为 `R109 - OpenCodeService health / legacy fallback seam`。
+> **当前状态**: [READY] `R109` 已完成；`R110-R137` 长队列继续排队，当前首个 `[NEXT]` 为 `R110 - OpenCodeService session abort/get fallback seam`。
 
 ## 控制规则
 
@@ -17,8 +17,8 @@
 
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
 - 当前 live lint 基线：`0 errors / 65 warnings`
-- 最近成功 phase：`docs/status/maintainability-phase-442.md`
-- 当前路线判断：`R108` 已完成 vault-path scope refresh lifecycle seam，当前必须从 `R109` 顺序执行，不得 freestyle。
+- 最近成功 phase：`docs/status/maintainability-phase-444.md`
+- 当前路线判断：`R109` 已完成 health / legacy fallback seam，当前必须从 `R110` 顺序执行，不得 freestyle。
 
 ## Queue
 ## Queue
@@ -1014,7 +1014,7 @@
 - **禁止项**: 不改变 SDK-first bootstrap、health probe ordering、sync-event bridge 语义。
 - **验收**: OpenCodeService 对 sync/bootstrap residual orchestration 继续减少。；并通过全量 `npm test` 与 `npm run build`。
 
-### [NEXT] R109 - OpenCodeService health / legacy fallback seam
+### [DONE] R109 - OpenCodeService health / legacy fallback seam
 
 - **Lane**: Maintainability / opencode fallback runtime
 - **目标**: 收束 health retry、legacy HTTP/SSE fallback 入口与 degraded-state follow-up residual。
@@ -1024,7 +1024,7 @@
 - **禁止项**: 不改变 SDK-first / legacy fallback 判定、HTTP/SSE fallback 语义。
 - **验收**: health / legacy fallback residual 分支明显减少。；并通过全量 `npm test` 与 `npm run build`。
 
-### [QUEUED] R110 - OpenCodeService session abort/get fallback seam
+### [NEXT] R110 - OpenCodeService session abort/get fallback seam
 
 - **Lane**: Maintainability / opencode session runtime
 - **目标**: 继续收束 session get/abort、session-scoped detach、fallback query 与 runtime follow-up residual。

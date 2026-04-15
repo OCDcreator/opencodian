@@ -24,7 +24,7 @@
 
 ## 核心类型 / 接口
 
-- `OpenCodeServiceLifecycleCoordinatorHost`: host seam，提供 settings/baseUrl、SDK health probe、server manager、sync/open-code event subscription ports、model/catalog bootstrap hooks 与对外通知回调。
+- `OpenCodeServiceLifecycleCoordinatorHost`: host seam，提供 settings/baseUrl、原始 SDK health probe payload、server manager、sync/open-code event subscription ports、model/catalog bootstrap hooks 与对外通知回调。
 - `OpenCodeServiceLifecycleCoordinator`: 持有初始化、start/stop/dispose、vault path scope refresh、health fallback、server-running bootstrap 与 event subscription restart 的编排逻辑。
 
 ## 核心逻辑
@@ -44,7 +44,7 @@
 
 ### Health probe fallback
 
-`checkHealth()` 仍保持 SDK-first 语义：`sdkCrud` 开启时先调用 SDK `global.health()`；SDK health 失败时记录 fallback warning，再回退到 `ServerManager.checkHealth(3000)`。任一健康路径成功都会重置 transient connectivity 日志抑制。
+`checkHealth()` 仍保持 SDK-first 语义：`sdkCrud` 开启时先调用 SDK `global.health()`，并在 coordinator 内统一归一化 boolean / `{ healthy }` 结构化响应；SDK health 失败时记录 fallback warning，再回退到 `ServerManager.checkHealth(3000)`。任一健康路径成功都会重置 transient connectivity 日志抑制。
 
 ### Subscription restarts
 

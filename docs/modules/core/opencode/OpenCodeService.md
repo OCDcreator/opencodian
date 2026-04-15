@@ -67,10 +67,10 @@
 - `messageNormalizationMapper`: `OpenCodeMessageNormalizationMapper` singleton，负责 question request normalization、历史 message → `ChatMessage` hydration、tool kind 归类、context attachment 提取与 OMO/system reminder 归一化。
 - `promptRequestBuilder`: `OpenCodePromptRequestBuilder` 实例，负责 SDK prompt parameters、legacy request body 与 shared prompt options/variant/output-format/model defaults 的组装。
 - `streamEventTransformer`: `OpenCodeStreamEventTransformer` 实例，负责 SDK / legacy stream event → `StreamChunk` 的转换、tool/question/file/permission 事件映射，以及 SSE parser。
-- `streamingRuntime`: `OpenCodeStreamingRuntimeCoordinator` 实例，负责 SDK/legacy streaming transport、legacy SSE reader lifecycle、final response completion，以及 active stream registry、session-scoped abort controller、part type tracking、cancel/detach lifecycle。
+- `streamingRuntime`: `OpenCodeStreamingRuntimeCoordinator` 实例，负责单一 streaming 入口下的 SDK/legacy transport 选择、首事件前的 legacy SSE fallback、legacy SSE reader lifecycle、final response completion，以及 active stream registry、session-scoped abort controller、part type tracking、cancel/detach lifecycle。
 - `sessionLifecycle`: `OpenCodeSessionLifecycleCoordinator` 实例，负责 session create/list/messages/todos/statuses/delete/update、默认 current session 指针，以及公开 session sync 订阅 API 到 `syncEventRuntime` 的委托。
 - `sessionControl`: `OpenCodeSessionControlOrchestrator` 实例，负责 fork/revert/unrevert/diff、context usage snapshot、session message control、command/shell 与 message-part operations。
-- `serviceLifecycle`: `OpenCodeServiceLifecycleCoordinator` 实例，负责 initialize/start/stop/dispose、server running 后的 model/catalog bootstrap、health probe fallback，以及 vault path scope refresh 与 sync/open-code event subscription 的 lifecycle 编排。
+- `serviceLifecycle`: `OpenCodeServiceLifecycleCoordinator` 实例，负责 initialize/start/stop/dispose、server running 后的 model/catalog bootstrap、SDK health response normalization / health probe fallback，以及 vault path scope refresh 与 sync/open-code event subscription 的 lifecycle 编排。
 - `questionPermissionHub`: `OpenCodeQuestionPermissionHub` 实例，负责 pending questions/reply/reject、pending permissions/respond，以及 session permission responder 的 negotiation lifecycle。
 - `queryGateway`: `OpenCodeQueryGateway` 实例，负责 provider auth、project/file/find/path/VCS/formatter/LSP 查询，以及 MCP status/server/auth 的 catalog 写回。
 - `settingsReconfiguration`: `OpenCodeSettingsReconfigurationCoordinator` 实例，负责 settings update plan、managed server stop/restart 决策、subscription pause/resume 与 rollback/restore lifecycle。
@@ -104,7 +104,7 @@
 运行时还有三条重要的配置通道：
 
 - `setVaultPath(path)`: 公开入口仍保留在服务层，但 vault path 写回、`ServerManager` 工作目录更新、tool schema cache scope invalidation 与 sync/open-code event restart 已委托给 `OpenCodeServiceLifecycleCoordinator`。
-- `checkHealth()`: 公开入口仍保留在服务层，但 SDK-first health probe 与 `ServerManager.checkHealth()` fallback 已委托给 `OpenCodeServiceLifecycleCoordinator`。
+- `checkHealth()`: 公开入口仍保留在服务层，但 SDK-first health probe、SDK health payload normalization 与 `ServerManager.checkHealth()` fallback 已委托给 `OpenCodeServiceLifecycleCoordinator`。
 - `updateSettings(settings)`: 公开入口仍保留在服务层，但完整 settings reconfiguration lifecycle 已委托给 `OpenCodeSettingsReconfigurationCoordinator`；失败时仍会回滚内存设置、`baseUrl`、`ServerManager` 配置，并尽力恢复原服务。
 
 补充一个运行时细节：
@@ -209,10 +209,9 @@
 `sendMessage()`：
 
 - 先通过 `OpenCodeContextPartSerializer` + `OpenCodePromptRequestBuilder` 组装 prompt parts / transport payload
-- `sdkStream` 开启时委托 `streamingRuntime.streamSdkResponse()`：coordinator 负责 SDK `event.subscribe()` 读取、首事件前失败时的 legacy SSE fallback，以及最终 assistant message completion
-- 否则委托 `streamingRuntime.streamLegacyResponse()`：coordinator 负责 `/event` SSE 读取、reader abort/detach 生命周期，以及最终 assistant message completion
+- 再统一委托 `streamingRuntime.streamResponse()`：coordinator 依据 `sdkStream` flag 选择 SDK 或 legacy transport，并继续持有首事件前失败时的 legacy SSE fallback 与最终 assistant message completion
 
-对应的 prompt option assembly 仍全部委托给 `OpenCodePromptRequestBuilder`；`sendMessage()` 现在只保留 session 选择、payload 组装与 SDK/legacy 入口分流，不再直接铺开 transport/fallback/read/finalize 细节。
+对应的 prompt option assembly 仍全部委托给 `OpenCodePromptRequestBuilder`；`sendMessage()` 现在只保留 session 选择、payload 组装与 transport callback 注入，不再直接铺开 SDK/legacy 入口分流、transport/fallback/read/finalize 细节。
 
 ### 流式事件处理与取消
 

@@ -2,19 +2,19 @@
 
 > **状态**: [READY]
 > **作用**: 这是 maintainability 无人值守的战略文档。每轮开始前，先读本文件，再读 `docs/status/maintainability-round-roadmap.md` 与最近的 `docs/status/maintainability-phase-XXX.md`。
-> **自动推进状态**: `R108` 已完成 vault-path scope refresh lifecycle seam；当前继续按 `R109-R137` 长队列顺序推进。恢复 autopilot 后只能从首个 `[NEXT]`（`R109`）顺序执行，不允许 freestyle。
+> **自动推进状态**: `R109` 已完成 health / legacy fallback seam；当前继续按 `R110-R137` 长队列顺序推进。恢复 autopilot 后只能从首个 `[NEXT]`（`R110`）顺序执行，不允许 freestyle。
 
 ## 1. 当前判断
 
-**当前分支已完成 `R68-R108` 并把 live lint 稳定在 `0 errors / 65 warnings`；`R108` 已把 vault path scope refresh、tool schema cache invalidation 与 sync/open-code subscription restart 收进现有 `OpenCodeServiceLifecycleCoordinator`。** 接下来的高收益 residual 将按 queue 继续推进 `OpenCodeService` fallback/streaming residual、secondary core / settings / startup，最后做 heavy tests follow-up、warning closeout 与最终 checkpoint。
+**当前分支已完成 `R68-R109` 并把 live lint 稳定在 `0 errors / 65 warnings`；`R109` 已把 SDK health response normalization 与 streaming transport selection/fallback entry 继续收进既有 lifecycle / streaming owners。** 接下来的高收益 residual 将按 queue 继续推进 `OpenCodeService` session runtime residual、secondary core / settings / startup，最后做 heavy tests follow-up、warning closeout 与最终 checkpoint。
 
 ## 2. 当前基线
 
 - **lint**: `0 errors / 65 warnings`
-- **最近验证**: `R108` 已确认 targeted `npm test -- OpenCodeServiceLifecycleCoordinator`、全量 `npm test` 与 `npm run build` 通过，`BUILD_ID` 为 `autopilot-maintainability.202604152352`
+- **最近验证**: `R109` 已确认 targeted `npm test -- OpenCodeServiceLifecycleCoordinator OpenCodeStreamingRuntimeCoordinator OpenCodeService.httpRuntime OpenCodeService.sdkStreamEvents`、全量 `npm test` 与 `npm run build` 通过，`BUILD_ID` 为 `autopilot-maintainability.202604160002`
 - **最近 Test Vault 部署**: `R64`，`BUILD_ID` `autopilot-maintainability.202604150602`
-- **当前 `[NEXT]`**: `R109 - OpenCodeService health / legacy fallback seam`
-- **主热点**: `src/core/opencode/OpenCodeService.ts` 与 `tests/unit/core/opencode/OpenCodeService.httpRuntime.test.ts` 构成 batch 5 的当前入口；继续收束 health retry、legacy HTTP/SSE fallback 入口与 degraded-state follow-up residual，同时保持 SDK-first fallback 判定与现有 HTTP/SSE 语义不变
+- **当前 `[NEXT]`**: `R110 - OpenCodeService session abort/get fallback seam`
+- **主热点**: `src/core/opencode/OpenCodeService.ts` 与 `tests/unit/core/opencode/OpenCodeService.sdkCrudSync.test.ts` 构成 batch 5 的当前入口；继续收束 session get/abort、session-scoped detach、fallback query 与 runtime follow-up residual，同时保持 session-scoped abort/detach 与 get fallback 语义不变
 
 ## 3. 本批执行规则
 

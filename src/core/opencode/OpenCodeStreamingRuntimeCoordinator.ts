@@ -78,6 +78,13 @@ export interface OpenCodeStreamingSdkStreamRequest {
   subscribe: (signal: AbortSignal) => Promise<AsyncIterable<SdkEvent>>;
 }
 
+export interface OpenCodeStreamingRuntimeRequest {
+  sessionId: string;
+  useSdkStream: boolean;
+  sdk: Omit<OpenCodeStreamingSdkStreamRequest, 'sessionId'>;
+  legacy: Omit<OpenCodeStreamingLegacyStreamRequest, 'sessionId'>;
+}
+
 type StreamingState = OpenCodeStreamEventState;
 
 function getDebugTextPreview(text: string, maxLength = 160): string {
@@ -207,6 +214,23 @@ export class OpenCodeStreamingRuntimeCoordinator {
   private readonly activeStreams = new Map<string, OpenCodeStreamingRuntimeContext>();
 
   constructor(private readonly host: OpenCodeStreamingRuntimeCoordinatorHost) {}
+
+  async *streamResponse(
+    request: OpenCodeStreamingRuntimeRequest,
+  ): AsyncGenerator<StreamChunk> {
+    if (request.useSdkStream) {
+      yield* this.streamSdkResponse({
+        sessionId: request.sessionId,
+        ...request.sdk,
+      });
+      return;
+    }
+
+    yield* this.streamLegacyResponse({
+      sessionId: request.sessionId,
+      ...request.legacy,
+    });
+  }
 
   createActiveStreamContext(sessionId: string): OpenCodeStreamingRuntimeContext {
     const existing = this.activeStreams.get(sessionId);

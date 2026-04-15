@@ -166,4 +166,16 @@ describe('OpenCodeServiceLifecycleCoordinator', () => {
     expect(host.serverManager.checkHealth).toHaveBeenCalledWith(3000);
     expect(host.resetTransientConnectivityLogState).toHaveBeenCalledTimes(1);
   });
+
+  it('normalizes structured SDK health responses before skipping the legacy probe', async () => {
+    const host = createHost({
+      checkSdkHealth: jest.fn().mockResolvedValue({ healthy: true }),
+    });
+    const coordinator = new OpenCodeServiceLifecycleCoordinator(host);
+
+    await expect(coordinator.checkHealth()).resolves.toBe(true);
+
+    expect(host.serverManager.checkHealth).not.toHaveBeenCalled();
+    expect(host.resetTransientConnectivityLogState).toHaveBeenCalledTimes(1);
+  });
 });

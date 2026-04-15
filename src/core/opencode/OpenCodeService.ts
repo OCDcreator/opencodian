@@ -434,10 +434,7 @@ export class OpenCodeService {
       getBaseUrl: () => this.baseUrl,
       getToolCatalogScopeKey: () => this.catalogQueries.getToolCatalogScopeKey(),
       shouldUseSdkCrud: () => this.shouldUseSdk('sdkCrud'),
-      checkSdkHealth: async () => {
-        const response = await this.getSdkClient().global.health();
-        return this.normalizeHealthResponse(response);
-      },
+      checkSdkHealth: async () => this.getSdkClient().global.health(),
       logHealthProbeFallback: (error) =>
         this.logServiceWarning('health', 'SDK health check failed, falling back to ServerManager health probe', error),
       resetTransientConnectivityLogState: () => this.resetTransientConnectivityLogState(),
@@ -868,29 +865,31 @@ export class OpenCodeService {
     }
 
     const parts = this.contextPartSerializer.buildPromptRequestParts(message, options);
+    let sdkClient: SdkOpencodeClient | null = null;
+    const getStreamingSdkClient = (): SdkOpencodeClient => {
+      sdkClient ??= this.getSdkClient();
+      return sdkClient;
+    };
 
-    if (this.shouldUseSdk('sdkStream')) {
-      const client = this.getSdkClient();
-      yield* this.streamingRuntime.streamSdkResponse({
-        sessionId,
+    yield* this.streamingRuntime.streamResponse({
+      sessionId,
+      useSdkStream: this.shouldUseSdk('sdkStream'),
+      sdk: {
         startPrompt: async () => {
-          await client.session.promptAsync(
+          await getStreamingSdkClient().session.promptAsync(
             this.promptRequestBuilder.buildSdkPromptParameters(sessionId, parts, options),
           );
         },
         subscribe: async (signal) => {
-          const subscription = await client.event.subscribe(undefined, { signal });
+          const subscription = await getStreamingSdkClient().event.subscribe(undefined, { signal });
           return subscription.stream as AsyncIterable<SdkEvent>;
         },
-      });
-      return;
-    }
-
-    const requestBody = this.promptRequestBuilder.buildLegacyStreamRequestBody(parts, options);
-    yield* this.streamingRuntime.streamLegacyResponse({
-      sessionId,
-      startPrompt: async () => {
-        await this.post<void>(`/session/${sessionId}/prompt_async`, requestBody);
+      },
+      legacy: {
+        startPrompt: async () => {
+          const requestBody = this.promptRequestBuilder.buildLegacyStreamRequestBody(parts, options);
+          await this.post<void>(`/session/${sessionId}/prompt_async`, requestBody);
+        },
       },
     });
   }
@@ -935,18 +934,6 @@ export class OpenCodeService {
         this.catalogQueries.observeRuntimeToolNames([toolName]);
       }
     }
-  }
-
-  private normalizeHealthResponse(response: unknown): boolean {
-    if (typeof response === 'boolean') {
-      return response;
-    }
-
-    if (response && typeof response === 'object' && 'healthy' in response) {
-      return Boolean((response as { healthy?: unknown }).healthy);
-    }
-
-    return false;
   }
 
   private normalizeSessionId(response: unknown): string {

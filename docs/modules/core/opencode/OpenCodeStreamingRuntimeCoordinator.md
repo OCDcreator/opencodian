@@ -8,6 +8,7 @@
 `OpenCodeStreamingRuntimeCoordinator` 是 `OpenCodeService` 的 streaming transport owner。它现在把这整段 runtime seam 收束到一个 session-scoped coordinator 里：
 
 - active stream registry 与 `AbortController` 生命周期
+- 单一 streaming 入口下的 SDK/legacy transport 选择
 - SDK stream 订阅与“首事件前失败 → legacy SSE”降级策略
 - legacy `/event` SSE reader / parser / abort-detach 生命周期
 - `session.idle` / `session.error` 停止判定后的 final assistant message completion
@@ -35,6 +36,7 @@
 
 - `OpenCodeStreamingRuntimeCoordinatorHost`: host seam，提供服务端 abort、legacy SSE 请求参数、session messages 读取、warning log，以及共享的 `streamEventTransformer`。
 - `OpenCodeStreamingRuntimeContext`: 单条活动流的 session-scoped runtime context，封装 `AbortController.signal` 与 part type map。
+- `OpenCodeStreamingRuntimeRequest`: 单一 transport 入口；调用方传入 `useSdkStream`、SDK callbacks 与 legacy callbacks，coordinator 负责选择实际 transport。
 - `OpenCodeStreamingLegacyStreamRequest`: legacy transport 入口；调用方可传入 `startPrompt()`，coordinator 随后接手 `/event` 读取。
 - `OpenCodeStreamingSdkStreamRequest`: SDK transport 入口；调用方传入 `startPrompt()` 与 `subscribe(signal)`，coordinator 负责 SDK stream 读取与必要时的 legacy fallback。
 - `activeStreams`: `Map<string, OpenCodeStreamingRuntimeContext>`，以 `sessionId` 为键保存当前活动流。
@@ -49,6 +51,7 @@
 
 ### SDK / legacy transport seam
 
+- `streamResponse()` 先根据 `useSdkStream` 选择 SDK 或 legacy transport，把 `OpenCodeService` 的入口分流收束到同一个 runtime seam。
 - `streamSdkResponse()` 先执行 `startPrompt()`，再用传入的 `subscribe(signal)` 建立 SDK event stream。
 - 如果 SDK iterator 在第一条事件前抛错，coordinator 会通过 host 的 legacy SSE 请求参数立即切到 `/event`，保持既有 SDK-first / legacy fallback 策略。
 - 一旦已经收到首个 SDK event，后续异常不会再切回 legacy，而是直接产出 `error` chunk。
@@ -95,7 +98,7 @@ graph LR
 
 ## 与其他模块的交互
 
-- `OpenCodeService` 现在只负责 prompt payload / request-body 组装、session 默认值解析，以及 SDK/legacy 入口分流；完整 transport/fallback/read/finalize 细节都委托给 coordinator。
+- `OpenCodeService` 现在只负责 prompt payload / request-body 组装、session 默认值解析，以及 transport callback 注入；SDK/legacy 入口分流、完整 transport/fallback/read/finalize 细节都委托给 coordinator。
 - `OpenCodeStreamEventTransformer` 继续负责 `session.error` / `session.idle` 的 stop 判断、tool/question/file/permission 事件映射，以及 SSE event parsing。
 - `OpenCodeSessionLifecycleCoordinator` 的 `getSessionMessages()` 通过 host seam 被用于 finalize 阶段补拉 assistant message。
 - `abortSessionOnServer()` 仍留在 `OpenCodeService`，因此 SDK `session.abort()` 失败后回退 legacy HTTP 的语义不变。

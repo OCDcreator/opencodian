@@ -160,6 +160,66 @@ describe('OpenCodeStreamingRuntimeCoordinator', () => {
     expect(host.abortSessionOnServer).not.toHaveBeenCalled();
   });
 
+  it('selects SDK or legacy transport from one runtime entrypoint', async () => {
+    const host = createHost();
+    const coordinator = new OpenCodeStreamingRuntimeCoordinator(host);
+    const sdkStart = jest.fn().mockResolvedValue(undefined);
+    const sdkSubscribe = jest.fn().mockResolvedValue((async function* () {
+      yield {
+        type: 'session.idle',
+        properties: { sessionID: 'sdk-route' },
+      } as never;
+    })());
+    const legacyStart = jest.fn().mockResolvedValue(undefined);
+
+    const sdkChunks: unknown[] = [];
+    for await (const chunk of coordinator.streamResponse({
+      sessionId: 'sdk-route',
+      useSdkStream: true,
+      sdk: {
+        startPrompt: sdkStart,
+        subscribe: sdkSubscribe,
+      },
+      legacy: {
+        startPrompt: legacyStart,
+      },
+    })) {
+      sdkChunks.push(chunk);
+    }
+
+    expect(sdkStart).toHaveBeenCalledTimes(1);
+    expect(sdkSubscribe).toHaveBeenCalledTimes(1);
+    expect(legacyStart).not.toHaveBeenCalled();
+    expect(sdkChunks[0]).toEqual({ type: 'message_start' });
+    expect(sdkChunks[sdkChunks.length - 1]).toEqual({ type: 'message_stop' });
+
+    global.fetch = createSseFetchMock([
+      '{"type":"session.idle","properties":{"sessionID":"legacy-route"}}',
+    ]) as typeof global.fetch;
+
+    const nextLegacyStart = jest.fn().mockResolvedValue(undefined);
+    const legacyChunks: unknown[] = [];
+    for await (const chunk of coordinator.streamResponse({
+      sessionId: 'legacy-route',
+      useSdkStream: false,
+      sdk: {
+        startPrompt: sdkStart,
+        subscribe: sdkSubscribe,
+      },
+      legacy: {
+        startPrompt: nextLegacyStart,
+      },
+    })) {
+      legacyChunks.push(chunk);
+    }
+
+    expect(nextLegacyStart).toHaveBeenCalledTimes(1);
+    expect(sdkStart).toHaveBeenCalledTimes(1);
+    expect(sdkSubscribe).toHaveBeenCalledTimes(1);
+    expect(legacyChunks[0]).toEqual({ type: 'message_start' });
+    expect(legacyChunks[legacyChunks.length - 1]).toEqual({ type: 'message_stop' });
+  });
+
   it('falls back to legacy SSE when the SDK iterator fails before the first event', async () => {
     const host = createHost();
     const coordinator = new OpenCodeStreamingRuntimeCoordinator(host);
