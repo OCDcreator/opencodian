@@ -1,26 +1,24 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [READY] `R98-R137` 长队列继续推进；当前 `[NEXT]` 为 `R98 - ContextUsageService usage-breakdown seam`。
+> **当前状态**: [READY] `R99-R137` 长队列继续推进；当前 `[NEXT]` 为 `R99 - ComposerContext coordinator/view runtime seam`。
 
 ## 当前优先级
 
-- **当前 `[NEXT]`**：`R98 - ContextUsageService usage-breakdown seam`
+- **当前 `[NEXT]`**：`R99 - ComposerContext coordinator/view runtime seam`
 - **本批目标**：继续 residual chat services runtime，再转 opencode core、secondary core / settings / startup，最后做 heavy tests follow-up、warning closeout 与最终 checkpoint
 - **当前 lint 基线**：`0 errors / 65 warnings`
 - **热点顺序**：
-  1. `src/features/chat/services/ContextUsageService.ts`
-  2. `tests/unit/features/chat/ContextUsageService.test.ts`
-  3. `src/features/chat/services/ComposerContextCoordinator.ts`
-  4. `src/features/chat/services/ComposerContextRuntimeStore.ts`
-  5. `src/features/chat/services/BackgroundConversationPostSyncHandoffCoordinator.ts`
-  6. `src/features/chat/services/BackgroundConversationPostSyncHandoffHostAdapter.ts`
-  7. `src/features/chat/runtime/BackgroundTaskStreamTriggerCoordinator.ts`
-  8. `src/features/chat/services/QuestionTodoBackgroundTaskRuntimeServiceBundle.ts`
-  9. `src/core/opencode/OpenCodeService.ts`
-  10. `src/core/opencode/OpenCodeStreamEventTransformer.ts`
-  11. `src/core/storage/StorageService.ts`
-  12. `src/main.ts`
+  1. `src/features/chat/services/ComposerContextCoordinator.ts`
+  2. `src/features/chat/services/ComposerContextRuntimeStore.ts`
+  3. `src/features/chat/services/BackgroundConversationPostSyncHandoffCoordinator.ts`
+  4. `src/features/chat/services/BackgroundConversationPostSyncHandoffHostAdapter.ts`
+  5. `src/features/chat/runtime/BackgroundTaskStreamTriggerCoordinator.ts`
+  6. `src/features/chat/services/QuestionTodoBackgroundTaskRuntimeServiceBundle.ts`
+  7. `src/core/opencode/OpenCodeService.ts`
+  8. `src/core/opencode/OpenCodeStreamEventTransformer.ts`
+  9. `src/core/storage/StorageService.ts`
+  10. `src/main.ts`
 
 ## 本批边界
 
@@ -42,5 +40,5 @@
 ## 历史入口
 
 - 批次归档：`docs/status/maintainability-completed-batches.md`
-- 最近成功 phase：`docs/status/maintainability-phase-432.md`
+- 最近成功 phase：`docs/status/maintainability-phase-433.md`
 - 最近 checkpoint：`docs/status/maintainability-phase-432.md`

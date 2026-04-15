@@ -7,25 +7,10 @@ import type {
   ModelSelectorKnownModelInfo,
   ModelSelectorSelection,
 } from '../ui/modelSelector/types';
-import { ContextUsageService } from './ContextUsageService';
-
-interface ActiveTabContextUsageSnapshot {
-  sessionId: string;
-  sessionTitle: string;
-  createdAt: number;
-  updatedAt: number;
-  providerId: string | null;
-  providerName: string | null;
-  modelId: string | null;
-  modelName: string | null;
-  contextWindow: number;
-  inputTokens: number;
-  outputTokens: number;
-  reasoningTokens: number;
-  cacheReadTokens: number;
-  cacheWriteTokens: number;
-  totalCost: number;
-}
+import {
+  ContextUsageService,
+  type ContextUsageSnapshot,
+} from './ContextUsageService';
 
 interface ActiveTabContextUsageConversation {
   id: string;
@@ -44,7 +29,7 @@ export interface ActiveTabContextUsageCoordinatorHost {
   getActiveTabContextUsage(): TabContextState | null;
   setActiveTabContextUsage(contextUsage: TabContextState): void;
   renderContextUsageIndicator(state: TabContextState | null): void;
-  getSessionContextUsageSnapshot(sessionId: string): Promise<ActiveTabContextUsageSnapshot | null>;
+  getSessionContextUsageSnapshot(sessionId: string): Promise<ContextUsageSnapshot | null>;
 }
 
 export class ActiveTabContextUsageCoordinator {
@@ -107,33 +92,7 @@ export class ActiveTabContextUsageCoordinator {
       return;
     }
 
-    const nextState = ContextUsageService.syncStateIdentity(
-      this.getCurrentState(),
-      {
-        provider: snapshot.providerId,
-        providerName: snapshot.providerName,
-        model: snapshot.modelId,
-        modelName: snapshot.modelName,
-        contextWindow: snapshot.contextWindow,
-      },
-      {
-        sessionId: snapshot.sessionId,
-        sessionTitle: snapshot.sessionTitle,
-        createdAt: snapshot.createdAt,
-        updatedAt: snapshot.updatedAt,
-      },
-    );
-
-    this.commitState(
-      ContextUsageService.applyPreciseUsage(nextState, {
-        input: snapshot.inputTokens,
-        output: snapshot.outputTokens,
-        reasoning: snapshot.reasoningTokens,
-        cacheRead: snapshot.cacheReadTokens,
-        cacheWrite: snapshot.cacheWriteTokens,
-        totalCost: snapshot.totalCost,
-      }),
-    );
+    this.commitState(ContextUsageService.applyUsageSnapshot(this.getCurrentState(), snapshot));
   }
 
   private getCurrentState(): TabContextState {

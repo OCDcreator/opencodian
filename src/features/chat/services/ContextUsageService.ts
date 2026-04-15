@@ -1,5 +1,6 @@
 import {
   type ChatMessage,
+  type ContextBreakdownKey,
   type ContextBreakdownSegment,
   createEmptyTabContextState,
   getDefaultContextWindow,
@@ -23,6 +24,24 @@ interface ContextSessionInfo {
   updatedAt?: number | null;
 }
 
+export interface ContextUsageSnapshot {
+  sessionId: string;
+  sessionTitle: string;
+  createdAt: number;
+  updatedAt: number;
+  providerId: string | null;
+  providerName: string | null;
+  modelId: string | null;
+  modelName: string | null;
+  contextWindow: number;
+  inputTokens: number;
+  outputTokens: number;
+  reasoningTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  totalCost: number;
+}
+
 export interface ContextUsageSummary {
   totalTokens: number;
   percentage: number;
@@ -32,6 +51,19 @@ export interface ContextUsageSummary {
   contextWindow: number;
   tooltip: string;
 }
+
+interface ContextDisplayTokenBreakdown {
+  input: number;
+  output: number;
+  reasoning: number;
+  cacheRead: number;
+  cacheWrite: number;
+  total: number;
+}
+
+type ContextBreakdownCharCounts = Record<Exclude<ContextBreakdownKey, 'other'>, number>;
+type ContextBreakdownTokenMap = Record<ContextBreakdownKey, number>;
+type TimestampRefreshMode = 'preserve' | 'now' | 'if-missing';
 
 export class ContextUsageService {
   static createState(
@@ -46,7 +78,7 @@ export class ContextUsageService {
     modelInfo?: ContextModelInfo,
     sessionInfo?: ContextSessionInfo,
   ): TabContextState {
-    const next = state ? { ...state } : createEmptyTabContextState();
+    const next = this.cloneState(state);
     const modelId = modelInfo?.model ?? next.model;
 
     next.provider = modelInfo?.provider ?? next.provider;
@@ -58,16 +90,11 @@ export class ContextUsageService {
     next.sessionTitle = sessionInfo?.sessionTitle ?? next.sessionTitle;
     next.createdAt = sessionInfo?.createdAt ?? next.createdAt;
     next.updatedAt = sessionInfo?.updatedAt ?? next.updatedAt;
-    next.percentage = this.calculatePercentage(
-      this.getTotalTokens(next),
-      next.contextWindow,
-    );
-
-    return next;
+    return this.finalizeState(next);
   }
 
   static beginStream(state: TabContextState | null | undefined): TabContextState {
-    const next = state ? { ...state } : createEmptyTabContextState();
+    const next = this.cloneState(state);
     next.streamInputTokens = 0;
     next.streamOutputTokens = 0;
     return next;
@@ -81,7 +108,7 @@ export class ContextUsageService {
     state: TabContextState | null | undefined,
     chunk: Extract<StreamChunk, { type: 'usage' }>,
   ): TabContextState {
-    const next = state ? { ...state } : createEmptyTabContextState();
+    const next = this.cloneState(state);
     const inputTokens = Math.max(0, chunk.inputTokens);
     const outputTokens = Math.max(0, chunk.outputTokens);
     const inputDelta = Math.max(0, inputTokens - next.streamInputTokens);
@@ -92,13 +119,7 @@ export class ContextUsageService {
     next.streamInputTokens = Math.max(next.streamInputTokens, inputTokens);
     next.streamOutputTokens = Math.max(next.streamOutputTokens, outputTokens);
     next.sessionId = chunk.sessionId ?? next.sessionId;
-    next.updatedAt = Date.now();
-    next.percentage = this.calculatePercentage(
-      this.getTotalTokens(next),
-      next.contextWindow,
-    );
-
-    return next;
+    return this.finalizeState(next, 'now');
   }
 
   static applyPreciseUsage(
@@ -112,22 +133,44 @@ export class ContextUsageService {
       totalCost?: number | null;
     },
   ): TabContextState {
-    const next = state ? { ...state } : createEmptyTabContextState();
-    const computedTotal = Math.max(0, usage.input + usage.output + usage.reasoning + usage.cacheRead + usage.cacheWrite);
-    next.preciseTokens = {
-      total: computedTotal,
-      input: Math.max(0, usage.input),
-      output: Math.max(0, usage.output),
-      reasoning: Math.max(0, usage.reasoning),
-      cacheRead: Math.max(0, usage.cacheRead),
-      cacheWrite: Math.max(0, usage.cacheWrite),
-    };
+    const next = this.cloneState(state);
+    next.preciseTokens = this.buildPreciseTokens(usage);
     next.estimatedInputTokens = next.preciseTokens.input + next.preciseTokens.cacheRead + next.preciseTokens.cacheWrite;
     next.estimatedOutputTokens = next.preciseTokens.output + next.preciseTokens.reasoning;
     next.totalCost = typeof usage.totalCost === 'number' ? usage.totalCost : next.totalCost;
-    next.updatedAt = next.updatedAt ?? Date.now();
-    next.percentage = this.calculatePercentage(this.getTotalTokens(next), next.contextWindow);
-    return next;
+    return this.finalizeState(next, 'if-missing');
+  }
+
+  static applyUsageSnapshot(
+    state: TabContextState | null | undefined,
+    snapshot: ContextUsageSnapshot,
+  ): TabContextState {
+    return this.applyPreciseUsage(
+      this.syncStateIdentity(
+        state,
+        {
+          provider: snapshot.providerId,
+          providerName: snapshot.providerName,
+          model: snapshot.modelId,
+          modelName: snapshot.modelName,
+          contextWindow: snapshot.contextWindow,
+        },
+        {
+          sessionId: snapshot.sessionId,
+          sessionTitle: snapshot.sessionTitle,
+          createdAt: snapshot.createdAt,
+          updatedAt: snapshot.updatedAt,
+        },
+      ),
+      {
+        input: snapshot.inputTokens,
+        output: snapshot.outputTokens,
+        reasoning: snapshot.reasoningTokens,
+        cacheRead: snapshot.cacheReadTokens,
+        cacheWrite: snapshot.cacheWriteTokens,
+        totalCost: snapshot.totalCost,
+      },
+    );
   }
 
   static summarize(state: TabContextState | null | undefined): ContextUsageSummary {
@@ -143,8 +186,9 @@ export class ContextUsageService {
       };
     }
 
-    const totalTokens = this.getTotalTokens(state);
-    const percentage = this.calculatePercentage(totalTokens, state.contextWindow);
+    const display = this.getDisplaySnapshot(state);
+    const totalTokens = display.totalTokens;
+    const percentage = display.percentage;
     const tone = percentage >= 85
       ? 'danger'
       : percentage >= 60
@@ -200,28 +244,7 @@ export class ContextUsageService {
     cacheWrite: number;
     total: number;
   } {
-    const precise = state?.preciseTokens;
-    if (precise) {
-      return {
-        input: precise.input,
-        output: precise.output,
-        reasoning: precise.reasoning,
-        cacheRead: precise.cacheRead,
-        cacheWrite: precise.cacheWrite,
-        total: precise.total,
-      };
-    }
-
-    const input = state?.estimatedInputTokens ?? 0;
-    const output = state?.estimatedOutputTokens ?? 0;
-    return {
-      input,
-      output,
-      reasoning: 0,
-      cacheRead: 0,
-      cacheWrite: 0,
-      total: input + output,
-    };
+    return this.getDisplaySnapshot(state).tokens;
   }
 
   static getContextBreakdown(
@@ -229,67 +252,18 @@ export class ContextUsageService {
     messages: ChatMessage[],
     systemPrompt?: string | null,
   ): ContextBreakdownSegment[] {
-    const inputTokens = this.getDisplayTokenBreakdown(state).input;
+    const inputTokens = this.getDisplaySnapshot(state).tokens.input;
     if (inputTokens <= 0) {
       return [];
     }
 
-    const systemChars = systemPrompt?.trim().length ?? 0;
-    const counts = messages.reduce(
-      (acc, message) => {
-        if (message.role === 'user') {
-          acc.user += this.getUserCharsFromMessage(message);
-          return acc;
-        }
-
-        if (message.role === 'assistant') {
-          const { assistant, tool } = this.getAssistantCharsFromMessage(message);
-          acc.assistant += assistant;
-          acc.tool += tool;
-        }
-
-        return acc;
-      },
-      {
-        system: systemChars,
-        user: 0,
-        assistant: 0,
-        tool: 0,
-      },
-    );
-
-    const estimated = {
-      system: this.estimateTokens(counts.system),
-      user: this.estimateTokens(counts.user),
-      assistant: this.estimateTokens(counts.assistant),
-      tool: this.estimateTokens(counts.tool),
-    };
-    const estimatedTotal = estimated.system + estimated.user + estimated.assistant + estimated.tool;
-
-    if (estimatedTotal <= inputTokens) {
-      return this.buildBreakdownSegments(
-        {
-          ...estimated,
-          other: inputTokens - estimatedTotal,
-        },
-        inputTokens,
-      );
-    }
-
-    const scale = inputTokens / estimatedTotal;
-    const scaled = {
-      system: Math.floor(estimated.system * scale),
-      user: Math.floor(estimated.user * scale),
-      assistant: Math.floor(estimated.assistant * scale),
-      tool: Math.floor(estimated.tool * scale),
-    };
-    const scaledTotal = scaled.system + scaled.user + scaled.assistant + scaled.tool;
-
     return this.buildBreakdownSegments(
-      {
-        ...scaled,
-        other: Math.max(0, inputTokens - scaledTotal),
-      },
+      this.fitBreakdownTokens(
+        this.estimateBreakdownTokens(
+          this.collectBreakdownChars(messages, systemPrompt),
+        ),
+        inputTokens,
+      ),
       inputTokens,
     );
   }
@@ -332,12 +306,156 @@ export class ContextUsageService {
     return Math.max(0, state.estimatedInputTokens + state.estimatedOutputTokens);
   }
 
+  private static cloneState(state: TabContextState | null | undefined): TabContextState {
+    return state ? { ...state } : createEmptyTabContextState();
+  }
+
+  private static finalizeState(
+    state: TabContextState,
+    timestampRefreshMode: TimestampRefreshMode = 'preserve',
+  ): TabContextState {
+    if (timestampRefreshMode === 'now') {
+      state.updatedAt = Date.now();
+    } else if (timestampRefreshMode === 'if-missing') {
+      state.updatedAt = state.updatedAt ?? Date.now();
+    }
+
+    state.percentage = this.calculatePercentage(this.getTotalTokens(state), state.contextWindow);
+    return state;
+  }
+
+  private static buildPreciseTokens(usage: {
+    input: number;
+    output: number;
+    reasoning: number;
+    cacheRead: number;
+    cacheWrite: number;
+  }): NonNullable<TabContextState['preciseTokens']> {
+    const input = Math.max(0, usage.input);
+    const output = Math.max(0, usage.output);
+    const reasoning = Math.max(0, usage.reasoning);
+    const cacheRead = Math.max(0, usage.cacheRead);
+    const cacheWrite = Math.max(0, usage.cacheWrite);
+
+    return {
+      total: input + output + reasoning + cacheRead + cacheWrite,
+      input,
+      output,
+      reasoning,
+      cacheRead,
+      cacheWrite,
+    };
+  }
+
+  private static getDisplaySnapshot(
+    state: TabContextState | null | undefined,
+  ): { tokens: ContextDisplayTokenBreakdown; totalTokens: number; percentage: number } {
+    const tokens = this.buildDisplayTokenBreakdown(state);
+    return {
+      tokens,
+      totalTokens: tokens.total,
+      percentage: this.calculatePercentage(tokens.total, state?.contextWindow ?? 0),
+    };
+  }
+
+  private static buildDisplayTokenBreakdown(
+    state: TabContextState | null | undefined,
+  ): ContextDisplayTokenBreakdown {
+    const precise = state?.preciseTokens;
+    if (precise) {
+      return {
+        input: precise.input,
+        output: precise.output,
+        reasoning: precise.reasoning,
+        cacheRead: precise.cacheRead,
+        cacheWrite: precise.cacheWrite,
+        total: precise.total,
+      };
+    }
+
+    const input = state?.estimatedInputTokens ?? 0;
+    const output = state?.estimatedOutputTokens ?? 0;
+    return {
+      input,
+      output,
+      reasoning: 0,
+      cacheRead: 0,
+      cacheWrite: 0,
+      total: input + output,
+    };
+  }
+
   private static estimateTokens(chars: number): number {
     return chars > 0 ? Math.ceil(chars / 4) : 0;
   }
 
+  private static collectBreakdownChars(
+    messages: ChatMessage[],
+    systemPrompt?: string | null,
+  ): ContextBreakdownCharCounts {
+    return messages.reduce<ContextBreakdownCharCounts>(
+      (acc, message) => {
+        if (message.role === 'user') {
+          acc.user += this.getUserCharsFromMessage(message);
+          return acc;
+        }
+
+        if (message.role === 'assistant') {
+          const { assistant, tool } = this.getAssistantCharsFromMessage(message);
+          acc.assistant += assistant;
+          acc.tool += tool;
+        }
+
+        return acc;
+      },
+      {
+        system: systemPrompt?.trim().length ?? 0,
+        user: 0,
+        assistant: 0,
+        tool: 0,
+      },
+    );
+  }
+
+  private static estimateBreakdownTokens(
+    counts: ContextBreakdownCharCounts,
+  ): Omit<ContextBreakdownTokenMap, 'other'> {
+    return {
+      system: this.estimateTokens(counts.system),
+      user: this.estimateTokens(counts.user),
+      assistant: this.estimateTokens(counts.assistant),
+      tool: this.estimateTokens(counts.tool),
+    };
+  }
+
+  private static fitBreakdownTokens(
+    estimated: Omit<ContextBreakdownTokenMap, 'other'>,
+    inputTokens: number,
+  ): ContextBreakdownTokenMap {
+    const estimatedTotal = estimated.system + estimated.user + estimated.assistant + estimated.tool;
+    if (estimatedTotal <= inputTokens) {
+      return {
+        ...estimated,
+        other: inputTokens - estimatedTotal,
+      };
+    }
+
+    const scale = inputTokens / estimatedTotal;
+    const scaled = {
+      system: Math.floor(estimated.system * scale),
+      user: Math.floor(estimated.user * scale),
+      assistant: Math.floor(estimated.assistant * scale),
+      tool: Math.floor(estimated.tool * scale),
+    };
+
+    return {
+      ...scaled,
+      other: Math.max(0, inputTokens - scaled.system - scaled.user - scaled.assistant - scaled.tool),
+    };
+  }
+
   private static buildBreakdownSegments(
-    tokens: Record<'system' | 'user' | 'assistant' | 'tool' | 'other', number>,
+    tokens: ContextBreakdownTokenMap,
     inputTokens: number,
   ): ContextBreakdownSegment[] {
     return ([

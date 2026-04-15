@@ -68,6 +68,51 @@ describe('ContextUsageService', () => {
     expect(summary.tooltip).toContain('Total tokens: 400');
   });
 
+  it('applies refreshed usage snapshots without losing identity or precise totals', () => {
+    const state = ContextUsageService.applyUsageSnapshot(
+      createEmptyTabContextState(),
+      {
+        sessionId: 'session-1',
+        sessionTitle: 'Planning',
+        createdAt: 1000,
+        updatedAt: 2000,
+        providerId: 'openai',
+        providerName: 'OpenAI',
+        modelId: 'gpt-5',
+        modelName: 'GPT-5',
+        contextWindow: 1000,
+        inputTokens: 200,
+        outputTokens: 100,
+        reasoningTokens: 50,
+        cacheReadTokens: 25,
+        cacheWriteTokens: 25,
+        totalCost: 1.25,
+      },
+    );
+
+    expect(state).toMatchObject({
+      sessionId: 'session-1',
+      sessionTitle: 'Planning',
+      createdAt: 1000,
+      updatedAt: 2000,
+      provider: 'openai',
+      providerName: 'OpenAI',
+      model: 'gpt-5',
+      modelName: 'GPT-5',
+      contextWindow: 1000,
+      preciseTokens: {
+        total: 400,
+        input: 200,
+        output: 100,
+        reasoning: 50,
+        cacheRead: 25,
+        cacheWrite: 25,
+      },
+      totalCost: 1.25,
+      percentage: 40,
+    });
+  });
+
   it('estimates context breakdown from messages and system prompt', () => {
     const state = ContextUsageService.applyPreciseUsage(
       ContextUsageService.syncStateIdentity(

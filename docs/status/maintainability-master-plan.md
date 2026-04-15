@@ -2,19 +2,19 @@
 
 > **状态**: [READY]
 > **作用**: 这是 maintainability 无人值守的战略文档。每轮开始前，先读本文件，再读 `docs/status/maintainability-round-roadmap.md` 与最近的 `docs/status/maintainability-phase-XXX.md`。
-> **自动推进状态**: `R97` checkpoint 已完成；当前已人工续排 `R98-R137` 长队列。恢复 autopilot 后只能从首个 `[NEXT]`（`R98`）顺序执行，不允许 freestyle。
+> **自动推进状态**: `R97` checkpoint 已完成；当前已人工续排 `R99-R137` 长队列。恢复 autopilot 后只能从首个 `[NEXT]`（`R99`）顺序执行，不允许 freestyle。
 
 ## 1. 当前判断
 
-**当前分支已完成 `R68-R97` 并把 live lint 稳定在 `0 errors / 65 warnings`；现在已完成 chat render/sync checkpoint，准备进入 `R98` 的 `ContextUsageService` usage-breakdown seam。** 新批次不重复已完成 seam，而是继续围绕最新 checkpoint 仍然高收益的 residual seams：先吃 chat services 残余，再吃 `OpenCodeService`/streaming residual，再转 secondary core / settings / startup，最后做 heavy tests follow-up、warning closeout 与最终 checkpoint。
+**当前分支已完成 `R68-R98` 并把 live lint 稳定在 `0 errors / 65 warnings`；现在已完成 `ContextUsageService` usage-breakdown seam，准备进入 `R99` 的 `ComposerContext` coordinator/view runtime seam。** 新批次不重复已完成 seam，而是继续围绕最新 checkpoint 仍然高收益的 residual seams：先吃 chat services 残余，再吃 `OpenCodeService`/streaming residual，再转 secondary core / settings / startup，最后做 heavy tests follow-up、warning closeout 与最终 checkpoint。
 
 ## 2. 当前基线
 
 - **lint**: `0 errors / 65 warnings`
-- **最近验证**: `R97` 已确认全量 `npm test` 与 `npm run build` 通过，`BUILD_ID` 为 `autopilot-maintainability.202604152121`
+- **最近验证**: `R98` 已确认 targeted `npm test -- --runTestsByPath tests/unit/features/chat/ContextUsageService.test.ts tests/unit/features/chat/ActiveTabContextUsageCoordinator.test.ts`、全量 `npm test` 与 `npm run build` 通过，`BUILD_ID` 为 `autopilot-maintainability.202604152131`
 - **最近 Test Vault 部署**: `R64`，`BUILD_ID` `autopilot-maintainability.202604150602`
-- **当前 `[NEXT]`**: `R98 - ContextUsageService usage-breakdown seam`
-- **主热点**: `src/features/chat/services/ContextUsageService.ts` 进入当前首要 seam，`src/features/chat/**` 仍是最大生产热点，`src/core/opencode/**` 仍是第二梯队热点
+- **当前 `[NEXT]`**: `R99 - ComposerContext coordinator/view runtime seam`
+- **主热点**: `src/features/chat/services/ComposerContextCoordinator.ts` 与 `src/features/chat/services/ComposerContextRuntimeStore.ts` 进入当前首要 seam，`src/features/chat/**` 仍是最大生产热点，`src/core/opencode/**` 仍是第二梯队热点
 
 ## 3. 本批执行规则
 
