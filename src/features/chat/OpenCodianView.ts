@@ -761,6 +761,12 @@ export class OpenCodianView extends ItemView {
       getInputPanelGlassRefractionSvgFilterSettings: () =>
         this.plugin.settings.inputPanelGlassRefractionSvgFilter,
       getLiquidGlassAdapterSettings: (adapterId) => this.plugin.settings.inputPanelLiquidGlass[adapterId],
+      scheduleChatSurfaceColorSync: () => {
+        this.scheduleChatSurfaceColorSync();
+      },
+      scheduleComposerLayoutSync: () => {
+        this.scheduleComposerLayoutSync();
+      },
       isDebugLoggingEnabled: () => this.plugin.settings.enableDebugLogging,
       resolveAssetUrl: (relativePath) => this.resolvePluginAssetUrl(relativePath),
       getLogPreview: (text, maxLength) => this.getLogPreview(text, maxLength),
@@ -2806,10 +2812,7 @@ export class OpenCodianView extends ItemView {
       this.chatAppearanceStyleEl = null;
     }
 
-    this.applyInputActionButtonStyleState();
-    this.applyInputPanelThemeState();
-    this.scheduleChatSurfaceColorSync();
-    this.scheduleComposerLayoutSync();
+    this.inputPanelAppearanceCoordinator.syncAppearanceState();
   }
 
   private async applyThemeBackgroundImage(requestId: number): Promise<void> {

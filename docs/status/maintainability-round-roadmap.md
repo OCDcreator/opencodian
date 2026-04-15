@@ -532,7 +532,7 @@
   - selection coordinator 的直接状态分支明显减少
   - focused validation、全量 `npm test`、`npm run build` 通过
 
-### [NEXT] R74 - InputPanelAppearanceCoordinator theme/runtime seam
+### [DONE] R74 - InputPanelAppearanceCoordinator theme/runtime seam
 
 - **Lane**: Maintainability / chat input appearance
 - **目标**: 从 `src/features/chat/services/InputPanelAppearanceCoordinator.ts` 收束 input panel theme selection、appearance sync、layout refresh 与 sticky UI follow-up 的完整 runtime seam。
@@ -549,7 +549,7 @@
   - input panel appearance coordinator 的直接状态分支明显减少
   - focused validation、全量 `npm test`、`npm run build` 通过
 
-### [QUEUED] R75 - SessionTodoStateService stale notice seam
+### [NEXT] R75 - SessionTodoStateService stale notice seam
 
 - **Lane**: Maintainability / session todo runtime
 - **目标**: 从 `src/features/chat/services/SessionTodoStateService.ts` 收束 todo normalization、stale-age/suppression、persisted stale restore 与 stale-notice append lifecycle。
