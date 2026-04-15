@@ -16,9 +16,9 @@
 ## 当前背景
 
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
-- 最近成功 phase：`docs/status/maintainability-phase-420.md`
-- 当前 live lint 基线：`0 errors / 66 warnings`
-- 当前路线判断：上一批已在 `R67` checkpoint 收口；当前新 batch 直接转向 chat runtime / services 与 opencode core，并把 heavy tests / warning cleanup 明确写成 `R81-R86`。
+- 最近成功 phase：`docs/status/maintainability-phase-421.md`
+- 当前 live lint 基线：`0 errors / 64 warnings`
+- 当前路线判断：`R86` 已完成 secondary residual warning cleanup；下一轮进入 `R87` checkpoint，复盘 `R68-R86` 收益与下一批建议。
 
 ## Queue
 
@@ -745,7 +745,7 @@
   - `npm run lint` 维持 `0 errors`
   - focused validation、全量 `npm test`、`npm run build` 通过
 
-### [NEXT] R86 - Warning cleanup batch E (secondary residuals)
+### [DONE] R86 - Warning cleanup batch E (secondary residuals)
 
 - **Lane**: Warning cleanup / secondary residuals
 - **目标**: 继续削减 secondary residual warnings，优先命中 `src/core/types/settings.ts`、`src/core/storage/StorageService.ts`、`src/core/config/modelConfig.ts`、`src/features/settings/SettingsStyleSection.ts`、`src/features/settings/SettingsModelSection.ts` 与直接相关 tests。
@@ -766,7 +766,7 @@
   - `npm run lint` 维持 `0 errors`
   - focused validation、全量 `npm test`、`npm run build` 通过
 
-### [QUEUED] R87 - Maintainability checkpoint
+### [NEXT] R87 - Maintainability checkpoint
 
 - **Lane**: Checkpoint
 - **目标**: 复盘 `R68-R86` 的 owner 收益、warning 变化、验证成本与剩余热点，决定下一批是否继续深挖 chat/opencode residuals，还是转入 secondary residual / opt-in demo route。

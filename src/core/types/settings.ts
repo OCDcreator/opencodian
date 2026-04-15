@@ -932,240 +932,263 @@ export function normalizeInputPanelGlassRefractionSvgFilterSettings(
   };
 }
 
+type LiquidGlassAdapterSettings = InputPanelLiquidGlassSettings['shuding'];
+
+function normalizeShudingLiquidGlassSettings(
+  value: LiquidGlassAdapterSettings | undefined,
+  defaults: LiquidGlassAdapterSettings,
+): LiquidGlassAdapterSettings {
+  const shuding = value ?? {};
+  return {
+    displacementScale: normalizeFiniteNumber(
+      shuding.displacementScale,
+      defaults.displacementScale as number,
+    ),
+    blurAmount: normalizeFiniteNumber(
+      shuding.blurAmount,
+      defaults.blurAmount as number,
+    ),
+    adaptiveSdf: normalizeBoolean(
+      shuding.adaptiveSdf,
+      defaults.adaptiveSdf as boolean,
+    ),
+    adaptiveSdfMix: normalizeFiniteNumberInRange(
+      shuding.adaptiveSdfMix,
+      defaults.adaptiveSdfMix as number,
+      0,
+      1,
+    ),
+    rectEdgeRefraction: normalizeBoolean(
+      shuding.rectEdgeRefraction,
+      defaults.rectEdgeRefraction as boolean,
+    ),
+    rectEdgeRefractionStrength: normalizeFiniteNumberInRange(
+      shuding.rectEdgeRefractionStrength,
+      defaults.rectEdgeRefractionStrength as number,
+      0,
+      2,
+    ),
+    cornerEnhancement: normalizeBoolean(
+      shuding.cornerEnhancement,
+      defaults.cornerEnhancement as boolean,
+    ),
+    cornerEnhancementStrength: normalizeFiniteNumberInRange(
+      shuding.cornerEnhancementStrength,
+      defaults.cornerEnhancementStrength as number,
+      0,
+      2,
+    ),
+    edgeBandWidth: normalizeFiniteNumberInRange(
+      shuding.edgeBandWidth,
+      defaults.edgeBandWidth as number,
+      0,
+      0.2,
+    ),
+    barrelDistortion: normalizeBoolean(
+      shuding.barrelDistortion,
+      defaults.barrelDistortion as boolean,
+    ),
+    barrelStrength: normalizeFiniteNumberInRange(
+      shuding.barrelStrength,
+      defaults.barrelStrength as number,
+      0,
+      0.1,
+    ),
+    topHighlight: normalizeBoolean(
+      shuding.topHighlight,
+      defaults.topHighlight as boolean,
+    ),
+    topHighlightOpacity: normalizeFiniteNumberInRange(
+      shuding.topHighlightOpacity,
+      defaults.topHighlightOpacity as number,
+      0,
+      1,
+    ),
+    innerBorder: normalizeBoolean(
+      shuding.innerBorder,
+      defaults.innerBorder as boolean,
+    ),
+    innerBorderOpacity: normalizeFiniteNumberInRange(
+      shuding.innerBorderOpacity,
+      defaults.innerBorderOpacity as number,
+      0,
+      1,
+    ),
+    bottomShadow: normalizeBoolean(
+      shuding.bottomShadow,
+      defaults.bottomShadow as boolean,
+    ),
+    bottomShadowOpacity: normalizeFiniteNumberInRange(
+      shuding.bottomShadowOpacity,
+      defaults.bottomShadowOpacity as number,
+      0,
+      1,
+    ),
+    insetDepthShadow: normalizeBoolean(
+      shuding.insetDepthShadow,
+      defaults.insetDepthShadow as boolean,
+    ),
+    insetDepthShadowOpacity: normalizeFiniteNumberInRange(
+      shuding.insetDepthShadowOpacity,
+      defaults.insetDepthShadowOpacity as number,
+      0,
+      1,
+    ),
+    insetShadowBlur: normalizeFiniteNumberInRange(
+      shuding.insetShadowBlur,
+      defaults.insetShadowBlur as number,
+      5,
+      30,
+    ),
+    contrastBoost: normalizeFiniteNumberInRange(
+      shuding.contrastBoost,
+      defaults.contrastBoost as number,
+      1,
+      1.5,
+    ),
+    brightnessBoost: normalizeFiniteNumberInRange(
+      shuding.brightnessBoost,
+      defaults.brightnessBoost as number,
+      1,
+      1.2,
+    ),
+    saturateBoost: normalizeFiniteNumberInRange(
+      shuding.saturateBoost,
+      defaults.saturateBoost as number,
+      1,
+      1.3,
+    ),
+  };
+}
+
+function normalizeNikdelvinLiquidGlassSettings(
+  value: LiquidGlassAdapterSettings | undefined,
+  defaults: LiquidGlassAdapterSettings,
+): LiquidGlassAdapterSettings {
+  const nikdelvin = value ?? {};
+  return {
+    depth: normalizeFiniteNumberInRange(
+      nikdelvin.depth,
+      defaults.depth as number,
+      0,
+      40,
+    ),
+    strength: normalizeFiniteNumberInRange(
+      nikdelvin.strength,
+      defaults.strength as number,
+      0,
+      200,
+    ),
+    chromaticAberration: normalizeFiniteNumberInRange(
+      nikdelvin.chromaticAberration,
+      defaults.chromaticAberration as number,
+      0,
+      10,
+    ),
+    blur: normalizeFiniteNumberInRange(
+      nikdelvin.blur,
+      defaults.blur as number,
+      0,
+      10,
+    ),
+    backgroundPreset:
+      nikdelvin.backgroundPreset === 'background'
+      || nikdelvin.backgroundPreset === 'lines'
+      || nikdelvin.backgroundPreset === 'rocks'
+      || nikdelvin.backgroundPreset === 'chrome'
+      || nikdelvin.backgroundPreset === 'silk'
+      || nikdelvin.backgroundPreset === 'none'
+        ? nikdelvin.backgroundPreset
+        : defaults.backgroundPreset,
+    color:
+      nikdelvin.color === 'black'
+      || nikdelvin.color === 'white'
+      || nikdelvin.color === 'transparent'
+        ? nikdelvin.color
+        : defaults.color,
+    background:
+      typeof nikdelvin.background === 'string'
+        ? nikdelvin.background.trim()
+        : defaults.background,
+    freeze: normalizeBoolean(
+      nikdelvin.freeze,
+      defaults.freeze as boolean,
+    ),
+    noMorph: normalizeBoolean(
+      nikdelvin.noMorph,
+      defaults.noMorph as boolean,
+    ),
+    button: normalizeBoolean(
+      nikdelvin.button,
+      defaults.button as boolean,
+    ),
+    inline: normalizeBoolean(
+      nikdelvin.inline,
+      defaults.inline as boolean,
+    ),
+    customEffects: normalizeBoolean(
+      nikdelvin.customEffects,
+      defaults.customEffects as boolean,
+    ),
+  };
+}
+
+function normalizeShudingDiamondLiquidGlassSettings(
+  value: LiquidGlassAdapterSettings | undefined,
+  defaults: LiquidGlassAdapterSettings,
+): LiquidGlassAdapterSettings {
+  const shudingDiamond = value ?? {};
+  return {
+    displacementScale: normalizeFiniteNumber(
+      shudingDiamond.displacementScale,
+      defaults.displacementScale as number,
+    ),
+    bloomOpacity: normalizeFiniteNumberInRange(
+      shudingDiamond.bloomOpacity,
+      defaults.bloomOpacity as number,
+      0,
+      1,
+    ),
+    rimOpacity: normalizeFiniteNumberInRange(
+      shudingDiamond.rimOpacity,
+      defaults.rimOpacity as number,
+      0,
+      1,
+    ),
+    faceOverlayOpacity: normalizeFiniteNumberInRange(
+      shudingDiamond.faceOverlayOpacity,
+      defaults.faceOverlayOpacity as number,
+      0,
+      1,
+    ),
+    supportOpacity: normalizeFiniteNumberInRange(
+      shudingDiamond.supportOpacity,
+      defaults.supportOpacity as number,
+      0,
+      1,
+    ),
+    pointerTracking: normalizeBoolean(
+      shudingDiamond.pointerTracking,
+      defaults.pointerTracking as boolean,
+    ),
+    pointerTilt: normalizeFiniteNumberInRange(
+      shudingDiamond.pointerTilt,
+      defaults.pointerTilt as number,
+      0,
+      2,
+    ),
+  };
+}
+
 export function normalizeInputPanelLiquidGlassSettings(
   value?: Partial<InputPanelLiquidGlassSettings> | null,
 ): InputPanelLiquidGlassSettings {
   const defaults = getDefaultInputPanelLiquidGlassSettings();
-  const shuding = value?.shuding ?? {};
-  const nikdelvin = value?.nikdelvin ?? {};
-  const shudingDiamond = value?.shudingDiamond ?? {};
 
   return {
-    shuding: {
-      displacementScale: normalizeFiniteNumber(
-        shuding.displacementScale,
-        defaults.shuding.displacementScale as number,
-      ),
-      blurAmount: normalizeFiniteNumber(
-        shuding.blurAmount,
-        defaults.shuding.blurAmount as number,
-      ),
-      adaptiveSdf: normalizeBoolean(
-        shuding.adaptiveSdf,
-        defaults.shuding.adaptiveSdf as boolean,
-      ),
-      adaptiveSdfMix: normalizeFiniteNumberInRange(
-        shuding.adaptiveSdfMix,
-        defaults.shuding.adaptiveSdfMix as number,
-        0,
-        1,
-      ),
-      rectEdgeRefraction: normalizeBoolean(
-        shuding.rectEdgeRefraction,
-        defaults.shuding.rectEdgeRefraction as boolean,
-      ),
-      rectEdgeRefractionStrength: normalizeFiniteNumberInRange(
-        shuding.rectEdgeRefractionStrength,
-        defaults.shuding.rectEdgeRefractionStrength as number,
-        0,
-        2,
-      ),
-      cornerEnhancement: normalizeBoolean(
-        shuding.cornerEnhancement,
-        defaults.shuding.cornerEnhancement as boolean,
-      ),
-      cornerEnhancementStrength: normalizeFiniteNumberInRange(
-        shuding.cornerEnhancementStrength,
-        defaults.shuding.cornerEnhancementStrength as number,
-        0,
-        2,
-      ),
-      edgeBandWidth: normalizeFiniteNumberInRange(
-        shuding.edgeBandWidth,
-        defaults.shuding.edgeBandWidth as number,
-        0,
-        0.2,
-      ),
-      barrelDistortion: normalizeBoolean(
-        shuding.barrelDistortion,
-        defaults.shuding.barrelDistortion as boolean,
-      ),
-      barrelStrength: normalizeFiniteNumberInRange(
-        shuding.barrelStrength,
-        defaults.shuding.barrelStrength as number,
-        0,
-        0.1,
-      ),
-      topHighlight: normalizeBoolean(
-        shuding.topHighlight,
-        defaults.shuding.topHighlight as boolean,
-      ),
-      topHighlightOpacity: normalizeFiniteNumberInRange(
-        shuding.topHighlightOpacity,
-        defaults.shuding.topHighlightOpacity as number,
-        0,
-        1,
-      ),
-      innerBorder: normalizeBoolean(
-        shuding.innerBorder,
-        defaults.shuding.innerBorder as boolean,
-      ),
-      innerBorderOpacity: normalizeFiniteNumberInRange(
-        shuding.innerBorderOpacity,
-        defaults.shuding.innerBorderOpacity as number,
-        0,
-        1,
-      ),
-      bottomShadow: normalizeBoolean(
-        shuding.bottomShadow,
-        defaults.shuding.bottomShadow as boolean,
-      ),
-      bottomShadowOpacity: normalizeFiniteNumberInRange(
-        shuding.bottomShadowOpacity,
-        defaults.shuding.bottomShadowOpacity as number,
-        0,
-        1,
-      ),
-      insetDepthShadow: normalizeBoolean(
-        shuding.insetDepthShadow,
-        defaults.shuding.insetDepthShadow as boolean,
-      ),
-      insetDepthShadowOpacity: normalizeFiniteNumberInRange(
-        shuding.insetDepthShadowOpacity,
-        defaults.shuding.insetDepthShadowOpacity as number,
-        0,
-        1,
-      ),
-      insetShadowBlur: normalizeFiniteNumberInRange(
-        shuding.insetShadowBlur,
-        defaults.shuding.insetShadowBlur as number,
-        5,
-        30,
-      ),
-      contrastBoost: normalizeFiniteNumberInRange(
-        shuding.contrastBoost,
-        defaults.shuding.contrastBoost as number,
-        1,
-        1.5,
-      ),
-      brightnessBoost: normalizeFiniteNumberInRange(
-        shuding.brightnessBoost,
-        defaults.shuding.brightnessBoost as number,
-        1,
-        1.2,
-      ),
-      saturateBoost: normalizeFiniteNumberInRange(
-        shuding.saturateBoost,
-        defaults.shuding.saturateBoost as number,
-        1,
-        1.3,
-      ),
-    },
-    nikdelvin: {
-      depth: normalizeFiniteNumberInRange(
-        nikdelvin.depth,
-        defaults.nikdelvin.depth as number,
-        0,
-        40,
-      ),
-      strength: normalizeFiniteNumberInRange(
-        nikdelvin.strength,
-        defaults.nikdelvin.strength as number,
-        0,
-        200,
-      ),
-      chromaticAberration: normalizeFiniteNumberInRange(
-        nikdelvin.chromaticAberration,
-        defaults.nikdelvin.chromaticAberration as number,
-        0,
-        10,
-      ),
-      blur: normalizeFiniteNumberInRange(
-        nikdelvin.blur,
-        defaults.nikdelvin.blur as number,
-        0,
-        10,
-      ),
-      backgroundPreset:
-        nikdelvin.backgroundPreset === 'background'
-        || nikdelvin.backgroundPreset === 'lines'
-        || nikdelvin.backgroundPreset === 'rocks'
-        || nikdelvin.backgroundPreset === 'chrome'
-        || nikdelvin.backgroundPreset === 'silk'
-        || nikdelvin.backgroundPreset === 'none'
-          ? nikdelvin.backgroundPreset
-          : defaults.nikdelvin.backgroundPreset,
-      color:
-        nikdelvin.color === 'black'
-        || nikdelvin.color === 'white'
-        || nikdelvin.color === 'transparent'
-          ? nikdelvin.color
-          : defaults.nikdelvin.color,
-      background:
-        typeof nikdelvin.background === 'string'
-          ? nikdelvin.background.trim()
-          : defaults.nikdelvin.background,
-      freeze: normalizeBoolean(
-        nikdelvin.freeze,
-        defaults.nikdelvin.freeze as boolean,
-      ),
-      noMorph: normalizeBoolean(
-        nikdelvin.noMorph,
-        defaults.nikdelvin.noMorph as boolean,
-      ),
-      button: normalizeBoolean(
-        nikdelvin.button,
-        defaults.nikdelvin.button as boolean,
-      ),
-      inline: normalizeBoolean(
-        nikdelvin.inline,
-        defaults.nikdelvin.inline as boolean,
-      ),
-      customEffects: normalizeBoolean(
-        nikdelvin.customEffects,
-        defaults.nikdelvin.customEffects as boolean,
-      ),
-    },
-    shudingDiamond: {
-      displacementScale: normalizeFiniteNumber(
-        shudingDiamond.displacementScale,
-        defaults.shudingDiamond.displacementScale as number,
-      ),
-      bloomOpacity: normalizeFiniteNumberInRange(
-        shudingDiamond.bloomOpacity,
-        defaults.shudingDiamond.bloomOpacity as number,
-        0,
-        1,
-      ),
-      rimOpacity: normalizeFiniteNumberInRange(
-        shudingDiamond.rimOpacity,
-        defaults.shudingDiamond.rimOpacity as number,
-        0,
-        1,
-      ),
-      faceOverlayOpacity: normalizeFiniteNumberInRange(
-        shudingDiamond.faceOverlayOpacity,
-        defaults.shudingDiamond.faceOverlayOpacity as number,
-        0,
-        1,
-      ),
-      supportOpacity: normalizeFiniteNumberInRange(
-        shudingDiamond.supportOpacity,
-        defaults.shudingDiamond.supportOpacity as number,
-        0,
-        1,
-      ),
-      pointerTracking: normalizeBoolean(
-        shudingDiamond.pointerTracking,
-        defaults.shudingDiamond.pointerTracking as boolean,
-      ),
-      pointerTilt: normalizeFiniteNumberInRange(
-        shudingDiamond.pointerTilt,
-        defaults.shudingDiamond.pointerTilt as number,
-        0,
-        2,
-      ),
-    },
+    shuding: normalizeShudingLiquidGlassSettings(value?.shuding, defaults.shuding),
+    nikdelvin: normalizeNikdelvinLiquidGlassSettings(value?.nikdelvin, defaults.nikdelvin),
+    shudingDiamond: normalizeShudingDiamondLiquidGlassSettings(value?.shudingDiamond, defaults.shudingDiamond),
   };
 }
 

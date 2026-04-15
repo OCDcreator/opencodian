@@ -65,6 +65,14 @@ interface SettingsReadResult<T> {
   message?: string;
 }
 
+interface LoadSettingsFileOptions<T extends Record<string, unknown>> {
+  filePath: string;
+  backupPath: string;
+  source: SettingsEnvelopeSource;
+  legacySettings: SettingsReadResult<Partial<OpenCodianSettings>>;
+  extractLegacyData: (settings: Partial<OpenCodianSettings>) => Partial<T>;
+}
+
 export interface SettingsFileLoadResult<T> {
   data: T | null;
   filePath: string;
@@ -238,12 +246,12 @@ export class StorageService {
 
   async loadPersistedSettings(): Promise<SettingsLoadResult> {
     const legacySettings = await this.readLegacySettings();
-    const core = await this.loadSettingsFile(
-      CORE_SETTINGS_FILE,
-      CORE_SETTINGS_BACKUP_FILE,
-      'settings.core',
+    const core = await this.loadSettingsFile({
+      filePath: CORE_SETTINGS_FILE,
+      backupPath: CORE_SETTINGS_BACKUP_FILE,
+      source: 'settings.core',
       legacySettings,
-      (settings) => {
+      extractLegacyData: (settings) => {
         const persistedCore = { ...settings };
         delete persistedCore.tabState;
         delete persistedCore.settingsPanelScrollTop;
@@ -251,19 +259,19 @@ export class StorageService {
         delete persistedCore.modelToolsSectionOpen;
         return persistedCore;
       },
-    );
-    const ui = await this.loadSettingsFile(
-      UI_SETTINGS_FILE,
-      UI_SETTINGS_BACKUP_FILE,
-      'settings.ui',
+    });
+    const ui = await this.loadSettingsFile({
+      filePath: UI_SETTINGS_FILE,
+      backupPath: UI_SETTINGS_BACKUP_FILE,
+      source: 'settings.ui',
       legacySettings,
-      (settings) => ({
+      extractLegacyData: (settings) => ({
         tabState: settings.tabState,
         settingsPanelScrollTop: settings.settingsPanelScrollTop,
         modelAvailabilitySectionOpen: settings.modelAvailabilitySectionOpen,
         modelToolsSectionOpen: settings.modelToolsSectionOpen,
       }),
-    );
+    });
 
     return {
       core,
@@ -408,12 +416,15 @@ export class StorageService {
   }
 
   private async loadSettingsFile<T extends Record<string, unknown>>(
-    filePath: string,
-    backupPath: string,
-    source: SettingsEnvelopeSource,
-    legacySettings: SettingsReadResult<Partial<OpenCodianSettings>>,
-    extractLegacyData: (settings: Partial<OpenCodianSettings>) => Partial<T>,
+    options: LoadSettingsFileOptions<T>,
   ): Promise<SettingsFileLoadResult<Partial<T>>> {
+    const {
+      filePath,
+      backupPath,
+      source,
+      legacySettings,
+      extractLegacyData,
+    } = options;
     const primary = await this.readEnvelopeFile<T>(filePath, source);
     if (primary.kind === 'ok') {
       return {

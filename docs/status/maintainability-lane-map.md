@@ -1,26 +1,18 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [READY] `R85` 已完成，当前首个 `[NEXT]` 为 `R86 - Warning cleanup batch E (secondary residuals)`。
+> **当前状态**: [READY] `R86` 已完成，当前首个 `[NEXT]` 为 `R87 - Maintainability checkpoint`。
 
 ## 当前优先级
 
-- **当前 `[NEXT]`**：`R86 - Warning cleanup batch E (secondary residuals)`
-- **本批目标**：先连续拿下 chat runtime / services，再推进 opencode core，再拆 heavy tests 并继续 warning cleanup，最后 checkpoint
-- **当前 lint 基线**：`0 errors / 66 warnings`
+- **当前 `[NEXT]`**：`R87 - Maintainability checkpoint`
+- **本批目标**：复盘 `R68-R86` 的 owner 收益、warning 变化、验证成本与后续建议
+- **当前 lint 基线**：`0 errors / 64 warnings`
 - **热点顺序**：
-  1. `src/features/chat/OpenCodianView.ts`
-  2. `src/features/chat/services/ConversationRenderService.ts`
-  3. `src/features/chat/services/ChatSelectionControlsCoordinator.ts`
-  4. `src/features/chat/services/BackgroundTaskTimelineService.ts`
-  5. `src/features/chat/services/InputPanelAppearanceCoordinator.ts`
-  6. `src/features/chat/services/SessionTodoStateService.ts`
-  7. `src/features/chat/services/QuestionDockCoordinator.ts`
-  8. `src/core/opencode/OpenCodeService.ts`
-  9. `src/core/opencode/OpenCodeStreamEventTransformer.ts`
-  10. `src/core/opencode/OpenCodeStreamingRuntimeCoordinator.ts`
-  11. `tests/unit/core/opencode/OpenCodeService.test.ts`
-  12. 直接相关 chat / opencode tests 与模块文档
+  1. `docs/status/maintainability-master-plan.md`
+  2. `docs/status/maintainability-round-roadmap.md`
+  3. `docs/status/maintainability-lane-map.md`
+  4. 最新 lint / test / build 输出与 phase 文档
 
 ## 本批边界
 
