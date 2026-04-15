@@ -1,7 +1,7 @@
 import { createEmptyTabContextState } from '../../../../src/core/types';
 import { ContextUsageService } from '../../../../src/features/chat/services/ContextUsageService';
 
-describe('ContextUsageService', () => {
+describe('ContextUsageService identity and totals', () => {
   it('stores session metadata while syncing identity', () => {
     const state = ContextUsageService.syncStateIdentity(
       createEmptyTabContextState(),
@@ -112,7 +112,9 @@ describe('ContextUsageService', () => {
       percentage: 40,
     });
   });
+});
 
+describe('ContextUsageService breakdown and formatting', () => {
   it('estimates context breakdown from messages and system prompt', () => {
     const state = ContextUsageService.applyPreciseUsage(
       ContextUsageService.syncStateIdentity(

@@ -1,16 +1,16 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [READY] `R134` 已完成；`R135-R137` 长队列继续推进，当前 `[NEXT]` 为 `R135 - Warning cleanup batch H (tests residuals)`。
+> **当前状态**: [READY] `R135` 已完成；`R136-R137` 长队列继续推进，当前 `[NEXT]` 为 `R136 - Warning cleanup batch I (final non-demo residuals)`。
 
 ## 当前优先级
 
-- **当前 `[NEXT]`**：`R135 - Warning cleanup batch H (tests residuals)`
-- **本批目标**：`R134` 已完成 secondary core/settings residual 首批 closeout；当前继续沿 `tests/unit/core/opencode/`、`tests/unit/features/chat/` 与相邻 heavy suites 收尾 tests residual warnings
-- **当前 lint 基线**：`0 errors / 67 warnings`
+- **当前 `[NEXT]`**：`R136 - Warning cleanup batch I (final non-demo residuals)`
+- **本批目标**：`R135` 已完成 tests residual 首批 closeout；当前继续沿非 demo `src/` owner 与必要的 `docs/modules/` 收尾 final residual warnings
+- **当前 lint 基线**：`0 errors / 62 warnings`
 - **热点顺序**：
-  1. `tests/unit/core/opencode/`
-  2. `tests/unit/features/chat/`
+  1. `src/`
+  2. `docs/modules/`
   3. `docs/status/maintainability-round-roadmap.md`
 
 ## 本批边界
@@ -33,5 +33,5 @@
 ## 历史入口
 
 - 批次归档：`docs/status/maintainability-completed-batches.md`
-- 最近成功 phase：`docs/status/maintainability-phase-469.md`
+- 最近成功 phase：`docs/status/maintainability-phase-470.md`
 - 最近 checkpoint：`docs/status/maintainability-phase-467.md`

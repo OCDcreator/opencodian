@@ -98,7 +98,7 @@ function createHost(
   } as jest.Mocked<OpenCodeStreamingRuntimeCoordinatorHost>;
 }
 
-describe('OpenCodeStreamingRuntimeCoordinator', () => {
+describe('OpenCodeStreamingRuntimeCoordinator active stream contexts', () => {
   afterEach(() => {
     jest.restoreAllMocks();
     global.fetch = originalFetch;
@@ -173,6 +173,13 @@ describe('OpenCodeStreamingRuntimeCoordinator', () => {
     expect(left.signal.aborted).toBe(true);
     expect(right.signal.aborted).toBe(true);
     expect(host.abortSessionOnServer).not.toHaveBeenCalled();
+  });
+});
+
+describe('OpenCodeStreamingRuntimeCoordinator transport selection and legacy fallback', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+    global.fetch = originalFetch;
   });
 
   it('selects SDK or legacy transport from one runtime entrypoint', async () => {
@@ -369,6 +376,13 @@ describe('OpenCodeStreamingRuntimeCoordinator', () => {
     expect(chunks).toContainEqual({ type: 'text', content: 'Hi' });
     expect(chunks[chunks.length - 1]).toEqual({ type: 'message_stop' });
   });
+});
+
+describe('OpenCodeStreamingRuntimeCoordinator SDK tail recovery', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+    global.fetch = originalFetch;
+  });
 
   it('emits only the assistant tail delta during SDK finalization', async () => {
     const host = createHost({
@@ -502,6 +516,13 @@ describe('OpenCodeStreamingRuntimeCoordinator', () => {
       },
       { type: 'message_stop' },
     ]);
+  });
+});
+
+describe('OpenCodeStreamingRuntimeCoordinator SDK error fallback', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+    global.fetch = originalFetch;
   });
 
   it('emits assistant error fallback when finalization finds a structured assistant error', async () => {

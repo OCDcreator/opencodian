@@ -95,7 +95,7 @@ function createPort(
   };
 }
 
-describe('ConversationLoadRecoveryCoordinator', () => {
+describe('ConversationLoadRecoveryCoordinator initialization', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
@@ -216,6 +216,12 @@ describe('ConversationLoadRecoveryCoordinator', () => {
     expect(host.resetPersistedTabState).toHaveBeenCalledTimes(1);
     expect(host.persistTabState).toHaveBeenCalledWith({ flush: true });
   });
+});
+
+describe('ConversationLoadRecoveryCoordinator rewind and restore', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
 
   it('rewinds a conversation through the service port and reloads with force sync', async () => {
     const conversation = createConversation('rewind');
@@ -252,6 +258,12 @@ describe('ConversationLoadRecoveryCoordinator', () => {
       forceServerSync: true,
     });
     expect(host.showNotice).toHaveBeenCalledWith(t('chat.rewind.restoreSuccess'));
+  });
+});
+
+describe('ConversationLoadRecoveryCoordinator forking', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
   });
 
   it('forks into the current tab and reloads the forked conversation without force sync', async () => {

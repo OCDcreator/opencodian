@@ -5,43 +5,43 @@ import {
 } from '../../../../src/features/chat/services/BackgroundTaskCompletionNoticeService';
 import { t } from '../../../../src/i18n';
 
-describe('BackgroundTaskCompletionNoticeService', () => {
-  function createService(options?: {
-    conversationMessages?: Array<Record<string, unknown>>;
-    isStreaming?: boolean;
-  }): {
-    service: BackgroundTaskCompletionNoticeService;
-    runtime: BackgroundTaskCompletionNoticeRuntime;
-    conversation: {
-      id: string;
-      openCodeSessionId: string;
-      messages: Array<Record<string, unknown>>;
-    };
-    appendPersistentAssistantNoticeMessage: jest.Mock;
-  } {
-    const runtime: BackgroundTaskCompletionNoticeRuntime = {
-      isStreaming: options?.isStreaming ?? false,
-    };
-    const conversation = {
-      id: 'conversation-1',
-      openCodeSessionId: 'session-1',
-      messages: options?.conversationMessages ?? [],
-    };
-    const appendPersistentAssistantNoticeMessage = jest.fn().mockResolvedValue(undefined);
+function createService(options?: {
+  conversationMessages?: Array<Record<string, unknown>>;
+  isStreaming?: boolean;
+}): {
+  service: BackgroundTaskCompletionNoticeService;
+  runtime: BackgroundTaskCompletionNoticeRuntime;
+  conversation: {
+    id: string;
+    openCodeSessionId: string;
+    messages: Array<Record<string, unknown>>;
+  };
+  appendPersistentAssistantNoticeMessage: jest.Mock;
+} {
+  const runtime: BackgroundTaskCompletionNoticeRuntime = {
+    isStreaming: options?.isStreaming ?? false,
+  };
+  const conversation = {
+    id: 'conversation-1',
+    openCodeSessionId: 'session-1',
+    messages: options?.conversationMessages ?? [],
+  };
+  const appendPersistentAssistantNoticeMessage = jest.fn().mockResolvedValue(undefined);
 
-    const host = {
-      getTabRuntimeState: jest.fn().mockReturnValue(runtime),
-      appendPersistentAssistantNoticeMessage,
-    };
+  const host = {
+    getTabRuntimeState: jest.fn().mockReturnValue(runtime),
+    appendPersistentAssistantNoticeMessage,
+  };
 
-    return {
-      service: new BackgroundTaskCompletionNoticeService(host),
-      runtime,
-      conversation,
-      appendPersistentAssistantNoticeMessage,
-    };
-  }
+  return {
+    service: new BackgroundTaskCompletionNoticeService(host),
+    runtime,
+    conversation,
+    appendPersistentAssistantNoticeMessage,
+  };
+}
 
+describe('BackgroundTaskCompletionNoticeService queue and flush', () => {
   it('persists sorted completion notices per anchor after flushing', async () => {
     const { service, conversation, appendPersistentAssistantNoticeMessage } = createService();
     const segments: BackgroundTaskCompletionNoticeSegment[] = [
@@ -174,7 +174,9 @@ describe('BackgroundTaskCompletionNoticeService', () => {
       },
     });
   });
+});
 
+describe('BackgroundTaskCompletionNoticeService deduplication', () => {
   it('skips reminder events already represented by persisted notices', async () => {
     const { service, conversation, appendPersistentAssistantNoticeMessage } = createService({
       conversationMessages: [
