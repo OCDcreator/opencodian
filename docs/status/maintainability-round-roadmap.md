@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的 `[NEXT]`”。
-> **当前状态**: [READY] `R89` 已完成；`R90-R137` 长队列继续排队，当前首个 `[NEXT]` 为 `R90 - OpenCodianView message render/update residual seam`。
+> **当前状态**: [READY] `R90` 已完成；`R91-R137` 长队列继续排队，当前首个 `[NEXT]` 为 `R91 - OpenCodianView send/composer interaction seam`。
 
 ## 控制规则
 
@@ -17,8 +17,8 @@
 
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
 - 当前 live lint 基线：`0 errors / 64 warnings`
-- 最近成功 phase：`docs/status/maintainability-phase-424.md`
-- 当前路线判断：`R89` 已完成并把 first-open bootstrap / persisted-restore ownership 并回现有 `ConversationLoadRecoveryCoordinator`；当前已明确续排 `R90-R137`，必须从 `R90` 顺序执行，不得 freestyle。
+- 最近成功 phase：`docs/status/maintainability-phase-425.md`
+- 当前路线判断：`R90` 已完成并把 message render/update follow-up 直连到现有 `ConversationRenderService` owner；当前已明确续排 `R91-R137`，必须从 `R91` 顺序执行，不得 freestyle。
 
 ## Queue
 ## Queue
@@ -808,7 +808,7 @@
 - **禁止项**: 不改变 restore preload、fork/rewind、active-tab recovery 语义。
 - **验收**: conversation load/recovery residual 分支继续下降。；并通过全量 `npm test` 与 `npm run build`。
 
-### [NEXT] R90 - OpenCodianView message render/update residual seam
+### [DONE] R90 - OpenCodianView message render/update residual seam
 
 - **Lane**: Maintainability / chat rendering
 - **目标**: 继续把 persisted-message apply、incremental update follow-up 与 rerender fallback 向 render owner 收拢。
@@ -818,7 +818,7 @@
 - **禁止项**: 不改变 assistant tail patch、question card resolution、background-task timeline 呈现。
 - **验收**: message render/update residual 装配继续收缩。；并通过全量 `npm test` 与 `npm run build`。
 
-### [QUEUED] R91 - OpenCodianView send/composer interaction seam
+### [NEXT] R91 - OpenCodianView send/composer interaction seam
 
 - **Lane**: Maintainability / chat composer runtime
 - **目标**: 从 view 收束 send action、composer draft/runtime context、submit follow-up 的完整 seam。

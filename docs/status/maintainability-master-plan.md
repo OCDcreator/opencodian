@@ -2,7 +2,7 @@
 
 > **状态**: [READY]
 > **作用**: 这是 maintainability 无人值守的战略文档。每轮开始前，先读本文件，再读 `docs/status/maintainability-round-roadmap.md` 与最近的 `docs/status/maintainability-phase-XXX.md`。
-> **自动推进状态**: `R89` 已完成；当前已人工续排 `R90-R137` 长队列。恢复 autopilot 后只能从首个 `[NEXT]`（`R90`）顺序执行，不允许 freestyle。
+> **自动推进状态**: `R90` 已完成；当前已人工续排 `R91-R137` 长队列。恢复 autopilot 后只能从首个 `[NEXT]`（`R91`）顺序执行，不允许 freestyle。
 
 ## 1. 当前判断
 
@@ -11,9 +11,9 @@
 ## 2. 当前基线
 
 - **lint**: `0 errors / 64 warnings`
-- **最近验证**: `R89` 已确认 focused `npm test -- ConversationLoadRecoveryCoordinator`、focused `npm test -- persistedTabRestore`、全量 `npm test` 与 `npm run build` 通过，`BUILD_ID` 为 `autopilot-maintainability.202604152008`
+- **最近验证**: `R90` 已确认 focused `npm test -- ConversationRenderService`、focused `npm test -- turnDiffNoticeRouting`、全量 `npm test` 与 `npm run build` 通过，`BUILD_ID` 为 `autopilot-maintainability.202604152019`
 - **最近 Test Vault 部署**: `R64`，`BUILD_ID` `autopilot-maintainability.202604150602`
-- **当前 `[NEXT]`**: `R90 - OpenCodianView message render/update residual seam`
+- **当前 `[NEXT]`**: `R91 - OpenCodianView send/composer interaction seam`
 - **主热点**: `src/features/chat/**` 仍是最大生产热点，`src/core/opencode/**` 仍是第二梯队热点
 
 ## 3. 本批执行规则

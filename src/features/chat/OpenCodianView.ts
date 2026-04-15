@@ -438,7 +438,6 @@ interface OpenCodianViewConversationRuntimeWiring {
 }
 
 interface OpenCodianViewInteractionRuntimeWiring {
-  conversationRenderService: ConversationRenderService;
   messageSendPreparationService: MessageSendPreparationService;
   messageFinalizationService: MessageFinalizationService;
   assistantNoticeCardRenderer: AssistantNoticeCardRenderer;
@@ -1180,7 +1179,15 @@ export class OpenCodianView extends ItemView {
     this.backgroundTaskLiveSignalCoordinator =
       backgroundTaskRuntime.backgroundTaskLiveSignalCoordinator;
 
-    const conversationRuntime = this.createConversationRuntimeWiring(backgroundTaskRuntime);
+    const conversationRenderService = new ConversationRenderService(
+      this.createConversationRenderHost(),
+    );
+    this.conversationRenderService = conversationRenderService;
+
+    const conversationRuntime = this.createConversationRuntimeWiring(
+      backgroundTaskRuntime,
+      conversationRenderService,
+    );
     this.conversationAuthoritativeSyncCoordinator =
       conversationRuntime.conversationAuthoritativeSyncCoordinator;
     this.conversationHydrationRenderBridge =
@@ -1218,8 +1225,8 @@ export class OpenCodianView extends ItemView {
 
     const interactionRuntime = this.createInteractionRuntimeWiring(
       conversationRuntime.conversationSyncBridgePorts,
+      conversationRenderService,
     );
-    this.conversationRenderService = interactionRuntime.conversationRenderService;
     this.messageSendPreparationService = interactionRuntime.messageSendPreparationService;
     this.messageFinalizationService = interactionRuntime.messageFinalizationService;
     this.assistantNoticeCardRenderer = interactionRuntime.assistantNoticeCardRenderer;
@@ -1319,14 +1326,15 @@ export class OpenCodianView extends ItemView {
 
   private createConversationRuntimeWiring(
     backgroundTaskRuntime: OpenCodianViewBackgroundTaskRuntimeWiring,
+    conversationRenderService: ConversationRenderService,
   ): OpenCodianViewConversationRuntimeWiring {
     const conversationAuthoritativeSyncCoordinator = new ConversationAuthoritativeSyncCoordinator(
-      this.createConversationAuthoritativeSyncHost(),
+      this.createConversationAuthoritativeSyncHost(conversationRenderService),
     );
     this.conversationAuthoritativeSyncCoordinator = conversationAuthoritativeSyncCoordinator;
     const conversationHydrationRuntimeViewHosts = createConversationHydrationRuntimeViewHosts(
       createConversationHydrationRuntimeViewHostFactoryHost(
-        this.createConversationHydrationRuntimeHostProviderHost(),
+        this.createConversationHydrationRuntimeHostProviderHost(conversationRenderService),
       ),
     );
     const conversationHydrationRenderBridge = new ConversationHydrationRenderBridge(
@@ -1369,7 +1377,7 @@ export class OpenCodianView extends ItemView {
     );
     const conversationSyncLoadRuntimeHosts = createConversationSyncLoadRuntimeViewHosts(
       createConversationSyncLoadRuntimeViewHostFactoryHost(
-        this.createConversationSyncLoadRuntimeHostProviderHost(),
+        this.createConversationSyncLoadRuntimeHostProviderHost(conversationRenderService),
       ),
     );
     const conversationSyncServices = createConversationSyncServices(
@@ -1500,15 +1508,13 @@ export class OpenCodianView extends ItemView {
 
   private createInteractionRuntimeWiring(
     conversationSyncBridgePorts: ConversationSyncBridgePorts,
+    conversationRenderService: ConversationRenderService,
   ): OpenCodianViewInteractionRuntimeWiring {
-    const conversationRenderService = new ConversationRenderService(
-      this.createConversationRenderHost(),
-    );
     const messageSendPreparationService = new MessageSendPreparationService(
-      this.createMessageSendPreparationHost(),
+      this.createMessageSendPreparationHost(conversationRenderService),
     );
     const messageFinalizationService = new MessageFinalizationService(
-      this.createMessageFinalizationHost(),
+      this.createMessageFinalizationHost(conversationRenderService),
     );
     const assistantNoticeCardRenderer = new AssistantNoticeCardRenderer(
       this.createAssistantNoticeCardRendererHost(),
@@ -1539,7 +1545,6 @@ export class OpenCodianView extends ItemView {
     );
 
     return {
-      conversationRenderService,
       messageSendPreparationService,
       messageFinalizationService,
       assistantNoticeCardRenderer,
@@ -1826,7 +1831,9 @@ export class OpenCodianView extends ItemView {
     };
   }
 
-  private createConversationSyncLoadRuntimeHostProviderHost():
+  private createConversationSyncLoadRuntimeHostProviderHost(
+    conversationRenderService: ConversationRenderService,
+  ):
   ConversationSyncLoadRuntimeHostProviderHost {
     return {
       loadConversations: () => this.plugin.loadConversations(),
@@ -1843,14 +1850,16 @@ export class OpenCodianView extends ItemView {
         this.currentConversationRevertState = revertState;
       },
       applySyncedConversationUpdate: (previousMessages, nextMessages) =>
-        this.applySyncedConversationUpdate(previousMessages, nextMessages),
+        conversationRenderService.applySyncedConversationUpdate(previousMessages, nextMessages),
       renderBackgroundTaskIndicatorIfNeeded: (tabId) =>
         this.renderBackgroundTaskIndicatorIfNeeded(tabId),
       hasInterruptedLocalAssistantTail: (messages) => this.hasInterruptedLocalAssistantTail(messages),
     };
   }
 
-  private createConversationAuthoritativeSyncHost():
+  private createConversationAuthoritativeSyncHost(
+    conversationRenderService: ConversationRenderService,
+  ):
   ConversationAuthoritativeSyncHost {
     return {
       getVaultBasePath: () => getVaultBasePath(this.app) ?? undefined,
@@ -1892,7 +1901,7 @@ export class OpenCodianView extends ItemView {
         );
       },
       rerenderSingleUserMessage: (previousMessageId, message) =>
-        this.rerenderSingleUserMessage(previousMessageId, message),
+        conversationRenderService.rerenderSingleUserMessage(previousMessageId, message),
       renderBackgroundTaskIndicatorIfNeeded: (tabId) =>
         this.renderBackgroundTaskIndicatorIfNeeded(tabId),
       summarizeChatMessageForDebug: (message) => this.summarizeChatMessageForDebug(message),
@@ -1987,7 +1996,9 @@ export class OpenCodianView extends ItemView {
     };
   }
 
-  private createConversationHydrationRuntimeHostProviderHost():
+  private createConversationHydrationRuntimeHostProviderHost(
+    conversationRenderService: ConversationRenderService,
+  ):
   ConversationHydrationRuntimeHostProviderHost {
     return {
       getMessagesContainer: () => this.messagesContainer,
@@ -2003,7 +2014,7 @@ export class OpenCodianView extends ItemView {
       syncBackgroundTaskStateFromConversation: (conversation) => {
         this.syncBackgroundTaskStateFromConversation(conversation);
       },
-      renderMessages: (messages) => this.renderMessages(messages),
+      renderMessages: (messages) => conversationRenderService.renderMessages(messages),
       getCurrentConversation: () => this.currentConversation,
       cancelTitleGeneration: (conversationId) => {
         this.titleGenerationService.cancelConversation(conversationId);
@@ -2245,7 +2256,9 @@ export class OpenCodianView extends ItemView {
     };
   }
 
-  private createMessageFinalizationHost(): MessageFinalizationHost {
+  private createMessageFinalizationHost(
+    conversationRenderService: ConversationRenderService,
+  ): MessageFinalizationHost {
     return {
       getCurrentConversation: () => this.currentConversation,
       getActiveTabId: () => this.getActiveTabId(),
@@ -2254,8 +2267,9 @@ export class OpenCodianView extends ItemView {
       getConversationVisualFingerprint: (messages) => this.getConversationVisualFingerprint(messages),
       getConversationSyncFingerprint: (messages) => this.getConversationSyncFingerprint(messages),
       patchTrailingAssistantRender: (previousMessages, nextMessages, tabId) =>
-        this.patchTrailingAssistantRender(previousMessages, nextMessages, tabId),
-      rerenderConversationMessages: (conversation) => this.rerenderConversationMessages(conversation),
+        conversationRenderService.patchTrailingAssistantRender(previousMessages, nextMessages, tabId),
+      rerenderConversationMessages: (conversation) =>
+        conversationRenderService.rerenderConversationMessages(conversation),
       renderBackgroundTaskIndicatorIfNeeded: (tabId) => this.renderBackgroundTaskIndicatorIfNeeded(tabId),
       appendTurnDiffNoticeIfNeeded: (conversation, editedFiles, tabId) =>
         this.appendTurnDiffNoticeIfNeeded(conversation, editedFiles, tabId),
@@ -2290,7 +2304,9 @@ export class OpenCodianView extends ItemView {
     };
   }
 
-  private createMessageSendPreparationHost(): MessageSendPreparationHost {
+  private createMessageSendPreparationHost(
+    conversationRenderService: ConversationRenderService,
+  ): MessageSendPreparationHost {
     return {
       ensureConversationReady: async () => {
         if (!this.currentConversation) {
@@ -2332,7 +2348,7 @@ export class OpenCodianView extends ItemView {
           runtime.autoScrollEnabled = enabled;
         }
       },
-      renderMessage: (message) => this.renderMessage(message),
+      renderMessage: (message) => conversationRenderService.renderMessage(message),
       scrollToBottom: (options) => {
         this.scrollToBottom(options);
       },
@@ -2821,7 +2837,7 @@ export class OpenCodianView extends ItemView {
       return;
     }
 
-    void this.rerenderConversationMessages(this.currentConversation);
+    void this.conversationRenderService.rerenderConversationMessages(this.currentConversation);
   }
 
   /** Apply configured chat scroll mode to the messages container */
@@ -2944,7 +2960,7 @@ export class OpenCodianView extends ItemView {
   public refreshQuestionUi(): void {
     this.questionDockSlotCoordinator.render();
     if (this.currentConversation) {
-      void this.rerenderConversationMessages(this.currentConversation);
+      void this.conversationRenderService.rerenderConversationMessages(this.currentConversation);
     }
   }
 
@@ -3750,11 +3766,6 @@ export class OpenCodianView extends ItemView {
     this.composerInputShellCoordinator.updateSendButtonState();
   }
 
-  /** Render a message */
-  private async renderMessage(message: ChatMessage) {
-    return this.conversationRenderService.renderMessage(message);
-  }
-
   private createUserMessageRenderFrame(message: ChatMessage): ConversationUserMessageRenderFrame | null {
     const turn = this.createTurn();
     const parentEl = turn?.headerEl;
@@ -3955,10 +3966,6 @@ export class OpenCodianView extends ItemView {
         showLessLabel: t('chat.omo.injected.hideRaw'),
       },
     });
-  }
-
-  private async renderMessages(messages: ChatMessage[]): Promise<void> {
-    await this.conversationRenderService.renderMessages(messages);
   }
 
   private armBackgroundTaskIndicatorForUserMessage(
@@ -4342,13 +4349,6 @@ export class OpenCodianView extends ItemView {
     }
   }
 
-  private async rerenderSingleUserMessage(
-    previousMessageId: string,
-    message: ChatMessage,
-  ): Promise<void> {
-    await this.conversationRenderService.rerenderSingleUserMessage(previousMessageId, message);
-  }
-
   private addUserMessageFooter(messageEl: HTMLElement, message: ChatMessage, content?: string): void {
     this.userMessageFooterRenderer.render(messageEl, message, content);
   }
@@ -4418,31 +4418,12 @@ export class OpenCodianView extends ItemView {
     await this.activeTabContextUsageCoordinator.refreshFromServer();
   }
 
-  private async rerenderConversationMessages(conversation: Conversation): Promise<void> {
-    await this.conversationRenderService.rerenderConversationMessages(conversation);
-  }
-
   private getMessagesForRender(messages: ChatMessage[]): ChatMessage[] {
     return buildMessageRenderGroups(messages.filter((message) => this.shouldRenderConversationMessage(message))).map((group) =>
       group.mergedAssistant && group.messages.length > 1
         ? mergeAssistantMessagesForRender(group.messages)
         : group.messages[0],
     );
-  }
-
-  private async patchTrailingAssistantRender(
-    previousMessages: ChatMessage[],
-    nextMessages: ChatMessage[],
-    tabId: TabId | null = this.getActiveTabId(),
-  ): Promise<boolean> {
-    return this.conversationRenderService.patchTrailingAssistantRender(previousMessages, nextMessages, tabId);
-  }
-
-  private async applySyncedConversationUpdate(
-    previousMessages: ChatMessage[],
-    nextMessages: ChatMessage[],
-  ): Promise<void> {
-    await this.conversationRenderService.applySyncedConversationUpdate(previousMessages, nextMessages);
   }
 
   private isNearBottom(threshold?: number): boolean {

@@ -50,7 +50,9 @@ describe('OpenCodianView turn diff notice routing', () => {
       ) => Promise<void>;
       getActiveTabId: () => string;
       getTabRuntimeState: (tabId?: string | null) => { lastConversationSyncFingerprint: string | null } | null;
-      renderMessage: (message: unknown) => Promise<void>;
+      assistantShellViewHostAdapter: {
+        renderPersistedAssistantMessage: (options: unknown) => Promise<HTMLElement>;
+      };
       scrollToBottom: () => void;
     };
 
@@ -82,7 +84,10 @@ describe('OpenCodianView turn diff notice routing', () => {
     jest.spyOn(view, 'getTabRuntimeState').mockImplementation((tabId?: string | null) => (
       tabId === 'tab-old' ? oldTabRuntime : null
     ));
-    const renderSpy = jest.spyOn(view, 'renderMessage').mockResolvedValue(undefined);
+    const renderSpy = jest.spyOn(
+      view.assistantShellViewHostAdapter,
+      'renderPersistedAssistantMessage',
+    ).mockResolvedValue(document.createElement('div'));
     const scrollSpy = jest.spyOn(view, 'scrollToBottom').mockImplementation(() => {});
 
     await view.appendTurnDiffNoticeIfNeeded(sendingConversation, ['notes.md'], 'tab-old');
