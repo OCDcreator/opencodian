@@ -97,6 +97,51 @@ describe('ComposerContextRuntimeStore', () => {
     expect(renderComposerContext).toHaveBeenCalledTimes(1);
   });
 
+  it('derives active-tab chip states from the shared draft and preview runtime', () => {
+    const { runtimeStore, setActiveTabId } = createHarness();
+    const currentNotePreview = createPreview('notes/current.md');
+    const selectionItem = createContextItem('item-1', 'notes/alpha.md', {
+      startLine: 1,
+      endLine: 4,
+    });
+    const fileItem = createContextItem('item-2', 'notes/beta.md');
+
+    runtimeStore.setFocusContextPreview(currentNotePreview);
+    runtimeStore.addDraftContextItem(selectionItem);
+    runtimeStore.addDraftContextItem(fileItem);
+
+    expect(runtimeStore.getContextChipStates()).toEqual([
+      {
+        key: 'notes/current.md:',
+        kind: 'current_note',
+        path: 'notes/current.md',
+        label: 'notes/current.md',
+        attached: false,
+        preview: true,
+      },
+      {
+        key: 'notes/alpha.md:1-4',
+        kind: 'selection',
+        path: 'notes/alpha.md',
+        label: 'notes/alpha.md',
+        lineRange: { startLine: 1, endLine: 4 },
+        attached: true,
+        preview: false,
+      },
+      {
+        key: 'notes/beta.md:',
+        kind: 'file',
+        path: 'notes/beta.md',
+        label: 'notes/beta.md',
+        attached: true,
+        preview: false,
+      },
+    ]);
+
+    setActiveTabId('tab-2' as TabId);
+    expect(runtimeStore.getContextChipStates()).toEqual([]);
+  });
+
   it('keeps tab-local draft and preview state isolated when the active tab changes', () => {
     const { runtimeStore, runtimes, setActiveTabId } = createHarness();
     const selectionItem = createContextItem('item-1', 'notes/alpha.md', { startLine: 1, endLine: 4 });

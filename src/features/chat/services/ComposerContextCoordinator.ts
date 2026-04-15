@@ -1,13 +1,10 @@
-import type { PromptContextItem } from '../../../core/types';
 import {
-  buildComposerContextChipStates,
-  type FocusContextPreview,
+  type ComposerContextChipState,
 } from '../composerContext';
 import type { ComposerContextChipActionService } from './ComposerContextChipActionService';
 
 export interface ComposerContextCoordinatorHost {
-  getDraftContextItems(): PromptContextItem[];
-  getFocusContextPreview(): FocusContextPreview | null;
+  getContextChipStates(): ComposerContextChipState[];
 }
 
 export class ComposerContextCoordinator {
@@ -28,10 +25,7 @@ export class ComposerContextCoordinator {
       return;
     }
 
-    const chipStates = buildComposerContextChipStates(
-      this.host.getDraftContextItems(),
-      this.host.getFocusContextPreview(),
-    );
+    const chipStates = this.host.getContextChipStates();
 
     this.contextRowEl.replaceChildren();
     this.contextRowEl.classList.toggle('is-empty', chipStates.length === 0);

@@ -31,7 +31,7 @@ class ComposerContextViewHostAdapter {
 
 ### host 组装
 
-- `createCoordinatorHost()` 只暴露 render 所需的只读 draft / preview seam
+- `createCoordinatorHost()` 只暴露 render 所需的 chip-state snapshot seam，不再把 raw draft / preview 读口直接交给 coordinator
 - `createChipActionServiceHost()` 把 attach/detach、副作用写回与 stale-preview refresh handoff 对接到 shared runtime store
 - `createActionServiceHost()` 让 current-note / selection 两条活动编辑器入口动作复用同一份 draft-item write port
 - `createPickerActionServiceHost()` 让 file picker 入口复用同一份 draft-item write port，并接收 `ContextPickerInteractionBridge` 暴露的 open/close 生命周期 callback

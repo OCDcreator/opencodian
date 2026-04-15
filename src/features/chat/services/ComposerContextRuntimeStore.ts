@@ -1,5 +1,7 @@
 import type { PromptContextItem } from '../../../core/types';
 import {
+  buildComposerContextChipStates,
+  type ComposerContextChipState,
   type FocusContextPreview,
   getContextTargetKey,
   removeDraftContextItemsByTarget,
@@ -20,6 +22,20 @@ export interface ComposerContextRuntimeStoreHost {
 
 export class ComposerContextRuntimeStore {
   constructor(private readonly host: ComposerContextRuntimeStoreHost) {}
+
+  getContextChipStates(
+    tabId: TabId | null = this.host.getActiveTabId(),
+  ): ComposerContextChipState[] {
+    const runtime = this.host.getTabRuntimeState(tabId);
+    if (!runtime) {
+      return [];
+    }
+
+    return buildComposerContextChipStates(
+      runtime.draftContextItems,
+      runtime.focusContextPreview,
+    );
+  }
 
   getDraftContextItems(
     tabId: TabId | null = this.host.getActiveTabId(),

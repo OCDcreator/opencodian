@@ -1,4 +1,5 @@
 import type { PromptContextItem } from '../../../../src/core/types';
+import { buildComposerContextChipStates } from '../../../../src/features/chat/composerContext';
 import type { FocusContextPreview } from '../../../../src/features/chat/composerContext';
 import { ComposerContextRuntimeStore } from '../../../../src/features/chat/services/ComposerContextRuntimeStore';
 import {
@@ -85,8 +86,12 @@ describe('ComposerContextViewHostAdapter', () => {
     runtimes.get('tab-1' as TabId)?.draftContextItems.push(selectionItem, fileItem);
     runtimes.get('tab-1' as TabId)!.focusContextPreview = createPreview('notes/alpha.md');
 
-    expect(coordinatorHost.getDraftContextItems()).toEqual([selectionItem, fileItem]);
-    expect(coordinatorHost.getFocusContextPreview()).toEqual(createPreview('notes/alpha.md'));
+    expect(coordinatorHost.getContextChipStates()).toEqual(
+      buildComposerContextChipStates(
+        [selectionItem, fileItem],
+        createPreview('notes/alpha.md'),
+      ),
+    );
     expect(chipActionHost.getFocusContextPreview()).toEqual(createPreview('notes/alpha.md'));
 
     chipActionHost.removeDraftContextItemsForTarget({
@@ -104,18 +109,22 @@ describe('ComposerContextViewHostAdapter', () => {
       createContextItem('item-3', 'notes/gamma.md'),
       pickerItem,
     ]);
-    expect(coordinatorHost.getDraftContextItems()).toEqual([
-      fileItem,
-      createContextItem('item-3', 'notes/gamma.md'),
-      pickerItem,
-    ]);
-    expect(coordinatorHost.getFocusContextPreview()).toEqual(createPreview('notes/alpha.md'));
+    expect(coordinatorHost.getContextChipStates()).toEqual(
+      buildComposerContextChipStates(
+        [
+          fileItem,
+          createContextItem('item-3', 'notes/gamma.md'),
+          pickerItem,
+        ],
+        createPreview('notes/alpha.md'),
+      ),
+    );
     expect(refreshActiveFocusContextPreview).toHaveBeenCalledTimes(1);
     expect(beginContextPickerInteraction).toHaveBeenCalledTimes(1);
     expect(completeContextPickerInteraction).toHaveBeenCalledTimes(1);
 
     setActiveTabId('tab-2' as TabId);
-    expect(coordinatorHost.getDraftContextItems()).toEqual([]);
+    expect(coordinatorHost.getContextChipStates()).toEqual([]);
     expect(chipActionHost.getFocusContextPreview()).toBeNull();
   });
 });

@@ -27,8 +27,7 @@ export class ComposerContextViewHostAdapter {
 
   createCoordinatorHost(): ComposerContextCoordinatorHost {
     return {
-      getDraftContextItems: () => this.runtimeStore.getDraftContextItems(),
-      getFocusContextPreview: () => this.runtimeStore.getFocusContextPreview(),
+      getContextChipStates: () => this.runtimeStore.getContextChipStates(),
     };
   }
 

@@ -5,7 +5,7 @@
 
 ## 概述
 
-`ComposerContextCoordinator` 现在只负责 composer context chip 的 DOM 渲染与 click 委托。它从 active-tab draft context / focus preview 生成 chip state，维护当前 row element，并把 attach/detach 交互转交给独立的 `ComposerContextChipActionService`，避免继续把 preview attach 细节和 DOM 组装混在一个模块里。
+`ComposerContextCoordinator` 现在只负责 composer context chip 的 DOM 渲染与 click 委托。它消费 runtime store 已经整理好的 chip state，维护当前 row element，并把 attach/detach 交互转交给独立的 `ComposerContextChipActionService`，避免继续把 runtime 投影细节和 DOM 组装混在一个模块里。
 
 ## 导入关系
 
@@ -16,8 +16,7 @@
 
 ```typescript
 interface ComposerContextCoordinatorHost {
-  getDraftContextItems(): PromptContextItem[]
-  getFocusContextPreview(): FocusContextPreview | null
+  getContextChipStates(): ComposerContextChipState[]
 }
 
 class ComposerContextCoordinator {
@@ -30,7 +29,7 @@ class ComposerContextCoordinator {
 
 ### chip 渲染
 
-- `render()` 继续复用 `composerContext.buildComposerContextChipStates()`，统一生成 attached / preview / selection 三种 chip 表现
+- `render()` 只消费 host 暴露的 chip-state snapshot，统一渲染 attached / preview / selection 三种 chip 表现
 - coordinator 自己维护当前的 context row DOM 引用，因此 `OpenCodianView` 只需要在 composer 重建或清理时交出/收回容器
 
 ### click 委托
@@ -40,11 +39,11 @@ class ComposerContextCoordinator {
 
 ## 与其他模块的交互
 
-- **OpenCodianView**：提供 active-tab draft items / focus preview 的只读 host callback，并负责 composer row 容器的 attach / detach
+- **OpenCodianView**：通过 shared runtime seam 驱动 composer row 容器的 attach / detach，不再让 coordinator 直接读取 raw draft / preview state
 - **ComposerContextChipActionService**：接管 chip click 后的 attach / detach、副作用和 preview 修正
-- **composerContext**：提供 chip state 生成
+- **ComposerContextRuntimeStore**：负责把 active-tab draft / preview runtime 状态投影成可渲染的 chip state snapshot
 
 ## 注意事项
 
-- coordinator 只处理 active composer row；多 tab 的 draft data 与 focus preview 仍然由 view host adapter 的 runtime seam 持有
+- coordinator 只处理 active composer row；多 tab 的 draft data、focus preview 与 chip-state 投影仍然由 runtime seam 持有
 - 保持既有 chip class、`aria-pressed` 和 render 顺序不变，避免影响现有样式或点击语义

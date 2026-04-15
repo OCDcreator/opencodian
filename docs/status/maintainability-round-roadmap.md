@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的 `[NEXT]`”。
-> **当前状态**: [READY] `R98` 已完成；`R99-R137` 长队列继续排队，当前首个 `[NEXT]` 为 `R99 - ComposerContext coordinator/view runtime seam`。
+> **当前状态**: [READY] `R99` 已完成；`R100-R137` 长队列继续排队，当前首个 `[NEXT]` 为 `R100 - BackgroundConversation post-sync handoff seam`。
 
 ## 控制规则
 
@@ -18,7 +18,7 @@
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
 - 当前 live lint 基线：`0 errors / 65 warnings`
 - 最近成功 phase：`docs/status/maintainability-phase-433.md`
-- 当前路线判断：`R98` 已完成 `ContextUsageService` usage-breakdown seam，当前已明确续排 `R99-R137`，必须从 `R99` 顺序执行，不得 freestyle。
+- 当前路线判断：`R99` 已完成 `ComposerContext` coordinator/view runtime seam，当前已明确续排 `R100-R137`，必须从 `R100` 顺序执行，不得 freestyle。
 
 ## Queue
 ## Queue
@@ -906,7 +906,7 @@
 - **禁止项**: 不改变 context usage 统计口径、display 值或 refresh 时机。
 - **验收**: usage-breakdown 责任更集中。；并通过全量 `npm test` 与 `npm run build`。
 
-### [NEXT] R99 - ComposerContext coordinator/view runtime seam
+### [DONE] R99 - ComposerContext coordinator/view runtime seam
 
 - **Lane**: Maintainability / chat composer runtime
 - **目标**: 整合 composer coordinator/runtime store/view facade 之间的 residual runtime 交界。
@@ -916,7 +916,7 @@
 - **禁止项**: 不改变 chips、picker actions、draft state、view host 语义；不拆成更多薄 adapter。
 - **验收**: composer context runtime 边界更清晰。；并通过全量 `npm test` 与 `npm run build`。
 
-### [QUEUED] R100 - BackgroundConversation post-sync handoff seam
+### [NEXT] R100 - BackgroundConversation post-sync handoff seam
 
 - **Lane**: Maintainability / chat background sync
 - **目标**: 继续收束 background conversation 的 post-sync handoff、attention/signal follow-up 与 host adapter 交界。

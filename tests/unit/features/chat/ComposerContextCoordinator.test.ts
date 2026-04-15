@@ -1,7 +1,8 @@
 import type { PromptContextItem } from '../../../../src/core/types';
 import {
+  buildComposerContextChipStates,
   createFocusContextPreview,
-  type FocusContextPreview,
+  type ComposerContextChipState,
 } from '../../../../src/features/chat/composerContext';
 import {
   ComposerContextCoordinator,
@@ -21,18 +22,15 @@ function createContextItem(overrides: Partial<PromptContextItem> = {}): PromptCo
 }
 
 function createHarness(options: {
-  draftContextItems?: PromptContextItem[];
-  focusPreview?: FocusContextPreview | null;
+  chipStates?: ComposerContextChipState[];
 } = {}) {
-  let draftContextItems = [...(options.draftContextItems ?? [])];
-  let focusPreview = options.focusPreview ?? null;
+  let chipStates = [...(options.chipStates ?? [])];
   const chipActionService = {
     handleChipClick: jest.fn(async () => undefined),
   };
 
   const host: ComposerContextCoordinatorHost = {
-    getDraftContextItems: () => draftContextItems,
-    getFocusContextPreview: () => focusPreview,
+    getContextChipStates: () => chipStates,
   };
 
   const coordinator = new ComposerContextCoordinator(host, chipActionService);
@@ -43,11 +41,8 @@ function createHarness(options: {
     coordinator,
     rowEl,
     chipActionService,
-    setDraftContextItems: (items: PromptContextItem[]) => {
-      draftContextItems = [...items];
-    },
-    setFocusPreview: (preview: FocusContextPreview | null) => {
-      focusPreview = preview;
+    setChipStates: (nextChipStates: ComposerContextChipState[]) => {
+      chipStates = [...nextChipStates];
     },
   };
 }
@@ -62,7 +57,7 @@ describe('ComposerContextCoordinator', () => {
       rowEl,
       chipActionService,
     } = createHarness({
-      focusPreview: selectionPreview,
+      chipStates: buildComposerContextChipStates([], selectionPreview),
     });
 
     const chipEl = rowEl.querySelector('button');
@@ -85,7 +80,7 @@ describe('ComposerContextCoordinator', () => {
       kind: 'file',
     });
     const { rowEl } = createHarness({
-      draftContextItems: [attachedItem],
+      chipStates: buildComposerContextChipStates([attachedItem], null),
     });
 
     const chipEl = rowEl.querySelector('button');
@@ -105,14 +100,17 @@ describe('ComposerContextCoordinator', () => {
     const {
       coordinator,
       rowEl,
-      setDraftContextItems,
-      setFocusPreview,
+      setChipStates,
     } = createHarness();
 
     expect(rowEl.classList.contains('is-empty')).toBe(true);
 
-    setDraftContextItems([attachedItem]);
-    setFocusPreview(createFocusContextPreview('notes/B.md'));
+    setChipStates(
+      buildComposerContextChipStates(
+        [attachedItem],
+        createFocusContextPreview('notes/B.md'),
+      ),
+    );
     coordinator.render();
 
     const chipLabels = Array.from(rowEl.querySelectorAll('button')).map((chip) => chip.textContent);
