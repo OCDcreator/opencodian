@@ -21,6 +21,7 @@ interface OpenCodeSseStreamContext {
   decoder: TextDecoder;
   signal?: AbortSignal;
   state: OpenCodeSseReadState;
+  abortHandler: () => void;
 }
 
 interface OpenCodeStreamingAssistantSummary {
@@ -453,22 +454,10 @@ export class OpenCodeStreamingRuntimeCoordinator {
   }
 
   private async *connectSSE(signal?: AbortSignal): AsyncGenerator<OpenCodeSSEEvent> {
-    if (signal?.aborted) {
+    const context = await this.createSseStreamContext(signal);
+    if (!context) {
       return;
     }
-
-    const reader = await this.openSseReader(signal);
-    const context: OpenCodeSseStreamContext = {
-      reader,
-      decoder: new TextDecoder(),
-      signal,
-      state: {
-        aborted: false,
-        buffer: '',
-      },
-    };
-    const abortHandler = this.createSseAbortHandler(reader, context.state);
-    signal?.addEventListener('abort', abortHandler);
 
     try {
       yield* this.readSseStream(context);
@@ -478,9 +467,37 @@ export class OpenCodeStreamingRuntimeCoordinator {
       }
       throw error;
     } finally {
-      signal?.removeEventListener('abort', abortHandler);
-      reader.releaseLock();
+      this.disposeSseStreamContext(context);
     }
+  }
+
+  private async createSseStreamContext(
+    signal?: AbortSignal,
+  ): Promise<OpenCodeSseStreamContext | null> {
+    if (signal?.aborted) {
+      return null;
+    }
+
+    const reader = await this.openSseReader(signal);
+    const state: OpenCodeSseReadState = {
+      aborted: false,
+      buffer: '',
+    };
+    const abortHandler = this.createSseAbortHandler(reader, state);
+    signal?.addEventListener('abort', abortHandler);
+
+    return {
+      reader,
+      decoder: new TextDecoder(),
+      signal,
+      state,
+      abortHandler,
+    };
+  }
+
+  private disposeSseStreamContext(context: OpenCodeSseStreamContext): void {
+    context.signal?.removeEventListener('abort', context.abortHandler);
+    context.reader.releaseLock();
   }
 
   private async openSseReader(
@@ -515,24 +532,32 @@ export class OpenCodeStreamingRuntimeCoordinator {
   }
 
   private async *readSseStream(context: OpenCodeSseStreamContext): AsyncGenerator<OpenCodeSSEEvent> {
-    while (!this.shouldStopSseStream(context)) {
-      const readResult = await this.readSseChunk(context);
-      if (!readResult) {
+    while (true) {
+      const decodedChunk = await this.readNextSseTextChunk(context);
+      if (decodedChunk === null) {
         break;
       }
 
-      const { done, value } = readResult;
-      if (done || this.shouldStopSseStream(context)) {
-        break;
-      }
-
-      context.state.buffer += context.decoder.decode(value, { stream: true });
+      context.state.buffer += decodedChunk;
       yield* this.emitParsedSseEvents(context.state);
     }
 
-    if (context.state.buffer.trim() && !this.shouldStopSseStream(context)) {
-      yield* this.emitRemainingSseEvents(context.state.buffer);
+    yield* this.flushRemainingSseEvents(context);
+  }
+
+  private async readNextSseTextChunk(
+    context: OpenCodeSseStreamContext,
+  ): Promise<string | null> {
+    if (this.shouldStopSseStream(context)) {
+      return null;
     }
+
+    const readResult = await this.readSseChunk(context);
+    if (!readResult || readResult.done || this.shouldStopSseStream(context)) {
+      return null;
+    }
+
+    return context.decoder.decode(readResult.value, { stream: true });
   }
 
   private async readSseChunk(
@@ -570,6 +595,17 @@ export class OpenCodeStreamingRuntimeCoordinator {
   private *emitRemainingSseEvents(buffer: string): Generator<OpenCodeSSEEvent, void, void> {
     const events = this.host.streamEventTransformer.parseSSEEvents(buffer + '\n\n');
     yield* events.events;
+  }
+
+  private *flushRemainingSseEvents(
+    context: OpenCodeSseStreamContext,
+  ): Generator<OpenCodeSSEEvent, void, void> {
+    if (!context.state.buffer.trim() || this.shouldStopSseStream(context)) {
+      return;
+    }
+
+    yield* this.emitRemainingSseEvents(context.state.buffer);
+    context.state.buffer = '';
   }
 
   private async loadAssistantTail(sessionId: string): Promise<OpenCodeStreamingAssistantTail | null> {

@@ -52,6 +52,34 @@ function createSseFetchMock(events: string[]): jest.Mock {
   });
 }
 
+function createRawSseFetchMock(chunks: string[]): jest.Mock {
+  return jest.fn().mockResolvedValue({
+    ok: true,
+    body: {
+      getReader: () => {
+        const readChunks = [
+          ...chunks.map((chunk) => ({
+            done: false,
+            value: Uint8Array.from(Buffer.from(chunk)),
+          })),
+          {
+            done: true,
+            value: undefined,
+          },
+        ];
+        return {
+          read: jest.fn().mockImplementation(() => Promise.resolve(readChunks.shift() ?? {
+            done: true,
+            value: undefined,
+          })),
+          cancel: jest.fn(),
+          releaseLock: jest.fn(),
+        };
+      },
+    },
+  });
+}
+
 function createHost(
   overrides: Partial<OpenCodeStreamingRuntimeCoordinatorHost> = {},
 ): jest.Mocked<OpenCodeStreamingRuntimeCoordinatorHost> {
@@ -217,6 +245,52 @@ describe('OpenCodeStreamingRuntimeCoordinator', () => {
       timestamp: 1234567890,
       modelId: 'openai/gpt-5',
     });
+    expect(chunks[chunks.length - 1]).toEqual({ type: 'message_stop' });
+  });
+
+  it('parses split SSE chunks and flushes the final buffered event at EOF', async () => {
+    const transformer = createStreamEventTransformer();
+    const handleStreamingEvent = jest.spyOn(transformer, 'handleStreamingEvent').mockImplementation((
+      eventData: OpenCodeStreamEvent,
+      _sessionId: string,
+      state: OpenCodeStreamEventState,
+    ) => {
+      if (eventData.type === 'message.part.delta') {
+        state.lastContent = 'Hi';
+        return {
+          chunks: [{ type: 'text', content: 'Hi' }],
+          stop: false,
+        };
+      }
+
+      return {
+        chunks: [],
+        stop: eventData.type === 'session.idle',
+      };
+    });
+    const host = createHost({
+      streamEventTransformer: transformer,
+    });
+    const coordinator = new OpenCodeStreamingRuntimeCoordinator(host);
+    global.fetch = createRawSseFetchMock([
+      'data: {"type":"message.part.delta","properties":{"sessionID":"legacy-buffer","delta":',
+      '"Hi"}}\n\n',
+      'data: {"type":"session.idle","properties":{"sessionID":"legacy-buffer"}}',
+    ]) as typeof global.fetch;
+
+    const chunks: unknown[] = [];
+    for await (const chunk of coordinator.streamLegacyResponse({
+      sessionId: 'legacy-buffer',
+      startPrompt: jest.fn().mockResolvedValue(undefined),
+    })) {
+      chunks.push(chunk);
+    }
+
+    expect(handleStreamingEvent.mock.calls.map(([eventData]) => eventData.type)).toEqual([
+      'message.part.delta',
+      'session.idle',
+    ]);
+    expect(chunks).toContainEqual({ type: 'text', content: 'Hi' });
     expect(chunks[chunks.length - 1]).toEqual({ type: 'message_stop' });
   });
 

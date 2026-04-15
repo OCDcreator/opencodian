@@ -635,7 +635,7 @@
   - streaming runtime coordinator 的 finalization 分支明显减少
   - focused validation、全量 `npm test`、`npm run build` 通过
 
-### [NEXT] R80 - OpenCodeStreamingRuntimeCoordinator SSE reader seam
+### [DONE] R80 - OpenCodeStreamingRuntimeCoordinator SSE reader seam
 
 - **Lane**: Maintainability / opencode SSE reader
 - **目标**: 从 `src/core/opencode/OpenCodeStreamingRuntimeCoordinator.ts:524` 一带收束 connectSSE、reader open/abort、chunk read、buffer parse 与 remaining-event flush 的完整 SSE lifecycle。
@@ -653,7 +653,7 @@
   - streaming runtime coordinator 的 SSE reader 分支明显减少
   - focused validation、全量 `npm test`、`npm run build` 通过
 
-### [QUEUED] R81 - OpenCodeService heavy suite split A
+### [NEXT] R81 - OpenCodeService heavy suite split A
 
 - **Lane**: Warning cleanup / opencode tests
 - **目标**: 把 `tests/unit/core/opencode/OpenCodeService.test.ts` 的 session/control/runtime 相关大块断言按责任拆成更窄 suite files，优先降低单文件与单 describe 规模。

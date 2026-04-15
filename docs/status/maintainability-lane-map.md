@@ -1,11 +1,11 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [READY] `R79` 已完成，当前首个 `[NEXT]` 为 `R80 - OpenCodeStreamingRuntimeCoordinator SSE reader seam`。
+> **当前状态**: [READY] `R80` 已完成，当前首个 `[NEXT]` 为 `R81 - OpenCodeService heavy suite split A`。
 
 ## 当前优先级
 
-- **当前 `[NEXT]`**：`R80 - OpenCodeStreamingRuntimeCoordinator SSE reader seam`
+- **当前 `[NEXT]`**：`R81 - OpenCodeService heavy suite split A`
 - **本批目标**：先连续拿下 chat runtime / services，再推进 opencode core，再拆 heavy tests 并继续 warning cleanup，最后 checkpoint
 - **当前 lint 基线**：`0 errors / 79 warnings`
 - **热点顺序**：
