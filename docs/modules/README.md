@@ -141,6 +141,7 @@ docs/modules/
 │   │   │   ├── ChatSelectionControlsCoordinator.md
 │   │   │   ├── ComposerInputShellCoordinator.md
 │   │   │   ├── InputPanelAppearanceCoordinator.md
+│   │   │   ├── ModelSelectionRuntime.md
 │   │   │   ├── ComposerContextActionService.md
 │   │   │   ├── ComposerContextCoordinator.md
 │   │   │   ├── ContextAttachmentBuilder.md

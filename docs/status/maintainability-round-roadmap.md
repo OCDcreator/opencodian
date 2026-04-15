@@ -16,7 +16,7 @@
 ## 当前背景
 
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
-- 最近成功 phase：`docs/status/maintainability-phase-405.md`
+- 最近成功 phase：`docs/status/maintainability-phase-408.md`
 - 当前 live lint 基线：`0 errors / 79 warnings`
 - 当前路线判断：上一批已在 `R67` checkpoint 收口；当前新 batch 直接转向 chat runtime / services 与 opencode core，并把 heavy tests / warning cleanup 明确写成 `R81-R86`。
 
@@ -515,7 +515,7 @@
   - timeline service 的 segment assembly 分支明显减少
   - focused validation、全量 `npm test`、`npm run build` 通过
 
-### [NEXT] R73 - ChatSelectionControlsCoordinator selection runtime seam
+### [DONE] R73 - ChatSelectionControlsCoordinator selection runtime seam
 
 - **Lane**: Maintainability / chat model selection
 - **目标**: 从 `src/features/chat/services/ChatSelectionControlsCoordinator.ts` 收束 active-tab selection state、requested/current/resolved model writeback、permission display 与 unavailable follow-up lifecycle。
@@ -532,7 +532,7 @@
   - selection coordinator 的直接状态分支明显减少
   - focused validation、全量 `npm test`、`npm run build` 通过
 
-### [QUEUED] R74 - InputPanelAppearanceCoordinator theme/runtime seam
+### [NEXT] R74 - InputPanelAppearanceCoordinator theme/runtime seam
 
 - **Lane**: Maintainability / chat input appearance
 - **目标**: 从 `src/features/chat/services/InputPanelAppearanceCoordinator.ts` 收束 input panel theme selection、appearance sync、layout refresh 与 sticky UI follow-up 的完整 runtime seam。
