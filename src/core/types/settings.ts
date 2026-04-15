@@ -91,6 +91,15 @@ export type InputPanelThemeId =
 export type InputPanelActionButtonStyleId = 'default' | 'etched';
 
 export type LiquidGlassAdapterId = 'shuding' | 'nikdelvin' | 'shudingDiamond';
+export type InputPanelThemeFamily = 'preset' | 'glass-refraction' | 'liquid-glass';
+export type GlassRefractionInputPanelThemeId = Exclude<
+  InputPanelThemeId,
+  'preset' | 'liquid-glass-shuding' | 'liquid-glass-nikdelvin'
+>;
+export type LiquidGlassInputPanelThemeId = Extract<
+  InputPanelThemeId,
+  'liquid-glass-shuding' | 'liquid-glass-nikdelvin'
+>;
 
 export type ChatAppearanceBackgroundFitMode = 'cover' | 'contain' | 'fit-width' | 'fit-height';
 
@@ -164,6 +173,81 @@ export function normalizeInputPanelThemeId(value: unknown): InputPanelThemeId {
       return 'preset';
     default:
       return 'preset';
+  }
+}
+
+export function getInputPanelThemeFamily(themeId: InputPanelThemeId): InputPanelThemeFamily {
+  if (themeId === 'preset') {
+    return 'preset';
+  }
+
+  if (
+    themeId === 'liquid-glass-shuding'
+    || themeId === 'liquid-glass-nikdelvin'
+  ) {
+    return 'liquid-glass';
+  }
+
+  return 'glass-refraction';
+}
+
+export function normalizeGlassRefractionInputPanelThemeId(
+  themeId: InputPanelThemeId,
+): GlassRefractionInputPanelThemeId {
+  switch (themeId) {
+    case 'glass-refraction-card':
+    case 'glass-refraction-pill':
+    case 'glass-refraction-glass':
+      return themeId;
+    default:
+      return 'glass-refraction-glass';
+  }
+}
+
+export function normalizeLiquidGlassInputPanelThemeId(
+  themeId: InputPanelThemeId,
+): LiquidGlassInputPanelThemeId {
+  switch (themeId) {
+    case 'liquid-glass-shuding':
+    case 'liquid-glass-nikdelvin':
+      return themeId;
+    default:
+      return 'liquid-glass-shuding';
+  }
+}
+
+export function getLiquidGlassAdapterIdForInputPanelTheme(themeId: InputPanelThemeId): LiquidGlassAdapterId | null {
+  switch (themeId) {
+    case 'liquid-glass-shuding':
+      return 'shuding';
+    case 'liquid-glass-nikdelvin':
+      return 'nikdelvin';
+    default:
+      return null;
+  }
+}
+
+export function getInputPanelThemeIdForLiquidGlassAdapter(adapterId: LiquidGlassAdapterId): InputPanelThemeId {
+  switch (adapterId) {
+    case 'shuding':
+      return 'liquid-glass-shuding';
+    case 'nikdelvin':
+      return 'liquid-glass-nikdelvin';
+    default:
+      return 'preset';
+  }
+}
+
+export function getInputPanelGlassRefractionVariantId(
+  themeId: InputPanelThemeId,
+): InputPanelGlassRefractionVariantId {
+  switch (normalizeGlassRefractionInputPanelThemeId(themeId)) {
+    case 'glass-refraction-card':
+      return 'card';
+    case 'glass-refraction-pill':
+      return 'pill';
+    default:
+      return 'glass';
   }
 }
 
@@ -1252,12 +1336,86 @@ export function normalizePartialChatAppearanceSettings(
   return normalized;
 }
 
+function normalizeChatAppearanceBackgroundSettings(
+  background: Partial<ChatAppearanceBackgroundSettings> | null | undefined,
+  defaults: ChatAppearanceBackgroundSettings,
+): ChatAppearanceBackgroundSettings {
+  return {
+    ...defaults,
+    ...(background ?? {}),
+    imagePath: typeof background?.imagePath === 'string' ? background.imagePath.trim() : defaults.imagePath,
+    imageMimeType: typeof background?.imageMimeType === 'string'
+      ? background.imageMimeType.trim()
+      : defaults.imageMimeType,
+    imageDisplayName: typeof background?.imageDisplayName === 'string'
+      ? background.imageDisplayName.trim()
+      : defaults.imageDisplayName,
+    fitMode: normalizeChatAppearanceBackgroundFitMode(background?.fitMode),
+    opacity: normalizeFiniteNumberInRange(background?.opacity, defaults.opacity, 0, 100),
+    blur: normalizeFiniteNumberInRange(background?.blur, defaults.blur, 0, 48),
+    depth: normalizeFiniteNumberInRange(background?.depth, defaults.depth, 0, 36),
+    dim: normalizeFiniteNumberInRange(background?.dim, defaults.dim, 0, 88),
+    edgeFade: normalizeFiniteNumberInRange(background?.edgeFade, defaults.edgeFade, 0, 80),
+    saturation: normalizeFiniteNumberInRange(background?.saturation, defaults.saturation, 50, 200),
+    brightness: normalizeFiniteNumberInRange(background?.brightness, defaults.brightness, 40, 140),
+    focusX: normalizeFiniteNumberInRange(background?.focusX, defaults.focusX, 0, 100),
+    focusY: normalizeFiniteNumberInRange(background?.focusY, defaults.focusY, 0, 100),
+  };
+}
+
+function normalizeChatAppearanceUserSettings(
+  user: Partial<ChatAppearanceUserSettings> | null | undefined,
+  defaults: ChatAppearanceUserSettings,
+): ChatAppearanceUserSettings {
+  return {
+    ...defaults,
+    ...(user ?? {}),
+    timeFontSize: normalizeFiniteNumberInRange(user?.timeFontSize, defaults.timeFontSize, 6, 36),
+    timeFontWeight: normalizeFontWeightValue(user?.timeFontWeight, defaults.timeFontWeight),
+    timeColor: normalizeCssColorValue(user?.timeColor, defaults.timeColor),
+  };
+}
+
+function normalizeChatAppearanceAssistantSettings(
+  assistant: Partial<ChatAppearanceAssistantSettings> | null | undefined,
+  defaults: ChatAppearanceAssistantSettings,
+): ChatAppearanceAssistantSettings {
+  const normalizedMetaFontSize = normalizeFiniteNumberInRange(
+    assistant?.metaFontSize,
+    defaults.metaFontSize,
+    6,
+    36,
+  );
+
+  return {
+    ...defaults,
+    ...(assistant ?? {}),
+    metaFontSize: normalizedMetaFontSize,
+    timeFontSize: normalizeFiniteNumberInRange(assistant?.timeFontSize, normalizedMetaFontSize, 6, 36),
+    timeFontWeight: normalizeFontWeightValue(assistant?.timeFontWeight, defaults.timeFontWeight),
+    metaColor: normalizeCssColorValue(assistant?.metaColor, defaults.metaColor),
+    timeColor: normalizeCssColorValue(assistant?.timeColor, defaults.timeColor),
+    modelIdFontSize: normalizeFiniteNumberInRange(assistant?.modelIdFontSize, normalizedMetaFontSize, 6, 36),
+    modelIdFontWeight: normalizeFontWeightValue(assistant?.modelIdFontWeight, defaults.modelIdFontWeight),
+    modelIdColor: normalizeCssColorValue(assistant?.modelIdColor, defaults.modelIdColor),
+  };
+}
+
+function normalizeChatAppearanceInputSettings(
+  input: Partial<ChatAppearanceInputSettings> | null | undefined,
+  defaults: ChatAppearanceInputSettings,
+): ChatAppearanceInputSettings {
+  return {
+    ...defaults,
+    ...(input ?? {}),
+    actionButtonStyle: normalizeInputPanelActionButtonStyleId(input?.actionButtonStyle),
+  };
+}
+
 export function normalizeChatAppearanceSettings(
   appearance?: PartialChatAppearanceSettings | null,
 ): ChatAppearanceSettings {
   const defaults = getDefaultChatAppearanceSettings();
-  const background = appearance?.background;
-  const assistant = appearance?.assistant;
 
   return {
     layout: {
@@ -1268,63 +1426,10 @@ export function normalizeChatAppearanceSettings(
       ...defaults.sticky,
       ...(appearance?.sticky ?? {}),
     },
-    background: {
-      ...defaults.background,
-      ...(background ?? {}),
-      imagePath: typeof background?.imagePath === 'string' ? background.imagePath.trim() : defaults.background.imagePath,
-      imageMimeType:
-        typeof background?.imageMimeType === 'string'
-          ? background.imageMimeType.trim()
-          : defaults.background.imageMimeType,
-      imageDisplayName:
-        typeof background?.imageDisplayName === 'string'
-          ? background.imageDisplayName.trim()
-          : defaults.background.imageDisplayName,
-      fitMode: normalizeChatAppearanceBackgroundFitMode(background?.fitMode),
-      opacity: normalizeFiniteNumberInRange(background?.opacity, defaults.background.opacity, 0, 100),
-      blur: normalizeFiniteNumberInRange(background?.blur, defaults.background.blur, 0, 48),
-      depth: normalizeFiniteNumberInRange(background?.depth, defaults.background.depth, 0, 36),
-      dim: normalizeFiniteNumberInRange(background?.dim, defaults.background.dim, 0, 88),
-      edgeFade: normalizeFiniteNumberInRange(background?.edgeFade, defaults.background.edgeFade, 0, 80),
-      saturation: normalizeFiniteNumberInRange(background?.saturation, defaults.background.saturation, 50, 200),
-      brightness: normalizeFiniteNumberInRange(background?.brightness, defaults.background.brightness, 40, 140),
-      focusX: normalizeFiniteNumberInRange(background?.focusX, defaults.background.focusX, 0, 100),
-      focusY: normalizeFiniteNumberInRange(background?.focusY, defaults.background.focusY, 0, 100),
-    },
-    user: {
-      ...defaults.user,
-      ...(appearance?.user ?? {}),
-      timeFontSize: normalizeFiniteNumberInRange(appearance?.user?.timeFontSize, defaults.user.timeFontSize, 6, 36),
-      timeFontWeight: normalizeFontWeightValue(appearance?.user?.timeFontWeight, defaults.user.timeFontWeight),
-      timeColor: normalizeCssColorValue(appearance?.user?.timeColor, defaults.user.timeColor),
-    },
-    assistant: {
-      ...defaults.assistant,
-      ...(assistant ?? {}),
-      metaFontSize: normalizeFiniteNumberInRange(assistant?.metaFontSize, defaults.assistant.metaFontSize, 6, 36),
-      timeFontSize: normalizeFiniteNumberInRange(
-        assistant?.timeFontSize,
-        normalizeFiniteNumberInRange(assistant?.metaFontSize, defaults.assistant.timeFontSize, 6, 36),
-        6,
-        36,
-      ),
-      timeFontWeight: normalizeFontWeightValue(assistant?.timeFontWeight, defaults.assistant.timeFontWeight),
-      metaColor: normalizeCssColorValue(assistant?.metaColor, defaults.assistant.metaColor),
-      timeColor: normalizeCssColorValue(assistant?.timeColor, defaults.assistant.timeColor),
-      modelIdFontSize: normalizeFiniteNumberInRange(
-        assistant?.modelIdFontSize,
-        normalizeFiniteNumberInRange(assistant?.metaFontSize, defaults.assistant.modelIdFontSize, 6, 36),
-        6,
-        36,
-      ),
-      modelIdFontWeight: normalizeFontWeightValue(assistant?.modelIdFontWeight, defaults.assistant.modelIdFontWeight),
-      modelIdColor: normalizeCssColorValue(assistant?.modelIdColor, defaults.assistant.modelIdColor),
-    },
-    input: {
-      ...defaults.input,
-      ...(appearance?.input ?? {}),
-      actionButtonStyle: normalizeInputPanelActionButtonStyleId(appearance?.input?.actionButtonStyle),
-    },
+    background: normalizeChatAppearanceBackgroundSettings(appearance?.background, defaults.background),
+    user: normalizeChatAppearanceUserSettings(appearance?.user, defaults.user),
+    assistant: normalizeChatAppearanceAssistantSettings(appearance?.assistant, defaults.assistant),
+    input: normalizeChatAppearanceInputSettings(appearance?.input, defaults.input),
     scrollbar: {
       ...defaults.scrollbar,
       ...(appearance?.scrollbar ?? {}),
@@ -1604,6 +1709,25 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
 
   hiddenSlashCommands: [],
 };
+
+export function normalizeQuestionCardSettings(
+  value?: Partial<Pick<
+    OpenCodianSettings,
+    'questionDisplayMode' | 'questionCardPosition' | 'showAnsweredQuestionCards'
+  >> | null,
+): Pick<
+  OpenCodianSettings,
+  'questionDisplayMode' | 'questionCardPosition' | 'showAnsweredQuestionCards'
+> {
+  return {
+    questionDisplayMode: normalizeQuestionDisplayMode(value?.questionDisplayMode),
+    questionCardPosition: normalizeQuestionCardPosition(value?.questionCardPosition),
+    showAnsweredQuestionCards:
+      typeof value?.showAnsweredQuestionCards === 'boolean'
+        ? value.showAnsweredQuestionCards
+        : DEFAULT_SETTINGS.showAnsweredQuestionCards,
+  };
+}
 
 export function isLocalServerMode(server: ServerConfig): boolean {
   return server.mode === 'local';

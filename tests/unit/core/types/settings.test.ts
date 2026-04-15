@@ -12,22 +12,29 @@ import {
   getDefaultInputPanelGlassRefractionSettings,
   getDefaultInputPanelGlassRefractionSvgFilterSettings,
   getDefaultInputPanelLiquidGlassSettings,
+  getInputPanelGlassRefractionVariantId,
+  getInputPanelThemeFamily,
+  getInputPanelThemeIdForLiquidGlassAdapter,
+  getLiquidGlassAdapterIdForInputPanelTheme,
   getDefaultThemeSettings,
   isValidChatAppearanceCustomCssDeclarations,
   normalizeBelowHeaderTabBarLayout,
   normalizeChatAppearanceSettings,
   normalizeDisabledModelRefs,
+  normalizeGlassRefractionInputPanelThemeId,
   normalizeInputPanelActionButtonStyleId,
   normalizeInputPanelGlassRefractionSettings,
   normalizeInputPanelGlassRefractionSvgFilterPresetId,
   normalizeInputPanelGlassRefractionSvgFilterSettings,
   normalizeInputPanelLiquidGlassSettings,
+  normalizeLiquidGlassInputPanelThemeId,
   normalizeInputPanelThemeId,
   normalizeLobehubIconVariant,
   normalizePartialChatAppearanceSettings,
   normalizeProviderIconLibrary,
   normalizeProviderIconResolvedFormat,
   normalizeQuestionCardPosition,
+  normalizeQuestionCardSettings,
   normalizeQuestionDisplayMode,
   normalizeTabBarPosition,
   normalizeThemeSettings,
@@ -259,6 +266,30 @@ describe('Settings', () => {
     });
   });
 
+  describe('question card settings normalization', () => {
+    it('normalizes the question card display cluster together', () => {
+      expect(normalizeQuestionCardSettings({
+        questionDisplayMode: 'single',
+        questionCardPosition: 'above_input',
+        showAnsweredQuestionCards: false,
+      })).toEqual({
+        questionDisplayMode: 'single',
+        questionCardPosition: 'above_input',
+        showAnsweredQuestionCards: false,
+      });
+
+      expect(normalizeQuestionCardSettings({
+        questionDisplayMode: 'grouped' as never,
+        questionCardPosition: 'floating' as never,
+        showAnsweredQuestionCards: 'yes' as never,
+      })).toEqual({
+        questionDisplayMode: 'all',
+        questionCardPosition: 'inline',
+        showAnsweredQuestionCards: true,
+      });
+    });
+  });
+
   describe('input panel theme normalization', () => {
     it('accepts supported input panel themes and normalizes invalid values to preset', () => {
       expect(normalizeInputPanelThemeId('preset')).toBe('preset');
@@ -272,6 +303,31 @@ describe('Settings', () => {
       expect(normalizeInputPanelThemeId('liquid-glass')).toBe('preset');
       expect(normalizeInputPanelThemeId('glass')).toBe('preset');
       expect(normalizeInputPanelThemeId(undefined)).toBe('preset');
+    });
+  });
+
+  describe('input panel theme helpers', () => {
+    it('derives theme families and theme-specific fallbacks', () => {
+      expect(getInputPanelThemeFamily('preset')).toBe('preset');
+      expect(getInputPanelThemeFamily('glass-refraction-card')).toBe('glass-refraction');
+      expect(getInputPanelThemeFamily('liquid-glass-nikdelvin')).toBe('liquid-glass');
+
+      expect(normalizeGlassRefractionInputPanelThemeId('glass-refraction-pill')).toBe('glass-refraction-pill');
+      expect(normalizeGlassRefractionInputPanelThemeId('preset')).toBe('glass-refraction-glass');
+      expect(normalizeLiquidGlassInputPanelThemeId('liquid-glass-nikdelvin')).toBe('liquid-glass-nikdelvin');
+      expect(normalizeLiquidGlassInputPanelThemeId('preset')).toBe('liquid-glass-shuding');
+      expect(getInputPanelGlassRefractionVariantId('glass-refraction-card')).toBe('card');
+      expect(getInputPanelGlassRefractionVariantId('preset')).toBe('glass');
+    });
+
+    it('maps supported liquid glass adapters to and from theme ids', () => {
+      expect(getLiquidGlassAdapterIdForInputPanelTheme('liquid-glass-shuding')).toBe('shuding');
+      expect(getLiquidGlassAdapterIdForInputPanelTheme('liquid-glass-nikdelvin')).toBe('nikdelvin');
+      expect(getLiquidGlassAdapterIdForInputPanelTheme('preset')).toBeNull();
+
+      expect(getInputPanelThemeIdForLiquidGlassAdapter('shuding')).toBe('liquid-glass-shuding');
+      expect(getInputPanelThemeIdForLiquidGlassAdapter('nikdelvin')).toBe('liquid-glass-nikdelvin');
+      expect(getInputPanelThemeIdForLiquidGlassAdapter('shudingDiamond')).toBe('preset');
     });
   });
 

@@ -52,8 +52,7 @@ import {
   normalizePluginIsolationMode,
   normalizeProviderIconColorMode,
   normalizeProviderIconLibrary,
-  normalizeQuestionCardPosition,
-  normalizeQuestionDisplayMode,
+  normalizeQuestionCardSettings,
   normalizeTabBarPosition,
   normalizeThemeSettings,
   normalizeThinkingBudget,
@@ -432,6 +431,8 @@ function buildNormalizedLoadedSettings(
   delete remainingSavedSettings.experimentalComposerGlassRefractionEnabled;
   delete remainingSavedSettings.inputPanelLiquidGlassMode;
 
+  const normalizedQuestionCardSettings = normalizeQuestionCardSettings(savedSettings);
+
   return {
     ...remainingSavedSettings,
     server: context.normalizedServer,
@@ -444,12 +445,7 @@ function buildNormalizedLoadedSettings(
     tabBarPosition: normalizeTabBarPosition(savedSettings.tabBarPosition),
     belowHeaderTabBarLayout: normalizeBelowHeaderTabBarLayout(savedSettings.belowHeaderTabBarLayout),
     titleMode: normalizeTitleMode(savedSettings.titleMode),
-    questionDisplayMode: normalizeQuestionDisplayMode(savedSettings.questionDisplayMode),
-    questionCardPosition: normalizeQuestionCardPosition(savedSettings.questionCardPosition),
-    showAnsweredQuestionCards:
-      typeof savedSettings.showAnsweredQuestionCards === 'boolean'
-        ? savedSettings.showAnsweredQuestionCards
-        : DEFAULT_SETTINGS.showAnsweredQuestionCards,
+    ...normalizedQuestionCardSettings,
     aiTitleModel: typeof savedSettings.aiTitleModel === 'string' ? savedSettings.aiTitleModel.trim() : '',
     disabledModelRefs: normalizeDisabledModelRefs(savedSettings.disabledModelRefs),
     renderUserMarkupAsCodeBlocks:

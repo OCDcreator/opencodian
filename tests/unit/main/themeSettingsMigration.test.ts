@@ -96,6 +96,20 @@ describe('OpenCodianPlugin.loadSettings theme migration', () => {
     expect(plugin.settings.chatAppearance.assistant.blur).toBe(4);
   });
 
+  it('normalizes question card display settings together on load', async () => {
+    const plugin = createPluginWithSavedSettings({
+      questionDisplayMode: 'single',
+      questionCardPosition: 'floating',
+      showAnsweredQuestionCards: false,
+    });
+
+    await plugin.loadSettings();
+
+    expect(plugin.settings.questionDisplayMode).toBe('single');
+    expect(plugin.settings.questionCardPosition).toBe('inline');
+    expect(plugin.settings.showAnsweredQuestionCards).toBe(false);
+  });
+
   it('preserves the saved background image when a preset-backed theme is restored', async () => {
     const storedAppearance = getDefaultChatAppearanceSettings();
     storedAppearance.background.imagePath = '.opencodian/theme-backgrounds/theme-bg-test.png';

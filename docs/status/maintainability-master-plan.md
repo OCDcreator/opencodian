@@ -2,19 +2,19 @@
 
 > **状态**: [READY]
 > **作用**: 这是 maintainability 无人值守的战略文档。每轮开始前，先读本文件，再读 `docs/status/maintainability-round-roadmap.md` 与最近的 `docs/status/maintainability-phase-XXX.md`。
-> **自动推进状态**: `R118` 已完成 `StorageService` settings-file lifecycle seam；当前继续按 `R119-R137` 长队列顺序推进。恢复 autopilot 后只能从首个 `[NEXT]`（`R119`）顺序执行，不允许 freestyle。
+> **自动推进状态**: `R119` 已完成 `core types settings normalization seam A`；当前继续按 `R120-R137` 长队列顺序推进。恢复 autopilot 后只能从首个 `[NEXT]`（`R120`）顺序执行，不允许 freestyle。
 
 ## 1. 当前判断
 
-**当前分支已完成 `R68-R118` 并把 live lint 稳定在 `0 errors / 65 warnings`；`R118` 已把 `StorageService` 的 split settings file profile、fallback recovery resolution、aggregate load-state assembly 与 legacy extraction 收束到更集中的 lifecycle seam。** 接下来继续 secondary core / settings / startup，先执行 `R119-R121` 的 settings normalization 与 modelConfig residual，再做 heavy tests follow-up、warning closeout 与最终 checkpoint。
+**当前分支已完成 `R68-R119` 并把 live lint 稳定在 `0 errors / 65 warnings`；`R119` 已把 question card cluster、input panel theme family/variant/adapter 映射与 chat appearance 第一组 normalization residual 收束到更集中的 settings owner path。** 接下来继续 secondary core / settings / startup，先执行 `R120-R121` 的 settings normalization 与 modelConfig residual，再做 heavy tests follow-up、warning closeout 与最终 checkpoint。
 
 ## 2. 当前基线
 
 - **lint**: `0 errors / 65 warnings`
-- **最近验证**: `R118` 已确认 focused `tests/unit/core/storage/StorageService.test.ts`、全量 `npm test` 与 `npm run build` 通过，`BUILD_ID` 为 `autopilot-maintainability.202604160126`
-- **最近 Test Vault 部署**: `R64`，`BUILD_ID` `autopilot-maintainability.202604150602`
-- **当前 `[NEXT]`**: `R119 - core types settings normalization seam A`
-- **主热点**: `R118` 已完成 `StorageService` settings-file lifecycle seam；下一步聚焦 `src/core/types/settings.ts` 与 `src/features/settings/SettingsStyleSection.ts`，收束 chat appearance、question/todo、input panel normalization residual
+- **最近验证**: `R119` 已确认 focused `tests/unit/core/types/settings.test.ts`、`tests/unit/features/settings/OpenCodianStyleSettings.test.ts`、`tests/unit/features/chat/inputPanelTheme.test.ts`、`tests/unit/main/themeSettingsMigration.test.ts`、全量 `npm test` 与 `npm run build` 通过，`BUILD_ID` 为 `autopilot-maintainability.202604160142`
+- **最近 Test Vault 部署**: `R119`，`BUILD_ID` `autopilot-maintainability.202604160142`
+- **当前 `[NEXT]`**: `R120 - core types settings normalization seam B`
+- **主热点**: `R119` 已完成 settings normalization seam A；下一步聚焦 `src/core/types/settings.ts` 与 `src/features/settings/OpenCodianSettings.ts`，继续收束 provider/model/plugin/debug normalization residual
 
 ## 3. 本批执行规则
 

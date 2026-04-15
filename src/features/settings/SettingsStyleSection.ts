@@ -6,12 +6,18 @@ import {
   type ChatAppearanceSettings,
   getDefaultInputPanelGlassRefractionSettings,
   getDefaultInputPanelGlassRefractionSvgFilterSettings,
+  getInputPanelGlassRefractionVariantId,
+  getInputPanelThemeFamily,
+  getInputPanelThemeIdForLiquidGlassAdapter,
+  getLiquidGlassAdapterIdForInputPanelTheme,
   type InputPanelActionButtonStyleId,
   type InputPanelGlassRefractionSvgFilterPresetId,
   type InputPanelGlassRefractionVariantId,
   type InputPanelThemeId,
   isValidChatAppearanceCustomCssDeclarations,
   type LiquidGlassAdapterId,
+  normalizeGlassRefractionInputPanelThemeId,
+  normalizeLiquidGlassInputPanelThemeId,
   type ThemePresetDefinition,
   type ThemeStyleId,
 } from '../../core/types';
@@ -1206,7 +1212,7 @@ export class SettingsStyleSection {
   }
 
   private addGlassRefractionInputControls(containerEl: HTMLElement): void {
-    const variantId = this.getCurrentGlassRefractionVariantId(this.plugin.settings.inputPanelTheme);
+    const variantId = getInputPanelGlassRefractionVariantId(this.plugin.settings.inputPanelTheme);
     const defaults = getDefaultInputPanelGlassRefractionSettings()[variantId];
     const svgFilterDefaults = getDefaultInputPanelGlassRefractionSvgFilterSettings();
     const syncHandlers: Array<() => void> = [];
@@ -1433,83 +1439,10 @@ export class SettingsStyleSection {
     });
   }
 
-  private getInputPanelThemeFamily(themeId: InputPanelThemeId): 'preset' | 'glass-refraction' | 'liquid-glass' {
-    if (themeId === 'preset') {
-      return 'preset';
-    }
-
-    if (
-      themeId === 'liquid-glass-shuding'
-      || themeId === 'liquid-glass-nikdelvin'
-    ) {
-      return 'liquid-glass';
-    }
-
-    return 'glass-refraction';
-  }
-
-  private getGlassRefractionInputPanelTheme(
-    themeId: InputPanelThemeId,
-  ): 'glass-refraction-glass' | 'glass-refraction-card' | 'glass-refraction-pill' {
-    switch (themeId) {
-      case 'glass-refraction-card':
-      case 'glass-refraction-pill':
-      case 'glass-refraction-glass':
-        return themeId;
-      default:
-        return 'glass-refraction-glass';
-    }
-  }
-
-  private getLiquidGlassInputPanelTheme(
-    themeId: InputPanelThemeId,
-  ): 'liquid-glass-shuding' | 'liquid-glass-nikdelvin' {
-    switch (themeId) {
-      case 'liquid-glass-shuding':
-      case 'liquid-glass-nikdelvin':
-        return themeId;
-      default:
-        return 'liquid-glass-shuding';
-    }
-  }
-
-  private getLiquidGlassAdapterId(themeId: InputPanelThemeId): LiquidGlassAdapterId | null {
-    switch (themeId) {
-      case 'liquid-glass-shuding':
-        return 'shuding';
-      case 'liquid-glass-nikdelvin':
-        return 'nikdelvin';
-      default:
-        return null;
-    }
-  }
-
-  private getLiquidGlassThemeId(adapterId: LiquidGlassAdapterId): InputPanelThemeId {
-    switch (adapterId) {
-      case 'shuding':
-        return 'liquid-glass-shuding';
-      case 'nikdelvin':
-        return 'liquid-glass-nikdelvin';
-      default:
-        return 'preset';
-    }
-  }
-
   private getInputPanelGlassRefractionSvgFilterScaleKey(
     preset: Exclude<InputPanelGlassRefractionSvgFilterPresetId, 'none'>,
   ): 'subtleScale' | 'strongScale' {
     return preset === 'subtle' ? 'subtleScale' : 'strongScale';
-  }
-
-  private getCurrentGlassRefractionVariantId(themeId: InputPanelThemeId): InputPanelGlassRefractionVariantId {
-    switch (themeId) {
-      case 'glass-refraction-card':
-        return 'card';
-      case 'glass-refraction-pill':
-        return 'pill';
-      default:
-        return 'glass';
-    }
   }
 
   private updateInputPanelGlassRefractionVariant(
@@ -1554,7 +1487,7 @@ export class SettingsStyleSection {
       t('settings.style.groups.input.title'),
       t('settings.style.groups.input.desc'),
     );
-    const themeFamily = this.getInputPanelThemeFamily(this.plugin.settings.inputPanelTheme);
+    const themeFamily = getInputPanelThemeFamily(this.plugin.settings.inputPanelTheme);
     const isPresetInputPanelTheme = themeFamily === 'preset';
     new Setting(inputGroupEl)
       .setName(t('settings.style.input.theme.name'))
@@ -1572,12 +1505,12 @@ export class SettingsStyleSection {
                 : value === 'glass-refraction'
                   ? (
                     themeFamily === 'glass-refraction'
-                      ? this.getGlassRefractionInputPanelTheme(this.plugin.settings.inputPanelTheme)
+                      ? normalizeGlassRefractionInputPanelThemeId(this.plugin.settings.inputPanelTheme)
                       : 'glass-refraction-glass'
                   )
                   : (
                     themeFamily === 'liquid-glass'
-                      ? this.getLiquidGlassInputPanelTheme(this.plugin.settings.inputPanelTheme)
+                      ? normalizeLiquidGlassInputPanelThemeId(this.plugin.settings.inputPanelTheme)
                       : 'liquid-glass-shuding'
                   );
             await this.applyInputPanelThemeChange(nextTheme);
@@ -1613,7 +1546,7 @@ export class SettingsStyleSection {
             .addOption('glass-refraction-glass', t('settings.style.input.variant.option.glass'))
             .addOption('glass-refraction-card', t('settings.style.input.variant.option.card'))
             .addOption('glass-refraction-pill', t('settings.style.input.variant.option.pill'))
-            .setValue(this.getGlassRefractionInputPanelTheme(this.plugin.settings.inputPanelTheme))
+            .setValue(normalizeGlassRefractionInputPanelThemeId(this.plugin.settings.inputPanelTheme))
             .onChange(async (value) => {
               await this.applyInputPanelThemeChange(value as InputPanelThemeId);
             });
@@ -1626,11 +1559,11 @@ export class SettingsStyleSection {
         .setDesc(t('settings.style.input.liquidGlass.variant.desc'))
         .addDropdown((dropdown) => {
           for (const adapter of getAllGlassAdapters()) {
-            dropdown.addOption(this.getLiquidGlassThemeId(adapter.id), adapter.displayName);
+            dropdown.addOption(getInputPanelThemeIdForLiquidGlassAdapter(adapter.id), adapter.displayName);
           }
 
           dropdown
-            .setValue(this.getLiquidGlassInputPanelTheme(this.plugin.settings.inputPanelTheme))
+            .setValue(normalizeLiquidGlassInputPanelThemeId(this.plugin.settings.inputPanelTheme))
             .onChange(async (value) => {
               await this.applyInputPanelThemeChange(value as InputPanelThemeId);
             });
@@ -1713,7 +1646,7 @@ export class SettingsStyleSection {
   }
 
   private addLiquidGlassInputControls(containerEl: HTMLElement): void {
-    const adapterId = this.getLiquidGlassAdapterId(this.plugin.settings.inputPanelTheme);
+    const adapterId = getLiquidGlassAdapterIdForInputPanelTheme(this.plugin.settings.inputPanelTheme);
     if (!adapterId) {
       return;
     }

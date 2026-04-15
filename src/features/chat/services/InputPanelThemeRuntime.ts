@@ -5,6 +5,7 @@ import type {
   InputPanelThemeId,
   LiquidGlassAdapterId,
 } from '../../../core/types';
+import { getLiquidGlassAdapterIdForInputPanelTheme } from '../../../core/types';
 import {
   getGlassAdapter,
   type GlassAdapterSettingsValue,
@@ -216,7 +217,7 @@ export class InputPanelThemeRuntime {
       return null;
     }
 
-    const liquidGlassAdapterId = this.getLiquidGlassAdapterId(inputPanelTheme);
+    const liquidGlassAdapterId = getLiquidGlassAdapterIdForInputPanelTheme(inputPanelTheme);
     if (liquidGlassAdapterId) {
       return this.applyLiquidGlassTheme(composerShellEl, liquidGlassAdapterId);
     }
@@ -300,17 +301,6 @@ export class InputPanelThemeRuntime {
     this.ensureComposerSvgFilterLayer();
     composerShellEl.addClass(INPUT_PANEL_SVG_FILTER_CLASS_BY_ID[activeSvgFilterPreset]);
     return null;
-  }
-
-  private getLiquidGlassAdapterId(themeId: InputPanelThemeId): LiquidGlassAdapterId | null {
-    switch (themeId) {
-      case 'liquid-glass-shuding':
-        return 'shuding';
-      case 'liquid-glass-nikdelvin':
-        return 'nikdelvin';
-      default:
-        return null;
-    }
   }
 
   private getActiveInputPanelGlassRefractionSvgFilterScale(

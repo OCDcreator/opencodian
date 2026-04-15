@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的 `[NEXT]`”。
-> **当前状态**: [READY] `R118` 已完成；`R119-R137` 长队列继续排队，当前首个 `[NEXT]` 为 `R119 - core types settings normalization seam A`。
+> **当前状态**: [READY] `R119` 已完成；`R120-R137` 长队列继续排队，当前首个 `[NEXT]` 为 `R120 - core types settings normalization seam B`。
 
 ## 控制规则
 
@@ -18,7 +18,7 @@
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
 - 当前 live lint 基线：`0 errors / 65 warnings`
 - 最近成功 phase：`docs/status/maintainability-phase-453.md`
-- 当前路线判断：`R118` 已完成 `StorageService` settings-file lifecycle seam，已把 split settings file profile、fallback recovery resolution 与 aggregate load-state assembly 收束到更集中的 owner path；当前必须从 `R119` settings normalization seam A 顺序执行，不得 freestyle。
+- 当前路线判断：`R119` 已完成 core types settings normalization seam A，已把 question card cluster、input panel theme family/variant/adapter 映射与 chat appearance 第一组 normalization residual 收束到更集中的 owner path；当前必须从 `R120` settings normalization seam B 顺序执行，不得 freestyle。
 
 ## Queue
 ## Queue
@@ -1122,7 +1122,7 @@
 - **禁止项**: 不改变 local-first persistence、settings-file 路径、migration 语义。
 - **验收**: settings-file lifecycle 更集中。；并通过全量 `npm test` 与 `npm run build`。
 
-### [NEXT] R119 - core types settings normalization seam A
+### [DONE] R119 - core types settings normalization seam A
 
 - **Lane**: Maintainability / settings normalization
 - **目标**: 优先收束 chat appearance、question/todo、input panel 相关 normalization residual。
@@ -1132,7 +1132,7 @@
 - **禁止项**: 不改变默认值、迁移语义、theme/background/glass normalization。
 - **验收**: settings normalization 第一组 residual 规则更集中。；并通过全量 `npm test` 与 `npm run build`。
 
-### [QUEUED] R120 - core types settings normalization seam B
+### [NEXT] R120 - core types settings normalization seam B
 
 - **Lane**: Maintainability / settings normalization
 - **目标**: 继续收束 provider/model/plugin/debug 相关 normalization residual。
