@@ -101,6 +101,7 @@ export {
   normalizeInputPanelGlassRefractionSvgFilterSettings,
   normalizeInputPanelLiquidGlassSettings,
   normalizeLiquidGlassInputPanelThemeId,
+  normalizeModelProviderPluginDebugSettings,
   normalizeInputPanelThemeId,
   normalizeLobehubIconVariant,
   normalizePartialChatAppearanceSettings,

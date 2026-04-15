@@ -6,6 +6,7 @@ import {
   DEFAULT_SETTINGS,
   getCurrentPlatformBlockedCommands,
   getCurrentPlatformDebugLogPath,
+  getCurrentPlatformKey,
   getDefaultBlockedCommands,
   getDefaultChatAppearanceSettings,
   getDefaultDebugLogPaths,
@@ -28,6 +29,7 @@ import {
   normalizeInputPanelGlassRefractionSvgFilterSettings,
   normalizeInputPanelLiquidGlassSettings,
   normalizeLiquidGlassInputPanelThemeId,
+  normalizeModelProviderPluginDebugSettings,
   normalizeInputPanelThemeId,
   normalizeLobehubIconVariant,
   normalizePartialChatAppearanceSettings,
@@ -286,6 +288,62 @@ describe('Settings', () => {
         questionDisplayMode: 'all',
         questionCardPosition: 'inline',
         showAnsweredQuestionCards: true,
+      });
+    });
+  });
+
+  describe('model/provider/plugin/debug settings normalization', () => {
+    it('normalizes the residual model/provider/plugin/debug cluster together', () => {
+      const normalized = normalizeModelProviderPluginDebugSettings({
+        aiTitleModel: '  openai/gpt-4o-mini  ',
+        disabledModelRefs: [
+          ' openai/gpt-4o ',
+          'invalid',
+          ' openai/gpt-4o ',
+        ],
+        renderUserMarkupAsCodeBlocks: false,
+        pluginIsolationMode: 'pure',
+        providerIconLibrary: {
+          openai: [
+            {
+              id: 'builtin:lobehub:openai',
+              type: 'builtin',
+              source: 'lobehub:openai',
+              variant: 'brand-color',
+              resolvedVariant: 'brand-color',
+              resolvedFormat: 'svg',
+              addedAt: 1,
+            },
+          ],
+        },
+        providerIconColorMode: 'color',
+        providerIconDefaultVariant: 'brand-color',
+        modelAvailabilitySectionOpen: false,
+        modelToolsSectionOpen: 'collapsed' as never,
+        inlineSerializedDebugLogArgs: true,
+        debugLogPaths: { unix: '', windows: '' },
+        debugLogPath: '/tmp/legacy-debug',
+      });
+
+      const expectedDebugLogPaths = { unix: '', windows: '' };
+      expectedDebugLogPaths[getCurrentPlatformKey()] = '/tmp/legacy-debug';
+
+      expect(normalized).toMatchObject({
+        aiTitleModel: 'openai/gpt-4o-mini',
+        disabledModelRefs: ['openai/gpt-4o'],
+        renderUserMarkupAsCodeBlocks: false,
+        pluginIsolationMode: 'pure',
+        providerIconColorMode: 'color',
+        providerIconDefaultVariant: 'brand-color',
+        modelAvailabilitySectionOpen: false,
+        modelToolsSectionOpen: true,
+        inlineSerializedDebugLogArgs: true,
+        debugLogPaths: expectedDebugLogPaths,
+      });
+      expect(normalized.providerIconLibrary.openai?.[0]).toMatchObject({
+        variant: 'brand-color',
+        resolvedVariant: 'brand-color',
+        resolvedFormat: 'svg',
       });
     });
   });

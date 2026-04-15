@@ -1729,6 +1729,80 @@ export function normalizeQuestionCardSettings(
   };
 }
 
+export function normalizeModelProviderPluginDebugSettings(
+  value?: (Partial<Pick<
+    OpenCodianSettings,
+    | 'aiTitleModel'
+    | 'disabledModelRefs'
+    | 'renderUserMarkupAsCodeBlocks'
+    | 'pluginIsolationMode'
+    | 'providerIconLibrary'
+    | 'providerIconColorMode'
+    | 'providerIconDefaultVariant'
+    | 'modelAvailabilitySectionOpen'
+    | 'modelToolsSectionOpen'
+    | 'inlineSerializedDebugLogArgs'
+    | 'debugLogPaths'
+  >> & {
+    debugLogPath?: unknown;
+  }) | null,
+): Pick<
+  OpenCodianSettings,
+  | 'aiTitleModel'
+  | 'disabledModelRefs'
+  | 'renderUserMarkupAsCodeBlocks'
+  | 'pluginIsolationMode'
+  | 'providerIconLibrary'
+  | 'providerIconColorMode'
+  | 'providerIconDefaultVariant'
+  | 'modelAvailabilitySectionOpen'
+  | 'modelToolsSectionOpen'
+  | 'inlineSerializedDebugLogArgs'
+  | 'debugLogPaths'
+> {
+  const normalizedDebugLogPaths: PlatformDebugLogPaths = {
+    ...DEFAULT_SETTINGS.debugLogPaths,
+    ...(
+      value?.debugLogPaths && typeof value.debugLogPaths === 'object'
+        ? value.debugLogPaths
+        : {}
+    ),
+  };
+  const legacyDebugLogPath = typeof value?.debugLogPath === 'string'
+    ? value.debugLogPath.trim()
+    : '';
+
+  if (legacyDebugLogPath.length > 0 && !normalizedDebugLogPaths[getCurrentPlatformKey()]) {
+    normalizedDebugLogPaths[getCurrentPlatformKey()] = legacyDebugLogPath;
+  }
+
+  return {
+    aiTitleModel: typeof value?.aiTitleModel === 'string' ? value.aiTitleModel.trim() : '',
+    disabledModelRefs: normalizeDisabledModelRefs(value?.disabledModelRefs),
+    renderUserMarkupAsCodeBlocks: normalizeBoolean(
+      value?.renderUserMarkupAsCodeBlocks,
+      DEFAULT_SETTINGS.renderUserMarkupAsCodeBlocks,
+    ),
+    pluginIsolationMode: normalizePluginIsolationMode(value?.pluginIsolationMode),
+    providerIconLibrary: normalizeProviderIconLibrary(value?.providerIconLibrary),
+    providerIconColorMode: normalizeProviderIconColorMode(value?.providerIconColorMode),
+    providerIconDefaultVariant: normalizeLobehubIconVariant(value?.providerIconDefaultVariant),
+    modelAvailabilitySectionOpen: normalizeBoolean(
+      value?.modelAvailabilitySectionOpen,
+      DEFAULT_SETTINGS.modelAvailabilitySectionOpen,
+    ),
+    modelToolsSectionOpen: normalizeBoolean(
+      value?.modelToolsSectionOpen,
+      DEFAULT_SETTINGS.modelToolsSectionOpen,
+    ),
+    inlineSerializedDebugLogArgs: normalizeBoolean(
+      value?.inlineSerializedDebugLogArgs,
+      DEFAULT_SETTINGS.inlineSerializedDebugLogArgs,
+    ),
+    debugLogPaths: normalizedDebugLogPaths,
+  };
+}
+
 export function isLocalServerMode(server: ServerConfig): boolean {
   return server.mode === 'local';
 }

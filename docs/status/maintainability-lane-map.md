@@ -1,19 +1,19 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [READY] `R119` 已完成；`R120-R137` 长队列继续推进，当前 `[NEXT]` 为 `R120 - core types settings normalization seam B`。
+> **当前状态**: [READY] `R120` 已完成；`R121-R137` 长队列继续推进，当前 `[NEXT]` 为 `R121 - modelConfig residual merge/assembly seam`。
 
 ## 当前优先级
 
-- **当前 `[NEXT]`**：`R120 - core types settings normalization seam B`
-- **本批目标**：`R119` 已完成 question card cluster、input panel theme family/variant/adapter 映射与 chat appearance 第一组 settings normalization seam；现在继续 Batch 7 secondary core seams，优先收束 provider/model/plugin/debug 相关 normalization residual
+- **当前 `[NEXT]`**：`R121 - modelConfig residual merge/assembly seam`
+- **本批目标**：`R120` 已完成 provider/model/plugin/debug settings normalization seam；现在继续 Batch 7 secondary core seams，优先收束 modelConfig merge/assembly residual、supplement、effective projection 与 provider resolution follow-up
 - **当前 lint 基线**：`0 errors / 65 warnings`
 - **热点顺序**：
-  1. `src/core/types/settings.ts`
-  2. `src/features/settings/OpenCodianSettings.ts`
+  1. `src/core/config/modelConfig.ts`
+  2. `src/core/config/ModelConfigService.ts`
   3. `docs/status/maintainability-round-roadmap.md`
   4. `docs/status/maintainability-master-plan.md`
-  5. `docs/status/maintainability-phase-454.md`
+  5. `docs/status/maintainability-phase-455.md`
 
 ## 本批边界
 
@@ -35,5 +35,5 @@
 ## 历史入口
 
 - 批次归档：`docs/status/maintainability-completed-batches.md`
-- 最近成功 phase：`docs/status/maintainability-phase-454.md`
+- 最近成功 phase：`docs/status/maintainability-phase-455.md`
 - 最近 checkpoint：`docs/status/maintainability-phase-452.md`

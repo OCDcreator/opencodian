@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的 `[NEXT]`”。
-> **当前状态**: [READY] `R119` 已完成；`R120-R137` 长队列继续排队，当前首个 `[NEXT]` 为 `R120 - core types settings normalization seam B`。
+> **当前状态**: [READY] `R120` 已完成；`R121-R137` 长队列继续排队，当前首个 `[NEXT]` 为 `R121 - modelConfig residual merge/assembly seam`。
 
 ## 控制规则
 
@@ -17,8 +17,8 @@
 
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
 - 当前 live lint 基线：`0 errors / 65 warnings`
-- 最近成功 phase：`docs/status/maintainability-phase-453.md`
-- 当前路线判断：`R119` 已完成 core types settings normalization seam A，已把 question card cluster、input panel theme family/variant/adapter 映射与 chat appearance 第一组 normalization residual 收束到更集中的 owner path；当前必须从 `R120` settings normalization seam B 顺序执行，不得 freestyle。
+- 最近成功 phase：`docs/status/maintainability-phase-455.md`
+- 当前路线判断：`R120` 已完成 core types settings normalization seam B，已把 provider/model/plugin/debug load-time normalization residual 收束到更集中的 owner path；当前必须从 `R121` modelConfig residual merge/assembly seam 顺序执行，不得 freestyle。
 
 ## Queue
 ## Queue
@@ -1132,7 +1132,7 @@
 - **禁止项**: 不改变默认值、迁移语义、theme/background/glass normalization。
 - **验收**: settings normalization 第一组 residual 规则更集中。；并通过全量 `npm test` 与 `npm run build`。
 
-### [NEXT] R120 - core types settings normalization seam B
+### [DONE] R120 - core types settings normalization seam B
 
 - **Lane**: Maintainability / settings normalization
 - **目标**: 继续收束 provider/model/plugin/debug 相关 normalization residual。
@@ -1142,7 +1142,7 @@
 - **禁止项**: 不改变 disabled model refs、provider toggle、project/global override 或 debug/export 语义。
 - **验收**: settings normalization 第二组 residual 规则继续收敛。；并通过全量 `npm test` 与 `npm run build`。
 
-### [QUEUED] R121 - modelConfig residual merge/assembly seam
+### [NEXT] R121 - modelConfig residual merge/assembly seam
 
 - **Lane**: Maintainability / config assembly
 - **目标**: 继续在 modelConfig 内收束 merge/assembly residual，包括 supplement、effective projection 与 provider resolution follow-up。

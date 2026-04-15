@@ -23,7 +23,6 @@ import type {
   ChatAppearanceSettings,
   Conversation,
   OpenCodianSettings,
-  PlatformDebugLogPaths,
   ThemePresetDefinition,
   ThemePresetId,
 } from './core/types';
@@ -41,17 +40,15 @@ import {
   isLocalServerMode,
   normalizeBelowHeaderTabBarLayout,
   normalizeChatAppearanceSettings,
-  normalizeDisabledModelRefs,
   normalizeEffortLevel,
   normalizeInputPanelGlassRefractionSettings,
   normalizeInputPanelGlassRefractionSvgFilterSettings,
   normalizeInputPanelLiquidGlassSettings,
+  normalizeModelProviderPluginDebugSettings,
   normalizeInputPanelThemeId,
   normalizeLobehubIconVariant,
   normalizePersistedTabState,
-  normalizePluginIsolationMode,
   normalizeProviderIconColorMode,
-  normalizeProviderIconLibrary,
   normalizeQuestionCardSettings,
   normalizeTabBarPosition,
   normalizeThemeSettings,
@@ -151,11 +148,9 @@ type LoadedSettingsSnapshot = Partial<OpenCodianSettings> & {
 
 type LoadSettingsNormalizationContext = {
   normalizedChatAppearance: OpenCodianSettings['chatAppearance'];
-  normalizedDebugLogPaths: PlatformDebugLogPaths;
   normalizedInputPanelGlassRefraction: OpenCodianSettings['inputPanelGlassRefraction'];
   normalizedInputPanelGlassRefractionSvgFilter: OpenCodianSettings['inputPanelGlassRefractionSvgFilter'];
   normalizedInputPanelLiquidGlass: OpenCodianSettings['inputPanelLiquidGlass'];
-  normalizedProviderIconLibrary: OpenCodianSettings['providerIconLibrary'];
   normalizedServer: OpenCodianSettings['server'];
   normalizedTabState: OpenCodianSettings['tabState'];
   normalizedTheme: OpenCodianSettings['theme'];
@@ -176,22 +171,6 @@ function mergeLoadedSettingsSnapshot(persistedSettings: LoadedPersistedSettings)
     ...(persistedSettings.core.data ?? {}),
     ...(persistedSettings.ui.data ?? {}),
   } as LoadedSettingsSnapshot;
-}
-
-function normalizeDebugLogPathsOnLoad(savedSettings: LoadedSettingsSnapshot | null): PlatformDebugLogPaths {
-  const normalizedDebugLogPaths: PlatformDebugLogPaths = {
-    ...DEFAULT_SETTINGS.debugLogPaths,
-    ...(savedSettings?.debugLogPaths ?? {}),
-  };
-  const legacyDebugLogPath = typeof savedSettings?.debugLogPath === 'string'
-    ? savedSettings.debugLogPath.trim()
-    : '';
-
-  if (legacyDebugLogPath.length > 0 && !normalizedDebugLogPaths[getCurrentPlatformKey()]) {
-    normalizedDebugLogPaths[getCurrentPlatformKey()] = legacyDebugLogPath;
-  }
-
-  return normalizedDebugLogPaths;
 }
 
 function normalizeServerSettingsOnLoad(savedSettings: LoadedSettingsSnapshot | null): {
@@ -420,6 +399,7 @@ function normalizeInputPanelSettingsOnLoad(savedSettings: LoadedSettingsSnapshot
 function buildNormalizedLoadedSettings(
   savedSettings: LoadedSettingsSnapshot | null,
   context: LoadSettingsNormalizationContext,
+  normalizedModelProviderPluginDebugSettings: ReturnType<typeof normalizeModelProviderPluginDebugSettings>,
 ): Partial<OpenCodianSettings> | null {
   if (!savedSettings) {
     return null;
@@ -430,11 +410,13 @@ function buildNormalizedLoadedSettings(
   };
   delete remainingSavedSettings.experimentalComposerGlassRefractionEnabled;
   delete remainingSavedSettings.inputPanelLiquidGlassMode;
+  delete remainingSavedSettings.debugLogPath;
 
   const normalizedQuestionCardSettings = normalizeQuestionCardSettings(savedSettings);
 
   return {
     ...remainingSavedSettings,
+    ...normalizedModelProviderPluginDebugSettings,
     server: context.normalizedServer,
     chatScrollMode:
       (savedSettings.chatScrollMode as OpenCodianSettings['chatScrollMode'] | 'sticky' | undefined) === 'sticky'
@@ -446,42 +428,19 @@ function buildNormalizedLoadedSettings(
     belowHeaderTabBarLayout: normalizeBelowHeaderTabBarLayout(savedSettings.belowHeaderTabBarLayout),
     titleMode: normalizeTitleMode(savedSettings.titleMode),
     ...normalizedQuestionCardSettings,
-    aiTitleModel: typeof savedSettings.aiTitleModel === 'string' ? savedSettings.aiTitleModel.trim() : '',
-    disabledModelRefs: normalizeDisabledModelRefs(savedSettings.disabledModelRefs),
-    renderUserMarkupAsCodeBlocks:
-      typeof savedSettings.renderUserMarkupAsCodeBlocks === 'boolean'
-        ? savedSettings.renderUserMarkupAsCodeBlocks
-        : DEFAULT_SETTINGS.renderUserMarkupAsCodeBlocks,
-    pluginIsolationMode: normalizePluginIsolationMode(savedSettings.pluginIsolationMode),
     inputPanelTheme: normalizeInputPanelThemeId(savedSettings.inputPanelTheme),
     inputPanelGlassRefraction: context.normalizedInputPanelGlassRefraction,
     inputPanelGlassRefractionSvgFilter: context.normalizedInputPanelGlassRefractionSvgFilter,
     inputPanelGlassRefractionGlassDefaultsVersion: INPUT_PANEL_GLASS_REFRACTION_GLASS_DEFAULTS_VERSION,
     inputPanelLiquidGlass: context.normalizedInputPanelLiquidGlass,
-    debugLogPaths: context.normalizedDebugLogPaths,
     chatAppearance: context.normalizedChatAppearance,
     theme: context.normalizedTheme,
     tabState: context.normalizedTabState,
-    modelAvailabilitySectionOpen:
-      typeof savedSettings.modelAvailabilitySectionOpen === 'boolean'
-        ? savedSettings.modelAvailabilitySectionOpen
-        : DEFAULT_SETTINGS.modelAvailabilitySectionOpen,
-    modelToolsSectionOpen:
-      typeof savedSettings.modelToolsSectionOpen === 'boolean'
-        ? savedSettings.modelToolsSectionOpen
-        : DEFAULT_SETTINGS.modelToolsSectionOpen,
-    inlineSerializedDebugLogArgs:
-      typeof savedSettings.inlineSerializedDebugLogArgs === 'boolean'
-        ? savedSettings.inlineSerializedDebugLogArgs
-        : DEFAULT_SETTINGS.inlineSerializedDebugLogArgs,
-    providerIconLibrary: context.normalizedProviderIconLibrary,
-    providerIconColorMode: normalizeProviderIconColorMode(savedSettings.providerIconColorMode),
-    providerIconDefaultVariant: normalizeLobehubIconVariant(savedSettings.providerIconDefaultVariant),
   };
 }
 
 function normalizeLoadedPluginSettings(savedSettings: LoadedSettingsSnapshot | null): LoadSettingsNormalizationResult {
-  const normalizedDebugLogPaths = normalizeDebugLogPathsOnLoad(savedSettings);
+  const normalizedModelProviderPluginDebugSettings = normalizeModelProviderPluginDebugSettings(savedSettings);
   const { normalizedServer, shouldMigrateLegacyLocalDefaultPort } = normalizeServerSettingsOnLoad(savedSettings);
   const { normalizedTheme, normalizedChatAppearance } = normalizeThemeAndChatAppearanceOnLoad(savedSettings);
   const {
@@ -492,16 +451,18 @@ function normalizeLoadedPluginSettings(savedSettings: LoadedSettingsSnapshot | n
   } = normalizeInputPanelSettingsOnLoad(savedSettings);
   const context: LoadSettingsNormalizationContext = {
     normalizedChatAppearance,
-    normalizedDebugLogPaths,
     normalizedInputPanelGlassRefraction,
     normalizedInputPanelGlassRefractionSvgFilter,
     normalizedInputPanelLiquidGlass,
-    normalizedProviderIconLibrary: normalizeProviderIconLibrary(savedSettings?.providerIconLibrary),
     normalizedServer,
     normalizedTabState: normalizePersistedTabState(savedSettings?.tabState),
     normalizedTheme,
   };
-  const normalizedSettings = buildNormalizedLoadedSettings(savedSettings, context);
+  const normalizedSettings = buildNormalizedLoadedSettings(
+    savedSettings,
+    context,
+    normalizedModelProviderPluginDebugSettings,
+  );
 
   return {
     settings: {
@@ -520,14 +481,14 @@ function normalizeLoadedPluginSettings(savedSettings: LoadedSettingsSnapshot | n
         ?? INPUT_PANEL_GLASS_REFRACTION_GLASS_DEFAULTS_VERSION,
       inputPanelLiquidGlass: normalizedSettings?.inputPanelLiquidGlass
         ?? getDefaultInputPanelLiquidGlassSettings(),
-      debugLogPaths: normalizedDebugLogPaths,
+      debugLogPaths: normalizedModelProviderPluginDebugSettings.debugLogPaths,
       disabledModelRefs: normalizedSettings?.disabledModelRefs ?? [],
       chatAppearance: normalizedChatAppearance,
       theme: normalizedTheme,
       tabState: normalizedSettings?.tabState ?? getDefaultPersistedTabState(),
-      providerIconLibrary: context.normalizedProviderIconLibrary,
-      providerIconColorMode: normalizeProviderIconColorMode(normalizedSettings?.providerIconColorMode),
-      providerIconDefaultVariant: normalizeLobehubIconVariant(normalizedSettings?.providerIconDefaultVariant),
+      providerIconLibrary: normalizedModelProviderPluginDebugSettings.providerIconLibrary,
+      providerIconColorMode: normalizedModelProviderPluginDebugSettings.providerIconColorMode,
+      providerIconDefaultVariant: normalizedModelProviderPluginDebugSettings.providerIconDefaultVariant,
     },
     shouldMigrateLegacyLocalDefaultPort,
     shouldResetGlassRefractionGlassDefaults,
