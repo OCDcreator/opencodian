@@ -1,22 +1,22 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [READY] `R103-R137` 长队列继续推进；当前 `[NEXT]` 为 `R103 - QuestionResolutionFlowCoordinator post-resolution seam`。
+> **当前状态**: [READY] `R104-R137` 长队列继续推进；当前 `[NEXT]` 为 `R104 - QuestionTodo status/refresh runtime seam`。
 
 ## 当前优先级
 
-- **当前 `[NEXT]`**：`R103 - QuestionResolutionFlowCoordinator post-resolution seam`
-- **本批目标**：进入 batch 4 的 question / todo / background-task seams，先处理 question resolution、todo refresh、stale notice 与 question dock pending-resolution residual，随后才回到 opencode core、secondary core / settings / startup
+- **当前 `[NEXT]`**：`R104 - QuestionTodo status/refresh runtime seam`
+- **本批目标**：继续 batch 4 的 question / todo / background-task seams，在完成 question resolution seam 后，顺序处理 todo refresh、stale notice 与 question dock pending-resolution residual，随后才回到 opencode core、secondary core / settings / startup
 - **当前 lint 基线**：`0 errors / 65 warnings`
 - **热点顺序**：
   1. `docs/status/maintainability-master-plan.md`
   2. `docs/status/maintainability-round-roadmap.md`
-  3. `docs/status/maintainability-phase-437.md`
-  4. `src/features/chat/services/QuestionResolutionFlowCoordinator.ts`
-  5. `src/features/chat/services/QuestionResolutionExecutionFacade.ts`
-  6. `src/features/chat/services/QuestionTodoStatusRefreshCoordinator.ts`
-  7. `src/features/chat/services/QuestionTodoActivationRefreshCoordinator.ts`
-  8. `src/features/chat/services/SessionTodoStateService.ts`
+  3. `docs/status/maintainability-phase-438.md`
+  4. `src/features/chat/services/QuestionTodoStatusRefreshCoordinator.ts`
+  5. `src/features/chat/services/QuestionTodoActivationRefreshCoordinator.ts`
+  6. `src/features/chat/services/SessionTodoStateService.ts`
+  7. `src/features/chat/services/QuestionDockCoordinator.ts`
+  8. `src/core/opencode/OpenCodeService.ts`
 
 ## 本批边界
 
@@ -38,5 +38,5 @@
 ## 历史入口
 
 - 批次归档：`docs/status/maintainability-completed-batches.md`
-- 最近成功 phase：`docs/status/maintainability-phase-437.md`
+- 最近成功 phase：`docs/status/maintainability-phase-438.md`
 - 最近 checkpoint：`docs/status/maintainability-phase-437.md`

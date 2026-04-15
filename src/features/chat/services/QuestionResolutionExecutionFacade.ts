@@ -1,6 +1,7 @@
 import { Notice } from 'obsidian';
 
 import type { QuestionRequest, QuestionResolution } from '../../../core/types';
+import type { TabId } from '../tabs';
 import { t } from '../../../i18n';
 import { createLogger } from '../../../shared';
 
@@ -20,6 +21,15 @@ export type QuestionResolutionExecutionAction =
 export interface QuestionResolutionExecutionFacadeHost {
   replyToQuestion(requestId: string, answers: string[][]): Promise<void>;
   rejectQuestion(requestId: string): Promise<void>;
+}
+
+export interface QuestionResolutionExecutionLifecyclePort {
+  markResolvedQuestionRequest(requestId: string, tabId: TabId | null): void;
+  applyResolvedQuestionState(
+    resolution: QuestionResolution,
+    tabId: TabId | null,
+  ): void;
+  followUpAfterResolution(tabId: TabId | null): Promise<void>;
 }
 
 const logger = createLogger('QuestionResolutionExecutionFacade');
@@ -53,8 +63,16 @@ export function createQuestionRejectExecutionAction(
   };
 }
 
+export interface QuestionResolutionApplyContext {
+  tabId: TabId | null;
+  afterStateApplied?: (() => void | Promise<void>) | null;
+}
+
 export class QuestionResolutionExecutionFacade {
-  constructor(private readonly host: QuestionResolutionExecutionFacadeHost) {}
+  constructor(
+    private readonly host: QuestionResolutionExecutionFacadeHost,
+    private readonly lifecycle?: QuestionResolutionExecutionLifecyclePort,
+  ) {}
 
   async execute(
     action: QuestionResolutionExecutionAction,
@@ -72,5 +90,21 @@ export class QuestionResolutionExecutionFacade {
       new Notice(t('chat.question.notice.error'));
       return null;
     }
+  }
+
+  async executeAndApply(
+    action: QuestionResolutionExecutionAction,
+    context: QuestionResolutionApplyContext,
+  ): Promise<boolean> {
+    const resolution = await this.execute(action);
+    if (!resolution) {
+      return false;
+    }
+
+    this.lifecycle?.markResolvedQuestionRequest(resolution.request.id, context.tabId);
+    this.lifecycle?.applyResolvedQuestionState(resolution, context.tabId);
+    await context.afterStateApplied?.();
+    await this.lifecycle?.followUpAfterResolution(context.tabId);
+    return true;
   }
 }

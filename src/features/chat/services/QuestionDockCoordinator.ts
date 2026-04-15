@@ -3,11 +3,9 @@ import { Notice } from 'obsidian';
 import type {
   QuestionDisplayMode,
   QuestionRequest,
-  QuestionResolution,
 } from '../../../core/types';
 import { t } from '../../../i18n';
 import { createLogger } from '../../../shared';
-import type { QuestionResolutionCoordinator } from '../runtime/QuestionResolutionCoordinator';
 import type { TabId } from '../tabs';
 import type { QuestionDock } from '../ui/QuestionDock';
 import {
@@ -23,8 +21,8 @@ import type {
   QuestionDockResolutionActionFacade,
   QuestionDockResolutionIntent,
 } from './QuestionDockResolutionActionFacade';
-import type { QuestionPostResolutionRuntimeFacade } from './QuestionPostResolutionRuntimeFacade';
 import type {
+  QuestionResolutionApplyContext,
   QuestionResolutionExecutionAction,
   QuestionResolutionExecutionFacade,
 } from './QuestionResolutionExecutionFacade';
@@ -37,14 +35,9 @@ type QuestionDockResolutionActionPort = Pick<
   QuestionDockResolutionActionFacade,
   'resolveAction'
 >;
-type QuestionResolutionExecutionPort = Pick<QuestionResolutionExecutionFacade, 'execute'>;
-type QuestionResolutionCoordinatorPort = Pick<
-  QuestionResolutionCoordinator,
-  'applyResolvedQuestionState'
->;
-type QuestionPostResolutionRuntimePort = Pick<
-  QuestionPostResolutionRuntimeFacade,
-  'followUpAfterResolution'
+type QuestionResolutionExecutionPort = Pick<
+  QuestionResolutionExecutionFacade,
+  'executeAndApply'
 >;
 
 export interface QuestionDockQueueDeferredRequest {
@@ -88,8 +81,6 @@ export class QuestionDockCoordinator {
     private readonly dockRenderState: QuestionDockRenderStatePort,
     private readonly dockResolutionAction: QuestionDockResolutionActionPort,
     private readonly resolutionExecution: QuestionResolutionExecutionPort,
-    private readonly resolutionCoordinator: QuestionResolutionCoordinatorPort,
-    private readonly postResolutionRuntime: QuestionPostResolutionRuntimePort,
   ) {}
 
   render(): void {
@@ -188,17 +179,10 @@ export class QuestionDockCoordinator {
     tabId: TabId | null,
     options: QuestionDockResolutionApplyOptions = {},
   ): Promise<boolean> {
-    const resolution = await this.resolutionExecution.execute(action);
-    if (!resolution) {
-      return false;
-    }
-
-    await this.completeResolutionAction(
-      resolution,
-      tabId,
-      options.afterStateApplied ?? null,
+    return this.resolutionExecution.executeAndApply(
+      action,
+      this.createResolutionApplyContext(tabId, options.afterStateApplied ?? null),
     );
-    return true;
   }
 
   private renderEmptyDock(
@@ -394,22 +378,14 @@ export class QuestionDockCoordinator {
     }
   }
 
-  private applyResolvedQuestionRuntime(
-    resolution: QuestionResolution,
-    tabId: TabId | null,
-  ): void {
-    this.host.getTabRuntimeState(tabId)?.resolvedQuestionRequestIds.add(resolution.request.id);
-    this.resolutionCoordinator.applyResolvedQuestionState(resolution, tabId);
-  }
-
-  private async completeResolutionAction(
-    resolution: QuestionResolution,
+  private createResolutionApplyContext(
     tabId: TabId | null,
     afterStateApplied: (() => void | Promise<void>) | null,
-  ): Promise<void> {
-    this.applyResolvedQuestionRuntime(resolution, tabId);
-    await afterStateApplied?.();
-    await this.postResolutionRuntime.followUpAfterResolution(tabId);
+  ): QuestionResolutionApplyContext {
+    return {
+      tabId,
+      afterStateApplied,
+    };
   }
 
   private writeBackPendingQuestionRuntime(

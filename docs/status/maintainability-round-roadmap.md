@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的 `[NEXT]`”。
-> **当前状态**: [READY] `R102` 已完成；`R103-R137` 长队列继续排队，当前首个 `[NEXT]` 为 `R103 - QuestionResolutionFlowCoordinator post-resolution seam`。
+> **当前状态**: [READY] `R103` 已完成；`R104-R137` 长队列继续排队，当前首个 `[NEXT]` 为 `R104 - QuestionTodo status/refresh runtime seam`。
 
 ## 控制规则
 
@@ -17,8 +17,8 @@
 
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
 - 当前 live lint 基线：`0 errors / 65 warnings`
-- 最近成功 phase：`docs/status/maintainability-phase-437.md`
-- 当前路线判断：`R102` 已完成 chat services checkpoint，已确认 `R98-R101` 的 residual 收益并把入口切到 batch 4；当前必须从 `R103` 顺序执行，不得 freestyle。
+- 最近成功 phase：`docs/status/maintainability-phase-438.md`
+- 当前路线判断：`R103` 已完成 question resolution execute/apply/follow-up seam，当前必须从 `R104` 顺序执行，不得 freestyle。
 
 ## Queue
 ## Queue
@@ -950,7 +950,7 @@
 
 - **批次目标**: 继续处理 question resolution、todo refresh、stale notice 与 dock pending-resolution residual。
 
-### [NEXT] R103 - QuestionResolutionFlowCoordinator post-resolution seam
+### [DONE] R103 - QuestionResolutionFlowCoordinator post-resolution seam
 
 - **Lane**: Maintainability / question runtime
 - **目标**: 收束 resolution execute、post-resolution apply、card refresh 与 background follow-up lifecycle。
@@ -960,7 +960,7 @@
 - **禁止项**: 不改变 resolution action、card renderer、background follow-up 或 answered-card 语义。
 - **验收**: post-resolution lifecycle 更集中。；并通过全量 `npm test` 与 `npm run build`。
 
-### [QUEUED] R104 - QuestionTodo status/refresh runtime seam
+### [NEXT] R104 - QuestionTodo status/refresh runtime seam
 
 - **Lane**: Maintainability / question todo runtime
 - **目标**: 整合 status refresh、activation refresh、post-sync refresh plan 与 background-task runtime 的 residual 交界。

@@ -138,7 +138,6 @@ function createCoordinator(options?: {
     },
     dockRenderState,
   );
-  const resolutionExecution = new QuestionResolutionExecutionFacade(host);
   const applyResolvedQuestionState = jest.fn();
   const postResolutionRuntime: jest.Mocked<Pick<
     QuestionPostResolutionRuntimeFacade,
@@ -146,15 +145,22 @@ function createCoordinator(options?: {
   >> = {
     followUpAfterResolution: jest.fn().mockResolvedValue(undefined),
   };
+  const resolutionExecution = new QuestionResolutionExecutionFacade(
+    host,
+    {
+      markResolvedQuestionRequest: (requestId, tabId) => {
+        host.getTabRuntimeState(tabId)?.resolvedQuestionRequestIds.add(requestId);
+      },
+      applyResolvedQuestionState,
+      followUpAfterResolution: (tabId) =>
+        postResolutionRuntime.followUpAfterResolution(tabId),
+    },
+  );
   const coordinator = new QuestionDockCoordinator(
     host,
     dockRenderState,
     dockResolutionAction,
     resolutionExecution,
-    {
-      applyResolvedQuestionState,
-    },
-    postResolutionRuntime,
   );
 
   return {

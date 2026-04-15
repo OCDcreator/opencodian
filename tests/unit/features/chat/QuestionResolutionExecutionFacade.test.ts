@@ -5,7 +5,9 @@ import {
   createQuestionRejectExecutionAction,
   createQuestionReplyExecutionAction,
   QuestionResolutionExecutionFacade,
+  type QuestionResolutionApplyContext,
   type QuestionResolutionExecutionFacadeHost,
+  type QuestionResolutionExecutionLifecyclePort,
 } from '../../../../src/features/chat/services/QuestionResolutionExecutionFacade';
 import { setLocale } from '../../../../src/i18n';
 
@@ -33,10 +35,16 @@ function createFacade() {
     replyToQuestion: jest.fn().mockResolvedValue(undefined),
     rejectQuestion: jest.fn().mockResolvedValue(undefined),
   };
+  const lifecycle: jest.Mocked<QuestionResolutionExecutionLifecyclePort> = {
+    markResolvedQuestionRequest: jest.fn(),
+    applyResolvedQuestionState: jest.fn(),
+    followUpAfterResolution: jest.fn().mockResolvedValue(undefined),
+  };
 
   return {
     host,
-    facade: new QuestionResolutionExecutionFacade(host),
+    lifecycle,
+    facade: new QuestionResolutionExecutionFacade(host, lifecycle),
   };
 }
 
@@ -88,6 +96,66 @@ describe('QuestionResolutionExecutionFacade', () => {
 
     expect(noticeSpy).toHaveBeenCalledWith('Failed to send the question response.');
     expect(errorSpy).toHaveBeenCalled();
+    noticeSpy.mockRestore();
+    errorSpy.mockRestore();
+  });
+
+  it('applies resolved runtime state and follow-up through the shared execution seam', async () => {
+    const request = createQuestionRequest();
+    const {
+      facade,
+      host,
+      lifecycle,
+    } = createFacade();
+    const action = createQuestionReplyExecutionAction(request, [['TypeScript']]);
+    const afterStateApplied = jest.fn();
+    const context: QuestionResolutionApplyContext = {
+      tabId: 'tab-active',
+      afterStateApplied,
+    };
+
+    await expect(facade.executeAndApply(action, context)).resolves.toBe(true);
+
+    expect(host.replyToQuestion).toHaveBeenCalledWith(request.id, [['TypeScript']]);
+    expect(lifecycle.markResolvedQuestionRequest).toHaveBeenCalledWith(
+      request.id,
+      'tab-active',
+    );
+    expect(lifecycle.applyResolvedQuestionState).toHaveBeenCalledWith(
+      {
+        request,
+        status: 'answered',
+        answers: [['TypeScript']],
+      },
+      'tab-active',
+    );
+    expect(afterStateApplied).toHaveBeenCalledTimes(1);
+    expect(lifecycle.followUpAfterResolution).toHaveBeenCalledWith('tab-active');
+  });
+
+  it('skips state apply and follow-up when shared execution fails', async () => {
+    const request = createQuestionRequest();
+    const {
+      facade,
+      host,
+      lifecycle,
+    } = createFacade();
+    const afterStateApplied = jest.fn();
+    host.replyToQuestion.mockRejectedValueOnce(new Error('boom'));
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const noticeSpy = jest.spyOn(obsidian, 'Notice').mockImplementation(() => undefined as never);
+
+    await expect(
+      facade.executeAndApply(createQuestionReplyExecutionAction(request, [['TypeScript']]), {
+        tabId: 'tab-active',
+        afterStateApplied,
+      }),
+    ).resolves.toBe(false);
+
+    expect(lifecycle.markResolvedQuestionRequest).not.toHaveBeenCalled();
+    expect(lifecycle.applyResolvedQuestionState).not.toHaveBeenCalled();
+    expect(afterStateApplied).not.toHaveBeenCalled();
+    expect(lifecycle.followUpAfterResolution).not.toHaveBeenCalled();
     noticeSpy.mockRestore();
     errorSpy.mockRestore();
   });

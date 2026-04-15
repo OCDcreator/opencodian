@@ -172,19 +172,27 @@ export function createQuestionRuntimeServices(
     hosts.dockResolutionActionHost,
     dockRenderStateFacade,
   );
-  const resolutionExecutionFacade = new QuestionResolutionExecutionFacade(
-    hosts.resolutionExecutionHost,
-  );
   const postResolutionRuntimeFacade = new QuestionPostResolutionRuntimeFacade(
     hosts.postResolutionRuntimeHost,
+  );
+  const resolutionExecutionFacade = new QuestionResolutionExecutionFacade(
+    hosts.resolutionExecutionHost,
+    {
+      markResolvedQuestionRequest: (requestId, tabId) => {
+        viewHost.getTabRuntimeState(tabId)?.resolvedQuestionRequestIds.add(requestId);
+      },
+      applyResolvedQuestionState: (resolution, tabId) => {
+        resolutionCoordinator.applyResolvedQuestionState(resolution, tabId);
+      },
+      followUpAfterResolution: (tabId) =>
+        postResolutionRuntimeFacade.followUpAfterResolution(tabId),
+    },
   );
   const dockCoordinator = new QuestionDockCoordinator(
     hosts.dockCoordinatorHost,
     dockRenderStateFacade,
     dockResolutionActionFacade,
     resolutionExecutionFacade,
-    resolutionCoordinator,
-    postResolutionRuntimeFacade,
   );
   const resolutionFlowCoordinatorHost: QuestionResolutionFlowCoordinatorHost = {
     getActiveTabId: () => viewHost.getActiveTabId(),
@@ -194,6 +202,7 @@ export function createQuestionRuntimeServices(
     {
       dockCoordinator,
       inlineResolutionAction: inlineResolutionActionFacade,
+      resolutionExecution: resolutionExecutionFacade,
     },
   );
 
