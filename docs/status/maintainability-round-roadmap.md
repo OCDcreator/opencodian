@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的 `[NEXT]`”。
-> **当前状态**: [READY] `R92` 已完成；`R93-R137` 长队列继续排队，当前首个 `[NEXT]` 为 `R93 - ConversationRenderService assistant/body residual seam`。
+> **当前状态**: [READY] `R93` 已完成；`R94-R137` 长队列继续排队，当前首个 `[NEXT]` 为 `R94 - OpenCodianView synced-apply / tail patch residual seam`。
 
 ## 控制规则
 
@@ -18,7 +18,7 @@
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
 - 当前 live lint 基线：`0 errors / 65 warnings`
 - 最近成功 phase：`docs/status/maintainability-phase-427.md`
-- 当前路线判断：`R92` 已完成并复盘 `R88-R91` 的 `OpenCodianView` residual 收益、lint 变化与验证成本；当前已明确续排 `R93-R137`，必须从 `R93` 顺序执行，不得 freestyle。
+- 当前路线判断：`R93` 已完成并收束 `ConversationRenderService` assistant/body render 与 trailing patch preflight residual；当前已明确续排 `R94-R137`，必须从 `R94` 顺序执行，不得 freestyle。
 
 ## Queue
 ## Queue
@@ -842,7 +842,7 @@
 
 - **批次目标**: 继续处理 render、tail patch、post-sync 与 finalization residual。
 
-### [NEXT] R93 - ConversationRenderService assistant/body residual seam
+### [DONE] R93 - ConversationRenderService assistant/body residual seam
 
 - **Lane**: Maintainability / chat rendering
 - **目标**: 继续收束 assistant/body render path、persisted/user branching 与 tail-patch 前置组装 residual。
@@ -852,7 +852,7 @@
 - **禁止项**: 不改变 assistant body render、pseudo-stream reveal、trailing patch 语义。
 - **验收**: render service residual 分支继续收敛。；并通过全量 `npm test` 与 `npm run build`。
 
-### [QUEUED] R94 - OpenCodianView synced-apply / tail patch residual seam
+### [NEXT] R94 - OpenCodianView synced-apply / tail patch residual seam
 
 - **Lane**: Maintainability / chat sync apply
 - **目标**: 继续收束 synced-apply、tail patch trigger、fallback rerender 与 scroll follow-up residual。

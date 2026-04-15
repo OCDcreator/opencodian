@@ -163,18 +163,6 @@ type TrailingAssistantPatchNonMergeableTailFailurePlan = {
   };
 };
 
-type TrailingAssistantPatchPlanningEnvironment = {
-  runtime: ConversationRenderRuntimeState | null;
-  shouldStickToBottom: boolean;
-};
-
-type TrailingAssistantPatchPlanningContextInputs = {
-  previousTailMessage: ChatMessage;
-  nextTailMessage: ChatMessage;
-  patchTarget: TrailingAssistantPatchDomTarget;
-  parentEl: HTMLElement;
-};
-
 type TrailingAssistantPatchPlanningContext = {
   previousTailMessage: ChatMessage;
   nextTailMessage: ChatMessage;
@@ -278,88 +266,26 @@ type ConversationSyncedUpdateApplyContext = {
   previousMessages: ChatMessage[];
 };
 
-class ConversationMessageRenderDelegate {
+class ConversationAssistantMessageRenderDelegate {
   constructor(private readonly host: ConversationRenderHost) {}
 
-  async renderMessage(message: ChatMessage): Promise<HTMLElement | void | undefined> {
-    if (message.role === 'assistant') {
-      return this.host.assistantShellRender.renderPersistedMessage(message);
-    }
-
-    const frame = this.host.createUserMessageFrame(message);
-    if (!frame) {
-      return undefined;
-    }
-
-    const copyContent = await this.host.renderUserMessageContent(frame.contentEl, message);
-    this.host.addUserMessageFooter(frame.messageEl, message, copyContent);
-
-    return frame.messageEl;
-  }
-
-  async renderMessages(messages: ChatMessage[]): Promise<void> {
-    if (messages.length === 0) {
-      await this.renderEmptyConversationNoticeIfNeeded();
-      return;
-    }
-
-    for (const message of this.host.getMessagesForRender(messages)) {
-      await this.renderMessage(message);
-    }
-  }
-
-  async rerenderSingleUserMessage(
-    previousMessageId: string,
+  renderPersistedMessage(
     message: ChatMessage,
-  ): Promise<void> {
-    const messageEl = this.host.getMessagesContainer()
-      ?.querySelector<HTMLElement>(`.opencodian-message[data-message-id="${previousMessageId}"]`);
-    if (!messageEl) {
+  ): Promise<HTMLElement | void | undefined> {
+    return this.host.assistantShellRender.renderPersistedMessage(message);
+  }
+
+  async renderSyncedMessage(message: ChatMessage): Promise<void> {
+    if (!this.shouldPseudoStreamSyncedAssistantMessage(message)) {
+      await this.renderPersistedMessage(message);
       return;
     }
 
-    messageEl.dataset.messageId = message.id;
-    if (message.sourceMessageId) {
-      messageEl.dataset.sourceMessageId = message.sourceMessageId;
-    } else {
-      delete messageEl.dataset.sourceMessageId;
-    }
-
-    messageEl.replaceChildren();
-    const contentEl = document.createElement('div');
-    contentEl.className = 'opencodian-message-content';
-    messageEl.appendChild(contentEl);
-    const copyContent = await this.host.renderUserMessageContent(contentEl, message);
-    this.host.addUserMessageFooter(messageEl, message, copyContent);
-  }
-
-  async renderSyncedMessages(messages: ChatMessage[]): Promise<void> {
-    for (const message of messages) {
-      await this.renderSyncedMessage(message);
-    }
-  }
-
-  private async renderEmptyConversationNoticeIfNeeded(): Promise<void> {
-    if (this.host.shouldRenderEmptyConversationNotice()) {
-      await this.renderMessage(this.host.createEmptyConversationNoticeMessage());
-    }
-  }
-
-  private async renderSyncedMessage(message: ChatMessage): Promise<void> {
-    if (this.shouldPseudoStreamSyncedAssistantMessage(message)) {
-      await this.renderSyncedAssistantMessageWithReveal(message);
-      return;
-    }
-
-    await this.renderMessage(message);
+    await this.renderSyncedAssistantMessageWithReveal(message);
   }
 
   private shouldPseudoStreamSyncedAssistantMessage(message: ChatMessage): boolean {
-    if (message.role !== 'assistant' || message.displayStyle === 'notice') {
-      return false;
-    }
-
-    if (message.questionResolution) {
+    if (message.displayStyle === 'notice' || message.questionResolution) {
       return false;
     }
 
@@ -436,6 +362,334 @@ class ConversationMessageRenderDelegate {
     return new Promise((resolve) => {
       window.setTimeout(resolve, ms);
     });
+  }
+}
+
+class ConversationUserMessageRenderDelegate {
+  constructor(private readonly host: ConversationRenderHost) {}
+
+  async renderMessage(message: ChatMessage): Promise<HTMLElement | undefined> {
+    const frame = this.host.createUserMessageFrame(message);
+    if (!frame) {
+      return undefined;
+    }
+
+    await this.renderMessageIntoFrame(frame, message);
+    return frame.messageEl;
+  }
+
+  async rerenderMessage(previousMessageId: string, message: ChatMessage): Promise<void> {
+    const messageEl = this.findExistingMessageElement(previousMessageId);
+    if (!messageEl) {
+      return;
+    }
+
+    this.syncExistingMessageIdentity(messageEl, message);
+    messageEl.replaceChildren();
+    const contentEl = this.appendMessageContentElement(messageEl);
+    await this.renderMessageIntoFrame({ messageEl, contentEl }, message);
+  }
+
+  private findExistingMessageElement(previousMessageId: string): HTMLElement | null {
+    return this.host.getMessagesContainer()
+      ?.querySelector<HTMLElement>(`.opencodian-message[data-message-id="${previousMessageId}"]`)
+      ?? null;
+  }
+
+  private syncExistingMessageIdentity(messageEl: HTMLElement, message: ChatMessage): void {
+    messageEl.dataset.messageId = message.id;
+    if (message.sourceMessageId) {
+      messageEl.dataset.sourceMessageId = message.sourceMessageId;
+      return;
+    }
+
+    delete messageEl.dataset.sourceMessageId;
+  }
+
+  private appendMessageContentElement(messageEl: HTMLElement): HTMLElement {
+    const contentEl = document.createElement('div');
+    contentEl.className = 'opencodian-message-content';
+    messageEl.appendChild(contentEl);
+    return contentEl;
+  }
+
+  private async renderMessageIntoFrame(
+    frame: ConversationUserMessageRenderFrame,
+    message: ChatMessage,
+  ): Promise<void> {
+    const copyContent = await this.host.renderUserMessageContent(frame.contentEl, message);
+    this.host.addUserMessageFooter(frame.messageEl, message, copyContent);
+  }
+}
+
+class ConversationMessageRenderDelegate {
+  private readonly assistantMessageRenderer: ConversationAssistantMessageRenderDelegate;
+  private readonly userMessageRenderer: ConversationUserMessageRenderDelegate;
+
+  constructor(private readonly host: ConversationRenderHost) {
+    this.assistantMessageRenderer = new ConversationAssistantMessageRenderDelegate(host);
+    this.userMessageRenderer = new ConversationUserMessageRenderDelegate(host);
+  }
+
+  async renderMessage(message: ChatMessage): Promise<HTMLElement | void | undefined> {
+    if (message.role === 'assistant') {
+      return this.assistantMessageRenderer.renderPersistedMessage(message);
+    }
+
+    return this.userMessageRenderer.renderMessage(message);
+  }
+
+  async renderMessages(messages: ChatMessage[]): Promise<void> {
+    if (messages.length === 0) {
+      await this.renderEmptyConversationNoticeIfNeeded();
+      return;
+    }
+
+    for (const message of this.host.getMessagesForRender(messages)) {
+      await this.renderMessage(message);
+    }
+  }
+
+  async rerenderSingleUserMessage(
+    previousMessageId: string,
+    message: ChatMessage,
+  ): Promise<void> {
+    await this.userMessageRenderer.rerenderMessage(previousMessageId, message);
+  }
+
+  async renderSyncedMessages(messages: ChatMessage[]): Promise<void> {
+    for (const message of messages) {
+      await this.renderSyncedMessage(message);
+    }
+  }
+
+  private async renderEmptyConversationNoticeIfNeeded(): Promise<void> {
+    if (this.host.shouldRenderEmptyConversationNotice()) {
+      await this.renderMessage(this.host.createEmptyConversationNoticeMessage());
+    }
+  }
+
+  private async renderSyncedMessage(message: ChatMessage): Promise<void> {
+    if (message.role === 'assistant') {
+      await this.assistantMessageRenderer.renderSyncedMessage(message);
+      return;
+    }
+
+    await this.userMessageRenderer.renderMessage(message);
+  }
+}
+
+class TrailingAssistantPatchPlanningDelegate {
+  constructor(private readonly host: ConversationRenderHost) {}
+
+  resolvePreflight(
+    previousMessages: ChatMessage[],
+    nextMessages: ChatMessage[],
+    tabId: TabId | null,
+  ): TrailingAssistantPatchPreflight {
+    const activeContainer = this.resolveActiveContainer(tabId);
+    if (!activeContainer.ok) {
+      return activeContainer;
+    }
+    const { messagesEl } = activeContainer;
+
+    const renderedMessages = this.resolveRenderedMessages(previousMessages, nextMessages);
+    if (!renderedMessages.ok) {
+      return renderedMessages;
+    }
+    const { previousRenderedMessages, nextRenderedMessages } = renderedMessages;
+
+    const nonTailSignatureMismatch = this.resolveNonTailSignatureMismatch(
+      previousRenderedMessages,
+      nextRenderedMessages,
+    );
+    if (!nonTailSignatureMismatch.ok) {
+      return nonTailSignatureMismatch;
+    }
+
+    const tailMessages = this.resolveTailMessages(previousRenderedMessages, nextRenderedMessages);
+    if (!tailMessages.ok) {
+      return tailMessages;
+    }
+
+    const patchTargets = this.resolvePatchTargets(messagesEl);
+    if (!patchTargets.ok) {
+      return patchTargets;
+    }
+
+    return {
+      ok: true,
+      planningContext: this.buildPlanningContext(tailMessages, patchTargets, tabId),
+    };
+  }
+
+  private resolveNonTailSignatureMismatch(
+    previousRenderedMessages: ChatMessage[],
+    nextRenderedMessages: ChatMessage[],
+  ): TrailingAssistantPatchNonTailSignatureResult {
+    const lastIndex = previousRenderedMessages.length - 1;
+    for (let index = 0; index < lastIndex; index += 1) {
+      if (
+        this.host.getMessageVisualSignature(previousRenderedMessages[index])
+        !== this.host.getMessageVisualSignature(nextRenderedMessages[index])
+      ) {
+        return {
+          ok: false,
+          reason: 'non-tail-message-signature-mismatch',
+          payload: {
+            mismatchIndex: index,
+          },
+        };
+      }
+    }
+
+    return { ok: true };
+  }
+
+  private resolveTailMessages(
+    previousRenderedMessages: ChatMessage[],
+    nextRenderedMessages: ChatMessage[],
+  ): TrailingAssistantPatchTailMessagesResult {
+    const previousTailMessage = previousRenderedMessages[previousRenderedMessages.length - 1];
+    const nextTailMessage = nextRenderedMessages[nextRenderedMessages.length - 1];
+    if (!this.isPatchableAssistantTail(previousTailMessage, nextTailMessage)) {
+      return {
+        ok: false,
+        ...this.buildNonMergeableTailFailurePlan(previousTailMessage, nextTailMessage),
+      };
+    }
+
+    return {
+      ok: true,
+      previousTailMessage,
+      nextTailMessage,
+    };
+  }
+
+  private isPatchableAssistantTail(
+    previousTailMessage: ChatMessage,
+    nextTailMessage: ChatMessage,
+  ): boolean {
+    return previousTailMessage.role === 'assistant'
+      && nextTailMessage.role === 'assistant'
+      && previousTailMessage.displayStyle !== 'notice'
+      && nextTailMessage.displayStyle !== 'notice';
+  }
+
+  private buildNonMergeableTailFailurePlan(
+    previousTailMessage: ChatMessage,
+    nextTailMessage: ChatMessage,
+  ): TrailingAssistantPatchNonMergeableTailFailurePlan {
+    return {
+      reason: 'tail-message-not-mergeable-assistant',
+      payload: {
+        previousTail: this.host.summarizeChatMessageForDebug(previousTailMessage),
+        nextTail: this.host.summarizeChatMessageForDebug(nextTailMessage),
+      },
+    };
+  }
+
+  private resolveRenderedMessages(
+    previousMessages: ChatMessage[],
+    nextMessages: ChatMessage[],
+  ): TrailingAssistantPatchRenderedMessagesResult {
+    const previousRenderedMessages = this.host.getMessagesForRender(previousMessages);
+    const nextRenderedMessages = this.host.getMessagesForRender(nextMessages);
+    if (
+      previousRenderedMessages.length === 0
+      || previousRenderedMessages.length !== nextRenderedMessages.length
+    ) {
+      return { ok: false, reason: 'rendered-message-count-mismatch' };
+    }
+
+    return {
+      ok: true,
+      previousRenderedMessages,
+      nextRenderedMessages,
+    };
+  }
+
+  private resolveActiveContainer(
+    tabId: TabId | null,
+  ): TrailingAssistantPatchContainerResult {
+    const messagesEl = this.host.getMessagesContainer();
+    if (!messagesEl || this.host.getActiveTabId() !== tabId) {
+      return { ok: false, reason: 'missing-container-or-inactive-tab' };
+    }
+
+    return {
+      ok: true,
+      messagesEl,
+    };
+  }
+
+  private buildPlanningContext(
+    tailMessages: SuccessfulTrailingAssistantPatchTailMessages,
+    patchTargets: SuccessfulTrailingAssistantPatchTargets,
+    tabId: TabId | null,
+  ): TrailingAssistantPatchPlanningContext {
+    return {
+      previousTailMessage: tailMessages.previousTailMessage,
+      nextTailMessage: tailMessages.nextTailMessage,
+      patchTarget: this.buildDomTarget(patchTargets),
+      parentEl: patchTargets.parentEl,
+      runtime: this.host.getRenderRuntimeForTab(tabId),
+      shouldStickToBottom: this.host.shouldAutoScroll(tabId),
+    };
+  }
+
+  private buildDomTarget(
+    patchTargets: SuccessfulTrailingAssistantPatchTargets,
+  ): TrailingAssistantPatchDomTarget {
+    return {
+      messageEl: patchTargets.existingTailMessageEl,
+      contentEl: patchTargets.existingContentEl,
+    };
+  }
+
+  private resolvePatchTargets(messagesEl: HTMLElement): TrailingAssistantPatchTargets {
+    const existingTailMessageEl = this.findExistingTrailingAssistantElement(messagesEl);
+    const parentEl = existingTailMessageEl?.parentElement;
+    if (!existingTailMessageEl || !(parentEl instanceof HTMLElement)) {
+      return this.buildTargetFailureResult('missing-existing-tail-element');
+    }
+
+    const existingContentEl = existingTailMessageEl.querySelector('.opencodian-message-content');
+    if (!(existingContentEl instanceof HTMLElement)) {
+      return this.buildTargetFailureResult('missing-tail-content-element');
+    }
+
+    return this.buildTargetSuccessResult(existingTailMessageEl, existingContentEl, parentEl);
+  }
+
+  private buildTargetFailureResult(
+    reason: TrailingAssistantPatchTargetFailureReason,
+  ): TrailingAssistantPatchTargetFailureResult {
+    return {
+      ok: false,
+      reason,
+    };
+  }
+
+  private buildTargetSuccessResult(
+    existingTailMessageEl: HTMLElement,
+    existingContentEl: HTMLElement,
+    parentEl: HTMLElement,
+  ): SuccessfulTrailingAssistantPatchTargets {
+    return {
+      ok: true,
+      existingTailMessageEl,
+      existingContentEl,
+      parentEl,
+    };
+  }
+
+  private findExistingTrailingAssistantElement(messagesEl: HTMLElement): HTMLElement | null {
+    return Array.from(
+      messagesEl.querySelectorAll<HTMLElement>('.opencodian-message--assistant'),
+    )
+      .filter((element) => !element.classList.contains('opencodian-message--notice'))
+      .pop() ?? null;
   }
 }
 
@@ -517,9 +771,11 @@ class ConversationSyncedUpdateApplyDelegate {
 export class ConversationRenderService {
   private readonly messageRenderer: ConversationMessageRenderDelegate;
   private readonly syncedUpdateApplier: ConversationSyncedUpdateApplyDelegate;
+  private readonly trailingAssistantPatchPlanner: TrailingAssistantPatchPlanningDelegate;
 
   constructor(private readonly host: ConversationRenderHost) {
     this.messageRenderer = new ConversationMessageRenderDelegate(host);
+    this.trailingAssistantPatchPlanner = new TrailingAssistantPatchPlanningDelegate(host);
     this.syncedUpdateApplier = new ConversationSyncedUpdateApplyDelegate(
       host,
       this.messageRenderer,
@@ -638,7 +894,7 @@ export class ConversationRenderService {
       );
       return false;
     };
-    const preflight = this.resolveTrailingAssistantPatchPreflight(
+    const preflight = this.trailingAssistantPatchPlanner.resolvePreflight(
       previousMessages,
       nextMessages,
       tabId,
@@ -665,206 +921,6 @@ export class ConversationRenderService {
     return true;
   }
 
-  private resolveTrailingAssistantPatchNonTailSignatureMismatch(
-    previousRenderedMessages: ChatMessage[],
-    nextRenderedMessages: ChatMessage[],
-  ): TrailingAssistantPatchNonTailSignatureResult {
-    const lastIndex = previousRenderedMessages.length - 1;
-    for (let index = 0; index < lastIndex; index += 1) {
-      if (
-        this.host.getMessageVisualSignature(previousRenderedMessages[index])
-        !== this.host.getMessageVisualSignature(nextRenderedMessages[index])
-      ) {
-        return {
-          ok: false,
-          reason: 'non-tail-message-signature-mismatch',
-          payload: {
-            mismatchIndex: index,
-          },
-        };
-      }
-    }
-
-    return { ok: true };
-  }
-
-  private isPatchableAssistantTail(
-    previousTailMessage: ChatMessage,
-    nextTailMessage: ChatMessage,
-  ): boolean {
-    return previousTailMessage.role === 'assistant'
-      && nextTailMessage.role === 'assistant'
-      && previousTailMessage.displayStyle !== 'notice'
-      && nextTailMessage.displayStyle !== 'notice';
-  }
-
-  private buildTrailingAssistantPatchNonMergeableTailFailurePlan(
-    previousTailMessage: ChatMessage,
-    nextTailMessage: ChatMessage,
-  ): TrailingAssistantPatchNonMergeableTailFailurePlan {
-    return {
-      reason: 'tail-message-not-mergeable-assistant',
-      payload: {
-        previousTail: this.host.summarizeChatMessageForDebug(previousTailMessage),
-        nextTail: this.host.summarizeChatMessageForDebug(nextTailMessage),
-      },
-    };
-  }
-
-  private resolveTrailingAssistantPatchTailMessages(
-    previousRenderedMessages: ChatMessage[],
-    nextRenderedMessages: ChatMessage[],
-  ): TrailingAssistantPatchTailMessagesResult {
-    const previousTailMessage = previousRenderedMessages[previousRenderedMessages.length - 1];
-    const nextTailMessage = nextRenderedMessages[nextRenderedMessages.length - 1];
-    if (!this.isPatchableAssistantTail(previousTailMessage, nextTailMessage)) {
-      return {
-        ok: false,
-        ...this.buildTrailingAssistantPatchNonMergeableTailFailurePlan(
-          previousTailMessage,
-          nextTailMessage,
-        ),
-      };
-    }
-
-    return {
-      ok: true,
-      previousTailMessage,
-      nextTailMessage,
-    };
-  }
-
-  private resolveTrailingAssistantPatchRenderedMessages(
-    previousMessages: ChatMessage[],
-    nextMessages: ChatMessage[],
-  ): TrailingAssistantPatchRenderedMessagesResult {
-    const previousRenderedMessages = this.host.getMessagesForRender(previousMessages);
-    const nextRenderedMessages = this.host.getMessagesForRender(nextMessages);
-    if (
-      previousRenderedMessages.length === 0
-      || previousRenderedMessages.length !== nextRenderedMessages.length
-    ) {
-      return { ok: false, reason: 'rendered-message-count-mismatch' };
-    }
-
-    return {
-      ok: true,
-      previousRenderedMessages,
-      nextRenderedMessages,
-    };
-  }
-
-  private resolveTrailingAssistantPatchActiveContainer(
-    tabId: TabId | null,
-  ): TrailingAssistantPatchContainerResult {
-    const messagesEl = this.host.getMessagesContainer();
-    if (!messagesEl || this.host.getActiveTabId() !== tabId) {
-      return { ok: false, reason: 'missing-container-or-inactive-tab' };
-    }
-
-    return {
-      ok: true,
-      messagesEl,
-    };
-  }
-
-  private resolveTrailingAssistantPatchPreflight(
-    previousMessages: ChatMessage[],
-    nextMessages: ChatMessage[],
-    tabId: TabId | null,
-  ): TrailingAssistantPatchPreflight {
-    const activeContainer = this.resolveTrailingAssistantPatchActiveContainer(tabId);
-    if (!activeContainer.ok) {
-      return activeContainer;
-    }
-    const { messagesEl } = activeContainer;
-
-    const renderedMessages = this.resolveTrailingAssistantPatchRenderedMessages(
-      previousMessages,
-      nextMessages,
-    );
-    if (!renderedMessages.ok) {
-      return renderedMessages;
-    }
-    const { previousRenderedMessages, nextRenderedMessages } = renderedMessages;
-
-    const nonTailSignatureMismatch = this.resolveTrailingAssistantPatchNonTailSignatureMismatch(
-      previousRenderedMessages,
-      nextRenderedMessages,
-    );
-    if (!nonTailSignatureMismatch.ok) {
-      return nonTailSignatureMismatch;
-    }
-
-    const tailMessages = this.resolveTrailingAssistantPatchTailMessages(
-      previousRenderedMessages,
-      nextRenderedMessages,
-    );
-    if (!tailMessages.ok) {
-      return tailMessages;
-    }
-
-    const patchTargets = this.resolveTrailingAssistantPatchTargets(messagesEl);
-    if (!patchTargets.ok) {
-      return patchTargets;
-    }
-
-    return {
-      ok: true,
-      planningContext: this.buildTrailingAssistantPatchPlanningContext(
-        tailMessages,
-        patchTargets,
-        tabId,
-      ),
-    };
-  }
-
-  private buildTrailingAssistantPatchPlanningContext(
-    tailMessages: SuccessfulTrailingAssistantPatchTailMessages,
-    patchTargets: SuccessfulTrailingAssistantPatchTargets,
-    tabId: TabId | null,
-  ): TrailingAssistantPatchPlanningContext {
-    return this.buildTrailingAssistantPatchSuccessPlanningContext(
-      this.buildTrailingAssistantPatchPlanningContextInputs(tailMessages, patchTargets),
-      this.buildTrailingAssistantPatchPlanningEnvironment(tabId),
-    );
-  }
-
-  private buildTrailingAssistantPatchPlanningContextInputs(
-    tailMessages: SuccessfulTrailingAssistantPatchTailMessages,
-    patchTargets: SuccessfulTrailingAssistantPatchTargets,
-  ): TrailingAssistantPatchPlanningContextInputs {
-    return {
-      previousTailMessage: tailMessages.previousTailMessage,
-      nextTailMessage: tailMessages.nextTailMessage,
-      patchTarget: this.buildTrailingAssistantPatchDomTarget(patchTargets),
-      parentEl: patchTargets.parentEl,
-    };
-  }
-
-  private buildTrailingAssistantPatchSuccessPlanningContext(
-    planningInputs: TrailingAssistantPatchPlanningContextInputs,
-    environment: TrailingAssistantPatchPlanningEnvironment,
-  ): TrailingAssistantPatchPlanningContext {
-    return {
-      previousTailMessage: planningInputs.previousTailMessage,
-      nextTailMessage: planningInputs.nextTailMessage,
-      patchTarget: planningInputs.patchTarget,
-      parentEl: planningInputs.parentEl,
-      runtime: environment.runtime,
-      shouldStickToBottom: environment.shouldStickToBottom,
-    };
-  }
-
-  private buildTrailingAssistantPatchPlanningEnvironment(
-    tabId: TabId | null,
-  ): TrailingAssistantPatchPlanningEnvironment {
-    return {
-      runtime: this.host.getRenderRuntimeForTab(tabId),
-      shouldStickToBottom: this.host.shouldAutoScroll(tabId),
-    };
-  }
-
   private buildTrailingAssistantPatchSuccessPlan(
     planningContext: TrailingAssistantPatchPlanningContext,
   ): TrailingAssistantPatchSuccessPlan {
@@ -875,15 +931,6 @@ export class ConversationRenderService {
         summarizeChatMessageForDebug: this.host.summarizeChatMessageForDebug,
       }),
     );
-  }
-
-  private buildTrailingAssistantPatchDomTarget(
-    patchTargets: SuccessfulTrailingAssistantPatchTargets,
-  ): TrailingAssistantPatchDomTarget {
-    return {
-      messageEl: patchTargets.existingTailMessageEl,
-      contentEl: patchTargets.existingContentEl,
-    };
   }
 
   private async executeTrailingAssistantPatch(
@@ -902,61 +949,6 @@ export class ConversationRenderService {
       executionPlan.contentEl,
       executionPlan.nextTailMessage,
     );
-  }
-
-  private buildTrailingAssistantPatchTargetFailureResult(
-    reason: TrailingAssistantPatchTargetFailureReason,
-  ): TrailingAssistantPatchTargetFailureResult {
-    return {
-      ok: false,
-      reason,
-    };
-  }
-
-  private buildTrailingAssistantPatchTargetSuccessResult(
-    existingTailMessageEl: HTMLElement,
-    existingContentEl: HTMLElement,
-    parentEl: HTMLElement,
-  ): SuccessfulTrailingAssistantPatchTargets {
-    return {
-      ok: true,
-      existingTailMessageEl,
-      existingContentEl,
-      parentEl,
-    };
-  }
-
-  private resolveTrailingAssistantPatchTargets(
-    messagesEl: HTMLElement,
-  ): TrailingAssistantPatchTargets {
-    const existingTailMessageEl = this.findExistingTrailingAssistantElement(messagesEl);
-    const parentEl = existingTailMessageEl?.parentElement;
-    if (!existingTailMessageEl || !(parentEl instanceof HTMLElement)) {
-      return this.buildTrailingAssistantPatchTargetFailureResult(
-        'missing-existing-tail-element',
-      );
-    }
-
-    const existingContentEl = existingTailMessageEl.querySelector('.opencodian-message-content');
-    if (!(existingContentEl instanceof HTMLElement)) {
-      return this.buildTrailingAssistantPatchTargetFailureResult(
-        'missing-tail-content-element',
-      );
-    }
-
-    return this.buildTrailingAssistantPatchTargetSuccessResult(
-      existingTailMessageEl,
-      existingContentEl,
-      parentEl,
-    );
-  }
-
-  private findExistingTrailingAssistantElement(messagesEl: HTMLElement): HTMLElement | null {
-    return Array.from(
-      messagesEl.querySelectorAll<HTMLElement>('.opencodian-message--assistant'),
-    )
-      .filter((element) => !element.classList.contains('opencodian-message--notice'))
-      .pop() ?? null;
   }
 
 }
