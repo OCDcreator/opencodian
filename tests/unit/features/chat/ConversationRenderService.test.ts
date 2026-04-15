@@ -21,6 +21,7 @@ import type {
   Conversation,
 } from '../../../../src/core/types';
 import {
+  type ConversationAssistantShellRenderPort,
   type ConversationAssistantTailRenderPort,
   type ConversationRenderHost,
   ConversationRenderService,
@@ -36,6 +37,13 @@ type MockedConversationAssistantTailRenderPort = {
     ConversationAssistantTailRenderPort[Key] extends (...args: infer Args) => infer Result
       ? jest.Mock<Result, Args>
       : ConversationAssistantTailRenderPort[Key];
+};
+
+type MockedConversationAssistantShellRenderPort = {
+  [Key in keyof ConversationAssistantShellRenderPort]:
+    ConversationAssistantShellRenderPort[Key] extends (...args: infer Args) => infer Result
+      ? jest.Mock<Result, Args>
+      : ConversationAssistantShellRenderPort[Key];
 };
 
 function createMessage(overrides: Partial<ChatMessage> = {}): ChatMessage {
@@ -63,14 +71,17 @@ type MockedConversationRenderHost = {
   [Key in keyof ConversationRenderHost]:
     Key extends 'assistantTailRender'
       ? MockedConversationAssistantTailRenderPort
+      : Key extends 'assistantShellRender'
+        ? MockedConversationAssistantShellRenderPort
       : ConversationRenderHost[Key] extends (...args: infer Args) => infer Result
         ? jest.Mock<Result, Args>
         : ConversationRenderHost[Key];
 };
 
 function createHost(
-  overrides: Partial<Omit<MockedConversationRenderHost, 'assistantTailRender'>> & {
+  overrides: Partial<Omit<MockedConversationRenderHost, 'assistantTailRender' | 'assistantShellRender'>> & {
     assistantTailRender?: Partial<MockedConversationAssistantTailRenderPort>;
+    assistantShellRender?: Partial<MockedConversationAssistantShellRenderPort>;
   } = {},
 ): MockedConversationRenderHost & {
   messagesEl: HTMLElement;
@@ -114,8 +125,37 @@ function createHost(
     finalizePersistedFooter: jest.fn(),
     ...overrides.assistantTailRender,
   };
+  const assistantShellRender: MockedConversationAssistantShellRenderPort = {
+    renderPersistedMessage: jest.fn().mockImplementation(async (message: ChatMessage) => {
+      const messageEl = document.createElement('div');
+      messageEl.className = 'opencodian-message opencodian-message--assistant';
+      messageEl.dataset.messageId = message.id;
+      const contentEl = document.createElement('div');
+      contentEl.className = 'opencodian-message-content';
+      contentEl.textContent = message.content;
+      messageEl.appendChild(contentEl);
+      messagesEl.appendChild(messageEl);
+      return messageEl;
+    }),
+    createAssistantMessageElement: jest.fn().mockImplementation(() => {
+      const messageEl = document.createElement('div');
+      messageEl.className = 'opencodian-message opencodian-message--assistant is-streaming';
+      const contentEl = document.createElement('div');
+      contentEl.className = 'opencodian-message-content';
+      messageEl.appendChild(contentEl);
+      messagesEl.appendChild(messageEl);
+      return {
+        messageEl,
+        contentEl,
+      };
+    }),
+    finalizePseudoStreamFooter: jest.fn(),
+    clearStreamingMessageState: jest.fn(),
+    ...overrides.assistantShellRender,
+  };
   const hostOverrides = { ...overrides };
   delete hostOverrides.assistantTailRender;
+  delete hostOverrides.assistantShellRender;
 
   return {
     messagesEl,
@@ -133,9 +173,40 @@ function createHost(
       messagesEl.replaceChildren();
     }),
     resetTurnState: jest.fn(),
-    renderMessages: jest.fn().mockResolvedValue(undefined),
-    renderMessage: jest.fn().mockResolvedValue(undefined),
-    renderSyncedAssistantMessageWithReveal: jest.fn().mockResolvedValue(undefined),
+    shouldRenderEmptyConversationNotice: jest.fn().mockReturnValue(false),
+    createEmptyConversationNoticeMessage: jest.fn().mockImplementation(() =>
+      createMessage({
+        id: 'opencodian-empty-rewind',
+        content: 'Nothing to show',
+        displayStyle: 'notice',
+      })),
+    createUserMessageFrame: jest.fn().mockImplementation((message: ChatMessage) => {
+      const messageEl = document.createElement('div');
+      messageEl.className = `opencodian-message opencodian-message--${message.role}`;
+      messageEl.dataset.messageId = message.id;
+      const contentEl = document.createElement('div');
+      contentEl.className = 'opencodian-message-content';
+      messageEl.appendChild(contentEl);
+      messagesEl.appendChild(messageEl);
+      return {
+        messageEl,
+        contentEl,
+      };
+    }),
+    renderUserMessageContent: jest.fn().mockImplementation(async (
+      contentEl: HTMLElement,
+      message: ChatMessage,
+    ) => {
+      contentEl.textContent = message.content;
+      return message.content;
+    }),
+    addUserMessageFooter: jest.fn(),
+    renderMarkdownInto: jest.fn().mockImplementation(async (
+      contentEl: HTMLElement,
+      markdown: string,
+    ) => {
+      contentEl.textContent = markdown;
+    }),
     renderBackgroundTaskIndicatorIfNeeded: jest.fn().mockResolvedValue(undefined),
     syncBackgroundTaskStateFromConversation: jest.fn(),
     shouldAutoScroll: jest.fn().mockReturnValue(false),
@@ -156,7 +227,7 @@ function createHost(
       streamState: message.streamState ?? null,
       contentBlocks: message.contentBlocks ?? null,
     })),
-    shouldPseudoStreamSyncedAssistantMessage: jest.fn().mockReturnValue(false),
+    assistantShellRender,
     assistantTailRender,
     logAssistantFinalizationDebug: jest.fn(),
     summarizeChatMessageForDebug: jest.fn().mockImplementation((message: ChatMessage | null | undefined) =>
@@ -226,11 +297,68 @@ describe('ConversationRenderService', () => {
     expect(result).toBeNull();
   });
 
+  it('renders the empty conversation notice when a rewind leaves no messages', async () => {
+    const host = createHost({
+      shouldRenderEmptyConversationNotice: jest.fn().mockReturnValue(true),
+    });
+    const service = new ConversationRenderService(host);
+
+    await service.renderMessages([]);
+
+    expect(host.createEmptyConversationNoticeMessage).toHaveBeenCalledTimes(1);
+    expect(host.assistantShellRender.renderPersistedMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'opencodian-empty-rewind',
+        displayStyle: 'notice',
+      }),
+    );
+  });
+
+  it('rerenders stored user messages through the shared user render hooks', async () => {
+    const host = createHost();
+    const messageEl = document.createElement('div');
+    messageEl.className = 'opencodian-message opencodian-message--user';
+    messageEl.dataset.messageId = 'user-1';
+    messageEl.dataset.sourceMessageId = 'source-1';
+    const staleContentEl = document.createElement('div');
+    staleContentEl.className = 'opencodian-message-content';
+    staleContentEl.textContent = 'stale';
+    messageEl.appendChild(staleContentEl);
+    host.messagesEl.appendChild(messageEl);
+    const updatedMessage = createMessage({
+      id: 'user-2',
+      role: 'user',
+      content: 'Updated user text',
+    });
+    const service = new ConversationRenderService(host);
+
+    await service.rerenderSingleUserMessage('user-1', updatedMessage);
+
+    expect(host.renderUserMessageContent).toHaveBeenCalledWith(
+      expect.any(HTMLElement),
+      updatedMessage,
+    );
+    expect(host.addUserMessageFooter).toHaveBeenCalledWith(
+      messageEl,
+      updatedMessage,
+      updatedMessage.content,
+    );
+    expect(messageEl.dataset.messageId).toBe('user-2');
+    expect(messageEl.dataset.sourceMessageId).toBeUndefined();
+    expect(messageEl.querySelector('.opencodian-message-content')?.textContent).toBe(
+      updatedMessage.content,
+    );
+  });
+
   it('appends rendered messages without forcing a full rerender', async () => {
     const previousMessages = [
       createMessage({ id: 'user-1', role: 'user', content: 'Hi' }),
     ];
-    const appendedMessage = createMessage({ id: 'assistant-2', content: 'Hello there' });
+    const appendedMessage = createMessage({
+      id: 'assistant-2',
+      content: 'Hello there',
+      contentBlocks: [{ type: 'thinking', thinking: 'step' }],
+    });
     const nextMessages = [...previousMessages, appendedMessage];
     const conversation = createConversation(nextMessages);
     const host = createHost({
@@ -241,8 +369,8 @@ describe('ConversationRenderService', () => {
     await service.applySyncedConversationUpdate(previousMessages, nextMessages);
 
     expect(host.syncBackgroundTaskStateFromConversation).toHaveBeenCalledWith(conversation);
-    expect(host.renderMessage).toHaveBeenCalledWith(appendedMessage);
-    expect(host.renderMessages).not.toHaveBeenCalled();
+    expect(host.assistantShellRender.renderPersistedMessage).toHaveBeenCalledWith(appendedMessage);
+    expect(host.clearMessagesContainer).not.toHaveBeenCalled();
   });
 
   it('finalizes a stable trailing assistant footer without forcing a full rerender', async () => {
@@ -263,7 +391,7 @@ describe('ConversationRenderService', () => {
 
     expect(host.assistantTailRender.finalizePersistedFooter).toHaveBeenCalledWith(tailEl, nextMessages[0]);
     expect(host.assistantTailRender.renderMessageBody).not.toHaveBeenCalled();
-    expect(host.renderMessages).not.toHaveBeenCalled();
+    expect(host.clearMessagesContainer).not.toHaveBeenCalled();
     expect(tailEl.dataset.messageId).toBe('assistant-2');
   });
 
@@ -490,8 +618,8 @@ describe('ConversationRenderService', () => {
 
     await service.applySyncedConversationUpdate(previousMessages, nextMessages);
 
-    expect(host.renderMessages).toHaveBeenCalledWith(nextMessages);
     expect(host.beginConversationHydration).toHaveBeenCalledWith('tab-1');
+    expect(host.assistantShellRender.renderPersistedMessage).toHaveBeenCalledWith(nextMessages[0]);
     expect(host.endConversationHydration).toHaveBeenCalledWith('tab-1');
   });
 
@@ -658,16 +786,21 @@ describe('ConversationRenderService', () => {
     const conversation = createConversation(nextMessages);
     const host = createHost({
       getCurrentConversation: jest.fn().mockReturnValue(conversation),
-      shouldPseudoStreamSyncedAssistantMessage: jest.fn().mockImplementation(
-        (message: ChatMessage) => message.id === 'assistant-2',
-      ),
     });
     const service = new ConversationRenderService(host);
 
     await service.applySyncedConversationUpdate(previousMessages, nextMessages);
 
-    expect(host.renderSyncedAssistantMessageWithReveal).toHaveBeenCalledWith(appendedMessage);
-    expect(host.renderMessage).not.toHaveBeenCalled();
+    expect(host.assistantShellRender.createAssistantMessageElement).toHaveBeenCalledTimes(1);
+    expect(host.renderMarkdownInto).toHaveBeenCalledWith(
+      expect.any(HTMLElement),
+      appendedMessage.content,
+    );
+    expect(host.assistantShellRender.finalizePseudoStreamFooter).toHaveBeenCalledWith(
+      expect.any(HTMLElement),
+      appendedMessage,
+    );
+    expect(host.assistantShellRender.renderPersistedMessage).not.toHaveBeenCalled();
   });
 
   it('preserves hydration, scroll restore, and layout sync during full rerenders', async () => {
@@ -687,7 +820,8 @@ describe('ConversationRenderService', () => {
     expect(host.clearScheduledScrollToBottom).toHaveBeenCalledTimes(1);
     expect(host.clearMessagesContainer).toHaveBeenCalledTimes(1);
     expect(host.resetTurnState).toHaveBeenCalledTimes(1);
-    expect(host.renderMessages).toHaveBeenCalledWith(messages);
+    expect(host.createUserMessageFrame).toHaveBeenCalledWith(messages[0]);
+    expect(host.assistantShellRender.renderPersistedMessage).toHaveBeenCalledWith(messages[1]);
     expect(host.renderBackgroundTaskIndicatorIfNeeded).toHaveBeenCalledTimes(1);
     expect(captureElementScrollRestoreSnapshot).toHaveBeenCalledWith(host.messagesEl, false, 120);
     expect(restoreElementScrollAfterRender).toHaveBeenCalled();

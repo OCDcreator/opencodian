@@ -96,6 +96,24 @@ export interface ConversationAssistantTailRenderPort {
   finalizePersistedFooter(messageEl: HTMLElement, message: ChatMessage): void;
 }
 
+export interface ConversationAssistantShellRenderPort {
+  renderPersistedMessage(message: ChatMessage): Promise<HTMLElement | void | undefined>;
+  createAssistantMessageElement(): {
+    messageEl: HTMLElement;
+    contentEl: HTMLElement;
+  };
+  finalizePseudoStreamFooter(
+    messageEl: HTMLElement,
+    message: Pick<ChatMessage, 'content' | 'timestamp' | 'modelId'>,
+  ): void;
+  clearStreamingMessageState(): void;
+}
+
+export interface ConversationUserMessageRenderFrame {
+  messageEl: HTMLElement;
+  contentEl: HTMLElement;
+}
+
 export interface ConversationRenderHost {
   getCurrentConversation(): Conversation | null;
   getMessagesContainer(): HTMLElement | null;
@@ -108,9 +126,12 @@ export interface ConversationRenderHost {
   endConversationHydration(tabId: TabId | null): void;
   clearMessagesContainer(): void;
   resetTurnState(): void;
-  renderMessages(messages: ChatMessage[]): Promise<void>;
-  renderMessage(message: ChatMessage): Promise<HTMLElement | void | undefined>;
-  renderSyncedAssistantMessageWithReveal(message: ChatMessage): Promise<void>;
+  shouldRenderEmptyConversationNotice(): boolean;
+  createEmptyConversationNoticeMessage(): ChatMessage;
+  createUserMessageFrame(message: ChatMessage): ConversationUserMessageRenderFrame | null;
+  renderUserMessageContent(container: HTMLElement, message: ChatMessage): Promise<string>;
+  addUserMessageFooter(messageEl: HTMLElement, message: ChatMessage, content?: string): void;
+  renderMarkdownInto(container: HTMLElement, markdown: string): Promise<void>;
   renderBackgroundTaskIndicatorIfNeeded(tabId?: TabId | null): Promise<void>;
   syncBackgroundTaskStateFromConversation(conversation: Conversation): void;
 
@@ -122,7 +143,7 @@ export interface ConversationRenderHost {
 
   getMessagesForRender(messages: ChatMessage[]): ChatMessage[];
   getMessageVisualSignature(message: ChatMessage): string;
-  shouldPseudoStreamSyncedAssistantMessage(message: ChatMessage): boolean;
+  assistantShellRender: ConversationAssistantShellRenderPort;
   assistantTailRender: ConversationAssistantTailRenderPort;
 
   logAssistantFinalizationDebug(label: string, payload: unknown): void;
@@ -245,6 +266,60 @@ type SuccessfulTrailingAssistantPatchTailMessages = Extract<
 export class ConversationRenderService {
   constructor(private readonly host: ConversationRenderHost) {}
 
+  async renderMessage(message: ChatMessage): Promise<HTMLElement | void | undefined> {
+    if (message.role === 'assistant') {
+      return this.host.assistantShellRender.renderPersistedMessage(message);
+    }
+
+    const frame = this.host.createUserMessageFrame(message);
+    if (!frame) {
+      return undefined;
+    }
+
+    const copyContent = await this.host.renderUserMessageContent(frame.contentEl, message);
+    this.host.addUserMessageFooter(frame.messageEl, message, copyContent);
+
+    return frame.messageEl;
+  }
+
+  async renderMessages(messages: ChatMessage[]): Promise<void> {
+    if (messages.length === 0) {
+      if (this.host.shouldRenderEmptyConversationNotice()) {
+        await this.renderMessage(this.host.createEmptyConversationNoticeMessage());
+      }
+      return;
+    }
+
+    for (const message of this.host.getMessagesForRender(messages)) {
+      await this.renderMessage(message);
+    }
+  }
+
+  async rerenderSingleUserMessage(
+    previousMessageId: string,
+    message: ChatMessage,
+  ): Promise<void> {
+    const messageEl = this.host.getMessagesContainer()
+      ?.querySelector<HTMLElement>(`.opencodian-message[data-message-id="${previousMessageId}"]`);
+    if (!messageEl) {
+      return;
+    }
+
+    messageEl.dataset.messageId = message.id;
+    if (message.sourceMessageId) {
+      messageEl.dataset.sourceMessageId = message.sourceMessageId;
+    } else {
+      delete messageEl.dataset.sourceMessageId;
+    }
+
+    messageEl.replaceChildren();
+    const contentEl = document.createElement('div');
+    contentEl.className = 'opencodian-message-content';
+    messageEl.appendChild(contentEl);
+    const copyContent = await this.host.renderUserMessageContent(contentEl, message);
+    this.host.addUserMessageFooter(messageEl, message, copyContent);
+  }
+
   async rerenderConversationMessages(conversation: Conversation): Promise<void> {
     const currentConversation = this.host.getCurrentConversation();
     const messagesEl = this.host.getMessagesContainer();
@@ -278,7 +353,7 @@ export class ConversationRenderService {
     this.host.resetTurnState();
 
     try {
-      await this.host.renderMessages(conversation.messages);
+      await this.renderMessages(conversation.messages);
       await this.host.renderBackgroundTaskIndicatorIfNeeded();
       restoreElementScrollAfterRender(messagesEl, scrollSnapshot, {
         runtime: this.host.getScrollRuntimeForTab(activeTabId),
@@ -338,10 +413,10 @@ export class ConversationRenderService {
     }
 
     for (const messageToRender of incrementalUpdate.appendedRenderedMessages) {
-      if (this.host.shouldPseudoStreamSyncedAssistantMessage(messageToRender)) {
-        await this.host.renderSyncedAssistantMessageWithReveal(messageToRender);
+      if (this.shouldPseudoStreamSyncedAssistantMessage(messageToRender)) {
+        await this.renderSyncedAssistantMessageWithReveal(messageToRender);
       } else {
-        await this.host.renderMessage(messageToRender);
+        await this.renderMessage(messageToRender);
       }
     }
 
@@ -350,6 +425,55 @@ export class ConversationRenderService {
     if (shouldStickToBottom) {
       this.host.scrollToBottom();
     }
+  }
+
+  shouldPseudoStreamSyncedAssistantMessage(message: ChatMessage): boolean {
+    if (message.role !== 'assistant' || message.displayStyle === 'notice') {
+      return false;
+    }
+
+    if (message.questionResolution) {
+      return false;
+    }
+
+    if (!message.content?.trim()) {
+      return false;
+    }
+
+    if (!message.contentBlocks || message.contentBlocks.length === 0) {
+      return true;
+    }
+
+    return message.contentBlocks.every((block) => block.type === 'text' && Boolean(block.text));
+  }
+
+  async renderSyncedAssistantMessageWithReveal(message: ChatMessage): Promise<void> {
+    const { messageEl, contentEl } = this.host.assistantShellRender.createAssistantMessageElement();
+    const textEl = document.createElement('div');
+    textEl.className = 'streaming-text-block';
+    contentEl.appendChild(textEl);
+    const chunks = this.splitPseudoStreamChunks(message.content);
+    const delayMs = this.getPseudoStreamDelay(chunks.length);
+
+    messageEl.style.visibility = 'hidden';
+
+    let rendered = '';
+    for (const chunk of chunks) {
+      rendered += chunk;
+      await this.host.renderMarkdownInto(textEl, rendered);
+      if (messageEl.style.visibility === 'hidden') {
+        messageEl.style.visibility = '';
+      }
+      if (delayMs > 0) {
+        await this.sleep(delayMs);
+      }
+    }
+
+    if (messageEl.style.visibility === 'hidden') {
+      messageEl.style.visibility = '';
+    }
+    this.host.assistantShellRender.finalizePseudoStreamFooter(messageEl, message);
+    this.host.assistantShellRender.clearStreamingMessageState();
   }
 
   async patchTrailingAssistantRender(
@@ -694,5 +818,40 @@ export class ConversationRenderService {
     )
       .filter((element) => !element.classList.contains('opencodian-message--notice'))
       .pop() ?? null;
+  }
+
+  private splitPseudoStreamChunks(text: string): string[] {
+    const normalized = text.replace(/\r\n/g, '\n');
+    const chunks: string[] = [];
+    let buffer = '';
+
+    for (const char of normalized) {
+      buffer += char;
+      if (buffer.length >= 12 || /[\n，。！？；：,.!?;:]/u.test(char)) {
+        chunks.push(buffer);
+        buffer = '';
+      }
+    }
+
+    if (buffer) {
+      chunks.push(buffer);
+    }
+
+    return chunks.length > 0 ? chunks : [text];
+  }
+
+  private getPseudoStreamDelay(chunkCount: number): number {
+    if (chunkCount <= 1) {
+      return 0;
+    }
+
+    const targetDurationMs = 900;
+    return Math.max(12, Math.min(36, Math.round(targetDurationMs / chunkCount)));
+  }
+
+  private sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => {
+      window.setTimeout(resolve, ms);
+    });
   }
 }

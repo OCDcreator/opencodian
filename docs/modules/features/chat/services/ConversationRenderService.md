@@ -7,12 +7,15 @@
 
 `ConversationRenderService` 负责把 `OpenCodianView` 里最密集的一段消息区重渲编排抽成独立 service：
 
+- persisted assistant / user message 的基础渲染入口
+- empty-rewind notice 与单条 user body rerender
+- synced text assistant 的 pseudo-stream reveal
 - conversation 全量重渲
 - synced message 的 append-only 增量渲染
 - 尾部 assistant render patch
 - 无法安全增量时回退 full rerender
 
-它不持有聊天视图的 DOM 根状态，也不直接依赖插件实例；所有真实渲染、scroll runtime、background-task UI 和调试日志都通过 `ConversationRenderHost` 回调回到 `OpenCodianView`。其中 assistant tail 相关的正文签名、正文重渲与 persisted footer 收尾，进一步收束在嵌套的 `ConversationAssistantTailRenderPort`。
+它不持有聊天视图的 DOM 根状态，也不直接依赖插件实例；所有真实渲染、scroll runtime、background-task UI 和调试日志都通过 `ConversationRenderHost` 回调回到 `OpenCodianView`。其中 persisted assistant shell / pseudo-stream footer / streaming-shell state 收尾由嵌套的 `ConversationAssistantShellRenderPort` 提供，assistant tail 相关的正文签名、正文重渲与 persisted footer 收尾则进一步收束在 `ConversationAssistantTailRenderPort`。
 
 ## 公开接口
 
@@ -35,7 +38,26 @@ export interface ConversationAssistantTailRenderPort {
   finalizePersistedFooter(messageEl: HTMLElement, message: ChatMessage): void;
 }
 
+export interface ConversationAssistantShellRenderPort {
+  renderPersistedMessage(message: ChatMessage): Promise<HTMLElement | void | undefined>;
+  createAssistantMessageElement(): {
+    messageEl: HTMLElement;
+    contentEl: HTMLElement;
+  };
+  finalizePseudoStreamFooter(
+    messageEl: HTMLElement,
+    message: Pick<ChatMessage, 'content' | 'timestamp' | 'modelId'>,
+  ): void;
+  clearStreamingMessageState(): void;
+}
+
 export class ConversationRenderService {
+  renderMessage(message: ChatMessage): Promise<HTMLElement | void | undefined>;
+  renderMessages(messages: ChatMessage[]): Promise<void>;
+  rerenderSingleUserMessage(
+    previousMessageId: string,
+    message: ChatMessage,
+  ): Promise<void>;
   rerenderConversationMessages(conversation: Conversation): Promise<void>;
   applySyncedConversationUpdate(
     previousMessages: ChatMessage[],
@@ -51,6 +73,12 @@ export class ConversationRenderService {
 
 ## 关键行为
 
+### 基础消息渲染
+
+- assistant persisted shell 直接复用 `AssistantShellViewHostAdapter`，避免 view 再持有顶层 assistant render/update 分支
+- user message shell / footer 仍通过 host callback 回到 view，但 render service 现在统一掌握“何时创建 frame、何时重绘 content/footer”
+- 空 conversation 且存在 revert state 时，会通过 host 提供的 notice message source 渲染空白 rewind notice
+
 ### 全量重渲
 
 - 只在当前活动 conversation 仍匹配、且消息容器存在时执行
@@ -61,7 +89,7 @@ export class ConversationRenderService {
 
 - `getIncrementalRenderedMessageUpdate()` 先判断是否还能沿用现有 rendered message 前缀
 - append-only 时只渲染新增消息，不重跑整段历史
-- 纯文本 assistant append 继续走 pseudo-stream reveal，而不是直接静态落盘
+- 纯文本 assistant append 继续直接在 service 内走 pseudo-stream reveal，而不是回到 view 再分支
 
 ### 尾部 assistant patch
 
@@ -92,8 +120,8 @@ export class ConversationRenderService {
 
 ## 与 `OpenCodianView` 的边界
 
-- `OpenCodianView` 仍保留 `renderMessage()`、`renderMessages()`、`renderAssistantMessageBody()`、pseudo-stream reveal 和 tab runtime 所有权
-- `OpenCodianView` 会先组装 `ConversationAssistantTailRenderPort`，再把它作为 `ConversationRenderHost` 的 assistant-tail 子边界传给 service
-- `ConversationRenderService` 只负责决定“何时整段重渲、何时 patch 尾部、何时仅追加”
+- `OpenCodianView` 现在主要保留 `renderAssistantMessageBody()` / `renderUserMessageContent()` / `renderContentBlock()` 这类 leaf renderer，以及 empty-notice 文案、copy/footer、markdown 与 tab runtime host seam
+- `OpenCodianView` 会先组装 `ConversationAssistantShellRenderPort` 与 `ConversationAssistantTailRenderPort`，再把它们作为 `ConversationRenderHost` 的子边界传给 service
+- `ConversationRenderService` 现在同时负责决定“何时整段重渲、何时 patch 尾部、何时仅追加、何时直接重画单条 user/assistant shell”
 - persisted assistant shell / notice / footer 装配已经下沉到 `AssistantShellViewHostAdapter`，所以这里的 tail port 只关心正文重渲与 footer finalization
 - 这样消息区编排逻辑首次拥有独立单测边界，而不用把 assistant renderer 一起打散

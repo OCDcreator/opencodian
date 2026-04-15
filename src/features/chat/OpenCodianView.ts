@@ -5,7 +5,7 @@
  */
 
 import type { Editor, EventRef, WorkspaceLeaf } from 'obsidian';
-import { addIcon, Component, ItemView, MarkdownView, normalizePath, Notice, Scope, setIcon } from 'obsidian';
+import { addIcon, Component, ItemView, MarkdownView, normalizePath, Notice, Scope } from 'obsidian';
 
 import {
   type ResolvedModelSelection,
@@ -207,11 +207,11 @@ import {
   createConversationHydrationRuntimeViewHosts,
 } from './services/ConversationHydrationRuntimeViewHostFactory';
 import {
+  type ConversationAssistantShellRenderPort,
   type ConversationAssistantTailRenderPort,
   type ConversationRenderHost,
+  type ConversationUserMessageRenderFrame,
   ConversationRenderService,
-  getIncrementalRenderedMessageUpdate as getConversationIncrementalRenderedMessageUpdate,
-  type IncrementalRenderedMessageUpdate,
 } from './services/ConversationRenderService';
 import {
   ConversationRestoreBootstrapCoordinator,
@@ -2165,6 +2165,8 @@ export class OpenCodianView extends ItemView {
   }
 
   private createConversationRenderHost(): ConversationRenderHost {
+    const assistantShellRender: ConversationAssistantShellRenderPort =
+      this.createConversationAssistantShellRenderPort();
     const assistantTailRender: ConversationAssistantTailRenderPort =
       this.createConversationAssistantTailRenderPort();
 
@@ -2189,9 +2191,19 @@ export class OpenCodianView extends ItemView {
       resetTurnState: () => {
         this.resetTurnState();
       },
-      renderMessages: (messages) => this.renderMessages(messages),
-      renderMessage: (message) => this.renderMessage(message),
-      renderSyncedAssistantMessageWithReveal: (message) => this.renderSyncedAssistantMessageWithReveal(message),
+      shouldRenderEmptyConversationNotice: () =>
+        Boolean(this.currentConversationRevertState?.messageID),
+      createEmptyConversationNoticeMessage: () =>
+        this.createEmptyConversationNoticeMessage(),
+      createUserMessageFrame: (message) =>
+        this.createUserMessageRenderFrame(message),
+      renderUserMessageContent: (container, message) =>
+        this.renderUserMessageContent(container, message),
+      addUserMessageFooter: (messageEl, message, content) => {
+        this.addUserMessageFooter(messageEl, message, content);
+      },
+      renderMarkdownInto: (container, markdown) =>
+        this.renderMarkdownInto(container, markdown),
       renderBackgroundTaskIndicatorIfNeeded: (tabId) => this.renderBackgroundTaskIndicatorIfNeeded(tabId),
       syncBackgroundTaskStateFromConversation: (conversation) => {
         this.syncBackgroundTaskStateFromConversation(conversation);
@@ -2209,12 +2221,28 @@ export class OpenCodianView extends ItemView {
       requestAnimationFrame: (callback) => window.requestAnimationFrame(callback),
       getMessagesForRender: (messages) => this.getMessagesForRender(messages),
       getMessageVisualSignature: (message) => this.getMessageVisualSignature(message),
-      shouldPseudoStreamSyncedAssistantMessage: (message) => this.shouldPseudoStreamSyncedAssistantMessage(message),
+      assistantShellRender,
       assistantTailRender,
       logAssistantFinalizationDebug: (label, payload) => {
         this.logAssistantFinalizationDebug(label, payload);
       },
       summarizeChatMessageForDebug: (message) => this.summarizeChatMessageForDebug(message),
+    };
+  }
+
+  private createConversationAssistantShellRenderPort(): ConversationAssistantShellRenderPort {
+    return {
+      renderPersistedMessage: (message) =>
+        this.assistantShellViewHostAdapter.renderPersistedAssistantMessage({ message }),
+      createAssistantMessageElement: () =>
+        this.assistantShellViewHostAdapter.createAssistantMessageElement(),
+      finalizePseudoStreamFooter: (messageEl, message) => {
+        this.assistantShellViewHostAdapter.finalizePseudoStreamFooter(messageEl, message);
+      },
+      clearStreamingMessageState: () => {
+        this.streamingMessageEl = null;
+        this.streamingContentEl = null;
+      },
     };
   }
 
@@ -3770,19 +3798,17 @@ export class OpenCodianView extends ItemView {
 
   /** Render a message */
   private async renderMessage(message: ChatMessage) {
-    if (message.role === 'assistant') {
-      return this.assistantShellViewHostAdapter.renderPersistedAssistantMessage({
-        message,
-      });
-    }
+    return this.conversationRenderService.renderMessage(message);
+  }
 
+  private createUserMessageRenderFrame(message: ChatMessage): ConversationUserMessageRenderFrame | null {
     const turn = this.createTurn();
     const parentEl = turn?.headerEl;
     const messageEl = parentEl?.createDiv({
       cls: `opencodian-message opencodian-message--${message.role}`,
     });
 
-    if (!messageEl) return;
+    if (!messageEl || !turn) return null;
     const runtime = this.getTabRuntimeState();
     runtime?.turnBodyByAnchorKey.set(this.getMessageAnchorKey(message), turn.bodyEl);
     messageEl.dataset.messageId = message.id;
@@ -3793,10 +3819,10 @@ export class OpenCodianView extends ItemView {
     // Content container
     const content = messageEl.createDiv({ cls: 'opencodian-message-content' });
 
-    const copyContent = await this.renderUserMessageContent(content, message);
-    this.addUserMessageFooter(messageEl, message, copyContent);
-
-    return messageEl;
+    return {
+      messageEl,
+      contentEl: content,
+    };
   }
 
   private async renderAssistantMessageBody(
@@ -3978,16 +4004,7 @@ export class OpenCodianView extends ItemView {
   }
 
   private async renderMessages(messages: ChatMessage[]): Promise<void> {
-    if (messages.length === 0) {
-      if (this.currentConversationRevertState?.messageID) {
-        await this.renderMessage(this.createEmptyConversationNoticeMessage());
-      }
-      return;
-    }
-
-    for (const message of this.getMessagesForRender(messages)) {
-      await this.renderMessage(message);
-    }
+    await this.conversationRenderService.renderMessages(messages);
   }
 
   private armBackgroundTaskIndicatorForUserMessage(
@@ -4202,30 +4219,6 @@ export class OpenCodianView extends ItemView {
     }
   }
 
-  /** Update message content during streaming */
-  private async updateMessageContent(contentEl: HTMLElement, content: string) {
-    if (!this.markdownService) {
-      contentEl.textContent = content;
-      return;
-    }
-
-    // Use markdown rendering for streaming updates
-    await this.markdownService.render(contentEl, content);
-  }
-
-  /** Render tool use */
-  private renderToolUse(name: string, input: Record<string, unknown>) {
-    const toolEl = this.messagesContainer?.createDiv({ cls: 'opencodian-tool-use' });
-    if (!toolEl) return;
-
-    const header = toolEl.createDiv({ cls: 'opencodian-tool-header' });
-    setIcon(header.createDiv({ cls: 'opencodian-tool-icon' }), 'wrench');
-    header.createEl('span', { text: name });
-
-    const inputEl = toolEl.createEl('pre', { cls: 'opencodian-tool-input' });
-    inputEl.textContent = JSON.stringify(input, null, 2);
-  }
-
   private attachCopyButtonBehavior(copyBtn: HTMLElement, content: string): void {
     let feedbackTimeout: ReturnType<typeof setTimeout> | null = null;
     const labelId = copyBtn.getAttribute('aria-labelledby');
@@ -4399,23 +4392,7 @@ export class OpenCodianView extends ItemView {
     previousMessageId: string,
     message: ChatMessage,
   ): Promise<void> {
-    const messageEl = this.messagesContainer
-      ?.querySelector<HTMLElement>(`.opencodian-message[data-message-id="${previousMessageId}"]`);
-    if (!messageEl) {
-      return;
-    }
-
-    messageEl.dataset.messageId = message.id;
-    if (message.sourceMessageId) {
-      messageEl.dataset.sourceMessageId = message.sourceMessageId;
-    } else {
-      delete messageEl.dataset.sourceMessageId;
-    }
-
-    messageEl.empty();
-    const contentEl = messageEl.createDiv({ cls: 'opencodian-message-content' });
-    const copyContent = await this.renderUserMessageContent(contentEl, message);
-    this.addUserMessageFooter(messageEl, message, copyContent);
+    await this.conversationRenderService.rerenderSingleUserMessage(previousMessageId, message);
   }
 
   private addUserMessageFooter(messageEl: HTMLElement, message: ChatMessage, content?: string): void {
@@ -4512,101 +4489,6 @@ export class OpenCodianView extends ItemView {
     nextMessages: ChatMessage[],
   ): Promise<void> {
     await this.conversationRenderService.applySyncedConversationUpdate(previousMessages, nextMessages);
-  }
-
-  private getIncrementalRenderedMessageUpdate(
-    previousMessages: ChatMessage[],
-    nextMessages: ChatMessage[],
-  ): IncrementalRenderedMessageUpdate | null {
-    return getConversationIncrementalRenderedMessageUpdate({
-      previousMessages,
-      nextMessages,
-      getMessagesForRender: (messages) => this.getMessagesForRender(messages),
-      getMessageVisualSignature: (message) => this.getMessageVisualSignature(message),
-    });
-  }
-
-  private shouldPseudoStreamSyncedAssistantMessage(message: ChatMessage): boolean {
-    if (message.role !== 'assistant' || message.displayStyle === 'notice') {
-      return false;
-    }
-
-    if (message.questionResolution) {
-      return false;
-    }
-
-    if (!message.content?.trim()) {
-      return false;
-    }
-
-    if (!message.contentBlocks || message.contentBlocks.length === 0) {
-      return true;
-    }
-
-    return message.contentBlocks.every((block) => block.type === 'text' && Boolean(block.text));
-  }
-
-  private async renderSyncedAssistantMessageWithReveal(message: ChatMessage): Promise<void> {
-    const { messageEl, contentEl } = this.assistantShellViewHostAdapter.createAssistantMessageElement();
-    const textEl = contentEl.createDiv({ cls: 'streaming-text-block' });
-    const chunks = this.splitPseudoStreamChunks(message.content);
-    const delayMs = this.getPseudoStreamDelay(chunks.length);
-
-    messageEl.style.visibility = 'hidden';
-
-    let rendered = '';
-    for (const chunk of chunks) {
-      rendered += chunk;
-      await this.renderMarkdownInto(textEl, rendered);
-      if (messageEl.style.visibility === 'hidden') {
-        messageEl.style.visibility = '';
-      }
-      if (delayMs > 0) {
-        await this.sleep(delayMs);
-      }
-    }
-
-    if (messageEl.style.visibility === 'hidden') {
-      messageEl.style.visibility = '';
-    }
-    this.assistantShellViewHostAdapter.finalizePseudoStreamFooter(messageEl, message);
-    this.streamingMessageEl = null;
-    this.streamingContentEl = null;
-  }
-
-  private splitPseudoStreamChunks(text: string): string[] {
-    const normalized = text.replace(/\r\n/g, '\n');
-    const chunks: string[] = [];
-    let buffer = '';
-
-    for (const char of normalized) {
-      buffer += char;
-      if (buffer.length >= 12 || /[\n，。！？；：,.!?;:]/u.test(char)) {
-        chunks.push(buffer);
-        buffer = '';
-      }
-    }
-
-    if (buffer) {
-      chunks.push(buffer);
-    }
-
-    return chunks.length > 0 ? chunks : [text];
-  }
-
-  private getPseudoStreamDelay(chunkCount: number): number {
-    if (chunkCount <= 1) {
-      return 0;
-    }
-
-    const targetDurationMs = 900;
-    return Math.max(12, Math.min(36, Math.round(targetDurationMs / chunkCount)));
-  }
-
-  private sleep(ms: number): Promise<void> {
-    return new Promise((resolve) => {
-      window.setTimeout(resolve, ms);
-    });
   }
 
   private isNearBottom(threshold?: number): boolean {

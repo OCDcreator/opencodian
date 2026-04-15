@@ -1,11 +1,11 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [READY] `R69` 已完成，当前首个 `[NEXT]` 为 `R70 - OpenCodianView message render/update seam`。
+> **当前状态**: [READY] `R70` 已完成，当前首个 `[NEXT]` 为 `R71 - ConversationRenderService assistant/body render seam`。
 
 ## 当前优先级
 
-- **当前 `[NEXT]`**：`R70 - OpenCodianView message render/update seam`
+- **当前 `[NEXT]`**：`R71 - ConversationRenderService assistant/body render seam`
 - **本批目标**：先连续拿下 chat runtime / services，再推进 opencode core，再拆 heavy tests 并继续 warning cleanup，最后 checkpoint
 - **当前 lint 基线**：`0 errors / 79 warnings`
 - **热点顺序**：
@@ -43,5 +43,5 @@
 ## 历史入口
 
 - 批次归档：`docs/status/maintainability-completed-batches.md`
-- 最近成功 phase：`docs/status/maintainability-phase-402.md`
+- 最近成功 phase：`docs/status/maintainability-phase-405.md`
 - 最近 checkpoint：`docs/status/maintainability-phase-402.md`

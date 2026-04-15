@@ -16,7 +16,7 @@
 ## 当前背景
 
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
-- 最近成功 phase：`docs/status/maintainability-phase-402.md`
+- 最近成功 phase：`docs/status/maintainability-phase-405.md`
 - 当前 live lint 基线：`0 errors / 79 warnings`
 - 当前路线判断：上一批已在 `R67` checkpoint 收口；当前新 batch 直接转向 chat runtime / services 与 opencode core，并把 heavy tests / warning cleanup 明确写成 `R81-R86`。
 
@@ -463,7 +463,7 @@
   - `OpenCodianView` 对 conversation load/recovery 分支的直接持有明显减少
   - focused validation、全量 `npm test`、`npm run build` 通过
 
-### [NEXT] R70 - OpenCodianView message render/update seam
+### [DONE] R70 - OpenCodianView message render/update seam
 
 - **Lane**: Maintainability / chat render update
 - **目标**: 从 `src/features/chat/OpenCodianView.ts:3805` 一带收束 renderMessage/renderMessages/renderContentBlock、user/assistant body update、tail patch 与 pseudo-stream update 的残余 render lifecycle。
@@ -481,7 +481,7 @@
   - `OpenCodianView` 对 message render/update 细节的直接铺开明显减少
   - focused validation、全量 `npm test`、`npm run build` 通过
 
-### [QUEUED] R71 - ConversationRenderService assistant/body render seam
+### [NEXT] R71 - ConversationRenderService assistant/body render seam
 
 - **Lane**: Maintainability / chat render service
 - **目标**: 从 `src/features/chat/services/ConversationRenderService.ts` 收束 assistant shell/body patch、content-block dispatch、tail rerender 与 synced update apply 的完整 render-service seam。
