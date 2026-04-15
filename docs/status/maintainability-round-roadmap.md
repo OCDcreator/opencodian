@@ -425,7 +425,7 @@
   - 如果 warning 未进入低八十区间，需要明确说明原因与后续优先级
 
 
-### [NEXT] R68 - OpenCodianView tab pane/runtime lifecycle seam
+### [DONE] R68 - OpenCodianView tab pane/runtime lifecycle seam
 
 - **Lane**: Maintainability / chat tab runtime
 - **目标**: 从 `src/features/chat/OpenCodianView.ts:2566` 一带收束 tab pane state、active pane switching、tab manager wiring、stream-like tab state sync 与 persist/restore lifecycle，优先把 tab runtime 责任继续压回现有 coordinator/owner，而不是留在 view 内散落。
@@ -444,7 +444,7 @@
   - `OpenCodianView` 对 tab pane/runtime state 的直接装配明显减少
   - focused validation、全量 `npm test`、`npm run build` 通过
 
-### [QUEUED] R69 - OpenCodianView conversation load and recovery lifecycle seam
+### [NEXT] R69 - OpenCodianView conversation load and recovery lifecycle seam
 
 - **Lane**: Maintainability / chat conversation load
 - **目标**: 从 `src/features/chat/OpenCodianView.ts:3445` 一带收束 create/load/fork/rewind、restore bootstrap、missing-conversation recovery 与 activation follow-up 的完整 conversation lifecycle。

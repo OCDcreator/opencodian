@@ -151,6 +151,7 @@ docs/modules/
 │   │   │   ├── ConversationRestoreBootstrapCoordinator.md
 │   │   │   ├── ConversationTabLifecycleRecoveryCoordinator.md
 │   │   │   ├── ConversationTabOpenCoordinator.md
+│   │   │   ├── ConversationTabRuntimeCoordinator.md
 │   │   │   ├── ConversationViewStateService.md
 │   │   │   ├── MessageFinalizationService.md
 │   │   │   ├── MessageSendPreparationService.md

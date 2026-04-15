@@ -251,6 +251,10 @@ import {
   type ConversationTabOpenHost,
 } from './services/ConversationTabOpenCoordinator';
 import {
+  ConversationTabRuntimeCoordinator,
+  type ConversationTabRuntimeCoordinatorHost,
+} from './services/ConversationTabRuntimeCoordinator';
+import {
   type ConversationViewStateHost,
   ConversationViewStateService,
 } from './services/ConversationViewStateService';
@@ -317,7 +321,7 @@ import {
   type TabMessagesPaneState,
 } from './services/TabMessagesPaneCoordinator';
 import { TitleGenerationService } from './services/TitleGenerationService';
-import { TabBar, type TabBarLayoutMode, type TabId, TabManager } from './tabs';
+import type { TabBar, TabId, TabManager } from './tabs';
 import { ContextDetailModal, type ContextRawMessageItem } from './ui/ContextDetailModal';
 import { ContextRing } from './ui/ContextRing';
 import { EffortSelector } from './ui/EffortSelector';
@@ -434,6 +438,7 @@ interface OpenCodianViewConversationRuntimeWiring {
   conversationTabOpenCoordinator: ConversationTabOpenCoordinator;
   conversationTabLifecycleRecoveryCoordinator: ConversationTabLifecycleRecoveryCoordinator;
   conversationRestoreBootstrapCoordinator: ConversationRestoreBootstrapCoordinator;
+  conversationTabRuntimeCoordinator: ConversationTabRuntimeCoordinator<TabRuntimeState>;
 }
 
 interface OpenCodianViewInteractionRuntimeWiring {
@@ -588,6 +593,7 @@ export class OpenCodianView extends ItemView {
   private conversationTabOpenCoordinator: ConversationTabOpenCoordinator;
   private conversationTabLifecycleRecoveryCoordinator: ConversationTabLifecycleRecoveryCoordinator;
   private conversationRestoreBootstrapCoordinator: ConversationRestoreBootstrapCoordinator;
+  private conversationTabRuntimeCoordinator: ConversationTabRuntimeCoordinator<TabRuntimeState>;
   private conversationViewStateService: ConversationViewStateService;
   private conversationRenderService: ConversationRenderService;
   private messageSendPreparationService: MessageSendPreparationService;
@@ -925,19 +931,19 @@ export class OpenCodianView extends ItemView {
   }
 
   private getTabPaneState(tabId: TabId | null): TabPaneState | null {
-    return this.tabMessagesPaneCoordinator.getPaneState(tabId);
+    return this.conversationTabRuntimeCoordinator.getPaneState(tabId);
   }
 
   private getTabRuntimeState(tabId: TabId | null = this.getActiveTabId()): TabRuntimeState | null {
-    return this.tabMessagesPaneCoordinator.getRuntimeState(tabId);
+    return this.conversationTabRuntimeCoordinator.getRuntimeState(tabId);
   }
 
   private ensureTabRuntimeState(tabId: TabId | null = this.getActiveTabId()): TabRuntimeState | null {
-    return this.tabMessagesPaneCoordinator.ensureRuntimeState(tabId);
+    return this.conversationTabRuntimeCoordinator.ensureRuntimeState(tabId);
   }
 
   private getActiveTabRuntimeState(): TabRuntimeState | null {
-    return this.getTabRuntimeState(this.getActiveTabId());
+    return this.conversationTabRuntimeCoordinator.getActiveRuntimeState();
   }
 
   private getOrCreateTabStreamController(tabId: TabId | null): StreamController | null {
@@ -1214,6 +1220,8 @@ export class OpenCodianView extends ItemView {
       conversationRuntime.conversationTabLifecycleRecoveryCoordinator;
     this.conversationRestoreBootstrapCoordinator =
       conversationRuntime.conversationRestoreBootstrapCoordinator;
+    this.conversationTabRuntimeCoordinator =
+      conversationRuntime.conversationTabRuntimeCoordinator;
 
     const interactionRuntime = this.createInteractionRuntimeWiring(
       conversationRuntime.conversationSyncBridgePorts,
@@ -1443,6 +1451,21 @@ export class OpenCodianView extends ItemView {
         activateTab: (tabId) => conversationViewStateService.activateTab(tabId),
       },
     );
+    const conversationTabRuntimeCoordinator = new ConversationTabRuntimeCoordinator(
+      this.createConversationTabRuntimeCoordinatorHost(),
+      this.tabMessagesPaneCoordinator,
+      {
+        activateTab: (tabId) => conversationViewStateService.activateTab(tabId),
+        closeTabAndRecover: (tabId) =>
+          conversationTabLifecycleRecoveryCoordinator.closeTabAndRecover(tabId),
+        initializeFirstTab: () => conversationRestoreBootstrapCoordinator.initializeFirstTab(),
+        restorePersistedTabs: () => conversationRestoreBootstrapCoordinator.restorePersistedTabs(),
+        syncTabStreamLikeState: (tabId) => tabRuntimeStateBridge.syncStreamLikeState(tabId),
+        syncActiveTabStreamLikeState: () => tabRuntimeStateBridge.syncActiveStreamLikeState(),
+        setTabNeedsAttention: (tabId, needsAttention) =>
+          tabRuntimeStateBridge.setNeedsAttention(tabId, needsAttention),
+      },
+    );
 
     return {
       conversationAuthoritativeSyncCoordinator,
@@ -1467,6 +1490,7 @@ export class OpenCodianView extends ItemView {
       conversationTabOpenCoordinator,
       conversationTabLifecycleRecoveryCoordinator,
       conversationRestoreBootstrapCoordinator,
+      conversationTabRuntimeCoordinator,
     };
   }
 
@@ -2061,6 +2085,45 @@ export class OpenCodianView extends ItemView {
     };
   }
 
+  private createConversationTabRuntimeCoordinatorHost(): ConversationTabRuntimeCoordinatorHost {
+    return {
+      getMaxTabs: () => this.plugin.settings.maxTabs,
+      getTabManager: () => this.tabManager,
+      setTabManager: (tabManager) => {
+        this.tabManager = tabManager;
+      },
+      getTabBar: () => this.tabBar,
+      setTabBar: (tabBar) => {
+        this.tabBar = tabBar;
+      },
+      getTabBarMountEl: () => this.tabBarMountEl,
+      setTabBarMountEl: (element) => {
+        this.tabBarMountEl = element;
+      },
+      getChatContainerEl: () => this.chatContainerEl,
+      getHeaderTabBarSlotEl: () => this.headerTabBarSlotEl,
+      getBelowHeaderTabBarSlotEl: () => this.belowHeaderTabBarSlotEl,
+      getOuterVerticalTabBarSlotEl: () => this.outerVerticalTabBarSlotEl,
+      getInputTabBarSlotEl: () => this.composerInputShellCoordinator.getTabBarSlotEl(),
+      getTabBarPosition: () => this.plugin.settings.tabBarPosition,
+      getBelowHeaderTabBarLayout: () => this.plugin.settings.belowHeaderTabBarLayout,
+      setPersistedTabState: (tabState) => {
+        this.plugin.settings.tabState = tabState;
+      },
+      savePersistedTabState: (options = {}) => {
+        if (options.flush) {
+          void this.plugin.saveSettingsUiStateImmediately();
+          return;
+        }
+
+        this.plugin.scheduleSettingsUiStateSave();
+      },
+      getSessionIdForTab: (tabId) => this.getSessionIdForTab(tabId),
+      getTabSessionStatus: (tabId, sessionId) =>
+        this.sessionTodoCoordinator.getTabSessionStatus(tabId, sessionId),
+    };
+  }
+
   private createConversationRenderHost(): ConversationRenderHost {
     const assistantTailRender: ConversationAssistantTailRenderPort =
       this.createConversationAssistantTailRenderPort();
@@ -2437,10 +2500,7 @@ export class OpenCodianView extends ItemView {
     this.destroyLiquidDiamondDemo();
 
     // Cleanup navigation sidebar
-    this.clearTabMessagesPanes();
-    this.tabBar?.destroy();
-    this.tabBar = null;
-    this.tabBarMountEl = null;
+    this.conversationTabRuntimeCoordinator.destroyTabSystem();
     this.headerTabBarSlotEl = null;
     this.belowHeaderTabBarSlotEl = null;
     this.outerVerticalTabBarSlotEl = null;
@@ -2449,7 +2509,6 @@ export class OpenCodianView extends ItemView {
     this.questionDockSlotCoordinator.destroy();
     this.sessionTodoCoordinator.destroy();
     this.conversationSessionSignalRuntime.stop();
-    this.tabManager = null;
 
     // Cleanup event refs
     for (const ref of this.eventRefs) {
@@ -2502,23 +2561,23 @@ export class OpenCodianView extends ItemView {
     tabId: TabId | null,
     messagesEl: HTMLElement | null = this.getTabPaneState(tabId)?.messagesEl ?? null,
   ): boolean {
-    return this.tabMessagesPaneCoordinator.syncScrollMetrics(tabId, messagesEl);
+    return this.conversationTabRuntimeCoordinator.syncPaneScrollMetrics(tabId, messagesEl);
   }
 
   private ensureTabMessagesPane(tabId: TabId): TabPaneState | null {
-    return this.tabMessagesPaneCoordinator.ensurePane(tabId);
+    return this.conversationTabRuntimeCoordinator.ensureTabMessagesPane(tabId);
   }
 
   private setActiveMessagesPane(tabId: TabId): void {
-    this.tabMessagesPaneCoordinator.setActivePane(tabId);
+    this.conversationTabRuntimeCoordinator.setActiveMessagesPane(tabId);
   }
 
   private removeTabMessagesPane(tabId: TabId): void {
-    this.tabMessagesPaneCoordinator.removePane(tabId);
+    this.conversationTabRuntimeCoordinator.removeTabMessagesPane(tabId);
   }
 
   private clearTabMessagesPanes(): void {
-    this.tabMessagesPaneCoordinator.clearPanes();
+    this.conversationTabRuntimeCoordinator.clearTabMessagesPanes();
   }
 
   private rebuildNavigationSidebar(): void {
@@ -2564,199 +2623,67 @@ export class OpenCodianView extends ItemView {
   }
 
   private initializeTabSystem(): void {
-    if (!this.chatContainerEl) {
-      return;
-    }
-
-    this.tabBarMountEl = document.createElement('div');
-    this.tabBarMountEl.className = 'opencodian-tab-bar-mount';
-    this.tabBar = new TabBar(this.tabBarMountEl, {
-      onTabClick: (tabId) => {
-        void this.handleTabSwitch(tabId);
-      },
-      onTabClose: (tabId) => {
-        void this.handleTabClose(tabId);
-      },
-    });
-
-    this.tabManager = this.createTabManager();
-
-    this.applyTabBarLayout();
-  }
-
-  private createTabManager(): TabManager {
-    return new TabManager(t('chat.tab.new'), {
-      getMaxTabs: () => this.plugin.settings.maxTabs,
-      onChanged: () => {
-        this.renderTabBar();
-        this.persistTabState();
-      },
-    });
+    this.conversationTabRuntimeCoordinator.initializeTabSystem();
   }
 
   private resetTabManager(): void {
-    this.tabManager = this.createTabManager();
-    this.renderTabBar();
+    this.conversationTabRuntimeCoordinator.resetTabManager();
   }
 
   private async initializeFirstTab(): Promise<void> {
-    await this.conversationRestoreBootstrapCoordinator.initializeFirstTab();
+    await this.conversationTabRuntimeCoordinator.initializeFirstTab();
   }
 
   private renderTabBar(): void {
-    if (!this.tabBar || !this.tabManager) {
-      return;
-    }
-
-    this.tabBar.render(this.tabManager.getTabBarItems(), this.getTabBarLayoutMode());
+    this.conversationTabRuntimeCoordinator.renderTabBar();
   }
 
   private restorePersistedTabs(): string | null {
-    return this.conversationRestoreBootstrapCoordinator.restorePersistedTabs();
+    return this.conversationTabRuntimeCoordinator.restorePersistedTabs();
   }
 
   private persistTabState(options: { flush?: boolean } = {}): void {
-    if (!this.tabManager) {
-      return;
-    }
-
-    const tabs = this.tabManager.getAllTabs();
-    const activeTabId = this.tabManager.getActiveTab()?.id ?? null;
-    const activeTabIndex = Math.max(0, tabs.findIndex((tab) => tab.id === activeTabId));
-
-    this.plugin.settings.tabState = {
-      tabs: tabs.map((tab) => ({
-        conversationId: tab.conversationId,
-        title: tab.title,
-        modelOverride: tab.modelOverride,
-      })),
-      activeTabIndex,
-    };
-
-    if (options.flush) {
-      void this.plugin.saveSettingsUiStateImmediately();
-      return;
-    }
-
-    this.plugin.scheduleSettingsUiStateSave();
+    this.conversationTabRuntimeCoordinator.persistTabState(options);
   }
 
   private getActiveTabId(): TabId | null {
-    return this.tabManager?.getActiveTab()?.id ?? null;
+    return this.conversationTabRuntimeCoordinator.getActiveTabId();
   }
 
   private isActiveTabStreaming(): boolean {
-    return Boolean(this.getActiveTabRuntimeState()?.isStreaming);
+    return this.conversationTabRuntimeCoordinator.isActiveTabStreaming();
   }
 
   private isTabForegroundBusy(tabId: TabId | null = this.getActiveTabId()): boolean {
-    const runtime = this.getTabRuntimeState(tabId);
-    if (!runtime) {
-      return false;
-    }
-
-    if (runtime.isStreaming) {
-      return true;
-    }
-
-    const status = this.sessionTodoCoordinator.getTabSessionStatus(
-      tabId,
-      this.getSessionIdForTab(tabId),
-    );
-    return status?.type === 'busy' || status?.type === 'retry';
+    return this.conversationTabRuntimeCoordinator.isTabForegroundBusy(tabId);
   }
 
   private syncTabStreamLikeState(tabId: TabId | null): void {
-    this.tabRuntimeStateBridge.syncStreamLikeState(tabId);
+    this.conversationTabRuntimeCoordinator.syncTabStreamLikeState(tabId);
   }
 
   private syncActiveTabStreamLikeState(): void {
-    this.tabRuntimeStateBridge.syncActiveStreamLikeState();
+    this.conversationTabRuntimeCoordinator.syncActiveTabStreamLikeState();
   }
 
   private setTabNeedsAttention(tabId: TabId | null, needsAttention: boolean): void {
-    this.tabRuntimeStateBridge.setNeedsAttention(tabId, needsAttention);
+    this.conversationTabRuntimeCoordinator.setTabNeedsAttention(tabId, needsAttention);
   }
 
   private async handleTabSwitch(tabId: string): Promise<void> {
-    if (!this.tabManager) {
-      return;
-    }
-
-    const switched = this.tabManager.switchToTab(tabId);
-    if (switched) {
-      await this.activateTab(tabId);
-    }
+    await this.conversationTabRuntimeCoordinator.handleTabSwitch(tabId);
   }
 
   private async handleTabClose(tabId: string): Promise<void> {
-    await this.conversationTabLifecycleRecoveryCoordinator.closeTabAndRecover(tabId);
+    await this.conversationTabRuntimeCoordinator.handleTabClose(tabId);
   }
 
   private async activateTab(tabId: string): Promise<void> {
-    await this.conversationViewStateService.activateTab(tabId);
-  }
-
-  private getTabBarLayoutMode(): TabBarLayoutMode {
-    if (this.plugin.settings.tabBarPosition === 'header') {
-      return 'header';
-    }
-
-    if (this.plugin.settings.tabBarPosition === 'below-header') {
-      return this.plugin.settings.belowHeaderTabBarLayout === 'vertical'
-        ? 'below-header-vertical'
-        : 'below-header-grid';
-    }
-
-    return 'input';
+    await this.conversationTabRuntimeCoordinator.activateTab(tabId);
   }
 
   public applyTabBarLayout(): void {
-    const inputTabBarSlotEl = this.composerInputShellCoordinator.getTabBarSlotEl();
-    if (
-      !this.chatContainerEl
-      || !this.tabBarMountEl
-      || !this.headerTabBarSlotEl
-      || !this.belowHeaderTabBarSlotEl
-      || !this.outerVerticalTabBarSlotEl
-      || !inputTabBarSlotEl
-    ) {
-      return;
-    }
-
-    const isBelowHeader = this.plugin.settings.tabBarPosition === 'below-header';
-    const isVerticalBelowHeader =
-      isBelowHeader && this.plugin.settings.belowHeaderTabBarLayout === 'vertical';
-
-    const targetSlot = this.plugin.settings.tabBarPosition === 'header'
-      ? this.headerTabBarSlotEl
-      : isVerticalBelowHeader
-        ? this.outerVerticalTabBarSlotEl
-        : isBelowHeader
-          ? this.belowHeaderTabBarSlotEl
-          : inputTabBarSlotEl;
-
-    if (this.tabBarMountEl.parentElement !== targetSlot) {
-      this.tabBarMountEl.remove();
-      targetSlot.appendChild(this.tabBarMountEl);
-    }
-
-    this.chatContainerEl.toggleClass('opencodian-container--tab-pos-header', this.plugin.settings.tabBarPosition === 'header');
-    this.chatContainerEl.toggleClass('opencodian-container--tab-pos-below-header', isBelowHeader);
-    this.chatContainerEl.toggleClass('opencodian-container--tab-pos-input', this.plugin.settings.tabBarPosition === 'input');
-    this.chatContainerEl.toggleClass(
-      'opencodian-container--tab-layout-grid',
-      isBelowHeader && this.plugin.settings.belowHeaderTabBarLayout === 'grid',
-    );
-    this.chatContainerEl.toggleClass(
-      'opencodian-container--tab-layout-vertical',
-      isVerticalBelowHeader,
-    );
-    this.headerTabBarSlotEl.classList.toggle('is-active-slot', targetSlot === this.headerTabBarSlotEl);
-    this.belowHeaderTabBarSlotEl.classList.toggle('is-active-slot', targetSlot === this.belowHeaderTabBarSlotEl);
-    this.outerVerticalTabBarSlotEl.classList.toggle('is-active-slot', targetSlot === this.outerVerticalTabBarSlotEl);
-    inputTabBarSlotEl.classList.toggle('is-active-slot', targetSlot === inputTabBarSlotEl);
-    this.renderTabBar();
+    this.conversationTabRuntimeCoordinator.applyTabBarLayout();
   }
 
   public applyChatAppearanceSettings(): void {
