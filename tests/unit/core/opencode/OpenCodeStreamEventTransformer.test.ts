@@ -29,7 +29,7 @@ function createState(): OpenCodeStreamEventState {
   };
 }
 
-describe('OpenCodeStreamEventTransformer', () => {
+describe('OpenCodeStreamEventTransformer event routing', () => {
   it('delegates question.asked payloads to normalized question_request chunks', () => {
     const host = createHost();
     const transformer = new OpenCodeStreamEventTransformer(host);
@@ -99,7 +99,9 @@ describe('OpenCodeStreamEventTransformer', () => {
       stop: false,
     });
   });
+});
 
+describe('OpenCodeStreamEventTransformer stream part handling', () => {
   it('tracks tool updates, tool results, and known MCP tool kinds without duplicate tool_use chunks', () => {
     const host = createHost();
     const transformer = new OpenCodeStreamEventTransformer(host);
@@ -290,7 +292,9 @@ describe('OpenCodeStreamEventTransformer', () => {
     });
     expect(mismatchedOutcome).toEqual({ chunks: [], stop: false });
   });
+});
 
+describe('OpenCodeStreamEventTransformer parsing helpers', () => {
   it('parses SSE buffers, infers event names, and preserves incomplete tails', () => {
     const transformer = new OpenCodeStreamEventTransformer(createHost());
 
