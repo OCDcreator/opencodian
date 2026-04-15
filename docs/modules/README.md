@@ -196,7 +196,9 @@ docs/modules/
 │       ├── ProviderBuiltinIconPickerModal.md
 │       ├── ProviderIconCacheModal.md
 │       ├── ServerSettingHelpModal.md
+│       ├── SettingsModelCatalogCoordinator.md
 │       ├── SettingsModelCatalogPresenter.md
+│       ├── SettingsModelIconCacheManager.md
 │       ├── SettingsModelSection.md
 │       ├── SettingsSectionCoordinator.md
 │       ├── SettingsSecuritySection.md

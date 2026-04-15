@@ -91,9 +91,9 @@
 
 因此设置页能展示“存在但被禁用”的模型，而不只是“当前下拉可选项”。
 
-新的结构把模型任务拆开了：`ModelCatalogStateService` 负责 core catalog state 语义，`SettingsModelSection` 负责模型 section lifecycle 与 refresh orchestration，`SettingsModelCatalogPresenter` 负责“可用范围与目录”的展示状态机，而 `OpenCodianSettings` 只保留 owner 装配与跨 section callback 桥接：
+新的结构把模型任务拆开了：`ModelCatalogStateService` 负责 core catalog state 语义，`SettingsModelSection` 负责模型 section shell 与 callback bridge，`SettingsModelCatalogCoordinator` 负责 refresh/workspace orchestration，`SettingsModelIconCacheManager` 负责 provider icon 工具区，`SettingsModelCatalogPresenter` 负责“可用范围与目录”的展示状态机，而 `OpenCodianSettings` 只保留 owner 装配与跨 section callback 桥接：
 
-- **模型 section owner**：`SettingsModelSection` 负责默认聊天模型、来源模式、手动刷新、workspace 卡片、icon cache 工具区，以及 catalog host 的整体刷新链路
+- **模型 section owner**：`SettingsModelSection` 负责 block shell、refresh callback 与 server-state bridge；默认聊天模型、来源模式、手动刷新、workspace 卡片和 icon cache 工具区分别由相邻 owner 承接
 - **可用范围与目录**：`ModelCatalogStateService` 先把 `baseEffective` / `effective` / `currentEnabledProviderIds` 整理成 `ModelCatalogState`，再由 `SettingsModelCatalogPresenter` 负责 provider accordion、模型级开关、project/server/effective/disabled 四张目录摘要卡，以及 provider probe badge/detail 呈现；`服务器目录` 应直接反映当前 runtime / `opencode models` 看到的 provider，provider 的禁用状态则作为配置层信息叠加到 `当前生效列表` / `当前禁用列表`；provider 卡主状态优先显示“项目禁用”，其次才是“服务端/继承配置禁用”，并保留逐 provider 的“测试可用性”按钮，用当前 vault 作用域重新探测 runtime 是否真的可用
   - provider 批量按钮现在绑定到当前激活的目录卡片，只对该目录里的 provider 集合生效，而不是跨全部目录统一操作；provider 展开后的批量模型按钮始终针对该 provider 的完整模型集，而不是当前搜索/过滤后剩余的可见子集
   - 这个按钮现在已经改成“最小真实发送测试”：允许发送时会挑一个测试模型创建临时 session，真正发一条极小请求；因此它能直接暴露 `invalid_api_key`、provider 鉴权失败、服务端拒绝等真实错误，而不再只是看 runtime/目录
@@ -155,7 +155,7 @@ provider 开关写回仍遵循 `ModelConfigService` 返回的 `effectiveProvider
 
 - `SettingsSectionCoordinator`: 管理 section heading 注册、quick-nav 构建、post-render setup 与 scroll restoration，避免这些 DOM/runtime 细节继续堆在设置页主类里
 - `SettingsServerSection`: 管理 server section 的 mode 切换、host/port/remote URL、auth 输入、状态轮询与 start/stop/test/refresh action；`OpenCodianSettings` 只保留 owner 装配与跨 section server-state 同步
-- `SettingsModelSection`: 管理模型 section 的 source mode、refresh 链路、workspace 卡片、icon cache 工具区与 `SettingsModelCatalogPresenter` host；`OpenCodianSettings` 只保留 owner 装配与 callback/state bridge
+- `SettingsModelSection`: 管理模型 section 的 block shell、callback bridge 与 `SettingsModelCatalogPresenter` host；source mode、refresh 链路、workspace 卡片和 icon cache 工具区继续委托给相邻 model-section owners
 - `SettingsConversationSection`: 管理 conversation section 的 title mode、AI title model picker、question card display/position、answered-card toggle 与 user-markup render toggle；`OpenCodianSettings` 只保留 owner 装配与 title-model refresh callback bridge
 - `SettingsPluginSection`: 管理 plugin section 的 environment snapshot、project config plugin editor、isolation mode、project plugin directory 与 OMO config open/create action；`OpenCodianSettings` 只保留 owner 装配与 formatting bridge
 - `SettingsUiSection`: 管理 UI section 的 max tabs、tab position/layout、auto scroll、chat scroll mode 与 open-in-main-tab 保存逻辑；`OpenCodianSettings` 只保留 owner 装配
