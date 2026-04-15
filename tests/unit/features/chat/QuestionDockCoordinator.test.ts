@@ -11,6 +11,7 @@ import {
 import { QuestionDockResolutionActionFacade } from '../../../../src/features/chat/services/QuestionDockResolutionActionFacade';
 import type { QuestionPostResolutionRuntimeFacade } from '../../../../src/features/chat/services/QuestionPostResolutionRuntimeFacade';
 import {
+  createQuestionReplyExecutionAction,
   QuestionResolutionExecutionFacade,
   type QuestionResolutionExecutionFacadeHost,
 } from '../../../../src/features/chat/services/QuestionResolutionExecutionFacade';
@@ -223,7 +224,75 @@ describe('QuestionDockCoordinator resolution flow', () => {
     );
     expect(postResolutionRuntime.followUpAfterResolution).toHaveBeenCalledWith('tab-active');
     expect(runtimeByTab.get('tab-active')?.pendingQuestionRequests).toEqual([]);
+    expect(runtimeByTab.get('tab-active')?.questionDraftAnswers.has(request.id)).toBe(false);
+    expect(runtimeByTab.get('tab-active')?.questionActiveGroupKeys.has(request.id)).toBe(false);
+    expect(runtimeByTab.get('tab-active')?.questionActiveIndexes.has(request.id)).toBe(false);
     expect(runtimeByTab.get('tab-active')?.resolvedQuestionRequestIds.has(request.id)).toBe(true);
+    expect(host.setTabNeedsAttention).toHaveBeenCalledWith('tab-active', false);
+  });
+
+  it('applies background resolution cleanup through the shared pending writeback path', async () => {
+    const request = createQuestionRequest({
+      id: 'request-background',
+      sessionId: 'session-background',
+    });
+    const answers = [['TypeScript']];
+    const {
+      coordinator,
+      host,
+      runtimeByTab,
+      applyResolvedQuestionState,
+      postResolutionRuntime,
+    } = createCoordinator({
+      sessionIdsByTab: {
+        'tab-background': 'session-background',
+      },
+    });
+    const backgroundRuntime = runtimeByTab.get('tab-background');
+    if (!backgroundRuntime) {
+      throw new Error('Expected background runtime');
+    }
+
+    const resolveWaiter = jest.fn();
+    backgroundRuntime.pendingQuestionRequests = [request];
+    backgroundRuntime.questionDraftAnswers.set(request.id, answers);
+    backgroundRuntime.questionActiveGroupKeys.set(request.id, 'Programming');
+    backgroundRuntime.questionActiveIndexes.set(request.id, 0);
+    backgroundRuntime.questionRequestWaiters.set(request.id, {
+      promise: Promise.resolve(),
+      resolve: resolveWaiter,
+    });
+
+    await expect(
+      coordinator.applyResolutionAction(
+        createQuestionReplyExecutionAction(request, answers),
+        'tab-background',
+        {
+          removePendingRequestId: request.id,
+        },
+      ),
+    ).resolves.toBe(true);
+
+    expect(host.replyToQuestion).toHaveBeenCalledWith(request.id, answers);
+    expect(applyResolvedQuestionState).toHaveBeenCalledWith(
+      expect.objectContaining({
+        request,
+        status: 'answered',
+        answers,
+      }),
+      'tab-background',
+    );
+    expect(postResolutionRuntime.followUpAfterResolution).toHaveBeenCalledWith(
+      'tab-background',
+    );
+    expect(backgroundRuntime.pendingQuestionRequests).toEqual([]);
+    expect(backgroundRuntime.questionDraftAnswers.has(request.id)).toBe(false);
+    expect(backgroundRuntime.questionActiveGroupKeys.has(request.id)).toBe(false);
+    expect(backgroundRuntime.questionActiveIndexes.has(request.id)).toBe(false);
+    expect(backgroundRuntime.questionRequestWaiters.has(request.id)).toBe(false);
+    expect(resolveWaiter).toHaveBeenCalledTimes(1);
+    expect(backgroundRuntime.resolvedQuestionRequestIds.has(request.id)).toBe(true);
+    expect(host.setTabNeedsAttention).toHaveBeenCalledWith('tab-background', false);
   });
 });
 

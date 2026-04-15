@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的 `[NEXT]`”。
-> **当前状态**: [READY] `R105` 已完成；`R106-R137` 长队列继续排队，当前首个 `[NEXT]` 为 `R106 - QuestionDockCoordinator pending-resolution residual seam`。
+> **当前状态**: [READY] `R106` 已完成；`R107-R137` 长队列继续排队，当前首个 `[NEXT]` 为 `R107 - Checkpoint after question/todo seams`。
 
 ## 控制规则
 
@@ -18,7 +18,7 @@
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
 - 当前 live lint 基线：`0 errors / 65 warnings`
 - 最近成功 phase：`docs/status/maintainability-phase-440.md`
-- 当前路线判断：`R105` 已完成 session todo stale-notice residual seam，当前必须从 `R106` 顺序执行，不得 freestyle。
+- 当前路线判断：`R106` 已完成 question dock pending-resolution residual seam，当前必须从 `R107` 顺序执行，不得 freestyle。
 
 ## Queue
 ## Queue
@@ -980,7 +980,7 @@
 - **禁止项**: 不改变 stale notice 显示时机、suppression 语义、append-dedupe 行为。
 - **验收**: stale-notice residual 分支继续收敛。；并通过全量 `npm test` 与 `npm run build`。
 
-### [NEXT] R106 - QuestionDockCoordinator pending-resolution residual seam
+### [DONE] R106 - QuestionDockCoordinator pending-resolution residual seam
 
 - **Lane**: Maintainability / question dock runtime
 - **目标**: 继续收束 pending-question presentation、resolution apply follow-up 与 active/background writeback residual。
@@ -990,7 +990,7 @@
 - **禁止项**: 不改变 pending dock visibility、resolution semantics、draft answer persistence 或 active-tab gating。
 - **验收**: question dock pending-resolution residual 继续减少。；并通过全量 `npm test` 与 `npm run build`。
 
-### [QUEUED] R107 - Checkpoint after question/todo seams
+### [NEXT] R107 - Checkpoint after question/todo seams
 
 - **Lane**: Checkpoint
 - **目标**: 复盘 R103-R106 的 question/todo/background-task residual 收益。

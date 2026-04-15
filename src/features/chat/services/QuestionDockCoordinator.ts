@@ -55,11 +55,19 @@ export interface QuestionDockRuntimeState {
 }
 
 export interface QuestionDockResolutionApplyOptions {
+  removePendingRequestId?: string | null;
   afterStateApplied?: (() => void | Promise<void>) | null;
 }
 
 interface QuestionDockPresentationSyncOptions {
   pruneInactiveState?: boolean;
+}
+
+interface QuestionDockPendingRequestCommitOptions {
+  pruneInactiveState?: boolean;
+  pruneResolvedQuestionRequestIdsFrom?: readonly QuestionRequest[] | null;
+  removedRequestIds?: ReadonlySet<string> | null;
+  resolveRemovedWaiters?: boolean;
 }
 
 export interface QuestionDockCoordinatorHost {
@@ -144,12 +152,11 @@ export class QuestionDockCoordinator {
       const sessionRequests = pendingRequests.filter(
         (request) => request.sessionId === sessionId,
       );
-      const mergedRequests = this.applyRefreshedPendingQuestionRequests(
-        runtime,
-        sessionRequests,
-      );
-      this.writeBackPendingQuestionRuntime(tabId, mergedRequests);
-      return mergedRequests;
+      const mergedRequests = this.mergePendingQuestionRequests(runtime, sessionRequests);
+      return this.commitPendingQuestionRequests(runtime, tabId, mergedRequests, {
+        pruneInactiveState: true,
+        pruneResolvedQuestionRequestIdsFrom: sessionRequests,
+      });
     } catch (error) {
       logger.debug('Failed to refresh pending questions', error);
       return runtime.pendingQuestionRequests;
@@ -181,7 +188,10 @@ export class QuestionDockCoordinator {
   ): Promise<boolean> {
     return this.resolutionExecution.executeAndApply(
       action,
-      this.createResolutionApplyContext(tabId, options.afterStateApplied ?? null),
+      this.createResolutionApplyContext(
+        tabId,
+        this.createResolutionApplyFollowUp(tabId, options),
+      ),
     );
   }
 
@@ -225,12 +235,13 @@ export class QuestionDockCoordinator {
       return;
     }
 
-    if (!runtime.pendingQuestionRequests.some((item) => item.id === request.id)) {
-      runtime.pendingQuestionRequests = [...runtime.pendingQuestionRequests, request];
-    }
+    const pendingRequests = runtime.pendingQuestionRequests.some(
+      (item) => item.id === request.id,
+    )
+      ? runtime.pendingQuestionRequests
+      : [...runtime.pendingQuestionRequests, request];
 
-    this.syncPendingQuestionPresentationState(runtime, runtime.pendingQuestionRequests);
-    this.writeBackPendingQuestionRuntime(tabId, runtime.pendingQuestionRequests);
+    this.commitPendingQuestionRequests(runtime, tabId, pendingRequests);
   }
 
   private removePendingQuestionRequest(
@@ -242,20 +253,14 @@ export class QuestionDockCoordinator {
       return;
     }
 
-    runtime.pendingQuestionRequests = runtime.pendingQuestionRequests.filter(
+    const pendingRequests = runtime.pendingQuestionRequests.filter(
       (request) => request.id !== requestId,
     );
-    runtime.questionDraftAnswers.delete(requestId);
-    runtime.questionActiveGroupKeys.delete(requestId);
-    runtime.questionActiveIndexes.delete(requestId);
 
-    const waiter = runtime.questionRequestWaiters.get(requestId);
-    if (waiter) {
-      waiter.resolve();
-      runtime.questionRequestWaiters.delete(requestId);
-    }
-
-    this.writeBackPendingQuestionRuntime(tabId, runtime.pendingQuestionRequests);
+    this.commitPendingQuestionRequests(runtime, tabId, pendingRequests, {
+      removedRequestIds: new Set([requestId]),
+      resolveRemovedWaiters: true,
+    });
   }
 
   private clearPendingQuestionState(runtime: QuestionDockRuntimeState): void {
@@ -265,21 +270,6 @@ export class QuestionDockCoordinator {
     runtime.questionActiveGroupKeys.clear();
     runtime.questionActiveIndexes.clear();
     runtime.questionRequestWaiters.clear();
-  }
-
-  private applyRefreshedPendingQuestionRequests(
-    runtime: QuestionDockRuntimeState,
-    sessionRequests: readonly QuestionRequest[],
-  ): QuestionRequest[] {
-    const mergedRequests = this.mergePendingQuestionRequests(runtime, sessionRequests);
-    runtime.pendingQuestionRequests = mergedRequests;
-
-    this.pruneResolvedQuestionRequestIds(runtime, sessionRequests);
-    this.syncPendingQuestionPresentationState(runtime, mergedRequests, {
-      pruneInactiveState: true,
-    });
-
-    return mergedRequests;
   }
 
   private mergePendingQuestionRequests(
@@ -314,6 +304,72 @@ export class QuestionDockCoordinator {
       if (!rawSessionRequestIds.has(requestId)) {
         runtime.resolvedQuestionRequestIds.delete(requestId);
       }
+    }
+  }
+
+  private commitPendingQuestionRequests(
+    runtime: QuestionDockRuntimeState,
+    tabId: TabId | null,
+    pendingRequests: readonly QuestionRequest[],
+    options: QuestionDockPendingRequestCommitOptions = {},
+  ): QuestionRequest[] {
+    const nextPendingRequests = [...pendingRequests];
+    const removedRequestIds = options.removedRequestIds
+      ? new Set(options.removedRequestIds)
+      : this.collectRemovedPendingQuestionRequestIds(
+          runtime.pendingQuestionRequests,
+          nextPendingRequests,
+        );
+
+    runtime.pendingQuestionRequests = nextPendingRequests;
+
+    if (options.pruneResolvedQuestionRequestIdsFrom) {
+      this.pruneResolvedQuestionRequestIds(
+        runtime,
+        options.pruneResolvedQuestionRequestIdsFrom,
+      );
+    }
+
+    this.syncPendingQuestionPresentationState(runtime, nextPendingRequests, {
+      pruneInactiveState: (options.pruneInactiveState ?? false) || removedRequestIds.size > 0,
+    });
+
+    if (options.resolveRemovedWaiters && removedRequestIds.size > 0) {
+      this.resolveRemovedQuestionWaiters(runtime, removedRequestIds);
+    }
+
+    this.writeBackPendingQuestionRuntime(tabId, nextPendingRequests);
+    return nextPendingRequests;
+  }
+
+  private collectRemovedPendingQuestionRequestIds(
+    pendingRequests: readonly QuestionRequest[],
+    nextPendingRequests: readonly QuestionRequest[],
+  ): Set<string> {
+    const nextRequestIds = new Set(nextPendingRequests.map((request) => request.id));
+    const removedRequestIds = new Set<string>();
+
+    for (const request of pendingRequests) {
+      if (!nextRequestIds.has(request.id)) {
+        removedRequestIds.add(request.id);
+      }
+    }
+
+    return removedRequestIds;
+  }
+
+  private resolveRemovedQuestionWaiters(
+    runtime: QuestionDockRuntimeState,
+    removedRequestIds: ReadonlySet<string>,
+  ): void {
+    for (const requestId of removedRequestIds) {
+      const waiter = runtime.questionRequestWaiters.get(requestId);
+      if (!waiter) {
+        continue;
+      }
+
+      waiter.resolve();
+      runtime.questionRequestWaiters.delete(requestId);
     }
   }
 
@@ -388,6 +444,26 @@ export class QuestionDockCoordinator {
     };
   }
 
+  private createResolutionApplyFollowUp(
+    tabId: TabId | null,
+    options: QuestionDockResolutionApplyOptions,
+  ): (() => Promise<void>) | null {
+    const removePendingRequestId = options.removePendingRequestId ?? null;
+    const afterStateApplied = options.afterStateApplied ?? null;
+
+    if (!removePendingRequestId && !afterStateApplied) {
+      return null;
+    }
+
+    return async () => {
+      if (removePendingRequestId) {
+        this.removePendingQuestionRequest(removePendingRequestId, tabId);
+      }
+
+      await afterStateApplied?.();
+    };
+  }
+
   private writeBackPendingQuestionRuntime(
     tabId: TabId | null,
     pendingRequests: readonly QuestionRequest[],
@@ -415,9 +491,7 @@ export class QuestionDockCoordinator {
     }
 
     await this.applyResolutionAction(action, tabId, {
-      afterStateApplied: () => {
-        this.removePendingQuestionRequest(action.request.id, tabId);
-      },
+      removePendingRequestId: action.request.id,
     });
   }
 

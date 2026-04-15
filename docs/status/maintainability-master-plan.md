@@ -2,19 +2,19 @@
 
 > **状态**: [READY]
 > **作用**: 这是 maintainability 无人值守的战略文档。每轮开始前，先读本文件，再读 `docs/status/maintainability-round-roadmap.md` 与最近的 `docs/status/maintainability-phase-XXX.md`。
-> **自动推进状态**: `R105` session todo stale-notice seam 已完成；当前继续按 `R106-R137` 长队列顺序推进。恢复 autopilot 后只能从首个 `[NEXT]`（`R106`）顺序执行，不允许 freestyle。
+> **自动推进状态**: `R106` question dock pending-resolution seam 已完成；当前继续按 `R107-R137` 长队列顺序推进。恢复 autopilot 后只能从首个 `[NEXT]`（`R107`）顺序执行，不允许 freestyle。
 
 ## 1. 当前判断
 
-**当前分支已完成 `R68-R105` 并把 live lint 稳定在 `0 errors / 65 warnings`；`R105` 已把 session todo snapshot apply、persisted stale-notice restore、suppression visibility 与 duplicate-notice target 检查收进同一条 stale-notice seam。** 接下来的高收益 residual 将按 queue 顺序处理 `R106` 的 question dock pending-resolution，然后进入 `OpenCodeService`/streaming residual、secondary core / settings / startup，最后做 heavy tests follow-up、warning closeout 与最终 checkpoint。
+**当前分支已完成 `R68-R106` 并把 live lint 稳定在 `0 errors / 65 warnings`；`R106` 已把 pending-question commit/writeback、resolution cleanup follow-up 与 active/background attention render 写回收进同一条 question dock seam。** 接下来的高收益 residual 将先按 queue 完成 `R107` 的 question/todo/background-task checkpoint，然后进入 `OpenCodeService`/streaming residual、secondary core / settings / startup，最后做 heavy tests follow-up、warning closeout 与最终 checkpoint。
 
 ## 2. 当前基线
 
 - **lint**: `0 errors / 65 warnings`
-- **最近验证**: `R105` queue item 已确认 focused `npm test -- SessionTodoStateService`、全量 `npm test` 与 `npm run build` 通过，`BUILD_ID` 为 `autopilot-maintainability.202604152322`
+- **最近验证**: `R106` queue item 已确认 focused `npm test -- QuestionDockCoordinator`、全量 `npm test` 与 `npm run build` 通过，`BUILD_ID` 为 `autopilot-maintainability.202604152336`
 - **最近 Test Vault 部署**: `R64`，`BUILD_ID` `autopilot-maintainability.202604150602`
-- **当前 `[NEXT]`**: `R106 - QuestionDockCoordinator pending-resolution residual seam`
-- **主热点**: `src/features/chat/services/QuestionDockCoordinator.ts`、`tests/unit/features/chat/QuestionDockCoordinator.test.ts`、`src/features/chat/services/SessionTodoStateService.ts` 与 `src/core/opencode/OpenCodeService.ts` 构成当前 batch 4 的剩余首要入口；其后再回到 `OpenCodeService` / streaming residual
+- **当前 `[NEXT]`**: `R107 - Checkpoint after question/todo seams`
+- **主热点**: `docs/status/maintainability-master-plan.md`、`docs/status/maintainability-round-roadmap.md`、`docs/status/maintainability-phase-441.md` 与 `src/core/opencode/OpenCodeService.ts` 构成当前 checkpoint / batch 5 的首要入口；完成 `R107` 后回到 `OpenCodeService` / streaming residual
 
 ## 3. 本批执行规则
 

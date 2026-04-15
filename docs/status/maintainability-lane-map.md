@@ -1,22 +1,21 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [READY] `R106-R137` 长队列继续推进；当前 `[NEXT]` 为 `R106 - QuestionDockCoordinator pending-resolution residual seam`。
+> **当前状态**: [READY] `R107-R137` 长队列继续推进；当前 `[NEXT]` 为 `R107 - Checkpoint after question/todo seams`。
 
 ## 当前优先级
 
-- **当前 `[NEXT]`**：`R106 - QuestionDockCoordinator pending-resolution residual seam`
-- **本批目标**：继续 batch 4 的 question / todo / background-task seams，在完成 question resolution、todo refresh 与 stale notice seams 后，顺序处理 question dock pending-resolution residual，随后才回到 opencode core、secondary core / settings / startup
+- **当前 `[NEXT]`**：`R107 - Checkpoint after question/todo seams`
+- **本批目标**：先复盘 `R103-R106` 的 question / todo / background-task seams 收益与剩余热点，再顺序回到 opencode core、secondary core / settings / startup
 - **当前 lint 基线**：`0 errors / 65 warnings`
 - **热点顺序**：
   1. `docs/status/maintainability-master-plan.md`
   2. `docs/status/maintainability-round-roadmap.md`
-  3. `docs/status/maintainability-phase-440.md`
-  4. `src/features/chat/services/QuestionDockCoordinator.ts`
-  5. `tests/unit/features/chat/QuestionDockCoordinator.test.ts`
-  6. `src/features/chat/services/SessionTodoStateService.ts`
-  7. `src/features/chat/services/QuestionTodoStatusRefreshCoordinator.ts`
-  8. `src/core/opencode/OpenCodeService.ts`
+  3. `docs/status/maintainability-phase-441.md`
+  4. `docs/status/maintainability-lane-map.md`
+  5. `src/core/opencode/OpenCodeService.ts`
+  6. `src/core/opencode/OpenCodeStreamingRuntimeCoordinator.ts`
+  7. `src/features/chat/services/QuestionDockCoordinator.ts`
 
 ## 本批边界
 
@@ -38,5 +37,5 @@
 ## 历史入口
 
 - 批次归档：`docs/status/maintainability-completed-batches.md`
-- 最近成功 phase：`docs/status/maintainability-phase-440.md`
+- 最近成功 phase：`docs/status/maintainability-phase-441.md`
 - 最近 checkpoint：`docs/status/maintainability-phase-437.md`
