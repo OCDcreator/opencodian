@@ -280,6 +280,42 @@ describe('QuestionDockCoordinator', () => {
     expect(host.setTabNeedsAttention).toHaveBeenCalledWith('tab-background', true);
   });
 
+  it('rerenders active-tab refreshes through the shared pending writeback path', async () => {
+    const request = createQuestionRequest();
+    const {
+      coordinator,
+      host,
+      runtimeByTab,
+      getLatestRenderState,
+    } = createCoordinator({
+      pendingQuestions: [request],
+    });
+    const activeRuntime = runtimeByTab.get('tab-active');
+    if (!activeRuntime) {
+      throw new Error('Expected active runtime');
+    }
+
+    activeRuntime.pendingQuestionRequests = [
+      createQuestionRequest({
+        id: 'request-stale',
+        sessionId: 'session-1',
+      }),
+    ];
+    activeRuntime.questionDraftAnswers.set('request-stale', [['stale']]);
+    activeRuntime.questionActiveGroupKeys.set('request-stale', 'Programming');
+    activeRuntime.questionActiveIndexes.set('request-stale', 0);
+
+    await expect(
+      coordinator.refreshPendingQuestionsForTab('tab-active', 'session-1'),
+    ).resolves.toEqual([request]);
+
+    expect(host.setTabNeedsAttention).toHaveBeenCalledWith('tab-active', false);
+    expect(activeRuntime.pendingQuestionRequests).toEqual([request]);
+    expect(activeRuntime.questionDraftAnswers.get(request.id)).toEqual([[]]);
+    expect(activeRuntime.questionDraftAnswers.has('request-stale')).toBe(false);
+    expect(getLatestRenderState().request).toEqual(request);
+  });
+
   it('clears stale background-tab question state when no session remains', async () => {
     const staleRequest = createQuestionRequest({
       id: 'request-stale',

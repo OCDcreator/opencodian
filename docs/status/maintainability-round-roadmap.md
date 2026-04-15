@@ -566,7 +566,7 @@
   - session todo service 的 stale-state 分支明显减少
   - focused validation、全量 `npm test`、`npm run build` 通过
 
-### [NEXT] R76 - QuestionDockCoordinator pending runtime seam
+### [DONE] R76 - QuestionDockCoordinator pending runtime seam
 
 - **Lane**: Maintainability / question dock runtime
 - **目标**: 从 `src/features/chat/services/QuestionDockCoordinator.ts:137` 一带收束 pending question refresh、draft answer merge、resolution action apply 与 active-tab writeback lifecycle。
@@ -583,7 +583,7 @@
   - question dock coordinator 的直接 runtime 分支明显减少
   - focused validation、全量 `npm test`、`npm run build` 通过
 
-### [QUEUED] R77 - OpenCodeService sync subscription lifecycle seam
+### [NEXT] R77 - OpenCodeService sync subscription lifecycle seam
 
 - **Lane**: Maintainability / opencode sync runtime
 - **目标**: 从 `src/core/opencode/OpenCodeService.ts:235` 一带收束 sync event subscription、initialize/start/stop、autoFetchModels 与 health/bootstrap follow-up 的完整 service lifecycle。

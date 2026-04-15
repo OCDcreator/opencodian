@@ -37,9 +37,9 @@ export class QuestionDockCoordinator {
 
 ## 关键行为
 
-- `refreshPendingQuestionsForTab()` 现在直接在 coordinator 内完成服务端 pending question 拉取、session 过滤、resolved-id suppression、waiter-owned request 保活、draft/group/index pruning，并根据 active/background tab 分流为重绘 dock 或标记 attention
-- `waitForDockResolutionIfEnabled()` 负责创建 waiter、入队 pending request、初始化 draft answer 与 active selection runtime，再触发同一条 writeback path
-- `applyResolutionAction()` 是 dock 与 inline fallback 共用的 resolve 后处理入口；执行成功后先标记 resolved id，再写入 answered/rejected runtime state，然后运行可选的 pending-request removal，最后触发 status/sync follow-up
+- `refreshPendingQuestionsForTab()` 现在通过同一条 pending runtime seam 完成服务端 pending question 拉取、session 过滤、resolved-id suppression、waiter-owned request 保活、draft answer / active selection 同步，以及 stale dock state pruning，再统一分流到 active/background tab writeback
+- `waitForDockResolutionIfEnabled()` 负责创建 waiter、入队 pending request，并复用同一个 pending presentation sync + writeback 路径初始化 draft answer 与 active selection runtime
+- `applyResolutionAction()` 是 dock 与 inline fallback 共用的 resolve 后处理入口；执行成功后统一走 resolved-id 标记、resolved state apply、可选 pending-request removal，再触发 status/sync follow-up
 - `render()` 仍只消费 `QuestionDockRenderStateFacade` 的 `active` / `empty` / `skip` 结果，并把 callback payload 委托给 `QuestionDockRenderAdapter`
 
 ## 与 `OpenCodianView` 的边界

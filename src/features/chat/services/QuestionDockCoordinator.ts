@@ -65,6 +65,10 @@ export interface QuestionDockResolutionApplyOptions {
   afterStateApplied?: (() => void | Promise<void>) | null;
 }
 
+interface QuestionDockPresentationSyncOptions {
+  pruneInactiveState?: boolean;
+}
+
 export interface QuestionDockCoordinatorHost {
   getActiveTabId(): TabId | null;
   getQuestionDock(): QuestionDockPort | null;
@@ -131,7 +135,7 @@ export class QuestionDockCoordinator {
     }
 
     this.clearPendingQuestionState(runtime);
-    this.applyClearedPendingQuestions(tabId);
+    this.writeBackPendingQuestionRuntime(tabId, []);
   }
 
   async refreshPendingQuestionsForTab(
@@ -153,7 +157,7 @@ export class QuestionDockCoordinator {
         runtime,
         sessionRequests,
       );
-      this.applyRefreshedPendingQuestions(tabId, mergedRequests);
+      this.writeBackPendingQuestionRuntime(tabId, mergedRequests);
       return mergedRequests;
     } catch (error) {
       logger.debug('Failed to refresh pending questions', error);
@@ -189,9 +193,11 @@ export class QuestionDockCoordinator {
       return false;
     }
 
-    this.applyResolvedQuestionRuntime(resolution, tabId);
-    await options.afterStateApplied?.();
-    await this.postResolutionRuntime.followUpAfterResolution(tabId);
+    await this.completeResolutionAction(
+      resolution,
+      tabId,
+      options.afterStateApplied ?? null,
+    );
     return true;
   }
 
@@ -239,21 +245,8 @@ export class QuestionDockCoordinator {
       runtime.pendingQuestionRequests = [...runtime.pendingQuestionRequests, request];
     }
 
-    const answers = normalizeQuestionDraftAnswers(
-      request.questions.length,
-      runtime.questionDraftAnswers.get(request.id),
-    );
-    runtime.questionDraftAnswers.set(request.id, answers);
-
-    if (!runtime.questionActiveGroupKeys.has(request.id)) {
-      const viewModel = buildQuestionDockViewModel(request, answers, {
-        displayMode: this.host.getQuestionDisplayMode(),
-      });
-      runtime.questionActiveGroupKeys.set(request.id, viewModel.activeGroupKey);
-      runtime.questionActiveIndexes.set(request.id, viewModel.activeQuestionIndex);
-    }
-
-    this.applyEnqueuedPendingQuestionRequest(tabId);
+    this.syncPendingQuestionPresentationState(runtime, runtime.pendingQuestionRequests);
+    this.writeBackPendingQuestionRuntime(tabId, runtime.pendingQuestionRequests);
   }
 
   private removePendingQuestionRequest(
@@ -278,7 +271,7 @@ export class QuestionDockCoordinator {
       runtime.questionRequestWaiters.delete(requestId);
     }
 
-    this.applyRemovedPendingQuestionRequest(tabId, runtime.pendingQuestionRequests);
+    this.writeBackPendingQuestionRuntime(tabId, runtime.pendingQuestionRequests);
   }
 
   private clearPendingQuestionState(runtime: QuestionDockRuntimeState): void {
@@ -298,8 +291,9 @@ export class QuestionDockCoordinator {
     runtime.pendingQuestionRequests = mergedRequests;
 
     this.pruneResolvedQuestionRequestIds(runtime, sessionRequests);
-    this.syncDraftAnswers(runtime, mergedRequests);
-    this.pruneInactiveQuestionState(runtime, mergedRequests);
+    this.syncPendingQuestionPresentationState(runtime, mergedRequests, {
+      pruneInactiveState: true,
+    });
 
     return mergedRequests;
   }
@@ -339,27 +333,48 @@ export class QuestionDockCoordinator {
     }
   }
 
-  private syncDraftAnswers(
+  private syncPendingQuestionPresentationState(
     runtime: QuestionDockRuntimeState,
-    mergedRequests: readonly QuestionRequest[],
+    pendingRequests: readonly QuestionRequest[],
+    options: QuestionDockPresentationSyncOptions = {},
   ): void {
-    for (const request of mergedRequests) {
-      runtime.questionDraftAnswers.set(
-        request.id,
-        normalizeQuestionDraftAnswers(
-          request.questions.length,
-          runtime.questionDraftAnswers.get(request.id),
-        ),
+    const activeRequestIds = new Set<string>();
+
+    for (const request of pendingRequests) {
+      activeRequestIds.add(request.id);
+      const answers = normalizeQuestionDraftAnswers(
+        request.questions.length,
+        runtime.questionDraftAnswers.get(request.id),
       );
+      runtime.questionDraftAnswers.set(request.id, answers);
+      this.ensureQuestionSelectionState(runtime, request, answers);
     }
+
+    if (options.pruneInactiveState) {
+      this.pruneInactiveQuestionState(runtime, activeRequestIds);
+    }
+  }
+
+  private ensureQuestionSelectionState(
+    runtime: QuestionDockRuntimeState,
+    request: QuestionRequest,
+    answers: string[][],
+  ): void {
+    if (runtime.questionActiveGroupKeys.has(request.id)) {
+      return;
+    }
+
+    const viewModel = buildQuestionDockViewModel(request, answers, {
+      displayMode: this.host.getQuestionDisplayMode(),
+    });
+    runtime.questionActiveGroupKeys.set(request.id, viewModel.activeGroupKey);
+    runtime.questionActiveIndexes.set(request.id, viewModel.activeQuestionIndex);
   }
 
   private pruneInactiveQuestionState(
     runtime: QuestionDockRuntimeState,
-    mergedRequests: readonly QuestionRequest[],
+    activeRequestIds: ReadonlySet<string>,
   ): void {
-    const activeRequestIds = new Set(mergedRequests.map((request) => request.id));
-
     for (const requestId of [...runtime.questionDraftAnswers.keys()]) {
       if (!activeRequestIds.has(requestId)) {
         runtime.questionDraftAnswers.delete(requestId);
@@ -387,50 +402,26 @@ export class QuestionDockCoordinator {
     this.resolutionCoordinator.applyResolvedQuestionState(resolution, tabId);
   }
 
-  private applyEnqueuedPendingQuestionRequest(tabId: TabId | null): void {
-    if (this.isActiveTab(tabId)) {
-      this.applyActiveTabDockWriteback(tabId);
-      return;
-    }
-
-    this.host.setTabNeedsAttention(tabId, true);
-  }
-
-  private applyRemovedPendingQuestionRequest(
+  private async completeResolutionAction(
+    resolution: QuestionResolution,
     tabId: TabId | null,
-    remainingRequests: readonly QuestionRequest[],
-  ): void {
-    if (this.isActiveTab(tabId)) {
-      this.applyActiveTabDockWriteback(tabId);
-      return;
-    }
-
-    this.host.setTabNeedsAttention(tabId, remainingRequests.length > 0);
+    afterStateApplied: (() => void | Promise<void>) | null,
+  ): Promise<void> {
+    this.applyResolvedQuestionRuntime(resolution, tabId);
+    await afterStateApplied?.();
+    await this.postResolutionRuntime.followUpAfterResolution(tabId);
   }
 
-  private applyClearedPendingQuestions(tabId: TabId | null): void {
-    this.applyRemovedPendingQuestionRequest(tabId, []);
-  }
-
-  private applyRefreshedPendingQuestions(
+  private writeBackPendingQuestionRuntime(
     tabId: TabId | null,
-    mergedRequests: readonly QuestionRequest[],
+    pendingRequests: readonly QuestionRequest[],
   ): void {
-    if (this.isActiveTab(tabId)) {
-      this.applyActiveTabDockWriteback(tabId);
-      return;
+    const isActiveTab = this.isActiveTab(tabId);
+    const needsAttention = !isActiveTab && pendingRequests.length > 0;
+    this.host.setTabNeedsAttention(tabId, needsAttention);
+    if (isActiveTab) {
+      this.render();
     }
-
-    this.host.setTabNeedsAttention(tabId, mergedRequests.length > 0);
-  }
-
-  private applyActiveTabDockWriteback(tabId: TabId | null): void {
-    this.host.setTabNeedsAttention(tabId, false);
-    this.render();
-  }
-
-  private isActiveTab(tabId: TabId | null): boolean {
-    return tabId === this.host.getActiveTabId();
   }
 
   private async handleQuestionDockAction(
@@ -452,5 +443,9 @@ export class QuestionDockCoordinator {
         this.removePendingQuestionRequest(action.request.id, tabId);
       },
     });
+  }
+
+  private isActiveTab(tabId: TabId | null): boolean {
+    return tabId === this.host.getActiveTabId();
   }
 }
