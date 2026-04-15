@@ -64,6 +64,32 @@ interface SettingsModelSectionOptions {
   }) => void;
 }
 
+type ModelConfigService = NonNullable<OpenCodianPlugin['modelConfigService']>;
+
+interface SettingsModelSectionRuntimeState {
+  modelConfigService: ModelConfigService;
+  modelCatalogStateService: ModelCatalogStateService;
+  catalogState: ModelCatalogState | null;
+  catalogs: ModelCatalogBundle | null;
+  localModelConfig: OpencodeModelConfigSubset | null;
+  modelPickerGroups: ModelPickerGroup[];
+  commonSummaryEl: HTMLElement;
+  configBodyEl: HTMLElement;
+  availabilityManagementEl: HTMLElement;
+  iconCacheOverviewSetting: Setting | null;
+  defaultModelButton: ButtonComponent | null;
+  refreshModelsButton: ButtonComponent | null;
+  refreshIconCacheButton: ButtonComponent | null;
+  warmIconCacheButton: ButtonComponent | null;
+  viewIconCacheButton: ButtonComponent | null;
+  isRefreshingModelCatalog: boolean;
+}
+
+interface SettingsModelSectionBodies {
+  commonBodyEl: HTMLElement;
+  toolsBodyEl: HTMLElement;
+}
+
 export class SettingsModelSection {
   private readonly app: App;
   private readonly plugin: OpenCodianPlugin;
@@ -83,6 +109,7 @@ export class SettingsModelSection {
     status: OpenCodeServerStatus;
   }) => void;
   private modelCatalogPresenter: SettingsModelCatalogPresenter | null = null;
+  private runtime: SettingsModelSectionRuntimeState | null = null;
 
   constructor(options: SettingsModelSectionOptions) {
     this.app = options.app;
@@ -99,11 +126,14 @@ export class SettingsModelSection {
   }
 
   dispose(): void {
+    this.runtime = null;
     this.setRefreshModelsCallback(undefined);
     this.setRefreshModelCatalogStatusCallback(undefined);
   }
 
   attach(containerEl: HTMLElement): HTMLHeadingElement {
+    this.dispose();
+
     const headingEl = this.createSectionHeading(
       containerEl,
       t('settings.model.title'),
@@ -119,27 +149,31 @@ export class SettingsModelSection {
       return headingEl;
     }
 
+    const { commonBodyEl, toolsBodyEl } = this.initializeRuntime(containerEl, modelConfigService);
+    this.attachCommonSettings(commonBodyEl);
+    this.attachIconCacheTools(toolsBodyEl);
+    this.updateCommonSummary();
+    this.updateDefaultModelButton();
+    void this.refreshIconCacheOverview();
+    void this.bootstrapModelSection();
+
+    return headingEl;
+  }
+
+  private initializeRuntime(
+    containerEl: HTMLElement,
+    modelConfigService: ModelConfigService,
+  ): SettingsModelSectionBodies {
     const modelCatalogStateService = new ModelCatalogStateService(modelConfigService);
     const modelCatalogPresenter = this.modelCatalogPresenter ??= new SettingsModelCatalogPresenter({
       catalogStateService: modelCatalogStateService,
-      applyInlineCodeText: (targetEl, text) => {
-        this.applyInlineCodeText(targetEl, text);
-      },
+      applyInlineCodeText: (targetEl, text) => this.applyInlineCodeText(targetEl, text),
       applyProviderIcon: (targetEl, providerId, label) => this.applyProviderIcon(targetEl, providerId, label),
-      onProviderAvailabilityChange: async (providerIds, enabled) => {
-        await applyProviderAvailabilityChange(providerIds, enabled);
-      },
-      onModelAvailabilityChange: async (modelRefs, enabled) => {
-        await applyModelAvailabilityChange(modelRefs, enabled);
-      },
+      onProviderAvailabilityChange: (providerIds, enabled) => this.applyProviderAvailabilityChange(providerIds, enabled),
+      onModelAvailabilityChange: (modelRefs, enabled) => this.applyModelAvailabilityChange(modelRefs, enabled),
     });
     modelCatalogPresenter.setPreferredCatalogTab(this.plugin.settings.modelSourceMode);
 
-    let catalogState: ModelCatalogState | null = null;
-    let catalogs: ModelCatalogBundle | null = null;
-    let localModelConfig: OpencodeModelConfigSubset | null = null;
-    let modelPickerGroups: ModelPickerGroup[] = [];
-    let defaultModelButton: ButtonComponent | null = null;
     const commonBodyEl = this.createSettingsBlock(containerEl, {
       title: t('settings.model.common.title'),
       description: t('settings.model.common.desc'),
@@ -158,7 +192,6 @@ export class SettingsModelSection {
         this.plugin.scheduleSettingsUiStateSave();
       },
     });
-    const availabilityManagementEl = availabilityBodyEl.createDiv({ cls: 'opencodian-model-toggle-management' });
     const toolsBodyEl = this.createSettingsBlock(containerEl, {
       title: t('settings.model.tools.title'),
       description: t('settings.model.tools.desc'),
@@ -170,350 +203,55 @@ export class SettingsModelSection {
       },
     });
     toolsBodyEl.parentElement?.addClass('opencodian-icon-cache-block');
-    const commonSummaryEl = commonBodyEl.createDiv({ cls: 'opencodian-model-common-summary' });
 
-    const syncSettingsWithCatalogs = (nextCatalogs: ModelCatalogBundle): boolean => {
-      const effectiveProviders = nextCatalogs.effective.providers;
-      const effectiveProvider = effectiveProviders.find(
-        (provider) => provider.id === this.plugin.settings.defaultProvider,
-      ) ?? null;
-      let dirty = false;
-
-      if (!effectiveProvider && this.plugin.settings.defaultProvider !== '') {
-        this.plugin.settings.defaultProvider = '';
-        dirty = true;
-      }
-
-      const effectiveModel = effectiveProvider?.models.find(
-        (model) => model.id === this.plugin.settings.defaultModel,
-      ) ?? null;
-      if (!effectiveProvider || !effectiveModel) {
-        if (this.plugin.settings.defaultModel !== '') {
-          this.plugin.settings.defaultModel = '';
-          dirty = true;
-        }
-      }
-
-      return dirty;
-    };
-
-    const updateCommonSummary = (): void => {
-      if (!catalogs) {
-        commonSummaryEl.setText(t('settings.model.common.summaryLoading'));
-        return;
-      }
-
-      commonSummaryEl.setText(t('settings.model.common.summary', {
-        providers: String(catalogs.effective.providers.length),
-        models: String(modelCatalogPresenter.getCatalogModelCount(catalogs.effective)),
-      }));
-    };
-
-    const openModelWorkspace = (options?: ConstructorParameters<typeof ModelConfigModal>[2]): void => {
-      new ModelConfigModal(this.app, this.plugin, {
-        ...options,
-        onSaved: async () => {
-          await refreshModelSettings({ forceViewReload: true });
-          await refreshIconCacheOverview();
-          await options?.onSaved?.();
-        },
-      }).open();
-    };
-
-    const renderConfigCards = (): void => {
-      configBodyEl.empty();
-
-      configBodyEl.createDiv({
-        cls: 'opencodian-config-path opencodian-model-config-block-path',
-        text: `${t('settings.model.config.path')}: ${modelConfigService.getConfigPath()}`,
-      });
-
-      const providers = Object.entries(localModelConfig?.provider ?? {});
-      if (providers.length === 0) {
-        configBodyEl.createDiv({
-          cls: 'opencodian-model-config-block-empty',
-          text: t('settings.model.configCard.empty'),
-        });
-      }
-
-      const gridEl = configBodyEl.createDiv({ cls: 'opencodian-settings-provider-grid' });
-      for (const [providerId, provider] of providers) {
-        const providerName = typeof provider.name === 'string' && provider.name.trim().length > 0
-          ? provider.name.trim()
-          : providerId;
-        const providerEnabled = isProviderEnabled(localModelConfig ?? {}, providerId);
-        const modelCount = Object.keys(provider.models ?? {}).length;
-        const cardEl = gridEl.createEl('button', {
-          cls: `opencodian-preset-card opencodian-settings-provider-card${providerEnabled ? '' : ' is-disabled'}`,
-        });
-        cardEl.type = 'button';
-        cardEl.addEventListener('click', () => {
-          openModelWorkspace({
-            initialProviderId: providerId,
-            initialView: 'editor',
-          });
-        });
-
-        const iconEl = cardEl.createDiv({ cls: 'opencodian-preset-card-icon' });
-        setIcon(iconEl, 'bot');
-        void this.applyProviderIcon(iconEl, providerId, providerName);
-
-        const copyEl = cardEl.createDiv({ cls: 'opencodian-preset-card-copy' });
-        copyEl.createDiv({
-          cls: 'opencodian-preset-card-title',
-          text: providerName,
-        });
-        copyEl.createDiv({
-          cls: 'opencodian-preset-card-subtitle',
-          text: providerId,
-        });
-        copyEl.createDiv({
-          cls: 'opencodian-preset-card-meta',
-          text: t('settings.model.configCard.modelCount', {
-            count: String(modelCount),
-          }),
-        });
-
-        const badgesEl = copyEl.createDiv({ cls: 'opencodian-settings-provider-card-badges' });
-        badgesEl.createSpan({
-          cls: `opencodian-model-workspace-status-badge ${providerEnabled ? 'is-enabled' : 'is-disabled'}`,
-          text: providerEnabled
-            ? t('settings.model.configCard.enabled')
-            : t('settings.model.configCard.disabled'),
-        });
-      }
-
-      const addCardEl = gridEl.createEl('button', {
-        cls: 'opencodian-preset-card opencodian-settings-provider-card is-add-card',
-      });
-      addCardEl.type = 'button';
-      addCardEl.addEventListener('click', () => {
-        openModelWorkspace({
-          initialView: 'preset-selector',
-        });
-      });
-
-      const addIconEl = addCardEl.createDiv({ cls: 'opencodian-preset-card-icon' });
-      setIcon(addIconEl, 'plus');
-      const addCopyEl = addCardEl.createDiv({ cls: 'opencodian-preset-card-copy' });
-      addCopyEl.createDiv({
-        cls: 'opencodian-preset-card-title',
-        text: t('settings.model.configCard.add'),
-      });
-      addCopyEl.createDiv({
-        cls: 'opencodian-preset-card-meta',
-        text: t('settings.model.configCard.addDesc'),
-      });
-
-      const actionsEl = configBodyEl.createDiv({ cls: 'opencodian-config-buttons' });
-      const jsonButton = actionsEl.createEl('button', {
-        text: t('settings.model.config.jsonButton'),
-      });
-      jsonButton.type = 'button';
-      jsonButton.addEventListener('click', () => {
-        new ModelConfigJsonModal(this.app, this.plugin).open();
-      });
-    };
-
-    const updateDefaultModelButton = (): void => {
-      if (!defaultModelButton) {
-        return;
-      }
-
-      const selected = findModelPickerOption(
-        modelPickerGroups,
-        this.plugin.settings.defaultProvider,
-        this.plugin.settings.defaultModel,
-      );
-      defaultModelButton.setButtonText(
-        selected
-          ? `${selected.providerName} / ${selected.modelName}`
-          : t('settings.model.unconfigured'),
-      );
-      defaultModelButton.setDisabled(modelPickerGroups.length === 0);
-    };
-
-    const applyProviderAvailabilityChange = async (
-      providerIds: Iterable<string>,
-      enabled: boolean,
-    ): Promise<void> => {
-      try {
-        const state = catalogState ?? await modelCatalogStateService.getCatalogState(
-          this.plugin.settings.modelSourceMode,
-          this.plugin.settings.disabledModelRefs,
-        );
-        const changed = await modelCatalogStateService.applyProviderAvailabilityChange({
-          state,
-          providerIds,
-          enabled,
-        });
-        if (!changed) {
-          return;
-        }
-        await refreshModelSettings({ forceViewReload: true });
-        await refreshIconCacheOverview();
-      } catch (error) {
-        logger.error('Failed to update provider availability in bulk:', error);
-        new Notice(t('settings.model.toggle.saveFailed'));
-        throw error;
-      }
-    };
-
-    const applyModelAvailabilityChange = async (
-      modelRefs: Iterable<string>,
-      enabled: boolean,
-    ): Promise<void> => {
-      const previousDisabledModelRefs = [...this.plugin.settings.disabledModelRefs];
-      this.plugin.settings.disabledModelRefs = modelCatalogStateService.applyModelAvailabilityChange({
-        disabledModelRefs: previousDisabledModelRefs,
-        modelRefs,
-        enabled,
-      });
-      if (this.plugin.settings.disabledModelRefs.join('\u0000') === previousDisabledModelRefs.join('\u0000')) {
-        return;
-      }
-
-      try {
-        await refreshModelSettings({ forceViewReload: true });
-        await refreshIconCacheOverview();
-      } catch (error) {
-        logger.error('Failed to update model availability in bulk:', error);
-        this.plugin.settings.disabledModelRefs = previousDisabledModelRefs;
-        new Notice(t('settings.model.toggle.saveFailed'));
-        throw error;
-      }
-    };
-
-    const openDefaultModelPicker = (): void => {
-      new ModelPickerModal(this.app, {
-        title: t('settings.model.defaultChatModel.pickerTitle'),
-        description: t('settings.model.defaultChatModel.pickerDesc'),
-        groups: modelPickerGroups,
-        selectedRef: this.plugin.settings.defaultProvider && this.plugin.settings.defaultModel
-          ? formatModelReference(this.plugin.settings.defaultProvider, this.plugin.settings.defaultModel)
-          : '',
-        emptySelectionLabel: t('settings.model.unconfigured'),
-        onChoose: async (option) => {
-          this.plugin.settings.defaultProvider = option?.providerId ?? '';
-          this.plugin.settings.defaultModel = option?.modelId ?? '';
-          updateDefaultModelButton();
-          await this.plugin.saveSettings({
-            syncConfig: false,
-            reloadModels: true,
-            applyUi: true,
-          });
-        },
-      }).open();
-    };
-
-    const renderAvailabilityManagement = (): void => {
-      modelCatalogPresenter.render({
-        containerEl: availabilityManagementEl,
-        catalogState,
-      });
-    };
-
-    const refreshModelSettings = async (
-      options: { showNotice?: boolean; forceViewReload?: boolean } = {},
-    ): Promise<ModelCatalogState | null> => {
-      const {
-        showNotice = false,
-        forceViewReload = false,
-      } = options;
-
-      try {
-        catalogState = await modelCatalogStateService.getCatalogState(
-          this.plugin.settings.modelSourceMode,
-          this.plugin.settings.disabledModelRefs,
-        );
-        localModelConfig = catalogState.localModelConfig;
-        catalogs = catalogState.catalogs;
-        modelPickerGroups = buildModelPickerGroups(catalogs.effective);
-        const dirty = syncSettingsWithCatalogs(catalogs);
-
-        const serializeCatalog = (catalog: ModelCatalog) => ({
-          defaults: { ...catalog.defaults },
-          providerCount: catalog.providers.length,
-          modelCount: modelCatalogPresenter.getCatalogModelCount(catalog),
-          providers: catalog.providers.map((provider) => ({
-            id: provider.id,
-            name: provider.name,
-            source: provider.source,
-            existsInLocal: provider.existsInLocal,
-            existsInServer: provider.existsInServer,
-            modelCount: provider.models.length,
-            models: provider.models.map((model) => ({
-              id: model.id,
-              name: model.name,
-              source: model.source,
-              existsInLocal: model.existsInLocal,
-              existsInServer: model.existsInServer,
-              contextWindow: model.contextWindow,
-            })),
-          })),
-        });
-
-        updateCommonSummary();
-        renderConfigCards();
-        updateDefaultModelButton();
-        renderAvailabilityManagement();
-        this.refreshTitleModels();
-
-        if (dirty || forceViewReload) {
-          await this.plugin.saveSettings({
-            syncConfig: false,
-            reloadModels: true,
-            applyUi: true,
-          });
-        }
-
-        if (showNotice) {
-          const serverDisplayCatalog = catalogState.displayCatalogs.server;
-          logger.debug('Manual model refresh snapshot', {
-            modelSourceMode: this.plugin.settings.modelSourceMode,
-            vaultPath: getVaultBasePath(this.app) ?? null,
-            disabledProviders: [...(localModelConfig.disabled_providers ?? [])],
-            enabledProviders: [...(localModelConfig.enabled_providers ?? [])],
-            disabledModelRefs: [...this.plugin.settings.disabledModelRefs],
-            selectedDefaultProvider: this.plugin.settings.defaultProvider,
-            selectedDefaultModel: this.plugin.settings.defaultModel,
-            selectedSmallModel: localModelConfig.small_model ?? null,
-            local: serializeCatalog(catalogs.local),
-            server: serializeCatalog(catalogs.server),
-            baseEffective: serializeCatalog(catalogs.baseEffective),
-            effective: serializeCatalog(catalogs.effective),
-            disabled: serializeCatalog(catalogState.displayCatalogs.disabled),
-          });
-          new Notice(t('settings.model.refresh.success', {
-            serverCount: String(serverDisplayCatalog.providers.length),
-            effectiveCount: String(catalogs.effective.providers.length),
-          }));
-        }
-
-        return catalogState;
-      } catch (error) {
-        logger.error('Failed to load models:', error);
-        if (showNotice) {
-          new Notice(t('settings.model.refresh.failed'));
-        }
-        return null;
-      }
+    this.runtime = {
+      modelConfigService,
+      modelCatalogStateService,
+      catalogState: null,
+      catalogs: null,
+      localModelConfig: null,
+      modelPickerGroups: [],
+      commonSummaryEl: commonBodyEl.createDiv({ cls: 'opencodian-model-common-summary' }),
+      configBodyEl,
+      availabilityManagementEl: availabilityBodyEl.createDiv({ cls: 'opencodian-model-toggle-management' }),
+      iconCacheOverviewSetting: null,
+      defaultModelButton: null,
+      refreshModelsButton: null,
+      refreshIconCacheButton: null,
+      warmIconCacheButton: null,
+      viewIconCacheButton: null,
+      isRefreshingModelCatalog: false,
     };
 
     this.setRefreshModelsCallback(() => {
-      void refreshModelSettings();
+      void this.refreshModelSettings();
     });
+    this.setRefreshModelCatalogStatusCallback(() => {
+      this.updateModelRefreshButtonState();
+    });
+
+    return {
+      commonBodyEl,
+      toolsBodyEl,
+    };
+  }
+
+  private attachCommonSettings(commonBodyEl: HTMLElement): void {
+    const runtime = this.runtime;
+    if (!runtime) {
+      return;
+    }
 
     new Setting(commonBodyEl)
       .setName(t('settings.model.defaultChatModel.name'))
       .setDesc(t('settings.model.defaultChatModel.desc'))
       .addButton((btn) => {
-        defaultModelButton = btn;
+        runtime.defaultModelButton = btn;
         btn
           .setButtonText(t('settings.model.common.summaryLoading'))
           .setCta()
           .onClick(() => {
-            openDefaultModelPicker();
+            this.openDefaultModelPicker();
           });
       });
 
@@ -526,200 +264,68 @@ export class SettingsModelSection {
           .addOption('server', t('settings.model.source.server'))
           .setValue(this.plugin.settings.modelSourceMode)
           .onChange(async (value) => {
-            this.plugin.settings.modelSourceMode = value as ModelSourceMode;
-            modelCatalogPresenter.setPreferredCatalogTab(value as ModelSourceMode);
-            await this.plugin.saveSettings({
-              syncConfig: false,
-              reloadModels: true,
-              applyUi: true,
-            });
-            new Notice(t('settings.model.source.updated'));
-            await refreshModelSettings();
-            await refreshIconCacheOverview();
+            await this.handleModelSourceModeChange(value as ModelSourceMode);
           });
       });
     this.setSettingDescWithFormatting(modelSourceSetting, t('settings.model.source.desc'));
-
-    let refreshModelsButton: ButtonComponent | undefined;
-    let isRefreshingModelCatalog = false;
-    const updateModelRefreshButtonState = () => {
-      if (!refreshModelsButton) {
-        return;
-      }
-
-      const serverState = this.getServerState();
-      const serverBusy = serverState.status === 'starting' || serverState.status === 'restarting';
-      refreshModelsButton.setButtonText(
-        isRefreshingModelCatalog
-          ? t('settings.model.refresh.loading')
-          : t('settings.model.refresh.button'),
-      );
-      refreshModelsButton.setDisabled(isRefreshingModelCatalog || !serverState.healthy || serverBusy);
-    };
-    this.setRefreshModelCatalogStatusCallback(updateModelRefreshButtonState);
-    updateModelRefreshButtonState();
 
     new Setting(commonBodyEl)
       .setName(t('settings.model.refresh.name'))
       .setDesc(t('settings.model.refresh.desc'))
       .addButton((btn) => {
-        refreshModelsButton = btn;
-        updateModelRefreshButtonState();
+        runtime.refreshModelsButton = btn;
+        this.updateModelRefreshButtonState();
         btn
           .setButtonText(t('settings.model.refresh.button'))
           .onClick(async () => {
-            isRefreshingModelCatalog = true;
-            updateModelRefreshButtonState();
-            const serverState = this.getServerState();
-            const isHealthy = serverState.healthy || await this.plugin.openCodeService.checkHealth();
-            if (!isHealthy) {
-              this.setServerState({
-                healthy: false,
-                status: this.plugin.openCodeService.getServerStatus(),
-              });
-              isRefreshingModelCatalog = false;
-              updateModelRefreshButtonState();
-              new Notice(t('settings.model.refresh.unavailable'));
-              return;
-            }
-            await refreshModelSettings({ showNotice: true, forceViewReload: true });
-            await refreshIconCacheOverview();
-            isRefreshingModelCatalog = false;
-            updateModelRefreshButtonState();
+            await this.handleManualModelRefresh();
           });
       });
+    this.updateModelRefreshButtonState();
 
-    renderConfigCards();
-    let refreshIconCacheButton: ButtonComponent;
-    let warmIconCacheButton: ButtonComponent;
-    let viewIconCacheButton: ButtonComponent;
-    const iconCacheOverviewSetting = new Setting(toolsBodyEl)
+    this.renderConfigCards();
+  }
+
+  private attachIconCacheTools(toolsBodyEl: HTMLElement): void {
+    const runtime = this.runtime;
+    if (!runtime) {
+      return;
+    }
+
+    runtime.iconCacheOverviewSetting = new Setting(toolsBodyEl)
       .setName(t('settings.model.iconCache.currentName'))
       .setDesc(t('settings.model.iconCache.currentLoading'))
       .addButton((btn) => {
-        viewIconCacheButton = btn;
+        runtime.viewIconCacheButton = btn;
         btn
           .setButtonText(t('settings.model.iconCache.view'))
           .onClick(async () => {
             const providerIds = await this.getCurrentProviderIdsForIconCache();
             new ProviderIconCacheModal(this.app, this.plugin, providerIds, () => {
-              renderConfigCards();
-              void refreshIconCacheOverview();
+              this.renderConfigCards();
+              void this.refreshIconCacheOverview();
             }).open();
           });
       });
-
-    const setIconCacheButtonsDisabled = (disabled: boolean) => {
-      refreshIconCacheButton?.setDisabled(disabled);
-      warmIconCacheButton?.setDisabled(disabled);
-      viewIconCacheButton?.setDisabled(disabled);
-    };
-
-    const refreshIconCacheOverview = async () => {
-      try {
-        const providerIds = await this.getCurrentProviderIdsForIconCache();
-        const { summary } = await ProviderIconService.getProviderCacheState(
-          this.app,
-          providerIds,
-          this.plugin.settings.providerIconLibrary,
-        );
-        iconCacheOverviewSetting.setDesc(t('settings.model.iconCache.currentStatus', {
-          cachedProviders: String(summary.cachedProviders),
-          totalProviders: String(summary.totalProviders),
-          cachedIcons: String(summary.cachedIcons),
-          totalIcons: String(summary.totalIcons),
-          currentProviders: String(summary.currentProviders),
-        }));
-        viewIconCacheButton?.setDisabled(summary.totalProviders === 0);
-      } catch (error) {
-        logger.error('Failed to load provider icon cache overview:', error);
-        iconCacheOverviewSetting.setDesc(t('settings.model.iconCache.currentFailed'));
-        viewIconCacheButton?.setDisabled(true);
-      }
-    };
 
     new Setting(toolsBodyEl)
       .setName(t('settings.model.iconCache.name'))
       .setDesc(t('settings.model.iconCache.desc'))
       .addButton((btn) => {
-        refreshIconCacheButton = btn;
+        runtime.refreshIconCacheButton = btn;
         btn
           .setButtonText(t('settings.model.iconCache.refresh'))
           .onClick(async () => {
-            setIconCacheButtonsDisabled(true);
-            try {
-              const providerIds = await this.getCurrentProviderIdsForIconCache();
-              this.plugin.settings.providerIconLibrary = ProviderIconService.persistDefaultEntries(
-                providerIds,
-                this.plugin.settings.providerIconLibrary,
-              );
-              const removed = await ProviderIconService.clearCache(this.app);
-              const summary = await ProviderIconService.warmProviderIcons(
-                this.app,
-                providerIds,
-                this.plugin.settings.providerIconLibrary,
-              );
-              await this.plugin.saveSettings({
-                syncService: false,
-                reloadModels: true,
-                syncConfig: false,
-                applyUi: true,
-              });
-              new Notice(t('settings.model.iconCache.refreshSuccess', {
-                cached: String(summary.cached),
-                supported: String(summary.supported),
-                removed: String(removed),
-              }));
-              renderConfigCards();
-              await refreshIconCacheOverview();
-            } catch (error) {
-              logger.error('Failed to refresh provider icon cache:', error);
-              new Notice(t('settings.model.iconCache.refreshFailed'));
-            } finally {
-              setIconCacheButtonsDisabled(false);
-            }
+            await this.refreshProviderIconCache('refresh');
           });
       })
       .addButton((btn) => {
-        warmIconCacheButton = btn;
+        runtime.warmIconCacheButton = btn;
         btn
           .setButtonText(t('settings.model.iconCache.warm'))
           .setCta()
           .onClick(async () => {
-            setIconCacheButtonsDisabled(true);
-            try {
-              const providerIds = await this.getCurrentProviderIdsForIconCache();
-              this.plugin.settings.providerIconLibrary = ProviderIconService.persistDefaultEntries(
-                providerIds,
-                this.plugin.settings.providerIconLibrary,
-              );
-              const summary = await ProviderIconService.warmProviderIcons(
-                this.app,
-                providerIds,
-                this.plugin.settings.providerIconLibrary,
-              );
-              await this.plugin.saveSettings({
-                syncService: false,
-                reloadModels: true,
-                syncConfig: false,
-                applyUi: true,
-              });
-              if (summary.total === 0) {
-                new Notice(t('settings.model.iconCache.noProviders'));
-                return;
-              }
-              new Notice(t('settings.model.iconCache.warmSuccess', {
-                cached: String(summary.cached),
-                supported: String(summary.supported),
-              }));
-              renderConfigCards();
-              await refreshIconCacheOverview();
-            } catch (error) {
-              logger.error('Failed to warm provider icon cache:', error);
-              new Notice(t('settings.model.iconCache.warmFailed'));
-            } finally {
-              setIconCacheButtonsDisabled(false);
-            }
+            await this.refreshProviderIconCache('warm');
           });
       });
 
@@ -795,17 +401,565 @@ export class SettingsModelSection {
             }
           });
       });
+  }
 
-    updateCommonSummary();
-    updateDefaultModelButton();
-    void refreshIconCacheOverview();
+  private async bootstrapModelSection(): Promise<void> {
+    await this.refreshModelSettings();
+    await this.refreshIconCacheOverview();
+  }
 
-    void (async () => {
-      await refreshModelSettings();
-      await refreshIconCacheOverview();
-    })();
+  private syncSettingsWithCatalogs(nextCatalogs: ModelCatalogBundle): boolean {
+    const effectiveProviders = nextCatalogs.effective.providers;
+    const effectiveProvider = effectiveProviders.find(
+      (provider) => provider.id === this.plugin.settings.defaultProvider,
+    ) ?? null;
+    let dirty = false;
 
-    return headingEl;
+    if (!effectiveProvider && this.plugin.settings.defaultProvider !== '') {
+      this.plugin.settings.defaultProvider = '';
+      dirty = true;
+    }
+
+    const effectiveModel = effectiveProvider?.models.find(
+      (model) => model.id === this.plugin.settings.defaultModel,
+    ) ?? null;
+    if ((!effectiveProvider || !effectiveModel) && this.plugin.settings.defaultModel !== '') {
+      this.plugin.settings.defaultModel = '';
+      dirty = true;
+    }
+
+    return dirty;
+  }
+
+  private updateCommonSummary(): void {
+    const runtime = this.runtime;
+    const modelCatalogPresenter = this.modelCatalogPresenter;
+    if (!runtime || !modelCatalogPresenter) {
+      return;
+    }
+
+    if (!runtime.catalogs) {
+      runtime.commonSummaryEl.setText(t('settings.model.common.summaryLoading'));
+      return;
+    }
+
+    runtime.commonSummaryEl.setText(t('settings.model.common.summary', {
+      providers: String(runtime.catalogs.effective.providers.length),
+      models: String(modelCatalogPresenter.getCatalogModelCount(runtime.catalogs.effective)),
+    }));
+  }
+
+  private openModelWorkspace(options?: ConstructorParameters<typeof ModelConfigModal>[2]): void {
+    new ModelConfigModal(this.app, this.plugin, {
+      ...options,
+      onSaved: async () => {
+        await this.refreshModelSettings({ forceViewReload: true });
+        await this.refreshIconCacheOverview();
+        await options?.onSaved?.();
+      },
+    }).open();
+  }
+
+  private renderConfigCards(): void {
+    const runtime = this.runtime;
+    if (!runtime) {
+      return;
+    }
+
+    runtime.configBodyEl.empty();
+    runtime.configBodyEl.createDiv({
+      cls: 'opencodian-config-path opencodian-model-config-block-path',
+      text: `${t('settings.model.config.path')}: ${runtime.modelConfigService.getConfigPath()}`,
+    });
+
+    const providers = Object.entries(runtime.localModelConfig?.provider ?? {});
+    if (providers.length === 0) {
+      runtime.configBodyEl.createDiv({
+        cls: 'opencodian-model-config-block-empty',
+        text: t('settings.model.configCard.empty'),
+      });
+    }
+
+    const gridEl = runtime.configBodyEl.createDiv({ cls: 'opencodian-settings-provider-grid' });
+    for (const [providerId, provider] of providers) {
+      const providerName = typeof provider.name === 'string' && provider.name.trim().length > 0
+        ? provider.name.trim()
+        : providerId;
+      const providerEnabled = isProviderEnabled(runtime.localModelConfig ?? {}, providerId);
+      const modelCount = Object.keys(provider.models ?? {}).length;
+      const cardEl = gridEl.createEl('button', {
+        cls: `opencodian-preset-card opencodian-settings-provider-card${providerEnabled ? '' : ' is-disabled'}`,
+      });
+      cardEl.type = 'button';
+      cardEl.addEventListener('click', () => {
+        this.openModelWorkspace({
+          initialProviderId: providerId,
+          initialView: 'editor',
+        });
+      });
+
+      const iconEl = cardEl.createDiv({ cls: 'opencodian-preset-card-icon' });
+      setIcon(iconEl, 'bot');
+      void this.applyProviderIcon(iconEl, providerId, providerName);
+
+      const copyEl = cardEl.createDiv({ cls: 'opencodian-preset-card-copy' });
+      copyEl.createDiv({
+        cls: 'opencodian-preset-card-title',
+        text: providerName,
+      });
+      copyEl.createDiv({
+        cls: 'opencodian-preset-card-subtitle',
+        text: providerId,
+      });
+      copyEl.createDiv({
+        cls: 'opencodian-preset-card-meta',
+        text: t('settings.model.configCard.modelCount', {
+          count: String(modelCount),
+        }),
+      });
+
+      const badgesEl = copyEl.createDiv({ cls: 'opencodian-settings-provider-card-badges' });
+      badgesEl.createSpan({
+        cls: `opencodian-model-workspace-status-badge ${providerEnabled ? 'is-enabled' : 'is-disabled'}`,
+        text: providerEnabled
+          ? t('settings.model.configCard.enabled')
+          : t('settings.model.configCard.disabled'),
+      });
+    }
+
+    const addCardEl = gridEl.createEl('button', {
+      cls: 'opencodian-preset-card opencodian-settings-provider-card is-add-card',
+    });
+    addCardEl.type = 'button';
+    addCardEl.addEventListener('click', () => {
+      this.openModelWorkspace({
+        initialView: 'preset-selector',
+      });
+    });
+
+    const addIconEl = addCardEl.createDiv({ cls: 'opencodian-preset-card-icon' });
+    setIcon(addIconEl, 'plus');
+    const addCopyEl = addCardEl.createDiv({ cls: 'opencodian-preset-card-copy' });
+    addCopyEl.createDiv({
+      cls: 'opencodian-preset-card-title',
+      text: t('settings.model.configCard.add'),
+    });
+    addCopyEl.createDiv({
+      cls: 'opencodian-preset-card-meta',
+      text: t('settings.model.configCard.addDesc'),
+    });
+
+    const actionsEl = runtime.configBodyEl.createDiv({ cls: 'opencodian-config-buttons' });
+    const jsonButton = actionsEl.createEl('button', {
+      text: t('settings.model.config.jsonButton'),
+    });
+    jsonButton.type = 'button';
+    jsonButton.addEventListener('click', () => {
+      new ModelConfigJsonModal(this.app, this.plugin).open();
+    });
+  }
+
+  private updateDefaultModelButton(): void {
+    const runtime = this.runtime;
+    if (!runtime?.defaultModelButton) {
+      return;
+    }
+
+    const selected = findModelPickerOption(
+      runtime.modelPickerGroups,
+      this.plugin.settings.defaultProvider,
+      this.plugin.settings.defaultModel,
+    );
+    runtime.defaultModelButton.setButtonText(
+      selected
+        ? `${selected.providerName} / ${selected.modelName}`
+        : t('settings.model.unconfigured'),
+    );
+    runtime.defaultModelButton.setDisabled(runtime.modelPickerGroups.length === 0);
+  }
+
+  private async applyProviderAvailabilityChange(
+    providerIds: Iterable<string>,
+    enabled: boolean,
+  ): Promise<void> {
+    const runtime = this.runtime;
+    if (!runtime) {
+      return;
+    }
+
+    try {
+      const state = runtime.catalogState ?? await runtime.modelCatalogStateService.getCatalogState(
+        this.plugin.settings.modelSourceMode,
+        this.plugin.settings.disabledModelRefs,
+      );
+      if (!this.isRuntimeActive(runtime)) {
+        return;
+      }
+
+      const changed = await runtime.modelCatalogStateService.applyProviderAvailabilityChange({
+        state,
+        providerIds,
+        enabled,
+      });
+      if (!changed) {
+        return;
+      }
+      await this.refreshModelSettings({ forceViewReload: true });
+      await this.refreshIconCacheOverview();
+    } catch (error) {
+      logger.error('Failed to update provider availability in bulk:', error);
+      new Notice(t('settings.model.toggle.saveFailed'));
+      throw error;
+    }
+  }
+
+  private async applyModelAvailabilityChange(
+    modelRefs: Iterable<string>,
+    enabled: boolean,
+  ): Promise<void> {
+    const runtime = this.runtime;
+    if (!runtime) {
+      return;
+    }
+
+    const previousDisabledModelRefs = [...this.plugin.settings.disabledModelRefs];
+    this.plugin.settings.disabledModelRefs = runtime.modelCatalogStateService.applyModelAvailabilityChange({
+      disabledModelRefs: previousDisabledModelRefs,
+      modelRefs,
+      enabled,
+    });
+    if (this.plugin.settings.disabledModelRefs.join('\u0000') === previousDisabledModelRefs.join('\u0000')) {
+      return;
+    }
+
+    try {
+      await this.refreshModelSettings({ forceViewReload: true });
+      await this.refreshIconCacheOverview();
+    } catch (error) {
+      logger.error('Failed to update model availability in bulk:', error);
+      this.plugin.settings.disabledModelRefs = previousDisabledModelRefs;
+      new Notice(t('settings.model.toggle.saveFailed'));
+      throw error;
+    }
+  }
+
+  private openDefaultModelPicker(): void {
+    const runtime = this.runtime;
+    if (!runtime) {
+      return;
+    }
+
+    new ModelPickerModal(this.app, {
+      title: t('settings.model.defaultChatModel.pickerTitle'),
+      description: t('settings.model.defaultChatModel.pickerDesc'),
+      groups: runtime.modelPickerGroups,
+      selectedRef: this.plugin.settings.defaultProvider && this.plugin.settings.defaultModel
+        ? formatModelReference(this.plugin.settings.defaultProvider, this.plugin.settings.defaultModel)
+        : '',
+      emptySelectionLabel: t('settings.model.unconfigured'),
+      onChoose: async (option) => {
+        this.plugin.settings.defaultProvider = option?.providerId ?? '';
+        this.plugin.settings.defaultModel = option?.modelId ?? '';
+        this.updateDefaultModelButton();
+        await this.plugin.saveSettings({
+          syncConfig: false,
+          reloadModels: true,
+          applyUi: true,
+        });
+      },
+    }).open();
+  }
+
+  private renderAvailabilityManagement(): void {
+    const runtime = this.runtime;
+    const modelCatalogPresenter = this.modelCatalogPresenter;
+    if (!runtime || !modelCatalogPresenter) {
+      return;
+    }
+
+    modelCatalogPresenter.render({
+      containerEl: runtime.availabilityManagementEl,
+      catalogState: runtime.catalogState,
+    });
+  }
+
+  private async refreshModelSettings(
+    options: { showNotice?: boolean; forceViewReload?: boolean } = {},
+  ): Promise<ModelCatalogState | null> {
+    const runtime = this.runtime;
+    if (!runtime) {
+      return null;
+    }
+
+    const {
+      showNotice = false,
+      forceViewReload = false,
+    } = options;
+
+    try {
+      const catalogState = await runtime.modelCatalogStateService.getCatalogState(
+        this.plugin.settings.modelSourceMode,
+        this.plugin.settings.disabledModelRefs,
+      );
+      if (!this.isRuntimeActive(runtime)) {
+        return null;
+      }
+
+      runtime.catalogState = catalogState;
+      runtime.localModelConfig = catalogState.localModelConfig;
+      runtime.catalogs = catalogState.catalogs;
+      runtime.modelPickerGroups = buildModelPickerGroups(runtime.catalogs.effective);
+      const dirty = this.syncSettingsWithCatalogs(runtime.catalogs);
+
+      this.updateCommonSummary();
+      this.renderConfigCards();
+      this.updateDefaultModelButton();
+      this.renderAvailabilityManagement();
+      this.refreshTitleModels();
+
+      if (dirty || forceViewReload) {
+        await this.plugin.saveSettings({
+          syncConfig: false,
+          reloadModels: true,
+          applyUi: true,
+        });
+      }
+
+      if (showNotice) {
+        const serverDisplayCatalog = catalogState.displayCatalogs.server;
+        logger.debug('Manual model refresh snapshot', {
+          modelSourceMode: this.plugin.settings.modelSourceMode,
+          vaultPath: getVaultBasePath(this.app) ?? null,
+          disabledProviders: [...(runtime.localModelConfig?.disabled_providers ?? [])],
+          enabledProviders: [...(runtime.localModelConfig?.enabled_providers ?? [])],
+          disabledModelRefs: [...this.plugin.settings.disabledModelRefs],
+          selectedDefaultProvider: this.plugin.settings.defaultProvider,
+          selectedDefaultModel: this.plugin.settings.defaultModel,
+          selectedSmallModel: runtime.localModelConfig?.small_model ?? null,
+          local: this.serializeCatalog(runtime.catalogs.local),
+          server: this.serializeCatalog(runtime.catalogs.server),
+          baseEffective: this.serializeCatalog(runtime.catalogs.baseEffective),
+          effective: this.serializeCatalog(runtime.catalogs.effective),
+          disabled: this.serializeCatalog(catalogState.displayCatalogs.disabled),
+        });
+        new Notice(t('settings.model.refresh.success', {
+          serverCount: String(serverDisplayCatalog.providers.length),
+          effectiveCount: String(runtime.catalogs.effective.providers.length),
+        }));
+      }
+
+      return catalogState;
+    } catch (error) {
+      logger.error('Failed to load models:', error);
+      if (showNotice) {
+        new Notice(t('settings.model.refresh.failed'));
+      }
+      return null;
+    }
+  }
+
+  private serializeCatalog(catalog: ModelCatalog) {
+    return {
+      defaults: { ...catalog.defaults },
+      providerCount: catalog.providers.length,
+      modelCount: this.modelCatalogPresenter?.getCatalogModelCount(catalog) ?? 0,
+      providers: catalog.providers.map((provider) => ({
+        id: provider.id,
+        name: provider.name,
+        source: provider.source,
+        existsInLocal: provider.existsInLocal,
+        existsInServer: provider.existsInServer,
+        modelCount: provider.models.length,
+        models: provider.models.map((model) => ({
+          id: model.id,
+          name: model.name,
+          source: model.source,
+          existsInLocal: model.existsInLocal,
+          existsInServer: model.existsInServer,
+          contextWindow: model.contextWindow,
+        })),
+      })),
+    };
+  }
+
+  private async handleModelSourceModeChange(mode: ModelSourceMode): Promise<void> {
+    this.plugin.settings.modelSourceMode = mode;
+    this.modelCatalogPresenter?.setPreferredCatalogTab(mode);
+    await this.plugin.saveSettings({
+      syncConfig: false,
+      reloadModels: true,
+      applyUi: true,
+    });
+    new Notice(t('settings.model.source.updated'));
+    await this.refreshModelSettings();
+    await this.refreshIconCacheOverview();
+  }
+
+  private async handleManualModelRefresh(): Promise<void> {
+    const runtime = this.runtime;
+    if (!runtime) {
+      return;
+    }
+
+    runtime.isRefreshingModelCatalog = true;
+    this.updateModelRefreshButtonState();
+    try {
+      const serverState = this.getServerState();
+      const isHealthy = serverState.healthy || await this.plugin.openCodeService.checkHealth();
+      if (!isHealthy) {
+        if (this.isRuntimeActive(runtime)) {
+          this.setServerState({
+            healthy: false,
+            status: this.plugin.openCodeService.getServerStatus(),
+          });
+          new Notice(t('settings.model.refresh.unavailable'));
+        }
+        return;
+      }
+
+      await this.refreshModelSettings({ showNotice: true, forceViewReload: true });
+      await this.refreshIconCacheOverview();
+    } finally {
+      if (this.isRuntimeActive(runtime)) {
+        runtime.isRefreshingModelCatalog = false;
+        this.updateModelRefreshButtonState();
+      }
+    }
+  }
+
+  private updateModelRefreshButtonState(): void {
+    const runtime = this.runtime;
+    if (!runtime?.refreshModelsButton) {
+      return;
+    }
+
+    const serverState = this.getServerState();
+    const serverBusy = serverState.status === 'starting' || serverState.status === 'restarting';
+    runtime.refreshModelsButton.setButtonText(
+      runtime.isRefreshingModelCatalog
+        ? t('settings.model.refresh.loading')
+        : t('settings.model.refresh.button'),
+    );
+    runtime.refreshModelsButton.setDisabled(runtime.isRefreshingModelCatalog || !serverState.healthy || serverBusy);
+  }
+
+  private setIconCacheButtonsDisabled(disabled: boolean): void {
+    const runtime = this.runtime;
+    if (!runtime) {
+      return;
+    }
+
+    runtime.refreshIconCacheButton?.setDisabled(disabled);
+    runtime.warmIconCacheButton?.setDisabled(disabled);
+    runtime.viewIconCacheButton?.setDisabled(disabled);
+  }
+
+  private async refreshProviderIconCache(mode: 'refresh' | 'warm'): Promise<void> {
+    const runtime = this.runtime;
+    if (!runtime) {
+      return;
+    }
+
+    this.setIconCacheButtonsDisabled(true);
+    try {
+      const providerIds = await this.getCurrentProviderIdsForIconCache();
+      this.plugin.settings.providerIconLibrary = ProviderIconService.persistDefaultEntries(
+        providerIds,
+        this.plugin.settings.providerIconLibrary,
+      );
+
+      let removed = 0;
+      if (mode === 'refresh') {
+        removed = await ProviderIconService.clearCache(this.app);
+      }
+
+      const summary = await ProviderIconService.warmProviderIcons(
+        this.app,
+        providerIds,
+        this.plugin.settings.providerIconLibrary,
+      );
+      await this.plugin.saveSettings({
+        syncService: false,
+        reloadModels: true,
+        syncConfig: false,
+        applyUi: true,
+      });
+
+      if (mode === 'warm' && summary.total === 0) {
+        new Notice(t('settings.model.iconCache.noProviders'));
+        return;
+      }
+
+      new Notice(mode === 'refresh'
+        ? t('settings.model.iconCache.refreshSuccess', {
+          cached: String(summary.cached),
+          supported: String(summary.supported),
+          removed: String(removed),
+        })
+        : t('settings.model.iconCache.warmSuccess', {
+          cached: String(summary.cached),
+          supported: String(summary.supported),
+        }));
+
+      this.renderConfigCards();
+      await this.refreshIconCacheOverview();
+    } catch (error) {
+      logger.error(
+        mode === 'refresh'
+          ? 'Failed to refresh provider icon cache:'
+          : 'Failed to warm provider icon cache:',
+        error,
+      );
+      new Notice(
+        mode === 'refresh'
+          ? t('settings.model.iconCache.refreshFailed')
+          : t('settings.model.iconCache.warmFailed'),
+      );
+    } finally {
+      if (this.isRuntimeActive(runtime)) {
+        this.setIconCacheButtonsDisabled(false);
+      }
+    }
+  }
+
+  private async refreshIconCacheOverview(): Promise<void> {
+    const runtime = this.runtime;
+    if (!runtime?.iconCacheOverviewSetting) {
+      return;
+    }
+
+    try {
+      const providerIds = await this.getCurrentProviderIdsForIconCache();
+      const { summary } = await ProviderIconService.getProviderCacheState(
+        this.app,
+        providerIds,
+        this.plugin.settings.providerIconLibrary,
+      );
+      if (!this.isRuntimeActive(runtime) || !runtime.iconCacheOverviewSetting) {
+        return;
+      }
+
+      runtime.iconCacheOverviewSetting.setDesc(t('settings.model.iconCache.currentStatus', {
+        cachedProviders: String(summary.cachedProviders),
+        totalProviders: String(summary.totalProviders),
+        cachedIcons: String(summary.cachedIcons),
+        totalIcons: String(summary.totalIcons),
+        currentProviders: String(summary.currentProviders),
+      }));
+      runtime.viewIconCacheButton?.setDisabled(summary.totalProviders === 0);
+    } catch (error) {
+      logger.error('Failed to load provider icon cache overview:', error);
+      if (!this.isRuntimeActive(runtime) || !runtime.iconCacheOverviewSetting) {
+        return;
+      }
+
+      runtime.iconCacheOverviewSetting.setDesc(t('settings.model.iconCache.currentFailed'));
+      runtime.viewIconCacheButton?.setDisabled(true);
+    }
+  }
+
+  private isRuntimeActive(runtime: SettingsModelSectionRuntimeState): boolean {
+    return this.runtime === runtime;
   }
 
   private async getCurrentProviderIdsForIconCache(): Promise<string[]> {

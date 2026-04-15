@@ -2,19 +2,19 @@
 
 > **状态**: [READY]
 > **作用**: 这是 maintainability 无人值守的战略文档。每轮开始前，先读本文件，再读 `docs/status/maintainability-round-roadmap.md` 与最近的 `docs/status/maintainability-phase-XXX.md`。
-> **自动推进状态**: `R122` 已完成 secondary core checkpoint；当前继续按 `R123-R137` 长队列顺序推进。恢复 autopilot 后只能从首个 `[NEXT]`（`R123`）顺序执行，不允许 freestyle。
+> **自动推进状态**: `R123` 已完成 settings runtime residual 第一项；当前继续按 `R124-R137` 长队列顺序推进。恢复 autopilot 后只能从首个 `[NEXT]`（`R124`）顺序执行，不允许 freestyle。
 
 ## 1. 当前判断
 
-**当前分支已完成 `R68-R122` 并把 live lint 稳定在 `0 errors / 65 warnings`；`R122` 已复盘 secondary core residual：`StorageService` settings-file lifecycle、settings normalization A/B 与 modelConfig merge/assembly seam 均已收束到各自 owner path。** 接下来进入 Batch 8 settings / main residual，从 `R123` 的 `SettingsModelSection.attach` residual seam 开始，再继续 heavy tests follow-up、warning closeout 与最终 checkpoint。
+**当前分支已完成 `R68-R123` 并把 live lint 稳定在 `0 errors / 65 warnings`；`R123` 已把 `SettingsModelSection.attach` 的 runtime 初始化、refresh wiring、icon-cache action follow-up 与 presenter follow-up 进一步收束回 section owner。** 接下来继续 Batch 8 settings / main residual，从 `R124` 的 `SettingsStyleSection.attach` residual seam 开始，再继续 heavy tests follow-up、warning closeout 与最终 checkpoint。
 
 ## 2. 当前基线
 
 - **lint**: `0 errors / 65 warnings`
-- **最近验证**: `R122` 已确认全量 `npm test` 与 `npm run build` 通过，`BUILD_ID` 为 `autopilot-maintainability.202604160213`
-- **最近 Test Vault 部署**: `R120`，`BUILD_ID` `autopilot-maintainability.202604160156`
-- **当前 `[NEXT]`**: `R123 - SettingsModelSection attach residual seam`
-- **主热点**: `R122` 已完成 secondary core checkpoint；下一步聚焦 `SettingsModelSection.attach` 的 attach、refresh wiring、action follow-up 与 presenter residual
+- **最近验证**: `R123` 已确认全量 `npm test` 与 `npm run build` 通过，`BUILD_ID` 为 `autopilot-maintainability.202604160228`
+- **最近 Test Vault 部署**: `R123`，`BUILD_ID` `autopilot-maintainability.202604160228`
+- **当前 `[NEXT]`**: `R124 - SettingsStyleSection attach residual seam`
+- **主热点**: `R123` 已完成 model section attach residual 收束；下一步聚焦 `SettingsStyleSection.attach` 的 preset/background/glass/custom CSS/preview wiring residual
 
 ## 3. 本批执行规则
 

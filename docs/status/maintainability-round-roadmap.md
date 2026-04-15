@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的 `[NEXT]`”。
-> **当前状态**: [READY] `R122` 已完成；`R123-R137` 长队列继续排队，当前首个 `[NEXT]` 为 `R123 - SettingsModelSection attach residual seam`。
+> **当前状态**: [READY] `R123` 已完成；`R124-R137` 长队列继续排队，当前首个 `[NEXT]` 为 `R124 - SettingsStyleSection attach residual seam`。
 
 ## 控制规则
 
@@ -18,7 +18,7 @@
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
 - 当前 live lint 基线：`0 errors / 65 warnings`
 - 最近成功 phase：`docs/status/maintainability-phase-456.md`
-- 当前路线判断：`R122` 已完成 secondary core checkpoint，确认 `R118-R121` 的 StorageService lifecycle、settings normalization A/B 与 modelConfig merge/assembly residual 已完成复盘；当前必须从 `R123` 的 SettingsModelSection attach residual seam 顺序执行，不得 freestyle。
+- 当前路线判断：`R123` 已完成 `SettingsModelSection.attach` residual seam，确认 model section attach、refresh wiring、action follow-up 与 presenter residual 已继续收束；当前必须从 `R124` 的 `SettingsStyleSection.attach` residual seam 顺序执行，不得 freestyle。
 
 ## Queue
 ## Queue
@@ -1166,7 +1166,7 @@
 
 - **批次目标**: 处理 settings section attach、modal 编辑渲染与 main.ts startup residual。
 
-### [NEXT] R123 - SettingsModelSection attach residual seam
+### [DONE] R123 - SettingsModelSection attach residual seam
 
 - **Lane**: Maintainability / settings runtime
 - **目标**: 继续收束 SettingsModelSection.attach 内的 attach、refresh wiring、action follow-up 与 presenter residual。
@@ -1176,7 +1176,7 @@
 - **禁止项**: 不改变 model availability layering、disabled model refs、title-generation fallback 或 provider icon refresh 语义。
 - **验收**: model section attach residual 装配继续减少。；并通过全量 `npm test` 与 `npm run build`。
 
-### [QUEUED] R124 - SettingsStyleSection attach residual seam
+### [NEXT] R124 - SettingsStyleSection attach residual seam
 
 - **Lane**: Maintainability / settings runtime
 - **目标**: 继续收束 SettingsStyleSection.attach 的 preset/background/glass/custom CSS/preview wiring residual。
