@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的 `[NEXT]`”。
-> **当前状态**: [PAUSED] `R87` checkpoint 已完成；`R68-R87` 长队列已全部执行，当前没有可自动执行的 `[NEXT]`。
+> **当前状态**: [READY] `R87` checkpoint 已完成；`R88-R137` 长队列已人工续排，当前首个 `[NEXT]` 为 `R88 - OpenCodianView tab pane/runtime residual seam`。
 
 ## 控制规则
 
@@ -18,8 +18,9 @@
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
 - 当前 live lint 基线：`0 errors / 64 warnings`
 - 最近成功 phase：`docs/status/maintainability-phase-422.md`
-- 当前路线判断：`R87` checkpoint 已完成；当前没有可自动执行的 `[NEXT]`，等待人工续排下一批 queue。
+- 当前路线判断：`R68-R87` 已完成并自然停回人工续排态；当前已明确续排 `R88-R137`，必须从 `R88` 顺序执行，不得 freestyle。
 
+## Queue
 ## Queue
 
 ### [DONE] R46 - Lint blocker housekeeping after R43-R45
@@ -783,4 +784,545 @@
 - **验收**:
   - phase 文档明确记录 `R68-R86` 收益、最新 lint 基线、warning 下降量与后续建议
 
-当前没有可自动执行的 `[NEXT]`。
+## Batch 1: OpenCodianView residual runtime seams
+
+- **批次目标**: 继续处理 OpenCodianView residual lifecycle/runtime seam，只沿既有 owner 周边收口。
+
+### [NEXT] R88 - OpenCodianView tab pane/runtime residual seam
+
+- **Lane**: Maintainability / chat runtime
+- **目标**: 继续围绕 tab pane/runtime lifecycle residual 收口，只沿现有 coordinator 压缩 view 直连。
+- **优先入口**:
+  - `src/features/chat/OpenCodianView.ts`
+  - `src/features/chat/services/ConversationTabRuntimeCoordinator.ts`
+- **禁止项**: 不改变并发 tab/session streaming、hydration/auth-sync gate、scroll restore 与 background-task completion notice。
+- **验收**: view 对 tab runtime 的残余直连继续减少。；并通过全量 `npm test` 与 `npm run build`。
+
+### [QUEUED] R89 - OpenCodianView conversation load/recovery residual seam
+
+- **Lane**: Maintainability / chat runtime
+- **目标**: 继续收束 create/load/fork/rewind/delete recovery 的 post-load apply 与 restore gating residual。
+- **优先入口**:
+  - `src/features/chat/OpenCodianView.ts`
+  - `src/features/chat/services/ConversationLoadRecoveryCoordinator.ts`
+- **禁止项**: 不改变 restore preload、fork/rewind、active-tab recovery 语义。
+- **验收**: conversation load/recovery residual 分支继续下降。；并通过全量 `npm test` 与 `npm run build`。
+
+### [QUEUED] R90 - OpenCodianView message render/update residual seam
+
+- **Lane**: Maintainability / chat rendering
+- **目标**: 继续把 persisted-message apply、incremental update follow-up 与 rerender fallback 向 render owner 收拢。
+- **优先入口**:
+  - `src/features/chat/OpenCodianView.ts`
+  - `src/features/chat/services/ConversationRenderService.ts`
+- **禁止项**: 不改变 assistant tail patch、question card resolution、background-task timeline 呈现。
+- **验收**: message render/update residual 装配继续收缩。；并通过全量 `npm test` 与 `npm run build`。
+
+### [QUEUED] R91 - OpenCodianView send/composer interaction seam
+
+- **Lane**: Maintainability / chat composer runtime
+- **目标**: 从 view 收束 send action、composer draft/runtime context、submit follow-up 的完整 seam。
+- **优先入口**:
+  - `src/features/chat/OpenCodianView.ts`
+  - `src/features/chat/services/ComposerContextCoordinator.ts`
+- **禁止项**: 不改变 model selection、input panel theme、question/todo 附着语义。
+- **验收**: send/composer interaction 责任更集中。；并通过全量 `npm test` 与 `npm run build`。
+
+### [QUEUED] R92 - Checkpoint after OpenCodianView residual seams
+
+- **Lane**: Checkpoint
+- **目标**: 复盘 R88-R91 的 residual 收益、lint 变化与验证成本。
+- **优先入口**:
+  - `docs/status/maintainability-master-plan.md`
+  - `docs/status/maintainability-round-roadmap.md`
+- **禁止项**: 只做 checkpoint 文档与指标复盘。
+- **验收**: phase 文档明确记录 R88-R91 收益与下一批入口。；并通过全量 `npm test` 与 `npm run build`。
+
+## Batch 2: chat render / sync / finalization seams
+
+- **批次目标**: 继续处理 render、tail patch、post-sync 与 finalization residual。
+
+### [QUEUED] R93 - ConversationRenderService assistant/body residual seam
+
+- **Lane**: Maintainability / chat rendering
+- **目标**: 继续收束 assistant/body render path、persisted/user branching 与 tail-patch 前置组装 residual。
+- **优先入口**:
+  - `src/features/chat/services/ConversationRenderService.ts`
+  - `tests/unit/features/chat/ConversationRenderService.test.ts`
+- **禁止项**: 不改变 assistant body render、pseudo-stream reveal、trailing patch 语义。
+- **验收**: render service residual 分支继续收敛。；并通过全量 `npm test` 与 `npm run build`。
+
+### [QUEUED] R94 - OpenCodianView synced-apply / tail patch residual seam
+
+- **Lane**: Maintainability / chat sync apply
+- **目标**: 继续收束 synced-apply、tail patch trigger、fallback rerender 与 scroll follow-up residual。
+- **优先入口**:
+  - `src/features/chat/OpenCodianView.ts`
+  - `src/features/chat/services/ConversationRenderService.ts`
+- **禁止项**: 不改变 authoritative sync、assistant tail patch、scroll restore 语义。
+- **验收**: view 对 synced-apply / tail patch 的直控继续减少。；并通过全量 `npm test` 与 `npm run build`。
+
+### [QUEUED] R95 - MessageFinalizationService sync-after-stream seam
+
+- **Lane**: Maintainability / chat finalization
+- **目标**: 收束 stream completion 后的 sync follow-up、persisted update apply 与 completion notice lifecycle。
+- **优先入口**:
+  - `src/features/chat/services/MessageFinalizationService.ts`
+  - `src/features/chat/services/ConversationSyncBridge.ts`
+- **禁止项**: 不改变 final response completion、persisted completion notice、question/todo refresh 语义。
+- **验收**: message finalization 的 sync-after-stream lifecycle 更集中。；并通过全量 `npm test` 与 `npm run build`。
+
+### [QUEUED] R96 - ConversationSyncBridge post-sync routing seam
+
+- **Lane**: Maintainability / chat sync routing
+- **目标**: 继续收束 visible/background post-sync route、refresh follow-up 与 host 分发 residual。
+- **优先入口**:
+  - `src/features/chat/services/ConversationSyncBridge.ts`
+  - `src/features/chat/services/ConversationSyncVisiblePostSyncRouter.ts`
+- **禁止项**: 不改变 foreground/background sync route、question/todo refresh、active-tab writeback 语义。
+- **验收**: post-sync routing 更清晰集中。；并通过全量 `npm test` 与 `npm run build`。
+
+### [QUEUED] R97 - Checkpoint after chat render/sync seams
+
+- **Lane**: Checkpoint
+- **目标**: 复盘 R93-R96 的 render/sync/finalization residual 收益。
+- **优先入口**:
+  - `docs/status/maintainability-master-plan.md`
+  - `docs/status/maintainability-round-roadmap.md`
+- **禁止项**: 只做 checkpoint 文档与指标复盘。
+- **验收**: phase 文档明确记录 render/sync residual 收益。；并通过全量 `npm test` 与 `npm run build`。
+
+## Batch 3: chat services runtime seams
+
+- **批次目标**: 继续处理 ContextUsage、composer context、background post-sync 与 background-task trigger residual。
+
+### [QUEUED] R98 - ContextUsageService usage-breakdown seam
+
+- **Lane**: Maintainability / chat services
+- **目标**: 收束 usage snapshot、breakdown assembly、display-state merge 与 refresh follow-up lifecycle。
+- **优先入口**:
+  - `src/features/chat/services/ContextUsageService.ts`
+  - `tests/unit/features/chat/ContextUsageService.test.ts`
+- **禁止项**: 不改变 context usage 统计口径、display 值或 refresh 时机。
+- **验收**: usage-breakdown 责任更集中。；并通过全量 `npm test` 与 `npm run build`。
+
+### [QUEUED] R99 - ComposerContext coordinator/view runtime seam
+
+- **Lane**: Maintainability / chat composer runtime
+- **目标**: 整合 composer coordinator/runtime store/view facade 之间的 residual runtime 交界。
+- **优先入口**:
+  - `src/features/chat/services/ComposerContextCoordinator.ts`
+  - `src/features/chat/services/ComposerContextRuntimeStore.ts`
+- **禁止项**: 不改变 chips、picker actions、draft state、view host 语义；不拆成更多薄 adapter。
+- **验收**: composer context runtime 边界更清晰。；并通过全量 `npm test` 与 `npm run build`。
+
+### [QUEUED] R100 - BackgroundConversation post-sync handoff seam
+
+- **Lane**: Maintainability / chat background sync
+- **目标**: 继续收束 background conversation 的 post-sync handoff、attention/signal follow-up 与 host adapter 交界。
+- **优先入口**:
+  - `src/features/chat/services/BackgroundConversationPostSyncHandoffCoordinator.ts`
+  - `src/features/chat/services/BackgroundConversationPostSyncHandoffHostAdapter.ts`
+- **禁止项**: 不改变 background-task timeline、attention routing、signal sync state 语义。
+- **验收**: background post-sync handoff seam 更集中。；并通过全量 `npm test` 与 `npm run build`。
+
+### [QUEUED] R101 - BackgroundTaskStreamTriggerCoordinator runtime seam
+
+- **Lane**: Maintainability / chat background runtime
+- **目标**: 收束 trigger arm/disarm、pending-task detection、stream follow-up 与 completion handoff residual。
+- **优先入口**:
+  - `src/features/chat/runtime/BackgroundTaskStreamTriggerCoordinator.ts`
+  - `src/features/chat/services/QuestionTodoBackgroundTaskRuntimeServiceBundle.ts`
+- **禁止项**: 不改变 background-task completion notice、foreground runner 状态或 stream trigger 语义。
+- **验收**: background-task trigger runtime residual 继续收缩。；并通过全量 `npm test` 与 `npm run build`。
+
+### [QUEUED] R102 - Checkpoint after chat services seams
+
+- **Lane**: Checkpoint
+- **目标**: 复盘 R98-R101 的服务层 residual 收益与 remaining hotspots。
+- **优先入口**:
+  - `docs/status/maintainability-master-plan.md`
+  - `docs/status/maintainability-round-roadmap.md`
+- **禁止项**: 只做 checkpoint 文档与指标复盘。
+- **验收**: phase 文档明确记录 chat services residual 收益。；并通过全量 `npm test` 与 `npm run build`。
+
+## Batch 4: question / todo / background-task seams
+
+- **批次目标**: 继续处理 question resolution、todo refresh、stale notice 与 dock pending-resolution residual。
+
+### [QUEUED] R103 - QuestionResolutionFlowCoordinator post-resolution seam
+
+- **Lane**: Maintainability / question runtime
+- **目标**: 收束 resolution execute、post-resolution apply、card refresh 与 background follow-up lifecycle。
+- **优先入口**:
+  - `src/features/chat/services/QuestionResolutionFlowCoordinator.ts`
+  - `src/features/chat/services/QuestionResolutionExecutionFacade.ts`
+- **禁止项**: 不改变 resolution action、card renderer、background follow-up 或 answered-card 语义。
+- **验收**: post-resolution lifecycle 更集中。；并通过全量 `npm test` 与 `npm run build`。
+
+### [QUEUED] R104 - QuestionTodo status/refresh runtime seam
+
+- **Lane**: Maintainability / question todo runtime
+- **目标**: 整合 status refresh、activation refresh、post-sync refresh plan 与 background-task runtime 的 residual 交界。
+- **优先入口**:
+  - `src/features/chat/services/QuestionTodoStatusRefreshCoordinator.ts`
+  - `src/features/chat/services/QuestionTodoActivationRefreshCoordinator.ts`
+- **禁止项**: 不改变 todo refresh trigger、activation timing、background-task notice 语义。
+- **验收**: question/todo refresh runtime 残余桥接继续减少。；并通过全量 `npm test` 与 `npm run build`。
+
+### [QUEUED] R105 - SessionTodoStateService stale-notice residual seam
+
+- **Lane**: Maintainability / todo runtime
+- **目标**: 继续收束 stale snapshot fingerprint、suppression visibility、persisted stale restore 与 append-target residual。
+- **优先入口**:
+  - `src/features/chat/services/SessionTodoStateService.ts`
+  - `tests/unit/features/chat/SessionTodoStateService.test.ts`
+- **禁止项**: 不改变 stale notice 显示时机、suppression 语义、append-dedupe 行为。
+- **验收**: stale-notice residual 分支继续收敛。；并通过全量 `npm test` 与 `npm run build`。
+
+### [QUEUED] R106 - QuestionDockCoordinator pending-resolution residual seam
+
+- **Lane**: Maintainability / question dock runtime
+- **目标**: 继续收束 pending-question presentation、resolution apply follow-up 与 active/background writeback residual。
+- **优先入口**:
+  - `src/features/chat/services/QuestionDockCoordinator.ts`
+  - `tests/unit/features/chat/QuestionDockCoordinator.test.ts`
+- **禁止项**: 不改变 pending dock visibility、resolution semantics、draft answer persistence 或 active-tab gating。
+- **验收**: question dock pending-resolution residual 继续减少。；并通过全量 `npm test` 与 `npm run build`。
+
+### [QUEUED] R107 - Checkpoint after question/todo seams
+
+- **Lane**: Checkpoint
+- **目标**: 复盘 R103-R106 的 question/todo/background-task residual 收益。
+- **优先入口**:
+  - `docs/status/maintainability-master-plan.md`
+  - `docs/status/maintainability-round-roadmap.md`
+- **禁止项**: 只做 checkpoint 文档与指标复盘。
+- **验收**: phase 文档明确记录 question/todo residual 收益。；并通过全量 `npm test` 与 `npm run build`。
+
+## Batch 5: OpenCodeService residual seams
+
+- **批次目标**: 继续处理 OpenCodeService lifecycle / fallback / diagnostics residual。
+
+### [QUEUED] R108 - OpenCodeService sync/bootstrap residual lifecycle seam
+
+- **Lane**: Maintainability / opencode service lifecycle
+- **目标**: 沿现有 lifecycle owner 继续收束 sync restart、bootstrap follow-up、catalog/model refresh residual。
+- **优先入口**:
+  - `src/core/opencode/OpenCodeService.ts`
+  - `src/core/opencode/OpenCodeServiceLifecycleCoordinator.ts`
+- **禁止项**: 不改变 SDK-first bootstrap、health probe ordering、sync-event bridge 语义。
+- **验收**: OpenCodeService 对 sync/bootstrap residual orchestration 继续减少。；并通过全量 `npm test` 与 `npm run build`。
+
+### [QUEUED] R109 - OpenCodeService health / legacy fallback seam
+
+- **Lane**: Maintainability / opencode fallback runtime
+- **目标**: 收束 health retry、legacy HTTP/SSE fallback 入口与 degraded-state follow-up residual。
+- **优先入口**:
+  - `src/core/opencode/OpenCodeService.ts`
+  - `tests/unit/core/opencode/OpenCodeService.httpRuntime.test.ts`
+- **禁止项**: 不改变 SDK-first / legacy fallback 判定、HTTP/SSE fallback 语义。
+- **验收**: health / legacy fallback residual 分支明显减少。；并通过全量 `npm test` 与 `npm run build`。
+
+### [QUEUED] R110 - OpenCodeService session abort/get fallback seam
+
+- **Lane**: Maintainability / opencode session runtime
+- **目标**: 继续收束 session get/abort、session-scoped detach、fallback query 与 runtime follow-up residual。
+- **优先入口**:
+  - `src/core/opencode/OpenCodeService.ts`
+  - `tests/unit/core/opencode/OpenCodeService.sdkCrudSync.test.ts`
+- **禁止项**: 不改变 session-scoped abort/detach、get fallback、conversation reload 语义。
+- **验收**: session abort/get fallback 残余控制流继续收敛。；并通过全量 `npm test` 与 `npm run build`。
+
+### [QUEUED] R111 - OpenCodeService transient logging/error normalization seam
+
+- **Lane**: Maintainability / opencode diagnostics
+- **目标**: 把 transient debug logging、error shaping 与 normalize follow-up 继续收束到集中点。
+- **优先入口**:
+  - `src/core/opencode/OpenCodeService.ts`
+  - `src/core/opencode/OpenCodeSdkFacade.ts`
+- **禁止项**: 不改变错误归一化口径、logging 开关、SDK facade 注入规则。
+- **验收**: logging/error normalization 更集中。；并通过全量 `npm test` 与 `npm run build`。
+
+### [QUEUED] R112 - Checkpoint after OpenCodeService residual seams
+
+- **Lane**: Checkpoint
+- **目标**: 复盘 R108-R111 的 residual service 收益与 streaming lane 准备度。
+- **优先入口**:
+  - `docs/status/maintainability-master-plan.md`
+  - `docs/status/maintainability-round-roadmap.md`
+- **禁止项**: 只做 checkpoint 文档与指标复盘。
+- **验收**: phase 文档明确记录 OpenCodeService residual 收益。；并通过全量 `npm test` 与 `npm run build`。
+
+## Batch 6: streaming transform / runtime seams
+
+- **批次目标**: 继续处理 event classification、payload parse、finalization 与 cancel-detach residual。
+
+### [QUEUED] R113 - OpenCodeStreamEventTransformer event-classification residual seam
+
+- **Lane**: Maintainability / opencode stream transform
+- **目标**: 继续收束 permission/file/session/question/tool/result 分支的 residual classification 责任。
+- **优先入口**:
+  - `src/core/opencode/OpenCodeStreamEventTransformer.ts`
+  - `tests/unit/core/opencode/OpenCodeStreamEventTransformer.test.ts`
+- **禁止项**: 不改变 event classification、tool/result dedupe、part-type tracking 或 usage update 语义。
+- **验收**: event-classification residual 分支继续减少。；并通过全量 `npm test` 与 `npm run build`。
+
+### [QUEUED] R114 - OpenCodeStreamEventTransformer payload/SSE-parse seam
+
+- **Lane**: Maintainability / opencode stream parsing
+- **目标**: 收束 raw payload decode、SSE payload parse、invalid-chunk shielding 与 parse error normalization residual。
+- **优先入口**:
+  - `src/core/opencode/OpenCodeStreamEventTransformer.ts`
+  - `src/core/opencode/OpenCodeStreamingRuntimeCoordinator.ts`
+- **禁止项**: 不改变 raw chunk parse 顺序、invalid event 容错、legacy SSE fallback 语义。
+- **验收**: payload/SSE-parse residual 责任更集中。；并通过全量 `npm test` 与 `npm run build`。
+
+### [QUEUED] R115 - OpenCodeStreamingRuntimeCoordinator finalization residual seam
+
+- **Lane**: Maintainability / opencode stream finalization
+- **目标**: 继续收束 final assistant lookup、completion fallback、final debug logging 与 post-finish cleanup residual。
+- **优先入口**:
+  - `src/core/opencode/OpenCodeStreamingRuntimeCoordinator.ts`
+  - `tests/unit/core/opencode/OpenCodeStreamingRuntimeCoordinator.test.ts`
+- **禁止项**: 不改变 final response completion、structured assistant-error fallback、message completion 语义。
+- **验收**: finalization residual orchestration 继续减少。；并通过全量 `npm test` 与 `npm run build`。
+
+### [QUEUED] R116 - OpenCodeStreamingRuntimeCoordinator active-context / cancel-detach seam
+
+- **Lane**: Maintainability / opencode stream runtime
+- **目标**: 收束 active-context register/cleanup、cancel-detach、abort follow-up 与 runtime disposal residual。
+- **优先入口**:
+  - `src/core/opencode/OpenCodeStreamingRuntimeCoordinator.ts`
+  - `src/core/opencode/OpenCodeService.ts`
+- **禁止项**: 不改变 session-scoped cancel/detach、abort ordering、active-context cleanup 语义。
+- **验收**: active-context / cancel-detach 生命周期更集中。；并通过全量 `npm test` 与 `npm run build`。
+
+### [QUEUED] R117 - Checkpoint after streaming residual seams
+
+- **Lane**: Checkpoint
+- **目标**: 复盘 R113-R116 的 streaming residual 收益与 secondary core 入口。
+- **优先入口**:
+  - `docs/status/maintainability-master-plan.md`
+  - `docs/status/maintainability-round-roadmap.md`
+- **禁止项**: 只做 checkpoint 文档与指标复盘。
+- **验收**: phase 文档明确记录 streaming residual 收益。；并通过全量 `npm test` 与 `npm run build`。
+
+## Batch 7: secondary core seams
+
+- **批次目标**: 处理 StorageService、settings.ts 与 modelConfig residual。
+
+### [QUEUED] R118 - StorageService settings-file lifecycle seam
+
+- **Lane**: Maintainability / secondary core
+- **目标**: 收束 settings-file load/save/merge、fallback path、error report 与 migration follow-up residual。
+- **优先入口**:
+  - `src/core/storage/StorageService.ts`
+  - `tests/unit/core/storage/StorageService.test.ts`
+- **禁止项**: 不改变 local-first persistence、settings-file 路径、migration 语义。
+- **验收**: settings-file lifecycle 更集中。；并通过全量 `npm test` 与 `npm run build`。
+
+### [QUEUED] R119 - core types settings normalization seam A
+
+- **Lane**: Maintainability / settings normalization
+- **目标**: 优先收束 chat appearance、question/todo、input panel 相关 normalization residual。
+- **优先入口**:
+  - `src/core/types/settings.ts`
+  - `src/features/settings/SettingsStyleSection.ts`
+- **禁止项**: 不改变默认值、迁移语义、theme/background/glass normalization。
+- **验收**: settings normalization 第一组 residual 规则更集中。；并通过全量 `npm test` 与 `npm run build`。
+
+### [QUEUED] R120 - core types settings normalization seam B
+
+- **Lane**: Maintainability / settings normalization
+- **目标**: 继续收束 provider/model/plugin/debug 相关 normalization residual。
+- **优先入口**:
+  - `src/core/types/settings.ts`
+  - `src/features/settings/OpenCodianSettings.ts`
+- **禁止项**: 不改变 disabled model refs、provider toggle、project/global override 或 debug/export 语义。
+- **验收**: settings normalization 第二组 residual 规则继续收敛。；并通过全量 `npm test` 与 `npm run build`。
+
+### [QUEUED] R121 - modelConfig residual merge/assembly seam
+
+- **Lane**: Maintainability / config assembly
+- **目标**: 继续在 modelConfig 内收束 merge/assembly residual，包括 supplement、effective projection 与 provider resolution follow-up。
+- **优先入口**:
+  - `src/core/config/modelConfig.ts`
+  - `src/core/config/ModelConfigService.ts`
+- **禁止项**: 不改变 baseEffective/effective 区分、provider layering、default model fallback 语义。
+- **验收**: modelConfig merge/assembly residual 继续下降。；并通过全量 `npm test` 与 `npm run build`。
+
+### [QUEUED] R122 - Checkpoint after secondary core seams
+
+- **Lane**: Checkpoint
+- **目标**: 复盘 R118-R121 的 secondary core residual 收益与 settings/main lane 准备度。
+- **优先入口**:
+  - `docs/status/maintainability-master-plan.md`
+  - `docs/status/maintainability-round-roadmap.md`
+- **禁止项**: 只做 checkpoint 文档与指标复盘。
+- **验收**: phase 文档明确记录 secondary core 收益。；并通过全量 `npm test` 与 `npm run build`。
+
+## Batch 8: residual settings / main seams
+
+- **批次目标**: 处理 settings section attach、modal 编辑渲染与 main.ts startup residual。
+
+### [QUEUED] R123 - SettingsModelSection attach residual seam
+
+- **Lane**: Maintainability / settings runtime
+- **目标**: 继续收束 SettingsModelSection.attach 内的 attach、refresh wiring、action follow-up 与 presenter residual。
+- **优先入口**:
+  - `src/features/settings/SettingsModelSection.ts`
+  - `tests/unit/features/settings/SettingsModelSection.test.ts`
+- **禁止项**: 不改变 model availability layering、disabled model refs、title-generation fallback 或 provider icon refresh 语义。
+- **验收**: model section attach residual 装配继续减少。；并通过全量 `npm test` 与 `npm run build`。
+
+### [QUEUED] R124 - SettingsStyleSection attach residual seam
+
+- **Lane**: Maintainability / settings runtime
+- **目标**: 继续收束 SettingsStyleSection.attach 的 preset/background/glass/custom CSS/preview wiring residual。
+- **优先入口**:
+  - `src/features/settings/SettingsStyleSection.ts`
+  - `docs/modules/features/settings/SettingsStyleSection.md`
+- **禁止项**: 不改变 theme preset、background persistence、glass/input panel appearance normalization 或 preview 行为。
+- **验收**: style section attach residual 装配继续减少。；并通过全量 `npm test` 与 `npm run build`。
+
+### [QUEUED] R125 - ModelConfigModal editor/render seam
+
+- **Lane**: Maintainability / settings modal
+- **目标**: 从 ModelConfigModal 收束 editor state、render branching、save/apply follow-up 与 validation feedback seam。
+- **优先入口**:
+  - `src/features/settings/ModelConfigModal.ts`
+  - `tests/unit/features/settings/ModelConfigModal.test.ts`
+- **禁止项**: 不改变 modal 编辑语义、validation 反馈、provider/model 保存逻辑。
+- **验收**: modal editor/render seam 更集中。；并通过全量 `npm test` 与 `npm run build`。
+
+### [QUEUED] R126 - main.ts residual startup normalization seam
+
+- **Lane**: Maintainability / plugin startup
+- **目标**: 继续收束 main.ts 中 settings normalize、storage preload、locale/theme/bootstrap follow-up residual。
+- **优先入口**:
+  - `src/main.ts`
+  - `src/core/types/settings.ts`
+- **禁止项**: 不改变 preload 顺序、conversation restore 前置条件、locale/theme startup 或 command/view registration 语义。
+- **验收**: main.ts startup residual orchestration 进一步减少。；并通过全量 `npm test` 与 `npm run build`。
+
+### [QUEUED] R127 - Checkpoint after settings/main seams
+
+- **Lane**: Checkpoint
+- **目标**: 复盘 R123-R126 的 settings/main residual 收益与 heavy test lane 入口。
+- **优先入口**:
+  - `docs/status/maintainability-master-plan.md`
+  - `docs/status/maintainability-round-roadmap.md`
+- **禁止项**: 只做 checkpoint 文档与指标复盘。
+- **验收**: phase 文档明确记录 settings/main residual 收益。；并通过全量 `npm test` 与 `npm run build`。
+
+## Batch 9: heavy test split wave
+
+- **批次目标**: 只按责任拆重型测试，不删断言、不弱化场景。
+
+### [QUEUED] R128 - OpenCodeService heavy suite split follow-up A
+
+- **Lane**: Warning cleanup / opencode tests
+- **目标**: 继续把 OpenCodeService residual heavy suites 按 bootstrap/lifecycle/session runtime 责任拆细。
+- **优先入口**:
+  - `tests/unit/core/opencode/OpenCodeService.test.ts`
+  - `tests/unit/core/opencode/OpenCodeServiceLifecycleCoordinator.test.ts`
+- **禁止项**: 不改变 production runtime 语义；不删断言、不减覆盖。
+- **验收**: opencode heavy suite residual warning 有可量化下降。；并通过全量 `npm test` 与 `npm run build`。
+
+### [QUEUED] R129 - OpenCodeService heavy suite split follow-up B
+
+- **Lane**: Warning cleanup / opencode tests
+- **目标**: 继续把 compat/stream/fallback 邻域重型 tests 按责任域拆分收口。
+- **优先入口**:
+  - `tests/unit/core/opencode/OpenCodeService.sdkCompat.test.ts`
+  - `tests/unit/core/opencode/OpenCodeService.sdkStreamEvents.test.ts`
+- **禁止项**: 不改变 production runtime 语义；不弱化 compatibility/fallback 覆盖。
+- **验收**: compat/stream heavy tests 的 residual warning 继续下降。；并通过全量 `npm test` 与 `npm run build`。
+
+### [QUEUED] R130 - Chat heavy suite split follow-up A
+
+- **Lane**: Warning cleanup / chat tests
+- **目标**: 继续把 chat runtime/render/sync 邻域的残余大测试按责任拆分。
+- **优先入口**:
+  - `tests/unit/features/chat/ConversationRenderService.test.ts`
+  - `tests/unit/features/chat/ConversationSyncOrchestrationService.test.ts`
+- **禁止项**: 不改变 production runtime 语义；不删断言、不弱化场景。
+- **验收**: chat render/sync heavy suites 的 residual warning 有可量化下降。；并通过全量 `npm test` 与 `npm run build`。
+
+### [QUEUED] R131 - Chat heavy suite split follow-up B
+
+- **Lane**: Warning cleanup / chat tests
+- **目标**: 继续把 question/todo/composer/background-task 邻域的残余大测试按责任拆分。
+- **优先入口**:
+  - `tests/unit/features/chat/QuestionDockCoordinator.test.ts`
+  - `tests/unit/features/chat/ComposerContextCoordinator.test.ts`
+- **禁止项**: 不改变 production runtime 语义；不通过降覆盖换低 warning。
+- **验收**: question/todo/composer heavy tests residual warning 继续下降。；并通过全量 `npm test` 与 `npm run build`。
+
+### [QUEUED] R132 - Checkpoint after heavy test split wave
+
+- **Lane**: Checkpoint
+- **目标**: 复盘 R128-R131 的 heavy suite split 收益与 final warning lane 入口。
+- **优先入口**:
+  - `docs/status/maintainability-master-plan.md`
+  - `docs/status/maintainability-round-roadmap.md`
+- **禁止项**: 只做 checkpoint 文档与指标复盘。
+- **验收**: phase 文档明确记录 heavy test split 收益。；并通过全量 `npm test` 与 `npm run build`。
+
+## Batch 10: warning cleanup and closeout
+
+- **批次目标**: 只沿已有厚 seam 收尾 warning，并以最终 checkpoint 收口。
+
+### [QUEUED] R133 - Warning cleanup batch F (chat/opencode residuals)
+
+- **Lane**: Warning cleanup / runtime residuals
+- **目标**: 沿 OpenCodianView、chat services、OpenCodeService 与 streaming owners 继续收尾 residual warnings。
+- **优先入口**:
+  - `src/features/chat/OpenCodianView.ts`
+  - `src/core/opencode/OpenCodeService.ts`
+- **禁止项**: 不新增薄 helper/adapter/provider/factory；不改变 chat/opencode runtime 语义。
+- **验收**: chat/opencode 邻域 warning 至少有可量化下降且 lint 维持 0 errors。；并通过全量 `npm test` 与 `npm run build`。
+
+### [QUEUED] R134 - Warning cleanup batch G (core/types/settings residuals)
+
+- **Lane**: Warning cleanup / secondary residuals
+- **目标**: 沿 storage、settings normalization、settings sections 与 main.ts 继续受控收尾 residual warnings。
+- **优先入口**:
+  - `src/core/storage/StorageService.ts`
+  - `src/core/types/settings.ts`
+- **禁止项**: 不为了清 warning 回切大规模 settings/startup 重构；不新增薄 normalize/provider 文件。
+- **验收**: secondary residual warning 有可量化下降且 lint 维持 0 errors。；并通过全量 `npm test` 与 `npm run build`。
+
+### [QUEUED] R135 - Warning cleanup batch H (tests residuals)
+
+- **Lane**: Warning cleanup / tests residuals
+- **目标**: 继续清理剩余 tests lint 热点，仅允许按责任重排与最小 typing/import 收口。
+- **优先入口**:
+  - `tests/unit/core/opencode/`
+  - `tests/unit/features/chat/`
+- **禁止项**: 不删除断言、不降低覆盖、不改变验证口径。
+- **验收**: tests residual warning 有可量化下降且 coverage 语义保持不变。；并通过全量 `npm test` 与 `npm run build`。
+
+### [QUEUED] R136 - Warning cleanup batch I (final non-demo residuals)
+
+- **Lane**: Warning cleanup / final residuals
+- **目标**: 只在非 demo 路径内处理最后一批 residual warnings，优先命中仍偏厚的 owner 与 root-level files。
+- **优先入口**:
+  - `src/`
+  - `docs/modules/`
+- **禁止项**: 不回切 demo/experimental visual 邻域；不制造薄碎片模块。
+- **验收**: final non-demo residual warning 继续下降且仍维持 0 errors。；并通过全量 `npm test` 与 `npm run build`。
+
+### [QUEUED] R137 - Final beautiful-version checkpoint / queue closeout
+
+- **Lane**: Checkpoint
+- **目标**: 复盘 R88-R136 的完整收益、warning 轨迹、验证成本与剩余热点，决定是否结束本批 maintainability autopilot。
+- **优先入口**:
+  - `docs/status/maintainability-master-plan.md`
+  - `docs/status/maintainability-round-roadmap.md`
+- **禁止项**: 只做 checkpoint 文档与关闭队列；不自动扩展 R138+。
+- **验收**: phase 文档明确记录 R88-R136 收益与是否仍需人工续排。；并通过全量 `npm test` 与 `npm run build`。
+
+当 `R137` 完成且没有新的 `[QUEUED]` 时，必须明确写回“当前没有可自动执行的 `[NEXT]`”。
+
