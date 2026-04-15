@@ -1,13 +1,13 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [READY] `R84` 已完成，当前首个 `[NEXT]` 为 `R85 - Warning cleanup batch D (chat and opencode residuals)`。
+> **当前状态**: [READY] `R85` 已完成，当前首个 `[NEXT]` 为 `R86 - Warning cleanup batch E (secondary residuals)`。
 
 ## 当前优先级
 
-- **当前 `[NEXT]`**：`R85 - Warning cleanup batch D (chat and opencode residuals)`
+- **当前 `[NEXT]`**：`R86 - Warning cleanup batch E (secondary residuals)`
 - **本批目标**：先连续拿下 chat runtime / services，再推进 opencode core，再拆 heavy tests 并继续 warning cleanup，最后 checkpoint
-- **当前 lint 基线**：`0 errors / 79 warnings`
+- **当前 lint 基线**：`0 errors / 66 warnings`
 - **热点顺序**：
   1. `src/features/chat/OpenCodianView.ts`
   2. `src/features/chat/services/ConversationRenderService.ts`
@@ -43,5 +43,5 @@
 ## 历史入口
 
 - 批次归档：`docs/status/maintainability-completed-batches.md`
-- 最近成功 phase：`docs/status/maintainability-phase-417.md`
+- 最近成功 phase：`docs/status/maintainability-phase-420.md`
 - 最近 checkpoint：`docs/status/maintainability-phase-402.md`

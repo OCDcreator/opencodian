@@ -9,11 +9,11 @@ import {
 } from '../../../../src/features/chat/services/InputPanelAppearanceCoordinator';
 import {
   getGlassAdapter,
+  type GlassEffectAdapter,
+  type GlassMountContext,
   registerBuiltinGlassAdapters,
   registerGlassAdapter,
   unregisterGlassAdapter,
-  type GlassEffectAdapter,
-  type GlassMountContext,
 } from '../../../../src/utils/glass';
 
 interface FixtureOptions {

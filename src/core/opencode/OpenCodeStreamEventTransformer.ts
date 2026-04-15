@@ -103,15 +103,28 @@ export type OpenCodeStreamPartTypeState = OpenCodeStreamingRuntimeContext | {
   partTypeMap?: Map<string, string>;
 };
 
+interface OpenCodeStreamingEventHandlerContext {
+  eventData: OpenCodeStreamEvent;
+  sessionId: string;
+  state: OpenCodeStreamEventState;
+  streamContext: OpenCodeStreamPartTypeState;
+  chunks: StreamChunk[];
+}
+
 type OpenCodeStreamEventOutcome = { chunks: StreamChunk[]; stop: boolean };
 
 type OpenCodeStreamingEventHandler = (
-  eventData: OpenCodeStreamEvent,
-  sessionId: string,
-  state: OpenCodeStreamEventState,
-  streamContext: OpenCodeStreamPartTypeState,
-  chunks: StreamChunk[],
+  context: OpenCodeStreamingEventHandlerContext,
 ) => OpenCodeStreamEventOutcome;
+
+interface OpenCodeTextDeltaChunkContext {
+  chunks: StreamChunk[];
+  delta: string;
+  partId: string | undefined;
+  partType: string;
+  sessionId: string;
+  state: OpenCodeStreamEventState;
+}
 
 function resolveReasoningDurationSeconds(
   part: Pick<OpenCodeStreamPart, 'duration' | 'time'>,
@@ -220,7 +233,13 @@ export class OpenCodeStreamEventTransformer {
     const chunks = this.createUsageChunks(eventData, sessionId);
     const eventHandler = this.streamingEventHandlers[eventData.type];
     if (eventHandler) {
-      return eventHandler(eventData, sessionId, state, streamContext, chunks);
+      return eventHandler({
+        eventData,
+        sessionId,
+        state,
+        streamContext,
+        chunks,
+      });
     }
 
     return { chunks, stop: false };
@@ -390,13 +409,12 @@ export class OpenCodeStreamEventTransformer {
     }];
   }
 
-  private handleMessagePartUpdated(
-    eventData: OpenCodeStreamEvent,
-    _sessionId: string,
-    state: OpenCodeStreamEventState,
-    streamContext: OpenCodeStreamPartTypeState,
-    chunks: StreamChunk[],
-  ): OpenCodeStreamEventOutcome {
+  private handleMessagePartUpdated({
+    eventData,
+    state,
+    streamContext,
+    chunks,
+  }: OpenCodeStreamingEventHandlerContext): OpenCodeStreamEventOutcome {
     const part = eventData.properties?.part;
     if (!part?.id || !part.type) {
       return { chunks, stop: false };
@@ -489,13 +507,13 @@ export class OpenCodeStreamEventTransformer {
     }
   }
 
-  private handleMessagePartDelta(
-    eventData: OpenCodeStreamEvent,
-    sessionId: string,
-    state: OpenCodeStreamEventState,
-    streamContext: OpenCodeStreamPartTypeState,
-    chunks: StreamChunk[],
-  ): OpenCodeStreamEventOutcome {
+  private handleMessagePartDelta({
+    eventData,
+    sessionId,
+    state,
+    streamContext,
+    chunks,
+  }: OpenCodeStreamingEventHandlerContext): OpenCodeStreamEventOutcome {
     const delta = eventData.properties?.delta;
     const field = eventData.properties?.field;
     const partID = eventData.properties?.partID;
@@ -514,7 +532,14 @@ export class OpenCodeStreamEventTransformer {
       return { chunks, stop: false };
     }
 
-    this.appendTextDeltaChunk(chunks, delta, partID, partType, sessionId, state);
+    this.appendTextDeltaChunk({
+      chunks,
+      delta,
+      partId: partID,
+      partType,
+      sessionId,
+      state,
+    });
     return { chunks, stop: false };
   }
 
@@ -535,21 +560,21 @@ export class OpenCodeStreamEventTransformer {
     return this.getStreamPartType(streamContext, partID) || 'text';
   }
 
-  private appendTextDeltaChunk(
-    chunks: StreamChunk[],
-    delta: string,
-    partID: string | undefined,
-    partType: string,
-    sessionId: string,
-    state: OpenCodeStreamEventState,
-  ): void {
+  private appendTextDeltaChunk({
+    chunks,
+    delta,
+    partId,
+    partType,
+    sessionId,
+    state,
+  }: OpenCodeTextDeltaChunkContext): void {
     chunks.push({ type: 'text', content: delta });
     state.lastContent += delta;
     state.debugChunkSequence += 1;
     state.lastTextDelta = {
       sequence: state.debugChunkSequence,
       source: 'event',
-      partId: partID ?? null,
+      partId: partId ?? null,
       partType,
       length: delta.length,
       totalLength: state.lastContent.length,
@@ -558,7 +583,7 @@ export class OpenCodeStreamEventTransformer {
     this.host.logStreamingDebug('service-text-delta', {
       sessionId,
       chunkSequence: state.debugChunkSequence,
-      partId: partID ?? null,
+      partId: partId ?? null,
       partType,
       deltaLength: delta.length,
       totalLength: state.lastContent.length,
@@ -566,13 +591,10 @@ export class OpenCodeStreamEventTransformer {
     });
   }
 
-  private handlePermissionAsked(
-    eventData: OpenCodeStreamEvent,
-    _sessionId: string,
-    _state: OpenCodeStreamEventState,
-    _streamContext: OpenCodeStreamPartTypeState,
-    chunks: StreamChunk[],
-  ): OpenCodeStreamEventOutcome {
+  private handlePermissionAsked({
+    eventData,
+    chunks,
+  }: OpenCodeStreamingEventHandlerContext): OpenCodeStreamEventOutcome {
     const permission = eventData.properties;
     if (permission?.id) {
       chunks.push({
@@ -587,13 +609,10 @@ export class OpenCodeStreamEventTransformer {
     return { chunks, stop: false };
   }
 
-  private handleFileEdited(
-    eventData: OpenCodeStreamEvent,
-    _sessionId: string,
-    _state: OpenCodeStreamEventState,
-    _streamContext: OpenCodeStreamPartTypeState,
-    chunks: StreamChunk[],
-  ): OpenCodeStreamEventOutcome {
+  private handleFileEdited({
+    eventData,
+    chunks,
+  }: OpenCodeStreamingEventHandlerContext): OpenCodeStreamEventOutcome {
     const file = eventData.properties?.file;
     if (typeof file === 'string' && file.trim()) {
       chunks.push({ type: 'file_edited', file: file.trim() });
@@ -602,13 +621,12 @@ export class OpenCodeStreamEventTransformer {
     return { chunks, stop: false };
   }
 
-  private handleSessionError(
-    eventData: OpenCodeStreamEvent,
-    sessionId: string,
-    state: OpenCodeStreamEventState,
-    _streamContext: OpenCodeStreamPartTypeState,
-    chunks: StreamChunk[],
-  ): OpenCodeStreamEventOutcome {
+  private handleSessionError({
+    eventData,
+    sessionId,
+    state,
+    chunks,
+  }: OpenCodeStreamingEventHandlerContext): OpenCodeStreamEventOutcome {
     const errorName = extractStructuredErrorName(eventData.properties?.error);
     const errorMessage = extractStructuredErrorMessage(eventData.properties?.error) ?? 'Unknown error';
     state.lastErrorMessage = errorMessage;
@@ -628,13 +646,11 @@ export class OpenCodeStreamEventTransformer {
     return { chunks, stop: true };
   }
 
-  private handleSessionIdle(
-    _eventData: OpenCodeStreamEvent,
-    sessionId: string,
-    state: OpenCodeStreamEventState,
-    _streamContext: OpenCodeStreamPartTypeState,
-    chunks: StreamChunk[],
-  ): OpenCodeStreamEventOutcome {
+  private handleSessionIdle({
+    sessionId,
+    state,
+    chunks,
+  }: OpenCodeStreamingEventHandlerContext): OpenCodeStreamEventOutcome {
     this.host.logStreamingDebug('service-session-idle', {
       sessionId,
       accumulatedTextLength: state.lastContent.length,
@@ -643,13 +659,10 @@ export class OpenCodeStreamEventTransformer {
     return { chunks, stop: true };
   }
 
-  private handleQuestionAsked(
-    eventData: OpenCodeStreamEvent,
-    _sessionId: string,
-    _state: OpenCodeStreamEventState,
-    _streamContext: OpenCodeStreamPartTypeState,
-    chunks: StreamChunk[],
-  ): OpenCodeStreamEventOutcome {
+  private handleQuestionAsked({
+    eventData,
+    chunks,
+  }: OpenCodeStreamingEventHandlerContext): OpenCodeStreamEventOutcome {
     const request = this.host.normalizeQuestionRequest(eventData.properties);
     if (request) {
       chunks.push({

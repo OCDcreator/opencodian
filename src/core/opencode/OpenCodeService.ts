@@ -52,6 +52,9 @@ import {
 } from './OpenCodeQuestionPermissionHub';
 import { OpenCodeSdkFacade } from './OpenCodeSdkFacade';
 import {
+  OpenCodeServiceLifecycleCoordinator,
+} from './OpenCodeServiceLifecycleCoordinator';
+import {
   OpenCodeSessionControlOrchestrator,
   type SessionContextUsageSnapshot,
 } from './OpenCodeSessionControlOrchestrator';
@@ -61,9 +64,6 @@ import {
   type Part,
   type Session,
 } from './OpenCodeSessionLifecycleCoordinator';
-import {
-  OpenCodeServiceLifecycleCoordinator,
-} from './OpenCodeServiceLifecycleCoordinator';
 import {
   OpenCodeSettingsReconfigurationCoordinator,
 } from './OpenCodeSettingsReconfigurationCoordinator';

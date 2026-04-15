@@ -1,15 +1,15 @@
 import { TextDecoder } from 'util';
 
-import { OpenCodeStreamEventTransformer } from '../../../../src/core/opencode/OpenCodeStreamEventTransformer';
-import {
-  OpenCodeStreamingRuntimeCoordinator,
-  type OpenCodeStreamingRuntimeContext,
-  type OpenCodeStreamingRuntimeCoordinatorHost,
-} from '../../../../src/core/opencode/OpenCodeStreamingRuntimeCoordinator';
 import type {
   OpenCodeStreamEvent,
   OpenCodeStreamEventState,
 } from '../../../../src/core/opencode/OpenCodeStreamEventTransformer';
+import { OpenCodeStreamEventTransformer } from '../../../../src/core/opencode/OpenCodeStreamEventTransformer';
+import {
+  type OpenCodeStreamingRuntimeContext,
+  OpenCodeStreamingRuntimeCoordinator,
+  type OpenCodeStreamingRuntimeCoordinatorHost,
+} from '../../../../src/core/opencode/OpenCodeStreamingRuntimeCoordinator';
 
 const originalFetch = global.fetch;
 
@@ -389,7 +389,7 @@ describe('OpenCodeStreamingRuntimeCoordinator', () => {
       sessionId: 'sdk-error',
       startPrompt: jest.fn().mockResolvedValue(undefined),
       subscribe: jest.fn().mockResolvedValue((async function* () {
-        return;
+        yield* [];
       })()),
     })) {
       chunks.push(chunk);

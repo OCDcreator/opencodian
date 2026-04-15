@@ -196,10 +196,6 @@ import {
   type ConversationHistoryActionsHost,
 } from './services/ConversationHistoryActionsCoordinator';
 import {
-  ConversationLoadRecoveryCoordinator,
-  type ConversationLoadRecoveryHost,
-} from './services/ConversationLoadRecoveryCoordinator';
-import {
   type ConversationHydrationRuntimeHostProviderHost,
   createConversationHydrationRuntimeViewHostFactoryHost,
 } from './services/ConversationHydrationRuntimeHostProvider';
@@ -207,11 +203,15 @@ import {
   createConversationHydrationRuntimeViewHosts,
 } from './services/ConversationHydrationRuntimeViewHostFactory';
 import {
+  ConversationLoadRecoveryCoordinator,
+  type ConversationLoadRecoveryHost,
+} from './services/ConversationLoadRecoveryCoordinator';
+import {
   type ConversationAssistantShellRenderPort,
   type ConversationAssistantTailRenderPort,
   type ConversationRenderHost,
-  type ConversationUserMessageRenderFrame,
   ConversationRenderService,
+  type ConversationUserMessageRenderFrame,
 } from './services/ConversationRenderService';
 import {
   ConversationRestoreBootstrapCoordinator,
