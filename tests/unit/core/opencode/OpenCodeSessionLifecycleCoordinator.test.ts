@@ -13,6 +13,7 @@ import type {
 import type { SessionTodo } from '../../../../src/core/types';
 
 type MockHost = OpenCodeSessionLifecycleCoordinatorHost & {
+  shouldUseSdkAbort: jest.Mock<boolean, []>;
   shouldUseSdkCrud: jest.Mock<boolean, []>;
   getSdkSession: jest.Mock<OpenCodeSessionLifecycleSdk, []>;
   postLegacy: jest.Mock<Promise<unknown>, [string, unknown]>;
@@ -39,7 +40,9 @@ function createSdk(
   overrides: Partial<jest.Mocked<OpenCodeSessionLifecycleSdk>> = {},
 ): jest.Mocked<OpenCodeSessionLifecycleSdk> {
   return {
+    abort: jest.fn(),
     create: jest.fn(),
+    get: jest.fn(),
     list: jest.fn(),
     messages: jest.fn(),
     todo: jest.fn(),
@@ -55,6 +58,7 @@ function createHost(
   overrides: Partial<MockHost> = {},
 ): MockHost {
   return {
+    shouldUseSdkAbort: jest.fn(() => true),
     shouldUseSdkCrud: jest.fn(() => true),
     getSdkSession: jest.fn(() => sdk),
     postLegacy: jest.fn(),
@@ -126,6 +130,58 @@ describe('OpenCodeSessionLifecycleCoordinator', () => {
       expect.any(Error),
     );
     expect(host.getLegacy).toHaveBeenCalledWith('/session');
+  });
+
+  it('keeps session get fallback in the lifecycle owner', async () => {
+    const legacySession: Session = {
+      id: 'legacy-session',
+      title: 'Legacy',
+      time: { created: 1, updated: 2 },
+    };
+    const sdk = createSdk({
+      get: jest.fn().mockRejectedValue(new Error('sdk get failed')),
+    });
+    const host = createHost(sdk, {
+      getLegacy: jest.fn().mockResolvedValue(legacySession),
+    });
+    const coordinator = new OpenCodeSessionLifecycleCoordinator(host, createSyncRuntime());
+
+    await expect(coordinator.getSessionInfo('session-1')).resolves.toEqual(legacySession);
+    expect(sdk.get).toHaveBeenCalledWith({ sessionID: 'session-1' });
+    expect(host.getLegacy).toHaveBeenCalledWith('/session/session-1');
+    expect(host.logServiceWarning).toHaveBeenCalledWith(
+      'session.get',
+      'SDK session.get failed for session-1, falling back to legacy HTTP',
+      expect.any(Error),
+    );
+  });
+
+  it('keeps session abort scoped and falls back through the lifecycle owner', async () => {
+    const sdk = createSdk({
+      abort: jest.fn()
+        .mockResolvedValueOnce(undefined)
+        .mockRejectedValueOnce(new Error('sdk abort failed')),
+    });
+    const host = createHost(sdk, {
+      shouldUseSdkCrud: jest.fn(() => false),
+      postLegacy: jest.fn().mockResolvedValue(undefined),
+    });
+    const coordinator = new OpenCodeSessionLifecycleCoordinator(host, createSyncRuntime());
+
+    await expect(coordinator.abortSession('sdk-session')).resolves.toBeUndefined();
+    expect(sdk.abort).toHaveBeenCalledWith({ sessionID: 'sdk-session' });
+    expect(host.postLegacy).not.toHaveBeenCalled();
+
+    await expect(coordinator.abortSession('fallback-session')).resolves.toBeUndefined();
+    await expect(coordinator.abortSession('')).resolves.toBeUndefined();
+
+    expect(sdk.abort).toHaveBeenCalledWith({ sessionID: 'fallback-session' });
+    expect(host.postLegacy).toHaveBeenCalledWith('/session/fallback-session/abort', {});
+    expect(host.logServiceWarning).toHaveBeenCalledWith(
+      'session.abort',
+      'SDK session.abort failed for fallback-session, falling back to legacy HTTP',
+      expect.any(Error),
+    );
   });
 
   it('loads SDK session messages through revert filtering and tool observation', async () => {

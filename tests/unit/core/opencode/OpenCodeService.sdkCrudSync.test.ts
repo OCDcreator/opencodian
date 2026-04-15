@@ -354,6 +354,30 @@ describe('OpenCodeService SDK revert lifecycle', () => {
     expect(mockSdkClient.session.get).toHaveBeenCalledWith({ sessionID: 'sdk-session' });
   });
 
+  it('falls back to legacy HTTP when SDK session.get fails', async () => {
+    service = createServiceWithSdkFlags();
+    mockSdkClient.session.get.mockRejectedValue(new Error('sdk get failed'));
+    mockRequestUrl.mockResolvedValue({
+      status: 200,
+      json: {
+        id: 'legacy-session',
+        title: 'Legacy',
+        revert: { messageID: 'msg-legacy' },
+        time: { created: 1, updated: 2 },
+      },
+      text: '{"id":"legacy-session","title":"Legacy","revert":{"messageID":"msg-legacy"},"time":{"created":1,"updated":2}}',
+    });
+
+    await expect(service.getSessionRevertState('legacy-session')).resolves.toEqual({
+      messageID: 'msg-legacy',
+    });
+    expect(mockSdkClient.session.get).toHaveBeenCalledWith({ sessionID: 'legacy-session' });
+    expect(mockRequestUrl).toHaveBeenCalledWith(expect.objectContaining({
+      url: 'http://127.0.0.1:4196/session/legacy-session',
+      method: 'GET',
+    }));
+  });
+
   it('restores reverted session via SDK', async () => {
     service = createServiceWithSdkFlags();
     mockSdkClient.session.unrevert.mockResolvedValue({

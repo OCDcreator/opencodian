@@ -66,7 +66,9 @@ export interface SessionMessage {
 }
 
 export interface OpenCodeSessionLifecycleSdk {
+  abort(request: { sessionID: string }): Promise<void>;
   create(request: { title: string }): Promise<unknown>;
+  get(request: { sessionID: string }): Promise<unknown>;
   list(): Promise<unknown>;
   messages(request: { sessionID: string }): Promise<unknown>;
   todo(request: { sessionID: string }): Promise<unknown>;
@@ -91,6 +93,7 @@ export type OpenCodeSessionLifecycleSyncRuntime = Pick<
 >;
 
 export interface OpenCodeSessionLifecycleCoordinatorHost {
+  shouldUseSdkAbort(): boolean;
   shouldUseSdkCrud(): boolean;
   getSdkSession(): OpenCodeSessionLifecycleSdk;
   postLegacy<T>(path: string, body: unknown): Promise<T>;
@@ -138,6 +141,39 @@ export class OpenCodeSessionLifecycleCoordinator {
 
   getSessionId(): string | null {
     return this.currentSessionId;
+  }
+
+  async getSessionInfo(sessionId: string): Promise<Session> {
+    if (this.host.shouldUseSdkCrud()) {
+      try {
+        return await this.host.getSdkSession().get({ sessionID: sessionId }) as unknown as Session;
+      } catch (error) {
+        this.host.logServiceWarning('session.get', `SDK session.get failed for ${sessionId}, falling back to legacy HTTP`, error);
+      }
+    }
+
+    return this.host.getLegacy<Session>(`/session/${sessionId}`);
+  }
+
+  async abortSession(sessionId: string): Promise<void> {
+    if (!sessionId) {
+      return;
+    }
+
+    if (this.host.shouldUseSdkAbort()) {
+      try {
+        await this.host.getSdkSession().abort({ sessionID: sessionId });
+        return;
+      } catch (error) {
+        this.host.logServiceWarning('session.abort', `SDK session.abort failed for ${sessionId}, falling back to legacy HTTP`, error);
+      }
+    }
+
+    try {
+      await this.host.postLegacy(`/session/${sessionId}/abort`, {});
+    } catch (error) {
+      this.host.logServiceWarning('session.abort', `Failed to abort session ${sessionId} via legacy HTTP`, error);
+    }
   }
 
   async listSessions(): Promise<Session[]> {

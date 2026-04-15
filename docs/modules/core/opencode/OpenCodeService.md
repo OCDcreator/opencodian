@@ -68,7 +68,7 @@
 - `promptRequestBuilder`: `OpenCodePromptRequestBuilder` 实例，负责 SDK prompt parameters、legacy request body 与 shared prompt options/variant/output-format/model defaults 的组装。
 - `streamEventTransformer`: `OpenCodeStreamEventTransformer` 实例，负责 SDK / legacy stream event → `StreamChunk` 的转换、tool/question/file/permission 事件映射，以及 SSE parser。
 - `streamingRuntime`: `OpenCodeStreamingRuntimeCoordinator` 实例，负责单一 streaming 入口下的 SDK/legacy transport 选择、首事件前的 legacy SSE fallback、legacy SSE reader lifecycle、final response completion，以及 active stream registry、session-scoped abort controller、part type tracking、cancel/detach lifecycle。
-- `sessionLifecycle`: `OpenCodeSessionLifecycleCoordinator` 实例，负责 session create/list/messages/todos/statuses/delete/update、默认 current session 指针，以及公开 session sync 订阅 API 到 `syncEventRuntime` 的委托。
+- `sessionLifecycle`: `OpenCodeSessionLifecycleCoordinator` 实例，负责 session create/list/messages/todos/statuses/delete/update、session info lookup、session abort fallback、默认 current session 指针，以及公开 session sync 订阅 API 到 `syncEventRuntime` 的委托。
 - `sessionControl`: `OpenCodeSessionControlOrchestrator` 实例，负责 fork/revert/unrevert/diff、context usage snapshot、session message control、command/shell 与 message-part operations。
 - `serviceLifecycle`: `OpenCodeServiceLifecycleCoordinator` 实例，负责 initialize/start/stop/dispose、server running 后的 model/catalog bootstrap、SDK health response normalization / health probe fallback，以及 vault path scope refresh 与 sync/open-code event subscription 的 lifecycle 编排。
 - `questionPermissionHub`: `OpenCodeQuestionPermissionHub` 实例，负责 pending questions/reply/reject、pending permissions/respond，以及 session permission responder 的 negotiation lifecycle。
@@ -118,9 +118,11 @@
 
 ### 会话 CRUD、control 与回退态过滤
 
-`OpenCodeService` 的 session lifecycle 公开接口现在由 `OpenCodeSessionLifecycleCoordinator` 承担主要 owner；服务层保留 host seam、transport helper、normalizer 与 revert/tool-observation 依赖，并继续作为对外 façade。被 lifecycle coordinator 收束的公开接口包括：
+`OpenCodeService` 的 session lifecycle 公开接口与共享 session runtime fallback 现在由 `OpenCodeSessionLifecycleCoordinator` 承担主要 owner；服务层保留 host seam、transport helper、normalizer 与 revert/tool-observation 依赖，并继续作为对外 façade。被 lifecycle coordinator 收束的接口包括：
 
 - `createSession()`
+- `getSessionInfo()`（内部 shared session lookup，含 SDK get fallback）
+- `abortSession()`（内部 streaming cancel 使用，含 SDK abort fallback）
 - `listSessions()`
 - `getSessionMessages()`
 - `getSessionTodos()`

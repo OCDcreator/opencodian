@@ -277,6 +277,7 @@ export class OpenCodeService {
       delay: (ms, signal) => this.delay(ms, signal),
     });
     this.sessionLifecycle = new OpenCodeSessionLifecycleCoordinator({
+      shouldUseSdkAbort: () => this.shouldUseSdk('sdkAbort'),
       shouldUseSdkCrud: () => this.shouldUseSdk('sdkCrud'),
       getSdkSession: () => this.sdk.session,
       postLegacy: (path, body) => this.post(path, body),
@@ -298,7 +299,7 @@ export class OpenCodeService {
       getSdkPart: () => this.sdk.part,
       postLegacy: (path, body) => this.post(path, body),
       getLegacy: (path) => this.get(path),
-      getSessionInfo: (sessionId) => this.getSessionInfo(sessionId),
+      getSessionInfo: (sessionId) => this.sessionLifecycle.getSessionInfo(sessionId),
       getSessionMessages: (sessionId) => this.sessionLifecycle.getSessionMessages(sessionId),
       getAvailableModels: () => this.getAvailableModels(),
       logServiceWarning: (key, message, error) => this.logServiceWarning(key, message, error),
@@ -379,7 +380,7 @@ export class OpenCodeService {
       logStreamingDebug: (label, payload) => logAssistantFinalizationDebug(label, payload),
     });
     this.streamingRuntime = new OpenCodeStreamingRuntimeCoordinator({
-      abortSessionOnServer: (sessionId) => this.abortSessionOnServer(sessionId),
+      abortSessionOnServer: (sessionId) => this.sessionLifecycle.abortSession(sessionId),
       getLegacyEventStreamRequest: () => {
         this.ensureBaseUrl();
         return {
@@ -1073,7 +1074,7 @@ export class OpenCodeService {
     }
 
     try {
-      const session = await this.getSessionInfo(sessionId);
+      const session = await this.sessionLifecycle.getSessionInfo(sessionId);
       const filtered = this.filterMessagesByRevertState(messages, session.revert);
       if (filtered.length !== messages.length && session.revert?.messageID) {
         logger.debug('Applied session revert state while loading messages', {
@@ -1131,27 +1132,6 @@ export class OpenCodeService {
 
   private observeRuntimeToolNames(toolNames: Iterable<string>): boolean {
     return this.catalogQueries.observeRuntimeToolNames(toolNames);
-  }
-
-  private async abortSessionOnServer(sessionId: string): Promise<void> {
-    if (!sessionId) {
-      return;
-    }
-
-    if (this.shouldUseSdk('sdkAbort')) {
-      try {
-        await this.getSdkClient().session.abort({ sessionID: sessionId });
-        return;
-      } catch (error) {
-        this.logServiceWarning('session.abort', `SDK session.abort failed for ${sessionId}, falling back to legacy HTTP`, error);
-      }
-    }
-
-    try {
-      await this.post(`/session/${sessionId}/abort`, {});
-    } catch (error) {
-      this.logServiceWarning('session.abort', `Failed to abort session ${sessionId} via legacy HTTP`, error);
-    }
   }
 
   /** Get available models - Handles both string array and object formats */
@@ -1218,18 +1198,6 @@ export class OpenCodeService {
 
   async getSessionDiff(sessionId: string, messageID?: string): Promise<SessionDiffEntry[]> {
     return this.sessionControl.getSessionDiff(sessionId, messageID);
-  }
-
-  private async getSessionInfo(sessionId: string): Promise<Session> {
-    if (this.shouldUseSdk('sdkCrud')) {
-      try {
-        return await this.getSdkClient().session.get({ sessionID: sessionId }) as unknown as Session;
-      } catch (error) {
-        this.logServiceWarning('session.get', `SDK session.get failed for ${sessionId}, falling back to legacy HTTP`, error);
-      }
-    }
-
-    return this.get<Session>(`/session/${sessionId}`);
   }
 
   private ensureBaseUrl(): void {
