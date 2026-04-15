@@ -8,6 +8,7 @@ import {
   type MessageSendPreparationHost,
   MessageSendPreparationService,
 } from '../../../../src/features/chat/services/MessageSendPreparationService';
+import type { ComposerSendContextPort } from '../../../../src/features/chat/services/ComposerContextViewFacade';
 
 function createConversation(messages: ChatMessage[] = []): Conversation {
   return {
@@ -38,19 +39,30 @@ function createPromptContextItem(overrides: Partial<PromptContextItem> = {}): Pr
 
 type MockedMessageSendPreparationHost = {
   [Key in keyof MessageSendPreparationHost]:
-    Key extends 'composerSendContext'
-      ? MockedComposerSendContextPort
-      : MessageSendPreparationHost[Key] extends (...args: infer Args) => infer Result
-        ? jest.Mock<Result, Args>
-        : MessageSendPreparationHost[Key];
+    MessageSendPreparationHost[Key] extends (...args: infer Args) => infer Result
+      ? jest.Mock<Result, Args>
+      : MessageSendPreparationHost[Key];
 };
 
 type MockedComposerSendContextPort = {
-  [Key in keyof MessageSendPreparationHost['composerSendContext']]:
-    MessageSendPreparationHost['composerSendContext'][Key] extends (...args: infer Args) => infer Result
+  [Key in keyof ComposerSendContextPort]:
+    ComposerSendContextPort[Key] extends (...args: infer Args) => infer Result
       ? jest.Mock<Result, Args>
-      : MessageSendPreparationHost['composerSendContext'][Key];
+      : ComposerSendContextPort[Key];
 };
+
+function createComposerSendContext(
+  callOrder: string[] = [],
+  overrides: Partial<MockedComposerSendContextPort> = {},
+): MockedComposerSendContextPort {
+  return {
+    getDraftContextItems: jest.fn().mockReturnValue([]),
+    clearDraftContextItems: jest.fn().mockImplementation(() => {
+      callOrder.push('clearDraftContextItems');
+    }),
+    ...overrides,
+  };
+}
 
 function createHost(
   conversation: Conversation,
@@ -65,12 +77,6 @@ function createHost(
     notifyForegroundBusy: jest.fn().mockImplementation(() => {
       callOrder.push('notifyForegroundBusy');
     }),
-    composerSendContext: {
-      getDraftContextItems: jest.fn().mockReturnValue([]),
-      clearDraftContextItems: jest.fn().mockImplementation(() => {
-        callOrder.push('clearDraftContextItems');
-      }),
-    },
     getServerAvailability: jest.fn().mockResolvedValue('running'),
     refreshServerStatusBadge: jest.fn().mockResolvedValue(undefined),
     ensureServerReadyForChat: jest.fn().mockResolvedValue(true),
@@ -173,7 +179,7 @@ describe('MessageSendPreparationService', () => {
       getServerAvailability: jest.fn().mockResolvedValue('offline'),
       ensureServerReadyForChat: jest.fn().mockResolvedValue(false),
     });
-    const service = new MessageSendPreparationService(host);
+    const service = new MessageSendPreparationService(host, createComposerSendContext());
 
     const result = await service.prepareMessageSend({ content: 'Hello' });
 
@@ -190,7 +196,7 @@ describe('MessageSendPreparationService', () => {
     const host = createHost(conversation, callOrder, {
       hasLoadedModelCatalog: jest.fn().mockReturnValue(false),
     });
-    const service = new MessageSendPreparationService(host);
+    const service = new MessageSendPreparationService(host, createComposerSendContext(callOrder));
 
     await service.prepareMessageSend({ content: 'Hello' });
 
@@ -204,7 +210,7 @@ describe('MessageSendPreparationService', () => {
     const host = createHost(conversation, [], {
       ensureSelectedModelAvailable: jest.fn().mockResolvedValue(false),
     });
-    const service = new MessageSendPreparationService(host);
+    const service = new MessageSendPreparationService(host, createComposerSendContext());
 
     const result = await service.prepareMessageSend({ content: 'Hello' });
 
@@ -220,15 +226,14 @@ describe('MessageSendPreparationService', () => {
     const conversation = createConversation();
     const contextItem = createPromptContextItem();
     const host = createHost(conversation, callOrder, {
-      composerSendContext: {
-        getDraftContextItems: jest.fn().mockReturnValue([contextItem]),
-        clearDraftContextItems: jest.fn().mockImplementation(() => {
-          callOrder.push('clearDraftContextItems');
-        }),
-      },
       shouldGenerateAiTitle: jest.fn().mockReturnValue(true),
     });
-    const service = new MessageSendPreparationService(host);
+    const service = new MessageSendPreparationService(
+      host,
+      createComposerSendContext(callOrder, {
+        getDraftContextItems: jest.fn().mockReturnValue([contextItem]),
+      }),
+    );
 
     const result = await service.prepareMessageSend({ content: 'Hello' });
 
@@ -268,7 +273,7 @@ describe('MessageSendPreparationService', () => {
     const host = createHost(conversation, callOrder, {
       isTabForegroundBusy: jest.fn().mockReturnValue(true),
     });
-    const service = new MessageSendPreparationService(host);
+    const service = new MessageSendPreparationService(host, createComposerSendContext(callOrder));
 
     const result = await service.prepareMessageSend({ content: 'Hello' });
 
@@ -282,7 +287,10 @@ describe('MessageSendPreparationService', () => {
     const callOrder: string[] = [];
     const conversation = createConversation();
     const host = createHost(conversation, callOrder);
-    const service = new MessageSendPreparationService(host);
+    const service = new MessageSendPreparationService(
+      host,
+      createComposerSendContext(callOrder),
+    );
 
     service.enterStreamingState('tab-1');
     service.completePreparedStreamStart('tab-1');

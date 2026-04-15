@@ -734,7 +734,7 @@ export class OpenCodianView extends ItemView {
       showProcessingBlockedNotice: () => {
         new Notice(t('chat.tab.processingBlocked'));
       },
-      submitMessage: (message) => this.sendMessage(message),
+      submitMessage: (message) => this.sendPipelineRuntime.sendMessage(message),
       setComposerStackHeight: (stackHeight) => {
         this.chatContainerEl?.style.setProperty('--opencodian-composer-stack-height', `${stackHeight}px`);
       },
@@ -1512,6 +1512,7 @@ export class OpenCodianView extends ItemView {
   ): OpenCodianViewInteractionRuntimeWiring {
     const messageSendPreparationService = new MessageSendPreparationService(
       this.createMessageSendPreparationHost(conversationRenderService),
+      this.composerContextViewFacade.sendContext,
     );
     const messageFinalizationService = new MessageFinalizationService(
       this.createMessageFinalizationHost(conversationRenderService),
@@ -2321,7 +2322,6 @@ export class OpenCodianView extends ItemView {
       notifyForegroundBusy: () => {
         new Notice(t('chat.tab.processingBlocked'));
       },
-      composerSendContext: this.composerContextViewFacade.sendContext,
       getServerAvailability: () => this.getServerAvailability(),
       refreshServerStatusBadge: () => this.chatHeaderPresenter.refreshServerStatusBadge(),
       ensureServerReadyForChat: (availability) => this.ensureServerReadyForChat(availability),
@@ -3504,11 +3504,6 @@ export class OpenCodianView extends ItemView {
 
   private async deleteConversationsAndCleanupTabs(conversationIds: string[]): Promise<void> {
     await this.conversationLoadRecoveryCoordinator.deleteConversationsAndRecover(conversationIds);
-  }
-
-  /** Send a message */
-  private async sendMessage(content: string) {
-    await this.sendPipelineRuntime.sendMessage(content);
   }
 
   private async ensureServerReadyForChat(availability: Exclude<ChatServerAvailability, 'running' | 'external'>): Promise<boolean> {

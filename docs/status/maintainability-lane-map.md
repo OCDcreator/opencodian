@@ -1,11 +1,11 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [READY] `R91-R137` 长队列继续推进；当前 `[NEXT]` 为 `R91 - OpenCodianView send/composer interaction seam`。
+> **当前状态**: [READY] `R92-R137` 长队列继续推进；当前 `[NEXT]` 为 `R92 - Checkpoint after OpenCodianView residual seams`。
 
 ## 当前优先级
 
-- **当前 `[NEXT]`**：`R91 - OpenCodianView send/composer interaction seam`
+- **当前 `[NEXT]`**：`R92 - Checkpoint after OpenCodianView residual seams`
 - **本批目标**：继续 residual chat runtime / services 与 opencode core，再转 secondary core / settings / startup，最后做 heavy tests follow-up、warning closeout 与最终 checkpoint
 - **当前 lint 基线**：`0 errors / 64 warnings`
 - **热点顺序**：

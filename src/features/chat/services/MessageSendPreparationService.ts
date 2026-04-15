@@ -57,7 +57,6 @@ export interface MessageSendPreparationHost {
   ensureTabRuntime(tabId: TabId | null): boolean;
   isTabForegroundBusy(tabId: TabId | null): boolean;
   notifyForegroundBusy(): void;
-  composerSendContext: ComposerSendContextPort;
   getServerAvailability(): Promise<SendPreparationServerAvailability>;
   refreshServerStatusBadge(): Promise<void>;
   ensureServerReadyForChat(
@@ -90,7 +89,10 @@ export interface MessageSendPreparationHost {
 }
 
 export class MessageSendPreparationService {
-  constructor(private readonly host: MessageSendPreparationHost) {}
+  constructor(
+    private readonly host: MessageSendPreparationHost,
+    private readonly composerSendContext: ComposerSendContextPort,
+  ) {}
 
   async prepareMessageSend(
     options: PrepareMessageSendOptions,
@@ -110,7 +112,7 @@ export class MessageSendPreparationService {
       return null;
     }
 
-    const draftContextItems = this.host.composerSendContext.getDraftContextItems(tabId);
+    const draftContextItems = this.composerSendContext.getDraftContextItems(tabId);
     const availability = await this.host.getServerAvailability();
     await this.host.refreshServerStatusBadge();
     if (availability !== 'running' && availability !== 'external') {
@@ -171,7 +173,7 @@ export class MessageSendPreparationService {
 
   completePreparedStreamStart(tabId: TabId | null): void {
     this.host.clearPendingEditedFiles(tabId);
-    this.host.composerSendContext.clearDraftContextItems(tabId);
+    this.composerSendContext.clearDraftContextItems(tabId);
   }
 
   private isFirstUserMessage(conversation: Conversation): boolean {
