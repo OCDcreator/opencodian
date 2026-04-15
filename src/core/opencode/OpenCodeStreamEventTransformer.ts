@@ -103,6 +103,16 @@ export type OpenCodeStreamPartTypeState = OpenCodeStreamingRuntimeContext | {
   partTypeMap?: Map<string, string>;
 };
 
+type OpenCodeStreamEventOutcome = { chunks: StreamChunk[]; stop: boolean };
+
+type OpenCodeStreamingEventHandler = (
+  eventData: OpenCodeStreamEvent,
+  sessionId: string,
+  state: OpenCodeStreamEventState,
+  streamContext: OpenCodeStreamPartTypeState,
+  chunks: StreamChunk[],
+) => OpenCodeStreamEventOutcome;
+
 function resolveReasoningDurationSeconds(
   part: Pick<OpenCodeStreamPart, 'duration' | 'time'>,
 ): number | undefined {
@@ -178,7 +188,19 @@ function extractStructuredErrorMessage(errorLike: unknown): string | null {
 }
 
 export class OpenCodeStreamEventTransformer {
-  constructor(private readonly host: OpenCodeStreamEventTransformerHost) {}
+  private readonly streamingEventHandlers: Record<string, OpenCodeStreamingEventHandler>;
+
+  constructor(private readonly host: OpenCodeStreamEventTransformerHost) {
+    this.streamingEventHandlers = {
+      'message.part.updated': this.handleMessagePartUpdated.bind(this),
+      'message.part.delta': this.handleMessagePartDelta.bind(this),
+      'permission.asked': this.handlePermissionAsked.bind(this),
+      'file.edited': this.handleFileEdited.bind(this),
+      'session.error': this.handleSessionError.bind(this),
+      'session.idle': this.handleSessionIdle.bind(this),
+      'question.asked': this.handleQuestionAsked.bind(this),
+    };
+  }
 
   handleStreamingEvent(
     eventData: OpenCodeStreamEvent,
@@ -195,199 +217,10 @@ export class OpenCodeStreamEventTransformer {
       return { chunks: [], stop: false };
     }
 
-    const chunks: StreamChunk[] = [];
-
-    if (eventData.properties?.usage) {
-      chunks.push({
-        type: 'usage',
-        inputTokens: eventData.properties.usage.input ?? 0,
-        outputTokens: eventData.properties.usage.output ?? 0,
-        sessionId,
-      });
-    }
-
-    if (eventData.type === 'message.part.updated') {
-      const part = eventData.properties?.part;
-      if (part?.id && part?.type) {
-        this.setStreamPartType(streamContext, part.id, part.type);
-
-        if (part.type === 'tool') {
-          const toolPart = part;
-          const toolId = toolPart.callID || toolPart.id;
-          const toolName = toolPart.tool || 'unknown';
-          if (isInternalStructuredOutputTool(toolName)) {
-            return { chunks, stop: false };
-          }
-
-          this.host.observeRuntimeToolNames([toolName]);
-
-          if (toolId) {
-            const toolKind = this.host.getOpenCodeToolKind(toolName);
-            const toolInput = toolPart.state?.input || {};
-            const nextSnapshot = this.getToolInputSnapshot(toolInput);
-            const previousSnapshot = state.toolInputSnapshots.get(toolId);
-            const shouldEmitToolUse =
-              !state.processedToolIds.has(toolId)
-              || nextSnapshot !== previousSnapshot;
-
-            if (shouldEmitToolUse) {
-              state.processedToolIds.add(toolId);
-              state.toolInputSnapshots.set(toolId, nextSnapshot);
-              chunks.push({
-                type: 'tool_use',
-                id: toolId,
-                name: toolName,
-                kind: toolKind,
-                input: toolInput,
-              });
-            }
-
-            const toolStatus = resolveToolExecutionStatus({
-              toolName,
-              state: toolPart.state,
-            });
-            const toolResult = resolveToolResultText(toolPart.state);
-            if ((toolStatus === 'completed' || toolStatus === 'error') && toolResult !== undefined) {
-              const resultKey = `${toolId}_result`;
-              if (!state.processedToolIds.has(resultKey)) {
-                state.processedToolIds.add(resultKey);
-                chunks.push({
-                  type: 'tool_result',
-                  toolUseId: toolId,
-                  content: toolResult,
-                  isError: toolStatus === 'error',
-                });
-              }
-            }
-          }
-        }
-
-        if (part.type === 'reasoning' || part.type === 'thinking') {
-          const durationSeconds = resolveReasoningDurationSeconds(part);
-          if (durationSeconds !== undefined) {
-            chunks.push({
-              type: 'thinking',
-              content: '',
-              partId: part.id,
-              durationSeconds,
-            });
-          }
-        }
-      }
-
-      return { chunks, stop: false };
-    }
-
-    if (eventData.type === 'message.part.delta') {
-      const delta = eventData.properties?.delta;
-      const field = eventData.properties?.field;
-      const partID = eventData.properties?.partID;
-
-      if (!delta || !field) {
-        return { chunks, stop: false };
-      }
-
-      if (partID && !this.hasStreamPartType(streamContext, partID)) {
-        const partType = eventData.properties?.part?.type;
-        this.setStreamPartType(streamContext, partID, partType || 'text');
-      }
-
-      const partType = partID ? (this.getStreamPartType(streamContext, partID) || 'text') : 'text';
-
-      if (field === 'text') {
-        if (partType === 'reasoning' || partType === 'thinking') {
-          chunks.push({ type: 'thinking', content: delta, partId: partID });
-        } else {
-          chunks.push({ type: 'text', content: delta });
-          state.lastContent += delta;
-          state.debugChunkSequence += 1;
-          state.lastTextDelta = {
-            sequence: state.debugChunkSequence,
-            source: 'event',
-            partId: partID ?? null,
-            partType,
-            length: delta.length,
-            totalLength: state.lastContent.length,
-            preview: getDebugTextPreview(delta, 120),
-          };
-          this.host.logStreamingDebug('service-text-delta', {
-            sessionId,
-            chunkSequence: state.debugChunkSequence,
-            partId: partID ?? null,
-            partType,
-            deltaLength: delta.length,
-            totalLength: state.lastContent.length,
-            deltaPreview: getDebugTextPreview(delta, 120),
-          });
-        }
-      }
-
-      return { chunks, stop: false };
-    }
-
-    if (eventData.type === 'permission.asked') {
-      const permission = eventData.properties;
-      if (permission?.id) {
-        chunks.push({
-          type: 'permission_request',
-          id: permission.id,
-          permission: permission.permission || 'unknown',
-          patterns: permission.patterns || [],
-          metadata: permission.metadata || {},
-        });
-      }
-
-      return { chunks, stop: false };
-    }
-
-    if (eventData.type === 'file.edited') {
-      const file = eventData.properties?.file;
-      if (typeof file === 'string' && file.trim()) {
-        chunks.push({ type: 'file_edited', file: file.trim() });
-      }
-
-      return { chunks, stop: false };
-    }
-
-    if (eventData.type === 'session.error') {
-      const errorName = extractStructuredErrorName(eventData.properties?.error);
-      const errorMessage = extractStructuredErrorMessage(eventData.properties?.error) ?? 'Unknown error';
-      state.lastErrorMessage = errorMessage;
-      this.host.logStreamingDebug('service-session-error', {
-        sessionId,
-        errorName,
-        errorMessage,
-      });
-      if (errorName === 'MessageAbortedError') {
-        return { chunks, stop: true };
-      }
-
-      chunks.push({
-        type: 'error',
-        content: errorMessage,
-      });
-      return { chunks, stop: true };
-    }
-
-    if (eventData.type === 'session.idle') {
-      this.host.logStreamingDebug('service-session-idle', {
-        sessionId,
-        accumulatedTextLength: state.lastContent.length,
-        lastTextDelta: state.lastTextDelta,
-      });
-      return { chunks, stop: true };
-    }
-
-    if (eventData.type === 'question.asked') {
-      const request = this.host.normalizeQuestionRequest(eventData.properties);
-      if (request) {
-        chunks.push({
-          type: 'question_request',
-          request,
-        });
-      }
-
-      return { chunks, stop: false };
+    const chunks = this.createUsageChunks(eventData, sessionId);
+    const eventHandler = this.streamingEventHandlers[eventData.type];
+    if (eventHandler) {
+      return eventHandler(eventData, sessionId, state, streamContext, chunks);
     }
 
     return { chunks, stop: false };
@@ -538,6 +371,298 @@ export class OpenCodeStreamEventTransformer {
     } catch {
       return '[unserializable-tool-input]';
     }
+  }
+
+  private createUsageChunks(
+    eventData: OpenCodeStreamEvent,
+    sessionId: string,
+  ): StreamChunk[] {
+    const usage = eventData.properties?.usage;
+    if (!usage) {
+      return [];
+    }
+
+    return [{
+      type: 'usage',
+      inputTokens: usage.input ?? 0,
+      outputTokens: usage.output ?? 0,
+      sessionId,
+    }];
+  }
+
+  private handleMessagePartUpdated(
+    eventData: OpenCodeStreamEvent,
+    _sessionId: string,
+    state: OpenCodeStreamEventState,
+    streamContext: OpenCodeStreamPartTypeState,
+    chunks: StreamChunk[],
+  ): OpenCodeStreamEventOutcome {
+    const part = eventData.properties?.part;
+    if (!part?.id || !part.type) {
+      return { chunks, stop: false };
+    }
+
+    this.setStreamPartType(streamContext, part.id, part.type);
+
+    if (part.type === 'tool') {
+      return this.handleToolPartUpdated(part, state, chunks);
+    }
+
+    this.appendReasoningPartUpdatedChunk(part, chunks);
+    return { chunks, stop: false };
+  }
+
+  private handleToolPartUpdated(
+    toolPart: OpenCodeStreamPart,
+    state: OpenCodeStreamEventState,
+    chunks: StreamChunk[],
+  ): OpenCodeStreamEventOutcome {
+    const toolId = toolPart.callID || toolPart.id;
+    const toolName = toolPart.tool || 'unknown';
+    if (isInternalStructuredOutputTool(toolName)) {
+      return { chunks, stop: false };
+    }
+
+    this.host.observeRuntimeToolNames([toolName]);
+
+    if (!toolId) {
+      return { chunks, stop: false };
+    }
+
+    const toolKind = this.host.getOpenCodeToolKind(toolName);
+    const toolInput = toolPart.state?.input || {};
+    const nextSnapshot = this.getToolInputSnapshot(toolInput);
+    const previousSnapshot = state.toolInputSnapshots.get(toolId);
+    const shouldEmitToolUse =
+      !state.processedToolIds.has(toolId)
+      || nextSnapshot !== previousSnapshot;
+
+    if (shouldEmitToolUse) {
+      state.processedToolIds.add(toolId);
+      state.toolInputSnapshots.set(toolId, nextSnapshot);
+      chunks.push({
+        type: 'tool_use',
+        id: toolId,
+        name: toolName,
+        kind: toolKind,
+        input: toolInput,
+      });
+    }
+
+    const toolStatus = resolveToolExecutionStatus({
+      toolName,
+      state: toolPart.state,
+    });
+    const toolResult = resolveToolResultText(toolPart.state);
+    if ((toolStatus === 'completed' || toolStatus === 'error') && toolResult !== undefined) {
+      const resultKey = `${toolId}_result`;
+      if (!state.processedToolIds.has(resultKey)) {
+        state.processedToolIds.add(resultKey);
+        chunks.push({
+          type: 'tool_result',
+          toolUseId: toolId,
+          content: toolResult,
+          isError: toolStatus === 'error',
+        });
+      }
+    }
+
+    return { chunks, stop: false };
+  }
+
+  private appendReasoningPartUpdatedChunk(
+    part: OpenCodeStreamPart,
+    chunks: StreamChunk[],
+  ): void {
+    if (!this.isReasoningPartType(part.type)) {
+      return;
+    }
+
+    const durationSeconds = resolveReasoningDurationSeconds(part);
+    if (durationSeconds !== undefined) {
+      chunks.push({
+        type: 'thinking',
+        content: '',
+        partId: part.id,
+        durationSeconds,
+      });
+    }
+  }
+
+  private handleMessagePartDelta(
+    eventData: OpenCodeStreamEvent,
+    sessionId: string,
+    state: OpenCodeStreamEventState,
+    streamContext: OpenCodeStreamPartTypeState,
+    chunks: StreamChunk[],
+  ): OpenCodeStreamEventOutcome {
+    const delta = eventData.properties?.delta;
+    const field = eventData.properties?.field;
+    const partID = eventData.properties?.partID;
+
+    if (!delta || !field) {
+      return { chunks, stop: false };
+    }
+
+    const partType = this.resolveDeltaPartType(eventData, streamContext, partID);
+    if (field !== 'text') {
+      return { chunks, stop: false };
+    }
+
+    if (this.isReasoningPartType(partType)) {
+      chunks.push({ type: 'thinking', content: delta, partId: partID });
+      return { chunks, stop: false };
+    }
+
+    this.appendTextDeltaChunk(chunks, delta, partID, partType, sessionId, state);
+    return { chunks, stop: false };
+  }
+
+  private resolveDeltaPartType(
+    eventData: OpenCodeStreamEvent,
+    streamContext: OpenCodeStreamPartTypeState,
+    partID: string | undefined,
+  ): string {
+    if (!partID) {
+      return 'text';
+    }
+
+    if (!this.hasStreamPartType(streamContext, partID)) {
+      const partType = eventData.properties?.part?.type;
+      this.setStreamPartType(streamContext, partID, partType || 'text');
+    }
+
+    return this.getStreamPartType(streamContext, partID) || 'text';
+  }
+
+  private appendTextDeltaChunk(
+    chunks: StreamChunk[],
+    delta: string,
+    partID: string | undefined,
+    partType: string,
+    sessionId: string,
+    state: OpenCodeStreamEventState,
+  ): void {
+    chunks.push({ type: 'text', content: delta });
+    state.lastContent += delta;
+    state.debugChunkSequence += 1;
+    state.lastTextDelta = {
+      sequence: state.debugChunkSequence,
+      source: 'event',
+      partId: partID ?? null,
+      partType,
+      length: delta.length,
+      totalLength: state.lastContent.length,
+      preview: getDebugTextPreview(delta, 120),
+    };
+    this.host.logStreamingDebug('service-text-delta', {
+      sessionId,
+      chunkSequence: state.debugChunkSequence,
+      partId: partID ?? null,
+      partType,
+      deltaLength: delta.length,
+      totalLength: state.lastContent.length,
+      deltaPreview: getDebugTextPreview(delta, 120),
+    });
+  }
+
+  private handlePermissionAsked(
+    eventData: OpenCodeStreamEvent,
+    _sessionId: string,
+    _state: OpenCodeStreamEventState,
+    _streamContext: OpenCodeStreamPartTypeState,
+    chunks: StreamChunk[],
+  ): OpenCodeStreamEventOutcome {
+    const permission = eventData.properties;
+    if (permission?.id) {
+      chunks.push({
+        type: 'permission_request',
+        id: permission.id,
+        permission: permission.permission || 'unknown',
+        patterns: permission.patterns || [],
+        metadata: permission.metadata || {},
+      });
+    }
+
+    return { chunks, stop: false };
+  }
+
+  private handleFileEdited(
+    eventData: OpenCodeStreamEvent,
+    _sessionId: string,
+    _state: OpenCodeStreamEventState,
+    _streamContext: OpenCodeStreamPartTypeState,
+    chunks: StreamChunk[],
+  ): OpenCodeStreamEventOutcome {
+    const file = eventData.properties?.file;
+    if (typeof file === 'string' && file.trim()) {
+      chunks.push({ type: 'file_edited', file: file.trim() });
+    }
+
+    return { chunks, stop: false };
+  }
+
+  private handleSessionError(
+    eventData: OpenCodeStreamEvent,
+    sessionId: string,
+    state: OpenCodeStreamEventState,
+    _streamContext: OpenCodeStreamPartTypeState,
+    chunks: StreamChunk[],
+  ): OpenCodeStreamEventOutcome {
+    const errorName = extractStructuredErrorName(eventData.properties?.error);
+    const errorMessage = extractStructuredErrorMessage(eventData.properties?.error) ?? 'Unknown error';
+    state.lastErrorMessage = errorMessage;
+    this.host.logStreamingDebug('service-session-error', {
+      sessionId,
+      errorName,
+      errorMessage,
+    });
+    if (errorName === 'MessageAbortedError') {
+      return { chunks, stop: true };
+    }
+
+    chunks.push({
+      type: 'error',
+      content: errorMessage,
+    });
+    return { chunks, stop: true };
+  }
+
+  private handleSessionIdle(
+    _eventData: OpenCodeStreamEvent,
+    sessionId: string,
+    state: OpenCodeStreamEventState,
+    _streamContext: OpenCodeStreamPartTypeState,
+    chunks: StreamChunk[],
+  ): OpenCodeStreamEventOutcome {
+    this.host.logStreamingDebug('service-session-idle', {
+      sessionId,
+      accumulatedTextLength: state.lastContent.length,
+      lastTextDelta: state.lastTextDelta,
+    });
+    return { chunks, stop: true };
+  }
+
+  private handleQuestionAsked(
+    eventData: OpenCodeStreamEvent,
+    _sessionId: string,
+    _state: OpenCodeStreamEventState,
+    _streamContext: OpenCodeStreamPartTypeState,
+    chunks: StreamChunk[],
+  ): OpenCodeStreamEventOutcome {
+    const request = this.host.normalizeQuestionRequest(eventData.properties);
+    if (request) {
+      chunks.push({
+        type: 'question_request',
+        request,
+      });
+    }
+
+    return { chunks, stop: false };
+  }
+
+  private isReasoningPartType(partType: string): boolean {
+    return partType === 'reasoning' || partType === 'thinking';
   }
 
   private setStreamPartType(

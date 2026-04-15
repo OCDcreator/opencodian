@@ -16,7 +16,7 @@
 ## 当前背景
 
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
-- 最近成功 phase：`docs/status/maintainability-phase-410.md`
+- 最近成功 phase：`docs/status/maintainability-phase-413.md`
 - 当前 live lint 基线：`0 errors / 79 warnings`
 - 当前路线判断：上一批已在 `R67` checkpoint 收口；当前新 batch 直接转向 chat runtime / services 与 opencode core，并把 heavy tests / warning cleanup 明确写成 `R81-R86`。
 
@@ -601,7 +601,7 @@
   - `OpenCodeService` 对 sync/bootstrap lifecycle 的直接铺开明显减少
   - focused validation、全量 `npm test`、`npm run build` 通过
 
-### [NEXT] R78 - OpenCodeStreamEventTransformer event classification seam
+### [DONE] R78 - OpenCodeStreamEventTransformer event classification seam
 
 - **Lane**: Maintainability / opencode stream transform
 - **目标**: 从 `src/core/opencode/OpenCodeStreamEventTransformer.ts:183` 一带收束 session event、question event、tool event、usage update 与 part-type tracking 的完整 event-classification seam。
@@ -618,7 +618,7 @@
   - stream transformer 的直接 event 分支明显减少
   - focused validation、全量 `npm test`、`npm run build` 通过
 
-### [QUEUED] R79 - OpenCodeStreamingRuntimeCoordinator finalization seam
+### [NEXT] R79 - OpenCodeStreamingRuntimeCoordinator finalization seam
 
 - **Lane**: Maintainability / opencode stream finalization
 - **目标**: 从 `src/core/opencode/OpenCodeStreamingRuntimeCoordinator.ts:409` 一带收束 finishStreamingResponse、assistant tail lookup、fallback final content/error completion 与 final debug logging 的完整 finalization seam。
