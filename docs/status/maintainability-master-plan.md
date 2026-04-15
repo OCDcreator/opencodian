@@ -2,19 +2,19 @@
 
 > **状态**: [READY]
 > **作用**: 这是 maintainability 无人值守的战略文档。每轮开始前，先读本文件，再读 `docs/status/maintainability-round-roadmap.md` 与最近的 `docs/status/maintainability-phase-XXX.md`。
-> **自动推进状态**: `R114` 已完成 OpenCodeStreamEventTransformer payload/SSE-parse seam；当前继续按 `R115-R137` 长队列顺序推进。恢复 autopilot 后只能从首个 `[NEXT]`（`R115`）顺序执行，不允许 freestyle。
+> **自动推进状态**: `R115` 已完成 OpenCodeStreamingRuntimeCoordinator finalization residual seam；当前继续按 `R116-R137` 长队列顺序推进。恢复 autopilot 后只能从首个 `[NEXT]`（`R116`）顺序执行，不允许 freestyle。
 
 ## 1. 当前判断
 
-**当前分支已完成 `R68-R114` 并把 live lint 稳定在 `0 errors / 65 warnings`；`R114` 已把 legacy SSE payload JSON parse、event-name inference 与 invalid chunk shielding 收束回 `OpenCodeStreamEventTransformer` 的解析 seam，并补齐 focused transformer/runtime coverage。** 接下来的高收益 residual 将继续进入 `R115-R116` 的 streaming runtime seams，再处理 secondary core / settings / startup，最后做 heavy tests follow-up、warning closeout 与最终 checkpoint。
+**当前分支已完成 `R68-R115` 并把 live lint 稳定在 `0 errors / 65 warnings`；`R115` 已把 finalization start logging、assistant tail completion planning 与 post-finish stop payload 收束到 `OpenCodeStreamingRuntimeCoordinator` 的单一 outcome seam，并补齐 latest-assistant / duplicate-error fallback coverage。** 接下来的高收益 residual 将继续进入 `R116` 的 active-context / cancel-detach seam，再处理 secondary core / settings / startup，最后做 heavy tests follow-up、warning closeout 与最终 checkpoint。
 
 ## 2. 当前基线
 
 - **lint**: `0 errors / 65 warnings`
-- **最近验证**: `R114` 已确认 focused `OpenCodeStreamEventTransformer` / `OpenCodeStreamingRuntimeCoordinator` suites、全量 `npm test` 与 `npm run build` 通过，`BUILD_ID` 为 `autopilot-maintainability.202604160053`
+- **最近验证**: `R115` 已确认 focused `OpenCodeStreamingRuntimeCoordinator.test.ts`、全量 `npm test` 与 `npm run build` 通过，`BUILD_ID` 为 `autopilot-maintainability.202604160102`
 - **最近 Test Vault 部署**: `R64`，`BUILD_ID` `autopilot-maintainability.202604150602`
-- **当前 `[NEXT]`**: `R115 - OpenCodeStreamingRuntimeCoordinator finalization residual seam`
-- **主热点**: `src/core/opencode/OpenCodeStreamingRuntimeCoordinator.ts` 现已完成 legacy SSE payload parse 调用侧收口；下一步继续收束 final assistant lookup、completion fallback、final debug logging 与 post-finish cleanup residual
+- **当前 `[NEXT]`**: `R116 - OpenCodeStreamingRuntimeCoordinator active-context / cancel-detach seam`
+- **主热点**: `src/core/opencode/OpenCodeStreamingRuntimeCoordinator.ts` 现已完成 finalization outcome orchestration residual 收口；下一步继续收束 active-context register/cleanup、cancel-detach、abort follow-up 与 runtime disposal residual
 
 ## 3. 本批执行规则
 

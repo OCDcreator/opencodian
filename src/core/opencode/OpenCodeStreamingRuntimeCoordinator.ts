@@ -46,6 +46,12 @@ interface OpenCodeStreamingAssistantTail {
   parts: Part[];
 }
 
+interface OpenCodeStreamingFinalizationOutcome {
+  assistantMessageId: string | null;
+  chunks: StreamChunk[];
+  finalContent: string;
+}
+
 export interface OpenCodeStreamingRuntimeEventTransformer {
   handleStreamingEvent(
     eventData: OpenCodeStreamEvent,
@@ -448,24 +454,9 @@ export class OpenCodeStreamingRuntimeCoordinator {
     lastContent: string,
     priorErrorMessage: string | null = null,
   ): AsyncGenerator<StreamChunk> {
-    const cursor: OpenCodeStreamingFinalizationCursor = {
-      lastContent,
-      priorErrorMessage,
-    };
-
-    logAssistantFinalizationDebug('service-finish-start', {
-      sessionId,
-      lastContentLength: cursor.lastContent.length,
-      lastContentPreview: getDebugTextPreview(cursor.lastContent, 120),
-      priorErrorMessage: cursor.priorErrorMessage,
-    });
-
-    const assistantTail = await this.loadAssistantTail(sessionId);
-    if (assistantTail) {
-      yield* this.emitAssistantFinalization(sessionId, assistantTail, cursor);
-    }
-
-    this.logFinalizationStop(sessionId, assistantTail?.info.id ?? null, cursor.lastContent);
+    const outcome = await this.buildFinalizationOutcome(sessionId, lastContent, priorErrorMessage);
+    yield* outcome.chunks;
+    this.logFinalizationStop(sessionId, outcome.assistantMessageId, outcome.finalContent);
     yield { type: 'message_stop' };
   }
 
@@ -631,6 +622,34 @@ export class OpenCodeStreamingRuntimeCoordinator {
     context.state.buffer = '';
   }
 
+  private async buildFinalizationOutcome(
+    sessionId: string,
+    lastContent: string,
+    priorErrorMessage: string | null,
+  ): Promise<OpenCodeStreamingFinalizationOutcome> {
+    const cursor: OpenCodeStreamingFinalizationCursor = {
+      lastContent,
+      priorErrorMessage,
+    };
+
+    this.logFinalizationStart(sessionId, cursor);
+
+    const assistantTail = await this.loadAssistantTail(sessionId);
+    if (!assistantTail) {
+      return {
+        assistantMessageId: null,
+        chunks: [],
+        finalContent: cursor.lastContent,
+      };
+    }
+
+    return {
+      assistantMessageId: assistantTail.info.id,
+      chunks: this.buildAssistantFinalizationChunks(sessionId, assistantTail, cursor),
+      finalContent: cursor.lastContent,
+    };
+  }
+
   private async loadAssistantTail(sessionId: string): Promise<OpenCodeStreamingAssistantTail | null> {
     try {
       const messages = await this.host.getSessionMessages(sessionId);
@@ -688,26 +707,20 @@ export class OpenCodeStreamingRuntimeCoordinator {
     return null;
   }
 
-  private *emitAssistantFinalization(
+  private buildAssistantFinalizationChunks(
     sessionId: string,
     assistantTail: OpenCodeStreamingAssistantTail,
     cursor: OpenCodeStreamingFinalizationCursor,
-  ): Generator<StreamChunk, void, void> {
-    if (this.shouldEmitAssistantError(assistantTail, cursor)) {
-      logAssistantFinalizationDebug('service-finish-emitting-assistant-error', {
-        sessionId,
-        assistantMessageId: assistantTail.info.id,
-        assistantError: assistantTail.assistantError,
-      });
-      yield {
-        type: 'error',
-        content: assistantTail.assistantError ?? '',
-      };
-      cursor.priorErrorMessage = assistantTail.assistantError;
+  ): StreamChunk[] {
+    const chunks: StreamChunk[] = [];
+    const errorChunk = this.buildAssistantErrorChunk(sessionId, assistantTail, cursor);
+    if (errorChunk) {
+      chunks.push(errorChunk);
     }
 
-    yield* this.emitAssistantTrailingText(sessionId, assistantTail, cursor);
-    yield this.buildAssistantMetadataChunk(sessionId, assistantTail, cursor.lastContent.length);
+    chunks.push(...this.collectAssistantTrailingTextChunks(sessionId, assistantTail, cursor));
+    chunks.push(this.buildAssistantMetadataChunk(sessionId, assistantTail, cursor.lastContent.length));
+    return chunks;
   }
 
   private shouldEmitAssistantError(
@@ -721,11 +734,33 @@ export class OpenCodeStreamingRuntimeCoordinator {
     );
   }
 
-  private *emitAssistantTrailingText(
+  private buildAssistantErrorChunk(
     sessionId: string,
     assistantTail: OpenCodeStreamingAssistantTail,
     cursor: OpenCodeStreamingFinalizationCursor,
-  ): Generator<StreamChunk, void, void> {
+  ): StreamChunk | null {
+    if (!this.shouldEmitAssistantError(assistantTail, cursor)) {
+      return null;
+    }
+
+    logAssistantFinalizationDebug('service-finish-emitting-assistant-error', {
+      sessionId,
+      assistantMessageId: assistantTail.info.id,
+      assistantError: assistantTail.assistantError,
+    });
+    cursor.priorErrorMessage = assistantTail.assistantError;
+    return {
+      type: 'error',
+      content: assistantTail.assistantError ?? '',
+    };
+  }
+
+  private collectAssistantTrailingTextChunks(
+    sessionId: string,
+    assistantTail: OpenCodeStreamingAssistantTail,
+    cursor: OpenCodeStreamingFinalizationCursor,
+  ): StreamChunk[] {
+    const chunks: StreamChunk[] = [];
     for (const part of assistantTail.parts) {
       if (part.type !== 'text' || typeof part.text !== 'string') {
         continue;
@@ -746,9 +781,23 @@ export class OpenCodeStreamingRuntimeCoordinator {
         nextLength: currentText.length,
         deltaPreview: getDebugTextPreview(delta, 120),
       });
-      yield { type: 'text', content: delta };
+      chunks.push({ type: 'text', content: delta });
       cursor.lastContent = currentText;
     }
+
+    return chunks;
+  }
+
+  private logFinalizationStart(
+    sessionId: string,
+    cursor: OpenCodeStreamingFinalizationCursor,
+  ): void {
+    logAssistantFinalizationDebug('service-finish-start', {
+      sessionId,
+      lastContentLength: cursor.lastContent.length,
+      lastContentPreview: getDebugTextPreview(cursor.lastContent, 120),
+      priorErrorMessage: cursor.priorErrorMessage,
+    });
   }
 
   private buildAssistantMetadataChunk(

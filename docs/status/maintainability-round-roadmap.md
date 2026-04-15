@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的 `[NEXT]`”。
-> **当前状态**: [READY] `R114` 已完成；`R115-R137` 长队列继续排队，当前首个 `[NEXT]` 为 `R115 - OpenCodeStreamingRuntimeCoordinator finalization residual seam`。
+> **当前状态**: [READY] `R115` 已完成；`R116-R137` 长队列继续排队，当前首个 `[NEXT]` 为 `R116 - OpenCodeStreamingRuntimeCoordinator active-context / cancel-detach seam`。
 
 ## 控制规则
 
@@ -18,7 +18,7 @@
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
 - 当前 live lint 基线：`0 errors / 65 warnings`
 - 最近成功 phase：`docs/status/maintainability-phase-449.md`
-- 当前路线判断：`R114` 已完成 OpenCodeStreamEventTransformer payload/SSE-parse seam，确认 legacy SSE payload JSON parse 与 invalid chunk shielding 已回收进 transformer 解析 seam；当前必须从 `R115` 的 finalization residual 顺序执行，不得 freestyle。
+- 当前路线判断：`R115` 已完成 OpenCodeStreamingRuntimeCoordinator finalization residual seam，确认 finalization start logging、assistant tail completion planning 与 post-finish stop payload 已回收进单一 outcome seam；当前必须从 `R116` 的 active-context / cancel-detach residual 顺序执行，不得 freestyle。
 
 ## Queue
 ## Queue
@@ -1078,7 +1078,7 @@
 - **禁止项**: 不改变 raw chunk parse 顺序、invalid event 容错、legacy SSE fallback 语义。
 - **验收**: payload/SSE-parse residual 责任更集中。；并通过全量 `npm test` 与 `npm run build`。
 
-### [NEXT] R115 - OpenCodeStreamingRuntimeCoordinator finalization residual seam
+### [DONE] R115 - OpenCodeStreamingRuntimeCoordinator finalization residual seam
 
 - **Lane**: Maintainability / opencode stream finalization
 - **目标**: 继续收束 final assistant lookup、completion fallback、final debug logging 与 post-finish cleanup residual。
@@ -1088,7 +1088,7 @@
 - **禁止项**: 不改变 final response completion、structured assistant-error fallback、message completion 语义。
 - **验收**: finalization residual orchestration 继续减少。；并通过全量 `npm test` 与 `npm run build`。
 
-### [QUEUED] R116 - OpenCodeStreamingRuntimeCoordinator active-context / cancel-detach seam
+### [NEXT] R116 - OpenCodeStreamingRuntimeCoordinator active-context / cancel-detach seam
 
 - **Lane**: Maintainability / opencode stream runtime
 - **目标**: 收束 active-context register/cleanup、cancel-detach、abort follow-up 与 runtime disposal residual。

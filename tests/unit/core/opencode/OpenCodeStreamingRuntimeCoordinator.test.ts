@@ -422,6 +422,73 @@ describe('OpenCodeStreamingRuntimeCoordinator', () => {
     ]);
   });
 
+  it('uses the latest assistant message even when a trailing user message exists', async () => {
+    const host = createHost({
+      getSessionMessages: jest.fn().mockResolvedValue([
+        {
+          info: {
+            id: 'assistant-latest',
+            sessionID: 'sdk-latest-assistant',
+            role: 'assistant',
+            providerID: 'openai',
+            modelID: 'gpt-5',
+            time: { created: 1234567893 },
+          },
+          parts: [
+            {
+              id: 'part-latest',
+              sessionID: 'sdk-latest-assistant',
+              messageID: 'assistant-latest',
+              type: 'text',
+              text: 'Recovered assistant tail',
+            },
+          ],
+        },
+        {
+          info: {
+            id: 'user-after-assistant',
+            sessionID: 'sdk-latest-assistant',
+            role: 'user',
+            time: { created: 1234567894 },
+          },
+          parts: [
+            {
+              id: 'user-part',
+              sessionID: 'sdk-latest-assistant',
+              messageID: 'user-after-assistant',
+              type: 'text',
+              text: 'A later user message should not replace the assistant tail',
+            },
+          ],
+        },
+      ]),
+    });
+    const coordinator = new OpenCodeStreamingRuntimeCoordinator(host);
+    const chunks: unknown[] = [];
+
+    for await (const chunk of coordinator.streamSdkResponse({
+      sessionId: 'sdk-latest-assistant',
+      startPrompt: jest.fn().mockResolvedValue(undefined),
+      subscribe: jest.fn().mockResolvedValue((async function* () {
+        yield* [];
+      })()),
+    })) {
+      chunks.push(chunk);
+    }
+
+    expect(chunks).toEqual([
+      { type: 'message_start' },
+      { type: 'text', content: 'Recovered assistant tail' },
+      {
+        type: 'message_metadata',
+        messageId: 'assistant-latest',
+        timestamp: 1234567893,
+        modelId: 'openai/gpt-5',
+      },
+      { type: 'message_stop' },
+    ]);
+  });
+
   it('emits assistant error fallback when finalization finds a structured assistant error', async () => {
     const host = createHost({
       getSessionMessages: jest.fn().mockResolvedValue([
@@ -464,6 +531,69 @@ describe('OpenCodeStreamingRuntimeCoordinator', () => {
         type: 'message_metadata',
         messageId: 'assistant-error',
         timestamp: 1234567892,
+        modelId: 'openai/gpt-5',
+      },
+      { type: 'message_stop' },
+    ]);
+  });
+
+  it('does not duplicate assistant error fallback after the stream already emitted one', async () => {
+    const host = createHost({
+      getSessionMessages: jest.fn().mockResolvedValue([
+        {
+          info: {
+            id: 'assistant-error-repeat',
+            sessionID: 'sdk-error-repeat',
+            role: 'assistant',
+            providerID: 'openai',
+            modelID: 'gpt-5',
+            time: { created: 1234567895 },
+            error: {
+              data: {
+                message: 'Rate limit hit',
+                statusCode: 429,
+              },
+            },
+          },
+          parts: [],
+        },
+      ]),
+      streamEventTransformer: {
+        handleStreamingEvent: jest.fn().mockImplementation((
+          _event: OpenCodeStreamEvent,
+          _sessionId: string,
+          state: OpenCodeStreamEventState,
+        ) => {
+          state.lastErrorMessage = 'Rate limit hit (HTTP 429)';
+          return {
+            chunks: [{ type: 'error', content: 'Rate limit hit (HTTP 429)' }],
+            stop: false,
+          };
+        }),
+        parseSSEEventPayload: jest.fn().mockReturnValue(null),
+        parseSSEEvents: jest.fn().mockReturnValue({ events: [], remaining: '' }),
+      },
+    });
+    const coordinator = new OpenCodeStreamingRuntimeCoordinator(host);
+    const chunks: unknown[] = [];
+
+    for await (const chunk of coordinator.streamSdkResponse({
+      sessionId: 'sdk-error-repeat',
+      startPrompt: jest.fn().mockResolvedValue(undefined),
+      subscribe: jest.fn().mockResolvedValue((async function* () {
+        yield { type: 'ignored' } as never;
+      })()),
+    })) {
+      chunks.push(chunk);
+    }
+
+    expect(chunks).toEqual([
+      { type: 'message_start' },
+      { type: 'error', content: 'Rate limit hit (HTTP 429)' },
+      {
+        type: 'message_metadata',
+        messageId: 'assistant-error-repeat',
+        timestamp: 1234567895,
         modelId: 'openai/gpt-5',
       },
       { type: 'message_stop' },

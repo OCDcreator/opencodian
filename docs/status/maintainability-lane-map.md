@@ -1,19 +1,19 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [READY] `R115-R137` 长队列继续推进；当前 `[NEXT]` 为 `R115 - OpenCodeStreamingRuntimeCoordinator finalization residual seam`。
+> **当前状态**: [READY] `R116-R137` 长队列继续推进；当前 `[NEXT]` 为 `R116 - OpenCodeStreamingRuntimeCoordinator active-context / cancel-detach seam`。
 
 ## 当前优先级
 
-- **当前 `[NEXT]`**：`R115 - OpenCodeStreamingRuntimeCoordinator finalization residual seam`
-- **本批目标**：`R114` 已把 legacy SSE payload parse 与 invalid-chunk shielding 继续收口到 transformer 解析 seam；现在继续 batch 6，推进 final assistant lookup / completion fallback / final debug logging residual
+- **当前 `[NEXT]`**：`R116 - OpenCodeStreamingRuntimeCoordinator active-context / cancel-detach seam`
+- **本批目标**：`R115` 已把 finalization start logging、assistant tail completion planning 与 post-finish stop payload 收口到 outcome seam；现在继续 batch 6，推进 active-context register/cleanup、cancel-detach、abort follow-up 与 runtime disposal residual
 - **当前 lint 基线**：`0 errors / 65 warnings`
 - **热点顺序**：
   1. `src/core/opencode/OpenCodeStreamingRuntimeCoordinator.ts`
-  2. `tests/unit/core/opencode/OpenCodeStreamingRuntimeCoordinator.test.ts`
-  3. `src/core/opencode/OpenCodeStreamEventTransformer.ts`
+  2. `src/core/opencode/OpenCodeService.ts`
+  3. `tests/unit/core/opencode/OpenCodeStreamingRuntimeCoordinator.test.ts`
   4. `docs/status/maintainability-round-roadmap.md`
-  5. `docs/status/maintainability-phase-449.md`
+  5. `docs/status/maintainability-phase-450.md`
 
 ## 本批边界
 
