@@ -1,21 +1,21 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [READY] `R126` 已完成；`R127-R137` 长队列继续推进，当前 `[NEXT]` 为 `R127 - Checkpoint after settings/main seams`。
+> **当前状态**: [READY] `R127` 已完成；`R128-R137` 长队列继续推进，当前 `[NEXT]` 为 `R128 - OpenCodeService heavy suite split follow-up A`。
 
 ## 当前优先级
 
-- **当前 `[NEXT]`**：`R127 - Checkpoint after settings/main seams`
-- **本批目标**：`R126` 已完成 `main.ts` startup normalization seam；当前先复盘 Batch 8 settings/main residual 收益，再切入 Batch 9 heavy tests
+- **当前 `[NEXT]`**：`R128 - OpenCodeService heavy suite split follow-up A`
+- **本批目标**：`R127` 已完成 Batch 8 settings/main residual checkpoint；当前切入 Batch 9 heavy tests，并从 OpenCodeService bootstrap/lifecycle/session runtime tests 开始
 - **当前 lint 基线**：`0 errors / 65 warnings`
 - **热点顺序**：
-  1. `docs/status/maintainability-master-plan.md`
-  2. `docs/status/maintainability-round-roadmap.md`
-  3. `docs/status/maintainability-phase-461.md`
+  1. `tests/unit/core/opencode/OpenCodeService.test.ts`
+  2. `tests/unit/core/opencode/OpenCodeServiceLifecycleCoordinator.test.ts`
+  3. `docs/status/maintainability-round-roadmap.md`
 
 ## 本批边界
 
-- autopilot 只能按 `R127 -> R137` 顺序推进
+- autopilot 只能按 `R128 -> R137` 顺序推进
 - 不新增薄 helper / adapter / provider / factory；新 owner 必须覆盖完整 lifecycle / runtime seam
 - `OpenCodeService`、`OpenCodianView`、`OpenCodianSettings` 的 maintainability 仅允许在 queue 明示项内继续推进
 - heavy tests follow-up 只允许按责任域收口，不允许为了降 warning 去篡改覆盖语义
@@ -33,5 +33,5 @@
 ## 历史入口
 
 - 批次归档：`docs/status/maintainability-completed-batches.md`
-- 最近成功 phase：`docs/status/maintainability-phase-461.md`
-- 最近 checkpoint：`docs/status/maintainability-phase-457.md`
+- 最近成功 phase：`docs/status/maintainability-phase-462.md`
+- 最近 checkpoint：`docs/status/maintainability-phase-462.md`

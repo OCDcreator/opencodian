@@ -2,19 +2,19 @@
 
 > **状态**: [READY]
 > **作用**: 这是 maintainability 无人值守的战略文档。每轮开始前，先读本文件，再读 `docs/status/maintainability-round-roadmap.md` 与最近的 `docs/status/maintainability-phase-XXX.md`。
-> **自动推进状态**: `R126` 已完成 plugin startup residual 项；当前继续按 `R127-R137` 长队列顺序推进。恢复 autopilot 后只能从首个 `[NEXT]`（`R127`）顺序执行，不允许 freestyle。
+> **自动推进状态**: `R127` 已完成 settings/main checkpoint；当前继续按 `R128-R137` 长队列顺序推进。恢复 autopilot 后只能从首个 `[NEXT]`（`R128`）顺序执行，不允许 freestyle。
 
 ## 1. 当前判断
 
-**当前分支已完成 `R68-R126` 并把 live lint 稳定在 `0 errors / 65 warnings`；`R126` 已把 `main.ts` 的 startup orchestration 收束到更清晰的 preload/runtime/registration owner seam，并把 loaded-settings persist 判定集中到单一 bootstrap state。** 接下来先执行 `R127` checkpoint，复盘 Batch 8 settings/main residual 收益，再进入 heavy tests follow-up、warning closeout 与最终 checkpoint。
+**当前分支已完成 `R68-R127` 并把 live lint 稳定在 `0 errors / 65 warnings`；`R127` 已复盘 `R123-R126` 的 settings/main residual 收益，确认 model/style settings attach、model config modal editor/render 与 `main.ts` startup residual 已完成 Batch 8 收束。** 接下来进入 `R128` 的 OpenCodeService heavy suite split follow-up A，再按 heavy tests follow-up、warning closeout 与最终 checkpoint 顺序推进。
 
 ## 2. 当前基线
 
 - **lint**: `0 errors / 65 warnings`
-- **最近验证**: `R126` 已确认 focused `main` startup suites、全量 `npm test` 与 `npm run build` 通过，`BUILD_ID` 为 `autopilot-maintainability.202604160258`
-- **最近 Test Vault 部署**: `R126`，`BUILD_ID` `autopilot-maintainability.202604160258`
-- **当前 `[NEXT]`**: `R127 - Checkpoint after settings/main seams`
-- **主热点**: `R126` 已完成 `main.ts` startup normalization seam；下一步先做 settings/main residual checkpoint，再进入 Batch 9 heavy test split wave
+- **最近验证**: `R127` 已确认全量 `npm test` 与 `npm run build` 通过，`BUILD_ID` 为 `autopilot-maintainability.202604160305`
+- **最近 Test Vault 部署**: `R126`，`BUILD_ID` `autopilot-maintainability.202604160258`（`R127` 仅改 checkpoint 文档，未触发部署）
+- **当前 `[NEXT]`**: `R128 - OpenCodeService heavy suite split follow-up A`
+- **主热点**: `R127` 已完成 settings/main residual checkpoint；下一步进入 Batch 9，从 OpenCodeService bootstrap/lifecycle/session runtime heavy suites 拆分开始
 
 ## 3. 本批执行规则
 
