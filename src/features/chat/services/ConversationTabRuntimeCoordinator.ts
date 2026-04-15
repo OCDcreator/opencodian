@@ -17,6 +17,13 @@ import {
   type TabMessagesPaneState,
 } from './TabMessagesPaneCoordinator';
 
+export interface ConversationTabRuntimeState extends TabMessagesPaneRuntimeState {
+  currentTurnBodyEl: HTMLElement | null;
+  backgroundTaskIndicatorEl: HTMLElement | null;
+  backgroundTaskInlineEls: Map<string, HTMLElement>;
+  turnBodyByAnchorKey: Map<string, HTMLElement>;
+}
+
 export interface ConversationTabRuntimeCoordinatorHost {
   getMaxTabs(): number;
   getTabManager(): TabManager | null;
@@ -52,7 +59,7 @@ export interface ConversationTabRuntimeCoordinatorPorts {
 }
 
 export class ConversationTabRuntimeCoordinator<
-  Runtime extends TabMessagesPaneRuntimeState = TabMessagesPaneRuntimeState,
+  Runtime extends ConversationTabRuntimeState = ConversationTabRuntimeState,
 > {
   constructor(
     private readonly host: ConversationTabRuntimeCoordinatorHost,
@@ -175,6 +182,55 @@ export class ConversationTabRuntimeCoordinator<
     messagesEl: HTMLElement | null = this.getPaneState(tabId)?.messagesEl ?? null,
   ): boolean {
     return this.paneCoordinator.syncScrollMetrics(tabId, messagesEl);
+  }
+
+  resetTurnState(tabId: TabId | null = this.getActiveTabId()): void {
+    const runtime = this.getRuntimeState(tabId);
+    if (!runtime) {
+      return;
+    }
+
+    runtime.currentTurnBodyEl = null;
+    runtime.backgroundTaskIndicatorEl = null;
+    runtime.turnBodyByAnchorKey.clear();
+    runtime.backgroundTaskInlineEls.clear();
+  }
+
+  createTurn(
+    tabId: TabId | null = this.getActiveTabId(),
+  ): { turnEl: HTMLElement; headerEl: HTMLElement; bodyEl: HTMLElement } | null {
+    const paneState = this.getPaneState(tabId);
+    if (!paneState) {
+      return null;
+    }
+
+    const turnEl = paneState.messagesEl.createDiv({ cls: 'opencodian-turn' });
+    const headerEl = turnEl.createDiv({ cls: 'opencodian-turn-header' });
+    const bodyEl = turnEl.createDiv({ cls: 'opencodian-turn-body' });
+
+    paneState.runtime.currentTurnBodyEl = bodyEl;
+
+    return { turnEl, headerEl, bodyEl };
+  }
+
+  ensureTurnBody(tabId: TabId | null = this.getActiveTabId()): HTMLElement | null {
+    const paneState = this.getPaneState(tabId);
+    if (!paneState) {
+      return null;
+    }
+
+    if (paneState.runtime.currentTurnBodyEl?.isConnected) {
+      return paneState.runtime.currentTurnBodyEl;
+    }
+
+    const turnEl = paneState.messagesEl.createDiv({
+      cls: 'opencodian-turn opencodian-turn--assistant-only',
+    });
+    const bodyEl = turnEl.createDiv({ cls: 'opencodian-turn-body' });
+
+    paneState.runtime.currentTurnBodyEl = bodyEl;
+
+    return bodyEl;
   }
 
   isActiveTabStreaming(): boolean {

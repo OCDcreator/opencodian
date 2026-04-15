@@ -4,15 +4,15 @@ import {
   ConversationTabRuntimeCoordinator,
   type ConversationTabRuntimeCoordinatorHost,
   type ConversationTabRuntimeCoordinatorPorts,
+  type ConversationTabRuntimeState,
 } from '../../../../src/features/chat/services/ConversationTabRuntimeCoordinator';
 import {
   type TabMessagesPaneCoordinator,
-  type TabMessagesPaneRuntimeState,
   type TabMessagesPaneState,
 } from '../../../../src/features/chat/services/TabMessagesPaneCoordinator';
 import type { TabBar, TabId, TabManager } from '../../../../src/features/chat/tabs';
 
-interface TestRuntimeState extends TabMessagesPaneRuntimeState {
+interface TestRuntimeState extends ConversationTabRuntimeState {
   label?: string;
 }
 
@@ -24,6 +24,10 @@ function createRuntimeState(overrides: Partial<TestRuntimeState> = {}): TestRunt
     isHydratingConversation: false,
     pendingLayoutMutations: 0,
     isStreaming: false,
+    currentTurnBodyEl: null,
+    backgroundTaskIndicatorEl: null,
+    backgroundTaskInlineEls: new Map(),
+    turnBodyByAnchorKey: new Map(),
     ...overrides,
   };
 }
@@ -216,5 +220,40 @@ describe('ConversationTabRuntimeCoordinator', () => {
     expect(fixture.coordinator.isTabForegroundBusy('tab-streaming')).toBe(true);
     expect(fixture.coordinator.isTabForegroundBusy('tab-retry')).toBe(true);
     expect(fixture.host.getTabSessionStatus).toHaveBeenCalledWith('tab-retry', 'tab-retry-session');
+  });
+
+  it('owns turn-body reset, creation, and reuse for tab panes', () => {
+    const fixture = createFixture();
+    const paneState = fixture.pane.coordinator.ensurePane('tab-1');
+    document.body.appendChild(paneState.messagesEl);
+    paneState.runtime.backgroundTaskIndicatorEl = document.createElement('div');
+    paneState.runtime.backgroundTaskInlineEls.set('background-task', document.createElement('div'));
+    paneState.runtime.turnBodyByAnchorKey.set('anchor', document.createElement('div'));
+
+    const turn = fixture.coordinator.createTurn('tab-1');
+    const reusedBody = fixture.coordinator.ensureTurnBody('tab-1');
+
+    expect(turn).not.toBeNull();
+    expect(turn?.turnEl.classList.contains('opencodian-turn')).toBe(true);
+    expect(turn?.headerEl.classList.contains('opencodian-turn-header')).toBe(true);
+    expect(turn?.bodyEl.classList.contains('opencodian-turn-body')).toBe(true);
+    expect(reusedBody).toBe(turn?.bodyEl);
+    expect(paneState.runtime.currentTurnBodyEl).toBe(turn?.bodyEl);
+
+    turn?.turnEl.remove();
+    const assistantOnlyBody = fixture.coordinator.ensureTurnBody('tab-1');
+
+    expect(assistantOnlyBody).not.toBeNull();
+    expect(assistantOnlyBody).not.toBe(turn?.bodyEl);
+    expect(assistantOnlyBody?.parentElement?.classList.contains(
+      'opencodian-turn--assistant-only',
+    )).toBe(true);
+
+    fixture.coordinator.resetTurnState('tab-1');
+
+    expect(paneState.runtime.currentTurnBodyEl).toBeNull();
+    expect(paneState.runtime.backgroundTaskIndicatorEl).toBeNull();
+    expect(paneState.runtime.backgroundTaskInlineEls.size).toBe(0);
+    expect(paneState.runtime.turnBodyByAnchorKey.size).toBe(0);
   });
 });

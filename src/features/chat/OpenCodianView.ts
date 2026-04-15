@@ -2925,48 +2925,17 @@ export class OpenCodianView extends ItemView {
 
   /** Reset active turn references */
   private resetTurnState(tabId: TabId | null = this.getActiveTabId()): void {
-    const runtime = this.getTabRuntimeState(tabId);
-    if (!runtime) {
-      return;
-    }
-
-    runtime.currentTurnBodyEl = null;
-    runtime.backgroundTaskIndicatorEl = null;
-    runtime.turnBodyByAnchorKey.clear();
-    runtime.backgroundTaskInlineEls.clear();
+    this.conversationTabRuntimeCoordinator.resetTurnState(tabId);
   }
 
   /** Create a new turn with sticky user header */
   private createTurn(tabId: TabId | null = this.getActiveTabId()): { turnEl: HTMLElement; headerEl: HTMLElement; bodyEl: HTMLElement } | null {
-    const paneState = this.getTabPaneState(tabId);
-    if (!paneState) return null;
-
-    const turnEl = paneState.messagesEl.createDiv({ cls: 'opencodian-turn' });
-    const headerEl = turnEl.createDiv({ cls: 'opencodian-turn-header' });
-    const bodyEl = turnEl.createDiv({ cls: 'opencodian-turn-body' });
-
-    paneState.runtime.currentTurnBodyEl = bodyEl;
-
-    return { turnEl, headerEl, bodyEl };
+    return this.conversationTabRuntimeCoordinator.createTurn(tabId);
   }
 
   /** Ensure there is a turn body available for assistant messages */
   private ensureTurnBody(tabId: TabId | null = this.getActiveTabId()): HTMLElement | null {
-    const paneState = this.getTabPaneState(tabId);
-    if (!paneState) return null;
-
-    if (paneState.runtime.currentTurnBodyEl?.isConnected) {
-      return paneState.runtime.currentTurnBodyEl;
-    }
-
-    const turnEl = paneState.messagesEl.createDiv({
-      cls: 'opencodian-turn opencodian-turn--assistant-only',
-    });
-    const bodyEl = turnEl.createDiv({ cls: 'opencodian-turn-body' });
-
-    paneState.runtime.currentTurnBodyEl = bodyEl;
-
-    return bodyEl;
+    return this.conversationTabRuntimeCoordinator.ensureTurnBody(tabId);
   }
 
   private getMessageAnchorKey(message: ChatMessage): string {

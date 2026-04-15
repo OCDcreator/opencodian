@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个标记为 `[NEXT]` 的任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成 `[NEXT]`；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的 `[NEXT]`”。
-> **当前状态**: [READY] `R87` checkpoint 已完成；`R88-R137` 长队列已人工续排，当前首个 `[NEXT]` 为 `R88 - OpenCodianView tab pane/runtime residual seam`。
+> **当前状态**: [READY] `R88` 已完成；`R89-R137` 长队列继续排队，当前首个 `[NEXT]` 为 `R89 - OpenCodianView conversation load/recovery residual seam`。
 
 ## 控制规则
 
@@ -17,8 +17,8 @@
 
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
 - 当前 live lint 基线：`0 errors / 64 warnings`
-- 最近成功 phase：`docs/status/maintainability-phase-422.md`
-- 当前路线判断：`R68-R87` 已完成并自然停回人工续排态；当前已明确续排 `R88-R137`，必须从 `R88` 顺序执行，不得 freestyle。
+- 最近成功 phase：`docs/status/maintainability-phase-423.md`
+- 当前路线判断：`R88` 已完成并把 tab pane/runtime turn-body residual 继续收口到现有 coordinator；当前已明确续排 `R89-R137`，必须从 `R89` 顺序执行，不得 freestyle。
 
 ## Queue
 ## Queue
@@ -788,7 +788,7 @@
 
 - **批次目标**: 继续处理 OpenCodianView residual lifecycle/runtime seam，只沿既有 owner 周边收口。
 
-### [NEXT] R88 - OpenCodianView tab pane/runtime residual seam
+### [DONE] R88 - OpenCodianView tab pane/runtime residual seam
 
 - **Lane**: Maintainability / chat runtime
 - **目标**: 继续围绕 tab pane/runtime lifecycle residual 收口，只沿现有 coordinator 压缩 view 直连。
@@ -798,7 +798,7 @@
 - **禁止项**: 不改变并发 tab/session streaming、hydration/auth-sync gate、scroll restore 与 background-task completion notice。
 - **验收**: view 对 tab runtime 的残余直连继续减少。；并通过全量 `npm test` 与 `npm run build`。
 
-### [QUEUED] R89 - OpenCodianView conversation load/recovery residual seam
+### [NEXT] R89 - OpenCodianView conversation load/recovery residual seam
 
 - **Lane**: Maintainability / chat runtime
 - **目标**: 继续收束 create/load/fork/rewind/delete recovery 的 post-load apply 与 restore gating residual。
@@ -1325,4 +1325,3 @@
 - **验收**: phase 文档明确记录 R88-R136 收益与是否仍需人工续排。；并通过全量 `npm test` 与 `npm run build`。
 
 当 `R137` 完成且没有新的 `[QUEUED]` 时，必须明确写回“当前没有可自动执行的 `[NEXT]`”。
-
