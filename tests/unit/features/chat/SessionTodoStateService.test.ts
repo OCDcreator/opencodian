@@ -36,6 +36,30 @@ describe('SessionTodoStateService', () => {
     };
   }
 
+  function createStaleIncompleteRuntime(): SessionTodoStateRuntime {
+    return createRuntime({
+      sessionTodos: [
+        { content: 'Investigate sync issue', status: 'in_progress' },
+      ],
+      sessionTodoFingerprint: JSON.stringify([
+        {
+          id: null,
+          content: 'Investigate sync issue',
+          status: 'in_progress',
+          priority: null,
+        },
+      ]),
+      sessionTodoLastChangedAt: Date.now() - 121_000,
+      sessionStatusLastChangedAt: Date.now() - 121_000,
+      backgroundTaskStartedAt: Date.now() - 121_000,
+    });
+  }
+
+  async function flushPendingNoticeTasks(): Promise<void> {
+    await Promise.resolve();
+    await Promise.resolve();
+  }
+
   function createFixture(options: {
     runtime?: SessionTodoStateRuntime;
     conversation?: Conversation | null;
@@ -102,22 +126,7 @@ describe('SessionTodoStateService', () => {
   }
 
   it('suppresses stale incomplete todos after prolonged inactivity', () => {
-    const runtime = createRuntime({
-      sessionTodos: [
-        { content: 'Investigate sync issue', status: 'in_progress' },
-      ],
-      sessionTodoFingerprint: JSON.stringify([
-        {
-          id: null,
-          content: 'Investigate sync issue',
-          status: 'in_progress',
-          priority: null,
-        },
-      ]),
-      sessionTodoLastChangedAt: Date.now() - 121_000,
-      sessionStatusLastChangedAt: Date.now() - 121_000,
-      backgroundTaskStartedAt: Date.now() - 121_000,
-    });
+    const runtime = createStaleIncompleteRuntime();
     const { service, renderSessionTodoDock } = createFixture({ runtime });
 
     const staleTodos = service.suppressStaleSessionTodosIfNeeded('tab-1');
@@ -128,6 +137,28 @@ describe('SessionTodoStateService', () => {
     expect(runtime.sessionTodoSuppressedFingerprint).toBe(runtime.sessionTodoFingerprint);
     expect(runtime.sessionTodos).toEqual([]);
     expect(renderSessionTodoDock).toHaveBeenCalledWith('tab-1');
+  });
+
+  it('appends a stale notice after suppressing a stale snapshot', async () => {
+    const runtime = createStaleIncompleteRuntime();
+    const conversation = createConversation();
+    const { service, appendPersistentAssistantNoticeMessage } = createFixture({
+      runtime,
+      conversation,
+    });
+
+    service.reconcileStaleSessionTodoState('tab-1');
+    await flushPendingNoticeTasks();
+
+    const content = service.buildStaleSessionTodoNoticeContent([
+      { content: 'Investigate sync issue', status: 'in_progress' },
+    ]);
+    expect(appendPersistentAssistantNoticeMessage).toHaveBeenCalledWith({
+      title: t('chat.todo.staleTitle'),
+      content,
+      tone: 'warning',
+    });
+    expect(runtime.sessionTodoStaleNoticeFingerprint).toBe(content);
   });
 
   it('restores a previously hidden snapshot when the stale notice already exists in conversation history', () => {
@@ -165,5 +196,22 @@ describe('SessionTodoStateService', () => {
     expect(runtime.sessionTodoSuppressedFingerprint).toBeNull();
     expect(runtime.sessionTodoStaleNoticeFingerprint).toBeNull();
     expect(renderSessionTodoDock).toHaveBeenCalledWith('tab-1');
+  });
+
+  it('resets the stale notice fingerprint when notice append fails', async () => {
+    const runtime = createStaleIncompleteRuntime();
+    const conversation = createConversation();
+    const { service, appendPersistentAssistantNoticeMessage } = createFixture({
+      runtime,
+      conversation,
+    });
+    appendPersistentAssistantNoticeMessage.mockRejectedValueOnce(new Error('append failed'));
+
+    service.reconcileStaleSessionTodoState('tab-1');
+    await flushPendingNoticeTasks();
+
+    expect(appendPersistentAssistantNoticeMessage).toHaveBeenCalledTimes(1);
+    expect(runtime.sessionTodoSuppressedFingerprint).toBe(runtime.sessionTodoFingerprint);
+    expect(runtime.sessionTodoStaleNoticeFingerprint).toBeNull();
   });
 });

@@ -16,7 +16,7 @@
 ## 当前背景
 
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
-- 最近成功 phase：`docs/status/maintainability-phase-408.md`
+- 最近成功 phase：`docs/status/maintainability-phase-410.md`
 - 当前 live lint 基线：`0 errors / 79 warnings`
 - 当前路线判断：上一批已在 `R67` checkpoint 收口；当前新 batch 直接转向 chat runtime / services 与 opencode core，并把 heavy tests / warning cleanup 明确写成 `R81-R86`。
 
@@ -549,7 +549,7 @@
   - input panel appearance coordinator 的直接状态分支明显减少
   - focused validation、全量 `npm test`、`npm run build` 通过
 
-### [NEXT] R75 - SessionTodoStateService stale notice seam
+### [DONE] R75 - SessionTodoStateService stale notice seam
 
 - **Lane**: Maintainability / session todo runtime
 - **目标**: 从 `src/features/chat/services/SessionTodoStateService.ts` 收束 todo normalization、stale-age/suppression、persisted stale restore 与 stale-notice append lifecycle。
@@ -566,7 +566,7 @@
   - session todo service 的 stale-state 分支明显减少
   - focused validation、全量 `npm test`、`npm run build` 通过
 
-### [QUEUED] R76 - QuestionDockCoordinator pending runtime seam
+### [NEXT] R76 - QuestionDockCoordinator pending runtime seam
 
 - **Lane**: Maintainability / question dock runtime
 - **目标**: 从 `src/features/chat/services/QuestionDockCoordinator.ts:137` 一带收束 pending question refresh、draft answer merge、resolution action apply 与 active-tab writeback lifecycle。

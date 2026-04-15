@@ -52,7 +52,9 @@ export class SessionTodoStateService {
 
 ### stale todo 降级
 
+- `setTabSessionTodos()` 现在先统一生成 normalized snapshot，再由同一条 stale runtime seam 处理 fingerprint 变更、suppression 清理/恢复，以及 suppressed snapshot 的可见性裁剪
 - `suppressStaleSessionTodosIfNeeded()` 继续沿用原先的 inactivity timeout、session live gate 与 background-task activity 参与的 last-activity 计算
+- stale suppression 与 persisted notice append/dedupe 现在共用同一组 suppression candidate / notice target 路径，避免 snapshot hide、persisted restore 与 append retry 状态分支分散在多个入口里
 - 当 snapshot 被降级后，服务只通过 host 请求 dock 重绘与持久化 notice 追加；具体的 persisted notice append/dedupe 现已复用 `PersistentAssistantNoticeService`
 - 如果 conversation 历史里已经存在完全相同的 stale notice，服务会恢复 suppression，而不会重复写 notice
 
