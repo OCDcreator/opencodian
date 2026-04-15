@@ -2,19 +2,19 @@
 
 > **状态**: [READY]
 > **作用**: 这是 maintainability 无人值守的战略文档。每轮开始前，先读本文件，再读 `docs/status/maintainability-round-roadmap.md` 与最近的 `docs/status/maintainability-phase-XXX.md`。
-> **自动推进状态**: `R111` 已完成 transient logging/error normalization seam；当前继续按 `R112-R137` 长队列顺序推进。恢复 autopilot 后只能从首个 `[NEXT]`（`R112`）顺序执行，不允许 freestyle。
+> **自动推进状态**: `R112` 已完成 OpenCodeService residual checkpoint；当前继续按 `R113-R137` 长队列顺序推进。恢复 autopilot 后只能从首个 `[NEXT]`（`R113`）顺序执行，不允许 freestyle。
 
 ## 1. 当前判断
 
-**当前分支已完成 `R68-R111` 并把 live lint 稳定在 `0 errors / 65 warnings`；`R111` 已把 transient logging/error normalization 收束到 service-local diagnostics seam 与 shared SDK error helpers。** 接下来的高收益 residual 将先执行 `R112` checkpoint 复盘 `OpenCodeService` residual 收益，再进入 streaming / secondary core / settings / startup，最后做 heavy tests follow-up、warning closeout 与最终 checkpoint。
+**当前分支已完成 `R68-R112` 并把 live lint 稳定在 `0 errors / 65 warnings`；`R112` 已确认 `R108-R111` 把 OpenCodeService residual 收束到 lifecycle / session / diagnostics 既有 owner seams，并且已具备切入 streaming transform/runtime batch 的条件。** 接下来的高收益 residual 将进入 `R113-R116` 的 streaming transform / runtime seams，再处理 secondary core / settings / startup，最后做 heavy tests follow-up、warning closeout 与最终 checkpoint。
 
 ## 2. 当前基线
 
 - **lint**: `0 errors / 65 warnings`
-- **最近验证**: `R111` 已确认 targeted `npm test -- OpenCodeSdkFacade OpenCodeService.sdkPromptTransport`、全量 `npm test` 与 `npm run build` 通过，`BUILD_ID` 为 `autopilot-maintainability.202604160031`
+- **最近验证**: `R112` 已确认全量 `npm test` 与 `npm run build` 通过，`BUILD_ID` 为 `autopilot-maintainability.202604160038`
 - **最近 Test Vault 部署**: `R64`，`BUILD_ID` `autopilot-maintainability.202604150602`
-- **当前 `[NEXT]`**: `R112 - Checkpoint after OpenCodeService residual seams`
-- **主热点**: `docs/status/maintainability-master-plan.md` 与 `docs/status/maintainability-round-roadmap.md` 构成当前 checkpoint 入口；复盘 `R108-R111` 的 service residual 收益、验证成本与 streaming lane 准备度
+- **当前 `[NEXT]`**: `R113 - OpenCodeStreamEventTransformer event-classification residual seam`
+- **主热点**: `src/core/opencode/OpenCodeStreamEventTransformer.ts` 与 `tests/unit/core/opencode/OpenCodeStreamEventTransformer.test.ts` 构成 streaming batch 新入口；先继续收束 event classification residual，再推进 payload parse / finalization / cancel-detach seams
 
 ## 3. 本批执行规则
 
