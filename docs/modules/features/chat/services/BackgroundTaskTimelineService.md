@@ -5,24 +5,23 @@
 
 ## 概述
 
-`BackgroundTaskTimelineService` 把 `OpenCodianView` 里仍然成块耦合的 background-task timeline/runtime ownership 收束成一个 dedicated service，专门负责：
+`BackgroundTaskTimelineService` 是 background-task timeline lane 的 runtime facade。它继续向 `OpenCodianView`、inline panel、indicator coordinator 与 live-signal coordinator 暴露稳定入口，但不再直接铺开完整 message timeline assembly 细节。
 
-- 从 search-mode user injection、`toolName === 'task'` 的 tool block，以及 system reminder 组装 segment timeline
-- 在 indicator reset / conversation reload 之前统一清空 active anchor、launch/completion、waiting-for-follow-up 等 runtime state
-- 维护 launch/completion 的 pending matching、completion event 收集与 display copy 组装
-- 把 conversation 历史重建回 tab runtime 的 active anchor / launch / completion / waiting-for-follow-up 状态
-- 为 inline panel 渲染和 completion notice queue 提供统一的 segment 视图
-- 为 OMO background-task diagnostics 提供稳定的 anchor / pending / completed 快照
+当前职责集中在：
 
-它不负责 stale/stopped notice 的内容与 suppression，也不直接渲染 inline panel DOM 或编排 completion notice queue/flush；这些现在分别由 `BackgroundTaskNoticeStateService`、`BackgroundTaskInlinePanelRenderer` 和 `BackgroundTaskIndicatorCoordinator` 承接。
+- indicator reset、active anchor、launch/completion、waiting-for-follow-up 与 stale fingerprint 的 runtime 清理
+- search-mode user injection 到 active runtime indicator 的 arm 入口
+- conversation→runtime rebuild 时的 authoritative-sync gate 与 stream-like state 回写
+- inline segment renderability、suppression 过滤、inline copy / task markdown 组装
+- 向调用方保留 `collectSegments()`、`collectDiagnostics()`、`upsertLaunch()` 与 `getPendingLaunches()` 的兼容 facade
+
+它不直接拥有 task launch identity parsing、completion→pending matching 或 persisted message timeline assembly；这些分别下沉到 `BackgroundTaskTimelineLaunchService` 与 `BackgroundTaskTimelineAssemblyService`。
 
 ## 公开接口
 
 ```typescript
-export interface BackgroundTaskTimelineServiceHost {
-  getTabRuntimeState(tabId: TabId | null): BackgroundTaskTimelineRuntime | null;
+export interface BackgroundTaskTimelineServiceHost extends BackgroundTaskTimelineAssemblyHost {
   getActiveTabId(): TabId | null;
-  getMessageAnchorKey(message: ChatMessage): string;
   clearInlinePanel(tabId: TabId | null): void;
   armAuthoritativeSyncGate(tabId: TabId | null): void;
   clearAuthoritativeSyncGate(tabId: TabId | null): void;
@@ -47,28 +46,27 @@ export class BackgroundTaskTimelineService {
 
 ## 关键行为
 
-### indicator reset / runtime 清空
+### runtime lifecycle
 
-- `resetIndicatorState()` 会统一清空 inline panel、active anchor、launch/completion map、waiting-for-follow-up 与 stale notice fingerprint，并在同一处复用 authoritative-sync gate 清理与 stream-like 状态回写
-- `syncStateFromConversation()` 也会复用同一条 runtime-reset 逻辑，只是不会提前清空 inline panel，这样 conversation reload / authoritative sync 的重建和主动 reset 共用一份 field-reset 规则
+- `resetIndicatorState()` 统一清空 inline panel、active anchor、launch/completion map、waiting-for-follow-up 与 stale notice fingerprint，并同步 authoritative-sync gate 与 stream-like state。
+- `syncStateFromConversation()` 复用同一份 runtime reset，只是不提前清空 inline panel；conversation reload / authoritative sync 的 runtime rebuild 因此与主动 reset 保持一致。
+- hydration 期间如果 conversation 里仍存在 active segment，会重新 arm authoritative-sync gate，避免过早把仍在运行的 background task 降级为 stale。
 
-### timeline segment 推导
+### timeline facade
 
-- `collectSegments()` 会按 user anchor 聚合 task tool block 和 completion reminder；当 reminder 没有显式 task→launch 匹配时，会回退到最近仍 pending 的 segment
-- segment assembly 现在分成私有的 message collector、reminder target resolver、runtime merge delegate 与 pending/finalize delegate；主入口只负责高层装配顺序
-- active runtime 里的 launch/completion 也会并入同一条 timeline，避免只靠 conversation 快照时丢失尚未持久化的前台状态
-- `collectInlineSegments()` 再叠加 stale-suppression 与 renderability 过滤，让 view 拿到可直接渲染的 segment 列表
+- `collectSegments()` 与 `collectDiagnostics()` 委托 `BackgroundTaskTimelineAssemblyService`，保留原 public API 与排序/diagnostics 语义。
+- `upsertLaunch()` 与 `getPendingLaunches()` 通过 assembly/launch service 复用同一套 task id、description、completion matching 规则。
+- `collectInlineSegments()` 在 assembly 输出之上叠加 stale suppression 与 renderability 过滤，供 `BackgroundTaskInlinePanelRenderer` 直接渲染。
 
-### conversation → runtime rebuild
+### inline copy
 
-- `syncStateFromConversation()` 先清掉旧的 active anchor / launch / completion runtime，再从最新且未被 suppression 的 active segment 重建
-- hydration 期间如果仍存在 active segment，会重新 arm authoritative-sync gate；这样 reload 后不会过早把“仍在运行”的后台任务降级成 stale
-- `getPendingLaunches()` 与 `getInlineCopy()` 统一复用同一套 pending-matching / markdown copy 规则，避免 view 和 notice queue 各自维护不同的背景任务文案逻辑
+- `shouldRenderInlineSegment()` 维持原规则：all-complete 不渲染；有 pending launch 渲染；search-mode anchor 在 launch 出现前渲染 preparing 状态。
+- `getInlineCopy()` 和 `buildTasksMarkdown()` 仍留在 facade 内，保证 inline panel 与 completion queue 使用同一份可读文案。
 
-## 与 `OpenCodianView` 的边界
+## 与相邻模块的边界
 
-- `BackgroundTaskInlinePanelRenderer` 负责 inline panel 的真实 DOM 创建、位置挂载、Markdown 渲染与 mount 复用
-- `BackgroundTaskTimelineService` 负责 timeline 数据、indicator reset/runtime 清空、conversation→runtime 重建、inline copy，以及 completion segment / diagnostics 快照
-- `BackgroundTaskIndicatorCoordinator` 负责 indicator render 场景和 post-sync 场景共用的 completion notice queue/flush 顺序
-- `BackgroundTaskLiveSignalCoordinator`、`BackgroundConversationPostSyncHandoffCoordinator`、`BackgroundTaskNoticeStateService` 和 `BackgroundTaskCompletionNoticeService` 继续分别负责 live-signal gate、hidden/background post-sync handoff、stale notice state、completion notice queue state
-- 这让 P2 `question / todo / background task` lane 继续把 background-task 的核心 runtime ownership 从 `OpenCodianView` 迁到可单测服务，而不是继续把 timeline 逻辑留在主视图里
+- `BackgroundTaskTimelineAssemblyService`：负责 persisted messages + runtime state 的 segment assembly、completion event 收集与 diagnostics 快照。
+- `BackgroundTaskTimelineLaunchService`：负责 task launch upsert、`bg_*` id 抽取、description fallback、completion matching 与 pending 过滤。
+- `BackgroundTaskInlinePanelRenderer`：负责真实 DOM 创建、位置挂载、Markdown 渲染与 mount 复用。
+- `BackgroundTaskIndicatorCoordinator`：负责 indicator render 场景和 post-sync 场景共用的 completion notice queue/flush 顺序。
+- `BackgroundTaskLiveSignalCoordinator`、`BackgroundTaskNoticeStateService` 与 `BackgroundTaskCompletionNoticeService` 继续分别负责 live-signal stale follow-up、stale notice state 与 completion notice queue state。

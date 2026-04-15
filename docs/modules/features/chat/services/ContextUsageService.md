@@ -5,27 +5,34 @@
 
 ## 概述
 
-`ContextUsageService` 是一个纯静态服务，用来读写 `TabContextState`。它不自己持有状态；状态由 `OpenCodianView` 和 `TabManager` 按 tab 保存。
+`ContextUsageService` 是 `TabContextState` 的纯 state/update facade。它不自己持有状态；状态由 `OpenCodianView` 和 `TabManager` 按 tab 保存。
 
-它处理三类事情：
+当前职责集中在：
 
 - 维护模型/会话身份信息和 context window
 - 处理 streaming usage 增量与服务端精确用量快照
-- 为 UI 生成摘要和上下文来源拆分
+- 计算并写回 `TabContextState.percentage`
+- 保留原有 display public API，并把 summary、token breakdown、context breakdown 与 formatter 委托给 `ContextUsageDisplayService`
 
 ## 核心类型
 
 ```typescript
-export interface ContextUsageSummary {
-  totalTokens: number;
-  percentage: number;
-  tone: 'success' | 'warning' | 'danger' | 'muted';
-  ringLabel: string;
-  isUnavailable: boolean;
+export interface ContextUsageSnapshot {
+  sessionId: string;
+  sessionTitle: string;
+  providerId: string | null;
+  modelId: string | null;
   contextWindow: number;
-  tooltip: string;
+  inputTokens: number;
+  outputTokens: number;
+  reasoningTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  totalCost: number;
 }
 ```
+
+`ContextUsageSummary` 仍从本模块 re-export，但实际由 `ContextUsageDisplayService` 定义和生成。
 
 ## 关键行为
 
@@ -49,9 +56,9 @@ export interface ContextUsageSummary {
 
 ### streaming 增量
 
-- `beginStream()` 把 `streamInputTokens` 和 `streamOutputTokens` 归零
-- `applyUsageChunk()` 用当前 chunk 和上一次流内计数做 delta，只累加新增部分
-- `completeStream()` 目前直接复用 `beginStream()`，也就是在流结束后清空这两个“本次流内计数器”
+- `beginStream()` 把 `streamInputTokens` 和 `streamOutputTokens` 归零。
+- `applyUsageChunk()` 用当前 chunk 和上一次流内计数做 delta，只累加新增部分，并用 `now` 模式刷新 `updatedAt`。
+- `completeStream()` 目前直接复用 `beginStream()`，也就是在流结束后清空这两个“本次流内计数器”。
 
 ### 精确快照
 
@@ -60,40 +67,19 @@ export interface ContextUsageSummary {
 - `estimatedInputTokens = input + cacheRead + cacheWrite`
 - `estimatedOutputTokens = output + reasoning`
 
-如果有 `totalCost`，也会同步到 state。
+如果有 `totalCost`，也会同步到 state。`applyUsageSnapshot()` 先同步 identity，再复用这条 precise usage 路径。
 
-### 摘要
+### display facade
 
-`summarize()` 返回 UI 可直接消费的 `ContextUsageSummary`：
-
-- 当 `state` 不存在、没有模型或 `contextWindow <= 0` 时，返回 `isUnavailable: true`
-- 百分比阈值：`>= 85` 为 `danger`，`>= 60` 为 `warning`，其余为 `success`
-- tooltip 由总 token、占用百分比和格式化后的美元费用组成
-
-### 展示拆分
-
-`getDisplayTokenBreakdown()`：
-
-- 有 `preciseTokens` 时直接返回精确拆分
-- 没有时只用估算的 input/output，reasoning 和 cache 系列记为 `0`
-
-`getContextBreakdown()` 只针对“输入侧”做来源拆分。它会按字符数估算：
-
-- system prompt
-- user message
-- assistant message
-- tool 输入/输出
-- other
-
-如果估算总量高于真实 `inputTokens`，会整体按比例缩放。
+- `summarize()`、`getDisplayTokenBreakdown()`、`getContextBreakdown()`、`formatNumber()`、`formatCurrency()` 与 `formatPercent()` 继续保留在本模块，避免 UI 调用方迁移。
+- 这些方法现在只是委托 `ContextUsageDisplayService`，让 state/update 逻辑与 UI display/presentation 规则分离。
 
 ## 模块关系
 
-- 上游依赖：`../../../core/types`、`../../../i18n`
-- 下游消费者：`OpenCodianView`、`ContextRing`、`ContextDetailModal`
+- 上游依赖：`../../../core/types`、`ContextUsageDisplayService`
+- 下游消费者：`OpenCodianView`、`ActiveTabContextUsageCoordinator`、`ContextRing`、`ContextDetailModal`
 
 ## 注意事项
 
-- token 估算规则固定为“字符数除以 4 向上取整”，只是 UI 级近似值。
-- 消息字符统计同时兼容两种存储形态：`parts` 和 `contentBlocks/content`。
-- `formatCurrency()` 固定按 USD 格式化，并根据金额大小调整小数位数。
+- `percentage` 写回 state 时仍基于 precise total 或 estimated input/output 的总量，不受 display breakdown 估算影响。
+- `ContextUsageService` 保持无状态纯函数式 API；不要在这里引入 tab/runtime 持有逻辑。
