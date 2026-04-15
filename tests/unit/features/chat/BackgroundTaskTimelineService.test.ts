@@ -139,6 +139,121 @@ describe('BackgroundTaskTimelineService', () => {
     }));
   });
 
+  it('falls back all-complete reminders to the latest active segment and clears pending tasks', () => {
+    const host = createHost(null);
+    const service = new BackgroundTaskTimelineService(host);
+    const messages: ChatMessage[] = [
+      {
+        id: 'user-local-1',
+        role: 'user',
+        content: 'search docs',
+        timestamp: 1,
+        sourceMessageId: 'msg-user-1',
+        omo: {
+          kind: 'user-injection',
+          modeTag: 'search-mode',
+          injectedPrompt: 'search docs',
+          originalText: 'search docs',
+          rawText: 'search docs',
+          headline: 'search docs',
+        },
+      },
+      {
+        id: 'assistant-1',
+        role: 'assistant',
+        content: '',
+        timestamp: 2,
+        contentBlocks: [{
+          type: 'tool_use',
+          toolId: 'call-1',
+          toolName: 'task',
+          toolInput: { description: 'Search docs', taskId: 'bg_1' },
+          toolResult: 'started bg_1',
+          toolStatus: 'completed',
+        }],
+      },
+      {
+        id: 'assistant-reminder-1',
+        role: 'assistant',
+        content: 'all background tasks complete',
+        timestamp: 3,
+        sourceMessageId: 'msg-reminder-1',
+        displayStyle: 'notice',
+        noticeTone: 'info',
+        omo: {
+          kind: 'system-reminder',
+          reminderType: 'all-background-tasks-complete',
+          reminderText: 'all background tasks complete',
+          rawText: 'all background tasks complete',
+          headline: 'all background tasks complete',
+          isInternalInitiator: false,
+          tasks: [],
+        },
+      },
+    ];
+
+    const segments = service.collectSegments(messages, 'tab-1');
+
+    expect(segments).toHaveLength(1);
+    expect(segments[0]).toEqual(expect.objectContaining({
+      anchorKey: 'msg-user-1',
+      sawAllTasksComplete: true,
+      pending: [],
+      waitingForFollowUp: false,
+      completionEvents: [expect.objectContaining({
+        reminderType: 'all-background-tasks-complete',
+        reminderMessageId: 'msg-reminder-1',
+      })],
+    }));
+  });
+
+  it('merges active runtime launches and completions into the assembled timeline', () => {
+    const runtime = createRuntime({
+      backgroundTaskStartedAt: 10,
+      backgroundTaskActiveAnchorKey: 'msg-user-live',
+      backgroundTaskModeTag: 'search-mode',
+      backgroundTaskWaitingForFollowUp: true,
+      backgroundTaskLaunches: new Map([
+        ['call-live', { launchId: 'call-live', taskId: 'bg_live', description: 'Live lookup' }],
+      ]),
+      backgroundTaskCompletedTasks: new Map([
+        ['bg_done', { taskId: 'bg_done', description: 'Existing task' }],
+      ]),
+    });
+    const host = createHost(runtime);
+    const service = new BackgroundTaskTimelineService(host);
+
+    const segments = service.collectSegments([
+      {
+        id: 'assistant-1',
+        role: 'assistant',
+        content: 'working',
+        timestamp: 11,
+      },
+    ], 'tab-1');
+
+    expect(segments).toHaveLength(1);
+    expect(segments[0]).toEqual(expect.objectContaining({
+      anchorKey: 'msg-user-live',
+      anchorTimestamp: 10,
+      modeTag: 'search-mode',
+      launches: [expect.objectContaining({
+        launchId: 'call-live',
+        taskId: 'bg_live',
+        description: 'Live lookup',
+      })],
+      completed: [expect.objectContaining({
+        taskId: 'bg_done',
+        description: 'Existing task',
+      })],
+      pending: [expect.objectContaining({
+        launchId: 'call-live',
+        taskId: 'bg_live',
+      })],
+      waitingForFollowUp: true,
+    }));
+  });
+
   it('filters suppressed inline segments but keeps preparing search-mode anchors', () => {
     const host = createHost(createRuntime());
     host.isSuppressedBackgroundTaskSegment.mockImplementation((segment) => segment.anchorKey === 'msg-user-1');

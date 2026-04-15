@@ -55,6 +55,7 @@ export class BackgroundTaskTimelineService {
 ### timeline segment 推导
 
 - `collectSegments()` 会按 user anchor 聚合 task tool block 和 completion reminder；当 reminder 没有显式 task→launch 匹配时，会回退到最近仍 pending 的 segment
+- segment assembly 现在分成私有的 message collector、reminder target resolver、runtime merge delegate 与 pending/finalize delegate；主入口只负责高层装配顺序
 - active runtime 里的 launch/completion 也会并入同一条 timeline，避免只靠 conversation 快照时丢失尚未持久化的前台状态
 - `collectInlineSegments()` 再叠加 stale-suppression 与 renderability 过滤，让 view 拿到可直接渲染的 segment 列表
 

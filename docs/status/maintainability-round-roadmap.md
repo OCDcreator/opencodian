@@ -498,7 +498,7 @@
   - `ConversationRenderService` 的直接 render/update 分支明显减少
   - focused validation、全量 `npm test`、`npm run build` 通过
 
-### [NEXT] R72 - BackgroundTaskTimelineService segment assembly seam
+### [DONE] R72 - BackgroundTaskTimelineService segment assembly seam
 
 - **Lane**: Maintainability / background task timeline
 - **目标**: 从 `src/features/chat/services/BackgroundTaskTimelineService.ts:347` 一带收束 launch collection、completion reminder matching、runtime merge、segment finalize 与 pending-filter lifecycle。
@@ -515,7 +515,7 @@
   - timeline service 的 segment assembly 分支明显减少
   - focused validation、全量 `npm test`、`npm run build` 通过
 
-### [QUEUED] R73 - ChatSelectionControlsCoordinator selection runtime seam
+### [NEXT] R73 - ChatSelectionControlsCoordinator selection runtime seam
 
 - **Lane**: Maintainability / chat model selection
 - **目标**: 从 `src/features/chat/services/ChatSelectionControlsCoordinator.ts` 收束 active-tab selection state、requested/current/resolved model writeback、permission display 与 unavailable follow-up lifecycle。
