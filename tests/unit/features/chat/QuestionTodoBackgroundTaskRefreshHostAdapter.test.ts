@@ -127,11 +127,11 @@ function createVisibleConversationPostSyncStateCoordinator(
   };
 }
 
-describe('QuestionTodoBackgroundTaskRefreshHostAdapter', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
+beforeEach(() => {
+  jest.clearAllMocks();
+});
 
+describe('QuestionTodoBackgroundTaskRefreshHostAdapter view host wiring', () => {
   it('adapts late-bound question/todo refresh ports into one refresh view host', async () => {
     const currentConversation = createConversation('conversation-active');
     const runtime = createRuntime();
@@ -262,7 +262,9 @@ describe('QuestionTodoBackgroundTaskRefreshHostAdapter', () => {
       { suppressErrors: true },
     );
   });
+});
 
+describe('QuestionTodoBackgroundTaskRefreshHostAdapter visible sync bridge', () => {
   it('wires visible sync refresh through the shared current-conversation session bridge', async () => {
     const runtime = createRuntime({
       sessionTodos: [{ id: 'todo-1', content: 'Refresh', status: 'pending' }],

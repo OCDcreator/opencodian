@@ -53,59 +53,59 @@ function createCanvasContextMock(): CanvasRenderingContext2D {
   } as unknown as CanvasRenderingContext2D;
 }
 
-describe('OpenCodianView input panel theme', () => {
-  beforeEach(() => {
-    document.body.innerHTML = '';
-    registerBuiltinGlassAdapters();
-  });
-
-  afterEach(() => {
-    setLocale('en');
-    jest.restoreAllMocks();
-  });
-
-  function createView(inputPanelTheme: InputPanelThemeId): InputPanelThemeViewHarness {
-    return new OpenCodianView(new WorkspaceLeaf(), {
-      settings: {
-        effortLevel: 'medium',
-        thinkingBudget: 0,
-        locale: 'en',
-        theme: getDefaultThemeSettings(),
-        chatAppearance: getDefaultChatAppearanceSettings(),
-        inputPanelTheme,
-        inputPanelGlassRefraction: getDefaultInputPanelGlassRefractionSettings(),
-        inputPanelGlassRefractionSvgFilter: getDefaultInputPanelGlassRefractionSvgFilterSettings(),
-        inputPanelLiquidGlass: getDefaultInputPanelLiquidGlassSettings(),
-      },
-      openCodeService: {},
-      storage: {},
-    } as never) as unknown as InputPanelThemeViewHarness;
-  }
-
-  function attachComposerShell(
-    view: InputPanelThemeViewHarness,
-    {
-      shellEl,
-      inputWrapperEl = null,
-      sendBtn = null,
-    }: {
-      shellEl: HTMLElement;
-      inputWrapperEl?: HTMLElement | null;
-      sendBtn?: HTMLElement | null;
+function createView(inputPanelTheme: InputPanelThemeId): InputPanelThemeViewHarness {
+  return new OpenCodianView(new WorkspaceLeaf(), {
+    settings: {
+      effortLevel: 'medium',
+      thinkingBudget: 0,
+      locale: 'en',
+      theme: getDefaultThemeSettings(),
+      chatAppearance: getDefaultChatAppearanceSettings(),
+      inputPanelTheme,
+      inputPanelGlassRefraction: getDefaultInputPanelGlassRefractionSettings(),
+      inputPanelGlassRefractionSvgFilter: getDefaultInputPanelGlassRefractionSvgFilterSettings(),
+      inputPanelLiquidGlass: getDefaultInputPanelLiquidGlassSettings(),
     },
-  ): void {
-    const coordinator = (view as unknown as {
-      composerInputShellCoordinator: {
-        composerShellEl: HTMLElement | null;
-        inputWrapperEl: HTMLElement | null;
-        sendBtnEl: HTMLElement | null;
-      };
-    }).composerInputShellCoordinator;
-    coordinator.composerShellEl = shellEl;
-    coordinator.inputWrapperEl = inputWrapperEl;
-    coordinator.sendBtnEl = sendBtn;
-  }
+    openCodeService: {},
+    storage: {},
+  } as never) as unknown as InputPanelThemeViewHarness;
+}
 
+function attachComposerShell(
+  view: InputPanelThemeViewHarness,
+  {
+    shellEl,
+    inputWrapperEl = null,
+    sendBtn = null,
+  }: {
+    shellEl: HTMLElement;
+    inputWrapperEl?: HTMLElement | null;
+    sendBtn?: HTMLElement | null;
+  },
+): void {
+  const coordinator = (view as unknown as {
+    composerInputShellCoordinator: {
+      composerShellEl: HTMLElement | null;
+      inputWrapperEl: HTMLElement | null;
+      sendBtnEl: HTMLElement | null;
+    };
+  }).composerInputShellCoordinator;
+  coordinator.composerShellEl = shellEl;
+  coordinator.inputWrapperEl = inputWrapperEl;
+  coordinator.sendBtnEl = sendBtn;
+}
+
+beforeEach(() => {
+  document.body.innerHTML = '';
+  registerBuiltinGlassAdapters();
+});
+
+afterEach(() => {
+  setLocale('en');
+  jest.restoreAllMocks();
+});
+
+describe('OpenCodianView input panel theme shell state', () => {
   it('keeps preset mode free of glass-refraction classes and extra glass nodes', () => {
     const view = createView('preset');
     const shellEl = document.body.createDiv({ cls: 'opencodian-composer-shell' });
@@ -221,7 +221,9 @@ describe('OpenCodianView input panel theme', () => {
     expect(shellEl.classList.contains('opencodian-composer-shell--gr-card')).toBe(false);
     expect(shellEl.classList.contains('opencodian-composer-shell--gr-pill')).toBe(false);
   });
+});
 
+describe('OpenCodianView input action buttons', () => {
   it('toggles the etched action button class from chat appearance settings', () => {
     const view = createView('preset');
     const shellEl = document.body.createDiv({ cls: 'opencodian-composer-shell' });
@@ -260,7 +262,9 @@ describe('OpenCodianView input panel theme', () => {
     view.updateSendButtonState();
     expect(sendBtn.getAttribute('data-tooltip')).toBe('停止生成');
   });
+});
 
+describe('OpenCodianView liquid glass input panel theme', () => {
   it('mounts shuding liquid glass with upstream defaults and cleans it up on theme switch', () => {
     const originalCss = globalThis.CSS;
     const originalResizeObserver = globalThis.ResizeObserver;
@@ -338,5 +342,4 @@ describe('OpenCodianView input panel theme', () => {
       });
     }
   });
-
 });

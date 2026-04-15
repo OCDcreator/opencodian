@@ -16,7 +16,7 @@
 ## 当前背景
 
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
-- 最近成功 phase：`docs/status/maintainability-phase-417.md`
+- 最近成功 phase：`docs/status/maintainability-phase-418.md`
 - 当前 live lint 基线：`0 errors / 79 warnings`
 - 当前路线判断：上一批已在 `R67` checkpoint 收口；当前新 batch 直接转向 chat runtime / services 与 opencode core，并把 heavy tests / warning cleanup 明确写成 `R81-R86`。
 
@@ -706,7 +706,7 @@
   - chat heavy suite 邻域 warning 有可量化下降
   - focused validation、全量 `npm test`、`npm run build` 通过
 
-### [NEXT] R84 - Chat heavy suite split B
+### [DONE] R84 - Chat heavy suite split B
 
 - **Lane**: Warning cleanup / chat tests
 - **目标**: 继续把 `tests/unit/features/chat/QuestionTodoBackgroundTaskRefreshHostAdapter.test.ts`、`tests/unit/features/chat/inputPanelTheme.test.ts` 与相关 question/todo runtime suites 按责任拆分收口。
@@ -724,7 +724,7 @@
   - question/todo/input chat tests 的 warning 有可量化下降
   - focused validation、全量 `npm test`、`npm run build` 通过
 
-### [QUEUED] R85 - Warning cleanup batch D (chat and opencode residuals)
+### [NEXT] R85 - Warning cleanup batch D (chat and opencode residuals)
 
 - **Lane**: Warning cleanup / runtime residuals
 - **目标**: 受控削减 chat 与 opencode 剩余 warning，优先命中 `OpenCodianView.ts`、chat services、`OpenCodeService.ts`、`OpenCodeStreamEventTransformer.ts`、`OpenCodeStreamingRuntimeCoordinator.ts` 的 file-size / complexity / max-params 残余。

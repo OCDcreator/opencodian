@@ -178,12 +178,12 @@ function createCoordinator(options?: {
   };
 }
 
-describe('QuestionDockCoordinator', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    setLocale('en');
-  });
+beforeEach(() => {
+  jest.clearAllMocks();
+  setLocale('en');
+});
 
+describe('QuestionDockCoordinator resolution flow', () => {
   it('waits for above-input dock submission and runs the active-tab follow-up flow', async () => {
     const request = createQuestionRequest();
     const {
@@ -219,7 +219,9 @@ describe('QuestionDockCoordinator', () => {
     expect(runtimeByTab.get('tab-active')?.pendingQuestionRequests).toEqual([]);
     expect(runtimeByTab.get('tab-active')?.resolvedQuestionRequestIds.has(request.id)).toBe(true);
   });
+});
 
+describe('QuestionDockCoordinator pending-question refresh', () => {
   it('hydrates pending requests and background attention through one lifecycle path', async () => {
     const freshRequest = createQuestionRequest({
       id: 'request-fresh',
@@ -356,7 +358,9 @@ describe('QuestionDockCoordinator', () => {
     expect(backgroundRuntime.questionRequestWaiters.size).toBe(0);
     expect(host.setTabNeedsAttention).toHaveBeenCalledWith('tab-background', false);
   });
+});
 
+describe('QuestionDockCoordinator lifecycle cleanup', () => {
   it('clears the active-tab lifecycle state and rerenders an empty dock', () => {
     const request = createQuestionRequest();
     const {
