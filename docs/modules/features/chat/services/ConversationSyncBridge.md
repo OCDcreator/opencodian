@@ -12,7 +12,7 @@
 - 为 signal/background sync 统一绑定 server-sync reason，并把 post-sync 路由委托给 dedicated router
 - 为 visible sync 只负责 transport callback，post-sync request shaping 与 outcome dispatch 改由 dedicated router 承接
 
-它不负责 tab / conversation 选择，也不负责 runtime lock / baseline fingerprint 判定；这些职责仍分别留在 `ConversationSyncOrchestrationService` 与 `ConversationSyncRuntimeCoordinator`。它也不直接操作消息 DOM，只把 `applySyncedConversationUpdate()` / `renderBackgroundTaskIndicatorIfNeeded()` 这类 render host 保留给 `OpenCodianView`，而这些 host 现在由 `ConversationSyncHostAdapter` 统一装配；view 再通过 `ConversationSyncBridgePortProvider` 把 loop / signal / visible-follow-up 端口分发给相邻 consumer。
+它不负责 tab / conversation 选择，也不负责 runtime lock / baseline fingerprint 判定；这些职责仍分别留在 `ConversationSyncOrchestrationService` 与 `ConversationSyncRuntimeCoordinator`。它也不直接操作消息 DOM，只把 `applySyncedConversationUpdate()` / `renderBackgroundTaskIndicatorIfNeeded()` 这类 render host 保留给 `OpenCodianView`，而这些 host 现在由 `ConversationSyncHostAdapter` 统一装配；view 再通过 `ConversationSyncBridge` 模块内联导出的 port builder 把 loop / signal / visible-follow-up 端口分发给相邻 consumer。
 
 ## 公开接口
 
@@ -59,6 +59,6 @@ export class ConversationSyncBridge {
 - `VisibleConversationPostSyncCoordinator`：负责 visible sync 完成后的 question/todo refresh 与 current-conversation state-commit
 - `BackgroundConversationPostSyncHandoffCoordinator`：负责 hidden/background sync 完成后的 signal state、question/todo/background-task refresh 与 attention handoff
 - `ConversationSyncHostAdapter`：负责把 `OpenCodianView` 的单一 sync host 适配成 bridge 所需的 host 形状
-- `ConversationSyncBridgePortProvider`：负责把 view 暴露的 flat bridge seam 重组为 loop、signal scheduler 与 visible-follow-up ports
+- `ConversationSyncBridge` 模块内联导出的 port builder：负责把 view 暴露的 flat bridge seam 重组为 loop、signal scheduler 与 visible-follow-up ports
 - `OpenCodianView`：只保留 host bridge、flat lifecycle/signal/follow-up seam 与真正依赖 DOM 的 `applySyncedConversationUpdate()` / `renderBackgroundTaskIndicatorIfNeeded()`
-- 最近两轮切片继续推进高优先级 sync ownership 收窄：bridge 保持纯粹的 sync transport，而 view-facing 的 loop / signal / visible-follow-up 转发则进一步下沉到 `ConversationSyncBridgePortProvider`
+- 本轮 defragmentation 继续推进高优先级 sync ownership 收窄：bridge 保持纯粹的 sync transport，而 view-facing 的 loop / signal / visible-follow-up 转发已并回 `ConversationSyncBridge` 模块自身

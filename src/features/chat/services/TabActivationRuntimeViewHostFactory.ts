@@ -1,11 +1,45 @@
+import type { ChatMessage } from '../../../core/types';
 import {
   createTabActivationRuntimeBridgeHosts,
   type TabActivationRuntimeBridgeHosts,
   type TabActivationRuntimeHostAdapterHost,
 } from '../runtime/TabActivationRuntimeHostAdapter';
-import type {
-  TabActivationConversationSyncRuntimePort,
-} from './TabActivationConversationSyncPortProvider';
+
+export interface TabActivationConversationSyncRuntimePort {
+  getConversationSyncFingerprint(messages: ChatMessage[]): string;
+  setLastConversationSyncFingerprint(fingerprint: string): void;
+  startConversationSyncLoop(): void;
+  stopConversationSyncLoop(): void;
+}
+
+export interface TabActivationConversationSyncRuntimePortHost {
+  getConversationSyncFingerprint:
+    TabActivationConversationSyncRuntimePort['getConversationSyncFingerprint'];
+  setLastConversationSyncFingerprint:
+    TabActivationConversationSyncRuntimePort['setLastConversationSyncFingerprint'];
+  startConversationSyncLoop:
+    TabActivationConversationSyncRuntimePort['startConversationSyncLoop'];
+  stopConversationSyncLoop:
+    TabActivationConversationSyncRuntimePort['stopConversationSyncLoop'];
+}
+
+export function createTabActivationConversationSyncRuntimePort(
+  host: TabActivationConversationSyncRuntimePortHost,
+): TabActivationConversationSyncRuntimePort {
+  return {
+    getConversationSyncFingerprint: (messages) =>
+      host.getConversationSyncFingerprint(messages),
+    setLastConversationSyncFingerprint: (fingerprint) => {
+      host.setLastConversationSyncFingerprint(fingerprint);
+    },
+    startConversationSyncLoop: () => {
+      host.startConversationSyncLoop();
+    },
+    stopConversationSyncLoop: () => {
+      host.stopConversationSyncLoop();
+    },
+  };
+}
 
 type TabActivationRuntimeTabPort = Pick<
   TabActivationRuntimeHostAdapterHost,

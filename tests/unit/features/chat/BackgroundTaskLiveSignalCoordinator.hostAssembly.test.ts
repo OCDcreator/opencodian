@@ -1,14 +1,9 @@
 import type { SessionActivityStatus } from '../../../../src/core/opencode';
 import {
+  type BackgroundTaskLiveSignalCoordinatorHostBuilderHost,
   type BackgroundTaskLiveSignalRuntime,
-} from '../../../../src/features/chat/services/BackgroundTaskLiveSignalCoordinator';
-import {
-  type BackgroundTaskLiveSignalCoordinatorHostProviderHost,
-  createBackgroundTaskLiveSignalCoordinatorViewHostFactoryHost,
-} from '../../../../src/features/chat/services/BackgroundTaskLiveSignalCoordinatorHostProvider';
-import {
   createBackgroundTaskLiveSignalCoordinatorHost,
-} from '../../../../src/features/chat/services/BackgroundTaskLiveSignalCoordinatorViewHostFactory';
+} from '../../../../src/features/chat/services/BackgroundTaskLiveSignalCoordinator';
 
 type Mocked<T> = {
   [Key in keyof T]:
@@ -42,7 +37,7 @@ function createFixture() {
   };
   let writeback = initialWriteback;
 
-  const host: Mocked<BackgroundTaskLiveSignalCoordinatorHostProviderHost> = {
+  const host: Mocked<BackgroundTaskLiveSignalCoordinatorHostBuilderHost> = {
     getTabRuntimeState: jest.fn((tabId) => (tabId ? runtime : null)),
     getSessionIdForTab: jest.fn(() => sessionId),
     getTabSessionStatus: jest.fn(() => status),
@@ -72,28 +67,24 @@ function createFixture() {
   };
 }
 
-describe('BackgroundTaskLiveSignalCoordinatorHostProvider', () => {
+describe('BackgroundTaskLiveSignalCoordinator host assembly', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
   it('groups the thin live-signal reconcile seam into the existing coordinator host ports', () => {
     const fixture = createFixture();
-    const factoryHost = createBackgroundTaskLiveSignalCoordinatorViewHostFactoryHost(fixture.host);
-    const runtime = factoryHost.getBackgroundTaskRuntime();
-    const sessionState = factoryHost.getSessionState();
-    const viewWriteback = factoryHost.getViewWriteback();
-    const coordinatorHost = createBackgroundTaskLiveSignalCoordinatorHost(factoryHost);
+    const coordinatorHost = createBackgroundTaskLiveSignalCoordinatorHost(fixture.host);
 
-    expect(runtime.getTabRuntimeState('tab-active')).toMatchObject({
+    expect(coordinatorHost.getTabRuntimeState('tab-active')).toMatchObject({
       backgroundTaskStartedAt: 1,
     });
-    expect(sessionState.getSessionIdForTab('tab-active')).toBe('session-active');
-    expect(sessionState.getTabSessionStatus('tab-active', 'session-active')).toEqual({
+    expect(coordinatorHost.getSessionIdForTab('tab-active')).toBe('session-active');
+    expect(coordinatorHost.getTabSessionStatus('tab-active', 'session-active')).toEqual({
       type: 'busy',
     });
 
-    viewWriteback.syncTabStreamLikeState('tab-active');
+    coordinatorHost.syncTabStreamLikeState('tab-active');
     coordinatorHost.resetBackgroundTaskIndicator('tab-hidden');
 
     expect(fixture.host.getTabRuntimeState).toHaveBeenCalledWith('tab-active');
@@ -110,8 +101,7 @@ describe('BackgroundTaskLiveSignalCoordinatorHostProvider', () => {
 
   it('keeps the grouped ports late-bound to the latest live-signal collaborators', () => {
     const fixture = createFixture();
-    const factoryHost = createBackgroundTaskLiveSignalCoordinatorViewHostFactoryHost(fixture.host);
-    const coordinatorHost = createBackgroundTaskLiveSignalCoordinatorHost(factoryHost);
+    const coordinatorHost = createBackgroundTaskLiveSignalCoordinatorHost(fixture.host);
     const nextWriteback = {
       syncTabStreamLikeState: jest.fn<void, [string | null]>(),
       resetBackgroundTaskIndicator: jest.fn<void, [string | null]>(),
@@ -126,7 +116,7 @@ describe('BackgroundTaskLiveSignalCoordinatorHostProvider', () => {
     fixture.setStatus({ type: 'idle' });
     fixture.setWriteback(nextWriteback);
 
-    expect(factoryHost.getBackgroundTaskRuntime().getTabRuntimeState('tab-next')).toMatchObject({
+    expect(coordinatorHost.getTabRuntimeState('tab-next')).toMatchObject({
       isStreaming: true,
       backgroundTaskModeTag: 'search-mode',
     });

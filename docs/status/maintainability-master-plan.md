@@ -2,7 +2,7 @@
 
 > **状态**: [ACTIVE]
 > **作用**: 这是 maintainability 无人值守的战略文档。每轮开始前，先读本文件，再读 `docs/status/maintainability-round-roadmap.md` 与最近的 `docs/status/maintainability-phase-XXX.md`。
-> **自动推进状态**: `R153-R156` 已人工续排；当前 `[NEXT]` 为 `R153 - OpenCodianView host/provider defragmentation seam`。
+> **自动推进状态**: `R153` 已完成；当前 `[NEXT]` 为 `R154 - OpenCodeService coordinator stack defragmentation seam`。
 
 ## 1. 当前判断
 
@@ -20,12 +20,12 @@
 ## 2. 当前基线
 
 - **lint**: `0 errors / 36 warnings`
-- **最近验证**: 远端实跑 `npm run lint -- --format unix`、`npm test` 与 `npm run build`；结果维持 `0 errors / 36 warnings`、`286 passed, 286 total` suites / `1190 passed, 1190 total` tests，通过构建的最新 `BUILD_ID` 为 `autopilot-maintainability.202604161408`
+- **最近验证**: `R153` 运行 focused `npm test -- BackgroundTaskLiveSignalCoordinator ConversationSyncBridge TabActivationRuntimeViewHostFactory`、全量 `npm run lint -- --format unix`、全量 `npm test` 与 `BUILD_ID=autopilot-maintainability.$(date +%Y%m%d%H%M); echo "$BUILD_ID"; BUILD_ID="$BUILD_ID" npm run build`；结果维持 `0 errors / 36 warnings`、`286 passed, 286 total` suites / `1190 passed, 1190 total` tests，通过构建的最新 `BUILD_ID` 为 `autopilot-maintainability.202604161442`
 - **最近 Test Vault 部署**: `R146`，`BUILD_ID` `autopilot-maintainability.202604160757`
-- **当前 `[NEXT]`**: `R153 - OpenCodianView host/provider defragmentation seam`
+- **当前 `[NEXT]`**: `R154 - OpenCodeService coordinator stack defragmentation seam`
 - **主热点**:
-  - `OpenCodianView` 的 host assembly / runtime wiring 与 import surface 仍过重
-  - `OpenCodeService` 的 coordinator stack / runtime wiring 仍偏厚
+  - `R153` 已删除 `4` 个 view-adjacent 纯转发薄层，并把 background live-signal / sync-port assembly 并回既有 owner
+  - `OpenCodianView` 仍约 `4866` 行，下一步需转向 `OpenCodeService` 周边 coordinator/wrapper 装配厚度
   - `tests/**` 约 `8` 条 warnings、`src/features/chat/**` 约 `7` 条、`src/utils/glass/**` 约 `6` 条、`src/features/settings/**` 约 `4` 条、`src/core/opencode/**` 约 `4` 条
 
 ## 3. 本批执行规则

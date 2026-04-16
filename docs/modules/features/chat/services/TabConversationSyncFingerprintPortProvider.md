@@ -11,7 +11,7 @@
 - `QuestionTodoBackgroundTaskRuntimeServiceBundle` 复用同一份 tab-scoped fingerprint writeback seam
 - `OpenCodianView` 不再在多个 host factory 里重复维护 `getTabRuntimeState()` + `lastConversationSyncFingerprint` 的内联回写逻辑
 
-它不负责 sync loop、activation orchestration 或 server pull；这些职责仍保留在 `ConversationSyncBridge`、`TabActivationConversationSyncPortProvider` 与既有 sync/runtime 协调层。
+它不负责 sync loop、activation orchestration 或 server pull；这些职责仍保留在 `ConversationSyncBridge`、`TabActivationRuntimeViewHostFactory` 与既有 sync/runtime 协调层。
 
 ## 公开接口
 

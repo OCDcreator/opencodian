@@ -1,8 +1,8 @@
 import type { ChatMessage } from '../../../../src/core/types';
 import {
   createTabActivationConversationSyncRuntimePort,
-  type TabActivationConversationSyncPortProviderHost,
-} from '../../../../src/features/chat/services/TabActivationConversationSyncPortProvider';
+  type TabActivationConversationSyncRuntimePortHost,
+} from '../../../../src/features/chat/services/TabActivationRuntimeViewHostFactory';
 
 type Mocked<T> = {
   [Key in keyof T]:
@@ -22,7 +22,7 @@ function createFixture() {
   };
   let ports = initialPorts;
 
-  const host: Mocked<TabActivationConversationSyncPortProviderHost> = {
+  const host: Mocked<TabActivationConversationSyncRuntimePortHost> = {
     getConversationSyncFingerprint: jest.fn((messages) =>
       ports.getConversationSyncFingerprint(messages)),
     setLastConversationSyncFingerprint: jest.fn((fingerprint) => {
@@ -45,7 +45,7 @@ function createFixture() {
   };
 }
 
-describe('TabActivationConversationSyncPortProvider', () => {
+describe('TabActivationRuntimeViewHostFactory conversation-sync port', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });

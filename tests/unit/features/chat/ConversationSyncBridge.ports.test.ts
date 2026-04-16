@@ -2,9 +2,9 @@ import type {
   SessionSyncEventUpdate,
 } from '../../../../src/core/opencode';
 import {
-  type ConversationSyncBridgePortProviderHost,
+  type ConversationSyncBridgePortBuilderHost,
   createConversationSyncBridgePorts,
-} from '../../../../src/features/chat/services/ConversationSyncBridgePortProvider';
+} from '../../../../src/features/chat/services/ConversationSyncBridge';
 
 type Mocked<T> = {
   [Key in keyof T]:
@@ -26,7 +26,7 @@ function createFixture() {
   };
   let ports = initialPorts;
 
-  const host: Mocked<ConversationSyncBridgePortProviderHost> = {
+  const host: Mocked<ConversationSyncBridgePortBuilderHost> = {
     startConversationSyncLoop: jest.fn(() => {
       ports.startConversationSyncLoop();
     }),
@@ -52,7 +52,7 @@ function createFixture() {
   };
 }
 
-describe('ConversationSyncBridgePortProvider', () => {
+describe('ConversationSyncBridge port assembly', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });

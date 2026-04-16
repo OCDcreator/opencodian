@@ -148,14 +148,9 @@ import {
 } from './services/BackgroundTaskCompletionNoticeService';
 import {
   BackgroundTaskLiveSignalCoordinator,
-} from './services/BackgroundTaskLiveSignalCoordinator';
-import {
-  type BackgroundTaskLiveSignalCoordinatorHostProviderHost,
-  createBackgroundTaskLiveSignalCoordinatorViewHostFactoryHost,
-} from './services/BackgroundTaskLiveSignalCoordinatorHostProvider';
-import {
+  type BackgroundTaskLiveSignalCoordinatorHostBuilderHost,
   createBackgroundTaskLiveSignalCoordinatorHost,
-} from './services/BackgroundTaskLiveSignalCoordinatorViewHostFactory';
+} from './services/BackgroundTaskLiveSignalCoordinator';
 import {
   BackgroundTaskNoticeStateService,
   type BackgroundTaskNoticeStateServiceHost,
@@ -218,12 +213,10 @@ import {
 } from './services/ConversationSessionSignalRuntime';
 import {
   ConversationSyncBridge,
-} from './services/ConversationSyncBridge';
-import {
-  type ConversationSyncBridgePortProviderHost,
+  type ConversationSyncBridgePortBuilderHost,
   type ConversationSyncBridgePorts,
   createConversationSyncBridgePorts,
-} from './services/ConversationSyncBridgePortProvider';
+} from './services/ConversationSyncBridge';
 import {
   createConversationSyncServices,
 } from './services/ConversationSyncHostAdapter';
@@ -298,16 +291,14 @@ import {
   type SessionTodoViewHost,
 } from './services/SessionTodoHostAdapter';
 import {
-  createTabActivationConversationSyncRuntimePort,
-  type TabActivationConversationSyncPortProviderHost,
-  type TabActivationConversationSyncRuntimePort,
-} from './services/TabActivationConversationSyncPortProvider';
-import {
   createTabActivationRuntimeViewHostFactoryHost,
   type TabActivationRuntimeHostProviderHost,
 } from './services/TabActivationRuntimeHostProvider';
 import {
+  createTabActivationConversationSyncRuntimePort,
   createTabActivationRuntimeViewHosts,
+  type TabActivationConversationSyncRuntimePort,
+  type TabActivationConversationSyncRuntimePortHost,
 } from './services/TabActivationRuntimeViewHostFactory';
 import {
   createTabConversationSyncFingerprintRuntimePort,
@@ -1244,9 +1235,7 @@ export class OpenCodianView extends ItemView {
       backgroundTaskTimelineService,
       backgroundTaskNoticeStateService,
       createBackgroundTaskLiveSignalCoordinatorHost(
-        createBackgroundTaskLiveSignalCoordinatorViewHostFactoryHost(
-          this.createBackgroundTaskLiveSignalCoordinatorHostProviderHost(),
-        ),
+        this.createBackgroundTaskLiveSignalCoordinatorHostBuilderHost(),
       ),
     );
 
@@ -1327,11 +1316,11 @@ export class OpenCodianView extends ItemView {
       backgroundTaskRuntime.backgroundConversationPostSyncHandoffCoordinator,
     );
     const conversationSyncBridgePorts = createConversationSyncBridgePorts(
-      this.createConversationSyncBridgePortProviderHost(),
+      this.createConversationSyncBridgePortBuilderHost(),
     );
     const tabActivationConversationSyncRuntimePort =
       createTabActivationConversationSyncRuntimePort(
-        this.createTabActivationConversationSyncPortProviderHost(),
+        this.createTabActivationConversationSyncRuntimePortHost(),
       );
     const conversationSessionSignalRuntime = new ConversationSessionSignalRuntime(
       this.createConversationSessionSignalRuntimeHost(),
@@ -1703,8 +1692,8 @@ export class OpenCodianView extends ItemView {
     };
   }
 
-  private createBackgroundTaskLiveSignalCoordinatorHostProviderHost():
-  BackgroundTaskLiveSignalCoordinatorHostProviderHost {
+  private createBackgroundTaskLiveSignalCoordinatorHostBuilderHost():
+  BackgroundTaskLiveSignalCoordinatorHostBuilderHost {
     return {
       getTabRuntimeState: (tabId: TabId | null) => this.getTabRuntimeState(tabId),
       getSessionIdForTab: (tabId: TabId | null) => this.getSessionIdForTab(tabId),
@@ -1839,8 +1828,8 @@ export class OpenCodianView extends ItemView {
     };
   }
 
-  private createConversationSyncBridgePortProviderHost():
-  ConversationSyncBridgePortProviderHost {
+  private createConversationSyncBridgePortBuilderHost():
+  ConversationSyncBridgePortBuilderHost {
     return {
       startConversationSyncLoop: () => {
         this.conversationSyncBridge.startConversationSyncLoop();
@@ -1872,8 +1861,8 @@ export class OpenCodianView extends ItemView {
     };
   }
 
-  private createTabActivationConversationSyncPortProviderHost():
-  TabActivationConversationSyncPortProviderHost {
+  private createTabActivationConversationSyncRuntimePortHost():
+  TabActivationConversationSyncRuntimePortHost {
     return {
       getConversationSyncFingerprint: (messages) =>
         this.getConversationSyncFingerprint(messages),

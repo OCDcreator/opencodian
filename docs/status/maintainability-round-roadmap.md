@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个活动任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成活动任务；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的后续任务”。
-> **当前状态**: [ACTIVE] `R153-R156` 已人工续排；当前 `[NEXT]` 为 `R153 - OpenCodianView host/provider defragmentation seam`。
+> **当前状态**: [ACTIVE] `R153` 已完成；当前 `[NEXT]` 为 `R154 - OpenCodeService coordinator stack defragmentation seam`。
 
 ## 控制规则
 
@@ -1534,7 +1534,7 @@
 
 - **批次目标**: 先回并前一阶段残留的碎片化装配链，优先压缩 `OpenCodianView` 与 `OpenCodeService` 的 direct assembly / import surface；只有在核心 owner 收缩后 live hotspot 仍成立时，才处理 heavy tests / glass/demo 残余。整个批次禁止继续制造新的薄 helper / adapter / provider / factory。
 
-### [NEXT] R153 - OpenCodianView host/provider defragmentation seam
+### [DONE] R153 - OpenCodianView host/provider defragmentation seam
 
 - **Lane**: Maintainability / chat defragmentation
 - **目标**: 沿 `OpenCodianView` 与直接相邻的 chat runtime/service owner 回并过薄 host/provider/factory/adapter 链，优先把碎片并回相邻厚 owner（而非 `OpenCodianView` 本体），处理 sync / hydration / tab activation / background live signal / render assembly 周边的装配噪音，降低 view 的 direct host wiring 与 import surface。
@@ -1564,7 +1564,7 @@
   - 至少一条过薄 chat 装配链被回并进相邻更厚 owner，而不是替换成新的薄层或回灌主文件
   - 全量 `npm test` 与 `npm run build` 通过
 
-### [QUEUED] R154 - OpenCodeService coordinator stack defragmentation seam
+### [NEXT] R154 - OpenCodeService coordinator stack defragmentation seam
 
 - **Lane**: Maintainability / opencode defragmentation
 - **目标**: 沿 `OpenCodeService` 与相邻 opencode owner 回并过薄 coordinator / wrapper / gateway 边界，优先把碎片并回相邻厚 owner（而非 `OpenCodeService` 本体），收束 constructor / lifecycle / session-control / catalog-query 装配噪音，降低 service 的 direct runtime wiring 压力。
@@ -1633,5 +1633,5 @@
 
 ### 当前状态
 
-- 当前可自动执行的 `[NEXT]` 是 `R153 - OpenCodianView host/provider defragmentation seam`。
+- 当前可自动执行的 `[NEXT]` 是 `R154 - OpenCodeService coordinator stack defragmentation seam`。
 - `R156` 完成后若没有新的人工续排项，必须再次停回“当前没有可自动执行的后续任务”。

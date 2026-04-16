@@ -46,6 +46,31 @@ export interface BackgroundTaskLiveSignalCoordinatorHost {
   resetBackgroundTaskIndicator(tabId: TabId | null): void;
 }
 
+export interface BackgroundTaskLiveSignalCoordinatorHostBuilderHost {
+  getTabRuntimeState: BackgroundTaskLiveSignalCoordinatorHost['getTabRuntimeState'];
+  getSessionIdForTab: BackgroundTaskLiveSignalCoordinatorHost['getSessionIdForTab'];
+  getTabSessionStatus: BackgroundTaskLiveSignalCoordinatorHost['getTabSessionStatus'];
+  syncTabStreamLikeState: BackgroundTaskLiveSignalCoordinatorHost['syncTabStreamLikeState'];
+  resetBackgroundTaskIndicator:
+    BackgroundTaskLiveSignalCoordinatorHost['resetBackgroundTaskIndicator'];
+}
+
+export function createBackgroundTaskLiveSignalCoordinatorHost(
+  host: BackgroundTaskLiveSignalCoordinatorHostBuilderHost,
+): BackgroundTaskLiveSignalCoordinatorHost {
+  return {
+    getTabRuntimeState: (tabId) => host.getTabRuntimeState(tabId),
+    getSessionIdForTab: (tabId) => host.getSessionIdForTab(tabId),
+    getTabSessionStatus: (tabId, sessionId) => host.getTabSessionStatus(tabId, sessionId),
+    syncTabStreamLikeState: (tabId) => {
+      host.syncTabStreamLikeState(tabId);
+    },
+    resetBackgroundTaskIndicator: (tabId) => {
+      host.resetBackgroundTaskIndicator(tabId);
+    },
+  };
+}
+
 export class BackgroundTaskLiveSignalCoordinator {
   constructor(
     private readonly sessionTodoStateService: BackgroundTaskLiveSignalTodoPort,
