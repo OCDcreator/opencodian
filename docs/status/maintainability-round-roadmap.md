@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个活动任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成活动任务；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的后续任务”。
-> **当前状态**: [WAITING] `R138-R152` 已完成；当前没有可自动执行的后续任务，等待人工续排。
+> **当前状态**: [ACTIVE] `R153-R156` 已人工续排；当前 `[NEXT]` 为 `R153 - OpenCodianView host/provider defragmentation seam`。
 
 ## 控制规则
 
@@ -18,7 +18,7 @@
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
 - 当前 live lint 基线：`0 errors / 36 warnings`
 - 最近成功 phase：`docs/status/maintainability-phase-487.md`
-- 当前路线判断：`R137` 已确认 `R88-R136` 完成 owner seam、heavy suite split、final warning closeout 与 queue closeout 的完整闭环；`R142` 已复盘 `R138-R141` 的 chat residual 收益；`R143-R150` 已完成 settings/startup、opencode lifecycle、streaming 与 persistence residual；`R151` 已在 `tests/unit/utils/glass/shuding.test.ts` 完成 heavy tests / opt-in glass residual 的首个受控 closeout；`R152` 已完成 continuation checkpoint 并确认当前 queue 自然耗尽，maintainability autopilot 需停回人工续排态。
+- 当前路线判断：`R137` 已确认 `R88-R136` 完成 owner seam、heavy suite split、final warning closeout 与 queue closeout 的完整闭环；`R142` 已复盘 `R138-R141` 的 chat residual 收益；`R143-R150` 已完成 settings/startup、opencode lifecycle、streaming 与 persistence residual；`R151` 已在 `tests/unit/utils/glass/shuding.test.ts` 完成 heavy tests / opt-in glass residual 的首个受控 closeout；`R152` 已完成 continuation checkpoint 并确认上一批 queue 自然耗尽。本次人工续排的 `R153-R156` 改为先做 defragmentation，再处理 `OpenCodianView` / `OpenCodeService` 与 justified hotspot closeout。
 
 ## Queue
 ## Queue
@@ -1530,7 +1530,106 @@
 - **禁止项**: 只做 checkpoint 文档与指标复盘；不自动扩展 `R153+`，不把下一批写成 freestyle backlog。
 - **验收**: phase 文档明确记录 `R138-R151` 收益、remaining hotspots、是否需要人工续排；并通过全量 `npm test` 与 `npm run build`。
 
+## Batch 14: defragmentation, large-owner recovery, and hotspot closeout
+
+- **批次目标**: 先回并前一阶段残留的碎片化装配链，优先压缩 `OpenCodianView` 与 `OpenCodeService` 的 direct assembly / import surface；只有在核心 owner 收缩后 live hotspot 仍成立时，才处理 heavy tests / glass/demo 残余。整个批次禁止继续制造新的薄 helper / adapter / provider / factory。
+
+### [NEXT] R153 - OpenCodianView host/provider defragmentation seam
+
+- **Lane**: Maintainability / chat defragmentation
+- **目标**: 沿 `OpenCodianView` 与直接相邻的 chat runtime/service owner 回并过薄 host/provider/factory/adapter 链，优先处理 sync / hydration / tab activation / background live signal / render assembly 周边的装配噪音，降低 view 的 direct host wiring 与 import surface。
+- **优先入口**:
+  - `src/features/chat/OpenCodianView.ts`
+  - `src/features/chat/services/ConversationSyncLoadRuntimeHostProvider.ts`
+  - `src/features/chat/services/ConversationSyncLoadRuntimeViewHostFactory.ts`
+  - `src/features/chat/services/ConversationHydrationRuntimeHostProvider.ts`
+  - `src/features/chat/services/ConversationHydrationRuntimeViewHostFactory.ts`
+  - `src/features/chat/services/TabActivationRuntimeHostProvider.ts`
+  - `src/features/chat/services/TabActivationRuntimeViewHostFactory.ts`
+  - `src/features/chat/services/BackgroundTaskLiveSignalCoordinatorHostProvider.ts`
+  - `src/features/chat/services/BackgroundTaskLiveSignalCoordinatorViewHostFactory.ts`
+  - `src/features/chat/services/ConversationSyncBridgePortProvider.ts`
+  - `src/features/chat/services/TabActivationConversationSyncPortProvider.ts`
+  - `src/features/chat/services/TabConversationSyncFingerprintPortProvider.ts`
+  - 直接相关 chat tests / docs
+- **允许边界**:
+  - 允许把过薄 host/provider/factory 文件并回既有 runtime / coordinator owner
+  - 允许把稳定 host type / port 定义与 owning runtime 同位收束，以减少装配跳转
+- **禁止项**:
+  - 不新增新的薄 helper / adapter / provider / factory
+  - 不改变并发 tab/session streaming、hydration/auth-sync gate、background-task completion notice、scroll restore、question resolution 语义
+- **验收**:
+  - `OpenCodianView` 的 direct host assembly / import surface 有可量化下降
+  - 至少一条过薄 chat 装配链被回并进更厚 owner，而不是替换成新的薄层
+  - 全量 `npm test` 与 `npm run build` 通过
+
+### [QUEUED] R154 - OpenCodeService coordinator stack defragmentation seam
+
+- **Lane**: Maintainability / opencode defragmentation
+- **目标**: 沿 `OpenCodeService` 与相邻 opencode owner 回并过薄 coordinator / wrapper / gateway 边界，优先收束 constructor / lifecycle / session-control / catalog-query 装配噪音，降低 service 的 direct runtime wiring 压力。
+- **优先入口**:
+  - `src/core/opencode/OpenCodeService.ts`
+  - `src/core/opencode/OpenCodeServiceLifecycleCoordinator.ts`
+  - `src/core/opencode/OpenCodeSessionLifecycleCoordinator.ts`
+  - `src/core/opencode/OpenCodeSessionControlOrchestrator.ts`
+  - `src/core/opencode/OpenCodeCatalogQueryCoordinator.ts`
+  - `src/core/opencode/OpenCodeQueryGateway.ts`
+  - `src/core/opencode/OpenCodeSettingsReconfigurationCoordinator.ts`
+  - `src/core/opencode/OpenCodeSdkFacade.ts`
+  - `src/core/opencode/ServerManager.ts`
+  - 直接相关 opencode tests / docs
+- **允许边界**:
+  - 允许把 ownership 过薄、只承担转发/装配的 wrapper 并回既有厚 owner
+  - 允许整理 constructor lifecycle assembly，使 runtime decision 更集中在既有 owner
+- **禁止项**:
+  - 不改变 SDK-first / legacy fallback、directory scope、managed server adoption/restart、auth fallback、session-scoped abort/detach 或 sync-event bridge 语义
+  - 不新增新的 facade / gateway / builder 薄层
+- **验收**:
+  - `OpenCodeService` 的 direct coordinator assembly / import surface 有可量化下降
+  - 至少一条过薄 opencode wrapper 链被回并，且 `OpenCodeService` 行数压力下降
+  - 全量 `npm test` 与 `npm run build` 通过
+
+### [QUEUED] R155 - Heavy tests and glass/demo hotspot closeout after core-owner recovery
+
+- **Lane**: Warning cleanup / justified hotspots
+- **目标**: 仅在 `R153-R154` 之后 live hotspot 仍成立时，沿现有 suite / owner 内部整理 heavy tests 与 glass/demo hotspots，优先按责任分组或收束局部参数/fixture 复杂度，不新增 test helper 碎片。
+- **优先入口**:
+  - `tests/unit/core/storage/StorageService.test.ts`
+  - `tests/unit/core/opencode/OpenCodeStreamingRuntimeCoordinator.test.ts`
+  - `tests/unit/core/config/OpencodeConfigManager.test.ts`
+  - `tests/unit/features/chat/glassOctahedronDemo.test.ts`
+  - `tests/unit/features/settings/ModelConfigModal.test.ts`
+  - `src/utils/glass/adapters/shuding.ts`
+  - `src/utils/glass/adapters/shudingDiamond.ts`
+  - `src/utils/glass/adapters/nikdelvin.ts`
+  - `src/features/chat/glassOctahedronDemo.ts`
+  - `src/features/chat/glassOctahedronDemoRefraction.ts`
+  - `src/features/chat/liquidDiamondDemo.ts`
+  - `src/features/chat/liquidDiamondDemoWebgl.ts`
+- **禁止项**:
+  - 不删除断言、不降低覆盖、不把 experimental demo 暴露到 stable UI path
+  - 不新增薄 test helper / adapter / provider / factory
+  - 若热点已被前序轮次自然消除，改做最小 checkpoint note，不自由换题
+- **验收**:
+  - heavy tests / glass/demo hotspots 有可量化下降，且 lint 维持 `0 errors`
+  - 全量 `npm test` 与 `npm run build` 通过
+
+### [QUEUED] R156 - Checkpoint after defragmentation and hotspot closeout
+
+- **Lane**: Checkpoint
+- **目标**: 复盘 `R153-R155` 的 defragmentation 收益、`OpenCodianView` / `OpenCodeService` 体量变化、warning 轨迹、验证成本与剩余热点，并据此判断 maintainability autopilot 是否应再次停回人工态。
+- **优先入口**:
+  - `docs/status/maintainability-master-plan.md`
+  - `docs/status/maintainability-round-roadmap.md`
+  - `docs/status/maintainability-lane-map.md`
+- **禁止项**:
+  - 只做 checkpoint 文档与指标复盘；不自动扩展 `R157+`
+  - 不把 checkpoint 写成 freestyle backlog
+- **验收**:
+  - phase 文档明确记录 defragmentation 收益、核心大文件体量变化、remaining hotspots 与 stop/continue 建议
+  - 全量 `npm test` 与 `npm run build` 通过
+
 ### 当前状态
 
-- 当前没有可自动执行的后续任务。
-- 如需继续 maintainability autopilot，请先人工续排新的 `[QUEUED]` 项。
+- 当前可自动执行的 `[NEXT]` 是 `R153 - OpenCodianView host/provider defragmentation seam`。
+- `R156` 完成后若没有新的人工续排项，必须再次停回“当前没有可自动执行的后续任务”。

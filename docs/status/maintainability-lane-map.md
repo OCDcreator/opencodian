@@ -1,31 +1,41 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [WAITING] `R138-R152` 已完成；当前没有可自动执行的 `[NEXT]`，等待人工续排。
+> **当前状态**: [ACTIVE] `R153-R156` 已人工续排；当前 `[NEXT]` 为 `R153 - OpenCodianView host/provider defragmentation seam`。
 
 ## 当前优先级
 
-- **当前 `[NEXT]`**：当前没有可自动执行的 `[NEXT]`
-- **本批目标**：`R138-R152` 的三批 residual 收束与 continuation checkpoint 已完成，当前只保留人工续排前的 hotspot 复盘
+- **当前 `[NEXT]`**：`R153 - OpenCodianView host/provider defragmentation seam`
+- **本批目标**：先回并碎片化装配链，再压缩 `OpenCodianView` / `OpenCodeService` 这两个核心大文件，最后只在热点仍存在时处理 heavy tests / glass/demo 残余
 - **当前 lint 基线**：`0 errors / 36 warnings`
 - **热点顺序**：
-  1. 人工续排前先在 `tests/**`、`src/features/chat/**`、`src/utils/glass/**`、`src/features/settings/**` 与 `src/core/opencode/**` 之间重排 residual 成本
+  1. `OpenCodianView` + chat services 的 host/provider/adapter/factory 碎片化链
+  2. `OpenCodeService` + opencode coordinator/wrapper stack 的装配厚度
+  3. heavy tests / glass/demo 热点（仅在前两步后仍为 live hotspot 时推进）
 
 ## 本批边界
 
-- `R138 -> R152` 队列已完成；当前不得自动扩展 `R153+`
-- 不新增薄 helper / adapter / provider / factory；新 owner 必须覆盖完整 lifecycle / runtime seam
+- 只允许执行 `R153 -> R154 -> R155 -> R156`；当前不得自动扩展 `R157+`
+- 不新增薄 helper / adapter / provider / factory；优先把过薄文件并回现有厚 owner
 - `OpenCodeService`、`OpenCodianView`、`OpenCodianSettings` 的 maintainability 仅允许在 queue 明示项内继续推进
-- warning closeout 只允许沿现有厚 seam 收口，不允许为了降 warning 去篡改覆盖语义或制造薄碎片模块
+- `OpenCodianView` / `OpenCodeService` 的改动必须带来可见的 import surface / assembly 收缩，不能只做“换文件不减复杂度”
+- tests / glass / demo cleanup 只允许沿现有 suite / owner 内部整理，不允许删断言、减覆盖或把实验特性暴露到 stable UI path
 - 命中 deploy-relevant paths 时，继续严格执行 build → Test Vault deploy → `BUILD_ID` 校验
 - 恢复运行必须使用外部 profile `/Users/dht/.config/opencodian/mac-autopilot-profile.json`
+
+## 远端实测热点提示
+
+- `src/features/chat/OpenCodianView.ts`：约 `4877` 行
+- `src/core/opencode/OpenCodeService.ts`：约 `1454` 行
+- `src/features/chat/services/`：命名上约有 `15` 个 `Adapter`、`7` 个 `Provider`、`5` 个 `Factory`、`23` 个 `Host` 文件；其中存在一批 `40` 行以下薄文件
+- `tests/**` 约 `8` 条 warning、`src/features/chat/**` 约 `7` 条、`src/utils/glass/**` 约 `6` 条、`src/features/settings/**` 约 `4` 条、`src/core/opencode/**` 约 `4` 条
 
 ## 回归观察点
 
 - `OpenCodianView`：并发 tab/session streaming、hydration/auth-sync gate、background-task completion notice、scroll restore、question card resolution 不回归
-- chat services：background-task timeline、model selection、input panel theme、session todo stale notice、question dock 行为不变
-- `OpenCodeService` / streaming：SDK-first / legacy fallback、session-scoped abort/detach、final response completion、sync-event bridge 语义不变
-- settings / startup：settings normalization、provider/model disable layering、conversation restore preload、locale/theme startup 不回归
+- chat services：background-task timeline、authoritative sync、question/todo runtime、input panel theme、model/permission selector 语义不变
+- `OpenCodeService` / streaming：SDK-first / legacy fallback、session-scoped abort/detach、managed server adoption/restart、sync-event bridge 语义不变
+- tests / glass / demo：heavy suites coverage、opt-in glass 行为与 experimental demo guardrail 不变
 - lint：整批都必须维持 `0 errors`
 
 ## 历史入口
