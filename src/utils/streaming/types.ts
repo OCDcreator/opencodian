@@ -150,6 +150,7 @@ export interface StreamControllerOptions {
   onStreamComplete?: (contentBlocks: ContentBlock[]) => void;
   onToolCallClick?: (toolCall: ToolCallInfo) => void;
   scrollToBottom?: () => void;
+  onCollapsibleToggle?: () => void;
 }
 
 // ============================================
@@ -165,6 +166,7 @@ export interface ToolRendererOptions {
     toolKind?: ToolCallInfo['kind']
   ) => string;
   renderExpandedContent?: (container: HTMLElement, toolName: string, result: string | undefined) => void;
+  onCollapsibleToggle?: () => void;
 }
 
 // ============================================
@@ -176,6 +178,7 @@ export interface ThinkingRendererOptions {
   showTimer?: boolean;
   collapsedLabel?: string;
   expandedLabel?: string;
+  onCollapsibleToggle?: () => void;
 }
 
 // ============================================

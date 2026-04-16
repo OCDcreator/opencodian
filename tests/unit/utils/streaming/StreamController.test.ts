@@ -171,4 +171,35 @@ describe('StreamController', () => {
       },
     ]);
   });
+
+  it('calls the collapsible toggle callback for stored thinking blocks', async () => {
+    const containerEl = document.createElement('div');
+    const contentEl = document.createElement('div');
+    const onCollapsibleToggle = jest.fn();
+    containerEl.appendChild(contentEl);
+
+    const markdownService = {
+      render: jest.fn().mockImplementation(async (el: HTMLElement, content: string) => {
+        el.textContent = content;
+      }),
+    };
+
+    const controller = new StreamController({
+      containerEl,
+      markdownService: markdownService as never,
+      onCollapsibleToggle,
+    });
+
+    controller.renderStoredContentBlocks(contentEl, [
+      {
+        type: 'thinking',
+        content: 'Need a moment',
+        durationSeconds: 1.2,
+      },
+    ]);
+
+    contentEl.querySelector<HTMLElement>('.streaming-thinking-header')?.click();
+
+    expect(onCollapsibleToggle).toHaveBeenCalledTimes(1);
+  });
 });

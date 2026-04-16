@@ -56,6 +56,7 @@ constructor(
 - 展开后显示 `payload`，通常是格式化后的 `{ message, parts }` JSON
 - 空数据与加载失败分别显示独立状态文案
 - `onClose()` 后不再回写异步结果，避免销毁后的 DOM 更新
+- modal shell 现在会在 `onOpen()` / `onClose()` 时切换 `opencodian-context-detail-modal`，专门覆盖 Obsidian 默认 modal 宽度限制，避免 raw JSON / token 明细被过窄容器压缩
 
 ### 时间戳格式化
 
@@ -103,6 +104,7 @@ Modal grid + breakdown bar + raw messages + notes
 - 当 `contextState` 为 null 或 `summary.isUnavailable` 时，显示空状态提示
 - 原始消息区是独立异步块；即使加载失败，也不影响上方 context usage 统计展示
 - `formatTimestamp` 有 fallback：先尝试 `dateStyle + timeStyle`，失败后使用 `year/month/day/hour/minute` 各组件
+- 该 modal 依赖 `src/style/modals/config-editor-modal.css` 里的宽 modal 壳层规则；如果后续重新命名类名，需要同步更新样式选择器
 
 ## 补充说明
 

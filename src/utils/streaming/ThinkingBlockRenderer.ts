@@ -96,6 +96,7 @@ export class ThinkingBlockRenderer {
       contentEl.style.display = state.isExpanded ? 'block' : 'none';
       header.setAttribute('aria-expanded', String(state.isExpanded));
       state.wrapperEl.toggleClass('is-expanded', state.isExpanded);
+      this.options.onCollapsibleToggle?.();
     };
 
     header.addEventListener('click', toggle);

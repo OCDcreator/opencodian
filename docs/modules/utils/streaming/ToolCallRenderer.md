@@ -20,6 +20,7 @@
   getToolName?: (name, input) => string;      // 工具名称解析
   getToolSummary?: (name, input, toolKind?) => string;   // 摘要生成
   renderExpandedContent?: (container, toolName, result) => void;  // 展开内容渲染
+  onCollapsibleToggle?: () => void;           // 展开/收起后通知上层
 }
 ```
 
@@ -152,7 +153,7 @@ StreamController.handleToolResultChunk(chunk)
     → 清空 content → renderExpandedContent
     → updateStatus (completed/error)
 
-用户点击 header → toggle 展开/折叠 content
+用户点击 header → toggle 展开/折叠 content → `onCollapsibleToggle?()`
 ```
 
 ## 与其他模块的交互
@@ -167,6 +168,7 @@ StreamController.handleToolResultChunk(chunk)
 - `getToolName` — 自定义名称解析
 - `getToolSummary` — 自定义摘要生成
 - `renderExpandedContent` — 自定义结果渲染
+- `onCollapsibleToggle` — tool 详情切换后通知宿主安排滚动补偿
 
 ## 注意事项
 

@@ -170,6 +170,17 @@
   max-width: 840px;
 }
 
+.opencodian-context-detail-modal {
+  width: min(1120px, calc(100vw - 32px)) !important;
+  max-width: none !important;
+}
+
+.opencodian-context-detail-modal .modal-content {
+  width: 100%;
+  max-width: none;
+  box-sizing: border-box;
+}
+
 .opencodian-context-modal-empty {
   padding: 12px 0;
   color: var(--text-muted);

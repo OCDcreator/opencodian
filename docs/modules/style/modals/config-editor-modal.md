@@ -10,7 +10,7 @@
 ## 关键类名 / CSS 变量
 
 - 配置编辑：`.opencodian-config-editor*`、`.opencodian-config-help*`、`.opencodian-config-buttons`。
-- 上下文统计：`.opencodian-context-breakdown*`、`.opencodian-context-modal-*`。
+- 上下文统计：`.opencodian-context-breakdown*`、`.opencodian-context-modal-*`、`.opencodian-context-detail-modal*`。
 - 模型开关管理：`.opencodian-model-toggle-*`。
 - 模型工作区：`.opencodian-model-workspace-*`（平铺表单、预设选择器、provider 切换条、工具条、JSON 预览、状态徽章）。
 - 设置区块：`.opencodian-settings-block*`。
@@ -28,4 +28,5 @@
 
 - 该文件是“设置弹窗样式聚合点”，命名冲突风险高，新增类建议保持 `opencodian-<feature>-*` 前缀。
 - 含较多响应式规则（`@media`），改网格列数、工具条折行或 footer 粘底时需同时检查窄屏可读性。
+- `ContextDetailModal` 通过 `.opencodian-context-detail-modal` 直接覆盖 Obsidian 默认 modal 宽度；若切回 `:has(...)` 或改 class 名，需确认 raw message JSON 在宽窗口下不会再次被默认壳层截断。
 - 修改后执行 `npm run build:css`（或完整 `npm run build`）。

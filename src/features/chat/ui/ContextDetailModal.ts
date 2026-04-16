@@ -13,6 +13,8 @@ export interface ContextRawMessageItem {
 
 export class ContextDetailModal extends Modal {
   private isClosed = false;
+  private static readonly MODAL_CLASS = 'opencodian-context-detail-modal';
+  private static readonly CONTENT_CLASS = 'opencodian-context-detail-modal-content';
 
   constructor(
     app: App,
@@ -37,6 +39,8 @@ export class ContextDetailModal extends Modal {
 
   onOpen(): void {
     this.isClosed = false;
+    this.modalEl.addClass(ContextDetailModal.MODAL_CLASS);
+    this.contentEl.addClass(ContextDetailModal.CONTENT_CLASS);
     const { contentEl } = this;
     const summary = ContextUsageService.summarize(this.contextState);
     const tokens = ContextUsageService.getDisplayTokenBreakdown(this.contextState);
@@ -154,6 +158,8 @@ export class ContextDetailModal extends Modal {
   onClose(): void {
     this.isClosed = true;
     this.contentEl.empty();
+    this.contentEl.removeClass(ContextDetailModal.CONTENT_CLASS);
+    this.modalEl.removeClass(ContextDetailModal.MODAL_CLASS);
   }
 
   private renderRow(containerEl: HTMLElement, label: string, value: string): void {

@@ -20,6 +20,7 @@
   showTimer?: boolean;           // 默认 true
   collapsedLabel?: string;       // 默认 'Thinking...'
   expandedLabel?: string;        // 默认 'Thought'
+  onCollapsibleToggle?: () => void;  // 展开/收起后通知上层
 }
 ```
 
@@ -117,6 +118,6 @@
 - 计时器通过 `setInterval` 实现，在 `finalize()` 或 `cleanup()` 时必须清除
 - `appendContent()` 每次调用都完整重新渲染 markdown
 - 折叠/展开通过 `display: none/block` 切换，不使用 CSS animation
+- 每次切换后会触发 `onCollapsibleToggle`（如果提供），通常由上层安排一次 settled scroll，避免 assistant 内容展开后底部不可达
 - 键盘支持：Enter 和 Space 键切换展开/折叠
-
 

@@ -934,6 +934,11 @@ export class OpenCodianView extends ItemView {
             this.scrollToBottomIfNeeded(this.shouldAutoScroll(tabId), tabId);
           }
         },
+        onCollapsibleToggle: () => {
+          if (this.getActiveTabId() === tabId) {
+            this.scheduleSettledScrollToBottomIfNeeded(this.shouldAutoScroll(tabId), tabId);
+          }
+        },
       });
       paneState.runtime.streamController.setCallbacks({
         onToolCallStart: (toolCall) => {
@@ -2345,6 +2350,7 @@ export class OpenCodianView extends ItemView {
     return {
       renderMarkdownInto: (container, markdown) => this.renderMarkdownInto(container, markdown),
       handleNoticeAction: (actionType) => this.handleNoticeAction(actionType),
+      handleCollapsibleToggle: () => this.scheduleActiveSettledScrollToBottomIfNeeded(),
     };
   }
 
@@ -3758,6 +3764,7 @@ export class OpenCodianView extends ItemView {
           showMoreLabel: t('chat.action.showMore'),
           showLessLabel: t('chat.action.showLess'),
         },
+        onToggle: () => this.scheduleActiveSettledScrollToBottomIfNeeded(),
       });
     }
 
@@ -3856,6 +3863,7 @@ export class OpenCodianView extends ItemView {
         showMoreLabel: t('chat.omo.injected.showRaw'),
         showLessLabel: t('chat.omo.injected.hideRaw'),
       },
+      onToggle: () => this.scheduleActiveSettledScrollToBottomIfNeeded(),
     });
   }
 
@@ -3969,6 +3977,7 @@ export class OpenCodianView extends ItemView {
           const thinkingRenderer = new ThinkingBlockRenderer(this.markdownService, {
             collapsedByDefault: true,
             showTimer: false,
+            onCollapsibleToggle: () => this.scheduleActiveSettledScrollToBottomIfNeeded(),
           });
           thinkingRenderer.renderStored(container, block.thinking, block.durationSeconds);
         }
@@ -3980,7 +3989,9 @@ export class OpenCodianView extends ItemView {
         }
 
         if (block.toolName && block.toolId) {
-          const toolRenderer = new ToolCallRenderer();
+          const toolRenderer = new ToolCallRenderer({
+            onCollapsibleToggle: () => this.scheduleActiveSettledScrollToBottomIfNeeded(),
+          });
           const toolCall: ToolCallInfo = {
             id: block.toolId,
             name: block.toolName,
@@ -4432,6 +4443,11 @@ export class OpenCodianView extends ItemView {
     }
 
     this.scrollToBottom({ tabId });
+  }
+
+  private scheduleActiveSettledScrollToBottomIfNeeded(): void {
+    const activeTabId = this.getActiveTabId();
+    this.scheduleSettledScrollToBottomIfNeeded(this.shouldAutoScroll(activeTabId), activeTabId);
   }
 
   private scheduleSettledScrollToBottomIfNeeded(

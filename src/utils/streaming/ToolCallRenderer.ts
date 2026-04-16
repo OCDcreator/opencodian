@@ -444,6 +444,7 @@ export class ToolCallRenderer {
       content.style.display = isExpanded ? 'block' : 'none';
       header.setAttribute('aria-expanded', String(isExpanded));
       toolEl.toggleClass('is-expanded', isExpanded);
+      this.options.onCollapsibleToggle?.();
     };
 
     header.addEventListener('click', toggle);

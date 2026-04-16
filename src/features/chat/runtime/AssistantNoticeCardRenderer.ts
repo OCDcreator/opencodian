@@ -9,6 +9,7 @@ type NoticeActionType = NonNullable<ChatMessage['noticeActions']>[number]['type'
 export interface AssistantNoticeCardRendererHost {
   renderMarkdownInto(container: HTMLElement, markdown: string): Promise<void>;
   handleNoticeAction(actionType: NoticeActionType): Promise<void> | void;
+  handleCollapsibleToggle?(): void;
 }
 
 export class AssistantNoticeCardRenderer {
@@ -83,6 +84,7 @@ export class AssistantNoticeCardRenderer {
         showMoreLabel: t('chat.omo.system.showRaw'),
         showLessLabel: t('chat.omo.system.hideRaw'),
       },
+      onToggle: () => this.host.handleCollapsibleToggle?.(),
     });
   }
 

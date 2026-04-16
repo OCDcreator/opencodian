@@ -12,7 +12,7 @@
 - 把实时流转换成可持久化的 `ContentBlock[]`
 - 在流结束、取消或超时时做一致性收尾
 
-最近这块逻辑最大的变化不是类型，而是“文本渲染节流”和“结构化输出工具过滤”。
+最近这块逻辑最大的变化不是类型，而是“文本渲染节流”“结构化输出工具过滤”，以及把 thinking/tool 折叠交互的滚动补偿统一下沉到 controller options。
 
 ## 核心逻辑
 
@@ -90,6 +90,15 @@ tool call 不再只是“收到结果时 append 一次”那么简单。控制�
 | `setCallbacks(callbacks)` | 设置外部事件回调 |
 | `renderStoredContentBlocks(parentEl, blocks)` | 从持久化内容块重建历史 DOM |
 
+### 折叠交互回调
+
+`StreamControllerOptions` 除了 `scrollToBottom` 外，还支持 `onCollapsibleToggle`。controller 会把它继续传给：
+
+- `ThinkingBlockRenderer`
+- `ToolCallRenderer`
+
+这样 assistant 的 thinking/tool 卡片在历史恢复和流式阶段都能复用同一套“展开后安排 settled scroll”的策略，而不是依赖 view 层分别补丁。
+
 ## 与其他模块的交互
 
 - `OpenCodianView`: 创建并持有控制器，把服务层 chunk 映射到这里
@@ -104,4 +113,4 @@ tool call 不再只是“收到结果时 append 一次”那么简单。控制�
 - `handleChunk()` 在 `isStreaming === false` 或 `currentContentEl === null` 时会直接返回。
 - 文本节流降低了抖动，但也意味着 chunk 到达和 DOM 完成渲染之间存在一个短暂缓冲窗口。
 - `renderStoredContentBlocks()` 同样会跳过内部结构化输出工具块。
-
+- 如果没有显式传入 `onCollapsibleToggle`，controller 会回退复用 `scrollToBottom`，保证老调用方仍有基本的滚动行为。

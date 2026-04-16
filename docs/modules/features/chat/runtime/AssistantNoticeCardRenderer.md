@@ -12,6 +12,7 @@
 - `AssistantNoticeCardRenderer.render()`：在指定 container 内渲染 notice card
 - `AssistantNoticeCardRendererHost.renderMarkdownInto()`：由 view 提供 Markdown 渲染能力
 - `AssistantNoticeCardRendererHost.handleNoticeAction()`：由 view 提供 notice action 的真实副作用入口
+- `AssistantNoticeCardRendererHost.handleCollapsibleToggle()`：由 view 在 raw block 展开/收起后决定是否安排滚动补偿
 
 ## 设计目的
 
@@ -21,6 +22,6 @@
 
 ## 注意事项
 
-- OMO system-reminder 的标题、正文 fallback 和 raw block 展开行为在这里保持集中；新增 reminder 类型时优先更新本模块。
+- OMO system-reminder 的标题、正文 fallback 和 raw block 展开行为在这里保持集中；raw block 现在会把 toggle 事件回传给 host，用于处理消息面板的 settled scroll；新增 reminder 类型时优先更新本模块。
 - notice footer / timestamp row 不属于本模块，仍由 `AssistantShellViewHostAdapter` 经 `AssistantFooterRenderer` 处理。
 - notice action type 的业务副作用仍由 `OpenCodianView` host 回调承接；不要在 renderer 内直接打开设置页或修改 conversation state。

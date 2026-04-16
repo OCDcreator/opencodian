@@ -45,12 +45,19 @@ export class StreamController {
     this.scrollToBottom = options.scrollToBottom;
     this.state = createStreamState();
     this.callbacks = {};
+    const onCollapsibleToggle = options.onCollapsibleToggle ?? options.scrollToBottom;
 
     this.thinkingRenderer = new ThinkingBlockRenderer(
       this.markdownService,
-      thinkingRendererOptions
+      {
+        ...thinkingRendererOptions,
+        onCollapsibleToggle: thinkingRendererOptions?.onCollapsibleToggle ?? onCollapsibleToggle,
+      }
     );
-    this.toolRenderer = new ToolCallRenderer(toolRendererOptions);
+    this.toolRenderer = new ToolCallRenderer({
+      ...toolRendererOptions,
+      onCollapsibleToggle: toolRendererOptions?.onCollapsibleToggle ?? onCollapsibleToggle,
+    });
   }
 
   setCallbacks(callbacks: StreamEventCallbacks): void {

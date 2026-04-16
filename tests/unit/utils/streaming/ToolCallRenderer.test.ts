@@ -166,4 +166,22 @@ describe('ToolCallRenderer', () => {
 
     expect(parentEl.querySelector('.streaming-tool-icon svg')?.getAttribute('data-icon')).toBe('layers');
   });
+
+  it('calls the collapsible toggle callback when tool details expand', () => {
+    const parentEl = document.createElement('div');
+    const onCollapsibleToggle = jest.fn();
+    const renderer = new ToolCallRenderer({ onCollapsibleToggle });
+
+    renderer.render(parentEl, {
+      id: 'tool-expand-1',
+      name: 'read',
+      input: { file_path: 'docs/spec.md' },
+      status: 'completed',
+      result: 'done',
+    });
+
+    parentEl.querySelector<HTMLElement>('.streaming-tool-header')?.click();
+
+    expect(onCollapsibleToggle).toHaveBeenCalledTimes(1);
+  });
 });

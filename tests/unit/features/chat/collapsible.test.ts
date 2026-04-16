@@ -77,4 +77,26 @@ describe('setupCollapsible', () => {
     headerEl.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
     expect(state.isExpanded).toBe(false);
   });
+
+  it('calls the toggle callback after expanding and collapsing', () => {
+    const { wrapperEl, contentEl, headerEl } = createElements();
+    const onToggle = jest.fn();
+    Object.defineProperty(contentEl, 'scrollHeight', { configurable: true, value: 320 });
+
+    const state: CollapsibleState = { isExpanded: false, isCollapsible: false };
+    setupCollapsible({
+      wrapperEl,
+      headerEl,
+      contentEl,
+      state,
+      options: labels,
+      onToggle,
+    });
+
+    headerEl.click();
+    headerEl.click();
+
+    expect(onToggle).toHaveBeenNthCalledWith(1, true);
+    expect(onToggle).toHaveBeenNthCalledWith(2, false);
+  });
 });

@@ -16,6 +16,7 @@ export interface SetupCollapsibleOptions {
   contentEl: HTMLElement;
   state: CollapsibleState;
   options?: CollapsibleOptions;
+  onToggle?: (isExpanded: boolean) => void;
 }
 
 const DEFAULT_COLLAPSED_HEIGHT = 168;
@@ -28,6 +29,7 @@ export function setupCollapsible(setup: SetupCollapsibleOptions): void {
     contentEl,
     state,
     options = {},
+    onToggle,
   } = setup;
   const collapsedHeight = options.collapsedHeight ?? DEFAULT_COLLAPSED_HEIGHT;
   const minOverflow = options.minOverflow ?? DEFAULT_MIN_OVERFLOW;
@@ -78,6 +80,7 @@ export function setupCollapsible(setup: SetupCollapsibleOptions): void {
     }
     state.isExpanded = !state.isExpanded;
     applyState();
+    onToggle?.(state.isExpanded);
   };
 
   headerEl.addEventListener('click', (event) => {

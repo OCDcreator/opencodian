@@ -5,7 +5,7 @@
 
 ## 概述
 
-`setupCollapsible()` 是一个一次性装配函数，用来给现有 DOM 节点加上“超高内容可折叠”的行为。它既被普通长文本复用，也被 OMO 原始提示块复用。
+`setupCollapsible()` 是一个一次性装配函数，用来给现有 DOM 节点加上“超高内容可折叠”的行为。它既被普通长文本复用，也被 OMO 原始提示块复用。现在它还支持在展开/收起后通知上层，由视图层决定是否执行“布局稳定后滚到底”的补偿。
 
 ## 核心类型
 
@@ -26,13 +26,14 @@ interface CollapsibleOptions {
 ## 函数行为
 
 ```typescript
-setupCollapsible(
-  wrapperEl: HTMLElement,
-  headerEl: HTMLElement,
-  contentEl: HTMLElement,
-  state: CollapsibleState,
-  options?: CollapsibleOptions,
-): void
+setupCollapsible({
+  wrapperEl,
+  headerEl,
+  contentEl,
+  state,
+  options?,
+  onToggle?,
+}): void
 ```
 
 初始化时会：
@@ -68,7 +69,7 @@ setupCollapsible(
 - `keydown` 中的 `Enter`
 - `keydown` 中的空格
 
-点击或按键后都会切换 `state.isExpanded`，再重新执行 `applyState()`。
+点击或按键后都会切换 `state.isExpanded`，再重新执行 `applyState()`。如果调用方传了 `onToggle(isExpanded)`，这里也会在状态落地后触发，供聊天视图在 auto-scroll 开启时安排一次 settled scroll。
 
 ### 尺寸变化
 
@@ -77,7 +78,7 @@ setupCollapsible(
 ## 模块关系
 
 - 无上游依赖
-- 下游消费者：`OpenCodianView.renderUserMessageContent()`、`OpenCodianView.renderOmoUserInjection()`
+- 下游消费者：`OpenCodianView.renderUserMessageContent()`、`OpenCodianView.renderOmoUserInjection()`、`AssistantNoticeCardRenderer.renderOmoRawSystemReminder()`
 
 ## 注意事项
 
