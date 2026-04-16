@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个活动任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成活动任务；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的后续任务”。
-> **当前状态**: [ACTIVE] 已人工续排 `R138-R152`；当前唯一活动任务是 `R150`。
+> **当前状态**: [ACTIVE] 已人工续排 `R138-R152`；当前唯一活动任务是 `R151`。
 
 ## 控制规则
 
@@ -17,8 +17,8 @@
 
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
 - 当前 live lint 基线：`0 errors / 39 warnings`
-- 最近成功 phase：`docs/status/maintainability-phase-484.md`
-- 当前路线判断：`R137` 已确认 `R88-R136` 完成 owner seam、heavy suite split、final warning closeout 与 queue closeout 的完整闭环；`R142` 已复盘 `R138-R141` 的 chat residual 收益；`R143-R148` 已完成 settings/startup 与 opencode lifecycle residual，`R149` 已把 streaming tool-render 的 MCP 摘要分类/字段回退回并到 `mcpSummaryConfig` 统一入口并将 live lint 推进到 `0 errors / 39 warnings`；当前 queue 进入 `R150` 的 storage/provider asset persistence residual，再视 live hotspot 决定是否执行 `R151` heavy cleanup。
+- 最近成功 phase：`docs/status/maintainability-phase-485.md`
+- 当前路线判断：`R137` 已确认 `R88-R136` 完成 owner seam、heavy suite split、final warning closeout 与 queue closeout 的完整闭环；`R142` 已复盘 `R138-R141` 的 chat residual 收益；`R143-R149` 已完成 settings/startup、opencode lifecycle 与 streaming residual，`R150` 已把 `StorageService` 内的主题背景资产 persistence 收束到 `ThemeBackgroundStorage` owner 并将 live lint 推进到 `0 errors / 38 warnings`；当前 queue 进入 `R151` 的 heavy tests / opt-in glass warning cleanup，随后由 `R152` 做 continuation checkpoint。
 
 ## Queue
 ## Queue
@@ -1489,7 +1489,7 @@
 - **禁止项**: 不改变 final response completion、tool-call rendering、MCP/custom tool summary rules、SSE fallback handling、session.diff/message.updated bridge 或 abort semantics。
 - **验收**: streaming residual warning 有可量化下降且 lint 维持 `0 errors`；并通过全量 `npm test` 与 `npm run build`。
 
-### [NEXT] R150 - Storage/provider asset persistence residual seam
+### [DONE] R150 - Storage/provider asset persistence residual seam
 
 - **Lane**: Maintainability / persistence
 - **目标**: 沿 `StorageService`、provider icon cache 与 builtin icon registry 收束 conversation persistence、theme background、provider asset cache residual，保持 local-first storage 与 icon fallback order。
@@ -1502,7 +1502,7 @@
 - **禁止项**: 不改变 conversation serialization、theme background persistence、provider icon builtin/LobeHub/custom fallback order、cache invalidation 或 asset path semantics。
 - **验收**: persistence/provider asset residual warning 有可量化下降且 lint 维持 `0 errors`；并通过全量 `npm test` 与 `npm run build`。
 
-### [QUEUED] R151 - Heavy tests and glass warning cleanup
+### [NEXT] R151 - Heavy tests and glass warning cleanup
 
 - **Lane**: Warning cleanup / justified hotspots
 - **目标**: 仅在前序轮次后 live lint 仍显示对应热点时，处理 remaining heavy tests 与 opt-in glass/demo warning residual，优先按 fixture/context 分组或既有 owner 内部整理完成。

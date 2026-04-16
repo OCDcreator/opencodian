@@ -10,14 +10,14 @@
 - 会话 JSON
 - 分层插件设置 JSON
 - 运行时状态 JSON
-- 主题背景图片资产
+- 主题背景图片资产（通过内部 `ThemeBackgroundStorage` owner）
 
 源码里没有把这些数据写到 `.obsidian/plugins/opencodian/`；实际相对路径都是以 vault 根目录为基准。
 
 ## 导入关系
 
 ```text
-上游: obsidian App/normalizePath, path, src/main.ts, src/core/opencode/types.ts, src/core/types/index.ts
+上游: obsidian App/normalizePath, src/main.ts, src/core/opencode/types.ts, src/core/storage/ThemeBackgroundStorage.ts, src/core/types/index.ts
 下游: src/main.ts, src/features/chat/OpenCodianView.ts
 ```
 
@@ -153,7 +153,9 @@ class StorageService {
 
 ### 主题背景资产
 
-`saveThemeBackgroundAsset()` 负责把用户上传的背景图写入 `theme-backgrounds/`：
+`saveThemeBackgroundAsset()` / `removeThemeBackground()` / `readThemeBackgroundDataUrl()` 现在委托给 `ThemeBackgroundStorage`，但对外 API 与调用时机保持不变。
+
+背景图 owner 仍负责把用户上传的背景图写入 `theme-backgrounds/`：
 
 1. 先校验大小不能超过 64 MB
 2. 检测 MIME 类型
@@ -182,7 +184,7 @@ class StorageService {
 
 ### MIME 检测顺序
 
-`detectThemeBackgroundMimeType()` 的顺序是：
+`ThemeBackgroundStorage.detectMimeType()` 的顺序是：
 
 1. 优先接受合法的 `hintedMimeType`
 2. 检测二进制或文本签名
@@ -213,6 +215,7 @@ OpenCodianView 会话变更
 - `src/main.ts` 是 `StorageService` 的创建者，也是设置恢复、分层保存、运行时状态、背景图资源读写的协调者。
 - `src/features/chat/OpenCodianView.ts` 通过 `plugin.saveConversation()` 持久化会话；UI 状态写盘也要先回到插件层。
 - 主题背景图的写入、移除和读取都由 `src/main.ts` 调用这个服务，再把结果回填到设置项中。
+- 背景图二进制细节已经从 `StorageService` 主类收束到 `src/core/storage/ThemeBackgroundStorage.ts`。
 
 ## 注意事项
 

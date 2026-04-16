@@ -7,6 +7,8 @@
 
 `src/core/storage/index.ts` 是存储层的最小公开入口，当前只导出 `StorageService`。所有会话、设置、运行时状态和主题背景资源的本地持久化能力，都通过这个类向上层暴露。
 
+主题背景资源的二进制读写已经下沉到内部 `ThemeBackgroundStorage` owner，但它暂时不通过 barrel 公开。
+
 ## 导入关系
 
 ```text
@@ -28,6 +30,7 @@ barrel 没有导出 `StorageService` 内部使用的：
 
 - `StoredThemeBackgroundAsset`
 - `RuntimeState`
+- `ThemeBackgroundStorage`
 - 存储路径常量
 
 调用方只能通过 `StorageService` 的方法间接操作这些数据。
@@ -39,4 +42,4 @@ barrel 没有导出 `StorageService` 内部使用的：
 ## 注意事项
 
 - 如果未来新增其他存储服务，需要同时更新这个 barrel 和对应模块文档。
-- 当前 barrel 很薄，真正的路径布局、文件格式和资源限制都定义在 `StorageService.ts` 内。
+- 当前 barrel 很薄；会话/设置/运行时布局主要在 `StorageService.ts`，主题背景资产约束则在 `ThemeBackgroundStorage.ts` 内。

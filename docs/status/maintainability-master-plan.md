@@ -2,19 +2,19 @@
 
 > **状态**: [ACTIVE]
 > **作用**: 这是 maintainability 无人值守的战略文档。每轮开始前，先读本文件，再读 `docs/status/maintainability-round-roadmap.md` 与最近的 `docs/status/maintainability-phase-XXX.md`。
-> **自动推进状态**: 已人工续排 `R138-R152`；当前唯一可自动执行的 `[NEXT]` 是 `R150`。
+> **自动推进状态**: 已人工续排 `R138-R152`；当前唯一可自动执行的 `[NEXT]` 是 `R151`。
 
 ## 1. 当前判断
 
-**当前分支已完成 `R88-R149` 并已人工续排 `R150-R152`。`R149` 已完成 streaming tool-render summary residual，把 `ToolCallRenderer` 内联的 MCP 摘要分类/字段回退收束回 `mcpSummaryConfig` 统一入口，保持 tool-call rendering 与 MCP/custom summary 语义不变，并把 live lint 推进到 `0 errors / 39 warnings`；当前 queue 已进入 `R150` 的 storage/provider asset persistence residual，随后仅在热点仍支撑时处理 `R151` heavy cleanup，并在 `R152` 做 continuation checkpoint。**
+**当前分支已完成 `R88-R150` 并已人工续排 `R151-R152`。`R150` 已完成 storage/theme background persistence residual：把 `StorageService` 中的主题背景目录初始化、MIME 检测、二进制写入/回读逻辑收束到新的 `ThemeBackgroundStorage` owner，保持 conversation serialization、theme background persistence 与 provider icon fallback/caching 语义不变，并把 live lint 推进到 `0 errors / 38 warnings`；当前 queue 已进入 `R151` 的 heavy tests / opt-in glass warning cleanup，随后在 `R152` 做 continuation checkpoint。**
 
 ## 2. 当前基线
 
-- **lint**: `0 errors / 39 warnings`
-- **最近验证**: `R149` 运行 targeted `npx eslint --format unix src/core/opencode/OpenCodeStreamEventTransformer.ts src/core/opencode/OpenCodeStreamingRuntimeCoordinator.ts src/utils/streaming/StreamController.ts src/utils/streaming/ToolCallRenderer.ts tests/unit/core/opencode/OpenCodeStreamingRuntimeCoordinator.test.ts tests/unit/core/opencode/OpenCodeStreamEventTransformer.test.ts`、focused `npm test -- ToolCallRenderer.test.ts`、全量 `npm run lint -- --format unix`、全量 `npm test` 与 `BUILD_ID=autopilot-maintainability.$(date +%Y%m%d%H%M) npm run build`；targeted streaming lint 从 `5` 个 warning 降到 `4` 个，整体 lint 维持 `0 errors / 39 warnings`，`npm test` 为 `286 passed, 286 total` suites / `1190 passed, 1190 total` tests，最新 `BUILD_ID` 为 `autopilot-maintainability.202604160825`
+- **lint**: `0 errors / 38 warnings`
+- **最近验证**: `R150` 运行 targeted `npx eslint --format unix src/core/storage/StorageService.ts src/core/storage/ThemeBackgroundStorage.ts tests/unit/core/storage/StorageService.test.ts`、focused `npm test -- StorageService.test.ts`、全量 `npm run lint -- --format unix`、全量 `npm test` 与 `BUILD_ID=autopilot-maintainability.$(date +%Y%m%d%H%M); echo "$BUILD_ID"; BUILD_ID=$BUILD_ID npm run build`；targeted storage lint 仅余 `3` 个 test warning，整体 lint 从 `0 errors / 39 warnings` 降到 `0 errors / 38 warnings`，`npm test` 为 `286 passed, 286 total` suites / `1190 passed, 1190 total` tests，最新 `BUILD_ID` 为 `autopilot-maintainability.202604160834`
 - **最近 Test Vault 部署**: `R146`，`BUILD_ID` `autopilot-maintainability.202604160757`
-- **当前 `[NEXT]`**: `R150 - Storage/provider asset persistence residual seam`
-- **主热点**: live lint 仍为 `39` warnings，其中 `tests/**` 约 `9`、`src/features/chat/**` 约 `7`、`src/utils/glass/**` 约 `6`、`src/core/opencode/**` 约 `4`，另有 storage/provider-icon persistence residual；当前先完成 `R150`，再视 live hotspot 决定是否执行 `R151`
+- **当前 `[NEXT]`**: `R151 - Heavy tests and glass warning cleanup`
+- **主热点**: live lint 仍为 `38` warnings，其中 `tests/**` 约 `9`、`src/features/chat/**` 约 `7`、`src/utils/glass/**` 约 `6`、`src/core/opencode/**` 约 `4`；storage/theme background persistence residual 已收束，当前转入 `R151`，再由 `R152` 做 continuation checkpoint
 
 ## 3. 本批执行规则
 
