@@ -17,6 +17,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint \"{src,tests}/**/*.ts\"",
     "lint:fix": "npm run lint -- --fix",
+    "verify": "npm run lint && npm run typecheck && npm test && npm run build",
     "test": "node scripts/run-jest.js",
     "test:watch": "node scripts/run-jest.js --watch",
     "test:coverage": "node scripts/run-jest.js --coverage",

@@ -5,7 +5,7 @@ import * as os from 'os';
 import * as path from 'path';
 
 import { OpencodeConfigManager } from '../../../../src/core/config';
-import { DEFAULT_SETTINGS } from '../../../../src/core/types';
+import { DEFAULT_SETTINGS, getCurrentPlatformKey } from '../../../../src/core/types';
 import { SettingsSecuritySection } from '../../../../src/features/settings/SettingsSecuritySection';
 import { setLocale, t } from '../../../../src/i18n';
 import type OpenCodianPlugin from '../../../../src/main';
@@ -76,6 +76,8 @@ const buttonRecords: ButtonRecord[] = [];
 const settingRecordMap = new WeakMap<Setting, SettingRecord>();
 const settingRecords: SettingRecord[] = [];
 const tempDirs: string[] = [];
+const currentPlatformKey = getCurrentPlatformKey();
+const currentPlatformLabel = currentPlatformKey === 'windows' ? 'Windows' : 'Unix';
 
 function ensureSettingRecord(instance: Setting): SettingRecord {
   const existing = settingRecordMap.get(instance);
@@ -400,10 +402,14 @@ describe('SettingsSecuritySection', () => {
       t('settings.security.blocklist.name'),
       t('settings.security.externalAccess.name'),
     ]);
-    expect(textAreaRecords.map((record) => record.name)).toEqual([
+    const expectedTextAreaNames = [
       t('settings.security.exportPaths.name'),
-      t('settings.security.blockedCommands.name', { platform: 'Unix' }),
-    ]);
+      t('settings.security.blockedCommands.name', { platform: currentPlatformLabel }),
+    ];
+    if (currentPlatformKey === 'windows') {
+      expectedTextAreaNames.push(t('settings.security.blockedCommands.unixName'));
+    }
+    expect(textAreaRecords.map((record) => record.name)).toEqual(expectedTextAreaNames);
     expect(buttonRecords.filter((record) => record.name === t('settings.security.configFile.name'))).toHaveLength(2);
 
     const configStatusRecord = await waitForSettingRecord(
@@ -500,12 +506,12 @@ describe('SettingsSecuritySection', () => {
     await exportPathsRecord?.onChange?.(' ~/Desktop \n\n /tmp/export ');
 
     const blockedCommandsRecord = textAreaRecords.find(
-      (record) => record.name === t('settings.security.blockedCommands.name', { platform: 'Unix' }),
+      (record) => record.name === t('settings.security.blockedCommands.name', { platform: currentPlatformLabel }),
     );
     await blockedCommandsRecord?.onChange?.('rm -rf\n\n chmod 777 ');
 
     expect(plugin.settings.allowedExportPaths).toEqual(['~/Desktop', '/tmp/export']);
-    expect(plugin.settings.blockedCommands.unix).toEqual(['rm -rf', 'chmod 777']);
+    expect(plugin.settings.blockedCommands[currentPlatformKey]).toEqual(['rm -rf', 'chmod 777']);
     expect(plugin.saveSettings).toHaveBeenCalledTimes(2);
   });
 });

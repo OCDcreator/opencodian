@@ -12,6 +12,7 @@ OpenCodian is an Obsidian plugin that embeds OpenCode into the sidebar. Keep thi
 
 ```bash
 npm install
+npm run verify
 npm run build
 npm run test
 npm run lint
@@ -19,6 +20,15 @@ npm run check:devlog-order
 ```
 
 Use `npm run doctor:esbuild` only after dependency changes or when build/dev reports an esbuild platform mismatch.
+
+## Maintainability Guardrails
+
+- Treat `npm run verify` as the default pre-merge gate: lint, typecheck, full tests, and production build must stay green.
+- Treat lint warnings as blockers; do not merge with anything above `0 errors / 0 warnings`.
+- Do not add thin helper / adapter / provider / factory files unless reused in 3+ places or isolating a high-risk dependency.
+- Prefer extending existing service / coordinator / runtime owners over adding new indirection layers.
+- Do not grow `src/features/chat/OpenCodianView.ts` or `src/core/opencode/OpenCodeService.ts` with new runtime ownership; move stable responsibilities to adjacent owners when touching them.
+- If a module boundary changes, update the matching `docs/modules/**` page and keep `docs/status/development-maintainability-rules.md` aligned.
 
 ## Current Architecture
 
