@@ -137,6 +137,31 @@ describe('StorageService conversation persistence', () => {
       ]);
     });
 
+    it('persists conversation external context paths', async () => {
+      const conversation = {
+        id: 'conv-paths',
+        title: 'Context paths conversation',
+        createdAt: 1234567890,
+        updatedAt: 1234567890,
+        openCodeSessionId: 'session-paths',
+        externalContextPaths: ['notes/alpha.md', 'notes/beta.md'],
+        messages: [],
+      };
+
+      await storage.saveConversation(conversation as unknown as {
+        id: string;
+        title: string;
+        createdAt: number;
+        updatedAt: number;
+        openCodeSessionId: string;
+        externalContextPaths: string[];
+        messages: unknown[];
+      });
+
+      const savedData = JSON.parse(mockAdapter.write.mock.calls[0][1]);
+      expect(savedData.externalContextPaths).toEqual(['notes/alpha.md', 'notes/beta.md']);
+    });
+
   });
 
   describe('loadConversation', () => {
@@ -235,6 +260,22 @@ describe('StorageService conversation persistence', () => {
           mime: 'text/markdown',
         },
       ]);
+    });
+
+    it('restores persisted external context paths after reload', async () => {
+      mockAdapter.read.mockResolvedValue(JSON.stringify({
+        id: 'conv-paths',
+        title: 'Context paths conversation',
+        createdAt: 1234567890,
+        updatedAt: 1234567999,
+        openCodeSessionId: 'session-paths',
+        externalContextPaths: ['notes/alpha.md', 'notes/beta.md'],
+        messages: [],
+      }));
+
+      const result = await storage.loadFullConversation('conv-paths');
+
+      expect(result?.externalContextPaths).toEqual(['notes/alpha.md', 'notes/beta.md']);
     });
 
   });

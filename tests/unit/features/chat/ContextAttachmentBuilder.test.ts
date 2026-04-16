@@ -159,6 +159,37 @@ describe('ContextAttachmentBuilder', () => {
     }));
   });
 
+  it('builds persistent file context items from stored paths and skips stale duplicates', async () => {
+    const alphaFile = createFile('notes/alpha.md');
+    const betaFile = createFile('notes/beta.md');
+    const noticeSpy = obsidian.Notice as unknown as jest.Mock;
+    const { builder, getAbstractFileByPath } = createBuilder({
+      files: [alphaFile, betaFile],
+    });
+
+    const items = await builder.buildPersistentFileContextItems([
+      'notes/alpha.md',
+      'notes/missing.md',
+      'notes/alpha.md',
+      'notes/beta.md',
+    ]);
+
+    expect(getAbstractFileByPath).toHaveBeenCalledTimes(3);
+    expect(items).toEqual([
+      expect.objectContaining({
+        kind: 'file',
+        path: 'notes/alpha.md',
+        label: 'alpha.md',
+      }),
+      expect.objectContaining({
+        kind: 'file',
+        path: 'notes/beta.md',
+        label: 'beta.md',
+      }),
+    ]);
+    expect(noticeSpy).not.toHaveBeenCalled();
+  });
+
   it('rejects remote binary files before reading them', async () => {
     const file = createFile('assets/image.png');
     const noticeSpy = obsidian.Notice as unknown as jest.Mock;

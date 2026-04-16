@@ -44,6 +44,7 @@ function createPreparedSend(overrides: Partial<PreparedMessageSend> = {}): Prepa
     conversation: overrides.conversation ?? createConversation([userMessage]),
     tabId: overrides.tabId ?? 'tab-1',
     draftContextItems: overrides.draftContextItems ?? [],
+    contextItems: overrides.contextItems ?? [],
     modelOptions: overrides.modelOptions ?? {
       provider: 'openai',
       model: 'gpt-5.4',
@@ -333,6 +334,40 @@ describe('SendPipelineRuntime', () => {
       editedFiles: ['notes.md'],
     }));
     expect(callOrder.indexOf('saveConversation')).toBeLessThan(callOrder.indexOf('finalizeAfterStream'));
+  });
+
+  it('sends the merged prepared context items instead of only draft items', async () => {
+    const contextItem = {
+      id: 'context-1',
+      kind: 'file',
+      path: 'notes/guide.md',
+      label: 'guide.md',
+      mime: 'text/markdown',
+    } as const;
+    const preparedSend = createPreparedSend({
+      draftContextItems: [],
+      contextItems: [contextItem],
+    });
+    const runtimeState = createTabRuntime();
+    const streamController = createStreamController();
+    const preparationPort = createPreparationPort(preparedSend);
+    const finalizationPort = createFinalizationPort();
+    const host = createHost(runtimeState, streamController, [], {
+      sendStreamMessage: jest.fn().mockImplementation(() => createAsyncStream([
+        { type: 'message_start' },
+        { type: 'message_stop' },
+      ])),
+    });
+    const runtime = new SendPipelineRuntime(host, preparationPort, finalizationPort);
+
+    await runtime.sendMessage('Hello');
+
+    expect(host.sendStreamMessage).toHaveBeenCalledWith('Hello', {
+      sessionId: 'session-1',
+      provider: 'openai',
+      model: 'gpt-5.4',
+      contextItems: [contextItem],
+    });
   });
 
   it('persists a notice when the stream ends with only an error', async () => {

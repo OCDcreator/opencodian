@@ -31,6 +31,7 @@ type ComposerContextAttachmentBuilderPort = Pick<
   | 'buildSelectionContextItem'
   | 'buildFileContextItem'
   | 'buildFileContextItemFromPath'
+  | 'buildPersistentFileContextItems'
   | 'buildSelectionContextItemFromPreview'
   | 'hasFileAtPath'
 >;
@@ -104,6 +105,7 @@ export interface ComposerContextViewFacadeCreateOptions {
 
 export interface ComposerSendContextPort {
   getDraftContextItems(tabId?: TabId | null): PromptContextItem[];
+  resolvePersistentContextItems(paths?: readonly string[]): Promise<PromptContextItem[]>;
   clearDraftContextItems(tabId?: TabId | null): void;
 }
 
@@ -114,6 +116,7 @@ export interface ComposerContextServices {
 }
 
 export interface ComposerContextViewFacadeDependencies {
+  contextAttachmentBuilder: Pick<ComposerContextAttachmentBuilderPort, 'buildPersistentFileContextItems'>;
   runtimeStore: ComposerContextRuntimeStorePort;
   actionService: ComposerContextActionPort;
   pickerActionService: ComposerContextPickerActionPort;
@@ -146,6 +149,8 @@ export class ComposerContextViewFacade {
     this.sendContext = {
       getDraftContextItems: (tabId?: TabId | null) =>
         this.dependencies.runtimeStore.getDraftContextItems(tabId),
+      resolvePersistentContextItems: (paths?: readonly string[]) =>
+        this.dependencies.contextAttachmentBuilder.buildPersistentFileContextItems(paths),
       clearDraftContextItems: (tabId?: TabId | null) => {
         this.dependencies.runtimeStore.clearDraftContextItems(tabId);
       },
@@ -268,6 +273,7 @@ export function createComposerContextServices(
     contextFileCatalogEventBridge,
   );
   const viewFacade = new ComposerContextViewFacade({
+    contextAttachmentBuilder: dependencies.contextAttachmentBuilder,
     runtimeStore,
     actionService,
     pickerActionService,

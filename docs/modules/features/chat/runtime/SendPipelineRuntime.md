@@ -58,6 +58,7 @@ export class SendPipelineRuntime {
 - 先调用 `prepareMessageSend()` 获取 `PreparedMessageSend`
 - 如果 active tab runtime 在 preparation 之后已经失效，直接中止，不继续发流
 - 进入 streaming 状态后，再创建真实 stream、streaming shell 和 `StreamController`
+- transport 层收到的是 `PreparedMessageSend.contextItems`，也就是“持久路径 + 一次性 composer context”的合并结果，而不是单独的 draft context
 - 把 stream、controller、tab runtime 与 prepared send 交给 `StreamChunkRouter`
 
 ### chunk router
