@@ -5,10 +5,10 @@
 
 ## 概述
 
-渲染 AI 工具调用卡片。显示工具名称、摘要信息、状态图标和可展开的执行结果。摘要逻辑仍按工具规范名分流，但工具名称/图标识别现在统一委托给 `shared/toolIdentity`，兼容 OpenCode 与 Claudian 的不同命名体系。
+渲染 AI 工具调用卡片。显示工具名称、摘要信息、状态图标和可展开的执行结果。`ToolCallRenderer` 现在把 MCP 摘要分类/字段回退委托给 `mcpSummaryConfig.getMcpToolSummary()`，自身只保留 DOM 渲染与 builtin/custom 工具摘要装配；工具名称/图标识别继续统一委托给 `shared/toolIdentity`，兼容 OpenCode 与 Claudian 的不同命名体系。
 
 ## 导入关系
-上游: `obsidian` (setIcon), `../../shared` (tool identity), `./types` (ToolCallInfo, ToolCallStatus, ToolRendererOptions)
+上游: `obsidian` (setIcon), `../../shared` (tool identity), `./mcpSummaryConfig` (MCP summary resolver), `./types` (ToolCallInfo, ToolCallStatus, ToolRendererOptions)
 下游: `StreamController` (持有并调用)
 
 ## 核心类型 / 接口
@@ -50,7 +50,7 @@
 | `web_search` / `websearch` / `codesearch` | 查询文本（截断 60 字符） |
 | `web_fetch` / `webfetch` | URL 文本（截断 60 字符） |
 
-对结构化 `kind: 'mcp'` 的工具，摘要规则改为“工具名语义优先”；字段配置集中维护在 `src/utils/streaming/mcpSummaryConfig.ts`，完整对照表见 [mcp-summary-fields.md](C:/Users/lt/Desktop/Write/custom-project/opencodian/docs/modules/utils/streaming/mcp-summary-fields.md)：
+对结构化 `kind: 'mcp'` 的工具，`ToolCallRenderer` 直接调用 `src/utils/streaming/mcpSummaryConfig.ts` 中的 `getMcpToolSummary()`；该 helper 继续按“工具名语义优先”执行字段回退，完整对照表见 [mcp-summary-fields.md](C:/Users/lt/Desktop/Write/custom-project/opencodian/docs/modules/utils/streaming/mcp-summary-fields.md)：
 
 1. 先把工具名按 `__` / `_` / `-` / `:` 拆词，并优先取最后一个命中的动作词
 2. 若命中动作词，则按该类别的字段优先级取摘要

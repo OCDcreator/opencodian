@@ -131,3 +131,131 @@ export const MCP_URL_LIKE_FIELDS = new Set([
 ]);
 
 export const MCP_ARGUMENT_FIELDS = new Set(['arguments', 'args', 'argv']);
+
+function truncateMcpSummaryText(text: string, maxLength: number): string {
+  if (text.length <= maxLength) {
+    return text;
+  }
+
+  return `${text.substring(0, maxLength)}...`;
+}
+
+function getPathTail(filePath: string): string {
+  if (!filePath) {
+    return '';
+  }
+
+  const normalized = filePath.replace(/\\/g, '/').replace(/\/+$/, '');
+  if (!normalized) {
+    return '';
+  }
+
+  return normalized.split('/').pop() ?? normalized;
+}
+
+function tokenizeMcpToolName(name: string): string[] {
+  return name
+    .toLowerCase()
+    .split(/(?:__|[_:-])+/)
+    .map((token) => token.trim())
+    .filter((token) => token.length > 0);
+}
+
+function resolveMcpSummaryCategory(tokens: string[]): McpSummaryCategoryDefinition | null {
+  for (let index = tokens.length - 1; index >= 0; index -= 1) {
+    const token = tokens[index];
+    const matched = MCP_SUMMARY_CATEGORY_DEFINITIONS.find((category) => category.verbs.includes(token));
+    if (matched) {
+      return matched;
+    }
+  }
+
+  for (const category of MCP_SUMMARY_CATEGORY_DEFINITIONS) {
+    if (category.verbs.some((verb) => tokens.includes(verb))) {
+      return category;
+    }
+  }
+
+  return null;
+}
+
+function formatMcpSummaryField(field: string, value: unknown): string {
+  if (MCP_ARGUMENT_FIELDS.has(field)) {
+    if (typeof value !== 'string') {
+      return '';
+    }
+
+    const trimmed = value.trim();
+    return trimmed ? truncateMcpSummaryText(trimmed, 60) : '';
+  }
+
+  if (typeof value !== 'string') {
+    return '';
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return '';
+  }
+
+  if (MCP_PATH_LIKE_FIELDS.has(field)) {
+    return getPathTail(trimmed);
+  }
+
+  return truncateMcpSummaryText(trimmed, 60);
+}
+
+function getMcpSummaryFromFields(
+  input: Record<string, unknown>,
+  fields: readonly string[],
+): string {
+  for (const field of fields) {
+    const formatted = formatMcpSummaryField(field, input[field]);
+    if (formatted) {
+      return formatted;
+    }
+  }
+
+  return '';
+}
+
+function getFirstScalarMcpFallback(input: Record<string, unknown>): string {
+  for (const value of Object.values(input)) {
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (trimmed) {
+        return truncateMcpSummaryText(trimmed, 60);
+      }
+      continue;
+    }
+
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return String(value);
+    }
+
+    if (typeof value === 'boolean') {
+      return String(value);
+    }
+  }
+
+  return '';
+}
+
+export function getMcpToolSummary(name: string, input: Record<string, unknown>): string {
+  const tokens = tokenizeMcpToolName(name);
+  const category = resolveMcpSummaryCategory(tokens);
+
+  if (category) {
+    const categorySummary = getMcpSummaryFromFields(input, category.fields);
+    if (categorySummary) {
+      return categorySummary;
+    }
+  }
+
+  const genericSummary = getMcpSummaryFromFields(input, MCP_GENERIC_SUMMARY_FIELDS);
+  if (genericSummary) {
+    return genericSummary;
+  }
+
+  return getFirstScalarMcpFallback(input);
+}
