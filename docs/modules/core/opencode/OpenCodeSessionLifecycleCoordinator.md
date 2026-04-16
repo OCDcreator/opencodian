@@ -25,7 +25,7 @@
 ## 核心类型 / 接口
 
 - `Session` / `Message` / `Part` / `SessionMessage`: session lifecycle 公开接口复用的基础形状。
-- `OpenCodeSessionLifecycleSdk`: coordinator 依赖的最小 session SDK 面，只覆盖 abort/create/get/list/messages/todo/status/delete/update。
+- `OpenCodeSessionLifecycleSdk`: coordinator 依赖的最小 session SDK 面，只覆盖 abort/create/get/list/messages/todo/status/delete/update；当前 host 可直接注入 `OpenCodeSdkFacade.session`，不再需要 `OpenCodeService` 先包一层 CRUD adapter。
 - `OpenCodeSessionLifecycleSyncRuntime`: 对 `OpenCodeSyncEventRuntimeCoordinator` 的最小订阅面抽象。
 - `OpenCodeSessionLifecycleCoordinatorHost`: host seam，提供 SDK CRUD/abort 开关、legacy HTTP helper、normalizer、revert 过滤、tool 观测与日志。
 - `OpenCodeSessionLifecycleCoordinator`: 持有 current session 指针，并实现 session lifecycle 公开方法。

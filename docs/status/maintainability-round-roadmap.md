@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个活动任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成活动任务；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的后续任务”。
-> **当前状态**: [ACTIVE] `R160` 已完成；当前 `[NEXT]` 为 `R161 - OpenCodeService final residual thick seam closeout`。
+> **当前状态**: [ACTIVE] `R161` 已完成；当前 `[NEXT]` 为 `R162 - Final high-maintainability checkpoint`。
 
 ## 控制规则
 
@@ -19,7 +19,7 @@
 - 当前 live lint 基线：`0 errors / 0 warnings`
 - 当前 typecheck 基线：已恢复通过
 - 最近成功 phase：`docs/status/maintainability-phase-495.md`
-- 当前路线判断：`R153-R160` 已完成并保持 `lint/typecheck/test/build` 全绿；用户已明确续排最后一批，只处理 `OpenCodianView` 与 `OpenCodeService` 两个 residual thick seam，并要求继续保持 `0` 碎片、`0` 错误、`0` 警告、typecheck 全绿与全量测试全过。
+- 当前路线判断：`R153-R161` 已完成并保持 `lint/typecheck/test/build` 全绿；`OpenCodianView` 与 `OpenCodeService` 两个 residual thick seam 已按 queue 完成 closeout，当前只剩 `R162` checkpoint，并要求继续保持 `0` 碎片、`0` 错误、`0` 警告、typecheck 全绿与全量测试全过。
 
 ## Queue
 ## Queue
@@ -1714,7 +1714,7 @@
   - 不产生新的薄碎片，且 `npm run lint -- --format unix` 为 `0 errors / 0 warnings`
   - `npm run typecheck`、全量 `npm test` 与 `npm run build` 通过
 
-### [NEXT] R161 - OpenCodeService final residual thick seam closeout
+### [DONE] R161 - OpenCodeService final residual thick seam closeout
 
 - **Lane**: Maintainability / final opencode thick owner
 - **目标**: 在绿色质量门槛下处理 `src/core/opencode/OpenCodeService.ts` 的最后一批高价值 residual thick seam，优先把仍由 service 直接持有的 diagnostics/session/question facade residual 收束到既有 lifecycle/session/control/question/catalog 厚 owner；禁止新建 wrapper/gateway/facade 碎片。
@@ -1739,7 +1739,7 @@
   - 不产生新的薄碎片，且 `npm run lint -- --format unix` 为 `0 errors / 0 warnings`
   - `npm run typecheck`、全量 `npm test` 与 `npm run build` 通过
 
-### [QUEUED] R162 - Final high-maintainability checkpoint
+### [NEXT] R162 - Final high-maintainability checkpoint
 
 - **Lane**: Checkpoint
 - **目标**: 复盘 `R160-R161` 是否真正收掉最后两个 residual thick seam，确认是否达到“高可维护性：0 新碎片、0 errors、0 warnings、typecheck 全绿、全量测试全过、build 通过”，并决定是否停止 autopilot。
@@ -1757,5 +1757,5 @@
 
 ### 当前状态
 
-- 当前可自动执行的 `[NEXT]` 是 `R161 - OpenCodeService final residual thick seam closeout`。
+- 当前可自动执行的 `[NEXT]` 是 `R162 - Final high-maintainability checkpoint`。
 - `R160-R162` 是最后一批人工续排的受控 closeout；完成后若无新人工队列，必须再次停回“当前没有可自动执行的后续任务”。

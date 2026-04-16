@@ -66,15 +66,15 @@ export interface SessionMessage {
 }
 
 export interface OpenCodeSessionLifecycleSdk {
-  abort(request: { sessionID: string }): Promise<void>;
+  abort(request: { sessionID: string }): Promise<unknown>;
   create(request: { title: string }): Promise<unknown>;
   get(request: { sessionID: string }): Promise<unknown>;
   list(): Promise<unknown>;
   messages(request: { sessionID: string }): Promise<unknown>;
   todo(request: { sessionID: string }): Promise<unknown>;
   status(): Promise<unknown>;
-  delete(request: { sessionID: string }): Promise<void>;
-  update(request: { sessionID: string; title: string }): Promise<void>;
+  delete(request: { sessionID: string }): Promise<unknown>;
+  update(request: { sessionID: string; title: string }): Promise<unknown>;
 }
 
 type SessionTodoUpdate = {

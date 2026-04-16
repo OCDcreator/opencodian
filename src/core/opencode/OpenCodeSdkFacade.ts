@@ -1,6 +1,8 @@
+import { createLogger } from '../../shared';
 import { createSdkClient, type CreateSdkClientOptions } from './createSdkClient';
 import type { SdkOpencodeClient } from './sdkTypes';
 
+const logger = createLogger('OpenCodeService');
 export const SDK_FACADE_NAMESPACE_NAMES = [
   'app',
   'auth',
@@ -65,6 +67,19 @@ type OpenCodeSdkErrorRecord = {
   name?: unknown;
   status?: unknown;
 };
+
+const TRANSIENT_CONNECTIVITY_ERROR_PATTERNS = [
+  /net::ERR_CONNECTION_REFUSED/i,
+  /net::ERR_CONNECTION_RESET/i,
+  /\bECONNREFUSED\b/i,
+  /\bECONNRESET\b/i,
+];
+
+interface TransientConnectivityLogState {
+  suppressedCount: number;
+}
+
+type ServiceLogLevel = 'warn' | 'error';
 
 function getSdkErrorText(value: unknown, trimMessage = false): string | null {
   if (typeof value !== 'string') {
@@ -173,6 +188,87 @@ export function normalizeSdkError(error: unknown): Error {
   }
 
   return new Error(describeSdkError(error));
+}
+
+export class OpenCodeServiceDiagnostics {
+  private transientConnectivityLogState: TransientConnectivityLogState | null = null;
+
+  extractAssistantErrorMessage(errorLike: unknown): string | null {
+    return extractSdkErrorMessage(errorLike, {
+      fallbackMessage: null,
+      includeName: true,
+      includeTopLevelError: false,
+      includeTopLevelStatus: false,
+      trimMessage: true,
+    });
+  }
+
+  describeError(error: unknown): string {
+    return describeSdkError(
+      error,
+      error instanceof Error ? error.message : String(error),
+    );
+  }
+
+  isTransientConnectivityError(error: unknown): boolean {
+    const message = error instanceof Error ? error.message : String(error);
+    return TRANSIENT_CONNECTIVITY_ERROR_PATTERNS.some((pattern) => pattern.test(message));
+  }
+
+  logAssistantFinalizationDebug(label: string, payload: unknown): void {
+    logger.debug(`Assistant stream finalization [${label}]: ${this.stringifyDebugPayload(payload)}`);
+  }
+
+  logServiceWarning(_key: string, message: string, error: unknown): void {
+    this.logServiceIssue('warn', message, error);
+  }
+
+  logServiceError(_key: string, message: string, error: unknown): void {
+    this.logServiceIssue('error', message, error);
+  }
+
+  resetTransientConnectivityLogState(): void {
+    this.transientConnectivityLogState = null;
+  }
+
+  private logServiceIssue(level: ServiceLogLevel, message: string, error: unknown): void {
+    if (this.isTransientConnectivityError(error)) {
+      this.logTransientConnectivityIssue(level, message, error);
+      return;
+    }
+
+    this.emit(level, message, error);
+  }
+
+  private logTransientConnectivityIssue(level: ServiceLogLevel, message: string, error: unknown): void {
+    if (this.transientConnectivityLogState) {
+      this.transientConnectivityLogState.suppressedCount += 1;
+      return;
+    }
+
+    this.transientConnectivityLogState = {
+      suppressedCount: 0,
+    };
+
+    this.emit(level, `${message} (subsequent offline logs suppressed until the server recovers)`, error);
+  }
+
+  private emit(level: ServiceLogLevel, message: string, error: unknown): void {
+    if (level === 'warn') {
+      logger.warn(message, error);
+      return;
+    }
+
+    logger.error(message, error);
+  }
+
+  private stringifyDebugPayload(payload: unknown): string {
+    try {
+      return JSON.stringify(payload);
+    } catch {
+      return '[unserializable]';
+    }
+  }
 }
 
 export interface OpenCodeSdkFacadeOptionsProvider {
