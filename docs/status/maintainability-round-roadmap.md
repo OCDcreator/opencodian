@@ -1537,7 +1537,7 @@
 ### [NEXT] R153 - OpenCodianView host/provider defragmentation seam
 
 - **Lane**: Maintainability / chat defragmentation
-- **目标**: 沿 `OpenCodianView` 与直接相邻的 chat runtime/service owner 回并过薄 host/provider/factory/adapter 链，优先处理 sync / hydration / tab activation / background live signal / render assembly 周边的装配噪音，降低 view 的 direct host wiring 与 import surface。
+- **目标**: 沿 `OpenCodianView` 与直接相邻的 chat runtime/service owner 回并过薄 host/provider/factory/adapter 链，优先把碎片并回相邻厚 owner（而非 `OpenCodianView` 本体），处理 sync / hydration / tab activation / background live signal / render assembly 周边的装配噪音，降低 view 的 direct host wiring 与 import surface。
 - **优先入口**:
   - `src/features/chat/OpenCodianView.ts`
   - `src/features/chat/services/ConversationSyncLoadRuntimeHostProvider.ts`
@@ -1555,18 +1555,19 @@
 - **允许边界**:
   - 允许把过薄 host/provider/factory 文件并回既有 runtime / coordinator owner
   - 允许把稳定 host type / port 定义与 owning runtime 同位收束，以减少装配跳转
+  - 明确禁止把碎片直接并回 `OpenCodianView.ts`；主文件只允许同步删减装配与 import，不承担回并落点
 - **禁止项**:
   - 不新增新的薄 helper / adapter / provider / factory
   - 不改变并发 tab/session streaming、hydration/auth-sync gate、background-task completion notice、scroll restore、question resolution 语义
 - **验收**:
   - `OpenCodianView` 的 direct host assembly / import surface 有可量化下降
-  - 至少一条过薄 chat 装配链被回并进更厚 owner，而不是替换成新的薄层
+  - 至少一条过薄 chat 装配链被回并进相邻更厚 owner，而不是替换成新的薄层或回灌主文件
   - 全量 `npm test` 与 `npm run build` 通过
 
 ### [QUEUED] R154 - OpenCodeService coordinator stack defragmentation seam
 
 - **Lane**: Maintainability / opencode defragmentation
-- **目标**: 沿 `OpenCodeService` 与相邻 opencode owner 回并过薄 coordinator / wrapper / gateway 边界，优先收束 constructor / lifecycle / session-control / catalog-query 装配噪音，降低 service 的 direct runtime wiring 压力。
+- **目标**: 沿 `OpenCodeService` 与相邻 opencode owner 回并过薄 coordinator / wrapper / gateway 边界，优先把碎片并回相邻厚 owner（而非 `OpenCodeService` 本体），收束 constructor / lifecycle / session-control / catalog-query 装配噪音，降低 service 的 direct runtime wiring 压力。
 - **优先入口**:
   - `src/core/opencode/OpenCodeService.ts`
   - `src/core/opencode/OpenCodeServiceLifecycleCoordinator.ts`
@@ -1581,12 +1582,13 @@
 - **允许边界**:
   - 允许把 ownership 过薄、只承担转发/装配的 wrapper 并回既有厚 owner
   - 允许整理 constructor lifecycle assembly，使 runtime decision 更集中在既有 owner
+  - 明确禁止把碎片直接并回 `OpenCodeService.ts`；主文件只允许同步删减装配与 import，不承担回并落点
 - **禁止项**:
   - 不改变 SDK-first / legacy fallback、directory scope、managed server adoption/restart、auth fallback、session-scoped abort/detach 或 sync-event bridge 语义
   - 不新增新的 facade / gateway / builder 薄层
 - **验收**:
   - `OpenCodeService` 的 direct coordinator assembly / import surface 有可量化下降
-  - 至少一条过薄 opencode wrapper 链被回并，且 `OpenCodeService` 行数压力下降
+  - 至少一条过薄 opencode wrapper 链被回并进相邻更厚 owner，且 `OpenCodeService` 行数压力下降
   - 全量 `npm test` 与 `npm run build` 通过
 
 ### [QUEUED] R155 - Heavy tests and glass/demo hotspot closeout after core-owner recovery

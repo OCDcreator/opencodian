@@ -16,9 +16,9 @@
 ## 本批边界
 
 - 只允许执行 `R153 -> R154 -> R155 -> R156`；当前不得自动扩展 `R157+`
-- 不新增薄 helper / adapter / provider / factory；优先把过薄文件并回现有厚 owner
+- 不新增薄 helper / adapter / provider / factory；优先把过薄文件并回相邻厚 owner，禁止并回 `OpenCodianView` / `OpenCodeService` 主文件本体
 - `OpenCodeService`、`OpenCodianView`、`OpenCodianSettings` 的 maintainability 仅允许在 queue 明示项内继续推进
-- `OpenCodianView` / `OpenCodeService` 的改动必须带来可见的 import surface / assembly 收缩，不能只做“换文件不减复杂度”
+- `OpenCodianView` / `OpenCodeService` 的改动必须带来可见的 import surface / assembly 收缩，不能只做“换文件不减复杂度”，也不能把碎片回灌进主文件
 - tests / glass / demo cleanup 只允许沿现有 suite / owner 内部整理，不允许删断言、减覆盖或把实验特性暴露到 stable UI path
 - 命中 deploy-relevant paths 时，继续严格执行 build → Test Vault deploy → `BUILD_ID` 校验
 - 恢复运行必须使用外部 profile `/Users/dht/.config/opencodian/mac-autopilot-profile.json`

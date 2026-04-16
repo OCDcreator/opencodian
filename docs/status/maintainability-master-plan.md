@@ -32,7 +32,7 @@
 
 1. 只能按 `R153 -> R154 -> R155 -> R156` 顺序执行，不能跳题。
 2. 每一轮都必须运行全量 `npm test` 与 `npm run build`；命中 deploy-relevant paths 时必须按仓库规则做 Test Vault 部署与 `BUILD_ID` 校验。
-3. 新一批的第一目标是**回并碎片**：优先把过薄 host/provider/adapter/factory/wrapper 文件并回既有厚 owner，而不是再新增一层薄文件。
+3. 新一批的第一目标是**回并碎片**：优先把过薄 host/provider/adapter/factory/wrapper 文件并回相邻的既有厚 owner，而不是并回 `OpenCodianView` / `OpenCodeService` 主文件本体，也不是再新增一层薄文件。
 4. `OpenCodianView` / `OpenCodeService` 的 maintainability 处理必须带来可见的 assembly/import surface 收缩；不能只把体量平移到更多小文件。
 5. `R155` 的 tests / glass / demo cleanup 只能在 `R153-R154` 完成后、且 live hotspot 仍真实存在时推进；不允许删断言、减覆盖、弱化实验特性保护边界。
 6. 恢复 autopilot 时必须使用外部 profile：`/Users/dht/.config/opencodian/mac-autopilot-profile.json`。
