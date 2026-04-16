@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个活动任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成活动任务；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的后续任务”。
-> **当前状态**: [ACTIVE] `R154` 已完成；当前 `[NEXT]` 为 `R155 - Heavy tests and glass/demo hotspot closeout after core-owner recovery`。
+> **当前状态**: [ACTIVE] `R154` 已完成；当前 `[NEXT]` 为 `R155 - Typecheck gate recovery before zero-warning closeout`。
 
 ## 控制规则
 
@@ -10,15 +10,16 @@
 - 如果当前活动任务已在仓库中自然完成，先在 phase 文档里说明证据，再把它标记为 `[DONE]` 并推进下一个
 - 如果当前活动任务被测试、构建或正确性问题阻塞，只允许做解除阻塞所需的最小修改，不得借机切换赛道
 - 新增文件必须满足 master plan 的粒度规则；默认优先在现有 owner 内收束，避免薄 helper / adapter / factory
-- 每个成功 queue item 都必须运行全量 `npm test` 与 `npm run build`
-- 命中 deploy-relevant paths 时，build 通过后必须执行 Test Vault 部署并校验 `BUILD_ID`
+- 每个成功 queue item 都必须运行全量 `npm run lint`、`npm run typecheck`、`npm test` 与 `npm run build`
+- 本批 maintainability 默认不做 Test Vault 部署；只有用户后续明确要求部署时才允许执行部署与 `BUILD_ID` 校验
 
 ## 当前背景
 
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
-- 当前 live lint 基线：`0 errors / 36 warnings`
+- 当前 live lint 基线：`0 errors / 39 warnings`
+- 当前 typecheck 基线：失败（当前远端存在 `OpenCodianView`、background-task services、settings 与 `src/types/jsx-shim.ts` 的红线）
 - 最近成功 phase：`docs/status/maintainability-phase-489.md`
-- 当前路线判断：`R137` 已确认 `R88-R136` 完成 owner seam、heavy suite split、final warning closeout 与 queue closeout 的完整闭环；`R142` 已复盘 `R138-R141` 的 chat residual 收益；`R143-R150` 已完成 settings/startup、opencode lifecycle、streaming 与 persistence residual；`R151` 已在 `tests/unit/utils/glass/shuding.test.ts` 完成 heavy tests / opt-in glass residual 的首个受控 closeout；`R152` 已完成 continuation checkpoint 并确认上一批 queue 自然耗尽；`R153-R154` 已完成 chat 与 opencode defragmentation 的两个受控切口。本次人工续排的 `R153-R156` 当前进入 justified hotspot closeout 与 checkpoint 收尾阶段。
+- 当前路线判断：`R153-R154` 已完成 chat 与 opencode defragmentation 两个受控切口，但远端真实基线仍未达到用户要求的 `0 errors / 0 warnings + typecheck 通过 + 全量测试通过`。因此当前批次先恢复绿色质量门槛，再继续压缩 heavy hotspots 与核心厚 owner。
 
 ## Queue
 ## Queue
@@ -1591,16 +1592,39 @@
   - 至少一条过薄 opencode wrapper 链被回并进相邻更厚 owner，且 `OpenCodeService` 行数压力下降
   - 全量 `npm test` 与 `npm run build` 通过
 
-### [NEXT] R155 - Heavy tests and glass/demo hotspot closeout after core-owner recovery
+### [NEXT] R155 - Typecheck gate recovery before zero-warning closeout
+
+- **Lane**: Correctness / typecheck recovery
+- **目标**: 先恢复远端真实 `typecheck` 绿灯，只吸收当前红线并保持运行语义不变；不得借机新建薄层。
+- **优先入口**:
+  - `src/features/chat/OpenCodianView.ts`
+  - `src/features/chat/services/BackgroundTaskTimelineAssemblyService.ts`
+  - `src/features/chat/services/QuestionTodoBackgroundTaskRuntimeServiceBundle.ts`
+  - `src/features/settings/OpenCodianSettings.ts`
+  - `src/features/settings/SettingsModelSection.ts`
+  - `src/types/jsx-shim.ts`
+- **允许边界**:
+  - 允许做最小类型收束、泛型/union 修正、runtime-state 类型对齐与 shim 清理
+  - 允许同步更新直接相关 tests / docs
+- **禁止项**:
+  - 不改变 chat runtime、settings 保存语义、background task 流程或 JSX/render 行为
+  - 不新增薄 helper / adapter / provider / factory
+- **验收**:
+  - `npm run typecheck` 通过
+  - `npm run lint` 保持 `0 errors` 且 warning 不上升
+  - 全量 `npm test` 与 `npm run build` 通过
+
+### [QUEUED] R156 - Zero-warning hotspot closeout after typecheck recovery
 
 - **Lane**: Warning cleanup / justified hotspots
-- **目标**: 仅在 `R153-R154` 之后 live hotspot 仍成立时，沿现有 suite / owner 内部整理 heavy tests 与 glass/demo hotspots，优先按责任分组或收束局部参数/fixture 复杂度，不新增 test helper 碎片。
+- **目标**: 在 `typecheck` 恢复后，把 live lint warning 从当前 `39` 条压到 `0`，优先沿现有 suite / owner 内部整理 heavy tests 与 glass/demo / opencode / chat residual，不新增 test helper 碎片。
 - **优先入口**:
   - `tests/unit/core/storage/StorageService.test.ts`
   - `tests/unit/core/opencode/OpenCodeStreamingRuntimeCoordinator.test.ts`
-  - `tests/unit/core/config/OpencodeConfigManager.test.ts`
   - `tests/unit/features/chat/glassOctahedronDemo.test.ts`
   - `tests/unit/features/settings/ModelConfigModal.test.ts`
+  - `src/core/opencode/OpenCodeService.ts`
+  - `src/core/opencode/OpenCodeCatalogQueryCoordinator.ts`
   - `src/utils/glass/adapters/shuding.ts`
   - `src/utils/glass/adapters/shudingDiamond.ts`
   - `src/utils/glass/adapters/nikdelvin.ts`
@@ -1611,27 +1635,62 @@
 - **禁止项**:
   - 不删除断言、不降低覆盖、不把 experimental demo 暴露到 stable UI path
   - 不新增薄 test helper / adapter / provider / factory
-  - 若热点已被前序轮次自然消除，改做最小 checkpoint note，不自由换题
+  - 不为了清 warning 把厚 owner 人为切碎
 - **验收**:
-  - heavy tests / glass/demo hotspots 有可量化下降，且 lint 维持 `0 errors`
-  - 全量 `npm test` 与 `npm run build` 通过
+  - `npm run lint -- --format unix` 达到 `0 errors / 0 warnings`
+  - `npm run typecheck`、全量 `npm test` 与 `npm run build` 通过
 
-### [QUEUED] R156 - Checkpoint after defragmentation and hotspot closeout
+### [QUEUED] R157 - OpenCodianView residual thick-owner reduction under green gates
+
+- **Lane**: Maintainability / chat residual thick owner
+- **目标**: 在 `lint/typecheck/test/build` 全绿后，继续削减 `OpenCodianView.ts` 的 direct assembly / import surface，优先把仍然过厚的 view-adjacent seam 压回相邻厚 owner，而不是回灌主文件或继续造碎片。
+- **优先入口**:
+  - `src/features/chat/OpenCodianView.ts`
+  - `src/features/chat/services/` 下与 view 直接耦合、且已具备较厚 owner 落点的 residual seam
+  - 直接相关 chat tests / docs
+- **禁止项**:
+  - 不新增薄 host/provider/adapter/factory
+  - 不把碎片并回 `OpenCodianView.ts` 主文件本体
+  - 不改变并发 tab/session streaming、hydration/auth-sync、background-task notice、scroll restore、question resolution 语义
+- **验收**:
+  - `OpenCodianView.ts` 行数与 direct assembly/import surface 有可量化下降
+  - lint/typecheck/test/build 全绿保持
+
+### [QUEUED] R158 - OpenCodeService residual thick-owner reduction under green gates
+
+- **Lane**: Maintainability / opencode residual thick owner
+- **目标**: 在绿色质量门槛下继续收束 `OpenCodeService.ts` 的 residual thick seam，优先把还偏薄或仅承担转发的 ownership 并回相邻厚 owner，不制造新的 wrapper/gateway 碎片。
+- **优先入口**:
+  - `src/core/opencode/OpenCodeService.ts`
+  - `src/core/opencode/OpenCodeServiceLifecycleCoordinator.ts`
+  - `src/core/opencode/OpenCodeSessionLifecycleCoordinator.ts`
+  - `src/core/opencode/OpenCodeSessionControlOrchestrator.ts`
+  - `src/core/opencode/OpenCodeCatalogQueryCoordinator.ts`
+  - 直接相关 opencode tests / docs
+- **禁止项**:
+  - 不改变 SDK-first / legacy fallback、directory scope、managed server adoption/restart、auth fallback、session-scoped abort/detach 或 sync-event bridge
+  - 不新增薄 facade / gateway / builder / provider
+- **验收**:
+  - `OpenCodeService.ts` 行数与 direct coordinator assembly/import surface 继续下降
+  - lint/typecheck/test/build 全绿保持
+
+### [QUEUED] R159 - Checkpoint after green-gate recovery and thick-owner reduction
 
 - **Lane**: Checkpoint
-- **目标**: 复盘 `R153-R155` 的 defragmentation 收益、`OpenCodianView` / `OpenCodeService` 体量变化、warning 轨迹、验证成本与剩余热点，并据此判断 maintainability autopilot 是否应再次停回人工态。
+- **目标**: 复盘 `R155-R158` 的 typecheck 恢复、warning 清零、`OpenCodianView` / `OpenCodeService` 体量变化、碎片回并收益与剩余 residual，并据此判断 maintainability autopilot 是否还值得继续。
 - **优先入口**:
   - `docs/status/maintainability-master-plan.md`
   - `docs/status/maintainability-round-roadmap.md`
   - `docs/status/maintainability-lane-map.md`
 - **禁止项**:
-  - 只做 checkpoint 文档与指标复盘；不自动扩展 `R157+`
+  - 只做 checkpoint 文档与指标复盘；不自动扩展 `R160+`
   - 不把 checkpoint 写成 freestyle backlog
 - **验收**:
-  - phase 文档明确记录 defragmentation 收益、核心大文件体量变化、remaining hotspots 与 stop/continue 建议
-  - 全量 `npm test` 与 `npm run build` 通过
+  - phase 文档明确记录 `lint/typecheck/test/build` 结果、核心大文件体量变化、remaining hotspots 与 stop/continue 建议
+  - `npm run lint -- --format unix`、`npm run typecheck`、全量 `npm test` 与 `npm run build` 通过
 
 ### 当前状态
 
-- 当前可自动执行的 `[NEXT]` 是 `R155 - Heavy tests and glass/demo hotspot closeout after core-owner recovery`。
-- `R156` 完成后若没有新的人工续排项，必须再次停回“当前没有可自动执行的后续任务”。
+- 当前可自动执行的 `[NEXT]` 是 `R155 - Typecheck gate recovery before zero-warning closeout`。
+- 当前批次必须先做到 `typecheck` 通过、再清到 `0 errors / 0 warnings`，然后才继续压缩 `OpenCodianView` / `OpenCodeService` 的 residual thick owner。
+- `R159` 完成后若没有新的人工续排项，必须再次停回“当前没有可自动执行的后续任务”。

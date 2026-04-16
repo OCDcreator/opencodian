@@ -38,9 +38,9 @@ Required workflow:
 7. Prefer merging thin provider / factory / adapter files back into an adjacent owner over creating new files. If a new module would stay under roughly 100 lines and under 3 exports, do not keep it separate unless it isolates a high-risk dependency or is reused in 3+ places.
 8. If the module boundary changes materially, update only the directly related docs.
 9. If this round changes code or tests, run targeted tests first (for example `npm test -- <focused suites>`).
-10. Every successful queue round must also run full `npm test`.
+10. Every successful queue round must also run full `npm run lint`, full `npm run typecheck`, and full `npm test`.
 11. If this round changes code, style, manifest, or build-pipeline files, also run `{{build_command}}`.
-12. Deploy to `{{test_vault_plugin_dir}}` only when the changed files hit deploy-relevant paths such as `src/main.ts`, `manifest.json`, `styles.css`, `assets/`, `src/style/`, `src/core/theme/`, or `src/features/settings/`, or when the user explicitly asked to deploy. If deployment runs, copy `dist/main.js`, `dist/manifest.json`, and `dist/styles.css`, copy `dist/assets/` when bundled assets changed, and verify deployed `main.js` contains the newest `BUILD_ID`.
+12. Do not deploy during this maintainability batch unless the user explicitly asked to deploy. If deployment is explicitly requested later, copy `dist/main.js`, `dist/manifest.json`, and `dist/styles.css`, copy `dist/assets/` when bundled assets changed, and verify deployed `main.js` contains the newest `BUILD_ID`.
 13. In successful rounds, keep `git status --short` to at most 2 invocations and `git diff --stat` to at most 1 invocation. Only exceed those budgets during a focused repair after a failed validation step.
 14. On success, update `docs/status/maintainability-round-roadmap.md`: mark the executed `[NEXT]` item as `[DONE]`, promote the next `[QUEUED]` item to `[NEXT]`, and keep all later items as `[QUEUED]`.
 15. Write the round summary to `{{next_phase_doc}}`. Include scope, files changed, validation commands, deployment result when applicable, the lane advanced, the completed roadmap queue item, and the next recommended slice.
