@@ -5,11 +5,15 @@
 
 ## 概述
 
-`OpenCodeServiceLifecycleCoordinator` 是 `OpenCodeService` 内部的 service bootstrap / subscription lifecycle owner。它把服务初始化、server start/stop/dispose、server running 后的 model/catalog bootstrap、health probe fallback，以及 vault path scope refresh 与 sync / open-code event subscription 的启动停止顺序收束到一个 coordinator 中。
+`OpenCodeServiceLifecycleCoordinator` 是 `OpenCodeService` 内部的 service lifecycle owner。它现在同时收束：
 
-同一模块现在还暴露 `createOpenCodeServiceLifecycleAssembly()`，把 `ServerManager`、`OpenCodeServiceLifecycleCoordinator` 与 `OpenCodeSettingsReconfigurationCoordinator` 的共享 lifecycle 装配集中到一个现有厚 owner 中，避免 `OpenCodeService` 构造函数继续直接铺开这段 wiring。
+- service initialize / start / stop / dispose
+- server status change 后的 model/catalog bootstrap
+- SDK-first health probe 与 `ServerManager.checkHealth()` fallback
+- vault path / directory scope 变化后的 cache invalidation 与 subscription restart
+- settings update plan、managed server stop/restart、subscription pause/resume 与 rollback/restore
 
-它不改变 `OpenCodeService` 的公开 API；上层仍然调用 `initialize()`、`start()`、`stop()`、`dispose()`、`checkHealth()` 和 `setVaultPath()`，只是这些入口的 runtime 编排不再直接铺在主门面里。
+这样 `OpenCodeService` 继续作为 façade + host seam，对外保留 `initialize()`、`start()`、`stop()`、`dispose()`、`checkHealth()`、`setVaultPath()` 与 `updateSettings()`，但不再直接持有独立的 settings reconfiguration coordinator 或 server-manager status wiring。
 
 ## 导入关系
 
@@ -17,6 +21,7 @@
 上游:
 - `../../shared`
 - `../types/settings`
+- `./ServerManager`
 - `./types`
 
 下游:
@@ -26,23 +31,24 @@
 
 ## 核心类型 / 接口
 
-- `OpenCodeServiceLifecycleAssemblyHost`: lifecycle 装配 seam，补充 settings/baseUrl 写回、managed server state 回传与 upward events，供 `createOpenCodeServiceLifecycleAssembly()` 统一创建共享的 `ServerManager`、`serviceLifecycle` 与 `settingsReconfiguration` owner。
-- `OpenCodeServiceLifecycleCoordinatorHost`: host seam，提供 settings/baseUrl、原始 SDK health probe payload、server manager、sync/open-code event subscription ports、model/catalog bootstrap hooks 与对外通知回调。
-- `OpenCodeServiceLifecycleCoordinator`: 持有初始化、start/stop/dispose、vault path scope refresh、health fallback、server-running bootstrap 与 event subscription restart 的编排逻辑。
+- `OpenCodeServiceLifecycleAssemblyHost`: service façade 提供的装配 seam，包含 settings/baseUrl 读写、server state 回传、SDK health probe、catalog/model hooks 与 subscription runtimes。
+- `OpenCodeServiceLifecycleCoordinatorHost`: coordinator 内部运行 seam，注入共享 `ServerManager`、sync/open-code event ports、scope invalidation hook 与对外通知回调。
+- `OpenCodeServiceLifecycleAssembly`: `createAssembly()` 返回的共享装配结果，包含同一个 `ServerManager` 与 `OpenCodeServiceLifecycleCoordinator`。
+- `OpenCodeSettingsUpdatePlan`: 单次 settings 更新的快照，记录新旧 mode/baseUrl/scope、subscription wanted state 与 managed server stop/restart 决策。
 
 ## 核心逻辑
 
 ### Lifecycle assembly
 
-`createOpenCodeServiceLifecycleAssembly()` 会先用当前 settings 创建共享的 `ServerManager`，再把同一个 manager 注入 `OpenCodeServiceLifecycleCoordinator` 与 `OpenCodeSettingsReconfigurationCoordinator`：
+`OpenCodeServiceLifecycleCoordinator.createAssembly()` 会先用当前 settings 创建共享 `ServerManager`，再把同一个 manager 注入 coordinator：
 
-- `ServerManager.onStatusChange` 直接回流到 `serviceLifecycle.handleServerStatusChange()`
+- `ServerManager.onStatusChange` 回流到 `handleServerStatusChange()`
 - `ServerManager.onError` 继续透传给 `OpenCodeService` 上游事件回调
-- settings reconfiguration 仍保留既有 rollback / restart 语义，只是不再由 `OpenCodeService` 构造函数亲自组装
+- server status / diagnostics / managed-state snapshot 由 coordinator 代理给服务层和 catalog debug metadata
 
 ### Initialize / start / stop
 
-`initialize()` 只在本地服务且 `autoStart` 开启时调用 `start()`。`start()` 先确认 `baseUrl` 存在，再启动 `ServerManager`，最后按原有顺序恢复 sync event 与 open-code event subscriptions。`stop()` 与 `dispose()` 都先停止两类 event subscriptions，再分别停止或释放 `ServerManager`。
+`initialize()` 只在本地服务且 `autoStart` 开启时调用 `start()`。`start()` 先确认 `baseUrl` 存在，再启动 `ServerManager`，最后恢复 sync event 与 open-code event subscriptions。`stop()` 与 `dispose()` 都先停止两类 subscriptions，再分别停止或释放 `ServerManager`。
 
 ### Server running bootstrap
 
@@ -55,24 +61,36 @@
 
 ### Health probe fallback
 
-`checkHealth()` 仍保持 SDK-first 语义：`sdkCrud` 开启时先调用 SDK `global.health()`，并在 coordinator 内统一归一化 boolean / `{ healthy }` 结构化响应；SDK health 失败时记录 fallback warning，再回退到 `ServerManager.checkHealth(3000)`。任一健康路径成功都会重置 transient connectivity 日志抑制。
+`checkHealth()` 保持 SDK-first 语义：`sdkCrud` 开启时先调用 SDK `global.health()`，并在 coordinator 内统一归一化 boolean / `{ healthy }` 响应；SDK health 失败时记录 fallback warning，再回退到 `ServerManager.checkHealth(3000)`。任一健康路径成功都会重置 transient connectivity 日志抑制。
+
+### Settings reconfiguration
+
+`updateSettings(settings)` 现在由本 coordinator 直接拥有完整 reconfiguration lifecycle：
+
+1. 构造 update plan：深拷贝新 settings，记录旧 baseUrl / tool catalog scope / subscription wanted state
+2. 在本地运行中切换 host/port 时先执行 `canBindLocalEndpoint()` 预检
+3. 写回 settings/baseUrl、更新 `ServerManager` config、按 scope 变化清理 tool schema cache，并暂停 subscriptions
+4. 根据 mode/config/auth/source-mode/isolation-mode 决策 stop 或 restart managed server
+5. 失败时回滚 settings/baseUrl/server config，必要时尽力 `start()` 原 managed server，最后恢复 subscriptions 并继续抛出原始错误
 
 ### Subscription restarts
 
-`setVaultPath(path)` 现在承担 vault path / directory scope 改变时的完整 lifecycle：它先记录旧的 tool catalog scope，再写回 `vaultPath`、同步 `ServerManager` 工作目录、按 scope 变化清理 tool schema cache，最后统一重启 sync event runtime 与 open-code event runtime。`restartEventSubscriptions()` 则继续作为共享的 subscription restart primitive，供 vault path 变更与其他 lifecycle follow-up 复用。
+`setVaultPath(path)` 承担 vault path / directory scope 改变时的完整 lifecycle：记录旧 tool catalog scope，写回 `vaultPath`，同步 `ServerManager` 工作目录，按 scope 变化清理 tool schema cache，最后统一重启 sync event runtime 与 open-code event runtime。`restartEventSubscriptions()` 仍作为共享 restart primitive。
 
 ## 关键方法
 
 | 方法 / 导出 | 说明 |
 |-------------|------|
+| `createAssembly(host)` | 创建共享 `ServerManager` 与 lifecycle coordinator |
+| `createServerConfig(settings)` | 统一构造 `ServerManager` 初始配置与 settings update 配置 |
 | `initialize()` | 按 settings 决定是否 auto-start local server |
 | `handleServerStatusChange()` | 转发 server status，并在 running 后触发 model/catalog bootstrap |
-| `start()` | 启动 server，并恢复 sync/open-code subscriptions |
-| `stop()` | 停止 subscriptions，再停止 server |
-| `dispose()` | 停止 subscriptions，并释放 server manager |
-| `setVaultPath(path)` | 更新 vault scope、刷新 ServerManager 工作目录、清理 scope-sensitive tool cache 并重启 subscriptions |
+| `start()` / `stop()` / `dispose()` | 编排 server 与 subscriptions lifecycle |
+| `setVaultPath(path)` | 更新 vault scope、工作目录、tool cache 与 subscriptions |
 | `restartEventSubscriptions()` | 统一重启 sync/open-code subscriptions |
 | `checkHealth()` | 执行 SDK-first health probe 与 ServerManager fallback |
+| `updateSettings(settings)` | 执行 settings reconfiguration / rollback lifecycle |
+| `isReady()` / `getServerStatus()` / `getServerDiagnostics()` / `isServerProcessRunning()` | 代理 server status / diagnostics / managed process state |
 
 ## 数据流
 
@@ -90,16 +108,13 @@ graph TD
 ## 与其他模块的交互
 
 - `OpenCodeService` 继续作为对外 façade，负责创建 coordinator 并提供 host seam。
-- `ServerManager` 仍拥有本地/远端 server process lifecycle；本 coordinator 只决定何时 start/stop/dispose 与何时响应 status。
-- `OpenCodeSyncEventRuntimeCoordinator` 与 `OpenCodeEventSubscriptionCoordinator` 仍各自持有 listener registry、wanted state 与 stream loop；本 coordinator 只统一编排 service lifecycle 时机。
-- `OpenCodeSettingsReconfigurationCoordinator` 仍负责 settings update / rollback 时的 pause/resume；不要把 settings reconfiguration 逻辑混入这里。
-
-## 配置项
-
-无独立配置项。它通过 host seam 读取 `OpenCodianSettings.server`、`baseUrl` 与 `sdkCrud` feature flag。
+- `ServerManager` 仍拥有本地/远端 server process lifecycle；本 coordinator 决定何时 start/stop/restart/dispose 与何时响应 status。
+- `OpenCodeCatalogQueryCoordinator` 仍拥有 tool schema cache；本 coordinator 只通过 host seam 触发 scope 变更时的 invalidation。
+- `OpenCodeSyncEventRuntimeCoordinator` 与 `OpenCodeEventSubscriptionCoordinator` 仍各自持有 listener registry、wanted state 与 stream loop；本 coordinator 统一编排 service lifecycle 与 settings pause/resume 时机。
 
 ## 注意事项
 
-- 不要把 streaming transport、prompt fallback 或 settings rollback 搬进本模块；这些分别属于 streaming runtime 与 settings reconfiguration owner。
+- 不要把 streaming transport、prompt fallback、catalog query 或 session control 搬进本模块。
 - `start()` 必须保持 server start 在前、subscription ensure 在后的顺序。
 - `stop()` / `dispose()` 必须先停止 subscriptions，再停止或释放 server manager，避免 lingering SDK event loops。
+- settings update 不得改变 managed server adoption/restart 规则、auth fallback、directory scope 或 sync/open-code event restart 条件。

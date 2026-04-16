@@ -2,16 +2,16 @@
 
 > **状态**: [ACTIVE]
 > **作用**: 这是 maintainability 无人值守的战略文档。每轮开始前，先读本文件，再读 `docs/status/maintainability-round-roadmap.md` 与最近的 `docs/status/maintainability-phase-XXX.md`。
-> **自动推进状态**: `R157` 已完成；当前 `[NEXT]` 为 `R158 - OpenCodeService residual thick-owner reduction under green gates`。
+> **自动推进状态**: `R158` 已完成；当前 `[NEXT]` 为 `R159 - Checkpoint after green-gate recovery and thick-owner reduction`。
 
 ## 1. 当前判断
 
-**当前分支已完成 `R153-R157` 的 chat / opencode defragmentation、typecheck gate recovery、zero-warning closeout 与首个 residual thick-owner 回并。当前最新实测为：`npm run lint` 通过、`npm run typecheck` 通过、`npm test` 通过（`284` 个 suites / `1187` 个 tests）、`npm run build` 通过。因此本批现已在绿灯下完成 `OpenCodianView` 的一条 residual seam 回并，接下来转入 `R158-R159` 继续处理 `OpenCodeService` 与 checkpoint。**
+**当前分支已完成 `R153-R158` 的 chat / opencode defragmentation、typecheck gate recovery、zero-warning closeout、view residual seam 回并与 `OpenCodeService` lifecycle/settings residual 回并。当前最新实测为：`npm run lint` 通过、`npm run typecheck` 通过、`npm test` 通过（`283` 个 suites / `1187` 个 tests）、`npm run build` 通过。因此本批现已在绿灯下完成 `OpenCodianView` 与 `OpenCodeService` 各一条 residual seam 回并，接下来只进入 `R159` checkpoint。**
 
 当前继续 maintainability 的理由不是 warning 数本身，而是远端仓库仍存在两类高价值 residual：
 
-- `src/features/chat/OpenCodianView.ts` 仍约 `4866` 行，且直接装配大量 chat runtime owner
-- `src/core/opencode/OpenCodeService.ts` 当前约 `1437` 行；`R154` 已把 `OpenCodeQueryGateway` 并回 `OpenCodeCatalogQueryCoordinator`，但 residual hotspot 仍需在 checkpoint 中复盘
+- `src/features/chat/OpenCodianView.ts` 约 `4859` 行，仍直接装配大量 chat runtime owner，需在 checkpoint 中复盘是否继续
+- `src/core/opencode/OpenCodeService.ts` 当前约 `1475` 行；`R158` 已把 settings reconfiguration residual 并入 `OpenCodeServiceLifecycleCoordinator`，删除独立 reconfiguration coordinator，并把 server status / diagnostics proxy 也收进 lifecycle owner
 - `src/features/chat/services/` 里仍可见明显碎片化迹象：按文件名统计约有 `15` 个 `Adapter`、`7` 个 `Provider`、`5` 个 `Factory`、`23` 个 `Host` 命名文件，且存在一批 `40` 行以下的极薄文件
 - lint gate 已清零；当前 residual hotspot 回到 `OpenCodianView` / `OpenCodeService` 主 owner 与其相邻装配面
 
@@ -21,12 +21,12 @@
 
 - **lint**: `0 errors / 0 warnings`
 - **typecheck**: 通过
-- **最近验证**: `npm run lint` 通过、`npm run typecheck` 通过、`npm test` 通过（`284 passed, 284 total` suites / `1187 passed, 1187 total` tests）、`npm run build` 通过
+- **最近验证**: `npm run lint` 通过、`npm run typecheck` 通过、`npm test` 通过（`283 passed, 283 total` suites / `1187 passed, 1187 total` tests）、`npm run build` 通过
 - **部署策略**: 当前 maintainability 批次不做 Test Vault 部署，除非用户后续明确要求
-- **当前 `[NEXT]`**: `R158 - OpenCodeService residual thick-owner reduction under green gates`
+- **当前 `[NEXT]`**: `R159 - Checkpoint after green-gate recovery and thick-owner reduction`
 - **主热点**:
   - `R157` 已把 conversation hydration / sync load 的薄 host-provider 链回并进既有 factory owner，使 `OpenCodianView.ts` 从 `4869` 行降到 `4859` 行，import statements 从 `91` 条降到 `89` 条
-  - `OpenCodeService.ts` 当前约 `1437` 行，constructor/import surface 已继续收束，但 residual coordinator assembly 仍需后续轮次继续压缩
+  - `R158` 已把 `OpenCodeSettingsReconfigurationCoordinator` 并回 `OpenCodeServiceLifecycleCoordinator`，`OpenCodeService.ts` 从 `1480` 行降到 `1475` 行，direct lifecycle fields 从 `serverManager` / `serviceLifecycle` / `settingsReconfiguration` 收束为单一 `serviceLifecycle`
 
 ## 3. 本批执行规则
 

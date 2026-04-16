@@ -1,12 +1,12 @@
 import {
-  createOpenCodeServiceLifecycleAssembly,
   type OpenCodeServiceLifecycleAssemblyHost,
   OpenCodeServiceLifecycleCoordinator,
   type OpenCodeServiceLifecycleCoordinatorHost,
 } from '../../../../src/core/opencode/OpenCodeServiceLifecycleCoordinator';
-import type { OpenCodeSettingsReconfigurationCoordinatorHost } from '../../../../src/core/opencode/OpenCodeSettingsReconfigurationCoordinator';
 import { ServerManager } from '../../../../src/core/opencode/ServerManager';
 import { DEFAULT_SETTINGS } from '../../../../src/core/types';
+import type { OpenCodianSettings } from '../../../../src/core/types/settings';
+import { getServerBaseUrl } from '../../../../src/core/types/settings';
 
 jest.mock('obsidian', () => ({
   Notice: jest.fn(),
@@ -18,12 +18,18 @@ async function flushAsync(): Promise<void> {
   await Promise.resolve();
 }
 
+function cloneSettings(settings: OpenCodianSettings): OpenCodianSettings {
+  return JSON.parse(JSON.stringify(settings)) as OpenCodianSettings;
+}
+
 function createHost(
   overrides: Partial<OpenCodeServiceLifecycleCoordinatorHost> = {},
 ): jest.Mocked<OpenCodeServiceLifecycleCoordinatorHost> {
   const host = {
     getSettings: jest.fn(() => DEFAULT_SETTINGS),
+    setSettings: jest.fn(),
     getBaseUrl: jest.fn(() => 'http://127.0.0.1:4096'),
+    setBaseUrl: jest.fn(),
     getToolCatalogScopeKey: jest.fn(() => 'http://127.0.0.1:4096::'),
     shouldUseSdkCrud: jest.fn(() => true),
     checkSdkHealth: jest.fn().mockResolvedValue(true),
@@ -50,13 +56,22 @@ function createHost(
       dispose: jest.fn(),
       checkHealth: jest.fn().mockResolvedValue(true),
       setWorkingDirectory: jest.fn(),
+      isRunning: jest.fn().mockReturnValue(false),
+      updateConfig: jest.fn(),
+      canBindLocalEndpoint: jest.fn().mockResolvedValue(true),
+      restart: jest.fn().mockResolvedValue(undefined),
+      getStatus: jest.fn(() => 'stopped'),
+      getServerDiagnosticsSnapshot: jest.fn(() => ({ reason: 'none' })),
+      getManagedServerStateSnapshot: jest.fn(() => null),
     },
     syncEvents: {
+      hasListeners: jest.fn().mockReturnValue(false),
       ensureSubscription: jest.fn(),
       stopSubscription: jest.fn(),
       restartSubscription: jest.fn(),
     },
     openCodeEvents: {
+      hasListeners: jest.fn().mockReturnValue(false),
       ensureSubscriptions: jest.fn(),
       stopSubscriptions: jest.fn(),
       restartSubscriptions: jest.fn(),
@@ -91,11 +106,13 @@ function createAssemblyHost(
     refreshMcpServerStatus: jest.fn().mockResolvedValue(undefined),
     onModelsLoaded: jest.fn(),
     syncEvents: {
+      hasListeners: jest.fn().mockReturnValue(false),
       ensureSubscription: jest.fn(),
       stopSubscription: jest.fn(),
       restartSubscription: jest.fn(),
     },
     openCodeEvents: {
+      hasListeners: jest.fn().mockReturnValue(false),
       ensureSubscriptions: jest.fn(),
       stopSubscriptions: jest.fn(),
       restartSubscriptions: jest.fn(),
@@ -106,8 +123,71 @@ function createAssemblyHost(
   return host as unknown as jest.Mocked<OpenCodeServiceLifecycleAssemblyHost>;
 }
 
-describe('OpenCodeServiceLifecycleCoordinator', () => {
-  it('assembles shared lifecycle owners around one server manager', () => {
+function createSettingsHarness(
+  overrides: Partial<{
+    serverManager: Partial<OpenCodeServiceLifecycleCoordinatorHost['serverManager']>;
+    syncEvents: Partial<OpenCodeServiceLifecycleCoordinatorHost['syncEvents']>;
+    openCodeEvents: Partial<OpenCodeServiceLifecycleCoordinatorHost['openCodeEvents']>;
+  }> = {},
+) {
+  let currentSettings = cloneSettings(DEFAULT_SETTINGS);
+  let currentBaseUrl = getServerBaseUrl(currentSettings.server);
+
+  const host = createHost({
+    getSettings: jest.fn(() => currentSettings),
+    setSettings: jest.fn((settings: OpenCodianSettings) => {
+      currentSettings = settings;
+    }),
+    getBaseUrl: jest.fn(() => currentBaseUrl),
+    setBaseUrl: jest.fn((baseUrl: string) => {
+      currentBaseUrl = baseUrl;
+    }),
+    getToolCatalogScopeKey: jest.fn(() => `${currentBaseUrl}::`),
+    clearToolSchemaCacheIfScopeChanged: jest.fn(),
+    serverManager: {
+      start: jest.fn().mockResolvedValue(undefined),
+      stop: jest.fn().mockResolvedValue(undefined),
+      dispose: jest.fn(),
+      checkHealth: jest.fn().mockResolvedValue(true),
+      setWorkingDirectory: jest.fn(),
+      isRunning: jest.fn().mockReturnValue(false),
+      updateConfig: jest.fn(),
+      canBindLocalEndpoint: jest.fn().mockResolvedValue(true),
+      restart: jest.fn().mockResolvedValue(undefined),
+      getStatus: jest.fn(() => 'stopped'),
+      getServerDiagnosticsSnapshot: jest.fn(() => ({ reason: 'none' })),
+      getManagedServerStateSnapshot: jest.fn(() => null),
+      ...overrides.serverManager,
+    },
+    syncEvents: {
+      hasListeners: jest.fn().mockReturnValue(false),
+      ensureSubscription: jest.fn(),
+      stopSubscription: jest.fn(),
+      restartSubscription: jest.fn(),
+      ...overrides.syncEvents,
+    },
+    openCodeEvents: {
+      hasListeners: jest.fn().mockReturnValue(false),
+      ensureSubscriptions: jest.fn(),
+      stopSubscriptions: jest.fn(),
+      restartSubscriptions: jest.fn(),
+      ...overrides.openCodeEvents,
+    },
+  });
+
+  return {
+    coordinator: new OpenCodeServiceLifecycleCoordinator(host),
+    host,
+    serverManager: host.serverManager,
+    syncEvents: host.syncEvents,
+    openCodeEvents: host.openCodeEvents,
+    getCurrentSettings: () => currentSettings,
+    getCurrentBaseUrl: () => currentBaseUrl,
+  };
+}
+
+describe('OpenCodeServiceLifecycleCoordinator lifecycle runtime', () => {
+  it('assembles lifecycle ownership around one server manager', () => {
     const managedServerState = {
       pid: 1234,
       host: '127.0.0.1',
@@ -117,22 +197,21 @@ describe('OpenCodeServiceLifecycleCoordinator', () => {
       initialManagedServerState: managedServerState,
     });
 
-    const assembly = createOpenCodeServiceLifecycleAssembly(host);
+    const assembly = OpenCodeServiceLifecycleCoordinator.createAssembly(host);
     const lifecycleHost = (
       assembly.serviceLifecycle as unknown as {
         host: OpenCodeServiceLifecycleCoordinatorHost;
-      }
-    ).host;
-    const settingsHost = (
-      assembly.settingsReconfiguration as unknown as {
-        host: OpenCodeSettingsReconfigurationCoordinatorHost;
       }
     ).host;
 
     expect(assembly.serverManager).toBeInstanceOf(ServerManager);
     expect(assembly.serverManager.getManagedServerStateSnapshot()).toEqual(managedServerState);
     expect(lifecycleHost.serverManager).toBe(assembly.serverManager);
-    expect(settingsHost.serverManager).toBe(assembly.serverManager);
+    expect(assembly.serviceLifecycle.getServerRuntimeMetadata()).toEqual({
+      serverStatus: 'stopped',
+      isManagedServerRunning: false,
+      managedServerState,
+    });
 
     const handleServerStatusChange = jest
       .spyOn(assembly.serviceLifecycle, 'handleServerStatusChange')
@@ -249,6 +328,13 @@ describe('OpenCodeServiceLifecycleCoordinator', () => {
         dispose: jest.fn(),
         checkHealth: jest.fn().mockResolvedValue(true),
         setWorkingDirectory: jest.fn(),
+        isRunning: jest.fn().mockReturnValue(false),
+        updateConfig: jest.fn(),
+        canBindLocalEndpoint: jest.fn().mockResolvedValue(true),
+        restart: jest.fn().mockResolvedValue(undefined),
+        getStatus: jest.fn(() => 'stopped'),
+        getServerDiagnosticsSnapshot: jest.fn(() => ({ reason: 'none' })),
+        getManagedServerStateSnapshot: jest.fn(() => null),
       },
     });
     const coordinator = new OpenCodeServiceLifecycleCoordinator(host);
@@ -270,5 +356,102 @@ describe('OpenCodeServiceLifecycleCoordinator', () => {
 
     expect(host.serverManager.checkHealth).not.toHaveBeenCalled();
     expect(host.resetTransientConnectivityLogState).toHaveBeenCalledTimes(1);
+  });
+
+});
+
+describe('OpenCodeServiceLifecycleCoordinator settings updates', () => {
+  it('restarts the managed server when local runtime settings change', async () => {
+    const harness = createSettingsHarness({
+      serverManager: {
+        isRunning: jest.fn().mockReturnValue(true),
+      },
+      syncEvents: {
+        hasListeners: jest.fn().mockReturnValue(true),
+      },
+      openCodeEvents: {
+        hasListeners: jest.fn().mockReturnValue(true),
+      },
+    });
+    const nextSettings = cloneSettings(DEFAULT_SETTINGS);
+    nextSettings.server.local.port = 5000;
+
+    await harness.coordinator.updateSettings(nextSettings);
+
+    expect(harness.serverManager.canBindLocalEndpoint).toHaveBeenCalledWith('127.0.0.1', 5000);
+    expect(harness.serverManager.updateConfig).toHaveBeenCalledWith(
+      OpenCodeServiceLifecycleCoordinator.createServerConfig(nextSettings),
+    );
+    expect(harness.serverManager.restart).toHaveBeenCalledTimes(1);
+    expect(harness.serverManager.stop).not.toHaveBeenCalled();
+    expect(harness.syncEvents.stopSubscription).toHaveBeenCalledWith(true);
+    expect(harness.openCodeEvents.stopSubscriptions).toHaveBeenCalledWith(true);
+    expect(harness.syncEvents.ensureSubscription).toHaveBeenCalledTimes(1);
+    expect(harness.openCodeEvents.ensureSubscriptions).toHaveBeenCalledTimes(1);
+    expect(harness.getCurrentSettings()).toEqual(nextSettings);
+    expect(harness.getCurrentSettings()).not.toBe(nextSettings);
+    expect(harness.getCurrentBaseUrl()).toBe('http://127.0.0.1:5000');
+  });
+
+  it('rolls back settings and restores the previous managed server after a failed restart', async () => {
+    const harness = createSettingsHarness({
+      serverManager: {
+        isRunning: jest.fn().mockReturnValue(true),
+        restart: jest.fn().mockRejectedValue(new Error('restart failed')),
+      },
+      syncEvents: {
+        hasListeners: jest.fn().mockReturnValue(true),
+      },
+      openCodeEvents: {
+        hasListeners: jest.fn().mockReturnValue(true),
+      },
+    });
+    const nextSettings = cloneSettings(DEFAULT_SETTINGS);
+    nextSettings.server.local.port = 5000;
+
+    await expect(harness.coordinator.updateSettings(nextSettings)).rejects.toThrow('restart failed');
+
+    expect(harness.serverManager.updateConfig).toHaveBeenNthCalledWith(
+      1,
+      OpenCodeServiceLifecycleCoordinator.createServerConfig(nextSettings),
+    );
+    expect(harness.serverManager.updateConfig).toHaveBeenNthCalledWith(
+      2,
+      OpenCodeServiceLifecycleCoordinator.createServerConfig(DEFAULT_SETTINGS),
+    );
+    expect(harness.serverManager.start).toHaveBeenCalledTimes(1);
+    expect(harness.syncEvents.stopSubscription).toHaveBeenNthCalledWith(1, true);
+    expect(harness.syncEvents.stopSubscription).toHaveBeenNthCalledWith(2, true);
+    expect(harness.openCodeEvents.stopSubscriptions).toHaveBeenNthCalledWith(1, true);
+    expect(harness.openCodeEvents.stopSubscriptions).toHaveBeenNthCalledWith(2, true);
+    expect(harness.syncEvents.ensureSubscription).toHaveBeenCalledTimes(1);
+    expect(harness.openCodeEvents.ensureSubscriptions).toHaveBeenCalledTimes(1);
+    expect(harness.getCurrentSettings()).toEqual(DEFAULT_SETTINGS);
+    expect(harness.getCurrentBaseUrl()).toBe('http://127.0.0.1:4196');
+  });
+
+  it('stops the managed server when switching away from local mode', async () => {
+    const harness = createSettingsHarness({
+      serverManager: {
+        isRunning: jest.fn().mockReturnValue(true),
+      },
+      syncEvents: {
+        hasListeners: jest.fn().mockReturnValue(true),
+      },
+      openCodeEvents: {
+        hasListeners: jest.fn().mockReturnValue(true),
+      },
+    });
+    const nextSettings = cloneSettings(DEFAULT_SETTINGS);
+    nextSettings.server.mode = 'remote';
+    nextSettings.server.remote.baseUrl = 'https://example.test/opencode';
+
+    await harness.coordinator.updateSettings(nextSettings);
+
+    expect(harness.serverManager.stop).toHaveBeenCalledTimes(1);
+    expect(harness.serverManager.restart).not.toHaveBeenCalled();
+    expect(harness.serverManager.canBindLocalEndpoint).not.toHaveBeenCalled();
+    expect(harness.getCurrentSettings()).toEqual(nextSettings);
+    expect(harness.getCurrentBaseUrl()).toBe('https://example.test/opencode');
   });
 });

@@ -52,7 +52,6 @@ import {
   OpenCodeSdkFacade,
 } from './OpenCodeSdkFacade';
 import {
-  createOpenCodeServiceLifecycleAssembly,
   OpenCodeServiceLifecycleCoordinator,
 } from './OpenCodeServiceLifecycleCoordinator';
 import {
@@ -68,9 +67,6 @@ import {
   type Session,
 } from './OpenCodeSessionLifecycleCoordinator';
 import {
-  OpenCodeSettingsReconfigurationCoordinator,
-} from './OpenCodeSettingsReconfigurationCoordinator';
-import {
   OpenCodeStreamEventTransformer,
 } from './OpenCodeStreamEventTransformer';
 import {
@@ -84,7 +80,6 @@ import {
 import type { SdkFeatureFlags } from './sdkFeatureFlags';
 import { resolveSdkFeatureFlags } from './sdkFeatureFlags';
 import type { SdkEvent } from './sdkTypes';
-import { ServerManager } from './ServerManager';
 import type {
   ManagedServerState,
   McpServerSnapshot,
@@ -264,7 +259,6 @@ export class OpenCodeService {
   private diagnostics: OpenCodeServiceDiagnostics;
   private settings: OpenCodianSettings;
   private events: OpenCodeServiceEvents;
-  private serverManager: ServerManager;
   private sessionLifecycle: OpenCodeSessionLifecycleCoordinator;
   private sessionControl: OpenCodeSessionControlOrchestrator;
   private questionPermissionHub: OpenCodeQuestionPermissionHub;
@@ -279,7 +273,6 @@ export class OpenCodeService {
   private streamEventTransformer: OpenCodeStreamEventTransformer;
   private streamingRuntime: OpenCodeStreamingRuntimeCoordinator;
   private openCodeEventRuntime: OpenCodeEventSubscriptionCoordinator;
-  private settingsReconfiguration: OpenCodeSettingsReconfigurationCoordinator;
   private serviceLifecycle: OpenCodeServiceLifecycleCoordinator;
   private vaultPath?: string;
 
@@ -369,6 +362,7 @@ export class OpenCodeService {
         this.openCodeEventRuntime.stopSubscriptions();
       },
     });
+    let serviceLifecycle: OpenCodeServiceLifecycleCoordinator | null = null;
     this.catalogQueries = new OpenCodeCatalogQueryCoordinator(this.catalogState, {
       shouldUseSdkCrud: () => this.shouldUseSdk('sdkCrud'),
       getSdkFacade: (options = {}) => options.includeDirectory === false
@@ -380,9 +374,11 @@ export class OpenCodeService {
       getDebugMetadata: () => ({
         baseUrl: this.baseUrl,
         vaultPath: this.vaultPath ?? null,
-        serverStatus: this.serverManager.getStatus(),
-        isManagedServerRunning: this.serverManager.isRunning(),
-        managedServerState: this.serverManager.getManagedServerStateSnapshot(),
+        ...(serviceLifecycle?.getServerRuntimeMetadata() ?? {
+          serverStatus: 'stopped' as ServerStatus,
+          isManagedServerRunning: false,
+          managedServerState: null,
+        }),
       }),
       getToolCatalogScopeKey: () => `${this.baseUrl}::${this.getScopedDirectoryPath() ?? ''}`,
     });
@@ -444,7 +440,7 @@ export class OpenCodeService {
       delay: (ms, signal) => this.delay(ms, signal),
     });
 
-    const lifecycleAssembly = createOpenCodeServiceLifecycleAssembly({
+    const lifecycleAssembly = OpenCodeServiceLifecycleCoordinator.createAssembly({
       getSettings: () => this.settings,
       setSettings: (nextSettings) => { this.settings = nextSettings; },
       getBaseUrl: () => this.baseUrl,
@@ -469,9 +465,8 @@ export class OpenCodeService {
       initialManagedServerState: runtimeOptions.initialManagedServerState,
       onManagedServerStateChange: runtimeOptions.onManagedServerStateChange,
     });
-    this.serverManager = lifecycleAssembly.serverManager;
+    serviceLifecycle = lifecycleAssembly.serviceLifecycle;
     this.serviceLifecycle = lifecycleAssembly.serviceLifecycle;
-    this.settingsReconfiguration = lifecycleAssembly.settingsReconfiguration;
   }
 
   private createSessionLifecycleSdk(): OpenCodeSessionLifecycleSdk {
@@ -544,16 +539,16 @@ export class OpenCodeService {
 
   /** Check if service is ready */
   isReady(): boolean {
-    return this.serverManager.getStatus() === 'running';
+    return this.serviceLifecycle.isReady();
   }
 
   /** Get server status */
   getServerStatus(): ServerStatus {
-    return this.serverManager.getStatus();
+    return this.serviceLifecycle.getServerStatus();
   }
 
   getServerDiagnostics(): ServerDiagnostics {
-    return this.serverManager.getServerDiagnosticsSnapshot();
+    return this.serviceLifecycle.getServerDiagnostics();
   }
 
   /** Check server health directly */
@@ -563,7 +558,7 @@ export class OpenCodeService {
 
   /** Check if plugin has a server process running */
   isServerProcessRunning(): boolean {
-    return this.serverManager.isRunning();
+    return this.serviceLifecycle.isServerProcessRunning();
   }
 
   /** HTTP GET helper using Obsidian's requestUrl */
@@ -1136,7 +1131,7 @@ export class OpenCodeService {
 
   /** Update settings */
   async updateSettings(settings: OpenCodianSettings): Promise<void> {
-    await this.settingsReconfiguration.updateSettings(settings);
+    await this.serviceLifecycle.updateSettings(settings);
   }
 
   async getSessionContextUsageSnapshot(sessionId: string): Promise<SessionContextUsageSnapshot | null> {

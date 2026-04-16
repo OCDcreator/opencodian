@@ -1,17 +1,16 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [ACTIVE] `R157` 已完成；当前 `[NEXT]` 为 `R158 - OpenCodeService residual thick-owner reduction under green gates`。
+> **当前状态**: [ACTIVE] `R158` 已完成；当前 `[NEXT]` 为 `R159 - Checkpoint after green-gate recovery and thick-owner reduction`。
 
 ## 当前优先级
 
-- **当前 `[NEXT]`**：`R158 - OpenCodeService residual thick-owner reduction under green gates`
-- **本批目标**：保持 `lint/typecheck/test/build` 全绿，并继续压缩 `OpenCodianView` / `OpenCodeService` 的 residual thick owner，最后进入 checkpoint
+- **当前 `[NEXT]`**：`R159 - Checkpoint after green-gate recovery and thick-owner reduction`
+- **本批目标**：保持 `lint/typecheck/test/build` 全绿，并复盘 `R155-R158` 的 gate recovery 与 thick-owner 回并收益
 - **当前 lint 基线**：`0 errors / 0 warnings`
 - **当前 typecheck 基线**：通过
 - **热点顺序**：
-  1. `R158` opencode residual thick-owner reduction
-  2. `R159` checkpoint；当前不得自动扩展 `R160+`
+  1. `R159` checkpoint；当前不得自动扩展 `R160+`
 
 ## 本批边界
 
@@ -26,10 +25,10 @@
 ## 远端实测热点提示
 
 - `src/features/chat/OpenCodianView.ts`：`R157` 后约 `4859` 行
-- `src/core/opencode/OpenCodeService.ts`：`R154` 已把 `OpenCodeQueryGateway` 并回 `OpenCodeCatalogQueryCoordinator`，当前约 `1437` 行
-- `src/features/chat/services/`：`R157` 已把 hydration / sync-load 的两条 view-adjacent host-provider 链并回既有 factory owner，继续压缩 chat 侧 provider/factory 碎片
+- `src/core/opencode/OpenCodeService.ts`：`R158` 已把 settings reconfiguration residual 并回 `OpenCodeServiceLifecycleCoordinator`，当前约 `1475` 行，direct lifecycle fields 收束为单一 `serviceLifecycle`
+- `src/features/chat/services/`：`R157` 已把 hydration / sync-load 的两条 view-adjacent host-provider 链并回既有 factory owner
 - `R156` 已把 live lint 清到 `0 errors / 0 warnings`，并把 justified heavy-suite / demo / registry hotspot 统一收口到现有 owner/config 里
-- 下一步 live hotspot 回到 `OpenCodeService.ts` 的 residual thick owner，而不是 warning gate
+- 下一步只做 `R159` checkpoint，而不是继续自动压缩新的 production hotspot
 
 ## 回归观察点
 

@@ -54,7 +54,6 @@ docs/modules/
 │   │   ├── OpenCodeMessageNormalizationMapper.md
 │   │   ├── OpenCodePromptRequestBuilder.md
 │   │   ├── OpenCodeServiceLifecycleCoordinator.md
-│   │   ├── OpenCodeSettingsReconfigurationCoordinator.md
 │   │   ├── OpenCodeService.md
 │   │   ├── OpenCodeStreamEventTransformer.md
 │   │   ├── OpenCodeStreamingRuntimeCoordinator.md
