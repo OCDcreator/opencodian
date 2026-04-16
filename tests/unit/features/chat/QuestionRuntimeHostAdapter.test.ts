@@ -8,6 +8,7 @@ import type { QuestionInlineResolutionActionFacadeHost } from '../../../../src/f
 import {
   QuestionPostResolutionRuntimeFacade,
   type QuestionPostResolutionRuntimeFacadeHost,
+  type QuestionPostResolutionRuntimeState,
 } from '../../../../src/features/chat/services/QuestionPostResolutionRuntimeFacade';
 import {
   createQuestionRejectExecutionAction,
@@ -15,9 +16,13 @@ import {
   QuestionResolutionExecutionFacade,
 } from '../../../../src/features/chat/services/QuestionResolutionExecutionFacade';
 import {
+  createQuestionPostResolutionRuntimeHostAdapter,
   createQuestionRuntimeHosts,
   createQuestionRuntimeServices,
+  type QuestionPostResolutionRuntimeViewHost,
+  type QuestionRuntimeConversationSyncPort,
   type QuestionRuntimeState,
+  type QuestionRuntimeStatusRefreshPort,
   type QuestionRuntimeViewHost,
 } from '../../../../src/features/chat/services/QuestionRuntimeHostAdapter';
 import type { TabId } from '../../../../src/features/chat/tabs';
@@ -337,5 +342,46 @@ describe('QuestionRuntimeHostAdapter', () => {
       status: 'answered',
       answers: [['TypeScript']],
     });
+  });
+
+  it('keeps post-resolution refresh and sync wiring in the question runtime owner', async () => {
+    let runtimeState: QuestionPostResolutionRuntimeState = { isStreaming: false };
+    const viewHost: Mocked<QuestionPostResolutionRuntimeViewHost> = {
+      getActiveTabId: jest.fn().mockReturnValue('tab-active'),
+      getTabRuntimeState: jest.fn(() => runtimeState),
+      getSessionIdForTab: jest.fn().mockReturnValue('session-1'),
+    };
+    const conversationSync: Mocked<QuestionRuntimeConversationSyncPort> = {
+      startConversationSyncLoop: jest.fn(),
+      syncVisibleConversationInBackground: jest.fn().mockResolvedValue(undefined),
+    };
+    const statusRefresh: Mocked<QuestionRuntimeStatusRefreshPort> = {
+      refreshTabSessionStatus: jest.fn().mockResolvedValue({ type: 'idle' }),
+    };
+
+    const adapter = createQuestionPostResolutionRuntimeHostAdapter({
+      viewHost,
+      conversationSync,
+      statusRefresh,
+    });
+
+    expect(adapter.getActiveTabId()).toBe('tab-active');
+    expect(adapter.getTabRuntimeState('tab-active')).toBe(runtimeState);
+    expect(adapter.getSessionIdForTab('tab-active')).toBe('session-1');
+
+    await adapter.refreshTabSessionStatus('tab-active', 'session-1', { suppressErrors: true });
+    adapter.startConversationSyncLoop();
+    await adapter.syncVisibleConversationInBackground();
+
+    expect(statusRefresh.refreshTabSessionStatus).toHaveBeenCalledWith(
+      'tab-active',
+      'session-1',
+      { suppressErrors: true },
+    );
+    expect(conversationSync.startConversationSyncLoop).toHaveBeenCalledTimes(1);
+    expect(conversationSync.syncVisibleConversationInBackground).toHaveBeenCalledTimes(1);
+
+    runtimeState = { isStreaming: true };
+    expect(adapter.getTabRuntimeState('tab-active')).toEqual({ isStreaming: true });
   });
 });

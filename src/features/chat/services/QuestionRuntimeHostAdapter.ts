@@ -71,6 +71,31 @@ export interface QuestionRuntimeViewHost {
   rejectQuestion(requestId: string): Promise<void>;
 }
 
+export interface QuestionPostResolutionRuntimeViewHost {
+  getActiveTabId(): TabId | null;
+  getTabRuntimeState(tabId: TabId | null): QuestionPostResolutionRuntimeState | null;
+  getSessionIdForTab(tabId: TabId | null): string | null | undefined;
+}
+
+export interface QuestionRuntimeConversationSyncPort {
+  startConversationSyncLoop(): void;
+  syncVisibleConversationInBackground(): Promise<void>;
+}
+
+export interface QuestionRuntimeStatusRefreshPort {
+  refreshTabSessionStatus(
+    tabId: TabId | null,
+    sessionId: string | undefined,
+    options: { suppressErrors?: boolean },
+  ): Promise<unknown>;
+}
+
+export interface QuestionPostResolutionRuntimeHostAdapterDependencies {
+  viewHost: QuestionPostResolutionRuntimeViewHost;
+  conversationSync: QuestionRuntimeConversationSyncPort;
+  statusRefresh: QuestionRuntimeStatusRefreshPort;
+}
+
 export interface QuestionRuntimeHosts {
   inlineCardRendererHost: QuestionInlineCardRendererHost;
   inlineResolutionActionHost: QuestionInlineResolutionActionFacadeHost;
@@ -87,6 +112,23 @@ export interface QuestionRuntimeServices {
   resolutionCoordinator: QuestionResolutionCoordinator;
   dockCoordinator: QuestionDockCoordinator;
   resolutionFlowCoordinator: QuestionResolutionFlowCoordinator;
+}
+
+export function createQuestionPostResolutionRuntimeHostAdapter(
+  dependencies: QuestionPostResolutionRuntimeHostAdapterDependencies,
+): QuestionPostResolutionRuntimeFacadeHost {
+  return {
+    getActiveTabId: () => dependencies.viewHost.getActiveTabId(),
+    getTabRuntimeState: (tabId) => dependencies.viewHost.getTabRuntimeState(tabId),
+    getSessionIdForTab: (tabId) => dependencies.viewHost.getSessionIdForTab(tabId),
+    refreshTabSessionStatus: (tabId, sessionId, options) =>
+      dependencies.statusRefresh.refreshTabSessionStatus(tabId, sessionId, options),
+    startConversationSyncLoop: () => {
+      dependencies.conversationSync.startConversationSyncLoop();
+    },
+    syncVisibleConversationInBackground: () =>
+      dependencies.conversationSync.syncVisibleConversationInBackground(),
+  };
 }
 
 export function createQuestionRuntimeHosts(

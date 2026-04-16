@@ -10,7 +10,7 @@
 - 从一份更窄的 `QuestionRuntimeViewHostFactoryHost` 派生 `QuestionRuntimeViewHost`
 - 统一收口 question dock slot、question API 与 tab attention 这几组原本在 view 构造函数里并排装配的 question 依赖
 - 继续复用既有的 `QuestionRuntimeViewHostAdapter`，让 adapter 只负责 question runtime host 适配，而把 view 侧的 late-bound 依赖拼装留在单独的 P2 factory
-- 把 question resolve 之后的 status refresh / sync follow-up 明确留给独立的 `QuestionPostResolutionRuntimeHostAdapter`，避免通用 question runtime host 再背负这组后处理端口
+- 把 question resolve 之后的 status refresh / sync follow-up 明确留给 `QuestionRuntimeHostAdapter` 内部的 post-resolution adapter，避免通用 question runtime view host 再背负这组后处理端口
 
 它不接管 question runtime bundle 的真实装配顺序；真正的 service/coordinator 实例化仍由 `QuestionRuntimeHostAdapter` 负责。
 
@@ -41,6 +41,5 @@ export function createQuestionRuntimeViewHost(
 
 - `OpenCodianView` 只保留一份 `QuestionRuntimeViewHostFactoryHost`，不再在构造函数里内联 question runtime 的多口依赖装配
 - `QuestionRuntimeViewHostAdapter` 继续负责把 dock/settings/API/tab-attention 等端口映射成 `QuestionRuntimeViewHost`
-- `QuestionPostResolutionRuntimeHostAdapter` 继续负责把 status refresh 与 conversation sync bridge 映射成 `QuestionPostResolutionRuntimeFacadeHost`
-- `QuestionRuntimeHostAdapter` 继续负责 question runtime service bundle 的 host 派生与实例化
+- `QuestionRuntimeHostAdapter` 继续负责 question runtime service bundle 的 host 派生、post-resolution follow-up 适配与实例化
 - 这次切片推进的是 master plan 的 P2 `question / todo / background task` lane：进一步压缩 `OpenCodianView` 里的 question runtime host wiring

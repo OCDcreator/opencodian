@@ -2,15 +2,15 @@
 
 > **状态**: [ACTIVE]
 > **作用**: 这是 maintainability 无人值守的战略文档。每轮开始前，先读本文件，再读 `docs/status/maintainability-round-roadmap.md` 与最近的 `docs/status/maintainability-phase-XXX.md`。
-> **自动推进状态**: `R159` 已完成；用户已明确续排最后一批，当前 `[NEXT]` 为 `R160 - OpenCodianView final residual thick seam closeout`。
+> **自动推进状态**: `R160` 已完成；用户已明确续排最后一批，当前 `[NEXT]` 为 `R161 - OpenCodeService final residual thick seam closeout`。
 
 ## 1. 当前判断
 
-当前分支已完成 `R153-R159`，并在远端实测维持 `lint/typecheck/test/build` 全绿：`npm run lint -- --format unix` 为 `0 errors / 0 warnings`，`npm run typecheck` 通过，`npm test` 通过（`283` suites / `1187` tests），`npm run build` 通过。用户现在明确要求继续把最后两个 residual thick seam 收掉，同时保持 `0` 碎片、`0` 错误、`0` 警告、typecheck 全绿、全量测试全过。
+当前分支已完成 `R153-R160`，并在本地实测维持 `lint/typecheck/test/build` 全绿：`npm run lint -- --format unix` 为 `0 errors / 0 warnings`，`npm run typecheck` 通过，`npm test` 通过（`282` suites / `1187` tests），`npm run build` 通过。用户已明确要求继续把最后一批 residual thick seam 收掉，同时保持 `0` 碎片、`0` 错误、`0` 警告、typecheck 全绿、全量测试全过。
 
 本批次的判断是：仍可继续一批，但只能打两个已知 production thick owner，不能重新开 freestyle backlog：
 
-- `src/features/chat/OpenCodianView.ts` 仍约 `4859` 行，`89` 条 import，仍直接装配较多 chat runtime owner
+- `src/features/chat/OpenCodianView.ts` 经 `R160` 后约 `4857` 行，`88` 条 import，question post-resolution thin adapter 已并回 `QuestionRuntimeHostAdapter`
 - `src/core/opencode/OpenCodeService.ts` 仍约 `1475` 行，`24` 条 import，仍是 opencode facade / session / diagnostics 的厚 owner
 - `src/features/chat/services/` 的 residual 碎片只能作为并回目标周边证据处理，禁止为了“降主文件行数”再制造薄 helper / adapter / provider / factory
 - 本批目标是**最后一批受控 thick-seam closeout**：先处理 `OpenCodianView`，再处理 `OpenCodeService`，最后 checkpoint 判断是否可称为高可维护性并停止 autopilot
@@ -24,7 +24,7 @@
 - **test**: `283 passed, 283 total` suites / `1187 passed, 1187 total` tests
 - **build**: 通过
 - **部署策略**: 当前 maintainability 批次不做 Test Vault 部署，除非用户后续明确要求
-- **当前 `[NEXT]`**: `R160 - OpenCodianView final residual thick seam closeout`
+- **当前 `[NEXT]`**: `R161 - OpenCodeService final residual thick seam closeout`
 
 ## 3. 本批执行规则
 

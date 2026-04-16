@@ -1,18 +1,17 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [ACTIVE] `R159` 已完成；当前 `[NEXT]` 为 `R160 - OpenCodianView final residual thick seam closeout`。
+> **当前状态**: [ACTIVE] `R160` 已完成；当前 `[NEXT]` 为 `R161 - OpenCodeService final residual thick seam closeout`。
 
 ## 当前优先级
 
-- **当前 `[NEXT]`**：`R160 - OpenCodianView final residual thick seam closeout`
+- **当前 `[NEXT]`**：`R161 - OpenCodeService final residual thick seam closeout`
 - **本批目标**：最后一批受控 closeout，只处理 `OpenCodianView` 与 `OpenCodeService` 两个 residual thick seam，然后 checkpoint 停机
 - **当前 lint 基线**：`0 errors / 0 warnings`
 - **当前 typecheck 基线**：通过
 - **热点顺序**：
-  1. `R160`：`OpenCodianView` final residual thick seam
-  2. `R161`：`OpenCodeService` final residual thick seam
-  3. `R162`：高可维护性 checkpoint；不得自动扩展 `R163+`
+  1. `R161`：`OpenCodeService` final residual thick seam
+  2. `R162`：高可维护性 checkpoint；不得自动扩展 `R163+`
 
 ## 本批边界
 
@@ -25,7 +24,7 @@
 
 ## 远端实测热点提示
 
-- `src/features/chat/OpenCodianView.ts`：`R157` 后约 `4859` 行、`89` 条 import；优先处理仍由 view 直接装配的 conversation/render/composer/question/background runtime residual
+- `src/features/chat/OpenCodianView.ts`：`R160` 后约 `4857` 行、`88` 条 import；question post-resolution thin adapter 已并回 `QuestionRuntimeHostAdapter`
 - `src/core/opencode/OpenCodeService.ts`：`R158` 后约 `1475` 行、`24` 条 import；优先处理仍由 service 直接持有的 diagnostics/session/question facade residual
 - `src/features/chat/services/`：只作为并回/收束目标周边证据，不为清理碎片新增新的薄层
 - 当前质量门槛已经全绿，任何 round 若不能维持 `0 errors / 0 warnings` 与 typecheck/test/build 通过，必须最小修复或失败回滚

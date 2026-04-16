@@ -29,19 +29,6 @@ export interface QuestionRuntimeTabAttentionPort {
   setNeedsAttention(tabId: TabId | null, needsAttention: boolean): void;
 }
 
-export interface QuestionRuntimeConversationSyncPort {
-  startConversationSyncLoop(): void;
-  syncVisibleConversationInBackground(): Promise<void>;
-}
-
-export interface QuestionRuntimeStatusRefreshPort {
-  refreshTabSessionStatus(
-    tabId: TabId | null,
-    sessionId: string | undefined,
-    options: { suppressErrors?: boolean },
-  ): Promise<unknown>;
-}
-
 export interface QuestionRuntimeViewHostAdapterHost {
   getActiveTabId(): TabId | null;
   getTabRuntimeState(tabId: TabId | null): QuestionRuntimeState | null;

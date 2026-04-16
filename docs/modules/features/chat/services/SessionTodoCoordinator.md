@@ -59,5 +59,5 @@ export class SessionTodoCoordinator {
 ## 与 `OpenCodianView` 的边界
 
 - `OpenCodianView` 现在只提供一份 `SessionTodoViewHost`，并持有单一 `SessionTodoCoordinator`
-- `QuestionTodoBackgroundTaskRefreshHostAdapter`、`QuestionTodoBackgroundTaskActivationHostAdapter`、`QuestionPostResolutionRuntimeHostAdapter`、`BackgroundTaskStreamTriggerCoordinator` 与 tab/session signal wiring 都改为消费 coordinator port
+- `QuestionTodoBackgroundTaskRefreshHostAdapter`、`QuestionTodoBackgroundTaskActivationHostAdapter`、`QuestionRuntimeHostAdapter` 的 post-resolution follow-up、`BackgroundTaskStreamTriggerCoordinator` 与 tab/session signal wiring 都改为消费 coordinator port
 - 这次切片推进的是 master plan 的 P2 `question / todo / background task` lane：把 session todo 的 refresh/status/runtime ownership 收束回一个统一 owner，并减少 view 对多个相邻 session-todo seam 的直接感知

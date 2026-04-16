@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个活动任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成活动任务；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的后续任务”。
-> **当前状态**: [ACTIVE] `R159` 已完成；当前 `[NEXT]` 为 `R160 - OpenCodianView final residual thick seam closeout`。
+> **当前状态**: [ACTIVE] `R160` 已完成；当前 `[NEXT]` 为 `R161 - OpenCodeService final residual thick seam closeout`。
 
 ## 控制规则
 
@@ -18,8 +18,8 @@
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
 - 当前 live lint 基线：`0 errors / 0 warnings`
 - 当前 typecheck 基线：已恢复通过
-- 最近成功 phase：`docs/status/maintainability-phase-494.md`
-- 当前路线判断：`R153-R159` 已完成并保持 `lint/typecheck/test/build` 全绿；用户已明确续排最后一批，只处理 `OpenCodianView` 与 `OpenCodeService` 两个 residual thick seam，并要求继续保持 `0` 碎片、`0` 错误、`0` 警告、typecheck 全绿与全量测试全过。
+- 最近成功 phase：`docs/status/maintainability-phase-495.md`
+- 当前路线判断：`R153-R160` 已完成并保持 `lint/typecheck/test/build` 全绿；用户已明确续排最后一批，只处理 `OpenCodianView` 与 `OpenCodeService` 两个 residual thick seam，并要求继续保持 `0` 碎片、`0` 错误、`0` 警告、typecheck 全绿与全量测试全过。
 
 ## Queue
 ## Queue
@@ -1689,7 +1689,7 @@
   - phase 文档明确记录 `lint/typecheck/test/build` 结果、核心大文件体量变化、remaining hotspots 与 stop/continue 建议
   - `npm run lint -- --format unix`、`npm run typecheck`、全量 `npm test` 与 `npm run build` 通过
 
-### [NEXT] R160 - OpenCodianView final residual thick seam closeout
+### [DONE] R160 - OpenCodianView final residual thick seam closeout
 
 - **Lane**: Maintainability / final chat thick owner
 - **目标**: 在 `lint/typecheck/test/build` 全绿下，处理 `src/features/chat/OpenCodianView.ts` 的最后一批高价值 residual thick seam，优先把仍由 view 直接装配的 conversation/render/composer/question/background runtime residual 收束到相邻既有厚 owner；禁止把碎片回灌进主文件或新增薄层。
@@ -1714,7 +1714,7 @@
   - 不产生新的薄碎片，且 `npm run lint -- --format unix` 为 `0 errors / 0 warnings`
   - `npm run typecheck`、全量 `npm test` 与 `npm run build` 通过
 
-### [QUEUED] R161 - OpenCodeService final residual thick seam closeout
+### [NEXT] R161 - OpenCodeService final residual thick seam closeout
 
 - **Lane**: Maintainability / final opencode thick owner
 - **目标**: 在绿色质量门槛下处理 `src/core/opencode/OpenCodeService.ts` 的最后一批高价值 residual thick seam，优先把仍由 service 直接持有的 diagnostics/session/question facade residual 收束到既有 lifecycle/session/control/question/catalog 厚 owner；禁止新建 wrapper/gateway/facade 碎片。
@@ -1757,5 +1757,5 @@
 
 ### 当前状态
 
-- 当前可自动执行的 `[NEXT]` 是 `R160 - OpenCodianView final residual thick seam closeout`。
+- 当前可自动执行的 `[NEXT]` 是 `R161 - OpenCodeService final residual thick seam closeout`。
 - `R160-R162` 是最后一批人工续排的受控 closeout；完成后若无新人工队列，必须再次停回“当前没有可自动执行的后续任务”。
