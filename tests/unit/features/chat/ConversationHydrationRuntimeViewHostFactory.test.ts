@@ -1,5 +1,5 @@
 import {
-  type ConversationHydrationRuntimeViewHostFactoryHost,
+  type ConversationHydrationRuntimeViewHost,
   createConversationHydrationRuntimeViewHosts,
 } from '../../../../src/features/chat/services/ConversationHydrationRuntimeViewHostFactory';
 
@@ -10,48 +10,34 @@ type Mocked<T> = {
       : T[Key];
 };
 
-type HydrationRenderRuntimePort =
-  ReturnType<ConversationHydrationRuntimeViewHostFactoryHost['getHydrationRenderRuntime']>;
-type HydrationOutcomeRuntimePort =
-  ReturnType<ConversationHydrationRuntimeViewHostFactoryHost['getHydrationOutcomeRuntime']>;
-type TransitionStatePort =
-  ReturnType<ConversationHydrationRuntimeViewHostFactoryHost['getConversationTransitionState']>;
-type TransitionWritebackPort =
-  ReturnType<ConversationHydrationRuntimeViewHostFactoryHost['getConversationTransitionWriteback']>;
+type ScrollRuntimeState = ReturnType<
+  ConversationHydrationRuntimeViewHost['getScrollRuntimeForTab']
+>;
+type TransitionSnapshot = ReturnType<
+  ConversationHydrationRuntimeViewHost['getCurrentConversation']
+>;
 
-function createHydrationRenderRuntimePort(): Mocked<HydrationRenderRuntimePort> {
-  const messagesContainer = {} as HTMLElement;
+function createFixture() {
+  let messagesContainer: HTMLElement | null = {} as HTMLElement;
+  let activeTabId: string | null = 'tab-active';
+  let scrollRuntime: ScrollRuntimeState = { autoScrollEnabled: true } as ScrollRuntimeState;
+  let currentConversation: TransitionSnapshot = {
+    id: 'conversation-current',
+    titleGenerationStatus: 'pending',
+  };
 
-  return {
-    getMessagesContainer: jest.fn().mockReturnValue(messagesContainer),
-    getActiveTabId: jest.fn().mockReturnValue('tab-active'),
-    getScrollRuntimeForTab: jest.fn().mockReturnValue({ autoScrollEnabled: true }),
+  const host: Mocked<ConversationHydrationRuntimeViewHost> = {
+    getMessagesContainer: jest.fn(() => messagesContainer),
+    getActiveTabId: jest.fn(() => activeTabId),
+    getScrollRuntimeForTab: jest.fn(() => scrollRuntime),
     scrollToBottom: jest.fn(),
     syncPaneScrollMetrics: jest.fn(),
     requestAnimationFrame: jest.fn().mockReturnValue(7),
-  };
-}
-
-function createHydrationOutcomeRuntimePort(): Mocked<HydrationOutcomeRuntimePort> {
-  return {
     syncBackgroundTaskStateFromConversation: jest.fn(),
     renderMessages: jest.fn().mockResolvedValue(undefined),
-  };
-}
-
-function createTransitionStatePort(): Mocked<TransitionStatePort> {
-  return {
-    getCurrentConversation: jest.fn().mockReturnValue({
-      id: 'conversation-current',
-      titleGenerationStatus: 'pending',
-    }),
+    getCurrentConversation: jest.fn(() => currentConversation),
     cancelTitleGeneration: jest.fn(),
     clearPendingTitleGenerationStatus: jest.fn().mockResolvedValue(undefined),
-  };
-}
-
-function createTransitionWritebackPort(): Mocked<TransitionWritebackPort> {
-  return {
     resetBackgroundTaskIndicator: jest.fn(),
     clearScheduledScrollToBottom: jest.fn(),
     beginConversationHydration: jest.fn(),
@@ -59,42 +45,20 @@ function createTransitionWritebackPort(): Mocked<TransitionWritebackPort> {
     resetTurnState: jest.fn(),
     endConversationHydration: jest.fn(),
   };
-}
-
-function createFixture() {
-  const initialHydrationRenderRuntime = createHydrationRenderRuntimePort();
-  const initialHydrationOutcomeRuntime = createHydrationOutcomeRuntimePort();
-  const initialTransitionState = createTransitionStatePort();
-  const initialTransitionWriteback = createTransitionWritebackPort();
-  let hydrationRenderRuntime = initialHydrationRenderRuntime;
-  let hydrationOutcomeRuntime = initialHydrationOutcomeRuntime;
-  let transitionState = initialTransitionState;
-  let transitionWriteback = initialTransitionWriteback;
-
-  const host: Mocked<ConversationHydrationRuntimeViewHostFactoryHost> = {
-    getHydrationRenderRuntime: jest.fn(() => hydrationRenderRuntime),
-    getHydrationOutcomeRuntime: jest.fn(() => hydrationOutcomeRuntime),
-    getConversationTransitionState: jest.fn(() => transitionState),
-    getConversationTransitionWriteback: jest.fn(() => transitionWriteback),
-  };
 
   return {
     host,
-    initialHydrationOutcomeRuntime,
-    initialHydrationRenderRuntime,
-    initialTransitionState,
-    initialTransitionWriteback,
-    setHydrationOutcomeRuntime: (next: Mocked<HydrationOutcomeRuntimePort>) => {
-      hydrationOutcomeRuntime = next;
+    setActiveTabId: (next: string | null) => {
+      activeTabId = next;
     },
-    setHydrationRenderRuntime: (next: Mocked<HydrationRenderRuntimePort>) => {
-      hydrationRenderRuntime = next;
+    setCurrentConversation: (next: TransitionSnapshot) => {
+      currentConversation = next;
     },
-    setTransitionState: (next: Mocked<TransitionStatePort>) => {
-      transitionState = next;
+    setMessagesContainer: (next: HTMLElement | null) => {
+      messagesContainer = next;
     },
-    setTransitionWriteback: (next: Mocked<TransitionWritebackPort>) => {
-      transitionWriteback = next;
+    setScrollRuntime: (next: ScrollRuntimeState) => {
+      scrollRuntime = next;
     },
   };
 }
@@ -104,7 +68,7 @@ describe('ConversationHydrationRuntimeViewHostFactory', () => {
     jest.clearAllMocks();
   });
 
-  it('derives hydration and transition hosts from grouped view ports', async () => {
+  it('derives hydration and transition hosts from the flattened view seam', async () => {
     const fixture = createFixture();
     const {
       conversationHydrationRenderBridgeHost,
@@ -115,13 +79,13 @@ describe('ConversationHydrationRuntimeViewHostFactory', () => {
       id: 'conversation-next',
       messages: [],
     } as Parameters<
-      HydrationOutcomeRuntimePort['syncBackgroundTaskStateFromConversation']
+      ConversationHydrationRuntimeViewHost['syncBackgroundTaskStateFromConversation']
     >[0];
-    const messages: Parameters<HydrationOutcomeRuntimePort['renderMessages']>[0] = [];
+    const messages: Parameters<ConversationHydrationRuntimeViewHost['renderMessages']>[0] = [];
     const messagesEl = {} as HTMLElement;
 
     expect(conversationHydrationRenderBridgeHost.getMessagesContainer()).toBe(
-      fixture.initialHydrationRenderRuntime.getMessagesContainer.mock.results[0].value,
+      fixture.host.getMessagesContainer.mock.results[0].value,
     );
     expect(conversationHydrationRenderBridgeHost.getActiveTabId()).toBe('tab-active');
     expect(conversationHydrationRenderBridgeHost.getScrollRuntimeForTab('tab-active')).toEqual({
@@ -149,54 +113,50 @@ describe('ConversationHydrationRuntimeViewHostFactory', () => {
     conversationHydrationOutcomeBridgeHost.syncBackgroundTaskStateFromConversation(conversation);
     await conversationHydrationOutcomeBridgeHost.renderMessages(messages);
 
-    expect(fixture.initialHydrationRenderRuntime.scrollToBottom).toHaveBeenCalledWith({
+    expect(fixture.host.scrollToBottom).toHaveBeenCalledWith({
       tabId: 'tab-active',
     });
-    expect(fixture.initialHydrationRenderRuntime.syncPaneScrollMetrics)
+    expect(fixture.host.syncPaneScrollMetrics)
       .toHaveBeenCalledWith('tab-active', messagesEl);
-    expect(fixture.initialHydrationRenderRuntime.requestAnimationFrame).toHaveBeenCalledTimes(1);
-    expect(fixture.initialTransitionState.cancelTitleGeneration)
+    expect(fixture.host.requestAnimationFrame).toHaveBeenCalledTimes(1);
+    expect(fixture.host.cancelTitleGeneration).toHaveBeenCalledWith('conversation-current');
+    expect(fixture.host.clearPendingTitleGenerationStatus)
       .toHaveBeenCalledWith('conversation-current');
-    expect(fixture.initialTransitionState.clearPendingTitleGenerationStatus)
-      .toHaveBeenCalledWith('conversation-current');
-    expect(fixture.initialTransitionWriteback.resetBackgroundTaskIndicator)
-      .toHaveBeenCalledTimes(1);
-    expect(fixture.initialTransitionWriteback.clearScheduledScrollToBottom)
-      .toHaveBeenCalledTimes(1);
-    expect(fixture.initialTransitionWriteback.beginConversationHydration)
-      .toHaveBeenCalledWith('tab-active');
-    expect(fixture.initialTransitionWriteback.clearMessagesContainer).toHaveBeenCalledTimes(1);
-    expect(fixture.initialTransitionWriteback.resetTurnState).toHaveBeenCalledTimes(1);
-    expect(fixture.initialTransitionWriteback.endConversationHydration)
-      .toHaveBeenCalledWith('tab-active');
-    expect(fixture.initialHydrationOutcomeRuntime.syncBackgroundTaskStateFromConversation)
+    expect(fixture.host.resetBackgroundTaskIndicator).toHaveBeenCalledTimes(1);
+    expect(fixture.host.clearScheduledScrollToBottom).toHaveBeenCalledTimes(1);
+    expect(fixture.host.beginConversationHydration).toHaveBeenCalledWith('tab-active');
+    expect(fixture.host.clearMessagesContainer).toHaveBeenCalledTimes(1);
+    expect(fixture.host.resetTurnState).toHaveBeenCalledTimes(1);
+    expect(fixture.host.endConversationHydration).toHaveBeenCalledWith('tab-active');
+    expect(fixture.host.syncBackgroundTaskStateFromConversation)
       .toHaveBeenCalledWith(conversation);
-    expect(fixture.initialHydrationOutcomeRuntime.renderMessages).toHaveBeenCalledWith(messages);
+    expect(fixture.host.renderMessages).toHaveBeenCalledWith(messages);
   });
 
-  it('uses the latest ports returned by the view host', async () => {
+  it('keeps the flattened seam late-bound to the latest hydration collaborators', async () => {
     const fixture = createFixture();
     const {
       conversationHydrationRenderBridgeHost,
       conversationHydrationOutcomeBridgeHost,
       conversationTransitionBridgeHost,
     } = createConversationHydrationRuntimeViewHosts(fixture.host);
-    const nextHydrationRenderRuntime = createHydrationRenderRuntimePort();
-    const nextHydrationOutcomeRuntime = createHydrationOutcomeRuntimePort();
-    const nextTransitionState = createTransitionStatePort();
-    const nextTransitionWriteback = createTransitionWritebackPort();
-    nextHydrationRenderRuntime.getActiveTabId.mockReturnValue('tab-next');
-    nextTransitionState.getCurrentConversation.mockReturnValue({
+    const nextMessagesContainer = {} as HTMLElement;
+
+    fixture.setMessagesContainer(nextMessagesContainer);
+    fixture.setActiveTabId('tab-next');
+    fixture.setScrollRuntime({ autoScrollEnabled: false } as ScrollRuntimeState);
+    fixture.setCurrentConversation({
       id: 'conversation-next',
       titleGenerationStatus: undefined,
     });
+    fixture.host.requestAnimationFrame.mockReturnValue(11);
 
-    fixture.setHydrationRenderRuntime(nextHydrationRenderRuntime);
-    fixture.setHydrationOutcomeRuntime(nextHydrationOutcomeRuntime);
-    fixture.setTransitionState(nextTransitionState);
-    fixture.setTransitionWriteback(nextTransitionWriteback);
-
+    expect(conversationHydrationRenderBridgeHost.getMessagesContainer()).toBe(nextMessagesContainer);
     expect(conversationHydrationRenderBridgeHost.getActiveTabId()).toBe('tab-next');
+    expect(conversationHydrationRenderBridgeHost.getScrollRuntimeForTab('tab-next')).toEqual({
+      autoScrollEnabled: false,
+    });
+    expect(conversationHydrationRenderBridgeHost.requestAnimationFrame(() => undefined)).toBe(11);
     expect(conversationTransitionBridgeHost.getCurrentConversation()).toEqual({
       id: 'conversation-next',
       titleGenerationStatus: undefined,
@@ -204,13 +164,12 @@ describe('ConversationHydrationRuntimeViewHostFactory', () => {
     conversationTransitionBridgeHost.clearMessagesContainer();
     await conversationHydrationOutcomeBridgeHost.renderMessages([]);
 
-    expect(fixture.initialHydrationRenderRuntime.getActiveTabId).not.toHaveBeenCalled();
-    expect(nextHydrationRenderRuntime.getActiveTabId).toHaveBeenCalledTimes(1);
-    expect(fixture.initialTransitionState.getCurrentConversation).not.toHaveBeenCalled();
-    expect(nextTransitionState.getCurrentConversation).toHaveBeenCalledTimes(1);
-    expect(fixture.initialTransitionWriteback.clearMessagesContainer).not.toHaveBeenCalled();
-    expect(nextTransitionWriteback.clearMessagesContainer).toHaveBeenCalledTimes(1);
-    expect(fixture.initialHydrationOutcomeRuntime.renderMessages).not.toHaveBeenCalled();
-    expect(nextHydrationOutcomeRuntime.renderMessages).toHaveBeenCalledWith([]);
+    expect(fixture.host.getMessagesContainer).toHaveBeenCalledTimes(1);
+    expect(fixture.host.getActiveTabId).toHaveBeenCalledTimes(1);
+    expect(fixture.host.getScrollRuntimeForTab).toHaveBeenCalledWith('tab-next');
+    expect(fixture.host.requestAnimationFrame).toHaveBeenCalledTimes(1);
+    expect(fixture.host.getCurrentConversation).toHaveBeenCalledTimes(1);
+    expect(fixture.host.clearMessagesContainer).toHaveBeenCalledTimes(1);
+    expect(fixture.host.renderMessages).toHaveBeenCalledWith([]);
   });
 });

@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个活动任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成活动任务；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的后续任务”。
-> **当前状态**: [ACTIVE] `R156` 已完成；当前 `[NEXT]` 为 `R157 - OpenCodianView residual thick-owner reduction under green gates`。
+> **当前状态**: [ACTIVE] `R157` 已完成；当前 `[NEXT]` 为 `R158 - OpenCodeService residual thick-owner reduction under green gates`。
 
 ## 控制规则
 
@@ -18,8 +18,8 @@
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
 - 当前 live lint 基线：`0 errors / 0 warnings`
 - 当前 typecheck 基线：已恢复通过
-- 最近成功 phase：`docs/status/maintainability-phase-490.md`
-- 当前路线判断：`R153-R156` 已完成 chat / opencode defragmentation、typecheck gate recovery 与 zero-warning closeout；当前真实基线已恢复到 `lint + typecheck + 全量测试 + build` 全绿，因此当前批次下一步转入 `R157-R158` 的核心厚 owner 收缩。
+- 最近成功 phase：`docs/status/maintainability-phase-492.md`
+- 当前路线判断：`R153-R157` 已完成 chat / opencode defragmentation、typecheck gate recovery、zero-warning closeout 与首个 view residual seam 回并；当前真实基线维持 `lint + typecheck + 全量测试 + build` 全绿，因此当前批次下一步转入 `R158-R159` 的 opencode residual owner 收缩与 checkpoint。
 
 ## Queue
 ## Queue
@@ -1640,7 +1640,7 @@
   - `npm run lint -- --format unix` 达到 `0 errors / 0 warnings`
   - `npm run typecheck`、全量 `npm test` 与 `npm run build` 通过
 
-### [NEXT] R157 - OpenCodianView residual thick-owner reduction under green gates
+### [DONE] R157 - OpenCodianView residual thick-owner reduction under green gates
 
 - **Lane**: Maintainability / chat residual thick owner
 - **目标**: 在 `lint/typecheck/test/build` 全绿后，继续削减 `OpenCodianView.ts` 的 direct assembly / import surface，优先把仍然过厚的 view-adjacent seam 压回相邻厚 owner，而不是回灌主文件或继续造碎片。
@@ -1656,7 +1656,7 @@
   - `OpenCodianView.ts` 行数与 direct assembly/import surface 有可量化下降
   - lint/typecheck/test/build 全绿保持
 
-### [QUEUED] R158 - OpenCodeService residual thick-owner reduction under green gates
+### [NEXT] R158 - OpenCodeService residual thick-owner reduction under green gates
 
 - **Lane**: Maintainability / opencode residual thick owner
 - **目标**: 在绿色质量门槛下继续收束 `OpenCodeService.ts` 的 residual thick seam，优先把还偏薄或仅承担转发的 ownership 并回相邻厚 owner，不制造新的 wrapper/gateway 碎片。
@@ -1691,6 +1691,6 @@
 
 ### 当前状态
 
-- 当前可自动执行的 `[NEXT]` 是 `R157 - OpenCodianView residual thick-owner reduction under green gates`。
-- 当前批次已恢复 `lint/typecheck/test/build` 全绿；下一步在绿灯下继续压缩 `OpenCodianView` / `OpenCodeService` 的 residual thick owner。
+- 当前可自动执行的 `[NEXT]` 是 `R158 - OpenCodeService residual thick-owner reduction under green gates`。
+- 当前批次维持 `lint/typecheck/test/build` 全绿；下一步在绿灯下继续压缩 `OpenCodeService` 的 residual thick owner，并在 `R159` 做 checkpoint。
 - `R159` 完成后若没有新的人工续排项，必须再次停回“当前没有可自动执行的后续任务”。

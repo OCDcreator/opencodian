@@ -3,7 +3,7 @@ import {
   createEmptyTabContextState,
 } from '../../../../src/core/types';
 import {
-  type ConversationSyncLoadRuntimeViewHostFactoryHost,
+  type ConversationSyncLoadRuntimeViewHost,
   createConversationSyncLoadRuntimeViewHosts,
 } from '../../../../src/features/chat/services/ConversationSyncLoadRuntimeViewHostFactory';
 import type { TabData } from '../../../../src/features/chat/tabs';
@@ -62,7 +62,7 @@ function createFixture() {
     getCurrentConversation: jest.fn().mockReturnValue(currentConversation),
     getActiveTabId: jest.fn().mockReturnValue('tab-active'),
     getAllTabs: jest.fn().mockReturnValue(tabs),
-    getTab: jest.fn().mockImplementation((tabId: string) =>
+    getTab: jest.fn().mockImplementation((tabId: string | null) =>
       tabs.find((tab) => tab.id === tabId) ?? null,
     ),
     getTabRuntimeState: jest.fn().mockReturnValue({
@@ -89,10 +89,29 @@ function createFixture() {
   let tabRuntime = initialTabRuntime;
   let conversationSyncBridge = initialBridge;
 
-  const host: Mocked<ConversationSyncLoadRuntimeViewHostFactoryHost> = {
-    getConversationStore: jest.fn(() => conversationStore),
-    getTabRuntime: jest.fn(() => tabRuntime),
-    getConversationSyncBridge: jest.fn(() => conversationSyncBridge),
+  const host: Mocked<ConversationSyncLoadRuntimeViewHost> = {
+    loadConversations: jest.fn(() => conversationStore.loadConversations()),
+    getConversationById: jest.fn((id: string) => conversationStore.getConversationById(id)),
+    getCurrentConversation: jest.fn(() => tabRuntime.getCurrentConversation()),
+    getActiveTabId: jest.fn(() => tabRuntime.getActiveTabId()),
+    getAllTabs: jest.fn(() => tabRuntime.getAllTabs()),
+    getTab: jest.fn((tabId: string | null) => tabRuntime.getTab(tabId)),
+    getTabRuntimeState: jest.fn((tabId: string | null) => tabRuntime.getTabRuntimeState(tabId)),
+    getConversationSyncFingerprint: jest.fn((messages) =>
+      conversationSyncBridge.getConversationSyncFingerprint(messages)),
+    syncConversationMessagesFromServer: jest.fn((conversation, tabId, reason, options) =>
+      conversationSyncBridge.syncConversationMessagesFromServer(
+        conversation,
+        tabId,
+        reason,
+        options,
+      )),
+    setCurrentConversationRevertState: jest.fn((revertState) =>
+      conversationSyncBridge.setCurrentConversationRevertState(revertState)),
+    applySyncedConversationUpdate: jest.fn((previousMessages, nextMessages) =>
+      conversationSyncBridge.applySyncedConversationUpdate(previousMessages, nextMessages)),
+    renderBackgroundTaskIndicatorIfNeeded: jest.fn((tabId) =>
+      conversationSyncBridge.renderBackgroundTaskIndicatorIfNeeded(tabId)),
     hasInterruptedLocalAssistantTail: jest.fn().mockReturnValue(false),
   };
 
@@ -121,7 +140,7 @@ describe('ConversationSyncLoadRuntimeViewHostFactory', () => {
     jest.clearAllMocks();
   });
 
-  it('derives sync/load hosts from late-bound view ports', async () => {
+  it('derives sync/load hosts from the flattened late-bound seam', async () => {
     const fixture = createFixture();
     const {
       conversationSyncViewHost,
@@ -255,5 +274,71 @@ describe('ConversationSyncLoadRuntimeViewHostFactory', () => {
         { forceServerSync: true },
       ),
     ).toBe(true);
+  });
+
+  it('keeps the flattened sync/load seam late-bound to the latest collaborators', async () => {
+    const fixture = createFixture();
+    const {
+      conversationSyncViewHost,
+    } = createConversationSyncLoadRuntimeViewHosts(fixture.host);
+    const nextTabs = [
+      createTab({
+        id: 'tab-next',
+        conversationId: fixture.hiddenConversation.id,
+        title: 'Next tab',
+      }),
+    ];
+
+    fixture.setTabRuntime({
+      ...fixture.initialTabRuntime,
+      getActiveTabId: jest.fn().mockReturnValue('tab-next'),
+      getAllTabs: jest.fn().mockReturnValue(nextTabs),
+      getTabRuntimeState: jest.fn().mockReturnValue({
+        isStreaming: true,
+        isConversationSyncInFlight: true,
+        lastConversationSyncFingerprint: 'runtime-next',
+        pendingSignalConversationSyncReasons: new Set(['manual']),
+        signalConversationSyncTimerId: 1,
+      }),
+    });
+    fixture.setConversationSyncBridge({
+      ...fixture.initialBridge,
+      getConversationSyncFingerprint: jest.fn().mockReturnValue('fingerprint:1'),
+      syncConversationMessagesFromServer: jest.fn().mockResolvedValue({
+        changed: false,
+        messages: fixture.hiddenConversation.messages,
+        fingerprint: 'sync-fingerprint-next',
+        revertState: null,
+      }),
+    });
+    fixture.host.hasInterruptedLocalAssistantTail.mockReturnValue(true);
+
+    expect(conversationSyncViewHost.getActiveTabId()).toBe('tab-next');
+    expect(conversationSyncViewHost.getAllTabs()).toEqual(nextTabs);
+    expect(conversationSyncViewHost.getTabRuntimeState('tab-next')).toMatchObject({
+      isConversationSyncInFlight: true,
+      lastConversationSyncFingerprint: 'runtime-next',
+    });
+    expect(conversationSyncViewHost.getConversationSyncFingerprint([])).toBe('fingerprint:1');
+    await expect(
+      conversationSyncViewHost.syncConversationMessagesFromServer(
+        fixture.hiddenConversation,
+        'tab-next',
+        'load-conversation',
+      ),
+    ).resolves.toMatchObject({
+      fingerprint: 'sync-fingerprint-next',
+      revertState: null,
+    });
+
+    expect(fixture.host.getActiveTabId).toHaveBeenCalledTimes(1);
+    expect(fixture.host.getAllTabs).toHaveBeenCalledTimes(1);
+    expect(fixture.host.getTabRuntimeState).toHaveBeenCalledWith('tab-next');
+    expect(fixture.host.syncConversationMessagesFromServer).toHaveBeenCalledWith(
+      fixture.hiddenConversation,
+      'tab-next',
+      'load-conversation',
+      undefined,
+    );
   });
 });

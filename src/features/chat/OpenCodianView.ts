@@ -190,10 +190,7 @@ import {
   type ConversationHistoryActionsHost,
 } from './services/ConversationHistoryActionsCoordinator';
 import {
-  type ConversationHydrationRuntimeHostProviderHost,
-  createConversationHydrationRuntimeViewHostFactoryHost,
-} from './services/ConversationHydrationRuntimeHostProvider';
-import {
+  type ConversationHydrationRuntimeViewHost,
   createConversationHydrationRuntimeViewHosts,
 } from './services/ConversationHydrationRuntimeViewHostFactory';
 import {
@@ -221,10 +218,7 @@ import {
   createConversationSyncServices,
 } from './services/ConversationSyncHostAdapter';
 import {
-  type ConversationSyncLoadRuntimeHostProviderHost,
-  createConversationSyncLoadRuntimeViewHostFactoryHost,
-} from './services/ConversationSyncLoadRuntimeHostProvider';
-import {
+  type ConversationSyncLoadRuntimeViewHost,
   createConversationSyncLoadRuntimeViewHosts,
 } from './services/ConversationSyncLoadRuntimeViewHostFactory';
 import {
@@ -1258,9 +1252,7 @@ export class OpenCodianView extends ItemView {
     );
     this.conversationAuthoritativeSyncCoordinator = conversationAuthoritativeSyncCoordinator;
     const conversationHydrationRuntimeViewHosts = createConversationHydrationRuntimeViewHosts(
-      createConversationHydrationRuntimeViewHostFactoryHost(
-        this.createConversationHydrationRuntimeHostProviderHost(conversationRenderService),
-      ),
+      this.createConversationHydrationRuntimeViewHost(conversationRenderService),
     );
     const conversationHydrationRenderBridge = new ConversationHydrationRenderBridge(
       conversationHydrationRuntimeViewHosts.conversationHydrationRenderBridgeHost,
@@ -1307,9 +1299,7 @@ export class OpenCodianView extends ItemView {
       tabActivationRuntimeBridgeHosts.tabRuntimeStateBridgeHost,
     );
     const conversationSyncLoadRuntimeHosts = createConversationSyncLoadRuntimeViewHosts(
-      createConversationSyncLoadRuntimeViewHostFactoryHost(
-        this.createConversationSyncLoadRuntimeHostProviderHost(conversationRenderService),
-      ),
+      this.createConversationSyncLoadRuntimeViewHost(conversationRenderService),
     );
     const conversationSyncServices = createConversationSyncServices(
       conversationSyncLoadRuntimeHosts.conversationSyncViewHost,
@@ -1749,10 +1739,10 @@ export class OpenCodianView extends ItemView {
     };
   }
 
-  private createConversationSyncLoadRuntimeHostProviderHost(
+  private createConversationSyncLoadRuntimeViewHost(
     conversationRenderService: ConversationRenderService,
   ):
-  ConversationSyncLoadRuntimeHostProviderHost {
+  ConversationSyncLoadRuntimeViewHost {
     return {
       loadConversations: () => this.plugin.loadConversations(),
       getConversationById: async (id) => (await this.plugin.getConversationById(id)) ?? null,
@@ -1916,10 +1906,10 @@ export class OpenCodianView extends ItemView {
     };
   }
 
-  private createConversationHydrationRuntimeHostProviderHost(
+  private createConversationHydrationRuntimeViewHost(
     conversationRenderService: ConversationRenderService,
   ):
-  ConversationHydrationRuntimeHostProviderHost {
+  ConversationHydrationRuntimeViewHost {
     return {
       getMessagesContainer: () => this.messagesContainer,
       getActiveTabId: () => this.getActiveTabId(),

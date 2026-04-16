@@ -2,11 +2,11 @@
 
 > **状态**: [ACTIVE]
 > **作用**: 这是 maintainability 无人值守的战略文档。每轮开始前，先读本文件，再读 `docs/status/maintainability-round-roadmap.md` 与最近的 `docs/status/maintainability-phase-XXX.md`。
-> **自动推进状态**: `R156` 已完成；当前 `[NEXT]` 为 `R157 - OpenCodianView residual thick-owner reduction under green gates`。
+> **自动推进状态**: `R157` 已完成；当前 `[NEXT]` 为 `R158 - OpenCodeService residual thick-owner reduction under green gates`。
 
 ## 1. 当前判断
 
-**当前分支已完成 `R153-R156` 的 chat / opencode defragmentation、typecheck gate recovery 与 zero-warning closeout。当前最新实测为：`npm run lint -- --format unix` 达到 `0 errors / 0 warnings`、`npm run typecheck` 通过、`npm test` 通过（`286` 个 suites / `1190` 个 tests）、`npm run build` 通过。因此本批现已恢复完整绿色质量门槛，接下来转入 `R157-R158` 在绿灯下继续削减 residual thick owner。**
+**当前分支已完成 `R153-R157` 的 chat / opencode defragmentation、typecheck gate recovery、zero-warning closeout 与首个 residual thick-owner 回并。当前最新实测为：`npm run lint` 通过、`npm run typecheck` 通过、`npm test` 通过（`284` 个 suites / `1187` 个 tests）、`npm run build` 通过。因此本批现已在绿灯下完成 `OpenCodianView` 的一条 residual seam 回并，接下来转入 `R158-R159` 继续处理 `OpenCodeService` 与 checkpoint。**
 
 当前继续 maintainability 的理由不是 warning 数本身，而是远端仓库仍存在两类高价值 residual：
 
@@ -21,12 +21,11 @@
 
 - **lint**: `0 errors / 0 warnings`
 - **typecheck**: 通过
-- **最近验证**: `npm run lint -- --format unix` 通过（`0 errors / 0 warnings`）、`npm run typecheck` 通过、`npm test` 通过（`286 passed, 286 total` suites / `1190 passed, 1190 total` tests）、`npm run build` 通过
+- **最近验证**: `npm run lint` 通过、`npm run typecheck` 通过、`npm test` 通过（`284 passed, 284 total` suites / `1187 passed, 1187 total` tests）、`npm run build` 通过
 - **部署策略**: 当前 maintainability 批次不做 Test Vault 部署，除非用户后续明确要求
-- **当前 `[NEXT]`**: `R157 - OpenCodianView residual thick-owner reduction under green gates`
+- **当前 `[NEXT]`**: `R158 - OpenCodeService residual thick-owner reduction under green gates`
 - **主热点**:
-  - `R156` 已把 live lint 从 `0 errors / 38 warnings` 收束到 `0 errors / 0 warnings`
-  - `OpenCodianView.ts` 仍约 `4866` 行，direct host/runtime wiring 仍是下一阶段最高价值入口
+  - `R157` 已把 conversation hydration / sync load 的薄 host-provider 链回并进既有 factory owner，使 `OpenCodianView.ts` 从 `4869` 行降到 `4859` 行，import statements 从 `91` 条降到 `89` 条
   - `OpenCodeService.ts` 当前约 `1437` 行，constructor/import surface 已继续收束，但 residual coordinator assembly 仍需后续轮次继续压缩
 
 ## 3. 本批执行规则

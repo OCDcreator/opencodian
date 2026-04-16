@@ -24,24 +24,24 @@ type ConversationSyncLoadBridgePort = Pick<
   | 'renderBackgroundTaskIndicatorIfNeeded'
 >;
 
-export interface ConversationSyncLoadRuntimeViewHostFactoryHost {
-  getConversationStore(): ConversationSyncLoadConversationStorePort;
-  getTabRuntime(): ConversationSyncLoadTabRuntimePort;
-  getConversationSyncBridge(): ConversationSyncLoadBridgePort;
+export interface ConversationSyncLoadRuntimeViewHost extends
+  ConversationSyncLoadConversationStorePort,
+  ConversationSyncLoadTabRuntimePort,
+  ConversationSyncLoadBridgePort {
   hasInterruptedLocalAssistantTail(messages: ChatMessage[]): boolean;
 }
 
 export function createConversationSyncLoadRuntimeViewHosts(
-  host: ConversationSyncLoadRuntimeViewHostFactoryHost,
+  host: ConversationSyncLoadRuntimeViewHost,
 ): ConversationSyncLoadRuntimeHosts {
   return createConversationSyncLoadRuntimeHosts({
-    getCurrentConversation: () => host.getTabRuntime().getCurrentConversation(),
-    getActiveTabId: () => host.getTabRuntime().getActiveTabId(),
-    getAllTabs: () => host.getTabRuntime().getAllTabs(),
-    getTab: (tabId) => host.getTabRuntime().getTab(tabId),
-    getTabRuntimeState: (tabId) => host.getTabRuntime().getTabRuntimeState(tabId),
-    loadConversations: () => host.getConversationStore().loadConversations(),
-    getConversationById: (id) => host.getConversationStore().getConversationById(id),
+    getCurrentConversation: () => host.getCurrentConversation(),
+    getActiveTabId: () => host.getActiveTabId(),
+    getAllTabs: () => host.getAllTabs(),
+    getTab: (tabId) => host.getTab(tabId),
+    getTabRuntimeState: (tabId) => host.getTabRuntimeState(tabId),
+    loadConversations: () => host.loadConversations(),
+    getConversationById: (id) => host.getConversationById(id),
     shouldSyncConversationFromServer: (conversation, options) => {
       const shouldSyncInterrupted = !host.hasInterruptedLocalAssistantTail(conversation.messages)
         && conversation.messages.some((message) =>
@@ -56,23 +56,15 @@ export function createConversationSyncLoadRuntimeViewHosts(
       );
     },
     getConversationSyncFingerprint: (messages) =>
-      host.getConversationSyncBridge().getConversationSyncFingerprint(messages),
+      host.getConversationSyncFingerprint(messages),
     syncConversationMessagesFromServer: (conversation, tabId, reason, options) =>
-      host.getConversationSyncBridge().syncConversationMessagesFromServer(
-        conversation,
-        tabId,
-        reason,
-        options,
-      ),
+      host.syncConversationMessagesFromServer(conversation, tabId, reason, options),
     setCurrentConversationRevertState: (revertState) => {
-      host.getConversationSyncBridge().setCurrentConversationRevertState(revertState);
+      host.setCurrentConversationRevertState(revertState);
     },
     applySyncedConversationUpdate: (previousMessages, nextMessages) =>
-      host.getConversationSyncBridge().applySyncedConversationUpdate(
-        previousMessages,
-        nextMessages,
-      ),
+      host.applySyncedConversationUpdate(previousMessages, nextMessages),
     renderBackgroundTaskIndicatorIfNeeded: (tabId) =>
-      host.getConversationSyncBridge().renderBackgroundTaskIndicatorIfNeeded(tabId),
+      host.renderBackgroundTaskIndicatorIfNeeded(tabId),
   });
 }

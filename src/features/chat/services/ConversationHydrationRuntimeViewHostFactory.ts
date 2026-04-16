@@ -44,60 +44,58 @@ export interface ConversationHydrationRuntimeViewHosts {
   conversationTransitionBridgeHost: ConversationTransitionBridgeHost;
 }
 
-export interface ConversationHydrationRuntimeViewHostFactoryHost {
-  getHydrationRenderRuntime(): ConversationHydrationRenderRuntimePort;
-  getHydrationOutcomeRuntime(): ConversationHydrationOutcomeRuntimePort;
-  getConversationTransitionState(): ConversationTransitionStatePort;
-  getConversationTransitionWriteback(): ConversationTransitionWritebackPort;
-}
+export interface ConversationHydrationRuntimeViewHost extends
+  ConversationHydrationRenderRuntimePort,
+  ConversationHydrationOutcomeRuntimePort,
+  ConversationTransitionStatePort,
+  ConversationTransitionWritebackPort {}
 
 export function createConversationHydrationRuntimeViewHosts(
-  host: ConversationHydrationRuntimeViewHostFactoryHost,
+  host: ConversationHydrationRuntimeViewHost,
 ): ConversationHydrationRuntimeViewHosts {
   return {
     conversationHydrationRenderBridgeHost: {
-      getMessagesContainer: () => host.getHydrationRenderRuntime().getMessagesContainer(),
-      getActiveTabId: () => host.getHydrationRenderRuntime().getActiveTabId(),
-      getScrollRuntimeForTab: (tabId) => host.getHydrationRenderRuntime().getScrollRuntimeForTab(tabId),
+      getMessagesContainer: () => host.getMessagesContainer(),
+      getActiveTabId: () => host.getActiveTabId(),
+      getScrollRuntimeForTab: (tabId) => host.getScrollRuntimeForTab(tabId),
       scrollToBottom: (options) => {
-        host.getHydrationRenderRuntime().scrollToBottom(options);
+        host.scrollToBottom(options);
       },
       syncPaneScrollMetrics: (tabId, messagesEl) => {
-        host.getHydrationRenderRuntime().syncPaneScrollMetrics(tabId, messagesEl);
+        host.syncPaneScrollMetrics(tabId, messagesEl);
       },
-      requestAnimationFrame: (callback) =>
-        host.getHydrationRenderRuntime().requestAnimationFrame(callback),
+      requestAnimationFrame: (callback) => host.requestAnimationFrame(callback),
     },
     conversationHydrationOutcomeBridgeHost: {
       syncBackgroundTaskStateFromConversation: (conversation) => {
-        host.getHydrationOutcomeRuntime().syncBackgroundTaskStateFromConversation(conversation);
+        host.syncBackgroundTaskStateFromConversation(conversation);
       },
-      renderMessages: (messages) => host.getHydrationOutcomeRuntime().renderMessages(messages),
+      renderMessages: (messages) => host.renderMessages(messages),
     },
     conversationTransitionBridgeHost: {
-      getCurrentConversation: () => host.getConversationTransitionState().getCurrentConversation(),
+      getCurrentConversation: () => host.getCurrentConversation(),
       cancelTitleGeneration: (conversationId) => {
-        host.getConversationTransitionState().cancelTitleGeneration(conversationId);
+        host.cancelTitleGeneration(conversationId);
       },
       resetBackgroundTaskIndicator: () => {
-        host.getConversationTransitionWriteback().resetBackgroundTaskIndicator();
+        host.resetBackgroundTaskIndicator();
       },
       clearPendingTitleGenerationStatus: (conversationId) =>
-        host.getConversationTransitionState().clearPendingTitleGenerationStatus(conversationId),
+        host.clearPendingTitleGenerationStatus(conversationId),
       clearScheduledScrollToBottom: () => {
-        host.getConversationTransitionWriteback().clearScheduledScrollToBottom();
+        host.clearScheduledScrollToBottom();
       },
       beginConversationHydration: (tabId) => {
-        host.getConversationTransitionWriteback().beginConversationHydration(tabId);
+        host.beginConversationHydration(tabId);
       },
       clearMessagesContainer: () => {
-        host.getConversationTransitionWriteback().clearMessagesContainer();
+        host.clearMessagesContainer();
       },
       resetTurnState: () => {
-        host.getConversationTransitionWriteback().resetTurnState();
+        host.resetTurnState();
       },
       endConversationHydration: (tabId) => {
-        host.getConversationTransitionWriteback().endConversationHydration(tabId);
+        host.endConversationHydration(tabId);
       },
     },
   };
