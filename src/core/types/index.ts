@@ -174,8 +174,10 @@ export {
 // OpenCode config types
 export {
   type OpencodeAgentConfig,
+  type OpencodeAgentConfigRecord,
   type OpencodeAgentMode,
   type OpencodeCommandConfig,
+  type OpencodeCommandConfigRecord,
   type OpencodeCompactionConfig,
   type OpencodeModelConfigSubset,
   type OpencodePluginOptions,
@@ -183,4 +185,5 @@ export {
   type OpencodeProviderConfig,
   type OpencodeProviderModelConfig,
   type OpencodeProviderModelLimit,
+  type OpencodeToolConfig,
 } from './opencodeConfig';

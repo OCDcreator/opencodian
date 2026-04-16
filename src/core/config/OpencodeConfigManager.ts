@@ -11,9 +11,18 @@ import { Notice } from 'obsidian';
 import * as path from 'path';
 
 import { createLogger } from '../../shared';
-import type { OpencodePluginSpec } from '../types';
-import type { OpencodeConfig, PermissionAction,PermissionConfig } from '../types/permission';
-import { OPENCODE_SCHEMA_URL, parseOpencodeConfigText } from './modelConfig';
+import type {
+  OpencodeAgentConfig,
+  OpencodeAgentConfigRecord,
+  OpencodeCommandConfig,
+  OpencodeCommandConfigRecord,
+  OpencodeCompactionConfig,
+  OpencodeConfig,
+  OpencodePluginSpec,
+  PermissionAction,
+  PermissionConfig,
+} from '../types';
+import { isRecord, OPENCODE_SCHEMA_URL, parseOpencodeConfigText } from './modelConfig';
 
 const logger = createLogger('OpencodeConfigManager');
 
@@ -104,6 +113,152 @@ export class OpencodeConfigManager {
       config.plugin = [...plugins];
     } else {
       delete config.plugin;
+    }
+    await this.write(config);
+  }
+
+  async getCompactionConfig(): Promise<OpencodeCompactionConfig | undefined> {
+    const config = await this.read();
+    if (!isRecord(config.compaction)) {
+      return undefined;
+    }
+
+    return this.cloneConfigObject(config.compaction);
+  }
+
+  async updateCompactionConfig(
+    compaction: OpencodeCompactionConfig | null | undefined,
+  ): Promise<void> {
+    const config = await this.read();
+    if (!compaction) {
+      delete config.compaction;
+      await this.write(config);
+      return;
+    }
+
+    const next = this.mergeConfigObjects(
+      isRecord(config.compaction) ? config.compaction : undefined,
+      compaction,
+    );
+    if (Object.keys(next).length > 0) {
+      config.compaction = next;
+    } else {
+      delete config.compaction;
+    }
+    await this.write(config);
+  }
+
+  async getDefaultAgent(): Promise<string | undefined> {
+    const config = await this.read();
+    const defaultAgent = typeof config.default_agent === 'string'
+      ? config.default_agent.trim()
+      : '';
+    return defaultAgent || undefined;
+  }
+
+  async updateDefaultAgent(defaultAgent: string | null | undefined): Promise<void> {
+    const config = await this.read();
+    const nextDefaultAgent = typeof defaultAgent === 'string' ? defaultAgent.trim() : '';
+    if (nextDefaultAgent) {
+      config.default_agent = nextDefaultAgent;
+    } else {
+      delete config.default_agent;
+    }
+    await this.write(config);
+  }
+
+  async getAgentConfig(): Promise<OpencodeAgentConfigRecord> {
+    const config = await this.read();
+    const legacyAgents = this.cloneConfigRecord<OpencodeAgentConfig>(config.mode);
+    const nativeAgents = this.cloneConfigRecord<OpencodeAgentConfig>(config.agent);
+    return {
+      ...legacyAgents,
+      ...nativeAgents,
+    };
+  }
+
+  async updateAgentConfig(agents: OpencodeAgentConfigRecord): Promise<void> {
+    const config = await this.read();
+    const nextAgents = this.normalizeConfigRecord('agent', agents);
+    if (Object.keys(nextAgents).length > 0) {
+      config.agent = nextAgents;
+    } else {
+      delete config.agent;
+    }
+    await this.write(config);
+  }
+
+  async upsertAgentConfig(agentId: string, agent: OpencodeAgentConfig): Promise<void> {
+    const config = await this.read();
+    const normalizedAgentId = this.normalizeConfigEntryId('agent', agentId);
+    const nativeAgents = this.cloneConfigRecord<OpencodeAgentConfig>(config.agent);
+    const legacyAgents = this.cloneConfigRecord<OpencodeAgentConfig>(config.mode);
+    const existingAgent = nativeAgents[normalizedAgentId] ?? legacyAgents[normalizedAgentId];
+
+    nativeAgents[normalizedAgentId] = this.mergeConfigObjects(existingAgent, agent);
+    config.agent = nativeAgents;
+    await this.write(config);
+  }
+
+  async removeAgentConfig(agentId: string): Promise<void> {
+    const config = await this.read();
+    const normalizedAgentId = this.normalizeConfigEntryId('agent', agentId);
+    const nativeAgents = this.cloneConfigRecord<OpencodeAgentConfig>(config.agent);
+    delete nativeAgents[normalizedAgentId];
+    if (Object.keys(nativeAgents).length > 0) {
+      config.agent = nativeAgents;
+    } else {
+      delete config.agent;
+    }
+
+    const legacyAgents = this.cloneConfigRecord<OpencodeAgentConfig>(config.mode);
+    if (Object.prototype.hasOwnProperty.call(legacyAgents, normalizedAgentId)) {
+      delete legacyAgents[normalizedAgentId];
+      if (Object.keys(legacyAgents).length > 0) {
+        config.mode = legacyAgents;
+      } else {
+        delete config.mode;
+      }
+    }
+
+    await this.write(config);
+  }
+
+  async getCommandConfig(): Promise<OpencodeCommandConfigRecord> {
+    const config = await this.read();
+    return this.cloneConfigRecord<OpencodeCommandConfig>(config.command);
+  }
+
+  async updateCommandConfig(commands: OpencodeCommandConfigRecord): Promise<void> {
+    const config = await this.read();
+    const nextCommands = this.normalizeConfigRecord('command', commands);
+    if (Object.keys(nextCommands).length > 0) {
+      config.command = nextCommands;
+    } else {
+      delete config.command;
+    }
+    await this.write(config);
+  }
+
+  async upsertCommandConfig(commandId: string, command: OpencodeCommandConfig): Promise<void> {
+    const config = await this.read();
+    const normalizedCommandId = this.normalizeConfigEntryId('command', commandId);
+    const commands = this.cloneConfigRecord<OpencodeCommandConfig>(config.command);
+
+    commands[normalizedCommandId] = this.mergeConfigObjects(commands[normalizedCommandId], command);
+    config.command = commands;
+    await this.write(config);
+  }
+
+  async removeCommandConfig(commandId: string): Promise<void> {
+    const config = await this.read();
+    const normalizedCommandId = this.normalizeConfigEntryId('command', commandId);
+    const commands = this.cloneConfigRecord<OpencodeCommandConfig>(config.command);
+    delete commands[normalizedCommandId];
+    if (Object.keys(commands).length > 0) {
+      config.command = commands;
+    } else {
+      delete config.command;
     }
     await this.write(config);
   }
@@ -200,6 +355,77 @@ export class OpencodeConfigManager {
         '*': 'ask',
       },
     };
+  }
+
+  private cloneConfigRecord<T extends Record<string, unknown>>(value: unknown): Record<string, T> {
+    if (!isRecord(value)) {
+      return {};
+    }
+
+    const next: Record<string, T> = {};
+    for (const [entryId, entry] of Object.entries(value)) {
+      if (!entryId || !isRecord(entry)) {
+        continue;
+      }
+
+      next[entryId] = this.cloneConfigObject(entry) as T;
+    }
+    return next;
+  }
+
+  private normalizeConfigRecord<T extends Record<string, unknown>>(
+    entryKind: string,
+    entries: Record<string, T>,
+  ): Record<string, T> {
+    const next: Record<string, T> = {};
+    for (const [entryId, entry] of Object.entries(entries)) {
+      const normalizedEntryId = this.normalizeConfigEntryId(entryKind, entryId);
+      next[normalizedEntryId] = this.cloneConfigObject(entry);
+    }
+    return next;
+  }
+
+  private normalizeConfigEntryId(entryKind: string, entryId: string): string {
+    const normalizedEntryId = entryId.trim();
+    if (!normalizedEntryId) {
+      throw new Error(`OpenCode ${entryKind} id is required`);
+    }
+    return normalizedEntryId;
+  }
+
+  private mergeConfigObjects<T extends Record<string, unknown>>(
+    existing: T | undefined,
+    patch: T,
+  ): T {
+    const next: Record<string, unknown> = existing
+      ? this.cloneConfigObject(existing)
+      : {};
+
+    for (const [key, value] of Object.entries(patch)) {
+      if (value === undefined) {
+        delete next[key];
+        continue;
+      }
+
+      const currentValue = next[key];
+      if (isRecord(currentValue) && isRecord(value)) {
+        next[key] = this.mergeConfigObjects(currentValue, value);
+        continue;
+      }
+
+      next[key] = this.cloneConfigValue(value);
+    }
+
+    return next as T;
+  }
+
+  private cloneConfigObject<T extends Record<string, unknown>>(value: T): T {
+    return this.cloneConfigValue(value);
+  }
+
+  private cloneConfigValue<T>(value: T): T {
+    const serialized = JSON.stringify(value);
+    return serialized === undefined ? value : JSON.parse(serialized) as T;
   }
 
   /** 

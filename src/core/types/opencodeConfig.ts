@@ -46,6 +46,8 @@ export interface OpencodeAgentConfig {
   [key: string]: unknown;
 }
 
+export type OpencodeAgentConfigRecord = Record<string, OpencodeAgentConfig>;
+
 export interface OpencodeCommandConfig {
   template?: string;
   description?: string;
@@ -55,12 +57,16 @@ export interface OpencodeCommandConfig {
   [key: string]: unknown;
 }
 
+export type OpencodeCommandConfigRecord = Record<string, OpencodeCommandConfig>;
+
 export interface OpencodeCompactionConfig {
   auto?: boolean;
   prune?: boolean;
   reserved?: number;
   [key: string]: unknown;
 }
+
+export type OpencodeToolConfig = Record<string, boolean>;
 
 export interface OpencodeModelConfigSubset {
   model?: string;
@@ -74,9 +80,11 @@ export interface OpencodeConfig extends OpencodeModelConfigSubset {
   $schema?: string;
   permission?: import('./permission').PermissionConfig | import('./permission').PermissionAction;
   plugin?: OpencodePluginSpec[];
-  agent?: Record<string, OpencodeAgentConfig>;
-  command?: Record<string, OpencodeCommandConfig>;
+  agent?: OpencodeAgentConfigRecord;
+  command?: OpencodeCommandConfigRecord;
   default_agent?: string;
   compaction?: OpencodeCompactionConfig;
+  mode?: OpencodeAgentConfigRecord;
+  tools?: OpencodeToolConfig;
   [key: string]: unknown;
 }

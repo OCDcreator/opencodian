@@ -30,6 +30,18 @@ class OpencodeConfigManager {
   updatePermission(permission: PermissionConfig | PermissionAction): Promise<void>;
   getPluginConfig(): Promise<OpencodePluginSpec[]>;
   updatePluginConfig(plugins: OpencodePluginSpec[]): Promise<void>;
+  getCompactionConfig(): Promise<OpencodeCompactionConfig | undefined>;
+  updateCompactionConfig(compaction: OpencodeCompactionConfig | null | undefined): Promise<void>;
+  getDefaultAgent(): Promise<string | undefined>;
+  updateDefaultAgent(defaultAgent: string | null | undefined): Promise<void>;
+  getAgentConfig(): Promise<OpencodeAgentConfigRecord>;
+  updateAgentConfig(agents: OpencodeAgentConfigRecord): Promise<void>;
+  upsertAgentConfig(agentId: string, agent: OpencodeAgentConfig): Promise<void>;
+  removeAgentConfig(agentId: string): Promise<void>;
+  getCommandConfig(): Promise<OpencodeCommandConfigRecord>;
+  updateCommandConfig(commands: OpencodeCommandConfigRecord): Promise<void>;
+  upsertCommandConfig(commandId: string, command: OpencodeCommandConfig): Promise<void>;
+  removeCommandConfig(commandId: string): Promise<void>;
   getPermissionConfig(): Promise<PermissionConfig | PermissionAction | undefined>;
   setYoloMode(): Promise<void>;
   setNormalMode(): Promise<void>;
@@ -90,6 +102,19 @@ class OpencodeConfigManager {
 - 读取时如果不是数组，返回空数组
 - 写入时如果传入空数组，会删除 `plugin` 字段而不是写 `[]`
 
+### 会话/Agent/Command 配置 helper
+
+本轮在 manager 内补齐了更细粒度的项目配置 helper，供后续 session settings / agents / slash commands UI 直接复用：
+
+- `getCompactionConfig()` / `updateCompactionConfig()`：读写 `compaction`，并在 patch 时保留已有未知字段
+- `getDefaultAgent()` / `updateDefaultAgent()`：读写并 trim `default_agent`，空字符串会删除字段
+- `getAgentConfig()`：把 native `agent` 与 deprecated `mode` 合并成单个 map，读取时优先返回 native `agent`
+- `upsertAgentConfig()`：写入 native `agent` 条目时，会先吸收同名 deprecated `mode` 条目，再递归 merge，避免丢失未知字段 / `tools` / `options`
+- `removeAgentConfig()`：删除 native `agent` 的同时，也会删除 deprecated `mode` 中的同名 legacy 条目，避免 helper 读取时被“复活”
+- `getCommandConfig()` / `upsertCommandConfig()` / `removeCommandConfig()`：对 `command` map 做同样的 clone + merge + 删除封装
+
+这些 helper 都基于 `read()` 后再局部修改再 `write()`，因此 `formatter`、`watcher`、top-level `tools` 等不属于当前切口的字段会保持原样。
+
 ### 路径与重启提醒
 
 `getConfigDir()`、`getPluginDir()`、`getConfigPath()` 只做路径返回，不触发文件创建。
@@ -105,6 +130,10 @@ class OpencodeConfigManager {
 | `updatePermission(permission)` | 直接替换 `permission` 字段 |
 | `getPluginConfig()` | 返回 `plugin` 数组副本 |
 | `updatePluginConfig(plugins)` | 更新或删除 `plugin` 字段 |
+| `getCompactionConfig()` / `updateCompactionConfig()` | 读写 `compaction`，支持 patch merge 与删除 |
+| `getDefaultAgent()` / `updateDefaultAgent()` | 读写 `default_agent`，空值时删除 |
+| `getAgentConfig()` / `upsertAgentConfig()` / `removeAgentConfig()` | 兼容 deprecated `mode` 导入的 agent helper |
+| `getCommandConfig()` / `upsertCommandConfig()` / `removeCommandConfig()` | 命令 map 的细粒度 helper |
 | `setYoloMode()` | 整体改为 `'allow'` |
 | `setNormalMode()` | 写入“全部询问”权限对象 |
 | `setPlanMode()` | 写入“禁止写入”的计划模式权限对象 |
@@ -124,3 +153,4 @@ class OpencodeConfigManager {
 - `read()` 的失败策略是“记录日志后静默回退默认值”，不会把错误向上抛。
 - `write()` 失败时会抛出新的通用错误 `Failed to write OpenCode configuration`，原始错误只写日志。
 - `remove()` 只删除配置文件，不会删除 `.opencode` 目录或其子目录。
+- 新增的 agent helper 会读取 deprecated `mode` 作为 legacy import source，但写回目标始终是 native `agent`；只有显式删除某个 agent 时才会同步清理对应的 `mode` 条目。
