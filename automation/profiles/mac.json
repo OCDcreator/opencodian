@@ -1,6 +1,6 @@
 {
   "profile_name": "mac",
   "platform_note": "macOS environment",
-  "test_vault_plugin_dir": "/Users/lt/Desktop/Write/testvault/.obsidian/plugins/opencodian",
+  "test_vault_plugin_dir": "",
   "shell_preference": "zsh"
 }
