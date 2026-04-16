@@ -1,19 +1,19 @@
 # Maintainability Lane Map
 
 > **用途**: 这是每轮开始时的快速定位图。先看这里，再配合 `docs/status/maintainability-round-roadmap.md` 执行当前 `[NEXT]` 任务，而不是自由选题。
-> **当前状态**: [ACTIVE] 已人工续排 `R138-R152`；当前唯一 `[NEXT]` 是 `R152`。
+> **当前状态**: [WAITING] `R138-R152` 已完成；当前没有可自动执行的 `[NEXT]`，等待人工续排。
 
 ## 当前优先级
 
-- **当前 `[NEXT]`**：`R152 - Continuation checkpoint after R138-R151`
-- **本批目标**：`R138-R152` 的三批 residual 收束已完成，当前进入 continuation checkpoint 复盘 warning 轨迹、验证记录与是否继续自动推进
+- **当前 `[NEXT]`**：当前没有可自动执行的 `[NEXT]`
+- **本批目标**：`R138-R152` 的三批 residual 收束与 continuation checkpoint 已完成，当前只保留人工续排前的 hotspot 复盘
 - **当前 lint 基线**：`0 errors / 36 warnings`
 - **热点顺序**：
-  1. `R152`: 复盘 `R138-R151` 收益、warning 轨迹、validation/deploy 记录与 remaining hotspots
+  1. 人工续排前先在 `tests/**`、`src/features/chat/**`、`src/utils/glass/**`、`src/features/settings/**` 与 `src/core/opencode/**` 之间重排 residual 成本
 
 ## 本批边界
 
-- `R138 -> R152` 是唯一新续排 queue；不得自动扩展 `R153+`
+- `R138 -> R152` 队列已完成；当前不得自动扩展 `R153+`
 - 不新增薄 helper / adapter / provider / factory；新 owner 必须覆盖完整 lifecycle / runtime seam
 - `OpenCodeService`、`OpenCodianView`、`OpenCodianSettings` 的 maintainability 仅允许在 queue 明示项内继续推进
 - warning closeout 只允许沿现有厚 seam 收口，不允许为了降 warning 去篡改覆盖语义或制造薄碎片模块
@@ -31,5 +31,5 @@
 ## 历史入口
 
 - 批次归档：`docs/status/maintainability-completed-batches.md`
-- 最近成功 phase：`docs/status/maintainability-phase-486.md`
-- 最近 checkpoint：`docs/status/maintainability-phase-482.md`
+- 最近成功 phase：`docs/status/maintainability-phase-487.md`
+- 最近 checkpoint：`docs/status/maintainability-phase-487.md`

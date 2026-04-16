@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个活动任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成活动任务；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的后续任务”。
-> **当前状态**: [ACTIVE] 已人工续排 `R138-R152`；当前唯一活动任务是 `R152`。
+> **当前状态**: [WAITING] `R138-R152` 已完成；当前没有可自动执行的后续任务，等待人工续排。
 
 ## 控制规则
 
@@ -17,8 +17,8 @@
 
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
 - 当前 live lint 基线：`0 errors / 36 warnings`
-- 最近成功 phase：`docs/status/maintainability-phase-486.md`
-- 当前路线判断：`R137` 已确认 `R88-R136` 完成 owner seam、heavy suite split、final warning closeout 与 queue closeout 的完整闭环；`R142` 已复盘 `R138-R141` 的 chat residual 收益；`R143-R150` 已完成 settings/startup、opencode lifecycle、streaming 与 persistence residual；`R151` 已在 `tests/unit/utils/glass/shuding.test.ts` 完成 heavy tests / opt-in glass residual 的首个受控 closeout，并将 live lint 推进到 `0 errors / 36 warnings`；当前 queue 进入 `R152` 的 continuation checkpoint。
+- 最近成功 phase：`docs/status/maintainability-phase-487.md`
+- 当前路线判断：`R137` 已确认 `R88-R136` 完成 owner seam、heavy suite split、final warning closeout 与 queue closeout 的完整闭环；`R142` 已复盘 `R138-R141` 的 chat residual 收益；`R143-R150` 已完成 settings/startup、opencode lifecycle、streaming 与 persistence residual；`R151` 已在 `tests/unit/utils/glass/shuding.test.ts` 完成 heavy tests / opt-in glass residual 的首个受控 closeout；`R152` 已完成 continuation checkpoint 并确认当前 queue 自然耗尽，maintainability autopilot 需停回人工续排态。
 
 ## Queue
 ## Queue
@@ -1519,7 +1519,7 @@
 - **禁止项**: 不删除断言、不降低覆盖、不把 demo/experimental visuals 暴露到 stable UI path、不新增薄 helper / adapter / provider / factory；若热点已被前序轮次自然消除，改做最小 docs checkpoint note 而不是自由选题。
 - **验收**: heavy tests / opt-in glass residual warning 有可量化下降且 lint 维持 `0 errors`；并通过全量 `npm test` 与 `npm run build`。
 
-### [NEXT] R152 - Continuation checkpoint after R138-R151
+### [DONE] R152 - Continuation checkpoint after R138-R151
 
 - **Lane**: Checkpoint
 - **目标**: 复盘 `R138-R151` 的三批收益、warning 轨迹、deploy 验证、剩余热点与是否需要再次停回人工续排态。
@@ -1529,3 +1529,8 @@
   - `docs/status/maintainability-lane-map.md`
 - **禁止项**: 只做 checkpoint 文档与指标复盘；不自动扩展 `R153+`，不把下一批写成 freestyle backlog。
 - **验收**: phase 文档明确记录 `R138-R151` 收益、remaining hotspots、是否需要人工续排；并通过全量 `npm test` 与 `npm run build`。
+
+### 当前状态
+
+- 当前没有可自动执行的后续任务。
+- 如需继续 maintainability autopilot，请先人工续排新的 `[QUEUED]` 项。
