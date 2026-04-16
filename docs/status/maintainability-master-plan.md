@@ -2,7 +2,7 @@
 
 > **状态**: [ACTIVE]
 > **作用**: 这是 maintainability 无人值守的战略文档。每轮开始前，先读本文件，再读 `docs/status/maintainability-round-roadmap.md` 与最近的 `docs/status/maintainability-phase-XXX.md`。
-> **自动推进状态**: `R153` 已完成；当前 `[NEXT]` 为 `R154 - OpenCodeService coordinator stack defragmentation seam`。
+> **自动推进状态**: `R154` 已完成；当前 `[NEXT]` 为 `R155 - Heavy tests and glass/demo hotspot closeout after core-owner recovery`。
 
 ## 1. 当前判断
 
@@ -10,8 +10,8 @@
 
 当前继续 maintainability 的理由不是 warning 数本身，而是远端仓库仍存在两类高价值 residual：
 
-- `src/features/chat/OpenCodianView.ts` 仍约 `4877` 行，且直接装配大量 chat runtime owner
-- `src/core/opencode/OpenCodeService.ts` 仍约 `1454` 行，constructor / runtime wiring 仍聚集多层 opencode owner
+- `src/features/chat/OpenCodianView.ts` 仍约 `4866` 行，且直接装配大量 chat runtime owner
+- `src/core/opencode/OpenCodeService.ts` 当前约 `1437` 行；`R154` 已把 `OpenCodeQueryGateway` 并回 `OpenCodeCatalogQueryCoordinator`，但 residual hotspot 仍需在 checkpoint 中复盘
 - `src/features/chat/services/` 里仍可见明显碎片化迹象：按文件名统计约有 `15` 个 `Adapter`、`7` 个 `Provider`、`5` 个 `Factory`、`23` 个 `Host` 命名文件，且存在一批 `40` 行以下的极薄文件
 - live hotspot 仍落在 `tests/**`、`src/features/chat/**`、`src/utils/glass/**` 与 `src/core/opencode/**`
 
@@ -20,12 +20,12 @@
 ## 2. 当前基线
 
 - **lint**: `0 errors / 36 warnings`
-- **最近验证**: `R153` 运行 focused `npm test -- BackgroundTaskLiveSignalCoordinator ConversationSyncBridge TabActivationRuntimeViewHostFactory`、全量 `npm run lint -- --format unix`、全量 `npm test` 与 `BUILD_ID=autopilot-maintainability.$(date +%Y%m%d%H%M); echo "$BUILD_ID"; BUILD_ID="$BUILD_ID" npm run build`；结果维持 `0 errors / 36 warnings`、`286 passed, 286 total` suites / `1190 passed, 1190 total` tests，通过构建的最新 `BUILD_ID` 为 `autopilot-maintainability.202604161442`
+- **最近验证**: `R154` 运行 focused `npm test -- OpenCodeCatalogQueryCoordinator OpenCodeService.sdkCompat`、全量 `npm test` 与 `BUILD_ID=autopilot-maintainability.$(date +%Y%m%d%H%M); echo "$BUILD_ID"; BUILD_ID="$BUILD_ID" npm run build`；结果为 `286 passed, 286 total` suites / `1190 passed, 1190 total` tests，通过构建的最新 `BUILD_ID` 为 `autopilot-maintainability.202604161502`
 - **最近 Test Vault 部署**: `R146`，`BUILD_ID` `autopilot-maintainability.202604160757`
-- **当前 `[NEXT]`**: `R154 - OpenCodeService coordinator stack defragmentation seam`
+- **当前 `[NEXT]`**: `R155 - Heavy tests and glass/demo hotspot closeout after core-owner recovery`
 - **主热点**:
-  - `R153` 已删除 `4` 个 view-adjacent 纯转发薄层，并把 background live-signal / sync-port assembly 并回既有 owner
-  - `OpenCodianView` 仍约 `4866` 行，下一步需转向 `OpenCodeService` 周边 coordinator/wrapper 装配厚度
+  - `R154` 已删除 `1` 个 opencode query gateway 薄层，并把 provider/project/file/find/path/VCS/formatter/LSP 与 MCP status/auth surface 并回 `OpenCodeCatalogQueryCoordinator`
+  - `OpenCodeService.ts` 行数从 `1454` 降到 `1437`，direct coordinator/import surface 继续收缩
   - `tests/**` 约 `8` 条 warnings、`src/features/chat/**` 约 `7` 条、`src/utils/glass/**` 约 `6` 条、`src/features/settings/**` 约 `4` 条、`src/core/opencode/**` 约 `4` 条
 
 ## 3. 本批执行规则

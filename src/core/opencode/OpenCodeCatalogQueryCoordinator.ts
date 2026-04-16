@@ -6,6 +6,7 @@ import type {
 } from './OpenCodeCatalogStateStore';
 import type { OpenCodeSdkFacade } from './OpenCodeSdkFacade';
 import type {
+  McpServerStatus,
   ServerStatus,
   ToolCatalogEntry,
   ToolCatalogSnapshot,
@@ -51,7 +52,22 @@ export interface OpenCodeCatalogQueryCoordinatorDebugMetadata {
 
 export interface OpenCodeCatalogQueryCoordinatorHost {
   shouldUseSdkCrud(): boolean;
-  getSdkFacade(options?: { includeDirectory?: boolean }): Pick<OpenCodeSdkFacade, 'config' | 'provider' | 'tool'>;
+  getSdkFacade(
+    options?: { includeDirectory?: boolean },
+  ): Pick<
+    OpenCodeSdkFacade,
+    'config'
+    | 'file'
+    | 'find'
+    | 'formatter'
+    | 'lsp'
+    | 'mcp'
+    | 'path'
+    | 'project'
+    | 'provider'
+    | 'tool'
+    | 'vcs'
+  >;
   getLegacy<T>(path: string, options?: { includeDirectory?: boolean }): Promise<T>;
   logServiceWarning(key: string, message: string, error: unknown): void;
   logServiceError(key: string, message: string, error: unknown): void;
@@ -256,6 +272,121 @@ export class OpenCodeCatalogQueryCoordinator {
     return this.catalogState.getToolCatalogSnapshot();
   }
 
+  async refreshMcpServerStatus(): Promise<Record<string, McpServerStatus>> {
+    return this.storeMcpServerStatus(await this.host.getSdkFacade().mcp.status());
+  }
+
+  async addMcpServer(name: string, config: Record<string, unknown>): Promise<Record<string, McpServerStatus>> {
+    return this.storeMcpServerStatus(await this.host.getSdkFacade().mcp.add({ name, config }));
+  }
+
+  async connectMcpServer(name: string): Promise<boolean> {
+    const response = await this.host.getSdkFacade().mcp.connect({ name });
+    await this.refreshMcpServerStatus();
+    return response === true;
+  }
+
+  async disconnectMcpServer(name: string): Promise<boolean> {
+    const response = await this.host.getSdkFacade().mcp.disconnect({ name });
+    await this.refreshMcpServerStatus();
+    return response === true;
+  }
+
+  async startMcpAuth(name: string): Promise<unknown> {
+    return this.host.getSdkFacade().mcp.auth.start({ name });
+  }
+
+  async completeMcpAuth(name: string, code: string): Promise<McpServerStatus> {
+    const response = await this.host.getSdkFacade().mcp.auth.callback({ name, code });
+    await this.refreshMcpServerStatus();
+    return this.normalizeSingleMcpServerStatus(name, response);
+  }
+
+  async authenticateMcp(name: string): Promise<McpServerStatus> {
+    const response = await this.host.getSdkFacade().mcp.auth.authenticate({ name });
+    await this.refreshMcpServerStatus();
+    return this.normalizeSingleMcpServerStatus(name, response);
+  }
+
+  async removeMcpAuth(name: string): Promise<{ success: true }> {
+    const response = await this.host.getSdkFacade().mcp.auth.remove({ name });
+    return response && typeof response === 'object' && 'success' in (response as Record<string, unknown>)
+      ? response as { success: true }
+      : { success: true };
+  }
+
+  async getProviderAuthMethods(): Promise<unknown> {
+    return this.host.getSdkFacade().provider.auth();
+  }
+
+  async authorizeProviderOAuth(providerID: string): Promise<unknown> {
+    return this.host.getSdkFacade().provider.oauth.authorize({ providerID });
+  }
+
+  async completeProviderOAuth(providerID: string, code: string, method?: number): Promise<unknown> {
+    return this.host.getSdkFacade().provider.oauth.callback({ providerID, code, method });
+  }
+
+  async listProjects(): Promise<unknown> {
+    return this.host.getSdkFacade().project.list();
+  }
+
+  async getCurrentProject(): Promise<unknown> {
+    return this.host.getSdkFacade().project.current();
+  }
+
+  async initializeProjectGit(): Promise<unknown> {
+    return this.host.getSdkFacade().project.initGit();
+  }
+
+  async updateProject(projectID: string, input: Record<string, unknown>): Promise<unknown> {
+    return this.host.getSdkFacade().project.update({ projectID, ...input });
+  }
+
+  async listFiles(input: Record<string, unknown> = {}): Promise<unknown> {
+    return this.host.getSdkFacade().file.list(input);
+  }
+
+  async readFile(input: Record<string, unknown>): Promise<unknown> {
+    return this.host.getSdkFacade().file.read(input);
+  }
+
+  async getFileStatus(input: Record<string, unknown> = {}): Promise<unknown> {
+    return this.host.getSdkFacade().file.status(input);
+  }
+
+  async findText(input: Record<string, unknown>): Promise<unknown> {
+    return this.host.getSdkFacade().find.text(input);
+  }
+
+  async findFiles(input: Record<string, unknown>): Promise<unknown> {
+    return this.host.getSdkFacade().find.files(input);
+  }
+
+  async findSymbols(input: Record<string, unknown>): Promise<unknown> {
+    return this.host.getSdkFacade().find.symbols(input);
+  }
+
+  async getPaths(): Promise<unknown> {
+    return this.host.getSdkFacade().path.get();
+  }
+
+  async getVcsInfo(input: Record<string, unknown> = {}): Promise<unknown> {
+    return this.host.getSdkFacade().vcs.get(input);
+  }
+
+  async getVcsDiff(input: Record<string, unknown> = {}): Promise<unknown> {
+    return this.host.getSdkFacade().vcs.diff(input);
+  }
+
+  async getFormatterStatus(): Promise<unknown> {
+    return this.host.getSdkFacade().formatter.status();
+  }
+
+  async getLspStatus(): Promise<unknown> {
+    return this.host.getSdkFacade().lsp.status();
+  }
+
   getToolCatalogScopeKey(): string {
     return this.host.getToolCatalogScopeKey();
   }
@@ -449,6 +580,15 @@ export class OpenCodeCatalogQueryCoordinator {
 
   private getToolSchemaCacheKey(providerID: string, modelID: string): string {
     return `${this.getToolCatalogScopeKey()}::${providerID}::${modelID}`;
+  }
+
+  private storeMcpServerStatus(input: unknown): Record<string, McpServerStatus> {
+    return this.catalogState.updateMcpServerStatus(this.catalogState.normalizeMcpServerStatusMap(input));
+  }
+
+  private normalizeSingleMcpServerStatus(name: string, input: unknown): McpServerStatus {
+    return this.catalogState.normalizeMcpServerStatusMap({ [name]: input })[name]
+      ?? { status: 'failed', error: 'Unknown MCP auth result' };
   }
 
   private normalizeDebugReason(debugReason: string | null): string | null {

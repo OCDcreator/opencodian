@@ -2,7 +2,7 @@
 
 > **用途**: 这是无人值守 maintainability 的受控轮次队列。Autopilot 必须按顺序执行，不得自由发挥。
 > **执行规则**: 每轮只允许处理第一个活动任务；成功后把它改成 `[DONE]`，并把紧随其后的首个 `[QUEUED]` 改成活动任务；如果不存在后续 `[QUEUED]`，则必须明确写成“当前没有可自动执行的后续任务”。
-> **当前状态**: [ACTIVE] `R153` 已完成；当前 `[NEXT]` 为 `R154 - OpenCodeService coordinator stack defragmentation seam`。
+> **当前状态**: [ACTIVE] `R154` 已完成；当前 `[NEXT]` 为 `R155 - Heavy tests and glass/demo hotspot closeout after core-owner recovery`。
 
 ## 控制规则
 
@@ -17,8 +17,8 @@
 
 - 已完成批次归档：`docs/status/maintainability-completed-batches.md`
 - 当前 live lint 基线：`0 errors / 36 warnings`
-- 最近成功 phase：`docs/status/maintainability-phase-487.md`
-- 当前路线判断：`R137` 已确认 `R88-R136` 完成 owner seam、heavy suite split、final warning closeout 与 queue closeout 的完整闭环；`R142` 已复盘 `R138-R141` 的 chat residual 收益；`R143-R150` 已完成 settings/startup、opencode lifecycle、streaming 与 persistence residual；`R151` 已在 `tests/unit/utils/glass/shuding.test.ts` 完成 heavy tests / opt-in glass residual 的首个受控 closeout；`R152` 已完成 continuation checkpoint 并确认上一批 queue 自然耗尽。本次人工续排的 `R153-R156` 改为先做 defragmentation，再处理 `OpenCodianView` / `OpenCodeService` 与 justified hotspot closeout。
+- 最近成功 phase：`docs/status/maintainability-phase-489.md`
+- 当前路线判断：`R137` 已确认 `R88-R136` 完成 owner seam、heavy suite split、final warning closeout 与 queue closeout 的完整闭环；`R142` 已复盘 `R138-R141` 的 chat residual 收益；`R143-R150` 已完成 settings/startup、opencode lifecycle、streaming 与 persistence residual；`R151` 已在 `tests/unit/utils/glass/shuding.test.ts` 完成 heavy tests / opt-in glass residual 的首个受控 closeout；`R152` 已完成 continuation checkpoint 并确认上一批 queue 自然耗尽；`R153-R154` 已完成 chat 与 opencode defragmentation 的两个受控切口。本次人工续排的 `R153-R156` 当前进入 justified hotspot closeout 与 checkpoint 收尾阶段。
 
 ## Queue
 ## Queue
@@ -1564,7 +1564,7 @@
   - 至少一条过薄 chat 装配链被回并进相邻更厚 owner，而不是替换成新的薄层或回灌主文件
   - 全量 `npm test` 与 `npm run build` 通过
 
-### [NEXT] R154 - OpenCodeService coordinator stack defragmentation seam
+### [DONE] R154 - OpenCodeService coordinator stack defragmentation seam
 
 - **Lane**: Maintainability / opencode defragmentation
 - **目标**: 沿 `OpenCodeService` 与相邻 opencode owner 回并过薄 coordinator / wrapper / gateway 边界，优先把碎片并回相邻厚 owner（而非 `OpenCodeService` 本体），收束 constructor / lifecycle / session-control / catalog-query 装配噪音，降低 service 的 direct runtime wiring 压力。
@@ -1591,7 +1591,7 @@
   - 至少一条过薄 opencode wrapper 链被回并进相邻更厚 owner，且 `OpenCodeService` 行数压力下降
   - 全量 `npm test` 与 `npm run build` 通过
 
-### [QUEUED] R155 - Heavy tests and glass/demo hotspot closeout after core-owner recovery
+### [NEXT] R155 - Heavy tests and glass/demo hotspot closeout after core-owner recovery
 
 - **Lane**: Warning cleanup / justified hotspots
 - **目标**: 仅在 `R153-R154` 之后 live hotspot 仍成立时，沿现有 suite / owner 内部整理 heavy tests 与 glass/demo hotspots，优先按责任分组或收束局部参数/fixture 复杂度，不新增 test helper 碎片。
@@ -1633,5 +1633,5 @@
 
 ### 当前状态
 
-- 当前可自动执行的 `[NEXT]` 是 `R154 - OpenCodeService coordinator stack defragmentation seam`。
+- 当前可自动执行的 `[NEXT]` 是 `R155 - Heavy tests and glass/demo hotspot closeout after core-owner recovery`。
 - `R156` 完成后若没有新的人工续排项，必须再次停回“当前没有可自动执行的后续任务”。

@@ -44,9 +44,6 @@ import {
   OpenCodePromptRequestBuilder,
 } from './OpenCodePromptRequestBuilder';
 import {
-  OpenCodeQueryGateway,
-} from './OpenCodeQueryGateway';
-import {
   OpenCodeQuestionPermissionHub,
 } from './OpenCodeQuestionPermissionHub';
 import {
@@ -269,7 +266,6 @@ export class OpenCodeService {
   private sessionLifecycle: OpenCodeSessionLifecycleCoordinator;
   private sessionControl: OpenCodeSessionControlOrchestrator;
   private questionPermissionHub: OpenCodeQuestionPermissionHub;
-  private queryGateway: OpenCodeQueryGateway;
   private responseHandlers: ResponseHandler[] = [];
   private baseUrl: string;
   private sdkFeatureFlags: SdkFeatureFlags;
@@ -385,19 +381,6 @@ export class OpenCodeService {
         managedServerState: this.serverManager.getManagedServerStateSnapshot(),
       }),
       getToolCatalogScopeKey: () => `${this.baseUrl}::${this.getScopedDirectoryPath() ?? ''}`,
-    });
-    this.queryGateway = new OpenCodeQueryGateway({
-      getMcpSdk: () => this.sdk.mcp,
-      getProviderSdk: () => this.sdk.provider,
-      getProjectSdk: () => this.sdk.project,
-      getFileSdk: () => this.sdk.file,
-      getFindSdk: () => this.sdk.find,
-      getPathSdk: () => this.sdk.path,
-      getVcsSdk: () => this.sdk.vcs,
-      getFormatterSdk: () => this.sdk.formatter,
-      getLspSdk: () => this.sdk.lsp,
-      normalizeMcpServerStatusMap: (input) => this.catalogState.normalizeMcpServerStatusMap(input),
-      updateMcpServerStatus: (statusMap) => this.catalogState.updateMcpServerStatus(statusMap),
     });
     this.contextPartSerializer = new OpenCodeContextPartSerializer({
       isLocalServerMode: () => this.settings.server.mode === 'local',
@@ -1229,7 +1212,7 @@ export class OpenCodeService {
   }
 
   async refreshMcpServerStatus(): Promise<Record<string, McpServerStatus>> {
-    return this.queryGateway.refreshMcpServerStatus();
+    return this.catalogQueries.refreshMcpServerStatus();
   }
 
   getToolCatalogSnapshot(): ToolCatalogSnapshot {
@@ -1266,35 +1249,35 @@ export class OpenCodeService {
   }
 
   async getMcpStatus(): Promise<Record<string, McpServerStatus>> {
-    return this.queryGateway.refreshMcpServerStatus();
+    return this.catalogQueries.refreshMcpServerStatus();
   }
 
   async addMcpServer(name: string, config: Record<string, unknown>): Promise<Record<string, McpServerStatus>> {
-    return this.queryGateway.addMcpServer(name, config);
+    return this.catalogQueries.addMcpServer(name, config);
   }
 
   async connectMcpServer(name: string): Promise<boolean> {
-    return this.queryGateway.connectMcpServer(name);
+    return this.catalogQueries.connectMcpServer(name);
   }
 
   async disconnectMcpServer(name: string): Promise<boolean> {
-    return this.queryGateway.disconnectMcpServer(name);
+    return this.catalogQueries.disconnectMcpServer(name);
   }
 
   async startMcpAuth(name: string): Promise<unknown> {
-    return this.queryGateway.startMcpAuth(name);
+    return this.catalogQueries.startMcpAuth(name);
   }
 
   async completeMcpAuth(name: string, code: string): Promise<McpServerStatus> {
-    return this.queryGateway.completeMcpAuth(name, code);
+    return this.catalogQueries.completeMcpAuth(name, code);
   }
 
   async authenticateMcp(name: string): Promise<McpServerStatus> {
-    return this.queryGateway.authenticateMcp(name);
+    return this.catalogQueries.authenticateMcp(name);
   }
 
   async removeMcpAuth(name: string): Promise<{ success: true }> {
-    return this.queryGateway.removeMcpAuth(name);
+    return this.catalogQueries.removeMcpAuth(name);
   }
 
   async initializeSession(sessionId: string, providerID: string, modelID: string, messageID: string): Promise<boolean> {
@@ -1348,75 +1331,75 @@ export class OpenCodeService {
   }
 
   async getProviderAuthMethods(): Promise<unknown> {
-    return this.queryGateway.getProviderAuthMethods();
+    return this.catalogQueries.getProviderAuthMethods();
   }
 
   async authorizeProviderOAuth(providerID: string): Promise<unknown> {
-    return this.queryGateway.authorizeProviderOAuth(providerID);
+    return this.catalogQueries.authorizeProviderOAuth(providerID);
   }
 
   async completeProviderOAuth(providerID: string, code: string, method?: number): Promise<unknown> {
-    return this.queryGateway.completeProviderOAuth(providerID, code, method);
+    return this.catalogQueries.completeProviderOAuth(providerID, code, method);
   }
 
   async listProjects(): Promise<unknown> {
-    return this.queryGateway.listProjects();
+    return this.catalogQueries.listProjects();
   }
 
   async getCurrentProject(): Promise<unknown> {
-    return this.queryGateway.getCurrentProject();
+    return this.catalogQueries.getCurrentProject();
   }
 
   async initializeProjectGit(): Promise<unknown> {
-    return this.queryGateway.initializeProjectGit();
+    return this.catalogQueries.initializeProjectGit();
   }
 
   async updateProject(projectID: string, input: Record<string, unknown>): Promise<unknown> {
-    return this.queryGateway.updateProject(projectID, input);
+    return this.catalogQueries.updateProject(projectID, input);
   }
 
   async listFiles(input: Record<string, unknown> = {}): Promise<unknown> {
-    return this.queryGateway.listFiles(input);
+    return this.catalogQueries.listFiles(input);
   }
 
   async readFile(input: Record<string, unknown>): Promise<unknown> {
-    return this.queryGateway.readFile(input);
+    return this.catalogQueries.readFile(input);
   }
 
   async getFileStatus(input: Record<string, unknown> = {}): Promise<unknown> {
-    return this.queryGateway.getFileStatus(input);
+    return this.catalogQueries.getFileStatus(input);
   }
 
   async findText(input: Record<string, unknown>): Promise<unknown> {
-    return this.queryGateway.findText(input);
+    return this.catalogQueries.findText(input);
   }
 
   async findFiles(input: Record<string, unknown>): Promise<unknown> {
-    return this.queryGateway.findFiles(input);
+    return this.catalogQueries.findFiles(input);
   }
 
   async findSymbols(input: Record<string, unknown>): Promise<unknown> {
-    return this.queryGateway.findSymbols(input);
+    return this.catalogQueries.findSymbols(input);
   }
 
   async getPaths(): Promise<unknown> {
-    return this.queryGateway.getPaths();
+    return this.catalogQueries.getPaths();
   }
 
   async getVcsInfo(input: Record<string, unknown> = {}): Promise<unknown> {
-    return this.queryGateway.getVcsInfo(input);
+    return this.catalogQueries.getVcsInfo(input);
   }
 
   async getVcsDiff(input: Record<string, unknown> = {}): Promise<unknown> {
-    return this.queryGateway.getVcsDiff(input);
+    return this.catalogQueries.getVcsDiff(input);
   }
 
   async getFormatterStatus(): Promise<unknown> {
-    return this.queryGateway.getFormatterStatus();
+    return this.catalogQueries.getFormatterStatus();
   }
 
   async getLspStatus(): Promise<unknown> {
-    return this.queryGateway.getLspStatus();
+    return this.catalogQueries.getLspStatus();
   }
 
   async respondToSessionPermission(
